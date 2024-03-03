@@ -1,5 +1,5 @@
 [package]
-name = "beet"
+name = "beet_ecs_macros"
 version = { workspace = true }
 edition = { workspace = true }
 description = { workspace = true }
@@ -11,6 +11,12 @@ license = { workspace = true }
 keywords = { workspace = true }
 categories = { workspace = true }
 
+[lib]
+proc-macro = true
 
 [dependencies]
-beet_ecs = { workspace = true }
+anyhow = { workspace = true }
+proc-macro2 = { workspace = true }
+syn = { workspace = true }
+quote = { workspace = true }
+extend = { workspace = true }

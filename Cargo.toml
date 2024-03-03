@@ -18,8 +18,51 @@ categories = [
 publish = false
 
 [workspace]
-members = ["crates/beet"]
+# default resolver
+resolver = "2"
+members = ["crates/beet", "crates/beet_ecs", "crates/beet_ecs/macros"]
 
 
 [workspace.dependencies]
-beet = { path = "crates/beet" }
+## Internal
+beet = { path = "crates/beet", version = "0.0.1" }
+beet_ecs = { path = "./crates/beet_ecs", version = "0.0.1" }
+beet_ecs_macros = { path = "./crates/beet_ecs/macros", version = "0.0.1" }
+
+## Local
+sweet = { path = "../forky/crates/sweet", features = ["bevy_core"] }
+
+## utility
+log = "0.4"
+anyhow = "1.0.75"
+petgraph = { version = "0.6.4", features = ["serde-1"] }
+bytemuck = "1.13.1"
+heck = "0.4.1"
+
+## macros
+syn = "2.0"
+quote = "1.0"
+proc-macro2 = "1.0"
+
+## attributes ###
+num-traits = "0.2.15"
+derive_deref = "1.1.1"
+strum = "0.25.0"
+strum_macros = "0.25.0"
+extend = "1.1.2"
+
+### io ###
+serde = { version = "1.0.193", features = ["derive"] }
+serde_json = "1.0.108"
+
+## Game
+bevy = { version = "0.12.*" }
+bevy_app = { version = "0.12.*" }
+bevy_core = { version = "0.12.*" }
+bevy_derive = { version = "0.12.*" }
+bevy_ecs = { version = "0.12.*" }
+bevy_hierarchy = { version = "0.12.*" }
+bevy_math = { version = "0.12.*" }
+bevy_time = { version = "0.12.*" }
+bevy_transform = { version = "0.12.*" }
+bevy_utils = { version = "0.12.*" }
