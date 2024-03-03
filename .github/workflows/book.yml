@@ -1,0 +1,44 @@
+name: 🌍 Deploy Book
+on:
+  push:
+    branches: main
+    paths: ['docs/**','.github/workflows/book.yml']
+jobs:
+  deploy:
+    name: Build and Deploy
+    runs-on: ubuntu-20.04
+    concurrency:
+      group: ${{ github.workflow }}-${{ github.ref }}
+    steps:
+      - name: 📂 Checkout
+        uses: actions/checkout@v2
+      - name: 📂 Cache
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+      - name: 🔨 Install mdbook
+        uses: peaceiris/actions-mdbook@v1
+        with:
+          mdbook-version: '0.4.34'
+      - name: 🔨 Install mdbook-mermaid
+        uses: baptiste0928/cargo-install@v2
+        with:
+          crate: mdbook-mermaid
+          version: '0.12.6'
+      - name: 🔨 Build Book
+        run: mdbook build
+        working-directory: ./docs
+      - name: 🌍 Deploy
+        uses: peaceiris/actions-gh-pages@v3
+        if: ${{ github.ref == 'refs/heads/main' }}
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_branch: pages
+          publish_dir: ./docs/book
+          destination_dir: docs
