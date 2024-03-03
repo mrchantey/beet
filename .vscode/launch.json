@@ -1,0 +1,17 @@
+{
+	"version": "0.2",
+	"configurations": [
+		{
+			"name": "Debug Rust Binary",
+			"type": "lldb",
+			"request": "launch",
+			"program": "${workspaceFolder}/target/debug/examples/main",
+			// "program": "${workspaceFolder}/target/debug/examples/test_beet.exe",
+			// "args": [
+			// 	"-w",
+			// 	"fallback_selector"
+			// ],
+			"cwd": "${workspaceFolder}"
+		}
+	]
+}

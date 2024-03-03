@@ -1,0 +1,25 @@
+[workspace.package]
+version = "0.0.1"
+edition = "2021"
+description = "AI behavior library for games and robotics."
+documentation = "https://mrchantey.github.io/beet"
+readme = "README.md"
+homepage = "https://mrchantey.github.io/beet"
+repository = "https://github.com/mrchantey/beet"
+license = "MIT OR Apache-2.0"
+keywords = ["beet", "beetmash", "behavior", "game-ai", "robotics"]
+categories = [
+	"science::robotics",
+	"game-development",
+	"simulation",
+	"wasm",
+	"embedded",
+]
+publish = false
+
+[workspace]
+members = ["crates/beet"]
+
+
+[workspace.dependencies]
+beet = { path = "crates/beet" }

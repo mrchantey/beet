@@ -1,0 +1,45 @@
+{
+	"files.autoSave": "afterDelay",
+	"files.autoSaveDelay": 1000,
+	"files.exclude": {
+		"**/.git": true,
+		"**/.svn": true,
+		"**/.hg": true,
+		"**/CVS": true,
+		"**/.DS_Store": true,
+		"**/Thumbs.db": true,
+		// ".vscode": true,
+		//optional
+		".gitignore": true,
+		".gitattributes": true,
+		"Cargo.lock": true,
+		"rustfmt.toml": true,
+		"LICENSE-APACHE.txt": true,
+		"LICENSE-MIT.txt": true,
+		"**/.embuild/": true,
+		// "**/.cargo/": true,
+		"**/mod.rs": true,
+		// "**/target/": true,
+		"**/sdkconfig.defaults": true,
+		"**/build.rs": true,
+		"docs/book/**": true,
+		// "crates/beet_esp": true,
+	},
+	// "rust-analyzer.cargo.features": "all",
+	// "rust-analyzer.cargo.features": [
+	// 	"web_sys_unstable_apis"
+	// ],
+	// "rust-analyzer.cargo.target": "x86_64-unknown-linux-gnu",
+	// "rust-analyzer.procMacro.enable": false,
+	// "rust-analyzer.procMacro.attributes.enable": false,
+	"rust-analyzer.showUnlinkedFileNotification": false,
+	"rust-analyzer.files.excludeDirs": [
+		"crates/beet_esp"
+	],
+	// "rust-analyzer.cargo.target": "wasm32-unknown-unknown",
+	"search.exclude": {
+		"**/assets/*": true,
+		"**.svg": true,
+		"Cargo.lock": true,
+	},
+}
