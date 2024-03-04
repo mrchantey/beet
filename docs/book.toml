@@ -1,5 +1,18 @@
 [book]
+title = "Beet"
 authors = []
 language = "en"
 multilingual = false
 src = "src"
+
+[build]
+create-missing = false
+# extra-watch-dirs = ["./custom"]
+[output.html]
+additional-js = ["src/custom/index.js"]
+additional-css = ["src/custom/index.css"]
+
+[preprocessor]
+
+[preprocessor.mermaid]
+command = "mdbook-mermaid"

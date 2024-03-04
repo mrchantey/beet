@@ -10,7 +10,7 @@
 		"**/Thumbs.db": true,
 		// ".vscode": true,
 		//optional
-		".gitignore": true,
+		// ".gitignore": true,
 		".gitattributes": true,
 		"Cargo.lock": true,
 		"rustfmt.toml": true,

@@ -1,3 +1,7 @@
+# Github Setup:
+# 1. settings > pages > branch > pages/root
+# 2. settings > actions > general > workflow permissions > read and write permissions
+# 3. (optional) in `pages` branch create `index.html` with redirect to `/docs`
 name: 🌍 Deploy Book
 on:
   push:

@@ -1,0 +1,19 @@
+footer {
+	text-align: center;
+	width: 100%;
+}
+
+#page-wrapper {
+	display: flex;
+	flex-direction: column;
+}
+
+.page {
+	/* mdbook quirk, title doesnt count */
+	flex: 1;
+	/* min-height: calc(100vh + 1em); */
+}
+
+#page-wrapper {
+	min-height: 100vh;
+}
