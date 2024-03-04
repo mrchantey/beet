@@ -7,17 +7,26 @@
 
 Beet is an AI behavior library for games and robotics.
 
-```mermaid
-	
-graph TB;
-    A-->B;
-
-
-```
-
-
 > *Very early stage warning:*
 > - breaking changes on patch versions
 > - continued development not guaranteed
 > - docs are wip
 > - bugs ahoy
+
+
+
+| Roadmap          |     |
+| ---------------- | --- |
+| Behavior Trees   | ✅   |
+| State Trees      | 🚧   |
+| GOAP             | 🚧   |
+| Machine Learning |     |
+
+
+
+## Crate structure
+```mermaid
+graph TB;
+    beet_ecs-->beet;
+		beet_net-->beet;
+```

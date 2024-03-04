@@ -9,8 +9,12 @@ src = "src"
 create-missing = false
 # extra-watch-dirs = ["./custom"]
 [output.html]
-additional-js = ["src/custom/index.js"]
-additional-css = ["src/custom/index.css"]
+additional-js = [
+	"deps/custom.js",
+	"deps/mermaid.min.js",
+	"deps/mermaid-init.js",
+]
+additional-css = ["deps/custom.css"]
 
 [preprocessor]
 
