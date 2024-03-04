@@ -1,18 +1,19 @@
 [package]
 name = "beet_net"
-publish = { workspace = true }
-version = "0.0.0"
-# version = { workspace = true }
+version = { workspace = true }
 edition = { workspace = true }
-repository = { workspace = true }
-readme = { workspace = true }
 description = { workspace = true }
 documentation = { workspace = true }
+readme = { workspace = true }
+homepage = { workspace = true }
+repository = { workspace = true }
+license = { workspace = true }
+keywords = { workspace = true }
+categories = { workspace = true }
 
 [features]
 default = ["tokio"]
 tokio = ["dep:tokio"]
-
 
 [dependencies]
 anyhow = { workspace = true }

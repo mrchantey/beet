@@ -260,6 +260,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "beet-cli"
+version = "0.0.1"
+
+[[package]]
 name = "beet_ecs"
 version = "0.0.1"
 dependencies = [
@@ -295,7 +299,7 @@ dependencies = [
 
 [[package]]
 name = "beet_net"
-version = "0.0.0"
+version = "0.0.1"
 dependencies = [
  "anyhow",
  "async-broadcast",

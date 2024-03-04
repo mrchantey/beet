@@ -25,14 +25,15 @@ members = [
 	"crates/beet_ecs",
 	"crates/beet_ecs/macros",
 	"crates/beet_net",
+	"crates/beet-cli",
 ]
-
 
 [workspace.dependencies]
 ## internal
 beet = { path = "crates/beet", version = "0.0.1" }
 beet_ecs = { path = "crates/beet_ecs", version = "0.0.1" }
 beet_ecs_macros = { path = "crates/beet_ecs/macros", version = "0.0.1" }
+beet_net = { path = "crates/beet_net", version = "0.0.1" }
 
 ## local
 sweet = { version = "0.1.40", features = ["bevy_core"] }
