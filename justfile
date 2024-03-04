@@ -1,7 +1,7 @@
 set windows-shell := ["C:/tools/cygwin/bin/sh.exe","-c"]
 set dotenv-load
-crates := 'beet beet_ecs'
-testable := 'beet_ecs'
+crates := 'beet beet_ecs beet_net'
+testable := 'beet_ecs beet_net'
 
 default:
 	just --list
