@@ -31,6 +31,9 @@ test crate *args:
 test-w crate *args:
 	just watch 'cargo run -p {{crate}} --example test_{{crate}} $BEET_CARGO -- -w {{args}}'
 
+test-all:
+	just test beet_ecs
+
 watch *command:
 	forky watch \
 	-w '**/*.rs' \
