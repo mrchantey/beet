@@ -1,6 +1,7 @@
 set windows-shell := ["C:/tools/cygwin/bin/sh.exe","-c"]
 set dotenv-load
 crates := 'beet beet_ecs'
+testable := 'beet_ecs'
 
 default:
 	just --list
@@ -31,8 +32,20 @@ test crate *args:
 test-w crate *args:
 	just watch 'cargo run -p {{crate}} --example test_{{crate}} $BEET_CARGO -- -w {{args}}'
 
-test-all:
-	just test beet_ecs
+test-all *args:
+	for crate in {{testable}}; do \
+			just test $crate {{args}}; \
+	done
+
+
+test-ci crate *args:
+	cargo run -p {{crate}} --example test_{{crate}} {{args}}
+
+test-ci-all *args:
+	for crate in {{testable}}; do \
+			just test-ci $crate {{args}}; \
+	done
+
 
 watch *command:
 	forky watch \

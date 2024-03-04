@@ -62,7 +62,7 @@ jobs:
     # - name: 🔎 Test Fantoccini
     #   run: just run sweet fantoccini
     - name: 🔎 Test Native
-      run: just test-all
+      run: just test-ci-all
     # - name: 🔎 Test Wasm - Windows # TODO sweet not compiling since cli added
     #   if: runner.os == 'Windows'
     #   run: just test-all-wasm-no-bevy
