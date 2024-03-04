@@ -974,7 +974,9 @@ checksum = "3f9eec918d3f24069decb9af1554cad7c880e2da24a9afd88aca000531ab82c1"
 
 [[package]]
 name = "forky_core"
-version = "0.1.39"
+version = "0.1.40"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fa8038b945d5997112d58b70a7a0b8ac22540240f727d7742638dccf1ffb7e4a"
 dependencies = [
  "anyhow",
  "console_error_panic_hook",
@@ -992,7 +994,9 @@ dependencies = [
 
 [[package]]
 name = "forky_fs"
-version = "0.1.39"
+version = "0.1.40"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "482bd9b5dd8d2f4c88a03b77ed18fe81a5915def9a3937d314116cfb7c30c737"
 dependencies = [
  "anyhow",
  "clap",
@@ -1012,12 +1016,13 @@ dependencies = [
 [[package]]
 name = "forky_web"
 version = "0.1.39"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d0240f884d4ccd5510bfeb41b399c3a45c084e7c0eb9c1569bf6ca28f90ba2ef"
 dependencies = [
  "anyhow",
  "console_error_panic_hook",
  "extend",
  "forky_core",
- "forky_web_macros",
  "js-sys",
  "leptos",
  "serde",
@@ -1025,16 +1030,6 @@ dependencies = [
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "web-sys",
-]
-
-[[package]]
-name = "forky_web_macros"
-version = "0.1.39"
-dependencies = [
- "anyhow",
- "proc-macro2",
- "quote",
- "syn 2.0.52",
 ]
 
 [[package]]
@@ -2585,7 +2580,9 @@ dependencies = [
 
 [[package]]
 name = "sweet"
-version = "0.1.39"
+version = "0.1.40"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a56c38a168a1b19f2f6dc26b49b07649787b560c1dc4f1746b0e3426e5b60a49"
 dependencies = [
  "anyhow",
  "backtrace",
@@ -2620,7 +2617,9 @@ dependencies = [
 
 [[package]]
 name = "sweet_macros"
-version = "0.1.39"
+version = "0.1.40"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "60829b6240cbef496bccc7517ae3363b2fe9c44cddd3cca6eee80d63a45c35f9"
 dependencies = [
  "anyhow",
  "proc-macro2",

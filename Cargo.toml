@@ -26,11 +26,12 @@ members = ["crates/beet", "crates/beet_ecs", "crates/beet_ecs/macros"]
 [workspace.dependencies]
 ## Internal
 beet = { path = "crates/beet", version = "0.0.1" }
-beet_ecs = { path = "./crates/beet_ecs", version = "0.0.1" }
-beet_ecs_macros = { path = "./crates/beet_ecs/macros", version = "0.0.1" }
+beet_ecs = { path = "crates/beet_ecs", version = "0.0.1" }
+beet_ecs_macros = { path = "crates/beet_ecs/macros", version = "0.0.1" }
 
 ## Local
-sweet = { path = "../forky/crates/sweet", features = ["bevy_core"] }
+sweet = { version = "0.1.40", features = ["bevy_core"] }
+# sweet = { path = "../forky/crates/sweet", features = ["bevy_core"] }
 
 ## utility
 log = "0.4"
