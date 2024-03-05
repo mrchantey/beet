@@ -38,6 +38,7 @@ beet_net = { path = "crates/beet_net", version = "0.0.1" }
 
 ## local
 # sweet = { version = "0.1.41", features = ["bevy_core"] }
+forky_core = { path = "../forky/crates/forky/forky_core" }
 forky_web = { path = "../forky/crates/forky/forky_web" }
 sweet = { path = "../forky/crates/sweet", features = ["bevy_core"] }
 

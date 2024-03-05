@@ -14,6 +14,13 @@ default:
 book:
 	cd docs && mdbook serve & cd docs/book && live-server --no-browser
 
+
+
+clean-repo:
+	cargo clean
+	rm -rf ./target
+# rm -rf ./Cargo.lock
+
 env:
 	@echo $RUST_LOG
 

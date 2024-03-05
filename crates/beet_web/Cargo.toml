@@ -11,16 +11,23 @@ license.workspace = true
 keywords.workspace = true
 categories.workspace = true
 
+
+[features]
+json = ["dep:serde_json"]
+
 [dependencies]
 ## internal
 beet.workspace = true
 
 ## local
+forky_core.workspace = true
 forky_web.workspace = true
-
 ## workspace
+extend.workspace = true
 log.workspace = true
 anyhow.workspace = true
+serde_json = { workspace = true, optional = true }
+bincode.workspace = true
 
 ## web
 console_log = "1.0"

@@ -1,6 +1,7 @@
 use crate::prelude::*;
 use anyhow::Result;
 use async_broadcast::Receiver;
+use bevy_utils::Duration;
 use std::marker::PhantomData;
 /// Typesafe wrapper for [`async_broadcast::Receiver`] for a specific topic.
 /// Held by the subscriber to listen for messages from the relay
@@ -10,6 +11,8 @@ pub struct Subscriber<T: Payload> {
 	recv: Receiver<StateMessage>,
 	phantom: PhantomData<T>,
 }
+
+pub const DEFAULT_RECV_TIMEOUT: Duration = Duration::from_secs(1);
 
 impl<T: Payload> Subscriber<T> {
 	pub fn new(topic: Topic, recv: Receiver<StateMessage>) -> Self {
@@ -52,13 +55,7 @@ impl<T: Payload> Subscriber<T> {
 	}
 	#[cfg(feature = "tokio")]
 	pub async fn recv_default_timeout(&mut self) -> Result<T> {
-		Ok(
-			tokio::time::timeout(
-				std::time::Duration::from_secs(1),
-				self.recv(),
-			)
-			.await??,
-		)
+		Ok(tokio::time::timeout(DEFAULT_RECV_TIMEOUT, self.recv()).await??)
 	}
 
 	pub fn try_recv_all(&mut self) -> Result<Vec<T>> {

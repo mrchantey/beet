@@ -15,7 +15,7 @@ pub fn run() -> Result<()> {
 
 	let container = create_container();
 
-	// let relay = Relay::new();
+	// let relay = PostMessageRelay::new();
 
 
 	spawn_local(async {
