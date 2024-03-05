@@ -46,6 +46,8 @@ test-ci-all *args:
 			just test-ci $crate {{args}}; \
 	done
 
+test-wasm crate *args:
+	sweet -p {{crate}} --example test_{{crate}} --interactive --watch {{args}}
 
 watch *command:
 	forky watch \

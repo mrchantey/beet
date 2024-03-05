@@ -1,0 +1,118 @@
+[package]
+name = "beet_web"
+version.workspace = true
+edition.workspace = true
+description.workspace = true
+documentation.workspace = true
+readme.workspace = true
+homepage.workspace = true
+repository.workspace = true
+license.workspace = true
+keywords.workspace = true
+categories.workspace = true
+
+[dependencies]
+## local
+forky_web.workspace = true
+
+## workspace
+log.workspace = true
+anyhow.workspace = true
+
+## web
+console_log = "1.0"
+js-sys = "0.3.63"
+wasm-bindgen = "0.2.86"
+wasm-bindgen-futures = "0.4.36"
+console_error_panic_hook = "0.1.7"
+
+
+[dependencies.web-sys]
+version = "0.3.61"
+features = [
+	# HTML
+	'Headers',
+	'Document',
+	'Element',
+	'Window',
+	'HtmlIFrameElement',
+	'ResizeObserver',
+	'ResizeObserverBoxOptions',
+	'ResizeObserverEntry',
+	'ResizeObserverOptions',
+	'ResizeObserverSize',
+	'DomRectReadOnly',
+	# Style
+	'MediaQueryList',
+	# Events
+	'MouseEvent',
+	'KeyboardEvent',
+	# JS
+	'Gpu',
+	'console',
+	'Navigator',
+	'Performance',
+	'WebGl2RenderingContext',
+	# Audio
+	'AudioContext',
+	'AudioDestinationNode',
+	'AudioNode',
+	'AudioParam',
+	'BiquadFilterNode',
+	'BiquadFilterOptions',
+	'BiquadFilterType',
+	'DelayNode',
+	'DelayOptions',
+	'GainNode',
+	'OscillatorNode',
+	'OscillatorType',
+	# Fetch
+	'Request',
+	'RequestInit',
+	'RequestMode',
+	'Response',
+	# Blob
+	'Blob',
+	'BlobEvent',
+	'BlobEventInit',
+	'BlobPropertyBag',
+	# Elements
+	'HtmlAnchorElement',
+	'HtmlCanvasElement',
+	'HtmlInputElement',
+	'File',
+	'FileList',
+	# Url
+	'Url',
+	'History',
+	'Location',
+	'UrlSearchParams',
+	# Sensors
+	'DeviceOrientationEvent',
+	'DeviceMotionEvent',
+	'DeviceAcceleration',
+	'DeviceRotationRate',
+	# Sockets
+	'BinaryType',
+	'FileReader',
+	'ErrorEvent',
+	'MessageEvent',
+	'ProgressEvent',
+	'WebSocket',
+]
+
+# beet.workspace = true
+
+[dev-dependencies]
+sweet.workspace = true
+
+
+[[example]]
+name = "test_beet_web"
+path = "test/sweet.rs"
+required-features = ["sweet/bevy_core"]
+console_log = "1.0"
+js-sys = "0.3.63"
+wasm-bindgen = "0.2.86"
+wasm-bindgen-futures = "0.4.36"
+console_error_panic_hook = "0.1.7"

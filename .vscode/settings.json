@@ -36,7 +36,7 @@
 	"rust-analyzer.files.excludeDirs": [
 		"crates/beet_esp"
 	],
-	// "rust-analyzer.cargo.target": "wasm32-unknown-unknown",
+	"rust-analyzer.cargo.target": "wasm32-unknown-unknown",
 	"search.exclude": {
 		"**/assets/*": true,
 		"**.svg": true,
