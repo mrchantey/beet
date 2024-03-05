@@ -12,6 +12,9 @@ keywords.workspace = true
 categories.workspace = true
 
 [dependencies]
+## internal
+beet.workspace = true
+
 ## local
 forky_web.workspace = true
 

@@ -12,7 +12,7 @@ keywords = { workspace = true }
 categories = { workspace = true }
 
 [features]
-default = ["tokio"]
+default = []
 tokio = ["dep:tokio"]
 
 [dependencies]
@@ -41,3 +41,4 @@ sweet = { workspace = true }
 [[example]]
 name = "test_beet_net"
 path = "test/sweet.rs"
+required-features = ["tokio"]

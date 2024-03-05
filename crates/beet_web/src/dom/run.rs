@@ -2,21 +2,12 @@ use anyhow::Result;
 use forky_web::wait_for_16_millis;
 use forky_web::AnimationFrame;
 use forky_web::DocumentExt;
-use forky_web::HtmlElementExt;
-use std::cell::RefCell;
-use std::rc::Rc;
 use std::sync::atomic::AtomicU64;
 use std::sync::atomic::Ordering;
-use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::spawn_local;
 // use wasm_bindgen::JsCast;
-use web_sys::window;
 use web_sys::Document;
 use web_sys::HtmlDivElement;
-use web_sys::HtmlElement;
-
-
-
 
 pub fn run() -> Result<()> {
 	console_error_panic_hook::set_once();
@@ -24,7 +15,7 @@ pub fn run() -> Result<()> {
 
 	let container = create_container();
 
-	let relay = Relay::new();
+	// let relay = Relay::new();
 
 
 	spawn_local(async {
