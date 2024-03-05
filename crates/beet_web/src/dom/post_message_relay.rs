@@ -68,9 +68,7 @@ impl PostMessageRelay {
 
 	pub fn send_all(&mut self) -> Result<()> {
 		let messages = self.relay.get_all_messages()?;
-		log::info!("sending messages: {:?}", messages);
-		let bytes = bincode::serialize(&messages)?;
-		let buff = into_array_buffer(bytes)?;
+		let buff = into_array_buffer(messages)?;
 		self.target.post_message(&buff.into(), "*").anyhow()?;
 		Ok(())
 	}
