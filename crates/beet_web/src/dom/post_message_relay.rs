@@ -105,7 +105,7 @@ fn from_js_value<T: DeserializeOwned>(value: &JsValue) -> Result<T> {
 		"Unknown data type\n(websockets - was set_binary_type set correctly?)"
 	)
 }
-
+/// Note: this seems to error if trying to pass in bytes, ie [`Vec<u8>`]
 fn into_array_buffer<T: Serialize>(val: T) -> Result<ArrayBuffer> {
 	let bytes = bincode::serialize(&val)?;
 	let array = Uint8Array::from(bytes.as_slice());

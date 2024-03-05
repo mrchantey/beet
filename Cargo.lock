@@ -323,6 +323,7 @@ version = "0.0.1"
 dependencies = [
  "anyhow",
  "beet",
+ "bevy_math",
  "bincode",
  "console_error_panic_hook",
  "console_log",
@@ -331,6 +332,7 @@ dependencies = [
  "forky_web",
  "js-sys",
  "log",
+ "serde",
  "serde_json",
  "sweet",
  "wasm-bindgen",

@@ -174,12 +174,12 @@ impl std::fmt::Display for Topic {
 
 impl Topic {
 	pub fn new(
-		address: TopicAddress,
+		address: impl Into<TopicAddress>,
 		scheme: TopicScheme,
 		method: TopicMethod,
 	) -> Self {
 		Self {
-			address,
+			address: address.into(),
 			scheme,
 			method,
 		}
