@@ -3,6 +3,7 @@ use strum_macros::Display;
 use strum_macros::EnumIter;
 use sweet::*;
 
+
 #[derive(Clone, FieldUi)]
 struct TestStruct {
 	#[number(min = 0, max = 100, step = 1, variant=NumberFieldVariant::default())]

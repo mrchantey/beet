@@ -1,10 +1,7 @@
 use beet_ecs::prelude::*;
-use beet_ecs::ui::GroupField;
-use beet_ecs_macros::FieldUi;
-// use beet_ecs::prelude::*;
+extern crate beet_ecs as beet;
 use strum_macros::Display;
 use strum_macros::EnumIter;
-// use beet_ecs_macros::*;
 
 fn main() {
 	let _a = NumberField::<u32> {

@@ -1,4 +1,5 @@
 use beet_ecs::prelude::*;
+extern crate beet_ecs as beet;
 
 
 
