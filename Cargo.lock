@@ -275,6 +275,7 @@ dependencies = [
  "forky_core",
  "log",
  "serde",
+ "strum",
  "sweet",
 ]
 
