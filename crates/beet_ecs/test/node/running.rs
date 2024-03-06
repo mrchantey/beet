@@ -9,11 +9,11 @@ pub fn works() -> Result<()> {
 
 
 	let mut app = App::new();
-	app.add_plugins(ActionPlugin::<BuiltinNode, _>::default());
+	app.add_plugins(ActionPlugin::<EcsNode, _>::default());
 
 	let target = app.world.spawn_empty().id();
 
-	let action_graph = BehaviorTree::<BuiltinNode>::new(
+	let action_graph = BehaviorTree::<EcsNode>::new(
 		vec![SetRunResult::default().into()].into(),
 	)
 	.into_action_graph();

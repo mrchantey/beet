@@ -24,7 +24,7 @@ pub fn default_components() -> Result<()> {
 #[sweet_test]
 pub fn sync_system() -> Result<()> {
 	let mut app = App::new();
-	app.add_plugins(ActionPlugin::<BuiltinNode, _>::default());
+	app.add_plugins(ActionPlugin::<EcsNode, _>::default());
 
 	let target = app.world.spawn_empty().id();
 	let actions = test_action_graph_typed();

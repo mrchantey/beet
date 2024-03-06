@@ -6,12 +6,12 @@ use sweet::*;
 #[sweet_test]
 pub fn works() -> Result<()> {
 	let mut app = App::new();
-	app.add_plugins(ActionPlugin::<BuiltinNode, _>::default());
+	app.add_plugins(ActionPlugin::<EcsNode, _>::default());
 
 	let target = app.world.spawn_empty().id();
 
-	let action_graph: BehaviorGraph<BuiltinNode> =
-		BehaviorGraph::<BuiltinNode>::from_tree(
+	let action_graph: BehaviorGraph<EcsNode> =
+		BehaviorGraph::<EcsNode>::from_tree(
 			Tree::new(vec![EmptyAction.into()].into())
 				.with_leaf(vec![EmptyAction.into()].into())
 				.with_child(

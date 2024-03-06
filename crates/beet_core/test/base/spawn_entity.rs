@@ -1,7 +1,7 @@
 use beet_core::base::BeetPlugin;
 use beet_core::base::SpawnEntityPayload;
 use beet_core::prelude::*;
-use beet_ecs::builtin_nodes::BuiltinNode;
+use beet_ecs::ecs_nodes::EcsNode;
 use beet_net::relay::Relay;
 use bevy_app::App;
 use bevy_math::Vec3;
@@ -11,7 +11,7 @@ use sweet::*;
 pub fn spawn_request() -> Result<()> {
 	let mut app = App::new();
 	let mut relay = Relay::default();
-	app.add_plugins(BeetPlugin::<BuiltinNode>::new(relay.clone()));
+	app.add_plugins(BeetPlugin::<EcsNode>::new(relay.clone()));
 
 	let mut send = SpawnEntityHandler::requester(&mut relay);
 	let message_id = send.start_request(

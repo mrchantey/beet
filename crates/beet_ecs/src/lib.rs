@@ -1,5 +1,5 @@
 pub mod action;
-pub mod builtin_nodes;
+pub mod ecs_nodes;
 pub mod edge;
 pub mod extensions;
 pub mod graph;
@@ -13,9 +13,9 @@ extern crate self as beet_ecs;
 pub mod prelude {
 
 	pub use crate::action::*;
-	pub use crate::builtin_nodes::actions::*;
-	pub use crate::builtin_nodes::selectors::*;
-	pub use crate::builtin_nodes::*;
+	pub use crate::ecs_nodes::actions::*;
+	pub use crate::ecs_nodes::selectors::*;
+	pub use crate::ecs_nodes::*;
 	pub use crate::edge::*;
 	pub use crate::extensions::*;
 	pub use crate::graph::*;

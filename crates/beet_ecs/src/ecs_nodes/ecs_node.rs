@@ -1,6 +1,6 @@
 use crate::action_list;
 
-action_list!(BuiltinNode, [
+action_list!(EcsNode, [
 	EmptyAction,
 	SetRunResult,
 	SetScore,

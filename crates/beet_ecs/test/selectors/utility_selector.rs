@@ -5,12 +5,12 @@ use sweet::*;
 
 fn setup() -> (App, EntityGraph) {
 	let mut app = App::new();
-	app.add_plugins(ActionPlugin::<BuiltinNode, _>::default());
+	app.add_plugins(ActionPlugin::<EcsNode, _>::default());
 
 	let target = app.world.spawn_empty().id();
 
 	let action_graph =
-		BehaviorTree::<BuiltinNode>::new(vec![UtilitySelector.into()].into())
+		BehaviorTree::<EcsNode>::new(vec![UtilitySelector.into()].into())
 			.with_leaf(
 				vec![
 					SetScore::new(Score::Fail).into(),

@@ -64,7 +64,7 @@ pub fn works() -> Result<()> {
 }
 #[sweet_test]
 pub fn works_for_action_lists() -> Result<()> {
-	let ui = FieldUiRoot::new(BuiltinNode::EmptyAction(EmptyAction)).get_ui();
+	let ui = FieldUiRoot::new(EcsNode::EmptyAction(EmptyAction)).get_ui();
 	// if let FieldUi::Heading(heading) = ui {
 	// 	expect(&heading.text).to_be(&"".to_string())?;
 	// } else {
