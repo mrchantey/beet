@@ -34,4 +34,3 @@ sweet.workspace = true
 [[example]]
 name = "test_beet_core"
 path = "test/sweet.rs"
-required-features = ["beet_net/tokio"]

@@ -3,9 +3,6 @@ use beet_core::base::SpawnEntity;
 use beet_core::base::SpawnEntityHandler;
 use beet_ecs::builtin_nodes::BuiltinNode;
 use beet_net::relay::Relay;
-use beet_net::topic::Topic;
-use beet_net::topic::TopicMethod;
-use beet_net::topic::TopicScheme;
 use bevy_app::App;
 use bevy_math::Vec3;
 use sweet::*;
@@ -17,16 +14,15 @@ pub async fn works() -> Result<()> {
 
 	let mut send = SpawnEntityHandler::requester(&mut relay);
 	send.req_mut()
-		.send(&SpawnEntity::with_position(Vec3::new(0., 0., 0.)))
-		.await?;
+		.send(&SpawnEntity::with_position(Vec3::new(0., 0., 0.)))?;
 
 	app.add_plugins(BeetPlugin::<BuiltinNode>::new(relay.clone()));
 
 	app.finish();
 	app.update();
 
-	let id = send.res_mut().recv().await?;
-	// expect(id).to_be(0)?;
+	let id = send.res_mut().recv()?;
+	expect(id).to_be(0)?;
 
 
 	Ok(())

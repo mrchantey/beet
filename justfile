@@ -8,13 +8,13 @@ default:
 
 ## common
 test-core *args:
-	just watch 'cargo run -p beet_core 	--example test_beet_core --features="beet_net/tokio" 		$BEET_CARGO_TEST -- -w {{args}}'
+	just watch 'cargo run -p beet_core 	--example test_beet_core 	$BEET_CARGO_TEST -- -w {{args}}'
 
 test-ecs *args:
-	just watch 'cargo run -p beet_ecs 	--example test_beet_ecs 														$BEET_CARGO_TEST -- -w {{args}}'
+	just watch 'cargo run -p beet_ecs 	--example test_beet_ecs		$BEET_CARGO_TEST -- -w {{args}}'
 
 test-net *args:
-	just watch 'cargo run -p beet_net 	--example test_beet_net $BEET_CARGO_TEST -- -w {{args}}'
+	just watch 'cargo run -p beet_net 	--example test_beet_net		$BEET_CARGO_TEST -- -w {{args}}'
 
 
 
@@ -50,14 +50,14 @@ test-w crate *args:
 	just watch 'cargo run -p {{crate}} --example test_{{crate}} $BEET_CARGO_TEST -- -w {{args}}'
 
 test-all *args:
-	cargo run -p beet_core 	--example test_beet_core --features="beet_net/tokio" $BEET_CARGO_TEST -- {{args}}
-	cargo run -p beet_ecs 	--example test_beet_ecs 														 $BEET_CARGO_TEST -- {{args}}
-	cargo run -p beet_net 	--example test_beet_net  --features="beet_net/tokio" $BEET_CARGO_TEST -- {{args}}
+	cargo run -p beet_core 	--example test_beet_core 	$BEET_CARGO_TEST -- {{args}}
+	cargo run -p beet_ecs 	--example test_beet_ecs		$BEET_CARGO_TEST -- {{args}}
+	cargo run -p beet_net 	--example test_beet_net  	$BEET_CARGO_TEST -- {{args}}
 
 test-ci *args:
-	cargo run -p beet_core --example test_beet_core --features="beet_net/tokio" $BEET_CARGO_TEST_CI -- {{args}}
-	cargo run -p beet_ecs  --example test_beet_ecs 															$BEET_CARGO_TEST_CI -- {{args}}
-	cargo run -p beet_net  --example test_beet_net  --features="beet_net/tokio" $BEET_CARGO_TEST_CI -- {{args}}
+	cargo run -p beet_core --example test_beet_core $BEET_CARGO_TEST_CI -- {{args}}
+	cargo run -p beet_ecs  --example test_beet_ecs 	$BEET_CARGO_TEST_CI -- {{args}}
+	cargo run -p beet_net  --example test_beet_net  $BEET_CARGO_TEST_CI -- {{args}}
 
 test-wasm crate *args:
 	sweet -p {{crate}} --example test_{{crate}} --interactive --watch {{args}}

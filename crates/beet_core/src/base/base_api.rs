@@ -32,10 +32,10 @@ pub struct BeetEntityMap {
 
 impl BeetEntityMap {
 	pub fn next(&mut self, entity: Entity) -> BeetEntityId {
-		let next_id = self.id_incr.wrapping_add(1);
-		self.id_incr = next_id;
-		self.map.insert(next_id, entity);
-		next_id
+		let id = self.id_incr;
+		self.id_incr = self.id_incr.wrapping_add(1);
+		self.map.insert(id, entity);
+		id
 	}
 }
 
@@ -111,40 +111,40 @@ pub fn handle_spawn_entity(
 	mut entity_map: ResMut<BeetEntityMap>,
 	mut handler: ResMut<SpawnEntityHandler>,
 ) {
-	// handler
-	// 	.try_handle_next_blocking(|val| {
-	// 		let mut entity = commands.spawn_empty();
-	// 		if let Some(pos) = val.pos {
-	// 			entity.insert(TransformBundle {
-	// 				local: Transform::from_translation(pos),
-	// 				..default()
-	// 			});
-	// 		}
-	// 		entity_map.next(entity.id())
-	// 	})
-	// 	.ok_or(|e| log::error!("{e}"));
+	handler
+		.try_handle_next(|val| {
+			let mut entity = commands.spawn_empty();
+			if let Some(pos) = val.pos {
+				entity.insert(TransformBundle {
+					local: Transform::from_translation(pos),
+					..default()
+				});
+			}
+			entity_map.next(entity.id())
+		})
+		.ok_or(|e| log::error!("{e}"));
 }
 pub fn handle_spawn_behavior_entity<T: ActionPayload>(
 	mut commands: Commands,
 	mut entity_map: ResMut<BeetEntityMap>,
 	mut handler: ResMut<SpawnBehaviorEntityHandler<T>>,
 ) {
-	// handler
-	// 	.try_handle_next(|val| {
-	// 		let mut entity = commands.spawn_empty();
+	handler
+		.try_handle_next(|val| {
+			let mut entity = commands.spawn_empty();
 
-	// 		if let Some(pos) = val.pos {
-	// 			entity.insert(TransformBundle {
-	// 				local: Transform::from_translation(pos),
-	// 				..default()
-	// 			});
-	// 		}
-	// 		let entity = entity.id();
+			if let Some(pos) = val.pos {
+				entity.insert(TransformBundle {
+					local: Transform::from_translation(pos),
+					..default()
+				});
+			}
+			let entity = entity.id();
 
-	// 		let graph = val.graph.spawn(&mut commands, entity);
-	// 		commands.entity(entity).insert(graph);
+			let graph = val.graph.spawn(&mut commands, entity);
+			commands.entity(entity).insert(graph);
 
-	// 		entity_map.next(entity)
-	// 	})
-	// .ok_or(|e| log::error!("{e}"));
+			entity_map.next(entity)
+		})
+		.ok_or(|e| log::error!("{e}"));
 }
