@@ -1,7 +1,6 @@
 set windows-shell := ["C:/tools/cygwin/bin/sh.exe","-c"]
 set dotenv-load
 crates := 'beet beet_ecs beet_net'
-testable := 'beet_ecs beet_net'
 
 default:
 	just --list
@@ -37,24 +36,21 @@ publish-all:
 	just publish beet
 
 test crate *args:
-	cargo run -p {{crate}} --example test_{{crate}} $BEET_CARGO -- {{args}}
+	cargo run -p {{crate}} --example test_{{crate}} $BEET_CARGO_TEST -- {{args}}
 
 test-w crate *args:
-	just watch 'cargo run -p {{crate}} --example test_{{crate}} $BEET_CARGO -- -w {{args}}'
+	just watch 'cargo run -p {{crate}} --example test_{{crate}} $BEET_CARGO_TEST -- -w {{args}}'
 
 test-all *args:
-	for crate in {{testable}}; do \
-			just test $crate {{args}}; \
-	done
-
+	cargo run -p beet_ecs --example test_beet_ecs $BEET_CARGO_TEST -- {{args}}
+	cargo run -p beet_net --example test_beet_net --features="beet_net/tokio" $BEET_CARGO_TEST -- {{args}}
 
 test-ci crate *args:
-	cargo run -p {{crate}} --example test_{{crate}} {{args}}
+	cargo run -p {{crate}} --example test_{{crate}} $BEET_CARGO_TEST_CI {{args}}
 
 test-ci-all *args:
-	for crate in {{testable}}; do \
-			just test-ci $crate {{args}}; \
-	done
+	just test-ci beet_ecs {{args}}
+	just test-ci beet_net --features="beet_net/tokio" {{args}}
 
 test-wasm crate *args:
 	sweet -p {{crate}} --example test_{{crate}} --interactive --watch {{args}}
