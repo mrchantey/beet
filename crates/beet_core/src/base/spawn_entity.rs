@@ -11,16 +11,28 @@ use forky_core::ResultTEExt;
 use serde::Deserialize;
 use serde::Serialize;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SpawnEntity {
-	pub pos: Option<Vec3>,
+#[derive(Default, Debug, Clone, Serialize, Deserialize)]
+pub struct SpawnEntityPayload {
+	pub position: Option<Vec3>,
+	pub position_tracking: bool,
 }
-impl SpawnEntity {
-	pub fn with_position(pos: Vec3) -> Self { Self { pos: Some(pos) } }
+impl SpawnEntityPayload {
+	pub fn with_position(self, pos: Vec3) -> Self {
+		SpawnEntityPayload {
+			position: Some(pos),
+			..self
+		}
+	}
+	pub fn with_position_tracking(self) -> Self {
+		SpawnEntityPayload {
+			position_tracking: true,
+			..self
+		}
+	}
 }
 
 #[derive(Resource, Deref, DerefMut)]
-pub struct SpawnEntityHandler(pub Responder<SpawnEntity, BeetEntityId>);
+pub struct SpawnEntityHandler(pub Responder<SpawnEntityPayload, BeetEntityId>);
 
 
 impl SpawnEntityHandler {
@@ -36,7 +48,7 @@ impl SpawnEntityHandler {
 
 	pub fn requester(
 		relay: &mut Relay,
-	) -> Requester<SpawnEntity, BeetEntityId> {
+	) -> Requester<SpawnEntityPayload, BeetEntityId> {
 		relay
 			.add_requester(Self::ADDRESS, TopicMethod::Create)
 			.unwrap() //should be correct topic
@@ -54,7 +66,10 @@ pub fn handle_spawn_entity(
 			let mut entity = commands.spawn_empty();
 			let beet_id = entity_map.next(entity.id());
 			entity.insert(beet_id);
-			if let Some(pos) = val.pos {
+			if val.position_tracking {
+				entity.insert(TrackedPosition);
+			}
+			if let Some(pos) = val.position {
 				entity.insert(TransformBundle {
 					local: Transform::from_translation(pos),
 					..default()

@@ -19,6 +19,9 @@ pub use self::text_field::*;
 pub mod field_reflect;
 #[allow(unused_imports)]
 pub use self::field_reflect::*;
+pub mod vec_field;
+#[allow(unused_imports)]
+pub use self::vec_field::*;
 pub mod checkbox_field;
 #[allow(unused_imports)]
 pub use self::checkbox_field::*;

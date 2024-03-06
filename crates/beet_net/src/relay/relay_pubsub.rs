@@ -6,6 +6,23 @@ use std::sync::Arc;
 
 
 impl Relay {
+	/// send once without keeping a publisher
+	pub fn send<T: Payload>(
+		&self,
+		topic: impl Into<Topic>,
+		payload: &T,
+	) -> Result<MessageId> {
+		self.add_publisher_with_topic(topic)?.send(payload)
+	}
+
+	/// recv once without keeping a subscriber
+	pub fn recv<T: Payload>(&self, topic: impl Into<Topic>) -> Result<T> {
+		self.add_subscriber_with_topic(topic)?.recv()
+	}
+
+
+
+
 	/// Create a publisher for a topic
 	pub fn add_publisher<T: Payload>(
 		&self,

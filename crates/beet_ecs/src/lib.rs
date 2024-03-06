@@ -6,7 +6,7 @@ pub mod graph;
 pub mod node;
 pub mod ui;
 
-// allows proc macros to work internally
+// currently required for action_list! macro to work
 extern crate self as beet;
 extern crate self as beet_ecs;
 

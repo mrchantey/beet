@@ -14,7 +14,7 @@ use serde::Serialize;
 
 #[derive(Resource, Deref, DerefMut)]
 pub struct SpawnBehaviorEntityHandler<T: ActionPayload>(
-	pub Responder<SpawnBehaviorEntity<T>, BeetEntityId>,
+	pub Responder<SpawnBehaviorEntityPayload<T>, BeetEntityId>,
 );
 
 impl<T: ActionPayload> SpawnBehaviorEntityHandler<T> {
@@ -30,7 +30,7 @@ impl<T: ActionPayload> SpawnBehaviorEntityHandler<T> {
 
 	pub fn requester(
 		relay: &mut Relay,
-	) -> Requester<SpawnBehaviorEntity<T>, BeetEntityId> {
+	) -> Requester<SpawnBehaviorEntityPayload<T>, BeetEntityId> {
 		relay
 			.add_requester(Self::ADDRESS, TopicMethod::Create)
 			.unwrap() //should be correct topic
@@ -39,11 +39,24 @@ impl<T: ActionPayload> SpawnBehaviorEntityHandler<T> {
 
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SpawnBehaviorEntity<T: ActionSuper> {
-	pub pos: Option<Vec3>,
+pub struct SpawnBehaviorEntityPayload<T: ActionSuper> {
+	pub position: Option<Vec3>,
 	pub graph: BehaviorGraph<T>,
+	pub position_tracking: bool,
 }
-
+impl<T: ActionSuper> SpawnBehaviorEntityPayload<T> {
+	pub fn new(
+		graph: BehaviorGraph<T>,
+		position: Option<Vec3>,
+		position_tracking: bool,
+	) -> Self {
+		Self {
+			position,
+			graph,
+			position_tracking,
+		}
+	}
+}
 
 pub fn handle_spawn_behavior_entity<T: ActionPayload>(
 	mut commands: Commands,
@@ -53,8 +66,11 @@ pub fn handle_spawn_behavior_entity<T: ActionPayload>(
 	handler
 		.try_handle_next(|val| {
 			let mut entity = commands.spawn_empty();
+			if val.position_tracking {
+				entity.insert(TrackedPosition);
+			}
 
-			if let Some(pos) = val.pos {
+			if let Some(pos) = val.position {
 				entity.insert(TransformBundle {
 					local: Transform::from_translation(pos),
 					..default()

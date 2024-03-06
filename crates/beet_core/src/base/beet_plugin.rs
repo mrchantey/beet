@@ -2,8 +2,13 @@ use crate::prelude::*;
 use beet_ecs::prelude::*;
 use beet_net::prelude::*;
 use bevy_app::prelude::*;
+use bevy_derive::Deref;
+use bevy_derive::DerefMut;
+use bevy_ecs::prelude::*;
 use std::marker::PhantomData;
 
+#[derive(Debug, Clone, Deref, DerefMut, Resource)]
+pub struct RelayRes(pub Relay);
 
 pub struct BeetPlugin<T: ActionPayload> {
 	relay: Relay,
@@ -28,6 +33,8 @@ impl<T: ActionPayload> Plugin for BeetPlugin<T> {
 			.add_systems(
 				PreUpdate,
 				(handle_spawn_entity, handle_spawn_behavior_entity::<T>),
-			);
+			)
+			.add_systems(PostUpdate, send_position)
+			.insert_resource(RelayRes(relay));
 	}
 }
