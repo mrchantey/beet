@@ -9,6 +9,17 @@ impl Relay {
 	/// Create a publisher for a topic
 	pub fn add_publisher<T: Payload>(
 		&self,
+		address: impl Into<TopicAddress>,
+		method: TopicMethod,
+	) -> Result<Publisher<T>> {
+		self.add_publisher_with_topic(Topic::new(
+			address,
+			TopicScheme::PubSub,
+			method,
+		))
+	}
+	pub fn add_publisher_with_topic<T: Payload>(
+		&self,
 		topic: impl Into<Topic>,
 	) -> Result<Publisher<T>> {
 		self.add_publisher_with_type(topic, &dodgy_get_payload_type::<T>())
@@ -35,6 +46,18 @@ impl Relay {
 
 	/// Create a subscriber for a topic
 	pub fn add_subscriber<T: Payload>(
+		&self,
+		address: impl Into<TopicAddress>,
+		method: TopicMethod,
+	) -> Result<Subscriber<T>> {
+		self.add_subscriber_with_topic(Topic::new(
+			address,
+			TopicScheme::PubSub,
+			method,
+		))
+	}
+	/// Create a subscriber for a topic
+	pub fn add_subscriber_with_topic<T: Payload>(
 		&self,
 		topic: impl Into<Topic>,
 	) -> Result<Subscriber<T>> {

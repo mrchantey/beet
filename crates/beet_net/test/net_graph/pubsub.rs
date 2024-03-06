@@ -5,13 +5,13 @@ use sweet::*;
 pub fn pubsub_fail_cases() -> Result<()> {
 	let relay = Relay::default();
 	let topic = Topic::pubsub_update("foo/bar");
-	let _sub = relay.add_subscriber::<u8>(&topic)?;
-	let bad_sub = relay.add_subscriber::<u32>(&topic);
+	let _sub = relay.add_subscriber_with_topic::<u8>(&topic)?;
+	let bad_sub = relay.add_subscriber_with_topic::<u32>(&topic);
 
 	let err_str =
 		"Type mismatch for PubSub.Update/foo/bar:0\nexpected u8, received u32";
 	expect(bad_sub).to_be_err_str(err_str)?;
-	let bad_pub = relay.add_publisher::<u32>(&topic);
+	let bad_pub = relay.add_publisher_with_topic::<u32>(&topic);
 	expect(bad_pub).to_be_err_str(err_str)?;
 	Ok(())
 }
@@ -23,9 +23,9 @@ pub fn pubsub_fail_cases() -> Result<()> {
 pub async fn pubsub() -> Result<()> {
 	let relay = Relay::default();
 	let topic = Topic::pubsub_update("foo/bar");
-	let mut sub1 = relay.add_subscriber::<u8>(&topic)?;
+	let mut sub1 = relay.add_subscriber_with_topic::<u8>(&topic)?;
 	// let mut sub2 = relay.add_subscriber::<u8>(&topic)?;
-	let publisher = relay.add_publisher::<u8>(&topic)?;
+	let publisher = relay.add_publisher_with_topic::<u8>(&topic)?;
 	publisher.send(&8_u8)?;
 	let out1 = sub1.recv()?;
 	// let out2 = sub2.recv()?;
@@ -51,9 +51,9 @@ pub async fn async_broadcast() -> Result<()> {
 pub async fn broadcast() -> Result<()> {
 	let relay = Relay::default();
 	let topic = Topic::pubsub_update("foo/bar");
-	let mut sub1 = relay.add_subscriber::<u8>(&topic)?;
-	let mut sub2 = relay.add_subscriber::<u8>(&topic)?;
-	let publisher = relay.add_publisher::<u8>(&topic)?;
+	let mut sub1 = relay.add_subscriber_with_topic::<u8>(&topic)?;
+	let mut sub2 = relay.add_subscriber_with_topic::<u8>(&topic)?;
+	let publisher = relay.add_publisher_with_topic::<u8>(&topic)?;
 	publisher.send(&8_u8)?;
 	let out1 = sub1.recv()?;
 	let out2 = sub2.recv()?;
