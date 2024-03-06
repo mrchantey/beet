@@ -64,4 +64,7 @@ impl<T: Payload> Publisher<T> {
 		let _ = self.send.broadcast_direct(message.clone()).await?;
 		Ok(message_id)
 	}
+	// pub fn broadcast_blocking(&self, payload: &T) -> Result<MessageId> {
+	// 	futures::executor::block_on(self.broadcast(payload))
+	// }
 }

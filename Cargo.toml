@@ -22,6 +22,7 @@ publish = false
 resolver = "2"
 members = [
 	"crates/beet",
+	"crates/beet_core",
 	"crates/beet_ecs",
 	"crates/beet_ecs/macros",
 	"crates/beet_net",
@@ -33,6 +34,7 @@ members = [
 ## internal
 beet = { path = "crates/beet", version = "0.0.1" }
 beet_ecs = { path = "crates/beet_ecs", version = "0.0.1" }
+beet_core = { path = "crates/beet_core", version = "0.0.1" }
 beet_ecs_macros = { path = "crates/beet_ecs/macros", version = "0.0.1" }
 beet_net = { path = "crates/beet_net", version = "0.0.1" }
 
@@ -91,6 +93,7 @@ bevy_derive = { version = "0.12.*" }
 bevy_ecs = { version = "0.12.*" }
 bevy_hierarchy = { version = "0.12.*" }
 bevy_math = { version = "0.12.*" }
+bevy_tasks = { version = "0.12.*" }
 bevy_time = { version = "0.12.*" }
 bevy_transform = { version = "0.12.*" }
 bevy_utils = { version = "0.12.*" }

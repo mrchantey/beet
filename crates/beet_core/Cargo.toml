@@ -1,0 +1,37 @@
+[package]
+name = "beet_core"
+version = { workspace = true }
+edition = { workspace = true }
+description = { workspace = true }
+documentation = { workspace = true }
+readme = { workspace = true }
+homepage = { workspace = true }
+repository = { workspace = true }
+license = { workspace = true }
+keywords = { workspace = true }
+categories = { workspace = true }
+
+
+[dependencies]
+forky_core.workspace = true
+log.workspace = true
+
+beet_ecs.workspace = true
+beet_net.workspace = true
+bevy_derive.workspace = true
+bevy_app.workspace = true
+bevy_utils.workspace = true
+
+serde.workspace = true
+bevy_math.workspace = true
+bevy_ecs.workspace = true
+bevy_tasks.workspace = true
+bevy_transform.workspace = true
+
+[dev-dependencies]
+sweet.workspace = true
+
+[[example]]
+name = "test_beet_core"
+path = "test/sweet.rs"
+required-features = ["beet_net/tokio"]

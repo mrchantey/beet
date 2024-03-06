@@ -18,16 +18,35 @@ impl<Req: Payload, Res: Payload> Responder<Req, Res> {
 		mut handler: impl FnMut(Req) -> Res,
 	) -> Result<!> {
 		loop {
-			self.handle_request(&mut handler).await?;
+			self.handle_next(&mut handler).await?;
 		}
 	}
 
-	pub async fn handle_request(
+	pub async fn handle_next(
 		&mut self,
 		mut handler: impl FnMut(Req) -> Res,
 	) -> Result<()> {
 		let recv = self.req.recv_inner_mut();
 		if let Ok(next) = recv.recv_direct().await {
+			let id = next.id;
+			let response = handler(next.payload()?);
+			self.res
+				.send_inner()
+				.broadcast_direct(StateMessage::new(
+					self.res.topic().clone(),
+					&response,
+					id,
+				)?)
+				.await?;
+		}
+		Ok(())
+	}
+	pub async fn try_handle_next(
+		&mut self,
+		mut handler: impl FnMut(Req) -> Res,
+	) -> Result<()> {
+		let recv = self.req.recv_inner_mut();
+		if let Ok(next) = recv.try_recv() {
 			let id = next.id;
 			let response = handler(next.payload()?);
 			self.res

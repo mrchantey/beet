@@ -1,11 +1,9 @@
+pub use beet_core::*;
 pub use beet_ecs::*;
 pub use beet_net::*;
 
-pub mod base;
-
-
 pub mod prelude {
-	pub use crate::base::*;
+	pub use beet_core::prelude::*;
 	pub use beet_ecs::prelude::*;
 	pub use beet_net::prelude::*;
 }

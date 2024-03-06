@@ -5,7 +5,7 @@ use anyhow::Result;
 
 
 impl Relay {
-	pub async fn add_responder<Req: Payload, Res: Payload>(
+	pub fn add_responder<Req: Payload, Res: Payload>(
 		&self,
 		address: impl Into<TopicAddress>,
 		method: TopicMethod,
@@ -16,12 +16,12 @@ impl Relay {
 		let topic_res =
 			Topic::new(address.clone(), TopicScheme::Response, method);
 
-		let req = self.add_subscriber::<Req>(topic_req).await?.recast();
-		let res = self.add_publisher::<Res>(topic_res).await?.recast();
+		let req = self.add_subscriber::<Req>(topic_req)?.recast();
+		let res = self.add_publisher::<Res>(topic_res)?.recast();
 		Ok(Responder::new(req, res))
 	}
 
-	pub async fn add_requester<Req: Payload, Res: Payload>(
+	pub fn add_requester<Req: Payload, Res: Payload>(
 		&self,
 		address: impl Into<TopicAddress>,
 		method: TopicMethod,
@@ -32,8 +32,8 @@ impl Relay {
 		let topic_res =
 			Topic::new(address.clone(), TopicScheme::Response, method);
 
-		let req = self.add_publisher::<Req>(topic_req).await?.recast();
-		let res = self.add_subscriber::<Res>(topic_res).await?.recast();
+		let req = self.add_publisher::<Req>(topic_req)?.recast();
+		let res = self.add_subscriber::<Res>(topic_res)?.recast();
 		Ok(Requester::new(req, res))
 	}
 }

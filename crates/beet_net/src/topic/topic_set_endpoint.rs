@@ -10,7 +10,7 @@ use std::sync::RwLock;
 pub struct TopicSetEndpoint {
 	topic_set: Arc<RwLock<TopicSet>>,
 	/// For whenever this relay's pubs or subs gets updated, used by `self` to broadcast changes
-	on_change_pub: Publisher<TopicSet>,
+	_on_change_pub: Publisher<TopicSet>,
 	/// For whenever this relay's pubs or subs gets updated, use by others to listen for changes
 	on_change_sub: Subscriber<TopicSet>,
 }
@@ -28,7 +28,7 @@ impl TopicSetEndpoint {
 
 		Self {
 			topic_set: Default::default(),
-			on_change_pub,
+			_on_change_pub: on_change_pub,
 			on_change_sub,
 		}
 	}
@@ -52,7 +52,7 @@ impl TopicSetEndpoint {
 	}
 
 	/// Adds a publisher and triggers on_change if it didnt already exist
-	pub async fn add_publisher(
+	pub fn add_publisher(
 		&self,
 		topic: &Topic,
 		payload_type: &PayloadType,
@@ -60,13 +60,13 @@ impl TopicSetEndpoint {
 		let mut graph = self.topic_set.write().unwrap();
 
 		if graph.try_add_publisher(topic, payload_type)? {
-			self.on_change_pub.broadcast(&graph).await?;
+			self.broadcast_change_blocking(&graph)?;
 		}
 		Ok(())
 	}
 
 	/// Adds a subscriber and triggers on_change if it didnt already exist
-	pub async fn add_subscriber(
+	pub fn add_subscriber(
 		&self,
 		topic: &Topic,
 		payload_type: &PayloadType,
@@ -74,20 +74,26 @@ impl TopicSetEndpoint {
 		let mut graph = self.topic_set.write().unwrap();
 
 		if graph.try_add_subscriber(topic, payload_type)? {
-			self.on_change_pub.broadcast(&graph).await?;
-		}
+			self.broadcast_change_blocking(&graph)?;
+		};
+
 		Ok(())
 	}
 
 	/// Provides full mutable access to the graph through a callback
 	/// and triggers on_change
-	pub async fn mutate(
-		&mut self,
-		f: impl FnOnce(&mut TopicSet),
-	) -> Result<()> {
+	pub fn mutate(&mut self, f: impl FnOnce(&mut TopicSet)) -> Result<()> {
 		let mut graph = self.topic_set.write().unwrap();
 		f(&mut graph);
-		self.on_change_pub.broadcast(&graph).await?;
+		self.broadcast_change_blocking(&graph)?;
+		Ok(())
+	}
+
+	/// No-op for now, still working this out
+	fn broadcast_change_blocking(&self, _graph: &TopicSet) -> Result<()> {
+		// futures::executor::block_on(async {
+		// 	self.on_change_pub.broadcast(graph).await
+		// })?;
 		Ok(())
 	}
 }

@@ -9,7 +9,7 @@ pub async fn works() -> Result<()> {
 
 	let relay = Relay::default();
 
-	let _sub1 = relay.add_subscriber::<u8>(&topic).await?;
+	let _sub1 = relay.add_subscriber::<u8>(&topic)?;
 
 
 	Ok(())

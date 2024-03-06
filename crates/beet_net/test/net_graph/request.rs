@@ -7,12 +7,8 @@ pub async fn request() -> Result<()> {
 	pretty_env_logger::try_init().ok();
 	let relay = Relay::default();
 	let topic = TopicAddress::new("foo/bar");
-	let mut req = relay
-		.add_requester::<u8, u8>(&topic, TopicMethod::Update)
-		.await?;
-	let mut res = relay
-		.add_responder::<u8, u8>(&topic, TopicMethod::Update)
-		.await?;
+	let mut req = relay.add_requester::<u8, u8>(&topic, TopicMethod::Update)?;
+	let mut res = relay.add_responder::<u8, u8>(&topic, TopicMethod::Update)?;
 
 	// let mock_fn = mock_func(|val| val);
 	// let mock_fn2 = mock_fn.clone();

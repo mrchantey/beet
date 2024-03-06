@@ -13,5 +13,6 @@ categories = { workspace = true }
 
 
 [dependencies]
-beet_ecs = { workspace = true }
-beet_net = { workspace = true }
+beet_core.workspace = true
+beet_ecs.workspace = true
+beet_net.workspace = true

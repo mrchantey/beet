@@ -5,7 +5,7 @@ use petgraph::graph::DiGraph;
 use serde::Deserialize;
 use serde::Serialize;
 
-#[derive(Debug, Clone, Deref, DerefMut, Serialize, Deserialize)]
+#[derive(Debug, Clone, Deref, DerefMut, Serialize, Deserialize, Component)]
 pub struct EntityGraph(pub DiGraph<Entity, ()>);
 
 
