@@ -17,7 +17,7 @@ pub async fn works() -> Result<()> {
 
 	let mut send = SpawnEntityHandler::requester(&mut relay);
 	send.req_mut()
-		.broadcast(&SpawnEntity::with_position(Vec3::new(0., 0., 0.)))
+		.send(&SpawnEntity::with_position(Vec3::new(0., 0., 0.)))
 		.await?;
 
 	app.add_plugins(BeetPlugin::<BuiltinNode>::new(relay.clone()));

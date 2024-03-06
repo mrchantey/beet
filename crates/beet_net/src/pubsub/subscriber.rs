@@ -1,7 +1,7 @@
 use crate::prelude::*;
 use anyhow::Result;
-use async_broadcast::Receiver;
 use bevy_utils::Duration;
+use flume::Receiver;
 use std::marker::PhantomData;
 /// Typesafe wrapper for [`async_broadcast::Receiver`] for a specific topic.
 /// Held by the subscriber to listen for messages from the relay
@@ -37,27 +37,30 @@ impl<T: Payload> Subscriber<T> {
 		&mut self.recv
 	}
 
-	/// Typesafe [`async_broadcast::Receiver::recv`]
-	pub async fn recv_pinned(&mut self) -> Result<T> {
-		Ok(self.recv.recv().await?.payload()?)
+	/// Typesafe [`flume::Receiver::recv`]
+	pub fn recv(&mut self) -> Result<T> { Ok(self.recv.recv()?.payload()?) }
+	/// Typesafe [`flume::Receiver::recv`]
+	pub async fn recv_async(&mut self) -> Result<T> {
+		Ok(self.recv.recv_async().await?.payload()?)
+	}
+	/// Typesafe [`flume::Receiver::recv_timeout`]
+	pub fn recv_timeout(&mut self, timeout: std::time::Duration) -> Result<T> {
+		Ok(self.recv.recv_timeout(timeout)?.payload()?)
+	}
+	/// Typesafe [`flume::Receiver::recv_timeout`]
+	pub fn recv_default_timeout(&mut self) -> Result<T> {
+		Ok(self.recv.recv_timeout(DEFAULT_RECV_TIMEOUT)?.payload()?)
+	}
+	/// Typesafe [`flume::Receiver::recv_deadline`]
+	pub fn recv_deadline(&mut self, deadline: std::time::Instant) -> Result<T> {
+		Ok(self.recv.recv_deadline(deadline)?.payload()?)
+	}
+	/// Typesafe [`flume::Receiver::try_recv`]
+	pub fn try_recv(&mut self) -> Result<T> {
+		Ok(self.recv.try_recv()?.payload()?)
 	}
 
-	/// Typesafe [`async_broadcast::Receiver::recv_direct`]
-	pub async fn recv(&mut self) -> Result<T> {
-		Ok(self.recv.recv_direct().await?.payload()?)
-	}
-	#[cfg(feature = "tokio")]
-	pub async fn recv_timeout(
-		&mut self,
-		timeout: std::time::Duration,
-	) -> Result<T> {
-		Ok(tokio::time::timeout(timeout, self.recv()).await??)
-	}
-	#[cfg(feature = "tokio")]
-	pub async fn recv_default_timeout(&mut self) -> Result<T> {
-		Ok(tokio::time::timeout(DEFAULT_RECV_TIMEOUT, self.recv()).await??)
-	}
-
+	/// Typesafe [`flume::Receiver::try_recv_all`]
 	pub fn try_recv_all(&mut self) -> Result<Vec<T>> {
 		let vec = self
 			.recv
@@ -65,10 +68,6 @@ impl<T: Payload> Subscriber<T> {
 			.into_iter()
 			.map(|message| message.payload())
 			.collect::<Result<Vec<_>>>()?;
-		Ok(vec)
-	}
-	pub fn try_recv_all_messages(&mut self) -> Result<Vec<StateMessage>> {
-		let vec = self.recv.try_recv_all()?.into_iter().collect();
 		Ok(vec)
 	}
 }

@@ -14,7 +14,7 @@ test-ecs *args:
 	just watch 'cargo run -p beet_ecs 	--example test_beet_ecs 														$BEET_CARGO_TEST -- -w {{args}}'
 
 test-net *args:
-	just watch 'cargo run -p beet_net 	--example test_beet_net --features="beet_net/tokio" $BEET_CARGO_TEST -- -w {{args}}'
+	just watch 'cargo run -p beet_net 	--example test_beet_net $BEET_CARGO_TEST -- -w {{args}}'
 
 
 

@@ -1,7 +1,7 @@
 use crate::prelude::*;
 use anyhow::Result;
-use async_broadcast::Receiver;
 use bevy_utils::HashMap;
+use flume::Receiver;
 use std::sync::Arc;
 use std::sync::RwLock;
 
@@ -90,7 +90,7 @@ impl TopicChannelMap {
 	pub async fn try_broadcast(&self, message: StateMessage) -> Result<bool> {
 		let topic = message.topic.clone();
 		if let Some(channel) = self.try_get_channel(&topic) {
-			channel.send.broadcast(message).await?;
+			channel.send.send_async(message).await?;
 			Ok(true)
 		} else {
 			Ok(false)
@@ -130,7 +130,7 @@ impl TopicChannelMap {
 			let channel = self.try_get_channel(&message.topic);
 			async {
 				let result: Result<_> = if let Some(channel) = channel {
-					channel.send.broadcast_direct(message).await?;
+					channel.send.send_async(message).await?; //TODO probs doesnt need to be async
 					Ok(None)
 				} else {
 					Ok(Some(message))

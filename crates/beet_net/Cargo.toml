@@ -13,11 +13,11 @@ categories.workspace = true
 
 [features]
 default = []
-tokio = ["dep:tokio"]
+# tokio = ["dep:tokio"]
 
 [dependencies]
 anyhow.workspace = true
-async-broadcast.workspace = true
+flume.workspace = true
 extend.workspace = true
 futures.workspace = true
 parking_lot.workspace = true
@@ -31,7 +31,7 @@ bevy_derive.workspace = true
 bevy_utils.workspace = true
 log.workspace = true
 
-tokio = { workspace = true, optional = true }
+# tokio = { workspace = true, optional = true }
 # [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 
 [dev-dependencies]
@@ -42,4 +42,4 @@ sweet.workspace = true
 [[example]]
 name = "test_beet_net"
 path = "test/sweet.rs"
-required-features = ["tokio"]
+# required-features = ["tokio"]

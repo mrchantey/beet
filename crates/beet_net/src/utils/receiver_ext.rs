@@ -1,5 +1,5 @@
-use async_broadcast::Receiver;
-use async_broadcast::TryRecvError;
+use flume::Receiver;
+use flume::TryRecvError;
 use std::error::Error;
 use std::fmt;
 
@@ -13,12 +13,11 @@ pub impl<T: Clone> Receiver<T> {
 			match self.try_recv() {
 				Ok(message) => vec.push(message),
 				Err(TryRecvError::Empty) => break Ok(vec),
-				Err(TryRecvError::Closed) => {
-					break Err(TryRecvAllError::Closed)
-				}
-				Err(TryRecvError::Overflowed(val)) => {
-					break Err(TryRecvAllError::Overflowed(val))
-				}
+				Err(TryRecvError::Disconnected) => {
+					break Err(TryRecvAllError::Disconnected)
+				} // Err(TryRecvError::Overflowed(val)) => {
+				  // 	break Err(TryRecvAllError::Overflowed(val))
+				  // }
 			}
 		}
 	}
@@ -43,15 +42,15 @@ pub enum TryRecvAllError {
 	/// succeed, but some messages have been skipped.
 	Overflowed(u64),
 	/// The channel is empty and closed.
-	Closed,
+	Disconnected,
 }
 impl Error for TryRecvAllError {}
 
 impl fmt::Display for TryRecvAllError {
 	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
 		match *self {
-			TryRecvAllError::Closed => {
-				write!(f, "receiving from an empty and closed channel")
+			TryRecvAllError::Disconnected => {
+				write!(f, "receiving from an empty and disconnected channel")
 			}
 			TryRecvAllError::Overflowed(n) => {
 				write!(f, "receiving operation observed {} lost messages", n)

@@ -1,9 +1,6 @@
 use super::*;
-use crate::prelude::*;
 use anyhow::Result;
-
-
-
+use std::ops::ControlFlow;
 
 #[derive(Debug, Clone)]
 pub struct Requester<Req: Payload, Res: Payload> {
@@ -16,21 +13,42 @@ impl<Req: Payload, Res: Payload> Requester<Req, Res> {
 		Self { req, res }
 	}
 
+	pub fn start_request(&mut self, req: &Req) -> Result<MessageId> {
+		self.req.send(&req)
+	}
 
-	pub async fn request(&mut self, req: &Req) -> Result<Res> {
-		let id = self.req.broadcast(req).await?;
+	pub fn block_on_response(&mut self, id: MessageId) -> Result<Res> {
 		let recv = self.res.recv_inner_mut();
 		loop {
-			match recv.recv_direct().await {
-				Ok(msg) => {
-					if msg.id == id {
-						break Ok(msg.payload()?);
-					}
-				}
-				Err(e) => break Err(e.into()),
+			match Self::check_received(recv.recv()?, id)? {
+				ControlFlow::Break(val) => break Ok(val),
+				_ => {}
 			}
 		}
 	}
+
+	pub async fn request(&mut self, req: &Req) -> Result<Res> {
+		let id = self.req.send(req)?;
+		let recv = self.res.recv_inner_mut();
+		loop {
+			match Self::check_received(recv.recv_async().await?, id)? {
+				ControlFlow::Break(val) => break Ok(val),
+				_ => {}
+			}
+		}
+	}
+
+	fn check_received(
+		msg: StateMessage,
+		id: MessageId,
+	) -> Result<ControlFlow<Res, ()>> {
+		if msg.id == id {
+			Ok(ControlFlow::Break(msg.payload()?))
+		} else {
+			Ok(ControlFlow::Continue(()))
+		}
+	}
+
 	pub fn req(&self) -> &Publisher<Req> { &self.req }
 	pub fn res(&self) -> &Subscriber<Res> { &self.res }
 	pub fn req_mut(&mut self) -> &mut Publisher<Req> { &mut self.req }

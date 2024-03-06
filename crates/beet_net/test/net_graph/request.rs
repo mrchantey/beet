@@ -10,23 +10,10 @@ pub async fn request() -> Result<()> {
 	let mut req = relay.add_requester::<u8, u8>(&topic, TopicMethod::Update)?;
 	let mut res = relay.add_responder::<u8, u8>(&topic, TopicMethod::Update)?;
 
-	// let mock_fn = mock_func(|val| val);
-	// let mock_fn2 = mock_fn.clone();
+	let id = req.start_request(&32)?;
+	res.try_handle_next(|val| val * 2)?;
 
-	let handle = tokio::spawn(async move {
-		// let mock_fn = mock_fn2.clone();
-		res.handle_requests_forever(|req| {
-			let val = req * 2;
-			// log::info!("wadduip");
-			// mock_fn.clone().call(val);
-			val
-		})
-		.await
-	});
-	// expect(&mock_fn).to_have_returned_with(&64)?;
-
-	let res = req.request(&32).await?;
+	let res = req.block_on_response(id)?;
 	expect(res).to_be(64)?;
-	handle.abort();
 	Ok(())
 }

@@ -10,7 +10,7 @@ use std::sync::RwLock;
 pub struct TopicSetEndpoint {
 	topic_set: Arc<RwLock<TopicSet>>,
 	/// For whenever this relay's pubs or subs gets updated, used by `self` to broadcast changes
-	_on_change_pub: Publisher<TopicSet>,
+	on_change_pub: Publisher<TopicSet>,
 	/// For whenever this relay's pubs or subs gets updated, use by others to listen for changes
 	on_change_sub: Subscriber<TopicSet>,
 }
@@ -28,7 +28,7 @@ impl TopicSetEndpoint {
 
 		Self {
 			topic_set: Default::default(),
-			_on_change_pub: on_change_pub,
+			on_change_pub,
 			on_change_sub,
 		}
 	}
@@ -60,7 +60,7 @@ impl TopicSetEndpoint {
 		let mut graph = self.topic_set.write().unwrap();
 
 		if graph.try_add_publisher(topic, payload_type)? {
-			self.broadcast_change_blocking(&graph)?;
+			self.on_change_pub.send(&graph)?;
 		}
 		Ok(())
 	}
@@ -74,7 +74,7 @@ impl TopicSetEndpoint {
 		let mut graph = self.topic_set.write().unwrap();
 
 		if graph.try_add_subscriber(topic, payload_type)? {
-			self.broadcast_change_blocking(&graph)?;
+			self.on_change_pub.send(&graph)?;
 		};
 
 		Ok(())
@@ -85,15 +85,7 @@ impl TopicSetEndpoint {
 	pub fn mutate(&mut self, f: impl FnOnce(&mut TopicSet)) -> Result<()> {
 		let mut graph = self.topic_set.write().unwrap();
 		f(&mut graph);
-		self.broadcast_change_blocking(&graph)?;
-		Ok(())
-	}
-
-	/// No-op for now, still working this out
-	fn broadcast_change_blocking(&self, _graph: &TopicSet) -> Result<()> {
-		// futures::executor::block_on(async {
-		// 	self.on_change_pub.broadcast(graph).await
-		// })?;
+		self.on_change_pub.send(&graph)?;
 		Ok(())
 	}
 }

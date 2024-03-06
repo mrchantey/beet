@@ -1,6 +1,6 @@
 use crate::prelude::*;
 use anyhow::Result;
-use async_broadcast::Sender;
+use flume::Sender;
 use std::marker::PhantomData;
 use std::sync::Arc;
 
@@ -44,27 +44,17 @@ impl<T: Payload> Publisher<T> {
 	pub fn topic(&self) -> &Topic { &self.topic }
 	pub fn send_inner(&self) -> &Sender<StateMessage> { &self.send }
 
-	/// Typesafe [`async_broadcast::Sender::broadcast`]
-	pub async fn broadcast_pinned(&self, payload: &T) -> Result<MessageId> {
+
+	fn into_message(&self, payload: &T) -> Result<StateMessage> {
 		let message_id = self.message_incr.next();
-		let message =
-			StateMessage::new(self.topic.clone(), payload, message_id)?;
-
-		let _ = self.send.broadcast(message.clone()).await?;
-
-		Ok(message_id)
+		StateMessage::new(self.topic.clone(), payload, message_id)
 	}
-	/// Typesafe [`async_broadcast::Sender::broadcast_direct`]
-	pub async fn broadcast(&self, payload: &T) -> Result<MessageId> {
-		let message_id = self.message_incr.next();
 
-		let message =
-			StateMessage::new(self.topic.clone(), payload, message_id)?;
-
-		let _ = self.send.broadcast_direct(message.clone()).await?;
-		Ok(message_id)
+	/// Typesafe [`flume::Sender::send`]
+	pub fn send(&self, payload: &T) -> Result<MessageId> {
+		let message = self.into_message(payload)?;
+		let id = message.id;
+		self.send.send(message)?;
+		Ok(id)
 	}
-	// pub fn broadcast_blocking(&self, payload: &T) -> Result<MessageId> {
-	// 	futures::executor::block_on(self.broadcast(payload))
-	// }
 }

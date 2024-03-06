@@ -1,7 +1,7 @@
 use crate::prelude::*;
 use anyhow::Result;
-use async_broadcast::Receiver;
-use async_broadcast::Sender;
+use flume::Receiver;
+use flume::Sender;
 
 
 #[derive(Debug, Default, Clone)]
@@ -19,8 +19,8 @@ impl<T: 'static + Clone + Send + Sync> LoopbackBroadcast<T> {
 
 	/// Call this inside a [`loop`], it will wait asynchronously for the next value to be sent
 	pub async fn update(&mut self) -> Result<()> {
-		let value = self.recv.recv.recv_direct().await?;
-		self.send.send.broadcast_direct(value).await?;
+		let value = self.recv.recv.recv_async().await?;
+		self.send.send.send_async(value).await?;
 		Ok(())
 	}
 }

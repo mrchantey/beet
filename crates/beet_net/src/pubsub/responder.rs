@@ -27,12 +27,12 @@ impl<Req: Payload, Res: Payload> Responder<Req, Res> {
 		mut handler: impl FnMut(Req) -> Res,
 	) -> Result<()> {
 		let recv = self.req.recv_inner_mut();
-		if let Ok(next) = recv.recv_direct().await {
+		if let Ok(next) = recv.recv_async().await {
 			let id = next.id;
 			let response = handler(next.payload()?);
 			self.res
 				.send_inner()
-				.broadcast_direct(StateMessage::new(
+				.send_async(StateMessage::new(
 					self.res.topic().clone(),
 					&response,
 					id,
@@ -41,7 +41,7 @@ impl<Req: Payload, Res: Payload> Responder<Req, Res> {
 		}
 		Ok(())
 	}
-	pub async fn try_handle_next(
+	pub fn try_handle_next(
 		&mut self,
 		mut handler: impl FnMut(Req) -> Res,
 	) -> Result<()> {
@@ -49,14 +49,11 @@ impl<Req: Payload, Res: Payload> Responder<Req, Res> {
 		if let Ok(next) = recv.try_recv() {
 			let id = next.id;
 			let response = handler(next.payload()?);
-			self.res
-				.send_inner()
-				.broadcast_direct(StateMessage::new(
-					self.res.topic().clone(),
-					&response,
-					id,
-				)?)
-				.await?;
+			self.res.send_inner().send(StateMessage::new(
+				self.res.topic().clone(),
+				&response,
+				id,
+			)?)?;
 		}
 		Ok(())
 	}

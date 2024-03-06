@@ -56,8 +56,8 @@ heck = "0.4.1"
 
 ## async
 futures = "0.3"
-async-broadcast = "0.5.0" # fast alternative to std::sync::mpsc
-parking_lot = "0.12"      # fast alternative std::sync::Mutex/RwLock
+flume = "0.11"       # fast alternative to std::sync::mpsc
+parking_lot = "0.12" # fast alternative std::sync::Mutex/RwLock
 # flume = { version = "0.11", default-features = false, features = ["async"] }
 
 ## async-native

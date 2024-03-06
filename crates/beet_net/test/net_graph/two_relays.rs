@@ -25,10 +25,10 @@ async fn cross_boundary_topic_changed() -> Result<()> {
 	let pub1 = relay1.add_publisher::<u32>(&topic)?;
 	let mut sub2 = relay2.add_subscriber::<u32>(&topic)?;
 
-	pub1.broadcast(&8).await?;
+	pub1.send(&8)?;
 
 	relay1.sync_local(&mut relay2).await?;
-	expect(sub2.recv_default_timeout().await?).to_be(8)?;
+	expect(sub2.recv_default_timeout()?).to_be(8)?;
 
 	Ok(())
 }
@@ -42,10 +42,10 @@ async fn cross_boundary_errors() -> Result<()> {
 
 	let mut relay2 = Relay::default();
 
-	pub1.broadcast(&8).await?;
+	pub1.send(&8)?;
 	let mut sub2 = relay2.add_subscriber::<u8>(&topic)?;
 	relay1.sync_local(&mut relay2).await?;
-	expect(sub2.recv_default_timeout().await).to_be_err_str(
+	expect(sub2.recv_default_timeout()).to_be_err_str(
 		"Type mismatch for foo/bar:0\nexpected u32, received u8",
 	)?;
 

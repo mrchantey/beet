@@ -1,7 +1,8 @@
-use async_broadcast::Receiver;
-use async_broadcast::Sender;
+use flume::Receiver;
+use flume::Sender;
 
-pub const DEFAULT_BROADCAST_CHANNEL_CAPACITY: usize = 4;
+// absolutely arbitary at this point
+// pub const DEFAULT_BROADCAST_CHANNEL_CAPACITY: usize = 128;
 
 
 #[derive(Debug, Clone)]
@@ -12,16 +13,17 @@ pub struct BroadcastChannel<T> {
 
 
 impl<T> Default for BroadcastChannel<T> {
-	fn default() -> Self {
-		let (send, recv) =
-			async_broadcast::broadcast(DEFAULT_BROADCAST_CHANNEL_CAPACITY);
-		Self { send, recv }
-	}
+	fn default() -> Self { Self::unbounded() }
 }
 
 impl<T> BroadcastChannel<T> {
-	pub fn new(capacity: usize) -> Self {
-		let (send, recv) = async_broadcast::broadcast(capacity);
+	pub fn unbounded() -> Self {
+		let (send, recv) = flume::unbounded();
+		Self { send, recv }
+	}
+
+	pub fn bounded(capacity: usize) -> Self {
+		let (send, recv) = flume::bounded(capacity);
 		Self { send, recv }
 	}
 }
