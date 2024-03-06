@@ -7,6 +7,7 @@ pub mod node;
 pub mod ui;
 
 // allows proc macros to work internally
+extern crate self as beet;
 extern crate self as beet_ecs;
 
 pub mod prelude {
@@ -31,4 +32,6 @@ pub mod exports {
 	pub use serde;
 	pub use serde::Deserialize;
 	pub use serde::Serialize;
+	pub use strum_macros::Display;
+	pub use strum_macros::EnumIter;
 }

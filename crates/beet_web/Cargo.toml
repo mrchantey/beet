@@ -32,6 +32,9 @@ serde_json = { workspace = true, optional = true }
 
 bevy_math.workspace = true
 
+## only needed for action_list!
+strum.workspace = true
+
 ## web
 console_log = "1.0"
 js-sys = "0.3.63"

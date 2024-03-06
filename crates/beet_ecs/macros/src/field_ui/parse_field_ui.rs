@@ -23,7 +23,7 @@ pub fn parse_field_ui(item: proc_macro::TokenStream) -> Result<TokenStream> {
 
 
 	Ok(quote! {
-		use beet_ecs::prelude::*;
+		use beet::prelude::*;
 		impl IntoFieldUi for #ident{
 			fn into_field_ui(reflect: FieldReflect<Self>) -> FieldUi {
 				#out

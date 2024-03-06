@@ -24,6 +24,9 @@ clean-repo:
 env:
 	@echo $RUST_LOG
 
+expand crate example *args:
+	just watch 'cargo expand -p {{crate}} --example {{example}} {{args}}'
+
 publish crate *args:
 	cargo publish -p {{crate}} --allow-dirty --no-verify {{args}}
 	sleep 2
