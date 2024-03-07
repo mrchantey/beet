@@ -30,14 +30,11 @@ impl<Req: Payload, Res: Payload> Responder<Req, Res> {
 		if let Ok(next) = recv.recv_async().await {
 			let id = next.id;
 			let response = handler(next.payload()?);
-			self.res
-				.send_inner()
-				.send_async(StateMessage::new(
-					self.res.topic().clone(),
-					&response,
-					id,
-				)?)
-				.await?;
+			self.res.channel_inner().push(StateMessage::new(
+				self.res.topic().clone(),
+				&response,
+				id,
+			)?)?;
 		}
 		Ok(())
 	}
@@ -49,7 +46,7 @@ impl<Req: Payload, Res: Payload> Responder<Req, Res> {
 		if let Ok(next) = recv.try_recv() {
 			let id = next.id;
 			let response = handler(next.payload()?);
-			self.res.send_inner().send(StateMessage::new(
+			self.res.channel_inner().push(StateMessage::new(
 				self.res.topic().clone(),
 				&response,
 				id,

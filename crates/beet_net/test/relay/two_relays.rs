@@ -25,7 +25,7 @@ async fn cross_boundary_topic_changed() -> Result<()> {
 	let pub1 = relay1.add_publisher_with_topic::<u32>(&topic)?;
 	let mut sub2 = relay2.add_subscriber_with_topic::<u32>(&topic)?;
 
-	pub1.send(&8)?;
+	pub1.push(&8)?;
 
 	relay1.sync_local(&mut relay2).await?;
 	expect(sub2.recv_default_timeout()?).to_be(8)?;
@@ -42,7 +42,7 @@ async fn cross_boundary_errors() -> Result<()> {
 
 	let mut relay2 = Relay::default();
 
-	pub1.send(&8)?;
+	pub1.push(&8)?;
 	let mut sub2 = relay2.add_subscriber_with_topic::<u8>(&topic)?;
 	relay1.sync_local(&mut relay2).await?;
 	expect(sub2.recv_default_timeout()).to_be_err_str(

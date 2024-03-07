@@ -12,7 +12,7 @@ impl Relay {
 		topic: impl Into<Topic>,
 		payload: &T,
 	) -> Result<MessageId> {
-		self.add_publisher_with_topic(topic)?.send(payload)
+		self.add_publisher_with_topic(topic)?.push(payload)
 	}
 
 	/// recv once without keeping a subscriber
@@ -52,11 +52,11 @@ impl Relay {
 		let topic = &topic.into();
 		self.endpoint.add_publisher(topic, payload_type)?;
 
-		let send = self.channel_map.get_or_insert_channel(topic).send;
+		let channel = self.channel_map.get_or_insert_channel(topic);
 
 		Ok(Publisher::new(
 			topic.clone(),
-			send,
+			channel,
 			Arc::clone(&self.channel_map.message_id_incr),
 		))
 	}

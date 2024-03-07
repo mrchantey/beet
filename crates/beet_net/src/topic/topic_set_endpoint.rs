@@ -60,7 +60,7 @@ impl TopicSetEndpoint {
 		let mut graph = self.topic_set.write().unwrap();
 
 		if graph.try_add_publisher(topic, payload_type)? {
-			self.on_change_pub.send(&graph)?;
+			self.on_change_pub.push(&graph)?;
 		}
 		Ok(())
 	}
@@ -74,7 +74,7 @@ impl TopicSetEndpoint {
 		let mut graph = self.topic_set.write().unwrap();
 
 		if graph.try_add_subscriber(topic, payload_type)? {
-			self.on_change_pub.send(&graph)?;
+			self.on_change_pub.push(&graph)?;
 		};
 
 		Ok(())
@@ -85,7 +85,7 @@ impl TopicSetEndpoint {
 	pub fn mutate(&mut self, f: impl FnOnce(&mut TopicSet)) -> Result<()> {
 		let mut graph = self.topic_set.write().unwrap();
 		f(&mut graph);
-		self.on_change_pub.send(&graph)?;
+		self.on_change_pub.push(&graph)?;
 		Ok(())
 	}
 }

@@ -188,6 +188,8 @@ impl Topic {
 		}
 	}
 
+	/// Create a topic with [`TopicScheme::PubSub`], [`TopicMethod::Create`], and [`QosHistory::Bounded`] with capacity of 1.
+	/// The channel will store at most one message.
 	pub fn pubsub_update(address: impl Into<TopicAddress>) -> Self {
 		Self {
 			address: address.into(),
@@ -207,28 +209,3 @@ impl Topic {
 impl Into<Topic> for &Topic {
 	fn into(self) -> Topic { self.clone() }
 }
-
-// #[derive(Debug, Clone)]
-// pub struct TopicChannel {
-// 	pub payload_type: PayloadType,
-// 	pub send: Sender<StateMessage>,
-// 	pub recv: Receiver<StateMessage>,
-// }
-
-
-
-// impl TopicChannel {
-// 	pub fn new_generic<T: Payload>() -> Self {
-// 		Self::new(dodgy_get_payload_type::<T>())
-// 	}
-// 	pub fn new(payload_type: PayloadType) -> Self {
-// 		let (send, recv) =
-// 			async_broadcast::broadcast(DEFAULT_BROADCAST_CHANNEL_CAPACITY);
-// 		Self {
-// 			payload_type,
-// 			send,
-// 			recv,
-// 		}
-// 	}
-// 	pub fn payload_type(&self) -> &PayloadType { &self.payload_type }
-// }

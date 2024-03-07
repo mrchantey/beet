@@ -1,6 +1,5 @@
 use crate::prelude::*;
 use anyhow::Result;
-use flume::Sender;
 use std::marker::PhantomData;
 use std::sync::Arc;
 
@@ -9,7 +8,7 @@ use std::sync::Arc;
 #[derive(Debug, Clone)]
 pub struct Publisher<T: Payload> {
 	topic: Topic,
-	send: Sender<StateMessage>,
+	channel: BroadcastChannel<StateMessage>,
 	message_incr: Arc<IdIncr>,
 	phantom: PhantomData<T>,
 }
@@ -17,12 +16,12 @@ pub struct Publisher<T: Payload> {
 impl<T: Payload> Publisher<T> {
 	pub fn new(
 		topic: Topic,
-		send: Sender<StateMessage>,
+		channel: BroadcastChannel<StateMessage>,
 		message_incr: Arc<IdIncr>,
 	) -> Self {
 		Self {
 			topic,
-			send,
+			channel,
 			message_incr,
 			phantom: PhantomData,
 		}
@@ -31,19 +30,21 @@ impl<T: Payload> Publisher<T> {
 	pub fn recast<U: Payload>(self) -> Publisher<U> {
 		let Publisher {
 			topic,
-			send,
+			channel,
 			message_incr,
 			..
 		} = self;
 		Publisher {
 			topic,
-			send,
+			channel,
 			message_incr,
 			phantom: PhantomData,
 		}
 	}
 	pub fn topic(&self) -> &Topic { &self.topic }
-	pub fn send_inner(&self) -> &Sender<StateMessage> { &self.send }
+	pub fn channel_inner(&self) -> &BroadcastChannel<StateMessage> {
+		&self.channel
+	}
 
 
 	fn into_message(&self, payload: &T) -> Result<StateMessage> {
@@ -51,11 +52,10 @@ impl<T: Payload> Publisher<T> {
 		StateMessage::new(self.topic.clone(), payload, message_id)
 	}
 
-	/// Typesafe [`flume::Sender::send`]
-	pub fn send(&self, payload: &T) -> Result<MessageId> {
+	pub fn push(&self, payload: &T) -> Result<MessageId> {
 		let message = self.into_message(payload)?;
 		let id = message.id;
-		self.send.send(message)?;
+		self.channel.push(message)?;
 		Ok(id)
 	}
 }

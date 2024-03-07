@@ -14,7 +14,7 @@ impl<Req: Payload, Res: Payload> Requester<Req, Res> {
 	}
 
 	pub fn start_request(&mut self, req: &Req) -> Result<MessageId> {
-		self.req.send(&req)
+		self.req.push(&req)
 	}
 
 	pub fn block_on_response(&mut self, id: MessageId) -> Result<Res> {
@@ -28,7 +28,7 @@ impl<Req: Payload, Res: Payload> Requester<Req, Res> {
 	}
 
 	pub async fn request(&mut self, req: &Req) -> Result<Res> {
-		let id = self.req.send(req)?;
+		let id = self.req.push(req)?;
 		let recv = self.res.recv_inner_mut();
 		loop {
 			match Self::check_received(recv.recv_async().await?, id)? {

@@ -62,7 +62,7 @@ impl TopicChannelMap {
 
 		let publisher = Publisher::new(
 			topic.clone(),
-			channel.send.clone(),
+			channel.clone(),
 			self.message_id_incr.clone(),
 		);
 

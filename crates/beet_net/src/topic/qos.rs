@@ -62,8 +62,10 @@ pub enum QosPolicy {
 	Display,
 )]
 pub enum QosHistory {
+	/// No limit to the number of messages stored
 	#[default]
 	Unbounded,
+	/// Only the last N messages are stored
 	Bounded(usize),
 }
 
