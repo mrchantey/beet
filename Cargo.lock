@@ -344,6 +344,8 @@ dependencies = [
  "beet",
  "bevy_app",
  "bevy_math",
+ "bevy_time",
+ "bevy_transform",
  "bincode",
  "console_error_panic_hook",
  "console_log",

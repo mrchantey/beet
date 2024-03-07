@@ -56,29 +56,18 @@ pub struct ItemIntoBehaviorNode;
 pub struct VecIntoBehaviorNode;
 pub struct IntoIntoBehaviorNode;
 
-// impl<T: Action, U, V, M2> IntoBehaviorNode<(IntoIntoIntoBehaviorNode, V, M2), T>
-// 	for U
-// where
-// 	U: Into<V>,
-// 	V: IntoBehaviorNode<M2, T>,
-// {
-// 	fn into_behavior_node(self) -> BehaviorNode<T> {
-// 		self.into().into_behavior_node()
-// 	}
-// }
-// impl<T: Action, U> IntoBehaviorNode<IntoIntoBehaviorNode, T> for U
-// where
-// 	U: Into<BehaviorNode<T>>,
-// {
-// 	fn into_behavior_node(self) -> BehaviorNode<T> { self.into() }
-// }
+impl<T: Action, U> IntoBehaviorNode<IntoIntoBehaviorNode, T> for U
+where
+	U: Into<BehaviorNode<T>>,
+{
+	fn into_behavior_node(self) -> BehaviorNode<T> { self.into() }
+}
+
+impl<T: Action> IntoBehaviorNode<VecIntoBehaviorNode, T> for Vec<T> {
+	fn into_behavior_node(self) -> BehaviorNode<T> { BehaviorNode::new(self) }
+}
 
 
-// impl<T: Action> IntoBehaviorNode<ItemIntoBehaviorNode, T> for T {
-// 	fn into_behavior_node(self) -> BehaviorNode<T> {
-// 		BehaviorNode::new(vec![self])
-// 	}
-// }
 impl<T: Action, U1: Into<T>> IntoBehaviorNode<(ItemIntoBehaviorNode, U1), T>
 	for U1
 {
@@ -95,17 +84,121 @@ impl<T: Action, U1: Into<T>, U2: Into<T>>
 		BehaviorNode::new(vec![u1.into(), u2.into()])
 	}
 }
-
-impl<T: Action> IntoBehaviorNode<VecIntoBehaviorNode, T> for Vec<T> {
-	fn into_behavior_node(self) -> BehaviorNode<T> { BehaviorNode::new(self) }
+impl<T: Action, U1: Into<T>, U2: Into<T>, U3: Into<T>>
+	IntoBehaviorNode<(ItemIntoBehaviorNode, U1, U2, U3), T> for (U1, U2, U3)
+{
+	fn into_behavior_node(self) -> BehaviorNode<T> {
+		let (u1, u2, u3) = self;
+		BehaviorNode::new(vec![u1.into(), u2.into(), u3.into()])
+	}
 }
 
-// impl<T: IntoAction> Into<Tree<BehaviorNode<T>>> for BehaviorNode<T> {
-// 	fn into(self) -> Tree<BehaviorNode<T>> { Tree::new(self) }
-// }
-// impl<T: IntoAction, U, M> Into<Tree<BehaviorNode<T>>> for U
-// where
-// 	U: IntoBehaviorNode<M, T>,
-// {
-// 	fn into(self) -> Tree<BehaviorNode<T>> { Tree::new(self) }
-// }
+impl<T: Action, U1: Into<T>, U2: Into<T>, U3: Into<T>, U4: Into<T>>
+	IntoBehaviorNode<(ItemIntoBehaviorNode, U1, U2, U3, U4), T>
+	for (U1, U2, U3, U4)
+{
+	fn into_behavior_node(self) -> BehaviorNode<T> {
+		let (u1, u2, u3, u4) = self;
+		BehaviorNode::new(vec![u1.into(), u2.into(), u3.into(), u4.into()])
+	}
+}
+
+impl<
+		T: Action,
+		U1: Into<T>,
+		U2: Into<T>,
+		U3: Into<T>,
+		U4: Into<T>,
+		U5: Into<T>,
+	> IntoBehaviorNode<(ItemIntoBehaviorNode, U1, U2, U3, U4, U5), T>
+	for (U1, U2, U3, U4, U5)
+{
+	fn into_behavior_node(self) -> BehaviorNode<T> {
+		let (u1, u2, u3, u4, u5) = self;
+		BehaviorNode::new(vec![
+			u1.into(),
+			u2.into(),
+			u3.into(),
+			u4.into(),
+			u5.into(),
+		])
+	}
+}
+
+impl<
+		T: Action,
+		U1: Into<T>,
+		U2: Into<T>,
+		U3: Into<T>,
+		U4: Into<T>,
+		U5: Into<T>,
+		U6: Into<T>,
+	> IntoBehaviorNode<(ItemIntoBehaviorNode, U1, U2, U3, U4, U5, U6), T>
+	for (U1, U2, U3, U4, U5, U6)
+{
+	fn into_behavior_node(self) -> BehaviorNode<T> {
+		let (u1, u2, u3, u4, u5, u6) = self;
+		BehaviorNode::new(vec![
+			u1.into(),
+			u2.into(),
+			u3.into(),
+			u4.into(),
+			u5.into(),
+			u6.into(),
+		])
+	}
+}
+
+impl<
+		T: Action,
+		U1: Into<T>,
+		U2: Into<T>,
+		U3: Into<T>,
+		U4: Into<T>,
+		U5: Into<T>,
+		U6: Into<T>,
+		U7: Into<T>,
+	> IntoBehaviorNode<(ItemIntoBehaviorNode, U1, U2, U3, U4, U5, U6, U7), T>
+	for (U1, U2, U3, U4, U5, U6, U7)
+{
+	fn into_behavior_node(self) -> BehaviorNode<T> {
+		let (u1, u2, u3, u4, u5, u6, u7) = self;
+		BehaviorNode::new(vec![
+			u1.into(),
+			u2.into(),
+			u3.into(),
+			u4.into(),
+			u5.into(),
+			u6.into(),
+			u7.into(),
+		])
+	}
+}
+
+impl<
+		T: Action,
+		U1: Into<T>,
+		U2: Into<T>,
+		U3: Into<T>,
+		U4: Into<T>,
+		U5: Into<T>,
+		U6: Into<T>,
+		U7: Into<T>,
+		U8: Into<T>,
+	> IntoBehaviorNode<(ItemIntoBehaviorNode, U1, U2, U3, U4, U5, U6, U7, U8), T>
+	for (U1, U2, U3, U4, U5, U6, U7, U8)
+{
+	fn into_behavior_node(self) -> BehaviorNode<T> {
+		let (u1, u2, u3, u4, u5, u6, u7, u8) = self;
+		BehaviorNode::new(vec![
+			u1.into(),
+			u2.into(),
+			u3.into(),
+			u4.into(),
+			u5.into(),
+			u6.into(),
+			u7.into(),
+			u8.into(),
+		])
+	}
+}

@@ -9,11 +9,20 @@ use web_sys::Document;
 use web_sys::HtmlDivElement;
 use web_sys::HtmlElement;
 
-
 pub struct GameConfig {
 	pub relay: Relay,
 	pub graph: BehaviorGraph<BeeNode>,
 	pub flower: bool,
+}
+
+impl Default for GameConfig {
+	fn default() -> Self {
+		Self {
+			relay: Relay::default(),
+			graph: BehaviorGraph::new(),
+			flower: true,
+		}
+	}
 }
 
 pub struct BeeGame {

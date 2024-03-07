@@ -5,25 +5,10 @@ use sweet::*;
 
 #[sweet_test]
 pub async fn works() -> Result<()> {
-	// expect(true).to_be_false()?;
-	let relay = Relay::default();
-
-
-	let graph = BehaviorTree::default().into_action_graph();
-
-	// let graph = BehaviorTree::new(
-	// 	vec![Translate::new(Vec3::new(-0.1, 0., 0.)).into()].into(),
-	// )
-	// .into_action_graph();
-
-	let game = GameConfig {
-		relay: relay.clone(),
-		graph,
-		flower: true,
-	};
-
-
-	run(game);
-
+	run(GameConfig {
+		graph: BehaviorTree::new(Translate::new(Vec3::new(-0.1, 0., 0.)))
+			.into_action_graph(),
+		..Default::default()
+	});
 	Ok(())
 }

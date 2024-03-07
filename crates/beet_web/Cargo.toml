@@ -34,6 +34,8 @@ serde_json = { workspace = true, optional = true }
 
 bevy_app.workspace = true
 bevy_math.workspace = true
+bevy_time.workspace = true
+bevy_transform.workspace = true
 
 ## only needed for action_list!
 strum.workspace = true

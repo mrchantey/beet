@@ -21,8 +21,8 @@ pub fn parse_action(
 	remove_field_attributes(&mut input);
 
 	Ok(quote! {
-		use beet_ecs::prelude::*;
-		use beet_ecs::exports::*;
+		use beet::prelude::*;
+		use beet::exports::*;
 		// #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Component)]
 		#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Component, FieldUi)]
 		#input

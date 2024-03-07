@@ -10,7 +10,6 @@ impl<T: ActionSuper> Default for BehaviorTree<T> {
 }
 
 impl<T: ActionSuper> BehaviorTree<T> {
-	// pub fn new() -> Self { Self::default() }
 	pub fn new<M>(item: impl IntoBehaviorNode<M, T>) -> Self {
 		Self(Tree::new(item.into_behavior_node()))
 	}
@@ -19,12 +18,6 @@ impl<T: ActionSuper> BehaviorTree<T> {
 		self.0 = self.0.with_child(child.into_behavior_tree().0);
 		self
 	}
-	// pub fn with_leaf<M>(mut self, leaf: impl IntoBehaviorNode<M, T>) -> Self {
-	// 	self.0 = self.0.with_leaf(leaf.into_behavior_node());
-	// 	self
-	// }
-	// pub fn with_action()
-	// pub fn with_child()
 
 	pub fn into_action_graph(self) -> BehaviorGraph<T> {
 		BehaviorGraph(self.0.into_graph())
@@ -64,7 +57,3 @@ where
 {
 	fn into_behavior_tree(self) -> BehaviorTree<T> { BehaviorTree::new(self) }
 }
-
-// impl<T: IntoAction> Into<Tree<BehaviorNode<T>>> for BehaviorNode<T> {
-// 	fn into(self) -> Tree<BehaviorNode<T>> { Tree::new(self) }
-// }
