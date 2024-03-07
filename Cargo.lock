@@ -351,6 +351,7 @@ dependencies = [
  "forky_bevy",
  "forky_core",
  "forky_web",
+ "futures",
  "js-sys",
  "log",
  "serde",
