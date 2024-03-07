@@ -9,12 +9,11 @@ use bevy_transform::components::Transform;
 use sweet::*;
 
 #[sweet_test]
-pub fn spawn_request() -> Result<()> {
+pub fn works() -> Result<()> {
 	let mut app = App::new();
 	let mut relay = Relay::default();
 	app.add_plugins(BeetPlugin::<CoreNode>::new(relay.clone()));
 	app.insert_time();
-
 
 	let mut send = SpawnBehaviorEntityHandler::requester(&mut relay);
 

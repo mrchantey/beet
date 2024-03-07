@@ -8,7 +8,7 @@ use bevy_math::Vec3;
 use sweet::*;
 
 #[sweet_test]
-pub fn spawn_request() -> Result<()> {
+pub fn works() -> Result<()> {
 	let mut app = App::new();
 	let mut relay = Relay::default();
 	app.add_plugins(BeetPlugin::<EcsNode>::new(relay.clone()));

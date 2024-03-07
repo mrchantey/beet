@@ -263,6 +263,7 @@ version = "0.0.1"
 name = "beet_core"
 version = "0.0.1"
 dependencies = [
+ "anyhow",
  "beet_ecs",
  "beet_net",
  "bevy_app",
@@ -341,11 +342,13 @@ version = "0.0.1"
 dependencies = [
  "anyhow",
  "beet",
+ "bevy_app",
  "bevy_math",
  "bincode",
  "console_error_panic_hook",
  "console_log",
  "extend",
+ "forky_bevy",
  "forky_core",
  "forky_web",
  "js-sys",
@@ -1149,6 +1152,27 @@ name = "fnv"
 version = "1.0.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3f9eec918d3f24069decb9af1554cad7c880e2da24a9afd88aca000531ab82c1"
+
+[[package]]
+name = "forky_bevy"
+version = "0.1.42"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7afba4e156902fc6312d16d90b489ca743270eb2d5af1c6f822cc30c63423b2e"
+dependencies = [
+ "anyhow",
+ "bevy_app",
+ "bevy_derive",
+ "bevy_ecs",
+ "bevy_hierarchy",
+ "bevy_math",
+ "bevy_time",
+ "bevy_transform",
+ "bevy_utils",
+ "extend",
+ "forky_core",
+ "forky_web",
+ "js-sys",
+]
 
 [[package]]
 name = "forky_core"

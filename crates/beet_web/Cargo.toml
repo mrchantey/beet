@@ -21,6 +21,7 @@ beet.workspace = true
 ## local
 forky_core.workspace = true
 forky_web.workspace = true
+forky_bevy.workspace = true
 ## workspace
 anyhow.workspace = true
 extend.workspace = true
@@ -30,6 +31,7 @@ bincode.workspace = true
 serde.workspace = true
 serde_json = { workspace = true, optional = true }
 
+bevy_app.workspace = true
 bevy_math.workspace = true
 
 ## only needed for action_list!

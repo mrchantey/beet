@@ -66,6 +66,9 @@ pub fn handle_spawn_behavior_entity<T: ActionPayload>(
 	handler
 		.try_handle_next(|val| {
 			let mut entity = commands.spawn_empty();
+			let beet_id = entity_map.next(entity.id());
+			entity.insert(beet_id);
+
 			if val.position_tracking {
 				entity.insert(TrackedPosition);
 			}
@@ -81,7 +84,7 @@ pub fn handle_spawn_behavior_entity<T: ActionPayload>(
 			let graph = val.graph.spawn(&mut commands, entity);
 			commands.entity(entity).insert(graph);
 
-			entity_map.next(entity)
+			beet_id
 		})
 		.ok_or(|e| log::error!("{e}"));
 }

@@ -16,7 +16,8 @@ test-ecs *args:
 test-net *args:
 	just watch 'cargo run -p beet_net 	--example test_beet_net		$BEET_CARGO_TEST -- -w {{args}}'
 
-
+test-web *args:
+	just test-wasm beet_web {{args}}
 
 
 # mdbooks server is busted on wsl so I use live-server

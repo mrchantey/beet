@@ -43,16 +43,26 @@ impl<T: Payload> Subscriber<T> {
 	pub async fn recv_async(&mut self) -> Result<T> {
 		Ok(self.recv.recv_async().await?.payload()?)
 	}
+
 	/// Typesafe [`flume::Receiver::recv_timeout`]
+	#[allow(unused)]
 	pub fn recv_timeout(&mut self, timeout: std::time::Duration) -> Result<T> {
+		#[cfg(target_arch = "wasm32")]
+		todo!();
 		Ok(self.recv.recv_timeout(timeout)?.payload()?)
 	}
 	/// Typesafe [`flume::Receiver::recv_timeout`]
+	#[allow(unused)]
 	pub fn recv_default_timeout(&mut self) -> Result<T> {
+		#[cfg(target_arch = "wasm32")]
+		todo!();
 		Ok(self.recv.recv_timeout(DEFAULT_RECV_TIMEOUT)?.payload()?)
 	}
 	/// Typesafe [`flume::Receiver::recv_deadline`]
+	#[allow(unused)]
 	pub fn recv_deadline(&mut self, deadline: std::time::Instant) -> Result<T> {
+		#[cfg(target_arch = "wasm32")]
+		todo!();
 		Ok(self.recv.recv_deadline(deadline)?.payload()?)
 	}
 	/// Typesafe [`flume::Receiver::try_recv`]

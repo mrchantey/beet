@@ -3,7 +3,6 @@ use beet::exports::serde::de::DeserializeOwned;
 use beet::exports::Serialize;
 use beet::prelude::*;
 use forky_core::ResultTEExt;
-use forky_web::future_timeout;
 use forky_web::HtmlEventListener;
 use forky_web::ResultTJsValueExt;
 use js_sys::ArrayBuffer;
@@ -110,20 +109,4 @@ fn into_array_buffer<T: Serialize>(val: T) -> Result<ArrayBuffer> {
 	let bytes = bincode::serialize(&val)?;
 	let array = Uint8Array::from(bytes.as_slice());
 	Ok(array.buffer())
-}
-
-
-#[extend::ext]
-pub impl<T: Payload> Subscriber<T> {
-	async fn recv_timeout(
-		&mut self,
-		timeout: std::time::Duration,
-	) -> Result<T> {
-		let mut this = self.clone();
-		let func = async move || this.recv().await;
-		future_timeout(func, timeout).await.and_then(|r| r)
-	}
-	async fn recv_default_timeout(&mut self) -> Result<T> {
-		self.recv_timeout(DEFAULT_RECV_TIMEOUT).await
-	}
 }

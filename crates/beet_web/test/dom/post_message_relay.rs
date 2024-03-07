@@ -11,19 +11,20 @@ pub async fn works() -> Result<()> {
 
 	let relay_tx = Relay::default();
 	let mut pm_tx = PostMessageRelay::new_with_current_window(relay_tx.clone());
-	let tx = relay_tx.add_publisher::<u32>(topic.clone()).await?;
+	let tx = relay_tx.add_publisher_with_topic::<u32>(topic.clone())?;
 
 	let relay_rx = Relay::default();
 	let _pm_rx = PostMessageRelay::new_with_current_window(relay_rx.clone());
-	let mut rx = relay_rx.add_subscriber::<u32>(topic).await?;
+	let mut rx = relay_rx.add_subscriber_with_topic::<u32>(topic)?;
 
-	tx.broadcast(&8).await?;
+	tx.push(&8)?;
 
 	pm_tx.send_all()?;
 
 	wait_for_millis(1).await;
 
-	let msg = rx.recv_default_timeout().await?;
+	let msg = rx.recv()?;
+
 
 	expect(msg).to_be(8)?;
 
