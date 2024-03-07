@@ -17,13 +17,11 @@ use beet_ecs::prelude::*;
 // }
 
 pub fn test_action_graph_typed() -> BehaviorGraph<EcsNode> {
-	BehaviorTree::<EcsNode>::new(
-		vec![EcsNode::SetScore(SetScore::default())].into(),
-	)
-	.with_leaf(vec![EcsNode::SetScore(SetScore::default())].into())
-	.with_child(
-		Tree::new(vec![EcsNode::SetScore(SetScore::default())].into())
-			.with_leaf(vec![EcsNode::SetScore(SetScore::default())].into()),
-	)
-	.into_action_graph()
+	BehaviorTree::<EcsNode>::new(SetScore::default())
+		.with_child(SetScore::default())
+		.with_child(
+			BehaviorTree::new(SetScore::default())
+				.with_child(SetScore::default()),
+		)
+		.into_action_graph()
 }

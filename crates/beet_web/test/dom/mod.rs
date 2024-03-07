@@ -1,6 +1,9 @@
-pub mod url_commands;
+pub mod hover;
 #[allow(unused_imports)]
-pub use self::url_commands::*;
+pub use self::hover::*;
+pub mod translate;
+#[allow(unused_imports)]
+pub use self::translate::*;
 pub mod post_message_relay;
 #[allow(unused_imports)]
 pub use self::post_message_relay::*;

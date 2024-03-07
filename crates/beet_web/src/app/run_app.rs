@@ -1,6 +1,5 @@
 use crate::prelude::*;
 use anyhow::Result;
-use beet::action_list;
 use beet::prelude::*;
 use bevy_app::prelude::*;
 use forky_bevy::prelude::*;
@@ -8,14 +7,13 @@ use forky_core::prelude::*;
 use forky_web::wait_for_16_millis;
 use wasm_bindgen_futures::spawn_local;
 
-pub fn run(game: GameConfig) {
+pub fn run(config: GameConfig) {
 	console_error_panic_hook::set_once();
 	console_log::init_with_level(log::Level::Info).ok();
 	setup_dom();
-	run_app_sync(game.relay.clone());
+	run_app_sync(config.relay.clone());
 	spawn_local(async move {
-		log::info!("game created");
-		game.run_forever().await.ok_or(|e| log::error!("{e}"));
+		BeeGame::new(config).await.unwrap().update_forever();
 	});
 }
 

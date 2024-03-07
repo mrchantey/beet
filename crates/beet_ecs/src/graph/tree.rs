@@ -23,6 +23,15 @@ impl<T: Debug> Debug for Tree<T> {
 	}
 }
 
+impl<T: Default> Default for Tree<T> {
+	fn default() -> Self {
+		Self {
+			value: T::default(),
+			children: Vec::new(),
+		}
+	}
+}
+
 impl<T: Display> Display for Tree<T> {
 	fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
 		write!(f, "{}", self.pretty_string_display(0))

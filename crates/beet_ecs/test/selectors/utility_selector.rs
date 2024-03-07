@@ -9,23 +9,10 @@ fn setup() -> (App, EntityGraph) {
 
 	let target = app.world.spawn_empty().id();
 
-	let action_graph =
-		BehaviorTree::<EcsNode>::new(vec![UtilitySelector.into()].into())
-			.with_leaf(
-				vec![
-					SetScore::new(Score::Fail).into(),
-					SetRunResult::failure().into(),
-				]
-				.into(),
-			)
-			.with_leaf(
-				vec![
-					SetScore::new(Score::Pass).into(),
-					SetRunResult::success().into(),
-				]
-				.into(),
-			)
-			.into_action_graph();
+	let action_graph = BehaviorTree::<EcsNode>::new(UtilitySelector)
+		.with_child((SetScore::new(Score::Fail), SetRunResult::failure()))
+		.with_child((SetScore::new(Score::Pass), SetRunResult::success()))
+		.into_action_graph();
 
 	let entity_graph = action_graph.spawn(&mut app.world, target);
 	(app, entity_graph)

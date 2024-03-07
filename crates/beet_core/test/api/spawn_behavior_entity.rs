@@ -1,7 +1,6 @@
 use beet_core::api::BeetPlugin;
 use beet_core::prelude::*;
 use beet_ecs::graph::BehaviorTree;
-use beet_ecs::graph::BehaviorTreeTExt;
 use beet_net::relay::Relay;
 use bevy_app::App;
 use bevy_math::Vec3;
@@ -17,10 +16,9 @@ pub fn works() -> Result<()> {
 
 	let mut send = SpawnBehaviorEntityHandler::requester(&mut relay);
 
-	let graph = BehaviorTree::<CoreNode>::new(
-		vec![Translate::new(Vec3::new(1., 0., 0.)).into()].into(),
-	)
-	.into_action_graph();
+	let graph =
+		BehaviorTree::<CoreNode>::new(Translate::new(Vec3::new(1., 0., 0.)))
+			.into_action_graph();
 
 	let message_id = send.start_request(&SpawnBehaviorEntityPayload::new(
 		graph,

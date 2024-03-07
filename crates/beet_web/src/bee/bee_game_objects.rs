@@ -16,45 +16,21 @@ pub struct GameConfig {
 	pub flower: bool,
 }
 
-impl GameConfig {
-	pub async fn run_forever(self) -> Result<()> {
-		let mut game = BeeGame::new(self.relay, self.graph).await?;
-		log::info!("game created");
-		if self.flower {
-			game = game.with_flower().await?;
-		}
-		game.update_forever();
-		Ok(())
-	}
-}
-
 pub struct BeeGame {
-	relay: Relay,
 	pub bee: Bee,
 	pub flower: Option<Flower>,
 }
 
 impl BeeGame {
-	pub async fn new(
-		mut relay: Relay,
-		graph: BehaviorGraph<BeeNode>,
-	) -> Result<Self> {
-		let bee = Bee::new(&mut relay, graph).await?;
-		Ok(Self {
-			relay,
-			bee,
-			flower: None,
-		})
+	pub async fn new(mut config: GameConfig) -> Result<Self> {
+		let flower = if config.flower {
+			Some(Flower::new(&mut config.relay).await?)
+		} else {
+			None
+		};
+		let bee = Bee::new(&mut config.relay, config.graph).await?;
+		Ok(Self { bee, flower })
 	}
-	pub async fn with_flower(mut self) -> Result<Self> {
-		let flower = Flower::new(&mut self.relay).await?;
-
-		Ok(Self {
-			flower: Some(flower),
-			..self
-		})
-	}
-
 	pub fn update(&mut self) { self.bee.update(); }
 
 	pub fn update_forever(mut self) {
@@ -63,6 +39,7 @@ impl BeeGame {
 				self.update();
 				wait_for_16_millis().await;
 			}
+			// 🥀🌹
 		});
 	}
 }

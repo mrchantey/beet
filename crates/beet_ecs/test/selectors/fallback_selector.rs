@@ -11,9 +11,9 @@ pub fn works() -> Result<()> {
 	let target = app.world.spawn_empty().id();
 
 	let action_graph =
-		BehaviorTree::<EcsNode>::new(vec![FallbackSelector.into()].into())
-			.with_leaf(vec![SetRunResult::failure().into()].into())
-			.with_leaf(vec![SetRunResult::success().into()].into())
+		BehaviorTree::<EcsNode>::new(FallbackSelector)
+			.with_child(SetRunResult::failure())
+			.with_child(SetRunResult::success())
 			.into_action_graph();
 
 	let entity_graph = action_graph.spawn(&mut app.world, target);

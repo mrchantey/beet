@@ -16,3 +16,6 @@ pub use self::behavior_graph::*;
 pub mod component_graph;
 #[allow(unused_imports)]
 pub use self::component_graph::*;
+pub mod behavior_tree;
+#[allow(unused_imports)]
+pub use self::behavior_tree::*;
