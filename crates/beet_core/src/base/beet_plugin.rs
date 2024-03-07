@@ -5,7 +5,15 @@ use bevy_app::prelude::*;
 use bevy_derive::Deref;
 use bevy_derive::DerefMut;
 use bevy_ecs::prelude::*;
+use bevy_time::TimePlugin;
 use std::marker::PhantomData;
+
+
+pub struct BeetMinimalPlugin;
+impl Plugin for BeetMinimalPlugin {
+	fn build(&self, app: &mut App) { app.add_plugins(TimePlugin); }
+}
+
 
 #[derive(Debug, Clone, Deref, DerefMut, Resource)]
 pub struct RelayRes(pub Relay);

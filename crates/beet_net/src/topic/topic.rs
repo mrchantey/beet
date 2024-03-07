@@ -1,3 +1,4 @@
+use super::*;
 use serde::Deserialize;
 use serde::Serialize;
 use std::fmt::Display;
@@ -164,6 +165,7 @@ pub struct Topic {
 	pub address: TopicAddress,
 	pub scheme: TopicScheme,
 	pub method: TopicMethod,
+	pub qos: Vec<Qos>,
 }
 
 impl std::fmt::Display for Topic {
@@ -182,16 +184,22 @@ impl Topic {
 			address: address.into(),
 			scheme,
 			method,
+			qos: Default::default(),
 		}
 	}
-
 
 	pub fn pubsub_update(address: impl Into<TopicAddress>) -> Self {
 		Self {
 			address: address.into(),
 			scheme: TopicScheme::PubSub,
 			method: TopicMethod::Update,
+			qos: Default::default(),
 		}
+	}
+
+	pub fn with_qos(mut self, qos: Qos) -> Self {
+		self.qos.push(qos);
+		self
 	}
 }
 
