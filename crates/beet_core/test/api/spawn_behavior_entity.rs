@@ -1,4 +1,4 @@
-use beet_core::base::BeetPlugin;
+use beet_core::api::BeetPlugin;
 use beet_core::prelude::*;
 use beet_ecs::graph::BehaviorTree;
 use beet_ecs::graph::BehaviorTreeTExt;

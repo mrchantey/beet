@@ -1,5 +1,5 @@
-use beet_core::base::BeetPlugin;
-use beet_core::base::SpawnEntityPayload;
+use beet_core::api::BeetPlugin;
+use beet_core::api::SpawnEntityPayload;
 use beet_core::prelude::*;
 use beet_ecs::ecs_nodes::EcsNode;
 use beet_net::relay::Relay;
