@@ -27,7 +27,7 @@ impl<T: Payload> Publisher<T> {
 			phantom: PhantomData,
 		}
 	}
-	
+
 	pub fn recast<U: Payload>(self) -> Publisher<U> {
 		let Publisher {
 			topic,

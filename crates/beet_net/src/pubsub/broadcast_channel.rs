@@ -1,5 +1,7 @@
+use anyhow::Result;
 use flume::Receiver;
 use flume::Sender;
+use flume::TrySendError;
 
 // absolutely arbitary at this point
 // pub const DEFAULT_BROADCAST_CHANNEL_CAPACITY: usize = 128;
@@ -7,8 +9,8 @@ use flume::Sender;
 
 #[derive(Debug, Clone)]
 pub struct BroadcastChannel<T> {
-	pub(crate) send: Sender<T>,
-	pub(crate) recv: Receiver<T>,
+	pub send: Sender<T>,
+	pub recv: Receiver<T>,
 }
 
 
@@ -25,5 +27,19 @@ impl<T> BroadcastChannel<T> {
 	pub fn bounded(capacity: usize) -> Self {
 		let (send, recv) = flume::bounded(capacity);
 		Self { send, recv }
+	}
+}
+impl<T: 'static + Send + Sync> BroadcastChannel<T> {
+	/// Push a message to the channel, returning the message that was popped if the channel was full
+	pub fn push(&self, msg: T) -> Result<Option<T>> {
+		match self.send.try_send(msg) {
+			Ok(()) => Ok(None),
+			Err(TrySendError::Full(unsent)) => {
+				let popped = self.recv.recv()?;
+				self.send.send(unsent)?;
+				Ok(Some(popped))
+			}
+			Err(other) => Err(other.into()),
+		}
 	}
 }

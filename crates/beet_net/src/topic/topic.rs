@@ -165,7 +165,7 @@ pub struct Topic {
 	pub address: TopicAddress,
 	pub scheme: TopicScheme,
 	pub method: TopicMethod,
-	pub qos: Vec<Qos>,
+	pub qos: Qos,
 }
 
 impl std::fmt::Display for Topic {
@@ -193,12 +193,12 @@ impl Topic {
 			address: address.into(),
 			scheme: TopicScheme::PubSub,
 			method: TopicMethod::Update,
-			qos: Default::default(),
+			qos: Qos::new(vec![QosHistory::Bounded(1).into()]),
 		}
 	}
 
-	pub fn with_qos(mut self, qos: Qos) -> Self {
-		self.qos.push(qos);
+	pub fn with_qos(mut self, qos: QosPolicy) -> Self {
+		self.qos.0.push(qos);
 		self
 	}
 }

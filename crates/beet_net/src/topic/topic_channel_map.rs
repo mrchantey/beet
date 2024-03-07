@@ -38,7 +38,12 @@ impl TopicChannelMap {
 				return channels.clone();
 			}
 		}
-		let channels = TopicChannel::default();
+		let channels = if let Some(bound) = topic.qos.history_bound() {
+			TopicChannel::bounded(bound)
+		} else {
+			TopicChannel::default()
+		};
+
 		self.map
 			.write()
 			.expect(POISONED_LOCK)
