@@ -13,17 +13,17 @@ pub fn works() -> Result<()> {
 	app.add_plugins(BeetPlugin::<CoreNode>::new(relay.clone()));
 	app.insert_time();
 
-	let mut send = SpawnBehaviorEntityHandler::requester(&mut relay);
+	let mut send = SpawnEntityHandler::requester(&mut relay);
 
 	let graph =
 		BehaviorTree::<CoreNode>::new(Translate::new(Vec3::new(1., 0., 0.)))
 			.into_action_graph();
 
-	let message_id = send.start_request(&SpawnBehaviorEntityPayload::new(
-		graph,
-		Some(Vec3::ZERO),
-		false,
-	))?;
+	let message_id = send.start_request(
+		&SpawnEntityPayload::default()
+			.with_graph(graph)
+			.with_position(Vec3::ZERO),
+	)?;
 
 	app.update_with_secs(2);
 	let id = send.block_on_response(message_id)?;

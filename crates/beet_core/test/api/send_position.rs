@@ -12,11 +12,10 @@ pub async fn works() -> Result<()> {
 	app.add_plugins(BeetPlugin::<EcsNode>::new(relay.clone()));
 
 
-	let mut send = SpawnEntityHandler::requester(&mut relay);
+	let mut send = SpawnEntityHandler::<EcsNode>::requester(&mut relay);
 	let message_id = send.start_request(
 		&SpawnEntityPayload::default()
-			.with_position(Vec3::new(0., 1., 0.))
-			.with_position_tracking(),
+			.with_tracked_position(Vec3::new(0., 1., 0.)),
 	)?;
 
 	app.update();

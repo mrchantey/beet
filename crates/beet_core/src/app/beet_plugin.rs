@@ -34,14 +34,10 @@ impl<T: ActionPayload> BeetPlugin<T> {
 impl<T: ActionPayload> Plugin for BeetPlugin<T> {
 	fn build(&self, app: &mut App) {
 		let mut relay = self.relay.clone();
-		app.insert_resource(SpawnEntityHandler::new(&mut relay))
-			.insert_resource(SpawnBehaviorEntityHandler::<T>::new(&mut relay))
+		app.insert_resource(SpawnEntityHandler::<T>::new(&mut relay))
 			.insert_resource(BeetEntityMap::default())
 			.add_plugins(ActionPlugin::<T, _>::default())
-			.add_systems(
-				PreUpdate,
-				(handle_spawn_entity, handle_spawn_behavior_entity::<T>),
-			)
+			.add_systems(PreUpdate, handle_spawn_entity::<T>)
 			.add_systems(PostUpdate, (send_position, cleanup_beet_entity_map))
 			.insert_resource(RelayRes(relay));
 	}

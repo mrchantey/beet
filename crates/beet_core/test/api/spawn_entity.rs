@@ -11,7 +11,7 @@ pub fn works() -> Result<()> {
 	let mut relay = Relay::default();
 	app.add_plugins(BeetPlugin::<EcsNode>::new(relay.clone()));
 
-	let mut send = SpawnEntityHandler::requester(&mut relay);
+	let mut send = SpawnEntityHandler::<EcsNode>::requester(&mut relay);
 	let message_id = send.start_request(
 		&SpawnEntityPayload::default().with_position(Vec3::new(0., 0., 0.)),
 	)?;
