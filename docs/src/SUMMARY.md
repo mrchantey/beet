@@ -1,6 +1,6 @@
 # Summary
 
-- [Beet](./overview/index.md)
+- [Beet](./core/index.md)
 	- [Getting Started](./overview/getting-started.md)
 - [ECS](./ecs/index.md)
 	<!-- - [System Ordering](./beet_ecs/system_ordering.md)

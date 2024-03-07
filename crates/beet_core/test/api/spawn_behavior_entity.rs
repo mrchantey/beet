@@ -1,4 +1,3 @@
-use beet_core::api::BeetPlugin;
 use beet_core::prelude::*;
 use beet_ecs::graph::BehaviorTree;
 use beet_net::relay::Relay;

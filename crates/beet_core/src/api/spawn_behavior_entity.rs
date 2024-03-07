@@ -1,4 +1,4 @@
-use super::*;
+use crate::prelude::*;
 use beet_ecs::prelude::*;
 use beet_net::prelude::*;
 use bevy_derive::Deref;

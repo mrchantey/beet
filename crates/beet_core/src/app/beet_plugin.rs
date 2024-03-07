@@ -42,7 +42,7 @@ impl<T: ActionPayload> Plugin for BeetPlugin<T> {
 				PreUpdate,
 				(handle_spawn_entity, handle_spawn_behavior_entity::<T>),
 			)
-			.add_systems(PostUpdate, send_position)
+			.add_systems(PostUpdate, (send_position, cleanup_beet_entity_map))
 			.insert_resource(RelayRes(relay));
 	}
 }

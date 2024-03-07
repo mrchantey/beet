@@ -2,6 +2,7 @@
 
 A fundamental concept of Beet is behavior trees. Consider the following diagram for Billy the Bee 🐝 
 
+
 ```mermaid
 graph TB;
     A-->B;

@@ -46,6 +46,7 @@ impl fmt::Display for BeetEntityId {
 pub struct BeetEntityMap {
 	id_incr: u64,
 	map: HashMap<BeetEntityId, Entity>,
+	reverse_map: HashMap<Entity, BeetEntityId>,
 }
 
 impl BeetEntityMap {
@@ -57,5 +58,19 @@ impl BeetEntityMap {
 		let id = BeetEntityId(id);
 		self.map.insert(id, entity);
 		id
+	}
+}
+
+
+pub fn cleanup_beet_entity_map(
+	mut entity_map: ResMut<BeetEntityMap>,
+	mut removed: RemovedComponents<BeetEntityId>,
+) {
+	for entity in removed.read() {
+		if let Some(id) = entity_map.reverse_map.remove(&entity) {
+			entity_map.map.remove(&id);
+		} else {
+			log::warn!("Entity {entity:?} not found in beet entity map")
+		}
 	}
 }
