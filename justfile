@@ -28,7 +28,10 @@ serve-web:
 
 # mdbooks server is busted on wsl so I use live-server
 book:
-	cd docs && mdbook serve & cd docs/book && live-server --no-browser
+	cd docs && mdbook serve
+
+serve-book:
+	cd docs/book && live-server --no-browser
 
 clean-repo:
 	cargo clean
@@ -113,6 +116,14 @@ serve-wasm *args:
 	--host=0.0.0.0 \
 	--watch=wasm/site_bg.wasm,wasm/simulator_bg.wasm,index.html,style.css \
 	{{args}}
+
+watch-assets:
+	just watch-web 'just copy-wasm-assets'
+
+watch-web *command:
+	forky watch \
+	-w '**/*/assets/**/*' \
+	-- {{command}}
 
 
 # too scary with untracked changes etc, do it manually

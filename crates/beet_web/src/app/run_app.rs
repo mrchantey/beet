@@ -10,7 +10,6 @@ use wasm_bindgen_futures::spawn_local;
 pub fn run(relay: Relay) {
 	console_error_panic_hook::set_once();
 	console_log::init_with_level(log::Level::Info).ok();
-	setup_dom();
 	let listeners = setup_ui(relay.clone()).unwrap();
 	listeners.into_iter().for_each(|l| l.forget());
 	run_app_sync(relay.clone());

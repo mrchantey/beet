@@ -21,7 +21,7 @@ impl EntityGraph {
 #[derive(Debug, Default, Clone, Deref, DerefMut, Resource)]
 pub struct TrackedEntityGraphs(pub HashMap<Entity, EntityGraph>);
 
-
+// TODO refactor to allow for multiple graphs
 /// This mechanism requires at least one frame between spawning a graph
 /// and deleting it
 pub fn cleanup_entity_graph(
@@ -30,7 +30,6 @@ pub fn cleanup_entity_graph(
 	added_graphs: Query<(Entity, &EntityGraph), Changed<EntityGraph>>,
 	mut entity_graphs: RemovedComponents<EntityGraph>,
 ) {
-
 	for (entity, graph) in added_graphs.iter() {
 		tracked_entities.insert(entity, graph.clone());
 	}

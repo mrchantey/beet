@@ -1,8 +1,9 @@
 <html>
 
 <head>
-	<title>Playground</title>
+	<title>Beet Playground</title>
 	<meta charset="UTF-8" />
+	<link rel="stylesheet" type="text/css" href="style.css" />
 </head>
 
 <body>
@@ -14,6 +15,20 @@
 					throw error
 			});
 	</script>
+	<div class="container">
+		<div class="overlay">
+			<div>
+				<button id="create-bee">Create Bee</button>
+				<button id="create-flower">Create Flower</button>
+				<button id="clear-all">Clear All</button>
+				<button id="toggle-json">Hide Graph</button>
+			</div>
+			<div id="graph-json-error">&nbsp;</div>
+			<div id="graph-json-container">
+				<textarea tabindex="1" id="graph-json-text"></textarea>
+			</div>
+		</div>
+	</div>
 </body>
 
 </html>

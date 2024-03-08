@@ -1,19 +1,10 @@
 :root {
-	--primary-color: #000000;
-	--background-color: #ffffff;
-	--hover: #eee;
-	--active: #ccc;
+	--primary-color: #ffffff;
+	--background-color: #282828;
+	--hover: #555;
+	--active: #777;
+	--pretty-sky: linear-gradient(0deg, rgba(0, 29, 2, 1) 0%, rgba(36, 121, 9, 1) 50%, rgba(29, 60, 138, 1) 50%, rgba(0, 112, 196, 1) 100%);
 }
-
-@media (prefers-color-scheme: dark) {
-	:root {
-		--primary-color: #ffffff;
-		--background-color: #282828;
-		--hover: #555;
-		--active: #777;
-	}
-}
-
 
 html,
 body {
@@ -27,6 +18,8 @@ body {
 }
 
 button {
+	border: none;
+	padding: 0.7em 1.5em;
 	color: var(--primary-color);
 	background-color: var(--background-color);
 	cursor: pointer;
@@ -44,6 +37,7 @@ div.container {
 	width: 100%;
 	height: 100%;
 	position: relative;
+	background: var(--pretty-sky);
 }
 
 div.container>div.entity {
@@ -70,7 +64,7 @@ textarea {
 	width: 100%;
 	height: 100%;
 	color: var(--primary-color);
-	background-color: var(--background-color);
+	background: transparent;
 	border: none;
-	/* Optional: Remove border if desired */
+	resize: none;
 }

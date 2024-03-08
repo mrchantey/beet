@@ -37,8 +37,12 @@ pub struct SucceedInDuration {
 }
 
 pub fn succeed_in_duration(
-	mut _commands: Commands,
-	mut _query: Query<Entity, (With<SetRunResult>, With<Running>)>,
+	mut commands: Commands,
+	mut query: Query<(Entity, &RunTimer, &SucceedInDuration), With<Running>>,
 ) {
-	// todo!()
+	for (entity, runtimer, succeed_in_duration) in query.iter_mut() {
+		if runtimer.last_started.elapsed() > succeed_in_duration.duration {
+			commands.entity(entity).insert(RunResult::Success);
+		}
+	}
 }

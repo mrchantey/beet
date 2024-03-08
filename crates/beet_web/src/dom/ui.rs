@@ -40,6 +40,9 @@ pub fn setup_ui(relay: Relay) -> Result<Vec<HtmlEventListener<Event>>> {
 	])
 }
 
+
+
+
 fn create_clear_all(relay: Relay) -> HtmlEventListener<Event> {
 	let clear_all_button =
 		Document::x_query_selector::<HtmlButtonElement>("#clear-all").unwrap();
@@ -61,7 +64,7 @@ fn create_clear_all(relay: Relay) -> HtmlEventListener<Event> {
 
 fn create_bee(
 	mut relay: Relay,
-	create_bee_button: HtmlButtonElement,
+	button: HtmlButtonElement,
 	textarea: HtmlTextAreaElement,
 ) -> HtmlEventListener<Event> {
 	let listener = HtmlEventListener::new_with_target(
@@ -75,17 +78,17 @@ fn create_bee(
 				.push(&graph)
 				.ok_or(|e| log::error!("{e}"));
 		},
-		create_bee_button.clone().into(),
+		button.clone().into(),
 	);
-	if SearchParams::get_flag("spawn_bee") {
-		create_bee_button.click();
+	if SearchParams::get_flag("spawn-bee") {
+		button.click();
 	}
 
 	listener
 }
 
 fn create_flower(mut relay: Relay) -> HtmlEventListener<Event> {
-	let create_flower_button =
+	let button =
 		Document::x_query_selector::<HtmlButtonElement>("#create-flower")
 			.unwrap();
 
@@ -96,11 +99,11 @@ fn create_flower(mut relay: Relay) -> HtmlEventListener<Event> {
 				.push(&())
 				.ok_or(|e| log::error!("{e}"));
 		},
-		create_flower_button.clone().into(),
+		button.clone().into(),
 	);
 
-	if SearchParams::get_flag("spawn_flower") {
-		create_flower_button.click();
+	if SearchParams::get_flag("spawn-flower") {
+		button.click();
 	}
 
 	listener
@@ -109,26 +112,31 @@ fn create_flower(mut relay: Relay) -> HtmlEventListener<Event> {
 
 
 fn create_toggle_json() -> HtmlEventListener<Event> {
-	let toggle_json_button =
+	let button =
 		Document::x_query_selector::<HtmlButtonElement>("#toggle-json")
 			.unwrap();
 	let container =
 		Document::x_query_selector::<HtmlDivElement>("#graph-json-container")
 			.unwrap();
-	let toggle_json_button2 = toggle_json_button.clone();
-	HtmlEventListener::new_with_target(
+	let toggle_json_button2 = button.clone();
+	let listener = HtmlEventListener::new_with_target(
 		"click",
 		move |_| {
 			if container.hidden() {
 				container.set_hidden(false);
-				toggle_json_button2.set_inner_text("Hide Json");
+				toggle_json_button2.set_inner_text("Hide Graph");
 			} else {
 				container.set_hidden(true);
-				toggle_json_button2.set_inner_text("Show Json");
+				toggle_json_button2.set_inner_text("Show Graph");
 			}
 		},
-		toggle_json_button.into(),
-	)
+		button.clone().into(),
+	);
+
+	if SearchParams::get_flag("hide-json") {
+		button.click();
+	}
+	listener
 }
 
 fn create_text(
@@ -173,11 +181,11 @@ fn set_url(tre: &BehaviorTree<BeeNode>) {
 	let val = bincode::serialize(tre).unwrap();
 	let val = general_purpose::STANDARD_NO_PAD.encode(val);
 	// let url = serde_json::to_string(tre).unwrap();
-	History::set_param("tree", &val);
+	History::set_param("graph", &val);
 }
 
 fn get_tree_url_param() -> Result<BehaviorTree<BeeNode>> {
-	if let Some(tree) = SearchParams::get("tree") {
+	if let Some(tree) = SearchParams::get("graph") {
 		let bytes = general_purpose::STANDARD_NO_PAD.decode(tree.as_bytes())?;
 		let tree = bincode::deserialize(&bytes)?;
 		Ok(tree)

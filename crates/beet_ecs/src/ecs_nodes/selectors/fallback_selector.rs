@@ -5,7 +5,9 @@ use bevy_ecs::schedule::SystemConfigs;
 use serde::Deserialize;
 use serde::Serialize;
 
-/// A node that runs all of its children in order until one succeeds.
+/// An action that runs all of its children in order until one succeeds.
+///
+/// Logical OR: `RUN child1 OTHERWISE child2 etc`
 ///
 /// If a child succeeds it will succeed.
 ///

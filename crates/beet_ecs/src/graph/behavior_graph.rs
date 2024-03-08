@@ -82,6 +82,7 @@ impl<T: ActionSuper> BehaviorGraph<T> {
 		}
 
 		let entity_graph = EntityGraph(entity_graph);
+		// NOTE this breaks multiple graphs per target
 		world.insert(target, entity_graph.clone());
 		entity_graph
 	}

@@ -3,6 +3,7 @@ use beet::exports::serde::de::DeserializeOwned;
 use beet::exports::Serialize;
 use beet::prelude::*;
 use forky_core::ResultTEExt;
+use forky_web::AnimationFrame;
 use forky_web::HtmlEventListener;
 use forky_web::ResultTJsValueExt;
 use js_sys::ArrayBuffer;
@@ -27,6 +28,13 @@ impl PostMessageRelay {
 	pub fn new_with_current_window(relay: Relay) -> Self {
 		let window = web_sys::window().unwrap();
 		Self::new(window, relay)
+	}
+
+	#[must_use]
+	pub fn run(mut self) -> AnimationFrame {
+		AnimationFrame::new(move || {
+			self.send_all().ok_or(|e| log::error!("{e}"));
+		})
 	}
 
 
