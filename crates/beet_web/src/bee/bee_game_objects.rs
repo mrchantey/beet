@@ -163,7 +163,7 @@ fn set_position<'a>(
 		.unwrap();
 }
 
-fn get_container() -> HtmlDivElement {
+pub fn get_container() -> HtmlDivElement {
 	Document::x_query_selector::<HtmlDivElement>(".container").unwrap()
 }
 
