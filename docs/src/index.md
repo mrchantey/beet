@@ -8,6 +8,9 @@ Beet, or *bee-tee*, is an AI behavior library for games and robotics built in Ru
 > - docs are wip
 > - bugs ahoy
 
+<iframe src="https://mrchantey.github.io/beet/play/?spawn-bee=&spawn-flower=&hide-graph=&graph=CAAAAAAAAABOZXcgTm9kZQEAAAAAAAAAAAAAAAAAAD%2FNzMw9AAAAAAAAAAA"></iframe>
+
+
 ## Features
 
 
@@ -33,7 +36,6 @@ Beet is built in Bevy, specifically the lightweight `bevy_ecs` crate, which can 
 
 All live examples use the [beet playground](https://mrchantey.github.io/beet/play?spawn_bee=1), a small web app for demos.
 
-<iframe src="https://mrchantey.github.io/beet/play/?spawn_bee=1&spawn_flower=1&tree=CAAAAAAAAABOZXcgTm9kZQEAAAAAAAAAAAAAAAAAAD%2FNzMw9AAAAAAAAAAA"></iframe>
 
 
 
