@@ -1,8 +1,10 @@
 use crate::prelude::*;
+use serde::Deserialize;
+use serde::Serialize;
 
 
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct BehaviorTree<T: ActionSuper>(pub Tree<BehaviorNode<T>>);
 
 impl<T: ActionSuper> Default for BehaviorTree<T> {

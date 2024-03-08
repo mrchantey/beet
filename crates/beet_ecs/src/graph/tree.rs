@@ -1,5 +1,9 @@
 use crate::prelude::*;
 use petgraph::graph::DiGraph;
+use serde::de::DeserializeOwned;
+use serde::ser::SerializeStruct;
+use serde::Deserialize;
+use serde::Serialize;
 use std::fmt;
 use std::fmt::Debug;
 use std::fmt::Display;
@@ -9,6 +13,37 @@ pub struct Tree<T> {
 	pub value: T,
 	pub children: Vec<Tree<T>>,
 }
+
+impl<T: Serialize> Serialize for Tree<T> {
+	fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+	where
+		S: serde::Serializer,
+	{
+		let mut state = serializer.serialize_struct("Tree", 2)?;
+		state.serialize_field("value", &self.value)?;
+		state.serialize_field("children", &self.children)?;
+		state.end()
+	}
+}
+
+impl<'de, T: Deserialize<'de>> Deserialize<'de> for Tree<T> {
+	fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+	where
+		D: serde::Deserializer<'de>,
+	{
+		#[derive(Deserialize)]
+		struct TreeHelper<T> {
+			value: T,
+			children: Vec<Tree<T>>,
+		}
+		let helper = TreeHelper::deserialize(deserializer)?;
+		Ok(Self {
+			value: helper.value,
+			children: helper.children,
+		})
+	}
+}
+
 
 impl<T: Debug> Debug for Tree<T> {
 	fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
