@@ -1,7 +1,6 @@
 use crate::prelude::*;
 use anyhow::Result;
 use bevy_utils::HashMap;
-use flume::Receiver;
 use std::sync::Arc;
 use std::sync::RwLock;
 
@@ -95,28 +94,20 @@ impl TopicChannelMap {
 	pub async fn try_broadcast(&self, message: StateMessage) -> Result<bool> {
 		let topic = message.topic.clone();
 		if let Some(channel) = self.try_get_channel(&topic) {
-			channel.send.send_async(message).await?;
+			channel.send.broadcast_direct(message).await?;
 			Ok(true)
 		} else {
 			Ok(false)
 		}
 	}
 
-	/// Get all published messages ready to be sent
-	fn get_all_recv(&self) -> Vec<Receiver<StateMessage>> {
-		self.map
-			.read()
-			.expect(POISONED_LOCK)
-			.values()
-			.map(|c| c.recv.clone())
-			.collect()
-	}
-
 	pub fn get_all_messages(&mut self) -> Result<Vec<StateMessage>> {
 		let messages = self
-			.get_all_recv()
-			.into_iter()
-			.map(|mut recv| recv.try_recv_all())
+			.map
+			.write()
+			.expect(POISONED_LOCK)
+			.values_mut()
+			.map(|c| c.recv.try_recv_all())
 			.collect::<Result<Vec<_>, _>>()?
 			.into_iter()
 			.flatten()
@@ -135,7 +126,7 @@ impl TopicChannelMap {
 			let channel = self.try_get_channel(&message.topic);
 			async {
 				let result: Result<_> = if let Some(channel) = channel {
-					channel.send.send_async(message).await?; //TODO probs doesnt need to be async
+					channel.send.broadcast_direct(message).await?; //TODO probs doesnt need to be async
 					Ok(None)
 				} else {
 					Ok(Some(message))

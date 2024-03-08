@@ -1,10 +1,9 @@
-use anyhow::Result;
-use flume::Receiver;
-use flume::Sender;
-use flume::TrySendError;
+use async_broadcast::Receiver;
+use async_broadcast::Sender;
+use async_broadcast::TrySendError;
 
 // absolutely arbitary at this point
-// pub const DEFAULT_BROADCAST_CHANNEL_CAPACITY: usize = 128;
+pub const MAX_BROADCAST_CHANNEL_CAPACITY: usize = 128;
 
 
 #[derive(Debug, Clone)]
@@ -19,27 +18,33 @@ impl<T> Default for BroadcastChannel<T> {
 }
 
 impl<T> BroadcastChannel<T> {
-	pub fn unbounded() -> Self {
-		let (send, recv) = flume::unbounded();
-		Self { send, recv }
-	}
+	pub fn unbounded() -> Self { Self::bounded(MAX_BROADCAST_CHANNEL_CAPACITY) }
 
 	pub fn bounded(capacity: usize) -> Self {
-		let (send, recv) = flume::bounded(capacity);
+		let (mut send, mut recv) = async_broadcast::broadcast(capacity);
+		send.set_overflow(true);
+		recv.set_overflow(true);
 		Self { send, recv }
 	}
 }
-impl<T: 'static + Send + Sync> BroadcastChannel<T> {
-	/// Push a message to the channel, returning the message that was popped if the channel was full
-	pub fn push(&self, msg: T) -> Result<Option<T>> {
-		match self.send.try_send(msg) {
-			Ok(()) => Ok(None),
-			Err(TrySendError::Full(unsent)) => {
-				let popped = self.recv.recv()?;
-				self.send.send(unsent)?;
-				Ok(Some(popped))
-			}
-			Err(other) => Err(other.into()),
-		}
+impl<T: 'static + Send + Sync + Clone> BroadcastChannel<T> {
+	pub fn push(&self, msg: T) -> Result<Option<T>, TrySendError<T>> {
+		self.send.try_broadcast(msg)
 	}
 }
+
+// only needed for flume, async_broadcast has overflow builtin
+// impl<T: 'static + Send + Sync + Clone> BroadcastChannel<T> {
+// 	/// Push a message to the channel, returning the message that was popped if the channel was full
+// 	pub fn push(&self, msg: T) -> Result<Option<T>> {
+// 		match self.send.try_broadcast(msg) {
+// 			Ok(()) => Ok(None),
+// 			Err(TrySendError::Full(unsent)) => {
+// 				let popped = self.recv.recv()?;
+// 				self.send.send(unsent)?;
+// 				Ok(Some(popped))
+// 			}
+// 			Err(other) => Err(other.into()),
+// 		}
+// 	}
+// }

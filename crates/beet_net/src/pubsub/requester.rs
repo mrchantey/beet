@@ -1,5 +1,6 @@
 use super::*;
 use anyhow::Result;
+use bevy_utils::Duration;
 use std::ops::ControlFlow;
 
 #[derive(Debug, Clone)]
@@ -20,10 +21,11 @@ impl<Req: Payload, Res: Payload> Requester<Req, Res> {
 	pub fn block_on_response(&mut self, id: MessageId) -> Result<Res> {
 		let recv = self.res.recv_inner_mut();
 		loop {
-			match Self::check_received(recv.recv()?, id)? {
+			match Self::check_received(recv.try_recv()?, id)? {
 				ControlFlow::Break(val) => break Ok(val),
 				_ => {}
 			}
+			std::thread::sleep(Duration::from_millis(16));
 		}
 	}
 
@@ -31,7 +33,7 @@ impl<Req: Payload, Res: Payload> Requester<Req, Res> {
 		let id = self.req.push(req)?;
 		let recv = self.res.recv_inner_mut();
 		loop {
-			match Self::check_received(recv.recv_async().await?, id)? {
+			match Self::check_received(recv.recv().await?, id)? {
 				ControlFlow::Break(val) => break Ok(val),
 				_ => {}
 			}

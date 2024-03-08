@@ -1,7 +1,7 @@
 use crate::prelude::*;
 use anyhow::Result;
+use async_broadcast::Receiver;
 use bevy_utils::Duration;
-use flume::Receiver;
 use std::marker::PhantomData;
 /// Typesafe wrapper for [`async_broadcast::Receiver`] for a specific topic.
 /// Held by the subscriber to listen for messages from the relay
@@ -37,38 +37,37 @@ impl<T: Payload> Subscriber<T> {
 		&mut self.recv
 	}
 
-	/// Typesafe [`flume::Receiver::recv`]
-	pub fn recv(&mut self) -> Result<T> { Ok(self.recv.recv()?.payload()?) }
-	/// Typesafe [`flume::Receiver::recv`]
+	/// Typesafe [`async_broadcast::Receiver::try_recv_overflow_ok`]
+	pub fn try_recv(&mut self) -> Result<T> {
+		Ok(self.recv.try_recv_overflow_ok()?.payload()?)
+	}
+	/// Typesafe [`async_broadcast::Receiver::recv`]
 	pub async fn recv_async(&mut self) -> Result<T> {
-		Ok(self.recv.recv_async().await?.payload()?)
+		Ok(self.recv.recv().await?.payload()?)
 	}
 
 	/// Typesafe [`flume::Receiver::recv_timeout`]
-	#[allow(unused)]
-	pub fn recv_timeout(&mut self, timeout: std::time::Duration) -> Result<T> {
-		#[cfg(target_arch = "wasm32")]
-		todo!();
-		Ok(self.recv.recv_timeout(timeout)?.payload()?)
-	}
-	/// Typesafe [`flume::Receiver::recv_timeout`]
-	#[allow(unused)]
-	pub fn recv_default_timeout(&mut self) -> Result<T> {
-		#[cfg(target_arch = "wasm32")]
-		todo!();
-		Ok(self.recv.recv_timeout(DEFAULT_RECV_TIMEOUT)?.payload()?)
-	}
-	/// Typesafe [`flume::Receiver::recv_deadline`]
-	#[allow(unused)]
-	pub fn recv_deadline(&mut self, deadline: std::time::Instant) -> Result<T> {
-		#[cfg(target_arch = "wasm32")]
-		todo!();
-		Ok(self.recv.recv_deadline(deadline)?.payload()?)
-	}
+	// #[allow(unused)]
+	// pub fn recv_timeout(&mut self, timeout: std::time::Duration) -> Result<T> {
+	// 	#[cfg(target_arch = "wasm32")]
+	// 	todo!();
+	// 	Ok(self.recv.recv_timeout(timeout)?.payload()?)
+	// }
+	// /// Typesafe [`flume::Receiver::recv_timeout`]
+	// #[allow(unused)]
+	// pub fn recv_default_timeout(&mut self) -> Result<T> {
+	// 	#[cfg(target_arch = "wasm32")]
+	// 	todo!();
+	// 	Ok(self.recv.recv_timeout(DEFAULT_RECV_TIMEOUT)?.payload()?)
+	// }
+	// /// Typesafe [`flume::Receiver::recv_deadline`]
+	// #[allow(unused)]
+	// pub fn recv_deadline(&mut self, deadline: std::time::Instant) -> Result<T> {
+	// 	#[cfg(target_arch = "wasm32")]
+	// 	todo!();
+	// 	Ok(self.recv.recv_deadline(deadline)?.payload()?)
+	// }
 	/// Typesafe [`flume::Receiver::try_recv`]
-	pub fn try_recv(&mut self) -> Result<T> {
-		Ok(self.recv.try_recv()?.payload()?)
-	}
 
 	/// Typesafe [`flume::Receiver::try_recv_all`]
 	pub fn try_recv_all(&mut self) -> Result<Vec<T>> {

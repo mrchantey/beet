@@ -1,5 +1,5 @@
-use flume::Receiver;
-use flume::TryRecvError;
+use async_broadcast::Receiver;
+use async_broadcast::TryRecvError;
 use std::error::Error;
 use std::fmt;
 
@@ -7,17 +7,27 @@ use std::fmt;
 
 #[extend::ext]
 pub impl<T: Clone> Receiver<T> {
-	fn try_recv_all(&mut self) -> Result<Vec<T>, TryRecvAllError> {
+	fn try_recv_all(&mut self) -> Result<Vec<T>, TryRecvError> {
 		let mut vec = Vec::new();
 		loop {
 			match self.try_recv() {
 				Ok(message) => vec.push(message),
 				Err(TryRecvError::Empty) => break Ok(vec),
-				Err(TryRecvError::Disconnected) => {
-					break Err(TryRecvAllError::Disconnected)
-				} // Err(TryRecvError::Overflowed(val)) => {
-				  // 	break Err(TryRecvAllError::Overflowed(val))
-				  // }
+				Err(other) => break Err(other), // Err(TryRecvError::Overflowed(val)) => {
+				                                // 	break Err(TryRecvAllError::Overflowed(val))
+				                                // }
+			}
+		}
+	}
+	/// Calls `try_recv`, and if it returns `TryRecvError::Overflowed`, calls itself again.
+	fn try_recv_overflow_ok(&mut self) -> Result<T, TryRecvError> {
+		loop {
+			match self.try_recv() {
+				Ok(message) => break Ok(message),
+				Err(TryRecvError::Overflowed(_)) => {
+					break self.try_recv_overflow_ok()
+				}
+				Err(other) => break Err(other),
 			}
 		}
 	}
@@ -26,7 +36,7 @@ pub impl<T: Clone> Receiver<T> {
 #[extend::ext]
 pub impl<T: Clone> Receiver<Vec<T>> {
 	/// Calls `flatten` on the result of `try_recv_all`.
-	fn try_recv_all_flat(&mut self) -> Result<Vec<T>, TryRecvAllError> {
+	fn try_recv_all_flat(&mut self) -> Result<Vec<T>, TryRecvError> {
 		let val = self.try_recv_all()?.into_iter().flatten().collect();
 		Ok(val)
 	}

@@ -17,7 +17,7 @@ default = []
 
 [dependencies]
 anyhow.workspace = true
-flume.workspace = true
+async-broadcast.workspace = true
 extend.workspace = true
 futures.workspace = true
 parking_lot.workspace = true

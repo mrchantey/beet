@@ -27,7 +27,7 @@ impl<Req: Payload, Res: Payload> Responder<Req, Res> {
 		mut handler: impl FnMut(Req) -> Res,
 	) -> Result<()> {
 		let recv = self.req.recv_inner_mut();
-		if let Ok(next) = recv.recv_async().await {
+		if let Ok(next) = recv.recv().await {
 			let id = next.id;
 			let response = handler(next.payload()?);
 			self.res.channel_inner().push(StateMessage::new(

@@ -27,7 +27,7 @@ pub async fn pubsub() -> Result<()> {
 	// let mut sub2 = relay.add_subscriber::<u8>(&topic)?;
 	let publisher = relay.add_publisher_with_topic::<u8>(&topic)?;
 	publisher.push(&8_u8)?;
-	let out1 = sub1.recv()?;
+	let out1 = sub1.try_recv()?;
 	// let out2 = sub2.recv()?;
 	expect(out1).to_be(8_u8)?;
 	// expect(out2).to_be(8_u8)?;
@@ -55,8 +55,8 @@ pub async fn broadcast() -> Result<()> {
 	let mut sub2 = relay.add_subscriber_with_topic::<u8>(&topic)?;
 	let publisher = relay.add_publisher_with_topic::<u8>(&topic)?;
 	publisher.push(&8_u8)?;
-	let out1 = sub1.recv()?;
-	let out2 = sub2.recv()?;
+	let out1 = sub1.try_recv()?;
+	let out2 = sub2.try_recv()?;
 	expect(out1).to_be(8_u8)?;
 	expect(out2).to_be(8_u8)?;
 	Ok(())

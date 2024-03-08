@@ -17,7 +17,7 @@ impl Relay {
 
 	/// recv once without keeping a subscriber
 	pub fn recv<T: Payload>(&self, topic: impl Into<Topic>) -> Result<T> {
-		self.add_subscriber_with_topic(topic)?.recv()
+		self.add_subscriber_with_topic(topic)?.try_recv()
 	}
 
 
