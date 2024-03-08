@@ -31,6 +31,7 @@ pub struct BeeGame {
 	pub relay: Relay,
 	create_bee_sub: Subscriber<BehaviorGraph<BeeNode>>,
 	create_flower_sub: Subscriber<()>,
+	despawn_sub: Subscriber<DespawnEntityPayload>,
 	pub elements: HashMap<BeetEntityId, HtmlDivElement>,
 }
 
@@ -38,15 +39,30 @@ impl BeeGame {
 	pub async fn new(mut relay: Relay) -> Result<Self> {
 		let create_bee_sub = create_bee_sub(&mut relay);
 		let create_flower_sub = create_flower_sub(&mut relay);
+		let despawn_sub = DespawnEntityHandler::subscriber(&mut relay);
 
 		Ok(Self {
 			relay,
 			create_bee_sub,
 			create_flower_sub,
+			despawn_sub,
 			elements: Default::default(),
 		})
 	}
 	pub async fn update(&mut self) -> Result<()> {
+		for payload in self.despawn_sub.try_recv_all()? {
+			if let Some(id) = payload.beet_id {
+				if let Some(el) = self.elements.remove(&id) {
+					el.remove();
+				}
+			} else {
+				for item in self.elements.values() {
+					item.remove();
+				}
+				self.elements.clear();
+			}
+		}
+
 		for graph in self.create_bee_sub.try_recv_all()? {
 			let (id, el) = create_bee(&mut self.relay, graph).await?;
 			self.elements.insert(id, el);
@@ -76,9 +92,13 @@ impl BeeGame {
 			}
 		});
 	}
-	pub fn create_bee_pub(relay: &mut Relay) -> Publisher<BehaviorGraph<BeeNode>> {
+	pub fn create_bee_pub(
+		relay: &mut Relay,
+	) -> Publisher<BehaviorGraph<BeeNode>> {
 		relay
-			.add_publisher_with_topic::<BehaviorGraph<BeeNode>>(create_bee_topic())
+			.add_publisher_with_topic::<BehaviorGraph<BeeNode>>(
+				create_bee_topic(),
+			)
 			.unwrap()
 	}
 	pub fn create_flower_pub(relay: &mut Relay) -> Publisher<()> {

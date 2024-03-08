@@ -40,10 +40,20 @@ impl<T: ActionPayload> Plugin for BeetPlugin<T> {
 			.add_systems(
 				PreUpdate,
 				// despawn before spawn to avoid immediate despawn in case of despawn_all
-				(handle_despawn_entity, handle_spawn_entity::<T>).chain(),
+				(
+					handle_despawn_entity.pipe(log_error),
+					handle_spawn_entity::<T>,
+				)
+					.chain(),
 			)
 			.add_plugins(ActionPlugin::<T, _>::default())
 			.add_systems(PostUpdate, (send_position, cleanup_beet_entity_map))
 			.insert_resource(RelayRes(relay));
+	}
+}
+
+fn log_error<T>(result: In<anyhow::Result<T>>) {
+	if let Err(e) = result.0 {
+		log::error!("{}", e);
 	}
 }

@@ -47,9 +47,8 @@ pub fn setup_ui(relay: Relay) -> Result<Vec<HtmlEventListener<Event>>> {
 			let mut relay4 = relay4.clone();
 			spawn_local(async move {
 				log::info!("clearing all");
-				DespawnEntityHandler::requester(&mut relay4)
-					.request(&DespawnEntityPayload::all())
-					.await
+				DespawnEntityHandler::publisher(&mut relay4)
+					.push(&DespawnEntityPayload::all())
 					.ok_or(|e| log::error!("{e}"));
 			});
 		},

@@ -23,10 +23,7 @@ pub async fn works() -> Result<()> {
 
 	wait_for_millis(1).await;
 
-	let msg = rx.recv()?;
-
-
-	expect(msg).to_be(8)?;
+	expect(rx.try_recv()?).to_be(8)?;
 
 	Ok(())
 }
