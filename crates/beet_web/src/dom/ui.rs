@@ -155,7 +155,7 @@ fn create_text(
 				Ok(tree) => {
 					create_bee_button.set_disabled(false);
 					warning_text.set_inner_html("&nbsp;");
-					textarea2.set_value(&prettify(&tree));
+					// textarea2.set_value(&prettify(&tree));
 					set_url(&tree);
 				}
 				Err(e) => {
@@ -174,7 +174,6 @@ fn set_url(tre: &BehaviorTree<BeeNode>) {
 	let val = general_purpose::STANDARD_NO_PAD.encode(val);
 	// let url = serde_json::to_string(tre).unwrap();
 	History::set_param("tree", &val);
-	log::info!("set url to url of length {}", val.len());
 }
 
 fn get_tree_url_param() -> Result<BehaviorTree<BeeNode>> {

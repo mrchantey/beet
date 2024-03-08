@@ -20,6 +20,12 @@ test-web *args:
 	just test-wasm beet_web {{args}}
 
 
+run-web *args:
+	just copy-wasm-assets
+	just watch-wasm-debug beet_web main
+serve-web:
+	just serve-wasm
+
 # mdbooks server is busted on wsl so I use live-server
 book:
 	cd docs && mdbook serve & cd docs/book && live-server --no-browser
@@ -69,3 +75,41 @@ watch *command:
 	-i '{.git,target,html}/**' \
 	-i '**/mod.rs' \
 	-- {{command}}
+
+
+
+
+build-wasm-release crate example *args:
+	just _build-wasm release {{crate}} {{example}} --release {{args}}
+build-wasm-debug crate example *args:
+	just _build-wasm debug {{crate}} {{example}} {{args}}
+watch-wasm-release crate example *args:
+	just _watch-wasm release {{crate}} {{example}} --release {{args}}
+watch-wasm-debug crate example *args:
+	just _watch-wasm debug {{crate}} {{example}} {{args}}
+
+_build-wasm build_config crate example *args:
+	cargo build -p {{crate}} --example {{example}} --target wasm32-unknown-unknown {{args}}
+	wasm-bindgen \
+	--out-dir ./target/static/wasm \
+	--target web \
+	./target/wasm32-unknown-unknown/{{build_config}}/examples/{{example}}.wasm \
+	--no-typescript \
+
+_watch-wasm build_config crate example *args:
+	just watch 'just _build-wasm {{build_config}} {{crate}} {{example}} {{args}}'
+
+copy-wasm-assets:
+	rm -rf ./target/static/assets
+	mkdir -p ./target/static/assets || true
+	cp -r ./crates/beet_web/assets/* ./target/static
+
+	
+serve-wasm *args:
+	cd ./target/static && \
+	npx live-server \
+	--no-browser \
+	--entry-file=index.html \
+	--host=0.0.0.0 \
+	--watch=wasm/site_bg.wasm,wasm/simulator_bg.wasm,index.html,style.css \
+	{{args}}

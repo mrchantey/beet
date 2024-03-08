@@ -1,3 +1,20 @@
+:root {
+	--primary-color: #000000;
+	--background-color: #ffffff;
+	--hover: #eee;
+	--active: #ccc;
+}
+
+@media (prefers-color-scheme: dark) {
+	:root {
+		--primary-color: #ffffff;
+		--background-color: #282828;
+		--hover: #555;
+		--active: #777;
+	}
+}
+
+
 html,
 body {
 	margin: 0;
@@ -5,14 +22,22 @@ body {
 	height: 100%;
 	max-width: 100vw;
 	max-height: 100vh;
-
+	color: var(--primary-color);
+	background-color: var(--background-color);
 }
 
-button.play {
-	/* background-color: red; */
-	position: absolute;
-	top: 10px;
-	left: 10px;
+button {
+	color: var(--primary-color);
+	background-color: var(--background-color);
+	cursor: pointer;
+}
+
+button:hover {
+	background-color: var(--hover);
+}
+
+button:active {
+	background-color: var(--active);
 }
 
 div.container {
@@ -42,4 +67,8 @@ div.overlay {
 textarea {
 	width: 100%;
 	height: 100%;
+	color: var(--primary-color);
+	background-color: var(--background-color);
+	border: none;
+	/* Optional: Remove border if desired */
 }

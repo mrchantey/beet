@@ -1,0 +1,19 @@
+<html>
+
+<head>
+	<title>Playground</title>
+	<meta charset="UTF-8" />
+</head>
+
+<body>
+	<script type="module">
+		import init from './wasm/main.js'
+		init()
+			.catch((error) => {
+				if (!error.message.startsWith("Using exceptions for control flow,"))
+					throw error
+			});
+	</script>
+</body>
+
+</html>
