@@ -1,11 +1,7 @@
 use forky_web::DocumentExt;
 use web_sys::Document;
-use web_sys::HtmlDivElement;
 
-pub fn setup_dom() {
-	append_style_to_head();
-	create_container();
-}
+pub fn setup_dom() { append_style_to_head(); }
 
 // fn run_post_message(relay: Relay) {
 // let current_frame = IdIncr::new();
@@ -16,18 +12,14 @@ pub fn setup_dom() {
 // });
 // }
 
-
-fn create_container() -> HtmlDivElement {
-	let container = Document::x_create_div();
-	container.set_class_name("container");
-	Document::x_append_child(&container);
-	container
-}
-
-
 fn append_style_to_head() {
 	let style_content = include_str!("style.css");
 	let style_element = Document::x_create_element("style");
 	style_element.set_inner_html(style_content);
 	Document::x_head().append_child(&style_element).unwrap();
+
+	let root = Document::x_create_div();
+	root.set_inner_html(include_str!("body.html"));
+	Document::x_body().append_child(&root).unwrap();
+	// Document::x_body().set_inner_html(include_str!("body.html"));
 }

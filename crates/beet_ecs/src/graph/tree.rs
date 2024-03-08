@@ -1,6 +1,5 @@
 use crate::prelude::*;
 use petgraph::graph::DiGraph;
-use serde::de::DeserializeOwned;
 use serde::ser::SerializeStruct;
 use serde::Deserialize;
 use serde::Serialize;

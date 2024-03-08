@@ -25,3 +25,21 @@ div.container>div.entity {
 	position: absolute;
 	font-size: 3em;
 }
+
+div.overlay {
+	display: flex;
+	flex-direction: column;
+	width: 100%;
+	height: 100%;
+}
+
+#graph-json-container {
+	width: 100%;
+	height: 100%;
+	flex-grow: 1;
+}
+
+textarea {
+	width: 100%;
+	height: 100%;
+}

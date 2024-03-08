@@ -1,14 +1,16 @@
-use crate::prelude::get_container;
 use crate::prelude::BeeGame;
 use crate::prelude::BeeNode;
 use anyhow::Result;
+use base64::engine::general_purpose;
+use base64::Engine;
 use beet::prelude::*;
 use bevy_math::Vec3;
 use forky_core::ResultTEExt;
 use forky_web::DocumentExt;
+use forky_web::History;
 use forky_web::HtmlEventListener;
+use forky_web::SearchParams;
 use js_sys::JSON;
-use wasm_bindgen::JsCast;
 use wasm_bindgen::JsValue;
 use wasm_bindgen_futures::spawn_local;
 use web_sys::Document;
@@ -19,15 +21,50 @@ use web_sys::HtmlTextAreaElement;
 
 #[must_use]
 pub fn setup_ui(relay: Relay) -> Result<Vec<HtmlEventListener<Event>>> {
-	let create_bee_button = create_button("Create Bee");
+	let create_bee_button =
+		Document::x_query_selector::<HtmlButtonElement>("#create-bee").unwrap();
 	let create_flower_listener = create_flower(relay.clone());
 	let clear_all_listener = create_clear_all(relay.clone());
+	let toggle_json = create_toggle_json();
 
 	let (textarea, text_changed_listener) =
 		create_text(create_bee_button.clone());
 
-	let mut relay = relay;
-	let create_bee_listener = HtmlEventListener::new_with_target(
+	let create_bee_listener = create_bee(relay, create_bee_button, textarea);
+	Ok(vec![
+		toggle_json,
+		text_changed_listener,
+		create_bee_listener,
+		create_flower_listener,
+		clear_all_listener,
+	])
+}
+
+fn create_clear_all(relay: Relay) -> HtmlEventListener<Event> {
+	let clear_all_button =
+		Document::x_query_selector::<HtmlButtonElement>("#clear-all").unwrap();
+
+	HtmlEventListener::new_with_target(
+		"click",
+		move |_| {
+			let mut relay = relay.clone();
+			spawn_local(async move {
+				DespawnEntityHandler::publisher(&mut relay)
+					.push(&DespawnEntityPayload::all())
+					.ok_or(|e| log::error!("{e}"));
+			});
+		},
+		clear_all_button.into(),
+	)
+}
+
+
+fn create_bee(
+	mut relay: Relay,
+	create_bee_button: HtmlButtonElement,
+	textarea: HtmlTextAreaElement,
+) -> HtmlEventListener<Event> {
+	let listener = HtmlEventListener::new_with_target(
 		"click",
 		move |_| {
 			let tree: BehaviorTree<BeeNode> =
@@ -40,66 +77,86 @@ pub fn setup_ui(relay: Relay) -> Result<Vec<HtmlEventListener<Event>>> {
 		},
 		create_bee_button.clone().into(),
 	);
+	if SearchParams::get_flag("spawn_bee") {
+		create_bee_button.click();
+	}
 
-	Ok(vec![
-		text_changed_listener,
-		create_bee_listener,
-		create_flower_listener,
-		clear_all_listener,
-	])
+	listener
 }
 
-fn create_clear_all(relay: Relay) -> HtmlEventListener<Event> {
-	let clear_all_button = create_button("Clear");
-	HtmlEventListener::new_with_target(
-		"click",
-		move |_| {
-			let mut relay = relay.clone();
-			spawn_local(async move {
-				log::info!("clearing all");
-				DespawnEntityHandler::publisher(&mut relay)
-					.push(&DespawnEntityPayload::all())
-					.ok_or(|e| log::error!("{e}"));
-			});
-		},
-		clear_all_button.into(),
-	)
-}
 fn create_flower(mut relay: Relay) -> HtmlEventListener<Event> {
-	let create_flower_button = create_button("Create Flower");
-	HtmlEventListener::new_with_target(
+	let create_flower_button =
+		Document::x_query_selector::<HtmlButtonElement>("#create-flower")
+			.unwrap();
+
+	let listener = HtmlEventListener::new_with_target(
 		"click",
 		move |_| {
 			BeeGame::create_flower_pub(&mut relay)
 				.push(&())
 				.ok_or(|e| log::error!("{e}"));
 		},
-		create_flower_button.into(),
-	)
+		create_flower_button.clone().into(),
+	);
+
+	if SearchParams::get_flag("spawn_flower") {
+		create_flower_button.click();
+	}
+
+	listener
 }
 
+
+
+fn create_toggle_json() -> HtmlEventListener<Event> {
+	let toggle_json_button =
+		Document::x_query_selector::<HtmlButtonElement>("#toggle-json")
+			.unwrap();
+	let container =
+		Document::x_query_selector::<HtmlDivElement>("#graph-json-container")
+			.unwrap();
+	let toggle_json_button2 = toggle_json_button.clone();
+	HtmlEventListener::new_with_target(
+		"click",
+		move |_| {
+			if container.hidden() {
+				container.set_hidden(false);
+				toggle_json_button2.set_inner_text("Hide Json");
+			} else {
+				container.set_hidden(true);
+				toggle_json_button2.set_inner_text("Show Json");
+			}
+		},
+		toggle_json_button.into(),
+	)
+}
 
 fn create_text(
 	create_bee_button: HtmlButtonElement,
 ) -> (HtmlTextAreaElement, HtmlEventListener<Event>) {
-	let initial =
-		BehaviorTree::<BeeNode>::new(Translate::new(Vec3::new(-0.1, 0., 0.)));
+	let initial = get_tree_url_param().unwrap_or_else(|_| {
+		BehaviorTree::<BeeNode>::new(Translate::new(Vec3::new(-0.1, 0., 0.)))
+	});
 
-	let warning_text = create_warning_div();
-	let textarea = create_textarea();
+	let warning_text =
+		Document::x_query_selector::<HtmlDivElement>("#graph-json-error")
+			.unwrap();
+	let textarea =
+		Document::x_query_selector::<HtmlTextAreaElement>("#graph-json-text")
+			.unwrap();
 	textarea.set_value(&prettify(&initial));
 
 	let textarea2 = textarea.clone();
 	let text_changed_listener = HtmlEventListener::new_with_target(
-		"change",
+		"input",
 		move |_| {
 			let text = textarea2.value();
 			match serde_json::from_str::<BehaviorTree<BeeNode>>(&text) {
 				Ok(tree) => {
 					create_bee_button.set_disabled(false);
-					warning_text.set_inner_text(LOOKING_GOOD);
+					warning_text.set_inner_html("&nbsp;");
 					textarea2.set_value(&prettify(&tree));
-
+					set_url(&tree);
 				}
 				Err(e) => {
 					create_bee_button.set_disabled(true);
@@ -112,24 +169,24 @@ fn create_text(
 	(textarea, text_changed_listener)
 }
 
-fn create_textarea() -> HtmlTextAreaElement {
-	let container = get_container();
-	let textarea: HtmlTextAreaElement = Document::get()
-		.create_element("textarea")
-		.unwrap()
-		.dyn_into()
-		.unwrap();
-	container.append_child(&textarea).unwrap();
-	textarea
+fn set_url(tre: &BehaviorTree<BeeNode>) {
+	let val = bincode::serialize(tre).unwrap();
+	let val = general_purpose::STANDARD_NO_PAD.encode(val);
+	// let url = serde_json::to_string(tre).unwrap();
+	History::set_param("tree", &val);
+	log::info!("set url to url of length {}", val.len());
 }
-const LOOKING_GOOD: &str = "Looking good!";
-fn create_warning_div() -> HtmlDivElement {
-	let container = get_container();
-	let el = Document::x_create_div();
-	el.set_inner_text(LOOKING_GOOD);
-	container.append_child(&el).unwrap();
-	el
+
+fn get_tree_url_param() -> Result<BehaviorTree<BeeNode>> {
+	if let Some(tree) = SearchParams::get("tree") {
+		let bytes = general_purpose::STANDARD_NO_PAD.decode(tree.as_bytes())?;
+		let tree = bincode::deserialize(&bytes)?;
+		Ok(tree)
+	} else {
+		anyhow::bail!("no tree param found");
+	}
 }
+
 
 fn prettify(tree: &BehaviorTree<BeeNode>) -> String {
 	let tree = serde_json::to_string(&tree).unwrap();
@@ -141,15 +198,4 @@ fn prettify(tree: &BehaviorTree<BeeNode>) -> String {
 	)
 	.unwrap();
 	pretty.as_string().unwrap()
-}
-
-
-fn create_button(text: &str) -> HtmlButtonElement {
-	let container = get_container();
-	let button = Document::x_create_button();
-	// button.set_class_name("button");
-	button.set_inner_text(text);
-	container.append_child(&button).unwrap();
-	// Document::x_append_child(&button);
-	button
 }
