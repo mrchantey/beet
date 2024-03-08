@@ -19,10 +19,15 @@ test-net *args:
 test-web *args:
 	just test-wasm beet_web {{args}}
 
+build-web *args:
+	just copy-wasm-assets
+	just build-wasm-release beet_web main
 
 run-web *args:
 	just copy-wasm-assets
 	just watch-wasm-debug beet_web main
+
+
 serve-web:
 	just serve-wasm
 
