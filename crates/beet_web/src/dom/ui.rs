@@ -133,7 +133,7 @@ fn create_toggle_json() -> HtmlEventListener<Event> {
 		button.clone().into(),
 	);
 
-	if SearchParams::get_flag("hide-json") {
+	if SearchParams::get_flag("hide-graph") {
 		button.click();
 	}
 	listener
