@@ -49,6 +49,8 @@ div.container {
 div.container>div.entity {
 	position: absolute;
 	font-size: 3em;
+	pointer-events: none;
+	user-select: none;
 }
 
 div.overlay {
