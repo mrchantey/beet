@@ -46,7 +46,7 @@ async fn cross_boundary_errors() -> Result<()> {
 	let mut sub2 = relay2.add_subscriber_with_topic::<u8>(&topic)?;
 	relay1.sync_local(&mut relay2).await?;
 	expect(sub2.recv_default_timeout()).to_be_err_str(
-		"Type mismatch for foo/bar:0\nexpected u32, received u8",
+		"Type mismatch for foo/bar\nexpected u32, received u8",
 	)?;
 
 

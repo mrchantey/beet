@@ -12,18 +12,19 @@ use forky_core::ResultTEExt;
 use serde::Deserialize;
 use serde::Serialize;
 
+
+pub const ENTITY_TOPIC: &'static str = "entity";
+
 #[derive(Resource, Deref, DerefMut)]
 pub struct SpawnEntityHandler<T: ActionPayload>(
 	pub Responder<SpawnEntityPayload<T>, BeetEntityId>,
 );
 
 impl<T: ActionPayload> SpawnEntityHandler<T> {
-	pub const ADDRESS: &'static str = "entity";
-	pub const METHOD: TopicMethod = TopicMethod::Create;
 	pub fn new(relay: &mut Relay) -> Self {
 		Self(
 			relay
-				.add_responder(Self::ADDRESS, TopicMethod::Create)
+				.add_responder(ENTITY_TOPIC, TopicMethod::Create)
 				.unwrap(), //should be correct topic
 		)
 	}
@@ -32,7 +33,7 @@ impl<T: ActionPayload> SpawnEntityHandler<T> {
 		relay: &mut Relay,
 	) -> Requester<SpawnEntityPayload<T>, BeetEntityId> {
 		relay
-			.add_requester(Self::ADDRESS, TopicMethod::Create)
+			.add_requester(ENTITY_TOPIC, TopicMethod::Create)
 			.unwrap() //should be correct topic
 	}
 }

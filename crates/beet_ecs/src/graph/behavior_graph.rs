@@ -81,6 +81,8 @@ impl<T: ActionSuper> BehaviorGraph<T> {
 			// warn that graph is empty?
 		}
 
-		EntityGraph(entity_graph)
+		let entity_graph = EntityGraph(entity_graph);
+		world.insert(target, entity_graph.clone());
+		entity_graph
 	}
 }

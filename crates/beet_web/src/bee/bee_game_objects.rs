@@ -2,6 +2,8 @@ use crate::prelude::*;
 use anyhow::Result;
 use beet::prelude::*;
 use bevy_math::prelude::*;
+use bevy_utils::HashMap;
+use forky_core::ResultTEExt;
 use forky_web::wait_for_16_millis;
 use forky_web::DocumentExt;
 use wasm_bindgen_futures::spawn_local;
@@ -26,90 +28,118 @@ impl Default for GameConfig {
 }
 
 pub struct BeeGame {
-	pub bee: Bee,
-	pub flower: Option<Flower>,
+	pub relay: Relay,
+	create_bee_sub: Subscriber<BehaviorGraph<BeeNode>>,
+	create_flower_sub: Subscriber<()>,
+	pub elements: HashMap<BeetEntityId, HtmlDivElement>,
 }
 
 impl BeeGame {
-	pub async fn new(mut config: GameConfig) -> Result<Self> {
-		let flower = if config.flower {
-			Some(Flower::new(&mut config.relay).await?)
-		} else {
-			None
-		};
-		let bee = Bee::new(&mut config.relay, config.graph).await?;
-		Ok(Self { bee, flower })
+	pub async fn new(mut relay: Relay) -> Result<Self> {
+		let create_bee_sub = create_bee_sub(&mut relay);
+		let create_flower_sub = create_flower_sub(&mut relay);
+
+		Ok(Self {
+			relay,
+			create_bee_sub,
+			create_flower_sub,
+			elements: Default::default(),
+		})
 	}
-	pub fn update(&mut self) { self.bee.update(); }
+	pub async fn update(&mut self) -> Result<()> {
+		for graph in self.create_bee_sub.try_recv_all()? {
+			let (id, el) = create_bee(&mut self.relay, graph).await?;
+			self.elements.insert(id, el);
+		}
+
+		for _ in self.create_flower_sub.try_recv_all()? {
+			let (id, el) = create_flower(&mut self.relay).await?;
+			self.elements.insert(id, el);
+		}
+
+		for (id, el) in &self.elements {
+			if let Ok(pos) = PositionSender::subscriber(&mut self.relay, *id)
+				.unwrap()
+				.try_recv()
+			{
+				set_position(&el, pos.xy(), &get_container());
+			}
+		}
+		Ok(())
+	}
 
 	pub fn update_forever(mut self) {
 		spawn_local(async move {
 			loop {
-				self.update();
+				self.update().await.ok_or(|e| log::error!("{e}"));
 				wait_for_16_millis().await;
 			}
-			// 🥀🌹
 		});
 	}
-}
-
-
-#[allow(unused)]
-pub struct Bee {
-	id: BeetEntityId,
-	el: HtmlDivElement,
-	position_update: Subscriber<Vec3>,
-}
-
-impl Bee {
-	pub async fn new(
-		relay: &mut Relay,
-		graph: BehaviorGraph<BeeNode>,
-	) -> Result<Self> {
-		let mut create_entity = SpawnBehaviorEntityHandler::requester(relay);
-		let id = create_entity
-			.request(&SpawnBehaviorEntityPayload::new(
-				graph,
-				Some(Vec3::new(0.5, 0., 0.)),
-				true,
-			))
-			.await?;
-		let position_update = PositionSender::subscriber(relay, id)?;
-		let el = create_dom_entity("🐝", Vec2::new(0.5, 0.));
-
-
-		Ok(Self {
-			id,
-			el,
-			position_update,
-		})
+	pub fn create_bee_pub(relay: &mut Relay) -> Publisher<BehaviorGraph<BeeNode>> {
+		relay
+			.add_publisher_with_topic::<BehaviorGraph<BeeNode>>(create_bee_topic())
+			.unwrap()
 	}
-	pub fn update(&mut self) {
-		if let Ok(pos) = self.position_update.try_recv() {
-			set_position(&self.el, pos.xy(), &get_container());
-		}
+	pub fn create_flower_pub(relay: &mut Relay) -> Publisher<()> {
+		relay
+			.add_publisher_with_topic::<()>(create_flower_topic())
+			.unwrap()
 	}
 }
 
-#[allow(unused)]
-pub struct Flower {
-	id: BeetEntityId,
-	el: HtmlDivElement,
+fn create_bee_topic() -> Topic {
+	Topic::new("bee", TopicScheme::PubSub, TopicMethod::Create)
 }
-impl Flower {
-	pub async fn new(relay: &mut Relay) -> Result<Self> {
-		let mut create_entity = SpawnEntityHandler::requester(relay);
-		let id = create_entity
-			.request(
-				&SpawnEntityPayload::default()
-					.with_position(Vec3::new(-0.5, 0., 0.)),
-			)
-			.await?;
 
-		let el = create_dom_entity("🌻", Vec2::new(-0.5, 0.));
+fn create_bee_sub(relay: &mut Relay) -> Subscriber<BehaviorGraph<BeeNode>> {
+	relay
+		.add_subscriber_with_topic::<BehaviorGraph<BeeNode>>(create_bee_topic())
+		.unwrap()
+}
 
-		Ok(Self { id, el })
-	}
+async fn create_bee(
+	relay: &mut Relay,
+	graph: BehaviorGraph<BeeNode>,
+) -> Result<(BeetEntityId, HtmlDivElement)> {
+	let mut create_entity = SpawnEntityHandler::requester(relay);
+	let id = create_entity
+		.request(
+			&SpawnEntityPayload::default()
+				.with_graph(graph)
+				.with_tracked_position(Vec3::new(0.5, 0., 0.)),
+		)
+		.await?;
+	let el = create_dom_entity("🐝", Vec2::new(0.5, 0.));
+
+	Ok((id, el))
+}
+
+fn create_flower_topic() -> Topic {
+	Topic::new("flower", TopicScheme::PubSub, TopicMethod::Create)
+}
+
+fn create_flower_sub(relay: &mut Relay) -> Subscriber<()> {
+	relay
+		.add_subscriber_with_topic::<()>(create_flower_topic())
+		.unwrap()
+}
+
+async fn create_flower(
+	relay: &mut Relay,
+) -> Result<(BeetEntityId, HtmlDivElement)> {
+	let mut create_entity = SpawnEntityHandler::<BeeNode>::requester(relay);
+	let id = create_entity
+		.request(
+			&SpawnEntityPayload::default()
+				.with_position(Vec3::new(-0.5, 0., 0.)),
+		)
+		.await?;
+	// 🥀🌹
+	let el = create_dom_entity("🌻", Vec2::new(-0.5, 0.));
+	Ok((id, el))
+	// spawn_local(async move { Flower::new(relay).await.unwrap() });
+	// Ok(Flower::new(relay).await?)
 }
 
 fn set_position<'a>(

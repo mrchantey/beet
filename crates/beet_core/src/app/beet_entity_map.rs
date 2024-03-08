@@ -7,6 +7,7 @@ use bevy_utils::HashMap;
 use core::fmt;
 use serde::Deserialize;
 use serde::Serialize;
+use std::error::Error;
 use strum::IntoEnumIterator;
 
 pub trait ActionPayload:
@@ -50,6 +51,13 @@ pub struct BeetEntityMap {
 }
 
 impl BeetEntityMap {
+	pub fn get(
+		&self,
+		id: BeetEntityId,
+	) -> Result<&Entity, EntityNotFoundError> {
+		self.map.get(&id).ok_or(EntityNotFoundError(id))
+	}
+
 	pub fn map(&self) -> &HashMap<BeetEntityId, Entity> { &self.map }
 
 	pub fn next(&mut self, entity: Entity) -> BeetEntityId {
@@ -57,10 +65,10 @@ impl BeetEntityMap {
 		self.id_incr = self.id_incr.wrapping_add(1);
 		let id = BeetEntityId(id);
 		self.map.insert(id, entity);
+		self.reverse_map.insert(entity, id);
 		id
 	}
 }
-
 
 pub fn cleanup_beet_entity_map(
 	mut entity_map: ResMut<BeetEntityMap>,
@@ -74,3 +82,14 @@ pub fn cleanup_beet_entity_map(
 		}
 	}
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EntityNotFoundError(pub BeetEntityId);
+
+impl fmt::Display for EntityNotFoundError {
+	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+		write!(f, "Entity not found: {}", self.0)
+	}
+}
+
+impl Error for EntityNotFoundError {}

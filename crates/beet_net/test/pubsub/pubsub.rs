@@ -9,7 +9,7 @@ pub fn pubsub_fail_cases() -> Result<()> {
 	let bad_sub = relay.add_subscriber_with_topic::<u32>(&topic);
 
 	let err_str =
-		"Type mismatch for PubSub.Update/foo/bar:0\nexpected u8, received u32";
+		"Type mismatch for PubSub.Update/foo/bar\nexpected u8, received u32";
 	expect(bad_sub).to_be_err_str(err_str)?;
 	let bad_pub = relay.add_publisher_with_topic::<u32>(&topic);
 	expect(bad_pub).to_be_err_str(err_str)?;

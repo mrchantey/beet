@@ -58,6 +58,12 @@ impl<T: IntoEnumIterator + IntoAction, Schedule: ScheduleLabel + Clone> Plugin
 			apply_deferred.after(TickSyncSet).before(PostTickSet),
 		);
 
+		app.insert_resource(TrackedEntityGraphs::default())
+			.add_systems(
+				self.schedule.clone(),
+				cleanup_entity_graph.in_set(PreTickSet),
+			);
+
 		app.add_systems(
 			self.schedule.clone(),
 			(sync_running, sync_interrupts).in_set(TickSyncSet),

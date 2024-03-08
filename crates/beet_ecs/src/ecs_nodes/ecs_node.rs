@@ -9,3 +9,8 @@ action_list!(EcsNode, [
 	FallbackSelector,
 	UtilitySelector
 ]);
+
+
+pub fn set_run_result_graph() -> BehaviorGraph<EcsNode> {
+	BehaviorTree::new(SetRunResult::success()).into_action_graph()
+}

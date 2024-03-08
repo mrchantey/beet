@@ -10,6 +10,9 @@ pub use self::topic_set_endpoint::*;
 pub mod topic_set;
 #[allow(unused_imports)]
 pub use self::topic_set::*;
+pub mod topic_address;
+#[allow(unused_imports)]
+pub use self::topic_address::*;
 pub mod qos;
 #[allow(unused_imports)]
 pub use self::qos::*;
