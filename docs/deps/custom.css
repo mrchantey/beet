@@ -17,3 +17,9 @@ footer {
 #page-wrapper {
 	min-height: 100vh;
 }
+
+iframe {
+	width: 100%;
+	height: 30em;
+	border: none;
+}

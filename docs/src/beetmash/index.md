@@ -1,3 +1,5 @@
 # Beetmash
 
-Beetmash a creation platform built upon `beet`.
+🚧 work in progress 🚧
+
+Beetmash a planned learning and creation platform for `beet`.
