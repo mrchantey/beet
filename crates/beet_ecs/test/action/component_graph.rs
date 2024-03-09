@@ -8,7 +8,7 @@ pub fn works() -> Result<()> {
 	let mut app = App::new();
 	let target = app.world.spawn_empty().id();
 	let actions = test_action_graph_typed();
-	let entities = actions.spawn(&mut app.world, target);
+	let entities = actions.spawn(&mut app, target);
 
 	let entity = *entities.node(2).unwrap();
 	app.world.entity_mut(entity).insert(Score::Pass);

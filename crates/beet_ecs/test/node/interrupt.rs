@@ -14,7 +14,7 @@ pub fn works() -> Result<()> {
 		.with_child(EmptyAction)
 		.with_child(BehaviorTree::new(EmptyAction).with_child(EmptyAction));
 
-	let entity_graph = tree.spawn(&mut app.world, target);
+	let entity_graph = tree.spawn(&mut app, target);
 
 	for entity in entity_graph.node_weights() {
 		app.world.entity_mut(*entity).insert(Running);

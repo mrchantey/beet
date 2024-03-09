@@ -9,7 +9,7 @@ pub fn default_components() -> Result<()> {
 	let mut app = App::new();
 	let target = app.world.spawn_empty().id();
 	let actions = test_action_graph_typed();
-	let entities = actions.spawn(&mut app.world, target);
+	let entities = actions.spawn(&mut app, target);
 	let entity = *entities.root().unwrap();
 
 	expect(&app).to_have_component::<SetScore>(entity)?;
@@ -28,7 +28,7 @@ pub fn sync_system() -> Result<()> {
 
 	let target = app.world.spawn_empty().id();
 	let actions = test_action_graph_typed();
-	let entities = actions.spawn(&mut app.world, target);
+	let entities = actions.spawn(&mut app, target);
 	let entity = *entities.root().unwrap();
 
 

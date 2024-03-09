@@ -13,7 +13,7 @@ fn setup() -> (App, EntityGraph) {
 		.with_child((SetScore::new(Score::Fail), SetRunResult::failure()))
 		.with_child((SetScore::new(Score::Pass), SetRunResult::success()));
 
-	let entity_graph = tree.spawn(&mut app.world, target);
+	let entity_graph = tree.spawn(&mut app, target);
 	(app, entity_graph)
 }
 

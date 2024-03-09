@@ -11,7 +11,7 @@ pub fn works() -> Result<()> {
 
 	let tree = BehaviorTree::<EcsNode>::new(SetRunResult::default());
 
-	let entity_graph = tree.spawn(&mut app.world, target);
+	let entity_graph = tree.spawn(&mut app, target);
 	let root = *entity_graph.root().unwrap();
 
 	expect(&app).to_have_component::<Running>(root)?;

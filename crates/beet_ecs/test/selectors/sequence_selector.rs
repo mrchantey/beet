@@ -14,7 +14,7 @@ pub fn works() -> Result<()> {
 		.with_child(SetRunResult::success())
 		.with_child(SetRunResult::failure());
 
-	let entity_graph = tree.spawn(&mut app.world, target);
+	let entity_graph = tree.spawn(&mut app, target);
 
 	app.update();
 	expect_tree(

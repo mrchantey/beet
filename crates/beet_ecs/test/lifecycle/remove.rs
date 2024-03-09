@@ -11,7 +11,7 @@ pub fn works() -> Result<()> {
 
 	let target = app.world.spawn_empty().id();
 	let graph = set_run_result_graph();
-	graph.spawn(&mut app.world, target);
+	graph.spawn(&mut app, target);
 
 	expect(app.world.entities().len()).to_be(2)?;
 	app.update();
