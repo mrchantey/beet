@@ -3,7 +3,7 @@ use crate::action_list;
 action_list!(EcsNode, [
 	EmptyAction,
 	SetRunResult,
-	SetScore,
+	ConstantScore,
 	SucceedInDuration,
 	SequenceSelector,
 	FallbackSelector,

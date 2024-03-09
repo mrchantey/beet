@@ -11,7 +11,7 @@ action_list!(CoreNode, [
 	//ecs
 	EmptyAction,
 	SetRunResult,
-	SetScore,
+	ConstantScore,
 	SucceedInDuration,
 	SequenceSelector,
 	FallbackSelector,

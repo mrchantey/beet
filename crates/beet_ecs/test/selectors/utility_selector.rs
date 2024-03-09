@@ -10,8 +10,8 @@ fn setup() -> (App, EntityGraph) {
 	let target = app.world.spawn_empty().id();
 
 	let tree = BehaviorTree::<EcsNode>::new(UtilitySelector)
-		.with_child((SetScore::new(Score::Fail), SetRunResult::failure()))
-		.with_child((SetScore::new(Score::Pass), SetRunResult::success()));
+		.with_child((ConstantScore::new(Score::Fail), SetRunResult::failure()))
+		.with_child((ConstantScore::new(Score::Pass), SetRunResult::success()));
 
 	let entity_graph = tree.spawn(&mut app, target);
 	(app, entity_graph)
@@ -63,7 +63,7 @@ pub fn works() -> Result<()> {
 // 	let child = entity_graph.clone().into_tree().children[1].value;
 // 	app.world
 // 		.entity_mut(child)
-// 		.insert(SetScore::new(Score::Pass));
+// 		.insert(ConstantScore::new(Score::Pass));
 
 // 	app.update();
 // 	expect_tree(

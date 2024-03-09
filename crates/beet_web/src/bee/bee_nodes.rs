@@ -14,7 +14,7 @@ action_list!(BeeNode, [
 	//ecs
 	EmptyAction,
 	SetRunResult,
-	SetScore,
+	ConstantScore,
 	SucceedInDuration,
 	SequenceSelector,
 	FallbackSelector,

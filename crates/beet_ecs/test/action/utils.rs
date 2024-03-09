@@ -8,11 +8,11 @@ use beet_ecs::prelude::*;
 ///
 
 pub fn test_action_graph_typed() -> BehaviorGraph<EcsNode> {
-	BehaviorTree::<EcsNode>::new(SetScore::default())
-		.with_child(SetScore::default())
+	BehaviorTree::<EcsNode>::new(ConstantScore::default())
+		.with_child(ConstantScore::default())
 		.with_child(
-			BehaviorTree::new(SetScore::default())
-				.with_child(SetScore::default()),
+			BehaviorTree::new(ConstantScore::default())
+				.with_child(ConstantScore::default()),
 		)
 		.into_behavior_graph()
 }

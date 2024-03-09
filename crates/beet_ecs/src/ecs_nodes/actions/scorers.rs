@@ -5,11 +5,11 @@ use serde::Serialize;
 
 #[action(system=empty_action)]
 #[derive(Default)]
-pub struct SetScore {
+pub struct ConstantScore {
 	#[shared]
 	pub score: Score,
 }
 
-impl SetScore {
+impl ConstantScore {
 	pub fn new(score: Score) -> Self { Self { score } }
 }
