@@ -2,7 +2,7 @@ name: 🌍 Deploy Playground
 on:
   push:
     branches: main
-    paths: ['crates/**','Cargo.toml']
+    paths: ['crates/**','Cargo.toml','.github/workflows/playground.yml']
 jobs:
   deploy:
     name: Build and Deploy
