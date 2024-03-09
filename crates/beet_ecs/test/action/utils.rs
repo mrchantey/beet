@@ -14,5 +14,5 @@ pub fn test_action_graph_typed() -> BehaviorGraph<EcsNode> {
 			BehaviorTree::new(SetScore::default())
 				.with_child(SetScore::default()),
 		)
-		.into_action_graph()
+		.into_behavior_graph()
 }

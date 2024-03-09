@@ -1,22 +1,17 @@
-// use bevy_ecs::prelude::*;
 use beet_ecs::prelude::*;
 use bevy_app::App;
 use sweet::*;
 
 #[sweet_test]
 pub fn works() -> Result<()> {
-	// expect(true).to_be_false()?;
-
-
 	let mut app = App::new();
 	app.add_plugins(ActionPlugin::<EcsNode, _>::default());
 
 	let target = app.world.spawn_empty().id();
 
-	let action_graph = BehaviorTree::<EcsNode>::new(SetRunResult::default())
-		.into_action_graph();
+	let tree = BehaviorTree::<EcsNode>::new(SetRunResult::default());
 
-	let entity_graph = action_graph.spawn(&mut app.world, target);
+	let entity_graph = tree.spawn(&mut app.world, target);
 	let root = *entity_graph.root().unwrap();
 
 	expect(&app).to_have_component::<Running>(root)?;

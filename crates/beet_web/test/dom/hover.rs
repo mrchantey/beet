@@ -8,7 +8,7 @@ pub async fn works() -> Result<()> {
 	let mut relay = Relay::default();
 
 	BeeGame::create_bee_pub(&mut relay)
-		.push(&BehaviorTree::new(Hover::new(1., 0.01)).into_action_graph())?;
+		.push(&BehaviorTree::new(Hover::new(1., 0.01)).into_behavior_graph())?;
 	BeeGame::create_flower_pub(&mut relay).push(&())?;
 
 	run(relay);

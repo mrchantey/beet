@@ -79,8 +79,8 @@ impl<T: ActionSuper> SpawnEntityPayload<T> {
 		self.position = Some(position);
 		self
 	}
-	pub fn with_graph(mut self, graph: BehaviorGraph<T>) -> Self {
-		self.graph = Some(graph);
+	pub fn with_graph(mut self, graph: impl Into<BehaviorGraph<T>>) -> Self {
+		self.graph = Some(graph.into());
 		self
 	}
 }
@@ -108,8 +108,7 @@ pub fn handle_spawn_entity<T: ActionPayload>(
 			}
 			let entity = entity.id();
 			if let Some(graph) = val.graph {
-				let graph = graph.spawn(&mut commands, entity);
-				commands.entity(entity).insert(graph);
+				graph.spawn(&mut commands, entity);
 			}
 
 			beet_id

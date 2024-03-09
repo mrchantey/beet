@@ -10,6 +10,9 @@ pub use self::action_timer::*;
 pub mod graph_ext;
 #[allow(unused_imports)]
 pub use self::graph_ext::*;
+pub mod succeed_in_duration;
+#[allow(unused_imports)]
+pub use self::succeed_in_duration::*;
 pub mod action;
 #[allow(unused_imports)]
 pub use self::action::*;

@@ -72,10 +72,9 @@ fn create_bee(
 		move |_| {
 			let tree: BehaviorTree<BeeNode> =
 				serde_json::from_str(&textarea.value()).unwrap(); // already validated
-			let graph = tree.into_action_graph();
 
 			BeeGame::create_bee_pub(&mut relay)
-				.push(&graph)
+				.push(&tree.into_behavior_graph())
 				.ok_or(|e| log::error!("{e}"));
 		},
 		button.clone().into(),

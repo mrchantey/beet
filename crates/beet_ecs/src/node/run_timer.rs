@@ -16,17 +16,17 @@ pub struct RunTimer {
 
 
 
-/// Syncs [`RunTimer`] components, by default added to [`PreNodeUpdateSet`].
-pub fn sync_run_timers(
+/// Syncs [`RunTimer`] components, by default added to [`PreTickSet`].
+/// This is added to the [`PreTickSet`], any changes detected were from the previous frame.
+/// For this reason timers are reset before they tick to accuratly indicate when the [`Running`]
+/// component was *actually* added or removed.
+pub fn update_run_timers(
 	time: Res<Time>,
 	mut timers: Query<&mut RunTimer>,
 	added: Query<Entity, Added<Running>>,
 	mut removed: RemovedComponents<Running>,
 ) {
-	for mut timer in timers.iter_mut() {
-		timer.last_started.tick(time.delta());
-		timer.last_stopped.tick(time.delta());
-	}
+	// 1. reset timers
 
 	for added in added.iter() {
 		if let Ok(mut timer) = timers.get_mut(added) {
@@ -38,5 +38,12 @@ pub fn sync_run_timers(
 		if let Ok(mut timer) = timers.get_mut(removed) {
 			timer.last_stopped.reset();
 		}
+	}
+
+	// 2. tick timers
+
+	for mut timer in timers.iter_mut() {
+		timer.last_started.tick(time.delta());
+		timer.last_stopped.tick(time.delta());
 	}
 }

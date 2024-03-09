@@ -1,10 +1,11 @@
 use crate::prelude::*;
+use bevy_ecs::entity::Entity;
 use serde::Deserialize;
 use serde::Serialize;
 
 
-
-#[derive(Debug, Serialize, Deserialize)]
+/// A non-cyclic [`BehaviorGraph`], can be converted into one by calling `.into()`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BehaviorTree<T: ActionSuper>(pub Tree<BehaviorNode<T>>);
 
 impl<T: ActionSuper> Default for BehaviorTree<T> {
@@ -21,13 +22,21 @@ impl<T: ActionSuper> BehaviorTree<T> {
 		self
 	}
 
-	pub fn into_action_graph(self) -> BehaviorGraph<T> {
+	pub fn spawn(
+		&self,
+		world: &mut impl WorldOrCommands,
+		target: Entity,
+	) -> EntityGraph {
+		EntityGraph::new(world, (*self).clone(), target)
+	}
+
+	pub fn into_behavior_graph(self) -> BehaviorGraph<T> {
 		BehaviorGraph(self.0.into_graph())
 	}
 }
 
 impl<T: ActionSuper> Into<BehaviorGraph<T>> for BehaviorTree<T> {
-	fn into(self) -> BehaviorGraph<T> { self.into_action_graph() }
+	fn into(self) -> BehaviorGraph<T> { self.into_behavior_graph() }
 }
 impl<T: ActionSuper> Into<Tree<BehaviorNode<T>>> for BehaviorTree<T> {
 	fn into(self) -> Tree<BehaviorNode<T>> { self.0 }

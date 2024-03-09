@@ -7,7 +7,7 @@ use std::ops::DerefMut;
 pub trait ActionSuper: Clone + PartialEq + Action {}
 impl<T: Clone + PartialEq + Action> ActionSuper for T {}
 
-
+/// A collection of actions related to this node.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct BehaviorNode<T: Action> {
 	pub name: String,

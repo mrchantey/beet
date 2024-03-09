@@ -20,5 +20,5 @@ action_list!(CoreNode, [
 
 
 pub fn translate_graph() -> BehaviorGraph<CoreNode> {
-	BehaviorTree::new(Translate::new(Vec3::new(0., 1., 0.))).into_action_graph()
+	BehaviorTree::new(Translate::new(Vec3::new(0., 1., 0.))).into()
 }

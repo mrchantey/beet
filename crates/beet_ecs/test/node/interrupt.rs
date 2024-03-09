@@ -10,13 +10,11 @@ pub fn works() -> Result<()> {
 
 	let target = app.world.spawn_empty().id();
 
-	let action_graph: BehaviorGraph<EcsNode> =
-		BehaviorTree::<EcsNode>::new(EmptyAction)
-			.with_child(EmptyAction)
-			.with_child(BehaviorTree::new(EmptyAction).with_child(EmptyAction))
-			.into_action_graph();
+	let tree = BehaviorTree::<EcsNode>::new(EmptyAction)
+		.with_child(EmptyAction)
+		.with_child(BehaviorTree::new(EmptyAction).with_child(EmptyAction));
 
-	let entity_graph = action_graph.spawn(&mut app.world, target);
+	let entity_graph = tree.spawn(&mut app.world, target);
 
 	for entity in entity_graph.node_weights() {
 		app.world.entity_mut(*entity).insert(Running);

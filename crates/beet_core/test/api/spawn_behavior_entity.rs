@@ -16,8 +16,7 @@ pub fn works() -> Result<()> {
 	let mut send = SpawnEntityHandler::requester(&mut relay);
 
 	let graph =
-		BehaviorTree::<CoreNode>::new(Translate::new(Vec3::new(1., 0., 0.)))
-			.into_action_graph();
+		BehaviorTree::<CoreNode>::new(Translate::new(Vec3::new(1., 0., 0.)));
 
 	let message_id = send.start_request(
 		&SpawnEntityPayload::default()

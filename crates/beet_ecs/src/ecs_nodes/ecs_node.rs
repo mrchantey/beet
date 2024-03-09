@@ -12,5 +12,5 @@ action_list!(EcsNode, [
 
 
 pub fn set_run_result_graph() -> BehaviorGraph<EcsNode> {
-	BehaviorTree::new(SetRunResult::success()).into_action_graph()
+	BehaviorTree::new(SetRunResult::success()).into_behavior_graph()
 }

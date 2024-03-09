@@ -10,13 +10,11 @@ pub fn works() -> Result<()> {
 
 	let target = app.world.spawn_empty().id();
 
-	let action_graph =
-		BehaviorTree::<EcsNode>::new(FallbackSelector)
-			.with_child(SetRunResult::failure())
-			.with_child(SetRunResult::success())
-			.into_action_graph();
+	let tree = BehaviorTree::<EcsNode>::new(FallbackSelector)
+		.with_child(SetRunResult::failure())
+		.with_child(SetRunResult::success());
 
-	let entity_graph = action_graph.spawn(&mut app.world, target);
+	let entity_graph = tree.spawn(&mut app.world, target);
 
 	app.update();
 	expect_tree(
