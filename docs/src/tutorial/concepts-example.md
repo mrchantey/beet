@@ -32,7 +32,7 @@ Lets go through each action in the diagram:
 3. `Wander`: The bee will move around the map somewhat randomly.
 4. `TargetScorer`: This action has two roles:
    - Provide the parent with a score depending on whether a target named "flower" is nearby
-   - Update `TargetEntity` component of its children.
+   - Update `ActionTarget` component of its children.
 5. `SequenceSelector`: Run each child in order until completion or one fails.
 6. `SucceedInDuration`: Upon arriving at the flower, wait for 1 second to emulate pollination.
 

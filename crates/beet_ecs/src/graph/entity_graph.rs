@@ -4,7 +4,6 @@ use bevy_derive::Deref;
 use bevy_derive::DerefMut;
 use bevy_ecs::prelude::*;
 use bevy_utils::prelude::default;
-use bevy_utils::HashMap;
 use petgraph::graph::DiGraph;
 use serde::Deserialize;
 use serde::Serialize;
@@ -68,7 +67,7 @@ impl EntityGraph {
 					RunTimer::default(),
 				));
 				if let Some(target) = target {
-					world.insert(entity, TargetEntity(target));
+					world.insert(entity, TargetAgent(target));
 				}
 				for action in actions.iter() {
 					world.apply_action_typed(action, entity);
@@ -103,8 +102,7 @@ impl EntityGraph {
 
 		let entity_graph = EntityGraph(entity_graph);
 		if let Some(target) = target {
-			// NOTE this breaks multiple graphs per target
-			world.insert(target, entity_graph.clone());
+			world.insert(target, AgentMarker);
 		}
 		entity_graph
 	}
@@ -117,27 +115,17 @@ impl EntityGraph {
 	}
 }
 
-#[derive(Debug, Default, Clone, Deref, DerefMut, Resource)]
-pub struct TrackedEntityGraphs(pub HashMap<Entity, EntityGraph>);
-
-// TODO refactor to allow for multiple graphs
-/// This mechanism requires at least one frame between spawning a graph
-/// and deleting it
+/// Removes all nodes with a [`TargetAgent`] component that matches the removed agent
 pub fn cleanup_entity_graph(
 	mut commands: Commands,
-	mut tracked_entities: ResMut<TrackedEntityGraphs>,
-	added_graphs: Query<(Entity, &EntityGraph), Changed<EntityGraph>>,
-	mut entity_graphs: RemovedComponents<EntityGraph>,
+	nodes: Query<(Entity, &TargetAgent)>,
+	mut removed_agents: RemovedComponents<AgentMarker>,
 ) {
-	for (entity, graph) in added_graphs.iter() {
-		tracked_entities.insert(entity, graph.clone());
-	}
-
-	for entity in entity_graphs.read() {
-		if let Some(graph) = tracked_entities.remove(&entity) {
-			graph.despawn(&mut commands);
-		} else {
-			log::warn!("Entity {entity:?} not found in tracked entity graphs");
+	for agent in removed_agents.read() {
+		for (node, target) in nodes.iter() {
+			if **target == agent {
+				commands.entity(node).despawn();
+			}
 		}
 	}
 }

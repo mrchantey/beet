@@ -63,8 +63,6 @@ impl<T: IntoEnumIterator + IntoAction, Schedule: ScheduleLabel + Clone> Plugin
 					.run_if(|time: Option<Res<Time>>| time.is_some())
 					.in_set(PreTickSet),
 			)
-			// remove this
-			.insert_resource(TrackedEntityGraphs::default())
 			.add_systems(
 				self.schedule.clone(),
 				cleanup_entity_graph.in_set(PreTickSet),

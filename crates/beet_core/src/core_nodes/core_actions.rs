@@ -19,7 +19,7 @@ fn translate(
 	mut _commands: Commands,
 	time: Res<Time>,
 	mut transforms: Query<&mut Transform>,
-	query: Query<(&TargetEntity, &Translate), With<Running>>,
+	query: Query<(&TargetAgent, &Translate), With<Running>>,
 ) {
 	for (target, translate) in query.iter() {
 		transforms.get_mut(**target).unwrap().translation +=

@@ -13,7 +13,7 @@ pub fn default_components() -> Result<()> {
 	let entity = *entities.root().unwrap();
 
 	expect(&app).to_have_component::<ConstantScore>(entity)?;
-	expect(&app).to_have_component::<TargetEntity>(entity)?;
+	expect(&app).to_have_component::<TargetAgent>(entity)?;
 	expect(&app).to_have_component::<RunTimer>(entity)?;
 	expect(&app).to_have_component::<Score>(entity)?;
 
