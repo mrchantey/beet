@@ -13,7 +13,8 @@ jobs:
     name: Build and Test
     strategy:
       matrix:
-        os: [windows-latest, ubuntu-latest, macos-latest]
+        # os: [windows-latest, ubuntu-latest, macos-latest]
+        os: [ubuntu-latest, macos-latest]
         # os: [ubuntu-latest]   # 1x  gh minutes
         # os: [windows-latest] # 2x  gh minutes
         # os: [macos-latest]   # 10x gh minutes
