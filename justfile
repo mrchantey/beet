@@ -27,7 +27,6 @@ run-web *args:
 	just copy-wasm-assets
 	just watch-wasm-debug beet_web main
 
-
 serve-web:
 	just serve-wasm
 
@@ -129,6 +128,7 @@ watch-web *command:
 	forky watch \
 	-w '**/*/assets/**/*' \
 	-- {{command}}
+
 
 
 # too scary with untracked changes etc, do it manually

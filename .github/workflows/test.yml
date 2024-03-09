@@ -20,9 +20,9 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
     - name: 📂 Checkout
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
     - name: 📂 Cache
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: |
           ~/.cargo/bin/
