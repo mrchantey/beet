@@ -1,5 +1,4 @@
 
-The ECS component of Beet is a modular task switching library suitable for game AI, robotics & other performance-critical environments. It is built with `bevy_ecs` which allows for parallelism and no blackboard. The primitives it provies can be used for multiple selector paradigms like Behaviour Trees, State Machines and Utility AI.
 
 ## Features
 
