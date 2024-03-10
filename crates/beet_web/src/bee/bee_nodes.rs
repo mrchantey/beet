@@ -16,6 +16,7 @@ action_list!(BeeNode, [
 	Wander,
 	FindSteerTarget,
 	ScoreSteerTarget,
+	DespawnSteerTarget,
 	SucceedOnArrive,
 	//ecs
 	EmptyAction,

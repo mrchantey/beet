@@ -264,7 +264,7 @@ checksum = "9475866fec1451be56a3c2400fd081ff546538961565ccb5b7142cbd22bc7a51"
 
 [[package]]
 name = "beet"
-version = "0.0.1"
+version = "0.0.2"
 dependencies = [
  "beet_core",
  "beet_ecs",
@@ -273,11 +273,11 @@ dependencies = [
 
 [[package]]
 name = "beet-cli"
-version = "0.0.1"
+version = "0.0.2"
 
 [[package]]
 name = "beet_core"
-version = "0.0.1"
+version = "0.0.2"
 dependencies = [
  "anyhow",
  "beet_ecs",
@@ -301,7 +301,7 @@ dependencies = [
 
 [[package]]
 name = "beet_ecs"
-version = "0.0.1"
+version = "0.0.2"
 dependencies = [
  "anyhow",
  "beet_ecs_macros",
@@ -326,7 +326,7 @@ dependencies = [
 
 [[package]]
 name = "beet_ecs_macros"
-version = "0.0.1"
+version = "0.0.2"
 dependencies = [
  "anyhow",
  "extend",
@@ -337,7 +337,7 @@ dependencies = [
 
 [[package]]
 name = "beet_net"
-version = "0.0.1"
+version = "0.0.2"
 dependencies = [
  "anyhow",
  "async-broadcast",
@@ -357,7 +357,7 @@ dependencies = [
 
 [[package]]
 name = "beet_web"
-version = "0.0.1"
+version = "0.0.2"
 dependencies = [
  "anyhow",
  "base64 0.22.0",

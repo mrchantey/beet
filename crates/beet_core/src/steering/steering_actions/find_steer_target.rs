@@ -9,6 +9,10 @@ pub struct FindSteerTarget {
 	pub name: String,
 }
 
+impl FindSteerTarget {
+	pub fn new(name: impl Into<String>) -> Self { Self { name: name.into() } }
+}
+
 // TODO this shouldnt run every frame?
 
 fn find_steer_target(

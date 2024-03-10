@@ -17,21 +17,24 @@ impl Default for SucceedOnArrive {
 
 pub fn succeed_on_arrive(
 	mut commands: Commands,
+	agents: Query<&SteerTarget>,
 	transforms: Query<&Transform>,
 	mut query: Query<
-		(Entity, &Transform, &SteerTarget, &SucceedOnArrive),
+		(Entity, &Transform, &TargetAgent, &SucceedOnArrive),
 		With<Running>,
 	>,
 ) {
-	for (entity, transform, target, succeed_on_arrive) in query.iter_mut() {
-		if let Ok(target) = target.position(&transforms) {
-			if Vec3::distance(transform.translation, target)
-				<= succeed_on_arrive.radius
-			{
-				commands.entity(entity).insert(RunResult::Success);
+	for (entity, transform, agent, succeed_on_arrive) in query.iter_mut() {
+		if let Ok(target) = agents.get(**agent) {
+			if let Ok(target) = target.position(&transforms) {
+				if Vec3::distance(transform.translation, target)
+					<= succeed_on_arrive.radius
+				{
+					commands.entity(entity).insert(RunResult::Success);
+				}
+			} else {
+				commands.entity(entity).insert(RunResult::Failure);
 			}
-		} else {
-			commands.entity(entity).insert(RunResult::Failure);
 		}
 	}
 }

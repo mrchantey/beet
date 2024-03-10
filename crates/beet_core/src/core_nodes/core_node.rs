@@ -12,6 +12,7 @@ action_list!(CoreNode, [
 	Seek,
 	Wander,
 	FindSteerTarget,
+	DespawnSteerTarget,
 	ScoreSteerTarget,
 	SucceedOnArrive,
 	//ecs

@@ -130,7 +130,7 @@ pub fn handle_spawn_entity<T: ActionPayload>(
 						wander_params: WanderParams {
 							outer_distance: 0.2,
 							outer_radius: 0.1,
-							inner_radius: 0.02,
+							inner_radius: 0.01,//lower = smoother
 							last_local_target: default(),
 						},
 						max_force: MaxForce(0.1),

@@ -1,5 +1,5 @@
 [workspace.package]
-version = "0.0.1"
+version = "0.0.2"
 edition = "2021"
 description = "AI behavior library for games and robotics."
 documentation = "https://mrchantey.github.io/beet"
@@ -32,11 +32,11 @@ members = [
 
 [workspace.dependencies]
 ## internal
-beet = { path = "crates/beet", version = "0.0.1" }
-beet_ecs = { path = "crates/beet_ecs", version = "0.0.1" }
-beet_core = { path = "crates/beet_core", version = "0.0.1" }
-beet_ecs_macros = { path = "crates/beet_ecs/macros", version = "0.0.1" }
-beet_net = { path = "crates/beet_net", version = "0.0.1" }
+beet = { path = "crates/beet", version = "0.0.2" }
+beet_ecs = { path = "crates/beet_ecs", version = "0.0.2" }
+beet_core = { path = "crates/beet_core", version = "0.0.2" }
+beet_ecs_macros = { path = "crates/beet_ecs/macros", version = "0.0.2" }
+beet_net = { path = "crates/beet_net", version = "0.0.2" }
 
 ## local
 forky_core = { path = "../forky/crates/forky/forky_core" }

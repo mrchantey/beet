@@ -10,6 +10,9 @@ pub use self::succeed_on_arrive::*;
 pub mod align;
 #[allow(unused_imports)]
 pub use self::align::*;
+pub mod despawn_steer_target;
+#[allow(unused_imports)]
+pub use self::despawn_steer_target::*;
 pub mod arrive;
 #[allow(unused_imports)]
 pub use self::arrive::*;
