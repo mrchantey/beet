@@ -45,7 +45,7 @@ Furthermore this graph can very easily be attached as a `work mode` subgraph of 
 ## Agent Lifecycle
 
 1. A graph is defined containing the relationships between nodes and the initial values for each of their accompanying actions.
-2. When creating an agent, call `my_graph.spawn(my_agent)` which will do the following for each node in the graph:
+2. When creating an agent, call `my_graph.spawn(&mut commands, my_agent)` which will do the following for each node in the graph:
 	- Create an entity
 	- If it has any children, put their entity ids in an `Edges` component
 	- Create a component for each action

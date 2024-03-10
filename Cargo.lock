@@ -290,7 +290,8 @@ dependencies = [
  "bevy_time",
  "bevy_transform",
  "bevy_utils",
- "forky_core",
+ "forky_bevy",
+ "forky_core 0.1.42",
  "log",
  "serde",
  "strum",
@@ -370,8 +371,8 @@ dependencies = [
  "console_log",
  "extend",
  "forky_bevy",
- "forky_core",
- "forky_web",
+ "forky_core 0.1.42",
+ "forky_web 0.1.42",
  "futures",
  "js-sys",
  "log",
@@ -1166,8 +1167,6 @@ checksum = "3f9eec918d3f24069decb9af1554cad7c880e2da24a9afd88aca000531ab82c1"
 [[package]]
 name = "forky_bevy"
 version = "0.1.42"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7afba4e156902fc6312d16d90b489ca743270eb2d5af1c6f822cc30c63423b2e"
 dependencies = [
  "anyhow",
  "bevy_app",
@@ -1179,9 +1178,22 @@ dependencies = [
  "bevy_transform",
  "bevy_utils",
  "extend",
- "forky_core",
- "forky_web",
+ "forky_core 0.1.42",
+ "forky_web 0.1.42",
  "js-sys",
+ "rand",
+]
+
+[[package]]
+name = "forky_core"
+version = "0.1.42"
+dependencies = [
+ "anyhow",
+ "extend",
+ "getrandom",
+ "log",
+ "num-traits",
+ "rand",
 ]
 
 [[package]]
@@ -1208,7 +1220,7 @@ dependencies = [
  "clap",
  "crossterm",
  "extend",
- "forky_core",
+ "forky_core 0.1.42 (registry+https://github.com/rust-lang/crates.io-index)",
  "futures",
  "gag",
  "glob",
@@ -1222,14 +1234,12 @@ dependencies = [
 [[package]]
 name = "forky_web"
 version = "0.1.42"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a402b3cf447434f0330e095f98058b1cab19585d52d81c086e0c7f1e1e9ad310"
 dependencies = [
  "anyhow",
  "console_error_panic_hook",
  "extend",
- "forky_core",
- "forky_web_macros",
+ "forky_core 0.1.42",
+ "forky_web_macros 0.1.42",
  "js-sys",
  "leptos",
  "serde",
@@ -1237,6 +1247,36 @@ dependencies = [
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "web-sys",
+]
+
+[[package]]
+name = "forky_web"
+version = "0.1.42"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a402b3cf447434f0330e095f98058b1cab19585d52d81c086e0c7f1e1e9ad310"
+dependencies = [
+ "anyhow",
+ "console_error_panic_hook",
+ "extend",
+ "forky_core 0.1.42 (registry+https://github.com/rust-lang/crates.io-index)",
+ "forky_web_macros 0.1.42 (registry+https://github.com/rust-lang/crates.io-index)",
+ "js-sys",
+ "leptos",
+ "serde",
+ "serde_json",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
+ "web-sys",
+]
+
+[[package]]
+name = "forky_web_macros"
+version = "0.1.42"
+dependencies = [
+ "anyhow",
+ "proc-macro2",
+ "quote",
+ "syn 2.0.52",
 ]
 
 [[package]]
@@ -2897,9 +2937,9 @@ dependencies = [
  "console_log",
  "crossterm",
  "extend",
- "forky_core",
+ "forky_core 0.1.42 (registry+https://github.com/rust-lang/crates.io-index)",
  "forky_fs",
- "forky_web",
+ "forky_web 0.1.42 (registry+https://github.com/rust-lang/crates.io-index)",
  "futures",
  "gag",
  "getrandom",

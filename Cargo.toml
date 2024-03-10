@@ -39,9 +39,12 @@ beet_ecs_macros = { path = "crates/beet_ecs/macros", version = "0.0.1" }
 beet_net = { path = "crates/beet_net", version = "0.0.1" }
 
 ## local
-forky_bevy = { version = "0.1.42" }
-forky_core = { version = "0.1.42" }
-forky_web = { version = "0.1.42" }
+forky_core = { path = "../forky/crates/forky/forky_core" }
+forky_bevy = { path = "../forky/crates/forky/forky_bevy" }
+forky_web = { path = "../forky/crates/forky/forky_web" }
+# forky_core = { version = "0.1.42" }
+# forky_bevy = { version = "0.1.42" }
+# forky_web = { version = "0.1.42" }
 sweet = { version = "0.1.42", features = ["bevy_core"] }
 
 # forky_core = { path = "../forky/crates/forky/forky_core" }

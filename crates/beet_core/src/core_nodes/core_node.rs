@@ -8,6 +8,7 @@ use bevy_math::Vec3;
 action_list!(CoreNode, [
 	//core
 	Translate,
+	Seek,
 	//ecs
 	EmptyAction,
 	SetRunResult,
