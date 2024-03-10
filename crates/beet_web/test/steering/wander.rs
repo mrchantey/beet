@@ -5,11 +5,9 @@ use sweet::*;
 #[sweet_test]
 pub async fn works() -> Result<()> {
 	append_html_for_tests();
-	let mut relay = Relay::default();
+	AppOptions::default()
+		.with_graph(BehaviorTree::new(Wander))
+		.run();
 
-	BeeGame::create_bee_pub(&mut relay)
-		.push(&BehaviorTree::new(Wander).into())?;
-
-	run(relay);
 	Ok(())
 }

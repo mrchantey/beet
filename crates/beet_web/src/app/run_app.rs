@@ -1,24 +1,82 @@
 use crate::prelude::*;
 use anyhow::Result;
+use base64::engine::general_purpose;
+use base64::Engine;
 use beet::prelude::*;
 use bevy_app::prelude::*;
+use bevy_math::Vec3;
 use forky_bevy::prelude::*;
 use forky_core::prelude::*;
 use forky_web::wait_for_16_millis;
+use forky_web::SearchParams;
 use wasm_bindgen_futures::spawn_local;
 
-pub fn run(relay: Relay) {
-	console_error_panic_hook::set_once();
-	console_log::init_with_level(log::Level::Info).ok();
-	let listeners = setup_ui(relay.clone()).unwrap();
-	listeners.into_iter().for_each(|l| l.forget());
-	run_app_sync(relay.clone());
-	spawn_local(async move {
-		BeeGame::new(relay).await.unwrap().update_forever();
-	});
+
+
+pub struct AppOptions {
+	pub initial_graph: BehaviorTree<BeeNode>,
+	pub spawn_bee: bool,
+	pub spawn_flower: bool,
+	pub hide_json: bool,
 }
 
+impl Default for AppOptions {
+	fn default() -> Self {
+		Self {
+			initial_graph: BehaviorTree::new(Translate::new(Vec3::new(
+				-0.1, 0., 0.,
+			))),
+			spawn_bee: true,
+			spawn_flower: true,
+			hide_json: false,
+		}
+	}
+}
 
+impl AppOptions {
+	pub fn from_url() -> Self {
+		let mut this = Self::default();
+		if SearchParams::get_flag("spawn-bee") {
+			this.spawn_bee = true;
+		}
+		if SearchParams::get_flag("spawn-flower") {
+			this.spawn_flower = true;
+		}
+		if SearchParams::get_flag("hide-json") {
+			this.hide_json = true;
+		}
+		if let Ok(tree) = get_tree_url_param() {
+			this.initial_graph = tree;
+		}
+		this
+	}
+	pub fn with_graph(mut self, graph: BehaviorTree<BeeNode>) -> Self {
+		self.initial_graph = graph;
+		self
+	}
+
+	pub fn run(&self) {
+		let relay = Relay::default();
+		console_error_panic_hook::set_once();
+		console_log::init_with_level(log::Level::Info).ok();
+		let listeners = setup_ui(relay.clone(), &self).unwrap();
+		listeners.into_iter().for_each(|l| l.forget());
+		run_app_sync(relay.clone());
+		spawn_local(async move {
+			BeeGame::new(relay).await.unwrap().update_forever();
+		});
+	}
+}
+
+fn get_tree_url_param() -> Result<BehaviorTree<BeeNode>> {
+	if let Some(tree) = SearchParams::get("graph") {
+		let bytes = general_purpose::STANDARD_NO_PAD.decode(tree.as_bytes())?;
+		let tree = bincode::deserialize(&bytes)?;
+		Ok(tree)
+	} else {
+		anyhow::bail!("no tree param found");
+	}
+}
 
 
 pub fn run_app_sync(relay: Relay) {

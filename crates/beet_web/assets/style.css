@@ -38,6 +38,7 @@ div.container {
 	height: 100%;
 	position: relative;
 	background: var(--pretty-sky);
+	overflow: hidden;
 }
 
 div.container>div.entity {

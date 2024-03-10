@@ -1,3 +1,4 @@
+use crate::prelude::AppOptions;
 use crate::prelude::BeeGame;
 use crate::prelude::BeeNode;
 use anyhow::Result;
@@ -11,7 +12,6 @@ use forky_core::ResultTEExt;
 use forky_web::DocumentExt;
 use forky_web::History;
 use forky_web::HtmlEventListener;
-use forky_web::SearchParams;
 use js_sys::JSON;
 use wasm_bindgen::JsValue;
 use wasm_bindgen_futures::spawn_local;
@@ -22,17 +22,21 @@ use web_sys::HtmlDivElement;
 use web_sys::HtmlTextAreaElement;
 
 #[must_use]
-pub fn setup_ui(relay: Relay) -> Result<Vec<HtmlEventListener<Event>>> {
+pub fn setup_ui(
+	relay: Relay,
+	options: &AppOptions,
+) -> Result<Vec<HtmlEventListener<Event>>> {
 	let create_bee_button =
 		Document::x_query_selector::<HtmlButtonElement>("#create-bee").unwrap();
-	let create_flower_listener = create_flower(relay.clone());
+	let create_flower_listener = create_flower(relay.clone(), options);
 	let clear_all_listener = create_clear_all(relay.clone());
-	let toggle_json = create_toggle_json();
+	let toggle_json = create_toggle_json(options);
 
 	let (textarea, text_changed_listener) =
-		create_text(create_bee_button.clone());
+		create_textarea(create_bee_button.clone(), options);
 
-	let create_bee_listener = create_bee(relay, create_bee_button, textarea);
+	let create_bee_listener =
+		create_bee(relay, create_bee_button, textarea, options);
 	Ok(vec![
 		toggle_json,
 		text_changed_listener,
@@ -68,6 +72,7 @@ fn create_bee(
 	mut relay: Relay,
 	button: HtmlButtonElement,
 	textarea: HtmlTextAreaElement,
+	options: &AppOptions,
 ) -> HtmlEventListener<Event> {
 	let listener = HtmlEventListener::new_with_target(
 		"click",
@@ -81,14 +86,17 @@ fn create_bee(
 		},
 		button.clone().into(),
 	);
-	if SearchParams::get_flag("spawn-bee") {
+	if options.spawn_bee {
 		button.click();
 	}
 
 	listener
 }
 
-fn create_flower(mut relay: Relay) -> HtmlEventListener<Event> {
+fn create_flower(
+	mut relay: Relay,
+	options: &AppOptions,
+) -> HtmlEventListener<Event> {
 	let button =
 		Document::x_query_selector::<HtmlButtonElement>("#create-flower")
 			.unwrap();
@@ -106,7 +114,7 @@ fn create_flower(mut relay: Relay) -> HtmlEventListener<Event> {
 		button.clone().into(),
 	);
 
-	if SearchParams::get_flag("spawn-flower") {
+	if options.spawn_flower {
 		button.click();
 	}
 
@@ -115,7 +123,7 @@ fn create_flower(mut relay: Relay) -> HtmlEventListener<Event> {
 
 
 
-fn create_toggle_json() -> HtmlEventListener<Event> {
+fn create_toggle_json(options: &AppOptions) -> HtmlEventListener<Event> {
 	let button =
 		Document::x_query_selector::<HtmlButtonElement>("#toggle-json")
 			.unwrap();
@@ -137,26 +145,23 @@ fn create_toggle_json() -> HtmlEventListener<Event> {
 		button.clone().into(),
 	);
 
-	if SearchParams::get_flag("hide-graph") {
+	if options.hide_json {
 		button.click();
 	}
 	listener
 }
 
-fn create_text(
+fn create_textarea(
 	create_bee_button: HtmlButtonElement,
+	options: &AppOptions,
 ) -> (HtmlTextAreaElement, HtmlEventListener<Event>) {
-	let initial = get_tree_url_param().unwrap_or_else(|_| {
-		BehaviorTree::<BeeNode>::new(Translate::new(Vec3::new(-0.1, 0., 0.)))
-	});
-
 	let warning_text =
 		Document::x_query_selector::<HtmlDivElement>("#graph-json-error")
 			.unwrap();
 	let textarea =
 		Document::x_query_selector::<HtmlTextAreaElement>("#graph-json-text")
 			.unwrap();
-	textarea.set_value(&prettify(&initial));
+	textarea.set_value(&prettify(&options.initial_graph));
 
 	let textarea2 = textarea.clone();
 	let text_changed_listener = HtmlEventListener::new_with_target(
@@ -188,15 +193,7 @@ fn set_url(tre: &BehaviorTree<BeeNode>) {
 	History::set_param("graph", &val);
 }
 
-fn get_tree_url_param() -> Result<BehaviorTree<BeeNode>> {
-	if let Some(tree) = SearchParams::get("graph") {
-		let bytes = general_purpose::STANDARD_NO_PAD.decode(tree.as_bytes())?;
-		let tree = bincode::deserialize(&bytes)?;
-		Ok(tree)
-	} else {
-		anyhow::bail!("no tree param found");
-	}
-}
+
 
 
 fn prettify(tree: &BehaviorTree<BeeNode>) -> String {

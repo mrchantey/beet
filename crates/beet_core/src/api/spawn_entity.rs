@@ -126,7 +126,18 @@ pub fn handle_spawn_entity<T: ActionPayload>(
 			if let Some(graph) = graph {
 				entity.insert((
 					ForceBundle::default(),
-					SteerBundle::default().with_target(Vec3::ZERO),
+					SteerBundle {
+						wander_params: WanderParams {
+							outer_distance: 0.2,
+							outer_radius: 0.1,
+							inner_radius: 0.02,
+							last_local_target: default(),
+						},
+						max_force: MaxForce(0.1),
+						max_speed: MaxSpeed(0.3),
+						..default()
+					}
+					.with_target(Vec3::ZERO),
 				));
 				let id = entity.id();
 				graph.spawn(&mut commands, id);

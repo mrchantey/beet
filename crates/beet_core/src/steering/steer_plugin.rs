@@ -1,10 +1,12 @@
 use crate::prelude::*;
+use beet_ecs::action::PostTickSet;
 use bevy_app::prelude::*;
 use bevy_ecs::prelude::*;
 #[allow(unused)]
 use bevy_time::Time;
 #[allow(unused)]
 use bevy_transform::prelude::TransformBundle;
+use forky_bevy::extensions::AppExt;
 
 
 /// Required Resources:
@@ -15,7 +17,13 @@ pub struct SteeringPlugin;
 
 impl Plugin for SteeringPlugin {
 	fn build(&self, app: &mut App) {
-		app.add_systems(PostUpdate, integrate_force);
+		app.__()
+			.add_systems(
+				Update,
+				(integrate_force, wrap_around).chain().in_set(PostTickSet),
+			)
+			.insert_resource(WrapAround::default())
+			.__();
 	}
 }
 
