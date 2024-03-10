@@ -38,6 +38,8 @@ impl EntityGraph {
 			..default()
 		})
 	}
+	/// Choosing no target agent means its your responsibility to ensure that all actions in the behavior graph
+	/// are compatible, actions that expect an agent may do nothing or panic.
 	pub fn new_no_target<T: ActionSuper>(
 		world: &mut impl WorldOrCommands,
 		graph: impl Into<BehaviorGraph<T>>,

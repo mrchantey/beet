@@ -44,7 +44,6 @@ pub fn child_props(_attr: TokenStream, _item: TokenStream) -> TokenStream {
 /// ```
 ///
 /// It also adds a syncing system
-/// TODO use Added, Removed instead of Option<AlwaysPass>
 /// ```rust
 /// fn sync_always_pass(mut query: Query<(Option<&mut Score>, Option<AlwaysPass>), With<AlwaysPass>>) {
 ///
@@ -52,6 +51,10 @@ pub fn child_props(_attr: TokenStream, _item: TokenStream) -> TokenStream {
 ///
 /// }
 /// ```
+/// ## `#[shared]`
+/// In `beet` all systems are run in parallel. If every system that performs scoring
+/// required a `Query<&mut Score>`, then each one of those would need to be run sequentially.
+/// Instead we use a `#[shared]` attribute to indicate that the field should be copied to that component at the end of each tick if it was changed.
 ///
 /// ## Derives
 ///

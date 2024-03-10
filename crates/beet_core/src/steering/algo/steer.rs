@@ -57,7 +57,7 @@ pub fn seek_impulse(
 		arrive_speed(position, target_position, max_speed, arrive_radius);
 
 	let delta_position = *target_position - *position;
-	let desired_velocity = delta_position.normalize() * *desired_speed;
+	let desired_velocity = delta_position.normalize_or_zero() * *desired_speed;
 
 	let perfect_impulse = desired_velocity - **velocity;
 	let impulse = perfect_impulse.clamp_length_max(*max_force);

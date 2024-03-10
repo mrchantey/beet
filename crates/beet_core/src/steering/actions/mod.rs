@@ -1,6 +1,12 @@
-pub mod steer_target_score;
+pub mod find_steer_target;
 #[allow(unused_imports)]
-pub use self::steer_target_score::*;
+pub use self::find_steer_target::*;
+pub mod score_steer_target;
+#[allow(unused_imports)]
+pub use self::score_steer_target::*;
+pub mod succeed_on_arrive;
+#[allow(unused_imports)]
+pub use self::succeed_on_arrive::*;
 pub mod align;
 #[allow(unused_imports)]
 pub use self::align::*;

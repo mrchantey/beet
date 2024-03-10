@@ -6,7 +6,7 @@ use bevy_transform::components::Transform;
 #[derive(Default)]
 pub struct Seek;
 
-
+// TODO if target has Velocity, pursue
 fn seek(
 	transforms: Query<&Transform>,
 	mut targets: Query<(
@@ -31,15 +31,18 @@ fn seek(
 			arrive_radius,
 		) = targets.get_mut(**target).unwrap();
 
-		let target_position = steer_target.position(&transforms).unwrap();
 
-		*impulse = seek_impulse(
-			&transform.translation,
-			&velocity,
-			&target_position,
-			*max_speed,
-			*max_force,
-			arrive_radius.copied(),
-		);
+		if let Ok(target_position) = steer_target.position(&transforms) {
+			*impulse = seek_impulse(
+				&transform.translation,
+				&velocity,
+				&target_position,
+				*max_speed,
+				*max_force,
+				arrive_radius.copied(),
+			);
+		} else {
+			log::warn!("Seek target not found");
+		}
 	}
 }

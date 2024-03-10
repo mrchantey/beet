@@ -142,7 +142,7 @@ pub fn recalculates_ui() -> Result<()> {
 
 	if let FieldUi::Group(group) = root.get_ui() {
 		if let FieldUi::Select(select) = &group.children[1] {
-			select.set_variant_ignoring_value(Score::Weight(10))?;
+			select.set_variant_ignoring_value(Score::Weight(0.1))?;
 		} else {
 			anyhow::bail!("Expected Select");
 		}
@@ -162,7 +162,9 @@ pub fn recalculates_ui() -> Result<()> {
 	expect(*was_called.borrow()).to_be_true()?;
 
 	// note that the actual value is not set, it just updates the ui
-	expect(root.borrow().score).not().to_be(Score::Weight(10))?;
+	expect(root.borrow().score)
+		.not()
+		.to_be(Score::Weight(0.1))?;
 
 	Ok(())
 }
