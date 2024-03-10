@@ -31,6 +31,7 @@ pub async fn run_app(relay: Relay) -> Result<()> {
 	let mut app = App::new();
 
 	app.add_plugins(BeetMinimalPlugin)
+		.add_plugins(SteeringPlugin::default())
 		.add_plugins(BeetPlugin::<BeeNode>::new(relay.clone()));
 
 	let _frame = app.run_on_animation_frame();

@@ -8,7 +8,7 @@ use bevy_ecs::prelude::*;
 use bevy_time::TimePlugin;
 use std::marker::PhantomData;
 
-
+/// The plugin required for most beet apps
 pub struct BeetMinimalPlugin;
 impl Plugin for BeetMinimalPlugin {
 	fn build(&self, app: &mut App) { app.add_plugins(TimePlugin); }

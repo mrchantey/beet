@@ -1,6 +1,7 @@
 use crate::prelude::*;
 use beet_ecs::prelude::*;
 use beet_net::prelude::*;
+use bevy_core::Name;
 use bevy_derive::Deref;
 use bevy_derive::DerefMut;
 use bevy_ecs::prelude::*;
@@ -38,9 +39,10 @@ impl<T: ActionPayload> SpawnEntityHandler<T> {
 	}
 }
 
-
+// these fields are all hacks until BevyReflect, Scene serialization etc
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SpawnEntityPayload<T: ActionSuper> {
+	pub name: String,
 	pub position: Option<Vec3>,
 	pub graph: Option<BehaviorGraph<T>>,
 	pub position_tracking: bool,
@@ -49,6 +51,7 @@ pub struct SpawnEntityPayload<T: ActionSuper> {
 impl<T: ActionSuper> Default for SpawnEntityPayload<T> {
 	fn default() -> Self {
 		Self {
+			name: "New Entity".to_string(),
 			position: None,
 			graph: None,
 			position_tracking: false,
@@ -60,16 +63,23 @@ impl<T: ActionSuper> Default for SpawnEntityPayload<T> {
 
 impl<T: ActionSuper> SpawnEntityPayload<T> {
 	pub fn new(
+		name: String,
 		graph: Option<BehaviorGraph<T>>,
 		position: Option<Vec3>,
 		position_tracking: bool,
 	) -> Self {
 		Self {
+			name,
 			position,
 			graph,
 			position_tracking,
 		}
 	}
+	pub fn with_name(mut self, name: impl Into<String>) -> Self {
+		self.name = name.into();
+		self
+	}
+
 	pub fn with_position(mut self, position: Vec3) -> Self {
 		self.position = Some(position);
 		self
@@ -84,7 +94,7 @@ impl<T: ActionSuper> SpawnEntityPayload<T> {
 		self
 	}
 }
-
+// This is a hack until BevyReflect, Scene serialization etc
 pub fn handle_spawn_entity<T: ActionPayload>(
 	mut commands: Commands,
 	mut entity_map: ResMut<BeetEntityMap>,
@@ -92,23 +102,34 @@ pub fn handle_spawn_entity<T: ActionPayload>(
 ) {
 	handler
 		.try_handle_next(|val| {
-			let mut entity = commands.spawn_empty();
+			let SpawnEntityPayload {
+				name,
+				position,
+				graph,
+				position_tracking,
+			} = val;
+
+			let mut entity = commands.spawn(Name::new(name));
 			let beet_id = entity_map.next(entity.id());
 			entity.insert(beet_id);
 
-			if val.position_tracking {
+			if position_tracking {
 				entity.insert(TrackedPosition);
 			}
 
-			if let Some(pos) = val.position {
+			if let Some(pos) = position {
 				entity.insert(TransformBundle {
 					local: Transform::from_translation(pos),
 					..default()
 				});
 			}
-			let entity = entity.id();
-			if let Some(graph) = val.graph {
-				graph.spawn(&mut commands, entity);
+			if let Some(graph) = graph {
+				entity.insert((
+					ForceBundle::default(),
+					SteerBundle::default().with_target(Vec3::ZERO),
+				));
+				let id = entity.id();
+				graph.spawn(&mut commands, id);
 			}
 
 			beet_id

@@ -5,6 +5,8 @@ use base64::engine::general_purpose;
 use base64::Engine;
 use beet::prelude::*;
 use bevy_math::Vec3;
+use forky_core::utility::random_signed;
+use forky_core::utility::random_value;
 use forky_core::ResultTEExt;
 use forky_web::DocumentExt;
 use forky_web::History;
@@ -94,8 +96,11 @@ fn create_flower(mut relay: Relay) -> HtmlEventListener<Event> {
 	let listener = HtmlEventListener::new_with_target(
 		"click",
 		move |_| {
+			let x = random_signed() * 0.9;
+			let y = random_value() * -0.9;
+
 			BeeGame::create_flower_pub(&mut relay)
-				.push(&())
+				.push(&Vec3::new(x, y, 0.))
 				.ok_or(|e| log::error!("{e}"));
 		},
 		button.clone().into(),

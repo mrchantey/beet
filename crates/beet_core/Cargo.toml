@@ -19,6 +19,7 @@ log.workspace = true
 
 beet_ecs.workspace = true
 beet_net.workspace = true
+bevy_core.workspace = true
 bevy_derive.workspace = true
 bevy_app.workspace = true
 bevy_utils.workspace = true

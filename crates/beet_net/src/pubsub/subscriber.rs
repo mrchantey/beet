@@ -41,9 +41,9 @@ impl<T: Payload> Subscriber<T> {
 	pub fn try_recv(&mut self) -> Result<T> {
 		Ok(self.recv.try_recv_overflow_ok()?.payload()?)
 	}
-	/// Typesafe [`async_broadcast::Receiver::recv`]
+	/// Typesafe [`async_broadcast::Receiver::recv_direct`] ignoring overflows
 	pub async fn recv_async(&mut self) -> Result<T> {
-		Ok(self.recv.recv().await?.payload()?)
+		Ok(self.recv.recv_direct_overflow_ok().await?.payload()?)
 	}
 
 	/// Typesafe [`flume::Receiver::recv_timeout`]

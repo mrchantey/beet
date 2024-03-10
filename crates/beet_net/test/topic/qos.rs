@@ -4,7 +4,7 @@ use beet_net::utils::ReceiverTExt;
 use sweet::*;
 
 #[sweet_test]
-pub fn flume() -> Result<()> {
+pub fn async_broadcast() -> Result<()> {
 	let (tx, mut rx) = async_broadcast::broadcast::<u8>(2);
 	tx.try_broadcast(8)?;
 	tx.try_broadcast(9)?;

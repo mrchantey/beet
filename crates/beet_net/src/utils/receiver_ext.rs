@@ -1,21 +1,36 @@
+#![allow(async_fn_in_trait)]
+use crate::prelude::async_broadcastReceiverTExt;
 use async_broadcast::Receiver;
+use async_broadcast::RecvError;
 use async_broadcast::TryRecvError;
-use std::error::Error;
-use std::fmt;
 
 
 
 #[extend::ext]
 pub impl<T: Clone> Receiver<T> {
+	/// Calls `recv_direct`, and if it returns [`RecvError::Overflowed`], calls itself again.
+	async fn recv_direct_overflow_ok(&mut self) -> Result<T, RecvError> {
+		loop {
+			match self.recv_direct().await {
+				Ok(message) => break Ok(message),
+				Err(RecvError::Overflowed(_)) => {
+					continue;
+				}
+				Err(other) => break Err(other),
+			}
+		}
+	}
 	fn try_recv_all(&mut self) -> Result<Vec<T>, TryRecvError> {
 		let mut vec = Vec::new();
 		loop {
-			match self.try_recv() {
+			match self.try_recv_overflow_ok() {
 				Ok(message) => vec.push(message),
 				Err(TryRecvError::Empty) => break Ok(vec),
-				Err(other) => break Err(other), // Err(TryRecvError::Overflowed(val)) => {
-				                                // 	break Err(TryRecvAllError::Overflowed(val))
-				                                // }
+				Err(other) => break Err(other),
+				// Err(TryRecvError::Closed) => break Err(TryRecvError::Closed),
+				// Err(TryRecvError::Overflowed(val)) => {
+				// 	break Err(TryRecvError::Overflowed(val))
+				// }
 			}
 		}
 	}
@@ -24,9 +39,7 @@ pub impl<T: Clone> Receiver<T> {
 		loop {
 			match self.try_recv() {
 				Ok(message) => break Ok(message),
-				Err(TryRecvError::Overflowed(_)) => {
-					break self.try_recv_overflow_ok()
-				}
+				Err(TryRecvError::Overflowed(_)) => continue,
 				Err(other) => break Err(other),
 			}
 		}
@@ -39,32 +52,5 @@ pub impl<T: Clone> Receiver<Vec<T>> {
 	fn try_recv_all_flat(&mut self) -> Result<Vec<T>, TryRecvError> {
 		let val = self.try_recv_all()?.into_iter().flatten().collect();
 		Ok(val)
-	}
-}
-
-
-
-
-/// An error returned from [`Receiver::try_recv()`].
-#[derive(PartialEq, Eq, Clone, Copy, Debug)]
-pub enum TryRecvAllError {
-	/// The channel has overflowed since the last element was seen.  Future recv operations will
-	/// succeed, but some messages have been skipped.
-	Overflowed(u64),
-	/// The channel is empty and closed.
-	Disconnected,
-}
-impl Error for TryRecvAllError {}
-
-impl fmt::Display for TryRecvAllError {
-	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-		match *self {
-			TryRecvAllError::Disconnected => {
-				write!(f, "receiving from an empty and disconnected channel")
-			}
-			TryRecvAllError::Overflowed(n) => {
-				write!(f, "receiving operation observed {} lost messages", n)
-			}
-		}
 	}
 }

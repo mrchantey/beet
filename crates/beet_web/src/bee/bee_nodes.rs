@@ -11,6 +11,12 @@ action_list!(BeeNode, [
 	Hover,
 	//core
 	Translate,
+	//steer
+	Seek,
+	Wander,
+	FindSteerTarget,
+	ScoreSteerTarget,
+	SucceedOnArrive,
 	//ecs
 	EmptyAction,
 	SetRunResult,

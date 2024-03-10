@@ -8,8 +8,12 @@ use bevy_math::Vec3;
 action_list!(CoreNode, [
 	//core
 	Translate,
+	//steer
 	Seek,
 	Wander,
+	FindSteerTarget,
+	ScoreSteerTarget,
+	SucceedOnArrive,
 	//ecs
 	EmptyAction,
 	SetRunResult,

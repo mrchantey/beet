@@ -3,7 +3,7 @@ use async_broadcast::Sender;
 use async_broadcast::TrySendError;
 
 // absolutely arbitary at this point
-pub const MAX_BROADCAST_CHANNEL_CAPACITY: usize = 128;
+pub const MAX_BROADCAST_CHANNEL_CAPACITY: usize = 2;
 
 
 #[derive(Debug, Clone)]

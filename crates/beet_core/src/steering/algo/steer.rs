@@ -27,21 +27,7 @@ impl Default for MaxSpeed {
 	fn default() -> Self { Self(1.0) }
 }
 
-#[derive(Default, Bundle)]
-pub struct SteerBundle {
-	pub max_force: MaxForce,
-	pub max_speed: MaxSpeed,
-	pub arrive_radius: ArriveRadius,
-	pub wander_params: WanderParams,
-	pub steer_target: SteerTarget,
-}
 
-impl SteerBundle {
-	pub fn with_target(mut self, target: impl Into<SteerTarget>) -> Self {
-		self.steer_target = target.into();
-		self
-	}
-}
 
 /// Calculate a seek impulse
 /// as described [here](https://www.youtube.com/watch?v=p1Ws1ZhG36g&list=PLRqwX-V7Uu6ZV4yEcW3uDwOgGXKUUsPOM&t=585s)

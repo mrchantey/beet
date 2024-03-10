@@ -42,14 +42,14 @@ beet_net = { path = "crates/beet_net", version = "0.0.1" }
 forky_core = { path = "../forky/crates/forky/forky_core" }
 forky_bevy = { path = "../forky/crates/forky/forky_bevy" }
 forky_web = { path = "../forky/crates/forky/forky_web" }
+sweet = { path = "../forky/crates/sweet", features = ["bevy_core"] }
 # forky_core = { version = "0.1.42" }
 # forky_bevy = { version = "0.1.42" }
 # forky_web = { version = "0.1.42" }
-sweet = { version = "0.1.42", features = ["bevy_core"] }
+# sweet = { version = "0.1.42", features = ["bevy_core"] }
 
 # forky_core = { path = "../forky/crates/forky/forky_core" }
 # forky_web = { path = "../forky/crates/forky/forky_web" }
-# sweet = { path = "../forky/crates/sweet", features = ["bevy_core"] }
 
 ## logging
 log = "0.4"
