@@ -9,6 +9,7 @@ action_list!(CoreNode, [
 	//core
 	Translate,
 	Seek,
+	Wander,
 	//ecs
 	EmptyAction,
 	SetRunResult,

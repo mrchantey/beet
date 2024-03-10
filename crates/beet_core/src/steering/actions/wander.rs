@@ -2,44 +2,39 @@ use crate::prelude::*;
 use beet_ecs::prelude::*;
 use bevy_transform::components::Transform;
 
-#[action(system=seek)]
+#[action(system=wander)]
 #[derive(Default)]
-pub struct Seek;
+pub struct Wander;
 
 
-pub fn seek(
-	transforms: Query<&Transform>,
+fn wander(
 	mut targets: Query<(
 		&Transform,
 		&Velocity,
-		&SteerTarget,
+		&mut WanderParams,
 		&MaxSpeed,
 		&MaxForce,
 		&mut Impulse,
-		Option<&ArriveRadius>,
 	)>,
-	query: Query<(&TargetAgent, &Seek), With<Running>>,
+	query: Query<(&TargetAgent, &Wander), (With<Running>, With<Wander>)>,
 ) {
 	for (target, _) in query.iter() {
 		let (
 			transform,
 			velocity,
-			steer_target,
+			mut wander,
 			max_speed,
 			max_force,
 			mut impulse,
-			arrive_radius,
 		) = targets.get_mut(**target).unwrap();
 
-		let target_position = steer_target.position(&transforms).unwrap();
 
-		*impulse = seek_impulse(
+		*impulse = wander_impulse(
 			&transform.translation,
 			&velocity,
-			&target_position,
+			&mut wander,
 			*max_speed,
 			*max_force,
-			arrive_radius.copied(),
 		);
 	}
 }

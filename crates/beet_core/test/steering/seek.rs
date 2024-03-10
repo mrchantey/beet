@@ -1,13 +1,28 @@
 use beet_core::prelude::*;
-use beet_ecs::action::ActionPlugin;
-use beet_ecs::graph::BehaviorTree;
+use beet_ecs::prelude::*;
 use bevy_app::App;
-use bevy_math::Vec3;
+use bevy_math::prelude::*;
 use bevy_transform::prelude::*;
 use sweet::*;
 
+
 #[sweet_test]
-pub fn works() -> Result<()> {
+fn algo() -> Result<()> {
+	let impulse = seek_impulse(
+		&Vec3::default(),
+		&Velocity::default(),
+		&Vec3::new(1., 0., 0.),
+		MaxSpeed::default(),
+		MaxForce::default(),
+		None,
+	);
+	expect(*impulse).to_be(Vec3::new(*MaxForce::default(), 0., 0.))?;
+
+	Ok(())
+}
+
+#[sweet_test]
+fn action() -> Result<()> {
 	let mut app = App::new();
 
 	app.add_plugins((

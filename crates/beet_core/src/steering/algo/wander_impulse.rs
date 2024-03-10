@@ -54,12 +54,14 @@ pub fn wander_impulse(
 	let inner_delta = Vec3::random_in_sphere() * wander.inner_radius;
 	// for the first iteration, last_local_target is Vec3::ZERO, this is
 	// allowed and means the first target will be a random point
-	let local_target = (wander.last_local_target + inner_delta).normalize()
+	let local_target = (wander.last_local_target + inner_delta)
+		.normalize_or_zero()
 		* wander.outer_radius;
 	wander.last_local_target = local_target;
 
-	let global_target =
-		*position + velocity.normalize() * wander.outer_distance + local_target;
+	let global_target = *position
+		+ velocity.normalize_or_zero() * wander.outer_distance
+		+ local_target;
 
 	seek_impulse(
 		position,

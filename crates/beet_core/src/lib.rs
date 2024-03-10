@@ -13,5 +13,7 @@ pub mod prelude {
 	pub use crate::api::*;
 	pub use crate::app::*;
 	pub use crate::core_nodes::*;
+	pub use crate::steering::actions::*;
+	pub use crate::steering::algo::*;
 	pub use crate::steering::*;
 }
