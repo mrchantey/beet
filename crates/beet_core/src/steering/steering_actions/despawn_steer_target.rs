@@ -7,13 +7,17 @@ pub struct DespawnSteerTarget;
 
 fn despawn_steer_target(
 	mut commands: Commands,
-	agents: Query<&SteerTarget>,
-	query: Query<&TargetAgent, (Added<Running>, With<DespawnSteerTarget>)>,
+	agents: Query<(Entity, &SteerTarget)>,
+	query: Query<&TargetAgent, (With<Running>, With<DespawnSteerTarget>)>,
 ) {
-	for agent in query.iter() {
-		if let Ok(steer_target) = agents.get(**agent) {
+	for target_agent in query.iter() {
+		if let Ok((agent, steer_target)) = agents.get(**target_agent) {
 			if let SteerTarget::Entity(target) = steer_target {
-				commands.entity(*target).despawn();
+				if let Some(mut entity) = commands.get_entity(*target) {
+					// this will occasionally error Entity not found
+					entity.despawn();
+					commands.entity(agent).remove::<SteerTarget>();
+				}
 			}
 		}
 	}

@@ -47,7 +47,10 @@ impl<T: ActionPayload> Plugin for BeetPlugin<T> {
 					.chain(),
 			)
 			.add_plugins(ActionPlugin::<T, _>::default())
-			.add_systems(PostUpdate, (send_position, cleanup_beet_entity_map))
+			.add_systems(
+				PostUpdate,
+				(send_position, cleanup_beet_entity_map.pipe(log_error)),
+			)
 			.insert_resource(RelayRes(relay));
 	}
 }

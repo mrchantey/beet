@@ -19,11 +19,12 @@ action_list!(BeeNode, [
 	DespawnSteerTarget,
 	SucceedOnArrive,
 	//ecs
-	EmptyAction,
-	SetRunResult,
 	ConstantScore,
-	SucceedInDuration,
+	EmptyAction,
+	Repeat,
+	SetRunResult,
 	SequenceSelector,
+	SucceedInDuration,
 	FallbackSelector,
 	UtilitySelector
 ]);

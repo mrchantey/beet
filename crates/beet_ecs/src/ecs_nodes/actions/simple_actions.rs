@@ -28,3 +28,19 @@ pub fn set_run_result(
 		commands.entity(entity).insert(result.0);
 	}
 }
+
+
+#[action(system=repeat)]
+#[derive(Default)]
+pub struct Repeat;
+
+/// This relys on [`sync_running`]
+pub fn repeat(
+	mut commands: Commands,
+	mut query: Query<(Entity, &Repeat), (With<RunResult>, Without<Running>)>,
+) {
+	for (entity, _repeat) in query.iter_mut() {
+		commands.entity(entity).insert(Running);
+		log::info!("repeat");
+	}
+}

@@ -1,3 +1,6 @@
+use crate::api::DespawnEntityHandler;
+use crate::api::DespawnEntityPayload;
+use anyhow::Result;
 use beet_ecs::prelude::*;
 use beet_net::prelude::*;
 use bevy_derive::Deref;
@@ -72,15 +75,18 @@ impl BeetEntityMap {
 
 pub fn cleanup_beet_entity_map(
 	mut entity_map: ResMut<BeetEntityMap>,
+	handler: Res<DespawnEntityHandler>,
 	mut removed: RemovedComponents<BeetEntityId>,
-) {
+) -> Result<()> {
 	for entity in removed.read() {
 		if let Some(id) = entity_map.reverse_map.remove(&entity) {
 			entity_map.map.remove(&id);
+			handler.send.push(&DespawnEntityPayload::new(id))?;
 		} else {
 			log::warn!("Entity {entity:?} not found in beet entity map")
 		}
 	}
+	Ok(())
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -88,7 +94,7 @@ pub struct EntityNotFoundError(pub BeetEntityId);
 
 impl fmt::Display for EntityNotFoundError {
 	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-		write!(f, "Entity not found: {}", self.0)
+		write!(f, "Beet Map - Entity not found: {}", self.0)
 	}
 }
 

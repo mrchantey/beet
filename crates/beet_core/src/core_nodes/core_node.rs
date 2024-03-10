@@ -16,12 +16,13 @@ action_list!(CoreNode, [
 	ScoreSteerTarget,
 	SucceedOnArrive,
 	//ecs
-	EmptyAction,
-	SetRunResult,
 	ConstantScore,
+	EmptyAction,
+	FallbackSelector,
+	Repeat,
+	SetRunResult,
 	SucceedInDuration,
 	SequenceSelector,
-	FallbackSelector,
 	UtilitySelector
 ]);
 
