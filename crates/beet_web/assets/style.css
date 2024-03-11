@@ -77,4 +77,5 @@ textarea {
 	background: transparent;
 	border: none;
 	resize: none;
+	font-family: monospace;
 }

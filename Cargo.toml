@@ -96,14 +96,14 @@ bincode = "1.3"
 base64 = "0.22.0"
 
 ## game
-bevy = { version = "0.12.*" }
-bevy_app = { version = "0.12.*" }
-bevy_core = { version = "0.12.*" }
-bevy_derive = { version = "0.12.*" }
-bevy_ecs = { version = "0.12.*" }
-bevy_hierarchy = { version = "0.12.*" }
-bevy_math = { version = "0.12.*" }
-bevy_tasks = { version = "0.12.*" }
-bevy_time = { version = "0.12.*" }
-bevy_transform = { version = "0.12.*" }
-bevy_utils = { version = "0.12.*" }
+bevy = { version = "0.13.*" }
+bevy_app = { version = "0.13.*" }
+bevy_core = { version = "0.13.*" }
+bevy_derive = { version = "0.13.*" }
+bevy_ecs = { version = "0.13.*" }
+bevy_hierarchy = { version = "0.13.*" }
+bevy_math = { version = "0.13.*" }
+bevy_tasks = { version = "0.13.*" }
+bevy_time = { version = "0.13.*" }
+bevy_transform = { version = "0.13.*" }
+bevy_utils = { version = "0.13.*" }

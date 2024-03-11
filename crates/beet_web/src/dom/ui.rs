@@ -194,7 +194,7 @@ fn prettify(tree: &BehaviorTree<BeeNode>) -> String {
 	let pretty = JSON::stringify_with_replacer_and_space(
 		&parsed,
 		&JsValue::NULL,
-		&JsValue::from_f64(2.),
+		&JsValue::from_f64(4.),
 	)
 	.unwrap();
 	pretty.as_string().unwrap()
