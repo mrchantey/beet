@@ -38,21 +38,6 @@ fn print_action(mut commands: Commands, query: Query<(Entity,&PrintAction), With
 }
 ```
 
-### Shared Actions
-To solve the problem of, say every scoring system wanting a `Query<&mut Score>` which would break parallelism, each action has a distinct component, and fields marked as `#[shared]` will be copied at the end of each tick when they change.
-
-The below action will add a `Score` component to this entity and update it whenever the `ScoringAction` changes.
-
-```rust
-#[action(system=scoring_action)]
-pub struct ScoringAction{
-	#[shared]
-	pub score: Score
-};
-```
-
-Now we can have a utility selector that immutably queries the `Score` component of its children, allowing for full parallelism.
-
 ### Next Steps
 
 Documentation is WIP, in the meantime have a look at `./crates/gamai/test/selectors` for examples of selectors and how they are used.

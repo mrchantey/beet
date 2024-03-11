@@ -1179,7 +1179,9 @@ checksum = "3f9eec918d3f24069decb9af1554cad7c880e2da24a9afd88aca000531ab82c1"
 
 [[package]]
 name = "forky_bevy"
-version = "0.1.42"
+version = "0.1.43"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "65c13d659023d251dbccfd1e518afac3033caa15574ef8905cd55ff549cf057a"
 dependencies = [
  "anyhow",
  "bevy_app",
@@ -1199,7 +1201,9 @@ dependencies = [
 
 [[package]]
 name = "forky_core"
-version = "0.1.42"
+version = "0.1.43"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5e893be4ceee0ee91a491d3777b6bcc6ab3f3922a99073fb8f0b0b3620ae0925"
 dependencies = [
  "anyhow",
  "extend",
@@ -1211,7 +1215,9 @@ dependencies = [
 
 [[package]]
 name = "forky_fs"
-version = "0.1.42"
+version = "0.1.43"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "87178f82398d0c108fd29e4c45820a149d86e8e8db9e0f3d08577b38c0a92d78"
 dependencies = [
  "anyhow",
  "clap",
@@ -1230,7 +1236,9 @@ dependencies = [
 
 [[package]]
 name = "forky_web"
-version = "0.1.42"
+version = "0.1.43"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c9cbefc9f96d44febb801743a2412c3decc3d51a2b9f7dd353b291aa8ae1713e"
 dependencies = [
  "anyhow",
  "console_error_panic_hook",
@@ -1248,7 +1256,9 @@ dependencies = [
 
 [[package]]
 name = "forky_web_macros"
-version = "0.1.42"
+version = "0.1.43"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b41781b0b3c7184c97236040a7b95cf647f2da727653db6bf1d398156b5d69b1"
 dependencies = [
  "anyhow",
  "proc-macro2",
@@ -2860,7 +2870,9 @@ dependencies = [
 
 [[package]]
 name = "sweet"
-version = "0.1.42"
+version = "0.1.43"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "42c562198e1890a6db6a5558628a4b2816a58ef0ac19306c596ad9bdc75d394e"
 dependencies = [
  "anyhow",
  "backtrace",
@@ -2898,7 +2910,9 @@ dependencies = [
 
 [[package]]
 name = "sweet_macros"
-version = "0.1.42"
+version = "0.1.43"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "35b3c9b3863c9894f4cc553c4022d0aad1044887e2ca9ef715848d73bcfccade"
 dependencies = [
  "anyhow",
  "proc-macro2",

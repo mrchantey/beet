@@ -8,45 +8,33 @@ use serde::Serialize;
 #[action(system=score_steer_target)]
 pub struct ScoreSteerTarget {
 	pub radius: f32,
-	#[shared]
-	pub score: Score,
 }
 
 impl Default for ScoreSteerTarget {
-	fn default() -> Self {
-		Self {
-			score: Score::Fail,
-			radius: 0.5,
-		}
-	}
+	fn default() -> Self { Self { radius: 0.5 } }
 }
 
 impl ScoreSteerTarget {
-	pub fn new(radius: f32) -> Self {
-		Self {
-			score: Score::Fail,
-			radius,
-		}
-	}
+	pub fn new(radius: f32) -> Self { Self { radius } }
 }
 
 fn score_steer_target(
 	transforms: Query<&Transform>,
 	agents: Query<(&Transform, &SteerTarget)>,
-	mut query: Query<(&TargetAgent, &mut ScoreSteerTarget)>,
+	mut query: Query<(&TargetAgent, &ScoreSteerTarget, &mut Score)>,
 ) {
-	for (agent, mut scorer) in query.iter_mut() {
+	for (agent, scorer, mut score) in query.iter_mut() {
 		if let Ok((transform, target)) = agents.get(**agent) {
 			if let Ok(target) = target.position(&transforms) {
 				if Vec3::distance(transform.translation, target)
 					<= scorer.radius
 				{
-					scorer.score = Score::Pass;
+					*score = Score::Pass;
 					continue;
 				}
 			}
 		}
-		scorer.score = Score::Fail;
+		*score = Score::Fail;
 	}
 }
 // Or<(

@@ -6,11 +6,10 @@ use bevy_ecs::world::EntityWorldMut;
 
 pub trait Action: 'static {
 	fn duplicate(&self) -> Box<dyn Action>;
-
-	fn spawn(&self, entity: &mut EntityWorldMut<'_>);
-	fn spawn_with_command(&self, entity: &mut EntityCommands);
-
 	fn meta(&self) -> ActionMeta;
+	// must be seperate so can be Boxed, ie no `impl WorldOrCommands`
+	fn insert_from_world(&self, entity: &mut EntityWorldMut<'_>);
+	fn insert_from_commands(&self, entity: &mut EntityCommands);
 }
 
 pub trait ActionSystems: 'static {

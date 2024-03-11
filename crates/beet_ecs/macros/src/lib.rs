@@ -27,34 +27,19 @@ pub fn child_props(_attr: TokenStream, _item: TokenStream) -> TokenStream {
 ///
 /// // a similar thing can be done for `AlwaysSuccceed`
 ///
-/// #[action(always_pass)]
-/// struct AlwaysPass{
-/// 	#[shared]
-///   score: Score,
-/// }
+/// #[action(system=always_pass,bundle=Score)]
+/// struct AlwaysPass;
 ///
 ///
-/// fn always_pass(entities: Query<&mut AlwaysPass, With<Running>>) {
+/// fn always_pass(entities: Query<&mut Score, (With<Running>, With<AlwaysPass>)>) {
 ///
-/// 	for mut node in entities.iter_mut() {
-///   	node.score = Score::Pass;
+/// 	for mut score in entities.iter_mut() {
+///   	score = Score::Pass;
 /// 	}
 /// }
 ///
 /// ```
 ///
-/// It also adds a syncing system
-/// ```rust
-/// fn sync_always_pass(mut query: Query<(Option<&mut Score>, Option<AlwaysPass>), With<AlwaysPass>>) {
-///
-///  // if they are equal, use commands or mutate etc.
-///
-/// }
-/// ```
-/// ## `#[shared]`
-/// In `beet` all systems are run in parallel. If every system that performs scoring
-/// required a `Query<&mut Score>`, then each one of those would need to be run sequentially.
-/// Instead we use a `#[shared]` attribute to indicate that the field should be copied to that component at the end of each tick if it was changed.
 ///
 /// ## Derives
 ///

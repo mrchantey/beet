@@ -10,8 +10,6 @@ pub fn main() {}
 pub struct Foo {
 	#[number(min = 0, max = 100, step = 1)]
 	health: u32,
-	#[shared]
-	score: Score,
 }
 
 fn foo() {}

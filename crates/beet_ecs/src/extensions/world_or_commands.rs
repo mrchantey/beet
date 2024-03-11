@@ -5,7 +5,7 @@ use bevy_ecs::prelude::*;
 pub trait WorldOrCommands {
 	fn spawn(&mut self, bundle: impl Bundle) -> Entity;
 	fn insert(&mut self, entity: Entity, bundle: impl Bundle);
-	fn apply_action(&mut self, action: &dyn Action, entity: Entity);
+	fn insert_action(&mut self, entity: Entity, action: &dyn Action);
 }
 
 impl WorldOrCommands for World {
@@ -15,8 +15,8 @@ impl WorldOrCommands for World {
 	fn insert(&mut self, entity: Entity, bundle: impl Bundle) {
 		self.entity_mut(entity).insert(bundle);
 	}
-	fn apply_action(&mut self, action: &dyn Action, entity: Entity) {
-		action.spawn(&mut self.entity_mut(entity));
+	fn insert_action(&mut self, entity: Entity, action: &dyn Action) {
+		action.insert_from_world(&mut self.entity_mut(entity));
 	}
 }
 impl WorldOrCommands for App {
@@ -26,8 +26,8 @@ impl WorldOrCommands for App {
 	fn insert(&mut self, entity: Entity, bundle: impl Bundle) {
 		self.world.entity_mut(entity).insert(bundle);
 	}
-	fn apply_action(&mut self, action: &dyn Action, entity: Entity) {
-		action.spawn(&mut self.world.entity_mut(entity));
+	fn insert_action(&mut self, entity: Entity, action: &dyn Action) {
+		action.insert_from_world(&mut self.world.entity_mut(entity));
 	}
 }
 impl<'w, 's> WorldOrCommands for Commands<'w, 's> {
@@ -37,7 +37,7 @@ impl<'w, 's> WorldOrCommands for Commands<'w, 's> {
 	fn insert(&mut self, entity: Entity, bundle: impl Bundle) {
 		self.entity(entity).insert(bundle);
 	}
-	fn apply_action(&mut self, action: &dyn Action, entity: Entity) {
-		action.spawn_with_command(&mut self.entity(entity));
+	fn insert_action(&mut self, entity: Entity, action: &dyn Action) {
+		action.insert_from_commands(&mut self.entity(entity));
 	}
 }

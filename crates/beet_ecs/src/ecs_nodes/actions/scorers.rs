@@ -1,15 +1,20 @@
 use crate::prelude::*;
+use bevy_derive::Deref;
+use bevy_derive::DerefMut;
 use bevy_ecs::prelude::*;
-use serde::Deserialize;
-use serde::Serialize;
 
-#[action(system=empty_action)]
-#[derive(Default)]
-pub struct ConstantScore {
-	#[shared]
-	pub score: Score,
-}
+#[action(system=constant_score,components=Score::default())]
+#[derive(Default, Deref, DerefMut)]
+pub struct ConstantScore(pub Score);
 
 impl ConstantScore {
-	pub fn new(score: Score) -> Self { Self { score } }
+	pub fn new(score: Score) -> Self { Self(score) }
+}
+
+pub fn constant_score(
+	mut query: Query<(&ConstantScore, &mut Score), Added<ConstantScore>>,
+) {
+	for (from, mut to) in query.iter_mut() {
+		*to = **from;
+	}
 }

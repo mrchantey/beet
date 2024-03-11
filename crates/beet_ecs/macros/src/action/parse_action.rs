@@ -1,6 +1,7 @@
 use crate::utils::*;
 use proc_macro2::TokenStream;
 use quote::quote;
+use quote::ToTokens;
 use std::collections::HashMap;
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering;
@@ -13,12 +14,10 @@ pub fn parse_action(
 	attr: proc_macro::TokenStream,
 	item: proc_macro::TokenStream,
 ) -> Result<TokenStream> {
-	let mut input = syn::parse::<ItemStruct>(item)?;
-	let args = &attributes_map(attr.into(), Some(&["system"]))?;
+	let input = syn::parse::<ItemStruct>(item)?;
+	let args = &attributes_map(attr.into(), Some(&["system", "components"]))?;
 
 	let action_trait = action_trait(&input, args);
-
-	remove_field_attributes(&mut input);
 
 	Ok(quote! {
 		use beet::prelude::*;
@@ -30,22 +29,6 @@ pub fn parse_action(
 	})
 }
 
-fn remove_field_attributes(input: &mut ItemStruct) {
-	let attrs_to_remove = ["shared"];
-
-	for field in input.fields.iter_mut() {
-		field.attrs = field
-			.attrs
-			.clone()
-			.into_iter()
-			.filter(|attr| {
-				!attrs_to_remove
-					.iter()
-					.any(|&name| attr.path().is_ident(name))
-			})
-			.collect();
-	}
-}
 
 fn action_trait(
 	input: &ItemStruct,
@@ -54,9 +37,13 @@ fn action_trait(
 	let ident = &input.ident;
 
 	let meta = meta(input);
-	let spawn = spawn(input);
 	let tick_system = tick_system(args);
-	let post_sync_system = post_sync_system(input);
+
+	let components = args
+		.get("components")
+		.map(|c| c.as_ref().map(|e| e.to_token_stream()))
+		.flatten()
+		.unwrap_or_default();
 
 	quote! {
 		impl Action for #ident {
@@ -64,23 +51,20 @@ fn action_trait(
 				Box::new(self.clone())
 			}
 			#meta
-
-			#spawn
-
+			fn insert_from_world(&self, entity: &mut EntityWorldMut<'_>){
+				entity.insert((self.clone(),#components));
+			}
+			fn insert_from_commands(&self, entity: &mut EntityCommands){
+				entity.insert((self.clone(),#components));
+			}
 		}
 
 		impl ActionSystems for #ident{
-
 			fn add_systems(app: &mut App, schedule: impl ScheduleLabel + Clone){
 				#tick_system
 				app.add_systems(
 					schedule.clone(),
 					tick_system.in_set(TickSet),
-				);
-				#post_sync_system
-				app.add_systems(
-					schedule.clone(),
-					post_sync_system.in_set(TickSyncSet),
 				);
 			}
 		}
@@ -110,77 +94,5 @@ fn tick_system(args: &HashMap<String, Option<Expr>>) -> TokenStream {
 	quote! {
 	// fn tick_system(&self) -> SystemConfigs {
 		let tick_system = #expr;
-	}
-}
-
-fn post_sync_system(input: &ItemStruct) -> TokenStream {
-	let ident = &input.ident;
-
-	let shared_fields = input.fields.iter().filter(is_shared);
-
-	let prop_types = shared_fields
-		.clone()
-		.map(|field| {
-			let ty = &field.ty;
-			quote!(&mut #ty, )
-		})
-		.collect::<TokenStream>();
-
-	let prop_destructs = shared_fields
-		.clone()
-		.map(|field| {
-			let field_ident = &field.ident;
-			quote!(mut #field_ident, )
-		})
-		.collect::<TokenStream>();
-
-	let prop_assignments = shared_fields
-		.map(|field| {
-			let field_ident = &field.ident;
-			quote!(*#field_ident = value.#field_ident;)
-		})
-		.collect::<TokenStream>();
-
-	quote! {
-		fn post_sync_system(mut query: Query<(&#ident,#prop_types), Changed<#ident>>){
-			for (value, #prop_destructs) in query.iter_mut(){
-				#prop_assignments
-			}
-		}
-	}
-}
-
-
-fn is_shared(field: &&syn::Field) -> bool {
-	field
-		.attrs
-		.iter()
-		.any(|attr| attr.meta.path().is_ident("shared"))
-}
-
-fn spawn(input: &ItemStruct) -> TokenStream {
-	let insert_props = input
-		.fields
-		.iter()
-		.filter(is_shared)
-		.map(|field| {
-			let field_name = &field.ident;
-			// let field_type = &field.ty;
-			quote! {
-				entity.insert(self.#field_name.clone());
-			}
-		})
-		.collect::<TokenStream>();
-
-
-	quote! {
-		fn spawn(&self, entity: &mut EntityWorldMut<'_>) {
-			entity.insert(self.clone());
-			#insert_props
-		}
-		fn spawn_with_command(&self, entity: &mut EntityCommands) {
-			entity.insert(self.clone());
-			#insert_props
-		}
 	}
 }

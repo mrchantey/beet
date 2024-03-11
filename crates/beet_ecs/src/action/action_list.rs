@@ -37,14 +37,15 @@ macro_rules! action_list {
 				}
 			}
 
-			fn spawn(&self, entity: &mut EntityWorldMut<'_>){
+
+			fn insert_from_world(&self, entity: &mut EntityWorldMut<'_>){
 				match self {
-					$(Self::$variant(x) => x.spawn(entity),)*
+					$(Self::$variant(x) => x.insert_from_world(entity),)*
 				}
 			}
-			fn spawn_with_command(&self, entity: &mut EntityCommands){
+			fn insert_from_commands(&self, entity: &mut EntityCommands){
 				match self {
-					$(Self::$variant(x) => x.spawn_with_command(entity),)*
+					$(Self::$variant(x) => x.insert_from_commands(entity),)*
 				}
 			}
 			fn meta(&self) -> ActionMeta{

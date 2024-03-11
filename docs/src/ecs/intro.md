@@ -1,20 +1,3 @@
-
-### Shared Actions
-
-Sometimes we need to communicate with a parent action, this can be done by marking an action field as `#[shared]`.
-
-```rust
-pub struct SomeScoreSetter{
-	#[shared]
-	pub score: Score
-}
-```
-
-### Selector Actions
-
-
-
-
 ### Trees
 
 Trees are a collection of actions and other trees. To reduce boilerplate they can be defined with [rsx](https://crates.io/crates/rstml).
