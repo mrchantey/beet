@@ -72,7 +72,7 @@ impl EntityGraph {
 					world.insert(entity, TargetAgent(target));
 				}
 				for action in actions.iter() {
-					world.apply_action_typed(action, entity);
+					world.apply_action(action, entity);
 				}
 				entity
 			},
