@@ -15,7 +15,7 @@ pub fn parse_action(
 	item: proc_macro::TokenStream,
 ) -> Result<TokenStream> {
 	let input = syn::parse::<ItemStruct>(item)?;
-	let args = &attributes_map(attr.into(), Some(&["system", "components"]))?;
+	let args = &attributes_map(attr.into(), Some(&["system", "components","set"]))?;
 
 	let action_trait = action_trait(&input, args);
 
@@ -45,6 +45,12 @@ fn action_trait(
 		.flatten()
 		.unwrap_or_default();
 
+	let set = args
+		.get("set")
+		.map(|s| s.as_ref().map(|e| e.to_token_stream()))
+		.flatten()
+		.unwrap_or(quote! {TickSet});
+
 	quote! {
 		impl Action for #ident {
 			fn duplicate(&self) -> Box<dyn Action> {
@@ -64,7 +70,7 @@ fn action_trait(
 				#tick_system
 				app.add_systems(
 					schedule.clone(),
-					tick_system.in_set(TickSet),
+					tick_system.in_set(#set),
 				);
 			}
 		}

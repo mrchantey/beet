@@ -5,7 +5,11 @@ use bevy_transform::components::Transform;
 use serde::Deserialize;
 use serde::Serialize;
 
-#[action(system=score_steer_target,components=Score::Fail)]
+#[action(
+	system=score_steer_target,
+	set=PreTickSet,
+	components=Score::default()
+)]
 pub struct ScoreSteerTarget {
 	pub radius: f32,
 }
