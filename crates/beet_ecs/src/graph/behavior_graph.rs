@@ -7,7 +7,6 @@ use serde::Deserialize;
 use serde::Serialize;
 use std::fmt::Debug;
 
-// pub type ActionList<T> = Vec<T>;
 
 /// A directed [`petgraph::graph`] where each node is a [`BehaviorNode`].
 #[derive(Default, Clone, Deref, DerefMut, Serialize, Deserialize)]

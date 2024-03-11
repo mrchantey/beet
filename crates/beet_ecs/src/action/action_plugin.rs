@@ -15,11 +15,11 @@ pub struct TickSyncSet;
 pub struct PostTickSet;
 
 
-pub struct ActionPlugin<T: ActionList, Schedule: ScheduleLabel + Clone> {
+pub struct ActionPlugin<T: ActionSystems, Schedule: ScheduleLabel + Clone> {
 	pub schedule: Schedule,
 	pub phantom: PhantomData<T>,
 }
-impl<T: ActionList> Default for ActionPlugin<T, Update> {
+impl<T: ActionSystems> Default for ActionPlugin<T, Update> {
 	fn default() -> Self {
 		Self {
 			schedule: Update,
@@ -28,7 +28,7 @@ impl<T: ActionList> Default for ActionPlugin<T, Update> {
 	}
 }
 
-impl<T: ActionList + Send + Sync, Schedule: ScheduleLabel + Clone> Plugin
+impl<T: ActionSystems + Send + Sync, Schedule: ScheduleLabel + Clone> Plugin
 	for ActionPlugin<T, Schedule>
 {
 	fn build(&self, app: &mut App) {

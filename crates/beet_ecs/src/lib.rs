@@ -26,10 +26,10 @@ pub mod prelude {
 
 
 pub mod exports {
-	pub use bevy_app;
+	pub use bevy_app::prelude::App;
 	pub use bevy_ecs;
 	pub use bevy_ecs::prelude::*;
-	pub use bevy_ecs::schedule::SystemConfigs;
+	pub use bevy_ecs::schedule::ScheduleLabel;
 	pub use bevy_ecs::system::EntityCommands;
 	pub use serde;
 	pub use serde::Deserialize;

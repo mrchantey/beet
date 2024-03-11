@@ -56,7 +56,7 @@ fn action_trait(
 	let meta = meta(input);
 	let spawn = spawn(input);
 	let tick_system = tick_system(args);
-	let post_tick_system = post_tick_system(input);
+	let post_sync_system = post_sync_system(input);
 
 	quote! {
 		impl Action for #ident {
@@ -67,8 +67,22 @@ fn action_trait(
 
 			#spawn
 
-			#tick_system
-			#post_tick_system
+		}
+
+		impl ActionSystems for #ident{
+
+			fn add_systems(app: &mut App, schedule: impl ScheduleLabel + Clone){
+				#tick_system
+				app.add_systems(
+					schedule.clone(),
+					tick_system.in_set(TickSet),
+				);
+				#post_sync_system
+				app.add_systems(
+					schedule.clone(),
+					post_sync_system.in_set(TickSyncSet),
+				);
+			}
 		}
 	}
 }
@@ -94,13 +108,12 @@ fn meta(input: &ItemStruct) -> TokenStream {
 fn tick_system(args: &HashMap<String, Option<Expr>>) -> TokenStream {
 	let expr = args.get("system").unwrap().as_ref().unwrap();
 	quote! {
-		fn tick_system(&self) -> SystemConfigs {
-			#expr.into_configs()
-		}
+	// fn tick_system(&self) -> SystemConfigs {
+		let tick_system = #expr;
 	}
 }
 
-fn post_tick_system(input: &ItemStruct) -> TokenStream {
+fn post_sync_system(input: &ItemStruct) -> TokenStream {
 	let ident = &input.ident;
 
 	let shared_fields = input.fields.iter().filter(is_shared);
@@ -129,15 +142,10 @@ fn post_tick_system(input: &ItemStruct) -> TokenStream {
 		.collect::<TokenStream>();
 
 	quote! {
-		fn post_tick_system(&self) -> SystemConfigs {
-
-			fn post_sync_system(mut query: Query<(&#ident,#prop_types), Changed<#ident>>){
-				for (value, #prop_destructs) in query.iter_mut(){
-					#prop_assignments
-				}
+		fn post_sync_system(mut query: Query<(&#ident,#prop_types), Changed<#ident>>){
+			for (value, #prop_destructs) in query.iter_mut(){
+				#prop_assignments
 			}
-
-			post_sync_system.into_configs()
 		}
 	}
 }

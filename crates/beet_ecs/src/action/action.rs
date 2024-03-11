@@ -1,5 +1,6 @@
 use anyhow::Result;
-use bevy_ecs::schedule::SystemConfigs;
+use bevy_app::App;
+use bevy_ecs::schedule::ScheduleLabel;
 use bevy_ecs::system::EntityCommands;
 use bevy_ecs::world::EntityWorldMut;
 
@@ -9,15 +10,12 @@ pub trait Action: 'static {
 	fn spawn(&self, entity: &mut EntityWorldMut<'_>);
 	fn spawn_with_command(&self, entity: &mut EntityCommands);
 
-	// fn pre_tick_system(&self) -> SystemConfigs;
-	fn tick_system(&self) -> SystemConfigs;
-	fn post_tick_system(&self) -> SystemConfigs;
-
 	fn meta(&self) -> ActionMeta;
 }
 
-
-
+pub trait ActionSystems: 'static {
+	fn add_systems(app: &mut App, schedule: impl ScheduleLabel + Clone);
+}
 
 pub type SetActionFunc = Box<dyn Fn(&mut EntityCommands) -> Result<()>>;
 
@@ -30,45 +28,3 @@ pub struct ActionMeta {
 	pub name: &'static str,
 	pub id: usize,
 }
-
-
-// pub trait IntoAction: 'static + Clone + Send + Sync + Serialize {
-// 	fn into_action(self) -> Box<dyn Action>;
-// 	fn into_action_ref(&self) -> &dyn Action;
-// 	fn into_action_mut(&mut self) -> &mut dyn Action;
-// }
-
-// impl<T: Action + Clone + Send + Sync + Serialize> IntoAction for T {
-// 	fn into_action(self) -> Box<dyn Action> { Box::new(self) }
-// 	fn into_action_ref(&self) -> &dyn Action { self }
-// 	fn into_action_mut(&mut self) -> &mut dyn Action { self }
-// }
-
-// impl<T: IntoAction> Action for T {
-// 	fn duplicate(&self) -> Box<dyn Action> {
-// 		self.into_action_ref().duplicate()
-// 	}
-
-// 	fn spawn(&self, entity: &mut EntityWorldMut<'_>) {
-// 		self.into_action_ref().spawn(entity)
-// 	}
-
-// 	fn spawn_with_command(&self, entity: &mut EntityCommands) {
-// 		self.into_action_ref().spawn_with_command(entity)
-// 	}
-
-// 	fn tick_system(&self) -> SystemConfigs {
-// 		self.into_action_ref().tick_system()
-// 	}
-
-// 	fn post_tick_system(&self) -> SystemConfigs {
-// 		self.into_action_ref().post_tick_system()
-// 	}
-
-// 	fn meta(&self) -> ActionMeta { self.into_action_ref().meta() }
-// }
-
-// impl<T> IntoAction for T where
-// 	T: 'static + Clone + Send + Sync + Serialize + Into<Box<dyn Action>>
-// {
-// }

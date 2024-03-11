@@ -1,15 +1,14 @@
 use super::*;
 use crate::prelude::*;
 use bevy_ecs::prelude::*;
-use bevy_ecs::schedule::SystemConfigs;
 use serde::Deserialize;
 use serde::Serialize;
 
 
 /// An action that observes the [`Score`] of each child and selects the highest to run.
-/// 
+///
 /// It will return the result of the highest scoring child.
-/// 
+///
 #[derive(Default)]
 #[action(system=utility_selector)]
 pub struct UtilitySelector;

@@ -17,14 +17,7 @@ action_list!(CoreNode, [
 	ScoreSteerTarget,
 	SucceedOnArrive,
 	//ecs
-	ConstantScore,
-	EmptyAction,
-	FallbackSelector,
-	Repeat,
-	SetRunResult,
-	SucceedInDuration,
-	SequenceSelector,
-	UtilitySelector
+	EcsNode
 ]);
 
 

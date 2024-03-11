@@ -1,7 +1,6 @@
 use super::*;
 use crate::prelude::*;
 use bevy_ecs::prelude::*;
-use bevy_ecs::schedule::SystemConfigs;
 use serde::Deserialize;
 use serde::Serialize;
 

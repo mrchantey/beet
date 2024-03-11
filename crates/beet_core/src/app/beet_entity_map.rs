@@ -12,8 +12,8 @@ use serde::Deserialize;
 use serde::Serialize;
 use std::error::Error;
 
-pub trait ActionPayload: Payload + ActionSuper + ActionList {}
-impl<T: Payload + ActionSuper + ActionList> ActionPayload for T {}
+pub trait ActionPayload: Payload + ActionSuper + ActionSystems {}
+impl<T: Payload + ActionSuper + ActionSystems> ActionPayload for T {}
 
 #[derive(
 	Debug,
