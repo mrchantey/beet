@@ -11,16 +11,9 @@ use core::fmt;
 use serde::Deserialize;
 use serde::Serialize;
 use std::error::Error;
-use strum::IntoEnumIterator;
 
-pub trait ActionPayload:
-	Payload + ActionSuper + IntoEnumIterator + IntoAction
-{
-}
-impl<T: Payload + ActionSuper + IntoEnumIterator + IntoAction> ActionPayload
-	for T
-{
-}
+pub trait ActionPayload: Payload + ActionSuper + ActionList {}
+impl<T: Payload + ActionSuper + ActionList> ActionPayload for T {}
 
 #[derive(
 	Debug,

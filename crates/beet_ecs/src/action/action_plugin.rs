@@ -4,9 +4,6 @@ use bevy_ecs::prelude::*;
 use bevy_ecs::schedule::ScheduleLabel;
 use bevy_time::Time;
 use std::marker::PhantomData;
-use strum::IntoEnumIterator;
-
-
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, SystemSet)]
 pub struct PreTickSet;
@@ -18,14 +15,11 @@ pub struct TickSyncSet;
 pub struct PostTickSet;
 
 
-pub struct ActionPlugin<
-	T: IntoEnumIterator + IntoAction,
-	Schedule: ScheduleLabel + Clone,
-> {
+pub struct ActionPlugin<T: ActionList, Schedule: ScheduleLabel + Clone> {
 	pub schedule: Schedule,
 	pub phantom: PhantomData<T>,
 }
-impl<T: IntoEnumIterator + IntoAction> Default for ActionPlugin<T, Update> {
+impl<T: ActionList> Default for ActionPlugin<T, Update> {
 	fn default() -> Self {
 		Self {
 			schedule: Update,
@@ -34,7 +28,7 @@ impl<T: IntoEnumIterator + IntoAction> Default for ActionPlugin<T, Update> {
 	}
 }
 
-impl<T: IntoEnumIterator + IntoAction, Schedule: ScheduleLabel + Clone> Plugin
+impl<T: ActionList + Send + Sync, Schedule: ScheduleLabel + Clone> Plugin
 	for ActionPlugin<T, Schedule>
 {
 	fn build(&self, app: &mut App) {
@@ -71,15 +65,6 @@ impl<T: IntoEnumIterator + IntoAction, Schedule: ScheduleLabel + Clone> Plugin
 				self.schedule.clone(),
 				(sync_running, sync_interrupts).in_set(TickSyncSet),
 			);
-		for action in T::iter().map(|item| item.into_action()) {
-			app.add_systems(
-				self.schedule.clone(),
-				action.tick_system().in_set(TickSet),
-			);
-			app.add_systems(
-				self.schedule.clone(),
-				action.post_tick_system().in_set(TickSyncSet),
-			);
-		}
+		T::add_systems(app, self.schedule.clone());
 	}
 }

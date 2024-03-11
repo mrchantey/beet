@@ -27,6 +27,12 @@ run-web *args:
 	just copy-wasm-assets
 	just watch-wasm-debug beet_web main
 
+run crate example *args:
+	cargo run -p {{crate}} --example {{example}} {{args}}
+
+run-w crate example *args:
+	just watch 'just run {{crate}} {{example}} {{args}}'
+
 serve-web:
 	just serve-wasm
 

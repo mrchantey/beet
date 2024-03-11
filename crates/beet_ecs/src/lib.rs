@@ -26,6 +26,7 @@ pub mod prelude {
 
 
 pub mod exports {
+	pub use bevy_app;
 	pub use bevy_ecs;
 	pub use bevy_ecs::prelude::*;
 	pub use bevy_ecs::schedule::SystemConfigs;
@@ -33,6 +34,7 @@ pub mod exports {
 	pub use serde;
 	pub use serde::Deserialize;
 	pub use serde::Serialize;
+	pub use strum::IntoEnumIterator;
 	pub use strum_macros::Display;
 	pub use strum_macros::EnumIter;
 }
