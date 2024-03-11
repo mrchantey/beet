@@ -10,6 +10,7 @@ pub struct EmptyAction;
 pub fn empty_action() {}
 
 // intentionally dont deref to avoid bugs.
+// TODO this should be generic
 #[action(system=set_run_result)]
 #[derive(Default)]
 pub struct SetRunResult(pub RunResult);
@@ -20,11 +21,11 @@ impl SetRunResult {
 	pub fn failure() -> Self { Self(RunResult::Failure) }
 }
 
-pub fn set_run_result(
+fn set_run_result(
 	mut commands: Commands,
-	mut query: Query<(Entity, &SetRunResult), With<Running>>,
+	query: Query<(Entity, &SetRunResult), With<Running>>,
 ) {
-	for (entity, result) in query.iter_mut() {
+	for (entity, result) in query.iter() {
 		commands.entity(entity).insert(result.0);
 	}
 }
@@ -35,7 +36,7 @@ pub fn set_run_result(
 pub struct Repeat;
 
 /// This relys on [`sync_running`]
-pub fn repeat(
+fn repeat(
 	mut commands: Commands,
 	mut query: Query<(Entity, &Repeat), (With<RunResult>, Without<Running>)>,
 ) {

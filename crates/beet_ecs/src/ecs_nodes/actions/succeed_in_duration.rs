@@ -17,6 +17,20 @@ impl Default for SucceedInDuration {
 	}
 }
 
+impl SucceedInDuration {
+	pub fn new(duration: Duration) -> Self { Self { duration } }
+	pub fn with_secs(secs: u64) -> Self {
+		Self {
+			duration: Duration::from_secs(secs),
+		}
+	}
+	pub fn with_millis(millis: u64) -> Self {
+		Self {
+			duration: Duration::from_millis(millis),
+		}
+	}
+}
+
 pub fn succeed_in_duration(
 	mut commands: Commands,
 	mut query: Query<(Entity, &RunTimer, &SucceedInDuration), With<Running>>,

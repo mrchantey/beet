@@ -15,8 +15,9 @@ use wasm_bindgen_futures::spawn_local;
 
 pub struct AppOptions {
 	pub initial_graph: BehaviorTree<BeeNode>,
-	pub spawn_bee: bool,
-	pub spawn_flower: bool,
+	pub bees: usize,
+	pub flowers: usize,
+	pub auto_flowers: Option<usize>,
 	pub hide_json: bool,
 }
 
@@ -26,8 +27,9 @@ impl Default for AppOptions {
 			initial_graph: BehaviorTree::new(Translate::new(Vec3::new(
 				-0.1, 0., 0.,
 			))),
-			spawn_bee: true,
-			spawn_flower: true,
+			bees: 1,
+			flowers: 1,
+			auto_flowers: None,
 			hide_json: false,
 		}
 	}
@@ -36,11 +38,14 @@ impl Default for AppOptions {
 impl AppOptions {
 	pub fn from_url() -> Self {
 		let mut this = Self::default();
-		if SearchParams::get_flag("spawn-bee") {
-			this.spawn_bee = true;
+		if let Some(bees) = SearchParams::get("bees") {
+			this.bees = bees.parse().unwrap_or(1);
 		}
-		if SearchParams::get_flag("spawn-flower") {
-			this.spawn_flower = true;
+		if let Some(flowers) = SearchParams::get("flowers") {
+			this.flowers = flowers.parse().unwrap_or(1);
+		}
+		if let Some(auto_flowers) = SearchParams::get("auto-flowers") {
+			this.auto_flowers = Some(auto_flowers.parse().unwrap_or(1));
 		}
 		if SearchParams::get_flag("hide-json") {
 			this.hide_json = true;
@@ -59,8 +64,7 @@ impl AppOptions {
 		let relay = Relay::default();
 		console_error_panic_hook::set_once();
 		console_log::init_with_level(log::Level::Info).ok();
-		let listeners = setup_ui(relay.clone(), &self).unwrap();
-		listeners.into_iter().for_each(|l| l.forget());
+		setup_ui(relay.clone(), &self).unwrap();
 		run_app_sync(relay.clone());
 		spawn_local(async move {
 			BeeGame::new(relay).await.unwrap().update_forever();

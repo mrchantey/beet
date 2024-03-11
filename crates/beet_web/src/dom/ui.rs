@@ -12,6 +12,7 @@ use forky_core::ResultTEExt;
 use forky_web::DocumentExt;
 use forky_web::History;
 use forky_web::HtmlEventListener;
+use forky_web::Interval;
 use js_sys::JSON;
 use wasm_bindgen::JsValue;
 use wasm_bindgen_futures::spawn_local;
@@ -22,40 +23,29 @@ use web_sys::HtmlDivElement;
 use web_sys::HtmlTextAreaElement;
 
 #[must_use]
-pub fn setup_ui(
-	relay: Relay,
-	options: &AppOptions,
-) -> Result<Vec<HtmlEventListener<Event>>> {
+pub fn setup_ui(relay: Relay, options: &AppOptions) -> Result<()> {
 	let create_bee_button =
 		Document::x_query_selector::<HtmlButtonElement>("#create-bee").unwrap();
-	let create_flower_listener = create_flower(relay.clone(), options);
-	let clear_all_listener = create_clear_all(relay.clone());
-	let toggle_json = create_toggle_json(options);
+	create_flower(relay.clone(), options);
+	create_clear_all(relay.clone());
+	create_toggle_json(options);
 
-	let (textarea, text_changed_listener) =
-		create_textarea(create_bee_button.clone(), options);
+	let textarea = create_textarea(create_bee_button.clone(), options);
 
-	let create_bee_listener =
-		create_bee(relay, create_bee_button, textarea, options);
-	Ok(vec![
-		toggle_json,
-		text_changed_listener,
-		create_bee_listener,
-		create_flower_listener,
-		clear_all_listener,
-	])
+	create_bee(relay, create_bee_button, textarea, options);
+	Ok(())
 }
 
 
 
 
-fn create_clear_all(relay: Relay) -> HtmlEventListener<Event> {
+fn create_clear_all(relay: Relay) {
 	let clear_all_button =
 		Document::x_query_selector::<HtmlButtonElement>("#clear-all").unwrap();
 
 	HtmlEventListener::new_with_target(
 		"click",
-		move |_| {
+		move |_: Event| {
 			let mut relay = relay.clone();
 			spawn_local(async move {
 				DespawnEntityHandler::publisher(&mut relay)
@@ -65,6 +55,7 @@ fn create_clear_all(relay: Relay) -> HtmlEventListener<Event> {
 		},
 		clear_all_button.into(),
 	)
+	.forget();
 }
 
 
@@ -73,10 +64,10 @@ fn create_bee(
 	button: HtmlButtonElement,
 	textarea: HtmlTextAreaElement,
 	options: &AppOptions,
-) -> HtmlEventListener<Event> {
-	let listener = HtmlEventListener::new_with_target(
+) {
+	HtmlEventListener::new_with_target(
 		"click",
-		move |_| {
+		move |_: Event| {
 			let tree: BehaviorTree<BeeNode> =
 				serde_json::from_str(&textarea.value()).unwrap(); // already validated
 
@@ -85,25 +76,21 @@ fn create_bee(
 				.ok_or(|e| log::error!("{e}"));
 		},
 		button.clone().into(),
-	);
-	if options.spawn_bee {
+	)
+	.forget();
+	for _ in 0..options.bees {
 		button.click();
 	}
-
-	listener
 }
 
-fn create_flower(
-	mut relay: Relay,
-	options: &AppOptions,
-) -> HtmlEventListener<Event> {
+fn create_flower(mut relay: Relay, options: &AppOptions) {
 	let button =
 		Document::x_query_selector::<HtmlButtonElement>("#create-flower")
 			.unwrap();
 
-	let listener = HtmlEventListener::new_with_target(
+	HtmlEventListener::new_with_target(
 		"click",
-		move |_| {
+		move |_: Event| {
 			let x = random_signed() * 0.9;
 			let y = random_value() * -0.9;
 
@@ -112,18 +99,22 @@ fn create_flower(
 				.ok_or(|e| log::error!("{e}"));
 		},
 		button.clone().into(),
-	);
+	)
+	.forget();
 
-	if options.spawn_flower {
+	for _ in 0..options.flowers {
 		button.click();
 	}
 
-	listener
+	if let Some(interval) = options.auto_flowers {
+		Interval::new(interval as i32, move || {
+			button.click();
+		})
+		.forget();
+	}
 }
 
-
-
-fn create_toggle_json(options: &AppOptions) -> HtmlEventListener<Event> {
+fn create_toggle_json(options: &AppOptions) {
 	let button =
 		Document::x_query_selector::<HtmlButtonElement>("#toggle-json")
 			.unwrap();
@@ -131,9 +122,9 @@ fn create_toggle_json(options: &AppOptions) -> HtmlEventListener<Event> {
 		Document::x_query_selector::<HtmlDivElement>("#graph-json-container")
 			.unwrap();
 	let toggle_json_button2 = button.clone();
-	let listener = HtmlEventListener::new_with_target(
+	HtmlEventListener::new_with_target(
 		"click",
-		move |_| {
+		move |_: Event| {
 			if container.hidden() {
 				container.set_hidden(false);
 				toggle_json_button2.set_inner_text("Hide Graph");
@@ -143,18 +134,18 @@ fn create_toggle_json(options: &AppOptions) -> HtmlEventListener<Event> {
 			}
 		},
 		button.clone().into(),
-	);
+	)
+	.forget();
 
 	if options.hide_json {
 		button.click();
 	}
-	listener
 }
 
 fn create_textarea(
 	create_bee_button: HtmlButtonElement,
 	options: &AppOptions,
-) -> (HtmlTextAreaElement, HtmlEventListener<Event>) {
+) -> HtmlTextAreaElement {
 	let warning_text =
 		Document::x_query_selector::<HtmlDivElement>("#graph-json-error")
 			.unwrap();
@@ -164,9 +155,9 @@ fn create_textarea(
 	textarea.set_value(&prettify(&options.initial_graph));
 
 	let textarea2 = textarea.clone();
-	let text_changed_listener = HtmlEventListener::new_with_target(
+	HtmlEventListener::new_with_target(
 		"input",
-		move |_| {
+		move |_: Event| {
 			let text = textarea2.value();
 			match serde_json::from_str::<BehaviorTree<BeeNode>>(&text) {
 				Ok(tree) => {
@@ -182,8 +173,9 @@ fn create_textarea(
 			}
 		},
 		textarea.clone().into(),
-	);
-	(textarea, text_changed_listener)
+	)
+	.forget();
+	textarea
 }
 
 fn set_url(tre: &BehaviorTree<BeeNode>) {

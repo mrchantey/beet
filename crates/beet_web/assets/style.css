@@ -36,12 +36,18 @@ button:active {
 div.container {
 	width: 100%;
 	height: 100%;
-	position: relative;
-	background: var(--pretty-sky);
 	overflow: hidden;
 }
 
-div.container>div.entity {
+div.entities {
+	width: 100%;
+	height: 100%;
+	position: relative;
+	overflow: hidden;
+	background: var(--pretty-sky);
+}
+
+div.entities>div.entity {
 	position: absolute;
 	font-size: 3em;
 	pointer-events: none;
@@ -51,8 +57,11 @@ div.container>div.entity {
 div.overlay {
 	display: flex;
 	flex-direction: column;
-	width: 100%;
-	height: 100%;
+	position: absolute;
+	top: 0;
+	left: 0;
+	right: 0;
+	bottom: 0;
 }
 
 #graph-json-container {

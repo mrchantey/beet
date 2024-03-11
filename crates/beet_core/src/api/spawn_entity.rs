@@ -1,4 +1,5 @@
 use crate::prelude::*;
+use anyhow::Result;
 use beet_ecs::prelude::*;
 use beet_net::prelude::*;
 use bevy_core::Name;
@@ -9,10 +10,8 @@ use bevy_math::prelude::*;
 use bevy_transform::components::Transform;
 use bevy_transform::TransformBundle;
 use bevy_utils::default;
-use forky_core::ResultTEExt;
 use serde::Deserialize;
 use serde::Serialize;
-
 
 pub const ENTITY_TOPIC: &'static str = "entity";
 
@@ -99,48 +98,47 @@ pub fn handle_spawn_entity<T: ActionPayload>(
 	mut commands: Commands,
 	mut entity_map: ResMut<BeetEntityMap>,
 	mut handler: ResMut<SpawnEntityHandler<T>>,
-) {
-	handler
-		.try_handle_next(|val| {
-			let SpawnEntityPayload {
-				name,
-				position,
-				graph,
-				position_tracking,
-			} = val;
+) -> Result<()> {
+	handler.try_handle_next(|val| {
+		let SpawnEntityPayload {
+			name,
+			position,
+			graph,
+			position_tracking,
+		} = val;
 
-			let mut entity = commands.spawn(Name::new(name));
-			let beet_id = entity_map.next(entity.id());
-			entity.insert(beet_id);
+		let mut entity = commands.spawn(Name::new(name));
+		let beet_id = entity_map.next(entity.id());
+		entity.insert(beet_id);
 
-			if position_tracking {
-				entity.insert(TrackedPosition);
-			}
+		if position_tracking {
+			entity.insert(TrackedPosition);
+		}
 
-			if let Some(pos) = position {
-				entity.insert(TransformBundle {
-					local: Transform::from_translation(pos),
-					..default()
-				});
-			}
-			if let Some(graph) = graph {
-				entity.insert((ForceBundle::default(), SteerBundle {
-					arrive_radius: ArriveRadius(0.2),
-					wander_params: WanderParams {
-						outer_distance: 0.2,
-						outer_radius: 0.1,
-						inner_radius: 0.01, //lower = smoother
-						last_local_target: default(),
-					},
-					max_force: MaxForce(0.1),
-					max_speed: MaxSpeed(0.3),
-					..default()
-				}));
-				let id = entity.id();
-				graph.spawn(&mut commands, id);
-			}
+		if let Some(pos) = position {
+			entity.insert(TransformBundle {
+				local: Transform::from_translation(pos),
+				..default()
+			});
+		}
+		if let Some(graph) = graph {
+			entity.insert((ForceBundle::default(), SteerBundle {
+				arrive_radius: ArriveRadius(0.2),
+				wander_params: WanderParams {
+					outer_distance: 0.2,
+					outer_radius: 0.1,
+					inner_radius: 0.01, //lower = smoother
+					last_local_target: default(),
+				},
+				max_force: MaxForce(0.1),
+				max_speed: MaxSpeed(0.3),
+				..default()
+			}));
+			let id = entity.id();
+			graph.spawn(&mut commands, id);
+		}
 
-			beet_id
-		})
-		.ok_or(|e| log::error!("{e}"));
+		beet_id
+	})?;
+	Ok(())
 }

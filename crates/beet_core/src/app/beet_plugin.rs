@@ -42,7 +42,7 @@ impl<T: ActionPayload> Plugin for BeetPlugin<T> {
 				// despawn before spawn to avoid immediate despawn in case of despawn_all
 				(
 					handle_despawn_entity.pipe(log_error),
-					handle_spawn_entity::<T>,
+					handle_spawn_entity::<T>.pipe(log_error),
 				)
 					.chain(),
 			)

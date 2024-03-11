@@ -11,6 +11,7 @@ action_list!(CoreNode, [
 	//steer
 	Seek,
 	Wander,
+	SetVelocity,
 	FindSteerTarget,
 	DespawnSteerTarget,
 	ScoreSteerTarget,

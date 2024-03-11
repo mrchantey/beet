@@ -7,10 +7,16 @@ use bevy_transform::components::Transform;
 #[derive(Default)]
 pub struct FindSteerTarget {
 	pub name: String,
+	pub radius: f32,
 }
 
 impl FindSteerTarget {
-	pub fn new(name: impl Into<String>) -> Self { Self { name: name.into() } }
+	pub fn new(name: impl Into<String>, radius: f32) -> Self {
+		Self {
+			name: name.into(),
+			radius,
+		}
+	}
 }
 
 // TODO this shouldnt run every frame?
@@ -32,7 +38,8 @@ fn find_steer_target(
 						agent_transform.translation,
 						target_transform.translation,
 					);
-					if new_dist < closest_dist {
+					if new_dist <= find_target.radius && new_dist < closest_dist
+					{
 						closest_dist = new_dist;
 						closest_target = Some(target_entity);
 					}

@@ -1,3 +1,6 @@
+pub mod set_velocity;
+#[allow(unused_imports)]
+pub use self::set_velocity::*;
 pub mod find_steer_target;
 #[allow(unused_imports)]
 pub use self::find_steer_target::*;

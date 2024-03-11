@@ -6,7 +6,10 @@ use sweet::*;
 pub async fn works() -> Result<()> {
 	append_html_for_tests();
 	AppOptions::default()
-		.with_graph(BehaviorTree::new((Seek, FindSteerTarget::new("flower"))))
+		.with_graph(BehaviorTree::new((
+			Seek,
+			FindSteerTarget::new("flower", 2.),
+		)))
 		.run();
 	Ok(())
 }

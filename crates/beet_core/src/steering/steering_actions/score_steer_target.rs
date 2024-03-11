@@ -21,15 +21,22 @@ impl Default for ScoreSteerTarget {
 	}
 }
 
+impl ScoreSteerTarget {
+	pub fn new(radius: f32) -> Self {
+		Self {
+			score: Score::Fail,
+			radius,
+		}
+	}
+}
+
 fn score_steer_target(
 	transforms: Query<&Transform>,
-	mut query: Query<
-		(&Transform, Option<&SteerTarget>, &mut ScoreSteerTarget),
-		With<Running>,
-	>,
+	agents: Query<(&Transform, &SteerTarget)>,
+	mut query: Query<(&TargetAgent, &mut ScoreSteerTarget)>,
 ) {
-	for (transform, target, mut scorer) in query.iter_mut() {
-		if let Some(target) = target {
+	for (agent, mut scorer) in query.iter_mut() {
+		if let Ok((transform, target)) = agents.get(**agent) {
 			if let Ok(target) = target.position(&transforms) {
 				if Vec3::distance(transform.translation, target)
 					<= scorer.radius

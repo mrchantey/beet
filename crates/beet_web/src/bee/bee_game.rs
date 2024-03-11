@@ -3,6 +3,7 @@ use anyhow::Result;
 use beet::prelude::*;
 use bevy_math::prelude::*;
 use bevy_utils::HashMap;
+use forky_bevy::extensions::Vec3Ext;
 use forky_core::ResultTEExt;
 use forky_web::wait_for_16_millis;
 use forky_web::DocumentExt;
@@ -70,7 +71,7 @@ impl BeeGame {
 
 		for pos in self.create_flower_sub.try_recv_all()? {
 			let (id, el) = create_flower(&mut self.relay, pos).await?;
-				self.elements.insert(id, el);
+			self.elements.insert(id, el);
 		}
 
 		for (id, el) in &self.elements {
@@ -78,7 +79,7 @@ impl BeeGame {
 				.unwrap()
 				.try_recv()
 			{
-				set_position(&el, pos.xy(), &get_container());
+				set_position(&el, pos.xy(), &get_entities_container());
 			}
 		}
 		Ok(())
@@ -118,7 +119,8 @@ async fn create_bee(
 	relay: &mut Relay,
 	graph: BehaviorGraph<BeeNode>,
 ) -> Result<(BeetEntityId, HtmlDivElement)> {
-	let pos = Vec3::new(0.5, 0., 0.);
+	let mut pos = Vec3::random_in_cube();
+	pos.z = 0.;
 	let mut create_entity = SpawnEntityHandler::requester(relay);
 	let id = create_entity
 		.request(
@@ -183,12 +185,12 @@ fn set_position<'a>(
 		.unwrap();
 }
 
-pub fn get_container() -> HtmlDivElement {
-	Document::x_query_selector::<HtmlDivElement>(".container").unwrap()
+fn get_entities_container() -> HtmlDivElement {
+	Document::x_query_selector::<HtmlDivElement>(".entities").unwrap()
 }
 
 fn create_dom_entity(text: &str, position: Vec2) -> HtmlDivElement {
-	let container = get_container();
+	let container = get_entities_container();
 	let div = Document::x_create_div();
 	div.set_inner_text(text);
 	div.set_class_name("entity");
