@@ -45,20 +45,21 @@ pub fn fails() -> Result<()> {
 #[sweet_test]
 pub fn spawns() -> Result<()> {
 	let prefab = BehaviorGraphPrefab::<EcsNode>::from_graph(
-		BehaviorTree::new(EmptyAction),
+		ConstantScore::new(Score::Weight(0.5)),
 	)?;
 
 	let mut world = World::new();
 
 	let agent = world.spawn_empty().id();
 
-	let result = prefab.spawn(&mut world, Some(agent))?;
+	let root = prefab.spawn(&mut world, Some(agent))?;
 
-	expect(&world).to_have_entity(result)?;
-	// expect(&world).component(root)?;
+	expect(&world).to_have_entity(root)?;
+	expect(&world).component::<AgentMarker>(agent)?;
+	expect(&world).component(root)?.to_be(&TargetAgent(agent))?;
+	expect(&world)
+		.component(root)?
+		.to_be(&ConstantScore(Score::Weight(0.5)))?;
 
-	// let tree = BehaviorTree::new(EmptyAction);
-	// let graph = tree.into_behavior_graph();
-	// expect(graph.into_prefab::<BadList>().map(|_| ())).to_be_err()?;
 	Ok(())
 }

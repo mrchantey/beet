@@ -73,6 +73,7 @@ impl<T: ActionTypes> BehaviorGraphPrefab<T> {
 		self.scene.write_to_world(world, &mut entity_map)?;
 
 		if let Some(target) = target {
+			world.entity_mut(target).insert(AgentMarker);
 			for entity in entity_map.values() {
 				world.entity_mut(*entity).insert(TargetAgent(target));
 			}
