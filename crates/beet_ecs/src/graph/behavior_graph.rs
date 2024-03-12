@@ -1,38 +1,34 @@
 use crate::prelude::*;
+use anyhow::anyhow;
+use anyhow::Result;
 use bevy_derive::Deref;
 use bevy_derive::DerefMut;
-use bevy_ecs::prelude::*;
+use bevy_ecs::entity::Entity;
+use bevy_ecs::reflect::AppTypeRegistry;
+use bevy_ecs::world::World;
 use petgraph::graph::DiGraph;
-use serde::Deserialize;
-use serde::Serialize;
-use std::fmt::Debug;
 
 
-/// A directed [`petgraph::graph`] where each node is a [`BehaviorNode`].
-#[derive(Default, Clone, Deref, DerefMut, Serialize, Deserialize)]
-pub struct BehaviorGraph<T: ActionSuper>(pub DiGraph<BehaviorNode<T>, ()>);
+#[derive(Default, Debug, Clone, Deref, DerefMut)]
+pub struct BehaviorGraph(pub DiGraph<BehaviorNode, ()>);
 
-impl<T: ActionSuper> PartialEq for BehaviorGraph<T> {
-	fn eq(&self, other: &Self) -> bool { self.0.is_identical(other) }
-}
+impl BehaviorGraph {
+	pub fn into_scene<T: ActionTypes>(&self) {}
 
-impl<T: Debug + ActionSuper> Debug for BehaviorGraph<T> {
-	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		self.0.fmt(f)
-		// f.debug_tuple("BehaviorGraph").field(&self.0).finish()
+	pub fn spawn(
+		&self,
+		world: &mut impl WorldOrCommands,
+		agent: Entity,
+	) -> EntityGraph {
+		EntityGraph::spawn(world, self.clone(), agent)
 	}
-}
 
-impl<T: ActionSuper> Into<WillyBehaviorGraph> for &BehaviorGraph<T> {
-	fn into(self) -> WillyBehaviorGraph {
-		WillyBehaviorGraph(self.0.map(|_, n| n.into(), |_, _| ()))
+	pub fn spawn_no_target(
+		&self,
+		world: &mut impl WorldOrCommands,
+	) -> EntityGraph {
+		EntityGraph::spawn_no_target(world, self.clone())
 	}
-}
-
-
-impl<T: ActionSuper> BehaviorGraph<T> {
-	pub fn new() -> Self { Self(DiGraph::new()) }
-	pub fn from_tree(tree: BehaviorTree<T>) -> Self { tree.into() }
 
 	pub fn with_indexed_names(mut self) -> Self {
 		self.node_weights_mut().enumerate().for_each(|(i, node)| {
@@ -41,11 +37,67 @@ impl<T: ActionSuper> BehaviorGraph<T> {
 		self
 	}
 
-	pub fn spawn(
+
+	/// # Errors
+	/// If a type in the graph is missing from `T`
+	fn get_checked_type_registry<T: ActionTypes>(
 		&self,
-		world: &mut impl WorldOrCommands,
-		target: Entity,
-	) -> EntityGraph {
-		EntityGraph::spawn(world, self, target)
+	) -> Result<AppTypeRegistry> {
+		let registry = BehaviorGraphPrefab::<T>::get_type_registry();
+		let registry_read = registry.read();
+		for node in self.node_weights() {
+			for action in node.actions.iter() {
+				registry_read
+					.get_type_data::<ReflectAction>(action.type_id())
+					.ok_or_else(|| {
+						anyhow::anyhow!(
+							"Type not registered: {:?}",
+							action.type_id()
+						)
+					})?;
+			}
+		}
+		drop(registry_read);
+
+		Ok(registry)
+	}
+
+	pub fn into_prefab<T: ActionTypes>(self) -> Result<BehaviorGraphPrefab<T>> {
+		let mut world = World::new();
+		let entity_graph =
+			EntityGraph::spawn_no_target(&mut world, self.clone());
+		let _root = entity_graph
+			.root()
+			.ok_or_else(|| anyhow!("No root entity"))?;
+		let registry = self.get_checked_type_registry::<T>()?;
+		world.insert_resource(registry);
+		Ok(BehaviorGraphPrefab::from_world(world))
+	}
+}
+
+pub trait IntoBehaviorGraph<M> {
+	fn into_behavior_graph(self) -> BehaviorGraph;
+}
+
+
+
+pub struct IntoIntoBehaviorGraph;
+pub struct TreeIntoBehaviorGraph;
+
+impl<T> IntoBehaviorGraph<IntoIntoBehaviorGraph> for T
+where
+	T: Into<BehaviorGraph>,
+{
+	fn into_behavior_graph(self) -> BehaviorGraph { self.into() }
+}
+
+
+
+impl<M, T> IntoBehaviorGraph<(TreeIntoBehaviorGraph, M)> for T
+where
+	T: IntoBehaviorTree<M>,
+{
+	fn into_behavior_graph(self) -> BehaviorGraph {
+		self.into_behavior_tree().into_behavior_graph()
 	}
 }

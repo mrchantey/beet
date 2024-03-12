@@ -36,9 +36,7 @@ impl<T: ActionTypes> BehaviorGraphPrefab<T> {
 		}
 	}
 
-	pub fn from_graph<M>(
-		graph: impl IntoWillyBehaviorGraph<M>,
-	) -> Result<Self> {
+	pub fn from_graph<M>(graph: impl IntoBehaviorGraph<M>) -> Result<Self> {
 		graph.into_behavior_graph().into_prefab()
 	}
 

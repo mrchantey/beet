@@ -8,7 +8,7 @@ use sweet::*;
 pub fn default_components() -> Result<()> {
 	let mut app = App::new();
 	let target = app.world.spawn_empty().id();
-	let actions = test_action_graph_typed();
+	let actions = test_constant_behavior_tree();
 	let entities = actions.spawn(&mut app, target);
 	let entity = *entities.root().unwrap();
 
@@ -27,7 +27,7 @@ pub fn sync_system() -> Result<()> {
 	app.add_plugins(ActionPlugin::<EcsNode, _>::default());
 
 	let target = app.world.spawn_empty().id();
-	let actions = test_action_graph_typed();
+	let actions = test_constant_behavior_tree();
 	let entities = actions.spawn(&mut app, target);
 	let entity = *entities.root().unwrap();
 

@@ -1,23 +1,18 @@
 use crate::prelude::*;
 use bevy_ecs::entity::Entity;
-use serde::Deserialize;
-use serde::Serialize;
 
 
-/// A non-cyclic [`BehaviorGraph`], can be converted into one by calling `.into()`.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct BehaviorTree<T: ActionSuper>(pub Tree<BehaviorNode<T>>);
+#[derive(Clone)]
+pub struct BehaviorTree(pub Tree<BehaviorNode>);
 
-impl<T: ActionSuper> Default for BehaviorTree<T> {
-	fn default() -> Self { Self(Tree::new(BehaviorNode::empty())) }
-}
 
-impl<T: ActionSuper> BehaviorTree<T> {
-	pub fn new<M>(item: impl IntoBehaviorNode<M, T>) -> Self {
+
+impl BehaviorTree {
+	pub fn new<M>(item: impl IntoBehaviorNode<M>) -> Self {
 		Self(Tree::new(item.into_behavior_node()))
 	}
 
-	pub fn with_child<M>(mut self, child: impl IntoBehaviorTree<M, T>) -> Self {
+	pub fn child<M>(mut self, child: impl IntoBehaviorTree<M>) -> Self {
 		self.0 = self.0.with_child(child.into_behavior_tree().0);
 		self
 	}
@@ -25,60 +20,40 @@ impl<T: ActionSuper> BehaviorTree<T> {
 	pub fn spawn(
 		&self,
 		world: &mut impl WorldOrCommands,
-		target: Entity,
+		agent: Entity,
 	) -> EntityGraph {
-		EntityGraph::spawn(world, self, target)
+		EntityGraph::spawn(world, self.clone(), agent)
 	}
 
-	pub fn into_behavior_graph(self) -> BehaviorGraph<T> {
+	pub fn into_behavior_graph(self) -> BehaviorGraph {
 		BehaviorGraph(self.0.into_graph())
 	}
 }
 
-impl<T: ActionSuper> Into<BehaviorGraph<T>> for BehaviorTree<T> {
-	fn into(self) -> BehaviorGraph<T> { self.into_behavior_graph() }
-}
-impl<T: ActionSuper> Into<Tree<BehaviorNode<T>>> for BehaviorTree<T> {
-	fn into(self) -> Tree<BehaviorNode<T>> { self.0 }
-}
+// impl Into<BehaviorGraph> for &BehaviorTree {
+// 	fn into(self) -> BehaviorGraph { self.clone().into_behavior_graph() }
+// }
+// impl Into<BehaviorGraph> for BehaviorTree {
+// 	fn into(self) -> BehaviorGraph { self.into_behavior_graph() }
+// }
 
-impl<T: ActionSuper> Into<WillyBehaviorGraph> for &BehaviorTree<T> {
-	fn into(self) -> WillyBehaviorGraph {
-		let graph = &self.clone().into_behavior_graph();
-		graph.into()
-	}
-}
-impl<T: ActionSuper> Into<WillyBehaviorGraph> for BehaviorTree<T> {
-	fn into(self) -> WillyBehaviorGraph {
-		let graph = &self.into_behavior_graph();
-		graph.into()
-	}
-}
-
-
-
-pub trait IntoBehaviorTree<M, T: ActionSuper> {
-	fn into_behavior_tree(self) -> BehaviorTree<T>;
+pub trait IntoBehaviorTree<M> {
+	fn into_behavior_tree(self) -> BehaviorTree;
 }
 
 pub struct IntoIntoBehaviorTree;
-pub struct TreeIntoBehaviorTree;
 pub struct NodeIntoBehaviorTree;
 
-impl<T: ActionSuper, U> IntoBehaviorTree<IntoIntoBehaviorTree, T> for U
+impl<T> IntoBehaviorTree<IntoIntoBehaviorTree> for T
 where
-	U: Into<BehaviorTree<T>>,
+	T: Into<BehaviorTree>,
 {
-	fn into_behavior_tree(self) -> BehaviorTree<T> { self.into() }
+	fn into_behavior_tree(self) -> BehaviorTree { self.into() }
 }
-impl<T: ActionSuper> IntoBehaviorTree<TreeIntoBehaviorTree, T>
-	for Tree<BehaviorNode<T>>
-{
-	fn into_behavior_tree(self) -> BehaviorTree<T> { BehaviorTree(self) }
-}
-impl<T: ActionSuper, U, M> IntoBehaviorTree<(NodeIntoBehaviorTree, M), T> for U
+
+impl<M, T> IntoBehaviorTree<(M, NodeIntoBehaviorTree)> for T
 where
-	U: IntoBehaviorNode<M, T>,
+	T: IntoBehaviorNode<M>,
 {
-	fn into_behavior_tree(self) -> BehaviorTree<T> { BehaviorTree::new(self) }
+	fn into_behavior_tree(self) -> BehaviorTree { BehaviorTree::new(self) }
 }

@@ -53,9 +53,9 @@ impl EntityGraph {
 	// 	}
 	// 	node_index
 	// }
-	pub fn spawn(
+	pub fn spawn<M>(
 		world: &mut impl WorldOrCommands,
-		graph: impl Into<WillyBehaviorGraph>,
+		graph: impl IntoBehaviorGraph<M>,
 		agent: Entity,
 	) -> Self {
 		Self::spawn_with_options(world, graph, EntityGraphOptions {
@@ -65,9 +65,9 @@ impl EntityGraph {
 	}
 	/// Choosing no target agent means its your responsibility to ensure that all actions in the behavior graph
 	/// are compatible, actions that expect an agent may do nothing or panic.
-	pub fn spawn_no_target(
+	pub fn spawn_no_target<M>(
 		world: &mut impl WorldOrCommands,
-		graph: impl Into<WillyBehaviorGraph>,
+		graph: impl IntoBehaviorGraph<M>,
 	) -> Self {
 		Self::spawn_with_options(world, graph, EntityGraphOptions {
 			agent: None,
@@ -75,12 +75,12 @@ impl EntityGraph {
 		})
 	}
 
-	pub fn spawn_with_options(
+	pub fn spawn_with_options<M>(
 		world: &mut impl WorldOrCommands,
-		graph: impl Into<WillyBehaviorGraph>,
+		graph: impl IntoBehaviorGraph<M>,
 		options: EntityGraphOptions,
 	) -> Self {
-		let graph = graph.into();
+		let graph = graph.into_behavior_graph();
 		let EntityGraphOptions {
 			agent: target,
 			run_on_spawn,

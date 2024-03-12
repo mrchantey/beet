@@ -10,9 +10,9 @@ pub fn works() -> Result<()> {
 
 	let target = app.world.spawn_empty().id();
 
-	let tree = BehaviorTree::<EcsNode>::new(FallbackSelector)
-		.with_child(SetRunResult::failure())
-		.with_child(SetRunResult::success());
+	let tree = FallbackSelector
+		.child(SetRunResult::failure())
+		.child(SetRunResult::success());
 
 	let entity_graph = tree.spawn(&mut app, target);
 

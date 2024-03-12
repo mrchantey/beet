@@ -9,7 +9,7 @@ pub fn works() -> Result<()> {
 
 	let target = app.world.spawn_empty().id();
 
-	let tree = BehaviorTree::<EcsNode>::new(SetRunResult::default());
+	let tree = BehaviorTree::new(SetRunResult::default());
 
 	let entity_graph = tree.spawn(&mut app, target);
 	let root = *entity_graph.root().unwrap();

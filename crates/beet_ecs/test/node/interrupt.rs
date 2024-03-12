@@ -1,3 +1,4 @@
+use crate::tests::action::test_no_action_behavior_tree;
 use crate::tests::utils::expect_tree;
 use beet_ecs::prelude::*;
 use bevy_app::App;
@@ -10,9 +11,7 @@ pub fn works() -> Result<()> {
 
 	let target = app.world.spawn_empty().id();
 
-	let tree = BehaviorTree::<EcsNode>::new(EmptyAction)
-		.with_child(EmptyAction)
-		.with_child(BehaviorTree::new(EmptyAction).with_child(EmptyAction));
+	let tree = test_no_action_behavior_tree();
 
 	let entity_graph = tree.spawn(&mut app, target);
 

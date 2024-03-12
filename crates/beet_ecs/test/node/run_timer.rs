@@ -8,7 +8,7 @@ pub fn works() -> Result<()> {
 	app.add_plugins(ActionPlugin::<EcsNode, _>::default());
 	app.insert_time();
 
-	let tree = BehaviorTree::<EcsNode>::new(EmptyAction);
+	let tree = BehaviorTree::new(EmptyAction);
 	let instance = EntityGraph::spawn_no_target(&mut app, tree);
 	let root = *instance.root().unwrap();
 

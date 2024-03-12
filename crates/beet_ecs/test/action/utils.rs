@@ -7,12 +7,14 @@ use beet_ecs::prelude::*;
 /// 		Child0
 ///
 
-pub fn test_action_graph_typed() -> BehaviorGraph<EcsNode> {
-	BehaviorTree::<EcsNode>::new(ConstantScore::default())
-		.with_child(ConstantScore::default())
-		.with_child(
-			BehaviorTree::new(ConstantScore::default())
-				.with_child(ConstantScore::default()),
-		)
-		.into_behavior_graph()
+pub fn test_constant_behavior_tree() -> BehaviorTree {
+	ConstantScore::default()
+		.child(ConstantScore::default())
+		.child(ConstantScore::default().child(ConstantScore::default()))
+}
+
+pub fn test_no_action_behavior_tree() -> BehaviorTree {
+	EmptyAction
+		.child(EmptyAction)
+		.child(EmptyAction.child(EmptyAction))
 }

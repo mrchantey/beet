@@ -1,199 +1,81 @@
 use crate::prelude::*;
-use serde::Deserialize;
-use serde::Serialize;
-use std::ops::Deref;
-use std::ops::DerefMut;
-
-pub trait ActionSuper: Clone + PartialEq + Action {}
-impl<T: Clone + PartialEq + Action> ActionSuper for T {}
-
-/// A collection of actions related to this node.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct BehaviorNode<T: Action> {
-	pub name: String,
-	pub actions: Vec<T>,
-}
+use bevy_ecs::all_tuples;
 
 pub const NEW_NAME: &str = "New Node";
 
-impl<T: Action> Deref for BehaviorNode<T> {
-	type Target = Vec<T>;
-	fn deref(&self) -> &Self::Target { &self.actions }
+#[derive(Debug)]
+pub struct BehaviorNode {
+	pub name: String,
+	pub actions: Vec<Box<dyn Action>>,
 }
-impl<T: Action> DerefMut for BehaviorNode<T> {
-	fn deref_mut(&mut self) -> &mut Self::Target { &mut self.actions }
-}
-impl<T: Action> Default for BehaviorNode<T> {
+impl Default for BehaviorNode {
 	fn default() -> Self {
 		Self {
-			actions: Vec::new(),
 			name: NEW_NAME.to_string(),
+			actions: Vec::new(),
 		}
 	}
 }
-
-impl<T: Action> BehaviorNode<T> {
-	pub fn empty() -> Self { Self::default() }
-	pub fn new(actions: Vec<T>) -> Self {
+impl BehaviorNode {
+	pub fn new(actions: Vec<Box<dyn Action>>) -> Self {
 		Self {
 			name: NEW_NAME.to_string(),
 			actions,
 		}
 	}
+	pub fn named<M>(
+		name: impl Into<String>,
+		actions: impl IntoBehaviorNode<M>,
+	) -> Self {
+		let mut this = actions.into_behavior_node();
+		this.name = name.into();
+		this
+	}
 }
 
-
-pub trait IntoBehaviorNode<M, T: Action> {
-	fn into_behavior_node(self) -> BehaviorNode<T>;
+impl Clone for BehaviorNode {
+	fn clone(&self) -> Self {
+		Self {
+			name: self.name.clone(),
+			actions: self
+				.actions
+				.iter()
+				.map(|action| action.duplicate())
+				.collect(),
+		}
+	}
 }
 
 pub struct ItemIntoBehaviorNode;
-pub struct VecIntoBehaviorNode;
-pub struct IntoIntoBehaviorNode;
+pub struct TupleIntoBehaviorNode;
 
-impl<T: Action, U> IntoBehaviorNode<IntoIntoBehaviorNode, T> for U
-where
-	U: Into<BehaviorNode<T>>,
-{
-	fn into_behavior_node(self) -> BehaviorNode<T> { self.into() }
-}
+pub trait IntoBehaviorNode<M>: Sized {
+	fn into_behavior_node(self) -> BehaviorNode;
 
-impl<T: Action> IntoBehaviorNode<VecIntoBehaviorNode, T> for Vec<T> {
-	fn into_behavior_node(self) -> BehaviorNode<T> { BehaviorNode::new(self) }
-}
-
-
-impl<T: Action, U1: Into<T>> IntoBehaviorNode<(ItemIntoBehaviorNode, U1), T>
-	for U1
-{
-	fn into_behavior_node(self) -> BehaviorNode<T> {
-		let u1 = self;
-		BehaviorNode::new(vec![u1.into()])
+	fn child<M2>(self, child: impl IntoBehaviorTree<M2>) -> BehaviorTree {
+		BehaviorTree::new(self).child(child)
 	}
 }
-impl<T: Action, U1: Into<T>, U2: Into<T>>
-	IntoBehaviorNode<(ItemIntoBehaviorNode, U1, U2), T> for (U1, U2)
-{
-	fn into_behavior_node(self) -> BehaviorNode<T> {
-		let (u1, u2) = self;
-		BehaviorNode::new(vec![u1.into(), u2.into()])
-	}
-}
-impl<T: Action, U1: Into<T>, U2: Into<T>, U3: Into<T>>
-	IntoBehaviorNode<(ItemIntoBehaviorNode, U1, U2, U3), T> for (U1, U2, U3)
-{
-	fn into_behavior_node(self) -> BehaviorNode<T> {
-		let (u1, u2, u3) = self;
-		BehaviorNode::new(vec![u1.into(), u2.into(), u3.into()])
+impl<T0: Action> IntoBehaviorNode<ItemIntoBehaviorNode> for T0 {
+	#[allow(unused_variables, unused_mut)]
+	fn into_behavior_node(self) -> BehaviorNode {
+		#[allow(non_snake_case)]
+		let T0 = self;
+		BehaviorNode::new(vec![T0.duplicate()])
 	}
 }
 
-impl<T: Action, U1: Into<T>, U2: Into<T>, U3: Into<T>, U4: Into<T>>
-	IntoBehaviorNode<(ItemIntoBehaviorNode, U1, U2, U3, U4), T>
-	for (U1, U2, U3, U4)
-{
-	fn into_behavior_node(self) -> BehaviorNode<T> {
-		let (u1, u2, u3, u4) = self;
-		BehaviorNode::new(vec![u1.into(), u2.into(), u3.into(), u4.into()])
-	}
+macro_rules! tuple_into_behavior_node {
+	($($T:ident),*) => {
+			impl<$($T:Action),*> IntoBehaviorNode<TupleIntoBehaviorNode> for ($($T,)*) {
+				#[allow(unused_variables, unused_mut)]
+				fn into_behavior_node(self) -> BehaviorNode {
+					#[allow(non_snake_case)]
+					let ($($T,)*) = self;
+					BehaviorNode::new(vec![$($T.duplicate(),)*])
+				}
+			}
+	};
 }
 
-impl<
-		T: Action,
-		U1: Into<T>,
-		U2: Into<T>,
-		U3: Into<T>,
-		U4: Into<T>,
-		U5: Into<T>,
-	> IntoBehaviorNode<(ItemIntoBehaviorNode, U1, U2, U3, U4, U5), T>
-	for (U1, U2, U3, U4, U5)
-{
-	fn into_behavior_node(self) -> BehaviorNode<T> {
-		let (u1, u2, u3, u4, u5) = self;
-		BehaviorNode::new(vec![
-			u1.into(),
-			u2.into(),
-			u3.into(),
-			u4.into(),
-			u5.into(),
-		])
-	}
-}
-
-impl<
-		T: Action,
-		U1: Into<T>,
-		U2: Into<T>,
-		U3: Into<T>,
-		U4: Into<T>,
-		U5: Into<T>,
-		U6: Into<T>,
-	> IntoBehaviorNode<(ItemIntoBehaviorNode, U1, U2, U3, U4, U5, U6), T>
-	for (U1, U2, U3, U4, U5, U6)
-{
-	fn into_behavior_node(self) -> BehaviorNode<T> {
-		let (u1, u2, u3, u4, u5, u6) = self;
-		BehaviorNode::new(vec![
-			u1.into(),
-			u2.into(),
-			u3.into(),
-			u4.into(),
-			u5.into(),
-			u6.into(),
-		])
-	}
-}
-
-impl<
-		T: Action,
-		U1: Into<T>,
-		U2: Into<T>,
-		U3: Into<T>,
-		U4: Into<T>,
-		U5: Into<T>,
-		U6: Into<T>,
-		U7: Into<T>,
-	> IntoBehaviorNode<(ItemIntoBehaviorNode, U1, U2, U3, U4, U5, U6, U7), T>
-	for (U1, U2, U3, U4, U5, U6, U7)
-{
-	fn into_behavior_node(self) -> BehaviorNode<T> {
-		let (u1, u2, u3, u4, u5, u6, u7) = self;
-		BehaviorNode::new(vec![
-			u1.into(),
-			u2.into(),
-			u3.into(),
-			u4.into(),
-			u5.into(),
-			u6.into(),
-			u7.into(),
-		])
-	}
-}
-
-impl<
-		T: Action,
-		U1: Into<T>,
-		U2: Into<T>,
-		U3: Into<T>,
-		U4: Into<T>,
-		U5: Into<T>,
-		U6: Into<T>,
-		U7: Into<T>,
-		U8: Into<T>,
-	> IntoBehaviorNode<(ItemIntoBehaviorNode, U1, U2, U3, U4, U5, U6, U7, U8), T>
-	for (U1, U2, U3, U4, U5, U6, U7, U8)
-{
-	fn into_behavior_node(self) -> BehaviorNode<T> {
-		let (u1, u2, u3, u4, u5, u6, u7, u8) = self;
-		BehaviorNode::new(vec![
-			u1.into(),
-			u2.into(),
-			u3.into(),
-			u4.into(),
-			u5.into(),
-			u6.into(),
-			u7.into(),
-			u8.into(),
-		])
-	}
-}
+all_tuples!(tuple_into_behavior_node, 0, 15, T);

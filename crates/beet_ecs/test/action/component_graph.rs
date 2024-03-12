@@ -1,4 +1,4 @@
-use super::test_action_graph_typed;
+use super::test_constant_behavior_tree;
 use beet_ecs::prelude::*;
 use bevy_app::App;
 use sweet::*;
@@ -7,7 +7,7 @@ use sweet::*;
 pub fn works() -> Result<()> {
 	let mut app = App::new();
 	let target = app.world.spawn_empty().id();
-	let actions = test_action_graph_typed();
+	let actions = test_constant_behavior_tree();
 	let entities = actions.spawn(&mut app, target);
 
 	let entity = *entities.node(2).unwrap();

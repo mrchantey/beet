@@ -4,8 +4,8 @@ use sweet::*;
 
 #[sweet_test]
 fn into() -> Result<()> {
-	fn foo<M>(_val: impl IntoWillyBehaviorGraph<M>) {}
-	
+	fn foo<M>(_val: impl IntoBehaviorGraph<M>) {}
+
 	let _prefab = foo(EmptyAction.child(EmptyAction));
 	let _prefab = foo(EmptyAction
 		.child((EmptyAction, EmptyAction))
@@ -37,7 +37,7 @@ impl ActionTypes for BadList {
 
 #[sweet_test]
 pub fn fails() -> Result<()> {
-	let tree = WillyBehaviorTree::new(EmptyAction);
+	let tree = BehaviorTree::new(EmptyAction);
 	let graph = tree.into_behavior_graph();
 	expect(graph.into_prefab::<BadList>().map(|_| ())).to_be_err()?;
 	Ok(())
@@ -45,7 +45,7 @@ pub fn fails() -> Result<()> {
 #[sweet_test]
 pub fn spawns() -> Result<()> {
 	let prefab = BehaviorGraphPrefab::<EcsNode>::from_graph(
-		WillyBehaviorTree::new(EmptyAction),
+		BehaviorTree::new(EmptyAction),
 	)?;
 
 	let mut world = World::new();
@@ -57,7 +57,7 @@ pub fn spawns() -> Result<()> {
 	expect(&world).to_have_entity(result)?;
 	// expect(&world).component(root)?;
 
-	// let tree = WillyBehaviorTree::new(EmptyAction);
+	// let tree = BehaviorTree::new(EmptyAction);
 	// let graph = tree.into_behavior_graph();
 	// expect(graph.into_prefab::<BadList>().map(|_| ())).to_be_err()?;
 	Ok(())
