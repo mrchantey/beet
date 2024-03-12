@@ -7,7 +7,6 @@ use forky_bevy::extensions::Vec3Ext;
 use forky_core::ResultTEExt;
 use forky_web::wait_for_16_millis;
 use forky_web::DocumentExt;
-use std::sync::atomic::AtomicUsize;
 use wasm_bindgen_futures::spawn_local;
 use web_sys::Document;
 use web_sys::HtmlDivElement;
@@ -93,21 +92,13 @@ impl TopicHandler<Vec3> for CreateFlowerHandler {
 	}
 }
 
-const ID_INCR: AtomicUsize = AtomicUsize::new(0);
-
-fn next_id() -> BeetEntityId {
-	BeetEntityId(
-		ID_INCR.fetch_add(1, std::sync::atomic::Ordering::SeqCst) as u64
-	)
-}
-
 fn create_bee(
 	relay: &mut Relay,
 	prefab: BehaviorPrefab<BeeNode>,
 ) -> Result<(BeetEntityId, HtmlDivElement)> {
 	let mut pos = Vec3::random_in_cube();
 	pos.z = 0.;
-	let id = next_id();
+	let id = BeetEntityId::next();
 	SpawnEntityHandler::publisher(relay)?.push(
 		&SpawnEntityPayload::from_id(id)
 			.with_name("bee")
@@ -123,7 +114,7 @@ fn create_flower(
 	relay: &mut Relay,
 	pos: Vec3,
 ) -> Result<(BeetEntityId, HtmlDivElement)> {
-	let id = next_id();
+	let id = BeetEntityId::next();
 	SpawnEntityHandler::<BeeNode>::publisher(relay)?.push(
 		&SpawnEntityPayload::from_id(id)
 			.with_name("flower")

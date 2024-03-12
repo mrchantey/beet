@@ -6,30 +6,7 @@ use std::f32::consts::TAU;
 
 // for now we need to manually keep in sync with crates/beet_ecs/src/builtin_nodes/builtin_nodes.rs
 
-action_list!(BeeNode, [
-	//bee
-	Hover,
-	//core
-	// CoreNode,
-	Translate,
-	//steer
-	Seek,
-	Wander,
-	FindSteerTarget,
-	ScoreSteerTarget,
-	SetVelocity,
-	DespawnSteerTarget,
-	SucceedOnArrive,
-	//ecs
-	ConstantScore,
-	EmptyAction,
-	Repeat,
-	SetRunResult,
-	SequenceSelector,
-	SucceedInDuration,
-	FallbackSelector,
-	UtilitySelector
-]);
+action_list!(BeeNode, [Hover, CoreNode]);
 
 #[action(system=hover)]
 #[derive(Default)]

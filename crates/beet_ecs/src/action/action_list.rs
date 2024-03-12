@@ -74,18 +74,18 @@ macro_rules! action_list {
 		// 	}
 		// }
 
-		$(
-			impl Into<$name> for $variant {
-				fn into(self) -> $name {
-						$name::$variant(self)
-				}
-			}
-			// impl<T> From<T> for $name where T: Into<$variant> {
-			// 	fn from(val:T) -> $name {
-			// 			$name::$variant(val.into())
-			// 	}
-			// }
-		)*
+		// $(
+		// 	impl Into<$name> for $variant {
+		// 		fn into(self) -> $name {
+		// 				$name::$variant(self)
+		// 		}
+		// 	}
+		// 	// impl<T> From<T> for $name where T: Into<$variant> {
+		// 	// 	fn from(val:T) -> $name {
+		// 	// 			$name::$variant(val.into())
+		// 	// 	}
+		// 	// }
+		// )*
 
 
 	};

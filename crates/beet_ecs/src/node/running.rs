@@ -35,6 +35,7 @@ pub struct Running;
 	Reflect,
 )]
 #[component(storage = "SparseSet")]
+#[reflect(Component)]
 pub enum RunResult {
 	#[default]
 	/// The Action was successful.

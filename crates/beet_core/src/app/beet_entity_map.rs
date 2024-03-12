@@ -9,6 +9,11 @@ use core::fmt;
 use serde::Deserialize;
 use serde::Serialize;
 use std::error::Error;
+use std::sync::atomic::AtomicUsize;
+
+
+
+static ID_INCR: AtomicUsize = AtomicUsize::new(0);
 
 
 /// This is a crutch until we have proper pub sub topic keying
@@ -28,6 +33,14 @@ use std::error::Error;
 	Component,
 )]
 pub struct BeetEntityId(pub u64);
+impl BeetEntityId {
+	pub fn next() -> Self {
+		BeetEntityId(
+			ID_INCR.fetch_add(1, std::sync::atomic::Ordering::SeqCst) as u64
+		)
+	}
+}
+
 
 impl Into<BeetEntityId> for u64 {
 	fn into(self) -> BeetEntityId { BeetEntityId(self) }
@@ -42,7 +55,6 @@ impl fmt::Display for BeetEntityId {
 
 #[derive(Default, Resource)]
 pub struct BeetEntityMap {
-	id_incr: u64,
 	map: HashMap<BeetEntityId, Entity>,
 	reverse_map: HashMap<Entity, BeetEntityId>,
 }
@@ -75,9 +87,7 @@ impl BeetEntityMap {
 		&mut self,
 		entity: Entity,
 	) -> Result<BeetEntityId, EntityExistsError> {
-		let id = self.id_incr;
-		self.id_incr = self.id_incr.wrapping_add(1);
-		let id = BeetEntityId(id);
+		let id = BeetEntityId::next();
 		self.try_insert(id, entity)?;
 		Ok(id)
 	}

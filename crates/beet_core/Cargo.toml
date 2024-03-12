@@ -36,6 +36,7 @@ bevy_transform.workspace = true
 
 [dev-dependencies]
 sweet.workspace = true
+bincode.workspace = true
 
 [[example]]
 name = "test_beet_core"
