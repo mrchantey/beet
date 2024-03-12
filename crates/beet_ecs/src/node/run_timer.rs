@@ -1,11 +1,13 @@
 use crate::prelude::*;
 use bevy_ecs::prelude::*;
+use bevy_reflect::Reflect;
 use bevy_time::Stopwatch;
 use bevy_time::Time;
 use std::fmt::Debug;
 
 /// Tracks the last time a node was run.
-#[derive(Default, Debug, Component)]
+#[derive(Default, Debug, Component, Reflect)]
+#[reflect(Component)]
 pub struct RunTimer {
 	/// Last time the node was last started, or time since level load if never started.
 	pub last_started: Stopwatch,

@@ -16,7 +16,7 @@ pub fn works() -> Result<()> {
 	SpawnEntityHandler::<CoreNode>::publisher(&mut relay)?.push(
 		&SpawnEntityPayload::from_id(beet_id)
 			.with_prefab(Translate::new(Vec3::new(1., 0., 0.)).into_prefab()?)
-			.with_position(Vec3::ZERO),
+			.with_position(Vec3::new(-1., 0., 0.)),
 	)?;
 
 	expect(&app.world.iter_entities().count()).to_be(&0)?;
@@ -31,13 +31,13 @@ pub fn works() -> Result<()> {
 		.get(&beet_id)
 		.unwrap();
 
-	// let translation = app
-	// 	.world
-	// 	.entity(*entity)
-	// 	.get::<Transform>()
-	// 	.unwrap()
-	// 	.translation;
-	// expect(translation).to_be(Vec3::new(2., 0., 0.))?;
+	let translation = app
+		.world
+		.entity(*entity)
+		.get::<Transform>()
+		.unwrap()
+		.translation;
+	expect(translation).to_be(Vec3::new(1., 0., 0.))?;
 
 	Ok(())
 }

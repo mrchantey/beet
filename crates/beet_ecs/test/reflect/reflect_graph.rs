@@ -1,4 +1,5 @@
 use beet_ecs::prelude::*;
+use bevy_core::Name;
 use bevy_ecs::prelude::*;
 use sweet::*;
 
@@ -21,12 +22,35 @@ fn into() -> Result<()> {
 }
 
 #[sweet_test]
-pub fn serde() -> Result<()> {
+fn serde_bytes() -> Result<()> {
 	let prefab1 = BehaviorPrefab::<EcsNode>::from_graph(EmptyAction)?;
 	let bytes1 = bincode::serialize(&prefab1)?;
 	let prefab2: BehaviorPrefab<EcsNode> = bincode::deserialize(&bytes1)?;
 	let bytes2 = bincode::serialize(&prefab2)?;
 	expect(bytes1).to_be(bytes2)?;
+	Ok(())
+}
+#[sweet_test]
+/// these are to be in sync with [`BehaviorPrefab::append_type_registry`]
+fn serde_types() -> Result<()> {
+	let prefab1 = BehaviorPrefab::<EcsNode>::from_graph(
+		EmptyAction.child(ConstantScore::default()),
+	)?;
+	let bytes1 = bincode::serialize(&prefab1)?;
+	let prefab2: BehaviorPrefab<EcsNode> = bincode::deserialize(&bytes1)?;
+	let mut world = World::new();
+	let target = world.spawn_empty().id();
+	let root = prefab2.spawn(&mut world, Some(target))?;
+	let child = world.entity(root).get::<Edges>().unwrap()[0];
+	expect(&world).component(child)?.to_be(&Score::default())?;
+
+	expect(&world).to_have_component::<Name>(root)?;
+	expect(&world).to_have_component::<Edges>(root)?;
+	expect(&world).to_have_component::<Running>(root)?;
+	expect(&world).to_have_component::<RunTimer>(root)?;
+	expect(&world).to_have_component::<BehaviorGraphRoot>(root)?;
+
+
 	Ok(())
 }
 #[derive(Debug, Clone)]
@@ -36,14 +60,13 @@ impl ActionTypes for BadList {
 }
 
 #[sweet_test]
-pub fn fails() -> Result<()> {
-	let tree = BehaviorTree::new(EmptyAction);
-	let graph = tree.into_behavior_graph();
-	expect(graph.into_prefab::<BadList>().map(|_| ())).to_be_err()?;
+fn fails() -> Result<()> {
+	expect(BehaviorPrefab::<BadList>::from_graph(EmptyAction).map(|_| ()))
+		.to_be_err()?;
 	Ok(())
 }
 #[sweet_test]
-pub fn spawns() -> Result<()> {
+fn spawns() -> Result<()> {
 	let prefab = BehaviorPrefab::<EcsNode>::from_graph(ConstantScore::new(
 		Score::Weight(0.5),
 	))?;
@@ -62,7 +85,7 @@ pub fn spawns() -> Result<()> {
 		.to_be(&ConstantScore(Score::Weight(0.5)))?;
 
 	// test shared component
-	expect(&world).component(root)?.to_be(&Score::Weight(0.5))?;
+	expect(&world).component(root)?.to_be(&Score::default())?;
 
 	Ok(())
 }

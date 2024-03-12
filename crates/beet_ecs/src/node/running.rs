@@ -12,6 +12,7 @@ use strum_macros::EnumIter;
 /// As this is frequently added and removed, it is `SparseSet`.
 #[derive(Default, Debug, Copy, Clone, Component, PartialEq, Reflect)]
 #[component(storage = "SparseSet")]
+#[reflect(Component)]
 pub struct Running;
 
 

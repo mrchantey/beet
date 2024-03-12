@@ -15,7 +15,7 @@ fn my_system() {}
 
 
 #[sweet_test]
-fn works() -> Result<()> {
+fn recursive_registry() -> Result<()> {
 	let mut registry = TypeRegistry::new();
 	MyAction::register(&mut registry);
 	registry.register::<MyAction>();

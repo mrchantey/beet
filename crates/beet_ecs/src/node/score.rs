@@ -30,6 +30,7 @@ pub struct Scoring;
 	strum_macros::EnumIter,
 	Reflect,
 )]
+#[reflect(Component)]
 pub enum Score {
 	#[default]
 	/// The node should not run.

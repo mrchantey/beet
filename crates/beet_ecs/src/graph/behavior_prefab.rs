@@ -1,5 +1,6 @@
 use crate::prelude::*;
 use anyhow::Result;
+use bevy_core::Name;
 use bevy_ecs::entity::Entity;
 use bevy_ecs::entity::EntityHashMap;
 use bevy_ecs::reflect::AppTypeRegistry;
@@ -127,8 +128,15 @@ impl<T: ActionTypes> BehaviorPrefab<T> {
 		registry
 	}
 
+	/// Register all types in [`T`] as well as those that get appended
+	/// to the graph by [`EntityGraph::spawn_with_options`]
+	/// with the exception of [[`TargetAgent`]] which gets reattached via [`BehaviorPrefab::spawn`]
 	pub fn append_type_registry(registry: &AppTypeRegistry) {
 		let mut registry = registry.write();
+		registry.register::<Name>();
+		registry.register::<Edges>();
+		registry.register::<Running>();
+		registry.register::<RunTimer>();
 		registry.register::<BehaviorGraphRoot>();
 		T::register(&mut registry);
 	}

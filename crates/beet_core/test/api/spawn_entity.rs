@@ -35,7 +35,7 @@ pub fn pubsub() -> Result<()> {
 			.with_prefab(Translate::new(Vec3::new(1., 0., 0.)).into_prefab()?),
 	)?;
 
-	let result = subscriber.try_recv()?;
+	let _result = subscriber.try_recv()?;
 	// expect(result.beet_id).to_be(beet_id)?;
 
 	Ok(())

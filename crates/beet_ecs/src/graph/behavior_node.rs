@@ -1,5 +1,6 @@
 use crate::prelude::*;
-use bevy_ecs::all_tuples;
+use bevy_utils::all_tuples;
+// use bevy_ecs::all_tuples;
 
 pub const NEW_NAME: &str = "New Node";
 

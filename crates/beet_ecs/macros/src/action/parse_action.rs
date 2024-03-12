@@ -75,6 +75,9 @@ fn action_trait(
 
 		impl ActionTypes for #ident{
 			fn register(registry: &mut TypeRegistry){
+
+				//TODO we also need to register the components
+
 				registry.register::<#ident>();
 			}
 		}

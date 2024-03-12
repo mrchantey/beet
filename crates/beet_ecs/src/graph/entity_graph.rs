@@ -120,13 +120,15 @@ impl EntityGraph {
 			world.insert(*entity, Edges(children));
 		}
 
-		if run_on_spawn {
-			if let Some(root) = entity_graph.root() {
-				world.insert(*root, (BehaviorGraphRoot, Running));
-			} else {
-				log::warn!("Tried to run on spawn but graph is empty");
+		if let Some(root) = entity_graph.root() {
+			world.insert(*root, BehaviorGraphRoot);
+			if run_on_spawn {
+				world.insert(*root, Running);
 			}
+		} else if run_on_spawn {
+			log::warn!("Tried to run on spawn but graph is empty");
 		}
+
 
 		let entity_graph = EntityGraph(entity_graph);
 		if let Some(target) = target {

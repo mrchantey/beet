@@ -39,13 +39,14 @@ beet_ecs_macros = { path = "crates/beet_ecs/macros", version = "0.0.4" }
 beet_net = { path = "crates/beet_net", version = "0.0.4" }
 
 ## local
-# forky_core = { path = "../forky/crates/forky/forky_core" }
-# forky_bevy = { path = "../forky/crates/forky/forky_bevy" }
-# forky_web = { path = "../forky/crates/forky/forky_web" }
+forky_core = { path = "../forky/crates/forky/forky_core" }
+forky_bevy = { path = "../forky/crates/forky/forky_bevy" }
+forky_web = { path = "../forky/crates/forky/forky_web" }
 sweet = { path = "../forky/crates/sweet", features = ["bevy_core"] }
-forky_core = { version = "0.1.43" }
-forky_bevy = { version = "0.1.43" }
-forky_web = { version = "0.1.43" }
+
+# forky_core = { version = "0.1.43" }
+# forky_bevy = { version = "0.1.43" }
+# forky_web = { version = "0.1.43" }
 # sweet = { version = "0.1.43", features = ["bevy_core"] }
 
 # forky_core = { path = "../forky/crates/forky/forky_core" }
@@ -96,16 +97,33 @@ bincode = "1.3"
 base64 = "0.22.0"
 
 ## game
-bevy = { version = "0.13.*" }
-bevy_app = { version = "0.13.*" }
-bevy_core = { version = "0.13.*" }
-bevy_derive = { version = "0.13.*" }
-bevy_ecs = { version = "0.13.*" }
-bevy_hierarchy = { version = "0.13.*" }
-bevy_math = { version = "0.13.*" }
-bevy_reflect = { version = "0.13.*" }
-bevy_scene = { version = "0.13.*" }
-bevy_tasks = { version = "0.13.*" }
-bevy_time = { version = "0.13.*" }
-bevy_transform = { version = "0.13.*" }
-bevy_utils = { version = "0.13.*" }
+# bevy = { version = "0.13.*" }
+# bevy_app = { version = "0.13.*" }
+# bevy_core = { version = "0.13.*" }
+# bevy_derive = { version = "0.13.*" }
+# bevy_ecs = { version = "0.13.*" }
+# bevy_hierarchy = { version = "0.13.*" }
+# bevy_math = { version = "0.13.*" }
+# bevy_reflect = { version = "0.13.*" }
+# bevy_scene = { version = "0.13.*" }
+# bevy_tasks = { version = "0.13.*" }
+# bevy_time = { version = "0.13.*" }
+# bevy_transform = { version = "0.13.*" }
+# bevy_utils = { version = "0.13.*" }
+
+
+# arbitrary sync point https://github.com/bevyengine/bevy/tree/4c47e31be60611d93d440a2d2f4e43aa8bbd64b2
+# allows for recursive type registration
+bevy = { git = "https://github.com/bevyengine/bevy.git", rev = "4c47e31be60611d93d440a2d2f4e43aa8bbd64b2" }
+bevy_app = { git = "https://github.com/bevyengine/bevy.git", rev = "4c47e31be60611d93d440a2d2f4e43aa8bbd64b2" }
+bevy_core = { git = "https://github.com/bevyengine/bevy.git", rev = "4c47e31be60611d93d440a2d2f4e43aa8bbd64b2" }
+bevy_derive = { git = "https://github.com/bevyengine/bevy.git", rev = "4c47e31be60611d93d440a2d2f4e43aa8bbd64b2" }
+bevy_ecs = { git = "https://github.com/bevyengine/bevy.git", rev = "4c47e31be60611d93d440a2d2f4e43aa8bbd64b2" }
+bevy_hierarchy = { git = "https://github.com/bevyengine/bevy.git", rev = "4c47e31be60611d93d440a2d2f4e43aa8bbd64b2" }
+bevy_math = { git = "https://github.com/bevyengine/bevy.git", rev = "4c47e31be60611d93d440a2d2f4e43aa8bbd64b2" }
+bevy_reflect = { git = "https://github.com/bevyengine/bevy.git", rev = "4c47e31be60611d93d440a2d2f4e43aa8bbd64b2" }
+bevy_scene = { git = "https://github.com/bevyengine/bevy.git", rev = "4c47e31be60611d93d440a2d2f4e43aa8bbd64b2" }
+bevy_tasks = { git = "https://github.com/bevyengine/bevy.git", rev = "4c47e31be60611d93d440a2d2f4e43aa8bbd64b2" }
+bevy_time = { git = "https://github.com/bevyengine/bevy.git", rev = "4c47e31be60611d93d440a2d2f4e43aa8bbd64b2" }
+bevy_transform = { git = "https://github.com/bevyengine/bevy.git", rev = "4c47e31be60611d93d440a2d2f4e43aa8bbd64b2" }
+bevy_utils = { git = "https://github.com/bevyengine/bevy.git", rev = "4c47e31be60611d93d440a2d2f4e43aa8bbd64b2" }
