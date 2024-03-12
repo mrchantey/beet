@@ -1,50 +1,50 @@
-# name: 🌍 Deploy Playground
-# on:
-#   push:
-#     branches: main
-#     paths: ['crates/**','Cargo.toml','.github/workflows/playground.yml']
-# jobs:
-#   deploy:
-#     name: Build and Deploy
-#     runs-on: ubuntu-20.04
-#     concurrency:
-#       group: ${{ github.workflow }}-${{ github.ref }}
-#     steps:
-#     - name: 📂 Checkout
-#       uses: actions/checkout@v4
-#     - name: 📂 Cache
-#       uses: actions/cache@v4
-#       with:
-#         path: |
-#           ~/.cargo/bin/
-#           ~/.cargo/registry/index/
-#           ~/.cargo/registry/cache/
-#           ~/.cargo/git/db/
-#           target/
-#         key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-#     - name: 🔨 Install Just
-#       uses: extractions/setup-just@v1
-#     - name: 🔨 Install Rust
-#       uses: actions-rs/toolchain@v1
-#       with:
-#         toolchain: nightly
-#         override: true
-#         default: true
-#         # components: rustfmt, clippy
-#     - name: 🔨 Install Wasm Target
-#       run: rustup target add wasm32-unknown-unknown
-#     - name: 🔨 Install Wasm Bindgen
-#       uses: baptiste0928/cargo-install@v2
-#       with:
-#         crate: wasm-bindgen-cli
-#         version: '0.2.88'
-#     - name: 🔨 Build Web
-#       run: just build-web
-#     - name: 🌍 Deploy
-#       uses: peaceiris/actions-gh-pages@v3
-#       if: ${{ github.ref == 'refs/heads/main' }}
-#       with:
-#         github_token: ${{ secrets.GITHUB_TOKEN }}
-#         publish_branch: pages
-#         publish_dir: ./target/static
-#         destination_dir: play
+name: 🌍 Deploy Playground
+on:
+  push:
+    branches: main
+    paths: ['crates/**','Cargo.toml','.github/workflows/playground.yml']
+jobs:
+  deploy:
+    name: Build and Deploy
+    runs-on: ubuntu-20.04
+    concurrency:
+      group: ${{ github.workflow }}-${{ github.ref }}
+    steps:
+    - name: 📂 Checkout
+      uses: actions/checkout@v4
+    - name: 📂 Cache
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cargo/bin/
+          ~/.cargo/registry/index/
+          ~/.cargo/registry/cache/
+          ~/.cargo/git/db/
+          target/
+        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+    - name: 🔨 Install Just
+      uses: extractions/setup-just@v1
+    - name: 🔨 Install Rust
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: nightly
+        override: true
+        default: true
+        # components: rustfmt, clippy
+    - name: 🔨 Install Wasm Target
+      run: rustup target add wasm32-unknown-unknown
+    - name: 🔨 Install Wasm Bindgen
+      uses: baptiste0928/cargo-install@v2
+      with:
+        crate: wasm-bindgen-cli
+        version: '0.2.88'
+    - name: 🔨 Build Web
+      run: just build-web
+    - name: 🌍 Deploy
+      uses: peaceiris/actions-gh-pages@v3
+      if: ${{ github.ref == 'refs/heads/main' }}
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        publish_branch: pages
+        publish_dir: ./target/static
+        destination_dir: play
