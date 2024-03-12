@@ -23,6 +23,12 @@ impl<T: Debug + ActionSuper> Debug for BehaviorGraph<T> {
 	}
 }
 
+impl<T: ActionSuper> Into<WillyBehavoirGraph> for &BehaviorGraph<T> {
+	fn into(self) -> WillyBehavoirGraph {
+		WillyBehavoirGraph(self.0.map(|_, n| n.into(), |_, _| ()))
+	}
+}
+
 
 impl<T: ActionSuper> BehaviorGraph<T> {
 	pub fn new() -> Self { Self(DiGraph::new()) }
@@ -40,6 +46,6 @@ impl<T: ActionSuper> BehaviorGraph<T> {
 		world: &mut impl WorldOrCommands,
 		target: Entity,
 	) -> EntityGraph {
-		EntityGraph::new(world, self.clone(), target)
+		EntityGraph::spawn(world, self, target)
 	}
 }

@@ -20,16 +20,20 @@ anyhow = { workspace = true }
 heck = { workspace = true }
 petgraph = { workspace = true }
 serde = { workspace = true }
+bincode = { workspace = true }
+
 extend = { workspace = true }
 num-traits = { workspace = true }
 strum = { workspace = true }
 strum_macros = { workspace = true }
 
-bevy_math = { workspace = true }
 bevy_app = { workspace = true }
 bevy_core = { workspace = true }
 bevy_derive = { workspace = true }
 bevy_ecs = { workspace = true }
+bevy_math = { workspace = true }
+bevy_reflect = { workspace = true }
+bevy_scene = { workspace = true }
 bevy_time = { workspace = true }
 bevy_utils = { workspace = true }
 

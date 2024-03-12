@@ -14,11 +14,6 @@ pub struct BehaviorNode<T: Action> {
 	pub actions: Vec<T>,
 }
 
-
-// impl<T: Action> Into<BehaviorNode<T>> for Vec<T> {
-// 	fn into(self) -> BehaviorNode<T> {}
-// }
-
 pub const NEW_NAME: &str = "New Node";
 
 impl<T: Action> Deref for BehaviorNode<T> {

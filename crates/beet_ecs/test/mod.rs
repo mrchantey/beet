@@ -1,3 +1,4 @@
+pub mod graph;
 pub mod selectors;
 pub mod edge;
 pub mod utils;

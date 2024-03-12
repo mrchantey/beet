@@ -27,7 +27,7 @@ impl<T: ActionSuper> BehaviorTree<T> {
 		world: &mut impl WorldOrCommands,
 		target: Entity,
 	) -> EntityGraph {
-		EntityGraph::new(world, (*self).clone(), target)
+		EntityGraph::spawn(world, self, target)
 	}
 
 	pub fn into_behavior_graph(self) -> BehaviorGraph<T> {
@@ -41,6 +41,20 @@ impl<T: ActionSuper> Into<BehaviorGraph<T>> for BehaviorTree<T> {
 impl<T: ActionSuper> Into<Tree<BehaviorNode<T>>> for BehaviorTree<T> {
 	fn into(self) -> Tree<BehaviorNode<T>> { self.0 }
 }
+
+impl<T: ActionSuper> Into<WillyBehavoirGraph> for &BehaviorTree<T> {
+	fn into(self) -> WillyBehavoirGraph {
+		let graph = &self.clone().into_behavior_graph();
+		graph.into()
+	}
+}
+impl<T: ActionSuper> Into<WillyBehavoirGraph> for BehaviorTree<T> {
+	fn into(self) -> WillyBehavoirGraph {
+		let graph = &self.into_behavior_graph();
+		graph.into()
+	}
+}
+
 
 
 pub trait IntoBehaviorTree<M, T: ActionSuper> {

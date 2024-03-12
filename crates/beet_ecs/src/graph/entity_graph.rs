@@ -3,12 +3,21 @@ use bevy_core::Name;
 use bevy_derive::Deref;
 use bevy_derive::DerefMut;
 use bevy_ecs::prelude::*;
+use bevy_reflect::Reflect;
 use bevy_utils::prelude::default;
 use petgraph::graph::DiGraph;
 use serde::Deserialize;
 use serde::Serialize;
 
-#[derive(Debug, Clone, Deref, DerefMut, Serialize, Deserialize, Component)]
+/// Marker to identify the root of a behavior graph
+#[derive(Debug, Default, Component, Reflect)]
+#[reflect(Component)]
+pub struct BehaviorGraphRoot;
+
+
+#[derive(
+	Debug, Default, Clone, Deref, DerefMut, Serialize, Deserialize, Component,
+)]
 pub struct EntityGraph(pub DiGraph<Entity, ()>);
 
 
@@ -28,31 +37,47 @@ impl Default for EntityGraphOptions {
 
 
 impl EntityGraph {
-	pub fn new<T: ActionSuper>(
+	// pub fn from_prefab<T: ActionTypes>(prefab: BehaviorGraphPrefab<T>) -> Self {
+	// 	let mut this = EntityGraph::default();
+	// 	let root = prefab.root();
+	// 	this.add_recursive(&prefab.world, root);
+	// 	this
+	// }
+	// fn add_recursive(&mut self, world: &World, parent: Entity) -> NodeIndex {
+	// 	let node_index = self.add_node(parent);
+	// 	if let Some(children) = world.get::<Edges>(parent) {
+	// 		for child in children.iter() {
+	// 			let child_index = self.add_recursive(world, *child);
+	// 			self.add_edge(node_index, child_index, ());
+	// 		}
+	// 	}
+	// 	node_index
+	// }
+	pub fn spawn(
 		world: &mut impl WorldOrCommands,
-		graph: impl Into<BehaviorGraph<T>>,
+		graph: impl Into<WillyBehavoirGraph>,
 		target: Entity,
 	) -> Self {
-		Self::new_with_options(world, graph, EntityGraphOptions {
+		Self::spawn_with_options(world, graph, EntityGraphOptions {
 			target: Some(target),
 			..default()
 		})
 	}
 	/// Choosing no target agent means its your responsibility to ensure that all actions in the behavior graph
 	/// are compatible, actions that expect an agent may do nothing or panic.
-	pub fn new_no_target<T: ActionSuper>(
+	pub fn spawn_no_target(
 		world: &mut impl WorldOrCommands,
-		graph: impl Into<BehaviorGraph<T>>,
+		graph: impl Into<WillyBehavoirGraph>,
 	) -> Self {
-		Self::new_with_options(world, graph, EntityGraphOptions {
+		Self::spawn_with_options(world, graph, EntityGraphOptions {
 			target: None,
 			..default()
 		})
 	}
 
-	pub fn new_with_options<T: ActionSuper>(
+	pub fn spawn_with_options(
 		world: &mut impl WorldOrCommands,
-		graph: impl Into<BehaviorGraph<T>>,
+		graph: impl Into<WillyBehavoirGraph>,
 		options: EntityGraphOptions,
 	) -> Self {
 		let graph = graph.into();
@@ -71,8 +96,8 @@ impl EntityGraph {
 				if let Some(target) = target {
 					world.insert(entity, TargetAgent(target));
 				}
-				for action in actions.iter() {
-					world.insert_action(entity,action);
+				for action in actions.actions.iter() {
+					world.insert_action(entity, action.as_ref());
 				}
 				entity
 			},
@@ -96,7 +121,7 @@ impl EntityGraph {
 
 		if run_on_spawn {
 			if let Some(root) = entity_graph.root() {
-				world.insert(*root, Running);
+				world.insert(*root, (BehaviorGraphRoot, Running));
 			} else {
 				log::warn!("Tried to run on spawn but graph is empty");
 			}

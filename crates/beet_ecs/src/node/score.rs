@@ -1,10 +1,12 @@
 use crate::prelude::*;
 use bevy_ecs::prelude::*;
+use bevy_reflect::Reflect;
 use serde::Deserialize;
 use serde::Serialize;
 use std::cmp::Ordering;
 use std::fmt::Debug;
 
+// TODO
 /// Indicate this node's parent will use the scores in the next tick.
 /// As this is frequently added and removed, it is `SparseSet`.
 #[derive(Default, Debug, Component)]
@@ -26,6 +28,7 @@ pub struct Scoring;
 	// strum
 	strum_macros::Display,
 	strum_macros::EnumIter,
+	Reflect,
 )]
 pub enum Score {
 	#[default]

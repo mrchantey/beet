@@ -31,6 +31,9 @@ pub mod exports {
 	pub use bevy_ecs::prelude::*;
 	pub use bevy_ecs::schedule::ScheduleLabel;
 	pub use bevy_ecs::system::EntityCommands;
+	pub use bevy_reflect;
+	pub use bevy_reflect::Reflect;
+	pub use bevy_reflect::TypeRegistry;
 	pub use serde;
 	pub use serde::Deserialize;
 	pub use serde::Serialize;

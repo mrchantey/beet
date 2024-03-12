@@ -9,7 +9,7 @@ pub fn works() -> Result<()> {
 	app.insert_time();
 
 	let tree = BehaviorTree::<EcsNode>::new(SucceedInDuration::default());
-	let instance = EntityGraph::new_no_target(&mut app, tree);
+	let instance = EntityGraph::spawn_no_target(&mut app, tree);
 	let root = *instance.root().unwrap();
 
 	expect(&app).to_have_component::<Running>(root)?;

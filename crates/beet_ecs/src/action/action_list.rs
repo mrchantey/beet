@@ -18,7 +18,7 @@ macro_rules! action_list {
 		use beet::exports::*;
 		//these should match most action auto impls, see macros/src/action/parse_action.rs
 		// #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, EnumIter, Display)]
-		#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Display, FieldUi)]
+		#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Reflect,Display, FieldUi)]
 		#[hide_ui]
 		pub enum $name {
 			$($variant($variant),)*
@@ -29,6 +29,13 @@ macro_rules! action_list {
 				$($variant::add_systems(app,schedule.clone());)*
 			}
 		}
+		impl ActionTypes for $name {
+			fn register(registry:&mut TypeRegistry){
+				$(registry.register::<$variant>();)*
+			}
+		}
+
+
 
 		impl Action for $name {
 			fn duplicate(&self) -> Box<dyn Action>{
@@ -36,7 +43,6 @@ macro_rules! action_list {
 					$(Self::$variant(x) => x.duplicate(),)*
 				}
 			}
-
 
 			fn insert_from_world(&self, entity: &mut EntityWorldMut<'_>){
 				match self {
@@ -46,11 +52,6 @@ macro_rules! action_list {
 			fn insert_from_commands(&self, entity: &mut EntityCommands){
 				match self {
 					$(Self::$variant(x) => x.insert_from_commands(entity),)*
-				}
-			}
-			fn meta(&self) -> ActionMeta{
-				match self {
-					$(Self::$variant(x) => x.meta(),)*
 				}
 			}
 		}

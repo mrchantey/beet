@@ -3,8 +3,6 @@ use proc_macro2::TokenStream;
 use quote::quote;
 use quote::ToTokens;
 use std::collections::HashMap;
-use std::sync::atomic::AtomicUsize;
-use std::sync::atomic::Ordering;
 use syn::Expr;
 use syn::ItemStruct;
 use syn::Result;
@@ -15,7 +13,8 @@ pub fn parse_action(
 	item: proc_macro::TokenStream,
 ) -> Result<TokenStream> {
 	let input = syn::parse::<ItemStruct>(item)?;
-	let args = &attributes_map(attr.into(), Some(&["system", "components","set"]))?;
+	let args =
+		&attributes_map(attr.into(), Some(&["system", "components", "set"]))?;
 
 	let action_trait = action_trait(&input, args);
 
@@ -23,7 +22,8 @@ pub fn parse_action(
 		use beet::prelude::*;
 		use beet::exports::*;
 		// #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Component)]
-		#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Component, FieldUi)]
+		#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Component, FieldUi, Reflect)]
+		#[reflect(Component,Action)]
 		#input
 		#action_trait
 	})
@@ -36,7 +36,6 @@ fn action_trait(
 ) -> TokenStream {
 	let ident = &input.ident;
 
-	let meta = meta(input);
 	let tick_system = tick_system(args);
 
 	let components = args
@@ -56,7 +55,6 @@ fn action_trait(
 			fn duplicate(&self) -> Box<dyn Action> {
 				Box::new(self.clone())
 			}
-			#meta
 			fn insert_from_world(&self, entity: &mut EntityWorldMut<'_>){
 				entity.insert((self.clone(),#components));
 			}
@@ -74,24 +72,13 @@ fn action_trait(
 				);
 			}
 		}
-	}
-}
 
-static ACTION_ID: AtomicUsize = AtomicUsize::new(0);
-
-
-fn meta(input: &ItemStruct) -> TokenStream {
-	let ident = &input.ident;
-	let name = ident.to_string();
-	let action_id = ACTION_ID.fetch_add(1, Ordering::SeqCst);
-
-	quote! {
-		fn meta(&self) -> ActionMeta {
-			ActionMeta {
-				id: #action_id,
-				name: #name
+		impl ActionTypes for #ident{
+			fn register(registry: &mut TypeRegistry){
+				registry.register::<#ident>();
 			}
 		}
+
 	}
 }
 

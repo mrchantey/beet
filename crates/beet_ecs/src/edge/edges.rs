@@ -1,13 +1,23 @@
 use bevy_derive::Deref;
 use bevy_derive::DerefMut;
+use bevy_ecs::entity::MapEntities;
 use bevy_ecs::prelude::*;
+use bevy_ecs::reflect::ReflectMapEntities;
+use bevy_reflect::Reflect;
 use bevy_utils::HashSet;
 
 
 /// Outgoing edges of an action, aka Children.
-#[derive(Debug, Default, Clone, Deref, DerefMut, Component)]
+#[derive(Debug, Default, Clone, Deref, DerefMut, Component, Reflect)]
+#[reflect(Component, MapEntities)]
 pub struct Edges(pub Vec<Entity>);
-
+impl MapEntities for Edges {
+	fn map_entities<M: EntityMapper>(&mut self, entity_mapper: &mut M) {
+		for entity in &mut self.0 {
+			*entity = entity_mapper.map_entity(*entity);
+		}
+	}
+}
 
 impl Edges {
 	pub fn new() -> Self { Self(Vec::new()) }

@@ -1,5 +1,6 @@
 use beet_ecs_macros::FieldUi;
 use bevy_ecs::prelude::*;
+use bevy_reflect::Reflect;
 use serde::Deserialize;
 use serde::Serialize;
 use std::fmt::Debug;
@@ -9,7 +10,7 @@ use strum_macros::EnumIter;
 
 /// Indicate this node is currently running.
 /// As this is frequently added and removed, it is `SparseSet`.
-#[derive(Default, Debug, Copy, Clone, Component, PartialEq)]
+#[derive(Default, Debug, Copy, Clone, Component, PartialEq, Reflect)]
 #[component(storage = "SparseSet")]
 pub struct Running;
 
@@ -30,6 +31,7 @@ pub struct Running;
 	EnumIter,
 	Display,
 	FieldUi,
+	Reflect,
 )]
 #[component(storage = "SparseSet")]
 pub enum RunResult {
