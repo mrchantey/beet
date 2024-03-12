@@ -22,14 +22,14 @@ pub struct EntityGraph(pub DiGraph<Entity, ()>);
 
 
 pub struct EntityGraphOptions {
-	target: Option<Entity>,
+	agent: Option<Entity>,
 	run_on_spawn: bool,
 }
 
 impl Default for EntityGraphOptions {
 	fn default() -> Self {
 		Self {
-			target: None,
+			agent: None,
 			run_on_spawn: true,
 		}
 	}
@@ -56,10 +56,10 @@ impl EntityGraph {
 	pub fn spawn(
 		world: &mut impl WorldOrCommands,
 		graph: impl Into<WillyBehaviorGraph>,
-		target: Entity,
+		agent: Entity,
 	) -> Self {
 		Self::spawn_with_options(world, graph, EntityGraphOptions {
-			target: Some(target),
+			agent: Some(agent),
 			..default()
 		})
 	}
@@ -70,7 +70,7 @@ impl EntityGraph {
 		graph: impl Into<WillyBehaviorGraph>,
 	) -> Self {
 		Self::spawn_with_options(world, graph, EntityGraphOptions {
-			target: None,
+			agent: None,
 			..default()
 		})
 	}
@@ -82,7 +82,7 @@ impl EntityGraph {
 	) -> Self {
 		let graph = graph.into();
 		let EntityGraphOptions {
-			target,
+			agent: target,
 			run_on_spawn,
 		} = options;
 

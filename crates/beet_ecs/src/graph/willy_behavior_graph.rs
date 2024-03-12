@@ -3,20 +3,33 @@ use anyhow::anyhow;
 use anyhow::Result;
 use bevy_derive::Deref;
 use bevy_derive::DerefMut;
+use bevy_ecs::entity::Entity;
 use bevy_ecs::reflect::AppTypeRegistry;
 use bevy_ecs::world::World;
 use petgraph::graph::DiGraph;
 
 
-#[derive(Default, Clone, Deref, DerefMut)]
+#[derive(Default, Debug, Clone, Deref, DerefMut)]
 pub struct WillyBehaviorGraph(pub DiGraph<WillyBehaviorNode, ()>);
 
 impl WillyBehaviorGraph {
 	pub fn into_scene<T: ActionTypes>(&self) {}
 
-	pub fn spawn(&self, world: &mut World) -> EntityGraph {
+	pub fn spawn(&self, world: &mut World, agent: Entity) -> EntityGraph {
+		EntityGraph::spawn(world, self.clone(), agent)
+	}
+
+	pub fn spawn_no_target(&self, world: &mut World) -> EntityGraph {
 		EntityGraph::spawn_no_target(world, self.clone())
 	}
+
+	pub fn with_indexed_names(mut self) -> Self {
+		self.node_weights_mut().enumerate().for_each(|(i, node)| {
+			node.name = format!("Node {i}");
+		});
+		self
+	}
+
 
 	/// # Errors
 	/// If a type in the graph is missing from `T`

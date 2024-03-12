@@ -6,10 +6,11 @@ use bevy_ecs::world::EntityWorldMut;
 use bevy_reflect::reflect_trait;
 use bevy_reflect::Reflect;
 use bevy_reflect::TypeRegistry;
+use std::fmt;
 
 
 #[reflect_trait]
-pub trait Action: 'static + Reflect {
+pub trait Action: 'static + Reflect + fmt::Debug {
 	// [`Clone`] but boxable, theres probably a better way..
 	fn duplicate(&self) -> Box<dyn Action>;
 	// must be seperate so can be Boxed, ie no `impl WorldOrCommands`

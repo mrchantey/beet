@@ -2,10 +2,12 @@ use crate::prelude::*;
 use bevy_ecs::all_tuples;
 
 
+#[derive(Debug)]
 pub struct WillyBehaviorNode {
 	pub name: String,
 	pub actions: Vec<Box<dyn Action>>,
 }
+
 
 impl Clone for WillyBehaviorNode {
 	fn clone(&self) -> Self {
