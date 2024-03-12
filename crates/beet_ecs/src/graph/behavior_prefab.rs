@@ -14,6 +14,7 @@ use bevy_scene::DynamicScene;
 use serde::de::DeserializeSeed;
 use serde::Deserialize;
 use serde::Serialize;
+use std::fmt;
 use std::sync::Arc;
 use std::sync::RwLock;
 
@@ -22,13 +23,36 @@ use std::sync::RwLock;
 /// This the 'instantiated' version of a [`BehaviorGraph`].
 /// It is a wrapper around a [`DynamicScene`] containing the behavior graph.
 /// It implements [`Serialize`] and [`Deserialize`]
-pub struct BehaviorGraphPrefab<T: ActionTypes> {
+pub struct BehaviorPrefab<T: ActionTypes> {
 	pub scene: DynamicScene,
 	// pub root: Entity,
 	_phantom: std::marker::PhantomData<T>,
 }
 
-impl<T: ActionTypes> BehaviorGraphPrefab<T> {
+impl<T: ActionTypes> fmt::Debug for BehaviorPrefab<T> {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		f.debug_struct("BehaviorPrefab")
+			.field("scene", &"TODO")
+			// .field("scene", &self.scene)
+			.finish()
+	}
+}
+/// Attempts a clone of this prefab
+/// # Panics
+/// if [`DynamicScene::write_to_world`] errors
+impl<T: ActionTypes> Clone for BehaviorPrefab<T> {
+	fn clone(&self) -> Self {
+		let mut world = World::new();
+		let mut entity_map = EntityHashMap::default();
+		self.scene
+			.write_to_world(&mut world, &mut entity_map)
+			.unwrap();
+		let scene = DynamicScene::from_world(&world);
+		Self::new(scene)
+	}
+}
+
+impl<T: ActionTypes> BehaviorPrefab<T> {
 	pub fn new(scene: DynamicScene) -> Self {
 		Self {
 			scene,
@@ -42,7 +66,6 @@ impl<T: ActionTypes> BehaviorGraphPrefab<T> {
 
 	/// # Panics
 	/// If the world is missing one of the following:
-	/// - [`SerdeRootEntity`]
 	/// - [`AppTypeRegistry`]
 	pub fn from_world(world: World) -> Self {
 		let _registry = world.resource::<AppTypeRegistry>();
@@ -57,6 +80,7 @@ impl<T: ActionTypes> BehaviorGraphPrefab<T> {
 		Ok(world)
 	}
 
+	/// Prefabs are [`DynamicScene`]s so can only be spawned using [`World`]. This means spawn systems must be exclusive.
 	/// If the world doesn't have a type registry, one matching this prefab will be added.
 	/// # Errors
 	/// If the world's [`AppTypeRegistry`] is missing a type in the graph
@@ -95,18 +119,23 @@ impl<T: ActionTypes> BehaviorGraphPrefab<T> {
 
 	// pub fn root(&self) -> Entity { **self.world.resource::<SerdeRootEntity>() }
 	pub fn get_type_registry() -> AppTypeRegistry {
-		let mut registry = TypeRegistry::default();
-		registry.register::<BehaviorGraphRoot>();
-		T::register(&mut registry);
+		let registry = TypeRegistry::default();
 		let registry = AppTypeRegistry(TypeRegistryArc {
 			internal: Arc::new(RwLock::new(registry)),
 		});
+		Self::append_type_registry(&registry);
 		registry
+	}
+
+	pub fn append_type_registry(registry: &AppTypeRegistry) {
+		let mut registry = registry.write();
+		registry.register::<BehaviorGraphRoot>();
+		T::register(&mut registry);
 	}
 }
 
 
-impl<T: ActionTypes> Serialize for BehaviorGraphPrefab<T> {
+impl<T: ActionTypes> Serialize for BehaviorPrefab<T> {
 	fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
 	where
 		S: serde::Serializer,
@@ -118,7 +147,7 @@ impl<T: ActionTypes> Serialize for BehaviorGraphPrefab<T> {
 }
 
 
-impl<'de, T: ActionTypes> Deserialize<'de> for BehaviorGraphPrefab<T> {
+impl<'de, T: ActionTypes> Deserialize<'de> for BehaviorPrefab<T> {
 	fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
 	where
 		D: serde::Deserializer<'de>,
@@ -153,5 +182,20 @@ impl<'de, T: ActionTypes> Deserialize<'de> for BehaviorGraphPrefab<T> {
 			))?;
 
 		Ok(Self::new(scene))
+	}
+}
+
+
+pub trait IntoBehaviorPrefab<M> {
+	fn into_prefab<T: ActionTypes>(self) -> Result<BehaviorPrefab<T>>;
+}
+
+
+impl<M, Graph> IntoBehaviorPrefab<M> for Graph
+where
+	Graph: IntoBehaviorGraph<M>,
+{
+	fn into_prefab<T: ActionTypes>(self) -> Result<BehaviorPrefab<T>> {
+		self.into_behavior_graph().into_prefab()
 	}
 }

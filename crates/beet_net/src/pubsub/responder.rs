@@ -2,7 +2,6 @@ use crate::prelude::*;
 use anyhow::Result;
 
 
-
 #[derive(Debug, Clone)]
 pub struct Responder<Req: Payload, Res: Payload> {
 	pub(crate) req: Subscriber<Req>,
@@ -38,6 +37,7 @@ impl<Req: Payload, Res: Payload> Responder<Req, Res> {
 		}
 		Ok(())
 	}
+
 	pub fn try_handle_next(
 		&mut self,
 		mut handler: impl FnMut(Req) -> Res,
@@ -54,6 +54,7 @@ impl<Req: Payload, Res: Payload> Responder<Req, Res> {
 		}
 		Ok(())
 	}
+
 	pub fn req(&self) -> &Subscriber<Req> { &self.req }
 	pub fn res(&self) -> &Publisher<Res> { &self.res }
 	pub fn req_mut(&mut self) -> &mut Subscriber<Req> { &mut self.req }

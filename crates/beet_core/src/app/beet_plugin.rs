@@ -18,11 +18,11 @@ impl Plugin for BeetMinimalPlugin {
 #[derive(Debug, Clone, Deref, DerefMut, Resource)]
 pub struct RelayRes(pub Relay);
 
-pub struct BeetPlugin<T: ActionPayload> {
+pub struct BeetPlugin<T: ActionList> {
 	relay: Relay,
 	_phantom: PhantomData<T>,
 }
-impl<T: ActionPayload> BeetPlugin<T> {
+impl<T: ActionList> BeetPlugin<T> {
 	pub fn new(relay: Relay) -> Self {
 		Self {
 			relay,
@@ -31,12 +31,13 @@ impl<T: ActionPayload> BeetPlugin<T> {
 	}
 }
 
-impl<T: ActionPayload> Plugin for BeetPlugin<T> {
+impl<T: ActionList> Plugin for BeetPlugin<T> {
 	fn build(&self, app: &mut App) {
 		let mut relay = self.relay.clone();
 		app.insert_resource(BeetEntityMap::default())
-			.insert_resource(SpawnEntityHandler::<T>::new(&mut relay))
-			.insert_resource(DespawnEntityHandler::new(&mut relay))
+			.insert_resource(BehaviorPrefab::<T>::get_type_registry())
+			.insert_resource(SpawnEntityHandler::<T>::new(&mut relay).unwrap())
+			.insert_resource(DespawnEntityHandler::new(&mut relay).unwrap())
 			.add_systems(
 				PreUpdate,
 				// despawn before spawn to avoid immediate despawn in case of despawn_all
@@ -57,6 +58,7 @@ impl<T: ActionPayload> Plugin for BeetPlugin<T> {
 
 fn log_error<T>(result: In<anyhow::Result<T>>) {
 	if let Err(e) = result.0 {
+		// eprintln!("{}", e);
 		log::error!("{}", e);
 	}
 }

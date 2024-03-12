@@ -1,5 +1,5 @@
 use beet_core::prelude::*;
-use beet_net::prelude::*;
+use beet_ecs::graph::IntoBehaviorPrefab;
 use bevy_app::prelude::*;
 use bevy_math::Vec3;
 use sweet::*;
@@ -14,22 +14,20 @@ pub fn works() -> Result<()> {
 	app.insert_time()
 		.add_plugins(BeetPlugin::<CoreNode>::new(relay.clone()));
 
-	let mut create = SpawnEntityHandler::<CoreNode>::requester(&mut relay);
+	let beet_id = BeetEntityId(0);
 
 	expect(app.world.entities().len()).to_be(0)?;
-	let message_id = create.start_request(
-		&SpawnEntityPayload::default()
+	SpawnEntityHandler::<CoreNode>::publisher(&mut relay)?.push(
+		&SpawnEntityPayload::from_id(beet_id)
 			.with_tracked_position(Vec3::ZERO)
-			.with_graph(translate_graph()),
+			.with_prefab(Translate::new(Vec3::new(0., 1., 0.)).into_prefab()?),
 	)?;
 
 	app.update();
 
-	let beet_id = create.block_on_response(message_id)?;
-
 	expect(app.world.entities().len()).to_be(2)?;
 
-	DespawnEntityHandler::publisher(&mut relay)
+	DespawnEntityHandler::publisher(&mut relay)?
 		.push(&DespawnEntityPayload::new(beet_id))?;
 
 	app.update();

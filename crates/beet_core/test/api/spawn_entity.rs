@@ -1,6 +1,4 @@
 use beet_core::prelude::*;
-use beet_ecs::ecs_nodes::EcsNode;
-use beet_net::relay::Relay;
 use bevy_app::App;
 use bevy_math::Vec3;
 use sweet::*;
@@ -11,15 +9,34 @@ pub fn works() -> Result<()> {
 	let mut relay = Relay::default();
 	app.add_plugins(BeetPlugin::<EcsNode>::new(relay.clone()));
 
-	let mut send = SpawnEntityHandler::<EcsNode>::requester(&mut relay);
-	let message_id = send.start_request(
-		&SpawnEntityPayload::default().with_position(Vec3::new(0., 0., 0.)),
+	SpawnEntityHandler::<EcsNode>::publisher(&mut relay)?.push(
+		&SpawnEntityPayload::from_id(0).with_position(Vec3::new(0., 0., 0.)),
 	)?;
 
+	expect(&app.world.iter_entities().count()).to_be(&0)?;
 	app.update();
+	expect(&app.world.iter_entities().count()).to_be(&1)?;
 
-	let id = send.block_on_response(message_id)?;
-	expect(*id).to_be(0)?;
+	Ok(())
+}
+
+#[sweet_test]
+pub fn pubsub() -> Result<()> {
+	let mut relay = Relay::default();
+
+	let mut subscriber =
+		SpawnEntityHandler::<CoreNode>::subscriber(&mut relay)?;
+	let beet_id = BeetEntityId(0);
+
+	SpawnEntityHandler::<CoreNode>::publisher(&mut relay)?.push(
+		&SpawnEntityPayload::from_id(beet_id)
+			.with_position(Vec3::new(0., 0., 0.))
+			// .with_prefab(EmptyAction.into_prefab()?),
+			.with_prefab(Translate::new(Vec3::new(1., 0., 0.)).into_prefab()?),
+	)?;
+
+	let result = subscriber.try_recv()?;
+	// expect(result.beet_id).to_be(beet_id)?;
 
 	Ok(())
 }

@@ -37,11 +37,12 @@ impl Default for EntityGraphOptions {
 
 
 impl EntityGraph {
-	// pub fn from_prefab<T: ActionTypes>(prefab: BehaviorGraphPrefab<T>) -> Self {
+	// pub fn from_prefab<T: ActionTypes>(prefab: BehaviorPrefab<T>) -> Result<Self> {
 	// 	let mut this = EntityGraph::default();
+	// 	let world = prefab.into_world()?;
 	// 	let root = prefab.root();
 	// 	this.add_recursive(&prefab.world, root);
-	// 	this
+	// 	Ok(this)
 	// }
 	// fn add_recursive(&mut self, world: &World, parent: Entity) -> NodeIndex {
 	// 	let node_index = self.add_node(parent);

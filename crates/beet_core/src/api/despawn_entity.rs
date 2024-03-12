@@ -11,23 +11,18 @@ pub struct DespawnEntityHandler {
 	pub recv: Subscriber<DespawnEntityPayload>,
 }
 
-impl DespawnEntityHandler {
-	pub fn new(relay: &mut Relay) -> Self {
-		Self {
-			send: Self::publisher(relay),
-			recv: Self::subscriber(relay),
-		}
+impl TopicHandler<DespawnEntityPayload> for DespawnEntityHandler {
+	fn topic() -> Topic {
+		Topic::new(ENTITY_TOPIC, TopicScheme::PubSub, TopicMethod::Delete)
 	}
-	pub fn subscriber(relay: &mut Relay) -> Subscriber<DespawnEntityPayload> {
-		relay
-			.add_subscriber(ENTITY_TOPIC, TopicMethod::Delete)
-			.unwrap() //should be correct topic
-	}
+}
 
-	pub fn publisher(relay: &mut Relay) -> Publisher<DespawnEntityPayload> {
-		relay
-			.add_publisher(ENTITY_TOPIC, TopicMethod::Delete)
-			.unwrap() //should be correct topic
+impl DespawnEntityHandler {
+	pub fn new(relay: &mut Relay) -> Result<Self> {
+		Ok(Self {
+			send: Self::publisher(relay)?,
+			recv: Self::subscriber(relay)?,
+		})
 	}
 }
 

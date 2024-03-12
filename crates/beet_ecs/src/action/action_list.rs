@@ -31,7 +31,7 @@ macro_rules! action_list {
 		}
 		impl ActionTypes for $name {
 			fn register(registry:&mut TypeRegistry){
-				$(registry.register::<$variant>();)*
+				$($variant::register(registry);)*
 			}
 		}
 

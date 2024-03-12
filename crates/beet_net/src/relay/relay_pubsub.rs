@@ -21,6 +21,20 @@ impl Relay {
 	}
 
 
+	pub fn handler_pub<H, T>(&mut self) -> Result<Publisher<T>>
+	where
+		T: Payload,
+		H: TopicHandler<T>,
+	{
+		H::publisher(self)
+	}
+	pub fn handler_sub<H, T>(&mut self) -> Result<Subscriber<T>>
+	where
+		T: Payload,
+		H: TopicHandler<T>,
+	{
+		H::subscriber(self)
+	}
 
 
 	/// Create a publisher for a topic

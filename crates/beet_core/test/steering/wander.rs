@@ -1,5 +1,4 @@
 use beet_core::prelude::*;
-use beet_ecs::prelude::*;
 use bevy_app::App;
 use bevy_math::prelude::*;
 use bevy_transform::prelude::*;
@@ -39,8 +38,7 @@ fn action() -> Result<()> {
 		))
 		.id();
 
-	let tree = BehaviorTree::<CoreNode>::new(Wander::default());
-	tree.spawn(&mut app, agent);
+	BehaviorTree::new(Wander::default()).spawn(&mut app, agent);
 
 	app.update();
 	app.update_with_secs(1);

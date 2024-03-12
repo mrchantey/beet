@@ -7,6 +7,7 @@ use bevy_reflect::reflect_trait;
 use bevy_reflect::Reflect;
 use bevy_reflect::TypeRegistry;
 use std::fmt;
+use std::fmt::Debug;
 
 
 #[reflect_trait]
@@ -32,9 +33,13 @@ pub trait Action: 'static + Reflect + fmt::Debug {
 pub trait ActionSystems: 'static {
 	fn add_systems(app: &mut App, schedule: impl ScheduleLabel + Clone);
 }
-pub trait ActionTypes: 'static {
+pub trait ActionTypes: 'static + Send + Sync + Debug + Clone {
 	fn register(registry: &mut TypeRegistry);
 }
+
+
+pub trait ActionList: ActionSystems + ActionTypes {}
+impl<T> ActionList for T where T: ActionSystems + ActionTypes {}
 
 pub type SetActionFunc = Box<dyn Fn(&mut EntityCommands) -> Result<()>>;
 

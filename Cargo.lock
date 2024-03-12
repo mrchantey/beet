@@ -385,7 +385,7 @@ checksum = "9475866fec1451be56a3c2400fd081ff546538961565ccb5b7142cbd22bc7a51"
 
 [[package]]
 name = "beet"
-version = "0.0.1"
+version = "0.0.4"
 dependencies = [
  "beet_core",
  "beet_ecs",
@@ -394,11 +394,11 @@ dependencies = [
 
 [[package]]
 name = "beet-cli"
-version = "0.0.1"
+version = "0.0.4"
 
 [[package]]
 name = "beet_core"
-version = "0.0.1"
+version = "0.0.4"
 dependencies = [
  "anyhow",
  "beet_ecs",
@@ -413,7 +413,7 @@ dependencies = [
  "bevy_transform",
  "bevy_utils",
  "forky_bevy",
- "forky_core",
+ "forky_core 0.1.43 (registry+https://github.com/rust-lang/crates.io-index)",
  "log",
  "serde",
  "strum",
@@ -422,7 +422,7 @@ dependencies = [
 
 [[package]]
 name = "beet_ecs"
-version = "0.0.1"
+version = "0.0.4"
 dependencies = [
  "anyhow",
  "beet_ecs_macros",
@@ -450,7 +450,7 @@ dependencies = [
 
 [[package]]
 name = "beet_ecs_macros"
-version = "0.0.1"
+version = "0.0.4"
 dependencies = [
  "anyhow",
  "extend",
@@ -461,7 +461,7 @@ dependencies = [
 
 [[package]]
 name = "beet_net"
-version = "0.0.1"
+version = "0.0.4"
 dependencies = [
  "anyhow",
  "async-broadcast",
@@ -481,7 +481,7 @@ dependencies = [
 
 [[package]]
 name = "beet_web"
-version = "0.0.1"
+version = "0.0.4"
 dependencies = [
  "anyhow",
  "base64 0.22.0",
@@ -496,8 +496,8 @@ dependencies = [
  "console_log",
  "extend",
  "forky_bevy",
- "forky_core",
- "forky_web",
+ "forky_core 0.1.43 (registry+https://github.com/rust-lang/crates.io-index)",
+ "forky_web 0.1.43 (registry+https://github.com/rust-lang/crates.io-index)",
  "futures",
  "js-sys",
  "log",
@@ -1634,9 +1634,21 @@ dependencies = [
  "bevy_transform",
  "bevy_utils",
  "extend",
- "forky_core",
- "forky_web",
+ "forky_core 0.1.43 (registry+https://github.com/rust-lang/crates.io-index)",
+ "forky_web 0.1.43 (registry+https://github.com/rust-lang/crates.io-index)",
  "js-sys",
+ "rand",
+]
+
+[[package]]
+name = "forky_core"
+version = "0.1.43"
+dependencies = [
+ "anyhow",
+ "extend",
+ "getrandom",
+ "log",
+ "num-traits",
  "rand",
 ]
 
@@ -1657,14 +1669,12 @@ dependencies = [
 [[package]]
 name = "forky_fs"
 version = "0.1.43"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "87178f82398d0c108fd29e4c45820a149d86e8e8db9e0f3d08577b38c0a92d78"
 dependencies = [
  "anyhow",
  "clap",
  "crossterm",
  "extend",
- "forky_core",
+ "forky_core 0.1.43",
  "futures",
  "gag",
  "glob",
@@ -1678,14 +1688,12 @@ dependencies = [
 [[package]]
 name = "forky_web"
 version = "0.1.43"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c9cbefc9f96d44febb801743a2412c3decc3d51a2b9f7dd353b291aa8ae1713e"
 dependencies = [
  "anyhow",
  "console_error_panic_hook",
  "extend",
- "forky_core",
- "forky_web_macros",
+ "forky_core 0.1.43",
+ "forky_web_macros 0.1.43",
  "js-sys",
  "leptos",
  "serde",
@@ -1693,6 +1701,36 @@ dependencies = [
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "web-sys",
+]
+
+[[package]]
+name = "forky_web"
+version = "0.1.43"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c9cbefc9f96d44febb801743a2412c3decc3d51a2b9f7dd353b291aa8ae1713e"
+dependencies = [
+ "anyhow",
+ "console_error_panic_hook",
+ "extend",
+ "forky_core 0.1.43 (registry+https://github.com/rust-lang/crates.io-index)",
+ "forky_web_macros 0.1.43 (registry+https://github.com/rust-lang/crates.io-index)",
+ "js-sys",
+ "leptos",
+ "serde",
+ "serde_json",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
+ "web-sys",
+]
+
+[[package]]
+name = "forky_web_macros"
+version = "0.1.43"
+dependencies = [
+ "anyhow",
+ "proc-macro2",
+ "quote",
+ "syn 2.0.52",
 ]
 
 [[package]]
@@ -3541,8 +3579,6 @@ dependencies = [
 [[package]]
 name = "sweet"
 version = "0.1.43"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "42c562198e1890a6db6a5558628a4b2816a58ef0ac19306c596ad9bdc75d394e"
 dependencies = [
  "anyhow",
  "backtrace",
@@ -3555,9 +3591,9 @@ dependencies = [
  "console_log",
  "crossterm",
  "extend",
- "forky_core",
+ "forky_core 0.1.43",
  "forky_fs",
- "forky_web",
+ "forky_web 0.1.43",
  "futures",
  "gag",
  "getrandom",
@@ -3581,8 +3617,6 @@ dependencies = [
 [[package]]
 name = "sweet_macros"
 version = "0.1.43"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "35b3c9b3863c9894f4cc553c4022d0aad1044887e2ca9ef715848d73bcfccade"
 dependencies = [
  "anyhow",
  "proc-macro2",

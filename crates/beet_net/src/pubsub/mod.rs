@@ -1,3 +1,6 @@
+pub mod handler;
+#[allow(unused_imports)]
+pub use self::handler::*;
 pub mod publisher;
 #[allow(unused_imports)]
 pub use self::publisher::*;

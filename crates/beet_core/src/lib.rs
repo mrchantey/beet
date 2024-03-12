@@ -13,7 +13,9 @@ pub mod prelude {
 	pub use crate::api::*;
 	pub use crate::app::*;
 	pub use crate::core_nodes::*;
-	pub use crate::steering::steering_actions::*;
 	pub use crate::steering::algo::*;
+	pub use crate::steering::steering_actions::*;
 	pub use crate::steering::*;
+	pub use beet_ecs::prelude::*;
+	pub use beet_net::prelude::*;
 }
