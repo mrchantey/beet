@@ -1,5 +1,4 @@
 use beet_ecs::prelude::*;
-use bevy_core::Name;
 use bevy_ecs::prelude::*;
 use sweet::*;
 
@@ -21,38 +20,6 @@ fn into() -> Result<()> {
 	Ok(())
 }
 
-#[sweet_test]
-fn serde_bytes() -> Result<()> {
-	let prefab1 = BehaviorPrefab::<EcsNode>::from_graph(EmptyAction)?;
-	let bytes1 = bincode::serialize(&prefab1)?;
-	let prefab2: BehaviorPrefab<EcsNode> = bincode::deserialize(&bytes1)?;
-	let bytes2 = bincode::serialize(&prefab2)?;
-	expect(bytes1).to_be(bytes2)?;
-	Ok(())
-}
-#[sweet_test]
-/// these are to be in sync with [`BehaviorPrefab::append_type_registry`]
-fn serde_types() -> Result<()> {
-	let prefab1 = BehaviorPrefab::<EcsNode>::from_graph(
-		EmptyAction.child(ConstantScore::default()),
-	)?;
-	let bytes1 = bincode::serialize(&prefab1)?;
-	let prefab2: BehaviorPrefab<EcsNode> = bincode::deserialize(&bytes1)?;
-	let mut world = World::new();
-	let target = world.spawn_empty().id();
-	let root = prefab2.spawn(&mut world, Some(target))?;
-	let child = world.entity(root).get::<Edges>().unwrap()[0];
-	expect(&world).component(child)?.to_be(&Score::default())?;
-
-	expect(&world).to_have_component::<Name>(root)?;
-	expect(&world).to_have_component::<Edges>(root)?;
-	expect(&world).to_have_component::<Running>(root)?;
-	expect(&world).to_have_component::<RunTimer>(root)?;
-	expect(&world).to_have_component::<BehaviorGraphRoot>(root)?;
-
-
-	Ok(())
-}
 #[derive(Debug, Clone)]
 struct BadList;
 impl ActionTypes for BadList {

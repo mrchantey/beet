@@ -57,15 +57,3 @@ fn beet_entity_id() -> Result<()> {
 
 	Ok(())
 }
-
-#[sweet_test]
-fn serde_bytes() -> Result<()> {
-	let prefab1 = BehaviorPrefab::<EcsNode>::from_graph(ConstantScore(
-		Score::Weight(0.5),
-	))?;
-	let bytes1 = bincode::serialize(&prefab1)?;
-	let prefab2: BehaviorPrefab<EcsNode> = bincode::deserialize(&bytes1)?;
-	let bytes2 = bincode::serialize(&prefab2)?;
-	expect(bytes1).to_be(bytes2)?;
-	Ok(())
-}

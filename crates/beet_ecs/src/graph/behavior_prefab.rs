@@ -199,11 +199,11 @@ pub trait IntoBehaviorPrefab<M> {
 }
 
 
-impl<M, Graph> IntoBehaviorPrefab<M> for Graph
+impl<M, T> IntoBehaviorPrefab<M> for T
 where
-	Graph: IntoBehaviorGraph<M>,
+	T: IntoBehaviorGraph<M>,
 {
-	fn into_prefab<T: ActionTypes>(self) -> Result<BehaviorPrefab<T>> {
+	fn into_prefab<Actions: ActionTypes>(self) -> Result<BehaviorPrefab<Actions>> {
 		self.into_behavior_graph().into_prefab()
 	}
 }

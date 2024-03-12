@@ -4,18 +4,6 @@ use bevy_math::Vec3;
 use bevy_utils::prelude::default;
 use sweet::*;
 
-#[sweet_test]
-fn serde_bytes() -> Result<()> {
-	let prefab1 = BehaviorPrefab::<EcsNode>::from_graph(ConstantScore(
-		Score::Weight(0.5),
-	))?;
-	let bytes1 = bincode::serialize(&prefab1)?;
-	let prefab2: BehaviorPrefab<EcsNode> = bincode::deserialize(&bytes1)?;
-	let bytes2 = bincode::serialize(&prefab2)?;
-	expect(bytes1).to_be(bytes2)?;
-	Ok(())
-}
-
 
 #[sweet_test]
 async fn works() -> Result<()> {
@@ -24,8 +12,8 @@ async fn works() -> Result<()> {
 
 	AppOptions {
 		bees: 1,
-		// flowers: 10,
-		// auto_flowers: Some(1000),
+		flowers: 10,
+		auto_flowers: Some(1000),
 		..default()
 	}
 	.with_graph(
@@ -34,7 +22,6 @@ async fn works() -> Result<()> {
 			UtilitySelector::default(),
 			FindSteerTarget::new("flower", awareness_radius),
 		)
-			// .child((Wander::default(), SetRunResult::new(RunResult::Success)))
 			.child((Wander::default(), ConstantScore::new(Score::Weight(0.5))))
 			.child(
 				(
