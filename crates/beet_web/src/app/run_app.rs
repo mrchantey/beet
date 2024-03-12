@@ -14,7 +14,7 @@ use wasm_bindgen_futures::spawn_local;
 
 
 pub struct AppOptions {
-	pub initial_graph: BehaviorTree<BeeNode>,
+	pub initial_prefab: BehaviorPrefab<BeeNode>,
 	pub bees: usize,
 	pub flowers: usize,
 	pub auto_flowers: Option<usize>,
@@ -24,9 +24,10 @@ pub struct AppOptions {
 impl Default for AppOptions {
 	fn default() -> Self {
 		Self {
-			initial_graph: BehaviorTree::new(Translate::new(Vec3::new(
-				-0.1, 0., 0.,
-			))),
+			initial_prefab: BehaviorPrefab::from_graph(Translate::new(
+				Vec3::new(-0.1, 0., 0.),
+			))
+			.unwrap(),
 			bees: 1,
 			flowers: 1,
 			auto_flowers: None,
@@ -50,13 +51,13 @@ impl AppOptions {
 		if SearchParams::get_flag("hide-json") {
 			this.hide_json = true;
 		}
-		if let Ok(tree) = get_tree_url_param() {
-			this.initial_graph = tree;
+		if let Ok(prefab) = get_prefab_url_param() {
+			this.initial_prefab = prefab;
 		}
 		this
 	}
-	pub fn with_graph(mut self, graph: BehaviorTree<BeeNode>) -> Self {
-		self.initial_graph = graph;
+	pub fn with_graph<M>(mut self, graph: impl IntoBehaviorGraph<M>) -> Self {
+		self.initial_prefab = graph.into_prefab().unwrap();
 		self
 	}
 
@@ -72,11 +73,11 @@ impl AppOptions {
 	}
 }
 
-fn get_tree_url_param() -> Result<BehaviorTree<BeeNode>> {
+fn get_prefab_url_param() -> Result<BehaviorPrefab<BeeNode>> {
 	if let Some(tree) = SearchParams::get("graph") {
 		let bytes = general_purpose::STANDARD_NO_PAD.decode(tree.as_bytes())?;
-		let tree = bincode::deserialize(&bytes)?;
-		Ok(tree)
+		let prefab = bincode::deserialize(&bytes)?;
+		Ok(prefab)
 	} else {
 		anyhow::bail!("no tree param found");
 	}

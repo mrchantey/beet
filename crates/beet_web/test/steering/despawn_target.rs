@@ -7,13 +7,13 @@ pub async fn works() -> Result<()> {
 	append_html_for_tests();
 	AppOptions::default()
 		.with_graph(
-			BehaviorTree::new((Repeat::default(), SequenceSelector))
-				.with_child((
+			(Repeat::default(), SequenceSelector)
+				.child((
 					Seek::default(),
 					FindSteerTarget::new("flower", 0.5),
 					SucceedOnArrive { radius: 0.1 },
 				))
-				.with_child((
+				.child((
 					SetRunResult::success(),
 					DespawnSteerTarget::default(),
 				)),

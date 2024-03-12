@@ -7,30 +7,15 @@ use forky_bevy::extensions::Vec3Ext;
 use forky_core::ResultTEExt;
 use forky_web::wait_for_16_millis;
 use forky_web::DocumentExt;
+use std::sync::atomic::AtomicUsize;
 use wasm_bindgen_futures::spawn_local;
 use web_sys::Document;
 use web_sys::HtmlDivElement;
 use web_sys::HtmlElement;
 
-pub struct GameConfig {
-	pub relay: Relay,
-	pub graph: BehaviorGraph<BeeNode>,
-	pub flower: bool,
-}
-
-impl Default for GameConfig {
-	fn default() -> Self {
-		Self {
-			relay: Relay::default(),
-			graph: BehaviorGraph::new(),
-			flower: true,
-		}
-	}
-}
-
 pub struct BeeGame {
 	pub relay: Relay,
-	create_bee_sub: Subscriber<BehaviorGraph<BeeNode>>,
+	create_bee_sub: Subscriber<BehaviorPrefab<BeeNode>>,
 	create_flower_sub: Subscriber<Vec3>,
 	despawn_sub: Subscriber<DespawnEntityPayload>,
 	pub elements: HashMap<BeetEntityId, HtmlDivElement>,
@@ -38,9 +23,9 @@ pub struct BeeGame {
 
 impl BeeGame {
 	pub async fn new(mut relay: Relay) -> Result<Self> {
-		let create_bee_sub = create_bee_sub(&mut relay);
-		let create_flower_sub = create_flower_sub(&mut relay);
-		let despawn_sub = DespawnEntityHandler::subscriber(&mut relay);
+		let create_bee_sub = CreateBeeHandler::subscriber(&mut relay)?;
+		let create_flower_sub = CreateFlowerHandler::subscriber(&mut relay)?;
+		let despawn_sub = DespawnEntityHandler::subscriber(&mut relay)?;
 
 		Ok(Self {
 			relay,
@@ -65,12 +50,12 @@ impl BeeGame {
 		}
 
 		for graph in self.create_bee_sub.try_recv_all()? {
-			let (id, el) = create_bee(&mut self.relay, graph).await?;
+			let (id, el) = create_bee(&mut self.relay, graph)?;
 			self.elements.insert(id, el);
 		}
 
 		for pos in self.create_flower_sub.try_recv_all()? {
-			let (id, el) = create_flower(&mut self.relay, pos).await?;
+			let (id, el) = create_flower(&mut self.relay, pos)?;
 			self.elements.insert(id, el);
 		}
 
@@ -93,70 +78,57 @@ impl BeeGame {
 			}
 		});
 	}
-	pub fn create_bee_pub(
-		relay: &mut Relay,
-	) -> Publisher<BehaviorGraph<BeeNode>> {
-		relay.add_publisher_with_topic(create_bee_topic()).unwrap()
-	}
-	pub fn create_flower_pub(relay: &mut Relay) -> Publisher<Vec3> {
-		relay
-			.add_publisher_with_topic(create_flower_topic())
-			.unwrap()
+}
+
+pub struct CreateBeeHandler;
+impl TopicHandler<BehaviorPrefab<BeeNode>> for CreateBeeHandler {
+	fn topic() -> Topic {
+		Topic::new("bee", TopicScheme::PubSub, TopicMethod::Create)
 	}
 }
-
-fn create_bee_topic() -> Topic {
-	Topic::new("bee", TopicScheme::PubSub, TopicMethod::Create)
+pub struct CreateFlowerHandler;
+impl TopicHandler<Vec3> for CreateFlowerHandler {
+	fn topic() -> Topic {
+		Topic::new("flower", TopicScheme::PubSub, TopicMethod::Create)
+	}
 }
 
-fn create_bee_sub(relay: &mut Relay) -> Subscriber<BehaviorGraph<BeeNode>> {
-	relay
-		.add_subscriber_with_topic::<BehaviorGraph<BeeNode>>(create_bee_topic())
-		.unwrap()
+const ID_INCR: AtomicUsize = AtomicUsize::new(0);
+
+fn next_id() -> BeetEntityId {
+	BeetEntityId(
+		ID_INCR.fetch_add(1, std::sync::atomic::Ordering::SeqCst) as u64
+	)
 }
 
-async fn create_bee(
+fn create_bee(
 	relay: &mut Relay,
-	graph: BehaviorGraph<BeeNode>,
+	prefab: BehaviorPrefab<BeeNode>,
 ) -> Result<(BeetEntityId, HtmlDivElement)> {
 	let mut pos = Vec3::random_in_cube();
 	pos.z = 0.;
-	let mut create_entity = SpawnEntityHandler::requester(relay);
-	let id = create_entity
-		.request(
-			&SpawnEntityPayload::default()
-				.with_name("bee")
-				.with_graph(graph)
-				.with_tracked_position(pos),
-		)
-		.await?;
+	let id = next_id();
+	SpawnEntityHandler::publisher(relay)?.push(
+		&SpawnEntityPayload::from_id(id)
+			.with_name("bee")
+			.with_prefab(prefab)
+			.with_tracked_position(pos),
+	)?;
 	let el = create_dom_entity("🐝", pos.xy());
 
 	Ok((id, el))
 }
 
-fn create_flower_topic() -> Topic {
-	Topic::new("flower", TopicScheme::PubSub, TopicMethod::Create)
-}
-
-fn create_flower_sub(relay: &mut Relay) -> Subscriber<Vec3> {
-	relay
-		.add_subscriber_with_topic(create_flower_topic())
-		.unwrap()
-}
-
-async fn create_flower(
+fn create_flower(
 	relay: &mut Relay,
 	pos: Vec3,
 ) -> Result<(BeetEntityId, HtmlDivElement)> {
-	let mut create_entity = SpawnEntityHandler::<BeeNode>::requester(relay);
-	let id = create_entity
-		.request(
-			&SpawnEntityPayload::default()
-				.with_name("flower")
-				.with_position(pos),
-		)
-		.await?;
+	let id = next_id();
+	SpawnEntityHandler::<BeeNode>::publisher(relay)?.push(
+		&SpawnEntityPayload::from_id(id)
+			.with_name("flower")
+			.with_position(pos),
+	)?;
 	// 🥀🌹
 	let el = create_dom_entity("🌻", pos.xy());
 	Ok((id, el))

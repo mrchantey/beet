@@ -16,27 +16,27 @@ pub async fn works() -> Result<()> {
 		..default()
 	}
 	.with_graph(
-		BehaviorTree::new((
+		(
 			Repeat::default(),
 			UtilitySelector::default(),
 			FindSteerTarget::new("flower", awareness_radius),
-		))
-		.with_child((Wander::default(), ConstantScore::new(Score::Weight(0.5))))
-		.with_child(
-			BehaviorTree::new((
-				SequenceSelector::default(),
-				ScoreSteerTarget::new(awareness_radius),
-			))
-			.with_child((Seek::default(), SucceedOnArrive { radius: 0.1 }))
-			.with_child((
-				SetVelocity(Vec3::ZERO),
-				SucceedInDuration::with_secs(1),
-			))
-			.with_child((
-				SetRunResult::success(),
-				DespawnSteerTarget::default(),
-			)),
-		),
+		)
+			.child((Wander::default(), ConstantScore::new(Score::Weight(0.5))))
+			.child(
+				BehaviorTree::new((
+					SequenceSelector::default(),
+					ScoreSteerTarget::new(awareness_radius),
+				))
+				.child((Seek::default(), SucceedOnArrive { radius: 0.1 }))
+				.child((
+					SetVelocity(Vec3::ZERO),
+					SucceedInDuration::with_secs(1),
+				))
+				.child((
+					SetRunResult::success(),
+					DespawnSteerTarget::default(),
+				)),
+			),
 	)
 	.run();
 	Ok(())

@@ -116,7 +116,7 @@ pub struct EntityExistsError(pub BeetEntityId);
 
 impl fmt::Display for EntityExistsError {
 	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-		write!(f, "Beet Map - Entity not found: {}", self.0)
+		write!(f, "Beet Map - Entity already exists: {}", self.0)
 	}
 }
 

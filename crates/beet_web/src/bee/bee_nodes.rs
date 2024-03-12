@@ -10,6 +10,7 @@ action_list!(BeeNode, [
 	//bee
 	Hover,
 	//core
+	// CoreNode,
 	Translate,
 	//steer
 	Seek,

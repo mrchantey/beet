@@ -8,7 +8,7 @@ pub async fn works() -> Result<()> {
 	append_html_for_tests();
 
 	AppOptions::default()
-		.with_graph(BehaviorTree::new(Translate::new(Vec3::new(-0.1, 0., 0.))))
+		.with_graph(Translate::new(Vec3::new(-0.1, 0., 0.)))
 		.run();
 
 	Ok(())

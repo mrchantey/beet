@@ -1,6 +1,7 @@
 use crate::prelude::AppOptions;
-use crate::prelude::BeeGame;
 use crate::prelude::BeeNode;
+use crate::prelude::CreateBeeHandler;
+use crate::prelude::CreateFlowerHandler;
 use anyhow::Result;
 use base64::engine::general_purpose;
 use base64::Engine;
@@ -49,6 +50,7 @@ fn create_clear_all(relay: Relay) {
 			let mut relay = relay.clone();
 			spawn_local(async move {
 				DespawnEntityHandler::publisher(&mut relay)
+					.unwrap()
 					.push(&DespawnEntityPayload::all())
 					.ok_or(|e| log::error!("{e}"));
 			});
@@ -68,11 +70,12 @@ fn create_bee(
 	HtmlEventListener::new_with_target(
 		"click",
 		move |_: Event| {
-			let tree: BehaviorTree<BeeNode> =
+			let prefab: BehaviorPrefab<BeeNode> =
 				serde_json::from_str(&textarea.value()).unwrap(); // already validated
 
-			BeeGame::create_bee_pub(&mut relay)
-				.push(&tree.into_behavior_graph())
+			CreateBeeHandler::publisher(&mut relay)
+				.unwrap()
+				.push(&prefab)
 				.ok_or(|e| log::error!("{e}"));
 		},
 		button.clone().into(),
@@ -94,7 +97,8 @@ fn create_flower(mut relay: Relay, options: &AppOptions) {
 			let x = random_signed() * 0.9;
 			let y = random_value() * -0.9;
 
-			BeeGame::create_flower_pub(&mut relay)
+			CreateFlowerHandler::publisher(&mut relay)
+				.unwrap()
 				.push(&Vec3::new(x, y, 0.))
 				.ok_or(|e| log::error!("{e}"));
 		},
@@ -152,14 +156,14 @@ fn create_textarea(
 	let textarea =
 		Document::x_query_selector::<HtmlTextAreaElement>("#graph-json-text")
 			.unwrap();
-	textarea.set_value(&prettify(&options.initial_graph));
+	textarea.set_value(&prettify(&options.initial_prefab));
 
 	let textarea2 = textarea.clone();
 	HtmlEventListener::new_with_target(
 		"input",
 		move |_: Event| {
 			let text = textarea2.value();
-			match serde_json::from_str::<BehaviorTree<BeeNode>>(&text) {
+			match serde_json::from_str::<BehaviorPrefab<BeeNode>>(&text) {
 				Ok(tree) => {
 					create_bee_button.set_disabled(false);
 					warning_text.set_inner_html("&nbsp;");
@@ -178,8 +182,8 @@ fn create_textarea(
 	textarea
 }
 
-fn set_url(tre: &BehaviorTree<BeeNode>) {
-	let val = bincode::serialize(tre).unwrap();
+fn set_url(prefab: &BehaviorPrefab<BeeNode>) {
+	let val = bincode::serialize(prefab).unwrap();
 	let val = general_purpose::STANDARD_NO_PAD.encode(val);
 	// let url = serde_json::to_string(tre).unwrap();
 	History::set_param("graph", &val);
@@ -188,8 +192,8 @@ fn set_url(tre: &BehaviorTree<BeeNode>) {
 
 
 
-fn prettify(tree: &BehaviorTree<BeeNode>) -> String {
-	let tree = serde_json::to_string(&tree).unwrap();
+fn prettify(prefab: &BehaviorPrefab<BeeNode>) -> String {
+	let tree = serde_json::to_string(&prefab).unwrap();
 	let parsed = JSON::parse(&tree).unwrap();
 	let pretty = JSON::stringify_with_replacer_and_space(
 		&parsed,
