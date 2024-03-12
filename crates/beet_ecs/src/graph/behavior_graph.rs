@@ -23,9 +23,9 @@ impl<T: Debug + ActionSuper> Debug for BehaviorGraph<T> {
 	}
 }
 
-impl<T: ActionSuper> Into<WillyBehavoirGraph> for &BehaviorGraph<T> {
-	fn into(self) -> WillyBehavoirGraph {
-		WillyBehavoirGraph(self.0.map(|_, n| n.into(), |_, _| ()))
+impl<T: ActionSuper> Into<WillyBehaviorGraph> for &BehaviorGraph<T> {
+	fn into(self) -> WillyBehaviorGraph {
+		WillyBehaviorGraph(self.0.map(|_, n| n.into(), |_, _| ()))
 	}
 }
 

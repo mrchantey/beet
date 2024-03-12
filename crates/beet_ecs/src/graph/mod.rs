@@ -1,4 +1,5 @@
 pub mod entity_graph;
+mod serde_root_entity;
 #[allow(unused_imports)]
 pub use self::entity_graph::*;
 pub mod behavior_graph_prefab;

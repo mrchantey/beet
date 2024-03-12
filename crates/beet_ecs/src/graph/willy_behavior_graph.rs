@@ -9,9 +9,9 @@ use petgraph::graph::DiGraph;
 
 
 #[derive(Default, Clone, Deref, DerefMut)]
-pub struct WillyBehavoirGraph(pub DiGraph<WillyBehaviorNode, ()>);
+pub struct WillyBehaviorGraph(pub DiGraph<WillyBehaviorNode, ()>);
 
-impl WillyBehavoirGraph {
+impl WillyBehaviorGraph {
 	pub fn into_scene<T: ActionTypes>(&self) {}
 
 	pub fn spawn(&self, world: &mut World) -> EntityGraph {
@@ -52,5 +52,19 @@ impl WillyBehavoirGraph {
 		let registry = self.get_checked_type_registry::<T>()?;
 		world.insert_resource(registry);
 		Ok(BehaviorGraphPrefab::from_world(world))
+	}
+}
+
+
+pub trait IntoWillyBehaviorGraph<M> {
+	fn into_behavior_graph(self) -> WillyBehaviorGraph;
+}
+
+impl<M, T> IntoWillyBehaviorGraph<M> for T
+where
+	T: IntoWillyBehaviorTree<M>,
+{
+	fn into_behavior_graph(self) -> WillyBehaviorGraph {
+		self.into_behavior_tree().into()
 	}
 }

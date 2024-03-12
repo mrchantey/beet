@@ -36,8 +36,16 @@ impl<T: Action> Into<WillyBehaviorNode> for &BehaviorNode<T> {
 pub struct ItemIntoWillyBehaviorNode;
 pub struct TupleIntoWillyBehaviorNode;
 
-pub trait IntoWillyBehaviorNode<M> {
+pub trait IntoWillyBehaviorNode<M>: Sized {
 	fn into_behavior_node(self) -> WillyBehaviorNode;
+
+
+	fn child<M2>(
+		self,
+		child: impl IntoWillyBehaviorTree<M2>,
+	) -> WillyBehaviorTree {
+		WillyBehaviorTree::new(self).child(child)
+	}
 }
 impl<T0: Action> IntoWillyBehaviorNode<ItemIntoWillyBehaviorNode> for T0 {
 	#[allow(unused_variables, unused_mut)]

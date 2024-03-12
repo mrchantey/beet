@@ -55,7 +55,7 @@ impl EntityGraph {
 	// }
 	pub fn spawn(
 		world: &mut impl WorldOrCommands,
-		graph: impl Into<WillyBehavoirGraph>,
+		graph: impl Into<WillyBehaviorGraph>,
 		target: Entity,
 	) -> Self {
 		Self::spawn_with_options(world, graph, EntityGraphOptions {
@@ -67,7 +67,7 @@ impl EntityGraph {
 	/// are compatible, actions that expect an agent may do nothing or panic.
 	pub fn spawn_no_target(
 		world: &mut impl WorldOrCommands,
-		graph: impl Into<WillyBehavoirGraph>,
+		graph: impl Into<WillyBehaviorGraph>,
 	) -> Self {
 		Self::spawn_with_options(world, graph, EntityGraphOptions {
 			target: None,
@@ -77,7 +77,7 @@ impl EntityGraph {
 
 	pub fn spawn_with_options(
 		world: &mut impl WorldOrCommands,
-		graph: impl Into<WillyBehavoirGraph>,
+		graph: impl Into<WillyBehaviorGraph>,
 		options: EntityGraphOptions,
 	) -> Self {
 		let graph = graph.into();

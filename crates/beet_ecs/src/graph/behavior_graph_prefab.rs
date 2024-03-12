@@ -17,6 +17,8 @@ use serde::Serialize;
 use std::sync::Arc;
 use std::sync::RwLock;
 
+
+
 /// This the 'instantiated' version of a [`BehaviorGraph`].
 /// It is a wrapper around a [`DynamicScene`] containing the behavior graph.
 /// It implements [`Serialize`] and [`Deserialize`]
@@ -33,6 +35,13 @@ impl<T: ActionTypes> BehaviorGraphPrefab<T> {
 			_phantom: std::marker::PhantomData,
 		}
 	}
+
+	pub fn from_graph<M>(
+		graph: impl IntoWillyBehaviorGraph<M>,
+	) -> Result<Self> {
+		graph.into_behavior_graph().into_prefab()
+	}
+
 	/// # Panics
 	/// If the world is missing one of the following:
 	/// - [`SerdeRootEntity`]
@@ -50,13 +59,18 @@ impl<T: ActionTypes> BehaviorGraphPrefab<T> {
 		Ok(world)
 	}
 
+	/// If the world doesn't have a type registry, one matching this prefab will be added.
 	/// # Errors
 	/// If the world's [`AppTypeRegistry`] is missing a type in the graph
 	pub fn spawn(
 		&self,
 		world: &mut World,
 		target: Option<Entity>,
-	) -> Result<()> {
+	) -> Result<Entity> {
+		if false == world.contains_resource::<AppTypeRegistry>() {
+			world.insert_resource(Self::get_type_registry());
+		}
+
 		let mut entity_map = EntityHashMap::default();
 		self.scene.write_to_world(world, &mut entity_map)?;
 
@@ -66,7 +80,18 @@ impl<T: ActionTypes> BehaviorGraphPrefab<T> {
 			}
 		}
 
-		Ok(())
+		let root = entity_map
+			.values()
+			.filter(|entity| {
+				world.entity(**entity).contains::<BehaviorGraphRoot>()
+			})
+			.next()
+			.ok_or(anyhow::anyhow!(
+				"Failed to spawn behavior graph, no root entity"
+			))?;
+
+
+		Ok(*root)
 	}
 
 	// pub fn root(&self) -> Entity { **self.world.resource::<SerdeRootEntity>() }

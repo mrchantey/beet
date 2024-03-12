@@ -42,14 +42,14 @@ impl<T: ActionSuper> Into<Tree<BehaviorNode<T>>> for BehaviorTree<T> {
 	fn into(self) -> Tree<BehaviorNode<T>> { self.0 }
 }
 
-impl<T: ActionSuper> Into<WillyBehavoirGraph> for &BehaviorTree<T> {
-	fn into(self) -> WillyBehavoirGraph {
+impl<T: ActionSuper> Into<WillyBehaviorGraph> for &BehaviorTree<T> {
+	fn into(self) -> WillyBehaviorGraph {
 		let graph = &self.clone().into_behavior_graph();
 		graph.into()
 	}
 }
-impl<T: ActionSuper> Into<WillyBehavoirGraph> for BehaviorTree<T> {
-	fn into(self) -> WillyBehavoirGraph {
+impl<T: ActionSuper> Into<WillyBehaviorGraph> for BehaviorTree<T> {
+	fn into(self) -> WillyBehaviorGraph {
 		let graph = &self.into_behavior_graph();
 		graph.into()
 	}
