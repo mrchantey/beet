@@ -1,35 +1,110 @@
+#![allow(unused)]
 use beet_ecs::prelude::*;
 use bevy_core::Name;
 use bevy_ecs::prelude::*;
 use bevy_reflect::serde::ReflectSerializer;
+use bevy_reflect::serde::TypedReflectDeserializer;
+use bevy_reflect::serde::TypedReflectSerializer;
 use bevy_reflect::serde::UntypedReflectDeserializer;
 use bevy_reflect::FromReflect;
+use bevy_reflect::GetTypeRegistration;
 use bevy_reflect::Reflect;
 use bevy_reflect::TypeRegistry;
+use bevy_scene::serde::SceneDeserializer;
+use bevy_scene::serde::SceneSerializer;
+use bevy_scene::DynamicScene;
 // use bevy_reflect::TypeRegistryArc;
 // use bevy_scene::DynamicScene;
 use serde::de::DeserializeSeed;
+use std::any::TypeId;
 // use std::sync::Arc;
 // use std::sync::RwLock;
 use sweet::*;
 
-#[sweet_test]
-fn serde_f32() -> Result<()> {
+#[derive(Reflect, PartialEq)]
+struct Foo(pub usize);
+
+#[derive(Reflect, PartialEq)]
+enum Bar {
+	A,
+	B { a: usize, b: usize },
+}
+
+fn do_a_test<T: Reflect + GetTypeRegistration + FromReflect + PartialEq>(
+	val: T,
+) -> Result<()> {
 	let mut registry = TypeRegistry::new();
-	registry.register::<ConstantScore>();
-	let val1 = ConstantScore::new(Score::Weight(0.5));
-	let reflect_serializer = ReflectSerializer::new(&val1, &registry);
-	let json = serde_json::to_string(&reflect_serializer)?;
-	let reflect_deserializer = UntypedReflectDeserializer::new(&registry);
-	let mut json_de = serde_json::Deserializer::from_str(&json);
+	registry.register::<T>();
+	let registration = registry.get(TypeId::of::<T>()).unwrap();
+	let reflect_serializer = TypedReflectSerializer::new(&val, &registry);
+
+	let input = ron::ser::to_string(&reflect_serializer)?;
+	let reflect_deserializer =
+		TypedReflectDeserializer::new(&registration, &registry);
+	let mut deserializer = ron::de::Deserializer::from_str(&input)?;
+
 	let deserialized_value: Box<dyn Reflect> =
-		reflect_deserializer.deserialize(&mut json_de)?;
-	let val2 =
-		<ConstantScore as FromReflect>::from_reflect(&*deserialized_value)
-			.unwrap();
-	expect(val1).to_be(val2)?;
+		reflect_deserializer.deserialize(&mut deserializer)?;
 	Ok(())
 }
+
+
+#[sweet_test]
+fn serde_f32() -> Result<()> {
+	do_a_test(Foo(0))?;
+	do_a_test(Bar::A)?;
+	do_a_test(Bar::B { a: 0, b: 0 })?;
+	do_a_test(ConstantScore(Score::Weight(0.5)))?;
+	Ok(())
+}
+
+#[sweet_test(skip)]
+fn test_2() -> Result<()> {
+	do_another_test(Bazz::B(0.5))?;
+	do_another_test(Fizz::B(0.5))?;
+	Ok(())
+}
+
+#[derive(Reflect, Component)]
+#[reflect(Component)]
+enum Fizz {
+	// #[default]
+	B(f32),
+	A,
+}
+#[derive(Reflect, Component)]
+#[reflect(Component)]
+enum Bazz {
+	A,
+	B(f32),
+}
+
+fn do_another_test<T: Reflect + GetTypeRegistration + Component>(
+	val: T,
+) -> Result<()> {
+	let mut world = World::new();
+	world.spawn(val);
+	let registry = AppTypeRegistry::default();
+	registry.write().register::<T>();
+	world.insert_resource(registry.clone());
+	let scene1 = DynamicScene::from_world(&world);
+
+	let serialized1 =
+		ron::ser::to_string(&SceneSerializer::new(&scene1, &registry))?;
+
+	let mut deserializer = ron::de::Deserializer::from_str(&serialized1)?;
+	let scene2 = SceneDeserializer {
+		type_registry: &registry.read(),
+	}
+	.deserialize(&mut deserializer)?;
+
+	let serialized2 =
+		ron::ser::to_string(&SceneSerializer::new(&scene2, &registry))?;
+
+	expect(serialized1).to_be(serialized2)?;
+	Ok(())
+}
+
 
 // is this the issue? https://github.com/bevyengine/bevy/issues/12357
 #[sweet_test(skip)]

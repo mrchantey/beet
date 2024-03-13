@@ -21,8 +21,9 @@ pub struct BehaviorPrefab {
 
 impl fmt::Debug for BehaviorPrefab {
 	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+		let scene = self.scene.serialize_ron(&self.registry).unwrap();
 		f.debug_struct("BehaviorPrefab")
-			.field("scene", &"TODO")
+			.field("scene", &scene)
 			.field("root", &self.root)
 			.field("registry", &"TODO")
 			.finish()

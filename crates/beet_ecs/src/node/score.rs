@@ -29,8 +29,8 @@ pub enum Score {
 	#[default]
 	/// The node should not run.
 	Fail,
+	Weight(f32), //this has to be here or the serde world breaks
 	/// The node has a weight, usually in the range `0..1`, where higher is more favorable.
-	Weight(f32),
 	// Weight(#[number(min = 0, max = 100, step = 1)] u8),
 	/// The node should run.
 	Pass,

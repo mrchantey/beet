@@ -24,6 +24,7 @@ async fn works() -> Result<()> {
 		)
 			.child((
 				Score::default(),
+				// ConstantScore::new(Score::Weight(0.5)),
 				ConstantScore::new(Score::Fail), // should be weight 0.5 but buggin out
 				Wander::default(),
 			))
