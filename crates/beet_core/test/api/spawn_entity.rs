@@ -32,7 +32,9 @@ pub fn pubsub() -> Result<()> {
 		&SpawnEntityPayload::from_id(beet_id)
 			.with_position(Vec3::new(0., 0., 0.))
 			// .with_prefab(EmptyAction.into_prefab()?),
-			.with_prefab(Translate::new(Vec3::new(1., 0., 0.)).into_prefab()?),
+			.with_prefab(
+				Translate::new(Vec3::new(1., 0., 0.)).into_prefab()?.typed(),
+			),
 	)?;
 
 	let _result = subscriber.try_recv()?;

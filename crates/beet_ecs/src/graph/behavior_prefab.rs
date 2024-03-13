@@ -1,5 +1,6 @@
 use super::type_registry_utils::append_beet_type_registry;
 use super::type_registry_utils::merge_type_registries;
+use super::typed_behavior_prefab::TypedBehaviorPrefab;
 use crate::prelude::*;
 use anyhow::Result;
 use bevy_ecs::entity::Entity;
@@ -9,6 +10,7 @@ use bevy_ecs::world::World;
 use bevy_scene::serde::SceneSerializer;
 use bevy_scene::DynamicScene;
 use serde::Serialize;
+use std::fmt;
 
 
 pub struct BehaviorPrefab {
@@ -16,6 +18,18 @@ pub struct BehaviorPrefab {
 	pub root: Entity,
 	pub registry: AppTypeRegistry,
 }
+
+impl fmt::Debug for BehaviorPrefab {
+	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+		f.debug_struct("BehaviorPrefab")
+			.field("scene", &"TODO")
+			.field("root", &self.root)
+			.field("registry", &"TODO")
+			.finish()
+	}
+}
+
+
 impl BehaviorPrefab {
 	pub fn new(
 		scene: DynamicScene,
@@ -41,6 +55,11 @@ impl BehaviorPrefab {
 			root,
 			registry,
 		}
+	}
+
+	/// Used for symmetry when passing a serializable into a struct that can also be deserialized
+	pub fn typed<T: ActionTypes>(self) -> TypedBehaviorPrefab<T> {
+		TypedBehaviorPrefab::from_prefab(self)
 	}
 
 	/// Prefabs are [`DynamicScene`]s so can only be spawned using [`World`]. This means spawn systems must be exclusive.

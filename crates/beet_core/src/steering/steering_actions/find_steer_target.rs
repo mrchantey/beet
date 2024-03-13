@@ -3,8 +3,8 @@ use bevy_core::prelude::*;
 use bevy_math::Vec3;
 use bevy_transform::components::Transform;
 
-#[action(system=find_steer_target)]
 #[derive(Default)]
+#[derive_action]
 pub struct FindSteerTarget {
 	pub name: String,
 	pub radius: f32,

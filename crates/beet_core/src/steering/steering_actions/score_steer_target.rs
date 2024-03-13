@@ -2,14 +2,8 @@ use beet_ecs::prelude::*;
 use bevy_ecs::prelude::*;
 use bevy_math::Vec3;
 use bevy_transform::components::Transform;
-use serde::Deserialize;
-use serde::Serialize;
 
-#[action(
-	system=score_steer_target,
-	set=PreTickSet,
-	components=Score::default()
-)]
+#[derive_action(set=PreTickSet)]
 pub struct ScoreSteerTarget {
 	pub radius: f32,
 }

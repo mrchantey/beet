@@ -11,7 +11,7 @@ pub struct SpawnEntityPayload<T: ActionTypes> {
 	pub name: String,
 	pub position: Option<Vec3>,
 	// #[serde(deserialize_with = "BehaviorPrefab::<T>::deserialize")]
-	pub prefab: Option<BehaviorPrefab<T>>,
+	pub prefab: Option<TypedBehaviorPrefab<T>>,
 	pub position_tracking: bool,
 }
 
@@ -39,7 +39,7 @@ impl<T: ActionTypes> SpawnEntityPayload<T> {
 	pub fn new(
 		beet_id: BeetEntityId,
 		name: String,
-		graph: Option<BehaviorPrefab<T>>,
+		prefab: Option<TypedBehaviorPrefab<T>>,
 		position: Option<Vec3>,
 		position_tracking: bool,
 	) -> Self {
@@ -47,7 +47,7 @@ impl<T: ActionTypes> SpawnEntityPayload<T> {
 			beet_id,
 			name,
 			position,
-			prefab: graph,
+			prefab,
 			position_tracking,
 		}
 	}
@@ -65,8 +65,11 @@ impl<T: ActionTypes> SpawnEntityPayload<T> {
 		self.position = Some(position);
 		self
 	}
-	pub fn with_prefab(mut self, graph: impl Into<BehaviorPrefab<T>>) -> Self {
-		self.prefab = Some(graph.into());
+	pub fn with_prefab(
+		mut self,
+		prefab: impl Into<TypedBehaviorPrefab<T>>,
+	) -> Self {
+		self.prefab = Some(prefab.into());
 		self
 	}
 }

@@ -15,7 +15,9 @@ pub fn works() -> Result<()> {
 
 	SpawnEntityHandler::<CoreNode>::publisher(&mut relay)?.push(
 		&SpawnEntityPayload::from_id(beet_id)
-			.with_prefab(Translate::new(Vec3::new(1., 0., 0.)).into_prefab()?)
+			.with_prefab(
+				Translate::new(Vec3::new(1., 0., 0.)).into_prefab()?.typed(),
+			)
 			.with_position(Vec3::new(-1., 0., 0.)),
 	)?;
 

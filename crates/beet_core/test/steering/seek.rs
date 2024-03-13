@@ -39,7 +39,7 @@ fn action() -> Result<()> {
 		))
 		.id();
 
-	BehaviorTree::new(Seek).spawn(&mut app, agent);
+	Seek.into_beet_node().spawn(&mut app, agent);
 
 	app.update();
 	app.update_with_secs(1);

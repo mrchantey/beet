@@ -1,8 +1,8 @@
 use beet_ecs::prelude::*;
 use bevy_ecs::prelude::*;
 
-#[action(system=despawn_steer_target)]
 #[derive(Default)]
+#[derive_action]
 pub struct DespawnSteerTarget;
 
 fn despawn_steer_target(

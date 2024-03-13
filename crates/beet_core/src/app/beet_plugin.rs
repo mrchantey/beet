@@ -35,7 +35,7 @@ impl<T: ActionList> Plugin for BeetPlugin<T> {
 	fn build(&self, app: &mut App) {
 		let mut relay = self.relay.clone();
 		app.insert_resource(BeetEntityMap::default())
-			.insert_resource(BehaviorPrefab::<T>::get_type_registry())
+			.insert_resource(TypedBehaviorPrefab::<T>::type_registry())
 			.insert_resource(SpawnEntityHandler::<T>::new(&mut relay).unwrap())
 			.insert_resource(DespawnEntityHandler::new(&mut relay).unwrap())
 			.add_systems(

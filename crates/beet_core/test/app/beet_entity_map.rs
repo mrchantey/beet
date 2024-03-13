@@ -20,7 +20,9 @@ pub fn works() -> Result<()> {
 	SpawnEntityHandler::<CoreNode>::publisher(&mut relay)?.push(
 		&SpawnEntityPayload::from_id(beet_id)
 			.with_tracked_position(Vec3::ZERO)
-			.with_prefab(Translate::new(Vec3::new(0., 1., 0.)).into_prefab()?),
+			.with_prefab(
+				Translate::new(Vec3::new(0., 1., 0.)).into_prefab()?.typed(),
+			),
 	)?;
 
 	app.update();

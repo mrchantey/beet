@@ -2,8 +2,8 @@ use crate::prelude::*;
 use beet_ecs::prelude::*;
 use bevy_transform::components::Transform;
 
-#[action(system=seek)]
 #[derive(Default)]
+#[derive_action]
 pub struct Seek;
 
 // TODO if target has Velocity, pursue
@@ -29,7 +29,8 @@ fn seek(
 			max_force,
 			mut impulse,
 			arrive_radius,
-		)) = targets.get_mut(**target) // if agent has no steer_target thats ok
+		)) = targets.get_mut(**target)
+		// if agent has no steer_target thats ok
 		{
 			if let Ok(target_position) = steer_target.position(&transforms) {
 				*impulse = seek_impulse(

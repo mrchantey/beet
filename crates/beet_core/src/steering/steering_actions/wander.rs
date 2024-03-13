@@ -2,10 +2,9 @@ use crate::prelude::*;
 use beet_ecs::prelude::*;
 use bevy_transform::components::Transform;
 
-#[action(system=wander)]
 #[derive(Default)]
+#[derive_action]
 pub struct Wander;
-
 
 fn wander(
 	mut targets: Query<(

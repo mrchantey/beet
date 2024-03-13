@@ -62,7 +62,7 @@ pub fn action(item: TokenStream) -> TokenStream {
 /// is the same as this:
 /// ```rust
 /// #[derive(Debug, Clone, Component, Reflect, Action)]
-///	#[reflect(Component, Action)]
+///	#[reflect(Component)]
 ///	#[action(no_system)]
 /// struct MyStruct{}
 /// ```
@@ -75,7 +75,7 @@ pub fn derive_action(attr: TokenStream, item: TokenStream) -> TokenStream {
 		use beet::prelude::*;
 		use beet::exports::*;
 		#[derive(Debug, Clone, Component, Reflect, Action)]
-		#[reflect(Component, Action)]
+		#[reflect(Component)]
 		#[action(#attr)]
 		#item
 	}

@@ -4,8 +4,8 @@ use bevy_time::Time;
 use bevy_transform::components::Transform;
 
 
-#[action(system=translate)]
 #[derive(Default)]
+#[derive_action]
 pub struct Translate {
 	/// Translation to apply, in meters per second
 	pub translation: Vec3,

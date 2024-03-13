@@ -68,17 +68,6 @@ pub fn parse_action(item: proc_macro::TokenStream) -> Result<TokenStream> {
 	Ok(quote! {
 		use beet::prelude::*;
 		use beet::exports::*;
-		impl Action for #ident {
-			fn duplicate(&self) -> Box<dyn Action> {
-				Box::new(self.clone())
-			}
-			fn insert_from_world(&self, entity: &mut EntityWorldMut<'_>){
-				entity.insert(self.clone());
-			}
-			fn insert_from_commands(&self, entity: &mut EntityCommands){
-				entity.insert(self.clone());
-			}
-		}
 
 		impl ActionTypes for #ident{
 			fn register(registry: &mut TypeRegistry){

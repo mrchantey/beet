@@ -12,6 +12,7 @@ use bevy_scene::DynamicScene;
 use serde::de::DeserializeSeed;
 use serde::Deserialize;
 use serde::Serialize;
+use std::fmt;
 use std::ops::Deref;
 use std::ops::DerefMut;
 
@@ -22,6 +23,15 @@ pub struct TypedBehaviorPrefab<T: ActionTypes> {
 	pub prefab: BehaviorPrefab,
 	_phantom: std::marker::PhantomData<T>,
 }
+
+impl<T: ActionTypes> fmt::Debug for TypedBehaviorPrefab<T> {
+	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+		f.debug_struct("TypedBehaviorPrefab")
+			.field("prefab", &self.prefab)
+			.finish()
+	}
+}
+
 
 impl<T: ActionTypes> Deref for TypedBehaviorPrefab<T> {
 	type Target = BehaviorPrefab;
@@ -53,6 +63,13 @@ impl<T: ActionTypes> TypedBehaviorPrefab<T> {
 		let registry = Self::type_registry();
 		Self {
 			prefab: BehaviorPrefab::new(scene, root, registry),
+			_phantom: std::marker::PhantomData,
+		}
+	}
+
+	pub fn from_prefab(prefab: BehaviorPrefab) -> Self {
+		Self {
+			prefab,
 			_phantom: std::marker::PhantomData,
 		}
 	}

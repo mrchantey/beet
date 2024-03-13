@@ -8,8 +8,8 @@ use bevy_math::Vec3;
 
 
 // TODO this should be generic
-#[action(system=set_velocity)]
 #[derive(Default, Deref, DerefMut)]
+#[derive_action]
 pub struct SetVelocity(pub Vec3);
 
 impl SetVelocity {
