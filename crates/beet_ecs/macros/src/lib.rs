@@ -41,10 +41,6 @@ pub fn child_props(_attr: TokenStream, _item: TokenStream) -> TokenStream {
 /// ```
 ///
 ///
-/// ## Derives
-///
-/// [`Debug`], [`Clone`], [`PartialEq`], [`serde::Serialize`], [`serde::Deserialize`], [`bevy::Component`]
-///
 ///
 #[proc_macro_derive(Action, attributes(action))]
 pub fn action(item: TokenStream) -> TokenStream {
@@ -54,6 +50,23 @@ pub fn action(item: TokenStream) -> TokenStream {
 }
 
 
+
+/// Minimal derives for an action, use to reduce boilerplate.
+///
+/// ```rust
+///
+/// #[derive_action(no_system)]
+/// struct MyStruct{}
+/// ```
+///
+/// is the same as this:
+/// ```rust
+/// #[derive(Debug, Clone, Component, Reflect, Action)]
+///	#[reflect(Component, Action)]
+///	#[action(no_system)]
+/// struct MyStruct{}
+/// ```
+///
 #[proc_macro_attribute]
 pub fn derive_action(attr: TokenStream, item: TokenStream) -> TokenStream {
 	let item = syn::parse_macro_input!(item as syn::ItemStruct);

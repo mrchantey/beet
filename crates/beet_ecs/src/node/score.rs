@@ -1,7 +1,5 @@
 use bevy_ecs::prelude::*;
 use bevy_reflect::Reflect;
-use serde::Deserialize;
-use serde::Serialize;
 use std::cmp::Ordering;
 use std::fmt::Debug;
 
@@ -17,8 +15,6 @@ pub struct Scoring;
 #[derive(
 	Debug,
 	Default,
-	Serialize,
-	Deserialize,
 	Clone,
 	Copy,
 	Component,

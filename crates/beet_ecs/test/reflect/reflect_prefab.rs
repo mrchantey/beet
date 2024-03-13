@@ -26,11 +26,11 @@ fn into() -> Result<()> {
 // 	fn register(_: &mut bevy_reflect::TypeRegistry) {}
 // }
 
-#[sweet_test(skip)]
-fn fails() -> Result<()> {
-	expect(EmptyAction.into_prefab().map(|_| ())).to_be_err()?;
-	Ok(())
-}
+// #[sweet_test(skip)]
+// fn fails() -> Result<()> {
+// 	expect(EmptyAction.into_prefab().map(|_| ())).to_be_err()?;
+// 	Ok(())
+// }
 #[sweet_test]
 fn spawns() -> Result<()> {
 	let mut world = World::new();

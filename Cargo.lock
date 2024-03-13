@@ -378,6 +378,31 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9d297deb1925b89f2ccc13d7635fa0714f12c87adce1c75356b39ca9b7178567"
 
 [[package]]
+name = "beet_core"
+version = "0.0.7"
+dependencies = [
+ "anyhow",
+ "beet_ecs",
+ "beet_net",
+ "bevy_app",
+ "bevy_core",
+ "bevy_derive",
+ "bevy_ecs",
+ "bevy_math",
+ "bevy_tasks",
+ "bevy_time",
+ "bevy_transform",
+ "bevy_utils",
+ "bincode",
+ "forky_bevy",
+ "forky_core",
+ "log",
+ "serde",
+ "strum",
+ "sweet",
+]
+
+[[package]]
 name = "beet_ecs"
 version = "0.0.7"
 dependencies = [
@@ -416,6 +441,26 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.52",
+]
+
+[[package]]
+name = "beet_net"
+version = "0.0.7"
+dependencies = [
+ "anyhow",
+ "async-broadcast",
+ "bevy_derive",
+ "bevy_utils",
+ "bincode",
+ "extend",
+ "futures",
+ "log",
+ "parking_lot",
+ "pretty_env_logger",
+ "serde",
+ "strum",
+ "strum_macros",
+ "sweet",
 ]
 
 [[package]]
@@ -1501,6 +1546,26 @@ name = "foreign-types-shared"
 version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "aa9a19cbb55df58761df49b23516a86d432839add4af60fc256da840f66ed35b"
+
+[[package]]
+name = "forky_bevy"
+version = "0.1.43"
+dependencies = [
+ "anyhow",
+ "bevy_app",
+ "bevy_derive",
+ "bevy_ecs",
+ "bevy_hierarchy",
+ "bevy_math",
+ "bevy_time",
+ "bevy_transform",
+ "bevy_utils",
+ "extend",
+ "forky_core",
+ "forky_web",
+ "js-sys",
+ "rand",
+]
 
 [[package]]
 name = "forky_core"

@@ -4,8 +4,6 @@ use quote::quote;
 use syn::ItemStruct;
 use syn::Result;
 
-// #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Component, FieldUi, Reflect)]
-
 pub fn parse_action(item: proc_macro::TokenStream) -> Result<TokenStream> {
 	let input = syn::parse::<ItemStruct>(item)?;
 	let args = ActionArgs::new(&input)?;

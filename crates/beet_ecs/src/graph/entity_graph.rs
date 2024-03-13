@@ -5,20 +5,12 @@ use bevy_ecs::prelude::*;
 use bevy_utils::HashSet;
 use petgraph::graph::DiGraph;
 use petgraph::graph::NodeIndex;
-use serde::Deserialize;
-use serde::Serialize;
 
-
-#[derive(
-	Debug, Default, Clone, Deref, DerefMut, Serialize, Deserialize, Component,
-)]
+#[derive(Debug, Default, Clone, Deref, DerefMut, Component)]
 pub struct EntityGraph(pub DiGraph<Entity, ()>);
 
 impl EntityGraph {
-	pub fn from_world(
-		world: &World,
-		root: Entity,
-	) -> Self {
+	pub fn from_world(world: &World, root: Entity) -> Self {
 		let mut this = EntityGraph::default();
 		this.add_recursive(world, root, &mut Default::default());
 		this

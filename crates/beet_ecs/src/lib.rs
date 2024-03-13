@@ -34,9 +34,6 @@ pub mod exports {
 	pub use bevy_reflect;
 	pub use bevy_reflect::Reflect;
 	pub use bevy_reflect::TypeRegistry;
-	pub use serde;
-	pub use serde::Deserialize;
-	pub use serde::Serialize;
 	pub use strum::IntoEnumIterator;
 	pub use strum_macros::Display;
 	pub use strum_macros::EnumIter;

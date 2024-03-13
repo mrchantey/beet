@@ -1,7 +1,5 @@
 use bevy_ecs::prelude::*;
 use bevy_reflect::Reflect;
-use serde::Deserialize;
-use serde::Serialize;
 use std::fmt::Debug;
 use strum_macros::Display;
 use strum_macros::EnumIter;
@@ -26,8 +24,6 @@ pub struct Running;
 	Copy,
 	Component,
 	PartialEq,
-	Serialize,
-	Deserialize,
 	EnumIter,
 	Display,
 	Reflect,
