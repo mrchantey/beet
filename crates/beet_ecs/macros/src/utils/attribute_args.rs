@@ -1,68 +1,101 @@
+use proc_macro2::Span;
 use proc_macro2::TokenStream;
 use std::collections::HashMap;
+use std::collections::HashSet;
 use syn::parse::Parser;
 use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
 use syn::Error;
 use syn::Expr;
+use syn::Ident;
 use syn::Result;
 use syn::Token;
 
-const ERR: &str = "Parse Error: Expected Assignment, ie `foo = \"bar\"`";
 
-pub fn attributes_map(
-	tokens: TokenStream,
-	allowed: Option<&[&str]>,
-) -> Result<HashMap<String, Option<Expr>>> {
-	attributes_vec(tokens, allowed).map(|vec| vec.into_iter().collect())
+#[derive(Default)]
+pub struct AttributesMap {
+	pub paths: HashMap<String, Span>,
+	pub exprs: HashMap<String, Expr>,
 }
 
+impl AttributesMap {
+	pub fn new(
+		tokens: TokenStream,
+		allowed_paths: &[&str],
+		allowed_exprs: &[&str],
+	) -> Result<Self> {
+		let mut paths = HashMap::new();
+		let mut exprs = HashMap::new();
+		let all_allowed = allowed_exprs
+			.iter()
+			.chain(allowed_paths.iter())
+			.map(|s| *s)
+			.collect::<HashSet<&str>>();
 
-pub fn attributes_vec(
-	tokens: TokenStream,
-	allowed: Option<&[&str]>,
-) -> Result<Vec<(String, Option<Expr>)>> {
-	let out = Punctuated::<Expr, Token![,]>::parse_terminated
-		.parse2(tokens)?
-		.iter()
-		.map(|item| match item {
-			Expr::Assign(expr) => match expr.left.as_ref() {
+		let items = Punctuated::<Expr, Token![,]>::parse_terminated
+			.parse2(tokens)?
+			.into_iter();
+
+		for item in items {
+			match item {
 				Expr::Path(path) => {
 					if let Some(ident) = path.path.get_ident() {
-						Ok((
-							ident.clone().to_string(),
-							Some(expr.right.as_ref().clone()),
-						))
+						check_allowed(ident, &all_allowed)?;
+						paths.insert(ident.clone().to_string(), ident.span());
 					} else {
-						Err(Error::new(path.span(), ERR))
+						return Err(Error::new(
+							path.span(),
+							"Parse Error: Expected Attribute without assignment",
+						));
 					}
 				}
-				_ => Err(Error::new(expr.span(), ERR)),
-			},
-			Expr::Path(path) => {
-				if let Some(ident) = path.path.get_ident() {
-					Ok((ident.clone().to_string(), None))
-				} else {
-					Err(Error::new(path.span(), ERR))
+				Expr::Assign(expr) => {
+					match expr.left.as_ref() {
+						Expr::Path(path) => {
+							if let Some(ident) = path.path.get_ident() {
+								check_allowed(ident, &all_allowed)?;
+								exprs.insert(
+									ident.clone().to_string(),
+									expr.right.as_ref().clone(),
+								);
+							} else {
+								return Err(Error::new(path.span(), 	"Parse Error: Expected Assignment, ie `foo=Bar"));
+							}
+						}
+						other => {
+							return Err(Error::new(
+								other.span(),
+								"Attribute Parser - Unexpected Error",
+							))
+						}
+					}
+				}
+				other => {
+					return Err(Error::new(
+						other.span(),
+						"Attribute Parser - Unexpected Error",
+					))
 				}
 			}
-			_ => Err(Error::new(item.span(), ERR)),
-		})
-		.collect::<Result<Vec<_>>>()?;
-
-	if let Some(allowed) = allowed {
-		for (key, _) in out.iter() {
-			if false == allowed.contains(&key.to_string().as_str()) {
-				let allowed =
-					allowed.iter().map(|s| *s).collect::<Vec<_>>().join(", ");
-
-				return Err(Error::new(
-					key.span(),
-					format!("Unknown Attribute: {key}\nExpected: {allowed}"),
-				));
-			}
 		}
+		Ok(Self { paths, exprs })
 	}
+}
 
-	Ok(out)
+fn check_allowed(ident: &Ident, allowed: &HashSet<&str>) -> Result<()> {
+	let key = ident.to_string();
+	if false == allowed.contains(key.as_str()) {
+		let allowed_str = allowed
+			.iter()
+			.map(|s| s.to_string())
+			.collect::<Vec<_>>()
+			.join(", ");
+
+		Err(Error::new(
+			ident.span(),
+			format!("Unknown Attribute: {key}\nExpected: {allowed_str}"),
+		))
+	} else {
+		Ok(())
+	}
 }

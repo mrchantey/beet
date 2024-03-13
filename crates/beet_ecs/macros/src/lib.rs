@@ -1,7 +1,7 @@
 mod action;
 use action::*;
-mod field_ui;
-use field_ui::*;
+// mod field_ui;
+// use field_ui::*;
 use proc_macro::TokenStream;
 mod utils;
 // pub(crate) use utils::*;
@@ -46,9 +46,9 @@ pub fn child_props(_attr: TokenStream, _item: TokenStream) -> TokenStream {
 /// [`Debug`], [`Clone`], [`PartialEq`], [`serde::Serialize`], [`serde::Deserialize`], [`bevy::Component`]
 ///
 ///
-#[proc_macro_attribute]
-pub fn action(attr: TokenStream, item: TokenStream) -> TokenStream {
-	parse_action(attr, item)
+#[proc_macro_derive(Action, attributes(action))]
+pub fn action(item: TokenStream) -> TokenStream {
+	parse_action(item)
 		.unwrap_or_else(syn::Error::into_compile_error)
 		.into()
 }
@@ -56,9 +56,9 @@ pub fn action(attr: TokenStream, item: TokenStream) -> TokenStream {
 
 
 // #[proc_macro_attribute]
-#[proc_macro_derive(FieldUi, attributes(number, hide_ui))]
-pub fn field_ui(item: TokenStream) -> TokenStream {
-	parse_field_ui(item)
-		.unwrap_or_else(syn::Error::into_compile_error)
-		.into()
-}
+// #[proc_macro_derive(FieldUi, attributes(number, hide_ui))]
+// pub fn field_ui(item: TokenStream) -> TokenStream {
+// 	parse_field_ui(item)
+// 		.unwrap_or_else(syn::Error::into_compile_error)
+// 		.into()
+// }

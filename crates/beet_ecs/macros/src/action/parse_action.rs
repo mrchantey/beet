@@ -1,94 +1,82 @@
-use crate::utils::*;
+use super::*;
 use proc_macro2::TokenStream;
 use quote::quote;
-use quote::ToTokens;
-use std::collections::HashMap;
-use syn::Expr;
 use syn::ItemStruct;
 use syn::Result;
 
+// #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Component, FieldUi, Reflect)]
 
-pub fn parse_action(
-	attr: proc_macro::TokenStream,
-	item: proc_macro::TokenStream,
-) -> Result<TokenStream> {
+pub fn parse_action(item: proc_macro::TokenStream) -> Result<TokenStream> {
 	let input = syn::parse::<ItemStruct>(item)?;
-	let args =
-		&attributes_map(attr.into(), Some(&["system", "components", "set"]))?;
+	let args = ActionArgs::new(&input)?;
+	let ident = &input.ident;
 
-	let action_trait = action_trait(&input, args);
+	let impl_systems = if let Some(system) = args.system {
+		let set = args.set;
+		quote! {
+			impl ActionSystems for #ident{
+				fn add_systems(app: &mut App, schedule: impl ScheduleLabel + Clone){
+					app.add_systems(
+						schedule.clone(),
+						#system.in_set(#set),
+					);
+				}
+			}
+		}
+	} else {
+		quote! {}
+	};
+
+	let impl_child_components = if args.child_components.len() > 0 {
+		let add_child_components = args
+			.child_components
+			.iter()
+			.map(|c| {
+				quote! {entity.insert(#c::default());}
+			})
+			.collect::<TokenStream>();
+
+		quote! {
+			impl ActionChildComponents for #ident {
+				fn insert_child_components(&self, entity: &mut EntityWorldMut<'_>){
+					#add_child_components
+				}
+			}
+		}
+	} else {
+		quote! {}
+	};
+
+	let register_child_components = args
+		.child_components
+		.iter()
+		.map(|c| {
+			quote! {registry.register::<#c>();}
+		})
+		.collect::<TokenStream>();
 
 	Ok(quote! {
 		use beet::prelude::*;
 		use beet::exports::*;
-		// #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Component)]
-		#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Component, FieldUi, Reflect)]
-		#[reflect(Component,Action)]
-		#input
-		#action_trait
-	})
-}
-
-
-fn action_trait(
-	input: &ItemStruct,
-	args: &HashMap<String, Option<Expr>>,
-) -> TokenStream {
-	let ident = &input.ident;
-
-	let tick_system = tick_system(args);
-
-	let components = args
-		.get("components")
-		.map(|c| c.as_ref().map(|e| e.to_token_stream()))
-		.flatten()
-		.unwrap_or_default();
-
-	let set = args
-		.get("set")
-		.map(|s| s.as_ref().map(|e| e.to_token_stream()))
-		.flatten()
-		.unwrap_or(quote! {TickSet});
-
-	quote! {
 		impl Action for #ident {
 			fn duplicate(&self) -> Box<dyn Action> {
 				Box::new(self.clone())
 			}
 			fn insert_from_world(&self, entity: &mut EntityWorldMut<'_>){
-				entity.insert((self.clone(),#components));
+				entity.insert(self.clone());
 			}
 			fn insert_from_commands(&self, entity: &mut EntityCommands){
-				entity.insert((self.clone(),#components));
-			}
-		}
-
-		impl ActionSystems for #ident{
-			fn add_systems(app: &mut App, schedule: impl ScheduleLabel + Clone){
-				#tick_system
-				app.add_systems(
-					schedule.clone(),
-					tick_system.in_set(#set),
-				);
+				entity.insert(self.clone());
 			}
 		}
 
 		impl ActionTypes for #ident{
 			fn register(registry: &mut TypeRegistry){
-
-				//TODO we also need to register the components
-
+				#register_child_components
 				registry.register::<#ident>();
 			}
 		}
-
-	}
-}
-
-fn tick_system(args: &HashMap<String, Option<Expr>>) -> TokenStream {
-	let expr = args.get("system").unwrap().as_ref().unwrap();
-	quote! {
-	// fn tick_system(&self) -> SystemConfigs {
-		let tick_system = #expr;
-	}
+		#impl_systems
+		#impl_child_components
+	})
 }

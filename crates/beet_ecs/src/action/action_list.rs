@@ -18,8 +18,8 @@ macro_rules! action_list {
 		use beet::exports::*;
 		//these should match most action auto impls, see macros/src/action/parse_action.rs
 		// #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, EnumIter, Display)]
-		#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Reflect,Display, FieldUi)]
-		#[hide_ui]
+		#[derive(Debug, Clone, PartialEq, Reflect, Display)]
+		// #[hide_ui]
 		pub enum $name {
 			$($variant($variant),)*
 		}

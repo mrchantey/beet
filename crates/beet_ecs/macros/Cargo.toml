@@ -15,6 +15,7 @@ categories.workspace = true
 proc-macro = true
 
 [dependencies]
+heck.workspace = true
 anyhow.workspace = true
 proc-macro2.workspace = true
 syn.workspace = true

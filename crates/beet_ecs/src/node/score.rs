@@ -1,4 +1,3 @@
-use crate::prelude::*;
 use bevy_ecs::prelude::*;
 use bevy_reflect::Reflect;
 use serde::Deserialize;
@@ -24,7 +23,6 @@ pub struct Scoring;
 	Copy,
 	Component,
 	PartialEq,
-	FieldUi,
 	// strum
 	strum_macros::Display,
 	strum_macros::EnumIter,

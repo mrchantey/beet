@@ -18,7 +18,9 @@ pub trait Action: 'static + Reflect + fmt::Debug {
 	fn insert_from_world(&self, entity: &mut EntityWorldMut<'_>);
 	fn insert_from_commands(&self, entity: &mut EntityCommands);
 }
-
+pub trait ActionChildComponents {
+	fn insert_child_components(&self, entity: &mut EntityWorldMut<'_>);
+}
 
 // impl Action for Box<dyn Action> {
 // 	fn duplicate(&self) -> Box<dyn Action> { self.as_ref().duplicate() }
@@ -33,6 +35,15 @@ pub trait Action: 'static + Reflect + fmt::Debug {
 pub trait ActionSystems: 'static {
 	fn add_systems(app: &mut App, schedule: impl ScheduleLabel + Clone);
 }
+
+pub struct ActionSystemMarker;
+// impl<T> IntoSystemConfigs<ActionSystemMarker> for T where T:ActionSystems{
+// 		fn into_configs(self) -> bevy_ecs::schedule::SystemConfigs {
+// 				// self.
+// 		}
+// }
+
+
 pub trait ActionTypes: 'static + Send + Sync + Debug + Clone {
 	fn register(registry: &mut TypeRegistry);
 }

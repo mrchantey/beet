@@ -1,4 +1,3 @@
-use beet_ecs_macros::FieldUi;
 use bevy_ecs::prelude::*;
 use bevy_reflect::Reflect;
 use serde::Deserialize;
@@ -31,7 +30,6 @@ pub struct Running;
 	Deserialize,
 	EnumIter,
 	Display,
-	FieldUi,
 	Reflect,
 )]
 #[component(storage = "SparseSet")]

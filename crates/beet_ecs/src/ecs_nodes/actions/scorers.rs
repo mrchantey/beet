@@ -4,12 +4,13 @@ use bevy_derive::DerefMut;
 use bevy_ecs::prelude::*;
 
 
-#[action(
-	system=constant_score,
-	set=PreTickSet,
-	components=Score::default()
-)]
-#[derive(Default, Deref, DerefMut)]
+// #[action(
+// 	system=constant_score,
+// 	set=PreTickSet,
+// 	components=Score::default()
+// )]
+#[derive(Default, Deref, DerefMut, Action)]
+#[action(set=PreTickSet)]
 pub struct ConstantScore(pub Score);
 
 impl ConstantScore {
