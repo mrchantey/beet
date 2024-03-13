@@ -22,11 +22,16 @@ async fn works() -> Result<()> {
 			UtilitySelector::default(),
 			FindSteerTarget::new("flower", awareness_radius),
 		)
-			.child((Wander::default(), ConstantScore::new(Score::Weight(0.5))))
+			.child((
+				Score::default(),
+				ConstantScore::new(Score::Weight(0.5)),
+				Wander::default(),
+			))
 			.child(
 				(
-					SequenceSelector::default(),
+					Score::default(),
 					ScoreSteerTarget::new(awareness_radius),
+					SequenceSelector::default(),
 				)
 					.child((Seek::default(), SucceedOnArrive { radius: 0.1 }))
 					.child((

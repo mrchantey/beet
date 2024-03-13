@@ -378,6 +378,21 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9d297deb1925b89f2ccc13d7635fa0714f12c87adce1c75356b39ca9b7178567"
 
 [[package]]
+name = "base64"
+version = "0.22.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9475866fec1451be56a3c2400fd081ff546538961565ccb5b7142cbd22bc7a51"
+
+[[package]]
+name = "beet"
+version = "0.0.7"
+dependencies = [
+ "beet_core",
+ "beet_ecs",
+ "beet_net",
+]
+
+[[package]]
 name = "beet_core"
 version = "0.0.7"
 dependencies = [
@@ -461,6 +476,37 @@ dependencies = [
  "strum",
  "strum_macros",
  "sweet",
+]
+
+[[package]]
+name = "beet_web"
+version = "0.0.7"
+dependencies = [
+ "anyhow",
+ "base64 0.22.0",
+ "beet",
+ "bevy_app",
+ "bevy_math",
+ "bevy_time",
+ "bevy_transform",
+ "bevy_utils",
+ "bincode",
+ "console_error_panic_hook",
+ "console_log",
+ "extend",
+ "forky_bevy",
+ "forky_core",
+ "forky_web",
+ "futures",
+ "js-sys",
+ "log",
+ "serde",
+ "serde_json",
+ "strum",
+ "sweet",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
+ "web-sys",
 ]
 
 [[package]]
@@ -2252,7 +2298,7 @@ version = "0.5.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b4f54a525a0edfc8c2bf3ee92aae411800b8b10892c9cd819f8e8a6d4f0d62f3"
 dependencies = [
- "base64",
+ "base64 0.21.7",
  "cfg-if",
  "futures",
  "indexmap",
@@ -3060,7 +3106,7 @@ version = "0.11.26"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "78bf93c4af7a8bb7d879d51cebe797356ff10ae8516ace542b5182d9dcac10b2"
 dependencies = [
- "base64",
+ "base64 0.21.7",
  "bytes",
  "encoding_rs",
  "futures-core",
@@ -3125,7 +3171,7 @@ version = "0.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b91f7eff05f748767f183df4320a63d6936e9c6107d97c9e6bdd9784f4289c94"
 dependencies = [
- "base64",
+ "base64 0.21.7",
  "bitflags 2.4.2",
  "serde",
  "serde_derive",

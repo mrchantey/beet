@@ -14,7 +14,7 @@ use web_sys::HtmlElement;
 
 pub struct BeeGame {
 	pub relay: Relay,
-	create_bee_sub: Subscriber<BehaviorPrefab<BeeNode>>,
+	create_bee_sub: Subscriber<TypedBehaviorPrefab<BeeNode>>,
 	create_flower_sub: Subscriber<Vec3>,
 	despawn_sub: Subscriber<DespawnEntityPayload>,
 	pub elements: HashMap<BeetEntityId, HtmlDivElement>,
@@ -80,7 +80,7 @@ impl BeeGame {
 }
 
 pub struct CreateBeeHandler;
-impl TopicHandler<BehaviorPrefab<BeeNode>> for CreateBeeHandler {
+impl TopicHandler<TypedBehaviorPrefab<BeeNode>> for CreateBeeHandler {
 	fn topic() -> Topic {
 		Topic::new("bee", TopicScheme::PubSub, TopicMethod::Create)
 	}
@@ -94,7 +94,7 @@ impl TopicHandler<Vec3> for CreateFlowerHandler {
 
 fn create_bee(
 	relay: &mut Relay,
-	prefab: BehaviorPrefab<BeeNode>,
+	prefab: TypedBehaviorPrefab<BeeNode>,
 ) -> Result<(BeetEntityId, HtmlDivElement)> {
 	let mut pos = Vec3::random_in_cube();
 	pos.z = 0.;

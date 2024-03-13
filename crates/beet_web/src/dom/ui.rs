@@ -70,7 +70,7 @@ fn create_bee(
 	HtmlEventListener::new_with_target(
 		"click",
 		move |_: Event| {
-			let prefab: BehaviorPrefab<BeeNode> =
+			let prefab: TypedBehaviorPrefab<BeeNode> =
 				serde_json::from_str(&textarea.value()).unwrap(); // already validated
 
 			CreateBeeHandler::publisher(&mut relay)
@@ -163,7 +163,7 @@ fn create_textarea(
 		"input",
 		move |_: Event| {
 			let text = textarea2.value();
-			match serde_json::from_str::<BehaviorPrefab<BeeNode>>(&text) {
+			match serde_json::from_str::<TypedBehaviorPrefab<BeeNode>>(&text) {
 				Ok(tree) => {
 					create_bee_button.set_disabled(false);
 					warning_text.set_inner_html("&nbsp;");
@@ -182,7 +182,7 @@ fn create_textarea(
 	textarea
 }
 
-fn set_url(prefab: &BehaviorPrefab<BeeNode>) {
+fn set_url(prefab: &TypedBehaviorPrefab<BeeNode>) {
 	let val = bincode::serialize(prefab).unwrap();
 	let val = general_purpose::STANDARD_NO_PAD.encode(val);
 	// let url = serde_json::to_string(tre).unwrap();
@@ -192,7 +192,7 @@ fn set_url(prefab: &BehaviorPrefab<BeeNode>) {
 
 
 
-fn prettify(prefab: &BehaviorPrefab<BeeNode>) -> String {
+fn prettify(prefab: &TypedBehaviorPrefab<BeeNode>) -> String {
 	let tree = serde_json::to_string(&prefab).unwrap();
 	let parsed = JSON::parse(&tree).unwrap();
 	let pretty = JSON::stringify_with_replacer_and_space(

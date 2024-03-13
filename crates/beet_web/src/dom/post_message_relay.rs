@@ -1,6 +1,4 @@
 use anyhow::Result;
-use beet::exports::serde::de::DeserializeOwned;
-use beet::exports::Serialize;
 use beet::prelude::*;
 use forky_core::ResultTEExt;
 use forky_web::AnimationFrame;
@@ -9,6 +7,8 @@ use forky_web::ResultTJsValueExt;
 use js_sys::ArrayBuffer;
 use js_sys::JsString;
 use js_sys::Uint8Array;
+use serde::de::DeserializeOwned;
+use serde::Serialize;
 use wasm_bindgen::JsCast;
 use wasm_bindgen::JsValue;
 use wasm_bindgen_futures::spawn_local;

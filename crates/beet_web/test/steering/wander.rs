@@ -5,9 +5,7 @@ use sweet::*;
 #[sweet_test]
 pub async fn works() -> Result<()> {
 	append_html_for_tests();
-	AppOptions::default()
-		.with_graph(BehaviorTree::new(Wander))
-		.run();
+	AppOptions::default().with_graph(Wander).run();
 
 	Ok(())
 }

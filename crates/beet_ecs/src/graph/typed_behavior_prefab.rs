@@ -2,7 +2,6 @@ use super::type_registry_utils::append_beet_type_registry_with_generics;
 use crate::prelude::*;
 use anyhow::Result;
 use bevy_ecs::entity::Entity;
-use bevy_ecs::entity::EntityHashMap;
 use bevy_ecs::reflect::AppTypeRegistry;
 use bevy_ecs::world::World;
 use bevy_reflect::FromReflect;
@@ -12,26 +11,17 @@ use bevy_scene::DynamicScene;
 use serde::de::DeserializeSeed;
 use serde::Deserialize;
 use serde::Serialize;
-use std::fmt;
 use std::ops::Deref;
 use std::ops::DerefMut;
 
 /// This the 'instantiated' version of a [`BeetNode`].
 /// It is a wrapper around a [`DynamicScene`] containing the behavior graph.
 /// It implements [`Serialize`] and [`Deserialize`]
+#[derive(Debug, Clone)]
 pub struct TypedBehaviorPrefab<T: ActionTypes> {
 	pub prefab: BehaviorPrefab,
 	_phantom: std::marker::PhantomData<T>,
 }
-
-impl<T: ActionTypes> fmt::Debug for TypedBehaviorPrefab<T> {
-	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-		f.debug_struct("TypedBehaviorPrefab")
-			.field("prefab", &self.prefab)
-			.finish()
-	}
-}
-
 
 impl<T: ActionTypes> Deref for TypedBehaviorPrefab<T> {
 	type Target = BehaviorPrefab;
@@ -40,22 +30,6 @@ impl<T: ActionTypes> Deref for TypedBehaviorPrefab<T> {
 
 impl<T: ActionTypes> DerefMut for TypedBehaviorPrefab<T> {
 	fn deref_mut(&mut self) -> &mut Self::Target { &mut self.prefab }
-}
-
-/// Attempts a clone of this prefab
-/// # Panics
-/// if [`DynamicScene::write_to_world`] errors
-impl<T: ActionTypes> Clone for TypedBehaviorPrefab<T> {
-	fn clone(&self) -> Self {
-		let mut tmp_world = World::new();
-		let mut entity_map = EntityHashMap::default();
-		self.scene
-			.write_to_world(&mut tmp_world, &mut entity_map)
-			.unwrap();
-		let scene = DynamicScene::from_world(&tmp_world);
-		let root = *entity_map.get(&self.root).unwrap();
-		Self::new(scene, root)
-	}
 }
 
 impl<T: ActionTypes> TypedBehaviorPrefab<T> {

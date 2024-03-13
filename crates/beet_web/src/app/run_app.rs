@@ -14,7 +14,7 @@ use wasm_bindgen_futures::spawn_local;
 
 
 pub struct AppOptions {
-	pub initial_prefab: BehaviorPrefab<BeeNode>,
+	pub initial_prefab: TypedBehaviorPrefab<BeeNode>,
 	pub bees: usize,
 	pub flowers: usize,
 	pub auto_flowers: Option<usize>,
@@ -24,10 +24,10 @@ pub struct AppOptions {
 impl Default for AppOptions {
 	fn default() -> Self {
 		Self {
-			initial_prefab: BehaviorPrefab::from_graph(Translate::new(
-				Vec3::new(-0.1, 0., 0.),
-			))
-			.unwrap(),
+			initial_prefab: Translate::new(Vec3::new(-0.1, 0., 0.))
+				.into_prefab()
+				.unwrap()
+				.typed(),
 			bees: 1,
 			flowers: 1,
 			auto_flowers: None,
@@ -56,8 +56,8 @@ impl AppOptions {
 		}
 		this
 	}
-	pub fn with_graph<M>(mut self, graph: impl IntoBehaviorGraph<M>) -> Self {
-		self.initial_prefab = graph.into_prefab().unwrap();
+	pub fn with_graph<M>(mut self, prefab: impl IntoBehaviorPrefab<M>) -> Self {
+		self.initial_prefab = prefab.into_prefab().unwrap().typed();
 		self
 	}
 
@@ -73,7 +73,7 @@ impl AppOptions {
 	}
 }
 
-fn get_prefab_url_param() -> Result<BehaviorPrefab<BeeNode>> {
+fn get_prefab_url_param() -> Result<TypedBehaviorPrefab<BeeNode>> {
 	if let Some(tree) = SearchParams::get("graph") {
 		let bytes = general_purpose::STANDARD_NO_PAD.decode(tree.as_bytes())?;
 		let prefab = bincode::deserialize(&bytes)?;

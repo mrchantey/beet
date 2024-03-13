@@ -8,8 +8,8 @@ use std::f32::consts::TAU;
 
 action_list!(BeeNode, [Hover, CoreNode]);
 
-#[action(system=hover)]
 #[derive(Default)]
+#[derive_action]
 pub struct Hover {
 	/// Measured in Hz
 	pub speed: f32,

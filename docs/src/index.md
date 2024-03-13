@@ -14,7 +14,7 @@ Beet is a *truely* ECS behavior library, this means that the behavior graph itss
 - Serialization
 - UI Integration
 
-Basically any tooling for working with Bevy worlds and prefabs also works with beet.
+This allows beet to ride on the wings (pun intended) of the incredible bevy community for all.
 
 ### 🌳 Modular
 

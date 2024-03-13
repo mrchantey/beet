@@ -30,6 +30,27 @@ impl fmt::Debug for BehaviorPrefab {
 }
 
 
+/// Attempts a clone of this prefab
+/// # Panics
+/// if [`DynamicScene::write_to_world`] errors
+impl Clone for BehaviorPrefab {
+	fn clone(&self) -> Self {
+		let mut tmp_world = World::new();
+		let mut entity_map = EntityHashMap::default();
+		self.scene
+			.write_to_world(&mut tmp_world, &mut entity_map)
+			.unwrap();
+		let scene = DynamicScene::from_world(&tmp_world);
+		let root = *entity_map.get(&self.root).unwrap();
+
+		let mut new_registry = AppTypeRegistry::default();
+		merge_type_registries(&self.registry, &mut new_registry);
+
+		Self::new(scene, root, new_registry)
+	}
+}
+
+
 impl BehaviorPrefab {
 	pub fn new(
 		scene: DynamicScene,
