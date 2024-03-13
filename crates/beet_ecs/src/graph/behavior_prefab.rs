@@ -65,11 +65,9 @@ impl<T: ActionTypes> BehaviorPrefab<T> {
 		graph.into_behavior_graph().into_prefab()
 	}
 
-	/// # Panics
-	/// If the world is missing one of the following:
-	/// - [`AppTypeRegistry`]
-	pub fn from_world(world: World) -> Self {
-		let _registry = world.resource::<AppTypeRegistry>();
+	/// This method will insert the corresponding AppTypeRegistry, or append it if it already exists
+	pub fn from_world(mut world: World) -> Self {
+		Self::append_type_registry_with_world(&mut world);
 		let scene = DynamicScene::from_world(&world);
 		Self::new(scene)
 	}
@@ -126,6 +124,15 @@ impl<T: ActionTypes> BehaviorPrefab<T> {
 		});
 		Self::append_type_registry(&registry);
 		registry
+	}
+
+	pub fn append_type_registry_with_world(world: &mut World) {
+		if let Some(mut registry) = world.get_resource_mut::<AppTypeRegistry>()
+		{
+			Self::append_type_registry(&mut registry);
+		} else {
+			world.insert_resource(Self::get_type_registry());
+		}
 	}
 
 	/// Register all types in [`T`] as well as those that get appended
@@ -203,7 +210,9 @@ impl<M, T> IntoBehaviorPrefab<M> for T
 where
 	T: IntoBehaviorGraph<M>,
 {
-	fn into_prefab<Actions: ActionTypes>(self) -> Result<BehaviorPrefab<Actions>> {
+	fn into_prefab<Actions: ActionTypes>(
+		self,
+	) -> Result<BehaviorPrefab<Actions>> {
 		self.into_behavior_graph().into_prefab()
 	}
 }
