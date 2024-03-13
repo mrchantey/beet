@@ -1,4 +1,5 @@
 pub mod entity_graph;
+mod beet_graph;
 #[allow(unused_imports)]
 pub use self::entity_graph::*;
 pub mod behavior_node;

@@ -1,17 +1,14 @@
 use crate::prelude::*;
 use bevy_ecs::prelude::*;
-use serde::Deserialize;
-use serde::Serialize;
 
-
-#[action(system=empty_action)]
 #[derive(Default)]
+#[derive_action]
 pub struct EmptyAction;
 pub fn empty_action() {}
 
 // intentionally dont deref to avoid bugs.
 // TODO this should be generic
-#[action(system=set_run_result)]
+#[derive_action]
 #[derive(Default)]
 pub struct SetRunResult(pub RunResult);
 
@@ -31,7 +28,7 @@ fn set_run_result(
 }
 
 
-#[action(system=repeat)]
+#[derive_action]
 #[derive(Default)]
 pub struct Repeat;
 

@@ -1,10 +1,8 @@
 use crate::prelude::*;
 use bevy_ecs::prelude::*;
 use bevy_utils::Duration;
-use serde::Deserialize;
-use serde::Serialize;
 
-#[action(system=succeed_in_duration)]
+#[derive_action]
 pub struct SucceedInDuration {
 	pub duration: Duration,
 }

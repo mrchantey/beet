@@ -9,15 +9,16 @@ use bevy_ecs::prelude::*;
 // 	set=PreTickSet,
 // 	components=Score::default()
 // )]
-#[derive(Default, Deref, DerefMut, Action)]
-#[action(set=PreTickSet)]
+// #[reflect(Component, Action)]
+#[derive(Default, PartialEq, Deref, DerefMut)]
+#[derive_action(set=PreTickSet)]
 pub struct ConstantScore(pub Score);
 
 impl ConstantScore {
 	pub fn new(score: Score) -> Self { Self(score) }
 }
 
-pub fn constant_score(
+fn constant_score(
 	mut query: Query<(&ConstantScore, &mut Score), Added<ConstantScore>>,
 ) {
 	for (from, mut to) in query.iter_mut() {

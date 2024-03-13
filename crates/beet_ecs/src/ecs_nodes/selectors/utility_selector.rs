@@ -1,16 +1,13 @@
 use super::*;
 use crate::prelude::*;
 use bevy_ecs::prelude::*;
-use serde::Deserialize;
-use serde::Serialize;
-
 
 /// An action that observes the [`Score`] of each child and selects the highest to run.
 ///
 /// It will return the result of the highest scoring child.
 ///
 #[derive(Default)]
-#[action(system=utility_selector)]
+#[derive_action(child_components=[Score])]
 pub struct UtilitySelector;
 
 pub enum UtilityInterruptRate {
@@ -22,7 +19,7 @@ pub enum UtilityInterruptRate {
 
 //TODO interrupt if child score changes
 
-pub fn utility_selector(
+fn utility_selector(
 	mut commands: Commands,
 	selectors: Query<(Entity, &UtilitySelector, &Edges), With<Running>>,
 	children_scores: Query<(Entity, &Score)>,

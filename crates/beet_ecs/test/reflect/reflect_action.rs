@@ -2,16 +2,15 @@ use beet_ecs::prelude::*;
 use std::any::TypeId;
 use sweet::*;
 
-#[derive(Debug, Clone, Reflect, FieldUi, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Reflect)]
 pub struct SomeValue(pub i32);
 
-
-#[action(system=my_system)]
+#[derive_action]
 struct MyAction {
 	pub val: SomeValue,
 }
 
-fn my_system() {}
+fn my_action() {}
 
 
 #[sweet_test]

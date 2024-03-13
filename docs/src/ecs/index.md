@@ -13,11 +13,13 @@
 
 ## Overview
 
-This is my third attempt at a modular AI architecture for ECS, the previous two attempts went the way of the dodo:
+This is my fourth attempt at a modular AI architecture for ECS, the previous two attempts went the way of the dodo:
 1. Shoehorn non-ecs solutions into bevy, which sucked mostly because of blackboards. 
 2. Get clever with generics and create distinct types *per node* of a graph. This allowed for an entire graph to be stored as components on a single entity but was not great for a bunch of reasons. The dealbreaker was not being able to create/edit graphs at runtime.
+3. Create a `petgraph` of `Actions` then convert that into a prefab world
 
-I'm quite confident in this third approach, representing graphs as linked entities. 
+
+I'm quite confident in this fourth, representing graphs as linked entities. 
 
 ### Actions
 

@@ -8,6 +8,13 @@ Beet is a task switching library suitable for game AI, robotics & other performa
 *Examples are built with the [beet playground](https://mrchantey.github.io/beet/play?spawn-bee=1), feel free to experiment with the bee's graph then spawn some to see the effect.*
 
 ## Features
+### 🐦 Simple
+Beet is a *truely* ECS behavior library, this means that the behavior graph itsself is represented as a graph of entities which makes it incredibly easy to integrate into existing workflows:
+- Visualization
+- Serialization
+- UI Integration
+
+Basically any tooling for working with Bevy worlds and prefabs also works with beet.
 
 ### 🌳 Modular
 

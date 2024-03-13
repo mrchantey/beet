@@ -54,6 +54,22 @@ pub fn action(item: TokenStream) -> TokenStream {
 }
 
 
+#[proc_macro_attribute]
+pub fn derive_action(attr: TokenStream, item: TokenStream) -> TokenStream {
+	let item = syn::parse_macro_input!(item as syn::ItemStruct);
+	let attr = proc_macro2::TokenStream::from(attr);
+	quote::quote! {
+		use beet::prelude::*;
+		use beet::exports::*;
+		#[derive(Debug, Clone, Component, Reflect, Action)]
+		#[reflect(Component, Action)]
+		#[action(#attr)]
+		#item
+	}
+	.into()
+}
+
+
 
 // #[proc_macro_attribute]
 // #[proc_macro_derive(FieldUi, attributes(number, hide_ui))]

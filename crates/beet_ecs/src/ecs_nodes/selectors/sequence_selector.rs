@@ -1,22 +1,20 @@
 use super::*;
 use crate::prelude::*;
 use bevy_ecs::prelude::*;
-use serde::Deserialize;
-use serde::Serialize;
 
 /// An action that runs all of its children in order until one fails.
 ///
 /// Logical AND - `RUN child1 THEN child2 etc`
-/// 
+///
 /// If a child succeeds it will run the next child.
 ///
 /// If there are no more children to run it will succeed.
 ///
 /// If a child fails it will fail.
 #[derive(Default)]
-#[action(system=sequence)]
+#[derive_action(child_components=[Score])]
 pub struct SequenceSelector;
-pub fn sequence(
+fn sequence_selector(
 	mut commands: Commands,
 	selectors: Query<(Entity, &SequenceSelector, &Edges), With<Running>>,
 	children_running: Query<(), With<Running>>,

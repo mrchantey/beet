@@ -120,6 +120,17 @@ impl EntityGraph {
 			world.insert(*entity, Edges(children));
 		}
 
+		// add child components
+		// for (index,node) in graph.node_indices().zip(graph.node_weights()) {
+		// 	for action in node.actions.iter(){
+
+
+		// 	}
+		// 	// world.insert(*node.1, node.0);
+		// }
+
+
+		// insert root
 		if let Some(root) = entity_graph.root() {
 			world.insert(*root, BehaviorGraphRoot);
 			if run_on_spawn {

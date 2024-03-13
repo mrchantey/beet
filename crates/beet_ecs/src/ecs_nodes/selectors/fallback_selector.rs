@@ -1,8 +1,6 @@
 use super::*;
 use crate::prelude::*;
 use bevy_ecs::prelude::*;
-use serde::Deserialize;
-use serde::Serialize;
 
 /// An action that runs all of its children in order until one succeeds.
 ///
@@ -12,9 +10,9 @@ use serde::Serialize;
 ///
 /// If the last child fails it will fail.
 #[derive(Default)]
-#[action(system=fallback)]
+#[derive_action(child_components=[Score])]
 pub struct FallbackSelector;
-pub fn fallback(
+fn fallback_selector(
 	mut commands: Commands,
 	selectors: Query<(Entity, &FallbackSelector, &Edges), With<Running>>,
 	children_running: Query<(), With<Running>>,
