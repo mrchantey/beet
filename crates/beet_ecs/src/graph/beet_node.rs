@@ -5,105 +5,166 @@ use bevy_ecs::prelude::*;
 use bevy_reflect::GetTypeRegistration;
 use bevy_reflect::Reflect;
 use bevy_utils::HashSet;
-use std::sync::Arc;
-use std::sync::RwLock;
 
-pub trait BeetBundle: Bundle + Reflect {}
-impl<T: Bundle + Reflect> BeetBundle for T {}
+/// Marker to identify the root of a behavior graph
+#[derive(Debug, Default, Component, Reflect)]
+#[reflect(Component)]
+pub struct BehaviorGraphRoot;
+
+// pub struct EntityGraphOptions {
+// 	agent: Option<Entity>,
+// 	run_on_spawn: bool,
+// }
+
+// impl Default for EntityGraphOptions {
+// 	fn default() -> Self {
+// 		Self {
+// 			agent: None,
+// 			run_on_spawn: true,
+// 		}
+// 	}
+// }
+
+const EXPECT_OK: &str =
+	"Unexpected Error, spawning from beet node should always be safe";
+
+pub type SpawnFunc = Box<dyn FnOnce(&mut World) -> Entity>;
+
+pub trait BeetBundle: Bundle + Reflect + GetTypeRegistration {}
+impl<T: Bundle + Reflect + GetTypeRegistration> BeetBundle for T {}
 
 pub struct BeetNode {
-	pub entity: Entity,
 	pub children: Vec<BeetNode>,
-	pub world: Arc<RwLock<World>>,
+	pub spawn_func: SpawnFunc,
+	pub misc_funcs: Vec<Box<dyn FnOnce(&mut World)>>,
+	// pub world: Arc<RwLock<World>>,
 }
 
 impl BeetNode {
-	pub fn new<M>(root: impl IntoBeetNode<M>) -> Self {
-		root.into_beet_node(Arc::new(RwLock::new(World::default())))
-	}
+	pub fn new<T: BeetBundle>(bundle: T) -> Self {
+		Self {
+			children: Vec::new(),
+			spawn_func: Box::new(move |world: &mut World| {
+				Self::register_type::<T>(world);
 
-	/// Append a type to the world's type registry
-	/// This is for components that will not appear in the action type list.
-	pub fn with_type<T: GetTypeRegistration>(self) -> Self {
-		let mut world = self.world.write().unwrap();
-		world.init_resource::<AppTypeRegistry>();
-		let registry = world.resource::<AppTypeRegistry>();
-		registry.write().register::<T>();
-		drop(world);
+				// let type_data = T::get_type_registration();
+				// type_data.
+
+				world.spawn(bundle).id()
+			}),
+			misc_funcs: Vec::new(),
+		}
+	}
+	pub fn with_type<T: GetTypeRegistration>(mut self) -> Self {
+		self.misc_funcs.push(Box::new(|world: &mut World| {
+			Self::register_type::<T>(world);
+		}));
 		self
 	}
 
-	pub fn with_entity_and_world(
-		entity: Entity,
-		world: Arc<RwLock<World>>,
-	) -> Self {
-		Self {
-			world,
-			entity,
-			children: Vec::new(),
-		}
+	fn register_type<T: GetTypeRegistration>(world: &mut World) {
+		world.init_resource::<AppTypeRegistry>();
+		world
+			.resource_mut::<AppTypeRegistry>()
+			.write()
+			.register::<T>();
 	}
 
-	fn build_recursive(&self, visited: &mut HashSet<Entity>) {
-		if visited.contains(&self.entity) {
-			return;
-		}
-		visited.insert(self.entity);
-		let mut world = self.world.write().unwrap();
-		let mut entity = world.entity_mut(self.entity);
-		entity.insert((
-			Name::new(format!("Node {}", visited.len())),
-			RunTimer::default(),
-		));
 
-		let edges = self.children.iter().map(|child| child.entity).collect();
-		entity.insert(Edges(edges));
-		drop(entity);
-		drop(world);
-		for child in self.children.iter() {
-			child.build_recursive(visited);
+	/// 
+	pub fn spawn<T: ActionTypes>(
+		self,
+		world: &mut impl IntoWorld,
+		target: Entity,
+	) -> EntityGraph {
+		self.into_prefab::<T>()
+			.expect(EXPECT_OK)
+			.spawn(world, Some(target))
+			.expect(EXPECT_OK)
+	}
+	pub fn spawn_no_target<T: ActionTypes>(
+		self,
+		world: &mut impl IntoWorld,
+	) -> EntityGraph {
+		self.into_prefab::<T>()
+			.expect(EXPECT_OK)
+			.spawn(world, None)
+			.expect(EXPECT_OK)
+	}
+
+	pub fn build(self) -> World {
+		let mut world = World::new();
+		let root = self.build_recursive(&mut world, &mut HashSet::default());
+		world.entity_mut(root).insert((BehaviorGraphRoot, Running));
+		world
+	}
+
+
+	fn build_recursive(
+		self,
+		world: &mut World,
+		visited: &mut HashSet<Entity>,
+	) -> Entity {
+		for func in self.misc_funcs {
+			func(world);
 		}
+		let entity = (self.spawn_func)(world);
+		visited.insert(entity);
+		let id = visited.len();
+
+		let edges = self
+			.children
+			.into_iter()
+			.map(|child| child.build_recursive(world, visited))
+			.collect();
+
+		world
+			.entity_mut(entity)
+			.insert((
+				Name::new(format!("Node {id}")),
+				RunTimer::default(),
+				Edges(edges),
+			))
+			.id()
 	}
 
 	pub fn child<M>(mut self, child: impl IntoBeetNode<M>) -> Self {
-		let child = child.into_beet_node(self.world.clone());
-		self.children.push(child);
+		self.children.push(child.into_beet_node());
 		self
 	}
 }
 
+pub struct IntoIntoBeetNode;
 pub struct ItemIntoBeetNode;
 pub struct TupleIntoBeetNode;
 
 pub trait IntoBeetNode<M>: Sized {
-	fn into_beet_node(self, world: Arc<RwLock<World>>) -> BeetNode;
-	fn child2<M2>(self, child: impl IntoBeetNode<M2>) -> BeetNode {
-		let node = self.into_beet_node(Default::default());
-		node.child(child)
+	fn into_beet_node(self) -> BeetNode;
+	fn child<M2>(self, child: impl IntoBeetNode<M2>) -> BeetNode {
+		self.into_beet_node().child(child)
 	}
 }
 
-impl<T0: BeetBundle> IntoBeetNode<ItemIntoBeetNode> for T0 {
-	#[allow(unused_variables, unused_mut)]
-	fn into_beet_node(self, world: Arc<RwLock<World>>) -> BeetNode {
-		let entity = world.write().unwrap().spawn(self).id();
-		BeetNode::with_entity_and_world(entity, world)
-	}
+impl<T> IntoBeetNode<IntoIntoBeetNode> for T
+where
+	T: Into<BeetNode>,
+{
+	fn into_beet_node(self) -> BeetNode { self.into() }
+}
+
+impl<T: BeetBundle> IntoBeetNode<ItemIntoBeetNode> for T {
+	fn into_beet_node(self) -> BeetNode { BeetNode::new(self) }
 }
 
 pub struct BeetNodeIntoPrefab;
 
-
-impl IntoBehaviorPrefab<BeetNodeIntoPrefab> for BeetNode {
+impl<T, M> IntoBehaviorPrefab<(BeetNodeIntoPrefab, M)> for T
+where
+	T: IntoBeetNode<M>,
+{
 	fn into_prefab<Actions: ActionTypes>(
 		self,
 	) -> Result<BehaviorPrefab<Actions>> {
-		self.build_recursive(&mut HashSet::default());
-		let mut world = self.world.write().unwrap();
-		world
-			.entity_mut(self.entity)
-			.insert((BehaviorGraphRoot, Running));
-		let world = std::mem::take(&mut *world);
-		Ok(BehaviorPrefab::from_world(world))
+		Ok(BehaviorPrefab::from_world(self.into_beet_node().build()))
 	}
 }

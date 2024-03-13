@@ -4,7 +4,7 @@ use bevy_derive::Deref;
 use bevy_derive::DerefMut;
 use bevy_ecs::prelude::*;
 
-/// Added to entites that have at least one associated [`BehaviorGraph`].
+/// Added to entites that have at least one associated behavior graph.
 /// Remove this component to dispose of all of this agents graphs.
 /// This is useful, for example for [`cleanup_entity_graph`] to only listen for removals
 /// of agent entities

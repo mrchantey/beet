@@ -10,7 +10,8 @@ pub struct Foobar;
 fn works() -> Result<()> {
 	let _node = BeetNode::new(EmptyAction);
 	let _node2 = BeetNode::new((EmptyAction, Foobar, ConstantScore::default()));
-	let node = EmptyAction.child2((EmptyAction, ConstantScore::default()));
+	let node = EmptyAction
+		.child((EmptyAction, ConstantScore::default()).child(EmptyAction));
 
 	let _prefab = node.into_prefab::<EcsNode>();
 

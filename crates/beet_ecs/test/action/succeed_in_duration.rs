@@ -8,9 +8,11 @@ pub fn works() -> Result<()> {
 	app.add_plugins(ActionPlugin::<EcsNode, _>::default());
 	app.insert_time();
 
-	let tree = SucceedInDuration::default();
-	let instance = EntityGraph::spawn_no_target(&mut app, tree);
-	let root = *instance.root().unwrap();
+	let root = *SucceedInDuration::default()
+		.into_beet_node()
+		.spawn_no_target::<EcsNode>(&mut app)
+		.root()
+		.unwrap();
 
 	expect(&app).to_have_component::<Running>(root)?;
 

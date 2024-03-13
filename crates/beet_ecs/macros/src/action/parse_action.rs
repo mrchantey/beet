@@ -35,11 +35,23 @@ pub fn parse_action(item: proc_macro::TokenStream) -> Result<TokenStream> {
 				quote! {entity.insert(#c::default());}
 			})
 			.collect::<TokenStream>();
+		let boxed_child_components = args
+			.child_components
+			.iter()
+			.map(|c| {
+				quote! {Box::new(#c::default()),}
+			})
+			.collect::<TokenStream>();
 
 		quote! {
 			impl ActionChildComponents for #ident {
 				fn insert_child_components(&self, entity: &mut EntityWorldMut<'_>){
 					#add_child_components
+				}
+				fn boxed_child_components(&self) -> Vec<Box<dyn Reflect>>{
+					vec![
+						#boxed_child_components
+					]
 				}
 			}
 		}

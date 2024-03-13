@@ -9,11 +9,19 @@ fn setup() -> (App, EntityGraph) {
 
 	let target = app.world.spawn_empty().id();
 
-	let tree = UtilitySelector
-		.child((ConstantScore::new(Score::Fail), SetRunResult::failure()))
-		.child((ConstantScore::new(Score::Pass), SetRunResult::success()));
+	let entity_graph = UtilitySelector
+		.child((
+			Score::default(),
+			ConstantScore::new(Score::Fail),
+			SetRunResult::failure(),
+		))
+		.child((
+			Score::default(),
+			ConstantScore::new(Score::Pass),
+			SetRunResult::success(),
+		))
+		.spawn::<EcsNode>(&mut app, target);
 
-	let entity_graph = tree.spawn(&mut app, target);
 	(app, entity_graph)
 }
 

@@ -7,21 +7,14 @@ use bevy_ecs::reflect::AppTypeRegistry;
 use bevy_ecs::world::World;
 use bevy_reflect::FromReflect;
 use bevy_reflect::Reflect;
-use bevy_reflect::TypeRegistry;
-use bevy_reflect::TypeRegistryArc;
 use bevy_scene::serde::SceneDeserializer;
 use bevy_scene::serde::SceneSerializer;
 use bevy_scene::DynamicScene;
 use serde::de::DeserializeSeed;
 use serde::Deserialize;
 use serde::Serialize;
-use std::fmt;
-use std::sync::Arc;
-use std::sync::RwLock;
 
-
-
-/// This the 'instantiated' version of a [`BehaviorGraph`].
+/// This the 'instantiated' version of a [`BeetNode`].
 /// It is a wrapper around a [`DynamicScene`] containing the behavior graph.
 /// It implements [`Serialize`] and [`Deserialize`]
 pub struct BehaviorPrefab<T: ActionTypes> {
@@ -30,25 +23,17 @@ pub struct BehaviorPrefab<T: ActionTypes> {
 	_phantom: std::marker::PhantomData<T>,
 }
 
-impl<T: ActionTypes> fmt::Debug for BehaviorPrefab<T> {
-	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		f.debug_struct("BehaviorPrefab")
-			.field("scene", &"TODO")
-			// .field("scene", &self.scene)
-			.finish()
-	}
-}
 /// Attempts a clone of this prefab
 /// # Panics
 /// if [`DynamicScene::write_to_world`] errors
 impl<T: ActionTypes> Clone for BehaviorPrefab<T> {
 	fn clone(&self) -> Self {
-		let mut world = World::new();
+		let mut tmp_world = World::new();
 		let mut entity_map = EntityHashMap::default();
 		self.scene
-			.write_to_world(&mut world, &mut entity_map)
+			.write_to_world(&mut tmp_world, &mut entity_map)
 			.unwrap();
-		let scene = DynamicScene::from_world(&world);
+		let scene = DynamicScene::from_world(&tmp_world);
 		Self::new(scene)
 	}
 }
@@ -61,22 +46,19 @@ impl<T: ActionTypes> BehaviorPrefab<T> {
 		}
 	}
 
-	pub fn from_graph<M>(graph: impl IntoBehaviorGraph<M>) -> Result<Self> {
-		graph.into_behavior_graph().into_prefab()
-	}
+	// / This method will insert the corresponding AppTypeRegistry, or append it if it already exists
+	pub fn from_world(mut src_world: World) -> Self {
+		Self::append_type_registry_with_world(&mut src_world);
+		let scene = DynamicScene::from_world(&src_world);
 
-	/// This method will insert the corresponding AppTypeRegistry, or append it if it already exists
-	pub fn from_world(mut world: World) -> Self {
-		Self::append_type_registry_with_world(&mut world);
-		let scene = DynamicScene::from_world(&world);
 		Self::new(scene)
 	}
 	pub fn into_world(&self) -> Result<World> {
-		let mut world = World::new();
+		let mut dst_world = World::new();
 		let registry = Self::get_type_registry();
-		world.insert_resource(registry);
-		self.spawn(&mut world, None)?;
-		Ok(world)
+		dst_world.insert_resource(registry);
+		self.spawn(&mut dst_world, None)?;
+		Ok(dst_world)
 	}
 
 	/// Prefabs are [`DynamicScene`]s so can only be spawned using [`World`]. This means spawn systems must be exclusive.
@@ -85,43 +67,40 @@ impl<T: ActionTypes> BehaviorPrefab<T> {
 	/// If the world's [`AppTypeRegistry`] is missing a type in the graph
 	pub fn spawn(
 		&self,
-		world: &mut World,
+		dst_world: &mut impl IntoWorld,
 		target: Option<Entity>,
-	) -> Result<Entity> {
-		if false == world.contains_resource::<AppTypeRegistry>() {
-			world.insert_resource(Self::get_type_registry());
-		}
+	) -> Result<EntityGraph> {
+		let dst_world = dst_world.into_world_mut();
+		Self::append_type_registry_with_world(dst_world);
 
 		let mut entity_map = EntityHashMap::default();
-		self.scene.write_to_world(world, &mut entity_map)?;
+		self.scene.write_to_world(dst_world, &mut entity_map)?;
 
-		if let Some(target) = target {
-			world.entity_mut(target).insert(AgentMarker);
-			for entity in entity_map.values() {
-				world.entity_mut(*entity).insert(TargetAgent(target));
-			}
-		}
-
+		// TODO we should track root through conversion, way easier and faster
 		let root = entity_map
 			.values()
 			.filter(|entity| {
-				world.entity(**entity).contains::<BehaviorGraphRoot>()
+				dst_world.entity(**entity).contains::<BehaviorGraphRoot>()
 			})
 			.next()
 			.ok_or(anyhow::anyhow!(
 				"Failed to spawn behavior graph, no root entity"
 			))?;
 
+		if let Some(target) = target {
+			dst_world.entity_mut(target).insert(AgentMarker);
+			for entity in entity_map.values() {
+				dst_world.entity_mut(*entity).insert(TargetAgent(target));
+			}
+		}
 
-		Ok(*root)
+		let entity_graph = EntityGraph::from_world(dst_world, *root);
+		Ok(entity_graph)
 	}
 
 	// pub fn root(&self) -> Entity { **self.world.resource::<SerdeRootEntity>() }
 	pub fn get_type_registry() -> AppTypeRegistry {
-		let registry = TypeRegistry::default();
-		let registry = AppTypeRegistry(TypeRegistryArc {
-			internal: Arc::new(RwLock::new(registry)),
-		});
+		let registry = AppTypeRegistry::default();
 		Self::append_type_registry(&registry);
 		registry
 	}
@@ -200,19 +179,6 @@ impl<'de, T: ActionTypes> Deserialize<'de> for BehaviorPrefab<T> {
 	}
 }
 
-
 pub trait IntoBehaviorPrefab<M> {
 	fn into_prefab<T: ActionTypes>(self) -> Result<BehaviorPrefab<T>>;
-}
-
-
-impl<M, T> IntoBehaviorPrefab<M> for T
-where
-	T: IntoBehaviorGraph<M>,
-{
-	fn into_prefab<Actions: ActionTypes>(
-		self,
-	) -> Result<BehaviorPrefab<Actions>> {
-		self.into_behavior_graph().into_prefab()
-	}
 }

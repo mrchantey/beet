@@ -9,6 +9,12 @@ use bevy_reflect::TypeRegistry;
 use std::fmt;
 use std::fmt::Debug;
 
+// #[derive(Debug, Clone)]
+// pub struct NoopActionTypes;
+// impl ActionTypes for NoopActionTypes {
+// 	fn register(_: &mut TypeRegistry) {}
+// }
+
 
 #[reflect_trait]
 pub trait Action: 'static + Reflect + fmt::Debug {
@@ -18,8 +24,11 @@ pub trait Action: 'static + Reflect + fmt::Debug {
 	fn insert_from_world(&self, entity: &mut EntityWorldMut<'_>);
 	fn insert_from_commands(&self, entity: &mut EntityCommands);
 }
+
+#[reflect_trait]
 pub trait ActionChildComponents {
 	fn insert_child_components(&self, entity: &mut EntityWorldMut<'_>);
+	fn boxed_child_components(&self) -> Vec<Box<dyn Reflect>>;
 }
 
 // impl Action for Box<dyn Action> {

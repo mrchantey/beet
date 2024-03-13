@@ -7,8 +7,8 @@ use sweet::*;
 pub fn works() -> Result<()> {
 	let mut app = App::new();
 	let target = app.world.spawn_empty().id();
-	let actions = test_constant_behavior_tree();
-	let entities = actions.spawn(&mut app, target);
+	let entities =
+		test_constant_behavior_tree().spawn::<EcsNode>(&mut app, target);
 
 	let entity = *entities.node(2).unwrap();
 	app.world.entity_mut(entity).insert(Score::Pass);

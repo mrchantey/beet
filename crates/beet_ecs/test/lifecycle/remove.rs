@@ -10,8 +10,9 @@ pub fn works() -> Result<()> {
 
 
 	let target = app.world.spawn_empty().id();
-	let graph = BehaviorTree::new(SetRunResult::success());
-	graph.spawn(&mut app, target);
+	SetRunResult::success()
+		.into_beet_node()
+		.spawn::<EcsNode>(&mut app, target);
 
 	expect(app.world.entities().len()).to_be(2)?;
 	app.update();

@@ -9,10 +9,11 @@ pub fn works() -> Result<()> {
 
 	let target = app.world.spawn_empty().id();
 
-	let tree = BehaviorTree::new(SetRunResult::default());
-
-	let entity_graph = tree.spawn(&mut app, target);
-	let root = *entity_graph.root().unwrap();
+	let root = *SetRunResult::default()
+		.into_beet_node()
+		.spawn::<EcsNode>(&mut app, target)
+		.root()
+		.unwrap();
 
 	expect(&app).to_have_component::<Running>(root)?;
 	// add `RunResult`, remove `Running`

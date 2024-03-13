@@ -10,11 +10,10 @@ pub fn works() -> Result<()> {
 
 	let target = app.world.spawn_empty().id();
 
-	let tree = FallbackSelector
+	let entity_graph = FallbackSelector
 		.child(SetRunResult::failure())
-		.child(SetRunResult::success());
-
-	let entity_graph = tree.spawn(&mut app, target);
+		.child(SetRunResult::success())
+		.spawn::<EcsNode>(&mut app, target);
 
 	app.update();
 	expect_tree(

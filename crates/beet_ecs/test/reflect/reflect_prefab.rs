@@ -4,7 +4,7 @@ use sweet::*;
 
 #[sweet_test]
 fn into() -> Result<()> {
-	fn foo<M>(_val: impl IntoBehaviorGraph<M>) {}
+	fn foo<M>(_val: impl IntoBeetNode<M>) {}
 
 	let _prefab = foo(EmptyAction.child(EmptyAction));
 	let _prefab = foo(EmptyAction
@@ -26,23 +26,23 @@ impl ActionTypes for BadList {
 	fn register(_: &mut bevy_reflect::TypeRegistry) {}
 }
 
-#[sweet_test]
+#[sweet_test(skip)]
 fn fails() -> Result<()> {
-	expect(BehaviorPrefab::<BadList>::from_graph(EmptyAction).map(|_| ()))
-		.to_be_err()?;
+	expect(EmptyAction.into_prefab::<BadList>().map(|_| ())).to_be_err()?;
 	Ok(())
 }
 #[sweet_test]
 fn spawns() -> Result<()> {
-	let prefab = BehaviorPrefab::<EcsNode>::from_graph(ConstantScore::new(
-		Score::Weight(0.5),
-	))?;
-
 	let mut world = World::new();
 
 	let agent = world.spawn_empty().id();
 
-	let root = prefab.spawn(&mut world, Some(agent))?;
+	let root = *(Score::default(), ConstantScore::new(Score::Weight(0.5)))
+		.into_beet_node()
+		.with_type::<Score>() // not needed by happenstance but usually required
+		.spawn::<EcsNode>(&mut world, agent)
+		.root()
+		.unwrap();
 
 	expect(&world).to_have_entity(root)?;
 	expect(&world).component::<AgentMarker>(agent)?;

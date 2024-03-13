@@ -11,9 +11,8 @@ pub fn works() -> Result<()> {
 
 	let target = app.world.spawn_empty().id();
 
-	let tree = test_no_action_behavior_tree();
-
-	let entity_graph = tree.spawn(&mut app, target);
+	let entity_graph =
+		test_no_action_behavior_tree().spawn::<EcsNode>(&mut app, target);
 
 	for entity in entity_graph.node_weights() {
 		app.world.entity_mut(*entity).insert(Running);

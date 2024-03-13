@@ -34,9 +34,7 @@ fn serde_f32() -> Result<()> {
 // is this the issue? https://github.com/bevyengine/bevy/issues/12357
 #[sweet_test(skip)]
 fn serde_prefab() -> Result<()> {
-	let prefab1 = BehaviorPrefab::<EcsNode>::from_graph(ConstantScore(
-		Score::Weight(0.5),
-	))?;
+	let prefab1 = ConstantScore(Score::Weight(0.5)).into_prefab::<EcsNode>()?;
 	let str1 = ron::ser::to_string_pretty(
 		&prefab1,
 		ron::ser::PrettyConfig::default(),
@@ -56,7 +54,7 @@ fn serde_prefab() -> Result<()> {
 
 #[sweet_test]
 fn serde_bytes() -> Result<()> {
-	let prefab1 = BehaviorPrefab::<EcsNode>::from_graph(EmptyAction)?;
+	let prefab1 = EmptyAction.into_prefab::<EcsNode>()?;
 	let bytes1 = bincode::serialize(&prefab1)?;
 	let prefab2: BehaviorPrefab<EcsNode> = bincode::deserialize(&bytes1)?;
 	let bytes2 = bincode::serialize(&prefab2)?;
@@ -66,16 +64,18 @@ fn serde_bytes() -> Result<()> {
 #[sweet_test]
 /// these are to be in sync with [`BehaviorPrefab::append_type_registry`]
 fn serde_types() -> Result<()> {
-	let prefab1 = BehaviorPrefab::<EcsNode>::from_graph(
-		EmptyAction.child(ConstantScore::default()),
-	)?;
+	let prefab1 = (Score::default(), ConstantScore::default())
+		.child(Score::Weight(0.5))
+		.into_prefab::<EcsNode>()?;
 	let bytes1 = bincode::serialize(&prefab1)?;
 	let prefab2: BehaviorPrefab<EcsNode> = bincode::deserialize(&bytes1)?;
 	let mut world = World::new();
 	let target = world.spawn_empty().id();
-	let root = prefab2.spawn(&mut world, Some(target))?;
+	let root = *prefab2.spawn(&mut world, Some(target))?.root().unwrap();
 	let child = world.entity(root).get::<Edges>().unwrap()[0];
-	expect(&world).component(child)?.to_be(&Score::default())?;
+	expect(&world)
+		.component(child)?
+		.to_be(&Score::Weight(0.5))?;
 
 	expect(&world).to_have_component::<Name>(root)?;
 	expect(&world).to_have_component::<Edges>(root)?;

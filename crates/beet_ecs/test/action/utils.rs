@@ -7,13 +7,16 @@ use beet_ecs::prelude::*;
 /// 		Child0
 ///
 
-pub fn test_constant_behavior_tree() -> BehaviorTree {
-	ConstantScore::default()
-		.child(ConstantScore::default())
-		.child(ConstantScore::default().child(ConstantScore::default()))
+pub fn test_constant_behavior_tree() -> BeetNode {
+	(Score::default(), ConstantScore::default())
+		.child((Score::default(), ConstantScore::default()))
+		.child(
+			(Score::default(), ConstantScore::default())
+				.child((Score::default(), ConstantScore::default())),
+		)
 }
 
-pub fn test_no_action_behavior_tree() -> BehaviorTree {
+pub fn test_no_action_behavior_tree() -> BeetNode {
 	EmptyAction
 		.child(EmptyAction)
 		.child(EmptyAction.child(EmptyAction))
