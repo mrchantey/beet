@@ -11,7 +11,7 @@ pub fn works() -> Result<()> {
 
 	let root = *SetRunResult::default()
 		.into_beet_node()
-		.spawn::<EcsNode>(&mut app, target)
+		.spawn(&mut app, target)
 		.root()
 		.unwrap();
 

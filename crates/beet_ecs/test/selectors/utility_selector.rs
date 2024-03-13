@@ -20,7 +20,7 @@ fn setup() -> (App, EntityGraph) {
 			ConstantScore::new(Score::Pass),
 			SetRunResult::success(),
 		))
-		.spawn::<EcsNode>(&mut app, target);
+		.spawn(&mut app, target);
 
 	(app, entity_graph)
 }

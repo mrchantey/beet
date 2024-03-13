@@ -13,7 +13,7 @@ fn works() -> Result<()> {
 	let node = EmptyAction
 		.child((EmptyAction, ConstantScore::default()).child(EmptyAction));
 
-	let _prefab = node.into_prefab::<EcsNode>();
+	let _prefab = node.into_prefab();
 
 	Ok(())
 }

@@ -12,7 +12,7 @@ pub fn works() -> Result<()> {
 	let target = app.world.spawn_empty().id();
 	SetRunResult::success()
 		.into_beet_node()
-		.spawn::<EcsNode>(&mut app, target);
+		.spawn(&mut app, target);
 
 	expect(app.world.entities().len()).to_be(2)?;
 	app.update();

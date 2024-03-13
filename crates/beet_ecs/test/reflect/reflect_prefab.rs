@@ -20,15 +20,15 @@ fn into() -> Result<()> {
 	Ok(())
 }
 
-#[derive(Debug, Clone)]
-struct BadList;
-impl ActionTypes for BadList {
-	fn register(_: &mut bevy_reflect::TypeRegistry) {}
-}
+// #[derive(Debug, Clone)]
+// struct BadList;
+// impl ActionTypes for BadList {
+// 	fn register(_: &mut bevy_reflect::TypeRegistry) {}
+// }
 
 #[sweet_test(skip)]
 fn fails() -> Result<()> {
-	expect(EmptyAction.into_prefab::<BadList>().map(|_| ())).to_be_err()?;
+	expect(EmptyAction.into_prefab().map(|_| ())).to_be_err()?;
 	Ok(())
 }
 #[sweet_test]
@@ -40,7 +40,7 @@ fn spawns() -> Result<()> {
 	let root = *(Score::default(), ConstantScore::new(Score::Weight(0.5)))
 		.into_beet_node()
 		.with_type::<Score>() // not needed by happenstance but usually required
-		.spawn::<EcsNode>(&mut world, agent)
+		.spawn(&mut world, agent)
 		.root()
 		.unwrap();
 

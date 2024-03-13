@@ -13,7 +13,7 @@ pub fn works() -> Result<()> {
 	let entity_graph = SequenceSelector
 		.child(SetRunResult::success())
 		.child(SetRunResult::failure())
-		.spawn::<EcsNode>(&mut app, target);
+		.spawn(&mut app, target);
 
 	app.update();
 	expect_tree(

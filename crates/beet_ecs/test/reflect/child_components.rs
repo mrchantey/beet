@@ -11,7 +11,7 @@ fn spawns() -> Result<()> {
 		.child(EmptyAction)
 		.into_beet_node()
 		.with_type::<Score>() // not needed by happenstance but usually required
-		.spawn::<EcsNode>(&mut world, agent)
+		.spawn(&mut world, agent)
 		.root()
 		.unwrap();
 	// expect(&world).component(root)?.to_be(&Score::default())?;

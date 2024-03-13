@@ -13,7 +13,7 @@ pub fn works() -> Result<()> {
 	let entity_graph = FallbackSelector
 		.child(SetRunResult::failure())
 		.child(SetRunResult::success())
-		.spawn::<EcsNode>(&mut app, target);
+		.spawn(&mut app, target);
 
 	app.update();
 	expect_tree(

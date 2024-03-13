@@ -10,7 +10,7 @@ pub fn works() -> Result<()> {
 
 	let root = *SucceedInDuration::default()
 		.into_beet_node()
-		.spawn_no_target::<EcsNode>(&mut app)
+		.spawn_no_target(&mut app)
 		.root()
 		.unwrap();
 

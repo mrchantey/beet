@@ -33,6 +33,11 @@ pub type SpawnFunc = Box<dyn FnOnce(&mut World) -> Entity>;
 pub trait BeetBundle: Bundle + Reflect + GetTypeRegistration {}
 impl<T: Bundle + Reflect + GetTypeRegistration> BeetBundle for T {}
 
+/// Intermediary structure between a [`Bundle`] graph and a [`BehaviorPrefab`]
+/// This does the following when build
+/// - Registers the bundle types
+/// - Spawns the entities
+/// - maps children to an [`Edges`] component
 pub struct BeetNode {
 	pub children: Vec<BeetNode>,
 	pub spawn_func: SpawnFunc,
@@ -46,10 +51,6 @@ impl BeetNode {
 			children: Vec::new(),
 			spawn_func: Box::new(move |world: &mut World| {
 				Self::register_type::<T>(world);
-
-				// let type_data = T::get_type_registration();
-				// type_data.
-
 				world.spawn(bundle).id()
 			}),
 			misc_funcs: Vec::new(),
@@ -70,33 +71,28 @@ impl BeetNode {
 			.register::<T>();
 	}
 
-
-	/// 
-	pub fn spawn<T: ActionTypes>(
+	pub fn spawn(
 		self,
 		world: &mut impl IntoWorld,
 		target: Entity,
 	) -> EntityGraph {
-		self.into_prefab::<T>()
+		self.into_prefab()
 			.expect(EXPECT_OK)
 			.spawn(world, Some(target))
 			.expect(EXPECT_OK)
 	}
-	pub fn spawn_no_target<T: ActionTypes>(
-		self,
-		world: &mut impl IntoWorld,
-	) -> EntityGraph {
-		self.into_prefab::<T>()
+	pub fn spawn_no_target(self, world: &mut impl IntoWorld) -> EntityGraph {
+		self.into_prefab()
 			.expect(EXPECT_OK)
 			.spawn(world, None)
 			.expect(EXPECT_OK)
 	}
 
-	pub fn build(self) -> World {
+	pub fn build(self) -> (World, Entity) {
 		let mut world = World::new();
 		let root = self.build_recursive(&mut world, &mut HashSet::default());
 		world.entity_mut(root).insert((BehaviorGraphRoot, Running));
-		world
+		(world, root)
 	}
 
 
@@ -162,9 +158,8 @@ impl<T, M> IntoBehaviorPrefab<(BeetNodeIntoPrefab, M)> for T
 where
 	T: IntoBeetNode<M>,
 {
-	fn into_prefab<Actions: ActionTypes>(
-		self,
-	) -> Result<BehaviorPrefab<Actions>> {
-		Ok(BehaviorPrefab::from_world(self.into_beet_node().build()))
+	fn into_prefab(self) -> Result<BehaviorPrefab> {
+		let (mut world, root) = self.into_beet_node().build();
+		Ok(BehaviorPrefab::from_world(&mut world, root))
 	}
 }
