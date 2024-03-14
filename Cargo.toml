@@ -113,17 +113,17 @@ base64 = "0.22.0"
 # bevy_utils = { version = "0.13.*" }
 
 
-# recursive type registration https://github.com/bevyengine/bevy/tree/ee0fa7d1c22adf5bf4cbac2553e1055b7f3cc579
-bevy = { git = "https://github.com/mrchantey/bevy.git", rev = "ac6ee8af3a13b5ebd80104a2908811a42b674f69" }
-bevy_app = { git = "https://github.com/mrchantey/bevy.git", rev = "ac6ee8af3a13b5ebd80104a2908811a42b674f69" }
-bevy_core = { git = "https://github.com/mrchantey/bevy.git", rev = "ac6ee8af3a13b5ebd80104a2908811a42b674f69" }
-bevy_derive = { git = "https://github.com/mrchantey/bevy.git", rev = "ac6ee8af3a13b5ebd80104a2908811a42b674f69" }
-bevy_ecs = { git = "https://github.com/mrchantey/bevy.git", rev = "ac6ee8af3a13b5ebd80104a2908811a42b674f69" }
-bevy_hierarchy = { git = "https://github.com/mrchantey/bevy.git", rev = "ac6ee8af3a13b5ebd80104a2908811a42b674f69" }
-bevy_math = { git = "https://github.com/mrchantey/bevy.git", rev = "ac6ee8af3a13b5ebd80104a2908811a42b674f69" }
-bevy_reflect = { git = "https://github.com/mrchantey/bevy.git", rev = "ac6ee8af3a13b5ebd80104a2908811a42b674f69" }
-bevy_scene = { git = "https://github.com/mrchantey/bevy.git", rev = "ac6ee8af3a13b5ebd80104a2908811a42b674f69" }
-bevy_tasks = { git = "https://github.com/mrchantey/bevy.git", rev = "ac6ee8af3a13b5ebd80104a2908811a42b674f69" }
-bevy_time = { git = "https://github.com/mrchantey/bevy.git", rev = "ac6ee8af3a13b5ebd80104a2908811a42b674f69" }
-bevy_transform = { git = "https://github.com/mrchantey/bevy.git", rev = "ac6ee8af3a13b5ebd80104a2908811a42b674f69" }
-bevy_utils = { git = "https://github.com/mrchantey/bevy.git", rev = "ac6ee8af3a13b5ebd80104a2908811a42b674f69" }
+# recursive type registration https://github.com/bevyengine/bevy/tree/d3e44325b45daf13087a6fe7a425b1744b5f2379
+bevy = { git = "https://github.com/bevyengine/bevy.git", rev = "d3e44325b45daf13087a6fe7a425b1744b5f2379" }
+bevy_app = { git = "https://github.com/bevyengine/bevy.git", rev = "d3e44325b45daf13087a6fe7a425b1744b5f2379" }
+bevy_core = { git = "https://github.com/bevyengine/bevy.git", rev = "d3e44325b45daf13087a6fe7a425b1744b5f2379" }
+bevy_derive = { git = "https://github.com/bevyengine/bevy.git", rev = "d3e44325b45daf13087a6fe7a425b1744b5f2379" }
+bevy_ecs = { git = "https://github.com/bevyengine/bevy.git", rev = "d3e44325b45daf13087a6fe7a425b1744b5f2379" }
+bevy_hierarchy = { git = "https://github.com/bevyengine/bevy.git", rev = "d3e44325b45daf13087a6fe7a425b1744b5f2379" }
+bevy_math = { git = "https://github.com/bevyengine/bevy.git", rev = "d3e44325b45daf13087a6fe7a425b1744b5f2379" }
+bevy_reflect = { git = "https://github.com/bevyengine/bevy.git", rev = "d3e44325b45daf13087a6fe7a425b1744b5f2379" }
+bevy_scene = { git = "https://github.com/bevyengine/bevy.git", rev = "d3e44325b45daf13087a6fe7a425b1744b5f2379" }
+bevy_tasks = { git = "https://github.com/bevyengine/bevy.git", rev = "d3e44325b45daf13087a6fe7a425b1744b5f2379" }
+bevy_time = { git = "https://github.com/bevyengine/bevy.git", rev = "d3e44325b45daf13087a6fe7a425b1744b5f2379" }
+bevy_transform = { git = "https://github.com/bevyengine/bevy.git", rev = "d3e44325b45daf13087a6fe7a425b1744b5f2379" }
+bevy_utils = { git = "https://github.com/bevyengine/bevy.git", rev = "d3e44325b45daf13087a6fe7a425b1744b5f2379" }
