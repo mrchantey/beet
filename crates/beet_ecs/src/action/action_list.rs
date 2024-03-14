@@ -16,10 +16,8 @@ macro_rules! action_list {
 		use beet::prelude::*;
 		#[allow(unused_imports)]
 		use beet::exports::*;
-		#[derive(Debug, Clone, Reflect, Display)]
-		pub enum $name {
-			$($variant($variant),)*
-		}
+		#[derive(Debug, Clone)]// must be debug and clone to be ActionList
+		pub struct $name;
 
 		impl ActionSystems for $name {
 			fn add_systems(app:&mut App, schedule: impl ScheduleLabel + Clone){

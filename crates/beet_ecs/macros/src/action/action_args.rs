@@ -4,9 +4,9 @@ use quote::quote;
 use quote::ToTokens;
 use syn::spanned::Spanned;
 use syn::Attribute;
+use syn::DeriveInput;
 use syn::Expr;
 use syn::Ident;
-use syn::ItemStruct;
 use syn::Result;
 
 pub struct ActionArgs {
@@ -15,15 +15,26 @@ pub struct ActionArgs {
 	pub child_components: Vec<Ident>,
 }
 
+
+fn default_system_name(input: &DeriveInput) -> TokenStream {
+	let snake_case = heck::AsSnakeCase(input.ident.to_string());
+	let snake_case =
+		Ident::new(&snake_case.to_string(), input.span()).to_token_stream();
+
+	let (_, type_generics, _) = &input.generics.split_for_impl();
+
+	let type_generics = type_generics.as_turbofish();
+
+	quote! {#snake_case #type_generics}
+}
+
 impl ActionArgs {
-	pub fn new(input: &ItemStruct) -> Result<Self> {
+	pub fn new(input: &DeriveInput) -> Result<Self> {
 		let args = Self::get_args(&input.attrs)?;
 
-		let snake_case = heck::AsSnakeCase(input.ident.to_string());
-		let snake_case =
-			Ident::new(&snake_case.to_string(), input.span()).to_token_stream();
+		let default_system_name = default_system_name(input);
 		let mut set = quote! {TickSet};
-		let mut system = Some(snake_case);
+		let mut system = Some(default_system_name);
 		let mut child_components = Vec::new();
 
 		if args.paths.contains_key("no_system") {

@@ -9,12 +9,12 @@ use bevy_utils::default;
 pub const ENTITY_TOPIC: &'static str = "entity";
 
 #[derive(Resource)]
-pub struct SpawnEntityHandler<T: ActionTypes> {
+pub struct SpawnEntityHandler<T: ActionList> {
 	pub send: Publisher<SpawnEntityPayload<T>>,
 	pub recv: Subscriber<SpawnEntityPayload<T>>,
 }
 
-impl<T: ActionTypes> TopicHandler<SpawnEntityPayload<T>>
+impl<T: ActionList> TopicHandler<SpawnEntityPayload<T>>
 	for SpawnEntityHandler<T>
 {
 	fn topic() -> Topic {
@@ -22,7 +22,7 @@ impl<T: ActionTypes> TopicHandler<SpawnEntityPayload<T>>
 	}
 }
 
-impl<T: ActionTypes> SpawnEntityHandler<T> {
+impl<T: ActionList> SpawnEntityHandler<T> {
 	pub fn new(relay: &mut Relay) -> Result<Self> {
 		Ok(Self {
 			send: Self::publisher(relay)?,
@@ -31,12 +31,12 @@ impl<T: ActionTypes> SpawnEntityHandler<T> {
 	}
 }
 
-// impl<T: ActionTypes> Payload for SpawnEntityPayload<T> {}
+// impl<T: ActionList> Payload for SpawnEntityPayload<T> {}
 
 // these fields are all hacks until BevyReflect, Scene serialization etc
 
 // This is a wip, shouldnt be so specific
-pub fn handle_spawn_entity<T: ActionTypes>(world: &mut World) -> Result<()> {
+pub fn handle_spawn_entity<T: ActionList>(world: &mut World) -> Result<()> {
 	let messages = world
 		.resource_mut::<SpawnEntityHandler<T>>()
 		.recv

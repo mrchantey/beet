@@ -69,7 +69,7 @@ pub fn action(item: TokenStream) -> TokenStream {
 ///
 #[proc_macro_attribute]
 pub fn derive_action(attr: TokenStream, item: TokenStream) -> TokenStream {
-	let item = syn::parse_macro_input!(item as syn::ItemStruct);
+	let item = syn::parse_macro_input!(item as syn::DeriveInput);
 	let attr = proc_macro2::TokenStream::from(attr);
 	quote::quote! {
 		use beet::prelude::*;

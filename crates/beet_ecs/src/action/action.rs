@@ -19,6 +19,7 @@ pub trait ActionChildComponents {
 	fn boxed_child_components(&self) -> Vec<Box<dyn Reflect>>;
 }
 
+// must be static for use in beet plugin
 pub trait ActionSystems: 'static {
 	fn add_systems(app: &mut App, schedule: impl ScheduleLabel + Clone);
 }
@@ -31,10 +32,16 @@ pub struct ActionSystemMarker;
 // }
 
 
-pub trait ActionTypes: 'static + Send + Sync + Debug + Clone {
+pub trait ActionTypes {
 	fn register(registry: &mut TypeRegistry);
 }
 
 
-pub trait ActionList: ActionSystems + ActionTypes {}
-impl<T> ActionList for T where T: ActionSystems + ActionTypes {}
+pub trait ActionList:
+	'static + Send + Sync + Debug + Clone + ActionSystems + ActionTypes
+{
+}
+impl<T> ActionList for T where
+	T: 'static + Send + Sync + Debug + Clone + ActionSystems + ActionTypes
+{
+}
