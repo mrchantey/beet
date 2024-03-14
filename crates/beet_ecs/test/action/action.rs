@@ -34,7 +34,7 @@ pub fn sync_system() -> Result<()> {
 
 	app.world
 		.entity_mut(entity)
-		.insert(SetOnStart::new(Score::Pass));
+		.insert(SetOnStart(Score::Pass));
 
 	expect(&app).component(entity)?.to_be(&Score::Fail)?;
 	app.update();

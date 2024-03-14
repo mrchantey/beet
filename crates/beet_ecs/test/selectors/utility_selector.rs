@@ -12,12 +12,12 @@ fn setup() -> (App, EntityGraph) {
 	let entity_graph = UtilitySelector
 		.child((
 			Score::default(),
-			SetOnStart::new(Score::Fail),
+			SetOnStart(Score::Fail),
 			InsertOnRun(RunResult::Failure),
 		))
 		.child((
 			Score::default(),
-			SetOnStart::new(Score::Pass),
+			SetOnStart(Score::Pass),
 			InsertOnRun(RunResult::Success),
 		))
 		.spawn(&mut app, target);
@@ -39,27 +39,29 @@ pub fn works() -> Result<()> {
 			.with_leaf(Some(&Running)),
 	)?;
 
-	// app.update();
-	// expect_tree(
-	// 	&mut app,
-	// 	&entity_graph,
-	// 	Tree::new(Some(&Running)).with_leaf(None).with_leaf(None),
-	// )?;
 
-	// app.update();
-	// expect_tree::<Running>(
-	// 	&mut app,
-	// 	&entity_graph,
-	// 	Tree::new(None).with_leaf(None).with_leaf(None),
-	// )?;
+	app.update();
+	expect_tree(
+		&mut app,
+		&entity_graph,
+		Tree::new(Some(&RunResult::Success))
+			.with_leaf(None)
+			.with_leaf(Some(&RunResult::Success)),
+	)?;
 
-	// expect_tree(
-	// 	&mut app,
-	// 	&entity_graph,
-	// 	Tree::new(Some(&RunResult::Success))
-	// 		.with_leaf(None)
-	// 		.with_leaf(None),
-	// )?;
+	expect_tree::<Running>(
+		&mut app,
+		&entity_graph,
+		Tree::new(None).with_leaf(None).with_leaf(None),
+	)?;
+	
+	app.update();
+
+	expect_tree::<RunResult>(
+		&mut app,
+		&entity_graph,
+		Tree::new(None).with_leaf(None).with_leaf(None),
+	)?;
 
 	Ok(())
 }

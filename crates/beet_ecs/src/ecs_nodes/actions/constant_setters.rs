@@ -15,7 +15,7 @@ use bevy_ecs::prelude::*;
 pub struct SetOnStart<T: Clone + Component>(pub T);
 
 impl<T: Clone + Component> SetOnStart<T> {
-	pub fn new(value: T) -> Self { Self(value) }
+	pub fn new(value: impl Into<T>) -> Self { Self(value.into()) }
 }
 
 fn set_on_start<T: Clone + Component>(
@@ -47,7 +47,7 @@ fn insert_on_run<T: Clone + Component>(
 
 /// If the node does not have the component this will do nothing.
 #[derive(Default, PartialEq, Deref, DerefMut)]
-#[derive_action(set=PreTickSet)]
+#[derive_action(set=PostTickSet)]
 pub struct SetOnRun<T: Clone + Component>(pub T);
 
 impl<T: Clone + Component> SetOnRun<T> {
@@ -64,11 +64,11 @@ fn set_on_run<T: Clone + Component>(
 
 /// If the agent does not have the component this will do nothing.
 #[derive(Default, PartialEq, Deref, DerefMut)]
-#[derive_action(set=PreTickSet)]
+#[derive_action(set=PostTickSet)]
 pub struct SetAgentOnRun<T: Clone + Component>(pub T);
 
 impl<T: Clone + Component> SetAgentOnRun<T> {
-	pub fn new(value: T) -> Self { Self(value.into()) }
+	pub fn new(value: impl Into<T>) -> Self { Self(value.into()) }
 }
 
 fn set_agent_on_run<T: Clone + Component>(
