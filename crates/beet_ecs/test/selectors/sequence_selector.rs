@@ -11,8 +11,8 @@ pub fn works() -> Result<()> {
 	let target = app.world.spawn_empty().id();
 
 	let entity_graph = SequenceSelector
-		.child(SetRunResult::success())
-		.child(SetRunResult::failure())
+		.child(InsertOnRun(RunResult::Success))
+		.child(InsertOnRun(RunResult::Failure))
 		.spawn(&mut app, target);
 
 	app.update();

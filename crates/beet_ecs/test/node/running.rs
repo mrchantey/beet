@@ -9,7 +9,7 @@ pub fn works() -> Result<()> {
 
 	let target = app.world.spawn_empty().id();
 
-	let root = *SetRunResult::default()
+	let root = *InsertOnRun(RunResult::Success)
 		.into_beet_node()
 		.spawn(&mut app, target)
 		.root()

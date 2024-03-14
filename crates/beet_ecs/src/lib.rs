@@ -32,7 +32,10 @@ pub mod exports {
 	pub use bevy_ecs::schedule::ScheduleLabel;
 	pub use bevy_ecs::system::EntityCommands;
 	pub use bevy_reflect;
+	pub use bevy_reflect::FromReflect;
+	pub use bevy_reflect::GetTypeRegistration;
 	pub use bevy_reflect::Reflect;
+	pub use bevy_reflect::TypePath;
 	pub use bevy_reflect::TypeRegistry;
 	pub use strum::IntoEnumIterator;
 	pub use strum_macros::Display;

@@ -37,7 +37,7 @@ fn spawns() -> Result<()> {
 
 	let agent = world.spawn_empty().id();
 
-	let root = *(Score::default(), ConstantScore::new(Score::Weight(0.5)))
+	let root = *(Score::default(), SetOnStart::new(Score::Weight(0.5)))
 		.into_beet_node()
 		.with_type::<Score>() // not needed by happenstance but usually required
 		.spawn(&mut world, agent)
@@ -49,7 +49,7 @@ fn spawns() -> Result<()> {
 	expect(&world).component(root)?.to_be(&TargetAgent(agent))?;
 	expect(&world)
 		.component(root)?
-		.to_be(&ConstantScore(Score::Weight(0.5)))?;
+		.to_be(&SetOnStart(Score::Weight(0.5)))?;
 
 	// test shared component
 	expect(&world).component(root)?.to_be(&Score::default())?;

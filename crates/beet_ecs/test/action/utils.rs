@@ -8,11 +8,11 @@ use beet_ecs::prelude::*;
 ///
 
 pub fn test_constant_behavior_tree() -> BeetNode {
-	(Score::default(), ConstantScore::default())
-		.child((Score::default(), ConstantScore::default()))
+	(Score::default(), SetOnStart::<Score>::default())
+		.child((Score::default(), SetOnStart::<Score>::default()))
 		.child(
-			(Score::default(), ConstantScore::default())
-				.child((Score::default(), ConstantScore::default())),
+			(Score::default(), SetOnStart::<Score>::default())
+				.child((Score::default(), SetOnStart::<Score>::default())),
 		)
 }
 

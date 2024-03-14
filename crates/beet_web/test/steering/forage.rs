@@ -24,7 +24,7 @@ async fn works() -> Result<()> {
 		)
 			.child((
 				Score::default(),
-				ConstantScore::new(Score::Weight(0.5)),
+				SetOnStart(Score::Weight(0.5)),
 				Wander::default(),
 			))
 			.child(
@@ -35,11 +35,11 @@ async fn works() -> Result<()> {
 				)
 					.child((Seek::default(), SucceedOnArrive { radius: 0.1 }))
 					.child((
-						SetVelocity(Vec3::ZERO),
+						SetAgentOnRun(Velocity(Vec3::ZERO)),
 						SucceedInDuration::with_secs(1),
 					))
 					.child((
-						SetRunResult::success(),
+						InsertOnRun(RunResult::Success),
 						DespawnSteerTarget::default(),
 					)),
 			),

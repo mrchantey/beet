@@ -12,13 +12,13 @@ fn setup() -> (App, EntityGraph) {
 	let entity_graph = UtilitySelector
 		.child((
 			Score::default(),
-			ConstantScore::new(Score::Fail),
-			SetRunResult::failure(),
+			SetOnStart::new(Score::Fail),
+			InsertOnRun(RunResult::Failure),
 		))
 		.child((
 			Score::default(),
-			ConstantScore::new(Score::Pass),
-			SetRunResult::success(),
+			SetOnStart::new(Score::Pass),
+			InsertOnRun(RunResult::Success),
 		))
 		.spawn(&mut app, target);
 

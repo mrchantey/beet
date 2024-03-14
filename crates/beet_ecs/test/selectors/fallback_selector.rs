@@ -11,8 +11,8 @@ pub fn works() -> Result<()> {
 	let target = app.world.spawn_empty().id();
 
 	let entity_graph = FallbackSelector
-		.child(SetRunResult::failure())
-		.child(SetRunResult::success())
+		.child(InsertOnRun(RunResult::Failure))
+		.child(InsertOnRun(RunResult::Success))
 		.spawn(&mut app, target);
 
 	app.update();

@@ -11,7 +11,7 @@
 ///
 #[macro_export]
 macro_rules! action_list {
-	($name:ident, [$($variant:ident),*]) => {
+	($name:ident, [$($variant:tt),*]) => {
 		#[allow(unused_imports)]
 		use beet::prelude::*;
 		#[allow(unused_imports)]

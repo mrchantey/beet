@@ -12,7 +12,7 @@ pub fn default_components() -> Result<()> {
 	let entities = actions.spawn(&mut app, target);
 	let entity = *entities.root().unwrap();
 
-	expect(&app).to_have_component::<ConstantScore>(entity)?;
+	expect(&app).to_have_component::<SetOnStart<Score>>(entity)?;
 	expect(&app).to_have_component::<TargetAgent>(entity)?;
 	expect(&app).to_have_component::<RunTimer>(entity)?;
 	expect(&app).to_have_component::<Score>(entity)?;
@@ -34,7 +34,7 @@ pub fn sync_system() -> Result<()> {
 
 	app.world
 		.entity_mut(entity)
-		.insert(ConstantScore::new(Score::Pass));
+		.insert(SetOnStart::new(Score::Pass));
 
 	expect(&app).component(entity)?.to_be(&Score::Fail)?;
 	app.update();

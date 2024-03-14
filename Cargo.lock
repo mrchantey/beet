@@ -398,6 +398,7 @@ dependencies = [
  "bevy_derive",
  "bevy_ecs",
  "bevy_math",
+ "bevy_reflect",
  "bevy_tasks",
  "bevy_time",
  "bevy_transform",

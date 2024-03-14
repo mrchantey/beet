@@ -23,7 +23,7 @@ use sweet::*;
 
 #[sweet_test]
 fn serde_prefab() -> Result<()> {
-	let prefab1 = ConstantScore(Score::Weight(0.5)).into_prefab()?;
+	let prefab1 = SetOnStart(Score::Weight(0.5)).into_prefab()?;
 	let str1 = ron::ser::to_string_pretty(
 		&prefab1,
 		ron::ser::PrettyConfig::default(),
@@ -51,7 +51,7 @@ fn serde_bytes() -> Result<()> {
 
 #[sweet_test]
 fn serde_types() -> Result<()> {
-	let prefab1 = (Score::default(), ConstantScore::default())
+	let prefab1 = (Score::default(), SetOnStart::<Score>::default())
 		.child(Score::Weight(0.5))
 		.into_prefab()?;
 	let bytes1 = bincode::serialize(&prefab1)?;
@@ -71,36 +71,5 @@ fn serde_types() -> Result<()> {
 	expect(&world).to_have_component::<RunTimer>(root)?;
 	expect(&world).to_have_component::<BehaviorGraphRoot>(root)?;
 
-
 	Ok(())
 }
-
-
-// #[sweet_test(only)]
-// fn serde_scene() -> Result<()> {
-// 	let mut world = World::new();
-// 	let mut registry = TypeRegistry::new();
-// 	registry.register::<ConstantScore>();
-// 	let registry = AppTypeRegistry(TypeRegistryArc {
-// 		internal: Arc::new(RwLock::new(registry)),
-// 	});
-// 	world.insert_resource(registry);
-// 	let scene = DynamicScene::from_world(&world);
-// 	let scene_serializer = SceneSerializer::new(&self.scene, &registry);
-// 	scene_serializer.serialize(serializer);
-
-// 	let prefab1 = BehaviorPrefab::<EcsNode>::from_graph(ConstantScore(
-// 		Score::Weight(0.5),
-// 	))?;
-// 	let str1 = ron::ser::to_string_pretty(
-// 		&prefab1,
-// 		ron::ser::PrettyConfig::default(),
-// 	)?;
-// 	let prefab2: BehaviorPrefab<EcsNode> = ron::from_str(&str1)?;
-// 	let str2 = ron::ser::to_string_pretty(
-// 		&prefab2,
-// 		ron::ser::PrettyConfig::default(),
-// 	)?;
-// 	expect(str1).to_be(str2)?;
-// 	Ok(())
-// }

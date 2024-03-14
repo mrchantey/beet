@@ -6,8 +6,7 @@ extern crate beet_ecs as beet;
 
 action_list!(MyNodes, [
 	EmptyAction,
-	SetRunResult,
-	ConstantScore,
+	// SetOnStart::<Score>,
 	SucceedInDuration,
 	SequenceSelector,
 	FallbackSelector,

@@ -1,3 +1,4 @@
+use beet_ecs::exports::Reflect;
 use bevy_derive::Deref;
 use bevy_derive::DerefMut;
 use bevy_ecs::prelude::*;
@@ -7,7 +8,10 @@ use bevy_transform::prelude::*;
 
 
 /// A vector measured in (m/s)
-#[derive(Debug, Default, Clone, PartialEq, Deref, DerefMut, Component)]
+#[derive(
+	Debug, Default, Clone, PartialEq, Deref, DerefMut, Component, Reflect,
+)]
+#[reflect(Component)]
 pub struct Velocity(pub Vec3);
 /// A force that is cleared each frame.
 #[derive(Debug, Default, Clone, PartialEq, Deref, DerefMut, Component)]

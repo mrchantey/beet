@@ -14,7 +14,7 @@ pub async fn works() -> Result<()> {
 					SucceedOnArrive { radius: 0.1 },
 				))
 				.child((
-					SetRunResult::success(),
+					InsertOnRun(RunResult::Success),
 					DespawnSteerTarget::default(),
 				)),
 		)

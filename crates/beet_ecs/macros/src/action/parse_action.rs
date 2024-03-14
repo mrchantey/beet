@@ -1,12 +1,17 @@
 use super::*;
 use proc_macro2::TokenStream;
 use quote::quote;
+use syn::parse_quote;
 use syn::DeriveInput;
 use syn::Result;
+use syn::WherePredicate;
+
 
 
 pub fn parse_action(item: proc_macro::TokenStream) -> Result<TokenStream> {
-	let input = syn::parse::<DeriveInput>(item)?;
+	let mut input = syn::parse::<DeriveInput>(item)?;
+	append_generic_constraints(&mut input);
+
 	let args = ActionArgs::new(&input)?;
 
 	let impl_register = parse_register(&args, &input);
@@ -23,6 +28,31 @@ pub fn parse_action(item: proc_macro::TokenStream) -> Result<TokenStream> {
 		#impl_systems
 		#impl_child_components
 	})
+}
+
+
+fn append_generic_constraints(input: &mut DeriveInput) {
+	let predicates = input
+		.generics
+		.params
+		.iter()
+		.filter_map(|param| match param {
+			syn::GenericParam::Type(param) => {
+				let ident = &param.ident;
+				Some(
+					parse_quote!(#ident: FromReflect + GetTypeRegistration + TypePath),
+				)
+			}
+			_ => None,
+		})
+		.collect::<Vec<WherePredicate>>();
+
+	if predicates.len() > 0 {
+		let where_clause = input.generics.make_where_clause();
+		for predicate in predicates {
+			where_clause.predicates.push(predicate);
+		}
+	}
 }
 
 fn parse_register(args: &ActionArgs, input: &DeriveInput) -> TokenStream {
@@ -54,7 +84,7 @@ fn parse_systems(args: &ActionArgs, input: &DeriveInput) -> TokenStream {
 
 		let ident = &input.ident;
 		let (impl_generics, type_generics, where_clause) =
-			&input.generics.split_for_impl();	
+			&input.generics.split_for_impl();
 
 		quote! {
 			impl #impl_generics ActionSystems for #ident #type_generics #where_clause {
