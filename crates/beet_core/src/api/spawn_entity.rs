@@ -37,12 +37,11 @@ impl<T: ActionList> SpawnEntityHandler<T> {
 
 // This is a wip, shouldnt be so specific
 pub fn handle_spawn_entity<T: ActionList>(world: &mut World) -> Result<()> {
-	let messages = world
+	for message in world
 		.resource_mut::<SpawnEntityHandler<T>>()
 		.recv
-		.try_recv_all()?;
-
-	for message in messages {
+		.try_recv_all()?
+	{
 		let SpawnEntityPayload {
 			beet_id,
 			name,

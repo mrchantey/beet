@@ -7,6 +7,9 @@ pub use self::spawn_entity_payload::*;
 pub mod despawn_entity;
 #[allow(unused_imports)]
 pub use self::despawn_entity::*;
+pub mod set_component;
+#[allow(unused_imports)]
+pub use self::set_component::*;
 pub mod spawn_entity;
 #[allow(unused_imports)]
 pub use self::spawn_entity::*;

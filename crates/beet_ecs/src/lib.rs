@@ -4,6 +4,7 @@ pub mod edge;
 pub mod extensions;
 pub mod graph;
 pub mod node;
+pub mod reflect;
 pub mod ui;
 
 // currently required for action_list! macro to work
@@ -20,6 +21,7 @@ pub mod prelude {
 	pub use crate::extensions::*;
 	pub use crate::graph::*;
 	pub use crate::node::*;
+	pub use crate::reflect::*;
 	pub use crate::ui::*;
 	pub use beet_ecs_macros::*;
 }
