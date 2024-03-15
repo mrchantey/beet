@@ -1,8 +1,8 @@
 use super::*;
 use crate::utils::ReceiverTExt;
 use anyhow::Result;
-use bevy_utils::Duration;
 use std::ops::ControlFlow;
+use std::time::Duration;
 
 #[derive(Debug, Clone)]
 pub struct Requester<Req: Payload, Res: Payload> {

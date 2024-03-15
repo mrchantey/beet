@@ -1,6 +1,6 @@
 use crate::prelude::*;
-use bevy_ecs::prelude::*;
-use bevy_utils::Duration;
+use bevy::prelude::*;
+use std::time::Duration;
 
 #[derive_action]
 pub struct SucceedInDuration {

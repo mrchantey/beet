@@ -1,5 +1,5 @@
 use beet_ecs::prelude::*;
-use bevy_ecs::prelude::*;
+use bevy::prelude::*;
 use sweet::*;
 
 #[sweet_test]
@@ -23,7 +23,7 @@ fn into() -> Result<()> {
 // #[derive(Debug, Clone)]
 // struct BadList;
 // impl ActionTypes for BadList {
-// 	fn register(_: &mut bevy_reflect::TypeRegistry) {}
+// 	fn register(_: &mut bevy::reflect::TypeRegistry) {}
 // }
 
 // #[sweet_test(skip)]

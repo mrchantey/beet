@@ -1,6 +1,6 @@
 use crate::tests::utils::expect_tree;
 use beet_ecs::prelude::*;
-use bevy_app::App;
+use bevy::prelude::*;
 use sweet::*;
 
 fn setup() -> (App, EntityGraph) {
@@ -54,7 +54,7 @@ pub fn works() -> Result<()> {
 		&entity_graph,
 		Tree::new(None).with_leaf(None).with_leaf(None),
 	)?;
-	
+
 	app.update();
 
 	expect_tree::<RunResult>(

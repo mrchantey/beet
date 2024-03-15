@@ -1,13 +1,8 @@
 use super::type_registry_utils::append_beet_type_registry_with_generics;
 use crate::prelude::*;
 use anyhow::Result;
-use bevy_ecs::entity::Entity;
-use bevy_ecs::reflect::AppTypeRegistry;
-use bevy_ecs::world::World;
-use bevy_reflect::FromReflect;
-use bevy_reflect::Reflect;
-use bevy_scene::serde::SceneDeserializer;
-use bevy_scene::DynamicScene;
+use bevy::prelude::*;
+use bevy::scene::serde::SceneDeserializer;
 use serde::de::DeserializeSeed;
 use serde::Deserialize;
 use serde::Serialize;

@@ -1,10 +1,11 @@
 use crate::prelude::*;
 use anyhow::Result;
-use bevy_utils::HashMap;
-use bevy_utils::HashSet;
+use bevy::utils::HashMap;
+use bevy::utils::HashSet;
 use serde::Deserialize;
 use serde::Serialize;
 use std::fmt;
+
 
 /// A representation of all topic interests (sub) and intents (pub)
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]

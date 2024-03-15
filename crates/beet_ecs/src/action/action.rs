@@ -1,9 +1,6 @@
-use bevy_app::App;
-use bevy_ecs::schedule::ScheduleLabel;
-use bevy_ecs::world::EntityWorldMut;
-use bevy_reflect::reflect_trait;
-use bevy_reflect::Reflect;
-use bevy_reflect::TypeRegistry;
+use bevy::ecs::schedule::ScheduleLabel;
+use bevy::prelude::*;
+use bevy::reflect::TypeRegistry;
 use std::fmt::Debug;
 
 #[derive(Debug, Clone)]
@@ -26,7 +23,7 @@ pub trait ActionSystems: 'static {
 
 pub struct ActionSystemMarker;
 // impl<T> IntoSystemConfigs<ActionSystemMarker> for T where T:ActionSystems{
-// 		fn into_configs(self) -> bevy_ecs::schedule::SystemConfigs {
+// 		fn into_configs(self) -> bevy::schedule::SystemConfigs {
 // 				// self.
 // 		}
 // }

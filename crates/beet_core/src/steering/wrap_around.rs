@@ -1,8 +1,5 @@
 use beet_ecs::node::AgentMarker;
-use bevy_ecs::prelude::*;
-use bevy_math::Vec3;
-use bevy_transform::components::Transform;
-
+use bevy::prelude::*;
 
 pub const DEFAULT_WRAPAROUND_HALF_EXTENTS: f32 = 1.;
 

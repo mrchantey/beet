@@ -1,8 +1,9 @@
 use beet_core::prelude::*;
-use bevy_app::App;
-use bevy_math::Vec3;
-use bevy_transform::components::Transform;
+use beet_ecs::prelude::*;
+use beet_net::prelude::*;
+use bevy::prelude::*;
 use sweet::*;
+
 
 #[sweet_test]
 pub fn works() -> Result<()> {

@@ -1,6 +1,6 @@
 use super::*;
 use crate::prelude::*;
-use bevy_ecs::prelude::*;
+use bevy::prelude::*;
 
 /// An action that runs all of its children in order until one fails.
 ///

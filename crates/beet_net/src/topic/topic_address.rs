@@ -1,10 +1,8 @@
-use bevy_derive::Deref;
-use bevy_derive::DerefMut;
+use bevy::prelude::*;
 use core::fmt;
 use serde::Deserialize;
 use serde::Serialize;
 use std::fmt::Display;
-
 
 pub type TopicKey = u64;
 
@@ -29,7 +27,10 @@ impl TopicPath {
 	///
 	pub fn from_str(path: &str) -> Self {
 		if path.contains("/") {
-			log::warn!("Topic Path contains '/', this is not allowed: {}", path);
+			log::warn!(
+				"Topic Path contains '/', this is not allowed: {}",
+				path
+			);
 		}
 		let mut split = path.split(":");
 		let path = split.next().unwrap_or_default();

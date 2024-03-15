@@ -8,7 +8,6 @@ pub mod reflect;
 pub mod ui;
 
 // currently required for action_list! macro to work
-extern crate self as beet;
 extern crate self as beet_ecs;
 
 pub mod prelude {
@@ -28,17 +27,16 @@ pub mod prelude {
 
 
 pub mod exports {
-	pub use bevy_app::prelude::App;
-	pub use bevy_ecs;
-	pub use bevy_ecs::prelude::*;
-	pub use bevy_ecs::schedule::ScheduleLabel;
-	pub use bevy_ecs::system::EntityCommands;
-	pub use bevy_reflect;
-	pub use bevy_reflect::FromReflect;
-	pub use bevy_reflect::GetTypeRegistration;
-	pub use bevy_reflect::Reflect;
-	pub use bevy_reflect::TypePath;
-	pub use bevy_reflect::TypeRegistry;
+	pub use bevy::ecs as bevy_ecs;
+	pub use bevy::ecs::schedule::ScheduleLabel;
+	pub use bevy::ecs::system::EntityCommands;
+	pub use bevy::prelude::*;
+	pub use bevy::reflect as bevy_reflect;
+	pub use bevy::reflect::FromReflect;
+	pub use bevy::reflect::GetTypeRegistration;
+	pub use bevy::reflect::Reflect;
+	pub use bevy::reflect::TypePath;
+	pub use bevy::reflect::TypeRegistry;
 	pub use strum::IntoEnumIterator;
 	pub use strum_macros::Display;
 	pub use strum_macros::EnumIter;

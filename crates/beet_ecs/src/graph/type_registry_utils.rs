@@ -1,6 +1,5 @@
 use crate::prelude::*;
-use bevy_core::Name;
-use bevy_ecs::reflect::AppTypeRegistry;
+use bevy::prelude::*;
 
 pub fn merge_type_registries(src: &AppTypeRegistry, dst: &mut AppTypeRegistry) {
 	let src = src.read();

@@ -1,8 +1,5 @@
 use crate::prelude::*;
-use bevy_derive::Deref;
-use bevy_derive::DerefMut;
-use bevy_ecs::prelude::*;
-use bevy_ecs::world::World;
+use bevy::prelude::*;
 use petgraph::graph::DiGraph;
 use petgraph::graph::NodeIndex;
 use std::fmt::Debug;

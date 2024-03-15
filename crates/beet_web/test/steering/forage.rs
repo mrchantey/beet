@@ -1,7 +1,7 @@
-use beet::prelude::*;
+use beet_core::prelude::*;
+use beet_ecs::prelude::*;
 use beet_web::prelude::*;
-use bevy_math::Vec3;
-use bevy_utils::prelude::default;
+use bevy::prelude::*;
 use sweet::*;
 
 

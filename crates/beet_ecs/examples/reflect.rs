@@ -1,4 +1,4 @@
-use bevy_reflect::prelude::*;
+use bevy::prelude::*;
 
 pub fn main() {}
 

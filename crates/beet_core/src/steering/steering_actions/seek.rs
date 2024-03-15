@@ -1,6 +1,6 @@
 use crate::prelude::*;
+use bevy::prelude::*;
 use beet_ecs::prelude::*;
-use bevy_transform::components::Transform;
 
 #[derive(Default)]
 #[derive_action]

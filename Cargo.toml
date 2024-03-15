@@ -99,31 +99,7 @@ base64 = "0.22.0"
 
 ## game
 # bevy = { version = "0.13.*" }
-# bevy_app = { version = "0.13.*" }
-# bevy_core = { version = "0.13.*" }
-# bevy_derive = { version = "0.13.*" }
-# bevy_ecs = { version = "0.13.*" }
-# bevy_hierarchy = { version = "0.13.*" }
-# bevy_math = { version = "0.13.*" }
-# bevy_reflect = { version = "0.13.*" }
-# bevy_scene = { version = "0.13.*" }
-# bevy_tasks = { version = "0.13.*" }
-# bevy_time = { version = "0.13.*" }
-# bevy_transform = { version = "0.13.*" }
-# bevy_utils = { version = "0.13.*" }
-
-
 # recursive type registration https://github.com/bevyengine/bevy/tree/d3e44325b45daf13087a6fe7a425b1744b5f2379
-bevy = { git = "https://github.com/bevyengine/bevy.git", rev = "d3e44325b45daf13087a6fe7a425b1744b5f2379" }
-bevy_app = { git = "https://github.com/bevyengine/bevy.git", rev = "d3e44325b45daf13087a6fe7a425b1744b5f2379" }
-bevy_core = { git = "https://github.com/bevyengine/bevy.git", rev = "d3e44325b45daf13087a6fe7a425b1744b5f2379" }
-bevy_derive = { git = "https://github.com/bevyengine/bevy.git", rev = "d3e44325b45daf13087a6fe7a425b1744b5f2379" }
-bevy_ecs = { git = "https://github.com/bevyengine/bevy.git", rev = "d3e44325b45daf13087a6fe7a425b1744b5f2379" }
-bevy_hierarchy = { git = "https://github.com/bevyengine/bevy.git", rev = "d3e44325b45daf13087a6fe7a425b1744b5f2379" }
-bevy_math = { git = "https://github.com/bevyengine/bevy.git", rev = "d3e44325b45daf13087a6fe7a425b1744b5f2379" }
-bevy_reflect = { git = "https://github.com/bevyengine/bevy.git", rev = "d3e44325b45daf13087a6fe7a425b1744b5f2379" }
-bevy_scene = { git = "https://github.com/bevyengine/bevy.git", rev = "d3e44325b45daf13087a6fe7a425b1744b5f2379" }
-bevy_tasks = { git = "https://github.com/bevyengine/bevy.git", rev = "d3e44325b45daf13087a6fe7a425b1744b5f2379" }
-bevy_time = { git = "https://github.com/bevyengine/bevy.git", rev = "d3e44325b45daf13087a6fe7a425b1744b5f2379" }
-bevy_transform = { git = "https://github.com/bevyengine/bevy.git", rev = "d3e44325b45daf13087a6fe7a425b1744b5f2379" }
-bevy_utils = { git = "https://github.com/bevyengine/bevy.git", rev = "d3e44325b45daf13087a6fe7a425b1744b5f2379" }
+bevy = { git = "https://github.com/bevyengine/bevy.git", rev = "d3e44325b45daf13087a6fe7a425b1744b5f2379", default-features = false, features = [
+	"bevy_scene",
+] }

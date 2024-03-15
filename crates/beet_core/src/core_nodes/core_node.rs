@@ -2,9 +2,8 @@ use super::*;
 use crate::prelude::*;
 use beet_ecs::exports::ScheduleLabel;
 use beet_ecs::prelude::*;
-use bevy_app::App;
-use bevy_reflect::TypeRegistry;
-
+use bevy::prelude::*;
+use bevy::reflect::TypeRegistry;
 
 // action_list!(CoreNode, [
 // 	//core

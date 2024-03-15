@@ -1,10 +1,8 @@
 use crate::prelude::*;
 use anyhow::Result;
-use bevy_core::Name;
-use bevy_ecs::prelude::*;
-use bevy_transform::components::Transform;
-use bevy_transform::TransformBundle;
-use bevy_utils::default;
+use beet_ecs::prelude::*;
+use beet_net::prelude::*;
+use bevy::prelude::*;
 
 pub const ENTITY_TOPIC: &'static str = "entity";
 

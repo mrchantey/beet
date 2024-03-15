@@ -1,7 +1,7 @@
 use crate::tests::action::test_no_action_behavior_tree;
 use crate::tests::utils::expect_tree;
 use beet_ecs::prelude::*;
-use bevy_app::App;
+use bevy::prelude::*;
 use sweet::*;
 
 #[sweet_test]

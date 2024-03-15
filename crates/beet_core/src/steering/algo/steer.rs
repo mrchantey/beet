@@ -6,10 +6,7 @@ These algorithms are from the book "The Nature of Code" by Daniel Shiffman
 [Craig Reynolds - References](https://www.red3d.com/cwr/steer/)
 */
 use crate::prelude::*;
-use bevy_derive::Deref;
-use bevy_derive::DerefMut;
-use bevy_ecs::prelude::*;
-use bevy_math::Vec3;
+use bevy::prelude::*;
 
 /// Max force used to clamp forces, defaults to `0.1`
 #[derive(Debug, Copy, Clone, PartialEq, Deref, DerefMut, Component)]

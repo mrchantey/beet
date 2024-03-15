@@ -1,8 +1,6 @@
 use crate::prelude::*;
-use bevy_derive::Deref;
-use bevy_derive::DerefMut;
-use bevy_ecs::prelude::*;
-use bevy_utils::HashSet;
+use bevy::prelude::*;
+use bevy::utils::HashSet;
 use petgraph::graph::DiGraph;
 use petgraph::graph::NodeIndex;
 

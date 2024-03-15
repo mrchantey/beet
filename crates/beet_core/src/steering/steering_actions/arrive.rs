@@ -1,9 +1,5 @@
 use crate::prelude::*;
-use bevy_derive::Deref;
-use bevy_derive::DerefMut;
-use bevy_ecs::prelude::*;
-use bevy_math::Vec3;
-use forky_core::prelude::*;
+use bevy::prelude::*;
 
 /// The distance at which an agent should begin to slow down, defaults to `0.5`
 #[derive(Debug, Copy, Clone, PartialEq, Deref, DerefMut, Component)]

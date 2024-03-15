@@ -1,6 +1,6 @@
 use super::test_constant_behavior_tree;
 use beet_ecs::prelude::*;
-use bevy_app::App;
+use bevy::prelude::*;
 use sweet::*;
 
 #[sweet_test]

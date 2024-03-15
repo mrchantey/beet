@@ -1,11 +1,8 @@
 use crate::prelude::*;
 use beet_ecs::prelude::*;
 use beet_net::prelude::*;
-use bevy_app::prelude::*;
-use bevy_derive::Deref;
-use bevy_derive::DerefMut;
-use bevy_ecs::prelude::*;
-use bevy_time::TimePlugin;
+use bevy::prelude::*;
+use bevy::time::TimePlugin;
 use std::marker::PhantomData;
 
 /// The plugin required for most beet apps

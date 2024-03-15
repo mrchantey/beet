@@ -29,14 +29,14 @@
 	// "rust-analyzer.cargo.features": [
 	// 	"web_sys_unstable_apis"
 	// ],
-	"rust-analyzer.cargo.target": "x86_64-unknown-linux-gnu",
+	// "rust-analyzer.cargo.target": "x86_64-unknown-linux-gnu",
 	// "rust-analyzer.procMacro.enable": false,
 	// "rust-analyzer.procMacro.attributes.enable": false,
 	"rust-analyzer.showUnlinkedFileNotification": false,
 	"rust-analyzer.files.excludeDirs": [
 		"crates/beet_esp"
 	],
-	// "rust-analyzer.cargo.target": "wasm32-unknown-unknown",
+	"rust-analyzer.cargo.target": "wasm32-unknown-unknown",
 	"search.exclude": {
 		"docs/deps/mermaid-init.js": true,
 		"docs/deps/mermaid.min.js": true,

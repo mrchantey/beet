@@ -1,11 +1,7 @@
-use bevy_derive::Deref;
-use bevy_derive::DerefMut;
-use bevy_ecs::entity::MapEntities;
-use bevy_ecs::prelude::*;
-use bevy_ecs::reflect::ReflectMapEntities;
-use bevy_reflect::Reflect;
-use bevy_utils::HashSet;
-
+use bevy::ecs::entity::MapEntities;
+use bevy::ecs::reflect::ReflectMapEntities;
+use bevy::prelude::*;
+use bevy::utils::HashSet;
 
 /// Outgoing edges of an action, aka Children.
 #[derive(Debug, Default, Clone, Deref, DerefMut, Component, Reflect)]

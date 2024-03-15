@@ -1,6 +1,6 @@
 use super::*;
 use beet_ecs::prelude::*;
-use bevy_app::App;
+use bevy::prelude::*;
 use sweet::*;
 
 
@@ -32,9 +32,7 @@ pub fn sync_system() -> Result<()> {
 	let entity = *entities.root().unwrap();
 
 
-	app.world
-		.entity_mut(entity)
-		.insert(SetOnStart(Score::Pass));
+	app.world.entity_mut(entity).insert(SetOnStart(Score::Pass));
 
 	expect(&app).component(entity)?.to_be(&Score::Fail)?;
 	app.update();

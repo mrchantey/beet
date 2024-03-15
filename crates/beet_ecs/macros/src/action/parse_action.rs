@@ -21,8 +21,8 @@ pub fn parse_action(item: proc_macro::TokenStream) -> Result<TokenStream> {
 	input.generics;
 
 	Ok(quote! {
-		use beet::prelude::*;
-		use beet::exports::*;
+		use ::beet_ecs::prelude::*;
+		use ::beet_ecs::exports::*;
 
 		#impl_register
 		#impl_systems

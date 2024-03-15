@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use bevy_ecs::prelude::*;
+use bevy::prelude::*;
 
 
 pub fn any_child_running(

@@ -2,7 +2,7 @@
 
 ## Features
 
-- 🐦 Powered by `bevy_ecs` and `petgraph`
+- 🐦 Powered by `bevy` and `petgraph`
 - 🔥 Highly Parallel
 - ✍️ No Blackboard
 - 🌈 Multi-paradigm

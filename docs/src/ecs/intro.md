@@ -47,4 +47,4 @@ world
 ```
 <!-- > This example uses `bevy`, see [no_bevy](./no_bevy) for more examples. -->
 
-[1]: https://crates.io/crates/bevy_ecs
+[1]: https://crates.io/crates/bevy

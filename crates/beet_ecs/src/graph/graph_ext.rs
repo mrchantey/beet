@@ -1,6 +1,6 @@
 use crate::prelude::*;
-use bevy_utils::HashMap;
-use bevy_utils::HashSet;
+use bevy::utils::HashMap;
+use bevy::utils::HashSet;
 use extend::ext;
 use petgraph::graph::DiGraph;
 use petgraph::graph::NodeIndex;

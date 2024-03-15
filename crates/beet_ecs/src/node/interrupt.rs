@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use bevy_ecs::prelude::*;
+use bevy::prelude::*;
 use std::fmt::Debug;
 
 /// Indicate this node should stop running.

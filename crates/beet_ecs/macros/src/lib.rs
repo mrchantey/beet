@@ -72,8 +72,8 @@ pub fn derive_action(attr: TokenStream, item: TokenStream) -> TokenStream {
 	let item = syn::parse_macro_input!(item as syn::DeriveInput);
 	let attr = proc_macro2::TokenStream::from(attr);
 	quote::quote! {
-		use beet::prelude::*;
-		use beet::exports::*;
+		use ::beet_ecs::prelude::*;
+		use ::beet_ecs::exports::*;
 		#[derive(Debug, Clone, Component, Reflect, Action)]
 		#[reflect(Component)]
 		#[action(#attr)]

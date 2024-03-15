@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use bevy_math::prelude::*;
+use bevy::prelude::*;
 
 // macro_rules! field_ui_macro {
 // 	($reflect:expr, $field_name:expr, $ident:expr) => {

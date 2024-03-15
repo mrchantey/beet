@@ -1,7 +1,8 @@
-use beet::prelude::*;
+use beet_core::prelude::*;
 use beet_web::prelude::*;
-use bevy_math::prelude::*;
+use bevy::prelude::*;
 use sweet::*;
+
 
 #[sweet_test]
 pub async fn works() -> Result<()> {

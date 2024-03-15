@@ -1,8 +1,6 @@
 use crate::prelude::*;
-use bevy_app::prelude::*;
-use bevy_ecs::prelude::*;
-use bevy_ecs::schedule::ScheduleLabel;
-use bevy_time::Time;
+use bevy::ecs::schedule::ScheduleLabel;
+use bevy::prelude::*;
 use std::marker::PhantomData;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, SystemSet)]

@@ -1,7 +1,5 @@
 use anyhow::Result;
-use bevy_ecs::prelude::*;
-use bevy_math::Vec3;
-use bevy_transform::components::Transform;
+use bevy::prelude::*;
 
 #[derive(Debug, Copy, Clone, PartialEq, Component)]
 pub enum SteerTarget {

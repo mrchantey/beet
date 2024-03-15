@@ -6,7 +6,9 @@ use anyhow::Result;
 use base64::engine::general_purpose;
 use base64::Engine;
 use beet::prelude::*;
-use bevy_math::Vec3;
+use beet_ecs::prelude::*;
+use beet_net::prelude::*;
+use bevy::prelude::*;
 use forky_core::utility::random_signed;
 use forky_core::utility::random_value;
 use forky_core::ResultTEExt;
@@ -22,6 +24,7 @@ use web_sys::Event;
 use web_sys::HtmlButtonElement;
 use web_sys::HtmlDivElement;
 use web_sys::HtmlTextAreaElement;
+
 
 #[must_use]
 pub fn setup_ui(relay: Relay, options: &AppOptions) -> Result<()> {

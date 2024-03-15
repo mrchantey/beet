@@ -26,9 +26,7 @@ bincode.workspace = true
 strum.workspace = true
 strum_macros.workspace = true
 
-# bevy_ecs.workspace = true
-bevy_derive.workspace = true
-bevy_utils.workspace = true
+bevy.workspace = true
 log.workspace = true
 
 # tokio = { workspace = true, optional = true }

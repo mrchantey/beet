@@ -1,7 +1,6 @@
 use beet_core::prelude::*;
-use bevy_app::App;
-use bevy_math::prelude::*;
-use bevy_transform::prelude::*;
+use beet_ecs::prelude::*;
+use bevy::prelude::*;
 use sweet::*;
 
 #[sweet_test]

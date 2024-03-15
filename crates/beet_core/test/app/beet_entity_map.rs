@@ -1,7 +1,7 @@
 use beet_core::prelude::*;
 use beet_ecs::graph::IntoBehaviorPrefab;
-use bevy_app::prelude::*;
-use bevy_math::Vec3;
+use beet_net::prelude::*;
+use bevy::prelude::*;
 use std::sync::atomic::AtomicUsize;
 use sweet::*;
 

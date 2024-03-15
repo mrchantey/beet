@@ -1,7 +1,6 @@
 use anyhow::Result;
 use beet_ecs::prelude::*;
-use bevy_app::App;
-use bevy_ecs::prelude::*;
+use bevy::prelude::*;
 use sweet::*;
 
 

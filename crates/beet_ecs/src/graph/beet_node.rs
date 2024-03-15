@@ -1,10 +1,8 @@
 use crate::prelude::*;
 use anyhow::Result;
-use bevy_core::Name;
-use bevy_ecs::prelude::*;
-use bevy_reflect::GetTypeRegistration;
-use bevy_reflect::Reflect;
-use bevy_utils::HashSet;
+use bevy::prelude::*;
+use bevy::reflect::GetTypeRegistration;
+use bevy::utils::HashSet;
 
 /// Marker to identify the root of a behavior graph
 #[derive(Debug, Default, Component, Reflect)]

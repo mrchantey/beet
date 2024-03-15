@@ -1,17 +1,12 @@
-// use bevy_ecs::prelude::*;
-// use bevy_reflect::Reflect;
+// use bevy::prelude::*;
 extern crate beet_ecs as beet;
+use bevy::prelude::*;
 // use beet_ecs_macros::*;
-// use bevy_reflect::FromReflect;
-// use bevy_reflect::GetTypeRegistration;
-// use bevy_reflect::TypePath;
-use bevy_derive::Deref;
-use bevy_derive::DerefMut;
 use std::fmt::Debug;
 
 pub fn main() {}
 
-// #[derive(Default, bevy_ecs::prelude::Component, bevy_reflect::Reflect)]
+// #[derive(Default, bevy::prelude::Component, bevy::reflect::Reflect)]
 // struct Bar;
 
 // // #[derive(Default)]
@@ -57,8 +52,8 @@ fn action2<T: Component>() {}
 // #[derive(
 // 	Debug,
 // 	Clone,
-// bevy_ecs::prelude::Component,
-// 	bevy_reflect::Reflect,
+// bevy::prelude::Component,
+// 	bevy::Reflect,
 // 	beet_ecs::prelude::Action,
 // )]
 // #[action(set=PreTickSet,child_components=[Bar])]

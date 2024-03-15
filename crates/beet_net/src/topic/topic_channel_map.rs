@@ -1,6 +1,6 @@
 use crate::prelude::*;
 use anyhow::Result;
-use bevy_utils::HashMap;
+use bevy::utils::HashMap;
 use std::sync::Arc;
 use std::sync::RwLock;
 

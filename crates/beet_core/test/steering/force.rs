@@ -1,8 +1,5 @@
 use beet_core::prelude::*;
-use bevy_app::App;
-use bevy_math::Vec3;
-use bevy_transform::prelude::*;
-use bevy_utils::default;
+use bevy::prelude::*;
 use sweet::*;
 
 #[sweet_test]
@@ -59,7 +56,7 @@ pub fn works() -> Result<()> {
 		.component::<Transform>(impulse_entity)?
 		.map(|t| t.translation)
 		.to_be(Vec3::new(1., 0., 0.))?;
-	expect(&app)// impulses are cleared each frame
+	expect(&app) // impulses are cleared each frame
 		.component(impulse_entity)?
 		.to_be(&Impulse(Vec3::ZERO))?;
 	expect(&app)

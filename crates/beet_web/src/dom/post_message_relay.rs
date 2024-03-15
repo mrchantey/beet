@@ -1,5 +1,5 @@
 use anyhow::Result;
-use beet::prelude::*;
+use beet_net::prelude::*;
 use forky_core::ResultTEExt;
 use forky_web::AnimationFrame;
 use forky_web::HtmlEventListener;

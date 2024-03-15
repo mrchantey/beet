@@ -13,9 +13,9 @@
 macro_rules! action_list {
 	($name:ident, [$($variant:tt),*]) => {
 		#[allow(unused_imports)]
-		use beet::prelude::*;
+		use ::beet_ecs::prelude::*;
 		#[allow(unused_imports)]
-		use beet::exports::*;
+		use ::beet_ecs::exports::*;
 		#[derive(Debug, Clone)]// must be debug and clone to be ActionList
 		pub struct $name;
 

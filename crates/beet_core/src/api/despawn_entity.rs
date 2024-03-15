@@ -1,7 +1,7 @@
 use crate::prelude::*;
 use anyhow::Result;
 use beet_net::prelude::*;
-use bevy_ecs::prelude::*;
+use bevy::prelude::*;
 use serde::Deserialize;
 use serde::Serialize;
 

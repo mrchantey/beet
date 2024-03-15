@@ -19,21 +19,11 @@ log.workspace = true
 
 beet_ecs.workspace = true
 beet_net.workspace = true
-bevy_core.workspace = true
-bevy_derive.workspace = true
-bevy_app.workspace = true
-bevy_utils.workspace = true
-bevy_reflect.workspace = true
+bevy.workspace = true
 
 anyhow.workspace = true
 serde.workspace = true
 strum.workspace = true
-
-bevy_time.workspace = true
-bevy_math.workspace = true
-bevy_ecs.workspace = true
-bevy_tasks.workspace = true
-bevy_transform.workspace = true
 
 [dev-dependencies]
 sweet.workspace = true

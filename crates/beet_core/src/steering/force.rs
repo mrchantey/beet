@@ -1,10 +1,5 @@
 use beet_ecs::exports::Reflect;
-use bevy_derive::Deref;
-use bevy_derive::DerefMut;
-use bevy_ecs::prelude::*;
-use bevy_math::prelude::*;
-use bevy_time::Time;
-use bevy_transform::prelude::*;
+use bevy::prelude::*;
 
 
 /// A vector measured in (m/s)

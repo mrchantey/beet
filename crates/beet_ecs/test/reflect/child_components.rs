@@ -1,5 +1,5 @@
 use beet_ecs::prelude::*;
-use bevy_ecs::prelude::*;
+use bevy::prelude::*;
 use sweet::*;
 
 #[sweet_test(skip)]

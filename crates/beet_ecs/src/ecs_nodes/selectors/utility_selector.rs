@@ -1,6 +1,6 @@
 use super::*;
 use crate::prelude::*;
-use bevy_ecs::prelude::*;
+use bevy::prelude::*;
 
 /// An action that observes the [`Score`] of each child and selects the highest to run.
 ///

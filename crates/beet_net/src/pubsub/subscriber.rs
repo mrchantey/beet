@@ -1,8 +1,8 @@
 use crate::prelude::*;
 use anyhow::Result;
 use async_broadcast::Receiver;
-use bevy_utils::Duration;
 use std::marker::PhantomData;
+use std::time::Duration;
 /// Typesafe wrapper for [`async_broadcast::Receiver`] for a specific topic.
 /// Held by the subscriber to listen for messages from the relay
 #[derive(Debug, Clone)]

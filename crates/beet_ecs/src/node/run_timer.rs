@@ -1,8 +1,6 @@
 use crate::prelude::*;
-use bevy_ecs::prelude::*;
-use bevy_reflect::Reflect;
-use bevy_time::Stopwatch;
-use bevy_time::Time;
+use bevy::prelude::*;
+use bevy::time::Stopwatch;
 use std::fmt::Debug;
 
 /// Tracks the last time a node was run.

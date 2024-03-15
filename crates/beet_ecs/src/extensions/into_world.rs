@@ -1,5 +1,4 @@
-use bevy_app::App;
-use bevy_ecs::prelude::*;
+use bevy::prelude::*;
 
 pub trait IntoWorld {
 	fn into_world(self) -> World;

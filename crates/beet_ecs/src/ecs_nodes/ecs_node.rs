@@ -1,7 +1,7 @@
 use crate::prelude::*;
-use bevy_app::App;
-use bevy_ecs::schedule::ScheduleLabel;
-use bevy_reflect::TypeRegistry;
+use bevy::ecs::schedule::ScheduleLabel;
+use bevy::prelude::*;
+use bevy::reflect::TypeRegistry;
 
 // action_list!(EcsNode, [
 // 	SetOnStart::<Score>,

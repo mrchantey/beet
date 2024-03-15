@@ -3,12 +3,9 @@ use super::type_registry_utils::merge_type_registries;
 use super::typed_behavior_prefab::TypedBehaviorPrefab;
 use crate::prelude::*;
 use anyhow::Result;
-use bevy_ecs::entity::Entity;
-use bevy_ecs::entity::EntityHashMap;
-use bevy_ecs::reflect::AppTypeRegistry;
-use bevy_ecs::world::World;
-use bevy_scene::serde::SceneSerializer;
-use bevy_scene::DynamicScene;
+use bevy::ecs::entity::EntityHashMap;
+use bevy::prelude::*;
+use bevy::scene::serde::SceneSerializer;
 use serde::Serialize;
 use std::fmt;
 

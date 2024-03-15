@@ -1,8 +1,6 @@
 #[allow(unused)]
 use crate::prelude::*;
-use bevy_derive::Deref;
-use bevy_derive::DerefMut;
-use bevy_ecs::prelude::*;
+use bevy::prelude::*;
 
 /// Added to entites that have at least one associated behavior graph.
 /// Remove this component to dispose of all of this agents graphs.

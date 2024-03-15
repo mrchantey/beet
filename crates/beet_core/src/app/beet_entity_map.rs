@@ -1,10 +1,8 @@
 use crate::api::DespawnEntityHandler;
 use crate::api::DespawnEntityPayload;
 use anyhow::Result;
-use bevy_derive::Deref;
-use bevy_derive::DerefMut;
-use bevy_ecs::prelude::*;
-use bevy_utils::HashMap;
+use bevy::prelude::*;
+use bevy::utils::HashMap;
 use core::fmt;
 use serde::Deserialize;
 use serde::Serialize;
