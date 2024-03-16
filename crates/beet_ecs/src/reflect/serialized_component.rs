@@ -20,7 +20,7 @@
 // 	pub component: Vec<u8>,
 // }
 
-
+ 
 // impl SerializedComponent {
 // 	/// Create a new serialized component.
 // 	/// # Errors

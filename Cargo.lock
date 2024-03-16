@@ -451,6 +451,7 @@ dependencies = [
  "bevy",
  "bincode",
  "extend",
+ "flume",
  "futures",
  "log",
  "parking_lot",
@@ -1597,6 +1598,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0ce7134b9999ecaf8bcd65542e436736ef32ddca1b3e06094cb6ec5755203b80"
 
 [[package]]
+name = "flume"
+version = "0.11.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "55ac459de2512911e4b674ce33cf20befaba382d05b62b008afc1c8b57cbf181"
+dependencies = [
+ "futures-core",
+ "futures-sink",
+ "nanorand",
+ "spin",
+]
+
+[[package]]
 name = "fnv"
 version = "1.0.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1631,7 +1644,7 @@ checksum = "aa9a19cbb55df58761df49b23516a86d432839add4af60fc256da840f66ed35b"
 
 [[package]]
 name = "forky_bevy"
-version = "0.1.44"
+version = "0.1.45"
 dependencies = [
  "anyhow",
  "bevy_app",
@@ -1651,7 +1664,7 @@ dependencies = [
 
 [[package]]
 name = "forky_core"
-version = "0.1.44"
+version = "0.1.45"
 dependencies = [
  "anyhow",
  "extend",
@@ -1663,7 +1676,7 @@ dependencies = [
 
 [[package]]
 name = "forky_fs"
-version = "0.1.44"
+version = "0.1.45"
 dependencies = [
  "anyhow",
  "clap",
@@ -1682,7 +1695,7 @@ dependencies = [
 
 [[package]]
 name = "forky_web"
-version = "0.1.44"
+version = "0.1.45"
 dependencies = [
  "anyhow",
  "console_error_panic_hook",
@@ -1700,7 +1713,7 @@ dependencies = [
 
 [[package]]
 name = "forky_web_macros"
-version = "0.1.44"
+version = "0.1.45"
 dependencies = [
  "anyhow",
  "proc-macro2",
@@ -2409,7 +2422,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0c2a198fb6b0eada2a8df47933734e6d35d350665a33a3593d7164fa52c75c19"
 dependencies = [
  "cfg-if",
- "windows-targets 0.48.5",
+ "windows-targets 0.52.4",
 ]
 
 [[package]]
@@ -2524,6 +2537,15 @@ dependencies = [
  "log",
  "wasi",
  "windows-sys 0.48.0",
+]
+
+[[package]]
+name = "nanorand"
+version = "0.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6a51313c5820b0b02bd422f4b44776fbf47961755c74ce64afc73bfad10226c3"
+dependencies = [
+ "getrandom",
 ]
 
 [[package]]
@@ -3515,6 +3537,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "spin"
+version = "0.9.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6980e8d7511241f8acf4aebddbb1ff938df5eebe98691418c4468d0b72a96a67"
+dependencies = [
+ "lock_api",
+]
+
+[[package]]
 name = "static_assertions"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3547,7 +3578,7 @@ dependencies = [
 
 [[package]]
 name = "sweet"
-version = "0.1.44"
+version = "0.1.45"
 dependencies = [
  "anyhow",
  "backtrace",
@@ -3585,7 +3616,7 @@ dependencies = [
 
 [[package]]
 name = "sweet_macros"
-version = "0.1.44"
+version = "0.1.45"
 dependencies = [
  "anyhow",
  "proc-macro2",

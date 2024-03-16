@@ -4,6 +4,6 @@ pub use self::reflect_entity::*;
 pub mod reflect_scene;
 #[allow(unused_imports)]
 pub use self::reflect_scene::*;
-pub mod reflect_component;
+pub mod serialized_component;
 #[allow(unused_imports)]
-pub use self::reflect_component::*;
+pub use self::serialized_component::*;

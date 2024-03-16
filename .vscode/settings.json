@@ -3,17 +3,12 @@
 	"files.autoSaveDelay": 1000,
 	"files.exclude": {
 		"**/.git": true,
-		"**/.svn": true,
-		"**/.hg": true,
-		"**/CVS": true,
-		"**/.DS_Store": true,
-		"**/Thumbs.db": true,
 		// ".vscode": true,
 		//optional
 		// ".gitignore": true,
 		".gitattributes": true,
 		"Cargo.lock": true,
-		"rustfmt.toml": true,
+		// "rustfmt.toml": true,
 		"LICENSE-APACHE.txt": true,
 		"LICENSE-MIT.txt": true,
 		"**/.embuild/": true,
@@ -36,7 +31,7 @@
 	"rust-analyzer.files.excludeDirs": [
 		"crates/beet_esp"
 	],
-	"rust-analyzer.cargo.target": "wasm32-unknown-unknown",
+	// "rust-analyzer.cargo.target": "wasm32-unknown-unknown",
 	"search.exclude": {
 		"docs/deps/mermaid-init.js": true,
 		"docs/deps/mermaid.min.js": true,
