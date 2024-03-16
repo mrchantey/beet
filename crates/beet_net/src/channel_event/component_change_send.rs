@@ -1,5 +1,4 @@
 use crate::prelude::*;
-use anyhow::Result;
 use bevy::ecs::world::FilteredEntityRef;
 use bevy::prelude::*;
 use bevy::reflect::ReflectFromPtr;
@@ -11,8 +10,14 @@ use std::sync::Arc;
 #[derive(Clone, Resource)]
 pub struct ComponentChangeSend {
 	pub type_registry: AppTypeRegistry,
-	pub senders:
-		Arc<RwLock<HashMap<EntityComponent, MpscChannel<ComponentChanged>>>>,
+	pub senders: Arc<
+		RwLock<
+			HashMap<
+				EntityComponent,
+				Vec<Box<dyn 'static + Send + Sync + Fn(ComponentChanged)>>,
+			>,
+		>,
+	>,
 }
 
 // #[derive(Component)]
@@ -26,55 +31,41 @@ impl ComponentChangeSend {
 		}
 	}
 
-	pub fn register_recv<T: 'static>(&self, entity: Entity) {
+	pub fn add<T: 'static + FromReflect>(
+		&self,
+		entity: Entity,
+		handler: impl 'static + Send + Sync + Fn(T),
+	) {
+		let type_registry = self.type_registry.clone();
+		let func = Box::new(move |msg: ComponentChanged| {
+			let msg =
+				msg.deserialize_typed::<T>(&type_registry.read()).unwrap();
+			handler(msg);
+		});
+
 		self.senders
 			.write()
 			.entry(EntityComponent::new::<T>(entity))
-			.or_insert_with(default);
-	}
-
-	pub fn recv<T: Component + FromReflect>(
-		&self,
-		entity: Entity,
-	) -> Result<Option<T>> {
-		let type_registry = self.type_registry.read();
-		let last_msg = self
-			.senders
-			.write()
-			.get_mut(&EntityComponent::new::<T>(entity))
-			.expect(
-				"tried to get an unregistered channel, call `register_recv`",
-			)
-			.recv
-			.try_recv_all()?
-			.into_iter()
-			.map(|t| t.deserialize_typed::<T>(&type_registry))
-			.collect::<Result<Vec<T>>>()?
-			.into_iter()
-			.last();
-
-		Ok(last_msg)
+			.or_insert_with(default)
+			.push(func);
 	}
 
 	// https://bevyengine.org/news/bevy-0-13/#dynamic-queries
 	pub fn system(world: &mut World) {
+		let this_run = world.read_change_tick();
+		let last_run = world.last_change_tick();
+
+
 		let entity_components = world
 			.resource::<ComponentChangeSend>()
 			.senders
 			.read()
-			.iter()
-			.map(|(k, v)| (k.clone(), v.send.clone()))
+			.keys()
+			.cloned()
 			.collect::<Vec<_>>();
-
-		let this_run = world.change_tick();
-		let last_run = world.last_change_tick();
-
-
-		let failures = entity_components
+		let messages = entity_components
 			.into_iter()
-			.filter_map(|(entity_component, sender)| {
-				let EntityComponent { entity, type_id } = entity_component;
-
+			.filter_map(|EntityComponent { entity, type_id }| {
 				let component_id = world.components().get_id(type_id).unwrap();
 
 				if let Ok(entity_ref) =
@@ -111,11 +102,7 @@ impl ComponentChangeSend {
 								type_id,
 							)
 							.unwrap();
-
-							return sender
-								.send(msg)
-								.map_err(|_| entity_component)
-								.err();
+							return Some(msg);
 						}
 					}
 				}
@@ -123,12 +110,12 @@ impl ComponentChangeSend {
 			})
 			.collect::<Vec<_>>();
 
-		for failure in failures.into_iter().rev() {
-			world
-				.resource::<ComponentChangeSend>()
-				.senders
-				.write()
-				.remove(&failure);
+		let sender_map = world.resource::<ComponentChangeSend>().senders.read();
+		for message in messages {
+			let senders = sender_map.get(&message.id).unwrap();
+			for sender in senders {
+				sender(message.clone());
+			}
 		}
 	}
 }
@@ -156,14 +143,21 @@ mod test {
 		app.insert_resource(send.clone());
 
 		let entity = app.world.spawn(MyStruct(2)).id();
-		send.register_recv::<MyStruct>(entity);
+
+		let val = mock_value();
+
+		let val2 = val.clone();
+		send.add(entity, move |msg: MyStruct| {
+			val2.push(msg);
+		});
+
 		app.update();
-		expect(send.recv(entity)?).as_some()?.to_be(MyStruct(2))?;
+		expect(&val).to_contain(MyStruct(2))?;
 		app.update();
-		expect(send.recv::<MyStruct>(entity)?).to_be_none()?;
+		expect(&val).to_be_empty()?;
 		app.world.entity_mut(entity).insert(MyStruct(3));
 		app.update();
-		expect(send.recv(entity)?).as_some()?.to_be(MyStruct(3))?;
+		expect(&val).to_contain(MyStruct(3))?;
 
 		Ok(())
 	}

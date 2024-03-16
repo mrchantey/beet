@@ -1,18 +1,15 @@
 use super::*;
-use crate::utils::flumeReceiverTExt;
 use anyhow::Result;
 use bevy::ecs::world::FilteredEntityMut;
 use bevy::prelude::*;
 use bevy::reflect::ReflectFromPtr;
-use bevy::utils::HashMap;
 use parking_lot::RwLock;
 use std::sync::Arc;
 
 #[derive(Clone, Resource)]
 pub struct ComponentChangeRecv {
 	pub type_registry: AppTypeRegistry,
-	pub receivers:
-		Arc<RwLock<HashMap<EntityComponent, MpscChannel<ComponentChanged>>>>,
+	pub receivers: Arc<RwLock<Vec<ComponentChanged>>>,
 }
 
 
@@ -34,31 +31,18 @@ impl ComponentChangeRecv {
 			entity,
 			value,
 		)?;
-		self.receivers
-			.write()
-			.entry(msg.id)
-			.or_insert_with(default)
-			.send
-			.send(msg)?;
+		self.receivers.write().push(msg);
 		Ok(())
 	}
 
 	pub fn system(world: &mut World) {
-		let (messages, fails): (
-			Vec<Option<Vec<ComponentChanged>>>,
-			Vec<Option<EntityComponent>>,
-		) = world
-			.resource::<ComponentChangeRecv>()
-			.receivers
-			.write()
-			.iter_mut()
-			.map(|(entity, channel)| match channel.recv.try_recv_all() {
-				Ok(msg) => (Some(msg), None),
-				Err(_) => (None, Some(*entity)),
-			})
-			.unzip();
+		let mut recv =
+			world.resource::<ComponentChangeRecv>().receivers.write();
+		let messages: &mut Vec<ComponentChanged> = recv.as_mut();
+		let messages = std::mem::take(messages);
+		drop(recv);
 
-		for changed in messages.into_iter().flatten().flatten() {
+		for changed in messages.into_iter() {
 			let type_id = changed.id.type_id;
 			let entity = changed.id.entity;
 			let component_id = world.components().get_id(type_id).unwrap();
@@ -85,15 +69,6 @@ impl ComponentChangeRecv {
 				value.apply(new_value.as_ref());
 			}
 		}
-
-		for fail in fails.into_iter().flatten().rev() {
-			world
-				.resource::<ComponentChangeRecv>()
-				.receivers
-				.write()
-				.remove(&fail);
-		}
-		// Ok(())
 	}
 }
 

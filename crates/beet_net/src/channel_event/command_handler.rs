@@ -1,34 +1,33 @@
-use crate::prelude::*;
 use bevy::prelude::*;
 use parking_lot::RwLock;
 use std::sync::Arc;
 
-type CommandRequest<T> = Box<dyn Send + FnOnce(&mut Commands) -> T>;
-pub type CommandChannels<T> = Vec<ResponseChannel<CommandRequest<T>, T>>;
+type CommandRequest = Box<dyn 'static + Send + Sync + FnOnce(&mut Commands)>;
 
 #[derive(Clone, Resource, Deref, DerefMut)]
-pub struct CommandHandler<T>(pub Arc<RwLock<CommandChannels<T>>>);
+pub struct CommandHandler(pub Arc<RwLock<Vec<CommandRequest>>>);
 
-impl<T> Default for CommandHandler<T> {
+impl Default for CommandHandler {
 	fn default() -> Self { Self(default()) }
 }
 
-impl<T: 'static + Send> CommandHandler<T> {
+impl CommandHandler {
 	pub fn new() -> Self { Self::default() }
 
-	pub fn add(&self) -> RequestChannel<CommandRequest<T>, T> {
-		let (req, res) = reqres_channel();
-		self.write().push(res);
-		req
+	pub fn push(
+		&self,
+		func: impl 'static + Send + Sync + FnOnce(&mut Commands),
+	) {
+		self.write().push(Box::new(func));
 	}
 
-	pub fn system(
-		mut commands: Commands,
-		spawn_handler: Res<CommandHandler<T>>,
-	) {
-		spawn_handler.write().retain_mut(|channel| {
-			channel.try_respond(|func| func(&mut commands)).is_ok()
-		});
+	pub fn system(mut commands: Commands, spawn_handler: Res<CommandHandler>) {
+		let mut handlers = spawn_handler.write();
+		let handlers: &mut Vec<CommandRequest> = handlers.as_mut();
+		let funcs = std::mem::take(handlers);
+		for func in funcs.into_iter() {
+			func(&mut commands);
+		}
 	}
 }
 
@@ -45,18 +44,19 @@ mod test {
 	#[test]
 	fn test_spawn_handler() -> Result<()> {
 		let mut app = App::new();
-		app.add_systems(PreUpdate, CommandHandler::<Entity>::system);
+		app.add_systems(PreUpdate, CommandHandler::system);
 		let handler = CommandHandler::default();
 		app.insert_resource(handler.clone());
 
-		let req = handler.add();
-		req.start_request(Box::new(|commands| {
-			commands.spawn(MyStruct(8)).id()
-		}))?;
+		let val = mock_value();
+
+		let val2 = val.clone();
+		handler
+			.push(move |commands| val2.push(commands.spawn(MyStruct(8)).id()));
 
 		app.update();
 
-		let entity = req.block_on_response()?;
+		let entity = val.pop().unwrap();
 		expect(&app).component(entity)?.to_be(&MyStruct(8))?;
 
 		Ok(())

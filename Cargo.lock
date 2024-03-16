@@ -3591,6 +3591,7 @@ dependencies = [
  "console_log",
  "crossterm",
  "extend",
+ "flume",
  "forky_core",
  "forky_fs",
  "forky_web",
