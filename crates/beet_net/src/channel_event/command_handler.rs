@@ -3,22 +3,29 @@ use bevy::prelude::*;
 use parking_lot::RwLock;
 use std::sync::Arc;
 
-type Request = Box<dyn Send + FnOnce(&mut Commands) -> Entity>;
-pub type SpawnChannels = Vec<ResponseChannel<Request, Entity>>;
+type CommandRequest<T> = Box<dyn Send + FnOnce(&mut Commands) -> T>;
+pub type CommandChannels<T> = Vec<ResponseChannel<CommandRequest<T>, T>>;
 
-#[derive(Default, Clone, Resource, Deref, DerefMut)]
-pub struct SpawnHandler(pub Arc<RwLock<SpawnChannels>>);
+#[derive(Clone, Resource, Deref, DerefMut)]
+pub struct CommandHandler<T>(pub Arc<RwLock<CommandChannels<T>>>);
 
-impl SpawnHandler {
+impl<T> Default for CommandHandler<T> {
+	fn default() -> Self { Self(default()) }
+}
+
+impl<T: 'static + Send> CommandHandler<T> {
 	pub fn new() -> Self { Self::default() }
 
-	pub fn add(&self) -> RequestChannel<Request, Entity> {
+	pub fn add(&self) -> RequestChannel<CommandRequest<T>, T> {
 		let (req, res) = reqres_channel();
 		self.write().push(res);
 		req
 	}
 
-	pub fn system(mut commands: Commands, spawn_handler: Res<SpawnHandler>) {
+	pub fn system(
+		mut commands: Commands,
+		spawn_handler: Res<CommandHandler<T>>,
+	) {
 		spawn_handler.write().retain_mut(|channel| {
 			channel.try_respond(|func| func(&mut commands)).is_ok()
 		});
@@ -38,8 +45,8 @@ mod test {
 	#[test]
 	fn test_spawn_handler() -> Result<()> {
 		let mut app = App::new();
-		app.add_systems(PreUpdate, SpawnHandler::system);
-		let handler = SpawnHandler::default();
+		app.add_systems(PreUpdate, CommandHandler::<Entity>::system);
+		let handler = CommandHandler::default();
 		app.insert_resource(handler.clone());
 
 		let req = handler.add();
@@ -51,8 +58,6 @@ mod test {
 
 		let entity = req.block_on_response()?;
 		expect(&app).component(entity)?.to_be(&MyStruct(8))?;
-
-		expect(true).to_be_false()?;
 
 		Ok(())
 	}

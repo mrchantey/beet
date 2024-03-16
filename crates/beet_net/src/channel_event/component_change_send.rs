@@ -147,7 +147,7 @@ mod test {
 	fn test_component_changed_send() -> Result<()> {
 		let mut app = App::new();
 
-		app.add_systems(PreUpdate, ComponentChangeSend::system);
+		app.add_systems(PostUpdate, ComponentChangeSend::system);
 		let registry = app.world.resource::<AppTypeRegistry>().clone();
 		registry.write().register::<MyStruct>();
 		app.world.init_component::<MyStruct>();
