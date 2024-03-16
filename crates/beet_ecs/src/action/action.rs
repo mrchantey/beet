@@ -3,13 +3,6 @@ use bevy::prelude::*;
 use bevy::reflect::TypeRegistry;
 use std::fmt::Debug;
 
-#[derive(Debug, Clone)]
-pub struct NoopActionTypes;
-impl ActionTypes for NoopActionTypes {
-	fn register(_: &mut TypeRegistry) {}
-}
-
-
 #[reflect_trait]
 pub trait ActionChildComponents {
 	fn insert_child_components(&self, entity: &mut EntityWorldMut<'_>);
@@ -30,7 +23,10 @@ pub struct ActionSystemMarker;
 
 
 pub trait ActionTypes {
-	fn register(registry: &mut TypeRegistry);
+	/// Register components via [`World::init_component`]
+	fn register_components(world: &mut World);
+	/// Register types via [`TypeRegistry::register`]
+	fn register_types(type_registry: &mut TypeRegistry);
 }
 
 

@@ -26,5 +26,5 @@ pub fn append_beet_type_registry_with_generics<T: ActionTypes>(
 ) {
 	append_beet_type_registry(registry);
 	let mut registry = registry.write();
-	T::register(&mut registry);
+	T::register_types(&mut registry);
 }

@@ -55,14 +55,14 @@ fn append_generic_constraints(input: &mut DeriveInput) {
 	}
 }
 
-fn parse_register(args: &ActionArgs, input: &DeriveInput) -> TokenStream {
-	let register_child_components = args
-		.child_components
-		.iter()
-		.map(|c| {
-			quote! {registry.register::<#c>();}
-		})
-		.collect::<TokenStream>();
+fn parse_register(_args: &ActionArgs, input: &DeriveInput) -> TokenStream {
+	// let register_child_components = args
+	// 	.child_components
+	// 	.iter()
+	// 	.map(|c| {
+	// 		quote! {registry.register::<#c>();}
+	// 	})
+	// 	.collect::<TokenStream>();
 
 	let ident = &input.ident;
 	let (impl_generics, type_generics, where_clause) =
@@ -70,9 +70,12 @@ fn parse_register(args: &ActionArgs, input: &DeriveInput) -> TokenStream {
 
 	quote! {
 		impl #impl_generics ActionTypes for #ident #type_generics #where_clause {
-			fn register(registry: &mut TypeRegistry){
-				#register_child_components
-				registry.register::<#ident #type_generics>();
+			fn register_types(registry: &mut TypeRegistry){
+				// #register_child_components
+				registry.register::<Self>();
+			}
+			fn register_components(world:&mut World){
+				world.init_component::<Self>();
 			}
 		}
 	}

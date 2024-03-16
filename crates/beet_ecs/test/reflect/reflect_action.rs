@@ -16,7 +16,7 @@ fn my_action() {}
 #[sweet_test]
 fn recursive_registry() -> Result<()> {
 	let mut registry = TypeRegistry::new();
-	MyAction::register(&mut registry);
+	MyAction::register_types(&mut registry);
 	registry.register::<MyAction>();
 	registry.get(TypeId::of::<MyAction>()).unwrap();
 	registry
