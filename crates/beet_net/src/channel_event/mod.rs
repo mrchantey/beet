@@ -13,6 +13,6 @@ pub use self::reqres_channel::*;
 pub mod component_change_recv;
 #[allow(unused_imports)]
 pub use self::component_change_recv::*;
-pub mod command_handler;
+pub mod world_handler;
 #[allow(unused_imports)]
-pub use self::command_handler::*;
+pub use self::world_handler::*;

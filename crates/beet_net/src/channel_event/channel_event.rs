@@ -4,7 +4,7 @@ use bevy::prelude::*;
 
 
 pub struct ChannelEventPlugin {
-	command_handler: CommandHandler,
+	command_handler: WorldHandler,
 	component_change_send: ComponentChangeSend,
 	component_change_recv: ComponentChangeRecv,
 }
@@ -16,7 +16,7 @@ impl Plugin for ChannelEventPlugin {
 			.insert_resource(self.command_handler.clone())
 			.insert_resource(self.component_change_recv.clone())
 			.add_systems(PreUpdate, ComponentChangeRecv::system)
-			.add_systems(PreUpdate, CommandHandler::system)
+			.add_systems(PreUpdate, WorldHandler::system)
 			.insert_resource(self.component_change_send.clone())
 			.add_systems(PostUpdate, ComponentChangeSend::system)
 			/*-*/;

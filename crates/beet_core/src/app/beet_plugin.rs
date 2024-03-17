@@ -30,6 +30,7 @@ impl<T: ActionList> BeetPlugin<T> {
 
 impl<T: ActionList> Plugin for BeetPlugin<T> {
 	fn build(&self, app: &mut App) {
+		T::register_components(&mut app.world);
 		let mut relay = self.relay.clone();
 		app.insert_resource(BeetEntityMap::default())
 			.insert_resource(TypedBehaviorPrefab::<T>::type_registry())
