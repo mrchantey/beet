@@ -1,4 +1,5 @@
 pub mod action;
+pub mod channel_event;
 pub mod ecs_nodes;
 pub mod edge;
 pub mod extensions;
@@ -8,11 +9,12 @@ pub mod reflect;
 pub mod ui;
 
 // currently required for action_list! macro to work
-extern crate self as beet_ecs;
+extern crate self as beet;
 
 pub mod prelude {
 
 	pub use crate::action::*;
+	pub use crate::channel_event::*;
 	pub use crate::ecs_nodes::actions::*;
 	pub use crate::ecs_nodes::selectors::*;
 	pub use crate::ecs_nodes::*;

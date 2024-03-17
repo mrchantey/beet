@@ -2,10 +2,13 @@ use bevy::prelude::*;
 use parking_lot::RwLock;
 use std::sync::Arc;
 
-type WorldRequest = Box<dyn 'static + Send + Sync + FnOnce(&mut World)>;
+
+
+pub type WorldFuncs = Vec<Box<dyn 'static + Send + Sync + FnOnce(&mut World)>>;
+
 
 #[derive(Clone, Resource, Deref, DerefMut)]
-pub struct WorldHandler(pub Arc<RwLock<Vec<WorldRequest>>>);
+pub struct WorldHandler(pub Arc<RwLock<WorldFuncs>>);
 
 impl Default for WorldHandler {
 	fn default() -> Self { Self(default()) }
@@ -14,14 +17,40 @@ impl Default for WorldHandler {
 impl WorldHandler {
 	pub fn new() -> Self { Self::default() }
 
+
+	/// Insert a callback to be called on the next world update
 	pub fn push(&self, func: impl 'static + Send + Sync + FnOnce(&mut World)) {
 		self.write().push(Box::new(func));
+	}
+
+	/// Insert a callback and block on the result
+	pub fn request<O: 'static + Send>(
+		&self,
+		func: impl 'static + Send + Sync + FnOnce(&mut World) -> O,
+	) -> O {
+		let (send, recv) = flume::unbounded();
+		self.write().push(Box::new(move |world| {
+			send.send(func(world)).unwrap();
+		}));
+		recv.recv().unwrap()
+	}
+
+	/// Insert a callback and await the result
+	pub async fn request_async<O: 'static + Send>(
+		&self,
+		func: impl 'static + Send + Sync + FnOnce(&mut World) -> O,
+	) -> O {
+		let (send, recv) = flume::unbounded();
+		self.write().push(Box::new(move |world| {
+			send.send(func(world)).unwrap();
+		}));
+		recv.recv_async().await.unwrap()
 	}
 
 	pub fn system(world: &mut World) {
 		let handlers = world.resource_mut::<WorldHandler>();
 		let mut handlers = handlers.write();
-		let funcs: &mut Vec<WorldRequest> = handlers.as_mut();
+		let funcs: &mut WorldFuncs = handlers.as_mut();
 		let funcs = std::mem::take(funcs);
 		drop(handlers);
 		for func in funcs.into_iter() {
@@ -59,4 +88,5 @@ mod test {
 
 		Ok(())
 	}
+
 }

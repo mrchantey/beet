@@ -1,0 +1,6 @@
+
+[target.x86_64-unknown-linux-gnu]
+# note: mold and clang must be installed: sudo apt install mold clang
+# i measured 2x server speedup with mold, 41 seconds to 19 seconds
+linker = "clang"
+rustflags = ["-C", "link-arg=-fuse-ld=/usr/bin/mold"]

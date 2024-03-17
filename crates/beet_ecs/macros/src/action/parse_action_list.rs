@@ -41,8 +41,8 @@ pub fn parse_action_list(item: proc_macro::TokenStream) -> Result<TokenStream> {
 		&input.generics.split_for_impl();
 
 	Ok(quote! {
-		use ::beet_ecs::prelude::*;
-		use ::beet_ecs::exports::*;
+		use ::beet::prelude::*;
+		use ::beet::exports::*;
 
 		impl #impl_generics ActionSystems for #ident #type_generics #where_clause {
 			fn add_systems(app: &mut App, schedule: impl ScheduleLabel + Clone) {

@@ -1,6 +1,7 @@
 use crate::prelude::*;
 use beet_ecs::prelude::*;
 use beet_net::prelude::*;
+use bevy::app::PluginGroupBuilder;
 use bevy::prelude::*;
 use bevy::time::TimePlugin;
 use std::marker::PhantomData;
@@ -10,7 +11,6 @@ pub struct BeetMinimalPlugin;
 impl Plugin for BeetMinimalPlugin {
 	fn build(&self, app: &mut App) { app.add_plugins(TimePlugin); }
 }
-
 
 #[derive(Debug, Clone, Deref, DerefMut, Resource)]
 pub struct RelayRes(pub Relay);
@@ -27,6 +27,32 @@ impl<T: ActionList> BeetPlugin<T> {
 		}
 	}
 }
+
+pub struct DefaultBeetPlugins<T: ActionList> {
+	pub beet: BeetPlugin<T>,
+	pub steering: SteeringPlugin,
+	pub bevy_event: BevyEventPlugin,
+}
+
+impl<T: ActionList> DefaultBeetPlugins<T> {
+	pub fn new(type_registry: AppTypeRegistry) -> Self {
+		Self {
+			beet: BeetPlugin::new(Relay::new(0)),
+			steering: SteeringPlugin::default(),
+			bevy_event: BevyEventPlugin::new(type_registry),
+		}
+	}
+}
+
+impl PluginGroup for DefaultBeetPlugins<CoreNode> {
+	fn build(self) -> PluginGroupBuilder {
+		PluginGroupBuilder::start::<Self>()
+			.add(self.beet)
+			.add(self.steering)
+			.add(self.bevy_event)
+	}
+}
+
 
 impl<T: ActionList> Plugin for BeetPlugin<T> {
 	fn build(&self, app: &mut App) {
