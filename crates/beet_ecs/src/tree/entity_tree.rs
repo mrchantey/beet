@@ -2,7 +2,7 @@ use crate::prelude::*;
 use bevy::prelude::*;
 use bevy::scene::DynamicEntity;
 
-/// Wrapper with utility functions for a [`Tree<Entity>`]
+
 #[derive(Debug, Clone, Deref, DerefMut, Component)]
 pub struct EntityTree(pub Tree<Entity>);
 
@@ -41,10 +41,11 @@ impl EntityTree {
 		&self,
 		world: &'a World,
 	) -> Tree<Option<&'a T>> {
-		self.map(|e| world.get::<T>(*e))
+		self.0.map(|e|world.get::<T>(*e))
 	}
-
+	
+	
 	pub fn dynamic_tree(&self, world: &World) -> Tree<DynamicEntity> {
-		self.map(|e| DynamicEntity::new(*e, world))
+		self.0.map(|e|DynamicEntity::new(*e, world))
 	}
 }

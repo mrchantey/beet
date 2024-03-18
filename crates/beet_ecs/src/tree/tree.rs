@@ -94,6 +94,9 @@ impl<T> Tree<T> {
 			children: Vec::new(),
 		}
 	}
+	pub fn new_with_children(value: T, children: Vec<Self>) -> Self {
+		Self { value, children }
+	}
 	/// Add a child tree, which may have children
 	pub fn with_child(mut self, child: impl Into<Tree<T>>) -> Self {
 		self.children.push(child.into());
@@ -109,11 +112,35 @@ impl<T> Tree<T> {
 		self.children.push(Tree::new(child));
 		self
 	}
-	pub fn new_with_children(value: T, children: Vec<Self>) -> Self {
-		Self { value, children }
-	}
 
 	pub fn into_graph(self) -> DiGraph<T, ()> { DiGraph::from_tree(self) }
+
+	pub fn map<O>(&self, mut map_func: impl FnMut(&T) -> O) -> Tree<O> {
+		self.map_ref(&mut map_func)
+	}
+	fn map_ref<O>(&self, map_func: &mut impl FnMut(&T) -> O) -> Tree<O> {
+		Tree {
+			value: map_func(&self.value),
+			children: self
+				.children
+				.iter()
+				.map(|child| child.map_ref(map_func))
+				.collect(),
+		}
+	}
+	pub fn map_owned<O>(self, mut map_func: impl FnMut(T) -> O) -> Tree<O> {
+		self.map_owned_ref(&mut map_func)
+	}
+	fn map_owned_ref<O>(self, map_func: &mut impl FnMut(T) -> O) -> Tree<O> {
+		Tree {
+			value: map_func(self.value),
+			children: self
+				.children
+				.into_iter()
+				.map(|child| child.map_owned_ref(map_func))
+				.collect(),
+		}
+	}
 }
 
 
@@ -165,3 +192,18 @@ impl<T: Display> Tree<T> {
 // pub trait IntoTree<T, M> {
 // 	fn into_tree(self) -> Tree<T>;
 // }
+#[cfg(test)]
+mod test {
+	use crate::prelude::*;
+	use anyhow::Result;
+	use sweet::*;
+
+	#[test]
+	fn works() -> Result<()> {
+		let tree = Tree::new(0).with_leaf(1).with_leaf(2);
+		let tree2 = tree.map(|x| x + 1);
+		expect(tree2).to_be(Tree::new(1).with_leaf(2).with_leaf(3))?;
+
+		Ok(())
+	}
+}

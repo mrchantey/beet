@@ -14,6 +14,7 @@ pub fn merge_type_registries(src: &AppTypeRegistry, dst: &mut AppTypeRegistry) {
 /// with the exception of [[`TargetAgent`]] which gets reattached via [`BehaviorPrefab::spawn`]
 pub fn append_beet_type_registry(registry: &AppTypeRegistry) {
 	let mut registry = registry.write();
+	registry.register::<NodeName>();
 	registry.register::<Name>();
 	registry.register::<Edges>();
 	registry.register::<Running>();

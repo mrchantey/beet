@@ -5,18 +5,24 @@ use bevy::scene::DynamicEntity;
 
 #[extend::ext]
 pub impl DynamicEntity {
-	fn new(entity: Entity, world: &impl IntoWorld) -> Self {
-		let world = world.into_world_ref();
-		let components = reflect_entity(world, entity);
-		Self { entity, components }
+	// fn new(entity: Entity, world: &impl IntoWorld) -> Self {
+	// 	let world = world.into_world_ref();
+	// 	let components = reflect_entity(world, entity);
+	// 	Self { entity, components }
+	// }
+	fn new(entity: Entity, world: &World) -> Self {
+		let scene = DynamicSceneBuilder::from_world(world)
+			.extract_entities(vec![entity].into_iter())
+			.build();
+		scene.entities.into_iter().next().unwrap()
 	}
 
-	fn name(&self) -> String {
+	fn node_name(&self) -> String {
 		for component in self.components.iter() {
 			if let Some(name) =
-				<Name as FromReflect>::from_reflect(component.as_ref())
+				<NodeName as FromReflect>::from_reflect(component.as_ref())
 			{
-				return name.as_str().to_string();
+				return name.to_string();
 			}
 		}
 		format!("New Entity {:?}", self.entity)
@@ -30,26 +36,16 @@ mod test {
 	use anyhow::Result;
 	use bevy::prelude::*;
 	use bevy::scene::DynamicEntity;
-	use petgraph::graph::DiGraph;
 	use sweet::*;
 
 	#[test]
 	fn works() -> Result<()> {
 		let mut app = App::new();
-		app.register_type::<Name>();
-		let entity = app.world.spawn(Name::new("Bob")).id();
-		let entity = DynamicEntity::new(entity, &app);
+		app.register_type::<NodeName>();
+		let entity = app.world.spawn(NodeName::new("Bob")).id();
+		let entity = DynamicEntity::new(entity, &app.world);
 		expect(entity.components.len()).to_be(1)?;
-		expect(entity.name().as_str()).to_be("Bob")?;
-
-		let mut digraph = DiGraph::new();
-		digraph.add_node(entity.entity);
-		let entity_graph = EntityGraph(digraph);
-		let dynamic_graph =
-			DynamicEntityGraph::from_entity_graph(&mut app, entity_graph);
-		let root = dynamic_graph.root().unwrap();
-		expect(root.name().as_str()).to_be("Bob")?;
-
+		expect(entity.node_name().as_str()).to_be("Bob")?;
 		Ok(())
 	}
 }

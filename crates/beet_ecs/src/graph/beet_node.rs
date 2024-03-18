@@ -3,11 +3,28 @@ use anyhow::Result;
 use bevy::prelude::*;
 use bevy::reflect::GetTypeRegistration;
 use bevy::utils::HashSet;
+use std::fmt;
 
 /// Marker to identify the root of a behavior graph
 #[derive(Debug, Default, Component, Reflect)]
 #[reflect(Component)]
 pub struct BehaviorGraphRoot;
+
+
+/// Temporary name holder, it seems theres a bug with bevy [`Name`], cow and reflect
+#[derive(Debug, Default, Component, Reflect)]
+#[reflect(Component)]
+pub struct NodeName(pub String);
+
+impl NodeName {
+	pub fn new(name: impl Into<String>) -> Self { Self(name.into()) }
+}
+
+impl fmt::Display for NodeName {
+	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+		write!(f, "{}", self.0)
+	}
+}
 
 // pub struct EntityGraphOptions {
 // 	agent: Option<Entity>,
@@ -102,11 +119,19 @@ impl BeetNode {
 		let edges = Edges(children.iter().map(|c| c.value).collect());
 
 		let mut entity = world.entity_mut(entity);
-		if false == entity.contains::<Name>() {
-			let id = visited.len();
-			entity.insert(Name::new(format!("Node {id}")));
-		}
-		entity.insert((RunTimer::default(), edges));
+		let id = visited.len();
+
+		let name = entity
+			.get::<Name>()
+			.map(|n| n.to_string())
+			.unwrap_or(format!("Node {}", id));
+
+		entity.insert((
+			Name::new(name.clone()),
+			NodeName::new(name),
+			RunTimer::default(),
+			edges,
+		));
 
 		Tree {
 			value: entity.id(),
