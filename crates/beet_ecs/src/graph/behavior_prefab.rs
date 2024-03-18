@@ -85,11 +85,7 @@ impl BehaviorPrefab {
 	/// If the world doesn't have a type registry, one matching this prefab will be added.
 	/// # Errors
 	/// If the world's [`AppTypeRegistry`] is missing a type in the graph
-	pub fn spawn(
-		&self,
-		dst_world: &mut impl IntoWorld,
-		target: Option<Entity>,
-	) -> Result<EntityGraph> {
+	pub fn spawn(&self, dst_world: &mut impl IntoWorld) -> Result<EntityTree> {
 		let dst_world = dst_world.into_world_mut();
 		dst_world.init_resource::<AppTypeRegistry>();
 		let mut dst_registry = dst_world.resource_mut::<AppTypeRegistry>();
@@ -109,16 +105,9 @@ impl BehaviorPrefab {
 			.ok_or(anyhow::anyhow!(
 				"Failed to spawn behavior graph, no root entity"
 			))?;
-
-		if let Some(target) = target {
-			dst_world.entity_mut(target).insert(AgentMarker);
-			for entity in entity_map.values() {
-				dst_world.entity_mut(*entity).insert(TargetAgent(target));
-			}
-		}
-
-		let entity_graph = EntityGraph::from_world(dst_world, *root);
-		Ok(entity_graph)
+		let graph = EntityGraph::from_world(dst_world, *root);
+		let tree = graph.0.into_tree();
+		Ok(EntityTree(tree))
 	}
 }
 

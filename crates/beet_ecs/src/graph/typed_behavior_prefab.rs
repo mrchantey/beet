@@ -62,7 +62,7 @@ impl<T: ActionTypes> TypedBehaviorPrefab<T> {
 		let mut dst_world = World::new();
 		let registry = Self::type_registry();
 		dst_world.insert_resource(registry);
-		self.spawn(&mut dst_world, None)?;
+		self.spawn(&mut dst_world)?;
 		Ok(dst_world)
 	}
 }

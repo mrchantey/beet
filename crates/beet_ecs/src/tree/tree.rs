@@ -119,7 +119,7 @@ impl<T> Tree<T> {
 
 impl<T: Debug> Tree<T> {
 	/// Creates a string from this tree, in the format
-	/// ```
+	/// ```ignore
 	/// value
 	/// 	Child0.value
 	/// 		Child0.Child0.value
@@ -141,7 +141,7 @@ impl<T: Debug> Tree<T> {
 }
 impl<T: Display> Tree<T> {
 	/// Creates a string from this tree, in the format
-	/// ```
+	/// ```ignore
 	/// value
 	/// 	Child0.value
 	/// 		Child0.Child0.value

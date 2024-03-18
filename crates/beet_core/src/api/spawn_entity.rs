@@ -77,8 +77,9 @@ pub fn handle_spawn_entity<T: ActionList>(world: &mut World) -> Result<()> {
 				max_speed: MaxSpeed(0.3),
 				..default()
 			}));
-			let id = entity.id();
-			prefab.spawn(world, Some(id))?;
+			let agent = entity.id();
+			let tree = prefab.spawn(world)?;
+			tree.bind_agent(world, agent);
 		};
 	}
 	Ok(())

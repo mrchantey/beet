@@ -37,24 +37,10 @@ impl EntityGraph {
 		Some(node_index)
 	}
 
+
 	pub fn despawn(&self, commands: &mut Commands) {
 		for entity in self.node_weights() {
 			commands.entity(*entity).despawn();
-		}
-	}
-}
-
-/// Removes all nodes with a [`TargetAgent`] component that matches the removed agent
-pub fn cleanup_entity_graph(
-	mut commands: Commands,
-	nodes: Query<(Entity, &TargetAgent)>,
-	mut removed_agents: RemovedComponents<AgentMarker>,
-) {
-	for agent in removed_agents.read() {
-		for (node, target) in nodes.iter() {
-			if **target == agent {
-				commands.entity(node).despawn();
-			}
 		}
 	}
 }

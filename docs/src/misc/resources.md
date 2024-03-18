@@ -14,8 +14,17 @@
 	- Follow-up - [2018](https://youtu.be/ZdN8dDa0ff4)
 
 ## AI libraries
-- C++ Behavior trees - [BehaviorTree.cpp](https://www.behaviortree.dev/)
-- Bevy Utility AI - [big-brain](https://crates.io/crates/big-brain)
+
+### Bevy
+- [big-brain](https://crates.io/crates/big-brain)
+- State machines - [seldom_state](https://crates.io/crates/seldom_state)
+- Behavior trees - [bevior_tree](https://crates.io/crates/bevior_tree)
+### Other
+
+- C++ - [BehaviorTree.cpp](https://www.behaviortree.dev/)
+- Godot - [beehave](https://bitbra.in/beehave/#/)
+
+Godot library
 
 ## Misc
 

@@ -1,4 +1,4 @@
-use sweet::*;
+// use sweet::*;
 
-#[sweet_test]
-pub fn works() -> Result<()> { Ok(()) }
+// #[sweet_test]
+// pub fn works() -> Result<()> { Ok(()) }

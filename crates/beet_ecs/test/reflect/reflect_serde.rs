@@ -44,7 +44,9 @@ fn serde_types() -> Result<()> {
 	let prefab2: TypedBehaviorPrefab<EcsNode> = bincode::deserialize(&bytes1)?;
 	let mut world = World::new();
 	let target = world.spawn_empty().id();
-	let root = *prefab2.spawn(&mut world, Some(target))?.root().unwrap();
+	let tree = prefab2.spawn(&mut world)?;
+	tree.bind_agent(&mut world, target);
+	let root = tree.value;
 	let child = world.entity(root).get::<Edges>().unwrap()[0];
 	expect(&world)
 		.component(child)?

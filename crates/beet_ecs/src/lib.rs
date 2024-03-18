@@ -6,7 +6,8 @@ pub mod extensions;
 pub mod graph;
 pub mod node;
 pub mod reflect;
-pub mod ui;
+pub mod tree;
+// pub mod ui;
 
 // currently required for action_list! macro to work
 extern crate self as beet;
@@ -21,9 +22,10 @@ pub mod prelude {
 	pub use crate::edge::*;
 	pub use crate::extensions::*;
 	pub use crate::graph::*;
+	pub use crate::tree::*;
 	pub use crate::node::*;
 	pub use crate::reflect::*;
-	pub use crate::ui::*;
+	// pub use crate::ui::*;
 	pub use beet_ecs_macros::*;
 }
 

@@ -1,11 +1,5 @@
-use crate::prelude::EntityGraph;
 use bevy::prelude::*;
 use bevy::reflect::ReflectFromPtr;
-use bevy::scene::DynamicEntity;
-use petgraph::graph::DiGraph;
-
-
-
 
 pub fn reflect_entity(world: &World, entity: Entity) -> Vec<Box<dyn Reflect>> {
 	let type_registry = world.resource::<AppTypeRegistry>().read();
@@ -24,21 +18,6 @@ pub fn reflect_entity(world: &World, entity: Entity) -> Vec<Box<dyn Reflect>> {
 		})
 		.collect::<Vec<_>>()
 }
-
-pub fn reflect_graph(
-	world: &World,
-	root: Entity,
-) -> DiGraph<DynamicEntity, ()> {
-	let entity_graph = EntityGraph::from_world(world, root);
-	entity_graph.map(
-		|_, entity| DynamicEntity {
-			components: reflect_entity(world, *entity),
-			entity: *entity,
-		},
-		|_, _| (),
-	)
-}
-
 
 #[cfg(test)]
 mod test {

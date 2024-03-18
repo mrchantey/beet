@@ -4,9 +4,12 @@ pub use self::entity_graph::*;
 pub mod type_registry_utils;
 #[allow(unused_imports)]
 pub use self::type_registry_utils::*;
-pub mod tree;
+pub mod despawn;
 #[allow(unused_imports)]
-pub use self::tree::*;
+pub use self::despawn::*;
+pub mod dynamic_entity_graph;
+#[allow(unused_imports)]
+pub use self::dynamic_entity_graph::*;
 pub mod graph_ext;
 #[allow(unused_imports)]
 pub use self::graph_ext::*;

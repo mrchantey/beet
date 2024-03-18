@@ -38,7 +38,7 @@ fn action() -> Result<()> {
 		))
 		.id();
 
-	Seek.into_beet_node().spawn(&mut app, agent);
+	Seek.into_beet_node().spawn(&mut app.world, agent);
 
 	app.update();
 	app.update_with_secs(1);

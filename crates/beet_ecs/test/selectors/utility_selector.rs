@@ -1,15 +1,14 @@
-use crate::tests::utils::expect_tree;
 use beet_ecs::prelude::*;
 use bevy::prelude::*;
 use sweet::*;
 
-fn setup() -> (App, EntityGraph) {
+fn setup() -> (App, EntityTree) {
 	let mut app = App::new();
 	app.add_plugins(ActionPlugin::<EcsNode, _>::default());
 
 	let target = app.world.spawn_empty().id();
 
-	let entity_graph = UtilitySelector
+	let tree = UtilitySelector
 		.child((
 			Score::default(),
 			SetOnStart(Score::Fail),
@@ -20,20 +19,18 @@ fn setup() -> (App, EntityGraph) {
 			SetOnStart(Score::Pass),
 			InsertOnRun(RunResult::Success),
 		))
-		.spawn(&mut app, target);
+		.spawn(&mut app.world, target);
 
-	(app, entity_graph)
+	(app, tree)
 }
 
 
 #[sweet_test]
 pub fn works() -> Result<()> {
-	let (mut app, entity_graph) = setup();
+	let (mut app, tree) = setup();
 
 	app.update();
-	expect_tree(
-		&mut app,
-		&entity_graph,
+	expect(tree.component_tree(&app.world)).to_be(
 		Tree::new(Some(&Running))
 			.with_leaf(None)
 			.with_leaf(Some(&Running)),
@@ -41,27 +38,19 @@ pub fn works() -> Result<()> {
 
 
 	app.update();
-	expect_tree(
-		&mut app,
-		&entity_graph,
+	expect(tree.component_tree(&app.world)).to_be(
 		Tree::new(Some(&RunResult::Success))
 			.with_leaf(None)
 			.with_leaf(Some(&RunResult::Success)),
 	)?;
 
-	expect_tree::<Running>(
-		&mut app,
-		&entity_graph,
-		Tree::new(None).with_leaf(None).with_leaf(None),
-	)?;
+	expect(tree.component_tree::<Running>(&app.world))
+		.to_be(Tree::new(None).with_leaf(None).with_leaf(None))?;
 
 	app.update();
 
-	expect_tree::<RunResult>(
-		&mut app,
-		&entity_graph,
-		Tree::new(None).with_leaf(None).with_leaf(None),
-	)?;
+	expect(tree.component_tree::<RunResult>(&app.world))
+		.to_be(Tree::new(None).with_leaf(None).with_leaf(None))?;
 
 	Ok(())
 }

@@ -1,5 +1,4 @@
 use crate::tests::action::test_no_action_behavior_tree;
-use crate::tests::utils::expect_tree;
 use beet_ecs::prelude::*;
 use bevy::prelude::*;
 use sweet::*;
@@ -11,35 +10,30 @@ pub fn works() -> Result<()> {
 
 	let target = app.world.spawn_empty().id();
 
-	let entity_graph = test_no_action_behavior_tree().spawn(&mut app, target);
+	let tree = test_no_action_behavior_tree().spawn(&mut app.world, target);
 
-	for entity in entity_graph.node_weights() {
-		app.world.entity_mut(*entity).insert(Running);
-	}
+	tree.visit_dfs(&mut |entity| {
+		app.world.entity_mut(entity).insert(Running);
+	});
 
-	expect_tree(
-		&mut app,
-		&entity_graph,
+	expect(tree.component_tree(&app.world)).to_be(
 		Tree::new(Some(&Running))
 			.with_leaf(Some(&Running))
 			.with_child(Tree::new(Some(&Running)).with_leaf(Some(&Running))),
 	)?;
 
-	let entity = &entity_graph.0.clone().into_tree().children[1].value;
-	app.world.entity_mut(*entity).insert(Interrupt);
+	app.world
+		.entity_mut(tree.children[1].value)
+		.insert(Interrupt);
 
 	app.update();
 
-	expect_tree(
-		&mut app,
-		&entity_graph,
+	expect(tree.component_tree(&app.world)).to_be(
 		Tree::new(Some(&Running))
 			.with_leaf(Some(&Running))
 			.with_child(Tree::new(None).with_leaf(None)),
 	)?;
-	expect_tree::<Interrupt>(
-		&mut app,
-		&entity_graph,
+	expect(tree.component_tree::<RunResult>(&app.world)).to_be(
 		Tree::new(None)
 			.with_leaf(None)
 			.with_child(Tree::new(None).with_leaf(None)),

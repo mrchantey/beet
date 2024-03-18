@@ -7,13 +7,12 @@ fn spawns() -> Result<()> {
 	let mut world = World::new();
 
 	let agent = world.spawn_empty().id();
-	let _root = *UtilitySelector
+	let _root = UtilitySelector
 		.child(EmptyAction)
 		.into_beet_node()
 		.with_type::<Score>() // not needed by happenstance but usually required
 		.spawn(&mut world, agent)
-		.root()
-		.unwrap();
+		.value;
 	// expect(&world).component(root)?.to_be(&Score::default())?;
 	// expect(true).to_be_false()?;
 

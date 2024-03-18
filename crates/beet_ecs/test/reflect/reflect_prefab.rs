@@ -37,12 +37,11 @@ fn spawns() -> Result<()> {
 
 	let agent = world.spawn_empty().id();
 
-	let root = *(Score::default(), SetOnStart(Score::Weight(0.5)))
+	let root = (Score::default(), SetOnStart(Score::Weight(0.5)))
 		.into_beet_node()
 		.with_type::<Score>() // not needed by happenstance but usually required
 		.spawn(&mut world, agent)
-		.root()
-		.unwrap();
+		.value;
 
 	expect(&world).to_have_entity(root)?;
 	expect(&world).component::<AgentMarker>(agent)?;

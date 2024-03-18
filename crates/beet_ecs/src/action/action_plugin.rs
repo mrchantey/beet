@@ -57,7 +57,7 @@ impl<T: ActionSystems + Send + Sync, Schedule: ScheduleLabel + Clone> Plugin
 			)
 			.add_systems(
 				self.schedule.clone(),
-				cleanup_entity_graph.in_set(PreTickSet),
+				despawn_graph_on_agent_removed.in_set(PreTickSet),
 			)
 			.add_systems(
 				self.schedule.clone(),

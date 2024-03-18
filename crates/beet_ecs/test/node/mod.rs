@@ -10,6 +10,9 @@ pub use self::run_timer::*;
 pub mod score;
 #[allow(unused_imports)]
 pub use self::score::*;
+pub mod despawn;
+#[allow(unused_imports)]
+pub use self::despawn::*;
 pub mod running;
 #[allow(unused_imports)]
 pub use self::running::*;

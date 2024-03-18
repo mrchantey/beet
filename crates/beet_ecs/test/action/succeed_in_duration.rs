@@ -8,11 +8,10 @@ pub fn works() -> Result<()> {
 	app.add_plugins(ActionPlugin::<EcsNode, _>::default());
 	app.insert_time();
 
-	let root = *SucceedInDuration::default()
+	let root = SucceedInDuration::default()
 		.into_beet_node()
-		.spawn_no_target(&mut app)
-		.root()
-		.unwrap();
+		.spawn_no_target(&mut app.world)
+		.value;
 
 	expect(&app).to_have_component::<Running>(root)?;
 

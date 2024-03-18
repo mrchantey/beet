@@ -13,8 +13,8 @@ test-core *args:
 test-ecs *args:
 	just watch 'cargo run -p beet_ecs 	--example test_beet_ecs		$BEET_CARGO_TEST -- -w {{args}}'
 
-test-net *args:
-	just watch 'cargo test -p beet_net $BEET_CARGO_TEST -- {{args}}'
+unit-ecs *args:
+	just watch 'cargo test -p beet_ecs $BEET_CARGO_TEST -- {{args}}'
 
 test-web *args:
 	just test-wasm beet_web {{args}}

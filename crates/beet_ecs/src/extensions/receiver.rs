@@ -2,7 +2,7 @@ use flume::Receiver;
 use flume::TryRecvError;
 
 
-#[extend::ext]
+#[extend::ext(name=FlumeReceiverExt)]
 pub impl<T> Receiver<T> {
 	fn try_recv_all(&mut self) -> anyhow::Result<Vec<T>> {
 		let mut vec = Vec::new();

@@ -1,3 +1,4 @@
+#![allow(unused)]
 // use beet_ecs::action_list;
 use beet_ecs_macros::ActionList;
 // use beet_ecs::exports::Display;

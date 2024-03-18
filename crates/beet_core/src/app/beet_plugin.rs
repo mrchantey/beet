@@ -19,6 +19,16 @@ pub struct BeetPlugin<T: ActionList> {
 	relay: Relay,
 	_phantom: PhantomData<T>,
 }
+
+impl<T: ActionList> Default for BeetPlugin<T> {
+	fn default() -> Self {
+		Self {
+			relay: default(),
+			_phantom: default(),
+		}
+	}
+}
+
 impl<T: ActionList> BeetPlugin<T> {
 	pub fn new(relay: Relay) -> Self {
 		Self {
@@ -57,6 +67,7 @@ impl PluginGroup for DefaultBeetPlugins<CoreNode> {
 impl<T: ActionList> Plugin for BeetPlugin<T> {
 	fn build(&self, app: &mut App) {
 		T::register_components(&mut app.world);
+		T::register_types(&mut app.world.resource::<AppTypeRegistry>().write());
 		let mut relay = self.relay.clone();
 		app.insert_resource(BeetEntityMap::default())
 			.insert_resource(TypedBehaviorPrefab::<T>::type_registry())
