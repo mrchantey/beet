@@ -6,8 +6,8 @@ pub mod app;
 pub mod bee;
 pub mod dom;
 
-// currently required for action_list! macro to work
-extern crate beet_core as beet;
+// currently required for internal macros to work
+extern crate beet_ecs as beet;
 
 pub mod prelude {
 	pub use crate::app::*;

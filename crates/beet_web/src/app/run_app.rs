@@ -2,7 +2,7 @@ use crate::prelude::*;
 use anyhow::Result;
 use base64::engine::general_purpose;
 use base64::Engine;
-use beet::prelude::*;
+use beet_core::prelude::*;
 use beet_ecs::prelude::*;
 use beet_net::prelude::*;
 use bevy::prelude::*;
@@ -98,7 +98,7 @@ pub async fn run_app(relay: Relay) -> Result<()> {
 		.add_plugins(SteeringPlugin::default())
 		.add_plugins(BeetPlugin::<BeeNode>::new(relay.clone()));
 
-	let _frame = app.run_onnimation_frame();
+	let _frame = app.run_on_animation_frame();
 
 	loop {
 		wait_for_16_millis().await;

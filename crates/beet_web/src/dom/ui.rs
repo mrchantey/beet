@@ -5,7 +5,7 @@ use crate::prelude::CreateFlowerHandler;
 use anyhow::Result;
 use base64::engine::general_purpose;
 use base64::Engine;
-use beet::prelude::*;
+use beet_core::prelude::*;
 use beet_ecs::prelude::*;
 use beet_net::prelude::*;
 use bevy::prelude::*;

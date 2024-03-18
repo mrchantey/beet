@@ -1,7 +1,7 @@
 use crate::prelude::*;
 use anyhow::Result;
 use beet::prelude::*;
-use beet_ecs::prelude::*;
+use beet_core::prelude::*;
 use beet_net::prelude::*;
 use bevy::prelude::*;
 use bevy::utils::HashMap;

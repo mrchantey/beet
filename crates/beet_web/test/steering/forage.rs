@@ -1,5 +1,4 @@
 use beet_core::prelude::*;
-use beet_ecs::prelude::*;
 use beet_web::prelude::*;
 use bevy::prelude::*;
 use sweet::*;
