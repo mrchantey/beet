@@ -18,13 +18,21 @@ impl ComponentType {
 	}
 
 	pub fn from_world(world: &World) -> Vec<Self> {
-		let type_registry = world.resource::<AppTypeRegistry>().read();
+		let registry = world.resource::<AppTypeRegistry>().read();
 
-		world
+		let mut vec: Vec<Self> = world
 			.components()
 			.iter()
-			.filter_map(|info| {
-				type_registry.get_type_info(info.type_id().unwrap())
+			.filter_map(|info| registry.get_type_info(info.type_id().unwrap()))
+			.filter(|info| {
+				let Some(registration) = registry.get(info.type_id()) else {
+					return false;
+				};
+				if let Some(_) = registration.data::<ReflectDefault>() {
+					true
+				} else {
+					false
+				}
 			})
 			.map(|info| {
 				ComponentType::new(
@@ -32,7 +40,9 @@ impl ComponentType {
 					info.type_id(),
 				)
 			})
-			.collect()
+			.collect();
+		vec.sort_by(|a, b| a.name.cmp(&b.name));
+		vec
 	}
 }
 
