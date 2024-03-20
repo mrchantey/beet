@@ -11,8 +11,10 @@ pub struct DynNode {
 }
 
 impl DynNode {
-	pub fn new(world: &World, entity: Entity) -> Self {
-		Self::new_from_dynamic(&DynamicEntity::new(world, entity))
+	pub fn new(world: &World, entity: Entity) -> Result<Self> {
+		let dyn_entity = DynamicEntity::new(world, entity)?;
+		let this = Self::new_from_dynamic(&dyn_entity);
+		Ok(this)
 	}
 	pub fn new_from_dynamic(other: &DynamicEntity) -> Self {
 		Self {
@@ -118,7 +120,7 @@ mod test {
 		let entity = world.spawn(MyStruct(2)).id();
 
 		// Create a DynNode from the entity
-		let mut dyn_node = DynNode::new(&world, entity);
+		let mut dyn_node = DynNode::new(&world, entity)?;
 
 		expect(dyn_node.name().as_str()).to_be("New Node")?;
 		dyn_node.set(&NodeName::new("Foobar"));

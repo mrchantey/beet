@@ -35,7 +35,7 @@ impl DynGraph {
 		self.world.read().resource::<AppTypeRegistry>().clone()
 	}
 
-	pub fn get_node(&self, entity: Entity) -> DynNode {
+	pub fn get_node(&self, entity: Entity) -> Result<DynNode> {
 		let world = self.world.read();
 		DynNode::new(&world, entity)
 	}
@@ -45,6 +45,7 @@ impl DynGraph {
 		Ok(())
 	}
 
+	/// Add a node as a child of the given entity
 	pub fn add_node(&self, parent: Entity) -> Entity {
 		let mut world = self.world.write();
 		let mut entity = world.spawn_empty();
@@ -74,13 +75,7 @@ impl DynGraph {
 
 	pub fn remove_node(&self, entity: Entity) {
 		// 1. remove children recursive
-		let world = self.world.read();
-		let children = world
-			.get::<Edges>(entity)
-			.map(|e| e.0.clone())
-			.unwrap_or_default();
-		drop(world);
-		for child in children {
+		for child in self.children(entity) {
 			self.remove_node(child);
 		}
 
@@ -152,7 +147,7 @@ mod test {
 		graph.type_registry().write().register::<MyStruct>();
 
 		expect(graph.nodes().len()).to_be(2)?;
-		let mut node = graph.get_node(graph.root());
+		let mut node = graph.get_node(graph.root())?;
 		node.set(&MyStruct(3));
 		expect(graph.world().read().get::<MyStruct>(graph.root()))
 			.to_be_none()?;

@@ -5,11 +5,18 @@ use bevy::scene::DynamicEntity;
 
 #[extend::ext]
 pub impl DynamicEntity {
-	fn new(world: &World, entity: Entity) -> Self {
+	fn new(world: &World, entity: Entity) -> Result<Self>
+	where
+		Self: Sized,
+	{
+		if world.get_entity(entity).is_none() {
+			anyhow::bail!("Entity not found");
+		}
 		let scene = DynamicSceneBuilder::from_world(world)
 			.extract_entities(vec![entity].into_iter())
 			.build();
-		scene.entities.into_iter().next().unwrap()
+		let out = scene.entities.into_iter().next().unwrap();
+		Ok(out)
 	}
 
 	fn apply(self, world: &mut World) -> Result<()> {
@@ -52,7 +59,7 @@ mod test {
 		let mut app = App::new();
 		app.register_type::<NodeName>();
 		let entity_id = app.world.spawn(NodeName::new("Bob")).id();
-		let mut entity = DynamicEntity::new(&app.world, entity_id);
+		let mut entity = DynamicEntity::new(&app.world, entity_id)?;
 		expect(entity.components.len()).to_be(1)?;
 		let name = node_name(&entity);
 		expect(name.as_str()).to_be("Bob")?;

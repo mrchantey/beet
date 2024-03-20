@@ -7,9 +7,6 @@ pub use self::type_registry_utils::*;
 pub mod despawn;
 #[allow(unused_imports)]
 pub use self::despawn::*;
-pub mod dynamic_entity_graph;
-#[allow(unused_imports)]
-pub use self::dynamic_entity_graph::*;
 pub mod graph_ext;
 #[allow(unused_imports)]
 pub use self::graph_ext::*;
