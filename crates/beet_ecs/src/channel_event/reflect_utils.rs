@@ -31,7 +31,7 @@ mod test {
 
 	#[test]
 	fn works() -> Result<()> {
-		pretty_env_logger::init();
+		pretty_env_logger::try_init().ok();
 		let mut app = App::new();
 
 		let entity = app.world.spawn(MyStruct(7)).id();
