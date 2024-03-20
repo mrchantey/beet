@@ -28,6 +28,7 @@ impl fmt::Debug for BehaviorPrefab {
 }
 
 
+// TODO this sucks, dyncomponent does this much better
 /// Attempts a clone of this prefab
 /// # Panics
 /// if [`DynamicScene::write_to_world`] errors

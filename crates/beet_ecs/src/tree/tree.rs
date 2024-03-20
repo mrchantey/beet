@@ -115,6 +115,14 @@ impl<T> Tree<T> {
 
 	pub fn into_graph(self) -> DiGraph<T, ()> { DiGraph::from_tree(self) }
 
+	pub fn flatten(self) -> Vec<T> {
+		let mut vec = vec![self.value];
+		for child in self.children {
+			vec.extend(child.flatten());
+		}
+		vec
+	}
+
 	pub fn map<O>(&self, mut map_func: impl FnMut(&T) -> O) -> Tree<O> {
 		self.map_ref(&mut map_func)
 	}

@@ -75,7 +75,6 @@ impl ComponentChangeRecv {
 
 
 #[cfg(test)]
-
 mod test {
 	use super::*;
 	use anyhow::Result;

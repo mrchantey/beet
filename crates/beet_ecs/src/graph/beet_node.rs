@@ -12,7 +12,7 @@ pub struct BehaviorGraphRoot;
 
 
 /// Temporary name holder, it seems theres a bug with bevy [`Name`], cow and reflect
-#[derive(Debug, Default, Component, Reflect)]
+#[derive(Debug, Default, Component, Reflect, PartialEq)]
 #[reflect(Component)]
 pub struct NodeName(pub String);
 
@@ -98,6 +98,26 @@ impl BeetNode {
 		EntityTree(tree)
 	}
 
+	pub fn into_graph<T: ActionList>(self) -> DynGraph {
+		DynGraph::new::<T>(self)
+	}
+
+	// TODO deprecate this in favor of insert_on_spawn actions
+	pub fn insert_default_components(
+		entity: &mut EntityWorldMut,
+		index: usize,
+	) {
+		let name = entity
+			.get::<Name>()
+			.map(|n| n.to_string())
+			.unwrap_or(format!("Node {}", index));
+
+		entity.insert((
+			Name::new(name.clone()),
+			NodeName::new(name),
+			RunTimer::default(),
+		));
+	}
 
 	fn build_recursive(
 		self,
@@ -116,22 +136,12 @@ impl BeetNode {
 			.map(|child| child.build_recursive(world, visited))
 			.collect::<Vec<_>>();
 
-		let edges = Edges(children.iter().map(|c| c.value).collect());
-
 		let mut entity = world.entity_mut(entity);
-		let id = visited.len();
 
-		let name = entity
-			.get::<Name>()
-			.map(|n| n.to_string())
-			.unwrap_or(format!("Node {}", id));
-
-		entity.insert((
-			Name::new(name.clone()),
-			NodeName::new(name),
-			RunTimer::default(),
-			edges,
-		));
+		if children.len() > 0 {
+			entity.insert(Edges(children.iter().map(|c| c.value).collect()));
+		}
+		Self::insert_default_components(&mut entity, visited.len());
 
 		Tree {
 			value: entity.id(),

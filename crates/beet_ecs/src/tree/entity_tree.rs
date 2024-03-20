@@ -41,11 +41,10 @@ impl EntityTree {
 		&self,
 		world: &'a World,
 	) -> Tree<Option<&'a T>> {
-		self.0.map(|e|world.get::<T>(*e))
+		self.0.map(|e| world.get::<T>(*e))
 	}
-	
-	
+
 	pub fn dynamic_tree(&self, world: &World) -> Tree<DynamicEntity> {
-		self.0.map(|e|DynamicEntity::new(*e, world))
+		self.0.map(|e| DynamicEntity::new(world, *e))
 	}
 }

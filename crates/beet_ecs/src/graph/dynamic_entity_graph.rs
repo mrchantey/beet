@@ -49,7 +49,7 @@ impl DynamicEntityGraph {
 		let world = world.into_world_ref();
 		DynamicEntityGraph(
 			entity_graph
-				.map(|_, entity| DynamicEntity::new(*entity, world), |_, _| ()),
+				.map(|_, entity| DynamicEntity::new(world, *entity), |_, _| ()),
 		)
 	}
 	pub fn into_tree(self) -> Tree<DynamicEntity> { self.0.into_tree() }
