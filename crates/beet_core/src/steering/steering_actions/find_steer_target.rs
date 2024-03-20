@@ -2,7 +2,6 @@ use beet_ecs::prelude::*;
 use bevy::prelude::*;
 use crate::prelude::*;
 
-#[derive(Default)]
 #[derive_action]
 pub struct FindSteerTarget {
 	pub name: String,

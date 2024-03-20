@@ -3,7 +3,8 @@ use beet_ecs::prelude::*;
 use bevy::prelude::*;
 
 
-#[derive_action(set=PreTickSet)]
+#[derive_action(Default)]
+#[action(set=PreTickSet)]
 pub struct ScoreSteerTarget {
 	pub radius: f32,
 }

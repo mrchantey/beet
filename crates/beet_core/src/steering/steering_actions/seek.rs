@@ -2,7 +2,6 @@ use crate::prelude::*;
 use bevy::prelude::*;
 use beet_ecs::prelude::*;
 
-#[derive(Default)]
 #[derive_action]
 pub struct Seek;
 

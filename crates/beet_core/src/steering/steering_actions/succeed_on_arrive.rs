@@ -2,7 +2,7 @@ use crate::prelude::*;
 use beet_ecs::prelude::*;
 use bevy::prelude::*;
 
-#[derive_action]
+#[derive_action(Default)]
 pub struct SucceedOnArrive {
 	/// When the distance between the agent and the target is <= than this value, the action will succeed.
 	pub radius: f32,

@@ -9,8 +9,8 @@ use bevy::prelude::*;
 /// If a child succeeds it will succeed.
 ///
 /// If the last child fails it will fail.
-#[derive(Default)]
-#[derive_action(child_components=[Score])]
+#[derive_action]
+#[action(child_components=[Score])]
 pub struct FallbackSelector;
 fn fallback_selector(
 	mut commands: Commands,

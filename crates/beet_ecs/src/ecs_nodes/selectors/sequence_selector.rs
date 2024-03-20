@@ -11,8 +11,8 @@ use bevy::prelude::*;
 /// If there are no more children to run it will succeed.
 ///
 /// If a child fails it will fail.
-#[derive(Default)]
-#[derive_action(child_components=[Score])]
+#[derive_action]
+#[action(child_components=[Score])]
 pub struct SequenceSelector;
 fn sequence_selector(
 	mut commands: Commands,

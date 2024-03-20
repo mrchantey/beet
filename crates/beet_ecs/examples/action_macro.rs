@@ -17,8 +17,9 @@ pub fn main() {}
 // }
 // fn foo() {}
 
-#[beet_ecs::prelude::derive_action(set=PreTickSet)]
-struct Action1<T: 'static + Component>
+#[beet_ecs::prelude::derive_action(Clone)]
+#[action(set=PreTickSet)]
+struct Action1<T: 'static + Default + Component>
 where
 	T: Debug,
 {
@@ -28,11 +29,11 @@ where
 fn action1<T: Component>() {}
 
 
-#[derive(PartialEq, Deref, DerefMut)]
-#[beet_ecs::prelude::derive_action(set=PreTickSet)]
-struct Action2<T: 'static + Component>(pub T);
+// #[derive(PartialEq, Deref, DerefMut)]
+// #[beet_ecs::prelude::derive_action(set=PreTickSet)]
+// struct Action2<T: 'static + Component>(pub T);
 
-fn action2<T: Component>() {}
+// fn action2<T: Component>() {}
 
 
 // #[beet_ecs::prelude::derive_action(set=PreTickSet)]

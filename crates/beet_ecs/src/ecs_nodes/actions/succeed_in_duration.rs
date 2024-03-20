@@ -2,7 +2,7 @@ use crate::prelude::*;
 use bevy::prelude::*;
 use std::time::Duration;
 
-#[derive_action]
+#[derive_action(Default)]
 pub struct SucceedInDuration {
 	pub duration: Duration,
 }

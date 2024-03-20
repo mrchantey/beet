@@ -2,7 +2,7 @@ use beet_ecs::prelude::*;
 use std::any::TypeId;
 use sweet::*;
 
-#[derive(Debug, Clone, Reflect)]
+#[derive(Debug, Default, Clone, Reflect)]
 pub struct SomeValue(pub i32);
 
 #[derive_action]

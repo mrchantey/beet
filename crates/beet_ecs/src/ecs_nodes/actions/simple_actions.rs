@@ -1,14 +1,12 @@
 use crate::prelude::*;
 use bevy::prelude::*;
 
-#[derive(Default)]
 #[derive_action]
 pub struct EmptyAction;
 pub fn empty_action() {}
 
 
 #[derive_action]
-#[derive(Default)]
 pub struct Repeat;
 
 /// This relys on [`sync_running`]

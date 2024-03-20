@@ -25,7 +25,8 @@ pub fn action_list(item: TokenStream) -> TokenStream {
 ///
 /// ```rust
 ///
-/// #[derive_action(no_system)]
+/// #[derive_action]
+/// #[action(no_system)]
 /// struct MyStruct{}
 /// ```
 ///
@@ -39,17 +40,9 @@ pub fn action_list(item: TokenStream) -> TokenStream {
 ///
 #[proc_macro_attribute]
 pub fn derive_action(attr: TokenStream, item: TokenStream) -> TokenStream {
-	let item = syn::parse_macro_input!(item as syn::DeriveInput);
-	let attr = proc_macro2::TokenStream::from(attr);
-	quote::quote! {
-		use ::beet::prelude::*;
-		use ::beet::exports::*;
-		#[derive(Debug, Clone, Component, Reflect, Action)]
-		#[reflect(Component)]
-		#[action(#attr)]
-		#item
-	}
-	.into()
+	parse_derive_action(attr, item)
+		.unwrap_or_else(syn::Error::into_compile_error)
+		.into()
 }
 
 

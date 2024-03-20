@@ -2,7 +2,6 @@ use crate::prelude::*;
 use beet_ecs::prelude::*;
 use bevy::prelude::*;
 
-#[derive(Default)]
 #[derive_action]
 pub struct Wander;
 

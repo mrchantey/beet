@@ -8,7 +8,6 @@ use std::f32::consts::TAU;
 pub struct BeeNode;
 
 
-#[derive(Default)]
 #[derive_action]
 pub struct Hover {
 	/// Measured in Hz

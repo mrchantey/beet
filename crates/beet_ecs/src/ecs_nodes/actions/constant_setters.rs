@@ -7,15 +7,16 @@ use bevy::prelude::*;
 // 	components=Score::default()
 // )]
 // #[reflect(Component, Action)]
-#[derive(Default, PartialEq, Deref, DerefMut)]
-#[derive_action(set=PreTickSet)]
-pub struct SetOnStart<T: Clone + Component>(pub T);
+#[derive(PartialEq, Deref, DerefMut)]
+#[derive_action]
+#[action(set=PreTickSet)]
+pub struct SetOnStart<T: Default + Clone + Component>(pub T);
 
-impl<T: Clone + Component> SetOnStart<T> {
+impl<T: Default + Clone + Component> SetOnStart<T> {
 	pub fn new(value: impl Into<T>) -> Self { Self(value.into()) }
 }
 
-fn set_on_start<T: Clone + Component>(
+fn set_on_start<T: Default + Clone + Component>(
 	mut query: Query<(&SetOnStart<T>, &mut T), Added<SetOnStart<T>>>,
 ) {
 	for (from, mut to) in query.iter_mut() {
@@ -23,17 +24,17 @@ fn set_on_start<T: Clone + Component>(
 	}
 }
 
+#[derive_action]
+#[derive(PartialEq, Deref, DerefMut)]
+#[action(set=PreTickSet)]
+pub struct InsertOnRun<T: Default + Clone + Component>(pub T);
 
-#[derive(Default, PartialEq, Deref, DerefMut)]
-#[derive_action(set=PreTickSet)]
-pub struct InsertOnRun<T: Clone + Component>(pub T);
-
-impl<T: Clone + Component> InsertOnRun<T> {
+impl<T: Default + Clone + Component> InsertOnRun<T> {
 	pub fn new(value: impl Into<T>) -> Self { Self(value.into()) }
 }
 
 // this was SetRunResult - With<Running> check for regression
-fn insert_on_run<T: Clone + Component>(
+fn insert_on_run<T: Default + Clone + Component>(
 	mut commands: Commands,
 	query: Query<(Entity, &InsertOnRun<T>), Added<Running>>,
 ) {
@@ -43,15 +44,16 @@ fn insert_on_run<T: Clone + Component>(
 }
 
 /// If the node does not have the component this will do nothing.
-#[derive(Default, PartialEq, Deref, DerefMut)]
-#[derive_action(set=PostTickSet)]
-pub struct SetOnRun<T: Clone + Component>(pub T);
+#[derive(PartialEq, Deref, DerefMut)]
+#[derive_action]
+#[action(set=PostTickSet)]
+pub struct SetOnRun<T: Default + Clone + Component>(pub T);
 
-impl<T: Clone + Component> SetOnRun<T> {
+impl<T: Default + Clone + Component> SetOnRun<T> {
 	pub fn new(value: impl Into<T>) -> Self { Self(value.into()) }
 }
 
-fn set_on_run<T: Clone + Component>(
+fn set_on_run<T: Default + Clone + Component>(
 	mut query: Query<(&SetOnRun<T>, &mut T), Added<Running>>,
 ) {
 	for (from, mut to) in query.iter_mut() {
@@ -60,15 +62,16 @@ fn set_on_run<T: Clone + Component>(
 }
 
 /// If the agent does not have the component this will do nothing.
-#[derive(Default, PartialEq, Deref, DerefMut)]
-#[derive_action(set=PostTickSet)]
-pub struct SetAgentOnRun<T: Clone + Component>(pub T);
+#[derive(PartialEq, Deref, DerefMut)]
+#[derive_action]
+#[action(set=PostTickSet)]
+pub struct SetAgentOnRun<T: Default + Clone + Component>(pub T);
 
-impl<T: Clone + Component> SetAgentOnRun<T> {
+impl<T: Default + Clone + Component> SetAgentOnRun<T> {
 	pub fn new(value: impl Into<T>) -> Self { Self(value.into()) }
 }
 
-fn set_agent_on_run<T: Clone + Component>(
+fn set_agent_on_run<T: Default + Clone + Component>(
 	mut agents: Query<&mut T>,
 	mut query: Query<(&TargetAgent, &SetAgentOnRun<T>), Added<Running>>,
 ) {
