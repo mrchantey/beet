@@ -2,6 +2,7 @@ use anyhow::Result;
 use beet::prelude::*;
 use bevy::prelude::*;
 use parking_lot::RwLock;
+use std::any::TypeId;
 use std::sync::Arc;
 
 #[derive(Clone)]
@@ -39,6 +40,33 @@ impl DynGraph {
 		let world = self.world.read();
 		DynNode::new(&world, entity)
 	}
+
+	pub fn set_component<T: Component>(
+		&self,
+		entity: Entity,
+		component: T,
+	) -> Result<()> {
+		let mut world = self.world.write();
+		world
+			.get_entity_mut(entity)
+			.map(|mut e| {
+				e.insert(component);
+			})
+			.ok_or_else(|| anyhow::anyhow!("entity not found"))
+	}
+	pub fn get_component<T: Component + Clone>(
+		&self,
+		entity: Entity,
+	) -> Option<T> {
+		let world = self.world.read();
+		world
+			.get_entity(entity)
+			.map(|e| e.get::<T>())
+			.flatten()
+			.map(|c| c.clone())
+	}
+
+
 	pub fn set_node(&self, node: DynNode) -> Result<()> {
 		let mut world = self.world.write();
 		node.apply(&mut world)?;
@@ -49,7 +77,10 @@ impl DynGraph {
 	pub fn add_node(&self, parent: Entity) -> Entity {
 		let mut world = self.world.write();
 		let mut entity = world.spawn_empty();
-		BeetNode::insert_default_components(&mut entity, 0);
+		BeetNode::insert_default_components(
+			&mut entity,
+			"New Node".to_string(),
+		);
 		let entity = entity.id();
 
 		if let Some(mut parent) = world.get_entity_mut(parent) {
@@ -71,6 +102,24 @@ impl DynGraph {
 			.get::<Edges>(entity)
 			.map(|e| e.0.clone())
 			.unwrap_or_default()
+	}
+
+	// this is awkward but we dont have a `world.entity().remove_by_id yet`
+	pub fn remove_component(
+		&self,
+		entity: Entity,
+		type_id: TypeId,
+	) -> Result<()> {
+		let mut node = self.get_node(entity)?;
+		let before = node.components.len();
+		node.components
+			.retain(|c| c.represented_type_info().type_id() != type_id);
+		if before == node.components.len() {
+			anyhow::bail!("component not found");
+		}
+
+		self.set_node(node)?;
+		Ok(())
 	}
 
 	pub fn remove_node(&self, entity: Entity) {
@@ -106,6 +155,7 @@ mod test {
 	use crate::prelude::*;
 	use anyhow::Result;
 	use bevy::prelude::*;
+	use std::any::TypeId;
 	use sweet::*;
 
 	#[derive(Debug, PartialEq, Component, Reflect)]
@@ -161,6 +211,28 @@ mod test {
 
 		expect(graph.world().read().get::<MyStruct>(graph.root()))
 			.to_be_none()?;
+		Ok(())
+	}
+	#[test]
+	fn edit_components() -> Result<()> {
+		pretty_env_logger::try_init().ok();
+
+		// Create a world and an entity
+		let graph = (EmptyAction.child((EmptyAction, SetOnRun(Score::Pass))))
+			.into_graph::<EcsNode>();
+
+		graph.type_registry().write().register::<MyStruct>();
+
+		expect(graph.nodes().len()).to_be(2)?;
+		let mut node = graph.get_node(graph.root())?;
+		node.set(&MyStruct(3));
+		graph.set_node(node.clone())?;
+		expect(graph.world().read().get::<MyStruct>(graph.root()))
+			.to_be_some()?;
+		graph.remove_component(node.entity, TypeId::of::<MyStruct>())?;
+		expect(graph.world().read().get::<MyStruct>(graph.root()))
+			.to_be_none()?;
+
 		Ok(())
 	}
 }

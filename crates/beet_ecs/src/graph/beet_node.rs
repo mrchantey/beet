@@ -12,7 +12,7 @@ pub struct BehaviorGraphRoot;
 
 
 /// Temporary name holder, it seems theres a bug with bevy [`Name`], cow and reflect
-#[derive(Debug, Default, Component, Reflect, PartialEq)]
+#[derive(Debug, Clone, Default, Component, Reflect, PartialEq)]
 #[reflect(Component)]
 pub struct NodeName(pub String);
 
@@ -105,12 +105,12 @@ impl BeetNode {
 	// TODO deprecate this in favor of insert_on_spawn actions
 	pub fn insert_default_components(
 		entity: &mut EntityWorldMut,
-		index: usize,
+		default_name: String,
 	) {
 		let name = entity
 			.get::<Name>()
 			.map(|n| n.to_string())
-			.unwrap_or(format!("Node {}", index));
+			.unwrap_or(default_name);
 
 		entity.insert((
 			Name::new(name.clone()),
@@ -141,7 +141,8 @@ impl BeetNode {
 		if children.len() > 0 {
 			entity.insert(Edges(children.iter().map(|c| c.value).collect()));
 		}
-		Self::insert_default_components(&mut entity, visited.len());
+		let default_name = format!("Node {}", visited.len());
+		Self::insert_default_components(&mut entity, default_name);
 
 		Tree {
 			value: entity.id(),

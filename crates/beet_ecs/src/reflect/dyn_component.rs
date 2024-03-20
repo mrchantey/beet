@@ -1,4 +1,6 @@
+use bevy::ecs::component::ComponentId;
 use bevy::prelude::*;
+use bevy::reflect::TypeInfo;
 
 
 
@@ -17,7 +19,23 @@ impl PartialEq for DynComponent {
 }
 
 impl DynComponent {
-	pub fn new(value: &dyn Reflect) -> Self { Self(value.clone_value()) }
+	pub fn new(value: &dyn Reflect) -> Self {
+		value
+			.get_represented_type_info()
+			.expect("DynComponents are for concrete types");
+		Self(value.clone_value())
+	}
+
+	pub fn short_name(&self) -> String {
+		self.0
+			.get_represented_type_info()
+			.map(|i| i.type_path_table().short_path())
+			.unwrap_or("unknown")
+			.to_string()
+	}
+	pub fn name(&self) -> String {
+		heck::AsTitleCase(self.short_name()).to_string()
+	}
 
 	pub fn inner(&self) -> &dyn Reflect { self.0.as_ref() }
 	pub fn take(self) -> Box<dyn Reflect> { self.0 }
@@ -27,6 +45,17 @@ impl DynComponent {
 	}
 	pub fn represents<T: Reflect + TypePath>(&self) -> bool {
 		self.0.represents::<T>()
+	}
+	pub fn represented_type_info(&self) -> &'static TypeInfo {
+		self.0
+			.get_represented_type_info()
+			.expect("DynComponents are for concrete types")
+	}
+
+	pub fn component_id(&self, world: &World) -> Option<ComponentId> {
+		world
+			.components()
+			.get_id(self.represented_type_info().type_id())
 	}
 
 	pub fn set<T: Reflect>(&mut self, value: &T) {
