@@ -2,8 +2,17 @@ use bevy::ecs::component::ComponentId;
 use bevy::prelude::*;
 use bevy::reflect::TypeInfo;
 
+#[derive(Deref, DerefMut)]
+pub struct DynReflect(pub Box<dyn Reflect>);
 
-
+impl Clone for DynReflect {
+	fn clone(&self) -> Self { Self(self.clone_value()) }
+}
+impl PartialEq for DynReflect {
+	fn eq(&self, other: &Self) -> bool {
+		self.reflect_partial_eq(other.as_ref()).unwrap_or(false)
+	}
+}
 
 /// A version of [`Reflect`] that is [`Clone`] and [`PartialEq`]
 #[derive(Deref, DerefMut)]

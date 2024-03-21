@@ -1,8 +1,11 @@
 use crate::prelude::*;
 use anyhow::Result;
 use bevy::prelude::*;
+use bevy::ptr::OwningPtr;
+use bevy::reflect::ReflectFromPtr;
 use parking_lot::RwLock;
 use std::any::TypeId;
+use std::ptr::NonNull;
 use std::sync::Arc;
 
 #[derive(Clone)]
@@ -47,12 +50,13 @@ impl DynGraph {
 			.map(|e| e.0.clone())
 			.unwrap_or_default()
 	}
+	/// This is expensive, only use when you need to
 	pub fn get_node(&self, entity: Entity) -> Result<DynNode> {
 		let world = self.world.read();
 		DynNode::new(&world, entity)
 	}
 
-
+	/// This is expensive, only use when you need to
 	pub fn set_node(&self, node: DynNode) -> Result<()> {
 		let mut world = self.world.write();
 		node.apply(&mut world)?;
@@ -99,7 +103,7 @@ impl DynGraph {
 	}
 
 
-	pub fn set_component<T: Component>(
+	pub fn set_component_typed<T: Component>(
 		&self,
 		entity: Entity,
 		component: T,
@@ -112,7 +116,7 @@ impl DynGraph {
 			})
 			.ok_or_else(|| anyhow::anyhow!("entity not found"))
 	}
-	pub fn get_component<T: Component + Clone>(
+	pub fn get_component_typed<T: Component + Clone>(
 		&self,
 		entity: Entity,
 	) -> Option<T> {
@@ -134,14 +138,29 @@ impl DynGraph {
 			registration.data::<ReflectDefault>().ok_or_else(|| {
 				anyhow::anyhow!("type is not ReflectDefault, try adding #[reflect(Default)]")
 			})?;
-
-		let mut node = self.get_node(entity)?;
 		let new_value: Box<dyn Reflect> = reflect_default.default();
-		node.components.push(DynComponent::new(new_value.as_ref()));
-		self.set_node(node)?;
-		Ok(())
+
+		let mut world = self.world.write();
+		let component_id =
+			world.components().get_id(type_id).ok_or_else(|| {
+				anyhow::anyhow!("type not registered as component: {type_id:?}")
+			})?;
+		if let Some(mut entity) = world.get_entity_mut(entity) {
+			unsafe {
+				let non_null =
+					NonNull::new_unchecked(Box::into_raw(new_value) as *mut _);
+				let ptr = OwningPtr::new(non_null);
+				entity.insert_by_id(component_id, ptr);
+			}
+			Ok(())
+		} else {
+			anyhow::bail!("entity not found: {entity:?}")
+		}
+		// let mut node = self.get_node(entity)?;
+		// node.components.push(DynComponent::new(new_value.as_ref()));
+		// self.set_node(node)?;
 	}
-	// this is awkward but we dont have a `world.entity().remove_by_id yet`
+	/// Expensive and awkward but we dont have a `world.entity().remove_by_id yet`
 	pub fn remove_component(
 		&self,
 		entity: Entity,
@@ -157,6 +176,86 @@ impl DynGraph {
 
 		self.set_node(node)?;
 		Ok(())
+	}
+
+
+	fn map_component<O>(
+		&self,
+		entity: Entity,
+		type_id: TypeId,
+		func: impl FnOnce(&mut dyn Reflect) -> O,
+	) -> Result<O> {
+		let registry = self.type_registry();
+		let registry = registry.read();
+		let Some(registration) = registry.get(type_id) else {
+			anyhow::bail!("type not registered: {type_id:?}")
+		};
+		// drop(registry);
+		let mut world = self.world.write();
+		let Some(component_id) = world.components().get_id(type_id) else {
+			anyhow::bail!("component not registered: {type_id:?}")
+		};
+		let Some(mut entity) = world.get_entity_mut(entity) else {
+			anyhow::bail!("entity not found: {entity:?}")
+		};
+		let Some(component) = entity.get_mut_by_id(component_id) else {
+			anyhow::bail!("component not in entity: {type_id:?}")
+		};
+		// component.
+		let value = unsafe {
+			registration
+				.data::<ReflectFromPtr>()
+				.unwrap()
+				.as_reflect_mut(component.into_inner())
+		};
+		Ok(func(value))
+	}
+	pub fn get_component(
+		&self,
+		entity: Entity,
+		type_id: TypeId,
+	) -> Result<Box<dyn Reflect>> {
+		self.map_component(entity, type_id, |c| c.clone_value())
+	}
+
+	pub fn get_field<'p>(
+		&self,
+		entity: Entity,
+		component: TypeId,
+		path: impl ReflectPath<'p>,
+	) -> Result<Box<dyn Reflect>> {
+		let component = self.get_component(entity, component)?;
+		let val = component
+			.reflect_path(path)
+			.map_err(|e| anyhow::anyhow!("{e}"))?;
+		Ok(val.clone_value())
+	}
+
+	pub fn set_field<'p>(
+		&self,
+		entity: Entity,
+		component: TypeId,
+		path: impl ReflectPath<'p>,
+		new_value: &dyn Reflect,
+	) -> Result<()> {
+		self.map_component(entity, component, move |component| {
+			let current = component
+				.reflect_path_mut(path)
+				.map_err(|e| anyhow::anyhow!("{e}"))?;
+			current.apply(new_value);
+			Ok(())
+		})?
+	}
+	pub fn set_component(
+		&self,
+		entity: Entity,
+		component: TypeId,
+		new_value: &dyn Reflect,
+	) -> Result<()> {
+		self.map_component(entity, component, move |current| {
+			current.apply(new_value);
+			Ok(())
+		})?
 	}
 
 	// pub fn into_dynamic_scene(&self) -> DynamicScene {
@@ -176,12 +275,18 @@ mod test {
 	use crate::prelude::*;
 	use anyhow::Result;
 	use bevy::prelude::*;
+	use bevy::reflect::Access;
+	use bevy::reflect::ParsedPath;
 	use std::any::TypeId;
 	use sweet::*;
 
 	#[derive(Debug, Default, PartialEq, Component, Reflect)]
 	#[reflect(Default, Component)]
 	struct MyStruct(pub i32);
+
+	fn default_graph() -> DynGraph {
+		BeetNode::new(EmptyAction).into_graph::<EcsNode>()
+	}
 
 	#[test]
 	fn add_remove_children() -> Result<()> {
@@ -212,12 +317,11 @@ mod test {
 		pretty_env_logger::try_init().ok();
 
 		// Create a world and an entity
-		let graph = (EmptyAction.child((EmptyAction, SetOnRun(Score::Pass))))
-			.into_graph::<EcsNode>();
+		let graph = default_graph();
 
 		graph.type_registry().write().register::<MyStruct>();
 
-		expect(graph.nodes().len()).to_be(2)?;
+		expect(graph.nodes().len()).to_be(1)?;
 		let mut node = graph.get_node(graph.root())?;
 		node.set(&MyStruct(3));
 		expect(graph.world().read().get::<MyStruct>(graph.root()))
@@ -238,8 +342,7 @@ mod test {
 	fn edit_components() -> Result<()> {
 		// setup
 		pretty_env_logger::try_init().ok();
-		let graph = (EmptyAction.child((EmptyAction, SetOnRun(Score::Pass))))
-			.into_graph::<EcsNode>();
+		let graph = default_graph();
 		graph.type_registry().write().register::<MyStruct>();
 
 		let mut node = graph.get_node(graph.root())?;
@@ -257,6 +360,56 @@ mod test {
 		graph.add_component(node.entity, TypeId::of::<MyStruct>())?;
 		expect(graph.world().read().get::<MyStruct>(graph.root()))
 			.to_be_some()?;
+
+		Ok(())
+	}
+	#[test]
+	fn edit_fields() -> Result<()> {
+		// setup
+		pretty_env_logger::try_init().ok();
+		let graph = default_graph();
+		graph.world().write().init_component::<MyStruct>();
+		graph.type_registry().write().register::<MyStruct>();
+
+		let entity = graph.root();
+		let type_id = TypeId::of::<MyStruct>();
+		graph.add_component(entity, type_id)?;
+
+		//set componnet
+		graph.set_component(entity, type_id, &MyStruct(1))?;
+		expect(
+			graph
+				.get_component(entity, type_id)?
+				.reflect_partial_eq(&MyStruct(1))
+				.unwrap_or_default(),
+		)
+		.to_be_true()?;
+
+
+		//set root value
+		let path: Vec<Access> = vec![];
+		let path = ParsedPath::from(path);
+		graph.set_field(entity, type_id, &path, &MyStruct(2))?;
+
+		expect(
+			graph
+				.get_field(entity, type_id, &path)?
+				.reflect_partial_eq(&MyStruct(2))
+				.unwrap_or_default(),
+		)
+		.to_be_true()?;
+
+		//set nested value
+		let path = ParsedPath::from(vec![Access::TupleIndex(0)]);
+		graph.set_field(entity, type_id, &path, &3)?;
+
+		expect(
+			graph
+				.get_field(entity, type_id, &path)?
+				.reflect_partial_eq(&3)
+				.unwrap_or_default(),
+		)
+		.to_be_true()?;
 
 		Ok(())
 	}

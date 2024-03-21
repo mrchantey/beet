@@ -67,10 +67,14 @@ mod test {
 		let types = graph.component_types();
 		expect(types.len()).to_be_greater_than(0)?;
 
+		// for ty in types.iter() {
+		// 	log::info!("Type: {:?}", ty);
+		// }
+
 		expect(types.contains(&ComponentType {
-			name: "Running".to_string(),
-			type_name: "Running".to_string(),
-			type_id: TypeId::of::<Running>(),
+			name: "Empty Action".to_string(),
+			type_name: "EmptyAction".to_string(),
+			type_id: TypeId::of::<EmptyAction>(),
 		}))
 		.to_be_true()?;
 
