@@ -13,6 +13,13 @@ impl PartialEq for DynReflect {
 		self.reflect_partial_eq(other.as_ref()).unwrap_or(false)
 	}
 }
+impl DynReflect {
+	pub fn new_cloned(value: &dyn Reflect) -> Self { Self(value.clone_value()) }
+	pub fn short_path(&self) -> String {
+		ReflectUtils::short_path(self.0.as_ref())
+	}
+	pub fn name(&self) -> String { ReflectUtils::name(self.0.as_ref()) }
+}
 
 pub struct ReflectUtils;
 
@@ -28,12 +35,6 @@ impl ReflectUtils {
 	}
 }
 
-impl DynReflect {
-	pub fn short_path(&self) -> String {
-		ReflectUtils::short_path(self.0.as_ref())
-	}
-	pub fn name(&self) -> String { ReflectUtils::name(self.0.as_ref()) }
-}
 
 /// A version of [`Reflect`] that is [`Clone`] and [`PartialEq`]
 #[derive(Deref, DerefMut)]
