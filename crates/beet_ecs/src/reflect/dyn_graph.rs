@@ -103,19 +103,27 @@ impl DynGraph {
 		}
 	}
 
-	/// gets the type id of components that are valid rust types
+	/// gets the type id of components that are valid rust types.
+	/// The list is alphabetically sorted
 	pub fn get_components(&self, entity: Entity) -> Vec<TypeId> {
 		let world = self.world.read();
+		fn split_long_path(path: &str) -> String {
+			path.split("::")
+				.last()
+				.map(|l| l.to_string())
+				.unwrap_or_default()
+		}
 		if world.get_entity(entity).is_none() {
 			Default::default()
 		} else {
-			world
-				.inspect_entity(entity)
-				.into_iter()
-				.filter_map(|c| c.type_id())
-				.collect()
+			let mut components = world.inspect_entity(entity);
+			components.sort_by(|a, b| {
+				split_long_path(a.name()).cmp(&split_long_path(b.name()))
+			});
+			components.into_iter().filter_map(|c| c.type_id()).collect()
 		}
 	}
+
 
 	pub fn component_id(&self, type_id: TypeId) -> Result<ComponentId> {
 		self.world
@@ -312,7 +320,7 @@ impl DynGraph {
 		path: impl ReflectPath<'p>,
 		new_value: &dyn Reflect,
 	) -> Result<()> {
-		self.map_field_mut(entity, component,path, move |field| {
+		self.map_field_mut(entity, component, path, move |field| {
 			field.apply(new_value);
 			Ok(())
 		})?
