@@ -36,7 +36,8 @@ impl ComponentType {
 			})
 			.map(|info| {
 				ComponentType::new(
-					info.type_path_table().ident().unwrap().to_string(),
+					info.type_path_table().short_path().to_string(),
+					// info.type_path_table().ident().unwrap().to_string(),
 					info.type_id(),
 				)
 			})

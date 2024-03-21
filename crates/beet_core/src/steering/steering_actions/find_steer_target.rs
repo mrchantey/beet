@@ -1,11 +1,20 @@
+use crate::prelude::*;
 use beet_ecs::prelude::*;
 use bevy::prelude::*;
-use crate::prelude::*;
 
-#[derive_action]
+#[derive_action(Default)]
 pub struct FindSteerTarget {
 	pub name: String,
 	pub radius: f32,
+}
+
+impl Default for FindSteerTarget {
+	fn default() -> Self {
+		Self {
+			name: "enemy".to_string(),
+			radius: 10.0,
+		}
+	}
 }
 
 impl FindSteerTarget {

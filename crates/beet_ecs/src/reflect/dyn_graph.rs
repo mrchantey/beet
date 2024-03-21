@@ -1,5 +1,6 @@
 use crate::prelude::*;
 use anyhow::Result;
+use bevy::ecs::component::ComponentId;
 use bevy::prelude::*;
 use bevy::ptr::OwningPtr;
 use bevy::reflect::ReflectFromPtr;
@@ -102,6 +103,30 @@ impl DynGraph {
 		}
 	}
 
+	/// gets the type id of components that are valid rust types
+	pub fn get_components(&self, entity: Entity) -> Vec<TypeId> {
+		let world = self.world.read();
+		if world.get_entity(entity).is_none() {
+			Default::default()
+		} else {
+			world
+				.inspect_entity(entity)
+				.into_iter()
+				.filter_map(|c| c.type_id())
+				.collect()
+		}
+	}
+
+	pub fn component_id(&self, type_id: TypeId) -> Result<ComponentId> {
+		self.world
+			.read()
+			.components()
+			.get_id(type_id)
+			.ok_or_else(|| {
+				anyhow::anyhow!("component not registered: {type_id:?}")
+			})
+	}
+
 
 	pub fn set_component_typed<T: Component>(
 		&self,
@@ -140,11 +165,8 @@ impl DynGraph {
 			})?;
 		let new_value: Box<dyn Reflect> = reflect_default.default();
 
+		let component_id = self.component_id(type_id)?;
 		let mut world = self.world.write();
-		let component_id =
-			world.components().get_id(type_id).ok_or_else(|| {
-				anyhow::anyhow!("type not registered as component: {type_id:?}")
-			})?;
 		if let Some(mut entity) = world.get_entity_mut(entity) {
 			unsafe {
 				let non_null =
@@ -178,8 +200,34 @@ impl DynGraph {
 		Ok(())
 	}
 
-
 	fn map_component<O>(
+		&self,
+		entity: Entity,
+		type_id: TypeId,
+		func: impl FnOnce(&dyn Reflect) -> O,
+	) -> Result<O> {
+		let registry = self.type_registry();
+		let registry = registry.read();
+		let Some(registration) = registry.get(type_id) else {
+			anyhow::bail!("type not registered: {type_id:?}")
+		};
+		let component_id = self.component_id(type_id)?;
+		let world = self.world.read();
+		let Some(entity) = world.get_entity(entity) else {
+			anyhow::bail!("entity not found: {entity:?}")
+		};
+		let Some(component) = entity.get_by_id(component_id) else {
+			anyhow::bail!("component not in entity: {type_id:?}")
+		};
+		let value = unsafe {
+			registration
+				.data::<ReflectFromPtr>()
+				.unwrap()
+				.as_reflect(component)
+		};
+		Ok(func(value))
+	}
+	fn map_component_mut<O>(
 		&self,
 		entity: Entity,
 		type_id: TypeId,
@@ -191,10 +239,8 @@ impl DynGraph {
 			anyhow::bail!("type not registered: {type_id:?}")
 		};
 		// drop(registry);
+		let component_id = self.component_id(type_id)?;
 		let mut world = self.world.write();
-		let Some(component_id) = world.components().get_id(type_id) else {
-			anyhow::bail!("component not registered: {type_id:?}")
-		};
 		let Some(mut entity) = world.get_entity_mut(entity) else {
 			anyhow::bail!("entity not found: {entity:?}")
 		};
@@ -218,6 +264,34 @@ impl DynGraph {
 		self.map_component(entity, type_id, |c| c.clone_value())
 	}
 
+	pub fn map_field<'p, O>(
+		&self,
+		entity: Entity,
+		component: TypeId,
+		path: impl ReflectPath<'p>,
+		func: impl Fn(&dyn Reflect) -> O,
+	) -> Result<O> {
+		self.map_component(entity, component, |component| {
+			let field = component
+				.reflect_path(path)
+				.map_err(|e| anyhow::anyhow!("{e}"))?;
+			Ok(func(field))
+		})?
+	}
+	pub fn map_field_mut<'p, O>(
+		&self,
+		entity: Entity,
+		component: TypeId,
+		path: impl ReflectPath<'p>,
+		func: impl Fn(&mut dyn Reflect) -> O,
+	) -> Result<O> {
+		self.map_component_mut(entity, component, |component| {
+			let field = component
+				.reflect_path_mut(path)
+				.map_err(|e| anyhow::anyhow!("{e}"))?;
+			Ok(func(field))
+		})?
+	}
 	pub fn get_field<'p>(
 		&self,
 		entity: Entity,
@@ -238,11 +312,8 @@ impl DynGraph {
 		path: impl ReflectPath<'p>,
 		new_value: &dyn Reflect,
 	) -> Result<()> {
-		self.map_component(entity, component, move |component| {
-			let current = component
-				.reflect_path_mut(path)
-				.map_err(|e| anyhow::anyhow!("{e}"))?;
-			current.apply(new_value);
+		self.map_field_mut(entity, component,path, move |field| {
+			field.apply(new_value);
 			Ok(())
 		})?
 	}
@@ -252,7 +323,7 @@ impl DynGraph {
 		component: TypeId,
 		new_value: &dyn Reflect,
 	) -> Result<()> {
-		self.map_component(entity, component, move |current| {
+		self.map_component_mut(entity, component, move |current| {
 			current.apply(new_value);
 			Ok(())
 		})?
@@ -345,21 +416,22 @@ mod test {
 		let graph = default_graph();
 		graph.type_registry().write().register::<MyStruct>();
 
-		let mut node = graph.get_node(graph.root())?;
+		let entity = graph.root();
+
+		expect(graph.get_components(entity).len()).to_be_greater_than(0)?;
+
+		let mut node = graph.get_node(entity)?;
 
 		// add normally
 		node.set(&MyStruct(3));
 		graph.set_node(node.clone())?;
-		expect(graph.world().read().get::<MyStruct>(graph.root()))
-			.to_be_some()?;
+		expect(graph.world().read().get::<MyStruct>(entity)).to_be_some()?;
 		// remove
 		graph.remove_component(node.entity, TypeId::of::<MyStruct>())?;
-		expect(graph.world().read().get::<MyStruct>(graph.root()))
-			.to_be_none()?;
+		expect(graph.world().read().get::<MyStruct>(entity)).to_be_none()?;
 		// add as default
 		graph.add_component(node.entity, TypeId::of::<MyStruct>())?;
-		expect(graph.world().read().get::<MyStruct>(graph.root()))
-			.to_be_some()?;
+		expect(graph.world().read().get::<MyStruct>(entity)).to_be_some()?;
 
 		Ok(())
 	}

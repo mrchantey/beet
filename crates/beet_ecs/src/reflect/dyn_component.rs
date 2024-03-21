@@ -14,6 +14,27 @@ impl PartialEq for DynReflect {
 	}
 }
 
+pub struct ReflectUtils;
+
+impl ReflectUtils {
+	pub fn short_path(val: &dyn Reflect) -> String {
+		val.get_represented_type_info()
+			.map(|i| i.type_path_table().short_path())
+			.unwrap_or("unknown")
+			.to_string()
+	}
+	pub fn name(val: &dyn Reflect) -> String {
+		heck::AsTitleCase(Self::short_path(val)).to_string()
+	}
+}
+
+impl DynReflect {
+	pub fn short_path(&self) -> String {
+		ReflectUtils::short_path(self.0.as_ref())
+	}
+	pub fn name(&self) -> String { ReflectUtils::name(self.0.as_ref()) }
+}
+
 /// A version of [`Reflect`] that is [`Clone`] and [`PartialEq`]
 #[derive(Deref, DerefMut)]
 pub struct DynComponent(Box<dyn Reflect>);
@@ -35,16 +56,10 @@ impl DynComponent {
 		Self(value.clone_value())
 	}
 
-	pub fn short_name(&self) -> String {
-		self.0
-			.get_represented_type_info()
-			.map(|i| i.type_path_table().short_path())
-			.unwrap_or("unknown")
-			.to_string()
+	pub fn short_path(&self) -> String {
+		ReflectUtils::short_path(self.0.as_ref())
 	}
-	pub fn name(&self) -> String {
-		heck::AsTitleCase(self.short_name()).to_string()
-	}
+	pub fn name(&self) -> String { ReflectUtils::name(self.0.as_ref()) }
 
 	pub fn inner(&self) -> &dyn Reflect { self.0.as_ref() }
 	pub fn take(self) -> Box<dyn Reflect> { self.0 }
