@@ -33,13 +33,13 @@ button:active {
 	background-color: var(--active);
 }
 
-div.container {
+.container {
 	width: 100%;
 	height: 100%;
 	overflow: hidden;
 }
 
-div.entities {
+.dom-sim-container {
 	width: 100%;
 	height: 100%;
 	position: relative;
@@ -47,14 +47,14 @@ div.entities {
 	background: var(--pretty-sky);
 }
 
-div.entities>div.entity {
+.dom-sim-container > .entity {
 	position: absolute;
 	font-size: 3em;
 	pointer-events: none;
 	user-select: none;
 }
 
-div.overlay {
+.overlay {
 	display: flex;
 	flex-direction: column;
 	position: absolute;
@@ -62,20 +62,4 @@ div.overlay {
 	left: 0;
 	right: 0;
 	bottom: 0;
-}
-
-#graph-json-container {
-	width: 100%;
-	height: 100%;
-	flex-grow: 1;
-}
-
-textarea {
-	width: 100%;
-	height: 100%;
-	color: var(--primary-color);
-	background: transparent;
-	border: none;
-	resize: none;
-	font-family: monospace;
 }

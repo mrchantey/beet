@@ -12,7 +12,7 @@ use web_sys::Element;
 use web_sys::HtmlDivElement;
 
 pub fn get_entities_container() -> HtmlDivElement {
-	Document::x_query_selector::<HtmlDivElement>(".entities").unwrap()
+	Document::x_query_selector::<HtmlDivElement>(".dom-sim-container").unwrap()
 }
 
 
