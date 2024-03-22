@@ -11,6 +11,11 @@ use web_sys::Document;
 use web_sys::Element;
 use web_sys::HtmlDivElement;
 
+pub fn get_entities_container() -> HtmlDivElement {
+	Document::x_query_selector::<HtmlDivElement>(".entities").unwrap()
+}
+
+
 #[derive(Clone)]
 pub enum DomSimMessage {
 	SpawnBee,
