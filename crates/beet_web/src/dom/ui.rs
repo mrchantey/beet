@@ -5,9 +5,7 @@ use crate::prelude::CreateFlowerHandler;
 use anyhow::Result;
 use base64::engine::general_purpose;
 use base64::Engine;
-use beet_core::prelude::*;
-use beet_ecs::prelude::*;
-use beet_net::prelude::*;
+use beet::prelude::*;
 use bevy::prelude::*;
 use forky_core::utility::random_signed;
 use forky_core::utility::random_value;
@@ -58,7 +56,7 @@ fn create_clear_all(relay: Relay) {
 					.ok_or(|e| log::error!("{e}"));
 			});
 		},
-		clear_all_button.into(),
+		clear_all_button,
 	)
 	.forget();
 }
@@ -81,7 +79,7 @@ fn create_bee(
 				.push(&prefab)
 				.ok_or(|e| log::error!("{e}"));
 		},
-		button.clone().into(),
+		button.clone(),
 	)
 	.forget();
 	for _ in 0..options.bees {
@@ -105,7 +103,7 @@ fn create_flower(mut relay: Relay, options: &AppOptions) {
 				.push(&Vec3::new(x, y, 0.))
 				.ok_or(|e| log::error!("{e}"));
 		},
-		button.clone().into(),
+		button.clone(),
 	)
 	.forget();
 
@@ -140,7 +138,7 @@ fn create_toggle_json(options: &AppOptions) {
 				toggle_json_button2.set_inner_text("Show Graph");
 			}
 		},
-		button.clone().into(),
+		button.clone(),
 	)
 	.forget();
 
@@ -179,7 +177,7 @@ fn create_textarea(
 				}
 			}
 		},
-		textarea.clone().into(),
+		textarea.clone(),
 	)
 	.forget();
 	textarea

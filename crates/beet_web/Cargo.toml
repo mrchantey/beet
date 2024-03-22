@@ -17,9 +17,7 @@ categories.workspace = true
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 ## internal
-beet_core.workspace = true
-beet_net.workspace = true
-beet_ecs.workspace = true
+beet.workspace = true
 ## local
 forky_web.workspace = true
 forky_core.workspace = true
@@ -36,9 +34,7 @@ serde.workspace = true
 serde_json.workspace = true
 
 bevy.workspace = true
-
-## only needed for action_list!
-strum.workspace = true
+flume.workspace = true
 
 ## web
 console_log = "1.0"

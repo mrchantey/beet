@@ -1,8 +1,6 @@
 use crate::prelude::*;
 use anyhow::Result;
 use beet::prelude::*;
-use beet_core::prelude::*;
-use beet_net::prelude::*;
 use bevy::prelude::*;
 use bevy::utils::HashMap;
 use forky_bevy::extensions::Vec3Ext;
@@ -150,7 +148,7 @@ fn set_position<'a>(
 		.unwrap();
 }
 
-fn get_entities_container() -> HtmlDivElement {
+pub fn get_entities_container() -> HtmlDivElement {
 	Document::x_query_selector::<HtmlDivElement>(".entities").unwrap()
 }
 

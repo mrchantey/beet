@@ -1,5 +1,5 @@
 use anyhow::Result;
-use beet_net::prelude::*;
+use beet::prelude::*;
 use forky_core::ResultTEExt;
 use forky_web::AnimationFrame;
 use forky_web::HtmlEventListener;
@@ -63,7 +63,7 @@ impl PostMessageRelay {
 						});
 					}
 				},
-				target.clone().into(),
+				target.clone(),
 			)
 		};
 		Self {

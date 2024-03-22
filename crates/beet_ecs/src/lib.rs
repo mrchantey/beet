@@ -31,7 +31,7 @@ pub mod prelude {
 
 
 pub mod exports {
-	pub use bevy::ecs as bevy_ecs;
+	// pub use bevy::ecs as bevy_ecs;
 	pub use bevy::ecs::schedule::ScheduleLabel;
 	pub use bevy::ecs::system::EntityCommands;
 	pub use bevy::prelude::*;

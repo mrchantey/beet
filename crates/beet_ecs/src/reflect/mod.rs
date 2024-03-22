@@ -10,3 +10,6 @@ pub use self::dyn_graph::*;
 pub mod dyn_component;
 #[allow(unused_imports)]
 pub use self::dyn_component::*;
+pub mod dyn_graph_spawn;
+#[allow(unused_imports)]
+pub use self::dyn_graph_spawn::*;

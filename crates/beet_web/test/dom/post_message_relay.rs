@@ -1,4 +1,4 @@
-use beet_net::prelude::*;
+use beet::prelude::*;
 use beet_web::prelude::*;
 use forky_web::wait_for_millis;
 use sweet::*;

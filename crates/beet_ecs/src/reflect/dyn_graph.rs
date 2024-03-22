@@ -9,7 +9,8 @@ use std::any::TypeId;
 use std::ptr::NonNull;
 use std::sync::Arc;
 
-#[derive(Clone)]
+/// Wrapper around a world in which every entity is a node on a behavior graph
+#[derive(Clone, Resource)]
 pub struct DynGraph {
 	world: Arc<RwLock<World>>,
 	root: Entity,
@@ -336,6 +337,9 @@ impl DynGraph {
 			Ok(())
 		})?
 	}
+
+
+
 
 	// pub fn into_dynamic_scene(&self) -> DynamicScene {
 	// 	DynamicScene {

@@ -1,5 +1,4 @@
-use beet_core::prelude::*;
-use beet_ecs::prelude::*;
+use beet::prelude::*;
 use bevy::prelude::*;
 use std::f32::consts::TAU;
 
@@ -7,6 +6,7 @@ use std::f32::consts::TAU;
 #[actions(Hover,SetAgentOnRun::<Velocity>, CoreNode)]
 pub struct BeeNode;
 
+use bevy::ecs as bevy_ecs;
 
 #[derive_action]
 pub struct Hover {
