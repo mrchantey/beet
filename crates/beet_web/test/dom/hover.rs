@@ -5,7 +5,9 @@ use sweet::*;
 pub fn works() -> Result<()> {
 	append_html_for_tests();
 
-	DomSim::default().with_graph(Hover::new(1., 0.01)).run()?;
+	DomSim::default()
+		.with_node(Hover::new(1., 0.01))
+		.run_forever()?;
 
 	Ok(())
 }

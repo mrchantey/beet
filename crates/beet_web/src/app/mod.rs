@@ -7,9 +7,9 @@ pub use self::auto_flowers::*;
 pub mod despawn;
 #[allow(unused_imports)]
 pub use self::despawn::*;
-pub mod dom_sim_plugin;
+pub mod dom_sim;
 #[allow(unused_imports)]
-pub use self::dom_sim_plugin::*;
+pub use self::dom_sim::*;
 pub mod setup_ui;
 #[allow(unused_imports)]
 pub use self::setup_ui::*;

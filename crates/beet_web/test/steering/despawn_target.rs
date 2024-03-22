@@ -6,7 +6,7 @@ use sweet::*;
 pub async fn works() -> Result<()> {
 	append_html_for_tests();
 	DomSim::default()
-		.with_graph(
+		.with_node(
 			(Repeat::default(), SequenceSelector)
 				.child((
 					Seek::default(),
@@ -18,6 +18,6 @@ pub async fn works() -> Result<()> {
 					DespawnSteerTarget::default(),
 				)),
 		)
-		.run()?;
+		.run_forever()?;
 	Ok(())
 }

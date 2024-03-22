@@ -5,7 +5,7 @@ use sweet::*;
 #[sweet_test]
 pub async fn works() -> Result<()> {
 	append_html_for_tests();
-	DomSim::default().with_graph(Wander).run()?;
+	DomSim::default().with_node(Wander).run_forever()?;
 
 	Ok(())
 }

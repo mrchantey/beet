@@ -24,6 +24,7 @@ pub struct DomSim {
 	pub auto_flowers: Option<Duration>,
 	pub bees: usize,
 	pub flowers: usize,
+	pub basic_ui: bool,
 }
 
 impl Default for DomSim {
@@ -31,6 +32,7 @@ impl Default for DomSim {
 		Self {
 			graph: DynGraph::new::<BeeNode>(forage()),
 			auto_flowers: None,
+			basic_ui: true,
 			bees: 1,
 			flowers: 1,
 		}
@@ -39,13 +41,9 @@ impl Default for DomSim {
 
 
 impl DomSim {
-	pub fn with_graph<M>(mut self, graph: impl IntoBeetNode<M>) -> Self {
+	pub fn with_node<M>(mut self, graph: impl IntoBeetNode<M>) -> Self {
 		self.graph = DynGraph::new::<BeeNode>(graph.into_beet_node());
 		self
-	}
-	pub fn run(self) -> Result<()> {
-		let (send, recv) = flume::unbounded();
-		self.run_with_channel(send, recv)
 	}
 	pub fn from_url() -> Self {
 		let mut this = Self::default();
@@ -65,13 +63,19 @@ impl DomSim {
 		this
 	}
 
+	pub fn run_forever(self) -> Result<()> {
+		let (send, recv) = flume::unbounded();
+		self.run_with_channel(send, recv)?.forget();
+		Ok(())
+	}
 
 
+	#[must_use]
 	pub fn run_with_channel(
 		self,
 		send: Sender<DomSimMessage>,
 		recv: Receiver<DomSimMessage>,
-	) -> Result<()> {
+	) -> Result<AnimationFrame> {
 		for _ in 0..self.bees {
 			send.send(DomSimMessage::SpawnBee)?;
 		}
@@ -81,7 +85,9 @@ impl DomSim {
 
 		console_error_panic_hook::set_once();
 		console_log::init_with_level(log::Level::Info).ok();
-		setup_cool_ui(send.clone());
+		if self.basic_ui {
+			setup_ui(send.clone());
+		}
 		let mut app = App::new();
 
 
@@ -112,8 +118,7 @@ impl DomSim {
 			app.update();
 		});
 
-		frame.forget();
-		Ok(())
+		Ok(frame)
 	}
 }
 

@@ -15,7 +15,7 @@ async fn works() -> Result<()> {
 		auto_flowers: Some(Duration::from_secs(1)),
 		..default()
 	}
-	.with_graph(forage())
-	.run()?;
+	.with_node(forage())
+	.run_forever()?;
 	Ok(())
 }

@@ -10,7 +10,7 @@ use web_sys::HtmlButtonElement;
 
 
 
-pub fn setup_cool_ui(send: Sender<DomSimMessage>) {
+pub fn setup_ui(send: Sender<DomSimMessage>) {
 	message_button(send.clone(), "#create-bee", DomSimMessage::SpawnBee);
 	message_button(send.clone(), "#create-flower", DomSimMessage::SpawnFlower);
 	message_button(send.clone(), "#clear-all", DomSimMessage::DespawnAll);

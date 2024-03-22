@@ -9,8 +9,8 @@ pub fn works() -> Result<()> {
 	append_html_for_tests();
 
 	DomSim::default()
-		.with_graph(Translate::new(Vec3::new(-0.1, 0., 0.)))
-		.run()?;
+		.with_node(Translate::new(Vec3::new(-0.1, 0., 0.)))
+		.run_forever()?;
 
 	Ok(())
 }
