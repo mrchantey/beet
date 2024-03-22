@@ -1,6 +1,7 @@
 use crate::prelude::*;
-use bevy::prelude::*;
 use beet_ecs::prelude::*;
+use bevy::prelude::*;
+use forky_core::ResultTEExt;
 
 #[derive_action]
 pub struct Seek;
@@ -31,7 +32,10 @@ fn seek(
 		)) = targets.get_mut(**target)
 		// if agent has no steer_target thats ok
 		{
-			if let Ok(target_position) = steer_target.position(&transforms) {
+			if let Some(target_position) = steer_target
+				.position(&transforms)
+				.ok_or(|e| log::warn!("{e}"))
+			{
 				*impulse = seek_impulse(
 					&transform.translation,
 					&velocity,
@@ -40,8 +44,6 @@ fn seek(
 					*max_force,
 					arrive_radius.copied(),
 				);
-			} else {
-				log::warn!("Seek target not found");
 			}
 		}
 	}

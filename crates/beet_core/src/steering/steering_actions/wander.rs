@@ -1,6 +1,7 @@
 use crate::prelude::*;
 use beet_ecs::prelude::*;
 use bevy::prelude::*;
+use forky_core::ResultTEExt;
 
 #[derive_action]
 pub struct Wander;
@@ -17,22 +18,22 @@ fn wander(
 	query: Query<(&TargetAgent, &Wander), (With<Running>, With<Wander>)>,
 ) {
 	for (target, _) in query.iter() {
-		let (
+		if let Some((
 			transform,
 			velocity,
 			mut wander,
 			max_speed,
 			max_force,
 			mut impulse,
-		) = targets.get_mut(**target).unwrap();
-
-
-		*impulse = wander_impulse(
-			&transform.translation,
-			&velocity,
-			&mut wander,
-			*max_speed,
-			*max_force,
-		);
+		)) = targets.get_mut(**target).ok_or(|e| log::warn!("{e}"))
+		{
+			*impulse = wander_impulse(
+				&transform.translation,
+				&velocity,
+				&mut wander,
+				*max_speed,
+				*max_force,
+			);
+		}
 	}
 }

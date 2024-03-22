@@ -1,5 +1,6 @@
 use beet_ecs::prelude::*;
 use bevy::prelude::*;
+use forky_core::ResultTEExt;
 
 #[derive_action]
 pub struct Translate {
@@ -18,7 +19,11 @@ fn translate(
 	query: Query<(&TargetAgent, &Translate), With<Running>>,
 ) {
 	for (target, translate) in query.iter() {
-		transforms.get_mut(**target).unwrap().translation +=
-			translate.translation * time.delta_seconds();
+		if let Some(mut transform) =
+			transforms.get_mut(**target).ok_or(|e| log::warn!("{e}"))
+		{
+			transform.translation +=
+				translate.translation * time.delta_seconds();
+		}
 	}
 }
