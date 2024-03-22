@@ -4,7 +4,7 @@ use sweet::*;
 
 fn setup() -> (App, EntityTree) {
 	let mut app = App::new();
-	app.add_plugins(ActionPlugin::<EcsNode, _>::default());
+	app.add_plugins(BeetSystemsPlugin::<EcsNode, _>::default());
 
 	let target = app.world.spawn_empty().id();
 

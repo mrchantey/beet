@@ -13,11 +13,12 @@ pub struct TickSyncSet;
 pub struct PostTickSet;
 
 
-pub struct ActionPlugin<T: ActionSystems, Schedule: ScheduleLabel + Clone> {
+pub struct BeetSystemsPlugin<T: ActionSystems, Schedule: ScheduleLabel + Clone>
+{
 	pub schedule: Schedule,
 	pub phantom: PhantomData<T>,
 }
-impl<T: ActionSystems> Default for ActionPlugin<T, Update> {
+impl<T: ActionSystems> Default for BeetSystemsPlugin<T, Update> {
 	fn default() -> Self {
 		Self {
 			schedule: Update,
@@ -27,7 +28,7 @@ impl<T: ActionSystems> Default for ActionPlugin<T, Update> {
 }
 
 impl<T: ActionSystems + Send + Sync, Schedule: ScheduleLabel + Clone> Plugin
-	for ActionPlugin<T, Schedule>
+	for BeetSystemsPlugin<T, Schedule>
 {
 	fn build(&self, app: &mut App) {
 		app.configure_sets(self.schedule.clone(), PreTickSet)

@@ -25,7 +25,7 @@ fn action() -> Result<()> {
 
 	app.add_plugins((
 		SteeringPlugin::default(),
-		ActionPlugin::<CoreNode, _>::default(),
+		BeetSystemsPlugin::<CoreNode, _>::default(),
 	))
 	.insert_time();
 

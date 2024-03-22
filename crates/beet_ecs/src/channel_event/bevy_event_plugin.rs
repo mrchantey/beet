@@ -2,7 +2,6 @@ use super::*;
 use bevy::prelude::*;
 
 
-
 #[derive(Clone)]
 pub struct BevyEventPlugin {
 	pub world_handler: WorldHandler,

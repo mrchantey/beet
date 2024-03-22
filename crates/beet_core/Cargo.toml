@@ -18,7 +18,6 @@ forky_bevy.workspace = true
 log.workspace = true
 
 beet_ecs.workspace = true
-beet_net.workspace = true
 bevy.workspace = true
 
 anyhow.workspace = true

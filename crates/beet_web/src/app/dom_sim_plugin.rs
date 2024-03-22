@@ -87,8 +87,7 @@ impl DomSim {
 
 		app /*-*/
 			.add_plugins(BeetMinimalPlugin)
-			.add_plugins(SteeringPlugin::default())
-			.add_plugins(BeetPlugin::<BeeNode>::new(Relay::default()))
+			.add_plugins(DefaultBeetPlugins::<BeeNode>::new())
 			.insert_resource(DomSimMessageSend(send))
 			.insert_resource(DomSimMessageRecv(recv))
 			.insert_resource(self.graph)
