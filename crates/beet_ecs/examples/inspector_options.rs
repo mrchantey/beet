@@ -6,6 +6,6 @@ fn main() {}
 
 #[derive(InspectorOptions)]
 struct MyStruct {
-	#[inspector(min = 0.1, max = 3.)]
+	#[inspector(min = 0.1, step = 3., max = 3.)]
 	_field: f32,
 }

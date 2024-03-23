@@ -1,3 +1,5 @@
+use crate::prelude::ReflectInspectorOptions;
+use beet_ecs_macros::InspectorOptions;
 use bevy::prelude::*;
 use std::cmp::Ordering;
 use std::fmt::Debug;
@@ -22,11 +24,13 @@ pub struct Scoring;
 	strum_macros::Display,
 	strum_macros::EnumIter,
 	Reflect,
+	InspectorOptions,
 )]
-#[reflect(Component)]
+#[reflect(Component, InspectorOptions)]
 pub enum Score {
 	#[default]
 	/// The node should not run.
+	#[inspector(min = 0., max = 1., step = 0.01)]
 	Fail,
 	Weight(f32), //this has to be here or the serde world breaks
 	/// The node has a weight, usually in the range `0..1`, where higher is more favorable.
