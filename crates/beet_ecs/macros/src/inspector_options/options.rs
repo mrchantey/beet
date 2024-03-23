@@ -23,8 +23,7 @@ fn expand_struct(
 	input: &DeriveInput,
 	data: &DataStruct,
 ) -> syn::Result<TokenStream> {
-	let bevy_reflect =
-		quote! { ::bevy_inspector_egui::__macro_exports::bevy_reflect };
+	let bevy_reflect = quote! { ::beet::exports::bevy::reflect };
 
 	let fields = data
         .fields
@@ -49,9 +48,9 @@ fn expand_struct(
             });
 
             Some(Ok(quote! {
-                let mut field_options = <#ty as ::bevy_inspector_egui::inspector_options::InspectorOptionsType>::DeriveOptions::default();
+                let mut field_options = <#ty as ::beet::prelude::InspectorOptionsType>::DeriveOptions::default();
                 #(#attrs)*
-                options.insert(::bevy_inspector_egui::inspector_options::Target::Field(#i), <#ty as ::bevy_inspector_egui::inspector_options::InspectorOptionsType>::options_from_derive(field_options));
+                options.insert(::beet::prelude::Target::Field(#i), <#ty as ::beet::prelude::InspectorOptionsType>::options_from_derive(field_options));
             }))
         })
         .collect::<syn::Result<Vec<_>>>()?;
@@ -61,11 +60,11 @@ fn expand_struct(
 		input.generics.split_for_impl();
 
 	Ok(quote! {
-		impl #impl_generics #bevy_reflect::FromType<#type_name #ty_generics> for ::bevy_inspector_egui::InspectorOptions
+		impl #impl_generics #bevy_reflect::FromType<#type_name #ty_generics> for ::beet::prelude::InspectorOptions
 		#where_clause
 		{
 			fn from_type() -> Self {
-				let mut options = ::bevy_inspector_egui::InspectorOptions::default();
+				let mut options = ::beet::prelude::InspectorOptions::default();
 
 				#(#fields)*
 
@@ -79,8 +78,7 @@ fn expand_enum(
 	input: &DeriveInput,
 	data: &DataEnum,
 ) -> syn::Result<TokenStream> {
-	let bevy_reflect =
-		quote! { ::bevy_inspector_egui::__macro_exports::bevy_reflect };
+	let bevy_reflect = quote! { ::beet::exports::bevy::reflect };
 
 	let fields = data
         .variants
@@ -110,14 +108,14 @@ fn expand_enum(
                     });
 
                     Some(Ok(quote! {
-                        let mut field_options = <#ty as ::bevy_inspector_egui::inspector_options::InspectorOptionsType>::DeriveOptions::default();
+                        let mut field_options = <#ty as ::beet::prelude::InspectorOptionsType>::DeriveOptions::default();
                         #(#attrs)*
                         options.insert(
-                            ::bevy_inspector_egui::inspector_options::Target::VariantField {
+                            ::beet::prelude::Target::VariantField {
                                 variant_index: #variant_index,
                                 field_index: #field_index,
                             },
-                            <#ty as ::bevy_inspector_egui::inspector_options::InspectorOptionsType>::options_from_derive(field_options)
+                            <#ty as ::beet::prelude::InspectorOptionsType>::options_from_derive(field_options)
                         );
                     }))
                 })
@@ -131,11 +129,11 @@ fn expand_enum(
 		input.generics.split_for_impl();
 
 	Ok(quote! {
-		impl #impl_generics #bevy_reflect::FromType<#type_name #ty_generics> for ::bevy_inspector_egui::InspectorOptions
+		impl #impl_generics #bevy_reflect::FromType<#type_name #ty_generics> for ::beet::prelude::InspectorOptions
 		#where_clause
 		{
 			fn from_type() -> Self {
-				let mut options = ::bevy_inspector_egui::InspectorOptions::default();
+				let mut options = ::beet::prelude::InspectorOptions::default();
 
 				#(#(#fields)*)*
 

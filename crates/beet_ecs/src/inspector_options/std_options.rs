@@ -40,18 +40,21 @@ macro_rules! impl_options_defer_generic {
 pub struct NumberOptions<T> {
 	pub min: Option<T>,
 	pub max: Option<T>,
-	pub speed: f32,
+	pub step: T,
 	pub prefix: String,
 	pub suffix: String,
 	pub display: NumberDisplay,
 }
 
-impl<T> Default for NumberOptions<T> {
+impl<T: 'static + Copy> Default for NumberOptions<T>
+where
+	f64: AsPrimitive<T>,
+{
 	fn default() -> Self {
 		Self {
 			min: None,
 			max: None,
-			speed: 0.0,
+			step: 0.1.as_(),
 			prefix: String::new(),
 			suffix: String::new(),
 			display: NumberDisplay::default(),
@@ -67,12 +70,15 @@ pub enum NumberDisplay {
 	Slider,
 }
 
-impl<T> NumberOptions<T> {
+impl<T: 'static + Copy> NumberOptions<T>
+where
+	f64: AsPrimitive<T>,
+{
 	pub fn between(min: T, max: T) -> NumberOptions<T> {
 		NumberOptions {
 			min: Some(min),
 			max: Some(max),
-			speed: 0.0,
+			step: 0.1.as_(),
 			prefix: String::new(),
 			suffix: String::new(),
 			display: NumberDisplay::default(),
@@ -82,23 +88,23 @@ impl<T> NumberOptions<T> {
 		NumberOptions {
 			min: Some(min),
 			max: None,
-			speed: 0.0,
+			step: 0.1.as_(),
 			prefix: String::new(),
 			suffix: String::new(),
 			display: NumberDisplay::default(),
 		}
 	}
 
-	pub fn with_speed(self, speed: f32) -> NumberOptions<T> {
-		NumberOptions { speed, ..self }
+	pub fn with_step(self, step: T) -> NumberOptions<T> {
+		NumberOptions { step, ..self }
 	}
 
 	pub fn map<U>(&self, f: impl Fn(&T) -> U) -> NumberOptions<U> {
 		NumberOptions {
             #[allow(clippy::redundant_closure)] // false positive
             min: self.min.as_ref().map(|min| f(min)),
-            max: self.max.as_ref().map(f),
-            speed: self.speed,
+            max: self.max.as_ref().map(|max| f(max)),
+            step: f(&self.step),
             prefix: self.prefix.clone(),
             suffix: self.suffix.clone(),
             display: NumberDisplay::default(),
@@ -113,7 +119,7 @@ where
 		NumberOptions {
 			min: Some(0.0.as_()),
 			max: None,
-			speed: 0.0,
+			step: 0.0.as_(),
 			prefix: String::new(),
 			suffix: String::new(),
 			display: NumberDisplay::default(),
@@ -124,7 +130,7 @@ where
 		NumberOptions {
 			min: Some(0.0.as_()),
 			max: Some(1.0.as_()),
-			speed: 0.01,
+			step: 0.01.as_(),
 			prefix: String::new(),
 			suffix: String::new(),
 			display: NumberDisplay::default(),
