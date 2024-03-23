@@ -17,11 +17,10 @@ impl ComponentType {
 		}
 	}
 
-	// TODO sort by category
 	pub fn from_world(world: &World) -> Vec<Self> {
 		let registry = world.resource::<AppTypeRegistry>().read();
 
-		let mut vec: Vec<Self> = world
+		world
 			.components()
 			.iter()
 			.filter_map(|info| registry.get_type_info(info.type_id().unwrap()))
@@ -42,9 +41,7 @@ impl ComponentType {
 					info.type_id(),
 				)
 			})
-			.collect();
-		vec.sort_by(|a, b| a.name.cmp(&b.name));
-		vec
+			.collect()
 	}
 }
 
