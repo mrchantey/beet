@@ -1,5 +1,6 @@
 mod action;
 use action::*;
+mod inspector_options;
 // mod field_ui;
 // use field_ui::*;
 use proc_macro::TokenStream;
@@ -43,6 +44,11 @@ pub fn derive_action(attr: TokenStream, item: TokenStream) -> TokenStream {
 	parse_derive_action(attr, item)
 		.unwrap_or_else(syn::Error::into_compile_error)
 		.into()
+}
+
+#[proc_macro_derive(InspectorOptions, attributes(inspector))]
+pub fn inspectable(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+	inspector_options::inspectable(input)
 }
 
 
