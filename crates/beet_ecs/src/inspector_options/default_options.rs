@@ -22,7 +22,7 @@ fn insert_options_struct<T: 'static>(
 			};
 			let field_index = info.index_of(field).unwrap();
 			options.insert_boxed(
-				Target::Field(field_index),
+				InspectorTarget::Field(field_index),
 				TypeData::clone_type_data(*data),
 			);
 		}
@@ -56,7 +56,7 @@ fn insert_options_enum<T: 'static>(
 				bevy::reflect::VariantInfo::Unit(_) => unreachable!(),
 			};
 			options.insert_boxed(
-				Target::VariantField {
+				InspectorTarget::VariantField {
 					variant_index,
 					field_index,
 				},

@@ -240,7 +240,7 @@ impl<T: InspectorOptionsType> InspectorOptionsType for Option<T> {
 
 		let mut inspector_options = InspectorOptions::new();
 		inspector_options.insert(
-			Target::VariantField {
+			InspectorTarget::VariantField {
 				variant_index: 1, // Some
 				field_index: 0,
 			},

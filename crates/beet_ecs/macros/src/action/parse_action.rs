@@ -16,6 +16,7 @@ pub fn parse_action(item: proc_macro::TokenStream) -> Result<TokenStream> {
 
 	let impl_register = parse_register(&args, &input);
 	let impl_systems = parse_systems(&args, &input);
+	let impl_meta = parse_meta(&args, &input);
 	let impl_child_components = parse_children(&args, &input);
 
 	input.generics;
@@ -26,6 +27,7 @@ pub fn parse_action(item: proc_macro::TokenStream) -> Result<TokenStream> {
 
 		#impl_register
 		#impl_systems
+		#impl_meta
 		#impl_child_components
 	})
 }
@@ -81,6 +83,21 @@ fn parse_register(_args: &ActionArgs, input: &DeriveInput) -> TokenStream {
 	}
 }
 
+fn parse_meta(args: &ActionArgs, input: &DeriveInput) -> TokenStream {
+	let role = &args.graph_role;
+
+	let ident = &input.ident;
+	let (impl_generics, type_generics, where_clause) =
+		&input.generics.split_for_impl();
+
+	quote! {
+		impl #impl_generics ActionMeta for #ident #type_generics #where_clause {
+			fn graph_role()->GraphRole{
+				#role
+			}
+		}
+	}
+}
 fn parse_systems(args: &ActionArgs, input: &DeriveInput) -> TokenStream {
 	if let Some(system) = &args.system {
 		let set = &args.set;

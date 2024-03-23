@@ -8,7 +8,7 @@ use std::collections::HashMap;
 /// Descriptor of a path into a struct/enum. Either a `Field` (`.foo`) or a `VariantField` (`RGBA.r`)
 #[derive(Hash, PartialEq, Eq, Clone, Copy, Debug)]
 #[non_exhaustive]
-pub enum Target {
+pub enum InspectorTarget {
 	Field(usize),
 	VariantField {
 		variant_index: usize,
@@ -42,7 +42,7 @@ pub enum Target {
 /// ```
 #[derive(Default)]
 pub struct InspectorOptions {
-	options: HashMap<Target, Box<dyn TypeData>>,
+	options: HashMap<InspectorTarget, Box<dyn TypeData>>,
 }
 
 impl std::fmt::Debug for InspectorOptions {
@@ -71,17 +71,23 @@ impl Clone for InspectorOptions {
 impl InspectorOptions {
 	pub fn new() -> Self { Self::default() }
 
-	pub fn insert<T: TypeData>(&mut self, target: Target, options: T) {
+	pub fn insert<T: TypeData>(&mut self, target: InspectorTarget, options: T) {
 		self.options.insert(target, Box::new(options));
 	}
-	pub fn insert_boxed(&mut self, target: Target, options: Box<dyn TypeData>) {
+	pub fn insert_boxed(
+		&mut self,
+		target: InspectorTarget,
+		options: Box<dyn TypeData>,
+	) {
 		self.options.insert(target, options);
 	}
-	pub fn get(&self, target: Target) -> Option<&dyn Any> {
+	pub fn get(&self, target: InspectorTarget) -> Option<&dyn Any> {
 		self.options.get(&target).map(|value| value.as_any())
 	}
 
-	pub fn iter(&self) -> impl Iterator<Item = (Target, &dyn TypeData)> + '_ {
+	pub fn iter(
+		&self,
+	) -> impl Iterator<Item = (InspectorTarget, &dyn TypeData)> + '_ {
 		self.options.iter().map(|(target, data)| (*target, &**data))
 	}
 }

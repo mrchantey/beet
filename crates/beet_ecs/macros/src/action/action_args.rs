@@ -12,6 +12,7 @@ use syn::Result;
 pub struct ActionArgs {
 	pub set: TokenStream,
 	pub system: Option<TokenStream>,
+	pub graph_role: TokenStream,
 	pub child_components: Vec<Ident>,
 }
 
@@ -34,6 +35,7 @@ impl ActionArgs {
 
 		let default_system_name = default_system_name(input);
 		let mut set = quote! {TickSet};
+		let mut graph_role = quote! {GraphRole::Other};
 		let mut system = Some(default_system_name);
 		let mut child_components = Vec::new();
 
@@ -45,6 +47,9 @@ impl ActionArgs {
 		}
 		if let Some(new_set) = args.exprs.get("set") {
 			set = new_set.to_token_stream();
+		}
+		if let Some(new_graph_role) = args.exprs.get("graph_role") {
+			graph_role = new_graph_role.to_token_stream();
 		}
 		if let Some(new_child_components) = args.exprs.get("child_components") {
 			child_components = match new_child_components {
@@ -69,6 +74,7 @@ impl ActionArgs {
 		}
 		Ok(Self {
 			system,
+			graph_role,
 			set,
 			child_components,
 		})
@@ -83,6 +89,7 @@ impl ActionArgs {
 				"system",
 				"child_components",
 				"set",
+				"graph_role",
 			])?;
 			Ok(args)
 		} else {

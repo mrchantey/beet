@@ -3,6 +3,7 @@ mod test {
 	use crate::prelude::*;
 	use anyhow::Result;
 	use bevy::prelude::*;
+	use bevy::reflect::Enum;
 	use bevy::reflect::TypeRegistry;
 	use std::any::Any;
 	use sweet::*;
@@ -14,19 +15,64 @@ mod test {
 		pub field: u8,
 	}
 
+
+
 	#[test]
-	fn works() -> Result<()> {
+	fn works_struct() -> Result<()> {
 		let mut registry = TypeRegistry::default();
 		// registry.register_type_data::<ReflectInspectorOptions>();
 		registry.register::<MyStruct>();
-		let my_struct = MyStruct { field: 5 };
-		let reflect_do_thing = registry
-			.get_type_data::<ReflectInspectorOptions>(my_struct.type_id())
+		let my_val = MyStruct { field: 5 };
+		let inspector_opts = registry
+			.get_type_data::<ReflectInspectorOptions>(my_val.type_id())
 			.unwrap();
-		let (_key, val) = reflect_do_thing.0.iter().next().unwrap();
+
+		let (_key, val) = inspector_opts.0.iter().next().unwrap();
 		let num_opts = val.downcast_ref::<NumberOptions<u8>>().unwrap();
 		expect(num_opts.max).to_be(Some(10))?;
 
 		Ok(())
 	}
+
+	#[derive(Debug, PartialEq, InspectorOptions, Reflect)]
+	#[reflect(InspectorOptions)]
+	enum MyEnum {
+		Foo,
+
+		Bar(#[inspector(min = 0, max = 10, step = 2)] u8),
+	}
+
+	#[test]
+	fn works_enum() -> Result<()> {
+		let mut registry = TypeRegistry::default();
+		// registry.register_type_data::<ReflectInspectorOptions>();
+		registry.register::<MyEnum>();
+		let my_val = MyEnum::Bar(30);
+		let inspector_opts = registry
+			.get_type_data::<ReflectInspectorOptions>(my_val.type_id())
+			.unwrap();
+
+		let variant_index = my_val.variant_index();
+		let field_index = 0;
+
+
+		expect(inspector_opts.0.get(InspectorTarget::VariantField {
+			variant_index,
+			field_index: 1,
+		}))
+		.to_be_none()?;
+
+		let val = inspector_opts
+			.0
+			.get(InspectorTarget::VariantField {
+				variant_index,
+				field_index,
+			})
+			.unwrap();
+		let num_opts = val.downcast_ref::<NumberOptions<u8>>().unwrap();
+		expect(num_opts.max).to_be(Some(10))?;
+
+		Ok(())
+	}
+
 }

@@ -1,5 +1,7 @@
+pub mod inspector_test;
+#[allow(unused_imports)]
+pub use self::inspector_test::*;
 pub mod misc;
-mod inspector_test;
 #[allow(unused_imports)]
 pub use self::misc::*;
 pub mod default_options;

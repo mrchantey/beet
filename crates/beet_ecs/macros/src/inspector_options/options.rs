@@ -50,7 +50,7 @@ fn expand_struct(
             Some(Ok(quote! {
                 let mut field_options = <#ty as ::beet::prelude::InspectorOptionsType>::DeriveOptions::default();
                 #(#attrs)*
-                options.insert(::beet::prelude::Target::Field(#i), <#ty as ::beet::prelude::InspectorOptionsType>::options_from_derive(field_options));
+                options.insert(::beet::prelude::InspectorTarget::Field(#i), <#ty as ::beet::prelude::InspectorOptionsType>::options_from_derive(field_options));
             }))
         })
         .collect::<syn::Result<Vec<_>>>()?;
@@ -111,7 +111,7 @@ fn expand_enum(
                         let mut field_options = <#ty as ::beet::prelude::InspectorOptionsType>::DeriveOptions::default();
                         #(#attrs)*
                         options.insert(
-                            ::beet::prelude::Target::VariantField {
+                            ::beet::prelude::InspectorTarget::VariantField {
                                 variant_index: #variant_index,
                                 field_index: #field_index,
                             },
