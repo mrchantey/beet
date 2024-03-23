@@ -14,7 +14,6 @@ use std::sync::Arc;
 pub struct DynGraph {
 	world: Arc<RwLock<World>>,
 	root: Entity,
-	component_types: Vec<ComponentType>,
 }
 
 impl DynGraph {
@@ -27,14 +26,18 @@ impl DynGraph {
 		let root = node.spawn_no_target(&mut world).value;
 
 		Self {
-			component_types: ComponentType::from_world(&world),
 			world: Arc::new(RwLock::new(world)),
 			root,
 		}
 	}
+	pub fn new_with(world: Arc<RwLock<World>>, root: Entity) -> Self {
+		Self { world, root }
+	}
+	pub fn into_serde<T: ActionTypes>(&self) -> DynGraphSerde<T> { self.into() }
+
 	pub fn world(&self) -> &Arc<RwLock<World>> { &self.world }
 	pub fn component_types(&self) -> Vec<ComponentType> {
-		self.component_types.clone()
+		ComponentType::from_world(&self.world.read())
 	}
 	pub fn nodes(&self) -> Vec<Entity> {
 		self.world.read().iter_entities().map(|e| e.id()).collect()
@@ -337,20 +340,6 @@ impl DynGraph {
 			Ok(())
 		})?
 	}
-
-
-
-
-	// pub fn into_dynamic_scene(&self) -> DynamicScene {
-	// 	DynamicScene {
-	// 		resources: Default::default(),
-	// 		entities: self
-	// 			.nodes
-	// 			.values()
-	// 			.map(|n| n.clone().into_dynamic_entity())
-	// 			.collect(),
-	// 	}
-	// }
 }
 
 #[cfg(test)]

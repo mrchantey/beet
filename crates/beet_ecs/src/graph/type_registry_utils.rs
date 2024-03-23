@@ -11,7 +11,7 @@ pub fn merge_type_registries(src: &AppTypeRegistry, dst: &mut AppTypeRegistry) {
 
 /// Register all types in [`T`] as well as those that get appended
 /// to the graph by [`EntityGraph::spawn_with_options`]
-/// with the exception of [[`TargetAgent`]] which gets reattached via [`BehaviorPrefab::spawn`]
+/// with the exception of [[`TargetAgent`]] which gets reattached via [`DynGraph::spawn`]
 pub fn append_beet_type_registry(registry: &AppTypeRegistry) {
 	let mut registry = registry.write();
 	registry.register::<NodeName>();

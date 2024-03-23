@@ -10,12 +10,6 @@ pub use self::despawn::*;
 pub mod graph_ext;
 #[allow(unused_imports)]
 pub use self::graph_ext::*;
-pub mod behavior_prefab;
-#[allow(unused_imports)]
-pub use self::behavior_prefab::*;
-pub mod typed_behavior_prefab;
-#[allow(unused_imports)]
-pub use self::typed_behavior_prefab::*;
 pub mod component_graph;
 #[allow(unused_imports)]
 pub use self::component_graph::*;

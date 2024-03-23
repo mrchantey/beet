@@ -1,5 +1,4 @@
 use crate::prelude::*;
-use anyhow::Result;
 use bevy::prelude::*;
 use bevy::reflect::GetTypeRegistration;
 use bevy::utils::HashSet;
@@ -45,7 +44,7 @@ pub type SpawnFunc = Box<dyn FnOnce(&mut World) -> Entity>;
 pub trait BeetBundle: Bundle + Reflect + GetTypeRegistration {}
 impl<T: Bundle + Reflect + GetTypeRegistration> BeetBundle for T {}
 
-/// An opaque intermediary structure between a [`Bundle`] graph and a [`BehaviorPrefab`]
+/// An opaque intermediary structure between a [`Bundle`] graph and a [`DynGraph`]
 /// This does the following when build
 /// - Registers the bundle types
 /// - Spawns the entities
@@ -178,17 +177,4 @@ where
 
 impl<T: BeetBundle> IntoBeetNode<ItemIntoBeetNode> for T {
 	fn into_beet_node(self) -> BeetNode { BeetNode::new(self) }
-}
-
-pub struct BeetNodeIntoPrefab;
-
-impl<T, M> IntoBehaviorPrefab<(BeetNodeIntoPrefab, M)> for T
-where
-	T: IntoBeetNode<M>,
-{
-	fn into_prefab(self) -> Result<BehaviorPrefab> {
-		let mut world = World::new();
-		let tree = self.into_beet_node().spawn_no_target(&mut world);
-		Ok(BehaviorPrefab::from_world(&mut world, tree.value))
-	}
 }

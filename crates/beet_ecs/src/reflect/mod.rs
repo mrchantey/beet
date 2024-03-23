@@ -7,6 +7,9 @@ pub use self::component_type::*;
 pub mod dyn_graph;
 #[allow(unused_imports)]
 pub use self::dyn_graph::*;
+pub mod dyn_graph_serde;
+#[allow(unused_imports)]
+pub use self::dyn_graph_serde::*;
 pub mod dyn_component;
 #[allow(unused_imports)]
 pub use self::dyn_component::*;

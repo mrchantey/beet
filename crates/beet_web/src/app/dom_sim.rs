@@ -9,6 +9,7 @@ use bevy::utils::HashMap;
 use flume::Receiver;
 use flume::Sender;
 use forky_web::AnimationFrame;
+use forky_web::History;
 use forky_web::SearchParams;
 use std::time::Duration;
 use web_sys::HtmlDivElement;
@@ -45,22 +46,21 @@ impl DomSim {
 		self.graph = DynGraph::new::<BeeNode>(graph.into_beet_node());
 		self
 	}
-	pub fn from_url() -> Self {
-		let mut this = Self::default();
+	pub fn with_url_params<T: ActionTypes>(mut self) -> Self {
 		if let Some(bees) = SearchParams::get("bees") {
-			this.bees = bees.parse().unwrap_or(1);
+			self.bees = bees.parse().unwrap_or(1);
 		}
 		if let Some(flowers) = SearchParams::get("flowers") {
-			this.flowers = flowers.parse().unwrap_or(1);
+			self.flowers = flowers.parse().unwrap_or(1);
 		}
 		if let Some(auto_flowers) = SearchParams::get("auto-flowers") {
 			let val: f64 = auto_flowers.parse().unwrap_or(1.0);
-			this.auto_flowers = Some(Duration::from_secs_f64(val));
+			self.auto_flowers = Some(Duration::from_secs_f64(val));
 		}
-		if let Ok(graph) = get_prefab_url_param() {
-			this.graph = graph;
+		if let Ok(graph) = get_graph_url_param::<T>() {
+			self.graph = graph;
 		}
-		this
+		self
 	}
 
 	pub fn run_forever(self) -> Result<()> {
@@ -122,18 +122,32 @@ impl DomSim {
 	}
 }
 
-fn get_prefab_url_param() -> Result<DynGraph> {
+pub fn get_graph_url_param<T: ActionTypes>() -> Result<DynGraph> {
 	if let Some(tree) = SearchParams::get("graph") {
-		let _bytes =
-			general_purpose::STANDARD_NO_PAD.decode(tree.as_bytes())?;
-		// let prefab = bincode::deserialize(&bytes)?;
-		// Ok(prefab)
-		todo!("deserialize graph")
+		let bytes = general_purpose::STANDARD_NO_PAD.decode(tree.as_bytes())?;
+		let serde: DynGraphSerde<T> = bincode::deserialize(&bytes)?;
+		serde.into_dyn_graph()
 	} else {
 		anyhow::bail!("no tree param found");
 	}
 }
 
+
+const MAX_URL_LENGTH: usize = 1900;
+pub fn set_graph_url_param<T: ActionTypes>(graph: &DynGraph) -> Result<()> {
+	let serde = graph.into_serde::<T>();
+	let val = bincode::serialize(&serde).unwrap();
+	let val = general_purpose::STANDARD_NO_PAD.encode(val);
+	if val.len() > MAX_URL_LENGTH {
+		anyhow::bail!(
+			"graph base64 length is too long: {} > {}",
+			val.len(),
+			MAX_URL_LENGTH
+		);
+	}
+	History::set_param("graph", &val);
+	Ok(())
+}
 
 fn log_error(val: In<Result<()>>) {
 	if let Err(e) = val.0 {
