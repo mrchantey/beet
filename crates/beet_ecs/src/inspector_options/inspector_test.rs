@@ -75,4 +75,31 @@ mod test {
 		Ok(())
 	}
 
+	#[derive(Debug, PartialEq, InspectorOptions, Reflect)]
+	#[reflect(InspectorOptions)]
+	struct MyVec3 {
+		#[inspector(min = 0., max = 10., step = 2.)]
+		pub field: Vec3,
+	}
+
+
+
+	#[test]
+	fn works_vec3() -> Result<()> {
+		let mut registry = TypeRegistry::default();
+		// registry.register_type_data::<ReflectInspectorOptions>();
+		registry.register::<MyVec3>();
+		let my_val = MyVec3 {
+			field: Vec3::default(),
+		};
+		let inspector_opts = registry
+			.get_type_data::<ReflectInspectorOptions>(my_val.type_id())
+			.unwrap();
+
+		let (_key, val) = inspector_opts.0.iter().next().unwrap();
+		let num_opts = val.downcast_ref::<NumberOptions<f32>>().unwrap();
+		expect(num_opts.max).to_be(Some(10.))?;
+
+		Ok(())
+	}
 }

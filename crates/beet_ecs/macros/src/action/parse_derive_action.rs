@@ -24,6 +24,16 @@ pub fn parse_derive_action(
 		parse_quote!(Component),
 		parse_quote!(Reflect),
 		parse_quote!(Action),
+		parse_quote!(InspectorOptions),
+	]
+	.into_iter()
+	.filter(|expr| !omits.contains(expr))
+	.collect::<Punctuated<Expr, Token![,]>>();
+
+	let reflects = vec![
+		parse_quote!(Default),
+		parse_quote!(Component),
+		parse_quote!(InspectorOptions),
 	]
 	.into_iter()
 	.filter(|expr| !omits.contains(expr))
@@ -33,7 +43,7 @@ pub fn parse_derive_action(
 	use ::beet::prelude::*;
 	use ::beet::exports::*;
 	#[derive(#exprs)]
-	#[reflect(Default, Component)]
+	#[reflect(#reflects)]
 		#item
 	})
 }

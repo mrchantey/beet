@@ -12,8 +12,10 @@ use bevy::ecs as bevy_ecs;
 #[action(graph_role=GraphRole::Agent)]
 pub struct Hover {
 	/// Measured in Hz
+	#[inspector(min = 0.1, max = 3., step = 0.1)]
 	pub speed: f32,
 	/// Measured in meters
+	#[inspector(min = 0.1, max = 3., step = 0.1)]
 	pub height: f32,
 }
 

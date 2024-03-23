@@ -153,6 +153,9 @@ impl_options!(u64 => NumberOptions<u64>);
 impl_options!(u128 => NumberOptions<u128>);
 impl_options!(usize => NumberOptions<usize>);
 
+impl_options!(Vec2 => NumberOptions<f32>);
+impl_options!(Vec3 => NumberOptions<f32>);
+
 #[non_exhaustive]
 pub struct RangeOptions<T: InspectorOptionsType> {
 	pub start: T::Options,

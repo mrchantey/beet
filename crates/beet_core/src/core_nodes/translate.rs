@@ -6,6 +6,7 @@ use forky_core::ResultTEExt;
 #[action(graph_role=GraphRole::Agent)]
 pub struct Translate {
 	/// Translation to apply, in meters per second
+	#[inspector(min=-2., max=2., step=0.1)]
 	pub translation: Vec3,
 }
 

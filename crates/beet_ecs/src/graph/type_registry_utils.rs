@@ -20,6 +20,8 @@ pub fn append_beet_type_registry(registry: &AppTypeRegistry) {
 	registry.register::<Running>();
 	registry.register::<RunTimer>();
 	registry.register::<BehaviorGraphRoot>();
+	// registry.register::<Cow<str>>();
+	// todo!("test name works now")
 }
 
 pub fn append_beet_type_registry_with_generics<T: ActionTypes>(
