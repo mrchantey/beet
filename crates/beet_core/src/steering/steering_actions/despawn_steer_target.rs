@@ -3,6 +3,7 @@ use beet_ecs::prelude::*;
 use bevy::prelude::*;
 
 #[derive_action]
+#[action(graph_role=GraphRole::Other)]
 pub struct DespawnSteerTarget;
 
 fn despawn_steer_target(

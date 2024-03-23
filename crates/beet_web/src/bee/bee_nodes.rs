@@ -9,6 +9,7 @@ pub struct BeeNode;
 use bevy::ecs as bevy_ecs;
 
 #[derive_action]
+#[action(graph_role=GraphRole::Agent)]
 pub struct Hover {
 	/// Measured in Hz
 	pub speed: f32,

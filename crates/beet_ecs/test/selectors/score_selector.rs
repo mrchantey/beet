@@ -8,7 +8,7 @@ fn setup() -> (App, EntityTree) {
 
 	let target = app.world.spawn_empty().id();
 
-	let tree = UtilitySelector
+	let tree = ScoreSelector
 		.child((
 			Score::default(),
 			SetOnStart(Score::Fail),

@@ -3,6 +3,7 @@ use bevy::prelude::*;
 use forky_core::ResultTEExt;
 
 #[derive_action]
+#[action(graph_role=GraphRole::Agent)]
 pub struct Translate {
 	/// Translation to apply, in meters per second
 	pub translation: Vec3,

@@ -4,6 +4,7 @@ use bevy::prelude::*;
 use forky_core::ResultTEExt;
 
 #[derive_action]
+#[action(graph_role=GraphRole::Agent)]
 pub struct Seek;
 
 // TODO if target has Velocity, pursue

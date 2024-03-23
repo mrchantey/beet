@@ -5,6 +5,7 @@ use bevy::prelude::*;
 
 #[derive_action(Default)]
 #[action(set=PreTickSet)]
+#[action(graph_role=GraphRole::Node)]
 pub struct ScoreSteerTarget {
 	pub radius: f32,
 }

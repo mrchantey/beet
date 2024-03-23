@@ -2,11 +2,13 @@ use crate::prelude::*;
 use bevy::prelude::*;
 
 #[derive_action]
+#[action(graph_role=GraphRole::Other)]
 pub struct EmptyAction;
 pub fn empty_action() {}
 
 
 #[derive_action]
+#[action(graph_role=GraphRole::Node)]
 pub struct Repeat;
 
 /// This relys on [`sync_running`]

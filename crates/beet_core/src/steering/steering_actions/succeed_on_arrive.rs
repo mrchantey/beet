@@ -3,6 +3,7 @@ use beet_ecs::prelude::*;
 use bevy::prelude::*;
 
 #[derive_action(Default)]
+#[action(graph_role=GraphRole::Node)]
 pub struct SucceedOnArrive {
 	/// When the distance between the agent and the target is <= than this value, the action will succeed.
 	pub radius: f32,

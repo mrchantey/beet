@@ -5,6 +5,7 @@ pub enum GraphRole {
 	Agent,
 	Child,
 	Other,
+	Multi(Vec<GraphRole>),
 }
 
 

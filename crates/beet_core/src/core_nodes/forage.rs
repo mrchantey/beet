@@ -11,7 +11,7 @@ pub fn forage() -> BeetNode {
 	(
 		Name::new("Wander or seek"),
 		Repeat::default(),
-		UtilitySelector::default(),
+		ScoreSelector::default(),
 		FindSteerTarget::new("flower", awareness_radius),
 	)
 		.child((

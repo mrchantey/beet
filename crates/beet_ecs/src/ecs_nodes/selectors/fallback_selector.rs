@@ -11,6 +11,7 @@ use bevy::prelude::*;
 /// If the last child fails it will fail.
 #[derive_action]
 #[action(child_components=[Score])]
+#[action(graph_role=GraphRole::Child)]
 pub struct FallbackSelector;
 fn fallback_selector(
 	mut commands: Commands,

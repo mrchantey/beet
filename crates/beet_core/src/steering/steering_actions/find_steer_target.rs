@@ -3,6 +3,7 @@ use beet_ecs::prelude::*;
 use bevy::prelude::*;
 
 #[derive_action(Default)]
+#[action(graph_role=GraphRole::Agent)]
 pub struct FindSteerTarget {
 	pub name: String,
 	pub radius: f32,

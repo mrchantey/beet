@@ -10,6 +10,7 @@ use bevy::prelude::*;
 #[derive(PartialEq, Deref, DerefMut)]
 #[derive_action]
 #[action(set=PreTickSet)]
+#[action(graph_role=GraphRole::Node)]
 pub struct SetOnStart<T: Default + Clone + Component>(pub T);
 
 impl<T: Default + Clone + Component> SetOnStart<T> {
@@ -27,6 +28,7 @@ fn set_on_start<T: Default + Clone + Component>(
 #[derive_action]
 #[derive(PartialEq, Deref, DerefMut)]
 #[action(set=PreTickSet)]
+#[action(graph_role=GraphRole::Node)]
 pub struct InsertOnRun<T: Default + Clone + Component>(pub T);
 
 impl<T: Default + Clone + Component> InsertOnRun<T> {
@@ -47,6 +49,7 @@ fn insert_on_run<T: Default + Clone + Component>(
 #[derive(PartialEq, Deref, DerefMut)]
 #[derive_action]
 #[action(set=PostTickSet)]
+#[action(graph_role=GraphRole::Node)]
 pub struct SetOnRun<T: Default + Clone + Component>(pub T);
 
 impl<T: Default + Clone + Component> SetOnRun<T> {
@@ -65,6 +68,7 @@ fn set_on_run<T: Default + Clone + Component>(
 #[derive(PartialEq, Deref, DerefMut)]
 #[derive_action]
 #[action(set=PostTickSet)]
+#[action(graph_role=GraphRole::Agent)]
 pub struct SetAgentOnRun<T: Default + Clone + Component>(pub T);
 
 impl<T: Default + Clone + Component> SetAgentOnRun<T> {

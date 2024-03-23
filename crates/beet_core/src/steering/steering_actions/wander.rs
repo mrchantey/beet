@@ -4,10 +4,11 @@ use bevy::prelude::*;
 use forky_core::ResultTEExt;
 
 #[derive_action]
+#[action(graph_role=GraphRole::Agent)]
 pub struct Wander;
 
 fn wander(
-	mut targets: Query<(
+	mut agents: Query<(
 		&Transform,
 		&Velocity,
 		&mut WanderParams,
@@ -17,7 +18,7 @@ fn wander(
 	)>,
 	query: Query<(&TargetAgent, &Wander), (With<Running>, With<Wander>)>,
 ) {
-	for (target, _) in query.iter() {
+	for (agent, _) in query.iter() {
 		if let Some((
 			transform,
 			velocity,
@@ -25,7 +26,7 @@ fn wander(
 			max_speed,
 			max_force,
 			mut impulse,
-		)) = targets.get_mut(**target).ok_or(|e| log::warn!("{e}"))
+		)) = agents.get_mut(**agent).ok_or(|e| log::warn!("{e}"))
 		{
 			*impulse = wander_impulse(
 				&transform.translation,

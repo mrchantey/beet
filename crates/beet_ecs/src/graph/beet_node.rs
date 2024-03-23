@@ -51,6 +51,10 @@ impl<T: Bundle + Reflect + GetTypeRegistration> BeetBundle for T {}
 /// - maps children to an [`Edges`] component
 pub struct BeetNode {
 	pub children: Vec<BeetNode>,
+	/// Inserts [`(Running, BehaviorGraphRoot)`] components to this node if its the root
+	pub insert_root_defaults: bool,
+	/// Inserts [`(Name, NodeName, RunTimer)`] components to this node
+	pub insert_defaults: bool,
 	pub spawn_func: SpawnFunc,
 	// great name buddy
 	pub misc_funcs: Vec<Box<dyn FnOnce(&mut World)>>,
@@ -66,6 +70,8 @@ impl BeetNode {
 				world.spawn(bundle).id()
 			}),
 			misc_funcs: Vec::new(),
+			insert_root_defaults: true,
+			insert_defaults: true,
 		}
 	}
 	pub fn with_type<T: GetTypeRegistration>(mut self) -> Self {
@@ -90,10 +96,13 @@ impl BeetNode {
 	}
 
 	pub fn spawn_no_target(self, world: &mut World) -> EntityTree {
+		let insert_root_defaults = self.insert_root_defaults;
 		let tree = self.build_recursive(world, &mut HashSet::default());
-		world
-			.entity_mut(tree.value)
-			.insert((BehaviorGraphRoot, Running));
+		if insert_root_defaults {
+			world
+				.entity_mut(tree.value)
+				.insert((BehaviorGraphRoot, Running));
+		}
 		EntityTree(tree)
 	}
 
@@ -101,7 +110,7 @@ impl BeetNode {
 		DynGraph::new::<T>(self)
 	}
 
-	// TODO deprecate this in favor of insert_on_spawn actions
+	// TODO deprecate this in favor of an optional bundle
 	pub fn insert_default_components(
 		entity: &mut EntityWorldMut,
 		default_name: String,
@@ -140,9 +149,10 @@ impl BeetNode {
 		if children.len() > 0 {
 			entity.insert(Edges(children.iter().map(|c| c.value).collect()));
 		}
-		let default_name = format!("Node {}", visited.len());
-		Self::insert_default_components(&mut entity, default_name);
-
+		if self.insert_defaults {
+			let default_name = format!("Node {}", visited.len());
+			Self::insert_default_components(&mut entity, default_name);
+		}
 		Tree {
 			value: entity.id(),
 			children,

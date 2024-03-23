@@ -10,7 +10,7 @@ graph TB;
 	C-->D;
 	C-->E;
 
-A[UtilitySelector]
+A[ScoreSelector]
 B[
 	SetOnStart(Score::Weight(0.5))
 	----------------
@@ -27,7 +27,7 @@ E[SucceedInDuration: 1 second]
 
 Lets go through each action in the diagram:
 
-1. `UtilitySelector`: This will choose the child to run with the highest score.
+1. `ScoreSelector`: This will choose the child to run with the highest score.
 2. `SetOnStart`: Provides the parent with a constant score for this node.
 3. `Wander`: The bee will move around the map somewhat randomly.
 4. `TargetScorer`: This action has two roles:

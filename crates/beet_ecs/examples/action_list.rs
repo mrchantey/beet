@@ -14,7 +14,7 @@ extern crate beet_ecs as beet;
 	SucceedInDuration,
 	SequenceSelector,
 	FallbackSelector,
-	UtilitySelector
+	ScoreSelector
 )]
 struct MyNodes;
 

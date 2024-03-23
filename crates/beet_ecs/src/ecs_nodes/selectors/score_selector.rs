@@ -2,13 +2,14 @@ use super::*;
 use crate::prelude::*;
 use bevy::prelude::*;
 
-/// An action that observes the [`Score`] of each child and selects the highest to run.
+/// A `Utility Selector` that observes the [`Score`] of each child and selects the highest to run.
 ///
 /// It will return the result of the highest scoring child.
 ///
 #[derive_action]
 #[action(child_components=[Score])]
-pub struct UtilitySelector;
+#[action(graph_role=GraphRole::Child)]
+pub struct ScoreSelector;
 
 pub enum UtilityInterruptRate {
 	/// Interrupt every frame.
@@ -19,9 +20,9 @@ pub enum UtilityInterruptRate {
 
 //TODO interrupt if child score changes
 
-fn utility_selector(
+fn score_selector(
 	mut commands: Commands,
-	selectors: Query<(Entity, &UtilitySelector, &Edges), With<Running>>,
+	selectors: Query<(Entity, &ScoreSelector, &Edges), With<Running>>,
 	children_scores: Query<(Entity, &Score)>,
 	children_scores_changed: Query<(), Changed<Score>>,
 	children_running: Query<(), With<Running>>,

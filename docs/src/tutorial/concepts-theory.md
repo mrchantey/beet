@@ -30,8 +30,8 @@ Here are some examples of selectors:
 - `FallbackSelector`
 	- An action that runs all of its children in order until one succeeds.
 	- Logical OR: `RUN child1 OTHERWISE child2 etc`
-- `UtilitySelector`
-	- An action that observes the current `Score` of each child and selects the highest to run.
+- `ScoreSelector`
+	- A Utility AI action that observes the current `Score` of each child and selects the highest to run.
 
 ## Common Components
 

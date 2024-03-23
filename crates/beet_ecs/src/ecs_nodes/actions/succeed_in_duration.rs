@@ -3,6 +3,7 @@ use bevy::prelude::*;
 use std::time::Duration;
 
 #[derive_action(Default)]
+#[action(graph_role=GraphRole::Node)]
 pub struct SucceedInDuration {
 	pub duration: Duration,
 }

@@ -15,6 +15,6 @@ use bevy::reflect::TypeRegistry;
 							// selectors
 							SequenceSelector,
 							FallbackSelector,
-							UtilitySelector
+							ScoreSelector
 						)]
 pub struct EcsNode;
