@@ -19,20 +19,16 @@ pub struct DynGraph {
 }
 
 impl DynGraph {
-	pub fn new<T: ActionList>(node: BeetNode) -> Self {
+	pub fn new<T: ActionTypes>(node: BeetNode) -> Self {
 		let mut world = World::new();
+		let root = node.spawn_no_target(&mut world).value;
+		Self::new_with::<T>(world, root)
+	}
+	pub fn new_with<T: ActionTypes>(mut world: World, root: Entity) -> Self {
 		world.init_resource::<AppTypeRegistry>();
 		T::register_components(&mut world);
 		append_beet_type_registry_with_generics::<T>(&mut world.resource());
-
-		let root = node.spawn_no_target(&mut world).value;
-
-		Self {
-			world: Arc::new(RwLock::new(world)),
-			root,
-		}
-	}
-	pub fn new_with(world: Arc<RwLock<World>>, root: Entity) -> Self {
+		let world = Arc::new(RwLock::new(world));
 		Self { world, root }
 	}
 	pub fn into_serde<T: ActionTypes>(&self) -> DynGraphSerde<T> { self.into() }

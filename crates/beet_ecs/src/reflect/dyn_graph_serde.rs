@@ -5,12 +5,10 @@ use bevy::ecs::world::World;
 use bevy::scene::serde::SceneDeserializer;
 use bevy::scene::serde::SceneSerializer;
 use bevy::scene::DynamicScene;
-use parking_lot::RwLock;
 use serde::de::DeserializeSeed;
 use serde::Deserialize;
 use serde::Serialize;
 use std::marker::PhantomData;
-use std::sync::Arc;
 
 #[derive(Serialize, Deserialize)]
 pub struct DynGraphSerde<T: ActionTypes> {
@@ -38,7 +36,7 @@ impl<T: ActionTypes> DynGraphSerde<T> {
 			.write_to_world(&mut world, &mut entity_map)?;
 
 		let root = entity_map[&self.root];
-		let graph = DynGraph::new_with(Arc::new(RwLock::new(world)), root);
+		let graph = DynGraph::new_with::<T>(world, root);
 		Ok(graph)
 	}
 }
