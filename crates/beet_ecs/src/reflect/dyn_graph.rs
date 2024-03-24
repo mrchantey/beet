@@ -146,7 +146,7 @@ impl DynGraph {
 			.map(|mut e| {
 				e.insert(component);
 			})
-			.ok_or_else(|| anyhow::anyhow!("entity not found"))
+			.ok_or_else(|| anyhow::anyhow!("entity not found: {entity:?}"))
 	}
 	pub fn get_component_typed<T: Component + Clone>(
 		&self,

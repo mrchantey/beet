@@ -57,7 +57,7 @@ impl DomSim {
 			let val: f64 = auto_flowers.parse().unwrap_or(1.0);
 			self.auto_flowers = Some(Duration::from_secs_f64(val));
 		}
-		if let Ok(graph) = get_graph_url_param::<T>() {
+		if let Ok(Some(graph)) = get_graph_url_param::<T>() {
 			self.graph = graph;
 		}
 		self
@@ -122,13 +122,13 @@ impl DomSim {
 	}
 }
 
-pub fn get_graph_url_param<T: ActionTypes>() -> Result<DynGraph> {
+pub fn get_graph_url_param<T: ActionTypes>() -> Result<Option<DynGraph>> {
 	if let Some(tree) = SearchParams::get("graph") {
 		let bytes = general_purpose::STANDARD_NO_PAD.decode(tree.as_bytes())?;
 		let serde: DynGraphSerde<T> = bincode::deserialize(&bytes)?;
-		serde.into_dyn_graph()
+		Ok(Some(serde.into_dyn_graph()?))
 	} else {
-		anyhow::bail!("no tree param found");
+		Ok(None)
 	}
 }
 
