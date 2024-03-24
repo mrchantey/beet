@@ -321,6 +321,14 @@ impl DynGraph {
 			Ok(())
 		})?
 	}
+
+	pub fn variant_index(&self, ident: FieldIdent) -> Result<usize> {
+		self.map_field(ident, |field| match field.reflect_ref() {
+			ReflectRef::Enum(field) => Ok(field.variant_index()),
+			_ => Err(anyhow::anyhow!("field is not an enum")),
+		})?
+	}
+
 	/// Get inspector options for a specified field
 	pub fn inspector_options<T: 'static + Clone>(
 		&self,
@@ -330,11 +338,7 @@ impl DynGraph {
 			anyhow::bail!("field has no parent")
 		};
 
-		let variant_index =
-			self.map_field(parent.clone(), |f| match f.reflect_ref() {
-				ReflectRef::Enum(field) => Some(field.variant_index()),
-				_ => None,
-			})?;
+		let variant_index = self.variant_index(parent.clone()).ok();
 
 		let Some(target) = ident.inspector_target(variant_index) else {
 			anyhow::bail!("failed to get inspector target from field")

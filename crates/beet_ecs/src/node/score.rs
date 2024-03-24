@@ -30,9 +30,8 @@ pub struct Scoring;
 pub enum Score {
 	#[default]
 	/// The node should not run.
-	#[inspector(min = 0., max = 1., step = 0.01)]
 	Fail,
-	Weight(f32), //this has to be here or the serde world breaks
+	Weight(#[inspector(min = 0., max = 1., step = 0.01)] f32), //this has to be here or the serde world breaks
 	/// The node has a weight, usually in the range `0..1`, where higher is more favorable.
 	// Weight(#[number(min = 0, max = 100, step = 1)] u8),
 	/// The node should run.
