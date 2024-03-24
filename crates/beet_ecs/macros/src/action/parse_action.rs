@@ -92,7 +92,7 @@ fn parse_meta(args: &ActionArgs, input: &DeriveInput) -> TokenStream {
 
 	quote! {
 		impl #impl_generics ActionMeta for #ident #type_generics #where_clause {
-			fn graph_role()->GraphRole{
+			fn graph_role(&self)->GraphRole{
 				#role
 			}
 		}

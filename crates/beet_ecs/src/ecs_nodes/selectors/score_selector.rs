@@ -7,8 +7,7 @@ use bevy::prelude::*;
 /// It will return the result of the highest scoring child.
 ///
 #[derive_action]
-#[action(child_components=[Score])]
-#[action(graph_role=GraphRole::Child)]
+#[action(graph_role=GraphRole::Child, child_components=[Score])]
 pub struct ScoreSelector;
 
 pub enum UtilityInterruptRate {

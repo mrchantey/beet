@@ -1,5 +1,16 @@
 use crate::prelude::*;
 use bevy::prelude::*;
+use bevy::reflect::GetTypeRegistration;
+
+
+pub trait SettableComponent:
+	Default + Clone + Component + GetTypeRegistration
+{
+}
+impl<T: Default + Clone + Component + GetTypeRegistration> SettableComponent
+	for T
+{
+}
 
 // #[action(
 // 	system=constant_score,
@@ -9,15 +20,14 @@ use bevy::prelude::*;
 // #[reflect(Component, Action)]
 #[derive(PartialEq, Deref, DerefMut)]
 #[derive_action]
-#[action(set=PreTickSet)]
-#[action(graph_role=GraphRole::Node)]
-pub struct SetOnStart<T: Default + Clone + Component>(pub T);
+#[action(graph_role=GraphRole::Node,set=PreTickSet)]
+pub struct SetOnStart<T: SettableComponent>(pub T);
 
-impl<T: Default + Clone + Component> SetOnStart<T> {
+impl<T: SettableComponent> SetOnStart<T> {
 	pub fn new(value: impl Into<T>) -> Self { Self(value.into()) }
 }
 
-fn set_on_start<T: Default + Clone + Component>(
+fn set_on_start<T: SettableComponent>(
 	mut query: Query<(&SetOnStart<T>, &mut T), Added<SetOnStart<T>>>,
 ) {
 	for (from, mut to) in query.iter_mut() {
@@ -27,16 +37,15 @@ fn set_on_start<T: Default + Clone + Component>(
 
 #[derive_action]
 #[derive(PartialEq, Deref, DerefMut)]
-#[action(set=PreTickSet)]
-#[action(graph_role=GraphRole::Node)]
-pub struct InsertOnRun<T: Default + Clone + Component>(pub T);
+#[action(graph_role=GraphRole::Node,set=PreTickSet)]
+pub struct InsertOnRun<T: SettableComponent>(pub T);
 
-impl<T: Default + Clone + Component> InsertOnRun<T> {
+impl<T: SettableComponent> InsertOnRun<T> {
 	pub fn new(value: impl Into<T>) -> Self { Self(value.into()) }
 }
 
 // this was SetRunResult - With<Running> check for regression
-fn insert_on_run<T: Default + Clone + Component>(
+fn insert_on_run<T: SettableComponent>(
 	mut commands: Commands,
 	query: Query<(Entity, &InsertOnRun<T>), Added<Running>>,
 ) {
@@ -48,15 +57,14 @@ fn insert_on_run<T: Default + Clone + Component>(
 /// If the node does not have the component this will do nothing.
 #[derive(PartialEq, Deref, DerefMut)]
 #[derive_action]
-#[action(set=PostTickSet)]
-#[action(graph_role=GraphRole::Node)]
-pub struct SetOnRun<T: Default + Clone + Component>(pub T);
+#[action(graph_role=GraphRole::Node,set=PostTickSet)]
+pub struct SetOnRun<T: SettableComponent>(pub T);
 
-impl<T: Default + Clone + Component> SetOnRun<T> {
+impl<T: SettableComponent> SetOnRun<T> {
 	pub fn new(value: impl Into<T>) -> Self { Self(value.into()) }
 }
 
-fn set_on_run<T: Default + Clone + Component>(
+fn set_on_run<T: SettableComponent>(
 	mut query: Query<(&SetOnRun<T>, &mut T), Added<Running>>,
 ) {
 	for (from, mut to) in query.iter_mut() {
@@ -67,15 +75,14 @@ fn set_on_run<T: Default + Clone + Component>(
 /// If the agent does not have the component this will do nothing.
 #[derive(PartialEq, Deref, DerefMut)]
 #[derive_action]
-#[action(set=PostTickSet)]
-#[action(graph_role=GraphRole::Agent)]
-pub struct SetAgentOnRun<T: Default + Clone + Component>(pub T);
+#[action(graph_role=GraphRole::Agent,set=PostTickSet)]
+pub struct SetAgentOnRun<T: SettableComponent>(pub T);
 
-impl<T: Default + Clone + Component> SetAgentOnRun<T> {
+impl<T: SettableComponent> SetAgentOnRun<T> {
 	pub fn new(value: impl Into<T>) -> Self { Self(value.into()) }
 }
 
-fn set_agent_on_run<T: Default + Clone + Component>(
+fn set_agent_on_run<T: SettableComponent>(
 	mut agents: Query<&mut T>,
 	mut query: Query<(&TargetAgent, &SetAgentOnRun<T>), Added<Running>>,
 ) {

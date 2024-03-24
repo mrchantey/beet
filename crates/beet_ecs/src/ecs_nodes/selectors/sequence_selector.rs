@@ -12,8 +12,7 @@ use bevy::prelude::*;
 ///
 /// If a child fails it will fail.
 #[derive_action]
-#[action(child_components=[Score])]
-#[action(graph_role=GraphRole::Child)]
+#[action(graph_role=GraphRole::Child,child_components=[Score])]
 pub struct SequenceSelector;
 fn sequence_selector(
 	mut commands: Commands,

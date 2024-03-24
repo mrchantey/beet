@@ -207,7 +207,7 @@ impl DynGraph {
 		Ok(())
 	}
 
-	fn map_component<O>(
+	pub fn map_component<O>(
 		&self,
 		entity: Entity,
 		type_id: TypeId,
@@ -232,9 +232,10 @@ impl DynGraph {
 				.unwrap()
 				.as_reflect(component)
 		};
+		assert!(value.type_id() == type_id);
 		Ok(func(value))
 	}
-	fn map_component_mut<O>(
+	pub fn map_component_mut<O>(
 		&self,
 		entity: Entity,
 		type_id: TypeId,
@@ -281,6 +282,42 @@ impl DynGraph {
 			current.apply(new_value);
 			Ok(())
 		})?
+	}
+
+
+	pub fn map_action_meta<O>(
+		&self,
+		entity: Entity,
+		type_id: TypeId,
+		func: impl FnOnce(&dyn ActionMeta) -> O,
+	) -> Result<O> {
+		let registry = self.type_registry();
+		self.map_component(entity, type_id, move |c| {
+			let registry = registry.read();
+			let Some(reflect) =
+				registry.get_type_data::<ReflectActionMeta>(type_id)
+			else {
+				let info = c.get_represented_type_info().unwrap().type_path();
+				anyhow::bail!("{:?} is not ActionMeta", info);
+			};
+			let Some(meta): Option<&dyn ActionMeta> = reflect.get(&*c) else {
+				unreachable!("must be ActionMeta")
+			};
+			Ok(func(meta))
+		})?
+	}
+	pub fn get_component_roles(
+		&self,
+		entity: Entity,
+	) -> Vec<Result<(TypeId, GraphRole)>> {
+		self.get_components(entity)
+			.into_iter()
+			.map(|component_id| {
+				self.map_action_meta(entity, component_id, |meta| {
+					(component_id, meta.graph_role())
+				})
+			})
+			.collect::<Vec<_>>()
 	}
 
 	pub fn map_field<O>(

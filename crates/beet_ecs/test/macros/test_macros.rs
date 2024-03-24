@@ -3,7 +3,7 @@ use std::any::Any;
 use sweet::*;
 
 #[derive_action]
-#[action(graph_role = GraphRole::Parent)]
+#[action(graph_role = GraphRole::Node)]
 struct MyStruct;
 
 
@@ -23,9 +23,6 @@ fn works() -> Result<()> {
 	let mut app = App::new();
 	MyStruct::add_systems(&mut app, Update);
 	expect(app.get_schedule(Update).unwrap().systems_len()).to_be(1)?;
-
-
-	expect(MyStruct::graph_role()).to_be(GraphRole::Parent)?;
 
 	Ok(())
 }

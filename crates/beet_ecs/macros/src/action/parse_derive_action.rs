@@ -34,6 +34,7 @@ pub fn parse_derive_action(
 		parse_quote!(Default),
 		parse_quote!(Component),
 		parse_quote!(InspectorOptions),
+		parse_quote!(ActionMeta),
 	]
 	.into_iter()
 	.filter(|expr| !omits.contains(expr))
