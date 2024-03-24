@@ -1,9 +1,11 @@
+use super::field_ident::FieldIdent;
 use crate::prelude::*;
 use anyhow::Result;
 use bevy::ecs::component::ComponentId;
 use bevy::prelude::*;
 use bevy::ptr::OwningPtr;
 use bevy::reflect::ReflectFromPtr;
+use bevy::reflect::ReflectRef;
 use parking_lot::RwLock;
 use std::any::TypeId;
 use std::ptr::NonNull;
@@ -250,7 +252,8 @@ impl DynGraph {
 			anyhow::bail!("entity not found: {entity:?}")
 		};
 		let Some(component) = entity.get_mut_by_id(component_id) else {
-			anyhow::bail!("component not in entity: {type_id:?}")
+			let name = registration.type_info().type_path();
+			anyhow::bail!("component not in entity: {name:?}")
 		};
 		// component.
 		let value = unsafe {
@@ -268,60 +271,6 @@ impl DynGraph {
 	) -> Result<Box<dyn Reflect>> {
 		self.map_component(entity, type_id, |c| c.clone_value())
 	}
-
-	pub fn map_field<'p, O>(
-		&self,
-		entity: Entity,
-		component: TypeId,
-		path: impl ReflectPath<'p>,
-		func: impl Fn(&dyn Reflect) -> O,
-	) -> Result<O> {
-		self.map_component(entity, component, |component| {
-			let field = component
-				.reflect_path(path)
-				.map_err(|e| anyhow::anyhow!("{e}"))?;
-			Ok(func(field))
-		})?
-	}
-	pub fn map_field_mut<'p, O>(
-		&self,
-		entity: Entity,
-		component: TypeId,
-		path: impl ReflectPath<'p>,
-		func: impl Fn(&mut dyn Reflect) -> O,
-	) -> Result<O> {
-		self.map_component_mut(entity, component, |component| {
-			let field = component
-				.reflect_path_mut(path)
-				.map_err(|e| anyhow::anyhow!("{e}"))?;
-			Ok(func(field))
-		})?
-	}
-	pub fn get_field<'p>(
-		&self,
-		entity: Entity,
-		component: TypeId,
-		path: impl ReflectPath<'p>,
-	) -> Result<Box<dyn Reflect>> {
-		let component = self.get_component(entity, component)?;
-		let val = component
-			.reflect_path(path)
-			.map_err(|e| anyhow::anyhow!("{e}"))?;
-		Ok(val.clone_value())
-	}
-
-	pub fn set_field<'p>(
-		&self,
-		entity: Entity,
-		component: TypeId,
-		path: impl ReflectPath<'p>,
-		new_value: &dyn Reflect,
-	) -> Result<()> {
-		self.map_field_mut(entity, component, path, move |field| {
-			field.apply(new_value);
-			Ok(())
-		})?
-	}
 	pub fn set_component(
 		&self,
 		entity: Entity,
@@ -333,21 +282,108 @@ impl DynGraph {
 			Ok(())
 		})?
 	}
+
+	pub fn map_field<O>(
+		&self,
+		ident: FieldIdent,
+		func: impl Fn(&dyn Reflect) -> O,
+	) -> Result<O> {
+		self.map_component(ident.entity, ident.component, |component| {
+			let field = component
+				.reflect_path(ident.path())
+				.map_err(|e| anyhow::anyhow!("{e}"))?;
+			Ok(func(field))
+		})?
+	}
+	pub fn map_field_mut<O>(
+		&self,
+		ident: FieldIdent,
+		func: impl Fn(&mut dyn Reflect) -> O,
+	) -> Result<O> {
+		self.map_component_mut(ident.entity, ident.component, |component| {
+			let field = component
+				.reflect_path_mut(ident.path())
+				.map_err(|e| anyhow::anyhow!("{e}"))?;
+			Ok(func(field))
+		})?
+	}
+	pub fn get_field(&self, ident: FieldIdent) -> Result<Box<dyn Reflect>> {
+		self.map_field(ident, |c| c.clone_value())
+	}
+
+	pub fn set_field(
+		&self,
+		ident: FieldIdent,
+		new_value: &dyn Reflect,
+	) -> Result<()> {
+		self.map_field_mut(ident, move |field| {
+			field.apply(new_value);
+			Ok(())
+		})?
+	}
+	/// Get inspector options for a specified field
+	pub fn inspector_options<T: 'static + Clone>(
+		&self,
+		ident: FieldIdent,
+	) -> Result<T> {
+		let Some(parent) = ident.parent() else {
+			anyhow::bail!("field has no parent")
+		};
+
+		let variant_index =
+			self.map_field(parent.clone(), |f| match f.reflect_ref() {
+				ReflectRef::Enum(field) => Some(field.variant_index()),
+				_ => None,
+			})?;
+
+		let Some(target) = ident.inspector_target(variant_index) else {
+			anyhow::bail!("failed to get inspector target from field")
+		};
+
+		let registry = self.type_registry();
+		self.map_field(parent, |parent| {
+			let registry = registry.read();
+			let type_info = parent
+				.get_represented_type_info()
+				.ok_or_else(|| anyhow::anyhow!("field has no type info"))?;
+
+			let type_path = type_info.type_path();
+
+			let inspector_opts = registry
+				.get_type_data::<ReflectInspectorOptions>(type_info.type_id())
+				.ok_or_else(|| {
+					anyhow::anyhow!(
+						"{type_path} is not ReflectInspectorOptions"
+					)
+				})?;
+			let val = inspector_opts.0.get(target).ok_or_else(|| {
+				anyhow::anyhow!(
+					"{type_path} has no options for this InspectorTarget"
+				)
+			})?;
+			let opts = val.downcast_ref::<T>().ok_or_else(|| {
+				anyhow::anyhow!("{type_path} Failed to downcast")
+			})?;
+			Ok(opts.clone())
+		})?
+	}
 }
 
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
+	use crate::reflect::field_ident::FieldIdent;
 	use anyhow::Result;
 	use bevy::prelude::*;
 	use bevy::reflect::Access;
-	use bevy::reflect::ParsedPath;
 	use std::any::TypeId;
 	use sweet::*;
 
-	#[derive(Debug, Default, PartialEq, Component, Reflect)]
-	#[reflect(Default, Component)]
-	struct MyStruct(pub i32);
+	#[derive(
+		Debug, Default, PartialEq, Component, Reflect, InspectorOptions,
+	)]
+	#[reflect(Default, Component, InspectorOptions)]
+	struct MyStruct(#[inspector(min = 2)] pub i32);
 
 	fn default_graph() -> DynGraph {
 		BeetNode::new(EmptyAction).into_graph::<EcsNode>()
@@ -453,29 +489,52 @@ mod test {
 
 
 		//set root value
-		let path: Vec<Access> = vec![];
-		let path = ParsedPath::from(path);
-		graph.set_field(entity, type_id, &path, &MyStruct(2))?;
+		let field_ident = FieldIdent::new(entity, type_id, vec![]);
+
+		graph.set_field(field_ident.clone(), &MyStruct(2))?;
 
 		expect(
 			graph
-				.get_field(entity, type_id, &path)?
+				.get_field(field_ident)?
 				.reflect_partial_eq(&MyStruct(2))
 				.unwrap_or_default(),
 		)
 		.to_be_true()?;
 
 		//set nested value
-		let path = ParsedPath::from(vec![Access::TupleIndex(0)]);
-		graph.set_field(entity, type_id, &path, &3)?;
+		let field_ident =
+			FieldIdent::new(entity, type_id, vec![Access::TupleIndex(0)]);
+		graph.set_field(field_ident.clone(), &3)?;
 
 		expect(
 			graph
-				.get_field(entity, type_id, &path)?
+				.get_field(field_ident)?
 				.reflect_partial_eq(&3)
 				.unwrap_or_default(),
 		)
 		.to_be_true()?;
+
+		Ok(())
+	}
+	#[test]
+	fn graph_inspector_options() -> Result<()> {
+		// setup
+		pretty_env_logger::try_init().ok();
+		let graph = default_graph();
+		graph.world().write().init_component::<MyStruct>();
+		graph.type_registry().write().register::<MyStruct>();
+
+		let entity = graph.root();
+		let type_id = TypeId::of::<MyStruct>();
+		graph.set_component_typed(entity, MyStruct(1))?;
+
+		let field_ident =
+			FieldIdent::new(entity, type_id, vec![Access::TupleIndex(0)]);
+
+		let options =
+			graph.inspector_options::<NumberOptions<i32>>(field_ident)?;
+
+		expect(options.min).as_some()?.to_be(2)?;
 
 		Ok(())
 	}

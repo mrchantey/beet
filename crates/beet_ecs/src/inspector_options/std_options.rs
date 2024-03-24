@@ -35,9 +35,9 @@ macro_rules! impl_options_defer_generic {
 	};
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 #[non_exhaustive]
-pub struct NumberOptions<T> {
+pub struct NumberOptions<T: PartialEq> {
 	pub min: Option<T>,
 	pub max: Option<T>,
 	pub step: T,
@@ -46,7 +46,7 @@ pub struct NumberOptions<T> {
 	pub display: NumberDisplay,
 }
 
-impl<T: 'static + Copy> Default for NumberOptions<T>
+impl<T: 'static + Copy + PartialEq> Default for NumberOptions<T>
 where
 	f64: AsPrimitive<T>,
 {
@@ -62,7 +62,7 @@ where
 	}
 }
 
-#[derive(Clone, Copy, Default)]
+#[derive(Clone, Copy, Default, PartialEq)]
 #[non_exhaustive]
 pub enum NumberDisplay {
 	#[default]
@@ -70,7 +70,7 @@ pub enum NumberDisplay {
 	Slider,
 }
 
-impl<T: 'static + Copy> NumberOptions<T>
+impl<T: 'static + Copy + PartialEq> NumberOptions<T>
 where
 	f64: AsPrimitive<T>,
 {
@@ -99,7 +99,7 @@ where
 		NumberOptions { step, ..self }
 	}
 
-	pub fn map<U>(&self, f: impl Fn(&T) -> U) -> NumberOptions<U> {
+	pub fn map<U: PartialEq>(&self, f: impl Fn(&T) -> U) -> NumberOptions<U> {
 		NumberOptions {
             #[allow(clippy::redundant_closure)] // false positive
             min: self.min.as_ref().map(|min| f(min)),
@@ -111,7 +111,7 @@ where
         }
 	}
 }
-impl<T: 'static + Copy> NumberOptions<T>
+impl<T: 'static + Copy + PartialEq> NumberOptions<T>
 where
 	f64: AsPrimitive<T>,
 {

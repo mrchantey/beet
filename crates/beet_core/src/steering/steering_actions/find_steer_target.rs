@@ -6,6 +6,7 @@ use bevy::prelude::*;
 #[action(graph_role=GraphRole::Agent)]
 pub struct FindSteerTarget {
 	pub name: String,
+	#[inspector(min = 0., max = 3., step = 0.1)]
 	pub radius: f32,
 }
 

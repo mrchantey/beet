@@ -40,6 +40,10 @@ mod test {
 		Foo,
 
 		Bar(#[inspector(min = 0, max = 10, step = 2)] u8),
+		Bazz {
+			#[inspector(min = 0, max = 10, step = 2)]
+			val: u8,
+		},
 	}
 
 	#[test]
@@ -51,6 +55,14 @@ mod test {
 		let inspector_opts = registry
 			.get_type_data::<ReflectInspectorOptions>(my_val.type_id())
 			.unwrap();
+
+		expect(inspector_opts.0.get(InspectorTarget::VariantField {
+			variant_index: 2,
+			field_index: 0,
+		}))
+		.to_be_some()?;
+
+
 
 		let variant_index = my_val.variant_index();
 		let field_index = 0;

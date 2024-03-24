@@ -1,4 +1,5 @@
 pub mod dyn_node;
+mod field_ident;
 #[allow(unused_imports)]
 pub use self::dyn_node::*;
 pub mod component_type;
