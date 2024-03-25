@@ -6,7 +6,7 @@
 	- [Concepts - Example](./tutorial/concepts-example.md)
 - [Library](./library/index.md)
 	- [Actions](./library/actions.md)
-	<!-- - [Selectors](./library/selectors.md) -->
+	- [Selectors](./library/selectors.md)
 	<!-- - [System Ordering](./beet_ecs/system_ordering.md)
 	<!-- - [Action Timers](./beet_ecs/action_timers.md) -->
 

@@ -1,6 +1,6 @@
-### Example Actions
+### Actions
 
-> Currently actions must implement a whole bunch of derives, ie reflect, hence the `#[derive_action]` crutch for lazy people. I'm working on getting this down to as few as possible.
+> Currently actions must implement a whole bunch of derives, ie reflect, hence the `#[derive_action]` wrapper for lazy people like me. I'm working on getting this down to as few as possible.
 
 ```rust
 #[derive_action]

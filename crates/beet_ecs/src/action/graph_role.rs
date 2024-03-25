@@ -1,4 +1,5 @@
-/// Used to indicate the purpose of an action, ie which parts of the world it will effect.
+/// Some extra metadata used to indicate the purpose of an action, ie which parts of the world it will effect.
+/// This is **not** used at runtime, only for UI and debugging purposes.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum GraphRole {
 	/// This action will effect only this node
