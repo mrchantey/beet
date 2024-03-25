@@ -4,7 +4,7 @@
 The terminology from this library is a wip and will likely change.
 
 ## `Actions`
-*aka `tasks`*
+*aka `tasks, behaviors`*
 
 Actions are something to be performed for a given node, in beet this a combination of a `Component`, the data required for the task, and a `System`, the accompanying logic for that task. They usually either get an agent to do something or send information to their parent.
 

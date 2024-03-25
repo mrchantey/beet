@@ -4,11 +4,11 @@
 	- [Getting Started](./tutorial/getting-started.md)
 	- [Concepts - Theory](./tutorial/concepts-theory.md)
 	- [Concepts - Example](./tutorial/concepts-example.md)
-- [ECS](./ecs/index.md)
+- [Library](./library/index.md)
+	- [Actions](./library/actions.md)
+	<!-- - [Selectors](./library/selectors.md) -->
 	<!-- - [System Ordering](./beet_ecs/system_ordering.md)
-	- [Selectors](./beet_ecs/selectors.md)
 	<!-- - [Action Timers](./beet_ecs/action_timers.md) -->
-- [Beetmash](./beetmash/index.md)
 
 ---
 

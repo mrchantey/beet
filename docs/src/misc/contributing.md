@@ -5,11 +5,3 @@ This repo is in a bit of a weird state for a rust project at the moment. I came 
 For example:
 - `mod.rs` files are automatically managed by `forky`, for this reason i have them set to hidden in `.vscode/settings.json`
 - I'm using `sweet` for running tests which is basically a `jest` clone
-
-
-## Crate structure
-```mermaid
-graph TB;
-    beet_ecs-->beet_core;
-		beet_net-->beet_core;
-```

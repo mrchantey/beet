@@ -12,7 +12,7 @@ graph TB;
 
 A[ScoreSelector]
 B[
-	SetOnStart(Score::Weight(0.5))
+	SetOnStart - Score::Weight - 0.5
 	----------------
 	Wander
 ]
@@ -39,13 +39,13 @@ Lets go through each action in the diagram:
 
 Notice how we are using these tiny actions to compose a behavior, every one of them is in the core library and we've created a behavior without writing any new code.
 
-Furthermore this graph can very easily be attached as a `work mode` subgraph of a larger `bee` graph.
+Furthermore this graph can very easily be attached as a `forage` subgraph of a larger `bee` behavior graph.
 
 
 ## Agent Lifecycle
 
 1. A graph is defined containing the relationships between nodes and the initial values for each of their accompanying actions.
-2. When creating an agent, call `my_graph.spawn(&mut commands, my_agent)` which will do the following for each node in the graph:
+2. When creating an agent, call `my_graph.spawn(world, my_agent)` which will do the following for each node in the graph:
 	- Create an entity
 	- If it has any children, put their entity ids in an `Edges` component
 	- Create a component for each action
