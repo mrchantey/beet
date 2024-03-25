@@ -9,7 +9,7 @@ pub fn forage() -> BeetNode {
 	let awareness_radius = 0.5;
 
 	(
-		Name::new("Wander or seek"),
+		Name::new("Forage"),
 		Repeat::default(),
 		ScoreSelector::default(),
 		FindSteerTarget::new("flower", awareness_radius),
