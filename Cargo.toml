@@ -1,7 +1,7 @@
 [workspace.package]
 version = "0.0.7"
 edition = "2021"
-description = "AI behavior library for games and robotics."
+description = "Modular AI behavior library for games and robotics."
 documentation = "https://mrchantey.github.io/beet"
 readme = "README.md"
 homepage = "https://mrchantey.github.io/beet"

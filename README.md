@@ -3,7 +3,7 @@
 <div align="center">
 
   <p>
-    <strong>AI behavior library for games and robotics.</strong>
+    <strong>Modular AI behavior library for games and robotics.</strong>
   </p>
 
   <p>
@@ -26,5 +26,5 @@
 ## Bevy Versions
 
 | `bevy` | `beet` |
-| ------ | ------- |
+| ------ | ------ |
 | 0.12   | 0.0.1  |

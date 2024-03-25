@@ -4,61 +4,27 @@ Beet is a modular AI Behavior library that uses a novel `entity graph` approach 
 
 <iframe src="https://mrchantey.github.io/beet/play/?spawn-bee=&spawn-flower=&hide-graph=&graph=CAAAAAAAAABOZXcgTm9kZQEAAAAAAAAAAAAAAAAAAD%2FNzMw9AAAAAAAAAAA"></iframe>
 
-*Examples are built with the [beet playground](https://mrchantey.github.io/beet/play?spawn-bee=1), feel free to experiment with the bee's graph then spawn some to see the effect.*
-
 ## Features
 
 ### 🌈 Multi-paradigm
 
-Using entity graphs we can mix-and-match techniques from different behavior selection approaches for each point in the graph, for example we can easily combine utility and behavior tree concepts:
-
-```mermaid
-graph TB
-	a --> b
-	a --> c
-	c --> d
-	c --> e
-
-a[Utility Selector]
-c[Sequence Selector]
-b[action 1]
-d[action 2]
-e[action 3]
-```
-
-
-#### Implementation status:
-
-| Approach       | Status    |
-| -------------- | --------- |
-| Behavior Trees | ✅         |
-| Utility AI     | ✅         |
-| State Machines | 🚧         |
-| GOAP           | Planned   |
-| ML             | Possibly? |
+The flexibility of entity graphs allows us to mix-and-match techniques from different behavior selection approaches.
 
 ### 🌳 Modular
 
-The same components can be reused at different places in the graph and graphs can be composed of other graphs, allowing for epic code reusability.
+Actions can be reused and graphs can be composed of other graphs, allowing for epic code reusability.
 
 ### 🐦 Ecosystem friendly
 
-All aspects of the library are just primitive components, and systems that work on them, which makes it incredibly easy to integrate into existing workflows, for example:
+All aspects of the library are simple components and systems, which makes it incredibly easy to integrate into existing bevy tooling, ie:
 - Visualization - `bevy-mod-debugdump`
 - Serialization - `bevy_reflect`
 - UI - `bevy-inspector-egui`
 
-This allows beet to ride on the wings of the incredible work already done by the bevy community.
-
 ### 🎯 Target Anything
 
-Beet only depends on the lightweight architectural components of the bevy library, ie `bevy_ecs`, which allows it to target epic gaming rigs and tiny microcontrollers alike.
+Beet only depends on the lightweight architectural components of the bevy library, ie `bevy_ecs`, which allows it to target multi-core gaming rigs and tiny microcontrollers alike.
 
-## Drawbacks
+## Drawbacks - Indirection
 
-Everything's a tradeoff in engineering, using an entity graph does have limitations:
-
-### Indirection
-
-Actions and the agents they work on are seperate queries, which is a cache missed and an ergonomic painpoint. Its my hope that this will largely be mittigated by the introduction of [Entity Relations](https://github.com/bevyengine/bevy/issues/3742).
-
+Actions and the agents they work on are seperate queries, which is a potential cache miss and ergonomic painpoint. Its my hope this will be addressed by the introduction of [Entity Relations](https://github.com/bevyengine/bevy/issues/3742).

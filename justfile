@@ -140,6 +140,7 @@ watch-web *command:
 
 # too scary with untracked changes etc, do it manually
 # deploy-web:
+#		just build-web
 # 	rm -rf /tmp/beet
 # 	mkdir -p /tmp/beet || true
 # 	cp -r target/static/* /tmp/beet
