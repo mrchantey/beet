@@ -42,7 +42,7 @@ pub enum InspectorTarget {
 /// ```
 #[derive(Default)]
 pub struct InspectorOptions {
-	options: HashMap<InspectorTarget, Box<dyn TypeData>>,
+	pub options: HashMap<InspectorTarget, Box<dyn TypeData>>,
 }
 
 impl std::fmt::Debug for InspectorOptions {
@@ -83,6 +83,14 @@ impl InspectorOptions {
 	}
 	pub fn get(&self, target: InspectorTarget) -> Option<&dyn Any> {
 		self.options.get(&target).map(|value| value.as_any())
+	}
+	pub fn get_cloned(
+		&self,
+		target: InspectorTarget,
+	) -> Option<Box<dyn TypeData>> {
+		self.options
+			.get(&target)
+			.map(|value| value.as_ref().clone_type_data())
 	}
 
 	pub fn iter(

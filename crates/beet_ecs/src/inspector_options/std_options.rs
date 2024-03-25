@@ -70,74 +70,6 @@ pub enum NumberDisplay {
 	Slider,
 }
 
-impl<T: 'static + Copy + PartialEq> NumberOptions<T>
-where
-	f64: AsPrimitive<T>,
-{
-	pub fn between(min: T, max: T) -> NumberOptions<T> {
-		NumberOptions {
-			min: Some(min),
-			max: Some(max),
-			step: 0.1.as_(),
-			prefix: String::new(),
-			suffix: String::new(),
-			display: NumberDisplay::default(),
-		}
-	}
-	pub fn at_least(min: T) -> NumberOptions<T> {
-		NumberOptions {
-			min: Some(min),
-			max: None,
-			step: 0.1.as_(),
-			prefix: String::new(),
-			suffix: String::new(),
-			display: NumberDisplay::default(),
-		}
-	}
-
-	pub fn with_step(self, step: T) -> NumberOptions<T> {
-		NumberOptions { step, ..self }
-	}
-
-	pub fn map<U: PartialEq>(&self, f: impl Fn(&T) -> U) -> NumberOptions<U> {
-		NumberOptions {
-            #[allow(clippy::redundant_closure)] // false positive
-            min: self.min.as_ref().map(|min| f(min)),
-            max: self.max.as_ref().map(|max| f(max)),
-            step: f(&self.step),
-            prefix: self.prefix.clone(),
-            suffix: self.suffix.clone(),
-            display: NumberDisplay::default(),
-        }
-	}
-}
-impl<T: 'static + Copy + PartialEq> NumberOptions<T>
-where
-	f64: AsPrimitive<T>,
-{
-	pub fn positive() -> NumberOptions<T> {
-		NumberOptions {
-			min: Some(0.0.as_()),
-			max: None,
-			step: 0.0.as_(),
-			prefix: String::new(),
-			suffix: String::new(),
-			display: NumberDisplay::default(),
-		}
-	}
-
-	pub fn normalized() -> Self {
-		NumberOptions {
-			min: Some(0.0.as_()),
-			max: Some(1.0.as_()),
-			step: 0.01.as_(),
-			prefix: String::new(),
-			suffix: String::new(),
-			display: NumberDisplay::default(),
-		}
-	}
-}
-
 impl_options!(f32 => NumberOptions<f32>);
 impl_options!(f64 => NumberOptions<f64>);
 impl_options!(i8 => NumberOptions<i8>);
@@ -155,6 +87,7 @@ impl_options!(usize => NumberOptions<usize>);
 
 impl_options!(Vec2 => NumberOptions<f32>);
 impl_options!(Vec3 => NumberOptions<f32>);
+
 
 #[non_exhaustive]
 pub struct RangeOptions<T: InspectorOptionsType> {

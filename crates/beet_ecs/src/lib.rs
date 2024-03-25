@@ -1,3 +1,4 @@
+#![feature(result_flattening)]
 pub mod action;
 pub mod channel_event;
 pub mod ecs_nodes;

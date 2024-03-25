@@ -6,6 +6,7 @@ use bevy::prelude::*;
 use bevy::ptr::OwningPtr;
 use bevy::reflect::ReflectFromPtr;
 use bevy::reflect::ReflectRef;
+use bevy::reflect::TypeData;
 use parking_lot::RwLock;
 use std::any::TypeId;
 use std::ptr::NonNull;
@@ -363,7 +364,7 @@ impl DynGraph {
 	}
 
 	/// Get inspector options for a specified field
-	pub fn inspector_options<T: 'static + Clone>(
+	pub fn inspector_options<T: TypeData>(
 		&self,
 		ident: FieldIdent,
 	) -> Result<T> {
@@ -378,31 +379,44 @@ impl DynGraph {
 		};
 
 		let registry = self.type_registry();
-		self.map_field(parent, |parent| {
-			let registry = registry.read();
-			let type_info = parent
-				.get_represented_type_info()
-				.ok_or_else(|| anyhow::anyhow!("field has no type info"))?;
+		let result: Result<T> = self
+			.map_field(parent, move |parent| {
+				let registry = registry.read();
+				let type_info = parent
+					.get_represented_type_info()
+					.ok_or_else(|| anyhow::anyhow!("field has no type info"))?;
 
-			let type_path = type_info.type_path();
+				let type_path = type_info.type_path();
 
-			let inspector_opts = registry
-				.get_type_data::<ReflectInspectorOptions>(type_info.type_id())
-				.ok_or_else(|| {
-					anyhow::anyhow!(
-						"{type_path} is not ReflectInspectorOptions"
+				let inspector_opts = registry
+					.get_type_data::<ReflectInspectorOptions>(
+						type_info.type_id(),
 					)
-				})?;
-			let val = inspector_opts.0.get(target).ok_or_else(|| {
-				anyhow::anyhow!(
+					.ok_or_else(|| {
+						anyhow::anyhow!(
+							"{type_path} is not ReflectInspectorOptions"
+						)
+					})?;
+				let val =
+					inspector_opts.0.get_cloned(target).ok_or_else(|| {
+						anyhow::anyhow!(
 					"{type_path} has no options for this InspectorTarget"
 				)
-			})?;
-			let opts = val.downcast_ref::<T>().ok_or_else(|| {
-				anyhow::anyhow!("{type_path} Failed to downcast")
-			})?;
-			Ok(opts.clone())
-		})?
+					})?;
+				val.downcast::<T>()
+					.map(|val| *val)
+					.map_err(|_| anyhow::anyhow!("failed to downcast"))
+			})
+			.flatten();
+
+		match result {
+			Ok(result) => Ok(result),
+			Err(err) => match ident.parent() {
+				// search parents recursively
+				Some(parent) => self.inspector_options::<T>(parent),
+				None => Err(err),
+			},
+		}
 	}
 }
 
@@ -570,8 +584,37 @@ mod test {
 
 		let options =
 			graph.inspector_options::<NumberOptions<i32>>(field_ident)?;
-
 		expect(options.min).as_some()?.to_be(2)?;
+
+		Ok(())
+	}
+
+	#[derive(
+		Debug, Default, PartialEq, Component, Reflect, InspectorOptions,
+	)]
+	#[reflect(Default, Component, InspectorOptions)]
+	struct MyVecStruct(#[inspector(min = 2.)] pub Vec3);
+
+	#[test]
+	fn recursive_inspector_options() -> Result<()> {
+		// setup
+		pretty_env_logger::try_init().ok();
+		let graph = default_graph();
+		graph.world().write().init_component::<MyVecStruct>();
+		graph.type_registry().write().register::<MyVecStruct>();
+
+		let entity = graph.root();
+		let type_id = TypeId::of::<MyVecStruct>();
+		graph.set_component_typed(entity, MyVecStruct(Vec3::default()))?;
+
+		let field_ident = FieldIdent::new(entity, type_id, vec![
+			Access::TupleIndex(0),
+			Access::FieldIndex(2),
+		]);
+
+		let options =
+			graph.inspector_options::<NumberOptions<f32>>(field_ident)?;
+		expect(options.min).as_some()?.to_be(2.)?;
 
 		Ok(())
 	}

@@ -94,12 +94,9 @@ mod test {
 		pub field: Vec3,
 	}
 
-
-
 	#[test]
 	fn works_vec3() -> Result<()> {
 		let mut registry = TypeRegistry::default();
-		// registry.register_type_data::<ReflectInspectorOptions>();
 		registry.register::<MyVec3>();
 		let my_val = MyVec3 {
 			field: Vec3::default(),
@@ -107,6 +104,8 @@ mod test {
 		let inspector_opts = registry
 			.get_type_data::<ReflectInspectorOptions>(my_val.type_id())
 			.unwrap();
+
+		println!("num options: {:?}", inspector_opts.0.options.len());
 
 		let (_key, val) = inspector_opts.0.iter().next().unwrap();
 		let num_opts = val.downcast_ref::<NumberOptions<f32>>().unwrap();
