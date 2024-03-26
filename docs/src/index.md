@@ -5,41 +5,6 @@ Beet is a modular AI Behavior library that uses a novel `entity graph` approach 
 
 <iframe src="https://mrchantey.github.io/beet/play/?spawn-bee=&spawn-flower=&hide-graph=&graph=CAAAAAAAAABOZXcgTm9kZQEAAAAAAAAAAAAAAAAAAD%2FNzMw9AAAAAAAAAAA"></iframe>
 
-
-## 1. Define an action
-Actions are just a component-system pair
-
-```rust
-#[Derive(Component, Action)]
-#[action(system=log_on_run)]
-pub struct LogOnRun(pub value: String);
-
-fn log_on_run(query: Query<&PrintAction, Added<Running>){
-	for (action) in query.iter(){
-		println!("{}", action.0);
-	}
-}
-```
-## 2. Define a graph
-```rust
-let my_graph = BeetNode::new(SequenceSelector)
-    .child((
-			// any component can be used here
-			LogOnRun("Hello"),
-			SetOnRun(RunResult::Success)
-		))
-    .child((
-			LogOnRun("World"), 
-			SetOnRun(RunResult::Success)
-		))	
-```
-
-## 3. Spawn the graph for an agent
-```rust
-let my_agent = world.spawn_empty().id();
-my_graph.spawn(world, my_agent);
-```
-
 ## Features
 
 #### 🌈 Multi-paradigm
@@ -65,6 +30,40 @@ Beet only depends on the lightweight architectural components of the bevy librar
 #### 🔥 Highly Parallel
 
 By default every action system is run in parallel with no built-in sync points.
+
+## Quickstart
+
+```rust
+// ## 1. define an action
+
+// actions are just a component-system pair
+#[Derive(Component, Action)]
+#[action(system=log_on_run)]
+pub struct LogOnRun(pub value: String);
+
+fn log_on_run(query: Query<&PrintAction, Added<Running>){
+	for (action) in query.iter(){
+		println!("{}", action.0);
+	}
+}
+
+
+// ## 2. define a graph
+let my_graph = BeetNode::new(SequenceSelector)
+  .child((
+    // any component can be used here
+    LogOnRun("Hello"),
+    SetOnRun(RunResult::Success)
+  ))
+  .child((
+    LogOnRun("World"), 
+    SetOnRun(RunResult::Success)
+  ));
+
+// ## 3. Spawn the graph for an agent
+let my_agent = world.spawn_empty().id();
+my_graph.spawn(world, my_agent);
+```
 
 ## Drawbacks
 
