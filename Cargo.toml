@@ -42,12 +42,12 @@ beet_net = { path = "crates/beet_net", version = "0.0.7" }
 forky_core = { path = "../forky/crates/forky/forky_core" }
 forky_bevy = { path = "../forky/crates/forky/forky_bevy" }
 forky_web = { path = "../forky/crates/forky/forky_web" }
-sweet = { path = "../forky/crates/sweet", features = ["bevy_core"] }
+sweet = { path = "../forky/crates/sweet", features = ["bevy"] }
 
 # forky_core = { version = "0.1.43" }
 # forky_bevy = { version = "0.1.43" }
 # forky_web = { version = "0.1.43" }
-# sweet = { version = "0.1.43", features = ["bevy_core"] }
+# sweet = { version = "0.1.43", features = ["bevy"] }
 
 # forky_core = { path = "../forky/crates/forky/forky_core" }
 # forky_web = { path = "../forky/crates/forky/forky_web" }
@@ -100,8 +100,10 @@ ron = "0.8"
 base64 = "0.22.0"
 
 ## game
-# bevy = { version = "0.13.*" }
-# recursive type registration https://github.com/bevyengine/bevy/tree/d3e44325b45daf13087a6fe7a425b1744b5f2379
-bevy = { git = "https://github.com/bevyengine/bevy.git", rev = "d3e44325b45daf13087a6fe7a425b1744b5f2379", default-features = false, features = [
-	"bevy_scene",
-] }
+# two requirements for back to release:
+# 1. recursive type registration https://github.com/bevyengine/bevy/tree/d3e44325b45daf13087a6fe7a425b1744b5f2379
+# 2. remove_by_id https://github.com/bevyengine/bevy/pull/9663
+bevy = { path = "../bevy", default-features = false, features = ["bevy_scene"] }
+# bevy = { git = "https://github.com/bevyengine/bevy.git", rev = "d3e44325b45daf13087a6fe7a425b1744b5f2379", default-features = false, features = [
+# 	"bevy_scene",
+# ] }

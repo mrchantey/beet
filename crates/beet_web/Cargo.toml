@@ -126,4 +126,4 @@ sweet.workspace = true
 [[example]]
 name = "test_beet_web"
 path = "test/sweet.rs"
-required-features = ["sweet/bevy_core"]
+required-features = ["sweet/bevy"]

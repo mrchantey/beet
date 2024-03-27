@@ -42,4 +42,4 @@ serde_json.workspace = true
 [[example]]
 name = "test_beet_ecs"
 path = "test/sweet.rs"
-required-features = ["sweet/bevy_core"]
+required-features = ["sweet/bevy"]

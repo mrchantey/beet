@@ -192,15 +192,16 @@ impl DynGraph {
 		entity: Entity,
 		type_id: TypeId,
 	) -> Result<()> {
-		let mut node = self.get_node(entity)?;
-		let before = node.components.len();
-		node.components
-			.retain(|c| c.represented_type_info().type_id() != type_id);
-		if before == node.components.len() {
-			anyhow::bail!("component not found");
-		}
+		let mut world = self.world.write();
+		let Some(component_id) = world.components().get_id(type_id) else {
+			anyhow::bail!("component not registered: {type_id:?}")
+		};
 
-		self.set_node(node)?;
+		let Some(mut entity) = world.get_entity_mut(entity) else {
+			anyhow::bail!("entity not found: {entity:?}")
+		};
+		unsafe { entity.remove_by_id(component_id) };
+
 		Ok(())
 	}
 

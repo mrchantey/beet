@@ -1,7 +1,7 @@
 use anyhow::Result;
 use bevy::prelude::*;
+use bevy::reflect::serde::ReflectDeserializer;
 use bevy::reflect::serde::ReflectSerializer;
-use bevy::reflect::serde::UntypedReflectDeserializer;
 use bevy::reflect::TypeRegistry;
 use bincode::Options;
 use flume::Receiver;
@@ -60,7 +60,7 @@ impl ComponentChanged {
 		let new_value = bincode::DefaultOptions::new()
 			.with_fixint_encoding()
 			.deserialize_seed(
-			UntypedReflectDeserializer::new(&type_registry),
+			ReflectDeserializer::new(&type_registry),
 			&self.value,
 		)?;
 		Ok(new_value)
