@@ -188,3 +188,90 @@ where
 impl<T: BeetBundle> IntoBeetNode<ItemIntoBeetNode> for T {
 	fn into_beet_node(self) -> BeetNode { BeetNode::new(self) }
 }
+
+
+#[cfg(test)]
+mod test {
+	use crate::prelude::*;
+	use anyhow::Result;
+	use bevy::prelude::*;
+	use sweet::*;
+
+	#[derive(Component, Reflect)]
+	pub struct Foobar;
+
+	#[test]
+	fn works() -> Result<()> {
+		let _node = BeetNode::new(EmptyAction);
+		let _node2 = BeetNode::new((
+			EmptyAction,
+			Foobar,
+			SetOnStart::<Score>::default(),
+		));
+		let node = EmptyAction.child(
+			(EmptyAction, SetOnStart::<Score>::default()).child(EmptyAction),
+		);
+
+		let _val = node.into_graph::<EcsNode>();
+
+		Ok(())
+	}
+
+	#[test]
+	fn into() -> Result<()> {
+		fn foo<M>(_val: impl IntoBeetNode<M>) {}
+
+		let _ = foo(EmptyAction.child(EmptyAction));
+		let _ = foo(EmptyAction
+			.child((EmptyAction, EmptyAction))
+			.child(EmptyAction)
+			.child(
+				(EmptyAction, EmptyAction)
+					.child(EmptyAction)
+					.child(EmptyAction),
+			));
+
+
+		Ok(())
+	}
+
+	#[test]
+	fn spawns() -> Result<()> {
+		let mut world = World::new();
+
+		let agent = world.spawn_empty().id();
+
+		let root = (Score::default(), SetOnStart(Score::Weight(0.5)))
+			.into_beet_node()
+			.with_type::<Score>() // not needed by happenstance but usually required
+			.spawn(&mut world, agent)
+			.value;
+
+		expect(&world).to_have_entity(root)?;
+		expect(&world).component::<AgentMarker>(agent)?;
+		expect(&world).component(root)?.to_be(&TargetAgent(agent))?;
+		expect(&world)
+			.component(root)?
+			.to_be(&SetOnStart(Score::Weight(0.5)))?;
+
+		// test shared component
+		expect(&world).component(root)?.to_be(&Score::default())?;
+
+		Ok(())
+	}
+
+	#[test]
+	fn default_components() -> Result<()> {
+		let mut app = App::new();
+		let target = app.world.spawn_empty().id();
+		let actions = test_constant_behavior_tree();
+		let root = actions.spawn(&mut app.world, target).value;
+
+		expect(&app).to_have_component::<SetOnStart<Score>>(root)?;
+		expect(&app).to_have_component::<TargetAgent>(root)?;
+		expect(&app).to_have_component::<RunTimer>(root)?;
+		expect(&app).to_have_component::<Score>(root)?;
+
+		Ok(())
+	}
+}

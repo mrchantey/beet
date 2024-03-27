@@ -1,4 +1,5 @@
-use beet_ecs::prelude::*;
+use crate::prelude::*;
+use anyhow::Result;
 use std::any::Any;
 use sweet::*;
 
@@ -9,7 +10,7 @@ struct MyStruct;
 
 fn my_struct() {}
 
-#[sweet_test]
+#[test]
 fn works() -> Result<()> {
 	// MyStruct.syste
 	let mut registry = TypeRegistry::default();

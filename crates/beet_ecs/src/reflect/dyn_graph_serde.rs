@@ -107,9 +107,6 @@ mod test {
 	use bevy::prelude::*;
 	use sweet::*;
 
-	#[derive(Debug, PartialEq)]
-	struct MyStruct(pub i32);
-
 	#[test]
 	fn works() -> Result<()> {
 		let graph1 = (Repeat, FallbackSelector)

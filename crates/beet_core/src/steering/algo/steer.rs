@@ -117,3 +117,27 @@ pub fn evade_impulse(
 	*impulse *= -1.0;
 	impulse
 }
+
+
+#[cfg(test)]
+mod test {
+	use crate::prelude::*;
+	use anyhow::Result;
+	use bevy::prelude::*;
+	use sweet::*;
+
+	#[test]
+	fn algo() -> Result<()> {
+		let impulse = seek_impulse(
+			&Vec3::default(),
+			&Velocity::default(),
+			&Vec3::new(1., 0., 0.),
+			MaxSpeed::default(),
+			MaxForce::default(),
+			None,
+		);
+		expect(*impulse).to_be(Vec3::new(*MaxForce::default(), 0., 0.))?;
+
+		Ok(())
+	}
+}

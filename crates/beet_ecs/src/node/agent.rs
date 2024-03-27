@@ -32,3 +32,34 @@ pub fn despawn_graph_on_agent_removed(
 		}
 	}
 }
+
+
+#[cfg(test)]
+mod test {
+	use crate::prelude::*;
+	use anyhow::Result;
+	use bevy::prelude::*;
+	use sweet::*;
+
+	#[test]
+	fn despawn() -> Result<()> {
+		let mut app = App::new();
+		// app.add_systems(PostUpdate, despawn_graph_on_agent_removed);
+		app.add_plugins(BeetSystemsPlugin::<EcsNode, _>::default());
+
+		let target = app.world.spawn_empty().id();
+		InsertOnRun(RunResult::Success)
+			.into_beet_node()
+			.spawn(&mut app.world, target);
+
+		expect(app.world.entities().len()).to_be(2)?;
+		app.update();
+		app.world.despawn(target);
+
+		expect(app.world.entities().len()).to_be(1)?;
+		app.update();
+		expect(app.world.entities().len()).to_be(0)?;
+
+		Ok(())
+	}
+}

@@ -52,9 +52,6 @@ mod test {
 	use std::any::TypeId;
 	use sweet::*;
 
-	#[derive(Debug, PartialEq)]
-	struct MyStruct(pub i32);
-
 	#[test]
 	fn component_types() -> Result<()> {
 		pretty_env_logger::try_init().ok();

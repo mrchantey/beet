@@ -19,7 +19,7 @@ pub fn main() {}
 
 #[beet_ecs::prelude::derive_action(Clone)]
 #[action(set=PreTickSet)]
-struct Action1<T: 'static + Default + Component>
+struct Action1<T: 'static + Default + Component + Reflect + GetTypeRegistration>
 where
 	T: Debug,
 {

@@ -1,12 +1,4 @@
-use beet_ecs::prelude::*;
-
-///
-/// Root
-/// 	Child0
-/// 	Child1
-/// 		Child0
-///
-
+use crate::prelude::*;
 pub fn test_constant_behavior_tree() -> BeetNode {
 	(Score::default(), SetOnStart::<Score>::default())
 		.child((Score::default(), SetOnStart::<Score>::default()))

@@ -70,3 +70,26 @@ pub fn wander_impulse(
 		None,
 	)
 }
+
+
+#[cfg(test)]
+mod test {
+	use crate::prelude::*;
+	use anyhow::Result;
+	use bevy::prelude::*;
+	use sweet::*;
+
+	#[test]
+	fn works() -> Result<()> {
+		let impulse = wander_impulse(
+			&Vec3::default(),
+			&Velocity::default(),
+			&mut WanderParams::default(),
+			MaxSpeed::default(),
+			MaxForce::default(),
+		);
+		expect(*impulse).not().to_be(Vec3::ZERO)?;
+
+		Ok(())
+	}
+}

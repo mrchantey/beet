@@ -53,3 +53,23 @@ impl PartialOrd for Score {
 		Some(val)
 	}
 }
+
+
+
+#[cfg(test)]
+mod test {
+	use crate::prelude::*;
+	use anyhow::Result;
+	use sweet::*;
+
+	#[test]
+	fn works() -> Result<()> {
+		expect(Score::Fail).to_be(Score::Fail)?;
+		expect(Score::Fail).to_be_less_than(Score::Pass)?;
+		expect(Score::Fail).to_be_less_than(Score::Weight(0.5))?;
+		expect(Score::Weight(0.5)).to_be_less_than(Score::Pass)?;
+		expect(Score::Weight(0.4)).to_be_less_than(Score::Weight(0.5))?;
+
+		Ok(())
+	}
+}

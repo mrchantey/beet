@@ -92,3 +92,31 @@ fn set_agent_on_run<T: SettableComponent>(
 		}
 	}
 }
+
+
+
+#[cfg(test)]
+mod test {
+	use crate::prelude::*;
+	use anyhow::Result;
+	use bevy::prelude::*;
+	use sweet::*;
+
+	#[test]
+	fn works() -> Result<()> {
+		let mut app = App::new();
+		app.add_plugins(BeetSystemsPlugin::<EcsNode, _>::default());
+
+		let target = app.world.spawn_empty().id();
+		let actions = test_constant_behavior_tree();
+		let root = actions.spawn(&mut app.world, target).value;
+
+		app.world.entity_mut(root).insert(SetOnStart(Score::Pass));
+
+		expect(&app).component(root)?.to_be(&Score::Fail)?;
+		app.update();
+		expect(&app).component(root)?.to_be(&Score::Pass)?;
+
+		Ok(())
+	}
+}

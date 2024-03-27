@@ -8,7 +8,10 @@ pub mod graph;
 pub mod inspector_options;
 pub mod node;
 pub mod reflect;
+#[cfg(test)]
+pub mod test;
 pub mod tree;
+
 // pub mod ui;
 
 // currently required for action_list! macro to work
@@ -27,6 +30,8 @@ pub mod prelude {
 	pub use crate::inspector_options::*;
 	pub use crate::node::*;
 	pub use crate::reflect::*;
+	#[cfg(test)]
+	pub use crate::test::*;
 	pub use crate::tree::*;
 	// pub use crate::ui::*;
 	pub use beet_ecs_macros::*;

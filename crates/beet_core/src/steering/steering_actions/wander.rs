@@ -38,3 +38,48 @@ fn wander(
 		}
 	}
 }
+
+
+#[cfg(test)]
+mod test {
+	use crate::prelude::*;
+	use anyhow::Result;
+	use beet_ecs::prelude::*;
+	use bevy::prelude::*;
+	use sweet::*;
+
+	#[test]
+	fn works() -> Result<()> {
+		let mut app = App::new();
+
+		app.add_plugins((
+			SteeringPlugin::default(),
+			BeetSystemsPlugin::<CoreNode, _>::default(),
+		))
+		.insert_time();
+
+		let agent = app
+			.world
+			.spawn((
+				TransformBundle::default(),
+				ForceBundle::default(),
+				SteerBundle::default(),
+			))
+			.id();
+
+		Wander::default()
+			.into_beet_node()
+			.spawn(&mut app.world, agent);
+
+		app.update();
+		app.update_with_secs(1);
+
+		expect(&app)
+			.component::<Transform>(agent)?
+			.map(|t| t.translation)
+			.not()
+			.to_be(Vec3::ZERO)?;
+
+		Ok(())
+	}
+}

@@ -8,12 +8,9 @@ default:
 
 ## common
 test-core *args:
-	just watch 'cargo run -p beet_core 	--example test_beet_core 	$BEET_CARGO_TEST -- -w {{args}}'
+	just watch 'cargo test -p beet_core $BEET_CARGO_TEST --lib -- --nocapture {{args}}'
 
 test-ecs *args:
-	just watch 'cargo run -p beet_ecs 	--example test_beet_ecs		$BEET_CARGO_TEST -- -w {{args}}'
-
-unit-ecs *args:
 	just watch 'cargo test -p beet_ecs $BEET_CARGO_TEST --lib -- --nocapture {{args}}'
 
 test-web *args:
@@ -71,8 +68,8 @@ test-w crate *args:
 
 test-all:
 	cargo test -p beet_ecs $BEET_CARGO_TEST --lib
+	cargo test -p beet_core $BEET_CARGO_TEST --lib
 	cargo run -p beet_core 	--example test_beet_core 	$BEET_CARGO_TEST
-	cargo run -p beet_ecs 	--example test_beet_ecs		$BEET_CARGO_TEST
 	cargo run -p beet_net 	--example test_beet_net  	$BEET_CARGO_TEST
 
 test-ci *args:
