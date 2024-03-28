@@ -1,11 +1,10 @@
-// use beet::graph::BeetNode;
 use crate::prelude::*;
 use beet_ecs::prelude::*;
 use bevy::core::Name;
 use bevy::math::Vec3;
 
 
-pub fn forage() -> BeetNode {
+pub fn forage() -> BeetBuilder {
 	let awareness_radius = 0.5;
 
 	(

@@ -43,4 +43,5 @@ impl EntityGraph {
 			commands.entity(*entity).despawn();
 		}
 	}
+
 }

@@ -78,7 +78,7 @@ mod test {
 			))
 			.id();
 
-		Seek.into_beet_node().spawn(&mut app.world, agent);
+		Seek.into_beet_builder().spawn(&mut app.world, agent);
 
 		app.update();
 		app.update_with_secs(1);

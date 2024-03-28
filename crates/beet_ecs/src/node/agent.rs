@@ -6,7 +6,7 @@ use bevy::prelude::*;
 /// Remove this component to dispose of all of this agents graphs.
 /// This is useful, for example for [`cleanup_entity_graph`] to only listen for removals
 /// of agent entities
-#[derive(Debug, Copy, Clone, Component)]
+#[derive(Debug, Copy, Clone, PartialEq, Component)]
 pub struct AgentMarker;
 
 /// Added to [`BehaviorNode`] entities that have a target agent.
@@ -49,7 +49,7 @@ mod test {
 
 		let target = app.world.spawn_empty().id();
 		InsertOnRun(RunResult::Success)
-			.into_beet_node()
+			.into_beet_builder()
 			.spawn(&mut app.world, target);
 
 		expect(app.world.entities().len()).to_be(2)?;

@@ -39,8 +39,8 @@ mod test {
 
 		let tree = test_no_action_behavior_tree().spawn(&mut app.world, target);
 
-		tree.visit_dfs(&mut |entity| {
-			app.world.entity_mut(entity).insert(Running);
+		tree.map(|entity| {
+			app.world.entity_mut(*entity).insert(Running);
 		});
 
 		expect(tree.component_tree(&app.world)).to_be(

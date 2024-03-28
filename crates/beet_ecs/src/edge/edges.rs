@@ -33,6 +33,20 @@ impl Edges {
 		});
 	}
 
+	pub fn collect(entity: Entity, edge_query: &Query<&Edges>) -> Vec<Entity> {
+		let mut entities = Vec::new();
+		Self::visit_dfs(entity, edge_query, |entity| {
+			entities.push(entity);
+		});
+		entities
+	}
+	pub fn collect_world(entity: Entity, world: &mut World) -> Vec<Entity> {
+		let mut entities = Vec::new();
+		Self::visit_dfs_world(world, entity, |_, entity| {
+			entities.push(entity);
+		});
+		entities
+	}
 
 	pub fn visit_dfs(
 		entity: Entity,
@@ -61,6 +75,41 @@ impl Edges {
 		if let Ok(edges) = edge_query.get(entity) {
 			for edge in edges.iter() {
 				Self::visit_dfs_recursive(*edge, edge_query, func, visited);
+			}
+		}
+	}
+	pub fn visit_dfs_world(
+		world: &mut World,
+		entity: Entity,
+		mut func: impl FnMut(&mut World, Entity),
+	) {
+		let mut query = world.query::<&Edges>();
+		Self::visit_dfs_recursive_world(
+			world,
+			&mut query,
+			entity,
+			&mut func,
+			&mut HashSet::default(),
+		);
+	}
+
+	fn visit_dfs_recursive_world(
+		world: &mut World,
+		edge_query: &mut QueryState<&Edges>,
+		entity: Entity,
+		func: &mut impl FnMut(&mut World, Entity),
+		visited: &mut HashSet<Entity>,
+	) {
+		if visited.contains(&entity) {
+			return;
+		}
+		visited.insert(entity);
+		func(world, entity);
+		if let Ok(edges) = edge_query.get(world, entity).map(|e| e.0.clone()) {
+			for edge in edges.into_iter() {
+				Self::visit_dfs_recursive_world(
+					world, edge_query, edge, func, visited,
+				);
 			}
 		}
 	}

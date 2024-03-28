@@ -68,7 +68,7 @@ mod test {
 			.id();
 
 		Wander::default()
-			.into_beet_node()
+			.into_beet_builder()
 			.spawn(&mut app.world, agent);
 
 		app.update();

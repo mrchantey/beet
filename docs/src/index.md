@@ -47,22 +47,20 @@ fn log_on_run(query: Query<&PrintAction, Added<Running>){
 	}
 }
 
-
-// ## 2. define a graph
-let my_graph = BeetNode::new(SequenceSelector)
-  .child((
-    // any component can be used here
-    LogOnRun("Hello"),
-    SetOnRun(RunResult::Success)
-  ))
-  .child((
-    LogOnRun("World"), 
-    SetOnRun(RunResult::Success)
-  ));
-
-// ## 3. Spawn the graph for an agent
-let my_agent = world.spawn_empty().id();
-my_graph.spawn(world, my_agent);
+fn main(){
+  let mut world = World::new();
+  let my_agent = world.spawn_empty().id();
+  let my_graph = BeetBuilder::new(SequenceSelector)
+    .child((
+      // any component can be used here
+      LogOnRun("Hello"),
+      SetOnRun(RunResult::Success)
+    ))
+    .child((
+      LogOnRun("World"), 
+      SetOnRun(RunResult::Success)
+    )).spawn(world, my_agent);
+}
 ```
 
 ## Drawbacks

@@ -56,7 +56,7 @@ mod test {
 		app.insert_time();
 
 		let root = SucceedInDuration::default()
-			.into_beet_node()
+			.into_beet_builder()
 			.spawn_no_target(&mut app.world)
 			.value;
 

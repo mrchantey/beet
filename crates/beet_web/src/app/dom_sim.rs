@@ -42,8 +42,8 @@ impl Default for DomSim {
 
 
 impl DomSim {
-	pub fn with_node<M>(mut self, graph: impl IntoBeetNode<M>) -> Self {
-		self.graph = DynGraph::new::<BeeNode>(graph.into_beet_node());
+	pub fn with_node<M>(mut self, graph: impl IntoBeetBuilder<M>) -> Self {
+		self.graph = DynGraph::new::<BeeNode>(graph.into_beet_builder());
 		self
 	}
 	pub fn with_url_params<T: ActionTypes>(mut self) -> Self {

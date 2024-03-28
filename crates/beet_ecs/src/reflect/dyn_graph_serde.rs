@@ -111,7 +111,7 @@ mod test {
 	fn works() -> Result<()> {
 		let graph1 = (Repeat, FallbackSelector)
 			.child(EmptyAction)
-			.into_graph::<EcsNode>();
+			.into_dyn_graph::<EcsNode>();
 
 		let serde1 = graph1.into_serde::<EcsNode>();
 		let bin1 = bincode::serialize(&serde1)?;

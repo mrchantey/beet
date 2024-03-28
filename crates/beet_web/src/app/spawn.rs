@@ -26,8 +26,10 @@ pub enum DomSimMessage {
 }
 
 impl DomSimMessage {
-	pub fn set_graph<M>(node: impl IntoBeetNode<M>) -> DomSimMessage {
-		DomSimMessage::SetGraph(node.into_beet_node().into_graph::<BeeNode>())
+	pub fn set_graph<M>(node: impl IntoBeetBuilder<M>) -> DomSimMessage {
+		DomSimMessage::SetGraph(
+			node.into_beet_builder().into_graph::<BeeNode>(),
+		)
 	}
 }
 

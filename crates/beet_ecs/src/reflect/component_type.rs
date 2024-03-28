@@ -58,7 +58,7 @@ mod test {
 
 		// Create a world and an entity
 		let graph = (EmptyAction.child((EmptyAction, SetOnRun(Score::Pass))))
-			.into_graph::<EcsNode>();
+			.into_dyn_graph::<EcsNode>();
 
 		let types = graph.component_types();
 		expect(types.len()).to_be_greater_than(0)?;

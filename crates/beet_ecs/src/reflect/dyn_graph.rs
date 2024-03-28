@@ -13,14 +13,14 @@ use std::ptr::NonNull;
 use std::sync::Arc;
 
 /// Wrapper around a world in which every entity is a node on a behavior graph
-#[derive(Clone, Resource)]
+#[derive(Clone)]
 pub struct DynGraph {
 	world: Arc<RwLock<World>>,
 	root: Entity,
 }
 
 impl DynGraph {
-	pub fn new<T: ActionTypes>(node: BeetNode) -> Self {
+	pub fn new<T: ActionTypes>(node: BeetBuilder) -> Self {
 		let mut world = World::new();
 		let root = node.spawn_no_target(&mut world).value;
 		Self::new_with::<T>(world, root)
@@ -54,13 +54,13 @@ impl DynGraph {
 			.map(|e| e.0.clone())
 			.unwrap_or_default()
 	}
-	/// This is expensive, only use when you need to
+	/// This is expensive and error prone, only use when you need to
 	pub fn get_node(&self, entity: Entity) -> Result<DynNode> {
 		let world = self.world.read();
 		DynNode::new(&world, entity)
 	}
 
-	/// This is expensive, only use when you need to
+	/// This is expensive and error prone, only use when you need to
 	pub fn set_node(&self, node: DynNode) -> Result<()> {
 		let mut world = self.world.write();
 		node.apply(&mut world)?;
@@ -71,7 +71,7 @@ impl DynGraph {
 	pub fn add_node(&self, parent: Entity) -> Entity {
 		let mut world = self.world.write();
 		let mut entity = world.spawn_empty();
-		BeetNode::insert_default_components(
+		BeetBuilder::insert_default_components(
 			&mut entity,
 			"New Node".to_string(),
 		);
@@ -323,24 +323,32 @@ impl DynGraph {
 		ident: FieldIdent,
 		func: impl Fn(&dyn Reflect) -> O,
 	) -> Result<O> {
-		self.map_component(ident.entity, ident.component, |component| {
-			let field = component
-				.reflect_path(ident.path())
-				.map_err(|e| anyhow::anyhow!("{e}"))?;
-			Ok(func(field))
-		})?
+		self.map_component(
+			ident.component.entity,
+			ident.component.type_id,
+			|component| {
+				let field = component
+					.reflect_path(ident.path())
+					.map_err(|e| anyhow::anyhow!("{e}"))?;
+				Ok(func(field))
+			},
+		)?
 	}
 	pub fn map_field_mut<O>(
 		&self,
 		ident: FieldIdent,
 		func: impl Fn(&mut dyn Reflect) -> O,
 	) -> Result<O> {
-		self.map_component_mut(ident.entity, ident.component, |component| {
-			let field = component
-				.reflect_path_mut(ident.path())
-				.map_err(|e| anyhow::anyhow!("{e}"))?;
-			Ok(func(field))
-		})?
+		self.map_component_mut(
+			ident.component.entity,
+			ident.component.type_id,
+			|component| {
+				let field = component
+					.reflect_path_mut(ident.path())
+					.map_err(|e| anyhow::anyhow!("{e}"))?;
+				Ok(func(field))
+			},
+		)?
 	}
 	pub fn get_field(&self, ident: FieldIdent) -> Result<Box<dyn Reflect>> {
 		self.map_field(ident, |c| c.clone_value())
@@ -438,7 +446,7 @@ mod test {
 	struct MyStruct(#[inspector(min = 2)] pub i32);
 
 	fn default_graph() -> DynGraph {
-		BeetNode::new(EmptyAction).into_graph::<EcsNode>()
+		BeetBuilder::new(EmptyAction).into_dyn_graph::<EcsNode>()
 	}
 
 	#[test]
@@ -447,7 +455,7 @@ mod test {
 
 		// Create a world and an entity
 		let graph = (EmptyAction.child((EmptyAction, SetOnRun(Score::Pass))))
-			.into_graph::<EcsNode>();
+			.into_dyn_graph::<EcsNode>();
 
 		expect(graph.nodes().len()).to_be(2)?;
 		let root = graph.root();
@@ -541,7 +549,7 @@ mod test {
 
 
 		//set root value
-		let field_ident = FieldIdent::new(entity, type_id, vec![]);
+		let field_ident = FieldIdent::new_with_entity(entity, type_id, vec![]);
 
 		graph.set_field(field_ident.clone(), &MyStruct(2))?;
 
@@ -554,8 +562,9 @@ mod test {
 		.to_be_true()?;
 
 		//set nested value
-		let field_ident =
-			FieldIdent::new(entity, type_id, vec![Access::TupleIndex(0)]);
+		let field_ident = FieldIdent::new_with_entity(entity, type_id, vec![
+			Access::TupleIndex(0),
+		]);
 		graph.set_field(field_ident.clone(), &3)?;
 
 		expect(
@@ -580,8 +589,9 @@ mod test {
 		let type_id = TypeId::of::<MyStruct>();
 		graph.set_component_typed(entity, MyStruct(1))?;
 
-		let field_ident =
-			FieldIdent::new(entity, type_id, vec![Access::TupleIndex(0)]);
+		let field_ident = FieldIdent::new_with_entity(entity, type_id, vec![
+			Access::TupleIndex(0),
+		]);
 
 		let options =
 			graph.inspector_options::<NumberOptions<i32>>(field_ident)?;
@@ -608,7 +618,7 @@ mod test {
 		let type_id = TypeId::of::<MyVecStruct>();
 		graph.set_component_typed(entity, MyVecStruct(Vec3::default()))?;
 
-		let field_ident = FieldIdent::new(entity, type_id, vec![
+		let field_ident = FieldIdent::new_with_entity(entity, type_id, vec![
 			Access::TupleIndex(0),
 			Access::FieldIndex(2),
 		]);

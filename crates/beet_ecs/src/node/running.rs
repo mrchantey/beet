@@ -70,7 +70,7 @@ mod test {
 		let target = app.world.spawn_empty().id();
 
 		let root = InsertOnRun(RunResult::Success)
-			.into_beet_node()
+			.into_beet_builder()
 			.spawn(&mut app.world, target)
 			.value;
 
