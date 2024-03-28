@@ -20,7 +20,7 @@ pub fn setup_ui(send: Sender<DomSimMessage>) {
 	message_button(send.clone(), "#clear-all", DomSimMessage::DespawnAll);
 
 
-	ResizeListener::new(&get_entities_container(), move |_e| {
+	ResizeListener::new(&get_entities_container().unwrap(), move |_e| {
 		send.send(DomSimMessage::Resize).ok();
 	})
 	.forget();

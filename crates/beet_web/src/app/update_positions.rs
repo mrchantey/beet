@@ -21,7 +21,10 @@ pub fn update_positions(
 }
 
 pub fn set_position(el: &HtmlElement, position: Vec2) {
-	let parent = get_entities_container();
+	let Some(parent) = get_entities_container() else {
+		// log::warn!("parent not found when setting position");
+		return;
+	};
 
 	let parent_width = parent.client_width() as f32;
 	let parent_height = parent.client_height() as f32;

@@ -1,3 +1,4 @@
+use crate::prelude::ReflectActionMeta;
 use bevy::prelude::*;
 use std::any::TypeId;
 
@@ -28,10 +29,12 @@ impl ComponentType {
 				let Some(registration) = registry.get(info.type_id()) else {
 					return false;
 				};
-				if let Some(_) = registration.data::<ReflectDefault>() {
-					true
-				} else {
+				if registration.data::<ReflectDefault>().is_none() {
 					false
+				} else if registration.data::<ReflectActionMeta>().is_none() {
+					false
+				} else {
+					true
 				}
 			})
 			.map(|info| {

@@ -11,8 +11,8 @@ use web_sys::Document;
 use web_sys::Element;
 use web_sys::HtmlDivElement;
 
-pub fn get_entities_container() -> HtmlDivElement {
-	Document::x_query_selector::<HtmlDivElement>(".dom-sim-container").unwrap()
+pub fn get_entities_container() -> Option<HtmlDivElement> {
+	Document::x_query_selector::<HtmlDivElement>(".dom-sim-container")
 }
 
 
@@ -122,7 +122,6 @@ fn spawn(
 	text: impl Into<String>,
 	position: Vec3,
 ) -> Entity {
-	let parent_el = get_entities_container();
 	let entity = world
 		.spawn((DomSimEntity, Name::new(name.into()), TransformBundle {
 			local: Transform::from_translation(position),
@@ -130,11 +129,13 @@ fn spawn(
 		}))
 		.id();
 
-	let child_el = create_dom_entity(&parent_el, &text.into());
+	if let Some(parent_el) = get_entities_container() {
+		let child_el = create_dom_entity(&parent_el, &text.into());
 
-	world
-		.non_send_resource_mut::<DomSimElements>()
-		.insert(entity, child_el);
+		world
+			.non_send_resource_mut::<DomSimElements>()
+			.insert(entity, child_el);
+	}
 	entity
 }
 

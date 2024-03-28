@@ -2,6 +2,7 @@ use crate::prelude::*;
 use anyhow::Result;
 use bevy::ecs::entity::EntityHashMap;
 use bevy::prelude::*;
+use std::any::TypeId;
 
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, Deref, DerefMut)]
@@ -83,6 +84,13 @@ impl BeetNode {
 			})
 			.unwrap_or_default()
 	}
+	pub fn add_default_component(
+		self,
+		world: &mut World,
+		component: TypeId,
+	) -> Result<()> {
+		ComponentIdent::new(*self, component).add(world)
+	}
 
 
 	pub fn remove(self, world: &mut World) {
@@ -105,6 +113,16 @@ impl BeetNode {
 		ComponentUtils::get(world, *self)
 			.into_iter()
 			.map(|c| ComponentIdent::new(*self, c))
+			.collect()
+	}
+
+	pub fn graph_roles(
+		self,
+		world: &World,
+	) -> Vec<(ComponentIdent, GraphRole)> {
+		self.components(world)
+			.into_iter()
+			.filter_map(|c| c.graph_role(world).ok().map(|role| (c, role)))
 			.collect()
 	}
 }
