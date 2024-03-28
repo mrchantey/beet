@@ -1,3 +1,6 @@
+pub mod beet_scene_serde;
+#[allow(unused_imports)]
+pub use self::beet_scene_serde::*;
 pub mod component_type;
 #[allow(unused_imports)]
 pub use self::component_type::*;

@@ -11,6 +11,7 @@ use flume::Sender;
 use forky_web::AnimationFrame;
 use forky_web::History;
 use forky_web::SearchParams;
+use std::marker::PhantomData;
 use std::time::Duration;
 use web_sys::HtmlDivElement;
 
@@ -20,33 +21,36 @@ pub struct DomSimEntity;
 #[derive(Clone, Default, Deref, DerefMut)]
 pub struct DomSimElements(pub HashMap<Entity, HtmlDivElement>);
 
-pub struct DomSim {
-	pub graph: DynGraph,
+pub struct DomSim<T: ActionList> {
+	pub scene: DynamicScene,
 	pub auto_flowers: Option<Duration>,
 	pub bees: usize,
 	pub flowers: usize,
 	pub basic_ui: bool,
+	pub phantom: PhantomData<T>,
 }
 
-impl Default for DomSim {
+impl<T: ActionList> Default for DomSim<T> {
 	fn default() -> Self {
 		Self {
-			graph: DynGraph::new::<BeeNode>(forage()),
+			scene: forage().into_scene::<T>(),
 			auto_flowers: None,
 			basic_ui: true,
 			bees: 1,
 			flowers: 1,
+			phantom: PhantomData,
 		}
 	}
 }
 
 
-impl DomSim {
-	pub fn with_node<M>(mut self, graph: impl IntoBeetBuilder<M>) -> Self {
-		self.graph = DynGraph::new::<BeeNode>(graph.into_beet_builder());
+impl<T: ActionList> DomSim<T> {
+	pub fn with_node<M>(mut self, node: impl IntoBeetBuilder<M>) -> Self {
+		let node = node.into_beet_builder();
+		self.scene = node.into_scene::<T>();
 		self
 	}
-	pub fn with_url_params<T: ActionTypes>(mut self) -> Self {
+	pub fn with_url_params(mut self) -> Self {
 		if let Some(bees) = SearchParams::get("bees") {
 			self.bees = bees.parse().unwrap_or(1);
 		}
@@ -57,8 +61,8 @@ impl DomSim {
 			let val: f64 = auto_flowers.parse().unwrap_or(1.0);
 			self.auto_flowers = Some(Duration::from_secs_f64(val));
 		}
-		if let Ok(Some(graph)) = get_graph_url_param::<T>() {
-			self.graph = graph;
+		if let Ok(Some(scene)) = get_scene_url_param::<T>() {
+			self.scene = scene;
 		}
 		self
 	}
@@ -77,7 +81,7 @@ impl DomSim {
 		recv: Receiver<DomSimMessage>,
 	) -> Result<AnimationFrame> {
 		for _ in 0..self.bees {
-			send.send(DomSimMessage::SpawnBee)?;
+			send.send(DomSimMessage::SpawnBeeFromFirstNode)?;
 		}
 		for _ in 0..self.flowers {
 			send.send(DomSimMessage::SpawnFlower)?;
@@ -93,10 +97,9 @@ impl DomSim {
 
 		app /*-*/
 			.add_plugins(BeetMinimalPlugin)
-			.add_plugins(DefaultBeetPlugins::<BeeNode>::new())
+			.add_plugins(DefaultBeetPlugins::<T>::new())
 			.insert_resource(DomSimMessageSend(send))
 			.insert_resource(DomSimMessageRecv(recv))
-			.insert_resource(self.graph)
 			.insert_non_send_resource(DomSimElements::default())
 			.add_systems(Update,(
 				message_handler.pipe(log_error),
@@ -105,6 +108,10 @@ impl DomSim {
 			)
 			.add_systems(Update, despawn_elements)
 		/*-*/;
+
+		self.scene
+			.write_to_world(&mut app.world, &mut Default::default())?;
+
 
 		if let Some(duration) = self.auto_flowers {
 			app.insert_resource(AutoFlowers(Timer::new(
@@ -122,11 +129,11 @@ impl DomSim {
 	}
 }
 
-pub fn get_graph_url_param<T: ActionTypes>() -> Result<Option<DynGraph>> {
-	if let Some(tree) = SearchParams::get("graph") {
+pub fn get_scene_url_param<T: ActionTypes>() -> Result<Option<DynamicScene>> {
+	if let Some(tree) = SearchParams::get("scene") {
 		let bytes = general_purpose::STANDARD_NO_PAD.decode(tree.as_bytes())?;
-		let serde: DynGraphSerde<T> = bincode::deserialize(&bytes)?;
-		Ok(Some(serde.into_dyn_graph()?))
+		let scene: BeetSceneSerde<T> = bincode::deserialize(&bytes)?;
+		Ok(Some(scene.scene))
 	} else {
 		Ok(None)
 	}
@@ -134,8 +141,9 @@ pub fn get_graph_url_param<T: ActionTypes>() -> Result<Option<DynGraph>> {
 
 
 const MAX_URL_LENGTH: usize = 1900;
-pub fn set_graph_url_param<T: ActionTypes>(graph: &DynGraph) -> Result<()> {
-	let serde = graph.into_serde::<T>();
+pub fn set_scene_url_param<T: ActionTypes>(world: &World) -> Result<()> {
+	let scene = DynamicScene::from_world(world);
+	let serde = BeetSceneSerde::<T>::new(scene);
 	let val = bincode::serialize(&serde).unwrap();
 	let val = general_purpose::STANDARD_NO_PAD.encode(val);
 	if val.len() > MAX_URL_LENGTH {

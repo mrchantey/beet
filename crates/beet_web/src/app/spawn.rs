@@ -18,19 +18,19 @@ pub fn get_entities_container() -> HtmlDivElement {
 
 #[derive(Clone)]
 pub enum DomSimMessage {
-	SpawnBee,
+	SpawnBee(BeetNode),
+	SpawnBeeFromFirstNode,
 	SpawnFlower,
 	DespawnAll,
 	Resize,
-	SetGraph(DynGraph),
 }
 
 impl DomSimMessage {
-	pub fn set_graph<M>(node: impl IntoBeetBuilder<M>) -> DomSimMessage {
-		DomSimMessage::SetGraph(
-			node.into_beet_builder().into_graph::<BeeNode>(),
-		)
-	}
+	// pub fn set_graph<M>(node: impl IntoBeetBuilder<M>) -> DomSimMessage {
+	// 	DomSimMessage::SetGraph(
+	// 		node.into_beet_builder().into_graph::<BeeNode>(),
+	// 	)
+	// }
 }
 
 #[derive(Resource, Deref, DerefMut)]
@@ -46,7 +46,15 @@ pub fn message_handler(world: &mut World) -> Result<()> {
 
 	for message in messages {
 		match message {
-			DomSimMessage::SpawnBee => spawn_bee(world)?,
+			DomSimMessage::SpawnBeeFromFirstNode => {
+				match BeetNode::get_roots(world).first() {
+					Some(node) => spawn_bee(world, *node)?,
+					None => {
+						log::error!("SpawnBeeFromFirstNode - no node found")
+					}
+				}
+			}
+			DomSimMessage::SpawnBee(node) => spawn_bee(world, node)?,
 			DomSimMessage::SpawnFlower => spawn_flower(world),
 			DomSimMessage::DespawnAll => {
 				let mut elements =
@@ -57,9 +65,9 @@ pub fn message_handler(world: &mut World) -> Result<()> {
 					world.despawn(entity);
 				}
 			}
-			DomSimMessage::SetGraph(graph) => {
-				*world.resource_mut::<DynGraph>() = graph;
-			}
+			// DomSimMessage::SetGraph(graph) => {
+			// 	*world.resource_mut::<DynGraph>() = graph;
+			// }
 			DomSimMessage::Resize => {
 				let elements =
 					world.non_send_resource::<DomSimElements>().clone();
@@ -82,7 +90,7 @@ fn spawn_flower(world: &mut World) {
 	spawn(world, "flower", "🌻", position);
 }
 
-fn spawn_bee(world: &mut World) -> Result<()> {
+fn spawn_bee(world: &mut World, node: BeetNode) -> Result<()> {
 	let mut position = Vec3::random_in_cube();
 	position.z = 0.;
 	let entity = spawn(world, "bee", "🐝", position);
@@ -102,8 +110,9 @@ fn spawn_bee(world: &mut World) -> Result<()> {
 			..default()
 		}));
 
-	let graph = world.resource::<DynGraph>().clone();
-	let _root = graph.spawn(world, entity)?;
+	let new_node = node.deep_clone(world)?;
+	new_node.bind_agent(world, entity);
+
 	Ok(())
 }
 

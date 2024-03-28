@@ -8,7 +8,7 @@ use sweet::*;
 pub fn works() -> Result<()> {
 	append_html_for_tests();
 
-	DomSim::default()
+	DomSim::<BeeNode>::default()
 		.with_node(Translate::new(Vec3::new(-0.1, 0., 0.)))
 		.run_forever()?;
 

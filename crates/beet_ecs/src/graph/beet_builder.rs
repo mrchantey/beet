@@ -111,6 +111,13 @@ impl BeetBuilder {
 		let root = self.spawn_no_target(world).value;
 		BeetNode::new(root)
 	}
+	pub fn into_scene<T: ActionTypes>(self) -> DynamicScene {
+		let mut world = World::new();
+		//  not strictly nessecary, currently the builder registers types but that may change
+		world.insert_resource(BeetSceneSerde::<T>::type_registry());
+		self.spawn_no_target(&mut world);
+		DynamicScene::from_world(&world)
+	}
 
 	// TODO deprecate this in favor of an optional bundle
 	pub fn insert_default_components(

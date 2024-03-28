@@ -5,7 +5,7 @@ use sweet::*;
 #[sweet_test]
 pub async fn works() -> Result<()> {
 	append_html_for_tests();
-	DomSim::default()
+	DomSim::<BeeNode>::default()
 		.with_node(
 			(Repeat::default(), SequenceSelector)
 				.child((

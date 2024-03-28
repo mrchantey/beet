@@ -1,19 +1,14 @@
 use crate::prelude::*;
 use bevy::ecs::entity::Entity;
-use bevy::ecs::reflect::AppTypeRegistry;
 use bevy::ecs::world::World;
-use bevy::scene::serde::SceneDeserializer;
-use bevy::scene::serde::SceneSerializer;
 use bevy::scene::DynamicScene;
-use serde::de::DeserializeSeed;
 use serde::Deserialize;
 use serde::Serialize;
-use std::marker::PhantomData;
 
 #[derive(Serialize, Deserialize)]
 pub struct DynGraphSerde<T: ActionTypes> {
 	#[serde(bound = "")]
-	scene: GraphSceneSerde<T>,
+	scene: BeetSceneSerde<T>,
 	root: Entity,
 }
 
@@ -21,14 +16,14 @@ impl<T: ActionTypes> DynGraphSerde<T> {
 	pub fn from_dyn_graph(graph: &DynGraph) -> Self {
 		let scene = DynamicScene::from_world(&graph.world().read());
 		Self {
-			scene: GraphSceneSerde::new(scene),
+			scene: BeetSceneSerde::new(scene),
 			root: graph.root(),
 		}
 	}
 
 	pub fn into_dyn_graph(&self) -> anyhow::Result<DynGraph> {
 		let mut world = World::new();
-		world.insert_resource(GraphSceneSerde::<T>::type_registry());
+		world.insert_resource(BeetSceneSerde::<T>::type_registry());
 		// let dyn_graph = DynGraph::new(node)
 		let mut entity_map = Default::default();
 		self.scene
@@ -49,54 +44,6 @@ impl<T: ActionTypes> Into<DynGraph> for DynGraphSerde<T> {
 	fn into(self) -> DynGraph { self.into_dyn_graph().unwrap() }
 }
 
-/// Basic serde functionality for a scene
-pub struct GraphSceneSerde<T: ActionTypes> {
-	pub scene: DynamicScene,
-	phantom: PhantomData<T>,
-}
-
-impl<T: ActionTypes> GraphSceneSerde<T> {
-	pub fn new(scene: DynamicScene) -> Self {
-		Self {
-			scene,
-			phantom: PhantomData,
-		}
-	}
-	pub fn type_registry() -> AppTypeRegistry {
-		let registry = AppTypeRegistry::default();
-		append_beet_type_registry_with_generics::<T>(&registry);
-		registry
-	}
-}
-
-impl<T: ActionTypes> Serialize for GraphSceneSerde<T> {
-	fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-	where
-		S: serde::Serializer,
-	{
-		let registry = Self::type_registry();
-		let scene_serializer = SceneSerializer::new(&self.scene, &registry);
-		scene_serializer.serialize(serializer)
-	}
-}
-
-impl<'de, T: ActionTypes> Deserialize<'de> for GraphSceneSerde<T> {
-	fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-	where
-		D: serde::Deserializer<'de>,
-	{
-		let registry = Self::type_registry();
-		let scene_deserializer = SceneDeserializer {
-			type_registry: &registry.read(),
-		};
-		let scene = scene_deserializer.deserialize(deserializer)?;
-
-		Ok(Self {
-			scene,
-			phantom: PhantomData,
-		})
-	}
-}
 
 
 #[cfg(test)]

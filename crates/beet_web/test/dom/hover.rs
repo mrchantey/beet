@@ -5,7 +5,7 @@ use sweet::*;
 pub fn works() -> Result<()> {
 	append_html_for_tests();
 
-	DomSim::default()
+	DomSim::<BeeNode>::default()
 		.with_node(Hover::new(1., 0.01))
 		.run_forever()?;
 
