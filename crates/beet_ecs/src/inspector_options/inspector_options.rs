@@ -16,30 +16,6 @@ pub enum InspectorTarget {
 	},
 }
 
-/// Map of [`Target`]s to arbitrary [`TypeData`] used to control how the value is displayed, e.g. [`NumberOptions`](crate::inspector_options::std_options::NumberOptions).
-///
-/// Comes with a [derive macro](derive@InspectorOptions), which generates a `FromType<T> for InspectorOptions` impl:
-/// ```rust
-/// use bevy_inspector_egui::prelude::*;
-/// use bevy_reflect::Reflect;
-///
-/// #[derive(Reflect, Default, InspectorOptions)]
-/// #[reflect(InspectorOptions)]
-/// struct Config {
-///     #[inspector(min = 10.0, max = 70.0)]
-///     font_size: f32,
-///     option: Option<f32>,
-/// }
-/// ```
-/// will expand roughly to
-/// ```rust
-/// # use bevy_inspector_egui::inspector_options::{InspectorOptions, Target, std_options::NumberOptions};
-/// let mut options = InspectorOptions::default();
-/// let mut field_options = NumberOptions::default();
-/// field_options.min = 10.0.into();
-/// field_options.max = 70.0.into();
-/// options.insert(Target::Field(0usize), field_options);
-/// ```
 #[derive(Default)]
 pub struct InspectorOptions {
 	pub options: HashMap<InspectorTarget, Box<dyn TypeData>>,
@@ -113,24 +89,7 @@ where
 	}
 }
 
-/// Helper trait for the [`derive@InspectorOptions`] macro.
-///
-/// ```skip
-///     #[inspector(min = 0.0, max = 1.0)]
-///     field: f32
-/// ```
-/// will expand to this:
-/// ```rust
-/// # use std::convert::Into;
-/// # use bevy_inspector_egui::inspector_options::{InspectorOptions, InspectorOptionsType, Target};
-/// let mut options = InspectorOptions::default();
-/// let mut field_options =  <f32 as InspectorOptionsType>::DeriveOptions::default();
-/// field_options.min = Into::into(2.0);
-/// field_options.max = Into::into(3.0);
-/// options.insert(
-///     Target::Field(0usize),
-///     <f32 as InspectorOptionsType>::options_from_derive(field_options),
-/// );
+
 pub trait InspectorOptionsType {
 	type DeriveOptions: Default;
 	/// Can be arbitrary types which will be passed to [`InspectorEguiImpl`](crate::inspector_egui_impls::InspectorEguiImpl) like [`NumberOptions`](crate::inspector_options::std_options::NumberOptions),

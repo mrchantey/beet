@@ -11,7 +11,7 @@ test-core *args:
 	just watch 'cargo test -p beet_core $BEET_CARGO_TEST --lib -- --nocapture {{args}}'
 
 test-ecs *args:
-	just watch 'cargo test -p beet_ecs $BEET_CARGO_TEST --lib -- --nocapture {{args}}'
+	just watch 'cargo test -p beet_ecs $BEET_CARGO_TEST --doc -- --nocapture {{args}}'
 
 test-web *args:
 	just test-wasm beet_web {{args}}

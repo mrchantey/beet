@@ -20,6 +20,7 @@ pub fn append_beet_type_registry(registry: &AppTypeRegistry) {
 	registry.register::<Running>();
 	registry.register::<RunTimer>();
 	registry.register::<BeetRoot>();
+	registry.register::<BeetPrefab>();
 	// registry.register::<Cow<str>>();
 	// todo!("test name works now")
 }

@@ -23,22 +23,6 @@ pub fn action_list(item: TokenStream) -> TokenStream {
 
 
 /// Minimal derives for an action, use to reduce boilerplate.
-///
-/// ```rust
-///
-/// #[derive_action]
-/// #[action(no_system)]
-/// struct MyStruct{}
-/// ```
-///
-/// is the same as this:
-/// ```rust
-/// #[derive(Debug, Clone, Component, Reflect, Action)]
-///	#[reflect(Component)]
-///	#[action(no_system)]
-/// struct MyStruct{}
-/// ```
-///
 #[proc_macro_attribute]
 pub fn derive_action(attr: TokenStream, item: TokenStream) -> TokenStream {
 	parse_derive_action(attr, item)

@@ -9,6 +9,11 @@ use std::fmt;
 #[reflect(Component)]
 pub struct BeetRoot;
 
+/// Marker to identify this graph is a prefab
+#[derive(Debug, Default, Component, Reflect)]
+#[reflect(Component)]
+pub struct BeetPrefab;
+
 
 /// Temporary name holder, it seems theres a bug with bevy [`Name`], cow and reflect
 #[derive(Debug, Clone, Default, Component, Reflect, PartialEq)]
