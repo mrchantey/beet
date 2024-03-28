@@ -73,13 +73,11 @@ impl<T: ActionList> DomSim<T> {
 		Ok(())
 	}
 
-
-	#[must_use]
-	pub fn run_with_channel(
+	pub fn into_app(
 		self,
 		send: Sender<DomSimMessage>,
 		recv: Receiver<DomSimMessage>,
-	) -> Result<AnimationFrame> {
+	) -> Result<App> {
 		for _ in 0..self.bees {
 			send.send(DomSimMessage::SpawnBeeFromFirstNode)?;
 		}
@@ -121,6 +119,17 @@ impl<T: ActionList> DomSim<T> {
 			.add_systems(Update, auto_flowers_spawn);
 		}
 
+		Ok(app)
+	}
+
+
+	#[must_use]
+	pub fn run_with_channel(
+		self,
+		send: Sender<DomSimMessage>,
+		recv: Receiver<DomSimMessage>,
+	) -> Result<AnimationFrame> {
+		let mut app = self.into_app(send, recv)?;
 		let frame = AnimationFrame::new(move || {
 			app.update();
 		});

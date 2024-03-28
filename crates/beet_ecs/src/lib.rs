@@ -12,7 +12,6 @@ pub mod reflect;
 pub mod test;
 pub mod tree;
 
-// pub mod ui;
 
 // currently required for action_list! macro to work
 extern crate self as beet;
@@ -33,7 +32,6 @@ pub mod prelude {
 	#[cfg(test)]
 	pub use crate::test::*;
 	pub use crate::tree::*;
-	// pub use crate::ui::*;
 	pub use beet_ecs_macros::*;
 }
 

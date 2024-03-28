@@ -4,11 +4,10 @@ use bevy::prelude::*;
 use bevy::reflect::Access;
 
 impl FieldIdent {
-	pub fn tree(
+	pub fn children(
 		&self,
 		world: &World,
-		name: Option<String>,
-	) -> Result<Tree<(Option<String>, FieldIdent)>> {
+	) -> Result<Vec<(Option<String>, FieldIdent)>> {
 		self.map(world, move |field| {
 			let children = match field.reflect_ref() {
 				bevy::reflect::ReflectRef::List(val) => {
@@ -36,16 +35,24 @@ impl FieldIdent {
 					vec![]
 				}
 			};
-
-			let children = children
-				.into_iter()
-				.map(|(name, field)| field.tree(world, name))
-				.collect::<Result<Vec<_>>>()?;
-
-
-			Ok(Tree::new_with_children((name, self.clone()), children))
+			Ok(children)
 		})
 		.flatten()
+	}
+
+	pub fn tree(
+		&self,
+		world: &World,
+		name: Option<String>,
+	) -> Result<Tree<(Option<String>, FieldIdent)>> {
+		let children = self.children(world)?;
+
+		let children = children
+			.into_iter()
+			.map(|(name, field)| field.tree(world, name))
+			.collect::<Result<Vec<_>>>()?;
+
+		Ok(Tree::new_with_children((name, self.clone()), children))
 	}
 }
 
