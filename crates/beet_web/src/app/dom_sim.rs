@@ -14,6 +14,7 @@ use std::sync::Arc;
 use std::sync::RwLock;
 use std::time::Duration;
 use web_sys::HtmlDivElement;
+use web_sys::HtmlElement;
 
 pub struct DomSim<T: ActionList> {
 	pub scene: DynamicScene,
@@ -111,7 +112,8 @@ impl<T: ActionList> DomSim<T> {
 			.write_to_world(&mut app.world, &mut Default::default())?;
 
 		if let Some(container) = self.test_container {
-			app.insert_non_send_resource(DomRenderer::new(container));
+			let container: &HtmlElement = &container;
+			app.insert_non_send_resource(DomRenderer::new(container.clone()));
 		}
 
 		if let Some(duration) = self.auto_flowers {

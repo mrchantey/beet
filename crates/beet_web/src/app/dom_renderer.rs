@@ -4,6 +4,7 @@ use bevy::utils::HashMap;
 use forky_web::DocumentExt;
 use web_sys::Document;
 use web_sys::HtmlDivElement;
+use web_sys::HtmlElement;
 
 pub fn has_renderer(world: &World) -> bool {
 	world.get_non_send_resource::<DomRenderer>().is_some()
@@ -17,12 +18,12 @@ pub struct HasElement;
 
 #[derive(Clone)]
 pub struct DomRenderer {
-	pub container: HtmlDivElement,
+	pub container: HtmlElement,
 	pub elements: HashMap<Entity, HtmlDivElement>,
 }
 
 impl DomRenderer {
-	pub fn new(container: HtmlDivElement) -> Self {
+	pub fn new(container: HtmlElement) -> Self {
 		Self {
 			container,
 			elements: HashMap::default(),
@@ -61,13 +62,17 @@ pub fn create_elements(
 
 
 pub fn remove_renderer(world: &mut World) {
-	world.remove_non_send_resource::<DomRenderer>();
 	for entity in world
 		.query_filtered::<Entity, With<HasElement>>()
 		.iter(world)
 		.collect::<Vec<_>>()
 	{
 		world.entity_mut(entity).remove::<HasElement>();
+	}
+	if let Some(renderer) = world.remove_non_send_resource::<DomRenderer>() {
+		for el in renderer.elements.values() {
+			el.remove();
+		}
 	}
 }
 
@@ -79,7 +84,7 @@ pub fn trigger_transform_change(world: &mut World) {
 	}
 }
 
-pub fn add_renderer(world: &mut World, container: HtmlDivElement) {
-	world.insert_non_send_resource(DomRenderer::new(container));
+pub fn add_renderer(world: &mut World, container: &HtmlElement) {
+	world.insert_non_send_resource(DomRenderer::new(container.clone()));
 	trigger_transform_change(world);
 }

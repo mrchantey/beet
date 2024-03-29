@@ -24,7 +24,7 @@ pub fn test_container_listener(app: Arc<RwLock<App>>) {
 			container.set_class_name("dom-sim-container");
 			root.prepend_with_node_1(&container).unwrap();
 
-			add_renderer(&mut app.write().unwrap().world, container);
+			add_renderer(&mut app.write().unwrap().world, &container);
 		}
 	})
 	.forget();
