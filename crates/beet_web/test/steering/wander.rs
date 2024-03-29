@@ -6,6 +6,7 @@ use sweet::*;
 pub async fn works() -> Result<()> {
 	append_html_for_tests();
 	DomSim::<BeeNode>::default()
+		.with_test_container(render_container())
 		.with_node(Wander)
 		.run_forever()?;
 

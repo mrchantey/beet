@@ -5,29 +5,22 @@ use web_sys::HtmlElement;
 
 
 
+
 pub fn update_positions(
-	elements: NonSend<DomSimElements>,
-	query: Query<
-		(Entity, &Transform),
-		(With<DomSimEntity>, Changed<Transform>),
-	>,
+	renderer: NonSend<DomRenderer>,
+	query: Query<(Entity, &Transform), (With<HasElement>, Changed<Transform>)>,
 ) {
 	for (entity, transform) in query.iter() {
-		if let Some(element) = elements.get(&entity) {
+		if let Some(element) = renderer.elements.get(&entity) {
 			let position = transform.translation.xy();
-			set_position(&element, position);
+			set_position(&renderer.container, &element, position);
 		}
 	}
 }
 
-pub fn set_position(el: &HtmlElement, position: Vec2) {
-	let Some(parent) = get_entities_container() else {
-		// log::warn!("parent not found when setting position");
-		return;
-	};
-
-	let parent_width = parent.client_width() as f32;
-	let parent_height = parent.client_height() as f32;
+pub fn set_position(container: &HtmlElement, el: &HtmlElement, position: Vec2) {
+	let parent_width = container.client_width() as f32;
+	let parent_height = container.client_height() as f32;
 	let child_width = el.client_width() as f32;
 	let child_height = el.client_height() as f32;
 

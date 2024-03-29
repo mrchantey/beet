@@ -3,28 +3,23 @@ use anyhow::Result;
 use base64::engine::general_purpose;
 use base64::Engine;
 use beet::prelude::*;
-use bevy::ecs as bevy_ecs;
 use bevy::prelude::*;
-use bevy::utils::HashMap;
 use flume::Receiver;
 use flume::Sender;
 use forky_web::AnimationFrame;
 use forky_web::History;
 use forky_web::SearchParams;
 use std::marker::PhantomData;
+use std::sync::Arc;
+use std::sync::RwLock;
 use std::time::Duration;
 use web_sys::HtmlDivElement;
-
-#[derive(Component)]
-pub struct DomSimEntity;
-
-#[derive(Clone, Default, Deref, DerefMut)]
-pub struct DomSimElements(pub HashMap<Entity, HtmlDivElement>);
 
 pub struct DomSim<T: ActionList> {
 	pub scene: DynamicScene,
 	pub auto_flowers: Option<Duration>,
 	pub bees: usize,
+	pub test_container: Option<HtmlDivElement>,
 	pub flowers: usize,
 	pub basic_ui: bool,
 	pub phantom: PhantomData<T>,
@@ -36,6 +31,7 @@ impl<T: ActionList> Default for DomSim<T> {
 			scene: forage().into_scene::<T>(),
 			auto_flowers: None,
 			basic_ui: true,
+			test_container: None,
 			bees: 1,
 			flowers: 1,
 			phantom: PhantomData,
@@ -46,8 +42,11 @@ impl<T: ActionList> Default for DomSim<T> {
 
 impl<T: ActionList> DomSim<T> {
 	pub fn with_node<M>(mut self, node: impl IntoBeetBuilder<M>) -> Self {
-		let node = node.into_beet_builder();
-		self.scene = node.into_scene::<T>();
+		self.scene = node.into_beet_builder().as_prefab().into_scene::<T>();
+		self
+	}
+	pub fn with_test_container(mut self, container: HtmlDivElement) -> Self {
+		self.test_container = Some(container);
 		self
 	}
 	pub fn with_url_params(mut self) -> Self {
@@ -98,18 +97,22 @@ impl<T: ActionList> DomSim<T> {
 			.add_plugins(DefaultBeetPlugins::<T>::new())
 			.insert_resource(DomSimMessageSend(send))
 			.insert_resource(DomSimMessageRecv(recv))
-			.insert_non_send_resource(DomSimElements::default())
 			.add_systems(Update,(
 				message_handler.pipe(log_error),
-				update_positions
+				create_elements.run_if(has_renderer),
+				// apply_deferred,
+				update_positions.run_if(has_renderer),
+				despawn_elements.run_if(has_renderer),
 			).chain()
-			)
-			.add_systems(Update, despawn_elements)
+		)
 		/*-*/;
 
 		self.scene
 			.write_to_world(&mut app.world, &mut Default::default())?;
 
+		if let Some(container) = self.test_container {
+			app.insert_non_send_resource(DomRenderer::new(container));
+		}
 
 		if let Some(duration) = self.auto_flowers {
 			app.insert_resource(AutoFlowers(Timer::new(
@@ -129,14 +132,23 @@ impl<T: ActionList> DomSim<T> {
 		send: Sender<DomSimMessage>,
 		recv: Receiver<DomSimMessage>,
 	) -> Result<AnimationFrame> {
-		let mut app = self.into_app(send, recv)?;
+		let test_container = self.test_container.is_some();
+
+		let app = self.into_app(send, recv)?;
+		let app = Arc::new(RwLock::new(app));
+
+		if test_container {
+			test_container_listener(app.clone());
+		}
+
 		let frame = AnimationFrame::new(move || {
-			app.update();
+			app.write().unwrap().update();
 		});
 
 		Ok(frame)
 	}
 }
+
 
 pub fn get_scene_url_param<T: ActionTypes>() -> Result<Option<DynamicScene>> {
 	if let Some(tree) = SearchParams::get("scene") {

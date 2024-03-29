@@ -6,14 +6,8 @@ use bevy::prelude::*;
 use flume::Receiver;
 use flume::Sender;
 use forky_bevy::extensions::Vec3Ext;
-use forky_web::DocumentExt;
-use web_sys::Document;
-use web_sys::Element;
-use web_sys::HtmlDivElement;
 
-pub fn get_entities_container() -> Option<HtmlDivElement> {
-	Document::x_query_selector::<HtmlDivElement>(".dom-sim-container")
-}
+
 
 
 #[derive(Clone)]
@@ -23,14 +17,6 @@ pub enum DomSimMessage {
 	SpawnFlower,
 	DespawnAll,
 	Resize,
-}
-
-impl DomSimMessage {
-	// pub fn set_graph<M>(node: impl IntoBeetBuilder<M>) -> DomSimMessage {
-	// 	DomSimMessage::SetGraph(
-	// 		node.into_beet_builder().into_graph::<BeeNode>(),
-	// 	)
-	// }
 }
 
 #[derive(Resource, Deref, DerefMut)]
@@ -57,25 +43,17 @@ pub fn message_handler(world: &mut World) -> Result<()> {
 			DomSimMessage::SpawnBee(node) => spawn_bee(world, node)?,
 			DomSimMessage::SpawnFlower => spawn_flower(world),
 			DomSimMessage::DespawnAll => {
-				let mut elements =
-					world.non_send_resource_mut::<DomSimElements>();
-				for (entity, el) in std::mem::take(&mut elements.0).into_iter()
+				// dont despawn everything, we need the graph
+				for entity in world
+					.query_filtered::<Entity, With<Transform>>()
+					.iter(world)
+					.collect::<Vec<_>>()
 				{
-					el.remove();
 					world.despawn(entity);
 				}
 			}
-			// DomSimMessage::SetGraph(graph) => {
-			// 	*world.resource_mut::<DynGraph>() = graph;
-			// }
 			DomSimMessage::Resize => {
-				let elements =
-					world.non_send_resource::<DomSimElements>().clone();
-				for (entity, _) in elements.0.into_iter() {
-					let mut entity = world.entity_mut(entity);
-					let _changed =
-						entity.get_mut::<Transform>().unwrap().as_mut();
-				}
+				trigger_transform_change(world);
 			}
 		}
 	}
@@ -123,26 +101,14 @@ fn spawn(
 	position: Vec3,
 ) -> Entity {
 	let entity = world
-		.spawn((DomSimEntity, Name::new(name.into()), TransformBundle {
-			local: Transform::from_translation(position),
-			..default()
-		}))
+		.spawn((
+			Name::new(name.into()),
+			DomText(text.into()),
+			TransformBundle {
+				local: Transform::from_translation(position),
+				..default()
+			},
+		))
 		.id();
-
-	if let Some(parent_el) = get_entities_container() {
-		let child_el = create_dom_entity(&parent_el, &text.into());
-
-		world
-			.non_send_resource_mut::<DomSimElements>()
-			.insert(entity, child_el);
-	}
 	entity
-}
-
-fn create_dom_entity(parent: &Element, text: &str) -> HtmlDivElement {
-	let div = Document::x_create_div();
-	div.set_inner_text(text);
-	div.set_class_name("entity");
-	parent.append_child(&div).unwrap();
-	div
 }

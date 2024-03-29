@@ -19,18 +19,14 @@ impl BeetNode {
 			.collect()
 	}
 
-	/// SrcWorld will not be mutated, but querystate doesnt have non-mutable option
 	pub fn deep_clone(self, world: &mut World) -> Result<Self> {
 		let entities = Edges::collect_world(*self, world);
 		let scene = DynamicSceneBuilder::from_world(world)
 			.extract_entities(entities.into_iter())
 			.build();
-
-		let mut entity_map = EntityHashMap::default();
-		scene.write_to_world(world, &mut entity_map)?;
-
-		Ok(Self::new(entity_map[&*self]))
+		self.clone_inner(world, scene)
 	}
+	/// `src_world` will not be mutated, but querystate doesnt have non-mutable option
 	pub fn deep_clone_to_dest(
 		self,
 		src_world: &mut World,
@@ -40,11 +36,20 @@ impl BeetNode {
 		let scene = DynamicSceneBuilder::from_world(src_world)
 			.extract_entities(entities.into_iter())
 			.build();
+		self.clone_inner(dst_world, scene)
+	}
 
+	fn clone_inner(
+		self,
+		world: &mut World,
+		scene: DynamicScene,
+	) -> Result<Self> {
 		let mut entity_map = EntityHashMap::default();
-		scene.write_to_world(dst_world, &mut entity_map)?;
+		scene.write_to_world(world, &mut entity_map)?;
+		let new_root = entity_map[&*self];
+		world.entity_mut(new_root).remove::<BeetPrefab>();
 
-		Ok(Self::new(entity_map[&*self]))
+		Ok(Self::new(new_root))
 	}
 
 	pub fn bind_agent(self, world: &mut World, agent: Entity) {

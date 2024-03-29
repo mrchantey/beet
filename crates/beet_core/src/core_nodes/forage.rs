@@ -3,7 +3,7 @@ use beet_ecs::prelude::*;
 use bevy::core::Name;
 use bevy::math::Vec3;
 
-
+/// A useful default prefab
 pub fn forage() -> BeetBuilder {
 	let awareness_radius = 0.5;
 
@@ -42,4 +42,5 @@ pub fn forage() -> BeetBuilder {
 					DespawnSteerTarget::default(),
 				)),
 		)
+		.as_prefab()
 }
