@@ -2,8 +2,8 @@ use crate::prelude::*;
 use bevy::app::App;
 use forky_web::DocumentExt;
 use forky_web::HtmlEventListener;
+use parking_lot::RwLock;
 use std::sync::Arc;
-use std::sync::RwLock;
 use web_sys::Document;
 use web_sys::HtmlDivElement;
 use web_sys::KeyboardEvent;
@@ -15,7 +15,7 @@ pub fn test_container_listener(app: Arc<RwLock<App>>) {
 			Document::x_query_selector::<HtmlDivElement>(".dom-sim-container")
 		{
 			el.remove();
-			remove_renderer(&mut app.write().unwrap().world);
+			remove_renderer(&mut app.write().world_mut());
 		} else {
 			let root =
 				Document::x_query_selector::<HtmlDivElement>(".container")
@@ -24,7 +24,7 @@ pub fn test_container_listener(app: Arc<RwLock<App>>) {
 			container.set_class_name("dom-sim-container");
 			root.prepend_with_node_1(&container).unwrap();
 
-			add_renderer(&mut app.write().unwrap().world, &container);
+			add_renderer(&mut app.write().world_mut(), &container);
 		}
 	})
 	.forget();

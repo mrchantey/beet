@@ -58,3 +58,22 @@ impl<'de, T: ActionTypes> Deserialize<'de> for BeetSceneSerde<T> {
 		})
 	}
 }
+
+
+#[cfg(test)]
+mod test {
+	use crate::prelude::*;
+	use anyhow::Result;
+	use sweet::*;
+
+	#[test]
+	fn works() -> Result<()> {
+		expect(true).to_be_false()?;
+
+		todo!("see comment");
+		//BeetSceneSerde::new should accept a world
+		// it will provide a SceneFilter to SceneBuilder::with_filter
+
+		Ok(())
+	}
+}

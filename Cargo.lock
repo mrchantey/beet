@@ -482,6 +482,7 @@ dependencies = [
  "futures",
  "js-sys",
  "log",
+ "parking_lot",
  "serde",
  "serde_json",
  "sweet",

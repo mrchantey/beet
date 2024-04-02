@@ -9,9 +9,9 @@ use flume::Sender;
 use forky_web::AnimationFrame;
 use forky_web::History;
 use forky_web::SearchParams;
+use parking_lot::RwLock;
 use std::marker::PhantomData;
 use std::sync::Arc;
-use std::sync::RwLock;
 use std::time::Duration;
 use web_sys::HtmlDivElement;
 use web_sys::HtmlElement;
@@ -144,16 +144,16 @@ impl<T: ActionList> DomSim<T> {
 		}
 
 		let frame = AnimationFrame::new(move || {
-			app.write().unwrap().update();
+			app.try_write().map(|mut a| a.update());
 		});
 
 		Ok(frame)
 	}
 }
-
+const SCENE_PARAM: &str = "scene";
 
 pub fn get_scene_url_param<T: ActionTypes>() -> Result<Option<DynamicScene>> {
-	if let Some(tree) = SearchParams::get("scene") {
+	if let Some(tree) = SearchParams::get(SCENE_PARAM) {
 		let bytes = general_purpose::STANDARD_NO_PAD.decode(tree.as_bytes())?;
 		let scene: BeetSceneSerde<T> = bincode::deserialize(&bytes)?;
 		Ok(Some(scene.scene))
@@ -162,12 +162,11 @@ pub fn get_scene_url_param<T: ActionTypes>() -> Result<Option<DynamicScene>> {
 	}
 }
 
-
 const MAX_URL_LENGTH: usize = 1900;
 pub fn set_scene_url_param<T: ActionTypes>(world: &World) -> Result<()> {
 	let scene = DynamicScene::from_world(world);
 	let serde = BeetSceneSerde::<T>::new(scene);
-	let val = bincode::serialize(&serde).unwrap();
+	let val = bincode::serialize(&serde)?;
 	let val = general_purpose::STANDARD_NO_PAD.encode(val);
 	if val.len() > MAX_URL_LENGTH {
 		anyhow::bail!(
@@ -176,7 +175,7 @@ pub fn set_scene_url_param<T: ActionTypes>(world: &World) -> Result<()> {
 			MAX_URL_LENGTH
 		);
 	}
-	History::set_param("graph", &val);
+	History::set_param(SCENE_PARAM, &val);
 	Ok(())
 }
 
