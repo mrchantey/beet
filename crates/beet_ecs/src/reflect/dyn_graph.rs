@@ -200,7 +200,7 @@ impl DynGraph {
 		let Some(mut entity) = world.get_entity_mut(entity) else {
 			anyhow::bail!("entity not found: {entity:?}")
 		};
-		unsafe { entity.remove_by_id(component_id) };
+		entity.remove_by_id(component_id);
 
 		Ok(())
 	}

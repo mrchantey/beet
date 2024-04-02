@@ -78,7 +78,7 @@ mod test {
 		let mut app = App::new();
 		app.add_plugins(BeetSystemsPlugin::<EcsNode, _>::default());
 
-		let target = app.world.spawn_empty().id();
+		let target = app.world_mut().spawn_empty().id();
 
 		let tree = ScoreSelector
 			.child((
@@ -91,7 +91,7 @@ mod test {
 				SetOnStart(Score::Pass),
 				InsertOnRun(RunResult::Success),
 			))
-			.spawn(&mut app.world, target);
+			.spawn(app.world_mut(), target);
 
 		(app, tree)
 	}
@@ -102,7 +102,7 @@ mod test {
 		let (mut app, tree) = setup();
 
 		app.update();
-		expect(tree.component_tree(&app.world)).to_be(
+		expect(tree.component_tree(app.world())).to_be(
 			Tree::new(Some(&Running))
 				.with_leaf(None)
 				.with_leaf(Some(&Running)),
@@ -110,18 +110,18 @@ mod test {
 
 
 		app.update();
-		expect(tree.component_tree(&app.world)).to_be(
+		expect(tree.component_tree(app.world())).to_be(
 			Tree::new(Some(&RunResult::Success))
 				.with_leaf(None)
 				.with_leaf(Some(&RunResult::Success)),
 		)?;
 
-		expect(tree.component_tree::<Running>(&app.world))
+		expect(tree.component_tree::<Running>(app.world()))
 			.to_be(Tree::new(None).with_leaf(None).with_leaf(None))?;
 
 		app.update();
 
-		expect(tree.component_tree::<RunResult>(&app.world))
+		expect(tree.component_tree::<RunResult>(app.world()))
 			.to_be(Tree::new(None).with_leaf(None).with_leaf(None))?;
 
 		Ok(())

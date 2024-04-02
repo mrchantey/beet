@@ -121,13 +121,13 @@ mod test {
 		let mut app = App::new();
 		app.register_type::<MyVecStruct>();
 
-		let entity = app.world.spawn(MyVecStruct(Vec3::default())).id();
+let entity = app.world_mut().spawn(MyVecStruct(Vec3::default())).id();
 
 
 		let field = ComponentIdent::new(entity, TypeId::of::<MyVecStruct>())
 			.into_field();
 
-		let tree = field.tree(&app.world, None)?;
+		let tree = field.tree(app.world(), None)?;
 
 		expect(tree.children.len()).to_be(1)?;
 		expect(tree.children[0].children.len()).to_be(3)?;

@@ -70,7 +70,7 @@ mod test {
 		.insert_time();
 
 		let agent = app
-			.world
+			.world_mut()
 			.spawn((
 				TransformBundle::default(),
 				ForceBundle::default(),
@@ -78,7 +78,7 @@ mod test {
 			))
 			.id();
 
-		Seek.into_beet_builder().spawn(&mut app.world, agent);
+		Seek.into_beet_builder().spawn(app.world_mut(), agent);
 
 		app.update();
 		app.update_with_secs(1);

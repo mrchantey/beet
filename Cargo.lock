@@ -516,6 +516,7 @@ dependencies = [
  "bevy_reflect",
  "bevy_tasks",
  "bevy_utils",
+ "console_error_panic_hook",
  "downcast-rs",
  "thiserror",
  "wasm-bindgen",
@@ -664,7 +665,6 @@ dependencies = [
  "bevy_input",
  "bevy_log",
  "bevy_math",
- "bevy_panic_handler",
  "bevy_ptr",
  "bevy_reflect",
  "bevy_scene",
@@ -707,14 +707,6 @@ dependencies = [
  "rand",
  "serde",
  "thiserror",
-]
-
-[[package]]
-name = "bevy_panic_handler"
-version = "0.14.0-dev"
-dependencies = [
- "bevy_app",
- "console_error_panic_hook",
 ]
 
 [[package]]

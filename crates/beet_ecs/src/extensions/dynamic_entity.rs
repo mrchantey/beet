@@ -58,19 +58,19 @@ mod test {
 	fn works() -> Result<()> {
 		let mut app = App::new();
 		app.register_type::<NodeName>();
-		let entity_id = app.world.spawn(NodeName::new("Bob")).id();
-		let mut entity = DynamicEntity::new(&app.world, entity_id)?;
+		let entity_id = app.world_mut().spawn(NodeName::new("Bob")).id();
+		let mut entity = DynamicEntity::new(app.world(), entity_id)?;
 		expect(entity.components.len()).to_be(1)?;
 		let name = node_name(&entity);
 		expect(name.as_str()).to_be("Bob")?;
 
 		entity.components[0].apply(&NodeName::new("Alice"));
 
-		expect(&app.world)
+		expect(app.world())
 			.component(entity_id)?
 			.to_be(&NodeName::new("Bob"))?;
-		entity.apply(&mut app.world)?;
-		expect(&app.world)
+		entity.apply(app.world_mut())?;
+		expect(app.world())
 			.component(entity_id)?
 			.to_be(&NodeName::new("Alice"))?;
 

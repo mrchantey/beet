@@ -19,12 +19,16 @@
 - [big-brain](https://crates.io/crates/big-brain)
 - State machines - [seldom_state](https://crates.io/crates/seldom_state)
 - Behavior trees - [bevior_tree](https://crates.io/crates/bevior_tree)
-### Other
 
+### Ros2
+- [ros 2 wasm](https://ros2wasm.dev/)
+	- [intro video](https://vimeo.com/879001638)
+- [Ros On Web](https://rosonweb.io/)
+
+### Other
 - C++ - [BehaviorTree.cpp](https://www.behaviortree.dev/)
 - Godot - [beehave](https://bitbra.in/beehave/#/)
 
-Godot library
 
 ## Misc
 

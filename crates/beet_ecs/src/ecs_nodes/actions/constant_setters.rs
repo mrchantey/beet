@@ -107,11 +107,13 @@ mod test {
 		let mut app = App::new();
 		app.add_plugins(BeetSystemsPlugin::<EcsNode, _>::default());
 
-		let target = app.world.spawn_empty().id();
+		let target = app.world_mut().spawn_empty().id();
 		let actions = test_constant_behavior_tree();
-		let root = actions.spawn(&mut app.world, target).value;
+		let root = actions.spawn(app.world_mut(), target).value;
 
-		app.world.entity_mut(root).insert(SetOnStart(Score::Pass));
+		app.world_mut()
+			.entity_mut(root)
+			.insert(SetOnStart(Score::Pass));
 
 		expect(&app).component(root)?.to_be(&Score::Fail)?;
 		app.update();

@@ -109,7 +109,7 @@ impl<T: ActionList> DomSim<T> {
 		/*-*/;
 
 		self.scene
-			.write_to_world(&mut app.world, &mut Default::default())?;
+			.write_to_world(app.world_mut(), &mut Default::default())?;
 
 		if let Some(container) = self.test_container {
 			let container: &HtmlElement = &container;

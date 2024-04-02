@@ -59,7 +59,7 @@ mod test {
 		.insert_time();
 
 		let agent = app
-			.world
+			.world_mut()
 			.spawn((
 				TransformBundle::default(),
 				ForceBundle::default(),
@@ -69,7 +69,7 @@ mod test {
 
 		Wander::default()
 			.into_beet_builder()
-			.spawn(&mut app.world, agent);
+			.spawn(app.world_mut(), agent);
 
 		app.update();
 		app.update_with_secs(1);

@@ -290,9 +290,9 @@ mod test {
 	#[test]
 	fn default_components() -> Result<()> {
 		let mut app = App::new();
-		let target = app.world.spawn_empty().id();
+		let target = app.world_mut().spawn_empty().id();
 		let actions = test_constant_behavior_tree();
-		let root = actions.spawn(&mut app.world, target).value;
+		let root = actions.spawn(app.world_mut(), target).value;
 
 		expect(&app).to_have_component::<SetOnStart<Score>>(root)?;
 		expect(&app).to_have_component::<TargetAgent>(root)?;

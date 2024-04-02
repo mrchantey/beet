@@ -88,14 +88,14 @@ mod test {
 		let mut app = App::new();
 
 		app.add_systems(PreUpdate, ComponentChangeRecv::system);
-		let registry = app.world.resource::<AppTypeRegistry>().clone();
+		let registry = app.world().resource::<AppTypeRegistry>().clone();
 		registry.write().register::<MyStruct>();
-		app.world.init_component::<MyStruct>();
+		app.world_mut().init_component::<MyStruct>();
 
 		let recv = ComponentChangeRecv::new(registry);
 		app.insert_resource(recv.clone());
 
-		let entity = app.world.spawn(MyStruct(0)).id();
+		let entity = app.world_mut().spawn(MyStruct(0)).id();
 		recv.send(entity, &MyStruct(2))?;
 		app.update();
 		expect(&app).component(entity)?.to_be(&MyStruct(2))?;

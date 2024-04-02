@@ -128,9 +128,9 @@ mod test {
 	fn works() -> Result<()> {
 		let mut app = App::new();
 
-		let child1 = app.world.spawn(Score::Fail).id();
+		let child1 = app.world_mut().spawn(Score::Fail).id();
 
-		let _parent = app.world.spawn(Edges::new().with_child(child1));
+		let _parent = app.world_mut().spawn(Edges::new().with_child(child1));
 		app.add_systems(Update, changes_score_to_pass);
 
 		expect(&app)

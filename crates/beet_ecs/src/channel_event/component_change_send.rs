@@ -135,14 +135,14 @@ mod test {
 		let mut app = App::new();
 
 		app.add_systems(PostUpdate, ComponentChangeSend::system);
-		let registry = app.world.resource::<AppTypeRegistry>().clone();
+		let registry = app.world().resource::<AppTypeRegistry>().clone();
 		registry.write().register::<MyStruct>();
-		app.world.init_component::<MyStruct>();
+		app.world_mut().init_component::<MyStruct>();
 
 		let send = ComponentChangeSend::new(registry);
 		app.insert_resource(send.clone());
 
-		let entity = app.world.spawn(MyStruct(2)).id();
+		let entity = app.world_mut().spawn(MyStruct(2)).id();
 
 		let val = mock_value();
 
@@ -155,7 +155,7 @@ mod test {
 		expect(&val).to_contain(MyStruct(2))?;
 		app.update();
 		expect(&val).to_be_empty()?;
-		app.world.entity_mut(entity).insert(MyStruct(3));
+		app.world_mut().entity_mut(entity).insert(MyStruct(3));
 		app.update();
 		expect(&val).to_contain(MyStruct(3))?;
 

@@ -34,13 +34,13 @@ mod test {
 		pretty_env_logger::try_init().ok();
 		let mut app = App::new();
 
-		let entity = app.world.spawn(MyStruct(7)).id();
-		app.world
+		let entity = app.world_mut().spawn(MyStruct(7)).id();
+		app.world()
 			.resource::<AppTypeRegistry>()
 			.write()
 			.register::<MyStruct>();
 
-		let reflects = reflect_entity(&app.world, entity);
+		let reflects = reflect_entity(app.world(), entity);
 
 		expect(reflects.len()).to_be(1)?;
 		let reflect = &reflects[0];

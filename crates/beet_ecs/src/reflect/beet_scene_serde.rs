@@ -35,6 +35,7 @@ impl<T: ActionTypes> Serialize for BeetSceneSerde<T> {
 		S: serde::Serializer,
 	{
 		let registry = Self::type_registry();
+		let registry = registry.read();
 		let scene_serializer = SceneSerializer::new(&self.scene, &registry);
 		scene_serializer.serialize(serializer)
 	}
