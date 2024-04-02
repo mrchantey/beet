@@ -73,11 +73,8 @@ impl ComponentUtils {
 		} else {
 			anyhow::bail!("entity not found: {entity:?}")
 		}
-		// let mut node = self.get_node(entity)?;
-		// node.components.push(DynComponent::new(new_value.as_ref()));
-		// self.set_node(node)?;
 	}
-	/// Expensive and awkward but we dont have a `world.entity().remove_by_id yet`
+
 	pub fn remove(
 		world: &mut World,
 		entity: Entity,

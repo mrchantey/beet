@@ -49,7 +49,7 @@ pub type SpawnFunc = Box<dyn FnOnce(&mut World) -> Entity>;
 pub trait BeetBundle: Bundle + Reflect + GetTypeRegistration {}
 impl<T: Bundle + Reflect + GetTypeRegistration> BeetBundle for T {}
 
-/// An opaque intermediary structure between a [`Bundle`] graph and a [`DynGraph`]
+/// An opaque intermediary structure between a [`Bundle`] graph and a [`BeetNode`]
 /// This does the following when build
 /// - Registers the bundle types
 /// - Spawns the entities
@@ -121,21 +121,11 @@ impl BeetBuilder {
 		EntityTree(tree)
 	}
 
-	pub fn into_dyn_graph<T: ActionList>(self) -> DynGraph {
-		DynGraph::new::<T>(self)
-	}
-
-	pub fn into_graph(self, world: &mut World) -> BeetNode {
+	pub fn into_node(self, world: &mut World) -> BeetNode {
 		let root = self.spawn_no_target(world).value;
 		BeetNode::new(root)
 	}
-	pub fn into_scene<T: ActionTypes>(self) -> DynamicScene {
-		let mut world = World::new();
-		//  not strictly nessecary, currently the builder registers types but that may change
-		world.insert_resource(BeetSceneSerde::<T>::type_registry());
-		self.spawn_no_target(&mut world);
-		DynamicScene::from_world(&world)
-	}
+
 
 	// TODO deprecate this in favor of an optional bundle
 	pub fn insert_default_components(
@@ -235,11 +225,9 @@ mod test {
 			Foobar,
 			SetOnStart::<Score>::default(),
 		));
-		let node = EmptyAction.child(
+		let _node = EmptyAction.child(
 			(EmptyAction, SetOnStart::<Score>::default()).child(EmptyAction),
 		);
-
-		let _val = node.into_dyn_graph::<EcsNode>();
 
 		Ok(())
 	}

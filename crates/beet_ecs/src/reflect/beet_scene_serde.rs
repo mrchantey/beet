@@ -1,8 +1,8 @@
 use crate::prelude::*;
-use bevy::ecs::reflect::AppTypeRegistry;
+use bevy::prelude::*;
 use bevy::scene::serde::SceneDeserializer;
 use bevy::scene::serde::SceneSerializer;
-use bevy::scene::DynamicScene;
+use bevy::utils::hashbrown::HashSet;
 use serde::de::DeserializeSeed;
 use serde::Deserialize;
 use serde::Serialize;
@@ -15,7 +15,24 @@ pub struct BeetSceneSerde<T: ActionTypes> {
 }
 
 impl<T: ActionTypes> BeetSceneSerde<T> {
-	pub fn new(scene: DynamicScene) -> Self {
+	pub fn new(world: &World) -> Self {
+		let registry = Self::type_registry();
+		let registry = registry.read();
+		let items = registry
+			.iter()
+			.map(|r| r.type_info().type_id())
+			.collect::<HashSet<_>>();
+
+		let scene = DynamicSceneBuilder::from_world(world)
+			.with_filter(SceneFilter::Allowlist(items))
+			.extract_entities(world.iter_entities().map(|entity| entity.id()))
+			.extract_resources()
+			.build();
+		Self::new_with(scene)
+	}
+
+
+	pub fn new_with(scene: DynamicScene) -> Self {
 		Self {
 			scene,
 			phantom: PhantomData,
@@ -60,19 +77,38 @@ impl<'de, T: ActionTypes> Deserialize<'de> for BeetSceneSerde<T> {
 }
 
 
+
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
 	use anyhow::Result;
+	use bevy::prelude::*;
 	use sweet::*;
 
 	#[test]
 	fn works() -> Result<()> {
-		expect(true).to_be_false()?;
+		let mut world = World::new();
+		world.insert_resource(BeetSceneSerde::<EcsNode>::type_registry());
+		let entity = world.spawn((EmptyAction, Transform::default())).id();
 
-		todo!("see comment");
-		//BeetSceneSerde::new should accept a world
-		// it will provide a SceneFilter to SceneBuilder::with_filter
+		let serde = BeetSceneSerde::<EcsNode>::new(&world);
+		let bin = bincode::serialize(&serde)?;
+		let serde = bincode::deserialize::<BeetSceneSerde<EcsNode>>(&bin)?;
+
+		let mut world2 = World::new();
+		world2.insert_resource(BeetSceneSerde::<EcsNode>::type_registry());
+
+		let mut hashmap = Default::default();
+		serde.scene.write_to_world(&mut world2, &mut hashmap)?;
+		let entity = hashmap[&entity];
+
+		expect(world2.entities().len()).to_be(1)?;
+		expect(&world2)
+			.not()
+			.to_have_component::<Transform>(entity)?;
+
+		expect(&world2)
+			.to_have_component::<EmptyAction>(entity)?;
 
 		Ok(())
 	}

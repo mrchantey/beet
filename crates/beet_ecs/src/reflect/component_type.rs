@@ -52,6 +52,7 @@ impl ComponentType {
 mod test {
 	use crate::prelude::*;
 	use anyhow::Result;
+	use bevy::ecs::world::World;
 	use std::any::TypeId;
 	use sweet::*;
 
@@ -59,11 +60,13 @@ mod test {
 	fn component_types() -> Result<()> {
 		pretty_env_logger::try_init().ok();
 
-		// Create a world and an entity
-		let graph = (EmptyAction.child((EmptyAction, SetOnRun(Score::Pass))))
-			.into_dyn_graph::<EcsNode>();
+		let mut world = World::new();
 
-		let types = graph.component_types();
+		let _graph = (EmptyAction.child((EmptyAction, SetOnRun(Score::Pass))))
+			.into_node(&mut world);
+
+		let types = ComponentType::from_world(&world);
+
 		expect(types.len()).to_be_greater_than(0)?;
 
 		// for ty in types.iter() {
