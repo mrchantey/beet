@@ -71,6 +71,11 @@ pub fn create_elements(
 }
 
 
+pub fn clear_world_with_dom_renderer(world: &mut World) {
+	world.clear_entities();
+	world.non_send_resource_mut::<DomRenderer>().clear();
+}
+
 pub fn remove_renderer(world: &mut World) {
 	for entity in world
 		.query_filtered::<Entity, With<HasElement>>()

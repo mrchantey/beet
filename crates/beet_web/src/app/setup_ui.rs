@@ -1,4 +1,4 @@
-use super::dom_renderer::DomRenderer;
+use super::dom_renderer::clear_world_with_dom_renderer;
 use super::scene_io::download_scene;
 use super::scene_io::upload_scene;
 use super::spawn::DomSimMessage;
@@ -70,8 +70,7 @@ fn upload_button(app: Arc<RwLock<App>>) {
 
 				let mut app = app.write();
 				let mut world = app.world_mut();
-				world.clear_entities();
-				world.non_send_resource_mut::<DomRenderer>().clear();
+				clear_world_with_dom_renderer(&mut world);
 				scene
 					.scene
 					.write_to_world(&mut world, &mut Default::default())
