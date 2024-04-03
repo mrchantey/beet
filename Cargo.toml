@@ -103,7 +103,7 @@ base64 = "0.22.0"
 # two requirements for back to release:
 # 1. recursive type registration https://github.com/bevyengine/bevy/tree/d3e44325b45daf13087a6fe7a425b1744b5f2379
 # 2. remove_by_id https://github.com/bevyengine/bevy/pull/9663
-bevy = { path = "../bevy", default-features = false, features = ["bevy_scene"] }
-# bevy = { git = "https://github.com/bevyengine/bevy.git", rev = "d3e44325b45daf13087a6fe7a425b1744b5f2379", default-features = false, features = [
-# 	"bevy_scene",
-# ] }
+# bevy = { path = "../bevy", default-features = false, features = ["bevy_scene"] }
+bevy = { git = "https://github.com/bevyengine/bevy.git", rev = "f516de456be2b65572de1af6956d52157663b9cc", default-features = false, features = [
+	"bevy_scene",
+] }
