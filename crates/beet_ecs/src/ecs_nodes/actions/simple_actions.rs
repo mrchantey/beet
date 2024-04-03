@@ -18,6 +18,5 @@ fn repeat(
 ) {
 	for (entity, _repeat) in query.iter_mut() {
 		commands.entity(entity).insert(Running);
-		log::info!("repeat");
 	}
 }

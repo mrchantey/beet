@@ -30,8 +30,6 @@ pub fn wrap_around(
 	mut query: Query<&mut Transform, (With<AgentMarker>, Changed<Transform>)>,
 ) {
 	for mut transform in query.iter_mut() {
-		// transform.translation = Vec3::ZERO;
-		// log::info!("pizza");
 		if transform.translation.x > wrap.half_extents.x {
 			transform.translation.x -= wrap.half_extents.x * 2.;
 		} else if transform.translation.x < -wrap.half_extents.x {

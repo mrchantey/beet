@@ -16,6 +16,9 @@ pub struct BeetSceneSerde<T: ActionTypes> {
 }
 
 impl<T: ActionTypes> BeetSceneSerde<T> {
+
+	/// Creates a [`DynamicScene`] from the world, including all entities
+	/// but no resources
 	pub fn new(world: &World) -> Self {
 		let registry = Self::type_registry();
 		let registry = registry.read();
@@ -23,8 +26,15 @@ impl<T: ActionTypes> BeetSceneSerde<T> {
 			.iter()
 			.map(|r| r.type_info().type_id())
 			.collect::<HashSet<_>>();
+		// let names = registry
+		// 	.iter()
+		// 	.map(|r| r.type_info().type_path_table().short_path())
+		// 	.collect::<Vec<_>>()
+		// 	.join("\n");
+		// log::info!("Allowed types: {}", names);
 
 		let scene = DynamicSceneBuilder::from_world(world)
+			.deny_all_resources()
 			.with_filter(SceneFilter::Allowlist(items))
 			.extract_entities(world.iter_entities().map(|entity| entity.id()))
 			.extract_resources()
@@ -84,6 +94,7 @@ mod test {
 	use crate::prelude::*;
 	use anyhow::Result;
 	use bevy::prelude::*;
+	use bevy::time::TimePlugin;
 	use sweet::*;
 
 
@@ -118,6 +129,28 @@ mod test {
 		expect(&world2)
 			.not()
 			.to_have_component::<MyStruct>(entity)?;
+
+		Ok(())
+	}
+
+	#[test]
+	fn works_with_app() -> Result<()> {
+		let mut app = App::new();
+
+
+		app /*-*/
+		.add_plugins(TimePlugin)
+		/*-*/;
+
+		let world = app.world_mut();
+		let entity = world.spawn_empty().id();
+		let tree = test_serde_tree();
+		tree.spawn(world, entity);
+		let scene = BeetSceneSerde::<EcsNode>::new(world);
+		let bin = bincode::serialize(&scene)?;
+		let scene2 = bincode::deserialize::<BeetSceneSerde<EcsNode>>(&bin)?;
+		let bin2 = bincode::serialize(&scene2)?;
+		expect(bin).to_be(bin2)?;
 
 		Ok(())
 	}

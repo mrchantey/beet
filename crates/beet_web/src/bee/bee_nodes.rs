@@ -7,7 +7,7 @@ use std::f32::consts::TAU;
 #[derive(Debug, Clone, ActionList)]
 #[actions(Hover,SetAgentOnRun::<Velocity>, CoreNode)]
 #[components(DomText)]
-pub struct BeeNode;
+pub struct BeetWebNode;
 
 
 #[derive_action]

@@ -22,7 +22,6 @@ pub struct DomSim<T: ActionList> {
 	pub bees: usize,
 	pub test_container: Option<HtmlDivElement>,
 	pub flowers: usize,
-	pub basic_ui: bool,
 	pub phantom: PhantomData<T>,
 }
 
@@ -31,7 +30,6 @@ impl<T: ActionList> Default for DomSim<T> {
 		Self {
 			scene: forage().into_scene(),
 			auto_flowers: None,
-			basic_ui: true,
 			test_container: None,
 			bees: 1,
 			flowers: 1,
@@ -77,7 +75,7 @@ impl<T: ActionList> DomSim<T> {
 		self,
 		send: Sender<DomSimMessage>,
 		recv: Receiver<DomSimMessage>,
-	) -> Result<App> {
+	) -> Result<Arc<RwLock<App>>> {
 		for _ in 0..self.bees {
 			send.send(DomSimMessage::SpawnBeeFromFirstNode)?;
 		}
@@ -87,16 +85,14 @@ impl<T: ActionList> DomSim<T> {
 
 		console_error_panic_hook::set_once();
 		console_log::init_with_level(log::Level::Info).ok();
-		if self.basic_ui {
-			setup_ui(send.clone());
-		}
+
 		let mut app = App::new();
 
 
 		app /*-*/
 			.add_plugins(BeetMinimalPlugin)
 			.add_plugins(DefaultBeetPlugins::<T>::new())
-			.insert_resource(DomSimMessageSend(send))
+			.insert_resource(DomSimMessageSend(send.clone()))
 			.insert_resource(DomSimMessageRecv(recv))
 			.add_systems(Update,(
 				message_handler.pipe(log_error),
@@ -131,6 +127,9 @@ impl<T: ActionList> DomSim<T> {
 			.add_systems(Update, auto_flowers_spawn);
 		}
 
+		let app = Arc::new(RwLock::new(app));
+
+
 		Ok(app)
 	}
 
@@ -143,10 +142,10 @@ impl<T: ActionList> DomSim<T> {
 	) -> Result<AnimationFrame> {
 		let test_container = self.test_container.is_some();
 
-		let app = self.into_app(send, recv)?;
-		let app = Arc::new(RwLock::new(app));
+		let app = self.into_app(send.clone(), recv)?;
 
 		if test_container {
+			setup_ui(send, app.clone());
 			test_container_listener(app.clone());
 		}
 

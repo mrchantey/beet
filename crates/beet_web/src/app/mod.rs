@@ -1,6 +1,9 @@
 pub mod auto_flowers;
 #[allow(unused_imports)]
 pub use self::auto_flowers::*;
+pub mod scene_io;
+#[allow(unused_imports)]
+pub use self::scene_io::*;
 pub mod dom_renderer;
 #[allow(unused_imports)]
 pub use self::dom_renderer::*;

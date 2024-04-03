@@ -18,6 +18,7 @@ fn wander(
 	)>,
 	query: Query<(&TargetAgent, &Wander), (With<Running>, With<Wander>)>,
 ) {
+	let num_agents = agents.iter().count();
 	for (agent, _) in query.iter() {
 		if let Some((
 			transform,
@@ -26,7 +27,9 @@ fn wander(
 			max_speed,
 			max_force,
 			mut impulse,
-		)) = agents.get_mut(**agent).ok_or(|e| log::warn!("{e}"))
+		)) = agents
+			.get_mut(**agent)
+			.ok_or(|e| log::warn!("wander - num agents: {num_agents}\n{e}",))
 		{
 			*impulse = wander_impulse(
 				&transform.translation,

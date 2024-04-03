@@ -13,3 +13,20 @@ pub fn test_no_action_behavior_tree() -> BeetBuilder {
 		.child(EmptyAction)
 		.child(EmptyAction.child(EmptyAction))
 }
+
+
+
+pub fn test_serde_tree() -> BeetBuilder {
+	BeetBuilder::new((
+		SetOnStart::<Score>::default(),
+		InsertOnRun::<RunResult>::default(),
+		// utility
+		EmptyAction::default(),
+		Repeat::default(),
+		SucceedInDuration::default(),
+		// selectors
+		SequenceSelector::default(),
+		FallbackSelector::default(),
+		ScoreSelector::default(),
+	))
+}

@@ -18,6 +18,7 @@ pub fn forage() -> BeetBuilder {
 			Score::default(),
 			SetOnStart(Score::Weight(0.5)),
 			Wander::default(),
+			SucceedInDuration::with_secs(1),
 		))
 		.child(
 			(

@@ -30,15 +30,16 @@ pub fn parse_derive_action(
 	.filter(|expr| !omits.contains(expr))
 	.collect::<Punctuated<Expr, Token![,]>>();
 
-	let reflects = vec![
+	let reflects: Vec<Expr> = vec![
 		parse_quote!(Default),
 		parse_quote!(Component),
 		parse_quote!(InspectorOptions),
 		parse_quote!(ActionMeta),
-	]
-	.into_iter()
-	.filter(|expr| !omits.contains(expr))
-	.collect::<Punctuated<Expr, Token![,]>>();
+	];
+	let reflects = reflects
+		.into_iter()
+		// .filter(|expr| !omits.contains(expr))
+		.collect::<Punctuated<Expr, Token![,]>>();
 
 	Ok(quote! {
 	use ::beet::prelude::*;

@@ -32,6 +32,13 @@ impl DomRenderer {
 			elements: HashMap::default(),
 		}
 	}
+
+	pub fn clear(&mut self) {
+		for el in self.elements.values() {
+			el.remove();
+		}
+		self.elements.clear();
+	}
 }
 
 #[derive(Resource)]
@@ -72,10 +79,9 @@ pub fn remove_renderer(world: &mut World) {
 	{
 		world.entity_mut(entity).remove::<HasElement>();
 	}
-	if let Some(renderer) = world.remove_non_send_resource::<DomRenderer>() {
-		for el in renderer.elements.values() {
-			el.remove();
-		}
+	if let Some(mut renderer) = world.remove_non_send_resource::<DomRenderer>()
+	{
+		renderer.clear();
 	}
 }
 
