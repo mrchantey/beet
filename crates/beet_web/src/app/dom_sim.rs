@@ -101,11 +101,17 @@ impl<T: ActionList> DomSim<T> {
 			.add_systems(Update,(
 				message_handler.pipe(log_error),
 				create_elements.run_if(has_renderer),
-				// apply_deferred,
+				)
+				.chain()
+				.before(PreTickSet)
+			)
+			.add_systems(Update,(
 				update_positions.run_if(has_renderer),
 				despawn_elements.run_if(has_renderer),
-			).chain()
-		)
+				)
+				.chain()
+				.after(PostTickSet)
+			)
 		/*-*/;
 
 		self.scene
