@@ -46,7 +46,7 @@ mod test {
 	fn node_name(entity: &DynamicEntity) -> String {
 		for component in entity.components.iter() {
 			if let Some(name) =
-				<NodeName as FromReflect>::from_reflect(component.as_ref())
+				<Name as FromReflect>::from_reflect(component.as_ref())
 			{
 				return name.to_string();
 			}
@@ -57,22 +57,22 @@ mod test {
 	#[test]
 	fn works() -> Result<()> {
 		let mut app = App::new();
-		app.register_type::<NodeName>();
-		let entity_id = app.world_mut().spawn(NodeName::new("Bob")).id();
+		app.register_type::<Name>();
+		let entity_id = app.world_mut().spawn(Name::new("Bob")).id();
 		let mut entity = DynamicEntity::new(app.world(), entity_id)?;
 		expect(entity.components.len()).to_be(1)?;
 		let name = node_name(&entity);
 		expect(name.as_str()).to_be("Bob")?;
 
-		entity.components[0].apply(&NodeName::new("Alice"));
+		entity.components[0].apply(&Name::new("Alice"));
 
 		expect(app.world())
 			.component(entity_id)?
-			.to_be(&NodeName::new("Bob"))?;
+			.to_be(&Name::new("Bob"))?;
 		entity.apply(app.world_mut())?;
 		expect(app.world())
 			.component(entity_id)?
-			.to_be(&NodeName::new("Alice"))?;
+			.to_be(&Name::new("Alice"))?;
 
 
 		Ok(())

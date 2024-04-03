@@ -2,7 +2,6 @@ use crate::prelude::*;
 use bevy::prelude::*;
 use bevy::reflect::GetTypeRegistration;
 use bevy::utils::HashSet;
-use std::fmt;
 
 /// Marker to identify the root of a behavior graph
 #[derive(Debug, Default, Component, Reflect)]
@@ -13,36 +12,6 @@ pub struct BeetRoot;
 #[derive(Debug, Default, Component, Reflect)]
 #[reflect(Component)]
 pub struct BeetPrefab;
-
-
-/// Temporary name holder, it seems theres a bug with bevy [`Name`], cow and reflect
-#[derive(Debug, Clone, Default, Component, Reflect, PartialEq)]
-#[reflect(Component)]
-pub struct NodeName(pub String);
-
-impl NodeName {
-	pub fn new(name: impl Into<String>) -> Self { Self(name.into()) }
-}
-
-impl fmt::Display for NodeName {
-	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-		write!(f, "{}", self.0)
-	}
-}
-
-// pub struct EntityGraphOptions {
-// 	agent: Option<Entity>,
-// 	run_on_spawn: bool,
-// }
-
-// impl Default for EntityGraphOptions {
-// 	fn default() -> Self {
-// 		Self {
-// 			agent: None,
-// 			run_on_spawn: true,
-// 		}
-// 	}
-// }
 
 pub type SpawnFunc = Box<dyn FnOnce(&mut World) -> Entity>;
 
@@ -60,7 +29,7 @@ pub struct BeetBuilder {
 	pub insert_root_defaults: bool,
 	/// Inserts [`BeetPrefab`] components to this node if its the root
 	pub is_prefab: bool,
-	/// Inserts [`(Name, NodeName, RunTimer)`] components to this node
+	/// Inserts [`(Name, RunTimer)`] components to this node
 	pub insert_defaults: bool,
 	pub spawn_func: SpawnFunc,
 	// great name buddy
@@ -139,16 +108,10 @@ impl BeetBuilder {
 		entity: &mut EntityWorldMut,
 		default_name: String,
 	) {
-		let name = entity
-			.get::<Name>()
-			.map(|n| n.to_string())
-			.unwrap_or(default_name);
-
-		entity.insert((
-			Name::new(name.clone()),
-			NodeName::new(name),
-			RunTimer::default(),
-		));
+		entity.insert(RunTimer::default());
+		if entity.contains::<Name>() == false {
+			entity.insert(Name::new(default_name));
+		}
 	}
 
 	fn build_recursive(
