@@ -126,6 +126,13 @@ impl BeetBuilder {
 		BeetNode::new(root)
 	}
 
+	pub fn into_scene<T: ActionTypes>(self) -> BeetSceneSerde<T> {
+		let mut world = World::new();
+		world.insert_resource(BeetSceneSerde::<T>::type_registry());
+		self.into_node(&mut world);
+		BeetSceneSerde::<T>::new(&world)
+	}
+
 
 	// TODO deprecate this in favor of an optional bundle
 	pub fn insert_default_components(

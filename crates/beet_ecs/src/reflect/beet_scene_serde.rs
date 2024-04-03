@@ -1,4 +1,5 @@
 use crate::prelude::*;
+use anyhow::Result;
 use bevy::prelude::*;
 use bevy::scene::serde::SceneDeserializer;
 use bevy::scene::serde::SceneSerializer;
@@ -94,7 +95,7 @@ mod test {
 		let mut world = World::new();
 		world.insert_resource(BeetSceneSerde::<EcsNode>::type_registry());
 		let entity = world
-			.spawn((EmptyAction, Transform::default(), MyStruct))
+			.spawn((EmptyAction, Name::new("billy"), MyStruct))
 			.id();
 
 		let serde = BeetSceneSerde::<EcsNode>::new(&world);
@@ -111,7 +112,9 @@ mod test {
 		expect(world2.entities().len()).to_be(1)?;
 
 		expect(&world2).to_have_component::<EmptyAction>(entity)?;
-		expect(&world2).to_have_component::<Transform>(entity)?;
+		expect(&world2)
+			.component(entity)?
+			.to_be(&Name::new("billy"))?;
 		expect(&world2)
 			.not()
 			.to_have_component::<MyStruct>(entity)?;

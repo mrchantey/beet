@@ -17,7 +17,7 @@ use web_sys::HtmlDivElement;
 use web_sys::HtmlElement;
 
 pub struct DomSim<T: ActionList> {
-	pub scene: DynamicScene,
+	pub scene: BeetSceneSerde<T>,
 	pub auto_flowers: Option<Duration>,
 	pub bees: usize,
 	pub test_container: Option<HtmlDivElement>,
@@ -29,7 +29,7 @@ pub struct DomSim<T: ActionList> {
 impl<T: ActionList> Default for DomSim<T> {
 	fn default() -> Self {
 		Self {
-			scene: forage().into_scene::<T>(),
+			scene: forage().into_scene(),
 			auto_flowers: None,
 			basic_ui: true,
 			test_container: None,
@@ -109,6 +109,7 @@ impl<T: ActionList> DomSim<T> {
 		/*-*/;
 
 		self.scene
+			.scene
 			.write_to_world(app.world_mut(), &mut Default::default())?;
 
 		if let Some(container) = self.test_container {
@@ -152,11 +153,12 @@ impl<T: ActionList> DomSim<T> {
 }
 const SCENE_PARAM: &str = "scene";
 
-pub fn get_scene_url_param<T: ActionTypes>() -> Result<Option<DynamicScene>> {
+pub fn get_scene_url_param<T: ActionTypes>() -> Result<Option<BeetSceneSerde<T>>>
+{
 	if let Some(tree) = SearchParams::get(SCENE_PARAM) {
 		let bytes = general_purpose::STANDARD_NO_PAD.decode(tree.as_bytes())?;
 		let scene: BeetSceneSerde<T> = bincode::deserialize(&bytes)?;
-		Ok(Some(scene.scene))
+		Ok(Some(scene))
 	} else {
 		Ok(None)
 	}
@@ -164,8 +166,7 @@ pub fn get_scene_url_param<T: ActionTypes>() -> Result<Option<DynamicScene>> {
 
 const MAX_URL_LENGTH: usize = 1900;
 pub fn set_scene_url_param<T: ActionTypes>(world: &World) -> Result<()> {
-	let scene = DynamicScene::from_world(world);
-	let serde = BeetSceneSerde::<T>::new(scene);
+	let serde = BeetSceneSerde::<T>::new(world);
 	let val = bincode::serialize(&serde)?;
 	let val = general_purpose::STANDARD_NO_PAD.encode(val);
 	if val.len() > MAX_URL_LENGTH {

@@ -22,4 +22,16 @@ use bevy::reflect::TypeRegistry;
 	//ecs
 		EcsNode
 	)]
+#[components(
+	//force bundle
+	Mass, 
+	Velocity, 
+	Impulse, 
+	Force,
+	//steer bundle
+	MaxForce,
+	MaxSpeed,
+	ArriveRadius,
+	WanderParams,
+)]
 pub struct CoreNode;

@@ -31,7 +31,7 @@
 	"rust-analyzer.files.excludeDirs": [
 		"crates/beet_esp"
 	],
-	// "rust-analyzer.cargo.target": "wasm32-unknown-unknown",
+	"rust-analyzer.cargo.target": "wasm32-unknown-unknown",
 	"search.exclude": {
 		"docs/deps/mermaid-init.js": true,
 		"docs/deps/mermaid.min.js": true,

@@ -1,5 +1,6 @@
 use bevy::ecs as bevy_ecs;
 use bevy::prelude::*;
+use bevy::reflect as bevy_reflect;
 use bevy::utils::HashMap;
 use forky_web::DocumentExt;
 use web_sys::Document;
@@ -11,8 +12,10 @@ pub fn has_renderer(world: &World) -> bool {
 }
 
 
-#[derive(Component, Deref, DerefMut)]
+#[derive(Component, Deref, DerefMut, Reflect)]
+#[reflect(Component)]
 pub struct DomText(pub String);
+
 #[derive(Component)]
 pub struct HasElement;
 

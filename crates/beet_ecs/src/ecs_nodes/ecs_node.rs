@@ -5,21 +5,34 @@ use bevy::reflect::TypeRegistry;
 
 #[derive(Debug, Clone, ActionList)]
 #[actions(
-							// constants
-							SetOnStart::<Score>,
-							InsertOnRun::<RunResult>,
-							// utility
-							EmptyAction,
-							Repeat,
-							SucceedInDuration,
-							// selectors
-							SequenceSelector,
-							FallbackSelector,
-							ScoreSelector
-						)]
-#[components(
-	NodeName, Name, Edges, Running, RunTimer, RunResult, BeetRoot, BeetPrefab,
-	Transform
+	// constants
+	SetOnStart::<Score>,
+	InsertOnRun::<RunResult>,
+	// utility
+	EmptyAction,
+	Repeat,
+	SucceedInDuration,
+	// selectors
+	SequenceSelector,
+	FallbackSelector,
+	ScoreSelector
 )]
-
+#[components(
+	NodeName,
+	// running
+	Running,
+	RunTimer,
+	RunResult,
+	// graph
+	Edges,
+	BeetPrefab,
+	BeetRoot,
+	AgentMarker,
+	TargetAgent,
+	ActionTarget,
+	// bevy
+	Name,
+	Transform,
+	GlobalTransform,
+)]
 pub struct EcsNode;

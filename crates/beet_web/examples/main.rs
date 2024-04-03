@@ -4,11 +4,11 @@ fn main() {}
 fn main() {
 	use beet_web::prelude::*;
 	use forky_core::ResultTEExt;
-	DomSim {
+	DomSim::<BeeNode> {
 		flowers: 10,
 		..Default::default()
 	}
-	.with_url_params::<BeeNode>()
+	.with_url_params()
 	.run_forever()
 	.ok_or(|e| log::error!("{e}"));
 }

@@ -9,13 +9,22 @@ use bevy::prelude::*;
 #[reflect(Component)]
 pub struct Velocity(pub Vec3);
 /// A force that is cleared each frame.
-#[derive(Debug, Default, Clone, PartialEq, Deref, DerefMut, Component)]
+#[derive(
+	Debug, Default, Clone, PartialEq, Deref, DerefMut, Component, Reflect,
+)]
+#[reflect(Component)]
 pub struct Impulse(pub Vec3);
 /// A constant force that is cleared each frame.
-#[derive(Debug, Default, Clone, PartialEq, Deref, DerefMut, Component)]
+#[derive(
+	Debug, Default, Clone, PartialEq, Deref, DerefMut, Component, Reflect,
+)]
+#[reflect(Component)]
 pub struct Force(pub Vec3);
 /// A constant force that is cleared each frame.
-#[derive(Debug, Copy, Clone, PartialEq, Deref, DerefMut, Component)]
+#[derive(
+	Debug, Copy, Clone, PartialEq, Deref, DerefMut, Component, Reflect,
+)]
+#[reflect(Component)]
 pub struct Mass(pub f32);
 
 impl Default for Mass {

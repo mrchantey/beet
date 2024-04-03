@@ -6,16 +6,16 @@ use bevy::prelude::*;
 /// Remove this component to dispose of all of this agents graphs.
 /// This is useful, for example for [`cleanup_entity_graph`] to only listen for removals
 /// of agent entities
-#[derive(Debug, Copy, Clone, PartialEq, Component)]
+#[derive(Debug, Copy, Clone, PartialEq, Component, Reflect)]
 pub struct AgentMarker;
 
 /// Added to [`BehaviorNode`] entities that have a target agent.
-#[derive(Debug, PartialEq, Deref, DerefMut, Component)]
+#[derive(Debug, PartialEq, Deref, DerefMut, Component, Reflect)]
 pub struct TargetAgent(pub Entity);
 
 
 /// Used by actions to specify some target, ie seek.
-#[derive(Debug, PartialEq, Deref, DerefMut, Component)]
+#[derive(Debug, PartialEq, Deref, DerefMut, Component, Reflect)]
 pub struct ActionTarget(pub Entity);
 
 /// Removes all nodes with a [`TargetAgent`] component that matches the removed agent

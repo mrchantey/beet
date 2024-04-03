@@ -2,7 +2,10 @@ use crate::prelude::*;
 use bevy::prelude::*;
 
 /// The distance at which an agent should begin to slow down, defaults to `0.5`
-#[derive(Debug, Copy, Clone, PartialEq, Deref, DerefMut, Component)]
+#[derive(
+	Debug, Copy, Clone, PartialEq, Deref, DerefMut, Component, Reflect,
+)]
+#[reflect(Component)]
 pub struct ArriveRadius(pub f32);
 
 impl Default for ArriveRadius {
