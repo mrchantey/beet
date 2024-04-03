@@ -16,7 +16,6 @@ pub struct BeetSceneSerde<T: ActionTypes> {
 }
 
 impl<T: ActionTypes> BeetSceneSerde<T> {
-
 	/// Creates a [`DynamicScene`] from the world, including all entities
 	/// but no resources
 	pub fn new(world: &World) -> Self {
@@ -104,17 +103,17 @@ mod test {
 	#[test]
 	fn works() -> Result<()> {
 		let mut world = World::new();
-		world.insert_resource(BeetSceneSerde::<EcsNode>::type_registry());
+		world.insert_resource(BeetSceneSerde::<EcsModule>::type_registry());
 		let entity = world
 			.spawn((EmptyAction, Name::new("billy"), MyStruct))
 			.id();
 
-		let serde = BeetSceneSerde::<EcsNode>::new(&world);
+		let serde = BeetSceneSerde::<EcsModule>::new(&world);
 		let bin = bincode::serialize(&serde)?;
-		let serde = bincode::deserialize::<BeetSceneSerde<EcsNode>>(&bin)?;
+		let serde = bincode::deserialize::<BeetSceneSerde<EcsModule>>(&bin)?;
 
 		let mut world2 = World::new();
-		world2.insert_resource(BeetSceneSerde::<EcsNode>::type_registry());
+		world2.insert_resource(BeetSceneSerde::<EcsModule>::type_registry());
 
 		let mut hashmap = Default::default();
 		serde.scene.write_to_world(&mut world2, &mut hashmap)?;
@@ -146,9 +145,9 @@ mod test {
 		let entity = world.spawn_empty().id();
 		let tree = test_serde_tree();
 		tree.spawn(world, entity);
-		let scene = BeetSceneSerde::<EcsNode>::new(world);
+		let scene = BeetSceneSerde::<EcsModule>::new(world);
 		let bin = bincode::serialize(&scene)?;
-		let scene2 = bincode::deserialize::<BeetSceneSerde<EcsNode>>(&bin)?;
+		let scene2 = bincode::deserialize::<BeetSceneSerde<EcsModule>>(&bin)?;
 		let bin2 = bincode::serialize(&scene2)?;
 		expect(bin).to_be(bin2)?;
 

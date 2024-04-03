@@ -103,7 +103,7 @@ fn spawn(
 	let entity = world
 		.spawn((
 			Name::new(name.into()),
-			DomText(text.into()),
+			RenderText(text.into()),
 			TransformBundle {
 				local: Transform::from_translation(position),
 				..default()

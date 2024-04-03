@@ -105,7 +105,7 @@ mod test {
 	#[test]
 	fn works() -> Result<()> {
 		let mut app = App::new();
-		app.add_plugins(BeetSystemsPlugin::<EcsNode, _>::default());
+		app.add_plugins(BeetSystemsPlugin::<EcsModule, _>::default());
 
 		let target = app.world_mut().spawn_empty().id();
 		let actions = test_constant_behavior_tree();

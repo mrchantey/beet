@@ -9,7 +9,7 @@ use sweet::*;
 async fn works() -> Result<()> {
 	append_html_for_tests();
 
-	DomSim::<BeetWebNode> {
+	DomSim::<CoreModule> {
 		bees: 1,
 		flowers: 10,
 		auto_flowers: Some(Duration::from_secs(1)),

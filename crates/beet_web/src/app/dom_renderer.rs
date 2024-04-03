@@ -1,6 +1,6 @@
+use beet::prelude::*;
 use bevy::ecs as bevy_ecs;
 use bevy::prelude::*;
-use bevy::reflect as bevy_reflect;
 use bevy::utils::HashMap;
 use forky_web::DocumentExt;
 use web_sys::Document;
@@ -10,11 +10,6 @@ use web_sys::HtmlElement;
 pub fn has_renderer(world: &World) -> bool {
 	world.get_non_send_resource::<DomRenderer>().is_some()
 }
-
-
-#[derive(Component, Deref, DerefMut, Reflect)]
-#[reflect(Component)]
-pub struct DomText(pub String);
 
 #[derive(Component)]
 pub struct HasElement;
@@ -58,7 +53,7 @@ pub fn despawn_elements(
 pub fn create_elements(
 	mut commands: Commands,
 	mut renderer: NonSendMut<DomRenderer>,
-	query: Query<(Entity, &DomText), Without<HasElement>>,
+	query: Query<(Entity, &RenderText), Without<HasElement>>,
 ) {
 	for (entity, text) in query.iter() {
 		let div = Document::x_create_div();

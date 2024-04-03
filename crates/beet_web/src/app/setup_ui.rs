@@ -1,8 +1,5 @@
-use super::dom_renderer::clear_world_with_dom_renderer;
-use super::scene_io::download_scene;
-use super::scene_io::upload_scene;
-use super::spawn::DomSimMessage;
-use crate::prelude::BeetWebNode;
+use crate::prelude::*;
+use beet::prelude::*;
 use bevy::prelude::*;
 use flume::Sender;
 use forky_core::ResultTEExt;
@@ -45,7 +42,7 @@ fn download_button(app: Arc<RwLock<App>>) {
 	HtmlEventListener::new_with_target(
 		"click",
 		move |_: Event| {
-			download_scene::<BeetWebNode>(&app.read().world())
+			download_scene::<CoreModule>(&app.read().world())
 				.ok_or(|e| log::error!("{e}"));
 		},
 		target,
@@ -61,7 +58,7 @@ fn upload_button(app: Arc<RwLock<App>>) {
 		move |_: Event| {
 			let app = app.clone();
 			spawn_local(async move {
-				let Some(scene) = upload_scene::<BeetWebNode>()
+				let Some(scene) = upload_scene::<CoreModule>()
 					.await
 					.ok_or(|e| log::error!("{e}",))
 				else {

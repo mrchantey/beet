@@ -5,7 +5,7 @@ use sweet::*;
 #[sweet_test]
 pub async fn works() -> Result<()> {
 	append_html_for_tests();
-	DomSim::<BeetWebNode>::default()
+	DomSim::<CoreModule>::default()
 		.with_test_container(render_container())
 		.with_node((Seek, FindSteerTarget::new("flower", 2.)))
 		.run_forever()?;

@@ -3,7 +3,6 @@
 #![feature(async_closure, async_fn_traits)]
 
 pub mod app;
-pub mod bee;
 pub mod dom;
 
 // currently required for internal macros to work
@@ -11,6 +10,5 @@ pub mod dom;
 
 pub mod prelude {
 	pub use crate::app::*;
-	pub use crate::bee::*;
 	pub use crate::dom::*;
 }

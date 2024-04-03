@@ -65,7 +65,7 @@ mod test {
 
 		app.add_plugins((
 			SteeringPlugin::default(),
-			BeetSystemsPlugin::<CoreNode, _>::default(),
+			BeetSystemsPlugin::<CoreModule, _>::default(),
 		))
 		.insert_time();
 

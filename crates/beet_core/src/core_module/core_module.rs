@@ -10,9 +10,12 @@ use bevy::reflect::TypeRegistry;
 
 #[derive(Debug, Clone, ActionList)]
 #[actions(
-	//core
+		//core
+		Hover,
 		Translate,
-	//steer
+		// force
+		SetAgentOnRun::<Velocity>,
+		//steer
 		Seek,
 		Wander,
 		FindSteerTarget,
@@ -20,9 +23,11 @@ use bevy::reflect::TypeRegistry;
 		ScoreSteerTarget,
 		SucceedOnArrive,
 	//ecs
-		EcsNode
+		EcsModule
 	)]
 #[components(
+	//render
+	RenderText,
 	//force bundle
 	Mass, 
 	Velocity, 
@@ -34,4 +39,9 @@ use bevy::reflect::TypeRegistry;
 	ArriveRadius,
 	WanderParams,
 )]
-pub struct CoreNode;
+pub struct CoreModule;
+
+
+#[derive(Component, Deref, DerefMut, Reflect)]
+#[reflect(Component)]
+pub struct RenderText(pub String);

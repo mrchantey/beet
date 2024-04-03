@@ -62,7 +62,7 @@ mod test {
 	fn despawn() -> Result<()> {
 		let mut app = App::new();
 		// app.add_systems(PostUpdate, despawn_graph_on_agent_removed);
-		app.add_plugins(BeetSystemsPlugin::<EcsNode, _>::default());
+		app.add_plugins(BeetSystemsPlugin::<EcsModule, _>::default());
 
 		let target = app.world_mut().spawn_empty().id();
 		InsertOnRun(RunResult::Success)

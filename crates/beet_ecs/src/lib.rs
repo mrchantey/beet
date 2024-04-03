@@ -1,7 +1,7 @@
 #![feature(result_flattening)]
 pub mod action;
 pub mod channel_event;
-pub mod ecs_nodes;
+pub mod ecs_module;
 pub mod edge;
 pub mod extensions;
 pub mod graph;
@@ -20,9 +20,9 @@ pub mod prelude {
 
 	pub use crate::action::*;
 	pub use crate::channel_event::*;
-	pub use crate::ecs_nodes::actions::*;
-	pub use crate::ecs_nodes::selectors::*;
-	pub use crate::ecs_nodes::*;
+	pub use crate::ecs_module::actions::*;
+	pub use crate::ecs_module::selectors::*;
+	pub use crate::ecs_module::*;
 	pub use crate::edge::*;
 	pub use crate::extensions::*;
 	pub use crate::graph::*;

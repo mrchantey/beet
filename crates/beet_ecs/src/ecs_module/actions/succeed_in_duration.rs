@@ -52,7 +52,7 @@ mod test {
 	#[test]
 	fn works() -> Result<()> {
 		let mut app = App::new();
-		app.add_plugins(BeetSystemsPlugin::<EcsNode, _>::default());
+		app.add_plugins(BeetSystemsPlugin::<EcsModule, _>::default());
 		app.insert_time();
 
 		let root = SucceedInDuration::default()

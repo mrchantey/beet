@@ -1,13 +1,6 @@
-use crate::prelude::*;
 use beet::prelude::*;
-use bevy::ecs as bevy_ecs;
 use bevy::prelude::*;
 use std::f32::consts::TAU;
-
-#[derive(Debug, Clone, ActionList)]
-#[actions(Hover,SetAgentOnRun::<Velocity>, CoreNode)]
-#[components(DomText)]
-pub struct BeetWebNode;
 
 
 #[derive_action]

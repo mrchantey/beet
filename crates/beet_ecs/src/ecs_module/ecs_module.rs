@@ -18,7 +18,6 @@ use bevy::reflect::TypeRegistry;
 	ScoreSelector
 )]
 #[components(
-	NodeName,
 	// running
 	Running,
 	RunTimer,
@@ -35,4 +34,4 @@ use bevy::reflect::TypeRegistry;
 	Transform,
 	GlobalTransform,
 )]
-pub struct EcsNode;
+pub struct EcsModule;
