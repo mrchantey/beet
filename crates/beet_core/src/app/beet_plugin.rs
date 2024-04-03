@@ -42,8 +42,8 @@ impl<T: ActionList> PluginGroup for DefaultBeetPlugins<T> {
 impl<T: ActionList> Plugin for BeetTypesPlugin<T> {
 	fn build(&self, app: &mut App) {
 		T::register_components(app.world_mut());
-		append_beet_type_registry_with_generics::<T>(
-			app.world().resource::<AppTypeRegistry>(),
+		T::register_types(
+			&mut app.world().resource::<AppTypeRegistry>().write(),
 		);
 	}
 }

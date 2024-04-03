@@ -13,7 +13,7 @@ pub fn action(item: TokenStream) -> TokenStream {
 		.unwrap_or_else(syn::Error::into_compile_error)
 		.into()
 }
-#[proc_macro_derive(ActionList, attributes(actions))]
+#[proc_macro_derive(ActionList, attributes(actions, components))]
 pub fn action_list(item: TokenStream) -> TokenStream {
 	parse_action_list(item)
 		.unwrap_or_else(syn::Error::into_compile_error)

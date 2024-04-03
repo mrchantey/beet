@@ -41,7 +41,7 @@ impl<T: ActionTypes> BeetSceneSerde<T> {
 
 	pub fn type_registry() -> AppTypeRegistry {
 		let registry = AppTypeRegistry::default();
-		append_beet_type_registry_with_generics::<T>(&registry);
+		T::register_types(&mut registry.write());
 		registry
 	}
 }
@@ -85,11 +85,17 @@ mod test {
 	use bevy::prelude::*;
 	use sweet::*;
 
+
+	#[derive(Reflect, Component)]
+	struct MyStruct;
+
 	#[test]
 	fn works() -> Result<()> {
 		let mut world = World::new();
 		world.insert_resource(BeetSceneSerde::<EcsNode>::type_registry());
-		let entity = world.spawn((EmptyAction, Transform::default())).id();
+		let entity = world
+			.spawn((EmptyAction, Transform::default(), MyStruct))
+			.id();
 
 		let serde = BeetSceneSerde::<EcsNode>::new(&world);
 		let bin = bincode::serialize(&serde)?;
@@ -103,12 +109,12 @@ mod test {
 		let entity = hashmap[&entity];
 
 		expect(world2.entities().len()).to_be(1)?;
+
+		expect(&world2).to_have_component::<EmptyAction>(entity)?;
+		expect(&world2).to_have_component::<Transform>(entity)?;
 		expect(&world2)
 			.not()
-			.to_have_component::<Transform>(entity)?;
-
-		expect(&world2)
-			.to_have_component::<EmptyAction>(entity)?;
+			.to_have_component::<MyStruct>(entity)?;
 
 		Ok(())
 	}

@@ -5,7 +5,7 @@ use bevy::reflect::TypeRegistry;
 
 #[derive(Debug, Clone, ActionList)]
 #[actions(
-	// constants
+							// constants
 							SetOnStart::<Score>,
 							InsertOnRun::<RunResult>,
 							// utility
@@ -17,4 +17,9 @@ use bevy::reflect::TypeRegistry;
 							FallbackSelector,
 							ScoreSelector
 						)]
+#[components(
+	NodeName, Name, Edges, Running, RunTimer, RunResult, BeetRoot, BeetPrefab,
+	Transform
+)]
+
 pub struct EcsNode;

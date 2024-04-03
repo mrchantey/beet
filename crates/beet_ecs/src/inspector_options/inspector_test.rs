@@ -105,8 +105,6 @@ mod test {
 			.get_type_data::<ReflectInspectorOptions>(my_val.type_id())
 			.unwrap();
 
-		println!("num options: {:?}", inspector_opts.0.options.len());
-
 		let (_key, val) = inspector_opts.0.iter().next().unwrap();
 		let num_opts = val.downcast_ref::<NumberOptions<f32>>().unwrap();
 		expect(num_opts.max).to_be(Some(10.))?;
