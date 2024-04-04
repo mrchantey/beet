@@ -19,30 +19,34 @@ impl<T: ActionTypes> BeetSceneSerde<T> {
 	/// Creates a [`DynamicScene`] from the world, including all entities
 	/// but no resources
 	pub fn new(world: &World) -> Self {
+		let entities = world
+			.iter_entities()
+			.map(|entity| entity.id())
+			.collect::<Vec<_>>()
+			.into_iter();
+		Self::new_with_entities(world, entities)
+	}
+	pub fn new_with_entities(
+		world: &World,
+		entities: impl IntoIterator<Item = Entity>,
+	) -> Self {
 		let registry = Self::type_registry();
 		let registry = registry.read();
 		let items = registry
 			.iter()
 			.map(|r| r.type_info().type_id())
 			.collect::<HashSet<_>>();
-		// let names = registry
-		// 	.iter()
-		// 	.map(|r| r.type_info().type_path_table().short_path())
-		// 	.collect::<Vec<_>>()
-		// 	.join("\n");
-		// log::info!("Allowed types: {}", names);
 
 		let scene = DynamicSceneBuilder::from_world(world)
 			.deny_all_resources()
 			.with_filter(SceneFilter::Allowlist(items))
-			.extract_entities(world.iter_entities().map(|entity| entity.id()))
+			.extract_entities(entities.into_iter())
 			.extract_resources()
 			.build();
-		Self::new_with(scene)
+		Self::new_with_scene(scene)
 	}
 
-
-	pub fn new_with(scene: DynamicScene) -> Self {
+	pub fn new_with_scene(scene: DynamicScene) -> Self {
 		Self {
 			scene,
 			phantom: PhantomData,

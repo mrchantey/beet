@@ -6,7 +6,6 @@ use bevy::math::Vec3;
 /// A useful default prefab
 pub fn forage() -> BeetBuilder {
 	let awareness_radius = 0.5;
-
 	(
 		Name::new("Forage"),
 		Repeat::default(),

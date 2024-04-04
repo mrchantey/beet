@@ -10,13 +10,12 @@ pub struct BeetMinimalPlugin;
 impl Plugin for BeetMinimalPlugin {
 	fn build(&self, app: &mut App) { app.add_plugins(TimePlugin); }
 }
-#[derive(Default)]
-pub struct BeetTypesPlugin<T: ActionList>(PhantomData<T>);
 
 pub struct DefaultBeetPlugins<T: ActionList> {
 	pub types: BeetTypesPlugin<T>,
 	pub systems: BeetSystemsPlugin<T, Update>,
 	pub steering: SteeringPlugin,
+	pub message: BeetMessagePlugin<T>,
 }
 
 impl<T: ActionList> DefaultBeetPlugins<T> {
@@ -25,6 +24,7 @@ impl<T: ActionList> DefaultBeetPlugins<T> {
 			types: BeetTypesPlugin(default()),
 			systems: BeetSystemsPlugin::default(),
 			steering: SteeringPlugin::default(),
+			message: BeetMessagePlugin(default()),
 		}
 	}
 }
@@ -35,9 +35,13 @@ impl<T: ActionList> PluginGroup for DefaultBeetPlugins<T> {
 			.add(self.types)
 			.add(self.systems)
 			.add(self.steering)
+			.add(self.message)
 	}
 }
 
+
+#[derive(Default)]
+pub struct BeetTypesPlugin<T: ActionList>(pub PhantomData<T>);
 
 impl<T: ActionList> Plugin for BeetTypesPlugin<T> {
 	fn build(&self, app: &mut App) {

@@ -111,9 +111,8 @@ impl<T: ActionList> DomSim<T> {
 			)
 		/*-*/;
 
-		self.scene
-			.scene
-			.write_to_world(app.world_mut(), &mut Default::default())?;
+		app.add_systems(Update, auto_flowers_spawn);
+
 
 		if let Some(container) = self.test_container {
 			let container: &HtmlElement = &container;
@@ -121,22 +120,19 @@ impl<T: ActionList> DomSim<T> {
 		}
 
 		if let Some(duration) = self.auto_flowers {
-			app.insert_resource(AutoFlowers(Timer::new(
-				duration,
-				TimerMode::Repeating,
-			)))
-			.add_systems(Update, auto_flowers_spawn);
+			app.world_mut()
+				.spawn(AutoFlowers(Timer::new(duration, TimerMode::Repeating)));
 		}
 
 		let app = Arc::new(RwLock::new(app));
 
-		if let Some(scene_url) = self.scene_url {
-			let app = app.clone();
-			spawn_local(async move {
-				scene_from_url::<T>(app, scene_url)
-					.await
-					.ok_or(|e| log::error!("{e}"));
-			});
+		if let Some(url) = self.scene_url {
+			try_load_url_scene(app.clone(), url, self.scene)
+		} else {
+			let mut app = app.write();
+			self.scene
+				.scene
+				.write_to_world(app.world_mut(), &mut Default::default())?;
 		}
 
 		Ok(app)
@@ -166,7 +162,30 @@ impl<T: ActionList> DomSim<T> {
 	}
 }
 
-async fn scene_from_url<T: ActionList>(
+
+
+fn try_load_url_scene<T: ActionList>(
+	app: Arc<RwLock<App>>,
+	url: String,
+	fallback: BeetSceneSerde<T>,
+) {
+	let app = app.clone();
+	spawn_local(async move {
+		if let Err(e) = try_load_url_scene_inner::<T>(app.clone(), url).await {
+			log::error!(
+				"Failed to load scene, loading default instead...\n{e}"
+			);
+			let mut app = app.write();
+			fallback
+				.scene
+				.write_to_world(app.world_mut(), &mut Default::default())
+				.ok_or(|e| log::error!("{e}"));
+		};
+	});
+}
+
+
+async fn try_load_url_scene_inner<T: ActionList>(
 	app: Arc<RwLock<App>>,
 	url: String,
 ) -> Result<()> {

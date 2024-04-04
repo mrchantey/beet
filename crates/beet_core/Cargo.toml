@@ -24,6 +24,10 @@ anyhow.workspace = true
 serde.workspace = true
 strum.workspace = true
 
+flume.workspace = true
+bincode.workspace = true
+
+pretty_env_logger.workspace = true
+
 [dev-dependencies]
 sweet.workspace = true
-bincode.workspace = true

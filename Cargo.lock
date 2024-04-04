@@ -380,9 +380,11 @@ dependencies = [
  "beet_ecs",
  "bevy",
  "bincode",
+ "flume",
  "forky_bevy",
  "forky_core",
  "log",
+ "pretty_env_logger",
  "serde",
  "strum",
  "sweet",
@@ -448,7 +450,6 @@ name = "beet_web"
 version = "0.0.8"
 dependencies = [
  "anyhow",
- "base64 0.22.0",
  "beet",
  "bevy",
  "bincode",
