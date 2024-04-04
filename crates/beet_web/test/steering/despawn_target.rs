@@ -7,6 +7,8 @@ pub async fn works() -> Result<()> {
 	append_html_for_tests();
 	BeetWebApp::default()
 		.with_test_container()
+		.with(spawn_bee)
+		.with(spawn_flower)
 		.with_node(
 			(Repeat::default(), SequenceSelector)
 				.child((

@@ -8,7 +8,7 @@ async fn works() -> Result<()> {
 	append_html_for_tests();
 
 	BeetWebApp::default()
-		.with(spawn_flower)
+		.with(spawn_bee)
 		.with(spawn_flower)
 		.with(spawn_flower)
 		.with(spawn_flower)

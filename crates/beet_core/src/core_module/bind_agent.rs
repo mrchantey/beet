@@ -28,6 +28,7 @@ pub fn bind_agent_to_first_graph(
 			.iter(world)
 			.next()
 		else {
+			log::warn!("No first graph found to bind agent to");
 			continue;
 		};
 

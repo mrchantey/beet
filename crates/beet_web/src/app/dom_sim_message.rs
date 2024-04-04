@@ -11,6 +11,8 @@ use flume::Sender;
 pub enum DomSimMessage {
 	DespawnAll,
 	Resize,
+	SpawnBee,
+	SpawnFlower,
 }
 
 #[derive(Resource, Deref, DerefMut)]
@@ -26,6 +28,12 @@ pub fn message_handler(world: &mut World) -> Result<()> {
 
 	for message in messages {
 		match message {
+			DomSimMessage::SpawnBee => {
+				spawn_bee(world);
+			}
+			DomSimMessage::SpawnFlower => {
+				spawn_flower(world);
+			}
 			DomSimMessage::DespawnAll => {
 				// dont despawn everything, we need the graph
 				for entity in world

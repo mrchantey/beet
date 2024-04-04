@@ -18,8 +18,8 @@ impl<T: ActionList> Default for DomSim<T> {
 		Self {
 			auto_flowers: None,
 			// test_container: None,
-			bees: 1,
-			flowers: 1,
+			bees: 0,
+			flowers: 0,
 			phantom: PhantomData,
 		}
 	}
@@ -68,7 +68,7 @@ impl<T: ActionList> Plugin for DomSim<T> {
 		/*-*/;
 
 		if let Some(duration) = self.auto_flowers {
-			flower_auto_spawn_with_duration(&mut app.world_mut() , duration);
+			flower_auto_spawn_with_duration(&mut app.world_mut(), duration);
 		}
 
 		for _ in 0..self.bees {

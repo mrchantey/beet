@@ -1,6 +1,7 @@
 use crate::prelude::*;
 use beet::prelude::*;
 use bevy::prelude::*;
+use flume::Sender;
 use forky_core::ResultTEExt;
 use forky_web::prelude::*;
 use parking_lot::RwLock;
@@ -18,37 +19,16 @@ pub fn render_container() -> HtmlDivElement {
 }
 
 pub fn setup_ui(app: Arc<RwLock<App>>) {
-	let send_beet = app.read().world().resource::<BeetMessageSend>().0.clone();
-	let send_dom_sim =
-		app.read().world().resource::<DomSimMessageSend>().0.clone();
+	let send = app.read().world().resource::<DomSimMessageSend>().0.clone();
 
-	let send_dom_sim2 = send_dom_sim.clone();
-	let despawn_all = move || {
-		send_dom_sim2.send(DomSimMessage::DespawnAll).ok();
-	};
-
-	let send_beet2 = send_beet.clone();
-	message_button("#create-bee", move || {
-		send_beet2
-			.send(
-				BeetMessage::spawn_bundle::<CoreModule>(bee_bundle()).unwrap(),
-			)
-			.ok();
-	});
-	message_button("#create-flower", move || {
-		send_beet
-			.send(
-				BeetMessage::spawn_bundle::<CoreModule>(flower_bundle())
-					.unwrap(),
-			)
-			.ok();
-	});
-	message_button("#clear-all", despawn_all);
+	message_button(send.clone(), "#create-bee", DomSimMessage::SpawnBee);
+	message_button(send.clone(), "#create-flower", DomSimMessage::SpawnFlower);
+	message_button(send.clone(), "#clear-all", DomSimMessage::DespawnAll);
 	download_button(app.clone());
 	upload_button(app);
 
 	ResizeListener::new(&render_container(), move |_e| {
-		send_dom_sim.send(DomSimMessage::Resize).ok();
+		send.send(DomSimMessage::Resize).ok();
 	})
 	.forget();
 }
@@ -94,10 +74,20 @@ fn upload_button(app: Arc<RwLock<App>>) {
 	.forget();
 }
 
-fn message_button(selector: &str, func: impl 'static + Fn()) {
+fn message_button(
+	send: Sender<DomSimMessage>,
+	selector: &str,
+	message: DomSimMessage,
+) {
 	let target =
 		Document::x_query_selector::<HtmlButtonElement>(selector).unwrap();
 
-	HtmlEventListener::new_with_target("click", move |_: Event| func(), target)
-		.forget();
+	HtmlEventListener::new_with_target(
+		"click",
+		move |_: Event| {
+			send.send(message.clone()).ok();
+		},
+		target,
+	)
+	.forget();
 }
