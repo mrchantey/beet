@@ -5,8 +5,8 @@ use sweet::*;
 #[sweet_test]
 pub async fn works() -> Result<()> {
 	append_html_for_tests();
-	DomSim::<CoreModule>::default()
-		.with_test_container(render_container())
+	BeetWebApp::default()
+		.with_test_container()
 		.with_node(
 			(Repeat::default(), SequenceSelector)
 				.child((
@@ -18,7 +18,7 @@ pub async fn works() -> Result<()> {
 					InsertOnRun(RunResult::Success),
 					DespawnSteerTarget::default(),
 				)),
-		)
+		)?
 		.run_forever()?;
 	Ok(())
 }

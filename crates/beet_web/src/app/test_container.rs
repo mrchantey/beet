@@ -6,8 +6,17 @@ use parking_lot::RwLock;
 use std::sync::Arc;
 use web_sys::Document;
 use web_sys::HtmlDivElement;
+use web_sys::HtmlElement;
 use web_sys::KeyboardEvent;
 
+
+pub fn init_test_app(app: Arc<RwLock<App>>) {
+	setup_ui(app.clone());
+	let container: &HtmlElement = &render_container();
+	app.write()
+		.insert_non_send_resource(DomRenderer::new(container.clone()));
+	// test_container_listener(app.clone());
+}
 
 pub fn test_container_listener(app: Arc<RwLock<App>>) {
 	HtmlEventListener::new("keydown", move |_event: KeyboardEvent| {

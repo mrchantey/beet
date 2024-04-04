@@ -37,14 +37,11 @@ pub struct BeetMessageSend(pub Sender<BeetMessage>);
 
 
 impl BeetMessage {
-	// pub fn spawn<T: ActionTypes>(
-	// 	world: &World,
-	// 	entity: Entity,
-	// ) -> Result<Self> {
-	// 	let serde = BeetSceneSerde::<T>::new_with_entities(world, [entity]);
-	// 	let bincode = bincode::serialize(&serde)?;
-	// 	Ok(BeetMessage::Spawn { bincode })
-	// }
+	pub fn spawn_bundle<T:ActionList>(bundle: impl Bundle)->Result<Self>{
+		let serde = BeetSceneSerde::<T>::new_with_bundle(bundle);
+		let bincode = bincode::serialize(&serde)?;
+		Ok(BeetMessage::Spawn { bincode })
+	}
 }
 
 fn message_handler<T: ActionTypes>(world: &mut World) -> Result<()> {
@@ -57,7 +54,7 @@ fn message_handler<T: ActionTypes>(world: &mut World) -> Result<()> {
 		match message {
 			BeetMessage::Spawn { bincode } => {
 				let serde: BeetSceneSerde<T> = bincode::deserialize(&bincode)?;
-				serde.scene.write_to_world(world, &mut Default::default())?;
+				serde.write(world)?;
 			}
 		}
 	}

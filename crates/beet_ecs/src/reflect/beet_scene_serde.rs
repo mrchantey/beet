@@ -15,6 +15,13 @@ pub struct BeetSceneSerde<T: ActionTypes> {
 	phantom: PhantomData<T>,
 }
 
+impl<T: ActionTypes> Clone for BeetSceneSerde<T> {
+	fn clone(&self) -> Self {
+		let bytes = bincode::serialize(&self).unwrap();
+		bincode::deserialize(&bytes).unwrap()
+	}
+}
+
 impl<T: ActionTypes> BeetSceneSerde<T> {
 	/// Creates a [`DynamicScene`] from the world, including all entities
 	/// but no resources
@@ -51,6 +58,18 @@ impl<T: ActionTypes> BeetSceneSerde<T> {
 			scene,
 			phantom: PhantomData,
 		}
+	}
+
+	pub fn new_with_bundle(bundle: impl Bundle) -> Self {
+		let mut world = World::new();
+		world.insert_resource(Self::type_registry());
+		world.spawn(bundle);
+		Self::new(&world)
+	}
+
+	pub fn write(self, world: &mut World) -> Result<()> {
+		self.scene.write_to_world(world, &mut Default::default())?;
+		Ok(())
 	}
 
 	pub fn type_registry() -> AppTypeRegistry {

@@ -57,7 +57,7 @@ pub fn create_elements(
 ) {
 	for (entity, text) in query.iter() {
 		let div = Document::x_create_div();
-		div.set_inner_text(text.as_str());
+		div.set_inner_text(text.0.as_ref());
 		div.set_class_name("entity");
 		renderer.container.append_child(&div).unwrap();
 		renderer.elements.insert(entity, div);

@@ -1,5 +1,4 @@
 use crate::prelude::*;
-use anyhow::Result;
 use beet::action::ActionTypes;
 use beet::reflect::BeetSceneSerde;
 use bevy::prelude::*;
@@ -17,12 +16,12 @@ impl AutoSpawn {
 	pub fn new<T: ActionTypes>(
 		scene: BeetSceneSerde<T>,
 		interval: Duration,
-	) -> Result<Self> {
-		let scene_bincode = bincode::serialize(&scene)?;
-		Ok(Self {
+	) -> Self {
+		let scene_bincode = bincode::serialize(&scene).unwrap();
+		Self {
 			timer: Timer::new(interval, TimerMode::Repeating),
 			scene_bincode,
-		})
+		}
 	}
 }
 
@@ -53,7 +52,7 @@ use crate::prelude::*;
 	use sweet::*;
 
 	#[test]
-	fn works() -> Result<()> {
+	fn serializes() -> Result<()> {
 		pretty_env_logger::try_init().ok();
 		let mut app = App::new();
 		app /*-*/		
@@ -67,13 +66,12 @@ use crate::prelude::*;
 			.into_scene::<CoreModule>();
 		
 
-		let auto_spawn = AutoSpawn::new(prefab1, Duration::from_secs(1))?;
+		let auto_spawn = AutoSpawn::new(prefab1, Duration::from_secs(1));
 		let prefab2 = BeetBuilder::new(auto_spawn.clone())
 		.into_scene::<CoreModule>();
 	
 		let bincode = bincode::serialize(&prefab2)?;
 
-		// log::info!("{:?}", bincode);
 		send.send(BeetMessage::Spawn{bincode})?;
 
 		expect(app.world().entities().len()).to_be(0)?;

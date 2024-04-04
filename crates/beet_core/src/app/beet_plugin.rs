@@ -16,6 +16,7 @@ pub struct DefaultBeetPlugins<T: ActionList> {
 	pub systems: BeetSystemsPlugin<T, Update>,
 	pub steering: SteeringPlugin,
 	pub message: BeetMessagePlugin<T>,
+	pub core: CorePlugin,
 }
 
 impl<T: ActionList> DefaultBeetPlugins<T> {
@@ -25,6 +26,7 @@ impl<T: ActionList> DefaultBeetPlugins<T> {
 			systems: BeetSystemsPlugin::default(),
 			steering: SteeringPlugin::default(),
 			message: BeetMessagePlugin(default()),
+			core: CorePlugin::default(),
 		}
 	}
 }
@@ -36,6 +38,7 @@ impl<T: ActionList> PluginGroup for DefaultBeetPlugins<T> {
 			.add(self.systems)
 			.add(self.steering)
 			.add(self.message)
+			.add(self.core)
 	}
 }
 

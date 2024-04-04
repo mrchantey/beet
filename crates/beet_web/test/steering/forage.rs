@@ -1,7 +1,5 @@
 use beet::prelude::*;
 use beet_web::prelude::*;
-use bevy::prelude::*;
-use std::time::Duration;
 use sweet::*;
 
 
@@ -9,14 +7,15 @@ use sweet::*;
 async fn works() -> Result<()> {
 	append_html_for_tests();
 
-	DomSim::<CoreModule> {
-		bees: 1,
-		flowers: 10,
-		auto_flowers: Some(Duration::from_secs(1)),
-		..default()
-	}
-	.with_test_container(render_container())
-	.with_node(forage())
-	.run_forever()?;
+	BeetWebApp::default()
+		.with(spawn_flower)
+		.with(spawn_flower)
+		.with(spawn_flower)
+		.with(spawn_flower)
+		.with(spawn_flower)
+		.with(flower_auto_spawn)
+		.with_test_container()
+		.with_node(forage())?
+		.run_forever()?;
 	Ok(())
 }
