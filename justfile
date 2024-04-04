@@ -119,7 +119,6 @@ serve-wasm *args:
 	cd ./target/static && \
 	npx live-server \
 	--no-browser \
-	--entry-file=index.html \
 	--host=0.0.0.0 \
 	--watch=wasm/site_bg.wasm,wasm/simulator_bg.wasm,index.html,style.css \
 	{{args}}

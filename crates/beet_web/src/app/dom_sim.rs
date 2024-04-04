@@ -1,23 +1,23 @@
 use crate::prelude::*;
 use anyhow::Result;
-use base64::engine::general_purpose;
-use base64::Engine;
 use beet::prelude::*;
 use bevy::prelude::*;
 use flume::Receiver;
 use flume::Sender;
+use forky_core::ResultTEExt;
 use forky_web::AnimationFrame;
-use forky_web::History;
 use forky_web::SearchParams;
 use parking_lot::RwLock;
 use std::marker::PhantomData;
 use std::sync::Arc;
 use std::time::Duration;
+use wasm_bindgen_futures::spawn_local;
 use web_sys::HtmlDivElement;
 use web_sys::HtmlElement;
 
 pub struct DomSim<T: ActionList> {
 	pub scene: BeetSceneSerde<T>,
+	pub scene_url: Option<String>,
 	pub auto_flowers: Option<Duration>,
 	pub bees: usize,
 	pub test_container: Option<HtmlDivElement>,
@@ -29,6 +29,7 @@ impl<T: ActionList> Default for DomSim<T> {
 	fn default() -> Self {
 		Self {
 			scene: forage().into_scene(),
+			scene_url: None,
 			auto_flowers: None,
 			test_container: None,
 			bees: 1,
@@ -59,8 +60,8 @@ impl<T: ActionList> DomSim<T> {
 			let val: f64 = auto_flowers.parse().unwrap_or(1.0);
 			self.auto_flowers = Some(Duration::from_secs_f64(val));
 		}
-		if let Ok(Some(scene)) = get_scene_url_param::<T>() {
-			self.scene = scene;
+		if let Some(scene_url) = SearchParams::get("scene") {
+			self.scene_url = Some(scene_url);
 		}
 		self
 	}
@@ -129,6 +130,14 @@ impl<T: ActionList> DomSim<T> {
 
 		let app = Arc::new(RwLock::new(app));
 
+		if let Some(scene_url) = self.scene_url {
+			let app = app.clone();
+			spawn_local(async move {
+				scene_from_url::<T>(app, scene_url)
+					.await
+					.ok_or(|e| log::error!("{e}"));
+			});
+		}
 
 		Ok(app)
 	}
@@ -146,7 +155,7 @@ impl<T: ActionList> DomSim<T> {
 
 		if test_container {
 			setup_ui(send, app.clone());
-			test_container_listener(app.clone());
+			// test_container_listener(app.clone());
 		}
 
 		let frame = AnimationFrame::new(move || {
@@ -156,34 +165,48 @@ impl<T: ActionList> DomSim<T> {
 		Ok(frame)
 	}
 }
-const SCENE_PARAM: &str = "scene";
 
-pub fn get_scene_url_param<T: ActionTypes>() -> Result<Option<BeetSceneSerde<T>>>
-{
-	if let Some(tree) = SearchParams::get(SCENE_PARAM) {
-		let bytes = general_purpose::STANDARD_NO_PAD.decode(tree.as_bytes())?;
-		let scene: BeetSceneSerde<T> = bincode::deserialize(&bytes)?;
-		Ok(Some(scene))
-	} else {
-		Ok(None)
-	}
-}
+async fn scene_from_url<T: ActionList>(
+	app: Arc<RwLock<App>>,
+	url: String,
+) -> Result<()> {
+	let scene = fetch_scene::<T>(&url).await?;
 
-const MAX_URL_LENGTH: usize = 1900;
-pub fn set_scene_url_param<T: ActionTypes>(world: &World) -> Result<()> {
-	let serde = BeetSceneSerde::<T>::new(world);
-	let val = bincode::serialize(&serde)?;
-	let val = general_purpose::STANDARD_NO_PAD.encode(val);
-	if val.len() > MAX_URL_LENGTH {
-		anyhow::bail!(
-			"graph base64 length is too long: {} > {}",
-			val.len(),
-			MAX_URL_LENGTH
-		);
-	}
-	History::set_param(SCENE_PARAM, &val);
+	let mut app = app.write();
+	let mut world = app.world_mut();
+	scene
+		.scene
+		.write_to_world(&mut world, &mut Default::default())?;
 	Ok(())
 }
+
+// const SCENE_PARAM: &str = "scene";
+
+// pub fn get_scene_url_param<T: ActionTypes>() -> Result<Option<String>> {
+// 	if let Some(tree) = SearchParams::get(SCENE_PARAM) {
+// 		let bytes = general_purpose::STANDARD_NO_PAD.decode(tree.as_bytes())?;
+// 		let scene: BeetSceneSerde<T> = bincode::deserialize(&bytes)?;
+// 		Ok(Some(scene))
+// 	} else {
+// 		Ok(None)
+// 	}
+// }
+
+// const MAX_URL_LENGTH: usize = 1900;
+// pub fn set_scene_url_param<T: ActionTypes>(world: &World) -> Result<()> {
+// 	let serde = BeetSceneSerde::<T>::new(world);
+// 	let val = bincode::serialize(&serde)?;
+// 	let val = general_purpose::STANDARD_NO_PAD.encode(val);
+// 	if val.len() > MAX_URL_LENGTH {
+// 		anyhow::bail!(
+// 			"graph base64 length is too long: {} > {}",
+// 			val.len(),
+// 			MAX_URL_LENGTH
+// 		);
+// 	}
+// 	History::set_param(SCENE_PARAM, &val);
+// 	Ok(())
+// }
 
 fn log_error(val: In<Result<()>>) {
 	if let Err(e) = val.0 {

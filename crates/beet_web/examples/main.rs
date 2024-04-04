@@ -4,7 +4,7 @@ fn main() {}
 fn main() {
 	use beet_web::prelude::*;
 	use forky_core::ResultTEExt;
-	DomSim::<beet::CoreModule> {
+	DomSim::<beet::prelude::CoreModule> {
 		// flowers: 10,
 		..Default::default()
 	}
