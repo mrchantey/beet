@@ -199,34 +199,6 @@ async fn try_load_url_scene_inner<T: ActionList>(
 	Ok(())
 }
 
-// const SCENE_PARAM: &str = "scene";
-
-// pub fn get_scene_url_param<T: ActionTypes>() -> Result<Option<String>> {
-// 	if let Some(tree) = SearchParams::get(SCENE_PARAM) {
-// 		let bytes = general_purpose::STANDARD_NO_PAD.decode(tree.as_bytes())?;
-// 		let scene: BeetSceneSerde<T> = bincode::deserialize(&bytes)?;
-// 		Ok(Some(scene))
-// 	} else {
-// 		Ok(None)
-// 	}
-// }
-
-// const MAX_URL_LENGTH: usize = 1900;
-// pub fn set_scene_url_param<T: ActionTypes>(world: &World) -> Result<()> {
-// 	let serde = BeetSceneSerde::<T>::new(world);
-// 	let val = bincode::serialize(&serde)?;
-// 	let val = general_purpose::STANDARD_NO_PAD.encode(val);
-// 	if val.len() > MAX_URL_LENGTH {
-// 		anyhow::bail!(
-// 			"graph base64 length is too long: {} > {}",
-// 			val.len(),
-// 			MAX_URL_LENGTH
-// 		);
-// 	}
-// 	History::set_param(SCENE_PARAM, &val);
-// 	Ok(())
-// }
-
 fn log_error(val: In<Result<()>>) {
 	if let Err(e) = val.0 {
 		log::error!("{e}");
