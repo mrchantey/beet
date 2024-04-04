@@ -26,6 +26,7 @@ use bevy::reflect::TypeRegistry;
 		EcsModule
 	)]
 #[components(
+	AutoSpawn,
 	//render
 	RenderText,
 	//force bundle
