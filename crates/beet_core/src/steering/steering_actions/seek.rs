@@ -19,7 +19,7 @@ fn seek(
 		&mut Impulse,
 		Option<&ArriveRadius>,
 	)>,
-	query: Query<(&TargetAgent, &Seek), With<Running>>,
+	query: Query<(&ParentRoot, &Seek), With<Running>>,
 ) {
 	for (target, _) in query.iter() {
 		if let Ok((
@@ -69,6 +69,9 @@ mod test {
 		))
 		.insert_time();
 
+
+		let tree = Seek.into_beet_builder().build(app.world_mut()).value;
+
 		let agent = app
 			.world_mut()
 			.spawn((
@@ -76,9 +79,9 @@ mod test {
 				ForceBundle::default(),
 				SteerBundle::default().with_target(Vec3::new(1.0, 0., 0.)),
 			))
+			.add_child(tree)
 			.id();
 
-		Seek.into_beet_builder().spawn(app.world_mut(), agent);
 
 		app.update();
 		app.update_with_secs(1);

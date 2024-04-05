@@ -18,7 +18,7 @@ fn translate(
 	mut _commands: Commands,
 	time: Res<Time>,
 	mut transforms: Query<&mut Transform>,
-	query: Query<(&TargetAgent, &Translate), With<Running>>,
+	query: Query<(&ParentRoot, &Translate), With<Running>>,
 ) {
 	for (target, translate) in query.iter() {
 		if let Some(mut transform) =

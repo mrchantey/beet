@@ -57,12 +57,11 @@ mod test {
 		let mut app = App::new();
 		app.add_plugins(BeetSystemsPlugin::<EcsModule, _>::default());
 
-		let target = app.world_mut().spawn_empty().id();
 
 		let tree = FallbackSelector
 			.child(InsertOnRun(RunResult::Failure))
 			.child(InsertOnRun(RunResult::Success))
-			.spawn(app.world_mut(), target);
+			.build(app.world_mut());
 
 		app.update();
 		expect(tree.component_tree(app.world())).to_be(

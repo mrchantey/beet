@@ -62,10 +62,7 @@ mod test {
 		app.add_plugins(BeetSystemsPlugin::<EcsModule, _>::default());
 		app.insert_time();
 
-		let root = EmptyAction
-			.into_beet_builder()
-			.spawn_no_target(app.world_mut())
-			.value;
+		let root = EmptyAction.into_beet_builder().build(app.world_mut()).value;
 
 		app.update_with_secs(1);
 

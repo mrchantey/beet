@@ -57,7 +57,7 @@ mod test {
 
 		let root = SucceedInDuration::default()
 			.into_beet_builder()
-			.spawn_no_target(app.world_mut())
+			.build(app.world_mut())
 			.value;
 
 		expect(&app).to_have_component::<Running>(root)?;

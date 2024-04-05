@@ -67,11 +67,9 @@ mod test {
 		let mut app = App::new();
 		app.add_plugins(BeetSystemsPlugin::<EcsModule, _>::default());
 
-		let target = app.world_mut().spawn_empty().id();
-
 		let root = InsertOnRun(RunResult::Success)
 			.into_beet_builder()
-			.spawn(app.world_mut(), target)
+			.build(app.world_mut())
 			.value;
 
 		expect(&app).to_have_component::<Running>(root)?;

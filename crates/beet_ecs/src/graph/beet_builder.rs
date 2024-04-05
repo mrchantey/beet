@@ -57,13 +57,7 @@ impl BeetBuilder {
 			.register::<T>();
 	}
 
-	pub fn spawn(self, world: &mut World, agent: Entity) -> EntityTree {
-		let tree = self.spawn_no_target(world);
-		tree.bind_agent(world, agent);
-		tree
-	}
-
-	pub fn spawn_no_target(self, world: &mut World) -> EntityTree {
+	pub fn build(self, world: &mut World) -> EntityTree {
 		let insert_root_defaults = self.insert_root_defaults;
 		let tree = self.build_recursive(world, &mut HashSet::default());
 		if insert_root_defaults {
@@ -73,7 +67,7 @@ impl BeetBuilder {
 	}
 
 	pub fn into_node(self, world: &mut World) -> EntityIdent {
-		let root = self.spawn_no_target(world).value;
+		let root = self.build(world).value;
 		EntityIdent::new(root)
 	}
 
@@ -90,7 +84,7 @@ impl BeetBuilder {
 		entity: &mut EntityWorldMut,
 		default_name: String,
 	) {
-		entity.insert(RunTimer::default());
+		entity.insert((RunTimer::default(), NeedsParentRoot));
 		if entity.contains::<Name>() == false {
 			entity.insert(Name::new(default_name));
 		}
@@ -207,16 +201,13 @@ mod test {
 	fn spawns() -> Result<()> {
 		let mut world = World::new();
 
-		let agent = world.spawn_empty().id();
-
 		let root = (Score::default(), SetOnStart(Score::Weight(0.5)))
 			.into_beet_builder()
 			.with_type::<Score>() // not needed by happenstance but usually required
-			.spawn(&mut world, agent)
+			.build(&mut world)
 			.value;
 
 		expect(&world).to_have_entity(root)?;
-		expect(&world).component(root)?.to_be(&TargetAgent(agent))?;
 		expect(&world)
 			.component(root)?
 			.to_be(&SetOnStart(Score::Weight(0.5)))?;
@@ -230,12 +221,11 @@ mod test {
 	#[test]
 	fn default_components() -> Result<()> {
 		let mut app = App::new();
-		let target = app.world_mut().spawn_empty().id();
 		let actions = test_constant_behavior_tree();
-		let root = actions.spawn(app.world_mut(), target).value;
+		let root = actions.build(app.world_mut()).value;
 
 		expect(&app).to_have_component::<SetOnStart<Score>>(root)?;
-		expect(&app).to_have_component::<TargetAgent>(root)?;
+		expect(&app).to_have_component::<NeedsParentRoot>(root)?;
 		expect(&app).to_have_component::<RunTimer>(root)?;
 		expect(&app).to_have_component::<Score>(root)?;
 

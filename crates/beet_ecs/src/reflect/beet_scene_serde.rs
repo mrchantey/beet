@@ -165,9 +165,8 @@ mod test {
 		/*-*/;
 
 		let world = app.world_mut();
-		let entity = world.spawn_empty().id();
-		let tree = test_serde_tree();
-		tree.spawn(world, entity);
+		let tree = test_serde_tree().build(world).value;
+		let _entity = world.spawn_empty().add_child(tree).id();
 		let scene = BeetSceneSerde::<EcsModule>::new(world);
 		let bin = bincode::serialize(&scene)?;
 		let scene2 = bincode::deserialize::<BeetSceneSerde<EcsModule>>(&bin)?;

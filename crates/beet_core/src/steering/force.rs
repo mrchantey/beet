@@ -82,7 +82,11 @@ mod test {
 	pub fn works() -> Result<()> {
 		let mut app = App::new();
 
-		app.add_plugins(SteeringPlugin::default());
+		app.add_plugins(SteeringPlugin {
+			wrap_around: WrapAround {
+				half_extents: Vec3::new(100., 100., 100.),
+			},
+		});
 		app.insert_time();
 
 		let velocity_entity = app

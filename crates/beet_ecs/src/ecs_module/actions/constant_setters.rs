@@ -84,7 +84,7 @@ impl<T: SettableComponent> SetAgentOnRun<T> {
 
 fn set_agent_on_run<T: SettableComponent>(
 	mut agents: Query<&mut T>,
-	mut query: Query<(&TargetAgent, &SetAgentOnRun<T>), Added<Running>>,
+	mut query: Query<(&ParentRoot, &SetAgentOnRun<T>), Added<Running>>,
 ) {
 	for (entity, src) in query.iter_mut() {
 		if let Ok(mut dst) = agents.get_mut(**entity) {
@@ -107,9 +107,8 @@ mod test {
 		let mut app = App::new();
 		app.add_plugins(BeetSystemsPlugin::<EcsModule, _>::default());
 
-		let target = app.world_mut().spawn_empty().id();
 		let actions = test_constant_behavior_tree();
-		let root = actions.spawn(app.world_mut(), target).value;
+		let root = actions.build(app.world_mut()).value;
 
 		app.world_mut()
 			.entity_mut(root)

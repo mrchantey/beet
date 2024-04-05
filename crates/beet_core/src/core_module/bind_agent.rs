@@ -1,5 +1,4 @@
 use beet::graph::BeetRoot;
-use beet::tree::EntityIdent;
 use bevy::prelude::*;
 
 
@@ -31,9 +30,9 @@ pub fn bind_agent_to_first_graph(
 			continue;
 		};
 
-		let new_node = EntityIdent(first).deep_clone(world).unwrap();
-		new_node.bind_agent(world, entity);
-
+		// let new_node = EntityIdent(first).deep_clone(world).unwrap();
+		let _ = first;
 		world.entity_mut(entity).remove::<BindAgentToFirstGraph>();
+		todo!("rethink this, no more binding");
 	}
 }

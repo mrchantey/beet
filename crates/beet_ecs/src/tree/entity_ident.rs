@@ -94,7 +94,7 @@ mod test {
 
 	fn node(world: &mut World) -> EntityIdent {
 		BeetBuilder::new(SetOnRun(RunResult::Success))
-			.spawn_no_target(world)
+			.build(world)
 			.node()
 	}
 
@@ -121,9 +121,7 @@ mod test {
 	#[test]
 	fn children() -> Result<()> {
 		let mut world = World::new();
-		let node = test_no_action_behavior_tree()
-			.spawn_no_target(&mut world)
-			.node();
+		let node = test_no_action_behavior_tree().build(&mut world).node();
 
 		expect(node.children(&world).len()).to_be(2)?;
 		let child = node.add_child_behavior(&mut world);
@@ -136,9 +134,7 @@ mod test {
 	#[test]
 	fn components() -> Result<()> {
 		let mut world = World::new();
-		let node = test_no_action_behavior_tree()
-			.spawn_no_target(&mut world)
-			.node();
+		let node = test_no_action_behavior_tree().build(&mut world).node();
 
 		expect(node.components(&world).len()).to_be_greater_than(0)?;
 

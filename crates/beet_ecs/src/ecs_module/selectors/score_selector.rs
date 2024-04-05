@@ -78,8 +78,6 @@ mod test {
 		let mut app = App::new();
 		app.add_plugins(BeetSystemsPlugin::<EcsModule, _>::default());
 
-		let target = app.world_mut().spawn_empty().id();
-
 		let tree = ScoreSelector
 			.child((
 				Score::default(),
@@ -91,7 +89,7 @@ mod test {
 				SetOnStart(Score::Pass),
 				InsertOnRun(RunResult::Success),
 			))
-			.spawn(app.world_mut(), target);
+			.build(app.world_mut());
 
 		(app, tree)
 	}

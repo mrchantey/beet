@@ -2,20 +2,12 @@ use crate::prelude::*;
 use bevy::prelude::*;
 
 impl EntityIdent {
-
 	pub fn get_roots(world: &mut World) -> Vec<EntityIdent> {
 		world
 			.query_filtered::<Entity, With<BeetRoot>>()
 			.iter(world)
 			.map(|e| EntityIdent::new(e))
 			.collect()
-	}
-
-
-	pub fn bind_agent(self, world: &mut World, agent: Entity) {
-		ChildrenExt::visit_dfs_world(world, *self, |world, entity| {
-			world.entity_mut(entity).insert(TargetAgent(agent));
-		});
 	}
 
 	/// Add a node as a child of the given entity
@@ -50,43 +42,23 @@ impl EntityIdent {
 
 #[cfg(test)]
 mod test {
-	use crate::prelude::*;
-	use anyhow::Result;
-	use bevy::prelude::*;
-	use sweet::*;
+	// use crate::prelude::*;
+	// use bevy::prelude::*;
 
+	// fn world() -> World {
+	// 	let mut world = World::new();
+	// 	world.init_resource::<AppTypeRegistry>();
+	// 	let registry = world.resource_mut::<AppTypeRegistry>();
+	// 	let mut registry = registry.write();
+	// 	registry.register::<SetOnRun<RunResult>>();
+	// 	registry.register::<BeetRoot>();
+	// 	drop(registry);
+	// 	world
+	// }
 
-	fn world() -> World {
-		let mut world = World::new();
-		world.init_resource::<AppTypeRegistry>();
-		let registry = world.resource_mut::<AppTypeRegistry>();
-		let mut registry = registry.write();
-		registry.register::<SetOnRun<RunResult>>();
-		registry.register::<BeetRoot>();
-		drop(registry);
-		world
-	}
-
-	fn node(world: &mut World) -> EntityIdent {
-		BeetBuilder::new(SetOnRun(RunResult::Success))
-			.spawn_no_target(world)
-			.node()
-	}
-
-	#[test]
-	fn bind() -> Result<()> {
-		let mut world = world();
-		let node = node(&mut world);
-
-		let agent = world.spawn_empty().id();
-
-		node.bind_agent(&mut world, agent);
-
-		expect(&world)
-			.component(*node)?
-			.to_be(&TargetAgent(agent))?;
-
-		Ok(())
-	}
-
+	// fn node(world: &mut World) -> EntityIdent {
+	// 	BeetBuilder::new(SetOnRun(RunResult::Success))
+	// 		.build(world)
+	// 		.node()
+	// }
 }

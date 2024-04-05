@@ -16,10 +16,7 @@ use bevy::prelude::*;
 pub struct SequenceSelector;
 fn sequence_selector(
 	mut commands: Commands,
-	selectors: Query<
-		(Entity, &SequenceSelector, &Children),
-		With<Running>,
-	>,
+	selectors: Query<(Entity, &SequenceSelector, &Children), With<Running>>,
 	children_running: Query<(), With<Running>>,
 	children_results: Query<&RunResult>,
 ) {
@@ -60,12 +57,10 @@ mod test {
 		let mut app = App::new();
 		app.add_plugins(BeetSystemsPlugin::<EcsModule, _>::default());
 
-		let target = app.world_mut().spawn_empty().id();
-
 		let tree = SequenceSelector
 			.child(InsertOnRun(RunResult::Success))
 			.child(InsertOnRun(RunResult::Failure))
-			.spawn(app.world_mut(), target);
+			.build(app.world_mut());
 
 		app.update();
 		expect(tree.component_tree(app.world())).to_be(

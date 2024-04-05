@@ -6,7 +6,9 @@ use forky_bevy::extensions::AppExt;
 /// Required Resources:
 /// - [`Time`]
 #[derive(Default)]
-pub struct SteeringPlugin;
+pub struct SteeringPlugin {
+	pub wrap_around: WrapAround,
+}
 
 
 impl Plugin for SteeringPlugin {
@@ -16,7 +18,7 @@ impl Plugin for SteeringPlugin {
 				Update,
 				(integrate_force, wrap_around).chain().in_set(PostTickSet),
 			)
-			.insert_resource(WrapAround::default())
+			.insert_resource(self.wrap_around.clone())
 			.__();
 	}
 }

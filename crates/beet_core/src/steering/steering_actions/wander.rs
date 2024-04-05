@@ -16,7 +16,7 @@ fn wander(
 		&MaxForce,
 		&mut Impulse,
 	)>,
-	query: Query<(&TargetAgent, &Wander), (With<Running>, With<Wander>)>,
+	query: Query<(&ParentRoot, &Wander), (With<Running>, With<Wander>)>,
 ) {
 	let num_agents = agents.iter().count();
 	for (agent, _) in query.iter() {
@@ -61,6 +61,12 @@ mod test {
 		))
 		.insert_time();
 
+
+		let tree = Wander::default()
+			.into_beet_builder()
+			.build(app.world_mut())
+			.value;
+
 		let agent = app
 			.world_mut()
 			.spawn((
@@ -68,11 +74,8 @@ mod test {
 				ForceBundle::default(),
 				SteerBundle::default(),
 			))
+			.add_child(tree)
 			.id();
-
-		Wander::default()
-			.into_beet_builder()
-			.spawn(app.world_mut(), agent);
 
 		app.update();
 		app.update_with_secs(1);

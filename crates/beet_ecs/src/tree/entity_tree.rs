@@ -13,11 +13,6 @@ impl EntityTree {
 	) -> Self {
 		Self(Tree::new_with_children(entity, children))
 	}
-	pub fn bind_agent(&self, world: &mut World, agent: Entity) {
-		self.map(move |entity| {
-			world.entity_mut(*entity).insert(TargetAgent(agent));
-		});
-	}
 
 	pub fn component_tree<'a, T: Component>(
 		&self,
@@ -39,8 +34,7 @@ mod test {
 	#[test]
 	fn component_tree() -> Result<()> {
 		let mut world = World::new();
-		let target = world.spawn_empty().id();
-		let tree = test_constant_behavior_tree().spawn(&mut world, target);
+		let tree = test_constant_behavior_tree().build(&mut world);
 		expect(tree.children.len()).to_be(2)?;
 
 		let entity = tree.children[1].value;

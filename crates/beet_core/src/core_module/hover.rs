@@ -22,7 +22,7 @@ fn hover(
 	mut _commands: Commands,
 	time: Res<Time>,
 	mut transforms: Query<&mut Transform>,
-	query: Query<(&TargetAgent, &Hover), With<Running>>,
+	query: Query<(&ParentRoot, &Hover), With<Running>>,
 ) {
 	for (target, hover) in query.iter() {
 		let elapsed = time.elapsed_seconds();

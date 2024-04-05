@@ -35,10 +35,7 @@ mod test {
 		let mut app = App::new();
 		app.add_plugins(BeetSystemsPlugin::<EcsModule, _>::default());
 
-		let target = app.world_mut().spawn_empty().id();
-
-		let tree =
-			test_no_action_behavior_tree().spawn(app.world_mut(), target);
+		let tree = test_no_action_behavior_tree().build(app.world_mut());
 
 		tree.map(|entity| {
 			app.world_mut().entity_mut(*entity).insert(Running);
