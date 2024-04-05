@@ -13,7 +13,7 @@ async fn works() -> Result<()> {
 		.with_bundle(flower_bundle())
 		.with_bundle(flower_bundle())
 		.with_bundle(flower_bundle())
-		.with(flower_auto_spawn)
+		.with_bundle(flower_auto_spawn_bundle())
 		.with_behavior(bee_bundle(), forage())
 		.run_forever()?;
 	Ok(())

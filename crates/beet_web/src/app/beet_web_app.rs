@@ -23,7 +23,7 @@ impl BeetWebApp {
 		console_log::init_with_level(log::Level::Info).ok();
 		let mut app = App::new();
 
-		app.add_plugins(DomSim::<CoreModule>::default().with_url_params());
+		app.add_plugins(DomSim::<CoreModule>::default());
 
 		Self(Arc::new(RwLock::new(app)))
 	}

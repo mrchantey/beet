@@ -62,7 +62,7 @@ pub struct CorePlugin;
 impl Plugin for CorePlugin {
 	fn build(&self, app: &mut App) {
 		app /*-*/
-			.add_systems(Update, auto_spawn.before(PreTickSet))
+			.add_systems(PreUpdate, auto_spawn.before(PreTickSet))
 			.add_systems(Update, randomize_position.in_set(PreTickSet))
 		/*-*/;
 	}

@@ -1,6 +1,3 @@
-pub mod bee;
-#[allow(unused_imports)]
-pub use self::bee::*;
 pub mod beet_web_app;
 #[allow(unused_imports)]
 pub use self::beet_web_app::*;
@@ -13,9 +10,6 @@ pub use self::dom_sim::*;
 pub mod dom_sim_message;
 #[allow(unused_imports)]
 pub use self::dom_sim_message::*;
-pub mod flower;
-#[allow(unused_imports)]
-pub use self::flower::*;
 pub mod scene_io;
 #[allow(unused_imports)]
 pub use self::scene_io::*;

@@ -2,34 +2,21 @@ use crate::prelude::*;
 use anyhow::Result;
 use beet::prelude::*;
 use bevy::prelude::*;
-use forky_web::SearchParams;
 use std::marker::PhantomData;
-use std::time::Duration;
 
 pub struct DomSim<T: ActionList> {
-	pub auto_flowers: Option<Duration>,
 	pub phantom: PhantomData<T>,
 }
 
 impl<T: ActionList> Default for DomSim<T> {
 	fn default() -> Self {
 		Self {
-			auto_flowers: None,
-			// test_container: None,
 			phantom: PhantomData,
 		}
 	}
 }
 
-impl<T: ActionList> DomSim<T> {
-	pub fn with_url_params(mut self) -> Self {
-		if let Some(auto_flowers) = SearchParams::get("auto-flowers") {
-			let val: f64 = auto_flowers.parse().unwrap_or(1.0);
-			self.auto_flowers = Some(Duration::from_secs_f64(val));
-		}
-		self
-	}
-}
+impl<T: ActionList> DomSim<T> {}
 
 
 impl<T: ActionList> Plugin for DomSim<T> {
@@ -56,10 +43,6 @@ impl<T: ActionList> Plugin for DomSim<T> {
 				.after(PostTickSet)
 			)
 		/*-*/;
-
-		if let Some(duration) = self.auto_flowers {
-			flower_auto_spawn_with_duration(&mut app.world_mut(), duration);
-		}
 	}
 }
 
