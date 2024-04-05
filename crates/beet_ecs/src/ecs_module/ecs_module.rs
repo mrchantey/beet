@@ -25,7 +25,6 @@ use bevy::reflect::TypeRegistry;
 	// graph
 	Parent,
 	Children,
-	BeetPrefab,
 	BeetRoot,
 	AgentMarker,
 	TargetAgent,

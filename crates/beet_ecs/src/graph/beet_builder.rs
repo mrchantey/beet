@@ -8,11 +8,6 @@ use bevy::utils::HashSet;
 #[reflect(Component)]
 pub struct BeetRoot;
 
-/// Marker to identify the graph as a prefab
-#[derive(Debug, Default, Component, Reflect)]
-#[reflect(Component)]
-pub struct BeetPrefab;
-
 pub type SpawnFunc = Box<dyn FnOnce(&mut World) -> Entity>;
 
 pub trait BeetBundle: Bundle + Reflect + GetTypeRegistration {}
@@ -26,8 +21,6 @@ pub struct BeetBuilder {
 	pub children: Vec<BeetBuilder>,
 	/// Inserts [`(Running, BeetRoot)`] components to this node if its the root
 	pub insert_root_defaults: bool,
-	/// Inserts [`BeetPrefab`] components to this node if its the root
-	pub is_prefab: bool,
 	/// Inserts [`(Name, RunTimer)`] components to this node
 	pub insert_defaults: bool,
 	pub spawn_func: SpawnFunc,
@@ -46,7 +39,6 @@ impl BeetBuilder {
 			}),
 			misc_funcs: Vec::new(),
 			insert_root_defaults: true,
-			is_prefab: false,
 			insert_defaults: true,
 		}
 	}
@@ -54,11 +46,6 @@ impl BeetBuilder {
 		self.misc_funcs.push(Box::new(|world: &mut World| {
 			Self::register_type::<T>(world);
 		}));
-		self
-	}
-
-	pub fn as_prefab(mut self) -> Self {
-		self.is_prefab = true;
 		self
 	}
 
@@ -77,14 +64,10 @@ impl BeetBuilder {
 	}
 
 	pub fn spawn_no_target(self, world: &mut World) -> EntityTree {
-		let is_prefab = self.is_prefab;
 		let insert_root_defaults = self.insert_root_defaults;
 		let tree = self.build_recursive(world, &mut HashSet::default());
 		if insert_root_defaults {
 			world.entity_mut(tree.value).insert((BeetRoot, Running));
-		}
-		if is_prefab {
-			world.entity_mut(tree.value).insert(BeetPrefab);
 		}
 		EntityTree(tree)
 	}

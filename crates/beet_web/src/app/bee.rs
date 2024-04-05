@@ -4,9 +4,16 @@ use bevy::prelude::*;
 
 
 
-pub fn spawn_bee(world: &mut World) { world.spawn(bee_bundle()); }
+pub fn spawn_bee(world: &mut World) { 
 
-pub fn bee_bundle() -> impl Bundle {
+
+	// let behavior = forage();	
+	world.spawn(bee_bundle()); 
+
+
+}
+
+fn bee_bundle() -> impl Bundle {
 	(
 		Name::new("bee"),
 		RenderText::new("🐝"),

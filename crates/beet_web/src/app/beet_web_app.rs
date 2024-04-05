@@ -56,10 +56,7 @@ impl BeetWebApp {
 
 	pub fn with_node<M>(self, node: impl IntoBeetBuilder<M>) -> Result<Self> {
 		let mut app = self.write();
-		let scene = node
-			.into_beet_builder()
-			.as_prefab()
-			.into_scene::<CoreModule>();
+		let scene = node.into_beet_builder().into_scene::<CoreModule>();
 
 		scene.write(&mut app.world_mut())?;
 		drop(app);

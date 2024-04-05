@@ -62,15 +62,15 @@ use crate::prelude::*;
 
 		let send = app.world_mut().resource::<BeetMessageSend>().clone();
 
-		let prefab1 = BeetBuilder::new(Score::Weight(0.1))
+		let scene1 = BeetBuilder::new(Score::Weight(0.1))
 			.into_scene::<CoreModule>();
 		
 
-		let auto_spawn = AutoSpawn::new(prefab1, Duration::from_secs(1));
-		let prefab2 = BeetBuilder::new(auto_spawn.clone())
+		let auto_spawn = AutoSpawn::new(scene1, Duration::from_secs(1));
+		let scene2 = BeetBuilder::new(auto_spawn.clone())
 		.into_scene::<CoreModule>();
 	
-		let bincode = bincode::serialize(&prefab2)?;
+		let bincode = bincode::serialize(&scene2)?;
 
 		send.send(BeetMessage::Spawn{bincode})?;
 

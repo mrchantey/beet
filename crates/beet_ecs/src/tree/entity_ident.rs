@@ -39,7 +39,6 @@ impl EntityIdent {
 		let mut entity_map = EntityHashMap::default();
 		scene.write_to_world(world, &mut entity_map)?;
 		let new_root = entity_map[&*self];
-		world.entity_mut(new_root).remove::<BeetPrefab>();
 
 		Ok(Self::new(new_root))
 	}

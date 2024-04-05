@@ -87,9 +87,9 @@ mod test {
 
 		let send = app.world_mut().resource::<BeetMessageSend>().clone();
 
-		let prefab = BeetBuilder::new(Score::Weight(0.1))
+		let scene = BeetBuilder::new(Score::Weight(0.1))
 			.into_scene::<CoreModule>();
-		let bincode = bincode::serialize(&prefab)?;
+		let bincode = bincode::serialize(&scene)?;
 		// log::info!("{:?}", bincode);
 		send.send(BeetMessage::Spawn{bincode})?;
 

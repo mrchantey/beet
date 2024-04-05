@@ -1,4 +1,3 @@
-use beet::graph::BeetPrefab;
 use beet::graph::BeetRoot;
 use beet::tree::EntityIdent;
 use bevy::prelude::*;
@@ -24,7 +23,7 @@ pub fn bind_agent_to_first_graph(
 		.into_iter()
 	{
 		let Some(first) = world
-			.query_filtered::<Entity, (With<BeetRoot>, With<BeetPrefab>)>()
+			.query_filtered::<Entity, With<BeetRoot>>()
 			.iter(world)
 			.next()
 		else {
