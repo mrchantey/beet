@@ -14,7 +14,6 @@ impl EntityTree {
 		Self(Tree::new_with_children(entity, children))
 	}
 	pub fn bind_agent(&self, world: &mut World, agent: Entity) {
-		world.entity_mut(agent).insert(AgentMarker);
 		self.map(move |entity| {
 			world.entity_mut(*entity).insert(TargetAgent(agent));
 		});

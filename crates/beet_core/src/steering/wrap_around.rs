@@ -1,4 +1,3 @@
-use beet_ecs::node::AgentMarker;
 use bevy::prelude::*;
 
 pub const DEFAULT_WRAPAROUND_HALF_EXTENTS: f32 = 1.;
@@ -27,7 +26,7 @@ impl WrapAround {
 
 pub fn wrap_around(
 	wrap: Res<WrapAround>,
-	mut query: Query<&mut Transform, (With<AgentMarker>, Changed<Transform>)>,
+	mut query: Query<&mut Transform, Changed<Transform>>,
 ) {
 	for mut transform in query.iter_mut() {
 		if transform.translation.x > wrap.half_extents.x {

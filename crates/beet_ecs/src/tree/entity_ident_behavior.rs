@@ -13,7 +13,6 @@ impl EntityIdent {
 
 
 	pub fn bind_agent(self, world: &mut World, agent: Entity) {
-		world.entity_mut(agent).insert(AgentMarker);
 		ChildrenExt::visit_dfs_world(world, *self, |world, entity| {
 			world.entity_mut(entity).insert(TargetAgent(agent));
 		});
@@ -82,8 +81,6 @@ mod test {
 		let agent = world.spawn_empty().id();
 
 		node.bind_agent(&mut world, agent);
-
-		expect(&world).component(agent)?.to_be(&AgentMarker)?;
 
 		expect(&world)
 			.component(*node)?

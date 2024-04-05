@@ -26,7 +26,6 @@ use bevy::reflect::TypeRegistry;
 	Parent,
 	Children,
 	BeetRoot,
-	AgentMarker,
 	TargetAgent,
 	ActionTarget,
 	// bevy

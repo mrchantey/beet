@@ -7,8 +7,9 @@ use bevy::prelude::*;
 pub fn spawn_bee(world: &mut World) { 
 
 
-	// let behavior = forage();	
-	world.spawn(bee_bundle()); 
+	// let behavior = forage().into_scene::<CoreModule>();	
+	// behavior.
+	let _entity = world.spawn(bee_bundle()); 
 
 
 }

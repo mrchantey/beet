@@ -58,12 +58,13 @@ impl<T: ActionSystems + Send + Sync, Schedule: ScheduleLabel + Clone> Plugin
 			)
 			.add_systems(
 				self.schedule.clone(),
-				despawn_graph_on_agent_removed.in_set(PreTickSet),
+				(sync_running, sync_interrupts).in_set(TickSyncSet),
 			)
 			.add_systems(
 				self.schedule.clone(),
-				(sync_running, sync_interrupts).in_set(TickSyncSet),
-			);
+				set_parent_root.in_set(PreTickSet),
+			)
+			/*-*/;
 		T::add_systems(app, self.schedule.clone());
 	}
 }

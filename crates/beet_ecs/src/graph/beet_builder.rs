@@ -216,7 +216,6 @@ mod test {
 			.value;
 
 		expect(&world).to_have_entity(root)?;
-		expect(&world).component::<AgentMarker>(agent)?;
 		expect(&world).component(root)?.to_be(&TargetAgent(agent))?;
 		expect(&world)
 			.component(root)?
