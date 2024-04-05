@@ -1,6 +1,6 @@
 use beet::graph::BeetPrefab;
 use beet::graph::BeetRoot;
-use beet::tree::BeetNode;
+use beet::tree::EntityIdent;
 use bevy::prelude::*;
 
 
@@ -32,7 +32,7 @@ pub fn bind_agent_to_first_graph(
 			continue;
 		};
 
-		let new_node = BeetNode(first).deep_clone(world).unwrap();
+		let new_node = EntityIdent(first).deep_clone(world).unwrap();
 		new_node.bind_agent(world, entity);
 
 		world.entity_mut(entity).remove::<BindAgentToFirstGraph>();

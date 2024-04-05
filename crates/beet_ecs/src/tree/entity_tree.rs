@@ -26,7 +26,7 @@ impl EntityTree {
 	) -> Tree<Option<&'a T>> {
 		self.0.map(|e| world.get::<T>(*e))
 	}
-	pub fn node(&self) -> BeetNode { BeetNode::new(self.0.value) }
+	pub fn node(&self) -> EntityIdent { EntityIdent::new(self.0.value) }
 }
 
 

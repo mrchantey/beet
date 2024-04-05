@@ -18,7 +18,7 @@ pub type SpawnFunc = Box<dyn FnOnce(&mut World) -> Entity>;
 pub trait BeetBundle: Bundle + Reflect + GetTypeRegistration {}
 impl<T: Bundle + Reflect + GetTypeRegistration> BeetBundle for T {}
 
-/// An opaque intermediary structure between a [`Bundle`] graph and a [`BeetNode`]
+/// An opaque intermediary structure between a [`Bundle`] graph and a spawned [`Entity`]
 /// This does the following when build
 /// - Registers the bundle types
 /// - Spawns the entities and forms parent-child relationships
@@ -89,9 +89,9 @@ impl BeetBuilder {
 		EntityTree(tree)
 	}
 
-	pub fn into_node(self, world: &mut World) -> BeetNode {
+	pub fn into_node(self, world: &mut World) -> EntityIdent {
 		let root = self.spawn_no_target(world).value;
-		BeetNode::new(root)
+		EntityIdent::new(root)
 	}
 
 	pub fn into_scene<T: ActionTypes>(self) -> BeetSceneSerde<T> {

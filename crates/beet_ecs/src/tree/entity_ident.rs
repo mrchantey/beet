@@ -6,18 +6,10 @@ use std::any::TypeId;
 
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, Deref, DerefMut)]
-pub struct BeetNode(pub Entity);
+pub struct EntityIdent(pub Entity);
 
-impl BeetNode {
+impl EntityIdent {
 	pub fn new(entity: Entity) -> Self { Self(entity) }
-
-	pub fn get_roots(world: &mut World) -> Vec<BeetNode> {
-		world
-			.query_filtered::<Entity, With<BeetRoot>>()
-			.iter(world)
-			.map(|e| BeetNode::new(e))
-			.collect()
-	}
 
 	pub fn deep_clone(self, world: &mut World) -> Result<Self> {
 		let entities = ChildrenExt::collect_world(*self, world);
@@ -52,36 +44,11 @@ impl BeetNode {
 		Ok(Self::new(new_root))
 	}
 
-	pub fn bind_agent(self, world: &mut World, agent: Entity) {
-		world.entity_mut(agent).insert(AgentMarker);
-		ChildrenExt::visit_dfs_world(world, *self, |world, entity| {
-			world.entity_mut(entity).insert(TargetAgent(agent));
-		});
-	}
-
-	/// Add a node as a child of the given entity
-	pub fn add_child(self, world: &mut World) -> BeetNode {
-		let mut entity = world.spawn_empty();
-		BeetBuilder::insert_default_components(
-			&mut entity,
-			"New Node".to_string(),
-		);
-		let entity = entity.id();
-
-		if let Some(mut parent) = world.get_entity_mut(*self) {
-			parent.add_child(entity);
-		} else {
-			log::warn!("parent not found when adding node");
-		}
-
-		BeetNode(entity)
-	}
-
-	pub fn children(self, world: &World) -> Vec<BeetNode> {
+	pub fn children(self, world: &World) -> Vec<EntityIdent> {
 		world
 			.get::<Children>(*self)
 			.map(|children| {
-				children.iter().map(|entity| BeetNode(*entity)).collect()
+				children.iter().map(|entity| EntityIdent(*entity)).collect()
 			})
 			.unwrap_or_default()
 	}
@@ -98,21 +65,10 @@ impl BeetNode {
 		despawn_with_children_recursive(world, *self);
 	}
 
-
 	pub fn components(self, world: &World) -> Vec<ComponentIdent> {
 		ComponentUtils::get(world, *self)
 			.into_iter()
 			.map(|c| ComponentIdent::new(*self, c))
-			.collect()
-	}
-
-	pub fn graph_roles(
-		self,
-		world: &World,
-	) -> Vec<(ComponentIdent, GraphRole)> {
-		self.components(world)
-			.into_iter()
-			.filter_map(|c| c.graph_role(world).ok().map(|role| (c, role)))
 			.collect()
 	}
 }
@@ -137,7 +93,7 @@ mod test {
 		world
 	}
 
-	fn node(world: &mut World) -> BeetNode {
+	fn node(world: &mut World) -> EntityIdent {
 		BeetBuilder::new(SetOnRun(RunResult::Success))
 			.spawn_no_target(world)
 			.node()
@@ -158,27 +114,11 @@ mod test {
 			.component(*node2)?
 			.to_be(&SetOnRun(RunResult::Success))?;
 
-		expect(BeetNode::get_roots(&mut world).len()).to_be(2)?;
+		expect(EntityIdent::get_roots(&mut world).len()).to_be(2)?;
 
 		Ok(())
 	}
-	#[test]
-	fn bind() -> Result<()> {
-		let mut world = world();
-		let node = node(&mut world);
 
-		let agent = world.spawn_empty().id();
-
-		node.bind_agent(&mut world, agent);
-
-		expect(&world).component(agent)?.to_be(&AgentMarker)?;
-
-		expect(&world)
-			.component(*node)?
-			.to_be(&TargetAgent(agent))?;
-
-		Ok(())
-	}
 	#[test]
 	fn children() -> Result<()> {
 		let mut world = World::new();
@@ -187,7 +127,7 @@ mod test {
 			.node();
 
 		expect(node.children(&world).len()).to_be(2)?;
-		let child = node.add_child(&mut world);
+		let child = node.add_child_behavior(&mut world);
 		expect(node.children(&world).len()).to_be(3)?;
 		child.remove_recursive(&mut world);
 		expect(node.children(&world).len()).to_be(2)?;
