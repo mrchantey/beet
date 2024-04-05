@@ -29,10 +29,11 @@ pub fn message_handler(world: &mut World) -> Result<()> {
 	for message in messages {
 		match message {
 			DomSimMessage::SpawnBee => {
-				spawn_bee(world);
+				let behavior = forage().build(world).value;
+				world.spawn(bee_bundle()).add_child(behavior);
 			}
 			DomSimMessage::SpawnFlower => {
-				spawn_flower(world);
+				world.spawn(flower_bundle());
 			}
 			DomSimMessage::DespawnAll => {
 				// dont despawn everything, we need the graph

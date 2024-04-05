@@ -10,8 +10,10 @@ pub fn works() -> Result<()> {
 
 	BeetWebApp::default()
 		.with_test_container()
-		.with(spawn_bee)
-		.with_node(Translate::new(Vec3::new(-0.1, 0., 0.)))?
+		.with_behavior(
+			bee_bundle(),
+			Translate::new(Vec3::new(-0.1, 0., 0.)),
+		)
 		.run_forever()?;
 
 	Ok(())

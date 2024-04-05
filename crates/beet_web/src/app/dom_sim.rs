@@ -8,8 +8,6 @@ use std::time::Duration;
 
 pub struct DomSim<T: ActionList> {
 	pub auto_flowers: Option<Duration>,
-	pub bees: usize,
-	pub flowers: usize,
 	pub phantom: PhantomData<T>,
 }
 
@@ -18,8 +16,6 @@ impl<T: ActionList> Default for DomSim<T> {
 		Self {
 			auto_flowers: None,
 			// test_container: None,
-			bees: 0,
-			flowers: 0,
 			phantom: PhantomData,
 		}
 	}
@@ -27,12 +23,6 @@ impl<T: ActionList> Default for DomSim<T> {
 
 impl<T: ActionList> DomSim<T> {
 	pub fn with_url_params(mut self) -> Self {
-		if let Some(bees) = SearchParams::get("bees") {
-			self.bees = bees.parse().unwrap_or(1);
-		}
-		if let Some(flowers) = SearchParams::get("flowers") {
-			self.flowers = flowers.parse().unwrap_or(1);
-		}
 		if let Some(auto_flowers) = SearchParams::get("auto-flowers") {
 			let val: f64 = auto_flowers.parse().unwrap_or(1.0);
 			self.auto_flowers = Some(Duration::from_secs_f64(val));
@@ -69,13 +59,6 @@ impl<T: ActionList> Plugin for DomSim<T> {
 
 		if let Some(duration) = self.auto_flowers {
 			flower_auto_spawn_with_duration(&mut app.world_mut(), duration);
-		}
-
-		for _ in 0..self.bees {
-			spawn_bee(&mut app.world_mut());
-		}
-		for _ in 0..self.flowers {
-			spawn_flower(&mut app.world_mut());
 		}
 	}
 }

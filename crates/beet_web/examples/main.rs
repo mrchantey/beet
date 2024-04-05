@@ -7,7 +7,7 @@ fn main() {
 	BeetWebApp::default()
 		.with_test_container()
 		.with(spawn_bee)
-		.with(spawn_flower)
+		.with_bundle(flower_bundle())
 		.run_forever()
 		.ok_or(|e| log::error!("{e}"));
 }

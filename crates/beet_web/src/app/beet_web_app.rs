@@ -53,15 +53,29 @@ impl BeetWebApp {
 		drop(app);
 		self
 	}
-
-	pub fn with_node<M>(self, node: impl IntoBeetBuilder<M>) -> Result<Self> {
+	
+	pub fn with_bundle(
+		self,
+		bundle: impl Bundle,
+	) ->Self{
 		let mut app = self.write();
-		let scene = node.into_beet_builder().into_scene::<CoreModule>();
-
-		scene.write(&mut app.world_mut())?;
+		let world = app.world_mut();
+		world.spawn(bundle);
 		drop(app);
-		Ok(self)
+		self
 	}
+	pub fn with_behavior<M>(
+		self,
+		bundle: impl Bundle,
+		node: impl IntoBeetBuilder<M>,
+	) ->Self{
+		let mut app = self.write();
+		let world = app.world_mut();
+		let behavior = node.into_beet_builder().build(world).value;
+		world.spawn(bundle).add_child(behavior);
+		drop(app);
+		self
+	}	
 
 	pub async fn try_load_scene_url(self) -> Result<()> {
 		let Some(url) = SearchParams::get("scene") else {

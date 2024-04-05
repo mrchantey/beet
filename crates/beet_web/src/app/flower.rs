@@ -10,9 +10,6 @@ pub fn flower_auto_spawn_with_duration(world: &mut World, duration: Duration) {
 	world.spawn(AutoSpawn::new(scene, duration));
 }
 
-
-pub fn spawn_flower(world: &mut World) { world.spawn(flower_bundle()); }
-
 pub fn flower_bundle() -> impl Bundle {
 	(
 		Name::new("flower"),

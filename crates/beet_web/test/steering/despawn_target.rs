@@ -7,9 +7,9 @@ pub async fn works() -> Result<()> {
 	append_html_for_tests();
 	BeetWebApp::default()
 		.with_test_container()
-		.with(spawn_bee)
-		.with(spawn_flower)
-		.with_node(
+		.with_bundle(flower_bundle())
+		.with_behavior(
+			bee_bundle(),
 			(Repeat::default(), SequenceSelector)
 				.child((
 					Seek::default(),
@@ -20,7 +20,7 @@ pub async fn works() -> Result<()> {
 					InsertOnRun(RunResult::Success),
 					DespawnSteerTarget::default(),
 				)),
-		)?
+		)
 		.run_forever()?;
 	Ok(())
 }

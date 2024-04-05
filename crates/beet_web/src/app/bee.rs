@@ -1,24 +1,10 @@
 use beet::prelude::*;
 use bevy::prelude::*;
 
-
-
-
-pub fn spawn_bee(world: &mut World) { 
-
-
-	// let behavior = forage().into_scene::<CoreModule>();	
-	// behavior.
-	let _entity = world.spawn(bee_bundle()); 
-
-
-}
-
-fn bee_bundle() -> impl Bundle {
+pub fn bee_bundle() -> impl Bundle {
 	(
 		Name::new("bee"),
 		RenderText::new("🐝"),
-		BindAgentToFirstGraph,
 		RandomizePosition::default(),
 		TransformBundle::default(),
 		ForceBundle::default(),

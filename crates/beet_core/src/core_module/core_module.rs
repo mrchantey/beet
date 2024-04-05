@@ -30,7 +30,6 @@ use bevy::reflect::TypeRegistry;
 #[components(
 	AutoSpawn,
 	RandomizePosition,
-	BindAgentToFirstGraph,
 	//render
 	RenderText,
 	//force bundle
@@ -64,7 +63,7 @@ impl Plugin for CorePlugin {
 	fn build(&self, app: &mut App) {
 		app /*-*/
 			.add_systems(Update, auto_spawn.before(PreTickSet))
-			.add_systems(Update, (randomize_position,bind_agent_to_first_graph).in_set(PreTickSet))
+			.add_systems(Update, randomize_position.in_set(PreTickSet))
 		/*-*/;
 	}
 }

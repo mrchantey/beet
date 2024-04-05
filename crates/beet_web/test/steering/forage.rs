@@ -8,14 +8,13 @@ async fn works() -> Result<()> {
 	append_html_for_tests();
 
 	BeetWebApp::default()
-		.with(spawn_bee)
-		.with(spawn_flower)
-		.with(spawn_flower)
-		.with(spawn_flower)
-		.with(spawn_flower)
-		.with(flower_auto_spawn)
 		.with_test_container()
-		.with_node(forage())?
+		.with_bundle(flower_bundle())
+		.with_bundle(flower_bundle())
+		.with_bundle(flower_bundle())
+		.with_bundle(flower_bundle())
+		.with(flower_auto_spawn)
+		.with_behavior(bee_bundle(), forage())
 		.run_forever()?;
 	Ok(())
 }

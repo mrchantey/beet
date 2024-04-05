@@ -8,8 +8,7 @@ pub fn works() -> Result<()> {
 
 	BeetWebApp::default()
 		.with_test_container()
-		.with(spawn_bee)
-		.with_node(Hover::new(1., 0.01))?
+		.with_behavior(bee_bundle(), Hover::new(1., 0.01))
 		.run_forever()?;
 
 	Ok(())

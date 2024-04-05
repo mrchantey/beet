@@ -66,6 +66,16 @@ impl<T: ActionTypes> BeetSceneSerde<T> {
 		world.spawn(bundle);
 		Self::new(&world)
 	}
+	pub fn new_with_behavior<M>(
+		bundle: impl Bundle,
+		behavior: impl IntoBeetBuilder<M>,
+	) -> Self {
+		let mut world = World::new();
+		world.insert_resource(Self::type_registry());
+		let behavior = behavior.into_beet_builder().build(&mut world).value;
+		world.spawn(bundle).add_child(behavior);
+		Self::new(&world)
+	}
 
 	pub fn write(self, world: &mut World) -> Result<()> {
 		self.scene.write_to_world(world, &mut Default::default())?;

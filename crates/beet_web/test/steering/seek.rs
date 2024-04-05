@@ -7,9 +7,8 @@ pub async fn works() -> Result<()> {
 	append_html_for_tests();
 	BeetWebApp::default()
 		.with_test_container()
-		.with(spawn_bee)
-		.with(spawn_flower)
-		.with_node((Seek, FindSteerTarget::new("flower", 2.)))?
+		.with_bundle(flower_bundle())
+		.with_behavior(bee_bundle(), (Seek, FindSteerTarget::new("flower", 2.)))
 		.run_forever()?;
 	Ok(())
 }
