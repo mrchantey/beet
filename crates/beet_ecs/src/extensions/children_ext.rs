@@ -1,39 +1,13 @@
-use bevy::ecs::entity::MapEntities;
-use bevy::ecs::reflect::ReflectMapEntities;
 use bevy::prelude::*;
 use bevy::utils::HashSet;
 
-/// Outgoing edges of an action, aka Children.
-#[derive(Debug, Default, Clone, Deref, DerefMut, Component, Reflect)]
-#[reflect(Component, MapEntities)]
-pub struct Edges(pub Vec<Entity>);
-impl MapEntities for Edges {
-	fn map_entities<M: EntityMapper>(&mut self, entity_mapper: &mut M) {
-		for entity in &mut self.0 {
-			*entity = entity_mapper.map_entity(*entity);
-		}
-	}
-}
+pub struct ChildrenExt;
 
-impl Edges {
-	pub fn new() -> Self { Self(Vec::new()) }
-
-	pub fn with_child(mut self, edge: Entity) -> Self {
-		self.push(edge);
-		self
-	}
-
-	pub fn despawn_recursive(
-		commands: &mut Commands,
+impl ChildrenExt {
+	pub fn collect(
 		entity: Entity,
-		edges: &Query<&Edges>,
-	) {
-		Edges::visit_dfs(entity, &edges, |entity| {
-			commands.entity(entity).despawn();
-		});
-	}
-
-	pub fn collect(entity: Entity, edge_query: &Query<&Edges>) -> Vec<Entity> {
+		edge_query: &Query<&Children>,
+	) -> Vec<Entity> {
 		let mut entities = Vec::new();
 		Self::visit_dfs(entity, edge_query, |entity| {
 			entities.push(entity);
@@ -50,7 +24,7 @@ impl Edges {
 
 	pub fn visit_dfs(
 		entity: Entity,
-		edge_query: &Query<&Edges>,
+		edge_query: &Query<&Children>,
 		mut func: impl FnMut(Entity),
 	) {
 		Self::visit_dfs_recursive(
@@ -63,7 +37,7 @@ impl Edges {
 
 	fn visit_dfs_recursive(
 		entity: Entity,
-		edge_query: &Query<&Edges>,
+		edge_query: &Query<&Children>,
 		func: &mut impl FnMut(Entity),
 		visited: &mut HashSet<Entity>,
 	) {
@@ -72,9 +46,9 @@ impl Edges {
 		}
 		visited.insert(entity);
 		func(entity);
-		if let Ok(edges) = edge_query.get(entity) {
-			for edge in edges.iter() {
-				Self::visit_dfs_recursive(*edge, edge_query, func, visited);
+		if let Ok(children) = edge_query.get(entity) {
+			for child in children.iter() {
+				Self::visit_dfs_recursive(*child, edge_query, func, visited);
 			}
 		}
 	}
@@ -83,7 +57,7 @@ impl Edges {
 		entity: Entity,
 		mut func: impl FnMut(&mut World, Entity),
 	) {
-		let mut query = world.query::<&Edges>();
+		let mut query = world.query::<&Children>();
 		Self::visit_dfs_recursive_world(
 			world,
 			&mut query,
@@ -95,7 +69,7 @@ impl Edges {
 
 	fn visit_dfs_recursive_world(
 		world: &mut World,
-		edge_query: &mut QueryState<&Edges>,
+		edge_query: &mut QueryState<&Children>,
 		entity: Entity,
 		func: &mut impl FnMut(&mut World, Entity),
 		visited: &mut HashSet<Entity>,
@@ -105,10 +79,12 @@ impl Edges {
 		}
 		visited.insert(entity);
 		func(world, entity);
-		if let Ok(edges) = edge_query.get(world, entity).map(|e| e.0.clone()) {
-			for edge in edges.into_iter() {
+		if let Ok(children) = edge_query.get(world, entity) {
+			for child in
+				children.into_iter().map(|edge| *edge).collect::<Vec<_>>()
+			{
 				Self::visit_dfs_recursive_world(
-					world, edge_query, edge, func, visited,
+					world, edge_query, child, func, visited,
 				);
 			}
 		}
@@ -130,7 +106,8 @@ mod test {
 
 		let child1 = app.world_mut().spawn(Score::Fail).id();
 
-		let _parent = app.world_mut().spawn(Edges::new().with_child(child1));
+
+		let _parent = app.world_mut().spawn_empty().add_child(child1);
 		app.add_systems(Update, changes_score_to_pass);
 
 		expect(&app)
@@ -148,12 +125,12 @@ mod test {
 
 
 	fn changes_score_to_pass(
-		parents: Query<&Edges>,
-		mut children: Query<&mut Score>,
+		parents: Query<&Children>,
+		mut scores: Query<&mut Score>,
 	) {
-		for edges in parents.iter() {
-			for child in edges.iter() {
-				if let Ok(mut score) = children.get_mut(*child) {
+		for children in parents.iter() {
+			for child in children.iter() {
+				if let Ok(mut score) = scores.get_mut(*child) {
 					*score = Score::Pass;
 				}
 			}

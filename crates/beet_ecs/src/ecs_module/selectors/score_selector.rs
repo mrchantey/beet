@@ -21,7 +21,7 @@ pub enum UtilityInterruptRate {
 
 fn score_selector(
 	mut commands: Commands,
-	selectors: Query<(Entity, &ScoreSelector, &Edges), With<Running>>,
+	selectors: Query<(Entity, &ScoreSelector, &Children), With<Running>>,
 	children_scores: Query<(Entity, &Score)>,
 	children_scores_changed: Query<(), Changed<Score>>,
 	children_running: Query<(), With<Running>>,

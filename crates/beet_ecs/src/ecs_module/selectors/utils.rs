@@ -3,7 +3,7 @@ use bevy::prelude::*;
 
 
 pub fn any_child_running(
-	children: &Edges,
+	children: &Children,
 	children_running: &Query<(), With<Running>>,
 ) -> bool {
 	children
@@ -12,7 +12,7 @@ pub fn any_child_running(
 }
 
 pub fn first_child_result<'a>(
-	children: &Edges,
+	children: &Children,
 	children_results: &'a Query<&RunResult>,
 ) -> Option<(usize, &'a RunResult)> {
 	children.iter().enumerate().find_map(|(index, child)| {
@@ -25,7 +25,7 @@ pub fn first_child_result<'a>(
 }
 
 pub fn any_child_score_changed(
-	children: &Edges,
+	children: &Children,
 	children_scores_changed: &Query<(), Changed<Score>>,
 ) -> bool {
 	children
@@ -35,7 +35,7 @@ pub fn any_child_score_changed(
 
 
 pub fn highest_score(
-	children: &Edges,
+	children: &Children,
 	children_scores: &Query<(Entity, &Score)>,
 ) -> Option<(Entity, Score)> {
 	children.iter().fold(None, |prev, child| {

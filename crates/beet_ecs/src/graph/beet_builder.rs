@@ -21,8 +21,7 @@ impl<T: Bundle + Reflect + GetTypeRegistration> BeetBundle for T {}
 /// An opaque intermediary structure between a [`Bundle`] graph and a [`BeetNode`]
 /// This does the following when build
 /// - Registers the bundle types
-/// - Spawns the entities
-/// - maps children to an [`Edges`] component
+/// - Spawns the entities and forms parent-child relationships
 pub struct BeetBuilder {
 	pub children: Vec<BeetBuilder>,
 	/// Inserts [`(Running, BeetRoot)`] components to this node if its the root
@@ -133,9 +132,10 @@ impl BeetBuilder {
 
 		let mut entity = world.entity_mut(entity);
 
-		if children.len() > 0 {
-			entity.insert(Edges(children.iter().map(|c| c.value).collect()));
+		for child in children.iter() {
+			entity.add_child(child.value);
 		}
+
 		if self.insert_defaults {
 			let default_name = format!("Node {}", visited.len());
 			Self::insert_default_components(&mut entity, default_name);

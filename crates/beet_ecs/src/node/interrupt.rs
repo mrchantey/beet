@@ -11,10 +11,10 @@ pub struct Interrupt;
 pub fn sync_interrupts(
 	mut commands: Commands,
 	interrupts: Query<Entity, Added<Interrupt>>,
-	edges: Query<&Edges>,
+	children: Query<&Children>,
 ) {
 	for entity in interrupts.iter() {
-		Edges::visit_dfs(entity, &edges, |edge| {
+		ChildrenExt::visit_dfs(entity, &children, |edge| {
 			commands
 				.entity(edge)
 				.remove::<(Interrupt, Running, RunResult)>();

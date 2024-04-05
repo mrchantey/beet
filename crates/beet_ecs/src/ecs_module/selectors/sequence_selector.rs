@@ -16,7 +16,10 @@ use bevy::prelude::*;
 pub struct SequenceSelector;
 fn sequence_selector(
 	mut commands: Commands,
-	selectors: Query<(Entity, &SequenceSelector, &Edges), With<Running>>,
+	selectors: Query<
+		(Entity, &SequenceSelector, &Children),
+		With<Running>,
+	>,
 	children_running: Query<(), With<Running>>,
 	children_results: Query<&RunResult>,
 ) {

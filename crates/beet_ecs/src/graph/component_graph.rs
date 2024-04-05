@@ -32,7 +32,7 @@ impl<'a, T: Component> ComponentGraph<'a, T> {
 		Self(component_graph)
 	}
 
-	pub fn from_edges(root: Entity, world: &'a World) -> Self {
+	pub fn from_children(root: Entity, world: &'a World) -> Self {
 		let mut this = Self(DiGraph::default());
 		this.add_recursive(root, world);
 		this
@@ -40,7 +40,7 @@ impl<'a, T: Component> ComponentGraph<'a, T> {
 	fn add_recursive(&mut self, entity: Entity, world: &'a World) -> NodeIndex {
 		let value = world.get::<T>(entity);
 		let node_index = self.add_node(value);
-		if let Some(children) = world.get::<Edges>(entity) {
+		if let Some(children) = world.get::<Children>(entity) {
 			for child in children.iter() {
 				let child_index = self.add_recursive(*child, world);
 				self.add_edge(node_index, child_index, ());
@@ -55,7 +55,7 @@ impl<'a, T: Component> ComponentGraph<'a, T> {
 		world: &'a World,
 		index: usize,
 	) -> Option<&'a T> {
-		ComponentGraph::<T>::from_edges(entity, world)
+		ComponentGraph::<T>::from_children(entity, world)
 			.node_weight(NodeIndex::new(index))
 			.unwrap()
 			.as_ref()

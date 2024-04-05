@@ -1,4 +1,3 @@
-use crate::prelude::*;
 use bevy::prelude::*;
 use bevy::utils::HashSet;
 use petgraph::graph::DiGraph;
@@ -25,7 +24,7 @@ impl EntityGraph {
 		visited.insert(parent);
 
 		let node_index = self.add_node(parent);
-		if let Some(children) = world.get::<Edges>(parent) {
+		if let Some(children) = world.get::<Children>(parent) {
 			for child in children.iter() {
 				if let Some(child_index) =
 					self.add_recursive(world, *child, visited)
@@ -43,5 +42,4 @@ impl EntityGraph {
 			commands.entity(*entity).despawn();
 		}
 	}
-
 }

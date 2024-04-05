@@ -14,7 +14,7 @@ use bevy::prelude::*;
 pub struct FallbackSelector;
 fn fallback_selector(
 	mut commands: Commands,
-	selectors: Query<(Entity, &FallbackSelector, &Edges), With<Running>>,
+	selectors: Query<(Entity, &FallbackSelector, &Children), With<Running>>,
 	children_running: Query<(), With<Running>>,
 	children_results: Query<&RunResult>,
 ) {

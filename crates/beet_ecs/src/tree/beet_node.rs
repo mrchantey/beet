@@ -20,7 +20,7 @@ impl BeetNode {
 	}
 
 	pub fn deep_clone(self, world: &mut World) -> Result<Self> {
-		let entities = Edges::collect_world(*self, world);
+		let entities = ChildrenExt::collect_world(*self, world);
 		let scene = DynamicSceneBuilder::from_world(world)
 			.extract_entities(entities.into_iter())
 			.build();
@@ -32,7 +32,7 @@ impl BeetNode {
 		src_world: &mut World,
 		dst_world: &mut World,
 	) -> Result<Self> {
-		let entities = Edges::collect_world(*self, src_world);
+		let entities = ChildrenExt::collect_world(*self, src_world);
 		let scene = DynamicSceneBuilder::from_world(src_world)
 			.extract_entities(entities.into_iter())
 			.build();
@@ -54,7 +54,7 @@ impl BeetNode {
 
 	pub fn bind_agent(self, world: &mut World, agent: Entity) {
 		world.entity_mut(agent).insert(AgentMarker);
-		Edges::visit_dfs_world(world, *self, |world, entity| {
+		ChildrenExt::visit_dfs_world(world, *self, |world, entity| {
 			world.entity_mut(entity).insert(TargetAgent(agent));
 		});
 	}
@@ -69,11 +69,7 @@ impl BeetNode {
 		let entity = entity.id();
 
 		if let Some(mut parent) = world.get_entity_mut(*self) {
-			if let Some(mut edges) = parent.get_mut::<Edges>() {
-				edges.push(entity);
-			} else {
-				parent.insert(Edges(vec![entity]));
-			}
+			parent.add_child(entity);
 		} else {
 			log::warn!("parent not found when adding node");
 		}
@@ -83,9 +79,9 @@ impl BeetNode {
 
 	pub fn children(self, world: &World) -> Vec<BeetNode> {
 		world
-			.get::<Edges>(*self)
-			.map(|edges| {
-				edges.0.iter().map(|entity| BeetNode(*entity)).collect()
+			.get::<Children>(*self)
+			.map(|children| {
+				children.iter().map(|entity| BeetNode(*entity)).collect()
 			})
 			.unwrap_or_default()
 	}
@@ -98,19 +94,8 @@ impl BeetNode {
 	}
 
 
-	pub fn remove(self, world: &mut World) {
-		// 1. remove children recursive
-		for child in self.children(world) {
-			child.remove(world);
-		}
-
-		// 2. despawn
-		world.despawn(*self);
-
-		// 3. remove from parent lists
-		for mut edges in world.query::<&mut Edges>().iter_mut(world) {
-			edges.retain(|e| *e != *self);
-		}
+	pub fn remove_recursive(self, world: &mut World) {
+		despawn_with_children_recursive(world, *self);
 	}
 
 
@@ -204,7 +189,7 @@ mod test {
 		expect(node.children(&world).len()).to_be(2)?;
 		let child = node.add_child(&mut world);
 		expect(node.children(&world).len()).to_be(3)?;
-		child.remove(&mut world);
+		child.remove_recursive(&mut world);
 		expect(node.children(&world).len()).to_be(2)?;
 
 		Ok(())

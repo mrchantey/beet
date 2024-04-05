@@ -23,7 +23,8 @@ use bevy::reflect::TypeRegistry;
 	RunTimer,
 	RunResult,
 	// graph
-	Edges,
+	Parent,
+	Children,
 	BeetPrefab,
 	BeetRoot,
 	AgentMarker,

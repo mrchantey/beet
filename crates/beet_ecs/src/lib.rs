@@ -2,7 +2,6 @@
 pub mod action;
 pub mod channel_event;
 pub mod ecs_module;
-pub mod edge;
 pub mod extensions;
 pub mod graph;
 pub mod inspector_options;
@@ -23,7 +22,6 @@ pub mod prelude {
 	pub use crate::ecs_module::actions::*;
 	pub use crate::ecs_module::selectors::*;
 	pub use crate::ecs_module::*;
-	pub use crate::edge::*;
 	pub use crate::extensions::*;
 	pub use crate::graph::*;
 	pub use crate::inspector_options::*;
