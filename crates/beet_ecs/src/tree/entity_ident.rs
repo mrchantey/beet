@@ -5,7 +5,9 @@ use bevy::prelude::*;
 use std::any::TypeId;
 
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, Deref, DerefMut)]
+#[derive(
+	Copy, Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, Deref, DerefMut,
+)]
 pub struct EntityIdent(pub Entity);
 
 impl EntityIdent {
@@ -60,7 +62,7 @@ impl EntityIdent {
 	}
 
 
-	pub fn remove_recursive(self, world: &mut World) {
+	pub fn despawn_recursive(self, world: &mut World) {
 		despawn_with_children_recursive(world, *self);
 	}
 
@@ -126,7 +128,7 @@ mod test {
 		expect(node.children(&world).len()).to_be(2)?;
 		let child = node.add_child_behavior(&mut world);
 		expect(node.children(&world).len()).to_be(3)?;
-		child.remove_recursive(&mut world);
+		child.despawn_recursive(&mut world);
 		expect(node.children(&world).len()).to_be(2)?;
 
 		Ok(())

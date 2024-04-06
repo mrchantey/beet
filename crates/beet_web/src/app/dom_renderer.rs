@@ -29,15 +29,22 @@ impl DomRenderer {
 	}
 
 	pub fn clear(&mut self) {
-		for el in self.elements.values() {
-			el.remove();
-		}
+		// for el in self.elements.values() {
+		// 	el.remove();
+		// }
 		self.elements.clear();
+		self.container.set_inner_text("");
+		// let iter = js_sys::try_iter(&self.container.children())
+		// 	.unwrap()
+		// 	.unwrap();
+		// for item in iter {
+		// 	log::info!("removing element");
+		// 	let val = item.unwrap();
+		// 	let val: HtmlElement = val.into();
+		// 	val.remove();
+		// }
 	}
 }
-
-#[derive(Resource)]
-pub struct DomSimRendererMarker;
 
 pub fn despawn_elements(
 	mut renderer: NonSendMut<DomRenderer>,
@@ -71,7 +78,7 @@ pub fn clear_world_with_dom_renderer(world: &mut World) {
 	world.non_send_resource_mut::<DomRenderer>().clear();
 }
 
-pub fn remove_renderer(world: &mut World) {
+pub fn remove_renderer(world: &mut World) -> Option<DomRenderer> {
 	for entity in world
 		.query_filtered::<Entity, With<HasElement>>()
 		.iter(world)
@@ -82,6 +89,9 @@ pub fn remove_renderer(world: &mut World) {
 	if let Some(mut renderer) = world.remove_non_send_resource::<DomRenderer>()
 	{
 		renderer.clear();
+		Some(renderer)
+	} else {
+		None
 	}
 }
 

@@ -10,6 +10,8 @@ fn main() {}
 struct MyStruct {
 	#[inspector(min = 0.1, step = 3., max = 3.)]
 	_field: f32,
+	// #[inspector(hidden)]
+	// _field2:bool
 }
 
 fn my_struct() {}

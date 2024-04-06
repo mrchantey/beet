@@ -43,8 +43,11 @@ pub fn flower_auto_spawn_bundle() -> impl Bundle {
 pub fn flower_auto_spawn_bundle_with_duration(
 	duration: Duration,
 ) -> impl Bundle {
-	AutoSpawn::new(
-		BeetSceneSerde::<CoreModule>::new_with_bundle(flower_bundle()),
-		duration,
+	(
+		Name::new("Flower Spawner"),
+		AutoSpawn::new(
+			BeetSceneSerde::<CoreModule>::new_with_bundle(flower_bundle()),
+			duration,
+		),
 	)
 }

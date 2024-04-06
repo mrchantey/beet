@@ -27,16 +27,6 @@ impl EntityIdent {
 
 		EntityIdent(entity)
 	}
-
-	pub fn graph_roles(
-		self,
-		world: &World,
-	) -> Vec<(ComponentIdent, GraphRole)> {
-		self.components(world)
-			.into_iter()
-			.filter_map(|c| c.graph_role(world).ok().map(|role| (c, role)))
-			.collect()
-	}
 }
 
 

@@ -3,7 +3,7 @@ use forky_bevy::extensions::Vec3Ext;
 
 
 #[derive(Clone, Component, Reflect)]
-#[reflect(Component)]
+#[reflect(Component, Default)]
 pub struct RandomizePosition {
 	pub offset: Vec3,
 	pub scale: Vec3,

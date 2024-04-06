@@ -36,14 +36,7 @@ pub fn message_handler(world: &mut World) -> Result<()> {
 				world.spawn(flower_bundle());
 			}
 			DomSimMessage::DespawnAll => {
-				// dont despawn everything, we need the graph
-				for entity in world
-					.query_filtered::<Entity, With<Transform>>()
-					.iter(world)
-					.collect::<Vec<_>>()
-				{
-					world.despawn(entity);
-				}
+				world.clear_entities();
 			}
 			DomSimMessage::Resize => {
 				trigger_transform_change(world);
