@@ -8,7 +8,13 @@ use web_sys::HtmlElement;
 
 pub fn update_positions(
 	renderer: NonSend<DomRenderer>,
-	query: Query<(Entity, &Transform), (With<HasElement>, Changed<Transform>)>,
+	query: Query<
+		(Entity, &Transform),
+		(
+			With<HasElement>,
+			Or<(Changed<Transform>, Added<HasElement>)>,
+		),
+	>,
 ) {
 	for (entity, transform) in query.iter() {
 		if let Some(element) = renderer.elements.get(&entity) {
