@@ -18,7 +18,7 @@ fn works() -> Result<()> {
 	expect(registry.get(MyStruct.type_id())).to_be_some()?;
 
 	let mut world = World::new();
-	MyStruct::register_components(&mut world);
+	MyStruct::register_bundles(&mut world);
 	expect(world.components().get_id(MyStruct.type_id())).to_be_some()?;
 
 	let mut app = App::new();

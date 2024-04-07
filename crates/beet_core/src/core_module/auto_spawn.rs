@@ -1,6 +1,5 @@
 use crate::prelude::*;
-use beet::action::ActionTypes;
-use beet::reflect::BeetSceneSerde;
+use beet_ecs::prelude::*;
 use bevy::prelude::*;
 use std::time::Duration;
 
@@ -13,7 +12,7 @@ pub struct AutoSpawn {
 
 
 impl AutoSpawn {
-	pub fn new<T: ActionTypes>(
+	pub fn new<T: BeetModule>(
 		scene: BeetSceneSerde<T>,
 		interval: Duration,
 	) -> Self {

@@ -11,7 +11,6 @@ use syn::Token;
 
 pub fn parse_beet_module(item: proc_macro::TokenStream) -> Result<TokenStream> {
 	let input = syn::parse::<DeriveInput>(item)?;
-	let modules = parse_named_list_attr(&input, "modules")?;
 	let actions = parse_named_list_attr(&input, "actions")?;
 	let components = parse_named_list_attr(&input, "bundles")?;
 	let ident = &input.ident;
@@ -29,7 +28,7 @@ pub fn parse_beet_module(item: proc_macro::TokenStream) -> Result<TokenStream> {
 		.iter()
 		.map(|a| {
 			quote! {
-				#a::register_components(world);
+				#a::register_bundles(world);
 			}
 		})
 		.collect::<TokenStream>();
@@ -38,7 +37,7 @@ pub fn parse_beet_module(item: proc_macro::TokenStream) -> Result<TokenStream> {
 		.iter()
 		.map(|a| {
 			quote! {
-				world.init_component::<#a>();
+				world.init_bundle::<#a>();
 			}
 		})
 		.collect::<TokenStream>();
@@ -74,8 +73,8 @@ pub fn parse_beet_module(item: proc_macro::TokenStream) -> Result<TokenStream> {
 			}
 		}
 
-		impl #impl_generics ActionTypes for #ident #type_generics #where_clause {
-				fn register_components(world: &mut World) {
+		impl #impl_generics BeetModule for #ident #type_generics #where_clause {
+				fn register_bundles(world: &mut World) {
 					#impl_components
 					#impl_components2
 				}

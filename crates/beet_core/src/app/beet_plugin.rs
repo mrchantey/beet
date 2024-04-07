@@ -48,7 +48,7 @@ pub struct BeetTypesPlugin<T: BeetModule>(pub PhantomData<T>);
 
 impl<T: BeetModule> Plugin for BeetTypesPlugin<T> {
 	fn build(&self, app: &mut App) {
-		T::register_components(app.world_mut());
+		T::register_bundles(app.world_mut());
 		T::register_types(
 			&mut app.world().resource::<AppTypeRegistry>().write(),
 		);

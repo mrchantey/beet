@@ -71,7 +71,7 @@ impl BeetBuilder {
 		EntityIdent::new(root)
 	}
 
-	pub fn into_scene<T: ActionTypes>(self) -> BeetSceneSerde<T> {
+	pub fn into_scene<T: BeetModule>(self) -> BeetSceneSerde<T> {
 		let mut world = World::new();
 		world.insert_resource(T::type_registry());
 		self.into_node(&mut world);

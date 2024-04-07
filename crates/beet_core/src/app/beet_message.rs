@@ -44,7 +44,7 @@ impl BeetMessage {
 	}
 }
 
-fn message_handler<T: ActionTypes>(world: &mut World) -> Result<()> {
+fn message_handler<T: BeetModule>(world: &mut World) -> Result<()> {
 	let Ok(messages) = world.resource_mut::<BeetMessageRecv>().try_recv_all()
 	else {
 		return Ok(()); // disconnected

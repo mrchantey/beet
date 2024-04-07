@@ -71,13 +71,13 @@ fn parse_register(_args: &ActionArgs, input: &DeriveInput) -> TokenStream {
 		&input.generics.split_for_impl();
 
 	quote! {
-		impl #impl_generics ActionTypes for #ident #type_generics #where_clause {
+		impl #impl_generics BeetModule for #ident #type_generics #where_clause {
 			fn register_types(registry: &mut TypeRegistry){
 				// #register_child_components
 				registry.register::<Self>();
 			}
-			fn register_components(world:&mut World){
-				world.init_component::<Self>();
+			fn register_bundles(world:&mut World){
+				world.init_bundle::<Self>();
 			}
 		}
 	}

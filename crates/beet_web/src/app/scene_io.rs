@@ -1,6 +1,5 @@
 use anyhow::Result;
-use beet::action::BeetModule;
-use beet::reflect::BeetSceneSerde;
+use beet::prelude::*;
 use bevy::prelude::*;
 use forky_web::download_text;
 use forky_web::fetch_text;

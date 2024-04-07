@@ -7,7 +7,10 @@ pub trait ActionChildComponents {
 	fn boxed_child_components(&self) -> Vec<Box<dyn Reflect>>;
 }
 
-// must be static for use in beet plugin
+/// A trait for registering systems associated with an action
+// - we use this instead of implementing IntoSystemConfigs so that
+//   `Default` is not required for the action
+// - must be static for use in beet plugin
 pub trait ActionSystems: 'static {
 	fn add_systems(app: &mut App, schedule: impl ScheduleLabel + Clone);
 }

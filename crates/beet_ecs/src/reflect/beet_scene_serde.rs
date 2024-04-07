@@ -10,19 +10,19 @@ use serde::Serialize;
 use std::marker::PhantomData;
 
 /// Basic serde functionality for a scene
-pub struct BeetSceneSerde<T: ActionTypes> {
+pub struct BeetSceneSerde<T: BeetModule> {
 	pub scene: DynamicScene,
 	phantom: PhantomData<T>,
 }
 
-impl<T: ActionTypes> Clone for BeetSceneSerde<T> {
+impl<T: BeetModule> Clone for BeetSceneSerde<T> {
 	fn clone(&self) -> Self {
 		let bytes = bincode::serialize(&self).unwrap();
 		bincode::deserialize(&bytes).unwrap()
 	}
 }
 
-impl<T: ActionTypes> BeetSceneSerde<T> {
+impl<T: BeetModule> BeetSceneSerde<T> {
 	/// Creates a [`DynamicScene`] from the world, including all entities
 	/// but no resources
 	pub fn new(world: &World) -> Self {
@@ -83,7 +83,7 @@ impl<T: ActionTypes> BeetSceneSerde<T> {
 	}
 }
 
-impl<T: ActionTypes> Serialize for BeetSceneSerde<T> {
+impl<T: BeetModule> Serialize for BeetSceneSerde<T> {
 	fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
 	where
 		S: serde::Serializer,
@@ -95,7 +95,7 @@ impl<T: ActionTypes> Serialize for BeetSceneSerde<T> {
 	}
 }
 
-impl<'de, T: ActionTypes> Deserialize<'de> for BeetSceneSerde<T> {
+impl<'de, T: BeetModule> Deserialize<'de> for BeetSceneSerde<T> {
 	fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
 	where
 		D: serde::Deserializer<'de>,
