@@ -1,5 +1,5 @@
-use bevy::reflect::reflect_trait;
 use crate::prelude::*;
+use bevy::reflect::reflect_trait;
 
 #[reflect_trait]
 pub trait ActionMeta {
@@ -24,7 +24,7 @@ mod test {
 	#[test]
 	fn works() -> Result<()> {
 		let mut registry = TypeRegistry::default();
-		MyStruct::register_types(&mut registry);
+		registry.register::<MyStruct>();
 
 		let val = MyStruct;
 		expect(val.graph_role()).to_be(GraphRole::Node)?;

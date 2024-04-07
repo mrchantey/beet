@@ -11,12 +11,17 @@ use syn::Token;
 
 pub fn parse_beet_module(item: proc_macro::TokenStream) -> Result<TokenStream> {
 	let input = syn::parse::<DeriveInput>(item)?;
+	let modules = parse_named_list_attr(&input, "modules")?;
 	let actions = parse_named_list_attr(&input, "actions")?;
-	let bundles = parse_named_list_attr(&input, "bundles")?;
 	let components = parse_named_list_attr(&input, "components")?;
-	let add_systems = add_systems(&actions);
-	let register_types = register_types(&actions, &components);
-	let register_bundles = register_bundles(&actions, &bundles, &components);
+	let actions_and_components =
+		actions.iter().chain(components.iter()).collect::<Vec<_>>();
+	let bundles = parse_named_list_attr(&input, "bundles")?;
+	let add_systems = add_systems(&modules, &actions);
+	let register_types = register_types(&modules, &actions_and_components);
+	let register_bundles =
+		register_bundles(&modules, &actions_and_components, &bundles);
+	let ids = ids(&modules, &actions, &components, &bundles);
 
 
 	let ident = &input.ident;
@@ -34,12 +39,21 @@ pub fn parse_beet_module(item: proc_macro::TokenStream) -> Result<TokenStream> {
 		impl #impl_generics BeetModule for #ident #type_generics #where_clause {
 			#register_bundles
 			#register_types
+			#ids
 		}
 	})
 }
 
-fn add_systems(actions: &Vec<Expr>) -> TokenStream {
-	let impl_add_systems = actions
+fn add_systems(modules: &Vec<Expr>, actions: &Vec<Expr>) -> TokenStream {
+	let modules = modules
+		.iter()
+		.map(|m| {
+			quote! {
+				#m::add_systems(app, schedule.clone());
+			}
+		})
+		.collect::<TokenStream>();
+	let actions = actions
 		.iter()
 		.map(|a| {
 			quote! {
@@ -50,77 +64,122 @@ fn add_systems(actions: &Vec<Expr>) -> TokenStream {
 
 	quote! {
 		fn add_systems(app: &mut App, schedule: impl ScheduleLabel + Clone) {
-			#impl_add_systems
+			#modules
+			#actions
 		}
 	}
 }
 
-fn register_types(actions: &Vec<Expr>, components: &Vec<Expr>) -> TokenStream {
-	let impl_types = actions
+fn register_types(
+	modules: &Vec<Expr>,
+	actions_and_components: &Vec<&Expr>,
+) -> TokenStream {
+	let modules = modules
 		.iter()
-		.map(|a| {
+		.map(|m| {
 			quote! {
-				#a::register_types(type_registry);
+				#m::register_types(type_registry);
 			}
 		})
 		.collect::<TokenStream>();
-
-	let impl_types2 = components
+	let actions_and_components = actions_and_components
 		.iter()
-		.map(|a| {
+		.map(|c| {
 			quote! {
-				type_registry.register::<#a>();
+				type_registry.register::<#c>();
 			}
 		})
 		.collect::<TokenStream>();
 
 	quote! {
 		fn register_types(type_registry: &mut TypeRegistry) {
-			#impl_types
-			#impl_types2
+			#modules
+			#actions_and_components
 		}
 	}
 }
 
 
 fn register_bundles(
-	actions: &Vec<Expr>,
+	modules: &Vec<Expr>,
+	actions_and_components: &Vec<&Expr>,
 	bundles: &Vec<Expr>,
-	components: &Vec<Expr>,
 ) -> TokenStream {
-	let register_bundles_actions = actions
+	let modules = modules
 		.iter()
-		.map(|a| {
+		.map(|m| {
 			quote! {
-				#a::register_bundles(world);
+				#m::register_bundles(world);
 			}
 		})
 		.collect::<TokenStream>();
-
-	let register_bundles_components = components
+	let actions_and_components = actions_and_components
 		.iter()
-		.map(|a| {
+		.map(|c| {
 			quote! {
-				world.init_component::<#a>();
+				world.init_component::<#c>();
 			}
 		})
 		.collect::<TokenStream>();
-	let register_bundles_bundles = bundles
+	let bundles = bundles
 		.iter()
-		.map(|a| {
+		.map(|b| {
 			quote! {
-				world.init_bundle::<#a>();
+				world.init_bundle::<#b>();
 			}
 		})
 		.collect::<TokenStream>();
 
 	quote! {
 		fn register_bundles(world: &mut World) {
-			#register_bundles_components
-			#register_bundles_bundles
-			#register_bundles_actions
+			#modules
+			#actions_and_components
+			#bundles
 		}
 	}
+}
+
+fn ids(
+	modules: &Vec<Expr>,
+	actions: &Vec<Expr>,
+	components: &Vec<Expr>,
+	bundles: &Vec<Expr>,
+) -> TokenStream {
+	let modules = modules
+		.iter()
+		.map(|m| {
+			quote! {
+				ids.extend(#m::ids());
+			}
+		})
+		.collect::<TokenStream>();
+
+	let actions = into_ids(actions);
+	let components = into_ids(components);
+	let bundles = into_ids(bundles);
+
+	quote! {
+		fn ids()->BeetModuleIds {
+			let mut ids = BeetModuleIds {
+				action_ids: vec![#actions],
+				component_ids: vec![#components],
+				bundle_ids: vec![#bundles],
+			};
+			#modules
+			ids
+		}
+	}
+}
+
+fn into_ids(items: &Vec<Expr>) -> TokenStream {
+	items
+		.iter()
+		.map(|i| {
+			quote! {
+				std::any::TypeId::of::<#i>(),
+			}
+		})
+		.collect::<TokenStream>()
 }
 
 fn parse_named_list_attr(input: &DeriveInput, name: &str) -> Result<Vec<Expr>> {

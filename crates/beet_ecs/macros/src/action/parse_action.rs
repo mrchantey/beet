@@ -14,7 +14,6 @@ pub fn parse_action(item: proc_macro::TokenStream) -> Result<TokenStream> {
 
 	let args = ActionArgs::new(&input)?;
 
-	let impl_register = parse_register(&args, &input);
 	let impl_systems = parse_systems(&args, &input);
 	let impl_meta = parse_meta(&args, &input);
 	let impl_child_components = parse_children(&args, &input);
@@ -25,7 +24,6 @@ pub fn parse_action(item: proc_macro::TokenStream) -> Result<TokenStream> {
 		use ::beet::prelude::*;
 		use ::beet::exports::*;
 
-		#impl_register
 		#impl_systems
 		#impl_meta
 		#impl_child_components
@@ -53,32 +51,6 @@ fn append_generic_constraints(input: &mut DeriveInput) {
 		let where_clause = input.generics.make_where_clause();
 		for predicate in predicates {
 			where_clause.predicates.push(predicate);
-		}
-	}
-}
-
-fn parse_register(_args: &ActionArgs, input: &DeriveInput) -> TokenStream {
-	// let register_child_components = args
-	// 	.child_components
-	// 	.iter()
-	// 	.map(|c| {
-	// 		quote! {registry.register::<#c>();}
-	// 	})
-	// 	.collect::<TokenStream>();
-
-	let ident = &input.ident;
-	let (impl_generics, type_generics, where_clause) =
-		&input.generics.split_for_impl();
-
-	quote! {
-		impl #impl_generics BeetModule for #ident #type_generics #where_clause {
-			fn register_types(registry: &mut TypeRegistry){
-				// #register_child_components
-				registry.register::<Self>();
-			}
-			fn register_bundles(world:&mut World){
-				world.init_bundle::<Self>();
-			}
 		}
 	}
 }

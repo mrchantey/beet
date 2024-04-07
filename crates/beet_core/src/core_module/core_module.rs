@@ -11,6 +11,7 @@ use bevy::reflect::TypeRegistry;
 // ]);
 
 #[derive(Debug, Clone, BeetModule)]
+#[modules(EcsModule)]
 #[actions(
 		//core
 		Hover,
@@ -24,8 +25,6 @@ use bevy::reflect::TypeRegistry;
 		DespawnSteerTarget,
 		ScoreSteerTarget,
 		SucceedOnArrive,
-	//ecs
-		EcsModule
 	)]
 #[components(
 	AutoSpawn,

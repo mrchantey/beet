@@ -15,7 +15,10 @@ pub fn action(item: TokenStream) -> TokenStream {
 		.unwrap_or_else(syn::Error::into_compile_error)
 		.into()
 }
-#[proc_macro_derive(BeetModule, attributes(actions, components, bundles))]
+#[proc_macro_derive(
+	BeetModule,
+	attributes(modules, actions, components, bundles)
+)]
 pub fn beet_module(item: TokenStream) -> TokenStream {
 	parse_beet_module(item)
 		.unwrap_or_else(syn::Error::into_compile_error)

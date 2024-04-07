@@ -3,6 +3,8 @@ use bevy::prelude::*;
 use bevy::reflect::TypeRegistry;
 use std::marker::PhantomData;
 
+
+
 #[derive(Default)]
 pub struct BeetModulePlugin<T: BeetModule>(pub PhantomData<T>);
 
@@ -27,6 +29,9 @@ pub trait BeetModule: 'static + Send + Sync + ActionSystems {
 		Self::register_types(&mut registry.write());
 		registry
 	}
+
+	/// Get all ids registered to this module and any submodule
+	fn ids() -> BeetModuleIds;
 }
 
 
