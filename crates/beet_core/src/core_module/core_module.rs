@@ -10,7 +10,7 @@ use bevy::reflect::TypeRegistry;
 // action_list!(CoreNode, [
 // ]);
 
-#[derive(Debug, Clone, ActionList)]
+#[derive(Debug, Clone, BeetModule)]
 #[actions(
 		//core
 		Hover,
@@ -27,7 +27,7 @@ use bevy::reflect::TypeRegistry;
 	//ecs
 		EcsModule
 	)]
-#[components(
+#[bundles(
 	AutoSpawn,
 	RandomizePosition,
 	//render

@@ -11,7 +11,7 @@ impl Plugin for BeetMinimalPlugin {
 	fn build(&self, app: &mut App) { app.add_plugins(TimePlugin); }
 }
 
-pub struct DefaultBeetPlugins<T: ActionList> {
+pub struct DefaultBeetPlugins<T: BeetModule> {
 	pub types: BeetTypesPlugin<T>,
 	pub systems: BeetSystemsPlugin<T, Update>,
 	pub steering: SteeringPlugin,
@@ -19,7 +19,7 @@ pub struct DefaultBeetPlugins<T: ActionList> {
 	pub core: CorePlugin,
 }
 
-impl<T: ActionList> DefaultBeetPlugins<T> {
+impl<T: BeetModule> DefaultBeetPlugins<T> {
 	pub fn new() -> Self {
 		Self {
 			types: BeetTypesPlugin(default()),
@@ -31,7 +31,7 @@ impl<T: ActionList> DefaultBeetPlugins<T> {
 	}
 }
 
-impl<T: ActionList> PluginGroup for DefaultBeetPlugins<T> {
+impl<T: BeetModule> PluginGroup for DefaultBeetPlugins<T> {
 	fn build(self) -> PluginGroupBuilder {
 		PluginGroupBuilder::start::<Self>()
 			.add(self.types)
@@ -44,9 +44,9 @@ impl<T: ActionList> PluginGroup for DefaultBeetPlugins<T> {
 
 
 #[derive(Default)]
-pub struct BeetTypesPlugin<T: ActionList>(pub PhantomData<T>);
+pub struct BeetTypesPlugin<T: BeetModule>(pub PhantomData<T>);
 
-impl<T: ActionList> Plugin for BeetTypesPlugin<T> {
+impl<T: BeetModule> Plugin for BeetTypesPlugin<T> {
 	fn build(&self, app: &mut App) {
 		T::register_components(app.world_mut());
 		T::register_types(

@@ -1,6 +1,9 @@
 # Beet
 
-Beet is a modular AI Behavior library that uses a novel `entity graph` approach to behavior selection. It is built with `bevy_ecs` and is suitable for creating autonomous agents in games, simulation and robotics.
+Beet is a modular AI behavior library for games and robotics. 
+
+
+It uses a novel `entity graph` approach to behavior selection. It is built with `bevy_ecs` and is suitable for creating autonomous agents in games, simulation and robotics.
 
 
 <iframe src="https://mrchantey.github.io/beet/play/?spawn-bee=&spawn-flower=&hide-graph=&graph=CAAAAAAAAABOZXcgTm9kZQEAAAAAAAAAAAAAAAAAAD%2FNzMw9AAAAAAAAAAA"></iframe>

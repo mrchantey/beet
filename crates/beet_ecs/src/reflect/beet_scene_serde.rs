@@ -37,7 +37,7 @@ impl<T: ActionTypes> BeetSceneSerde<T> {
 		world: &World,
 		entities: impl IntoIterator<Item = Entity>,
 	) -> Self {
-		let registry = Self::type_registry();
+		let registry = T::type_registry();
 		let registry = registry.read();
 		let items = registry
 			.iter()
@@ -62,7 +62,7 @@ impl<T: ActionTypes> BeetSceneSerde<T> {
 
 	pub fn new_with_bundle(bundle: impl Bundle) -> Self {
 		let mut world = World::new();
-		world.insert_resource(Self::type_registry());
+		world.insert_resource(T::type_registry());
 		world.spawn(bundle);
 		Self::new(&world)
 	}
@@ -71,7 +71,7 @@ impl<T: ActionTypes> BeetSceneSerde<T> {
 		behavior: impl IntoBeetBuilder<M>,
 	) -> Self {
 		let mut world = World::new();
-		world.insert_resource(Self::type_registry());
+		world.insert_resource(T::type_registry());
 		let behavior = behavior.into_beet_builder().build(&mut world).value;
 		world.spawn(bundle).add_child(behavior);
 		Self::new(&world)
@@ -81,12 +81,6 @@ impl<T: ActionTypes> BeetSceneSerde<T> {
 		self.scene.write_to_world(world, &mut Default::default())?;
 		Ok(())
 	}
-
-	pub fn type_registry() -> AppTypeRegistry {
-		let registry = AppTypeRegistry::default();
-		T::register_types(&mut registry.write());
-		registry
-	}
 }
 
 impl<T: ActionTypes> Serialize for BeetSceneSerde<T> {
@@ -94,7 +88,7 @@ impl<T: ActionTypes> Serialize for BeetSceneSerde<T> {
 	where
 		S: serde::Serializer,
 	{
-		let registry = Self::type_registry();
+		let registry = T::type_registry();
 		let registry = registry.read();
 		let scene_serializer = SceneSerializer::new(&self.scene, &registry);
 		scene_serializer.serialize(serializer)
@@ -106,7 +100,7 @@ impl<'de, T: ActionTypes> Deserialize<'de> for BeetSceneSerde<T> {
 	where
 		D: serde::Deserializer<'de>,
 	{
-		let registry = Self::type_registry();
+		let registry = T::type_registry();
 		let scene_deserializer = SceneDeserializer {
 			type_registry: &registry.read(),
 		};
@@ -136,7 +130,7 @@ mod test {
 	#[test]
 	fn works() -> Result<()> {
 		let mut world = World::new();
-		world.insert_resource(BeetSceneSerde::<EcsModule>::type_registry());
+		world.insert_resource(EcsModule::type_registry());
 		let entity = world
 			.spawn((EmptyAction, Name::new("billy"), MyStruct))
 			.id();
@@ -146,7 +140,7 @@ mod test {
 		let serde = bincode::deserialize::<BeetSceneSerde<EcsModule>>(&bin)?;
 
 		let mut world2 = World::new();
-		world2.insert_resource(BeetSceneSerde::<EcsModule>::type_registry());
+		world2.insert_resource(EcsModule::type_registry());
 
 		let mut hashmap = Default::default();
 		serde.scene.write_to_world(&mut world2, &mut hashmap)?;

@@ -15,3 +15,13 @@ struct MyStruct {
 }
 
 fn my_struct() {}
+
+
+#[derive(Bundle)]
+struct FooBar {
+	foo: bevy::prelude::Transform,
+	bar: bevy::prelude::GlobalTransform,
+}
+
+#[derive(Component)]
+struct Fizz;

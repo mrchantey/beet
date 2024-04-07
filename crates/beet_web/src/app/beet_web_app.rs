@@ -53,11 +53,8 @@ impl BeetWebApp {
 		drop(app);
 		self
 	}
-	
-	pub fn with_bundle(
-		self,
-		bundle: impl Bundle,
-	) ->Self{
+
+	pub fn with_bundle(self, bundle: impl Bundle) -> Self {
 		let mut app = self.write();
 		let world = app.world_mut();
 		world.spawn(bundle);
@@ -68,18 +65,18 @@ impl BeetWebApp {
 		self,
 		bundle: impl Bundle,
 		node: impl IntoBeetBuilder<M>,
-	) ->Self{
+	) -> Self {
 		let mut app = self.write();
 		let world = app.world_mut();
 		let behavior = node.into_beet_builder().build(world).value;
 		world.spawn(bundle).add_child(behavior);
 		drop(app);
 		self
-	}	
+	}
 
-	pub async fn try_load_scene_url(self) -> Result<()> {
+	pub async fn try_load_scene_url(&self) -> Result<()> {
 		let Some(url) = SearchParams::get("scene") else {
-			return Ok(());
+			anyhow::bail!("no scene url found");
 		};
 		let scene = fetch_scene::<CoreModule>(&url).await?;
 

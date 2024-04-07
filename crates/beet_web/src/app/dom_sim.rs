@@ -4,11 +4,11 @@ use beet::prelude::*;
 use bevy::prelude::*;
 use std::marker::PhantomData;
 
-pub struct DomSim<T: ActionList> {
+pub struct DomSim<T: BeetModule> {
 	pub phantom: PhantomData<T>,
 }
 
-impl<T: ActionList> Default for DomSim<T> {
+impl<T: BeetModule> Default for DomSim<T> {
 	fn default() -> Self {
 		Self {
 			phantom: PhantomData,
@@ -16,10 +16,10 @@ impl<T: ActionList> Default for DomSim<T> {
 	}
 }
 
-impl<T: ActionList> DomSim<T> {}
+impl<T: BeetModule> DomSim<T> {}
 
 
-impl<T: ActionList> Plugin for DomSim<T> {
+impl<T: BeetModule> Plugin for DomSim<T> {
 	fn build(&self, app: &mut App) {
 		let (send, recv) = flume::unbounded();
 

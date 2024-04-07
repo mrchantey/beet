@@ -9,14 +9,15 @@ use syn::Meta;
 use syn::Result;
 use syn::Token;
 
-pub fn parse_action_list(item: proc_macro::TokenStream) -> Result<TokenStream> {
+pub fn parse_beet_module(item: proc_macro::TokenStream) -> Result<TokenStream> {
 	let input = syn::parse::<DeriveInput>(item)?;
-	let actions = parse_actions_attr(&input)?;
-	let components = parse_components_attr(&input)?;
+	let modules = parse_named_list_attr(&input, "modules")?;
+	let actions = parse_named_list_attr(&input, "actions")?;
+	let components = parse_named_list_attr(&input, "bundles")?;
 	let ident = &input.ident;
 
 	let impl_add_systems = actions
-		.iter()
+	.iter()
 		.map(|a| {
 			quote! {
 				#a::add_systems(app, schedule.clone());
@@ -86,27 +87,16 @@ pub fn parse_action_list(item: proc_macro::TokenStream) -> Result<TokenStream> {
 	})
 }
 
-
-fn parse_actions_attr(input: &DeriveInput) -> Result<Vec<Expr>> {
-	if let Some(attr) =
-		input.attrs.iter().find(|a| a.path().is_ident("actions"))
-	{
-		parse_list_attr(attr)
-	} else {
-		Err(syn::Error::new(
-			input.ident.span(),
-			"ActionList expected #[actions(MyAction1, MyAction2, ...)]",
-		))
-	}
-}
-fn parse_components_attr(input: &DeriveInput) -> Result<Vec<Expr>> {
-	if let Some(attr) =
-		input.attrs.iter().find(|a| a.path().is_ident("components"))
-	{
-		parse_list_attr(attr)
-	} else {
-		Ok(vec![])
-	}
+fn parse_named_list_attr(
+	input: &DeriveInput,
+	name: &str,
+) -> Result<Vec<Expr>> {
+	input
+		.attrs
+		.iter()
+		.find(|a| a.path().is_ident(name))
+		.map(|attr| parse_list_attr(attr))
+		.unwrap_or(Ok(Vec::new()))
 }
 
 fn parse_list_attr(attr: &Attribute) -> Result<Vec<Expr>> {

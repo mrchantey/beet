@@ -1,5 +1,6 @@
 #![feature(result_flattening)]
 pub mod action;
+pub mod beet_module;
 pub mod channel_event;
 pub mod ecs_module;
 pub mod extensions;
@@ -18,6 +19,7 @@ extern crate self as beet;
 pub mod prelude {
 
 	pub use crate::action::*;
+	pub use crate::beet_module::*;
 	pub use crate::channel_event::*;
 	pub use crate::ecs_module::actions::*;
 	pub use crate::ecs_module::selectors::*;

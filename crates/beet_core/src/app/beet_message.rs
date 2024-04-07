@@ -9,9 +9,9 @@ use std::marker::PhantomData;
 
 
 #[derive(Default)]
-pub struct BeetMessagePlugin<T: ActionList>(pub PhantomData<T>);
+pub struct BeetMessagePlugin<T: BeetModule>(pub PhantomData<T>);
 
-impl<T: ActionList> Plugin for BeetMessagePlugin<T> {
+impl<T: BeetModule> Plugin for BeetMessagePlugin<T> {
 	fn build(&self, app: &mut App) {
 		let (send, recv) = flume::unbounded();
 		app /*-*/
@@ -37,7 +37,7 @@ pub struct BeetMessageSend(pub Sender<BeetMessage>);
 
 
 impl BeetMessage {
-	pub fn spawn_bundle<T:ActionList>(bundle: impl Bundle)->Result<Self>{
+	pub fn spawn_bundle<T:BeetModule>(bundle: impl Bundle)->Result<Self>{
 		let serde = BeetSceneSerde::<T>::new_with_bundle(bundle);
 		let bincode = bincode::serialize(&serde)?;
 		Ok(BeetMessage::Spawn { bincode })

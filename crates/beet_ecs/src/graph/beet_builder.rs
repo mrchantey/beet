@@ -73,7 +73,7 @@ impl BeetBuilder {
 
 	pub fn into_scene<T: ActionTypes>(self) -> BeetSceneSerde<T> {
 		let mut world = World::new();
-		world.insert_resource(BeetSceneSerde::<T>::type_registry());
+		world.insert_resource(T::type_registry());
 		self.into_node(&mut world);
 		BeetSceneSerde::<T>::new(&world)
 	}

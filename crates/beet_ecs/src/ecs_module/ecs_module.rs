@@ -3,7 +3,7 @@ use bevy::ecs::schedule::ScheduleLabel;
 use bevy::prelude::*;
 use bevy::reflect::TypeRegistry;
 
-#[derive(Debug, Clone, ActionList)]
+#[derive(Debug, Clone, BeetModule)]
 #[actions(
 	// constants
 	SetOnStart::<Score>,
@@ -17,7 +17,7 @@ use bevy::reflect::TypeRegistry;
 	FallbackSelector,
 	ScoreSelector
 )]
-#[components(
+#[bundles(
 	// running
 	Running,
 	RunTimer,
