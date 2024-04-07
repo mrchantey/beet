@@ -19,7 +19,7 @@ extern crate beet_ecs as beet;
 	FallbackSelector,
 	ScoreSelector
 )]
-#[bundles(Transform)]
+#[components(Transform)]
 // #[bundles(TransformBundle)]
 struct MyNodes;
 

@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use beet_ecs::action::PostTickSet;
+use beet_ecs::prelude::*;
 use bevy::prelude::*;
 use forky_bevy::extensions::AppExt;
 

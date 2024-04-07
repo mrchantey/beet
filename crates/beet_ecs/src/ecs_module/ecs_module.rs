@@ -17,7 +17,7 @@ use bevy::reflect::TypeRegistry;
 	FallbackSelector,
 	ScoreSelector
 )]
-#[bundles(
+#[components(
 	// running
 	Running,
 	RunTimer,
@@ -31,7 +31,9 @@ use bevy::reflect::TypeRegistry;
 	ActionTarget,
 	// bevy
 	Name,
+	// transform bundle
 	Transform,
 	GlobalTransform,
 )]
+#[bundles(TransformBundle)]
 pub struct EcsModule;

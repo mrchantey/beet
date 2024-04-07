@@ -1,6 +1,19 @@
 use crate::prelude::*;
 use bevy::prelude::*;
 use bevy::reflect::TypeRegistry;
+use std::marker::PhantomData;
+
+#[derive(Default)]
+pub struct BeetModulePlugin<T: BeetModule>(pub PhantomData<T>);
+
+impl<T: BeetModule> Plugin for BeetModulePlugin<T> {
+	fn build(&self, app: &mut App) {
+		T::register_bundles(app.world_mut());
+		T::register_types(
+			&mut app.world().resource::<AppTypeRegistry>().write(),
+		);
+	}
+}
 
 pub trait BeetModule: 'static + Send + Sync + ActionSystems {
 	/// Register components via [`World::init_bundle`]
@@ -15,6 +28,7 @@ pub trait BeetModule: 'static + Send + Sync + ActionSystems {
 		registry
 	}
 }
+
 
 
 #[cfg(test)]

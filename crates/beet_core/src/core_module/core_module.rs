@@ -27,7 +27,7 @@ use bevy::reflect::TypeRegistry;
 	//ecs
 		EcsModule
 	)]
-#[bundles(
+#[components(
 	AutoSpawn,
 	RandomizePosition,
 	//render
@@ -42,6 +42,10 @@ use bevy::reflect::TypeRegistry;
 	MaxSpeed,
 	ArriveRadius,
 	WanderParams,
+)]
+#[bundles(
+	ForceBundle,
+	SteerBundle,
 )]
 pub struct CoreModule;
 

@@ -72,7 +72,7 @@ fn log_error(val: In<Result<()>>) {
 mod test {
 	use crate::prelude::*;
 	use anyhow::Result;
-	use beet::{graph::BeetBuilder, node::Score};
+	use beet_ecs::prelude::*;
 	use bevy::prelude::*;
 	use sweet::*;
 
@@ -82,7 +82,7 @@ mod test {
 		let mut app = App::new();
 		app /*-*/		
 			.add_plugins(BeetMessagePlugin::<CoreModule>(default()))
-			.add_plugins(BeetTypesPlugin::<CoreModule>(default()))
+			.add_plugins(BeetModulePlugin::<CoreModule>(default()))
 		/*-*/;
 
 		let send = app.world_mut().resource::<BeetMessageSend>().clone();
