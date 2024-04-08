@@ -19,6 +19,9 @@ pub use self::setup_ui::*;
 pub mod test_container;
 #[allow(unused_imports)]
 pub use self::test_container::*;
+pub mod update_dom_text;
+#[allow(unused_imports)]
+pub use self::update_dom_text::*;
 pub mod update_positions;
 #[allow(unused_imports)]
 pub use self::update_positions::*;

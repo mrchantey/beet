@@ -1,6 +1,7 @@
 use crate::prelude::*;
 use anyhow::Result;
 use beet::prelude::*;
+use bevy::ecs::system::RunSystemOnce;
 use bevy::prelude::*;
 use std::marker::PhantomData;
 
@@ -37,6 +38,7 @@ impl<T: BeetModule> Plugin for DomSim<T> {
 			)
 			.add_systems(Update,(
 				update_positions.run_if(has_renderer),
+				update_dom_text.run_if(has_renderer),
 				despawn_elements.run_if(has_renderer),
 				)
 				.chain()
@@ -49,5 +51,15 @@ impl<T: BeetModule> Plugin for DomSim<T> {
 fn log_error(val: In<Result<()>>) {
 	if let Err(e) = val.0 {
 		log::error!("{e}");
+	}
+}
+
+
+pub fn run_render_systems_once(world: &mut World) {
+	if has_renderer(world) {
+		world.run_system_once(create_elements);
+		world.run_system_once(update_positions);
+		world.run_system_once(update_dom_text);
+		world.run_system_once(despawn_elements);
 	}
 }

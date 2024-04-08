@@ -2,10 +2,6 @@ use crate::prelude::*;
 use bevy::prelude::*;
 use web_sys::HtmlElement;
 
-
-
-
-
 pub fn update_positions(
 	renderer: NonSend<DomRenderer>,
 	query: Query<
