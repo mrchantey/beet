@@ -5,7 +5,7 @@ use std::fmt::Debug;
 
 /// Tracks the last time a node was run.
 #[derive(Default, Debug, Component, Reflect)]
-#[reflect(Component)]
+#[reflect(Component, Default)]
 pub struct RunTimer {
 	/// Last time the node was last started, or time since level load if never started.
 	pub last_started: Stopwatch,

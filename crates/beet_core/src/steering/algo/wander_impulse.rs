@@ -5,7 +5,7 @@ use forky_bevy::extensions::Vec3Ext;
 
 /// The distance at which an agent should begin to slow down, defaults to `0.5`
 #[derive(Debug, Clone, PartialEq, Component, Reflect, InspectorOptions)]
-#[reflect(Component)]
+#[reflect(Component, Default)]
 pub struct WanderParams {
 	pub outer_distance: f32,
 	pub outer_radius: f32,

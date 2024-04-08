@@ -60,6 +60,31 @@ impl EntityIdent {
 	) -> Result<()> {
 		ComponentIdent::new(*self, component).add(world)
 	}
+	pub fn add_default_bundle(
+		self,
+		world: &mut World,
+		bundle: TypeId,
+	) -> Result<()> {
+		let Some(bundle_id) = world.bundles().get_id(bundle) else {
+			anyhow::bail!("Bundle not found: {:?}", bundle);
+		};
+		let bundle_info = world.bundles().get(bundle_id).expect("just checked");
+		for component in bundle_info
+			.iter_components()
+			.collect::<Vec<_>>()
+			.into_iter()
+		{
+			if let Some(type_id) = world
+				.components()
+				.get_info(component)
+				.expect("just checked")
+				.type_id()
+			{
+				ComponentIdent::new(*self, type_id).add(world)?;
+			}
+		}
+		Ok(())
+	}
 
 
 	pub fn despawn_recursive(self, world: &mut World) {

@@ -5,7 +5,7 @@ use bevy::utils::HashSet;
 
 /// Marker to identify the root of a behavior graph
 #[derive(Debug, Default, Component, Reflect)]
-#[reflect(Component)]
+#[reflect(Component, Default)]
 pub struct BeetRoot;
 
 pub type SpawnFunc = Box<dyn FnOnce(&mut World) -> Entity>;

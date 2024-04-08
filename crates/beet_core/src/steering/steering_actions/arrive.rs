@@ -5,7 +5,7 @@ use bevy::prelude::*;
 #[derive(
 	Debug, Copy, Clone, PartialEq, Deref, DerefMut, Component, Reflect,
 )]
-#[reflect(Component)]
+#[reflect(Component, Default)]
 pub struct ArriveRadius(pub f32);
 
 impl Default for ArriveRadius {

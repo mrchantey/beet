@@ -9,8 +9,10 @@ use crate::prelude::*;
 use bevy::prelude::*;
 
 /// Max force used to clamp forces, defaults to `0.1`
-#[derive(Debug, Copy, Clone, PartialEq, Deref, DerefMut, Component,Reflect)]
-#[reflect(Component)]
+#[derive(
+	Debug, Copy, Clone, PartialEq, Deref, DerefMut, Component, Reflect,
+)]
+#[reflect(Component, Default)]
 pub struct MaxForce(pub f32);
 
 impl Default for MaxForce {
@@ -18,8 +20,10 @@ impl Default for MaxForce {
 }
 
 /// Max speed used to clamp velocity, defaults to `1.0`
-#[derive(Debug, Copy, Clone, PartialEq, Deref, DerefMut, Component,Reflect)]
-#[reflect(Component)]
+#[derive(
+	Debug, Copy, Clone, PartialEq, Deref, DerefMut, Component, Reflect,
+)]
+#[reflect(Component, Default)]
 pub struct MaxSpeed(pub f32);
 
 impl Default for MaxSpeed {

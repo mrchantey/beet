@@ -3,8 +3,8 @@ use bevy::ecs::reflect::ReflectMapEntities;
 use bevy::prelude::*;
 
 
-#[derive(Debug, Component, Reflect)]
-#[reflect(Component)]
+#[derive(Debug, Default, Component, Reflect)]
+#[reflect(Component, Default)]
 pub struct NeedsParentRoot;
 
 #[derive(Debug, PartialEq, Deref, DerefMut, Component, Reflect)]
