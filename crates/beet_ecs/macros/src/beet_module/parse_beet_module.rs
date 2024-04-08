@@ -149,34 +149,30 @@ fn ids(
 		.iter()
 		.map(|m| {
 			quote! {
-				ids.extend(#m::ids());
+				ids.extend(#m::infos());
 			}
 		})
 		.collect::<TokenStream>();
 
-	let actions = into_ids(actions);
-	let components = into_ids(components);
-	let bundles = into_ids(bundles);
+	let actions = into_ids(actions, quote! {BeetType::Action});
+	let components = into_ids(components, quote! {BeetType::Component});
+	let bundles = into_ids(bundles, quote! {BeetType::Bundle});
 
 	quote! {
-		fn ids()->BeetModuleIds {
-			let mut ids = BeetModuleIds {
-				action_ids: vec![#actions],
-				component_ids: vec![#components],
-				bundle_ids: vec![#bundles],
-			};
+		fn infos()->Vec<BeetTypeInfo> {
+			let mut ids = vec![#actions #components #bundles];
 			#modules
 			ids
 		}
 	}
 }
 
-fn into_ids(items: &Vec<Expr>) -> TokenStream {
+fn into_ids(items: &Vec<Expr>, ty: TokenStream) -> TokenStream {
 	items
 		.iter()
 		.map(|i| {
 			quote! {
-				std::any::TypeId::of::<#i>(),
+				BeetTypeInfo::new::<#i>(#ty),
 			}
 		})
 		.collect::<TokenStream>()

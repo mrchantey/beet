@@ -31,7 +31,7 @@ pub trait BeetModule: 'static + Send + Sync + ActionSystems {
 	}
 
 	/// Get all ids registered to this module and any submodule
-	fn ids() -> BeetModuleIds;
+	fn infos() -> Vec<BeetTypeInfo>;
 }
 
 
