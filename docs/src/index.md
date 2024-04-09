@@ -2,11 +2,11 @@
 
 Beet is a modular AI behavior library for games and robotics. 
 
-It is built with `bevy_ecs` and applies the battle-tested parent-child relationship to behaviors.
+It is built with `bevy` and applies the battle-tested parent-child relationship to behaviors.
 This is proving to be an intuitive workflow to those familiar with ecs, and allows for high levels of modularity and flexibility.
 
 ## Quick Links
-- [Approach](./overview/approach.md)
+- [AI Strategy](./overview/ai-strategy.md)
 - [Concepts](./tutorial/concepts-theory.md)
 - [Example](./tutorial/concepts-example.md)
 - [Beetmash Web Editor](https://app.beetmash.com/)
