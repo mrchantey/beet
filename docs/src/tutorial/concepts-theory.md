@@ -8,6 +8,7 @@ The terminology from this library is a wip and will likely change.
 
 Actions are something to be performed for a given node, in beet this a combination of a `Component`, the data required for the task, and a `System`, the accompanying logic for that task. They usually either get an agent to do something or send information to their parent.
 
+
 Here are some examples of actions:
 
 - `SucceedInDuration`
@@ -16,6 +17,12 @@ Here are some examples of actions:
 	- The entity will slowly move up and down in a sinusoidal pattern.
 
 Notice the primitive nature of these actions, they could be combined to create a "hover for duration" node.
+
+
+### `Evaluator Actions`
+
+Sometimes we need to notify a parent of how favorable it would be for a behavior to run, a common example is setting the `Score`.
+
 
 ## `Selectors`
 

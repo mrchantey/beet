@@ -3,7 +3,7 @@ set dotenv-load
 crates := 'beet beet_ecs beet_net'
 
 default:
-	just --list
+	just --list --unsorted
 
 
 ## common
@@ -33,10 +33,10 @@ run-w crate example *args:
 serve-web:
 	just serve-wasm
 
-# mdbooks server is busted on wsl so I use live-server
 book:
 	cd docs && mdbook serve
 
+# mdbooks server is busted on wsl so I use live-server
 serve-book:
 	cd docs/book && live-server --no-browser
 

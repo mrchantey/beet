@@ -1,6 +1,7 @@
 # Summary
 <!-- https://rust-lang.github.io/mdBook/format/summary.html -->
 - [Beet](./index.md)
+	- [Approach](./overview/approach.md)
 	- [Getting Started](./tutorial/getting-started.md)
 	- [Concepts - Theory](./tutorial/concepts-theory.md)
 	- [Concepts - Example](./tutorial/concepts-example.md)

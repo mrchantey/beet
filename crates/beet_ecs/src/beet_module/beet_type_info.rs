@@ -3,7 +3,7 @@ use std::any::type_name;
 use std::any::TypeId;
 use strum_macros::Display;
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Display, PartialOrd, Ord)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Display, PartialOrd, Ord)]
 pub enum BeetType {
 	Action,
 	Bundle,
