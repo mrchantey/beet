@@ -17,7 +17,7 @@
     <span> | </span>
     <a href="https://docs.rs/beet">API Docs</a>
     <!-- <span> | </span>
-    <a href="https://mrchantey.github.io/beet/docs/other/contributing.html">Contributing</a> -->
+    <a href="https://mrchantey.github.io/beet/other/contributing.html">Contributing</a> -->
   </h3>
 
   <sub>made with ❤️‍🔥 by mrchantey</a></sub>
