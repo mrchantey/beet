@@ -370,6 +370,7 @@ dependencies = [
  "beet_core",
  "beet_ecs",
  "beet_net",
+ "bevy",
 ]
 
 [[package]]

@@ -16,3 +16,5 @@ categories.workspace = true
 beet_core.workspace = true
 beet_ecs.workspace = true
 beet_net.workspace = true
+
+bevy.workspace = true

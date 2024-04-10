@@ -12,7 +12,9 @@ use std::fmt::Debug;
 pub struct Scoring;
 
 
-/// Used to indicate to selectors how favorable a child node would be to run.
+/// Score is a primitive of [`beet`]. The weight is almost always in the range of `0..1` Like a [`Vec3`], the meaning of a [`Score`] depends on its context, for example:
+/// - As a parameter of an Astar cost component
+/// - Indicate to selectors how favorable a child node would be to run.
 #[derive(
 	Debug,
 	Default,
@@ -29,12 +31,12 @@ pub struct Scoring;
 #[reflect(Component, InspectorOptions)]
 pub enum Score {
 	#[default]
-	/// The node should not run.
+	/// Lowest possible score, ie the node should not run.
 	Fail,
-	Weight(#[inspector(min = 0., max = 1., step = 0.01)] f32), //this has to be here or the serde world breaks
+	Weight(#[inspector(min = 0., max = 1., step = 0.01)] f32),
 	/// The node has a weight, usually in the range `0..1`, where higher is more favorable.
 	// Weight(#[number(min = 0, max = 100, step = 1)] u8),
-	/// The node should run.
+	/// Highest possible score, ie the node should run.
 	Pass,
 }
 

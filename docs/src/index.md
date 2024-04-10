@@ -31,80 +31,86 @@ Beet only depends on the lightweight architectural components of the bevy librar
 
 #### 🔥 Epic Concurrency
 
-By default all actions are run in parallel non-exclusive systems. This means graph traversals occur on each update of the schedule, which makes unit testing, breakpoints etc a breeze, although it is not always desired, see [drawbacks](#multi-tick).
+By default all actions are run in parallel systems. This means graph traversals occur on each update of the schedule, which makes unit testing, breakpoints etc a breeze, although it is not always desired, see [drawbacks](#multi-tick).
 
 ## Quickstart
 
 ```rust
+use beet::prelude::*;
 use bevy::prelude::*;
-use beet::{
-  BeetPlugin, Running, RunResult, 
-  SequenceSelector, SetOnRun
-};
 
 // actions are a component-system pair
-#[Derive(Component, Action)]
-#[action(system=log_on_run)]
+// by default the system is the StructName in snake_case
+#[derive(Component, Action)]
 pub struct LogOnRun(pub String);
 
-fn log_on_run(query: Query<&LogOnRun, Added<Running>){
-	for (action) in query.iter(){
+fn log_on_run(query: Query<&LogOnRun, Added<Running>>) {
+	for action in query.iter() {
 		println!("{}", action.0);
 	}
 }
 
-fn main(){
-  let mut app = App::new();
+fn main() {
+	let mut app = App::new();
 
-  // the BeetPlugin adds the systems associated with each action,
-  // as well as utility systems that clean up run state
-  app.add_plugins(BeetPlugin::<(
-    SequenceSelector,
-    LogOnRun,
-    SetOnRun,
-    )>::default());
+	// the BeetSystemsPlugin adds each action system
+	// and utility systems that clean up run state
+	app.add_plugins(BeetSystemsPlugin::<(
+      SequenceSelector, 
+      InsertOnRun<RunResult>
+      LogOnRun, 
+    ), Update>::default());
 
-  // behavior graphs are regular entity hierarchies!
-  app
-    .world_mut()
-    .spawn((SequenceSelector::default(), Running))
-    .with_children(|parent|
-      parent.spawn((
-        LogOnRun("Hello"),
-        SetOnRun(RunResult::Success)
-      ));
-      parent.spawn((
-        LogOnRun("World"),
-        SetOnRun(RunResult::Success)
-      ));
-    );
-  
-  // all actions are run in parallel so each update is a tick
+	// behavior graphs are regular entity hierarchies!
+	app.world_mut()
+		.spawn((SequenceSelector::default(), Running))
+		.with_children(|parent| {
+			parent.spawn((
+				LogOnRun("Hello".into()),
+				InsertOnRun(RunResult::Success),
+			));
+			parent.spawn((
+				LogOnRun("World".into()),
+				InsertOnRun(RunResult::Success),
+			));
+		});
 
-  // 1. Selector chooses first child
-  app.update();
+	// each update is a tick
 
-  // 2. First child succeeds
-  app.update(); 
-  // "Hello"
+	println!("1 - Selector chooses first child");
+	app.update();
 
-  // 3. Selector chooses second child
-  app.update();
+	println!("2 - First child runs");
+	app.update();
 
-  // 4. Second child succeeds
-  app.update();
-  // "World"
+	println!("3 - Selector chooses second child");
+	app.update();
 
-  // 5. Selector succeeeds
-  app.update();
+	println!("4 - Second child runs");
+	app.update();
+
+	println!("5 - Selector succeeds, all done");
+	app.update();
 }
 ```
+```
+cargo run --example hello_world
+
+1 - Selector chooses first child
+2 - First child runs
+Hello
+3 - Selector chooses second child
+4 - Second child runs
+World
+5 - Selector succeeds, all done
+```
+
 
 ## Drawbacks
 
 #### Indirection
 
-Agents, behaviors and children are seperate entities, which is a potential cache miss and ergonomic painpoint. Its my hope this will largely be addressed by the introduction of [Entity Relations](https://github.com/bevyengine/bevy/issues/3742).
+Agents, behaviors and children are seperate entities, which is a bit of an ergonomic painpoint. Its my hope this will be helped by the introduction of [Entity Relations](https://github.com/bevyengine/bevy/issues/3742).
 
 #### Tick Traversal
 

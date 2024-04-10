@@ -1,5 +1,6 @@
 use bevy::ecs::schedule::ScheduleLabel;
 use bevy::prelude::*;
+use bevy::utils::all_tuples;
 
 #[reflect_trait]
 pub trait ActionChildComponents {
@@ -14,3 +15,20 @@ pub trait ActionChildComponents {
 pub trait ActionSystems: 'static {
 	fn add_systems(app: &mut App, schedule: impl ScheduleLabel + Clone);
 }
+
+
+macro_rules! impl_plugins_tuples {
+	($($param: ident),*) => {
+			impl<$($param),*> ActionSystems for ($($param,)*)
+			where
+					$($param: ActionSystems),*
+			{
+					#[allow(non_snake_case, unused_variables)]
+					#[track_caller]
+					fn add_systems(app: &mut App,schedule:impl ScheduleLabel + Clone) {
+							$($param::add_systems(app, schedule.clone());)*
+					}
+			}
+	}
+}
+all_tuples!(impl_plugins_tuples, 1, 15, P);
