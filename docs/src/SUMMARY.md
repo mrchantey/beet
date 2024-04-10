@@ -2,9 +2,9 @@
 <!-- https://rust-lang.github.io/mdBook/format/summary.html -->
 - [Beet](./index.md)
 	- [AI Strategy](./overview/ai-strategy.md)
-	- [Getting Started](./tutorial/getting-started.md)
-	- [Concepts - Theory](./tutorial/concepts-theory.md)
-	- [Concepts - Example](./tutorial/concepts-example.md)
+	- [Getting Started](./overview/getting-started.md)
+	- [Concepts - Theory](./overview/concepts-theory.md)
+	- [Concepts - Example](./overview/concepts-example.md)
 - [Library](./library/index.md)
 	- [Actions](./library/actions.md)
 	- [Selectors](./library/selectors.md)

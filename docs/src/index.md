@@ -1,25 +1,24 @@
 # Beet
 
-Beet is a modular AI behavior library for games and robotics. 
+Beet is a modular AI behavior library for games and robotics, with the goal of being a single point of coordination across the spectrum of AI strategies.
 
-It is built with `bevy` and applies the battle-tested parent-child relationship to behaviors.
+It is built with `bevy` and harnesses parent-child relationships for behavior selection.
 This is proving to be an intuitive workflow to those familiar with ecs, and allows for high levels of modularity and flexibility.
 
 ## Quick Links
 - [AI Strategy](./overview/ai-strategy.md)
-- [Concepts](./tutorial/concepts-theory.md)
-- [Example](./tutorial/concepts-example.md)
+- [Concepts](./overview/concepts.md)
 - [Beetmash Web Editor](https://app.beetmash.com/)
 
 ## Features
 
 #### 🌈 Multi-paradigm
 
-The flexibility of entity graphs allows us to mix-and-match techniques from different paradigms, ie behavior trees, utility selectors, etc.
+The flexibility of entity graphs allows us to mix-and-match techniques from different paradigms, ie behavior trees, utility selectors, LLMs, etc.
 
-#### 🌳 Modular
+#### 🌳 Modular Trees
 
-Using an entity graph unlocks epic flexibility, components and systems are reused anywhere in the graph and graphs can be composed of other graphs.
+Behaviors are composable trees of entities and actions are reusable.
 
 #### 🐦 Ecosystem friendly
 
@@ -54,14 +53,14 @@ fn main() {
 	let mut app = App::new();
 
 	// the BeetSystemsPlugin adds each action system
-	// and utility systems that clean up run state
+	// and some helpers that clean up run state
 	app.add_plugins(BeetSystemsPlugin::<(
       SequenceSelector, 
       InsertOnRun<RunResult>
       LogOnRun, 
     ), Update>::default());
 
-	// behavior graphs are regular entity hierarchies!
+	// behavior graphs are regular entity hierarchies
 	app.world_mut()
 		.spawn((SequenceSelector::default(), Running))
 		.with_children(|parent| {

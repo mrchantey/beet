@@ -15,14 +15,14 @@ fn log_on_run(query: Query<&LogOnRun, Added<Running>>) {
 fn main() {
 	let mut app = App::new();
 
-	// the BeetPlugin adds the systems associated with each action,
-	// as well as utility systems that clean up run state
+	// the BeetPlugin adds the systems associated with each action
+	// and some helpers that clean up run state
 	app.add_plugins(BeetSystemsPlugin::<
 		(SequenceSelector, LogOnRun, InsertOnRun<RunResult>),
 		_,
 	>::default());
 
-	// behavior graphs are regular entity hierarchies!
+	// behavior graphs are regular entity hierarchies
 	app.world_mut()
 		.spawn((SequenceSelector::default(), Running))
 		.with_children(|parent| {
