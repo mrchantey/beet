@@ -1,6 +1,3 @@
-pub mod app_plugin;
-#[allow(unused_imports)]
-pub use self::app_plugin::*;
 pub mod smoother;
 #[allow(unused_imports)]
 pub use self::smoother::*;

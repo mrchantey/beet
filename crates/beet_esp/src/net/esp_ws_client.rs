@@ -1,35 +1,27 @@
 use beet::prelude::*;
+use dotenv_codegen::dotenv;
 use embedded_svc::ws::FrameType;
 use esp_idf_hal::io::EspIOError;
-use esp_idf_hal::task::block_on;
 use esp_idf_svc::ws::client::EspWebSocketClient;
 use esp_idf_svc::ws::client::EspWebSocketClientConfig;
 use esp_idf_svc::ws::client::WebSocketEvent;
 use esp_idf_svc::ws::client::WebSocketEventType;
-use std::sync::Arc;
-use std::sync::Mutex;
+use flume::Sender;
+use forky_core::ResultTEExt;
 use std::time::Duration;
 
 // 4096 - too big
 // 2048 - works, but i think its pretty close
-const CIBORIUM_SCRATCH_BUFFER_SIZE: usize = 4096;
-
+// const CIBORIUM_SCRATCH_BUFFER_SIZE: usize = 4096;
 
 pub type EspWsEvent = WebSocketEvent<'static>;
 
 pub struct EspWsClient {
-	// pub ws: EspWebSocketClient<'static>,
-	pub channel: WsChannel,
+	pub ws: EspWebSocketClient<'static>,
 }
-
-impl WsChannelHelpers for EspWsClient {
-	fn channel(&self) -> &WsChannel { &self.channel }
-	fn channel_mut(&mut self) -> &mut WsChannel { &mut self.channel }
-}
-
 
 impl EspWsClient {
-	pub fn new() -> anyhow::Result<Self> {
+	pub fn new(send: Sender<BeetMessage>) -> anyhow::Result<Self> {
 		let timeout = Duration::from_secs(10);
 		let config = EspWebSocketClientConfig {
 			server_cert: None,
@@ -39,37 +31,21 @@ impl EspWsClient {
 			..Default::default()
 		};
 
-		let url = DEFAULT_WS_LOCAL_URL;
+		let url = dotenv!("WS_URL");
 		let timeout = Duration::from_secs(10);
 
-		let mut recv = WsRecv::new(WsSend::dummy());
-		let mut recv2 = recv.clone();
 		let ws =
 			EspWebSocketClient::new(&url, &config, timeout, move |event| {
-				block_on(async {
-					if let Err(err) = parse(event, &mut recv2).await {
-						log::error!("WS Recv Error: {:?}", err);
-					}
-				});
+				parse(event, &mut send).ok_or(|e| log::error!("{e}"));
 			})?;
 
-		let ws = Arc::new(Mutex::new(ws));
+		Ok(Self { ws })
+	}
 
-		let send = WsSend::new(async move |msg: Message| {
-			let mut ws = ws.lock().unwrap();
-			ws.send(FrameType::Binary(false), &msg.to_bytes()?)?;
-			Ok(())
-		});
-
-		recv.set_send(send.clone());
-		let channel = WsChannel {
-			send,
-			recv,
-			dest_client: None,
-		}
-		.as_client(ConnectParams::default_esp());
-
-		Ok(Self { channel })
+	fn send(&mut self, msg: &BeetMessage) -> anyhow::Result<()> {
+		let bytes = bincode::serialize(msg)?;
+		self.ws.send(FrameType::Binary(false), &bytes)?;
+		Ok(())
 	}
 }
 
@@ -79,9 +55,9 @@ impl Drop for EspWsClient {
 	}
 }
 
-async fn parse(
+fn parse(
 	event: &Result<WebSocketEvent<'_>, EspIOError>,
-	recv: &mut WsRecv,
+	send: &mut Sender<BeetMessage>,
 ) -> anyhow::Result<()> {
 	match event {
 		Ok(event) => {
@@ -91,14 +67,11 @@ async fn parse(
 				}
 				WebSocketEventType::Binary(value) => {
 					// safer to keep on heap, but watch for framentation
-					let mut scratch_buffer =
-						Box::new([0; CIBORIUM_SCRATCH_BUFFER_SIZE]);
+					// let mut scratch_buffer =
+					// 	Box::new([0; CIBORIUM_SCRATCH_BUFFER_SIZE]);
 
-					let msg = Message::from_bytes_with_buffer(
-						value,
-						scratch_buffer.as_mut(),
-					)?;
-					recv.recv(msg).await?;
+					let msg: BeetMessage = bincode::deserialize(&value)?;
+					send.send(msg)?;
 				}
 				_ => {}
 			};

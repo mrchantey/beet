@@ -1,6 +1,6 @@
 use super::*;
 use anyhow::Result;
-use beet::vehicle::DualMotorValue;
+use beet::prelude::*;
 use bevy::prelude::*;
 use esp_idf_hal::gpio::*;
 use esp_idf_hal::ledc;

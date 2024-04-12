@@ -1,9 +1,9 @@
-use crate::prelude::*;
-use beet::prelude::*;
+// use crate::prelude::*;
+// use beet::prelude::*;
 use bevy::prelude::*;
 use bevy::time::TimePlugin;
 use std::time::Duration;
-use std::time::Instant;
+// use std::time::Instant;
 
 
 pub struct AppPlugin;
@@ -11,8 +11,8 @@ pub struct AppPlugin;
 impl Plugin for AppPlugin {
 	fn build(&self, app: &mut App) {
 		app.add_plugins(TimePlugin);
-		app.add_plugins(VehiclePlugin);
-		app.add_systems(Update, spawn_vehicle);
+		// app.add_plugins(VehiclePlugin);
+		// app.add_systems(Update, spawn_vehicle);
 	}
 }
 
@@ -26,7 +26,7 @@ pub fn run_app_with_delay(app: &mut App) {
 
 /// Attempt to accurately delay the given duration, offset by actual frame duration.
 fn delay(app: &App, duration: Duration) {
-	let time = app.world.resource::<Time>();
+	let time = app.world().resource::<Time>();
 
 	if let Some(delay_time) = duration.checked_sub(time.delta()) {
 		// log::info!(
