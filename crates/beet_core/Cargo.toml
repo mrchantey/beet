@@ -23,6 +23,7 @@ bevy.workspace = true
 anyhow.workspace = true
 serde.workspace = true
 strum.workspace = true
+strum_macros.workspace = true
 
 flume.workspace = true
 bincode.workspace = true

@@ -1,20 +1,7 @@
 use crate::prelude::*;
-use beet_ecs::prelude::*;
 use bevy::prelude::*;
-use serde::Deserialize;
-use serde::Serialize;
 
-#[derive(
-	Default,
-	Debug,
-	Copy,
-	Clone,
-	PartialEq,
-	Component,
-	Serialize,
-	Deserialize,
-	FieldUi,
-)]
+#[derive(Default, Debug, Copy, Clone, PartialEq, Component, Reflect)]
 pub struct DualMotorValue {
 	pub left: MotorValue,
 	pub right: MotorValue,

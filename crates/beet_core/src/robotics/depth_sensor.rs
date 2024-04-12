@@ -30,14 +30,13 @@ impl DepthSensor {
 	}
 }
 
-#[derive_action]
+#[derive_action(Default)]
 pub struct DepthSensorScorer {
-	#[shared]
 	pub score: Score,
-	#[number(step = 0.1)]
+	#[inspector(step = 0.1)]
 	pub threshold_dist: f32,
-	pub low_weight: u8,
-	pub high_weight: u8,
+	pub low_weight: f32,
+	pub high_weight: f32,
 }
 
 impl Default for DepthSensorScorer {
@@ -45,14 +44,14 @@ impl Default for DepthSensorScorer {
 		Self {
 			score: Score::Fail,
 			threshold_dist: 0.5,
-			low_weight: 40,
-			high_weight: 60,
+			low_weight: 0.4,
+			high_weight: 0.6,
 		}
 	}
 }
 
 impl DepthSensorScorer {
-	pub fn new(threshold_dist: f32, low_weight: u8, high_weight: u8) -> Self {
+	pub fn new(threshold_dist: f32, low_weight: f32, high_weight: f32) -> Self {
 		Self {
 			score: Score::Fail,
 			threshold_dist,
@@ -64,7 +63,7 @@ impl DepthSensorScorer {
 
 pub fn depth_sensor_scorer(
 	sensors: Query<&DepthSensor, Changed<DepthSensor>>,
-	mut scorers: Query<(&mut DepthSensorScorer, &TargetEntity)>,
+	mut scorers: Query<(&mut DepthSensorScorer, &ParentRoot)>,
 ) {
 	for (mut scorer, target) in scorers.iter_mut() {
 		if let Ok(sensor) = sensors.get(**target) {

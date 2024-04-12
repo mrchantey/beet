@@ -1,21 +1,9 @@
-use beet_ecs::prelude::*;
-use bevy_ecs::prelude::*;
-use serde::Deserialize;
-use serde::Serialize;
+use bevy::prelude::*;
 use strum_macros::Display;
 use strum_macros::EnumIter;
 
 #[derive(
-	Debug,
-	Default,
-	Copy,
-	Clone,
-	PartialEq,
-	Serialize,
-	Deserialize,
-	FieldUi,
-	EnumIter,
-	Display,
+	Debug, Default, Copy, Clone, PartialEq, Reflect, EnumIter, Display,
 )]
 pub enum MotorDirection {
 	#[default]
@@ -23,17 +11,7 @@ pub enum MotorDirection {
 	Backward,
 }
 
-#[derive(
-	Debug,
-	Default,
-	Copy,
-	Clone,
-	PartialEq,
-	Serialize,
-	Deserialize,
-	FieldUi,
-	Component,
-)]
+#[derive(Debug, Default, Copy, Clone, PartialEq, Reflect, Component)]
 pub struct MotorValue {
 	pub value: u8,
 	pub direction: MotorDirection,
