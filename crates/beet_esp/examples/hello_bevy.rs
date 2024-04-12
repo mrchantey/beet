@@ -2,10 +2,8 @@ use beet_esp::prelude::*;
 use bevy::prelude::*;
 use esp_idf_svc::hal::delay::FreeRtos;
 
-fn main() {
-	esp_idf_svc::sys::link_patches();
-	esp_idf_svc::log::EspLogger::initialize_default();
-	print_free("init");
+fn main()->anyhow::Result<()> {
+	init_esp()?;
 
 	let mut app = App::new();
 

@@ -8,7 +8,6 @@ use futures::Future;
 pub fn spawn_local(
 	fut: impl Future<Output = ()> + 'static,
 ) -> Result<(), SpawnError> {
-	let mut local_executor = LocalPool::new();
-	let spawner = local_executor.spawner();
+	let local_executor = LocalPool::new();
 	local_executor.spawner().spawn_local(fut)
 }

@@ -32,6 +32,7 @@ fn free_stack_size() -> u32 {
 pub fn init_esp() -> Result<()> {
 	esp_idf_svc::sys::link_patches();
 	init_logger()?;
+	print_free("init");
 	Ok(())
 }
 

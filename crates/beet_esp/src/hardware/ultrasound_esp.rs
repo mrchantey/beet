@@ -6,14 +6,14 @@ use esp_idf_hal::gpio::*;
 use esp_idf_hal::peripheral::Peripheral;
 use esp_idf_hal::peripherals::Peripherals;
 
-pub type DefaultUltrasoundEsp<'d> = UltrasoundSensorEsp<'d, Gpio1, Gpio0>;
+pub type DefaultUltrasoundEsp<'d> = UltrasoundSensorEsp<'d, Gpio14, Gpio13>;
 
 pub fn default_ultrasound_esp<'d>() -> Result<DefaultUltrasoundEsp<'d>> {
 	let peripherals = Peripherals::take()?;
 
 	let ultrasound = UltrasoundSensorEsp::new(
-		peripherals.pins.gpio1,
-		peripherals.pins.gpio0,
+		peripherals.pins.gpio14,
+		peripherals.pins.gpio13,
 		DEFAULT_ULTRASOUND_MAX_DEPTH,
 	)?;
 	Ok(ultrasound)

@@ -32,8 +32,8 @@ impl AppHardware<'_> {
 		)?;
 
 		let ultrasound = UltrasoundSensorEsp::new(
-			peripherals.pins.gpio1,
-			peripherals.pins.gpio0,
+			peripherals.pins.gpio14,
+			peripherals.pins.gpio13,
 			DEFAULT_ULTRASOUND_MAX_DEPTH,
 		)?;
 

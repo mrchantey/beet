@@ -20,12 +20,12 @@ pub fn default_hbridge_esp<'d>() -> Result<DefaultHBridgeEsp<'d>> {
 	let bridge = DualHBridgeEsp::new(
 		peripherals.pins.gpio7,
 		peripherals.pins.gpio6,
-		peripherals.pins.gpio2,
+		peripherals.pins.gpio16,
 		peripherals.ledc.channel0,
 		peripherals.ledc.timer0,
 		peripherals.pins.gpio4,
 		peripherals.pins.gpio5,
-		peripherals.pins.gpio3,
+		peripherals.pins.gpio15,
 		peripherals.ledc.channel1,
 		peripherals.ledc.timer1,
 	)?;

@@ -21,7 +21,7 @@ pub struct EspWsClient {
 }
 
 impl EspWsClient {
-	pub fn new(send: Sender<BeetMessage>) -> anyhow::Result<Self> {
+	pub fn new(mut send: Sender<BeetMessage>) -> anyhow::Result<Self> {
 		let timeout = Duration::from_secs(10);
 		let config = EspWebSocketClientConfig {
 			server_cert: None,
@@ -42,7 +42,7 @@ impl EspWsClient {
 		Ok(Self { ws })
 	}
 
-	fn send(&mut self, msg: &BeetMessage) -> anyhow::Result<()> {
+	pub fn send(&mut self, msg: &BeetMessage) -> anyhow::Result<()> {
 		let bytes = bincode::serialize(msg)?;
 		self.ws.send(FrameType::Binary(false), &bytes)?;
 		Ok(())

@@ -1,12 +1,13 @@
+use beet::prelude::*;
 use embedded_hal::delay::DelayNs;
 use embedded_hal::digital::InputPin;
 use embedded_hal::digital::OutputPin;
 use esp_idf_hal::delay::FreeRtos;
 use std::time::Duration;
 use std::time::Instant;
+
 /// Speed of sound in meters per second
 const SPEED_OF_SOUND: f32 = 343.;
-pub const DEFAULT_ULTRASOUND_MAX_DEPTH: f32 = 1.5;
 
 pub type Meters = f32;
 
