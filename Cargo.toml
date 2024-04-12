@@ -29,6 +29,7 @@ members = [
 	"crates/beet_web",
 	# "crates/beet-cli",
 ]
+exclude = ["crates/beet_esp"]
 
 [workspace.dependencies]
 ## internal
