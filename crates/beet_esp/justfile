@@ -1,0 +1,16 @@
+
+
+
+# run example *args:
+# 	# cargo build --example 
+# 	just flash {{example}}
+
+monitor:
+	cargo espflash monitor --port=/dev/ttyACM0
+
+run example:
+	cargo espflash flash \
+	--baud 921600 \
+	--monitor \
+	--port=/dev/ttyACM0 \
+	--example {{example}}

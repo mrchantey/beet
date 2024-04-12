@@ -1,0 +1,53 @@
+[package]
+name = "beet_esp"
+version = "0.1.0"
+edition = "2021"
+resolver = "2"
+rust-version = "1.71"
+
+[profile.release]
+opt-level = "s"
+
+[profile.dev]
+debug = true    # Symbols are nice and they don't increase the size on Flash
+opt-level = "z"
+
+[features]
+default = ["std", "embassy", "esp-idf-svc/native"]
+
+std = ["alloc", "esp-idf-svc/binstart", "esp-idf-svc/std"]
+alloc = ["esp-idf-svc/alloc"]
+nightly = ["esp-idf-svc/nightly"]
+experimental = ["esp-idf-svc/experimental"]
+embassy = [
+	"esp-idf-svc/embassy-sync",
+	"esp-idf-svc/critical-section",
+	"esp-idf-svc/embassy-time-driver",
+]
+
+[dependencies]
+beet = { path = "../beet" }
+forky_core = { path = "../../../forky/crates/forky/forky_core" }
+
+bevy = { git = "https://github.com/bevyengine/bevy.git", rev = "f516de456be2b65572de1af6956d52157663b9cc", default-features = false, features = [
+	"bevy_scene",
+] }
+
+anyhow = "1.0.75"
+log = { version = "0.4", default-features = false }
+
+embedded-svc = "0.27"
+embedded-hal = "1.0.0"
+esp-idf-hal = "0.43"
+esp-idf-sys = "0.34"
+esp-idf-svc = { version = "0.48", default-features = false }
+# match https://github.com/esp-rs/embedded-svc/blob/master/Cargo.toml
+heapless = "0.8"
+futures = "0.3.30"
+dotenv_codegen = "0.15.0"
+
+[build-dependencies]
+embuild = "0.31.3"
+
+[[package.metadata.esp-idf-sys.extra_components]]
+remote_component = { name = "espressif/esp_websocket_client", version = "1.1.0" }
