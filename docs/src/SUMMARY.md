@@ -1,9 +1,7 @@
 # Summary
 <!-- https://rust-lang.github.io/mdBook/format/summary.html -->
 - [Beet](./index.md)
-	- [AI Strategy](./overview/ai-strategy.md)
-	- [Concepts](./overview/concepts.md)
-	- [Demo](./overview/demo.md)
+	- [Concepts](./concepts.md)
 
 ---
 <!-- [Changelog](./misc/roadmap.md) -->
