@@ -1,9 +1,8 @@
 # Beet
 
-Beet is a modular AI behavior library for games and robotics, with the goal of being a single point of coordination across the spectrum of AI strategies.
+Beet is a modular AI behavior library for games and robotics.
 
-It is built with `bevy` and harnesses parent-child relationships for behavior selection.
-This is proving to be an intuitive workflow to those familiar with ecs, and allows for high levels of modularity and flexibility.
+It is built with `bevy` and uses entities to represent behaviors, connecting them through the parent-child relationship. This approach feels familiar and allows for high levels of modularity like scene graphs (in fact behaviors *are* scene graphs).
 
 ## Quick Links
 - [AI Strategy](./overview/ai-strategy.md)

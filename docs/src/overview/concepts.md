@@ -1,8 +1,6 @@
 # Concepts
 <!-- keep all code references in sync with docs please -->
 
-The scope of beet spans several AI strategies, many with their own terminology, so I'm doing my best to use terms that fit. If you have any ideas please create an issue.
-
 ## Everything is an `Action`
 
 Actions are simply a combination of a `Component` and a `System`. They are the single primitive from which all behaviors are built, whether modifying the world or the behavior graph.
