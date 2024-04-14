@@ -13,7 +13,7 @@ These terms are not nessecarily types in the codebase but may be helpful when de
 
 | Name     | Descrition                                                                | Example         |
 | -------- | ------------------------------------------------------------------------- | --------------- |
-| Agent    | A entity that has an associated behavior, usually as a child              | `Enemy`         |
+| Agent    | A entity that has an associated behavior, usually as a child entity       | `Enemy`         |
 | Behavior | An entity that contains at least one action, and possibly child behaviors | `Attack Target` |
 | Action   | A component-system pair                                                   | `Swing Sword`   |
 

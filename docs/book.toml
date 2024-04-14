@@ -9,6 +9,8 @@ src = "src"
 create-missing = false
 # extra-watch-dirs = ["./custom"]
 [output.html]
+git-repository-url = "https://github.com/mrchantey/beet"
+edit-url-template = "https://github.com/mrchantey/beet/{path}"
 additional-js = [
 	"deps/custom.js",
 	"deps/mermaid.min.js",
