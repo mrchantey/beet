@@ -1,5 +1,9 @@
 # Resources
 
+## ML
+
+- [GTC 24 - Robotics in the Age of Generative AI](https://youtu.be/vOrhfyMe_EQ)
+
 ## Architecture
 
 - GDC - [Modular AI](https://youtu.be/IvK0ZlNoxjw)

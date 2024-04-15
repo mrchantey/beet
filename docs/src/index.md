@@ -5,9 +5,10 @@ Beet is a modular AI behavior library for games and robotics.
 It is built with `bevy` and uses entities to represent behaviors, connecting them through the parent-child relationship. This approach feels familiar and allows for high levels of modularity, just like scene graphs (in fact behaviors *are* scene graphs).
 
 ## Quick Links
+Currently the best place for examples is the tests for specific actions, ie [ScoreSelector](https://github.com/mrchantey/beet/blob/main/crates/beet_ecs/src/ecs_module/selectors/score_selector.rs)
+
 - [Concepts](./concepts.md)
 - [Beetmash Web Editor](https://app.beetmash.com/)
-- Examples - currently the best place for examples is the tests for specific actions, ie [ScoreSelector]()
 ## Features
 
 #### 🌈 Multi-paradigm

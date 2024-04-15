@@ -6,7 +6,10 @@ name: 🌍 Deploy Book
 on:
   push:
     branches: main
-    paths: ['docs/**','.github/workflows/book.yml']
+    paths: [
+      'docs/**',
+      '.github/workflows/book.yml',
+      ]
 jobs:
   deploy:
     name: Build and Deploy
