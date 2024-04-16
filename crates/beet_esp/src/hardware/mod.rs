@@ -1,6 +1,3 @@
-pub mod esp_device;
-#[allow(unused_imports)]
-pub use self::esp_device::*;
 pub mod rgb;
 #[allow(unused_imports)]
 pub use self::rgb::*;
@@ -22,3 +19,6 @@ pub use self::apps::*;
 pub mod hbridge_esp;
 #[allow(unused_imports)]
 pub use self::hbridge_esp::*;
+pub mod esp_device;
+#[allow(unused_imports)]
+pub use self::esp_device::*;

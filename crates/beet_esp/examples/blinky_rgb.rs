@@ -25,7 +25,7 @@ fn main() -> anyhow::Result<()> {
 	// ESP32-C3-DevKitC-02 gpio8,
 	// ESP32-C3-DevKit-RUST-1 gpio2
 	// ESP32-S3 AI gpio48
-	let led = peripherals.pins.gpio38;
+	let led = peripherals.pins.gpio47;
 	let channel = peripherals.rmt.channel0;
 	let config = TransmitConfig::new().clock_divider(1);
 	let mut tx = TxRmtDriver::new(channel, led, &config)?;

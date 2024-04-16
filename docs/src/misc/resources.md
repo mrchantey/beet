@@ -1,8 +1,9 @@
 # Resources
 
 ## ML
-
-- [GTC 24 - Robotics in the Age of Generative AI](https://youtu.be/vOrhfyMe_EQ)
+- GTC 24
+	- [Robotics in the Age of Generative AI](https://youtu.be/vOrhfyMe_EQ)
+	- [Generally Capable Agents in Open-Ended Worlds](https://youtu.be/ZSPEyFqAGDc)
 
 ## Architecture
 
