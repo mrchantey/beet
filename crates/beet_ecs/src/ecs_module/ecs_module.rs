@@ -1,7 +1,5 @@
 use crate::prelude::*;
-use bevy::ecs::schedule::ScheduleLabel;
 use bevy::prelude::*;
-use bevy::reflect::TypeRegistry;
 
 #[derive(Debug, Clone, BeetModule)]
 #[actions(

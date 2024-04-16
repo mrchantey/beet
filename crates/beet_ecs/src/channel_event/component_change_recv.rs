@@ -77,7 +77,6 @@ impl ComponentChangeRecv {
 #[cfg(test)]
 mod test {
 	use super::*;
-	use anyhow::Result;
 	use sweet::*;
 
 	#[derive(Debug, PartialEq, Component, Reflect)]

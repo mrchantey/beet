@@ -36,9 +36,3 @@ log.workspace = true
 [dev-dependencies]
 pretty_env_logger.workspace = true
 sweet.workspace = true
-
-
-[[example]]
-name = "test_beet_net"
-path = "test/sweet.rs"
-# required-features = ["tokio"]

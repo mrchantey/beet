@@ -1,7 +1,5 @@
 use crate::prelude::*;
 use bevy::prelude::*;
-use bevy::reflect::GetTypeRegistration;
-
 
 pub trait SettableComponent:
 	Default + Clone + Component + GetTypeRegistration
