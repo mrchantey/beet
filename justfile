@@ -13,6 +13,9 @@ test-core *args:
 test-ecs *args:
 	just watch 'cargo test -p beet_ecs $BEET_CARGO_TEST --lib -- --nocapture {{args}}'
 
+test-ml *args:
+	just watch 'cargo test -p beet_ml $BEET_CARGO_TEST --lib -- --nocapture {{args}}'
+
 test-web *args:
 	just test-wasm beet_web {{args}}
 

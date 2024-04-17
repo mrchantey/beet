@@ -1,6 +1,6 @@
 # Beet
 
-Beet is a modular AI behavior library for games and robotics.
+Beet is a distributed behavior library for games and robotics.
 
 It is built with `bevy` and uses entities to represent behaviors, connecting them through the parent-child relationship. This approach feels familiar and allows for high levels of modularity, just like scene graphs (in fact behaviors *are* scene graphs).
 
@@ -9,6 +9,7 @@ Currently the best place for examples is the tests for specific actions, ie [Sco
 
 - [Concepts](./concepts.md)
 - [Beetmash Web Editor](https://app.beetmash.com/)
+
 ## Features
 
 #### 🌈 Multi-paradigm
@@ -18,6 +19,10 @@ The flexibility of entity graphs allows us to mix-and-match techniques from diff
 #### 🌳 Modular Trees
 
 Behaviors are composable trees of entities and actions are reusable.
+
+#### 🌐 Messageless distribution
+
+Work can be distributed across environments through world replication. Any given agent may run some actions locally in a constrained environment, and others remotely.
 
 #### 🐦 Ecosystem friendly
 

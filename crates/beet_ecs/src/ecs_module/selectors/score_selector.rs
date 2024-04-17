@@ -8,7 +8,11 @@ use bevy::prelude::*;
 ///
 #[derive_action]
 #[action(graph_role=GraphRole::Child, child_components=[Score])]
-pub struct ScoreSelector;
+pub struct ScoreSelector {
+	/// Remove the score component from children when one is selected.
+	pub consume_scores: bool,
+}
+
 
 pub enum UtilityInterruptRate {
 	/// Interrupt every frame.
@@ -27,7 +31,7 @@ fn score_selector(
 	children_running: Query<(), With<Running>>,
 	children_results: Query<&RunResult>,
 ) {
-	for (parent, _selector, children) in selectors.iter() {
+	for (parent, selector, children) in selectors.iter() {
 		// if a child has finished, return
 		if let Some((_, result)) =
 			first_child_result(children, &children_results)
@@ -60,6 +64,12 @@ fn score_selector(
 
 				// run highest score
 				commands.entity(highest_child).insert(Running);
+
+				if selector.consume_scores {
+					for child in children.iter() {
+						commands.entity(*child).remove::<Score>();
+					}
+				}
 			}
 			// else no passing score, do nothing
 		}
@@ -78,7 +88,7 @@ mod test {
 		let mut app = App::new();
 		app.add_plugins(BeetSystemsPlugin::<EcsModule, _>::default());
 
-		let tree = ScoreSelector
+		let tree = ScoreSelector::default()
 			.child((
 				Score::default(),
 				SetOnStart(Score::Fail),

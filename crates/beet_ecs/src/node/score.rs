@@ -40,6 +40,17 @@ pub enum Score {
 	Pass,
 }
 
+impl Score {
+	/// Maps [`Score::Fail`] to `0.0`, [`Score::Pass`] to `1.0` and [`Score::Weight`] to its value.
+	pub fn weight(&self) -> f32 {
+		match self {
+			Score::Fail => 0.0,
+			Score::Weight(w) => *w,
+			Score::Pass => 1.0,
+		}
+	}
+}
+
 impl PartialOrd for Score {
 	fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
 		let val = match (self, other) {

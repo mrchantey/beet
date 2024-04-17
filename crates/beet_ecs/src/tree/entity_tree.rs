@@ -14,6 +14,16 @@ impl EntityTree {
 		Self(Tree::new_with_children(entity, children))
 	}
 
+	pub fn new_with_world(entity: Entity, world: &World) -> Self {
+		let mut tree = Tree::new(entity);
+		if let Some(children) = world.entity(entity).get::<Children>() {
+			for child in children {
+				tree = tree.with_child(Self::new_with_world(*child, world).0);
+			}
+		}
+		Self(tree)
+	}
+
 	pub fn component_tree<'a, T: Component>(
 		&self,
 		world: &'a World,

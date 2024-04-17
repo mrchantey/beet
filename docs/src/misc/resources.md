@@ -1,10 +1,13 @@
 # Resources
 
+Various resource on AI in games/robotics, architecture etc.
+
 ## ML
 - GTC 24
 	- [Robotics in the Age of Generative AI](https://youtu.be/vOrhfyMe_EQ)
 	- [Generally Capable Agents in Open-Ended Worlds](https://youtu.be/ZSPEyFqAGDc)
 - [Huggingface - ML in games](https://huggingface.co/learn/ml-games-course/unit0/introduction)
+- [candle book](https://huggingface.github.io/candle/guide/installation.html)
 
 ## Architecture
 

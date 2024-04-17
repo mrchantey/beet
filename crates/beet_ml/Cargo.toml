@@ -1,0 +1,36 @@
+[package]
+name = "beet_ml"
+version.workspace = true
+edition.workspace = true
+description.workspace = true
+documentation.workspace = true
+readme.workspace = true
+homepage.workspace = true
+repository.workspace = true
+license.workspace = true
+keywords.workspace = true
+categories.workspace = true
+
+[features]
+default = []
+# tokio = ["dep:tokio"]
+
+[dependencies]
+beet_ecs.workspace = true
+anyhow.workspace = true
+log.workspace = true
+bevy.workspace = true
+serde_json.workspace = true
+
+### huggingface ###
+candle-core = "0.4.1"
+candle-transformers = "0.4.1"
+candle-nn = "0.4.1"
+hf-hub = "0.3.2"
+tokenizers = "0.15.2"
+###  ###
+
+
+[dev-dependencies]
+pretty_env_logger.workspace = true
+sweet.workspace = true
