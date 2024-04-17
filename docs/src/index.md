@@ -2,7 +2,7 @@
 
 > This library has a broad scope and is largely incomplete, contributions are very welcome.
 
-Beet is a distributed behavior library for games and robotics.
+Beet is a modular behavior library for games and robotics.
 
 It is built with `bevy` and uses entities to represent behaviors, connecting them through the parent-child relationship. This approach feels familiar and allows for high levels of modularity, just like scene graphs (in fact behaviors *are* scene graphs).
 
@@ -21,10 +21,6 @@ The flexibility of entity graphs allows us to mix-and-match techniques from diff
 
 Behaviors are composable trees of entities and actions are reusable.
 
-#### 🌐 Messageless replication
-
-Work can be distributed across environments through world replication. An agent may run some actions locally in a constrained environment, and others remotely.
-
 #### 🐦 Ecosystem friendly
 
 All aspects of the library are simple components and systems, which means no blackboard and easy integration with existing bevy tooling.
@@ -36,6 +32,11 @@ Beet only depends on the lightweight architectural components of the bevy librar
 #### 🔥 Epic Concurrency
 
 By default all actions are run in parallel systems. This means graph traversals occur on each update of the schedule, which makes unit testing, breakpoints etc a breeze, although it is not always desired, see [drawbacks](#multi-tick).
+
+#### 🌐 Messageless replication (wip)
+
+Work can be distributed across environments through world replication. An agent may run some actions in a constrained environment and others in a remote server.
+
 
 ## Quickstart
 

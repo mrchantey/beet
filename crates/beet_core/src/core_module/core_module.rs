@@ -18,16 +18,18 @@ use bevy::prelude::*;
 		//steer
 		Seek,
 		Wander,
-		FindSteerTarget,
-		DespawnSteerTarget,
-		ScoreSteerTarget,
 		SucceedOnArrive,
+		FindSteerTarget,
+		ScoreSteerTarget,
+		DespawnSteerTarget,
 	)]
 #[components(
 	AutoSpawn,
 	RandomizePosition,
 	//render
 	RenderText,
+	// steering
+	SteerTarget,
 	//force bundle
 	Mass, 
 	Velocity, 

@@ -5,6 +5,7 @@ use bevy::prelude::*;
 
 #[derive_action(Default)]
 #[action(graph_role=GraphRole::Node,set=PreTickSet)]
+/// Adjusts the [`Score`] based on distance to the [`SteerTarget`]
 pub struct ScoreSteerTarget {
 	pub radius: f32,
 }

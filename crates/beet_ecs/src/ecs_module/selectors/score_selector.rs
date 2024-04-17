@@ -91,12 +91,12 @@ mod test {
 		let tree = ScoreSelector::default()
 			.child((
 				Score::default(),
-				SetOnStart(Score::Fail),
+				SetOnSpawn(Score::Fail),
 				InsertOnRun(RunResult::Failure),
 			))
 			.child((
 				Score::default(),
-				SetOnStart(Score::Pass),
+				SetOnSpawn(Score::Pass),
 				InsertOnRun(RunResult::Success),
 			))
 			.build(app.world_mut());

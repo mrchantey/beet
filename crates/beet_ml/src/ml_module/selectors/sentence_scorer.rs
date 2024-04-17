@@ -11,9 +11,8 @@ impl Sentence {
 	pub fn new(s: impl Into<Cow<'static, str>>) -> Self { Self(s.into()) }
 }
 
-/// This selector uses [`Bert`] to compare the [`SentenceOption`] attached to the agent
-/// with those on child behaviors. It does
-/// This should be used with the [`UtilitySelector`]
+/// Updates the [`Score`] of each child based on the similarity of its [`Sentence`] with the agent,
+/// for use with [`ScoreSelector`]
 #[derive_action]
 #[action(graph_role=GraphRole::Child, child_components=[Score])]
 pub struct SentenceScorer;

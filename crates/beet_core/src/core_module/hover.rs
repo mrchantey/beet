@@ -5,6 +5,7 @@ use std::f32::consts::TAU;
 
 #[derive_action]
 #[action(graph_role=GraphRole::Agent)]
+/// Translate the agent up and down in a sine wave
 pub struct Hover {
 	/// Measured in Hz
 	#[inspector(min = 0.1, max = 3., step = 0.1)]

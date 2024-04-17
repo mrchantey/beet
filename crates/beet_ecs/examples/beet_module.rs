@@ -9,10 +9,10 @@ extern crate beet_ecs as beet;
 
 // struct Foobar;
 
-// SetOnStart::<Score>,
+// SetOnSpawn::<Score>,
 #[derive(BeetModule)]
 #[actions(
-	SetOnStart::<Score>,
+	SetOnSpawn::<Score>,
 	EmptyAction,
 	InsertInDuration::<RunResult>,
 	SequenceSelector,

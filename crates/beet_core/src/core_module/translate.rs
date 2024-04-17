@@ -4,6 +4,7 @@ use forky_core::ResultTEExt;
 
 #[derive_action]
 #[action(graph_role=GraphRole::Agent)]
+/// Applies constant translation, multiplied by [`Time::delta_seconds`]
 pub struct Translate {
 	/// Translation to apply, in meters per second
 	#[inspector(min=-2., max=2., step=0.1)]

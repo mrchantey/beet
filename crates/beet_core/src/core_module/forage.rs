@@ -15,7 +15,7 @@ pub fn forage() -> BeetBuilder {
 		.child((
 			Name::new("Wander"),
 			Score::default(),
-			SetOnStart(Score::Weight(0.5)),
+			SetOnSpawn(Score::Weight(0.5)),
 			Wander::default(),
 			InsertInDuration::<RunResult>::default(),
 		))

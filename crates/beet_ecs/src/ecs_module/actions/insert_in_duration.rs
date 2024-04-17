@@ -4,7 +4,8 @@ use std::time::Duration;
 
 #[derive_action(Default)]
 #[action(graph_role=GraphRole::Node)]
-/// After running for a given duration, add the
+/// Inserts the given component after running for a given duration. Has no effect if
+/// the action completes before the duration.
 pub struct InsertInDuration<T: SettableComponent> {
 	pub duration: Duration,
 	pub value: T,

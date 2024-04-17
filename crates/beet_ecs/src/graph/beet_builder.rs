@@ -170,10 +170,10 @@ mod test {
 		let _node2 = BeetBuilder::new((
 			EmptyAction,
 			Foobar,
-			SetOnStart::<Score>::default(),
+			SetOnSpawn::<Score>::default(),
 		));
 		let _node = EmptyAction.child(
-			(EmptyAction, SetOnStart::<Score>::default()).child(EmptyAction),
+			(EmptyAction, SetOnSpawn::<Score>::default()).child(EmptyAction),
 		);
 
 		Ok(())
@@ -201,7 +201,7 @@ mod test {
 	fn spawns() -> Result<()> {
 		let mut world = World::new();
 
-		let root = (Score::default(), SetOnStart(Score::Weight(0.5)))
+		let root = (Score::default(), SetOnSpawn(Score::Weight(0.5)))
 			.into_beet_builder()
 			.with_type::<Score>() // not needed by happenstance but usually required
 			.build(&mut world)
@@ -210,7 +210,7 @@ mod test {
 		expect(&world).to_have_entity(root)?;
 		expect(&world)
 			.component(root)?
-			.to_be(&SetOnStart(Score::Weight(0.5)))?;
+			.to_be(&SetOnSpawn(Score::Weight(0.5)))?;
 
 		// test shared component
 		expect(&world).component(root)?.to_be(&Score::default())?;
@@ -224,7 +224,7 @@ mod test {
 		let actions = test_constant_behavior_tree();
 		let root = actions.build(app.world_mut()).value;
 
-		expect(&app).to_have_component::<SetOnStart<Score>>(root)?;
+		expect(&app).to_have_component::<SetOnSpawn<Score>>(root)?;
 		expect(&app).to_have_component::<RootIsTargetAgent>(root)?;
 		expect(&app).to_have_component::<RunTimer>(root)?;
 		expect(&app).to_have_component::<Score>(root)?;

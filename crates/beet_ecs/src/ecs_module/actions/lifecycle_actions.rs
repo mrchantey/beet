@@ -10,23 +10,19 @@ impl<T: Default + Clone + Component + GetTypeRegistration> SettableComponent
 {
 }
 
-// #[action(
-// 	system=constant_score,
-// 	set=PreTickSet,
-// 	components=Score::default()
-// )]
-// #[reflect(Component, Action)]
 #[derive(PartialEq, Deref, DerefMut)]
 #[derive_action]
 #[action(graph_role=GraphRole::Node,set=PreTickSet)]
-pub struct SetOnStart<T: SettableComponent>(pub T);
+/// Sets a component when this behavior spawns.
+/// This does nothing if the entity does not have the component.
+pub struct SetOnSpawn<T: SettableComponent>(pub T);
 
-impl<T: SettableComponent> SetOnStart<T> {
+impl<T: SettableComponent> SetOnSpawn<T> {
 	pub fn new(value: impl Into<T>) -> Self { Self(value.into()) }
 }
 
-fn set_on_start<T: SettableComponent>(
-	mut query: Query<(&SetOnStart<T>, &mut T), Added<SetOnStart<T>>>,
+fn set_on_spawn<T: SettableComponent>(
+	mut query: Query<(&SetOnSpawn<T>, &mut T), Added<SetOnSpawn<T>>>,
 ) {
 	for (from, mut to) in query.iter_mut() {
 		*to = from.0.clone();
@@ -52,7 +48,8 @@ fn insert_on_run<T: SettableComponent>(
 	}
 }
 
-/// If the node does not have the component this will do nothing.
+/// Sets a component when this behavior starts running.
+/// This does nothing if the entity does not have the component.
 #[derive(PartialEq, Deref, DerefMut)]
 #[derive_action]
 #[action(graph_role=GraphRole::Node,set=PostTickSet)]
@@ -70,7 +67,8 @@ fn set_on_run<T: SettableComponent>(
 	}
 }
 
-/// If the agent does not have the component this will do nothing.
+/// Sets an agent's component when this behavior starts running.
+/// This does nothing if the agent does not have the component.
 #[derive(PartialEq, Deref, DerefMut)]
 #[derive_action]
 #[action(graph_role=GraphRole::Agent,set=PostTickSet)]
@@ -110,7 +108,7 @@ mod test {
 
 		app.world_mut()
 			.entity_mut(root)
-			.insert(SetOnStart(Score::Pass));
+			.insert(SetOnSpawn(Score::Pass));
 
 		expect(&app).component(root)?.to_be(&Score::Fail)?;
 		app.update();

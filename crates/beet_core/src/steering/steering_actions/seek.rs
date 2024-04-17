@@ -5,6 +5,7 @@ use forky_core::ResultTEExt;
 
 #[derive_action]
 #[action(graph_role=GraphRole::Agent)]
+/// Go to the agent's [`SteerTarget`] with an optional [`ArriveRadius`]
 pub struct Seek;
 
 // TODO if target has Velocity, pursue

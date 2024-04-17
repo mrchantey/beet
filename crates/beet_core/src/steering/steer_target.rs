@@ -1,7 +1,8 @@
 use anyhow::Result;
 use bevy::prelude::*;
 
-#[derive(Debug, Copy, Clone, PartialEq, Component)]
+#[derive(Debug, Copy, Clone, PartialEq, Component, Reflect)]
+#[reflect(Component)]
 pub enum SteerTarget {
 	Position(Vec3),
 	Entity(Entity),

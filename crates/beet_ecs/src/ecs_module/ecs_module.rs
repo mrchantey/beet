@@ -4,7 +4,7 @@ use bevy::prelude::*;
 #[derive(Debug, Clone, BeetModule)]
 #[actions(
 	// constants
-	SetOnStart::<Score>,
+	SetOnSpawn::<Score>,
 	InsertOnRun::<RunResult>,
 	// utility
 	EmptyAction,

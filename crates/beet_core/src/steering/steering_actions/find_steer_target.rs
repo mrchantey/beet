@@ -4,6 +4,7 @@ use bevy::prelude::*;
 
 #[derive_action(Default)]
 #[action(graph_role=GraphRole::Agent)]
+/// Sets the [`SteerTarget`] when an entity with the given name is nearby.
 pub struct FindSteerTarget {
 	pub name: String,
 	#[inspector(min = 0., max = 3., step = 0.1)]

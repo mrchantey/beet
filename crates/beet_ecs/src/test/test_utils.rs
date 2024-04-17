@@ -1,10 +1,10 @@
 use crate::prelude::*;
 pub fn test_constant_behavior_tree() -> BeetBuilder {
-	(Score::default(), SetOnStart::<Score>::default())
-		.child((Score::default(), SetOnStart::<Score>::default()))
+	(Score::default(), SetOnSpawn::<Score>::default())
+		.child((Score::default(), SetOnSpawn::<Score>::default()))
 		.child(
-			(Score::default(), SetOnStart::<Score>::default())
-				.child((Score::default(), SetOnStart::<Score>::default())),
+			(Score::default(), SetOnSpawn::<Score>::default())
+				.child((Score::default(), SetOnSpawn::<Score>::default())),
 		)
 }
 
@@ -18,7 +18,7 @@ pub fn test_no_action_behavior_tree() -> BeetBuilder {
 
 pub fn test_serde_tree() -> BeetBuilder {
 	BeetBuilder::new((
-		SetOnStart::<Score>::default(),
+		SetOnSpawn::<Score>::default(),
 		InsertOnRun::<RunResult>::default(),
 		// utility
 		EmptyAction::default(),

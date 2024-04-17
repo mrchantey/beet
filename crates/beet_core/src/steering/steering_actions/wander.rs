@@ -5,6 +5,7 @@ use forky_core::ResultTEExt;
 
 #[derive_action]
 #[action(graph_role=GraphRole::Agent)]
+/// Somewhat cohesive random walk
 pub struct Wander;
 
 fn wander(
