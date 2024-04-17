@@ -9,7 +9,7 @@ use bevy::prelude::*;
 	// utility
 	EmptyAction,
 	Repeat,
-	SucceedInDuration,
+	InsertInDuration::<RunResult>,
 	// selectors
 	SequenceSelector,
 	FallbackSelector,

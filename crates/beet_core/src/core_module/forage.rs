@@ -17,7 +17,7 @@ pub fn forage() -> BeetBuilder {
 			Score::default(),
 			SetOnStart(Score::Weight(0.5)),
 			Wander::default(),
-			SucceedInDuration::with_secs(1),
+			InsertInDuration::<RunResult>::default(),
 		))
 		.child(
 			(
@@ -34,7 +34,7 @@ pub fn forage() -> BeetBuilder {
 				.child((
 					Name::new("Wait 1 second"),
 					SetAgentOnRun(Velocity(Vec3::ZERO)),
-					SucceedInDuration::with_secs(1),
+					InsertInDuration::<RunResult>::default(),
 				))
 				.child((
 					Name::new("Collect flower"),

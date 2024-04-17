@@ -14,7 +14,7 @@ extern crate beet_ecs as beet;
 #[actions(
 	SetOnStart::<Score>,
 	EmptyAction,
-	SucceedInDuration,
+	InsertInDuration::<RunResult>,
 	SequenceSelector,
 	FallbackSelector,
 	ScoreSelector

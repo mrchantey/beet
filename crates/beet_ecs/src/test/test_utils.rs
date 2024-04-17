@@ -23,7 +23,7 @@ pub fn test_serde_tree() -> BeetBuilder {
 		// utility
 		EmptyAction::default(),
 		Repeat::default(),
-		SucceedInDuration::default(),
+		InsertInDuration::<RunResult>::default(),
 		// selectors
 		SequenceSelector::default(),
 		FallbackSelector::default(),

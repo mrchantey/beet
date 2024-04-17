@@ -5,7 +5,7 @@
 
 Actions are simply a combination of a `Component` and a `System`. They are the single primitive from which all behaviors are built, whether modifying the world or the behavior graph.
 
-For the goal of modularity they are usually very simple, for example `Translate` and `SucceedInDuration` could be combined to create a `Translate For Duration` behavior.
+For the goal of modularity they are usually very simple, for example `Translate` and `InsertInDuration<RunResult>` could be combined to create a `Translate For Duration` behavior.
 
 ## Terminology
 
@@ -19,14 +19,14 @@ These terms are not nessecarily types in the codebase but may be helpful when de
 
 ## Graph Roles
 
-Actions can be categorized by what parts of the scene graph they mutate. This concept does not effect how the actions run, it is only used to help categorize actions.
+Actions can be categorized by what parts of the scene graph they mutate. This is just metadata and has no actual effect.
 
-| Name               | Description                                                                                                                   | Example                                      |
-| ------------------ | ----------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------- |
-| Selector Action    | aka `selectors`, modifies child entities, ie adding/removing `Running`                                                        | [`SequenceSelector`][sequence]               |
-| `GraphRole::Self`  | aka `evaluators`, modifies some part of the entity, ie updating `Score` to be interpreted a [`ScoreSelector`][score-selector] | [`ScoreSteerTarget`][score-steer-target]     |
-| `GraphRole::Agent` | Modifies the associated agent, ie movement                                                                                    | [`Translate`][translate]                     |
-| `GraphRole::World` | Modifies entities or resources external to the tree, ie despawning a collectable                                              | [`DespawnSteerTarget`][despawn-steer-target] |
+| Name               | Description                                                                                                                                 | Example                                      |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------- |
+| `GraphRole::Node`  | Only modifies some part of the behavior entity it is attached to, ie updating `Score` to be interpreted a [`ScoreSelector`][score-selector] | [`ScoreSteerTarget`][score-steer-target]     |
+| `GraphRole::Child` | Modifies child entities, ie adding/removing `Running`                                                                                       | [`SequenceSelector`][sequence]               |
+| `GraphRole::Agent` | Modifies the associated agent, ie movement                                                                                                  | [`Translate`][translate]                     |
+| `GraphRole::World` | Modifies entities or resources external to the tree, ie despawning a collectable                                                            | [`DespawnSteerTarget`][despawn-steer-target] |
 
 ## Common Components
 

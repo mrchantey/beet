@@ -4,39 +4,48 @@ use std::time::Duration;
 
 #[derive_action(Default)]
 #[action(graph_role=GraphRole::Node)]
-pub struct SucceedInDuration {
+/// After running for a given duration, add the
+pub struct InsertInDuration<T: SettableComponent> {
 	pub duration: Duration,
+	pub value: T,
 }
 
-impl Default for SucceedInDuration {
+impl<T: SettableComponent> Default for InsertInDuration<T> {
 	fn default() -> Self {
 		Self {
 			duration: Duration::from_secs(1),
+			value: T::default(),
 		}
 	}
 }
 
-impl SucceedInDuration {
-	pub fn new(duration: Duration) -> Self { Self { duration } }
-	pub fn with_secs(secs: u64) -> Self {
+impl<T: SettableComponent> InsertInDuration<T> {
+	pub fn new(value: T, duration: Duration) -> Self {
+		Self { value, duration }
+	}
+	pub fn with_secs(value: T, secs: u64) -> Self {
 		Self {
+			value,
 			duration: Duration::from_secs(secs),
 		}
 	}
-	pub fn with_millis(millis: u64) -> Self {
+	pub fn with_millis(value: T, millis: u64) -> Self {
 		Self {
+			value,
 			duration: Duration::from_millis(millis),
 		}
 	}
 }
 
-pub fn succeed_in_duration(
+pub fn insert_in_duration<T: SettableComponent>(
 	mut commands: Commands,
-	mut query: Query<(Entity, &RunTimer, &SucceedInDuration), With<Running>>,
+	mut query: Query<(Entity, &RunTimer, &InsertInDuration<T>), With<Running>>,
 ) {
-	for (entity, timer, succeed_in_duration) in query.iter_mut() {
-		if timer.last_started.elapsed() >= succeed_in_duration.duration {
-			commands.entity(entity).insert(RunResult::Success);
+	for (entity, timer, insert_in_duration) in query.iter_mut() {
+		if timer.last_started.elapsed() >= insert_in_duration.duration {
+			commands
+				.entity(entity)
+				.insert(insert_in_duration.value.clone());
 		}
 	}
 }
@@ -55,7 +64,7 @@ mod test {
 		app.add_plugins(BeetSystemsPlugin::<EcsModule, _>::default());
 		app.insert_time();
 
-		let root = SucceedInDuration::default()
+		let root = InsertInDuration::<RunResult>::default()
 			.into_beet_builder()
 			.build(app.world_mut())
 			.value;
