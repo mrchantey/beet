@@ -13,22 +13,35 @@ categories.workspace = true
 
 [features]
 default = []
+webtransport = ["lightyear/webtransport"]
+websocket = ["lightyear/websocket"]
 # tokio = ["dep:tokio"]
 
 [dependencies]
 anyhow.workspace = true
-async-broadcast.workspace = true
 extend.workspace = true
 futures.workspace = true
 parking_lot.workspace = true
+
 serde.workspace = true
-bincode.workspace = true
+ron.workspace = true
+
 strum.workspace = true
 strum_macros.workspace = true
 
 
-bevy.workspace = true
+# from the simple_box example
+crossbeam-channel = "0.5.11"
+clap = { version = "4.4", features = ["derive"] }
+async-compat = "0.2.3"
+derive_more = { version = "0.99", features = ["add", "mul"] }
+
+
+bevy = { version = "0.13", default-features = false }
+# bevy.workspace = true
 log.workspace = true
+# lightyear = "0.13.0"
+lightyear = { git = "https://github.com/cBournhonesque/lightyear.git", rev = "665c07b93e2938a8edc10fec767045cc92575803" }
 
 # tokio = { workspace = true, optional = true }
 # [target.'cfg(not(target_arch = "wasm32"))'.dependencies]

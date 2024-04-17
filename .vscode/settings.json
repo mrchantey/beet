@@ -7,7 +7,7 @@
 		//optional
 		// ".gitignore": true,
 		".gitattributes": true,
-		"Cargo.lock": true,
+		// "Cargo.lock": true,
 		// "rustfmt.toml": true,
 		"LICENSE-APACHE.txt": true,
 		"LICENSE-MIT.txt": true,

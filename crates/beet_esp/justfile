@@ -5,6 +5,9 @@
 # 	# cargo build --example 
 # 	just flash {{example}}
 
+build example *args:
+	cargo build --example {{example}} {{args}}
+
 monitor:
 	cargo espflash monitor --port=/dev/ttyACM0
 

@@ -90,8 +90,7 @@ strum_macros = "0.25.0"
 extend = "1.1.2"
 
 # channels
-parking_lot = "0.12"    # fast alternative std::sync::Mutex/RwLock
-async-broadcast = "0.5" # https://github.com/smol-rs/async-broadcast/issues/50
+parking_lot = "0.12" # fast alternative std::sync::Mutex/RwLock
 # flume = { version = "0.11", default-features = false, features = ["async"] }
 flume = "0.11"
 
@@ -108,4 +107,5 @@ ron = "0.8"
 # bevy = { path = "../bevy", default-features = false, features = ["bevy_scene"] }
 bevy = { git = "https://github.com/bevyengine/bevy.git", rev = "f516de456be2b65572de1af6956d52157663b9cc", default-features = false, features = [
 	"bevy_scene",
+	# "bevy_color",
 ] }
