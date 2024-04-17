@@ -16,7 +16,7 @@ fn wander(
 		&MaxForce,
 		&mut Impulse,
 	)>,
-	query: Query<(&ParentRoot, &Wander), (With<Running>, With<Wander>)>,
+	query: Query<(&TargetAgent, &Wander), (With<Running>, With<Wander>)>,
 ) {
 	let num_agents = agents.iter().count();
 	for (agent, _) in query.iter() {

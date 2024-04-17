@@ -17,14 +17,16 @@ These terms are not nessecarily types in the codebase but may be helpful when de
 | Behavior | An entity that contains at least one action, and possibly child behaviors | `Attack Target` |
 | Action   | A component-system pair                                                   | `Swing Sword`   |
 
-### Action types
-| Name             | Descrition                                                                  | Example                                      |
-| ---------------- | --------------------------------------------------------------------------- | -------------------------------------------- |
-| Agent Action     | Modifies the associated agent                                               | [`Translate`][translate]                     |
-| World Action     | Modifies entities or resources external to the tree                         | [`DespawnSteerTarget`][despawn-steer-target] |
-| Selector Action  | Choose which child to run, adds/removes `Running`                           | [`SequenceSelector`][sequence]               |
-| Evaluator Action | Modifies the `Score`, to be interpreted a [`ScoreSelector`][score-selector] | [`ScoreSteerTarget`][score-steer-target]     |
-| Lifecycle Action | Does something as a reaction to the run state changing                      | [`InsertOnRun<T>`][insert-on-run]            |
+## Graph Roles
+
+Actions can be categorized by what parts of the scene graph they mutate. This concept does not effect how the actions run, it is only used to help categorize actions.
+
+| Name               | Description                                                                                                                   | Example                                      |
+| ------------------ | ----------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------- |
+| Selector Action    | aka `selectors`, modifies child entities, ie adding/removing `Running`                                                        | [`SequenceSelector`][sequence]               |
+| `GraphRole::Self`  | aka `evaluators`, modifies some part of the entity, ie updating `Score` to be interpreted a [`ScoreSelector`][score-selector] | [`ScoreSteerTarget`][score-steer-target]     |
+| `GraphRole::Agent` | Modifies the associated agent, ie movement                                                                                    | [`Translate`][translate]                     |
+| `GraphRole::World` | Modifies entities or resources external to the tree, ie despawning a collectable                                              | [`DespawnSteerTarget`][despawn-steer-target] |
 
 ## Common Components
 
@@ -34,6 +36,7 @@ These components are used by actions to determine run-state and make decisions.
 - [`RunResult`][run-result] - Notify their parent that this node has finished.
 - [`Score`][score] - Notify the parent how favourable it would be for this node to run.
 - [`RunTimer`][run-timer] - Time since an action started/stopped.
+- [`InsertOnRun<T>`][insert-on-run] - Inserts a component whenever state changes
 
 
 [translate]:https://github.com/mrchantey/beet/blob/main/crates/beet_core/src/core_module/translate.rs

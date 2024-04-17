@@ -20,7 +20,7 @@ impl ScoreSteerTarget {
 fn score_steer_target(
 	transforms: Query<&Transform>,
 	agents: Query<(&Transform, &SteerTarget)>,
-	mut query: Query<(&ParentRoot, &ScoreSteerTarget, &mut Score)>,
+	mut query: Query<(&TargetAgent, &ScoreSteerTarget, &mut Score)>,
 ) {
 	for (agent, scorer, mut score) in query.iter_mut() {
 		if let Ok((transform, target)) = agents.get(**agent) {

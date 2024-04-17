@@ -11,10 +11,14 @@ license.workspace = true
 keywords.workspace = true
 categories.workspace = true
 
+[features]
+ml = ["dep:beet_ml"]
+net = ["dep:beet_net"]
 
 [dependencies]
 beet_core.workspace = true
 beet_ecs.workspace = true
-beet_net.workspace = true
+beet_ml = { workspace = true, optional = true }
+beet_net = { workspace = true, optional = true }
 
 bevy.workspace = true

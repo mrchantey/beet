@@ -19,7 +19,7 @@ fn seek(
 		&mut Impulse,
 		Option<&ArriveRadius>,
 	)>,
-	query: Query<(&ParentRoot, &Seek), With<Running>>,
+	query: Query<(&TargetAgent, &Seek), With<Running>>,
 ) {
 	for (target, _) in query.iter() {
 		if let Ok((

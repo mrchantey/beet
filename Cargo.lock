@@ -552,6 +552,7 @@ version = "0.0.8"
 dependencies = [
  "beet_core",
  "beet_ecs",
+ "beet_ml",
  "beet_net",
  "bevy 0.14.0-dev",
 ]

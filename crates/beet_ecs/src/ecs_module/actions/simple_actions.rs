@@ -2,7 +2,7 @@ use crate::prelude::*;
 use bevy::prelude::*;
 
 #[derive_action]
-#[action(graph_role=GraphRole::Other)]
+#[action(graph_role=GraphRole::World)]
 pub struct EmptyAction;
 pub fn empty_action() {}
 

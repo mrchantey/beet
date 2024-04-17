@@ -3,13 +3,13 @@ use beet_ecs::prelude::*;
 use bevy::prelude::*;
 
 #[derive_action]
-#[action(graph_role=GraphRole::Other)]
+#[action(graph_role=GraphRole::World)]
 pub struct DespawnSteerTarget;
 
 fn despawn_steer_target(
 	mut commands: Commands,
 	agents: Query<(Entity, &SteerTarget)>,
-	query: Query<&ParentRoot, (With<Running>, With<DespawnSteerTarget>)>,
+	query: Query<&TargetAgent, (With<Running>, With<DespawnSteerTarget>)>,
 ) {
 	for target_agent in query.iter() {
 		if let Ok((agent, steer_target)) = agents.get(**target_agent) {

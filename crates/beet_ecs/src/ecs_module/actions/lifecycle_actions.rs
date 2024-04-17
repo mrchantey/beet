@@ -82,7 +82,7 @@ impl<T: SettableComponent> SetAgentOnRun<T> {
 
 fn set_agent_on_run<T: SettableComponent>(
 	mut agents: Query<&mut T>,
-	mut query: Query<(&ParentRoot, &SetAgentOnRun<T>), Added<Running>>,
+	mut query: Query<(&TargetAgent, &SetAgentOnRun<T>), Added<Running>>,
 ) {
 	for (entity, src) in query.iter_mut() {
 		if let Ok(mut dst) = agents.get_mut(**entity) {

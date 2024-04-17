@@ -23,7 +23,7 @@ fn sentence_scorer(
 	mut commands: Commands,
 	mut bert: ResMut<Bert>,
 	sentences: Query<&Sentence>,
-	started: Query<(&SentenceScorer, &ParentRoot, &Children), Added<Running>>,
+	started: Query<(&SentenceScorer, &TargetAgent, &Children), Added<Running>>,
 ) {
 	for (_scorer, agent, children) in started.iter() {
 		let Ok(parent) = sentences.get(agent.0) else {
@@ -78,7 +78,7 @@ mod test {
 				let id = parent.parent_entity();
 				parent
 					.spawn((
-						ParentRoot(id),
+						TargetAgent(id),
 						SentenceScorer,
 						ScoreSelector {
 							consume_scores: true,

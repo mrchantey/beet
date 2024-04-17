@@ -24,8 +24,8 @@ use bevy::prelude::*;
 	Parent,
 	Children,
 	BeetRoot,
-	NeedsParentRoot,
-	ParentRoot,
+	RootIsTargetAgent,
+	TargetAgent,
 	ActionTarget,
 	// bevy
 	Name,
@@ -34,4 +34,5 @@ use bevy::prelude::*;
 	GlobalTransform,
 )]
 #[bundles(TransformBundle)]
+/// The core actions and components required for most behaviors.
 pub struct EcsModule;

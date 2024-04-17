@@ -62,7 +62,7 @@ impl<T: ActionSystems + Send + Sync, Schedule: ScheduleLabel + Clone> Plugin
 			)
 			.add_systems(
 				self.schedule.clone(),
-				set_parent_root.in_set(PreTickSet),
+				set_root_as_target_agent.in_set(PreTickSet),
 			)
 			/*-*/;
 		T::add_systems(app, self.schedule.clone());

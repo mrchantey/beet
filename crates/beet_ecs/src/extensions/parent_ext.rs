@@ -3,15 +3,17 @@ use bevy::ecs::reflect::ReflectMapEntities;
 use bevy::prelude::*;
 
 
+/// This component will be replaced with a [`TargetAgent`] that points to the root [`Parent`] of this entity.
 #[derive(Debug, Default, Component, Reflect)]
 #[reflect(Component, Default)]
-pub struct NeedsParentRoot;
+pub struct RootIsTargetAgent;
 
+/// Attach this to behavior entities that require a target agent.
 #[derive(Debug, PartialEq, Deref, DerefMut, Component, Reflect)]
 #[reflect(Component, MapEntities)]
-pub struct ParentRoot(pub Entity);
+pub struct TargetAgent(pub Entity);
 
-impl MapEntities for ParentRoot {
+impl MapEntities for TargetAgent {
 	fn map_entities<M: EntityMapper>(&mut self, entity_mapper: &mut M) {
 		**self = entity_mapper.map_entity(**self);
 	}
@@ -19,17 +21,17 @@ impl MapEntities for ParentRoot {
 
 
 
-pub fn set_parent_root(
+pub fn set_root_as_target_agent(
 	mut commands: Commands,
 	parents: Query<&Parent>,
-	query: Query<(Entity, &Parent), With<NeedsParentRoot>>,
+	query: Query<(Entity, &Parent), With<RootIsTargetAgent>>,
 ) {
 	for (entity, parent) in query.iter() {
 		let root = ParentExt::get_root(parent, &parents);
 		commands
 			.entity(entity)
-			.remove::<NeedsParentRoot>()
-			.insert(ParentRoot(root));
+			.remove::<RootIsTargetAgent>()
+			.insert(TargetAgent(root));
 	}
 }
 
@@ -55,25 +57,26 @@ mod test {
 	#[test]
 	fn works() -> Result<()> {
 		let mut app = App::new();
-		app.add_systems(Update, set_parent_root);
+		app.add_systems(Update, set_root_as_target_agent);
 
 		let world = app.world_mut();
-		let grandparent = world.spawn(NeedsParentRoot).id();
-		let parent = world.spawn(NeedsParentRoot).set_parent(grandparent).id();
-		let child = world.spawn(NeedsParentRoot).set_parent(parent).id();
+		let grandparent = world.spawn(RootIsTargetAgent).id();
+		let parent =
+			world.spawn(RootIsTargetAgent).set_parent(grandparent).id();
+		let child = world.spawn(RootIsTargetAgent).set_parent(parent).id();
 
 
 		app.update();
 
 		expect(&app)
 			.not()
-			.to_have_component::<ParentRoot>(grandparent)?;
+			.to_have_component::<TargetAgent>(grandparent)?;
 		expect(&app)
 			.component(parent)?
-			.to_be(&ParentRoot(grandparent))?;
+			.to_be(&TargetAgent(grandparent))?;
 		expect(&app)
 			.component(child)?
-			.to_be(&ParentRoot(grandparent))?;
+			.to_be(&TargetAgent(grandparent))?;
 
 		Ok(())
 	}

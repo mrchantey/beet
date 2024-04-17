@@ -35,7 +35,7 @@ impl ActionArgs {
 
 		let default_system_name = default_system_name(input);
 		let mut set = quote! {TickSet};
-		let mut graph_role = quote! {GraphRole::Other};
+		let mut graph_role = quote! {GraphRole::World};
 		let mut system = Some(default_system_name);
 		let mut child_components = Vec::new();
 

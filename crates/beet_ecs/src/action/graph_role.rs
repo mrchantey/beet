@@ -9,7 +9,7 @@ pub enum GraphRole {
 	/// This action will effect the agent bound to this node
 	Agent,
 	/// This action will effect some other aspect of the world
-	Other,
+	World,
 }
 
 impl GraphRole {}

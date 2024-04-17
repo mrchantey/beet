@@ -84,7 +84,7 @@ impl BeetBuilder {
 		entity: &mut EntityWorldMut,
 		default_name: String,
 	) {
-		entity.insert((RunTimer::default(), NeedsParentRoot));
+		entity.insert((RunTimer::default(), RootIsTargetAgent));
 		if entity.contains::<Name>() == false {
 			entity.insert(Name::new(default_name));
 		}
@@ -225,7 +225,7 @@ mod test {
 		let root = actions.build(app.world_mut()).value;
 
 		expect(&app).to_have_component::<SetOnStart<Score>>(root)?;
-		expect(&app).to_have_component::<NeedsParentRoot>(root)?;
+		expect(&app).to_have_component::<RootIsTargetAgent>(root)?;
 		expect(&app).to_have_component::<RunTimer>(root)?;
 		expect(&app).to_have_component::<Score>(root)?;
 

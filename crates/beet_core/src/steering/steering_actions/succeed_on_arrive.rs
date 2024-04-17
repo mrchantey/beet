@@ -17,7 +17,7 @@ pub fn succeed_on_arrive(
 	mut commands: Commands,
 	agents: Query<(&Transform, &SteerTarget)>,
 	transforms: Query<&Transform>,
-	mut query: Query<(Entity, &ParentRoot, &SucceedOnArrive), With<Running>>,
+	mut query: Query<(Entity, &TargetAgent, &SucceedOnArrive), With<Running>>,
 ) {
 	for (entity, agent, succeed_on_arrive) in query.iter_mut() {
 		if let Ok((transform, target)) = agents.get(**agent) {

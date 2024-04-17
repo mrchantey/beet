@@ -63,7 +63,7 @@ impl DepthSensorScorer {
 
 pub fn depth_sensor_scorer(
 	sensors: Query<&DepthSensor, Changed<DepthSensor>>,
-	mut scorers: Query<(&mut DepthSensorScorer, &ParentRoot)>,
+	mut scorers: Query<(&mut DepthSensorScorer, &TargetAgent)>,
 ) {
 	for (mut scorer, target) in scorers.iter_mut() {
 		if let Ok(sensor) = sensors.get(**target) {
