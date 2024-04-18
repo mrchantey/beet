@@ -3,13 +3,14 @@
 This crate is an exploration of the use of Bevy & Beet in microcontrollers. The initial focus is on the ESP32-S3-WROOM-1-N16R8, purchasable for < $10, ie [here](https://www.aliexpress.us/item/1005004617322170.html). 
 
 
+- [Hello World Demo](https://youtu.be/R-q5iJ98X40)
+
 ## Datasheets
 - esp32-s3
 	- [datasheet](https://www.espressif.com/sites/default/files/documentation/esp32-s3-wroom-1_wroom-1u_datasheet_en.pdf)
 	- [pinout](https://docs.espressif.com/projects/esp-idf/en/latest/esp32s3/_images/ESP32-S3_DevKitC-1_pinlayout.jpg)
 - HC-SR04
 	- https://www.sparkfun.com/products/15569
-- 
 
 
 ### USB-IPD

@@ -2,7 +2,7 @@
 
 > This library has a broad scope and is largely incomplete, contributions are very welcome.
 
-Beet is a modular behavior library for games and robotics.
+Beet is a very flexible behavior library for games and robotics.
 
 It is built with `bevy` and uses entities to represent behaviors, connecting them through the parent-child relationship. This approach feels familiar and allows for high levels of modularity, just like scene graphs (in fact behaviors *are* scene graphs).
 
@@ -10,6 +10,7 @@ It is built with `bevy` and uses entities to represent behaviors, connecting the
 
 - [Concepts](./concepts.md)
 - [Actions](./actions.md)
+- [Robotics](./robotics.md)
 
 ## Features
 
@@ -27,7 +28,7 @@ All aspects of the library are simple components and systems, which means no bla
 
 #### 🎯 Target Anything
 
-Beet only depends on the lightweight architectural components of the bevy library, ie `bevy_ecs`, which allows it to target multi-core gaming rigs and tiny microcontrollers alike.
+Beet only depends on the lightweight architectural components of the bevy library, ie `bevy_ecs`, making it suitable for powerful gaming rigs and tiny microcontrollers alike.
 
 #### 🔥 Epic Concurrency
 

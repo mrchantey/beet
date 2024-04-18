@@ -3,7 +3,7 @@
 <div align="center">
 
   <p>
-    <strong>A modular AI behavior library for games and robotics.</strong>
+    <strong>A very flexible AI behavior library for games and robotics.</strong>
   </p>
 
   <p>
