@@ -1,12 +1,22 @@
 # Actions
 
-Beet has a growing list of actions. For now the best place to look for examples is the tests at the bottom of the file for each action.
+Beet has a growing list of actions. For now the best place to find usage examples is the tests at the bottom of the file for each action.
 
-- [Graph Roles](./concepts.md#graph-roles) are a way of categorizing actions.
+
+## Lifecycle Actions
+
+Often we want to do something when a behavior is spawned or starts running. [Lifecycle actions][lifecycle-actions] are generic and have a range of use cases.
+
+- `InsertOnRun<T>` - Inserts a component when this behavior starts running
+- `SetOnRun<T>` - Sets a component when this behavior starts running
+- `SetAgentOnRun<T>` - Sets an agent's component when this behavior starts running
+- `SetOnSpawn<T>` - Sets a component when this behavior spawns
 
 ## `EcsModule`
 
-The [`EcsModule`][EcsModule] contains the basic actions and components required for most behaviors.
+The [`EcsModule`][EcsModule] contains the basic actions required for most behaviors.
+
+*[Graph Roles](./concepts.md#graph-roles) are a way of categorizing actions.*
 
 | Name                          | Graph Role | Description                                                      |
 | ----------------------------- | ---------- | ---------------------------------------------------------------- |
@@ -26,7 +36,7 @@ The [`EcsModule`][EcsModule] contains the basic actions and components required 
 
 ## `CoreModule`
 
-The [`CoreModule`][CoreModule] contains more domain-specific actions, ie movement.
+The [`CoreModule`][CoreModule] contains more domain-specific actions.
 
 | Name                            | Graph Role | Description                                                          |
 | ------------------------------- | ---------- | -------------------------------------------------------------------- |
@@ -48,13 +58,15 @@ The [`CoreModule`][CoreModule] contains more domain-specific actions, ie movemen
 
 ## `MlModule`
 
-The [`MlModule`][MlModule] contains actions that use machine learning.
+The [`MlModule`][MlModule] contains actions that use machine learning, using models from [huggingface candle](https://github.com/huggingface/candle)
 
 | Name             | Graph Role | Description                                                                                                              |
 | ---------------- | ---------- | ------------------------------------------------------------------------------------------------------------------------ |
 | `SentenceScorer` | Child      | Updates the `Score` of each child based on the similarity of its `Sentence` with the agent, for use with `ScoreSelector` |
 
+[lifecycle-actions]:https://github.com/mrchantey/beet/blob/main/crates/beet_ecs/src/ecs_module/actions/lifecycle_actions.rs
 
 [EcsModule]:https://github.com/mrchantey/beet/blob/main/crates/beet_ecs/src/ecs_module/ecs_module.rs
 [CoreModule]:https://github.com/mrchantey/beet/blob/main/crates/beet_core/src/core_module/core_module.rs
 [MlModule]:https://github.com/mrchantey/beet/blob/main/crates/beet_ml/src/ml_module/ml_module.rs
+

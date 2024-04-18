@@ -1,17 +1,20 @@
 # Roadmap
 
-The scope for beet is very broad, so any ideas for priorities would be greatly appreciated.
+### Paradigm Status
 
-- ✅ we have at least a proof of concept
-- 🚧 we have some idea how it could work
-- 🤷 it'd be cool but haven't thought about it
+The strategy is to implement paradigms very broadly at first to test the core concepts of beet for flexibility.
+
 
 | Descrition                     | Status |
 | ------------------------------ | ------ |
-| Behavior Trees (sequences etc) | ✅      |
-| Utility AI (score selectors)   | ✅      |
-| LLMs (sentence scorer)         | ✅      |
-| Robotics (esp32 example)       | ✅      |
+| Behavior Trees - Sequences etc | ✅      |
+| Utility AI - Score Selectors   | ✅      |
+| LLM - Sentence Scorer          | ✅      |
+| Robotics - esp32 Example       | ✅      |
 | Pathfinding/search (a* etc)    | 🚧      |
 | State Trees (transitions)      | 🚧      |
 | GOAP (runtime tree generators) | 🚧      |
+
+- ✅ at least a proof of concept
+- 🚧 planned
+- 🤷 it'd be cool but haven't thought about it

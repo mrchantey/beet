@@ -3,6 +3,8 @@ use bevy::ecs::schedule::ScheduleLabel;
 use bevy::prelude::*;
 use std::marker::PhantomData;
 
+
+/// In this set you can do things that need to happen before the tick.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, SystemSet)]
 pub struct PreTickSet;
 #[derive(Debug, Clone, PartialEq, Eq, Hash, SystemSet)]
@@ -12,7 +14,7 @@ pub struct TickSyncSet;
 #[derive(Debug, Clone, PartialEq, Eq, Hash, SystemSet)]
 pub struct PostTickSet;
 
-
+// Adds the system associated with each action and some helpers that clean up run state
 pub struct BeetSystemsPlugin<T: ActionSystems, Schedule: ScheduleLabel + Clone>
 {
 	pub schedule: Schedule,
