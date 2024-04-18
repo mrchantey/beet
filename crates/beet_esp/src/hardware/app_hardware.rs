@@ -21,19 +21,19 @@ impl AppHardware<'_> {
 		let hbridge = DualHBridgeEsp::new(
 			peripherals.pins.gpio7,
 			peripherals.pins.gpio6,
-			peripherals.pins.gpio2,
+			peripherals.pins.gpio16,
 			peripherals.ledc.channel0,
 			peripherals.ledc.timer0,
 			peripherals.pins.gpio4,
 			peripherals.pins.gpio5,
-			peripherals.pins.gpio3,
+			peripherals.pins.gpio15,
 			peripherals.ledc.channel1,
 			peripherals.ledc.timer1,
 		)?;
 
 		let ultrasound = UltrasoundSensorEsp::new(
-			peripherals.pins.gpio14,
 			peripherals.pins.gpio13,
+			peripherals.pins.gpio12,
 			DEFAULT_ULTRASOUND_MAX_DEPTH,
 		)?;
 

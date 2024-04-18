@@ -32,8 +32,6 @@ pub fn default_hbridge_esp<'d>() -> Result<DefaultHBridgeEsp<'d>> {
 	Ok(bridge)
 }
 
-
-
 #[derive(Deref, DerefMut, Component)]
 pub struct DualHBridgeEsp<'d, A1: Pin, A2: Pin, B1: Pin, B2: Pin>(
 	pub  DualHBridge<

@@ -4,7 +4,7 @@ use bevy::core::Name;
 use bevy::math::Vec3;
 
 /// A useful default behavior
-pub fn forage() -> BeetBuilder {
+pub fn forage_behavior() -> BeetBuilder {
 	let awareness_radius = 0.5;
 	(
 		Name::new("Forage"),

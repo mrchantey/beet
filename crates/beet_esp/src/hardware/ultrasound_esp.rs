@@ -1,4 +1,4 @@
-use super::*;
+use crate::prelude::*;
 use anyhow::Result;
 use beet::prelude::*;
 use bevy::prelude::*;
@@ -6,32 +6,37 @@ use esp_idf_hal::gpio::*;
 use esp_idf_hal::peripheral::Peripheral;
 use esp_idf_hal::peripherals::Peripherals;
 
-pub type DefaultUltrasoundEsp<'d> = UltrasoundSensorEsp<'d, Gpio14, Gpio13>;
+pub type DefaultUltrasoundEsp<'d> = UltrasoundSensorEsp<'d, Gpio13, Gpio12>;
 
 pub fn default_ultrasound_esp<'d>() -> Result<DefaultUltrasoundEsp<'d>> {
 	let peripherals = Peripherals::take()?;
 
 	let ultrasound = UltrasoundSensorEsp::new(
-		peripherals.pins.gpio14,
 		peripherals.pins.gpio13,
+		peripherals.pins.gpio12,
 		DEFAULT_ULTRASOUND_MAX_DEPTH,
 	)?;
 	Ok(ultrasound)
 }
 
 #[derive(Deref, DerefMut, Component)]
-pub struct UltrasoundSensorEsp<'d, T: Pin, E: Pin>(
-	pub UltrasoundSensor<PinDriver<'d, T, Output>, PinDriver<'d, E, Input>>,
+pub struct UltrasoundSensorEsp<'d, Trig: Pin, Echo: Pin>(
+	pub  UltrasoundSensor<
+		PinDriver<'d, Trig, Output>,
+		PinDriver<'d, Echo, Input>,
+	>,
 );
 
-impl<'d, T: Pin + OutputPin, E: Pin + InputPin> UltrasoundSensorEsp<'d, T, E> {
+impl<'d, Trig: Pin + OutputPin, Echo: Pin + InputPin>
+	UltrasoundSensorEsp<'d, Trig, Echo>
+{
 	pub fn new(
-		trigger: impl Peripheral<P = T> + 'd,
-		echo: impl Peripheral<P = E> + 'd,
+		trig: impl Peripheral<P = Trig> + 'd,
+		echo: impl Peripheral<P = Echo> + 'd,
 		max_depth: Meters,
-	) -> Result<UltrasoundSensorEsp<'d, T, E>> {
-		Ok(UltrasoundSensorEsp(UltrasoundSensor::new(
-			PinDriver::output(trigger)?,
+	) -> Result<UltrasoundSensorEsp<'d, Trig, Echo>> {
+		Ok(Self(UltrasoundSensor::new(
+			PinDriver::output(trig)?,
 			PinDriver::input(echo)?,
 			max_depth,
 		)))
@@ -40,16 +45,18 @@ impl<'d, T: Pin + OutputPin, E: Pin + InputPin> UltrasoundSensorEsp<'d, T, E> {
 	//TODO only update when sensor actions active
 	pub fn update_system(
 		&self,
-	) -> impl Fn(NonSendMut<Self>, Query<&mut DepthSensor>) {
-		move |mut sensor, mut query| {
-			for mut depth_value in query.iter_mut() {
-				// if depth_value.max_depth != self.max_depth {
-				// 	depth_value.max_depth = self.max_depth;
-				// }
-				if let Some(depth) = sensor.measure() {
-					depth_value.value = depth;
-				} else {
-					depth_value.value = depth_value.max_depth;
+	) -> impl Fn(Local<SignalSmoother>, NonSendMut<Self>, Query<&mut DepthValue>)
+	{
+		move |mut smoother, mut sensor, mut query| {
+			for mut value in query.iter_mut() {
+				let new_depth = sensor.measure_or_max();
+				let smoothed = smoother.add_and_smooth(new_depth);
+
+				if value.set_if_neq(DepthValue(Some(smoothed))) {
+					log::info!(
+						"New depth: {:.2}",
+						smoothed
+					);
 				}
 			}
 		}

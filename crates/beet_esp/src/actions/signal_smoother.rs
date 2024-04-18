@@ -2,14 +2,18 @@ use std::collections::VecDeque;
 
 
 
-pub struct Smoother {
+pub struct SignalSmoother {
 	buffer: VecDeque<f32>,
 	/// Should be proportional to the frequency of the input signal
 	/// a good starting point is 5x delay, ie 10ms delay -> 50 buffer size
 	buffer_size: usize,
 }
 
-impl Smoother {
+impl Default for SignalSmoother {
+	fn default() -> Self { Self::new(50) }
+}
+
+impl SignalSmoother {
 	pub fn new(buffer_size: usize) -> Self {
 		Self {
 			buffer: VecDeque::with_capacity(buffer_size),

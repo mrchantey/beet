@@ -9,7 +9,7 @@ pub struct BeetMinimalPlugin;
 impl Plugin for BeetMinimalPlugin {
 	fn build(&self, app: &mut App) { app.add_plugins(TimePlugin); }
 }
-
+#[derive(Default)]
 pub struct DefaultBeetPlugins<T: BeetModule> {
 	pub types: BeetModulePlugin<T>,
 	pub systems: BeetSystemsPlugin<T, Update>,

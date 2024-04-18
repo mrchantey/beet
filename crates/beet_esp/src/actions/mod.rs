@@ -1,9 +1,6 @@
-pub mod smoother;
+pub mod signal_smoother;
 #[allow(unused_imports)]
-pub use self::smoother::*;
-pub mod spawn_vehicle;
-#[allow(unused_imports)]
-pub use self::spawn_vehicle::*;
+pub use self::signal_smoother::*;
 pub mod motor;
 #[allow(unused_imports)]
 pub use self::motor::*;

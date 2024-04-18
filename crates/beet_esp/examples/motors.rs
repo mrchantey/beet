@@ -9,7 +9,7 @@ fn main() -> anyhow::Result<()> {
 	println!("awake");
 	bridge.a.stop();
 	bridge.b.stop();
-	std::thread::sleep(Duration::from_secs(3));
+	std::thread::sleep(Duration::from_secs(1));
 
 	println!("starting");
 	bridge.a.forward().set_duty(255)?;

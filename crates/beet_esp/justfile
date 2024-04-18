@@ -17,3 +17,4 @@ run example:
 	--monitor \
 	--port=/dev/ttyACM0 \
 	--example {{example}}
+	--release

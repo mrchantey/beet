@@ -10,30 +10,41 @@ The [`EcsModule`][EcsModule] contains the basic actions and components required 
 
 | Name                          | Graph Role | Description                                                      |
 | ----------------------------- | ---------- | ---------------------------------------------------------------- |
-| `EmptyAction`                 | Node       | Does what it says on the tin, useful for tests                   |
-| `Repeat`                      | Node       | Reattaches the `Running` component whenever it is removed.       |
+| *Lifecycle*                   |            |                                                                  |
+| `LogNameOnRun`                | Node       | Logs the `Name` when the action is run.                          |
+| `LogOnRun`                    | Node       | Logs a message when the action is run.                           |
 | `InsertInDuration<RunResult>` | Node       | Adds a `RunResult` after a given duration.                       |
-| `SetOnSpawn<Score>`           | Node       | Sets the score to a constant value when this behavior is spawned |
 | `InsertOnRun<RunResult>`      | Node       | Immediately succeed or fail when this behavior runs              |
-| `SequenceSelector`            | Child      | Run children in sequence until one fails                         |
+| `Repeat`                      | Node       | Reattaches the `Running` component whenever it is removed.       |
+| `SetOnSpawn<Score>`           | Node       | Sets the score to a constant value when this behavior is spawned |
+| *Selectors*                   |            |                                                                  |
 | `FallbackSelector`            | Child      | Run children in sequence until one succeeds                      |
+| `SequenceSelector`            | Child      | Run children in sequence until one fails                         |
 | `ScoreSelector`               | Child      | Run the child with the highest score                             |
+| *Utility*                     |            |                                                                  |
+| `EmptyAction`                 | Node       | Does what it says on the tin, useful for tests                   |
 
 ## `CoreModule`
 
 The [`CoreModule`][CoreModule] contains more domain-specific actions, ie movement.
 
-| Name                      | Graph Role | Description                                                          |
-| ------------------------- | ---------- | -------------------------------------------------------------------- |
-| `Hover`                   | Agent      | Translate the agent up and down in a sine wave                       |
-| `Translate`               | Agent      | Apply constant translation                                           |
-| `SetAgentOnRun<Velocity>` | Agent      | Set the `Velocity` of an agent on run                                |
-| `Seek`                    | Agent      | Go to the agent's `SteerTarget` with an optional `ArriveRadius`      |
-| `Wander`                  | Agent      | Somewhat cohesive random walk                                        |
-| `SucceedOnArrive`         | Agent      | Succeeds when the agent arrives at the `SteerTarget`                 |
-| `FindSteerTarget`         | Agent      | Sets the `SteerTarget` when an entity with the given name is nearby. |
-| `ScoreSteerTarget`        | Node       | Adjusts the `Score` based on distance to the `SteerTarget`           |
-| `DespawnSteerTarget`      | World      | Immediately recursively despawns the `SteerTarget`                   |
+| Name                            | Graph Role | Description                                                          |
+| ------------------------------- | ---------- | -------------------------------------------------------------------- |
+| *Movement*                      |            |                                                                      |
+| `Hover`                         | Agent      | Translates the agent up and down in a sine wave                      |
+| `Translate`                     | Agent      | Applies constant translation                                         |
+| `SetAgentOnRun<Velocity>`       | Agent      | Sets the `Velocity` of an agent on run                               |
+| *Steering*                      |            |                                                                      |
+| `Seek`                          | Agent      | Go to the agent's `SteerTarget` with an optional `ArriveRadius`      |
+| `Wander`                        | Agent      | Somewhat cohesive random walk                                        |
+| `SucceedOnArrive`               | Agent      | Succeeds when the agent arrives at the `SteerTarget`                 |
+| `FindSteerTarget`               | Agent      | Sets the `SteerTarget` when an entity with the given name is nearby. |
+| `ScoreSteerTarget`              | Node       | Adjusts the `Score` based on distance to the `SteerTarget`           |
+| `DespawnSteerTarget`            | World      | Recursively despawns the `SteerTarget`                               |
+| *Robotics*                      |            |                                                                      |
+| `SetAgentOnRun<DualMotorValue>` | Agent      | Sets the `DualMotorValue` of an agent on run                         |
+| `DepthSensorScorer`             | Node       | Sets the [`Score`] based on the [`DepthSensor`] value                |
+
 
 ## `MlModule`
 

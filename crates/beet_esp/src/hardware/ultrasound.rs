@@ -1,10 +1,10 @@
 use beet::prelude::*;
-use embedded_hal::delay::DelayNs;
 use embedded_hal::digital::InputPin;
 use embedded_hal::digital::OutputPin;
-use esp_idf_hal::delay::FreeRtos;
+use esp_idf_hal::delay::Ets;
 use std::time::Duration;
 use std::time::Instant;
+
 
 /// Speed of sound in meters per second
 const SPEED_OF_SOUND: f32 = 343.;
@@ -35,30 +35,32 @@ where
 		// usually only get to about 60-75 percent of this
 		max_depth: Meters,
 	) -> UltrasoundSensor<Trig, Echo> {
-		let timeout = calculate_timeout(max_depth);
+		let timeout = meters_to_tof(max_depth);
+		log::info!("Timeout: {:?}", timeout);
 
-		UltrasoundSensor {
+		let mut this = UltrasoundSensor {
 			trig,
 			echo,
 			max_depth,
 			timeout,
-		}
+		};
+		this.trig.set_low().unwrap();
+
+		this
 	}
 
 	pub fn measure(&mut self) -> Option<f32> {
+		// clear signal
 		self.trig.set_low().unwrap();
-		// std::thread::sleep(Duration::from_micros(2));
-		FreeRtos::delay_us(&mut FreeRtos, 2);
+		Ets::delay_us(5);
 		//start pulse
 		self.trig.set_high().unwrap();
-		std::thread::sleep(Duration::from_micros(10));
-		FreeRtos::delay_us(&mut FreeRtos, 10);
+		Ets::delay_us(10);
 		//stop pulse
 		self.trig.set_low().unwrap();
 
 		if let Some(duration) = pulse_in(&mut self.echo, true, self.timeout) {
-			let distance = duration.as_secs_f32() * SPEED_OF_SOUND / 2.;
-			Some(distance)
+			Some(tof_to_meters(duration))
 		} else {
 			None
 		}
@@ -71,14 +73,12 @@ where
 	}
 }
 
-
-
-/// distance to time of flight
-fn calculate_timeout(dist_meters: f32) -> Duration {
-	let secs = dist_meters / SPEED_OF_SOUND * 2.;
-	Duration::from_millis((secs * 1000.) as u64)
+fn meters_to_tof(dist_meters: f32) -> Duration {
+	Duration::from_secs_f32(dist_meters / SPEED_OF_SOUND * 2.)
 }
-
+fn tof_to_meters(duration: Duration) -> f32 {
+	duration.as_secs_f32() * SPEED_OF_SOUND / 2.
+}
 
 /// Set to true to read a high pulse
 fn pulse_in(
@@ -87,12 +87,14 @@ fn pulse_in(
 	timeout: Duration,
 ) -> Option<Duration> {
 	let start_time = Instant::now();
+	// await the start of the pulse
 	while pin.is_high().unwrap() != value {
 		if start_time.elapsed() > timeout {
 			return None;
 		}
 	}
 	let pulse_start_time = Instant::now();
+	// await the end of the pulse
 	while pin.is_high().unwrap() == value {
 		if start_time.elapsed() > timeout {
 			return None;

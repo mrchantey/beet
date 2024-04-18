@@ -7,21 +7,23 @@ use bevy::prelude::*;
 // action_list!(CoreNode, [
 // ]);
 
-#[derive(Debug, Clone, BeetModule)]
+#[derive(Debug,Default, Clone, BeetModule)]
 #[modules(EcsModule)]
 #[actions(
-		//core
+		//movement
 		Hover,
 		Translate,
-		// force
 		SetAgentOnRun::<Velocity>,
-		//steer
+		//steering
 		Seek,
 		Wander,
 		SucceedOnArrive,
 		FindSteerTarget,
 		ScoreSteerTarget,
 		DespawnSteerTarget,
+		//robotics
+		SetAgentOnRun::<DualMotorValue>,
+		DepthSensorScorer,
 	)]
 #[components(
 	AutoSpawn,

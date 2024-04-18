@@ -12,3 +12,6 @@ pub mod steer_plugin;
 #[allow(unused_imports)]
 pub use self::steer_plugin::*;
 pub mod steering_actions;
+pub mod forage_behavior;
+#[allow(unused_imports)]
+pub use self::forage_behavior::*;

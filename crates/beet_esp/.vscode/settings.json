@@ -10,6 +10,7 @@
 		"components_esp32s3.lock": true,
 		// "Cargo.lock": true,
 		"build.rs": true,
+		"**/mod.rs": true,
 	},
 	"files.autoSave": "afterDelay",
 	"files.autoSaveDelay": 1000,

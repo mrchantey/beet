@@ -3,17 +3,19 @@ use bevy::prelude::*;
 
 #[derive(Debug, Clone, BeetModule)]
 #[actions(
-	// constants
-	SetOnSpawn::<Score>,
-	InsertOnRun::<RunResult>,
-	// utility
-	EmptyAction,
-	Repeat,
+	// lifecycle
 	InsertInDuration::<RunResult>,
+	InsertOnRun::<RunResult>,
+	LogNameOnRun,
+	LogOnRun,
+	Repeat,
+	SetOnSpawn::<Score>,
 	// selectors
 	SequenceSelector,
 	FallbackSelector,
-	ScoreSelector
+	ScoreSelector,
+	// utility
+	EmptyAction,
 )]
 #[components(
 	// running

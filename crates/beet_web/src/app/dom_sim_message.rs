@@ -29,7 +29,7 @@ pub fn message_handler(world: &mut World) -> Result<()> {
 	for message in messages {
 		match message {
 			DomSimMessage::SpawnBee => {
-				let behavior = forage().build(world).value;
+				let behavior = forage_behavior().build(world).value;
 				world.spawn(bee_bundle()).add_child(behavior);
 			}
 			DomSimMessage::SpawnFlower => {

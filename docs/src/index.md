@@ -15,7 +15,7 @@ It is built with `bevy` and uses entities to represent behaviors, connecting the
 
 #### 🌈 Multi-paradigm
 
-The flexibility of entity graphs allows us to mix-and-match techniques from different paradigms, ie behavior trees, utility selectors, LLMs, etc.
+Actions can be created for any paradigm, from behavior trees to llms and everything in between.
 
 #### 🌳 Modular Trees
 
@@ -33,10 +33,9 @@ Beet only depends on the lightweight architectural components of the bevy librar
 
 By default all actions are run in parallel systems. This means graph traversals occur on each update of the schedule, which makes unit testing, breakpoints etc a breeze, although it is not always desired, see [drawbacks](#multi-tick).
 
-#### 🌐 Messageless replication (wip)
+<!-- #### 🌐 Zero-config replication
 
-Work can be distributed across environments through world replication. An agent may run some actions in a constrained environment and others in a remote server.
-
+Work can be distributed across environments through world replication. An agent may run some actions in a constrained environment and others in a remote server. -->
 
 ## Quickstart
 
@@ -113,9 +112,9 @@ World
 
 ## Drawbacks
 
-#### Indirection
+#### Lots of Relations
 
-Agents, behaviors and children are seperate entities, which is a bit of an ergonomic painpoint. Its my hope this will be helped by the introduction of [Entity Relations](https://github.com/bevyengine/bevy/issues/3742).
+Agents, behaviors and children are seperate entities, which can be an ergonomic painpoint. Hopefully this will be addressed by the introduction of [Entity Relations](https://github.com/bevyengine/bevy/issues/3742).
 
 #### Tick Traversal
 

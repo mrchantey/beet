@@ -7,6 +7,10 @@ This crate is an exploration of the use of Bevy & Beet in microcontrollers. The 
 - esp32-s3
 	- [datasheet](https://www.espressif.com/sites/default/files/documentation/esp32-s3-wroom-1_wroom-1u_datasheet_en.pdf)
 	- [pinout](https://docs.espressif.com/projects/esp-idf/en/latest/esp32s3/_images/ESP32-S3_DevKitC-1_pinlayout.jpg)
+- HC-SR04
+	- https://www.sparkfun.com/products/15569
+- 
+
 
 ### USB-IPD
 ```admin powershell

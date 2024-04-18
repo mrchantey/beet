@@ -4,7 +4,7 @@ use bevy::prelude::*;
 
 #[derive_action]
 #[action(graph_role=GraphRole::World)]
-/// Immediately recursively despawns the [`SteerTarget`]
+/// Recursively despawns the [`SteerTarget`]
 pub struct DespawnSteerTarget;
 
 fn despawn_steer_target(

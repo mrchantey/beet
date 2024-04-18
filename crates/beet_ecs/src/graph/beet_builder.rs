@@ -3,7 +3,7 @@ use bevy::prelude::*;
 use bevy::reflect::GetTypeRegistration;
 use bevy::utils::HashSet;
 
-/// Marker to identify the root of a behavior graph
+/// Couldn't resist.. Marker to identify the root of a behavior graph
 #[derive(Debug, Default, Component, Reflect)]
 #[reflect(Component, Default)]
 pub struct BeetRoot;
