@@ -4,14 +4,21 @@ use bevy::prelude::*;
 use std::marker::PhantomData;
 
 
-/// In this set you can do things that need to happen before the tick.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, SystemSet)]
+/// Runs before [`TickSet`] and In this set you can do things that need to happen before the tick.
 pub struct PreTickSet;
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash, SystemSet)]
+/// The set in which actions are run.
 pub struct TickSet;
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash, SystemSet)]
+/// Runs after [`TickSet`] and [`apply_deferred`], used to synchronize various lifecycle components
+/// like [`Running`] or [`Interrupt`]
 pub struct TickSyncSet;
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash, SystemSet)]
+/// Runs after [`TickSyncSet`] and [`apply_deferred`].
 pub struct PostTickSet;
 
 // Adds the system associated with each action and some helpers that clean up run state
@@ -33,25 +40,14 @@ impl<T: ActionSystems + Send + Sync, Schedule: ScheduleLabel + Clone> Plugin
 	for BeetSystemsPlugin<T, Schedule>
 {
 	fn build(&self, app: &mut App) {
-		app.configure_sets(self.schedule.clone(), PreTickSet)
+		app /*-*/
+			.configure_sets(self.schedule.clone(), PreTickSet)
 			.configure_sets(self.schedule.clone(), TickSet.after(PreTickSet))
 			.configure_sets(self.schedule.clone(), TickSyncSet.after(TickSet))
-			.configure_sets(
-				self.schedule.clone(),
-				PostTickSet.after(TickSyncSet),
-			)
-			.add_systems(
-				self.schedule.clone(),
-				apply_deferred.after(PreTickSet).before(TickSet),
-			)
-			.add_systems(
-				self.schedule.clone(),
-				apply_deferred.after(TickSet).before(TickSyncSet),
-			)
-			.add_systems(
-				self.schedule.clone(),
-				apply_deferred.after(TickSyncSet).before(PostTickSet),
-			)
+			.configure_sets(self.schedule.clone(), PostTickSet.after(TickSyncSet))
+			.add_systems(self.schedule.clone(), apply_deferred.after(PreTickSet).before(TickSet))
+			.add_systems(self.schedule.clone(), apply_deferred.after(TickSet).before(TickSyncSet))
+			.add_systems(self.schedule.clone(), apply_deferred.after(TickSyncSet).before(PostTickSet))
 			.add_systems(
 				self.schedule.clone(),
 				update_run_timers
@@ -60,7 +56,7 @@ impl<T: ActionSystems + Send + Sync, Schedule: ScheduleLabel + Clone> Plugin
 			)
 			.add_systems(
 				self.schedule.clone(),
-				(sync_running, sync_interrupts).in_set(TickSyncSet),
+				(sync_interrupts, sync_running).chain().in_set(TickSyncSet),
 			)
 			.add_systems(
 				self.schedule.clone(),

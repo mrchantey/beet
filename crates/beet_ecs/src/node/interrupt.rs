@@ -2,7 +2,7 @@ use crate::prelude::*;
 use bevy::prelude::*;
 use std::fmt::Debug;
 
-/// Indicate this node should stop running.
+/// Indicate this behavior and its children should stop running.
 /// As this is frequently added and removed, it is `SparseSet`.
 #[derive(Default, Debug, Component, PartialEq)]
 #[component(storage = "SparseSet")]

@@ -21,8 +21,8 @@ impl Default for GroupParams {
 /// as described [here](https://youtu.be/fWqOdLI944M?list=PLRqwX-V7Uu6YHt0dtyf4uiw8tKOxQLvlW&t=349)
 pub fn align_impulse(
 	position: &Vec3,
-	max_speed: MaxSpeed,
-	max_force: MaxForce,
+	max_speed: &MaxSpeed,
+	max_force: &MaxForce,
 	params: &GroupParams,
 	agents: impl IntoIterator<Item = (&Transform, &Velocity)>,
 ) -> Impulse {
@@ -41,8 +41,8 @@ pub fn align_impulse(
 
 	if total > 0 {
 		average /= total as f32;
-		average = average.normalize() * *max_speed;
-		average = average.clamp_length_max(*max_force);
+		average = average.normalize() * **max_speed;
+		average = average.clamp_length_max(**max_force);
 	}
 	Impulse(average)
 }
@@ -77,8 +77,8 @@ mod test {
 
 		expect(align_impulse(
 			&Vec3::ZERO,
-			MaxSpeed(2.),
-			MaxForce(10.),
+			&MaxSpeed(2.),
+			&MaxForce(10.),
 			&GroupParams::default(),
 			agents,
 		))

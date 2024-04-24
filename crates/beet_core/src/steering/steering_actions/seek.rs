@@ -90,7 +90,7 @@ mod test {
 		expect(&app)
 			.component::<Transform>(agent)?
 			.map(|t| t.translation)
-			.to_be(Vec3::new(0.2, 0., 0.))?;
+			.to_be(Vec3::new(0.02, 0., 0.))?;
 
 
 		Ok(())
