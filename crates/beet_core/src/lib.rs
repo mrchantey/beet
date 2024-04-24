@@ -1,4 +1,4 @@
-#![feature(let_chains)]
+#![feature(let_chains, anonymous_lifetime_in_impl_trait)]
 pub mod app;
 pub mod core_module;
 pub mod movement;

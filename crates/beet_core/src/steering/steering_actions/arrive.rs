@@ -12,7 +12,6 @@ impl Default for ArriveRadius {
 	fn default() -> Self { Self(0.5) }
 }
 
-
 /// Calculates an arrive speed
 /// as described [here](https://youtu.be/OxHJ-o_bbzs?list=PLRqwX-V7Uu6ZV4yEcW3uDwOgGXKUUsPOM&t=439)
 pub fn arrive_speed(

@@ -8,30 +8,6 @@ These algorithms are from the book "The Nature of Code" by Daniel Shiffman
 use crate::prelude::*;
 use bevy::prelude::*;
 
-/// Max force used to clamp forces, defaults to `0.1`
-#[derive(
-	Debug, Copy, Clone, PartialEq, Deref, DerefMut, Component, Reflect,
-)]
-#[reflect(Component, Default)]
-pub struct MaxForce(pub f32);
-
-impl Default for MaxForce {
-	fn default() -> Self { Self(0.1) }
-}
-
-/// Max speed used to clamp velocity, defaults to `1.0`
-#[derive(
-	Debug, Copy, Clone, PartialEq, Deref, DerefMut, Component, Reflect,
-)]
-#[reflect(Component, Default)]
-pub struct MaxSpeed(pub f32);
-
-impl Default for MaxSpeed {
-	fn default() -> Self { Self(1.0) }
-}
-
-
-
 /// Calculate a seek impulse
 /// as described [here](https://www.youtube.com/watch?v=p1Ws1ZhG36g&list=PLRqwX-V7Uu6ZV4yEcW3uDwOgGXKUUsPOM&t=585s)
 pub fn seek_impulse(

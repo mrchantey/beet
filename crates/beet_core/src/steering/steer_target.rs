@@ -3,8 +3,11 @@ use bevy::prelude::*;
 
 #[derive(Debug, Copy, Clone, PartialEq, Component, Reflect)]
 #[reflect(Component)]
+// Description of a target used by steering behaviors.
 pub enum SteerTarget {
+	/// The target is a fixed position
 	Position(Vec3),
+	/// The target is an entity with a [`Transform`] component
 	Entity(Entity),
 }
 impl Default for SteerTarget {
@@ -20,7 +23,7 @@ impl SteerTarget {
 				if let Ok(transform) = query.get(*entity) {
 					Ok(transform.translation)
 				} else {
-					anyhow::bail!("entity {entity:?} not found")
+					anyhow::bail!("transform not found for entity {entity:?}")
 				}
 			}
 		}

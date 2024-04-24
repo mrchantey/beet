@@ -2,36 +2,41 @@ use beet_ecs::exports::Reflect;
 use bevy::prelude::*;
 
 
-/// A vector measured in (m/s)
 #[derive(
 	Debug, Default, Clone, PartialEq, Deref, DerefMut, Component, Reflect,
 )]
 #[reflect(Component, Default)]
+/// A vector measured in (m/s).
+/// This is multiplied by delta time.
 pub struct Velocity(pub Vec3);
-/// A force that is cleared each frame.
+
 #[derive(
 	Debug, Default, Clone, PartialEq, Deref, DerefMut, Component, Reflect,
 )]
 #[reflect(Component, Default)]
+/// An instant force, ie jump, that is cleared each frame.
+/// This is not multiplied by delta time.
 pub struct Impulse(pub Vec3);
-/// A constant force that is cleared each frame.
 #[derive(
 	Debug, Default, Clone, PartialEq, Deref, DerefMut, Component, Reflect,
 )]
 #[reflect(Component, Default)]
+/// A constant force, ie gravity, that is cleared each frame.
+/// This is multiplied by delta time.
 pub struct Force(pub Vec3);
-/// A constant force that is cleared each frame.
+
 #[derive(
 	Debug, Copy, Clone, PartialEq, Deref, DerefMut, Component, Reflect,
 )]
 #[reflect(Component, Default)]
+/// Larger masses are less effected by forces, defaults to `1.0`.
 pub struct Mass(pub f32);
 
 impl Default for Mass {
 	fn default() -> Self { Self(1.0) }
 }
 
-
+/// The components required for force integration, for use with a [`TransformBundle`] or equivalent.
 #[derive(Default, Bundle)]
 pub struct ForceBundle {
 	pub mass: Mass,
@@ -51,22 +56,30 @@ pub fn integrate_force(
 		&mut Transform,
 		Option<&Mass>,
 		&mut Velocity,
-		Option<&Force>,
+		Option<&mut Force>,
 		Option<&mut Impulse>,
 	)>,
 ) {
-	for (mut transform, mass, mut velocity, force, mut impulse) in
+	for (mut transform, mass, mut velocity, mut force, mut impulse) in
 		query.iter_mut()
 	{
-		let mut force = force.map(|f| **f).unwrap_or_default();
-		let mass = mass.map(|m| **m).unwrap_or(1.0);
+		let mut summed_force = Vec3::ZERO;
+		if let Some(force) = force.as_mut() {
+			summed_force += ***force * time.delta_seconds();
+			***force = Vec3::ZERO;
+		}
 		if let Some(impulse) = impulse.as_mut() {
-			force += ***impulse;
+			summed_force += ***impulse;
 			***impulse = Vec3::ZERO;
 		}
-		let acceleration = force / mass;
+		// if summed_force != Vec3::ZERO {
+		let mass = mass.map(|m| **m).unwrap_or(1.0);
+		let acceleration = summed_force / mass;
 		**velocity += acceleration;
+		// }
+		// if **velocity != Vec3::ZERO {
 		transform.translation += **velocity * time.delta_seconds();
+		// }
 	}
 }
 
@@ -82,11 +95,7 @@ mod test {
 	pub fn works() -> Result<()> {
 		let mut app = App::new();
 
-		app.add_plugins(SteeringPlugin {
-			wrap_around: WrapAround {
-				half_extents: Vec3::new(100., 100., 100.),
-			},
-		});
+		app.add_plugins(SteerPlugin::default());
 		app.insert_time();
 
 		let velocity_entity = app
@@ -120,8 +129,6 @@ mod test {
 			}))
 			.id();
 
-
-
 		app.update_with_secs(1);
 
 		expect(&app)
@@ -153,7 +160,7 @@ mod test {
 		expect(&app)
 			.component::<Transform>(force_entity)?
 			.map(|t| t.translation)
-			.to_be(Vec3::new(3., 0., 0.))?;
+			.to_be(Vec3::new(2., 0., 0.))?;
 		expect(&app)
 			.component::<Transform>(impulse_entity)?
 			.map(|t| t.translation)

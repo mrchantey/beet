@@ -57,7 +57,7 @@ mod test {
 		let mut app = App::new();
 
 		app.add_plugins((
-			SteeringPlugin::default(),
+			SteerPlugin::default(),
 			BeetSystemsPlugin::<CoreModule, _>::default(),
 		))
 		.insert_time();

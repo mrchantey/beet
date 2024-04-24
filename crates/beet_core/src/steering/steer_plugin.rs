@@ -6,35 +6,27 @@ use forky_bevy::extensions::AppExt;
 /// Required Resources:
 /// - [`Time`]
 #[derive(Default)]
-pub struct SteeringPlugin {
-	pub wrap_around: WrapAround,
+pub struct SteerPlugin {
+	pub wrap_around: Option<WrapAround>,
 }
 
 
-impl Plugin for SteeringPlugin {
+impl Plugin for SteerPlugin {
 	fn build(&self, app: &mut App) {
 		app.__()
 			.add_systems(
 				Update,
-				(integrate_force, wrap_around).chain().in_set(PostTickSet),
+				(
+					integrate_force,
+					wrap_around
+						.run_if(|res: Option<Res<WrapAround>>| res.is_some()),
+				)
+					.chain()
+					.in_set(PostTickSet),
 			)
-			.insert_resource(self.wrap_around.clone())
 			.__();
-	}
-}
-
-/// This should be used in conjunction with the [`ForceBundle`] and [`TransformBundle`]
-#[derive(Default, Bundle)]
-pub struct SteerBundle {
-	pub max_force: MaxForce,
-	pub max_speed: MaxSpeed,
-	pub arrive_radius: ArriveRadius,
-	pub wander_params: WanderParams,
-}
-
-impl SteerBundle {
-	pub fn with_target(self, target: impl Into<SteerTarget>) -> impl Bundle {
-		// self.steer_target = target.into();
-		(self, target.into())
+		if let Some(wrap_around) = self.wrap_around.as_ref() {
+			app.insert_resource(wrap_around.clone());
+		}
 	}
 }

@@ -13,7 +13,7 @@ impl Plugin for BeetMinimalPlugin {
 pub struct DefaultBeetPlugins<T: BeetModule> {
 	pub types: BeetModulePlugin<T>,
 	pub systems: BeetSystemsPlugin<T, Update>,
-	pub steering: SteeringPlugin,
+	pub steering: SteerPlugin,
 	pub message: BeetMessagePlugin<T>,
 	pub core: CorePlugin,
 }
@@ -23,7 +23,7 @@ impl<T: BeetModule> DefaultBeetPlugins<T> {
 		Self {
 			types: BeetModulePlugin(default()),
 			systems: BeetSystemsPlugin::default(),
-			steering: SteeringPlugin::default(),
+			steering: SteerPlugin::default(),
 			message: BeetMessagePlugin(default()),
 			core: CorePlugin::default(),
 		}

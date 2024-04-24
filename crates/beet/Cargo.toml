@@ -21,4 +21,7 @@ beet_ecs.workspace = true
 beet_ml = { workspace = true, optional = true }
 beet_net = { workspace = true, optional = true }
 
-bevy.workspace = true
+# bevy.workspace = true
+
+[dev-dependencies]
+bevy = { workspace = true, default-features = true }
