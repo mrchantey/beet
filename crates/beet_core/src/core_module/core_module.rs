@@ -17,6 +17,7 @@ use bevy::prelude::*;
 		//steering
 		Seek,
 		Wander,
+		Align::<GroupSteerAgent>,
 		SucceedOnArrive,
 		FindSteerTarget,
 		ScoreSteerTarget,

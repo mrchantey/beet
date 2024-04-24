@@ -44,6 +44,7 @@ pub struct SteerBundle {
 	pub max_speed: MaxSpeed,
 	pub arrive_radius: ArriveRadius,
 	pub wander_params: WanderParams,
+	pub group_params: GroupParams,
 }
 
 impl SteerBundle {
@@ -52,6 +53,7 @@ impl SteerBundle {
 		self.max_speed.0 *= val;
 		self.arrive_radius.0 *= val;
 		self.wander_params = self.wander_params.scaled_to(val);
+		self.group_params = self.group_params.scaled_to(val);
 		self
 	}
 

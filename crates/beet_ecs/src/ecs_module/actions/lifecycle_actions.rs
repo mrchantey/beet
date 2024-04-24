@@ -38,7 +38,6 @@ impl<T: SettableComponent> InsertOnRun<T> {
 	pub fn new(value: impl Into<T>) -> Self { Self(value.into()) }
 }
 
-// this was SetRunResult - With<Running> check for regression
 fn insert_on_run<T: SettableComponent>(
 	mut commands: Commands,
 	query: Query<(Entity, &InsertOnRun<T>), Added<Running>>,

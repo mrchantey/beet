@@ -5,13 +5,6 @@ use bevy::prelude::*;
 mod example_plugin;
 use example_plugin::ExamplePlugin;
 
-
-#[derive(Component, Reflect)]
-pub struct BoidMarker;
-
-
-
-
 fn main() {
 	let mut app = App::new();
 
@@ -32,20 +25,22 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
 					..default()
 				},
 				RotateToVelocity2d,
-				// Mass::default(),
-				// Velocity::default(),
-				// Impulse::default(),
-				// Force::default(),
 				ForceBundle::default(),
 				SteerBundle::default().scaled_to(500.),
+				VelocityScalar(Vec3::new(1., 1., 0.)),
+				GroupSteerAgent,
 			))
-			.with_children(|parent| {
+			.with_children(|agent| {
 				// behavior
-				// parent.spawn((
-				// 	Align::<BoidMarker>::default(),
-				// 	Running,
-				// 	TargetAgent(parent.parent_entity()),
-				// ));
+				agent.spawn((Running, ParallelSelector)).with_children(
+					|selector| {
+						selector.spawn((
+							Align::<GroupSteerAgent>::default(),
+							RootIsTargetAgent,
+						));
+						selector.spawn((Wander::default(), RootIsTargetAgent));
+					},
+				);
 			});
 	}
 }

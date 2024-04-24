@@ -10,12 +10,13 @@ pub fn integrate_force(
 	mut query: Query<(
 		&mut Transform,
 		Option<&Mass>,
+		Option<&VelocityScalar>,
 		&mut Velocity,
 		Option<&mut Force>,
 		Option<&mut Impulse>,
 	)>,
 ) {
-	for (mut transform, mass, mut velocity, mut force, mut impulse) in
+	for (mut transform, mass, scalar, mut velocity, mut force, mut impulse) in
 		query.iter_mut()
 	{
 		let mut summed_force = Vec3::ZERO;
@@ -31,6 +32,9 @@ pub fn integrate_force(
 			let mass = mass.map(|m| **m).unwrap_or(1.0);
 			let acceleration = summed_force / mass;
 			**velocity += acceleration;
+		}
+		if let Some(scalar) = scalar {
+			**velocity *= **scalar;
 		}
 		if **velocity != Vec3::ZERO {
 			transform.translation += **velocity * time.delta_seconds();

@@ -10,6 +10,15 @@ use bevy::prelude::*;
 /// This is multiplied by delta time.
 pub struct Velocity(pub Vec3);
 
+#[derive(Debug, Clone, PartialEq, Deref, DerefMut, Component, Reflect)]
+#[reflect(Component, Default)]
+/// A constant value for constraining axes
+pub struct VelocityScalar(pub Vec3);
+
+impl Default for VelocityScalar {
+	fn default() -> Self { Self(Vec3::ONE) }
+}
+
 #[derive(
 	Debug, Default, Clone, PartialEq, Deref, DerefMut, Component, Reflect,
 )]

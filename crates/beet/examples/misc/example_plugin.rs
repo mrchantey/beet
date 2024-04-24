@@ -11,11 +11,13 @@ pub struct ExamplePlugin;
 impl Plugin for ExamplePlugin {
 	fn build(&self, app: &mut App) {
 		app
+		.insert_resource(WrapAround::default())
 		.add_plugins(DefaultPlugins)
 		.add_plugins(DefaultBeetPlugins::<CoreModule>::default())
 		.add_systems(Startup, space_setup)
+		.add_systems(Update, update_wrap_around)
 		.add_systems(Update, follow_cursor)
-.add_systems(Update, close_on_esc)
+		.add_systems(Update, close_on_esc)
 		/*-*/;
 	}
 }

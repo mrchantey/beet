@@ -12,8 +12,15 @@ pub struct GroupParams {
 impl Default for GroupParams {
 	fn default() -> Self {
 		Self {
-			influence_radius: 10.,
+			influence_radius: 0.5,
 		}
+	}
+}
+
+impl GroupParams {
+	pub fn scaled_to(mut self, val: f32) -> Self {
+		self.influence_radius *= val;
+		self
 	}
 }
 

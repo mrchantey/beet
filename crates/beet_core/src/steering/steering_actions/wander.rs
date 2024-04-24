@@ -1,7 +1,6 @@
 use crate::prelude::*;
 use beet_ecs::prelude::*;
 use bevy::prelude::*;
-use forky_core::ResultTEExt;
 
 #[derive_action]
 #[action(graph_role=GraphRole::Agent)]
@@ -19,18 +18,15 @@ fn wander(
 	)>,
 	query: Query<(&TargetAgent, &Wander), (With<Running>, With<Wander>)>,
 ) {
-	let num_agents = agents.iter().count();
 	for (agent, _) in query.iter() {
-		if let Some((
+		if let Ok((
 			transform,
 			velocity,
 			mut wander,
 			max_speed,
 			max_force,
 			mut impulse,
-		)) = agents
-			.get_mut(**agent)
-			.ok_or(|e| log::warn!("wander - num agents: {num_agents}\n{e}",))
+		)) = agents.get_mut(**agent)
 		{
 			*impulse = wander_impulse(
 				&transform.translation,
