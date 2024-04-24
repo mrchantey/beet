@@ -12,7 +12,7 @@ use bevy::prelude::*;
 ///
 /// If a child fails it will fail.
 #[derive_action]
-#[action(graph_role=GraphRole::Child,child_components=[Score])]
+#[action(graph_role=GraphRole::Child)]
 pub struct SequenceSelector;
 fn sequence_selector(
 	mut commands: Commands,
@@ -22,23 +22,28 @@ fn sequence_selector(
 ) {
 	for (parent, _selector, children) in selectors.iter() {
 		if any_child_running(children, &children_running) {
+			// continue
 			continue;
 		}
 
 		match first_child_result(children, &children_results) {
 			Some((index, result)) => match result {
 				&RunResult::Failure => {
+					// finish
 					commands.entity(parent).insert(RunResult::Failure);
 				}
 				&RunResult::Success => {
 					if index == children.len() - 1 {
+						// finish
 						commands.entity(parent).insert(RunResult::Success);
 					} else {
+						// next
 						commands.entity(children[index + 1]).insert(Running);
 					}
 				}
 			},
 			None => {
+				// start
 				commands.entity(children[0]).insert(Running);
 			}
 		}

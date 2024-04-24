@@ -23,6 +23,20 @@ impl Default for MaxSpeed {
 	fn default() -> Self { Self(1.) }
 }
 
+/// Scale the force effect that a particular behavior will have
+#[derive(
+	Debug, Copy, Clone, PartialEq, Deref, DerefMut, Component, Reflect,
+)]
+#[reflect(Component, Default)]
+pub struct ForceScalar(pub f32);
+
+impl Default for ForceScalar {
+	fn default() -> Self { Self(1.) }
+}
+
+
+
+
 /// This should be used in conjunction with the [`ForceBundle`] and [`TransformBundle`]
 #[derive(Default, Bundle)]
 pub struct SteerBundle {

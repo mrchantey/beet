@@ -14,7 +14,7 @@ impl Sentence {
 /// Updates the [`Score`] of each child based on the similarity of its [`Sentence`] with the agent,
 /// for use with [`ScoreSelector`]
 #[derive_action]
-#[action(graph_role=GraphRole::Child, child_components=[Score])]
+#[action(graph_role=GraphRole::Child)]
 pub struct SentenceScorer;
 
 

@@ -30,6 +30,7 @@ The [`EcsModule`][EcsModule] contains the basic actions required for most behavi
 | *Selectors*                   |            |                                                                  |
 | `FallbackSelector`            | Child      | Run children in sequence until one succeeds                      |
 | `SequenceSelector`            | Child      | Run children in sequence until one fails                         |
+| `ParallelSelector`            | Child      | Run children in parallel until one finishes                      |
 | `ScoreSelector`               | Child      | Run the child with the highest score                             |
 | *Utility*                     |            |                                                                  |
 | `EmptyAction`                 | Node       | Does what it says on the tin, useful for tests                   |

@@ -14,6 +14,7 @@ use bevy::prelude::*;
 	SequenceSelector,
 	FallbackSelector,
 	ScoreSelector,
+	ParallelSelector,
 	// utility
 	EmptyAction,
 )]
