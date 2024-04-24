@@ -1,7 +1,7 @@
 use crate::prelude::*;
 use bevy::prelude::*;
 
-/// Max force used to clamp forces, defaults to `0.1`
+/// Max force used to clamp forces
 #[derive(
 	Debug, Copy, Clone, PartialEq, Deref, DerefMut, Component, Reflect,
 )]
@@ -9,10 +9,10 @@ use bevy::prelude::*;
 pub struct MaxForce(pub f32);
 
 impl Default for MaxForce {
-	fn default() -> Self { Self(0.1) }
+	fn default() -> Self { Self(0.01) }
 }
 
-/// Max speed used to clamp velocity, defaults to `1.0`
+/// Max speed used to clamp velocity
 #[derive(
 	Debug, Copy, Clone, PartialEq, Deref, DerefMut, Component, Reflect,
 )]
@@ -20,7 +20,7 @@ impl Default for MaxForce {
 pub struct MaxSpeed(pub f32);
 
 impl Default for MaxSpeed {
-	fn default() -> Self { Self(1.0) }
+	fn default() -> Self { Self(1.) }
 }
 
 /// This should be used in conjunction with the [`ForceBundle`] and [`TransformBundle`]
@@ -33,8 +33,15 @@ pub struct SteerBundle {
 }
 
 impl SteerBundle {
+	pub fn scaled_to(mut self, val: f32) -> Self {
+		self.max_force.0 *= val;
+		self.max_speed.0 *= val;
+		self.arrive_radius.0 *= val;
+		self.wander_params = self.wander_params.scaled_to(val);
+		self
+	}
+
 	pub fn with_target(self, target: impl Into<SteerTarget>) -> impl Bundle {
-		// self.steer_target = target.into();
 		(self, target.into())
 	}
 }

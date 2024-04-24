@@ -11,7 +11,7 @@ pub struct Seek;
 // TODO if target has Velocity, pursue
 fn seek(
 	transforms: Query<&Transform>,
-	mut targets: Query<(
+	mut agents: Query<(
 		&Transform,
 		&Velocity,
 		&SteerTarget,
@@ -31,7 +31,7 @@ fn seek(
 			max_force,
 			mut impulse,
 			arrive_radius,
-		)) = targets.get_mut(**target)
+		)) = agents.get_mut(**target)
 		// if agent has no steer_target thats ok
 		{
 			if let Some(target_position) = steer_target

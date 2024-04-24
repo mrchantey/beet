@@ -25,3 +25,6 @@ beet_net = { workspace = true, optional = true }
 
 [dev-dependencies]
 bevy = { workspace = true, default-features = true }
+log.workspace = true
+pretty_env_logger.workspace = true
+forky_bevy.workspace = true

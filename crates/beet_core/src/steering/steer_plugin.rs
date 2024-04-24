@@ -18,6 +18,7 @@ impl Plugin for SteerPlugin {
 				Update,
 				(
 					integrate_force,
+					rotate_to_velocity_2d,
 					wrap_around
 						.run_if(|res: Option<Res<WrapAround>>| res.is_some()),
 				)

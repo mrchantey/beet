@@ -9,7 +9,7 @@ use bevy::prelude::*;
 pub struct ArriveRadius(pub f32);
 
 impl Default for ArriveRadius {
-	fn default() -> Self { Self(0.5) }
+	fn default() -> Self { Self(0.7) }
 }
 
 /// Calculates an arrive speed

@@ -28,6 +28,15 @@ impl Default for WanderParams {
 }
 
 impl WanderParams {
+	pub fn scaled_to(mut self, val: f32) -> Self {
+		self.outer_distance *= val;
+		self.outer_radius *= val;
+		self.inner_radius *= val;
+
+		self
+	}
+
+
 	pub fn default_forward() -> Self {
 		Self {
 			last_local_target: Vec3::new(0., 0., -1.),
