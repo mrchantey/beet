@@ -27,6 +27,7 @@ embassy = [
 
 [dependencies]
 beet = { path = "../beet" }
+# forky_core = "0.1.46"
 forky_core = { path = "../../../forky/crates/forky/forky_core" }
 
 bevy = { git = "https://github.com/bevyengine/bevy.git", rev = "f516de456be2b65572de1af6956d52157663b9cc", default-features = false, features = [

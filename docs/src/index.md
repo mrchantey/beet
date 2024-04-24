@@ -2,7 +2,7 @@
 
 Beet is a very flexible behavior library for games and robotics.
 
-It is built with `bevy` and represents behaviors as regular entities, connecting them through the parent-child relationship.
+It is built with `bevy` and represents behaviors as entities, connecting them through the parent-child relationship.
 
 > This library is experimental and I'd love to hear any questions or feedback, my Bevy Discord handle is `@mrchantey`.
 

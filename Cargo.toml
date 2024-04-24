@@ -49,13 +49,10 @@ forky_bevy = { path = "../forky/crates/forky/forky_bevy" }
 forky_web = { path = "../forky/crates/forky/forky_web" }
 sweet = { path = "../forky/crates/sweet", features = ["bevy"] }
 
-# forky_core = { version = "0.1.43" }
-# forky_bevy = { version = "0.1.43" }
-# forky_web = { version = "0.1.43" }
-# sweet = { version = "0.1.43", features = ["bevy"] }
-
-# forky_core = { path = "../forky/crates/forky/forky_core" }
-# forky_web = { path = "../forky/crates/forky/forky_web" }
+# forky_core = "0.1.46"
+# forky_bevy = "0.1.46"
+# forky_web = "0.1.46"
+# sweet = { version = "0.1.46", features = ["bevy"] }
 
 ## logging
 log = "0.4"
