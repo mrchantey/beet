@@ -3,30 +3,30 @@
 
 ## Everything is an `Action`
 
-Actions are simply a combination of a `Component` and a `System`. They are the single primitive from which all behaviors are built, whether modifying the world or behavior lifecycles.
+Actions are simply a combination of a `Component` and a `System`. They are the single primitive from which all behaviors are built, whether modifying the world or traversing the behavior graph.
 
-For the goal of modularity they are usually very simple, for example `Translate` and `InsertInDuration(RunResult::Success)` could be combined to create a `Translate For Duration` behavior.
+For the purpose of modularity they are usually very simple, for example `Translate` and `InsertInDuration(RunResult::Success)` could be combined to create a `Translate For Duration` behavior.
 
 ## Terminology
 
 These terms may be helpful when describing Beet principles.
 
-| Name     | Descrition                                                                    | Example                                   |
-| -------- | ----------------------------------------------------------------------------- | ----------------------------------------- |
-| Agent    | A entity that has an associated `Behavior`, usually as a child entity         | `Dragon`                                  |
-| Behavior | An entity that contains at least one `Action`, and possibly child `Behaviors` | `Fire Attack`                             |
-| Action   | A component-system pair                                                       | `SetAgentOnRun(Animation::BreathingFire)` |
+| Name     | Descrition                                                                    | Example                                  |
+| -------- | ----------------------------------------------------------------------------- | ---------------------------------------- |
+| Agent    | A entity that has an associated `Behavior`, usually as a child entity         | Dragon                                   |
+| Behavior | An entity that contains at least one `Action`, and possibly child `Behaviors` | Fire Attack                              |
+| Action   | A component-system pair                                                       | Set agent's animation to `BreathingFire` |
 
 ## Graph Roles
 
-Actions can be categorized by what parts of the scene graph they mutate. This is just metadata, there is no techical barrier to creating a super action that does everything, although its usually best to keep actions specific.
+Actions can be categorized by what they modify. This is just metadata, there is no techical barrier to creating a super action that does everything, although its usually best to keep actions specific.
 
 | Name               | Description                                                                      | Example                                      |
 | ------------------ | -------------------------------------------------------------------------------- | -------------------------------------------- |
-| `GraphRole::Node`  | Modifies some part of the entity it is attached to, ie updating a `Score`        | [`ScoreSteerTarget`][score-steer-target]     |
-| `GraphRole::Child` | Modifies child entities, ie adding/removing `Running`                            | [`SequenceSelector`][sequence]               |
-| `GraphRole::Agent` | Modifies the associated agent, ie movement                                       | [`Translate`][translate]                     |
-| `GraphRole::World` | Modifies entities or resources external to the tree, ie despawning a collectable | [`DespawnSteerTarget`][despawn-steer-target] |
+| `GraphRole::Node`  | Modifies some part of the entity it is attached to, like setting the `RunResult` | [`InsertOnRun<RunResult>`][run-result]       |
+| `GraphRole::Child` | Modifies child entities, like adding/removing `Running`                          | [`SequenceSelector`][sequence]               |
+| `GraphRole::Agent` | Modifies the associated agent, like its `Transform`                              | [`Translate`][translate]                     |
+| `GraphRole::World` | Modifies external entities or resources, like despawning a collectable           | [`DespawnSteerTarget`][despawn-steer-target] |
 
 ## Common Components
 

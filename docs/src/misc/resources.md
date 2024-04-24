@@ -6,8 +6,11 @@ Various resource on AI in games/robotics, architecture etc.
 - GTC 24
 	- [Robotics in the Age of Generative AI](https://youtu.be/vOrhfyMe_EQ)
 	- [Generally Capable Agents in Open-Ended Worlds](https://youtu.be/ZSPEyFqAGDc)
-- [Huggingface - ML in games](https://huggingface.co/learn/ml-games-course/unit0/introduction)
-- [candle book](https://huggingface.github.io/candle/guide/installation.html)
+- [Agility Robotics - LLMS in robots](https://youtu.be/OP1mY2-S-g0?t=2392)
+	- 'Chain of thought'
+- Huggingface
+	- [ML in games](https://huggingface.co/learn/ml-games-course/unit0/introduction)
+	- [Candle Book](https://huggingface.github.io/candle/guide/installation.html)
 
 ## Architecture
 

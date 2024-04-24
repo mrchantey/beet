@@ -72,7 +72,7 @@ test-w crate *args:
 test-all:
 	cargo test -p beet_ecs $BEET_CARGO_TEST --lib
 	cargo test -p beet_core $BEET_CARGO_TEST --lib
-	cargo run -p beet_net 	--example test_beet_net  	$BEET_CARGO_TEST
+	cargo test -p beet_net $BEET_CARGO_TEST --lib
 
 test-ci *args:
 	cargo run -p beet_core --example test_beet_core $BEET_CARGO_TEST_CI -- {{args}}

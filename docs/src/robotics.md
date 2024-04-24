@@ -5,9 +5,6 @@ Bevy is a remarkably versatile engine, it can run on tiny microcontrollers like 
 
 ## But why use a game engine?
 
-Just because we *can* run bevy on a microntroller, should we? Yes I think so and here's a few reasons why:
-
-- Simulation: We get a simulation environment out of the box
-- Ecosystem: Share and reuse libraries like netcode, navigation or behavior selection
-- Animation: Bringing robotics tooling closer to skilled animators is an important step toward quality human interaction
-- ECS beyond games: Its a really nice architectural pattern, and performance is also critical in robotics
+- Simulation: We get a deeply integrated simulation environment out of the box
+- Ecosystem: Share and reuse editors, netcode, animations, behaviors etc
+- ECS beyond games: ECS is very well suited to performance critical robotics applications

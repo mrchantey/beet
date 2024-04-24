@@ -4,7 +4,7 @@ Beet is a very flexible behavior library for games and robotics.
 
 It is built with `bevy` and represents behaviors as regular entities, connecting them through the parent-child relationship.
 
-> This library is experimental, if you have any questions or feedback my Bevy discord handle is `@mrchantey`.
+> This library is experimental and I'd love to hear any questions or feedback, my Bevy Discord handle is `@mrchantey`.
 
 ## Quick Links
 
@@ -20,7 +20,7 @@ Create behaviors from a growing list of paradigms, check out the [roadmap](./mis
 
 #### 🐦 Bevy Friendly
 
-Actions are simply component-system pairs, which means no blackboard and easy integration with existing bevy tooling.
+Actions are simply component-system pairs, which means no blackboard and easy integration with the bevy ecosystem.
 
 #### 🕑 Tick Tock
 
@@ -38,7 +38,7 @@ Work can be distributed across environments through world replication. An agent 
 
 ## Quickstart
 
-In this example we will create an action and then use it with some built-in actions to run a behavior.
+In this example we will create an action and then combine it with some built-in actions to run a behavior.
 
 ```rust
 use beet::prelude::*;
@@ -50,8 +50,8 @@ use bevy::prelude::*;
 pub struct LogOnRun(pub String);
 
 fn log_on_run(query: Query<&LogOnRun, Added<Running>>) {
-	for action in query.iter() {
-		println!("{}", action.0);
+	for message in query.iter() {
+		println!("{}", message.0);
 	}
 }
 
@@ -72,8 +72,8 @@ fn main() {
 	// Behaviors are regular entity hierarchies
 	app.world_mut()
 		.spawn((
-			// start this behavior running at its root
-			Running, 
+			// start this behavior running
+			Running,
 			SequenceSelector::default(), 
 		))
 		.with_children(|parent| {
