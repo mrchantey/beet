@@ -5,7 +5,7 @@ use std::marker::PhantomData;
 
 #[derive_action(Default)]
 #[action(graph_role=GraphRole::Agent)]
-/// Separate from entities that have a [`Transform`] and `M`
+/// Move towards the center of mass of entities with the given component.
 pub struct Cohere<M: GenericActionComponent> {
 	/// The scalar to apply to the impulse
 	pub scalar: f32,

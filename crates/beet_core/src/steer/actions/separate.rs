@@ -5,7 +5,7 @@ use std::marker::PhantomData;
 
 #[derive_action(Default)]
 #[action(graph_role=GraphRole::Agent)]
-/// Separate from entities that have a [`Transform`] and `M`
+/// Separate from entities with the given component.
 pub struct Separate<M: GenericActionComponent> {
 	/// The scalar to apply to the impulse
 	pub scalar: f32,

@@ -3,17 +3,9 @@ use beet_ecs::prelude::*;
 use bevy::prelude::*;
 use std::marker::PhantomData;
 
-
-#[derive(Default, Clone, Component, Reflect)]
-/// Default marker for agents that should be considered
-/// in group steering actions.
-pub struct GroupSteerAgent;
-
-
-
 #[derive_action(Default)]
 #[action(graph_role=GraphRole::Agent)]
-/// Align with entities that have a [`Transform`], [`Velocity`] and `M`
+/// Align [`Velocity`] with that of entities with the given component.
 pub struct Align<M: GenericActionComponent> {
 	/// The scalar to apply to the impulse
 	pub scalar: f32,

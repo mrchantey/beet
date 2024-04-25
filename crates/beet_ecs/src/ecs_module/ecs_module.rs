@@ -11,10 +11,10 @@ use bevy::prelude::*;
 	Repeat,
 	SetOnSpawn::<Score>,
 	// selectors
-	SequenceSelector,
 	FallbackSelector,
-	ScoreSelector,
 	ParallelSelector,
+	SequenceSelector,
+	ScoreSelector,
 	// utility
 	EmptyAction,
 )]
