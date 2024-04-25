@@ -10,3 +10,6 @@ pub use self::dual_motor::*;
 pub mod motor;
 #[allow(unused_imports)]
 pub use self::motor::*;
+pub mod robotics_module;
+#[allow(unused_imports)]
+pub use self::robotics_module::*;

@@ -6,6 +6,9 @@ pub mod steering_actions;
 pub mod steer_bundle;
 #[allow(unused_imports)]
 pub use self::steer_bundle::*;
+pub mod steer_module;
+#[allow(unused_imports)]
+pub use self::steer_module::*;
 pub mod steer_plugin;
 #[allow(unused_imports)]
 pub use self::steer_plugin::*;

@@ -37,5 +37,5 @@ use bevy::prelude::*;
 	GlobalTransform,
 )]
 #[bundles(TransformBundle)]
-/// The core actions and components required for most behaviors.
+/// Basic actions required for lifecycle handling and debugging.
 pub struct EcsModule;
