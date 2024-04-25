@@ -1,7 +1,7 @@
 use beet::prelude::*;
 use bevy::prelude::*;
 
-#[path = "misc/example_plugin.rs"]
+#[path = "common/example_plugin.rs"]
 mod example_plugin;
 use example_plugin::ExamplePlugin;
 use example_plugin::FollowCursor;
