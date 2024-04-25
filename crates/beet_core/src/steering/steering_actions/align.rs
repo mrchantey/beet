@@ -5,58 +5,55 @@ use std::marker::PhantomData;
 
 
 #[derive(Default, Clone, Component, Reflect)]
-/// Default marker for group steering actions
+/// Default marker for agents that should be considered
+/// in group steering actions.
 pub struct GroupSteerAgent;
 
 
 
-#[derive_action(Default, Clone)]
+#[derive_action(Default)]
 #[action(graph_role=GraphRole::Agent)]
-/// Align with entities that have a [`Transform`], [`Velocity`] and [``]
-pub struct Align<M: SettableComponent + FromReflect> {
+/// Align with entities that have a [`Transform`], [`Velocity`] and `M`
+pub struct Align<M: GenericActionComponent> {
+	/// The scalar to apply to the impulse
+	pub scalar: f32,
 	#[reflect(ignore)]
 	phantom: PhantomData<M>,
 }
 
-impl<M: SettableComponent + FromReflect> Default for Align<M> {
+impl<M: GenericActionComponent> Default for Align<M> {
 	fn default() -> Self {
 		Self {
+			scalar: 1.,
 			phantom: PhantomData,
 		}
 	}
 }
-impl<M: SettableComponent + FromReflect> Clone for Align<M> {
-	fn clone(&self) -> Self {
+
+impl<M: GenericActionComponent> Align<M> {
+	pub fn new(scalar: f32) -> Self {
 		Self {
-			phantom: self.phantom.clone(),
+			scalar,
+			phantom: PhantomData,
 		}
 	}
 }
 
-
-fn align<M: SettableComponent + FromReflect>(
-	boids: Query<(&Transform, &Velocity), With<M>>,
-	mut agents: Query<(
-		&Transform,
-		&mut Impulse,
-		&MaxSpeed,
-		&MaxForce,
-		&GroupParams,
-	)>,
+fn align<M: GenericActionComponent>(
+	boids: Query<(Entity, &Transform, &Velocity), With<M>>,
+	mut agents: Query<(Entity, &Transform, &mut Impulse, &GroupParams)>,
 	query: Query<(&TargetAgent, &Align<M>), With<Running>>,
 ) {
-	for (target, _) in query.iter() {
-		let Ok((transform, mut impulse, max_speed, max_force, params)) =
+	for (target, align) in query.iter() {
+		let Ok((entity, transform, mut impulse, params)) =
 			agents.get_mut(**target)
 		else {
 			continue;
 		};
-		impulse.set_if_neq(align_impulse(
-			&transform.translation,
-			max_speed,
-			max_force,
-			params,
-			boids.iter(),
-		));
+
+		let new_impulse =
+			align_impulse(entity, transform.translation, params, boids.iter());
+
+		**impulse += *new_impulse * align.scalar;
 	}
 }

@@ -28,3 +28,4 @@ bevy = { workspace = true, default-features = true }
 log.workspace = true
 pretty_env_logger.workspace = true
 forky_bevy.workspace = true
+# bevy-inspector-egui = "0.24.0"

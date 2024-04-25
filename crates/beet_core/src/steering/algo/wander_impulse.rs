@@ -21,7 +21,7 @@ impl Default for WanderParams {
 		Self {
 			outer_distance: 1.,
 			outer_radius: 0.5,
-			inner_radius: 0.01,
+			inner_radius: 0.05,
 			last_local_target: Vec3::ZERO,
 		}
 	}
@@ -35,7 +35,6 @@ impl WanderParams {
 
 		self
 	}
-
 
 	pub fn default_forward() -> Self {
 		Self {

@@ -16,18 +16,48 @@ impl Plugin for SteerPlugin {
 		app.__()
 			.add_systems(
 				Update,
-				(
-					integrate_force,
-					rotate_to_velocity_2d,
-					wrap_around
-						.run_if(|res: Option<Res<WrapAround>>| res.is_some()),
-				)
+				(integrate_force, rotate_to_velocity_2d)
 					.chain()
 					.in_set(PostTickSet),
 			)
+			.add_systems(
+				Update,
+				wrap_around
+					.run_if(|res: Option<Res<WrapAround>>| res.is_some())
+					.in_set(PostTickSet),
+			)
 			.__();
+
+		#[cfg(feature = "gizmos")]
+		app.add_systems(Update, debug_group_steer.in_set(PostTickSet));
+
+
 		if let Some(wrap_around) = self.wrap_around.as_ref() {
 			app.insert_resource(wrap_around.clone());
 		}
+	}
+}
+
+#[cfg(feature = "gizmos")]
+pub fn debug_group_steer(
+	mut gizmos: Gizmos,
+	query: Query<(&Transform, &GroupParams)>,
+) {
+	for (transform, params) in query.iter() {
+		gizmos.circle_2d(
+			transform.translation.xy(),
+			params.separate_radius,
+			Color::hsl(0., 1., 0.5),
+		);
+		gizmos.circle_2d(
+			transform.translation.xy(),
+			params.align_radius,
+			Color::hsl(30., 1., 0.5),
+		);
+		gizmos.circle_2d(
+			transform.translation.xy(),
+			params.cohere_radius,
+			Color::hsl(60., 1., 0.5),
+		);
 	}
 }

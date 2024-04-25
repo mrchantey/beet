@@ -2,10 +2,21 @@ use crate::prelude::*;
 use beet_ecs::prelude::*;
 use bevy::prelude::*;
 
-#[derive_action]
+#[derive_action(Default)]
 #[action(graph_role=GraphRole::Agent)]
 /// Somewhat cohesive random walk
-pub struct Wander;
+pub struct Wander {
+	/// The scalar to apply to the impulse
+	pub scalar: f32,
+}
+
+impl Default for Wander {
+	fn default() -> Self { Self { scalar: 1. } }
+}
+
+impl Wander {
+	pub fn new(scalar: f32) -> Self { Self { scalar } }
+}
 
 fn wander(
 	mut agents: Query<(
@@ -18,23 +29,25 @@ fn wander(
 	)>,
 	query: Query<(&TargetAgent, &Wander), (With<Running>, With<Wander>)>,
 ) {
-	for (agent, _) in query.iter() {
+	for (agent, wander) in query.iter() {
 		if let Ok((
 			transform,
 			velocity,
-			mut wander,
+			mut wander_params,
 			max_speed,
 			max_force,
 			mut impulse,
 		)) = agents.get_mut(**agent)
 		{
-			*impulse = wander_impulse(
+			let new_impulse = wander_impulse(
 				&transform.translation,
 				&velocity,
-				&mut wander,
+				&mut wander_params,
 				*max_speed,
 				*max_force,
 			);
+
+			**impulse += *new_impulse * wander.scalar;
 		}
 	}
 }

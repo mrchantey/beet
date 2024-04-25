@@ -1,12 +1,12 @@
 use crate::prelude::*;
 use bevy::prelude::*;
 
-pub trait SettableComponent:
-	Default + Clone + Component + GetTypeRegistration
+pub trait GenericActionComponent:
+	Default + Clone + Component + FromReflect + GetTypeRegistration
 {
 }
-impl<T: Default + Clone + Component + GetTypeRegistration> SettableComponent
-	for T
+impl<T: Default + Clone + Component + FromReflect + GetTypeRegistration>
+	GenericActionComponent for T
 {
 }
 
@@ -15,13 +15,13 @@ impl<T: Default + Clone + Component + GetTypeRegistration> SettableComponent
 #[action(graph_role=GraphRole::Node,set=PreTickSet)]
 /// Sets a component when this behavior spawns.
 /// This does nothing if the entity does not have the component.
-pub struct SetOnSpawn<T: SettableComponent>(pub T);
+pub struct SetOnSpawn<T: GenericActionComponent>(pub T);
 
-impl<T: SettableComponent> SetOnSpawn<T> {
+impl<T: GenericActionComponent> SetOnSpawn<T> {
 	pub fn new(value: impl Into<T>) -> Self { Self(value.into()) }
 }
 
-fn set_on_spawn<T: SettableComponent>(
+fn set_on_spawn<T: GenericActionComponent>(
 	mut query: Query<(&SetOnSpawn<T>, &mut T), Added<SetOnSpawn<T>>>,
 ) {
 	for (from, mut to) in query.iter_mut() {
@@ -32,13 +32,13 @@ fn set_on_spawn<T: SettableComponent>(
 #[derive_action]
 #[derive(PartialEq, Deref, DerefMut)]
 #[action(graph_role=GraphRole::Node,set=PreTickSet)]
-pub struct InsertOnRun<T: SettableComponent>(pub T);
+pub struct InsertOnRun<T: GenericActionComponent>(pub T);
 
-impl<T: SettableComponent> InsertOnRun<T> {
+impl<T: GenericActionComponent> InsertOnRun<T> {
 	pub fn new(value: impl Into<T>) -> Self { Self(value.into()) }
 }
 
-fn insert_on_run<T: SettableComponent>(
+fn insert_on_run<T: GenericActionComponent>(
 	mut commands: Commands,
 	query: Query<(Entity, &InsertOnRun<T>), Added<Running>>,
 ) {
@@ -52,13 +52,13 @@ fn insert_on_run<T: SettableComponent>(
 #[derive(PartialEq, Deref, DerefMut)]
 #[derive_action]
 #[action(graph_role=GraphRole::Node,set=PostTickSet)]
-pub struct SetOnRun<T: SettableComponent>(pub T);
+pub struct SetOnRun<T: GenericActionComponent>(pub T);
 
-impl<T: SettableComponent> SetOnRun<T> {
+impl<T: GenericActionComponent> SetOnRun<T> {
 	pub fn new(value: impl Into<T>) -> Self { Self(value.into()) }
 }
 
-fn set_on_run<T: SettableComponent>(
+fn set_on_run<T: GenericActionComponent>(
 	mut query: Query<(&SetOnRun<T>, &mut T), Added<Running>>,
 ) {
 	for (from, mut to) in query.iter_mut() {
@@ -71,13 +71,13 @@ fn set_on_run<T: SettableComponent>(
 #[derive(PartialEq, Deref, DerefMut)]
 #[derive_action]
 #[action(graph_role=GraphRole::Agent,set=PostTickSet)]
-pub struct SetAgentOnRun<T: SettableComponent>(pub T);
+pub struct SetAgentOnRun<T: GenericActionComponent>(pub T);
 
-impl<T: SettableComponent> SetAgentOnRun<T> {
+impl<T: GenericActionComponent> SetAgentOnRun<T> {
 	pub fn new(value: impl Into<T>) -> Self { Self(value.into()) }
 }
 
-fn set_agent_on_run<T: SettableComponent>(
+fn set_agent_on_run<T: GenericActionComponent>(
 	mut agents: Query<&mut T>,
 	mut query: Query<(&TargetAgent, &SetAgentOnRun<T>), Added<Running>>,
 ) {

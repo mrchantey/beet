@@ -6,12 +6,12 @@ use std::time::Duration;
 #[action(graph_role=GraphRole::Node)]
 /// Inserts the given component after running for a given duration. Has no effect if
 /// the action completes before the duration.
-pub struct InsertInDuration<T: SettableComponent> {
+pub struct InsertInDuration<T: GenericActionComponent> {
 	pub duration: Duration,
 	pub value: T,
 }
 
-impl<T: SettableComponent> Default for InsertInDuration<T> {
+impl<T: GenericActionComponent> Default for InsertInDuration<T> {
 	fn default() -> Self {
 		Self {
 			duration: Duration::from_secs(1),
@@ -20,7 +20,7 @@ impl<T: SettableComponent> Default for InsertInDuration<T> {
 	}
 }
 
-impl<T: SettableComponent> InsertInDuration<T> {
+impl<T: GenericActionComponent> InsertInDuration<T> {
 	pub fn new(value: T, duration: Duration) -> Self {
 		Self { value, duration }
 	}
@@ -38,7 +38,7 @@ impl<T: SettableComponent> InsertInDuration<T> {
 	}
 }
 
-pub fn insert_in_duration<T: SettableComponent>(
+pub fn insert_in_duration<T: GenericActionComponent>(
 	mut commands: Commands,
 	mut query: Query<(Entity, &RunTimer, &InsertInDuration<T>), With<Running>>,
 ) {

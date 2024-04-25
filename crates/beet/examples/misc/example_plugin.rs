@@ -1,6 +1,7 @@
 use beet::prelude::*;
-use bevy::prelude::*;
+use bevy::{prelude::*, window::WindowResolution};
 use forky_bevy::systems::close_on_esc;
+// use bevy_inspector_egui::quick::WorldInspectorPlugin;
 
 #[derive(Component)]
 pub struct FollowCursor;
@@ -12,7 +13,15 @@ impl Plugin for ExamplePlugin {
 	fn build(&self, app: &mut App) {
 		app
 		.insert_resource(WrapAround::default())
-		.add_plugins(DefaultPlugins)
+		// .add_plugins(WorldInspectorPlugin::new())
+		.add_plugins(DefaultPlugins.set(WindowPlugin{
+			primary_window: Some(Window {
+				resolution:WindowResolution::new(960., 960.),
+				position:WindowPosition::At(IVec2::new(5120, 0)),				
+				..default()
+			}),
+	..default()		
+	}))
 		.add_plugins(DefaultBeetPlugins::<CoreModule>::default())
 		.add_systems(Startup, space_setup)
 		.add_systems(Update, update_wrap_around)

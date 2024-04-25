@@ -1,7 +1,7 @@
 use crate::prelude::*;
 use bevy::prelude::*;
 
-/// Max force used to clamp forces
+/// Max force used to clamp [`Force`] and [`Impulse`]
 #[derive(
 	Debug, Copy, Clone, PartialEq, Deref, DerefMut, Component, Reflect,
 )]
@@ -12,7 +12,7 @@ impl Default for MaxForce {
 	fn default() -> Self { Self(0.01) }
 }
 
-/// Max speed used to clamp velocity
+/// Max speed used as a scalar for steering and to clamp [`Velocity`]
 #[derive(
 	Debug, Copy, Clone, PartialEq, Deref, DerefMut, Component, Reflect,
 )]
