@@ -10,9 +10,9 @@ pub use self::group_params::*;
 pub mod separate_impulse;
 #[allow(unused_imports)]
 pub use self::separate_impulse::*;
-pub mod target_steer;
+pub mod seek_impulse;
 #[allow(unused_imports)]
-pub use self::target_steer::*;
+pub use self::seek_impulse::*;
 pub mod wander_impulse;
 #[allow(unused_imports)]
 pub use self::wander_impulse::*;

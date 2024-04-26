@@ -15,7 +15,6 @@ pub fn seek_impulse(
 	velocity: &Velocity,
 	target_position: &Vec3,
 	max_speed: MaxSpeed,
-	max_force: MaxForce,
 	arrive_radius: Option<ArriveRadius>,
 ) -> Impulse {
 	let desired_speed =
@@ -24,8 +23,7 @@ pub fn seek_impulse(
 	let delta_position = *target_position - *position;
 	let desired_velocity = delta_position.normalize_or_zero() * *desired_speed;
 
-	let perfect_impulse = desired_velocity - **velocity;
-	let impulse = perfect_impulse.clamp_length_max(*max_force);
+	let impulse = desired_velocity - **velocity;
 
 	Impulse(impulse)
 }
@@ -36,16 +34,9 @@ pub fn flee_impulse(
 	velocity: &Velocity,
 	target_position: &Vec3,
 	max_speed: MaxSpeed,
-	max_force: MaxForce,
 ) -> Impulse {
-	let mut impulse = seek_impulse(
-		position,
-		velocity,
-		target_position,
-		max_speed,
-		max_force,
-		None,
-	);
+	let mut impulse =
+		seek_impulse(position, velocity, target_position, max_speed, None);
 	*impulse *= -1.0;
 	impulse
 }
@@ -60,7 +51,6 @@ pub fn pursue_impulse(
 	target_position: &Vec3,
 	target_velocity: &Velocity,
 	max_speed: MaxSpeed,
-	max_force: MaxForce,
 	arrive_radius: Option<ArriveRadius>,
 ) -> Impulse {
 	let delta_position = *target_position - *position;
@@ -73,7 +63,6 @@ pub fn pursue_impulse(
 		velocity,
 		&next_target_position,
 		max_speed,
-		max_force,
 		arrive_radius,
 	)
 }
@@ -85,7 +74,6 @@ pub fn evade_impulse(
 	target_position: &Vec3,
 	target_velocity: &Velocity,
 	max_speed: MaxSpeed,
-	max_force: MaxForce,
 ) -> Impulse {
 	let mut impulse = pursue_impulse(
 		position,
@@ -93,7 +81,6 @@ pub fn evade_impulse(
 		target_position,
 		target_velocity,
 		max_speed,
-		max_force,
 		None,
 	);
 	*impulse *= -1.0;
@@ -115,10 +102,9 @@ mod test {
 			&Velocity::default(),
 			&Vec3::new(1., 0., 0.),
 			MaxSpeed::default(),
-			MaxForce::default(),
 			None,
 		);
-		expect(*impulse).to_be(Vec3::new(*MaxForce::default(), 0., 0.))?;
+		expect(*impulse).to_be(Vec3::new(1., 0., 0.))?;
 
 		Ok(())
 	}

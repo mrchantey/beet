@@ -24,7 +24,6 @@ fn wander(
 		&Velocity,
 		&mut WanderParams,
 		&MaxSpeed,
-		&MaxForce,
 		&mut Impulse,
 	)>,
 	query: Query<(&TargetAgent, &Wander), (With<Running>, With<Wander>)>,
@@ -35,7 +34,6 @@ fn wander(
 			velocity,
 			mut wander_params,
 			max_speed,
-			max_force,
 			mut impulse,
 		)) = agents.get_mut(**agent)
 		{
@@ -44,7 +42,6 @@ fn wander(
 				&velocity,
 				&mut wander_params,
 				*max_speed,
-				*max_force,
 			);
 
 			**impulse += *new_impulse * wander.scalar;

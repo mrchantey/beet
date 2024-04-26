@@ -58,7 +58,6 @@ pub fn wander_impulse(
 	velocity: &Velocity,
 	wander: &mut WanderParams,
 	max_speed: MaxSpeed,
-	max_force: MaxForce,
 ) -> Impulse {
 	let inner_delta = Vec3::random_in_sphere() * wander.inner_radius;
 	// for the first iteration, last_local_target is Vec3::ZERO, this is
@@ -72,14 +71,7 @@ pub fn wander_impulse(
 		+ velocity.normalize_or_zero() * wander.outer_distance
 		+ local_target;
 
-	seek_impulse(
-		position,
-		velocity,
-		&global_target,
-		max_speed,
-		max_force,
-		None,
-	)
+	seek_impulse(position, velocity, &global_target, max_speed, None)
 }
 
 
@@ -97,7 +89,6 @@ mod test {
 			&Velocity::default(),
 			&mut WanderParams::default(),
 			MaxSpeed::default(),
-			MaxForce::default(),
 		);
 		expect(*impulse).not().to_be(Vec3::ZERO)?;
 

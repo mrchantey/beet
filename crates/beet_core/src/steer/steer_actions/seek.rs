@@ -16,7 +16,6 @@ fn seek(
 		&Velocity,
 		&SteerTarget,
 		&MaxSpeed,
-		&MaxForce,
 		&mut Impulse,
 		Option<&ArriveRadius>,
 	)>,
@@ -28,7 +27,6 @@ fn seek(
 			velocity,
 			steer_target,
 			max_speed,
-			max_force,
 			mut impulse,
 			arrive_radius,
 		)) = agents.get_mut(**target)
@@ -43,7 +41,6 @@ fn seek(
 					&velocity,
 					&target_position,
 					*max_speed,
-					*max_force,
 					arrive_radius.copied(),
 				);
 			}
