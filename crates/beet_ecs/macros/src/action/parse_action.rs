@@ -40,7 +40,8 @@ fn append_generic_constraints(input: &mut DeriveInput) {
 			syn::GenericParam::Type(param) => {
 				let ident = &param.ident;
 				Some(
-					parse_quote!(#ident: FromReflect + GetTypeRegistration + TypePath),
+					parse_quote!(#ident: 'static),
+					// parse_quote!(#ident: FromReflect + GetTypeRegistration + TypePath),
 				)
 			}
 			_ => None,

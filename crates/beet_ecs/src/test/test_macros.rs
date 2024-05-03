@@ -3,6 +3,20 @@ use anyhow::Result;
 use std::any::Any;
 use sweet::*;
 
+
+struct Bazz {
+	val: f32,
+}
+
+#[derive(Action)]
+struct Fizz<T> {
+	bazz: Bazz,
+	val: T,
+}
+
+fn fizz<T>() {}
+
+
 #[derive_action]
 #[action(graph_role = GraphRole::Node)]
 struct MyStruct;

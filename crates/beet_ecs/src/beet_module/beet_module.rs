@@ -17,8 +17,9 @@ impl<T: BeetModule> Plugin for BeetModulePlugin<T> {
 	}
 }
 
+/// Utility trait to assist registration of components & systems, can be recursive.
 pub trait BeetModule: 'static + Send + Sync + ActionSystems {
-	/// Register components via [`World::init_bundle`]
+	/// Register bundles/components via [`World::init_bundle`]
 	fn register_bundles(world: &mut World);
 	/// Register types via [`TypeRegistry::register`]
 	fn register_types(type_registry: &mut TypeRegistry);
