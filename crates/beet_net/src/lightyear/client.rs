@@ -4,7 +4,8 @@
 //! - sending inputs to the server
 //! - applying inputs to the locally predicted player (for prediction to work, inputs have to be applied to both the
 //! predicted entity and the server entity)
-use crate::prelude::*;
+use crate::lightyear::protocol::Direction;
+use crate::lightyear::protocol::*;
 use bevy::prelude::*;
 use lightyear::prelude::client::*;
 use lightyear::prelude::*;
@@ -19,13 +20,13 @@ impl Plugin for ExampleClientPlugin {
 			FixedPreUpdate,
 			buffer_input.in_set(InputSystemSet::BufferInputs),
 		);
-		app.add_systems(FixedUpdate, player_movement);
 		app.add_systems(
 			Update,
 			(
 				receive_message1,
 				receive_entity_spawn,
 				receive_entity_despawn,
+				receive_player_id_insert,
 				handle_predicted_spawn,
 				handle_interpolated_spawn,
 			),
@@ -40,26 +41,25 @@ pub struct ClientIdText;
 
 /// Listen for events to know when the client is connected, and spawn a text entity
 /// to display the client id
-pub fn handle_connection(
-	mut commands: Commands,
+pub(crate) fn handle_connection(
 	mut connection_event: EventReader<ConnectEvent>,
 ) {
-	for _event in connection_event.read() {
-		// let client_id = event.client_id();
-		commands.spawn(ClientIdText);
+	for event in connection_event.read() {
+		let client_id = event.client_id();
+		log::info!("Connected to server with client id: {}", client_id);
 	}
 }
 
 /// System that reads from peripherals and adds inputs to the buffer
 /// This system must be run in the
-pub fn buffer_input(
+pub(crate) fn buffer_input(
 	tick_manager: Res<TickManager>,
 	mut input_manager: ResMut<InputManager<Inputs>>,
 	keypress: Res<ButtonInput<KeyCode>>,
 ) {
 	let tick = tick_manager.tick();
 	let mut input = Inputs::None;
-	let mut direction = crate::prelude::Direction {
+	let mut direction = Direction {
 		up: false,
 		down: false,
 		left: false,
@@ -90,72 +90,62 @@ pub fn buffer_input(
 	input_manager.add_input(input, tick)
 }
 
-/// The client input only gets applied to predicted entities that we own
-/// This works because we only predict the user's controlled entity.
-/// If we were predicting more entities, we would have to only apply movement to the player owned one.
-fn player_movement(
-	// TODO: maybe make prediction mode a separate component!!!
-	mut position_query: Query<&mut PlayerPosition, With<Predicted>>,
-	mut input_reader: EventReader<InputEvent<Inputs>>,
-) {
-	if <Components as SyncMetadata<PlayerPosition>>::mode()
-		!= ComponentSyncMode::Full
-	{
-		return;
-	}
-	for input in input_reader.read() {
-		if let Some(input) = input.input() {
-			for position in position_query.iter_mut() {
-				shared_movement_behaviour(position, input);
-			}
-		}
-	}
-}
-
 /// System to receive messages on the client
-pub fn receive_message1(mut reader: EventReader<MessageEvent<Message1>>) {
+pub(crate) fn receive_message1(
+	mut reader: EventReader<MessageEvent<Message1>>,
+) {
 	for event in reader.read() {
 		info!("Received message: {:?}", event.message());
 	}
 }
 
 /// Example system to handle EntitySpawn events
-pub fn receive_entity_spawn(mut reader: EventReader<EntitySpawnEvent>) {
+pub(crate) fn receive_entity_spawn(mut reader: EventReader<EntitySpawnEvent>) {
 	for event in reader.read() {
 		info!("Received entity spawn: {:?}", event.entity());
 	}
 }
 
 /// Example system to handle EntitySpawn events
-pub fn receive_entity_despawn(mut reader: EventReader<EntityDespawnEvent>) {
+pub(crate) fn receive_entity_despawn(
+	mut reader: EventReader<EntityDespawnEvent>,
+) {
 	for event in reader.read() {
 		info!("Received entity despawn: {:?}", event.entity());
+	}
+}
+
+/// Example system to handle ComponentInsertEvent events
+pub(crate) fn receive_player_id_insert(
+	mut reader: EventReader<ComponentInsertEvent<PlayerId>>,
+) {
+	for event in reader.read() {
+		info!(
+			"Received component PlayerId insert for entity: {:?}",
+			event.entity()
+		);
+	}
+}
+
+pub(crate) fn handle_predicted_spawn(
+	mut predicted: Query<Entity, Added<Predicted>>,
+) {
+	for entity in predicted.iter_mut() {
+		log::info!("Predicted entity spawned: {:?}", entity);
 	}
 }
 
 /// When the predicted copy of the client-owned entity is spawned, do stuff
 /// - assign it a different saturation
 /// - keep track of it in the Global resource
-pub fn handle_predicted_spawn(
-	mut _predicted: Query<Entity, Added<Predicted>>,
-	// mut predicted: Query<&mut PlayerColor, Added<Predicted>>,
+pub(crate) fn handle_interpolated_spawn(
+	mut interpolated: Query<Entity, Added<Interpolated>>,
 ) {
-	// for mut color in predicted.iter_mut() {
-	// 	color.0.set_s(0.3);
-	// }
+	for entity in interpolated.iter_mut() {
+		log::info!("Interpolated entity spawned: {:?}", entity);
+	}
 }
 
-/// When the predicted copy of the client-owned entity is spawned, do stuff
-/// - assign it a different saturation
-/// - keep track of it in the Global resource
-pub fn handle_interpolated_spawn(
-	mut _interpolated: Query<Entity, Added<Interpolated>>,
-	// mut interpolated: Query<&mut PlayerColor, Added<Interpolated>>,
-) {
-	// for mut color in interpolated.iter_mut() {
-	// 	color.0.set_s(0.1);
-	// }
-}
 
 /// Remove all entities when the client disconnect
 fn on_disconnect(

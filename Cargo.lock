@@ -692,6 +692,7 @@ dependencies = [
  "log",
  "parking_lot",
  "pretty_env_logger",
+ "rand",
  "ron",
  "serde",
  "strum",
@@ -997,6 +998,7 @@ dependencies = [
  "bevy_reflect 0.14.0-dev",
  "bevy_tasks 0.14.0-dev",
  "bevy_utils 0.14.0-dev",
+ "serde",
  "uuid",
 ]
 
@@ -1283,6 +1285,7 @@ dependencies = [
  "bevy_math 0.14.0-dev",
  "bevy_reflect 0.14.0-dev",
  "bevy_utils 0.14.0-dev",
+ "serde",
  "smol_str",
  "thiserror",
 ]
@@ -1780,6 +1783,7 @@ dependencies = [
  "bevy_reflect 0.14.0-dev",
  "bevy_utils 0.14.0-dev",
  "crossbeam-channel",
+ "serde",
  "thiserror",
 ]
 
@@ -1807,6 +1811,7 @@ dependencies = [
  "bevy_hierarchy 0.14.0-dev",
  "bevy_math 0.14.0-dev",
  "bevy_reflect 0.14.0-dev",
+ "serde",
  "thiserror",
 ]
 
@@ -1834,6 +1839,7 @@ dependencies = [
  "bevy_window 0.14.0-dev",
  "bytemuck",
  "nonmax",
+ "serde",
  "smallvec",
  "taffy",
  "thiserror",
@@ -1922,6 +1928,7 @@ dependencies = [
  "bevy_reflect 0.14.0-dev",
  "bevy_utils 0.14.0-dev",
  "raw-window-handle",
+ "serde",
  "smol_str",
 ]
 
@@ -1970,6 +1977,7 @@ dependencies = [
  "bevy_window 0.14.0-dev",
  "crossbeam-channel",
  "raw-window-handle",
+ "serde",
  "wasm-bindgen",
  "web-sys",
  "winit",
@@ -2034,7 +2042,8 @@ dependencies = [
 [[package]]
 name = "bitcode_lightyear_patch"
 version = "0.5.1"
-source = "git+https://github.com/cBournhonesque/lightyear.git?rev=665c07b93e2938a8edc10fec767045cc92575803#665c07b93e2938a8edc10fec767045cc92575803"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c82d186a0148ef9a83a4c8129acf71485a273a5650fcb47cbf66d361615dc660"
 dependencies = [
  "bitcode_derive",
  "bytemuck",
@@ -2819,18 +2828,8 @@ version = "0.14.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7b750cb3417fd1b327431a470f388520309479ab0bf5e323505daf0290cd3850"
 dependencies = [
- "darling_core 0.14.4",
- "darling_macro 0.14.4",
-]
-
-[[package]]
-name = "darling"
-version = "0.20.8"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "54e36fcd13ed84ffdfda6f5be89b31287cbb80c439841fe69e04841435464391"
-dependencies = [
- "darling_core 0.20.8",
- "darling_macro 0.20.8",
+ "darling_core",
+ "darling_macro",
 ]
 
 [[package]]
@@ -2848,39 +2847,14 @@ dependencies = [
 ]
 
 [[package]]
-name = "darling_core"
-version = "0.20.8"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9c2cf1c23a687a1feeb728783b993c4e1ad83d99f351801977dd809b48d0a70f"
-dependencies = [
- "fnv",
- "ident_case",
- "proc-macro2",
- "quote",
- "strsim 0.10.0",
- "syn 2.0.59",
-]
-
-[[package]]
 name = "darling_macro"
 version = "0.14.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a4aab4dbc9f7611d8b55048a3a16d2d010c2c8334e46304b40ac1cc14bf3b48e"
 dependencies = [
- "darling_core 0.14.4",
+ "darling_core",
  "quote",
  "syn 1.0.109",
-]
-
-[[package]]
-name = "darling_macro"
-version = "0.20.8"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a668eda54683121533a393014d8692171709ff57a7d61f187b6e782719f8933f"
-dependencies = [
- "darling_core 0.20.8",
- "quote",
- "syn 2.0.59",
 ]
 
 [[package]]
@@ -2957,7 +2931,7 @@ version = "0.12.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c11bdc11a0c47bc7d37d582b5285da6849c96681023680b906673c5707af7b0f"
 dependencies = [
- "darling 0.14.4",
+ "darling",
  "proc-macro2",
  "quote",
  "syn 1.0.109",
@@ -3128,30 +3102,6 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.59",
-]
-
-[[package]]
-name = "enum_delegate"
-version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a8ea75f31022cba043afe037940d73684327e915f88f62478e778c3de914cd0a"
-dependencies = [
- "enum_delegate_lib",
- "proc-macro2",
- "quote",
- "syn 1.0.109",
-]
-
-[[package]]
-name = "enum_delegate_lib"
-version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2e1f6c3800b304a6be0012039e2a45a322a093539c45ab818d9e6895a39c90fe"
-dependencies = [
- "proc-macro2",
- "quote",
- "rand",
- "syn 1.0.109",
 ]
 
 [[package]]
@@ -3412,7 +3362,7 @@ checksum = "aa9a19cbb55df58761df49b23516a86d432839add4af60fc256da840f66ed35b"
 
 [[package]]
 name = "forky_bevy"
-version = "0.1.46"
+version = "0.1.45"
 dependencies = [
  "anyhow",
  "bevy 0.14.0-dev",
@@ -3425,7 +3375,7 @@ dependencies = [
 
 [[package]]
 name = "forky_core"
-version = "0.1.46"
+version = "0.1.45"
 dependencies = [
  "anyhow",
  "extend",
@@ -3437,7 +3387,7 @@ dependencies = [
 
 [[package]]
 name = "forky_fs"
-version = "0.1.46"
+version = "0.1.45"
 dependencies = [
  "anyhow",
  "clap",
@@ -3456,7 +3406,7 @@ dependencies = [
 
 [[package]]
 name = "forky_web"
-version = "0.1.46"
+version = "0.1.45"
 dependencies = [
  "anyhow",
  "console_error_panic_hook",
@@ -3475,7 +3425,7 @@ dependencies = [
 
 [[package]]
 name = "forky_web_macros"
-version = "0.1.46"
+version = "0.1.45"
 dependencies = [
  "anyhow",
  "proc-macro2",
@@ -4908,10 +4858,12 @@ dependencies = [
 
 [[package]]
 name = "lightyear"
-version = "0.13.0"
-source = "git+https://github.com/cBournhonesque/lightyear.git?rev=665c07b93e2938a8edc10fec767045cc92575803#665c07b93e2938a8edc10fec767045cc92575803"
+version = "0.14.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "538d3b88c86e17cc27c0bd4ce215ccaf38421e9455117a1e833c8694ff47453b"
 dependencies = [
  "anyhow",
+ "async-channel",
  "async-compat",
  "base64 0.21.7",
  "bevy 0.13.2",
@@ -4924,7 +4876,6 @@ dependencies = [
  "console_error_panic_hook",
  "crossbeam-channel",
  "derive_more",
- "enum_delegate",
  "enum_dispatch",
  "futures",
  "futures-util",
@@ -4943,6 +4894,7 @@ dependencies = [
  "seahash",
  "self_cell",
  "serde",
+ "steamworks",
  "thiserror",
  "tokio",
  "tokio-tungstenite",
@@ -4950,6 +4902,7 @@ dependencies = [
  "tracing-log 0.2.0",
  "tracing-subscriber",
  "wasm-bindgen",
+ "wasm-bindgen-futures",
  "web-sys",
  "wtransport",
  "xwt-core",
@@ -4958,16 +4911,14 @@ dependencies = [
 
 [[package]]
 name = "lightyear_macros"
-version = "0.13.0"
-source = "git+https://github.com/cBournhonesque/lightyear.git?rev=665c07b93e2938a8edc10fec767045cc92575803#665c07b93e2938a8edc10fec767045cc92575803"
+version = "0.14.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "512004b222dcc0b325ee9adf5e875acaa628e1933beffe4d3b59dae8ddeda405"
 dependencies = [
- "anyhow",
- "darling 0.20.8",
  "proc-macro2",
  "quote",
  "serde",
  "syn 2.0.59",
- "uuid",
 ]
 
 [[package]]
@@ -7006,6 +6957,24 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a2eb9349b6444b326872e140eb1cf5e7c522154d69e7a0ffb0fb81c06b37543f"
 
 [[package]]
+name = "steamworks"
+version = "0.11.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a79d6f059322f73a4586cc2d0ca595ce1583104b2b1574ae1bb87f2c05bf4c67"
+dependencies = [
+ "bitflags 1.3.2",
+ "lazy_static",
+ "steamworks-sys",
+ "thiserror",
+]
+
+[[package]]
+name = "steamworks-sys"
+version = "0.11.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7ef6b00f8fe8eaaaff22cb9b70822a48c1a5d772bc682c202a57c0b438175845"
+
+[[package]]
 name = "strsim"
 version = "0.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7050,7 +7019,7 @@ checksum = "f83ba502a3265efb76efb89b0a2f7782ad6f2675015d4ce37e4b547dda42b499"
 
 [[package]]
 name = "sweet"
-version = "0.1.46"
+version = "0.1.45"
 dependencies = [
  "anyhow",
  "backtrace",
@@ -7086,7 +7055,7 @@ dependencies = [
 
 [[package]]
 name = "sweet_macros"
-version = "0.1.46"
+version = "0.1.45"
 dependencies = [
  "anyhow",
  "proc-macro2",
@@ -7953,9 +7922,9 @@ dependencies = [
 
 [[package]]
 name = "web-sys-async-io"
-version = "0.3.1"
+version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ffe72329eae3fbd1dc02e2d51dcfce3db196c9c6cea7517c847452878c4dd346"
+checksum = "65a1ea96a932ec2252276bc517eb4fccaebc0ecfea2faa49e242de769d188409"
 dependencies = [
  "js-sys",
  "tokio",
@@ -8610,19 +8579,15 @@ checksum = "791978798f0597cfc70478424c2b4fdc2b7a8024aaff78497ef00f24ef674193"
 
 [[package]]
 name = "xwt-core"
-version = "0.2.2"
+version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7bf44ee4af307907eaba5452e33d0bbe56d4104e2ee17a8f1d42b3b379d74fdf"
-dependencies = [
- "async-trait",
- "tokio",
-]
+checksum = "7fc6cfb9e839435187a71872c0bd836b52bb4e74709b5aecbdb3d2b859294b0c"
 
 [[package]]
 name = "xwt-web-sys"
-version = "0.6.0"
+version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "06d0204451b4b53e1a07abc3cd892d00a0024afb93bfb99a04b8877031539719"
+checksum = "e1e028f18e310bc2e8e3650ba9cbbf3b7a5b13277e8c0ded6a0d81b510ccc1a6"
 dependencies = [
  "js-sys",
  "tokio",

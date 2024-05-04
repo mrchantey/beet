@@ -40,8 +40,13 @@ derive_more = { version = "0.99", features = ["add", "mul"] }
 bevy = { version = "0.13", default-features = false }
 # bevy.workspace = true
 log.workspace = true
-# lightyear = "0.13.0"
-lightyear = { git = "https://github.com/cBournhonesque/lightyear.git", rev = "665c07b93e2938a8edc10fec767045cc92575803" }
+lightyear = { version = "0.14.1", features = [
+	"steam",
+	"webtransport",
+	"websocket",
+	# "render",
+	# "zstd",
+] }
 
 # tokio = { workspace = true, optional = true }
 # [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
@@ -49,3 +54,4 @@ lightyear = { git = "https://github.com/cBournhonesque/lightyear.git", rev = "66
 [dev-dependencies]
 pretty_env_logger.workspace = true
 sweet.workspace = true
+rand = "0.8.1"

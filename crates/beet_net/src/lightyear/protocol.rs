@@ -6,39 +6,25 @@
 //! - how the component should be synchronized between the `Confirmed` entity and the `Predicted`/`Interpolated` entity
 use bevy::ecs::entity::MapEntities;
 use bevy::prelude::default;
+use bevy::prelude::App;
 use bevy::prelude::Bundle;
 use bevy::prelude::Component;
-use bevy::prelude::Deref;
-use bevy::prelude::DerefMut;
 use bevy::prelude::Entity;
 use bevy::prelude::EntityMapper;
-use bevy::prelude::Vec2;
-use derive_more::Add;
-use derive_more::Mul;
+use bevy::prelude::Plugin;
+use lightyear::client::components::ComponentSyncMode;
 use lightyear::prelude::*;
 use serde::Deserialize;
 use serde::Serialize;
-use std::ops::Mul;
-
 
 // Player
 #[derive(Bundle)]
-pub struct PlayerBundle {
+pub(crate) struct PlayerBundle {
 	id: PlayerId,
-	position: PlayerPosition,
 }
 
 impl PlayerBundle {
-	pub fn new(id: ClientId, position: Vec2) -> Self {
-		// Generate pseudo random color from client id.
-		let _h = (((id.to_bits().wrapping_mul(30)) % 360) as f32) / 360.0;
-		let _s = 0.8;
-		let _l = 0.5;
-		Self {
-			id: PlayerId(id),
-			position: PlayerPosition(position),
-		}
-	}
+	pub(crate) fn new(id: ClientId) -> Self { Self { id: PlayerId(id) } }
 }
 
 // Components
@@ -46,31 +32,11 @@ impl PlayerBundle {
 #[derive(Component, Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct PlayerId(ClientId);
 
-#[derive(
-	Component,
-	Serialize,
-	Deserialize,
-	Clone,
-	Debug,
-	PartialEq,
-	Deref,
-	DerefMut,
-	Add,
-	Mul,
-)]
-pub struct PlayerPosition(Vec2);
-
-impl Mul<f32> for &PlayerPosition {
-	type Output = PlayerPosition;
-
-	fn mul(self, rhs: f32) -> Self::Output { PlayerPosition(self.0 * rhs) }
-}
-
 // Example of a component that contains an entity.
 // This component, when replicated, needs to have the inner entity mapped from the Server world
 // to the client World.
-// This can be done by adding a `#[message(custom_map)]` attribute to the component, and then
-// deriving the `MapEntities` trait for the component.
+// You will need to derive the `MapEntities` trait for the component, and register
+// app.add_map_entities<PlayerParent>() in your protocol
 #[derive(Component, Deserialize, Serialize, Clone, Debug, PartialEq)]
 pub struct PlayerParent(Entity);
 
@@ -78,14 +44,6 @@ impl MapEntities for PlayerParent {
 	fn map_entities<M: EntityMapper>(&mut self, entity_mapper: &mut M) {
 		self.0 = entity_mapper.map_entity(self.0);
 	}
-}
-
-#[component_protocol(protocol = "MyProtocol")]
-pub enum Components {
-	#[protocol(sync(mode = "once"))]
-	PlayerId(PlayerId),
-	#[protocol(sync(mode = "full"))]
-	PlayerPosition(PlayerPosition),
 }
 
 // Channels
@@ -98,23 +56,18 @@ pub struct Channel1;
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct Message1(pub usize);
 
-#[message_protocol(protocol = "MyProtocol")]
-pub enum Messages {
-	Message1(Message1),
-}
-
 // Inputs
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
 pub struct Direction {
-	pub up: bool,
-	pub down: bool,
-	pub left: bool,
-	pub right: bool,
+	pub(crate) up: bool,
+	pub(crate) down: bool,
+	pub(crate) left: bool,
+	pub(crate) right: bool,
 }
 
 impl Direction {
-	pub fn is_none(&self) -> bool {
+	pub(crate) fn is_none(&self) -> bool {
 		!self.up && !self.down && !self.left && !self.right
 	}
 }
@@ -127,22 +80,24 @@ pub enum Inputs {
 	None,
 }
 
-impl UserAction for Inputs {}
-
 // Protocol
+pub(crate) struct ProtocolPlugin;
 
-protocolize! {
-	Self = MyProtocol,
-	Message = Messages,
-	Component = Components,
-	Input = Inputs,
-}
+impl Plugin for ProtocolPlugin {
+	fn build(&self, app: &mut App) {
+		// messages
+		app.add_message::<Message1>(ChannelDirection::Bidirectional);
+		// inputs
+		app.add_plugins(InputPlugin::<Inputs>::default());
+		// components
+		app.register_component::<PlayerId>(ChannelDirection::ServerToClient)
+			.add_prediction::<PlayerId>(ComponentSyncMode::Once)
+			.add_interpolation::<PlayerId>(ComponentSyncMode::Once);
 
-pub fn protocol() -> MyProtocol {
-	let mut protocol = MyProtocol::default();
-	protocol.add_channel::<Channel1>(ChannelSettings {
-		mode: ChannelMode::OrderedReliable(ReliableSettings::default()),
-		..default()
-	});
-	protocol
+		// channels
+		app.add_channel::<Channel1>(ChannelSettings {
+			mode: ChannelMode::OrderedReliable(ReliableSettings::default()),
+			..default()
+		});
+	}
 }

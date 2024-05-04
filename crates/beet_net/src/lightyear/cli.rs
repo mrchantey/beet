@@ -11,7 +11,15 @@
 #![allow(unused_variables)]
 #![allow(dead_code)]
 
+use crate::lightyear::client;
+use crate::lightyear::server;
+use crate::lightyear::settings;
+use crate::lightyear::settings::*;
+use crate::lightyear::shared;
+use crate::lightyear::shared::shared_config;
+use crate::lightyear::shared::SharedPlugin;
 use crate::prelude::*;
+// use bevy::asset::ron;
 use bevy::log::Level;
 use bevy::log::LogPlugin;
 use bevy::prelude::*;
@@ -29,6 +37,7 @@ use serde::Deserialize;
 use serde::Serialize;
 use std::net::SocketAddr;
 use std::str::FromStr;
+use std::time::Duration;
 
 #[derive(Parser, PartialEq, Debug)]
 pub enum Cli {
@@ -56,14 +65,28 @@ pub enum Cli {
 	},
 }
 
+/// We parse the settings.ron file to read the settings, than create the apps and run them
+pub fn run_app() {
+	#[cfg(target_family = "wasm")]
+	let cli = Cli::Client {
+		client_id: Some(rand::random::<u64>()),
+	};
+
+	#[cfg(not(target_family = "wasm"))]
+	let cli = Cli::parse();
+
+	let settings_str = include_str!("../../assets/settings.ron");
+	let settings = ron::de::from_str::<Settings>(settings_str).unwrap();
+	run(settings, cli);
+}
+
 /// This is the main function
 /// The cli argument is used to determine if we are running as a client or a server (or listen-server)
 /// Then we build the app and run it.
 ///
 /// To build a lightyear app you will need to add either the [`client::ClientPlugin`] or [`server::ServerPlugin`]
 /// They can be created by providing a [`client::ClientConfig`] or [`server::ServerConfig`] struct, along with a
-/// shared [`Protocol`](lightyear::prelude::Protocol) which defines the messages (Messages, Components, Inputs) that
-/// can be sent between client and server.
+/// shared protocol which defines the messages (Messages, Components, Inputs) that can be sent between client and server.
 pub fn run(settings: Settings, cli: Cli) {
 	match cli {
 		// ListenServer using a single app
@@ -115,7 +138,9 @@ pub fn run(settings: Settings, cli: Cli) {
 		#[cfg(not(target_family = "wasm"))]
 		Cli::Server => {
 			let mut app = server_app(settings, vec![]);
+			log::info!("running..");
 			app.run();
+			log::info!("done..");
 		}
 		Cli::Client { client_id } => {
 			let server_addr = SocketAddr::new(
@@ -126,28 +151,39 @@ pub fn run(settings: Settings, cli: Cli) {
 			let client_id = client_id.unwrap_or(settings.client.client_id);
 			let net_config = get_client_net_config(&settings, client_id);
 			let mut app = client_app(settings, net_config);
-			app.run();
+			log::info!("running..");
+			app.finish();
+			loop {
+				app.update();
+				std::thread::sleep(Duration::from_secs_f64(1.0 / 60.0));
+			}
+			// app.run();
+			// log::info!("done..");
 		}
 	}
 }
 
 /// Build the client app
-fn client_app(settings: Settings, net_config: NetConfig) -> App {
+fn client_app(
+	settings: Settings,
+	net_config: lightyear::prelude::client::NetConfig,
+) -> App {
 	let mut app = App::new();
 	app.add_plugins(DefaultPlugins.build().set(LogPlugin {
 		level: Level::INFO,
 		filter: "wgpu=error,bevy_render=info,bevy_ecs=warn".to_string(),
 		update_subscriber: Some(add_log_layer),
 	}));
-	let client_config = lightyear::client::config::ClientConfig {
+	// if settings.client.inspector {
+	//     app.add_plugins(WorldInspectorPlugin::new());
+	// }
+	let client_config = lightyear::prelude::client::ClientConfig {
 		shared: shared_config(Mode::Separate),
 		net: net_config,
 		..default()
 	};
-	let plugin_config =
-		lightyear::client::plugin::PluginConfig::new(client_config, protocol());
 	app.add_plugins((
-		lightyear::client::plugin::ClientPlugin::new(plugin_config),
+		lightyear::prelude::client::ClientPlugin::new(client_config),
 		ExampleClientPlugin,
 		SharedPlugin,
 	));
@@ -172,6 +208,9 @@ fn server_app(
 		update_subscriber: Some(add_log_layer),
 	});
 
+	// if settings.server.inspector {
+	//     app.add_plugins(WorldInspectorPlugin::new());
+	// }
 	let mut net_configs = get_server_net_configs(&settings);
 	let extra_net_configs = extra_transport_configs.into_iter().map(|c| {
 		build_server_netcode_config(
@@ -181,18 +220,13 @@ fn server_app(
 		)
 	});
 	net_configs.extend(extra_net_configs);
-	let server_config = lightyear::server::config::ServerConfig {
+	let server_config = lightyear::prelude::server::ServerConfig {
 		shared: shared_config(Mode::Separate),
 		net: net_configs,
 		..default()
 	};
 	app.add_plugins((
-		lightyear::server::plugin::ServerPlugin::new(
-			lightyear::server::plugin::PluginConfig::new(
-				server_config,
-				protocol(),
-			),
-		),
+		lightyear::prelude::server::ServerPlugin::new(server_config),
 		ExampleServerPlugin,
 		SharedPlugin,
 	));
@@ -212,6 +246,9 @@ fn combined_app(
 		filter: "wgpu=error,bevy_render=info,bevy_ecs=warn".to_string(),
 		update_subscriber: Some(add_log_layer),
 	}));
+	// if settings.client.inspector {
+	//     app.add_plugins(WorldInspectorPlugin::new());
+	// }
 
 	// server plugin
 	let mut net_configs = get_server_net_configs(&settings);
@@ -223,23 +260,18 @@ fn combined_app(
 		)
 	});
 	net_configs.extend(extra_net_configs);
-	let server_config = lightyear::server::config::ServerConfig {
+	let server_config = lightyear::prelude::server::ServerConfig {
 		shared: shared_config(Mode::HostServer),
 		net: net_configs,
 		..default()
 	};
 	app.add_plugins((
-		lightyear::server::plugin::ServerPlugin::new(
-			lightyear::server::plugin::PluginConfig::new(
-				server_config,
-				protocol(),
-			),
-		),
+		lightyear::prelude::server::ServerPlugin::new(server_config),
 		ExampleServerPlugin,
 	));
 
 	// client plugin
-	let client_config = lightyear::client::config::ClientConfig {
+	let client_config = lightyear::prelude::client::ClientConfig {
 		shared: shared_config(Mode::HostServer),
 		net: client_net_config,
 		interpolation: InterpolationConfig {
@@ -248,10 +280,8 @@ fn combined_app(
 		},
 		..default()
 	};
-	let plugin_config =
-		lightyear::client::plugin::PluginConfig::new(client_config, protocol());
 	app.add_plugins((
-		lightyear::client::plugin::ClientPlugin::new(plugin_config),
+		lightyear::prelude::client::ClientPlugin::new(client_config),
 		ExampleClientPlugin,
 	));
 	// shared plugin

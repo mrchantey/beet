@@ -106,5 +106,6 @@ ron = "0.8"
 # bevy = { path = "../bevy", default-features = false, features = ["bevy_scene"] }
 bevy = { git = "https://github.com/bevyengine/bevy.git", rev = "f516de456be2b65572de1af6956d52157663b9cc", default-features = false, features = [
 	"bevy_scene",
+	"serialize",
 	# "bevy_color",
 ] }
