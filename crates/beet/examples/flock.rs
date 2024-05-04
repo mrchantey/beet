@@ -18,8 +18,6 @@ fn main() {
 }
 
 
-
-
 fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
 	for _ in 0..50 {
 		spawn_agent(
@@ -87,8 +85,8 @@ fn spawn_agent(
 				Running,
 				RootIsTargetAgent,
 				Separate::<GroupSteerAgent>::new(1.),
-				Align::<GroupSteerAgent>::new(0.5),
-				Cohere::<GroupSteerAgent>::new(0.5),
+				Align::<GroupSteerAgent>::new(1.),
+				Cohere::<GroupSteerAgent>::new(1.),
 				Wander::new(1.),
 			));
 		});

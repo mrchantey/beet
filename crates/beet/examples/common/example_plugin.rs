@@ -1,6 +1,6 @@
 use beet::prelude::*;
 use bevy::{prelude::*, window::WindowResolution};
-use forky_bevy::systems::close_on_esc;
+// use forky_bevy::systems::close_on_esc;
 // use bevy_inspector_egui::quick::WorldInspectorPlugin;
 
 #[derive(Component)]
@@ -26,7 +26,7 @@ impl Plugin for ExamplePlugin {
 		.add_systems(Startup, space_setup)
 		.add_systems(Update, update_wrap_around)
 		.add_systems(Update, follow_cursor)
-		.add_systems(Update, close_on_esc)
+		// .add_systems(Update, close_on_esc)
 		/*-*/;
 	}
 }
