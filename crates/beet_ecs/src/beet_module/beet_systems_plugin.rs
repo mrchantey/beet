@@ -1,8 +1,5 @@
 use crate::prelude::*;
-use bevy::ecs::schedule::ScheduleLabel;
 use bevy::prelude::*;
-use std::marker::PhantomData;
-
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, SystemSet)]
 /// Runs before [`TickSet`] and In this set you can do things that need to happen before the tick.
@@ -21,48 +18,38 @@ pub struct TickSyncSet;
 /// Runs after [`TickSyncSet`] and [`apply_deferred`].
 pub struct PostTickSet;
 
-// Adds the system associated with each action and some helpers that clean up run state
-pub struct BeetSystemsPlugin<T: ActionSystems, Schedule: ScheduleLabel + Clone>
-{
-	pub schedule: Schedule,
-	pub phantom: PhantomData<T>,
-}
-impl<T: ActionSystems> Default for BeetSystemsPlugin<T, Update> {
-	fn default() -> Self {
-		Self {
-			schedule: Update,
-			phantom: PhantomData,
-		}
-	}
-}
+#[derive(Debug, Clone, Default)]
+// Helpers that clean up run state
+pub struct BeetSystemsPlugin;
 
-impl<T: ActionSystems + Send + Sync, Schedule: ScheduleLabel + Clone> Plugin
-	for BeetSystemsPlugin<T, Schedule>
-{
+impl Plugin for BeetSystemsPlugin {
 	fn build(&self, app: &mut App) {
+		app.init_resource::<BeetConfig>();
+		let config = app.world().resource::<BeetConfig>();
+		let schedule = config.schedule.clone();
+
 		app /*-*/
-			.configure_sets(self.schedule.clone(), PreTickSet)
-			.configure_sets(self.schedule.clone(), TickSet.after(PreTickSet))
-			.configure_sets(self.schedule.clone(), TickSyncSet.after(TickSet))
-			.configure_sets(self.schedule.clone(), PostTickSet.after(TickSyncSet))
-			.add_systems(self.schedule.clone(), apply_deferred.after(PreTickSet).before(TickSet))
-			.add_systems(self.schedule.clone(), apply_deferred.after(TickSet).before(TickSyncSet))
-			.add_systems(self.schedule.clone(), apply_deferred.after(TickSyncSet).before(PostTickSet))
+			.configure_sets(schedule, PreTickSet)
+			.configure_sets(schedule, TickSet.after(PreTickSet))
+			.configure_sets(schedule, TickSyncSet.after(TickSet))
+			.configure_sets(schedule, PostTickSet.after(TickSyncSet))
+			.add_systems(schedule, apply_deferred.after(PreTickSet).before(TickSet))
+			.add_systems(schedule, apply_deferred.after(TickSet).before(TickSyncSet))
+			.add_systems(schedule, apply_deferred.after(TickSyncSet).before(PostTickSet))
 			.add_systems(
-				self.schedule.clone(),
+				schedule,
 				update_run_timers
 					.run_if(|time: Option<Res<Time>>| time.is_some())
 					.in_set(PreTickSet),
 			)
 			.add_systems(
-				self.schedule.clone(),
+				schedule,
 				(sync_interrupts, sync_running).chain().in_set(TickSyncSet),
 			)
 			.add_systems(
-				self.schedule.clone(),
+				schedule,
 				set_root_as_target_agent.in_set(PreTickSet),
 			)
 			/*-*/;
-		T::add_systems(app, self.schedule.clone());
 	}
 }

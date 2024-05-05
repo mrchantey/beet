@@ -95,28 +95,23 @@ impl ComponentIdent {
 mod test {
 	use crate::prelude::*;
 	use anyhow::Result;
+	use bevy::prelude::*;
 	use std::any::TypeId;
 	use sweet::*;
-
-	#[derive_action]
-	#[action(graph_role=GraphRole::Node)]
-	struct MyStruct;
-
-	fn my_struct() {}
 
 	#[test]
 	fn works() -> Result<()> {
 		let mut world = World::new();
 		world.init_resource::<AppTypeRegistry>();
 		let mut registry = world.resource::<AppTypeRegistry>().write();
-		registry.register::<MyStruct>();
-		let type_id = TypeId::of::<MyStruct>();
+		registry.register::<EmptyAction>();
+		let type_id = TypeId::of::<EmptyAction>();
 		drop(registry);
 
-		let entity = world.spawn(MyStruct).id();
+		let entity = world.spawn(EmptyAction).id();
 		let component = ComponentIdent::new(entity, type_id);
 
-		expect(component.graph_role(&world)?).to_be(GraphRole::Node)?;
+		expect(component.graph_role(&world)?).to_be(GraphRole::World)?;
 
 
 		Ok(())

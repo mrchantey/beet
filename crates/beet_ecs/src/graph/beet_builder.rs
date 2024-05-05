@@ -71,14 +71,6 @@ impl BeetBuilder {
 		EntityIdent::new(root)
 	}
 
-	pub fn into_scene<T: BeetModule>(self) -> BeetSceneSerde<T> {
-		let mut world = World::new();
-		world.insert_resource(T::type_registry());
-		self.into_node(&mut world);
-		BeetSceneSerde::<T>::new(&world)
-	}
-
-
 	// TODO deprecate this in favor of an optional bundle
 	pub fn insert_default_components(
 		entity: &mut EntityWorldMut,

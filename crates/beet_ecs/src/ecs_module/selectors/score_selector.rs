@@ -1,18 +1,7 @@
 use super::*;
 use crate::prelude::*;
+use bevy::ecs::schedule::SystemConfigs;
 use bevy::prelude::*;
-
-/// A `Utility Selector` that observes the [`Score`] of each child and selects the highest to run.
-///
-/// It will return the result of the highest scoring child.
-///
-#[derive_action]
-#[action(graph_role=GraphRole::Child)]
-pub struct ScoreSelector {
-	/// Remove the score component from children when one is selected.
-	pub consume_scores: bool,
-}
-
 
 pub enum UtilityInterruptRate {
 	/// Interrupt every frame.
@@ -20,6 +9,18 @@ pub enum UtilityInterruptRate {
 	/// Interrupt every time a score changes
 	ScoreChanged,
 }
+
+/// A `Utility Selector` that observes the [`Score`] of each child and selects the highest to run.
+///
+/// It will return the result of the highest scoring child.
+///
+#[derive(Debug, Default, Clone, PartialEq, Component, Reflect)]
+#[reflect(Default, Component, ActionMeta)]
+pub struct ScoreSelector {
+	/// Remove the score component from children when one is selected.
+	pub consume_scores: bool,
+}
+
 
 //TODO interrupt if child score changes
 
@@ -76,6 +77,14 @@ fn score_selector(
 	}
 }
 
+impl ActionMeta for ScoreSelector {
+	fn graph_role(&self) -> GraphRole { GraphRole::Child }
+}
+
+impl ActionSystems for ScoreSelector {
+	fn systems() -> SystemConfigs { score_selector.in_set(TickSet) }
+}
+
 
 #[cfg(test)]
 mod test {
@@ -86,7 +95,14 @@ mod test {
 
 	fn setup() -> (App, EntityTree) {
 		let mut app = App::new();
-		app.add_plugins(BeetSystemsPlugin::<EcsModule, _>::default());
+		app.add_plugins((
+			BeetSystemsPlugin,
+			ActionPlugin::<(
+				ScoreSelector,
+				SetOnSpawn<Score>,
+				InsertOnRun<RunResult>,
+			)>::default(),
+		));
 
 		let tree = ScoreSelector::default()
 			.child((

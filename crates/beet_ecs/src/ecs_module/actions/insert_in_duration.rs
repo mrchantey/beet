@@ -1,14 +1,23 @@
 use crate::prelude::*;
+use bevy::ecs::schedule::SystemConfigs;
 use bevy::prelude::*;
 use std::time::Duration;
 
-#[derive_action(Default)]
-#[action(graph_role=GraphRole::Node)]
+#[derive(Debug, Clone, Component, Reflect)]
+#[reflect(Default, Component, ActionMeta)]
 /// Inserts the given component after running for a given duration. Has no effect if
 /// the action completes before the duration.
 pub struct InsertInDuration<T: GenericActionComponent> {
 	pub duration: Duration,
 	pub value: T,
+}
+
+impl<T: GenericActionComponent> ActionMeta for InsertInDuration<T> {
+	fn graph_role(&self) -> GraphRole { GraphRole::Node }
+}
+
+impl<T: GenericActionComponent> ActionSystems for InsertInDuration<T> {
+	fn systems() -> SystemConfigs { insert_in_duration::<T>.in_set(TickSet) }
 }
 
 impl<T: GenericActionComponent> Default for InsertInDuration<T> {
@@ -62,7 +71,10 @@ mod test {
 	#[test]
 	fn works() -> Result<()> {
 		let mut app = App::new();
-		app.add_plugins(BeetSystemsPlugin::<EcsModule, _>::default());
+		app.add_plugins((
+			BeetSystemsPlugin,
+			ActionPlugin::<InsertInDuration<RunResult>>::default(),
+		));
 		app.insert_time();
 
 		let root = InsertInDuration::<RunResult>::default()

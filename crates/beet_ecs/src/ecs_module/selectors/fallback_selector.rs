@@ -1,6 +1,8 @@
 use super::*;
 use crate::prelude::*;
+use bevy::ecs::schedule::SystemConfigs;
 use bevy::prelude::*;
+
 
 /// An action that runs all of its children in order until one succeeds.
 ///
@@ -9,9 +11,10 @@ use bevy::prelude::*;
 /// If a child succeeds it will succeed.
 ///
 /// If the last child fails it will fail.
-#[derive_action]
-#[action(graph_role=GraphRole::Child)]
+#[derive(Debug, Default, Clone, PartialEq, Component, Reflect)]
+#[reflect(Default, Component, ActionMeta)]
 pub struct FallbackSelector;
+
 fn fallback_selector(
 	mut commands: Commands,
 	selectors: Query<(Entity, &FallbackSelector, &Children), With<Running>>,
@@ -43,6 +46,14 @@ fn fallback_selector(
 	}
 }
 
+impl ActionMeta for FallbackSelector {
+	fn graph_role(&self) -> GraphRole { GraphRole::Child }
+}
+
+impl ActionSystems for FallbackSelector {
+	fn systems() -> SystemConfigs { fallback_selector.in_set(TickSet) }
+}
+
 
 
 #[cfg(test)]
@@ -55,8 +66,11 @@ mod test {
 	#[test]
 	pub fn works() -> Result<()> {
 		let mut app = App::new();
-		app.add_plugins(BeetSystemsPlugin::<EcsModule, _>::default());
-
+		app.add_plugins((
+			BeetSystemsPlugin,
+			ActionPlugin::<(FallbackSelector, InsertOnRun<RunResult>)>::default(
+			),
+		));
 
 		let tree = FallbackSelector
 			.child(InsertOnRun(RunResult::Failure))

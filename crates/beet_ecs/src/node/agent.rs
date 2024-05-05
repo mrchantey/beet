@@ -26,8 +26,7 @@ mod test {
 	#[test]
 	fn despawn() -> Result<()> {
 		let mut app = App::new();
-		// app.add_systems(PostUpdate, despawn_graph_on_agent_removed);
-		app.add_plugins(BeetSystemsPlugin::<EcsModule, _>::default());
+		app.add_plugins((BeetSystemsPlugin, LifecyclePlugin));
 
 		let behavior = InsertOnRun(RunResult::Success)
 			.into_beet_builder()

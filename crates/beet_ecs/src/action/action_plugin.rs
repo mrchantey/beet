@@ -25,14 +25,14 @@ impl BeetConfig {
 }
 
 
-
+/// Plugin for adding systems to the schedule
 #[derive(Debug, Default, Copy, Clone)]
-pub struct ActionPlugin<T: ActionSystems2> {
+pub struct ActionPlugin<T: 'static + Send + Sync + Bundle + ActionSystems> {
 	phantom: PhantomData<T>,
 }
 
 #[cfg(feature = "reflect")]
-impl<T: 'static + Send + Sync + Component + Reflect + ActionSystems2> Plugin
+impl<T: 'static + Send + Sync + Bundle + Reflect + ActionSystems> Plugin
 	for ActionPlugin<T>
 where
 	Self: ActionMeta,
@@ -53,14 +53,12 @@ where
 }
 
 #[cfg(not(feature = "reflect"))]
-impl<T: 'static + Send + Sync + Component + ActionSystems2> Plugin
+impl<T: 'static + Send + Sync + Bundle + ActionSystems> Plugin
 	for ActionPlugin<T>
-where
-	Self: ActionMeta,
 {
 	fn build(&self, app: &mut App) {
 		let world = app.world_mut();
-		world.init_component::<T>();
+		world.init_bundle::<T>();
 
 		app.init_resource::<BeetConfig>();
 		let settings = app.world().resource::<BeetConfig>();

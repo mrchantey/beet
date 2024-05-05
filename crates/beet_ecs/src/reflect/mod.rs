@@ -16,9 +16,6 @@ pub use self::field_ident::*;
 pub mod field_inspector;
 #[allow(unused_imports)]
 pub use self::field_inspector::*;
-pub mod beet_scene_serde;
-#[allow(unused_imports)]
-pub use self::beet_scene_serde::*;
 pub mod field_tree;
 #[allow(unused_imports)]
 pub use self::field_tree::*;

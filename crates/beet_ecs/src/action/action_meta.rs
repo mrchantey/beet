@@ -11,20 +11,22 @@ pub trait ActionMeta {
 mod test {
 	use crate::prelude::*;
 	use anyhow::Result;
-	// use bevy::ecs::schedule::SystemConfigs;
-	use bevy::{
-		ecs::schedule::SystemConfigs,
-		reflect::ReflectFromPtr,
-	};
+	use bevy::ecs::schedule::SystemConfigs;
+	use bevy::prelude::*;
+	use bevy::reflect::ReflectFromPtr;
+	use bevy::reflect::TypeRegistry;
 	use std::any::Any;
 	use sweet::*;
 
-
-	#[derive_action]
-	#[action(graph_role = GraphRole::Node)]
+	#[derive(Component, Reflect)]
+	#[reflect(ActionMeta)]
 	struct MyStruct;
 
-	impl ActionSystems2 for MyStruct {
+	impl ActionMeta for MyStruct {
+		fn graph_role(&self) -> GraphRole { GraphRole::Node }
+	}
+
+	impl ActionSystems for MyStruct {
 		fn systems() -> SystemConfigs { my_struct.in_set(TickSet) }
 	}
 	// impl ActionMeta for MyStruct {

@@ -1,5 +1,6 @@
 use super::*;
 use crate::prelude::*;
+use bevy::ecs::schedule::SystemConfigs;
 use bevy::prelude::*;
 
 /// An action that runs all of its children in order until one fails.
@@ -11,8 +12,8 @@ use bevy::prelude::*;
 /// If there are no more children to run it will succeed.
 ///
 /// If a child fails it will fail.
-#[derive_action]
-#[action(graph_role=GraphRole::Child)]
+#[derive(Debug, Default, Clone, PartialEq, Component, Reflect)]
+#[reflect(Default, Component, ActionMeta)]
 pub struct SequenceSelector;
 fn sequence_selector(
 	mut commands: Commands,
@@ -50,6 +51,14 @@ fn sequence_selector(
 	}
 }
 
+impl ActionMeta for SequenceSelector {
+	fn graph_role(&self) -> GraphRole { GraphRole::Node }
+}
+
+impl ActionSystems for SequenceSelector {
+	fn systems() -> SystemConfigs { sequence_selector.in_set(TickSet) }
+}
+
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
@@ -60,7 +69,11 @@ mod test {
 	#[test]
 	pub fn works() -> Result<()> {
 		let mut app = App::new();
-		app.add_plugins(BeetSystemsPlugin::<EcsModule, _>::default());
+		app.add_plugins((
+			BeetSystemsPlugin,
+			ActionPlugin::<(SequenceSelector, InsertOnRun<RunResult>)>::default(
+			),
+		));
 
 		let tree = SequenceSelector
 			.child(InsertOnRun(RunResult::Success))

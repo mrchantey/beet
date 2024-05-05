@@ -1,11 +1,13 @@
 use super::*;
 use crate::prelude::*;
+use bevy::ecs::schedule::SystemConfigs;
 use bevy::prelude::*;
 
 /// Run children in parallel until one finishes.
-#[derive_action]
-#[action(graph_role=GraphRole::Child)]
+#[derive(Debug, Default, Clone, PartialEq, Component, Reflect)]
+#[reflect(Default, Component, ActionMeta)]
 pub struct ParallelSelector;
+
 fn parallel_selector(
 	mut commands: Commands,
 	actions: Query<(Entity, &ParallelSelector, &Children), With<Running>>,
@@ -36,6 +38,14 @@ fn parallel_selector(
 	}
 }
 
+impl ActionMeta for ParallelSelector {
+	fn graph_role(&self) -> GraphRole { GraphRole::Child }
+}
+
+impl ActionSystems for ParallelSelector {
+	fn systems() -> SystemConfigs { parallel_selector.in_set(TickSet) }
+}
+
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
@@ -47,7 +57,10 @@ mod test {
 	pub fn works() -> Result<()> {
 		pretty_env_logger::init();
 		let mut app = App::new();
-		app.add_plugins(BeetSystemsPlugin::<EcsModule, _>::default());
+		app.add_plugins((
+			BeetSystemsPlugin,
+			ActionPlugin::<ParallelSelector>::default(),
+		));
 
 		let tree = ParallelSelector.child(()).child(()).build(app.world_mut());
 

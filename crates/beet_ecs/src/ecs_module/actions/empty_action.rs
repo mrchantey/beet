@@ -1,8 +1,17 @@
 use crate::prelude::*;
+use bevy::ecs::schedule::IntoSystemConfigs;
+use bevy::ecs::schedule::SystemConfigs;
 use bevy::prelude::*;
 
-#[derive_action]
-#[action(graph_role=GraphRole::World)]
-/// Does what it says on the tin, useful for tests
+/// Does what it says on the tin, useful for tests etc
+#[derive(Debug, Default, Clone, PartialEq, Component, Reflect)]
+#[reflect(Default, Component, ActionMeta)]
 pub struct EmptyAction;
-pub fn empty_action() {}
+
+impl ActionMeta for EmptyAction {
+	fn graph_role(&self) -> GraphRole { GraphRole::World }
+}
+
+impl ActionSystems for EmptyAction {
+	fn systems() -> SystemConfigs { (|| {}).into_configs() }
+}

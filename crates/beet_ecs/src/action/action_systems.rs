@@ -1,17 +1,8 @@
-use bevy::ecs::schedule::ScheduleLabel;
 use bevy::ecs::schedule::SystemConfigs;
 use bevy::prelude::*;
 use bevy::utils::all_tuples;
 
-/// A trait for registering systems associated with an action
-// - we use this instead of implementing IntoSystemConfigs so that
-// 	 `Default` is not required for the action
-// - must be static for use in beet plugin
-pub trait ActionSystems: 'static {
-	fn add_systems(app: &mut App, schedule: impl ScheduleLabel + Clone);
-}
-
-pub trait ActionSystems2: Sized {
+pub trait ActionSystems: Sized {
 	fn systems() -> SystemConfigs;
 }
 
@@ -24,8 +15,8 @@ macro_rules! impl_plugins_tuples {
 			{
 					#[allow(non_snake_case, unused_variables)]
 					#[track_caller]
-					fn add_systems(app: &mut App,schedule:impl ScheduleLabel + Clone) {
-							$($param::add_systems(app, schedule.clone());)*
+					fn systems()-> SystemConfigs {
+							($($param::systems(),)*).into_configs()
 					}
 			}
 	}
