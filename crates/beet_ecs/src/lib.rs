@@ -17,7 +17,6 @@ pub mod tree;
 extern crate self as beet;
 
 pub mod prelude {
-
 	pub use crate::action::*;
 	pub use crate::beet_module::*;
 	pub use crate::channel_event::*;
@@ -33,22 +32,4 @@ pub mod prelude {
 	pub use crate::test::*;
 	pub use crate::tree::*;
 	pub use beet_ecs_macros::*;
-}
-
-
-pub mod exports {
-	// pub use bevy::ecs as bevy_ecs;
-	pub use bevy;
-	pub use bevy::ecs::schedule::ScheduleLabel;
-	pub use bevy::ecs::system::EntityCommands;
-	pub use bevy::prelude::*;
-	pub use bevy::reflect as bevy_reflect;
-	pub use bevy::reflect::FromReflect;
-	pub use bevy::reflect::GetTypeRegistration;
-	pub use bevy::reflect::Reflect;
-	pub use bevy::reflect::TypePath;
-	pub use bevy::reflect::TypeRegistry;
-	pub use strum::IntoEnumIterator;
-	pub use strum_macros::Display;
-	pub use strum_macros::EnumIter;
 }

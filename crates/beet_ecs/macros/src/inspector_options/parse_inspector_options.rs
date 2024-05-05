@@ -7,6 +7,10 @@ use syn::DataUnion;
 use syn::DeriveInput;
 // mod attributes;
 
+fn bevy_reflect() -> TokenStream {
+	quote! { bevy::reflect }
+}
+
 pub fn inspectable(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 	let input = syn::parse_macro_input!(input as syn::DeriveInput);
 
@@ -23,7 +27,7 @@ fn expand_struct(
 	input: &DeriveInput,
 	data: &DataStruct,
 ) -> syn::Result<TokenStream> {
-	let bevy_reflect = quote! { ::beet::exports::bevy::reflect };
+	let bevy_reflect = bevy_reflect();
 
 	let fields = data
         .fields
@@ -78,7 +82,7 @@ fn expand_enum(
 	input: &DeriveInput,
 	data: &DataEnum,
 ) -> syn::Result<TokenStream> {
-	let bevy_reflect = quote! { ::beet::exports::bevy::reflect };
+	let bevy_reflect = bevy_reflect();
 
 	let fields = data
         .variants
