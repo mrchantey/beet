@@ -2,6 +2,7 @@ use crate::prelude::*;
 use bevy::prelude::*;
 
 
+/// A tree of entities, useful for tests and debugging.
 #[derive(Debug, Clone, Deref, DerefMut, Component)]
 pub struct EntityTree(pub Tree<Entity>);
 
@@ -24,13 +25,14 @@ impl EntityTree {
 		Self(tree)
 	}
 
+	/// Get a tree of `Option<&T>` from the [`EntityTree`].
 	pub fn component_tree<'a, T: Component>(
 		&self,
 		world: &'a World,
 	) -> Tree<Option<&'a T>> {
 		self.0.map(|e| world.get::<T>(*e))
 	}
-	pub fn node(&self) -> EntityIdent { EntityIdent::new(self.0.value) }
+	pub fn ident(&self) -> EntityIdent { EntityIdent::new(self.0.value) }
 }
 
 
@@ -44,7 +46,7 @@ mod test {
 	#[test]
 	fn component_tree() -> Result<()> {
 		let mut world = World::new();
-		let tree = test_constant_behavior_tree().build(&mut world);
+		let tree = test_constant_behavior_tree(&mut world);
 		expect(tree.children.len()).to_be(2)?;
 
 		let entity = tree.children[1].value;

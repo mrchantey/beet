@@ -35,7 +35,7 @@ mod test {
 		let mut app = App::new();
 		app.add_plugins(LifecyclePlugin);
 
-		let tree = test_no_action_behavior_tree().build(app.world_mut());
+		let tree = test_no_action_behavior_tree(app.world_mut());
 
 		tree.map(|entity| {
 			app.world_mut().entity_mut(*entity).insert(Running);

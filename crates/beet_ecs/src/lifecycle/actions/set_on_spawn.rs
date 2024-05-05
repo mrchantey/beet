@@ -44,8 +44,7 @@ mod test {
 		let mut app = App::new();
 		app.add_plugins(ActionPlugin::<SetOnSpawn<Score>>::default());
 
-		let actions = test_constant_behavior_tree();
-		let root = actions.build(app.world_mut()).value;
+		let root = test_constant_behavior_tree(app.world_mut()).value;
 
 		app.world_mut()
 			.entity_mut(root)

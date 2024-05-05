@@ -72,10 +72,15 @@ mod test {
 			),
 		));
 
-		let tree = FallbackSelector
-			.child(InsertOnRun(RunResult::Failure))
-			.child(InsertOnRun(RunResult::Success))
-			.build(app.world_mut());
+		let entity = app
+			.world_mut()
+			.spawn((Running, FallbackSelector))
+			.with_children(|parent| {
+				parent.spawn(InsertOnRun(RunResult::Failure));
+				parent.spawn(InsertOnRun(RunResult::Success));
+			})
+			.id();
+		let tree = EntityTree::new_with_world(entity, app.world());
 
 		app.update();
 		expect(tree.component_tree(app.world())).to_be(

@@ -50,9 +50,10 @@ impl ComponentType {
 
 #[cfg(test)]
 mod test {
+	#![cfg(feature = "reflect")]
 	use crate::prelude::*;
 	use anyhow::Result;
-	use bevy::ecs::world::World;
+	use bevy::app::App;
 	use std::any::TypeId;
 	use sweet::*;
 
@@ -60,12 +61,10 @@ mod test {
 	fn component_types() -> Result<()> {
 		pretty_env_logger::try_init().ok();
 
-		let mut world = World::new();
+		let mut app = App::new();
+		app.add_plugins(LifecyclePlugin);
 
-		let _graph = (EmptyAction.child((EmptyAction, SetOnRun(Score::Pass))))
-			.into_node(&mut world);
-
-		let types = ComponentType::from_world(&world);
+		let types = ComponentType::from_world(app.world());
 
 		expect(types.len()).to_be_greater_than(0)?;
 

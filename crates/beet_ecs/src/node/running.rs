@@ -67,21 +67,18 @@ mod test {
 		let mut app = App::new();
 		app.add_plugins(LifecyclePlugin);
 
-		let root = InsertOnRun(RunResult::Success)
-			.into_beet_builder()
-			.build(app.world_mut())
-			.value;
+		let entity = app.world_mut().spawn((Running, RunResult::Success)).id();
 
-		expect(&app).to_have_component::<Running>(root)?;
+		expect(&app).to_have_component::<Running>(entity)?;
 		// add `RunResult`, remove `Running`
 		app.update();
-		expect(&app).not().to_have_component::<Running>(root)?;
-		expect(&app).to_have_component::<RunResult>(root)?;
+		expect(&app).not().to_have_component::<Running>(entity)?;
+		expect(&app).to_have_component::<RunResult>(entity)?;
 		// remove `Running`
 		app.update();
 		// remove `RunResult`
-		expect(&app).not().to_have_component::<Running>(root)?;
-		expect(&app).not().to_have_component::<RunResult>(root)?;
+		expect(&app).not().to_have_component::<Running>(entity)?;
+		expect(&app).not().to_have_component::<RunResult>(entity)?;
 
 		Ok(())
 	}

@@ -12,13 +12,8 @@ impl EntityIdent {
 
 	/// Add a node as a child of the given entity
 	pub fn add_child_behavior(self, world: &mut World) -> EntityIdent {
-		let mut entity = world.spawn_empty();
-		BeetBuilder::insert_default_components(
-			&mut entity,
-			"New Node".to_string(),
-		);
-		let entity = entity.id();
-
+		let entity = world.spawn(Name::new("New Node")).id();
+		
 		if let Some(mut parent) = world.get_entity_mut(*self) {
 			parent.add_child(entity);
 		} else {

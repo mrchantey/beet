@@ -62,7 +62,16 @@ mod test {
 			ActionPlugin::<ParallelSelector>::default(),
 		));
 
-		let tree = ParallelSelector.child(()).child(()).build(app.world_mut());
+		let entity = app
+			.world_mut()
+			.spawn((Running, ParallelSelector))
+			.with_children(|parent| {
+				parent.spawn_empty();
+				parent.spawn_empty();
+			})
+			.id();
+
+		let tree = EntityTree::new_with_world(entity, app.world());
 
 		app.update();
 		expect(tree.component_tree(app.world())).to_be(

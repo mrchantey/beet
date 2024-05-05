@@ -1,9 +1,9 @@
 pub mod graph_ext;
 #[allow(unused_imports)]
 pub use self::graph_ext::*;
-pub mod beet_builder;
+pub mod beet_root;
 #[allow(unused_imports)]
-pub use self::beet_builder::*;
+pub use self::beet_root::*;
 pub mod despawn;
 #[allow(unused_imports)]
 pub use self::despawn::*;

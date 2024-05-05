@@ -75,10 +75,16 @@ mod test {
 			),
 		));
 
-		let tree = SequenceSelector
-			.child(InsertOnRun(RunResult::Success))
-			.child(InsertOnRun(RunResult::Failure))
-			.build(app.world_mut());
+		let entity = app
+			.world_mut()
+			.spawn((Running, SequenceSelector))
+			.with_children(|parent| {
+				parent.spawn(InsertOnRun(RunResult::Success));
+				parent.spawn(InsertOnRun(RunResult::Failure));
+			})
+			.id();
+
+		let tree = EntityTree::new_with_world(entity, app.world());
 
 		app.update();
 		expect(tree.component_tree(app.world())).to_be(

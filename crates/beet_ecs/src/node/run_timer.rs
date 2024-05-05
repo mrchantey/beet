@@ -62,18 +62,18 @@ mod test {
 		app.add_plugins(LifecyclePlugin);
 		app.insert_time();
 
-		let root = EmptyAction.into_beet_builder().build(app.world_mut()).value;
+		let entity = app.world_mut().spawn((Running, RunTimer::default())).id();
 
 		app.update_with_secs(1);
 
-		let timer = app.world().get::<RunTimer>(root).unwrap();
+		let timer = app.world().get::<RunTimer>(entity).unwrap();
 		expect(timer.last_started.elapsed_secs()).to_be_close_to(1.0)?;
 		expect(timer.last_stopped.elapsed_secs()).to_be_close_to(1.0)?;
 
-		app.world_mut().entity_mut(root).remove::<Running>();
+		app.world_mut().entity_mut(entity).remove::<Running>();
 		app.update_with_secs(1);
 
-		let timer = app.world().get::<RunTimer>(root).unwrap();
+		let timer = app.world().get::<RunTimer>(entity).unwrap();
 		expect(timer.last_started.elapsed_secs()).to_be_close_to(2.0)?;
 		expect(timer.last_stopped.elapsed_secs()).to_be_close_to(1.0)?;
 

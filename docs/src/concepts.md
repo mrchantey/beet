@@ -30,12 +30,13 @@ Actions can be categorized by what they modify. This is just metadata, there is 
 
 ## Common Components
 
-These are are the most frequently used components.
+Here are some of the most frequently used components.
 
 - [`Running`][running] - Indicate this node is currently running.
-- [`RunResult`][run-result] - Notify their parent that this node has finished.
+- [`RunResult`][run-result] - Added by actions to notify their parent that they have finished.
 - [`Score`][score] - Notify the parent how favourable it would be for this node to run.
 - [`RunTimer`][run-timer] - Time since an action started/stopped.
+- `RootIsTargetAgent` - Before the first tick, this will be replaced by a `TargetAgent` pointing to the root of its hierarchy.
 
 [translate]:https://github.com/mrchantey/beet/blob/main/crates/beet_core/src/core_module/translate.rs
 [score-selector]:https://github.com/mrchantey/beet/blob/main/crates/beet_ecs/src/ecs_module/selectors/score_selector.rs

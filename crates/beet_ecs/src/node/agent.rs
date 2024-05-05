@@ -28,11 +28,13 @@ mod test {
 		let mut app = App::new();
 		app.add_plugins(LifecyclePlugin);
 
-		let behavior = InsertOnRun(RunResult::Success)
-			.into_beet_builder()
-			.build(app.world_mut())
-			.value;
-		let target = app.world_mut().spawn_empty().add_child(behavior).id();
+		let target = app
+			.world_mut()
+			.spawn_empty()
+			.with_children(|parent| {
+				parent.spawn((Running, InsertOnRun(RunResult::Success)));
+			})
+			.id();
 
 		expect(app.world().entities().len()).to_be(2)?;
 		app.update();

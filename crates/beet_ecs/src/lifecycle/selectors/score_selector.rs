@@ -104,18 +104,23 @@ mod test {
 			)>::default(),
 		));
 
-		let tree = ScoreSelector::default()
-			.child((
-				Score::default(),
-				SetOnSpawn(Score::Fail),
-				InsertOnRun(RunResult::Failure),
-			))
-			.child((
-				Score::default(),
-				SetOnSpawn(Score::Pass),
-				InsertOnRun(RunResult::Success),
-			))
-			.build(app.world_mut());
+		let entity = app
+			.world_mut()
+			.spawn((Running, ScoreSelector::default()))
+			.with_children(|parent| {
+				parent.spawn((
+					Score::default(),
+					SetOnSpawn(Score::Fail),
+					InsertOnRun(RunResult::Failure),
+				));
+				parent.spawn((
+					Score::default(),
+					SetOnSpawn(Score::Pass),
+					InsertOnRun(RunResult::Success),
+				));
+			})
+			.id();
+		let tree = EntityTree::new_with_world(entity, app.world());
 
 		(app, tree)
 	}

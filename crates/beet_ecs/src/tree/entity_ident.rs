@@ -119,20 +119,17 @@ mod test {
 		world
 	}
 
-	fn node(world: &mut World) -> EntityIdent {
-		BeetBuilder::new(SetOnRun(RunResult::Success))
-			.build(world)
-			.node()
-	}
-
 	#[test]
 	fn deep_clone() -> Result<()> {
 		let mut world = world();
-		let node1 = node(&mut world);
+		let entity1 = world
+			.spawn((BeetRoot, Running, SetOnRun(RunResult::Success)))
+			.id();
+		let entity1 = EntityIdent::new(entity1);
 
 		expect(world.entities().len()).to_be(1)?;
 
-		let node2 = node1.deep_clone(&mut world)?;
+		let node2 = entity1.deep_clone(&mut world)?;
 
 		expect(world.entities().len()).to_be(2)?;
 
@@ -148,7 +145,7 @@ mod test {
 	#[test]
 	fn children() -> Result<()> {
 		let mut world = World::new();
-		let node = test_no_action_behavior_tree().build(&mut world).node();
+		let node = test_no_action_behavior_tree(&mut world).ident();
 
 		expect(node.children(&world).len()).to_be(2)?;
 		let child = node.add_child_behavior(&mut world);
@@ -161,7 +158,7 @@ mod test {
 	#[test]
 	fn components() -> Result<()> {
 		let mut world = World::new();
-		let node = test_no_action_behavior_tree().build(&mut world).node();
+		let node = test_no_action_behavior_tree(&mut world).ident();
 
 		expect(node.components(&world).len()).to_be_greater_than(0)?;
 

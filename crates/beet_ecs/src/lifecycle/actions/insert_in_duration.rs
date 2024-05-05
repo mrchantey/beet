@@ -77,10 +77,14 @@ mod test {
 		));
 		app.insert_time();
 
-		let root = InsertInDuration::<RunResult>::default()
-			.into_beet_builder()
-			.build(app.world_mut())
-			.value;
+		let root = app
+			.world_mut()
+			.spawn((
+				Running,
+				RunTimer::default(),
+				InsertInDuration::<RunResult>::default(),
+			))
+			.id();
 
 		expect(&app).to_have_component::<Running>(root)?;
 
