@@ -1,6 +1,6 @@
-pub mod core_module;
+pub mod some_fun_plugin;
 #[allow(unused_imports)]
-pub use self::core_module::*;
+pub use self::some_fun_plugin::*;
 pub mod auto_spawn;
 #[allow(unused_imports)]
 pub use self::auto_spawn::*;

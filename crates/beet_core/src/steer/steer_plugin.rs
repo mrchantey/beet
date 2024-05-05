@@ -13,6 +13,31 @@ pub struct SteerPlugin {
 
 impl Plugin for SteerPlugin {
 	fn build(&self, app: &mut App) {
+		app.add_plugins(ActionPlugin::<(
+			Seek,
+			Wander,
+			Separate<GroupSteerAgent>,
+			Align<GroupSteerAgent>,
+			Cohere<GroupSteerAgent>,
+			SucceedOnArrive,
+			FindSteerTarget,
+			ScoreSteerTarget,
+			DespawnSteerTarget,
+		)>::default());
+
+		let world = app.world_mut();
+		world.init_bundle::<SteerBundle>();
+
+		let mut registry =
+			world.get_resource::<AppTypeRegistry>().unwrap().write();
+		registry.register::<SteerTarget>();
+		registry.register::<MaxForce>();
+		registry.register::<MaxSpeed>();
+		registry.register::<ArriveRadius>();
+		registry.register::<WanderParams>();
+
+		drop(registry);
+
 		app.__()
 			.add_systems(
 				Update,

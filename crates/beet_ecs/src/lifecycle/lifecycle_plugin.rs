@@ -2,10 +2,13 @@ use crate::prelude::*;
 use bevy::prelude::*;
 
 
+#[derive(Default)]
 pub struct LifecyclePlugin;
 
 impl Plugin for LifecyclePlugin {
 	fn build(&self, app: &mut App) {
+		app.add_plugins(LifecycleSystemsPlugin);
+
 		app.add_plugins(ActionPlugin::<(
 			InsertInDuration<RunResult>,
 			InsertOnRun<RunResult>,

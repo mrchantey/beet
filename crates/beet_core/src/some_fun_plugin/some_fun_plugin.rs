@@ -1,14 +1,7 @@
 use super::*;
-use crate::prelude::*;
 use beet_ecs::prelude::*;
 use bevy::prelude::*;
 use std::borrow::Cow;
-
-#[derive(Debug, Default, Clone, BeetModule)]
-#[modules(EcsModule, MovementModule, SteerModule, RoboticsModule)]
-#[components(AutoSpawn, RandomizePosition, RenderText)]
-/// Collection of all built-in modules.
-pub struct CoreModule;
 
 #[derive(Component, Deref, DerefMut, Reflect)]
 #[reflect(Component, Default)]
@@ -23,13 +16,25 @@ impl Default for RenderText {
 }
 
 #[derive(Default)]
-pub struct CorePlugin;
+pub struct SomeFunPlugin;
 
-impl Plugin for CorePlugin {
+impl Plugin for SomeFunPlugin {
 	fn build(&self, app: &mut App) {
 		app /*-*/
-			.add_systems(PreUpdate, auto_spawn.before(PreTickSet))
+			// .add_systems(PreUpdate, auto_spawn.before(PreTickSet))
 			.add_systems(Update, randomize_position.in_set(PreTickSet))
 		/*-*/;
+
+		let world = app.world_mut();
+
+		world.init_component::<AutoSpawn>();
+		world.init_component::<RandomizePosition>();
+		world.init_component::<RenderText>();
+
+		let mut registry =
+			world.get_resource::<AppTypeRegistry>().unwrap().write();
+		registry.register::<AutoSpawn>();
+		registry.register::<RandomizePosition>();
+		registry.register::<RenderText>();
 	}
 }

@@ -1,5 +1,6 @@
 use crate::prelude::*;
 use beet_ecs::prelude::*;
+use bevy::ecs::schedule::SystemConfigs;
 use bevy::prelude::*;
 use std::borrow::Cow;
 
@@ -13,8 +14,8 @@ impl Sentence {
 
 /// Updates the [`Score`] of each child based on the similarity of its [`Sentence`] with the agent,
 /// for use with [`ScoreSelector`]
-#[derive_action]
-#[action(graph_role=GraphRole::Child)]
+#[derive(Debug, Default, Clone, PartialEq, Component, Reflect)]
+#[reflect(Default, Component, ActionMeta)]
 pub struct SentenceScorer;
 
 
@@ -47,7 +48,13 @@ fn sentence_scorer(
 	}
 }
 
+impl ActionMeta for SentenceScorer {
+	fn graph_role(&self) -> GraphRole { GraphRole::Child }
+}
 
+impl ActionSystems for SentenceScorer {
+	fn systems() -> SystemConfigs { sentence_scorer.in_set(TickSet) }
+}
 
 #[cfg(test)]
 mod test {
@@ -63,11 +70,7 @@ mod test {
 		pretty_env_logger::try_init().ok();
 
 		let mut app = App::new();
-		app.add_plugins(MlPlugin::default())
-			.add_plugins(BeetSystemsPlugin::<
-			(SentenceScorer, ScoreSelector),
-			_,
-		>::default());
+		app.add_plugins((MlPlugin::default(), LifecyclePlugin));
 
 
 		let entity = app

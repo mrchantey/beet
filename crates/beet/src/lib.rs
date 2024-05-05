@@ -15,7 +15,3 @@ pub mod prelude {
 	#[cfg(feature = "net")]
 	pub use beet_net::prelude::*;
 }
-
-pub mod exports {
-	pub use beet_ecs::exports::*;
-}

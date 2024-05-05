@@ -19,10 +19,10 @@ pub struct TickSyncSet;
 pub struct PostTickSet;
 
 #[derive(Debug, Clone, Default)]
-// Helpers that clean up run state
-pub struct BeetSystemsPlugin;
+// Helpers that clean up run state, this is included in the [`LifecyclePlugin`]
+pub struct LifecycleSystemsPlugin;
 
-impl Plugin for BeetSystemsPlugin {
+impl Plugin for LifecycleSystemsPlugin {
 	fn build(&self, app: &mut App) {
 		app.init_resource::<BeetConfig>();
 		let config = app.world().resource::<BeetConfig>();

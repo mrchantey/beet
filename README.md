@@ -23,6 +23,13 @@
   <sub>made with ❤️‍🔥 by mrchantey</a></sub>
 </div>
 
+## Examples
+
+```sh
+cargo run -p beet --example hello_world
+cargo run -p beet --example flock
+```
+
 ## Bevy Versions
 
 | `bevy` | `beet` |

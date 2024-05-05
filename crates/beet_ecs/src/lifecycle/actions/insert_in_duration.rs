@@ -72,7 +72,7 @@ mod test {
 	fn works() -> Result<()> {
 		let mut app = App::new();
 		app.add_plugins((
-			BeetSystemsPlugin,
+			LifecycleSystemsPlugin,
 			ActionPlugin::<InsertInDuration<RunResult>>::default(),
 		));
 		app.insert_time();

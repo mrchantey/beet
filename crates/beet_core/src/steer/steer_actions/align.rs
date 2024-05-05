@@ -1,10 +1,12 @@
 use crate::prelude::*;
 use beet_ecs::prelude::*;
+use bevy::ecs::schedule::SystemConfigs;
 use bevy::prelude::*;
 use std::marker::PhantomData;
 
-#[derive_action(Default)]
-#[action(graph_role=GraphRole::Agent)]
+
+#[derive(Debug, Clone, PartialEq, Component, Reflect)]
+#[reflect(Default, Component, ActionMeta)]
 /// Align [`Velocity`] with that of entities with the given component.
 pub struct Align<M: GenericActionComponent> {
 	/// The scalar to apply to the impulse
@@ -48,4 +50,13 @@ fn align<M: GenericActionComponent>(
 
 		**impulse += *new_impulse * align.scalar;
 	}
+}
+
+
+impl<M: GenericActionComponent> ActionMeta for Align<M> {
+	fn graph_role(&self) -> GraphRole { GraphRole::Agent }
+}
+
+impl<M: GenericActionComponent> ActionSystems for Align<M> {
+	fn systems() -> SystemConfigs { align::<M>.in_set(TickSet) }
 }

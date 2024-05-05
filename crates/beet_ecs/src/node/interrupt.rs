@@ -33,7 +33,7 @@ mod test {
 	#[test]
 	pub fn works() -> Result<()> {
 		let mut app = App::new();
-		app.add_plugins((BeetSystemsPlugin, LifecyclePlugin));
+		app.add_plugins(LifecyclePlugin);
 
 		let tree = test_no_action_behavior_tree().build(app.world_mut());
 

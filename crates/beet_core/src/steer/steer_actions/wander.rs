@@ -1,9 +1,10 @@
 use crate::prelude::*;
 use beet_ecs::prelude::*;
+use bevy::ecs::schedule::SystemConfigs;
 use bevy::prelude::*;
 
-#[derive_action(Default)]
-#[action(graph_role=GraphRole::Agent)]
+#[derive(Debug, Clone, PartialEq, Component, Reflect)]
+#[reflect(Default, Component, ActionMeta)]
 /// Somewhat cohesive random walk
 pub struct Wander {
 	/// The scalar to apply to the impulse
@@ -50,6 +51,15 @@ fn wander(
 }
 
 
+impl ActionMeta for Wander {
+	fn graph_role(&self) -> GraphRole { GraphRole::Agent }
+}
+
+impl ActionSystems for Wander {
+	fn systems() -> SystemConfigs { wander.in_set(TickSet) }
+}
+
+
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
@@ -62,11 +72,7 @@ mod test {
 	fn works() -> Result<()> {
 		let mut app = App::new();
 
-		app.add_plugins((
-			SteerPlugin::default(),
-			BeetSystemsPlugin::<CoreModule, _>::default(),
-		))
-		.insert_time();
+		app.add_plugins(DefaultBeetPlugins::default()).insert_time();
 
 
 		let tree = Wander::default()

@@ -96,7 +96,7 @@ mod test {
 	fn setup() -> (App, EntityTree) {
 		let mut app = App::new();
 		app.add_plugins((
-			BeetSystemsPlugin,
+			LifecycleSystemsPlugin,
 			ActionPlugin::<(
 				ScoreSelector,
 				SetOnSpawn<Score>,

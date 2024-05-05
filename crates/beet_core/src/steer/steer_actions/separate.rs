@@ -1,10 +1,11 @@
 use crate::prelude::*;
 use beet_ecs::prelude::*;
+use bevy::ecs::schedule::SystemConfigs;
 use bevy::prelude::*;
 use std::marker::PhantomData;
 
-#[derive_action(Default)]
-#[action(graph_role=GraphRole::Agent)]
+#[derive(Debug, Clone, PartialEq, Component, Reflect)]
+#[reflect(Default, Component, ActionMeta)]
 /// Separate from entities with the given component.
 pub struct Separate<M: GenericActionComponent> {
 	/// The scalar to apply to the impulse
@@ -59,4 +60,13 @@ fn separate<M: GenericActionComponent>(
 
 		**impulse += *new_impulse * separate.scalar;
 	}
+}
+
+
+impl<M: GenericActionComponent> ActionMeta for Separate<M> {
+	fn graph_role(&self) -> GraphRole { GraphRole::Agent }
+}
+
+impl<M: GenericActionComponent> ActionSystems for Separate<M> {
+	fn systems() -> SystemConfigs { separate::<M>.in_set(TickSet) }
 }

@@ -58,7 +58,7 @@ mod test {
 		pretty_env_logger::init();
 		let mut app = App::new();
 		app.add_plugins((
-			BeetSystemsPlugin,
+			LifecycleSystemsPlugin,
 			ActionPlugin::<ParallelSelector>::default(),
 		));
 

@@ -1,10 +1,10 @@
 use beet::prelude::*;
 use bevy::prelude::*;
 
-// actions are a component-system pair
-#[derive(Component, Action)]
-#[action(system=log_on_run)]
-pub struct LogOnRun(pub String);
+
+// Actions are a component-system pair
+#[derive(Component)]
+struct LogOnRun(pub String);
 
 fn log_on_run(query: Query<&LogOnRun, Added<Running>>) {
 	for action in query.iter() {
@@ -15,12 +15,11 @@ fn log_on_run(query: Query<&LogOnRun, Added<Running>>) {
 fn main() {
 	let mut app = App::new();
 
-	// the BeetPlugin adds the systems associated with each action
-	// and some helpers that clean up run state
-	app.add_plugins(BeetSystemsPlugin::<
-		(SequenceSelector, LogOnRun, InsertOnRun<RunResult>),
-		_,
-	>::default());
+	// this will add some helpers that clean up run state
+	app.add_plugins(LifecyclePlugin::default());
+
+	// action systems are usually added to the `TickSet`
+	app.add_systems(Update, log_on_run.in_set(TickSet));
 
 	// behavior graphs are regular entity hierarchies
 	app.world_mut()

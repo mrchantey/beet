@@ -3,58 +3,61 @@ use crate::prelude::*;
 use bevy::ecs::schedule::SystemConfigs;
 use bevy::prelude::*;
 
-
-/// An action that runs all of its children in order until one succeeds.
+/// An action that runs all of its children in order until one fails.
 ///
-/// Logical OR: `RUN child1 OTHERWISE child2 etc`
+/// Logical AND - `RUN child1 THEN child2 etc`
 ///
-/// If a child succeeds it will succeed.
+/// If a child succeeds it will run the next child.
 ///
-/// If the last child fails it will fail.
+/// If there are no more children to run it will succeed.
+///
+/// If a child fails it will fail.
 #[derive(Debug, Default, Clone, PartialEq, Component, Reflect)]
 #[reflect(Default, Component, ActionMeta)]
-pub struct FallbackSelector;
-
-fn fallback_selector(
+pub struct SequenceSelector;
+fn sequence_selector(
 	mut commands: Commands,
-	selectors: Query<(Entity, &FallbackSelector, &Children), With<Running>>,
+	selectors: Query<(Entity, &SequenceSelector, &Children), With<Running>>,
 	children_running: Query<(), With<Running>>,
 	children_results: Query<&RunResult>,
 ) {
 	for (parent, _selector, children) in selectors.iter() {
 		if any_child_running(children, &children_running) {
+			// continue
 			continue;
 		}
 
 		match first_child_result(children, &children_results) {
 			Some((index, result)) => match result {
-				&RunResult::Success => {
-					commands.entity(parent).insert(RunResult::Success);
-				}
 				&RunResult::Failure => {
+					// finish
+					commands.entity(parent).insert(RunResult::Failure);
+				}
+				&RunResult::Success => {
 					if index == children.len() - 1 {
-						commands.entity(parent).insert(RunResult::Failure);
+						// finish
+						commands.entity(parent).insert(RunResult::Success);
 					} else {
+						// next
 						commands.entity(children[index + 1]).insert(Running);
 					}
 				}
 			},
 			None => {
+				// start
 				commands.entity(children[0]).insert(Running);
 			}
 		}
 	}
 }
 
-impl ActionMeta for FallbackSelector {
-	fn graph_role(&self) -> GraphRole { GraphRole::Child }
+impl ActionMeta for SequenceSelector {
+	fn graph_role(&self) -> GraphRole { GraphRole::Node }
 }
 
-impl ActionSystems for FallbackSelector {
-	fn systems() -> SystemConfigs { fallback_selector.in_set(TickSet) }
+impl ActionSystems for SequenceSelector {
+	fn systems() -> SystemConfigs { sequence_selector.in_set(TickSet) }
 }
-
-
 
 #[cfg(test)]
 mod test {
@@ -67,14 +70,14 @@ mod test {
 	pub fn works() -> Result<()> {
 		let mut app = App::new();
 		app.add_plugins((
-			BeetSystemsPlugin,
-			ActionPlugin::<(FallbackSelector, InsertOnRun<RunResult>)>::default(
+			LifecycleSystemsPlugin,
+			ActionPlugin::<(SequenceSelector, InsertOnRun<RunResult>)>::default(
 			),
 		));
 
-		let tree = FallbackSelector
-			.child(InsertOnRun(RunResult::Failure))
+		let tree = SequenceSelector
 			.child(InsertOnRun(RunResult::Success))
+			.child(InsertOnRun(RunResult::Failure))
 			.build(app.world_mut());
 
 		app.update();
@@ -103,7 +106,7 @@ mod test {
 		expect(tree.component_tree::<Running>(app.world()))
 			.to_be(Tree::new(None).with_leaf(None).with_leaf(None))?;
 		expect(tree.component_tree(app.world())).to_be(
-			Tree::new(Some(&RunResult::Success))
+			Tree::new(Some(&RunResult::Failure))
 				.with_leaf(None)
 				.with_leaf(None),
 		)?;

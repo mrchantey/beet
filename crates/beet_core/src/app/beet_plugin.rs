@@ -10,33 +10,30 @@ impl Plugin for BeetMinimalPlugin {
 	fn build(&self, app: &mut App) { app.add_plugins(TimePlugin); }
 }
 #[derive(Default)]
-pub struct DefaultBeetPlugins<T: BeetModule> {
-	pub types: BeetModulePlugin<T>,
-	pub systems: BeetSystemsPlugin<T, Update>,
+pub struct DefaultBeetPlugins {
+	pub lifecycle: LifecyclePlugin,
 	pub steering: SteerPlugin,
-	pub message: BeetMessagePlugin<T>,
-	pub core: CorePlugin,
+	pub movement: MovementPlugin,
+	pub core: SomeFunPlugin,
 }
 
-impl<T: BeetModule> DefaultBeetPlugins<T> {
+impl DefaultBeetPlugins {
 	pub fn new() -> Self {
 		Self {
-			types: BeetModulePlugin(default()),
-			systems: BeetSystemsPlugin::default(),
-			steering: SteerPlugin::default(),
-			message: BeetMessagePlugin(default()),
-			core: CorePlugin::default(),
+			lifecycle: Default::default(),
+			steering: Default::default(),
+			movement: Default::default(),
+			core: Default::default(),
 		}
 	}
 }
 
-impl<T: BeetModule> PluginGroup for DefaultBeetPlugins<T> {
+impl PluginGroup for DefaultBeetPlugins {
 	fn build(self) -> PluginGroupBuilder {
 		PluginGroupBuilder::start::<Self>()
-			.add(self.types)
-			.add(self.systems)
+			.add(self.lifecycle)
 			.add(self.steering)
-			.add(self.message)
+			.add(self.movement)
 			.add(self.core)
 	}
 }

@@ -1,9 +1,11 @@
 use crate::prelude::*;
 use beet_ecs::prelude::*;
+use bevy::ecs::schedule::SystemConfigs;
 use bevy::prelude::*;
 
-#[derive_action(Default)]
-#[action(graph_role=GraphRole::Node)]
+
+#[derive(Debug, Clone, PartialEq, Component, Reflect)]
+#[reflect(Default, Component, ActionMeta)]
 /// Succeeds when the agent arrives at the [`SteerTarget`].
 pub struct SucceedOnArrive {
 	pub radius: f32,
@@ -32,4 +34,13 @@ pub fn succeed_on_arrive(
 			}
 		}
 	}
+}
+
+
+impl ActionMeta for SucceedOnArrive {
+	fn graph_role(&self) -> GraphRole { GraphRole::Node }
+}
+
+impl ActionSystems for SucceedOnArrive {
+	fn systems() -> SystemConfigs { succeed_on_arrive.in_set(TickSet) }
 }

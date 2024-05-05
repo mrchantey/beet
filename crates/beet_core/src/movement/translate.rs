@@ -1,9 +1,20 @@
 use beet_ecs::prelude::*;
+use bevy::ecs::schedule::SystemConfigs;
 use bevy::prelude::*;
 use forky_core::ResultTEExt;
 
-#[derive_action]
-#[action(graph_role=GraphRole::Agent)]
+impl ActionMeta for Translate {
+	fn graph_role(&self) -> GraphRole { GraphRole::Agent }
+}
+
+impl ActionSystems for Translate {
+	fn systems() -> SystemConfigs { translate.in_set(TickSet) }
+}
+
+#[derive(
+	Debug, Default, Clone, PartialEq, Component, Reflect, InspectorOptions,
+)]
+#[reflect(Default, Component, ActionMeta, InspectorOptions)]
 /// Applies constant translation, multiplied by [`Time::delta_seconds`]
 pub struct Translate {
 	/// Translation to apply, in meters per second

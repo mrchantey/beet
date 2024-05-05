@@ -22,7 +22,7 @@ impl Plugin for ExamplePlugin {
 			}),
 	..default()		
 	}))
-		.add_plugins(DefaultBeetPlugins::<CoreModule>::default())
+		.add_plugins(DefaultBeetPlugins::default())
 		.add_systems(Startup, space_setup)
 		.add_systems(Update, update_wrap_around)
 		.add_systems(Update, follow_cursor)

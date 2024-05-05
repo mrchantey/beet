@@ -59,7 +59,7 @@ mod test {
 	#[test]
 	pub fn works() -> Result<()> {
 		let mut app = App::new();
-		app.add_plugins((BeetSystemsPlugin, LifecyclePlugin));
+		app.add_plugins(LifecyclePlugin);
 		app.insert_time();
 
 		let root = EmptyAction.into_beet_builder().build(app.world_mut()).value;

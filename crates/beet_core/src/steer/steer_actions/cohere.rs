@@ -1,10 +1,11 @@
 use crate::prelude::*;
 use beet_ecs::prelude::*;
+use bevy::ecs::schedule::SystemConfigs;
 use bevy::prelude::*;
 use std::marker::PhantomData;
 
-#[derive_action(Default)]
-#[action(graph_role=GraphRole::Agent)]
+#[derive(Debug, Clone, PartialEq, Component, Reflect)]
+#[reflect(Default, Component, ActionMeta)]
 /// Move towards the center of mass of entities with the given component.
 pub struct Cohere<M: GenericActionComponent> {
 	/// The scalar to apply to the impulse
@@ -59,4 +60,12 @@ fn cohere<M: GenericActionComponent>(
 
 		**impulse += *new_impulse * cohere.scalar;
 	}
+}
+
+impl<M: GenericActionComponent> ActionMeta for Cohere<M> {
+	fn graph_role(&self) -> GraphRole { GraphRole::Node }
+}
+
+impl<M: GenericActionComponent> ActionSystems for Cohere<M> {
+	fn systems() -> SystemConfigs { cohere::<M>.in_set(TickSet) }
 }

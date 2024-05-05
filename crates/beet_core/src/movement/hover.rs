@@ -1,10 +1,13 @@
 use beet::prelude::*;
+use bevy::ecs::schedule::SystemConfigs;
 use bevy::prelude::*;
 use std::f32::consts::TAU;
 
 
-#[derive_action]
-#[action(graph_role=GraphRole::Agent)]
+#[derive(
+	Debug, Default, Clone, PartialEq, Component, Reflect, InspectorOptions,
+)]
+#[reflect(Default, Component, ActionMeta, InspectorOptions)]
 /// Translate the agent up and down in a sine wave
 pub struct Hover {
 	/// Measured in Hz
@@ -30,4 +33,14 @@ fn hover(
 		let y = f32::sin(TAU * elapsed * hover.speed) * hover.height;
 		transforms.get_mut(**target).unwrap().translation.y = y;
 	}
+}
+
+
+
+impl ActionMeta for Hover {
+	fn graph_role(&self) -> GraphRole { GraphRole::Agent }
+}
+
+impl ActionSystems for Hover {
+	fn systems() -> SystemConfigs { hover.in_set(TickSet) }
 }

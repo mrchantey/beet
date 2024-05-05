@@ -1,10 +1,14 @@
 use crate::prelude::*;
 use beet_ecs::prelude::*;
+use bevy::ecs::schedule::SystemConfigs;
 use bevy::prelude::*;
 use forky_core::ResultTEExt;
 
-#[derive_action]
-#[action(graph_role=GraphRole::Agent)]
+
+
+
+#[derive(Debug, Default, Clone, PartialEq, Component, Reflect)]
+#[reflect(Default, Component, ActionMeta)]
 /// Go to the agent's [`SteerTarget`] with an optional [`ArriveRadius`]
 pub struct Seek;
 
@@ -49,6 +53,14 @@ fn seek(
 }
 
 
+impl ActionMeta for Seek {
+	fn graph_role(&self) -> GraphRole { GraphRole::Agent }
+}
+
+impl ActionSystems for Seek {
+	fn systems() -> SystemConfigs { seek.in_set(TickSet) }
+}
+
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
@@ -61,11 +73,8 @@ mod test {
 	fn works() -> Result<()> {
 		let mut app = App::new();
 
-		app.add_plugins((
-			SteerPlugin::default(),
-			BeetSystemsPlugin::<CoreModule, _>::default(),
-		))
-		.insert_time();
+		app.add_plugins(DefaultBeetPlugins::default())
+			.insert_time();
 
 
 		let tree = Seek.into_beet_builder().build(app.world_mut()).value;

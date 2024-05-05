@@ -65,7 +65,7 @@ mod test {
 	#[test]
 	pub fn works() -> Result<()> {
 		let mut app = App::new();
-		app.add_plugins((BeetSystemsPlugin, LifecyclePlugin));
+		app.add_plugins(LifecyclePlugin);
 
 		let root = InsertOnRun(RunResult::Success)
 			.into_beet_builder()

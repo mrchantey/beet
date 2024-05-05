@@ -1,7 +1,5 @@
 use crate::prelude::*;
-use beet::prelude::*;
 use bevy::prelude::*;
-use std::time::Duration;
 
 pub fn bee_bundle() -> impl Bundle {
 	(
@@ -37,17 +35,17 @@ pub fn flower_bundle() -> impl Bundle {
 	)
 }
 
-pub fn flower_auto_spawn_bundle() -> impl Bundle {
-	flower_auto_spawn_bundle_with_duration(Duration::from_secs(2))
-}
-pub fn flower_auto_spawn_bundle_with_duration(
-	duration: Duration,
-) -> impl Bundle {
-	(
-		Name::new("Flower Spawner"),
-		AutoSpawn::new(
-			BeetSceneSerde::<CoreModule>::new_with_bundle(flower_bundle()),
-			duration,
-		),
-	)
-}
+// pub fn flower_auto_spawn_bundle() -> impl Bundle {
+// 	flower_auto_spawn_bundle_with_duration(Duration::from_secs(2))
+// }
+// pub fn flower_auto_spawn_bundle_with_duration(
+// 	duration: Duration,
+// ) -> impl Bundle {
+// 	(
+// 		Name::new("Flower Spawner"),
+// 		AutoSpawn::new(
+// 			BeetSceneSerde::<CoreModule>::new_with_bundle(flower_bundle()),
+// 			duration,
+// 		),
+// 	)
+// }
