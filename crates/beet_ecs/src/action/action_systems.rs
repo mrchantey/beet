@@ -1,4 +1,5 @@
 use bevy::ecs::schedule::ScheduleLabel;
+use bevy::ecs::schedule::SystemConfigs;
 use bevy::prelude::*;
 use bevy::utils::all_tuples;
 
@@ -8,6 +9,10 @@ use bevy::utils::all_tuples;
 // - must be static for use in beet plugin
 pub trait ActionSystems: 'static {
 	fn add_systems(app: &mut App, schedule: impl ScheduleLabel + Clone);
+}
+
+pub trait ActionSystems2: Sized {
+	fn systems() -> SystemConfigs;
 }
 
 
