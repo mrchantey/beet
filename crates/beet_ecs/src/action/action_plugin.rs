@@ -1,9 +1,29 @@
 use crate::prelude::*;
-// use bevy::ecs::schedule::ScheduleLabel;
+use bevy::ecs::schedule::ScheduleLabel;
 // use bevy::ecs::schedule::SystemConfigs;
 use bevy::prelude::*;
-// use bevy::utils::intern::Interned;
+use bevy::utils::intern::Interned;
 use std::marker::PhantomData;
+
+
+#[derive(Resource, Clone)]
+pub struct BeetConfig {
+	pub schedule: Interned<dyn ScheduleLabel>,
+}
+
+impl Default for BeetConfig {
+	fn default() -> Self { Self::new(Update) }
+}
+
+
+impl BeetConfig {
+	pub fn new(schedule: impl ScheduleLabel) -> Self {
+		Self {
+			schedule: schedule.intern(),
+		}
+	}
+}
+
 
 
 #[derive(Debug, Default, Copy, Clone)]

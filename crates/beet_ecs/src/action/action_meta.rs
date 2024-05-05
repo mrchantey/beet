@@ -1,29 +1,9 @@
 use crate::prelude::*;
-use bevy::ecs::schedule::ScheduleLabel;
 use bevy::prelude::*;
-use bevy::utils::intern::Interned;
 
-#[derive(Resource, Clone)]
-pub struct BeetConfig {
-	pub schedule: Interned<dyn ScheduleLabel>,
-}
-
-impl Default for BeetConfig {
-	fn default() -> Self { Self::new(Update) }
-}
-
-
-impl BeetConfig {
-	pub fn new(schedule: impl ScheduleLabel) -> Self {
-		Self {
-			schedule: schedule.intern(),
-		}
-	}
-}
-
+/// Provide extra info for action components, useful for debugging, visualization etc.
 #[reflect_trait]
 pub trait ActionMeta {
-	// fn system() -> SystemConfigs;
 	fn graph_role(&self) -> GraphRole { GraphRole::Node }
 }
 
@@ -32,7 +12,10 @@ mod test {
 	use crate::prelude::*;
 	use anyhow::Result;
 	// use bevy::ecs::schedule::SystemConfigs;
-	use bevy::reflect::ReflectFromPtr;
+	use bevy::{
+		ecs::schedule::SystemConfigs,
+		reflect::ReflectFromPtr,
+	};
 	use std::any::Any;
 	use sweet::*;
 
@@ -41,8 +24,11 @@ mod test {
 	#[action(graph_role = GraphRole::Node)]
 	struct MyStruct;
 
+	impl ActionSystems2 for MyStruct {
+		fn systems() -> SystemConfigs { my_struct.in_set(TickSet) }
+	}
 	// impl ActionMeta for MyStruct {
-	// 	fn system() -> SystemConfigs { my_struct.in_set(TickSet) }
+	// 	fn graph_role(&self) -> GraphRole { GraphRole::Node }
 	// }
 
 	fn my_struct() {}
