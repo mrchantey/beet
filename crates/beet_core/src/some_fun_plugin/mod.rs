@@ -1,3 +1,6 @@
+pub mod bundles;
+#[allow(unused_imports)]
+pub use self::bundles::*;
 pub mod some_fun_plugin;
 #[allow(unused_imports)]
 pub use self::some_fun_plugin::*;

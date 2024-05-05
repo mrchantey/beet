@@ -10,7 +10,7 @@ pub struct EspPlugin;
 impl Plugin for EspPlugin {
 	fn build(&self, app: &mut App) {
 		app /*-*/
-			.add_plugins(BeetMinimalPlugin)
+			.add_plugins(TimePlugin)
 			.add_plugins(BeetSystemsPlugin::<CoreModule,Update>::default())
 			// .add_plugins(DefaultBeetPlugins::<CoreModule>::default())
 			.add_systems(Startup,spawn_obstacle_avoider)

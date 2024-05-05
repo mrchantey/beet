@@ -25,7 +25,7 @@ impl<T: BeetModule> Plugin for DomSim<T> {
 		let (send, recv) = flume::unbounded();
 
 		app /*-*/
-			.add_plugins(BeetMinimalPlugin)
+			.add_plugins(TimePlugin)
 			.add_plugins(DefaultBeetPlugins::<T>::new())
 			.insert_resource(DomSimMessageSend(send.clone()))
 			.insert_resource(DomSimMessageRecv(recv))

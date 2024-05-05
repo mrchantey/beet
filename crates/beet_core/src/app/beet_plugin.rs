@@ -2,13 +2,7 @@ use crate::prelude::*;
 use beet_ecs::prelude::*;
 use bevy::app::PluginGroupBuilder;
 use bevy::prelude::*;
-use bevy::time::TimePlugin;
 
-/// The plugin required for most beet apps
-pub struct BeetMinimalPlugin;
-impl Plugin for BeetMinimalPlugin {
-	fn build(&self, app: &mut App) { app.add_plugins(TimePlugin); }
-}
 #[derive(Default)]
 pub struct DefaultBeetPlugins {
 	pub lifecycle: LifecyclePlugin,
