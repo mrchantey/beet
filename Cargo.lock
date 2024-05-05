@@ -3362,7 +3362,7 @@ checksum = "aa9a19cbb55df58761df49b23516a86d432839add4af60fc256da840f66ed35b"
 
 [[package]]
 name = "forky_bevy"
-version = "0.1.45"
+version = "0.1.46"
 dependencies = [
  "anyhow",
  "bevy 0.14.0-dev",
@@ -3375,7 +3375,7 @@ dependencies = [
 
 [[package]]
 name = "forky_core"
-version = "0.1.45"
+version = "0.1.46"
 dependencies = [
  "anyhow",
  "extend",
@@ -3387,7 +3387,7 @@ dependencies = [
 
 [[package]]
 name = "forky_fs"
-version = "0.1.45"
+version = "0.1.46"
 dependencies = [
  "anyhow",
  "clap",
@@ -3406,7 +3406,7 @@ dependencies = [
 
 [[package]]
 name = "forky_web"
-version = "0.1.45"
+version = "0.1.46"
 dependencies = [
  "anyhow",
  "console_error_panic_hook",
@@ -3425,7 +3425,7 @@ dependencies = [
 
 [[package]]
 name = "forky_web_macros"
-version = "0.1.45"
+version = "0.1.46"
 dependencies = [
  "anyhow",
  "proc-macro2",
@@ -7019,7 +7019,7 @@ checksum = "f83ba502a3265efb76efb89b0a2f7782ad6f2675015d4ce37e4b547dda42b499"
 
 [[package]]
 name = "sweet"
-version = "0.1.45"
+version = "0.1.46"
 dependencies = [
  "anyhow",
  "backtrace",
@@ -7055,7 +7055,7 @@ dependencies = [
 
 [[package]]
 name = "sweet_macros"
-version = "0.1.45"
+version = "0.1.46"
 dependencies = [
  "anyhow",
  "proc-macro2",

@@ -1,18 +1,18 @@
-pub mod force_bundle;
-#[allow(unused_imports)]
-pub use self::force_bundle::*;
 pub mod hover;
 #[allow(unused_imports)]
 pub use self::hover::*;
-pub mod integrate_force;
+pub mod force_bundle;
 #[allow(unused_imports)]
-pub use self::integrate_force::*;
+pub use self::force_bundle::*;
+pub mod translate;
+#[allow(unused_imports)]
+pub use self::translate::*;
 pub mod movement_module;
 #[allow(unused_imports)]
 pub use self::movement_module::*;
 pub mod rotate_to_velocity;
 #[allow(unused_imports)]
 pub use self::rotate_to_velocity::*;
-pub mod translate;
+pub mod integrate_force;
 #[allow(unused_imports)]
-pub use self::translate::*;
+pub use self::integrate_force::*;
