@@ -3,12 +3,12 @@ use beet_ecs::prelude::*;
 use bevy::app::PluginGroupBuilder;
 use bevy::prelude::*;
 
+/// Plugins used for most beet apps.
 #[derive(Default)]
 pub struct DefaultBeetPlugins {
 	pub lifecycle: LifecyclePlugin,
 	pub movement: MovementPlugin,
 	pub steering: SteerPlugin,
-	pub core: SomeFunPlugin,
 }
 
 impl DefaultBeetPlugins {
@@ -17,7 +17,6 @@ impl DefaultBeetPlugins {
 			lifecycle: Default::default(),
 			movement: Default::default(),
 			steering: Default::default(),
-			core: Default::default(),
 		}
 	}
 }
@@ -28,6 +27,5 @@ impl PluginGroup for DefaultBeetPlugins {
 			.add(self.lifecycle)
 			.add(self.movement)
 			.add(self.steering)
-			.add(self.core)
 	}
 }

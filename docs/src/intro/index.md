@@ -12,6 +12,11 @@ It is built with `bevy` and represents behaviors as entities, connecting them th
 - [Actions](./actions.md)
 - [Robotics](./robotics.md)
 
+## Examples
+- [Hello World](../examples/hello_world.md)
+- [Seek](../examples/seek.md)
+- [Flocking](../examples/flock.md)
+
 ## Features
 
 #### 🌈 Multi-Paradigm
@@ -35,87 +40,6 @@ Beet is suitable for powerful gaming rigs and tiny microcontrollers alike.
 <!-- #### 🌐 Zero-config replication
 
 Work can be distributed across environments through world replication. An agent may run some actions in a constrained environment and others in a remote server. -->
-
-## Quickstart
-
-In this example we will create an action and then combine it with some built-in actions to run a behavior.
-
-```rust
-use beet::prelude::*;
-use bevy::prelude::*;
-
-// actions are a component-system pair
-// by default the system is the ComponentName in snake_case
-#[derive(Component, Action)]
-pub struct LogOnRun(pub String);
-
-fn log_on_run(query: Query<&LogOnRun, Added<Running>>) {
-	for message in query.iter() {
-		println!("{}", message.0);
-	}
-}
-
-fn main() {
-	let mut app = App::new();
-
-	app.add_plugins(
-		// This plugin schedules every action in parallel
-		BeetSystemsPlugin::<(
-			SequenceSelector, 
-			InsertOnRun<RunResult>
-			LogOnRun, 
-		), 
-		// Define your own schedule to run ticks independently
-		Update
-		>::default());
-
-	// Behaviors are regular entity hierarchies
-	app.world_mut()
-		.spawn((
-			// start this behavior running
-			Running,
-			SequenceSelector::default(), 
-		))
-		.with_children(|parent| {
-			parent.spawn((
-				LogOnRun("Hello".into()),
-				InsertOnRun(RunResult::Success),
-			));
-			parent.spawn((
-				LogOnRun("World".into()),
-				InsertOnRun(RunResult::Success),
-			));
-		});
-
-	// graph traversals occur on each tick
-	println!("1 - Selector chooses first child");
-	app.update();
-
-	println!("2 - First child runs");
-	app.update();
-
-	println!("3 - Selector chooses second child");
-	app.update();
-
-	println!("4 - Second child runs");
-	app.update();
-
-	println!("5 - Selector succeeds, all done");
-	app.update();
-}
-```
-```
-cargo run --example hello_world
-
-1 - Selector chooses first child
-2 - First child runs
-Hello
-3 - Selector chooses second child
-4 - Second child runs
-World
-5 - Selector succeeds, all done
-```
-
 
 ## Drawbacks
 

@@ -6,9 +6,7 @@ use forky_bevy::extensions::AppExt;
 /// Required Resources:
 /// - [`Time`]
 #[derive(Default)]
-pub struct SteerPlugin {
-	pub wrap_around: Option<WrapAround>,
-}
+pub struct SteerPlugin;
 
 
 impl Plugin for SteerPlugin {
@@ -45,21 +43,10 @@ impl Plugin for SteerPlugin {
 					.chain()
 					.in_set(PostTickSet),
 			)
-			.add_systems(
-				Update,
-				wrap_around
-					.run_if(|res: Option<Res<WrapAround>>| res.is_some())
-					.in_set(PostTickSet),
-			)
 			.__();
 
 		#[cfg(feature = "gizmos")]
 		app.add_systems(Update, debug_group_steer.in_set(PostTickSet));
-
-
-		if let Some(wrap_around) = self.wrap_around.as_ref() {
-			app.insert_resource(wrap_around.clone());
-		}
 	}
 }
 

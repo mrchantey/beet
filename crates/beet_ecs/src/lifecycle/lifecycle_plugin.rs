@@ -2,6 +2,7 @@ use crate::prelude::*;
 use bevy::prelude::*;
 
 
+/// Provides the core actions and utility systems to manage behavior lifecycles.
 #[derive(Default)]
 pub struct LifecyclePlugin;
 

@@ -17,11 +17,11 @@ impl Default for WrapAround {
 }
 
 impl WrapAround {
-	pub fn cube(half_width: f32) -> Self {
-		Self {
-			half_extents: Vec3::new(half_width, half_width, half_width),
-		}
-	}
+	// pub fn cube(half_width: f32) -> Self {
+	// 	Self {
+	// 		half_extents: Vec3::new(half_width, half_width, half_width),
+	// 	}
+	// }
 	pub fn from_window_size(val: Vec2) -> Self {
 		Self {
 			half_extents: Vec3::new(val.x, val.y, 0.1) * 0.5,

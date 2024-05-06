@@ -39,6 +39,7 @@ build-examples-web:
 	rm -rf ./target/examples-web || true
 	just _build-example-web beet seek
 	just _build-example-web beet flock
+	just _build-example-web beet hello_world
 
 deploy-examples-web:
 	just build-examples-web

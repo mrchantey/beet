@@ -1,3 +1,5 @@
+//! In this example we will create an action
+//! and then combine it with some built-in actions to run a behavior.
 use beet::prelude::*;
 use bevy::prelude::*;
 
@@ -8,7 +10,7 @@ struct LogOnRun(pub String);
 
 fn log_on_run(query: Query<&LogOnRun, Added<Running>>) {
 	for action in query.iter() {
-		println!("{}", action.0);
+		log::info!("{}", action.0);
 	}
 }
 
@@ -35,21 +37,20 @@ fn main() {
 			));
 		});
 
-	// each update is a tick
-
-	println!("1 - Selector chooses first child");
+	// graph traversals occur on each tick
+	log::info!("1 - Selector chooses first child");
 	app.update();
 
-	println!("2 - First child runs");
+	log::info!("2 - First child runs");
 	app.update();
 
-	println!("3 - Selector chooses second child");
+	log::info!("3 - Selector chooses second child");
 	app.update();
 
-	println!("4 - Second child runs");
+	log::info!("4 - Second child runs");
 	app.update();
 
-	println!("5 - Selector succeeds, all done");
+	log::info!("5 - Selector succeeds, all done");
 	app.update();
 }
 
