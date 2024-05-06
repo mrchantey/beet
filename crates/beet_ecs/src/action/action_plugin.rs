@@ -24,8 +24,7 @@ impl BeetConfig {
 	}
 }
 
-
-/// Plugin for adding systems to the schedule
+/// Plugin that adds all [`ActionSystems`] to the schedule in [`BeetConfig`], and inits the components.
 #[derive(Debug, Default, Copy, Clone)]
 pub struct ActionPlugin<T: 'static + Send + Sync + Bundle + ActionSystems> {
 	phantom: PhantomData<T>,

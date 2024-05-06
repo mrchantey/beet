@@ -1,11 +1,9 @@
 #![feature(result_flattening)]
 pub mod action;
-pub mod channel_event;
 pub mod extensions;
 pub mod graph;
 pub mod inspector_options;
 pub mod lifecycle;
-pub mod node;
 pub mod reflect;
 #[cfg(test)]
 pub mod test;
@@ -17,14 +15,13 @@ extern crate self as beet;
 
 pub mod prelude {
 	pub use crate::action::*;
-	pub use crate::channel_event::*;
 	pub use crate::extensions::*;
 	pub use crate::graph::*;
 	pub use crate::inspector_options::*;
 	pub use crate::lifecycle::actions::*;
+	pub use crate::lifecycle::components::*;
 	pub use crate::lifecycle::selectors::*;
 	pub use crate::lifecycle::*;
-	pub use crate::node::*;
 	pub use crate::reflect::*;
 	#[cfg(test)]
 	pub use crate::test::*;

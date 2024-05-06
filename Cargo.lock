@@ -631,18 +631,14 @@ dependencies = [
  "bevy 0.14.0-dev",
  "bincode",
  "extend",
- "flume",
  "heck 0.4.1",
  "log",
  "num-traits",
- "parking_lot",
  "petgraph",
  "pretty_env_logger",
  "ron",
  "serde",
  "serde_json",
- "strum",
- "strum_macros",
  "sweet",
 ]
 

@@ -14,21 +14,14 @@ categories.workspace = true
 [dependencies]
 beet_ecs_macros.workspace = true
 
-
 log.workspace = true
 anyhow.workspace = true
 heck.workspace = true
 petgraph.workspace = true
 serde.workspace = true
-bincode.workspace = true
 
 extend.workspace = true
 num-traits.workspace = true
-strum.workspace = true
-strum_macros.workspace = true
-
-parking_lot.workspace = true
-flume.workspace = true
 
 bevy.workspace = true
 

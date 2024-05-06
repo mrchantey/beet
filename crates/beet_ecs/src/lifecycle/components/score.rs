@@ -16,19 +16,9 @@ pub struct Scoring;
 /// - As a parameter of an Astar cost component
 /// - Indicate to selectors how favorable a child node would be to run.
 #[derive(
-	Debug,
-	Default,
-	Clone,
-	Copy,
-	Component,
-	PartialEq,
-	// strum
-	strum_macros::Display,
-	strum_macros::EnumIter,
-	Reflect,
-	InspectorOptions,
+	Debug, Default, Clone, Copy, Component, PartialEq, Reflect, InspectorOptions,
 )]
-#[reflect(Component, InspectorOptions)]
+#[reflect(Default, Component, InspectorOptions)]
 pub enum Score {
 	#[default]
 	/// Lowest possible score, ie the node should not run.

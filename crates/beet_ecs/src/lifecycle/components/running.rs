@@ -1,8 +1,5 @@
 use bevy::prelude::*;
 use std::fmt::Debug;
-use strum_macros::Display;
-use strum_macros::EnumIter;
-
 
 /// Indicate this node is currently running.
 /// As this is frequently added and removed, it is `SparseSet`.
@@ -16,17 +13,7 @@ pub struct Running;
 
 /// Indicate the result of an action.
 /// As this is frequently added and removed, it is `SparseSet`.
-#[derive(
-	Default,
-	Debug,
-	Clone,
-	Copy,
-	Component,
-	PartialEq,
-	EnumIter,
-	Display,
-	Reflect,
-)]
+#[derive(Default, Debug, Clone, Copy, Component, PartialEq, Reflect)]
 #[component(storage = "SparseSet")]
 #[reflect(Component, Default)]
 pub enum RunResult {

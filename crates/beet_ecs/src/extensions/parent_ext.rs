@@ -2,6 +2,11 @@ use bevy::ecs::entity::MapEntities;
 use bevy::ecs::reflect::ReflectMapEntities;
 use bevy::prelude::*;
 
+/// Couldn't resist.. Marker to identify the root of a behavior graph
+#[derive(Debug, Default, Component, Reflect)]
+#[reflect(Component, Default)]
+pub struct BeetRoot;
+
 
 /// This component will be replaced with a [`TargetAgent`] that points to the root [`Parent`] of this entity.
 #[derive(Debug, Default, Component, Reflect)]
@@ -18,8 +23,6 @@ impl MapEntities for TargetAgent {
 		**self = entity_mapper.map_entity(**self);
 	}
 }
-
-
 
 pub fn set_root_as_target_agent(
 	mut commands: Commands,
