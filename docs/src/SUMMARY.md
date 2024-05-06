@@ -1,10 +1,12 @@
 # Summary
 <!-- https://rust-lang.github.io/mdBook/format/summary.html -->
-- [Beet](./index.md)
-	- [Concepts](./concepts.md)
-	- [Actions](./actions.md)
-	- [Robotics](./robotics.md)
-
+- [Beet](./intro/index.md)
+	- [Concepts](./intro/concepts.md)
+	- [Actions](./intro/actions.md)
+	- [Robotics](./intro/robotics.md)
+- [Examples](./examples/index.md)
+	- [Seek](./examples/seek.md)
+	- [Flock](./examples/flock.md)
 ---
 <!-- [Changelog](./misc/roadmap.md) -->
 

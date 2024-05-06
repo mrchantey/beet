@@ -1,4 +1,10 @@
 html,
 body {
 	margin: 0;
+	background-color: transparent;
+}
+
+canvas {
+	outline: none;
+	border: none;
 }

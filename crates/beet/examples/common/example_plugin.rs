@@ -1,5 +1,5 @@
 use beet::prelude::*;
-use bevy::{prelude::*, window::WindowResolution};
+use bevy::prelude::*;
 use forky_bevy::systems::close_on_esc;
 // use bevy_inspector_egui::quick::WorldInspectorPlugin;
 
@@ -17,8 +17,9 @@ impl Plugin for ExamplePlugin {
 		.add_plugins(DefaultPlugins.set(
 			WindowPlugin{
 				primary_window: Some( Window {
-					resolution: WindowResolution::new(960., 960.),
-					position: WindowPosition::At(IVec2::new(5120, 0)),				
+					fit_canvas_to_parent:true,
+					// resolution: window::WindowResolution::new(960., 960.),
+					// position: WindowPosition::At(IVec2::new(5120, 0)),				
 					..default()
 				}),
 				..default()		
