@@ -1,6 +1,6 @@
 set windows-shell := ["C:/tools/cygwin/bin/sh.exe","-c"]
 set dotenv-load
-crates := 'beet beet_ecs beet_net'
+crates := 'beet beet_core beet_ecs beet_net'
 
 default:
 	just --list --unsorted
@@ -33,6 +33,14 @@ run crate example *args:
 
 run-w crate example *args:
 	just watch 'just run {{crate}} {{example}} {{args}}'
+
+
+build-examples-web:
+	rm -rf ./target/examples-web
+	mkdir -p ./target/examples-web || true
+	mkdir -p ./target/examples-web/assets || true
+	cp -r ./crates/beet/html/* ./target/examples-web
+	cp -r ./crates/beet/assets/* ./target/examples-web/assets
 
 serve-web:
 	just serve-wasm

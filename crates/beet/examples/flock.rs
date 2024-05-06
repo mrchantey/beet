@@ -4,7 +4,6 @@ use bevy::prelude::*;
 #[path = "common/example_plugin.rs"]
 mod example_plugin;
 use example_plugin::ExamplePlugin;
-use forky_bevy::extensions::Vec3Ext;
 
 fn main() {
 	let mut app = App::new();
@@ -19,11 +18,12 @@ fn main() {
 
 
 fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
-	for _ in 0..50 {
+	for _ in 0..100 {
 		spawn_agent(
 			&mut commands,
 			&asset_server,
-			Vec3::random_in_sphere() * 500.,
+			Vec3::ZERO,
+			// Vec3::random_in_sphere() * 500.,
 		);
 	}
 }
@@ -87,7 +87,7 @@ fn spawn_agent(
 				Separate::<GroupSteerAgent>::new(1.),
 				Align::<GroupSteerAgent>::new(1.),
 				Cohere::<GroupSteerAgent>::new(1.),
-				Wander::new(1.),
+				Wander::new(0.1),
 			));
 		});
 }

@@ -14,14 +14,16 @@ impl Plugin for ExamplePlugin {
 		app
 		.insert_resource(WrapAround::default())
 		// .add_plugins(WorldInspectorPlugin::new())
-		.add_plugins(DefaultPlugins.set(WindowPlugin{
-			primary_window: Some(Window {
-				resolution:WindowResolution::new(960., 960.),
-				position:WindowPosition::At(IVec2::new(5120, 0)),				
-				..default()
-			}),
-	..default()		
-	}))
+		.add_plugins(DefaultPlugins.set(
+			WindowPlugin{
+				primary_window: Some( Window {
+					resolution: WindowResolution::new(960., 960.),
+					position: WindowPosition::At(IVec2::new(5120, 0)),				
+					..default()
+				}),
+				..default()		
+			}
+		))
 		.add_plugins(DefaultBeetPlugins::default())
 		.add_systems(Startup, space_setup)
 		.add_systems(Update, update_wrap_around)
