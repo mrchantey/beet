@@ -53,6 +53,8 @@ pub struct SteerBundle {
 }
 
 impl SteerBundle {
+	/// Defaults are in a range 0..1, this is a convenience method for scaling all parameters in the bundle.
+	/// For instance if using pixel space, you might want to scale all parameters by 100.
 	pub fn scaled_to(mut self, val: f32) -> Self {
 		self.max_force.0 *= val;
 		self.max_speed.0 *= val;

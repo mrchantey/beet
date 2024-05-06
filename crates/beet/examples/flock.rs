@@ -71,10 +71,7 @@ fn spawn_agent(
 				..default()
 			},
 			RotateToVelocity2d,
-			ForceBundle {
-				// velocity: Velocity(Vec3::random_in_sphere() * 500.),
-				..default()
-			},
+			ForceBundle::default(),
 			SteerBundle::default().scaled_to(100.),
 			VelocityScalar(Vec3::new(1., 1., 0.)),
 			GroupSteerAgent,
