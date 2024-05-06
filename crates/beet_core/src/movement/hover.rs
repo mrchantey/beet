@@ -5,16 +5,16 @@ use std::f32::consts::TAU;
 
 
 #[derive(
-	Debug, Default, Clone, PartialEq, Component, Reflect, InspectorOptions,
+	Debug, Default, Clone, PartialEq, Component, Reflect,
 )]
-#[reflect(Default, Component, ActionMeta, InspectorOptions)]
+#[reflect(Default, Component, ActionMeta)]
 /// Translate the agent up and down in a sine wave
 pub struct Hover {
 	/// Measured in Hz
-	#[inspector(min = 0.1, max = 3., step = 0.1)]
+	// #[inspector(min = 0.1, max = 3., step = 0.1)]
 	pub speed: f32,
 	/// Measured in meters
-	#[inspector(min = 0.1, max = 3., step = 0.1)]
+	// #[inspector(min = 0.1, max = 3., step = 0.1)]
 	pub height: f32,
 }
 

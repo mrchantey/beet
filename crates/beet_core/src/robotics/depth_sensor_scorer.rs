@@ -3,11 +3,11 @@ use beet_ecs::prelude::*;
 use bevy::ecs::schedule::SystemConfigs;
 use bevy::prelude::*;
 
-#[derive(Debug, Clone, PartialEq, Component, Reflect, InspectorOptions)]
-#[reflect(Default, Component, ActionMeta, InspectorOptions)]
+#[derive(Debug, Clone, PartialEq, Component, Reflect)]
+#[reflect(Default, Component, ActionMeta)]
 /// Sets the [`Score`] based on the [`DepthValue`].
 pub struct DepthSensorScorer {
-	#[inspector(step = 0.1)]
+	// #[inspector(step = 0.1)]
 	pub threshold_dist: f32,
 	pub far_score: Score,
 	pub close_score: Score,

@@ -12,13 +12,13 @@ impl ActionSystems for Translate {
 }
 
 #[derive(
-	Debug, Default, Clone, PartialEq, Component, Reflect, InspectorOptions,
+	Debug, Default, Clone, PartialEq, Component, Reflect,
 )]
-#[reflect(Default, Component, ActionMeta, InspectorOptions)]
+#[reflect(Default, Component, ActionMeta)]
 /// Applies constant translation, multiplied by [`Time::delta_seconds`]
 pub struct Translate {
 	/// Translation to apply, in meters per second
-	#[inspector(min=-2., max=2., step=0.1)]
+	// #[inspector(min=-2., max=2., step=0.1)]
 	pub translation: Vec3,
 }
 

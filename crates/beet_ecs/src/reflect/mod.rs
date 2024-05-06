@@ -13,9 +13,6 @@ pub use self::dyn_reflect::*;
 pub mod field_ident;
 #[allow(unused_imports)]
 pub use self::field_ident::*;
-pub mod field_inspector;
-#[allow(unused_imports)]
-pub use self::field_inspector::*;
 pub mod field_tree;
 #[allow(unused_imports)]
 pub use self::field_tree::*;

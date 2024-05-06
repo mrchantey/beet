@@ -645,14 +645,6 @@ dependencies = [
 [[package]]
 name = "beet_ecs_macros"
 version = "0.0.8"
-dependencies = [
- "anyhow",
- "extend",
- "heck 0.4.1",
- "proc-macro2",
- "quote",
- "syn 2.0.59",
-]
 
 [[package]]
 name = "beet_ml"

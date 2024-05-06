@@ -108,11 +108,9 @@ mod test {
 	use std::any::TypeId;
 	use sweet::*;
 
-	#[derive(
-		Debug, Default, PartialEq, Component, Reflect, InspectorOptions,
-	)]
-	#[reflect(Default, Component, InspectorOptions)]
-	struct MyVecStruct(#[inspector(min = 2.)] pub Vec3);
+	#[derive(Debug, Default, PartialEq, Component, Reflect)]
+	#[reflect(Default, Component)]
+	struct MyVecStruct(pub Vec3);
 
 	#[test]
 	fn tuple_struct() -> Result<()> {
@@ -121,7 +119,7 @@ mod test {
 		let mut app = App::new();
 		app.register_type::<MyVecStruct>();
 
-let entity = app.world_mut().spawn(MyVecStruct(Vec3::default())).id();
+		let entity = app.world_mut().spawn(MyVecStruct(Vec3::default())).id();
 
 
 		let field = ComponentIdent::new(entity, TypeId::of::<MyVecStruct>())

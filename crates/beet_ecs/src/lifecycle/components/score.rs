@@ -1,5 +1,3 @@
-use crate::prelude::ReflectInspectorOptions;
-use beet_ecs_macros::InspectorOptions;
 use bevy::prelude::*;
 use std::cmp::Ordering;
 use std::fmt::Debug;
@@ -15,15 +13,14 @@ pub struct Scoring;
 /// Score is a primitive of [`beet`]. The weight is almost always in the range of `0..1` Like a [`Vec3`], the meaning of a [`Score`] depends on its context, for example:
 /// - As a parameter of an Astar cost component
 /// - Indicate to selectors how favorable a child node would be to run.
-#[derive(
-	Debug, Default, Clone, Copy, Component, PartialEq, Reflect, InspectorOptions,
-)]
-#[reflect(Default, Component, InspectorOptions)]
+#[derive(Debug, Default, Clone, Copy, Component, PartialEq, Reflect)]
+#[reflect(Default, Component)]
 pub enum Score {
 	#[default]
 	/// Lowest possible score, ie the node should not run.
 	Fail,
-	Weight(#[inspector(min = 0., max = 1., step = 0.01)] f32),
+	Weight(f32),
+	// Weight(#[inspector(min = 0., max = 1., step = 0.01)] f32),
 	/// The node has a weight, usually in the range `0..1`, where higher is more favorable.
 	// Weight(#[number(min = 0, max = 100, step = 1)] u8),
 	/// Highest possible score, ie the node should run.
