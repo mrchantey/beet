@@ -1,45 +1,49 @@
 use crate::prelude::*;
 use beet_ecs::prelude::*;
-use bevy::core::Name;
-use bevy::math::Vec3;
+use bevy::prelude::*;
 
 /// A useful default behavior
-pub fn forage_behavior() -> BeetBuilder {
+pub fn forage_behavior(world: &mut World) -> Entity {
 	let awareness_radius = 0.5;
-	(
-		Name::new("Forage"),
-		Repeat::default(),
-		ScoreSelector::default(),
-		FindSteerTarget::new("flower", awareness_radius),
-	)
-		.child((
-			Name::new("Wander"),
-			Score::default(),
-			SetOnSpawn(Score::Weight(0.5)),
-			Wander::default(),
-			InsertInDuration::<RunResult>::default(),
+	world
+		.spawn((
+			Name::new("Forage"),
+			Repeat::default(),
+			ScoreSelector::default(),
+			FindSteerTarget::new("flower", awareness_radius),
 		))
-		.child(
-			(
-				Name::new("Seek"),
+		.with_children(|parent| {
+			parent.spawn((
+				Name::new("Wander"),
 				Score::default(),
-				ScoreSteerTarget::new(awareness_radius),
-				SequenceSelector::default(),
-			)
-				.child((
-					Name::new("Go to flower"),
-					Seek::default(),
-					SucceedOnArrive { radius: 0.1 },
+				SetOnSpawn(Score::Weight(0.5)),
+				Wander::default(),
+				InsertInDuration::<RunResult>::default(),
+			));
+			parent
+				.spawn((
+					Name::new("Seek"),
+					Score::default(),
+					ScoreSteerTarget::new(awareness_radius),
+					SequenceSelector::default(),
 				))
-				.child((
-					Name::new("Wait 1 second"),
-					SetAgentOnRun(Velocity(Vec3::ZERO)),
-					InsertInDuration::<RunResult>::default(),
-				))
-				.child((
-					Name::new("Collect flower"),
-					InsertOnRun(RunResult::Success),
-					DespawnSteerTarget::default(),
-				)),
-		)
+				.with_children(|parent| {
+					parent.spawn((
+						Name::new("Go to flower"),
+						Seek::default(),
+						SucceedOnArrive { radius: 0.1 },
+					));
+					parent.spawn((
+						Name::new("Wait 1 second"),
+						SetAgentOnRun(Velocity(Vec3::ZERO)),
+						InsertInDuration::<RunResult>::default(),
+					));
+					parent.spawn((
+						Name::new("Collect flower"),
+						InsertOnRun(RunResult::Success),
+						DespawnSteerTarget::default(),
+					));
+				});
+		})
+		.id()
 }

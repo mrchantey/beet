@@ -74,12 +74,6 @@ mod test {
 
 		app.add_plugins(DefaultBeetPlugins::default()).insert_time();
 
-
-		let tree = Wander::default()
-			.into_beet_builder()
-			.build(app.world_mut())
-			.value;
-
 		let agent = app
 			.world_mut()
 			.spawn((
@@ -87,7 +81,9 @@ mod test {
 				ForceBundle::default(),
 				SteerBundle::default(),
 			))
-			.add_child(tree)
+			.with_children(|parent| {
+				parent.spawn((RootIsTargetAgent, Running, Wander::default()));
+			})
 			.id();
 
 		app.update();

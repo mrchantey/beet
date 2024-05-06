@@ -73,11 +73,7 @@ mod test {
 	fn works() -> Result<()> {
 		let mut app = App::new();
 
-		app.add_plugins(DefaultBeetPlugins::default())
-			.insert_time();
-
-
-		let tree = Seek.into_beet_builder().build(app.world_mut()).value;
+		app.add_plugins(DefaultBeetPlugins::default()).insert_time();
 
 		let agent = app
 			.world_mut()
@@ -86,7 +82,9 @@ mod test {
 				ForceBundle::default(),
 				SteerBundle::default().with_target(Vec3::new(1.0, 0., 0.)),
 			))
-			.add_child(tree)
+			.with_children(|parent| {
+				parent.spawn((RootIsTargetAgent, Running, Seek));
+			})
 			.id();
 
 
