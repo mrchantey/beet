@@ -14,7 +14,7 @@ pub fn sync_interrupts(
 	children: Query<&Children>,
 ) {
 	for entity in interrupts.iter() {
-		ChildrenExt::visit_dfs(entity, &children, |edge| {
+		ChildrenExt::visit(entity, &children, |edge| {
 			commands
 				.entity(edge)
 				.remove::<(Interrupt, Running, RunResult)>();

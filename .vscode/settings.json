@@ -1,6 +1,4 @@
 {
-	"files.autoSave": "afterDelay",
-	"files.autoSaveDelay": 1000,
 	"files.exclude": {
 		"**/.git": true,
 		// ".vscode": true,
@@ -27,7 +25,6 @@
 	// "rust-analyzer.cargo.target": "x86_64-unknown-linux-gnu",
 	// "rust-analyzer.procMacro.enable": false,
 	// "rust-analyzer.procMacro.attributes.enable": false,
-	"rust-analyzer.showUnlinkedFileNotification": false,
 	"rust-analyzer.files.excludeDirs": [
 		"crates/beet_esp"
 	],

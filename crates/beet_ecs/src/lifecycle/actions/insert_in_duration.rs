@@ -7,6 +7,8 @@ use std::time::Duration;
 #[reflect(Default, Component, ActionMeta)]
 /// Inserts the given component after running for a given duration. Has no effect if
 /// the action completes before the duration.
+/// # Requires
+/// - [`RunTimer`]
 pub struct InsertInDuration<T: GenericActionComponent> {
 	pub duration: Duration,
 	pub value: T,

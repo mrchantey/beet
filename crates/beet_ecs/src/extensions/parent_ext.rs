@@ -41,6 +41,33 @@ pub fn set_root_as_target_agent(
 pub struct ParentExt;
 
 impl ParentExt {
+	pub fn visit(
+		entity: Entity,
+		parents: &Query<&Parent>,
+		mut func: impl FnMut(Entity),
+	) {
+		func(entity);
+		if let Ok(parent) = parents.get(entity) {
+			Self::visit(**parent, parents, func);
+		}
+	}
+
+	pub fn find<T>(
+		entity: Entity,
+		parents: &Query<&Parent>,
+		mut func: impl FnMut(Entity) -> Option<T>,
+	) -> Option<T> {
+		if let Some(val) = func(entity) {
+			return Some(val);
+		}
+		if let Ok(parent) = parents.get(entity) {
+			Self::find(**parent, parents, func)
+		} else {
+			None
+		}
+	}
+
+
 	pub fn get_root(parent: &Parent, parent_query: &Query<&Parent>) -> Entity {
 		if let Ok(grandparent) = parent_query.get(**parent) {
 			Self::get_root(grandparent, parent_query)

@@ -9,7 +9,7 @@ impl ChildrenExt {
 		edge_query: &Query<&Children>,
 	) -> Vec<Entity> {
 		let mut entities = Vec::new();
-		Self::visit_dfs(entity, edge_query, |entity| {
+		Self::visit(entity, edge_query, |entity| {
 			entities.push(entity);
 		});
 		entities
@@ -22,36 +22,79 @@ impl ChildrenExt {
 		entities
 	}
 
-	pub fn visit_dfs(
+	/// dfs visit
+	pub fn visit(
 		entity: Entity,
 		edge_query: &Query<&Children>,
 		mut func: impl FnMut(Entity),
 	) {
-		Self::visit_dfs_recursive(
-			entity,
-			edge_query,
-			&mut func,
-			&mut HashSet::default(),
-		);
-	}
-
-	fn visit_dfs_recursive(
-		entity: Entity,
-		edge_query: &Query<&Children>,
-		func: &mut impl FnMut(Entity),
-		visited: &mut HashSet<Entity>,
-	) {
-		if visited.contains(&entity) {
-			return;
-		}
-		visited.insert(entity);
-		func(entity);
-		if let Ok(children) = edge_query.get(entity) {
-			for child in children.iter() {
-				Self::visit_dfs_recursive(*child, edge_query, func, visited);
+		fn visit(
+			entity: Entity,
+			edge_query: &Query<&Children>,
+			func: &mut impl FnMut(Entity),
+		) {
+			func(entity);
+			if let Ok(children) = edge_query.get(entity) {
+				for child in children.iter() {
+					visit(*child, edge_query, func);
+				}
 			}
 		}
+		visit(entity, edge_query, &mut func);
 	}
+
+	/// dfs find
+	pub fn find<T>(
+		entity: Entity,
+		query: &Query<&Children>,
+		mut func: impl FnMut(Entity) -> Option<T>,
+	) -> Option<T> {
+		fn find<T>(
+			entity: Entity,
+			query: &Query<&Children>,
+			func: &mut impl FnMut(Entity) -> Option<T>,
+		) -> Option<T> {
+			if let Some(val) = func(entity) {
+				return Some(val);
+			}
+			if let Ok(children) = query.get(entity) {
+				for child in children.iter() {
+					match find(*child, query, func) {
+						None => {}
+						some => return some,
+					}
+				}
+			}
+			None
+		}
+		find(entity, query, &mut func)
+	}
+	pub fn first(
+		entity: Entity,
+		query: &Query<&Children>,
+		mut func: impl FnMut(Entity) -> bool,
+	) -> Option<Entity> {
+		fn first(
+			entity: Entity,
+			query: &Query<&Children>,
+			func: &mut impl FnMut(Entity) -> bool,
+		) -> Option<Entity> {
+			if func(entity) {
+				return Some(entity);
+			}
+			if let Ok(children) = query.get(entity) {
+				for child in children.iter() {
+					match first(*child, query, func) {
+						None => {}
+						some => return some,
+					}
+				}
+			}
+			None
+		}
+		first(entity, query, &mut func)
+	}
+
 	pub fn visit_dfs_world(
 		world: &mut World,
 		entity: Entity,
