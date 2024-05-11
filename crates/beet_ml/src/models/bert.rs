@@ -76,36 +76,34 @@ impl Bert {
 		let model_url = config.model.model_url();
 		let tokenizer_url = config.model.tokenizer_url();
 		
-		log::info!("BANG 1");
-		let (model_config, weights, tokenizer) = futures::join!(
-			open_or_fetch(&config_url),
-			open_or_fetch(&model_url),
-			open_or_fetch(&tokenizer_url)
-		);
-		// futures::(
-			// );
-			
-			log::info!("BANG 2");
+		let model_config = open_or_fetch(&config_url).await;
+		let weights = open_or_fetch(&model_url).await;
+		let tokenizer = open_or_fetch(&tokenizer_url).await;
+
+		// let (model_config, weights, tokenizer) = futures::join!(
+		// 	open_or_fetch(&config_url),
+		// 	open_or_fetch(&model_url),
+		// 	open_or_fetch(&tokenizer_url)
+		// );
 			
 			let model_config = model_config
-			.map_err(|e| anyhow::anyhow!("{:?}", e))?
+			.map_err(|e| anyhow::anyhow!("config fetch error: {:?}", e))?
 			.to_vec();
 		let model_config: Config = serde_json::from_slice(&model_config)?;
 		
-		
-		let weights = weights.map_err(|e| anyhow::anyhow!("{:?}", e))?.to_vec();
+		let weights = weights.map_err(|e| anyhow::anyhow!("weights fetch error: {:?}", e))?.to_vec();
 		let device = &candle_core::Device::Cpu;
 		let vb =
-		VarBuilder::from_buffered_safetensors(weights, DType::F64, device)?;
+		VarBuilder::from_buffered_safetensors(weights, candle_transformers::models::bert::DTYPE, device)?;
+		// VarBuilder::from_buffered_safetensors(weights, DType::F64, device)?;
 		
 		
-
 		let tokenizer =
-			tokenizer.map_err(|e| anyhow::anyhow!("{:?}", e))?.to_vec();
+		tokenizer.map_err(|e| anyhow::anyhow!("tokenizer fetch error: {:?}", e))?.to_vec();
 		let tokenizer = Tokenizer::from_bytes(&tokenizer)
-			.map_err(|m| anyhow::anyhow!(m.to_string()))?;
-
-
+		.map_err(|m| anyhow::anyhow!(m.to_string()))?;
+	
+	
 		let model = BertModel::load(vb, &model_config)?;
 
 		Ok(Self {

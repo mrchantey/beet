@@ -680,6 +680,7 @@ dependencies = [
  "sweet",
  "thiserror",
  "tokenizers",
+ "tokio",
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "web-sys",

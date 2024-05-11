@@ -8,14 +8,14 @@ default:
 
 ## common
 test-core *args:
-	just watch 'cargo test -p beet_core $BEET_CARGO_TEST --lib -- {{args}}'
+	just watch 'cargo test -p beet_core --lib -- {{args}}'
 
 test-ecs *args:
-	just watch 'cargo test -p beet_ecs $BEET_CARGO_TEST --lib -- {{args}}'
-# just watch 'cargo test -p beet_ecs $BEET_CARGO_TEST --lib -- --nocapture {{args}}'
+	just watch 'cargo test -p beet_ecs --lib -- {{args}}'
+# just watch 'cargo test -p beet_ecs --lib -- --nocapture {{args}}'
 
 test-ml *args:
-	just watch 'cargo test -p beet_ml $BEET_CARGO_TEST --lib -- {{args}}'
+	just watch 'cargo test -p beet_ml --lib -- {{args}}'
 
 
 test-web *args:
@@ -35,14 +35,16 @@ run crate example *args:
 run-w crate example *args:
 	just watch 'just run {{crate}} {{example}} {{args}}'
 
+watch-ml-example:
+	just watch 'just build-web-example beet hello_ml_bevy'
 
 build-web-examples:
 	rm -rf ./target/web-examples || true
-	just _build-web-example beet animation
-	just _build-web-example beet flock
-	just _build-web-example beet hello_world
-	just _build-web-example beet hello_ml_bevy
-	just _build-web-example beet seek
+	just build-web-example beet animation
+	just build-web-example beet flock
+	just build-web-example beet hello_world
+	just build-web-example beet hello_ml_bevy
+	just build-web-example beet seek
 
 serve-web-examples:
 	cd ./target/web-examples && forky serve
@@ -52,7 +54,7 @@ deploy-web-examples:
 	gsutil -m rsync -d -r ./target/web-examples gs://beet-examples
 # -m parallel rsync copy -d delete if not in local -r recursive
 
-_build-web-example crate example *args:
+build-web-example crate example *args:
 	mkdir -p ./target/web-examples/{{example}} || true
 	mkdir -p ./target/web-examples/{{example}}/assets || true
 	cp -r ./crates/beet/examples/html/* ./target/web-examples/{{example}}
@@ -96,20 +98,20 @@ publish-all:
 	just publish beet
 
 test crate *args:
-	cargo run -p {{crate}} --example test_{{crate}} $BEET_CARGO_TEST -- {{args}}
+	cargo run -p {{crate}} --example test_{{crate}} -- {{args}}
 
 test-w crate *args:
-	just watch 'cargo run -p {{crate}} --example test_{{crate}} $BEET_CARGO_TEST -- -w {{args}}'
+	just watch 'cargo run -p {{crate}} --example test_{{crate}} -- -w {{args}}'
 
 test-all:
-	cargo test -p beet_ecs $BEET_CARGO_TEST --lib
-	cargo test -p beet_core $BEET_CARGO_TEST --lib
-	cargo test -p beet_net $BEET_CARGO_TEST --lib
+	cargo test -p beet_ecs --lib
+	cargo test -p beet_core --lib
+	cargo test -p beet_net --lib
 
 test-ci *args:
-	cargo run -p beet_core --example test_beet_core $BEET_CARGO_TEST_CI -- {{args}}
-	cargo run -p beet_ecs  --example test_beet_ecs 	$BEET_CARGO_TEST_CI -- {{args}}
-	cargo run -p beet_net  --example test_beet_net  $BEET_CARGO_TEST_CI -- {{args}}
+	cargo run -p beet_core --example test_beet_core -- {{args}}
+	cargo run -p beet_ecs  --example test_beet_ecs  -- {{args}}
+	cargo run -p beet_net  --example test_beet_net  -- {{args}}
 
 test-wasm crate *args:
 	sweet -p {{crate}} --example test_{{crate}} --interactive --watch {{args}}

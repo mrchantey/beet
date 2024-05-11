@@ -1,7 +1,5 @@
-use anyhow::Result;
 use serde::Deserialize;
 use serde::Serialize;
-use std::fs;
 
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -11,8 +9,7 @@ pub struct BertConfig {
 	pub approximate_gelu: bool,
 }
 
-impl Default for BertConfig{
-
+impl Default for BertConfig {
 	fn default() -> Self {
 		Self{
 			model: BertModelConfig {
@@ -26,12 +23,9 @@ impl Default for BertConfig{
 			approximate_gelu: false,
 		}
 	}
-
 }
 
 impl BertConfig {
-
-
 	pub fn new(model: BertModelConfig) -> Self {
 		Self {
 			model,

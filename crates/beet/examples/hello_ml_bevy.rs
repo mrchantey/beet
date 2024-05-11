@@ -1,10 +1,7 @@
-use anyhow::Result;
 use beet::prelude::*;
 use bevy::prelude::*;
 
 fn main() {
-	// pretty_env_logger::try_init().ok();
-
 	App::new()
 		.add_plugins((DefaultPlugins, DefaultBeetPlugins, MlPlugin::default()))
 		.add_systems(Startup, setup)
@@ -12,6 +9,7 @@ fn main() {
 }
 
 fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
+
 	commands
 		.spawn(Sentence::new("destroy"))
 		.with_children(|parent| {

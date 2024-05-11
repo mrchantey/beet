@@ -29,8 +29,9 @@ impl AssetLoader for BertLoader {
 			let mut bytes = Vec::new();
 			reader.read_to_end(&mut bytes).await?;
 			let config = ron::de::from_bytes::<BertConfig>(&bytes)?;
-
 			let bert = Bert::new(config).await?;
+
+			log::info!("bert loaded");
 
 			Ok(bert)
 		})

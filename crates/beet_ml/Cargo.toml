@@ -94,3 +94,6 @@ features = [
 [dev-dependencies]
 pretty_env_logger.workspace = true
 sweet.workspace = true
+
+[target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
+tokio.workspace = true

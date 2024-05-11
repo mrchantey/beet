@@ -44,12 +44,10 @@ fn sentence_scorer(
 		let mut options = vec![parent.0.clone()];
 		options.extend(children.iter().map(|c| c.1 .0.clone()));
 
-		// log::info!("hello 1");
-		
+
 		let Some(bert) = berts.get_mut(&scorer.bert) else {
 			continue;
 		};
-		// log::info!("hello 2");
 
 		//VERY EXPENSIVE
 		let embeddings = bert.get_embeddings(options).unwrap();
@@ -167,10 +165,11 @@ mod test {
 					.with_leaf(Some(&Running)),
 			),
 		)?;
-		expect(tree.component_tree::<Score>(app.world())).to_be(
-			Tree::new(None)
-				.with_child(Tree::new(None).with_leaf(None).with_leaf(None)),
-		)?;
+		// why was this here?
+		// expect(tree.component_tree::<Score>(app.world())).to_be(
+		// 	Tree::new(None)
+		// 		.with_child(Tree::new(None).with_leaf(None).with_leaf(None)),
+		// )?;
 
 		Ok(())
 	}

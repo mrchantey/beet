@@ -28,7 +28,7 @@ impl LogOnRun {
 
 fn log_on_run(query: Query<&LogOnRun, Added<Running>>) {
 	for log in query.iter() {
-		println!("{}", log.0)
+		log::info!("{}", log.0)
 	}
 }
 
