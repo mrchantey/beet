@@ -103,6 +103,8 @@ mod test {
 
 	#[test]
 	fn works() -> Result<()> {
+		pretty_env_logger::try_init().ok();
+
 		let mut app = App::new();
 		app.add_plugins((
 			MinimalPlugins,
@@ -142,6 +144,7 @@ mod test {
 		let tree = EntityTree::new_with_world(entity, app.world());
 
 		let scores = tree.component_tree::<Score>(app.world());
+
 		let heal_score = scores.children[0].children[0].value.unwrap();
 		let kill_score = scores.children[0].children[1].value.unwrap();
 		expect(kill_score).to_be_greater_than(heal_score)?;

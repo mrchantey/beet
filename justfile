@@ -17,6 +17,7 @@ test-ecs *args:
 test-ml *args:
 	just watch 'cargo test -p beet_ml $BEET_CARGO_TEST --lib -- {{args}}'
 
+
 test-web *args:
 	just test-wasm beet_web {{args}}
 
