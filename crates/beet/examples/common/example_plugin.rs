@@ -1,3 +1,4 @@
+#![allow(unused_imports)]
 use beet::prelude::*;
 use bevy::prelude::*;
 use forky_bevy::systems::close_on_esc;
@@ -5,13 +6,15 @@ mod auto_spawn;
 mod follow_cursor;
 mod randomize_position;
 mod render_text;
+mod setup_scene_3d;
 mod wrap_around;
 pub use auto_spawn::*;
-#[allow(unused_imports)]
 pub use follow_cursor::*;
 pub use randomize_position::*;
 pub use render_text::*;
+pub use setup_scene_3d::*;
 pub use wrap_around::*;
+
 // use bevy_inspector_egui::quick::WorldInspectorPlugin;
 /// Boilerplate for examples
 pub struct ExamplePlugin;

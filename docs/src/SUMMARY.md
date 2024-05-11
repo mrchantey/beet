@@ -6,6 +6,7 @@
 	- [Robotics](./intro/robotics.md)
 - [Examples](./examples/index.md)
 	- [Hello World](./examples/hello_world.md)
+	- [Animation](./examples/animation.md)
 	- [Seek](./examples/seek.md)
 	- [Flock](./examples/flock.md)
 ---

@@ -11,6 +11,9 @@ license = { workspace = true }
 keywords = { workspace = true }
 categories = { workspace = true }
 
+[features]
+default = ["animation"]
+animation = ["bevy/bevy_animation"]
 
 [dependencies]
 forky_core.workspace = true

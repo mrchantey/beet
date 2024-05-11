@@ -1,4 +1,4 @@
-use beet::prelude::*;
+use beet_ecs::prelude::*;
 use bevy::ecs::schedule::SystemConfigs;
 use bevy::prelude::*;
 use std::f32::consts::TAU;

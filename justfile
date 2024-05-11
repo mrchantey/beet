@@ -35,26 +35,27 @@ run-w crate example *args:
 	just watch 'just run {{crate}} {{example}} {{args}}'
 
 
-build-examples-web:
-	rm -rf ./target/examples-web || true
-	just _build-example-web beet seek
+build-web-examples:
+	rm -rf ./target/web-examples || true
+	just _build-example-web beet animation
 	just _build-example-web beet flock
 	just _build-example-web beet hello_world
+	just _build-example-web beet seek
 
-deploy-examples-web:
-	just build-examples-web
-	gsutil -m rsync -d -r ./target/examples-web gs://beet-examples
+deploy-web-examples:
+	just build-web-examples
+	gsutil -m rsync -d -r ./target/web-examples gs://beet-examples
 # -m parallel rsync copy -d delete if not in local -r recursive
 
 _build-example-web crate example *args:
-	mkdir -p ./target/examples-web/{{example}} || true
-	mkdir -p ./target/examples-web/{{example}}/assets || true
-	cp -r ./crates/beet/examples/html/* ./target/examples-web/{{example}}
-	cp -r ./crates/beet/assets/* ./target/examples-web/{{example}}/assets
+	mkdir -p ./target/web-examples/{{example}} || true
+	mkdir -p ./target/web-examples/{{example}}/assets || true
+	cp -r ./crates/beet/examples/html/* ./target/web-examples/{{example}}
+	cp -r ./crates/beet/assets/* ./target/web-examples/{{example}}/assets
 	cargo build -p {{crate}} --example {{example}} --target wasm32-unknown-unknown --release {{args}}
 	wasm-bindgen \
 	--out-name main \
-	--out-dir ./target/examples-web/{{example}}/wasm \
+	--out-dir ./target/web-examples/{{example}}/wasm \
 	--target web \
 	./target/wasm32-unknown-unknown/release/examples/{{example}}.wasm \
 	--no-typescript \

@@ -25,9 +25,19 @@ impl BeetConfig {
 }
 
 /// Plugin that adds all [`ActionSystems`] to the schedule in [`BeetConfig`], and inits the components.
-#[derive(Debug, Default, Copy, Clone)]
+#[derive(Debug, Copy, Clone)]
 pub struct ActionPlugin<T: 'static + Send + Sync + Bundle + ActionSystems> {
 	phantom: PhantomData<T>,
+}
+
+impl<T: 'static + Send + Sync + Bundle + ActionSystems> Default
+	for ActionPlugin<T>
+{
+	fn default() -> Self {
+		Self {
+			phantom: Default::default(),
+		}
+	}
 }
 
 #[cfg(feature = "reflect")]
