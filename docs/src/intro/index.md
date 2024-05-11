@@ -16,6 +16,7 @@ It is built with `bevy` and represents behaviors as entities, connecting them th
 - [Hello World](../examples/hello_world.md)
 - [Seek](../examples/seek.md)
 - [Flocking](../examples/flock.md)
+- [Animation](../examples/animation.md)
 
 ## Features
 

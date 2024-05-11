@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use beet::prelude::*;
+use beet_ecs::prelude::*;
 use bevy::prelude::*;
 
 #[derive(Default)]
@@ -11,7 +11,6 @@ pub struct MlPlugin {
 impl Plugin for MlPlugin {
 	fn build(&self, app: &mut App) {
 		app.add_plugins(ActionPlugin::<SentenceScorer>::default());
-
 
 		app.insert_resource(Bert::new(self.bert_config.clone()).unwrap());
 

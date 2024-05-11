@@ -12,6 +12,7 @@ keywords.workspace = true
 categories.workspace = true
 
 [features]
+default = ["ml"]
 ml = ["dep:beet_ml"]
 net = ["dep:beet_net"]
 

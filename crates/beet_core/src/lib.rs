@@ -7,8 +7,6 @@ pub mod robotics;
 pub mod steer;
 
 pub mod prelude {
-
-	// pub extern crate beet_ecs as beet;
 	#[cfg(feature = "animation")]
 	pub use crate::animation::*;
 	pub use crate::app::*;

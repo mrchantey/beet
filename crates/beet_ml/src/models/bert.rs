@@ -1,5 +1,6 @@
 //https://github.com/huggingface/candle/blob/main/candle-examples/examples/bert/main.rs
 use crate::models::sentence_embeddings::SentenceEmbeddings;
+use crate::prelude::BertModelConfig;
 use anyhow::Error as E;
 use anyhow::Result;
 use bevy::prelude::*;
@@ -9,17 +10,13 @@ use candle_transformers::models::bert::BertModel;
 use candle_transformers::models::bert::Config;
 use candle_transformers::models::bert::HiddenAct;
 use candle_transformers::models::bert::DTYPE;
-use hf_hub::api::sync::Api;
-use hf_hub::Repo;
-use hf_hub::RepoType;
 use std::borrow::Cow;
 use tokenizers::PaddingParams;
 use tokenizers::Tokenizer;
 
 #[derive(Clone)]
 pub struct BertConfig {
-	model_id: Option<String>,
-	revision: Option<String>,
+	model: BertModelConfig,
 	normalize_embeddings: bool,
 	approximate_gelu: bool,
 }
@@ -27,8 +24,7 @@ pub struct BertConfig {
 impl Default for BertConfig {
 	fn default() -> Self {
 		Self {
-			model_id: Default::default(),
-			revision: None,
+			model: BertModelConfig::new_default(),
 			normalize_embeddings: true,
 			approximate_gelu: false,
 		}
@@ -42,20 +38,20 @@ pub struct Bert {
 }
 
 impl Bert {
+	/// When native we use the hf-hub which caches the models for use with this and other applications
+	#[cfg(not(target_arch = "wasm32"))]
 	pub fn new(config: BertConfig) -> Result<Self> {
-		let device = candle_core::Device::Cpu;
-		let default_model =
-			"sentence-transformers/all-MiniLM-L6-v2".to_string();
-		let default_revision = "refs/pr/21".to_string();
-		let (model_id, revision) =
-			match (config.model_id.to_owned(), config.revision.to_owned()) {
-				(Some(model_id), Some(revision)) => (model_id, revision),
-				(Some(model_id), None) => (model_id, "main".to_string()),
-				(None, Some(revision)) => (default_model, revision),
-				(None, None) => (default_model, default_revision),
-			};
+		use hf_hub::api::sync::Api;
+		use hf_hub::Repo;
+		use hf_hub::RepoType;
 
-		let repo = Repo::with_revision(model_id, RepoType::Model, revision);
+		let device = candle_core::Device::Cpu;
+
+		let repo = Repo::with_revision(
+			config.model.model_id.clone(),
+			RepoType::Model,
+			config.model.revision.clone(),
+		);
 		let api = Api::new()?;
 		let api = api.repo(repo);
 		let tokenizer_filename = api.get("tokenizer.json")?;

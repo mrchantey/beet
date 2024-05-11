@@ -37,17 +37,17 @@ run-w crate example *args:
 
 build-web-examples:
 	rm -rf ./target/web-examples || true
-	just _build-example-web beet animation
-	just _build-example-web beet flock
-	just _build-example-web beet hello_world
-	just _build-example-web beet seek
+	just _build-web-example beet animation
+	just _build-web-example beet flock
+	just _build-web-example beet hello_world
+	just _build-web-example beet seek
 
 deploy-web-examples:
 	just build-web-examples
 	gsutil -m rsync -d -r ./target/web-examples gs://beet-examples
 # -m parallel rsync copy -d delete if not in local -r recursive
 
-_build-example-web crate example *args:
+_build-web-example crate example *args:
 	mkdir -p ./target/web-examples/{{example}} || true
 	mkdir -p ./target/web-examples/{{example}}/assets || true
 	cp -r ./crates/beet/examples/html/* ./target/web-examples/{{example}}

@@ -46,7 +46,7 @@ beet_server = { path = "crates/beet_server", version = "0.0.8" }
 ## local
 forky_core = { path = "../forky/crates/forky/forky_core" }
 forky_bevy = { path = "../forky/crates/forky/forky_bevy" }
-forky_web = { path = "../forky/crates/forky/forky_web" }
+forky_web = { path = "../forky/crates/forky/forky_web", default-features = false }
 sweet = { path = "../forky/crates/sweet", features = ["bevy"] }
 
 # forky_core = "0.1.46"
