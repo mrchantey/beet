@@ -55,7 +55,7 @@ mod test {
 
 	#[test]
 	pub fn works() -> Result<()> {
-		pretty_env_logger::init();
+		pretty_env_logger::try_init().ok();
 		let mut app = App::new();
 		app.add_plugins((
 			LifecycleSystemsPlugin,
