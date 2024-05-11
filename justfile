@@ -36,14 +36,14 @@ run-w crate example *args:
 	just watch 'just run {{crate}} {{example}} {{args}}'
 
 watch-ml-example:
-	just watch 'just build-web-example beet hello_ml_bevy'
+	just watch 'just build-web-example beet hello_ml'
 
 build-web-examples:
 	rm -rf ./target/web-examples || true
 	just build-web-example beet animation
 	just build-web-example beet flock
 	just build-web-example beet hello_world
-	just build-web-example beet hello_ml_bevy
+	just build-web-example beet hello_ml
 	just build-web-example beet seek
 
 serve-web-examples:
