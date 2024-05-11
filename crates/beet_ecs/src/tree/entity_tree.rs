@@ -1,10 +1,16 @@
 use crate::prelude::*;
 use bevy::prelude::*;
-
+use std::fmt;
 
 /// A tree of entities, useful for tests and debugging.
 #[derive(Debug, Clone, Deref, DerefMut, Component)]
 pub struct EntityTree(pub Tree<Entity>);
+
+impl fmt::Display for EntityTree {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		write!(f, "{}", self.0)
+	}
+}
 
 impl EntityTree {
 	pub fn new(entity: Entity) -> Self { Self(Tree::new(entity)) }

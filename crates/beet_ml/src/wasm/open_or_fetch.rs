@@ -18,14 +18,14 @@ use web_sys::Response;
 
 /// Attempt to retreive a file from the cache, if it doesn't exist, fetch it from the network
 pub async fn open_or_fetch(
-	url: String,
+	url: &str,
 ) -> Result<js_sys::Uint8Array, JsValue> {
 	let cache_name = "bert-candle-cache";
 
 	let cache_promise = web_sys::window().unwrap().caches()?.open(cache_name);
 	let cache = JsFuture::from(cache_promise).await?.dyn_into::<Cache>()?;
 
-	let request = Request::new_with_str(&url)?;
+	let request = Request::new_with_str(url)?;
 
 	let cached_response_promise = cache.match_all_with_request(&request);
 	let cached_response = JsFuture::from(cached_response_promise)

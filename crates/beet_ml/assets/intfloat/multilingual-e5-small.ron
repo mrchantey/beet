@@ -1,0 +1,11 @@
+(
+    model: (
+        base_url: "https://huggingface.co/intfloat/multilingual-e5-small/resolve/main/",
+        search_prefix: "query: ",
+        document_prefix: "passage: ",
+        model_id: "intfloat/multilingual-e5-small",
+        revision: "main",
+    ),
+    normalize_embeddings: true,
+    approximate_gelu: false,
+)

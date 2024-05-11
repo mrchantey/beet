@@ -1,6 +1,6 @@
 //https://github.com/huggingface/candle/blob/main/candle-examples/examples/bert/main.rs
 use crate::models::sentence_embeddings::SentenceEmbeddings;
-use crate::prelude::BertModelConfig;
+use crate::prelude::*;
 use anyhow::Error as E;
 use anyhow::Result;
 use bevy::prelude::*;
@@ -8,29 +8,12 @@ use candle_core::Tensor;
 use candle_nn::VarBuilder;
 use candle_transformers::models::bert::BertModel;
 use candle_transformers::models::bert::Config;
-use candle_transformers::models::bert::HiddenAct;
-use candle_transformers::models::bert::DTYPE;
 use std::borrow::Cow;
 use tokenizers::PaddingParams;
 use tokenizers::Tokenizer;
 
-#[derive(Clone)]
-pub struct BertConfig {
-	model: BertModelConfig,
-	normalize_embeddings: bool,
-	approximate_gelu: bool,
-}
 
-impl Default for BertConfig {
-	fn default() -> Self {
-		Self {
-			model: BertModelConfig::new_default(),
-			normalize_embeddings: true,
-			approximate_gelu: false,
-		}
-	}
-}
-#[derive(Resource)]
+#[derive(Asset, TypePath)]
 pub struct Bert {
 	config: BertConfig,
 	model: BertModel,
@@ -40,7 +23,10 @@ pub struct Bert {
 impl Bert {
 	/// When native we use the hf-hub which caches the models for use with this and other applications
 	#[cfg(not(target_arch = "wasm32"))]
-	pub fn new(config: BertConfig) -> Result<Self> {
+	pub async fn new(config: BertConfig) -> Result<Self> {
+		// TODO more async stuff here
+		use candle_transformers::models::bert::HiddenAct;
+		use candle_transformers::models::bert::DTYPE;
 		use hf_hub::api::sync::Api;
 		use hf_hub::Repo;
 		use hf_hub::RepoType;
@@ -73,6 +59,52 @@ impl Bert {
 			candle_config.hidden_act = HiddenAct::GeluApproximate;
 		}
 		let model = BertModel::load(vb, &candle_config)?;
+		Ok(Self {
+			config,
+			model,
+			tokenizer,
+		})
+	}
+
+	#[cfg(target_arch = "wasm32")]
+	pub async fn new(config: BertConfig) -> Result<Self> {
+		// use super::bert_loader::BertAssetLoaderError;
+		use crate::wasm::open_or_fetch;
+		use candle_core::DType;
+
+		let config_url = config.model.config_url();
+		let model_url = config.model.model_url();
+		let tokenizer_url = config.model.tokenizer_url();
+
+		let (model_config, weights, tokenizer) = futures::join!(
+			open_or_fetch(&config_url),
+			open_or_fetch(&model_url),
+			open_or_fetch(&tokenizer_url)
+		);
+		// futures::(
+		// );
+
+		let model_config = model_config
+			.map_err(|e| anyhow::anyhow!("{:?}", e))?
+			.to_vec();
+		let model_config: Config = serde_json::from_slice(&model_config)?;
+
+
+		let weights = weights.map_err(|e| anyhow::anyhow!("{:?}", e))?.to_vec();
+		let device = &candle_core::Device::Cpu;
+		let vb =
+			VarBuilder::from_buffered_safetensors(weights, DType::F64, device)?;
+
+
+
+		let tokenizer =
+			tokenizer.map_err(|e| anyhow::anyhow!("{:?}", e))?.to_vec();
+		let tokenizer = Tokenizer::from_bytes(&tokenizer)
+			.map_err(|m| anyhow::anyhow!(m.to_string()))?;
+
+
+		let model = BertModel::load(vb, &model_config)?;
+
 		Ok(Self {
 			config,
 			model,
@@ -162,11 +194,12 @@ mod test {
 	use anyhow::Result;
 	use sweet::*;
 
-	#[test]
-	fn works() -> Result<()> {
+	#[tokio::test]
+	async fn works() -> Result<()> {
 		pretty_env_logger::try_init().ok();
 
-		let mut bert = Bert::new(BertConfig::default())?;
+		let config = BertConfig::load_default()?;
+		let mut bert = Bert::new(config).await?;
 		let embeddings = bert.get_embeddings(vec![
 			"The cat sits outside".into(),
 			"A man is playing guitar".into(),

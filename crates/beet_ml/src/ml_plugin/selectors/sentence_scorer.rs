@@ -14,18 +14,24 @@ impl Sentence {
 
 /// Updates the [`Score`] of each child based on the similarity of its [`Sentence`] with the agent,
 /// for use with [`ScoreSelector`]
-#[derive(Debug, Default, Clone, PartialEq, Component, Reflect)]
-#[reflect(Default, Component, ActionMeta)]
-pub struct SentenceScorer;
+#[derive(Debug, Clone, PartialEq, Component, Reflect)]
+#[reflect(Component, ActionMeta)]
+pub struct SentenceScorer {
+	pub bert: Handle<Bert>,
+}
+
+impl SentenceScorer {
+	pub fn new(bert: Handle<Bert>) -> Self { Self { bert } }
+}
 
 
 fn sentence_scorer(
 	mut commands: Commands,
-	mut bert: ResMut<Bert>,
+	mut berts: ResMut<Assets<Bert>>,
 	sentences: Query<&Sentence>,
 	started: Query<(&SentenceScorer, &TargetAgent, &Children), Added<Running>>,
 ) {
-	for (_scorer, agent, children) in started.iter() {
+	for (scorer, agent, children) in started.iter() {
 		let Ok(parent) = sentences.get(agent.0) else {
 			continue;
 		};
@@ -38,7 +44,13 @@ fn sentence_scorer(
 		let mut options = vec![parent.0.clone()];
 		options.extend(children.iter().map(|c| c.1 .0.clone()));
 
+
+		let Some(bert) = berts.get_mut(&scorer.bert) else {
+			continue;
+		};
+
 		let embeddings = bert.get_embeddings(options).unwrap();
+
 		let scores = embeddings.scores(0).unwrap();
 		for score in scores {
 			// subtract 1 because the first index is the agent
@@ -65,23 +77,17 @@ mod test {
 	use bevy::prelude::*;
 	use sweet::*;
 
-	#[test]
-	fn works() -> Result<()> {
-		pretty_env_logger::try_init().ok();
-
-		let mut app = App::new();
-		app.add_plugins((MlPlugin::default(), LifecyclePlugin));
-
-
-		let entity = app
-			.world_mut()
+	fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
+		commands
 			.spawn(Sentence::new("destroy"))
 			.with_children(|parent| {
 				let id = parent.parent_entity();
 				parent
 					.spawn((
 						TargetAgent(id),
-						SentenceScorer,
+						SentenceScorer::new(
+							asset_server.load("default-bert.ron"),
+						),
 						ScoreSelector {
 							consume_scores: true,
 						},
@@ -91,10 +97,47 @@ mod test {
 						parent.spawn(Sentence::new("heal"));
 						parent.spawn(Sentence::new("kill"));
 					});
-			})
-			.id();
+			});
+	}
 
-		app.update();
+
+	#[test]
+	fn works() -> Result<()> {
+		let mut app = App::new();
+		app.add_plugins((
+			MinimalPlugins,
+			AssetPlugin::default(),
+			MlPlugin::default(),
+			LifecyclePlugin,
+		))
+		.add_systems(Startup, setup)
+		.finish();
+
+		let entity = loop {
+			app.update();
+			let scorer = app
+				.world_mut()
+				.query::<&SentenceScorer>()
+				.iter(app.world())
+				.next()
+				.unwrap();
+
+			if app
+				.world()
+				.get_resource::<Assets<Bert>>()
+				.unwrap()
+				.get(&scorer.bert)
+				.is_some()
+			{
+				break app
+					.world_mut()
+					.query_filtered::<Entity, With<Sentence>>()
+					.iter(app.world())
+					.next()
+					.unwrap();
+			}
+			std::thread::sleep(std::time::Duration::from_millis(1));
+		};
 
 		let tree = EntityTree::new_with_world(entity, app.world());
 

@@ -2,17 +2,15 @@ use crate::prelude::*;
 use beet_ecs::prelude::*;
 use bevy::prelude::*;
 
-#[derive(Default)]
-pub struct MlPlugin {
-	bert_config: BertConfig,
-}
 
+#[derive(Default)]
+pub struct MlPlugin;
 
 impl Plugin for MlPlugin {
 	fn build(&self, app: &mut App) {
-		app.add_plugins(ActionPlugin::<SentenceScorer>::default());
-
-		app.insert_resource(Bert::new(self.bert_config.clone()).unwrap());
+		app.add_plugins(ActionPlugin::<SentenceScorer>::default())
+			.init_asset::<Bert>()
+			.init_asset_loader::<BertLoader>();
 
 		let world = app.world_mut();
 		world.init_component::<Sentence>();

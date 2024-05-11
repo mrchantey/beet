@@ -1,5 +1,5 @@
 [workspace.package]
-version = "0.0.8"
+version = "0.0.1"
 edition = "2021"
 description = "A very flexible AI behavior library for games and robotics."
 documentation = "https://mrchantey.github.io/beet"
@@ -35,13 +35,13 @@ exclude = ["crates/beet_esp"]
 
 [workspace.dependencies]
 ## internal
-beet = { path = "crates/beet", version = "0.0.8" }
-beet_core = { path = "crates/beet_core", version = "0.0.8" }
-beet_ecs = { path = "crates/beet_ecs", version = "0.0.8" }
-beet_ecs_macros = { path = "crates/beet_ecs/macros", version = "0.0.8" }
-beet_ml = { path = "crates/beet_ml", version = "0.0.8" }
-beet_net = { path = "crates/beet_net", version = "0.0.8" }
-beet_server = { path = "crates/beet_server", version = "0.0.8" }
+beet = { path = "crates/beet", version = "0.0.1" }
+beet_core = { path = "crates/beet_core", version = "0.0.1" }
+beet_ecs = { path = "crates/beet_ecs", version = "0.0.1" }
+beet_ecs_macros = { path = "crates/beet_ecs/macros", version = "0.0.1" }
+beet_ml = { path = "crates/beet_ml", version = "0.0.1" }
+beet_net = { path = "crates/beet_net", version = "0.0.1" }
+beet_server = { path = "crates/beet_server", version = "0.0.1" }
 
 ## local
 forky_core = { path = "../forky/crates/forky/forky_core" }
@@ -60,6 +60,7 @@ pretty_env_logger = "0.4"
 
 ## utility
 anyhow = "1.0.75"
+thiserror = "1.0.60"
 bytemuck = "1.13.1"
 petgraph = { version = "0.6.4", features = ["serde-1"] }
 heck = "0.4"
@@ -94,8 +95,8 @@ parking_lot = "0.12" # fast alternative std::sync::Mutex/RwLock
 flume = "0.11"
 
 ## io
-serde = { version = "1.0.193", features = ["derive"] }
-serde_json = "1.0.108"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
 bincode = "1.3"
 ron = "0.8"
 

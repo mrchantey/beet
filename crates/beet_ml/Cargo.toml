@@ -16,10 +16,14 @@ default = []
 # tokio = ["dep:tokio"]
 
 [dependencies]
+futures = "0.3.30"
 beet_ecs.workspace = true
+thiserror.workspace = true
 anyhow.workspace = true
 log.workspace = true
 bevy.workspace = true
+ron.workspace = true
+serde.workspace = true
 serde_json.workspace = true
 
 ### huggingface ###
@@ -90,3 +94,4 @@ features = [
 [dev-dependencies]
 pretty_env_logger.workspace = true
 sweet.workspace = true
+tokio.workspace = true

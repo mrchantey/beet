@@ -4,6 +4,6 @@ pub use self::sentence_embeddings::*;
 pub mod bert;
 #[allow(unused_imports)]
 pub use self::bert::*;
-pub mod candle_examples;
+pub mod bert_loader;
 #[allow(unused_imports)]
-pub use self::candle_examples::*;
+pub use self::bert_loader::*;
