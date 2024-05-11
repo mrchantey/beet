@@ -41,7 +41,11 @@ build-web-examples:
 	just _build-web-example beet animation
 	just _build-web-example beet flock
 	just _build-web-example beet hello_world
+	just _build-web-example beet hello_ml_bevy
 	just _build-web-example beet seek
+
+serve-web-examples:
+	cd ./target/web-examples && forky serve
 
 deploy-web-examples:
 	just build-web-examples

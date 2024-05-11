@@ -75,27 +75,30 @@ impl Bert {
 		let config_url = config.model.config_url();
 		let model_url = config.model.model_url();
 		let tokenizer_url = config.model.tokenizer_url();
-
+		
+		log::info!("BANG 1");
 		let (model_config, weights, tokenizer) = futures::join!(
 			open_or_fetch(&config_url),
 			open_or_fetch(&model_url),
 			open_or_fetch(&tokenizer_url)
 		);
 		// futures::(
-		// );
-
-		let model_config = model_config
+			// );
+			
+			log::info!("BANG 2");
+			
+			let model_config = model_config
 			.map_err(|e| anyhow::anyhow!("{:?}", e))?
 			.to_vec();
 		let model_config: Config = serde_json::from_slice(&model_config)?;
-
-
+		
+		
 		let weights = weights.map_err(|e| anyhow::anyhow!("{:?}", e))?.to_vec();
 		let device = &candle_core::Device::Cpu;
 		let vb =
-			VarBuilder::from_buffered_safetensors(weights, DType::F64, device)?;
-
-
+		VarBuilder::from_buffered_safetensors(weights, DType::F64, device)?;
+		
+		
 
 		let tokenizer =
 			tokenizer.map_err(|e| anyhow::anyhow!("{:?}", e))?.to_vec();

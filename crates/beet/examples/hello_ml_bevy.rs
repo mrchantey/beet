@@ -5,11 +5,9 @@ use bevy::prelude::*;
 fn main() {
 	// pretty_env_logger::try_init().ok();
 
-	log::info!("Hello, world!");
 	App::new()
 		.add_plugins((DefaultPlugins, DefaultBeetPlugins, MlPlugin::default()))
 		.add_systems(Startup, setup)
-		.add_systems(Startup,||log::info!("bang"))
 		.run();
 }
 

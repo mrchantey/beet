@@ -107,9 +107,7 @@ pub fn insert_on_animation_end<T: GenericActionComponent>(
 
 		if !nearly_finished && !action.is_playing {
 			action.is_playing = true;
-			log::info!("yes playing");
 		} else if nearly_finished && action.is_playing {
-			log::info!("ended");
 			action.is_playing = false;
 			commands.entity(entity).insert(action.value.clone());
 		}

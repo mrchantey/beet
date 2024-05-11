@@ -44,9 +44,12 @@ fn sentence_scorer(
 		let mut options = vec![parent.0.clone()];
 		options.extend(children.iter().map(|c| c.1 .0.clone()));
 
+		// log::info!("hello 1");
+		
 		let Some(bert) = berts.get_mut(&scorer.bert) else {
 			continue;
 		};
+		// log::info!("hello 2");
 
 		//VERY EXPENSIVE
 		let embeddings = bert.get_embeddings(options).unwrap();
