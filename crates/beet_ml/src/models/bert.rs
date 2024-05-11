@@ -198,8 +198,7 @@ mod test {
 	async fn works() -> Result<()> {
 		pretty_env_logger::try_init().ok();
 
-		let config = BertConfig::load_default()?;
-		let mut bert = Bert::new(config).await?;
+		let mut bert = Bert::new(BertConfig::default()).await?;
 		let embeddings = bert.get_embeddings(vec![
 			"The cat sits outside".into(),
 			"A man is playing guitar".into(),

@@ -11,15 +11,26 @@ pub struct BertConfig {
 	pub approximate_gelu: bool,
 }
 
+impl Default for BertConfig{
+
+	fn default() -> Self {
+		Self{
+			model: BertModelConfig {
+					base_url: "https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2/resolve/refs%2Fpr%2F21/".into(),
+					search_prefix: "".into(),
+					document_prefix: "".into(),
+					model_id: "sentence-transformers/all-MiniLM-L6-v2".into(),
+					revision: "refs/pr/21".into(),
+		},
+			normalize_embeddings: true,
+			approximate_gelu: false,
+		}
+	}
+
+}
+
 impl BertConfig {
 
-	pub fn load_default() -> Result<Self> {
-		let str = fs::read_to_string("assets/default-bert.ron")?;
-
-		let val = ron::de::from_str(&str)?;
-
-		Ok(val)
-	}
 
 	pub fn new(model: BertModelConfig) -> Self {
 		Self {

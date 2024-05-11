@@ -602,6 +602,7 @@ checksum = "9475866fec1451be56a3c2400fd081ff546538961565ccb5b7142cbd22bc7a51"
 name = "beet"
 version = "0.0.1"
 dependencies = [
+ "anyhow",
  "beet_core",
  "beet_ecs",
  "beet_ml",
@@ -610,6 +611,7 @@ dependencies = [
  "forky_bevy",
  "log",
  "pretty_env_logger",
+ "tokio",
 ]
 
 [[package]]
@@ -678,7 +680,6 @@ dependencies = [
  "sweet",
  "thiserror",
  "tokenizers",
- "tokio",
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "web-sys",

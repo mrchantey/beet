@@ -2,9 +2,8 @@ use beet_ml::prelude::*;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-	pretty_env_logger::try_init().ok();
 
-	let mut bert = Bert::new(BertConfig::load_default()?).await?;
+	let mut bert = Bert::new(BertConfig::default()).await?;
 	let embeddings = bert.get_embeddings(vec![
 		"The cat sits outside".into(),
 		"A man is playing guitar".into(),
@@ -21,5 +20,8 @@ async fn main() -> anyhow::Result<()> {
 		embeddings.sentences[results[0].0].as_ref(),
 		"The cat plays in the garden"
 	);
+
+	println!("Results: {:?}", results);
+
 	Ok(())
 }

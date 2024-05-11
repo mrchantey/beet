@@ -94,4 +94,3 @@ features = [
 [dev-dependencies]
 pretty_env_logger.workspace = true
 sweet.workspace = true
-tokio.workspace = true

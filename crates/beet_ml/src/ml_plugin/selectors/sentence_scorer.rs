@@ -24,12 +24,12 @@ impl SentenceScorer {
 	pub fn new(bert: Handle<Bert>) -> Self { Self { bert } }
 }
 
-
 fn sentence_scorer(
 	mut commands: Commands,
 	mut berts: ResMut<Assets<Bert>>,
 	sentences: Query<&Sentence>,
-	started: Query<(&SentenceScorer, &TargetAgent, &Children), Added<Running>>,
+	// TODO double query, ie added running and added asset
+	started: Query<(&SentenceScorer, &TargetAgent, &Children), With<Running>>,
 ) {
 	for (scorer, agent, children) in started.iter() {
 		let Ok(parent) = sentences.get(agent.0) else {
@@ -44,11 +44,11 @@ fn sentence_scorer(
 		let mut options = vec![parent.0.clone()];
 		options.extend(children.iter().map(|c| c.1 .0.clone()));
 
-
 		let Some(bert) = berts.get_mut(&scorer.bert) else {
 			continue;
 		};
 
+		//VERY EXPENSIVE
 		let embeddings = bert.get_embeddings(options).unwrap();
 
 		let scores = embeddings.scores(0).unwrap();
