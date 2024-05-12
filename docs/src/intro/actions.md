@@ -13,41 +13,42 @@ Often we want to insert or change a component when a behavior is spawned or star
 
 ## Action List
 
-| Name                                          | Graph Role [?](./concepts.md#graph-roles) | Description                                                                                  |
-| --------------------------------------------- | ----------------------------------------- | -------------------------------------------------------------------------------------------- |
-| <h3>[LifecyclePlugin][LifecyclePlugin]</h3>   |                                           |                                                                                              |
-| `InsertInDuration<RunResult>`                 | Node                                      | Adds a `RunResult` after a given duration.                                                   |
-| `InsertOnRun<RunResult>`                      | Node                                      | Immediately succeed or fail when this behavior runs                                          |
-| `LogOnRun`                                    | Node                                      | Logs a message when the action is run.                                                       |
-| `Repeat`                                      | Node                                      | Reattaches the `Running` component whenever it is removed.                                   |
-| `SetOnSpawn<Score>`                           | Node                                      | Sets the score to a constant value when this behavior is spawned                             |
-| `EmptyAction`                                 | Node                                      | Does what it says on the tin, useful for tests                                               |
-| `FallbackSelector`                            | Child                                     | Run children in sequence until one succeeds                                                  |
-| `ParallelSelector`                            | Child                                     | Run children in parallel until one finishes                                                  |
-| `SequenceSelector`                            | Child                                     | Run children in sequence until one fails                                                     |
-| `ScoreSelector`                               | Child                                     | Run the child with the highest score                                                         |
-| <h3>[`MovementPlugin`][MovementPlugin]</h3>   |                                           |                                                                                              |
-| `Hover`                                       | Agent                                     | Translates the agent up and down in a sine wave                                              |
-| `Translate`                                   | Agent                                     | Applies constant translation                                                                 |
-| `SetAgentOnRun<Velocity>`                     | Agent                                     | Sets the `Velocity` of an agent on run                                                       |
-| <h3>[`SteerPlugin`][SteerPlugin]</h3>         |                                           |                                                                                              |
-| `Seek`                                        | Agent                                     | Go to the agent's `SteerTarget` with an optional `ArriveRadius`                              |
-| `Wander`                                      | Agent                                     | Somewhat cohesive random walk                                                                |
-| `Separate::<GroupSteerAgent>`                 | Agent                                     | Separate from entities with `GroupSteerAgent`.                                               |
-| `Align::<GroupSteerAgent>`                    | Agent                                     | Align `Velocity` with that of entities with `GroupSteerAgent`.                               |
-| `Cohere::<GroupSteerAgent>`                   | Agent                                     | Move towards the center of mass of entities with `GroupSteerAgent`.                          |
-| `SucceedOnArrive`                             | Agent                                     | Succeeds when the agent arrives at the `SteerTarget`                                         |
-| `FindSteerTarget`                             | Agent                                     | Sets the `SteerTarget` when an entity with the given name is nearby.                         |
-| `ScoreSteerTarget`                            | Node                                      | Adjusts the `Score` based on distance to the `SteerTarget`                                   |
-| `DespawnSteerTarget`                          | World                                     | Recursively despawns the `SteerTarget`                                                       |
-| <h3>[`AnimationPlugin`][AnimationPlugin]</h3> |                                           |                                                                                              |
-| `PlayAnimation`                               | Agent                                     | Play an animation on the agent when this action starts running.                              |
-| `InsertOnAnimationEnd<RunResult>`             | Agent                                     | Inserts the given `RunResult` when an animation is almost finished.                          |
-| <h3>[`RoboticsPlugin`][RoboticsPlugin]</h3>   |                                           |                                                                                              |
-| `SetAgentOnRun<DualMotorValue>`               | Agent                                     | Sets the `DualMotorValue` of an agent on run                                                 |
-| `DepthSensorScorer`                           | Node                                      | Sets the [`Score`] based on the [`DepthSensor`] value                                        |
-| <h3>[`MlPlugin`][MlPlugin]</h3>               |                                           |                                                                                              |
-| `SentenceScorer`                              | Child                                     | Updates the `Score` of each child based on the similarity of its `Sentence` with the agent's |
+| Name                                          | Graph Role [?](./concepts.md#graph-roles) | Description                                                                                             |
+| --------------------------------------------- | ----------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| <h3>[LifecyclePlugin][LifecyclePlugin]</h3>   |                                           |                                                                                                         |
+| `InsertInDuration<RunResult>`                 | Node                                      | Adds a `RunResult` after a given duration.                                                              |
+| `InsertOnRun<RunResult>`                      | Node                                      | Immediately succeed or fail when this behavior runs                                                     |
+| `LogOnRun`                                    | Node                                      | Logs a message when the action is run.                                                                  |
+| `Repeat`                                      | Node                                      | Reattaches the `Running` component whenever it is removed.                                              |
+| `SetOnSpawn<Score>`                           | Node                                      | Sets the score to a constant value when this behavior is spawned                                        |
+| `EmptyAction`                                 | Node                                      | Does what it says on the tin, useful for tests                                                          |
+| `FallbackSelector`                            | Child                                     | Run children in sequence until one succeeds                                                             |
+| `ParallelSelector`                            | Child                                     | Run children in parallel until one finishes                                                             |
+| `SequenceSelector`                            | Child                                     | Run children in sequence until one fails                                                                |
+| `ScoreSelector`                               | Child                                     | Run the child with the highest score                                                                    |
+| <h3>[`MovementPlugin`][MovementPlugin]</h3>   |                                           |                                                                                                         |
+| `Hover`                                       | Agent                                     | Translates the agent up and down in a sine wave                                                         |
+| `Translate`                                   | Agent                                     | Applies constant translation                                                                            |
+| `SetAgentOnRun<Velocity>`                     | Agent                                     | Sets the `Velocity` of an agent on run                                                                  |
+| <h3>[`SteerPlugin`][SteerPlugin]</h3>         |                                           |                                                                                                         |
+| `Seek`                                        | Agent                                     | Go to the agent's `SteerTarget` with an optional `ArriveRadius`                                         |
+| `Wander`                                      | Agent                                     | Somewhat cohesive random walk                                                                           |
+| `Separate::<GroupSteerAgent>`                 | Agent                                     | Separate from entities with `GroupSteerAgent`.                                                          |
+| `Align::<GroupSteerAgent>`                    | Agent                                     | Align `Velocity` with that of entities with `GroupSteerAgent`.                                          |
+| `Cohere::<GroupSteerAgent>`                   | Agent                                     | Move towards the center of mass of entities with `GroupSteerAgent`.                                     |
+| `SucceedOnArrive`                             | Agent                                     | Succeeds when the agent arrives at the `SteerTarget`                                                    |
+| `FindSteerTarget`                             | Agent                                     | Sets the `SteerTarget` when an entity with the given name is nearby.                                    |
+| `ScoreSteerTarget`                            | Node                                      | Adjusts the `Score` based on distance to the `SteerTarget`                                              |
+| `DespawnSteerTarget`                          | World                                     | Recursively despawns the `SteerTarget`                                                                  |
+| <h3>[`AnimationPlugin`][AnimationPlugin]</h3> |                                           |                                                                                                         |
+| `PlayAnimation`                               | Agent                                     | Play an animation on the agent when this action starts running.                                         |
+| `InsertOnAnimationEnd<RunResult>`             | Agent                                     | Inserts the given `RunResult` when an animation is almost finished.                                     |
+| <h3>[`RoboticsPlugin`][RoboticsPlugin]</h3>   |                                           |                                                                                                         |
+| `SetAgentOnRun<DualMotorValue>`               | Agent                                     | Sets the `DualMotorValue` of an agent on run                                                            |
+| `DepthSensorScorer`                           | Node                                      | Sets the [`Score`] based on the [`DepthSensor`] value                                                   |
+| <h3>[`MlPlugin`][MlPlugin]</h3>               |                                           |                                                                                                         |
+| `SentenceScorer`                              | Child                                     | Updates the `Score` of each child based on the similarity of its `Sentence` with the agent's            |
+| `FindSentenceSteerTarget`                     | Agent                                     | Finds the `Sentence` with the highest similarity to the agent's, then set it as the agent's steer target. |
 
 [LifecyclePlugin]:https://github.com/mrchantey/beet/blob/main/crates/beet_ecs/src/lifecycle/lifecycle_plugin.rs
 [MovementPlugin]:https://github.com/mrchantey/beet/blob/main/crates/beet_core/src/movement/movement_plugin.rs

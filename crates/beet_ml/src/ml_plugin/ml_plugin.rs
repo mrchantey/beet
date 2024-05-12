@@ -12,6 +12,12 @@ impl Plugin for MlPlugin {
 			.init_asset::<Bert>()
 			.init_asset_loader::<BertLoader>();
 
+		#[cfg(feature = "beet_core")]
+		app.add_plugins(
+			ActionPlugin::<FindSentenceSteerTarget<With<Sentence>>>::default(),
+		);
+
+
 		let world = app.world_mut();
 		world.init_component::<Sentence>();
 

@@ -2,6 +2,7 @@ use crate::prelude::*;
 use beet_ecs::prelude::*;
 use bevy::ecs::schedule::SystemConfigs;
 use bevy::prelude::*;
+use forky_core::ResultTEExt;
 use std::borrow::Cow;
 
 /// This component is for use with the [`SentenceScorer`]. Add to either the agent or a child behavior.
@@ -32,32 +33,19 @@ fn sentence_scorer(
 	started: Query<(&SentenceScorer, &TargetAgent, &Children), With<Running>>,
 ) {
 	for (scorer, agent, children) in started.iter() {
-		let Ok(parent) = sentences.get(agent.0) else {
-			continue;
-		};
-
-		let children = children
-			.iter()
-			.filter_map(|e| sentences.get(*e).ok().map(|s| (e, s)))
-			.collect::<Vec<_>>();
-
-		let mut options = vec![parent.0.clone()];
-		options.extend(children.iter().map(|c| c.1 .0.clone()));
-
-
 		let Some(bert) = berts.get_mut(&scorer.bert) else {
 			continue;
 		};
 
-		//VERY EXPENSIVE
-		let embeddings = bert.get_embeddings(options).unwrap();
-
-		let scores = embeddings.scores(0).unwrap();
-		for score in scores {
-			// subtract 1 because the first index is the agent
-			let entity = *children[score.0 - 1].0;
-			commands.entity(entity).insert(Score::Weight(score.1));
-		}
+		let children = children.into_iter().cloned().collect::<Vec<_>>();
+		//TODO: VERY EXPENSIVE
+		bert.score_sentences(agent.0, children, &sentences)
+			.ok_or(|e| log::error!("{e}"))
+			.map(|scores| {
+				for (entity, _, score) in scores {
+					commands.entity(entity).insert(Score::Weight(score));
+				}
+			});
 	}
 }
 
@@ -134,7 +122,8 @@ mod test {
 			{
 				break app
 					.world_mut()
-					.query_filtered::<Entity, With<Sentence>>()
+					.query_filtered::<Entity, (Without<Parent>, With<Sentence>)>(
+					)
 					.iter(app.world())
 					.next()
 					.unwrap();

@@ -75,7 +75,7 @@ impl Bert {
 		let config_url = config.model.config_url();
 		let model_url = config.model.model_url();
 		let tokenizer_url = config.model.tokenizer_url();
-		
+
 		let model_config = open_or_fetch(&config_url).await;
 		let weights = open_or_fetch(&model_url).await;
 		let tokenizer = open_or_fetch(&tokenizer_url).await;
@@ -85,25 +85,31 @@ impl Bert {
 		// 	open_or_fetch(&model_url),
 		// 	open_or_fetch(&tokenizer_url)
 		// );
-			
-			let model_config = model_config
+
+		let model_config = model_config
 			.map_err(|e| anyhow::anyhow!("config fetch error: {:?}", e))?
 			.to_vec();
 		let model_config: Config = serde_json::from_slice(&model_config)?;
-		
-		let weights = weights.map_err(|e| anyhow::anyhow!("weights fetch error: {:?}", e))?.to_vec();
+
+		let weights = weights
+			.map_err(|e| anyhow::anyhow!("weights fetch error: {:?}", e))?
+			.to_vec();
 		let device = &candle_core::Device::Cpu;
-		let vb =
-		VarBuilder::from_buffered_safetensors(weights, candle_transformers::models::bert::DTYPE, device)?;
+		let vb = VarBuilder::from_buffered_safetensors(
+			weights,
+			candle_transformers::models::bert::DTYPE,
+			device,
+		)?;
 		// VarBuilder::from_buffered_safetensors(weights, DType::F64, device)?;
-		
-		
-		let tokenizer =
-		tokenizer.map_err(|e| anyhow::anyhow!("tokenizer fetch error: {:?}", e))?.to_vec();
+
+
+		let tokenizer = tokenizer
+			.map_err(|e| anyhow::anyhow!("tokenizer fetch error: {:?}", e))?
+			.to_vec();
 		let tokenizer = Tokenizer::from_bytes(&tokenizer)
-		.map_err(|m| anyhow::anyhow!(m.to_string()))?;
-	
-	
+			.map_err(|m| anyhow::anyhow!(m.to_string()))?;
+
+
 		let model = BertModel::load(vb, &model_config)?;
 
 		Ok(Self {
@@ -113,8 +119,9 @@ impl Bert {
 		})
 	}
 
-	/// Calculate the embeddings for a list of sentences
-	/// For a trivial example this may take ~500ms
+	/// Calculate the embeddings for a list of sentences.
+	/// For a small example this may take 0.5 seconds on desktop targets
+	/// or 10 seconds on wasm32
 	pub fn get_embeddings(
 		&mut self,
 		options: Vec<Cow<'static, str>>,
@@ -153,6 +160,55 @@ impl Bert {
 		};
 
 		Ok(SentenceEmbeddings::new(options, embeddings))
+	}
+
+
+	/// Score a list of entities with a [`Sentence`] against a root entity with a [`Sentence`]. This returns a list of entities with their sentence and raw cosine similarity scores. Higher means more similar, the list is sorted in descending order.
+	/// This calls [`Bert::get_embeddings`] and has the associated performance implications.
+	/// If the root is missing a [`Sentence`] an empty vec will be returned.
+	/// If options are missing a [`Sentence`] they will be ignored.
+	/// The root is filtered out of the options.
+	/// # Errors
+	/// Will return an error if the embeddings are not calculated correctly.
+	pub fn score_sentences(
+		&mut self,
+		root_entity: Entity,
+		options: impl IntoIterator<Item = Entity>,
+		sentences: &Query<&Sentence>,
+	) -> Result<Vec<(Entity, Sentence, f32)>> {
+		let Ok(root_sentence) = sentences.get(root_entity) else {
+			return Ok(vec![]);
+		};
+
+		let options = options
+			.into_iter()
+			.filter(|option| option != &root_entity)
+			.filter_map(|e| sentences.get(e).ok().map(|s| (e, s)))
+			.collect::<Vec<_>>();
+
+		let mut all_sentences = vec![root_sentence.0.clone()];
+		all_sentences.extend(options.iter().map(|c| (c.1 .0.clone())));
+
+		let embeddings = self.get_embeddings(all_sentences)?;
+
+		let scores = embeddings
+			.scores(0)?
+			.into_iter()
+			.map(|(score_index, score)| {
+				// subtract 1 because the first index is the agent
+				let (entity, sentence) = options[score_index - 1];
+
+				(entity, sentence.clone(), score)
+			})
+			.collect::<Vec<_>>();
+
+		Ok(scores)
+
+		// for score in scores {
+		// 	// subtract 1 because the first index is the agent
+		// 	let entity = *children[score.0 - 1].0;
+		// 	commands.entity(entity).insert(Score::Weight(score.1));
+		// }
 	}
 
 

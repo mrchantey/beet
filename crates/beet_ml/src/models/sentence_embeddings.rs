@@ -2,6 +2,9 @@ use anyhow::Result;
 use candle_core::Tensor;
 use std::borrow::Cow;
 
+
+/// Container for a list of sentences and their embeddings.
+/// This can be used to calculate the similarity between sentences.
 pub struct SentenceEmbeddings {
 	pub sentences: Vec<Cow<'static, str>>,
 	pub embeddings: Tensor,
@@ -17,11 +20,10 @@ impl SentenceEmbeddings {
 	}
 
 
-	/// Given a sentence index, returns a list of all other sentences indices and their score, 
+	/// Given a sentence index, returns a list of all other sentences indices and their score,
 	/// sorted by score in descending order.
 	pub fn scores(&self, index: usize) -> Result<Vec<(usize, f32)>> {
 		let e_i = self.embeddings.get(index)?;
-
 		let mut results = Vec::with_capacity(self.sentences.len() - 1);
 		for i in 0..self.sentences.len() {
 			if i == index {
@@ -35,8 +37,6 @@ impl SentenceEmbeddings {
 
 		Ok(results)
 	}
-
-
 
 	fn similarity(a: &Tensor, b: &Tensor) -> Result<f32> {
 		let sum_ij = (a * b)?.sum_all()?.to_scalar::<f32>()?;

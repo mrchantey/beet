@@ -663,6 +663,7 @@ name = "beet_ml"
 version = "0.0.1"
 dependencies = [
  "anyhow",
+ "beet_core",
  "beet_ecs",
  "bevy 0.14.0-dev",
  "candle-core",
@@ -670,6 +671,7 @@ dependencies = [
  "candle-transformers",
  "console_error_panic_hook",
  "console_log",
+ "forky_core",
  "futures",
  "hf-hub",
  "js-sys",

@@ -12,12 +12,16 @@ keywords.workspace = true
 categories.workspace = true
 
 [features]
-default = []
+default = ["beet_core"]
+beet_core = ["dep:beet_core"]
+
 # tokio = ["dep:tokio"]
 
 [dependencies]
-futures = "0.3.30"
 beet_ecs.workspace = true
+beet_core = { workspace = true, optional = true }
+
+futures = "0.3.30"
 thiserror.workspace = true
 anyhow.workspace = true
 log.workspace = true
@@ -25,6 +29,7 @@ bevy.workspace = true
 ron.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+forky_core.workspace = true
 
 ### huggingface ###
 candle-core = "0.5.0"

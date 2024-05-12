@@ -1,3 +1,4 @@
+#![feature(let_chains)]
 pub mod ml_plugin;
 pub mod models;
 #[cfg(target_arch = "wasm32")]
