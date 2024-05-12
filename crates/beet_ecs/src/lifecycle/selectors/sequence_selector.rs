@@ -23,7 +23,6 @@ fn sequence_selector(
 ) {
 	for (parent, _selector, children) in selectors.iter() {
 		if any_child_running(children, &children_running) {
-			// continue
 			continue;
 		}
 

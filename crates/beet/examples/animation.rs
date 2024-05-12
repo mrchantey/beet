@@ -1,24 +1,18 @@
 use beet::prelude::*;
 use bevy::animation::RepeatAnimation;
 use bevy::prelude::*;
-use forky_bevy::prelude::close_on_esc;
 use std::time::Duration;
-#[path = "common/setup_scene_3d.rs"]
-mod setup_scene_3d;
+#[path = "common/example_plugin_3d.rs"]
+mod example_plugin_3d;
+use example_plugin_3d::ExamplePlugin3d;
 
 pub fn main() {
 	App::new()
-		.add_plugins(DefaultPlugins.set(WindowPlugin {
-			primary_window: Some(Window {
-				fit_canvas_to_parent: true,
-				..default()
-			}),
-			..default()
-		}))
+		.add_plugins(ExamplePlugin3d)
 		.add_plugins(DefaultBeetPlugins)
+		.add_plugins(BeetDebugPlugin::default())
 		.add_plugins(beet::prelude::AnimationPlugin)
-		.add_systems(Startup, (setup_scene_3d::setup_scene_3d, setup_fox))
-		.add_systems(Update, close_on_esc)
+		.add_systems(Startup, setup_fox)
 		.run();
 }
 
@@ -51,10 +45,15 @@ fn setup_fox(
 		.with_children(|parent| {
 			let agent = parent.parent_entity();
 			parent
-				.spawn((Running, Repeat, SequenceSelector))
+				.spawn((
+					Name::new("Selector"),
+					Running,
+					SequenceSelector,
+					Repeat,
+				))
 				.with_children(|parent| {
 					parent.spawn((
-						LogOnRun::new("running 1"),
+						Name::new("Idle"),
 						TargetAgent(agent),
 						PlayAnimation::new(anim1_index)
 							.repeat(RepeatAnimation::Count(1))
@@ -68,7 +67,7 @@ fn setup_fox(
 						.with_transition_duration(transition_duration),
 					));
 					parent.spawn((
-						LogOnRun::new("running 2"),
+						Name::new("Running"),
 						TargetAgent(agent),
 						RunTimer::default(),
 						PlayAnimation::new(anim2_index)

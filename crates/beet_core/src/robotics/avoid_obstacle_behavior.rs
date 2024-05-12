@@ -11,13 +11,11 @@ pub fn avoid_obstacle_behavior(world: &mut World) -> Entity {
 			Name::new("Avoid Obstacles"),
 			Running,
 			BeetRoot,
-			LogNameOnRun,
 			ScoreSelector::default(),
 		))
 		.with_children(|parent| {
 			parent.spawn((
 				Name::new("Drive Forward"),
-				LogNameOnRun,
 				RootIsTargetAgent,
 				Score::Weight(0.5),
 				SetAgentOnRun(DualMotorValue::splat(MotorValue::forward_max())),
@@ -25,7 +23,6 @@ pub fn avoid_obstacle_behavior(world: &mut World) -> Entity {
 
 			parent.spawn((
 				Name::new("Turn Right"),
-				LogNameOnRun,
 				RootIsTargetAgent,
 				Score::default(),
 				DepthSensorScorer::new(threshold_dist),

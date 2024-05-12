@@ -6,20 +6,18 @@ mod auto_spawn;
 mod follow_cursor;
 mod randomize_position;
 mod render_text;
-mod setup_scene_3d;
 mod wrap_around;
 pub use auto_spawn::*;
 pub use follow_cursor::*;
 pub use randomize_position::*;
 pub use render_text::*;
-pub use setup_scene_3d::*;
 pub use wrap_around::*;
 
 // use bevy_inspector_egui::quick::WorldInspectorPlugin;
 /// Boilerplate for examples
-pub struct ExamplePlugin;
+pub struct ExamplePlugin2d;
 
-impl Plugin for ExamplePlugin {
+impl Plugin for ExamplePlugin2d {
 	fn build(&self, app: &mut App) {
 		app.insert_resource(WrapAround::default())
 			// .add_plugins(WorldInspectorPlugin::new())

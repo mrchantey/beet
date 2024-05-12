@@ -18,7 +18,6 @@ Often we want to insert or change a component when a behavior is spawned or star
 | <h3>[LifecyclePlugin][LifecyclePlugin]</h3>   |                                           |                                                                                              |
 | `InsertInDuration<RunResult>`                 | Node                                      | Adds a `RunResult` after a given duration.                                                   |
 | `InsertOnRun<RunResult>`                      | Node                                      | Immediately succeed or fail when this behavior runs                                          |
-| `LogNameOnRun`                                | Node                                      | Logs the `Name` when the action is run.                                                      |
 | `LogOnRun`                                    | Node                                      | Logs a message when the action is run.                                                       |
 | `Repeat`                                      | Node                                      | Reattaches the `Running` component whenever it is removed.                                   |
 | `SetOnSpawn<Score>`                           | Node                                      | Sets the score to a constant value when this behavior is spawned                             |

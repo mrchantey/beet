@@ -31,22 +31,3 @@ fn log_on_run(query: Query<&LogOnRun, Added<Running>>) {
 		log::info!("{}", log.0)
 	}
 }
-
-#[derive(Debug, Default, Clone, PartialEq, Component, Reflect)]
-#[reflect(Default, Component, ActionMeta)]
-/// Logs the [`Name`] when the action is run.
-pub struct LogNameOnRun;
-
-impl ActionMeta for LogNameOnRun {
-	fn graph_role(&self) -> GraphRole { GraphRole::Node }
-}
-
-impl ActionSystems for LogNameOnRun {
-	fn systems() -> SystemConfigs { log_name_on_run.in_set(TickSet) }
-}
-
-fn log_name_on_run(query: Query<&Name, (With<LogNameOnRun>, Added<Running>)>) {
-	for name in query.iter() {
-		log::info!("Running: {name}")
-	}
-}

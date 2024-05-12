@@ -1,7 +1,25 @@
 #![allow(unused)]
 use bevy::pbr::CascadeShadowConfigBuilder;
 use bevy::prelude::*;
+use forky_bevy::systems::close_on_esc;
 use std::f32::consts::PI;
+
+pub struct ExamplePlugin3d;
+
+impl Plugin for ExamplePlugin3d {
+	fn build(&self, app: &mut App) {
+		app.add_plugins(DefaultPlugins.set(WindowPlugin {
+			primary_window: Some(Window {
+				fit_canvas_to_parent: true,
+				..default()
+			}),
+			..default()
+		}))
+		.add_systems(Startup, setup_scene_3d)
+		.add_systems(Update, close_on_esc);
+	}
+}
+
 
 pub fn setup_scene_3d(
 	mut commands: Commands,

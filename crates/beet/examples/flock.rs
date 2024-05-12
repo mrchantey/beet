@@ -1,15 +1,15 @@
 use beet::prelude::*;
 use bevy::prelude::*;
 
-#[path = "common/example_plugin.rs"]
-mod example_plugin;
-use example_plugin::ExamplePlugin;
+#[path = "common/example_plugin_2d.rs"]
+mod example_plugin_2d;
+use example_plugin_2d::ExamplePlugin2d;
 
 fn main() {
 	let mut app = App::new();
 
 	app /*-*/
-		.add_plugins(ExamplePlugin)
+		.add_plugins(ExamplePlugin2d)
 		.add_systems(Startup, setup)
 		.add_systems(Update, spawn_on_click)
 		.run()
