@@ -72,7 +72,8 @@ mod test {
 	fn works() -> Result<()> {
 		let mut app = App::new();
 
-		app.add_plugins(DefaultBeetPlugins::default()).insert_time();
+		app.add_plugins((LifecyclePlugin, MovementPlugin, SteerPlugin))
+			.insert_time();
 
 		let agent = app
 			.world_mut()

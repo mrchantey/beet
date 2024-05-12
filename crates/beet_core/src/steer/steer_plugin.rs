@@ -1,7 +1,6 @@
 use crate::prelude::*;
 use beet_ecs::prelude::*;
 use bevy::prelude::*;
-use forky_bevy::extensions::AppExt;
 
 /// Required Resources:
 /// - [`Time`]
@@ -35,15 +34,6 @@ impl Plugin for SteerPlugin {
 		registry.register::<WanderParams>();
 
 		drop(registry);
-
-		app.__()
-			.add_systems(
-				Update,
-				(integrate_force, rotate_to_velocity_2d)
-					.chain()
-					.in_set(PostTickSet),
-			)
-			.__();
 
 		#[cfg(feature = "gizmos")]
 		app.add_systems(Update, debug_group_steer.in_set(PostTickSet));

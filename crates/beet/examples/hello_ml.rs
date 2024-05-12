@@ -23,7 +23,7 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
 			let id = parent.parent_entity();
 			parent
 				.spawn((
-					Name::new("Selector"),
+					Name::new("Agent Behavior"),
 					TargetAgent(id),
 					SentenceScorer::new(asset_server.load("default-bert.ron")),
 					ScoreSelector {

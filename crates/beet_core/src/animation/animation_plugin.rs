@@ -2,6 +2,7 @@ use super::*;
 use beet_ecs::prelude::*;
 use bevy::prelude::*;
 
+#[derive(Default)]
 pub struct AnimationPlugin;
 
 impl Plugin for AnimationPlugin {

@@ -22,5 +22,17 @@ impl Plugin for MovementPlugin {
 		registry.register::<Velocity>();
 		registry.register::<Impulse>();
 		registry.register::<Force>();
+
+		drop(registry);
+
+		app.add_systems(
+			Update,
+			(
+				integrate_force,
+				(rotate_to_velocity_2d, rotate_to_velocity_3d),
+			)
+				.chain()
+				.in_set(PostTickSet),
+		);
 	}
 }

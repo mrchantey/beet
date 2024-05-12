@@ -71,8 +71,10 @@ fn score_selector(
 						commands.entity(*child).remove::<Score>();
 					}
 				}
+			} else {
+				// no highest score, do nothing
+				continue;
 			}
-			// else no passing score, do nothing
 		}
 	}
 }

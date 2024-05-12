@@ -4,6 +4,8 @@ use bevy::prelude::*;
 use forky_bevy::systems::close_on_esc;
 use std::f32::consts::PI;
 
+
+#[derive(Default)]
 pub struct ExamplePlugin3d;
 
 impl Plugin for ExamplePlugin3d {
@@ -26,16 +28,9 @@ pub fn setup_scene_3d(
 	mut meshes: ResMut<Assets<Mesh>>,
 	mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
-	// Camera
-	commands.spawn(Camera3dBundle {
-		transform: Transform::from_xyz(100.0, 100.0, 150.0)
-			.looking_at(Vec3::new(0.0, 20.0, 0.0), Vec3::Y),
-		..default()
-	});
-
 	// Plane
 	commands.spawn(PbrBundle {
-		mesh: meshes.add(Plane3d::default().mesh().size(500000.0, 500000.0)),
+		mesh: meshes.add(Plane3d::default().mesh().size(100., 100.)),
 		material: materials.add(Color::srgb(0.3, 0.5, 0.3)),
 		..default()
 	});
@@ -53,8 +48,8 @@ pub fn setup_scene_3d(
 			..default()
 		},
 		cascade_shadow_config: CascadeShadowConfigBuilder {
-			first_cascade_far_bound: 200.0,
-			maximum_distance: 400.0,
+			first_cascade_far_bound: 20.0,
+			maximum_distance: 40.0,
 			..default()
 		}
 		.into(),

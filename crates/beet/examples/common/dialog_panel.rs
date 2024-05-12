@@ -2,7 +2,6 @@ use bevy::prelude::*;
 
 pub struct DialogPanelPlugin;
 
-
 impl Plugin for DialogPanelPlugin {
 	fn build(&self, app: &mut App) {
 		app.add_systems(Startup, setup_ui)
@@ -10,16 +9,19 @@ impl Plugin for DialogPanelPlugin {
 				Update,
 				(
 					(parse_text_input, button_system),
-					(update_text_input, handle_user_submit),
+					(update_text_input, handle_messages),
 				)
 					.chain(),
 			)
-			.add_event::<OnSubmit>();
+			.add_event::<OnPlayerMessage>()
+			.add_event::<OnNpcMessage>();
 	}
 }
 
-#[derive(Event)]
-pub struct OnSubmit(pub String);
+#[derive(Event, Deref, DerefMut)]
+pub struct OnPlayerMessage(pub String);
+#[derive(Event, Deref, DerefMut)]
+pub struct OnNpcMessage(pub String);
 
 #[derive(Component, Deref, DerefMut)]
 pub struct InputTextField(pub String);
@@ -40,19 +42,21 @@ fn setup_ui(mut commands: Commands) {
 		.with_children(|root| {
 			// left
 			root.spawn(NodeBundle {
-				background_color: Color::srgba(0., 0., 0., 0.).into(),
+				style: Style { ..default() },
+				// background_color: Color::srgba(0., 0., 0., 0.).into(),
 				..default()
 			});
 			// right
 			root.spawn((NodeBundle {
 				style: Style {
 					width: Val::Px(400.),
+					// width: Val::Percent((1. - SPLIT_RATIO) * 100.),
 					border: UiRect::all(Val::Px(2.)),
 					display: Display::Flex,
 					flex_direction: FlexDirection::Column,
 					..default()
 				},
-				background_color: Color::linear_rgb(0.1, 0.1, 0.1).into(),
+				background_color: Color::linear_rgba(0.1, 0.1, 0.1, 0.1).into(),
 				..default()
 			},))
 				.with_children(|right_col| {
@@ -72,7 +76,7 @@ fn setup_ui(mut commands: Commands) {
 						.spawn(NodeBundle {
 							style: Style {
 								width: Val::Percent(100.),
-								height: Val::Px(100.),
+								height: Val::Px(40.),
 								display: Display::Flex,
 								flex_direction: FlexDirection::Row,
 								..default()
@@ -83,7 +87,7 @@ fn setup_ui(mut commands: Commands) {
 							input_area
 								.spawn(NodeBundle {
 									style: Style {
-										width: Val::Percent(80.),
+										width: Val::Percent(100.),
 										height: Val::Percent(100.),
 										display: Display::Flex,
 										align_items: AlignItems::Center,
@@ -132,7 +136,8 @@ fn setup_ui(mut commands: Commands) {
 								},))
 								.with_children(|parent| {
 									parent.spawn(TextBundle::from_section(
-										"Submit",
+										// "Submit",
+										"Enter",
 										TextStyle {
 											font_size: 18.,
 											..default()
@@ -153,45 +158,59 @@ fn update_text_input(
 }
 
 
-fn handle_user_submit(
+fn handle_messages(
 	mut commands: Commands,
-	mut on_submit: EventReader<OnSubmit>,
+	mut on_player_message: EventReader<OnPlayerMessage>,
+	mut on_npc_message: EventReader<OnNpcMessage>,
 	message_section: Query<Entity, With<MessagesSection>>,
 ) {
-	for submit in on_submit.read() {
+	for msg in on_player_message.read() {
 		commands
 			.entity(message_section.iter().next().unwrap())
 			.with_children(|parent| {
-				let text = format!("Player 1:\n    {}", submit.0);
-				parent.spawn(
-					TextBundle::from_section(text, TextStyle {
-						font_size: 18.,
-						..default()
-					})
-					.with_style(Style {
-						width: Val::Percent(80.),
-						padding: UiRect::all(Val::Px(10.)),
-						..default()
-					}),
-				);
+				parent.spawn(new_message(&msg, true));
 			});
 	}
+	for msg in on_npc_message.read() {
+		commands
+			.entity(message_section.iter().next().unwrap())
+			.with_children(|parent| {
+				parent.spawn(new_message(&msg, false));
+			});
+	}
+}
+
+
+fn new_message(text: &str, is_player: bool) -> impl Bundle {
+	let text = if is_player {
+		format!("Player 1:\n  {}", text)
+	} else {
+		format!("Foxie:\n  {}", text)
+	};
+
+	TextBundle::from_section(text, TextStyle {
+		font_size: 18.,
+		..default()
+	})
+	.with_style(Style {
+		width: Val::Percent(80.),
+		padding: UiRect::all(Val::Px(10.)),
+		..default()
+	})
 }
 
 fn parse_text_input(
 	mut evr_char: EventReader<ReceivedCharacter>,
 	key_input: Res<ButtonInput<KeyCode>>,
-	mut on_submit: EventWriter<OnSubmit>,
+	mut on_submit: EventWriter<OnPlayerMessage>,
 	mut query: Query<&mut InputTextField>,
 ) {
 	for mut field in query.iter_mut() {
 		if key_input.just_pressed(KeyCode::Enter) {
-			on_submit.send(OnSubmit(field.0.clone()));
+			on_submit.send(OnPlayerMessage(field.0.clone()));
 			field.clear();
 		} else if key_input.just_pressed(KeyCode::Backspace) {
-			// log::info!("backspace: {}", field.0);
 			field.pop();
-		// log::info!("backspace: {}", field.0);
 		} else {
 			for ev in evr_char.read() {
 				field.push_str(&ev.char);
@@ -209,7 +228,7 @@ fn button_system(
 		(&Interaction, &mut BackgroundColor, &Children),
 		(Changed<Interaction>, With<Button>),
 	>,
-	mut on_submit: EventWriter<OnSubmit>,
+	mut on_submit: EventWriter<OnPlayerMessage>,
 	mut query: Query<&mut InputTextField>,
 	mut text_query: Query<&mut Text>,
 ) {
@@ -221,7 +240,7 @@ fn button_system(
 				text.sections[0].value = "Press".to_string();
 				*color = PRESSED_BUTTON.into();
 				for mut field in query.iter_mut() {
-					on_submit.send(OnSubmit(field.0.clone()));
+					on_submit.send(OnPlayerMessage(field.0.clone()));
 					field.clear();
 				}
 			}

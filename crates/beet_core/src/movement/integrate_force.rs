@@ -71,7 +71,7 @@ mod test {
 	pub fn works() -> Result<()> {
 		let mut app = App::new();
 
-		app.add_plugins(SteerPlugin::default());
+		app.add_systems(Update, integrate_force);
 		app.insert_time();
 
 		let velocity_entity = app

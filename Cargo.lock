@@ -611,6 +611,7 @@ dependencies = [
  "forky_bevy",
  "log",
  "pretty_env_logger",
+ "rand",
  "tokio",
 ]
 

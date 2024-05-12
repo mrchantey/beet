@@ -29,6 +29,7 @@ bevy = { workspace = true, default-features = true }
 log.workspace = true
 pretty_env_logger.workspace = true
 forky_bevy.workspace = true
+rand = "0.8"
 
 anyhow.workspace = true
 
