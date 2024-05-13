@@ -4,9 +4,7 @@ use bevy::prelude::*;
 use std::f32::consts::TAU;
 
 
-#[derive(
-	Debug, Default, Clone, PartialEq, Component, Reflect,
-)]
+#[derive(Debug, Default, Clone, PartialEq, Component, Reflect)]
 #[reflect(Default, Component, ActionMeta)]
 /// Translate the agent up and down in a sine wave
 pub struct Hover {
@@ -38,7 +36,7 @@ fn hover(
 
 
 impl ActionMeta for Hover {
-	fn graph_role(&self) -> GraphRole { GraphRole::Agent }
+	fn category(&self) -> ActionCategory { ActionCategory::Agent }
 }
 
 impl ActionSystems for Hover {

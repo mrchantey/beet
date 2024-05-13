@@ -1,11 +1,30 @@
+#[allow(unused)]
 use crate::prelude::*;
 use bevy::prelude::*;
 
-/// Provide extra info for action components, useful for debugging, visualization etc.
+/// Provide extra info for action components, useful for ui, debugging, visualization etc.
 #[reflect_trait]
 pub trait ActionMeta {
-	fn graph_role(&self) -> GraphRole { GraphRole::Node }
+	fn category(&self) -> ActionCategory { ActionCategory::Internal }
 }
+
+
+/// Some extra metadata used to indicate the purpose of an action, ie which parts of the world it will effect.
+/// This is **not** used at runtime, only for UI and debugging purposes.
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum ActionCategory {
+	/// This action will effect only this entity
+	Internal,
+	/// This action will effect children of this entity
+	Children,
+	/// This action will effect the [`TargetAgent`] of this entity
+	Agent,
+	/// This action will effect some other aspect of the world
+	World,
+}
+
+
+
 
 #[cfg(test)]
 mod test {
@@ -23,7 +42,7 @@ mod test {
 	struct MyStruct;
 
 	impl ActionMeta for MyStruct {
-		fn graph_role(&self) -> GraphRole { GraphRole::Node }
+		fn category(&self) -> ActionCategory { ActionCategory::Internal }
 	}
 
 	impl ActionSystems for MyStruct {
@@ -41,12 +60,12 @@ mod test {
 		registry.register::<MyStruct>();
 
 		let val = MyStruct;
-		expect(val.graph_role()).to_be(GraphRole::Node)?;
+		expect(val.category()).to_be(ActionCategory::Internal)?;
 		let data = registry
 			.get_type_data::<ReflectActionMeta>(MyStruct.type_id())
 			.unwrap();
 		let val: &dyn ActionMeta = data.get(&val).unwrap();
-		expect(val.graph_role()).to_be(GraphRole::Node)?;
+		expect(val.category()).to_be(ActionCategory::Internal)?;
 
 
 		Ok(())
@@ -79,7 +98,7 @@ mod test {
 			.unwrap();
 		let component: &dyn ActionMeta = data.get(component).unwrap();
 
-		expect(component.graph_role()).to_be(GraphRole::Node)?;
+		expect(component.category()).to_be(ActionCategory::Internal)?;
 
 		Ok(())
 	}

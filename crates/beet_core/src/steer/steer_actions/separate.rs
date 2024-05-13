@@ -64,7 +64,7 @@ fn separate<M: GenericActionComponent>(
 
 
 impl<M: GenericActionComponent> ActionMeta for Separate<M> {
-	fn graph_role(&self) -> GraphRole { GraphRole::Agent }
+	fn category(&self) -> ActionCategory { ActionCategory::Agent }
 }
 
 impl<M: GenericActionComponent> ActionSystems for Separate<M> {

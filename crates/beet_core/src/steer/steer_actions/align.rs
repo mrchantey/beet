@@ -54,7 +54,7 @@ fn align<M: GenericActionComponent>(
 
 
 impl<M: GenericActionComponent> ActionMeta for Align<M> {
-	fn graph_role(&self) -> GraphRole { GraphRole::Agent }
+	fn category(&self) -> ActionCategory { ActionCategory::Agent }
 }
 
 impl<M: GenericActionComponent> ActionSystems for Align<M> {

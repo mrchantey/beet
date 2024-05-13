@@ -9,7 +9,7 @@ use bevy::prelude::*;
 pub struct Repeat;
 
 impl ActionMeta for Repeat {
-	fn graph_role(&self) -> GraphRole { GraphRole::Node }
+	fn category(&self) -> ActionCategory { ActionCategory::Internal }
 }
 
 impl ActionSystems for Repeat {

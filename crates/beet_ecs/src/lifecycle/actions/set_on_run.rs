@@ -12,7 +12,7 @@ pub struct SetOnRun<T: GenericActionComponent>(pub T);
 
 
 impl<T: GenericActionComponent> ActionMeta for SetOnRun<T> {
-	fn graph_role(&self) -> GraphRole { GraphRole::Node }
+	fn category(&self) -> ActionCategory { ActionCategory::Internal }
 }
 
 impl<T: GenericActionComponent> ActionSystems for SetOnRun<T> {

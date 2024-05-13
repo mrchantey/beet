@@ -52,7 +52,7 @@ fn wander(
 
 
 impl ActionMeta for Wander {
-	fn graph_role(&self) -> GraphRole { GraphRole::Agent }
+	fn category(&self) -> ActionCategory { ActionCategory::Agent }
 }
 
 impl ActionSystems for Wander {

@@ -67,7 +67,7 @@ fn find_steer_target(
 }
 
 impl ActionMeta for FindSteerTarget {
-	fn graph_role(&self) -> GraphRole { GraphRole::Agent }
+	fn category(&self) -> ActionCategory { ActionCategory::Agent }
 }
 
 impl ActionSystems for FindSteerTarget {

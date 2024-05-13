@@ -63,7 +63,7 @@ fn cohere<M: GenericActionComponent>(
 }
 
 impl<M: GenericActionComponent> ActionMeta for Cohere<M> {
-	fn graph_role(&self) -> GraphRole { GraphRole::Node }
+	fn category(&self) -> ActionCategory { ActionCategory::Internal }
 }
 
 impl<M: GenericActionComponent> ActionSystems for Cohere<M> {

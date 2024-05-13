@@ -15,7 +15,7 @@ pub struct InsertInDuration<T: GenericActionComponent> {
 }
 
 impl<T: GenericActionComponent> ActionMeta for InsertInDuration<T> {
-	fn graph_role(&self) -> GraphRole { GraphRole::Node }
+	fn category(&self) -> ActionCategory { ActionCategory::Internal }
 }
 
 impl<T: GenericActionComponent> ActionSystems for InsertInDuration<T> {

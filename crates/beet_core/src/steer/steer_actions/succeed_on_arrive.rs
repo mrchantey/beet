@@ -38,7 +38,7 @@ pub fn succeed_on_arrive(
 
 
 impl ActionMeta for SucceedOnArrive {
-	fn graph_role(&self) -> GraphRole { GraphRole::Node }
+	fn category(&self) -> ActionCategory { ActionCategory::Internal }
 }
 
 impl ActionSystems for SucceedOnArrive {

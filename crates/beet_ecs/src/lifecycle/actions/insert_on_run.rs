@@ -10,7 +10,7 @@ use bevy::prelude::*;
 pub struct InsertOnRun<T: GenericActionComponent>(pub T);
 
 impl<T: GenericActionComponent> ActionMeta for InsertOnRun<T> {
-	fn graph_role(&self) -> GraphRole { GraphRole::Node }
+	fn category(&self) -> ActionCategory { ActionCategory::Internal }
 }
 
 impl<T: GenericActionComponent> ActionSystems for InsertOnRun<T> {

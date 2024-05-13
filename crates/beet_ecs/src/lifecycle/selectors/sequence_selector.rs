@@ -51,7 +51,7 @@ fn sequence_selector(
 }
 
 impl ActionMeta for SequenceSelector {
-	fn graph_role(&self) -> GraphRole { GraphRole::Node }
+	fn category(&self) -> ActionCategory { ActionCategory::Internal }
 }
 
 impl ActionSystems for SequenceSelector {

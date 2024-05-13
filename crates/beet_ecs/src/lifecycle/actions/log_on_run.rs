@@ -9,7 +9,7 @@ use std::borrow::Cow;
 pub struct LogOnRun(pub Cow<'static, str>);
 
 impl ActionMeta for LogOnRun {
-	fn graph_role(&self) -> GraphRole { GraphRole::Node }
+	fn category(&self) -> ActionCategory { ActionCategory::Internal }
 }
 
 impl ActionSystems for LogOnRun {

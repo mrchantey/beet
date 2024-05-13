@@ -44,7 +44,7 @@ fn score_steer_target(
 // )>,
 
 impl ActionMeta for ScoreSteerTarget {
-	fn graph_role(&self) -> GraphRole { GraphRole::Node }
+	fn category(&self) -> ActionCategory { ActionCategory::Internal }
 }
 
 impl ActionSystems for ScoreSteerTarget {

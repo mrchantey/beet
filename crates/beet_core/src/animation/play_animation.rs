@@ -111,7 +111,7 @@ fn play_animation_on_load(
 }
 
 impl ActionMeta for PlayAnimation {
-	fn graph_role(&self) -> GraphRole { GraphRole::Agent }
+	fn category(&self) -> ActionCategory { ActionCategory::Agent }
 }
 
 impl ActionSystems for PlayAnimation {

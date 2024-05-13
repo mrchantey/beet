@@ -51,7 +51,7 @@ pub fn depth_sensor_scorer(
 }
 
 impl ActionMeta for DepthSensorScorer {
-	fn graph_role(&self) -> GraphRole { GraphRole::Node }
+	fn category(&self) -> ActionCategory { ActionCategory::Internal }
 }
 
 impl ActionSystems for DepthSensorScorer {

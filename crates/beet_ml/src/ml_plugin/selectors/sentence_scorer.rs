@@ -50,7 +50,7 @@ fn sentence_scorer(
 }
 
 impl ActionMeta for SentenceScorer {
-	fn graph_role(&self) -> GraphRole { GraphRole::Child }
+	fn category(&self) -> ActionCategory { ActionCategory::Children }
 }
 
 impl ActionSystems for SentenceScorer {

@@ -9,7 +9,7 @@ use bevy::prelude::*;
 pub struct EmptyAction;
 
 impl ActionMeta for EmptyAction {
-	fn graph_role(&self) -> GraphRole { GraphRole::World }
+	fn category(&self) -> ActionCategory { ActionCategory::World }
 }
 
 impl ActionSystems for EmptyAction {

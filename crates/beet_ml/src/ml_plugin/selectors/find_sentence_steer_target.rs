@@ -54,20 +54,13 @@ fn find_sentence_steer_target<T: 'static + Send + Sync + QueryFilter>(
 			let (entity, _, _score) = scores[0];
 			commands.entity(agent.0).insert(SteerTarget::Entity(entity));
 		}
-
-		// let options =
-
-		//VERY EXPENSIVE
-		// let embeddings = bert.get_embeddings(options).unwrap();
-
-		// log::info!("Running - {}", find_sentence_steer_target);
 	}
 }
 
 impl<T: 'static + Send + Sync + QueryFilter> ActionMeta
 	for FindSentenceSteerTarget<T>
 {
-	fn graph_role(&self) -> GraphRole { GraphRole::Node }
+	fn category(&self) -> ActionCategory { ActionCategory::Internal }
 }
 
 impl<T: 'static + Send + Sync + QueryFilter> ActionSystems

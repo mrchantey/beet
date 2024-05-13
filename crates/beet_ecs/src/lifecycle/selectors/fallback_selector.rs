@@ -47,7 +47,7 @@ fn fallback_selector(
 }
 
 impl ActionMeta for FallbackSelector {
-	fn graph_role(&self) -> GraphRole { GraphRole::Child }
+	fn category(&self) -> ActionCategory { ActionCategory::Children }
 }
 
 impl ActionSystems for FallbackSelector {

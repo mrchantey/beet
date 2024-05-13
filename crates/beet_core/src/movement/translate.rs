@@ -4,16 +4,14 @@ use bevy::prelude::*;
 use forky_core::ResultTEExt;
 
 impl ActionMeta for Translate {
-	fn graph_role(&self) -> GraphRole { GraphRole::Agent }
+	fn category(&self) -> ActionCategory { ActionCategory::Agent }
 }
 
 impl ActionSystems for Translate {
 	fn systems() -> SystemConfigs { translate.in_set(TickSet) }
 }
 
-#[derive(
-	Debug, Default, Clone, PartialEq, Component, Reflect,
-)]
+#[derive(Debug, Default, Clone, PartialEq, Component, Reflect)]
 #[reflect(Default, Component, ActionMeta)]
 /// Applies constant translation, multiplied by [`Time::delta_seconds`]
 pub struct Translate {

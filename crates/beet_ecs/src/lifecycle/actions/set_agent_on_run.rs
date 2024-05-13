@@ -15,7 +15,7 @@ impl<T: GenericActionComponent> SetAgentOnRun<T> {
 
 
 impl<T: GenericActionComponent> ActionMeta for SetAgentOnRun<T> {
-	fn graph_role(&self) -> GraphRole { GraphRole::Agent }
+	fn category(&self) -> ActionCategory { ActionCategory::Agent }
 }
 
 impl<T: GenericActionComponent> ActionSystems for SetAgentOnRun<T> {

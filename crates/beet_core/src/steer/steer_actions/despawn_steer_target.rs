@@ -27,7 +27,7 @@ fn despawn_steer_target(
 }
 
 impl ActionMeta for DespawnSteerTarget {
-	fn graph_role(&self) -> GraphRole { GraphRole::World }
+	fn category(&self) -> ActionCategory { ActionCategory::World }
 }
 
 impl ActionSystems for DespawnSteerTarget {

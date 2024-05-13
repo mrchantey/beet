@@ -39,7 +39,7 @@ fn parallel_selector(
 }
 
 impl ActionMeta for ParallelSelector {
-	fn graph_role(&self) -> GraphRole { GraphRole::Child }
+	fn category(&self) -> ActionCategory { ActionCategory::Children }
 }
 
 impl ActionSystems for ParallelSelector {

@@ -54,7 +54,7 @@ fn seek(
 
 
 impl ActionMeta for Seek {
-	fn graph_role(&self) -> GraphRole { GraphRole::Agent }
+	fn category(&self) -> ActionCategory { ActionCategory::Agent }
 }
 
 impl ActionSystems for Seek {

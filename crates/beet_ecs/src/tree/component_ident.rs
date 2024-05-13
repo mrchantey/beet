@@ -85,8 +85,8 @@ impl ComponentIdent {
 			.flatten()?;
 		Ok(out)
 	}
-	pub fn graph_role(self, world: &World) -> Result<GraphRole> {
-		self.map_action_meta(world, |meta| meta.graph_role())
+	pub fn category(self, world: &World) -> Result<ActionCategory> {
+		self.map_action_meta(world, |meta| meta.category())
 	}
 }
 
@@ -111,7 +111,7 @@ mod test {
 		let entity = world.spawn(EmptyAction).id();
 		let component = ComponentIdent::new(entity, type_id);
 
-		expect(component.graph_role(&world)?).to_be(GraphRole::World)?;
+		expect(component.category(&world)?).to_be(ActionCategory::World)?;
 
 
 		Ok(())

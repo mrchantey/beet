@@ -20,7 +20,7 @@ pub struct InsertOnAnimationEnd<T: GenericActionComponent> {
 }
 
 impl<T: GenericActionComponent> ActionMeta for InsertOnAnimationEnd<T> {
-	fn graph_role(&self) -> GraphRole { GraphRole::Agent }
+	fn category(&self) -> ActionCategory { ActionCategory::Agent }
 }
 
 impl<T: GenericActionComponent> ActionSystems for InsertOnAnimationEnd<T> {
