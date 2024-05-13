@@ -9,7 +9,7 @@ use std::borrow::Cow;
 pub struct LogOnRun(pub Cow<'static, str>);
 
 impl ActionMeta for LogOnRun {
-	fn category(&self) -> ActionCategory { ActionCategory::Internal }
+	fn category(&self) -> ActionCategory { ActionCategory::Behavior }
 }
 
 impl ActionSystems for LogOnRun {

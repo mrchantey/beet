@@ -50,7 +50,7 @@ fn sentence_scorer(
 }
 
 impl ActionMeta for SentenceScorer {
-	fn category(&self) -> ActionCategory { ActionCategory::Children }
+	fn category(&self) -> ActionCategory { ActionCategory::ChildBehaviors }
 }
 
 impl ActionSystems for SentenceScorer {

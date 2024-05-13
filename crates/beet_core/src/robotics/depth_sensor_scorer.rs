@@ -51,7 +51,7 @@ pub fn depth_sensor_scorer(
 }
 
 impl ActionMeta for DepthSensorScorer {
-	fn category(&self) -> ActionCategory { ActionCategory::Internal }
+	fn category(&self) -> ActionCategory { ActionCategory::Behavior }
 }
 
 impl ActionSystems for DepthSensorScorer {

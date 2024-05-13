@@ -9,7 +9,7 @@ use bevy::prelude::*;
 pub struct Repeat;
 
 impl ActionMeta for Repeat {
-	fn category(&self) -> ActionCategory { ActionCategory::Internal }
+	fn category(&self) -> ActionCategory { ActionCategory::Behavior }
 }
 
 impl ActionSystems for Repeat {

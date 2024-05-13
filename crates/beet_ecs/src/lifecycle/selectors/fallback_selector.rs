@@ -47,7 +47,7 @@ fn fallback_selector(
 }
 
 impl ActionMeta for FallbackSelector {
-	fn category(&self) -> ActionCategory { ActionCategory::Children }
+	fn category(&self) -> ActionCategory { ActionCategory::ChildBehaviors }
 }
 
 impl ActionSystems for FallbackSelector {

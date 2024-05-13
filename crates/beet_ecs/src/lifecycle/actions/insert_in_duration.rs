@@ -15,7 +15,7 @@ pub struct InsertInDuration<T: GenericActionComponent> {
 }
 
 impl<T: GenericActionComponent> ActionMeta for InsertInDuration<T> {
-	fn category(&self) -> ActionCategory { ActionCategory::Internal }
+	fn category(&self) -> ActionCategory { ActionCategory::Behavior }
 }
 
 impl<T: GenericActionComponent> ActionSystems for InsertInDuration<T> {

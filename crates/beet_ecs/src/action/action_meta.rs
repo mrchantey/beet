@@ -2,21 +2,20 @@
 use crate::prelude::*;
 use bevy::prelude::*;
 
-/// Provide extra info for action components, useful for ui, debugging, visualization etc.
+/// Provide extra metadata to describe actions used for debugging, UI, etc.
 #[reflect_trait]
 pub trait ActionMeta {
-	fn category(&self) -> ActionCategory { ActionCategory::Internal }
+	fn category(&self) -> ActionCategory { ActionCategory::Behavior }
 }
 
 
-/// Some extra metadata used to indicate the purpose of an action, ie which parts of the world it will effect.
-/// This is **not** used at runtime, only for UI and debugging purposes.
+/// Descrition of what the purpose of this action is, ie whether it will effect the entity, its children, the agent, or the world
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum ActionCategory {
-	/// This action will effect only this entity
-	Internal,
-	/// This action will effect children of this entity
-	Children,
+	/// This action will effect only the entity it is attached to.
+	Behavior,
+	/// This action will effect children of this behavior.
+	ChildBehaviors,
 	/// This action will effect the [`TargetAgent`] of this entity
 	Agent,
 	/// This action will effect some other aspect of the world
@@ -42,7 +41,7 @@ mod test {
 	struct MyStruct;
 
 	impl ActionMeta for MyStruct {
-		fn category(&self) -> ActionCategory { ActionCategory::Internal }
+		fn category(&self) -> ActionCategory { ActionCategory::Behavior }
 	}
 
 	impl ActionSystems for MyStruct {
@@ -60,12 +59,12 @@ mod test {
 		registry.register::<MyStruct>();
 
 		let val = MyStruct;
-		expect(val.category()).to_be(ActionCategory::Internal)?;
+		expect(val.category()).to_be(ActionCategory::Behavior)?;
 		let data = registry
 			.get_type_data::<ReflectActionMeta>(MyStruct.type_id())
 			.unwrap();
 		let val: &dyn ActionMeta = data.get(&val).unwrap();
-		expect(val.category()).to_be(ActionCategory::Internal)?;
+		expect(val.category()).to_be(ActionCategory::Behavior)?;
 
 
 		Ok(())
@@ -98,7 +97,7 @@ mod test {
 			.unwrap();
 		let component: &dyn ActionMeta = data.get(component).unwrap();
 
-		expect(component.category()).to_be(ActionCategory::Internal)?;
+		expect(component.category()).to_be(ActionCategory::Behavior)?;
 
 		Ok(())
 	}

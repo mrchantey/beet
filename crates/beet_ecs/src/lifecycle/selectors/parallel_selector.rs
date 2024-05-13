@@ -39,7 +39,7 @@ fn parallel_selector(
 }
 
 impl ActionMeta for ParallelSelector {
-	fn category(&self) -> ActionCategory { ActionCategory::Children }
+	fn category(&self) -> ActionCategory { ActionCategory::ChildBehaviors }
 }
 
 impl ActionSystems for ParallelSelector {

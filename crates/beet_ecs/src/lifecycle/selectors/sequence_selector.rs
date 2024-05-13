@@ -51,7 +51,7 @@ fn sequence_selector(
 }
 
 impl ActionMeta for SequenceSelector {
-	fn category(&self) -> ActionCategory { ActionCategory::Internal }
+	fn category(&self) -> ActionCategory { ActionCategory::Behavior }
 }
 
 impl ActionSystems for SequenceSelector {

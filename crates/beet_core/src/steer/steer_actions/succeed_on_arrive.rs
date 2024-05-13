@@ -38,7 +38,7 @@ pub fn succeed_on_arrive(
 
 
 impl ActionMeta for SucceedOnArrive {
-	fn category(&self) -> ActionCategory { ActionCategory::Internal }
+	fn category(&self) -> ActionCategory { ActionCategory::Behavior }
 }
 
 impl ActionSystems for SucceedOnArrive {

@@ -63,7 +63,7 @@ fn cohere<M: GenericActionComponent>(
 }
 
 impl<M: GenericActionComponent> ActionMeta for Cohere<M> {
-	fn category(&self) -> ActionCategory { ActionCategory::Internal }
+	fn category(&self) -> ActionCategory { ActionCategory::Behavior }
 }
 
 impl<M: GenericActionComponent> ActionSystems for Cohere<M> {

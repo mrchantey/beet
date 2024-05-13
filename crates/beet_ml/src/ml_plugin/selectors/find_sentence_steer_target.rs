@@ -60,7 +60,7 @@ fn find_sentence_steer_target<T: 'static + Send + Sync + QueryFilter>(
 impl<T: 'static + Send + Sync + QueryFilter> ActionMeta
 	for FindSentenceSteerTarget<T>
 {
-	fn category(&self) -> ActionCategory { ActionCategory::Internal }
+	fn category(&self) -> ActionCategory { ActionCategory::Behavior }
 }
 
 impl<T: 'static + Send + Sync + QueryFilter> ActionSystems

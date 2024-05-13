@@ -11,7 +11,7 @@ use bevy::prelude::*;
 pub struct SetOnSpawn<T: GenericActionComponent>(pub T);
 
 impl<T: GenericActionComponent> ActionMeta for SetOnSpawn<T> {
-	fn category(&self) -> ActionCategory { ActionCategory::Internal }
+	fn category(&self) -> ActionCategory { ActionCategory::Behavior }
 }
 
 impl<T: GenericActionComponent> ActionSystems for SetOnSpawn<T> {

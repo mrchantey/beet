@@ -10,7 +10,7 @@ use bevy::prelude::*;
 pub struct InsertOnRun<T: GenericActionComponent>(pub T);
 
 impl<T: GenericActionComponent> ActionMeta for InsertOnRun<T> {
-	fn category(&self) -> ActionCategory { ActionCategory::Internal }
+	fn category(&self) -> ActionCategory { ActionCategory::Behavior }
 }
 
 impl<T: GenericActionComponent> ActionSystems for InsertOnRun<T> {

@@ -12,7 +12,7 @@ pub struct SetOnRun<T: GenericActionComponent>(pub T);
 
 
 impl<T: GenericActionComponent> ActionMeta for SetOnRun<T> {
-	fn category(&self) -> ActionCategory { ActionCategory::Internal }
+	fn category(&self) -> ActionCategory { ActionCategory::Behavior }
 }
 
 impl<T: GenericActionComponent> ActionSystems for SetOnRun<T> {

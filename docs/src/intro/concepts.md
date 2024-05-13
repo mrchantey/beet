@@ -19,14 +19,16 @@ These terms may be helpful when describing Beet principles.
 
 ## Action Category
 
+Action categories are metadata that describes what the 
+
 Actions can be categorized by what they modify. This is just metadata, there is no techical barrier to creating a super action that does everything, although its usually best to keep actions specific.
 
-| Name                       | Description                                                            | Example                                      |
-| -------------------------- | ---------------------------------------------------------------------- | -------------------------------------------- |
-| `ActionCategory::Internal` | Modifies some part of its own behavior, like setting the `RunResult`   | [`InsertOnRun<RunResult>`][run-result]       |
-| `ActionCategory::Children` | Modifies child behaviors, like adding/removing `Running`               | [`SequenceSelector`][sequence]               |
-| `ActionCategory::Agent`    | Modifies the associated agent, like its `Transform`                    | [`Translate`][translate]                     |
-| `ActionCategory::World`    | Modifies external entities or resources, like despawning a collectable | [`DespawnSteerTarget`][despawn-steer-target] |
+| Name                             | Description                                                            | Example                                      |
+| -------------------------------- | ---------------------------------------------------------------------- | -------------------------------------------- |
+| `ActionCategory::Behavior`       | Modifies some part of its own behavior, like setting the `RunResult`   | [`InsertOnRun<RunResult>`][run-result]       |
+| `ActionCategory::ChildBehaviors` | Modifies child behaviors, like adding/removing `Running`               | [`SequenceSelector`][sequence]               |
+| `ActionCategory::Agent`          | Modifies the associated agent, like its `Transform`                    | [`Translate`][translate]                     |
+| `ActionCategory::World`          | Modifies external entities or resources, like despawning a collectable | [`DespawnSteerTarget`][despawn-steer-target] |
 
 ## Common Components
 

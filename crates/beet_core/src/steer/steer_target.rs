@@ -15,7 +15,7 @@ impl Default for SteerTarget {
 }
 
 impl SteerTarget {
-	// TODO 0.13 query lens
+	/// Get either the fixed position or the entity's transform, dependent on the variant.
 	pub fn position(&self, query: &Query<&Transform>) -> Result<Vec3> {
 		match self {
 			Self::Position(position) => Ok(*position),

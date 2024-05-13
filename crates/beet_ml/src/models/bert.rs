@@ -163,7 +163,8 @@ impl Bert {
 	}
 
 
-	/// Score a list of entities with a [`Sentence`] against a root entity with a [`Sentence`]. This returns a list of entities with their sentence and raw cosine similarity scores. Higher means more similar, the list is sorted in descending order.
+	/// Score a list of entities with a [`Sentence`] against a root entity with a [`Sentence`]. This returns a list of entities with their sentence and raw cosine similarity scores. 
+	/// Scores are in a range of `0..1`, higher means more similar, the list is sorted in descending order.
 	/// This calls [`Bert::get_embeddings`] and has the associated performance implications.
 	/// If the root is missing a [`Sentence`] an empty vec will be returned.
 	/// If options are missing a [`Sentence`] they will be ignored.
@@ -203,12 +204,6 @@ impl Bert {
 			.collect::<Vec<_>>();
 
 		Ok(scores)
-
-		// for score in scores {
-		// 	// subtract 1 because the first index is the agent
-		// 	let entity = *children[score.0 - 1].0;
-		// 	commands.entity(entity).insert(Score::Weight(score.1));
-		// }
 	}
 
 

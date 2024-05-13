@@ -44,7 +44,7 @@ fn score_steer_target(
 // )>,
 
 impl ActionMeta for ScoreSteerTarget {
-	fn category(&self) -> ActionCategory { ActionCategory::Internal }
+	fn category(&self) -> ActionCategory { ActionCategory::Behavior }
 }
 
 impl ActionSystems for ScoreSteerTarget {
