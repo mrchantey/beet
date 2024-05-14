@@ -4,13 +4,16 @@ use bevy::prelude::*;
 
 /// Sets an agent's component when this behavior starts running.
 /// This does nothing if the agent does not have the component.
-#[derive(
-	Default, PartialEq, Deref, DerefMut, Debug, Clone, Component, Reflect,
-)]
+#[derive(PartialEq, Deref, DerefMut, Debug, Clone, Component, Reflect)]
+#[reflect(Component, ActionMeta)]
 pub struct SetAgentOnRun<T: GenericActionComponent>(pub T);
 
 impl<T: GenericActionComponent> SetAgentOnRun<T> {
 	pub fn new(value: impl Into<T>) -> Self { Self(value.into()) }
+}
+
+impl<T: Default + GenericActionComponent> Default for SetAgentOnRun<T> {
+	fn default() -> Self { Self(T::default()) }
 }
 
 

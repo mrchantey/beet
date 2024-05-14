@@ -1,6 +1,6 @@
 use beet::prelude::*;
-use bevy::prelude::*;
 use beet_examples::*;
+use bevy::prelude::*;
 
 fn main() {
 	App::new()
@@ -9,35 +9,57 @@ fn main() {
 			DefaultBeetPlugins,
 			BeetDebugPlugin::default(),
 			MlPlugin::default(),
+			ActionPlugin::<InsertOnAssetEvent<RunResult, Bert>>::default(),
 		))
 		.add_systems(Startup, setup)
 		.run();
 }
 
 fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
+	let bert_handle = asset_server.load("default-bert.ron");
+
 	commands
 		.spawn((Name::new("Agent"), Sentence::new("please kill the baddies")))
 		.with_children(|parent| {
-			let id = parent.parent_entity();
+			let agent = parent.parent_entity();
+
 			parent
-				.spawn((
-					Name::new("Agent Behavior"),
-					TargetAgent(id),
-					SentenceScorer::new(asset_server.load("default-bert.ron")),
-					ScoreSelector {
-						consume_scores: true,
-					},
-					Running,
-				))
+				.spawn((Running, SequenceSelector))
 				.with_children(|parent| {
 					parent.spawn((
-						Name::new("Heal Behavior"),
-						Sentence::new("heal"),
+						Name::new("Await Bert Loaded"),
+						InsertOnAssetEvent::loaded(
+							RunResult::Success,
+							&bert_handle,
+						),
 					));
-					parent.spawn((
-						Name::new("Attack Behavior"),
-						Sentence::new("attack"),
-					));
+					parent
+						.spawn((
+							Name::new("Sentence Selector"),
+							TargetAgent(agent),
+							SentenceScorer::new(bert_handle),
+							ScoreSelector {
+								consume_scores: true,
+							},
+						))
+						.with_children(|parent| {
+							parent.spawn((
+								Name::new("Heal Behavior"),
+								Sentence::new("heal"),
+							));
+							parent.spawn((
+								Name::new("Attack Behavior"),
+								Sentence::new("attack"),
+							));
+						});
 				});
 		});
 }
+/*
+STDOUT:
+
+Started: Await Bert Loaded
+bert loaded
+Started: Sentence Selector
+Started: Attack Behavior
+*/

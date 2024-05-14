@@ -30,7 +30,7 @@ fn sentence_scorer(
 	mut berts: ResMut<Assets<Bert>>,
 	sentences: Query<&Sentence>,
 	// TODO double query, ie added running and added asset
-	started: Query<(&SentenceScorer, &TargetAgent, &Children), With<Running>>,
+	started: Query<(&SentenceScorer, &TargetAgent, &Children), Added<Running>>,
 ) {
 	for (scorer, agent, children) in started.iter() {
 		let Some(bert) = berts.get_mut(&scorer.bert) else {

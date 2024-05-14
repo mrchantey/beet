@@ -4,7 +4,7 @@ use bevy::prelude::*;
 use std::time::Duration;
 
 #[derive(Debug, Clone, Component, Reflect)]
-#[reflect(Default, Component, ActionMeta)]
+#[reflect(Component, ActionMeta)]
 /// Inserts the given component after running for a given duration. Has no effect if
 /// the action completes before the duration.
 /// # Requires
@@ -14,21 +14,17 @@ pub struct InsertInDuration<T: GenericActionComponent> {
 	pub value: T,
 }
 
+impl<T: Default + GenericActionComponent> Default for InsertInDuration<T> {
+	fn default() -> Self { Self::new(T::default(), Duration::from_secs(1)) }
+}
+
+
 impl<T: GenericActionComponent> ActionMeta for InsertInDuration<T> {
 	fn category(&self) -> ActionCategory { ActionCategory::Behavior }
 }
 
 impl<T: GenericActionComponent> ActionSystems for InsertInDuration<T> {
 	fn systems() -> SystemConfigs { insert_in_duration::<T>.in_set(TickSet) }
-}
-
-impl<T: GenericActionComponent> Default for InsertInDuration<T> {
-	fn default() -> Self {
-		Self {
-			duration: Duration::from_secs(1),
-			value: T::default(),
-		}
-	}
 }
 
 impl<T: GenericActionComponent> InsertInDuration<T> {
@@ -68,6 +64,7 @@ mod test {
 	use crate::prelude::*;
 	use anyhow::Result;
 	use bevy::prelude::*;
+	use std::time::Duration;
 	use sweet::*;
 
 	#[test]
@@ -84,7 +81,10 @@ mod test {
 			.spawn((
 				Running,
 				RunTimer::default(),
-				InsertInDuration::<RunResult>::default(),
+				InsertInDuration::<RunResult>::new(
+					RunResult::default(),
+					Duration::from_secs(1),
+				),
 			))
 			.id();
 

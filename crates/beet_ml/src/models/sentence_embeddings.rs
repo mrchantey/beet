@@ -21,7 +21,7 @@ impl SentenceEmbeddings {
 
 
 	/// Given a sentence index, returns a list of all other sentences indices and their score,
-	/// sorted by score in descending order.
+	/// sorted by score in descending order. Scores are in a range of 0..1 where 1 is the most similar.
 	pub fn scores(&self, index: usize) -> Result<Vec<(usize, f32)>> {
 		let e_i = self.embeddings.get(index)?;
 		let mut results = Vec::with_capacity(self.sentences.len() - 1);

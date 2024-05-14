@@ -2,13 +2,15 @@ use crate::prelude::*;
 use bevy::ecs::schedule::SystemConfigs;
 use bevy::prelude::*;
 
-#[derive(
-	Debug, Default, Clone, PartialEq, Deref, DerefMut, Component, Reflect,
-)]
-#[reflect(Default, Component, ActionMeta)]
+#[derive(Debug, Clone, PartialEq, Deref, DerefMut, Component, Reflect)]
+#[reflect(Component, ActionMeta)]
 /// Sets a component when this behavior spawns.
 /// This does nothing if the entity does not have the component.
 pub struct SetOnSpawn<T: GenericActionComponent>(pub T);
+
+impl<T: Default + GenericActionComponent> Default for SetOnSpawn<T> {
+	fn default() -> Self { Self(T::default()) }
+}
 
 impl<T: GenericActionComponent> ActionMeta for SetOnSpawn<T> {
 	fn category(&self) -> ActionCategory { ActionCategory::Behavior }

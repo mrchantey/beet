@@ -14,7 +14,9 @@ async fn main() -> anyhow::Result<()> {
 		"Do you like pizza?".into(),
 	])?;
 
-	let results = embeddings.scores(0)?;
+	let cat_outside_index = 0;
+
+	let results = embeddings.scores(cat_outside_index)?;
 	assert_eq!(
 		embeddings.sentences[results[0].0].as_ref(),
 		"The cat plays in the garden"

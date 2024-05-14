@@ -1,6 +1,12 @@
 pub mod set_on_run;
 #[allow(unused_imports)]
 pub use self::set_on_run::*;
+pub mod remove_agent_on_run;
+#[allow(unused_imports)]
+pub use self::remove_agent_on_run::*;
+pub mod insert_agent_on_run;
+#[allow(unused_imports)]
+pub use self::insert_agent_on_run::*;
 pub mod insert_in_duration;
 #[allow(unused_imports)]
 pub use self::insert_in_duration::*;

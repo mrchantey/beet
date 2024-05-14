@@ -28,6 +28,9 @@ pub enum Score {
 }
 
 impl Score {
+	/// A score with weight of `0.5`.
+	pub fn neutral() -> Self { Score::Weight(0.5) }
+
 	/// Maps [`Score::Fail`] to `0.0`, [`Score::Pass`] to `1.0` and [`Score::Weight`] to its value.
 	pub fn weight(&self) -> f32 {
 		match self {

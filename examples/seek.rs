@@ -39,9 +39,9 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
 			// behavior
 			parent.spawn((
 				Name::new("Seek"),
-				Seek,
 				Running,
 				TargetAgent(parent.parent_entity()),
+				Seek,
 			));
 		});
 }

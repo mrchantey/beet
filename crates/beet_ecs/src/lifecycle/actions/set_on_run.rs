@@ -4,12 +4,13 @@ use bevy::prelude::*;
 
 /// Sets a component when this behavior starts running.
 /// This does nothing if the entity does not have the component.
-#[derive(
-	Default, PartialEq, Deref, DerefMut, Debug, Clone, Component, Reflect,
-)]
-#[reflect(Default, Component, ActionMeta)]
+#[derive(PartialEq, Deref, DerefMut, Debug, Clone, Component, Reflect)]
+#[reflect(Component, ActionMeta)]
 pub struct SetOnRun<T: GenericActionComponent>(pub T);
 
+impl<T: Default + GenericActionComponent> Default for SetOnRun<T> {
+	fn default() -> Self { Self(T::default()) }
+}
 
 impl<T: GenericActionComponent> ActionMeta for SetOnRun<T> {
 	fn category(&self) -> ActionCategory { ActionCategory::Behavior }

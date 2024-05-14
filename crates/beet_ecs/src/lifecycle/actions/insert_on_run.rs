@@ -3,11 +3,13 @@ use bevy::ecs::schedule::SystemConfigs;
 use bevy::prelude::*;
 
 
-#[derive(
-	Default, PartialEq, Deref, DerefMut, Debug, Clone, Component, Reflect,
-)]
-#[reflect(Default, Component, ActionMeta)]
+#[derive(Debug, Clone, PartialEq, Deref, DerefMut, Component, Reflect)]
+#[reflect(Component, ActionMeta)]
 pub struct InsertOnRun<T: GenericActionComponent>(pub T);
+
+impl<T: Default + GenericActionComponent> Default for InsertOnRun<T> {
+	fn default() -> Self { Self(T::default()) }
+}
 
 impl<T: GenericActionComponent> ActionMeta for InsertOnRun<T> {
 	fn category(&self) -> ActionCategory { ActionCategory::Behavior }

@@ -31,7 +31,7 @@ impl<T: 'static + Send + Sync + QueryFilter> FindSentenceSteerTarget<T> {
 
 fn find_sentence_steer_target<T: 'static + Send + Sync + QueryFilter>(
 	mut commands: Commands,
-	query: Query<(&TargetAgent, &FindSentenceSteerTarget<T>), With<Running>>,
+	query: Query<(&TargetAgent, &FindSentenceSteerTarget<T>), Added<Running>>,
 	sentences: Query<&Sentence>,
 	// TODO this should be query of Sentence, but we need
 	// it to be similar to sentence_scorer
@@ -51,8 +51,9 @@ fn find_sentence_steer_target<T: 'static + Send + Sync + QueryFilter>(
 			.ok_or(|e| log::error!("{e}"))
 			&& scores.len() > 0
 		{
-			let (entity, _, _score) = scores[0];
-			commands.entity(agent.0).insert(SteerTarget::Entity(entity));
+			let (target, _, _score) = scores[0];
+			// log::info!("Setting target to {:?}", target);
+			commands.entity(agent.0).insert(SteerTarget::Entity(target));
 		}
 	}
 }
@@ -87,18 +88,13 @@ mod test {
 			.spawn(Sentence::new("destroy"))
 			.with_children(|parent| {
 				let id = parent.parent_entity();
-				parent
-					.spawn((
-						TargetAgent(id),
-						FindSentenceSteerTarget::<With<Sentence>>::new(
-							asset_server.load("default-bert.ron"),
-						),
-						Running,
-					))
-					.with_children(|parent| {
-						parent.spawn(Sentence::new("heal"));
-						parent.spawn(Sentence::new("kill"));
-					});
+				parent.spawn((
+					TargetAgent(id),
+					FindSentenceSteerTarget::<With<Sentence>>::new(
+						asset_server.load("default-bert.ron"),
+					),
+					Running,
+				));
 			});
 	}
 
@@ -106,6 +102,8 @@ mod test {
 	#[test]
 	fn works() -> Result<()> {
 		pretty_env_logger::try_init().ok();
+
+
 
 		let mut app = App::new();
 		app.add_plugins((
@@ -116,6 +114,8 @@ mod test {
 		))
 		.add_systems(Startup, setup)
 		.finish();
+		let _heal = app.world_mut().spawn(Sentence::new("heal")).id();
+		let kill = app.world_mut().spawn(Sentence::new("kill")).id();
 
 		let entity = loop {
 			app.update();
@@ -135,7 +135,7 @@ mod test {
 			{
 				break app
 					.world_mut()
-					.query_filtered::<Entity, (Without<Parent>, With<Sentence>)>(
+					.query_filtered::<Entity, (With<Children>, With<Sentence>)>(
 					)
 					.iter(app.world())
 					.next()
@@ -143,9 +143,6 @@ mod test {
 			}
 			std::thread::sleep(std::time::Duration::from_millis(1));
 		};
-
-		let tree = EntityTree::new_with_world(entity, app.world());
-		let kill = tree.children[0].children[1].value;
 
 		let target = app.world().entity(entity).get::<SteerTarget>();
 		expect(target).to_be(Some(&SteerTarget::Entity(kill)))?;

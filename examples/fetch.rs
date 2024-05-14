@@ -1,22 +1,32 @@
 // use beet::prelude::*;
 use beet::prelude::*;
-use bevy::animation::RepeatAnimation;
-use bevy::prelude::*;
 // use example_plugin::ExamplePlugin;
 use beet_examples::*;
+use bevy::prelude::*;
 use rand::prelude::IteratorRandom;
 use std::time::Duration;
 
 fn main() {
 	App::new()
-		.add_plugins(ExamplePlugin3d)
-		.add_plugins(DefaultBeetPlugins)
-		.add_plugins(BeetDebugPlugin::default())
+		.add_plugins((
+			ExamplePlugin3d,
+			DefaultBeetPlugins,
+			BeetDebugPlugin::default(),
+			DialogPanelPlugin,
+			MlPlugin,
+			ActionPlugin::<(
+				// SetAgentOnRun<SteerTarget>,
+				InsertOnAssetEvent<RunResult, Bert>,
+				FindSentenceSteerTarget<With<Item>>,
+				RemoveAgentOnRun<Sentence>,
+				RemoveAgentOnRun<SteerTarget>,
+			)>::default(),
+		))
 		.add_systems(
 			Startup,
 			(setup_camera, setup_fox, setup_chat, setup_items),
 		)
-		.add_plugins(DialogPanelPlugin)
+		.add_systems(Update, set_player_sentence)
 		.run();
 }
 
@@ -31,6 +41,9 @@ fn setup_chat(mut npc_events: EventWriter<OnNpcMessage>) {
 	npc_events.send(OnNpcMessage(what_does_the_fox_say()));
 }
 
+#[derive(Component)]
+pub struct Player;
+
 fn setup_fox(
 	mut commands: Commands,
 	asset_server: Res<AssetServer>,
@@ -38,15 +51,16 @@ fn setup_fox(
 ) {
 	let mut graph = AnimationGraph::new();
 
-	let anim1_clip = asset_server.load("Fox.glb#Animation0");
-	let anim1_index = graph.add_clip(anim1_clip.clone(), 1.0, graph.root);
-	let anim2_clip = asset_server.load("Fox.glb#Animation1");
-	let anim2_index = graph.add_clip(anim2_clip.clone(), 1.0, graph.root);
-
-	let transition_duration = Duration::from_secs_f32(0.5);
+	let idle_anim_clip = asset_server.load("Fox.glb#Animation0");
+	let idle_anim_index =
+		graph.add_clip(idle_anim_clip.clone(), 1.0, graph.root);
+	let walk_anim_clip = asset_server.load("Fox.glb#Animation1");
+	let walk_anim_index =
+		graph.add_clip(walk_anim_clip.clone(), 1.0, graph.root);
 
 	commands
 		.spawn((
+			Player,
 			SceneBundle {
 				scene: asset_server.load("Fox.glb#Scene0"),
 				transform: Transform::from_scale(Vec3::splat(0.1)),
@@ -54,86 +68,165 @@ fn setup_fox(
 			},
 			graphs.add(graph),
 			AnimationTransitions::new(),
+			RotateToVelocity3d::default(),
+			ForceBundle::default(),
+			SteerBundle {
+				max_force: MaxForce(0.05),
+				..default()
+			}
+			.scaled_to(10.),
+			// Uncomment this to have an initial target
+			// Sentence::new("tasty"),
 		))
 		.with_children(|parent| {
 			let agent = parent.parent_entity();
+
+			let bert_handle = asset_server.load("default-bert.ron");
+
 			parent
 				.spawn((
-					Name::new("Animation Behavior"),
+					Name::new("Fetch Behavior"),
 					Running,
 					SequenceSelector,
 					Repeat,
 				))
 				.with_children(|parent| {
 					parent.spawn((
-						Name::new("Idle"),
-						TargetAgent(agent),
-						PlayAnimation::new(anim1_index)
-							.repeat(RepeatAnimation::Forever),
-						InsertOnAnimationEnd::new(
-							anim1_clip,
-							anim1_index,
+						Name::new("Await Bert Load"),
+						InsertOnAssetEvent::loaded(
 							RunResult::Success,
-						)
-						.with_transition_duration(transition_duration),
+							&bert_handle,
+						),
 					));
-					parent.spawn((
-						Name::new("Walking"),
-						TargetAgent(agent),
-						PlayAnimation::new(anim2_index)
-							.repeat(RepeatAnimation::Count(4))
-							.with_transition_duration(transition_duration),
-						InsertOnAnimationEnd::new(
-							anim2_clip,
-							anim2_index,
-							RunResult::Success,
-						)
-						.with_transition_duration(transition_duration),
-					));
+					parent
+						.spawn((
+							Name::new("Idle Or Fetch"),
+							TargetAgent(agent),
+							ScoreSelector::default(),
+							// ScoreSelector::consuming(),
+							FindSentenceSteerTarget::<With<Item>>::new(
+								bert_handle,
+							),
+						))
+						.with_children(|parent| {
+							parent.spawn((
+								Name::new("Idle"),
+								Score::neutral(),
+								TargetAgent(agent),
+								SetAgentOnRun(Velocity::default()),
+								PlayAnimation::new(idle_anim_index)
+									.repeat_forever(),
+								RunTimer::default(),
+								InsertInDuration::new(
+									RunResult::Success,
+									Duration::from_secs(1),
+								),
+							));
+							parent
+								.spawn((
+									Name::new("Fetch"),
+									Score::default(),
+									TargetAgent(agent),
+									ScoreSteerTarget::new(1000.),
+									PlayAnimation::new(walk_anim_index)
+										.repeat_forever(),
+									SequenceSelector,
+									RemoveAgentOnRun::<Sentence>::default(),
+								))
+								.with_children(|parent| {
+									parent.spawn((
+										Name::new("Go To Item"),
+										TargetAgent(agent),
+										Seek,
+										SucceedOnArrive::new(6.),
+									));
+									parent.spawn((
+										Name::new("Pick Up Item"),
+										TargetAgent(agent),
+										// SetAgentOnRun(SteerTarget::Position(
+										// 		Vec3::ZERO,
+										// 	)),
+										RemoveAgentOnRun::<SteerTarget>::default(),
+										InsertOnRun(RunResult::Success),
+									));
+									// parent.spawn((
+									// 	Name::new("Return Item To Center"),
+									// 	TargetAgent(agent),
+									// 	Seek,
+									// 	SucceedOnArrive::new(6.),
+									// ));
+								});
+						});
 				});
 		});
 }
 
 
 #[derive(Component)]
-pub struct Item;
+struct Item;
 
-fn setup_items(
-	mut commands: Commands,
-	mut meshes: ResMut<Assets<Mesh>>,
-	mut materials: ResMut<Assets<StandardMaterial>>,
-) {
+fn setup_items(mut commands: Commands, asset_server: Res<AssetServer>) {
 	let scale = Vec3::splat(5.);
 	let offset = 40.;
-	commands.spawn((Name::new("Yellow Cube"), PbrBundle {
-		mesh: meshes.add(Cuboid::default()),
-		material: materials.add(Color::srgb(1., 1., 0.)),
-		transform: Transform::from_xyz(-offset, scale.y * 0.5, -offset)
-			.with_scale(scale),
-		..default()
-	}));
-	commands.spawn((Name::new("Red Sphere"), PbrBundle {
-		mesh: meshes.add(Sphere::default()),
-		material: materials.add(Color::srgb(1., 0., 0.)),
-		transform: Transform::from_xyz(offset, scale.y * 0.5, -offset)
-			.with_scale(scale),
-		..default()
-	}));
-	commands.spawn((Name::new("Green Cylinder"), PbrBundle {
-		mesh: meshes.add(Cylinder::default()),
-		material: materials.add(Color::srgb(0., 1., 0.)),
-		transform: Transform::from_xyz(-offset, scale.y * 0.5, offset)
-			.with_scale(scale),
-		..default()
-	}));
-	commands.spawn((Name::new("Blue Torus"), PbrBundle {
-		mesh: meshes.add(Torus::default()),
-		material: materials.add(Color::srgb(0., 0., 1.)),
-		transform: Transform::from_xyz(offset, scale.y * 0.5, offset)
-			.with_scale(scale),
-		..default()
-	}));
+	let y = 1.;
+	commands.spawn((
+		Name::new("Potion"),
+		Sentence::new("miraculous red healing potion"),
+		Item,
+		SceneBundle {
+			scene: asset_server.load("kaykit/potion.glb#Scene0"),
+			transform: Transform::from_xyz(offset, y, offset).with_scale(scale),
+			..default()
+		},
+	));
+	commands.spawn((
+		Name::new("Coin"),
+		Sentence::new("shiny golden coin"),
+		Item,
+		SceneBundle {
+			scene: asset_server.load("kaykit/coin.glb#Scene0"),
+			transform: Transform::from_xyz(offset, y, -offset)
+				.with_scale(scale),
+			..default()
+		},
+	));
+	commands.spawn((
+		Name::new("Sword"),
+		Sentence::new("powerful protective silver sword"),
+		Item,
+		SceneBundle {
+			scene: asset_server.load("kaykit/sword.glb#Scene0"),
+			transform: Transform::from_xyz(-offset, y, offset)
+				.with_scale(scale),
+			..default()
+		},
+	));
+	commands.spawn((
+		Name::new("Cheese"),
+		Sentence::new("delicious satisfying cheese"),
+		Item,
+		SceneBundle {
+			scene: asset_server.load("kaykit/cheese.glb#Scene0"),
+			transform: Transform::from_xyz(-offset, y, -offset)
+				.with_scale(scale),
+			..default()
+		},
+	));
 }
+
+fn set_player_sentence(
+	mut commands: Commands,
+	mut events: EventReader<OnPlayerMessage>,
+	query: Query<Entity, With<Player>>,
+) {
+	for ev in events.read() {
+		log::info!("setting player sentence");
+		commands
+			.entity(query.iter().next().unwrap())
+			.insert(Sentence::new(ev.0.clone()));
+	}
+}
+
 
 fn what_does_the_fox_say() -> String {
 	let sounds = [

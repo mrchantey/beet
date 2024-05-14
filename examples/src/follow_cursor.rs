@@ -34,7 +34,9 @@ pub fn follow_cursor_3d(
 	mut cursor_query: Query<&mut Transform, With<FollowCursor3d>>,
 	windows: Query<&Window>,
 ) {
-	let (camera, camera_transform) = camera_query.single();
+	let Ok((camera, camera_transform)) = camera_query.get_single() else {
+		return;
+	};
 
 	let Some(cursor_position) = windows.single().cursor_position() else {
 		return;

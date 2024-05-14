@@ -21,6 +21,14 @@ pub struct ScoreSelector {
 	pub consume_scores: bool,
 }
 
+impl ScoreSelector {
+	pub fn new(consume_scores: bool) -> Self { Self { consume_scores } }
+	pub fn consuming() -> Self {
+		Self {
+			consume_scores: true,
+		}
+	}
+}
 
 //TODO interrupt if child score changes
 
