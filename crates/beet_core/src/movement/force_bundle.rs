@@ -8,6 +8,11 @@ use bevy::prelude::*;
 /// This is multiplied by delta time.
 pub struct Velocity(pub Vec3);
 
+
+impl Velocity {
+	pub fn from_xyz(x: f32, y: f32, z: f32) -> Self { Self(Vec3::new(x, y, z)) }
+}
+
 #[derive(Debug, Clone, PartialEq, Deref, DerefMut, Component, Reflect)]
 #[reflect(Component, Default)]
 /// A constant value for constraining axes

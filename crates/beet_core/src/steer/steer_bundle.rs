@@ -6,7 +6,10 @@ use bevy::prelude::*;
 /// in group steering actions.
 pub struct GroupSteerAgent;
 
-/// Max force used to clamp [`Force`] and [`Impulse`]
+/// Max force used to clamp [`Force`] and [`Impulse`].
+/// Higher values will make the agent more responsive to steering forces,
+/// appropriate for walking agents.
+/// Lower values will give a more spongey feel, appropriate for boats, cars etc.
 #[derive(
 	Debug, Copy, Clone, PartialEq, Deref, DerefMut, Component, Reflect,
 )]

@@ -3,7 +3,7 @@ use bevy::pbr::CascadeShadowConfigBuilder;
 use bevy::prelude::*;
 use forky_bevy::systems::close_on_esc;
 use std::f32::consts::PI;
-
+use crate::follow_cursor_3d;
 
 #[derive(Default)]
 pub struct ExamplePlugin3d;
@@ -18,7 +18,7 @@ impl Plugin for ExamplePlugin3d {
 			..default()
 		}))
 		.add_systems(Startup, setup_scene_3d)
-		.add_systems(Update, close_on_esc);
+		.add_systems(Update, (close_on_esc, follow_cursor_3d));
 	}
 }
 

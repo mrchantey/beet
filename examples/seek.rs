@@ -1,12 +1,13 @@
 use beet::prelude::*;
-use bevy::prelude::*;
 use beet_examples::*;
+use bevy::prelude::*;
 
 fn main() {
 	let mut app = App::new();
 
 	app /*-*/
 		.add_plugins(ExamplePlugin2d)
+		.add_plugins(DefaultBeetPlugins::default())
 		.add_systems(Startup, setup)
 		.run()
 	/*-*/;
@@ -16,7 +17,7 @@ fn main() {
 fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
 	// target
 	let target = commands
-		.spawn((FollowCursor, SpriteBundle {
+		.spawn((FollowCursor2d, SpriteBundle {
 			transform: Transform::from_translation(Vec3::new(200., 0., 0.)),
 			texture: asset_server.load("spaceship_pack/planet_6.png"),
 			..default()
@@ -36,6 +37,11 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
 		))
 		.with_children(|parent| {
 			// behavior
-			parent.spawn((Seek, Running, TargetAgent(parent.parent_entity())));
+			parent.spawn((
+				Name::new("Seek"),
+				Seek,
+				Running,
+				TargetAgent(parent.parent_entity()),
+			));
 		});
 }

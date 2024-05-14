@@ -21,7 +21,6 @@ impl Plugin for ExamplePlugin2d {
 				..default()
 			}))
 			// .add_plugins(WorldInspectorPlugin::new())
-			.add_plugins(DefaultBeetPlugins::default())
 			.add_systems(Startup, space_setup)
 			.add_systems(Update, follow_cursor)
 			.add_systems(Update, close_on_esc)

@@ -15,6 +15,10 @@ impl Default for SucceedOnArrive {
 	fn default() -> Self { Self { radius: 0.5 } }
 }
 
+impl SucceedOnArrive {
+	pub fn new(radius: f32) -> Self { Self { radius } }
+}
+
 pub fn succeed_on_arrive(
 	mut commands: Commands,
 	agents: Query<(&Transform, &SteerTarget)>,

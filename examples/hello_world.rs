@@ -18,11 +18,11 @@ fn log_on_run(query: Query<&LogOnRun, Added<Running>>) {
 fn main() {
 	let mut app = App::new();
 
-	// this will add some helpers that clean up run state
-	app.add_plugins((LogPlugin::default(), LifecyclePlugin::default()));
-
-	// action systems are usually added to the `TickSet`
-	app.add_systems(Update, log_on_run.in_set(TickSet));
+	app
+		// this will add some helpers that clean up run state
+		.add_plugins((LogPlugin::default(), LifecyclePlugin::default()))
+		// action systems are usually added to the `TickSet`
+		.add_systems(Update, log_on_run.in_set(TickSet));
 
 	// behavior graphs are regular entity hierarchies
 	app.world_mut()

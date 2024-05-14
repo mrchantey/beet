@@ -1,11 +1,11 @@
 use bevy::prelude::*;
 
 #[derive(Component)]
-pub struct FollowCursor;
+pub struct FollowCursor2d;
 
 pub fn follow_cursor(
 	camera_query: Query<(&Camera, &GlobalTransform)>,
-	mut cursor_query: Query<&mut Transform, With<FollowCursor>>,
+	mut cursor_query: Query<&mut Transform, With<FollowCursor2d>>,
 	windows: Query<&Window>,
 ) {
 	let (camera, camera_transform) = camera_query.single();
@@ -22,5 +22,36 @@ pub fn follow_cursor(
 
 	for mut transform in cursor_query.iter_mut() {
 		transform.translation = point.extend(0.);
+	}
+}
+
+
+#[derive(Component)]
+pub struct FollowCursor3d;
+
+pub fn follow_cursor_3d(
+	camera_query: Query<(&Camera, &GlobalTransform)>,
+	mut cursor_query: Query<&mut Transform, With<FollowCursor3d>>,
+	windows: Query<&Window>,
+) {
+	let (camera, camera_transform) = camera_query.single();
+
+	let Some(cursor_position) = windows.single().cursor_position() else {
+		return;
+	};
+
+	let Some(ray) = camera.viewport_to_world(camera_transform, cursor_position)
+	else {
+		return;
+	};
+
+	let Some(dist) = ray.intersect_plane(Vec3::ZERO, Plane3d::new(Vec3::Y))
+	else {
+		return;
+	};
+	let point = ray.get_point(dist);
+
+	for mut transform in cursor_query.iter_mut() {
+		transform.translation = point;
 	}
 }

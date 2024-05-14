@@ -7,6 +7,7 @@ fn main() {
 
 	app /*-*/
 		.add_plugins(ExamplePlugin2d)
+		.add_plugins(DefaultBeetPlugins)
 		.add_systems(Startup, setup)
 		.add_systems(Update, spawn_on_click)
 		.run()

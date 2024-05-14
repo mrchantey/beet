@@ -12,6 +12,7 @@ pub const DEFAULT_ANIMATION_TRANSITION: Duration = Duration::from_millis(250);
 #[reflect(Default, Component, ActionMeta)]
 pub struct PlayAnimation {
 	animation: AnimationNodeIndex,
+	/// Trigger once again if the animation is already playing
 	pub trigger_if_playing: bool,
 	pub repeat: RepeatAnimation,
 	pub transition_duration: Duration,
@@ -22,7 +23,7 @@ impl PlayAnimation {
 		Self {
 			animation,
 			trigger_if_playing: false,
-			repeat: RepeatAnimation::Forever,
+			repeat: RepeatAnimation::default(),
 			transition_duration: DEFAULT_ANIMATION_TRANSITION,
 		}
 	}
@@ -32,6 +33,10 @@ impl PlayAnimation {
 	}
 	pub fn repeat(mut self, repeat: RepeatAnimation) -> Self {
 		self.repeat = repeat;
+		self
+	}
+	pub fn repeat_forever(mut self) -> Self {
+		self.repeat = RepeatAnimation::Forever;
 		self
 	}
 	pub fn trigger_if_playing(mut self) -> Self {

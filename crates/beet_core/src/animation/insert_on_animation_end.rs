@@ -16,7 +16,7 @@ pub struct InsertOnAnimationEnd<T: GenericActionComponent> {
 	/// This must be greater than frame delta time or there will be no chance
 	/// for the the system to catch the end of the animation.
 	pub transition_duration: Duration,
-	is_playing: bool,
+	// is_playing: bool,
 }
 
 impl<T: GenericActionComponent> ActionMeta for InsertOnAnimationEnd<T> {
@@ -41,7 +41,7 @@ impl<T: GenericActionComponent> InsertOnAnimationEnd<T> {
 			animation_clip: clip,
 			animation_index: index,
 			transition_duration: DEFAULT_ANIMATION_TRANSITION,
-			is_playing: false,
+			// is_playing: false,
 		}
 	}
 	pub fn with_transition_duration(mut self, duration: Duration) -> Self {
@@ -105,10 +105,11 @@ pub fn insert_on_animation_end<T: GenericActionComponent>(
 		// 	.unwrap_or_default();
 		// log::info!("is playing: {is_playing}",);
 
-		if !nearly_finished && !action.is_playing {
-			action.is_playing = true;
-		} else if nearly_finished && action.is_playing {
-			action.is_playing = false;
+		// if !nearly_finished && !action.is_playing {
+		// action.is_playing = true;
+		// } else if nearly_finished && action.is_playing {
+		if nearly_finished {
+			// action.is_playing = false;
 			commands.entity(entity).insert(action.value.clone());
 		}
 	}

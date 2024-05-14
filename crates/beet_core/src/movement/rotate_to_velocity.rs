@@ -1,5 +1,6 @@
 use crate::prelude::*;
 use bevy::prelude::*;
+use forky_bevy::extensions::QuatExt;
 use std::f32::consts::PI;
 
 /// Rotate an entity to face its [`Velocity`] in 2D space
@@ -11,23 +12,33 @@ pub fn rotate_to_velocity_2d(
 	mut query: Query<(&mut Transform, &Velocity), With<RotateToVelocity2d>>,
 ) {
 	for (mut transform, velocity) in query.iter_mut() {
-		let dir = velocity.0.try_normalize().unwrap_or(Vec3::X);
+		let Some(dir) = velocity.0.try_normalize() else {
+			continue;
+		};
 		transform.rotation =
-		Quat::from_rotation_z(f32::atan2(dir.y, dir.x) - PI * 0.5);
+			Quat::from_rotation_z(f32::atan2(dir.y, dir.x) - PI * 0.5);
 	}
 }
 
 
 /// Rotate an entity to face its [`Velocity`] in 3D space
-#[derive(Component)]
-pub struct RotateToVelocity3d;
+#[derive(Component, Deref, DerefMut)]
+pub struct RotateToVelocity3d(pub f32);
+
+impl Default for RotateToVelocity3d {
+	fn default() -> Self { Self(5.) }
+}
 
 pub fn rotate_to_velocity_3d(
-	mut query: Query<(&mut Transform, &Velocity), With<RotateToVelocity3d>>,
+	time: Res<Time>,
+	mut query: Query<(&mut Transform, &Velocity, &RotateToVelocity3d)>,
 ) {
-	for (mut transform, velocity) in query.iter_mut() {
-		let dir = velocity.0.try_normalize().unwrap_or(-Vec3::Z);
-		transform.rotation =
-			Quat::from_rotation_y(f32::atan2(dir.y, dir.x) - PI * 0.5);
+	for (mut transform, velocity, rotate) in query.iter_mut() {
+		let Some(dir) = velocity.0.try_normalize() else {
+			continue;
+		};
+		transform.rotation = transform
+			.rotation
+			.slerp(Quat::look_at(dir), **rotate * time.delta_seconds());
 	}
 }
