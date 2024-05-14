@@ -9,6 +9,7 @@
 	- [Animation](./examples/animation.md)
 	- [Hello ML](./examples/hello_ml.md)
 	- [Seek](./examples/seek.md)
+	- [Seek 3D](./examples/seek_3d.md)
 	- [Flock](./examples/flock.md)
 ---
 <!-- [Changelog](./misc/roadmap.md) -->

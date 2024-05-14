@@ -53,6 +53,7 @@ build-web-examples:
 	just build-web-example hello_world
 	just build-web-example hello_ml
 	just build-web-example seek
+	just build-web-example fetch
 
 serve-web-examples:
 	cd ./target/web-examples && forky serve
