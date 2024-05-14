@@ -5,5 +5,5 @@
 Open the console to see the output, it may take up to a minute to load.
 
 ```rust
-{{#include ../../../crates/beet/examples/hello_ml.rs}}
+{{#include ../../../examples/hello_ml.rs}}
 ```

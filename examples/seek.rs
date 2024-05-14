@@ -1,6 +1,6 @@
 use beet::prelude::*;
 use bevy::prelude::*;
-use examples::*;
+use beet_examples::*;
 
 fn main() {
 	let mut app = App::new();

@@ -3,7 +3,7 @@ use beet::prelude::*;
 use bevy::animation::RepeatAnimation;
 use bevy::prelude::*;
 // use example_plugin::ExamplePlugin;
-use examples::*;
+use beet_examples::*;
 use rand::prelude::IteratorRandom;
 use std::time::Duration;
 

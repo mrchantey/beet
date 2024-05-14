@@ -1,6 +1,6 @@
 use beet::prelude::*;
+use beet_examples::ExamplePlugin2d;
 use bevy::prelude::*;
-use examples::ExamplePlugin2d;
 
 fn main() {
 	let mut app = App::new();

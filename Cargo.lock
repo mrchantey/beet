@@ -605,10 +605,10 @@ dependencies = [
  "anyhow",
  "beet_core",
  "beet_ecs",
+ "beet_examples",
  "beet_ml",
  "beet_net",
  "bevy 0.14.0-dev",
- "examples",
  "forky_bevy",
  "log",
  "pretty_env_logger",
@@ -658,6 +658,20 @@ dependencies = [
 [[package]]
 name = "beet_ecs_macros"
 version = "0.0.1"
+
+[[package]]
+name = "beet_examples"
+version = "0.0.1"
+dependencies = [
+ "anyhow",
+ "beet",
+ "bevy 0.14.0-dev",
+ "forky_bevy",
+ "log",
+ "pretty_env_logger",
+ "rand",
+ "tokio",
+]
 
 [[package]]
 name = "beet_ml"
@@ -3241,20 +3255,6 @@ checksum = "332f51cb23d20b0de8458b86580878211da09bcd4503cb579c225b3d124cabb3"
 dependencies = [
  "event-listener 5.3.0",
  "pin-project-lite",
-]
-
-[[package]]
-name = "examples"
-version = "0.0.1"
-dependencies = [
- "anyhow",
- "beet",
- "bevy 0.14.0-dev",
- "forky_bevy",
- "log",
- "pretty_env_logger",
- "rand",
- "tokio",
 ]
 
 [[package]]

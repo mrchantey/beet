@@ -48,11 +48,11 @@ watch-ml-example:
 
 build-web-examples:
 	rm -rf ./target/web-examples || true
-	just build-web-example beet animation
-	just build-web-example beet flock
-	just build-web-example beet hello_world
-	just build-web-example beet hello_ml
-	just build-web-example beet seek
+	just build-web-example animation
+	just build-web-example flock
+	just build-web-example hello_world
+	just build-web-example hello_ml
+	just build-web-example seek
 
 serve-web-examples:
 	cd ./target/web-examples && forky serve
@@ -62,12 +62,12 @@ deploy-web-examples:
 	gsutil -m rsync -d -r ./target/web-examples gs://beet-examples
 # -m parallel rsync copy -d delete if not in local -r recursive
 
-build-web-example crate example *args:
+build-web-example example *args:
 	mkdir -p ./target/web-examples/{{example}} || true
 	mkdir -p ./target/web-examples/{{example}}/assets || true
-	cp -r ./crates/beet/examples/html/* ./target/web-examples/{{example}}
-	cp -r ./crates/beet/assets/* ./target/web-examples/{{example}}/assets
-	cargo build -p {{crate}} --example {{example}} --target wasm32-unknown-unknown --release {{args}}
+	cp -r ./examples/html/* ./target/web-examples/{{example}}
+	cp -r ./assets/* ./target/web-examples/{{example}}/assets
+	cargo build --example {{example}} --target wasm32-unknown-unknown --release {{args}}
 	wasm-bindgen \
 	--out-name main \
 	--out-dir ./target/web-examples/{{example}}/wasm \

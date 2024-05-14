@@ -1,7 +1,7 @@
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
 use wasm_bindgen_futures::JsFuture;
-use web_sys::Cache;
+// use web_sys::Cache;
 use web_sys::Request;
 use web_sys::RequestInit;
 use web_sys::Response;
