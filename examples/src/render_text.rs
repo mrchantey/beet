@@ -1,4 +1,4 @@
-use super::*;
+use bevy::prelude::*;
 use std::borrow::Cow;
 
 #[derive(Component, Deref, DerefMut, Reflect)]

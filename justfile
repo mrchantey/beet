@@ -7,6 +7,14 @@ default:
 
 
 ## common
+
+doc:
+	just watch 'cargo doc'
+
+serve-doc:
+	cd ./target/doc/beet && forky serve
+
+
 test-core *args:
 	just watch 'cargo test -p beet_core --lib -- {{args}}'
 

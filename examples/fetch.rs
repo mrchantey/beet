@@ -1,13 +1,11 @@
 // use beet::prelude::*;
+use beet::prelude::*;
 use bevy::animation::RepeatAnimation;
 use bevy::prelude::*;
-use std::time::Duration;
 // use example_plugin::ExamplePlugin;
-#[path = "common/common.rs"]
-mod common;
-use beet::prelude::*;
-use common::*;
+use examples::*;
 use rand::prelude::IteratorRandom;
+use std::time::Duration;
 
 fn main() {
 	App::new()

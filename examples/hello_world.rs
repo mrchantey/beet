@@ -1,6 +1,7 @@
 //! In this example we will create an action
 //! and then combine it with some built-in actions to run a behavior.
 use beet::prelude::*;
+use bevy::log::LogPlugin;
 use bevy::prelude::*;
 
 
@@ -18,7 +19,7 @@ fn main() {
 	let mut app = App::new();
 
 	// this will add some helpers that clean up run state
-	app.add_plugins(LifecyclePlugin::default());
+	app.add_plugins((LogPlugin::default(), LifecyclePlugin::default()));
 
 	// action systems are usually added to the `TickSet`
 	app.add_systems(Update, log_on_run.in_set(TickSet));

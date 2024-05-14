@@ -1,3 +1,75 @@
+[package]
+name = "beet"
+version.workspace = true
+edition.workspace = true
+description.workspace = true
+documentation.workspace = true
+readme.workspace = true
+homepage.workspace = true
+repository.workspace = true
+license.workspace = true
+keywords.workspace = true
+categories.workspace = true
+
+[features]
+default = ["ml"]
+ml = ["dep:beet_ml"]
+net = ["dep:beet_net"]
+
+
+[dependencies]
+# beet = { path = "crates/beet", version = "0.0.1" }
+beet_core.workspace = true
+beet_ecs.workspace = true
+beet_ml = { workspace = true, optional = true }
+beet_net = { workspace = true, optional = true }
+
+[dev-dependencies]
+bevy = { workspace = true, default-features = true }
+examples.workspace = true
+log.workspace = true
+pretty_env_logger.workspace = true
+forky_bevy.workspace = true
+rand = "0.8"
+anyhow.workspace = true
+
+[target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
+tokio.workspace = true
+
+
+
+
+# [[example]]
+# name = "animation"
+# path = "animation.rs"
+
+# [[example]]
+# name = "fetch"
+# path = "fetch.rs"
+
+# [[example]]
+# name = "flock"
+# path = "flock.rs"
+
+# [[example]]
+# name = "hello_ml_vanilla"
+# path = "hello_ml_vanilla.rs"
+
+# [[example]]
+# name = "hello_ml"
+# path = "hello_ml.rs"
+
+# [[example]]
+# name = "hello_world"
+# path = "hello_world.rs"
+
+# [[example]]
+# name = "seek"
+# path = "seek.rs"
+
+
+################## WORKSPACE ##################
+
 [workspace.package]
 version = "0.0.1"
 edition = "2021"
@@ -21,7 +93,8 @@ publish = false
 # default resolver
 resolver = "2"
 members = [
-	"crates/beet",
+	"examples",
+	# "crates/beet",
 	"crates/beet_core",
 	"crates/beet_ecs",
 	"crates/beet_ecs/macros",
@@ -35,13 +108,14 @@ exclude = ["crates/beet_esp"]
 
 [workspace.dependencies]
 ## internal
-beet = { path = "crates/beet", version = "0.0.1" }
+beet = { path = "./", version = "0.0.1" }
 beet_core = { path = "crates/beet_core", version = "0.0.1" }
 beet_ecs = { path = "crates/beet_ecs", version = "0.0.1" }
 beet_ecs_macros = { path = "crates/beet_ecs/macros", version = "0.0.1" }
 beet_ml = { path = "crates/beet_ml", version = "0.0.1" }
 beet_net = { path = "crates/beet_net", version = "0.0.1" }
 beet_server = { path = "crates/beet_server", version = "0.0.1" }
+examples = { path = "examples", version = "0.0.1" }
 
 ## local
 forky_core = { path = "../forky/crates/forky/forky_core" }

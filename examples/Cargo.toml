@@ -1,0 +1,19 @@
+[package]
+name = "examples"
+publish = false
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+beet.workspace = true
+bevy = { workspace = true, default-features = true }
+log.workspace = true
+pretty_env_logger.workspace = true
+forky_bevy.workspace = true
+rand = "0.8"
+
+[dev-dependencies]
+anyhow.workspace = true
+
+[target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
+tokio.workspace = true

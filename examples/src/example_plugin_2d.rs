@@ -1,17 +1,7 @@
-#![allow(unused_imports)]
+use crate::*;
 use beet::prelude::*;
 use bevy::prelude::*;
 use forky_bevy::systems::close_on_esc;
-mod auto_spawn;
-mod follow_cursor;
-mod randomize_position;
-mod render_text;
-mod wrap_around;
-pub use auto_spawn::*;
-pub use follow_cursor::*;
-pub use randomize_position::*;
-pub use render_text::*;
-pub use wrap_around::*;
 
 // use bevy_inspector_egui::quick::WorldInspectorPlugin;
 /// Boilerplate for examples
@@ -33,7 +23,7 @@ impl Plugin for ExamplePlugin2d {
 			// .add_plugins(WorldInspectorPlugin::new())
 			.add_plugins(DefaultBeetPlugins::default())
 			.add_systems(Startup, space_setup)
-			.add_systems(Update, follow_cursor::follow_cursor)
+			.add_systems(Update, follow_cursor)
 			.add_systems(Update, close_on_esc)
 			// .add_systems(PreUpdate, auto_spawn::auto_spawn.before(PreTickSet))
 			.add_systems(Update, randomize_position.in_set(PreTickSet))

@@ -1,8 +1,6 @@
 use beet::prelude::*;
 use bevy::prelude::*;
-#[path = "common/example_plugin_3d.rs"]
-mod example_plugin_3d;
-use example_plugin_3d::ExamplePlugin3d;
+use examples::*;
 
 fn main() {
 	App::new()

@@ -1,8 +1,7 @@
-use beet_ml::prelude::*;
+use beet::prelude::*;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-
 	let mut bert = Bert::new(BertConfig::default()).await?;
 	let embeddings = bert.get_embeddings(vec![
 		"The cat sits outside".into(),

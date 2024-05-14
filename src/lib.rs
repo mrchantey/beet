@@ -1,9 +1,10 @@
-pub use beet_core::*;
-pub use beet_ecs::*;
+#![doc = include_str!("../README.md")]
+pub use beet_core;
+pub use beet_ecs;
 #[cfg(feature = "ml")]
-pub use beet_ml::*;
+pub use beet_ml;
 #[cfg(feature = "net")]
-pub use beet_net::*;
+pub use beet_net;
 
 pub mod prelude {
 

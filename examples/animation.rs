@@ -1,10 +1,8 @@
 use beet::prelude::*;
 use bevy::animation::RepeatAnimation;
 use bevy::prelude::*;
+use examples::*;
 use std::time::Duration;
-#[path = "common/example_plugin_3d.rs"]
-mod example_plugin_3d;
-use example_plugin_3d::ExamplePlugin3d;
 
 pub fn main() {
 	App::new()

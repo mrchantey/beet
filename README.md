@@ -3,7 +3,7 @@
 <div align="center">
 
   <p>
-    <strong>A very flexible AI behavior library for games and robotics.</strong>
+    <strong>A very flexible behavior library for games and robotics.</strong>
   </p>
 
   <p>
@@ -20,18 +20,32 @@
     <a href="https://mrchantey.github.io/beet/other/contributing.html">Contributing</a> -->
   </h3>
 
-  <sub>made with ❤️‍🔥 by mrchantey</a></sub>
+  <sub>made with ❤️‍🔥 by <a href="https://github.com/mrchantey">mrchantey</a></sub>
 </div>
 
-## Examples
-
-```sh
-cargo run -p beet --example hello_world
-cargo run -p beet --example flock
+```rust
+use bevy::prelude::*;
+use beet::prelude::*;
+fn main(){
+  App::new().world_mut().spawn((
+      Running,
+      SequenceSelector::default(), 
+    ))
+    .with_children(|parent| {
+      parent.spawn((
+        LogOnRun("Hello".into()),
+        InsertOnRun(RunResult::Success),
+      ));
+      parent.spawn((
+        LogOnRun("World".into()),
+        InsertOnRun(RunResult::Success),
+      ));
+    });
+}
 ```
 
 ## Bevy Versions
 
 | `bevy` | `beet` |
 | ------ | ------ |
-| 0.14.0 | 0.0.9  |
+| 0.14.0 | 0.0.2  |
