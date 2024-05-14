@@ -13,10 +13,9 @@ pub struct InsertOnAnimationEnd<T: GenericActionComponent> {
 	pub animation_clip: Handle<AnimationClip>,
 	pub animation_index: AnimationNodeIndex,
 	/// The duration of the transition to the next action.
-	/// This must be greater than frame delta time or there will be no chance
+	/// This should be greater than frame delta time or there will be no chance
 	/// for the the system to catch the end of the animation.
 	pub transition_duration: Duration,
-	// is_playing: bool,
 }
 
 impl<T: GenericActionComponent> ActionMeta for InsertOnAnimationEnd<T> {
@@ -41,7 +40,6 @@ impl<T: GenericActionComponent> InsertOnAnimationEnd<T> {
 			animation_clip: clip,
 			animation_index: index,
 			transition_duration: DEFAULT_ANIMATION_TRANSITION,
-			// is_playing: false,
 		}
 	}
 	pub fn with_transition_duration(mut self, duration: Duration) -> Self {
@@ -56,11 +54,11 @@ pub fn insert_on_animation_end<T: GenericActionComponent>(
 	children: Query<&Children>,
 	clips: Res<Assets<AnimationClip>>,
 	mut query: Query<
-		(Entity, &TargetAgent, &mut InsertOnAnimationEnd<T>),
+		(Entity, &TargetAgent, &InsertOnAnimationEnd<T>),
 		With<Running>,
 	>,
 ) {
-	for (entity, agent, mut action) in query.iter_mut() {
+	for (entity, agent, action) in query.iter_mut() {
 		let Some(target) = ChildrenExt::first(**agent, &children, |entity| {
 			animators.contains(entity)
 		}) else {
@@ -69,11 +67,9 @@ pub fn insert_on_animation_end<T: GenericActionComponent>(
 		// safe unwrap, just checked
 		let player = animators.get(target).unwrap();
 
-
 		let Some(clip) = clips.get(&action.animation_clip) else {
 			continue;
 		};
-		// let duration = Duration::from_secs_f32(clip.duration());
 
 		let Some(active_animation) = player.animation(action.animation_index)
 		else {
@@ -98,18 +94,7 @@ pub fn insert_on_animation_end<T: GenericActionComponent>(
 		let nearly_finished =
 			remaining_time < action.transition_duration.as_secs_f32();
 
-
-		// let is_playing = player
-		// 	.animation(action.animation_index)
-		// 	.map(|anim| !anim.is_finished())
-		// 	.unwrap_or_default();
-		// log::info!("is playing: {is_playing}",);
-
-		// if !nearly_finished && !action.is_playing {
-		// action.is_playing = true;
-		// } else if nearly_finished && action.is_playing {
 		if nearly_finished {
-			// action.is_playing = false;
 			commands.entity(entity).insert(action.value.clone());
 		}
 	}
