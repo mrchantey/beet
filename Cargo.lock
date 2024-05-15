@@ -666,11 +666,15 @@ dependencies = [
  "anyhow",
  "beet",
  "bevy 0.14.0-dev",
+ "crossbeam-channel",
  "forky_bevy",
+ "js-sys",
  "log",
  "pretty_env_logger",
  "rand",
  "tokio",
+ "wasm-bindgen",
+ "web-sys",
 ]
 
 [[package]]

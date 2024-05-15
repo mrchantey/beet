@@ -1,3 +1,5 @@
+//! # Hello ML
+//! This example demonstrates the use of a [`SentenceScorer`] with a *very* small LLM run locally.
 use beet::prelude::*;
 use beet_examples::*;
 use bevy::prelude::*;

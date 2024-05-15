@@ -7,32 +7,33 @@ use rand::prelude::IteratorRandom;
 use std::time::Duration;
 
 fn main() {
-	App::new()
-		.add_plugins((
-			ExamplePlugin3d,
-			DefaultBeetPlugins,
-			BeetDebugPlugin::default(),
-			DialogPanelPlugin,
-			MlPlugin,
-			ActionPlugin::<(
-				// SetAgentOnRun<SteerTarget>,
-				InsertOnAssetEvent<RunResult, Bert>,
-				FindSentenceSteerTarget<With<Item>>,
-				RemoveAgentOnRun<Sentence>,
-				RemoveAgentOnRun<SteerTarget>,
-			)>::default(),
-		))
-		.add_systems(
-			Startup,
-			(setup_camera, setup_fox, setup_chat, setup_items),
-		)
-		.add_systems(Update, set_player_sentence)
-		.run();
+	let mut app = App::new();
+	app.add_plugins((
+		ExamplePlugin3d,
+		DefaultBeetPlugins,
+		BeetDebugPlugin::default(),
+		DialogPanelPlugin,
+		MlPlugin,
+		ActionPlugin::<(
+			// SetAgentOnRun<SteerTarget>,
+			InsertOnAssetEvent<RunResult, Bert>,
+			FindSentenceSteerTarget<With<Item>>,
+			RemoveAgentOnRun<Sentence>,
+			RemoveAgentOnRun<SteerTarget>,
+		)>::default(),
+	))
+	.add_systems(Startup, (setup_camera, setup_fox, setup_chat, setup_items))
+	.add_systems(Update, (set_player_sentence, rotate_items));
+
+	#[cfg(target_arch = "wasm32")]
+	app.add_plugins(PostmessageInputPlugin);
+
+	app.run();
 }
 
 fn setup_camera(mut commands: Commands) {
 	commands.spawn(Camera3dBundle {
-		transform: Transform::from_xyz(50., 30., 100.)
+		transform: Transform::from_xyz(0., 1.6, 5.)
 			.looking_at(Vec3::new(0., 0., 0.), Vec3::Y),
 		..default()
 	});
@@ -60,7 +61,8 @@ fn setup_fox(
 			Player,
 			SceneBundle {
 				scene: asset_server.load("Fox.glb#Scene0"),
-				transform: Transform::from_scale(Vec3::splat(0.1)),
+				transform: Transform::from_xyz(0., 0., 0.)
+					.with_scale(Vec3::splat(0.01)),
 				..default()
 			},
 			graphs.add(graph),
@@ -72,7 +74,7 @@ fn setup_fox(
 				max_speed: MaxSpeed(2.),
 				..default()
 			}
-			.scaled_to(10.),
+			.scaled_to(1.),
 			// Uncomment this to have an initial target
 			// Sentence::new("tasty"),
 		))
@@ -125,7 +127,7 @@ fn setup_fox(
 									Name::new("Fetch"),
 									Score::default(),
 									TargetAgent(agent),
-									ScoreSteerTarget::new(1000.),
+									ScoreSteerTarget::new(10.),
 									PlayAnimation::new(walk_anim_index)
 										.repeat_forever(),
 									SequenceSelector,
@@ -136,7 +138,7 @@ fn setup_fox(
 										Name::new("Go To Item"),
 										TargetAgent(agent),
 										Seek,
-										SucceedOnArrive::new(6.),
+										SucceedOnArrive::new(1.),
 									));
 									parent.spawn((
 										Name::new("Pick Up Item"),
@@ -164,52 +166,82 @@ fn setup_fox(
 struct Item;
 
 fn setup_items(mut commands: Commands, asset_server: Res<AssetServer>) {
-	let scale = Vec3::splat(5.);
-	let offset = 40.;
-	let y = 1.;
-	commands.spawn((
-		Name::new("Potion"),
-		Sentence::new("red healing potion"),
-		Item,
-		SceneBundle {
-			scene: asset_server.load("kaykit/potion.glb#Scene0"),
-			transform: Transform::from_xyz(offset, y, offset).with_scale(scale),
-			..default()
-		},
-	));
-	commands.spawn((
-		Name::new("Coin"),
-		Sentence::new("gold coin"),
-		Item,
-		SceneBundle {
-			scene: asset_server.load("kaykit/coin.glb#Scene0"),
-			transform: Transform::from_xyz(offset, y, -offset)
-				.with_scale(scale),
-			..default()
-		},
-	));
-	commands.spawn((
-		Name::new("Sword"),
-		Sentence::new("silver sword"),
-		Item,
-		SceneBundle {
-			scene: asset_server.load("kaykit/sword.glb#Scene0"),
-			transform: Transform::from_xyz(-offset, y, offset)
-				.with_scale(scale),
-			..default()
-		},
-	));
-	commands.spawn((
-		Name::new("Cheese"),
-		Sentence::new("tasty cheese"),
-		Item,
-		SceneBundle {
-			scene: asset_server.load("kaykit/cheese.glb#Scene0"),
-			transform: Transform::from_xyz(-offset, y, -offset)
-				.with_scale(scale),
-			..default()
-		},
-	));
+	let scale = Vec3::splat(0.5);
+	let offset = 2.;
+	commands
+		.spawn((
+			Name::new("Potion"),
+			Sentence::new("red healing potion"),
+			Item,
+			SpatialBundle {
+				transform: Transform::from_xyz(offset, 0., offset),
+				..default()
+			},
+		))
+		.with_children(|parent| {
+			parent.spawn(SceneBundle {
+				scene: asset_server.load("kaykit/potion.glb#Scene0"),
+				transform: Transform::from_xyz(0., 0., 0.).with_scale(scale),
+				..default()
+			});
+		});
+	commands
+		.spawn((
+			Name::new("Coin"),
+			Sentence::new("gold coin"),
+			Item,
+			SpatialBundle {
+				transform: Transform::from_xyz(offset, 0., -offset),
+				..default()
+			},
+		))
+		.with_children(|parent| {
+			parent.spawn(SceneBundle {
+				scene: asset_server.load("kaykit/coin.glb#Scene0"),
+				transform: Transform::from_xyz(0., 0.2, 0.).with_scale(scale),
+				..default()
+			});
+		});
+	commands
+		.spawn((
+			Name::new("Sword"),
+			Sentence::new("silver sword"),
+			Item,
+			SpatialBundle {
+				transform: Transform::from_xyz(-offset, 0., offset),
+				..default()
+			},
+		))
+		.with_children(|parent| {
+			parent.spawn(SceneBundle {
+				scene: asset_server.load("kaykit/sword.glb#Scene0"),
+				transform: Transform::from_xyz(0., 0.15, 0.).with_scale(scale),
+				..default()
+			});
+		});
+	commands
+		.spawn((
+			Name::new("Cheese"),
+			Sentence::new("tasty cheese"),
+			Item,
+			SpatialBundle {
+				transform: Transform::from_xyz(-offset, 0., -offset),
+				..default()
+			},
+		))
+		.with_children(|parent| {
+			parent.spawn(SceneBundle {
+				scene: asset_server.load("kaykit/cheese.glb#Scene0"),
+				transform: Transform::from_xyz(0., 0., 0.).with_scale(scale),
+				..default()
+			});
+		});
+}
+
+fn rotate_items(time: Res<Time>, mut query: Query<&mut Transform, With<Item>>) {
+	for mut transform in query.iter_mut() {
+		transform.rotate(Quat::from_rotation_y(time.delta_seconds() * 0.5));
+	}
 }
 
 fn setup_chat(mut npc_events: EventWriter<OnNpcMessage>) {

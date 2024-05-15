@@ -1,8 +1,13 @@
 // #![allow(unused, dead_code)]
-mod example_plugin_3d;
-pub use example_plugin_3d::*;
+#[cfg(target_arch = "wasm32")]
+mod postmessage_input;
+#[cfg(target_arch = "wasm32")]
+pub use postmessage_input::*;
+
 mod example_plugin_2d;
+mod example_plugin_3d;
 pub use example_plugin_2d::*;
+pub use example_plugin_3d::*;
 mod dialog_panel;
 pub use dialog_panel::*;
 mod auto_spawn;

@@ -9,7 +9,7 @@ impl Plugin for DialogPanelPlugin {
 				Update,
 				(
 					(parse_text_input, button_system),
-					(update_text_input, handle_messages),
+					(handle_player_message, handle_npc_message),
 				)
 					.chain(),
 			)
@@ -23,205 +23,140 @@ pub struct OnPlayerMessage(pub String);
 #[derive(Event, Deref, DerefMut)]
 pub struct OnNpcMessage(pub String);
 
-#[derive(Component, Deref, DerefMut)]
-pub struct InputTextField(pub String);
 #[derive(Component)]
-pub struct MessagesSection;
+pub struct PlayerInput;
+
+#[derive(Component)]
+pub struct PlayerOutput;
+
+#[derive(Component)]
+pub struct NpcOutput;
 
 fn setup_ui(mut commands: Commands) {
 	commands
 		.spawn(NodeBundle {
 			style: Style {
-				width: Val::Percent(100.),
+				width: Val::Px(300.),
 				height: Val::Percent(100.),
-				justify_content: JustifyContent::SpaceBetween,
+				padding: UiRect::all(Val::Px(10.)),
+				display: Display::Flex,
+				// justify_content: JustifyContent::SpaceBetween,
+				flex_direction: FlexDirection::Column,
 				..default()
 			},
 			..default()
 		})
 		.with_children(|root| {
-			// left
+			// fox output
+			// root.spawn((
+			// 	NpcOutput,
+			// 	TextBundle::from_section("Foxie: ", TextStyle {
+			// 		font_size: 18.,
+			// 		..default()
+			// 	})
+			// 	.with_style(Style { ..default() }),
+			// ));
+			// player output
+			root.spawn((
+				PlayerOutput,
+				TextBundle::from_section("Player 1: ", TextStyle {
+					font_size: 18.,
+					..default()
+				})
+				.with_style(Style { ..default() }),
+			));
+
+			// player input
+			#[cfg(not(target_arch = "wasm32"))]
 			root.spawn(NodeBundle {
-				style: Style { ..default() },
-				// background_color: Color::srgba(0., 0., 0., 0.).into(),
-				..default()
-			});
-			// right
-			root.spawn((NodeBundle {
 				style: Style {
-					width: Val::Px(400.),
-					// width: Val::Percent((1. - SPLIT_RATIO) * 100.),
-					border: UiRect::all(Val::Px(2.)),
+					width: Val::Percent(100.),
+					height: Val::Px(40.),
 					display: Display::Flex,
-					flex_direction: FlexDirection::Column,
+					flex_direction: FlexDirection::Row,
+					justify_content: JustifyContent::SpaceBetween,
+					align_items: AlignItems::Center,
 					..default()
 				},
-				background_color: Color::linear_rgba(0.1, 0.1, 0.1, 0.1).into(),
+				background_color: Color::srgba(1., 1., 1., 0.2).into(),
 				..default()
-			},))
-				.with_children(|right_col| {
-					// message section
-					right_col.spawn((
-						MessagesSection,
-						// ScrollingList::default(),
-						NodeBundle {
-							style: Style {
-								height: Val::Auto,
-								// flex_grow: 1.,
-								overflow: Overflow::clip_y(),
-								// max_height: Val::Percent(100.) - Val::Px(40.),
-								display: Display::Flex,
-								flex_direction: FlexDirection::Column,
-								// width: Val::Percent(100.),
-								..default()
-							},
+			})
+			.with_children(|input_area| {
+				input_area.spawn((
+					TextBundle::from_section("I need healing!", TextStyle {
+						font_size: 18.,
+						..default() // font: (),
+						            // color: (),
+					})
+					.with_style(Style { ..default() }),
+					PlayerInput,
+				));
+
+				input_area
+					.spawn((ButtonBundle {
+						style: Style {
+							width: Val::Percent(20.),
+							height: Val::Percent(100.),
+							display: Display::Flex,
+							justify_content: JustifyContent::Center,
+							align_items: AlignItems::Center,
 							..default()
 						},
-					));
-
-					// input area
-					right_col
-						.spawn(NodeBundle {
-							style: Style {
-								width: Val::Percent(100.),
-								height: Val::Px(40.),
-								display: Display::Flex,
-								flex_direction: FlexDirection::Row,
+						image: UiImage::default().with_color(NORMAL_BUTTON),
+						..default()
+					},))
+					.with_children(|parent| {
+						parent.spawn(TextBundle::from_section(
+							// "Submit",
+							"Enter",
+							TextStyle {
+								font_size: 18.,
 								..default()
 							},
-							..default()
-						})
-						.with_children(|input_area| {
-							input_area
-								.spawn(NodeBundle {
-									style: Style {
-										width: Val::Percent(100.),
-										height: Val::Percent(100.),
-										display: Display::Flex,
-										align_items: AlignItems::Center,
-										..default()
-									},
-									background_color: Color::linear_rgb(
-										0.2, 0.2, 0.2,
-									)
-									.into(),
-									..default()
-								})
-								.with_children(|parent| {
-									parent.spawn((
-										TextBundle::from_section(
-											"I need healing!",
-											TextStyle {
-												font_size: 18.,
-												..default() // font: (),
-												            // color: (),
-											},
-										)
-										.with_style(Style {
-											max_width: Val::Percent(80.),
-											// flex_grow: 1.,
-											..default()
-										})
-										.with_style(Style { ..default() }),
-										InputTextField(
-											"I need healing!".into(),
-										),
-									));
-								});
-							input_area
-								.spawn((ButtonBundle {
-									style: Style {
-										width: Val::Percent(20.),
-										height: Val::Percent(100.),
-										display: Display::Flex,
-										justify_content: JustifyContent::Center,
-										align_items: AlignItems::Center,
-										..default()
-									},
-									image: UiImage::default()
-										.with_color(NORMAL_BUTTON),
-									..default()
-								},))
-								.with_children(|parent| {
-									parent.spawn(TextBundle::from_section(
-										// "Submit",
-										"Enter",
-										TextStyle {
-											font_size: 18.,
-											..default()
-										},
-									));
-								});
-						});
-				});
+						));
+					});
+			});
 		});
 }
 
-fn update_text_input(
-	mut query: Query<(&mut Text, &InputTextField), Changed<InputTextField>>,
-) {
-	for (mut text, input) in query.iter_mut() {
-		text.sections[0].value = input.0.clone();
-	}
-}
-
-
-fn handle_messages(
-	mut commands: Commands,
+fn handle_player_message(
 	mut on_player_message: EventReader<OnPlayerMessage>,
-	mut on_npc_message: EventReader<OnNpcMessage>,
-	message_section: Query<Entity, With<MessagesSection>>,
+	mut player_text: Query<&mut Text, With<PlayerOutput>>,
 ) {
 	for msg in on_player_message.read() {
-		commands
-			.entity(message_section.iter().next().unwrap())
-			.with_children(|parent| {
-				parent.spawn(new_message(&msg, true));
-			});
-	}
-	for msg in on_npc_message.read() {
-		commands
-			.entity(message_section.iter().next().unwrap())
-			.with_children(|parent| {
-				parent.spawn(new_message(&msg, false));
-			});
+		for mut text in player_text.iter_mut() {
+			text.sections[0].value = format!("Player 1: {}", msg.0);
+		}
 	}
 }
 
-
-fn new_message(text: &str, is_player: bool) -> impl Bundle {
-	let text = if is_player {
-		format!("Player 1:\n  {}", text)
-	} else {
-		format!("Foxie:\n  {}", text)
-	};
-
-	TextBundle::from_section(text, TextStyle {
-		font_size: 18.,
-		..default()
-	})
-	.with_style(Style {
-		width: Val::Percent(80.),
-		padding: UiRect::all(Val::Px(10.)),
-		..default()
-	})
+fn handle_npc_message(
+	mut on_npc_message: EventReader<OnNpcMessage>,
+	mut npc_text: Query<&mut Text, With<NpcOutput>>,
+) {
+	for msg in on_npc_message.read() {
+		for mut text in npc_text.iter_mut() {
+			text.sections[0].value = format!("Foxie: {}", msg.0);
+		}
+	}
 }
 
 fn parse_text_input(
 	mut evr_char: EventReader<ReceivedCharacter>,
 	key_input: Res<ButtonInput<KeyCode>>,
 	mut on_submit: EventWriter<OnPlayerMessage>,
-	mut query: Query<&mut InputTextField>,
+	mut query: Query<&mut Text, With<PlayerInput>>,
 ) {
-	for mut field in query.iter_mut() {
+	for mut text in query.iter_mut() {
+		let text = &mut text.sections[0].value;
 		if key_input.just_pressed(KeyCode::Enter) {
-			on_submit.send(OnPlayerMessage(field.0.clone()));
-			field.clear();
+			on_submit.send(OnPlayerMessage(text.clone()));
+			text.clear();
 		} else if key_input.just_pressed(KeyCode::Backspace) {
-			field.pop();
+			text.pop();
 		} else {
 			for ev in evr_char.read() {
-				field.push_str(&ev.char);
+				text.push_str(&ev.char);
 			}
 		}
 	}
@@ -233,31 +168,26 @@ const PRESSED_BUTTON: Color = Color::srgb(0.35, 0.75, 0.35);
 
 fn button_system(
 	mut interaction_query: Query<
-		(&Interaction, &mut BackgroundColor, &Children),
+		(&Interaction, &mut BackgroundColor),
 		(Changed<Interaction>, With<Button>),
 	>,
 	mut on_submit: EventWriter<OnPlayerMessage>,
-	mut query: Query<&mut InputTextField>,
-	mut text_query: Query<&mut Text>,
+	mut input_query: Query<&mut Text, With<PlayerInput>>,
 ) {
-	for (interaction, mut color, children) in &mut interaction_query {
-		let mut text = text_query.get_mut(children[0]).unwrap();
+	for (interaction, mut color) in &mut interaction_query {
 		match *interaction {
 			Interaction::Pressed => {
-				log::info!("Pressed");
-				text.sections[0].value = "Press".to_string();
 				*color = PRESSED_BUTTON.into();
-				for mut field in query.iter_mut() {
-					on_submit.send(OnPlayerMessage(field.0.clone()));
-					field.clear();
+				for mut text in input_query.iter_mut() {
+					let text = &mut text.sections[0].value;
+					on_submit.send(OnPlayerMessage(text.clone()));
+					text.clear();
 				}
 			}
 			Interaction::Hovered => {
-				text.sections[0].value = "Hover".to_string();
 				*color = HOVERED_BUTTON.into();
 			}
 			Interaction::None => {
-				text.sections[0].value = "Button".to_string();
 				*color = NORMAL_BUTTON.into();
 			}
 		}
