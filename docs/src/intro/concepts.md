@@ -19,7 +19,7 @@ These terms may be helpful when describing Beet principles.
 
 ## Action Category
 
-Action categories are metadata that describes what they modify. This is just metadata, there is no techical barrier to creating a super action that does everything, although its usually best to keep actions specific.
+Action categories describe what the action modifies. This is just metadata, there is no techical barrier to creating a super action that makes lots of changes, although keeping actions specific allows for more code reusability.
 
 | Name                             | Description                                                            | Example                                      |
 | -------------------------------- | ---------------------------------------------------------------------- | -------------------------------------------- |
