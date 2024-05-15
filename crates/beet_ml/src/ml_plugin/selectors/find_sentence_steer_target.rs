@@ -83,27 +83,30 @@ mod test {
 	use bevy::prelude::*;
 	use sweet::*;
 
-	fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
-		commands
+	fn setup(app: &mut App) -> Entity {
+		let handle = app
+			.world_mut()
+			.resource_mut::<AssetServer>()
+			.load::<Bert>("default-bert.ron");
+
+
+		app.world_mut()
 			.spawn(Sentence::new("destroy"))
 			.with_children(|parent| {
 				let id = parent.parent_entity();
 				parent.spawn((
 					TargetAgent(id),
-					FindSentenceSteerTarget::<With<Sentence>>::new(
-						asset_server.load("default-bert.ron"),
-					),
+					FindSentenceSteerTarget::<With<Sentence>>::new(handle),
 					Running,
 				));
-			});
+			})
+			.id()
 	}
 
 
 	#[test]
 	fn works() -> Result<()> {
 		pretty_env_logger::try_init().ok();
-
-
 
 		let mut app = App::new();
 		app.add_plugins((
@@ -112,37 +115,15 @@ mod test {
 			MlPlugin::default(),
 			LifecyclePlugin,
 		))
-		.add_systems(Startup, setup)
 		.finish();
+
+		block_on_asset_load::<Bert>(&mut app, "default-bert.ron");
+
+		let entity = setup(&mut app);
 		let _heal = app.world_mut().spawn(Sentence::new("heal")).id();
 		let kill = app.world_mut().spawn(Sentence::new("kill")).id();
 
-		let entity = loop {
-			app.update();
-			let action = app
-				.world_mut()
-				.query::<&FindSentenceSteerTarget>()
-				.iter(app.world())
-				.next()
-				.unwrap();
-
-			if app
-				.world()
-				.get_resource::<Assets<Bert>>()
-				.unwrap()
-				.get(&action.bert)
-				.is_some()
-			{
-				break app
-					.world_mut()
-					.query_filtered::<Entity, (With<Children>, With<Sentence>)>(
-					)
-					.iter(app.world())
-					.next()
-					.unwrap();
-			}
-			std::thread::sleep(std::time::Duration::from_millis(1));
-		};
+		app.update();
 
 		let target = app.world().entity(entity).get::<SteerTarget>();
 		expect(target).to_be(Some(&SteerTarget::Entity(kill)))?;

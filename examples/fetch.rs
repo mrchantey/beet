@@ -37,9 +37,6 @@ fn setup_camera(mut commands: Commands) {
 		..default()
 	});
 }
-fn setup_chat(mut npc_events: EventWriter<OnNpcMessage>) {
-	npc_events.send(OnNpcMessage(what_does_the_fox_say()));
-}
 
 #[derive(Component)]
 pub struct Player;
@@ -72,6 +69,7 @@ fn setup_fox(
 			ForceBundle::default(),
 			SteerBundle {
 				max_force: MaxForce(0.05),
+				max_speed: MaxSpeed(2.),
 				..default()
 			}
 			.scaled_to(10.),
@@ -171,7 +169,7 @@ fn setup_items(mut commands: Commands, asset_server: Res<AssetServer>) {
 	let y = 1.;
 	commands.spawn((
 		Name::new("Potion"),
-		Sentence::new("miraculous red healing potion"),
+		Sentence::new("red healing potion"),
 		Item,
 		SceneBundle {
 			scene: asset_server.load("kaykit/potion.glb#Scene0"),
@@ -181,7 +179,7 @@ fn setup_items(mut commands: Commands, asset_server: Res<AssetServer>) {
 	));
 	commands.spawn((
 		Name::new("Coin"),
-		Sentence::new("shiny golden coin"),
+		Sentence::new("gold coin"),
 		Item,
 		SceneBundle {
 			scene: asset_server.load("kaykit/coin.glb#Scene0"),
@@ -192,7 +190,7 @@ fn setup_items(mut commands: Commands, asset_server: Res<AssetServer>) {
 	));
 	commands.spawn((
 		Name::new("Sword"),
-		Sentence::new("powerful protective silver sword"),
+		Sentence::new("silver sword"),
 		Item,
 		SceneBundle {
 			scene: asset_server.load("kaykit/sword.glb#Scene0"),
@@ -203,7 +201,7 @@ fn setup_items(mut commands: Commands, asset_server: Res<AssetServer>) {
 	));
 	commands.spawn((
 		Name::new("Cheese"),
-		Sentence::new("delicious satisfying cheese"),
+		Sentence::new("tasty cheese"),
 		Item,
 		SceneBundle {
 			scene: asset_server.load("kaykit/cheese.glb#Scene0"),
@@ -214,8 +212,13 @@ fn setup_items(mut commands: Commands, asset_server: Res<AssetServer>) {
 	));
 }
 
+fn setup_chat(mut npc_events: EventWriter<OnNpcMessage>) {
+	npc_events.send(OnNpcMessage(what_does_the_fox_say()));
+}
+
 fn set_player_sentence(
 	mut commands: Commands,
+	mut npc_events: EventWriter<OnNpcMessage>,
 	mut events: EventReader<OnPlayerMessage>,
 	query: Query<Entity, With<Player>>,
 ) {
@@ -224,6 +227,8 @@ fn set_player_sentence(
 		commands
 			.entity(query.iter().next().unwrap())
 			.insert(Sentence::new(ev.0.clone()));
+
+		npc_events.send(OnNpcMessage("ok".to_string()));
 	}
 }
 

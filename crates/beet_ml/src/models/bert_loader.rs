@@ -3,6 +3,7 @@ use bevy::asset::io::Reader;
 use bevy::asset::AssetLoader;
 use bevy::asset::AsyncReadExt;
 use bevy::asset::LoadContext;
+use bevy::prelude::*;
 use bevy::utils::ConditionalSendFuture;
 
 #[derive(Default)]
@@ -31,9 +32,49 @@ impl AssetLoader for BertLoader {
 			let config = ron::de::from_bytes::<BertConfig>(&bytes)?;
 			let bert = Bert::new(config).await?;
 
-			log::info!("bert loaded");
-
 			Ok(bert)
 		})
+	}
+}
+
+pub fn block_on_asset_load<'a, A: Asset>(app: &'a mut App, path: &'static str) {
+	let handle = app
+		.world_mut()
+		.resource_mut::<AssetServer>()
+		.load::<A>(path)
+		.clone();
+	loop {
+		match app
+			.world_mut()
+			.resource_mut::<AssetServer>()
+			.load_state(handle.id())
+		{
+			bevy::asset::LoadState::Loaded => return,
+			_ => {}
+		}
+		app.update();
+	}
+}
+
+#[cfg(test)]
+mod test {
+	use crate::prelude::*;
+	use anyhow::Result;
+	use bevy::prelude::*;
+	use sweet::*;
+
+	#[test]
+	fn works() -> Result<()> {
+		let mut app = App::new();
+
+		app.add_plugins((TaskPoolPlugin::default(), AssetPlugin::default()))
+			.init_asset::<Bert>()
+			.init_asset_loader::<BertLoader>();
+
+		block_on_asset_load::<Bert>(&mut app, "default-bert.ron");
+
+		expect(true).to_be_true()?;
+
+		Ok(())
 	}
 }

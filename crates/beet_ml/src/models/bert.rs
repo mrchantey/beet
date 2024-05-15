@@ -70,8 +70,7 @@ impl Bert {
 	pub async fn new(config: BertConfig) -> Result<Self> {
 		// use super::bert_loader::BertAssetLoaderError;
 		use crate::wasm::open_or_fetch;
-		use candle_core::DType;
-
+	
 		let config_url = config.model.config_url();
 		let model_url = config.model.model_url();
 		let tokenizer_url = config.model.tokenizer_url();

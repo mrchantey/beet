@@ -38,7 +38,7 @@ fn sentence_scorer(
 		};
 
 		let children = children.into_iter().cloned().collect::<Vec<_>>();
-		//TODO: VERY EXPENSIVE
+		//todo: async
 		bert.score_sentences(agent.0, children, &sentences)
 			.ok_or(|e| log::error!("{e}"))
 			.map(|scores| {
@@ -66,17 +66,20 @@ mod test {
 	use bevy::prelude::*;
 	use sweet::*;
 
-	fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
-		commands
+	fn setup(app: &mut App) -> Entity {
+		let handle = app
+			.world_mut()
+			.resource_mut::<AssetServer>()
+			.load::<Bert>("default-bert.ron");
+
+		app.world_mut()
 			.spawn(Sentence::new("destroy"))
 			.with_children(|parent| {
 				let id = parent.parent_entity();
 				parent
 					.spawn((
 						TargetAgent(id),
-						SentenceScorer::new(
-							asset_server.load("default-bert.ron"),
-						),
+						SentenceScorer::new(handle),
 						ScoreSelector {
 							consume_scores: true,
 						},
@@ -86,7 +89,8 @@ mod test {
 						parent.spawn(Sentence::new("heal"));
 						parent.spawn(Sentence::new("kill"));
 					});
-			});
+			})
+			.id()
 	}
 
 
@@ -101,38 +105,29 @@ mod test {
 			MlPlugin::default(),
 			LifecyclePlugin,
 		))
-		.add_systems(Startup, setup)
 		.finish();
 
-		let entity = loop {
-			app.update();
-			let scorer = app
-				.world_mut()
-				.query::<&SentenceScorer>()
-				.iter(app.world())
-				.next()
-				.unwrap();
+		block_on_asset_load::<Bert>(&mut app, "default-bert.ron");
+		let entity = setup(&mut app);
+		app.update();
 
-			if app
-				.world()
+		let tree = EntityTree::new_with_world(entity, app.world());
+
+		let scorer = app
+			.world_mut()
+			.query::<&SentenceScorer>()
+			.iter(app.world())
+			.next()
+			.unwrap();
+
+		println!(
+			"{:?}",
+			app.world()
 				.get_resource::<Assets<Bert>>()
 				.unwrap()
 				.get(&scorer.bert)
 				.is_some()
-			{
-				break app
-					.world_mut()
-					.query_filtered::<Entity, (Without<Parent>, With<Sentence>)>(
-					)
-					.iter(app.world())
-					.next()
-					.unwrap();
-			}
-			std::thread::sleep(std::time::Duration::from_millis(1));
-		};
-
-		let tree = EntityTree::new_with_world(entity, app.world());
-
+		);
 		let scores = tree.component_tree::<Score>(app.world());
 
 		let heal_score = scores.children[0].children[0].value.unwrap();
@@ -154,11 +149,6 @@ mod test {
 					.with_leaf(Some(&Running)),
 			),
 		)?;
-		// why was this here?
-		// expect(tree.component_tree::<Score>(app.world())).to_be(
-		// 	Tree::new(None)
-		// 		.with_child(Tree::new(None).with_leaf(None).with_leaf(None)),
-		// )?;
 
 		Ok(())
 	}

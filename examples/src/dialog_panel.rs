@@ -60,18 +60,26 @@ fn setup_ui(mut commands: Commands) {
 				..default()
 			},))
 				.with_children(|right_col| {
-					right_col.spawn((MessagesSection, NodeBundle {
-						style: Style {
-							height: Val::Auto,
-							flex_grow: 1.,
-							display: Display::Flex,
-							flex_direction: FlexDirection::Column,
-							// width: Val::Percent(100.),
+					// message section
+					right_col.spawn((
+						MessagesSection,
+						// ScrollingList::default(),
+						NodeBundle {
+							style: Style {
+								height: Val::Auto,
+								// flex_grow: 1.,
+								overflow: Overflow::clip_y(),
+								// max_height: Val::Percent(100.) - Val::Px(40.),
+								display: Display::Flex,
+								flex_direction: FlexDirection::Column,
+								// width: Val::Percent(100.),
+								..default()
+							},
 							..default()
 						},
-						..default()
-					}));
+					));
 
+					// input area
 					right_col
 						.spawn(NodeBundle {
 							style: Style {
@@ -102,7 +110,7 @@ fn setup_ui(mut commands: Commands) {
 								.with_children(|parent| {
 									parent.spawn((
 										TextBundle::from_section(
-											"Fetch the yellow thing",
+											"I need healing!",
 											TextStyle {
 												font_size: 18.,
 												..default() // font: (),
@@ -116,7 +124,7 @@ fn setup_ui(mut commands: Commands) {
 										})
 										.with_style(Style { ..default() }),
 										InputTextField(
-											"Fetch the yellow thing".into(),
+											"I need healing!".into(),
 										),
 									));
 								});

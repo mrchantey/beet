@@ -59,7 +59,7 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
 STDOUT:
 
 Started: Await Bert Loaded
-bert loaded
 Started: Sentence Selector
 Started: Attack Behavior
+
 */
