@@ -1,17 +1,17 @@
 # Summary
 <!-- https://rust-lang.github.io/mdBook/format/summary.html -->
-- [Beet](./intro/index.md)
-	- [Concepts](./intro/concepts.md)
-	- [Actions](./intro/actions.md)
-	- [Robotics](./intro/robotics.md)
-- [Examples](./examples/index.md)
-	- [Hello World](./examples/hello_world.md)
-	- [Animation](./examples/animation.md)
-	- [Hello ML](./examples/hello_ml.md)
-	- [Seek](./examples/seek.md)
-	- [Seek 3D](./examples/seek_3d.md)
-	- [Flock](./examples/flock.md)
-	- [Fetch](./examples/fetch.md)
+- [Beet](intro/index.md)
+	- [Concepts](intro/concepts.md)
+	- [Actions](intro/actions.md)
+	- [Robotics](intro/robotics.md)
+- [Examples](examples/index.md)
+	- [Hello World](examples/hello_world.md)
+	- [Animation](examples/animation.md)
+	- [Hello ML](examples/hello_ml.md)
+	- [Seek](examples/seek.md)
+	- [Seek 3D](examples/seek_3d.md)
+	- [Flock](examples/flock.md)
+	- [Fetch](examples/fetch.md)
 ---
 <!-- [Changelog](./misc/roadmap.md) -->
 
