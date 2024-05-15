@@ -12,7 +12,6 @@ It is built with `bevy` and represents behaviors as entities, connecting them th
 
 - [Concepts](./concepts.md)
 - [Actions](./actions.md)
-- [Robotics](./robotics.md)
 - [Examples](../examples/index.md)
 
 ## Features
