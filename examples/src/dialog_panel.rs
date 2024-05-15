@@ -40,7 +40,7 @@ pub struct NpcOutput;
 
 fn setup_ui(mut commands: Commands) {
 	let text_style = TextStyle {
-		font_size: 18.,
+		font_size: 20.,
 		..default()
 	};
 
@@ -65,7 +65,6 @@ fn setup_ui(mut commands: Commands) {
 					TextSection::new("Status: ", text_style.clone()),
 					TextSection::new("Loading", text_style.clone()),
 				])
-				.with_style(Style { ..default() }),
 			));
 			// root.spawn((
 			// 	NpcOutput,
@@ -79,10 +78,9 @@ fn setup_ui(mut commands: Commands) {
 			root.spawn((
 				PlayerOutput,
 				TextBundle::from_sections([
-					TextSection::new("Player 1: ", text_style.clone()),
+					TextSection::new("Message: ", text_style.clone()),
 					TextSection::new("", text_style.clone()),
-				])
-				.with_style(Style { ..default() }),
+				]),
 			));
 
 			// player input
@@ -102,12 +100,10 @@ fn setup_ui(mut commands: Commands) {
 			})
 			.with_children(|input_area| {
 				input_area.spawn((
-					TextBundle::from_section("I need healing!", TextStyle {
-						font_size: 18.,
-						..default() // font: (),
-						            // color: (),
-					})
-					.with_style(Style { ..default() }),
+					TextBundle::from_section(
+						"I need healing!",
+						text_style.clone(),
+					),
 					PlayerInput,
 				));
 
@@ -128,10 +124,7 @@ fn setup_ui(mut commands: Commands) {
 						parent.spawn(TextBundle::from_section(
 							// "Submit",
 							"Enter",
-							TextStyle {
-								font_size: 18.,
-								..default()
-							},
+							text_style.clone(),
 						));
 					});
 			});
