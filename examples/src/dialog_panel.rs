@@ -8,13 +8,16 @@ impl Plugin for DialogPanelPlugin {
 			.add_systems(
 				Update,
 				(
-					(parse_text_input, button_system),
+					parse_text_input,
 					(handle_player_message, handle_npc_message),
 				)
 					.chain(),
 			)
 			.add_event::<OnPlayerMessage>()
 			.add_event::<OnNpcMessage>();
+
+		#[cfg(not(target_arch = "wasm32"))]
+		app.add_systems(Update, button_system);
 	}
 }
 
