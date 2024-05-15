@@ -1,6 +1,4 @@
-// use beet::prelude::*;
 use beet::prelude::*;
-// use example_plugin::ExamplePlugin;
 use beet_examples::*;
 use bevy::prelude::*;
 use rand::prelude::IteratorRandom;

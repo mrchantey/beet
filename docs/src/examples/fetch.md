@@ -5,25 +5,20 @@
 <button id="submit">Submit</button>
 
 <script>
-console.log("hello world")
 function send(){
 	let input = document.getElementById('prompt');
 	if (input.value == "")
 		return;
 	const iframe = document.querySelector('iframe').contentWindow;
 	iframe.postMessage(input.value, '*');
-	console.log(`${input.value}`);
 	input.value = "";
 }
 document.getElementById('submit').addEventListener('click', send);
-
 document.getElementById('prompt').addEventListener('keyup', function(event) {
 	if (event.key === 'Enter')
 		send();
 });
-
 </script>
-
 
 ```rust
 {{#include ../../../examples/fetch.rs}}

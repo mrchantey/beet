@@ -16,7 +16,7 @@ impl Plugin for DialogPanelPlugin {
 			.add_event::<OnPlayerMessage>()
 			.add_event::<OnNpcMessage>();
 
-		#[cfg(not(target_arch = "wasm32"))]
+		// #[cfg(not(target_arch = "wasm32"))]
 		app.add_systems(Update, button_system);
 	}
 }
