@@ -10,9 +10,9 @@ It is built with `bevy` and represents behaviors as entities, connecting them th
 
 ## Quick Links
 
-- [Concepts](intro/concepts.md)
-- [Actions](intro/actions.md)
-- [Examples](examples/index.md)
+- [Concepts](concepts.md)
+- [Actions](actions.md)
+- [Examples](../examples/index.md)
 
 ## Features
 
