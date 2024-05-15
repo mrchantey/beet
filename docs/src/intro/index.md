@@ -1,6 +1,6 @@
 # Beet
 
-***B**ehavior **E**xpressed as **E**ntity **T**rees*
+***B**ehaviors **E**xpressed as **E**ntity **T**rees*
 
 Beet is a very flexible behavior library for games and robotics.
 
