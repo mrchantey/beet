@@ -43,6 +43,10 @@
 | <h3>[`MlPlugin`][MlPlugin]</h3>               |                                             |                                                                                                           |
 | `SentenceScorer`                              | ChildBehaviors                              | Updates the `Score` of each child based on the similarity of its `Sentence` with the agent's              |
 | `FindSentenceSteerTarget`                     | Agent                                       | Finds the `Sentence` with the highest similarity to the agent's, then set it as the agent's steer target. |
+| <h3>`UI`</h3>                                 |                                             |                                                                                                           |
+| `SetTextOnRun`                                | World                                       | Sets the `Text` of all entities matching the query on run.                                                |
+|                                               |
+
 
 [LifecyclePlugin]:https://github.com/mrchantey/beet/blob/main/crates/beet_ecs/src/lifecycle/lifecycle_plugin.rs
 [MovementPlugin]:https://github.com/mrchantey/beet/blob/main/crates/beet_core/src/movement/movement_plugin.rs

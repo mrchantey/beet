@@ -33,9 +33,17 @@ pub struct PlayerInput;
 pub struct PlayerOutput;
 
 #[derive(Component)]
+pub struct StatusOutput;
+
+#[derive(Component)]
 pub struct NpcOutput;
 
 fn setup_ui(mut commands: Commands) {
+	let text_style = TextStyle {
+		font_size: 18.,
+		..default()
+	};
+
 	commands
 		.spawn(NodeBundle {
 			style: Style {
@@ -51,6 +59,14 @@ fn setup_ui(mut commands: Commands) {
 		})
 		.with_children(|root| {
 			// fox output
+			root.spawn((
+				StatusOutput,
+				TextBundle::from_sections([
+					TextSection::new("Status: ", text_style.clone()),
+					TextSection::new("Loading", text_style.clone()),
+				])
+				.with_style(Style { ..default() }),
+			));
 			// root.spawn((
 			// 	NpcOutput,
 			// 	TextBundle::from_section("Foxie: ", TextStyle {
@@ -62,10 +78,10 @@ fn setup_ui(mut commands: Commands) {
 			// player output
 			root.spawn((
 				PlayerOutput,
-				TextBundle::from_section("Player 1: ", TextStyle {
-					font_size: 18.,
-					..default()
-				})
+				TextBundle::from_sections([
+					TextSection::new("Player 1: ", text_style.clone()),
+					TextSection::new("", text_style.clone()),
+				])
 				.with_style(Style { ..default() }),
 			));
 
@@ -128,7 +144,7 @@ fn handle_player_message(
 ) {
 	for msg in on_player_message.read() {
 		for mut text in player_text.iter_mut() {
-			text.sections[0].value = format!("Player 1: {}", msg.0);
+			text.sections[1].value = msg.0.clone();
 		}
 	}
 }
@@ -139,7 +155,7 @@ fn handle_npc_message(
 ) {
 	for msg in on_npc_message.read() {
 		for mut text in npc_text.iter_mut() {
-			text.sections[0].value = format!("Foxie: {}", msg.0);
+			text.sections[1].value = format!("Foxie: {}", msg.0);
 		}
 	}
 }

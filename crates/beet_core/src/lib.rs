@@ -4,6 +4,8 @@ pub mod animation;
 pub mod app;
 #[cfg(feature = "assets")]
 pub mod asset_actions;
+#[cfg(feature = "ui")]
+pub mod ui;
 pub mod movement;
 pub mod robotics;
 pub mod steer;
@@ -14,6 +16,8 @@ pub mod prelude {
 	pub use crate::app::*;
 	#[cfg(feature = "assets")]
 	pub use crate::asset_actions::*;
+	#[cfg(feature = "ui")]
+	pub use crate::ui::*;
 	pub use crate::movement::*;
 	pub use crate::robotics::*;
 	pub use crate::steer::algo::*;

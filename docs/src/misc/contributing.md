@@ -1,3 +1,3 @@
 # Contributing
 
-Please contribute
+Please contribute.

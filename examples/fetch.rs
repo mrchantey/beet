@@ -1,3 +1,10 @@
+//! Fetch is a combined example demonstrating the following features
+//! - Machine Learning
+//! - Animation
+//! - UI
+//!
+//!
+
 use beet::prelude::*;
 use beet_examples::*;
 use bevy::prelude::*;
@@ -14,6 +21,7 @@ fn main() {
 		MlPlugin,
 		ActionPlugin::<(
 			// SetAgentOnRun<SteerTarget>,
+			SetTextOnRun<With<StatusOutput>>,
 			InsertOnAssetEvent<RunResult, Bert>,
 			FindSentenceSteerTarget<With<Item>>,
 			RemoveAgentOnRun<Sentence>,
@@ -119,6 +127,9 @@ fn setup_fox(
 									RunResult::Success,
 									Duration::from_secs(1),
 								),
+								SetTextOnRun::<With<StatusOutput>>::new_with_section(
+									"Idle..", 1
+								),
 							));
 							parent
 								.spawn((
@@ -130,6 +141,9 @@ fn setup_fox(
 										.repeat_forever(),
 									SequenceSelector,
 									RemoveAgentOnRun::<Sentence>::default(),
+									SetTextOnRun::<With<StatusOutput>>::new_with_section(
+										"Fetching..",1
+									),
 								))
 								.with_children(|parent| {
 									parent.spawn((
