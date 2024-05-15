@@ -1,5 +1,7 @@
 # Beet
 
+***B**ehavior **E**xpressed as **E**ntity **T**rees*
+
 Beet is a very flexible behavior library for games and robotics.
 
 It is built with `bevy` and represents behaviors as entities, connecting them through the parent-child relationship.
@@ -17,17 +19,15 @@ It is built with `bevy` and represents behaviors as entities, connecting them th
 
 #### 🌈 Multi-Paradigm
 
-Create behaviors from a growing list of paradigms, check out the [roadmap](./misc/roadmap.md) for implementation status.
+Create behaviors from a growing list of paradigms including classical and machine learning techniques. Check out the [roadmap](../misc/roadmap.md) for implementation status.
 
 #### 🐦 Bevy Friendly
 
-Actions are simply component-system pairs, which means no blackboard and easy integration with the bevy ecosystem.
+Behaviors are defined as a collection of components and ticks are ecs-first, running all action systems concurrently.
 
-#### 🕑 Tick Tock
+#### 🌳 Modular
 
-Ticks are ecs-first, running all action systems in parallel. Behavior lifecycles are managed through component changes.
-
-<!-- #### 🌳  -->
+Actions are very simple and entity trees are self-contained, enabling behavior composition.
 
 #### 🎯 Target Anything
 
@@ -45,7 +45,7 @@ Agents and behaviors are seperate entities requiring their own queries. This may
 
 #### Tick Traversal
 
-When using the `Update` schedule graph traversals are handled in the next frame, if frame perfect traversals are required there are a couple of options:
+By default graph traversals are handled in the next frame, if frame perfect traversals are required there are a couple of options:
 - Use a custom schedule and update it manually until traversals are complete
 - Arrange and/or duplicate system execution in a specific order
 - Hardcode action sequences into a single system

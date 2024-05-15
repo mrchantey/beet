@@ -5,7 +5,7 @@ use bevy::log::LogPlugin;
 use bevy::prelude::*;
 
 
-// Actions are a component-system pair
+// Actions are simply a component-system pair
 #[derive(Component)]
 struct LogOnRun(pub String);
 
@@ -19,12 +19,12 @@ fn main() {
 	let mut app = App::new();
 
 	app
-		// this will add some helpers that clean up run state
+		// The `LifecyclePlugin` cleans up run state
 		.add_plugins((LogPlugin::default(), LifecyclePlugin::default()))
 		// action systems are usually added to the `TickSet`
 		.add_systems(Update, log_on_run.in_set(TickSet));
 
-	// behavior graphs are regular entity hierarchies
+	// Behavior graphs are regular entity hierarchies
 	app.world_mut()
 		.spawn((SequenceSelector::default(), Running))
 		.with_children(|parent| {
@@ -38,7 +38,6 @@ fn main() {
 			));
 		});
 
-	// graph traversals occur on each tick
 	log::info!("1 - Selector chooses first child");
 	app.update();
 
