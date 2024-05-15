@@ -1,6 +1,6 @@
 # Actions
 
-## Action List
+These are the actions that are built into Beet and its subcrates.
 
 | Name                                          | Category [?](./concepts.md#action-category) | Description                                                                                               |
 | --------------------------------------------- | ------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
