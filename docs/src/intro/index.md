@@ -18,7 +18,7 @@ It is built with `bevy` and represents behaviors as entities, connecting them th
 
 #### 🌈 Multi-Paradigm
 
-Create behaviors from a growing list of paradigms including classical and machine learning techniques. Check out the [roadmap](/misc/roadmap.md) for implementation status.
+Create behaviors from a growing list of paradigms including classical and machine learning techniques. Check out the [roadmap](../misc/roadmap.md) for implementation status.
 
 #### 🐦 Bevy Friendly
 
