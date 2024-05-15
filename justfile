@@ -53,6 +53,7 @@ build-web-examples:
 	just build-web-example hello_world
 	just build-web-example hello_ml
 	just build-web-example seek
+	just build-web-example seek_3d
 	just build-web-example fetch
 
 serve-web-examples:
@@ -60,7 +61,8 @@ serve-web-examples:
 
 deploy-web-examples:
 	just build-web-examples
-	gsutil -m rsync -d -r ./target/web-examples gs://beet-examples
+	gsutil -m rsync -r ./target/web-examples gs://beet-examples
+# gsutil -m rsync -d -r ./target/web-examples gs://beet-examples
 # -m parallel rsync copy -d delete if not in local -r recursive
 
 build-web-example example *args:

@@ -1,6 +1,7 @@
 # Fetch
 
 <iframe src="https://storage.googleapis.com/beet-examples/fetch/index.html"></iframe>
+
 <input id="prompt" value="fetch my weapon!">
 <button id="submit">Submit</button>
 

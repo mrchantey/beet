@@ -24,6 +24,17 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
 			// Vec3::random_in_sphere() * 500.,
 		);
 	}
+	commands.spawn(TextBundle {
+		text: Text::from_section("Click to spawn agents", TextStyle {
+			font_size: 40.0,
+			..default()
+		}),
+		style: Style {
+			padding: UiRect::all(Val::Px(16.)),
+			..default()
+		},
+		..default()
+	});
 }
 
 fn spawn_on_click(

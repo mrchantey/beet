@@ -10,15 +10,15 @@ It is built with `bevy` and represents behaviors as entities, connecting them th
 
 ## Quick Links
 
-- [Concepts](./concepts.md)
-- [Actions](./actions.md)
-- [Examples](../examples/index.md)
+- [Concepts](/intro/concepts.md)
+- [Actions](/intro/actions.md)
+- [Examples](/examples/index.md)
 
 ## Features
 
 #### 🌈 Multi-Paradigm
 
-Create behaviors from a growing list of paradigms including classical and machine learning techniques. Check out the [roadmap](../misc/roadmap.md) for implementation status.
+Create behaviors from a growing list of paradigms including classical and machine learning techniques. Check out the [roadmap](/misc/roadmap.md) for implementation status.
 
 #### 🐦 Bevy Friendly
 
@@ -44,7 +44,7 @@ Agents and behaviors are seperate entities requiring their own queries. This may
 
 #### Tick Traversal
 
-By default graph traversals are handled in the next frame, if frame perfect traversals are required there are a couple of options:
+By default all actions run concurrently meaning graph traversals are handled in the next frame. If single frame traversals are required there are a couple of options:
 - Use a custom schedule and update it manually until traversals are complete
 - Arrange and/or duplicate system execution in a specific order
 - Hardcode action sequences into a single system

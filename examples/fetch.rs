@@ -1,8 +1,9 @@
-//! Fetch is a combined example demonstrating the following features
+//! Fetch is a combined example demonstrating the following behaviors:
 //! - Machine Learning
 //! - Animation
 //! - UI
 //!
+//! Please wait for the status to change to `Idle` before issuing commands.
 //!
 
 use beet::prelude::*;
@@ -128,7 +129,7 @@ fn setup_fox(
 									Duration::from_secs(1),
 								),
 								SetTextOnRun::<With<StatusOutput>>::new_with_section(
-									"Idle..", 1
+									"Idle", 1
 								),
 							));
 							parent
@@ -142,7 +143,7 @@ fn setup_fox(
 									SequenceSelector,
 									RemoveAgentOnRun::<Sentence>::default(),
 									SetTextOnRun::<With<StatusOutput>>::new_with_section(
-										"Fetching..",1
+										"Fetching",1
 									),
 								))
 								.with_children(|parent| {

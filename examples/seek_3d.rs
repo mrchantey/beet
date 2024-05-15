@@ -30,8 +30,7 @@ fn setup(
 	// cheese
 	let target = commands
 		.spawn((FollowCursor3d, SceneBundle {
-			scene: asset_server
-				.load("restaurant_bits/food_ingredient_cheese.glb#Scene0"),
+			scene: asset_server.load("kaykit/cheese.glb#Scene0"),
 			transform: Transform::from_xyz(20., 0., 40.)
 				.with_scale(Vec3::splat(3.)),
 			..default()
