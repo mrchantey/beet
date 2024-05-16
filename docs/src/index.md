@@ -10,15 +10,15 @@ It is built with `bevy` and represents behaviors as entities, connecting them th
 
 ## Quick Links
 
-- [Concepts](concepts.md)
-- [Actions](actions.md)
-- [Examples](../examples/index.md)
+- [Concepts](intro/concepts.md)
+- [Actions](intro/actions.md)
+- [Examples](examples/index.md)
 
 ## Features
 
 #### 🌈 Multi-Paradigm
 
-Create behaviors from a growing list of paradigms including classical and machine learning techniques. Check out the [roadmap](../misc/roadmap.md) for implementation status.
+Create behaviors from a growing list of paradigms including classical and machine learning techniques. Check out the [roadmap](misc/roadmap.md) for implementation status.
 
 #### 🐦 Bevy Friendly
 

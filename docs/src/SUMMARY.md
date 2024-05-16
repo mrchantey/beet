@@ -1,6 +1,6 @@
 # Summary
 <!-- https://rust-lang.github.io/mdBook/format/summary.html -->
-- [Beet](intro/index.md)
+- [Beet](index.md)
 	- [Concepts](intro/concepts.md)
 	- [Actions](intro/actions.md)
 	- [Robotics](intro/robotics.md)
