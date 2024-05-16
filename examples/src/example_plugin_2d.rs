@@ -3,6 +3,14 @@ use beet::prelude::*;
 use bevy::prelude::*;
 use forky_bevy::systems::close_on_esc;
 
+
+pub fn assets_path() -> String {
+	#[cfg(target_arch = "wasm32")]
+	return "../assets".into();
+	#[cfg(not(target_arch = "wasm32"))]
+	return "assets".into();
+}
+
 // use bevy_inspector_egui::quick::WorldInspectorPlugin;
 /// Boilerplate for examples
 pub struct ExamplePlugin2d;
@@ -23,7 +31,7 @@ impl Plugin for ExamplePlugin2d {
 						..default()
 					})
 					.set(AssetPlugin {
-						file_path: "/assets".into(),
+						file_path: assets_path(),
 						..default()
 					})
 					.build(),

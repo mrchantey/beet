@@ -17,7 +17,8 @@ pub enum UtilityInterruptRate {
 #[derive(Debug, Default, Clone, PartialEq, Component, Reflect)]
 #[reflect(Default, Component, ActionMeta)]
 pub struct ScoreSelector {
-	/// Remove the score component from children when one is selected.
+	/// Remove the score component from children when one is selected. This is useful if
+	/// the selector should only run once.
 	pub consume_scores: bool,
 }
 

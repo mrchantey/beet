@@ -1,4 +1,5 @@
 #![allow(unused)]
+use crate::assets_path;
 use crate::follow_cursor_3d;
 use bevy::pbr::CascadeShadowConfigBuilder;
 use bevy::prelude::*;
@@ -20,7 +21,7 @@ impl Plugin for ExamplePlugin3d {
 					..default()
 				})
 				.set(AssetPlugin {
-					file_path: "/assets".into(),
+					file_path: assets_path(),
 					..default()
 				})
 				.build(),

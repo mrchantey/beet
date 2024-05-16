@@ -1,5 +1,7 @@
 //! # Hello ML
-//! This example demonstrates the use of a [`SentenceScorer`] with a *very* small LLM run locally.
+//! A popular 'hello world' for machine learning in games is sentence similarity,
+//! where models rank the similarity of sentences.
+//! This example uses a locally run LLM to select the child behavior with the most similar sentence.
 use beet::prelude::*;
 use beet_examples::*;
 use bevy::prelude::*;

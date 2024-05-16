@@ -8,8 +8,8 @@
 <br/>
 <iframe src="https://storage.googleapis.com/beet-examples/fetch/index.html" allowTransparency="true"></iframe>
 
-> **Web troubleshooting**
-> Sometimes retrieving the model returns a `403 Header Too Large`, I'm currently looking into a solution.
+> **Troubleshooting**
+> Sometimes retrieving the model in desktop chrome returns a `403 Header Too Large`, I'm currently looking into a solution.
 
 <script>
 function send(){
