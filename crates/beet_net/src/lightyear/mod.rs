@@ -1,6 +1,7 @@
-pub mod shared;
+pub mod app;
+mod minimal_client;
 #[allow(unused_imports)]
-pub use self::shared::*;
+pub use self::app::*;
 pub mod protocol;
 #[allow(unused_imports)]
 pub use self::protocol::*;
@@ -10,9 +11,6 @@ pub use self::client::*;
 pub mod settings;
 #[allow(unused_imports)]
 pub use self::settings::*;
-pub mod cli;
-#[allow(unused_imports)]
-pub use self::cli::*;
 pub mod server;
 #[allow(unused_imports)]
 pub use self::server::*;

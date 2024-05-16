@@ -20,7 +20,7 @@ keywords.workspace = true
 categories.workspace = true
 
 [features]
-default = ["ml"]
+default = ["ml", "net"]
 ml = ["dep:beet_ml"]
 net = ["dep:beet_net"]
 # dynamic_linking = ["bevy/dynamic_linking"]
@@ -43,36 +43,6 @@ anyhow.workspace = true
 
 [target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
 tokio.workspace = true
-
-
-# [[example]]
-# name = "animation"
-# path = "animation.rs"
-
-# [[example]]
-# name = "fetch"
-# path = "fetch.rs"
-
-# [[example]]
-# name = "flock"
-# path = "flock.rs"
-
-# [[example]]
-# name = "hello_ml_vanilla"
-# path = "hello_ml_vanilla.rs"
-
-# [[example]]
-# name = "hello_ml"
-# path = "hello_ml.rs"
-
-# [[example]]
-# name = "hello_world"
-# path = "hello_world.rs"
-
-# [[example]]
-# name = "seek"
-# path = "seek.rs"
-
 
 ################## WORKSPACE ##################
 
@@ -108,7 +78,7 @@ members = [
 	"crates/beet_net",
 	"crates/beet_server",
 	"crates/beet_web",
-	# "crates/beet-cli",
+	# "crates/cli",
 ]
 exclude = ["crates/beet_esp"]
 
