@@ -1,6 +1,6 @@
 # Hello ML
 
-<iframe src="https://storage.googleapis.com/beet-examples/hello_ml/index.html"></iframe>
+<iframe src="https://storage.googleapis.com/beet-examples/hello_ml/index.html" allowTransparency="true"></iframe>
 
 Open the console to see the output, it may take up to a minute to load.
 

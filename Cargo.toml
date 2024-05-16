@@ -1,3 +1,11 @@
+# Enable a small amount of optimization in debug mode
+[profile.dev]
+opt-level = 1
+
+# Enable high optimizations for dependencies (incl. Bevy), but not for our code:
+[profile.dev.package."*"]
+opt-level = 3
+
 [package]
 name = "beet"
 version.workspace = true
@@ -15,7 +23,7 @@ categories.workspace = true
 default = ["ml"]
 ml = ["dep:beet_ml"]
 net = ["dep:beet_net"]
-
+# dynamic_linking = ["bevy/dynamic_linking"]
 
 [dependencies]
 # beet = { path = "crates/beet", version = "0.0.1" }
@@ -35,8 +43,6 @@ anyhow.workspace = true
 
 [target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
 tokio.workspace = true
-
-
 
 
 # [[example]]

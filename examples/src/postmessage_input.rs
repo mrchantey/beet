@@ -27,7 +27,9 @@ pub fn postmessage_input(mut commands: Commands) {
 	let closure =
 		Closure::<dyn FnMut(MessageEvent)>::new(move |e: MessageEvent| {
 			let value = e.data().as_string().unwrap_or_default();
-			send.send(value).unwrap();
+			if value != "wasm_loaded" {
+				send.send(value).unwrap();
+			}
 		});
 	window()
 		.unwrap()

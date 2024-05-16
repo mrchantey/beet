@@ -43,11 +43,17 @@ run crate example *args:
 run-w crate example *args:
 	just watch 'just run {{crate}} {{example}} {{args}}'
 
-watch-ml-example:
-	just watch 'just build-web-example beet hello_ml'
+watch-web-example example *args:
+	just copy-web-assets
+	just watch 'just build-web-example {{example}} {{args}}'
+
+copy-web-assets:
+	mkdir -p ./target/web-examples/assets || true
+	cp -r ./assets/* ./target/web-examples/assets
 
 build-web-examples:
 	rm -rf ./target/web-examples || true
+	just copy-web-assets
 	just build-web-example animation
 	just build-web-example flock
 	just build-web-example hello_world
@@ -67,9 +73,7 @@ deploy-web-examples:
 
 build-web-example example *args:
 	mkdir -p ./target/web-examples/{{example}} || true
-	mkdir -p ./target/web-examples/{{example}}/assets || true
 	cp -r ./examples/html/* ./target/web-examples/{{example}}
-	cp -r ./assets/* ./target/web-examples/{{example}}/assets
 	cargo build --example {{example}} --target wasm32-unknown-unknown --release {{args}}
 	wasm-bindgen \
 	--out-name main \

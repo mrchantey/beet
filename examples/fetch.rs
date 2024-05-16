@@ -17,11 +17,10 @@ fn main() {
 	app.add_plugins((
 		ExamplePlugin3d,
 		DefaultBeetPlugins,
-		BeetDebugPlugin::default(),
+		// BeetDebugPlugin::default(),
 		DialogPanelPlugin,
 		MlPlugin,
 		ActionPlugin::<(
-			// SetAgentOnRun<SteerTarget>,
 			SetTextOnRun<With<StatusOutput>>,
 			InsertOnAssetEvent<RunResult, Bert>,
 			FindSentenceSteerTarget<With<Item>>,
@@ -268,7 +267,6 @@ fn set_player_sentence(
 	query: Query<Entity, With<Player>>,
 ) {
 	for ev in events.read() {
-		log::info!("setting player sentence");
 		commands
 			.entity(query.iter().next().unwrap())
 			.insert(Sentence::new(ev.0.clone()));
@@ -276,7 +274,6 @@ fn set_player_sentence(
 		npc_events.send(OnNpcMessage("ok".to_string()));
 	}
 }
-
 
 fn what_does_the_fox_say() -> String {
 	let sounds = [
