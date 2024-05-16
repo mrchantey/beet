@@ -1,14 +1,16 @@
 //! This module parses the settings.ron file and builds a lightyear configuration from it
 #![allow(unused_variables)]
-#[cfg(not(target_family = "wasm"))]
+#[cfg(all(feature = "webtransport", not(target_family = "wasm")))]
 use async_compat::Compat;
+use bevy::asset::ron;
 use bevy::prelude::Resource;
-#[cfg(not(target_family = "wasm"))]
+#[cfg(all(feature = "webtransport", not(target_family = "wasm")))]
 use bevy::tasks::IoTaskPool;
 use bevy::utils::Duration;
 use lightyear::prelude::client;
 use lightyear::prelude::client::Authentication;
-#[cfg(not(target_family = "wasm"))]
+#[cfg(all(feature = "steam", not(target_family = "wasm")))]
+use lightyear::prelude::client::SteamConfig;
 use lightyear::prelude::server;
 use lightyear::prelude::CompressionConfig;
 use lightyear::prelude::LinkConditionerConfig;
@@ -30,14 +32,12 @@ pub fn settings<T: DeserializeOwned>(settings_str: &str) -> T {
 pub enum ClientTransports {
 	#[cfg(not(target_family = "wasm"))]
 	Udp,
-	WebTransport {
-		certificate_digest: String,
-	},
+	#[cfg(feature = "webtransport")]
+	WebTransport { certificate_digest: String },
+	#[cfg(feature = "websocket")]
 	WebSocket,
-	#[cfg(not(target_family = "wasm"))]
-	Steam {
-		app_id: u32,
-	},
+	#[cfg(all(feature = "steam", not(target_family = "wasm")))]
+	Steam { app_id: u32 },
 }
 
 #[derive(
@@ -47,13 +47,15 @@ pub enum ServerTransports {
 	Udp {
 		local_port: u16,
 	},
+	#[cfg(feature = "webtransport")]
 	WebTransport {
 		local_port: u16,
 	},
+	#[cfg(feature = "websocket")]
 	WebSocket {
 		local_port: u16,
 	},
-	#[cfg(not(target_family = "wasm"))]
+	#[cfg(all(feature = "steam", not(target_family = "wasm")))]
 	Steam {
 		app_id: u32,
 		server_ip: Ipv4Addr,
@@ -99,6 +101,9 @@ pub struct ServerSettings {
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct ClientSettings {
+	/// If true, enable bevy_inspector_egui
+	pub(crate) inspector: bool,
+
 	/// The client id
 	pub(crate) client_id: u64,
 
@@ -182,6 +187,7 @@ pub fn get_server_net_configs(settings: &Settings) -> Vec<server::NetConfig> {
 					)),
 				)
 			}
+			#[cfg(feature = "webtransport")]
 			ServerTransports::WebTransport { local_port } => {
 				// this is async because we need to load the certificate from io
 				// we need async_compat because wtransport expects a tokio reactor
@@ -189,8 +195,8 @@ pub fn get_server_net_configs(settings: &Settings) -> Vec<server::NetConfig> {
 					.scope(|s| {
 						s.spawn(Compat::new(async {
 							server::Identity::load_pemfiles(
-								"assets/certificates/cert.pem",
-								"assets/certificates/key.pem",
+								"../certificates/cert.pem",
+								"../certificates/key.pem",
 							)
 							.await
 							.unwrap()
@@ -216,26 +222,38 @@ pub fn get_server_net_configs(settings: &Settings) -> Vec<server::NetConfig> {
 					},
 				)
 			}
-			ServerTransports::WebSocket { local_port } => {
-				build_server_netcode_config(
-					settings.server.conditioner.as_ref(),
-					&settings.shared,
-					server::ServerTransport::WebSocketServer {
-						server_addr: SocketAddr::new(
-							Ipv4Addr::UNSPECIFIED.into(),
-							*local_port,
-						),
-					},
-				)
-			}
+			#[cfg(feature = "websocket")]
+			ServerTransports::WebSocket { local_port } => build_server_netcode_config(
+				settings.server.conditioner.as_ref(),
+				&settings.shared,
+				server::ServerTransport::WebSocketServer {
+					server_addr: SocketAddr::new(
+						Ipv4Addr::UNSPECIFIED.into(),
+						*local_port,
+					),
+				},
+			),
+			#[cfg(feature = "steam")]
 			ServerTransports::Steam {
 				app_id,
 				server_ip,
 				game_port,
 				query_port,
-			} => {
-				panic!("unsupported")
-			}
+			} => server::NetConfig::Steam {
+				config: server::SteamConfig {
+					app_id: *app_id,
+					server_ip: *server_ip,
+					game_port: *game_port,
+					query_port: *query_port,
+					max_clients: 16,
+					version: "1.0".to_string(),
+				},
+				conditioner: settings
+					.server
+					.conditioner
+					.as_ref()
+					.map_or(None, |c| Some(c.build())),
+			},
 		})
 		.collect()
 }
@@ -291,6 +309,7 @@ pub fn get_client_net_config(
 			&settings.shared,
 			client::ClientTransport::UdpSocket(client_addr),
 		),
+		#[cfg(feature = "webtransport")]
 		ClientTransports::WebTransport { certificate_digest } => {
 			build_client_netcode_config(
 				client_id,
@@ -307,6 +326,7 @@ pub fn get_client_net_config(
 				},
 			)
 		}
+		#[cfg(feature = "websocket")]
 		ClientTransports::WebSocket => build_client_netcode_config(
 			client_id,
 			server_addr,
@@ -314,9 +334,17 @@ pub fn get_client_net_config(
 			&settings.shared,
 			client::ClientTransport::WebSocketClient { server_addr },
 		),
-		#[cfg(not(target_family = "wasm"))]
-		_ => {
-			panic!("unsupported")
-		}
+		#[cfg(all(feature = "steam", not(target_family = "wasm")))]
+		ClientTransports::Steam { app_id } => client::NetConfig::Steam {
+			config: SteamConfig {
+				server_addr,
+				app_id: *app_id,
+			},
+			conditioner: settings
+				.server
+				.conditioner
+				.as_ref()
+				.map_or(None, |c| Some(c.build())),
+		},
 	}
 }

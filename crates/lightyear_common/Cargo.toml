@@ -1,0 +1,28 @@
+[package]
+name = "lightyear_common"
+version = "0.1.0"
+edition = "2021"
+description = "Common harness for the lightyear examples"
+
+[features]
+default = ["websocket"]
+steam = ["lightyear/steam"]
+webtransport = ["lightyear/webtransport"]
+websocket = ["lightyear/websocket"]
+
+[dependencies]
+lightyear = { version = "0.15.1" }
+
+# utils
+anyhow = { version = "1.0.75", features = [] }
+async-compat = "0.2.3"
+cfg-if = "1.0.0"
+clap = { version = "4.5.4", features = ["derive"] }
+crossbeam-channel = "0.5.12"
+rand = "0.8.5"
+serde = { version = "1.0.201", features = ["derive"] }
+
+
+# bevy
+bevy = { version = "0.13", default-features = false, features = ["bevy_asset"] }
+# bevy-inspector-egui = "0.24"

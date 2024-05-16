@@ -40,10 +40,11 @@ derive_more = { version = "0.99", features = ["add", "mul"] }
 bevy = { version = "0.13", default-features = false }
 # bevy.workspace = true
 log.workspace = true
+lightyear_common = { workspace = true, features = ["websocket"] }
 lightyear = { version = "0.15.1", features = [
-	# "steam",
-	"webtransport",
 	"websocket",
+	"webtransport",
+	# "steam",
 	# "render",
 	# "zstd",
 ] }
