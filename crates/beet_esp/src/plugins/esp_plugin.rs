@@ -1,6 +1,7 @@
 use super::spawn_obstacle_avoider;
-use beet::prelude::*;
+// use beet::prelude::*;
 use bevy::prelude::*;
+use bevy::time::TimePlugin;
 use esp_idf_hal::delay::FreeRtos;
 use std::time::Duration;
 
@@ -10,11 +11,12 @@ pub struct EspPlugin;
 impl Plugin for EspPlugin {
 	fn build(&self, app: &mut App) {
 		app /*-*/
-			.add_plugins(TimePlugin)
-			.add_plugins(BeetSystemsPlugin::<CoreModule,Update>::default())
-			// .add_plugins(DefaultBeetPlugins::<CoreModule>::default())
-			.add_systems(Startup,spawn_obstacle_avoider)
+		.add_plugins(TimePlugin)
+		// .add_plugins(BeetSystemsPlugin::<CoreModule,Update>::default())
+		// .add_plugins(DefaultBeetPlugins::<CoreModule>::default())
+		.add_systems(Startup,spawn_obstacle_avoider)
 		/*-*/;
+		todo!("beet stuff");
 	}
 }
 

@@ -5,16 +5,19 @@
 # 	# cargo build --example 
 # 	just flash {{example}}
 
+PORT := '/dev/ttyACM0'
+
 build example *args:
 	cargo build --example {{example}} {{args}}
 
 monitor:
-	cargo espflash monitor --port=/dev/ttyACM0
+	cargo espflash monitor --port={{PORT}}
 
 run example:
 	cargo espflash flash \
 	--baud 921600 \
 	--monitor \
-	--port=/dev/ttyACM0 \
-	--example {{example}}
+	--port={{PORT}} \
+	--partition-table partitions.csv \
+	--example {{example}} \
 	--release

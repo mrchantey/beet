@@ -13,8 +13,8 @@ categories.workspace = true
 
 [features]
 default = []
-webtransport = ["lightyear/webtransport"]
-websocket = ["lightyear/websocket"]
+webtransport = ["lightyear/webtransport", "lightyear_common/webtransport"]
+websocket = ["lightyear/websocket", "lightyear_common/websocket"]
 # tokio = ["dep:tokio"]
 
 [dependencies]
@@ -40,14 +40,8 @@ derive_more = { version = "0.99", features = ["add", "mul"] }
 bevy = { version = "0.13", default-features = false }
 # bevy.workspace = true
 log.workspace = true
-lightyear_common = { workspace = true, features = ["websocket"] }
-lightyear = { version = "0.15.1", features = [
-	"websocket",
-	"webtransport",
-	# "steam",
-	# "render",
-	# "zstd",
-] }
+lightyear_common = { workspace = true }
+lightyear = { version = "0.15.1" }
 
 # tokio = { workspace = true, optional = true }
 # [target.'cfg(not(target_arch = "wasm32"))'.dependencies]

@@ -1,4 +1,6 @@
-use beet::prelude::*;
+use anyhow::Result;
+use crossbeam_channel::Receiver;
+use crossbeam_channel::Sender;
 use dotenv_codegen::dotenv;
 use embedded_svc::ws::FrameType;
 use esp_idf_hal::io::EspIOError;
@@ -6,7 +8,6 @@ use esp_idf_svc::ws::client::EspWebSocketClient;
 use esp_idf_svc::ws::client::EspWebSocketClientConfig;
 use esp_idf_svc::ws::client::WebSocketEvent;
 use esp_idf_svc::ws::client::WebSocketEventType;
-use flume::Sender;
 use forky_core::ResultTEExt;
 use std::time::Duration;
 
@@ -14,14 +15,16 @@ use std::time::Duration;
 // 2048 - works, but i think its pretty close
 // const CIBORIUM_SCRATCH_BUFFER_SIZE: usize = 4096;
 
-pub type EspWsEvent = WebSocketEvent<'static>;
-
-pub struct EspWsClient {
+pub struct WsClient {
 	pub ws: EspWebSocketClient<'static>,
+	pub recv: Receiver<Vec<u8>>,
 }
 
-impl EspWsClient {
-	pub fn new(mut send: Sender<BeetMessage>) -> anyhow::Result<Self> {
+impl WsClient {
+	pub fn new(
+		mut send: Sender<Vec<u8>>,
+		recv: Receiver<Vec<u8>>,
+	) -> anyhow::Result<Self> {
 		let timeout = Duration::from_secs(10);
 		let config = EspWebSocketClientConfig {
 			server_cert: None,
@@ -39,17 +42,25 @@ impl EspWsClient {
 				parse(event, &mut send).ok_or(|e| log::error!("{e}"));
 			})?;
 
-		Ok(Self { ws })
+		Ok(Self { ws, recv })
 	}
 
-	pub fn send(&mut self, msg: &BeetMessage) -> anyhow::Result<()> {
-		let bytes = bincode::serialize(msg)?;
-		self.ws.send(FrameType::Binary(false), &bytes)?;
+	pub fn send(&mut self, bytes: &[u8]) -> anyhow::Result<()> {
+		self.ws.send(FrameType::Binary(false), bytes)?;
 		Ok(())
+	}
+
+	pub fn update(&mut self) -> anyhow::Result<()> {
+		self.recv
+			.try_iter()
+			.collect::<Vec<_>>()
+			.into_iter()
+			.map(|msg| -> Result<()> { self.send(&msg) })
+			.collect::<Result<_>>()
 	}
 }
 
-impl Drop for EspWsClient {
+impl Drop for WsClient {
 	fn drop(&mut self) {
 		log::info!("EspWsClient Dropped");
 	}
@@ -57,7 +68,7 @@ impl Drop for EspWsClient {
 
 fn parse(
 	event: &Result<WebSocketEvent<'_>, EspIOError>,
-	send: &mut Sender<BeetMessage>,
+	send: &mut Sender<Vec<u8>>,
 ) -> anyhow::Result<()> {
 	match event {
 		Ok(event) => {
@@ -66,12 +77,7 @@ fn parse(
 					log::error!("Receiving text Socket Messages on ESP32 is not supported");
 				}
 				WebSocketEventType::Binary(value) => {
-					// safer to keep on heap, but watch for framentation
-					// let mut scratch_buffer =
-					// 	Box::new([0; CIBORIUM_SCRATCH_BUFFER_SIZE]);
-
-					let msg: BeetMessage = bincode::deserialize(&value)?;
-					send.send(msg)?;
+					send.send(value.to_vec())?;
 				}
 				_ => {}
 			};

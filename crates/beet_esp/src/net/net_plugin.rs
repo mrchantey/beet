@@ -6,17 +6,14 @@ use esp_idf_hal::task::block_on;
 
 pub struct NetPlugin {
 	wifi: WifiClient,
-	ws: EspWsClient,
+	ws: WsClient,
 }
 
 impl NetPlugin {
-	pub fn new_blocking(wifi: WifiClient, ws: EspWsClient) -> Result<Self> {
+	pub fn new_blocking(wifi: WifiClient, ws: WsClient) -> Result<Self> {
 		block_on(Self::new_async(wifi, ws))
 	}
-	pub async fn new_async(
-		mut wifi: WifiClient,
-		ws: EspWsClient,
-	) -> Result<Self> {
+	pub async fn new_async(mut wifi: WifiClient, ws: WsClient) -> Result<Self> {
 		wifi.connect().await?;
 		// let mut ws = EspWsClient::new()?;
 		// ws.ws.await_upgrade().await?;

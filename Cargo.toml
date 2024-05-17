@@ -20,16 +20,20 @@ keywords.workspace = true
 categories.workspace = true
 
 [features]
-default = ["ml", "net"]
+default = ["ml", "net", "animation", "assets", "ui"]
 ml = ["dep:beet_ml"]
 net = ["dep:beet_net"]
+ui = ["beet_core/ui"]
+assets = ["beet_core/assets"]
+animation = ["beet_core/animation"]
+
+
 # dynamic_linking = ["bevy/dynamic_linking"]
 
 [dependencies]
-# beet = { path = "crates/beet", version = "0.0.1" }
 beet_core.workspace = true
 beet_ecs.workspace = true
-beet_ml = { workspace = true, optional = true }
+beet_ml = { workspace = true, optional = true }  # beet = { path = "crates/beet", version = "0.0.1" }
 beet_net = { workspace = true, optional = true }
 
 [dev-dependencies]
@@ -86,7 +90,7 @@ exclude = ["crates/beet_esp"]
 [workspace.dependencies]
 ## internal
 beet = { path = "./", version = "0.0.1" }
-beet_core = { path = "crates/beet_core", version = "0.0.1" }
+beet_core = { path = "crates/beet_core", version = "0.0.1", default-features = false }
 beet_ecs = { path = "crates/beet_ecs", version = "0.0.1" }
 beet_ecs_macros = { path = "crates/beet_ecs/macros", version = "0.0.1" }
 beet_ml = { path = "crates/beet_ml", version = "0.0.1" }

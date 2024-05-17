@@ -10,6 +10,6 @@ pub use self::futures_utils::*;
 pub mod dotenv;
 #[allow(unused_imports)]
 pub use self::dotenv::*;
-pub mod esp_ws_client;
+pub mod ws_client;
 #[allow(unused_imports)]
-pub use self::esp_ws_client::*;
+pub use self::ws_client::*;

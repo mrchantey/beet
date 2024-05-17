@@ -9,6 +9,16 @@ pub struct Rgb {
 	pub b: u8,
 }
 
+// const WS2812_T0H_NS: Duration = Duration::from_nanos(400);
+// const WS2812_T0L_NS: Duration = Duration::from_nanos(850);
+// const WS2812_T1H_NS: Duration = Duration::from_nanos(800);
+// const WS2812_T1L_NS: Duration = Duration::from_nanos(450);
+const WS2812_T0H_NS: Duration = Duration::from_nanos(350);
+const WS2812_T0L_NS: Duration = Duration::from_nanos(800);
+const WS2812_T1H_NS: Duration = Duration::from_nanos(700);
+const WS2812_T1L_NS: Duration = Duration::from_nanos(600);
+
+
 impl Rgb {
 	pub fn new(r: u8, g: u8, b: u8) -> Self { Self { r, g, b } }
 	/// Converts hue, saturation, value to RGB
@@ -41,26 +51,10 @@ impl Rgb {
 		let color = self.into_tx_value();
 		let ticks_hz = tx.counter_clock()?;
 		let (t0h, t0l, t1h, t1l) = (
-			Pulse::new_with_duration(
-				ticks_hz,
-				PinState::High,
-				&Duration::from_nanos(350),
-			)?,
-			Pulse::new_with_duration(
-				ticks_hz,
-				PinState::Low,
-				&Duration::from_nanos(800),
-			)?,
-			Pulse::new_with_duration(
-				ticks_hz,
-				PinState::High,
-				&Duration::from_nanos(700),
-			)?,
-			Pulse::new_with_duration(
-				ticks_hz,
-				PinState::Low,
-				&Duration::from_nanos(600),
-			)?,
+			Pulse::new_with_duration(ticks_hz, PinState::High, &WS2812_T0H_NS)?,
+			Pulse::new_with_duration(ticks_hz, PinState::Low, &WS2812_T0L_NS)?,
+			Pulse::new_with_duration(ticks_hz, PinState::High, &WS2812_T1H_NS)?,
+			Pulse::new_with_duration(ticks_hz, PinState::Low, &WS2812_T1L_NS)?,
 		);
 		let mut signal = FixedLengthSignal::<24>::new();
 		for i in (0..24).rev() {

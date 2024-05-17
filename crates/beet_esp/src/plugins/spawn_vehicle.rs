@@ -3,7 +3,7 @@ use bevy::prelude::*;
 
 
 pub fn spawn_obstacle_avoider(world: &mut World) {
-	let behavior = avoid_obstacle_behavior().build(world).value;
+	let behavior = avoid_obstacle_behavior(world);
 
 	world
 		.spawn((

@@ -171,6 +171,33 @@ impl Apps {
 		}
 	}
 
+
+	pub fn from_cli_crossbeam(
+		settings: Settings,
+		cli: Cli,
+		send: Sender<Vec<u8>>,
+		recv: Receiver<Vec<u8>>,
+	) -> Self {
+		match cli {
+			Cli::HostServer { .. } => {
+				panic!("crossbeam apps not supported for HostServer")
+			}
+			Cli::ListenServer { .. } => {
+				panic!("crossbeam apps not supported for ListenServer")
+			}
+			Cli::Server => {
+				let config =
+					settings_to_server_config_crossbeam(settings, send, recv);
+				Apps::server(config)
+			}
+			Cli::Client { client_id } => {
+				let config =
+					build_crossbeam_client_app(settings, send, recv, client_id);
+				Apps::client(config)
+			}
+		}
+	}
+
 	pub fn client(config: ClientConfig) -> Self {
 		let mut app = App::new();
 		app.add_plugins(client::ClientPlugins {
@@ -353,32 +380,6 @@ impl Apps {
 			Apps::HostServer { app, .. } => {
 				f(app);
 			}
-		}
-	}
-}
-
-pub fn build_crossbeam_app(
-	settings: Settings,
-	cli: Cli,
-	send: Sender<Vec<u8>>,
-	recv: Receiver<Vec<u8>>,
-) -> Apps {
-	match cli {
-		Cli::HostServer { .. } => {
-			panic!("crossbeam apps not supported for HostServer")
-		}
-		Cli::ListenServer { .. } => {
-			panic!("crossbeam apps not supported for ListenServer")
-		}
-		Cli::Server => {
-			let config =
-				settings_to_server_config_crossbeam(settings, send, recv);
-			Apps::server(config)
-		}
-		Cli::Client { client_id } => {
-			let config =
-				build_crossbeam_client_app(settings, send, recv, client_id);
-			Apps::client(config)
 		}
 	}
 }

@@ -26,7 +26,7 @@ embassy = [
 ]
 
 [dependencies]
-beet = { path = "../beet" }
+beet = { path = "../../", default-features = false, features = ["net"] }
 # forky_core = "0.1.46"
 forky_core = { path = "../../../forky/crates/forky/forky_core" }
 
@@ -37,7 +37,7 @@ bevy = { git = "https://github.com/bevyengine/bevy.git", rev = "f516de456be2b655
 anyhow = "1.0.75"
 log = { version = "0.4", default-features = false }
 
-flume = "0.11"
+crossbeam-channel = "0.5"
 
 embedded-svc = "0.27"
 embedded-hal = "1.0.0"

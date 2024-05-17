@@ -5,7 +5,7 @@ edition = "2021"
 description = "Common harness for the lightyear examples"
 
 [features]
-default = ["websocket"]
+default = []
 steam = ["lightyear/steam"]
 webtransport = ["lightyear/webtransport"]
 websocket = ["lightyear/websocket"]
