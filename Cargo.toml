@@ -23,7 +23,7 @@ categories.workspace = true
 default = ["ml", "net", "websocket", "animation", "assets", "ui"]
 ml = ["dep:beet_ml"]
 net = ["dep:beet_net"]
-websocket = ["dep:beet_net", "beet_net/websocket"]
+websocket = ["dep:beet_net"]
 ui = ["beet_core/ui"]
 assets = ["beet_core/assets"]
 animation = ["beet_core/animation"]
@@ -83,7 +83,6 @@ members = [
 	"crates/beet_net",
 	"crates/beet_server",
 	"crates/beet_web",
-	"crates/lightyear_common",
 	# "crates/cli",
 ]
 exclude = ["crates/beet_esp"]
@@ -95,11 +94,9 @@ beet_core = { path = "crates/beet_core", version = "0.0.1", default-features = f
 beet_ecs = { path = "crates/beet_ecs", version = "0.0.1" }
 beet_ecs_macros = { path = "crates/beet_ecs/macros", version = "0.0.1" }
 beet_ml = { path = "crates/beet_ml", version = "0.0.1" }
-beet_net = { path = "crates/beet_net", version = "0.0.1", default-features = false }
+beet_net = { path = "crates/beet_net", version = "0.0.1" }
 beet_server = { path = "crates/beet_server", version = "0.0.1" }
 beet_examples = { path = "examples", version = "0.0.1" }
-lightyear_common = { path = "crates/lightyear_common", version = "0.1.0" }
-
 
 ## local
 forky_core = { path = "../forky/crates/forky/forky_core" }

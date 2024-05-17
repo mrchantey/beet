@@ -12,42 +12,30 @@ keywords.workspace = true
 categories.workspace = true
 
 [features]
-default = ["websocket"]
-webtransport = ["lightyear/webtransport", "lightyear_common/webtransport"]
-# websocket = ["lightyear/websocket", "lightyear_common/websocket"]
-websocket = [
-	"lightyear/websocket",
-	"lightyear/webtransport",
-	"lightyear_common/websocket",
-	"lightyear_common/webtransport",
-]
-# tokio = ["dep:tokio"]
 
 [dependencies]
-anyhow.workspace = true
-extend.workspace = true
-futures.workspace = true
-parking_lot.workspace = true
+# anyhow.workspace = true
+# extend.workspace = true
+# futures.workspace = true
+# parking_lot.workspace = true
 
-serde.workspace = true
-ron.workspace = true
+# serde.workspace = true
+# ron.workspace = true
 
-strum.workspace = true
-strum_macros.workspace = true
-
-
-# from the simple_box example
-crossbeam-channel = "0.5.11"
-clap = { version = "4.4", features = ["derive"] }
-async-compat = "0.2.3"
-derive_more = { version = "0.99", features = ["add", "mul"] }
+# strum.workspace = true
+# strum_macros.workspace = true
 
 
-bevy = { version = "0.13", default-features = false }
+# # from the simple_box example
+# crossbeam-channel = "0.5.11"
+# clap = { version = "4.4", features = ["derive"] }
+# async-compat = "0.2.3"
+# derive_more = { version = "0.99", features = ["add", "mul"] }
+
+
+# # bevy = { version = "0.13", default-features = false }
 # bevy.workspace = true
-log.workspace = true
-lightyear_common = { workspace = true }
-lightyear = { version = "0.15.1" }
+# log.workspace = true
 
 # tokio = { workspace = true, optional = true }
 # [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
