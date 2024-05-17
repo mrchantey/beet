@@ -1,6 +1,6 @@
 use super::*;
 use anyhow::Result;
-use beet::prelude::*;
+use bevy::ecs::schedule::SystemConfigs;
 use bevy::prelude::*;
 use esp_idf_hal::gpio::*;
 use esp_idf_hal::ledc;
@@ -81,15 +81,14 @@ impl<
 			pwm_driver(channel_b, timer_b, pwm_b)?,
 		)))
 	}
-	pub fn update_system(
-		&self,
-	) -> impl Fn(NonSendMut<Self>, Query<&DualMotorValue, Changed<DualMotorValue>>)
-	{
-		|mut motors, query| {
-			for value in query.iter() {
-				motors.from_dual_motor_value(value).unwrap();
-			}
-		}
+	pub fn update_system(&self) -> SystemConfigs {
+		todo!("bevy 0.14");
+		// || {}
+		// |mut motors, query| {
+		// 	for value in query.iter() {
+		// 		motors.from_dual_motor_value(value).unwrap();
+		// 	}
+		// }
 	}
 }
 

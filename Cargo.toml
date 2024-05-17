@@ -34,8 +34,8 @@ animation = ["beet_core/animation"]
 [dependencies]
 beet_core.workspace = true
 beet_ecs.workspace = true
-beet_ml = { workspace = true, optional = true }  # beet = { path = "crates/beet", version = "0.0.1" }
-beet_net = { workspace = true, optional = true }
+beet_ml = { workspace = true, optional = true }                            # beet = { path = "crates/beet", version = "0.0.1" }
+beet_net = { workspace = true, optional = true, default-features = false }
 
 [dev-dependencies]
 bevy = { workspace = true, default-features = true }
@@ -95,7 +95,7 @@ beet_core = { path = "crates/beet_core", version = "0.0.1", default-features = f
 beet_ecs = { path = "crates/beet_ecs", version = "0.0.1" }
 beet_ecs_macros = { path = "crates/beet_ecs/macros", version = "0.0.1" }
 beet_ml = { path = "crates/beet_ml", version = "0.0.1" }
-beet_net = { path = "crates/beet_net", version = "0.0.1" }
+beet_net = { path = "crates/beet_net", version = "0.0.1", default-features = false }
 beet_server = { path = "crates/beet_server", version = "0.0.1" }
 beet_examples = { path = "examples", version = "0.0.1" }
 lightyear_common = { path = "crates/lightyear_common", version = "0.1.0" }

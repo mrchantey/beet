@@ -3,20 +3,20 @@ use bevy::app::App;
 // use bevy::MinimalPlugins;
 use bevy::DefaultPlugins;
 use lightyear::client::plugin::ClientPlugins;
+use lightyear_common::apps::default_settings;
 use lightyear_common::apps::settings_to_client_config_crossbeam;
-use lightyear_common::settings::Settings;
 use std::time::Duration;
 
 
 fn main() {
-	let settings = lightyear_common::settings::settings::<Settings>(
-		include_str!("../assets/settings.ron"),
-	);
-
 	let (send, recv) = crossbeam_channel::unbounded();
 
-	let config =
-		settings_to_client_config_crossbeam(settings, send.clone(), recv, None);
+	let config = settings_to_client_config_crossbeam(
+		default_settings(),
+		send.clone(),
+		recv,
+		None,
+	);
 
 
 	std::thread::spawn(move || {

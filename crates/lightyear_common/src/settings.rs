@@ -2,7 +2,6 @@
 #![allow(unused_variables)]
 #[cfg(all(feature = "webtransport", not(target_family = "wasm")))]
 use async_compat::Compat;
-use bevy::asset::ron;
 use bevy::prelude::Resource;
 #[cfg(all(feature = "webtransport", not(target_family = "wasm")))]
 use bevy::tasks::IoTaskPool;

@@ -22,7 +22,7 @@ crossbeam-channel = "0.5.12"
 rand = "0.8.5"
 serde = { version = "1.0.201", features = ["derive"] }
 
+ron.workspace = true
 
 # bevy
-bevy = { version = "0.13", default-features = false, features = ["bevy_asset"] }
-# bevy-inspector-egui = "0.24"
+bevy = { version = "0.13", default-features = false }

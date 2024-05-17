@@ -385,6 +385,10 @@ impl Apps {
 	}
 }
 
+pub fn default_settings() -> Settings {
+	settings::<Settings>(include_str!("../default_settings.ron"))
+}
+
 pub fn settings_to_server_config_crossbeam(
 	settings: Settings,
 	from_server_send: Sender<Vec<u8>>,

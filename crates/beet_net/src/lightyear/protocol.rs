@@ -27,14 +27,14 @@ pub(crate) struct PlayerBundle {
 }
 
 impl PlayerBundle {
-	pub fn new(id: ClientId, position: Vec2) -> Self {
-		Self {
-			id: PlayerId(id),
-			position: PlayerPosition(position),
-			color: PlayerColor(0),
-			replicate: Replicate::default(),
-		}
-	}
+	// pub fn new(id: ClientId, position: Vec2) -> Self {
+	// 	Self {
+	// 		id: PlayerId(id),
+	// 		position: PlayerPosition(position),
+	// 		color: PlayerColor(0),
+	// 		replicate: Replicate::default(),
+	// 	}
+	// }
 }
 
 // Player

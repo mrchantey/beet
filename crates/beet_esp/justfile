@@ -13,11 +13,12 @@ build example *args:
 monitor:
 	cargo espflash monitor --port={{PORT}}
 
-run example:
+run example *args:
 	cargo espflash flash \
 	--baud 921600 \
 	--monitor \
 	--port={{PORT}} \
 	--partition-table partitions.csv \
 	--example {{example}} \
-	--release
+	--release \
+	{{args}}

@@ -7,3 +7,9 @@ pub mod prelude {
 	pub use crate::lightyear::*;
 	// pub use crate::server::*;
 }
+
+
+pub mod exports {
+	pub use lightyear;
+	pub use lightyear_common;
+}

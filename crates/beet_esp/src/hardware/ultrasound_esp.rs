@@ -1,6 +1,7 @@
 use crate::prelude::*;
 use anyhow::Result;
 use beet::prelude::*;
+use bevy::ecs::schedule::SystemConfigs;
 use bevy::prelude::*;
 use esp_idf_hal::gpio::*;
 use esp_idf_hal::peripheral::Peripheral;
@@ -43,22 +44,20 @@ impl<'d, Trig: Pin + OutputPin, Echo: Pin + InputPin>
 	}
 
 	//TODO only update when sensor actions active
-	pub fn update_system(
-		&self,
-	) -> impl Fn(Local<SignalSmoother>, NonSendMut<Self>, Query<&mut DepthValue>)
-	{
-		move |mut smoother, mut sensor, mut query| {
-			for mut value in query.iter_mut() {
-				let new_depth = sensor.measure_or_max();
-				let smoothed = smoother.add_and_smooth(new_depth);
+	pub fn update_system(&self) -> SystemConfigs {
+		todo!("bevy 0.14");
+		// 	move |mut smoother, mut sensor, mut query| {
+		// 		for mut value in query.iter_mut() {
+		// 			let new_depth = sensor.measure_or_max();
+		// 			let smoothed = smoother.add_and_smooth(new_depth);
 
-				if value.set_if_neq(DepthValue(Some(smoothed))) {
-					log::info!(
-						"New depth: {:.2}",
-						smoothed
-					);
-				}
-			}
-		}
+		// 			if value.set_if_neq(DepthValue(Some(smoothed))) {
+		// 				log::info!(
+		// 					"New depth: {:.2}",
+		// 					smoothed
+		// 				);
+		// 			}
+		// 		}
+		// 	}
 	}
 }

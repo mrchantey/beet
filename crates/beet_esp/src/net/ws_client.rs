@@ -3,6 +3,7 @@ use crossbeam_channel::Receiver;
 use crossbeam_channel::Sender;
 use dotenv_codegen::dotenv;
 use embedded_svc::ws::FrameType;
+use esp_idf_hal::delay::FreeRtos;
 use esp_idf_hal::io::EspIOError;
 use esp_idf_svc::ws::client::EspWebSocketClient;
 use esp_idf_svc::ws::client::EspWebSocketClientConfig;
@@ -57,6 +58,13 @@ impl WsClient {
 			.into_iter()
 			.map(|msg| -> Result<()> { self.send(&msg) })
 			.collect::<Result<_>>()
+	}
+
+	pub fn run(mut self) -> anyhow::Result<!> {
+		loop {
+			self.update().unwrap();
+			FreeRtos::delay_ms(100);
+		}
 	}
 }
 
