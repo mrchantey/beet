@@ -142,6 +142,7 @@ pub struct Settings {
 	pub shared: SharedSettings,
 }
 
+
 pub fn build_server_netcode_config(
 	conditioner: Option<&Conditioner>,
 	shared: &SharedSettings,

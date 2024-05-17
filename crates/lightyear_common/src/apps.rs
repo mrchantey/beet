@@ -191,8 +191,9 @@ impl Apps {
 				Apps::server(config)
 			}
 			Cli::Client { client_id } => {
-				let config =
-					build_crossbeam_client_app(settings, send, recv, client_id);
+				let config = settings_to_client_config_crossbeam(
+					settings, send, recv, client_id,
+				);
 				Apps::client(config)
 			}
 		}
@@ -396,7 +397,21 @@ pub fn settings_to_server_config_crossbeam(
 	settings_to_server_config(settings, extra_transport_configs)
 }
 
-pub fn build_crossbeam_client_app(
+/// Build the client app with the `ClientPlugins` added.
+/// Takes in a `net_config` parameter so that we configure the network transport.
+fn settings_to_client_config(
+	settings: Settings,
+	net_config: client::NetConfig,
+) -> ClientConfig {
+	let client_config = client::ClientConfig {
+		shared: shared_config(Mode::Separate),
+		net: net_config,
+		..default()
+	};
+	client_config
+}
+
+pub fn settings_to_client_config_crossbeam(
 	settings: Settings,
 	to_server_send: Sender<Vec<u8>>,
 	from_server_recv: Receiver<Vec<u8>>,
@@ -418,19 +433,6 @@ pub fn build_crossbeam_client_app(
 }
 
 
-/// Build the client app with the `ClientPlugins` added.
-/// Takes in a `net_config` parameter so that we configure the network transport.
-fn settings_to_client_config(
-	settings: Settings,
-	net_config: client::NetConfig,
-) -> ClientConfig {
-	let client_config = client::ClientConfig {
-		shared: shared_config(Mode::Separate),
-		net: net_config,
-		..default()
-	};
-	client_config
-}
 
 /// Build the server app with the `ServerPlugins` added.
 #[cfg(not(target_family = "wasm"))]

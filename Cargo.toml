@@ -20,9 +20,10 @@ keywords.workspace = true
 categories.workspace = true
 
 [features]
-default = ["ml", "net", "animation", "assets", "ui"]
+default = ["ml", "net", "websocket", "animation", "assets", "ui"]
 ml = ["dep:beet_ml"]
 net = ["dep:beet_net"]
+websocket = ["dep:beet_net", "beet_net/websocket"]
 ui = ["beet_core/ui"]
 assets = ["beet_core/assets"]
 animation = ["beet_core/animation"]

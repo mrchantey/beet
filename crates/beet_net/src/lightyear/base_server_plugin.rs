@@ -4,9 +4,9 @@ use lightyear::prelude::server::*;
 use lightyear::prelude::*;
 
 // Plugin for server-specific logic
-pub struct ExampleServerPlugin;
+pub struct BaseServerPlugin;
 
-impl Plugin for ExampleServerPlugin {
+impl Plugin for BaseServerPlugin {
 	fn build(&self, app: &mut App) {
 		app.add_systems(Startup, init);
 		// Re-adding Replicate components to client-replicated entities must be done in this set for proper handling.

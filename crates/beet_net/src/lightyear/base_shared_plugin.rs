@@ -2,9 +2,9 @@ use crate::prelude::*;
 use bevy::prelude::*;
 
 #[derive(Clone)]
-pub struct SharedPlugin;
+pub struct BaseSharedPlugin;
 
-impl Plugin for SharedPlugin {
+impl Plugin for BaseSharedPlugin {
 	fn build(&self, app: &mut App) { app.add_plugins(ProtocolPlugin); }
 }
 

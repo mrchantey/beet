@@ -4,9 +4,9 @@ use lightyear::prelude::client::*;
 use lightyear::prelude::*;
 
 
-pub struct ExampleClientPlugin;
+pub struct BaseClientPlugin;
 
-impl Plugin for ExampleClientPlugin {
+impl Plugin for BaseClientPlugin {
 	fn build(&self, app: &mut App) {
 		app.add_systems(Startup, init);
 		app.add_systems(PreUpdate, handle_connection.after(MainSet::Receive));
@@ -23,7 +23,7 @@ impl Plugin for ExampleClientPlugin {
 				cursor_movement,
 				receive_message,
 				send_message,
-				spawn_player,
+				// spawn_player,
 				handle_predicted_spawn,
 				handle_interpolated_spawn,
 			),
@@ -107,39 +107,39 @@ fn player_movement(
 	}
 }
 
-/// Spawn a server-owned pre-predicted player entity when the space command is pressed
-fn spawn_player(
-	mut commands: Commands,
-	mut input_reader: EventReader<InputEvent<Inputs>>,
-	connection: Res<ClientConnection>,
-	players: Query<&PlayerId, With<PlayerPosition>>,
-) {
-	let client_id = connection.id();
+// /// Spawn a server-owned pre-predicted player entity when the space command is pressed
+// fn spawn_player(
+// 	mut commands: Commands,
+// 	mut input_reader: EventReader<InputEvent<Inputs>>,
+// 	connection: Res<ClientConnection>,
+// 	players: Query<&PlayerId, With<PlayerPosition>>,
+// ) {
+// 	let client_id = connection.id();
 
-	// do not spawn a new player if we already have one
-	for player_id in players.iter() {
-		if player_id.0 == client_id {
-			return;
-		}
-	}
-	for input in input_reader.read() {
-		if let Some(input) = input.input() {
-			match input {
-				Inputs::Spawn => {
-					debug!("got spawn input");
-					commands.spawn((
-						PlayerBundle::new(client_id, Vec2::ZERO),
-						// IMPORTANT: this lets the server know that the entity is pre-predicted
-						// when the server replicates this entity; we will get a Confirmed entity which will use this entity
-						// as the Predicted version
-						PrePredicted::default(),
-					));
-				}
-				_ => {}
-			}
-		}
-	}
-}
+// 	// do not spawn a new player if we already have one
+// 	for player_id in players.iter() {
+// 		if player_id.0 == client_id {
+// 			return;
+// 		}
+// 	}
+// 	for input in input_reader.read() {
+// 		if let Some(input) = input.input() {
+// 			match input {
+// 				Inputs::Spawn => {
+// 					debug!("got spawn input");
+// 					commands.spawn((
+// 						PlayerBundle::new(client_id, Vec2::ZERO),
+// 						// IMPORTANT: this lets the server know that the entity is pre-predicted
+// 						// when the server replicates this entity; we will get a Confirmed entity which will use this entity
+// 						// as the Predicted version
+// 						PrePredicted::default(),
+// 					));
+// 				}
+// 				_ => {}
+// 			}
+// 		}
+// 	}
+// }
 
 /// Delete the predicted player when the space command is pressed
 fn delete_player(

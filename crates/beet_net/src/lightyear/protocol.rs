@@ -27,7 +27,7 @@ pub(crate) struct PlayerBundle {
 }
 
 impl PlayerBundle {
-	pub(crate) fn new(id: ClientId, position: Vec2) -> Self {
+	pub fn new(id: ClientId, position: Vec2) -> Self {
 		Self {
 			id: PlayerId(id),
 			position: PlayerPosition(position),

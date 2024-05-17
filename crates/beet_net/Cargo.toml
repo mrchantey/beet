@@ -12,9 +12,15 @@ keywords.workspace = true
 categories.workspace = true
 
 [features]
-default = []
+default = ["websocket"]
 webtransport = ["lightyear/webtransport", "lightyear_common/webtransport"]
-websocket = ["lightyear/websocket", "lightyear_common/websocket"]
+# websocket = ["lightyear/websocket", "lightyear_common/websocket"]
+websocket = [
+	"lightyear/websocket",
+	"lightyear/webtransport",
+	"lightyear_common/websocket",
+	"lightyear_common/webtransport",
+]
 # tokio = ["dep:tokio"]
 
 [dependencies]
