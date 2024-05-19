@@ -13,7 +13,7 @@
 		// "**/.cargo/": true,
 		"**/mod.rs": true,
 		// "**/target/": true,
-		"**/sdkconfig.defaults": true,
+		// "**/sdkconfig.defaults": true,
 		"**/build.rs": true,
 		"docs/book/**": true,
 		// "crates/beet_esp": true,

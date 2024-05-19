@@ -16,9 +16,13 @@ monitor:
 run example *args:
 	cargo espflash flash \
 	--baud 921600 \
-	--monitor \
-	--port={{PORT}} \
+	--flash-size 16mb \
 	--partition-table partitions.csv \
+	--port={{PORT}} \
 	--example {{example}} \
+	--monitor \
 	--release \
 	{{args}}
+
+clean:
+	cargo clean && rm -rf .embuild && cargo b

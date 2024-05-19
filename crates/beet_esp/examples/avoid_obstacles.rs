@@ -7,6 +7,8 @@ pub fn main() -> anyhow::Result<()> {
 	let AppHardware {
 		hbridge,
 		ultrasound,
+		// modem,
+		// sys_loop,
 		..
 	} = AppHardware::new()?;
 
@@ -20,6 +22,13 @@ pub fn main() -> anyhow::Result<()> {
 		.add_systems(PostUpdate, hbridge.update_system())
 		.insert_non_send_resource(hbridge)
 	/*-*/;
+
+
+	// let mut wifi = WifiClient::new(modem,sys_loop)?;
+	// esp_idf_hal::task::block_on(wifi.connect())?;
+	// let ws = WsClient::new()?;
+	// app.insert_non_send_resource(wifi)
+	// 	.insert_non_send_resource(ws);
 
 
 	run_app_with_delay(&mut app);

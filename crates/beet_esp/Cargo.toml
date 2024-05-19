@@ -13,9 +13,10 @@ debug = true    # Symbols are nice and they don't increase the size on Flash
 opt-level = "z"
 
 [features]
-default = ["std", "embassy", "esp-idf-svc/native", "beet_net"]
+default = ["std", "embassy", "esp-idf-svc/native", "net"]
 beet = ["dep:beet"]
-beet_net = ["dep:beet_net"]
+# net = ["dep:bevy_replicon"]
+net = ["dep:beet_net", "dep:bevy_replicon"]
 
 
 std = ["alloc", "esp-idf-svc/binstart", "esp-idf-svc/std"]
@@ -29,13 +30,16 @@ embassy = [
 ]
 
 [dependencies]
+# version = "0.25",
+bevy_replicon = { path = "../../../../me-ref/bevy_replicon", optional = true, default-features = false }
 beet = { path = "../../", optional = true, default-features = false }
 beet_net = { path = "../beet_net", optional = true, default-features = false, features = [
+	"bevy_replicon",
 ] }
 # forky_core = "0.1.46"
 forky_core = { path = "../../../forky/crates/forky/forky_core" }
 
-bevy = { version = "0.13", default-features = false, features = ["bevy_scene"] }
+bevy = { version = "0.13", default-features = false }
 # bevy = { git = "https://github.com/bevyengine/bevy.git", rev = "f516de456be2b65572de1af6956d52157663b9cc", default-features = false, features = [
 # 	"bevy_scene",
 # ] }

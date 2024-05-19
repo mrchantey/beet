@@ -1,3 +1,4 @@
+# https://docs.espressif.com/projects/esp-idf/en/stable/esp32s3/api-reference/kconfig.html
 # Rust often needs a bit of an extra main task stack size compared to C (the default is 3K)
 # CONFIG_ESP_MAIN_TASK_STACK_SIZE=8000
 
@@ -12,10 +13,6 @@ CONFIG_SPIRAM_TYPE_AUTO=y
 CONFIG_SPIRAM_MODE_OCT=y # required for esp32-s3 N16R8
 CONFIG_SPIRAM_USE_MALLOC=y
 # CONFIG_SPIRAM_MEMTEST=y
-
-
-# CONFIG_ESPTOOLPY_FLASHMODE_QIO=y
-
 
 # Use this to set FreeRTOS kernel tick frequency to 1000 Hz (100 Hz by default).
 # This allows to use 1 ms granuality for thread sleeps (10 ms by default).

@@ -88,9 +88,7 @@ pub fn reset_reason() -> esp_reset_reason_t { unsafe { esp_reset_reason() } }
 // }
 #[allow(unreachable_code)]
 pub fn restart() -> ! {
-	unsafe {
-		esp_restart();
-	}
+	unsafe { esp_restart() }
 	//...actually never reached
 	// sleep_forever();
 }

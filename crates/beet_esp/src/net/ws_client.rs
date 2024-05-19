@@ -1,9 +1,9 @@
 use anyhow::Result;
 use crossbeam_channel::Receiver;
 use crossbeam_channel::Sender;
+use crossbeam_channel::TryRecvError;
 use dotenv_codegen::dotenv;
 use embedded_svc::ws::FrameType;
-use esp_idf_hal::delay::FreeRtos;
 use esp_idf_hal::io::EspIOError;
 use esp_idf_svc::ws::client::EspWebSocketClient;
 use esp_idf_svc::ws::client::EspWebSocketClientConfig;
@@ -18,13 +18,18 @@ use std::time::Duration;
 
 pub struct WsClient {
 	pub ws: EspWebSocketClient<'static>,
-	pub recv: Receiver<Vec<u8>>,
+	// pub outgoing_send: Sender<Vec<u8>>,
+	// pub incoming_send: Sender<Vec<u8>>,
+	incoming_recv: Receiver<Vec<u8>>,
+	// outgoing_recv: Receiver<Vec<u8>>,
 }
 
 impl WsClient {
-	pub fn new(
-		mut send: Sender<Vec<u8>>,
-		recv: Receiver<Vec<u8>>,
+	pub fn new_with_channels(
+		mut incoming_send: Sender<Vec<u8>>,
+		incoming_recv: Receiver<Vec<u8>>,
+		// outgoing_send: Sender<Vec<u8>>,
+		// outgoing_recv: Receiver<Vec<u8>>,
 	) -> anyhow::Result<Self> {
 		let timeout = Duration::from_secs(10);
 		let config = EspWebSocketClientConfig {
@@ -36,14 +41,21 @@ impl WsClient {
 		};
 
 		let url = dotenv!("WS_URL");
-		let timeout = Duration::from_secs(10);
 
+		// let mut incoming_send2 = incoming_send.clone();
 		let ws =
 			EspWebSocketClient::new(&url, &config, timeout, move |event| {
-				parse(event, &mut send).ok_or(|e| log::error!("{e}"));
+				parse(event, &mut incoming_send).ok_or(|e| log::error!("{e}"));
 			})?;
 
-		Ok(Self { ws, recv })
+		Ok(Self { ws, incoming_recv })
+	}
+
+	pub fn is_connected(&self) -> bool { self.ws.is_connected() }
+
+	pub fn new() -> anyhow::Result<Self> {
+		let (incoming_send, incoming_recv) = crossbeam_channel::unbounded();
+		Self::new_with_channels(incoming_send, incoming_recv)
 	}
 
 	pub fn send(&mut self, bytes: &[u8]) -> anyhow::Result<()> {
@@ -51,20 +63,8 @@ impl WsClient {
 		Ok(())
 	}
 
-	pub fn update(&mut self) -> anyhow::Result<()> {
-		self.recv
-			.try_iter()
-			.collect::<Vec<_>>()
-			.into_iter()
-			.map(|msg| -> Result<()> { self.send(&msg) })
-			.collect::<Result<_>>()
-	}
-
-	pub fn run(mut self) -> anyhow::Result<!> {
-		loop {
-			self.update().unwrap();
-			FreeRtos::delay_ms(100);
-		}
+	pub fn try_recv(&self) -> Result<Vec<u8>, TryRecvError> {
+		self.incoming_recv.try_recv()
 	}
 }
 

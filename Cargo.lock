@@ -644,8 +644,16 @@ dependencies = [
 name = "beet_net"
 version = "0.0.1"
 dependencies = [
+ "anyhow",
+ "beet_ecs",
+ "bevy",
+ "bincode",
+ "flume",
+ "forky_core",
+ "log",
  "pretty_env_logger",
  "rand",
+ "serde",
  "sweet",
 ]
 
