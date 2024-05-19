@@ -14,6 +14,8 @@ doc:
 serve-doc:
 	cd ./target/doc/beet && forky serve
 
+test-all *args:
+	just watch 'cargo test --workspace --lib -- {{args}}'
 
 test-core *args:
 	just watch 'cargo test -p beet_core --lib -- {{args}}'

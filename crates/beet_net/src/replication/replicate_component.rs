@@ -235,14 +235,6 @@ mod test {
 			ReplicatePlugin,
 			ReplicateComponentPlugin::<MyComponent>::default(),
 		));
-
-		let entity1 = app1
-			.world_mut()
-			.spawn((Replicate::default(), MyComponent(7)))
-			.id();
-
-		app1.update();
-
 		let mut app2 = App::new();
 
 		app2.add_plugins((
@@ -250,10 +242,15 @@ mod test {
 			ReplicateComponentPlugin::<MyComponent>::default(),
 		));
 
+
+		// INSERT
+		let entity1 = app1
+			.world_mut()
+			.spawn((Replicate::default(), MyComponent(7)))
+			.id();
+		app1.update();
 		Message::loopback(app1.world_mut(), app2.world_mut());
-
 		app2.update();
-
 		expect(
 			app2.world_mut()
 				.query::<&MyComponent>()
@@ -263,32 +260,11 @@ mod test {
 		.as_some()?
 		.to_be(&MyComponent(7))?;
 
-		app1.world_mut()
-			.entity_mut(entity1)
-			.get_mut::<MyComponent>()
-			.unwrap()
-			.0 = 8;
-
+		// CHANGE
+		app1.world_mut().entity_mut(entity1).insert(MyComponent(8));
 		app1.update();
-
-
 		Message::loopback(app1.world_mut(), app2.world_mut());
-
-		// let events = app2
-		// 	.world_mut()
-		// 	.run_system_once(collect_events::<MessageOutgoing>);
-		// expect(events.len()).to_be(3)?;
-		// expect(&events[2]).to_be(
-		// 	&Message::Change {
-		// 		entity: entity1,
-		// 		reg_id: RegistrationId::new_with(0),
-		// 		bytes: vec![8, 0, 0, 0],
-		// 	}
-		// 	.into(),
-		// )?;
-
 		app2.update();
-
 		expect(
 			app2.world_mut()
 				.query::<&MyComponent>()
@@ -298,6 +274,18 @@ mod test {
 		.as_some()?
 		.to_be(&MyComponent(8))?;
 
+		// REMOVE
+		app1.world_mut().entity_mut(entity1).remove::<MyComponent>();
+		app1.update();
+		Message::loopback(app1.world_mut(), app2.world_mut());
+		app2.update();
+		expect(
+			app2.world_mut()
+				.query::<&MyComponent>()
+				.iter(app2.world())
+				.next(),
+		)
+		.to_be_none()?;
 
 		Ok(())
 	}

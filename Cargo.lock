@@ -648,6 +648,7 @@ dependencies = [
  "beet_ecs",
  "bevy",
  "bincode",
+ "extend",
  "flume",
  "forky_core",
  "log",

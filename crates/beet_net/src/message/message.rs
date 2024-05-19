@@ -62,6 +62,14 @@ impl Message {
 			incoming.send_event(MessageIncoming(event.0.clone()));
 		}
 	}
+
+	pub fn from_bytes(bytes: &[u8]) -> Result<Vec<Message>, bincode::Error> {
+		bincode::deserialize::<Vec<Message>>(bytes)
+	}
+
+	pub fn into_bytes(items: Vec<&Message>) -> Result<Vec<u8>, bincode::Error> {
+		bincode::serialize(&items)
+	}
 }
 
 

@@ -1,3 +1,4 @@
 /target/
 docs/book
 crates/beet_web/assets/scenes
+out.txt
