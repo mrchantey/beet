@@ -1,3 +1,10 @@
 # `beet_net`
 
-Integration of beet with networking libaries.
+
+This is a minimalist replication library that can run on microcontrollers.
+
+
+
+## References
+
+- [bevy_replicon](https://docs.rs/bevy_replicon/latest/bevy_replicon/)

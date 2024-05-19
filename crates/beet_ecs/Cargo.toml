@@ -11,6 +11,12 @@ license.workspace = true
 keywords.workspace = true
 categories.workspace = true
 
+
+[features]
+default = []
+# default = ["reflect"]
+reflect = []
+
 [dependencies]
 beet_ecs_macros.workspace = true
 

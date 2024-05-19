@@ -1,6 +1,5 @@
 use crate::prelude::*;
 use bevy::ecs::schedule::ScheduleLabel;
-// use bevy::ecs::schedule::SystemConfigs;
 use bevy::prelude::*;
 use bevy::utils::intern::Interned;
 use std::marker::PhantomData;
@@ -41,23 +40,26 @@ impl<T: 'static + Send + Sync + Bundle + ActionSystems> Default
 }
 
 #[cfg(feature = "reflect")]
-impl<T: 'static + Send + Sync + Bundle + Reflect + ActionSystems> Plugin
-	for ActionPlugin<T>
-where
-	Self: ActionMeta,
+impl<
+		T: 'static
+			+ Send
+			+ Sync
+			+ Bundle
+			+ Reflect
+			+ bevy::reflect::GetTypeRegistration
+			+ ActionSystems,
+	> Plugin for ActionPlugin<T>
+// where
+// 	Self: ActionMeta,
 {
 	fn build(&self, app: &mut App) {
-		// app.init_resource::<AppTypeRegistry>();
+		app.init_resource::<AppTypeRegistry>();
 		let mut registry =
 			app.world_mut().resource::<AppTypeRegistry>().write();
 		registry.register::<T>();
 
-		let world = app.world_mut();
-		world.init_component::<T>();
-
-		app.init_resource::<BeetConfig>();
-		let settings = app.world().resource::<BeetConfig>();
-		app.add_systems(settings.schedule, T::system());
+		drop(registry);
+		build_common::<T>(app);
 	}
 }
 
@@ -65,12 +67,16 @@ where
 impl<T: 'static + Send + Sync + Bundle + ActionSystems> Plugin
 	for ActionPlugin<T>
 {
-	fn build(&self, app: &mut App) {
-		let world = app.world_mut();
-		world.init_bundle::<T>();
+	fn build(&self, app: &mut App) { build_common::<T>(app); }
+}
 
-		app.init_resource::<BeetConfig>();
-		let settings = app.world().resource::<BeetConfig>();
-		app.add_systems(settings.schedule, T::systems());
-	}
+fn build_common<T: 'static + Send + Sync + Bundle + ActionSystems>(
+	app: &mut App,
+) {
+	let world = app.world_mut();
+	world.init_bundle::<T>();
+
+	app.init_resource::<BeetConfig>();
+	let settings = app.world().resource::<BeetConfig>();
+	app.add_systems(settings.schedule, T::systems());
 }

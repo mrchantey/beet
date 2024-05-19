@@ -66,6 +66,8 @@ mod test {
 	#[test]
 	pub fn works() -> Result<()> {
 		let mut app = App::new();
+
+
 		app.add_plugins((
 			LifecycleSystemsPlugin,
 			ActionPlugin::<(FallbackSelector, InsertOnRun<RunResult>)>::default(
