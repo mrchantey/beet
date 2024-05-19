@@ -1,7 +1,7 @@
 # `beet_net`
 
 
-This is a minimalist replication library that can run on microcontrollers.
+This is a woefully naive but very tiny replication library that can run on microcontrollers.
 
 
 

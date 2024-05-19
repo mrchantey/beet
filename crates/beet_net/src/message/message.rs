@@ -1,5 +1,4 @@
 use crate::prelude::RegistrationId;
-use bevy::ecs::component::ComponentId;
 use bevy::prelude::*;
 use serde::Deserialize;
 use serde::Serialize;
@@ -54,12 +53,24 @@ pub enum Message {
 	// },
 }
 
-
-#[derive(Debug, Copy, Clone, Serialize, Deserialize)]
-pub struct SerdeComponentId(pub usize);
-impl Into<ComponentId> for SerdeComponentId {
-	fn into(self) -> ComponentId { ComponentId::new(self.0) }
+impl Message {
+	pub fn loopback(outgoing: &mut World, incoming: &mut World) {
+		for event in outgoing
+			.resource::<Events<MessageOutgoing>>()
+			.iter_current_update_events()
+		{
+			incoming.send_event(MessageIncoming(event.0.clone()));
+		}
+	}
 }
-impl From<ComponentId> for SerdeComponentId {
-	fn from(component_id: ComponentId) -> Self { Self(component_id.index()) }
+
+
+#[extend::ext]
+pub impl World {
+	#[cfg(test)]
+	fn events<T: Event>(&self) -> Vec<&T> {
+		self.resource::<Events<T>>()
+			.iter_current_update_events()
+			.collect()
+	}
 }

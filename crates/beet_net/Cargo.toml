@@ -28,7 +28,7 @@ forky_core.workspace = true
 serde.workspace = true
 flume.workspace = true
 anyhow.workspace = true
-# extend.workspace = true
+extend.workspace = true
 # futures.workspace = true
 # parking_lot.workspace = true
 
