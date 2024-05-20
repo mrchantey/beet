@@ -67,8 +67,8 @@ impl Message {
 		bincode::deserialize::<Vec<Message>>(bytes)
 	}
 
-	pub fn into_bytes(items: Vec<&Message>) -> Result<Vec<u8>, bincode::Error> {
-		bincode::serialize(&items)
+	pub fn into_bytes(items: &Vec<Message>) -> Result<Vec<u8>, bincode::Error> {
+		bincode::serialize(items)
 	}
 }
 

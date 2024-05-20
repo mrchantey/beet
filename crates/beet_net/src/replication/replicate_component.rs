@@ -250,6 +250,10 @@ mod test {
 			.id();
 		app1.update();
 		Message::loopback(app1.world_mut(), app2.world_mut());
+
+		let events = app2.world_mut().events::<MessageIncoming>();
+		expect(events.len()).to_be(2)?;
+
 		app2.update();
 		expect(
 			app2.world_mut()
