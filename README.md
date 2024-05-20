@@ -26,9 +26,19 @@
 ```rust
 use bevy::prelude::*;
 use beet::prelude::*;
+
 fn main(){
-  App::new().world_mut().spawn((
+
+  let mut app = App::new();
+
+  app.add_plugins((
+    DefaultPlugins,
+    DefaultBeetPlugins
+  ));
+
+  app.world_mut().spawn((
       Running,
+      Repeat,
       SequenceSelector::default(), 
     ))
     .with_children(|parent| {
@@ -41,6 +51,9 @@ fn main(){
         InsertOnRun(RunResult::Success),
       ));
     });
+
+  app.run();
+
 }
 ```
 
