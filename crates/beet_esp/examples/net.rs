@@ -1,7 +1,12 @@
 use beet_esp::prelude::*;
-use bevy::log::LogPlugin;
+use beet_net::prelude::*;
 use bevy::prelude::*;
 use esp_idf_hal::delay::FreeRtos;
+use serde::Deserialize;
+use serde::Serialize;
+
+#[derive(Debug, Default, Component, Serialize, Deserialize)]
+struct MyComponent(pub i32);
 
 fn main() -> anyhow::Result<()> {
 	init_esp()?;
@@ -15,11 +20,14 @@ fn main() -> anyhow::Result<()> {
 	let mut app = App::new();
 
 	app.insert_non_send_resource(wifi)
-		.insert_non_send_resource(ws)
+		// .insert_non_send_resource(ws)
 		.add_plugins((
-			DefaultPlugins.build().disable::<LogPlugin>(),
-			RepliconEspClientPlugin,
+			MinimalPlugins,
+			ReplicatePlugin,
+			ReplicateComponentPlugin::<MyComponent>::default(),
+			TransportPlugin::arc(ws),
 		))
+		.add_systems(Update, update)
 		.finish();
 
 	loop {
@@ -30,4 +38,9 @@ fn main() -> anyhow::Result<()> {
 	}
 
 	// Ok(())
+}
+fn update(query: Query<(Entity, &MyComponent), Added<MyComponent>>) {
+	for (_entity, comp) in query.iter() {
+		log::info!("SUCCESS - {:?}", comp);
+	}
 }

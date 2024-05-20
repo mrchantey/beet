@@ -15,9 +15,7 @@ opt-level = "z"
 [features]
 default = ["std", "embassy", "esp-idf-svc/native", "net"]
 beet = ["dep:beet"]
-# net = ["dep:bevy_replicon"]
-net = ["dep:beet_net", "dep:bevy_replicon"]
-
+net = ["dep:beet_net"]
 
 std = ["alloc", "esp-idf-svc/binstart", "esp-idf-svc/std"]
 alloc = ["esp-idf-svc/alloc"]
@@ -31,23 +29,21 @@ embassy = [
 
 [dependencies]
 # version = "0.25",
-bevy_replicon = { path = "../../../../me-ref/bevy_replicon", optional = true, default-features = false }
 beet = { path = "../../", optional = true, default-features = false }
 beet_net = { path = "../beet_net", optional = true, default-features = false, features = [
-	"bevy_replicon",
 ] }
 # forky_core = "0.1.46"
 forky_core = { path = "../../../forky/crates/forky/forky_core" }
 
-bevy = { version = "0.13", default-features = false }
-# bevy = { git = "https://github.com/bevyengine/bevy.git", rev = "f516de456be2b65572de1af6956d52157663b9cc", default-features = false, features = [
-# 	"bevy_scene",
-# ] }
+bevy = { git = "https://github.com/bevyengine/bevy.git", rev = "f516de456be2b65572de1af6956d52157663b9cc", default-features = false, features = [
+	# "bevy_scene",
+] }
 
 anyhow = "1.0.75"
 log = { version = "0.4", default-features = false }
 
-crossbeam-channel = "0.5"
+flume = "0.11"
+# crossbeam-channel = "0.5"
 
 embedded-svc = "0.27"
 embedded-hal = "1.0.0"
@@ -72,6 +68,15 @@ remote_component = { name = "espressif/esp_websocket_client", version = "1.1.0" 
 
 
 [[example]]
+name = "avoid_obstacles"
+path = "examples/avoid_obstacles.rs"
+required-features = ["beet"]
+
+[[example]]
+name = "blinky_rgb"
+path = "examples/blinky_rgb.rs"
+required-features = ["beet"]
+[[example]]
 name = "depth_sensor"
 path = "examples/depth_sensor.rs"
 required-features = ["beet"]
@@ -87,11 +92,11 @@ path = "examples/motors.rs"
 required-features = ["beet"]
 
 [[example]]
-name = "avoid_obstacles"
-path = "examples/avoid_obstacles.rs"
-required-features = ["beet"]
+name = "net"
+path = "examples/net.rs"
+required-features = ["net"]
 
 [[example]]
-name = "blinky_rgb"
-path = "examples/blinky_rgb.rs"
-required-features = ["beet"]
+name = "wifi"
+path = "examples/wifi.rs"
+required-features = ["net"]

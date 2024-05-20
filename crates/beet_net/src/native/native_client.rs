@@ -62,30 +62,6 @@ impl NativeWsClient {
 			recv: recv_recv,
 		})
 	}
-
-
-	pub async fn send(&mut self, messages: &Vec<Message>) -> Result<()> {
-		self.send_bytes(Message::into_bytes(messages)?).await
-	}
-
-	pub fn recv(&mut self) -> Result<Vec<Message>> {
-		let bytes = self
-			.recv
-			.try_recv_all()?
-			.into_iter()
-			.flatten()
-			.collect::<Vec<_>>();
-
-		if bytes.is_empty() {
-			return Ok(Vec::new());
-		}
-
-
-		// log::info!("received bytes: {:?}", bytes);
-		let messages = Message::from_bytes(&bytes)?;
-		log::info!("received messages: {:?}", messages);
-		Ok(messages)
-	}
 }
 
 impl Drop for NativeWsClient {

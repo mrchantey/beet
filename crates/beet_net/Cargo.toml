@@ -53,7 +53,10 @@ tokio-tungstenite = { workspace = true, optional = true }
 futures-util = { workspace = true, optional = true }
 
 # bevy = { version = "0.13", default-features = false }
-bevy = { workspace = true, default-features = false, features = [] }
+# bevy = { workspace = true, default-features = false, features = [] }
+bevy = { git = "https://github.com/bevyengine/bevy.git", rev = "f516de456be2b65572de1af6956d52157663b9cc", default-features = false, features = [
+	# "bevy_scene",
+] }
 
 
 # tokio = { workspace = true, optional = true }

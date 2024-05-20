@@ -8,7 +8,7 @@
 		"**/Thumbs.db": true,
 		"rust-toolchain.toml": true,
 		"components_esp32s3.lock": true,
-		// "Cargo.lock": true,
+		"Cargo.lock": true,
 		"build.rs": true,
 		"**/mod.rs": true,
 	},

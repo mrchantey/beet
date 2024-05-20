@@ -9,6 +9,8 @@ pub trait Transport {
 	#[allow(async_fn_in_trait)]
 	async fn send_bytes(&mut self, bytes: Vec<u8>)
 		-> Result<(), anyhow::Error>;
+	fn recv_bytes(&mut self) -> Result<Vec<Vec<u8>>, anyhow::Error>;
+
 
 	#[allow(async_fn_in_trait)]
 	async fn send(
@@ -19,7 +21,6 @@ pub trait Transport {
 	}
 
 
-	fn recv_bytes(&mut self) -> Result<Vec<Vec<u8>>, anyhow::Error>;
 	fn recv(&mut self) -> Result<Vec<Message>, anyhow::Error> {
 		let messages = self
 			.recv_bytes()?
@@ -85,5 +86,20 @@ impl Transport for ChannelsTransport {
 
 	fn recv_bytes(&mut self) -> Result<Vec<Vec<u8>>, anyhow::Error> {
 		self.recv.try_recv_all()
+	}
+}
+
+
+#[cfg(test)]
+mod test {
+	use crate::prelude::*;
+	use anyhow::Result;
+	use sweet::*;
+
+	#[test]
+	fn works() -> Result<()> {
+		// expect(true).to_be_false()?;
+
+		Ok(())
 	}
 }

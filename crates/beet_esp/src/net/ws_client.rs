@@ -1,7 +1,6 @@
 use anyhow::Result;
-use crossbeam_channel::Receiver;
-use crossbeam_channel::Sender;
-use crossbeam_channel::TryRecvError;
+use beet_net::extensions::FlumeReceiverExt;
+use beet_net::networking::Transport;
 use dotenv_codegen::dotenv;
 use embedded_svc::ws::FrameType;
 use esp_idf_hal::io::EspIOError;
@@ -9,6 +8,8 @@ use esp_idf_svc::ws::client::EspWebSocketClient;
 use esp_idf_svc::ws::client::EspWebSocketClientConfig;
 use esp_idf_svc::ws::client::WebSocketEvent;
 use esp_idf_svc::ws::client::WebSocketEventType;
+use flume::Receiver;
+use flume::Sender;
 use forky_core::ResultTEExt;
 use std::time::Duration;
 
@@ -25,6 +26,11 @@ pub struct WsClient {
 }
 
 impl WsClient {
+	pub fn new() -> anyhow::Result<Self> {
+		let (incoming_send, incoming_recv) = flume::unbounded();
+		Self::new_with_channels(incoming_send, incoming_recv)
+	}
+
 	pub fn new_with_channels(
 		mut incoming_send: Sender<Vec<u8>>,
 		incoming_recv: Receiver<Vec<u8>>,
@@ -37,6 +43,7 @@ impl WsClient {
 			reconnect_timeout_ms: timeout, //default 10s
 			network_timeout_ms: timeout,   //default 10s
 			task_stack: 5_000, // 10_000 - not enough heap, default - stack overflow
+			
 			..Default::default()
 		};
 
@@ -52,20 +59,6 @@ impl WsClient {
 	}
 
 	pub fn is_connected(&self) -> bool { self.ws.is_connected() }
-
-	pub fn new() -> anyhow::Result<Self> {
-		let (incoming_send, incoming_recv) = crossbeam_channel::unbounded();
-		Self::new_with_channels(incoming_send, incoming_recv)
-	}
-
-	pub fn send(&mut self, bytes: &[u8]) -> anyhow::Result<()> {
-		self.ws.send(FrameType::Binary(false), bytes)?;
-		Ok(())
-	}
-
-	pub fn try_recv(&self) -> Result<Vec<u8>, TryRecvError> {
-		self.incoming_recv.try_recv()
-	}
 }
 
 impl Drop for WsClient {
@@ -93,4 +86,16 @@ fn parse(
 		Err(err) => anyhow::bail!("{err:?}"),
 	}
 	Ok(())
+}
+
+
+impl Transport for WsClient {
+	async fn send_bytes(&mut self, bytes: Vec<u8>) -> Result<()> {
+		self.ws.send(FrameType::Binary(false), &bytes)?;
+		Ok(())
+	}
+
+	fn recv_bytes(&mut self) -> Result<Vec<Vec<u8>>> {
+		self.incoming_recv.try_recv_all()
+	}
 }

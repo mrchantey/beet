@@ -26,7 +26,7 @@ pub fn run_app_with_delay(app: &mut App) -> ! {
 	let duration = Duration::from_millis(16);
 	loop {
 		app.update();
-		let time = app.world.resource::<Time>();
+		let time = app.world().resource::<Time>();
 		// let time = app.world().resource::<Time>();
 		let delay_time = duration
 			.checked_sub(time.delta())
