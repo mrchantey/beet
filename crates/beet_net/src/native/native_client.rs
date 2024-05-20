@@ -29,6 +29,7 @@ pub struct NativeWsClient {
 // 	}
 // }
 
+
 impl NativeWsClient {
 	pub async fn new(url: &str) -> Result<Self> {
 		let (ws_stream, _response) = connect_async(url).await?;
@@ -67,11 +68,6 @@ impl NativeWsClient {
 		self.send_bytes(Message::into_bytes(messages)?).await
 	}
 
-	pub async fn send_bytes(&mut self, bytes: Vec<u8>) -> Result<()> {
-		self.send.send(TungMessage::Binary(bytes)).await?;
-		Ok(())
-	}
-
 	pub fn recv(&mut self) -> Result<Vec<Message>> {
 		let bytes = self
 			.recv
@@ -94,4 +90,16 @@ impl NativeWsClient {
 
 impl Drop for NativeWsClient {
 	fn drop(&mut self) { self.recv_task.abort(); }
+}
+
+impl Transport for NativeWsClient {
+	async fn send_bytes(&mut self, bytes: Vec<u8>) -> Result<()> {
+		self.send.send(TungMessage::Binary(bytes)).await?;
+		Ok(())
+	}
+
+	fn recv_bytes(&mut self) -> Result<Vec<Vec<u8>>> {
+		let bytes = self.recv.try_recv_all()?;
+		Ok(bytes)
+	}
 }
