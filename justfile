@@ -121,11 +121,6 @@ test crate *args:
 test-w crate *args:
 	just watch 'cargo run -p {{crate}} --example test_{{crate}} -- -w {{args}}'
 
-test-all:
-	cargo test -p beet_ecs --lib
-	cargo test -p beet_core --lib
-	cargo test -p beet_net --lib
-
 test-ci *args:
 	cargo run -p beet_core --example test_beet_core -- {{args}}
 	cargo run -p beet_ecs  --example test_beet_ecs  -- {{args}}

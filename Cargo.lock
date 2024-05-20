@@ -651,6 +651,7 @@ dependencies = [
  "extend",
  "flume",
  "forky_core",
+ "futures-util",
  "log",
  "pretty_env_logger",
  "rand",
@@ -658,10 +659,12 @@ dependencies = [
  "strum",
  "strum_macros",
  "sweet",
+ "tokio",
+ "tokio-tungstenite",
 ]
 
 [[package]]
-name = "beet_net_axum"
+name = "beet_server"
 version = "0.0.1"
 dependencies = [
  "anyhow",

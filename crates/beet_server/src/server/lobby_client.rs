@@ -1,4 +1,4 @@
-use crate::prelude::*;
+use super::*;
 use anyhow::Result;
 use axum::extract::ws;
 use forky_core::prelude::*;
@@ -11,12 +11,13 @@ pub type AxumWsEvent = axum::extract::ws::Message;
 
 pub struct LobbyClient {
 	send: SplitSink<ws::WebSocket, ws::Message>,
-	recv_task: tokio::task::JoinHandle<Result<()>>,
+	#[allow(dead_code)]
+	recv_task: tokio::task::JoinHandle<()>,
 }
 
 impl LobbyClient {
 	pub fn new(lobby: Lobby, client: Client, client_id: ClientId) -> Self {
-		let (mut send, mut recv) = client.socket.split();
+		let (send, mut recv) = client.socket.split();
 		let recv_task = tokio::spawn(async move {
 			while let Some(Ok(msg)) = recv.next().await {
 				if let Some(msg) =
@@ -24,6 +25,7 @@ impl LobbyClient {
 				{
 					lobby
 						.write()
+						.await
 						.handle_message(client_id, msg)
 						.await
 						.ok_or(|e| log::error!("{e}"));
@@ -45,6 +47,11 @@ impl LobbyClient {
 		Ok(())
 	}
 }
+
+impl Drop for LobbyClient {
+	fn drop(&mut self) { self.recv_task.abort(); }
+}
+
 fn filter_payload(msg: AxumWsEvent) -> Result<Option<Vec<u8>>> {
 	match msg {
 		// AxumWsEvent::Text(txt) => Ok(Some(Message::from_string(&txt)?)),

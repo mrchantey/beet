@@ -10,8 +10,6 @@
 //! websocket server and how the client-side and server-side code can be quite similar.
 //!
 
-mod lobby_map;
-
 use futures_util::stream::FuturesUnordered;
 use futures_util::SinkExt;
 use futures_util::StreamExt;

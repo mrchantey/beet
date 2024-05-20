@@ -1,12 +1,11 @@
 use axum::extract::connect_info::ConnectInfo;
 use axum::extract::ws;
 use axum_extra::TypedHeader;
-use forky_core::prelude::*;
 use std::net::SocketAddr;
 
 pub struct Client {
 	pub socket: ws::WebSocket,
-	pub user_agent: Option<TypedHeader<headers::UserAgent>>,
+	pub user_agent: String,
 	pub connect_info: ConnectInfo<SocketAddr>,
 }
 

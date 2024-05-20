@@ -82,7 +82,7 @@ members = [
 	"crates/beet_ecs/macros",
 	"crates/beet_ml",
 	"crates/beet_net",
-	"crates/beet_net_axum",
+	"crates/beet_server",
 	"crates/beet_web",
 	# "crates/cli",
 ]
@@ -96,7 +96,7 @@ beet_ecs = { path = "crates/beet_ecs", version = "0.0.1" }
 beet_ecs_macros = { path = "crates/beet_ecs/macros", version = "0.0.1" }
 beet_ml = { path = "crates/beet_ml", version = "0.0.1" }
 beet_net = { path = "crates/beet_net", version = "0.0.1" }
-beet_net_axum = { path = "crates/beet_net_axum", version = "0.0.1" }
+beet_server = { path = "crates/beet_server", version = "0.0.1" }
 beet_examples = { path = "examples", version = "0.0.1" }
 
 ## local
