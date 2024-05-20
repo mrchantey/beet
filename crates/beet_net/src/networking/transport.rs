@@ -94,11 +94,21 @@ impl Transport for ChannelsTransport {
 mod test {
 	use crate::prelude::*;
 	use anyhow::Result;
+	use bevy::prelude::*;
 	use sweet::*;
 
-	#[test]
-	fn works() -> Result<()> {
-		// expect(true).to_be_false()?;
+	#[tokio::test]
+	async fn works() -> Result<()> {
+		let (mut a, mut b) = ChannelsTransport::pair();
+
+		a.send(&vec![Message::Spawn {
+			entity: Entity::PLACEHOLDER,
+		}])
+		.await?;
+
+		expect(b.recv()?).to_be(vec![Message::Spawn {
+			entity: Entity::PLACEHOLDER,
+		}])?;
 
 		Ok(())
 	}
