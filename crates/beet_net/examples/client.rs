@@ -47,7 +47,7 @@ fn start(mut commands: Commands) {
 
 fn update(query: Query<(Entity, &MyComponent), Added<MyComponent>>) {
 	// log::info!("update");
-	for entity in query.iter() {
-		println!("{:?}", entity);
+	for (_entity, comp) in query.iter() {
+		log::info!("SUCCESS - {:?}", comp);
 	}
 }

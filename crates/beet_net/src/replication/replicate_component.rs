@@ -40,7 +40,7 @@ pub struct ComponentFns {
 
 fn outgoing_insert<T: Component + Serialize>(
 	registrations: Res<Registrations>,
-	mut outgoing: EventWriter<MessageOutgoing>,
+	mut outgoing: ResMut<MessageOutgoing>,
 	query: Query<(Entity, &T), (Added<T>, With<Replicate>)>,
 ) {
 	for (entity, component) in query.iter() {
@@ -49,7 +49,7 @@ fn outgoing_insert<T: Component + Serialize>(
 		else {
 			continue;
 		};
-		outgoing.send(
+		outgoing.push(
 			Message::Insert {
 				entity,
 				reg_id: registrations.registration_id::<T>(),
@@ -62,7 +62,7 @@ fn outgoing_insert<T: Component + Serialize>(
 
 fn outgoing_change<T: Component + Serialize>(
 	registrations: Res<Registrations>,
-	mut outgoing: EventWriter<MessageOutgoing>,
+	mut outgoing: ResMut<MessageOutgoing>,
 	query: Query<(Entity, Ref<T>), (Changed<T>, With<Replicate>)>,
 ) {
 	for (entity, component) in query.iter() {
@@ -75,7 +75,7 @@ fn outgoing_change<T: Component + Serialize>(
 			continue;
 		};
 
-		outgoing.send(
+		outgoing.push(
 			Message::Change {
 				entity,
 				reg_id: registrations.registration_id::<T>(),
@@ -89,13 +89,13 @@ fn outgoing_change<T: Component + Serialize>(
 /// Ignores despawned entities
 fn handle_remove<T: Component>(
 	registrations: Res<Registrations>,
-	mut outgoing: EventWriter<MessageOutgoing>,
+	mut outgoing: ResMut<MessageOutgoing>,
 	mut removed: RemovedComponents<T>,
 	query: Query<(), With<Replicate>>,
 ) {
 	for removed in removed.read() {
 		if query.contains(removed) {
-			outgoing.send(
+			outgoing.push(
 				Message::Remove {
 					entity: removed,
 					reg_id: registrations.registration_id::<T>(),
@@ -190,10 +190,21 @@ mod test {
 			.id();
 
 		app.update();
-		let events = app.world_mut().events::<MessageOutgoing>();
-		expect(events.len()).to_be(2)?;
-		expect(events[0]).to_be(&Message::Spawn { entity }.into())?;
-		expect(events[1]).to_be(
+
+
+		app.world_mut().entity_mut(entity).insert(MyComponent(8));
+
+		app.update();
+
+
+		app.world_mut().despawn(entity);
+
+		app.update();
+
+		let events = app.world_mut().resource_mut::<MessageOutgoing>();
+		expect(events.len()).to_be(4)?;
+		expect(&events[0]).to_be(&Message::Spawn { entity }.into())?;
+		expect(&events[1]).to_be(
 			&Message::Insert {
 				entity,
 				reg_id: RegistrationId::new_with(0),
@@ -201,15 +212,7 @@ mod test {
 			}
 			.into(),
 		)?;
-
-
-		app.world_mut().entity_mut(entity).insert(MyComponent(8));
-
-		app.update();
-
-		let events = app.world_mut().events::<MessageOutgoing>();
-		expect(events.len()).to_be(1)?;
-		expect(events[0]).to_be(
+		expect(&events[2]).to_be(
 			&Message::Change {
 				entity,
 				reg_id: RegistrationId::new_with(0),
@@ -217,13 +220,7 @@ mod test {
 			}
 			.into(),
 		)?;
-
-		app.world_mut().despawn(entity);
-
-		app.update();
-		let events = app.world_mut().events::<MessageOutgoing>();
-		expect(events.len()).to_be(1)?;
-		expect(events[0]).to_be(&Message::Despawn { entity }.into())?;
+		expect(&events[3]).to_be(&Message::Despawn { entity }.into())?;
 
 		Ok(())
 	}
@@ -251,7 +248,7 @@ mod test {
 		app1.update();
 		Message::loopback(app1.world_mut(), app2.world_mut());
 
-		let events = app2.world_mut().events::<MessageIncoming>();
+		let events = app2.world_mut().resource_mut::<MessageIncoming>();
 		expect(events.len()).to_be(2)?;
 
 		app2.update();

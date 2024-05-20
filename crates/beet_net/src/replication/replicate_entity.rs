@@ -3,35 +3,35 @@ use bevy::prelude::*;
 use forky_core::ResultTEExt;
 
 pub fn handle_spawn_outgoing(
-	mut outgoing: EventWriter<MessageOutgoing>,
+	mut outgoing: ResMut<MessageOutgoing>,
 	query: Query<Entity, Added<Replicate>>,
 ) {
 	for entity in query.iter() {
-		outgoing.send(Message::Spawn { entity }.into());
+		outgoing.push(Message::Spawn { entity }.into());
 	}
 }
 
 pub fn handle_despawn_outgoing(
-	mut outgoing: EventWriter<MessageOutgoing>,
+	mut outgoing: ResMut<MessageOutgoing>,
 	mut removed: RemovedComponents<Replicate>,
 ) {
 	for entity in removed.read() {
-		outgoing.send(Message::Despawn { entity }.into());
+		outgoing.push(Message::Despawn { entity }.into());
 	}
 }
 pub fn handle_incoming(
 	mut commands: Commands,
 	mut registrations: ResMut<Registrations>,
-	mut incoming: EventReader<MessageIncoming>,
+	mut incoming: ResMut<MessageIncoming>,
 ) {
-	for msg in incoming.read() {
-		match &**msg {
+	for msg in incoming.drain(..) {
+		match msg {
 			Message::Spawn { entity } => {
 				let local = commands.spawn_empty().id();
-				registrations.entities.insert(*entity, local);
+				registrations.entities.insert(entity, local);
 			}
 			Message::Despawn { entity } => {
-				commands.entity(*entity).despawn();
+				commands.entity(entity).despawn();
 			}
 			Message::Insert {
 				entity,
@@ -39,9 +39,9 @@ pub fn handle_incoming(
 				bytes,
 			} => {
 				if let Some((entity, fns)) =
-					registrations.entity_fns(*entity, *reg_id)
+					registrations.entity_fns(entity, reg_id)
 				{
-					(fns.insert)(&mut commands.entity(entity), bytes)
+					(fns.insert)(&mut commands.entity(entity), &bytes)
 						.ok_or(|e| log::error!("{e}"));
 				} else {
 				}
@@ -52,16 +52,16 @@ pub fn handle_incoming(
 				bytes,
 			} => {
 				if let Some((entity, fns)) =
-					registrations.entity_fns(*entity, *reg_id)
+					registrations.entity_fns(entity, reg_id)
 				{
-					(fns.change)(&mut commands.entity(entity), bytes)
+					(fns.change)(&mut commands.entity(entity), &bytes)
 						.ok_or(|e| log::error!("{e}"));
 				} else {
 				}
 			}
 			Message::Remove { entity, reg_id } => {
 				if let Some((entity, fns)) =
-					registrations.entity_fns(*entity, *reg_id)
+					registrations.entity_fns(entity, reg_id)
 				{
 					(fns.remove)(&mut commands.entity(entity));
 				} else {
@@ -88,16 +88,13 @@ mod test {
 		let entity = app.world_mut().spawn(Replicate::default()).id();
 
 		app.update();
-		let events = app.world_mut().events::<MessageOutgoing>();
-		expect(events.len()).to_be(1)?;
-		expect(events[0]).to_be(&Message::Spawn { entity }.into())?;
-
 		app.world_mut().despawn(entity);
-
 		app.update();
-		let events = app.world_mut().events::<MessageOutgoing>();
-		expect(events.len()).to_be(1)?;
-		expect(events[0]).to_be(&Message::Despawn { entity }.into())?;
+
+		let events = app.world_mut().resource_mut::<MessageOutgoing>();
+		expect(events.len()).to_be(2)?;
+		expect(&events[0]).to_be(&Message::Spawn { entity }.into())?;
+		expect(&events[1]).to_be(&Message::Despawn { entity }.into())?;
 
 		Ok(())
 	}

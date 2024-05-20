@@ -4,26 +4,13 @@ use serde::Deserialize;
 use serde::Serialize;
 
 
-#[derive(Debug, Clone, PartialEq, Deref, DerefMut, Event)]
-pub struct MessageIncoming(pub Message);
+#[derive(Debug, Default, Clone, PartialEq, Deref, DerefMut, Resource)]
+pub struct MessageIncoming(pub Vec<Message>);
 
-impl Into<MessageIncoming> for Message {
-	fn into(self) -> MessageIncoming { MessageIncoming(self) }
-}
-impl Into<MessageIncoming> for MessageOutgoing {
-	fn into(self) -> MessageIncoming { MessageIncoming(self.0) }
-}
 
-#[derive(Debug, Clone, PartialEq, Deref, DerefMut, Event)]
-pub struct MessageOutgoing(pub Message);
+#[derive(Debug, Default, Clone, PartialEq, Deref, DerefMut, Resource)]
+pub struct MessageOutgoing(pub Vec<Message>);
 
-impl Into<MessageOutgoing> for Message {
-	fn into(self) -> MessageOutgoing { MessageOutgoing(self) }
-}
-
-impl Into<MessageOutgoing> for MessageIncoming {
-	fn into(self) -> MessageOutgoing { MessageOutgoing(self.0) }
-}
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum Message {
@@ -54,13 +41,12 @@ pub enum Message {
 }
 
 impl Message {
+	/// Clear outgoing and drain incoming into outgoing messages.
 	pub fn loopback(outgoing: &mut World, incoming: &mut World) {
-		for event in outgoing
-			.resource::<Events<MessageOutgoing>>()
-			.iter_current_update_events()
-		{
-			incoming.send_event(MessageIncoming(event.0.clone()));
-		}
+		incoming.resource_mut::<MessageIncoming>().0 = outgoing
+			.resource_mut::<MessageOutgoing>()
+			.drain(..)
+			.collect();
 	}
 
 	pub fn from_bytes(bytes: &[u8]) -> Result<Vec<Message>, bincode::Error> {
