@@ -1,5 +1,5 @@
 [package]
-name = "beet_server"
+name = "beet_net_axum"
 publish = { workspace = true }
 version = { workspace = true }
 edition = { workspace = true }
@@ -12,7 +12,8 @@ documentation = { workspace = true }
 # get rust-analyzer to stop complaining by specifying not wasm
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 forky_core = { workspace = true }
-beet = { workspace = true }
+beet_net = { workspace = true }
+
 extend = { workspace = true }
 anyhow = { workspace = true }
 serde = { workspace = true }
@@ -21,6 +22,7 @@ log = { workspace = true }
 pretty_env_logger = { workspace = true }
 
 tokio = { workspace = true }
+tokio-tungstenite = "0.21"
 futures-util = { workspace = true }
 axum = { version = "0.7", features = ["ws"] }
 axum-extra = { version = "0.9", features = ["typed-header"] }

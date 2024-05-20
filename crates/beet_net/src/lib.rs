@@ -1,7 +1,7 @@
-pub mod message;
+pub mod networking;
 pub mod replication;
 
 pub mod prelude {
-	pub use crate::message::*;
+	pub use crate::networking::*;
 	pub use crate::replication::*;
 }

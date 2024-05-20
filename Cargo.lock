@@ -655,17 +655,19 @@ dependencies = [
  "pretty_env_logger",
  "rand",
  "serde",
+ "strum",
+ "strum_macros",
  "sweet",
 ]
 
 [[package]]
-name = "beet_server"
+name = "beet_net_axum"
 version = "0.0.1"
 dependencies = [
  "anyhow",
  "axum",
  "axum-extra",
- "beet",
+ "beet_net",
  "extend",
  "forky_core",
  "futures",
@@ -677,6 +679,7 @@ dependencies = [
  "serde",
  "sweet",
  "tokio",
+ "tokio-tungstenite",
  "tower",
  "tower-http",
  "tracing",
