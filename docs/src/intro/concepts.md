@@ -7,6 +7,18 @@ Actions are simply a combination of a `Component` and a `System`. They are the s
 
 For the purpose of modularity they are usually very simple, for example `Translate` and `InsertInDuration(RunResult::Success)` could be combined to create a `Translate For Duration` behavior.
 
+
+## Common Components
+
+Here are some common components used in action systems.
+
+- [`Running`][running] - Indicate this node is currently running.
+- [`RunResult`][run-result] - Added by actions to notify their parent that they have finished.
+- [`Score`][score] - Notify the parent how favourable it would be for this node to run.
+- [`RunTimer`][run-timer] - Time since an action started/stopped.
+
+
+
 ## Terminology
 
 These terms may be helpful when describing Beet principles.
@@ -27,16 +39,6 @@ Action categories describe what the action modifies. This is just metadata, ther
 | `ActionCategory::ChildBehaviors` | Modifies child behaviors, like adding/removing `Running`               | [`SequenceSelector`][sequence]               |
 | `ActionCategory::Agent`          | Modifies the associated agent, like its `Transform`                    | [`Translate`][translate]                     |
 | `ActionCategory::World`          | Modifies external entities or resources, like despawning a collectable | [`DespawnSteerTarget`][despawn-steer-target] |
-
-## Common Components
-
-Here are some common components used in action systems.
-
-- [`Running`][running] - Indicate this node is currently running.
-- [`RunResult`][run-result] - Added by actions to notify their parent that they have finished.
-- [`Score`][score] - Notify the parent how favourable it would be for this node to run.
-- [`RunTimer`][run-timer] - Time since an action started/stopped.
-
 
 [translate]:https://github.com/mrchantey/beet/blob/main/crates/beet_core/src/core_module/translate.rs
 [score-selector]:https://github.com/mrchantey/beet/blob/main/crates/beet_ecs/src/ecs_module/selectors/score_selector.rs

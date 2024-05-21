@@ -8,7 +8,7 @@ use web_sys::Response;
 
 /// Attempt to retreive a model from the cache, if it doesn't exist, fetch it from the network
 pub async fn open_or_fetch(url: &str) -> Result<js_sys::Uint8Array, JsValue> {
-	let cache_name = "bert-candle-cache";
+	let cache_name = "beet";
 
 	let cache_promise = web_sys::window().unwrap().caches()?.open(cache_name);
 	let cache = JsFuture::from(cache_promise).await?.dyn_into::<Cache>()?;

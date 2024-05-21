@@ -3,12 +3,6 @@ use crate::prelude::*;
 use bevy::ecs::schedule::SystemConfigs;
 use bevy::prelude::*;
 
-pub enum UtilityInterruptRate {
-	/// Interrupt every frame.
-	Frame,
-	/// Interrupt every time a score changes
-	ScoreChanged,
-}
 
 /// A `Utility Selector` that observes the [`Score`] of each child and selects the highest to run.
 ///

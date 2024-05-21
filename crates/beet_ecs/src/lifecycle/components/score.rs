@@ -7,7 +7,7 @@ use std::fmt::Debug;
 /// As this is frequently added and removed, it is `SparseSet`.
 #[derive(Default, Debug, Component)]
 #[component(storage = "SparseSet")]
-pub struct Scoring;
+pub struct IsScoring;
 
 
 /// Score is a primitive of [`beet`]. The weight is almost always in the range of `0..1` Like a [`Vec3`], the meaning of a [`Score`] depends on its context, for example:

@@ -1,10 +1,6 @@
 # Beet
 
-**B**ehaviors **E**xpressed as **E**ntity **T**rees
-
-Beet is a very flexible behavior library for games and robotics.
-
-It is built with `bevy` and represents behaviors as entities, connecting them through the parent-child relationship.
+Beet is a very flexible behavior library for games and robotics. It is built with `bevy` and represents behaviors as entities, connecting them through the parent-child relationship.
 
 > This library is experimental and I'd love to hear any questions or feedback, my handle is `@mrchantey` on the Bevy Discord.
 
@@ -22,7 +18,7 @@ Create behaviors from a growing list of paradigms including classical and machin
 
 #### 🐦 Bevy Friendly
 
-Behaviors are defined as a collection of components and ticks are ecs-first, running all action systems concurrently.
+Beet is regular components, systems and plugins all the way down. Behaviors can be visualized, serialized etc in the same way as bevy scenes.
 
 #### 🌳 Modular
 
