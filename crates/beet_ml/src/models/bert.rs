@@ -70,7 +70,7 @@ impl Bert {
 	pub async fn new(config: BertConfig) -> Result<Self> {
 		// use super::bert_loader::BertAssetLoaderError;
 		use crate::wasm::open_or_fetch;
-	
+
 		let config_url = config.model.config_url();
 		let model_url = config.model.model_url();
 		let tokenizer_url = config.model.tokenizer_url();
@@ -162,7 +162,7 @@ impl Bert {
 	}
 
 
-	/// Score a list of entities with a [`Sentence`] against a root entity with a [`Sentence`]. This returns a list of entities with their sentence and raw cosine similarity scores. 
+	/// Score a list of entities with a [`Sentence`] against a root entity with a [`Sentence`]. This returns a list of entities with their sentence and raw cosine similarity scores.
 	/// Scores are in a range of `0..1`, higher means more similar, the list is sorted in descending order.
 	/// This calls [`Bert::get_embeddings`] and has the associated performance implications.
 	/// If the root is missing a [`Sentence`] an empty vec will be returned.
