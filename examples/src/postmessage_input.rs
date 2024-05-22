@@ -1,7 +1,7 @@
 #![cfg(target_arch = "wasm32")]
 use crate::OnPlayerMessage;
 use bevy::prelude::*;
-use crossbeam_channel::Receiver;
+use flume::Receiver;
 use wasm_bindgen::prelude::Closure;
 use wasm_bindgen::JsCast;
 use web_sys::window;
@@ -21,7 +21,7 @@ impl Plugin for PostmessageInputPlugin {
 pub struct PostmessageIn(pub Receiver<String>);
 
 pub fn postmessage_input(mut commands: Commands) {
-	let (send, recv) = crossbeam_channel::unbounded();
+	let (send, recv) = flume::unbounded();
 	commands.insert_resource(PostmessageIn(recv));
 
 	let closure =

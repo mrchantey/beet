@@ -91,6 +91,7 @@ impl Transport for ChannelsTransport {
 
 
 #[cfg(test)]
+#[cfg(not(target_arch = "wasm32"))]
 mod test {
 	use crate::prelude::*;
 	use anyhow::Result;

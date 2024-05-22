@@ -541,10 +541,10 @@ dependencies = [
  "beet_ml",
  "beet_net",
  "bevy",
+ "console_log",
  "forky_bevy",
  "log",
  "pretty_env_logger",
- "rand",
  "tokio",
 ]
 
@@ -598,7 +598,7 @@ dependencies = [
  "anyhow",
  "beet",
  "bevy",
- "crossbeam-channel",
+ "flume",
  "forky_bevy",
  "js-sys",
  "log",
@@ -623,6 +623,7 @@ dependencies = [
  "console_error_panic_hook",
  "console_log",
  "forky_core",
+ "forky_web",
  "futures",
  "hf-hub",
  "js-sys",
@@ -651,7 +652,9 @@ dependencies = [
  "extend",
  "flume",
  "forky_core",
+ "forky_web",
  "futures-util",
+ "js-sys",
  "log",
  "pretty_env_logger",
  "rand",
@@ -661,6 +664,8 @@ dependencies = [
  "sweet",
  "tokio",
  "tokio-tungstenite",
+ "wasm-bindgen",
+ "web-sys",
 ]
 
 [[package]]
@@ -1963,6 +1968,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "be8aed40e4edbf4d3b4431ab260b63fdc40f5780a4766824329ea0f1eefe3c0f"
 dependencies = [
  "log",
+ "wasm-bindgen",
  "web-sys",
 ]
 

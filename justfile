@@ -82,7 +82,7 @@ build-web-example example *args:
 	--out-name main \
 	--out-dir ./target/web-examples/{{example}}/wasm \
 	--target web \
-	./target/wasm32-unknown-unknown/release/examples/{{example}}.wasm \
+	$CARGO_TARGET_DIR/wasm32-unknown-unknown/release/examples/{{example}}.wasm \
 	--no-typescript \
 
 serve-web:

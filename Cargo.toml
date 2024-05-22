@@ -20,10 +20,9 @@ keywords.workspace = true
 categories.workspace = true
 
 [features]
-default = ["ml", "net", "websocket", "animation", "assets", "ui"]
+default = ["ml", "animation", "assets", "ui"]
 ml = ["dep:beet_ml"]
 net = ["dep:beet_net"]
-websocket = ["dep:beet_net"]
 ui = ["beet_core/ui"]
 assets = ["beet_core/assets"]
 animation = ["beet_core/animation"]
@@ -44,8 +43,10 @@ beet_examples.workspace = true
 log.workspace = true
 pretty_env_logger.workspace = true
 forky_bevy.workspace = true
-rand = "0.8"
 anyhow.workspace = true
+
+[target.'cfg(target_arch = "wasm32")'.dev-dependencies]
+console_log.workspace = true
 
 [target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
 tokio.workspace = true
@@ -113,6 +114,7 @@ sweet = { path = "../forky/crates/sweet", features = ["bevy"] }
 ## logging
 log = "0.4"
 pretty_env_logger = "0.4"
+console_log = { version = "1.0", features = ["color"] }
 
 ## utility
 anyhow = "1.0.75"
@@ -120,6 +122,7 @@ thiserror = "1.0.60"
 bytemuck = "1.13.1"
 petgraph = { version = "0.6.4", features = ["serde-1"] }
 heck = "0.4"
+rand = "0.8"
 
 ## async
 futures = "0.3"
@@ -166,3 +169,80 @@ bevy = { git = "https://github.com/bevyengine/bevy.git", rev = "f516de456be2b655
 	"serialize",
 	# "bevy_color",
 ] }
+
+
+# [target.'cfg(target_arch = "wasm32")'.dependencies]
+js-sys = "0.3"
+wasm-bindgen = "0.2"
+wasm-bindgen-futures = "0.4"
+console_error_panic_hook = "0.1"
+
+[workspace.dependencies.web-sys]
+# [target.'cfg(target_arch = "wasm32")'.dependencies.web-sys]
+version = "0.3"
+features = [
+	# HTML
+	'Headers',
+	'Document',
+	'Element',
+	'Window',
+	"Cache",
+	"CacheStorage",
+	'HtmlIFrameElement',
+	'DomRectReadOnly',
+	# Style
+	'MediaQueryList',
+	# Events
+	'MouseEvent',
+	'KeyboardEvent',
+	# JS
+	'Gpu',
+	'console',
+	'Navigator',
+	'Performance',
+	# Fetch
+	'Request',
+	'RequestInit',
+	'RequestMode',
+	'Response',
+	# Blob
+	'Blob',
+	'BlobEvent',
+	'BlobEventInit',
+	'BlobPropertyBag',
+	# Elements
+	'HtmlAnchorElement',
+	'HtmlCanvasElement',
+	'HtmlInputElement',
+	'File',
+	'FileList',
+	# Url
+	'Url',
+	'History',
+	'Location',
+	'UrlSearchParams',
+	# indexedDB
+	"IdbCursor",
+	"IdbCursorDirection",
+	"IdbCursorWithValue",
+	"IdbDatabase",
+	"IdbFactory",
+	"IdbFileHandle",
+	"IdbFileMetadataParameters",
+	"IdbFileRequest",
+	"IdbIndex",
+	"IdbIndexParameters",
+	"IdbKeyRange",
+	"IdbLocaleAwareKeyRange",
+	"IdbMutableFile",
+	"IdbObjectStore",
+	"IdbObjectStoreParameters",
+	"IdbOpenDbOptions",
+	"IdbOpenDbRequest",
+	"IdbRequest",
+	"IdbRequestReadyState",
+	"IdbTransaction",
+	"IdbTransactionMode",
+	"IdbVersionChangeEvent",
+	"IdbVersionChangeEventInit",
+]

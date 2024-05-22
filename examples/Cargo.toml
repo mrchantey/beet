@@ -10,16 +10,13 @@ bevy = { workspace = true, default-features = true }
 log.workspace = true
 pretty_env_logger.workspace = true
 forky_bevy.workspace = true
-rand = "0.8"
+rand.workspace = true
+flume.workspace = true
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
-crossbeam-channel = "0.5"
-wasm-bindgen = "0.2"
-js-sys = "0.3"
-
-[target.'cfg(target_arch = "wasm32")'.dependencies.web-sys]
-version = "0.3"
-features = ['Document', 'Element', 'Window']
+wasm-bindgen.workspace = true
+js-sys.workspace = true
+web-sys.workspace = true
 
 [dev-dependencies]
 anyhow.workspace = true

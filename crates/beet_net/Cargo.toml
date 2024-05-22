@@ -12,9 +12,9 @@ keywords.workspace = true
 categories.workspace = true
 
 [features]
-default = ["native"]
+default = []
 beet_ecs = ["dep:beet_ecs"]
-native = ["dep:tokio", "dep:tokio-tungstenite", "dep:futures-util"]
+tokio-client = ["dep:tokio", "dep:tokio-tungstenite", "dep:futures-util"]
 # default = ["bevy_replicon"]
 # bevy_replicon = ["dep:bevy_replicon"]
 
@@ -43,7 +43,6 @@ strum_macros.workspace = true
 
 
 # # from the simple_box example
-# crossbeam-channel = "0.5.11"
 # clap = { version = "4.4", features = ["derive"] }
 # async-compat = "0.2.3"
 # derive_more = { version = "0.99", features = ["add", "mul"] }
@@ -58,6 +57,11 @@ bevy = { git = "https://github.com/bevyengine/bevy.git", rev = "f516de456be2b655
 	# "bevy_scene",
 ] }
 
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+web-sys.workspace = true
+js-sys.workspace = true
+forky_web.workspace = true
+wasm-bindgen.workspace = true
 
 # tokio = { workspace = true, optional = true }
 # [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
@@ -65,4 +69,15 @@ bevy = { git = "https://github.com/bevyengine/bevy.git", rev = "f516de456be2b655
 [dev-dependencies]
 pretty_env_logger.workspace = true
 sweet.workspace = true
-rand = "0.8.1"
+rand.workspace = true
+
+
+[[example]]
+name = "client"
+path = "examples/client.rs"
+required-features = ["tokio-client"]
+
+[[example]]
+name = "two_clients"
+path = "examples/two_clients.rs"
+required-features = ["tokio-client"]
