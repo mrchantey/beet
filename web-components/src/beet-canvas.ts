@@ -4,45 +4,31 @@ import '@material/web/progress/linear-progress.js'
 
 import { LitElement, css, html } from 'lit'
 import { customElement, property } from 'lit/decorators.js'
+import { materialStyles } from './styles'
 
-
-// window
 type LoadState = 'loading' | 'loaded' | 'running' | 'error'
 
 
-
-/**
- * An example element.
- *
- * @slot - This element has a slot
- * @csspart button - The button
- */
+/// Canvas loader
 @customElement('beet-canvas')
 export class BeetCanvas extends LitElement {
-
-  /**
-   * Wait for `finshOnLoad` to be called manually
-   */
+  /// Wait for `finshOnLoad` to be called manually
   @property({ type: Boolean, attribute: 'custom-load' })
   customLoad: boolean = false
-  /**
-   * Display a start button on load
-   */
+
+  /// Display a start button on load
   @property({ type: Boolean, attribute: 'require-interaction' })
   requireInteraction: boolean = false
-  /**
-   * The id of the canvas that will be created
-   */
+
+  /// The id of the canvas that will be created
   @property({ type: String, attribute: 'canvas-id' })
   canvasId: string = 'beet-canvas'
-  /**
-   * The source file
-   */
+
+  /// The source file
   @property({ type: String })
   src: string | null = null
-  /**
-   * The load state of the canvas
-   */
+
+  /// The load state of the canvas
   @property({ type: String })
   loadState: LoadState = 'loading'
 
@@ -52,13 +38,6 @@ export class BeetCanvas extends LitElement {
     super.connectedCallback()
     this.innerHTML += `<canvas id='${this.canvasId}' slot='canvas-slot'></canvas>`
     this.tryLoadSrc()
-
-    // el.setAttribute('href', 'https://fonts.googleapis.com/icon?family=Material+Symbols+Outlined')
-    // console.log('wtf')
-    // const linkElem = document.createElement('link')
-    // linkElem.setAttribute('rel', 'stylesheet')
-    // linkElem.setAttribute('href', 'https://fonts.googleapis.com/icon?family=Material+Symbols+Outlined')
-    // document.appendChild(linkElem)
   }
 
   async tryLoadSrc() {
@@ -128,12 +107,7 @@ export class BeetCanvas extends LitElement {
     this.dispatchEvent(new CustomEvent('start'))
   }
 
-  static styles = css`
-    :host {
-      --md-ref-typeface-brand: 'Open Sans';
-	    --md-ref-typeface-plain: system-ui;
-      font-family: 'Roboto', 'Arial', 'Helvetica', sans-serif;
-    }
+  static styles = [materialStyles, css`
     
     .container{
       position: relative;
@@ -169,7 +143,7 @@ export class BeetCanvas extends LitElement {
     .progress-overlay{
       width:80%;
     }
-  `
+  `]
 }
 
 declare global {

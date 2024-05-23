@@ -1,7 +1,6 @@
 # Fetch
 
 - Please wait for status to change to `Idle` before issuing commands.
-
 <input id="prompt" value="fetch my weapon!">
 <button id="submit">Submit</button>
 <br/>

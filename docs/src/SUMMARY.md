@@ -12,6 +12,7 @@
 	- [Seek 3D](examples/seek_3d.md)
 	- [Flock](examples/flock.md)
 	- [Fetch](examples/fetch.md)
+	- [Web Components](examples/web-components.md)
 ---
 <!-- [Changelog](./misc/roadmap.md) -->
 

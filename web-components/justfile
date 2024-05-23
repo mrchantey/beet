@@ -1,6 +1,15 @@
 
 
+run:
+  npx vite
 
+build:
+	npx tsc && npx vite build
 
 publish:
-	npm run build && npm publish
+	npm version patch
+	just build
+	npm publish
+
+preview:
+	npx vite preview
