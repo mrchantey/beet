@@ -600,6 +600,8 @@ dependencies = [
  "bevy",
  "flume",
  "forky_bevy",
+ "forky_core",
+ "forky_web",
  "js-sys",
  "log",
  "pretty_env_logger",

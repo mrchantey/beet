@@ -14,6 +14,7 @@ impl Plugin for LifecyclePlugin {
 			InsertInDuration<RunResult>,
 			InsertOnRun<RunResult>,
 			LogOnRun,
+			CallOnRun,
 			Repeat,
 			SetOnSpawn<Score>,
 			// selectors

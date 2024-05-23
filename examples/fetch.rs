@@ -9,7 +9,6 @@
 use beet::prelude::*;
 use beet_examples::*;
 use bevy::prelude::*;
-use rand::prelude::IteratorRandom;
 use std::time::Duration;
 
 fn main() {
@@ -28,7 +27,7 @@ fn main() {
 			RemoveAgentOnRun<SteerTarget>,
 		)>::default(),
 	))
-	.add_systems(Startup, (setup_camera, setup_fox, setup_chat, setup_items))
+	.add_systems(Startup, (setup_camera, setup_fox, setup_items))
 	.add_systems(Update, (set_player_sentence, rotate_items));
 
 	#[cfg(target_arch = "wasm32")]
@@ -107,6 +106,7 @@ fn setup_fox(
 					parent
 						.spawn((
 							Name::new("Idle Or Fetch"),
+							CallOnRun::new(beet_finished_loading),
 							TargetAgent(agent),
 							ScoreSelector::default(),
 							// ScoreSelector::consuming(),
@@ -256,10 +256,6 @@ fn rotate_items(time: Res<Time>, mut query: Query<&mut Transform, With<Item>>) {
 	}
 }
 
-fn setup_chat(mut npc_events: EventWriter<OnNpcMessage>) {
-	npc_events.send(OnNpcMessage(what_does_the_fox_say()));
-}
-
 fn set_player_sentence(
 	mut commands: Commands,
 	mut npc_events: EventWriter<OnNpcMessage>,
@@ -273,19 +269,4 @@ fn set_player_sentence(
 
 		npc_events.send(OnNpcMessage("ok".to_string()));
 	}
-}
-
-fn what_does_the_fox_say() -> String {
-	let sounds = [
-		"Wa-pa-pa-pa-pa-pa-pow!",
-		"Hatee-hatee-hatee-ho!",
-		"Joff-tchoff-tchoffo-tchoffo-tchoff!",
-		"Jacha-chacha-chacha-chow!",
-		"Fraka-kaka-kaka-kaka-kow!",
-		"A-hee-ahee ha-hee!",
-		"A-oo-oo-oo-ooo!",
-		"Ring-ding-ding-ding-dingeringeding!",
-	];
-	let sound = sounds.iter().choose(&mut rand::thread_rng()).unwrap();
-	sound.to_string()
 }

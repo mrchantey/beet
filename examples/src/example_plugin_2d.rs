@@ -1,3 +1,4 @@
+use crate::example_plugin::ExamplePlugin;
 use crate::*;
 use beet::prelude::*;
 use bevy::prelude::*;
@@ -19,23 +20,7 @@ impl Plugin for ExamplePlugin2d {
 	fn build(&self, app: &mut App) {
 		app.insert_resource(WrapAround::default())
 			// .add_plugins(WorldInspectorPlugin::new())
-			.add_plugins(
-				DefaultPlugins
-					.set(WindowPlugin {
-						primary_window: Some(Window {
-							fit_canvas_to_parent: true,
-							// resolution: window::WindowResolution::new(960., 960.),
-							// position: WindowPosition::At(IVec2::new(5120, 0)),
-							..default()
-						}),
-						..default()
-					})
-					.set(AssetPlugin {
-						file_path: assets_path(),
-						..default()
-					})
-					.build(),
-			)
+			.add_plugins(ExamplePlugin)
 			// .add_plugins(WorldInspectorPlugin::new())
 			.add_systems(Startup, space_setup)
 			.add_systems(Update, follow_cursor)

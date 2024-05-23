@@ -5,6 +5,7 @@ version.workspace = true
 edition.workspace = true
 
 [dependencies]
+forky_core.workspace = true
 beet.workspace = true
 bevy = { workspace = true, default-features = true }
 log.workspace = true
@@ -14,6 +15,7 @@ rand.workspace = true
 flume.workspace = true
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
+forky_web.workspace = true
 wasm-bindgen.workspace = true
 js-sys.workspace = true
 web-sys.workspace = true
@@ -23,3 +25,8 @@ anyhow.workspace = true
 
 [target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
 tokio.workspace = true
+
+
+[[example]]
+name = "hello_ml_vanilla"
+path = "examples/hello_ml_vanilla.rs"

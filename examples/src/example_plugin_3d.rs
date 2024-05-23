@@ -1,5 +1,6 @@
 #![allow(unused)]
 use crate::assets_path;
+use crate::example_plugin::ExamplePlugin;
 use crate::follow_cursor_3d;
 use bevy::pbr::CascadeShadowConfigBuilder;
 use bevy::prelude::*;
@@ -11,23 +12,9 @@ pub struct ExamplePlugin3d;
 
 impl Plugin for ExamplePlugin3d {
 	fn build(&self, app: &mut App) {
-		app.add_plugins(
-			DefaultPlugins
-				.set(WindowPlugin {
-					primary_window: Some(Window {
-						fit_canvas_to_parent: true,
-						..default()
-					}),
-					..default()
-				})
-				.set(AssetPlugin {
-					file_path: assets_path(),
-					..default()
-				})
-				.build(),
-		)
-		.add_systems(Startup, setup_scene_3d)
-		.add_systems(Update, (close_on_esc, follow_cursor_3d));
+		app.add_plugins(ExamplePlugin)
+			.add_systems(Startup, setup_scene_3d)
+			.add_systems(Update, (close_on_esc, follow_cursor_3d));
 	}
 }
 
