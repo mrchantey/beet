@@ -12,8 +12,9 @@ keywords.workspace = true
 categories.workspace = true
 
 [features]
-default = ["beet_ecs"]
+default = ["beet_ecs", "serde_json"]
 beet_ecs = ["dep:beet_ecs"]
+serde_json = ["dep:serde_json"]
 tokio-client = ["dep:tokio", "dep:tokio-tungstenite", "dep:futures-util"]
 # default = ["bevy_replicon"]
 # bevy_replicon = ["dep:bevy_replicon"]
@@ -29,6 +30,7 @@ log.workspace = true
 bincode.workspace = true
 forky_core.workspace = true
 serde.workspace = true
+serde_json = { workspace = true, optional = true }
 flume.workspace = true
 anyhow.workspace = true
 extend.workspace = true

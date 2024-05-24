@@ -36,4 +36,3 @@ pretty_env_logger.workspace = true
 sweet.workspace = true
 bincode.workspace = true
 ron.workspace = true
-serde_json.workspace = true
