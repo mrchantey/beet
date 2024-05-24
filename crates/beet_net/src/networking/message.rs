@@ -38,6 +38,10 @@ pub enum Message {
 		reg_id: RegistrationId,
 		bytes: Vec<u8>,
 	},
+	ChangeResource {
+		reg_id: RegistrationId,
+		bytes: Vec<u8>,
+	},
 	RemoveResource {
 		reg_id: RegistrationId,
 	},

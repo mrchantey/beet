@@ -69,9 +69,9 @@ mod test {
 
 		app.update();
 
-		let events = app.world_mut().resource_mut::<MessageOutgoing>();
-		expect(events.len()).to_be(1)?;
-		expect(&events[0]).to_be(
+		let msg_out = app.world_mut().resource_mut::<MessageOutgoing>();
+		expect(msg_out.len()).to_be(1)?;
+		expect(&msg_out[0]).to_be(
 			&Message::SendEvent {
 				reg_id: RegistrationId::new_with(0),
 				bytes: vec![7, 0, 0, 0],
@@ -100,8 +100,8 @@ mod test {
 		app1.update();
 		Message::loopback(app1.world_mut(), app2.world_mut());
 
-		let events = app2.world_mut().resource_mut::<MessageIncoming>();
-		expect(events.len()).to_be(1)?;
+		let msg_in = app2.world_mut().resource_mut::<MessageIncoming>();
+		expect(msg_in.len()).to_be(1)?;
 
 		app2.update();
 		let events = app2

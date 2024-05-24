@@ -54,6 +54,12 @@ pub fn handle_incoming_commands(
 						.ok_or(|e| log::error!("{e}"));
 				}
 			}
+			Message::ChangeResource { reg_id, bytes } => {
+				if let Some(fns) = registrations.resources.get(reg_id) {
+					(fns.change)(&mut commands, bytes)
+						.ok_or(|e| log::error!("{e}"));
+				}
+			}
 			Message::RemoveResource { reg_id } => {
 				if let Some(fns) = registrations.resources.get(reg_id) {
 					(fns.remove)(&mut commands).ok_or(|e| log::error!("{e}"));

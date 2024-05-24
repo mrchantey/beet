@@ -147,10 +147,10 @@ mod test {
 
 		app.update();
 
-		let events = app.world_mut().resource_mut::<MessageOutgoing>();
-		expect(events.len()).to_be(4)?;
-		expect(&events[0]).to_be(&Message::Spawn { entity }.into())?;
-		expect(&events[1]).to_be(
+		let msg_out = app.world_mut().resource_mut::<MessageOutgoing>();
+		expect(msg_out.len()).to_be(4)?;
+		expect(&msg_out[0]).to_be(&Message::Spawn { entity }.into())?;
+		expect(&msg_out[1]).to_be(
 			&Message::Insert {
 				entity,
 				reg_id: RegistrationId::new_with(0),
@@ -158,7 +158,7 @@ mod test {
 			}
 			.into(),
 		)?;
-		expect(&events[2]).to_be(
+		expect(&msg_out[2]).to_be(
 			&Message::Change {
 				entity,
 				reg_id: RegistrationId::new_with(0),
@@ -166,7 +166,7 @@ mod test {
 			}
 			.into(),
 		)?;
-		expect(&events[3]).to_be(&Message::Despawn { entity }.into())?;
+		expect(&msg_out[3]).to_be(&Message::Despawn { entity }.into())?;
 
 		Ok(())
 	}
@@ -188,8 +188,8 @@ mod test {
 		app1.update();
 		Message::loopback(app1.world_mut(), app2.world_mut());
 
-		let events = app2.world_mut().resource_mut::<MessageIncoming>();
-		expect(events.len()).to_be(2)?;
+		let msg_in = app2.world_mut().resource_mut::<MessageIncoming>();
+		expect(msg_in.len()).to_be(2)?;
 
 		app2.update();
 		expect(
