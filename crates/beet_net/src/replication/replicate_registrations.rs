@@ -4,21 +4,14 @@ use bevy::utils::HashMap;
 use serde::Deserialize;
 use serde::Serialize;
 use std::any::TypeId;
-use std::sync::atomic::AtomicUsize;
-use std::sync::atomic::Ordering;
 
 /// Unique identifier for components registered.
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]
+#[derive(
+	Debug, Copy, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, Deref,
+)]
 pub struct RegistrationId(usize);
 
 impl RegistrationId {
-	const ID_INCR: AtomicUsize = AtomicUsize::new(0);
-
-	fn next() -> Self {
-		let id = Self::ID_INCR.fetch_add(1, Ordering::SeqCst);
-		RegistrationId(id)
-	}
-
 	pub fn inner(&self) -> usize { self.0 }
 
 	#[cfg(test)]
@@ -26,11 +19,13 @@ impl RegistrationId {
 }
 
 #[derive(Default, Resource)]
-pub struct Registrations {
-	pub types: HashMap<TypeId, RegistrationId>,
+pub struct ReplicateRegistry {
+	id_incr: usize,
+
+	types: HashMap<TypeId, RegistrationId>,
 
 	#[cfg(debug_assertions)]
-	pub type_names: HashMap<RegistrationId, String>,
+	type_names: HashMap<RegistrationId, String>,
 
 	/// Map of remote to local entity ids
 	pub entities: HashMap<Entity, Entity>,
@@ -40,7 +35,7 @@ pub struct Registrations {
 }
 
 
-impl Registrations {
+impl ReplicateRegistry {
 	pub fn registration_id<T: 'static>(&self) -> RegistrationId {
 		if let Some(value) = self.types.get(&TypeId::of::<T>()) {
 			*value
@@ -48,6 +43,20 @@ impl Registrations {
 			let name = std::any::type_name::<T>();
 			panic!("Type {} is not registered", name);
 		}
+	}
+
+	#[cfg(debug_assertions)]
+	pub fn types_to_json(&self) -> String {
+		let types = self
+			.types
+			.values()
+			.map(|v| {
+				let name = self.type_names.get(v).unwrap();
+				format!("  \"{name}\": {}", **v)
+			})
+			.collect::<Vec<String>>()
+			.join(",\n");
+		format!("{{\n{}\n}}", types)
 	}
 
 	pub fn entity_fns(
@@ -64,7 +73,8 @@ impl Registrations {
 	}
 
 	fn next_id<T: 'static>(&mut self) -> RegistrationId {
-		let id = RegistrationId::next();
+		let id = RegistrationId(self.id_incr);
+		self.id_incr += 1;
 		self.types.insert(std::any::TypeId::of::<T>(), id);
 		#[cfg(debug_assertions)]
 		self.type_names

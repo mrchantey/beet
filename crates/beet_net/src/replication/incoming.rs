@@ -5,7 +5,7 @@ use forky_core::ResultTEExt;
 
 pub fn handle_incoming_commands(
 	mut commands: Commands,
-	mut registrations: ResMut<Registrations>,
+	mut registrations: ResMut<ReplicateRegistry>,
 	incoming: Res<MessageIncoming>,
 ) {
 	for msg in incoming.iter() {
@@ -73,7 +73,7 @@ pub fn handle_incoming_commands(
 }
 
 pub fn handle_incoming_world(world: &mut World) {
-	let registrations = world.resource::<Registrations>();
+	let registrations = world.resource::<ReplicateRegistry>();
 	let events = world
 		.resource::<MessageIncoming>()
 		.iter()

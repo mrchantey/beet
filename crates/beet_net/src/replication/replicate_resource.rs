@@ -16,7 +16,7 @@ pub struct ResourceFns {
 impl<T: Send + Sync + 'static + Resource + Serialize + DeserializeOwned>
 	ReplicateType<ReplicateResourceMarker> for T
 {
-	fn register(registrations: &mut Registrations) {
+	fn register(registrations: &mut ReplicateRegistry) {
 		registrations.register_resource::<T>(ResourceFns {
 			insert: |commands, payload| {
 				let res: T = bincode::deserialize(payload)?;
@@ -40,7 +40,7 @@ impl<T: Send + Sync + 'static + Resource + Serialize + DeserializeOwned>
 	}
 }
 fn handle_outgoing<T: Resource + Serialize>(
-	registrations: Res<Registrations>,
+	registrations: Res<ReplicateRegistry>,
 	mut outgoing: ResMut<MessageOutgoing>,
 	value: Option<Res<T>>,
 	mut exists: Local<bool>,

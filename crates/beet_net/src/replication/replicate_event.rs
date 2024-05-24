@@ -13,7 +13,7 @@ pub struct EventFns {
 impl<T: Send + Sync + 'static + Event + Serialize + DeserializeOwned>
 	ReplicateType<ReplicateEventMarker> for T
 {
-	fn register(registrations: &mut Registrations) {
+	fn register(registrations: &mut ReplicateRegistry) {
 		registrations.register_event::<T>(EventFns {
 			send: |commands, payload| {
 				let ev: T = bincode::deserialize(payload)?;
@@ -26,7 +26,7 @@ impl<T: Send + Sync + 'static + Event + Serialize + DeserializeOwned>
 	fn outgoing_systems() -> SystemConfigs { outgoing_send::<T>.into_configs() }
 }
 fn outgoing_send<T: Event + Serialize>(
-	registrations: Res<Registrations>,
+	registrations: Res<ReplicateRegistry>,
 	mut outgoing: ResMut<MessageOutgoing>,
 	mut events: EventReader<T>,
 ) {

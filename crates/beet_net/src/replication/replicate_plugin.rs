@@ -34,7 +34,7 @@ impl Plugin for ReplicatePlugin {
 				Update,
 				MessageIncomingSet.before(MessageOutgoingSet),
 			)
-			.init_resource::<Registrations>()
+			.init_resource::<ReplicateRegistry>()
 			.init_resource::<MessageIncoming>()
 			.init_resource::<MessageOutgoing>()
 			.add_systems(

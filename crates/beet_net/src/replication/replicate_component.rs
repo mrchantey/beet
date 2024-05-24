@@ -15,7 +15,7 @@ pub struct ComponentFns {
 }
 
 fn outgoing_insert<T: Component + Serialize>(
-	registrations: Res<Registrations>,
+	registrations: Res<ReplicateRegistry>,
 	mut outgoing: ResMut<MessageOutgoing>,
 	query: Query<(Entity, &T), (Added<T>, With<Replicate>)>,
 ) {
@@ -37,7 +37,7 @@ fn outgoing_insert<T: Component + Serialize>(
 }
 
 fn outgoing_change<T: Component + Serialize>(
-	registrations: Res<Registrations>,
+	registrations: Res<ReplicateRegistry>,
 	mut outgoing: ResMut<MessageOutgoing>,
 	query: Query<(Entity, Ref<T>), (Changed<T>, With<Replicate>)>,
 ) {
@@ -64,7 +64,7 @@ fn outgoing_change<T: Component + Serialize>(
 
 /// This only responds to removed componets, it ignores despawned entities
 fn outgoing_remove<T: Component>(
-	registrations: Res<Registrations>,
+	registrations: Res<ReplicateRegistry>,
 	mut outgoing: ResMut<MessageOutgoing>,
 	mut removed: RemovedComponents<T>,
 	query: Query<(), With<Replicate>>,
@@ -85,7 +85,7 @@ fn outgoing_remove<T: Component>(
 impl<T: Send + Sync + 'static + Component + Serialize + DeserializeOwned>
 	ReplicateType<ReplicateComponentMarker> for T
 {
-	fn register(registrations: &mut Registrations) {
+	fn register(registrations: &mut ReplicateRegistry) {
 		registrations.register_component::<T>(ComponentFns {
 			insert: |commands, payload| {
 				let component: T = bincode::deserialize(payload)?;
