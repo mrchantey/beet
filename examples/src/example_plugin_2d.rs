@@ -2,15 +2,6 @@ use crate::example_plugin::ExamplePlugin;
 use crate::*;
 use beet::prelude::*;
 use bevy::prelude::*;
-use forky_bevy::systems::close_on_esc;
-
-
-pub fn assets_path() -> String {
-	#[cfg(target_arch = "wasm32")]
-	return "../assets".into();
-	#[cfg(not(target_arch = "wasm32"))]
-	return "assets".into();
-}
 
 // use bevy_inspector_egui::quick::WorldInspectorPlugin;
 /// Boilerplate for examples
@@ -24,7 +15,6 @@ impl Plugin for ExamplePlugin2d {
 			// .add_plugins(WorldInspectorPlugin::new())
 			.add_systems(Startup, space_setup)
 			.add_systems(Update, follow_cursor)
-			.add_systems(Update, close_on_esc)
 			// .add_systems(PreUpdate, auto_spawn::auto_spawn.before(PreTickSet))
 			.add_systems(Update, randomize_position.in_set(PreTickSet))
 			.add_systems(

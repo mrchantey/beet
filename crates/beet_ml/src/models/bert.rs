@@ -239,6 +239,7 @@ fn normalize_l2(v: &Tensor) -> Result<Tensor> {
 
 
 
+#[cfg(not(target_arch = "wasm32"))]
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;

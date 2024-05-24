@@ -2,36 +2,48 @@ use crate::prelude::*;
 use bevy::prelude::*;
 use forky_core::ResultTEExt;
 
-pub fn handle_spawn_outgoing(
-	mut outgoing: ResMut<MessageOutgoing>,
-	query: Query<Entity, Added<Replicate>>,
-) {
-	for entity in query.iter() {
-		outgoing.push(Message::Spawn { entity }.into());
+
+pub struct ReplicateEntityPlugin;
+
+
+impl Plugin for ReplicateEntityPlugin {
+	fn build(&self, app: &mut App) {
+		app.add_systems(
+			Update,
+			(
+				handle_incoming.in_set(MessageIncomingSet),
+				handle_outgoing.in_set(MessageOutgoingSet),
+			),
+		);
 	}
 }
 
-pub fn handle_despawn_outgoing(
+fn handle_outgoing(
 	mut outgoing: ResMut<MessageOutgoing>,
+	added: Query<Entity, Added<Replicate>>,
 	mut removed: RemovedComponents<Replicate>,
 ) {
+	for entity in added.iter() {
+		outgoing.push(Message::Spawn { entity }.into());
+	}
 	for entity in removed.read() {
 		outgoing.push(Message::Despawn { entity }.into());
 	}
 }
-pub fn handle_incoming(
+
+fn handle_incoming(
 	mut commands: Commands,
 	mut registrations: ResMut<Registrations>,
-	mut incoming: ResMut<MessageIncoming>,
+	incoming: Res<MessageIncoming>,
 ) {
-	for msg in incoming.drain(..) {
+	for msg in incoming.iter() {
 		match msg {
 			Message::Spawn { entity } => {
 				let local = commands.spawn_empty().id();
-				registrations.entities.insert(entity, local);
+				registrations.entities.insert(*entity, local);
 			}
 			Message::Despawn { entity } => {
-				commands.entity(entity).despawn();
+				commands.entity(*entity).despawn();
 			}
 			Message::Insert {
 				entity,
@@ -39,7 +51,7 @@ pub fn handle_incoming(
 				bytes,
 			} => {
 				if let Some((entity, fns)) =
-					registrations.entity_fns(entity, reg_id)
+					registrations.entity_fns(*entity, *reg_id)
 				{
 					(fns.insert)(&mut commands.entity(entity), &bytes)
 						.ok_or(|e| log::error!("{e}"));
@@ -52,16 +64,16 @@ pub fn handle_incoming(
 				bytes,
 			} => {
 				if let Some((entity, fns)) =
-					registrations.entity_fns(entity, reg_id)
+					registrations.entity_fns(*entity, *reg_id)
 				{
-					(fns.change)(&mut commands.entity(entity), &bytes)
+					(fns.change)(&mut commands.entity(entity), bytes)
 						.ok_or(|e| log::error!("{e}"));
 				} else {
 				}
 			}
 			Message::Remove { entity, reg_id } => {
 				if let Some((entity, fns)) =
-					registrations.entity_fns(entity, reg_id)
+					registrations.entity_fns(*entity, *reg_id)
 				{
 					(fns.remove)(&mut commands.entity(entity));
 				} else {

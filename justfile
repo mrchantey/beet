@@ -66,7 +66,7 @@ build-web-examples:
 	just build-web-example fetch
 
 serve-web-examples:
-	cd ./target/web-examples && forky serve
+	cd ./target/web-examples && forky serve --any-origin
 
 deploy-web-examples:
 	just build-web-examples
@@ -89,7 +89,7 @@ serve-web:
 	just serve-wasm
 
 book:
-	cd docs && mdbook serve
+	cd docs && mdbook serve --port 3001
 
 # mdbooks server is busted on wsl so I use live-server
 serve-book:

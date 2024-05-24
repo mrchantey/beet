@@ -26,7 +26,10 @@ impl<T: ReplicateComponent> Plugin for ReplicateComponentPlugin<T> {
 		app.init_resource::<Registrations>();
 		let mut registrations = app.world_mut().resource_mut::<Registrations>();
 		T::register(&mut registrations);
-		app.add_systems(Update, T::update_systems().after(MessageSet));
+		app.add_systems(
+			Update,
+			T::outgoing_systems().in_set(MessageOutgoingSet),
+		);
 	}
 }
 
@@ -86,8 +89,8 @@ fn outgoing_change<T: Component + Serialize>(
 	}
 }
 
-/// Ignores despawned entities
-fn handle_remove<T: Component>(
+/// This only responds to removed componets, it ignores despawned entities
+fn outgoing_remove<T: Component>(
 	registrations: Res<Registrations>,
 	mut outgoing: ResMut<MessageOutgoing>,
 	mut removed: RemovedComponents<T>,
@@ -109,7 +112,7 @@ fn handle_remove<T: Component>(
 
 pub trait ReplicateComponent: 'static + Send + Sync {
 	fn register(registrations: &mut Registrations);
-	fn update_systems() -> SystemConfigs;
+	fn outgoing_systems() -> SystemConfigs;
 }
 
 impl<T: Send + Sync + 'static + Component + Serialize + DeserializeOwned>
@@ -134,11 +137,11 @@ impl<T: Send + Sync + 'static + Component + Serialize + DeserializeOwned>
 		});
 	}
 
-	fn update_systems() -> SystemConfigs {
+	fn outgoing_systems() -> SystemConfigs {
 		(
 			outgoing_insert::<T>,
 			outgoing_change::<T>,
-			handle_remove::<T>,
+			outgoing_remove::<T>,
 		)
 			.into_configs()
 	}

@@ -12,7 +12,7 @@ keywords.workspace = true
 categories.workspace = true
 
 [features]
-default = []
+default = ["beet_ecs"]
 beet_ecs = ["dep:beet_ecs"]
 tokio-client = ["dep:tokio", "dep:tokio-tungstenite", "dep:futures-util"]
 # default = ["bevy_replicon"]
@@ -20,6 +20,7 @@ tokio-client = ["dep:tokio", "dep:tokio-tungstenite", "dep:futures-util"]
 
 [dependencies]
 beet_ecs = { workspace = true, optional = true }
+# beet_ecs = { workspace = true, optional = true }
 
 # bevy_replicon = { path = "../../../../me-ref/bevy_replicon", default-features = false, optional = true }
 
@@ -47,15 +48,18 @@ strum_macros.workspace = true
 # async-compat = "0.2.3"
 # derive_more = { version = "0.99", features = ["add", "mul"] }
 
-tokio = { workspace = true, optional = true }
-tokio-tungstenite = { workspace = true, optional = true }
-futures-util = { workspace = true, optional = true }
 
 # bevy = { version = "0.13", default-features = false }
 # bevy = { workspace = true, default-features = false, features = [] }
 bevy = { git = "https://github.com/bevyengine/bevy.git", rev = "f516de456be2b65572de1af6956d52157663b9cc", default-features = false, features = [
 	# "bevy_scene",
 ] }
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+tokio = { workspace = true, optional = true }
+tokio-tungstenite = { workspace = true, optional = true }
+futures-util = { workspace = true, optional = true }
+
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 web-sys.workspace = true
@@ -70,7 +74,8 @@ wasm-bindgen.workspace = true
 pretty_env_logger.workspace = true
 sweet.workspace = true
 rand.workspace = true
-
+[target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
+tokio.workspace = true
 
 [[example]]
 name = "client"

@@ -1,10 +1,7 @@
-#![allow(unused)]
-use crate::assets_path;
 use crate::example_plugin::ExamplePlugin;
 use crate::follow_cursor_3d;
 use bevy::pbr::CascadeShadowConfigBuilder;
 use bevy::prelude::*;
-use forky_bevy::systems::close_on_esc;
 use std::f32::consts::PI;
 
 #[derive(Default)]
@@ -14,7 +11,7 @@ impl Plugin for ExamplePlugin3d {
 	fn build(&self, app: &mut App) {
 		app.add_plugins(ExamplePlugin)
 			.add_systems(Startup, setup_scene_3d)
-			.add_systems(Update, (close_on_esc, follow_cursor_3d));
+			.add_systems(Update, follow_cursor_3d);
 	}
 }
 

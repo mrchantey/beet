@@ -8,4 +8,5 @@ Beet uses some custom web components in its examples.
 Sends speech input to the bevy apps
 
 <speech-to-text debug ></speech-to-text>
-<beet-canvas require-interaction src="https://storage.googleapis.com/beet-examples/fetch/wasm/main.js"> </beet-canvas>
+<beet-canvas custom-load src="http://localhost:3000/fetch/wasm/main.js"> </beet-canvas>
+<!-- <beet-canvas require-interaction src="https://storage.googleapis.com/beet-examples/fetch/wasm/main.js"> </beet-canvas> -->

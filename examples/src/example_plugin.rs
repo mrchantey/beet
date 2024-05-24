@@ -1,5 +1,5 @@
-use crate::assets_path;
 use bevy::prelude::*;
+use forky_bevy::systems::close_on_esc;
 
 
 
@@ -14,7 +14,7 @@ impl Plugin for ExamplePlugin {
 				.set(WindowPlugin {
 					primary_window: Some(Window {
 						fit_canvas_to_parent: true,
-						canvas: Some("#beet-canvas".into()),
+						canvas: canvas(),
 						..default()
 					}),
 					..default()
@@ -24,10 +24,24 @@ impl Plugin for ExamplePlugin {
 					..default()
 				})
 				.build(),
-		);
-
-		// #[cfg(target_arch = "wasm32")]
-		// app.add_systems(Startup, wasm_funcs::set_canvas_ready);
+		)
+		.add_systems(Update, close_on_esc);
 	}
 }
 
+
+fn canvas() -> Option<String> {
+	// #[cfg(debug_assertions)]
+	return Some("#beet-canvas".into());
+	// #[cfg(not(debug_assertions))]
+	// return None;
+}
+
+
+fn assets_path() -> String {
+	#[cfg(target_arch = "wasm32")]
+	return "https://storage.googleapis.com/beet-examples/assets".into();
+	// return "../assets".into();
+	#[cfg(not(target_arch = "wasm32"))]
+	return "assets".into();
+}
