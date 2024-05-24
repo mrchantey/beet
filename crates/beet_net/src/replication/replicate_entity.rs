@@ -50,20 +50,19 @@ mod test {
 
 	#[test]
 	fn incoming() -> Result<()> {
-		let mut app = App::new();
-		app.add_plugins(ReplicatePlugin);
-
-		let _entity1 = app.world_mut().spawn(Replicate::default()).id();
-
-		app.update();
-
+		let mut app1 = App::new();
+		app1.add_plugins(ReplicatePlugin);
 
 		let mut app2 = App::new();
-
 		app2.add_plugins(ReplicatePlugin);
 
-		Message::loopback(app.world_mut(), app2.world_mut());
+		let _entity1 = app1.world_mut().spawn(Replicate::default()).id();
 
+		app1.update();
+
+		Message::loopback(app1.world_mut(), app2.world_mut());
+
+		// test different entity ids
 		let _dummy = app2.world_mut().spawn_empty();
 
 		app2.update();

@@ -6,6 +6,7 @@ use forky_core::ResultTEExt;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 
+#[derive(Copy, Clone)]
 pub struct ComponentFns {
 	// pub type_id: std::any::TypeId,
 	pub insert: fn(&mut EntityCommands, payload: &[u8]) -> bincode::Result<()>,
@@ -82,7 +83,7 @@ fn outgoing_remove<T: Component>(
 }
 
 impl<T: Send + Sync + 'static + Component + Serialize + DeserializeOwned>
-	ReplicateType for T
+	ReplicateType<ReplicateComponentMarker> for T
 {
 	fn register(registrations: &mut Registrations) {
 		registrations.register_component::<T>(ComponentFns {
@@ -127,10 +128,7 @@ mod test {
 	#[test]
 	fn outgoing() -> Result<()> {
 		let mut app = App::new();
-		app.add_plugins((
-			ReplicatePlugin,
-			ReplicateTypePlugin::<MyComponent>::default(),
-		));
+		app.add_plugins(ReplicatePlugin).replicate::<MyComponent>();
 
 		let entity = app
 			.world_mut()
@@ -176,16 +174,10 @@ mod test {
 	#[test]
 	fn incoming() -> Result<()> {
 		let mut app1 = App::new();
-		app1.add_plugins((
-			ReplicatePlugin,
-			ReplicateTypePlugin::<MyComponent>::default(),
-		));
+		app1.add_plugins(ReplicatePlugin).replicate::<MyComponent>();
 		let mut app2 = App::new();
 
-		app2.add_plugins((
-			ReplicatePlugin,
-			ReplicateTypePlugin::<MyComponent>::default(),
-		));
+		app2.add_plugins(ReplicatePlugin).replicate::<MyComponent>();
 
 
 		// INSERT

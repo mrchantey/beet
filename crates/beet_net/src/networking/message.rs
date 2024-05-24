@@ -40,7 +40,6 @@ pub enum Message {
 	},
 	RemoveResource {
 		reg_id: RegistrationId,
-		bytes: Vec<u8>,
 	},
 	SendEvent {
 		reg_id: RegistrationId,
@@ -65,7 +64,6 @@ impl Message {
 		bincode::serialize(items)
 	}
 }
-
 
 #[extend::ext]
 pub impl World {
