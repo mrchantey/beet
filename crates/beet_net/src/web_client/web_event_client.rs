@@ -4,11 +4,11 @@ use flume::Receiver;
 use forky_core::ResultTEExt;
 use forky_web::HtmlEventListener;
 use forky_web::ResultTJsValueExt;
+use wasm_bindgen::JsCast;
 use wasm_bindgen::JsValue;
 use web_sys::CustomEvent;
 use web_sys::CustomEventInit;
 use web_sys::EventTarget;
-
 
 /// The [`WebEventClient`] can be used on any [`EventTarget`].
 /// - listens for `"js-message"`
@@ -20,7 +20,11 @@ pub struct WebEventClient {
 	listener: HtmlEventListener<CustomEvent>,
 }
 impl WebEventClient {
-	pub fn new(target: EventTarget) -> Result<Self> {
+	pub fn new_with_window() -> Self {
+		Self::new(web_sys::window().unwrap().dyn_into().unwrap())
+	}
+
+	pub fn new(target: EventTarget) -> Self {
 		let (send, recv) = flume::unbounded();
 
 		let listener = HtmlEventListener::new_with_target(
@@ -34,11 +38,11 @@ impl WebEventClient {
 			},
 			target.clone(),
 		);
-		Ok(Self {
+		Self {
 			target,
 			recv,
 			listener,
-		})
+		}
 	}
 }
 

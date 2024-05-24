@@ -1,6 +1,5 @@
 use crate::prelude::*;
 use bevy::prelude::*;
-use bevy::tasks::block_on;
 use bevy::time::common_conditions::on_timer;
 use forky_core::ResultTEExt;
 use std::sync::Arc;
@@ -14,6 +13,7 @@ impl<T: Transport> TransportClient<T> {
 	pub fn new(client: T) -> Self { Self(client) }
 }
 
+// #[derive(Clone)]
 pub struct TransportPlugin<T: Transport> {
 	pub transport: T,
 }
@@ -24,21 +24,26 @@ impl<T: Transport> TransportPlugin<T> {
 		TransportPlugin::new(Arc::new(Mutex::new(transport)))
 	}
 }
+impl<T: 'static + Transport + Clone> TransportPlugin<T> {
+	pub fn closure(transport: T) -> TransportPlugin<Box<dyn Fn() -> T>> {
+		let func = move || transport.clone();
+		TransportPlugin::new(Box::new(func))
+	}
+}
 /// Adds the [`transport_incoming`] and [`transport_outgoing`] systems
 impl<T: SendTransport> Plugin for TransportPlugin<T> {
 	fn build(&self, app: &mut App) {
 		app.insert_resource(TransportClient(self.transport.clone()))
 			.add_systems(
 				Update,
-				transport_incoming::<T>
-					.run_if(on_timer(SOCKET_INTERVAL))
-					.before(MessageIncomingSet),
-			)
-			.add_systems(
-				Update,
-				transport_outgoing::<T>
-					.run_if(on_timer(SOCKET_INTERVAL))
-					.after(MessageOutgoingSet),
+				(
+					transport_incoming::<T>
+						.run_if(on_timer(SOCKET_INTERVAL))
+						.before(MessageIncomingSet),
+					transport_outgoing::<T>
+						.run_if(on_timer(SOCKET_INTERVAL))
+						.after(MessageOutgoingSet),
+				),
 			);
 	}
 }
@@ -68,10 +73,16 @@ pub(crate) fn transport_outgoing<T: SendTransport>(
 	let messages = outgoing.drain(..).collect();
 	let mut client = client.clone();
 	{
+		#[cfg(target_arch = "wasm32")]
+		wasm_bindgen_futures::spawn_local(async move {
+			client.send(&messages).await.ok_or(|e| log::error!("{e}"));
+		});
+
+		#[cfg(not(target_arch = "wasm32"))]
 		//TODO transport defines async runtime
 		std::thread::spawn(|| {
-			block_on(async move {
-				client.send(&messages).await.ok_or(|e| log::error!("{e}"))
+			bevy::tasks::block_on(async move {
+				client.send(&messages).await.ok_or(|e| log::error!("{e}"));
 			});
 		});
 	}

@@ -52,7 +52,6 @@ impl<T: Transport> Transport for Arc<Mutex<T>> {
 	}
 }
 
-
 pub struct ChannelsTransport {
 	pub send: Sender<Vec<u8>>,
 	pub recv: Receiver<Vec<u8>>,

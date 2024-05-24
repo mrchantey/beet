@@ -20,7 +20,7 @@ keywords.workspace = true
 categories.workspace = true
 
 [features]
-default = ["ml", "animation", "assets", "ui"]
+default = ["ml", "animation", "assets", "ui", "net"]
 ml = ["dep:beet_ml"]
 net = ["dep:beet_net"]
 ui = ["beet_core/ui"]
@@ -44,14 +44,17 @@ log.workspace = true
 pretty_env_logger.workspace = true
 forky_bevy.workspace = true
 anyhow.workspace = true
+serde.workspace = true
 
 [target.'cfg(target_arch = "wasm32")'.dev-dependencies]
 console_log.workspace = true
+web-sys.workspace = true
+wasm-bindgen.workspace = true
 
 [target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
 tokio.workspace = true
 
-################## WORKSPACE ##################
+### WORKSPACE ###########################################################################################################################
 
 [workspace.package]
 version = "0.0.1"

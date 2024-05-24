@@ -15,10 +15,8 @@ pub struct WebPostmessageClient {
 	listener: HtmlEventListener<MessageEvent>,
 }
 impl WebPostmessageClient {
-	pub fn new() -> Result<Self> {
-		Self::new_with_window(web_sys::window().unwrap())
-	}
-	pub fn new_with_window(target: Window) -> Result<Self> {
+	pub fn new() -> Self { Self::new_with(web_sys::window().unwrap()) }
+	pub fn new_with(target: Window) -> Self {
 		let (send, recv) = flume::unbounded();
 
 		let listener = HtmlEventListener::new_with_target(
@@ -32,11 +30,11 @@ impl WebPostmessageClient {
 			},
 			target.clone(),
 		);
-		Ok(Self {
+		Self {
 			target,
 			recv,
 			listener,
-		})
+		}
 	}
 }
 

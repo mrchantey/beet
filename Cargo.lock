@@ -545,7 +545,10 @@ dependencies = [
  "forky_bevy",
  "log",
  "pretty_env_logger",
+ "serde",
  "tokio",
+ "wasm-bindgen",
+ "web-sys",
 ]
 
 [[package]]
@@ -667,6 +670,7 @@ dependencies = [
  "tokio",
  "tokio-tungstenite",
  "wasm-bindgen",
+ "wasm-bindgen-futures",
  "web-sys",
 ]
 
