@@ -28,9 +28,15 @@ impl RegistrationId {
 #[derive(Default, Resource)]
 pub struct Registrations {
 	pub types: HashMap<TypeId, RegistrationId>,
+
+	#[cfg(debug_assertions)]
+	pub type_names: HashMap<RegistrationId, String>,
+
 	/// Map of remote to local entity ids
 	pub entities: HashMap<Entity, Entity>,
 	pub components: HashMap<RegistrationId, ComponentFns>,
+	pub resources: HashMap<RegistrationId, ResourceFns>,
+	pub events: HashMap<RegistrationId, EventFns>,
 }
 
 
@@ -57,10 +63,37 @@ impl Registrations {
 		None
 	}
 
-	pub fn register_component(&mut self, fns: ComponentFns) -> RegistrationId {
+	fn next_id<T: 'static>(&mut self) -> RegistrationId {
 		let id = RegistrationId::next();
-		self.types.insert(fns.type_id, id);
+		self.types.insert(std::any::TypeId::of::<T>(), id);
+		#[cfg(debug_assertions)]
+		self.type_names
+			.insert(id, std::any::type_name::<T>().to_string());
+		id
+	}
+
+	pub fn register_component<T: Component>(
+		&mut self,
+		fns: ComponentFns,
+	) -> RegistrationId {
+		let id = self.next_id::<T>();
 		self.components.insert(id, fns);
+		id
+	}
+	pub fn register_resource<T: Resource>(
+		&mut self,
+		fns: ResourceFns,
+	) -> RegistrationId {
+		let id = self.next_id::<T>();
+		self.resources.insert(id, fns);
+		id
+	}
+	pub fn register_event<T: Event>(
+		&mut self,
+		fns: EventFns,
+	) -> RegistrationId {
+		let id = self.next_id::<T>();
+		self.events.insert(id, fns);
 		id
 	}
 }

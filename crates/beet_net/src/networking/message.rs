@@ -21,23 +21,31 @@ pub enum Message {
 		entity: Entity,
 	},
 	Insert {
-		entity: Entity,
 		reg_id: RegistrationId,
 		bytes: Vec<u8>,
+		entity: Entity,
 	},
 	Change {
-		entity: Entity,
 		reg_id: RegistrationId,
+		entity: Entity,
 		bytes: Vec<u8>,
 	},
 	Remove {
-		entity: Entity,
 		reg_id: RegistrationId,
+		entity: Entity,
 	},
-	// InsertResource {
-	// 	resource_id: SerdeComponentId,
-	// 	bytes: Vec<u8>,
-	// },
+	InsertResource {
+		reg_id: RegistrationId,
+		bytes: Vec<u8>,
+	},
+	RemoveResource {
+		reg_id: RegistrationId,
+		bytes: Vec<u8>,
+	},
+	SendEvent {
+		reg_id: RegistrationId,
+		bytes: Vec<u8>,
+	},
 }
 
 impl Message {

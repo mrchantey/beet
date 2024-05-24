@@ -5,37 +5,9 @@ use bevy::prelude::*;
 use forky_core::ResultTEExt;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
-use std::marker::PhantomData;
-
-
-pub struct ReplicateComponentPlugin<T: ReplicateComponent> {
-	phantom: PhantomData<T>,
-}
-
-impl<T: ReplicateComponent> Default for ReplicateComponentPlugin<T> {
-	fn default() -> Self {
-		Self {
-			phantom: PhantomData,
-		}
-	}
-}
-
-
-impl<T: ReplicateComponent> Plugin for ReplicateComponentPlugin<T> {
-	fn build(&self, app: &mut App) {
-		app.init_resource::<Registrations>();
-		let mut registrations = app.world_mut().resource_mut::<Registrations>();
-		T::register(&mut registrations);
-		app.add_systems(
-			Update,
-			T::outgoing_systems().in_set(MessageOutgoingSet),
-		);
-	}
-}
-
 
 pub struct ComponentFns {
-	pub type_id: std::any::TypeId,
+	// pub type_id: std::any::TypeId,
 	pub insert: fn(&mut EntityCommands, payload: &[u8]) -> bincode::Result<()>,
 	pub change: fn(&mut EntityCommands, payload: &[u8]) -> bincode::Result<()>,
 	pub remove: fn(&mut EntityCommands),
@@ -109,18 +81,11 @@ fn outgoing_remove<T: Component>(
 	}
 }
 
-
-pub trait ReplicateComponent: 'static + Send + Sync {
-	fn register(registrations: &mut Registrations);
-	fn outgoing_systems() -> SystemConfigs;
-}
-
 impl<T: Send + Sync + 'static + Component + Serialize + DeserializeOwned>
-	ReplicateComponent for T
+	ReplicateType for T
 {
 	fn register(registrations: &mut Registrations) {
-		registrations.register_component(ComponentFns {
-			type_id: std::any::TypeId::of::<T>(),
+		registrations.register_component::<T>(ComponentFns {
 			insert: |commands, payload| {
 				let component: T = bincode::deserialize(payload)?;
 				commands.insert(component);
@@ -147,26 +112,6 @@ impl<T: Send + Sync + 'static + Component + Serialize + DeserializeOwned>
 	}
 }
 
-// macro_rules! impl_replicate_component_tuples {
-// 	($($param: ident),*) => {
-// 			impl<$($param),*> ReplicateComponent for ($($param,)*)
-// 			where
-// 					$($param: Send + Sync + 'static + Component + Serialize + DeserializeOwned),*
-// 			{
-// 					#[allow(non_snake_case, unused_variables)]
-// 					#[track_caller]
-// 					fn register(registrations:&mut Registrations) {
-// 							$($param::register(registrations);)*
-// 					}
-// 					fn update_systems()-> SystemConfigs {
-// 							($($param::update_systems(),)*).into_configs()
-// 					}
-// 			}
-// 	}
-// }
-// all_tuples!(impl_replicate_component_tuples, 1, 15, P);
-
-
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
@@ -184,7 +129,7 @@ mod test {
 		let mut app = App::new();
 		app.add_plugins((
 			ReplicatePlugin,
-			ReplicateComponentPlugin::<MyComponent>::default(),
+			ReplicateTypePlugin::<MyComponent>::default(),
 		));
 
 		let entity = app
@@ -233,13 +178,13 @@ mod test {
 		let mut app1 = App::new();
 		app1.add_plugins((
 			ReplicatePlugin,
-			ReplicateComponentPlugin::<MyComponent>::default(),
+			ReplicateTypePlugin::<MyComponent>::default(),
 		));
 		let mut app2 = App::new();
 
 		app2.add_plugins((
 			ReplicatePlugin,
-			ReplicateComponentPlugin::<MyComponent>::default(),
+			ReplicateTypePlugin::<MyComponent>::default(),
 		));
 
 

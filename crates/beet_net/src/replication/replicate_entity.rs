@@ -1,24 +1,11 @@
 use crate::prelude::*;
 use bevy::prelude::*;
-use forky_core::ResultTEExt;
 
 
 pub struct ReplicateEntityPlugin;
 
 
-impl Plugin for ReplicateEntityPlugin {
-	fn build(&self, app: &mut App) {
-		app.add_systems(
-			Update,
-			(
-				handle_incoming.in_set(MessageIncomingSet),
-				handle_outgoing.in_set(MessageOutgoingSet),
-			),
-		);
-	}
-}
-
-fn handle_outgoing(
+pub fn handle_entity_outgoing(
 	mut outgoing: ResMut<MessageOutgoing>,
 	added: Query<Entity, Added<Replicate>>,
 	mut removed: RemovedComponents<Replicate>,
@@ -31,57 +18,7 @@ fn handle_outgoing(
 	}
 }
 
-fn handle_incoming(
-	mut commands: Commands,
-	mut registrations: ResMut<Registrations>,
-	incoming: Res<MessageIncoming>,
-) {
-	for msg in incoming.iter() {
-		match msg {
-			Message::Spawn { entity } => {
-				let local = commands.spawn_empty().id();
-				registrations.entities.insert(*entity, local);
-			}
-			Message::Despawn { entity } => {
-				commands.entity(*entity).despawn();
-			}
-			Message::Insert {
-				entity,
-				reg_id,
-				bytes,
-			} => {
-				if let Some((entity, fns)) =
-					registrations.entity_fns(*entity, *reg_id)
-				{
-					(fns.insert)(&mut commands.entity(entity), &bytes)
-						.ok_or(|e| log::error!("{e}"));
-				} else {
-				}
-			}
-			Message::Change {
-				entity,
-				reg_id,
-				bytes,
-			} => {
-				if let Some((entity, fns)) =
-					registrations.entity_fns(*entity, *reg_id)
-				{
-					(fns.change)(&mut commands.entity(entity), bytes)
-						.ok_or(|e| log::error!("{e}"));
-				} else {
-				}
-			}
-			Message::Remove { entity, reg_id } => {
-				if let Some((entity, fns)) =
-					registrations.entity_fns(*entity, *reg_id)
-				{
-					(fns.remove)(&mut commands.entity(entity));
-				} else {
-				}
-			}
-		}
-	}
-}
+
 
 #[cfg(test)]
 mod test {

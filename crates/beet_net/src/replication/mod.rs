@@ -1,15 +1,24 @@
 pub mod replicate_plugin;
 #[allow(unused_imports)]
 pub use self::replicate_plugin::*;
+pub mod replicate_event;
+#[allow(unused_imports)]
+pub use self::replicate_event::*;
 pub mod replicate_entity;
 #[allow(unused_imports)]
 pub use self::replicate_entity::*;
-pub mod outgoing_component;
+pub mod replicate_resource;
 #[allow(unused_imports)]
-pub use self::outgoing_component::*;
+pub use self::replicate_resource::*;
 pub mod replicate_registrations;
 #[allow(unused_imports)]
 pub use self::replicate_registrations::*;
+pub mod replicate_type;
+#[allow(unused_imports)]
+pub use self::replicate_type::*;
+pub mod incoming;
+#[allow(unused_imports)]
+pub use self::incoming::*;
 pub mod replicate_component;
 #[allow(unused_imports)]
 pub use self::replicate_component::*;

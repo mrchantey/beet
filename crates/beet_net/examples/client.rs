@@ -15,7 +15,7 @@ async fn main() {
 			// LogPlugin::default(),
 			MinimalPlugins,
 			ReplicatePlugin,
-			ReplicateComponentPlugin::<MyComponent>::default(),
+			ReplicateTypePlugin::<MyComponent>::default(),
 			NativeClientPlugin::default(),
 		))
 		.add_systems(Startup, start)

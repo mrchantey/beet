@@ -11,14 +11,14 @@ pub struct MessageIncomingSet;
 /// The set in which [`MessageOutgoing`] messages are written.
 pub struct MessageOutgoingSet;
 
-
+/// Mark an entity for outgoing replication
 #[derive(Default, Component)]
 pub struct Replicate {}
 
-
-
 /**
-A typical replication setup would look something like this:
+Base replication plugin, excluding [`Transport`] and any registered [`Component`], [`Resource`], or [`Event`] plugins.
+
+A typical replication system order would look something like this:
 - [`transport_incoming`]: [`MessageIncoming`] is appended by the transport
 - [`MessageIncomingSet`]: [`MessageIncoming`] is read by registered systems
 - [`MessageOutgoingSet`]: [`MessageOutgoing`] is appended by registered systems
@@ -30,7 +30,6 @@ pub struct ReplicatePlugin;
 impl Plugin for ReplicatePlugin {
 	fn build(&self, app: &mut App) {
 		app /*-*/
-			.add_plugins(ReplicateEntityPlugin)
 			.configure_sets(
 				Update,
 				MessageIncomingSet.before(MessageOutgoingSet),
@@ -38,13 +37,26 @@ impl Plugin for ReplicatePlugin {
 			.init_resource::<Registrations>()
 			.init_resource::<MessageIncoming>()
 			.init_resource::<MessageOutgoing>()
-			.add_systems(Update, clear_incoming.after(MessageIncomingSet));
+			.add_systems(
+				Update,
+				(
+					handle_incoming_commands.in_set(MessageIncomingSet),
+					handle_incoming_world.in_set(MessageIncomingSet),
+					handle_entity_outgoing.in_set(MessageOutgoingSet),
+					clear_incoming.after(MessageIncomingSet),
+				),
+			);
 
 		#[cfg(feature = "beet_ecs")]
 		{
 			use beet_ecs::prelude::*;
-			app.configure_sets(Update, MessageIncomingSet.in_set(PreTickSet));
-			app.configure_sets(Update, MessageOutgoingSet.in_set(PostTickSet));
+			app.configure_sets(
+				Update,
+				(
+					MessageIncomingSet.in_set(PreTickSet),
+					MessageOutgoingSet.in_set(PostTickSet),
+				),
+			);
 		}
 	}
 }
