@@ -8,6 +8,7 @@ use js_sys::ArrayBuffer;
 use js_sys::JsString;
 use js_sys::Uint8Array;
 use wasm_bindgen::JsCast;
+use wasm_bindgen::JsValue;
 use web_sys::BinaryType;
 use web_sys::MessageEvent;
 use web_sys::WebSocket;
@@ -29,7 +30,7 @@ impl WebWsClient {
 			"message",
 			move |e: MessageEvent| {
 				if let Some(bytes) =
-					message_event_to_bytes(e).ok_or(|e| log::error!("{e}"))
+					js_value_to_bytes(&e.data()).ok_or(|e| log::error!("{e}"))
 				{
 					send.send(bytes).ok_or(|e| log::error!("{e}"));
 				}
@@ -61,13 +62,12 @@ impl Drop for WebWsClient {
 
 /// Converts the [`MessageEvent::data`] field into a vec of bytes.
 /// If the data is a string, it will be converted to bytes using `serde_json`.
-pub fn message_event_to_bytes(event: MessageEvent) -> Result<Vec<u8>> {
-	let data = event.data();
-	if let Ok(array_buffer) = data.clone().dyn_into::<ArrayBuffer>().anyhow() {
+pub fn js_value_to_bytes(data: &JsValue) -> Result<Vec<u8>> {
+	if let Some(array_buffer) = data.dyn_ref::<ArrayBuffer>() {
 		let array = Uint8Array::new(&array_buffer);
 		let bytes = array.to_vec();
 		Ok(bytes)
-	} else if let Ok(str) = data.dyn_into::<JsString>() {
+	} else if let Some(str) = data.dyn_ref::<JsString>() {
 		// #[allow(unused_variables)]
 		#[cfg(feature = "serde_json")]
 		return Ok(Message::json_to_bytes(&str.as_string().unwrap())?);
