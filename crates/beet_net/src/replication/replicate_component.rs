@@ -22,7 +22,7 @@ fn outgoing_insert<T: Component + Serialize>(
 ) {
 	for (entity, component) in query.iter() {
 		let Some(payload) =
-			MessagePayload::bytes(component).ok_or(|e| log::error!("{e}"))
+			MessagePayload::new(component).ok_or(|e| log::error!("{e}"))
 		else {
 			continue;
 		};
@@ -46,7 +46,7 @@ fn outgoing_change<T: Component + Serialize>(
 		if component.is_added() {
 			continue;
 		}
-		let Some(payload) = MessagePayload::bytes(component.into_inner())
+		let Some(payload) = MessagePayload::new(component.into_inner())
 			.ok_or(|e| log::error!("{e}"))
 		else {
 			continue;
@@ -153,7 +153,7 @@ mod test {
 			&Message::Insert {
 				entity,
 				reg_id: RegistrationId::new_with(0),
-				payload: MessagePayload::bytes(&MyComponent(7))?,
+				payload: MessagePayload::new(&MyComponent(7))?,
 			}
 			.into(),
 		)?;
@@ -161,7 +161,7 @@ mod test {
 			&Message::Change {
 				entity,
 				reg_id: RegistrationId::new_with(0),
-				payload: MessagePayload::bytes(&MyComponent(8))?,
+				payload: MessagePayload::new(&MyComponent(8))?,
 			}
 			.into(),
 		)?;

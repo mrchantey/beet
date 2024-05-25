@@ -32,7 +32,7 @@ fn outgoing_send<T: Event + Serialize>(
 ) {
 	for ev in events.read() {
 		let Some(payload) =
-			MessagePayload::bytes(ev).ok_or(|e| log::error!("{e}"))
+			MessagePayload::new(ev).ok_or(|e| log::error!("{e}"))
 		else {
 			continue;
 		};
@@ -75,7 +75,7 @@ mod test {
 		expect(&msg_out[0]).to_be(
 			&Message::SendEvent {
 				reg_id: RegistrationId::new_with(0),
-				payload: MessagePayload::bytes(&MyEvent(7))?,
+				payload: MessagePayload::new(&MyEvent(7))?,
 			}
 			.into(),
 		)?;

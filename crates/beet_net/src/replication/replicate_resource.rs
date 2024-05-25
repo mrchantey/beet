@@ -46,7 +46,7 @@ fn handle_outgoing<T: Resource + Serialize>(
 		if *exists && value.is_changed() {
 			// CHANGED
 			let Some(payload) =
-				MessagePayload::bytes(&*value).ok_or(|e| log::error!("{e}"))
+				MessagePayload::new(&*value).ok_or(|e| log::error!("{e}"))
 			else {
 				return;
 			};
@@ -61,7 +61,7 @@ fn handle_outgoing<T: Resource + Serialize>(
 			// ADDED
 			*exists = true;
 			let Some(payload) =
-				MessagePayload::bytes(&*value).ok_or(|e| log::error!("{e}"))
+				MessagePayload::new(&*value).ok_or(|e| log::error!("{e}"))
 			else {
 				return;
 			};
@@ -119,14 +119,14 @@ mod test {
 		expect(&msg_out[0]).to_be(
 			&&Message::InsertResource {
 				reg_id,
-				payload: MessagePayload::bytes(&MyResource(7))?,
+				payload: MessagePayload::new(&MyResource(7))?,
 			}
 			.into(),
 		)?;
 		expect(&msg_out[1]).to_be(
 			&&Message::ChangeResource {
 				reg_id: RegistrationId::new_with(0),
-				payload: MessagePayload::bytes(&MyResource(8))?,
+				payload: MessagePayload::new(&MyResource(8))?,
 			}
 			.into(),
 		)?;
@@ -160,14 +160,14 @@ mod test {
 		expect(&msg_in[0]).to_be(
 			&&Message::InsertResource {
 				reg_id: RegistrationId::new_with(0),
-				payload: MessagePayload::bytes(&MyResource(7))?,
+				payload: MessagePayload::new(&MyResource(7))?,
 			}
 			.into(),
 		)?;
 		expect(&msg_in[1]).to_be(
 			&&Message::ChangeResource {
 				reg_id: RegistrationId::new_with(0),
-				payload: MessagePayload::bytes(&MyResource(8))?,
+				payload: MessagePayload::new(&MyResource(8))?,
 			}
 			.into(),
 		)?;
