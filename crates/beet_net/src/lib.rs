@@ -5,7 +5,7 @@ pub mod tokio_client;
 pub mod networking;
 pub mod replication;
 #[cfg(target_arch = "wasm32")]
-pub mod web_client;
+pub mod web_transport;
 
 pub mod prelude {
 	pub use crate::extensions::*;
@@ -14,5 +14,5 @@ pub mod prelude {
 	pub use crate::networking::*;
 	pub use crate::replication::*;
 	#[cfg(target_arch = "wasm32")]
-	pub use crate::web_client::*;
+	pub use crate::web_transport::*;
 }

@@ -11,11 +11,13 @@ use web_sys::CustomEventInit;
 use web_sys::EventTarget;
 
 /// The [`WebEventClient`] can be used on any [`EventTarget`].
+/// Can receive binary or json messages.
+/// Sends json messages.
 /// - listens for `"js-message"`
 /// - emits `"wasm-message"`
 pub struct WebEventClient {
 	target: EventTarget,
-	recv: Receiver<Vec<u8>>,
+	recv: Receiver<Vec<Message>>,
 	#[allow(unused)] // dropping this deregisters the listener
 	listener: HtmlEventListener<CustomEvent>,
 }
@@ -30,10 +32,10 @@ impl WebEventClient {
 		let listener = HtmlEventListener::new_with_target(
 			"js-message",
 			move |e: CustomEvent| {
-				if let Some(bytes) =
-					js_value_to_bytes(&e.detail()).ok_or(|e| log::error!("{e}"))
+				if let Some(messags) = js_value_to_messages(&e.detail())
+					.ok_or(|e| log::error!("{e}"))
 				{
-					send.send(bytes).ok_or(|e| log::error!("{e}"));
+					send.send(messags).ok_or(|e| log::error!("{e}"));
 				}
 			},
 			target.clone(),
@@ -47,8 +49,8 @@ impl WebEventClient {
 }
 
 impl Transport for WebEventClient {
-	async fn send_bytes(&mut self, bytes: Vec<u8>) -> Result<()> {
-		let json = Message::bytes_to_json(&bytes)?;
+	fn send(&mut self, messages: &Vec<Message>) -> Result<()> {
+		let json = Message::into_json(messages)?;
 		let mut init = CustomEventInit::new();
 		init.detail(&JsValue::from_str(&json));
 		let event =
@@ -58,7 +60,5 @@ impl Transport for WebEventClient {
 		Ok(())
 	}
 
-	fn recv_bytes(&mut self) -> Result<Vec<Vec<u8>>> {
-		self.recv.try_recv_all()
-	}
+	fn recv(&mut self) -> Result<Vec<Message>> { self.recv.try_recv_all_flat() }
 }

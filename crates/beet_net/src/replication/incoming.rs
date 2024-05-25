@@ -65,6 +65,12 @@ pub fn handle_incoming_commands(
 					(fns.remove)(&mut commands).ok_or(|e| log::error!("{e}"));
 				}
 			}
+			#[cfg(feature = "serde_json")]
+			Message::InsertJson { reg_id, entity, json }=>{
+				serde_json::to_value(json);
+
+			},
+
 			_ => {
 				// events require world access
 			}

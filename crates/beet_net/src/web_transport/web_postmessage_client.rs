@@ -10,7 +10,7 @@ use web_sys::Window;
 
 pub struct WebPostmessageClient {
 	target: Window,
-	recv: Receiver<Vec<u8>>,
+	recv: Receiver<Vec<Message>>,
 	#[allow(unused)] // dropping this deregisters the listener
 	listener: HtmlEventListener<MessageEvent>,
 }
@@ -22,10 +22,10 @@ impl WebPostmessageClient {
 		let listener = HtmlEventListener::new_with_target(
 			"message",
 			move |e: MessageEvent| {
-				if let Some(bytes) =
-					js_value_to_bytes(&e.data()).ok_or(|e| log::error!("{e}"))
+				if let Some(msg) = js_value_to_messages(&e.data())
+					.ok_or(|e| log::error!("{e}"))
 				{
-					send.send(bytes).ok_or(|e| log::error!("{e}"));
+					send.send(msg).ok_or(|e| log::error!("{e}"));
 				}
 			},
 			target.clone(),
@@ -39,15 +39,13 @@ impl WebPostmessageClient {
 }
 
 impl Transport for WebPostmessageClient {
-	async fn send_bytes(&mut self, bytes: Vec<u8>) -> Result<()> {
-		let json = Message::bytes_to_json(&bytes)?;
+	fn send(&mut self, messages: &Vec<Message>) -> Result<()> {
+		let json = Message::into_json(messages)?;
 		self.target
 			.post_message(&JsValue::from_str(&json), "*")
 			.anyhow()?;
 		Ok(())
 	}
 
-	fn recv_bytes(&mut self) -> Result<Vec<Vec<u8>>> {
-		self.recv.try_recv_all()
-	}
+	fn recv(&mut self) -> Result<Vec<Message>> { self.recv.try_recv_all_flat() }
 }

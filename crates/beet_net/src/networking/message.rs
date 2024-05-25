@@ -22,8 +22,8 @@ pub enum Message {
 	},
 	Insert {
 		reg_id: RegistrationId,
-		bytes: Vec<u8>,
 		entity: Entity,
+		bytes: Vec<u8>,
 	},
 	Change {
 		reg_id: RegistrationId,
@@ -48,6 +48,33 @@ pub enum Message {
 	SendEvent {
 		reg_id: RegistrationId,
 		bytes: Vec<u8>,
+	},
+	#[cfg(feature = "serde_json")]
+	InsertJson {
+		reg_id: RegistrationId,
+		entity: Entity,
+		json: String,
+	},
+	#[cfg(feature = "serde_json")]
+	ChangeJson {
+		reg_id: RegistrationId,
+		entity: Entity,
+		json: String,
+	},
+	#[cfg(feature = "serde_json")]
+	InsertResourceJson {
+		reg_id: RegistrationId,
+		json: String,
+	},
+	#[cfg(feature = "serde_json")]
+	ChangeResourceJson {
+		reg_id: RegistrationId,
+		json: String,
+	},
+	#[cfg(feature = "serde_json")]
+	SendEventJson {
+		reg_id: RegistrationId,
+		json: String,
 	},
 }
 
@@ -76,22 +103,6 @@ impl Message {
 	#[cfg(feature = "serde_json")]
 	pub fn into_json(items: &Vec<Message>) -> serde_json::Result<String> {
 		serde_json::to_string(items)
-	}
-
-
-	/// Transport interface only allows bytes, use this to convert json to bytes
-	#[cfg(feature = "serde_json")]
-	pub fn json_to_bytes(string: &str) -> anyhow::Result<Vec<u8>> {
-		let msg = Self::from_json(string)?;
-		let bytes = Self::into_bytes(&msg)?;
-		return Ok(bytes);
-	}
-	/// Transport interface only allows bytes, use this to convert json to bytes
-	#[cfg(feature = "serde_json")]
-	pub fn bytes_to_json(bytes: &Vec<u8>) -> anyhow::Result<String> {
-		let msg = Self::from_bytes(bytes)?;
-		let json = Self::into_json(&msg)?;
-		return Ok(json);
 	}
 }
 

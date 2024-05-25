@@ -19,7 +19,7 @@ pub struct ReplicateEventMarker;
 
 
 
-#[extend::ext]
+#[extend::ext(name=AppExtReplicate)]
 pub impl App {
 	fn replicate<T: ReplicateType<ReplicateComponentMarker>>(
 		&mut self,

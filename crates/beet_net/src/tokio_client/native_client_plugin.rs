@@ -25,7 +25,9 @@ impl Plugin for NativeClientPlugin {
 		{
 			log::info!("client connected");
 
-			app.add_plugins(TransportPlugin::arc(client));
+			app.add_transport(client);
+
+			// app.add_plugins(TransportPlugin::arc(client));
 		}
 	}
 }
