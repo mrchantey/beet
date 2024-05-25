@@ -32,6 +32,9 @@ impl WebEventClient {
 		let listener = HtmlEventListener::new_with_target(
 			"js-message",
 			move |e: CustomEvent| {
+				log::info!("Received event: {:?}", e.detail());
+
+
 				if let Some(messags) = js_value_to_messages(&e.detail())
 					.ok_or(|e| log::error!("{e}"))
 				{
@@ -50,7 +53,7 @@ impl WebEventClient {
 
 impl Transport for WebEventClient {
 	fn send(&mut self, messages: &Vec<Message>) -> Result<()> {
-		let json = Message::into_json(messages)?;
+		let json = Message::vec_into_json(messages)?;
 		let mut init = CustomEventInit::new();
 		init.detail(&JsValue::from_str(&json));
 		let event =

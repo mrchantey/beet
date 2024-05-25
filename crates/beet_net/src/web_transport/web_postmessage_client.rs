@@ -40,7 +40,7 @@ impl WebPostmessageClient {
 
 impl Transport for WebPostmessageClient {
 	fn send(&mut self, messages: &Vec<Message>) -> Result<()> {
-		let json = Message::into_json(messages)?;
+		let json = Message::vec_into_json(messages)?;
 		self.target
 			.post_message(&JsValue::from_str(&json), "*")
 			.anyhow()?;

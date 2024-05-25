@@ -15,9 +15,9 @@ fn main() {
 		.add_transport(DebugSendTransport)
 		.add_transport(WebEventClient::new_with_window())
 		.add_plugins((MinimalPlugins, LogPlugin::default(), ReplicatePlugin))
-		.add_systems(Startup, transmit)
 		.add_event::<MyEvent>()
 		.replicate_event::<MyEvent>()
+		.add_systems(Startup, transmit)
 		.add_systems(Update, handle_event)
 		.run();
 }
@@ -27,6 +27,14 @@ fn handle_event(mut events: EventReader<MyEvent>) {
 		log::info!("Received event: {:?}", event);
 	}
 }
-fn transmit(mut events: EventWriter<MyEvent>) {
-	events.send(MyEvent("Hello, world!".to_string()));
+fn transmit() {
+	let event = MyEvent("Hello, world!".to_string());
+	let payload_json = serde_json::to_string(&event).unwrap();
+	let message = Message::SendEvent {
+		reg_id: RegistrationId::new_with(0),
+		payload: MessagePayload::Json(payload_json),
+	};
+	let message_json = serde_json::to_string(&vec![message]).unwrap();
+
+	log::info!("example events: \n{:?}", message_json);
 }

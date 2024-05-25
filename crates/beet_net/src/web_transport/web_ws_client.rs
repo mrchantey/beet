@@ -45,7 +45,7 @@ impl WebWsClient {
 
 impl Transport for WebWsClient {
 	fn send(&mut self, messages: &Vec<Message>) -> Result<()> {
-		let bytes = Message::into_bytes(messages)?;
+		let bytes = Message::vec_into_bytes(messages)?;
 		self.ws.send_with_u8_array(&bytes).anyhow()
 	}
 
@@ -67,17 +67,22 @@ pub fn js_value_to_messages(data: &JsValue) -> Result<Vec<Message>> {
 	if let Some(array_buffer) = data.dyn_ref::<ArrayBuffer>() {
 		let array = Uint8Array::new(&array_buffer);
 		let bytes = array.to_vec();
-		let messages = Message::from_bytes(&bytes)?;
+		let messages = Message::vec_from_bytes(&bytes)?;
 		Ok(messages)
 	} else if let Some(str) = data.dyn_ref::<JsString>() {
 		// #[allow(unused_variables)]
 		#[cfg(feature = "serde_json")]
-		return Ok(Message::from_json(&str.as_string().unwrap())?);
+		return Ok(Message::vec_from_json(&str.as_string().unwrap())?);
 		#[cfg(not(feature = "serde_json"))]
 		anyhow::bail!(
 			"received string but `serde_json` feature is not enabled\n{str}"
 		)
 	} else {
-		anyhow::bail!("received unknown message type")
+		anyhow::bail!(
+			"received unknown message type: {}",
+			data.js_typeof()
+				.as_string()
+				.unwrap_or("no type".to_string())
+		)
 	}
 }

@@ -41,12 +41,12 @@ impl NativeWsClient {
 			while let Some(Ok(msg)) = recv_stream.next().await {
 				match msg {
 					// #[allow(unused_variables)]
-					// TungWsEvent::Text(txt) => {
-					// 	#[cfg(feature = "json")]
-					// 	recv2.recv(Message::from_string(&txt)?).await?;
+					TungWsEvent::Text(txt) => {
+						// #[cfg(feature = "json")]
+						// recv_send.recv(Message::vec_from_json(&txt)?).await?;
 					// 	#[cfg(not(feature = "json"))]
 					// 	anyhow::bail!("received text but feature coora_core/json disabled");
-					// }
+					}
 					TungMessage::Binary(bytes) => {
 						recv_send.send(bytes)?;
 					}

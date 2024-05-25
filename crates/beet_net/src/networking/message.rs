@@ -146,7 +146,7 @@ impl Message {
 
 /// A serializable container for message payloads.
 /// With the `serde_json` feature enabled, both binary and json representations are stored
-/// and filtered depending on whether [`Message::into_json`] or [`Message::into_bytes`] is called.
+/// and filtered depending on whether [`Message::vec_into_json`] or [`Message::vec_into_bytes`] is called.
 #[derive(Debug, Clone, PartialEq, Resource, Serialize, Deserialize)]
 pub enum MessagePayload {
 	Bytes(Vec<u8>),

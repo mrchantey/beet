@@ -14,7 +14,7 @@ pub struct RegistrationId(usize);
 impl RegistrationId {
 	pub fn inner(&self) -> usize { self.0 }
 
-	#[cfg(test)]
+	// #[cfg(test)]
 	pub fn new_with(id: usize) -> Self { Self(id) }
 }
 

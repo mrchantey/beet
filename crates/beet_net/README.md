@@ -3,11 +3,15 @@
 
 This is a woefully naive but very tiny replication library that can run on microcontrollers.
 
+## Features
+### Multiple transports 
+For instance a web bevy app can send `serde_json` messages to the dom and `bincode` messages to the server
+
 ## Limitations
 
 - Components must be registered in the same order for every client
 - Messages are not cached, if a client joins late it misses previous messages
-
+- No authority determination
 
 
 ## References

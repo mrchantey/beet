@@ -45,6 +45,7 @@ pretty_env_logger.workspace = true
 forky_bevy.workspace = true
 anyhow.workspace = true
 serde.workspace = true
+serde_json.workspace = true
 
 [target.'cfg(target_arch = "wasm32")'.dev-dependencies]
 console_log.workspace = true
