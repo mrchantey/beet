@@ -7,6 +7,7 @@ use forky_core::ResultTEExt;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 
+/// Functions for handling reception of [`Component`] messages.
 #[derive(Copy, Clone)]
 pub struct ComponentFns {
 	// pub type_id: std::any::TypeId,
@@ -86,20 +87,26 @@ fn outgoing_remove<T: Component>(
 impl<T: Send + Sync + 'static + Component + Serialize + DeserializeOwned>
 	ReplicateType<ReplicateComponentMarker> for T
 {
-	fn register(registrations: &mut ReplicateRegistry) {
-		registrations.register_component::<T>(ComponentFns {
-			insert: |commands, payload| {
-				commands.insert(payload.deserialize::<T>()?);
-				Ok(())
+	fn register(
+		registrations: &mut ReplicateRegistry,
+		direction: ReplicateDirection,
+	) {
+		registrations.register_component::<T>(
+			ComponentFns {
+				insert: |commands, payload| {
+					commands.insert(payload.deserialize::<T>()?);
+					Ok(())
+				},
+				change: |commands, payload| {
+					commands.insert(payload.deserialize::<T>()?);
+					Ok(())
+				},
+				remove: |commands| {
+					commands.remove::<T>();
+				},
 			},
-			change: |commands, payload| {
-				commands.insert(payload.deserialize::<T>()?);
-				Ok(())
-			},
-			remove: |commands| {
-				commands.remove::<T>();
-			},
-		});
+			direction,
+		);
 	}
 
 	fn outgoing_systems() -> SystemConfigs {

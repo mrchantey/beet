@@ -6,6 +6,8 @@ use forky_core::ResultTEExt;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 
+
+/// Functions for handling reception of [`Resource`] messages.
 #[derive(Copy, Clone)]
 pub struct ResourceFns {
 	pub insert: fn(&mut Commands, payload: &MessagePayload) -> Result<()>,
@@ -16,20 +18,26 @@ pub struct ResourceFns {
 impl<T: Send + Sync + 'static + Resource + Serialize + DeserializeOwned>
 	ReplicateType<ReplicateResourceMarker> for T
 {
-	fn register(registrations: &mut ReplicateRegistry) {
-		registrations.register_resource::<T>(ResourceFns {
-			insert: |commands, payload| {
-				commands.insert_resource(payload.deserialize::<T>()?);
-				Ok(())
+	fn register(
+		registrations: &mut ReplicateRegistry,
+		direction: ReplicateDirection,
+	) {
+		registrations.register_resource::<T>(
+			ResourceFns {
+				insert: |commands, payload| {
+					commands.insert_resource(payload.deserialize::<T>()?);
+					Ok(())
+				},
+				change: |commands, payload| {
+					commands.insert_resource(payload.deserialize::<T>()?);
+					Ok(())
+				},
+				remove: |commands| {
+					commands.remove_resource::<T>();
+				},
 			},
-			change: |commands, payload| {
-				commands.insert_resource(payload.deserialize::<T>()?);
-				Ok(())
-			},
-			remove: |commands| {
-				commands.remove_resource::<T>();
-			},
-		});
+			direction,
+		);
 	}
 
 	fn outgoing_systems() -> SystemConfigs {
@@ -101,7 +109,7 @@ mod test {
 	fn outgoing() -> Result<()> {
 		let mut app = App::new();
 		app.add_plugins(ReplicatePlugin)
-			.replicate_resource::<MyResource>();
+			.replicate_resource_outgoing::<MyResource>();
 
 		app.world_mut().insert_resource(MyResource(7));
 		app.update();
@@ -140,12 +148,12 @@ mod test {
 	fn incoming() -> Result<()> {
 		let mut app1 = App::new();
 		app1.add_plugins(ReplicatePlugin)
-			.replicate_resource::<MyResource>();
+			.replicate_resource_outgoing::<MyResource>();
 
 		let mut app2 = App::new();
 
 		app2.add_plugins(ReplicatePlugin)
-			.replicate_resource::<MyResource>();
+			.replicate_resource_incoming::<MyResource>();
 		app1.world_mut().insert_resource(MyResource(7));
 		app1.update();
 		app1.world_mut().insert_resource(MyResource(8));

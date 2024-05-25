@@ -6,6 +6,7 @@ use forky_core::ResultTEExt;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 
+/// Functions for handling reception of [`Event`] messages.
 #[derive(Copy, Clone)]
 pub struct EventFns {
 	pub send: fn(&mut World, payload: &MessagePayload) -> Result<()>,
@@ -14,13 +15,19 @@ pub struct EventFns {
 impl<T: Send + Sync + 'static + Event + Serialize + DeserializeOwned>
 	ReplicateType<ReplicateEventMarker> for T
 {
-	fn register(registrations: &mut ReplicateRegistry) {
-		registrations.register_event::<T>(EventFns {
-			send: |commands, payload| {
-				commands.send_event(payload.deserialize::<T>()?);
-				Ok(())
+	fn register(
+		registrations: &mut ReplicateRegistry,
+		direction: ReplicateDirection,
+	) {
+		registrations.register_event::<T>(
+			EventFns {
+				send: |commands, payload| {
+					commands.send_event(payload.deserialize::<T>()?);
+					Ok(())
+				},
 			},
-		});
+			direction,
+		);
 	}
 
 	fn outgoing_systems() -> SystemConfigs { outgoing_send::<T>.into_configs() }
@@ -64,7 +71,7 @@ mod test {
 		let mut app = App::new();
 		app.add_plugins(ReplicatePlugin)
 			.add_event::<MyEvent>()
-			.replicate_event::<MyEvent>();
+			.replicate_event_outgoing::<MyEvent>();
 
 		app.world_mut().send_event(MyEvent(7));
 
@@ -88,12 +95,12 @@ mod test {
 		let mut app1 = App::new();
 		app1.add_plugins(ReplicatePlugin)
 			.add_event::<MyEvent>()
-			.replicate_event::<MyEvent>();
+			.replicate_event_outgoing::<MyEvent>();
 		let mut app2 = App::new();
 
 		app2.add_plugins(ReplicatePlugin)
 			.add_event::<MyEvent>()
-			.replicate_event::<MyEvent>();
+			.replicate_event_incoming::<MyEvent>();
 
 
 		// Send

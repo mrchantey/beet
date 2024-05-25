@@ -13,7 +13,6 @@ pub struct RegistrationId(usize);
 
 impl RegistrationId {
 	pub fn inner(&self) -> usize { self.0 }
-
 	// #[cfg(test)]
 	pub fn new_with(id: usize) -> Self { Self(id) }
 }
@@ -29,13 +28,14 @@ pub struct ReplicateRegistry {
 
 	/// Map of remote to local entity ids
 	pub entities: HashMap<Entity, Entity>,
-	pub components: HashMap<RegistrationId, ComponentFns>,
-	pub resources: HashMap<RegistrationId, ResourceFns>,
-	pub events: HashMap<RegistrationId, EventFns>,
+	pub incoming_component_fns: HashMap<RegistrationId, ComponentFns>,
+	pub incoming_resource_fns: HashMap<RegistrationId, ResourceFns>,
+	pub incoming_event_fns: HashMap<RegistrationId, EventFns>,
+	pub directions: HashMap<RegistrationId, ReplicateDirection>,
 }
 
 
-pub fn log_replicate_registry(registry:Res<ReplicateRegistry>){
+pub fn log_replicate_registry(registry: Res<ReplicateRegistry>) {
 	log::info!("Replicate Registry:\n{}", registry.types_to_json());
 }
 
@@ -69,16 +69,20 @@ impl ReplicateRegistry {
 		id: RegistrationId,
 	) -> Option<(Entity, &ComponentFns)> {
 		if let Some(entity) = self.entities.get(&remote) {
-			if let Some(fns) = self.components.get(&id) {
+			if let Some(fns) = self.incoming_component_fns.get(&id) {
 				return Some((*entity, fns));
 			}
 		}
 		None
 	}
 
-	fn next_id<T: 'static>(&mut self) -> RegistrationId {
+	fn next_id<T: 'static>(
+		&mut self,
+		direction: ReplicateDirection,
+	) -> RegistrationId {
 		let id = RegistrationId(self.id_incr);
 		self.id_incr += 1;
+		self.directions.insert(id, direction);
 		self.types.insert(std::any::TypeId::of::<T>(), id);
 		#[cfg(debug_assertions)]
 		self.type_names
@@ -89,25 +93,34 @@ impl ReplicateRegistry {
 	pub fn register_component<T: Component>(
 		&mut self,
 		fns: ComponentFns,
+		direction: ReplicateDirection,
 	) -> RegistrationId {
-		let id = self.next_id::<T>();
-		self.components.insert(id, fns);
+		let id = self.next_id::<T>(direction);
+		if direction.is_incoming() {
+			self.incoming_component_fns.insert(id, fns);
+		}
 		id
 	}
 	pub fn register_resource<T: Resource>(
 		&mut self,
 		fns: ResourceFns,
+		direction: ReplicateDirection,
 	) -> RegistrationId {
-		let id = self.next_id::<T>();
-		self.resources.insert(id, fns);
+		let id = self.next_id::<T>(direction);
+		if direction.is_incoming() {
+			self.incoming_resource_fns.insert(id, fns);
+		}
 		id
 	}
 	pub fn register_event<T: Event>(
 		&mut self,
 		fns: EventFns,
+		direction: ReplicateDirection,
 	) -> RegistrationId {
-		let id = self.next_id::<T>();
-		self.events.insert(id, fns);
+		let id = self.next_id::<T>(direction);
+		if direction.is_incoming() {
+			self.incoming_event_fns.insert(id, fns);
+		}
 		id
 	}
 }

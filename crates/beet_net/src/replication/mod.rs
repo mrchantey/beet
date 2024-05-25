@@ -13,6 +13,9 @@ pub use self::replicate_resource::*;
 pub mod replicate_type;
 #[allow(unused_imports)]
 pub use self::replicate_type::*;
+pub mod replicate_direction;
+#[allow(unused_imports)]
+pub use self::replicate_direction::*;
 pub mod incoming;
 #[allow(unused_imports)]
 pub use self::incoming::*;
@@ -22,3 +25,6 @@ pub use self::replicate_component::*;
 pub mod replicate_registry;
 #[allow(unused_imports)]
 pub use self::replicate_registry::*;
+pub mod common_events;
+#[allow(unused_imports)]
+pub use self::common_events::*;

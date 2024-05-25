@@ -49,19 +49,25 @@ pub fn handle_incoming_commands(
 				}
 			}
 			Message::InsertResource { reg_id, payload } => {
-				if let Some(fns) = registrations.resources.get(reg_id) {
+				if let Some(fns) =
+					registrations.incoming_resource_fns.get(reg_id)
+				{
 					(fns.insert)(&mut commands, payload)
 						.ok_or(|e| log::error!("{e}"));
 				}
 			}
 			Message::ChangeResource { reg_id, payload } => {
-				if let Some(fns) = registrations.resources.get(reg_id) {
+				if let Some(fns) =
+					registrations.incoming_resource_fns.get(reg_id)
+				{
 					(fns.change)(&mut commands, payload)
 						.ok_or(|e| log::error!("{e}"));
 				}
 			}
 			Message::RemoveResource { reg_id } => {
-				if let Some(fns) = registrations.resources.get(reg_id) {
+				if let Some(fns) =
+					registrations.incoming_resource_fns.get(reg_id)
+				{
 					(fns.remove)(&mut commands);
 				}
 			}
@@ -82,13 +88,17 @@ pub fn handle_incoming_world(world: &mut World) {
 		.iter()
 		.filter_map(|msg| match msg {
 			Message::SendEvent { reg_id, payload } => {
-				if let Some(fns) = registrations.events.get(reg_id) {
+				if let Some(fns) = registrations.incoming_event_fns.get(reg_id)
+				{
 					Some((fns.clone(), payload.clone()))
 				} else {
 					None
 				}
 			}
-			_ => None,
+			_ => {
+				// all other messages are handled by `handle_incoming_commands`
+				None
+			}
 		})
 		.collect::<Vec<_>>();
 
