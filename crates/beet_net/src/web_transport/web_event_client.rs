@@ -32,9 +32,6 @@ impl WebEventClient {
 		let listener = HtmlEventListener::new_with_target(
 			"js-message",
 			move |e: CustomEvent| {
-				log::info!("Received event: {:?}", e.detail());
-
-
 				if let Some(messags) = js_value_to_messages(&e.detail())
 					.ok_or(|e| log::error!("{e}"))
 				{
