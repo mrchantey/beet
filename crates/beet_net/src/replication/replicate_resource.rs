@@ -1,16 +1,16 @@
 use crate::prelude::*;
+use anyhow::Result;
 use bevy::ecs::schedule::SystemConfigs;
 use bevy::prelude::*;
 use forky_core::ResultTEExt;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 
-
 #[derive(Copy, Clone)]
 pub struct ResourceFns {
-	pub insert: fn(&mut Commands, payload: &[u8]) -> bincode::Result<()>,
-	pub change: fn(&mut Commands, payload: &[u8]) -> bincode::Result<()>,
-	pub remove: fn(&mut Commands) -> bincode::Result<()>,
+	pub insert: fn(&mut Commands, payload: &MessagePayload) -> Result<()>,
+	pub change: fn(&mut Commands, payload: &MessagePayload) -> Result<()>,
+	pub remove: fn(&mut Commands),
 }
 
 impl<T: Send + Sync + 'static + Resource + Serialize + DeserializeOwned>
@@ -19,18 +19,15 @@ impl<T: Send + Sync + 'static + Resource + Serialize + DeserializeOwned>
 	fn register(registrations: &mut ReplicateRegistry) {
 		registrations.register_resource::<T>(ResourceFns {
 			insert: |commands, payload| {
-				let res: T = bincode::deserialize(payload)?;
-				commands.insert_resource(res);
+				commands.insert_resource(payload.deserialize::<T>()?);
 				Ok(())
 			},
 			change: |commands, payload| {
-				let res: T = bincode::deserialize(payload)?;
-				commands.insert_resource(res);
+				commands.insert_resource(payload.deserialize::<T>()?);
 				Ok(())
 			},
 			remove: |commands| {
 				commands.remove_resource::<T>();
-				Ok(())
 			},
 		});
 	}
@@ -48,30 +45,30 @@ fn handle_outgoing<T: Resource + Serialize>(
 	if let Some(value) = value {
 		if *exists && value.is_changed() {
 			// CHANGED
-			let Some(bytes) =
-				bincode::serialize(&*value).ok_or(|e| log::error!("{e}"))
+			let Some(payload) =
+				MessagePayload::bytes(&*value).ok_or(|e| log::error!("{e}"))
 			else {
 				return;
 			};
 			outgoing.push(
 				Message::ChangeResource {
 					reg_id: registrations.registration_id::<T>(),
-					bytes,
+					payload,
 				}
 				.into(),
 			);
 		} else {
 			// ADDED
 			*exists = true;
-			let Some(bytes) =
-				bincode::serialize(&*value).ok_or(|e| log::error!("{e}"))
+			let Some(payload) =
+				MessagePayload::bytes(&*value).ok_or(|e| log::error!("{e}"))
 			else {
 				return;
 			};
 			outgoing.push(
 				Message::InsertResource {
 					reg_id: registrations.registration_id::<T>(),
-					bytes,
+					payload,
 				}
 				.into(),
 			);
@@ -122,14 +119,14 @@ mod test {
 		expect(&msg_out[0]).to_be(
 			&&Message::InsertResource {
 				reg_id,
-				bytes: vec![7, 0, 0, 0],
+				payload: MessagePayload::bytes(&MyResource(7))?,
 			}
 			.into(),
 		)?;
 		expect(&msg_out[1]).to_be(
 			&&Message::ChangeResource {
 				reg_id: RegistrationId::new_with(0),
-				bytes: vec![8, 0, 0, 0],
+				payload: MessagePayload::bytes(&MyResource(8))?,
 			}
 			.into(),
 		)?;
@@ -163,14 +160,14 @@ mod test {
 		expect(&msg_in[0]).to_be(
 			&&Message::InsertResource {
 				reg_id: RegistrationId::new_with(0),
-				bytes: vec![7, 0, 0, 0],
+				payload: MessagePayload::bytes(&MyResource(7))?,
 			}
 			.into(),
 		)?;
 		expect(&msg_in[1]).to_be(
 			&&Message::ChangeResource {
 				reg_id: RegistrationId::new_with(0),
-				bytes: vec![8, 0, 0, 0],
+				payload: MessagePayload::bytes(&MyResource(8))?,
 			}
 			.into(),
 		)?;

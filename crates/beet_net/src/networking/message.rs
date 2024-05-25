@@ -1,5 +1,6 @@
 use crate::prelude::RegistrationId;
 use bevy::prelude::*;
+use serde::de::DeserializeOwned;
 use serde::Deserialize;
 use serde::Serialize;
 
@@ -23,12 +24,12 @@ pub enum Message {
 	Insert {
 		reg_id: RegistrationId,
 		entity: Entity,
-		bytes: Vec<u8>,
+		payload: MessagePayload,
 	},
 	Change {
 		reg_id: RegistrationId,
 		entity: Entity,
-		bytes: Vec<u8>,
+		payload: MessagePayload,
 	},
 	Remove {
 		reg_id: RegistrationId,
@@ -36,45 +37,18 @@ pub enum Message {
 	},
 	InsertResource {
 		reg_id: RegistrationId,
-		bytes: Vec<u8>,
+		payload: MessagePayload,
 	},
 	ChangeResource {
 		reg_id: RegistrationId,
-		bytes: Vec<u8>,
+		payload: MessagePayload,
 	},
 	RemoveResource {
 		reg_id: RegistrationId,
 	},
 	SendEvent {
 		reg_id: RegistrationId,
-		bytes: Vec<u8>,
-	},
-	#[cfg(feature = "serde_json")]
-	InsertJson {
-		reg_id: RegistrationId,
-		entity: Entity,
-		json: String,
-	},
-	#[cfg(feature = "serde_json")]
-	ChangeJson {
-		reg_id: RegistrationId,
-		entity: Entity,
-		json: String,
-	},
-	#[cfg(feature = "serde_json")]
-	InsertResourceJson {
-		reg_id: RegistrationId,
-		json: String,
-	},
-	#[cfg(feature = "serde_json")]
-	ChangeResourceJson {
-		reg_id: RegistrationId,
-		json: String,
-	},
-	#[cfg(feature = "serde_json")]
-	SendEventJson {
-		reg_id: RegistrationId,
-		json: String,
+		payload: MessagePayload,
 	},
 }
 
@@ -106,12 +80,31 @@ impl Message {
 	}
 }
 
-#[extend::ext]
-pub impl World {
-	#[cfg(test)]
-	fn events<T: Event>(&self) -> Vec<&T> {
-		self.resource::<Events<T>>()
-			.iter_current_update_events()
-			.collect()
+#[derive(Debug, Clone, PartialEq, Resource, Serialize, Deserialize)]
+pub enum MessagePayload {
+	Bytes(Vec<u8>),
+	Json(String),
+}
+
+impl MessagePayload {
+	pub fn bytes<T: Serialize>(value: T) -> bincode::Result<Self> {
+		let bytes = bincode::serialize(&value)?;
+		Ok(Self::Bytes(bytes))
+	}
+	#[cfg(feature = "serde_json")]
+	pub fn json<T: Serialize>(value: T) -> serde_json::Result<Self> {
+		let json = serde_json::to_string(&value)?;
+		Ok(Self::Json(json))
+	}
+	pub fn deserialize<T: DeserializeOwned>(&self) -> anyhow::Result<T> {
+		match self {
+			Self::Bytes(bytes) => Ok(bincode::deserialize(bytes)?),
+			Self::Json(json) => {
+				#[cfg(feature = "serde_json")]
+				return Ok(serde_json::from_str(json)?);
+				#[cfg(not(feature = "serde_json"))]
+				anyhow::bail!("message payload is json but `serde_json` feature is not enabled")
+			}
+		}
 	}
 }

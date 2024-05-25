@@ -1,4 +1,5 @@
 use crate::prelude::*;
+use anyhow::Result;
 use bevy::ecs::schedule::SystemConfigs;
 use bevy::prelude::*;
 use forky_core::ResultTEExt;
@@ -7,7 +8,7 @@ use serde::Serialize;
 
 #[derive(Copy, Clone)]
 pub struct EventFns {
-	pub send: fn(&mut World, payload: &[u8]) -> bincode::Result<()>,
+	pub send: fn(&mut World, payload: &MessagePayload) -> Result<()>,
 }
 
 impl<T: Send + Sync + 'static + Event + Serialize + DeserializeOwned>
@@ -16,8 +17,7 @@ impl<T: Send + Sync + 'static + Event + Serialize + DeserializeOwned>
 	fn register(registrations: &mut ReplicateRegistry) {
 		registrations.register_event::<T>(EventFns {
 			send: |commands, payload| {
-				let ev: T = bincode::deserialize(payload)?;
-				commands.send_event(ev);
+				commands.send_event(payload.deserialize::<T>()?);
 				Ok(())
 			},
 		});
@@ -31,14 +31,15 @@ fn outgoing_send<T: Event + Serialize>(
 	mut events: EventReader<T>,
 ) {
 	for ev in events.read() {
-		let Some(bytes) = bincode::serialize(ev).ok_or(|e| log::error!("{e}"))
+		let Some(payload) =
+			MessagePayload::bytes(ev).ok_or(|e| log::error!("{e}"))
 		else {
 			continue;
 		};
 		outgoing.push(
 			Message::SendEvent {
 				reg_id: registrations.registration_id::<T>(),
-				bytes,
+				payload,
 			}
 			.into(),
 		);
@@ -74,7 +75,7 @@ mod test {
 		expect(&msg_out[0]).to_be(
 			&Message::SendEvent {
 				reg_id: RegistrationId::new_with(0),
-				bytes: vec![7, 0, 0, 0],
+				payload: MessagePayload::bytes(&MyEvent(7))?,
 			}
 			.into(),
 		)?;

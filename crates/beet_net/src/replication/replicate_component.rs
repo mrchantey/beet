@@ -1,4 +1,5 @@
 use crate::prelude::*;
+use anyhow::Result;
 use bevy::ecs::schedule::SystemConfigs;
 use bevy::ecs::system::EntityCommands;
 use bevy::prelude::*;
@@ -9,8 +10,8 @@ use serde::Serialize;
 #[derive(Copy, Clone)]
 pub struct ComponentFns {
 	// pub type_id: std::any::TypeId,
-	pub insert: fn(&mut EntityCommands, payload: &[u8]) -> bincode::Result<()>,
-	pub change: fn(&mut EntityCommands, payload: &[u8]) -> bincode::Result<()>,
+	pub insert: fn(&mut EntityCommands, payload: &MessagePayload) -> Result<()>,
+	pub change: fn(&mut EntityCommands, payload: &MessagePayload) -> Result<()>,
 	pub remove: fn(&mut EntityCommands),
 }
 
@@ -20,8 +21,8 @@ fn outgoing_insert<T: Component + Serialize>(
 	query: Query<(Entity, &T), (Added<T>, With<Replicate>)>,
 ) {
 	for (entity, component) in query.iter() {
-		let Some(bytes) =
-			bincode::serialize(component).ok_or(|e| log::error!("{e}"))
+		let Some(payload) =
+			MessagePayload::bytes(component).ok_or(|e| log::error!("{e}"))
 		else {
 			continue;
 		};
@@ -29,7 +30,7 @@ fn outgoing_insert<T: Component + Serialize>(
 			Message::Insert {
 				entity,
 				reg_id: registrations.registration_id::<T>(),
-				bytes,
+				payload,
 			}
 			.into(),
 		);
@@ -45,7 +46,7 @@ fn outgoing_change<T: Component + Serialize>(
 		if component.is_added() {
 			continue;
 		}
-		let Some(bytes) = bincode::serialize(component.into_inner())
+		let Some(payload) = MessagePayload::bytes(component.into_inner())
 			.ok_or(|e| log::error!("{e}"))
 		else {
 			continue;
@@ -55,7 +56,7 @@ fn outgoing_change<T: Component + Serialize>(
 			Message::Change {
 				entity,
 				reg_id: registrations.registration_id::<T>(),
-				bytes,
+				payload,
 			}
 			.into(),
 		);
@@ -88,13 +89,11 @@ impl<T: Send + Sync + 'static + Component + Serialize + DeserializeOwned>
 	fn register(registrations: &mut ReplicateRegistry) {
 		registrations.register_component::<T>(ComponentFns {
 			insert: |commands, payload| {
-				let component: T = bincode::deserialize(payload)?;
-				commands.insert(component);
+				commands.insert(payload.deserialize::<T>()?);
 				Ok(())
 			},
 			change: |commands, payload| {
-				let component: T = bincode::deserialize(payload)?;
-				commands.insert(component);
+				commands.insert(payload.deserialize::<T>()?);
 				Ok(())
 			},
 			remove: |commands| {
@@ -154,7 +153,7 @@ mod test {
 			&Message::Insert {
 				entity,
 				reg_id: RegistrationId::new_with(0),
-				bytes: vec![7, 0, 0, 0],
+				payload: MessagePayload::bytes(&MyComponent(7))?,
 			}
 			.into(),
 		)?;
@@ -162,7 +161,7 @@ mod test {
 			&Message::Change {
 				entity,
 				reg_id: RegistrationId::new_with(0),
-				bytes: vec![8, 0, 0, 0],
+				payload: MessagePayload::bytes(&MyComponent(8))?,
 			}
 			.into(),
 		)?;

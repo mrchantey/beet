@@ -69,8 +69,7 @@ mod test {
 
 		a.send(&vec![Message::Spawn {
 			entity: Entity::PLACEHOLDER,
-		}])
-		.await?;
+		}])?;
 
 		expect(b.recv()?).to_be(vec![Message::Spawn {
 			entity: Entity::PLACEHOLDER,
