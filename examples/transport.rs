@@ -1,6 +1,5 @@
 use beet::prelude::*;
 use beet_examples::*;
-use bevy::log::LogPlugin;
 use bevy::prelude::*;
 use serde::Deserialize;
 use serde::Serialize;
@@ -15,7 +14,7 @@ fn main() {
 	App::new()
 		// .add_transport(DebugSendTransport)
 		.add_transport(WebEventClient::new_with_window())
-		.add_plugins((ExamplePlugin, LogPlugin::default(), ReplicatePlugin))
+		.add_plugins((ExamplePlugin,  ExampleReplicatePlugin))
 		.add_event::<MyEvent>()
 		.replicate_event_incoming::<MyEvent>()
 		// .add_systems(Startup, transmit)

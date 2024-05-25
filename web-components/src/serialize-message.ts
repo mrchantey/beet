@@ -10,12 +10,6 @@ interface Message {
 const messageLookup = {
 	"beet_net::replication::common_events::AppReady": 0,
 	"beet_examples::dialog_panel::OnPlayerMessage": 1
-	// "web_event::MyEvent": 0,
-	// "print_registry::MyEvent": 1,
-	// "print_registry::MyResource": 2
-	// "print_registry::MyComponent": 0,
-	// "print_registry::MyEvent": 1,
-	// "print_registry::MyResource": 2
 }
 
 export function sendEventMessage(messageKey: keyof typeof messageLookup, payload: any) {
@@ -38,20 +32,22 @@ function send(message: Message) {
 
 export function addEventMessageListener(messageKey: keyof typeof messageLookup, callback: (payload: any) => void) {
 	window.addEventListener('wasm-message', (event) => {
-		const message = event.detail
-		if (message.SendEvent?.reg_id === messageLookup[messageKey]) {
-			const payload = JSON.parse(message.SendEvent.payload.Json)
-			callback(payload)
+		const messages: Message[] = JSON.parse(event.detail)
+		for (let message of messages) {
+			if (message.SendEvent?.reg_id === messageLookup[messageKey]) {
+				const payload = JSON.parse(message.SendEvent.payload.Json)
+				callback(payload)
+			}
 		}
 	})
 }
 
 addEventMessageListener('beet_net::replication::common_events::AppReady', (payload) => {
-	console.log('AppReady', payload)
+	console.log('YES AppReady', payload)
 })
 
 declare global {
 	interface Window {
-		addEventListener(event: 'wasm-message', listener: (event: CustomEvent<Message>) => void): void
+		addEventListener(event: 'wasm-message', listener: (event: CustomEvent<string>) => void): void
 	}
 }
