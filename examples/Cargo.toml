@@ -13,6 +13,7 @@ pretty_env_logger.workspace = true
 forky_bevy.workspace = true
 rand.workspace = true
 flume.workspace = true
+serde.workspace = true
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 forky_web.workspace = true

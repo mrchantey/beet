@@ -1,4 +1,5 @@
 use bevy::prelude::*;
+use serde::{Deserialize, Serialize};
 
 pub struct DialogPanelPlugin;
 
@@ -21,9 +22,9 @@ impl Plugin for DialogPanelPlugin {
 	}
 }
 
-#[derive(Event, Deref, DerefMut)]
+#[derive(Event, Deref, DerefMut, Serialize, Deserialize)]
 pub struct OnPlayerMessage(pub String);
-#[derive(Event, Deref, DerefMut)]
+#[derive(Event, Deref, DerefMut, Serialize, Deserialize)]
 pub struct OnNpcMessage(pub String);
 
 #[derive(Component)]

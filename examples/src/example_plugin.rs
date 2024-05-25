@@ -1,5 +1,8 @@
+use crate::OnPlayerMessage;
+use beet::prelude::*;
 use bevy::prelude::*;
 use forky_bevy::systems::close_on_esc;
+
 
 
 
@@ -29,6 +32,14 @@ impl Plugin for ExamplePlugin {
 	}
 }
 
+pub struct ExampleReplicatePlugin;
+
+impl Plugin for ExampleReplicatePlugin {
+	fn build(&self, app: &mut App) {
+		app.add_plugins(ReplicatePlugin)
+			.replicate_event::<OnPlayerMessage>();
+	}
+}
 
 fn canvas() -> Option<String> {
 	// #[cfg(debug_assertions)]

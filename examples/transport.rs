@@ -17,7 +17,7 @@ fn main() {
 		.add_plugins((MinimalPlugins, LogPlugin::default(), ReplicatePlugin))
 		.add_event::<MyEvent>()
 		.replicate_event::<MyEvent>()
-		.add_systems(Startup, transmit)
+		// .add_systems(Startup, transmit)
 		.add_systems(Update, handle_event)
 		.run();
 }
@@ -26,15 +26,4 @@ fn handle_event(mut events: EventReader<MyEvent>) {
 	for event in events.read() {
 		log::info!("Received event: {:?}", event);
 	}
-}
-fn transmit() {
-	let event = MyEvent("Hello, world!".to_string());
-	let payload_json = serde_json::to_string(&event).unwrap();
-	let message = Message::SendEvent {
-		reg_id: RegistrationId::new_with(0),
-		payload: MessagePayload::Json(payload_json),
-	};
-	let message_json = serde_json::to_string(&vec![message]).unwrap();
-
-	log::info!("example events: \n{:?}", message_json);
 }

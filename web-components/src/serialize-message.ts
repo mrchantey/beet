@@ -8,9 +8,13 @@ interface Message {
 }
 
 const messageLookup = {
-	"print_registry::MyComponent": 0,
-	"print_registry::MyEvent": 1,
-	"print_registry::MyResource": 2
+	"beet_examples::dialog_panel::OnPlayerMessage": 0,
+	// "web_event::MyEvent": 0,
+	// "print_registry::MyEvent": 1,
+	// "print_registry::MyResource": 2
+	// "print_registry::MyComponent": 0,
+	// "print_registry::MyEvent": 1,
+	// "print_registry::MyResource": 2
 }
 
 export function eventMessage(eventName: keyof typeof messageLookup, payload: any): string {

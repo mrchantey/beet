@@ -10,9 +10,6 @@ pub use self::replicate_entity::*;
 pub mod replicate_resource;
 #[allow(unused_imports)]
 pub use self::replicate_resource::*;
-pub mod replicate_registrations;
-#[allow(unused_imports)]
-pub use self::replicate_registrations::*;
 pub mod replicate_type;
 #[allow(unused_imports)]
 pub use self::replicate_type::*;
@@ -22,3 +19,6 @@ pub use self::incoming::*;
 pub mod replicate_component;
 #[allow(unused_imports)]
 pub use self::replicate_component::*;
+pub mod replicate_registry;
+#[allow(unused_imports)]
+pub use self::replicate_registry::*;

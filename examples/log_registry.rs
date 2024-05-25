@@ -1,9 +1,8 @@
-use beet_net::prelude::*;
+use beet::prelude::*;
 use bevy::prelude::*;
+use beet_examples::*;
 use serde::Deserialize;
 use serde::Serialize;
-
-
 
 #[derive(Debug, Default, Component, Serialize, Deserialize)]
 struct MyComponent;
@@ -15,11 +14,7 @@ struct MyResource;
 
 fn main() {
 	let mut app = App::new();
-	app.replicate::<MyComponent>()
-		.replicate_event::<MyEvent>()
-		.replicate_resource::<MyResource>();
-
-	let types = app.world().resource::<ReplicateRegistry>().types_to_json();
-
-	println!("{}", types);
+	app.add_plugins(ExampleReplicatePlugin);
+	let registry = app.world().resource::<ReplicateRegistry>();
+	println!("Replicate Registry:\n{}", registry.types_to_json());
 }

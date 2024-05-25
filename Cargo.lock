@@ -609,6 +609,7 @@ dependencies = [
  "log",
  "pretty_env_logger",
  "rand",
+ "serde",
  "tokio",
  "wasm-bindgen",
  "web-sys",
