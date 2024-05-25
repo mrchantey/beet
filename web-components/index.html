@@ -5,14 +5,19 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Web Components</title>
-  <script type="module" src="/src/speech-to-text.ts"></script>
+  <script type="module" src="/src/index.ts"></script>
+  <style>
+    html,
+    body {
+      background-color: #444;
+    }
+  </style>
 </head>
 
 <body>
-  <speech-to-text />
-  <!-- <beet-canvas src="/wasm/main.js" require-interaction custom-load/> -->
+  <!-- <speech-to-text /> -->
+  <text-input />
+  <!-- <beet-loading-canvas src="/wasm/main.js" require-interaction custom-load/> -->
 </body>
-
-
 
 </html>

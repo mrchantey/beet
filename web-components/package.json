@@ -17,7 +17,7 @@
   },
   "browser": "dist/beet-web-components.js",
   "dependencies": {
-    "@material/web": "^1.4.1",
+    "@material/web": "^1.5.0",
     "lit": "^3.1.2",
     "path": "^0.12.7"
   },

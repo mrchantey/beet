@@ -8,16 +8,6 @@ pub trait Transport {
 	fn recv(&mut self) -> Result<Vec<Message>, anyhow::Error>;
 }
 
-pub struct DebugSendTransport;
-impl Transport for DebugSendTransport {
-	fn send(&mut self, messages: &Vec<Message>) -> Result<(), anyhow::Error> {
-		log::info!("DebugOutTransport: {:?}", messages);
-		Ok(())
-	}
-
-	fn recv(&mut self) -> Result<Vec<Message>, anyhow::Error> { Ok(vec![]) }
-}
-
 pub struct ChannelsTransport {
 	pub send: Sender<Vec<Message>>,
 	pub recv: Receiver<Vec<Message>>,

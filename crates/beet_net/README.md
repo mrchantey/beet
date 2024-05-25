@@ -1,13 +1,14 @@
 # `beet_net`
 
 
-This is a very tiny and simple replication library that can run on microcontrollers. It is extremely simple
+This is a very tiny and simple replication library that can run on microcontrollers and be used for DOM communication.
 
 ## Features
 
 ### Incoming / Outgoing
 
 Components, Events and Resources can be specified as incoming or outgoing.
+Components can be both because the `Replicate` component can be used to distuinguish who should be doing the sending.
 
 ### Multiple transports 
 For instance a web bevy app can send `serde_json` messages to the dom and `bincode` messages to the server

@@ -9,7 +9,8 @@ export const materialStyles = css`
       font-family: 'Roboto', 'Arial', 'Helvetica', sans-serif;
     }
 
-md-filled-button,md-outlined-button {
+    md-filled-button,md-outlined-button {
+  /* mdbook breaks size for some reason */
   font-size:0.9em;
 
 }

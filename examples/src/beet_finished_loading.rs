@@ -18,7 +18,7 @@ mod wasm_funcs {
 			.unwrap()
 			.document()
 			.unwrap()
-			.query_selector("beet-canvas")
+			.query_selector("beet-loading-canvas")
 		else {
 			return;
 		};

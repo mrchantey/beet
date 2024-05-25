@@ -1,4 +1,5 @@
 use beet::prelude::*;
+use beet_examples::*;
 use bevy::log::LogPlugin;
 use bevy::prelude::*;
 use serde::Deserialize;
@@ -12,11 +13,11 @@ fn main() {
 	// app.add_plugins();
 	// app.add_plugins(TransportPlugin::arc(WebWsClient::new("").unwrap()));
 	App::new()
-		.add_transport(DebugSendTransport)
+		// .add_transport(DebugSendTransport)
 		.add_transport(WebEventClient::new_with_window())
-		.add_plugins((MinimalPlugins, LogPlugin::default(), ReplicatePlugin))
+		.add_plugins((ExamplePlugin, LogPlugin::default(), ReplicatePlugin))
 		.add_event::<MyEvent>()
-		.replicate_event::<MyEvent>()
+		.replicate_event_incoming::<MyEvent>()
 		// .add_systems(Startup, transmit)
 		.add_systems(Update, handle_event)
 		.run();

@@ -34,11 +34,6 @@ pub struct ReplicateRegistry {
 	pub directions: HashMap<RegistrationId, ReplicateDirection>,
 }
 
-
-pub fn log_replicate_registry(registry: Res<ReplicateRegistry>) {
-	log::info!("Replicate Registry:\n{}", registry.types_to_json());
-}
-
 impl ReplicateRegistry {
 	pub fn registration_id<T: 'static>(&self) -> RegistrationId {
 		if let Some(value) = self.types.get(&TypeId::of::<T>()) {

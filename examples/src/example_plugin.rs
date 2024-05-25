@@ -37,7 +37,7 @@ pub struct ExampleReplicatePlugin;
 impl Plugin for ExampleReplicatePlugin {
 	fn build(&self, app: &mut App) {
 		app.add_plugins((ReplicatePlugin, CommonEventsPlugin))
-			.replicate_event::<OnPlayerMessage>();
+			.replicate_event_incoming::<OnPlayerMessage>();
 	}
 }
 
