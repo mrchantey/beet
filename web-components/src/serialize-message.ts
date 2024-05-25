@@ -26,7 +26,7 @@ export function sendEventMessage(messageKey: keyof typeof messageLookup, payload
 
 
 function send(message: Message) {
-	let detail = JSON.stringify(message)
+	let detail = JSON.stringify([message])
 	window.dispatchEvent(new CustomEvent('js-message', { detail }))
 }
 
@@ -44,6 +44,7 @@ export function addEventMessageListener(messageKey: keyof typeof messageLookup, 
 
 addEventMessageListener('beet_net::replication::common_events::AppReady', (payload) => {
 	console.log('YES AppReady', payload)
+	sendEventMessage('beet_examples::dialog_panel::OnPlayerMessage', "Hello from JS")
 })
 
 declare global {
