@@ -18,12 +18,14 @@
   "browser": "dist/beet-web-components.js",
   "dependencies": {
     "@material/web": "^1.5.0",
+    "esbuild": "^0.21.4",
     "lit": "^3.1.2",
     "path": "^0.12.7"
   },
   "devDependencies": {
     "@types/dom-speech-recognition": "^0.0.4",
-    "typescript": "^5.2.2",
-    "vite": "^5.2.0"
+    "@types/node": "^20.12.12",
+    "esbuild-css-modules-plugin": "^3.1.2",
+    "typescript": "^5.2.2"
   }
 }

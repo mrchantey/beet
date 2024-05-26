@@ -5,6 +5,10 @@ import { css, html, LitElement } from 'lit'
 import { customElement, query } from 'lit/decorators.js'
 import { materialStyles } from './styles'
 
+// import style from './style/foobar.css'
+
+
+// console.log("val:", JSON.stringify(style))
 
 @customElement('text-input')
 export class TextInput extends LitElement {
@@ -16,9 +20,9 @@ export class TextInput extends LitElement {
 
 	render() {
 		return html`
-		<div class='container'>
+		<div class='row-container'>
 			<md-outlined-text-field placeholder="Send some text" @keyup=${this.onKeyUp}>
-  		<md-icon slot="leading-icon">search</md-icon>
+  			<md-icon slot="leading-icon">search</md-icon>
 			</md-outlined-text-field>
 			<md-outlined-button  @click=${this.onSubmit}>
 				Submit

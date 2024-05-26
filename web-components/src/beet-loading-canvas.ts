@@ -11,7 +11,7 @@ type LoadState = 'loading' | 'loaded' | 'running' | 'error'
 
 /// Canvas loader
 @customElement('beet-loading-canvas')
-export class BeetCanvas extends LitElement {
+export class BeetLoadingCanvas extends LitElement {
   /// Wait for `finshOnLoad` to be called manually
   @property({ type: Boolean, attribute: 'custom-load' })
   customLoad: boolean = false
@@ -148,6 +148,6 @@ export class BeetCanvas extends LitElement {
 
 declare global {
   interface HTMLElementTagNameMap {
-    'beet-loading-canvas': BeetCanvas
+    'beet-loading-canvas': BeetLoadingCanvas
   }
 }

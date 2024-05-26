@@ -1,15 +1,23 @@
-
-
 run:
-  npx vite
+  just watch 'just build'
 
 build:
-	npx tsc && npx vite build
+	node ./esbuild.mjs
+	mkdir -p ./public/js || true
+	cp -r ./dist/* ./public/js
 
 publish:
 	npm version patch
 	just build
 	npm publish
 
-preview:
-	npx vite preview
+watch *command:
+	forky watch \
+	-w '**/*.ts' \
+	-w '**/*.mjs' \
+	-w 'public/**/*' \
+	-i '{.git,dist}/**' \
+	-- {{command}}
+
+serve:
+	cd public && forky serve --any-origin

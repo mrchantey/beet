@@ -1,7 +1,13 @@
-import '@material/web/button/outlined-button'
+import '@material/web/switch/switch.js'
+import { MdSwitch } from '@material/web/switch/switch.js'
 import { css, html, LitElement } from 'lit'
 import { customElement, property } from 'lit/decorators.js'
 import { materialStyles } from './styles'
+
+import style from './style/foobar.module.css'
+
+console.dir(style)
+console.log("val:", JSON.stringify(style))
 
 
 @customElement('speech-to-text')
@@ -45,22 +51,22 @@ export class SpeechToText extends LitElement {
 	}
 
 	render() {
-		let text = this.isRunning ? "Stop" : "Start"
+		let text = this.isRunning ? "Running" : ""
 		return html`
-		<div class='container'>
-			<span>Speech to Text</span>
-			<md-outlined-button @click=${this.onClick}>
-				${text}
-			</md-outlined-button>
+		<div class='row-container'>
+			<span>Speech to Text: ${text}</span>
+			<md-switch @change=${this.onClick}>
+			</md-switch>
 		</div>
 		`
 	}
 
-	onClick() {
-		if (this.isRunning)
-			this.recognition.stop()
-		else
+	onClick(e: Event) {
+		let checked = (e.target as MdSwitch).selected
+		if (checked)
 			this.recognition.start()
+		else
+			this.recognition.stop()
 	}
 
 	static styles = [materialStyles, css`
