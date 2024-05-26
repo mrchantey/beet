@@ -1,0 +1,23 @@
+.controls {
+	padding: 1em;
+	/* width: 100%; */
+	/* min-width: 100%; */
+	/* height: 100%; */
+}
+
+
+.microphone {
+	display: flex;
+	justify-content: space-between;
+
+}
+
+.messagebox {
+	display: flex;
+	flex-direction: row;
+
+}
+
+.sendIcon{
+	
+}

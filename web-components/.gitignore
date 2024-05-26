@@ -1,20 +1,4 @@
-public/wasm
-my-test
-
-# Logs
-npm-debug.log*
-
 node_modules
 dist
-dist-ssr
-*.local
-
-# Editor directories and files
-.vscode/*
-!.vscode/extensions.json
-.idea
-*.suo
-*.ntvs*
-*.njsproj
-*.sln
-*.sw?
+public/*
+!public/index.html

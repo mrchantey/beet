@@ -1,21 +1,18 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Web Components Test</title>
-  <script src="js/index.js"></script>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Symbols+Outlined" />
-  <style>
-  </style>
+	<meta charset="utf-8">
+	<title>Web Component Test</title>
+	<meta name="description" content="An amazing website">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<link rel="stylesheet" href="style.css">
 </head>
 
 <body>
-  <h1>Web Components Test</h1>
-  <speech-to-text></speech-to-text>
-  <text-input></text-input>
-  <!-- <beet-loading-canvas src="wasm/main.js" require-interaction custom-load></beet-loading-canvas> -->
+	<!-- <div id="root"></div> -->
+	<script src="lib.mjs" type="module"></script>
+	<beet-app full-height="true" src="./wasm/main.js"> </beet-app>
 </body>
 
 </html>

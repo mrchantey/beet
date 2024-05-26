@@ -51,12 +51,12 @@ watch-web-example example *args:
 	just watch 'just build-web-example {{example}} {{args}}'
 
 
-watch-lit-test example *args:
+watch-web-component-wasm example *args:
 	just copy-web-assets
 	mkdir -p ./web-components/public || true
-	just watch 'just build-lit-test {{example}} {{args}}'
+	just watch 'just build-web-component-wasm {{example}} {{args}}'
 
-build-lit-test example *args:
+build-web-component-wasm example *args:
 	just build-web-example {{example}} {{args}} 
 	cp -r ./target/web-examples/{{example}}/wasm ./web-components/public
 

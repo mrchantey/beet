@@ -1,0 +1,26 @@
+.layout {
+	align-items: stretch;
+}
+
+
+.layout> :nth-child(2) {
+	width: 300px;
+	min-width: 300px;
+}
+
+
+@media (max-width: 500px) {
+	.layout {
+		flex-direction: column !important;
+	}
+
+	.layout> :nth-child(1) {
+		max-height: 60vh;
+	}
+
+
+	.layout> :nth-child(2) {
+		width: auto;
+		min-width: auto;
+	}
+}
