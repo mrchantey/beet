@@ -4,7 +4,6 @@ use bevy::prelude::*;
 
 fn main() {
 	App::new()
-		.add_transport(WebEventClient::new_with_window())
-		.add_plugins((ExamplePlugin,  ExampleReplicatePlugin))
+		.add_plugins(ExamplePlugin)
 		.run();
 }

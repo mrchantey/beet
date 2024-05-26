@@ -28,4 +28,4 @@ watch *command:
 	-- {{command}}
 
 serve:
-	cd public && forky serve --any-origin
+	cd public && forky serve --port=3007 --any-origin
