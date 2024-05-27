@@ -31,7 +31,10 @@ fn main() {
 		)>::default(),
 	))
 	.add_systems(Startup, (setup_camera, setup_fox, setup_items))
-	.add_systems(Update, (set_player_sentence, rotate_items));
+	.add_systems(
+		Update,
+		(set_player_sentence, rotate_items, ready_on_bert_load),
+	);
 
 	#[cfg(target_arch = "wasm32")]
 	app.add_plugins(PostmessageInputPlugin);
@@ -40,11 +43,11 @@ fn main() {
 }
 
 fn setup_camera(mut commands: Commands) {
-	// let x = ;
-
 	commands.spawn((
+		// camera always in line with front row of items
+		// and keeps them exactly in view
 		CameraDistance {
-			x: ITEM_OFFSET * 1.5,
+			x: ITEM_OFFSET * 1.6,
 			origin: Vec3::new(0., 0., ITEM_OFFSET),
 		},
 		Camera3dBundle {

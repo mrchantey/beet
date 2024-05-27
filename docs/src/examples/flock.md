@@ -1,6 +1,6 @@
 # Flock
 
-<iframe src="https://storage.googleapis.com/beet-examples/flock/index.html" allowTransparency="true"></iframe>
+<iframe style="height:60dvh;" src="https://demo.beetmash.com?example=flock"></iframe>
 
 ```rust
 {{#include ../../../examples/flock.rs}}

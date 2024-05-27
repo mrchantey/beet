@@ -13,7 +13,8 @@ The strategy is to implement paradigms very broadly at first to test the core co
 | Robotics - esp32 Example       | ✅      |
 | Pathfinding/search (a* etc)    | 🚧      |
 | State Trees (transitions)      | 🚧      |
-| GOAP (runtime tree generators) | 🚧      |
+| Reinforcement Learning         | 🚧      |
+| GOAP (runtime tree generators) | 🤷      |
 
 - ✅ at least a proof of concept
 - 🚧 planned

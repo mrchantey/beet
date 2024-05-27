@@ -6,7 +6,11 @@ import * as fs from 'fs'
 
 
 export default defineConfig({
+  // set environment variables
   define: getDefine(),
+  // instead of `/` this allows for the index to be nested
+  base: './',
+  appType: 'spa',
   plugins: [
     /* 
     Uncomment the following line to enable solid-devtools.
@@ -16,20 +20,21 @@ export default defineConfig({
     suidPlugin(),
     solidPlugin(),
   ],
-  server: {
-    port: 3000,
-  },
   build: {
+    // rollupOptions: {
+    // input: ""
+    // },
+    // target modern browsers
     target: 'esnext',
-    copyPublicDir: false,
-    lib: {
-      /* @ts-ignore */
-      // entry: resolve(__dirname, 'src/lib.ts'),
-      entry: 'src/lib.ts',
-      fileName: 'lib',
-      name: 'lib',
-      formats: ['es'],
-    },
+    // copyPublicDir: false,
+    // lib: {
+    //   /* @ts-ignore */
+    //   // entry: resolve(__dirname, 'src/lib.ts'),
+    //   entry: 'src/lib.ts',
+    //   fileName: 'lib',
+    //   name: 'lib',
+    //   formats: ['es'],
+    // },
   },
 })
 

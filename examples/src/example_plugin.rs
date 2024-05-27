@@ -1,5 +1,6 @@
 use crate::OnPlayerMessage;
 use beet::prelude::*;
+use bevy::asset::AssetMetaCheck;
 use bevy::prelude::*;
 use forky_bevy::systems::close_on_esc;
 
@@ -20,6 +21,10 @@ impl Plugin for ExamplePlugin {
 
 		#[cfg(feature = "tokio")]
 		app.add_transport(NativeWsClient::new(DEFAULT_SOCKET_URL).unwrap());
+
+		app.world_mut().insert_resource(AssetMetaCheck::Never);
+
+
 
 		app.add_plugins(ExampleReplicatePlugin)
 			.add_plugins(
@@ -63,8 +68,9 @@ fn canvas() -> Option<String> {
 
 fn assets_path() -> String {
 	#[cfg(target_arch = "wasm32")]
+	// return "/wasm/assets".into();
+	// return "https://demo.beetmash.com/wasm/assets".into();
 	return "https://storage.googleapis.com/beet-examples/assets".into();
-	// return "../assets".into();
 	#[cfg(not(target_arch = "wasm32"))]
 	return "assets".into();
 }

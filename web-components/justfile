@@ -2,12 +2,16 @@
 run:
   just watch 'just build'
 
-# run:
-#   npx vite
+vite *args:
+  npx vite --port=3006 {{args}}
 
 build:
 	npx vite build
-	cp -r ./dist/* ./public
+# cp -r ./dist/* ./public
+
+deploy:
+	just build
+	firebase deploy --only hosting:beet-mash-demo
 
 publish:
 	npm version patch
@@ -26,4 +30,4 @@ watch *command:
 	-- {{command}}
 
 serve:
-	cd public && forky serve --port=3007 --any-origin
+	cd dist && forky serve --port=3007 --any-origin

@@ -1,10 +1,25 @@
 {
-  "name": "vite-template-solid",
-  "version": "0.0.0",
-  "description": "",
+  "name": "beet-web-components",
+  "version": "0.0.15",
+  "type": "module",
+  "files": [
+    "dist"
+  ],
+  "keywords": [
+    "beet",
+    "web",
+    "components"
+  ],
+  "homepage": "https://mrchantey.github.io/beet/",
+  "repository": {
+    "type": "git",
+    "url": "https: //github.com/mrchantey/beet.git"
+  },
+  "browser": "dist/lib.js",
   "license": "MIT",
   "dependencies": {
     "@fontsource/roboto": "^5.0.13",
+    "@solidjs/router": "^0.13.3",
     "@suid/icons-material": "^0.7.0",
     "@suid/material": "*",
     "@types/dom-speech-recognition": "^0.0.4",

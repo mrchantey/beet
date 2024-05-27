@@ -14,15 +14,9 @@ const BeetAppElement: Component = (props: Partial<AppContext>) => {
 
 	noShadowDOM()
 	return (
-		<>
-			{/* <style>{roboto300}</style>
-			<style>{roboto400}</style>
-			<style>{roboto500}</style>
-			<style>{roboto700}</style> */}
-			{/* <style>{inlineStyles}</style> */}
-			<App {...props} />
-		</>
+		<App {...props} />
 	)
+	{/* <style>{inlineStyles}</style> */ }
 }
 
 customElement("beet-app", defaultAppContext(), BeetAppElement)

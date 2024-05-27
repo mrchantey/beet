@@ -622,6 +622,7 @@ dependencies = [
  "anyhow",
  "beet_core",
  "beet_ecs",
+ "beet_net",
  "bevy",
  "candle-core",
  "candle-nn",

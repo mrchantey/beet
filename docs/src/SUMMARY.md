@@ -20,4 +20,4 @@
 
 [Resources](./misc/resources.md)
 
-<!-- [Contributing](./misc/contributing.md) -->
+[Contributing](./misc/contributing.md)

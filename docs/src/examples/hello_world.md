@@ -1,6 +1,7 @@
 # Hello World
 
-<iframe src="https://storage.googleapis.com/beet-examples/hello_world/index.html" allowTransparency="true"></iframe>
+<iframe style="height:60dvh;" src="https://demo.beetmash.com?example=hello_world"></iframe>
+
 
 > Open the console to see the output
 

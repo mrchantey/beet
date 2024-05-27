@@ -1,6 +1,6 @@
 # Animation
 
-<iframe src="https://storage.googleapis.com/beet-examples/animation/index.html" allowTransparency="true"></iframe>
+<iframe style="height:60dvh;" src="https://demo.beetmash.com?example=animation"></iframe>
 
 ```rust
 {{#include ../../../examples/animation.rs}}

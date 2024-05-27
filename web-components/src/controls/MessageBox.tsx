@@ -1,13 +1,16 @@
 
 import SendIcon from "@suid/icons-material/Send"
 import { Button, Stack, TextField } from '@suid/material'
-import { createSignal } from 'solid-js'
+import { createSignal, useContext } from 'solid-js'
+import { AppContext } from "../app/AppContext"
 import { sendPlayerMessage } from '../beet/message'
 
 
 export const MessageBox = () => {
 
-	const [text, setText] = createSignal('')
+	let ctx = useContext(AppContext)
+
+	const [text, setText] = createSignal(ctx.initialPrompt)
 
 	let submit = () => {
 		sendPlayerMessage(text())

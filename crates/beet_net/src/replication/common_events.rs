@@ -4,7 +4,7 @@ use serde::Deserialize;
 use serde::Serialize;
 
 
-
+/// Signal that this app is fully loaded, usually once assets are ready.
 #[derive(Debug, Clone, Serialize, Deserialize, Event)]
 pub struct AppReady;
 
@@ -13,10 +13,10 @@ pub struct CommonEventsPlugin;
 impl Plugin for CommonEventsPlugin {
 	fn build(&self, app: &mut App) {
 		app.add_event::<AppReady>()
-			.replicate_event_outgoing::<AppReady>()
-			.add_systems(Startup, ready);
+			.replicate_event_outgoing::<AppReady>();
+		// .add_systems(Startup, ready);
 	}
 }
 
 
-fn ready(mut events: EventWriter<AppReady>) { events.send(AppReady); }
+// fn ready(mut events: EventWriter<AppReady>) { events.send(AppReady); }

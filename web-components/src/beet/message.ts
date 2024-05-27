@@ -8,15 +8,15 @@ interface Message {
 }
 
 const messageLookup = {
-	"beet_net::replication::common_events::AppReady": 0,
-	"beet_examples::dialog_panel::OnPlayerMessage": 1
+	"AppReady": 0,
+	"OnPlayerMessage": 1
 }
 
 export function sendPlayerMessage(message: string) {
-	sendEventMessage("beet_examples::dialog_panel::OnPlayerMessage", message)
+	sendEventMessage("OnPlayerMessage", message)
 }
 export function sendStartGameMessage() {
-	console.log('todo!')
+	console.warn('todo: send start game message')
 }
 
 export function sendEventMessage(messageKey: keyof typeof messageLookup, payload: any) {
@@ -38,6 +38,12 @@ function send(message: Message) {
 	window.dispatchEvent(new CustomEvent('js-message', { detail }))
 }
 
+
+export function removeMessageListener(callback: () => void) {
+	window.removeEventListener('wasm-message', callback)
+}
+
+
 export function addEventMessageListener(messageKey: keyof typeof messageLookup, callback: (payload: any) => void) {
 	window.addEventListener('wasm-message', (event) => {
 		const messages: Message[] = JSON.parse(event.detail)
@@ -49,11 +55,6 @@ export function addEventMessageListener(messageKey: keyof typeof messageLookup, 
 		}
 	})
 }
-
-addEventMessageListener('beet_net::replication::common_events::AppReady', (payload) => {
-	// console.log('YES AppReady', payload)
-	sendEventMessage('beet_examples::dialog_panel::OnPlayerMessage', "Hello from JS")
-})
 
 declare global {
 	interface Window {

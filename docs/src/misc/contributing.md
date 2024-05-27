@@ -1,3 +1,1 @@
-# Contributing
-
-Please contribute.
+{{#include ../../../contributing.md}}

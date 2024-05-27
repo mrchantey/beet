@@ -2,6 +2,7 @@ set windows-shell := ["C:/tools/cygwin/bin/sh.exe","-c"]
 set dotenv-load
 crates := 'beet beet_core beet_ecs beet_net'
 
+
 default:
 	just --list --unsorted
 
@@ -46,55 +47,6 @@ run crate example *args:
 run-w crate example *args:
 	just watch 'just run {{crate}} {{example}} {{args}}'
 
-watch-web-example example *args:
-	just copy-web-assets
-	just watch 'just build-web-example {{example}} {{args}}'
-
-
-watch-web-component-wasm example *args:
-	just copy-web-assets
-	mkdir -p ./web-components/public || true
-	just watch 'just build-web-component-wasm {{example}} {{args}}'
-
-build-web-component-wasm example *args:
-	just build-web-example {{example}} {{args}} 
-	cp -r ./target/web-examples/{{example}}/wasm ./web-components/public
-
-copy-web-assets:
-	mkdir -p ./target/web-examples/assets || true
-	cp -r ./assets/* ./target/web-examples/assets
-
-build-web-examples:
-	rm -rf ./target/web-examples || true
-	just copy-web-assets
-	just build-web-example animation
-	just build-web-example flock
-	just build-web-example hello_world
-	just build-web-example hello_ml
-	just build-web-example seek
-	just build-web-example seek_3d
-	just build-web-example fetch
-
-serve-web-examples:
-	cd ./target/web-examples && forky serve --any-origin
-
-deploy-web-examples:
-	just build-web-examples
-	gsutil -m rsync -r ./target/web-examples gs://beet-examples
-# gsutil -m rsync -d -r ./target/web-examples gs://beet-examples
-# -m parallel rsync copy -d delete if not in local -r recursive
-
-build-web-example example *args:
-	mkdir -p ./target/web-examples/{{example}} || true
-	cp -r ./examples/html/* ./target/web-examples/{{example}}
-	cargo build --example {{example}} --target wasm32-unknown-unknown --release {{args}}
-	wasm-bindgen \
-	--out-name main \
-	--out-dir ./target/web-examples/{{example}}/wasm \
-	--target web \
-	$CARGO_TARGET_DIR/wasm32-unknown-unknown/release/examples/{{example}}.wasm \
-	--no-typescript \
-
 serve-web:
 	just serve-wasm
 
@@ -109,6 +61,54 @@ clean-repo:
 	cargo clean
 	rm -rf ./target
 # rm -rf ./Cargo.lock
+
+#### WEB EXAMPLES #####################################################
+
+wasm-dir:= './target/web-examples'
+
+watch-web-example example *args:
+	just copy-web-assets
+	just watch 'just build-web-example {{example}} {{args}}'
+
+build-and-deploy-web-examples:
+	just build-web-examples
+	just deploy-web-examples
+
+copy-web-assets:
+	mkdir -p {{wasm-dir}}/assets || true
+	cp -r ./assets/* {{wasm-dir}}/assets
+
+build-web-examples:
+	rm -rf {{wasm-dir}} || true
+	just copy-web-assets
+	just build-web-example animation
+	just build-web-example flock
+	just build-web-example hello_world
+	just build-web-example hello_ml
+	just build-web-example seek
+	just build-web-example seek_3d
+	just build-web-example fetch
+
+serve-web-examples:
+	cd {{wasm-dir}} && forky serve --any-origin --port=3002
+
+deploy-web-examples:
+	gsutil -m rsync -c -d -r {{wasm-dir}} gs://beet-examples
+# -m  		= parallel 
+# -c 			= use checksum instead of timestamp for compare
+# rsync  	=	copy 
+# -d 			= delete if not in local 
+# -r 			= recursive
+
+build-web-example example *args:
+	mkdir -p {{wasm-dir}}/{{example}} || true
+	cargo build --example {{example}} --target wasm32-unknown-unknown --release {{args}}
+	wasm-bindgen \
+	--out-name main \
+	--out-dir {{wasm-dir}}/{{example}} \
+	--target web \
+	$CARGO_TARGET_DIR/wasm32-unknown-unknown/release/examples/{{example}}.wasm \
+	--no-typescript \
 
 env:
 	@echo $RUST_LOG
@@ -173,7 +173,6 @@ copy-wasm-assets:
 	rm -rf ./target/static/assets
 	mkdir -p ./target/static/assets || true
 	cp -r ./crates/beet_web/assets/* ./target/static
-
 	
 serve-wasm *args:
 	cd ./target/static && forky serve {{args}}

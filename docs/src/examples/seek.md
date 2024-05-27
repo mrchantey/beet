@@ -1,6 +1,6 @@
 # Seek
 
-<iframe src="https://storage.googleapis.com/beet-examples/seek/index.html" allowTransparency="true"></iframe>
+<iframe style="height:60dvh;" src="https://demo.beetmash.com?example=seek"></iframe>
 
 ```rust
 {{#include ../../../examples/seek.rs}}

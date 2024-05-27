@@ -12,14 +12,16 @@ keywords.workspace = true
 categories.workspace = true
 
 [features]
-default = ["beet_core"]
+default = ["beet_core", "beet_net"]
 beet_core = ["dep:beet_core"]
+beet_net = ["dep:beet_net"]
 
 # tokio = ["dep:tokio"]
 
 [dependencies]
 beet_ecs.workspace = true
 beet_core = { workspace = true, optional = true }
+beet_net = { workspace = true, optional = true }
 
 futures = "0.3.30"
 thiserror.workspace = true

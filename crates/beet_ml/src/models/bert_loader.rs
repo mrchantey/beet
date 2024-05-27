@@ -37,6 +37,21 @@ impl AssetLoader for BertLoader {
 	}
 }
 
+#[cfg(feature = "beet_net")]
+pub fn ready_on_bert_load(
+	mut asset_events: EventReader<AssetEvent<Bert>>,
+	mut ready_events: EventWriter<beet_net::replication::AppReady>,
+) {
+	for ev in asset_events.read() {
+		match ev {
+			AssetEvent::LoadedWithDependencies { id: _ } => {
+				ready_events.send(beet_net::replication::AppReady);
+			}
+			_ => {}
+		}
+	}
+}
+
 pub fn block_on_asset_load<'a, A: Asset>(app: &'a mut App, path: &'static str) {
 	let handle = app
 		.world_mut()
