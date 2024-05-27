@@ -15,7 +15,7 @@ categories.workspace = true
 default = ["beet_ecs", "serde_json"]
 beet_ecs = ["dep:beet_ecs"]
 serde_json = ["dep:serde_json"]
-tokio-client = ["dep:tokio", "dep:tokio-tungstenite", "dep:futures-util"]
+tokio = ["dep:tokio", "dep:tokio-tungstenite", "dep:futures-util"]
 # default = ["bevy_replicon"]
 # bevy_replicon = ["dep:bevy_replicon"]
 
@@ -83,9 +83,9 @@ tokio.workspace = true
 [[example]]
 name = "client"
 path = "examples/client.rs"
-required-features = ["tokio-client"]
+required-features = ["tokio"]
 
 [[example]]
 name = "two_clients"
 path = "examples/two_clients.rs"
-required-features = ["tokio-client"]
+required-features = ["tokio"]

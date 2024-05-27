@@ -1,5 +1,6 @@
 // #![allow(unused, dead_code)]
 mod beet_finished_loading;
+mod camera_distance;
 #[cfg(target_arch = "wasm32")]
 mod postmessage_input;
 #[cfg(target_arch = "wasm32")]
@@ -13,6 +14,7 @@ pub use example_plugin_2d::*;
 pub use example_plugin_3d::*;
 mod dialog_panel;
 pub use beet_finished_loading::*;
+pub use camera_distance::*;
 pub use dialog_panel::*;
 mod auto_spawn;
 pub use auto_spawn::*;

@@ -21,11 +21,11 @@ fn setup(
 	mut graphs: ResMut<Assets<AnimationGraph>>,
 ) {
 	// camera
-	commands.spawn(Camera3dBundle {
+	commands.spawn((CameraDistance::new(100.), Camera3dBundle {
 		transform: Transform::from_xyz(0., 30., 100.)
 			.looking_at(Vec3::new(0.0, 2.0, 0.0), Vec3::Y),
 		..default()
-	});
+	}));
 
 	// cheese
 	let target = commands

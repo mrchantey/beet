@@ -26,7 +26,7 @@ net = ["dep:beet_net"]
 ui = ["beet_core/ui"]
 assets = ["beet_core/assets"]
 animation = ["beet_core/animation"]
-
+tokio = ["beet_net/tokio", "beet_examples/tokio"]
 
 # dynamic_linking = ["bevy/dynamic_linking"]
 
@@ -54,6 +54,7 @@ wasm-bindgen.workspace = true
 
 [target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
 tokio.workspace = true
+
 
 ### WORKSPACE ###########################################################################################################################
 

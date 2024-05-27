@@ -1,5 +1,4 @@
-use crate::example_plugin::ExamplePlugin;
-use crate::follow_cursor_3d;
+use crate::*;
 use bevy::pbr::CascadeShadowConfigBuilder;
 use bevy::prelude::*;
 use std::f32::consts::PI;
@@ -11,7 +10,7 @@ impl Plugin for ExamplePlugin3d {
 	fn build(&self, app: &mut App) {
 		app.add_plugins(ExamplePlugin)
 			.add_systems(Startup, setup_scene_3d)
-			.add_systems(Update, follow_cursor_3d);
+			.add_systems(Update, (follow_cursor_3d, camera_distance));
 	}
 }
 

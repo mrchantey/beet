@@ -1,18 +1,18 @@
 #![feature(let_chains)]
 pub mod extensions;
-#[cfg(feature = "tokio-client")]
-pub mod tokio_client;
 pub mod networking;
 pub mod replication;
+#[cfg(feature = "tokio")]
+pub mod tokio_client;
 #[cfg(target_arch = "wasm32")]
 pub mod web_transport;
 
 pub mod prelude {
 	pub use crate::extensions::*;
-	#[cfg(feature = "tokio-client")]
-	pub use crate::tokio_client::*;
 	pub use crate::networking::*;
 	pub use crate::replication::*;
+	#[cfg(feature = "tokio")]
+	pub use crate::tokio_client::*;
 	#[cfg(target_arch = "wasm32")]
 	pub use crate::web_transport::*;
 }

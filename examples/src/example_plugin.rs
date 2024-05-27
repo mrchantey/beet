@@ -10,16 +10,25 @@ use forky_bevy::systems::close_on_esc;
 pub struct ExamplePlugin;
 
 
+#[cfg(feature = "tokio")]
+const DEFAULT_SOCKET_URL: &str = "ws://127.0.0.1:3000/ws";
+
 impl Plugin for ExamplePlugin {
 	fn build(&self, app: &mut App) {
-		app.add_transport(WebEventClient::new_with_window())
-			.add_plugins(ExampleReplicatePlugin)
+		#[cfg(target_arch = "wasm32")]
+		app.add_transport(WebEventClient::new_with_window());
+
+		#[cfg(feature = "tokio")]
+		app.add_transport(NativeWsClient::new(DEFAULT_SOCKET_URL).unwrap());
+
+		app.add_plugins(ExampleReplicatePlugin)
 			.add_plugins(
 				DefaultPlugins
 					.set(WindowPlugin {
 						primary_window: Some(Window {
 							fit_canvas_to_parent: true,
 							canvas: canvas(),
+							resizable: true,
 							..default()
 						}),
 						..default()

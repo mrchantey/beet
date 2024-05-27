@@ -44,8 +44,8 @@ impl NativeWsClient {
 					TungWsEvent::Text(txt) => {
 						// #[cfg(feature = "json")]
 						// recv_send.recv(Message::vec_from_json(&txt)?).await?;
-					// 	#[cfg(not(feature = "json"))]
-					// 	anyhow::bail!("received text but feature coora_core/json disabled");
+						// 	#[cfg(not(feature = "json"))]
+						// 	anyhow::bail!("received text but feature coora_core/json disabled");
 					}
 					TungMessage::Binary(bytes) => {
 						recv_send.send(bytes)?;

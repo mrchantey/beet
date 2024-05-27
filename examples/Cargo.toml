@@ -4,6 +4,11 @@ publish = false
 version.workspace = true
 edition.workspace = true
 
+[features]
+default = []
+tokio = ["beet/tokio"]
+
+
 [dependencies]
 forky_core.workspace = true
 beet.workspace = true

@@ -11,6 +11,9 @@ use beet_examples::*;
 use bevy::prelude::*;
 use std::time::Duration;
 
+const ITEM_OFFSET: f32 = 2.;
+
+
 fn main() {
 	let mut app = App::new();
 	app.add_plugins((
@@ -37,11 +40,13 @@ fn main() {
 }
 
 fn setup_camera(mut commands: Commands) {
-	commands.spawn(Camera3dBundle {
+	let x = ITEM_OFFSET * 1.2;
+
+	commands.spawn((CameraDistance::new(x), Camera3dBundle {
 		transform: Transform::from_xyz(0., 1.6, 5.)
 			.looking_at(Vec3::new(0., 0., 0.), Vec3::Y),
 		..default()
-	});
+	}));
 }
 
 #[derive(Component)]
@@ -179,14 +184,13 @@ struct Item;
 
 fn setup_items(mut commands: Commands, asset_server: Res<AssetServer>) {
 	let scale = Vec3::splat(0.5);
-	let offset = 2.;
 	commands
 		.spawn((
 			Name::new("Potion"),
 			Sentence::new("red healing potion"),
 			Item,
 			SpatialBundle {
-				transform: Transform::from_xyz(offset, 0., offset),
+				transform: Transform::from_xyz(ITEM_OFFSET, 0., ITEM_OFFSET),
 				..default()
 			},
 		))
@@ -203,7 +207,7 @@ fn setup_items(mut commands: Commands, asset_server: Res<AssetServer>) {
 			Sentence::new("gold coin"),
 			Item,
 			SpatialBundle {
-				transform: Transform::from_xyz(offset, 0., -offset),
+				transform: Transform::from_xyz(ITEM_OFFSET, 0., -ITEM_OFFSET),
 				..default()
 			},
 		))
@@ -220,7 +224,7 @@ fn setup_items(mut commands: Commands, asset_server: Res<AssetServer>) {
 			Sentence::new("silver sword"),
 			Item,
 			SpatialBundle {
-				transform: Transform::from_xyz(-offset, 0., offset),
+				transform: Transform::from_xyz(-ITEM_OFFSET, 0., ITEM_OFFSET),
 				..default()
 			},
 		))
@@ -237,7 +241,7 @@ fn setup_items(mut commands: Commands, asset_server: Res<AssetServer>) {
 			Sentence::new("tasty cheese"),
 			Item,
 			SpatialBundle {
-				transform: Transform::from_xyz(-offset, 0., -offset),
+				transform: Transform::from_xyz(-ITEM_OFFSET, 0., -ITEM_OFFSET),
 				..default()
 			},
 		))
