@@ -40,13 +40,19 @@ fn main() {
 }
 
 fn setup_camera(mut commands: Commands) {
-	let x = ITEM_OFFSET * 1.2;
+	// let x = ;
 
-	commands.spawn((CameraDistance::new(x), Camera3dBundle {
-		transform: Transform::from_xyz(0., 1.6, 5.)
-			.looking_at(Vec3::new(0., 0., 0.), Vec3::Y),
-		..default()
-	}));
+	commands.spawn((
+		CameraDistance {
+			x: ITEM_OFFSET * 1.5,
+			origin: Vec3::new(0., 0., ITEM_OFFSET),
+		},
+		Camera3dBundle {
+			transform: Transform::from_xyz(0., 1.6, 5.)
+				.looking_at(Vec3::new(0., 0., 0.), Vec3::Y),
+			..default()
+		},
+	));
 }
 
 #[derive(Component)]

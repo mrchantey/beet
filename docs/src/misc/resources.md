@@ -44,3 +44,8 @@ Various resource on AI in games/robotics, architecture etc.
 - [Flecs - State Machine Example](https://github.com/SanderMertens/flecs/blob/master/examples/cpp/game_mechanics/factory/src/main.cpp)
 - [Games as databases](https://ajmmertens.medium.com/e7971da33ac3)
 - [Why storing state machines in ecs is a bad idea](https://ajmmertens.medium.com/742de7a18e59)
+
+## Robotics
+- [Supercon - Jorvon Moss](https://youtu.be/3B-lOhh1k7g)
+- [Bittle dog](https://www.petoi.com/products/petoi-bittle-robot-dog)
+- [Arduino Alvik](https://www.arduino.cc/education/arduino-alvik/)

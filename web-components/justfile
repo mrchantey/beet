@@ -9,8 +9,6 @@ build:
 	npx vite build
 	cp -r ./dist/* ./public
 
-
-
 publish:
 	npm version patch
 	just build

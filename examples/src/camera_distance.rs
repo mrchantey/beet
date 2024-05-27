@@ -26,6 +26,7 @@ impl CameraDistance {
 			origin: Vec3::ZERO,
 		}
 	}
+	pub fn new_with_origin(x: f32, origin: Vec3) -> Self { Self { x, origin } }
 }
 
 
