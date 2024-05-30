@@ -17,7 +17,7 @@ export const Microphone = () => {
 		<Stack>
 			<FormControlLabel
 				onChange={handleChange}
-				class={styles.microphone}
+				class={styles.toggleControl}
 				labelPlacement="start"
 				control={<Switch />} label="Microphone" />
 		</Stack>

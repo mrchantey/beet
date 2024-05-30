@@ -5,6 +5,7 @@ import { MessageBox } from "./MessageBox"
 import { Microphone } from "./Microphone"
 
 import controls from './Controls.module.css'
+import { Video } from "./Video"
 
 export const Controls = () => {
 
@@ -15,6 +16,7 @@ export const Controls = () => {
 			<Typography variant="h5">{appContext.appName}</Typography>
 			<MessageBox />
 			<Microphone />
+			<Video />
 		</Stack>
 	)
 }

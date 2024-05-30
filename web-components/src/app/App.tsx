@@ -5,7 +5,7 @@
 import { CssBaseline, ThemeProvider } from '@suid/material'
 import { lazy, type Component } from 'solid-js'
 import { AppContext, defaultAppContext } from './AppContext'
-import Runner from "./pages/Runner"
+import Runner from './pages/Runner'
 import { useBeetTheme } from './theme'
 
 const Home = lazy(() => import("./pages/Home"))
@@ -20,6 +20,7 @@ const App: Component = (props: Partial<AppContext>) => {
     <ThemeProvider theme={theme}>
       <CssBaseline />
       <AppContext.Provider value={ctx}>
+        {/* <Video /> */}
         <Runner />
         {/* <Router> */}
         {/* <Route path="/" component={Home} /> */}

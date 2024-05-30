@@ -6,7 +6,7 @@
 }
 
 
-.microphone {
+.toggleControl {
 	display: flex;
 	justify-content: space-between;
 
@@ -18,6 +18,29 @@
 
 }
 
-.sendIcon{
-	
+.videoContainer {
+	position: relative;
+	width: 100%;
 }
+
+.videoContainer>video {
+	width: 100%;
+	height: 100%;
+}
+
+.videoContainer>canvas {
+	position: absolute;
+	top: 0;
+	left: 0;
+	width: 100%;
+	height: 100%;
+}
+
+.videoContainer>div {
+	position: absolute;
+	top: 0;
+	left: 0;
+	width: 100%;
+	height: 100%;
+}
+

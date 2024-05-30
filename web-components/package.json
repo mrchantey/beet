@@ -24,7 +24,8 @@
     "@suid/material": "*",
     "@types/dom-speech-recognition": "^0.0.4",
     "solid-element": "^1.8.0",
-    "solid-js": "^1.8.11"
+    "solid-js": "^1.8.11",
+    "@mediapipe/tasks-vision": "^0.10.3"
   },
   "devDependencies": {
     "@suid/vite-plugin": "*",
