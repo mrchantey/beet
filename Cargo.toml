@@ -149,8 +149,8 @@ proc-macro2 = "1.0"
 ## attributes
 num-traits = "0.2.15"
 derive_deref = "1.1.1"
-strum = "0.25.0"
-strum_macros = "0.25.0"
+strum = { version = "0.26.0", features = ["derive"] }
+strum_macros = "0.26.0"
 extend = "1.1.2"
 
 # channels
