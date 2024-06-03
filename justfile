@@ -2,7 +2,6 @@ set windows-shell := ["C:/tools/cygwin/bin/sh.exe","-c"]
 set dotenv-load
 crates := 'beet beet_core beet_ecs beet_net'
 
-
 default:
 	just --list --unsorted
 

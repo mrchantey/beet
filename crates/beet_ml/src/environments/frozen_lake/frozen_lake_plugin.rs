@@ -1,4 +1,4 @@
-use bevy::prelude::*;
+// use bevy::prelude::*;
 
 /**
 Implementation of the OpenAI Gym Frozen Lake environment.
@@ -33,9 +33,9 @@ Reward schedule:
 **/
 pub struct FrozenLakePlugin;
 
-impl Plugin for FrozenLakePlugin {
-	fn build(&self, app: &mut App) {}
-}
+// impl Plugin for FrozenLakePlugin {
+// 	fn build(&self, app: &mut App) {}
+// }
 
 
 
@@ -45,35 +45,42 @@ impl Plugin for FrozenLakePlugin {
 mod test {
 	use crate::prelude::*;
 	use anyhow::Result;
-	use bevy::math::UVec2;
-	use frozen_lake::*;
+	use std::time::Duration;
+	use std::time::Instant;
 	use sweet::*;
 
 	#[test]
 	fn works() -> Result<()> {
 		let map = FrozenLakeMap::default_four_by_four();
-		let actions = TranslateGrid::default();
-		println!("{:?}", map.shape());
-		println!("{:?}", map.sample());
-		println!("{:?}", actions.shape());
-		println!("{:?}", actions.sample());
+		// let actions = TranslateGrid::default();
+		// println!("{:?}", map.shape());
+		// println!("{:?}", map.sample());
+		// println!("{:?}", actions.shape());
+		// println!("{:?}", actions.sample());
 
-		let table = QTable::<
-			{ FrozenLakeMap::<16>::LEN },
-			{ TranslateGrid::LEN },
-		>::default();
+		// let mut table = QTable::<
+		// 	{ FrozenLakeMap::<16>::LEN },
+		// 	{ TranslateGrid::LEN },
+		// >::default();
+		let mut table = QTable::<16, 4>::default();
 
-		println!("table: {:?}", table);
 
-		let mut env = FrozenLakeEnv::new(map, true);
+		let mut trainer = QTableTrainer::new();
+		// println!("table: {:?}", table);
 
-		let action = TranslateGridDirection::Left;
-		let out = env.step(action);
-		expect(out.new_pos).to_be(UVec2::new(0, 0))?;
-		let action = TranslateGridDirection::Down;
-		let out = env.step(action);
-		expect(out.new_pos).to_be(UVec2::new(0, 1))?;
+		let now = Instant::now();
+		trainer.train(&mut table, || FrozenLakeEnv::new(map, false));
+		let elapsed = now.elapsed();
+		println!("\nTrained in: {:.2?}\n", elapsed);
+		// println!("trained table: {:?}", table);
+		expect(elapsed).to_be_less_than(Duration::from_millis(100))?;
 
+		let evaluation =
+			trainer.evaluate(&table, || FrozenLakeEnv::new(map, false));
+		println!("{evaluation:?}\n");
+
+		expect(evaluation.mean).to_be_greater_than(0.99)?;
+		expect(evaluation.std).to_be_close_to(0.00)?;
 
 		Ok(())
 	}

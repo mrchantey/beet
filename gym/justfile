@@ -1,0 +1,40 @@
+set shell := ["bash", "-uc"]
+
+watch *command:
+	forky watch \
+	-w '**/*.py' \
+	-i '{bin,include,lib,lib64}/**' \
+	-i '**/mod.rs' \
+	-- {{command}}
+
+py *args:
+	bin/python3 {{args}}
+
+run:
+	just watch 'bin/python3 run.py'
+
+install:
+	python3 -m venv ./
+	just init
+	bin/pip install gymnasium
+	bin/pip install pygame
+	bin/pip install numpy
+	bin/pip install pyyaml
+	bin/pip install huggingface_hub
+	bin/pip install imageio
+	bin/pip install imageio_ffmpeg
+	bin/pip install pyglet==1.5.1
+	bin/pip install tqdm
+	bin/pip install notebook
+	bin/pip install ipywidgets
+
+
+#bin/pip install pickle5
+# n
+# bin/pip install -r requirements.txt
+
+
+
+
+init:
+	source ./bin/activate
