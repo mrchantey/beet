@@ -52,22 +52,9 @@ mod test {
 	#[test]
 	fn works() -> Result<()> {
 		let map = FrozenLakeMap::default_four_by_four();
-		// let actions = TranslateGrid::default();
-		// println!("{:?}", map.shape());
-		// println!("{:?}", map.sample());
-		// println!("{:?}", actions.shape());
-		// println!("{:?}", actions.sample());
-
-		// let mut table = QTable::<
-		// 	{ FrozenLakeMap::<16>::LEN },
-		// 	{ TranslateGrid::LEN },
-		// >::default();
 		let mut table = QTable::<16, 4>::default();
 
-
 		let mut trainer = QTableTrainer::new();
-		// println!("table: {:?}", table);
-
 		let now = Instant::now();
 		trainer.train(&mut table, || FrozenLakeEnv::new(map, false));
 		let elapsed = now.elapsed();

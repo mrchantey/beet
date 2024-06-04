@@ -31,7 +31,7 @@ impl<T: Debug + Hash + Clone> Space for T {}
 // 	// Box(Vec<usize>),
 // }
 
-pub trait StateSpace: Space +Into<usize>{}
+pub trait StateSpace: Space + Into<usize> {}
 impl<T: Space + Into<usize>> StateSpace for T {}
 
 pub trait ActionSpace: Space + From<usize> {}

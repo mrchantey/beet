@@ -1,5 +1,5 @@
 //https://github.com/huggingface/candle/blob/main/candle-examples/examples/bert/main.rs
-use crate::models::sentence_embeddings::SentenceEmbeddings;
+use crate::language::sentence_embeddings::SentenceEmbeddings;
 use crate::prelude::*;
 use anyhow::Error as E;
 use anyhow::Result;
