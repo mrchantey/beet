@@ -41,7 +41,7 @@ impl QTableTrainer {
 		table: &mut impl QSource,
 		env: impl Fn() -> E,
 	) {
-		'episode: for episode in 0..self.n_training_episodes {
+		for episode in 0..self.n_training_episodes {
 			let epsilon = self.min_epsilon
 				+ (self.max_epsilon - self.min_epsilon)
 					* (-self.decay_rate * episode as f32).exp();
@@ -49,7 +49,7 @@ impl QTableTrainer {
 			let mut env = env();
 			let mut prev_state: usize = env.state().into();
 
-			for _step in 0..self.max_steps {
+			'step: for _step in 0..self.max_steps {
 				let action_index =
 					table.epsilon_greedy_policy(prev_state, epsilon);
 				let action = A::from(action_index);
@@ -78,7 +78,7 @@ impl QTableTrainer {
 				prev_state = new_state;
 
 				if done {
-					break;
+					break 'step;
 				}
 			}
 		}

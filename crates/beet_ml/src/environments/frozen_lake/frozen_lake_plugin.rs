@@ -71,7 +71,7 @@ mod test {
 		let now = Instant::now();
 		trainer.train(&mut table, || FrozenLakeEnv::new(map, false));
 		let elapsed = now.elapsed();
-		println!("\nTrained in: {:.2?}\n", elapsed);
+		println!("\nTrained in: {:.2?} seconds\n", elapsed.as_secs_f32());
 		// println!("trained table: {:?}", table);
 		expect(elapsed).to_be_less_than(Duration::from_millis(100))?;
 

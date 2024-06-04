@@ -14,11 +14,7 @@ Beet is a very flexible behavior library for games and robotics. It is built wit
 
 #### 🌈 Multi-Paradigm
 
-Create behaviors from a growing list of paradigms including classical and machine learning techniques. Check out the [roadmap](misc/roadmap.md) for implementation status.
-
-#### 🐦 Bevy Friendly
-
-Beet is regular components, systems and plugins all the way down. Behaviors can be visualized, serialized etc in the same way as bevy scenes.
+Interoperate between Behavior Trees, Utility AI, Reinforcement Learning, and other behavior paradigms, check out the [roadmap](misc/roadmap.md) for implementation status.
 
 #### 🌳 Modular
 
@@ -26,11 +22,20 @@ Actions are very simple and entity trees are self-contained, enabling behavior c
 
 #### 🎯 Target Anything
 
-Beet is suitable for powerful gaming rigs and tiny microcontrollers alike.
+Runs on servers, web, mobile and even tiny microcontrollers like the ESP32.
 
-<!-- #### 🌐 Zero-config replication
 
-Work can be distributed across environments through world replication. An agent may run some actions in a constrained environment and others in a remote server. -->
+### 🌐 Zero-config replication
+
+Rendering, sensor input & decision-making can be distributed across devices through simple world replication.
+
+#### 🐦 Bevy Friendly
+
+Beet is regular components, systems and plugins all the way down. Behaviors can be visualized, serialized etc in the same way as bevy scenes.
+
+### 🕯️ Machine Learning
+
+100% Rust RL environments with [Huggingface Candle](https://github.com/huggingface/candle) integration, including rust ports of OpenAI Gym environments like `Frozen Lake`.
 
 ## Drawbacks
 
