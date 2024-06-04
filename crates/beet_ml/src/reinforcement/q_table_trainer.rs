@@ -36,7 +36,7 @@ impl QTableTrainer {
 		}
 	}
 
-	pub fn train<E: Environment<S, A>, S: StateSpace, A: ActionSpace>(
+	pub fn train<E: Environment>(
 		&mut self,
 		table: &mut impl QSource,
 		env: impl Fn() -> E,
@@ -52,12 +52,11 @@ impl QTableTrainer {
 			'step: for _step in 0..self.max_steps {
 				let action_index =
 					table.epsilon_greedy_policy(prev_state, epsilon);
-				let action = A::from(action_index);
 				let StepOutcome {
 					state,
 					reward,
 					done,
-				} = env.step(action);
+				} = env.step(action_index);
 				let new_state: usize = state.into();
 
 
@@ -84,7 +83,7 @@ impl QTableTrainer {
 		}
 	}
 	///   Evaluate the agent for ``n_eval_episodes`` episodes and returns average reward and std of reward.
-	pub fn evaluate<E: Environment<S, A>, S: StateSpace, A: ActionSpace>(
+	pub fn evaluate<E: Environment>(
 		&self,
 		table: &impl QSource,
 		env: impl Fn() -> E,
@@ -101,7 +100,7 @@ impl QTableTrainer {
 					state,
 					reward,
 					done,
-				} = env.step(A::from(action_index));
+				} = env.step(action_index);
 				total_reward += reward;
 				prev_state = state.into();
 

@@ -45,14 +45,20 @@ impl FrozenLakeEnv {
 	}
 }
 
-impl Environment<usize, TranslateGridDirection> for FrozenLakeEnv {
-	fn state(&self) -> usize { self.pos_index() }
+impl Environment for FrozenLakeEnv {
+	type State = usize;
+	type Action = TranslateGridDirection;
 
-	fn step(&mut self, action: TranslateGridDirection) -> StepOutcome<usize> {
+	fn state(&self) -> Self::State { self.pos_index() }
+
+	fn step(
+		&mut self,
+		action: impl Into<Self::Action>,
+	) -> StepOutcome<Self::State> {
 		let action = if self.is_slippery {
-			action.as_slippery()
+			action.into().as_slippery()
 		} else {
-			action
+			action.into()
 		};
 		let TransitionOutcome {
 			pos,

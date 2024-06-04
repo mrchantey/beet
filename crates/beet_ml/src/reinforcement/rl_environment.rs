@@ -1,9 +1,11 @@
 use std::fmt::Debug;
 use std::hash::Hash;
 
-pub trait Environment<State: StateSpace, Action: ActionSpace> {
-	fn state(&self) -> State;
-	fn step(&mut self, action: Action) -> StepOutcome<State>;
+pub trait Environment {
+	type State: StateSpace;
+	type Action: ActionSpace;
+	fn state(&self) -> Self::State;
+	fn step(&mut self, action: impl Into<Self::Action>) -> StepOutcome<Self::State>;
 	// fn state_space(&self) -> State;
 	// fn action_space(&self) -> Action;
 }
