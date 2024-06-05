@@ -13,15 +13,15 @@ pub trait QSource {
 		&self,
 		state: &Self::State,
 		epsilon: f32,
+		rng: &mut impl Rng,
 	) -> (Self::Action, QValue) {
-		let mut rng = rand::thread_rng();
 		let random_num: f32 = rng.gen(); // generates a float between 0 and 1
 		if random_num > epsilon {
 			// Exploitation: Take the action with the highest value given a state
 			self.greedy_policy(state)
 		} else {
 			// Exploration: Take a random action
-			(Self::Action::sample(), QValue::default())
+			(Self::Action::sample(rng), QValue::default())
 		}
 	}
 

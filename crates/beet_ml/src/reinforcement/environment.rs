@@ -1,3 +1,4 @@
+use rand::Rng;
 use std::fmt::Debug;
 use std::hash::Hash;
 
@@ -37,6 +38,6 @@ pub trait StateSpace: DiscreteSpace {}
 impl<T: DiscreteSpace> StateSpace for T {}
 
 pub trait ActionSpace: DiscreteSpace + Default {
-	fn sample() -> Self;
+	fn sample(rng: &mut impl Rng) -> Self;
 }
 // impl<T: DiscreteSpace + TryFrom<usize>> ActionSpace for T {}

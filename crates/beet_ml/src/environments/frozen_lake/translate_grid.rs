@@ -2,6 +2,7 @@ use crate::prelude::ActionSpace;
 use beet_ecs::prelude::*;
 use bevy::ecs::schedule::SystemConfigs;
 use bevy::prelude::*;
+use rand::rngs::StdRng;
 use rand::Rng;
 use strum::EnumCount;
 use strum::EnumIter;
@@ -53,8 +54,7 @@ impl From<usize> for TranslateGridDirection {
 }
 
 impl TranslateGridDirection {
-	pub fn as_slippery(&self) -> Self {
-		let mut rng = rand::thread_rng();
+	pub fn as_slippery(&self, rng: &mut StdRng) -> Self {
 		match rng.gen_range(0..3) {
 			0 => self.clone(),
 			1 => self.rotate_left(),
@@ -114,8 +114,8 @@ impl ActionSystems for TranslateGrid {
 // }
 
 impl ActionSpace for TranslateGridDirection {
-	fn sample() -> Self {
-		match rand::thread_rng().gen_range(0..4) {
+	fn sample(rng: &mut impl Rng) -> Self {
+		match rng.gen_range(0..4) {
 			0 => Self::Up,
 			1 => Self::Right,
 			2 => Self::Down,

@@ -45,6 +45,8 @@ pub struct FrozenLakePlugin;
 mod test {
 	use crate::prelude::*;
 	use anyhow::Result;
+	use rand::rngs::StdRng;
+	use rand::SeedableRng;
 	use std::time::Duration;
 	use std::time::Instant;
 	use sweet::*;
@@ -54,20 +56,28 @@ mod test {
 		let map = FrozenLakeMap::default_four_by_four();
 		let mut table = QTable::default();
 
+		let slippery_rng = StdRng::seed_from_u64(0);
+		let mut policy_rng = StdRng::seed_from_u64(10);
+		let new_env = move || {
+			FrozenLakeEnv::new(map, false)
+				.with_slippery_rng(slippery_rng.clone())
+		};
+
 		let mut trainer = QTableTrainer::new();
 		let now = Instant::now();
-		trainer.train(&mut table, || FrozenLakeEnv::new(map, false));
+		trainer.train(&mut table, &new_env, &mut policy_rng);
 		let elapsed = now.elapsed();
-		println!("\nTrained in: {:.4?} seconds\n", elapsed.as_secs_f32());
+		println!("\nTrained in: {:.2?} seconds\n", elapsed.as_secs_f32());
 		// println!("trained table: {:?}", table);
-		expect(elapsed).to_be_less_than(Duration::from_millis(100))?;
+		expect(elapsed).to_be_greater_than(Duration::from_millis(30))?;
+		expect(elapsed).to_be_less_than(Duration::from_millis(70))?;
 
-		let evaluation =
-			trainer.evaluate(&table, || FrozenLakeEnv::new(map, false));
+		let evaluation = trainer.evaluate(&table, &new_env);
 		println!("{evaluation:?}\n");
 
 		expect(evaluation.mean).to_be_greater_than(0.99)?;
 		expect(evaluation.std).to_be_close_to(0.00)?;
+		expect(evaluation.total_steps).to_be(600)?;
 
 		Ok(())
 	}

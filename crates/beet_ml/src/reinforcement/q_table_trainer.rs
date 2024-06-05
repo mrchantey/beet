@@ -2,6 +2,7 @@
 use super::QSource;
 use crate::prelude::*;
 use bevy::prelude::*;
+use rand::Rng;
 
 #[derive(Debug, Clone, PartialEq, Reflect)]
 pub struct QTableTrainer<M> {
@@ -51,10 +52,13 @@ where
 		}
 	}
 
+
+	/// Perform off-policy training with an epsilon-greedy strategy
 	pub fn train(
 		&mut self,
 		table: &mut Table,
 		env: impl Fn() -> Env,
+		rng: &mut impl Rng,
 	) {
 		for episode in 0..self.n_training_episodes {
 			let epsilon = self.min_epsilon
@@ -66,7 +70,7 @@ where
 
 			'step: for _step in 0..self.max_steps {
 				let (action, _) =
-					table.epsilon_greedy_policy(&prev_state, epsilon);
+					table.epsilon_greedy_policy(&prev_state, epsilon, rng);
 				let StepOutcome {
 					state: new_state,
 					reward,
@@ -99,19 +103,17 @@ where
 			}
 		}
 	}
-	///   Evaluate the agent for ``n_eval_episodes`` episodes and returns average reward and std of reward.
-	pub fn evaluate(
-		&self,
-		table: &Table,
-		env: impl Fn() -> Env,
-	) -> Evaluation {
+	///   Evaluate using greedy policy for [`Self::n_eval_episodes`] episodes.
+	pub fn evaluate(&self, table: &Table, env: impl Fn() -> Env) -> Evaluation {
 		let mut rewards = Vec::new();
-		for _episode in 0..self.n_training_episodes {
+		let mut total_steps = 0;
+		for _episode in 0..self.n_eval_episodes {
 			let mut env = env();
 			let mut prev_state = env.state();
 			let mut total_reward = 0.0;
 
 			for _step in 0..self.max_steps {
+				total_steps += 1;
 				let (action, _) = table.greedy_policy(&prev_state);
 				let StepOutcome {
 					state,
@@ -127,21 +129,26 @@ where
 			}
 			rewards.push(total_reward);
 		}
-		Evaluation::new(rewards)
+		Evaluation::new(rewards, total_steps)
 	}
 }
 
 #[derive(Debug, Clone)]
 pub struct Evaluation {
+	pub total_steps: u128,
 	pub mean: f32,
 	pub std: f32,
 }
 
 impl Evaluation {
-	pub fn new(rewards: Vec<f32>) -> Self {
+	pub fn new(rewards: Vec<f32>, total_steps: u128) -> Self {
 		let mean = mean(&rewards).unwrap();
 		let std = variance(&rewards).unwrap();
-		Self { mean, std }
+		Self {
+			mean,
+			std,
+			total_steps,
+		}
 	}
 }
 
