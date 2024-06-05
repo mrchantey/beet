@@ -192,18 +192,18 @@ watch-web *command:
 	-w '**/*/assets/**/*' \
 	-- {{command}}
 
+### GSUTIL
+push-assets:
+	tar -czvf ./assets.tar.gz ./assets
+	gsutil cp ./assets.tar.gz gs://beet-misc/assets.tar.gz
+	rm ./assets.tar.gz
 
+pull-assets:
+	curl -o ./assets.tar.gz https://storage.googleapis.com/beet-misc/assets.tar.gz
+	tar -xzvf ./assets.tar.gz
+	rm ./assets.tar.gz
 
-# too scary with untracked changes etc, do it manually
-# deploy-web:
-#		just build-web
-# 	rm -rf /tmp/beet
-# 	mkdir -p /tmp/beet || true
-# 	cp -r target/static/* /tmp/beet
-# 	git checkout pages
-# 	mkdir -p play || true
-# 	cp -r /tmp/beet/* play
-# 	git add .
-# 	git commit -m "Publish Playground"
-# 	git push origin main
-# 	git checkout main
+view-cors:
+	gcloud storage buckets describe gs://beet-examples --format="default(cors_config)"
+update-cors:
+	gcloud storage buckets update gs://beet-examples --cors-file=cors.json

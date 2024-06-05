@@ -56,6 +56,17 @@ fn main(){
 
 }
 ```
+## Examples
+
+Most examples rely on assets that can be downloaded with the following commands:
+
+```sh
+curl -o ./assets.tar.gz https://storage.googleapis.com/beet-misc/assets.tar.gz
+tar -xzvf ./assets.tar.gz
+rm ./assets.tar.gz
+```
+
+
 
 ## Bevy Versions
 
