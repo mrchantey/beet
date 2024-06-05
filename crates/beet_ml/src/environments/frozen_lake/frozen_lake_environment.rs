@@ -15,6 +15,7 @@ pub struct TransitionOutcome {
 	pub is_terminal: bool,
 }
 
+#[derive(Debug,Clone)]
 /// The environment for the Frozen Lake game.
 pub struct FrozenLakeEnv {
 	/// The position of the agent.

@@ -5,7 +5,7 @@ type QValue = f32;
 use rand::Rng;
 
 
-pub trait QSource {
+pub trait QSource: 'static + Send + Sync {
 	type State: StateSpace;
 	type Action: ActionSpace;
 	fn greedy_policy(&self, state: &Self::State) -> (Self::Action, QValue);

@@ -1,8 +1,18 @@
+use bevy::prelude::Deref;
 use rand::Rng;
 use std::fmt::Debug;
 use std::hash::Hash;
 
-pub trait Environment {
+#[derive(Deref)]
+pub struct Readonly<T:Clone>(T);
+impl<T:Clone> Readonly<T> {
+	pub fn new(value: T) -> Self {
+		Self(value)
+	}
+}
+
+
+pub trait Environment: 'static + Send + Sync + Clone {
 	type State: StateSpace;
 	type Action: ActionSpace;
 
@@ -18,14 +28,19 @@ pub struct StepOutcome<State> {
 	pub done: bool,
 }
 
-pub trait DiscreteSpace: Debug + Hash + Clone + PartialEq + Eq {
+pub trait DiscreteSpace:
+	'static + Send + Sync + Debug + Hash + Clone + PartialEq + Eq
+{
 	// type Value;
 	// const LEN: usize;
 	// // fn shape(&self) -> SpaceShape;
 	// fn len(&self) -> usize { Self::LEN }
 	// fn sample(&self) -> Self::Value;
 }
-impl<T: Debug + Hash + Clone + PartialEq + Eq> DiscreteSpace for T {}
+impl<T: 'static + Send + Sync + Debug + Hash + Clone + PartialEq + Eq>
+	DiscreteSpace for T
+{
+}
 
 
 // #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
