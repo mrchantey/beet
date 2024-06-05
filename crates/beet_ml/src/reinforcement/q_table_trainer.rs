@@ -1,10 +1,10 @@
 #![allow(dead_code)]
 use super::QSource;
 use crate::prelude::*;
-use std::cmp::Ordering;
+use bevy::prelude::*;
 
-// #[derive()]
-pub struct QTableTrainer {
+#[derive(Debug, Clone, PartialEq, Reflect)]
+pub struct QTableTrainer<M> {
 	n_training_episodes: u32,
 	learning_rate: f32,
 	n_eval_episodes: u32,
@@ -14,13 +14,27 @@ pub struct QTableTrainer {
 	max_epsilon: f32,
 	min_epsilon: f32,
 	decay_rate: f32,
+	phantom: std::marker::PhantomData<M>,
 }
 
-impl Default for QTableTrainer {
+impl<State, Action, Env, Table> Default
+	for QTableTrainer<(State, Action, Env, Table)>
+where
+	State: StateSpace,
+	Action: ActionSpace,
+	Table: QSource<State = State, Action = Action>,
+	Env: Environment<State = State, Action = Action>,
+{
 	fn default() -> Self { Self::new() }
 }
 
-impl QTableTrainer {
+impl<State, Action, Env, Table> QTableTrainer<(State, Action, Env, Table)>
+where
+	State: StateSpace,
+	Action: ActionSpace,
+	Table: QSource<State = State, Action = Action>,
+	Env: Environment<State = State, Action = Action>,
+{
 	pub fn new() -> Self {
 		Self {
 			n_training_episodes: 10000,
@@ -33,13 +47,14 @@ impl QTableTrainer {
 			max_epsilon: 1.0,
 			min_epsilon: 0.05,
 			decay_rate: 0.0005,
+			phantom: std::marker::PhantomData,
 		}
 	}
 
-	pub fn train<E: Environment>(
+	pub fn train(
 		&mut self,
-		table: &mut impl QSource,
-		env: impl Fn() -> E,
+		table: &mut Table,
+		env: impl Fn() -> Env,
 	) {
 		for episode in 0..self.n_training_episodes {
 			let epsilon = self.min_epsilon
@@ -47,33 +62,35 @@ impl QTableTrainer {
 					* (-self.decay_rate * episode as f32).exp();
 
 			let mut env = env();
-			let mut prev_state: usize = env.state().into();
+			let mut prev_state = env.state();
 
 			'step: for _step in 0..self.max_steps {
-				let action_index =
-					table.epsilon_greedy_policy(prev_state, epsilon);
+				let (action, _) =
+					table.epsilon_greedy_policy(&prev_state, epsilon);
 				let StepOutcome {
-					state,
+					state: new_state,
 					reward,
 					done,
-				} = env.step(action_index);
-				let new_state: usize = state.into();
-
+				} = env.step(&action);
+				// let new_state: usize = state.into();
 
 				// Update Q(s,a):= Q(s,a) + lr [R(s,a) + gamma * max Q(s',a') - Q(s,a)]
-				let prev_reward = table.get(prev_state, action_index);
+				let prev_reward = table.get_q(&prev_state, &action);
 
-				let max = table
-					.get_actions(new_state)
-					.max_by(|a, b| a.partial_cmp(b).unwrap_or(Ordering::Equal))
-					.unwrap();
+				let (_, best_value) = table.greedy_policy(&new_state);
+				// let (best_action, best_value) = table
+				// 	.get_actions(&new_state)
+				// 	.max_by(|(_, a), (_, b)| {
+				// 		a.partial_cmp(b).unwrap_or(Ordering::Equal)
+				// 	})
+				// 	.unwrap();
 
 
 				let discounted_reward = prev_reward
 					+ self.learning_rate
-						* (reward + self.gamma * max - prev_reward);
+						* (reward + self.gamma * best_value - prev_reward);
 
-				table.set(prev_state, action_index, discounted_reward);
+				table.set_q(&prev_state, &action, discounted_reward);
 				prev_state = new_state;
 
 				if done {
@@ -83,26 +100,26 @@ impl QTableTrainer {
 		}
 	}
 	///   Evaluate the agent for ``n_eval_episodes`` episodes and returns average reward and std of reward.
-	pub fn evaluate<E: Environment>(
+	pub fn evaluate(
 		&self,
-		table: &impl QSource,
-		env: impl Fn() -> E,
+		table: &Table,
+		env: impl Fn() -> Env,
 	) -> Evaluation {
 		let mut rewards = Vec::new();
 		for _episode in 0..self.n_training_episodes {
 			let mut env = env();
-			let mut prev_state: usize = env.state().into();
+			let mut prev_state = env.state();
 			let mut total_reward = 0.0;
 
 			for _step in 0..self.max_steps {
-				let action_index = table.greedy_policy(prev_state);
+				let (action, _) = table.greedy_policy(&prev_state);
 				let StepOutcome {
 					state,
 					reward,
 					done,
-				} = env.step(action_index);
+				} = env.step(&action);
 				total_reward += reward;
-				prev_state = state.into();
+				prev_state = state;
 
 				if done {
 					break;

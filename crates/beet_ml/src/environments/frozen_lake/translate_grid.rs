@@ -1,7 +1,9 @@
+use crate::prelude::ActionSpace;
 use beet_ecs::prelude::*;
 use bevy::ecs::schedule::SystemConfigs;
 use bevy::prelude::*;
 use rand::Rng;
+use strum::EnumCount;
 use strum::EnumIter;
 use strum::VariantArray;
 
@@ -17,6 +19,7 @@ use strum::VariantArray;
 	Component,
 	VariantArray,
 	EnumIter,
+	EnumCount,
 )]
 pub enum TranslateGridDirection {
 	#[default]
@@ -106,11 +109,18 @@ impl ActionSystems for TranslateGrid {
 	fn systems() -> SystemConfigs { translate_grid.in_set(TickSet) }
 }
 
-
-// impl Space for TranslateGrid {
-// type Value = TranslateGridDirection;
-// const LEN: usize = 4;
-// fn shape(&self) -> SpaceShape { SpaceShape::Discrete(4) }
-// // fn len(&self) -> usize { 4 }
-// fn sample(&self) -> Self::Value { Self::Value::default() }
+// impl DiscreteSpace for TranslateGridDirection {
+// 	const LEN: usize = Self::COUNT;
 // }
+
+impl ActionSpace for TranslateGridDirection {
+	fn sample() -> Self {
+		match rand::thread_rng().gen_range(0..4) {
+			0 => Self::Up,
+			1 => Self::Right,
+			2 => Self::Down,
+			3 => Self::Left,
+			_ => unreachable!(),
+		}
+	}
+}

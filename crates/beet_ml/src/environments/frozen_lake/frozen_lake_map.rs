@@ -41,6 +41,9 @@ impl FrozenLakeCell {
 		matches!(self, Self::Goal | Self::Hole)
 	}
 }
+
+
+/// Define an intial state for a [`FrozenLakeEnv`].
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Component)]
 pub struct FrozenLakeMap<const L: usize> {
 	cells: [FrozenLakeCell; L],

@@ -16,8 +16,7 @@ pub struct TransitionOutcome {
 /// The environment for the Frozen Lake game.
 pub struct FrozenLakeEnv {
 	/// The position of the agent.
-	pub pos: UVec2,
-	width: usize,
+	pub state: GridPos,
 	/// Whether there is a 2/3 chance the agent moves left or right of the intended direction.
 	is_slippery: bool,
 	/// The transition probabilities for each state-action pair.
@@ -33,43 +32,38 @@ impl FrozenLakeEnv {
 		is_slippery: bool,
 	) -> Self {
 		Self {
-			width: grid.width(),
 			is_slippery,
-			pos: grid.agent_position().expect("No agent position found"),
+			state: grid
+				.agent_position()
+				.expect("No agent position found")
+				.into(),
 			outcomes: grid.transition_outcomes(),
 		}
-	}
-
-	pub fn pos_index(&self) -> usize {
-		self.pos.x as usize + self.pos.y as usize * self.width
 	}
 }
 
 impl Environment for FrozenLakeEnv {
-	type State = usize;
+	type State = GridPos;
 	type Action = TranslateGridDirection;
 
-	fn state(&self) -> Self::State { self.pos_index() }
+	fn state(&self) -> Self::State { self.state }
 
-	fn step(
-		&mut self,
-		action: impl Into<Self::Action>,
-	) -> StepOutcome<Self::State> {
+	fn step(&mut self, action: &Self::Action) -> StepOutcome<Self::State> {
 		let action = if self.is_slippery {
-			action.into().as_slippery()
+			action.as_slippery()
 		} else {
-			action.into()
+			action.clone()
 		};
 		let TransitionOutcome {
 			pos,
 			reward,
 			is_terminal,
-		} = self.outcomes[&(self.pos, action)];
+		} = self.outcomes[&(*self.state, action)];
 		// println!("pos: {:?}, reward: {:?}, is_terminal: {:?}", pos, reward, is_terminal);
 
-		self.pos = pos;
+		self.state = pos.into();
 		StepOutcome {
-			state: self.pos_index(),
+			state: self.state,
 			reward,
 			done: is_terminal,
 		}

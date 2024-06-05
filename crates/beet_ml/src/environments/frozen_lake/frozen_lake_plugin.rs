@@ -52,13 +52,13 @@ mod test {
 	#[test]
 	fn works() -> Result<()> {
 		let map = FrozenLakeMap::default_four_by_four();
-		let mut table = QTable::<16, 4>::default();
+		let mut table = QTable::default();
 
 		let mut trainer = QTableTrainer::new();
 		let now = Instant::now();
 		trainer.train(&mut table, || FrozenLakeEnv::new(map, false));
 		let elapsed = now.elapsed();
-		println!("\nTrained in: {:.2?} seconds\n", elapsed.as_secs_f32());
+		println!("\nTrained in: {:.4?} seconds\n", elapsed.as_secs_f32());
 		// println!("trained table: {:?}", table);
 		expect(elapsed).to_be_less_than(Duration::from_millis(100))?;
 

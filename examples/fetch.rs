@@ -5,7 +5,6 @@
 //!
 //! Please wait for the status to change to `Idle` before issuing commands.
 //!
-
 use beet::prelude::*;
 use beet_examples::*;
 use bevy::prelude::*;

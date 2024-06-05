@@ -4,8 +4,9 @@ use std::hash::Hash;
 pub trait Environment {
 	type State: StateSpace;
 	type Action: ActionSpace;
+
 	fn state(&self) -> Self::State;
-	fn step(&mut self, action: impl Into<Self::Action>) -> StepOutcome<Self::State>;
+	fn step(&mut self, action: &Self::Action) -> StepOutcome<Self::State>;
 	// fn state_space(&self) -> State;
 	// fn action_space(&self) -> Action;
 }
@@ -16,15 +17,14 @@ pub struct StepOutcome<State> {
 	pub done: bool,
 }
 
-pub trait Space: Debug + Hash + Clone {
+pub trait DiscreteSpace: Debug + Hash + Clone + PartialEq + Eq {
 	// type Value;
 	// const LEN: usize;
 	// // fn shape(&self) -> SpaceShape;
 	// fn len(&self) -> usize { Self::LEN }
 	// fn sample(&self) -> Self::Value;
 }
-impl<T: Debug + Hash + Clone> Space for T {}
-
+impl<T: Debug + Hash + Clone + PartialEq + Eq> DiscreteSpace for T {}
 
 
 // #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
@@ -33,8 +33,10 @@ impl<T: Debug + Hash + Clone> Space for T {}
 // 	// Box(Vec<usize>),
 // }
 
-pub trait StateSpace: Space + Into<usize> {}
-impl<T: Space + Into<usize>> StateSpace for T {}
+pub trait StateSpace: DiscreteSpace {}
+impl<T: DiscreteSpace> StateSpace for T {}
 
-pub trait ActionSpace: Space + From<usize> {}
-impl<T: Space + From<usize>> ActionSpace for T {}
+pub trait ActionSpace: DiscreteSpace + Default {
+	fn sample() -> Self;
+}
+// impl<T: DiscreteSpace + TryFrom<usize>> ActionSpace for T {}

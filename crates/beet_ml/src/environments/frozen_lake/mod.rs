@@ -1,6 +1,9 @@
 pub mod frozen_lake_plugin;
 #[allow(unused_imports)]
 pub use self::frozen_lake_plugin::*;
+pub mod grid_state;
+#[allow(unused_imports)]
+pub use self::grid_state::*;
 pub mod frozen_lake_map;
 #[allow(unused_imports)]
 pub use self::frozen_lake_map::*;
