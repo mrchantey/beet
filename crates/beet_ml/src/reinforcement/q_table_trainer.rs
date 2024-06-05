@@ -17,17 +17,19 @@ impl<
 		S: StateSpace,
 		A: ActionSpace,
 		Env: Environment<State = S, Action = A>,
-		// Table: QSource<State = S, Action = A> + Default,
-	> QTableTrainer<S, A, Env, QTable<S, A>>
+		Table: QSource<State = S, Action = A>,
+	> QTableTrainer<S, A, Env, Table>
 {
-	pub fn new(env: Env) -> Self {
+	pub fn new(env: Env, table: Table) -> Self {
 		Self {
-			table: QTable::default(),
+			table,
 			env: Readonly::new(env),
 			params: Readonly::new(QLearnParams::new()),
 		}
 	}
 }
+
+
 
 
 impl<
@@ -126,18 +128,18 @@ mod test {
 		let mut policy_rng = StdRng::seed_from_u64(10);
 
 		let map = FrozenLakeMap::default_four_by_four();
-		let env = FrozenLakeEnv::new(map, false)
-			.with_slippery_rng(slippery_rng.clone());
+		let env =
+			FrozenLakeEnv::new(map, false).with_slippery_rng(slippery_rng);
 
-
-		let mut trainer = QTableTrainer::new(env.clone());
+		let mut trainer = QTableTrainer::new(env.clone(), QTable::default());
 		let now = Instant::now();
 		trainer.train(&mut policy_rng);
 		let elapsed = now.elapsed();
-		println!("\nTrained in: {:.2?} seconds\n", elapsed.as_secs_f32());
+		println!("\nTrained in: {:.3?} seconds\n", elapsed.as_secs_f32());
 		// println!("trained table: {:?}", table);
 		expect(elapsed).to_be_greater_than(Duration::from_millis(2))?;
-		expect(elapsed).to_be_less_than(Duration::from_millis(100))?;
+		// should be about 10ms
+		expect(elapsed).to_be_less_than(Duration::from_millis(20))?;
 
 		let evaluation = trainer.evaluate();
 		println!("{evaluation:?}\n");

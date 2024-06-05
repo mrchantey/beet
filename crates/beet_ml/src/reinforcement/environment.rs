@@ -4,11 +4,9 @@ use std::fmt::Debug;
 use std::hash::Hash;
 
 #[derive(Deref)]
-pub struct Readonly<T:Clone>(T);
-impl<T:Clone> Readonly<T> {
-	pub fn new(value: T) -> Self {
-		Self(value)
-	}
+pub struct Readonly<T>(T);
+impl<T> Readonly<T> {
+	pub fn new(value: T) -> Self { Self(value) }
 }
 
 
