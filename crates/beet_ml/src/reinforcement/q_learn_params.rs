@@ -20,6 +20,7 @@ impl Default for QLearnParams {
 impl QLearnParams {
 	pub fn new() -> Self {
 		Self {
+			// n_training_episodes: 1000,
 			n_training_episodes: 10000,
 			// n_training_episodes: 10,
 			learning_rate: 0.7,

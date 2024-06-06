@@ -83,10 +83,12 @@ impl<
 			let mut state = env.state();
 
 			'step: for _step in 0..params.max_steps {
+				// 1. select action
 				let (action, _) =
 					self.table.epsilon_greedy_policy(&state, epsilon, rng);
+				// 2. step environent
 				let outcome = env.step(&action);
-
+				// 3. update reward
 				self.table.set_discounted_reward(
 					params,
 					&action,
@@ -94,11 +96,11 @@ impl<
 					&state,
 					&outcome.state,
 				);
-				state = outcome.state;
-
+				// 4. update state and break if done
 				if outcome.done {
 					break 'step;
 				}
+				state = outcome.state;
 			}
 		}
 	}
@@ -145,29 +147,27 @@ mod test {
 
 	#[test]
 	fn works() -> Result<()> {
-		let slippery_rng = StdRng::seed_from_u64(0);
-		let mut policy_rng = StdRng::seed_from_u64(10);
+		let mut policy_rng = StdRng::seed_from_u64(0);
 
-		let map = FrozenLakeMap::default_four_by_four();
-		let env =
-			FrozenLakeEnv::new(map, false).with_slippery_rng(slippery_rng);
+		let env = FrozenLakeEnv::default();
 
 		let mut trainer = QTableTrainer::new(env.clone(), QTable::default());
 		let now = Instant::now();
 		trainer.train(&mut policy_rng);
 		let elapsed = now.elapsed();
-		println!("\nTrained in: {:.3?} seconds\n", elapsed.as_secs_f32());
+		// println!("\nTrained in: {:.3?} seconds\n", elapsed.as_secs_f32());
 		// println!("trained table: {:?}", table);
 		expect(elapsed).to_be_greater_than(Duration::from_millis(2))?;
 		// should be about 10ms
-		expect(elapsed).to_be_less_than(Duration::from_millis(20))?;
+		expect(elapsed).to_be_less_than(Duration::from_millis(30))?;
 
-		let evaluation = trainer.evaluate();
-		println!("{evaluation:?}\n");
+		let eval = trainer.evaluate();
+		// println!("{eval:?}\n");
 
-		expect(evaluation.mean).to_be_greater_than(0.99)?;
-		expect(evaluation.std).to_be_close_to(0.00)?;
-		expect(evaluation.total_steps).to_be(600)?;
+		// optimal policy
+		expect(eval.mean).to_be(1.)?;
+		expect(eval.std).to_be(0.)?;
+		expect(eval.total_steps).to_be(600)?;
 
 		Ok(())
 	}

@@ -9,7 +9,17 @@ use strum::EnumIter;
 use strum::VariantArray;
 
 #[derive(
-	Debug, Copy, Clone, Hash, PartialEq, Eq, Deref, DerefMut, Component, Reflect,
+	Debug,
+	Default,
+	Copy,
+	Clone,
+	Hash,
+	PartialEq,
+	Eq,
+	Deref,
+	DerefMut,
+	Component,
+	Reflect,
 )]
 pub struct GridPos(pub UVec2);
 

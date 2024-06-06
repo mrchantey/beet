@@ -28,6 +28,12 @@ pub struct FrozenLakeEnv {
 	outcomes: HashMap<(UVec2, GridDirection), TransitionOutcome>,
 }
 
+impl Default for FrozenLakeEnv {
+	fn default() -> Self {
+		Self::new(FrozenLakeMap::default_four_by_four(), false)
+	}
+}
+
 impl FrozenLakeEnv {
 	/// Creates a new environment.
 	/// # Panics
