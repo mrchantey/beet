@@ -32,4 +32,9 @@ impl QLearnParams {
 			decay_rate: 0.0005,
 		}
 	}
+	pub fn next_epsilon(&self, episode: u32) -> f32 {
+		self.min_epsilon
+			+ (self.max_epsilon - self.min_epsilon)
+				* (-self.decay_rate * episode as f32).exp()
+	}
 }

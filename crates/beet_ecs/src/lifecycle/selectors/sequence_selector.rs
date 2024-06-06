@@ -4,14 +4,9 @@ use bevy::ecs::schedule::SystemConfigs;
 use bevy::prelude::*;
 
 /// An action that runs all of its children in order until one fails.
-///
-/// Logical AND - `RUN child1 THEN child2 etc`
-///
-/// If a child succeeds it will run the next child.
-///
-/// If there are no more children to run it will succeed.
-///
-/// If a child fails it will fail.
+/// - If a child succeeds it will run the next child.
+/// - If there are no more children to run it will succeed.
+/// - If a child fails it will fail.
 #[derive(Debug, Default, Clone, PartialEq, Component, Reflect)]
 #[reflect(Default, Component, ActionMeta)]
 pub struct SequenceSelector;

@@ -1,7 +1,7 @@
 use crate::prelude::*;
 use bevy::prelude::*;
 use bevy::utils::HashMap;
-type QValue = f32;
+pub type QValue = f32;
 use rand::Rng;
 
 
@@ -38,6 +38,27 @@ pub trait QSource: 'static + Send + Sync {
 		action: &Self::Action,
 		value: QValue,
 	);
+
+
+	fn set_discounted_reward(
+		&mut self,
+		params: &QLearnParams,
+		action: &Self::Action,
+		reward: QValue,
+		prev_state: &Self::State,
+		next_state: &Self::State,
+	) {
+		let prev_q = self.get_q(&prev_state, &action);
+		let (_, new_max_q) = self.greedy_policy(&next_state);
+
+		// Update using Bellman equation
+		// Q(s,a):= Q(s,a) + lr [R(s,a) + gamma * max Q(s',a') - Q(s,a)]
+		let discounted_reward = prev_q
+			+ params.learning_rate
+				* (reward + params.gamma * new_max_q - prev_q);
+
+		self.set_q(&prev_state, &action, discounted_reward);
+	}
 }
 
 #[derive(Debug, Clone, PartialEq, Component, Deref, DerefMut, Reflect)]

@@ -2,6 +2,8 @@ use super::*;
 use rand::Rng;
 
 
+
+
 pub struct QTableTrainer<
 	S: StateSpace,
 	A: ActionSpace,
@@ -30,6 +32,39 @@ impl<
 }
 
 
+impl<
+		S: StateSpace,
+		A: ActionSpace,
+		Env: Environment<State = S, Action = A>,
+		Table: QSource<State = S, Action = A>,
+	> QSource for QTableTrainer<S, A, Env, Table>
+{
+	type Action = A;
+	type State = S;
+	fn greedy_policy(&self, state: &Self::State) -> (Self::Action, QValue) {
+		self.table.greedy_policy(state)
+	}
+
+	fn get_actions(
+		&self,
+		state: &Self::State,
+	) -> impl Iterator<Item = (&Self::Action, &QValue)> {
+		self.table.get_actions(state)
+	}
+
+	fn get_q(&self, state: &Self::State, action: &Self::Action) -> QValue {
+		self.table.get_q(state, action)
+	}
+
+	fn set_q(
+		&mut self,
+		state: &Self::State,
+		action: &Self::Action,
+		value: QValue,
+	) {
+		self.table.set_q(state, action, value)
+	}
+}
 
 
 impl<
@@ -39,41 +74,29 @@ impl<
 		Table: QSource<State = S, Action = A>,
 	> QTrainer for QTableTrainer<S, A, Env, Table>
 {
-	type Action = A;
-	type State = S;
 	fn train(&mut self, rng: &mut impl Rng) {
 		let params = &self.params;
 
 		for episode in 0..params.n_training_episodes {
-			let epsilon = params.min_epsilon
-				+ (params.max_epsilon - params.min_epsilon)
-					* (-params.decay_rate * episode as f32).exp();
-
+			let epsilon = params.next_epsilon(episode);
 			let mut env = self.env.clone();
-			let mut prev_state = env.state();
+			let mut state = env.state();
 
 			'step: for _step in 0..params.max_steps {
 				let (action, _) =
-					self.table.epsilon_greedy_policy(&prev_state, epsilon, rng);
-				let StepOutcome {
-					state: new_state,
-					reward: new_reward,
-					done,
-				} = env.step(&action);
+					self.table.epsilon_greedy_policy(&state, epsilon, rng);
+				let outcome = env.step(&action);
 
-				let prev_q = self.table.get_q(&prev_state, &action);
-				let (_, new_max_q) = self.table.greedy_policy(&new_state);
+				self.table.set_discounted_reward(
+					params,
+					&action,
+					outcome.reward,
+					&state,
+					&outcome.state,
+				);
+				state = outcome.state;
 
-				// Update using Bellman equation
-				// Q(s,a):= Q(s,a) + lr [R(s,a) + gamma * max Q(s',a') - Q(s,a)]
-				let discounted_reward = prev_q
-					+ params.learning_rate
-						* (new_reward + params.gamma * new_max_q - prev_q);
-
-				self.table.set_q(&prev_state, &action, discounted_reward);
-				prev_state = new_state;
-
-				if done {
+				if outcome.done {
 					break 'step;
 				}
 			}
@@ -86,21 +109,17 @@ impl<
 		let params = &self.params;
 		for _episode in 0..params.n_eval_episodes {
 			let mut env = self.env.clone();
-			let mut prev_state = env.state();
+			let mut state = env.state();
 			let mut total_reward = 0.0;
 
 			for _step in 0..self.params.max_steps {
 				total_steps += 1;
-				let (action, _) = self.table.greedy_policy(&prev_state);
-				let StepOutcome {
-					state,
-					reward,
-					done,
-				} = env.step(&action);
-				total_reward += reward;
-				prev_state = state;
+				let (action, _) = self.table.greedy_policy(&state);
+				let outcome = env.step(&action);
+				total_reward += outcome.reward;
+				state = outcome.state;
 
-				if done {
+				if outcome.done {
 					break;
 				}
 			}
