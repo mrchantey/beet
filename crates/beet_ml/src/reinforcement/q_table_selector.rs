@@ -9,12 +9,21 @@ use bevy::prelude::*;
 pub struct QTableSelector<L: QTrainer> {
 	pub evaluate: bool,
 	pub learner: L,
+	pub current_episode: usize,
+	pub current_step: usize,
 }
 
 fn q_table_selector<L: QTrainer>(
-	query: Query<&QTableSelector<L>, With<Running>>,
+	mut agents: Query<(&L::State, &mut L::Action, &Reward)>,
+	query: Query<(&TargetAgent, &QTableSelector<L>), With<Running>>,
 ) {
-	for _selector in query.iter() {
+	for (agent, selector) in query.iter() {
+		let Ok((state, mut action, reward)) = agents.get_mut(**agent) else {
+			continue;
+		};
+
+		// *action = selector.next_action(state, reward);
+
 		// if selector.
 		// log::info!("Running - {:?}", q_table_selector);
 	}

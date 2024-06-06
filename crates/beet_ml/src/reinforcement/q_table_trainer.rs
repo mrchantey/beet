@@ -39,6 +39,8 @@ impl<
 		Table: QSource<State = S, Action = A>,
 	> QTrainer for QTableTrainer<S, A, Env, Table>
 {
+	type Action = A;
+	type State = S;
 	fn train(&mut self, rng: &mut impl Rng) {
 		let params = &self.params;
 

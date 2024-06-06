@@ -9,6 +9,30 @@ use strum::EnumIter;
 use strum::VariantArray;
 
 #[derive(
+	Debug, Copy, Clone, Hash, PartialEq, Eq, Deref, DerefMut, Component, Reflect,
+)]
+pub struct GridPos(pub UVec2);
+
+impl GridPos {
+	pub fn new(pos: UVec2) -> Self { Self(pos) }
+	pub fn sat_add(&mut self, other: IVec2) {
+		fn add(u: u32, i: i32) -> u32 {
+			if i.is_negative() {
+				u - i.wrapping_abs() as u32
+			} else {
+				u + i as u32
+			}
+		}
+		self.0.x = add(self.0.x, other.x);
+		self.0.y = add(self.0.y, other.y);
+	}
+}
+
+impl From<UVec2> for GridPos {
+	fn from(pos: UVec2) -> Self { Self(pos) }
+}
+
+#[derive(
 	Debug,
 	Default,
 	Copy,
@@ -22,7 +46,7 @@ use strum::VariantArray;
 	EnumIter,
 	EnumCount,
 )]
-pub enum TranslateGridDirection {
+pub enum GridDirection {
 	#[default]
 	Up,
 	Right,
@@ -30,7 +54,7 @@ pub enum TranslateGridDirection {
 	Left,
 }
 
-impl Into<IVec2> for TranslateGridDirection {
+impl Into<IVec2> for GridDirection {
 	fn into(self) -> IVec2 {
 		match self {
 			Self::Up => IVec2::new(0, 1),
@@ -41,19 +65,7 @@ impl Into<IVec2> for TranslateGridDirection {
 	}
 }
 
-impl From<usize> for TranslateGridDirection {
-	fn from(value: usize) -> Self {
-		match value {
-			0 => Self::Up,
-			1 => Self::Right,
-			2 => Self::Down,
-			3 => Self::Left,
-			_ => unreachable!(),
-		}
-	}
-}
-
-impl TranslateGridDirection {
+impl GridDirection {
 	pub fn as_slippery(&self, rng: &mut StdRng) -> Self {
 		match rng.gen_range(0..3) {
 			0 => self.clone(),
@@ -89,31 +101,8 @@ impl TranslateGridDirection {
 	}
 }
 
-#[derive(Debug, Default, Clone, PartialEq, Component, Reflect)]
-#[reflect(Default, Component, ActionMeta)]
-pub struct TranslateGrid {
-	pub direction: TranslateGridDirection,
-}
 
-fn translate_grid(query: Query<&TranslateGrid, With<Running>>) {
-	for translate_grid in query.iter() {
-		log::info!("Running - {:?}", translate_grid);
-	}
-}
-
-impl ActionMeta for TranslateGrid {
-	fn category(&self) -> ActionCategory { ActionCategory::Behavior }
-}
-
-impl ActionSystems for TranslateGrid {
-	fn systems() -> SystemConfigs { translate_grid.in_set(TickSet) }
-}
-
-// impl DiscreteSpace for TranslateGridDirection {
-// 	const LEN: usize = Self::COUNT;
-// }
-
-impl ActionSpace for TranslateGridDirection {
+impl ActionSpace for GridDirection {
 	fn sample(rng: &mut impl Rng) -> Self {
 		match rng.gen_range(0..4) {
 			0 => Self::Up,
@@ -123,4 +112,38 @@ impl ActionSpace for TranslateGridDirection {
 			_ => unreachable!(),
 		}
 	}
+}
+
+#[derive(Debug, Clone, PartialEq, Component, Reflect)]
+#[reflect(Default, Component, ActionMeta)]
+pub struct TranslateGrid {
+	pub speed: f32,
+}
+
+impl Default for TranslateGrid {
+	fn default() -> Self { Self { speed: 1.0 } }
+}
+
+fn translate_grid(
+	mut commands: Commands,
+	mut agents: Query<(&mut Transform, &mut GridPos, &GridDirection)>,
+	action: Query<(Entity, &TranslateGrid, &TargetAgent), With<Running>>,
+) {
+	for (entity, _, agent) in action.iter() {
+		let Ok((mut transform, mut pos, dir)) = agents.get_mut(**agent) else {
+			continue;
+		};
+		pos.sat_add((*dir).into());
+		transform.translation = Vec3::new(pos.0.x as f32, 0.0, pos.0.y as f32);
+		// TODO incremental move and check if done
+		commands.entity(entity).insert(RunResult::Success);
+	}
+}
+
+impl ActionMeta for TranslateGrid {
+	fn category(&self) -> ActionCategory { ActionCategory::Behavior }
+}
+
+impl ActionSystems for TranslateGrid {
+	fn systems() -> SystemConfigs { translate_grid.in_set(TickSet) }
 }

@@ -15,7 +15,7 @@ pub struct TransitionOutcome {
 	pub is_terminal: bool,
 }
 
-#[derive(Debug,Clone)]
+#[derive(Debug, Clone)]
 /// The environment for the Frozen Lake game.
 pub struct FrozenLakeEnv {
 	/// The position of the agent.
@@ -25,17 +25,14 @@ pub struct FrozenLakeEnv {
 	/// Whether there is a 2/3 chance the agent moves left or right of the intended direction.
 	is_slippery: bool,
 	/// The transition probabilities for each state-action pair.
-	outcomes: HashMap<(UVec2, TranslateGridDirection), TransitionOutcome>,
+	outcomes: HashMap<(UVec2, GridDirection), TransitionOutcome>,
 }
 
 impl FrozenLakeEnv {
 	/// Creates a new environment.
 	/// # Panics
 	/// If the map has no agent position.
-	pub fn new<const L: usize>(
-		grid: FrozenLakeMap<L>,
-		is_slippery: bool,
-	) -> Self {
+	pub fn new(grid: FrozenLakeMap, is_slippery: bool) -> Self {
 		Self {
 			is_slippery,
 			rng: StdRng::from_entropy(),
@@ -54,7 +51,7 @@ impl FrozenLakeEnv {
 
 impl Environment for FrozenLakeEnv {
 	type State = GridPos;
-	type Action = TranslateGridDirection;
+	type Action = GridDirection;
 
 	fn state(&self) -> Self::State { self.state }
 

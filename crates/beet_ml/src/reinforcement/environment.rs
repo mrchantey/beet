@@ -1,4 +1,4 @@
-use bevy::prelude::Deref;
+use bevy::prelude::*;
 use rand::Rng;
 use std::fmt::Debug;
 use std::hash::Hash;
@@ -27,7 +27,7 @@ pub struct StepOutcome<State> {
 }
 
 pub trait DiscreteSpace:
-	'static + Send + Sync + Debug + Hash + Clone + PartialEq + Eq
+	'static + Send + Sync + Debug + Hash + Clone + PartialEq + Eq + Component
 {
 	// type Value;
 	// const LEN: usize;
@@ -35,8 +35,17 @@ pub trait DiscreteSpace:
 	// fn len(&self) -> usize { Self::LEN }
 	// fn sample(&self) -> Self::Value;
 }
-impl<T: 'static + Send + Sync + Debug + Hash + Clone + PartialEq + Eq>
-	DiscreteSpace for T
+impl<
+		T: 'static
+			+ Send
+			+ Sync
+			+ Debug
+			+ Hash
+			+ Clone
+			+ PartialEq
+			+ Eq
+			+ Component,
+	> DiscreteSpace for T
 {
 }
 

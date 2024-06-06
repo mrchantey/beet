@@ -44,18 +44,18 @@ impl FrozenLakeCell {
 
 
 /// Define an intial state for a [`FrozenLakeEnv`].
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Component)]
-pub struct FrozenLakeMap<const L: usize> {
-	cells: [FrozenLakeCell; L],
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Component)]
+pub struct FrozenLakeMap {
+	cells: Vec<FrozenLakeCell>,
 	width: usize,
 	height: usize,
 }
 
-impl<const L: usize> FrozenLakeMap<L> {
+impl FrozenLakeMap {
 	pub fn new(
 		width: usize,
 		height: usize,
-		cells: [FrozenLakeCell; L],
+		cells: Vec<FrozenLakeCell>,
 	) -> Self {
 		Self {
 			cells,
@@ -72,11 +72,11 @@ impl<const L: usize> FrozenLakeMap<L> {
 		(position.y as usize) * self.width + position.x as usize
 	}
 
-	fn position_to_cell(&self, position: UVec2) -> FrozenLakeCell {
+	pub fn position_to_cell(&self, position: UVec2) -> FrozenLakeCell {
 		self.cells[self.position_to_index(position)]
 	}
 
-	pub fn cells(&self) -> &[FrozenLakeCell; L] { &self.cells }
+	pub fn cells(&self) -> &Vec<FrozenLakeCell> { &self.cells }
 	pub fn width(&self) -> usize { self.width }
 	pub fn height(&self) -> usize { self.height }
 	pub fn cells_with_positions(
@@ -97,7 +97,7 @@ impl<const L: usize> FrozenLakeMap<L> {
 	pub fn try_transition(
 		&self,
 		position: UVec2,
-		direction: TranslateGridDirection,
+		direction: GridDirection,
 	) -> Option<TransitionOutcome> {
 		let direction: IVec2 = direction.into();
 		let new_pos = IVec2::new(
@@ -130,10 +130,10 @@ impl<const L: usize> FrozenLakeMap<L> {
 
 	pub fn transition_outcomes(
 		&self,
-	) -> HashMap<(UVec2, TranslateGridDirection), TransitionOutcome> {
+	) -> HashMap<(UVec2, GridDirection), TransitionOutcome> {
 		let mut outcomes = HashMap::new();
 		for (pos, cell) in self.cells_with_positions() {
-			for action in TranslateGridDirection::iter() {
+			for action in GridDirection::iter() {
 				let outcome = if cell.is_terminal() {
 					// early exit, cannot move from terminal cell
 					TransitionOutcome {
@@ -168,14 +168,14 @@ impl<const L: usize> FrozenLakeMap<L> {
 // fn sample(&self) -> Self::Value { self.tiles[0] }
 // }
 
-impl FrozenLakeMap<16> {
+impl FrozenLakeMap {
 	#[rustfmt::skip]
 	pub fn default_four_by_four() -> Self {
 		Self {
 			width: 4,
 			height: 4,
 			//https://github.com/openai/gym/blob/dcd185843a62953e27c2d54dc8c2d647d604b635/gym/envs/toy_text/frozen_lake.py#L17
-			cells: [
+			cells: vec![
 				//row 1
 				FrozenLakeCell::Agent,	FrozenLakeCell::Ice,	FrozenLakeCell::Ice,	FrozenLakeCell::Ice,
 				//row 2
@@ -190,14 +190,14 @@ impl FrozenLakeMap<16> {
 }
 
 
-impl FrozenLakeMap<64> {
+impl FrozenLakeMap {
 	#[rustfmt::skip]
 	pub fn default_eight_by_eight() -> Self {
 		Self {
 			width: 8,
 			height: 8,
 			//https://github.com/openai/gym/blob/dcd185843a62953e27c2d54dc8c2d647d604b635/gym/envs/toy_text/frozen_lake.py#L17
-			cells: [
+			cells: vec![
 				//row 1
 				FrozenLakeCell::Agent,	FrozenLakeCell::Ice, 	FrozenLakeCell::Ice, 	FrozenLakeCell::Ice, 	FrozenLakeCell::Ice, 	FrozenLakeCell::Ice, 	FrozenLakeCell::Ice, 	FrozenLakeCell::Ice,
 				//row 2

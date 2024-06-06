@@ -1,4 +1,6 @@
-// use bevy::prelude::*;
+use crate::prelude::*;
+use beet_ecs::prelude::*;
+use bevy::prelude::*;
 
 /**
 Implementation of the OpenAI Gym Frozen Lake environment.
@@ -33,6 +35,22 @@ Reward schedule:
 **/
 pub struct FrozenLakePlugin;
 
-// impl Plugin for FrozenLakePlugin {
-// 	fn build(&self, app: &mut App) {}
-// }
+impl Plugin for FrozenLakePlugin {
+	fn build(&self, app: &mut App) {
+		app.add_plugins(ActionPlugin::<TranslateGrid>::default());
+
+
+		app.add_systems(Update, reward_grid.in_set(PostTickSet));
+
+
+		let world = app.world_mut();
+		world.init_component::<GridPos>();
+		world.init_component::<GridDirection>();
+
+		let mut registry =
+			world.get_resource::<AppTypeRegistry>().unwrap().write();
+
+		registry.register::<GridPos>();
+		registry.register::<GridDirection>();
+	}
+}

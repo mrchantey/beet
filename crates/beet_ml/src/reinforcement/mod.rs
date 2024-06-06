@@ -13,6 +13,9 @@ pub use self::q_learn::*;
 pub mod q_table;
 #[allow(unused_imports)]
 pub use self::q_table::*;
+pub mod rl_components;
+#[allow(unused_imports)]
+pub use self::rl_components::*;
 pub mod q_table_trainer;
 #[allow(unused_imports)]
 pub use self::q_table_trainer::*;
