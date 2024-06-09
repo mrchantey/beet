@@ -6,7 +6,7 @@ use std::time::Duration;
 
 pub fn main() {
 	App::new()
-		.add_plugins(ExamplePlugin3d)
+		.add_plugins(ExamplePlugin3d::default())
 		.add_plugins(DefaultBeetPlugins)
 		.add_plugins(BeetDebugPlugin::default())
 		.add_systems(Startup, (setup_camera, setup_fox))

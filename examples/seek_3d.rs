@@ -7,7 +7,7 @@ fn main() {
 	let mut app = App::new();
 
 	app /*-*/
-		.add_plugins(ExamplePlugin3d)
+		.add_plugins(ExamplePlugin3d::default())
 		.add_plugins(DefaultBeetPlugins::default())
 		.add_plugins(BeetDebugPlugin::default())
 		.add_systems(Startup, setup)
@@ -21,11 +21,13 @@ fn setup(
 	mut graphs: ResMut<Assets<AnimationGraph>>,
 ) {
 	// camera
-	commands.spawn((CameraDistance::new(100.), Camera3dBundle {
-		transform: Transform::from_xyz(0., 30., 100.)
-			.looking_at(Vec3::new(0.0, 2.0, 0.0), Vec3::Y),
-		..default()
-	}));
+	commands.spawn((
+		CameraDistance {
+			width: 80.,
+			offset: Vec3::new(0., 20., 40.),
+		},
+		Camera3dBundle::default(),
+	));
 
 	// cheese
 	let target = commands

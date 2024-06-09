@@ -7,6 +7,9 @@ pub use self::frozen_lake_map::*;
 pub mod translate_grid;
 #[allow(unused_imports)]
 pub use self::translate_grid::*;
+pub mod grid;
+#[allow(unused_imports)]
+pub use self::grid::*;
 pub mod reward_grid;
 #[allow(unused_imports)]
 pub use self::reward_grid::*;

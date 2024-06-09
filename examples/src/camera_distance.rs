@@ -1,20 +1,18 @@
 use bevy::prelude::*;
 use bevy::window::WindowResized;
 
-
-
-/// Given a value  `x`, move camera backward to include that value
+/// Moves camera distance to keep the width in view on window resize
 #[derive(Component)]
 pub struct CameraDistance {
-	pub x: f32,
-	pub origin: Vec3,
+	pub width: f32,
+	pub offset: Vec3,
 }
 
 impl Default for CameraDistance {
 	fn default() -> Self {
 		Self {
-			x: 10.0,
-			origin: Vec3::ZERO,
+			width: 10.0,
+			offset: Vec3::ZERO,
 		}
 	}
 }
@@ -22,11 +20,16 @@ impl Default for CameraDistance {
 impl CameraDistance {
 	pub fn new(x: f32) -> Self {
 		Self {
-			x,
-			origin: Vec3::ZERO,
+			width: x,
+			offset: Vec3::ZERO,
 		}
 	}
-	pub fn new_with_origin(x: f32, origin: Vec3) -> Self { Self { x, origin } }
+	pub fn new_with_origin(width: f32, origin: Vec3) -> Self {
+		Self {
+			width,
+			offset: origin,
+		}
+	}
 }
 
 
@@ -46,16 +49,18 @@ pub fn camera_distance(
 			let fov = perspective.fov * 0.5;
 
 			let hfov = 2. * f32::atan(f32::tan(fov) * aspect_ratio);
-			let z = camera_distance.x / f32::tan(hfov * 0.5);
+			let z = camera_distance.width / f32::tan(hfov * 0.5);
 
 			// log::info!("z: {}", z);
 
 			// let z = camera_distance.x / fov.tan();
 
 
-			let fwd = transform.forward();
-			let pos = camera_distance.origin - fwd * z;
+			// let fwd = transform.forward();
+			let fwd = camera_distance.offset.normalize();
+			let pos = camera_distance.offset + fwd * z;
 			transform.translation = pos;
+			transform.look_at(Vec3::ZERO, Vec3::Y);
 		}
 	}
 }

@@ -3,19 +3,28 @@ use bevy::pbr::CascadeShadowConfigBuilder;
 use bevy::prelude::*;
 use std::f32::consts::PI;
 
-#[derive(Default)]
-pub struct ExamplePlugin3d;
+pub struct ExamplePlugin3d {
+	pub ground: bool,
+}
+
+impl Default for ExamplePlugin3d {
+	fn default() -> Self { Self { ground: true } }
+}
 
 impl Plugin for ExamplePlugin3d {
 	fn build(&self, app: &mut App) {
 		app.add_plugins(ExamplePlugin)
 			.add_systems(Startup, setup_scene_3d)
 			.add_systems(Update, (follow_cursor_3d, camera_distance));
+
+		if self.ground {
+			app.add_systems(Startup, setup_ground_plane);
+		}
 	}
 }
 
 
-pub fn setup_scene_3d(
+pub fn setup_ground_plane(
 	mut commands: Commands,
 	mut meshes: ResMut<Assets<Mesh>>,
 	mut materials: ResMut<Assets<StandardMaterial>>,
@@ -26,7 +35,11 @@ pub fn setup_scene_3d(
 		material: materials.add(Color::srgb(0.3, 0.5, 0.3)),
 		..default()
 	});
+}
 
+pub fn setup_scene_3d(
+	mut commands: Commands,
+) {
 	// Light
 	commands.spawn(DirectionalLightBundle {
 		transform: Transform::from_rotation(Quat::from_euler(

@@ -5,7 +5,6 @@ use serde::Deserialize;
 use serde::Serialize;
 use strum::IntoEnumIterator;
 
-
 #[derive(
 	Debug,
 	Default,
@@ -64,7 +63,7 @@ impl FrozenLakeMap {
 		}
 	}
 
-	fn index_to_position(&self, index: usize) -> UVec2 {
+	pub fn index_to_position(&self, index: usize) -> UVec2 {
 		UVec2::new((index % self.width) as u32, (index / self.width) as u32)
 	}
 

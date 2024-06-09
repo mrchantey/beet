@@ -9,7 +9,7 @@ use bevy::prelude::*;
 fn main() {
 	App::new()
 		.add_plugins((
-			ExamplePlugin3d,
+			ExamplePlugin3d::default(),
 			DefaultBeetPlugins,
 			BeetDebugPlugin::default(),
 			MlPlugin::default(),
