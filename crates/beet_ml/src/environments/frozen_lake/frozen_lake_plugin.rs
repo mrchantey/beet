@@ -37,7 +37,15 @@ pub struct FrozenLakePlugin;
 
 impl Plugin for FrozenLakePlugin {
 	fn build(&self, app: &mut App) {
-		app.add_plugins(ActionPlugin::<TranslateGrid>::default());
+		app.add_plugins(ActionPlugin::<(
+			TranslateGrid,
+			StepEnvironment<
+				GridPos,
+				GridDirection,
+				FrozenLakeEnv,
+				QTable<_, _>,
+			>,
+		)>::default());
 
 
 		app.add_systems(Update, reward_grid.in_set(PostTickSet));

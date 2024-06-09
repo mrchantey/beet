@@ -18,20 +18,12 @@ pub struct TransitionOutcome {
 #[derive(Debug, Clone, Component)]
 /// An environment for the Frozen Lake game.
 pub struct FrozenLakeEnv {
-	/// The position of the agent.
-	pub state: GridPos,
 	/// A number generator for determining.
 	rng: StdRng,
 	/// Whether there is a 2/3 chance the agent moves left or right of the intended direction.
 	is_slippery: bool,
 	/// The transition probabilities for each state-action pair.
 	outcomes: HashMap<(UVec2, GridDirection), TransitionOutcome>,
-}
-
-impl Default for FrozenLakeEnv {
-	fn default() -> Self {
-		Self::new(FrozenLakeMap::default_four_by_four(), false)
-	}
 }
 
 impl FrozenLakeEnv {
@@ -42,10 +34,6 @@ impl FrozenLakeEnv {
 		Self {
 			is_slippery,
 			rng: StdRng::from_entropy(),
-			state: grid
-				.agent_position()
-				.expect("No agent position found")
-				.into(),
 			outcomes: grid.transition_outcomes(),
 		}
 	}
@@ -59,9 +47,12 @@ impl Environment for FrozenLakeEnv {
 	type State = GridPos;
 	type Action = GridDirection;
 
-	fn state(&self) -> Self::State { self.state }
 
-	fn step(&mut self, action: &Self::Action) -> StepOutcome<Self::State> {
+	fn step(
+		&mut self,
+		state: &Self::State,
+		action: &Self::Action,
+	) -> StepOutcome<Self::State> {
 		let action = if self.is_slippery {
 			action.as_slippery(&mut self.rng)
 		} else {
@@ -71,12 +62,11 @@ impl Environment for FrozenLakeEnv {
 			pos,
 			reward,
 			is_terminal,
-		} = self.outcomes[&(*self.state, action)];
+		} = self.outcomes[&(**state, action)];
 		// println!("pos: {:?}, reward: {:?}, is_terminal: {:?}", pos, reward, is_terminal);
 
-		self.state = pos.into();
 		StepOutcome {
-			state: self.state,
+			state: pos.into(),
 			reward,
 			done: is_terminal,
 		}

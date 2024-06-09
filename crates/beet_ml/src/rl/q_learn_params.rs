@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 
-#[derive(Debug, Clone, PartialEq, Reflect)]
+#[derive(Debug, Clone, PartialEq, Reflect, Component)]
 pub struct QLearnParams {
 	pub n_training_episodes: u32,
 	pub n_eval_episodes: u32,

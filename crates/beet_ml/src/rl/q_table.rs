@@ -76,41 +76,46 @@ mod test {
 	#[test]
 	fn works() -> Result<()> {
 		let mut source = QTable::<GridPos, GridDirection>::default();
-		let env = FrozenLakeEnv::default();
-		let initial_state = env.state();
 		let params = QLearnParams::default();
 		let mut rng = StdRng::seed_from_u64(0);
+		let map = FrozenLakeMap::default_four_by_four();
+		let initial_state = map.agent_position();
+		let env = FrozenLakeEnv::new(map, false);
 
 		for episode in 0..params.n_training_episodes {
-			let mut prev_state = initial_state.clone();
+			let mut state = initial_state.clone();
 			let epsilon = params.epsilon(episode);
 
 			let mut env = env.clone();
-			let mut action = source
-				.epsilon_greedy_policy(&prev_state, epsilon, &mut rng)
-				.0;
+			let mut action =
+				source.epsilon_greedy_policy(&state, epsilon, &mut rng).0;
 
 			for _step in 0..params.max_steps {
-				let outcome = env.step(&action);
+				let outcome = env.step(&state, &action);
 				// Must step even if outcome is done, to remember reward
 				action = source.step(
 					&params,
 					&mut rng,
 					epsilon,
 					&action,
-					&prev_state,
+					&state,
 					&outcome.state,
 					outcome.reward,
 				);
 				if outcome.done {
 					break;
 				}
-				prev_state = outcome.state;
+				state = outcome.state;
 			}
 		}
 
-		let eval =
-			QTableTrainer::new(FrozenLakeEnv::default(), source).evaluate();
+		let eval = QTableTrainer::new(
+			env,
+			source,
+			params,
+			initial_state,
+		)
+		.evaluate();
 
 		expect(eval.mean).to_be(1.)?;
 		expect(eval.std).to_be(0.)?;

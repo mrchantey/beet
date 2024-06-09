@@ -5,7 +5,7 @@ use rand::Rng;
 
 /// Used for training a QTable to completion with a provided [`Environment`].
 pub struct QTableTrainer<
-	S: StateSpace,
+	S: StateSpace + Clone,
 	A: ActionSpace,
 	Env: Environment<State = S, Action = A>,
 	Table: QSource<State = S, Action = A>,
@@ -13,27 +13,34 @@ pub struct QTableTrainer<
 	pub table: Table,
 	pub env: Readonly<Env>,
 	pub params: Readonly<QLearnParams>,
+	initial_state: S,
 }
 
 impl<
-		S: StateSpace,
+		S: StateSpace + Clone,
 		A: ActionSpace,
 		Env: Environment<State = S, Action = A>,
 		Table: QSource<State = S, Action = A>,
 	> QTableTrainer<S, A, Env, Table>
 {
-	pub fn new(env: Env, table: Table) -> Self {
+	pub fn new(
+		env: Env,
+		table: Table,
+		params: QLearnParams,
+		initial_state: S,
+	) -> Self {
 		Self {
 			table,
 			env: Readonly::new(env),
-			params: Readonly::new(QLearnParams::new()),
+			params: Readonly::new(params),
+			initial_state,
 		}
 	}
 }
 
 
 impl<
-		S: StateSpace,
+		S: StateSpace + Clone,
 		A: ActionSpace,
 		Env: Environment<State = S, Action = A>,
 		Table: QSource<State = S, Action = A>,
@@ -68,7 +75,7 @@ impl<
 
 
 impl<
-		S: StateSpace,
+		S: StateSpace + Clone,
 		A: ActionSpace,
 		Env: Environment<State = S, Action = A>,
 		Table: QSource<State = S, Action = A>,
@@ -80,14 +87,14 @@ impl<
 		for episode in 0..params.n_training_episodes {
 			let epsilon = params.epsilon(episode);
 			let mut env = self.env.clone();
-			let mut state = env.state();
+			let mut state = self.initial_state.clone();
 
 			'step: for _step in 0..params.max_steps {
 				// 1. select action
 				let (action, _) =
 					self.table.epsilon_greedy_policy(&state, epsilon, rng);
 				// 2. step environent
-				let outcome = env.step(&action);
+				let outcome = env.step(&state, &action);
 				// 3. update reward
 				self.table.set_discounted_reward(
 					params,
@@ -111,13 +118,13 @@ impl<
 		let params = &self.params;
 		for _episode in 0..params.n_eval_episodes {
 			let mut env = self.env.clone();
-			let mut state = env.state();
+			let mut state = self.initial_state.clone();
 			let mut total_reward = 0.0;
 
 			for _step in 0..self.params.max_steps {
 				total_steps += 1;
 				let (action, _) = self.table.greedy_policy(&state);
-				let outcome = env.step(&action);
+				let outcome = env.step(&state, &action);
 				total_reward += outcome.reward;
 				state = outcome.state;
 
@@ -148,10 +155,17 @@ mod test {
 	#[test]
 	fn works() -> Result<()> {
 		let mut policy_rng = StdRng::seed_from_u64(0);
+		let map = FrozenLakeMap::default_four_by_four();
+		let initial_state = map.agent_position();
+		let env = FrozenLakeEnv::new(map, false);
+		let params = QLearnParams::default();
 
-		let env = FrozenLakeEnv::default();
-
-		let mut trainer = QTableTrainer::new(env.clone(), QTable::default());
+		let mut trainer = QTableTrainer::new(
+			env.clone(),
+			QTable::default(),
+			params,
+			initial_state,
+		);
 		let now = Instant::now();
 		trainer.train(&mut policy_rng);
 		// My PC: 10ms

@@ -14,8 +14,11 @@ pub trait Environment: 'static + Send + Sync + Clone {
 	type State: StateSpace;
 	type Action: ActionSpace;
 
-	fn state(&self) -> Self::State;
-	fn step(&mut self, action: &Self::Action) -> StepOutcome<Self::State>;
+	fn step(
+		&mut self,
+		state: &Self::State,
+		action: &Self::Action,
+	) -> StepOutcome<Self::State>;
 	// fn state_space(&self) -> State;
 	// fn action_space(&self) -> Action;
 }

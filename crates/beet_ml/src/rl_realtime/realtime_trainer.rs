@@ -3,6 +3,10 @@ use bevy::prelude::*;
 use std::borrow::Cow;
 
 
+#[derive(Component, Deref)]
+pub struct Trainer(pub Entity);
+
+
 pub struct EpisodeParams<'a, 'w, 's> {
 	pub commands: &'a mut Commands<'w, 's>,
 	pub episode: u32,

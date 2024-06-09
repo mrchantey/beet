@@ -103,7 +103,7 @@ fn setup_environment(mut commands: Commands, asset_server: Res<AssetServer>) {
 					});
 			}
 			FrozenLakeCell::Hole => {
-				pos.y += grid_to_world.cell_width * 0.25;
+				pos.y += grid_to_world.cell_width * 0.25;// this asset is a bit too low
 				commands.spawn(SceneBundle {
 					scene: hazard_handle.clone(),
 					transform: Transform::from_translation(pos)

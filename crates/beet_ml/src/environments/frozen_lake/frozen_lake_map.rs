@@ -117,14 +117,18 @@ impl FrozenLakeMap {
 		}
 	}
 
-	pub fn agent_position(&self) -> Option<UVec2> {
-		self.cells.iter().enumerate().find_map(|(i, &cell)| {
-			if cell == FrozenLakeCell::Agent {
-				Some(self.index_to_position(i))
-			} else {
-				None
-			}
-		})
+	pub fn agent_position(&self) -> GridPos {
+		self.cells
+			.iter()
+			.enumerate()
+			.find_map(|(i, &cell)| {
+				if cell == FrozenLakeCell::Agent {
+					Some(GridPos(self.index_to_position(i)))
+				} else {
+					None
+				}
+			})
+			.expect("No agent position found")
 	}
 
 	pub fn transition_outcomes(
