@@ -3,8 +3,8 @@ use bevy::prelude::*;
 #[derive(Debug, Clone, PartialEq, Reflect)]
 pub struct QLearnParams {
 	pub n_training_episodes: u32,
-	pub learning_rate: f32,
 	pub n_eval_episodes: u32,
+	pub learning_rate: f32,
 	pub max_steps: u32,
 	pub gamma: f32,
 	// pub eval_seed: u64,
@@ -33,7 +33,7 @@ impl QLearnParams {
 			decay_rate: 0.0005,
 		}
 	}
-	pub fn next_epsilon(&self, episode: u32) -> f32 {
+	pub fn epsilon(&self, episode: u32) -> f32 {
 		self.min_epsilon
 			+ (self.max_epsilon - self.min_epsilon)
 				* (-self.decay_rate * episode as f32).exp()
