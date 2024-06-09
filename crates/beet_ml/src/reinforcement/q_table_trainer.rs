@@ -3,7 +3,7 @@ use rand::Rng;
 
 
 
-
+/// Used for training a QTable to completion with a provided [`Environment`].
 pub struct QTableTrainer<
 	S: StateSpace,
 	A: ActionSpace,

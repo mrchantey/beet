@@ -2,6 +2,8 @@ use crate::prelude::*;
 use bevy::prelude::*;
 use rand::rngs::StdRng;
 
+
+/// Used for training a QTable in steps
 #[derive(Component)]
 pub struct QTableRunner<S: QSource> {
 	params: Readonly<QLearnParams>,
@@ -94,7 +96,7 @@ mod test {
 		);
 
 		while !runner.episodes_finished() {
-			let mut env = FrozenLakeEnv::default();
+			let mut env = env.clone();
 			let mut action = runner.next_action();
 
 			while !runner.steps_finished() {

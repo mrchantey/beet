@@ -13,9 +13,8 @@ jobs:
     name: Build and Test
     strategy:
       matrix:
-        os: [windows-latest, ubuntu-latest, macos-latest]
-        # os: [ubuntu-latest, macos-latest] # cygwin failing to install?
-        # os: [ubuntu-latest]   # 1x  gh minutes
+        # os: [windows-latest, ubuntu-latest, macos-latest]
+        os: [ubuntu-latest]   # 1x  gh minutes
         # os: [windows-latest] # 2x  gh minutes
         # os: [macos-latest]   # 10x gh minutes
     runs-on: ${{ matrix.os }}
@@ -42,8 +41,6 @@ jobs:
       run: sudo apt-get update && sudo apt-get install g++ pkg-config libx11-dev libasound2-dev libudev-dev mold
     - name: 🔨 Install Just
       uses: extractions/setup-just@v1
-    - name: 🔨 Install Chromedriver
-      uses: nanasess/setup-chromedriver@v2
     - name: 🔨 Install Rust
       uses: actions-rs/toolchain@v1
       with:
@@ -51,6 +48,8 @@ jobs:
         override: true
         default: true
         # components: rustfmt, clippy
+    # - name: 🔨 Install Chromedriver
+    #   uses: nanasess/setup-chromedriver@v2  
     # - name: 🔨 Install Wasm Target
     #   run: rustup target add wasm32-unknown-unknown
     # - name: 🔨 Install Wasm Bindgen
