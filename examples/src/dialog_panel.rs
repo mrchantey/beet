@@ -1,5 +1,8 @@
+use bevy::input::keyboard::Key;
+use bevy::input::keyboard::KeyboardInput;
 use bevy::prelude::*;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
+use serde::Serialize;
 
 pub struct DialogPanelPlugin;
 
@@ -65,7 +68,7 @@ fn setup_ui(mut commands: Commands) {
 				TextBundle::from_sections([
 					TextSection::new("Status: ", text_style.clone()),
 					TextSection::new("Loading", text_style.clone()),
-				])
+				]),
 			));
 			// root.spawn((
 			// 	NpcOutput,
@@ -155,21 +158,25 @@ fn handle_npc_message(
 }
 
 fn parse_text_input(
-	mut evr_char: EventReader<ReceivedCharacter>,
-	key_input: Res<ButtonInput<KeyCode>>,
+	mut evr_char: EventReader<KeyboardInput>,
 	mut on_submit: EventWriter<OnPlayerMessage>,
 	mut query: Query<&mut Text, With<PlayerInput>>,
 ) {
-	for mut text in query.iter_mut() {
-		let text = &mut text.sections[0].value;
-		if key_input.just_pressed(KeyCode::Enter) {
-			on_submit.send(OnPlayerMessage(text.clone()));
-			text.clear();
-		} else if key_input.just_pressed(KeyCode::Backspace) {
-			text.pop();
-		} else {
-			for ev in evr_char.read() {
-				text.push_str(&ev.char);
+	for ev in evr_char.read() {
+		for mut text in query.iter_mut() {
+			let text = &mut text.sections[0].value;
+			match &ev.logical_key {
+				Key::Enter => {
+					on_submit.send(OnPlayerMessage(text.clone()));
+					text.clear();
+				}
+				Key::Backspace => {
+					text.pop();
+				}
+				Key::Character(char) => {
+					text.push_str(char);
+				}
+				_ => {}
 			}
 		}
 	}

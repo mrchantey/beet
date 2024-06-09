@@ -1,7 +1,7 @@
 use crate::prelude::*;
+use bevy::ecs::intern::Interned;
 use bevy::ecs::schedule::ScheduleLabel;
 use bevy::prelude::*;
-use bevy::utils::intern::Interned;
 use std::marker::PhantomData;
 
 

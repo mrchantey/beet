@@ -1,4 +1,3 @@
-use beet::prelude::*;
 use beet_examples::*;
 use bevy::prelude::*;
 

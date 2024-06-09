@@ -22,10 +22,6 @@ impl Plugin for ExamplePlugin {
 		#[cfg(feature = "tokio")]
 		app.add_transport(NativeWsClient::new(DEFAULT_SOCKET_URL).unwrap());
 
-		app.world_mut().insert_resource(AssetMetaCheck::Never);
-
-
-
 		app.add_plugins(ExampleReplicatePlugin)
 			.add_plugins(
 				DefaultPlugins
@@ -40,6 +36,7 @@ impl Plugin for ExamplePlugin {
 					})
 					.set(AssetPlugin {
 						file_path: assets_path(),
+						meta_check: AssetMetaCheck::Never,
 						..default()
 					})
 					.build(),

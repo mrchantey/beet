@@ -33,9 +33,10 @@ fn q_table_selector<L: QSource>(
 			// 1. wait for child to finish
 			continue;
 		}
-		// let Ok((state, mut action, reward)) = agents.get_mut(**agent) else {
-		// 	continue;
-		// };
+		#[allow(unused_variables)]
+		let Ok((state, action, reward)) = agents.get_mut(**agent) else {
+			continue;
+		};
 
 		selector.current_step += 1;
 
@@ -49,7 +50,6 @@ fn q_table_selector<L: QSource>(
 				&RunResult::Success => {
 					// evaluate reward
 					// selector.learner.set_discounted_reward(params, action, reward, prev_state, next_state)
-					
 
 					// *action = selector.next_action(state, reward);
 					// true

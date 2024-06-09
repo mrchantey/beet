@@ -21,10 +21,6 @@ tokio = ["dep:tokio", "dep:tokio-tungstenite", "dep:futures-util"]
 
 [dependencies]
 beet_ecs = { workspace = true, optional = true }
-# beet_ecs = { workspace = true, optional = true }
-
-# bevy_replicon = { path = "../../../../me-ref/bevy_replicon", default-features = false, optional = true }
-
 
 log.workspace = true
 bincode.workspace = true
@@ -53,7 +49,8 @@ strum_macros.workspace = true
 
 # bevy = { version = "0.13", default-features = false }
 # bevy = { workspace = true, default-features = false, features = [] }
-bevy = { git = "https://github.com/bevyengine/bevy.git", rev = "f516de456be2b65572de1af6956d52157663b9cc", default-features = false, features = [
+bevy = { version = "=0.14.0-rc.2", default-features = false, features = [
+	# bevy = { git = "https://github.com/bevyengine/bevy.git", rev = "f516de456be2b65572de1af6956d52157663b9cc", default-features = false, features = [
 	# "bevy_scene",
 ] }
 

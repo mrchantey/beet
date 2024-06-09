@@ -47,7 +47,8 @@ pub fn follow_cursor_3d(
 		return;
 	};
 
-	let Some(dist) = ray.intersect_plane(Vec3::ZERO, Plane3d::new(Vec3::Y))
+	let Some(dist) =
+		ray.intersect_plane(Vec3::ZERO, InfinitePlane3d::new(Vec3::Y))
 	else {
 		return;
 	};
