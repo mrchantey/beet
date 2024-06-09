@@ -31,8 +31,3 @@ anyhow.workspace = true
 
 [target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
 tokio.workspace = true
-
-
-[[example]]
-name = "hello_ml_vanilla"
-path = "examples/hello_ml_vanilla.rs"

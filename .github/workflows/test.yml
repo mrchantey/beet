@@ -13,8 +13,8 @@ jobs:
     name: Build and Test
     strategy:
       matrix:
-        # os: [windows-latest, ubuntu-latest, macos-latest]
-        os: [ubuntu-latest, macos-latest] # cygwin failing to install?
+        os: [windows-latest, ubuntu-latest, macos-latest]
+        # os: [ubuntu-latest, macos-latest] # cygwin failing to install?
         # os: [ubuntu-latest]   # 1x  gh minutes
         # os: [windows-latest] # 2x  gh minutes
         # os: [macos-latest]   # 10x gh minutes
@@ -51,19 +51,19 @@ jobs:
         override: true
         default: true
         # components: rustfmt, clippy
-    - name: 🔨 Install Wasm Target
-      run: rustup target add wasm32-unknown-unknown
-    - name: 🔨 Install Wasm Bindgen
-      uses: baptiste0928/cargo-install@v2
-      with:
-        crate: wasm-bindgen-cli
-        version: '0.2.88'
+    # - name: 🔨 Install Wasm Target
+    #   run: rustup target add wasm32-unknown-unknown
+    # - name: 🔨 Install Wasm Bindgen
+    #   uses: baptiste0928/cargo-install@v2
+    #   with:
+    #     crate: wasm-bindgen-cli
+    #     version: '0.2.88'
     # - name: 🔨 Build Crates
     #   run: just all build
     # - name: 🔎 Test Fantoccini
     #   run: just run sweet fantoccini
     - name: 🔎 Test Native
-      run: cargo test --workspace
+      run: cargo test --workspace --lib
     # - name: 🔎 Test Wasm - Windows # TODO sweet not compiling since cli added
     #   if: runner.os == 'Windows'
     #   run: just test-all-wasm-no-bevy
