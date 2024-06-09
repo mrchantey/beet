@@ -16,6 +16,7 @@ pub struct StepEnvironment<
 	Table: Component + QSource<State = S, Action = A>,
 > {
 	episode: u32,
+	step: u32,
 	phantom: PhantomData<(S, A, Env, Table)>,
 }
 
@@ -29,6 +30,7 @@ impl<
 	pub fn new(episode: u32) -> Self {
 		Self {
 			episode,
+			step: 0,
 			phantom: PhantomData,
 		}
 	}
@@ -42,13 +44,20 @@ fn step_environment<
 	Table: Component + QSource<State = S, Action = A>,
 >(
 	mut commands: Commands,
-	mut agents: Query<(&S, &mut A, &mut Table, &mut Env, &QLearnParams, &Trainer)>,
-	query: Query<
-		(&TargetAgent, &StepEnvironment<S, A, Env, Table>),
-		With<Running>,
+	mut agents: Query<(
+		&S,
+		&mut A,
+		&mut Table,
+		&mut Env,
+		&QLearnParams,
+		&Trainer,
+	)>,
+	mut query: Query<
+		(Entity, &TargetAgent, &mut StepEnvironment<S, A, Env, Table>),
+		Added<Running>,
 	>,
 ) {
-	for (agent, step) in query.iter() {
+	for (action_entity, agent, mut step) in query.iter_mut() {
 		let Ok((state, mut action, mut table, mut env, params, trainer)) =
 			agents.get_mut(**agent)
 		else {
@@ -70,7 +79,10 @@ fn step_environment<
 			outcome.reward,
 		);
 
-		if outcome.done {
+		commands.entity(action_entity).insert(RunResult::Success);
+		
+		step.step += 1;
+		if outcome.done || step.step >= params.max_steps {
 			commands.entity(**trainer).insert(RunResult::Success);
 		}
 	}
