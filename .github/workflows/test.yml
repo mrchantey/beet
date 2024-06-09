@@ -39,7 +39,7 @@ jobs:
         install-dir: C:\tools\cygwin
     - name: 🔨 Install Bevy Dependencies
       if: runner.os == 'Linux'
-      run: sudo apt-get update && sudo apt-get install g++ pkg-config libx11-dev libasound2-dev libudev-dev
+      run: sudo apt-get update && sudo apt-get install g++ pkg-config libx11-dev libasound2-dev libudev-dev mold
     - name: 🔨 Install Just
       uses: extractions/setup-just@v1
     - name: 🔨 Install Chromedriver
