@@ -13,3 +13,6 @@ pub use self::step_environment::*;
 pub mod rl_plugin;
 #[allow(unused_imports)]
 pub use self::rl_plugin::*;
+pub mod rl_session;
+#[allow(unused_imports)]
+pub use self::rl_session::*;

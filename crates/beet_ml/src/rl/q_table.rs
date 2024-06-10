@@ -109,7 +109,7 @@ mod test {
 			}
 		}
 
-		let eval = QTableTrainer::new(
+		let eval = QTableTrainer::<FrozenLakeQTableSession>::new(
 			env,
 			source,
 			params,

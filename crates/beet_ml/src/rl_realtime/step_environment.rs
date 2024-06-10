@@ -6,20 +6,13 @@ use std::marker::PhantomData;
 
 #[derive(Debug, Clone, PartialEq, Component, Reflect)]
 #[reflect(Component, ActionMeta)]
-pub struct StepEnvironment<
-	Env: Component + Environment<State = Table::State, Action = Table::Action>,
-	Table: Component + QSource,
-> {
+pub struct StepEnvironment<S: RlSessionTypes> {
 	episode: u32,
 	step: u32,
-	phantom: PhantomData<(Env, Table)>,
+	phantom: PhantomData<S>,
 }
 
-impl<
-		Env: Component + Environment<State = Table::State, Action = Table::Action>,
-		Table: Component + QSource,
-	> StepEnvironment<Env, Table>
-{
+impl<S: RlSessionTypes> StepEnvironment<S> {
 	pub fn new(episode: u32) -> Self {
 		Self {
 			episode,
@@ -30,27 +23,29 @@ impl<
 }
 
 
-fn step_environment<
-	Env: Component + Environment<State = Table::State, Action = Table::Action>,
-	Table: Component + QSource,
->(
+fn step_environment<S: RlSessionTypes>(
 	mut rng: ResMut<RlRng>,
+	mut end_episode_events: EventWriter<EndEpisode<S::EpisodeParams>>,
 	mut commands: Commands,
 	mut agents: Query<(
-		&Table::State,
-		&mut Table::Action,
-		&mut Table,
-		&mut Env,
+		&S::State,
+		&mut S::Action,
+		&mut S::QSource,
+		&mut S::Env,
 		&QLearnParams,
 		&EpisodeOwner,
 	)>,
 	mut query: Query<
-		(Entity, &TargetAgent, &mut StepEnvironment<Env, Table>),
+		(Entity, &TargetAgent, &mut StepEnvironment<S>),
 		Added<Running>,
 	>,
-) {
+) where
+	S::State: Component,
+	S::Action: Component,
+	S::QSource: Component,
+	S::Env: Component,
+{
 	for (action_entity, agent, mut step) in query.iter_mut() {
-		log::info!("step start");
 		let Ok((state, mut action, mut table, mut env, params, trainer)) =
 			agents.get_mut(**agent)
 		else {
@@ -80,28 +75,23 @@ fn step_environment<
 
 		step.step += 1;
 		if outcome.done || step.step >= params.max_steps {
-			commands.entity(**trainer).insert(RunResult::Success);
-			log::info!("episode complete");
+			end_episode_events.send(EndEpisode::new(**trainer));
 		}
 	}
 }
 
-impl<
-		Env: Component + Environment<State = Table::State, Action = Table::Action>,
-		Table: Component + QSource,
-	> ActionMeta for StepEnvironment<Env, Table>
-{
+impl<S: RlSessionTypes> ActionMeta for StepEnvironment<S> {
 	fn category(&self) -> ActionCategory { ActionCategory::Behavior }
 }
 
-impl<
-		Env: Component + Environment<State = Table::State, Action = Table::Action>,
-		Table: Component + QSource,
-	> ActionSystems for StepEnvironment<Env, Table>
+impl<S: RlSessionTypes> ActionSystems for StepEnvironment<S>
+where
+	S::State: Component,
+	S::Action: Component,
+	S::QSource: Component,
+	S::Env: Component,
 {
-	fn systems() -> SystemConfigs {
-		step_environment::<Env, Table>.in_set(TickSet)
-	}
+	fn systems() -> SystemConfigs { step_environment::<S>.in_set(TickSet) }
 }
 
 
@@ -118,8 +108,12 @@ mod test {
 	fn works() -> Result<()> {
 		let mut app = App::new();
 
-		app.add_plugins((LifecyclePlugin, FrozenLakePlugin))
-			.insert_time();
+		app.add_plugins((
+			AssetPlugin::default(),
+			LifecyclePlugin,
+			FrozenLakePlugin,
+		))
+		.insert_time();
 
 		let map = FrozenLakeMap::default_four_by_four();
 
@@ -140,7 +134,7 @@ mod test {
 			.with_children(|parent| {
 				parent.spawn((
 					TargetAgent(parent.parent_entity()),
-					StepEnvironment::<FrozenLakeEnv, FrozenLakeQTable>::new(0),
+					StepEnvironment::<FrozenLakeQTableSession>::new(0),
 					Running,
 				));
 			})
@@ -162,8 +156,7 @@ mod test {
 		let table = app.world().get::<FrozenLakeQTable>(agent).unwrap();
 		expect(table.keys().next()).to_be(Some(&GridPos(UVec2::new(0, 0))))?;
 		let inner = table.values().next().unwrap();
-		expect(inner.iter().next().unwrap())
-			.to_be((&GridDirection::Left, &0.))?;
+		expect(inner.iter().next().unwrap().1).to_be(&0.)?;
 
 		Ok(())
 	}

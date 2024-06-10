@@ -93,8 +93,7 @@ pub fn spawn_frozen_lake(
 									parent.spawn((
 										TargetAgent(agent),
 										StepEnvironment::<
-											FrozenLakeEnv,
-											FrozenLakeQTable,
+											FrozenLakeQTableSession,
 										>::new(event.episode),
 									));
 								});

@@ -1,4 +1,3 @@
-use crate::prelude::*;
 use beet_ecs::prelude::*;
 use bevy::prelude::*;
 use std::borrow::Cow;
@@ -21,7 +20,7 @@ pub struct EndEpisode<T: EpisodeParams> {
 	phantom: PhantomData<T>,
 }
 
-impl EndEpisode<FrozenLakeEpParams> {
+impl<T: EpisodeParams> EndEpisode<T> {
 	pub fn new(trainer: Entity) -> Self {
 		Self {
 			trainer,
@@ -39,7 +38,10 @@ impl<T: EpisodeParams> Plugin for EpisodeRunnerPlugin<T> {
 	fn build(&self, app: &mut App) {
 		app.add_systems(
 			Update,
-			(init_episode_runner::<T>, handle_episode_end::<T>).in_set(TickSet),
+			(
+				init_episode_runner::<T>.in_set(PreTickSet),
+				handle_episode_end::<T>.in_set(PostTickSet),
+			),
 		)
 		.add_event::<StartEpisode<T>>()
 		.add_event::<EndEpisode<T>>();
@@ -153,8 +155,7 @@ mod test {
 			LifecyclePlugin::default(),
 			EpisodeRunnerPlugin::<FrozenLakeEpParams>::default(),
 		))
-		.add_systems(Update, start_ep.in_set(PostTickSet))
-		.add_systems(Update, end_ep.in_set(PreTickSet));
+		.add_systems(Update, (start_ep, end_ep).in_set(TickSet));
 		let mut params = FrozenLakeEpParams::default();
 		params.learn_params.n_training_episodes = 1;
 		app.world_mut().spawn(EpisodeRunner::new(params));

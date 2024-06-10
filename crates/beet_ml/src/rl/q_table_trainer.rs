@@ -1,33 +1,23 @@
 use super::*;
+use crate::prelude::RlSessionTypes;
 use rand::Rng;
 
 
 
 /// Used for training a QTable to completion with a provided [`Environment`].
-pub struct QTableTrainer<
-	S: StateSpace + Clone,
-	A: ActionSpace,
-	Env: Environment<State = S, Action = A>,
-	Table: QSource<State = S, Action = A>,
-> {
-	pub table: Table,
-	pub env: Readonly<Env>,
+pub struct QTableTrainer<S: RlSessionTypes> {
+	pub table: S::QSource,
+	pub env: Readonly<S::Env>,
 	pub params: Readonly<QLearnParams>,
-	initial_state: S,
+	initial_state: S::State,
 }
 
-impl<
-		S: StateSpace + Clone,
-		A: ActionSpace,
-		Env: Environment<State = S, Action = A>,
-		Table: QSource<State = S, Action = A>,
-	> QTableTrainer<S, A, Env, Table>
-{
+impl<S: RlSessionTypes> QTableTrainer<S> {
 	pub fn new(
-		env: Env,
-		table: Table,
+		env: S::Env,
+		table: S::QSource,
 		params: QLearnParams,
-		initial_state: S,
+		initial_state: S::State,
 	) -> Self {
 		Self {
 			table,
@@ -39,15 +29,9 @@ impl<
 }
 
 
-impl<
-		S: StateSpace + Clone,
-		A: ActionSpace,
-		Env: Environment<State = S, Action = A>,
-		Table: QSource<State = S, Action = A>,
-	> QSource for QTableTrainer<S, A, Env, Table>
-{
-	type Action = A;
-	type State = S;
+impl<S: RlSessionTypes> QSource for QTableTrainer<S> {
+	type Action = S::Action;
+	type State = S::State;
 	fn greedy_policy(&self, state: &Self::State) -> (Self::Action, QValue) {
 		self.table.greedy_policy(state)
 	}
@@ -74,12 +58,9 @@ impl<
 }
 
 
-impl<
-		S: StateSpace + Clone,
-		A: ActionSpace,
-		Env: Environment<State = S, Action = A>,
-		Table: QSource<State = S, Action = A>,
-	> QTrainer for QTableTrainer<S, A, Env, Table>
+impl<S: RlSessionTypes> QTrainer for QTableTrainer<S>
+where
+	S::State: Clone,
 {
 	fn train(&mut self, rng: &mut impl Rng) {
 		let params = &self.params;
@@ -160,7 +141,7 @@ mod test {
 		let env = FrozenLakeEnv::new(map, false);
 		let params = QLearnParams::default();
 
-		let mut trainer = QTableTrainer::new(
+		let mut trainer = QTableTrainer::<FrozenLakeQTableSession>::new(
 			env.clone(),
 			QTable::default(),
 			params,

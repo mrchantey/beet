@@ -2,9 +2,6 @@ use crate::prelude::*;
 use beet_ecs::prelude::*;
 use bevy::prelude::*;
 
-pub type FrozenLakeQTable = QTable<GridPos, GridDirection>;
-
-
 /**
 Implementation of the OpenAI Gym Frozen Lake environment.
 https://github.com/openai/gym/blob/master/gym/envs/toy_text/frozen_lake.py
@@ -38,32 +35,12 @@ Reward schedule:
 **/
 pub struct FrozenLakePlugin;
 
-#[derive(Debug, Clone, Reflect)]
-pub struct FrozenLakeEpParams {
-	pub learn_params: QLearnParams,
-	pub map_width: f32,
-}
-
-impl Default for FrozenLakeEpParams {
-	fn default() -> Self {
-		Self {
-			learn_params: QLearnParams::default(),
-			map_width: 4.,
-		}
-	}
-}
-
-impl EpisodeParams for FrozenLakeEpParams {
-	fn num_episodes(&self) -> u32 { self.learn_params.n_training_episodes }
-}
-
-
 impl Plugin for FrozenLakePlugin {
 	fn build(&self, app: &mut App) {
 		app.add_plugins((
 			ActionPlugin::<(
 				TranslateGrid,
-				StepEnvironment<FrozenLakeEnv, FrozenLakeQTable>,
+				StepEnvironment<FrozenLakeQTableSession>,
 			)>::default(),
 			EpisodeRunnerPlugin::<FrozenLakeEpParams>::default(),
 		))
@@ -83,4 +60,37 @@ impl Plugin for FrozenLakePlugin {
 		registry.register::<GridPos>();
 		registry.register::<GridDirection>();
 	}
+}
+
+
+#[derive(Debug, Clone, Reflect)]
+pub struct FrozenLakeEpParams {
+	pub learn_params: QLearnParams,
+	pub map_width: f32,
+}
+
+impl Default for FrozenLakeEpParams {
+	fn default() -> Self {
+		Self {
+			learn_params: QLearnParams::default(),
+			map_width: 4.0,
+		}
+	}
+}
+
+impl EpisodeParams for FrozenLakeEpParams {
+	fn num_episodes(&self) -> u32 { self.learn_params.n_training_episodes }
+}
+
+pub type FrozenLakeQTable = QTable<GridPos, GridDirection>;
+
+
+pub struct FrozenLakeQTableSession;
+
+impl RlSessionTypes for FrozenLakeQTableSession {
+	type State = GridPos;
+	type Action = GridDirection;
+	type QSource = FrozenLakeQTable;
+	type Env = FrozenLakeEnv;
+	type EpisodeParams = FrozenLakeEpParams;
 }
