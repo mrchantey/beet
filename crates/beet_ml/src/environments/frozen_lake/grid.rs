@@ -128,6 +128,7 @@ impl ActionSpace for GridDirection {
 pub struct GridToWorld {
 	pub map_width: f32,
 	pub cell_width: f32,
+	pub map_size:UVec2,
 	pub offset: Vec3,
 }
 
@@ -142,6 +143,7 @@ impl GridToWorld {
 		) * -0.5;
 
 		Self {
+			map_size: grid.size(),
 			map_width,
 			cell_width,
 			offset,
@@ -155,5 +157,12 @@ impl GridToWorld {
 				0.,
 				pos.y as f32 * self.cell_width,
 			)
+	}
+
+	pub fn clamped_add(&self, pos: UVec2, dir: IVec2) -> UVec2 {
+		let mut new_pos = pos.saturating_add_signed(dir);
+		new_pos.x = new_pos.x.min(self.map_size.x - 1);
+		new_pos.y = new_pos.y.min(self.map_size.y - 1);
+		new_pos
 	}
 }

@@ -46,29 +46,23 @@ impl FrozenLakeCell {
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Component)]
 pub struct FrozenLakeMap {
 	cells: Vec<FrozenLakeCell>,
-	width: usize,
-	height: usize,
+	size: UVec2,
 }
 
 impl FrozenLakeMap {
-	pub fn new(
-		width: usize,
-		height: usize,
-		cells: Vec<FrozenLakeCell>,
-	) -> Self {
+	pub fn new(width: u32, height: u32, cells: Vec<FrozenLakeCell>) -> Self {
 		Self {
 			cells,
-			width,
-			height,
+			size: UVec2::new(width, height),
 		}
 	}
 
 	pub fn index_to_position(&self, index: usize) -> UVec2 {
-		UVec2::new((index % self.width) as u32, (index / self.width) as u32)
+		UVec2::new(index as u32 % self.size.x, index as u32 / self.size.x)
 	}
 
 	fn position_to_index(&self, position: UVec2) -> usize {
-		(position.y as usize) * self.width + position.x as usize
+		(position.y * self.size.x + position.x) as usize
 	}
 
 	pub fn position_to_cell(&self, position: UVec2) -> FrozenLakeCell {
@@ -76,8 +70,9 @@ impl FrozenLakeMap {
 	}
 
 	pub fn cells(&self) -> &Vec<FrozenLakeCell> { &self.cells }
-	pub fn width(&self) -> usize { self.width }
-	pub fn height(&self) -> usize { self.height }
+	pub fn size(&self) -> UVec2 { self.size }
+	pub fn width(&self) -> u32 { self.size.x }
+	pub fn height(&self) -> u32 { self.size.y }
 	pub fn cells_with_positions(
 		&self,
 	) -> impl Iterator<Item = (UVec2, &FrozenLakeCell)> {
@@ -89,8 +84,8 @@ impl FrozenLakeMap {
 
 	fn out_of_bounds(&self, pos: IVec2) -> bool {
 		pos.x < 0
-			|| pos.y < 0 || pos.x >= self.width as i32
-			|| pos.y >= self.height as i32
+			|| pos.y < 0 || pos.x >= self.size.x as i32
+			|| pos.y >= self.size.y as i32
 	}
 
 	pub fn try_transition(
@@ -175,8 +170,7 @@ impl FrozenLakeMap {
 	#[rustfmt::skip]
 	pub fn default_four_by_four() -> Self {
 		Self {
-			width: 4,
-			height: 4,
+			size: UVec2::new(4, 4),
 			//https://github.com/openai/gym/blob/dcd185843a62953e27c2d54dc8c2d647d604b635/gym/envs/toy_text/frozen_lake.py#L17
 			cells: vec![
 				//row 1
@@ -197,8 +191,7 @@ impl FrozenLakeMap {
 	#[rustfmt::skip]
 	pub fn default_eight_by_eight() -> Self {
 		Self {
-			width: 8,
-			height: 8,
+			size: UVec2::new(8, 8),
 			//https://github.com/openai/gym/blob/dcd185843a62953e27c2d54dc8c2d647d604b635/gym/envs/toy_text/frozen_lake.py#L17
 			cells: vec![
 				//row 1

@@ -41,8 +41,7 @@ fn setup_environment(mut commands: Commands, asset_server: Res<AssetServer>) {
 		asset_server.load("kaykit-minigame/tileSmall_teamBlue.gltf.glb#Scene0");
 	for x in 0..map.width() {
 		for y in 0..map.height() {
-			let mut pos =
-				grid_to_world.world_pos(UVec2::new(x as u32, y as u32));
+			let mut pos = grid_to_world.world_pos(UVec2::new(x, y));
 			pos.y -= grid_to_world.cell_width;
 			commands.spawn((SceneBundle {
 				scene: tile_handle.clone(),
@@ -112,7 +111,10 @@ fn setup_environment(mut commands: Commands, asset_server: Res<AssetServer>) {
 								));
 								parent.spawn((
 									TargetAgent(agent),
-									StepEnvironment::<FrozenLakeEnv, FrozenLakeQTable>::new(0),
+									StepEnvironment::<
+										FrozenLakeEnv,
+										FrozenLakeQTable,
+									>::new(0),
 								));
 							});
 					});
