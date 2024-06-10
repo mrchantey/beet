@@ -14,7 +14,7 @@ pub struct RlAgentBundle<
 	pub table: Table,
 	pub env: Env,
 	pub params: QLearnParams,
-	pub trainer: Trainer,
+	pub trainer: EpisodeOwner,
 }
 
 

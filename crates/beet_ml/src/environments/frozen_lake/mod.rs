@@ -16,6 +16,9 @@ pub use self::grid::*;
 pub mod reward_grid;
 #[allow(unused_imports)]
 pub use self::reward_grid::*;
+pub mod spawn_frozen_lake;
+#[allow(unused_imports)]
+pub use self::spawn_frozen_lake::*;
 pub mod frozen_lake_environment;
 #[allow(unused_imports)]
 pub use self::frozen_lake_environment::*;

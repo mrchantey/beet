@@ -16,3 +16,16 @@ This example uses the frozen lake
 3. `TranslateGrid` runs until completion, at which point it updates the `GridPos` state
 4. `reward_grid` runs directly after, updating the reward for the action taken
 5. `QTableSelector` evaluates the reward and selects the next action.
+
+
+## Glossary
+
+Lets use a game of super mario as an example environment to describe these terms.
+
+
+| Term          | Description                                                                                 | Example |
+| ------------- | ------------------------------------------------------------------------------------------- | ------- |
+| `Step`        | A single Action->(state,reward) cycle                                                       |         |
+| `Episode`     | This could be a 'level' that ends when mario either dies, completes the level or times out. |         |
+| `Environment` |                                                                                             |         |
+| `Epsilon`     |                                                                                             |         |

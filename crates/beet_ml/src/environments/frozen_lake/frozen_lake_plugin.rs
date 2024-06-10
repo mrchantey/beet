@@ -38,15 +38,37 @@ Reward schedule:
 **/
 pub struct FrozenLakePlugin;
 
+#[derive(Debug, Clone, Reflect)]
+pub struct FrozenLakeEpParams {
+	pub learn_params: QLearnParams,
+	pub map_width: f32,
+}
+
+impl Default for FrozenLakeEpParams {
+	fn default() -> Self {
+		Self {
+			learn_params: QLearnParams::default(),
+			map_width: 4.,
+		}
+	}
+}
+
+impl EpisodeParams for FrozenLakeEpParams {
+	fn num_episodes(&self) -> u32 { self.learn_params.n_training_episodes }
+}
+
+
 impl Plugin for FrozenLakePlugin {
 	fn build(&self, app: &mut App) {
-		app.add_plugins(ActionPlugin::<(
-			TranslateGrid,
-			StepEnvironment<FrozenLakeEnv, FrozenLakeQTable>,
-		)>::default());
-
-
-		app.add_systems(Update, reward_grid.in_set(PostTickSet));
+		app.add_plugins((
+			ActionPlugin::<(
+				TranslateGrid,
+				StepEnvironment<FrozenLakeEnv, FrozenLakeQTable>,
+			)>::default(),
+			EpisodeRunnerPlugin::<FrozenLakeEpParams>::default(),
+		))
+		.add_systems(Update, reward_grid.in_set(PostTickSet))
+		.add_systems(Update, spawn_frozen_lake.in_set(PostTickSet));
 
 		app.init_resource::<RlRng>();
 

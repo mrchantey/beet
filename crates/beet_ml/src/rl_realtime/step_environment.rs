@@ -42,7 +42,7 @@ fn step_environment<
 		&mut Table,
 		&mut Env,
 		&QLearnParams,
-		&Trainer,
+		&EpisodeOwner,
 	)>,
 	mut query: Query<
 		(Entity, &TargetAgent, &mut StepEnvironment<Env, Table>),
@@ -135,7 +135,7 @@ mod test {
 				table: QTable::default(),
 				env: FrozenLakeEnv::new(map, false),
 				params: QLearnParams::default(),
-				trainer: Trainer(trainer),
+				trainer: EpisodeOwner(trainer),
 			})
 			.with_children(|parent| {
 				parent.spawn((
