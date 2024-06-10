@@ -38,14 +38,15 @@ fn translate_grid(
 	>,
 ) {
 	for (entity, action, agent, run_timer) in query.iter() {
-		let Ok((mut transform, pos, dir, grid_to_world)) =
+		let Ok((mut transform, mut pos, dir, grid_to_world)) =
 			agents.get_mut(**agent)
 		else {
 			continue;
 		};
-		let from = grid_to_world.world_pos(**pos);
-		let to = pos.saturating_add_signed((*dir).into());
-		let to = grid_to_world.world_pos(to);
+		let from_world = grid_to_world.world_pos(**pos);
+		let to_grid = pos.saturating_add_signed((*dir).into());
+		// TODO check upper bounds
+		let to_world = grid_to_world.world_pos(to_grid);
 
 		let t = run_timer.last_started.elapsed().as_secs_f32()
 			/ action.anim_duration.as_secs_f32();
@@ -54,12 +55,13 @@ fn translate_grid(
 		transform.look_to(-dir_vec, Vec3::Y);
 
 		if t < 1.0 {
-			let mut pos = from.lerp(to, t);
+			let mut pos = from_world.lerp(to_world, t);
 			pos.y = grid_to_world.offset.y
 				+ bounce(t, 1) * grid_to_world.cell_width * 0.25;
 			transform.translation = pos;
 		} else {
-			transform.translation = to;
+			transform.translation = to_world;
+			**pos = to_grid;
 			commands.entity(entity).insert(RunResult::Success);
 		}
 	}

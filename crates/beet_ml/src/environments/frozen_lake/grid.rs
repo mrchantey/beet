@@ -112,7 +112,7 @@ impl GridDirection {
 
 
 impl ActionSpace for GridDirection {
-	fn sample(rng: &mut impl Rng) -> Self {
+	fn sample_with_rng(rng: &mut impl Rng) -> Self {
 		match rng.gen_range(0..4) {
 			0 => Self::Up,
 			1 => Self::Right,
@@ -134,8 +134,12 @@ pub struct GridToWorld {
 impl GridToWorld {
 	pub fn from_frozen_lake_map(grid: &FrozenLakeMap, map_width: f32) -> Self {
 		let cell_width = map_width / grid.width() as f32;
-		let offset = cell_width * 0.5
-			+ Vec3::new(grid.width() as f32, 0., grid.height() as f32) * -0.5;
+		let h_cell_width = cell_width * 0.5;
+		let offset = Vec3::new(
+			grid.width() as f32 + h_cell_width,
+			0.,
+			grid.height() as f32 + h_cell_width,
+		) * -0.5;
 
 		Self {
 			map_width,

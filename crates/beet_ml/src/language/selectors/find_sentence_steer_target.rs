@@ -75,7 +75,6 @@ impl<T: 'static + Send + Sync + QueryFilter> ActionSystems
 
 #[cfg(test)]
 mod test {
-	// use crate::ml_module::ml_plugin::MlPlugin;
 	use crate::prelude::*;
 	use anyhow::Result;
 	use beet_core::steer::SteerTarget;
@@ -112,7 +111,7 @@ mod test {
 		app.add_plugins((
 			MinimalPlugins,
 			AssetPlugin::default(),
-			MlPlugin::default(),
+			BertPlugin::default(),
 			LifecyclePlugin,
 		))
 		.finish();

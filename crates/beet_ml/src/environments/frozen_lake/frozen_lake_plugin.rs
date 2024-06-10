@@ -2,6 +2,9 @@ use crate::prelude::*;
 use beet_ecs::prelude::*;
 use bevy::prelude::*;
 
+pub type FrozenLakeQTable = QTable<GridPos, GridDirection>;
+
+
 /**
 Implementation of the OpenAI Gym Frozen Lake environment.
 https://github.com/openai/gym/blob/master/gym/envs/toy_text/frozen_lake.py
@@ -39,16 +42,13 @@ impl Plugin for FrozenLakePlugin {
 	fn build(&self, app: &mut App) {
 		app.add_plugins(ActionPlugin::<(
 			TranslateGrid,
-			StepEnvironment<
-				GridPos,
-				GridDirection,
-				FrozenLakeEnv,
-				QTable<_, _>,
-			>,
+			StepEnvironment<FrozenLakeEnv, FrozenLakeQTable>,
 		)>::default());
 
 
 		app.add_systems(Update, reward_grid.in_set(PostTickSet));
+
+		app.init_resource::<RlRng>();
 
 
 		let world = app.world_mut();

@@ -1,8 +1,7 @@
-use std::time::Duration;
-
 use beet::prelude::*;
 use beet_examples::*;
 use bevy::prelude::*;
+use std::time::Duration;
 
 const MAP_WIDTH: f32 = 4.;
 
@@ -10,9 +9,8 @@ fn main() {
 	let mut app = App::new();
 	app.add_plugins((
 		ExamplePlugin3d { ground: false },
-		FrozenLakePlugin,
 		DefaultBeetPlugins,
-		MlPlugin,
+		FrozenLakePlugin,
 	))
 	.add_systems(Startup, (setup_camera, setup_environment));
 
@@ -76,6 +74,9 @@ fn setup_environment(mut commands: Commands, asset_server: Res<AssetServer>) {
 		let mut pos = grid_to_world.world_pos(grid_pos);
 		match cell {
 			FrozenLakeCell::Agent => {
+				let trainer = commands.spawn_empty().id();
+
+
 				commands
 					.spawn((
 						SceneBundle {
@@ -84,26 +85,40 @@ fn setup_environment(mut commands: Commands, asset_server: Res<AssetServer>) {
 								.with_scale(object_scale),
 							..default()
 						},
-						GridPos(grid_pos),
-						GridDirection::Left,
 						grid_to_world.clone(),
+						RlAgentBundle {
+							state: map.agent_position(),
+							action: GridDirection::sample(),
+							table: QTable::default(),
+							env: FrozenLakeEnv::new(map.clone(), false),
+							params: QLearnParams::default(),
+							trainer: Trainer(trainer),
+						},
 					))
 					.with_children(|parent| {
 						let agent = parent.parent_entity();
 
 						parent
-							.spawn((Running, SequenceSelector))
+							.spawn((
+								Running,
+								SequenceSelector,
+								Repeat::default(),
+							))
 							.with_children(|parent| {
 								parent.spawn((
 									TranslateGrid::new(Duration::from_secs(1)),
 									TargetAgent(agent),
 									RunTimer::default(),
 								));
+								parent.spawn((
+									TargetAgent(agent),
+									StepEnvironment::<FrozenLakeEnv, FrozenLakeQTable>::new(0),
+								));
 							});
 					});
 			}
 			FrozenLakeCell::Hole => {
-				pos.y += grid_to_world.cell_width * 0.25;// this asset is a bit too low
+				pos.y += grid_to_world.cell_width * 0.25; // this asset is a bit too low
 				commands.spawn(SceneBundle {
 					scene: hazard_handle.clone(),
 					transform: Transform::from_translation(pos)

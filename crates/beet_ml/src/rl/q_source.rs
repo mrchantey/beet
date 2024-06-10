@@ -34,7 +34,7 @@ pub trait QSource: 'static + Send + Sync {
 			self.greedy_policy(state)
 		} else {
 			// Exploration: Take a random action
-			(Self::Action::sample(rng), QValue::default())
+			(Self::Action::sample_with_rng(rng), QValue::default())
 		}
 	}
 

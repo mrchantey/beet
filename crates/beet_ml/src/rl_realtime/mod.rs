@@ -1,3 +1,6 @@
+pub mod rl_agent;
+#[allow(unused_imports)]
+pub use self::rl_agent::*;
 pub mod rl_components;
 #[allow(unused_imports)]
 pub use self::rl_components::*;

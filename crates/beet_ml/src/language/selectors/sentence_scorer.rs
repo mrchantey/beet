@@ -59,7 +59,6 @@ impl ActionSystems for SentenceScorer {
 
 #[cfg(test)]
 mod test {
-	// use crate::ml_module::ml_plugin::MlPlugin;
 	use crate::prelude::*;
 	use anyhow::Result;
 	use beet_ecs::prelude::*;
@@ -102,7 +101,7 @@ mod test {
 		app.add_plugins((
 			MinimalPlugins,
 			AssetPlugin::default(),
-			MlPlugin::default(),
+			BertPlugin::default(),
 			LifecyclePlugin,
 		))
 		.finish();

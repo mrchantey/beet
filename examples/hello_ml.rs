@@ -12,7 +12,7 @@ fn main() {
 			ExamplePlugin3d::default(),
 			DefaultBeetPlugins,
 			BeetDebugPlugin::default(),
-			MlPlugin::default(),
+			BertPlugin::default(),
 			ActionPlugin::<InsertOnAssetEvent<RunResult, Bert>>::default(),
 		))
 		.add_systems(Startup, setup)

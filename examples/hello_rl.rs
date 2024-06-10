@@ -8,8 +8,12 @@ const CELL_WIDTH: f32 = 1.;
 
 fn main() {
 	let mut app = App::new();
-	app.add_plugins((ExamplePlugin3d::default(), DefaultBeetPlugins, MlPlugin))
-		.add_systems(Startup, (setup_camera, setup_environment));
+	app.add_plugins((
+		ExamplePlugin3d::default(),
+		DefaultBeetPlugins,
+		BertPlugin,
+	))
+	.add_systems(Startup, (setup_camera, setup_environment));
 
 
 	app.run();

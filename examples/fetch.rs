@@ -20,7 +20,7 @@ fn main() {
 		DefaultBeetPlugins,
 		// BeetDebugPlugin::default(),
 		DialogPanelPlugin,
-		MlPlugin,
+		BertPlugin,
 		ActionPlugin::<(
 			SetTextOnRun<With<StatusOutput>>,
 			InsertOnAssetEvent<RunResult, Bert>,

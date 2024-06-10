@@ -40,7 +40,7 @@ These are the actions that are built into Beet and its subcrates.
 | <h3>[`RoboticsPlugin`][RoboticsPlugin]</h3>   |                                             |                                                                                                           |
 | `SetAgentOnRun<DualMotorValue>`               | Agent                                       | Sets the `DualMotorValue` of an agent on run                                                              |
 | `DepthSensorScorer`                           | Behavior                                    | Sets the [`Score`] based on the [`DepthSensor`] value                                                     |
-| <h3>[`MlPlugin`][MlPlugin]</h3>               |                                             |                                                                                                           |
+| <h3>[`BertPlugin`][BertPlugin]</h3>               |                                             |                                                                                                           |
 | `SentenceScorer`                              | ChildBehaviors                              | Updates the `Score` of each child based on the similarity of its `Sentence` with the agent's              |
 | `FindSentenceSteerTarget`                     | Agent                                       | Finds the `Sentence` with the highest similarity to the agent's, then set it as the agent's steer target. |
 | <h3>`UI`</h3>                                 |                                             |                                                                                                           |
@@ -52,5 +52,5 @@ These are the actions that are built into Beet and its subcrates.
 [MovementPlugin]:https://github.com/mrchantey/beet/blob/main/crates/beet_core/src/movement/movement_plugin.rs
 [SteerPlugin]:https://github.com/mrchantey/beet/blob/main/crates/beet_core/src/steer/steer_plugin.rs
 [AnimationPlugin]:https://github.com/mrchantey/beet/blob/main/crates/beet_core/src/animation/animation_plugin.rs
-[MlPlugin]:https://github.com/mrchantey/beet/blob/main/crates/beet_ml/src/ml_module/ml_plugin.rs
+[BertPlugin]:https://github.com/mrchantey/beet/blob/main/crates/beet_ml/src/language/bert_plugin.rs
 [RoboticsPlugin]:https://github.com/mrchantey/beet/blob/main/crates/beet_core/src/robotics/robotics_plugin.rs

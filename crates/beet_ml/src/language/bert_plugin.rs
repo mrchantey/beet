@@ -4,9 +4,9 @@ use bevy::prelude::*;
 
 
 #[derive(Default)]
-pub struct MlPlugin;
+pub struct BertPlugin;
 
-impl Plugin for MlPlugin {
+impl Plugin for BertPlugin {
 	fn build(&self, app: &mut App) {
 		app.add_plugins(ActionPlugin::<SentenceScorer>::default())
 			.init_asset::<Bert>()
