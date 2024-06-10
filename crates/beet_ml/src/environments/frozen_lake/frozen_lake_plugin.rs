@@ -42,13 +42,14 @@ impl Plugin for FrozenLakePlugin {
 				TranslateGrid,
 				StepEnvironment<FrozenLakeQTableSession>,
 			)>::default(),
-			EpisodeRunnerPlugin::<FrozenLakeEpParams>::default(),
+			RlSessionPlugin::<FrozenLakeEpParams>::default(),
 		))
 		.add_systems(Startup, init_frozen_lake_assets)
 		.add_systems(Update, reward_grid.in_set(PostTickSet))
 		.add_systems(
 			Update,
-			(spawn_frozen_lake_static, spawn_frozen_lake).in_set(PostTickSet),
+			(spawn_frozen_lake_session, spawn_frozen_lake_episode)
+				.in_set(PostTickSet),
 		)
 		.init_resource::<RlRng>();
 

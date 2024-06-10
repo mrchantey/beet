@@ -27,13 +27,13 @@ fn step_environment<S: RlSessionTypes>(
 	mut rng: ResMut<RlRng>,
 	mut end_episode_events: EventWriter<EndEpisode<S::EpisodeParams>>,
 	mut commands: Commands,
+	mut sessions: Query<&mut S::QSource>,
 	mut agents: Query<(
 		&S::State,
 		&mut S::Action,
-		&mut S::QSource,
 		&mut S::Env,
 		&QLearnParams,
-		&EpisodeOwner,
+		&SessionEntity,
 	)>,
 	mut query: Query<
 		(Entity, &TargetAgent, &mut StepEnvironment<S>),
@@ -46,9 +46,12 @@ fn step_environment<S: RlSessionTypes>(
 	S::Env: Component,
 {
 	for (action_entity, agent, mut step) in query.iter_mut() {
-		let Ok((state, mut action, mut table, mut env, params, trainer)) =
+		let Ok((state, mut action, mut env, params, session_entity)) =
 			agents.get_mut(**agent)
 		else {
+			continue;
+		};
+		let Ok(mut table) = sessions.get_mut(**session_entity) else {
 			continue;
 		};
 
@@ -75,7 +78,7 @@ fn step_environment<S: RlSessionTypes>(
 		step.step += 1;
 
 		if outcome.done || step.step >= params.max_steps {
-			end_episode_events.send(EndEpisode::new(**trainer));
+			end_episode_events.send(EndEpisode::new(**session_entity));
 		}
 	}
 }
@@ -111,7 +114,7 @@ mod test {
 		app.add_plugins((
 			LifecyclePlugin,
 			ActionPlugin::<StepEnvironment<FrozenLakeQTableSession>>::default(),
-			EpisodeRunnerPlugin::<FrozenLakeEpParams>::default(),
+			RlSessionPlugin::<FrozenLakeEpParams>::default(),
 		))
 		.insert_time();
 
@@ -119,17 +122,17 @@ mod test {
 
 		let mut rng = RlRng::deterministic();
 
-		let trainer = app.world_mut().spawn_empty().id();
+		let session = app.world_mut().spawn(FrozenLakeQTable::default()).id();
 
 		let agent = app
 			.world_mut()
 			.spawn(RlAgentBundle {
 				state: map.agent_position(),
 				action: GridDirection::sample_with_rng(&mut *rng),
-				table: QTable::default(),
 				env: FrozenLakeEnv::new(map, false),
 				params: QLearnParams::default(),
-				trainer: EpisodeOwner(trainer),
+				session: SessionEntity(session),
+				despawn: DespawnOnEpisodeEnd,
 			})
 			.with_children(|parent| {
 				parent.spawn((
@@ -153,7 +156,7 @@ mod test {
 			.to_be(Tree::new(None).with_leaf(None))?;
 
 
-		let table = app.world().get::<FrozenLakeQTable>(agent).unwrap();
+		let table = app.world().get::<FrozenLakeQTable>(session).unwrap();
 		expect(table.keys().next()).to_be(Some(&GridPos(UVec2::new(0, 0))))?;
 		let inner = table.values().next().unwrap();
 		expect(inner.iter().next().unwrap().1).to_be(&0.)?;

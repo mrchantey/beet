@@ -33,7 +33,7 @@ pub fn init_frozen_lake_assets(
 	});
 }
 
-pub fn spawn_frozen_lake_static(
+pub fn spawn_frozen_lake_session(
 	mut events: EventReader<StartSession<FrozenLakeEpParams>>,
 	mut commands: Commands,
 	assets: Res<FrozenLakeAssets>,
@@ -56,7 +56,8 @@ pub fn spawn_frozen_lake_static(
 							.with_scale(tile_scale),
 						..default()
 					},
-					EpisodeOwner(event.trainer),
+					SessionEntity(event.session),
+					DespawnOnSessionEnd,
 				));
 			}
 		}
@@ -76,7 +77,8 @@ pub fn spawn_frozen_lake_static(
 								.with_scale(object_scale),
 							..default()
 						},
-						EpisodeOwner(event.trainer),
+						SessionEntity(event.session),
+						DespawnOnSessionEnd,
 					));
 				}
 				FrozenLakeCell::Goal => {
@@ -87,7 +89,8 @@ pub fn spawn_frozen_lake_static(
 								.with_scale(object_scale),
 							..default()
 						},
-						EpisodeOwner(event.trainer),
+						SessionEntity(event.session),
+						DespawnOnSessionEnd,
 					));
 				}
 				FrozenLakeCell::Ice => {}
@@ -99,7 +102,7 @@ pub fn spawn_frozen_lake_static(
 }
 
 
-pub fn spawn_frozen_lake(
+pub fn spawn_frozen_lake_episode(
 	mut events: EventReader<StartEpisode<FrozenLakeEpParams>>,
 	mut commands: Commands,
 	assets: Res<FrozenLakeAssets>,
@@ -128,10 +131,10 @@ pub fn spawn_frozen_lake(
 							RlAgentBundle {
 								state: map.agent_position(),
 								action: GridDirection::sample(),
-								table: QTable::default(),
 								env: FrozenLakeEnv::new(map.clone(), false),
 								params: event.params.learn_params.clone(),
-								trainer: EpisodeOwner(event.trainer),
+								session: SessionEntity(event.session),
+								despawn: DespawnOnEpisodeEnd,
 							},
 						))
 						.with_children(|parent| {
@@ -146,7 +149,7 @@ pub fn spawn_frozen_lake(
 								.with_children(|parent| {
 									parent.spawn((
 										TranslateGrid::new(
-											Duration::from_secs(1),
+											Duration::from_millis(1),
 										),
 										TargetAgent(agent),
 										RunTimer::default(),

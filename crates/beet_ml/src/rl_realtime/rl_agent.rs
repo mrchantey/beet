@@ -5,22 +5,19 @@ use bevy::prelude::*;
 
 
 #[derive(Bundle)]
-pub struct RlAgentBundle<
-	Env: Component + Environment<State = Table::State, Action = Table::Action>,
-	Table: Component + QSource,
-> {
-	pub state: Table::State,
-	pub action: Table::Action,
-	pub table: Table,
+pub struct RlAgentBundle<Env: Component + Environment> {
+	pub state: Env::State,
+	pub action: Env::Action,
 	pub env: Env,
 	pub params: QLearnParams,
-	pub trainer: EpisodeOwner,
+	pub session: SessionEntity,
+	pub despawn:DespawnOnEpisodeEnd
 }
 
-
-impl<
-		Env: Component + Environment<State = Table::State, Action = Table::Action>,
-		Table: Component + QSource,
-	> RlAgentBundle<Env, Table>
-{
-}
+// #[derive(Bundle)]
+// pub struct RlSessionBundle<S: RlSessionTypes>
+// where
+// 	S::QSource: Component,
+// {
+// 	pub source: S::QSource,
+// }

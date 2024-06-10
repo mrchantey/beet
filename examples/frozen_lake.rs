@@ -33,5 +33,5 @@ fn setup_runner(mut commands: Commands) {
 		learn_params: default(),
 		map_width: MAP_WIDTH,
 	};
-	commands.spawn(EpisodeRunner::new(params));
+	commands.spawn((RlSession::new(params), FrozenLakeQTable::default()));
 }
