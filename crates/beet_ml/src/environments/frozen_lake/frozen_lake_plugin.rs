@@ -44,11 +44,13 @@ impl Plugin for FrozenLakePlugin {
 			)>::default(),
 			EpisodeRunnerPlugin::<FrozenLakeEpParams>::default(),
 		))
+		.add_systems(Startup, init_frozen_lake_assets)
 		.add_systems(Update, reward_grid.in_set(PostTickSet))
-		.add_systems(Update, spawn_frozen_lake.in_set(PostTickSet));
-
-		app.init_resource::<RlRng>();
-
+		.add_systems(
+			Update,
+			(spawn_frozen_lake_static, spawn_frozen_lake).in_set(PostTickSet),
+		)
+		.init_resource::<RlRng>();
 
 		let world = app.world_mut();
 		world.init_component::<GridPos>();

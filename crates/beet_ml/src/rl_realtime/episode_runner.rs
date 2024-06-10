@@ -15,6 +15,17 @@ pub struct StartEpisode<T: EpisodeParams> {
 	pub params: T,
 }
 #[derive(Debug, Event)]
+pub struct StartSession<T: EpisodeParams> {
+	pub trainer: Entity,
+	pub params: T,
+}
+#[derive(Debug, Event)]
+pub struct EndSession<T: EpisodeParams> {
+	pub trainer: Entity,
+	pub params: T,
+}
+
+#[derive(Debug, Event)]
 pub struct EndEpisode<T: EpisodeParams> {
 	pub trainer: Entity,
 	phantom: PhantomData<T>,
@@ -43,6 +54,8 @@ impl<T: EpisodeParams> Plugin for EpisodeRunnerPlugin<T> {
 				handle_episode_end::<T>.in_set(PostTickSet),
 			),
 		)
+		.add_event::<StartSession<T>>()
+		.add_event::<EndSession<T>>()
 		.add_event::<StartEpisode<T>>()
 		.add_event::<EndEpisode<T>>();
 	}
@@ -79,11 +92,16 @@ impl<T: EpisodeParams> EpisodeRunner<T> {
 }
 
 pub fn init_episode_runner<T: EpisodeParams>(
-	mut events: EventWriter<StartEpisode<T>>,
+	mut start_session: EventWriter<StartSession<T>>,
+	mut start_episode: EventWriter<StartEpisode<T>>,
 	runners: Query<(Entity, &mut EpisodeRunner<T>), Added<EpisodeRunner<T>>>,
 ) {
 	for (entity, trainer) in runners.iter() {
-		events.send(StartEpisode {
+		start_session.send(StartSession {
+			trainer: entity,
+			params: trainer.params.clone(),
+		});
+		start_episode.send(StartEpisode {
 			trainer: entity,
 			episode: trainer.episode,
 			params: trainer.params.clone(),
@@ -93,12 +111,13 @@ pub fn init_episode_runner<T: EpisodeParams>(
 
 pub fn handle_episode_end<T: EpisodeParams>(
 	mut commands: Commands,
-	mut start_events: EventWriter<StartEpisode<T>>,
-	mut end_events: EventReader<EndEpisode<T>>,
+	mut start_ep: EventWriter<StartEpisode<T>>,
+	mut end_ep: EventReader<EndEpisode<T>>,
+	mut end_session: EventWriter<EndSession<T>>,
 	mut ep_entities: Query<(Entity, &EpisodeOwner)>,
 	mut trainers: Query<(Entity, &mut EpisodeRunner<T>)>,
 ) {
-	for event in end_events.read() {
+	for event in end_ep.read() {
 		if let Ok((runner_entity, mut runner)) = trainers.get_mut(event.trainer)
 		{
 			for (ep_entity, parent_runner) in ep_entities.iter_mut() {
@@ -108,14 +127,17 @@ pub fn handle_episode_end<T: EpisodeParams>(
 			}
 			runner.episode += 1;
 			if runner.episode < runner.params.num_episodes() {
-				start_events.send(StartEpisode {
+				start_ep.send(StartEpisode {
 					trainer: runner_entity,
 					episode: runner.episode,
 					params: runner.params.clone(),
 				});
 			} else {
-				println!("Training complete");
-				// todo!("Save model");
+				// complete!
+				end_session.send(EndSession {
+					trainer: runner_entity,
+					params: runner.params.clone(),
+				});
 			}
 		}
 	}

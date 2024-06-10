@@ -4,10 +4,39 @@ use bevy::prelude::*;
 use std::time::Duration;
 
 
-pub fn spawn_frozen_lake(
-	mut events: EventReader<StartEpisode<FrozenLakeEpParams>>,
+#[derive(Resource)]
+pub struct FrozenLakeAssets {
+	pub tile: Handle<Scene>,
+	pub character: Handle<Scene>,
+	pub goal: Handle<Scene>,
+	pub hazard: Handle<Scene>,
+}
+
+pub fn init_frozen_lake_assets(
 	mut commands: Commands,
 	asset_server: Res<AssetServer>,
+) {
+	let tile =
+		asset_server.load("kaykit-minigame/tileSmall_teamBlue.gltf.glb#Scene0");
+	let character =
+		asset_server.load("kaykit-minigame/character_dog.gltf.glb#Scene0");
+	let goal =
+		asset_server.load("kaykit-minigame/flag_teamYellow.gltf.glb#Scene0");
+	let hazard =
+		asset_server.load("kaykit-minigame/bomb_teamRed.gltf.glb#Scene0");
+
+	commands.insert_resource(FrozenLakeAssets {
+		tile,
+		character,
+		goal,
+		hazard,
+	});
+}
+
+pub fn spawn_frozen_lake_static(
+	mut events: EventReader<StartSession<FrozenLakeEpParams>>,
+	mut commands: Commands,
+	assets: Res<FrozenLakeAssets>,
 ) {
 	for event in events.read() {
 		let map = FrozenLakeMap::default_four_by_four();
@@ -16,34 +45,21 @@ pub fn spawn_frozen_lake(
 			GridToWorld::from_frozen_lake_map(&map, event.params.map_width);
 
 		let tile_scale = Vec3::splat(grid_to_world.cell_width);
-		let tile_handle = asset_server
-			.load("kaykit-minigame/tileSmall_teamBlue.gltf.glb#Scene0");
 		for x in 0..map.width() {
 			for y in 0..map.height() {
 				let mut pos = grid_to_world.world_pos(UVec2::new(x, y));
 				pos.y -= grid_to_world.cell_width;
-				commands.spawn((SceneBundle {
-					scene: tile_handle.clone(),
-					transform: Transform::from_translation(pos)
-						.with_scale(tile_scale),
-					..default()
-				},));
+				commands.spawn((
+					SceneBundle {
+						scene: assets.tile.clone(),
+						transform: Transform::from_translation(pos)
+							.with_scale(tile_scale),
+						..default()
+					},
+					EpisodeOwner(event.trainer),
+				));
 			}
 		}
-		// if let Some(agent_pos) = map.agent_position() {
-		// 	let pos =
-		// 		offset + Vec3::new(agent_pos.x as f32, 0.1, agent_pos.y as f32);
-		// }
-
-		let character_handle =
-			asset_server.load("kaykit-minigame/character_dog.gltf.glb#Scene0");
-
-		let goal_handle = asset_server
-			.load("kaykit-minigame/flag_teamYellow.gltf.glb#Scene0");
-
-		let hazard_handle =
-			asset_server.load("kaykit-minigame/bomb_teamRed.gltf.glb#Scene0");
-
 
 		let object_scale = Vec3::splat(grid_to_world.cell_width * 0.5);
 
@@ -51,14 +67,59 @@ pub fn spawn_frozen_lake(
 			let grid_pos = map.index_to_position(index);
 			let mut pos = grid_to_world.world_pos(grid_pos);
 			match cell {
+				FrozenLakeCell::Hole => {
+					pos.y += grid_to_world.cell_width * 0.25; // this asset is a bit too low
+					commands.spawn((
+						SceneBundle {
+							scene: assets.hazard.clone(),
+							transform: Transform::from_translation(pos)
+								.with_scale(object_scale),
+							..default()
+						},
+						EpisodeOwner(event.trainer),
+					));
+				}
+				FrozenLakeCell::Goal => {
+					commands.spawn((
+						SceneBundle {
+							scene: assets.goal.clone(),
+							transform: Transform::from_translation(pos)
+								.with_scale(object_scale),
+							..default()
+						},
+						EpisodeOwner(event.trainer),
+					));
+				}
+				FrozenLakeCell::Ice => {}
+				FrozenLakeCell::Agent => { /*spawns on episode */ }
+			}
+			{}
+		}
+	}
+}
+
+
+pub fn spawn_frozen_lake(
+	mut events: EventReader<StartEpisode<FrozenLakeEpParams>>,
+	mut commands: Commands,
+	assets: Res<FrozenLakeAssets>,
+) {
+	for event in events.read() {
+		// TODO deduplicate
+		let map = FrozenLakeMap::default_four_by_four();
+		let grid_to_world =
+			GridToWorld::from_frozen_lake_map(&map, event.params.map_width);
+		let object_scale = Vec3::splat(grid_to_world.cell_width * 0.5);
+
+		for (index, cell) in map.cells().iter().enumerate() {
+			let grid_pos = map.index_to_position(index);
+			let pos = grid_to_world.world_pos(grid_pos);
+			match cell {
 				FrozenLakeCell::Agent => {
-					let trainer = commands.spawn_empty().id();
-
-
 					commands
 						.spawn((
 							SceneBundle {
-								scene: character_handle.clone(),
+								scene: assets.character.clone(),
 								transform: Transform::from_translation(pos)
 									.with_scale(object_scale),
 								..default()
@@ -70,7 +131,7 @@ pub fn spawn_frozen_lake(
 								table: QTable::default(),
 								env: FrozenLakeEnv::new(map.clone(), false),
 								params: event.params.learn_params.clone(),
-								trainer: EpisodeOwner(trainer),
+								trainer: EpisodeOwner(event.trainer),
 							},
 						))
 						.with_children(|parent| {
@@ -99,24 +160,7 @@ pub fn spawn_frozen_lake(
 								});
 						});
 				}
-				FrozenLakeCell::Hole => {
-					pos.y += grid_to_world.cell_width * 0.25; // this asset is a bit too low
-					commands.spawn(SceneBundle {
-						scene: hazard_handle.clone(),
-						transform: Transform::from_translation(pos)
-							.with_scale(object_scale),
-						..default()
-					});
-				}
-				FrozenLakeCell::Goal => {
-					commands.spawn(SceneBundle {
-						scene: goal_handle.clone(),
-						transform: Transform::from_translation(pos)
-							.with_scale(object_scale),
-						..default()
-					});
-				}
-				FrozenLakeCell::Ice => {}
+				_ => {}
 			}
 			{}
 		}

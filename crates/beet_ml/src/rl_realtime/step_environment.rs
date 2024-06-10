@@ -65,15 +65,15 @@ fn step_environment<S: RlSessionTypes>(
 			&outcome.state,
 			outcome.reward,
 		);
-		log::info!(
-			"step complete - action: {:?}, reward: {:?}",
-			action,
-			outcome.reward
-		);
+		// log::info!(
+		// 	"step complete - action: {:?}, reward: {:?}",
+		// 	action,
+		// 	outcome.reward
+		// );
 
 		commands.entity(action_entity).insert(RunResult::Success);
-
 		step.step += 1;
+
 		if outcome.done || step.step >= params.max_steps {
 			end_episode_events.send(EndEpisode::new(**trainer));
 		}
@@ -109,9 +109,9 @@ mod test {
 		let mut app = App::new();
 
 		app.add_plugins((
-			AssetPlugin::default(),
 			LifecyclePlugin,
-			FrozenLakePlugin,
+			ActionPlugin::<StepEnvironment<FrozenLakeQTableSession>>::default(),
+			EpisodeRunnerPlugin::<FrozenLakeEpParams>::default(),
 		))
 		.insert_time();
 
