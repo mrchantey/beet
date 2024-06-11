@@ -26,7 +26,6 @@
 	// "rust-analyzer.procMacro.enable": false,
 	// "rust-analyzer.procMacro.attributes.enable": false,
 	"rust-analyzer.files.excludeDirs": [
-		"web-components",
 		"crates/beet_esp"
 	],
 	// "rust-analyzer.cargo.target": "wasm32-unknown-unknown",
