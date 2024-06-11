@@ -87,6 +87,8 @@ build-web-examples:
 	just build-web-example seek
 	just build-web-example seek_3d
 	just build-web-example fetch
+	just build-web-example frozen_lake_train
+	just build-web-example frozen_lake_run
 
 serve-web-examples:
 	cd {{wasm-dir}} && forky serve --any-origin --port=3002
