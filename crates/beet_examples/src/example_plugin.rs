@@ -16,6 +16,8 @@ const DEFAULT_SOCKET_URL: &str = "ws://127.0.0.1:3000/ws";
 
 impl Plugin for ExamplePlugin {
 	fn build(&self, app: &mut App) {
+		assert_local_assets();
+
 		#[cfg(target_arch = "wasm32")]
 		app.add_transport(WebEventClient::new_with_window());
 
@@ -70,4 +72,34 @@ fn assets_path() -> String {
 	return "https://storage.googleapis.com/beet-examples/assets".into();
 	#[cfg(not(target_arch = "wasm32"))]
 	return "assets".into();
+}
+
+
+fn assert_local_assets() {
+	#[cfg(not(target_arch = "wasm32"))]
+	{
+		let path = std::path::Path::new("assets/README.md");
+		if !path.exists() {
+			panic!(
+				r#"
+🐝🐝🐝
+
+Howdy! Beet examples use large assets that are stored remotely. 
+
+Windows:
+
+1. Download https://storage.googleapis.com/beet-misc/assets.tar.gz
+2. Unzip into `./assets`
+
+Linux/MacOS:
+
+curl -o ./assets.tar.gz https://storage.googleapis.com/beet-misc/assets.tar.gz
+tar -xzvf ./assets.tar.gz
+rm ./assets.tar.gz
+
+🐝🐝🐝
+"#
+			);
+		}
+	}
 }

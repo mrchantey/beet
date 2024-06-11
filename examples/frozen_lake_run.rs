@@ -23,19 +23,17 @@ fn setup(
 	assets: Res<FrozenLakeAssets>,
 	asset_server: Res<AssetServer>,
 ) {
+	let map = FrozenLakeMap::default_four_by_four();
+	let grid_to_world = GridToWorld::from_frozen_lake_map(&map, SCENE_SCALE);
+	
 	// camera
 	commands
 		.spawn((CameraDistance::new(SCENE_SCALE), Camera3dBundle::default()));
+	
 	// scene
-	let map = FrozenLakeMap::default_four_by_four();
-	let grid_to_world = GridToWorld::from_frozen_lake_map(&map, SCENE_SCALE);
-
 	spawn_frozen_lake_scene(&mut commands, &map, &grid_to_world, &assets, ());
+	
 	// agent
-
-
-
-
 	let agent_grid_pos = map.agent_position();
 	let agent_pos = grid_to_world.world_pos(*agent_grid_pos);
 	let object_scale = Vec3::splat(grid_to_world.cell_width * 0.5);

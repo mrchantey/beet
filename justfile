@@ -198,6 +198,7 @@ watch-web *command:
 push-assets:
 	tar -czvf ./assets.tar.gz ./assets
 	gsutil cp ./assets.tar.gz gs://beet-misc/assets.tar.gz
+	gsutil cp ./assets.tar.gz gs://beet-misc/assets-backup.tar.gz
 	rm ./assets.tar.gz
 
 pull-assets:
