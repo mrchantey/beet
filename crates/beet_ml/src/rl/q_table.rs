@@ -1,9 +1,22 @@
 use crate::prelude::*;
 use bevy::prelude::*;
 use bevy::utils::HashMap;
+use serde::Deserialize;
+use serde::Serialize;
 pub type QValue = f32;
 
-#[derive(Debug, Clone, PartialEq, Component, Deref, DerefMut, Reflect)]
+#[derive(
+	Debug,
+	Clone,
+	PartialEq,
+	Component,
+	Deref,
+	DerefMut,
+	Reflect,
+	Serialize,
+	Deserialize,
+	Asset,
+)]
 #[reflect(Default)]
 pub struct QTable<State: StateSpace, Action: ActionSpace>(
 	pub HashMap<State, HashMap<Action, QValue>>,
@@ -13,7 +26,7 @@ impl<State: StateSpace, Action: ActionSpace> Default for QTable<State, Action> {
 	fn default() -> Self { Self(HashMap::default()) }
 }
 
-impl<State: StateSpace, Action: ActionSpace> QSource for QTable<State, Action> {
+impl<State: StateSpace, Action: ActionSpace> QPolicy for QTable<State, Action> {
 	type Action = Action;
 	type State = State;
 
@@ -80,7 +93,7 @@ mod test {
 		let mut rng = StdRng::seed_from_u64(0);
 		let map = FrozenLakeMap::default_four_by_four();
 		let initial_state = map.agent_position();
-		let env = FrozenLakeEnv::new(map, false);
+		let env = QTableEnv::new(map.transition_outcomes());
 
 		for episode in 0..params.n_training_episodes {
 			let mut state = initial_state.clone();

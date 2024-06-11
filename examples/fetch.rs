@@ -44,7 +44,7 @@ fn main() {
 fn setup_camera(mut commands: Commands) {
 	commands.spawn((
 		CameraDistance {
-			width: ITEM_OFFSET * 1.6,
+			width: ITEM_OFFSET * 1.4,
 			offset: Vec3::new(0., 1.6, ITEM_OFFSET),
 		},
 		Camera3dBundle::default(),

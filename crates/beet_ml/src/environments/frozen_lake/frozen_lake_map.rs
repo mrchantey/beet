@@ -16,6 +16,7 @@ use strum::IntoEnumIterator;
 	Serialize,
 	Deserialize,
 	Component,
+	Reflect,
 )]
 pub enum FrozenLakeCell {
 	Agent,
@@ -43,7 +44,7 @@ impl FrozenLakeCell {
 
 
 /// Define an intial state for a [`FrozenLakeEnv`].
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Component)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Component, Reflect)]
 pub struct FrozenLakeMap {
 	cells: Vec<FrozenLakeCell>,
 	size: UVec2,
@@ -71,8 +72,8 @@ impl FrozenLakeMap {
 
 	pub fn cells(&self) -> &Vec<FrozenLakeCell> { &self.cells }
 	pub fn size(&self) -> UVec2 { self.size }
-	pub fn width(&self) -> u32 { self.size.x }
-	pub fn height(&self) -> u32 { self.size.y }
+	pub fn num_cols(&self) -> u32 { self.size.x }
+	pub fn num_rows(&self) -> u32 { self.size.y }
 	pub fn cells_with_positions(
 		&self,
 	) -> impl Iterator<Item = (UVec2, &FrozenLakeCell)> {
@@ -92,7 +93,7 @@ impl FrozenLakeMap {
 		&self,
 		position: UVec2,
 		direction: GridDirection,
-	) -> Option<TransitionOutcome> {
+	) -> Option<StepOutcome<GridPos>> {
 		let direction: IVec2 = direction.into();
 		let new_pos = IVec2::new(
 			position.x as i32 + direction.x,
@@ -104,10 +105,10 @@ impl FrozenLakeMap {
 			let new_pos =
 				new_pos.try_into().expect("already checked in bounds");
 			let new_cell = self.position_to_cell(new_pos);
-			Some(TransitionOutcome {
+			Some(StepOutcome {
 				reward: new_cell.reward(),
-				pos: new_pos,
-				is_terminal: new_cell.is_terminal(),
+				state: GridPos(new_pos),
+				done: new_cell.is_terminal(),
 			})
 		}
 	}
@@ -128,29 +129,29 @@ impl FrozenLakeMap {
 
 	pub fn transition_outcomes(
 		&self,
-	) -> HashMap<(UVec2, GridDirection), TransitionOutcome> {
+	) -> HashMap<(GridPos, GridDirection), StepOutcome<GridPos>> {
 		let mut outcomes = HashMap::new();
 		for (pos, cell) in self.cells_with_positions() {
 			for action in GridDirection::iter() {
 				let outcome = if cell.is_terminal() {
 					// early exit, cannot move from terminal cell
-					TransitionOutcome {
+					StepOutcome {
 						reward: 0.0,
-						pos,
-						is_terminal: true,
+						state: GridPos(pos),
+						done: true,
 					}
 				} else {
 					// yes you can go here
 					self.try_transition(pos, action).unwrap_or(
 						// stay where you are
-						TransitionOutcome {
+						StepOutcome {
 							reward: 0.0,
-							pos,
-							is_terminal: false,
+							state: GridPos(pos),
+							done: false,
 						},
 					)
 				};
-				outcomes.insert((pos, action), outcome);
+				outcomes.insert((GridPos(pos), action), outcome);
 			}
 		}
 
@@ -190,27 +191,28 @@ impl FrozenLakeMap {
 impl FrozenLakeMap {
 	#[rustfmt::skip]
 	pub fn default_eight_by_eight() -> Self {
-		Self {
-			size: UVec2::new(8, 8),
-			//https://github.com/openai/gym/blob/dcd185843a62953e27c2d54dc8c2d647d604b635/gym/envs/toy_text/frozen_lake.py#L17
-			cells: vec![
-				//row 1
-				FrozenLakeCell::Agent,	FrozenLakeCell::Ice, 	FrozenLakeCell::Ice, 	FrozenLakeCell::Ice, 	FrozenLakeCell::Ice, 	FrozenLakeCell::Ice, 	FrozenLakeCell::Ice, 	FrozenLakeCell::Ice,
-				//row 2
-				FrozenLakeCell::Ice, 		FrozenLakeCell::Ice, 	FrozenLakeCell::Ice, 	FrozenLakeCell::Ice, 	FrozenLakeCell::Ice, 	FrozenLakeCell::Ice, 	FrozenLakeCell::Ice, 	FrozenLakeCell::Ice,
-				//row 3
-				FrozenLakeCell::Ice, 		FrozenLakeCell::Ice, 	FrozenLakeCell::Ice, 	FrozenLakeCell::Hole, FrozenLakeCell::Ice, 	FrozenLakeCell::Ice, 	FrozenLakeCell::Ice, 	FrozenLakeCell::Ice,
-				//row 4
-				FrozenLakeCell::Ice, 		FrozenLakeCell::Ice, 	FrozenLakeCell::Ice, 	FrozenLakeCell::Ice, 	FrozenLakeCell::Ice, 	FrozenLakeCell::Hole, FrozenLakeCell::Ice, 	FrozenLakeCell::Ice,
-				//row 5
-				FrozenLakeCell::Ice, 		FrozenLakeCell::Ice, 	FrozenLakeCell::Ice, 	FrozenLakeCell::Hole, FrozenLakeCell::Ice, 	FrozenLakeCell::Ice, 	FrozenLakeCell::Ice, 	FrozenLakeCell::Ice,
-				//row 6
-				FrozenLakeCell::Ice, 		FrozenLakeCell::Hole, FrozenLakeCell::Hole, FrozenLakeCell::Ice, 	FrozenLakeCell::Ice, 	FrozenLakeCell::Ice, 	FrozenLakeCell::Hole, FrozenLakeCell::Ice,
-				//row 7
-				FrozenLakeCell::Ice, 		FrozenLakeCell::Hole, FrozenLakeCell::Ice, 	FrozenLakeCell::Ice, 	FrozenLakeCell::Hole, FrozenLakeCell::Ice, 	FrozenLakeCell::Hole, FrozenLakeCell::Ice,
-				//row 8
-				FrozenLakeCell::Ice, 		FrozenLakeCell::Ice, 	FrozenLakeCell::Ice, 	FrozenLakeCell::Hole, FrozenLakeCell::Ice, 	FrozenLakeCell::Ice, 	FrozenLakeCell::Ice, 	FrozenLakeCell::Goal,
-			],
-		}
+		todo!();
+		// Self {
+		// 	size: UVec2::new(8, 8),
+		// 	//https://github.com/openai/gym/blob/dcd185843a62953e27c2d54dc8c2d647d604b635/gym/envs/toy_text/frozen_lake.py#L17
+		// 	cells: vec![
+		// 		//row 1
+		// 		FrozenLakeCell::Agent,	FrozenLakeCell::Ice, 	FrozenLakeCell::Ice, 	FrozenLakeCell::Ice, 	FrozenLakeCell::Ice, 	FrozenLakeCell::Ice, 	FrozenLakeCell::Ice, 	FrozenLakeCell::Ice,
+		// 		//row 2
+		// 		FrozenLakeCell::Ice, 		FrozenLakeCell::Ice, 	FrozenLakeCell::Ice, 	FrozenLakeCell::Ice, 	FrozenLakeCell::Ice, 	FrozenLakeCell::Ice, 	FrozenLakeCell::Ice, 	FrozenLakeCell::Ice,
+		// 		//row 3
+		// 		FrozenLakeCell::Ice, 		FrozenLakeCell::Ice, 	FrozenLakeCell::Ice, 	FrozenLakeCell::Hole, FrozenLakeCell::Ice, 	FrozenLakeCell::Ice, 	FrozenLakeCell::Ice, 	FrozenLakeCell::Ice,
+		// 		//row 4
+		// 		FrozenLakeCell::Ice, 		FrozenLakeCell::Ice, 	FrozenLakeCell::Ice, 	FrozenLakeCell::Ice, 	FrozenLakeCell::Ice, 	FrozenLakeCell::Hole, FrozenLakeCell::Ice, 	FrozenLakeCell::Ice,
+		// 		//row 5
+		// 		FrozenLakeCell::Ice, 		FrozenLakeCell::Ice, 	FrozenLakeCell::Ice, 	FrozenLakeCell::Hole, FrozenLakeCell::Ice, 	FrozenLakeCell::Ice, 	FrozenLakeCell::Ice, 	FrozenLakeCell::Ice,
+		// 		//row 6
+		// 		FrozenLakeCell::Ice, 		FrozenLakeCell::Hole, FrozenLakeCell::Hole, FrozenLakeCell::Ice, 	FrozenLakeCell::Ice, 	FrozenLakeCell::Ice, 	FrozenLakeCell::Hole, FrozenLakeCell::Ice,
+		// 		//row 7
+		// 		FrozenLakeCell::Ice, 		FrozenLakeCell::Hole, FrozenLakeCell::Ice, 	FrozenLakeCell::Ice, 	FrozenLakeCell::Hole, FrozenLakeCell::Ice, 	FrozenLakeCell::Hole, FrozenLakeCell::Ice,
+		// 		//row 8
+		// 		FrozenLakeCell::Ice, 		FrozenLakeCell::Ice, 	FrozenLakeCell::Ice, 	FrozenLakeCell::Hole, FrozenLakeCell::Ice, 	FrozenLakeCell::Ice, 	FrozenLakeCell::Ice, 	FrozenLakeCell::Goal,
+		// 	],
+		// }
 	}
 }

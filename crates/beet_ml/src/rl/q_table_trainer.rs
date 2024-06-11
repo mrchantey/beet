@@ -6,7 +6,7 @@ use rand::Rng;
 
 /// Used for training a QTable to completion with a provided [`Environment`].
 pub struct QTableTrainer<S: RlSessionTypes> {
-	pub table: S::QSource,
+	pub table: S::QLearnPolicy,
 	pub env: Readonly<S::Env>,
 	pub params: Readonly<QLearnParams>,
 	initial_state: S::State,
@@ -15,7 +15,7 @@ pub struct QTableTrainer<S: RlSessionTypes> {
 impl<S: RlSessionTypes> QTableTrainer<S> {
 	pub fn new(
 		env: S::Env,
-		table: S::QSource,
+		table: S::QLearnPolicy,
 		params: QLearnParams,
 		initial_state: S::State,
 	) -> Self {
@@ -29,7 +29,7 @@ impl<S: RlSessionTypes> QTableTrainer<S> {
 }
 
 
-impl<S: RlSessionTypes> QSource for QTableTrainer<S> {
+impl<S: RlSessionTypes> QPolicy for QTableTrainer<S> {
 	type Action = S::Action;
 	type State = S::State;
 	fn greedy_policy(&self, state: &Self::State) -> (Self::Action, QValue) {
@@ -62,7 +62,7 @@ impl<S: RlSessionTypes> QTrainer for QTableTrainer<S>
 where
 	S::State: Clone,
 {
-	fn train(&mut self, rng: &mut impl Rng) {
+	fn train_with_rng(&mut self, rng: &mut impl Rng) {
 		let params = &self.params;
 
 		for episode in 0..params.n_training_episodes {
@@ -138,7 +138,7 @@ mod test {
 		let mut policy_rng = StdRng::seed_from_u64(0);
 		let map = FrozenLakeMap::default_four_by_four();
 		let initial_state = map.agent_position();
-		let env = FrozenLakeEnv::new(map, false);
+		let env = QTableEnv::new(map.transition_outcomes());
 		let params = QLearnParams::default();
 
 		let mut trainer = QTableTrainer::<FrozenLakeQTableSession>::new(
@@ -148,7 +148,7 @@ mod test {
 			initial_state,
 		);
 		let now = Instant::now();
-		trainer.train(&mut policy_rng);
+		trainer.train_with_rng(&mut policy_rng);
 		// My PC: 10ms
 		// Github Actions: 50ms
 		let elapsed = now.elapsed();

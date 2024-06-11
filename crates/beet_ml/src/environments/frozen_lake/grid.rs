@@ -3,6 +3,8 @@ use crate::prelude::ActionSpace;
 use bevy::prelude::*;
 use rand::rngs::StdRng;
 use rand::Rng;
+use serde::Deserialize;
+use serde::Serialize;
 use strum::EnumCount;
 use strum::EnumIter;
 use strum::VariantArray;
@@ -19,6 +21,8 @@ use strum::VariantArray;
 	DerefMut,
 	Component,
 	Reflect,
+	Serialize,
+	Deserialize,
 )]
 pub struct GridPos(pub UVec2);
 
@@ -55,6 +59,8 @@ impl From<UVec2> for GridPos {
 	VariantArray,
 	EnumIter,
 	EnumCount,
+	Serialize,
+	Deserialize,
 )]
 pub enum GridDirection {
 	#[default]
@@ -124,23 +130,35 @@ impl ActionSpace for GridDirection {
 }
 
 
-#[derive(Debug, Clone, Component)]
+#[derive(Debug, Clone, Component, Reflect)]
 pub struct GridToWorld {
 	pub map_width: f32,
 	pub cell_width: f32,
-	pub map_size:UVec2,
+	pub map_size: UVec2,
 	pub offset: Vec3,
 }
 
 impl GridToWorld {
 	pub fn from_frozen_lake_map(grid: &FrozenLakeMap, map_width: f32) -> Self {
-		let cell_width = map_width / grid.width() as f32;
+		let cell_width = map_width / grid.num_cols() as f32;
 		let h_cell_width = cell_width * 0.5;
+
+		let h_map_width = map_width * 0.5;
+
 		let offset = Vec3::new(
-			grid.width() as f32 + h_cell_width,
+			-h_map_width + h_cell_width,
 			0.,
-			grid.height() as f32 + h_cell_width,
-		) * -0.5;
+			-h_map_width + h_cell_width,
+		);
+
+
+		// let mut offset = Vec3::new(
+		// 	grid.num_cols() as f32,
+		// 	0.,
+		// 	grid.num_rows() as f32,
+		// ) * -0.5;
+		// offset.x -= h_cell_width;
+		// offset.z -= h_cell_width;
 
 		Self {
 			map_size: grid.size(),

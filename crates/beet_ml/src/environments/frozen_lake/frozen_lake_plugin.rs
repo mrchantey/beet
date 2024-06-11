@@ -41,17 +41,20 @@ impl Plugin for FrozenLakePlugin {
 			ActionPlugin::<(
 				TranslateGrid,
 				StepEnvironment<FrozenLakeQTableSession>,
+				ReadQPolicy<FrozenLakeQTable>,
 			)>::default(),
 			RlSessionPlugin::<FrozenLakeEpParams>::default(),
 		))
-		.add_systems(Startup, init_frozen_lake_assets)
+		.add_systems(PreStartup, init_frozen_lake_assets)
 		.add_systems(Update, reward_grid.in_set(PostTickSet))
 		.add_systems(
 			Update,
 			(spawn_frozen_lake_session, spawn_frozen_lake_episode)
 				.in_set(PostTickSet),
 		)
-		.init_resource::<RlRng>();
+		.init_resource::<RlRng>()
+		.init_asset::<QTable<GridPos, GridDirection>>()
+		.init_asset_loader::<QTableLoader<GridPos, GridDirection>>();
 
 		let world = app.world_mut();
 		world.init_component::<GridPos>();
@@ -69,14 +72,17 @@ impl Plugin for FrozenLakePlugin {
 #[derive(Debug, Clone, Reflect)]
 pub struct FrozenLakeEpParams {
 	pub learn_params: QLearnParams,
-	pub map_width: f32,
+	pub map: FrozenLakeMap,
+	pub grid_to_world: GridToWorld,
 }
 
 impl Default for FrozenLakeEpParams {
 	fn default() -> Self {
+		let map = FrozenLakeMap::default_four_by_four();
 		Self {
 			learn_params: QLearnParams::default(),
-			map_width: 4.0,
+			grid_to_world: GridToWorld::from_frozen_lake_map(&map, 4.0),
+			map,
 		}
 	}
 }
@@ -93,7 +99,7 @@ pub struct FrozenLakeQTableSession;
 impl RlSessionTypes for FrozenLakeQTableSession {
 	type State = GridPos;
 	type Action = GridDirection;
-	type QSource = FrozenLakeQTable;
-	type Env = FrozenLakeEnv;
+	type QLearnPolicy = FrozenLakeQTable;
+	type Env = QTableEnv<Self::State, Self::Action>;
 	type EpisodeParams = FrozenLakeEpParams;
 }

@@ -1,7 +1,7 @@
 use crate::prelude::*;
 use rand::Rng;
 
-pub trait QSource: 'static + Send + Sync {
+pub trait QPolicy: 'static + Send + Sync {
 	type State: StateSpace;
 	type Action: ActionSpace;
 
@@ -12,13 +12,35 @@ pub trait QSource: 'static + Send + Sync {
 		rng: &mut impl Rng,
 		epsilon: f32,
 		action: &Self::Action,
-		prev_state: &Self::State,
 		state: &Self::State,
+		// the anticipated state, it may not occur
+		next_state: &Self::State,
 		reward: f32,
 	) -> Self::Action {
-		self.set_discounted_reward(params, action, reward, prev_state, state);
-		let (action, _) = self.epsilon_greedy_policy(&state, epsilon, rng);
+		self.set_discounted_reward(params, action, reward, state, next_state);
+		let (action, _) = self.epsilon_greedy_policy(&next_state, epsilon, rng);
 		action
+	}
+
+	fn set_discounted_reward(
+		&mut self,
+		params: &QLearnParams,
+		action: &Self::Action,
+		reward: QValue,
+		state: &Self::State,
+		// the anticipated state, it may not occur
+		next_state: &Self::State,
+	) {
+		let prev_q = self.get_q(&state, &action);
+		let (_, new_max_q) = self.greedy_policy(&next_state);
+
+		// Bellman equation
+		// Q(s,a):= Q(s,a) + lr [R(s,a) + gamma * max Q(s',a') - Q(s,a)]
+		let discounted_reward = prev_q
+			+ params.learning_rate
+				* (reward + params.gamma * new_max_q - prev_q);
+
+		self.set_q(&state, &action, discounted_reward);
 	}
 
 	fn greedy_policy(&self, state: &Self::State) -> (Self::Action, QValue);
@@ -51,25 +73,4 @@ pub trait QSource: 'static + Send + Sync {
 		action: &Self::Action,
 		value: QValue,
 	);
-
-
-	fn set_discounted_reward(
-		&mut self,
-		params: &QLearnParams,
-		action: &Self::Action,
-		reward: QValue,
-		prev_state: &Self::State,
-		next_state: &Self::State,
-	) {
-		let prev_q = self.get_q(&prev_state, &action);
-		let (_, new_max_q) = self.greedy_policy(&next_state);
-
-		// Bellman equation
-		// Q(s,a):= Q(s,a) + lr [R(s,a) + gamma * max Q(s',a') - Q(s,a)]
-		let discounted_reward = prev_q
-			+ params.learning_rate
-				* (reward + params.gamma * new_max_q - prev_q);
-
-		self.set_q(&prev_state, &action, discounted_reward);
-	}
 }

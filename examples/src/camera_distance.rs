@@ -9,25 +9,14 @@ pub struct CameraDistance {
 }
 
 impl Default for CameraDistance {
-	fn default() -> Self {
-		Self {
-			width: 10.0,
-			offset: Vec3::ZERO,
-		}
-	}
+	fn default() -> Self { Self::new(10.) }
 }
 
 impl CameraDistance {
-	pub fn new(x: f32) -> Self {
+	pub fn new(scale: f32) -> Self {
 		Self {
-			width: x,
-			offset: Vec3::ZERO,
-		}
-	}
-	pub fn new_with_origin(width: f32, origin: Vec3) -> Self {
-		Self {
-			width,
-			offset: origin,
+			width: scale * 1.1,
+			offset: Vec3::new(0., scale, scale),
 		}
 	}
 }

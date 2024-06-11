@@ -11,14 +11,14 @@ use bevy::prelude::*;
 /// - If a child succeeds, evaluate reward and select next action.
 #[derive(Debug, Clone, PartialEq, Component, Reflect)]
 #[reflect(Component, ActionMeta)]
-pub struct QTableSelector<L: QSource> {
+pub struct QTableSelector<L: QPolicy> {
 	pub evaluate: bool,
 	pub learner: L,
 	pub current_episode: usize,
 	pub current_step: usize,
 }
 
-fn q_table_selector<L: QSource>(
+fn q_table_selector<L: QPolicy>(
 	mut commands: Commands,
 	mut agents: Query<(&L::State, &mut L::Action, &Reward)>,
 	mut query: Query<
@@ -70,10 +70,10 @@ fn q_table_selector<L: QSource>(
 	}
 }
 
-impl<L: QSource> ActionMeta for QTableSelector<L> {
+impl<L: QPolicy> ActionMeta for QTableSelector<L> {
 	fn category(&self) -> ActionCategory { ActionCategory::Agent }
 }
 
-impl<L: QSource> ActionSystems for QTableSelector<L> {
+impl<L: QPolicy> ActionSystems for QTableSelector<L> {
 	fn systems() -> SystemConfigs { q_table_selector::<L>.in_set(TickSet) }
 }

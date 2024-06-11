@@ -179,7 +179,7 @@ mod test {
 		mut events: EventReader<StartEpisode<FrozenLakeEpParams>>,
 	) {
 		for event in events.read() {
-			commands.spawn(SessionEntity(event.session));
+			commands.spawn((SessionEntity(event.session), DespawnOnEpisodeEnd));
 		}
 	}
 

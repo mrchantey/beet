@@ -39,65 +39,17 @@ pub fn spawn_frozen_lake_session(
 	assets: Res<FrozenLakeAssets>,
 ) {
 	for event in events.read() {
-		let map = FrozenLakeMap::default_four_by_four();
+		let FrozenLakeEpParams {
+			map, grid_to_world, ..
+		} = &event.params;
 
-		let grid_to_world =
-			GridToWorld::from_frozen_lake_map(&map, event.params.map_width);
-
-		let tile_scale = Vec3::splat(grid_to_world.cell_width);
-		for x in 0..map.width() {
-			for y in 0..map.height() {
-				let mut pos = grid_to_world.world_pos(UVec2::new(x, y));
-				pos.y -= grid_to_world.cell_width;
-				commands.spawn((
-					SceneBundle {
-						scene: assets.tile.clone(),
-						transform: Transform::from_translation(pos)
-							.with_scale(tile_scale),
-						..default()
-					},
-					SessionEntity(event.session),
-					DespawnOnSessionEnd,
-				));
-			}
-		}
-
-		let object_scale = Vec3::splat(grid_to_world.cell_width * 0.5);
-
-		for (index, cell) in map.cells().iter().enumerate() {
-			let grid_pos = map.index_to_position(index);
-			let mut pos = grid_to_world.world_pos(grid_pos);
-			match cell {
-				FrozenLakeCell::Hole => {
-					pos.y += grid_to_world.cell_width * 0.25; // this asset is a bit too low
-					commands.spawn((
-						SceneBundle {
-							scene: assets.hazard.clone(),
-							transform: Transform::from_translation(pos)
-								.with_scale(object_scale),
-							..default()
-						},
-						SessionEntity(event.session),
-						DespawnOnSessionEnd,
-					));
-				}
-				FrozenLakeCell::Goal => {
-					commands.spawn((
-						SceneBundle {
-							scene: assets.goal.clone(),
-							transform: Transform::from_translation(pos)
-								.with_scale(object_scale),
-							..default()
-						},
-						SessionEntity(event.session),
-						DespawnOnSessionEnd,
-					));
-				}
-				FrozenLakeCell::Ice => {}
-				FrozenLakeCell::Agent => { /*spawns on episode */ }
-			}
-			{}
-		}
+		spawn_frozen_lake_scene(
+			&mut commands,
+			map,
+			grid_to_world,
+			&assets,
+			(SessionEntity(event.session), DespawnOnSessionEnd),
+		)
 	}
 }
 
@@ -108,64 +60,52 @@ pub fn spawn_frozen_lake_episode(
 	assets: Res<FrozenLakeAssets>,
 ) {
 	for event in events.read() {
-		// TODO deduplicate
-		let map = FrozenLakeMap::default_four_by_four();
-		let grid_to_world =
-			GridToWorld::from_frozen_lake_map(&map, event.params.map_width);
+		let FrozenLakeEpParams {
+			map, grid_to_world, ..
+		} = &event.params;
+
 		let object_scale = Vec3::splat(grid_to_world.cell_width * 0.5);
 
-		for (index, cell) in map.cells().iter().enumerate() {
-			let grid_pos = map.index_to_position(index);
-			let pos = grid_to_world.world_pos(grid_pos);
-			match cell {
-				FrozenLakeCell::Agent => {
-					commands
-						.spawn((
-							SceneBundle {
-								scene: assets.character.clone(),
-								transform: Transform::from_translation(pos)
-									.with_scale(object_scale),
-								..default()
-							},
-							grid_to_world.clone(),
-							RlAgentBundle {
-								state: map.agent_position(),
-								action: GridDirection::sample(),
-								env: FrozenLakeEnv::new(map.clone(), false),
-								params: event.params.learn_params.clone(),
-								session: SessionEntity(event.session),
-								despawn: DespawnOnEpisodeEnd,
-							},
-						))
-						.with_children(|parent| {
-							let agent = parent.parent_entity();
+		let agent_pos = map.agent_position();
+		let agent_pos = grid_to_world.world_pos(*agent_pos);
 
-							parent
-								.spawn((
-									Running,
-									SequenceSelector,
-									Repeat::default(),
-								))
-								.with_children(|parent| {
-									parent.spawn((
-										TranslateGrid::new(
-											Duration::from_millis(1),
-										),
-										TargetAgent(agent),
-										RunTimer::default(),
-									));
-									parent.spawn((
-										TargetAgent(agent),
-										StepEnvironment::<
-											FrozenLakeQTableSession,
-										>::new(event.episode),
-									));
-								});
-						});
-				}
-				_ => {}
-			}
-			{}
-		}
+
+		commands
+			.spawn((
+				SceneBundle {
+					scene: assets.character.clone(),
+					transform: Transform::from_translation(agent_pos)
+						.with_scale(object_scale),
+					..default()
+				},
+				grid_to_world.clone(),
+				RlAgentBundle {
+					state: map.agent_position(),
+					action: GridDirection::sample(),
+					env: QTableEnv::new(map.transition_outcomes()),
+					params: event.params.learn_params.clone(),
+					session: SessionEntity(event.session),
+					despawn: DespawnOnEpisodeEnd,
+				},
+			))
+			.with_children(|parent| {
+				let agent = parent.parent_entity();
+
+				parent
+					.spawn((Running, SequenceSelector, Repeat::default()))
+					.with_children(|parent| {
+						parent.spawn((
+							TranslateGrid::new(Duration::from_millis(100)),
+							TargetAgent(agent),
+							RunTimer::default(),
+						));
+						parent.spawn((
+							TargetAgent(agent),
+							StepEnvironment::<FrozenLakeQTableSession>::new(
+								event.episode,
+							),
+						));
+					});
+			});
 	}
 }

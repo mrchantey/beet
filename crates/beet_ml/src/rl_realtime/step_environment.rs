@@ -27,7 +27,7 @@ fn step_environment<S: RlSessionTypes>(
 	mut rng: ResMut<RlRng>,
 	mut end_episode_events: EventWriter<EndEpisode<S::EpisodeParams>>,
 	mut commands: Commands,
-	mut sessions: Query<&mut S::QSource>,
+	mut sessions: Query<&mut S::QLearnPolicy>,
 	mut agents: Query<(
 		&S::State,
 		&mut S::Action,
@@ -42,7 +42,7 @@ fn step_environment<S: RlSessionTypes>(
 ) where
 	S::State: Component,
 	S::Action: Component,
-	S::QSource: Component,
+	S::QLearnPolicy: Component,
 	S::Env: Component,
 {
 	for (action_entity, agent, mut step) in query.iter_mut() {
@@ -91,7 +91,7 @@ impl<S: RlSessionTypes> ActionSystems for StepEnvironment<S>
 where
 	S::State: Component,
 	S::Action: Component,
-	S::QSource: Component,
+	S::QLearnPolicy: Component,
 	S::Env: Component,
 {
 	fn systems() -> SystemConfigs { step_environment::<S>.in_set(TickSet) }
@@ -129,7 +129,7 @@ mod test {
 			.spawn(RlAgentBundle {
 				state: map.agent_position(),
 				action: GridDirection::sample_with_rng(&mut *rng),
-				env: FrozenLakeEnv::new(map, false),
+				env: QTableEnv::new(map.transition_outcomes()),
 				params: QLearnParams::default(),
 				session: SessionEntity(session),
 				despawn: DespawnOnEpisodeEnd,

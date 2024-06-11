@@ -23,6 +23,7 @@ pub trait Environment: 'static + Send + Sync + Clone {
 	// fn action_space(&self) -> Action;
 }
 
+#[derive(Clone)]
 pub struct StepOutcome<State> {
 	pub state: State,
 	pub reward: f32,
@@ -30,7 +31,7 @@ pub struct StepOutcome<State> {
 }
 
 pub trait DiscreteSpace:
-	'static + Send + Sync + Debug + Hash + Clone + PartialEq + Eq + Component
+	'static + Send + Sync + Debug + Hash + Clone + PartialEq + Eq + Component + TypePath
 {
 	// type Value;
 	// const LEN: usize;
@@ -47,7 +48,8 @@ impl<
 			+ Clone
 			+ PartialEq
 			+ Eq
-			+ Component,
+			+ Component
+			+ TypePath
 	> DiscreteSpace for T
 {
 }
