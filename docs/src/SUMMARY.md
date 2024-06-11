@@ -12,6 +12,8 @@
 	- [Seek 3D](examples/seek_3d.md)
 	- [Flock](examples/flock.md)
 	- [Fetch](examples/fetch.md)
+	- [Frozen Lake - Train](examples/frozen_lake_train.md)
+	- [Frozen Lake - Run](examples/frozen_lake_run.md)
 	- [Web Components](examples/web-components.md)
 ---
 <!-- [Changelog](./misc/roadmap.md) -->
