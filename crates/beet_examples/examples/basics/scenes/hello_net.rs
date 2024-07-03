@@ -4,7 +4,7 @@ use bevy::prelude::*;
 
 pub fn hello_net(mut commands: Commands) {
 	commands
-		.spawn((SequenceSelector::default(), Running))
+		.spawn((SerializeMarker, SequenceSelector::default(), Running))
 		.with_children(|parent| {
 			parent.spawn((
 				LogOnRun::new("Send: AppReady"),
@@ -12,6 +12,7 @@ pub fn hello_net(mut commands: Commands) {
 			));
 		});
 	commands.spawn((
+		SerializeMarker,
 		InsertOnTrigger::<OnUserMessage, Running>::new(Running),
 		LogOnRun::new("Recv: Player Message"),
 	));

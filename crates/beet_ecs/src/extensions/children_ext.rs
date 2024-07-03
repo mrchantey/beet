@@ -4,6 +4,7 @@ use bevy::utils::HashSet;
 pub struct ChildrenExt;
 
 impl ChildrenExt {
+	/// Array this entity and all of its children
 	pub fn collect(
 		entity: Entity,
 		edge_query: &Query<&Children>,

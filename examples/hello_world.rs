@@ -1,7 +1,6 @@
 //! In this example we will create an action
 //! and then combine it with some built-in actions to run a behavior.
 use beet::prelude::*;
-use beet_examples::prelude::*;
 use bevy::log::LogPlugin;
 use bevy::prelude::*;
 
@@ -25,9 +24,6 @@ fn main() {
 		// action systems are usually added to the `TickSet`
 		.add_systems(Update, log_on_run.in_set(TickSet));
 
-	app.add_plugins(TaskPoolPlugin::default())
-		.add_systems(PostStartup, save_scene("target/scenes/hello_world.ron"));
-
 	// Behavior graphs are regular entity hierarchies
 	app.world_mut()
 		.spawn((SequenceSelector::default(), Running))
@@ -45,20 +41,15 @@ fn main() {
 	// 1 - Selector chooses first child
 	app.update();
 
-	// 2 - First child runs (Hello)
+	// 2 - First child runs >> Hello
 	app.update();
 
 	// 3 - Selector chooses second child
 	app.update();
 
-	// 4 - Second child runs (World)
+	// 4 - Second child runs >> World
 	app.update();
 
 	// 5 - Selector succeeds, all done
 	app.update();
 }
-
-/*
-Hello
-World
-*/

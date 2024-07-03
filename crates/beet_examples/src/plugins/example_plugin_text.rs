@@ -25,5 +25,5 @@ impl Plugin for ExamplePluginText {
 }
 
 fn setup(mut commands: Commands) {
-	commands.spawn((DoNotSerialize, Camera2dBundle::default()));
+	commands.spawn(Camera2dBundle::default());
 }

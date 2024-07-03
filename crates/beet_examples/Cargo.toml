@@ -35,5 +35,8 @@ tokio.workspace = true
 
 
 [[example]]
+name = "export_scenes"
+path = "examples/export_scenes.rs"
+[[example]]
 name = "basics"
 path = "examples/basics/main.rs"

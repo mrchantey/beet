@@ -9,22 +9,29 @@ use std::io::Write;
 
 
 #[derive(Component)]
-pub struct DoNotSerialize;
+pub struct SerializeMarker;
 
-fn entities_to_serialize(world: &World) -> Vec<Entity> {
-	world
-		.iter_entities()
-		.map(|entity| entity.id())
-		.filter(|entity| world.get::<DoNotSerialize>(*entity).is_none())
-		.collect()
-}
+// fn entities_to_serialize(world: &mut World) -> Vec<Entity> {
+// 	world
+// 		.query_filtered::<Entity, With<SerializeMarker>>()
+// 		.iter(world)
+// 		.collect::<Vec<_>>()
+// 		.into_iter()
+// 		.map(|parent| ChildrenExt::collect_world(parent, world))
+// 		.flatten()
+// 		.collect()
+// }
 
 
-pub fn save_scene(filename: &'static str) -> SystemConfigs {
+pub fn save_scene(filename: impl Into<String>) -> SystemConfigs {
+	let filename = filename.into();
 	(move |world: &mut World| {
-		let scene = DynamicSceneBuilder::from_world(world)
-			.extract_entities(entities_to_serialize(world).into_iter())
-			.build();
+		let filename = filename.clone();
+		let scene = DynamicScene::from_world(world);
+		// let entities = entities_to_serialize(world);
+		// let scene = DynamicSceneBuilder::from_world(world)
+		// 	.extract_entities(entities.into_iter())
+		// 	.build();
 
 		// Scenes can be serialized like this:
 		let type_registry = world.resource::<AppTypeRegistry>();
@@ -40,7 +47,7 @@ pub fn save_scene(filename: &'static str) -> SystemConfigs {
 		#[cfg(not(target_arch = "wasm32"))]
 		IoTaskPool::get()
 			.spawn(async move {
-				let dir_path = std::path::Path::new(filename).parent().unwrap();
+				let dir_path = std::path::Path::new(&filename).parent().unwrap();
 				fs::create_dir_all(dir_path)
 					.expect("Error while creating directory");
 
