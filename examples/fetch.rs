@@ -110,7 +110,7 @@ fn setup_fox(
 					parent
 						.spawn((
 							Name::new("Idle Or Fetch"),
-							TriggerOnRun(AppLoaded),
+							TriggerOnRun(AppReady),
 							TargetAgent(agent),
 							ScoreSelector::default(),
 							// ScoreSelector::consuming(),

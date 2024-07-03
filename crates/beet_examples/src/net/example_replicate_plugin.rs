@@ -10,21 +10,12 @@ impl Plugin for ExampleReplicatePlugin {
 		app.add_plugins((ReplicatePlugin, CommonEventsPlugin))
 			.add_event::<OnUserMessage>()
 			.replicate_event_incoming::<OnUserMessage>()
-			.add_plugins(ActionPlugin::<InsertOnTrigger<OnUserMessage,Running>>::default())
-
-			.add_event::<AppLoaded>()
-			.replicate_event_outgoing::<AppLoaded>()
-			.add_plugins(ActionPlugin::<TriggerOnRun<AppLoaded>>::default());
+			.add_plugins(ActionPlugin::<InsertOnTrigger<OnUserMessage,Running>>::default());
 	}
 }
-
 
 /// User messages received either internally or externally
 #[derive(
 	Debug, Clone, Deref, DerefMut, Serialize, Deserialize, Event, Reflect,
 )]
 pub struct OnUserMessage(pub String);
-
-/// Sent from this bevy app to web ui etc to notify that assets etc have loaded.
-#[derive(Debug, Clone, Serialize, Deserialize, Event, Reflect)]
-pub struct AppLoaded;

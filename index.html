@@ -20,10 +20,18 @@
 
 <body>
 	<script>
+
+		const regIds = {
+			// keep in sync with common_events.rs
+			appReady: 0,
+			// keep in sync with example_replicate_plugin.rs
+			onUserMessage: 1
+		}
+
 		function sendUserMessage(message) {
 			const detail = JSON.stringify([{
 				SendEvent: {
-					reg_id: 0,//the first registered id, OnUserMessage
+					reg_id: regIds.onUserMessage,
 					payload: {
 						Json: JSON.stringify(message)
 					}

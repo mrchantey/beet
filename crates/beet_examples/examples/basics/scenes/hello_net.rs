@@ -7,8 +7,8 @@ pub fn hello_net(mut commands: Commands) {
 		.spawn((SequenceSelector::default(), Running))
 		.with_children(|parent| {
 			parent.spawn((
-				LogOnRun::new("Send: AppLoaded"),
-				TriggerOnRun(AppLoaded),
+				LogOnRun::new("Send: AppReady"),
+				TriggerOnRun(AppReady),
 			));
 		});
 	commands.spawn((
