@@ -8,7 +8,7 @@ use web_sys::window;
 use web_sys::MessageEvent;
 
 
-#[deprecated("use beet_net instead")]
+#[deprecated = "use beet_net instead"]
 pub struct PostmessageInputPlugin;
 
 impl Plugin for PostmessageInputPlugin {

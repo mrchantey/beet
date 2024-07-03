@@ -32,7 +32,7 @@ pub fn save_scene(filename: &'static str) -> SystemConfigs {
 		let serialized_scene = scene.serialize(&type_registry).unwrap();
 
 		// Showing the scene in the console
-		info!("{}", serialized_scene);
+		// info!("{}", serialized_scene);
 
 		// Writing the scene to a new file. Using a task to avoid calling the filesystem APIs in a system
 		// as they are blocking

@@ -17,5 +17,5 @@ pub mod prelude {
 	pub use crate::serde_utils::*;
 	pub use crate::net::*;
 	#[cfg(target_arch = "wasm32")]
-	pub use wasm::*;
+	pub use crate::wasm::*;
 }

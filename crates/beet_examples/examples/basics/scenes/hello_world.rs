@@ -13,5 +13,25 @@ pub fn hello_world(mut commands: Commands) {
 				LogOnRun("World".into()),
 				InsertOnRun(RunResult::Success),
 			));
+			parent.spawn((
+				LogOnRun("World 1".into()),
+				RunTimer::default(),
+				InsertInDuration::with_secs(RunResult::Success, 1),
+			));
+			parent.spawn((
+				LogOnRun("World 2".into()),
+				RunTimer::default(),
+				InsertInDuration::with_secs(RunResult::Success, 1),
+			));
+			parent.spawn((
+				LogOnRun("World 3".into()),
+				RunTimer::default(),
+				InsertInDuration::with_secs(RunResult::Success, 1),
+			));
+			parent.spawn((
+				LogOnRun("World 4".into()),
+				RunTimer::default(),
+				InsertInDuration::with_secs(RunResult::Success, 1),
+			));
 		});
 }

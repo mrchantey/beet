@@ -1,67 +1,118 @@
-use crate::prelude::DoNotSerialize;
 use beet::prelude::LogOnRun;
 use beet::prelude::Running;
 use bevy::prelude::*;
+use bevy::window::WindowResized;
 
 #[derive(Debug, Default, Component)]
 pub struct LogToUi;
 
-
+fn style() -> TextStyle {
+	TextStyle {
+		font_size: 32.,
+		..Default::default()
+	}
+}
 
 pub fn log_to_ui(
+	mut commands: Commands,
+	query: Query<Entity, With<LogToUi>>,
 	actions: Query<&LogOnRun, Added<Running>>,
-	mut query: Query<&mut Text, With<LogToUi>>,
 ) {
-	for mut text in query.iter_mut() {
+	for entity in query.iter() {
 		for log in actions.iter() {
-			text.sections[0].value.push_str(&log.0);
-			text.sections[0].value.push_str("\n");
+			commands.entity(entity).with_children(|parent| {
+				parent.spawn(
+					// AccessibilityNode(NodeBuilder::new(Role::ListItem)),
+					TextBundle::from_section(
+						format!("> {}", log.0.clone()),
+						style(),
+					),
+				);
+			});
 		}
 	}
 }
 
-const TEST: &str = r#"
-val 1
-val 2
-val 3
-val 4
-val 5
-val 6
-val 7
-val 8
-val 9
-val 10
-val 11
-"#;
+fn get_top_pos(node: &Node, parent: &Node) -> f32 {
+	let items_height = node.size().y;
+	let container_height = parent.size().y;
+	let max_scroll = (items_height - container_height).max(0.);
+	log::info!("\nitems_height: {items_height}\ncontainer_height: {container_height}\nmax_scroll: {max_scroll}");
+	return -max_scroll;
+}
 
+pub fn scroll_to_bottom_on_resize(
+	mut resize_reader: EventReader<WindowResized>,
+	parents: Query<&Node>,
+	mut list: Query<(&mut Style, &Node, &Parent), With<LogToUi>>,
+) {
+	for _ev in resize_reader.read() {
+		for (mut style, node, parent) in list.iter_mut() {
+			if let Ok(parent) = parents.get(**parent) {
+				style.top = Val::Px(get_top_pos(node, parent));
+			}
+		}
+	}
+}
+
+pub fn scroll_to_bottom_on_append(
+	mut list: Query<
+		(&mut Style, &Node, &Parent),
+		(With<LogToUi>, Changed<Children>),
+	>,
+	parents: Query<&Node>,
+) {
+	for (mut style, node, parent) in list.iter_mut() {
+		if let Ok(parent) = parents.get(**parent) {
+			style.top = Val::Px(get_top_pos(node, parent));
+		}
+	}
+}
 
 pub fn spawn_log_to_ui(mut commands: Commands) {
 	commands
-		.spawn((
-			NodeBundle {
-				style: Style {
-					flex_direction: FlexDirection::ColumnReverse,
-					// align_items: AlignItems::Center,
-					..default()
-				},
+		// CONTAINER
+		.spawn(NodeBundle {
+			style: Style {
+				height: Val::Percent(100.),
+				width: Val::Percent(100.),
+				// align_self: AlignSelf::Stretch,
+				flex_direction: FlexDirection::Column,
+				overflow: Overflow::clip(),
 				..default()
 			},
-			// ScrollingList::default(),
-			// AccessibilityNode(NodeBuilder::new(Role::List)),
-		))
+			// background_color: Color::srgb(0.10, 0.10, 0.10).into(),
+			..default()
+		})
 		.with_children(|parent| {
-			parent.spawn((
-				DoNotSerialize,
-				LogToUi,
-				TextBundle::from_sections([TextSection::new(
-					TEST,
-					TextStyle {
-						// This font is loaded and will be used instead of the default font.
-						// font: asset_server.load("fonts/FiraSans-Bold.ttf"),
-						font_size: 60.0,
+			parent
+				// LIST
+				.spawn((
+					LogToUi,
+					NodeBundle {
+						style: Style {
+							padding: UiRect::all(Val::Px(10.)),
+							flex_direction: FlexDirection::Column,
+							// align_items: AlignItems::Center,
+							..default()
+						},
 						..default()
 					},
-				)]),
-			));
+					// ScrollingList::default(),
+					// AccessibilityNode(NodeBuilder::new(Role::List)),
+				));
+			// ))
+			// .with_children(|parent| {
+			// 	// SCROLL TEST ITEMS
+			// 	for i in 0..30 {
+			// 		parent.spawn(
+			// 			// AccessibilityNode(NodeBuilder::new(Role::ListItem)),
+			// 			TextBundle::from_section(
+			// 				format!("Item {i}"),
+			// 				style(),
+			// 			),
+			// 		);
+			// 	}
+			// });
 		});
 }

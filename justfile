@@ -152,11 +152,11 @@ watch *command:
 
 build-wasm-release crate example *args:
 	just _build-wasm release {{crate}} {{example}} --release {{args}}
-build-wasm-debug crate example *args:
+build-wasm crate example *args:
 	just _build-wasm debug {{crate}} {{example}} {{args}}
 watch-wasm-release crate example *args:
 	just _watch-wasm release {{crate}} {{example}} --release {{args}}
-watch-wasm-debug crate example *args:
+watch-wasm crate example *args:
 	just _watch-wasm debug {{crate}} {{example}} {{args}}
 
 _build-wasm build_config crate example *args:

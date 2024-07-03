@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+	<meta charset="utf-8">
+	<title>A Cool Site</title>
+	<meta name="description" content="An amazing website">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<style>
+		body {
+			margin: 0;
+		}
+
+		canvas {
+			width: 100dvw;
+			height: 100dvh;
+		}
+	</style>
+</head>
+
+<body>
+	<script type="module">
+		import init from './target/static/wasm/basics.js'
+		init()
+			.catch((error) => {
+				if (!error.message.startsWith("Using exceptions for control flow,"))
+					throw error
+			}).then(() => {
+				window.parent?.postMessage("wasm_loaded", "*")
+			})
+	</script>
+	<canvas id="beet-canvas"></canvas>
+</body>
+
+</html>

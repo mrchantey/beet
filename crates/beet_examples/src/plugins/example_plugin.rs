@@ -1,11 +1,7 @@
 use crate::prelude::*;
-use beet::prelude::*;
 use bevy::asset::AssetMetaCheck;
 use bevy::prelude::*;
 use forky_bevy::systems::close_on_esc;
-
-
-
 
 #[derive(Default)]
 pub struct ExamplePlugin;

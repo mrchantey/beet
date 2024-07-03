@@ -13,6 +13,7 @@ fn main() {
 		DefaultBeetPlugins::default(),
 	))
 	.add_systems(Startup, scenes::hello_world)
+	// .add_systems(Startup, scenes::hello_net)
 	.add_systems(PostStartup, save_scene("target/scenes/hello_world.ron"))
 	.run();
 }
