@@ -32,7 +32,6 @@ tokio = ["beet_net/tokio", "beet_examples/tokio"]
 # dynamic_linking = ["bevy/dynamic_linking"]
 
 [dependencies]
-# beet = { path = "crates/beet", version = "0.0.1" }
 beet_core.workspace = true
 beet_ecs.workspace = true
 beet_ml = { workspace = true, optional = true }
@@ -57,7 +56,7 @@ wasm-bindgen.workspace = true
 tokio.workspace = true
 
 
-### WORKSPACE ###########################################################################################################################
+### WORKSPACE ################################################################################################z###########################
 
 [workspace.package]
 version = "0.0.1"
