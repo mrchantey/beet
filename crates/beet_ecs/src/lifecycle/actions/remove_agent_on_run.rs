@@ -5,7 +5,9 @@ use std::marker::PhantomData;
 
 /// Removes a component on the agent when this behavior starts running.
 #[derive(PartialEq, Deref, DerefMut, Debug, Clone, Component, Reflect)]
-pub struct RemoveAgentOnRun<T: GenericActionComponent>(pub PhantomData<T>);
+pub struct RemoveAgentOnRun<T: GenericActionComponent>(
+	#[reflect(ignore)] pub PhantomData<T>,
+);
 
 impl<T: GenericActionComponent> Default for RemoveAgentOnRun<T> {
 	fn default() -> Self { Self(PhantomData) }

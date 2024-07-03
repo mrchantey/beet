@@ -93,7 +93,7 @@ impl EpisodeParams for FrozenLakeEpParams {
 
 pub type FrozenLakeQTable = QTable<GridPos, GridDirection>;
 
-
+#[derive(Debug, Reflect)]
 pub struct FrozenLakeQTableSession;
 
 impl RlSessionTypes for FrozenLakeQTableSession {

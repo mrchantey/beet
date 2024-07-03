@@ -1,7 +1,7 @@
+use crate::prelude::*;
 use bevy::input::keyboard::Key;
 use bevy::input::keyboard::KeyboardInput;
 use bevy::prelude::*;
-use crate::prelude::*;
 use serde::Deserialize;
 use serde::Serialize;
 
@@ -35,7 +35,8 @@ pub struct PlayerInput;
 #[derive(Component)]
 pub struct PlayerOutput;
 
-#[derive(Component)]
+#[derive(Clone, Component, Reflect)]
+#[reflect(Component)]
 pub struct StatusOutput;
 
 #[derive(Component)]

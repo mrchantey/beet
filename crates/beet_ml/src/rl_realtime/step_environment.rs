@@ -9,6 +9,7 @@ use std::marker::PhantomData;
 pub struct StepEnvironment<S: RlSessionTypes> {
 	episode: u32,
 	step: u32,
+	#[reflect(ignore)]
 	phantom: PhantomData<S>,
 }
 

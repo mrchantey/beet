@@ -1,3 +1,4 @@
+use super::*;
 use beet_ecs::prelude::*;
 use bevy::asset::LoadState;
 // use bevy::asset::LoadState;
@@ -5,20 +6,21 @@ use bevy::ecs::schedule::SystemConfigs;
 use bevy::prelude::*;
 
 /// Inserts the given component when a matching asset event is received.
-#[derive(PartialEq, Debug, Clone, Component, Reflect)]
+#[derive(Debug, Clone, PartialEq, Component, Reflect)]
 #[reflect(Component, ActionMeta)]
-pub struct InsertOnAssetEvent<T: GenericActionComponent, A: Asset> {
+pub struct InsertOnAssetEvent<T: GenericActionComponent, A: GenericActionAsset>
+{
 	pub value: T,
-	pub asset_event: AssetEvent<A>,
+	pub asset_event: ReflectedAssetEvent<A>,
 }
 
-impl<T: GenericActionComponent, A: Asset> ActionMeta
+impl<T: GenericActionComponent, A: GenericActionAsset> ActionMeta
 	for InsertOnAssetEvent<T, A>
 {
 	fn category(&self) -> ActionCategory { ActionCategory::Behavior }
 }
 
-impl<T: GenericActionComponent, A: Asset> ActionSystems
+impl<T: GenericActionComponent, A: GenericActionAsset> ActionSystems
 	for InsertOnAssetEvent<T, A>
 {
 	fn systems() -> SystemConfigs {
@@ -30,9 +32,14 @@ impl<T: GenericActionComponent, A: Asset> ActionSystems
 	}
 }
 
-impl<T: GenericActionComponent, A: Asset> InsertOnAssetEvent<T, A> {
+impl<T: GenericActionComponent, A: GenericActionAsset>
+	InsertOnAssetEvent<T, A>
+{
 	pub fn new(value: T, asset_event: AssetEvent<A>) -> Self {
-		Self { value, asset_event }
+		Self {
+			value,
+			asset_event: asset_event.into(),
+		}
 	}
 	pub fn loaded(value: T, handle: &Handle<A>) -> Self {
 		Self::new(value, AssetEvent::LoadedWithDependencies {
@@ -42,36 +49,37 @@ impl<T: GenericActionComponent, A: Asset> InsertOnAssetEvent<T, A> {
 
 	pub fn matches_load_state(&self, state: LoadState) -> bool {
 		match (self.asset_event, state) {
-			(AssetEvent::Added { .. }, LoadState::Loaded) => true,
-			(AssetEvent::LoadedWithDependencies { .. }, LoadState::Loaded) => {
+			(ReflectedAssetEvent::Added { .. }, LoadState::Loaded) => true,
+			(ReflectedAssetEvent::LoadedWithDependencies { .. }, LoadState::Loaded) => {
 				true
 			}
-			(AssetEvent::Removed { .. }, LoadState::NotLoaded) => true,
+			(ReflectedAssetEvent::Removed { .. }, LoadState::NotLoaded) => true,
 			(_, _) => false,
 		}
 	}
 }
 
-fn insert_on_asset_event<T: GenericActionComponent, A: Asset>(
+fn insert_on_asset_event<T: GenericActionComponent, A: GenericActionAsset>(
 	mut commands: Commands,
 	mut asset_events: EventReader<AssetEvent<A>>,
 	query: Query<(Entity, &InsertOnAssetEvent<T, A>), With<Running>>,
 ) {
 	for ev in asset_events.read() {
 		for (entity, action) in query.iter() {
-			if action.asset_event == *ev {
+			let action_event:AssetEvent<A> = action.asset_event.into();
+			if action_event == *ev {
 				commands.entity(entity).insert(action.value.clone());
 			}
 		}
 	}
 }
-fn insert_on_asset_status<T: GenericActionComponent, A: Asset>(
+fn insert_on_asset_status<T: GenericActionComponent, A: GenericActionAsset>(
 	mut commands: Commands,
 	asset_server: Res<AssetServer>,
 	query: Query<(Entity, &InsertOnAssetEvent<T, A>), Added<Running>>,
 ) {
 	for (entity, action) in query.iter() {
-		let id = asset_event_id(action.asset_event);
+		let id = asset_event_id(action.asset_event.into());
 		let Some(state) = asset_server.get_load_state(id) else {
 			continue;
 		};

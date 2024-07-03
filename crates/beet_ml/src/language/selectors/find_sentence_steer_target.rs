@@ -2,7 +2,6 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_ecs::prelude::*;
-use bevy::ecs::query::QueryFilter;
 use bevy::ecs::schedule::SystemConfigs;
 use bevy::prelude::*;
 use forky_core::ResultTEExt;
@@ -11,17 +10,16 @@ use forky_core::ResultTEExt;
 #[reflect(Component, ActionMeta)]
 // #[serde(bound = "")]
 /// Finds the [`Sentence`] with the highest similarity to the agent's, then set it as the agent's [`SteerTarget`].
-/// The generic parameter is used to filter the entities to consider.
-pub struct FindSentenceSteerTarget<
-	T: 'static + Send + Sync + QueryFilter = With<Sentence>,
-> {
+/// The generic parameter is used to [`With`] filter the entities to consider.
+pub struct FindSentenceSteerTarget<T: GenericActionComponent = Sentence> {
 	pub bert: Handle<Bert>,
 	// / The value below which the agent will ignore the target.
 	// pub threshold:f32,
+	#[reflect(ignore)]
 	phantom: std::marker::PhantomData<T>,
 }
 
-impl<T: 'static + Send + Sync + QueryFilter> FindSentenceSteerTarget<T> {
+impl<T: GenericActionComponent> FindSentenceSteerTarget<T> {
 	pub fn new(bert: Handle<Bert>) -> Self {
 		Self {
 			bert,
@@ -30,13 +28,13 @@ impl<T: 'static + Send + Sync + QueryFilter> FindSentenceSteerTarget<T> {
 	}
 }
 
-fn find_sentence_steer_target<T: 'static + Send + Sync + QueryFilter>(
+fn find_sentence_steer_target<T: GenericActionComponent>(
 	mut commands: Commands,
 	query: Query<(&TargetAgent, &FindSentenceSteerTarget<T>), Added<Running>>,
 	sentences: Query<&Sentence>,
 	// TODO this should be query of Sentence, but we need
 	// it to be similar to sentence_scorer
-	items: Query<Entity, T>,
+	items: Query<Entity, With<T>>,
 	mut berts: ResMut<Assets<Bert>>,
 ) {
 	for (agent, action) in query.iter() {
@@ -59,15 +57,11 @@ fn find_sentence_steer_target<T: 'static + Send + Sync + QueryFilter>(
 	}
 }
 
-impl<T: 'static + Send + Sync + QueryFilter> ActionMeta
-	for FindSentenceSteerTarget<T>
-{
+impl<T: GenericActionComponent> ActionMeta for FindSentenceSteerTarget<T> {
 	fn category(&self) -> ActionCategory { ActionCategory::Behavior }
 }
 
-impl<T: 'static + Send + Sync + QueryFilter> ActionSystems
-	for FindSentenceSteerTarget<T>
-{
+impl<T: GenericActionComponent> ActionSystems for FindSentenceSteerTarget<T> {
 	fn systems() -> SystemConfigs {
 		find_sentence_steer_target::<T>.in_set(TickSet)
 	}
@@ -96,7 +90,7 @@ mod test {
 				let id = parent.parent_entity();
 				parent.spawn((
 					TargetAgent(id),
-					FindSentenceSteerTarget::<With<Sentence>>::new(handle),
+					FindSentenceSteerTarget::<Sentence>::new(handle),
 					Running,
 				));
 			})

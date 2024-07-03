@@ -14,7 +14,7 @@ impl Plugin for BertPlugin {
 
 		#[cfg(feature = "beet_core")]
 		app.add_plugins(
-			ActionPlugin::<FindSentenceSteerTarget<With<Sentence>>>::default(),
+			ActionPlugin::<FindSentenceSteerTarget<Sentence>>::default(),
 		);
 
 

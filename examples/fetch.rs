@@ -22,9 +22,9 @@ fn main() {
 		DialogPanelPlugin,
 		BertPlugin,
 		ActionPlugin::<(
-			SetTextOnRun<With<StatusOutput>>,
+			SetTextOnRun<StatusOutput>,
 			InsertOnAssetEvent<RunResult, Bert>,
-			FindSentenceSteerTarget<With<Item>>,
+			FindSentenceSteerTarget<Item>,
 			RemoveAgentOnRun<Sentence>,
 			RemoveAgentOnRun<SteerTarget>,
 		)>::default(),
@@ -114,9 +114,7 @@ fn setup_fox(
 							TargetAgent(agent),
 							ScoreSelector::default(),
 							// ScoreSelector::consuming(),
-							FindSentenceSteerTarget::<With<Item>>::new(
-								bert_handle,
-							),
+							FindSentenceSteerTarget::<Item>::new(bert_handle),
 						))
 						.with_children(|parent| {
 							parent.spawn((
@@ -131,7 +129,7 @@ fn setup_fox(
 									RunResult::Success,
 									Duration::from_secs(1),
 								),
-								SetTextOnRun::<With<StatusOutput>>::new_with_section(
+								SetTextOnRun::<StatusOutput>::new_with_section(
 									"Idle", 1
 								),
 							));
@@ -145,7 +143,7 @@ fn setup_fox(
 										.repeat_forever(),
 									SequenceSelector,
 									RemoveAgentOnRun::<Sentence>::default(),
-									SetTextOnRun::<With<StatusOutput>>::new_with_section(
+									SetTextOnRun::<StatusOutput>::new_with_section(
 										"Fetching",1
 									),
 								))
@@ -178,7 +176,7 @@ fn setup_fox(
 }
 
 
-#[derive(Component)]
+#[derive(Clone, Component, Reflect)]
 struct Item;
 
 fn setup_items(mut commands: Commands, asset_server: Res<AssetServer>) {

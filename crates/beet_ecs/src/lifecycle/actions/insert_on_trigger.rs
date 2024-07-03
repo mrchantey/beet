@@ -10,6 +10,7 @@ use std::ops::DerefMut;
 #[reflect(Component, ActionMeta)]
 pub struct InsertOnTrigger<E: GenericActionEvent, T: GenericActionComponent> {
 	pub value: T,
+	#[reflect(ignore)]
 	phantom: PhantomData<E>,
 }
 impl<E: GenericActionEvent, T: GenericActionComponent> Deref

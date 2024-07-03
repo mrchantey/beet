@@ -3,19 +3,25 @@ use bevy::reflect::GetTypeRegistration;
 
 /// Minimal traits generally required for an action component.
 pub trait GenericActionComponent:
-Clone + Component + FromReflect + GetTypeRegistration
+	Clone + FromReflect + GetTypeRegistration + Component
 {
 }
-impl<T: Clone + Component + FromReflect + GetTypeRegistration>
-GenericActionComponent for T
+impl<T: Clone + FromReflect + GetTypeRegistration + Component>
+	GenericActionComponent for T
 {
 }
 /// Minimal traits generally required for an action event.
 pub trait GenericActionEvent:
-	Clone + Event + FromReflect + GetTypeRegistration
+	Clone + FromReflect + GetTypeRegistration + Event
 {
 }
-impl<T: Clone + Event + FromReflect + GetTypeRegistration>
-	GenericActionEvent for T
+impl<T: Clone + FromReflect + GetTypeRegistration + Event> GenericActionEvent
+	for T
 {
 }
+/// Minimal traits generally required for an action asset type.
+pub trait GenericActionAsset:
+	'static + Send + Sync + TypePath + Asset
+{
+}
+impl<T: 'static + Send + Sync + TypePath + Asset> GenericActionAsset for T {}

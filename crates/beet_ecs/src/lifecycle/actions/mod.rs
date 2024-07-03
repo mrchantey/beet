@@ -10,6 +10,9 @@ pub use self::insert_in_duration::*;
 pub mod insert_on_run;
 #[allow(unused_imports)]
 pub use self::insert_on_run::*;
+pub mod insert_on_trigger;
+#[allow(unused_imports)]
+pub use self::insert_on_trigger::*;
 pub mod lifecycle_actions;
 #[allow(unused_imports)]
 pub use self::lifecycle_actions::*;
@@ -22,9 +25,6 @@ pub use self::remove_agent_on_run::*;
 pub mod repeat;
 #[allow(unused_imports)]
 pub use self::repeat::*;
-pub mod insert_on_trigger;
-#[allow(unused_imports)]
-pub use self::insert_on_trigger::*;
 pub mod set_agent_on_run;
 #[allow(unused_imports)]
 pub use self::set_agent_on_run::*;
