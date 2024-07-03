@@ -155,7 +155,7 @@ strum_macros = "0.26.0"
 extend = "1.1.2"
 
 # channels
-parking_lot = "0.12" # fast alternative std::sync::Mutex/RwLock
+# parking_lot = {version = "0.12", features = ["wasm-bindgen"] } # fast alternative std::sync::Mutex/RwLock
 # flume = { version = "0.11", default-features = false, features = ["async"] }
 flume = "0.11"
 

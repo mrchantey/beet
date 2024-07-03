@@ -726,7 +726,6 @@ dependencies = [
  "futures",
  "js-sys",
  "log",
- "parking_lot",
  "ron",
  "serde",
  "serde_json",

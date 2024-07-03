@@ -19,6 +19,33 @@
 </head>
 
 <body>
+	<script>
+		function sendUserMessage(message) {
+			const detail = JSON.stringify([{
+				SendEvent: {
+					reg_id: 0,//the first registered id, OnUserMessage
+					payload: {
+						Json: JSON.stringify(message)
+					}
+				}
+			}])
+			window.dispatchEvent(new CustomEvent('js-message', { detail }))
+		}
+
+		window.addEventListener('wasm-message', (event) => {
+			const messages = JSON.parse(event.detail)
+			for (const message of messages) {
+				console.log(`message received: ${JSON.stringify(message)}`)
+				if (message?.SendEvent?.payload?.Json) {
+					const payload = JSON.parse(message.SendEvent.payload.Json)
+					console.log(`payload received: ${JSON.stringify(payload)}`)
+					sendUserMessage('loud and clear')
+				}
+			}
+		})
+	</script>
+
+
 	<script type="module">
 		import init from './target/static/wasm/basics.js'
 		init()

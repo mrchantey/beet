@@ -1,4 +1,6 @@
 use crate::prelude::*;
+#[cfg(any(target_arch = "wasm32", feature = "tokio"))]
+use beet::prelude::*;
 use bevy::asset::AssetMetaCheck;
 use bevy::prelude::*;
 use forky_bevy::systems::close_on_esc;
@@ -20,7 +22,8 @@ impl Plugin for ExamplePlugin {
 		#[cfg(feature = "tokio")]
 		app.add_transport(NativeWsClient::new(DEFAULT_SOCKET_URL).unwrap());
 
-		app.add_plugins(ExampleReplicatePlugin)
+		app
+			.add_plugins(ExampleReplicatePlugin)
 			.add_plugins(
 				DefaultPlugins
 					.set(WindowPlugin {

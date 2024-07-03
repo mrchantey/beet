@@ -1,5 +1,3 @@
-//! In this example we will create an action
-//! and then combine it with some built-in actions to run a behavior.
 use beet::prelude::*;
 use beet_examples::prelude::*;
 use bevy::prelude::*;
