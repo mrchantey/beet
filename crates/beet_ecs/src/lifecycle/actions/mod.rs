@@ -1,6 +1,3 @@
-pub mod call_on_run;
-#[allow(unused_imports)]
-pub use self::call_on_run::*;
 pub mod empty_action;
 #[allow(unused_imports)]
 pub use self::empty_action::*;
@@ -34,3 +31,6 @@ pub use self::set_on_run::*;
 pub mod set_on_spawn;
 #[allow(unused_imports)]
 pub use self::set_on_spawn::*;
+pub mod trigger_on_run;
+#[allow(unused_imports)]
+pub use self::trigger_on_run::*;

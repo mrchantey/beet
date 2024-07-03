@@ -35,9 +35,6 @@ fn main() {
 		(set_player_sentence, rotate_items, ready_on_bert_load),
 	);
 
-	#[cfg(target_arch = "wasm32")]
-	app.add_plugins(PostmessageInputPlugin);
-
 	app.run();
 }
 
@@ -113,7 +110,7 @@ fn setup_fox(
 					parent
 						.spawn((
 							Name::new("Idle Or Fetch"),
-							CallOnRun::new(beet_finished_loading),
+							TriggerOnRun(AppLoaded),
 							TargetAgent(agent),
 							ScoreSelector::default(),
 							// ScoreSelector::consuming(),

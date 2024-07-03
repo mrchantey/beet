@@ -2,7 +2,7 @@ use crate::prelude::*;
 use bevy::ecs::schedule::SystemConfigs;
 use bevy::prelude::*;
 
-
+/// Inserts the given component when this behavior starts running.
 #[derive(Debug, Clone, PartialEq, Deref, DerefMut, Component, Reflect)]
 #[reflect(Component, ActionMeta)]
 pub struct InsertOnRun<T: GenericActionComponent>(pub T);
