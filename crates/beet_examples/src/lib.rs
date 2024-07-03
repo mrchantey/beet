@@ -1,28 +1,19 @@
 // #![allow(unused, dead_code)]
-mod beet_finished_loading;
-mod camera_distance;
-#[cfg(target_arch = "wasm32")]
-mod postmessage_input;
-#[cfg(target_arch = "wasm32")]
-pub use postmessage_input::*;
 
-mod example_plugin;
-mod example_plugin_2d;
-mod example_plugin_3d;
-pub use example_plugin::*;
-pub use example_plugin_2d::*;
-pub use example_plugin_3d::*;
-mod dialog_panel;
-pub use beet_finished_loading::*;
-pub use camera_distance::*;
-pub use dialog_panel::*;
-mod auto_spawn;
-pub use auto_spawn::*;
-mod follow_cursor;
-pub use follow_cursor::*;
-mod randomize_position;
-pub use randomize_position::*;
-mod render_text;
-pub use render_text::*;
-mod wrap_around;
-pub use wrap_around::*;
+#[cfg(target_arch = "wasm32")]
+pub mod wasm;
+#[cfg(target_arch = "wasm32")]
+pub use wasm::*;
+pub mod serde_utils;
+
+pub mod components;
+pub mod plugins;
+
+
+pub mod prelude {
+	pub use crate::components::*;
+	pub use crate::plugins::*;
+	pub use crate::serde_utils::*;
+	#[cfg(target_arch = "wasm32")]
+	pub use wasm::*;
+}

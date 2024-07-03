@@ -1,5 +1,5 @@
 use beet::prelude::*;
-use beet_examples::ExamplePlugin2d;
+use beet_examples::prelude::*;
 use bevy::prelude::*;
 
 fn main() {

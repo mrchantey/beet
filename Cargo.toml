@@ -26,6 +26,7 @@ net = ["dep:beet_net"]
 ui = ["beet_core/ui"]
 assets = ["beet_core/assets"]
 animation = ["beet_core/animation"]
+reflect = ["beet_ecs/reflect"]
 tokio = ["beet_net/tokio", "beet_examples/tokio"]
 
 # dynamic_linking = ["bevy/dynamic_linking"]
@@ -106,15 +107,15 @@ beet_server = { path = "crates/beet_server", version = "0.0.1" }
 beet_examples = { path = "crates/beet_examples", version = "0.0.1" }
 
 ## local
-# forky_core = { path = "../forky/crates/forky/forky_core" }
-# forky_bevy = { path = "../forky/crates/forky/forky_bevy" }
-# forky_web = { path = "../forky/crates/forky/forky_web", default-features = false }
-# sweet = { path = "../forky/crates/sweet", features = ["bevy"] }
+forky_core = { path = "../forky/crates/forky/forky_core" }
+forky_bevy = { path = "../forky/crates/forky/forky_bevy" }
+forky_web = { path = "../forky/crates/forky/forky_web", default-features = false }
+sweet = { path = "../forky/crates/sweet", features = ["bevy"] }
 
-forky_core = "0.1.49"
-forky_bevy = "0.1.49"
-forky_web = "0.1.49"
-sweet = { version = "0.1.49", features = ["bevy"] }
+# forky_core = "0.1.49"
+# forky_bevy = "0.1.49"
+# forky_web = "0.1.49"
+# sweet = { version = "0.1.49", features = ["bevy"] }
 
 ## logging
 log = "0.4"
@@ -165,12 +166,7 @@ bincode = "1"
 ron = "0.8"
 
 ## game
-# two requirements for back to release:
-# 1. recursive type registration https://github.com/bevyengine/bevy/tree/d3e44325b45daf13087a6fe7a425b1744b5f2379
-# 2. remove_by_id https://github.com/bevyengine/bevy/pull/9663
-# bevy = { path = "../bevy", default-features = false, features = ["bevy_scene"] }
-# bevy = { git = "https://github.com/bevyengine/bevy.git", rev = "f516de456be2b65572de1af6956d52157663b9cc", default-features = false, features = [
-bevy = { version = "=0.14.0-rc.2", default-features = false, features = [
+bevy = { version = "=0.14.0-rc.4", default-features = false, features = [
 	"bevy_scene",
 	"serialize",
 	# "bevy_color",

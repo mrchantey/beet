@@ -1,5 +1,4 @@
-use crate::example_plugin::ExamplePlugin;
-use crate::*;
+use crate::prelude::*;
 use beet::prelude::*;
 use bevy::prelude::*;
 

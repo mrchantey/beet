@@ -11,7 +11,8 @@ tokio = ["beet/tokio"]
 
 [dependencies]
 forky_core.workspace = true
-beet.workspace = true
+beet = { workspace = true }
+# beet = { workspace = true, features = ["reflect"] }
 bevy = { workspace = true, default-features = true }
 log.workspace = true
 pretty_env_logger.workspace = true
@@ -31,3 +32,8 @@ anyhow.workspace = true
 
 [target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
 tokio.workspace = true
+
+
+[[example]]
+name = "basics"
+path = "examples/basics/main.rs"

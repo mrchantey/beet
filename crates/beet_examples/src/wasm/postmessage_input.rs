@@ -1,5 +1,5 @@
 #![cfg(target_arch = "wasm32")]
-use crate::OnPlayerMessage;
+use crate::prelude::*;
 use bevy::prelude::*;
 use flume::Receiver;
 use wasm_bindgen::prelude::Closure;

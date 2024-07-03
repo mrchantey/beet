@@ -1,6 +1,6 @@
 use beet::prelude::*;
 use bevy::prelude::*;
-use beet_examples::*;
+use beet_examples::prelude::*;
 use serde::Deserialize;
 use serde::Serialize;
 

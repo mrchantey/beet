@@ -1,4 +1,5 @@
 use crate::prelude::*;
+use beet::prelude::*;
 use bevy::prelude::*;
 
 pub fn bee_bundle() -> impl Bundle {

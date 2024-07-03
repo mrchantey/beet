@@ -2,7 +2,7 @@
 //!
 //! Rendering a reinforcement learning algorithm can be entertaining and useful for debugging.
 use beet::prelude::*;
-use beet_examples::*;
+use beet_examples::prelude::*;
 use bevy::prelude::*;
 
 const SCENE_SCALE: f32 = 1.;

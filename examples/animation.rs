@@ -1,7 +1,7 @@
 use beet::prelude::*;
 use bevy::animation::RepeatAnimation;
 use bevy::prelude::*;
-use beet_examples::*;
+use beet_examples::prelude::*;
 use std::time::Duration;
 
 pub fn main() {

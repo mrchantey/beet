@@ -1,4 +1,4 @@
-use crate::*;
+use crate::prelude::*;
 use bevy::pbr::CascadeShadowConfigBuilder;
 use bevy::prelude::*;
 use std::f32::consts::PI;

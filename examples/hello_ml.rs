@@ -3,7 +3,7 @@
 //! where models rank the similarity of sentences.
 //! This example uses a locally run *small* language model to select the child behavior with the most similar sentence.
 use beet::prelude::*;
-use beet_examples::*;
+use beet_examples::prelude::*;
 use bevy::prelude::*;
 
 fn main() {

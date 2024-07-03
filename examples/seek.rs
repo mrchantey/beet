@@ -1,5 +1,5 @@
 use beet::prelude::*;
-use beet_examples::*;
+use beet_examples::prelude::*;
 use bevy::prelude::*;
 
 fn main() {
