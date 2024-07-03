@@ -265,7 +265,7 @@ fn rotate_items(time: Res<Time>, mut query: Query<&mut Transform, With<Item>>) {
 fn set_player_sentence(
 	mut commands: Commands,
 	mut npc_events: EventWriter<OnNpcMessage>,
-	mut events: EventReader<OnPlayerMessage>,
+	mut events: EventReader<OnUserMessage>,
 	query: Query<Entity, With<Player>>,
 ) {
 	for ev in events.read() {

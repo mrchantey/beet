@@ -47,16 +47,6 @@ impl Plugin for ExamplePlugin {
 	}
 }
 
-pub struct ExampleReplicatePlugin;
-
-impl Plugin for ExampleReplicatePlugin {
-	fn build(&self, app: &mut App) {
-		app.add_plugins((ReplicatePlugin, CommonEventsPlugin))
-			.add_event::<OnPlayerMessage>()
-			.replicate_event_incoming::<OnPlayerMessage>();
-	}
-}
-
 fn canvas() -> Option<String> {
 	// #[cfg(debug_assertions)]
 	return Some("#beet-canvas".into());

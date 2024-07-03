@@ -9,6 +9,7 @@ use forky_core::ResultTEExt;
 
 #[derive(Debug, Clone, PartialEq, Component, Reflect)]
 #[reflect(Component, ActionMeta)]
+// #[serde(bound = "")]
 /// Finds the [`Sentence`] with the highest similarity to the agent's, then set it as the agent's [`SteerTarget`].
 /// The generic parameter is used to filter the entities to consider.
 pub struct FindSentenceSteerTarget<

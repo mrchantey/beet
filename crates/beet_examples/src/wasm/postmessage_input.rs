@@ -44,9 +44,9 @@ pub fn postmessage_input(mut commands: Commands) {
 
 pub fn postmessage_input_system(
 	postmessage_in: Res<PostmessageIn>,
-	mut events: EventWriter<OnPlayerMessage>,
+	mut events: EventWriter<OnUserMessage>,
 ) {
 	for msg in postmessage_in.0.try_iter() {
-		events.send(OnPlayerMessage(msg));
+		events.send(OnUserMessage(msg));
 	}
 }

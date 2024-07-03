@@ -1,6 +1,7 @@
 use bevy::input::keyboard::Key;
 use bevy::input::keyboard::KeyboardInput;
 use bevy::prelude::*;
+use crate::prelude::*;
 use serde::Deserialize;
 use serde::Serialize;
 
@@ -17,7 +18,7 @@ impl Plugin for DialogPanelPlugin {
 				)
 					.chain(),
 			)
-			.add_event::<OnPlayerMessage>()
+			.add_event::<OnUserMessage>()
 			.add_event::<OnNpcMessage>();
 
 		// #[cfg(not(target_arch = "wasm32"))]
@@ -25,8 +26,6 @@ impl Plugin for DialogPanelPlugin {
 	}
 }
 
-#[derive(Event, Deref, DerefMut, Serialize, Deserialize)]
-pub struct OnPlayerMessage(pub String);
 #[derive(Event, Deref, DerefMut, Serialize, Deserialize)]
 pub struct OnNpcMessage(pub String);
 
@@ -136,7 +135,7 @@ fn setup_ui(mut commands: Commands) {
 }
 
 fn handle_player_message(
-	mut on_player_message: EventReader<OnPlayerMessage>,
+	mut on_player_message: EventReader<OnUserMessage>,
 	mut player_text: Query<&mut Text, With<PlayerOutput>>,
 ) {
 	for msg in on_player_message.read() {
@@ -159,7 +158,7 @@ fn handle_npc_message(
 
 fn parse_text_input(
 	mut evr_char: EventReader<KeyboardInput>,
-	mut on_submit: EventWriter<OnPlayerMessage>,
+	mut on_submit: EventWriter<OnUserMessage>,
 	mut query: Query<&mut Text, With<PlayerInput>>,
 ) {
 	for ev in evr_char.read() {
@@ -167,7 +166,7 @@ fn parse_text_input(
 			let text = &mut text.sections[0].value;
 			match &ev.logical_key {
 				Key::Enter => {
-					on_submit.send(OnPlayerMessage(text.clone()));
+					on_submit.send(OnUserMessage(text.clone()));
 					text.clear();
 				}
 				Key::Backspace => {
@@ -191,7 +190,7 @@ fn button_system(
 		(&Interaction, &mut BackgroundColor),
 		(Changed<Interaction>, With<Button>),
 	>,
-	mut on_submit: EventWriter<OnPlayerMessage>,
+	mut on_submit: EventWriter<OnUserMessage>,
 	mut input_query: Query<&mut Text, With<PlayerInput>>,
 ) {
 	for (interaction, mut color) in &mut interaction_query {
@@ -200,7 +199,7 @@ fn button_system(
 				*color = PRESSED_BUTTON.into();
 				for mut text in input_query.iter_mut() {
 					let text = &mut text.sections[0].value;
-					on_submit.send(OnPlayerMessage(text.clone()));
+					on_submit.send(OnUserMessage(text.clone()));
 					text.clear();
 				}
 			}
