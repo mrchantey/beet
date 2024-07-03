@@ -1,4 +1,5 @@
 #![feature(let_chains)]
+pub mod events;
 pub mod extensions;
 pub mod networking;
 pub mod replication;
@@ -8,6 +9,7 @@ pub mod tokio_client;
 pub mod web_transport;
 
 pub mod prelude {
+	pub use crate::events::*;
 	pub use crate::extensions::*;
 	pub use crate::networking::*;
 	pub use crate::replication::*;

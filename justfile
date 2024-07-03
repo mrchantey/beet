@@ -26,6 +26,7 @@ test-ecs *args:
 
 test-ml *args:
 	just watch 'cargo test -p beet_ml --lib -- {{args}}'
+
 test-net *args:
 	just watch 'cargo test -p beet_net --lib -- {{args}}'
 
@@ -125,17 +126,6 @@ publish-all:
 	just publish beet_ecs_macros
 	just publish beet_ecs
 	just publish beet
-
-test crate *args:
-	cargo run -p {{crate}} --example test_{{crate}} -- {{args}}
-
-test-w crate *args:
-	just watch 'cargo run -p {{crate}} --example test_{{crate}} -- -w {{args}}'
-
-test-ci *args:
-	cargo run -p beet_core --example test_beet_core -- {{args}}
-	cargo run -p beet_ecs  --example test_beet_ecs  -- {{args}}
-	cargo run -p beet_net  --example test_beet_net  -- {{args}}
 
 test-wasm crate *args:
 	sweet -p {{crate}} --example test_{{crate}} --interactive --watch {{args}}
