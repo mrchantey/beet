@@ -3,8 +3,10 @@ use beet::prelude::*;
 use beet_examples::prelude::*;
 use bevy::ecs::schedule::SystemConfigs;
 use bevy::prelude::*;
-use bevy::render::RenderPlugin;
-use bevy::ui::UiPlugin;
+mod scenes;
+mod utils;
+
+
 
 fn main() -> Result<()> {
 	vec![Project {
@@ -34,8 +36,6 @@ fn main() -> Result<()> {
 	.collect::<Result<Vec<_>>>()?;
 	Ok(())
 }
-
-mod scenes;
 
 struct Project {
 	pub name: &'static str,
@@ -92,31 +92,10 @@ impl SceneItem {
 	pub fn save(self, _project_name: &str) -> Result<()> {
 		let mut app = App::new();
 		app.add_plugins((
-			//bevy
-			TaskPoolPlugin::default(),
-			HierarchyPlugin::default(),
-			TransformPlugin::default(),
-			AssetPlugin::default(),
-			RenderPlugin::default(),
-			bevy::prelude::AnimationPlugin::default(),
-			UiPlugin::default(),
-			//beet
+			utils::MostDefaultPlugins,
 			DefaultBeetPlugins::default(),
-			// examples
 			ExamplePlugins,
-			// DefaultPlugins
-			// .build()
-			// .disable::<TimePlugin>()
-			// .disable::<RenderPlugin>()
-			// .disable::<TimePlugin>()
-			// .disable::<InputPlugin>()
-			// .disable::<WinitPlugin>()
-			// .disable::<WindowPlugin>(),
-			// TaskPoolPlugin::default(),
-			// ExamplePlugin::default(),
 		))
-		.register_type::<Name>()
-		.register_type::<ImageScaleMode>()
 		.finish();
 
 		Schedule::default()
