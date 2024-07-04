@@ -10,7 +10,7 @@ impl Plugin for ExamplePlugin2d {
 	fn build(&self, app: &mut App) {
 		app.insert_resource(WrapAround::default())
 			// .add_plugins(WorldInspectorPlugin::new())
-			.add_plugins(ExamplePlugin)
+			.add_plugins(ExampleDefaultPlugins)
 			// .add_plugins(WorldInspectorPlugin::new())
 			.add_systems(Startup, space_setup)
 			.add_systems(Update, follow_cursor)

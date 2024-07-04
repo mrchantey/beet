@@ -1,4 +1,3 @@
-use crate::prelude::*;
 #[cfg(any(target_arch = "wasm32", feature = "tokio"))]
 use beet::prelude::*;
 use bevy::asset::AssetMetaCheck;
@@ -6,13 +5,13 @@ use bevy::prelude::*;
 use forky_bevy::systems::close_on_esc;
 
 #[derive(Default)]
-pub struct ExamplePlugin;
+pub struct ExampleDefaultPlugins;
 
 
 #[cfg(feature = "tokio")]
 const DEFAULT_SOCKET_URL: &str = "ws://127.0.0.1:3000/ws";
 
-impl Plugin for ExamplePlugin {
+impl Plugin for ExampleDefaultPlugins {
 	fn build(&self, app: &mut App) {
 		assert_local_assets();
 
@@ -22,27 +21,25 @@ impl Plugin for ExamplePlugin {
 		#[cfg(feature = "tokio")]
 		app.add_transport(NativeWsClient::new(DEFAULT_SOCKET_URL).unwrap());
 
-		app
-			.add_plugins(ExampleReplicatePlugin)
-			.add_plugins(
-				DefaultPlugins
-					.set(WindowPlugin {
-						primary_window: Some(Window {
-							fit_canvas_to_parent: true,
-							canvas: canvas(),
-							resizable: true,
-							..default()
-						}),
+		app.add_plugins(
+			DefaultPlugins
+				.set(WindowPlugin {
+					primary_window: Some(Window {
+						fit_canvas_to_parent: true,
+						canvas: canvas(),
+						resizable: true,
 						..default()
-					})
-					.set(AssetPlugin {
-						file_path: assets_path(),
-						meta_check: AssetMetaCheck::Never,
-						..default()
-					})
-					.build(),
-			)
-			.add_systems(Update, close_on_esc);
+					}),
+					..default()
+				})
+				.set(AssetPlugin {
+					file_path: assets_path(),
+					meta_check: AssetMetaCheck::Never,
+					..default()
+				})
+				.build(),
+		)
+		.add_systems(Update, close_on_esc);
 	}
 }
 

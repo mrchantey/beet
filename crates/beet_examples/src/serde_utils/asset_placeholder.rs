@@ -1,18 +1,26 @@
+use super::*;
 use bevy::prelude::*;
 use bevy::utils::HashMap;
 use std::marker::PhantomData;
-
-
 
 #[derive(Debug, Clone, Component, Reflect)]
 #[reflect(Component)]
 pub struct AssetPlaceholder<A> {
 	pub path: String,
+	#[reflect(ignore)]
 	phantom: PhantomData<A>,
 }
 
+impl<A> AssetPlaceholder<A> {
+	pub fn new(path: impl Into<String>) -> Self {
+		Self {
+			path: path.into(),
+			phantom: PhantomData,
+		}
+	}
+}
 
-#[derive(Debug, Default, Clone, Resource)]
+#[derive(Debug, Default, Clone, Resource, Reflect)]
 pub struct AssetPlaceholderLookup<A: Asset>(pub HashMap<String, Handle<A>>);
 
 impl<A: Asset> AssetPlaceholderLookup<A> {
@@ -37,8 +45,10 @@ impl<T> Default for AssetPlaceholderPlugin<T> {
 
 impl<A: Asset> Plugin for AssetPlaceholderPlugin<A> {
 	fn build(&self, app: &mut App) {
-		app.insert_resource(AssetPlaceholderLookup::<A>(Default::default()))
-			.add_systems(PreUpdate, init_asset::<A>);
+		app.init_resource::<ReadyOnAssetLoad>()
+			.insert_resource(AssetPlaceholderLookup::<A>(Default::default()))
+			.add_systems(PreUpdate, (init_asset::<A>, ready_on_asset_load::<A>))
+			.register_type::<AssetPlaceholder<A>>();
 	}
 }
 
@@ -55,5 +65,6 @@ fn init_asset<A: Asset>(
 			.entity(entity)
 			.insert(handle)
 			.remove::<AssetPlaceholder<A>>();
+		// placeholder used for readyOnPlaceholder
 	}
 }

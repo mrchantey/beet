@@ -20,6 +20,8 @@ impl PluginGroup for ExamplePlugins {
 		PluginGroupBuilder::start::<Self>()
 			.add(ExampleReplicatePlugin)
 			.add(ExampleMlPlugin)
+			.add(BundlePlaceholderPlugin)
+			.add(UiTerminalPlugin)
 	}
 }
 
@@ -31,7 +33,7 @@ impl Plugin for ExampleMlPlugin {
 		app.add_plugins((
 			BertPlugin::default(),
 			ActionPlugin::<InsertOnAssetEvent<RunResult, Bert>>::default(),
-			AssetPlaceholderPlugin::<Bert>::default()
+			AssetPlaceholderPlugin::<Bert>::default(),
 		));
 	}
 }

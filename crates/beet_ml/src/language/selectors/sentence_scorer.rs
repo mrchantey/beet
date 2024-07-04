@@ -15,14 +15,12 @@ impl Sentence {
 
 /// Updates the [`Score`] of each child based on the similarity of its [`Sentence`] with the agent,
 /// for use with [`ScoreSelector`]
-#[derive(Debug, Clone, PartialEq, Component, Reflect)]
+#[derive(Debug, Default, Clone, PartialEq, Component, Reflect)]
 #[reflect(Component, ActionMeta)]
-pub struct SentenceScorer {
-	pub bert: Handle<Bert>,
-}
+pub struct SentenceScorer;
 
 impl SentenceScorer {
-	pub fn new(bert: Handle<Bert>) -> Self { Self { bert } }
+	pub fn new() -> Self { Self {} }
 }
 
 fn sentence_scorer(
@@ -30,10 +28,13 @@ fn sentence_scorer(
 	mut berts: ResMut<Assets<Bert>>,
 	sentences: Query<&Sentence>,
 	// TODO double query, ie added running and added asset
-	started: Query<(&SentenceScorer, &TargetAgent, &Children), Added<Running>>,
+	started: Query<
+		(&SentenceScorer, &Handle<Bert>, &TargetAgent, &Children),
+		Added<Running>,
+	>,
 ) {
-	for (scorer, agent, children) in started.iter() {
-		let Some(bert) = berts.get_mut(&scorer.bert) else {
+	for (_scorer, handle, agent, children) in started.iter() {
+		let Some(bert) = berts.get_mut(handle) else {
 			continue;
 		};
 
@@ -78,7 +79,8 @@ mod test {
 				parent
 					.spawn((
 						TargetAgent(id),
-						SentenceScorer::new(handle),
+						handle,
+						SentenceScorer::default(),
 						ScoreSelector {
 							consume_scores: true,
 						},
@@ -112,21 +114,13 @@ mod test {
 
 		let tree = EntityTree::new_with_world(entity, app.world());
 
-		let scorer = app
+		let _scorer = app
 			.world_mut()
 			.query::<&SentenceScorer>()
 			.iter(app.world())
 			.next()
 			.unwrap();
 
-		println!(
-			"{:?}",
-			app.world()
-				.get_resource::<Assets<Bert>>()
-				.unwrap()
-				.get(&scorer.bert)
-				.is_some()
-		);
 		let scores = tree.component_tree::<Score>(app.world());
 
 		let heal_score = scores.children[0].children[0].value.unwrap();

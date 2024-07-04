@@ -6,6 +6,7 @@ use bevy::ecs::schedule::SystemConfigs;
 use bevy::prelude::*;
 
 /// Inserts the given component when a matching asset event is received.
+/// This requires the entity to have a Handle<T>
 #[derive(Debug, Clone, PartialEq, Component, Reflect)]
 #[reflect(Component, ActionMeta)]
 pub struct InsertOnAssetEvent<T: GenericActionComponent, A: GenericActionAsset>

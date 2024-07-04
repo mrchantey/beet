@@ -1,42 +1,40 @@
 use beet::prelude::*;
-// use beet_examples::prelude::*;
+use beet_examples::prelude::*;
 use bevy::prelude::*;
 
-pub fn sentence_selector(mut commands: Commands) {
+pub fn sentence_selector(
+	mut commands: Commands,
+	mut ready_on_asset_load: ResMut<ReadyOnAssetLoad>,
+) {
+	let bert_handle = AssetPlaceholder::<Bert>::new("default-bert.ron");
+	ready_on_asset_load.insert("default-bert.ron");
+
 	commands
 		.spawn((Name::new("Agent"), Sentence::new("please kill the baddies")))
 		.with_children(|parent| {
 			let agent = parent.parent_entity();
 
 			parent
-				.spawn((Running, SequenceSelector))
+				.spawn((
+					Name::new("Sentence Selector"),
+					InsertOnTrigger::<AppReady, Running>::default(),
+					SequenceSelector,
+					TargetAgent(agent),
+					bert_handle,
+					SentenceScorer::default(),
+					ScoreSelector {
+						consume_scores: true,
+					},
+				))
 				.with_children(|parent| {
 					parent.spawn((
-						Name::new("Await Bert Loaded"),
-						InsertOnAssetEvent::loaded(
-							RunResult::Success,
-							&bert_handle,
-						),
+						Name::new("Heal Behavior"),
+						Sentence::new("heal"),
 					));
-					parent
-						.spawn((
-							Name::new("Sentence Selector"),
-							TargetAgent(agent),
-							SentenceScorer::new(bert_handle),
-							ScoreSelector {
-								consume_scores: true,
-							},
-						))
-						.with_children(|parent| {
-							parent.spawn((
-								Name::new("Heal Behavior"),
-								Sentence::new("heal"),
-							));
-							parent.spawn((
-								Name::new("Attack Behavior"),
-								Sentence::new("attack"),
-							));
-						});
+					parent.spawn((
+						Name::new("Attack Behavior"),
+						Sentence::new("attack"),
+					));
 				});
 		});
 }

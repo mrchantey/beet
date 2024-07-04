@@ -2,24 +2,25 @@ use anyhow::Result;
 use beet::prelude::*;
 use beet_examples::prelude::*;
 use bevy::ecs::schedule::SystemConfigs;
-use bevy::input::InputPlugin;
 use bevy::prelude::*;
 use bevy::render::RenderPlugin;
-use bevy::time::TimePlugin;
 use bevy::ui::UiPlugin;
-use bevy::winit::WinitPlugin;
 
 fn main() -> Result<()> {
 	vec![Project {
 		name: "beet-basics",
 		scenes: vec![
 			SceneItem::new("empty", || {}),
-			SceneItem::new("log-to-ui", spawn_log_to_ui),
+			SceneItem::new("camera-2d", BundlePlaceholder::Camera2d {
+				transform: Default::default(),
+			}),
+			SceneItem::new("camera-3d", BundlePlaceholder::Camera3d {
+				transform: Default::default(),
+			}),
+			SceneItem::new("ui-terminal", spawn_ui_terminal),
 			SceneItem::new("hello-world", scenes::hello_world),
 			SceneItem::new("hello-net", scenes::hello_net),
 			SceneItem::new("sentence-selector", scenes::sentence_selector),
-			// SceneItem::new("camera-2d", Camera2dBundle::default()),
-			// SceneItem::new("camera-3d", Camera3dBundle::default()),
 		],
 	}]
 	.into_iter()
@@ -50,14 +51,36 @@ struct SceneItem {
 	pub system: SystemConfigs,
 }
 
+trait BundleOrSystem<M> {
+	fn into_system_configs(self) -> SystemConfigs;
+}
+impl<B> BundleOrSystem<BundleMarker> for B
+where
+	B: Bundle + Clone,
+{
+	fn into_system_configs(self) -> SystemConfigs {
+		(move |mut commands: Commands| {
+			commands.spawn(self.clone());
+		})
+		.into_configs()
+	}
+}
+
+struct SystemMarker;
+struct BundleMarker;
+
+impl<M, T> BundleOrSystem<(M, SystemMarker)> for T
+where
+	T: IntoSystemConfigs<M>,
+{
+	fn into_system_configs(self) -> SystemConfigs { self.into_configs() }
+}
+
 impl SceneItem {
-	pub fn new<M>(
-		name: &'static str,
-		system: impl IntoSystemConfigs<M>,
-	) -> Self {
+	pub fn new<M>(name: &'static str, system: impl BundleOrSystem<M>) -> Self {
 		Self {
 			name,
-			system: system.into_configs(),
+			system: system.into_system_configs(),
 		}
 	}
 
@@ -99,13 +122,6 @@ impl SceneItem {
 		save_scene(app.world_mut(), &filename)
 	}
 }
-
-// fn bundle_to_system<B: Bundle>(bundle: fn() -> B) -> SystemConfigs {
-// 	(move |mut commands: Commands| {
-// 		commands.spawn(bundle());
-// 	})
-// 	.into_configs()
-// }
 
 
 // mod reflect_utils{

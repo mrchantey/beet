@@ -20,7 +20,7 @@ fn main() {
 }
 
 fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
-	let bert_handle = asset_server.load("default-bert.ron");
+	let bert_handle: Handle<Bert> = asset_server.load("default-bert.ron");
 
 	commands
 		.spawn((Name::new("Agent"), Sentence::new("please kill the baddies")))
@@ -41,7 +41,8 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
 						.spawn((
 							Name::new("Sentence Selector"),
 							TargetAgent(agent),
-							SentenceScorer::new(bert_handle),
+							bert_handle,
+							SentenceScorer::default(),
 							ScoreSelector {
 								consume_scores: true,
 							},

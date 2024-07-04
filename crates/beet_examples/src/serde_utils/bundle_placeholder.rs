@@ -1,51 +1,52 @@
+use bevy::ecs::system::EntityCommands;
 use bevy::prelude::*;
-use std::marker::PhantomData;
 
 
 #[derive(Debug, Clone, Component, Reflect)]
 #[reflect(Component)]
-pub struct BundlePlaceholder<B: Bundle> {
-	/// optionally override the transform of the bundle
-	pub transform: Option<Transform>,
-	phantom: PhantomData<B>,
+pub enum BundlePlaceholder {
+	Camera2d { transform: Transform },
+	Camera3d { transform: Transform },
 }
 
-impl<B: Bundle> BundlePlaceholder<B> {
-	pub fn new() -> Self {
-		Self {
-			transform: None,
-			phantom: PhantomData,
-		}
-	}
-	pub fn new_with_transform(transform: Transform) -> Self {
-		Self {
-			transform: Some(transform),
-			phantom: PhantomData,
+impl BundlePlaceholder {
+	pub fn apply(self, commands: &mut EntityCommands) {
+		match self {
+			BundlePlaceholder::Camera2d { transform } => {
+				commands.insert(Camera2dBundle {
+					transform,
+					..default()
+				});
+			}
+			BundlePlaceholder::Camera3d { transform } => {
+				commands.insert(Camera3dBundle {
+					transform,
+					..default()
+				});
+			}
 		}
 	}
 }
 
 #[derive(Debug, Default)]
-pub struct BundlePlaceholderPlugin<B: Bundle>(PhantomData<B>);
+pub struct BundlePlaceholderPlugin;
 
-impl<B: Bundle + Default> Plugin for BundlePlaceholder<B> {
+impl Plugin for BundlePlaceholderPlugin {
 	fn build(&self, app: &mut App) {
-		app.add_systems(PreUpdate, init_bundle::<B>);
+		app.add_systems(PreUpdate, init_bundle)
+			.register_type::<BundlePlaceholder>();
 	}
 }
 
 
-fn init_bundle<B: Bundle + Default>(
+fn init_bundle(
 	mut commands: Commands,
-	query: Query<(Entity, &BundlePlaceholder<B>), Added<BundlePlaceholder<B>>>,
+	query: Query<(Entity, &BundlePlaceholder), Added<BundlePlaceholder>>,
 ) {
 	for (entity, placeholder) in query.iter() {
-		commands
-			.entity(entity)
-			.insert(B::default())
-			.remove::<BundlePlaceholder<B>>();
-		if let Some(transform) = placeholder.transform {
-			commands.entity(entity).insert(transform);
-		}
+		let mut entity_commands = commands.entity(entity);
+		entity_commands.remove::<BundlePlaceholder>();
+
+		placeholder.clone().apply(&mut entity_commands);
 	}
 }

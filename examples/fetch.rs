@@ -30,10 +30,7 @@ fn main() {
 		)>::default(),
 	))
 	.add_systems(Startup, (setup_camera, setup_fox, setup_items))
-	.add_systems(
-		Update,
-		(set_player_sentence, rotate_items, ready_on_bert_load),
-	);
+	.add_systems(Update, (set_player_sentence, rotate_items));
 
 	app.run();
 }
@@ -54,6 +51,7 @@ pub struct Player;
 fn setup_fox(
 	mut commands: Commands,
 	asset_server: Res<AssetServer>,
+	mut ready_on_load: ResMut<ReadyOnAssetLoad>,
 	mut graphs: ResMut<Assets<AnimationGraph>>,
 ) {
 	let mut graph = AnimationGraph::new();
@@ -91,7 +89,7 @@ fn setup_fox(
 			let agent = parent.parent_entity();
 
 			let bert_handle = asset_server.load("default-bert.ron");
-
+			ready_on_load.insert("default-bert.ron".to_string());
 			parent
 				.spawn((
 					Name::new("Fetch Behavior"),
@@ -130,7 +128,7 @@ fn setup_fox(
 									Duration::from_secs(1),
 								),
 								SetTextOnRun::<StatusOutput>::new_with_section(
-									"Idle", 1
+									"Idle", 1,
 								),
 							));
 							parent

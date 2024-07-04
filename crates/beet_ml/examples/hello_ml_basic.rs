@@ -1,4 +1,4 @@
-use beet::prelude::*;
+use beet_ml::prelude::*;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {

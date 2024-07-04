@@ -13,7 +13,7 @@ impl Default for ExamplePlugin3d {
 
 impl Plugin for ExamplePlugin3d {
 	fn build(&self, app: &mut App) {
-		app.add_plugins(ExamplePlugin)
+		app.add_plugins(ExampleDefaultPlugins)
 			.add_systems(Startup, setup_scene_3d)
 			.add_systems(Update, (follow_cursor_3d, camera_distance));
 
@@ -37,9 +37,7 @@ pub fn setup_ground_plane(
 	});
 }
 
-pub fn setup_scene_3d(
-	mut commands: Commands,
-) {
+pub fn setup_scene_3d(mut commands: Commands) {
 	// Light
 	commands.spawn(DirectionalLightBundle {
 		transform: Transform::from_rotation(Quat::from_euler(

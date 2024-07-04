@@ -5,17 +5,17 @@ use bevy::ui::UiSystem;
 use bevy::window::WindowResized;
 
 
-pub struct LogToUiPlugin;
+pub struct UiTerminalPlugin;
 
-impl Plugin for LogToUiPlugin {
+impl Plugin for UiTerminalPlugin {
 	fn build(&self, app: &mut App) {
-		app.add_systems(Update, log_to_ui).add_systems(
+		app.add_systems(Update, ui_terminal).add_systems(
 			PostUpdate,
 			(scroll_to_bottom_on_resize, scroll_to_bottom_on_append)
 				.after(UiSystem::Layout),
 		);
 
-		app.register_type::<LogToUi>();
+		app.register_type::<UiTerminal>();
 	}
 }
 
@@ -23,7 +23,7 @@ impl Plugin for LogToUiPlugin {
 
 #[derive(Debug, Default, Component, Reflect)]
 #[reflect(Component)]
-pub struct LogToUi;
+pub struct UiTerminal;
 
 fn style() -> TextStyle {
 	TextStyle {
@@ -32,9 +32,9 @@ fn style() -> TextStyle {
 	}
 }
 
-pub fn log_to_ui(
+fn ui_terminal(
 	mut commands: Commands,
-	query: Query<Entity, With<LogToUi>>,
+	query: Query<Entity, With<UiTerminal>>,
 	actions: Query<&LogOnRun, Added<Running>>,
 ) {
 	for entity in query.iter() {
@@ -56,14 +56,14 @@ fn get_top_pos(node: &Node, parent: &Node) -> f32 {
 	let items_height = node.size().y;
 	let container_height = parent.size().y;
 	let max_scroll = (items_height - container_height).max(0.);
-	log::info!("\nitems_height: {items_height}\ncontainer_height: {container_height}\nmax_scroll: {max_scroll}");
+	// log::info!("\nitems_height: {items_height}\ncontainer_height: {container_height}\nmax_scroll: {max_scroll}");
 	return -max_scroll;
 }
 
-pub fn scroll_to_bottom_on_resize(
+fn scroll_to_bottom_on_resize(
 	mut resize_reader: EventReader<WindowResized>,
 	parents: Query<&Node>,
-	mut list: Query<(&mut Style, &Node, &Parent), With<LogToUi>>,
+	mut list: Query<(&mut Style, &Node, &Parent), With<UiTerminal>>,
 ) {
 	for _ev in resize_reader.read() {
 		for (mut style, node, parent) in list.iter_mut() {
@@ -77,7 +77,7 @@ pub fn scroll_to_bottom_on_resize(
 pub fn scroll_to_bottom_on_append(
 	mut list: Query<
 		(&mut Style, &Node, &Parent),
-		(With<LogToUi>, Changed<Children>),
+		(With<UiTerminal>, Changed<Children>),
 	>,
 	parents: Query<&Node>,
 ) {
@@ -88,7 +88,7 @@ pub fn scroll_to_bottom_on_append(
 	}
 }
 
-pub fn spawn_log_to_ui(mut commands: Commands) {
+pub fn spawn_ui_terminal(mut commands: Commands) {
 	commands
 		// CONTAINER
 		.spawn(NodeBundle {
@@ -107,7 +107,7 @@ pub fn spawn_log_to_ui(mut commands: Commands) {
 			parent
 				// LIST
 				.spawn((
-					LogToUi,
+					UiTerminal,
 					NodeBundle {
 						style: Style {
 							padding: UiRect::all(Val::Px(10.)),

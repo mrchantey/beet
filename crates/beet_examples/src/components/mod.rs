@@ -16,9 +16,9 @@ pub use self::dialog_panel::*;
 pub mod follow_cursor;
 #[allow(unused_imports)]
 pub use self::follow_cursor::*;
-pub mod log_to_ui;
+pub mod ui_terminal;
 #[allow(unused_imports)]
-pub use self::log_to_ui::*;
+pub use self::ui_terminal::*;
 pub mod randomize_position;
 #[allow(unused_imports)]
 pub use self::randomize_position::*;
