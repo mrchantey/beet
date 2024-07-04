@@ -40,17 +40,7 @@ strum_macros.workspace = true
 # strum.workspace = true
 # strum_macros.workspace = true
 
-
-# # from the simple_box example
-# clap = { version = "4.4", features = ["derive"] }
-# async-compat = "0.2.3"
-# derive_more = { version = "0.99", features = ["add", "mul"] }
-
-
-# bevy = { version = "0.13", default-features = false }
-# bevy = { workspace = true, default-features = false, features = [] }
 bevy = { version = "=0.14.0-rc.4", default-features = false, features = [
-	# bevy = { git = "https://github.com/bevyengine/bevy.git", rev = "f516de456be2b65572de1af6956d52157663b9cc", default-features = false, features = [
 	# "bevy_scene",
 ] }
 

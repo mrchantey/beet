@@ -119,3 +119,54 @@ impl ReplicateRegistry {
 		id
 	}
 }
+
+
+#[cfg(test)]
+mod test {
+	use crate::prelude::*;
+	use anyhow::Result;
+	use bevy::prelude::*;
+	use serde::Deserialize;
+	use serde::Serialize;
+	use serde_json::Value;
+	use sweet::*;
+
+
+	#[derive(Debug, Default, Component, Serialize, Deserialize)]
+	struct MyComponent;
+	#[derive(Debug, Default, Event, Serialize, Deserialize)]
+	struct MyEvent;
+	#[derive(Debug, Default, Resource, Serialize, Deserialize)]
+	struct MyResource;
+
+
+	#[test]
+	fn works() -> Result<()> {
+		let mut app = App::new();
+		app.replicate_event_incoming::<MyEvent>()
+			.replicate_with::<MyComponent>(ReplicateDirection::Incoming)
+			.replicate_resource_incoming::<MyResource>();
+
+		let registry = app.world().resource::<ReplicateRegistry>();
+		let json = registry.types_to_json();
+		let json: Value = serde_json::from_str(&json)?;
+		if let Value::Object(map) = &json {
+			expect(map.len()).to_be(3)?;
+			expect(map.get(
+				"beet_net::replication::replicate_registry::test::MyEvent",
+			))
+			.to_be(Some(&Value::Number(0.into())))?;
+			expect(map.get(
+				"beet_net::replication::replicate_registry::test::MyResource",
+			))
+			.to_be(Some(&Value::Number(2.into())))?;
+			expect(map.get(
+				"beet_net::replication::replicate_registry::test::MyComponent",
+			))
+			.to_be(Some(&Value::Number(1.into())))?;
+		} else {
+			panic!("Expected object");
+		}
+		Ok(())
+	}
+}

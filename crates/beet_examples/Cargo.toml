@@ -20,6 +20,7 @@ forky_bevy.workspace = true
 rand.workspace = true
 flume.workspace = true
 serde.workspace = true
+anyhow.workspace = true
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 forky_web.workspace = true
@@ -35,8 +36,5 @@ tokio.workspace = true
 
 
 [[example]]
-name = "export_scenes"
-path = "examples/export_scenes.rs"
-[[example]]
-name = "basics"
-path = "examples/basics/main.rs"
+name="export_scenes"
+path="./examples/export_scenes.rs"

@@ -1,9 +1,28 @@
 use beet::prelude::LogOnRun;
 use beet::prelude::Running;
 use bevy::prelude::*;
+use bevy::ui::UiSystem;
 use bevy::window::WindowResized;
 
-#[derive(Debug, Default, Component)]
+
+pub struct LogToUiPlugin;
+
+impl Plugin for LogToUiPlugin {
+	fn build(&self, app: &mut App) {
+		app.add_systems(Update, log_to_ui).add_systems(
+			PostUpdate,
+			(scroll_to_bottom_on_resize, scroll_to_bottom_on_append)
+				.after(UiSystem::Layout),
+		);
+
+		app.register_type::<LogToUi>();
+	}
+}
+
+
+
+#[derive(Debug, Default, Component, Reflect)]
+#[reflect(Component)]
 pub struct LogToUi;
 
 fn style() -> TextStyle {

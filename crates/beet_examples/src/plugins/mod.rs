@@ -7,6 +7,6 @@ pub use self::example_plugin_2d::*;
 pub mod example_plugin_3d;
 #[allow(unused_imports)]
 pub use self::example_plugin_3d::*;
-pub mod example_plugin_text;
+pub mod example_plugin_group;
 #[allow(unused_imports)]
-pub use self::example_plugin_text::*;
+pub use self::example_plugin_group::*;

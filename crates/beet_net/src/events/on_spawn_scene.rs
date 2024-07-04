@@ -21,12 +21,12 @@ pub fn handle_spawn_scene(
 		.map(|e| e.0.clone())
 		.collect::<Vec<_>>()
 		.into_iter()
-		.map(|scene| spawn(&scene, world))
+		.map(|scene| write_ron_to_world(&scene, world))
 		.collect::<Result<Vec<_>>>()
 		.ok_or(|e| log::error!("{e}"));
 }
 
-fn spawn(ron_str: &str, world: &mut World) -> Result<()> {
+pub fn write_ron_to_world(ron_str: &str, world: &mut World) -> Result<()> {
 	let type_registry = world.resource::<AppTypeRegistry>().clone();
 	let mut deserializer =
 		bevy::scene::ron::de::Deserializer::from_str(ron_str)?;
