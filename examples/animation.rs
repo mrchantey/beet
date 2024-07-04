@@ -63,8 +63,8 @@ fn setup_fox(
 						PlayAnimation::new(anim1_index)
 							.repeat(RepeatAnimation::Count(1))
 							.with_transition_duration(transition_duration),
+						anim1_clip,
 						InsertOnAnimationEnd::new(
-							anim1_clip,
 							anim1_index,
 							RunResult::Success,
 						)
@@ -76,8 +76,8 @@ fn setup_fox(
 						PlayAnimation::new(anim2_index)
 							.repeat(RepeatAnimation::Count(4))
 							.with_transition_duration(transition_duration),
+						anim2_clip,
 						InsertOnAnimationEnd::new(
-							anim2_clip,
 							anim2_index,
 							RunResult::Success,
 						)

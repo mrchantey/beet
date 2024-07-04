@@ -47,24 +47,24 @@ pub struct Example2dPlugin;
 impl Plugin for Example2dPlugin {
 	fn build(&self, app: &mut App) {
 		app
-			.add_plugins(ReadyOnAssetLoadPlugin::<Image>::default())
-			.add_systems(Update, follow_cursor_2d)
-			// .add_systems(PreUpdate, auto_spawn::auto_spawn.before(PreTickSet))
-			.add_systems(Update, randomize_position.in_set(PreTickSet))
-			.add_systems(
-				Update,
-				(update_wrap_around, wrap_around)
-					.chain()
-					.run_if(|res: Option<Res<WrapAround>>| res.is_some())
-					.in_set(PostTickSet),
-			)
-			.register_type::<AutoSpawn>()
-			.register_type::<RandomizePosition>()
-			.register_type::<RenderText>()
-			.register_type::<WrapAround>()
-			.register_type::<FollowCursor2d>()
-			.register_type::<FollowCursor3d>()
-			/*_*/;
+		.add_plugins(ReadyOnAssetLoadPlugin::<Image>::default())
+		.add_systems(Update, follow_cursor_2d)
+		// .add_systems(PreUpdate, auto_spawn::auto_spawn.before(PreTickSet))
+		.add_systems(Update, randomize_position.in_set(PreTickSet))
+		.add_systems(
+			Update,
+			(update_wrap_around, wrap_around)
+			.chain()
+			.run_if(|res: Option<Res<WrapAround>>| res.is_some())
+			.in_set(PostTickSet),
+		)
+		.register_type::<AutoSpawn>()
+		.register_type::<RandomizePosition>()
+		.register_type::<RenderText>()
+		.register_type::<WrapAround>()
+		.register_type::<FollowCursor2d>()
+		.register_type::<FollowCursor3d>()
+		/*_*/;
 	}
 }
 
@@ -72,6 +72,11 @@ pub struct Example3dPlugin;
 
 impl Plugin for Example3dPlugin {
 	fn build(&self, app: &mut App) {
-		app.add_systems(Update, (follow_cursor_3d, camera_distance));
+		app.add_plugins((
+			AnimationGraphPlaceholderPlugin,
+			AssetPlaceholderPlugin::<AnimationClip>::default(),
+			ReadyOnAssetLoadPlugin::<AnimationClip>::default(),
+		))
+		.add_systems(Update, (follow_cursor_3d, camera_distance));
 	}
 }

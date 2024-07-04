@@ -85,8 +85,8 @@ fn setup(
 						SetAgentOnRun(Velocity::default()),
 						PlayAnimation::new(idle_anim_index)
 							.with_transition_duration(transition_duration),
+						idle_anim_clip,
 						InsertOnAnimationEnd::new(
-							idle_anim_clip,
 							idle_anim_index,
 							RunResult::Success,
 						)

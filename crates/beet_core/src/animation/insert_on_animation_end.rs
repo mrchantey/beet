@@ -8,9 +8,9 @@ use std::time::Duration;
 #[derive(Debug, Clone, Component, Reflect)]
 #[reflect(Component, ActionMeta)]
 /// Inserts the given component when an animation is almost finished.
+/// Requires a [`Handle<AnimationClip>`] component.
 pub struct InsertOnAnimationEnd<T: GenericActionComponent> {
 	pub value: T,
-	pub animation_clip: Handle<AnimationClip>,
 	pub animation_index: AnimationNodeIndex,
 	/// The duration of the transition to the next action.
 	/// This should be greater than frame delta time or there will be no chance
@@ -30,14 +30,9 @@ impl<T: GenericActionComponent> ActionSystems for InsertOnAnimationEnd<T> {
 
 
 impl<T: GenericActionComponent> InsertOnAnimationEnd<T> {
-	pub fn new(
-		clip: Handle<AnimationClip>,
-		index: AnimationNodeIndex,
-		value: T,
-	) -> Self {
+	pub fn new(index: AnimationNodeIndex, value: T) -> Self {
 		Self {
 			value,
-			animation_clip: clip,
 			animation_index: index,
 			transition_duration: DEFAULT_ANIMATION_TRANSITION,
 		}
@@ -54,11 +49,16 @@ pub fn insert_on_animation_end<T: GenericActionComponent>(
 	children: Query<&Children>,
 	clips: Res<Assets<AnimationClip>>,
 	mut query: Query<
-		(Entity, &TargetAgent, &InsertOnAnimationEnd<T>),
+		(
+			Entity,
+			&TargetAgent,
+			&InsertOnAnimationEnd<T>,
+			&Handle<AnimationClip>,
+		),
 		With<Running>,
 	>,
 ) {
-	for (entity, agent, action) in query.iter_mut() {
+	for (entity, agent, action, handle) in query.iter_mut() {
 		let Some(target) = ChildrenExt::first(**agent, &children, |entity| {
 			animators.contains(entity)
 		}) else {
@@ -67,7 +67,7 @@ pub fn insert_on_animation_end<T: GenericActionComponent>(
 		// safe unwrap, just checked
 		let player = animators.get(target).unwrap();
 
-		let Some(clip) = clips.get(&action.animation_clip) else {
+		let Some(clip) = clips.get(handle) else {
 			continue;
 		};
 

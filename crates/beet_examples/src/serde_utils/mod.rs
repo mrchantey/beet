@@ -1,3 +1,6 @@
+pub mod animation_graph_placeholder;
+#[allow(unused_imports)]
+pub use self::animation_graph_placeholder::*;
 pub mod asset_placeholder;
 #[allow(unused_imports)]
 pub use self::asset_placeholder::*;

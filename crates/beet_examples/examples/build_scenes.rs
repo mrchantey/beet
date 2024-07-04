@@ -14,13 +14,19 @@ fn main() -> Result<()> {
 			SceneItem::new_bundle("camera-2d", BundlePlaceholder::Camera2d),
 			SceneItem::new_bundle("camera-3d", BundlePlaceholder::Camera3d),
 			SceneItem::new_resource("beet-debug", BeetDebugConfig::default()),
-			SceneItem::new("space-scene", scenes::space_scene),
+			// text
 			SceneItem::new("ui-terminal", spawn_ui_terminal),
-			SceneItem::new("seek", scenes::seek),
-			SceneItem::new("flock", scenes::flock),
 			SceneItem::new("hello-world", scenes::hello_world),
 			SceneItem::new("hello-net", scenes::hello_net),
 			SceneItem::new("sentence-selector", scenes::sentence_selector),
+			// 2d
+			SceneItem::new("space-scene", scenes::space_scene),
+			SceneItem::new("seek", scenes::seek),
+			SceneItem::new("flock", scenes::flock),
+			// 3d
+			SceneItem::new("ground-3d", scenes::setup_ground_3d),
+			SceneItem::new("lighting-3d", scenes::setup_lighting_3d),
+			SceneItem::new("animation-demo", scenes::animation_demo),
 		],
 	}]
 	.into_iter()
@@ -92,6 +98,7 @@ impl SceneItem {
 			TransformPlugin::default(),
 			AssetPlugin::default(),
 			RenderPlugin::default(),
+			bevy::prelude::AnimationPlugin::default(),
 			UiPlugin::default(),
 			//beet
 			DefaultBeetPlugins::default(),
