@@ -63,6 +63,8 @@ impl Plugin for Example2dPlugin {
 			.register_type::<RandomizePosition>()
 			.register_type::<RenderText>()
 			.register_type::<WrapAround>()
+			.register_type::<FollowCursor2d>()
+			.register_type::<FollowCursor3d>()
 			/*_*/;
 	}
 }

@@ -63,9 +63,9 @@ fn inset_on_trigger<E: GenericActionEvent, T: GenericActionComponent>(
 	query: Query<(Entity, &InsertOnTrigger<E, T>)>,
 ) {
 	for _ev in reader.read() {
-		log::info!("EVENT");
+		// log::info!("EVENT");
 		for (entity, trigger) in query.iter() {
-			log::info!("RECEIVED");
+			// log::info!("RECEIVED");
 			commands.entity(entity).insert(trigger.value.clone());
 		}
 	}

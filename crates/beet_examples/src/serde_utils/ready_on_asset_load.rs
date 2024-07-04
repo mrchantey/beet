@@ -26,6 +26,7 @@ pub fn ready_on_asset_load<A: Asset>(
 	query: Query<(Entity, &Handle<A>), With<AssetLoadBlockAppReady>>,
 	all_blocks: Query<Entity, With<AssetLoadBlockAppReady>>,
 ) {
+	let mut total_ready = 0;
 	for ev in asset_events.read() {
 		match ev {
 			AssetEvent::LoadedWithDependencies { id } => {
@@ -34,13 +35,15 @@ pub fn ready_on_asset_load<A: Asset>(
 						commands
 							.entity(entity)
 							.remove::<AssetLoadBlockAppReady>();
-						if all_blocks.iter().count() == 1 {
-							ready_events.send(AppReady);
-						}
+						total_ready += 1;
 					}
 				}
 			}
 			_ => {}
 		}
+	}
+	let total_blocks = all_blocks.iter().count();
+	if total_blocks > 0 && total_blocks == total_ready {
+		ready_events.send(AppReady);
 	}
 }

@@ -1,4 +1,15 @@
 //! For use with scene-based workflows
+//! 
+//! Usage: 
+//! 1. build scenes: `cargo run -p beet_examples --example build_scenes`
+//! 2. run: `cargo run --example defaylt_beet_app <scene_names>`
+//! 
+//! Common combinations:
+//! - hello world: 	`beet-debug camera-2d ui-terminal hello-world`
+//! - hello_llm: 		`beet-debug camera-2d ui-terminal sentence-selector`
+//! - seek: 				`beet-debug camera-2d space-background seek`
+//! 
+//! 
 use anyhow::Result;
 use beet::prelude::*;
 use beet_examples::prelude::*;

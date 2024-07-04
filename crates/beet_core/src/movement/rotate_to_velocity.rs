@@ -4,7 +4,8 @@ use forky_bevy::extensions::QuatExt;
 use std::f32::consts::PI;
 
 /// Rotate an entity to face its [`Velocity`] in 2D space
-#[derive(Component)]
+#[derive(Default, Component, Reflect)]
+#[reflect(Default, Component)]
 pub struct RotateToVelocity2d;
 
 
@@ -22,7 +23,8 @@ pub fn rotate_to_velocity_2d(
 
 
 /// Rotate an entity to face its [`Velocity`] in 3D space
-#[derive(Component, Deref, DerefMut)]
+#[derive(Component, Deref, DerefMut, Reflect)]
+#[reflect(Default, Component)]
 pub struct RotateToVelocity3d(pub f32);
 
 impl Default for RotateToVelocity3d {

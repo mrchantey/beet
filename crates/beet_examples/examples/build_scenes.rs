@@ -11,15 +11,13 @@ fn main() -> Result<()> {
 		name: "beet-basics",
 		scenes: vec![
 			SceneItem::new("empty", || {}),
-			SceneItem::new_bundle("camera-2d", BundlePlaceholder::Camera2d {
-				transform: Default::default(),
-			}),
-			SceneItem::new_bundle("camera-3d", BundlePlaceholder::Camera3d {
-				transform: Default::default(),
-			}),
+			SceneItem::new_bundle("camera-2d", BundlePlaceholder::Camera2d),
+			SceneItem::new_bundle("camera-3d", BundlePlaceholder::Camera3d),
 			SceneItem::new_resource("beet-debug", BeetDebugConfig::default()),
 			SceneItem::new("space-background", scenes::space_background),
 			SceneItem::new("ui-terminal", spawn_ui_terminal),
+			SceneItem::new("seek", scenes::seek),
+			SceneItem::new("flock", scenes::flock),
 			SceneItem::new("hello-world", scenes::hello_world),
 			SceneItem::new("hello-net", scenes::hello_net),
 			SceneItem::new("sentence-selector", scenes::sentence_selector),

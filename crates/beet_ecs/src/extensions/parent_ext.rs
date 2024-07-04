@@ -15,7 +15,7 @@ pub struct RootIsTargetAgent;
 
 /// Attach this to behavior entities that require a target agent.
 #[derive(Debug, PartialEq, Deref, DerefMut, Component, Reflect)]
-#[reflect(Component, MapEntities)]
+#[reflect(Component, MapEntities, PartialEq)]
 pub struct TargetAgent(pub Entity);
 
 impl MapEntities for TargetAgent {

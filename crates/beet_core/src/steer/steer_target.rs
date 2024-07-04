@@ -1,8 +1,10 @@
 use anyhow::Result;
+use bevy::ecs::entity::MapEntities;
+use bevy::ecs::reflect::ReflectMapEntities;
 use bevy::prelude::*;
 
 #[derive(Debug, Copy, Clone, PartialEq, Component, Reflect)]
-#[reflect(Component)]
+#[reflect(Component, MapEntities)]
 // Description of a target used by steering behaviors.
 pub enum SteerTarget {
 	/// The target is a fixed position
@@ -29,6 +31,17 @@ impl SteerTarget {
 		}
 	}
 }
+
+
+impl MapEntities for SteerTarget {
+	fn map_entities<M: EntityMapper>(&mut self, entity_mapper: &mut M) {
+		match self {
+			Self::Entity(entity) => *entity = entity_mapper.map_entity(*entity),
+			_ => {}
+		}
+	}
+}
+
 
 impl Into<SteerTarget> for Vec3 {
 	fn into(self) -> SteerTarget { SteerTarget::Position(self) }

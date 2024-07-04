@@ -1,6 +1,7 @@
 use bevy::prelude::*;
 
-#[derive(Component)]
+#[derive(Default, Component, Reflect)]
+#[reflect(Default, Component)]
 pub struct FollowCursor2d;
 
 pub fn follow_cursor_2d(
@@ -26,7 +27,8 @@ pub fn follow_cursor_2d(
 }
 
 
-#[derive(Component)]
+#[derive(Default, Component, Reflect)]
+#[reflect(Default, Component)]
 pub struct FollowCursor3d;
 
 pub fn follow_cursor_3d(

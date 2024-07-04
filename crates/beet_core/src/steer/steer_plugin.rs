@@ -32,6 +32,7 @@ impl Plugin for SteerPlugin {
 		registry.register::<MaxSpeed>();
 		registry.register::<ArriveRadius>();
 		registry.register::<WanderParams>();
+		registry.register::<GroupParams>();
 
 		drop(registry);
 
