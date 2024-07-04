@@ -9,8 +9,9 @@ fn main() {
 	app /*-*/
 		.add_plugins(ExamplePlugin3d::default())
 		.add_plugins(DefaultBeetPlugins::default())
-		.add_plugins(BeetDebugPlugin::default())
+		.add_plugins(BeetDebugPluginStdout)
 		.add_systems(Startup, setup)
+		.init_resource::<BeetDebugConfig>()
 		.run();
 }
 

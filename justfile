@@ -8,6 +8,8 @@ default:
 
 ## common
 
+build-scenes *args:
+	cargo run -p beet_examples --example build_scenes {{args}}
 app *args:
 	cargo run --example default_beet_app {{args}}
 

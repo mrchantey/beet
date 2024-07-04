@@ -6,30 +6,30 @@ pub fn hello_world(mut commands: Commands) {
 		.spawn((SequenceSelector::default(), Running))
 		.with_children(|parent| {
 			parent.spawn((
-				LogOnRun("Hello".into()),
+				Name::new("Hello"),
 				InsertOnRun(RunResult::Success),
 			));
 			parent.spawn((
-				LogOnRun("World".into()),
+				Name::new("World"),
 				InsertOnRun(RunResult::Success),
 			));
 			parent.spawn((
-				LogOnRun("World 1".into()),
+				Name::new("World 1"),
 				RunTimer::default(),
 				InsertInDuration::with_secs(RunResult::Success, 1),
 			));
 			parent.spawn((
-				LogOnRun("World 2".into()),
+				Name::new("World 2"),
 				RunTimer::default(),
 				InsertInDuration::with_secs(RunResult::Success, 1),
 			));
 			parent.spawn((
-				LogOnRun("World 3".into()),
+				Name::new("World 3"),
 				RunTimer::default(),
 				InsertInDuration::with_secs(RunResult::Success, 1),
 			));
 			parent.spawn((
-				LogOnRun("World 4".into()),
+				Name::new("World 4"),
 				RunTimer::default(),
 				InsertInDuration::with_secs(RunResult::Success, 1),
 			));

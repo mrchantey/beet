@@ -11,10 +11,11 @@ fn main() {
 		.add_plugins((
 			ExamplePlugin3d::default(),
 			DefaultBeetPlugins,
-			BeetDebugPlugin::default(),
+			BeetDebugPluginStdout,
 			BertPlugin::default(),
 			ActionPlugin::<InsertOnAssetEvent<RunResult, Bert>>::default(),
 		))
+		.init_resource::<BeetDebugConfig>()
 		.add_systems(Startup, setup)
 		.run();
 }

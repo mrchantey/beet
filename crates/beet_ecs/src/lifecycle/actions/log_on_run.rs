@@ -5,7 +5,8 @@ use std::borrow::Cow;
 
 #[derive(Debug, Clone, PartialEq, Component, Reflect)]
 #[reflect(Default, Component, ActionMeta)]
-/// Logs a message when the action is run.
+/// Mostly used for hello-world programs, logs a message when the action is run.
+/// Use [`BeetDebugPlugin`] for debugging run-state.
 pub struct LogOnRun(pub Cow<'static, str>);
 
 impl ActionMeta for LogOnRun {

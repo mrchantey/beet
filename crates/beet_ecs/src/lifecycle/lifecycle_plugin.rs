@@ -26,6 +26,17 @@ impl Plugin for LifecyclePlugin {
 			EmptyAction,
 		)>::default());
 
+		// running
+		app.register_type::<Running>();
+		app.register_type::<RunTimer>();
+		app.register_type::<RunResult>();
+		// graph
+		app.register_type::<Parent>();
+		app.register_type::<Children>();
+		app.register_type::<BeetRoot>();
+		app.register_type::<RootIsTargetAgent>();
+		app.register_type::<TargetAgent>();
+		app.register_type::<ActionTarget>();
 
 		let world = app.world_mut();
 

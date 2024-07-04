@@ -1,5 +1,4 @@
-use beet::prelude::LogOnRun;
-use beet::prelude::Running;
+use beet::prelude::*;
 use bevy::prelude::*;
 use bevy::ui::UiSystem;
 use bevy::window::WindowResized;
@@ -9,11 +8,13 @@ pub struct UiTerminalPlugin;
 
 impl Plugin for UiTerminalPlugin {
 	fn build(&self, app: &mut App) {
-		app.add_systems(Update, ui_terminal).add_systems(
-			PostUpdate,
-			(scroll_to_bottom_on_resize, scroll_to_bottom_on_append)
-				.after(UiSystem::Layout),
-		);
+		app.add_plugins(BeetDebugPlugin::new(append_text))
+			.add_systems(Update, log_log_on_run.pipe(append_text))
+			.add_systems(
+				PostUpdate,
+				(scroll_to_bottom_on_resize, scroll_to_bottom_on_append)
+					.after(UiSystem::Layout),
+			);
 
 		app.register_type::<UiTerminal>();
 	}
@@ -32,24 +33,25 @@ fn style() -> TextStyle {
 	}
 }
 
-fn ui_terminal(
+fn append_text(
+	values: In<Vec<String>>,
 	mut commands: Commands,
-	query: Query<Entity, With<UiTerminal>>,
-	actions: Query<&LogOnRun, Added<Running>>,
+	terminals: Query<Entity, With<UiTerminal>>,
 ) {
-	for entity in query.iter() {
-		for log in actions.iter() {
+	for entity in terminals.iter() {
+		for text in values.iter() {
 			commands.entity(entity).with_children(|parent| {
 				parent.spawn(
 					// AccessibilityNode(NodeBuilder::new(Role::ListItem)),
-					TextBundle::from_section(
-						format!("> {}", log.0.clone()),
-						style(),
-					),
+					TextBundle::from_section(format!("> {text}"), style()),
 				);
 			});
 		}
 	}
+}
+
+fn log_log_on_run(query: Query<&LogOnRun, Added<Running>>) -> Vec<String> {
+	query.iter().map(|log| log.0.to_string()).collect()
 }
 
 fn get_top_pos(node: &Node, parent: &Node) -> f32 {

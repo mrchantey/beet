@@ -1,15 +1,16 @@
 use beet::prelude::*;
+use beet_examples::prelude::*;
 use bevy::animation::RepeatAnimation;
 use bevy::prelude::*;
-use beet_examples::prelude::*;
 use std::time::Duration;
 
 pub fn main() {
 	App::new()
 		.add_plugins(ExamplePlugin3d::default())
 		.add_plugins(DefaultBeetPlugins)
-		.add_plugins(BeetDebugPlugin::default())
+		.add_plugins(BeetDebugPluginStdout)
 		.add_systems(Startup, (setup_camera, setup_fox))
+		.init_resource::<BeetDebugConfig>()
 		.run();
 }
 

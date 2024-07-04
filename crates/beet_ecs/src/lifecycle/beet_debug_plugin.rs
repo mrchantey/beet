@@ -1,15 +1,17 @@
 use crate::prelude::*;
 use bevy::prelude::*;
+use std::marker::PhantomData;
 
 
-/// A plugin that logs lifecycle events for behaviors with a [`Name`].
-pub struct BeetDebugPlugin {
-	log_on_start: bool,
-	log_on_update: bool,
-	log_on_stop: bool,
+#[derive(Resource, Clone, Reflect)]
+#[reflect(Resource)]
+pub struct BeetDebugConfig {
+	pub log_on_start: bool,
+	pub log_on_update: bool,
+	pub log_on_stop: bool,
 }
 
-impl Default for BeetDebugPlugin {
+impl Default for BeetDebugConfig {
 	fn default() -> Self {
 		Self {
 			log_on_start: true,
@@ -19,50 +21,104 @@ impl Default for BeetDebugPlugin {
 	}
 }
 
-
-impl Plugin for BeetDebugPlugin {
+pub struct BeetDebugPluginStdout;
+impl Plugin for BeetDebugPluginStdout {
 	fn build(&self, app: &mut App) {
-		app.init_resource::<BeetConfig>();
+		app.add_plugins(BeetDebugPlugin::new(log_stdout));
+	}
+}
+fn log_stdout(In(messages): In<Vec<String>>) {
+	for message in messages.into_iter() {
+		log::info!("{message}");
+	}
+}
+
+/// A plugin that logs lifecycle events for behaviors with a [`Name`].
+pub struct BeetDebugPlugin<
+	M: 'static + Send + Sync,
+	T: 'static + Send + Sync + Clone + IntoSystem<Vec<String>, (), M>,
+> {
+	log_system: T,
+	_marker: PhantomData<M>,
+}
+
+impl<
+		M: 'static + Send + Sync,
+		T: 'static + Send + Sync + Clone + IntoSystem<Vec<String>, (), M>,
+	> BeetDebugPlugin<M, T>
+{
+	pub fn new(log_system: T) -> Self {
+		Self {
+			log_system,
+			_marker: PhantomData,
+		}
+	}
+}
+
+impl<
+		M: 'static + Send + Sync,
+		T: 'static + Send + Sync + Clone + IntoSystem<Vec<String>, (), M>,
+	> Plugin for BeetDebugPlugin<M, T>
+{
+	fn build(&self, app: &mut App) {
+		app.init_resource::<BeetConfig>()
+			.register_type::<BeetDebugConfig>();
 		let config = app.world().resource::<BeetConfig>();
 		let schedule = config.schedule.clone();
+		app.add_systems(
+			schedule,
+			(
+				log_on_start.pipe(self.log_system.clone()).run_if(
+					|config: Option<Res<BeetDebugConfig>>| {
+						config.map(|c| c.log_on_start).unwrap_or_default()
+					},
+				),
+				log_on_update.pipe(self.log_system.clone()).run_if(
+					|config: Option<Res<BeetDebugConfig>>| {
+						config.map(|c| c.log_on_update).unwrap_or_default()
+					},
+				),
+			)
+				.chain()
+				.in_set(PostTickSet),
+		)
+		// .add_systems(
+		// 	schedule,
+		// 	,
+		// )
+		.add_systems(
+			schedule,
+			log_on_stop
+				.pipe(self.log_system.clone())
+				.after(PostTickSet)
+				.run_if(|config: Option<Res<BeetDebugConfig>>| {
+					config.map(|c| c.log_on_stop).unwrap_or_default()
+				}),
+		);
+	}
+}
 
 
-		if self.log_on_start {
-			app.add_systems(schedule, log_on_running_added.in_set(PostTickSet));
-		}
-		if self.log_on_update {
-			app.add_systems(
-				schedule,
-				log_on_running
-					.after(log_on_running_added)
-					.in_set(PostTickSet),
-			);
-		}
-		if self.log_on_stop {
-			app.add_systems(
-				schedule,
-				log_on_running_removed.after(PostTickSet),
-			);
-		}
-	}
+
+fn log_on_start(query: Query<&Name, Added<Running>>) -> Vec<String> {
+	query
+		.iter()
+		.map(|name| format!("Started: {name}"))
+		.collect()
 }
-fn log_on_running_added(query: Query<&Name, Added<Running>>) {
-	for name in query.iter() {
-		log::info!("Started: {name}")
-	}
+fn log_on_update(query: Query<&Name, With<Running>>) -> Vec<String> {
+	query
+		.iter()
+		.map(|name| format!("Running: {name}"))
+		.collect()
 }
-fn log_on_running(query: Query<&Name, With<Running>>) {
-	for name in query.iter() {
-		log::info!("Running: {name}")
-	}
-}
-fn log_on_running_removed(
+fn log_on_stop(
 	query: Query<&Name>,
 	mut removed: RemovedComponents<Running>,
-) {
-	for removed in removed.read() {
-		if let Ok(name) = query.get(removed) {
-			log::info!("Stopped: {name}")
-		}
-	}
+) -> Vec<String> {
+	removed
+		.read()
+		.filter_map(|removed| query.get(removed).ok())
+		.map(|name| format!("Stopped: {name}"))
+		.collect()
 }

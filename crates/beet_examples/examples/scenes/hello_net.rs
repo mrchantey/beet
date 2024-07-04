@@ -7,12 +7,12 @@ pub fn hello_net(mut commands: Commands) {
 		.spawn((SequenceSelector::default(), Running))
 		.with_children(|parent| {
 			parent.spawn((
-				LogOnRun::new("Send: AppReady"),
+				Name::new("Send - AppReady"),
 				TriggerOnRun(AppReady),
 			));
 		});
 	commands.spawn((
+		Name::new("Recv - Player Message"),
 		InsertOnTrigger::<OnUserMessage, Running>::new(Running),
-		LogOnRun::new("Recv: Player Message"),
 	));
 }

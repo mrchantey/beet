@@ -18,6 +18,7 @@ pub struct ExamplePlugins;
 impl PluginGroup for ExamplePlugins {
 	fn build(self) -> PluginGroupBuilder {
 		PluginGroupBuilder::start::<Self>()
+			.add(BeetDebugPluginStdout)
 			.add(Example2dPlugin)
 			.add(Example3dPlugin)
 			.add(UiTerminalPlugin)

@@ -11,12 +11,13 @@ fn main() -> Result<()> {
 		name: "beet-basics",
 		scenes: vec![
 			SceneItem::new("empty", || {}),
-			SceneItem::new("camera-2d", BundlePlaceholder::Camera2d {
+			SceneItem::new_bundle("camera-2d", BundlePlaceholder::Camera2d {
 				transform: Default::default(),
 			}),
-			SceneItem::new("camera-3d", BundlePlaceholder::Camera3d {
+			SceneItem::new_bundle("camera-3d", BundlePlaceholder::Camera3d {
 				transform: Default::default(),
 			}),
+			SceneItem::new_resource("beet-debug", BeetDebugConfig::default()),
 			SceneItem::new("space-background", scenes::space_background),
 			SceneItem::new("ui-terminal", spawn_ui_terminal),
 			SceneItem::new("hello-world", scenes::hello_world),
@@ -52,36 +53,35 @@ struct SceneItem {
 	pub system: SystemConfigs,
 }
 
-trait BundleOrSystem<M> {
-	fn into_system_configs(self) -> SystemConfigs;
-}
-impl<B> BundleOrSystem<BundleMarker> for B
-where
-	B: Bundle + Clone,
-{
-	fn into_system_configs(self) -> SystemConfigs {
-		(move |mut commands: Commands| {
-			commands.spawn(self.clone());
-		})
-		.into_configs()
-	}
-}
-
-struct SystemMarker;
-struct BundleMarker;
-
-impl<M, T> BundleOrSystem<(M, SystemMarker)> for T
-where
-	T: IntoSystemConfigs<M>,
-{
-	fn into_system_configs(self) -> SystemConfigs { self.into_configs() }
-}
-
 impl SceneItem {
-	pub fn new<M>(name: &'static str, system: impl BundleOrSystem<M>) -> Self {
+	pub fn new<M>(
+		name: &'static str,
+		system: impl IntoSystemConfigs<M>,
+	) -> Self {
 		Self {
 			name,
-			system: system.into_system_configs(),
+			system: system.into_configs(),
+		}
+	}
+	pub fn new_bundle(name: &'static str, bundle: impl Bundle + Clone) -> Self {
+		Self {
+			name,
+			system: (move |mut commands: Commands| {
+				commands.spawn(bundle.clone());
+			})
+			.into_configs(),
+		}
+	}
+	pub fn new_resource(
+		name: &'static str,
+		resource: impl Resource + Clone,
+	) -> Self {
+		Self {
+			name,
+			system: (move |mut commands: Commands| {
+				commands.insert_resource(resource.clone());
+			})
+			.into_configs(),
 		}
 	}
 
@@ -110,6 +110,7 @@ impl SceneItem {
 			// TaskPoolPlugin::default(),
 			// ExamplePlugin::default(),
 		))
+		.register_type::<Name>()
 		.register_type::<ImageScaleMode>()
 		.finish();
 
@@ -117,8 +118,7 @@ impl SceneItem {
 			.add_systems(self.system)
 			.run(app.world_mut());
 
-		let filename =
-			format!("target/scenes/{}.ron", self.name);
+		let filename = format!("target/scenes/{}.ron", self.name);
 
 		save_scene(app.world_mut(), &filename)
 	}
