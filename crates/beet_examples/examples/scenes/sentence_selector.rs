@@ -13,10 +13,9 @@ pub fn sentence_selector(mut commands: Commands) {
 			parent
 				.spawn((
 					Name::new("Sentence Selector"),
-					InsertOnTrigger::<AppReady, Running>::default(),
-					SequenceSelector,
-					TargetAgent(agent),
 					AssetLoadBlockAppReady,
+					InsertOnTrigger::<AppReady, Running>::default(),
+					TargetAgent(agent),
 					bert_handle,
 					SentenceScorer::default(),
 					ScoreSelector {
