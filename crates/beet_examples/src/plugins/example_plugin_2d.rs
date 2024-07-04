@@ -8,12 +8,11 @@ pub struct ExamplePlugin2d;
 
 impl Plugin for ExamplePlugin2d {
 	fn build(&self, app: &mut App) {
-		app.insert_resource(WrapAround::default())
+		app
 			// .add_plugins(WorldInspectorPlugin::new())
 			.add_plugins(ExampleDefaultPlugins)
-			// .add_plugins(WorldInspectorPlugin::new())
 			.add_systems(Startup, space_setup)
-			.add_systems(Update, follow_cursor)
+			.add_systems(Update, follow_cursor_2d)
 			// .add_systems(PreUpdate, auto_spawn::auto_spawn.before(PreTickSet))
 			.add_systems(Update, randomize_position.in_set(PreTickSet))
 			.add_systems(

@@ -3,7 +3,7 @@ use bevy::prelude::*;
 #[derive(Component)]
 pub struct FollowCursor2d;
 
-pub fn follow_cursor(
+pub fn follow_cursor_2d(
 	camera_query: Query<(&Camera, &GlobalTransform)>,
 	mut cursor_query: Query<&mut Transform, With<FollowCursor2d>>,
 	windows: Query<&Window>,

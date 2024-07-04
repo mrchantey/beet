@@ -1,4 +1,3 @@
-use super::*;
 use bevy::prelude::*;
 use bevy::utils::HashMap;
 use std::marker::PhantomData;
@@ -45,9 +44,8 @@ impl<T> Default for AssetPlaceholderPlugin<T> {
 
 impl<A: Asset> Plugin for AssetPlaceholderPlugin<A> {
 	fn build(&self, app: &mut App) {
-		app.init_resource::<ReadyOnAssetLoad>()
-			.insert_resource(AssetPlaceholderLookup::<A>(Default::default()))
-			.add_systems(PreUpdate, (init_asset::<A>, ready_on_asset_load::<A>))
+		app.insert_resource(AssetPlaceholderLookup::<A>(Default::default()))
+			.add_systems(PreUpdate, init_asset::<A>)
 			.register_type::<AssetPlaceholder<A>>();
 	}
 }

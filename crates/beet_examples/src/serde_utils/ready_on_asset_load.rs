@@ -1,50 +1,43 @@
 use beet::prelude::AppReady;
 use bevy::prelude::*;
-use bevy::utils::HashSet;
-use std::ops::Deref;
-use std::ops::DerefMut;
+use std::marker::PhantomData;
 
-#[derive(Debug, Default, Clone, Resource)]
-pub struct ReadyOnAssetLoad {
-	pub lookup: HashSet<String>,
-	loaded: usize,
+#[derive(Debug, Default, Clone, Component, Reflect)]
+#[reflect(Component)]
+pub struct AssetLoadBlockAppReady;
+
+pub struct ReadyOnAssetLoadPlugin<A: Asset>(PhantomData<A>);
+
+impl<A: Asset> Default for ReadyOnAssetLoadPlugin<A> {
+	fn default() -> Self { Self(PhantomData) }
 }
 
-impl ReadyOnAssetLoad {
-	pub fn insert(&mut self, path: impl Into<String>) {
-		self.lookup.insert(path.into());
+impl<A: Asset> Plugin for ReadyOnAssetLoadPlugin<A> {
+	fn build(&self, app: &mut App) {
+		app.add_systems(PreUpdate, ready_on_asset_load::<A>)
+			.register_type::<AssetLoadBlockAppReady>();
 	}
 }
 
-impl Deref for ReadyOnAssetLoad {
-	type Target = HashSet<String>;
-	fn deref(&self) -> &Self::Target { &self.lookup }
-}
-impl DerefMut for ReadyOnAssetLoad {
-	fn deref_mut(&mut self) -> &mut Self::Target { &mut self.lookup }
-}
-
 pub fn ready_on_asset_load<A: Asset>(
-	mut ready: ResMut<ReadyOnAssetLoad>,
 	mut asset_events: EventReader<AssetEvent<A>>,
 	mut ready_events: EventWriter<AppReady>,
-	query: Query<&Handle<A>>,
+	mut commands: Commands,
+	query: Query<(Entity, &Handle<A>), With<AssetLoadBlockAppReady>>,
+	all_blocks: Query<Entity, With<AssetLoadBlockAppReady>>,
 ) {
 	for ev in asset_events.read() {
 		match ev {
 			AssetEvent::LoadedWithDependencies { id } => {
-				for handle in query.iter() {
+				for (entity, handle) in query.iter() {
 					if handle.id() == *id {
-						if let Some(path) = handle.path() {
-							if ready.lookup.contains(&path.to_string()) {
-								ready.loaded += 1;
-								if ready.loaded == ready.lookup.len() {
-									ready_events.send(AppReady);
-								}
-							}
+						commands
+							.entity(entity)
+							.remove::<AssetLoadBlockAppReady>();
+						if all_blocks.iter().count() == 1 {
+							ready_events.send(AppReady);
 						}
 					}
-					// ready_events.send(beet_net::prelude::AppReady);
 				}
 			}
 			_ => {}

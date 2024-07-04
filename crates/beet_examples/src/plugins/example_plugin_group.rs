@@ -18,10 +18,12 @@ pub struct ExamplePlugins;
 impl PluginGroup for ExamplePlugins {
 	fn build(self) -> PluginGroupBuilder {
 		PluginGroupBuilder::start::<Self>()
+			.add(Example2dPlugin)
+			.add(Example3dPlugin)
+			.add(UiTerminalPlugin)
 			.add(ExampleReplicatePlugin)
 			.add(ExampleMlPlugin)
 			.add(BundlePlaceholderPlugin)
-			.add(UiTerminalPlugin)
 	}
 }
 
@@ -34,6 +36,40 @@ impl Plugin for ExampleMlPlugin {
 			BertPlugin::default(),
 			ActionPlugin::<InsertOnAssetEvent<RunResult, Bert>>::default(),
 			AssetPlaceholderPlugin::<Bert>::default(),
+			ReadyOnAssetLoadPlugin::<Bert>::default(),
 		));
+	}
+}
+
+pub struct Example2dPlugin;
+
+impl Plugin for Example2dPlugin {
+	fn build(&self, app: &mut App) {
+		app
+			.add_plugins(ReadyOnAssetLoadPlugin::<Image>::default())
+			.add_systems(Update, follow_cursor_2d)
+			// .add_systems(PreUpdate, auto_spawn::auto_spawn.before(PreTickSet))
+			.add_systems(Update, randomize_position.in_set(PreTickSet))
+			.add_systems(
+				Update,
+				(update_wrap_around, wrap_around)
+					.chain()
+					.run_if(|res: Option<Res<WrapAround>>| res.is_some())
+					.in_set(PostTickSet),
+			)
+			// .insert_resource(WrapAround::default())
+			.register_type::<AutoSpawn>()
+			.register_type::<RandomizePosition>()
+			.register_type::<RenderText>()
+			.register_type::<WrapAround>()
+			/*_*/;
+	}
+}
+
+pub struct Example3dPlugin;
+
+impl Plugin for Example3dPlugin {
+	fn build(&self, app: &mut App) {
+		app.add_systems(Update, (follow_cursor_3d, camera_distance));
 	}
 }

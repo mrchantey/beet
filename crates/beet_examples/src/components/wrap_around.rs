@@ -3,7 +3,7 @@ use bevy::prelude::*;
 pub const DEFAULT_WRAPAROUND_HALF_EXTENTS: f32 = 1.;
 
 
-#[derive(Debug, Clone, Resource, PartialEq)]
+#[derive(Debug, Clone, Resource, PartialEq, Reflect)]
 pub struct WrapAround {
 	pub half_extents: Vec3,
 }

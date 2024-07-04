@@ -17,6 +17,7 @@ fn main() -> Result<()> {
 			SceneItem::new("camera-3d", BundlePlaceholder::Camera3d {
 				transform: Default::default(),
 			}),
+			SceneItem::new("space-background", scenes::space_background),
 			SceneItem::new("ui-terminal", spawn_ui_terminal),
 			SceneItem::new("hello-world", scenes::hello_world),
 			SceneItem::new("hello-net", scenes::hello_net),
@@ -84,7 +85,7 @@ impl SceneItem {
 		}
 	}
 
-	pub fn save(self, project_name: &str) -> Result<()> {
+	pub fn save(self, _project_name: &str) -> Result<()> {
 		let mut app = App::new();
 		app.add_plugins((
 			//bevy
@@ -109,7 +110,7 @@ impl SceneItem {
 			// TaskPoolPlugin::default(),
 			// ExamplePlugin::default(),
 		))
-		// .register_type::<reflect_utils::ReflectRoot>()
+		.register_type::<ImageScaleMode>()
 		.finish();
 
 		Schedule::default()
@@ -117,7 +118,7 @@ impl SceneItem {
 			.run(app.world_mut());
 
 		let filename =
-			format!("target/scenes/{}/{}.ron", project_name, self.name);
+			format!("target/scenes/{}.ron", self.name);
 
 		save_scene(app.world_mut(), &filename)
 	}

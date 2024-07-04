@@ -1,4 +1,3 @@
-use bevy::ecs::system::EntityCommands;
 use bevy::prelude::*;
 
 
@@ -7,25 +6,7 @@ use bevy::prelude::*;
 pub enum BundlePlaceholder {
 	Camera2d { transform: Transform },
 	Camera3d { transform: Transform },
-}
-
-impl BundlePlaceholder {
-	pub fn apply(self, commands: &mut EntityCommands) {
-		match self {
-			BundlePlaceholder::Camera2d { transform } => {
-				commands.insert(Camera2dBundle {
-					transform,
-					..default()
-				});
-			}
-			BundlePlaceholder::Camera3d { transform } => {
-				commands.insert(Camera3dBundle {
-					transform,
-					..default()
-				});
-			}
-		}
-	}
+	Sprite { path: String, transform: Transform },
 }
 
 #[derive(Debug, Default)]
@@ -40,6 +21,7 @@ impl Plugin for BundlePlaceholderPlugin {
 
 
 fn init_bundle(
+	asset_server: Res<AssetServer>,
 	mut commands: Commands,
 	query: Query<(Entity, &BundlePlaceholder), Added<BundlePlaceholder>>,
 ) {
@@ -47,6 +29,26 @@ fn init_bundle(
 		let mut entity_commands = commands.entity(entity);
 		entity_commands.remove::<BundlePlaceholder>();
 
-		placeholder.clone().apply(&mut entity_commands);
+		match placeholder.clone() {
+			BundlePlaceholder::Camera2d { transform } => {
+				entity_commands.insert(Camera2dBundle {
+					transform,
+					..default()
+				});
+			}
+			BundlePlaceholder::Camera3d { transform } => {
+				entity_commands.insert(Camera3dBundle {
+					transform,
+					..default()
+				});
+			}
+			BundlePlaceholder::Sprite { path, transform } => {
+				entity_commands.insert(SpriteBundle {
+					texture: asset_server.load(path),
+					transform,
+					..default()
+				});
+			}
+		}
 	}
 }

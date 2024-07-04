@@ -51,7 +51,6 @@ pub struct Player;
 fn setup_fox(
 	mut commands: Commands,
 	asset_server: Res<AssetServer>,
-	mut ready_on_load: ResMut<ReadyOnAssetLoad>,
 	mut graphs: ResMut<Assets<AnimationGraph>>,
 ) {
 	let mut graph = AnimationGraph::new();
@@ -89,7 +88,6 @@ fn setup_fox(
 			let agent = parent.parent_entity();
 
 			let bert_handle = asset_server.load("default-bert.ron");
-			ready_on_load.insert("default-bert.ron".to_string());
 			parent
 				.spawn((
 					Name::new("Fetch Behavior"),

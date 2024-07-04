@@ -8,6 +8,9 @@ default:
 
 ## common
 
+app *args:
+	cargo run --example default_beet_app {{args}}
+
 doc:
 	just watch 'cargo doc'
 
