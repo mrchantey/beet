@@ -24,6 +24,7 @@ impl Plugin for MovementPlugin {
 		registry.register::<Force>();
 		registry.register::<RotateToVelocity2d>();
 		registry.register::<RotateToVelocity3d>();
+		registry.register::<VelocityScalar>();
 
 		drop(registry);
 

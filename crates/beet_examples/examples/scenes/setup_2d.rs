@@ -1,7 +1,9 @@
 use beet_examples::prelude::*;
 use bevy::prelude::*;
 
-pub fn space_background(mut commands: Commands) {
+pub fn space_scene(mut commands: Commands) {
+	commands.insert_resource(WrapAround::default());
+
 	commands.spawn((
 		AssetLoadBlockAppReady,
 		Transform::from_translation(Vec3::new(0., 0., -1.))

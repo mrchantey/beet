@@ -7,6 +7,7 @@ pub enum BundlePlaceholder {
 	Camera2d,
 	Camera3d,
 	Sprite(String),
+	Scene(String),
 }
 
 #[derive(Debug, Default)]
@@ -23,9 +24,12 @@ impl Plugin for BundlePlaceholderPlugin {
 fn init_bundle(
 	asset_server: Res<AssetServer>,
 	mut commands: Commands,
-	query: Query<(Entity,Option<&Transform>, &BundlePlaceholder), Added<BundlePlaceholder>>,
+	query: Query<
+		(Entity, Option<&Transform>, &BundlePlaceholder),
+		Added<BundlePlaceholder>,
+	>,
 ) {
-	for (entity,transform, placeholder) in query.iter() {
+	for (entity, transform, placeholder) in query.iter() {
 		let mut entity_commands = commands.entity(entity);
 		entity_commands.remove::<BundlePlaceholder>();
 		let transform = transform.cloned().unwrap_or_default();
@@ -46,6 +50,13 @@ fn init_bundle(
 			BundlePlaceholder::Sprite(path) => {
 				entity_commands.insert(SpriteBundle {
 					texture: asset_server.load(path),
+					transform,
+					..default()
+				});
+			}
+			BundlePlaceholder::Scene(path) => {
+				entity_commands.insert(SceneBundle {
+					scene: asset_server.load(path),
 					transform,
 					..default()
 				});

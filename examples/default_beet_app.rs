@@ -7,7 +7,8 @@
 //! Common combinations:
 //! - hello world: 	`beet-debug camera-2d ui-terminal hello-world`
 //! - hello_llm: 		`beet-debug camera-2d ui-terminal sentence-selector`
-//! - seek: 				`beet-debug camera-2d space-background seek`
+//! - seek: 				`beet-debug camera-2d space-scene seek`
+//! - flocking: 		`beet-debug camera-2d space-scene flock`
 //! 
 //! 
 use anyhow::Result;

@@ -58,7 +58,6 @@ impl Plugin for Example2dPlugin {
 					.run_if(|res: Option<Res<WrapAround>>| res.is_some())
 					.in_set(PostTickSet),
 			)
-			// .insert_resource(WrapAround::default())
 			.register_type::<AutoSpawn>()
 			.register_type::<RandomizePosition>()
 			.register_type::<RenderText>()

@@ -14,7 +14,7 @@ fn main() -> Result<()> {
 			SceneItem::new_bundle("camera-2d", BundlePlaceholder::Camera2d),
 			SceneItem::new_bundle("camera-3d", BundlePlaceholder::Camera3d),
 			SceneItem::new_resource("beet-debug", BeetDebugConfig::default()),
-			SceneItem::new("space-background", scenes::space_background),
+			SceneItem::new("space-scene", scenes::space_scene),
 			SceneItem::new("ui-terminal", spawn_ui_terminal),
 			SceneItem::new("seek", scenes::seek),
 			SceneItem::new("flock", scenes::flock),
