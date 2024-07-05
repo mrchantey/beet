@@ -49,7 +49,7 @@ pub fn seek_3d(mut commands: Commands) {
 			let agent = parent.parent_entity();
 			parent
 				.spawn((
-					Name::new("Animation Behavior"),
+					Name::new("Seek Behavior"),
 					Running,
 					SequenceSelector,
 					Repeat,

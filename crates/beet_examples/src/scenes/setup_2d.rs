@@ -1,6 +1,12 @@
 use crate::prelude::*;
 use bevy::prelude::*;
 
+
+pub fn camera_2d(mut commands: Commands) {
+	commands.spawn(BundlePlaceholder::Camera2d);
+}
+
+
 pub fn space_scene(mut commands: Commands) {
 	commands.insert_resource(WrapAround::default());
 

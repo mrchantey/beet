@@ -1,6 +1,6 @@
 use super::*;
-use beet::prelude::*;
 use crate::prelude::*;
+use beet::prelude::*;
 use bevy::prelude::*;
 use std::time::Duration;
 
@@ -48,6 +48,7 @@ pub fn fetch_npc(mut commands: Commands) {
 							TargetAgent(agent),
 							ScoreSelector::default(),
 							// ScoreSelector::consuming(),
+							AssetLoadBlockAppReady,
 							AssetPlaceholder::<Bert>::new("default-bert.ron"),
 							FindSentenceSteerTarget::<Collectable>::default(),
 						))
@@ -114,7 +115,7 @@ pub fn fetch_scene(mut commands: Commands) {
 			width: ITEM_OFFSET * 1.4,
 			offset: Vec3::new(0., 1.6, ITEM_OFFSET),
 		},
-		BundlePlaceholder::Camera3d
+		BundlePlaceholder::Camera3d,
 	));
 
 	// items

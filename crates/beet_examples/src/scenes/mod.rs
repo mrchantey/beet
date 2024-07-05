@@ -1,9 +1,6 @@
 pub mod animation_demo;
 #[allow(unused_imports)]
 pub use self::animation_demo::*;
-pub mod basic;
-#[allow(unused_imports)]
-pub use self::basic::*;
 pub mod fetch;
 #[allow(unused_imports)]
 pub use self::fetch::*;
@@ -13,6 +10,7 @@ pub use self::flock::*;
 pub mod foxie;
 #[allow(unused_imports)]
 pub use self::foxie::*;
+pub mod frozen_lake;
 pub mod hello_net;
 #[allow(unused_imports)]
 pub use self::hello_net::*;

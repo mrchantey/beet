@@ -3,6 +3,9 @@ use bevy::pbr::CascadeShadowConfigBuilder;
 use bevy::prelude::*;
 use std::f32::consts::PI;
 
+pub fn camera_3d(mut commands: Commands) {
+	commands.spawn(BundlePlaceholder::Camera3d);
+}
 
 pub fn ground_3d(mut commands: Commands) {
 	commands.spawn(BundlePlaceholder::Pbr {

@@ -243,7 +243,7 @@ pub fn spawn_ui_terminal(mut commands: Commands, user_input: bool) {
 					.with_children(|input_area| {
 						input_area.spawn((
 							TextBundle::from_sections([
-								TextSection::new("User > ", style()),
+								TextSection::new("User> ", style()),
 								TextSection::new("", style()),
 							]),
 							InputContainer,
@@ -271,6 +271,9 @@ fn parse_text_input(
 				}
 				Key::Backspace => {
 					text.pop();
+				}
+				Key::Space => {
+					text.push(' ');
 				}
 				Key::Character(char) => {
 					text.push_str(char);

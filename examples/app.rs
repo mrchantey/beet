@@ -6,10 +6,12 @@
 //!
 //! Common combinations:
 //! - hello world: 	`beet-debug camera-2d ui-terminal hello-world`
-//! - hello_llm: 		`beet-debug camera-2d ui-terminal sentence-selector`
+//! - hello llm: 		`beet-debug camera-2d ui-terminal sentence-selector`
 //! - seek: 				`beet-debug camera-2d space-scene seek`
 //! - flocking: 		`beet-debug camera-2d space-scene flock`
-//! - animation:		`beet-debug animation-demo`
+//! - seek-3d:			`beet-debug ui-terminal lighting-3d ground-3d seek-3d`
+//! - animation:		`beet-debug ui-terminal lighting-3d ground-3d animation-demo`
+//! - fetch:				`ui-terminal-input lighting-3d ground-3d fetch-scene fetch-npc`
 //!
 use anyhow::Result;
 use beet::prelude::*;
