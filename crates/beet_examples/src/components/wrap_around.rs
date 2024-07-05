@@ -4,6 +4,7 @@ pub const DEFAULT_WRAPAROUND_HALF_EXTENTS: f32 = 1.;
 
 
 #[derive(Debug, Clone, Resource, PartialEq, Reflect)]
+#[reflect(Resource)]
 pub struct WrapAround {
 	pub half_extents: Vec3,
 }

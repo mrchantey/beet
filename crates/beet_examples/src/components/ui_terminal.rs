@@ -15,6 +15,7 @@ impl Plugin for UiTerminalPlugin {
 			.add_systems(Update, (
 				log_log_on_run.pipe(append_text),
 				log_user_input.pipe(append_text),
+				log_app_ready.pipe(append_text),
 				parse_text_input
 			))
 			.add_systems(
@@ -89,6 +90,12 @@ fn log_user_input(mut events: EventReader<OnUserMessage>) -> Vec<String> {
 	events
 		.read()
 		.map(|ev| format!("User: {}", ev.0.to_string()))
+		.collect()
+}
+fn log_app_ready(mut events: EventReader<AppReady>) -> Vec<String> {
+	events
+		.read()
+		.map(|_ev| format!("Event: AppReady"))
 		.collect()
 }
 

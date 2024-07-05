@@ -2,6 +2,7 @@ use crate::prelude::*;
 use bevy::prelude::*;
 
 #[derive(Default, Clone, Component, Reflect)]
+#[reflect(Component)]
 /// Default marker for agents that should be considered
 /// in group steering actions.
 pub struct GroupSteerAgent;

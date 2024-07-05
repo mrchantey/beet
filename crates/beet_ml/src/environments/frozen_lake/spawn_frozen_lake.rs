@@ -3,61 +3,36 @@ use beet_ecs::prelude::*;
 use bevy::prelude::*;
 use std::time::Duration;
 
-
-#[derive(Resource)]
-pub struct FrozenLakeAssets {
-	pub tile: Handle<Scene>,
-	pub character: Handle<Scene>,
-	pub goal: Handle<Scene>,
-	pub hazard: Handle<Scene>,
+pub mod frozen_lake_assets {
+	pub const TILE: &str = "kaykit-minigame/tileSmall_teamBlue.gltf.glb#Scene0";
+	pub const CHARACTER: &str = "kaykit-minigame/character_dog.gltf.glb#Scene0";
+	pub const GOAL: &str = "kaykit-minigame/flag_teamYellow.gltf.glb#Scene0";
+	pub const HAZARD: &str = "kaykit-minigame/bomb_teamRed.gltf.glb#Scene0";
 }
 
-pub fn init_frozen_lake_assets(
-	mut commands: Commands,
-	asset_server: Res<AssetServer>,
-) {
-	let tile =
-		asset_server.load("kaykit-minigame/tileSmall_teamBlue.gltf.glb#Scene0");
-	let character =
-		asset_server.load("kaykit-minigame/character_dog.gltf.glb#Scene0");
-	let goal =
-		asset_server.load("kaykit-minigame/flag_teamYellow.gltf.glb#Scene0");
-	let hazard =
-		asset_server.load("kaykit-minigame/bomb_teamRed.gltf.glb#Scene0");
-
-	commands.insert_resource(FrozenLakeAssets {
-		tile,
-		character,
-		goal,
-		hazard,
-	});
-}
-
-pub fn spawn_frozen_lake_session(
-	mut events: EventReader<StartSession<FrozenLakeEpParams>>,
-	mut commands: Commands,
-	assets: Res<FrozenLakeAssets>,
-) {
-	for event in events.read() {
-		let FrozenLakeEpParams {
-			map, grid_to_world, ..
-		} = &event.params;
-
-		spawn_frozen_lake_scene(
-			&mut commands,
-			map,
-			grid_to_world,
-			&assets,
-			(SessionEntity(event.session), DespawnOnSessionEnd),
-		)
-	}
-}
+// pub fn spawn_frozen_lake_session(
+// 	mut events: EventReader<StartSession<FrozenLakeEpParams>>,
+// 	mut commands: Commands,
+// ) {
+// 	for event in events.read() {
+// 		let FrozenLakeEpParams {
+// 			map, grid_to_world, ..
+// 		} = &event.params;
+//
+// spawn_frozen_lake_scene(
+// 	&mut commands,
+// 	map,
+// 	grid_to_world,
+// 	(SessionEntity(event.session), DespawnOnSessionEnd),
+// )
+// 	}
+// }
 
 
 pub fn spawn_frozen_lake_episode(
 	mut events: EventReader<StartEpisode<FrozenLakeEpParams>>,
 	mut commands: Commands,
-	assets: Res<FrozenLakeAssets>,
+	asset_server: Res<AssetServer>,
 ) {
 	for event in events.read() {
 		let FrozenLakeEpParams {
@@ -69,11 +44,10 @@ pub fn spawn_frozen_lake_episode(
 		let agent_pos = map.agent_position();
 		let agent_pos = grid_to_world.world_pos(*agent_pos);
 
-
 		commands
 			.spawn((
 				SceneBundle {
-					scene: assets.character.clone(),
+					scene: asset_server.load(frozen_lake_assets::CHARACTER),
 					transform: Transform::from_translation(agent_pos)
 						.with_scale(object_scale),
 					..default()

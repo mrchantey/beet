@@ -53,12 +53,7 @@ impl<
 // 	Self: ActionMeta,
 {
 	fn build(&self, app: &mut App) {
-		app.init_resource::<AppTypeRegistry>();
-		let mut registry =
-			app.world_mut().resource::<AppTypeRegistry>().write();
-		registry.register::<T>();
-
-		drop(registry);
+		app.register_type::<T>();
 		build_common::<T>(app);
 	}
 }

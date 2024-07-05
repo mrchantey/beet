@@ -17,7 +17,7 @@ pub type QValue = f32;
 	Deserialize,
 	Asset,
 )]
-#[reflect(Default)]
+#[reflect(Default, Component)]
 pub struct QTable<State: StateSpace, Action: ActionSpace>(
 	pub HashMap<State, HashMap<Action, QValue>>,
 );

@@ -5,6 +5,7 @@ use beet_examples::scenes;
 use bevy::ecs::schedule::SystemConfigs;
 use bevy::prelude::*;
 mod utils;
+use rayon::prelude::*;
 
 
 
@@ -33,9 +34,22 @@ fn main() -> Result<()> {
 			SceneItem::new("seek-3d", scenes::seek_3d),
 			SceneItem::new("fetch-scene", scenes::fetch_scene),
 			SceneItem::new("fetch-npc", scenes::fetch_npc),
+			// frozen-lake
+			SceneItem::new(
+				"frozen-lake-scene",
+				scenes::frozen_lake::frozen_lake_scene,
+			),
+			SceneItem::new(
+				"frozen-lake-train",
+				scenes::frozen_lake::frozen_lake_train,
+			),
+			SceneItem::new(
+				"frozen-lake-run",
+				scenes::frozen_lake::frozen_lake_run,
+			),
 		],
 	}]
-	.into_iter()
+	.into_par_iter()
 	.map(|project| project.save())
 	.collect::<Result<Vec<_>>>()?;
 	Ok(())

@@ -24,6 +24,7 @@ use strum::VariantArray;
 	Serialize,
 	Deserialize,
 )]
+#[reflect(Default, Component)]
 pub struct GridPos(pub UVec2);
 
 impl GridPos {
@@ -62,6 +63,7 @@ impl From<UVec2> for GridPos {
 	Serialize,
 	Deserialize,
 )]
+#[reflect(Default, Component)]
 pub enum GridDirection {
 	#[default]
 	Up,
@@ -131,6 +133,7 @@ impl ActionSpace for GridDirection {
 
 
 #[derive(Debug, Clone, Component, Reflect)]
+#[reflect(Component)]
 pub struct GridToWorld {
 	pub map_width: f32,
 	pub cell_width: f32,

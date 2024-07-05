@@ -27,6 +27,7 @@ impl Plugin for SteerPlugin {
 		.register_type::<ArriveRadius>()
 		.register_type::<WanderParams>()
 		.register_type::<GroupParams>()
+		.register_type::<GroupSteerAgent>()
 		/*_*/;
 
 		let world = app.world_mut();

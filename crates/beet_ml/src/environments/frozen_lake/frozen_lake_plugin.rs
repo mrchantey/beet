@@ -45,25 +45,26 @@ impl Plugin for FrozenLakePlugin {
 			)>::default(),
 			RlSessionPlugin::<FrozenLakeEpParams>::default(),
 		))
-		.add_systems(PreStartup, init_frozen_lake_assets)
 		.add_systems(Update, reward_grid.in_set(PostTickSet))
 		.add_systems(
 			Update,
-			(spawn_frozen_lake_session, spawn_frozen_lake_episode)
-				.in_set(PostTickSet),
+			spawn_frozen_lake_episode
+			// (spawn_frozen_lake_session, spawn_frozen_lake_episode)
+			.in_set(PostTickSet),
 		)
-		.init_resource::<RlRng>()
 		.init_asset::<QTable<GridPos, GridDirection>>()
 		.init_asset_loader::<QTableLoader<GridPos, GridDirection>>()
 		.register_type::<GridPos>()
+		.register_type::<RlSession<FrozenLakeEpParams>>()
+		.register_type::<QTable<GridPos, GridDirection>>()
+		.register_type::<GridPos>()
 		.register_type::<GridDirection>()
+		.register_type::<GridToWorld>()
 		/*-*/;
 
 		let world = app.world_mut();
 		world.init_component::<GridPos>();
 		world.init_component::<GridDirection>();
-
-
 	}
 }
 

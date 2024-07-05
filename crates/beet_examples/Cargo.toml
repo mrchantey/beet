@@ -30,6 +30,7 @@ web-sys.workspace = true
 
 [dev-dependencies]
 anyhow.workspace = true
+rayon = "1.10.0"
 
 [target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
 tokio.workspace = true

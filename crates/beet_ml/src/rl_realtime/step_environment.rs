@@ -25,7 +25,7 @@ impl<S: RlSessionTypes> StepEnvironment<S> {
 
 
 fn step_environment<S: RlSessionTypes>(
-	mut rng: ResMut<RlRng>,
+	mut rng: Option<ResMut<RlRng>>,
 	mut end_episode_events: EventWriter<EndEpisode<S::EpisodeParams>>,
 	mut commands: Commands,
 	mut sessions: Query<&mut S::QLearnPolicy>,
@@ -59,6 +59,12 @@ fn step_environment<S: RlSessionTypes>(
 		let outcome = env.step(&state, &action);
 		// we ignore the state of the outcome, allow simulation to determine
 		let epsilon = params.epsilon(step.episode);
+
+		let rng = if let Some(rng) = &mut rng {
+			rng.as_mut()
+		} else {
+			&mut RlRng::default()
+		};
 
 		*action = table.step(
 			params,

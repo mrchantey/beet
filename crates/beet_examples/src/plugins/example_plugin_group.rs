@@ -15,14 +15,14 @@ use bevy::prelude::*;
 ///
 pub struct ExamplePluginFull;
 
-impl Plugin for ExamplePluginFull{
-		fn build(&self, app: &mut App) {
-			app.add_plugins((
-				ExampleDefaultPlugins,
-				DefaultBeetPlugins,
-				ExamplePlugins,
-			));		
-		}
+impl Plugin for ExamplePluginFull {
+	fn build(&self, app: &mut App) {
+		app.add_plugins((
+			ExampleDefaultPlugins,
+			DefaultBeetPlugins,
+			ExamplePlugins,
+		));
+	}
 }
 
 #[derive(Default)]
@@ -39,6 +39,7 @@ impl PluginGroup for ExamplePlugins {
 			.add(ExampleReplicatePlugin)
 			.add(ExampleMlPlugin)
 			.add(BundlePlaceholderPlugin)
+			.add(FrozenLakePlugin)
 	}
 }
 
@@ -48,10 +49,14 @@ pub struct ExampleMlPlugin;
 impl Plugin for ExampleMlPlugin {
 	fn build(&self, app: &mut App) {
 		app.add_plugins((
+			// sentence selector
 			BertPlugin::default(),
 			ActionPlugin::<InsertOnAssetEvent<RunResult, Bert>>::default(),
 			AssetPlaceholderPlugin::<Bert>::default(),
 			ReadyOnAssetLoadPlugin::<Bert>::default(),
+			// qtables (frozen lake)
+			AssetPlaceholderPlugin::<QTable<GridPos,GridDirection>>::default(),
+			ReadyOnAssetLoadPlugin::<QTable<GridPos,GridDirection>>::default()
 		));
 	}
 }
@@ -111,7 +116,6 @@ impl Plugin for Example3dPlugin {
 			FindSentenceSteerTarget<Collectable>,
 			RemoveAgentOnRun<Sentence>,
 			RemoveAgentOnRun<SteerTarget>,
-		)>::default())		
-		/*-*/;
+		)>::default());
 	}
 }
