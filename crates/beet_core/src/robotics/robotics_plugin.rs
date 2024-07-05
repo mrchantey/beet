@@ -10,15 +10,13 @@ impl Plugin for RoboticsPlugin {
 		app.add_plugins(ActionPlugin::<(
 			SetAgentOnRun<DualMotorValue>,
 			DepthSensorScorer,
-		)>::default());
+		)>::default())
+		.register_type::<DepthValue>()
+		.register_type::<DualMotorValue>();
 
 		let world = app.world_mut();
 		world.init_bundle::<DepthValue>();
 		world.init_bundle::<DualMotorValue>();
 
-		let mut registry =
-			world.get_resource::<AppTypeRegistry>().unwrap().write();
-		registry.register::<DepthValue>();
-		registry.register::<DualMotorValue>();
 	}
 }

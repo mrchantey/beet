@@ -20,21 +20,17 @@ impl Plugin for SteerPlugin {
 			FindSteerTarget,
 			ScoreSteerTarget,
 			DespawnSteerTarget,
-		)>::default());
+		)>::default())
+		.register_type::<SteerTarget>()
+		.register_type::<MaxForce>()
+		.register_type::<MaxSpeed>()
+		.register_type::<ArriveRadius>()
+		.register_type::<WanderParams>()
+		.register_type::<GroupParams>()
+		/*_*/;
 
 		let world = app.world_mut();
 		world.init_bundle::<SteerBundle>();
-
-		let mut registry =
-			world.get_resource::<AppTypeRegistry>().unwrap().write();
-		registry.register::<SteerTarget>();
-		registry.register::<MaxForce>();
-		registry.register::<MaxSpeed>();
-		registry.register::<ArriveRadius>();
-		registry.register::<WanderParams>();
-		registry.register::<GroupParams>();
-
-		drop(registry);
 
 		#[cfg(feature = "gizmos")]
 		app.add_systems(Update, debug_group_steer.in_set(PostTickSet));

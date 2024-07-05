@@ -22,8 +22,11 @@ impl Plugin for ExamplePlugin2d {
 					.run_if(|res: Option<Res<WrapAround>>| res.is_some())
 					.in_set(PostTickSet),
 			)
-			.insert_resource(WrapAround::default());
-		/*-*/
+			.insert_resource(WrapAround::default())
+		.register_type::<AutoSpawn>()
+		.register_type::<RandomizePosition>()
+		.register_type::<RenderText>()
+		/*-*/;
 
 
 
@@ -33,11 +36,6 @@ impl Plugin for ExamplePlugin2d {
 		world.init_component::<RandomizePosition>();
 		world.init_component::<RenderText>();
 
-		let mut registry =
-			world.get_resource::<AppTypeRegistry>().unwrap().write();
-		registry.register::<AutoSpawn>();
-		registry.register::<RandomizePosition>();
-		registry.register::<RenderText>();
 	}
 }
 

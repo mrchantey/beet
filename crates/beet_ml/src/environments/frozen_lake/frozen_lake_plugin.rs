@@ -54,17 +54,16 @@ impl Plugin for FrozenLakePlugin {
 		)
 		.init_resource::<RlRng>()
 		.init_asset::<QTable<GridPos, GridDirection>>()
-		.init_asset_loader::<QTableLoader<GridPos, GridDirection>>();
+		.init_asset_loader::<QTableLoader<GridPos, GridDirection>>()
+		.register_type::<GridPos>()
+		.register_type::<GridDirection>()
+		/*-*/;
 
 		let world = app.world_mut();
 		world.init_component::<GridPos>();
 		world.init_component::<GridDirection>();
 
-		let mut registry =
-			world.get_resource::<AppTypeRegistry>().unwrap().write();
 
-		registry.register::<GridPos>();
-		registry.register::<GridDirection>();
 	}
 }
 

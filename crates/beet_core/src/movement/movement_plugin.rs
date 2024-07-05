@@ -11,24 +11,7 @@ impl Plugin for MovementPlugin {
 			Hover,
 			Translate,
 			SetAgentOnRun<Velocity>,
-		)>::default());
-
-		let world = app.world_mut();
-		world.init_bundle::<ForceBundle>();
-
-		let mut registry =
-			world.get_resource::<AppTypeRegistry>().unwrap().write();
-		registry.register::<Mass>();
-		registry.register::<Velocity>();
-		registry.register::<Impulse>();
-		registry.register::<Force>();
-		registry.register::<RotateToVelocity2d>();
-		registry.register::<RotateToVelocity3d>();
-		registry.register::<VelocityScalar>();
-
-		drop(registry);
-
-		app.add_systems(
+		)>::default()).add_systems(
 			Update,
 			(
 				integrate_force,
@@ -36,6 +19,16 @@ impl Plugin for MovementPlugin {
 			)
 				.chain()
 				.in_set(PostTickSet),
-		);
+		)		.register_type::<Mass>()
+		.register_type::<Velocity>()
+		.register_type::<Impulse>()
+		.register_type::<Force>()
+		.register_type::<RotateToVelocity2d>()
+		.register_type::<RotateToVelocity3d>()
+		.register_type::<VelocityScalar>()		
+		/*-*/;
+
+		let world = app.world_mut();
+		world.init_bundle::<ForceBundle>();
 	}
 }
