@@ -1,5 +1,5 @@
 use beet::prelude::*;
-use beet_examples::prelude::*;
+use crate::prelude::*;
 use bevy::prelude::*;
 
 pub fn sentence_selector(mut commands: Commands) {

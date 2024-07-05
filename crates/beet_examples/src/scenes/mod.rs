@@ -1,6 +1,9 @@
 pub mod animation_demo;
 #[allow(unused_imports)]
 pub use self::animation_demo::*;
+pub mod basic;
+#[allow(unused_imports)]
+pub use self::basic::*;
 pub mod fetch;
 #[allow(unused_imports)]
 pub use self::fetch::*;
@@ -31,3 +34,6 @@ pub use self::setup_2d::*;
 pub mod setup_3d;
 #[allow(unused_imports)]
 pub use self::setup_3d::*;
+pub mod ui_terminal;
+#[allow(unused_imports)]
+pub use self::ui_terminal::*;

@@ -1,10 +1,10 @@
-use beet_examples::prelude::*;
+use crate::prelude::*;
 use bevy::pbr::CascadeShadowConfigBuilder;
 use bevy::prelude::*;
 use std::f32::consts::PI;
 
 
-pub fn setup_ground_3d(mut commands: Commands) {
+pub fn ground_3d(mut commands: Commands) {
 	commands.spawn(BundlePlaceholder::Pbr {
 		mesh: MeshPlaceholder::Plane3d {
 			plane: Plane3d::default(),
@@ -16,7 +16,7 @@ pub fn setup_ground_3d(mut commands: Commands) {
 }
 
 
-pub fn setup_lighting_3d(mut commands: Commands) {
+pub fn lighting_3d(mut commands: Commands) {
 	// Light
 	commands.spawn(DirectionalLightBundle {
 		transform: Transform::from_rotation(Quat::from_euler(

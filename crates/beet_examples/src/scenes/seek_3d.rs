@@ -1,29 +1,32 @@
 use super::*;
 use beet::prelude::*;
-use beet_examples::prelude::*;
-use bevy::animation::RepeatAnimation;
+use crate::prelude::*;
 use bevy::prelude::*;
 use std::time::Duration;
 
-
-
-
-pub fn animation_demo(mut commands: Commands) {
+pub fn seek_3d(mut commands: Commands) {
 	// camera
-	commands.spawn((
-		BundlePlaceholder::Camera3d,
-		Transform::from_xyz(10.0, 10.0, 15.0)
-			.looking_at(Vec3::new(0.0, 2.0, 0.0), Vec3::Y),
-	));
+	commands.spawn((BundlePlaceholder::Camera3d, CameraDistance {
+		width: 80.,
+		offset: Vec3::new(0., 20., 40.),
+	}));
 
-	let Foxie {
-		graph,
-		idle_clip,
-		idle_index,
-		walk_clip,
-		walk_index,
-	} = load_foxie();
+	// cheese
+	let target = commands
+		.spawn((
+			FollowCursor3d,
+			Transform::from_xyz(20., 0., 40.).with_scale(Vec3::splat(3.)),
+			BundlePlaceholder::Scene("kaykit/cheese.glb#Scene0".into()),
+		))
+		.id();
 
+		let Foxie {
+			graph,
+			idle_clip,
+			idle_index,
+			walk_index,
+			..
+		} = load_foxie();
 
 	let transition_duration = Duration::from_secs_f32(0.5);
 
@@ -33,6 +36,14 @@ pub fn animation_demo(mut commands: Commands) {
 			BundlePlaceholder::Scene("Fox.glb#Scene0".into()),
 			graph,
 			AnimationTransitions::new(),
+			RotateToVelocity3d::default(),
+			ForceBundle::default(),
+			SteerBundle {
+				max_force: MaxForce(0.05),
+				..default()
+			}
+			.scaled_to(10.)
+			.with_target(target),
 		))
 		.with_children(|parent| {
 			let agent = parent.parent_entity();
@@ -47,8 +58,8 @@ pub fn animation_demo(mut commands: Commands) {
 					parent.spawn((
 						Name::new("Idle"),
 						TargetAgent(agent),
+						SetAgentOnRun(Velocity::default()),
 						PlayAnimation::new(idle_index)
-							.repeat(RepeatAnimation::Count(1))
 							.with_transition_duration(transition_duration),
 						idle_clip,
 						InsertOnAnimationEnd::new(
@@ -58,17 +69,13 @@ pub fn animation_demo(mut commands: Commands) {
 						.with_transition_duration(transition_duration),
 					));
 					parent.spawn((
-						Name::new("Walking"),
+						Name::new("Seek"),
 						TargetAgent(agent),
+						Seek,
 						PlayAnimation::new(walk_index)
-							.repeat(RepeatAnimation::Count(4))
+							.repeat_forever()
 							.with_transition_duration(transition_duration),
-						walk_clip,
-						InsertOnAnimationEnd::new(
-							walk_index,
-							RunResult::Success,
-						)
-						.with_transition_duration(transition_duration),
+						SucceedOnArrive::new(6.),
 					));
 				});
 		});

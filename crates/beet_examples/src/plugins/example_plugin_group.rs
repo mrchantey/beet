@@ -3,6 +3,7 @@ use beet::prelude::*;
 use bevy::app::PluginGroupBuilder;
 use bevy::prelude::*;
 
+
 /// Kitchen sink plugin, this is all you need for
 /// ### Rendering
 /// - text
@@ -12,6 +13,18 @@ use bevy::prelude::*;
 /// - steering
 /// - machine learning
 ///
+pub struct ExamplePluginFull;
+
+impl Plugin for ExamplePluginFull{
+		fn build(&self, app: &mut App) {
+			app.add_plugins((
+				ExampleDefaultPlugins,
+				DefaultBeetPlugins,
+				ExamplePlugins,
+			));		
+		}
+}
+
 #[derive(Default)]
 pub struct ExamplePlugins;
 

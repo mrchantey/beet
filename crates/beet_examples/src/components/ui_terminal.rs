@@ -19,17 +19,18 @@ impl Plugin for UiTerminalPlugin {
 			))
 			.add_systems(
 				PostUpdate,
-				(init_output,resize_output)
+				(init_output,handle_resize_event,remove_excessive_lines)
 					.before(UiSystem::Layout),
 			)
 			.add_systems(
 				PostUpdate,
-				(scroll_to_bottom_on_resize, scroll_to_bottom_on_append)
+				(scroll_to_bottom_on_resize, scroll_to_bottom_on_append,show_new_sections)
 					.after(UiSystem::Layout),
 			)
 			.register_type::<UiTerminal>()
 			.register_type::<InputContainer>()
 			.register_type::<OutputContainer>()
+			.register_type::<OutputItem>()
 			/*-*/;
 	}
 }
@@ -43,6 +44,10 @@ pub struct InputContainer;
 #[derive(Debug, Default, Component, Reflect)]
 #[reflect(Default, Component)]
 pub struct UiTerminal;
+
+#[derive(Debug, Default, Component, Reflect)]
+#[reflect(Default, Component)]
+pub struct OutputItem;
 
 #[derive(Debug, Default, Component, Reflect)]
 #[reflect(Default, Component)]
@@ -63,9 +68,11 @@ fn append_text(
 	for entity in terminals.iter() {
 		for text in values.iter() {
 			commands.entity(entity).with_children(|parent| {
+				let mut style = style();
+				style.color.set_alpha(0.);
 				parent.spawn(
 					// AccessibilityNode(NodeBuilder::new(Role::ListItem)),
-					TextBundle::from_section(text, style()),
+					(OutputItem, TextBundle::from_section(text, style)),
 				);
 			});
 		}
@@ -107,7 +114,7 @@ fn scroll_to_bottom_on_resize(
 	}
 }
 
-pub fn scroll_to_bottom_on_append(
+fn scroll_to_bottom_on_append(
 	mut list: Query<
 		(&mut Style, &Node, &Parent),
 		(With<UiTerminal>, Changed<Children>),
@@ -121,16 +128,27 @@ pub fn scroll_to_bottom_on_append(
 	}
 }
 
-pub fn spawn_ui_terminal_with_input(commands: Commands) {
-	spawn_ui_terminal(commands, true);
+const MAX_LINES: usize = 32;
+fn remove_excessive_lines(
+	mut commands: Commands,
+	mut list: Query<&Children, (With<UiTerminal>, Changed<Children>)>,
+) {
+	for children in list.iter_mut() {
+		let num_over_max = children.len().saturating_sub(MAX_LINES);
+		for child in children.iter().take(num_over_max) {
+			commands.entity(*child).despawn_recursive();
+		}
+	}
 }
-pub fn spawn_ui_terminal_no_input(commands: Commands) {
-	spawn_ui_terminal(commands, false);
+fn show_new_sections(mut query: Query<&mut Text, Added<OutputItem>>) {
+	for mut text in query.iter_mut() {
+		text.sections[0].style.color.set_alpha(1.);
+	}
 }
 
 const INPUT_HEIGHT_PX: f32 = 50.;
 
-fn resize_output(
+fn handle_resize_event(
 	mut resize_reader: EventReader<WindowResized>,
 	mut containers: Query<&mut Style, With<OutputContainer>>,
 ) {
@@ -151,7 +169,7 @@ fn init_output(
 	}
 }
 
-fn spawn_ui_terminal(mut commands: Commands, user_input: bool) {
+pub fn spawn_ui_terminal(mut commands: Commands, user_input: bool) {
 	commands
 		// ROOT CONTAINER
 		.spawn(NodeBundle {
@@ -219,7 +237,7 @@ fn spawn_ui_terminal(mut commands: Commands, user_input: bool) {
 							padding: UiRect::all(Val::Px(10.)),
 							..default()
 						},
-						background_color: Color::srgba(1., 1., 1., 0.2).into(),
+						background_color: Color::srgba(0., 0., 0., 0.2).into(),
 						..default()
 					})
 					.with_children(|input_area| {

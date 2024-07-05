@@ -1,9 +1,9 @@
 use anyhow::Result;
 use beet::prelude::*;
 use beet_examples::prelude::*;
+use beet_examples::scenes;
 use bevy::ecs::schedule::SystemConfigs;
 use bevy::prelude::*;
-mod scenes;
 mod utils;
 
 
@@ -13,12 +13,12 @@ fn main() -> Result<()> {
 		name: "beet-basics",
 		scenes: vec![
 			SceneItem::new("empty", || {}),
-			SceneItem::new_bundle("camera-2d", BundlePlaceholder::Camera2d),
-			SceneItem::new_bundle("camera-3d", BundlePlaceholder::Camera3d),
-			SceneItem::new_resource("beet-debug", BeetDebugConfig::default()),
+			SceneItem::new("camera-2d", scenes::camera_2d),
+			SceneItem::new("camera-3d", scenes::camera_3d),
+			SceneItem::new("beet-debug", scenes::beet_debug),
 			// text
-			SceneItem::new("ui-terminal", spawn_ui_terminal_no_input),
-			SceneItem::new("ui-terminal-input", spawn_ui_terminal_with_input),
+			SceneItem::new("ui-terminal", scenes::ui_terminal),
+			SceneItem::new("ui-terminal-input", scenes::ui_terminal_input),
 			SceneItem::new("hello-world", scenes::hello_world),
 			SceneItem::new("hello-net", scenes::hello_net),
 			SceneItem::new("sentence-selector", scenes::sentence_selector),
@@ -27,8 +27,8 @@ fn main() -> Result<()> {
 			SceneItem::new("seek", scenes::seek),
 			SceneItem::new("flock", scenes::flock),
 			// 3d
-			SceneItem::new("ground-3d", scenes::setup_ground_3d),
-			SceneItem::new("lighting-3d", scenes::setup_lighting_3d),
+			SceneItem::new("ground-3d", scenes::ground_3d),
+			SceneItem::new("lighting-3d", scenes::lighting_3d),
 			SceneItem::new("animation-demo", scenes::animation_demo),
 			SceneItem::new("seek-3d", scenes::seek_3d),
 			SceneItem::new("fetch-scene", scenes::fetch_scene),
@@ -71,28 +71,6 @@ impl SceneItem {
 			system: system.into_configs(),
 		}
 	}
-	pub fn new_bundle(name: &'static str, bundle: impl Bundle + Clone) -> Self {
-		Self {
-			name,
-			system: (move |mut commands: Commands| {
-				commands.spawn(bundle.clone());
-			})
-			.into_configs(),
-		}
-	}
-	pub fn new_resource(
-		name: &'static str,
-		resource: impl Resource + Clone,
-	) -> Self {
-		Self {
-			name,
-			system: (move |mut commands: Commands| {
-				commands.insert_resource(resource.clone());
-			})
-			.into_configs(),
-		}
-	}
-
 	pub fn save(self, _project_name: &str) -> Result<()> {
 		let mut app = App::new();
 		app.add_plugins((

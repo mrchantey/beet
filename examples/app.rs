@@ -9,7 +9,7 @@
 //! - hello_llm: 		`beet-debug camera-2d ui-terminal sentence-selector`
 //! - seek: 				`beet-debug camera-2d space-scene seek`
 //! - flocking: 		`beet-debug camera-2d space-scene flock`
-//!
+//! - animation:		`beet-debug animation-demo`
 //!
 use anyhow::Result;
 use beet::prelude::*;
@@ -18,15 +18,7 @@ use bevy::prelude::*;
 
 fn main() {
 	let mut app = App::new();
-	app.add_plugins((
-		ExampleDefaultPlugins,
-		DefaultBeetPlugins,
-		ExamplePlugins,
-	))
-	// .add_systems(
-	// 	Startup,
-		// spawn_ui_terminal_with_input,
-	// )
+	app.add_plugins(ExamplePluginFull)
 	/*-*/;
 
 	#[cfg(not(target_arch = "wasm32"))]

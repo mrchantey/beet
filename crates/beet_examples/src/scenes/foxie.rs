@@ -1,4 +1,4 @@
-use beet_examples::prelude::*;
+use crate::prelude::*;
 use bevy::prelude::*;
 
 pub struct Foxie {
