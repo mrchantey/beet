@@ -40,7 +40,7 @@ strum_macros.workspace = true
 # strum.workspace = true
 # strum_macros.workspace = true
 
-bevy = { version = "=0.14.0-rc.4", default-features = false, features = [
+bevy = { version = "0.14", default-features = false, features = [
 	# "bevy_scene",
 ] }
 

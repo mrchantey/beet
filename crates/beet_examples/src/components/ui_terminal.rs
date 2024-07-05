@@ -2,6 +2,7 @@ use crate::prelude::OnUserMessage;
 use beet::prelude::*;
 use bevy::input::keyboard::Key;
 use bevy::input::keyboard::KeyboardInput;
+use bevy::input::ButtonState;
 use bevy::prelude::*;
 use bevy::ui::UiSystem;
 use bevy::window::WindowResized;
@@ -11,14 +12,24 @@ pub struct UiTerminalPlugin;
 impl Plugin for UiTerminalPlugin {
 	fn build(&self, app: &mut App) {
 		app.add_plugins(BeetDebugPlugin::new(append_text))
-			.add_systems(Update, (log_log_on_run.pipe(append_text),parse_text_input))
+			.add_systems(Update, (
+				log_log_on_run.pipe(append_text),
+				log_user_input.pipe(append_text),
+				parse_text_input
+			))
+			.add_systems(
+				PostUpdate,
+				(init_output,resize_output)
+					.before(UiSystem::Layout),
+			)
 			.add_systems(
 				PostUpdate,
 				(scroll_to_bottom_on_resize, scroll_to_bottom_on_append)
 					.after(UiSystem::Layout),
 			)
 			.register_type::<UiTerminal>()
-			.register_type::<PlayerInput>()
+			.register_type::<InputContainer>()
+			.register_type::<OutputContainer>()
 			/*-*/;
 	}
 }
@@ -26,12 +37,16 @@ impl Plugin for UiTerminalPlugin {
 
 #[derive(Debug, Default, Component, Reflect)]
 #[reflect(Default, Component)]
-pub struct PlayerInput;
+pub struct InputContainer;
 
 
 #[derive(Debug, Default, Component, Reflect)]
-#[reflect(Component)]
+#[reflect(Default, Component)]
 pub struct UiTerminal;
+
+#[derive(Debug, Default, Component, Reflect)]
+#[reflect(Default, Component)]
+pub struct OutputContainer;
 
 fn style() -> TextStyle {
 	TextStyle {
@@ -50,7 +65,7 @@ fn append_text(
 			commands.entity(entity).with_children(|parent| {
 				parent.spawn(
 					// AccessibilityNode(NodeBuilder::new(Role::ListItem)),
-					TextBundle::from_section(format!("> {text}"), style()),
+					TextBundle::from_section(text, style()),
 				);
 			});
 		}
@@ -58,7 +73,16 @@ fn append_text(
 }
 
 fn log_log_on_run(query: Query<&LogOnRun, Added<Running>>) -> Vec<String> {
-	query.iter().map(|log| log.0.to_string()).collect()
+	query
+		.iter()
+		.map(|log| format!("LogOnRun: {}", log.0.to_string()))
+		.collect()
+}
+fn log_user_input(mut events: EventReader<OnUserMessage>) -> Vec<String> {
+	events
+		.read()
+		.map(|ev| format!("User: {}", ev.0.to_string()))
+		.collect()
 }
 
 fn get_top_pos(node: &Node, parent: &Node) -> f32 {
@@ -104,88 +128,124 @@ pub fn spawn_ui_terminal_no_input(commands: Commands) {
 	spawn_ui_terminal(commands, false);
 }
 
+const INPUT_HEIGHT_PX: f32 = 50.;
+
+fn resize_output(
+	mut resize_reader: EventReader<WindowResized>,
+	mut containers: Query<&mut Style, With<OutputContainer>>,
+) {
+	for ev in resize_reader.read() {
+		for mut style in containers.iter_mut() {
+			style.height = Val::Px(ev.height as f32 - INPUT_HEIGHT_PX);
+		}
+	}
+}
+fn init_output(
+	window: Query<&Window>,
+	mut containers: Query<&mut Style, Added<OutputContainer>>,
+) {
+	for window in window.iter() {
+		for mut style in containers.iter_mut() {
+			style.height = Val::Px(window.height() - INPUT_HEIGHT_PX);
+		}
+	}
+}
 
 fn spawn_ui_terminal(mut commands: Commands, user_input: bool) {
 	commands
-		// CONTAINER
+		// ROOT CONTAINER
 		.spawn(NodeBundle {
 			style: Style {
-				height: Val::Percent(100.),
 				width: Val::Percent(100.),
+				height: Val::Percent(100.),
 				justify_content: JustifyContent::SpaceBetween,
-				// align_self: AlignSelf::Stretch,
 				flex_direction: FlexDirection::Column,
-				overflow: Overflow::clip(),
 				..default()
 			},
 			// background_color: Color::srgb(0.10, 0.10, 0.10).into(),
 			..default()
 		})
 		.with_children(|parent| {
+			// OUTPUT_CONTAINER
 			parent
-				// LIST
-				.spawn((
-					UiTerminal,
-					NodeBundle {
+				.spawn((OutputContainer, NodeBundle {
+					style: Style {
+						// flex_grow: 1.,
+						width: Val::Percent(100.),
+						height: Val::Percent(80.), // gets overridden by init_output and resize_output
+						flex_direction: FlexDirection::Column,
+						overflow: Overflow::clip(),
+						..default()
+					},
+					// background_color: Color::srgb(0.10, 0.10, 0.10).into(),
+					..default()
+				}))
+				.with_children(|parent| {
+					parent
+						// LIST
+						.spawn((
+							UiTerminal,
+							NodeBundle {
+								style: Style {
+									padding: UiRect::all(Val::Px(10.)),
+									flex_direction: FlexDirection::Column,
+									..default()
+								},
+								..default()
+							},
+							// AccessibilityNode(NodeBuilder::new(Role::List)),
+						));
+					// ))
+					// .with_children(|parent| {
+					// 	// SCROLL TEST ITEMS
+					// 	for i in 0..30 {
+					// 		parent.spawn(
+					// 			// AccessibilityNode(NodeBuilder::new(Role::ListItem)),
+					// 			TextBundle::from_section(
+					// 				format!("Item {i}"),
+					// 				style(),
+					// 			),
+					// 		);
+					// 	}
+					// });
+				});
+			// INPUT_CONTAINER
+			if user_input {
+				parent
+					.spawn(NodeBundle {
 						style: Style {
+							width: Val::Percent(100.),
+							height: Val::Px(INPUT_HEIGHT_PX),
 							padding: UiRect::all(Val::Px(10.)),
-							flex_direction: FlexDirection::Column,
-							// align_items: AlignItems::Center,
 							..default()
 						},
+						background_color: Color::srgba(1., 1., 1., 0.2).into(),
 						..default()
-					},
-					// ScrollingList::default(),
-					// AccessibilityNode(NodeBuilder::new(Role::List)),
-				));
-			// ))
-			// .with_children(|parent| {
-			// 	// SCROLL TEST ITEMS
-			// 	for i in 0..30 {
-			// 		parent.spawn(
-			// 			// AccessibilityNode(NodeBuilder::new(Role::ListItem)),
-			// 			TextBundle::from_section(
-			// 				format!("Item {i}"),
-			// 				style(),
-			// 			),
-			// 		);
-			// 	}
-			// });
-			if !user_input {
-				return;
+					})
+					.with_children(|input_area| {
+						input_area.spawn((
+							TextBundle::from_sections([
+								TextSection::new("User > ", style()),
+								TextSection::new("", style()),
+							]),
+							InputContainer,
+						));
+					});
 			}
-			parent
-				.spawn(NodeBundle {
-					style: Style {
-						width: Val::Percent(100.),
-						height: Val::Px(40.),
-						padding: UiRect::all(Val::Px(10.)),
-						display: Display::Flex,
-						flex_direction: FlexDirection::Row,
-						justify_content: JustifyContent::SpaceBetween,
-						align_items: AlignItems::Center,
-						..default()
-					},
-					background_color: Color::srgba(1., 1., 1., 0.2).into(),
-					..default()
-				})
-				.with_children(|input_area| {
-					input_area.spawn((
-						TextBundle::from_section("I need healing!", style()),
-						PlayerInput,
-					));
-				});
 		});
 }
 
 fn parse_text_input(
 	mut evr_char: EventReader<KeyboardInput>,
 	mut on_submit: EventWriter<OnUserMessage>,
-	mut query: Query<&mut Text, With<PlayerInput>>,
+	mut query: Query<&mut Text, With<InputContainer>>,
 ) {
 	for ev in evr_char.read() {
+		if let ButtonState::Released = ev.state {
+			continue;
+		}
 		for mut text in query.iter_mut() {
-			let text = &mut text.sections[0].value;
+			let text = &mut text.sections[1].value; // first index is ' > '
 			match &ev.logical_key {
 				Key::Enter => {
 					on_submit.send(OnUserMessage(text.clone()));

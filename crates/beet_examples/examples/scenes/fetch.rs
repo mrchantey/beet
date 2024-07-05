@@ -63,9 +63,6 @@ pub fn fetch_npc(mut commands: Commands) {
 									RunResult::Success,
 									Duration::from_secs(1),
 								),
-								SetTextOnRun::<StatusOutput>::new_with_section(
-									"Idle", 1,
-								),
 							));
 							parent
 								.spawn((
@@ -77,9 +74,6 @@ pub fn fetch_npc(mut commands: Commands) {
 										.repeat_forever(),
 									SequenceSelector,
 									RemoveAgentOnRun::<Sentence>::default(),
-									SetTextOnRun::<StatusOutput>::new_with_section(
-										"Fetching",1
-									),
 								))
 								.with_children(|parent| {
 									parent.spawn((
@@ -120,7 +114,7 @@ pub fn fetch_scene(mut commands: Commands) {
 			width: ITEM_OFFSET * 1.4,
 			offset: Vec3::new(0., 1.6, ITEM_OFFSET),
 		},
-		Camera3dBundle::default(),
+		BundlePlaceholder::Camera3d
 	));
 
 	// items

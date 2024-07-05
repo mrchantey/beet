@@ -23,10 +23,10 @@ fn main() {
 		DefaultBeetPlugins,
 		ExamplePlugins,
 	))
-	.add_systems(
-		Startup,
-		spawn_ui_terminal_with_input,
-	)
+	// .add_systems(
+	// 	Startup,
+		// spawn_ui_terminal_with_input,
+	// )
 	/*-*/;
 
 	#[cfg(not(target_arch = "wasm32"))]

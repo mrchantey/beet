@@ -61,9 +61,11 @@ tar -xzvf ./assets.tar.gz
 rm ./assets.tar.gz
 ```
 
+The examples for beet are *scene-based*. As Bevy scene workflows are a wip, there are a few `Placeholder` types used for not-yet-serializable types like cameras, asset handles etc.
+
 ## Bevy Versions
 
 | `bevy` | `beet` |
 | ------ | ------ |
-| 0.12.0 | 0.0.2  |
-| 0.14.0 | 0.0.2  |
+| 0.12   | 0.0.1  |
+| 0.14   | 0.0.2  |

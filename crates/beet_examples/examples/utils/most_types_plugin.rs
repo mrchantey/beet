@@ -32,18 +32,15 @@ impl Plugin for MostDefaultPlugins {
 				.disable::<PanicHandlerPlugin>()
 				.disable::<LogPlugin>()
 				// .disable::<TaskPoolPlugin>()
-				.disable::<TypeRegistrationPlugin>()
-				.disable::<FrameCountPlugin>()
-				.disable::<TimePlugin>()
+				// .disable::<TypeRegistrationPlugin>()
+				// .disable::<FrameCountPlugin>()
+				// .disable::<TimePlugin>()
 				// .disable::<TransformPlugin>()
 				// .disable::<HierarchyPlugin>()
 				.disable::<DiagnosticsPlugin>()
 				.disable::<InputPlugin>()
 				.disable::<WindowPlugin>()
-				.disable::<AccessibilityPlugin>()
-				.disable::<PanicHandlerPlugin>()
-				.disable::<TimePlugin>()
-				// optionals
+				// .disable::<AccessibilityPlugin>()
 				// .disable::<AssetPlugin>()
 				// .disable::<ScenePlugin>()
 				.disable::<WinitPlugin>()
@@ -60,7 +57,7 @@ impl Plugin for MostDefaultPlugins {
 				.disable::<GilrsPlugin>()
 				// .disable::<AnimationPlugin>()
 				// .disable::<GizmoPlugin>()
-				.disable::<StatesPlugin>(),
+				// .disable::<StatesPlugin>(),
 			//
 			// .disable::<DevToolsPlugin>()
 			// .disable::<CiTestingPlugin>()
