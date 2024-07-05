@@ -41,6 +41,18 @@ impl Plugin for ExampleMlPlugin {
 		));
 	}
 }
+pub struct ExampleBasePlugin;
+
+impl Plugin for ExampleBasePlugin {
+	fn build(&self, app: &mut App) {
+		app
+    .add_systems(Update,set_player_sentence)
+		.register_type::<Player>()
+		.register_type::<Collectable>()
+	/*-*/;
+	}
+}
+
 
 pub struct Example2dPlugin;
 
@@ -63,7 +75,6 @@ impl Plugin for Example2dPlugin {
 		.register_type::<RenderText>()
 		.register_type::<WrapAround>()
 		.register_type::<FollowCursor2d>()
-		.register_type::<FollowCursor3d>()
 		/*_*/;
 	}
 }
@@ -77,6 +88,16 @@ impl Plugin for Example3dPlugin {
 			AssetPlaceholderPlugin::<AnimationClip>::default(),
 			ReadyOnAssetLoadPlugin::<AnimationClip>::default(),
 		))
-		.add_systems(Update, (follow_cursor_3d, camera_distance));
+		.add_systems(Update, (follow_cursor_3d, camera_distance,rotate_collectables))
+		.register_type::<FollowCursor3d>()
+		.register_type::<CameraDistance>()
+				//fetch stuff
+		.add_plugins(ActionPlugin::<(
+			InsertOnAssetEvent<RunResult, Bert>,
+			FindSentenceSteerTarget<Collectable>,
+			RemoveAgentOnRun<Sentence>,
+			RemoveAgentOnRun<SteerTarget>,
+		)>::default())		
+		/*-*/;
 	}
 }

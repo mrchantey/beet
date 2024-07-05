@@ -15,7 +15,15 @@ impl Plugin for ExamplePlugin3d {
 	fn build(&self, app: &mut App) {
 		app.add_plugins(ExampleDefaultPlugins)
 			.add_systems(Startup, setup_scene_3d)
-			.add_systems(Update, (follow_cursor_3d, camera_distance));
+			.add_systems(
+				Update,
+				(
+					follow_cursor_3d,
+					camera_distance,
+					rotate_collectables,
+					set_player_sentence,
+				),
+			);
 
 		if self.ground {
 			app.add_systems(Startup, setup_ground_plane);

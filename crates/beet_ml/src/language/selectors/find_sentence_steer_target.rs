@@ -5,40 +5,42 @@ use beet_ecs::prelude::*;
 use bevy::ecs::schedule::SystemConfigs;
 use bevy::prelude::*;
 use forky_core::ResultTEExt;
+use std::marker::PhantomData;
 
 #[derive(Debug, Clone, PartialEq, Component, Reflect)]
-#[reflect(Component, ActionMeta)]
+#[reflect(Default, Component, ActionMeta)]
 // #[serde(bound = "")]
 /// Finds the [`Sentence`] with the highest similarity to the agent's, then set it as the agent's [`SteerTarget`].
 /// The generic parameter is used to [`With`] filter the entities to consider.
 pub struct FindSentenceSteerTarget<T: GenericActionComponent = Sentence> {
-	pub bert: Handle<Bert>,
 	// / The value below which the agent will ignore the target.
 	// pub threshold:f32,
 	#[reflect(ignore)]
-	phantom: std::marker::PhantomData<T>,
+	phantom: PhantomData<T>,
 }
 
-impl<T: GenericActionComponent> FindSentenceSteerTarget<T> {
-	pub fn new(bert: Handle<Bert>) -> Self {
+impl<T: GenericActionComponent> Default for FindSentenceSteerTarget<T> {
+	fn default() -> Self {
 		Self {
-			bert,
-			phantom: std::marker::PhantomData,
+			phantom: PhantomData,
 		}
 	}
 }
 
 fn find_sentence_steer_target<T: GenericActionComponent>(
 	mut commands: Commands,
-	query: Query<(&TargetAgent, &FindSentenceSteerTarget<T>), Added<Running>>,
+	query: Query<
+		(&TargetAgent, &Handle<Bert>, &FindSentenceSteerTarget<T>),
+		Added<Running>,
+	>,
 	sentences: Query<&Sentence>,
 	// TODO this should be query of Sentence, but we need
 	// it to be similar to sentence_scorer
 	items: Query<Entity, With<T>>,
 	mut berts: ResMut<Assets<Bert>>,
 ) {
-	for (agent, action) in query.iter() {
-		let Some(bert) = berts.get_mut(&action.bert) else {
+	for (agent, handle, _) in query.iter() {
+		let Some(bert) = berts.get_mut(handle) else {
 			continue;
 		};
 
@@ -90,7 +92,8 @@ mod test {
 				let id = parent.parent_entity();
 				parent.spawn((
 					TargetAgent(id),
-					FindSentenceSteerTarget::<Sentence>::new(handle),
+					handle,
+					FindSentenceSteerTarget::<Sentence>::default(),
 					Running,
 				));
 			})

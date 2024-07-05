@@ -17,7 +17,8 @@ fn main() -> Result<()> {
 			SceneItem::new_bundle("camera-3d", BundlePlaceholder::Camera3d),
 			SceneItem::new_resource("beet-debug", BeetDebugConfig::default()),
 			// text
-			SceneItem::new("ui-terminal", spawn_ui_terminal),
+			SceneItem::new("ui-terminal", spawn_ui_terminal_no_input),
+			SceneItem::new("ui-terminal-input", spawn_ui_terminal_with_input),
 			SceneItem::new("hello-world", scenes::hello_world),
 			SceneItem::new("hello-net", scenes::hello_net),
 			SceneItem::new("sentence-selector", scenes::sentence_selector),
@@ -29,6 +30,9 @@ fn main() -> Result<()> {
 			SceneItem::new("ground-3d", scenes::setup_ground_3d),
 			SceneItem::new("lighting-3d", scenes::setup_lighting_3d),
 			SceneItem::new("animation-demo", scenes::animation_demo),
+			SceneItem::new("seek-3d", scenes::seek_3d),
+			SceneItem::new("fetch-scene", scenes::fetch_scene),
+			SceneItem::new("fetch-npc", scenes::fetch_npc),
 		],
 	}]
 	.into_iter()

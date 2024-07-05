@@ -2,7 +2,8 @@ use bevy::prelude::*;
 use bevy::window::WindowResized;
 
 /// Moves camera distance to keep the width in view on window resize
-#[derive(Component)]
+#[derive(Component, Reflect)]
+#[reflect(Default, Component)]
 pub struct CameraDistance {
 	pub width: f32,
 	pub offset: Vec3,

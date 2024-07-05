@@ -1,16 +1,16 @@
 //! For use with scene-based workflows
-//! 
-//! Usage: 
+//!
+//! Usage:
 //! 1. build scenes: `cargo run -p beet_examples --example build_scenes`
 //! 2. run: `cargo run --example defaylt_beet_app <scene_names>`
-//! 
+//!
 //! Common combinations:
 //! - hello world: 	`beet-debug camera-2d ui-terminal hello-world`
 //! - hello_llm: 		`beet-debug camera-2d ui-terminal sentence-selector`
 //! - seek: 				`beet-debug camera-2d space-scene seek`
 //! - flocking: 		`beet-debug camera-2d space-scene flock`
-//! 
-//! 
+//!
+//!
 use anyhow::Result;
 use beet::prelude::*;
 use beet_examples::prelude::*;
@@ -22,7 +22,12 @@ fn main() {
 		ExampleDefaultPlugins,
 		DefaultBeetPlugins,
 		ExamplePlugins,
-	));
+	))
+	.add_systems(
+		Startup,
+		spawn_ui_terminal_with_input,
+	)
+	/*-*/;
 
 	#[cfg(not(target_arch = "wasm32"))]
 	load_scenes(app.world_mut()).unwrap();

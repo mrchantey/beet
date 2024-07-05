@@ -1,9 +1,15 @@
 pub mod animation_demo;
 #[allow(unused_imports)]
 pub use self::animation_demo::*;
+pub mod fetch;
+#[allow(unused_imports)]
+pub use self::fetch::*;
 pub mod flock;
 #[allow(unused_imports)]
 pub use self::flock::*;
+pub mod foxie;
+#[allow(unused_imports)]
+pub use self::foxie::*;
 pub mod hello_net;
 #[allow(unused_imports)]
 pub use self::hello_net::*;
@@ -13,6 +19,9 @@ pub use self::hello_world::*;
 pub mod seek;
 #[allow(unused_imports)]
 pub use self::seek::*;
+pub mod seek_3d;
+#[allow(unused_imports)]
+pub use self::seek_3d::*;
 pub mod sentence_selector;
 #[allow(unused_imports)]
 pub use self::sentence_selector::*;

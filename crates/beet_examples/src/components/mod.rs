@@ -10,12 +10,15 @@ pub use self::bundles::*;
 pub mod camera_distance;
 #[allow(unused_imports)]
 pub use self::camera_distance::*;
-pub mod dialog_panel;
+pub mod collectable;
 #[allow(unused_imports)]
-pub use self::dialog_panel::*;
+pub use self::collectable::*;
 pub mod follow_cursor;
 #[allow(unused_imports)]
 pub use self::follow_cursor::*;
+pub mod player;
+#[allow(unused_imports)]
+pub use self::player::*;
 pub mod randomize_position;
 #[allow(unused_imports)]
 pub use self::randomize_position::*;
