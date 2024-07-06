@@ -3,7 +3,7 @@ use bevy::prelude::*;
 
 pub fn main() {
 	App::new()
-		.add_plugins(ExamplePluginFull)
+		.add_plugins(ExamplePluginBasics)
 		.add_systems(
 			Startup,
 			(
@@ -11,7 +11,7 @@ pub fn main() {
 				scenes::ui_terminal,
 				scenes::lighting_3d,
 				scenes::ground_3d,
-				scenes::animation_demo,
+				scenes::hello_animation,
 			),
 		)
 		.run();

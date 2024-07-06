@@ -7,11 +7,13 @@ default:
 
 
 ## common
+cmd *args:
+	cd /cygdrive/c/work/beet && {{args}}
 
 build-scenes *args:
 	cargo run -p beet_examples --example build_scenes {{args}}
 app *args:
-	cargo run --example app {{args}}
+	cargo run --example app_full {{args}}
 
 doc:
 	just watch 'cargo doc'
@@ -67,47 +69,15 @@ clean-repo:
 	rm -rf ./target
 # rm -rf ./Cargo.lock
 
+powershell *args:
+	just --shell powershell.exe --shell-arg -c {{args}}
+
 #### WEB EXAMPLES #####################################################
 
 wasm-dir:= './target/web-examples'
+web-examples:= 'animation app_basics app_full fetch flock frozen_lake_run frozen_lake_train hello_ml hello_world seek_3d seek'
 
-watch-web-example example *args:
-	just copy-web-assets
-	just watch 'just build-web-example {{example}} {{args}}'
-
-build-and-deploy-web-examples:
-	just build-web-examples
-	just deploy-web-examples
-
-copy-web-assets:
-	mkdir -p {{wasm-dir}}/assets || true
-	cp -r ./assets/* {{wasm-dir}}/assets
-
-build-web-examples:
-	rm -rf {{wasm-dir}} || true
-	just copy-web-assets
-	just build-web-example animation
-	just build-web-example flock
-	just build-web-example hello_world
-	just build-web-example hello_ml
-	just build-web-example seek
-	just build-web-example seek_3d
-	just build-web-example fetch
-	just build-web-example frozen_lake_train
-	just build-web-example frozen_lake_run
-
-serve-web-examples:
-	cd {{wasm-dir}} && forky serve --any-origin --port=3002
-
-deploy-web-examples:
-	gsutil -m rsync -c -d -r {{wasm-dir}} gs://beet-examples
-# -m  		= parallel 
-# -c 			= use checksum instead of timestamp for compare
-# rsync  	=	copy 
-# -d 			= delete if not in local 
-# -r 			= recursive
-
-build-web-example example *args:
+web-example-build example *args:
 	mkdir -p {{wasm-dir}}/{{example}} || true
 	cargo build --example {{example}} --target wasm32-unknown-unknown --release {{args}}
 	wasm-bindgen \
@@ -116,6 +86,44 @@ build-web-example example *args:
 	--target web \
 	$CARGO_TARGET_DIR/wasm32-unknown-unknown/release/examples/{{example}}.wasm \
 	--no-typescript \
+
+web-example-watch example *args:
+	just copy-web-assets
+	just watch 'just web-example-build {{example}} {{args}}'
+
+web-examples-build-and-deploy:
+	just web-examples-build
+	just web-examples-deploy
+
+copy-web-assets:
+	mkdir -p {{wasm-dir}}/assets || true
+	cp -r ./assets/* {{wasm-dir}}/assets
+
+web-examples-build:
+	rm -rf {{wasm-dir}} || true
+	just copy-web-assets
+	for file in {{web-examples}}; do \
+		just web-example-build ${file}; \
+	done
+
+web-examples-size:
+	for file in {{web-examples}}; do \
+		du -sh {{wasm-dir}}/${file}; \
+	done
+
+web-examples-serve:
+	cd {{wasm-dir}} && forky serve --any-origin --port=3002
+
+web-examples-deploy:
+	gsutil -m rsync -c -d -r {{wasm-dir}} gs://beet-examples
+# -m  		= parallel 
+# -c 			= use checksum instead of timestamp for compare
+# rsync  	=	copy 
+# -d 			= delete if not in local 
+# -r 			= recursive
+
+
+### MISC
 
 env:
 	@echo $RUST_LOG

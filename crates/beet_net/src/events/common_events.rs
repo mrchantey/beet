@@ -17,22 +17,32 @@ pub struct CommonEventsPlugin;
 
 impl Plugin for CommonEventsPlugin {
 	fn build(&self, app: &mut App) {
-		app.add_event::<AppReady>()
-			.replicate_event_outgoing::<AppReady>()
-			.add_plugins(ActionPlugin::<(
-				TriggerOnRun<AppReady>,
-				InsertOnTrigger<AppReady, Running>,
-			)>::default())
-			.register_type::<TriggerOnRun<AppReady>>()
-			.register_type::<InsertOnTrigger<AppReady, Running>>()
-			.add_event::<OnSpawnScene>()
-			.replicate_event_incoming::<OnSpawnScene>();
-		// .add_systems(Startup, ready);
+		app
+		// AppStartup
+		.add_event::<AppStartup>()
+		.replicate_event_outgoing::<AppStartup>()
+		.add_systems(Startup, |mut events: EventWriter<AppStartup>| {
+			events.send(AppStartup);
+		})
+		// AppReady
+		.add_event::<AppReady>()
+		.replicate_event_outgoing::<AppReady>()
+		.add_plugins(ActionPlugin::<(
+			TriggerOnRun<AppReady>,
+			InsertOnTrigger<AppReady, Running>,
+		)>::default())
+		.register_type::<TriggerOnRun<AppReady>>()
+		.register_type::<InsertOnTrigger<AppReady, Running>>()
+		// SpawnSceneFile
+		.add_event::<SpawnSceneFile>()
+		.replicate_event_incoming::<SpawnSceneFile>()
+			/*-*/;
 	}
 }
 
-
-
+/// Sent from this app on the Startup schedule.
+#[derive(Debug, Clone, Serialize, Deserialize, Event, Reflect)]
+pub struct AppStartup;
 /// Sent from this app, usually once assets are ready.
 #[derive(Debug, Clone, Serialize, Deserialize, Event, Reflect)]
 pub struct AppReady;

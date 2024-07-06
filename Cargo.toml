@@ -59,12 +59,12 @@ tokio.workspace = true
 ### WORKSPACE ################################################################################################z###########################
 
 [workspace.package]
-version = "0.0.2"
+version = "0.0.1"
 edition = "2021"
 description = "A very flexible AI behavior library for games and robotics."
-documentation = "https://mrchantey.github.io/beet"
+documentation = "https://beetmash.com/docs/beet"
 readme = "README.md"
-homepage = "https://mrchantey.github.io/beet"
+homepage = "https://beetmash.com/docs/beet"
 repository = "https://github.com/mrchantey/beet"
 license = "MIT OR Apache-2.0"
 keywords = ["beet", "beetmash", "behavior", "game-ai", "robotics"]
@@ -96,14 +96,14 @@ exclude = ["crates/beet_esp"]
 
 [workspace.dependencies]
 ## internal
-beet = { path = "./", version = "0.0.2" }
-beet_core = { path = "crates/beet_core", version = "0.0.2", default-features = false }
-beet_ecs = { path = "crates/beet_ecs", version = "0.0.2" }
-beet_ecs_macros = { path = "crates/beet_ecs/macros", version = "0.0.2" }
-beet_ml = { path = "crates/beet_ml", version = "0.0.2" }
-beet_net = { path = "crates/beet_net", version = "0.0.2" }
-beet_server = { path = "crates/beet_server", version = "0.0.2" }
-beet_examples = { path = "crates/beet_examples", version = "0.0.2" }
+beet = { path = "./", version = "0.0.1" }
+beet_core = { path = "crates/beet_core", version = "0.0.1", default-features = false }
+beet_ecs = { path = "crates/beet_ecs", version = "0.0.1" }
+beet_ecs_macros = { path = "crates/beet_ecs/macros", version = "0.0.1" }
+beet_ml = { path = "crates/beet_ml", version = "0.0.1" }
+beet_net = { path = "crates/beet_net", version = "0.0.1" }
+beet_server = { path = "crates/beet_server", version = "0.0.1" }
+beet_examples = { path = "crates/beet_examples", version = "0.0.1" }
 
 ## local
 forky_core = { path = "../forky/crates/forky/forky_core" }

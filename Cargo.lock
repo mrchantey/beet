@@ -534,7 +534,7 @@ checksum = "72b3254f16251a8381aa12e40e3c4d2f0199f8c6508fbecb9d91f575e0fbb8c6"
 
 [[package]]
 name = "beet"
-version = "0.0.2"
+version = "0.0.1"
 dependencies = [
  "anyhow",
  "beet_core",
@@ -556,7 +556,7 @@ dependencies = [
 
 [[package]]
 name = "beet_core"
-version = "0.0.2"
+version = "0.0.1"
 dependencies = [
  "anyhow",
  "beet_ecs",
@@ -575,7 +575,7 @@ dependencies = [
 
 [[package]]
 name = "beet_ecs"
-version = "0.0.2"
+version = "0.0.1"
 dependencies = [
  "anyhow",
  "beet_ecs_macros",
@@ -594,11 +594,11 @@ dependencies = [
 
 [[package]]
 name = "beet_ecs_macros"
-version = "0.0.2"
+version = "0.0.1"
 
 [[package]]
 name = "beet_examples"
-version = "0.0.2"
+version = "0.0.1"
 dependencies = [
  "anyhow",
  "beet",
@@ -620,7 +620,7 @@ dependencies = [
 
 [[package]]
 name = "beet_ml"
-version = "0.0.2"
+version = "0.0.1"
 dependencies = [
  "anyhow",
  "beet_core",
@@ -656,7 +656,7 @@ dependencies = [
 
 [[package]]
 name = "beet_net"
-version = "0.0.2"
+version = "0.0.1"
 dependencies = [
  "anyhow",
  "beet_ecs",
@@ -685,7 +685,7 @@ dependencies = [
 
 [[package]]
 name = "beet_server"
-version = "0.0.2"
+version = "0.0.1"
 dependencies = [
  "anyhow",
  "axum",
@@ -711,7 +711,7 @@ dependencies = [
 
 [[package]]
 name = "beet_web"
-version = "0.0.2"
+version = "0.0.1"
 dependencies = [
  "anyhow",
  "beet",

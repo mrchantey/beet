@@ -1,6 +1,6 @@
 use super::*;
-use beet::prelude::*;
 use crate::prelude::*;
+use beet::prelude::*;
 use bevy::animation::RepeatAnimation;
 use bevy::prelude::*;
 use std::time::Duration;
@@ -8,7 +8,7 @@ use std::time::Duration;
 
 
 
-pub fn animation_demo(mut commands: Commands) {
+pub fn hello_animation(mut commands: Commands) {
 	// camera
 	commands.spawn((
 		BundlePlaceholder::Camera3d,

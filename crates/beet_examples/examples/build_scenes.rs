@@ -10,6 +10,8 @@ use rayon::prelude::*;
 
 
 fn main() -> Result<()> {
+	std::fs::remove_dir_all("target/scenes").ok();
+
 	vec![Project {
 		name: "beet-basics",
 		scenes: vec![
@@ -30,8 +32,10 @@ fn main() -> Result<()> {
 			// 3d
 			SceneItem::new("ground-3d", scenes::ground_3d),
 			SceneItem::new("lighting-3d", scenes::lighting_3d),
-			SceneItem::new("animation-demo", scenes::animation_demo),
+			SceneItem::new("hello-animation", scenes::hello_animation),
+			
 			SceneItem::new("seek-3d", scenes::seek_3d),
+			// fetch
 			SceneItem::new("fetch-scene", scenes::fetch_scene),
 			SceneItem::new("fetch-npc", scenes::fetch_npc),
 			// frozen-lake

@@ -9,9 +9,11 @@ pub fn follow_cursor_2d(
 	mut cursor_query: Query<&mut Transform, With<FollowCursor2d>>,
 	windows: Query<&Window>,
 ) {
-	let (camera, camera_transform) = camera_query.single();
+	let Ok((camera, camera_transform)) = camera_query.get_single() else {
+		return;
+	};
 
-	let Some(cursor_position) = windows.single().cursor_position() else {
+	let Some(cursor_position) = windows.get_single().ok().map(|w|w.cursor_position()).flatten() else {
 		return;
 	};
 
@@ -40,10 +42,9 @@ pub fn follow_cursor_3d(
 		return;
 	};
 
-	let Some(cursor_position) = windows.single().cursor_position() else {
+	let Some(cursor_position) = windows.get_single().ok().map(|w|w.cursor_position()).flatten() else {
 		return;
 	};
-
 	let Some(ray) = camera.viewport_to_world(camera_transform, cursor_position)
 	else {
 		return;

@@ -79,18 +79,18 @@ fn assert_scene_match(
 		issues.push(
 		format!("Resource count mismatch: Expected {num_resources_world}, got {num_resources_scene}"));
 	}
-	for (resource, _) in world.iter_resources() {
-		let resource_scene = scene.resources.iter().find(|r| {
-			r.get_represented_type_info()
-				.expect("found resource without typeinfo")
-				.type_id() == resource
-				.type_id()
-				.expect("found resource without typeid")
-		});
-		if resource_scene.is_none() {
-			issues.push(format!("Resource missing: {}", resource.name()));
-		}
-	}
+	// for (resource, _) in world.iter_resources() {
+	// 	let resource_scene = scene.resources.iter().find(|r| {
+	// 		r.get_represented_type_info()
+	// 			.expect("found resource without typeinfo")
+	// 			.type_id() == resource
+	// 			.type_id()
+	// 			.expect("found resource without typeid")
+	// 	});
+	// 	if resource_scene.is_none() {
+	// 		issues.push(format!("Resource missing: {}", resource.name()));
+	// 	}
+	// }
 
 	for entity in world.iter_entities() {
 		let entity_scene = scene

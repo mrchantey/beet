@@ -6,14 +6,15 @@ use forky_core::ResultTEExt;
 use serde::de::DeserializeSeed;
 use serde::Deserialize;
 use serde::Serialize;
+
 /// Received by this app, containing the raw text of a ron file for
 /// deserialization and spawning
 #[derive(Debug, Clone, Serialize, Deserialize, Event, Reflect)]
-pub struct OnSpawnScene(pub String);
+pub struct SpawnSceneFile(pub String);
 
 pub fn handle_spawn_scene(
 	world: &mut World,
-	events: &mut SystemState<EventReader<OnSpawnScene>>,
+	events: &mut SystemState<EventReader<SpawnSceneFile>>,
 ) {
 	events
 		.get_mut(world)
@@ -70,7 +71,7 @@ mod test {
 		app2.add_plugins((LogPlugin::default(), ReplicatePlugin, CommonEventsPlugin))
 			.add_systems(Update, handle_spawn_scene).register_type::<MyStruct>();
 
-		app2.world_mut().send_event(OnSpawnScene(str.into()));
+		app2.world_mut().send_event(SpawnSceneFile(str.into()));
 
 		expect(
 			app2.world_mut()

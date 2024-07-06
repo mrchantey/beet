@@ -21,7 +21,27 @@ impl Plugin for ExamplePluginFull {
 			ExampleDefaultPlugins,
 			DefaultBeetPlugins,
 			ExamplePlugins,
-		));
+		))
+		.add_systems(Startup, load_scenes_from_args);
+	}
+}
+/// Just the essentials, no machine learning
+pub struct ExamplePluginBasics;
+
+impl Plugin for ExamplePluginBasics {
+	fn build(&self, app: &mut App) {
+		app.add_plugins((
+			ExampleDefaultPlugins,
+			DefaultBeetPlugins,
+			BeetDebugPluginStdout,
+			ExampleBasePlugin,
+			Example2dPlugin,
+			Example3dPlugin,
+			UiTerminalPlugin,
+			ExampleReplicatePlugin,
+			BundlePlaceholderPlugin,
+		))
+		.add_systems(Startup, load_scenes_from_args);
 	}
 }
 
@@ -37,8 +57,8 @@ impl PluginGroup for ExamplePlugins {
 			.add(Example3dPlugin)
 			.add(UiTerminalPlugin)
 			.add(ExampleReplicatePlugin)
-			.add(ExampleMlPlugin)
 			.add(BundlePlaceholderPlugin)
+			.add(ExampleMlPlugin)
 			.add(FrozenLakePlugin)
 	}
 }
@@ -55,8 +75,8 @@ impl Plugin for ExampleMlPlugin {
 			AssetPlaceholderPlugin::<Bert>::default(),
 			ReadyOnAssetLoadPlugin::<Bert>::default(),
 			// qtables (frozen lake)
-			AssetPlaceholderPlugin::<QTable<GridPos,GridDirection>>::default(),
-			ReadyOnAssetLoadPlugin::<QTable<GridPos,GridDirection>>::default()
+			AssetPlaceholderPlugin::<QTable<GridPos, GridDirection>>::default(),
+			ReadyOnAssetLoadPlugin::<QTable<GridPos, GridDirection>>::default(),
 		));
 	}
 }
@@ -107,10 +127,13 @@ impl Plugin for Example3dPlugin {
 			AssetPlaceholderPlugin::<AnimationClip>::default(),
 			ReadyOnAssetLoadPlugin::<AnimationClip>::default(),
 		))
-		.add_systems(Update, (follow_cursor_3d, camera_distance,rotate_collectables))
+		.add_systems(
+			Update,
+			(follow_cursor_3d, camera_distance, rotate_collectables),
+		)
 		.register_type::<FollowCursor3d>()
 		.register_type::<CameraDistance>()
-				//fetch stuff
+		//fetch stuff
 		.add_plugins(ActionPlugin::<(
 			InsertOnAssetEvent<RunResult, Bert>,
 			FindSentenceSteerTarget<Collectable>,
