@@ -67,5 +67,5 @@ The examples for beet are *scene-based*. As Bevy scene workflows are a wip, ther
 
 | `bevy` | `beet` |
 | ------ | ------ |
-| 0.12   | 0.0.1  |
 | 0.14   | 0.0.2  |
+| 0.12   | 0.0.1  |
