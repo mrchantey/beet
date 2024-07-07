@@ -27,7 +27,7 @@ ui = ["beet_core/ui"]
 assets = ["beet_core/assets"]
 animation = ["beet_core/animation"]
 reflect = ["beet_ecs/reflect"]
-tokio = ["beet_net/tokio", "beet_examples/tokio"]
+tokio = ["beet_net/tokio"]
 
 # dynamic_linking = ["bevy/dynamic_linking"]
 
@@ -38,8 +38,8 @@ beet_ml = { workspace = true, optional = true }
 beet_net = { workspace = true, optional = true }
 
 [dev-dependencies]
+beet_examples.workspace = true # TODO cyclic dependency
 bevy = { workspace = true, default-features = true }
-beet_examples.workspace = true
 log.workspace = true
 pretty_env_logger.workspace = true
 forky_bevy.workspace = true

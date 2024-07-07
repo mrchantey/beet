@@ -137,12 +137,13 @@ publish crate *args:
 	sleep 2
 
 publish-all *args:
-	just publish beet_ecs_macros {{args}}
-	just publish beet_ecs {{args}}
-	just publish beet_core {{args}}
-	just publish beet_ml {{args}}
-	just publish beet_net {{args}}
-	just publish beet {{args}}
+	just publish beet_ecs_macros {{args}}	|| true
+	just publish beet_ecs {{args}}				|| true
+	just publish beet_core {{args}}				|| true
+	just publish beet_net {{args}}				|| true
+	just publish beet_ml {{args}}					|| true
+	just publish beet {{args}}						|| true
+	just publish beet_examples {{args}}		|| true
 
 test-wasm crate *args:
 	sweet -p {{crate}} --example test_{{crate}} --interactive --watch {{args}}
