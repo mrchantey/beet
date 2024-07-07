@@ -7,7 +7,17 @@ use std::any::TypeId;
 
 /// Unique identifier for components registered.
 #[derive(
-	Debug, Copy, Clone, Eq, PartialEq, Hash, Serialize, Deserialize, Deref,
+	Debug,
+	Copy,
+	Clone,
+	Eq,
+	PartialEq,
+	Hash,
+	Serialize,
+	Deserialize,
+	Deref,
+	PartialOrd,
+	Ord,
 )]
 pub struct RegistrationId(usize);
 
@@ -46,9 +56,10 @@ impl ReplicateRegistry {
 
 	#[cfg(debug_assertions)]
 	pub fn types_to_json(&self) -> String {
-		let types = self
-			.types
-			.values()
+		let mut types = self.types.values().collect::<Vec<_>>();
+		types.sort();
+		let types = types
+			.into_iter()
 			.map(|v| {
 				let name = self.type_names.get(v).unwrap();
 				format!("  \"{name}\": {}", **v)

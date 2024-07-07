@@ -69,13 +69,14 @@ clean-repo:
 	rm -rf ./target
 # rm -rf ./Cargo.lock
 
-powershell *args:
+pws *args:
 	just --shell powershell.exe --shell-arg -c {{args}}
 
 #### WEB EXAMPLES #####################################################
 
 wasm-dir:= './target/web-examples'
-web-examples:= 'animation app_basics app_full fetch flock frozen_lake_run frozen_lake_train hello_ml hello_world seek_3d seek'
+web-examples:= 'app_basics app_full'
+# web-examples:= 'animation app_basics app_full fetch flock frozen_lake_run frozen_lake_train hello_ml hello_world seek_3d seek'
 
 web-example-build example *args:
 	mkdir -p {{wasm-dir}}/{{example}} || true
@@ -115,7 +116,7 @@ web-examples-serve:
 	cd {{wasm-dir}} && forky serve --any-origin --port=3002
 
 web-examples-deploy:
-	gsutil -m rsync -c -d -r {{wasm-dir}} gs://beet-examples
+	gsutil -m -h "Cache-Control:public, max-age=1" rsync -c -d -r {{wasm-dir}} gs://beet-examples
 # -m  		= parallel 
 # -c 			= use checksum instead of timestamp for compare
 # rsync  	=	copy 
@@ -135,10 +136,13 @@ publish crate *args:
 	cargo publish -p {{crate}} --allow-dirty --no-verify {{args}}
 	sleep 2
 
-publish-all:
-	just publish beet_ecs_macros
-	just publish beet_ecs
-	just publish beet
+publish-all *args:
+	just publish beet_ecs_macros {{args}}
+	just publish beet_ecs {{args}}
+	just publish beet_core {{args}}
+	just publish beet_ml {{args}}
+	just publish beet_net {{args}}
+	just publish beet {{args}}
 
 test-wasm crate *args:
 	sweet -p {{crate}} --example test_{{crate}} --interactive --watch {{args}}

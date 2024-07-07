@@ -77,7 +77,15 @@ impl Plugin for ExampleMlPlugin {
 			// qtables (frozen lake)
 			AssetPlaceholderPlugin::<QTable<GridPos, GridDirection>>::default(),
 			ReadyOnAssetLoadPlugin::<QTable<GridPos, GridDirection>>::default(),
-		));
+		))
+		// fetch
+		.add_plugins(ActionPlugin::<(
+			InsertOnAssetEvent<RunResult, Bert>,
+			FindSentenceSteerTarget<Collectable>,
+			RemoveAgentOnRun<Sentence>,
+			RemoveAgentOnRun<SteerTarget>,
+		)>::default())
+			/*-*/;
 	}
 }
 pub struct ExampleBasePlugin;
@@ -133,12 +141,6 @@ impl Plugin for Example3dPlugin {
 		)
 		.register_type::<FollowCursor3d>()
 		.register_type::<CameraDistance>()
-		//fetch stuff
-		.add_plugins(ActionPlugin::<(
-			InsertOnAssetEvent<RunResult, Bert>,
-			FindSentenceSteerTarget<Collectable>,
-			RemoveAgentOnRun<Sentence>,
-			RemoveAgentOnRun<SteerTarget>,
-		)>::default());
+		/*-*/;
 	}
 }

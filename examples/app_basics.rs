@@ -6,6 +6,7 @@
 //!
 //! Common combinations:
 //! - hello world: 					`beet-debug camera-2d ui-terminal hello-world`
+//! - hello net: 						`beet-debug camera-2d ui-terminal hello-net`
 //! - seek: 								`beet-debug camera-2d space-scene seek`
 //! - flocking: 						`beet-debug camera-2d space-scene flock`
 //! - seek-3d:							`beet-debug ui-terminal lighting-3d ground-3d seek-3d`

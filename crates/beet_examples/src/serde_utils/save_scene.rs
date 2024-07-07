@@ -62,7 +62,7 @@ fn assert_scene_match(
 	world: &World,
 	scene: &DynamicScene,
 ) -> Result<()> {
-	const NUM_IGNORED_RESOURCES: usize = 155;
+	const NUM_IGNORED_RESOURCES: usize = 158;
 
 	let mut issues = Vec::<String>::new();
 
@@ -77,7 +77,7 @@ fn assert_scene_match(
 	let num_resources_scene = scene.resources.len();
 	if num_resources_world != num_resources_scene {
 		issues.push(
-		format!("Resource count mismatch: Expected {num_resources_world}, got {num_resources_scene}"));
+		format!("Resource count mismatch: Expected {num_resources_world}, got {num_resources_scene}\nRemember to update NUM_IGNORED_RESOURCES when registering assets, events etc."));
 	}
 	// for (resource, _) in world.iter_resources() {
 	// 	let resource_scene = scene.resources.iter().find(|r| {

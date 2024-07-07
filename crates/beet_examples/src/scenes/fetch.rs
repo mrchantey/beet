@@ -44,7 +44,6 @@ pub fn fetch_npc(mut commands: Commands) {
 					parent
 						.spawn((
 							Name::new("Idle Or Fetch"),
-							TriggerOnRun(AppReady),
 							TargetAgent(agent),
 							ScoreSelector::default(),
 							// ScoreSelector::consuming(),

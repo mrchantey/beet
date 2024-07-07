@@ -9,6 +9,8 @@
 	<style>
 		body {
 			margin: 0;
+			background-color: black;
+			overflow: hidden;
 		}
 
 		canvas {
@@ -21,47 +23,102 @@
 <body>
 	<script>
 
-		const regIds = {
-			// keep in sync with common_events.rs
-			appReady: 0,
-			// keep in sync with example_replicate_plugin.rs
-			onUserMessage: 1
+		const replicationRegistry =
+		{
+			"beet_net::events::common_events::AppStartup": 0,
+			"beet_net::events::common_events::AppReady": 1,
+			"beet_net::events::spawn_scene_file::SpawnSceneFile": 2,
+			"beet_net::events::spawn_scene_file::SpawnSceneFileResponse": 3,
+			"beet_examples::net::example_replicate_plugin::OnUserMessage": 4
+		}
+
+		async function loadScene(name) {
+			const response = await fetch(`/target/scenes/${name}.ron`)
+			const json = await response.text()
+			let hashmap = await sendMessage(
+				"beet_net::events::spawn_scene_file::SpawnSceneFile",
+				json,
+				"beet_net::events::spawn_scene_file::SpawnSceneFileResponse"
+			)
+			console.log('hashmap received')
+			console.dir(hashmap)
 		}
 
 		function sendUserMessage(message) {
+			sendMessage("beet_examples::net::example_replicate_plugin::OnUserMessage", message)
+		}
+
+		async function sendMessage(key, payload, awaitKey) {
 			const detail = JSON.stringify([{
 				SendEvent: {
-					reg_id: regIds.onUserMessage,
+					reg_id: replicationRegistry[key],
 					payload: {
-						Json: JSON.stringify(message)
+						Json: JSON.stringify(payload)
 					}
 				}
 			}])
+			let awaiter = awaitKey
+				? awaitMessage(awaitKey)
+				: null
 			window.dispatchEvent(new CustomEvent('js-message', { detail }))
+			if (awaiter) {
+				return await awaiter
+			}
 		}
 
-		window.addEventListener('wasm-message', (event) => {
+		function awaitMessage(key) {
+			return new Promise((resolve) => {
+				const listener = (event) => {
+					const messages = JSON.parse(event.detail)
+					for (const message of messages) {
+						if (message?.SendEvent?.reg_id === replicationRegistry[key]) {
+							resolve(message.SendEvent.payload.Json)
+							window.removeEventListener('wasm-message', listener)
+						}
+					}
+				}
+				window.addEventListener('wasm-message', listener)
+			})
+		}
+
+		window.addEventListener('wasm-message', async (event) => {
 			const messages = JSON.parse(event.detail)
 			for (const message of messages) {
-				console.log(`message received: ${JSON.stringify(message)}`)
-				if (message?.SendEvent?.payload?.Json) {
-					const payload = JSON.parse(message.SendEvent.payload.Json)
-					console.log(`payload received: ${JSON.stringify(payload)}`)
+				if (message?.SendEvent?.reg_id === replicationRegistry["beet_net::events::common_events::AppStartup"]) {
+					console.log('AppStartup')
+					await loadScene('beet-debug')
+					await loadScene('camera-2d')
+					// await new Promise(resolve => setTimeout(resolve, 1000))
+					await loadScene('ui-terminal-input')
+					await loadScene('hello-world')
+					// await loadScene('sentence-selector')
+					console.log('All scenes sent')
 					sendUserMessage('loud and clear')
 				}
+				// console.log(`message received: ${JSON.stringify(message)}`)
+				// if (message?.SendEvent?.payload?.Json) {
+				// 	const payload = JSON.parse(message.SendEvent.payload.Json)
+				// 	console.log(`payload received: ${JSON.stringify(payload)}`)
+				// 	sendUserMessage('loud and clear')
+				// }
 			}
 		})
 	</script>
 
 
 	<script type="module">
-		import init from './target/static/wasm/basics.js'
-		init()
+		// import init from 'https://storage.googleapis.com/beet-examples/hello_ml/main.js'
+		// import init from 'https://storage.googleapis.com/beet-examples/hello_world/main.js'
+		// import init from 'https://storage.googleapis.com/beet-examples/app_basics/main.js'
+		// import init from 'https://storage.googleapis.com/beet-examples/app_full/main.js'
+		import init from './target/web-examples/app_full/main.js'
+		// import init from './target/web-examples/hello_ml/main.js'
+		// init()
+		// init('https://storage.googleapis.com/beet-examples/app_full/main_bg.wasm')
+		init('./target/web-examples/app_full/main_bg.wasm')
 			.catch((error) => {
 				if (!error.message.startsWith("Using exceptions for control flow,"))
 					throw error
-			}).then(() => {
-				window.parent?.postMessage("wasm_loaded", "*")
 			})
 	</script>
 	<canvas id="beet-canvas"></canvas>

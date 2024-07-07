@@ -20,7 +20,7 @@ impl Plugin for UiTerminalPlugin {
 			))
 			.add_systems(
 				PostUpdate,
-				(init_output,handle_resize_event,remove_excessive_lines)
+				(init_output,resize_output_container,remove_excessive_lines)
 					.before(UiSystem::Layout),
 			)
 			.add_systems(
@@ -109,10 +109,13 @@ fn get_top_pos(node: &Node, parent: &Node) -> f32 {
 
 fn scroll_to_bottom_on_resize(
 	mut resize_reader: EventReader<WindowResized>,
+	containers_added: Query<(), Added<UiTerminal>>,
 	parents: Query<&Node>,
 	mut list: Query<(&mut Style, &Node, &Parent), With<UiTerminal>>,
 ) {
-	for _ev in resize_reader.read() {
+	let should_update =
+		resize_reader.read().count() > 0 || containers_added.iter().count() > 0;
+	if should_update {
 		for (mut style, node, parent) in list.iter_mut() {
 			if let Ok(parent) = parents.get(**parent) {
 				style.top = Val::Px(get_top_pos(node, parent));
@@ -155,13 +158,20 @@ fn show_new_sections(mut query: Query<&mut Text, Added<OutputItem>>) {
 
 const INPUT_HEIGHT_PX: f32 = 50.;
 
-fn handle_resize_event(
+fn resize_output_container(
 	mut resize_reader: EventReader<WindowResized>,
+	window: Query<&Window>,
+	containers_added: Query<(), Added<OutputContainer>>,
 	mut containers: Query<&mut Style, With<OutputContainer>>,
 ) {
-	for ev in resize_reader.read() {
+	let should_update =
+		resize_reader.read().count() > 0 || containers_added.iter().count() > 0;
+	if should_update {
+		let Ok(window) = window.get_single() else {
+			return;
+		};
 		for mut style in containers.iter_mut() {
-			style.height = Val::Px(ev.height as f32 - INPUT_HEIGHT_PX);
+			style.height = Val::Px(window.height() - INPUT_HEIGHT_PX);
 		}
 	}
 }
@@ -262,9 +272,13 @@ pub fn spawn_ui_terminal(mut commands: Commands, user_input: bool) {
 
 fn parse_text_input(
 	mut evr_char: EventReader<KeyboardInput>,
+	keys: Res<ButtonInput<KeyCode>>,
 	mut on_submit: EventWriter<OnUserMessage>,
 	mut query: Query<&mut Text, With<InputContainer>>,
 ) {
+	if keys.any_pressed([KeyCode::ControlRight, KeyCode::ControlLeft]) {
+		return;
+	}
 	for ev in evr_char.read() {
 		if let ButtonState::Released = ev.state {
 			continue;
