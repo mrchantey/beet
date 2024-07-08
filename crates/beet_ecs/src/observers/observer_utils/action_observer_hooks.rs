@@ -74,13 +74,13 @@ mod test {
 	fn works() -> Result<()> {
 		let mut world = World::new();
 
-		let entity = world.spawn(Sequence).id();
+		let entity = world.spawn(SequenceFlow).id();
 
 		expect(world.entities().len()).to_be(1)?;
 		world.flush();
 		expect(world.entities().len()).to_be(3)?;
 
-		world.entity_mut(entity).remove::<Sequence>();
+		world.entity_mut(entity).remove::<SequenceFlow>();
 		// world.entity_mut(entity).despawn();
 		expect(world.entities().len()).to_be(3)?;
 		world.flush();

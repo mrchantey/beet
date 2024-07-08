@@ -1,16 +1,24 @@
 use bevy::prelude::*;
+use crate::prelude::*;
 
+
+/// Adds types and systems for beet observers
 pub struct BeetObserverPlugin;
 
 
 impl Plugin for BeetObserverPlugin {
-	fn build(&self, _app: &mut App) {
-		// app.add_event::<OnRun>()
-		// .add_event::<OnChildResult>()
-		// .add_event::<OnRunResult>()
-		// .add_system(sequence_start.system())
-		// .add_system(sequence_next.system())
-		// .add_system(log_on_run.system())
-		// .add_system(succeed_on_run.system());
+	fn build(&self, app: &mut App) {
+
+		app
+    .register_type::<LongRun>()
+    .register_type::<SequenceFlow>()
+    .register_type::<EndOnRun>()
+    .register_type::<RunOnSpawn>()
+		
+		/*-*/;
+		let world = app.world_mut();
+		world.observe(bubble_run_result);
+		world.observe(trigger_run_on_spawn);
+
 	}
 }

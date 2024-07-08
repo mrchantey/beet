@@ -3,8 +3,8 @@ use bevy::prelude::*;
 
 #[derive(Default, Action, Reflect)]
 #[reflect(Default, Component)]
-#[observers(sequence_start,sequence_next)]
-pub struct Sequence;
+#[observers(sequence_start, sequence_next)]
+pub struct SequenceFlow;
 
 fn sequence_start(
 	trigger: Trigger<OnRun>,
@@ -39,7 +39,7 @@ fn sequence_next(
 	}
 }
 
-impl ActionMeta for Sequence {
+impl ActionMeta for SequenceFlow {
 	fn category(&self) -> ActionCategory { ActionCategory::Behavior }
 }
 
@@ -59,7 +59,7 @@ mod test {
 		let on_run = observe_triggers::<OnRun>(&mut world);
 
 		world
-			.spawn((Name::new("root"), Sequence))
+			.spawn((Name::new("root"), SequenceFlow))
 			.with_children(|parent| {
 				parent.spawn((Name::new("child1"), EndOnRun::success()));
 				parent.spawn((Name::new("child2"), EndOnRun::success()));
