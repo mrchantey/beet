@@ -29,5 +29,5 @@ fn main() {
 	let mut world = World::new();
 	world
 		.spawn((Name::new("root1"), LogOnRun("root2".to_string())))
-		.trigger(OnRun);
+		.flush_trigger(OnRun);
 }

@@ -41,12 +41,14 @@ mod test {
 	fn works() -> Result<()> {
 		let mut world = World::new();
 
-		let entity = world.spawn(LongRun::default()).trigger(OnRun).id();
+		let entity = world.spawn(LongRun::default()).flush_trigger(OnRun).id();
 		expect(world.entities().len()).to_be(3)?;
 		expect(world.entity(entity).get::<Running>()).to_be_none()?;
 		world.flush();
 		expect(world.entity(entity).get::<Running>()).to_be_some()?;
-		world.entity_mut(entity).trigger(OnRunResult::success());
+		world
+			.entity_mut(entity)
+			.flush_trigger(OnRunResult::success());
 		expect(world.entity(entity).get::<Running>()).to_be_some()?;
 		world.flush();
 		expect(world.entity(entity).get::<Running>()).to_be_none()?;

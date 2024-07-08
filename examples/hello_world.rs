@@ -1,19 +1,6 @@
-//! In this example we will create an action
-//! and then combine it with some built-in actions to run a behavior.
 use beet::prelude::*;
 use bevy::log::LogPlugin;
 use bevy::prelude::*;
-
-
-// Actions are simply a component-system pair
-#[derive(Component)]
-struct LogOnRun(pub String);
-
-fn log_on_run(query: Query<&LogOnRun, Added<Running>>) {
-	for action in query.iter() {
-		log::info!("{}", action.0);
-	}
-}
 
 fn main() {
 	let mut app = App::new();

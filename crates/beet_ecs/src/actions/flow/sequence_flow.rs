@@ -64,8 +64,7 @@ mod test {
 				parent.spawn((Name::new("child1"), EndOnRun::success()));
 				parent.spawn((Name::new("child2"), EndOnRun::success()));
 			})
-			.trigger(OnRun);
-		world.flush();
+			.flush_trigger(OnRun);
 
 		expect(&on_run).to_have_been_called_times(3)?;
 		expect(&on_result).to_have_been_called_times(3)?;
