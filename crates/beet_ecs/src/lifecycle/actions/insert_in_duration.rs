@@ -1,14 +1,15 @@
 use crate::prelude::*;
-use bevy::ecs::schedule::SystemConfigs;
 use bevy::prelude::*;
 use std::time::Duration;
 
-#[derive(Debug, Clone, Component, Reflect)]
-#[reflect(Component, ActionMeta)]
 /// Inserts the given component after running for a given duration. Has no effect if
 /// the action completes before the duration.
 /// # Requires
 /// - [`RunTimer`]
+#[derive(Debug, Clone, Action, Reflect)]
+#[reflect(Component, ActionMeta)]
+#[category(ActionCategory::Behavior)]
+#[systems(insert_in_duration::<T>.in_set(TickSet))]
 pub struct InsertInDuration<T: GenericActionComponent> {
 	pub duration: Duration,
 	pub value: T,
@@ -16,15 +17,6 @@ pub struct InsertInDuration<T: GenericActionComponent> {
 
 impl<T: Default + GenericActionComponent> Default for InsertInDuration<T> {
 	fn default() -> Self { Self::new(T::default(), Duration::from_secs(1)) }
-}
-
-
-impl<T: GenericActionComponent> ActionMeta for InsertInDuration<T> {
-	fn category(&self) -> ActionCategory { ActionCategory::Behavior }
-}
-
-impl<T: GenericActionComponent> ActionSystems for InsertInDuration<T> {
-	fn systems() -> SystemConfigs { insert_in_duration::<T>.in_set(TickSet) }
 }
 
 impl<T: GenericActionComponent> InsertInDuration<T> {

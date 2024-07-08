@@ -1,20 +1,13 @@
 use crate::prelude::*;
-use bevy::ecs::schedule::SystemConfigs;
 use bevy::prelude::*;
 
 
-#[derive(Debug, Default, Clone, PartialEq, Component, Reflect)]
+#[derive(Debug, Default, Clone, PartialEq, Action, Reflect)]
 #[reflect(Default, Component, ActionMeta)]
+#[category(ActionCategory::Behavior)]
+#[systems(repeat.in_set(PreTickSet))]
 /// Reattaches the [`Running`] component whenever it is removed.
 pub struct Repeat;
-
-impl ActionMeta for Repeat {
-	fn category(&self) -> ActionCategory { ActionCategory::Behavior }
-}
-
-impl ActionSystems for Repeat {
-	fn systems() -> SystemConfigs { repeat.in_set(PreTickSet) }
-}
 
 /// This relys on [`sync_running`]
 fn repeat(

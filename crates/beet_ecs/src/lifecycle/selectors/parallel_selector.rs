@@ -1,11 +1,12 @@
 use super::*;
 use crate::prelude::*;
-use bevy::ecs::schedule::SystemConfigs;
 use bevy::prelude::*;
 
 /// Run children in parallel until one finishes.
-#[derive(Debug, Default, Clone, PartialEq, Component, Reflect)]
+#[derive(Debug, Default, Clone, PartialEq, Action, Reflect)]
 #[reflect(Default, Component, ActionMeta)]
+#[category(ActionCategory::ChildBehaviors)]
+#[systems(parallel_selector.in_set(TickSet))]
 pub struct ParallelSelector;
 
 fn parallel_selector(
@@ -36,14 +37,6 @@ fn parallel_selector(
 			}
 		}
 	}
-}
-
-impl ActionMeta for ParallelSelector {
-	fn category(&self) -> ActionCategory { ActionCategory::ChildBehaviors }
-}
-
-impl ActionSystems for ParallelSelector {
-	fn systems() -> SystemConfigs { parallel_selector.in_set(TickSet) }
 }
 
 #[cfg(test)]

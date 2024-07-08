@@ -1,6 +1,5 @@
 use super::*;
 use crate::prelude::*;
-use bevy::ecs::schedule::SystemConfigs;
 use bevy::prelude::*;
 
 
@@ -8,8 +7,10 @@ use bevy::prelude::*;
 ///
 /// It will return the result of the highest scoring child.
 ///
-#[derive(Debug, Default, Clone, PartialEq, Component, Reflect)]
+#[derive(Debug, Default, Clone, PartialEq, Action, Reflect)]
 #[reflect(Default, Component, ActionMeta)]
+#[category(ActionCategory::ChildBehaviors)]
+#[systems(score_selector.in_set(TickSet))]
 pub struct ScoreSelector {
 	/// Remove the score component from children when one is selected. This is useful if
 	/// the selector should only run once.
@@ -81,15 +82,6 @@ fn score_selector(
 		}
 	}
 }
-
-impl ActionMeta for ScoreSelector {
-	fn category(&self) -> ActionCategory { ActionCategory::ChildBehaviors }
-}
-
-impl ActionSystems for ScoreSelector {
-	fn systems() -> SystemConfigs { score_selector.in_set(TickSet) }
-}
-
 
 #[cfg(test)]
 mod test {

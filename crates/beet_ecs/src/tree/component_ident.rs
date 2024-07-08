@@ -111,7 +111,7 @@ mod test {
 		let entity = world.spawn(EmptyAction).id();
 		let component = ComponentIdent::new(entity, type_id);
 
-		expect(component.category(&world)?).to_be(ActionCategory::World)?;
+		expect(component.category(&world)?).to_be(ActionCategory::Behavior)?;
 
 
 		Ok(())

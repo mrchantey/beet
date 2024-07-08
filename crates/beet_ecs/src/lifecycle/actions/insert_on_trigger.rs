@@ -1,13 +1,14 @@
 use crate::prelude::*;
-use bevy::ecs::schedule::SystemConfigs;
 use bevy::prelude::*;
 use std::marker::PhantomData;
 use std::ops::Deref;
 use std::ops::DerefMut;
 
 /// Triggers the given event when this behavior starts Insertning.
-#[derive(Debug, Clone, PartialEq, Component, Reflect)]
+#[derive(Debug, Clone, PartialEq, Action, Reflect)]
 #[reflect(Component, ActionMeta)]
+#[category(ActionCategory::World)]
+#[systems(inset_on_trigger::<E, T>.in_set(TickSet))]
 pub struct InsertOnTrigger<E: GenericActionEvent, T: GenericActionComponent> {
 	pub value: T,
 	#[reflect(ignore)]
@@ -43,18 +44,6 @@ impl<E: GenericActionEvent, T: GenericActionComponent> InsertOnTrigger<E, T> {
 			phantom: Default::default(),
 		}
 	}
-}
-
-impl<E: GenericActionEvent, T: GenericActionComponent> ActionMeta
-	for InsertOnTrigger<E, T>
-{
-	fn category(&self) -> ActionCategory { ActionCategory::World }
-}
-
-impl<E: GenericActionEvent, T: GenericActionComponent> ActionSystems
-	for InsertOnTrigger<E, T>
-{
-	fn systems() -> SystemConfigs { inset_on_trigger::<E, T>.in_set(TickSet) }
 }
 
 fn inset_on_trigger<E: GenericActionEvent, T: GenericActionComponent>(

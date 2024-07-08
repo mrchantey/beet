@@ -3,6 +3,7 @@ use bevy::prelude::*;
 
 #[derive(Default, Action, Reflect)]
 #[reflect(Default, Component)]
+#[category(ActionCategory::ChildBehaviors)]
 #[observers(sequence_start, sequence_next)]
 pub struct SequenceFlow;
 
@@ -39,9 +40,6 @@ fn sequence_next(
 	}
 }
 
-impl ActionMeta for SequenceFlow {
-	fn category(&self) -> ActionCategory { ActionCategory::Behavior }
-}
 
 #[cfg(test)]
 mod test {

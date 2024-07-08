@@ -1,14 +1,15 @@
 use super::*;
 use crate::prelude::*;
-use bevy::ecs::schedule::SystemConfigs;
 use bevy::prelude::*;
 
 /// An action that runs all of its children in order until one fails.
 /// - If a child succeeds it will run the next child.
 /// - If there are no more children to run it will succeed.
 /// - If a child fails it will fail.
-#[derive(Debug, Default, Clone, PartialEq, Component, Reflect)]
+#[derive(Debug, Default, Clone, PartialEq, Action, Reflect)]
 #[reflect(Default, Component, ActionMeta)]
+#[category(ActionCategory::ChildBehaviors)]
+#[systems(sequence_selector.in_set(TickSet))]
 pub struct SequenceSelector;
 fn sequence_selector(
 	mut commands: Commands,
@@ -43,14 +44,6 @@ fn sequence_selector(
 			}
 		}
 	}
-}
-
-impl ActionMeta for SequenceSelector {
-	fn category(&self) -> ActionCategory { ActionCategory::Behavior }
-}
-
-impl ActionSystems for SequenceSelector {
-	fn systems() -> SystemConfigs { sequence_selector.in_set(TickSet) }
 }
 
 #[cfg(test)]

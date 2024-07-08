@@ -1,6 +1,5 @@
 use super::*;
 use crate::prelude::*;
-use bevy::ecs::schedule::SystemConfigs;
 use bevy::prelude::*;
 
 
@@ -11,8 +10,10 @@ use bevy::prelude::*;
 /// If a child succeeds it will succeed.
 ///
 /// If the last child fails it will fail.
-#[derive(Debug, Default, Clone, PartialEq, Component, Reflect)]
+#[derive(Debug, Default, Clone, PartialEq, Action, Reflect)]
 #[reflect(Default, Component, ActionMeta)]
+#[category(ActionCategory::ChildBehaviors)]
+#[systems(fallback_selector.in_set(TickSet))]
 pub struct FallbackSelector;
 
 fn fallback_selector(
@@ -45,16 +46,6 @@ fn fallback_selector(
 		}
 	}
 }
-
-impl ActionMeta for FallbackSelector {
-	fn category(&self) -> ActionCategory { ActionCategory::ChildBehaviors }
-}
-
-impl ActionSystems for FallbackSelector {
-	fn systems() -> SystemConfigs { fallback_selector.in_set(TickSet) }
-}
-
-
 
 #[cfg(test)]
 mod test {
