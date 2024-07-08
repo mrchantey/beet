@@ -32,5 +32,5 @@ pub mod prelude {
 	#[cfg(test)]
 	pub use crate::test::*;
 	pub use crate::tree::*;
-	// pub use beet_ecs_macros::*;
+	pub use beet_ecs_macros::*;
 }
