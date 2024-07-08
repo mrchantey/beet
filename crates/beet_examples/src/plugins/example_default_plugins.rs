@@ -1,5 +1,5 @@
 #[cfg(any(target_arch = "wasm32", feature = "tokio"))]
-use beet::prelude::*;
+use crate::beet::prelude::*;
 use bevy::asset::AssetMetaCheck;
 use bevy::prelude::*;
 use forky_bevy::systems::close_on_esc;

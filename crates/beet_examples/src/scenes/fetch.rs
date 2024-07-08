@@ -1,6 +1,6 @@
 use super::*;
 use crate::prelude::*;
-use beet::prelude::*;
+use crate::beet::prelude::*;
 use bevy::prelude::*;
 use std::time::Duration;
 

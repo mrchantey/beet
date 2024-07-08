@@ -1,5 +1,5 @@
+use crate::beet::prelude::*;
 use anyhow::Result;
-use beet::prelude::*;
 use bevy::prelude::*;
 
 pub fn load_scenes_from_args(_world: &mut World) {

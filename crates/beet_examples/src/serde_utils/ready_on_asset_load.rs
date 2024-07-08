@@ -1,4 +1,4 @@
-use beet::prelude::AppReady;
+use crate::beet::prelude::AppReady;
 use bevy::prelude::*;
 use std::marker::PhantomData;
 

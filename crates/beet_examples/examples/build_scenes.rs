@@ -1,7 +1,7 @@
 use anyhow::Result;
-use beet::prelude::*;
 use beet_examples::prelude::*;
 use beet_examples::scenes;
+use beet_examples::beet::prelude::*;
 use bevy::ecs::schedule::SystemConfigs;
 use bevy::prelude::*;
 mod utils;

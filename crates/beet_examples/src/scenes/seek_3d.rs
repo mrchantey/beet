@@ -1,5 +1,5 @@
 use super::*;
-use beet::prelude::*;
+use crate::beet::prelude::*;
 use crate::prelude::*;
 use bevy::prelude::*;
 use std::time::Duration;
@@ -20,13 +20,13 @@ pub fn seek_3d(mut commands: Commands) {
 		))
 		.id();
 
-		let Foxie {
-			graph,
-			idle_clip,
-			idle_index,
-			walk_index,
-			..
-		} = load_foxie();
+	let Foxie {
+		graph,
+		idle_clip,
+		idle_index,
+		walk_index,
+		..
+	} = load_foxie();
 
 	let transition_duration = Duration::from_secs_f32(0.5);
 

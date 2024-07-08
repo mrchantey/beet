@@ -17,7 +17,10 @@ default = []
 
 [dependencies]
 forky_core.workspace = true
-# beet = { workspace = true }
+beet_ecs.workspace = true
+beet_core.workspace = true
+beet_net.workspace = true
+beet_ml.workspace = true
 # beet = { workspace = true, features = ["reflect"] }
 bevy = { workspace = true, default-features = true }
 log.workspace = true

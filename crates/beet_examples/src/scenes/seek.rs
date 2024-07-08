@@ -1,4 +1,4 @@
-use beet::prelude::*;
+use crate::beet::prelude::*;
 use crate::prelude::*;
 use bevy::prelude::*;
 

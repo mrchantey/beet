@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use beet::prelude::*;
+use crate::beet::prelude::*;
 use bevy::prelude::*;
 
 // use bevy_inspector_egui::quick::WorldInspectorPlugin;
