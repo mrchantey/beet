@@ -1,5 +1,4 @@
 use crate::prelude::*;
-use bevy::ecs::component::ComponentId;
 use bevy::ecs::world::DeferredWorld;
 use bevy::prelude::Commands;
 use bevy::prelude::Entity;
@@ -8,26 +7,25 @@ use std::marker::PhantomData;
 
 /// Use this builder inside `Component::register_component_hooks` to add observers to an entity.
 /// They will be removed when the component is removed.
-pub struct ActionObserverHooks<T, M, Systems: ObserverLifecycle<M>> {
+pub struct ActionObservers<T, M, Systems: ObserverLifecycle<M>> {
 	systems: Systems,
 	phantom: PhantomData<(T, M)>,
 }
 
-impl<T> Default for ActionObserverHooks<T, (), ()> {
+impl<T> Default for ActionObservers<T, (), ()> {
 	fn default() -> Self {
-		ActionObserverHooks {
+		ActionObservers {
 			systems: (),
 			phantom: PhantomData,
 		}
 	}
 }
 
-impl ActionObserverHooks<(), (), ()> {
-	pub fn new<T>() -> ActionObserverHooks<T, (), ()> { Default::default() }
+impl ActionObservers<(), (), ()> {
+	pub fn new<T>() -> ActionObservers<T, (), ()> { Default::default() }
 	pub fn cleanup<'w, T: 'static + Send + Sync>(
-		mut world: DeferredWorld<'w>,
+		world: &mut DeferredWorld<'w>,
 		entity: Entity,
-		_: ComponentId,
 	) {
 		if let Some(observers) = world
 			.entity(entity)
@@ -43,18 +41,19 @@ impl ActionObserverHooks<(), (), ()> {
 }
 
 impl<T: 'static + Send + Sync, M, O: ObserverLifecycle<M> + Clone>
-	ActionObserverHooks<T, M, O>
+	ActionObservers<T, M, O>
 {
 	pub fn add_observers<O2: ObserverLifecycle<M2>, M2>(
 		self,
 		next: O2,
-	) -> ActionObserverHooks<T, ((M, M2), ObserverLifecycleTupleMarker), (O, O2)>
+	) -> ActionObservers<T, ((M, M2), ObserverLifecycleTupleMarker), (O, O2)>
 	{
-		ActionObserverHooks {
+		ActionObservers {
 			systems: (self.systems, next),
 			phantom: PhantomData,
 		}
 	}
+	
 	pub fn build(self, mut commands: Commands, entity: Entity) {
 		let entities = self.systems.spawn_observers(&mut commands, entity);
 		commands

@@ -1,6 +1,6 @@
-pub mod action_observer_hooks;
+pub mod action_observers;
 #[allow(unused_imports)]
-pub use self::action_observer_hooks::*;
+pub use self::action_observers::*;
 pub mod action_observer_map;
 #[allow(unused_imports)]
 pub use self::action_observer_map::*;
