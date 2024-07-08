@@ -1,9 +1,9 @@
-use bevy::ecs::schedule::SystemConfigs;
 use bevy::prelude::*;
+use crate::prelude::*;
 use bevy::utils::all_tuples;
 
 pub trait ActionSystems: Sized {
-	fn systems() -> SystemConfigs;
+	fn on_build(app: &mut App, config: &BeetConfig);
 }
 
 
@@ -15,8 +15,11 @@ macro_rules! impl_plugins_tuples {
 			{
 					#[allow(non_snake_case, unused_variables)]
 					#[track_caller]
-					fn systems()-> SystemConfigs {
-							($($param::systems(),)*).into_configs()
+					fn on_build(app:&mut App, config: &BeetConfig){
+						$(
+								$param::on_build(app, config);
+						)*
+							// ($($param::systems(),)*).into_configs()
 					}
 			}
 	}

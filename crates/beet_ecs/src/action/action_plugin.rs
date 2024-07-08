@@ -1,27 +1,7 @@
 use crate::prelude::*;
-use bevy::ecs::intern::Interned;
-use bevy::ecs::schedule::ScheduleLabel;
 use bevy::prelude::*;
 use std::marker::PhantomData;
 
-
-#[derive(Resource, Clone)]
-pub struct BeetConfig {
-	pub schedule: Interned<dyn ScheduleLabel>,
-}
-
-impl Default for BeetConfig {
-	fn default() -> Self { Self::new(Update) }
-}
-
-
-impl BeetConfig {
-	pub fn new(schedule: impl ScheduleLabel) -> Self {
-		Self {
-			schedule: schedule.intern(),
-		}
-	}
-}
 
 /// Plugin that adds all [`ActionSystems`] to the schedule in [`BeetConfig`], and inits the components.
 #[derive(Debug, Copy, Clone)]
@@ -73,5 +53,5 @@ fn build_common<T: 'static + Send + Sync + Bundle + ActionSystems>(
 
 	app.init_resource::<BeetConfig>();
 	let settings = app.world().resource::<BeetConfig>();
-	app.add_systems(settings.schedule, T::systems());
+	T::on_build(app, &settings.clone());
 }

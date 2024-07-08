@@ -8,7 +8,7 @@ pub type LongRun = InsertWhileRunning<Running>;
 /// 2. Removes the component when [`OnRunResult`] is called
 #[derive(Default, Action, Reflect)]
 #[reflect(Default, Component)]
-#[generic_observers(on_start_running, on_stop_running)]
+#[observers(on_start_running::<T>, on_stop_running::<T>)]
 pub struct InsertWhileRunning<T: Default + GenericActionComponent>(pub T);
 
 fn on_start_running<T: Default + GenericActionComponent>(

@@ -29,29 +29,16 @@ pub enum ActionCategory {
 mod test {
 	use crate::prelude::*;
 	use anyhow::Result;
-	use bevy::ecs::schedule::SystemConfigs;
 	use bevy::prelude::*;
 	use bevy::reflect::ReflectFromPtr;
 	use bevy::reflect::TypeRegistry;
 	use std::any::Any;
 	use sweet::*;
 
-	#[derive(Component, Reflect)]
+	#[derive(Action, Reflect)]
 	#[reflect(ActionMeta)]
+	#[category(ActionCategory::Behavior)]
 	struct MyStruct;
-
-	impl ActionMeta for MyStruct {
-		fn category(&self) -> ActionCategory { ActionCategory::Behavior }
-	}
-
-	impl ActionSystems for MyStruct {
-		fn systems() -> SystemConfigs { my_struct.in_set(TickSet) }
-	}
-	// impl ActionMeta for MyStruct {
-	// 	fn graph_role(&self) -> GraphRole { GraphRole::Node }
-	// }
-
-	fn my_struct() {}
 
 	#[test]
 	fn works() -> Result<()> {

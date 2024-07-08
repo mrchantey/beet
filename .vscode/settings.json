@@ -1,5 +1,6 @@
 {
 	// "files.autoSave": "off",
+	"files.autoSaveDelay": 2000,
 	"files.exclude": {
 		"**/.git": true,
 		// ".vscode": true,

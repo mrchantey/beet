@@ -22,7 +22,11 @@ mod utils;
 /// }
 /// 
 /// ```
-#[proc_macro_derive(Action, attributes(observers,generic_observers))]
+#[proc_macro_derive(Action, attributes(
+	observers,
+	systems,
+	category
+))]
 pub fn action(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 	action::derive_action(input)
 }
