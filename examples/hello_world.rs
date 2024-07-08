@@ -1,42 +1,21 @@
 use beet::prelude::*;
-use bevy::log::LogPlugin;
 use bevy::prelude::*;
 
 fn main() {
-	let mut app = App::new();
+	std::env::set_var("RUST_LOG", "info");
+	pretty_env_logger::init();
 
-	app
-		// The `LifecyclePlugin` cleans up run state
-		.add_plugins((LogPlugin::default(), LifecyclePlugin::default()))
-		// action systems are usually added to the `TickSet`
-		.add_systems(Update, log_on_run.in_set(TickSet));
-
-	// Behavior graphs are regular entity hierarchies
-	app.world_mut()
-		.spawn((SequenceSelector::default(), Running))
+	World::new()
+		// ensures RunResult from children bubble up to the parent
+		.with_observer(bubble_run_result)
+		// logs the name of each entity as it runs
+		.with_observer(log_name_on_run)
+		// create the root entity
+		.spawn((Name::new("root"), SequenceFlow))
 		.with_children(|parent| {
-			parent.spawn((
-				LogOnRun("Hello".into()),
-				InsertOnRun(RunResult::Success),
-			));
-			parent.spawn((
-				LogOnRun("World".into()),
-				InsertOnRun(RunResult::Success),
-			));
-		});
-
-	// 1 - Selector chooses first child
-	app.update();
-
-	// 2 - First child runs >> Hello
-	app.update();
-
-	// 3 - Selector chooses second child
-	app.update();
-
-	// 4 - Second child runs >> World
-	app.update();
-
-	// 5 - Selector succeeds, all done
-	app.update();
+			parent.spawn((Name::new("child1"), EndOnRun::success()));
+			parent.spawn((Name::new("child2"), EndOnRun::success()));
+		})
+		// trigger OnRun for the root
+		.flush_trigger(OnRun);
 }

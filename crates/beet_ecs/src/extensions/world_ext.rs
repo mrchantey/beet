@@ -1,6 +1,18 @@
+use bevy::ecs::system::IntoObserverSystem;
 use bevy::prelude::*;
 
 
+
+#[extend::ext]
+pub impl World {
+	fn with_observer<E: Event, B: Bundle, M>(
+		mut self,
+		system: impl IntoObserverSystem<E, B, M>,
+	) -> Self {
+		self.spawn(Observer::new(system));
+		self
+	}
+}
 
 #[extend::ext]
 pub impl<'w> EntityWorldMut<'w> {
