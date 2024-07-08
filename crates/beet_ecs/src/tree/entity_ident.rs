@@ -123,7 +123,7 @@ mod test {
 	fn deep_clone() -> Result<()> {
 		let mut world = world();
 		let entity1 = world
-			.spawn((BeetRoot, Running, SetOnRun(RunResult::Success)))
+			.spawn((BeetRoot::default(), Running, SetOnRun(RunResult::Success)))
 			.id();
 		let entity1 = EntityIdent::new(entity1);
 

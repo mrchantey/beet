@@ -3,6 +3,7 @@ pub mod action;
 pub mod extensions;
 pub mod graph;
 pub mod lifecycle;
+pub mod observers;
 pub mod reflect;
 #[cfg(test)]
 pub mod test;
@@ -11,6 +12,9 @@ pub mod tree;
 pub mod prelude {
 	pub use crate::action::*;
 	pub use crate::extensions::*;
+	pub use crate::observers::*;
+	pub use crate::observers::actions::*;
+	pub use crate::observers::selectors::*;
 	pub use crate::graph::*;
 	pub use crate::lifecycle::actions::*;
 	pub use crate::lifecycle::beet_debug_plugin::*;

@@ -33,7 +33,6 @@ fn main(){
 
   app.world_mut().spawn((
       Running,
-      Repeat,
       SequenceSelector::default(), 
     ))
     .with_children(|parent| {
