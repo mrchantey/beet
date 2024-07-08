@@ -12,6 +12,13 @@ pub impl World {
 		self.spawn(Observer::new(system));
 		self
 	}
+	fn observing<E: Event, B: Bundle, M>(
+		&mut self,
+		system: impl IntoObserverSystem<E, B, M>,
+	) -> &mut Self {
+		self.spawn(Observer::new(system));
+		self
+	}
 }
 
 #[extend::ext]

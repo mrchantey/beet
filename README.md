@@ -19,35 +19,36 @@
 </div>
 
 ```rust
-use bevy::prelude::*;
-use beet::prelude::*;
+// A demonstration of Sequence control flow
+fn main() {
+	App::new()
+		.add_plugins((
+			LogPlugin::default(), 
+			BeetObserverPlugin
+		))
+		.world_mut()
+		.spawn((
+			Name::new("root"), 
+			LogNameOnRun, 
+			SequenceFlow
+		))
+		.with_children(|parent| {
+			parent.spawn((
+				Name::new("child1"),
+				LogNameOnRun,
+				EndOnRun::success(),
+			));
+			parent.spawn((
+				Name::new("child2"),
+				LogNameOnRun,
+				EndOnRun::success(),
+			));
+		})
+		.flush_trigger(OnRun);
 
-fn main(){
-
-  let mut app = App::new();
-
-  app.add_plugins((
-    DefaultPlugins,
-    DefaultBeetPlugins
-  ));
-
-  app.world_mut().spawn((
-      Running,
-      SequenceSelector::default(), 
-    ))
-    .with_children(|parent| {
-      parent.spawn((
-        LogOnRun("Hello".into()),
-        InsertOnRun(RunResult::Success),
-      ));
-      parent.spawn((
-        LogOnRun("World".into()),
-        InsertOnRun(RunResult::Success),
-      ));
-    });
-
-  app.run();
-
+// Running: root
+// Running: child1
+// Running: child2
 }
 ```
 ## Examples
