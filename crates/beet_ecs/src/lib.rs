@@ -1,5 +1,7 @@
 #![feature(result_flattening, let_chains)]
 pub mod action;
+pub mod actions;
+pub mod events;
 pub mod extensions;
 pub mod graph;
 pub mod lifecycle;
@@ -11,10 +13,11 @@ pub mod tree;
 
 pub mod prelude {
 	pub use crate::action::*;
+	pub use crate::actions::flow::*;
+	pub use crate::actions::leaf::*;
+	pub use crate::actions::*;
+	pub use crate::events::*;
 	pub use crate::extensions::*;
-	pub use crate::observers::*;
-	pub use crate::observers::actions::*;
-	pub use crate::observers::selectors::*;
 	pub use crate::graph::*;
 	pub use crate::lifecycle::actions::*;
 	pub use crate::lifecycle::beet_debug_plugin::*;
@@ -22,6 +25,8 @@ pub mod prelude {
 	pub use crate::lifecycle::lifecycle_plugin::*;
 	pub use crate::lifecycle::lifecycle_systems_plugin::*;
 	pub use crate::lifecycle::selectors::*;
+	pub use crate::observers::observer_utils::*;
+	pub use crate::observers::*;
 	// pub use crate::lifecycle::*;
 	pub use crate::reflect::*;
 	#[cfg(test)]

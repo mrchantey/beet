@@ -58,8 +58,8 @@ impl ActionMeta for Sequence {
 
 #[cfg(test)]
 mod test {
-	use super::*;
-	use actions::EndOnRun;
+	use crate::prelude::*;
+	use bevy::prelude::*;
 	use anyhow::Result;
 	use sweet::*;
 

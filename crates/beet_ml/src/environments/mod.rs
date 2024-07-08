@@ -1,2 +1,2 @@
-pub mod frozen_lake;
 pub mod blackjack;
+pub mod frozen_lake;

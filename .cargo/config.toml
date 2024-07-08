@@ -1,4 +1,3 @@
-
 [target.x86_64-unknown-linux-gnu]
 # note: mold and clang must be installed: sudo apt install mold clang
 linker = "clang"
