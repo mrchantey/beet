@@ -1,6 +1,5 @@
 use super::ActionAttributes;
 use crate::utils::BeetManifest;
-use crate::utils::TokenStreamIterExt;
 use crate::utils::TokenStreamVecExt;
 use proc_macro2::TokenStream;
 use quote::quote;
@@ -23,14 +22,19 @@ fn parse(input: DeriveInput) -> syn::Result<TokenStream> {
 	let ident = input.ident;
 	let (impl_generics, type_generics, where_clause) =
 		&input.generics.split_for_impl();
-	let observers = attributes
-		.observers
+	let mut observers = attributes
+		.observers_generic
 		.into_iter()
 		.map(|ident| {
 			quote! { #ident::#type_generics }
 		})
-		.collect_comma_punct();
-	let observers_non_generic = attributes.observers_non_generic.collect_comma_punct();
+		.collect::<Vec<_>>();
+	observers.extend(attributes.observers_non_generic.into_iter().map(
+		|ident| {
+			quote! { #ident }
+		},
+	));
+	let observers = observers.collect_comma_punct();
 
 	Ok(quote! {
 		use #beet_ecs_path::prelude::*;
@@ -42,7 +46,7 @@ fn parse(input: DeriveInput) -> syn::Result<TokenStream> {
 			fn register_component_hooks(hooks: &mut ComponentHooks) {
 				hooks.on_add(|mut world, entity, _| {
 					ActionObserverHooks::new::<#ident #type_generics>()
-						.add_observers((#observers,#observers_non_generic))
+						.add_observers((#observers))
 						.build(world.commands(), entity);
 				});
 				hooks.on_remove(ActionObserverHooks::cleanup::<#ident #type_generics>);

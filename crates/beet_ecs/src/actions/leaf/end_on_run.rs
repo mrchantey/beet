@@ -1,28 +1,15 @@
 use crate::prelude::*;
-use bevy::ecs::component::ComponentHooks;
-use bevy::ecs::component::StorageType;
 use bevy::prelude::*;
 
 /// Trigger `OnRunResult` immediately when this action runs
-#[derive(Default, Deref, DerefMut, Reflect)]
+#[derive(Default, Action, Deref, DerefMut, Reflect)]
 #[reflect(Default, Component)]
+#[observers(end_on_run)]
 pub struct EndOnRun(pub RunResult);
 
 impl EndOnRun {
 	pub fn success() -> Self { Self(RunResult::Success) }
 	pub fn failure() -> Self { Self(RunResult::Failure) }
-}
-
-impl Component for EndOnRun {
-	const STORAGE_TYPE: StorageType = StorageType::Table;
-	fn register_component_hooks(hooks: &mut ComponentHooks) {
-		hooks.on_add(|mut world, entity, _| {
-			ActionObserverHooks::new::<EndOnRun>()
-				.add_observers(end_on_run)
-				.build(world.commands(), entity);
-		});
-		hooks.on_remove(ActionObserverHooks::cleanup::<EndOnRun>);
-	}
 }
 
 fn end_on_run(

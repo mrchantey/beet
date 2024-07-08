@@ -1,23 +1,10 @@
 use crate::prelude::*;
-use bevy::ecs::component::ComponentHooks;
-use bevy::ecs::component::StorageType;
 use bevy::prelude::*;
 
-#[derive(Default, Reflect)]
+#[derive(Default, Action, Reflect)]
 #[reflect(Default, Component)]
+#[observers(sequence_start,sequence_next)]
 pub struct Sequence;
-
-impl Component for Sequence {
-	const STORAGE_TYPE: StorageType = StorageType::Table;
-	fn register_component_hooks(hooks: &mut ComponentHooks) {
-		hooks.on_add(|mut world, entity, _| {
-			ActionObserverHooks::new::<Sequence>()
-				.add_observers((sequence_start, sequence_next))
-				.build(world.commands(), entity);
-		});
-		hooks.on_remove(ActionObserverHooks::cleanup::<Sequence>);
-	}
-}
 
 fn sequence_start(
 	trigger: Trigger<OnRun>,
@@ -59,8 +46,8 @@ impl ActionMeta for Sequence {
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use bevy::prelude::*;
 	use anyhow::Result;
+	use bevy::prelude::*;
 	use sweet::*;
 
 	#[test]

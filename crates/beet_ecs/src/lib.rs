@@ -11,6 +11,9 @@ pub mod reflect;
 pub mod test;
 pub mod tree;
 
+// required for action macros
+extern crate self as beet_ecs;
+
 pub mod prelude {
 	pub use crate::action::*;
 	pub use crate::actions::flow::*;

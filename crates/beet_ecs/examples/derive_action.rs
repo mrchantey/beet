@@ -2,25 +2,13 @@ use beet_ecs::prelude::*;
 use bevy::prelude::*;
 
 #[derive(Action)]
-#[observers(log_on_run)]
-#[observers_non_generic(log_name_on_run)]
-struct LogOnRun<T: 'static + Send + Sync + ToString>(pub T);
+#[observers(log_name_on_run,log_name_on_run)]
+struct LogOnRun(pub String);
 
-fn log_on_run<T: 'static + Send + Sync + ToString>(
-	trigger: Trigger<OnRun>,
-	query: Query<&LogOnRun<T>>,
-) {
+fn log_name_on_run(trigger: Trigger<OnRun>, query: Query<&LogOnRun>) {
 	let name = query
 		.get(trigger.entity())
-		.map(|n| n.0.to_string())
-		.unwrap();
-	println!("log_on_run: {name}");
-}
-
-fn log_name_on_run(trigger: Trigger<OnRun>, query: Query<&Name>) {
-	let name = query
-		.get(trigger.entity())
-		.map(|n| n.as_str())
+		.map(|n| n.0.as_str())
 		.unwrap_or("");
 	println!("log_name_on_run: {name}");
 }
@@ -28,6 +16,6 @@ fn log_name_on_run(trigger: Trigger<OnRun>, query: Query<&Name>) {
 fn main() {
 	let mut world = World::new();
 	world
-		.spawn((Name::new("root1"), LogOnRun("root2".to_string())))
+		.spawn(LogOnRun("root".to_string()))
 		.trigger(OnRun);
 }

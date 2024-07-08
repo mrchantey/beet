@@ -1,12 +1,15 @@
+use syn::Expr;
+use crate::utils::punctuated_args;
+
 pub struct ActionAttributes {
-	pub observers: Vec<syn::Ident>,
-	pub observers_non_generic: Vec<syn::Ident>,
+	pub observers_generic: Vec<Expr>,
+	pub observers_non_generic: Vec<Expr>,
 }
 
 
 impl ActionAttributes {
 	pub fn parse(attrs: &[syn::Attribute]) -> syn::Result<Self> {
-		let mut observers = Vec::new();
+		let mut observers_generic = Vec::new();
 		let mut observers_non_generic = Vec::new();
 
 		for attr in attrs {
@@ -14,16 +17,16 @@ impl ActionAttributes {
 				attr.path().get_ident().map(|ident| ident.to_string());
 			match attr_str.as_ref().map(|a| a.as_str()) {
 				Some("observers") => {
-					observers.push(attr.parse_args()?);
+					observers_non_generic.extend(punctuated_args(attr.parse_args()?)?);
 				}
-				Some("observers_non_generic") => {
-					observers_non_generic.push(attr.parse_args()?);
+				Some("generic_observers") => {
+					observers_generic.extend(punctuated_args(attr.parse_args()?)?);
 				}
 				_ => {}
 			}
 		}
 		return Ok(Self {
-			observers,
+			observers_generic,
 			observers_non_generic,
 		});
 	}

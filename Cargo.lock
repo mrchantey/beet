@@ -610,6 +610,10 @@ name = "beet_examples"
 version = "0.0.3"
 dependencies = [
  "anyhow",
+ "beet_core",
+ "beet_ecs",
+ "beet_ml",
+ "beet_net",
  "bevy",
  "flume",
  "forky_bevy",
