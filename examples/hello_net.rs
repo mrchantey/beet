@@ -9,7 +9,7 @@ pub fn main() {
 			(
 				scenes::beet_debug,
 				scenes::camera_2d,
-				scenes::ui_terminal,
+				scenes::ui_terminal_input,
 				scenes::hello_net,
 			),
 		)

@@ -1,26 +1,18 @@
 use crate::prelude::*;
-use bevy::prelude::*;
+
+/// Immediately end the run with the provided result
+pub type EndOnRun = TriggerOnTrigger<OnRun, OnRunResult>;
+
 
 /// Trigger `OnRunResult` immediately when this action runs
-#[derive(Default, Action, Deref, DerefMut, Reflect)]
-#[reflect(Default, Component)]
-#[observers(end_on_run)]
-pub struct EndOnRun(pub RunResult);
+// #[derive(Default, Action, Deref, DerefMut, Reflect)]
+// #[reflect(Default, Component)]
+// #[observers(end_on_run)]
+// pub struct EndOnRun(pub RunResult);
 
 impl EndOnRun {
-	pub fn success() -> Self { Self(RunResult::Success) }
-	pub fn failure() -> Self { Self(RunResult::Failure) }
-}
-
-fn end_on_run(
-	trigger: Trigger<OnRun>,
-	mut commands: Commands,
-	query: Query<&EndOnRun>,
-) {
-	if let Ok(end_on_run) = query.get(trigger.entity()) {
-		commands
-			.trigger_targets(OnRunResult::new(**end_on_run), trigger.entity());
-	}
+	pub fn success() -> Self { Self::new(OnRunResult::success()) }
+	pub fn failure() -> Self { Self::new(OnRunResult::failure()) }
 }
 
 

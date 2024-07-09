@@ -10,7 +10,8 @@ pub mod child_expect {
 }
 
 
-#[derive(Debug, Default, Clone, Event, PartialEq, Deref)]
+#[derive(Debug, Default, Clone, Copy, Event, PartialEq, Deref, Reflect)]
+#[reflect(Default)]
 pub struct OnRunResult(RunResult);
 impl OnRunResult {
 	pub fn new(result: RunResult) -> Self { Self(result) }
@@ -19,7 +20,7 @@ impl OnRunResult {
 	pub fn result(&self) -> RunResult { **self }
 }
 
-#[derive(Event)]
+#[derive(Debug, Clone, Copy, Event, Reflect)]
 pub struct OnChildResult {
 	child: Entity,
 	result: RunResult,

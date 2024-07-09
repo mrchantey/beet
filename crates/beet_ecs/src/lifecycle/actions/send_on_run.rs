@@ -4,7 +4,7 @@ use bevy::prelude::*;
 /// Sends the given event when this behavior starts running.
 #[derive(Debug, Clone, PartialEq, Deref, DerefMut, Action, Reflect)]
 #[reflect(Component, ActionMeta)]
-#[systems(send_on_run::<T>.in_set(TickSet))]
+#[observers(send_on_run::<T>)]
 pub struct SendOnRun<T: GenericActionEvent>(pub T);
 
 impl<T: Default + GenericActionEvent> Default for SendOnRun<T> {
@@ -16,10 +16,12 @@ impl<T: GenericActionEvent> SendOnRun<T> {
 }
 
 fn send_on_run<T: GenericActionEvent>(
+	trigger: Trigger<OnRun>,
 	mut writer: EventWriter<T>,
-	query: Query<&SendOnRun<T>, Added<Running>>,
+	query: Query<&SendOnRun<T>>,
 ) {
-	for trigger in query.iter() {
-		writer.send(trigger.0.clone());
-	}
+	let action = query
+		.get(trigger.entity())
+		.expect(expect_action::NO_ACTION_COMP);
+	writer.send(action.0.clone());
 }

@@ -16,11 +16,10 @@ fn on_start_running<T: Default + GenericActionComponent>(
 	query: Query<&InsertWhileRunning<T>>,
 	mut commands: Commands,
 ) {
-	if let Ok(insert_while_running) = query.get(trigger.entity()) {
-		commands
-			.entity(trigger.entity())
-			.insert(insert_while_running.0.clone());
-	}
+	let action = query
+		.get(trigger.entity())
+		.expect(expect_action::NO_ACTION_COMP);
+	commands.entity(trigger.entity()).insert(action.0.clone());
 }
 fn on_stop_running<T: Default + GenericActionComponent>(
 	trigger: Trigger<OnRunResult>,

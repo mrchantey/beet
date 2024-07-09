@@ -25,6 +25,9 @@ pub use self::remove_agent_on_run::*;
 pub mod repeat;
 #[allow(unused_imports)]
 pub use self::repeat::*;
+pub mod send_on_run;
+#[allow(unused_imports)]
+pub use self::send_on_run::*;
 pub mod set_agent_on_run;
 #[allow(unused_imports)]
 pub use self::set_agent_on_run::*;
@@ -34,6 +37,3 @@ pub use self::set_on_run::*;
 pub mod set_on_spawn;
 #[allow(unused_imports)]
 pub use self::set_on_spawn::*;
-pub mod send_on_run;
-#[allow(unused_imports)]
-pub use self::send_on_run::*;
