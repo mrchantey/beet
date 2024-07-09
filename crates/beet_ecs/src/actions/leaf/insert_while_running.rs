@@ -1,7 +1,7 @@
 use crate::prelude::*;
 use bevy::prelude::*;
 
-pub type LongRun = InsertWhileRunning<Running>;
+pub type ContinueRun = InsertWhileRunning<Running>;
 
 
 /// 1. Adds the provided component when [`OnRun`] is called
@@ -41,7 +41,10 @@ mod test {
 	fn works() -> Result<()> {
 		let mut world = World::new();
 
-		let entity = world.spawn(LongRun::default()).flush_trigger(OnRun).id();
+		let entity = world
+			.spawn(ContinueRun::default())
+			.flush_trigger(OnRun)
+			.id();
 		expect(world.entities().len()).to_be(3)?;
 		expect(&world).to_have_component::<Running>(entity)?;
 		world

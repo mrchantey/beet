@@ -1,5 +1,5 @@
-use crate::prelude::*;
 use crate::beet::prelude::*;
+use crate::prelude::*;
 use bevy::app::PluginGroupBuilder;
 use bevy::prelude::*;
 
@@ -33,6 +33,7 @@ impl Plugin for ExamplePluginBasics {
 		app.add_plugins((
 			ExampleDefaultPlugins,
 			DefaultBeetPlugins,
+			BeetDebugPluginBase,
 			BeetDebugPluginStdout,
 			ExampleBasePlugin,
 			Example2dPlugin,
@@ -51,6 +52,7 @@ pub struct ExamplePlugins;
 impl PluginGroup for ExamplePlugins {
 	fn build(self) -> PluginGroupBuilder {
 		PluginGroupBuilder::start::<Self>()
+			.add(BeetDebugPluginBase)
 			.add(BeetDebugPluginStdout)
 			.add(ExampleBasePlugin)
 			.add(Example2dPlugin)

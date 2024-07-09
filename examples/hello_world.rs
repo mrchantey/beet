@@ -5,28 +5,27 @@ use bevy::prelude::*;
 #[rustfmt::skip]
 fn main() {
 	App::new()
+    .insert_resource(BeetDebugConfig::default())
 		.add_plugins((
 			LogPlugin::default(), 
-			BeetObserverPlugin
+			BeetDebugPluginBase,
+			BeetDebugPluginStdout,
+			LifecyclePlugin,
 		))
 		.world_mut()
 		.spawn((
 			Name::new("root"), 
-			LogNameOnRun, 
 			SequenceFlow
 		))
 		.with_children(|parent| {
 			parent.spawn((
 				Name::new("child1"),
-				LogNameOnRun,
 				EndOnRun::success(),
 			));
 			parent.spawn((
 				Name::new("child2"),
-				LogNameOnRun,
 				EndOnRun::success(),
 			));
 		})
-		// trigger OnRun for the root
 		.flush_trigger(OnRun);
 }

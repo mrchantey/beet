@@ -44,7 +44,6 @@ mod test {
 	fn works() -> Result<()> {
 		let mut world = World::new();
 		world.observe(bubble_run_result);
-		world.observe(trigger_run_on_spawn);
 		let on_run = observe_triggers::<OnRun>(&mut world);
 		let on_run_result = observe_triggers::<OnRunResult>(&mut world);
 
@@ -52,14 +51,11 @@ mod test {
 			.spawn((Name::new("root"), EndOnRun::success()))
 			.observe(passthrough_run_result)
 			.with_children(|parent| {
-				// child starts running which triggers parent
-				parent.spawn((
-					Name::new("child1"),
-					RunOnSpawn,
-					EndOnRun::success(),
-				));
+				parent
+					.spawn((Name::new("child1"), EndOnRun::success()))
+					// child starts running which triggers parent
+					.flush_trigger(OnRun);
 			});
-		world.flush();
 
 		expect(&on_run).to_have_been_called_times(1)?;
 		expect(&on_run_result).to_have_been_called_times(2)?;

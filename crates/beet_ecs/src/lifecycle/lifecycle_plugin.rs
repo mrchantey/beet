@@ -24,19 +24,27 @@ impl Plugin for LifecyclePlugin {
 			ScoreSelector,
 			// utility
 			EmptyAction,
-		)>::default());
-
+		)>::default())
+		.add_plugins(ActionPlugin::<(
+			ContinueRun,
+			SequenceFlow,
+			EndOnRun,
+			RunOnSpawn,
+		)>::default())
+		// observers
+		.register_type::<RunOnSpawn>()
 		// running
-		app.register_type::<Running>();
-		app.register_type::<RunTimer>();
-		app.register_type::<RunResult>();
+		.register_type::<Running>()
+		.register_type::<RunTimer>()
+		.register_type::<RunResult>()
 		// graph
-		app.register_type::<Parent>();
-		app.register_type::<Children>();
-		app.register_type::<BeetRoot>();
-		app.register_type::<RootIsTargetAgent>();
-		app.register_type::<TargetAgent>();
-		app.register_type::<ActionTarget>();
+		.register_type::<Parent>()
+		.register_type::<Children>()
+		.register_type::<BeetRoot>()
+		.register_type::<RootIsTargetAgent>()
+		.register_type::<TargetAgent>()
+		.register_type::<ActionTarget>()
+		/*-*/;
 
 		let world = app.world_mut();
 

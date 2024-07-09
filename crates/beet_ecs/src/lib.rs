@@ -1,3 +1,4 @@
+#![allow(deprecated)] // TODO remove deprecated
 #![feature(result_flattening, let_chains)]
 pub mod action;
 pub mod actions;

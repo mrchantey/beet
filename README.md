@@ -24,7 +24,7 @@ fn main() {
 	App::new()
 		.add_plugins((
 			LogPlugin::default(), 
-			BeetObserverPlugin
+			LifecyclePlugin
 		))
 		.world_mut()
 		.spawn((

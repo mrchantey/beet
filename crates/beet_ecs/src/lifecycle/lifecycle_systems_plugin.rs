@@ -51,5 +51,8 @@ impl Plugin for LifecycleSystemsPlugin {
 				set_root_as_target_agent.in_set(PreTickSet),
 			)
 			/*-*/;
+
+		let world = app.world_mut();
+		world.observe(bubble_run_result);
 	}
 }

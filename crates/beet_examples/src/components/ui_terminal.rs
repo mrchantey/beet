@@ -1,5 +1,5 @@
-use crate::prelude::*;
 use crate::beet::prelude::*;
+use crate::prelude::*;
 use bevy::input::keyboard::Key;
 use bevy::input::keyboard::KeyboardInput;
 use bevy::input::ButtonState;
@@ -12,6 +12,12 @@ pub struct UiTerminalPlugin;
 impl Plugin for UiTerminalPlugin {
 	fn build(&self, app: &mut App) {
 		app.add_plugins(BeetDebugPlugin::new(append_text))
+		.observe(
+			|trigger: Trigger<OnLogMessage>,	commands: Commands,
+			terminals: Query<Entity, With<UiTerminal>>| {
+				append_text(In(vec![trigger.event().0.to_string()]), commands, terminals);
+			},
+		)
 			.add_systems(Update, (
 				log_log_on_run.pipe(append_text),
 				log_user_input.pipe(append_text),

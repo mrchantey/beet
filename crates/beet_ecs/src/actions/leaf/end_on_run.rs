@@ -29,6 +29,7 @@ mod test {
 	use super::EndOnRun;
 	use crate::prelude::*;
 	use anyhow::Result;
+	use bevy::ecs::system::RunSystemOnce;
 	use bevy::prelude::*;
 	use sweet::*;
 
@@ -52,13 +53,12 @@ mod test {
 	#[test]
 	fn works_with_run_on_spawn() -> Result<()> {
 		let mut world = World::new();
-		world.observe(trigger_run_on_spawn);
 		let func = observe_run_results(&mut world);
 
 		world.spawn((RunOnSpawn, EndOnRun::failure()));
+		world.run_system_once(run_on_spawn);
 		world.flush();
-		expect(world.entities().len()).to_be(4)?;
-		world.flush();
+		expect(world.entities().len()).to_be(3)?;
 		expect(&func).to_have_been_called()?;
 		expect(&func).to_have_returned_nth_with(0, &RunResult::Failure)?;
 		Ok(())
