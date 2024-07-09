@@ -1,6 +1,14 @@
 use crate::prelude::*;
 use bevy::prelude::*;
 
+#[rustfmt::skip]
+pub mod child_expect {
+	pub const NO_CHILDREN: &str = 
+		"OnChildResult triggered but no children found";
+	pub const NOT_MY_CHILD: &str =
+		"OnChildResult triggered but caller not in children";
+}
+
 
 #[derive(Debug, Default, Clone, Event, PartialEq, Deref)]
 pub struct OnRunResult(RunResult);

@@ -7,17 +7,24 @@ use bevy::prelude::*;
 #[observers(sequence_start, sequence_next)]
 pub struct SequenceFlow;
 
+
+
+
 fn sequence_start(
 	trigger: Trigger<OnRun>,
 	mut commands: Commands,
 	query: Query<&Children>,
 ) {
-	if let Ok(children) = query.get(trigger.entity()) {
-		if let Some(first_child) = children.iter().next() {
-			commands.trigger_targets(OnRun, *first_child);
-		}
+	let children = query
+		.get(trigger.entity())
+		.expect(child_expect::NO_CHILDREN);
+	if let Some(first_child) = children.iter().next() {
+		commands.trigger_targets(OnRun, *first_child);
+	} else {
+		commands.trigger_targets(OnRunResult::success(), trigger.entity());
 	}
 }
+
 fn sequence_next(
 	trigger: Trigger<OnChildResult>,
 	mut commands: Commands,
@@ -27,11 +34,14 @@ fn sequence_next(
 		commands.trigger_targets(OnRunResult::failure(), trigger.entity());
 		return;
 	}
-	if let Ok(children) = query.get(trigger.entity()) {
+	let children = query
+		.get(trigger.entity())
+		.expect(child_expect::NO_CHILDREN);
+	{
 		let index = children
 			.iter()
 			.position(|&x| x == trigger.event().child())
-			.expect("Only children may trigger OnChildResult");
+			.expect(child_expect::NOT_MY_CHILD);
 		if index == children.len() - 1 {
 			commands.trigger_targets(OnRunResult::success(), trigger.entity());
 		} else {
