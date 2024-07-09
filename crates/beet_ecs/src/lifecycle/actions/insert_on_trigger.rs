@@ -9,6 +9,7 @@ use std::ops::DerefMut;
 #[reflect(Component, ActionMeta)]
 #[category(ActionCategory::World)]
 #[systems(inset_on_trigger::<E, T>.in_set(TickSet))]
+#[deprecated = "Use `TriggerOnTrigger` instead"]
 pub struct InsertOnTrigger<E: GenericActionEvent, T: GenericActionComponent> {
 	pub value: T,
 	#[reflect(ignore)]

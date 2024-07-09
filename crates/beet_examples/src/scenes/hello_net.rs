@@ -1,21 +1,15 @@
 use crate::beet::prelude::*;
-use crate::prelude::*;
 use bevy::prelude::*;
 
+#[rustfmt::skip]
 pub fn hello_net(mut commands: Commands) {
-	commands
-		.spawn((
-			Name::new("Hello Net Sequence"),
-			SequenceSelector::default(),
-			Running
-			// SequenceFlow::default(),
-			// RunOnSpawn,
-		))
-		.with_children(|parent| {
-			parent.spawn((Name::new("Send - AppReady"), SendOnRun(AppReady)));
-		});
+	let target = commands.spawn((
+		Name::new("Recv - AppReady"), 
+		RunOnAppReady::default()
+	)).id();
 	commands.spawn((
-		Name::new("Recv - OnUserMessage"),
-		InsertOnTrigger::<OnUserMessage, Running>::new(Running),
+		Name::new("Send - AppReady"),
+		RunOnSpawn,
+		TriggerOnRun::new(AppReady).with_target(target)
 	));
 }

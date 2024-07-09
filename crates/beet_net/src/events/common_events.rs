@@ -29,6 +29,8 @@ impl Plugin for CommonEventsPlugin {
 			.replicate_event_outgoing::<AppReady>()
 			.add_plugins(ActionPlugin::<(
 				SendOnRun<AppReady>,
+				TriggerOnRun<AppReady>,
+				RunOnAppReady,
 				InsertOnTrigger<AppReady, Running>,
 			)>::default())
 			// SpawnSceneFile
@@ -51,8 +53,12 @@ impl Plugin for CommonEventsPlugin {
 }
 
 /// Sent from this app on the Startup schedule.
-#[derive(Debug, Clone, Serialize, Deserialize, Event, Reflect)]
+#[derive(Debug, Default, Clone, Serialize, Deserialize, Event, Reflect)]
+#[reflect(Default)]
 pub struct AppStartup;
 /// Sent from this app, usually once assets are ready.
-#[derive(Debug, Clone, Serialize, Deserialize, Event, Reflect)]
+#[derive(Debug, Default, Clone, Serialize, Deserialize, Event, Reflect)]
+#[reflect(Default)]
 pub struct AppReady;
+
+pub type RunOnAppReady = TriggerOnTrigger<AppReady, OnRun>;

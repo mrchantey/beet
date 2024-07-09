@@ -10,3 +10,6 @@ pub use self::run_on_spawn::*;
 pub mod trigger_on_trigger;
 #[allow(unused_imports)]
 pub use self::trigger_on_trigger::*;
+pub mod trigger_target;
+#[allow(unused_imports)]
+pub use self::trigger_target::*;

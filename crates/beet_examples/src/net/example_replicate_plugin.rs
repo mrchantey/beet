@@ -10,7 +10,7 @@ impl Plugin for ExampleReplicatePlugin {
 		app.add_plugins((ReplicatePlugin, CommonEventsPlugin))
 			.add_event::<OnUserMessage>()
 			.replicate_event_incoming::<OnUserMessage>()
-			.add_plugins(ActionPlugin::<InsertOnTrigger<OnUserMessage,Running>>::default());
+			/*-*/;
 	}
 }
 
