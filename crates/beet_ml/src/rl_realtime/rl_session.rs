@@ -205,12 +205,11 @@ mod test {
 		params.learn_params.n_training_episodes = 1;
 		app.world_mut().spawn(RlSession::new(params));
 
-		expect(app.world().entities().len()).to_be(1)?;
-
-		app.update();
 		expect(app.world().entities().len()).to_be(2)?;
 		app.update();
-		expect(app.world().entities().len()).to_be(1)?;
+		expect(app.world().entities().len()).to_be(3)?;
+		app.update();
+		expect(app.world().entities().len()).to_be(2)?;
 
 		Ok(())
 	}

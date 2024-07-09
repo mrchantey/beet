@@ -34,6 +34,6 @@ pub use self::set_on_run::*;
 pub mod set_on_spawn;
 #[allow(unused_imports)]
 pub use self::set_on_spawn::*;
-pub mod trigger_on_run;
+pub mod send_on_run;
 #[allow(unused_imports)]
-pub use self::trigger_on_run::*;
+pub use self::send_on_run::*;

@@ -18,27 +18,25 @@ pub struct CommonEventsPlugin;
 impl Plugin for CommonEventsPlugin {
 	fn build(&self, app: &mut App) {
 		app
-		// AppStartup
-		.add_event::<AppStartup>()
-		.replicate_event_outgoing::<AppStartup>()
-		.add_systems(Startup, |mut events: EventWriter<AppStartup>| {
-			events.send(AppStartup);
-		})
-		// AppReady
-		.add_event::<AppReady>()
-		.replicate_event_outgoing::<AppReady>()
-		.add_plugins(ActionPlugin::<(
-			TriggerOnRun<AppReady>,
-			InsertOnTrigger<AppReady, Running>,
-		)>::default())
-		.register_type::<TriggerOnRun<AppReady>>()
-		.register_type::<InsertOnTrigger<AppReady, Running>>()
-		// SpawnSceneFile
-		.add_event::<SpawnSceneFile>()
-		.replicate_event_incoming::<SpawnSceneFile>()
-		.add_event::<SpawnSceneFileResponse>()
-		.replicate_event_outgoing::<SpawnSceneFileResponse>()
-		.add_systems(Update, handle_spawn_scene);
+			// AppStartup
+			.add_event::<AppStartup>()
+			.replicate_event_outgoing::<AppStartup>()
+			.add_systems(Startup, |mut events: EventWriter<AppStartup>| {
+				events.send(AppStartup);
+			})
+			// AppReady
+			.add_event::<AppReady>()
+			.replicate_event_outgoing::<AppReady>()
+			.add_plugins(ActionPlugin::<(
+				SendOnRun<AppReady>,
+				InsertOnTrigger<AppReady, Running>,
+			)>::default())
+			// SpawnSceneFile
+			.add_event::<SpawnSceneFile>()
+			.replicate_event_incoming::<SpawnSceneFile>()
+			.add_event::<SpawnSceneFileResponse>()
+			.replicate_event_outgoing::<SpawnSceneFileResponse>()
+			.add_systems(Update, handle_spawn_scene);
 		// Screenshot
 
 		#[cfg(not(test))]

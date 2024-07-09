@@ -6,8 +6,7 @@ pub fn hello_net(mut commands: Commands) {
 	commands
 		.spawn((SequenceSelector::default(), Running))
 		.with_children(|parent| {
-			parent
-				.spawn((Name::new("Send - AppReady"), TriggerOnRun(AppReady)));
+			parent.spawn((Name::new("Send - AppReady"), SendOnRun(AppReady)));
 		});
 	commands.spawn((
 		Name::new("Recv - Player Message"),

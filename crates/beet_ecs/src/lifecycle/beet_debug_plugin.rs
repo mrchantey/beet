@@ -162,7 +162,6 @@ fn log_on_start_observer(
 		.get(trigger.entity())
 		.map(|n| format!("Started: {n}"))
 		.unwrap_or_else(|_| format!("Started: {}", trigger.entity()));
-	log::info!("called: {}", name);
 	commands.trigger(OnLogMessage::new(name));
 }
 fn log_on_stop_observer(
