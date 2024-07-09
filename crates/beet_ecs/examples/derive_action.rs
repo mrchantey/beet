@@ -3,6 +3,7 @@ use bevy::prelude::*;
 
 #[derive(Action)]
 #[observers(log_name_on_run, log_name_on_run)]
+#[storage(StorageType::SparseSet)]
 struct LogOnRun(pub String);
 
 fn log_name_on_run(trigger: Trigger<OnRun>, query: Query<&LogOnRun>) {

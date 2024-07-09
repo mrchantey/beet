@@ -10,8 +10,9 @@ use std::time::Duration;
 #[systems(insert_on_animation_end::<T>.in_set(TickSet))]
 /// Inserts the given component when an animation is almost finished.
 /// Requires a [`Handle<AnimationClip>`] component.
-pub struct InsertOnAnimationEnd<T: GenericActionComponent> {
+pub struct TriggerOnAnimationEnd<T: GenericActionEvent> {
 	pub value: T,
+	pub target: TriggerTarget,
 	pub animation_index: AnimationNodeIndex,
 	/// The duration of the transition to the next action.
 	/// This should be greater than frame delta time or there will be no chance
@@ -20,13 +21,18 @@ pub struct InsertOnAnimationEnd<T: GenericActionComponent> {
 }
 
 
-impl<T: GenericActionComponent> InsertOnAnimationEnd<T> {
+impl<T: GenericActionEvent> TriggerOnAnimationEnd<T> {
 	pub fn new(index: AnimationNodeIndex, value: T) -> Self {
 		Self {
 			value,
+			target: TriggerTarget::default(),
 			animation_index: index,
 			transition_duration: DEFAULT_ANIMATION_TRANSITION,
 		}
+	}
+	pub fn with_target(mut self, target: TriggerTarget) -> Self {
+		self.target = target;
+		self
 	}
 	pub fn with_transition_duration(mut self, duration: Duration) -> Self {
 		self.transition_duration = duration;
@@ -34,7 +40,7 @@ impl<T: GenericActionComponent> InsertOnAnimationEnd<T> {
 	}
 }
 
-pub fn insert_on_animation_end<T: GenericActionComponent>(
+pub fn insert_on_animation_end<T: GenericActionEvent>(
 	mut commands: Commands,
 	animators: Query<&AnimationPlayer>,
 	children: Query<&Children>,
@@ -43,7 +49,7 @@ pub fn insert_on_animation_end<T: GenericActionComponent>(
 		(
 			Entity,
 			&TargetAgent,
-			&InsertOnAnimationEnd<T>,
+			&TriggerOnAnimationEnd<T>,
 			&Handle<AnimationClip>,
 		),
 		With<Running>,
@@ -86,7 +92,10 @@ pub fn insert_on_animation_end<T: GenericActionComponent>(
 			remaining_time < action.transition_duration.as_secs_f32();
 
 		if nearly_finished {
-			commands.entity(entity).insert(action.value.clone());
+			action
+				.target
+				.trigger(&mut commands, entity, action.value.clone());
+			// commands.entity(entity).trigger();
 		}
 	}
 }

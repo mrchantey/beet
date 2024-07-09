@@ -1,6 +1,6 @@
 use super::*;
-use crate::prelude::*;
 use crate::beet::prelude::*;
+use crate::prelude::*;
 use bevy::animation::RepeatAnimation;
 use bevy::prelude::*;
 use std::time::Duration;
@@ -39,34 +39,36 @@ pub fn hello_animation(mut commands: Commands) {
 			parent
 				.spawn((
 					Name::new("Animation Behavior"),
-					Running,
-					SequenceSelector,
-					Repeat,
+					RunOnSpawn,
+					SequenceFlow,
+					Repeat::default(),
 				))
 				.with_children(|parent| {
 					parent.spawn((
 						Name::new("Idle"),
+						ContinueRun::default(),
 						TargetAgent(agent),
 						PlayAnimation::new(idle_index)
 							.repeat(RepeatAnimation::Count(1))
 							.with_transition_duration(transition_duration),
 						idle_clip,
-						InsertOnAnimationEnd::new(
+						TriggerOnAnimationEnd::new(
 							idle_index,
-							RunResult::Success,
+							OnRunResult::success(),
 						)
 						.with_transition_duration(transition_duration),
 					));
 					parent.spawn((
 						Name::new("Walking"),
+						ContinueRun::default(),
 						TargetAgent(agent),
 						PlayAnimation::new(walk_index)
 							.repeat(RepeatAnimation::Count(4))
 							.with_transition_duration(transition_duration),
 						walk_clip,
-						InsertOnAnimationEnd::new(
+						TriggerOnAnimationEnd::new(
 							walk_index,
-							RunResult::Success,
+							OnRunResult::success(),
 						)
 						.with_transition_duration(transition_duration),
 					));

@@ -52,7 +52,7 @@ pub fn seek_3d(mut commands: Commands) {
 					Name::new("Seek Behavior"),
 					Running,
 					SequenceSelector,
-					Repeat,
+					Repeat::default(),
 				))
 				.with_children(|parent| {
 					parent.spawn((
@@ -62,9 +62,9 @@ pub fn seek_3d(mut commands: Commands) {
 						PlayAnimation::new(idle_index)
 							.with_transition_duration(transition_duration),
 						idle_clip,
-						InsertOnAnimationEnd::new(
+						TriggerOnAnimationEnd::new(
 							idle_index,
-							RunResult::Success,
+							OnRunResult::success(),
 						)
 						.with_transition_duration(transition_duration),
 					));

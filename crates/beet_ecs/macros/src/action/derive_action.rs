@@ -2,7 +2,7 @@ use super::ActionAttributes;
 use crate::utils::*;
 use proc_macro2::TokenStream;
 use quote::quote;
-use syn::DeriveInput;
+use syn::{parse_quote, DeriveInput};
 
 
 pub fn derive_action(
@@ -59,13 +59,17 @@ fn impl_component(
 			},
 		)
 	};
-
+	let storage = if let Some(storage) = &attributes.storage {
+		storage.clone()
+	} else {
+		parse_quote! { StorageType::SparseSet }
+	};
 
 	Ok(quote! {
 		use bevy::ecs::component::ComponentHooks;
 		use bevy::ecs::component::StorageType;
 		impl #impl_generics Component for #ident #type_generics #where_clause {
-			const STORAGE_TYPE: StorageType = StorageType::Table;
+			const STORAGE_TYPE: StorageType = #storage;
 			#[allow(unused)]
 			fn register_component_hooks(hooks: &mut ComponentHooks) {
 				#[allow(unused)]

@@ -118,13 +118,13 @@ impl<
 fn log_on_start(query: Query<&Name, Added<Running>>) -> Vec<String> {
 	query
 		.iter()
-		.map(|name| format!("Started: {name}"))
+		.map(|name| format!("Started Continue: {name}"))
 		.collect()
 }
 fn log_on_update(query: Query<&Name, With<Running>>) -> Vec<String> {
 	query
 		.iter()
-		.map(|name| format!("Running: {name}"))
+		.map(|name| format!("Continue: {name}"))
 		.collect()
 }
 #[deprecated = "use observers"]
@@ -135,7 +135,7 @@ fn log_on_stop(
 	removed
 		.read()
 		.filter_map(|removed| query.get(removed).ok())
-		.map(|name| format!("Stopped: {name}"))
+		.map(|name| format!("Stopped Continue: {name}"))
 		.collect()
 }
 

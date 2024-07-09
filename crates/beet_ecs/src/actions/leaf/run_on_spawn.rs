@@ -2,12 +2,13 @@ use crate::prelude::*;
 use bevy::prelude::*;
 
 
-/// A component that turns into an [`OnRun`] event on add, 
+/// A component that turns into an [`OnRun`] event on add,
 /// useful for scene-based workflows
 /// This will likely be deprecated if/when bsn observers are implemented
-#[derive(Default, Action, Reflect)]
+#[derive(Default, Clone, Action, Reflect)]
 #[reflect(Default, Component)]
 #[systems(run_on_spawn.in_set(PreTickSet))]
+#[storage(StorageType::SparseSet)]
 pub struct RunOnSpawn;
 // pub fn trigger_run_on_spawn(
 // 	trigger: Trigger<OnAdd, RunOnSpawn>,
@@ -23,7 +24,10 @@ pub fn run_on_spawn(
 	query: Query<Entity, Added<RunOnSpawn>>,
 ) {
 	for entity in query.iter() {
-		commands.trigger_targets(OnRun, entity);
+		commands
+			.entity(entity)
+			.remove::<RunOnSpawn>()
+			.trigger(OnRun);
 	}
 }
 

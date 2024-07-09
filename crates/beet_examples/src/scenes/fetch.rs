@@ -38,7 +38,7 @@ pub fn fetch_npc(mut commands: Commands) {
 					Name::new("Fetch Behavior"),
 					InsertOnSend::<AppReady, Running>::default(),
 					SequenceSelector,
-					Repeat,
+					Repeat::default(),
 				))
 				.with_children(|parent| {
 					parent
