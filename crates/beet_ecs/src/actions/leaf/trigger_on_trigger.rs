@@ -20,6 +20,12 @@ pub struct TriggerOnTrigger<
 	phantom: PhantomData<In>,
 }
 
+impl<In: GenericActionEvent, Out: Default + GenericActionEvent> Default
+	for TriggerOnTrigger<In, Out>
+{
+	fn default() -> Self { Self::new(Out::default()) }
+}
+
 impl<In: GenericActionEvent, Out: Default + GenericActionEvent>
 	TriggerOnTrigger<In, Out>
 {
@@ -56,10 +62,5 @@ fn on_trigger<In: GenericActionEvent, Out: Default + GenericActionEvent>(
 		.trigger(&mut commands, trigger.entity(), action.out.clone());
 }
 
-impl<In: GenericActionEvent, Out: Default + GenericActionEvent> Default
-	for TriggerOnTrigger<In, Out>
-{
-	fn default() -> Self { Self::new(Out::default()) }
-}
 
 // see `end_on_run` for tests

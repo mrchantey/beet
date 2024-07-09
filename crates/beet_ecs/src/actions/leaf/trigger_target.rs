@@ -1,5 +1,7 @@
 use bevy::prelude::*;
 
+
+/// Used by systems and observers that trigger observers, to specify the target of the trigger.
 #[derive(Debug, Default, Clone, Reflect)]
 #[reflect(Default)]
 pub enum TriggerTarget {
@@ -18,14 +20,14 @@ impl TriggerTarget {
 		out: impl Event,
 	) {
 		match self {
-			TriggerTarget::This => commands.trigger_targets(out, caller),
-			TriggerTarget::Entity(entity) => {
+			Self::This => commands.trigger_targets(out, caller),
+			Self::Entity(entity) => {
 				commands.trigger_targets(out, *entity)
 			}
-			TriggerTarget::Entities(entities) => {
+			Self::Entities(entities) => {
 				commands.trigger_targets(out, entities.clone())
 			}
-			TriggerTarget::Global => commands.trigger(out),
+			Self::Global => commands.trigger(out),
 		}
 	}
 }

@@ -10,25 +10,25 @@ use std::ops::DerefMut;
 #[category(ActionCategory::World)]
 #[systems(inset_on_trigger::<E, T>.in_set(TickSet))]
 #[deprecated = "Use `TriggerOnTrigger` instead"]
-pub struct InsertOnTrigger<E: GenericActionEvent, T: GenericActionComponent> {
+pub struct InsertOnSend<E: GenericActionEvent, T: GenericActionComponent> {
 	pub value: T,
 	#[reflect(ignore)]
 	phantom: PhantomData<E>,
 }
 impl<E: GenericActionEvent, T: GenericActionComponent> Deref
-	for InsertOnTrigger<E, T>
+	for InsertOnSend<E, T>
 {
 	type Target = T;
 	fn deref(&self) -> &Self::Target { &self.value }
 }
 impl<E: GenericActionEvent, T: GenericActionComponent> DerefMut
-	for InsertOnTrigger<E, T>
+	for InsertOnSend<E, T>
 {
 	fn deref_mut(&mut self) -> &mut Self::Target { &mut self.value }
 }
 
 impl<E: GenericActionEvent, T: Default + GenericActionComponent> Default
-	for InsertOnTrigger<E, T>
+	for InsertOnSend<E, T>
 {
 	fn default() -> Self {
 		Self {
@@ -38,7 +38,7 @@ impl<E: GenericActionEvent, T: Default + GenericActionComponent> Default
 	}
 }
 
-impl<E: GenericActionEvent, T: GenericActionComponent> InsertOnTrigger<E, T> {
+impl<E: GenericActionEvent, T: GenericActionComponent> InsertOnSend<E, T> {
 	pub fn new(value: impl Into<T>) -> Self {
 		Self {
 			value: value.into(),
@@ -50,7 +50,7 @@ impl<E: GenericActionEvent, T: GenericActionComponent> InsertOnTrigger<E, T> {
 fn inset_on_trigger<E: GenericActionEvent, T: GenericActionComponent>(
 	mut commands: Commands,
 	mut reader: EventReader<E>,
-	query: Query<(Entity, &InsertOnTrigger<E, T>)>,
+	query: Query<(Entity, &InsertOnSend<E, T>)>,
 ) {
 	for _ev in reader.read() {
 		// log::info!("EVENT");

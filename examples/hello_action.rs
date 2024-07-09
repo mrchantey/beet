@@ -6,16 +6,12 @@ use bevy::prelude::*;
 struct LogOnRun(pub String);
 
 fn log_on_run(trigger: Trigger<OnRun>, query: Query<&LogOnRun>) {
-	let name = query
-		.get(trigger.entity())
-		.map(|n| n.0.as_str())
-		.unwrap();
+	let name = query.get(trigger.entity()).map(|n| n.0.as_str()).unwrap();
 	println!("running: {name}");
 }
 
 fn main() {
-	let mut world = World::new();
-	world
+	World::new()
 		.spawn(LogOnRun("root".to_string()))
 		.flush_trigger(OnRun);
 }

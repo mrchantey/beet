@@ -1,6 +1,6 @@
 use super::*;
-use crate::prelude::*;
 use crate::beet::prelude::*;
+use crate::prelude::*;
 use bevy::prelude::*;
 use std::time::Duration;
 
@@ -36,7 +36,7 @@ pub fn fetch_npc(mut commands: Commands) {
 			parent
 				.spawn((
 					Name::new("Fetch Behavior"),
-					InsertOnTrigger::<AppReady, Running>::default(),
+					InsertOnSend::<AppReady, Running>::default(),
 					SequenceSelector,
 					Repeat,
 				))

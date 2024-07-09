@@ -31,7 +31,7 @@ impl Plugin for CommonEventsPlugin {
 				SendOnRun<AppReady>,
 				TriggerOnRun<AppReady>,
 				RunOnAppReady,
-				InsertOnTrigger<AppReady, Running>,
+				InsertOnSend<AppReady, Running>,
 			)>::default())
 			// SpawnSceneFile
 			.add_event::<SpawnSceneFile>()

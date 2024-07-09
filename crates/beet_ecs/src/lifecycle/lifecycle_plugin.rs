@@ -26,12 +26,15 @@ impl Plugin for LifecyclePlugin {
 			EmptyAction,
 		)>::default())
 		.add_plugins(ActionPlugin::<(
-			ContinueRun,
+			// ContinueRun,
+			InsertOnTrigger<OnRun, Running>,
+			RemoveOnTrigger<OnRunResult, Running>,
 			SequenceFlow,
 			EndOnRun,
 			RunOnSpawn,
 		)>::default())
 		// observers
+		.register_type::<ContinueRun>()
 		.register_type::<RunOnSpawn>()
 		// running
 		.register_type::<Running>()

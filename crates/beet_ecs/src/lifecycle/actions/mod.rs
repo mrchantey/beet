@@ -10,9 +10,9 @@ pub use self::insert_in_duration::*;
 pub mod insert_on_run;
 #[allow(unused_imports)]
 pub use self::insert_on_run::*;
-pub mod insert_on_trigger;
+pub mod insert_on_send;
 #[allow(unused_imports)]
-pub use self::insert_on_trigger::*;
+pub use self::insert_on_send::*;
 pub mod lifecycle_actions;
 #[allow(unused_imports)]
 pub use self::lifecycle_actions::*;

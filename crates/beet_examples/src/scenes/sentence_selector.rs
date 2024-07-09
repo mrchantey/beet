@@ -14,7 +14,7 @@ pub fn sentence_selector(mut commands: Commands) {
 				.spawn((
 					Name::new("Sentence Selector"),
 					AssetLoadBlockAppReady,
-					InsertOnTrigger::<AppReady, Running>::default(),
+					InsertOnSend::<AppReady, Running>::default(),
 					TargetAgent(agent),
 					bert_handle,
 					SentenceScorer::default(),

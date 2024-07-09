@@ -30,7 +30,7 @@ pub fn frozen_lake_run(mut commands: Commands) {
 				.spawn((
 					Name::new("Inference Behavior"),
 					// Running,
-					InsertOnTrigger::<AppReady,Running>::default(),
+					InsertOnSend::<AppReady, Running>::default(),
 					SequenceSelector,
 					Repeat::default(),
 				))

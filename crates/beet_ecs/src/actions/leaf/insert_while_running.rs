@@ -3,29 +3,36 @@ use bevy::prelude::*;
 
 pub type ContinueRun = InsertWhileRunning<Running>;
 
-
 /// 1. Adds the provided component when [`OnRun`] is called
 /// 2. Removes the component when [`OnRunResult`] is called
-#[derive(Default, Action, Reflect)]
-#[reflect(Default, Component)]
-#[observers(on_start_running::<T>, on_stop_running::<T>)]
-pub struct InsertWhileRunning<T: Default + GenericActionComponent>(pub T);
-
-fn on_start_running<T: Default + GenericActionComponent>(
-	trigger: Trigger<OnRun>,
-	query: Query<&InsertWhileRunning<T>>,
-	mut commands: Commands,
-) {
-	let action = query
-		.get(trigger.entity())
-		.expect(expect_action::NO_ACTION_COMP);
-	commands.entity(trigger.entity()).insert(action.0.clone());
+#[derive(Bundle, Reflect)]
+pub struct InsertWhileRunning<T: Default + GenericActionComponent> {
+	add: InsertOnTrigger<OnRun, T>,
+	remove: RemoveOnTrigger<OnRunResult, T>,
 }
-fn on_stop_running<T: Default + GenericActionComponent>(
-	trigger: Trigger<OnRunResult>,
-	mut commands: Commands,
-) {
-	commands.entity(trigger.entity()).remove::<T>();
+impl<T: Default + GenericActionComponent> Default for InsertWhileRunning<T> {
+	fn default() -> Self {
+		Self {
+			add: InsertOnTrigger::default(),
+			remove: RemoveOnTrigger::default(),
+		}
+	}
+}
+impl<T: Default + GenericActionComponent> InsertWhileRunning<T> {
+	pub fn new(comp: T) -> Self {
+		Self {
+			add: InsertOnTrigger::new(comp),
+			remove: RemoveOnTrigger::default(),
+		}
+	}
+	pub fn with_target(self, target: impl Into<ComponentTarget>) -> Self {
+		let target: ComponentTarget = target.into();
+		Self {
+			add: self.add.with_target(target.clone()),
+			remove: self.remove.with_target(target),
+			..self
+		}
+	}
 }
 
 
