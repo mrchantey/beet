@@ -15,7 +15,6 @@ impl Plugin for LifecyclePlugin {
 			InsertOnRun<RunResult>,
 			LogOnRun,
 			// CallOnRun,
-			Repeat,
 			SetOnSpawn<Score>,
 			// selectors
 			FallbackSelector,
@@ -27,6 +26,7 @@ impl Plugin for LifecyclePlugin {
 		)>::default())
 		.add_plugins(ActionPlugin::<(
 			// ContinueRun,
+			Repeat,
 			InsertOnTrigger<OnRun, Running>,
 			RemoveOnTrigger<OnRunResult, Running>,
 			SequenceFlow,

@@ -11,6 +11,7 @@ pub fn main() {
 				scenes::lighting_3d,
 				scenes::ground_3d,
 				scenes::seek_3d,
+				scenes::ui_terminal,
 			),
 		)
 		.run();

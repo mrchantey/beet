@@ -6,7 +6,7 @@ use bevy::prelude::*;
 #[derive(PartialEq, Deref, DerefMut, Debug, Clone, Action, Reflect)]
 #[reflect(Component, ActionMeta)]
 #[category(ActionCategory::Agent)]
-#[systems(set_agent_on_run::<T>.in_set(PostTickSet))]
+#[observers(set_agent_on_run::<T>)]
 pub struct SetAgentOnRun<T: GenericActionComponent>(pub T);
 
 impl<T: GenericActionComponent> SetAgentOnRun<T> {
@@ -18,12 +18,17 @@ impl<T: Default + GenericActionComponent> Default for SetAgentOnRun<T> {
 }
 
 fn set_agent_on_run<T: GenericActionComponent>(
+	trigger: Trigger<OnRun>,
 	mut agents: Query<&mut T>,
-	mut query: Query<(&TargetAgent, &SetAgentOnRun<T>), Added<Running>>,
+	query: Query<(&TargetAgent, &SetAgentOnRun<T>)>,
 ) {
-	for (entity, src) in query.iter_mut() {
-		if let Ok(mut dst) = agents.get_mut(**entity) {
-			*dst = src.0.clone();
-		}
+	let (target, action) = query
+		.get(trigger.entity())
+		.expect(expect_action::NO_ACTION_COMP);
+
+	if let Ok(mut dst) = agents.get_mut(**target) {
+		*dst = action.0.clone();
+	} else {
+		log::warn!("SetAgentOnRun: Agent with component not found");
 	}
 }

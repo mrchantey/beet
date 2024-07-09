@@ -16,7 +16,7 @@ impl Plugin for SteerPlugin {
 			Separate<GroupSteerAgent>,
 			Align<GroupSteerAgent>,
 			Cohere<GroupSteerAgent>,
-			SucceedOnArrive,
+			StopOnArrive,
 			FindSteerTarget,
 			ScoreSteerTarget,
 			DespawnSteerTarget,

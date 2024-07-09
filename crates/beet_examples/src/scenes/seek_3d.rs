@@ -50,13 +50,14 @@ pub fn seek_3d(mut commands: Commands) {
 			parent
 				.spawn((
 					Name::new("Seek Behavior"),
-					Running,
-					SequenceSelector,
+					RunOnSpawn,
+					SequenceFlow,
 					Repeat::default(),
 				))
 				.with_children(|parent| {
 					parent.spawn((
 						Name::new("Idle"),
+						ContinueRun::default(),
 						TargetAgent(agent),
 						SetAgentOnRun(Velocity::default()),
 						PlayAnimation::new(idle_index)
@@ -70,12 +71,13 @@ pub fn seek_3d(mut commands: Commands) {
 					));
 					parent.spawn((
 						Name::new("Seek"),
+						ContinueRun::default(),
 						TargetAgent(agent),
 						Seek,
 						PlayAnimation::new(walk_index)
 							.repeat_forever()
 							.with_transition_duration(transition_duration),
-						SucceedOnArrive::new(6.),
+						StopOnArrive::new(6.),
 					));
 				});
 		});

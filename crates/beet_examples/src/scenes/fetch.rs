@@ -80,7 +80,7 @@ pub fn fetch_npc(mut commands: Commands) {
 										Name::new("Go To Item"),
 										TargetAgent(agent),
 										Seek,
-										SucceedOnArrive::new(1.),
+										StopOnArrive::new(1.),
 									));
 									parent.spawn((
 										Name::new("Pick Up Item"),
@@ -95,7 +95,7 @@ pub fn fetch_npc(mut commands: Commands) {
 									// 	Name::new("Return Item To Center"),
 									// 	TargetAgent(agent),
 									// 	Seek,
-									// 	SucceedOnArrive::new(6.),
+									// 	StopOnArrive::new(6.),
 									// ));
 								});
 						});
