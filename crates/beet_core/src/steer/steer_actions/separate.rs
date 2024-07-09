@@ -1,12 +1,13 @@
 use crate::prelude::*;
 use beet_ecs::prelude::*;
-use bevy::ecs::schedule::SystemConfigs;
 use bevy::prelude::*;
 use std::marker::PhantomData;
 
-#[derive(Debug, Clone, PartialEq, Component, Reflect)]
-#[reflect(Default, Component, ActionMeta)]
 /// Separate from entities with the given component.
+#[derive(Debug, Clone, PartialEq, Action, Reflect)]
+#[reflect(Default, Component, ActionMeta)]
+#[category(ActionCategory::Agent)]
+#[systems(separate::<M>.in_set(TickSet))]
 pub struct Separate<M: GenericActionComponent> {
 	/// The scalar to apply to the impulse
 	pub scalar: f32,
@@ -60,13 +61,4 @@ fn separate<M: GenericActionComponent>(
 
 		**impulse += *new_impulse * separate.scalar;
 	}
-}
-
-
-impl<M: GenericActionComponent> ActionMeta for Separate<M> {
-	fn category(&self) -> ActionCategory { ActionCategory::Agent }
-}
-
-impl<M: GenericActionComponent> ActionSystems for Separate<M> {
-	fn systems() -> SystemConfigs { separate::<M>.in_set(TickSet) }
 }

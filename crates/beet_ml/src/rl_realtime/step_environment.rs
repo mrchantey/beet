@@ -1,19 +1,32 @@
 use crate::prelude::*;
 use beet_ecs::prelude::*;
-use bevy::ecs::schedule::SystemConfigs;
 use bevy::prelude::*;
 use std::marker::PhantomData;
 
-#[derive(Debug, Clone, PartialEq, Component, Reflect)]
+#[derive(Debug, Clone, PartialEq, Action, Reflect)]
 #[reflect(Component, ActionMeta)]
-pub struct StepEnvironment<S: RlSessionTypes> {
+#[category(ActionCategory::Behavior)]
+#[systems(step_environment::<S>.in_set(TickSet))]
+pub struct StepEnvironment<S: RlSessionTypes>
+where
+	S::State: Component,
+	S::Action: Component,
+	S::QLearnPolicy: Component,
+	S::Env: Component,
+{
 	episode: u32,
 	step: u32,
 	#[reflect(ignore)]
 	phantom: PhantomData<S>,
 }
 
-impl<S: RlSessionTypes> StepEnvironment<S> {
+impl<S: RlSessionTypes> StepEnvironment<S>
+where
+	S::State: Component,
+	S::Action: Component,
+	S::QLearnPolicy: Component,
+	S::Env: Component,
+{
 	pub fn new(episode: u32) -> Self {
 		Self {
 			episode,
@@ -89,22 +102,6 @@ fn step_environment<S: RlSessionTypes>(
 		}
 	}
 }
-
-impl<S: RlSessionTypes> ActionMeta for StepEnvironment<S> {
-	fn category(&self) -> ActionCategory { ActionCategory::Behavior }
-}
-
-impl<S: RlSessionTypes> ActionSystems for StepEnvironment<S>
-where
-	S::State: Component,
-	S::Action: Component,
-	S::QLearnPolicy: Component,
-	S::Env: Component,
-{
-	fn systems() -> SystemConfigs { step_environment::<S>.in_set(TickSet) }
-}
-
-
 
 #[cfg(test)]
 mod test {

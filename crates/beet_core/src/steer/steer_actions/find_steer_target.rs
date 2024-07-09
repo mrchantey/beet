@@ -1,11 +1,12 @@
 use crate::prelude::*;
 use beet_ecs::prelude::*;
-use bevy::ecs::schedule::SystemConfigs;
 use bevy::prelude::*;
 
-#[derive(Debug, Clone, PartialEq, Component, Reflect)]
-#[reflect(Default, Component, ActionMeta)]
 /// Sets the [`SteerTarget`] when an entity with the given name is nearby.
+#[derive(Debug, Clone, PartialEq, Action, Reflect)]
+#[reflect(Default, Component, ActionMeta)]
+#[category(ActionCategory::Agent)]
+#[systems(find_steer_target.in_set(TickSet))]
 pub struct FindSteerTarget {
 	pub name: String,
 	// #[inspector(min = 0., max = 3., step = 0.1)]
@@ -64,12 +65,4 @@ fn find_steer_target(
 			}
 		}
 	}
-}
-
-impl ActionMeta for FindSteerTarget {
-	fn category(&self) -> ActionCategory { ActionCategory::Agent }
-}
-
-impl ActionSystems for FindSteerTarget {
-	fn systems() -> SystemConfigs { find_steer_target.in_set(TickSet) }
 }

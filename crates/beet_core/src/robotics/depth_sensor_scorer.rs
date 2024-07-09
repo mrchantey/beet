@@ -1,11 +1,12 @@
 use super::*;
 use beet_ecs::prelude::*;
-use bevy::ecs::schedule::SystemConfigs;
 use bevy::prelude::*;
 
-#[derive(Debug, Clone, PartialEq, Component, Reflect)]
-#[reflect(Default, Component, ActionMeta)]
 /// Sets the [`Score`] based on the [`DepthValue`].
+#[derive(Debug, Clone, PartialEq, Action, Reflect)]
+#[reflect(Default, Component, ActionMeta)]
+#[category(ActionCategory::Behavior)]
+#[systems(depth_sensor_scorer.in_set(TickSet))]
 pub struct DepthSensorScorer {
 	// #[inspector(step = 0.1)]
 	pub threshold_dist: f32,
@@ -48,12 +49,4 @@ pub fn depth_sensor_scorer(
 			score.set_if_neq(next_score);
 		}
 	}
-}
-
-impl ActionMeta for DepthSensorScorer {
-	fn category(&self) -> ActionCategory { ActionCategory::Behavior }
-}
-
-impl ActionSystems for DepthSensorScorer {
-	fn systems() -> SystemConfigs { depth_sensor_scorer.in_set(TickSet) }
 }

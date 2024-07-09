@@ -11,8 +11,8 @@ keywords.workspace = true
 categories.workspace = true
 
 [features]
-default = []
-# tokio = ["beet/tokio"]
+default = ["beet_ecs/reflect"]
+tokio = ["beet_net/tokio"]
 
 
 [dependencies]

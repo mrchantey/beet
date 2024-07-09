@@ -1,10 +1,11 @@
 use crate::prelude::*;
 use beet_ecs::prelude::*;
-use bevy::ecs::schedule::SystemConfigs;
 use bevy::prelude::*;
 
-#[derive(Debug, Clone, PartialEq, Component, Reflect)]
+#[derive(Debug, Clone, PartialEq, Action, Reflect)]
 #[reflect(Default, Component, ActionMeta)]
+#[category(ActionCategory::Behavior)]
+#[systems(score_steer_target.in_set(PreTickSet))]
 /// Adjusts the [`Score`] based on distance to the [`SteerTarget`]
 pub struct ScoreSteerTarget {
 	pub radius: f32,
@@ -42,11 +43,3 @@ fn score_steer_target(
 // 	Changed<SteerTarget>,
 // 	Changed<ScoreSteerTarget>,
 // )>,
-
-impl ActionMeta for ScoreSteerTarget {
-	fn category(&self) -> ActionCategory { ActionCategory::Behavior }
-}
-
-impl ActionSystems for ScoreSteerTarget {
-	fn systems() -> SystemConfigs { score_steer_target.in_set(PreTickSet) }
-}

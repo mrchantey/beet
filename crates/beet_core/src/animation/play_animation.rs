@@ -1,6 +1,5 @@
 use beet_ecs::prelude::*;
 use bevy::animation::RepeatAnimation;
-use bevy::ecs::schedule::SystemConfigs;
 use bevy::prelude::*;
 use std::time::Duration;
 
@@ -8,8 +7,10 @@ use std::time::Duration;
 pub const DEFAULT_ANIMATION_TRANSITION: Duration = Duration::from_millis(250);
 
 /// Play an animation on the agent when this action starts running.
-#[derive(Debug, Default, Clone, PartialEq, Component, Reflect)]
+#[derive(Debug, Default, Clone, PartialEq, Action, Reflect)]
 #[reflect(Default, Component, ActionMeta)]
+#[systems((play_animation_on_run, play_animation_on_load).in_set(TickSet))]
+#[category(ActionCategory::Agent)]
 pub struct PlayAnimation {
 	animation: AnimationNodeIndex,
 	/// Trigger once again if the animation is already playing
@@ -112,15 +113,5 @@ fn play_animation_on_load(
 				)
 				.set_repeat(play_animation.repeat);
 		}
-	}
-}
-
-impl ActionMeta for PlayAnimation {
-	fn category(&self) -> ActionCategory { ActionCategory::Agent }
-}
-
-impl ActionSystems for PlayAnimation {
-	fn systems() -> SystemConfigs {
-		(play_animation_on_run, play_animation_on_load).in_set(TickSet)
 	}
 }

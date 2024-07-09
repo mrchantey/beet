@@ -1,12 +1,13 @@
 use crate::prelude::*;
 use beet_ecs::prelude::*;
-use bevy::ecs::schedule::SystemConfigs;
 use bevy::prelude::*;
 use std::marker::PhantomData;
 
-#[derive(Debug, Clone, PartialEq, Component, Reflect)]
-#[reflect(Default, Component, ActionMeta)]
 /// Move towards the center of mass of entities with the given component.
+#[derive(Debug, Clone, PartialEq, Action, Reflect)]
+#[reflect(Default, Component, ActionMeta)]
+#[category(ActionCategory::Behavior)]
+#[systems(cohere::<M>.in_set(TickSet))]
 pub struct Cohere<M: GenericActionComponent> {
 	/// The scalar to apply to the impulse
 	pub scalar: f32,
@@ -60,12 +61,4 @@ fn cohere<M: GenericActionComponent>(
 
 		**impulse += *new_impulse * cohere.scalar;
 	}
-}
-
-impl<M: GenericActionComponent> ActionMeta for Cohere<M> {
-	fn category(&self) -> ActionCategory { ActionCategory::Behavior }
-}
-
-impl<M: GenericActionComponent> ActionSystems for Cohere<M> {
-	fn systems() -> SystemConfigs { cohere::<M>.in_set(TickSet) }
 }

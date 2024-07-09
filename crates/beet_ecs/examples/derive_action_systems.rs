@@ -8,13 +8,11 @@ use bevy::prelude::*;
 struct LogOnRun(pub String);
 
 fn log_on_run(query: Query<&LogOnRun, Added<Running>>) {
-	let name = query.get(trigger.entity()).map(|n| n.0.as_str()).unwrap();
+	let name = &query.single().0;
 	println!("log_on_run: {name}");
 }
 
 fn main() {
 	let mut world = World::new();
-	world
-		.spawn(LogOnRun("root".to_string()))
-		.flush_trigger(OnRun);
+	world.spawn((Running, LogOnRun("root".to_string())));
 }

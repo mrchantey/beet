@@ -1,11 +1,12 @@
 use crate::prelude::*;
 use beet_ecs::prelude::*;
-use bevy::ecs::schedule::SystemConfigs;
 use bevy::prelude::*;
 use std::marker::PhantomData;
 
-#[derive(Debug, Clone, PartialEq, Component, Reflect)]
+#[derive(Debug, Clone, PartialEq, Action, Reflect)]
 #[reflect(Component, ActionMeta)]
+#[category(ActionCategory::Behavior)]
+#[systems(read_q_policy::<P>.in_set(TickSet))]
 pub struct ReadQPolicy<P: QPolicy + Asset> {
 	#[reflect(ignore)]
 	phantom: PhantomData<P>,
@@ -33,12 +34,4 @@ fn read_q_policy<P: QPolicy + Asset>(
 			}
 		}
 	}
-}
-
-impl<P: QPolicy + Asset> ActionMeta for ReadQPolicy<P> {
-	fn category(&self) -> ActionCategory { ActionCategory::Behavior }
-}
-
-impl<P: QPolicy + Asset> ActionSystems for ReadQPolicy<P> {
-	fn systems() -> SystemConfigs { read_q_policy::<P>.in_set(TickSet) }
 }

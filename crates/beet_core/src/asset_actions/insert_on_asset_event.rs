@@ -2,35 +2,20 @@ use super::*;
 use beet_ecs::prelude::*;
 use bevy::asset::LoadState;
 // use bevy::asset::LoadState;
-use bevy::ecs::schedule::SystemConfigs;
 use bevy::prelude::*;
 
 /// Inserts the given component when a matching asset event is received.
 /// This requires the entity to have a Handle<T>
-#[derive(Debug, Clone, PartialEq, Component, Reflect)]
+#[derive(Debug, Clone, PartialEq, Action, Reflect)]
 #[reflect(Component, ActionMeta)]
+#[category(ActionCategory::Behavior)]
+#[systems(
+(insert_on_asset_status::<T, A>, insert_on_asset_event::<T, A>).in_set(TickSet)
+)]
 pub struct InsertOnAssetEvent<T: GenericActionComponent, A: GenericActionAsset>
 {
 	pub value: T,
 	pub asset_event: ReflectedAssetEvent<A>,
-}
-
-impl<T: GenericActionComponent, A: GenericActionAsset> ActionMeta
-	for InsertOnAssetEvent<T, A>
-{
-	fn category(&self) -> ActionCategory { ActionCategory::Behavior }
-}
-
-impl<T: GenericActionComponent, A: GenericActionAsset> ActionSystems
-	for InsertOnAssetEvent<T, A>
-{
-	fn systems() -> SystemConfigs {
-		(
-			insert_on_asset_status::<T, A>,
-			insert_on_asset_event::<T, A>,
-		)
-			.in_set(TickSet)
-	}
 }
 
 impl<T: GenericActionComponent, A: GenericActionAsset>

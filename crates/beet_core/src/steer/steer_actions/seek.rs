@@ -1,15 +1,16 @@
 use crate::prelude::*;
 use beet_ecs::prelude::*;
-use bevy::ecs::schedule::SystemConfigs;
 use bevy::prelude::*;
 use forky_core::ResultTEExt;
 
 
 
 
-#[derive(Debug, Default, Clone, PartialEq, Component, Reflect)]
-#[reflect(Default, Component, ActionMeta)]
 /// Go to the agent's [`SteerTarget`] with an optional [`ArriveRadius`]
+#[derive(Debug, Default, Clone, PartialEq, Action, Reflect)]
+#[reflect(Default, Component, ActionMeta)]
+#[category(ActionCategory::Agent)]
+#[systems(seek.in_set(TickSet))]
 pub struct Seek;
 
 // TODO if target has Velocity, pursue
@@ -50,15 +51,6 @@ fn seek(
 			}
 		}
 	}
-}
-
-
-impl ActionMeta for Seek {
-	fn category(&self) -> ActionCategory { ActionCategory::Agent }
-}
-
-impl ActionSystems for Seek {
-	fn systems() -> SystemConfigs { seek.in_set(TickSet) }
 }
 
 #[cfg(test)]

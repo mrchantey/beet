@@ -2,16 +2,17 @@
 use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_ecs::prelude::*;
-use bevy::ecs::schedule::SystemConfigs;
 use bevy::prelude::*;
 use forky_core::ResultTEExt;
 use std::marker::PhantomData;
 
-#[derive(Debug, Clone, PartialEq, Component, Reflect)]
-#[reflect(Default, Component, ActionMeta)]
 // #[serde(bound = "")]
 /// Finds the [`Sentence`] with the highest similarity to the agent's, then set it as the agent's [`SteerTarget`].
 /// The generic parameter is used to [`With`] filter the entities to consider.
+#[derive(Debug, Clone, PartialEq, Action, Reflect)]
+#[reflect(Default, Component, ActionMeta)]
+#[category(ActionCategory::Behavior)]
+#[systems(find_sentence_steer_target::<T>.in_set(TickSet))]
 pub struct FindSentenceSteerTarget<T: GenericActionComponent = Sentence> {
 	// / The value below which the agent will ignore the target.
 	// pub threshold:f32,
@@ -58,17 +59,6 @@ fn find_sentence_steer_target<T: GenericActionComponent>(
 		}
 	}
 }
-
-impl<T: GenericActionComponent> ActionMeta for FindSentenceSteerTarget<T> {
-	fn category(&self) -> ActionCategory { ActionCategory::Behavior }
-}
-
-impl<T: GenericActionComponent> ActionSystems for FindSentenceSteerTarget<T> {
-	fn systems() -> SystemConfigs {
-		find_sentence_steer_target::<T>.in_set(TickSet)
-	}
-}
-
 
 #[cfg(test)]
 mod test {

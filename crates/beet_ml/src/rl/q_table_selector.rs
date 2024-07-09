@@ -1,16 +1,15 @@
 use crate::prelude::*;
 use beet_ecs::prelude::*;
-use bevy::ecs::schedule::SystemConfigs;
 use bevy::prelude::*;
-
-
 
 /// An action used for training, evaluating and running QTable agents.
 /// - If any child is running do nothing
 /// - If a child fails, also fail.
 /// - If a child succeeds, evaluate reward and select next action.
-#[derive(Debug, Clone, PartialEq, Component, Reflect)]
+#[derive(Debug, Clone, PartialEq, Action, Reflect)]
 #[reflect(Component, ActionMeta)]
+#[category(ActionCategory::Agent)]
+#[systems(q_table_selector::<L>.in_set(TickSet))]
 pub struct QTableSelector<L: QPolicy> {
 	pub evaluate: bool,
 	pub learner: L,
@@ -68,12 +67,4 @@ fn q_table_selector<L: QPolicy>(
 			}
 		}
 	}
-}
-
-impl<L: QPolicy> ActionMeta for QTableSelector<L> {
-	fn category(&self) -> ActionCategory { ActionCategory::Agent }
-}
-
-impl<L: QPolicy> ActionSystems for QTableSelector<L> {
-	fn systems() -> SystemConfigs { q_table_selector::<L>.in_set(TickSet) }
 }

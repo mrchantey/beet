@@ -1,12 +1,13 @@
 use beet_ecs::prelude::*;
-use bevy::ecs::schedule::SystemConfigs;
 use bevy::prelude::*;
 use std::borrow::Cow;
 use std::marker::PhantomData;
 
 
-#[derive(Debug, Clone, PartialEq, Component, Reflect)]
+#[derive(Debug, Clone, PartialEq, Action, Reflect)]
 #[reflect(Component, ActionMeta)]
+#[category(ActionCategory::World)]
+#[systems(set_text_on_run::<F>.in_set(TickSet))]
 /// Sets the [`Text`] of all entities matching the query on run.
 pub struct SetTextOnRun<F: GenericActionComponent> {
 	pub value: Cow<'static, str>,
@@ -51,12 +52,4 @@ fn set_text_on_run<F: GenericActionComponent>(
 				set_text_on_run.value.to_string();
 		}
 	}
-}
-
-impl<F: GenericActionComponent> ActionMeta for SetTextOnRun<F> {
-	fn category(&self) -> ActionCategory { ActionCategory::World }
-}
-
-impl<F: GenericActionComponent> ActionSystems for SetTextOnRun<F> {
-	fn systems() -> SystemConfigs { set_text_on_run::<F>.in_set(TickSet) }
 }

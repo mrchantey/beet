@@ -1,12 +1,13 @@
 use crate::prelude::*;
 use beet_ecs::prelude::*;
-use bevy::ecs::schedule::SystemConfigs;
 use bevy::prelude::*;
 
 
-#[derive(Debug, Clone, PartialEq, Component, Reflect)]
-#[reflect(Default, Component, ActionMeta)]
 /// Succeeds when the agent arrives at the [`SteerTarget`].
+#[derive(Debug, Clone, PartialEq, Action, Reflect)]
+#[reflect(Default, Component, ActionMeta)]
+#[category(ActionCategory::Behavior)]
+#[systems(succeed_on_arrive.in_set(TickSet))]
 pub struct SucceedOnArrive {
 	pub radius: f32,
 }
@@ -38,13 +39,4 @@ pub fn succeed_on_arrive(
 			}
 		}
 	}
-}
-
-
-impl ActionMeta for SucceedOnArrive {
-	fn category(&self) -> ActionCategory { ActionCategory::Behavior }
-}
-
-impl ActionSystems for SucceedOnArrive {
-	fn systems() -> SystemConfigs { succeed_on_arrive.in_set(TickSet) }
 }

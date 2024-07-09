@@ -1,6 +1,5 @@
 use crate::prelude::*;
 use beet_ecs::prelude::*;
-use bevy::ecs::schedule::SystemConfigs;
 use bevy::prelude::*;
 use forky_core::ResultTEExt;
 use std::borrow::Cow;
@@ -15,8 +14,10 @@ impl Sentence {
 
 /// Updates the [`Score`] of each child based on the similarity of its [`Sentence`] with the agent,
 /// for use with [`ScoreSelector`]
-#[derive(Debug, Default, Clone, PartialEq, Component, Reflect)]
+#[derive(Debug, Default, Clone, PartialEq, Action, Reflect)]
 #[reflect(Component, ActionMeta)]
+#[category(ActionCategory::ChildBehaviors)]
+#[systems(sentence_scorer.in_set(TickSet))]
 pub struct SentenceScorer;
 
 impl SentenceScorer {
@@ -48,14 +49,6 @@ fn sentence_scorer(
 				}
 			});
 	}
-}
-
-impl ActionMeta for SentenceScorer {
-	fn category(&self) -> ActionCategory { ActionCategory::ChildBehaviors }
-}
-
-impl ActionSystems for SentenceScorer {
-	fn systems() -> SystemConfigs { sentence_scorer.in_set(TickSet) }
 }
 
 #[cfg(test)]
