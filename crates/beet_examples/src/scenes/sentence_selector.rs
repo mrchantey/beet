@@ -14,13 +14,10 @@ pub fn sentence_selector(mut commands: Commands) {
 				.spawn((
 					Name::new("Sentence Selector"),
 					AssetLoadBlockAppReady,
-					InsertOnSend::<AppReady, Running>::default(),
+					RunOnAppReady::default(),
 					TargetAgent(agent),
 					bert_handle,
-					SentenceScorer::default(),
-					ScoreSelector {
-						consume_scores: true,
-					},
+					SentenceFlow::default(),
 				))
 				.with_children(|parent| {
 					parent.spawn((

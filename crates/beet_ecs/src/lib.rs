@@ -8,7 +8,7 @@ pub mod graph;
 pub mod lifecycle;
 pub mod observers;
 pub mod reflect;
-#[cfg(test)]
+#[cfg(any(test, feature = "test"))]
 pub mod test;
 pub mod tree;
 
@@ -34,7 +34,7 @@ pub mod prelude {
 	pub use crate::observers::*;
 	// pub use crate::lifecycle::*;
 	pub use crate::reflect::*;
-	#[cfg(test)]
+	#[cfg(any(test, feature = "test"))]
 	pub use crate::test::*;
 	pub use crate::tree::*;
 	pub use beet_ecs_macros::*;

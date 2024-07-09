@@ -30,9 +30,8 @@ pub fn seek(mut commands: Commands) {
 			// behavior
 			parent.spawn((
 				Name::new("Seek"),
-				RunOnSpawn,
+				RunOnAppReady::default(),
 				ContinueRun::default(),
-				InsertOnTrigger::<AppReady, Running>::default(),
 				TargetAgent(parent.parent_entity()),
 				Seek,
 			));

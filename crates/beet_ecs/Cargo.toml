@@ -16,6 +16,7 @@ categories.workspace = true
 default = []
 # default = ["reflect"]
 reflect = []
+test = ["dep:sweet"]
 
 [dependencies]
 beet_ecs_macros.workspace = true
@@ -30,9 +31,9 @@ extend.workspace = true
 num-traits.workspace = true
 
 bevy.workspace = true
+sweet = { workspace = true, optional = true }
 
 [dev-dependencies]
 pretty_env_logger.workspace = true
-sweet.workspace = true
 bincode.workspace = true
 ron.workspace = true
