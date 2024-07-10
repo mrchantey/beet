@@ -1,9 +1,15 @@
 #[cfg(any(target_arch = "wasm32", feature = "tokio"))]
 use crate::beet::prelude::*;
+use crate::prelude::load_scenes_from_args;
 use bevy::asset::AssetMetaCheck;
+use bevy::input::common_conditions::input_toggle_active;
 use bevy::prelude::*;
+use bevy_inspector_egui::quick::WorldInspectorPlugin;
 use forky_bevy::systems::close_on_esc;
 
+
+/// Default plugins and a couple of extra bells
+/// and whistles for ui apps
 #[derive(Default)]
 pub struct ExampleDefaultPlugins;
 
@@ -21,7 +27,7 @@ impl Plugin for ExampleDefaultPlugins {
 		#[cfg(feature = "tokio")]
 		app.add_transport(NativeWsClient::new(DEFAULT_SOCKET_URL).unwrap());
 
-		app.add_plugins(
+		app.add_plugins((
 			DefaultPlugins
 				.set(WindowPlugin {
 					primary_window: Some(Window {
@@ -38,8 +44,12 @@ impl Plugin for ExampleDefaultPlugins {
 					..default()
 				})
 				.build(),
-		)
-		.add_systems(Update, close_on_esc);
+			WorldInspectorPlugin::default()
+				.run_if(input_toggle_active(false, KeyCode::Tab)),
+		))
+		.add_systems(Startup, load_scenes_from_args)
+		.add_systems(Update, close_on_esc)
+		/*-*/;
 	}
 }
 

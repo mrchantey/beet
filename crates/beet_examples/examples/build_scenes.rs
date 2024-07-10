@@ -93,7 +93,7 @@ impl SceneItem {
 		app.add_plugins((
 			utils::MostDefaultPlugins,
 			DefaultBeetPlugins::default(),
-			ExamplePlugins,
+			ExamplePluginTypesFull,
 		))
 		.finish();
 

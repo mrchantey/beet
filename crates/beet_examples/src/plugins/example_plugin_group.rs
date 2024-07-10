@@ -1,84 +1,59 @@
 use crate::beet::prelude::*;
 use crate::prelude::*;
-use bevy::app::PluginGroupBuilder;
-use bevy::input::common_conditions::input_toggle_active;
 use bevy::prelude::*;
-use bevy_inspector_egui::quick::WorldInspectorPlugin;
 
-
-/// Kitchen sink plugin, this is all you need for
-/// ### Rendering
-/// - text
-/// - 2d
-/// - 3d
-/// ### Beet
-/// - steering
-/// - machine learning
-///
-pub struct ExamplePluginFull;
-
-impl Plugin for ExamplePluginFull {
-	fn build(&self, app: &mut App) {
-		app.add_plugins((
-			ExampleDefaultPlugins,
-			WorldInspectorPlugin::default()
-				.run_if(input_toggle_active(false, KeyCode::Tab)),
-			DefaultBeetPlugins,
-			ExamplePlugins,
-		))
-		.add_systems(Startup, load_scenes_from_args);
-	}
-}
-/// Just the essentials, no machine learning
+/// Some types, and ui elements
 pub struct ExamplePluginBasics;
 
 impl Plugin for ExamplePluginBasics {
 	fn build(&self, app: &mut App) {
-		app.add_plugins((
+		app
+    .add_plugins((
 			ExampleDefaultPlugins,
+			ExamplePluginTypesBasic,
+		))
+	/*-*/;
+	}
+}
+
+/// All types and ui elements
+pub struct ExamplePluginFull;
+
+impl Plugin for ExamplePluginFull {
+	fn build(&self, app: &mut App) {
+		app.add_plugins((ExampleDefaultPlugins, ExamplePluginTypesFull));
+	}
+}
+
+
+pub struct ExamplePluginTypesBasic;
+
+impl Plugin for ExamplePluginTypesBasic {
+	fn build(&self, app: &mut App) {
+		app.add_plugins((
 			DefaultBeetPlugins,
 			BeetDebugPluginBase,
 			BeetDebugPluginStdout,
-			ExampleBasePlugin,
 			Example2dPlugin,
 			Example3dPlugin,
 			UiTerminalPlugin,
 			ExampleReplicatePlugin,
 			BundlePlaceholderPlugin,
 		))
-		.add_systems(Startup, load_scenes_from_args);
+		.register_type::<Collectable>();
 	}
 }
+pub struct ExamplePluginTypesFull;
 
-pub struct ExampleBasePlugin;
-
-impl Plugin for ExampleBasePlugin {
+impl Plugin for ExamplePluginTypesFull {
 	fn build(&self, app: &mut App) {
-		app
-		.register_type::<Collectable>()
-	/*-*/;
+		app.add_plugins((
+			ExamplePluginTypesBasic,
+			ExampleMlPlugin,
+			FrozenLakePlugin,
+		));
 	}
 }
-
-#[derive(Default)]
-pub struct ExamplePlugins;
-
-impl PluginGroup for ExamplePlugins {
-	fn build(self) -> PluginGroupBuilder {
-		PluginGroupBuilder::start::<Self>()
-			.add(BeetDebugPluginBase)
-			.add(BeetDebugPluginStdout)
-			.add(ExampleBasePlugin)
-			.add(Example2dPlugin)
-			.add(Example3dPlugin)
-			.add(UiTerminalPlugin)
-			.add(ExampleReplicatePlugin)
-			.add(BundlePlaceholderPlugin)
-			.add(ExampleMlPlugin)
-			.add(FrozenLakePlugin)
-	}
-}
-
 
 pub struct ExampleMlPlugin;
 
