@@ -6,6 +6,7 @@ use std::fmt::Debug;
 /// As this is frequently added and removed, it is `SparseSet`.
 #[derive(Default, Debug, Component, PartialEq)]
 #[component(storage = "SparseSet")]
+#[deprecated = "use observers"]
 pub struct Interrupt;
 
 pub fn sync_interrupts(

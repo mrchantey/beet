@@ -18,6 +18,7 @@ extern crate self as beet_ecs;
 pub mod prelude {
 	pub use crate::action::*;
 	pub use crate::actions::flow::*;
+	#[allow(ambiguous_glob_reexports)]
 	pub use crate::actions::global::*;
 	#[allow(ambiguous_glob_reexports)]
 	pub use crate::actions::on_trigger::*;

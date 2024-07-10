@@ -36,11 +36,10 @@ pub fn fetch_npc(mut commands: Commands) {
 					Name::new("Idle Or Fetch"),
 					TargetAgent(agent),
 					ScoreSelector::default(),
-					// ScoreSelector::consuming(),
-					AssetLoadBlockAppReady,
-					AssetPlaceholder::<Bert>::new("default-bert.ron"),
-					SetSentenceOnUserInput::default(),
+					AssetRunOnReady::<Bert>::new("default-bert.ron"),
+					
 					RunOnSentenceChange::default(),
+					SetSentenceOnUserInput::default(),
 					FindSentenceSteerTarget::<Collectable>::default(),
 				))
 				.with_children(|parent| {

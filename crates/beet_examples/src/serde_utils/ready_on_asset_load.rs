@@ -1,6 +1,25 @@
 use crate::beet::prelude::AppReady;
+use crate::prelude::*;
+use beet_net::prelude::*;
 use bevy::prelude::*;
 use std::marker::PhantomData;
+
+#[derive(Bundle)]
+pub struct AssetRunOnReady<A: Asset> {
+	pub block_asset_ready: AssetLoadBlockAppReady,
+	pub placeholder: AssetPlaceholder<A>,
+	pub run_on_ready: RunOnAppReady,
+}
+impl<A: Asset> AssetRunOnReady<A> {
+	pub fn new(path: impl Into<String>) -> Self {
+		Self {
+			block_asset_ready: AssetLoadBlockAppReady,
+			placeholder: AssetPlaceholder::new(path),
+			run_on_ready: RunOnAppReady::default(),
+		}
+	}
+}
+
 
 #[derive(Debug, Default, Clone, Component, Reflect)]
 #[reflect(Component)]

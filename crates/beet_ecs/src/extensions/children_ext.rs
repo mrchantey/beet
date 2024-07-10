@@ -29,19 +29,33 @@ impl ChildrenExt {
 		edge_query: &Query<&Children>,
 		mut func: impl FnMut(Entity),
 	) {
-		fn visit(
+		Self::visit_or_cancel(entity, edge_query, |entity| {
+			func(entity);
+			true
+		});
+	}
+	/// dfs visit, do not visit children if func returns false
+	pub fn visit_or_cancel(
+		entity: Entity,
+		edge_query: &Query<&Children>,
+		mut func: impl FnMut(Entity) -> bool,
+	) -> bool {
+		fn visit_inner(
 			entity: Entity,
 			edge_query: &Query<&Children>,
-			func: &mut impl FnMut(Entity),
-		) {
-			func(entity);
+			func: &mut impl FnMut(Entity) -> bool,
+		) -> bool {
+			if !func(entity) {
+				return false;
+			}
 			if let Ok(children) = edge_query.get(entity) {
 				for child in children.iter() {
-					visit(*child, edge_query, func);
+					visit_inner(*child, edge_query, func);
 				}
 			}
+			return true;
 		}
-		visit(entity, edge_query, &mut func);
+		visit_inner(entity, edge_query, &mut func)
 	}
 
 	/// dfs find

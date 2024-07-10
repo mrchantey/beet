@@ -54,5 +54,8 @@ impl Plugin for LifecycleSystemsPlugin {
 
 		let world = app.world_mut();
 		world.observe(bubble_run_result);
+		world.observe(interrupt_running);
 	}
 }
+
+pub const NUM_GLOBAL_OBSERVERS: u32 = 2;

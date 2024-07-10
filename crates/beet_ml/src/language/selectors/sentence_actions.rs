@@ -1,7 +1,8 @@
-use super::Sentence;
+use crate::prelude::*;
 use beet_ecs::prelude::*;
 use beet_net::prelude::*;
 use bevy::prelude::*;
+use std::borrow::Cow;
 
 #[derive(Reflect)]
 pub struct MapUserMessageToSentence;
@@ -21,3 +22,15 @@ pub type SetSentenceOnUserInput =
 	InsertMappedOnGlobalTrigger<MapUserMessageToSentence>;
 
 pub type RunOnSentenceChange = TriggerOnTrigger<OnInsert, OnRun, Sentence>;
+
+#[derive(Bundle, Default)]
+pub struct SentenceBundle {
+	pub flow: SentenceFlow,
+	pub run_on_change: RunOnSentenceChange,
+	pub set_on_input: SetSentenceOnUserInput,
+}
+impl SentenceBundle {
+	pub fn with_initial(sentence: impl Into<Cow<'static, str>>) -> impl Bundle {
+		(Self::default(), Sentence::new(sentence))
+	}
+}
