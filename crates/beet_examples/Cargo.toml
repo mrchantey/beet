@@ -23,6 +23,7 @@ beet_net.workspace = true
 beet_ml.workspace = true
 # beet = { workspace = true, features = ["reflect"] }
 bevy = { workspace = true, default-features = true }
+bevy-inspector-egui = "0.25.0"
 log.workspace = true
 pretty_env_logger.workspace = true
 forky_bevy.workspace = true

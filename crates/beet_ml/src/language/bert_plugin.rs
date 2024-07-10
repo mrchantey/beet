@@ -8,10 +8,6 @@ pub struct BertPlugin;
 
 impl Plugin for BertPlugin {
 	fn build(&self, app: &mut App) {
-		app.world_mut().spawn((
-			SetSentenceOnUserInput::default(),
-			RunOnSentenceChange::default(),
-		));
 
 		app.add_plugins(ActionPlugin::<(
 			SentenceFlow,

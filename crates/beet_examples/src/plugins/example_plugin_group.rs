@@ -1,7 +1,9 @@
 use crate::beet::prelude::*;
 use crate::prelude::*;
 use bevy::app::PluginGroupBuilder;
+use bevy::input::common_conditions::input_toggle_active;
 use bevy::prelude::*;
+use bevy_inspector_egui::quick::WorldInspectorPlugin;
 
 
 /// Kitchen sink plugin, this is all you need for
@@ -19,6 +21,8 @@ impl Plugin for ExamplePluginFull {
 	fn build(&self, app: &mut App) {
 		app.add_plugins((
 			ExampleDefaultPlugins,
+			WorldInspectorPlugin::default()
+				.run_if(input_toggle_active(false, KeyCode::Tab)),
 			DefaultBeetPlugins,
 			ExamplePlugins,
 		))
@@ -43,6 +47,16 @@ impl Plugin for ExamplePluginBasics {
 			BundlePlaceholderPlugin,
 		))
 		.add_systems(Startup, load_scenes_from_args);
+	}
+}
+
+pub struct ExampleBasePlugin;
+
+impl Plugin for ExampleBasePlugin {
+	fn build(&self, app: &mut App) {
+		app
+		.register_type::<Collectable>()
+	/*-*/;
 	}
 }
 
@@ -90,15 +104,7 @@ impl Plugin for ExampleMlPlugin {
 			/*-*/;
 	}
 }
-pub struct ExampleBasePlugin;
 
-impl Plugin for ExampleBasePlugin {
-	fn build(&self, app: &mut App) {
-		app
-		.register_type::<Collectable>()
-	/*-*/;
-	}
-}
 
 
 pub struct Example2dPlugin;

@@ -137,6 +137,9 @@ env:
 expand crate example *args:
 	just watch 'cargo expand -p {{crate}} --example {{example}} {{args}}'
 
+patch:
+	cargo set-version --bump patch
+
 publish crate *args:
 	cargo publish -p {{crate}} --allow-dirty --no-verify {{args}}
 	sleep 2
