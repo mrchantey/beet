@@ -6,7 +6,7 @@ use std::marker::PhantomData;
 #[derive(PartialEq, Deref, DerefMut, Debug, Clone, Action, Reflect)]
 #[reflect(Component)]
 #[category(ActionCategory::Agent)]
-#[systems(remove_agent_on_run::<T>.in_set(PostTickSet))]
+#[observers(remove_agent_on_run::<T>)]
 pub struct RemoveAgentOnRun<T: GenericActionComponent>(
 	#[reflect(ignore)] pub PhantomData<T>,
 );
@@ -20,10 +20,12 @@ impl<T: GenericActionComponent> Default for RemoveAgentOnRun<T> {
 // }
 
 fn remove_agent_on_run<T: GenericActionComponent>(
+	trigger: Trigger<OnRun>,
 	mut commands: Commands,
-	mut query: Query<(&TargetAgent, &RemoveAgentOnRun<T>), Added<Running>>,
+	query: Query<(&TargetAgent, &RemoveAgentOnRun<T>)>,
 ) {
-	for (agent, _) in query.iter_mut() {
-		commands.entity(agent.0).remove::<T>();
-	}
+	let (agent, _) = query
+		.get(trigger.entity())
+		.expect(expect_action::ACTION_QUERY_MISSING);
+	commands.entity(agent.0).remove::<T>();
 }

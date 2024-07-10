@@ -22,6 +22,6 @@ fn send_on_run<T: GenericActionEvent>(
 ) {
 	let action = query
 		.get(trigger.entity())
-		.expect(expect_action::NO_ACTION_COMP);
+		.expect(expect_action::ACTION_QUERY_MISSING);
 	writer.send(action.0.clone());
 }

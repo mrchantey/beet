@@ -32,72 +32,58 @@ pub fn fetch_npc(mut commands: Commands) {
 		))
 		.with_children(|parent| {
 			let agent = parent.parent_entity();
-
 			parent
 				.spawn((
-					Name::new("Fetch Behavior"),
-					InsertOnSend::<AppReady, Running>::default(),
-					SequenceSelector,
-					Repeat::default(),
+					Name::new("Idle Or Fetch"),
+					TargetAgent(agent),
+					ScoreSelector::default(),
+					// ScoreSelector::consuming(),
+					AssetLoadBlockAppReady,
+					AssetPlaceholder::<Bert>::new("default-bert.ron"),
+					FindSentenceSteerTarget::<Collectable>::default(),
 				))
 				.with_children(|parent| {
+					parent.spawn((
+						Name::new("Idle"),
+						Score::neutral(),
+						TargetAgent(agent),
+						SetAgentOnRun(Velocity::default()),
+						PlayAnimation::new(idle_index).repeat_forever(),
+						RunTimer::default(),
+						InsertInDuration::new(
+							RunResult::Success,
+							Duration::from_secs(1),
+						),
+					));
 					parent
 						.spawn((
-							Name::new("Idle Or Fetch"),
+							Name::new("Fetch"),
+							Score::default(),
 							TargetAgent(agent),
-							ScoreSelector::default(),
-							// ScoreSelector::consuming(),
-							AssetLoadBlockAppReady,
-							AssetPlaceholder::<Bert>::new("default-bert.ron"),
-							FindSentenceSteerTarget::<Collectable>::default(),
+							ScoreSteerTarget::new(10.),
+							PlayAnimation::new(walk_index).repeat_forever(),
+							SequenceFlow,
+							RemoveAgentOnRun::<Sentence>::default(),
 						))
 						.with_children(|parent| {
 							parent.spawn((
-								Name::new("Idle"),
-								Score::neutral(),
+								Name::new("Go To Item"),
 								TargetAgent(agent),
-								SetAgentOnRun(Velocity::default()),
-								PlayAnimation::new(idle_index).repeat_forever(),
-								RunTimer::default(),
-								InsertInDuration::new(
-									RunResult::Success,
-									Duration::from_secs(1),
-								),
+								Seek,
+								StopOnArrive::new(1.),
 							));
-							parent
-								.spawn((
-									Name::new("Fetch"),
-									Score::default(),
-									TargetAgent(agent),
-									ScoreSteerTarget::new(10.),
-									PlayAnimation::new(walk_index)
-										.repeat_forever(),
-									SequenceSelector,
-									RemoveAgentOnRun::<Sentence>::default(),
-								))
-								.with_children(|parent| {
-									parent.spawn((
-										Name::new("Go To Item"),
-										TargetAgent(agent),
-										Seek,
-										StopOnArrive::new(1.),
-									));
-									parent.spawn((
-										Name::new("Pick Up Item"),
-										TargetAgent(agent),
-										// SetAgentOnRun(SteerTarget::Position(
-										// 		Vec3::ZERO,
-										// 	)),
-										RemoveAgentOnRun::<SteerTarget>::default(),
-										InsertOnRun(RunResult::Success),
-									));
-									// parent.spawn((
-									// 	Name::new("Return Item To Center"),
-									// 	TargetAgent(agent),
-									// 	Seek,
-									// 	StopOnArrive::new(6.),
-									// ));
-								});
+							parent.spawn((
+								Name::new("Pick Up Item"),
+								TargetAgent(agent),
+								RemoveAgentOnRun::<SteerTarget>::default(),
+								EndOnRun::success(),
+							));
+							// parent.spawn((
+							// 	Name::new("Return Item To Center"),
+							// 	TargetAgent(agent),
+							// 	Seek,
+							// 	StopOnArrive::new(6.),
+							// ));
 						});
 				});
 		});

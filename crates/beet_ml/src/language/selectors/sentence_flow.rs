@@ -34,7 +34,7 @@ fn sentence_flow(
 ) {
 	let (_scorer, handle, agent, children) = query
 		.get(trigger.entity())
-		.expect(expect_action::NO_ACTION_COMP);
+		.expect(expect_action::ACTION_QUERY_MISSING);
 	let Some(bert) = berts.get_mut(handle) else {
 		// not ready yet
 		log::warn!("SentenceFlow: Bert asset was not ready, will not run");

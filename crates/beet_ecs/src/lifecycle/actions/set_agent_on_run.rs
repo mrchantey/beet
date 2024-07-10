@@ -24,7 +24,7 @@ fn set_agent_on_run<T: GenericActionComponent>(
 ) {
 	let (target, action) = query
 		.get(trigger.entity())
-		.expect(expect_action::NO_ACTION_COMP);
+		.expect(expect_action::ACTION_QUERY_MISSING);
 
 	if let Ok(mut dst) = agents.get_mut(**target) {
 		*dst = action.0.clone();

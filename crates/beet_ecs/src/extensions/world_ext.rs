@@ -29,9 +29,10 @@ pub impl<'w> EntityWorldMut<'w> {
 	fn flush_trigger<E: Event>(&mut self, event: E) -> &mut Self {
 		let entity = self.id();
 		unsafe {
-			self.world_mut().flush();
-			self.world_mut().trigger_targets(event, entity);
-			self.world_mut().flush();
+			let world = self.world_mut();
+			world.flush();
+			world.trigger_targets(event, entity);
+			world.flush();
 		}
 		self
 	}

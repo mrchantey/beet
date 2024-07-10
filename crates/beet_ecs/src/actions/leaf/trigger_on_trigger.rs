@@ -56,7 +56,7 @@ fn on_trigger<In: GenericActionEvent, Out: Default + GenericActionEvent>(
 	);
 	let action = query
 		.get(trigger.entity())
-		.expect(expect_action::NO_ACTION_COMP);
+		.expect(expect_action::ACTION_QUERY_MISSING);
 	action
 		.target
 		.trigger(&mut commands, trigger.entity(), action.out.clone());

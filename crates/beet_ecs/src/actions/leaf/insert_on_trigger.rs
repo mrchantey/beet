@@ -49,7 +49,7 @@ fn on_trigger<E: GenericActionEvent, T: Default + GenericActionComponent>(
 ) {
 	let action = query
 		.get(trigger.entity())
-		.expect(expect_action::NO_ACTION_COMP);
+		.expect(expect_action::ACTION_QUERY_MISSING);
 	action
 		.target
 		.insert(&mut commands, trigger.entity(), action.comp.clone());
