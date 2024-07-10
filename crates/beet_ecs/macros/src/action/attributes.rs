@@ -2,10 +2,9 @@ use crate::utils::punctuated_args;
 use syn::Expr;
 
 pub struct ActionAttributes {
-	pub observers_generic: Vec<Expr>,
-	pub observers_non_generic: Vec<Expr>,
-	pub systems_generic: Vec<Expr>,
-	pub systems_non_generic: Vec<Expr>,
+	pub global_observers: Vec<Expr>,
+	pub observers: Vec<Expr>,
+	pub systems: Vec<Expr>,
 	pub category: Option<Expr>,
 	pub storage: Option<Expr>,
 }
@@ -13,10 +12,9 @@ pub struct ActionAttributes {
 
 impl ActionAttributes {
 	pub fn parse(attrs: &[syn::Attribute]) -> syn::Result<Self> {
-		let mut observers_generic = Vec::new();
-		let mut observers_non_generic = Vec::new();
-		let mut systems_generic = Vec::new();
-		let mut systems_non_generic = Vec::new();
+		let mut global_observers = Vec::new();
+		let mut observers = Vec::new();
+		let mut systems = Vec::new();
 		let mut category = None;
 		let mut storage = None;
 
@@ -24,21 +22,15 @@ impl ActionAttributes {
 			let attr_str =
 				attr.path().get_ident().map(|ident| ident.to_string());
 			match attr_str.as_ref().map(|a| a.as_str()) {
-				Some("observers") => {
-					observers_non_generic
+				Some("global_observers") => {
+					global_observers
 						.extend(punctuated_args(attr.parse_args()?)?);
 				}
-				Some("generic_observers") => {
-					observers_generic
-						.extend(punctuated_args(attr.parse_args()?)?);
+				Some("observers") => {
+					observers.extend(punctuated_args(attr.parse_args()?)?);
 				}
 				Some("systems") => {
-					systems_non_generic
-						.extend(punctuated_args(attr.parse_args()?)?);
-				}
-				Some("generic_systems") => {
-					systems_generic
-						.extend(punctuated_args(attr.parse_args()?)?);
+					systems.extend(punctuated_args(attr.parse_args()?)?);
 				}
 				Some("category") => {
 					category = Some(attr.parse_args()?);
@@ -50,10 +42,9 @@ impl ActionAttributes {
 			}
 		}
 		return Ok(Self {
-			observers_generic,
-			observers_non_generic,
-			systems_generic,
-			systems_non_generic,
+			global_observers,
+			observers,
+			systems,
 			category,
 			storage,
 		});

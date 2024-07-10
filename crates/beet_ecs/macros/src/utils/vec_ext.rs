@@ -8,10 +8,11 @@ pub impl<T: Iterator<Item = TokenStream>> T {
 	fn collect_comma_punct(self) -> TokenStream {
 		let mut out = TokenStream::new();
 		for (i, item) in self.enumerate() {
-			if i != 0 {
-				out.extend(quote! {,});
+			if i == 0 {
+				out.extend(quote! {#item});
+			} else {
+				out.extend(quote! {,#item});
 			}
-			out.extend(item);
 		}
 		out
 	}
@@ -31,17 +32,16 @@ pub impl<T: Iterator<Item = Result<Option<TokenStream>>>> T {
 
 
 #[ext(name=TokenStreamVecExt)]
-pub impl<T:quote::ToTokens > Vec<T> {
-	fn collect_comma_punct(self) -> TokenStream {
+pub impl<T: quote::ToTokens> Vec<T> {
+	fn collect_comma_punct(&self) -> TokenStream {
 		let mut out = TokenStream::new();
 		for (i, item) in self.into_iter().enumerate() {
-			if i != 0 {
-				out.extend(quote! {,});
+			if i == 0 {
+				out.extend(quote! {#item});
+			} else {
+				out.extend(quote! {,#item});
 			}
-			out.extend(item.into_token_stream());
 		}
 		out
 	}
 }
-
-

@@ -31,7 +31,6 @@ impl Plugin for CommonEventsPlugin {
 				SendOnRun<AppReady>,
 				TriggerOnRun<AppReady>,
 				RunOnAppReady,
-				InsertOnSend<AppReady, Running>,
 			)>::default())
 			// SpawnSceneFile
 			.add_event::<SpawnSceneFile>()
@@ -61,4 +60,4 @@ pub struct AppStartup;
 #[reflect(Default)]
 pub struct AppReady;
 
-pub type RunOnAppReady = TriggerOnTrigger<AppReady, OnRun>;
+pub type RunOnAppReady = TriggerOnGlobalTrigger<AppReady, OnRun>;

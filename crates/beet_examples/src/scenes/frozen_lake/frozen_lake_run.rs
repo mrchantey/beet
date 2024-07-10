@@ -29,9 +29,8 @@ pub fn frozen_lake_run(mut commands: Commands) {
 			parent
 				.spawn((
 					Name::new("Inference Behavior"),
-					// Running,
-					InsertOnSend::<AppReady, Running>::default(),
-					SequenceSelector,
+					RunOnAppReady::default(),
+					SequenceFlow,
 					Repeat::default(),
 				))
 				.with_children(|parent| {

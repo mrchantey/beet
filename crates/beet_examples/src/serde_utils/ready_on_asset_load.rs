@@ -1,5 +1,4 @@
 use crate::beet::prelude::AppReady;
-use beet_net::events::RunOnAppReady;
 use bevy::prelude::*;
 use std::marker::PhantomData;
 
@@ -25,7 +24,6 @@ pub fn ready_on_asset_load<A: Asset>(
 	mut commands: Commands,
 	query: Query<(Entity, &Handle<A>), With<AssetLoadBlockAppReady>>,
 	all_blocks: Query<Entity, With<AssetLoadBlockAppReady>>,
-	all_awaiting: Query<Entity, With<RunOnAppReady>>,
 ) {
 	let mut total_ready = 0;
 	for ev in asset_events.read() {
@@ -45,7 +43,6 @@ pub fn ready_on_asset_load<A: Asset>(
 	}
 	let total_blocks = all_blocks.iter().count();
 	if total_blocks > 0 && total_blocks == total_ready {
-		let targets = all_awaiting.iter().collect::<Vec<_>>();
-		commands.trigger_targets(AppReady,targets);
+		commands.trigger(AppReady);
 	}
 }

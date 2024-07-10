@@ -2,7 +2,8 @@ use super::ActionAttributes;
 use crate::utils::*;
 use proc_macro2::TokenStream;
 use quote::quote;
-use syn::{parse_quote, DeriveInput};
+use syn::parse_quote;
+use syn::DeriveInput;
 
 
 pub fn derive_action(
@@ -37,28 +38,23 @@ fn impl_component(
 	let ident = &input.ident;
 	let (impl_generics, type_generics, where_clause) =
 		&input.generics.split_for_impl();
-	let observers = build_generic_funcs(
-		&attributes.observers_non_generic,
-		&attributes.observers_generic,
-		type_generics,
-	);
 
-
-	let (observers_on_add, observers_on_remove) = if observers.len() == 0 {
-		(TokenStream::new(), TokenStream::new())
-	} else {
-		let observers = observers.collect_comma_punct();
-		(
-			quote! {
-				ActionObservers::new::<#ident #type_generics>()
-				.add_observers((#observers))
-				.build(world.commands(), entity);
-			},
-			quote! {
-				ActionObservers::cleanup::<#ident #type_generics>(&mut world,entity);
-			},
-		)
-	};
+	let (observers_on_add, observers_on_remove) =
+		if attributes.observers.len() == 0 {
+			(TokenStream::new(), TokenStream::new())
+		} else {
+			let observers = attributes.observers.collect_comma_punct();
+			(
+				quote! {
+					ActionObservers::new::<#ident #type_generics>()
+					.add_observers((#observers))
+					.build(world.commands(), entity);
+				},
+				quote! {
+					ActionObservers::cleanup::<#ident #type_generics>(&mut world,entity);
+				},
+			)
+		};
 	let storage = if let Some(storage) = &attributes.storage {
 		storage.clone()
 	} else {
@@ -97,23 +93,34 @@ fn impl_action_systems(
 	let (impl_generics, type_generics, where_clause) =
 		&input.generics.split_for_impl();
 
-	let systems = build_generic_funcs(
-		&attributes.systems_non_generic,
-		&attributes.systems_generic,
-		type_generics,
-	);
-
-	let add_systems = if systems.len() == 0 {
+	let add_systems = if attributes.systems.len() == 0 {
 		quote! {}
 	} else {
-		let systems = systems.collect_comma_punct();
+		let systems = attributes.systems.collect_comma_punct();
 		quote! { config.add_systems(app, (#systems)); }
+	};
+
+	let add_global_observers = if attributes.global_observers.len() == 0 {
+		quote! {}
+	} else {
+		let adds: TokenStream = attributes
+			.global_observers
+			.iter()
+			.map(|obs| {
+				quote! { world.observe(#obs); }
+			})
+			.collect();
+		quote! {
+			let world = app.world_mut();
+			#adds
+		}
 	};
 
 	Ok(quote! {
 		impl #impl_generics ActionSystems for #ident #type_generics #where_clause {
 			fn on_build(app: &mut App, config: &BeetConfig) {
 				#add_systems
+				#add_global_observers
 			}
 		}
 	})

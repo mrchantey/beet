@@ -8,7 +8,7 @@ use std::ops::DerefMut;
 #[derive(Debug, Clone, PartialEq, Action, Reflect)]
 #[reflect(Component, ActionMeta)]
 #[category(ActionCategory::World)]
-#[systems(inset_on_trigger::<E, T>.in_set(TickSet))]
+#[systems(insert_on_send::<E, T>.in_set(TickSet))]
 #[deprecated = "Use `TriggerOnTrigger` instead"]
 pub struct InsertOnSend<E: GenericActionEvent, T: GenericActionComponent> {
 	pub value: T,
@@ -47,7 +47,7 @@ impl<E: GenericActionEvent, T: GenericActionComponent> InsertOnSend<E, T> {
 	}
 }
 
-fn inset_on_trigger<E: GenericActionEvent, T: GenericActionComponent>(
+fn insert_on_send<E: GenericActionEvent, T: GenericActionComponent>(
 	mut commands: Commands,
 	mut reader: EventReader<E>,
 	query: Query<(Entity, &InsertOnSend<E, T>)>,

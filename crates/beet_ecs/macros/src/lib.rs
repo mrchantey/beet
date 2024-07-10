@@ -24,6 +24,7 @@ mod utils;
 /// ```
 #[proc_macro_derive(Action, attributes(
 	observers,
+	global_observers,
 	systems,
 	category,
 	storage
