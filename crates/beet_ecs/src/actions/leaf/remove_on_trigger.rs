@@ -1,54 +1,26 @@
 use crate::prelude::*;
 use bevy::prelude::*;
-use leaf::component_target::ComponentTarget;
 use std::marker::PhantomData;
 
 
-/// Removes the provided component when [`<E>`] is triggered
-#[derive(Action, Reflect)]
-#[reflect(Default, Component)]
-#[observers(on_trigger::<E,T>)]
-pub struct RemoveOnTrigger<
-	E: GenericActionEvent,
-	T: Default + GenericActionComponent,
-> {
-	pub target: ComponentTarget,
-	#[reflect(ignore)]
-	phantom: PhantomData<(E, T)>,
-}
+pub type RemoveOnTrigger<Event, Params> =
+	OnTrigger<RemoveHandler<Event, Params>>;
 
-impl<E: GenericActionEvent, T: Default + GenericActionComponent> Default
-	for RemoveOnTrigger<E, T>
+#[derive(Reflect)]
+pub struct RemoveHandler<E,T>(#[reflect(ignore)] PhantomData<(E,T)>);
+
+
+impl<E:Event,T:Bundle> OnTriggerHandler for RemoveHandler<E,T>
 {
-	fn default() -> Self { Self::new() }
-}
-
-impl<E: GenericActionEvent, T: Default + GenericActionComponent>
-	RemoveOnTrigger<E, T>
-{
-	pub fn new() -> Self {
-		Self {
-			target: default(),
-			phantom: default(),
-		}
+	type Event = E;
+	type Params = ();
+	fn handle(
+		commands: &mut Commands,
+		trigger: &Trigger<Self::Event>,
+		comp: &OnTrigger<Self>,
+	) {
+		comp.target.remove::<T>(commands, trigger.entity());
 	}
-	pub fn with_target(self, target: impl Into<ComponentTarget>) -> Self {
-		Self {
-			target: target.into(),
-			..self
-		}
-	}
-}
-
-fn on_trigger<E: GenericActionEvent, T: Default + GenericActionComponent>(
-	trigger: Trigger<E>,
-	query: Query<&RemoveOnTrigger<E, T>>,
-	mut commands: Commands,
-) {
-	let action = query
-		.get(trigger.entity())
-		.expect(expect_action::ACTION_QUERY_MISSING);
-	action.target.remove::<T>(&mut commands, trigger.entity());
 }
 
 #[cfg(test)]

@@ -10,8 +10,10 @@ pub fn hello_ml(mut commands: Commands) {
 			Name::new("Sentence Selector"),
 			Sentence::new("please kill the baddies"),
 			AssetLoadBlockAppReady,
+			RunOnSentenceChange::default(),
 			RunOnAppReady::default(),
 			bert_handle,
+			SetSentenceOnUserInput::default(),
 			SentenceFlow::default(),
 		))
 		.with_children(|parent| {

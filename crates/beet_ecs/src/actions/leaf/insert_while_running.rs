@@ -25,8 +25,8 @@ impl<T: Default + GenericActionComponent> InsertWhileRunning<T> {
 			remove: default(),
 		}
 	}
-	pub fn with_target(self, target: impl Into<ComponentTarget>) -> Self {
-		let target: ComponentTarget = target.into();
+	pub fn with_target(self, target: impl Into<TriggerTarget>) -> Self {
+		let target: TriggerTarget = target.into();
 		Self {
 			add: self.add.with_target(target.clone()),
 			remove: self.remove.with_target(target),

@@ -8,7 +8,17 @@ pub struct BertPlugin;
 
 impl Plugin for BertPlugin {
 	fn build(&self, app: &mut App) {
-		app.add_plugins(ActionPlugin::<SentenceFlow>::default())
+		app.world_mut().spawn((
+			SetSentenceOnUserInput::default(),
+			RunOnSentenceChange::default(),
+		));
+
+		app.add_plugins(ActionPlugin::<(
+			SentenceFlow,
+			SetSentenceOnUserInput,
+			//we need OnInsert to derive reflect https://github.com/bevyengine/bevy/pull/14259
+			// RunOnSentenceChange 
+		)>::default())
 			.init_asset::<Bert>()
 			.init_asset_loader::<BertLoader>()
 			.register_type::<Sentence>()

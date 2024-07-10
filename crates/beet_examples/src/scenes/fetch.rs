@@ -14,7 +14,6 @@ pub fn fetch_npc(mut commands: Commands) {
 
 	commands
 		.spawn((
-			Player,
 			Transform::from_xyz(0., 0., 0.).with_scale(Vec3::splat(0.01)),
 			BundlePlaceholder::Scene("Fox.glb#Scene0".into()),
 			graph,
@@ -40,6 +39,8 @@ pub fn fetch_npc(mut commands: Commands) {
 					// ScoreSelector::consuming(),
 					AssetLoadBlockAppReady,
 					AssetPlaceholder::<Bert>::new("default-bert.ron"),
+					SetSentenceOnUserInput::default(),
+					RunOnSentenceChange::default(),
 					FindSentenceSteerTarget::<Collectable>::default(),
 				))
 				.with_children(|parent| {

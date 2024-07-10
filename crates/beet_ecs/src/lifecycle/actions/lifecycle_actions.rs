@@ -6,8 +6,15 @@ pub trait GenericActionType:
 	'static + Send + Sync + Default + Clone + FromReflect + GetTypeRegistration
 {
 }
-impl<T: 'static + Send + Sync + Default + Clone + FromReflect + GetTypeRegistration>
-	GenericActionType for T
+impl<
+		T: 'static
+			+ Send
+			+ Sync
+			+ Default
+			+ Clone
+			+ FromReflect
+			+ GetTypeRegistration,
+	> GenericActionType for T
 {
 }
 
@@ -30,6 +37,9 @@ impl<T: Clone + FromReflect + GetTypeRegistration + Event> GenericActionEvent
 	for T
 {
 }
+pub trait ReflectEvent: Event + FromReflect + GetTypeRegistration {}
+impl<T: Event + FromReflect + GetTypeRegistration> ReflectEvent for T {}
+
 /// Minimal traits generally required for an action asset type.
 pub trait GenericActionAsset: 'static + Send + Sync + TypePath + Asset {}
 impl<T: 'static + Send + Sync + TypePath + Asset> GenericActionAsset for T {}
