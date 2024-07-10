@@ -2,7 +2,7 @@ use super::*;
 use crate::beet::prelude::*;
 use crate::prelude::*;
 use bevy::prelude::*;
-use std::time::Duration;
+
 
 pub fn fetch_npc(mut commands: Commands) {
 	let Foxie {
@@ -35,9 +35,8 @@ pub fn fetch_npc(mut commands: Commands) {
 				.spawn((
 					Name::new("Idle Or Fetch"),
 					TargetAgent(agent),
-					ScoreSelector::default(),
+					ScoreFlow::default(),
 					AssetRunOnReady::<Bert>::new("default-bert.ron"),
-					
 					RunOnSentenceChange::default(),
 					SetSentenceOnUserInput::default(),
 					FindSentenceSteerTarget::<Collectable>::default(),
@@ -49,11 +48,7 @@ pub fn fetch_npc(mut commands: Commands) {
 						TargetAgent(agent),
 						SetAgentOnRun(Velocity::default()),
 						PlayAnimation::new(idle_index).repeat_forever(),
-						RunTimer::default(),
-						InsertInDuration::new(
-							RunResult::Success,
-							Duration::from_secs(1),
-						),
+						ContinueRun::default(), // never end
 					));
 					parent
 						.spawn((
@@ -69,8 +64,8 @@ pub fn fetch_npc(mut commands: Commands) {
 							parent.spawn((
 								Name::new("Go To Item"),
 								TargetAgent(agent),
-								ContinueRun::default(),
 								Seek,
+								ContinueRun::default(),
 								EndOnArrive::new(1.),
 							));
 							parent.spawn((

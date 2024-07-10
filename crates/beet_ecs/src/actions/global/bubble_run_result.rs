@@ -20,6 +20,8 @@ pub fn bubble_run_result(
 	}
 }
 
+
+/// Add this to flow actions to pass the run result to the parent.
 pub fn passthrough_run_result(
 	trigger: Trigger<OnChildResult>,
 	mut commands: Commands,

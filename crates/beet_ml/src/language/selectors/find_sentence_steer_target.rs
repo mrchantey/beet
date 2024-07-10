@@ -32,7 +32,7 @@ fn find_sentence_steer_target<T: GenericActionComponent>(
 	mut commands: Commands,
 	query: Query<(
 		&TargetAgent,
-		&Sentence,
+		Option<&Sentence>,
 		&Handle<Bert>,
 		&FindSentenceSteerTarget<T>,
 	)>,
@@ -48,6 +48,10 @@ fn find_sentence_steer_target<T: GenericActionComponent>(
 
 	let Some(bert) = berts.get_mut(handle) else {
 		log::warn!("{}", expect_asset::NOT_READY);
+		return;
+	};
+	let Some(target_sentence) = target_sentence else {
+		log::warn!("{}", "sentence not set yet?");
 		return;
 	};
 
