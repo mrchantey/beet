@@ -55,3 +55,29 @@ fn on_global_trigger<
 			.trigger(&mut commands, entity, action.out.clone());
 	}
 }
+
+#[cfg(test)]
+mod test {
+	use crate::prelude::*;
+	use anyhow::Result;
+	use bevy::prelude::*;
+	use sweet::*;
+
+	#[test]
+	fn works() -> Result<()> {
+		let mut app = App::new();
+		app.add_plugins(ActionPlugin::<
+			TriggerOnGlobalTrigger<OnRun, OnRunResult>,
+		>::default());
+		let world = app.world_mut();
+		let func = observe_run_results(world);
+
+		world.spawn(TriggerOnGlobalTrigger::<OnRun, OnRunResult>::new(
+			OnRunResult::failure(),
+		));
+		world.trigger(OnRun);
+		world.flush();
+		expect(&func).to_have_returned_nth_with(0, &RunResult::Failure)?;
+		Ok(())
+	}
+}

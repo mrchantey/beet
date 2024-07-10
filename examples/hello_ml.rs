@@ -14,7 +14,7 @@ pub fn main() {
 				scenes::beet_debug,
 				scenes::camera_2d,
 				scenes::ui_terminal,
-				scenes::sentence_selector,
+				scenes::hello_ml,
 			),
 		)
 		.run();

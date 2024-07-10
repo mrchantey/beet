@@ -9,15 +9,15 @@ use bevy::prelude::*;
 #[reflect(Default, Component, ActionMeta)]
 #[category(ActionCategory::Behavior)]
 #[systems(succeed_on_arrive.in_set(TickSet))]
-pub struct StopOnArrive {
+pub struct EndOnArrive {
 	pub radius: f32,
 }
 
-impl Default for StopOnArrive {
+impl Default for EndOnArrive {
 	fn default() -> Self { Self { radius: 0.5 } }
 }
 
-impl StopOnArrive {
+impl EndOnArrive {
 	pub fn new(radius: f32) -> Self { Self { radius } }
 }
 
@@ -25,7 +25,7 @@ pub fn succeed_on_arrive(
 	mut commands: Commands,
 	agents: Query<(&Transform, &SteerTarget)>,
 	transforms: Query<&Transform>,
-	mut query: Query<(Entity, &TargetAgent, &StopOnArrive), With<Running>>,
+	mut query: Query<(Entity, &TargetAgent, &EndOnArrive), With<Running>>,
 ) {
 	for (entity, agent, succeed_on_arrive) in query.iter_mut() {
 		if let Ok((transform, target)) = agents.get(**agent) {

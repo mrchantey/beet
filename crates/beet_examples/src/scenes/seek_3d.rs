@@ -77,7 +77,7 @@ pub fn seek_3d(mut commands: Commands) {
 						PlayAnimation::new(walk_index)
 							.repeat_forever()
 							.with_transition_duration(transition_duration),
-						StopOnArrive::new(6.),
+						EndOnArrive::new(6.),
 					));
 				});
 		});

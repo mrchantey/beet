@@ -1,7 +1,6 @@
 use crate::prelude::*;
 use beet_ecs::prelude::*;
 use bevy::prelude::*;
-use forky_core::ResultTEExt;
 use std::borrow::Cow;
 
 /// This component is for use with [`SentenceFlow`]. Add to either the agent or a child behavior.
@@ -30,28 +29,26 @@ fn sentence_flow(
 	mut berts: ResMut<Assets<Bert>>,
 	sentences: Query<&Sentence>,
 	// TODO double query, ie added running and added asset
-	query: Query<(&SentenceFlow, &Handle<Bert>, &TargetAgent, &Children)>,
+	query: Query<(&SentenceFlow, &Sentence, &Handle<Bert>, &Children)>,
 ) {
-	let (_scorer, handle, agent, children) = query
+	let (_scorer, target_sentence, handle, children) = query
 		.get(trigger.entity())
 		.expect(expect_action::ACTION_QUERY_MISSING);
 	let Some(bert) = berts.get_mut(handle) else {
-		// not ready yet
-		log::warn!("SentenceFlow: Bert asset was not ready, will not run");
+		log::warn!("{}", expect_asset::NOT_READY);
 		return;
 	};
 
-	let children = children.into_iter().cloned().collect::<Vec<_>>();
-	//todo: async
-	bert.score_sentences(agent.0, children, &sentences)
-		.ok_or(|e| log::error!("{e}"))
-		.map(|scores| {
-			if let Some((entity, ..)) = scores.first() {
-				commands.entity(*entity).trigger(OnRun);
-			} else {
-				log::warn!("SentenceFlow: No scores returned");
-			}
-		});
+	match bert.closest_sentence_entity(
+		target_sentence.0.clone(),
+		children.iter().map(|e| e.clone()),
+		&sentences,
+	) {
+		Ok(entity) => {
+			commands.entity(entity).trigger(OnRun);
+		}
+		Err(e) => log::error!("SentenceFlow: {}", e),
+	}
 }
 
 #[cfg(test)]
@@ -85,13 +82,10 @@ mod test {
 			.resource_mut::<AssetServer>()
 			.load::<Bert>("default-bert.ron");
 
-		let agent = app.world_mut().spawn(Sentence::new("destroy")).id();
-
-
 		app.world_mut()
 			.spawn((
 				Name::new("root"),
-				TargetAgent(agent),
+				Sentence::new("destroy"),
 				handle,
 				SentenceFlow::default(),
 			))

@@ -23,9 +23,9 @@ pub use self::seek::*;
 pub mod seek_3d;
 #[allow(unused_imports)]
 pub use self::seek_3d::*;
-pub mod sentence_selector;
+pub mod hello_ml;
 #[allow(unused_imports)]
-pub use self::sentence_selector::*;
+pub use self::hello_ml::*;
 pub mod setup_2d;
 #[allow(unused_imports)]
 pub use self::setup_2d::*;

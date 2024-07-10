@@ -69,8 +69,9 @@ pub fn fetch_npc(mut commands: Commands) {
 							parent.spawn((
 								Name::new("Go To Item"),
 								TargetAgent(agent),
+								ContinueRun::default(),
 								Seek,
-								StopOnArrive::new(1.),
+								EndOnArrive::new(1.),
 							));
 							parent.spawn((
 								Name::new("Pick Up Item"),

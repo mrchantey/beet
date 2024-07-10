@@ -3,7 +3,6 @@ use crate::prelude::*;
 use beet_core::prelude::*;
 use beet_ecs::prelude::*;
 use bevy::prelude::*;
-use forky_core::ResultTEExt;
 use std::marker::PhantomData;
 
 // #[serde(bound = "")]
@@ -12,7 +11,7 @@ use std::marker::PhantomData;
 #[derive(Debug, Clone, PartialEq, Action, Reflect)]
 #[reflect(Default, Component, ActionMeta)]
 #[category(ActionCategory::Behavior)]
-#[systems(find_sentence_steer_target::<T>.in_set(TickSet))]
+#[observers(find_sentence_steer_target::<T>)]
 pub struct FindSentenceSteerTarget<T: GenericActionComponent = Sentence> {
 	// / The value below which the agent will ignore the target.
 	// pub threshold:f32,
@@ -29,34 +28,41 @@ impl<T: GenericActionComponent> Default for FindSentenceSteerTarget<T> {
 }
 
 fn find_sentence_steer_target<T: GenericActionComponent>(
+	trigger: Trigger<OnRun>,
 	mut commands: Commands,
-	query: Query<
-		(&TargetAgent, &Handle<Bert>, &FindSentenceSteerTarget<T>),
-		Added<Running>,
-	>,
+	query: Query<(
+		&TargetAgent,
+		&Sentence,
+		&Handle<Bert>,
+		&FindSentenceSteerTarget<T>,
+	)>,
 	sentences: Query<&Sentence>,
 	// TODO this should be query of Sentence, but we need
 	// it to be similar to sentence_scorer
 	items: Query<Entity, With<T>>,
 	mut berts: ResMut<Assets<Bert>>,
 ) {
-	for (agent, handle, _) in query.iter() {
-		let Some(bert) = berts.get_mut(handle) else {
-			continue;
-		};
+	let (agent, target_sentence, handle, _) = query
+		.get(trigger.entity())
+		.expect(expect_action::ACTION_QUERY_MISSING);
 
-		let options = items.into_iter().collect::<Vec<_>>();
+	let Some(bert) = berts.get_mut(handle) else {
+		log::warn!("{}", expect_asset::NOT_READY);
+		return;
+	};
 
-		//TODO: VERY EXPENSIVE
-		if let Some(scores) = bert
-			.score_sentences(agent.0, options, &sentences)
-			.ok_or(|e| log::error!("{e}"))
-			&& scores.len() > 0
-		{
-			let (target, _, _score) = scores[0];
-			// log::info!("Setting target to {:?}", target);
-			commands.entity(agent.0).insert(SteerTarget::Entity(target));
+	match bert.closest_sentence_entity(
+		target_sentence.0.clone(),
+		items
+			.into_iter()
+			.filter(|e| *e != trigger.entity())
+			.collect::<Vec<_>>(),
+		&sentences,
+	) {
+		Ok(entity) => {
+			commands.entity(agent.0).insert(SteerTarget::Entity(entity));
 		}
+		Err(e) => log::error!("SentenceFlow: {}", e),
 	}
 }
 
@@ -68,28 +74,6 @@ mod test {
 	use beet_ecs::prelude::*;
 	use bevy::prelude::*;
 	use sweet::*;
-
-	fn setup(app: &mut App) -> Entity {
-		let handle = app
-			.world_mut()
-			.resource_mut::<AssetServer>()
-			.load::<Bert>("default-bert.ron");
-
-
-		app.world_mut()
-			.spawn(Sentence::new("destroy"))
-			.with_children(|parent| {
-				let id = parent.parent_entity();
-				parent.spawn((
-					TargetAgent(id),
-					handle,
-					FindSentenceSteerTarget::<Sentence>::default(),
-					Running,
-				));
-			})
-			.id()
-	}
-
 
 	#[test]
 	fn works() -> Result<()> {
@@ -106,13 +90,32 @@ mod test {
 
 		block_on_asset_load::<Bert>(&mut app, "default-bert.ron");
 
-		let entity = setup(&mut app);
-		let _heal = app.world_mut().spawn(Sentence::new("heal")).id();
+		let handle = app
+			.world_mut()
+			.resource_mut::<AssetServer>()
+			.load::<Bert>("default-bert.ron");
+
+
+		let agent = app.world_mut().spawn_empty().id();
+
+		let heal = app.world_mut().spawn(Sentence::new("heal")).id();
 		let kill = app.world_mut().spawn(Sentence::new("kill")).id();
+
+		app.world_mut()
+			.spawn((
+				TargetAgent(agent),
+				Sentence::new("destroy"),
+				handle,
+				FindSentenceSteerTarget::<Sentence>::default(),
+			))
+			.flush_trigger(OnRun);
 
 		app.update();
 
-		let target = app.world().entity(entity).get::<SteerTarget>();
+		let target = app.world().entity(agent).get::<SteerTarget>();
+		expect(target)
+			.not()
+			.to_be(Some(&SteerTarget::Entity(heal)))?;
 		expect(target).to_be(Some(&SteerTarget::Entity(kill)))?;
 
 		Ok(())

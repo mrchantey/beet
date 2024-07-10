@@ -31,7 +31,7 @@ pub fn forage_behavior(world: &mut World) -> Entity {
 					parent.spawn((
 						Name::new("Go to flower"),
 						Seek::default(),
-						StopOnArrive { radius: 0.1 },
+						EndOnArrive { radius: 0.1 },
 					));
 					parent.spawn((
 						Name::new("Wait 1 second"),

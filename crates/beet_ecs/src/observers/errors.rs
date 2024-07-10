@@ -6,3 +6,8 @@ pub mod expect_action{
 		"Action entity missing from observer query";
 
 }
+
+pub mod expect_asset {
+
+	pub const NOT_READY: &str = "Asset was not ready, will not run";
+}

@@ -22,9 +22,9 @@ pub use self::seek::*;
 pub mod separate;
 #[allow(unused_imports)]
 pub use self::separate::*;
-pub mod stop_on_arrive;
+pub mod end_on_arrive;
 #[allow(unused_imports)]
-pub use self::stop_on_arrive::*;
+pub use self::end_on_arrive::*;
 pub mod wander;
 #[allow(unused_imports)]
 pub use self::wander::*;
