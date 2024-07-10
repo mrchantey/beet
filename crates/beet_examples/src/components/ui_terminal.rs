@@ -277,8 +277,10 @@ pub fn spawn_ui_terminal(mut commands: Commands, user_input: bool) {
 }
 
 fn parse_text_input(
+	mut commands: Commands,
 	mut evr_char: EventReader<KeyboardInput>,
 	keys: Res<ButtonInput<KeyCode>>,
+	//TODO deprecate eventwriter
 	mut on_submit: EventWriter<OnUserMessage>,
 	mut query: Query<&mut Text, With<InputContainer>>,
 ) {
@@ -293,6 +295,7 @@ fn parse_text_input(
 			let text = &mut text.sections[1].value; // first index is ' > '
 			match &ev.logical_key {
 				Key::Enter => {
+					commands.trigger(OnUserMessage(text.clone()));
 					on_submit.send(OnUserMessage(text.clone()));
 					text.clear();
 				}

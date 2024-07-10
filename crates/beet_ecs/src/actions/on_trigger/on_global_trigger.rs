@@ -2,18 +2,26 @@ use crate::prelude::*;
 use bevy::prelude::*;
 
 
-
+/// Insert given component on a global trigger.
 pub type InsertOnGlobalTrigger<Event, Params, TriggerBundle = ()> =
 	OnGlobalTrigger<
-		TriggerHandler<DefaultMapFunc<Event, Params, TriggerBundle>>,
+		InsertHandler<DefaultMapFunc<Event, Params, TriggerBundle>>,
 	>;
+/// Map to an insert on global trigger.
+pub type InsertMappedOnGlobalTrigger<M> = OnGlobalTrigger<InsertHandler<M>>;
+
+/// Remove given component on a global trigger.
 pub type RemoveOnGlobalTrigger<Event, Params, TriggerBundle = ()> =
 	OnGlobalTrigger<RemoveHandler<Event, Params, TriggerBundle>>;
+
+/// Trigger the given event on a global trigger.
 pub type TriggerOnGlobalTrigger<Event, Params, TriggerBundle = ()> =
 	OnGlobalTrigger<
 		TriggerHandler<DefaultMapFunc<Event, Params, TriggerBundle>>,
 	>;
 
+/// Map to a trigger event on global trigger.
+pub type TriggerMappedOnGlobalTrigger<M> = OnGlobalTrigger<TriggerHandler<M>>;
 
 #[derive(Action, Reflect)]
 #[reflect(Default, Component)]
@@ -37,11 +45,11 @@ impl<Handler: OnTriggerHandler> OnGlobalTrigger<Handler> {
 
 fn on_trigger<Handler: OnTriggerHandler>(
 	trigger: Trigger<Handler::Event, Handler::TriggerBundle>,
-	query: Query<&OnGlobalTrigger<Handler>>,
+	query: Query<(Entity, &OnGlobalTrigger<Handler>)>,
 	mut commands: Commands,
 ) {
-	for action in query.iter() {
-		Handler::handle(&mut commands, &trigger, &action.0);
+	for (entity, action) in query.iter() {
+		Handler::handle(&mut commands, &trigger, (entity, &action.0));
 	}
 }
 

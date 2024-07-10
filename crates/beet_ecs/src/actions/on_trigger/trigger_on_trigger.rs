@@ -23,10 +23,10 @@ where
 	fn handle(
 		commands: &mut Commands,
 		trigger: &Trigger<Self::Event, Self::TriggerBundle>,
-		comp: &OnTrigger<Self>,
+		(entity, on_trigger): (Entity, &OnTrigger<Self>),
 	) {
-		let out = M::map(trigger, &comp.params);
-		comp.target.trigger(commands, trigger.entity(), out);
+		let out = M::map(trigger, (entity, &on_trigger.params));
+		on_trigger.target.trigger(commands, entity, out);
 	}
 }
 

@@ -11,7 +11,7 @@ pub trait OnTriggerHandler: 'static + Send + Sync + Sized {
 	fn handle(
 		commands: &mut Commands,
 		ev: &Trigger<Self::Event, Self::TriggerBundle>,
-		comp: &OnTrigger<Self>,
+		query: (Entity, &OnTrigger<Self>),
 	);
 }
 
@@ -22,7 +22,7 @@ pub trait MapFunc: 'static + Send + Sync {
 	type Out: Bundle;
 	fn map(
 		trigger: &Trigger<Self::Event, Self::TriggerBundle>,
-		params: &Self::Params,
+		target: (Entity, &Self::Params),
 	) -> Self::Out;
 }
 #[derive(Debug, Default, Clone, PartialEq, Reflect)]
@@ -34,6 +34,5 @@ impl<E: Event, T: Bundle + Clone + Default + Reflect, B: Bundle> MapFunc
 	type TriggerBundle = B;
 	type Params = T;
 	type Out = T;
-	fn map(_ev: &Trigger<E, B>, params: &T) -> T { params.clone() }
+	fn map(_ev: &Trigger<E, B>, params: (Entity, &T)) -> T { params.1.clone() }
 }
-

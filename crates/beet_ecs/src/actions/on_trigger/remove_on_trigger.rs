@@ -12,7 +12,7 @@ pub struct RemoveHandler<E, T, B = ()>(
 );
 
 
-impl<E: Event, T: Bundle, TrigBundle:Bundle> OnTriggerHandler
+impl<E: Event, T: Bundle, TrigBundle: Bundle> OnTriggerHandler
 	for RemoveHandler<E, T, TrigBundle>
 {
 	type Event = E;
@@ -20,10 +20,10 @@ impl<E: Event, T: Bundle, TrigBundle:Bundle> OnTriggerHandler
 	type Params = ();
 	fn handle(
 		commands: &mut Commands,
-		trigger: &Trigger<Self::Event, Self::TriggerBundle>,
-		comp: &OnTrigger<Self>,
+		_trigger: &Trigger<Self::Event, Self::TriggerBundle>,
+		(entity, comp): (Entity, &OnTrigger<Self>),
 	) {
-		comp.target.remove::<T>(commands, trigger.entity());
+		comp.target.remove::<T>(commands, entity);
 	}
 }
 

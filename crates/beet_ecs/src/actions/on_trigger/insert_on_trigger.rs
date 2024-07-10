@@ -22,10 +22,10 @@ where
 	fn handle(
 		commands: &mut Commands,
 		trigger: &Trigger<Self::Event, Self::TriggerBundle>,
-		comp: &OnTrigger<Self>,
+		(entity, action): (Entity, &OnTrigger<Self>),
 	) {
-		let out = M::map(trigger, &comp.params);
-		comp.target.insert(commands, trigger.entity(), out);
+		let out = M::map(trigger, (entity, &action.params));
+		action.target.insert(commands, entity, out);
 	}
 }
 
@@ -55,7 +55,10 @@ mod test {
 		type Event = OnRun;
 		type Params = RunResult;
 		type Out = Name;
-		fn map(_ev: &Trigger<Self::Event>, params: &Self::Params) -> Self::Out {
+		fn map(
+			_ev: &Trigger<Self::Event>,
+			(_, params): (Entity, &Self::Params),
+		) -> Self::Out {
 			Name::new(format!("{:?}", params))
 		}
 	}

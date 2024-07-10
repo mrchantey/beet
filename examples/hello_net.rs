@@ -15,11 +15,3 @@ pub fn main() {
 		)
 		.run();
 }
-
-/*
-STDOUT:
-
-Started: Sentence Selector
-Started: Attack Behavior
-
-*/

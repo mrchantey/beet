@@ -39,7 +39,7 @@ impl<Handler: OnTriggerHandler> OnTrigger<Handler> {
 
 fn on_trigger<Handler: OnTriggerHandler>(
 	trigger: Trigger<Handler::Event, Handler::TriggerBundle>,
-	query: Query<&OnTrigger<Handler>>,
+	query: Query<(Entity, &OnTrigger<Handler>)>,
 	mut commands: Commands,
 ) {
 	let action = query
