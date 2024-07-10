@@ -19,7 +19,8 @@ pub mod prelude {
 	pub use crate::action::*;
 	pub use crate::actions::flow::*;
 	pub use crate::actions::global::*;
-	pub use crate::actions::leaf::*;
+	#[allow(ambiguous_glob_reexports)]
+	pub use crate::actions::on_trigger::*;
 	pub use crate::actions::*;
 	pub use crate::events::*;
 	pub use crate::extensions::*;

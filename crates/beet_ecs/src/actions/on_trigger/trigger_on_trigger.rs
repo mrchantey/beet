@@ -4,8 +4,6 @@ use std::marker::PhantomData;
 
 pub type TriggerOnRun<T> = TriggerOnTrigger<OnRun, T>;
 
-
-
 pub type TriggerOnTrigger<Event, Params, TriggerBundle = ()> =
 	TriggerMappedOnTrigger<DefaultMapFunc<Event, Params, TriggerBundle>>;
 

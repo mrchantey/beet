@@ -3,20 +3,24 @@ use bevy::prelude::*;
 use std::marker::PhantomData;
 
 
-pub type RemoveOnTrigger<Event, Params> =
-	OnTrigger<RemoveHandler<Event, Params>>;
+pub type RemoveOnTrigger<Event, Params, TriggerBundle = ()> =
+	OnTrigger<RemoveHandler<Event, Params, TriggerBundle>>;
 
 #[derive(Reflect)]
-pub struct RemoveHandler<E,T>(#[reflect(ignore)] PhantomData<(E,T)>);
+pub struct RemoveHandler<E, T, B = ()>(
+	#[reflect(ignore)] PhantomData<(E, T, B)>,
+);
 
 
-impl<E:Event,T:Bundle> OnTriggerHandler for RemoveHandler<E,T>
+impl<E: Event, T: Bundle, TrigBundle:Bundle> OnTriggerHandler
+	for RemoveHandler<E, T, TrigBundle>
 {
 	type Event = E;
+	type TriggerBundle = TrigBundle;
 	type Params = ();
 	fn handle(
 		commands: &mut Commands,
-		trigger: &Trigger<Self::Event>,
+		trigger: &Trigger<Self::Event, Self::TriggerBundle>,
 		comp: &OnTrigger<Self>,
 	) {
 		comp.target.remove::<T>(commands, trigger.entity());
