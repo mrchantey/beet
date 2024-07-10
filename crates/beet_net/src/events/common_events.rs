@@ -37,7 +37,13 @@ impl Plugin for CommonEventsPlugin {
 			.replicate_event_incoming::<SpawnSceneFile>()
 			.add_event::<SpawnSceneFileResponse>()
 			.replicate_event_outgoing::<SpawnSceneFileResponse>()
-			.add_systems(Update, handle_spawn_scene);
+			.add_systems(Update, handle_spawn_scene)
+			// UserMessage
+			.add_event::<OnUserMessage>()
+			.replicate_event_incoming::<OnUserMessage>()
+			// AppMesage
+			.add_event::<OnAppMessage>()
+			.replicate_event_outgoing::<OnAppMessage>();
 		// Screenshot
 
 		#[cfg(not(test))]
@@ -61,3 +67,17 @@ pub struct AppStartup;
 pub struct AppReady;
 
 pub type RunOnAppReady = TriggerOnGlobalTrigger<AppReady, OnRun>;
+
+
+
+
+/// User messages received either internally or externally, can be treated like an StdIn.
+#[derive(
+	Debug, Clone, Deref, DerefMut, Serialize, Deserialize, Event, Reflect,
+)]
+pub struct OnUserMessage(pub String);
+/// App messages for outputting, can be treated like an StdOut.
+#[derive(
+	Debug, Clone, Deref, DerefMut, Serialize, Deserialize, Event, Reflect,
+)]
+pub struct OnAppMessage(pub String);

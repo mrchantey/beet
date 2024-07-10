@@ -13,16 +13,16 @@ pub struct InsertWhileRunning<T: Default + GenericActionComponent> {
 impl<T: Default + GenericActionComponent> Default for InsertWhileRunning<T> {
 	fn default() -> Self {
 		Self {
-			add: InsertOnTrigger::default(),
-			remove: RemoveOnTrigger::default(),
+			add: default(),
+			remove: default(),
 		}
 	}
 }
 impl<T: Default + GenericActionComponent> InsertWhileRunning<T> {
 	pub fn new(comp: T) -> Self {
 		Self {
-			add: InsertOnTrigger::new(comp),
-			remove: RemoveOnTrigger::default(),
+			add: InsertMappedOnTrigger::new(comp),
+			remove: default(),
 		}
 	}
 	pub fn with_target(self, target: impl Into<ComponentTarget>) -> Self {

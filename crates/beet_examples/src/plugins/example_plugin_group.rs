@@ -95,8 +95,6 @@ pub struct ExampleBasePlugin;
 impl Plugin for ExampleBasePlugin {
 	fn build(&self, app: &mut App) {
 		app
-    .add_systems(Update,set_player_sentence)
-		.register_type::<Player>()
 		.register_type::<Collectable>()
 	/*-*/;
 	}

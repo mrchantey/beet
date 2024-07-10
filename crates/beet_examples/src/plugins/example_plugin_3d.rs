@@ -21,7 +21,6 @@ impl Plugin for ExamplePlugin3d {
 					follow_cursor_3d,
 					camera_distance,
 					rotate_collectables,
-					set_player_sentence,
 				),
 			);
 
