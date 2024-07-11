@@ -8,7 +8,7 @@ use bevy::prelude::*;
 #[derive(Debug, Clone, PartialEq, Component, Action, Reflect)]
 #[reflect(Default, Component, ActionMeta)]
 #[category(ActionCategory::Behavior)]
-#[systems(succeed_on_arrive.in_set(TickSet))]
+#[systems(end_on_arrive.in_set(TickSet))]
 pub struct EndOnArrive {
 	pub radius: f32,
 }
@@ -21,17 +21,17 @@ impl EndOnArrive {
 	pub fn new(radius: f32) -> Self { Self { radius } }
 }
 
-pub fn succeed_on_arrive(
+pub fn end_on_arrive(
 	mut commands: Commands,
 	agents: Query<(&Transform, &SteerTarget)>,
 	transforms: Query<&Transform>,
 	mut query: Query<(Entity, &TargetAgent, &EndOnArrive), With<Running>>,
 ) {
-	for (entity, agent, succeed_on_arrive) in query.iter_mut() {
+	for (entity, agent, action) in query.iter_mut() {
 		if let Ok((transform, target)) = agents.get(**agent) {
 			if let Ok(target) = target.position(&transforms) {
 				if Vec3::distance(transform.translation, target)
-					<= succeed_on_arrive.radius
+					<= action.radius
 				{
 					commands.entity(entity).trigger(OnRunResult::success());
 				}

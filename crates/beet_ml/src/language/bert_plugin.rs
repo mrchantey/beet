@@ -21,7 +21,7 @@ impl Plugin for BertPlugin {
 
 		#[cfg(feature = "beet_core")]
 		app.add_plugins(
-			ActionPlugin::<FindSentenceSteerTarget<Sentence>>::default(),
+			ActionPlugin::<InsertSentenceSteerTarget<Sentence>>::default(),
 		);
 
 		let world = app.world_mut();

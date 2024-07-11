@@ -17,7 +17,6 @@ fn on_start(
 	let children = query
 		.get(trigger.entity())
 		.expect(child_expect::NO_CHILDREN);
-
 	if let Some(highest) = get_highest(scores, children) {
 		commands.trigger_targets(OnRun, highest);
 	} else {

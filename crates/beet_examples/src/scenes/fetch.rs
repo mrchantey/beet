@@ -14,6 +14,7 @@ pub fn fetch_npc(mut commands: Commands) {
 
 	commands
 		.spawn((
+			Name::new("Fox"),
 			Transform::from_xyz(0., 0., 0.).with_scale(Vec3::splat(0.01)),
 			BundlePlaceholder::Scene("Fox.glb#Scene0".into()),
 			graph,
@@ -35,11 +36,14 @@ pub fn fetch_npc(mut commands: Commands) {
 				.spawn((
 					Name::new("Idle Or Fetch"),
 					TargetAgent(agent),
-					ScoreFlow::default(),
 					AssetRunOnReady::<Bert>::new("default-bert.ron"),
-					RunOnSentenceChange::default(),
 					InsertSentenceOnUserInput::default(),
-					FindSentenceSteerTarget::<Collectable>::default(),
+					InsertSentenceSteerTarget::<Collectable>::default(),
+					RunOnSteerTargetInsert::default().with_source(agent),
+					RunOnSteerTargetRemove::default().with_source(agent),
+					ScoreFlow::default(),
+					RemoveOnTrigger::<OnRunResult, Sentence>::default(),
+					// RunOnSentenceChange::default(),
 				))
 				.with_children(|parent| {
 					parent.spawn((
@@ -58,7 +62,6 @@ pub fn fetch_npc(mut commands: Commands) {
 							ScoreSteerTarget::new(10.),
 							PlayAnimation::new(walk_index).repeat_forever(),
 							SequenceFlow,
-							RemoveAgentOnRun::<Sentence>::default(),
 						))
 						.with_children(|parent| {
 							parent.spawn((
@@ -68,10 +71,11 @@ pub fn fetch_npc(mut commands: Commands) {
 								ContinueRun::default(),
 								EndOnArrive::new(1.),
 							));
+							#[rustfmt::skip]
 							parent.spawn((
 								Name::new("Pick Up Item"),
-								TargetAgent(agent),
-								RemoveAgentOnRun::<SteerTarget>::default(),
+								RemoveOnTrigger::<OnRun, SteerTarget>::default()
+									.with_target(agent),
 								EndOnRun::success(),
 							));
 							// parent.spawn((

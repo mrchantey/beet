@@ -72,9 +72,9 @@ impl Plugin for ExampleMlPlugin {
 		// fetch
 		.add_plugins(ActionPlugin::<(
 			InsertOnAssetEvent<RunResult, Bert>,
-			FindSentenceSteerTarget<Collectable>,
-			RemoveAgentOnRun<Sentence>,
-			RemoveAgentOnRun<SteerTarget>,
+			InsertSentenceSteerTarget<Collectable>,
+			RemoveOnTrigger<OnRunResult, Sentence>,
+			RemoveOnTrigger<OnRun, SteerTarget>,
 		)>::default())
 			/*-*/;
 	}

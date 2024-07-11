@@ -11,15 +11,15 @@ use std::marker::PhantomData;
 #[derive(Debug, Clone, PartialEq, Component, Action, Reflect)]
 #[reflect(Default, Component, ActionMeta)]
 #[category(ActionCategory::Behavior)]
-#[observers(find_sentence_steer_target::<T>)]
-pub struct FindSentenceSteerTarget<T: GenericActionComponent = Sentence> {
+#[observers(insert_sentence_steer_target::<T>)]
+pub struct InsertSentenceSteerTarget<T: GenericActionComponent = Sentence> {
 	// / The value below which the agent will ignore the target.
 	// pub threshold:f32,
 	#[reflect(ignore)]
 	phantom: PhantomData<T>,
 }
 
-impl<T: GenericActionComponent> Default for FindSentenceSteerTarget<T> {
+impl<T: GenericActionComponent> Default for InsertSentenceSteerTarget<T> {
 	fn default() -> Self {
 		Self {
 			phantom: PhantomData,
@@ -27,14 +27,14 @@ impl<T: GenericActionComponent> Default for FindSentenceSteerTarget<T> {
 	}
 }
 
-fn find_sentence_steer_target<T: GenericActionComponent>(
-	trigger: Trigger<OnRun>,
+fn insert_sentence_steer_target<T: GenericActionComponent>(
+	trigger: Trigger<OnInsert, Sentence>,
 	mut commands: Commands,
 	query: Query<(
 		&TargetAgent,
 		Option<&Sentence>,
 		&Handle<Bert>,
-		&FindSentenceSteerTarget<T>,
+		&InsertSentenceSteerTarget<T>,
 	)>,
 	sentences: Query<&Sentence>,
 	// TODO this should be query of Sentence, but we need
@@ -54,7 +54,6 @@ fn find_sentence_steer_target<T: GenericActionComponent>(
 		log::warn!("{}", "sentence not set yet.. should this be allowed?");
 		return;
 	};
-
 	match bert.closest_sentence_entity(
 		target_sentence.0.clone(),
 		items
@@ -94,29 +93,30 @@ mod test {
 
 		block_on_asset_load::<Bert>(&mut app, "default-bert.ron");
 
-		let handle = app
-			.world_mut()
+		let world = app.world_mut();
+
+		let handle = world
 			.resource_mut::<AssetServer>()
 			.load::<Bert>("default-bert.ron");
 
 
-		let agent = app.world_mut().spawn_empty().id();
+		let agent = world.spawn_empty().id();
 
-		let heal = app.world_mut().spawn(Sentence::new("heal")).id();
-		let kill = app.world_mut().spawn(Sentence::new("kill")).id();
+		let heal = world.spawn(Sentence::new("heal")).id();
+		let kill = world.spawn(Sentence::new("kill")).id();
 
-		app.world_mut()
+		let behavior = world
 			.spawn((
 				TargetAgent(agent),
-				Sentence::new("destroy"),
+				InsertSentenceSteerTarget::<Sentence>::default(),
 				handle,
-				FindSentenceSteerTarget::<Sentence>::default(),
 			))
-			.flush_trigger(OnRun);
+			.id();
+		world.flush();
+		world.entity_mut(behavior).insert(Sentence::new("destroy"));
+		world.flush();
 
-		app.update();
-
-		let target = app.world().entity(agent).get::<SteerTarget>();
+		let target = world.entity(agent).get::<SteerTarget>();
 		expect(target)
 			.not()
 			.to_be(Some(&SteerTarget::Entity(heal)))?;

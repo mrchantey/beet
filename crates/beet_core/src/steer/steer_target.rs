@@ -1,7 +1,14 @@
 use anyhow::Result;
+use beet_ecs::prelude::*;
 use bevy::ecs::entity::MapEntities;
 use bevy::ecs::reflect::ReflectMapEntities;
 use bevy::prelude::*;
+
+
+pub type RunOnSteerTargetInsert =
+	TriggerOnTrigger<OnInsert, OnRun, SteerTarget>;
+pub type RunOnSteerTargetRemove =
+	TriggerOnTrigger<OnRemove, OnRun, SteerTarget>;
 
 #[derive(Debug, Copy, Clone, PartialEq, Component, Reflect)]
 #[reflect(Component, MapEntities)]

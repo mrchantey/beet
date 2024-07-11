@@ -20,6 +20,8 @@ impl Plugin for SteerPlugin {
 			FindSteerTarget,
 			ScoreSteerTarget,
 			DespawnSteerTarget,
+			RunOnSteerTargetInsert,
+			RunOnSteerTargetRemove,
 		)>::default())
 		.register_type::<SteerTarget>()
 		.register_type::<MaxForce>()
