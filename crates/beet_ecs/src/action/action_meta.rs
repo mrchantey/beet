@@ -10,9 +10,10 @@ pub trait ActionMeta {
 
 
 /// Descrition of what the purpose of this action is, ie whether it will effect the entity, its children, the agent, or the world
-#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Default, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum ActionCategory {
 	/// This action will effect only the entity it is attached to.
+	#[default]
 	Behavior,
 	/// This action will effect children of this behavior.
 	ChildBehaviors,

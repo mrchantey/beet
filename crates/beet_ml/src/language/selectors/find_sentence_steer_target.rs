@@ -51,7 +51,7 @@ fn find_sentence_steer_target<T: GenericActionComponent>(
 		return;
 	};
 	let Some(target_sentence) = target_sentence else {
-		log::warn!("{}", "sentence not set yet?");
+		log::warn!("{}", "sentence not set yet.. should this be allowed?");
 		return;
 	};
 

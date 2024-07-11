@@ -7,22 +7,22 @@ use std::marker::PhantomData;
 
 /// Use this builder inside `Component::register_component_hooks` to add observers to an entity.
 /// They will be removed when the component is removed.
-pub struct ActionObservers<T, M, Systems: ObserverLifecycle<M>> {
-	systems: Systems,
+pub struct ActionObserversBuilder<T, M, Observers: IntoActionObservers<M>> {
+	observers: Observers,
 	phantom: PhantomData<(T, M)>,
 }
 
-impl<T> Default for ActionObservers<T, (), ()> {
+impl<T> Default for ActionObserversBuilder<T, (), ()> {
 	fn default() -> Self {
-		ActionObservers {
-			systems: (),
+		ActionObserversBuilder {
+			observers: (),
 			phantom: PhantomData,
 		}
 	}
 }
 
-impl ActionObservers<(), (), ()> {
-	pub fn new<T>() -> ActionObservers<T, (), ()> { Default::default() }
+impl ActionObserversBuilder<(), (), ()> {
+	pub fn new<T>() -> ActionObserversBuilder<T, (), ()> { Default::default() }
 	pub fn cleanup<'w, T: 'static + Send + Sync>(
 		world: &mut DeferredWorld<'w>,
 		entity: Entity,
@@ -40,22 +40,21 @@ impl ActionObservers<(), (), ()> {
 	}
 }
 
-impl<T: 'static + Send + Sync, M, O: ObserverLifecycle<M> + Clone>
-	ActionObservers<T, M, O>
+impl<T: 'static + Send + Sync, M, O: IntoActionObservers<M> + Clone>
+	ActionObserversBuilder<T, M, O>
 {
-	pub fn add_observers<O2: ObserverLifecycle<M2>, M2>(
+	pub fn add_observers<O2: IntoActionObservers<M2>, M2>(
 		self,
 		next: O2,
-	) -> ActionObservers<T, ((M, M2), ObserverLifecycleTupleMarker), (O, O2)>
-	{
-		ActionObservers {
-			systems: (self.systems, next),
+	) -> ActionObserversBuilder<T, ((M, M2), IntoActionObserversTupleMarker), (O, O2)> {
+		ActionObserversBuilder {
+			observers: (self.observers, next),
 			phantom: PhantomData,
 		}
 	}
-	
+
 	pub fn build(self, mut commands: Commands, entity: Entity) {
-		let entities = self.systems.spawn_observers(&mut commands, entity);
+		let entities = self.observers.spawn_observers(&mut commands, entity);
 		commands
 			.entity(entity)
 			.insert(ActionObserverMap::<T>::new(entities));

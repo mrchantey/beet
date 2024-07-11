@@ -2,10 +2,11 @@ use bevy::ecs::system::IntoObserverSystem;
 use bevy::prelude::*;
 use bevy::utils::all_tuples;
 
-pub struct ObserverLifecycleTupleMarker;
-pub struct ObserverLifecycleSystemMarker;
+pub struct IntoActionObserversTupleMarker;
+pub struct IntoActionObserversSystemMarker;
 
-pub trait ObserverLifecycle<M>: Sized {
+pub trait IntoActionObservers<M>: 'static + Send + Sync + Sized {
+	
 	fn spawn_observers(
 		&self,
 		commands: &mut Commands,
@@ -13,15 +14,15 @@ pub trait ObserverLifecycle<M>: Sized {
 	) -> Vec<Entity>;
 }
 
-impl ObserverLifecycle<()> for () {
+impl IntoActionObservers<()> for () {
 	fn spawn_observers(&self, _: &mut Commands, _: Entity) -> Vec<Entity> {
 		Vec::new()
 	}
 }
 
 
-impl<E: Event, B: Bundle, M, T>
-	ObserverLifecycle<(E, B, M, ObserverLifecycleSystemMarker)> for T
+impl<E: Event, B: Bundle, M, T: 'static + Send + Sync>
+	IntoActionObservers<(E, B, M, IntoActionObserversSystemMarker)> for T
 where
 	T: IntoObserverSystem<E, B, M> + Clone,
 {
@@ -38,9 +39,9 @@ where
 
 macro_rules! impl_plugins_tuples {
 	($(($param: ident,$marker:ident)),*) => {
-			impl<$($param, $marker),*> ObserverLifecycle<(($($marker,)*),ObserverLifecycleTupleMarker)> for ($($param,)*)
+			impl<$($param, $marker),*> IntoActionObservers<(($($marker,)*),IntoActionObserversTupleMarker)> for ($($param,)*)
 			where
-					$($param: ObserverLifecycle<$marker>),*
+					$($param: IntoActionObservers<$marker>),*
 			{
 					#[allow(non_snake_case, unused_variables)]
 					#[track_caller]

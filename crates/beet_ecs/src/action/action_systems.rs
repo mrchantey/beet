@@ -1,5 +1,5 @@
-use bevy::prelude::*;
 use crate::prelude::*;
+use bevy::prelude::*;
 use bevy::utils::all_tuples;
 
 pub trait ActionSystems: Sized {

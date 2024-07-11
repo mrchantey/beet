@@ -33,7 +33,6 @@ fn get_highest(scores: Query<&Score>, children: &Children) -> Option<Entity> {
 		.map(|(entity, _)| entity)
 }
 
-
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
@@ -69,8 +68,7 @@ mod test {
 		expect(&on_result).to_have_been_called_times(2)?;
 		expect(&on_result)
 			.to_have_returned_nth_with(0, &"child2".to_string())?;
-		expect(&on_result)
-			.to_have_returned_nth_with(1, &"root".to_string())?;
+		expect(&on_result).to_have_returned_nth_with(1, &"root".to_string())?;
 
 		Ok(())
 	}

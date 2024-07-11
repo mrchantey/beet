@@ -46,12 +46,12 @@ fn impl_component(
 			let observers = attributes.observers.collect_comma_punct();
 			(
 				quote! {
-					ActionObservers::new::<#ident #type_generics>()
+					ActionObserversBuilder::new::<#ident #type_generics>()
 					.add_observers((#observers))
 					.build(world.commands(), entity);
 				},
 				quote! {
-					ActionObservers::cleanup::<#ident #type_generics>(&mut world,entity);
+					ActionObserversBuilder::cleanup::<#ident #type_generics>(&mut world,entity);
 				},
 			)
 		};
