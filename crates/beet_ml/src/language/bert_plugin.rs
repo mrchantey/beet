@@ -11,7 +11,7 @@ impl Plugin for BertPlugin {
 
 		app.add_plugins(ActionPlugin::<(
 			SentenceFlow,
-			SetSentenceOnUserInput,
+			InsertSentenceOnUserInput,
 			RunOnSentenceChange 
 		)>::default())
 			.init_asset::<Bert>()

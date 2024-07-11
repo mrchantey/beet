@@ -38,7 +38,7 @@ pub fn fetch_npc(mut commands: Commands) {
 					ScoreFlow::default(),
 					AssetRunOnReady::<Bert>::new("default-bert.ron"),
 					RunOnSentenceChange::default(),
-					SetSentenceOnUserInput::default(),
+					InsertSentenceOnUserInput::default(),
 					FindSentenceSteerTarget::<Collectable>::default(),
 				))
 				.with_children(|parent| {

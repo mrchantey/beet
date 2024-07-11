@@ -15,7 +15,7 @@ impl<T: ObserverType> ActionObserver<T> {
 		}
 	}
 	pub fn observe(
-		&self,
+		self,
 		commands: &mut Commands,
 		caller: Entity,
 	) -> Vec<Entity> {
@@ -55,7 +55,7 @@ impl<T: ObserverType>
 	)> for ActionObserver<T>
 {
 	fn spawn_observers(
-		&self,
+		self,
 		commands: &mut Commands,
 		entity: Entity,
 	) -> Vec<Entity> {

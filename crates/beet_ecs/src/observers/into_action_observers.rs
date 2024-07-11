@@ -2,32 +2,43 @@ use bevy::ecs::system::IntoObserverSystem;
 use bevy::prelude::*;
 use bevy::utils::all_tuples;
 
+pub struct IntoActionObserversObserver;
 pub struct IntoActionObserversTupleMarker;
 pub struct IntoActionObserversSystemMarker;
 
 pub trait IntoActionObservers<M>: 'static + Send + Sync + Sized {
-	
 	fn spawn_observers(
-		&self,
+		self,
 		commands: &mut Commands,
 		entity: Entity,
 	) -> Vec<Entity>;
 }
 
 impl IntoActionObservers<()> for () {
-	fn spawn_observers(&self, _: &mut Commands, _: Entity) -> Vec<Entity> {
+	fn spawn_observers(self, _: &mut Commands, _: Entity) -> Vec<Entity> {
 		Vec::new()
 	}
 }
 
 
+impl<E: Event, B: Bundle, M>
+	IntoActionObservers<(E, B, M, IntoActionObserversObserver)> for Observer<E, B>
+{
+	fn spawn_observers(
+		self,
+		commands: &mut Commands,
+		_entity: Entity,
+	) -> Vec<Entity> {
+		vec![commands.spawn(self).id()]
+	}
+}
 impl<E: Event, B: Bundle, M, T: 'static + Send + Sync>
 	IntoActionObservers<(E, B, M, IntoActionObserversSystemMarker)> for T
 where
 	T: IntoObserverSystem<E, B, M> + Clone,
 {
 	fn spawn_observers(
-		&self,
+		self,
 		commands: &mut Commands,
 		entity: Entity,
 	) -> Vec<Entity> {
@@ -46,7 +57,7 @@ macro_rules! impl_plugins_tuples {
 					#[allow(non_snake_case, unused_variables)]
 					#[track_caller]
 					fn spawn_observers(
-							&self,
+							self,
 							commands: &mut Commands,
 							entity: Entity,
 					) -> Vec<Entity> {

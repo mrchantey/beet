@@ -17,7 +17,7 @@ fn parse(input: DeriveInput) -> syn::Result<TokenStream> {
 	let attributes = ActionAttributes::parse(&input.attrs)?;
 
 	let beet_ecs_path = BeetManifest::get_path_direct("beet_ecs");
-	let impl_action_systems = impl_action_systems(&input, &attributes)?;
+	let impl_action_systems = impl_action_builder(&input, &attributes)?;
 	let impl_action_meta = impl_action_meta(&input, &attributes)?;
 
 	Ok(quote! {
@@ -29,12 +29,9 @@ fn parse(input: DeriveInput) -> syn::Result<TokenStream> {
 }
 
 fn impl_component_hooks(
-	input: &DeriveInput,
+	_input: &DeriveInput,
 	attributes: &ActionAttributes,
 ) -> syn::Result<Option<TokenStream>> {
-	let ident = &input.ident;
-	let (_impl_generics, type_generics, _where_clause) =
-		&input.generics.split_for_impl();
 
 	if attributes.observers.len() == 0 {
 		return Ok(None);
@@ -43,14 +40,14 @@ fn impl_component_hooks(
 	let observers = attributes.observers.collect_comma_punct();
 
 	Ok(Some(quote! {
-		app.world_mut().register_component_hooks::<#ident #type_generics>()
+		app.world_mut().register_component_hooks::<Self>()
 		.on_add(|mut world, entity, _| {
-				ActionObserversBuilder::new::<#ident #type_generics>()
+				ActionObserversBuilder::new::<Self>()
 				.add_observers((#observers))
 				.build(world.commands(), entity);
 			})
 		.on_remove(|mut world, entity, _|{
-				ActionObserversBuilder::cleanup::<#ident #type_generics>(&mut world,entity);
+				ActionObserversBuilder::cleanup::<Self>(&mut world,entity);
 			});
 	}))
 }
@@ -58,7 +55,7 @@ fn impl_component_hooks(
 
 
 
-fn impl_action_systems(
+fn impl_action_builder(
 	input: &DeriveInput,
 	attributes: &ActionAttributes,
 ) -> syn::Result<TokenStream> {
@@ -73,7 +70,7 @@ fn impl_action_systems(
 		quote! { config.add_systems(app, (#systems)); }
 	};
 
-	let component_hooks = impl_component_hooks(input, attributes)?;
+	let add_component_hooks = impl_component_hooks(input, attributes)?;
 
 	let add_global_observers = if attributes.global_observers.len() == 0 {
 		quote! {}
@@ -96,7 +93,7 @@ fn impl_action_systems(
 			fn build(app: &mut App, config: &BeetConfig) {
 				#add_systems
 				#add_global_observers
-				#component_hooks
+				#add_component_hooks
 			}
 		}
 	})

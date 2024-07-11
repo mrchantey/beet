@@ -18,7 +18,7 @@ impl MapFunc for MapUserMessageToSentence {
 	}
 }
 
-pub type SetSentenceOnUserInput =
+pub type InsertSentenceOnUserInput =
 	InsertMappedOnGlobalTrigger<MapUserMessageToSentence>;
 
 pub type RunOnSentenceChange = TriggerOnTrigger<OnInsert, OnRun, Sentence>;
@@ -27,7 +27,7 @@ pub type RunOnSentenceChange = TriggerOnTrigger<OnInsert, OnRun, Sentence>;
 pub struct SentenceBundle {
 	pub flow: SentenceFlow,
 	pub run_on_change: RunOnSentenceChange,
-	pub set_on_input: SetSentenceOnUserInput,
+	pub set_on_input: InsertSentenceOnUserInput,
 }
 impl SentenceBundle {
 	pub fn with_initial(sentence: impl Into<Cow<'static, str>>) -> impl Bundle {
