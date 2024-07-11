@@ -18,7 +18,7 @@ impl Plugin for SteerPlugin {
 			Cohere<GroupSteerAgent>,
 			EndOnArrive,
 			FindSteerTarget,
-			ScoreSteerTarget,
+			SteerTargetScoreProvider,
 			DespawnSteerTarget,
 			RunOnSteerTargetInsert,
 			RunOnSteerTargetRemove,

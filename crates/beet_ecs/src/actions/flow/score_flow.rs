@@ -1,35 +1,55 @@
 use crate::prelude::*;
 use bevy::prelude::*;
+use bevy::utils::HashMap;
 use std::cmp::Ordering;
 
-#[derive(Default, Component, Action, Reflect)]
+
+#[derive(Event)]
+pub struct RequestScore;
+
+pub type OnChildScore = OnChildValue<ScoreValue>;
+
+#[derive(Default, Deref, DerefMut, Component, Action, Reflect)]
 #[reflect(Default, Component)]
 #[category(ActionCategory::ChildBehaviors)]
-#[observers(on_start, passthrough_run_result)]
-pub struct ScoreFlow;
+#[observers(on_start, on_receive_score, passthrough_run_result)]
+pub struct ScoreFlow(HashMap<Entity, ScoreValue>);
 
 fn on_start(
 	trigger: Trigger<OnRun>,
 	mut commands: Commands,
-	query: Query<&Children>,
-	scores: Query<&Score>,
+	mut query: Query<(&mut ScoreFlow, &Children)>,
 ) {
-	let children = query
-		.get(trigger.entity())
+	let (mut score_flow, children) = query
+		.get_mut(trigger.entity())
 		.expect(child_expect::NO_CHILDREN);
-	if let Some(highest) = get_highest(scores, children) {
-		commands.trigger_targets(OnRun, highest);
-	} else {
-		commands.trigger_targets(OnRunResult::success(), trigger.entity());
-	}
+
+	score_flow.clear();
+
+	commands.trigger_targets(
+		RequestScore,
+		children.iter().map(|c| c.clone()).collect::<Vec<_>>(),
+	);
 }
 
-fn get_highest(scores: Query<&Score>, children: &Children) -> Option<Entity> {
-	children
-		.iter()
-		.filter_map(|&child| scores.get(child).ok().map(|score| (child, score)))
-		.max_by(|a, b| a.1.partial_cmp(b.1).unwrap_or(Ordering::Equal))
-		.map(|(entity, _)| entity)
+fn on_receive_score(
+	trigger: Trigger<OnChildScore>,
+	mut commands: Commands,
+	mut query: Query<(&mut ScoreFlow, &Children)>,
+) {
+	let (mut flow, children) = query
+		.get_mut(trigger.entity())
+		.expect(child_expect::NO_CHILDREN);
+
+	flow.insert(trigger.event().child(), *trigger.event().value());
+
+	if flow.len() == children.iter().len() {
+		let (highest, _) = flow
+			.iter()
+			.max_by(|a, b| a.1.partial_cmp(b.1).unwrap_or(Ordering::Equal))
+			.expect(child_expect::NO_CHILDREN);
+		commands.entity(*highest).trigger(OnRun);
+	}
 }
 
 #[cfg(test)]
@@ -42,7 +62,9 @@ mod test {
 	#[test]
 	fn works() -> Result<()> {
 		let mut app = App::new();
-		app.add_plugins(ActionPlugin::<(ScoreFlow, EndOnRun)>::default());
+		app.add_plugins(
+			ActionPlugin::<(ScoreFlow, ScoreProvider, EndOnRun)>::default(),
+		);
 		let world = app.world_mut();
 		world.observe(bubble_run_result);
 
@@ -50,16 +72,16 @@ mod test {
 		let on_run = observe_triggers::<OnRun>(world);
 
 		world
-			.spawn((Name::new("root"), ScoreFlow))
+			.spawn((Name::new("root"), ScoreFlow::default()))
 			.with_children(|parent| {
 				parent.spawn((
 					Name::new("child1"),
-					Score::neutral(),
+					ScoreProvider::NEUTRAL,
 					EndOnRun::success(),
 				));
 				parent.spawn((
 					Name::new("child2"),
-					Score::Pass,
+					ScoreProvider::PASS,
 					EndOnRun::success(),
 				));
 			})

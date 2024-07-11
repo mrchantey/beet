@@ -48,7 +48,7 @@ pub fn fetch_npc(mut commands: Commands) {
 				.with_children(|parent| {
 					parent.spawn((
 						Name::new("Idle"),
-						Score::neutral(),
+						ScoreProvider::NEUTRAL,
 						TargetAgent(agent),
 						SetAgentOnRun(Velocity::default()),
 						PlayAnimation::new(idle_index).repeat_forever(),
@@ -59,7 +59,7 @@ pub fn fetch_npc(mut commands: Commands) {
 							Name::new("Fetch"),
 							Score::default(),
 							TargetAgent(agent),
-							ScoreSteerTarget::new(10.),
+							SteerTargetScoreProvider::new(10.),
 							PlayAnimation::new(walk_index).repeat_forever(),
 							SequenceFlow,
 						))

@@ -31,6 +31,7 @@ impl Plugin for LifecyclePlugin {
 			RemoveOnTrigger<OnRunResult, Running>,
 			SequenceFlow,
 			ScoreFlow,
+			ScoreProvider,
 			EndOnRun,
 			RunOnSpawn,
 		)>::default())

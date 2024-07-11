@@ -30,7 +30,7 @@ fn sequence_next(
 	mut commands: Commands,
 	query: Query<&Children>,
 ) {
-	if trigger.event().result() == RunResult::Failure {
+	if *trigger.event().value() == RunResult::Failure {
 		commands.trigger_targets(OnRunResult::failure(), trigger.entity());
 		return;
 	}

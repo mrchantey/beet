@@ -20,21 +20,12 @@ impl OnRunResult {
 	pub fn result(&self) -> RunResult { **self }
 }
 
-#[derive(Debug, Clone, Copy, Event, Reflect)]
-pub struct OnChildResult {
-	child: Entity,
-	result: RunResult,
-}
+pub type OnChildResult = OnChildValue<RunResult>;
 impl OnChildResult {
-	pub fn new(child: Entity, result: RunResult) -> Self {
-		Self { child, result }
-	}
 	pub fn success(child: Entity) -> Self {
 		Self::new(child, RunResult::Success)
 	}
 	pub fn failure(child: Entity) -> Self {
 		Self::new(child, RunResult::Failure)
 	}
-	pub fn result(&self) -> RunResult { self.result }
-	pub fn child(&self) -> Entity { self.child }
 }

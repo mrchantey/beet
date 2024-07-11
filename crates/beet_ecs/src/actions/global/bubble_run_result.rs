@@ -27,7 +27,7 @@ pub fn passthrough_run_result(
 	mut commands: Commands,
 ) {
 	commands.trigger_targets(
-		OnRunResult::new(trigger.event().result()),
+		OnRunResult::new(*trigger.event().value()),
 		trigger.entity(),
 	);
 }

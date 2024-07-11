@@ -16,9 +16,9 @@ pub use self::end_on_arrive::*;
 pub mod find_steer_target;
 #[allow(unused_imports)]
 pub use self::find_steer_target::*;
-pub mod score_steer_target;
+pub mod steer_target_score_provider;
 #[allow(unused_imports)]
-pub use self::score_steer_target::*;
+pub use self::steer_target_score_provider::*;
 pub mod seek;
 #[allow(unused_imports)]
 pub use self::seek::*;

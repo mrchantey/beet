@@ -24,7 +24,7 @@ pub fn forage_behavior(world: &mut World) -> Entity {
 				.spawn((
 					Name::new("Seek"),
 					Score::default(),
-					ScoreSteerTarget::new(awareness_radius),
+					SteerTargetScoreProvider::new(awareness_radius),
 					SequenceSelector::default(),
 				))
 				.with_children(|parent| {
