@@ -5,7 +5,7 @@ use bevy::prelude::*;
 
 /// Succeeds when the agent arrives at the [`SteerTarget`].
 /// Fails if the target is not found.
-#[derive(Debug, Clone, PartialEq, Action, Reflect)]
+#[derive(Debug, Clone, PartialEq, Component, Action, Reflect)]
 #[reflect(Default, Component, ActionMeta)]
 #[category(ActionCategory::Behavior)]
 #[systems(succeed_on_arrive.in_set(TickSet))]

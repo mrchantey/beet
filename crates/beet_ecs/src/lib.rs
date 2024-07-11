@@ -17,14 +17,15 @@ pub mod tree;
 extern crate self as beet_ecs;
 
 pub mod prelude {
-	pub use crate::action_builder::*;
 	pub use crate::action::*;
+	pub use crate::action_builder::*;
 	pub use crate::actions::flow::*;
 	#[allow(ambiguous_glob_reexports)]
 	pub use crate::actions::global::*;
 	#[allow(ambiguous_glob_reexports)]
 	pub use crate::actions::on_trigger::*;
 	pub use crate::actions::*;
+	pub use crate::build_observer_hooks;
 	pub use crate::events::*;
 	pub use crate::extensions::*;
 	pub use crate::graph::*;

@@ -8,7 +8,7 @@ use std::marker::PhantomData;
 // #[serde(bound = "")]
 /// Finds the [`Sentence`] with the highest similarity to the agent's, then set it as the agent's [`SteerTarget`].
 /// The generic parameter is used to [`With`] filter the entities to consider.
-#[derive(Debug, Clone, PartialEq, Action, Reflect)]
+#[derive(Debug, Clone, PartialEq, Component, Action, Reflect)]
 #[reflect(Default, Component, ActionMeta)]
 #[category(ActionCategory::Behavior)]
 #[observers(find_sentence_steer_target::<T>)]

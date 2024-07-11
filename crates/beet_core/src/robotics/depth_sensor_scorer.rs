@@ -3,7 +3,7 @@ use beet_ecs::prelude::*;
 use bevy::prelude::*;
 
 /// Sets the [`Score`] based on the [`DepthValue`].
-#[derive(Debug, Clone, PartialEq, Action, Reflect)]
+#[derive(Debug, Clone, PartialEq, Component, Action, Reflect)]
 #[reflect(Default, Component, ActionMeta)]
 #[category(ActionCategory::Behavior)]
 #[systems(depth_sensor_scorer.in_set(TickSet))]

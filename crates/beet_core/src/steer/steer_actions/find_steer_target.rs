@@ -3,7 +3,7 @@ use beet_ecs::prelude::*;
 use bevy::prelude::*;
 
 /// Sets the [`SteerTarget`] when an entity with the given name is nearby.
-#[derive(Debug, Clone, PartialEq, Action, Reflect)]
+#[derive(Debug, Clone, PartialEq, Component, Action, Reflect)]
 #[reflect(Default, Component, ActionMeta)]
 #[category(ActionCategory::Agent)]
 #[systems(find_steer_target.in_set(TickSet))]

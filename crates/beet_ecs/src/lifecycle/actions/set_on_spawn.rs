@@ -3,7 +3,7 @@ use bevy::prelude::*;
 
 /// Sets a component when this behavior spawns.
 /// This does nothing if the entity does not have the component.
-#[derive(Debug, Clone, PartialEq, Deref, DerefMut, Action, Reflect)]
+#[derive(Debug, Clone, PartialEq, Deref, DerefMut, Component, Action, Reflect)]
 #[reflect(Component, ActionMeta)]
 #[category(ActionCategory::Behavior)]
 #[systems(set_on_spawn::<T>.in_set(PreTickSet))]

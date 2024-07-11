@@ -2,7 +2,7 @@ use crate::prelude::*;
 use bevy::prelude::*;
 
 /// Logs the [`Name`] of the entity when it runs.
-#[derive(Default, Action, Reflect)]
+#[derive(Default, Component, Action, Reflect)]
 #[reflect(Default, Component)]
 #[observers(log_name_on_run)]
 pub struct BubbleRunResult;
@@ -44,10 +44,12 @@ mod test {
 
 	#[test]
 	fn works() -> Result<()> {
-		let mut world = World::new();
+		let mut app = App::new();
+		app.add_plugins(ActionPlugin::<EndOnRun>::default());
+		let world = app.world_mut();
 		world.observe(bubble_run_result);
-		let on_run = observe_triggers::<OnRun>(&mut world);
-		let on_run_result = observe_triggers::<OnRunResult>(&mut world);
+		let on_run = observe_triggers::<OnRun>(world);
+		let on_run_result = observe_triggers::<OnRunResult>(world);
 
 		world
 			.spawn((Name::new("root"), EndOnRun::success()))

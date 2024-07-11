@@ -10,7 +10,7 @@ use bevy::prelude::*;
 /// If a child succeeds it will succeed.
 ///
 /// If the last child fails it will fail.
-#[derive(Debug, Default, Clone, PartialEq, Action, Reflect)]
+#[derive(Debug, Default, Clone, PartialEq, Component, Action, Reflect)]
 #[reflect(Default, Component, ActionMeta)]
 #[category(ActionCategory::ChildBehaviors)]
 #[systems(fallback_selector.in_set(TickSet))]

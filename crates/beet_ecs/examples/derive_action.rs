@@ -1,10 +1,10 @@
 use beet_ecs::prelude::*;
 use bevy::prelude::*;
 
-#[derive(Action, Reflect)]
+#[derive(Component, Action, Reflect)]
+#[component(storage = "SparseSet")]
 #[observers(log_name_on_run, log_name_on_run)]
 #[global_observers(log_name_on_run, log_name_on_run)]
-#[storage(StorageType::SparseSet)]
 struct LogOnRun(pub String);
 
 fn log_name_on_run(trigger: Trigger<OnRun>, query: Query<&LogOnRun>) {

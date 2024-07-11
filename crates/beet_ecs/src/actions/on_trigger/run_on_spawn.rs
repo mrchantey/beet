@@ -5,10 +5,10 @@ use bevy::prelude::*;
 /// A component that turns into an [`OnRun`] event on add,
 /// useful for scene-based workflows
 /// This will likely be deprecated if/when bsn observers are implemented
-#[derive(Default, Clone, Action, Reflect)]
+#[derive(Default, Clone, Component, Action, Reflect)]
 #[reflect(Default, Component)]
 #[systems(run_on_spawn.in_set(PreTickSet))]
-#[storage(StorageType::SparseSet)]
+#[component(storage = "SparseSet")]
 pub struct RunOnSpawn;
 // pub fn trigger_run_on_spawn(
 // 	trigger: Trigger<OnAdd, RunOnSpawn>,

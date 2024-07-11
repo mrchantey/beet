@@ -3,7 +3,7 @@ use beet_ecs::prelude::*;
 use bevy::prelude::*;
 
 /// Somewhat cohesive random walk
-#[derive(Debug, Clone, PartialEq, Action, Reflect)]
+#[derive(Debug, Clone, PartialEq, Component, Action, Reflect)]
 #[reflect(Default, Component, ActionMeta)]
 #[category(ActionCategory::Agent)]
 #[systems(wander.in_set(TickSet))]

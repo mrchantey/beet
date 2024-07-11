@@ -6,7 +6,7 @@ use bevy::prelude::*;
 /// - If any child is running do nothing
 /// - If a child fails, also fail.
 /// - If a child succeeds, evaluate reward and select next action.
-#[derive(Debug, Clone, PartialEq, Action, Reflect)]
+#[derive(Debug, Clone, PartialEq, Component, Action, Reflect)]
 #[reflect(Component, ActionMeta)]
 #[category(ActionCategory::Agent)]
 #[systems(q_table_selector::<L>.in_set(TickSet))]

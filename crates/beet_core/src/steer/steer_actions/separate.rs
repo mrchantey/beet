@@ -4,7 +4,7 @@ use bevy::prelude::*;
 use std::marker::PhantomData;
 
 /// Separate from entities with the given component.
-#[derive(Debug, Clone, PartialEq, Action, Reflect)]
+#[derive(Debug, Clone, PartialEq, Component, Action, Reflect)]
 #[reflect(Default, Component, ActionMeta)]
 #[category(ActionCategory::Agent)]
 #[systems(separate::<M>.in_set(TickSet))]

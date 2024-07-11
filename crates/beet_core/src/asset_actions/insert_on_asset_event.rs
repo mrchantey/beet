@@ -6,7 +6,7 @@ use bevy::prelude::*;
 
 /// Inserts the given component when a matching asset event is received.
 /// This requires the entity to have a Handle<T>
-#[derive(Debug, Clone, PartialEq, Action, Reflect)]
+#[derive(Debug, Clone, PartialEq, Component, Action, Reflect)]
 #[reflect(Component, ActionMeta)]
 #[category(ActionCategory::Behavior)]
 #[systems(
@@ -36,9 +36,10 @@ impl<T: GenericActionComponent, A: GenericActionAsset>
 	pub fn matches_load_state(&self, state: LoadState) -> bool {
 		match (self.asset_event, state) {
 			(ReflectedAssetEvent::Added { .. }, LoadState::Loaded) => true,
-			(ReflectedAssetEvent::LoadedWithDependencies { .. }, LoadState::Loaded) => {
-				true
-			}
+			(
+				ReflectedAssetEvent::LoadedWithDependencies { .. },
+				LoadState::Loaded,
+			) => true,
 			(ReflectedAssetEvent::Removed { .. }, LoadState::NotLoaded) => true,
 			(_, _) => false,
 		}
@@ -52,7 +53,7 @@ fn insert_on_asset_event<T: GenericActionComponent, A: GenericActionAsset>(
 ) {
 	for ev in asset_events.read() {
 		for (entity, action) in query.iter() {
-			let action_event:AssetEvent<A> = action.asset_event.into();
+			let action_event: AssetEvent<A> = action.asset_event.into();
 			if action_event == *ev {
 				commands.entity(entity).insert(action.value.clone());
 			}

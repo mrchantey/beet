@@ -4,7 +4,7 @@ use bevy::animation::RepeatAnimation;
 use bevy::prelude::*;
 use std::time::Duration;
 
-#[derive(Debug, Clone, Action, Reflect)]
+#[derive(Debug, Clone, Component, Action, Reflect)]
 #[reflect(Component, ActionMeta)]
 #[category(ActionCategory::Agent)]
 #[systems(insert_on_animation_end::<T>.in_set(TickSet))]

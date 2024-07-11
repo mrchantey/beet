@@ -7,7 +7,7 @@ use std::time::Duration;
 pub const DEFAULT_ANIMATION_TRANSITION: Duration = Duration::from_millis(250);
 
 /// Play an animation on the agent when this action starts running.
-#[derive(Debug, Default, Clone, PartialEq, Action, Reflect)]
+#[derive(Debug, Default, Clone, PartialEq, Component, Action, Reflect)]
 #[reflect(Default, Component, ActionMeta)]
 #[systems((play_animation_on_run, play_animation_on_load).in_set(TickSet))]
 #[category(ActionCategory::Agent)]

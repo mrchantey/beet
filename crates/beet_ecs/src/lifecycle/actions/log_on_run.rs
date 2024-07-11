@@ -4,7 +4,7 @@ use std::borrow::Cow;
 
 /// Mostly used for hello-world programs, logs a message when the action is run.
 /// Use [`BeetDebugPlugin`] for debugging run-state.
-#[derive(Debug, Clone, PartialEq, Action, Reflect)]
+#[derive(Debug, Clone, PartialEq, Component, Action, Reflect)]
 #[reflect(Default, Component, ActionMeta)]
 #[category(ActionCategory::Behavior)]
 #[systems(log_on_run.in_set(TickSet))]

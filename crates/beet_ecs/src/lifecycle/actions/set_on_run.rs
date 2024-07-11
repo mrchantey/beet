@@ -3,7 +3,7 @@ use bevy::prelude::*;
 
 /// Sets a component when this behavior starts running.
 /// This does nothing if the entity does not have the component.
-#[derive(PartialEq, Deref, DerefMut, Debug, Clone, Action, Reflect)]
+#[derive(PartialEq, Deref, DerefMut, Debug, Clone, Component, Action, Reflect)]
 #[reflect(Component, ActionMeta)]
 #[category(ActionCategory::Behavior)]
 #[systems(set_on_run::<T>.in_set(PostTickSet))]

@@ -2,7 +2,7 @@ use beet_ecs::prelude::*;
 use bevy::prelude::*;
 
 
-#[derive(Action)]
+#[derive(Component, Action)]
 #[systems(log_on_run)]
 #[category(ActionCategory::Agent)]
 struct LogOnRun(pub String);

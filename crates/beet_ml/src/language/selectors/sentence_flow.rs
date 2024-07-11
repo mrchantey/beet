@@ -13,7 +13,7 @@ impl Sentence {
 
 /// Runs the child with the [`Sentence`] that is most similar to that of the agent.
 /// for use with [`ScoreSelector`]
-#[derive(Debug, Default, Clone, PartialEq, Action, Reflect)]
+#[derive(Debug, Default, Clone, PartialEq, Component, Action, Reflect)]
 #[reflect(Component, ActionMeta)]
 #[category(ActionCategory::ChildBehaviors)]
 #[observers(sentence_flow)]

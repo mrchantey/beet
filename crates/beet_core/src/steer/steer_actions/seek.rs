@@ -7,7 +7,7 @@ use forky_core::ResultTEExt;
 
 
 /// Go to the agent's [`SteerTarget`] with an optional [`ArriveRadius`]
-#[derive(Debug, Default, Clone, PartialEq, Action, Reflect)]
+#[derive(Debug, Default, Clone, PartialEq, Component, Action, Reflect)]
 #[reflect(Default, Component, ActionMeta)]
 #[category(ActionCategory::Agent)]
 #[systems(seek.in_set(TickSet))]

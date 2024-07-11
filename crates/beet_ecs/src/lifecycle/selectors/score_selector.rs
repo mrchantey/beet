@@ -7,7 +7,7 @@ use bevy::prelude::*;
 ///
 /// It will return the result of the highest scoring child.
 ///
-#[derive(Debug, Default, Clone, PartialEq, Action, Reflect)]
+#[derive(Debug, Default, Clone, PartialEq, Component, Action, Reflect)]
 #[reflect(Default, Component, ActionMeta)]
 #[category(ActionCategory::ChildBehaviors)]
 #[systems(score_selector.in_set(TickSet))]

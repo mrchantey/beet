@@ -4,12 +4,6 @@ use crate::prelude::*;
 pub type EndOnRun = TriggerOnTrigger<OnRun, OnRunResult>;
 
 
-/// Trigger `OnRunResult` immediately when this action runs
-// #[derive(Default, Action, Deref, DerefMut, Reflect)]
-// #[reflect(Default, Component)]
-// #[observers(end_on_run)]
-// pub struct EndOnRun(pub RunResult);
-
 impl EndOnRun {
 	pub fn success() -> Self { Self::new(OnRunResult::success()) }
 	pub fn failure() -> Self { Self::new(OnRunResult::failure()) }
@@ -27,8 +21,10 @@ mod test {
 
 	#[test]
 	fn works() -> Result<()> {
-		let mut world = World::new();
-		let func = observe_run_results(&mut world);
+		let mut app = App::new();
+		app.add_plugins(ActionPlugin::<EndOnRun>::default());
+		let world = app.world_mut();
+		let func = observe_run_results(world);
 
 		expect(world.entities().len()).to_be(1)?;
 		let entity = world.spawn(EndOnRun::failure()).id();
@@ -44,8 +40,10 @@ mod test {
 	}
 	#[test]
 	fn works_with_run_on_spawn() -> Result<()> {
-		let mut world = World::new();
-		let func = observe_run_results(&mut world);
+		let mut app = App::new();
+		app.add_plugins(ActionPlugin::<EndOnRun>::default());
+		let world = app.world_mut();
+		let func = observe_run_results(world);
 
 		world.spawn((RunOnSpawn, EndOnRun::failure()));
 		world.run_system_once(run_on_spawn);

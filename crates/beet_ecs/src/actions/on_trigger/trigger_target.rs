@@ -88,10 +88,14 @@ mod test {
 
 	#[test]
 	fn trigger() -> Result<()> {
-		let mut world = World::new();
+		let mut app = App::new();
+		app.add_plugins(
+			ActionPlugin::<(TriggerOnRun<OnRun>, EndOnRun)>::default(),
+		);
+		let world = app.world_mut();
 
-		let on_run = observe_triggers::<OnRun>(&mut world);
-		let on_result = observe_run_results(&mut world);
+		let on_run = observe_triggers::<OnRun>(world);
+		let on_result = observe_run_results(world);
 
 		let target = world.spawn(EndOnRun::success()).id();
 		world

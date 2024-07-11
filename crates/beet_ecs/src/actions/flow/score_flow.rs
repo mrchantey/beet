@@ -2,7 +2,7 @@ use crate::prelude::*;
 use bevy::prelude::*;
 use std::cmp::Ordering;
 
-#[derive(Default, Action, Reflect)]
+#[derive(Default, Component, Action, Reflect)]
 #[reflect(Default, Component)]
 #[category(ActionCategory::ChildBehaviors)]
 #[observers(on_start, passthrough_run_result)]
@@ -42,11 +42,13 @@ mod test {
 
 	#[test]
 	fn works() -> Result<()> {
-		let mut world = World::new();
+		let mut app = App::new();
+		app.add_plugins(ActionPlugin::<(ScoreFlow, EndOnRun)>::default());
+		let world = app.world_mut();
 		world.observe(bubble_run_result);
 
-		let on_result = observe_trigger_names::<OnRunResult>(&mut world);
-		let on_run = observe_triggers::<OnRun>(&mut world);
+		let on_result = observe_trigger_names::<OnRunResult>(world);
+		let on_run = observe_triggers::<OnRun>(world);
 
 		world
 			.spawn((Name::new("root"), ScoreFlow))

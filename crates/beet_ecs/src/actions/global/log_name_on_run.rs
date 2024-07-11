@@ -2,7 +2,7 @@ use crate::prelude::*;
 use bevy::prelude::*;
 
 /// Logs the [`Name`] of the entity when it runs.
-#[derive(Default, Action, Reflect)]
+#[derive(Default, Component, Action, Reflect)]
 #[reflect(Default, Component)]
 #[observers(log_name_on_run)]
 pub struct LogNameOnRun;

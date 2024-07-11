@@ -6,7 +6,6 @@ pub struct ActionAttributes {
 	pub observers: Vec<Expr>,
 	pub systems: Vec<Expr>,
 	pub category: Option<Expr>,
-	pub storage: Option<Expr>,
 }
 
 
@@ -16,7 +15,6 @@ impl ActionAttributes {
 		let mut observers = Vec::new();
 		let mut systems = Vec::new();
 		let mut category = None;
-		let mut storage = None;
 
 		for attr in attrs {
 			let attr_str =
@@ -35,9 +33,6 @@ impl ActionAttributes {
 				Some("category") => {
 					category = Some(attr.parse_args()?);
 				}
-				Some("storage") => {
-					storage = Some(attr.parse_args()?);
-				}
 				_ => {}
 			}
 		}
@@ -46,7 +41,6 @@ impl ActionAttributes {
 			observers,
 			systems,
 			category,
-			storage,
 		});
 	}
 }

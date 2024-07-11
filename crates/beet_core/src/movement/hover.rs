@@ -3,7 +3,7 @@ use bevy::prelude::*;
 use std::f32::consts::TAU;
 
 
-#[derive(Debug, Default, Clone, PartialEq, Action, Reflect)]
+#[derive(Debug, Default, Clone, PartialEq, Component, Action, Reflect)]
 #[reflect(Default, Component, ActionMeta)]
 #[category(ActionCategory::Agent)]
 #[systems(hover.in_set(TickSet))]

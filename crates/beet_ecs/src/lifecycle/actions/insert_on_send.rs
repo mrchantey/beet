@@ -5,7 +5,7 @@ use std::ops::Deref;
 use std::ops::DerefMut;
 
 /// Triggers the given event when this behavior starts Insertning.
-#[derive(Debug, Clone, PartialEq, Action, Reflect)]
+#[derive(Debug, Clone, PartialEq, Component, Action, Reflect)]
 #[reflect(Component, ActionMeta)]
 #[category(ActionCategory::World)]
 #[systems(insert_on_send::<E, T>.in_set(TickSet))]

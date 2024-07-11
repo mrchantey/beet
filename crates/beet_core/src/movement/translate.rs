@@ -3,7 +3,7 @@ use bevy::prelude::*;
 use forky_core::ResultTEExt;
 
 /// Applies constant translation, multiplied by [`Time::delta_seconds`]
-#[derive(Debug, Default, Clone, PartialEq, Action, Reflect)]
+#[derive(Debug, Default, Clone, PartialEq, Component, Action, Reflect)]
 #[reflect(Default, Component, ActionMeta)]
 #[category(ActionCategory::Agent)]
 #[systems(translate.in_set(TickSet))]

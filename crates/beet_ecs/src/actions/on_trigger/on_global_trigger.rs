@@ -23,7 +23,7 @@ pub type TriggerOnGlobalTrigger<Event, Params, TriggerBundle = ()> =
 /// Map to a trigger event on global trigger.
 pub type TriggerMappedOnGlobalTrigger<M> = OnGlobalTrigger<TriggerHandler<M>>;
 
-#[derive(Action, Reflect)]
+#[derive(Component, Action, Reflect)]
 #[reflect(Default, Component)]
 #[global_observers(on_trigger::<Handler>)]
 pub struct OnGlobalTrigger<Handler: OnTriggerHandler>(pub OnTrigger<Handler>);

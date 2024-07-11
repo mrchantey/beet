@@ -2,7 +2,7 @@ use crate::prelude::*;
 use bevy::prelude::*;
 
 /// Sends the given event when this behavior starts running.
-#[derive(Debug, Clone, PartialEq, Deref, DerefMut, Action, Reflect)]
+#[derive(Debug, Clone, PartialEq, Deref, DerefMut, Component, Action, Reflect)]
 #[reflect(Component, ActionMeta)]
 #[observers(send_on_run::<T>)]
 pub struct SendOnRun<T: GenericActionEvent>(pub T);

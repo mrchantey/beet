@@ -3,7 +3,7 @@ use bevy::prelude::*;
 use std::marker::PhantomData;
 
 /// Removes a component on the agent when this behavior starts running.
-#[derive(PartialEq, Deref, DerefMut, Debug, Clone, Action, Reflect)]
+#[derive(PartialEq, Deref, DerefMut, Debug, Clone, Component, Action, Reflect)]
 #[reflect(Component)]
 #[category(ActionCategory::Agent)]
 #[observers(remove_agent_on_run::<T>)]

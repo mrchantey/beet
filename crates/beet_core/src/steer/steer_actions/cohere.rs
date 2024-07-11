@@ -4,7 +4,7 @@ use bevy::prelude::*;
 use std::marker::PhantomData;
 
 /// Move towards the center of mass of entities with the given component.
-#[derive(Debug, Clone, PartialEq, Action, Reflect)]
+#[derive(Debug, Clone, PartialEq, Component, Action, Reflect)]
 #[reflect(Default, Component, ActionMeta)]
 #[category(ActionCategory::Behavior)]
 #[systems(cohere::<M>.in_set(TickSet))]

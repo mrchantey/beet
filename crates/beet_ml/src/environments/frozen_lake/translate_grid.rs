@@ -4,7 +4,7 @@ use bevy::prelude::*;
 use std::f32::consts::TAU;
 use std::time::Duration;
 
-#[derive(Debug, Clone, PartialEq, Action, Reflect)]
+#[derive(Debug, Clone, PartialEq, Component, Action, Reflect)]
 #[reflect(Default, Component, ActionMeta)]
 #[category(ActionCategory::Behavior)]
 #[systems(translate_grid.in_set(TickSet))]

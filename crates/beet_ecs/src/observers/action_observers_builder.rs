@@ -46,7 +46,11 @@ impl<T: 'static + Send + Sync, M, O: IntoActionObservers<M> + Clone>
 	pub fn add_observers<O2: IntoActionObservers<M2>, M2>(
 		self,
 		next: O2,
-	) -> ActionObserversBuilder<T, ((M, M2), IntoActionObserversTupleMarker), (O, O2)> {
+	) -> ActionObserversBuilder<
+		T,
+		((M, M2), IntoActionObserversTupleMarker),
+		(O, O2),
+	> {
 		ActionObserversBuilder {
 			observers: (self.observers, next),
 			phantom: PhantomData,
@@ -70,7 +74,9 @@ mod test {
 
 	#[test]
 	fn works() -> Result<()> {
-		let mut world = World::new();
+		let mut app = App::new();
+		app.add_plugins(ActionPlugin::<SequenceFlow>::default());
+		let world = app.world_mut();
 
 		let entity = world.spawn(SequenceFlow).id();
 

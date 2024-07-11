@@ -36,7 +36,7 @@ mod test {
 	use std::any::Any;
 	use sweet::*;
 
-	#[derive(Action, Reflect)]
+	#[derive(Component, Action, Reflect)]
 	#[reflect(ActionMeta)]
 	#[category(ActionCategory::Behavior)]
 	struct MyStruct;

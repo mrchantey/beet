@@ -2,7 +2,9 @@ use crate::prelude::*;
 use bevy::prelude::*;
 
 /// Inserts a component on the agent when this behavior starts running.
-#[derive(PartialEq, Deref, DerefMut, Debug, Clone, Action, Reflect)]
+#[derive(
+	PartialEq, Deref, DerefMut, Debug, Clone, Component, Action, Reflect,
+)]
 #[reflect(Component, ActionMeta)]
 #[category(ActionCategory::Agent)]
 #[systems(set_agent_on_run::<T>.in_set(PostTickSet))]

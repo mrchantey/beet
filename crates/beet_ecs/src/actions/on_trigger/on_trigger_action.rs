@@ -4,7 +4,7 @@ use std::marker::PhantomData;
 
 
 /// Adds the provided component when [`<E>`] is triggered
-#[derive(Action, Reflect)]
+#[derive(Component, Action, Reflect)]
 #[reflect(Default, Component)]
 #[observers(on_trigger::<Handler>)]
 pub struct OnTrigger<Handler: OnTriggerHandler> {
@@ -57,14 +57,18 @@ mod test {
 
 	#[test]
 	fn works() -> Result<()> {
-		let mut world = World::new();
+		let mut app = App::new();
+		app.add_plugins(
+			ActionPlugin::<InsertOnTrigger<OnRun, Running>>::default(),
+		);
+		let world = app.world_mut();
 
 		let entity = world
 			.spawn(InsertOnTrigger::<OnRun, Running>::default())
 			.flush_trigger(OnRun)
 			.id();
 		expect(world.entities().len()).to_be(2)?;
-		expect(&world).to_have_component::<Running>(entity)?;
+		expect(&*world).to_have_component::<Running>(entity)?;
 		Ok(())
 	}
 }

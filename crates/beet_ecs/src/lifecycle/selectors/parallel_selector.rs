@@ -3,7 +3,7 @@ use crate::prelude::*;
 use bevy::prelude::*;
 
 /// Run children in parallel until one finishes.
-#[derive(Debug, Default, Clone, PartialEq, Action, Reflect)]
+#[derive(Debug, Default, Clone, PartialEq, Component, Action, Reflect)]
 #[reflect(Default, Component, ActionMeta)]
 #[category(ActionCategory::ChildBehaviors)]
 #[systems(parallel_selector.in_set(TickSet))]

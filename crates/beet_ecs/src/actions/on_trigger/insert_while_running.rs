@@ -45,18 +45,23 @@ mod test {
 
 	#[test]
 	fn works() -> Result<()> {
-		let mut world = World::new();
+		let mut app = App::new();
+		app.add_plugins(ActionPlugin::<(
+			InsertOnTrigger<OnRun, Running>,
+			RemoveOnTrigger<OnRunResult, Running>,
+		)>::default());
+		let world = app.world_mut();
 
 		let entity = world
 			.spawn(ContinueRun::default())
 			.flush_trigger(OnRun)
 			.id();
 		expect(world.entities().len()).to_be(3)?;
-		expect(&world).to_have_component::<Running>(entity)?;
+		expect(&*world).to_have_component::<Running>(entity)?;
 		world
 			.entity_mut(entity)
 			.flush_trigger(OnRunResult::success());
-		expect(&world).not().to_have_component::<Running>(entity)?;
+		expect(&*world).not().to_have_component::<Running>(entity)?;
 		Ok(())
 	}
 }

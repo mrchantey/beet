@@ -6,7 +6,7 @@ use std::time::Duration;
 /// the action completes before the duration.
 /// # Requires
 /// - [`RunTimer`]
-#[derive(Debug, Clone, Action, Reflect)]
+#[derive(Debug, Clone, Component, Action, Reflect)]
 #[reflect(Component, ActionMeta)]
 #[category(ActionCategory::Behavior)]
 #[systems(insert_in_duration::<T>.in_set(TickSet))]

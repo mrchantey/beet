@@ -39,17 +39,22 @@ mod test {
 
 	#[test]
 	fn works() -> Result<()> {
-		let mut world = World::new();
+		let mut app = App::new();
+		app.add_plugins(
+			ActionPlugin::<InsertOnTrigger<OnRun, Running>>::default(),
+		);
+		let world = app.world_mut();
 
 		let entity = world
 			.spawn(InsertOnTrigger::<OnRun, Running>::default())
 			.flush_trigger(OnRun)
 			.id();
 		expect(world.entities().len()).to_be(2)?;
-		expect(&world).to_have_component::<Running>(entity)?;
+		expect(&*world).to_have_component::<Running>(entity)?;
 		Ok(())
 	}
 
+	#[derive(Reflect)]
 	struct MapRunResult;
 	impl MapFunc for MapRunResult {
 		type Event = OnRun;
@@ -65,14 +70,18 @@ mod test {
 
 	#[test]
 	fn with_map() -> Result<()> {
-		let mut world = World::new();
+		let mut app = App::new();
+		app.add_plugins(
+			ActionPlugin::<InsertMappedOnTrigger<MapRunResult>>::default(),
+		);
+		let world = app.world_mut();
 
 		let entity = world
 			.spawn(InsertMappedOnTrigger::<MapRunResult>::default())
 			.flush_trigger(OnRun)
 			.id();
 		expect(world.entities().len()).to_be(2)?;
-		expect(&world)
+		expect(&*world)
 			.component(entity)?
 			.to_be(&Name::new("Success"))?;
 		Ok(())

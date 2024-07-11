@@ -1,7 +1,7 @@
 use beet_ecs::prelude::*;
 use bevy::prelude::*;
 
-#[derive(Action)]
+#[derive(Component, Action)]
 #[observers(log_name_on_run, log_on_run::<T>)]
 struct LogOnRun<T: 'static + Send + Sync + ToString>(pub T);
 

@@ -3,7 +3,7 @@ use bevy::prelude::*;
 
 /// Sets an agent's component when this behavior starts running.
 /// This does nothing if the agent does not have the component.
-#[derive(PartialEq, Deref, DerefMut, Debug, Clone, Action, Reflect)]
+#[derive(PartialEq, Deref, DerefMut, Debug, Clone, Component, Action, Reflect)]
 #[reflect(Component, ActionMeta)]
 #[category(ActionCategory::Agent)]
 #[observers(set_agent_on_run::<T>)]

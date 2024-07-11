@@ -4,7 +4,7 @@ use std::borrow::Cow;
 use std::marker::PhantomData;
 
 
-#[derive(Debug, Clone, PartialEq, Action, Reflect)]
+#[derive(Debug, Clone, PartialEq, Component, Action, Reflect)]
 #[reflect(Component, ActionMeta)]
 #[category(ActionCategory::World)]
 #[systems(set_text_on_run::<F>.in_set(TickSet))]
