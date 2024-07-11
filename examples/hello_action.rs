@@ -1,7 +1,7 @@
 use beet::prelude::*;
 use bevy::prelude::*;
 
-#[derive(Action)]
+#[derive(Component, Action)]
 #[observers(log_on_run)]
 struct LogOnRun(pub String);
 

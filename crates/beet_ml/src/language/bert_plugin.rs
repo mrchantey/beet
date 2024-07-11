@@ -12,8 +12,7 @@ impl Plugin for BertPlugin {
 		app.add_plugins(ActionPlugin::<(
 			SentenceFlow,
 			SetSentenceOnUserInput,
-			//we need OnInsert to derive reflect https://github.com/bevyengine/bevy/pull/14259
-			// RunOnSentenceChange 
+			RunOnSentenceChange 
 		)>::default())
 			.init_asset::<Bert>()
 			.init_asset_loader::<BertLoader>()

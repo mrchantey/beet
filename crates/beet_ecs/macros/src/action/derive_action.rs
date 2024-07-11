@@ -92,8 +92,8 @@ fn impl_action_systems(
 	};
 
 	Ok(quote! {
-		impl #impl_generics ActionSystems for #ident #type_generics #where_clause {
-			fn on_build(app: &mut App, config: &BeetConfig) {
+		impl #impl_generics ActionBuilder for #ident #type_generics #where_clause {
+			fn build(app: &mut App, config: &BeetConfig) {
 				#add_systems
 				#add_global_observers
 				#component_hooks

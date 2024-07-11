@@ -3,13 +3,13 @@ use bevy::prelude::*;
 use std::marker::PhantomData;
 
 
-/// Plugin that adds all [`ActionSystems`] to the schedule in [`BeetConfig`], and inits the components.
+/// Plugin that adds all [`ActionBuilder`] to the schedule in [`BeetConfig`], and inits the components.
 #[derive(Debug, Copy, Clone)]
-pub struct ActionPlugin<T: 'static + Send + Sync + Bundle + ActionSystems> {
+pub struct ActionPlugin<T: 'static + Send + Sync + Bundle + ActionBuilder> {
 	phantom: PhantomData<T>,
 }
 
-impl<T: 'static + Send + Sync + Bundle + ActionSystems> Default
+impl<T: 'static + Send + Sync + Bundle + ActionBuilder> Default
 	for ActionPlugin<T>
 {
 	fn default() -> Self {
@@ -27,7 +27,7 @@ impl<
 			+ Bundle
 			+ Reflect
 			+ bevy::reflect::GetTypeRegistration
-			+ ActionSystems,
+			+ ActionBuilder,
 	> Plugin for ActionPlugin<T>
 // where
 // 	Self: ActionMeta,
@@ -39,13 +39,13 @@ impl<
 }
 
 #[cfg(not(feature = "reflect"))]
-impl<T: 'static + Send + Sync + Bundle + ActionSystems> Plugin
+impl<T: 'static + Send + Sync + Bundle + ActionBuilder> Plugin
 	for ActionPlugin<T>
 {
 	fn build(&self, app: &mut App) { build_common::<T>(app); }
 }
 
-fn build_common<T: 'static + Send + Sync + Bundle + ActionSystems>(
+fn build_common<T: 'static + Send + Sync + Bundle + ActionBuilder>(
 	app: &mut App,
 ) {
 	let world = app.world_mut();
@@ -53,5 +53,5 @@ fn build_common<T: 'static + Send + Sync + Bundle + ActionSystems>(
 
 	app.init_resource::<BeetConfig>();
 	let settings = app.world().resource::<BeetConfig>();
-	T::on_build(app, &settings.clone());
+	T::build(app, &settings.clone());
 }

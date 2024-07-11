@@ -59,9 +59,6 @@ pub fn ready_on_asset_load<A: Asset>(
 			}
 			_ => {}
 		}
-		for asset in all_blocks.iter() {
-			log::info!("remaining {}", asset);
-		}
 	}
 	let total_blocks = all_blocks.iter().count();
 	if total_blocks > 0 && total_blocks == total_ready {

@@ -1,6 +1,5 @@
 #![allow(deprecated)] // TODO remove deprecated
 #![feature(result_flattening, let_chains, associated_type_defaults)]
-pub mod action;
 pub mod action_builder;
 pub mod actions;
 pub mod events;
@@ -17,7 +16,6 @@ pub mod tree;
 extern crate self as beet_ecs;
 
 pub mod prelude {
-	pub use crate::action::*;
 	pub use crate::action_builder::*;
 	pub use crate::actions::flow::*;
 	#[allow(ambiguous_glob_reexports)]
