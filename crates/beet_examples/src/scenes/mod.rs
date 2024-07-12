@@ -4,6 +4,9 @@ pub use self::fetch::*;
 pub mod flock;
 #[allow(unused_imports)]
 pub use self::flock::*;
+pub mod forage;
+#[allow(unused_imports)]
+pub use self::forage::*;
 pub mod foxie;
 #[allow(unused_imports)]
 pub use self::foxie::*;

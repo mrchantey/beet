@@ -2,15 +2,15 @@ use crate::prelude::*;
 use bevy::prelude::*;
 
 
-/// An action that runs all of its children in order until one fails.
-/// - If a child succeeds it will run the next child.
+/// An action that runs all of its children in order until one succeeds.
+/// - If a child succeeds it succeed.
+/// - If a child fails it will run the next child.
 /// - If there are no more children to run it will succeed.
-/// - If a child fails it will fail.
 #[derive(Default, Component, Action, Reflect)]
 #[reflect(Default, Component)]
 #[category(ActionCategory::ChildBehaviors)]
 #[observers(on_start, on_next)]
-pub struct SequenceFlow;
+pub struct FallbackFlow;
 
 fn on_start(
 	trigger: Trigger<OnRun>,
@@ -34,10 +34,10 @@ fn on_next(
 	mut commands: Commands,
 	query: Query<&Children>,
 ) {
-	if *trigger.event().value() == RunResult::Failure {
+	if *trigger.event().value() == RunResult::Success {
 		commands
 			.entity(trigger.entity())
-			.trigger(OnRunResult::failure());
+			.trigger(OnRunResult::success());
 		return;
 	}
 	let children = query
@@ -69,7 +69,7 @@ mod test {
 	#[test]
 	fn works() -> Result<()> {
 		let mut app = App::new();
-		app.add_plugins(ActionPlugin::<(SequenceFlow, EndOnRun)>::default());
+		app.add_plugins(ActionPlugin::<(FallbackFlow, EndOnRun)>::default());
 		let world = app.world_mut();
 		world.observe(bubble_run_result);
 
@@ -77,9 +77,9 @@ mod test {
 		let on_run = observe_triggers::<OnRun>(world);
 
 		world
-			.spawn((Name::new("root"), SequenceFlow))
+			.spawn((Name::new("root"), FallbackFlow))
 			.with_children(|parent| {
-				parent.spawn((Name::new("child1"), EndOnRun::success()));
+				parent.spawn((Name::new("child1"), EndOnRun::failure()));
 				parent.spawn((Name::new("child2"), EndOnRun::success()));
 			})
 			.flush_trigger(OnRun);

@@ -28,7 +28,7 @@ fn on_start(
 
 	commands.trigger_targets(
 		RequestScore,
-		children.iter().map(|c| c.clone()).collect::<Vec<_>>(),
+		children.iter().cloned().collect::<Vec<_>>(),
 	);
 }
 

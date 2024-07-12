@@ -13,10 +13,10 @@ pub fn bubble_run_result(
 	parents: Query<&Parent>,
 ) {
 	if let Some(parent) = parents.get(trigger.entity()).ok() {
-		commands.trigger_targets(
-			OnChildResult::new(trigger.entity(), trigger.event().result()),
-			parent.get(),
-		);
+		commands.entity(parent.get()).trigger(OnChildResult::new(
+			trigger.entity(),
+			trigger.event().result(),
+		));
 	}
 }
 
@@ -26,10 +26,9 @@ pub fn passthrough_run_result(
 	trigger: Trigger<OnChildResult>,
 	mut commands: Commands,
 ) {
-	commands.trigger_targets(
-		OnRunResult::new(*trigger.event().value()),
-		trigger.entity(),
-	);
+	commands
+		.entity(trigger.entity())
+		.trigger(OnRunResult::new(*trigger.event().value()));
 }
 
 

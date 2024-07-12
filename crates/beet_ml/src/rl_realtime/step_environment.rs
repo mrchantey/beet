@@ -94,7 +94,9 @@ fn step_environment<S: RlSessionTypes>(
 	// 	outcome.reward
 	// );
 
-	commands.trigger_targets(OnRunResult::success(), trigger.entity());
+	commands
+		.entity(trigger.entity())
+		.trigger(OnRunResult::success());
 	step.step += 1;
 
 	if outcome.done || step.step >= params.max_steps {
@@ -129,8 +131,7 @@ mod test {
 
 		let session = app.world_mut().spawn(FrozenLakeQTable::default()).id();
 
-		app
-			.world_mut()
+		app.world_mut()
 			.spawn(RlAgentBundle {
 				state: map.agent_position(),
 				action: GridDirection::sample_with_rng(&mut *rng),

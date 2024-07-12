@@ -45,8 +45,7 @@ fn provide_score(
 	} else {
 		0.
 	};
-	commands.trigger_targets(
-		OnChildScore::new(trigger.entity(), score),
-		parent.get(),
-	);
+	commands
+		.entity(parent.get())
+		.trigger(OnChildScore::new(trigger.entity(), score));
 }

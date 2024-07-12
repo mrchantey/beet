@@ -2,10 +2,6 @@ use super::*;
 use crate::prelude::*;
 use bevy::prelude::*;
 
-/// An action that runs all of its children in order until one fails.
-/// - If a child succeeds it will run the next child.
-/// - If there are no more children to run it will succeed.
-/// - If a child fails it will fail.
 #[derive(Debug, Default, Clone, PartialEq, Component, Action, Reflect)]
 #[reflect(Default, Component, ActionMeta)]
 #[category(ActionCategory::ChildBehaviors)]

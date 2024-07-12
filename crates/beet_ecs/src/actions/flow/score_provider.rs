@@ -27,8 +27,7 @@ fn provide_score(
 		.get(trigger.entity())
 		.expect(expect_action::ACTION_QUERY_MISSING);
 
-	commands.trigger_targets(
-		OnChildScore::new(trigger.entity(), **score_provider),
-		parent.get(),
-	);
+	commands
+		.entity(parent.get())
+		.trigger(OnChildScore::new(trigger.entity(), **score_provider));
 }
