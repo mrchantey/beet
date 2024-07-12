@@ -23,6 +23,7 @@ pub fn rotate_to_velocity_2d(
 
 
 /// Rotate an entity to face its [`Velocity`] in 3D space
+/// If the velocity is zero, this does nothing
 #[derive(Component, Deref, DerefMut, Reflect)]
 #[reflect(Default, Component)]
 pub struct RotateToVelocity3d(pub f32);
@@ -37,8 +38,10 @@ pub fn rotate_to_velocity_3d(
 ) {
 	for (mut transform, velocity, rotate) in query.iter_mut() {
 		let Some(dir) = velocity.0.try_normalize() else {
+			log::info!("cannot rotate");
 			continue;
 		};
+		log::info!("rotating! {}", velocity.0);
 		transform.rotation = transform
 			.rotation
 			.slerp(Quat::look_at(dir), **rotate * time.delta_seconds());

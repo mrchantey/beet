@@ -17,6 +17,10 @@ pub fn interrupt_running(
 	running: Query<(), (With<Running>, Without<NoInterrupt>)>,
 ) {
 	ChildrenExt::visit_or_cancel(trigger.entity(), &children, |entity| {
+		// skip the entity that just started running
+		if entity == trigger.entity() {
+			return true;
+		}
 		if running.contains(entity) {
 			commands.entity(entity).remove::<Running>();
 		}
@@ -73,15 +77,13 @@ mod test {
 				.component_tree::<Running>(&world),
 		)
 		.to_be(
-			Tree::new(None)
+			Tree::new(Some(&Running))
 				.with_leaf(None)
 				.with_leaf(None)
 				.with_child(Tree::new(None).with_leaf(None))
 				.with_child(Tree::new(None).with_leaf(None))
 				.with_child(Tree::new(Some(&Running)).with_leaf(Some(&Running)))
-				.with_child(
-					Tree::new(None).with_leaf(Some(&Running)),
-				),
+				.with_child(Tree::new(None).with_leaf(Some(&Running))),
 		)?;
 		Ok(())
 	}

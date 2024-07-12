@@ -52,7 +52,6 @@ pub fn fetch_npc(mut commands: Commands) {
 						TargetAgent(agent),
 						SetAgentOnRun(Velocity::default()),
 						PlayAnimation::new(idle_index).repeat_forever(),
-						ContinueRun::default(), // never end
 					));
 					parent
 						.spawn((
