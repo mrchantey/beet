@@ -45,6 +45,8 @@ world.spawn(FallbackFlow)
 ```
 ## Examples
 
+The examples for beet are *scene-based*, meaning each example provides a scene for a common base app. As Bevy scene workflows are a wip, there are a few `Placeholder` types used for not-yet-serializable types like cameras, asset handles etc.
+
 Most examples rely on assets that can be downloaded with the following commands, or manually from [here](https://storage.googleapis.com/beet-misc/assets.tar.gz).
 
 ```sh
@@ -53,7 +55,6 @@ tar -xzvf ./assets.tar.gz
 rm ./assets.tar.gz
 ```
 
-The examples for beet are *scene-based*. As Bevy scene workflows are a wip, there are a few `Placeholder` types used for not-yet-serializable types like cameras, asset handles etc.
 
 ## Bevy Versions
 
