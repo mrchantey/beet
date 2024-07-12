@@ -2,7 +2,7 @@
 
 <div align="center">
   <p>
-    <strong>A very flexible behavior library for games and robotics.</strong>
+    <strong>A modular behavior library for the Bevy Engine.</strong>
   </p>
   <p>
     <a href="https://crates.io/crates/beet"><img src="https://img.shields.io/crates/v/beet.svg?style=flat-square" alt="Crates.io version" /></a>
@@ -18,40 +18,34 @@
   </h3>
 </div>
 
-```rust
-// A demonstration of Sequence control flow
-fn main() {
-	App::new()
-		.add_plugins((
-			LogPlugin::default(), 
-			LifecyclePlugin
-		))
-		.world_mut()
-		.spawn((
-			Name::new("root"), 
-			LogNameOnRun, 
-			SequenceFlow
-		))
-		.with_children(|parent| {
-			parent.spawn((
-				Name::new("child1"),
-				LogNameOnRun,
-				EndOnRun::success(),
-			));
-			parent.spawn((
-				Name::new("child2"),
-				LogNameOnRun,
-				EndOnRun::success(),
-			));
-		})
-		.flush_trigger(OnRun);
+Beet is Behavior Expressed as Entity Trees, using [Observers][bevy-observers] for control flow and messaging. The entity-based approach is very flexible, and allows for multiple behavior paradigms to be used together as needed.
 
-// Running: root
-// Running: child1
-// Running: child2
-}
+Currently implemented paradigms:
+- [Behavior Trees](./examples/hello_world.rs)
+- [Basic Utility AI](./examples/hello_utility_ai.rs)
+- [LLM Sentence Similarity](./examples/hello_ml.rs)
+- [Reinforcement Learning](./examples/frozen_lake_train.rs)
+
+
+## Hello World
+
+```rust
+// A demonstration of Fallback control flow
+world.spawn(FallbackFlow)
+  .with_children(|parent| {
+    parent.spawn((
+      LogOnRun::("Hello"),
+      EndOnRun::failure(),
+    ));
+    parent.spawn((
+      LogOnRun::("World"),
+      EndOnRun::success(),
+    ));
+  })
 ```
 ## Examples
+
+The examples for beet are *scene-based*, meaning each example provides a scene for a common base app. As Bevy scene workflows are a wip, there are a few `Placeholder` types used for not-yet-serializable types like cameras, asset handles etc.
 
 Most examples rely on assets that can be downloaded with the following commands, or manually from [here](https://storage.googleapis.com/beet-misc/assets.tar.gz).
 
@@ -61,7 +55,6 @@ tar -xzvf ./assets.tar.gz
 rm ./assets.tar.gz
 ```
 
-The examples for beet are *scene-based*. As Bevy scene workflows are a wip, there are a few `Placeholder` types used for not-yet-serializable types like cameras, asset handles etc.
 
 ## Bevy Versions
 
@@ -69,3 +62,6 @@ The examples for beet are *scene-based*. As Bevy scene workflows are a wip, ther
 | ------ | ------ |
 | 0.14   | 0.0.2  |
 | 0.12   | 0.0.1  |
+
+
+[bevy-observers]:(https://docs.rs/bevy/latest/bevy/ecs/observer/struct.Observer.html#)

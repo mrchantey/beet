@@ -26,7 +26,7 @@ pub fn flock(mut commands: Commands) {
 				agent.spawn((
 					RunOnSpawn,
 					ContinueRun::default(),
-					RootIsTargetAgent,
+					TargetAgent(agent.parent_entity()),
 					Separate::<GroupSteerAgent>::new(1.),
 					Align::<GroupSteerAgent>::new(1.),
 					Cohere::<GroupSteerAgent>::new(1.),

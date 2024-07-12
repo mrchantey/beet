@@ -16,14 +16,14 @@
 // 		.with_children(|parent| {
 // 			parent.spawn((
 // 				Name::new("Drive Forward"),
-// 				RootIsTargetAgent,
+// 				TargetAgent(agent.parent_entity()),
 // 				Score::Weight(0.5),
 // 				SetAgentOnRun(DualMotorValue::splat(MotorValue::forward_max())),
 // 			));
 
 // 			parent.spawn((
 // 				Name::new("Turn Right"),
-// 				RootIsTargetAgent,
+// 				TargetAgent(agent.parent_entity()),
 // 				Score::default(),
 // 				DepthSensorScorer::new(threshold_dist),
 // 				SetAgentOnRun(DualMotorValue::new(

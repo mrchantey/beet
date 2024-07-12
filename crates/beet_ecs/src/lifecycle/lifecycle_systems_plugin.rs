@@ -10,12 +10,7 @@ pub struct PreTickSet;
 pub struct TickSet;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, SystemSet)]
-/// Runs after [`TickSet`] and [`apply_deferred`], used to synchronize various lifecycle components
-/// like [`Running`] or [`Interrupt`]
-pub struct TickSyncSet;
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash, SystemSet)]
-/// Runs after [`TickSyncSet`] and [`apply_deferred`].
+/// Runs after [`TickSet`] and [`apply_deferred`].
 pub struct PostTickSet;
 
 #[derive(Debug, Clone, Default)]
@@ -31,11 +26,7 @@ impl Plugin for LifecycleSystemsPlugin {
 		app /*-*/
 			.configure_sets(schedule, PreTickSet)
 			.configure_sets(schedule, TickSet.after(PreTickSet))
-			.configure_sets(schedule, TickSyncSet.after(TickSet))
-			.configure_sets(schedule, PostTickSet.after(TickSyncSet))
-			.add_systems(schedule, apply_deferred.after(PreTickSet).before(TickSet))
-			.add_systems(schedule, apply_deferred.after(TickSet).before(TickSyncSet))
-			.add_systems(schedule, apply_deferred.after(TickSyncSet).before(PostTickSet))
+			.configure_sets(schedule, PostTickSet.after(TickSet))
 			.add_systems(
 				schedule,
 				set_root_as_target_agent.in_set(PreTickSet),
