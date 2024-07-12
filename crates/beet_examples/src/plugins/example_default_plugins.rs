@@ -78,9 +78,9 @@ fn assert_local_assets() {
 		if !path.exists() {
 			panic!(
 				r#"
-🐝🐝🐝
+🥁🥁🥁
 
-Howdy! Beet examples use large assets that are stored remotely. 
+Welcome! Beet examples use large assets that are stored remotely. 
 
 Windows:
 
@@ -93,7 +93,7 @@ curl -o ./assets.tar.gz https://storage.googleapis.com/beet-misc/assets.tar.gz
 tar -xzvf ./assets.tar.gz
 rm ./assets.tar.gz
 
-🐝🐝🐝
+🥁🥁🥁
 "#
 			);
 		}

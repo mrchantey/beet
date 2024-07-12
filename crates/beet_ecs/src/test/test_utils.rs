@@ -43,7 +43,7 @@ pub fn test_serde_entity(world: &mut World) -> Entity {
 			// utility
 			EmptyAction::default(),
 			Repeat::default(),
-			InsertInDuration::<RunResult>::default(),
+			TriggerInDuration::<OnRunResult>::default(),
 			// control flow actions
 			SequenceFlow::default(),
 			FallbackSelector::default(),

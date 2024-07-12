@@ -11,7 +11,7 @@ impl Plugin for LifecyclePlugin {
 		app.add_plugins(LifecycleSystemsPlugin);
 
 		app.add_plugins(ActionPlugin::<(
-			InsertInDuration<RunResult>,
+			TriggerInDuration<OnRunResult>,
 			InsertOnRun<RunResult>,
 			RunTimer,
 			LogOnRun,

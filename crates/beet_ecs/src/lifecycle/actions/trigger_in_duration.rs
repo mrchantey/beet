@@ -2,24 +2,24 @@ use crate::prelude::*;
 use bevy::prelude::*;
 use std::time::Duration;
 
-/// Inserts the given component after running for a given duration. Has no effect if
+/// Triggers the given event after running for a given duration. Has no effect if
 /// the action completes before the duration.
 /// # Requires
 /// - [`RunTimer`]
 #[derive(Debug, Clone, Component, Action, Reflect)]
 #[reflect(Component, ActionMeta)]
 #[category(ActionCategory::Behavior)]
-#[systems(insert_in_duration::<T>.in_set(TickSet))]
-pub struct InsertInDuration<T: GenericActionComponent> {
+#[systems(trigger_in_duration::<T>.in_set(TickSet))]
+pub struct TriggerInDuration<T: GenericActionEvent> {
 	pub duration: Duration,
 	pub value: T,
 }
 
-impl<T: Default + GenericActionComponent> Default for InsertInDuration<T> {
+impl<T: Default + GenericActionEvent> Default for TriggerInDuration<T> {
 	fn default() -> Self { Self::new(T::default(), Duration::from_secs(1)) }
 }
 
-impl<T: GenericActionComponent> InsertInDuration<T> {
+impl<T: GenericActionEvent> TriggerInDuration<T> {
 	pub fn new(value: T, duration: Duration) -> Self {
 		Self { value, duration }
 	}
@@ -37,15 +37,16 @@ impl<T: GenericActionComponent> InsertInDuration<T> {
 	}
 }
 
-pub fn insert_in_duration<T: GenericActionComponent>(
+pub fn trigger_in_duration<T: GenericActionEvent>(
 	mut commands: Commands,
-	mut query: Query<(Entity, &RunTimer, &InsertInDuration<T>), With<Running>>,
+	mut query: Query<(Entity, &RunTimer, &TriggerInDuration<T>), With<Running>>,
 ) {
 	for (entity, timer, insert_in_duration) in query.iter_mut() {
+		println!("here!{:?}", timer.last_started.elapsed());
 		if timer.last_started.elapsed() >= insert_in_duration.duration {
 			commands
 				.entity(entity)
-				.insert(insert_in_duration.value.clone());
+				.trigger(insert_in_duration.value.clone());
 		}
 	}
 }
@@ -62,30 +63,35 @@ mod test {
 	#[test]
 	fn works() -> Result<()> {
 		let mut app = App::new();
-		app.add_plugins((
-			LifecycleSystemsPlugin,
-			ActionPlugin::<InsertInDuration<RunResult>>::default(),
-		));
+
+		let on_result = observe_triggers::<OnRunResult>(app.world_mut());
+
+		app.add_plugins(ActionPlugin::<(
+			RunTimer,
+			TriggerInDuration<OnRunResult>,
+		)>::default());
+
+		app.configure_sets(Update, PreTickSet.before(TickSet));
+
 		app.insert_time();
 
-		let root = app
-			.world_mut()
-			.spawn((
-				Running,
-				RunTimer::default(),
-				InsertInDuration::<RunResult>::new(
-					RunResult::default(),
-					Duration::from_secs(1),
-				),
-			))
-			.id();
+		app.world_mut().spawn((
+			Running,
+			RunTimer::default(),
+			TriggerInDuration::<OnRunResult>::new(
+				OnRunResult::default(),
+				Duration::from_secs(2),
+			),
+		));
 
-		expect(&app).to_have_component::<Running>(root)?;
+		app.update_with_secs(1);
 
-		app.update_with_secs(2);
+		expect(&on_result).not().to_have_been_called()?;
 
-		expect(&app).component(root)?.to_be(&RunResult::Success)?;
-		expect(&app).not().to_have_component::<Running>(root)?;
+		app.update_with_secs(10);
+
+		expect(&on_result).to_have_been_called()?;
+
 		Ok(())
 	}
 }

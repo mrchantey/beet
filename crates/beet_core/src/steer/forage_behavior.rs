@@ -18,7 +18,7 @@ pub fn forage_behavior(world: &mut World) -> Entity {
 				Score::default(),
 				SetOnSpawn(Score::Weight(0.5)),
 				Wander::default(),
-				InsertInDuration::<RunResult>::default(),
+				TriggerInDuration::<OnRunResult>::default(),
 			));
 			parent
 				.spawn((
@@ -36,7 +36,7 @@ pub fn forage_behavior(world: &mut World) -> Entity {
 					parent.spawn((
 						Name::new("Wait 1 second"),
 						SetAgentOnRun(Velocity(Vec3::ZERO)),
-						InsertInDuration::<RunResult>::default(),
+						TriggerInDuration::<OnRunResult>::default(),
 					));
 					parent.spawn((
 						Name::new("Collect flower"),

@@ -4,9 +4,9 @@ pub use self::empty_action::*;
 pub mod insert_agent_on_run;
 #[allow(unused_imports)]
 pub use self::insert_agent_on_run::*;
-pub mod insert_in_duration;
+pub mod trigger_in_duration;
 #[allow(unused_imports)]
-pub use self::insert_in_duration::*;
+pub use self::trigger_in_duration::*;
 pub mod insert_on_run;
 #[allow(unused_imports)]
 pub use self::insert_on_run::*;

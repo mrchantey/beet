@@ -64,9 +64,9 @@ mod test {
 	#[test]
 	fn works() -> Result<()> {
 		let mut app = App::new();
-		app.add_plugins((ActionPlugin::<
+		app.add_plugins(ActionPlugin::<
 			TriggerOnGlobalTrigger<OnRun, OnRunResult>,
-		>::default(),));
+		>::default());
 		let world = app.world_mut();
 		let func = observe_run_results(world);
 
