@@ -18,7 +18,7 @@
   </h3>
 </div>
 
-Beet is Behavior Expressed as Entity Trees, using [bevy observers][bevy-observers] for control flow and messaging. The entity-based approach is very flexible, and allows for multiple behavior paradigms to be used together as needed.
+Beet is Behavior Expressed as Entity Trees, using [Observers][bevy-observers] for control flow and messaging. The entity-based approach is very flexible, and allows for multiple behavior paradigms to be used together as needed.
 
 Currently implemented paradigms:
 - [Behavior Trees](./examples/hello_world.rs)

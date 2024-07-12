@@ -74,7 +74,11 @@ mod test {
 				SteerBundle::default(),
 			))
 			.with_children(|parent| {
-				parent.spawn((RootIsTargetAgent, Running, Wander::default()));
+				parent.spawn((
+					TargetAgent(parent.parent_entity()),
+					Running,
+					Wander::default(),
+				));
 			})
 			.id();
 

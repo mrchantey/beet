@@ -76,7 +76,7 @@ mod test {
 				SteerBundle::default().with_target(Vec3::new(1.0, 0., 0.)),
 			))
 			.with_children(|parent| {
-				parent.spawn((RootIsTargetAgent, Running, Seek));
+				parent.spawn((TargetAgent(parent.parent_entity()), Running, Seek));
 			})
 			.id();
 
