@@ -43,47 +43,34 @@ pub fn fetch_npc(mut commands: Commands) {
 					RunOnSteerTargetRemove::default().with_source(agent),
 					ScoreFlow::default(),
 					RemoveOnTrigger::<OnRunResult, Sentence>::default(),
-					// RunOnSentenceChange::default(),
 				))
 				.with_children(|parent| {
 					parent.spawn((
 						Name::new("Idle"),
 						ScoreProvider::NEUTRAL,
 						TargetAgent(agent),
-						SetAgentOnRun(Velocity::default()),
+						// SetAgentOnRun(Velocity::default()),
 						PlayAnimation::new(idle_index).repeat_forever(),
 					));
-					parent
-						.spawn((
-							Name::new("Fetch"),
-							Score::default(),
-							TargetAgent(agent),
-							SteerTargetScoreProvider::new(10.),
-							PlayAnimation::new(walk_index).repeat_forever(),
-							SequenceFlow,
-						))
-						.with_children(|parent| {
-							parent.spawn((
-								Name::new("Go To Item"),
-								TargetAgent(agent),
-								Seek,
-								ContinueRun::default(),
-								EndOnArrive::new(1.),
-							));
-							#[rustfmt::skip]
-							parent.spawn((
-								Name::new("Pick Up Item"),
-								RemoveOnTrigger::<OnRun, SteerTarget>::default()
-									.with_target(agent),
-								EndOnRun::success(),
-							));
-							// parent.spawn((
-							// 	Name::new("Return Item To Center"),
-							// 	TargetAgent(agent),
-							// 	Seek,
-							// 	StopOnArrive::new(6.),
-							// ));
-						});
+					parent.spawn((
+						Name::new("Fetch"),
+						Score::default(),
+						TargetAgent(agent),
+						SteerTargetScoreProvider {
+							min_radius: 1.,
+							max_radius: 10.,
+						},
+						PlayAnimation::new(walk_index).repeat_forever(),
+						InsertOnTrigger::<OnRun, Velocity>::default()
+							.with_target(agent),
+						ContinueRun::default(),
+						Seek,
+						EndOnArrive::new(1.),
+						RemoveOnTrigger::<OnRunResult, SteerTarget>::default()
+							.with_target(agent),
+						RemoveOnTrigger::<OnRunResult, Velocity>::default()
+							.with_target(agent),
+					));
 				});
 		});
 }

@@ -28,7 +28,6 @@ fn set_agent_on_run<T: GenericActionComponent>(
 
 	if let Ok(mut dst) = agents.get_mut(**target) {
 		*dst = action.0.clone();
-		log::info!("setting agent value");
 	} else {
 		log::warn!("SetAgentOnRun: Agent with component not found");
 	}

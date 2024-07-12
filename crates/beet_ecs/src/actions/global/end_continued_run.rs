@@ -10,6 +10,7 @@ pub fn end_continued_run(
 	running: Query<Entity, With<Running>>,
 ) {
 	if let Some(entity) = running.get(trigger.entity()).ok() {
+		// log::info!("end_continued_run: {entity}");
 		commands.entity(entity).remove::<Running>();
 	}
 }

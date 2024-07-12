@@ -74,7 +74,9 @@ impl Plugin for ExampleMlPlugin {
 			InsertOnAssetEvent<RunResult, Bert>,
 			InsertSentenceSteerTarget<Collectable>,
 			RemoveOnTrigger<OnRunResult, Sentence>,
-			RemoveOnTrigger<OnRun, SteerTarget>,
+			RemoveOnTrigger<OnRunResult, SteerTarget>,
+			InsertOnTrigger<OnRun,Velocity>,
+			RemoveOnTrigger<OnRunResult,Velocity>,
 		)>::default())
 			/*-*/;
 	}

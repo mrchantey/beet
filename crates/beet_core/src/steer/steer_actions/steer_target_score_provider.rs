@@ -8,15 +8,18 @@ use bevy::prelude::*;
 #[observers(provide_score)]
 /// Provides a [`ScoreValue`] based on distance to the [`SteerTarget`]
 pub struct SteerTargetScoreProvider {
-	pub radius: f32,
+	/// fail if already at location
+	pub min_radius: f32,
+	pub max_radius: f32,
 }
 
 impl Default for SteerTargetScoreProvider {
-	fn default() -> Self { Self { radius: 0.5 } }
-}
-
-impl SteerTargetScoreProvider {
-	pub fn new(radius: f32) -> Self { Self { radius } }
+	fn default() -> Self {
+		Self {
+			min_radius: 1.,
+			max_radius: 10.,
+		}
+	}
 }
 
 fn provide_score(
@@ -32,9 +35,13 @@ fn provide_score(
 
 	let score = if let Ok((transform, target)) = agents.get(**agent)
 		&& let Ok(target) = target.position(&transforms)
-		&& Vec3::distance(transform.translation, target) <= action.radius
 	{
-		1.
+		let dist = Vec3::distance(transform.translation, target);
+		if dist >= action.min_radius && dist <= action.max_radius {
+			1.
+		} else {
+			0.
+		}
 	} else {
 		0.
 	};
