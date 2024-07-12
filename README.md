@@ -18,8 +18,7 @@
   </h3>
 </div>
 
-Beet is Behavior Expressed as Entity Trees, using [Observers][bevy-observers] for control flow and messaging. The entity-based approach is very flexible, and allows for multiple behavior paradigms to be used together as needed.
-
+Beet is behavior expressed as entity trees, using [Observers][bevy-observers] for control flow. The entity-based approach is very flexible and allows for multiple behavior paradigms to be used together as needed.
 
 Currently implemented paradigms:
 - [Behavior Trees](./examples/hello_world.rs)
@@ -44,6 +43,11 @@ world.spawn(FallbackFlow)
     ));
   })
 ```
+
+
+[bevy-observers]:https://docs.rs/bevy/latest/bevy/ecs/observer/struct.Observer.html#
+
+
 ## Examples
 
 The examples for beet are *scene-based*, meaning each example provides a scene for a common base app. As Bevy scene workflows are a wip, there are a few `Placeholder` types used for not-yet-serializable types like cameras, asset handles etc.
@@ -63,5 +67,3 @@ rm ./assets.tar.gz
 | ------ | ------ |
 | 0.14   | 0.0.2  |
 | 0.12   | 0.0.1  |
-
-[bevy-observers]:https://docs.rs/bevy/latest/bevy/ecs/observer/struct.Observer.html#
