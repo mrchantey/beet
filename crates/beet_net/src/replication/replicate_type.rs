@@ -1,103 +1,89 @@
 use crate::prelude::*;
-use bevy::ecs::schedule::SystemConfigs;
 use bevy::prelude::*;
-
-/// Base trait for any [`Component`], [`Resource`], or [`Event`] that can be replicated.
-pub trait ReplicateType<Marker>: 'static + Send + Sync {
-	fn register(
-		registrations: &mut ReplicateRegistry,
-		direction: ReplicateDirection,
-	);
-	fn outgoing_systems() -> SystemConfigs;
-}
-
-impl ReplicateType<()> for () {
-	fn register(
-		_registrations: &mut ReplicateRegistry,
-		_direction: ReplicateDirection,
-	) {
-	}
-	fn outgoing_systems() -> SystemConfigs { (|| ()).into_configs() }
-}
-
-pub struct ReplicateComponentMarker;
-pub struct ReplicateResourceMarker;
-pub struct ReplicateEventMarker;
-
+use serde::de::DeserializeOwned;
+use serde::Serialize;
 
 
 #[extend::ext(name=AppExtReplicate)]
 pub impl App {
-	fn replicate<T: ReplicateType<ReplicateComponentMarker>>(
+	fn replicate<T: Component + Serialize + DeserializeOwned>(
 		&mut self,
 	) -> &mut Self {
-		replicate::<T, ReplicateComponentMarker>(
-			self,
-			ReplicateDirection::Both,
-		);
-		self
+		self.replicate_with::<T>(ReplicateDirection::Both)
 	}
-	fn replicate_with<T: ReplicateType<ReplicateComponentMarker>>(
+	fn replicate_with<T: Component + Serialize + DeserializeOwned>(
 		&mut self,
 		direction: ReplicateDirection,
 	) -> &mut Self {
-		replicate::<T, ReplicateComponentMarker>(self, direction);
+		self.init_resource::<ReplicateRegistry>()
+			.world_mut()
+			.resource_mut::<ReplicateRegistry>()
+			.register_component::<T>(direction);
+		if direction.is_outgoing() {
+			register_component_outgoing::<T>(self);
+		}
 		self
 	}
 	fn replicate_resource_incoming<
-		T: ReplicateType<ReplicateResourceMarker>,
+		T: Resource + Serialize + DeserializeOwned,
 	>(
 		&mut self,
 	) -> &mut Self {
-		replicate::<T, ReplicateResourceMarker>(
-			self,
-			ReplicateDirection::Incoming,
-		);
+		self.init_resource::<ReplicateRegistry>()
+			.world_mut()
+			.resource_mut::<ReplicateRegistry>()
+			.register_resource::<T>(ReplicateDirection::Incoming);
 		self
 	}
 	fn replicate_resource_outgoing<
-		T: ReplicateType<ReplicateResourceMarker>,
+		T: Resource + Serialize + DeserializeOwned,
 	>(
 		&mut self,
 	) -> &mut Self {
-		replicate::<T, ReplicateResourceMarker>(
-			self,
-			ReplicateDirection::Outgoing,
-		);
+		self.init_resource::<ReplicateRegistry>()
+			.world_mut()
+			.resource_mut::<ReplicateRegistry>()
+			.register_resource::<T>(ReplicateDirection::Incoming);
+		register_resource_outgoing::<T>(self);
 		self
 	}
 
-	fn replicate_event_incoming<T: ReplicateType<ReplicateEventMarker>>(
+	fn replicate_event_incoming<T: Event + Serialize + DeserializeOwned>(
 		&mut self,
 	) -> &mut Self {
-		replicate::<T, ReplicateEventMarker>(
-			self,
-			ReplicateDirection::Incoming,
-		);
+		self.init_resource::<ReplicateRegistry>()
+			.world_mut()
+			.resource_mut::<ReplicateRegistry>()
+			.register_event::<T>(ReplicateDirection::Incoming);
 		self
 	}
-	fn replicate_event_outgoing<T: ReplicateType<ReplicateEventMarker>>(
+	fn replicate_event_outgoing<T: Event + Serialize + DeserializeOwned>(
 		&mut self,
 	) -> &mut Self {
-		replicate::<T, ReplicateEventMarker>(
-			self,
-			ReplicateDirection::Outgoing,
-		);
+		self.init_resource::<ReplicateRegistry>()
+			.world_mut()
+			.resource_mut::<ReplicateRegistry>()
+			.register_event::<T>(ReplicateDirection::Incoming);
+		register_event_outgoing::<T>(self);
 		self
 	}
-}
-
-pub fn replicate<T: ReplicateType<M>, M>(
-	app: &mut App,
-	direction: ReplicateDirection,
-) {
-	app.init_resource::<ReplicateRegistry>();
-	let mut registrations = app.world_mut().resource_mut::<ReplicateRegistry>();
-	T::register(&mut registrations, direction);
-	if direction.is_outgoing() {
-		app.add_systems(
-			Update,
-			T::outgoing_systems().in_set(MessageOutgoingSet),
-		);
+	fn replicate_observer_incoming<T: Event + Serialize + DeserializeOwned>(
+		&mut self,
+	) -> &mut Self {
+		self.init_resource::<ReplicateRegistry>()
+			.world_mut()
+			.resource_mut::<ReplicateRegistry>()
+			.register_observer::<T>(ReplicateDirection::Incoming);
+		self
+	}
+	fn replicate_observer_outgoing<T: Event + Serialize + DeserializeOwned>(
+		&mut self,
+	) -> &mut Self {
+		self.init_resource::<ReplicateRegistry>()
+			.world_mut()
+			.resource_mut::<ReplicateRegistry>()
+			.register_observer::<T>(ReplicateDirection::Incoming);
+		register_observer_outgoing::<T>(self);
+		self
 	}
 }

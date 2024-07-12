@@ -13,6 +13,9 @@ pub use self::replicate_entity::*;
 pub mod replicate_event;
 #[allow(unused_imports)]
 pub use self::replicate_event::*;
+pub mod replicate_observer;
+#[allow(unused_imports)]
+pub use self::replicate_observer::*;
 pub mod replicate_plugin;
 #[allow(unused_imports)]
 pub use self::replicate_plugin::*;

@@ -1,10 +1,8 @@
 use crate::prelude::*;
 use anyhow::Result;
-use bevy::ecs::schedule::SystemConfigs;
 use bevy::prelude::*;
 use forky_core::ResultTEExt;
-use serde::de::DeserializeOwned;
-use serde::Serialize;
+use serde::{de::DeserializeOwned, Serialize};
 
 
 /// Functions for handling reception of [`Resource`] messages.
@@ -15,35 +13,28 @@ pub struct ResourceFns {
 	pub remove: fn(&mut Commands),
 }
 
-impl<T: Send + Sync + 'static + Resource + Serialize + DeserializeOwned>
-	ReplicateType<ReplicateResourceMarker> for T
-{
-	fn register(
-		registrations: &mut ReplicateRegistry,
-		direction: ReplicateDirection,
-	) {
-		registrations.register_resource::<T>(
-			ResourceFns {
-				insert: |commands, payload| {
-					commands.insert_resource(payload.deserialize::<T>()?);
-					Ok(())
-				},
-				change: |commands, payload| {
-					commands.insert_resource(payload.deserialize::<T>()?);
-					Ok(())
-				},
-				remove: |commands| {
-					commands.remove_resource::<T>();
-				},
+impl ResourceFns {
+	pub fn new<T: Resource + DeserializeOwned>() -> Self {
+		Self {
+			insert: |commands, payload| {
+				commands.insert_resource(payload.deserialize::<T>()?);
+				Ok(())
 			},
-			direction,
-		);
-	}
-
-	fn outgoing_systems() -> SystemConfigs {
-		handle_outgoing::<T>.into_configs()
+			change: |commands, payload| {
+				commands.insert_resource(payload.deserialize::<T>()?);
+				Ok(())
+			},
+			remove: |commands| {
+				commands.remove_resource::<T>();
+			},
+		}
 	}
 }
+
+pub fn register_resource_outgoing<T: Resource + Serialize>(app: &mut App) {
+	app.add_systems(Update, handle_outgoing::<T>.in_set(MessageOutgoingSet));
+}
+
 fn handle_outgoing<T: Resource + Serialize>(
 	registrations: Res<ReplicateRegistry>,
 	mut outgoing: ResMut<MessageOutgoing>,

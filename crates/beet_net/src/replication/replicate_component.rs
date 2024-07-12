@@ -1,6 +1,5 @@
 use crate::prelude::*;
 use anyhow::Result;
-use bevy::ecs::schedule::SystemConfigs;
 use bevy::ecs::system::EntityCommands;
 use bevy::prelude::*;
 use forky_core::ResultTEExt;
@@ -16,28 +15,50 @@ pub struct ComponentFns {
 	pub remove: fn(&mut EntityCommands),
 }
 
-fn outgoing_insert<T: Component + Serialize>(
+impl ComponentFns {
+	pub fn new<T: Component + DeserializeOwned>() -> Self {
+		Self {
+			insert: |commands, payload| {
+				commands.insert(payload.deserialize::<T>()?);
+				Ok(())
+			},
+			change: |commands, payload| {
+				commands.insert(payload.deserialize::<T>()?);
+				Ok(())
+			},
+			remove: |commands| {
+				commands.remove::<T>();
+			},
+		}
+	}
+}
+
+fn outgoing_add<T: Component + Serialize>(
+	trigger: Trigger<OnAdd, T>,
 	registrations: Res<ReplicateRegistry>,
 	mut outgoing: ResMut<MessageOutgoing>,
-	query: Query<(Entity, &T), (Added<T>, With<Replicate>)>,
+	query: Query<&T, With<Replicate>>,
 ) {
-	for (entity, component) in query.iter() {
+	if let Ok(component) = query.get(trigger.entity()) {
 		let Some(payload) =
 			MessagePayload::new(component).ok_or(|e| log::error!("{e}"))
 		else {
-			continue;
+			return;
 		};
 		outgoing.push(
-			Message::Insert {
-				entity,
+			Message::Add {
+				entity: trigger.entity(),
 				reg_id: registrations.registration_id::<T>(),
 				payload,
 			}
 			.into(),
 		);
+	} else {
+		// no replicate component
 	}
 }
 
+/// This is a system because currently no `OnChange` trigger exists
 fn outgoing_change<T: Component + Serialize>(
 	registrations: Res<ReplicateRegistry>,
 	mut outgoing: ResMut<MessageOutgoing>,
@@ -66,57 +87,26 @@ fn outgoing_change<T: Component + Serialize>(
 
 /// This only responds to removed componets, it ignores despawned entities
 fn outgoing_remove<T: Component>(
+	trigger: Trigger<OnRemove, T>,
 	registrations: Res<ReplicateRegistry>,
 	mut outgoing: ResMut<MessageOutgoing>,
-	mut removed: RemovedComponents<T>,
 	query: Query<(), With<Replicate>>,
 ) {
-	for removed in removed.read() {
-		if query.contains(removed) {
-			outgoing.push(
-				Message::Remove {
-					entity: removed,
-					reg_id: registrations.registration_id::<T>(),
-				}
-				.into(),
-			);
-		}
+	if query.contains(trigger.entity()) {
+		outgoing.push(
+			Message::Remove {
+				entity: trigger.entity(),
+				reg_id: registrations.registration_id::<T>(),
+			}
+			.into(),
+		);
 	}
 }
 
-impl<T: Send + Sync + 'static + Component + Serialize + DeserializeOwned>
-	ReplicateType<ReplicateComponentMarker> for T
-{
-	fn register(
-		registrations: &mut ReplicateRegistry,
-		direction: ReplicateDirection,
-	) {
-		registrations.register_component::<T>(
-			ComponentFns {
-				insert: |commands, payload| {
-					commands.insert(payload.deserialize::<T>()?);
-					Ok(())
-				},
-				change: |commands, payload| {
-					commands.insert(payload.deserialize::<T>()?);
-					Ok(())
-				},
-				remove: |commands| {
-					commands.remove::<T>();
-				},
-			},
-			direction,
-		);
-	}
-
-	fn outgoing_systems() -> SystemConfigs {
-		(
-			outgoing_insert::<T>,
-			outgoing_change::<T>,
-			outgoing_remove::<T>,
-		)
-			.into_configs()
-	}
+pub fn register_component_outgoing<T: Component + Serialize>(app: &mut App) {
+	app.add_systems(Update, outgoing_change::<T>.in_set(MessageOutgoingSet));
+	app.world_mut().observe(outgoing_add::<T>);
+	app.world_mut().observe(outgoing_remove::<T>);
 }
 
 #[cfg(test)]
@@ -143,7 +133,6 @@ mod test {
 
 		app.update();
 
-
 		app.world_mut().entity_mut(entity).insert(MyComponent(8));
 
 		app.update();
@@ -154,10 +143,10 @@ mod test {
 		app.update();
 
 		let msg_out = app.world_mut().resource_mut::<MessageOutgoing>();
-		expect(msg_out.len()).to_be(4)?;
+		expect(msg_out.len()).to_be(5)?;
 		expect(&msg_out[0]).to_be(&Message::Spawn { entity }.into())?;
 		expect(&msg_out[1]).to_be(
-			&Message::Insert {
+			&Message::Add {
 				entity,
 				reg_id: RegistrationId::new_with(0),
 				payload: MessagePayload::new(&MyComponent(7))?,
