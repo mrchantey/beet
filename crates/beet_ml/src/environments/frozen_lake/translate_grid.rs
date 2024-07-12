@@ -66,7 +66,7 @@ fn translate_grid(
 		} else {
 			transform.translation = to_world;
 			**grid_pos = to_grid;
-			commands.entity(entity).insert(RunResult::Success);
+			commands.trigger_targets(OnRunResult::success(), entity);
 		}
 	}
 }

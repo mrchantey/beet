@@ -6,7 +6,7 @@ use std::marker::PhantomData;
 #[derive(Debug, Clone, PartialEq, Component, Action, Reflect)]
 #[reflect(Component, ActionMeta)]
 #[category(ActionCategory::Behavior)]
-#[systems(step_environment::<S>.in_set(TickSet))]
+#[observers(step_environment::<S>)]
 pub struct StepEnvironment<S: RlSessionTypes>
 where
 	S::State: Component,
@@ -38,6 +38,7 @@ where
 
 
 fn step_environment<S: RlSessionTypes>(
+	trigger: Trigger<OnRun>,
 	mut rng: Option<ResMut<RlRng>>,
 	mut end_episode_events: EventWriter<EndEpisode<S::EpisodeParams>>,
 	mut commands: Commands,
@@ -49,57 +50,55 @@ fn step_environment<S: RlSessionTypes>(
 		&QLearnParams,
 		&SessionEntity,
 	)>,
-	mut query: Query<
-		(Entity, &TargetAgent, &mut StepEnvironment<S>),
-		Added<Running>,
-	>,
+	mut query: Query<(&TargetAgent, &mut StepEnvironment<S>)>,
 ) where
 	S::State: Component,
 	S::Action: Component,
 	S::QLearnPolicy: Component,
 	S::Env: Component,
 {
-	for (action_entity, agent, mut step) in query.iter_mut() {
-		let Ok((state, mut action, mut env, params, session_entity)) =
-			agents.get_mut(**agent)
-		else {
-			continue;
-		};
-		let Ok(mut table) = sessions.get_mut(**session_entity) else {
-			continue;
-		};
+	let (agent, mut step) = query
+		.get_mut(trigger.entity())
+		.expect(expect_action::ACTION_QUERY_MISSING);
+	let Ok((state, mut action, mut env, params, session_entity)) =
+		agents.get_mut(**agent)
+	else {
+		return;
+	};
+	let Ok(mut table) = sessions.get_mut(**session_entity) else {
+		return;
+	};
 
-		let outcome = env.step(&state, &action);
-		// we ignore the state of the outcome, allow simulation to determine
-		let epsilon = params.epsilon(step.episode);
+	let outcome = env.step(&state, &action);
+	// we ignore the state of the outcome, allow simulation to determine
+	let epsilon = params.epsilon(step.episode);
 
-		let rng = if let Some(rng) = &mut rng {
-			rng.as_mut()
-		} else {
-			&mut RlRng::default()
-		};
+	let rng = if let Some(rng) = &mut rng {
+		rng.as_mut()
+	} else {
+		&mut RlRng::default()
+	};
 
-		*action = table.step(
-			params,
-			&mut **rng,
-			epsilon,
-			&action,
-			state,
-			&outcome.state,
-			outcome.reward,
-		);
-		// log::info!(
-		// 	"step complete - action: {:?}, reward: {:?}",
-		// 	action,
-		// 	outcome.reward
-		// );
+	*action = table.step(
+		params,
+		&mut **rng,
+		epsilon,
+		&action,
+		state,
+		&outcome.state,
+		outcome.reward,
+	);
+	// log::info!(
+	// 	"step complete - action: {:?}, reward: {:?}",
+	// 	action,
+	// 	outcome.reward
+	// );
 
-		commands.entity(action_entity).insert(RunResult::Success);
-		step.step += 1;
+	commands.trigger_targets(OnRunResult::success(), trigger.entity());
+	step.step += 1;
 
-		if outcome.done || step.step >= params.max_steps {
-			end_episode_events.send(EndEpisode::new(**session_entity));
-		}
+	if outcome.done || step.step >= params.max_steps {
+		end_episode_events.send(EndEpisode::new(**session_entity));
 	}
 }
 
@@ -115,6 +114,8 @@ mod test {
 	fn works() -> Result<()> {
 		let mut app = App::new();
 
+		let on_result = observe_triggers::<OnRunResult>(app.world_mut());
+
 		app.add_plugins((
 			LifecyclePlugin,
 			ActionPlugin::<StepEnvironment<FrozenLakeQTableSession>>::default(),
@@ -128,7 +129,7 @@ mod test {
 
 		let session = app.world_mut().spawn(FrozenLakeQTable::default()).id();
 
-		let agent = app
+		app
 			.world_mut()
 			.spawn(RlAgentBundle {
 				state: map.agent_position(),
@@ -139,25 +140,20 @@ mod test {
 				despawn: DespawnOnEpisodeEnd,
 			})
 			.with_children(|parent| {
-				parent.spawn((
-					TargetAgent(parent.parent_entity()),
-					StepEnvironment::<FrozenLakeQTableSession>::new(0),
-					Running,
-				));
-			})
-			.id();
+				parent
+					.spawn((
+						TargetAgent(parent.parent_entity()),
+						StepEnvironment::<FrozenLakeQTableSession>::new(0),
+					))
+					.flush_trigger(OnRun);
+			});
+
 
 		app.world_mut().insert_resource(rng);
 
-		let tree = EntityTree::new_with_world(agent, app.world_mut());
-
-		expect(tree.component_tree(app.world()))
-			.to_be(Tree::new(None).with_leaf(Some(&Running)))?;
-
 		app.update();
 
-		expect(tree.component_tree::<Running>(app.world()))
-			.to_be(Tree::new(None).with_leaf(None))?;
+		expect(&on_result).to_have_been_called()?;
 
 
 		let table = app.world().get::<FrozenLakeQTable>(session).unwrap();

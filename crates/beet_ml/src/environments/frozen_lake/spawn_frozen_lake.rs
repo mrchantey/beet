@@ -66,20 +66,28 @@ pub fn spawn_frozen_lake_episode(
 				let agent = parent.parent_entity();
 
 				parent
-					.spawn((Running, SequenceSelector, Repeat::default()))
+					.spawn((
+						Name::new("Train Frozen Lake Agent"),
+						SequenceFlow::default(),
+						Repeat::default(),
+					))
 					.with_children(|parent| {
 						parent.spawn((
+							Name::new("Go to grid cell"),
+							ContinueRun::default(),
 							TranslateGrid::new(Duration::from_millis(100)),
 							TargetAgent(agent),
 							RunTimer::default(),
 						));
 						parent.spawn((
+							Name::new("Step environment"),
 							TargetAgent(agent),
 							StepEnvironment::<FrozenLakeQTableSession>::new(
 								event.episode,
 							),
 						));
-					});
+					})
+					.trigger(OnRun);
 			});
 	}
 }
