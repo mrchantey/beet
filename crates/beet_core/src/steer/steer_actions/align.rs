@@ -1,13 +1,13 @@
 use crate::prelude::*;
 use beet_ecs::prelude::*;
-use bevy::ecs::schedule::SystemConfigs;
 use bevy::prelude::*;
 use std::marker::PhantomData;
 
-
-#[derive(Debug, Clone, PartialEq, Component, Reflect)]
-#[reflect(Default, Component, ActionMeta)]
 /// Align [`Velocity`] with that of entities with the given component.
+#[derive(Debug, Clone, PartialEq, Component, Action, Reflect)]
+#[reflect(Default, Component, ActionMeta)]
+#[category(ActionCategory::Agent)]
+#[systems(align::<M>.in_set(TickSet))]
 pub struct Align<M: GenericActionComponent> {
 	/// The scalar to apply to the impulse
 	pub scalar: f32,
@@ -50,13 +50,4 @@ fn align<M: GenericActionComponent>(
 
 		**impulse += *new_impulse * align.scalar;
 	}
-}
-
-
-impl<M: GenericActionComponent> ActionMeta for Align<M> {
-	fn category(&self) -> ActionCategory { ActionCategory::Agent }
-}
-
-impl<M: GenericActionComponent> ActionSystems for Align<M> {
-	fn systems() -> SystemConfigs { align::<M>.in_set(TickSet) }
 }

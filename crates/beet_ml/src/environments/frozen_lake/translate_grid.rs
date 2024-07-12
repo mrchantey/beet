@@ -1,12 +1,13 @@
 use crate::prelude::*;
 use beet_ecs::prelude::*;
-use bevy::ecs::schedule::SystemConfigs;
 use bevy::prelude::*;
 use std::f32::consts::TAU;
 use std::time::Duration;
 
-#[derive(Debug, Clone, PartialEq, Component, Reflect)]
+#[derive(Debug, Clone, PartialEq, Component, Action, Reflect)]
 #[reflect(Default, Component, ActionMeta)]
+#[category(ActionCategory::Behavior)]
+#[systems(translate_grid.in_set(TickSet))]
 pub struct TranslateGrid {
 	pub anim_duration: Duration,
 }
@@ -65,7 +66,7 @@ fn translate_grid(
 		} else {
 			transform.translation = to_world;
 			**grid_pos = to_grid;
-			commands.entity(entity).insert(RunResult::Success);
+			commands.entity(entity).trigger(OnRunResult::success());
 		}
 	}
 }
@@ -74,12 +75,4 @@ fn bounce(t: f32, n: i32) -> f32 {
 	let t = t * (n as f32) * TAU;
 	let bounce = t.sin().abs();
 	bounce
-}
-
-impl ActionMeta for TranslateGrid {
-	fn category(&self) -> ActionCategory { ActionCategory::Behavior }
-}
-
-impl ActionSystems for TranslateGrid {
-	fn systems() -> SystemConfigs { translate_grid.in_set(TickSet) }
 }

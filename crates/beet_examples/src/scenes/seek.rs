@@ -1,4 +1,4 @@
-use beet::prelude::*;
+use crate::beet::prelude::*;
 use crate::prelude::*;
 use bevy::prelude::*;
 
@@ -30,7 +30,8 @@ pub fn seek(mut commands: Commands) {
 			// behavior
 			parent.spawn((
 				Name::new("Seek"),
-				InsertOnTrigger::<AppReady, Running>::default(),
+				RunOnAppReady::default(),
+				ContinueRun::default(),
 				TargetAgent(parent.parent_entity()),
 				Seek,
 			));

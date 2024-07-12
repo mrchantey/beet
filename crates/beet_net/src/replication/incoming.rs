@@ -17,7 +17,7 @@ pub fn handle_incoming_commands(
 			Message::Despawn { entity } => {
 				commands.entity(*entity).despawn();
 			}
-			Message::Insert {
+			Message::Add {
 				entity,
 				reg_id,
 				payload,
@@ -69,6 +69,14 @@ pub fn handle_incoming_commands(
 					registrations.incoming_resource_fns.get(reg_id)
 				{
 					(fns.remove)(&mut commands);
+				}
+			}
+			Message::SendObserver { reg_id, payload } => {
+				if let Some(fns) =
+					registrations.incoming_observer_fns.get(reg_id)
+				{
+					(fns.send)(&mut commands, payload)
+						.ok_or(|e| log::error!("{e}"));
 				}
 			}
 			Message::SendEvent {

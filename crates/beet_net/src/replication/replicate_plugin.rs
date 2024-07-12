@@ -42,10 +42,12 @@ impl Plugin for ReplicatePlugin {
 				(
 					handle_incoming_commands.in_set(MessageIncomingSet),
 					handle_incoming_world.in_set(MessageIncomingSet),
-					handle_entity_outgoing.in_set(MessageOutgoingSet),
 					clear_incoming.after(MessageIncomingSet),
 				),
 			);
+
+		app.world_mut().observe(outgoing_spawn);
+		app.world_mut().observe(outgoing_despawn);
 
 		#[cfg(feature = "beet_ecs")]
 		{

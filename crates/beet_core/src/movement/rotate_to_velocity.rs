@@ -23,6 +23,7 @@ pub fn rotate_to_velocity_2d(
 
 
 /// Rotate an entity to face its [`Velocity`] in 3D space
+/// If the velocity is zero, this does nothing
 #[derive(Component, Deref, DerefMut, Reflect)]
 #[reflect(Default, Component)]
 pub struct RotateToVelocity3d(pub f32);

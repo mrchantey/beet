@@ -8,7 +8,12 @@ pub struct BertPlugin;
 
 impl Plugin for BertPlugin {
 	fn build(&self, app: &mut App) {
-		app.add_plugins(ActionPlugin::<SentenceScorer>::default())
+
+		app.add_plugins(ActionPlugin::<(
+			SentenceFlow,
+			InsertSentenceOnUserInput,
+			RunOnSentenceChange 
+		)>::default())
 			.init_asset::<Bert>()
 			.init_asset_loader::<BertLoader>()
 			.register_type::<Sentence>()
@@ -16,7 +21,7 @@ impl Plugin for BertPlugin {
 
 		#[cfg(feature = "beet_core")]
 		app.add_plugins(
-			ActionPlugin::<FindSentenceSteerTarget<Sentence>>::default(),
+			ActionPlugin::<InsertSentenceSteerTarget<Sentence>>::default(),
 		);
 
 		let world = app.world_mut();

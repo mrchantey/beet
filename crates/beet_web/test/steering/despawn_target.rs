@@ -14,7 +14,7 @@ pub async fn works() -> Result<()> {
 				.child((
 					Seek::default(),
 					FindSteerTarget::new("flower", 10.),
-					SucceedOnArrive { radius: 0.1 },
+					StopOnArrive { radius: 0.1 },
 				))
 				.child((
 					InsertOnRun(RunResult::Success),

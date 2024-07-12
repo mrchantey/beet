@@ -1,19 +1,12 @@
 use beet_ecs::prelude::*;
-use bevy::ecs::schedule::SystemConfigs;
 use bevy::prelude::*;
 use forky_core::ResultTEExt;
 
-impl ActionMeta for Translate {
-	fn category(&self) -> ActionCategory { ActionCategory::Agent }
-}
-
-impl ActionSystems for Translate {
-	fn systems() -> SystemConfigs { translate.in_set(TickSet) }
-}
-
-#[derive(Debug, Default, Clone, PartialEq, Component, Reflect)]
-#[reflect(Default, Component, ActionMeta)]
 /// Applies constant translation, multiplied by [`Time::delta_seconds`]
+#[derive(Debug, Default, Clone, PartialEq, Component, Action, Reflect)]
+#[reflect(Default, Component, ActionMeta)]
+#[category(ActionCategory::Agent)]
+#[systems(translate.in_set(TickSet))]
 pub struct Translate {
 	/// Translation to apply, in meters per second
 	// #[inspector(min=-2., max=2., step=0.1)]

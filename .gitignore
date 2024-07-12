@@ -3,3 +3,4 @@ assets
 docs/book
 crates/beet_web/assets/scenes
 out.txt
+rustc-ice*

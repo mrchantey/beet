@@ -16,10 +16,12 @@ impl Plugin for SteerPlugin {
 			Separate<GroupSteerAgent>,
 			Align<GroupSteerAgent>,
 			Cohere<GroupSteerAgent>,
-			SucceedOnArrive,
+			EndOnArrive,
 			FindSteerTarget,
-			ScoreSteerTarget,
+			SteerTargetScoreProvider,
 			DespawnSteerTarget,
+			RunOnSteerTargetInsert,
+			RunOnSteerTargetRemove,
 		)>::default())
 		.register_type::<SteerTarget>()
 		.register_type::<MaxForce>()

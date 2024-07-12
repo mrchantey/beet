@@ -1,25 +1,17 @@
 use crate::prelude::*;
-use bevy::ecs::schedule::SystemConfigs;
 use bevy::prelude::*;
 
-#[derive(Debug, Clone, PartialEq, Deref, DerefMut, Component, Reflect)]
-#[reflect(Component, ActionMeta)]
 /// Sets a component when this behavior spawns.
 /// This does nothing if the entity does not have the component.
+#[derive(Debug, Clone, PartialEq, Deref, DerefMut, Component, Action, Reflect)]
+#[reflect(Component, ActionMeta)]
+#[category(ActionCategory::Behavior)]
+#[systems(set_on_spawn::<T>.in_set(PreTickSet))]
 pub struct SetOnSpawn<T: GenericActionComponent>(pub T);
 
 impl<T: Default + GenericActionComponent> Default for SetOnSpawn<T> {
 	fn default() -> Self { Self(T::default()) }
 }
-
-impl<T: GenericActionComponent> ActionMeta for SetOnSpawn<T> {
-	fn category(&self) -> ActionCategory { ActionCategory::Behavior }
-}
-
-impl<T: GenericActionComponent> ActionSystems for SetOnSpawn<T> {
-	fn systems() -> SystemConfigs { set_on_spawn::<T>.in_set(PreTickSet) }
-}
-
 
 impl<T: GenericActionComponent> SetOnSpawn<T> {
 	pub fn new(value: impl Into<T>) -> Self { Self(value.into()) }

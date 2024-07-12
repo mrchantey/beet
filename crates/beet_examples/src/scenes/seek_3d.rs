@@ -1,5 +1,5 @@
 use super::*;
-use beet::prelude::*;
+use crate::beet::prelude::*;
 use crate::prelude::*;
 use bevy::prelude::*;
 use std::time::Duration;
@@ -20,13 +20,13 @@ pub fn seek_3d(mut commands: Commands) {
 		))
 		.id();
 
-		let Foxie {
-			graph,
-			idle_clip,
-			idle_index,
-			walk_index,
-			..
-		} = load_foxie();
+	let Foxie {
+		graph,
+		idle_clip,
+		idle_index,
+		walk_index,
+		..
+	} = load_foxie();
 
 	let transition_duration = Duration::from_secs_f32(0.5);
 
@@ -50,32 +50,34 @@ pub fn seek_3d(mut commands: Commands) {
 			parent
 				.spawn((
 					Name::new("Seek Behavior"),
-					Running,
-					SequenceSelector,
-					Repeat,
+					RunOnSpawn,
+					SequenceFlow,
+					Repeat::default(),
 				))
 				.with_children(|parent| {
 					parent.spawn((
 						Name::new("Idle"),
+						ContinueRun::default(),
 						TargetAgent(agent),
 						SetAgentOnRun(Velocity::default()),
 						PlayAnimation::new(idle_index)
 							.with_transition_duration(transition_duration),
 						idle_clip,
-						InsertOnAnimationEnd::new(
+						TriggerOnAnimationEnd::new(
 							idle_index,
-							RunResult::Success,
+							OnRunResult::success(),
 						)
 						.with_transition_duration(transition_duration),
 					));
 					parent.spawn((
 						Name::new("Seek"),
+						ContinueRun::default(),
 						TargetAgent(agent),
 						Seek,
 						PlayAnimation::new(walk_index)
 							.repeat_forever()
 							.with_transition_duration(transition_duration),
-						SucceedOnArrive::new(6.),
+						EndOnArrive::new(6.),
 					));
 				});
 		});

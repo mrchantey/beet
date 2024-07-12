@@ -1,5 +1,5 @@
-use crate::prelude::OnUserMessage;
-use beet::prelude::*;
+use crate::beet::prelude::*;
+// use crate::prelude::*;
 use bevy::input::keyboard::Key;
 use bevy::input::keyboard::KeyboardInput;
 use bevy::input::ButtonState;
@@ -12,9 +12,14 @@ pub struct UiTerminalPlugin;
 impl Plugin for UiTerminalPlugin {
 	fn build(&self, app: &mut App) {
 		app.add_plugins(BeetDebugPlugin::new(append_text))
+		.observe(
+			|trigger: Trigger<OnLogMessage>,	commands: Commands,
+			terminals: Query<Entity, With<UiTerminal>>| {
+				append_text(In(vec![trigger.event().0.to_string()]), commands, terminals);
+			},
+		)
 			.add_systems(Update, (
 				log_log_on_run.pipe(append_text),
-				log_user_input.pipe(append_text),
 				log_app_ready.pipe(append_text),
 				parse_text_input
 			))
@@ -86,12 +91,7 @@ fn log_log_on_run(query: Query<&LogOnRun, Added<Running>>) -> Vec<String> {
 		.map(|log| format!("LogOnRun: {}", log.0.to_string()))
 		.collect()
 }
-fn log_user_input(mut events: EventReader<OnUserMessage>) -> Vec<String> {
-	events
-		.read()
-		.map(|ev| format!("User: {}", ev.0.to_string()))
-		.collect()
-}
+
 fn log_app_ready(mut events: EventReader<AppReady>) -> Vec<String> {
 	events
 		.read()
@@ -271,9 +271,9 @@ pub fn spawn_ui_terminal(mut commands: Commands, user_input: bool) {
 }
 
 fn parse_text_input(
+	mut commands: Commands,
 	mut evr_char: EventReader<KeyboardInput>,
 	keys: Res<ButtonInput<KeyCode>>,
-	mut on_submit: EventWriter<OnUserMessage>,
 	mut query: Query<&mut Text, With<InputContainer>>,
 ) {
 	if keys.any_pressed([KeyCode::ControlRight, KeyCode::ControlLeft]) {
@@ -287,7 +287,7 @@ fn parse_text_input(
 			let text = &mut text.sections[1].value; // first index is ' > '
 			match &ev.logical_key {
 				Key::Enter => {
-					on_submit.send(OnUserMessage(text.clone()));
+					commands.trigger(OnUserMessage(text.clone()));
 					text.clear();
 				}
 				Key::Backspace => {

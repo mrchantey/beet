@@ -12,7 +12,7 @@ impl Plugin for AnimationPlugin {
     	.add_systems(Update, init_animators)
 			.add_plugins(ActionPlugin::<(
 				PlayAnimation,
-				InsertOnAnimationEnd<RunResult>
+				TriggerOnAnimationEnd<OnRunResult>
 			)>::default())
 		;
 	}

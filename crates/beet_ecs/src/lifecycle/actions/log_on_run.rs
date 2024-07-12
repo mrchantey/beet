@@ -1,21 +1,14 @@
 use crate::prelude::*;
-use bevy::ecs::schedule::SystemConfigs;
 use bevy::prelude::*;
 use std::borrow::Cow;
 
-#[derive(Debug, Clone, PartialEq, Component, Reflect)]
-#[reflect(Default, Component, ActionMeta)]
 /// Mostly used for hello-world programs, logs a message when the action is run.
 /// Use [`BeetDebugPlugin`] for debugging run-state.
+#[derive(Debug, Clone, PartialEq, Component, Action, Reflect)]
+#[reflect(Default, Component, ActionMeta)]
+#[category(ActionCategory::Behavior)]
+#[systems(log_on_run.in_set(TickSet))]
 pub struct LogOnRun(pub Cow<'static, str>);
-
-impl ActionMeta for LogOnRun {
-	fn category(&self) -> ActionCategory { ActionCategory::Behavior }
-}
-
-impl ActionSystems for LogOnRun {
-	fn systems() -> SystemConfigs { log_on_run.in_set(TickSet) }
-}
 
 impl Default for LogOnRun {
 	fn default() -> Self { Self(Cow::Borrowed("Running...")) }

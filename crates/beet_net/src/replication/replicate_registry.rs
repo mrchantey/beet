@@ -1,6 +1,7 @@
 use crate::prelude::*;
 use bevy::prelude::*;
 use bevy::utils::HashMap;
+use serde::de::DeserializeOwned;
 use serde::Deserialize;
 use serde::Serialize;
 use std::any::TypeId;
@@ -41,6 +42,7 @@ pub struct ReplicateRegistry {
 	pub incoming_component_fns: HashMap<RegistrationId, ComponentFns>,
 	pub incoming_resource_fns: HashMap<RegistrationId, ResourceFns>,
 	pub incoming_event_fns: HashMap<RegistrationId, EventFns>,
+	pub incoming_observer_fns: HashMap<RegistrationId, ObserverFns>,
 	pub directions: HashMap<RegistrationId, ReplicateDirection>,
 }
 
@@ -96,36 +98,46 @@ impl ReplicateRegistry {
 		id
 	}
 
-	pub fn register_component<T: Component>(
+	pub fn register_component<T: Component + DeserializeOwned>(
 		&mut self,
-		fns: ComponentFns,
 		direction: ReplicateDirection,
 	) -> RegistrationId {
 		let id = self.next_id::<T>(direction);
 		if direction.is_incoming() {
-			self.incoming_component_fns.insert(id, fns);
+			self.incoming_component_fns
+				.insert(id, ComponentFns::new::<T>());
 		}
 		id
 	}
-	pub fn register_resource<T: Resource>(
+	pub fn register_resource<T: Resource + DeserializeOwned>(
 		&mut self,
-		fns: ResourceFns,
 		direction: ReplicateDirection,
 	) -> RegistrationId {
 		let id = self.next_id::<T>(direction);
 		if direction.is_incoming() {
-			self.incoming_resource_fns.insert(id, fns);
+			self.incoming_resource_fns
+				.insert(id, ResourceFns::new::<T>());
 		}
 		id
 	}
-	pub fn register_event<T: Event>(
+	pub fn register_event<T: Event + DeserializeOwned>(
 		&mut self,
-		fns: EventFns,
 		direction: ReplicateDirection,
 	) -> RegistrationId {
 		let id = self.next_id::<T>(direction);
 		if direction.is_incoming() {
-			self.incoming_event_fns.insert(id, fns);
+			self.incoming_event_fns.insert(id, EventFns::new::<T>());
+		}
+		id
+	}
+	pub fn register_observer<T: Event + DeserializeOwned>(
+		&mut self,
+		direction: ReplicateDirection,
+	) -> RegistrationId {
+		let id = self.next_id::<T>(direction);
+		if direction.is_incoming() {
+			self.incoming_observer_fns
+				.insert(id, ObserverFns::new::<T>());
 		}
 		id
 	}

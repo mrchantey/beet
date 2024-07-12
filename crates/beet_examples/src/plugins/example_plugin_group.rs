@@ -1,68 +1,59 @@
+use crate::beet::prelude::*;
 use crate::prelude::*;
-use beet::prelude::*;
-use bevy::app::PluginGroupBuilder;
 use bevy::prelude::*;
 
-
-/// Kitchen sink plugin, this is all you need for
-/// ### Rendering
-/// - text
-/// - 2d
-/// - 3d
-/// ### Beet
-/// - steering
-/// - machine learning
-///
-pub struct ExamplePluginFull;
-
-impl Plugin for ExamplePluginFull {
-	fn build(&self, app: &mut App) {
-		app.add_plugins((
-			ExampleDefaultPlugins,
-			DefaultBeetPlugins,
-			ExamplePlugins,
-		))
-		.add_systems(Startup, load_scenes_from_args);
-	}
-}
-/// Just the essentials, no machine learning
+/// Some types, and ui elements
 pub struct ExamplePluginBasics;
 
 impl Plugin for ExamplePluginBasics {
 	fn build(&self, app: &mut App) {
-		app.add_plugins((
+		app
+    .add_plugins((
 			ExampleDefaultPlugins,
+			ExamplePluginTypesBasic,
+		))
+	/*-*/;
+	}
+}
+
+/// All types and ui elements
+pub struct ExamplePluginFull;
+
+impl Plugin for ExamplePluginFull {
+	fn build(&self, app: &mut App) {
+		app.add_plugins((ExampleDefaultPlugins, ExamplePluginTypesFull));
+	}
+}
+
+
+pub struct ExamplePluginTypesBasic;
+
+impl Plugin for ExamplePluginTypesBasic {
+	fn build(&self, app: &mut App) {
+		app.add_plugins((
+			ExampleReplicatePlugin,
 			DefaultBeetPlugins,
+			BundlePlaceholderPlugin,
+			UiTerminalPlugin,
+			BeetDebugPluginBase,
 			BeetDebugPluginStdout,
-			ExampleBasePlugin,
 			Example2dPlugin,
 			Example3dPlugin,
-			UiTerminalPlugin,
-			ExampleReplicatePlugin,
-			BundlePlaceholderPlugin,
 		))
-		.add_systems(Startup, load_scenes_from_args);
+		.register_type::<Collectable>();
 	}
 }
+pub struct ExamplePluginTypesFull;
 
-#[derive(Default)]
-pub struct ExamplePlugins;
-
-impl PluginGroup for ExamplePlugins {
-	fn build(self) -> PluginGroupBuilder {
-		PluginGroupBuilder::start::<Self>()
-			.add(BeetDebugPluginStdout)
-			.add(ExampleBasePlugin)
-			.add(Example2dPlugin)
-			.add(Example3dPlugin)
-			.add(UiTerminalPlugin)
-			.add(ExampleReplicatePlugin)
-			.add(BundlePlaceholderPlugin)
-			.add(ExampleMlPlugin)
-			.add(FrozenLakePlugin)
+impl Plugin for ExamplePluginTypesFull {
+	fn build(&self, app: &mut App) {
+		app.add_plugins((
+			ExamplePluginTypesBasic,
+			ExampleMlPlugin,
+			FrozenLakePlugin,
+		));
 	}
 }
-
 
 pub struct ExampleMlPlugin;
 
@@ -71,7 +62,6 @@ impl Plugin for ExampleMlPlugin {
 		app.add_plugins((
 			// sentence selector
 			BertPlugin::default(),
-			ActionPlugin::<InsertOnAssetEvent<RunResult, Bert>>::default(),
 			AssetPlaceholderPlugin::<Bert>::default(),
 			ReadyOnAssetLoadPlugin::<Bert>::default(),
 			// qtables (frozen lake)
@@ -80,25 +70,16 @@ impl Plugin for ExampleMlPlugin {
 		))
 		// fetch
 		.add_plugins(ActionPlugin::<(
-			InsertOnAssetEvent<RunResult, Bert>,
-			FindSentenceSteerTarget<Collectable>,
-			RemoveAgentOnRun<Sentence>,
-			RemoveAgentOnRun<SteerTarget>,
+			InsertSentenceSteerTarget<Collectable>,
+			RemoveOnTrigger<OnRunResult, Sentence>,
+			RemoveOnTrigger<OnRunResult, SteerTarget>,
+			InsertOnTrigger<OnRun,Velocity>,
+			RemoveOnTrigger<OnRunResult,Velocity>,
 		)>::default())
 			/*-*/;
 	}
 }
-pub struct ExampleBasePlugin;
 
-impl Plugin for ExampleBasePlugin {
-	fn build(&self, app: &mut App) {
-		app
-    .add_systems(Update,set_player_sentence)
-		.register_type::<Player>()
-		.register_type::<Collectable>()
-	/*-*/;
-	}
-}
 
 
 pub struct Example2dPlugin;

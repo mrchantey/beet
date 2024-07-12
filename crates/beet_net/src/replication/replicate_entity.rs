@@ -4,19 +4,42 @@ use bevy::prelude::*;
 
 pub struct ReplicateEntityPlugin;
 
-
-pub fn handle_entity_outgoing(
+pub fn outgoing_spawn(
+	trigger: Trigger<OnAdd, Replicate>,
 	mut outgoing: ResMut<MessageOutgoing>,
-	added: Query<Entity, Added<Replicate>>,
-	mut removed: RemovedComponents<Replicate>,
 ) {
-	for entity in added.iter() {
-		outgoing.push(Message::Spawn { entity }.into());
-	}
-	for entity in removed.read() {
-		outgoing.push(Message::Despawn { entity }.into());
-	}
+	outgoing.push(
+		Message::Spawn {
+			entity: trigger.entity(),
+		}
+		.into(),
+	);
 }
+
+pub fn outgoing_despawn(
+	trigger: Trigger<OnRemove, Replicate>,
+	mut outgoing: ResMut<MessageOutgoing>,
+) {
+	outgoing.push(
+		Message::Despawn {
+			entity: trigger.entity(),
+		}
+		.into(),
+	);
+}
+
+// pub fn handle_entity_outgoing(
+// 	mut outgoing: ResMut<MessageOutgoing>,
+// 	added: Query<Entity, Added<Replicate>>,
+// 	mut removed: RemovedComponents<Replicate>,
+// ) {
+// 	for entity in added.iter() {
+// 		outgoing.push(Message::Spawn { entity }.into());
+// 	}
+// 	for entity in removed.read() {
+// 		outgoing.push(Message::Despawn { entity }.into());
+// 	}
+// }
 
 
 
@@ -68,9 +91,11 @@ mod test {
 		app2.update();
 
 		let entities = app2.world().iter_entities().collect::<Vec<_>>();
-		// 1 = dummy
-		// 2 = replicated
-		expect(entities.len()).to_be(2)?;
+		// 0 = observer
+		// 1 = observer
+		// 3 = dummy
+		// 4 = replicated
+		expect(entities.len()).to_be(4)?;
 
 		Ok(())
 	}

@@ -12,14 +12,19 @@ categories.workspace = true
 
 [features]
 default = []
-tokio = ["beet/tokio"]
-
+# to enable reflect we need OnInsert to derive reflect https://github.com/bevyengine/bevy/pull/14259
+reflect = ["beet_ecs/reflect"]
+tokio = ["beet_net/tokio"]
 
 [dependencies]
 forky_core.workspace = true
-# beet = { workspace = true }
-beet = { workspace = true, features = ["reflect"] }
+beet_ecs.workspace = true
+beet_core.workspace = true
+beet_net.workspace = true
+beet_ml.workspace = true
+# beet = { workspace = true, features = ["reflect"] }
 bevy = { workspace = true, default-features = true }
+bevy-inspector-egui = "0.25.0"
 log.workspace = true
 pretty_env_logger.workspace = true
 forky_bevy.workspace = true
@@ -43,5 +48,5 @@ tokio.workspace = true
 
 
 [[example]]
-name="export_scenes"
-path="./examples/export_scenes.rs"
+name = "export_scenes"
+path = "./examples/export_scenes.rs"

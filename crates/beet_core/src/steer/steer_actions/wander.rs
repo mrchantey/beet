@@ -1,11 +1,12 @@
 use crate::prelude::*;
 use beet_ecs::prelude::*;
-use bevy::ecs::schedule::SystemConfigs;
 use bevy::prelude::*;
 
-#[derive(Debug, Clone, PartialEq, Component, Reflect)]
-#[reflect(Default, Component, ActionMeta)]
 /// Somewhat cohesive random walk
+#[derive(Debug, Clone, PartialEq, Component, Action, Reflect)]
+#[reflect(Default, Component, ActionMeta)]
+#[category(ActionCategory::Agent)]
+#[systems(wander.in_set(TickSet))]
 pub struct Wander {
 	/// The scalar to apply to the impulse
 	pub scalar: f32,
@@ -49,16 +50,6 @@ fn wander(
 		}
 	}
 }
-
-
-impl ActionMeta for Wander {
-	fn category(&self) -> ActionCategory { ActionCategory::Agent }
-}
-
-impl ActionSystems for Wander {
-	fn systems() -> SystemConfigs { wander.in_set(TickSet) }
-}
-
 
 #[cfg(test)]
 mod test {

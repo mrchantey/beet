@@ -1,11 +1,12 @@
 use crate::prelude::*;
-use bevy::ecs::schedule::SystemConfigs;
 use bevy::prelude::*;
 
 /// Sets an agent's component when this behavior starts running.
 /// This does nothing if the agent does not have the component.
-#[derive(PartialEq, Deref, DerefMut, Debug, Clone, Component, Reflect)]
+#[derive(PartialEq, Deref, DerefMut, Debug, Clone, Component, Action, Reflect)]
 #[reflect(Component, ActionMeta)]
+#[category(ActionCategory::Agent)]
+#[observers(set_agent_on_run::<T>)]
 pub struct SetAgentOnRun<T: GenericActionComponent>(pub T);
 
 impl<T: GenericActionComponent> SetAgentOnRun<T> {
@@ -16,23 +17,18 @@ impl<T: Default + GenericActionComponent> Default for SetAgentOnRun<T> {
 	fn default() -> Self { Self(T::default()) }
 }
 
-
-impl<T: GenericActionComponent> ActionMeta for SetAgentOnRun<T> {
-	fn category(&self) -> ActionCategory { ActionCategory::Agent }
-}
-
-impl<T: GenericActionComponent> ActionSystems for SetAgentOnRun<T> {
-	fn systems() -> SystemConfigs { set_agent_on_run::<T>.in_set(PostTickSet) }
-}
-
-
 fn set_agent_on_run<T: GenericActionComponent>(
+	trigger: Trigger<OnRun>,
 	mut agents: Query<&mut T>,
-	mut query: Query<(&TargetAgent, &SetAgentOnRun<T>), Added<Running>>,
+	query: Query<(&TargetAgent, &SetAgentOnRun<T>)>,
 ) {
-	for (entity, src) in query.iter_mut() {
-		if let Ok(mut dst) = agents.get_mut(**entity) {
-			*dst = src.0.clone();
-		}
+	let (target, action) = query
+		.get(trigger.entity())
+		.expect(expect_action::ACTION_QUERY_MISSING);
+
+	if let Ok(mut dst) = agents.get_mut(**target) {
+		*dst = action.0.clone();
+	} else {
+		log::warn!("SetAgentOnRun: Agent with component not found");
 	}
 }

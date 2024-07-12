@@ -1,6 +1,5 @@
 use crate::prelude::*;
 use anyhow::Result;
-use bevy::ecs::schedule::SystemConfigs;
 use bevy::prelude::*;
 use forky_core::ResultTEExt;
 use serde::de::DeserializeOwned;
@@ -12,26 +11,21 @@ pub struct EventFns {
 	pub send: fn(&mut World, payload: &MessagePayload) -> Result<()>,
 }
 
-impl<T: Send + Sync + 'static + Event + Serialize + DeserializeOwned>
-	ReplicateType<ReplicateEventMarker> for T
-{
-	fn register(
-		registrations: &mut ReplicateRegistry,
-		direction: ReplicateDirection,
-	) {
-		registrations.register_event::<T>(
-			EventFns {
-				send: |commands, payload| {
-					commands.send_event(payload.deserialize::<T>()?);
-					Ok(())
-				},
+impl EventFns {
+	pub fn new<T: Event + DeserializeOwned>() -> Self {
+		Self {
+			send: |world, payload| {
+				world.send_event(payload.deserialize::<T>()?);
+				Ok(())
 			},
-			direction,
-		);
+		}
 	}
-
-	fn outgoing_systems() -> SystemConfigs { outgoing_send::<T>.into_configs() }
 }
+
+pub fn register_event_outgoing<T: Event + Serialize>(app: &mut App) {
+	app.add_systems(Update, outgoing_send::<T>.in_set(MessageOutgoingSet));
+}
+
 fn outgoing_send<T: Event + Serialize>(
 	registrations: Res<ReplicateRegistry>,
 	mut outgoing: ResMut<MessageOutgoing>,

@@ -1,11 +1,12 @@
 use crate::prelude::*;
 use beet_ecs::prelude::*;
-use bevy::ecs::schedule::SystemConfigs;
 use bevy::prelude::*;
 use std::marker::PhantomData;
 
-#[derive(Debug, Clone, PartialEq, Component, Reflect)]
+#[derive(Debug, Clone, PartialEq, Component, Action, Reflect)]
 #[reflect(Component, ActionMeta)]
+#[category(ActionCategory::Behavior)]
+#[observers(read_q_policy::<P>)]
 pub struct ReadQPolicy<P: QPolicy + Asset> {
 	#[reflect(ignore)]
 	phantom: PhantomData<P>,
@@ -20,25 +21,26 @@ impl<P: QPolicy + Asset> Default for ReadQPolicy<P> {
 }
 
 fn read_q_policy<P: QPolicy + Asset>(
+	trigger: Trigger<OnRun>,
 	mut commands: Commands,
 	assets: Res<Assets<P>>,
 	mut agents: Query<(&P::State, &mut P::Action)>,
-	query: Query<(Entity, &Handle<P>, &ReadQPolicy<P>), With<Running>>,
+	query: Query<(&ReadQPolicy<P>, &Handle<P>, &TargetAgent)>,
 ) {
-	for (entity, handle, _read_q_policy) in query.iter() {
-		if let Some(policy) = assets.get(handle) {
-			for (state, mut action) in agents.iter_mut() {
-				*action = policy.greedy_policy(state).0;
-				commands.entity(entity).insert(RunResult::Success);
-			}
-		}
-	}
-}
+	let (_, handle, agent) = query
+		.get(trigger.entity())
+		.expect(expect_action::ACTION_QUERY_MISSING);
 
-impl<P: QPolicy + Asset> ActionMeta for ReadQPolicy<P> {
-	fn category(&self) -> ActionCategory { ActionCategory::Behavior }
-}
+	let policy = assets.get(handle).expect(expect_asset::NOT_READY);
 
-impl<P: QPolicy + Asset> ActionSystems for ReadQPolicy<P> {
-	fn systems() -> SystemConfigs { read_q_policy::<P>.in_set(TickSet) }
+	let (state, mut action) = agents
+		.get_mut(agent.0)
+		.expect(expect_action::TARGET_MISSING);
+
+
+	*action = policy.greedy_policy(state).0;
+	log::info!("ReadQPolicy: \n{:?}\n{:?}", state, action);
+	commands
+		.entity(trigger.entity())
+		.trigger(OnRunResult::success());
 }

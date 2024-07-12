@@ -160,49 +160,54 @@ impl Bert {
 
 		Ok(SentenceEmbeddings::new(options, embeddings))
 	}
-
-
-	/// Score a list of entities with a [`Sentence`] against a root entity with a [`Sentence`]. This returns a list of entities with their sentence and raw cosine similarity scores.
+	/// **Very expensive!**
+	/// Returns the option with a [`Sentence`] that is closest
 	/// Scores are in a range of `0..1`, higher means more similar, the list is sorted in descending order.
 	/// This calls [`Bert::get_embeddings`] and has the associated performance implications.
-	/// If the root is missing a [`Sentence`] an empty vec will be returned.
 	/// If options are missing a [`Sentence`] they will be ignored.
 	/// The root is filtered out of the options.
 	/// # Errors
 	/// Will return an error if the embeddings are not calculated correctly.
-	pub fn score_sentences(
+	pub fn closest_sentence_entity(
 		&mut self,
-		root_entity: Entity,
+		target: impl Into<Cow<'static, str>>,
 		options: impl IntoIterator<Item = Entity>,
 		sentences: &Query<&Sentence>,
-	) -> Result<Vec<(Entity, Sentence, f32)>> {
-		let Ok(root_sentence) = sentences.get(root_entity) else {
-			return Ok(vec![]);
-		};
-
+	) -> Result<Entity> {
 		let options = options
 			.into_iter()
-			.filter(|option| option != &root_entity)
 			.filter_map(|e| sentences.get(e).ok().map(|s| (e, s)))
 			.collect::<Vec<_>>();
+		//todo: async
 
-		let mut all_sentences = vec![root_sentence.0.clone()];
-		all_sentences.extend(options.iter().map(|c| (c.1 .0.clone())));
+		self.closest_option_index(
+			target,
+			options.iter().map(|c| c.1 .0.clone()),
+		)
+		.map(|i| options[i].0)
+	}
 
+	/// Returns the index of the option that is closest to the target.
+	pub fn closest_option_index(
+		&mut self,
+		target: impl Into<Cow<'static, str>>,
+		options: impl IntoIterator<Item = Cow<'static, str>>,
+	) -> Result<usize> {
+		let mut all_sentences = vec![target.into()];
+		all_sentences.extend(options);
 		let embeddings = self.get_embeddings(all_sentences)?;
+		let scores = embeddings.scores_from_first()?;
 
-		let scores = embeddings
-			.scores(0)?
-			.into_iter()
-			.map(|(score_index, score)| {
-				// subtract 1 because the first index is the agent
-				let (entity, sentence) = options[score_index - 1];
-
-				(entity, sentence.clone(), score)
+		let highest_index = scores
+			.iter()
+			.enumerate()
+			.max_by(|a, b| {
+				a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal)
 			})
-			.collect::<Vec<_>>();
+			.ok_or_else(|| E::msg("No scores returned"))?
+			.0;
 
-		Ok(scores)
+		Ok(highest_index)
 	}
 
 
@@ -262,7 +267,7 @@ mod test {
 			"Do you like pizza?".into(),
 		])?;
 
-		let results = embeddings.scores(0)?;
+		let results = embeddings.scores_sorted(0)?;
 		expect(embeddings.sentences[results[0].0].as_ref())
 			.to_be("The cat plays in the garden")?;
 

@@ -1,5 +1,5 @@
 use anyhow::Result;
-use beet::prelude::*;
+use beet_examples::beet::prelude::*;
 use beet_examples::prelude::*;
 use beet_examples::scenes;
 use bevy::ecs::schedule::SystemConfigs;
@@ -24,7 +24,7 @@ fn main() -> Result<()> {
 			SceneItem::new("ui-terminal-input", scenes::ui_terminal_input),
 			SceneItem::new("hello-world", scenes::hello_world),
 			SceneItem::new("hello-net", scenes::hello_net),
-			SceneItem::new("sentence-selector", scenes::sentence_selector),
+			SceneItem::new("sentence-selector", scenes::hello_ml),
 			// 2d
 			SceneItem::new("space-scene", scenes::space_scene),
 			SceneItem::new("seek", scenes::seek),
@@ -33,7 +33,6 @@ fn main() -> Result<()> {
 			SceneItem::new("ground-3d", scenes::ground_3d),
 			SceneItem::new("lighting-3d", scenes::lighting_3d),
 			SceneItem::new("hello-animation", scenes::hello_animation),
-			
 			SceneItem::new("seek-3d", scenes::seek_3d),
 			// fetch
 			SceneItem::new("fetch-scene", scenes::fetch_scene),
@@ -94,7 +93,7 @@ impl SceneItem {
 		app.add_plugins((
 			utils::MostDefaultPlugins,
 			DefaultBeetPlugins::default(),
-			ExamplePlugins,
+			ExamplePluginTypesFull,
 		))
 		.finish();
 

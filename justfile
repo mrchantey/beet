@@ -5,6 +5,11 @@ crates := 'beet beet_core beet_ecs beet_net'
 default:
 	just --list --unsorted
 
+example example:
+	cargo run --example {{example}} 
+
+foo:
+	RUST_LOG=info cargo run --example hello_world
 
 ## common
 cmd *args:
@@ -131,6 +136,9 @@ env:
 
 expand crate example *args:
 	just watch 'cargo expand -p {{crate}} --example {{example}} {{args}}'
+
+patch:
+	cargo set-version --bump patch
 
 publish crate *args:
 	cargo publish -p {{crate}} --allow-dirty --no-verify {{args}}

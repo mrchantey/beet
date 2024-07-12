@@ -1,3 +1,6 @@
+pub mod beet_root;
+#[allow(unused_imports)]
+pub use self::beet_root::*;
 pub mod component_ident;
 #[allow(unused_imports)]
 pub use self::component_ident::*;

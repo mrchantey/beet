@@ -1,11 +1,12 @@
 use beet_ecs::prelude::*;
-use bevy::ecs::schedule::SystemConfigs;
 use bevy::prelude::*;
 use std::f32::consts::TAU;
 
 
-#[derive(Debug, Default, Clone, PartialEq, Component, Reflect)]
+#[derive(Debug, Default, Clone, PartialEq, Component, Action, Reflect)]
 #[reflect(Default, Component, ActionMeta)]
+#[category(ActionCategory::Agent)]
+#[systems(hover.in_set(TickSet))]
 /// Translate the agent up and down in a sine wave
 pub struct Hover {
 	/// Measured in Hz
@@ -31,14 +32,4 @@ fn hover(
 		let y = f32::sin(TAU * elapsed * hover.speed) * hover.height;
 		transforms.get_mut(**target).unwrap().translation.y = y;
 	}
-}
-
-
-
-impl ActionMeta for Hover {
-	fn category(&self) -> ActionCategory { ActionCategory::Agent }
-}
-
-impl ActionSystems for Hover {
-	fn systems() -> SystemConfigs { hover.in_set(TickSet) }
 }

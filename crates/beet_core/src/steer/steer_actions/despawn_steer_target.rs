@@ -1,10 +1,11 @@
 use crate::prelude::*;
 use beet_ecs::prelude::*;
-use bevy::ecs::schedule::SystemConfigs;
 use bevy::prelude::*;
 
-#[derive(Debug, Default, Clone, PartialEq, Component, Reflect)]
+#[derive(Debug, Default, Clone, PartialEq, Component, Action, Reflect)]
 #[reflect(Default, Component, ActionMeta)]
+#[category(ActionCategory::World)]
+#[systems(despawn_steer_target.in_set(TickSet))]
 /// Recursively despawns the [`SteerTarget`]
 pub struct DespawnSteerTarget;
 
@@ -24,12 +25,4 @@ fn despawn_steer_target(
 			}
 		}
 	}
-}
-
-impl ActionMeta for DespawnSteerTarget {
-	fn category(&self) -> ActionCategory { ActionCategory::World }
-}
-
-impl ActionSystems for DespawnSteerTarget {
-	fn systems() -> SystemConfigs { despawn_steer_target.in_set(TickSet) }
 }

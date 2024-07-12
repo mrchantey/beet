@@ -38,18 +38,15 @@ impl Plugin for LifecycleSystemsPlugin {
 			.add_systems(schedule, apply_deferred.after(TickSyncSet).before(PostTickSet))
 			.add_systems(
 				schedule,
-				update_run_timers
-					.run_if(|time: Option<Res<Time>>| time.is_some())
-					.in_set(PreTickSet),
-			)
-			.add_systems(
-				schedule,
-				(sync_interrupts, sync_running).chain().in_set(TickSyncSet),
-			)
-			.add_systems(
-				schedule,
 				set_root_as_target_agent.in_set(PreTickSet),
 			)
 			/*-*/;
+
+		let world = app.world_mut();
+		world.observe(bubble_run_result);
+		world.observe(interrupt_running);
+		world.observe(end_continued_run);
 	}
 }
+
+pub const NUM_GLOBAL_OBSERVERS: u32 = 3;

@@ -21,7 +21,7 @@ pub enum Message {
 	Despawn {
 		entity: Entity,
 	},
-	Insert {
+	Add {
 		reg_id: RegistrationId,
 		entity: Entity,
 		payload: MessagePayload,
@@ -47,6 +47,10 @@ pub enum Message {
 		reg_id: RegistrationId,
 	},
 	SendEvent {
+		reg_id: RegistrationId,
+		payload: MessagePayload,
+	},
+	SendObserver {
 		reg_id: RegistrationId,
 		payload: MessagePayload,
 	},
@@ -96,11 +100,11 @@ impl Message {
 		func: impl FnOnce(&MessagePayload) -> Result<MessagePayload>,
 	) -> Result<Self> {
 		match self {
-			Self::Insert {
+			Self::Add {
 				entity,
 				reg_id,
 				payload,
-			} => Ok(Self::Insert {
+			} => Ok(Self::Add {
 				entity: *entity,
 				reg_id: *reg_id,
 				payload: func(payload)?,

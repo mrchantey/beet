@@ -1,6 +1,5 @@
 use beet_ecs::prelude::*;
 use bevy::animation::RepeatAnimation;
-use bevy::ecs::schedule::SystemConfigs;
 use bevy::prelude::*;
 use std::time::Duration;
 
@@ -8,8 +7,11 @@ use std::time::Duration;
 pub const DEFAULT_ANIMATION_TRANSITION: Duration = Duration::from_millis(250);
 
 /// Play an animation on the agent when this action starts running.
-#[derive(Debug, Default, Clone, PartialEq, Component, Reflect)]
+#[derive(Debug, Default, Clone, PartialEq, Component, Action, Reflect)]
 #[reflect(Default, Component, ActionMeta)]
+#[observers(play_animation_on_run)]
+#[systems(play_animation_on_load.in_set(TickSet))]
+#[category(ActionCategory::Agent)]
 pub struct PlayAnimation {
 	animation: AnimationNodeIndex,
 	/// Trigger once again if the animation is already playing
@@ -47,34 +49,38 @@ impl PlayAnimation {
 
 /// Play animations for behaviors that run after the agent loads
 fn play_animation_on_run(
+	trigger: Trigger<OnRun>,
 	mut animators: Query<(&mut AnimationPlayer, &mut AnimationTransitions)>,
 	children: Query<&Children>,
-	query: Query<(&TargetAgent, &PlayAnimation), Added<Running>>,
+	query: Query<(&TargetAgent, &PlayAnimation)>,
 ) {
-	for (agent, play_animation) in query.iter() {
-		// log::info!("playonrun {}", agents.iter().count());
-		// let Ok((mut player, mut transitions)) = agents.get_mut(agent.0) else {
-		// 	continue;
-		// };
-		let Some(target) = ChildrenExt::first(**agent, &children, |entity| {
-			animators.contains(entity)
-		}) else {
-			continue;
-		};
-		// safe unwrap, just checked
-		let (mut player, mut transitions) = animators.get_mut(target).unwrap();
+	let (agent, play_animation) = query
+		.get(trigger.entity())
+		.expect(expect_action::ACTION_QUERY_MISSING);
 
-		if !player.is_playing_animation(play_animation.animation)
-			|| play_animation.trigger_if_playing
-		{
-			transitions
-				.play(
-					&mut player,
-					play_animation.animation,
-					play_animation.transition_duration,
-				)
-				.set_repeat(play_animation.repeat);
-		}
+	// log::info!("playonrun {}", agents.iter().count());
+	// let Ok((mut player, mut transitions)) = agents.get_mut(agent.0) else {
+	// 	continue;
+	// };
+	let Some(target) = ChildrenExt::first(**agent, &children, |entity| {
+		animators.contains(entity)
+	}) else {
+		log::warn!("PlayAnimation: agent {:?} has no animator", **agent);
+		return;
+	};
+	// safe unwrap, just checked
+	let (mut player, mut transitions) = animators.get_mut(target).unwrap();
+
+	if !player.is_playing_animation(play_animation.animation)
+		|| play_animation.trigger_if_playing
+	{
+		transitions
+			.play(
+				&mut player,
+				play_animation.animation,
+				play_animation.transition_duration,
+			)
+			.set_repeat(play_animation.repeat);
 	}
 }
 
@@ -112,15 +118,5 @@ fn play_animation_on_load(
 				)
 				.set_repeat(play_animation.repeat);
 		}
-	}
-}
-
-impl ActionMeta for PlayAnimation {
-	fn category(&self) -> ActionCategory { ActionCategory::Agent }
-}
-
-impl ActionSystems for PlayAnimation {
-	fn systems() -> SystemConfigs {
-		(play_animation_on_run, play_animation_on_load).in_set(TickSet)
 	}
 }

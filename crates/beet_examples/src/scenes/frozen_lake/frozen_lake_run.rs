@@ -1,6 +1,6 @@
 use super::*;
+use crate::beet::prelude::*;
 use crate::prelude::*;
-use beet::prelude::*;
 use bevy::prelude::*;
 use std::time::Duration;
 
@@ -28,10 +28,9 @@ pub fn frozen_lake_run(mut commands: Commands) {
 
 			parent
 				.spawn((
-					Name::new("Inference Behavior"),
-					// Running,
-					InsertOnTrigger::<AppReady,Running>::default(),
-					SequenceSelector,
+					Name::new("Run Frozen Lake Agent"),
+					RunOnAppReady::default(),
+					SequenceFlow,
 					Repeat::default(),
 				))
 				.with_children(|parent| {
@@ -46,6 +45,7 @@ pub fn frozen_lake_run(mut commands: Commands) {
 					));
 					parent.spawn((
 						Name::new("Perform action"),
+						ContinueRun::default(),
 						TranslateGrid::new(Duration::from_secs(1)),
 						TargetAgent(agent),
 						RunTimer::default(),
