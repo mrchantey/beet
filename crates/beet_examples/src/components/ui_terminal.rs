@@ -20,7 +20,6 @@ impl Plugin for UiTerminalPlugin {
 		)
 			.add_systems(Update, (
 				log_log_on_run.pipe(append_text),
-				log_user_input.pipe(append_text),
 				log_app_ready.pipe(append_text),
 				parse_text_input
 			))
@@ -92,12 +91,7 @@ fn log_log_on_run(query: Query<&LogOnRun, Added<Running>>) -> Vec<String> {
 		.map(|log| format!("LogOnRun: {}", log.0.to_string()))
 		.collect()
 }
-fn log_user_input(mut events: EventReader<OnUserMessage>) -> Vec<String> {
-	events
-		.read()
-		.map(|ev| format!("User: {}", ev.0.to_string()))
-		.collect()
-}
+
 fn log_app_ready(mut events: EventReader<AppReady>) -> Vec<String> {
 	events
 		.read()
@@ -280,8 +274,6 @@ fn parse_text_input(
 	mut commands: Commands,
 	mut evr_char: EventReader<KeyboardInput>,
 	keys: Res<ButtonInput<KeyCode>>,
-	//TODO deprecate eventwriter
-	mut on_submit: EventWriter<OnUserMessage>,
 	mut query: Query<&mut Text, With<InputContainer>>,
 ) {
 	if keys.any_pressed([KeyCode::ControlRight, KeyCode::ControlLeft]) {
@@ -296,7 +288,6 @@ fn parse_text_input(
 			match &ev.logical_key {
 				Key::Enter => {
 					commands.trigger(OnUserMessage(text.clone()));
-					on_submit.send(OnUserMessage(text.clone()));
 					text.clear();
 				}
 				Key::Backspace => {

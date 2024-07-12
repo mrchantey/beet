@@ -19,6 +19,13 @@ pub impl World {
 		self.spawn(Observer::new(system));
 		self
 	}
+
+	fn flush_trigger<E: Event>(&mut self, event: E) -> &mut Self {
+		self.flush();
+		self.trigger(event);
+		self.flush();
+		self
+	}
 }
 
 #[extend::ext]

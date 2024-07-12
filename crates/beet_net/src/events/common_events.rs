@@ -38,12 +38,9 @@ impl Plugin for CommonEventsPlugin {
 			.add_event::<SpawnSceneFileResponse>()
 			.replicate_event_outgoing::<SpawnSceneFileResponse>()
 			.add_systems(Update, handle_spawn_scene)
-			// UserMessage
-			.add_event::<OnUserMessage>()
-			.replicate_event_incoming::<OnUserMessage>()
-			// AppMesage
-			.add_event::<OnAppMessage>()
-			.replicate_event_outgoing::<OnAppMessage>();
+			.replicate_observer_incoming::<OnUserMessage>()
+			.observe(log_on_user_message)
+			.replicate_observer_outgoing::<OnAppMessage>();
 		// Screenshot
 
 		#[cfg(not(test))]
@@ -81,3 +78,11 @@ pub struct OnUserMessage(pub String);
 	Debug, Clone, Deref, DerefMut, Serialize, Deserialize, Event, Reflect,
 )]
 pub struct OnAppMessage(pub String);
+
+
+fn log_on_user_message(
+	trigger: Trigger<OnUserMessage>,
+	mut commands: Commands,
+) {
+	commands.trigger(OnLogMessage::new(format!("User: {}", &trigger.event().0)))
+}

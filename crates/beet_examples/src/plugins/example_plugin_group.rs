@@ -31,14 +31,14 @@ pub struct ExamplePluginTypesBasic;
 impl Plugin for ExamplePluginTypesBasic {
 	fn build(&self, app: &mut App) {
 		app.add_plugins((
+			ExampleReplicatePlugin,
 			DefaultBeetPlugins,
+			BundlePlaceholderPlugin,
+			UiTerminalPlugin,
 			BeetDebugPluginBase,
 			BeetDebugPluginStdout,
 			Example2dPlugin,
 			Example3dPlugin,
-			UiTerminalPlugin,
-			ExampleReplicatePlugin,
-			BundlePlaceholderPlugin,
 		))
 		.register_type::<Collectable>();
 	}

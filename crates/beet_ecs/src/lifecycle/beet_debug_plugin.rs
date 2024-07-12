@@ -85,60 +85,23 @@ impl<
 
 		app.add_systems(
 			schedule,
-			(
-				log_on_start.pipe(self.log_system.clone()).run_if(
-					|config: Option<Res<BeetDebugConfig>>| {
-						config.map(|c| c.log_on_start).unwrap_or_default()
-					},
-				),
 				log_on_update.pipe(self.log_system.clone()).run_if(
 					|config: Option<Res<BeetDebugConfig>>| {
 						config.map(|c| c.log_on_update).unwrap_or_default()
 					},
-				),
-			)
-				.chain()
-				.in_set(PostTickSet),
-		)
-		.add_systems(
-			schedule,
-			log_on_stop
-				.pipe(self.log_system.clone())
-				.after(PostTickSet)
-				.run_if(|config: Option<Res<BeetDebugConfig>>| {
-					config.map(|c| c.log_on_stop).unwrap_or_default()
-				}),
+				)
+				.in_set(PostTickSet)
 		)
 		/*-*/;
 	}
 }
 
-
-#[deprecated = "use observers"]
-fn log_on_start(query: Query<&Name, Added<Running>>) -> Vec<String> {
-	query
-		.iter()
-		.map(|name| format!("Started Continue: {name}"))
-		.collect()
-}
 fn log_on_update(query: Query<&Name, With<Running>>) -> Vec<String> {
 	query
 		.iter()
 		.map(|name| format!("Continue: {name}"))
 		.collect()
 }
-#[deprecated = "use observers"]
-fn log_on_stop(
-	query: Query<&Name>,
-	mut removed: RemovedComponents<Running>,
-) -> Vec<String> {
-	removed
-		.read()
-		.filter_map(|removed| query.get(removed).ok())
-		.map(|name| format!("Stopped Continue: {name}"))
-		.collect()
-}
-
 
 #[derive(Event, Deref)]
 pub struct OnLogMessage(pub Cow<'static, str>);
