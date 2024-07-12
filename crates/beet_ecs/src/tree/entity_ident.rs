@@ -113,7 +113,7 @@ mod test {
 		world.init_resource::<AppTypeRegistry>();
 		let registry = world.resource_mut::<AppTypeRegistry>();
 		let mut registry = registry.write();
-		registry.register::<SetOnRun<RunResult>>();
+		registry.register::<Name>();
 		registry.register::<BeetRoot>();
 		drop(registry);
 		world
@@ -123,7 +123,7 @@ mod test {
 	fn deep_clone() -> Result<()> {
 		let mut world = world();
 		let entity1 = world
-			.spawn((BeetRoot::default(), Running, SetOnRun(RunResult::Success)))
+			.spawn((BeetRoot::default(), Running, Name::new("Foo")))
 			.id();
 		let entity1 = EntityIdent::new(entity1);
 
@@ -133,9 +133,7 @@ mod test {
 
 		expect(world.entities().len()).to_be(2)?;
 
-		expect(&world)
-			.component(*node2)?
-			.to_be(&SetOnRun(RunResult::Success))?;
+		expect(&world).component(*node2)?.to_be(&Name::new("Foo"))?;
 
 		expect(EntityIdent::get_roots(&mut world).len()).to_be(2)?;
 

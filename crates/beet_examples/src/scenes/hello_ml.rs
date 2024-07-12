@@ -6,7 +6,7 @@ use bevy::prelude::*;
 pub fn hello_ml(mut commands: Commands) {
 	commands
 		.spawn((
-			Name::new("Sentence Selector"),
+			Name::new("Sentence Flow"),
 			AssetRunOnReady::<Bert>::new("default-bert.ron"),
 			SentenceBundle::with_initial("please kill the baddies"),
 		))

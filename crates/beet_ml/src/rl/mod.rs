@@ -22,9 +22,6 @@ pub use self::q_table_env::*;
 pub mod q_table_loader;
 #[allow(unused_imports)]
 pub use self::q_table_loader::*;
-pub mod q_table_selector;
-#[allow(unused_imports)]
-pub use self::q_table_selector::*;
 pub mod q_table_trainer;
 #[allow(unused_imports)]
 pub use self::q_table_trainer::*;

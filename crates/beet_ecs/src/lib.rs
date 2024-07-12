@@ -32,7 +32,6 @@ pub mod prelude {
 	pub use crate::lifecycle::components::*;
 	pub use crate::lifecycle::lifecycle_plugin::*;
 	pub use crate::lifecycle::lifecycle_systems_plugin::*;
-	pub use crate::lifecycle::selectors::*;
 	pub use crate::observers::*;
 	// pub use crate::lifecycle::*;
 	pub use crate::reflect::*;

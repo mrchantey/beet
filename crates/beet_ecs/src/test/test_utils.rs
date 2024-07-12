@@ -31,23 +31,3 @@ pub fn test_no_action_behavior_tree(world: &mut World) -> EntityTree {
 		.id();
 	EntityTree::new_with_world(entity, world)
 }
-
-
-
-pub fn test_serde_entity(world: &mut World) -> Entity {
-	world
-		.spawn((
-			Running,
-			SetOnSpawn::<Score>::default(),
-			InsertOnRun::<RunResult>::default(),
-			// utility
-			EmptyAction::default(),
-			Repeat::default(),
-			TriggerInDuration::<OnRunResult>::default(),
-			// control flow actions
-			SequenceFlow::default(),
-			FallbackSelector::default(),
-			ScoreSelector::default(),
-		))
-		.id()
-}

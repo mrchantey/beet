@@ -1,3 +1,6 @@
+pub mod avoid_obstacles;
+#[allow(unused_imports)]
+pub use self::avoid_obstacles::*;
 pub mod fetch;
 #[allow(unused_imports)]
 pub use self::fetch::*;

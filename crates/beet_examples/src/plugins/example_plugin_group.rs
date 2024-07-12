@@ -62,7 +62,6 @@ impl Plugin for ExampleMlPlugin {
 		app.add_plugins((
 			// sentence selector
 			BertPlugin::default(),
-			ActionPlugin::<InsertOnAssetEvent<RunResult, Bert>>::default(),
 			AssetPlaceholderPlugin::<Bert>::default(),
 			ReadyOnAssetLoadPlugin::<Bert>::default(),
 			// qtables (frozen lake)
@@ -71,7 +70,6 @@ impl Plugin for ExampleMlPlugin {
 		))
 		// fetch
 		.add_plugins(ActionPlugin::<(
-			InsertOnAssetEvent<RunResult, Bert>,
 			InsertSentenceSteerTarget<Collectable>,
 			RemoveOnTrigger<OnRunResult, Sentence>,
 			RemoveOnTrigger<OnRunResult, SteerTarget>,

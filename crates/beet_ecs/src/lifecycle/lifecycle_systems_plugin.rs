@@ -38,10 +38,6 @@ impl Plugin for LifecycleSystemsPlugin {
 			.add_systems(schedule, apply_deferred.after(TickSyncSet).before(PostTickSet))
 			.add_systems(
 				schedule,
-				(sync_interrupts, sync_running).chain().in_set(TickSyncSet),
-			)
-			.add_systems(
-				schedule,
 				set_root_as_target_agent.in_set(PreTickSet),
 			)
 			/*-*/;

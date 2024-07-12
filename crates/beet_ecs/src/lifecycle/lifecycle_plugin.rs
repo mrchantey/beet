@@ -12,16 +12,10 @@ impl Plugin for LifecyclePlugin {
 
 		app.add_plugins(ActionPlugin::<(
 			TriggerInDuration<OnRunResult>,
-			InsertOnRun<RunResult>,
 			RunTimer,
 			LogOnRun,
 			// CallOnRun,
 			SetOnSpawn<Score>,
-			// selectors
-			FallbackSelector,
-			ParallelSelector,
-			SequenceSelector,
-			ScoreSelector,
 			// utility
 			EmptyAction,
 		)>::default())
@@ -31,6 +25,8 @@ impl Plugin for LifecyclePlugin {
 			InsertOnTrigger<OnRun, Running>,
 			RemoveOnTrigger<OnRunResult, Running>,
 			SequenceFlow,
+			FallbackFlow,
+			ParallelFlow,
 			ScoreFlow,
 			ScoreProvider,
 			EndOnRun,
@@ -57,7 +53,6 @@ impl Plugin for LifecyclePlugin {
 		// running
 		world.init_component::<Running>();
 		world.init_component::<RunTimer>();
-		world.init_component::<RunResult>();
 		// graph
 		world.init_component::<Parent>();
 		world.init_component::<Children>();
