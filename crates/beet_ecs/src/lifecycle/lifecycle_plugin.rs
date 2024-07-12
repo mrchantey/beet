@@ -13,6 +13,7 @@ impl Plugin for LifecyclePlugin {
 		app.add_plugins(ActionPlugin::<(
 			InsertInDuration<RunResult>,
 			InsertOnRun<RunResult>,
+			RunTimer,
 			LogOnRun,
 			// CallOnRun,
 			SetOnSpawn<Score>,

@@ -28,7 +28,7 @@ pub fn frozen_lake_run(mut commands: Commands) {
 
 			parent
 				.spawn((
-					Name::new("Inference Behavior"),
+					Name::new("Run Frozen Lake Agent"),
 					RunOnAppReady::default(),
 					SequenceFlow,
 					Repeat::default(),
@@ -45,6 +45,7 @@ pub fn frozen_lake_run(mut commands: Commands) {
 					));
 					parent.spawn((
 						Name::new("Perform action"),
+						ContinueRun::default(),
 						TranslateGrid::new(Duration::from_secs(1)),
 						TargetAgent(agent),
 						RunTimer::default(),
