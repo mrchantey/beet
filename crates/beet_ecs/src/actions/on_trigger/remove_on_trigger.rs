@@ -23,6 +23,7 @@ impl<E: Event, T: Bundle, TrigBundle: Bundle> OnTriggerHandler
 		_trigger: &Trigger<Self::Event, Self::TriggerBundle>,
 		(entity, comp): (Entity, &OnTrigger<Self>),
 	) {
+		// log::info!("RemoveOnTrigger: {:?}", std::any::type_name::<T>());
 		comp.target.remove::<T>(commands, entity);
 	}
 }

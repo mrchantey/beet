@@ -39,7 +39,7 @@ fn read_q_policy<P: QPolicy + Asset>(
 
 
 	*action = policy.greedy_policy(state).0;
-	log::info!("ReadQPolicy: \n{:?}\n{:?}", state, action);
+	// log::info!("ReadQPolicy: \n{:?}\n{:?}", state, action);
 	commands
 		.entity(trigger.entity())
 		.trigger(OnRunResult::success());

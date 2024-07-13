@@ -34,7 +34,7 @@ pub fn fetch_npc(mut commands: Commands) {
 			let agent = parent.parent_entity();
 			parent
 				.spawn((
-					Name::new("Idle Or Fetch"),
+					Name::new("Fetch Behavior"),
 					TargetAgent(agent),
 					AssetRunOnReady::<Bert>::new("default-bert.ron"),
 					InsertSentenceOnUserInput::default(),
@@ -49,12 +49,10 @@ pub fn fetch_npc(mut commands: Commands) {
 						Name::new("Idle"),
 						ScoreProvider::NEUTRAL,
 						TargetAgent(agent),
-						// SetAgentOnRun(Velocity::default()),
 						PlayAnimation::new(idle_index).repeat_forever(),
 					));
 					parent.spawn((
 						Name::new("Fetch"),
-						Score::default(),
 						TargetAgent(agent),
 						SteerTargetScoreProvider {
 							min_radius: 1.,

@@ -92,7 +92,7 @@ impl SceneItem {
 		let mut app = App::new();
 		app.add_plugins((
 			utils::MostDefaultPlugins,
-			DefaultBeetPlugins::default(),
+			BeetPlugins::default(),
 			ExamplePluginTypesFull,
 		))
 		.finish();

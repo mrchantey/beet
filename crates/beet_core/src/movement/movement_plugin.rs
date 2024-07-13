@@ -10,7 +10,6 @@ impl Plugin for MovementPlugin {
 		app.add_plugins(ActionPlugin::<(
 			Hover,
 			Translate,
-			SetAgentOnRun<Velocity>,
 		)>::default()).add_systems(
 			Update,
 			(

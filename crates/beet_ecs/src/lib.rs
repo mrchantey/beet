@@ -20,6 +20,7 @@ pub mod prelude {
 	pub use crate::actions::flow::*;
 	#[allow(ambiguous_glob_reexports)]
 	pub use crate::actions::global::*;
+	pub use crate::actions::misc::*;
 	#[allow(ambiguous_glob_reexports)]
 	pub use crate::actions::on_trigger::*;
 	pub use crate::actions::*;
@@ -27,7 +28,6 @@ pub mod prelude {
 	pub use crate::events::*;
 	pub use crate::extensions::*;
 	pub use crate::graph::*;
-	pub use crate::lifecycle::actions::*;
 	pub use crate::lifecycle::beet_debug_plugin::*;
 	pub use crate::lifecycle::components::*;
 	pub use crate::lifecycle::lifecycle_plugin::*;
