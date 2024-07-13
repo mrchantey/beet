@@ -150,8 +150,8 @@ publish-all *args:
 	just publish beet_core {{args}}				|| true
 	just publish beet_net {{args}}				|| true
 	just publish beet_ml {{args}}					|| true
-	just publish beet {{args}}						|| true
 	just publish beet_examples {{args}}		|| true
+	just publish beet {{args}}						|| true
 
 test-wasm crate *args:
 	sweet -p {{crate}} --example test_{{crate}} --interactive --watch {{args}}
