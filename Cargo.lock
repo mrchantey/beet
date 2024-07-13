@@ -741,33 +741,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "beet_web"
-version = "0.0.3-rc.2"
-dependencies = [
- "anyhow",
- "beet",
- "bevy",
- "bincode",
- "console_error_panic_hook",
- "console_log",
- "extend",
- "flume",
- "forky_bevy",
- "forky_core",
- "forky_web",
- "futures",
- "js-sys",
- "log",
- "ron",
- "serde",
- "serde_json",
- "sweet",
- "wasm-bindgen",
- "wasm-bindgen-futures",
- "web-sys",
-]
-
-[[package]]
 name = "bevy"
 version = "0.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"

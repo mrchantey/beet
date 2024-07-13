@@ -89,7 +89,6 @@ members = [
 	"crates/beet_ml",
 	"crates/beet_net",
 	"crates/beet_server",
-	"crates/beet_web",
 	# "crates/cli",
 ]
 exclude = ["crates/beet_esp"]

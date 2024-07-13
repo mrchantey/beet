@@ -42,17 +42,6 @@ test-ml *args:
 test-net *args:
 	just watch 'cargo test -p beet_net --lib -- {{args}}'
 
-test-web *args:
-	just test-wasm beet_web {{args}}
-
-build-web *args:
-	just copy-wasm-assets
-	just build-wasm-release beet_web main
-
-run-web *args:
-	just copy-wasm-assets
-	just watch-wasm-debug beet_web main
-
 run crate example *args:
 	cargo run -p {{crate}} --example {{example}} {{args}}
 
@@ -189,7 +178,6 @@ _watch-wasm build_config crate example *args:
 copy-wasm-assets:
 	rm -rf ./target/static/assets
 	mkdir -p ./target/static/assets || true
-	cp -r ./crates/beet_web/assets/* ./target/static
 	
 serve-wasm *args:
 	cd ./target/static && forky serve {{args}}
