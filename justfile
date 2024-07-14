@@ -5,11 +5,8 @@ crates := 'beet beet_core beet_ecs beet_net'
 default:
 	just --list --unsorted
 
-example example:
-	cargo run --example {{example}} 
-
-foo:
-	RUST_LOG=info cargo run --example hello_world
+example example *args:
+	cargo run --example {{example}} {{args}}
 
 ## common
 cmd *args:
