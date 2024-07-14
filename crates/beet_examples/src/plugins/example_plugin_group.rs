@@ -32,7 +32,7 @@ impl Plugin for ExamplePluginTypesBasic {
 	fn build(&self, app: &mut App) {
 		app.add_plugins((
 			ExampleReplicatePlugin,
-			DefaultBeetPlugins,
+			BeetPlugins,
 			BundlePlaceholderPlugin,
 			UiTerminalPlugin,
 			BeetDebugPluginBase,
@@ -72,9 +72,6 @@ impl Plugin for ExampleMlPlugin {
 		.add_plugins(ActionPlugin::<(
 			InsertSentenceSteerTarget<Collectable>,
 			RemoveOnTrigger<OnRunResult, Sentence>,
-			RemoveOnTrigger<OnRunResult, SteerTarget>,
-			InsertOnTrigger<OnRun,Velocity>,
-			RemoveOnTrigger<OnRunResult,Velocity>,
 		)>::default())
 			/*-*/;
 	}
@@ -122,6 +119,13 @@ impl Plugin for Example3dPlugin {
 		)
 		.register_type::<FollowCursor3d>()
 		.register_type::<CameraDistance>()
+		// velocity
+		.add_plugins(ActionPlugin::<(
+			RemoveOnTrigger<OnRunResult, SteerTarget>,
+			RemoveOnTrigger<OnRunResult, Velocity>,
+			InsertOnTrigger<OnRun, Velocity>,
+			RemoveOnTrigger<OnRun, Velocity>,
+		)>::default())
 		/*-*/;
 	}
 }

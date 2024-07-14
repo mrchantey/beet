@@ -49,21 +49,37 @@ mod test {
 	use bevy::prelude::*;
 	use sweet::*;
 
+
+	fn create_tree(world: &mut World) -> EntityTree {
+		let entity = world
+			.spawn(Name::new("parent"))
+			.with_children(|parent| {
+				parent.spawn(Name::new("child1"));
+				parent.spawn(Name::new("child2")).with_children(|parent| {
+					parent.spawn(Name::new("grandchild1"));
+				});
+			})
+			.id();
+		EntityTree::new_with_world(entity, world)
+	}
+
+
 	#[test]
 	fn component_tree() -> Result<()> {
 		let mut world = World::new();
-		let tree = test_constant_behavior_tree(&mut world);
+		let tree = create_tree(&mut world);
 		expect(tree.children.len()).to_be(2)?;
 
 		let entity = tree.children[1].value;
-		world.entity_mut(entity).insert(Score::Pass);
-		let scores = tree.component_tree::<Score>(&world);
+		world.entity_mut(entity).insert(Name::new("child2new"));
+		let scores = tree.component_tree::<Name>(&world);
 
-		expect(scores.value).to_be(Some(&Score::Fail))?;
-		expect(scores.children[0].value).to_be(Some(&Score::Fail))?;
-		expect(scores.children[1].value).to_be(Some(&Score::Pass))?;
+		expect(scores.value).to_be(Some(&Name::new("parent")))?;
+		expect(scores.children[0].value).to_be(Some(&Name::new("child1")))?;
+		expect(scores.children[1].value)
+			.to_be(Some(&Name::new("child2new")))?;
 		expect(scores.children[1].children[0].value)
-			.to_be(Some(&Score::Fail))?;
+			.to_be(Some(&Name::new("grandchild1")))?;
 
 		Ok(())
 	}

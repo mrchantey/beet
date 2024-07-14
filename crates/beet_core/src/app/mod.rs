@@ -1,3 +1,3 @@
-pub mod beet_plugin;
+pub mod beet_plugins;
 #[allow(unused_imports)]
-pub use self::beet_plugin::*;
+pub use self::beet_plugins::*;

@@ -26,9 +26,8 @@ impl Plugin for CommonEventsPlugin {
 			})
 			// AppReady
 			.add_event::<AppReady>()
-			.replicate_event_outgoing::<AppReady>()
+			.replicate_observer_outgoing::<AppReady>()
 			.add_plugins(ActionPlugin::<(
-				SendOnRun<AppReady>,
 				TriggerOnRun<AppReady>,
 				RunOnAppReady,
 			)>::default())

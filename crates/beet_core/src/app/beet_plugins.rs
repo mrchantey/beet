@@ -5,9 +5,9 @@ use bevy::prelude::*;
 
 /// Plugins used for most beet apps.
 #[derive(Default)]
-pub struct DefaultBeetPlugins;
+pub struct BeetPlugins;
 
-impl PluginGroup for DefaultBeetPlugins {
+impl PluginGroup for BeetPlugins {
 	fn build(self) -> PluginGroupBuilder {
 		#[allow(unused_mut)]
 		let mut builder = PluginGroupBuilder::start::<Self>()

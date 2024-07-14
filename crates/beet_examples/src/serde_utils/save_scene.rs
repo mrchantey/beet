@@ -1,5 +1,8 @@
 use anyhow::Result;
+use beet_net::events::OnUserMessage;
 use bevy::audio::DefaultSpatialScale;
+use bevy::ecs::observer::Observer;
+use bevy::ecs::observer::ObserverState;
 use bevy::pbr::DirectionalLightShadowMap;
 use bevy::pbr::PointLightShadowMap;
 use bevy::prelude::*;
@@ -10,10 +13,18 @@ use std::fs::{
 };
 use std::io::Write;
 
+fn get_save_entities(world: &mut World) -> Vec<Entity> {
+	world
+		.query_filtered::<Entity, (Without<ObserverState>,Without<Observer<OnUserMessage,()>>)>()
+		.iter(world)
+		.collect()
+}
+
 pub fn save_scene(
 	world: &mut World,
 	filename: impl Into<String>,
 ) -> Result<()> {
+	let entities = get_save_entities(world);
 	let filename = filename.into();
 	// let scene = DynamicScene::from_world(world);
 	let scene = DynamicSceneBuilder::from_world(world)
@@ -32,7 +43,7 @@ pub fn save_scene(
 		.deny_resource::<Time<Virtual>>()
 		.deny_resource::<Time<Fixed>>()
 		.deny_resource::<TimeUpdateStrategy>()
-		.extract_entities(world.iter_entities().map(|entity| entity.id()))
+		.extract_entities(entities.into_iter())
 		.extract_resources()
 		.build();
 
@@ -55,18 +66,20 @@ pub fn save_scene(
 const ALLOWED_IGNORES: &[&str] = &[
 	"bevy_ui::ui_node::BorderRadius",
 	"bevy_animation::transition::AnimationTransitions",
+	"beet_ecs::observers::action_observer_map::ActionObserverMap",
+	"bevy_ecs::observer::entity_observer::ObservedBy",
 ];
 
 fn assert_scene_match(
 	filename: &str,
-	world: &World,
+	world: &mut World,
 	scene: &DynamicScene,
 ) -> Result<()> {
 	const NUM_IGNORED_RESOURCES: usize = 158;
 
 	let mut issues = Vec::<String>::new();
 
-	let num_entities_world = world.iter_entities().count();
+	let num_entities_world = get_save_entities(world).len();
 	let num_entities_scene = scene.entities.len();
 	if num_entities_world != num_entities_scene {
 		issues.push(
@@ -92,16 +105,14 @@ fn assert_scene_match(
 	// 	}
 	// }
 
-	for entity in world.iter_entities() {
-		let entity_scene = scene
-			.entities
-			.iter()
-			.find(|e| e.entity == entity.id())
-			.expect("just checked entity count");
+	for dyn_entity in scene.entities.iter() {
+		// let scene_entity =
+		// 	.expect("just checked entity count");
 
-		for component in world.inspect_entity(entity.id()).iter() {
-			let num_components_world = world.inspect_entity(entity.id()).len();
-			let num_components_scene = entity_scene.components.len();
+		for component in world.inspect_entity(dyn_entity.entity).iter() {
+			let num_components_world =
+				world.inspect_entity(dyn_entity.entity).len();
+			let num_components_scene = dyn_entity.components.len();
 			if num_components_world != num_components_scene {
 				// issues.push(format!(
 				// 	"Component count mismatch: Expected {num_components_world}, got {num_components_scene}"
@@ -111,7 +122,7 @@ fn assert_scene_match(
 				// );
 			}
 
-			let component_scene = entity_scene.components.iter().find(|c| {
+			let component_scene = dyn_entity.components.iter().find(|c| {
 				c.get_represented_type_info()
 					.expect("found component without typeinfo")
 					.type_id() == component
@@ -119,7 +130,9 @@ fn assert_scene_match(
 					.expect("found component without typeid")
 			});
 			if component_scene.is_none()
-				&& !ALLOWED_IGNORES.contains(&component.name())
+				&& !ALLOWED_IGNORES
+					.iter()
+					.any(|i| component.name().starts_with(i))
 			{
 				issues.push(format!("Component missing: {}", component.name()));
 			}

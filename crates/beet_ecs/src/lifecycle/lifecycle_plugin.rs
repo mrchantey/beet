@@ -8,36 +8,33 @@ pub struct LifecyclePlugin;
 
 impl Plugin for LifecyclePlugin {
 	fn build(&self, app: &mut App) {
-		app.add_plugins(LifecycleSystemsPlugin);
-
-		app.add_plugins(ActionPlugin::<(
-			TriggerInDuration<OnRunResult>,
+		app
+		.add_plugins((
+			LifecycleSystemsPlugin,
+			ActionPlugin::<(
+				EndOnRun,
+				TriggerInDuration<OnRunResult>,
+				InsertOnTrigger<OnRun, Running>,
+				RemoveOnTrigger<OnRunResult, Running>,
+			)>::default(),
+			ActionPlugin::<(
+			EmptyAction,
 			RunTimer,
 			LogOnRun,
-			// CallOnRun,
-			SetOnSpawn<Score>,
-			// utility
-			EmptyAction,
-		)>::default())
-		.add_plugins(ActionPlugin::<(
-			// ContinueRun,
 			Repeat,
-			InsertOnTrigger<OnRun, Running>,
-			RemoveOnTrigger<OnRunResult, Running>,
 			SequenceFlow,
 			FallbackFlow,
 			ParallelFlow,
 			ScoreFlow,
 			ScoreProvider,
-			EndOnRun,
 			RunOnSpawn,
-		)>::default())
+		)>::default()
+		))
 		// observers
 		.register_type::<ContinueRun>()
 		.register_type::<RunOnSpawn>()
 		// running
 		.register_type::<Running>()
-		.register_type::<RunTimer>()
 		.register_type::<RunResult>()
 		// graph
 		.register_type::<Parent>()
@@ -45,21 +42,18 @@ impl Plugin for LifecyclePlugin {
 		.register_type::<BeetRoot>()
 		.register_type::<RootIsTargetAgent>()
 		.register_type::<TargetAgent>()
-		.register_type::<ActionTarget>()
 		/*-*/;
 
 		let world = app.world_mut();
 
 		// running
 		world.init_component::<Running>();
-		world.init_component::<RunTimer>();
 		// graph
 		world.init_component::<Parent>();
 		world.init_component::<Children>();
 		world.init_component::<BeetRoot>();
 		world.init_component::<RootIsTargetAgent>();
 		world.init_component::<TargetAgent>();
-		world.init_component::<ActionTarget>();
 		// bevy
 		world.init_component::<Name>();
 		world.init_component::<Transform>();

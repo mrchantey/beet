@@ -552,7 +552,7 @@ checksum = "72b3254f16251a8381aa12e40e3c4d2f0199f8c6508fbecb9d91f575e0fbb8c6"
 
 [[package]]
 name = "beet"
-version = "0.0.3-rc.2"
+version = "0.0.3-rc.3"
 dependencies = [
  "anyhow",
  "beet_core",
@@ -574,7 +574,7 @@ dependencies = [
 
 [[package]]
 name = "beet_core"
-version = "0.0.3-rc.2"
+version = "0.0.3-rc.3"
 dependencies = [
  "anyhow",
  "beet_ecs",
@@ -593,7 +593,7 @@ dependencies = [
 
 [[package]]
 name = "beet_ecs"
-version = "0.0.3-rc.2"
+version = "0.0.3-rc.3"
 dependencies = [
  "anyhow",
  "beet_ecs_macros",
@@ -612,7 +612,7 @@ dependencies = [
 
 [[package]]
 name = "beet_ecs_macros"
-version = "0.0.3-rc.2"
+version = "0.0.3-rc.3"
 dependencies = [
  "anyhow",
  "extend",
@@ -625,7 +625,7 @@ dependencies = [
 
 [[package]]
 name = "beet_examples"
-version = "0.0.3-rc.2"
+version = "0.0.3-rc.3"
 dependencies = [
  "anyhow",
  "beet_core",
@@ -651,7 +651,7 @@ dependencies = [
 
 [[package]]
 name = "beet_ml"
-version = "0.0.3-rc.2"
+version = "0.0.3-rc.3"
 dependencies = [
  "anyhow",
  "beet_core",
@@ -687,7 +687,7 @@ dependencies = [
 
 [[package]]
 name = "beet_net"
-version = "0.0.3-rc.2"
+version = "0.0.3-rc.3"
 dependencies = [
  "anyhow",
  "beet_ecs",
@@ -716,7 +716,7 @@ dependencies = [
 
 [[package]]
 name = "beet_server"
-version = "0.0.3-rc.2"
+version = "0.0.3-rc.3"
 dependencies = [
  "anyhow",
  "axum",
@@ -738,33 +738,6 @@ dependencies = [
  "tower-http",
  "tracing",
  "tracing-subscriber",
-]
-
-[[package]]
-name = "beet_web"
-version = "0.0.3-rc.2"
-dependencies = [
- "anyhow",
- "beet",
- "bevy",
- "bincode",
- "console_error_panic_hook",
- "console_log",
- "extend",
- "flume",
- "forky_bevy",
- "forky_core",
- "forky_web",
- "futures",
- "js-sys",
- "log",
- "ron",
- "serde",
- "serde_json",
- "sweet",
- "wasm-bindgen",
- "wasm-bindgen-futures",
- "web-sys",
 ]
 
 [[package]]

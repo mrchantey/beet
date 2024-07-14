@@ -153,7 +153,6 @@ impl ChildrenExt {
 
 #[cfg(test)]
 mod test {
-	use crate::prelude::*;
 	use anyhow::Result;
 	use bevy::prelude::*;
 	use sweet::*;
@@ -162,19 +161,19 @@ mod test {
 	fn works() -> Result<()> {
 		let mut app = App::new();
 
-		let child1 = app.world_mut().spawn(Score::Fail).id();
+		let child1 = app.world_mut().spawn(Name::new("foo")).id();
 
 
 		let _parent = app.world_mut().spawn_empty().add_child(child1);
-		app.add_systems(Update, changes_score_to_pass);
+		app.add_systems(Update, changes_name);
 
 		expect(&app)
-			.component::<Score>(child1)?
-			.to_be(&Score::Fail)?;
+			.component(child1)?
+			.to_be(&Name::new("foo"))?;
 		app.update();
 		expect(&app)
-			.component::<Score>(child1)?
-			.to_be(&Score::Pass)?;
+			.component(child1)?
+			.to_be(&Name::new("bar"))?;
 
 
 
@@ -182,14 +181,14 @@ mod test {
 	}
 
 
-	fn changes_score_to_pass(
+	fn changes_name(
 		parents: Query<&Children>,
-		mut scores: Query<&mut Score>,
+		mut scores: Query<&mut Name>,
 	) {
 		for children in parents.iter() {
 			for child in children.iter() {
-				if let Ok(mut score) = scores.get_mut(*child) {
-					*score = Score::Pass;
+				if let Ok(mut name) = scores.get_mut(*child) {
+					*name = Name::new("bar");
 				}
 			}
 		}

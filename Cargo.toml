@@ -38,7 +38,7 @@ beet_ml = { workspace = true, optional = true }
 beet_net = { workspace = true, optional = true }
 
 [dev-dependencies]
-beet_examples.workspace = true # TODO cyclic dependency
+beet_examples.workspace = true
 bevy = { workspace = true, default-features = true }
 log.workspace = true
 pretty_env_logger.workspace = true
@@ -59,7 +59,7 @@ tokio.workspace = true
 ### WORKSPACE ################################################################################################z###########################
 
 [workspace.package]
-version = "0.0.3-rc.2"
+version = "0.0.3-rc.3"
 edition = "2021"
 description = "A very flexible AI behavior library for games and robotics."
 documentation = "https://beetmash.com/docs/beet"
@@ -89,21 +89,20 @@ members = [
 	"crates/beet_ml",
 	"crates/beet_net",
 	"crates/beet_server",
-	"crates/beet_web",
 	# "crates/cli",
 ]
 exclude = ["crates/beet_esp"]
 
 [workspace.dependencies]
 ## internal
-beet = { path = "./", version = "0.0.3-rc.2" }
-beet_core = { path = "crates/beet_core", version = "0.0.3-rc.2", default-features = false }
-beet_ecs = { path = "crates/beet_ecs", version = "0.0.3-rc.2" }
-beet_ecs_macros = { path = "crates/beet_ecs/macros", version = "0.0.3-rc.2" }
-beet_ml = { path = "crates/beet_ml", version = "0.0.3-rc.2" }
-beet_net = { path = "crates/beet_net", version = "0.0.3-rc.2" }
-beet_server = { path = "crates/beet_server", version = "0.0.3-rc.2" }
-beet_examples = { path = "crates/beet_examples", version = "0.0.3-rc.2" }
+beet = { path = "./", version = "0.0.3-rc.3" }
+beet_core = { path = "crates/beet_core", version = "0.0.3-rc.3", default-features = false }
+beet_ecs = { path = "crates/beet_ecs", version = "0.0.3-rc.3" }
+beet_ecs_macros = { path = "crates/beet_ecs/macros", version = "0.0.3-rc.3" }
+beet_ml = { path = "crates/beet_ml", version = "0.0.3-rc.3" }
+beet_net = { path = "crates/beet_net", version = "0.0.3-rc.3" }
+beet_server = { path = "crates/beet_server", version = "0.0.3-rc.3" }
+beet_examples = { path = "crates/beet_examples", version = "0.0.3-rc.3" }
 
 ## local
 # forky_core = { path = "../forky/crates/forky/forky_core" }
