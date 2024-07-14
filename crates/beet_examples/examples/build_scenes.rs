@@ -1,5 +1,4 @@
 use anyhow::Result;
-use beet_examples::beet::prelude::*;
 use beet_examples::prelude::*;
 use beet_examples::scenes;
 use bevy::ecs::schedule::SystemConfigs;
@@ -92,7 +91,6 @@ impl SceneItem {
 		let mut app = App::new();
 		app.add_plugins((
 			utils::MostDefaultPlugins,
-			BeetPlugins::default(),
 			ExamplePluginTypesFull,
 		))
 		.finish();

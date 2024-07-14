@@ -8,24 +8,28 @@ pub struct LifecyclePlugin;
 
 impl Plugin for LifecyclePlugin {
 	fn build(&self, app: &mut App) {
-		app.add_plugins(LifecycleSystemsPlugin)
-		.add_plugins(ActionPlugin::<(
+		app
+		.add_plugins((
+			LifecycleSystemsPlugin,
+			ActionPlugin::<(
+				EndOnRun,
+				TriggerInDuration<OnRunResult>,
+				InsertOnTrigger<OnRun, Running>,
+				RemoveOnTrigger<OnRunResult, Running>,
+			)>::default(),
+			ActionPlugin::<(
 			EmptyAction,
-			TriggerInDuration<OnRunResult>,
 			RunTimer,
 			LogOnRun,
-			// ContinueRun,
 			Repeat,
-			InsertOnTrigger<OnRun, Running>,
-			RemoveOnTrigger<OnRunResult, Running>,
 			SequenceFlow,
 			FallbackFlow,
 			ParallelFlow,
 			ScoreFlow,
 			ScoreProvider,
-			EndOnRun,
 			RunOnSpawn,
-		)>::default())
+		)>::default()
+		))
 		// observers
 		.register_type::<ContinueRun>()
 		.register_type::<RunOnSpawn>()

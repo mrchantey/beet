@@ -38,7 +38,7 @@ beet_ml = { workspace = true, optional = true }
 beet_net = { workspace = true, optional = true }
 
 [dev-dependencies]
-beet_examples.workspace = true # TODO cyclic dependency
+beet_examples.workspace = true
 bevy = { workspace = true, default-features = true }
 log.workspace = true
 pretty_env_logger.workspace = true
