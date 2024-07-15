@@ -11,6 +11,15 @@ impl Plugin for ExampleReplicatePlugin {
 			.add_event::<SomeCustomEvent>()
 			.replicate_event_incoming::<SomeCustomEvent>()
 			/*-*/;
+
+		#[cfg(feature = "tokio")]
+		const DEFAULT_SOCKET_URL: &str = "ws://127.0.0.1:3000/ws";
+
+		#[cfg(target_arch = "wasm32")]
+		app.add_transport(WebEventClient::new_with_window());
+
+		#[cfg(feature = "tokio")]
+		app.add_transport(NativeWsClient::new(DEFAULT_SOCKET_URL).unwrap());
 	}
 }
 

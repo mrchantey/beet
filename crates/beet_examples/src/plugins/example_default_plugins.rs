@@ -1,6 +1,4 @@
-#[cfg(any(target_arch = "wasm32", feature = "tokio"))]
-use crate::beet::prelude::*;
-use crate::prelude::load_scenes_from_args;
+use crate::prelude::*;
 use bevy::asset::AssetMetaCheck;
 use bevy::input::common_conditions::input_toggle_active;
 use bevy::prelude::*;
@@ -13,19 +11,9 @@ use forky_bevy::systems::close_on_esc;
 #[derive(Default)]
 pub struct ExampleDefaultPlugins;
 
-
-#[cfg(feature = "tokio")]
-const DEFAULT_SOCKET_URL: &str = "ws://127.0.0.1:3000/ws";
-
 impl Plugin for ExampleDefaultPlugins {
 	fn build(&self, app: &mut App) {
 		assert_local_assets();
-
-		#[cfg(target_arch = "wasm32")]
-		app.add_transport(WebEventClient::new_with_window());
-
-		#[cfg(feature = "tokio")]
-		app.add_transport(NativeWsClient::new(DEFAULT_SOCKET_URL).unwrap());
 
 		app.add_plugins((
 			DefaultPlugins
