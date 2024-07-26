@@ -316,6 +316,7 @@ scene.path = "scenes/space-scene.ron"
 [[package.metadata.project]]
 name = "hello-world"
 thumb-text = "🌍"
+thumb-url = "https://storage.googleapis.com/beet-examples/screenshots/hello-world.png"
 description = "A simple behavior that prints 'Hello' then 'World' to the console."
 scene.path = "scenes/hello-world.ron"
 scene.dependencies = ["beet-debug", "camera-2d", "ui-terminal"]
@@ -324,56 +325,58 @@ scene.dependencies = ["beet-debug", "camera-2d", "ui-terminal"]
 [[package.metadata.project]]
 name = "hello-net"
 description = "A simple behavior demonstrating triggering and reacting to network events."
+thumb-url = "https://storage.googleapis.com/beet-examples/screenshots/hello-net.png"
 scene.path = "scenes/hello-net.ron"
 scene.dependencies = ["beet-debug", "camera-2d", "ui-terminal"]
 
 [[package.metadata.project]]
 name = "hello-animation"
 description = "A simple behavior demonstrating animation control."
+thumb-url = "https://storage.googleapis.com/beet-examples/screenshots/hello-animation.png"
 scene.path = "scenes/hello-animation.ron"
 scene.dependencies = ["beet-debug", "ui-terminal", "lighting-3d", "ground-3d"]
 
 [[package.metadata.project]]
 name = "flock"
 description = "Demonstration of flocking behaviors."
+thumb-url = "https://storage.googleapis.com/beet-examples/screenshots/flock.png"
 scene.path = "scenes/flock.ron"
 scene.dependencies = ["beet-debug", "camera-2d", "space-scene"]
+app = "app-basic"
 
 [[package.metadata.project]]
 name = "seek"
 description = "Demonstration of the seek behavior."
+thumb-url = "https://storage.googleapis.com/beet-examples/screenshots/seek.png"
 scene.path = "scenes/seek.ron"
 scene.dependencies = ["beet-debug", "camera-2d", "space-scene"]
 
 [[package.metadata.project]]
 name = "seek-3d"
 description = "A 3D demonstration of the seek behavior."
+thumb-url = "https://storage.googleapis.com/beet-examples/screenshots/seek-3d.png"
 scene.path = "scenes/seek-3d.ron"
 scene.dependencies = ["beet-debug", "lighting-3d", "ground-3d"]
 
 [[package.metadata.project]]
 name = "hello-llm"
 description = "A behavior that uses a Sentence Selector to score child behaviors, deciding which will run next."
+thumb-url = "https://storage.googleapis.com/beet-examples/screenshots/hello-llm.png"
 scene.path = "scenes/hello-llm.ron"
 scene.dependencies = ["beet-debug", "camera-2d", "ui-terminal"]
 
 [[package.metadata.project]]
 name = "fetch-npc"
-thumb-text = "🐶"
 description = "The fetch character that will interact with the player."
+thumb-url = "https://storage.googleapis.com/beet-examples/screenshots/fetch.png"
 scene.path = "scenes/fetch-npc.ron"
+app = "app-full"
 
 [[package.metadata.project]]
 name = "fetch-scene"
 thumb-text = "🏠"
 description = "A camera and the items that the fetch character can go to."
 scene.path = "scenes/fetch-scene.ron"
-
-[[package.metadata.project]]
-name = "frozen-lake-scene"
-thumb-text = "❄️"
-description = "The static scene for the frozen lake environment."
-scene.path = "scenes/frozen-lake-scene.ron"
 
 [[package.metadata.project]]
 name = "fetch"
@@ -390,8 +393,16 @@ scene.dependencies = [
 events.playerMessage.initial = "I'm hungry!"
 
 [[package.metadata.project]]
+name = "frozen-lake-scene"
+thumb-text = "❄️"
+description = "The static scene for the frozen lake environment."
+scene.path = "scenes/frozen-lake-scene.ron"
+
+
+[[package.metadata.project]]
 name = "train"
 description = "Train a Q-learning agent to navigate the frozen lake environment."
+thumb-url = "https://storage.googleapis.com/beet-examples/screenshots/frozen-lake-run.png"
 scene.path = "scenes/frozen-lake-train.ron"
 scene.dependencies = [
 	"beet-debug",
@@ -403,6 +414,7 @@ scene.dependencies = [
 [[package.metadata.project]]
 name = "infer"
 description = "Use a trained Q-learning agent to navigate the frozen lake environment."
+thumb-url = "https://storage.googleapis.com/beet-examples/screenshots/frozen-lake-run.png"
 scene.path = "scenes/frozen-lake-run.ron"
 scene.dependencies = [
 	"beet-debug",
