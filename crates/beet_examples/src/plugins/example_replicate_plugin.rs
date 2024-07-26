@@ -1,4 +1,4 @@
-use crate::beet::prelude::*;
+use beetmash::prelude::*;
 use bevy::prelude::*;
 use serde::Deserialize;
 use serde::Serialize;

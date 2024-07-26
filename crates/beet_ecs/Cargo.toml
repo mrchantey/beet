@@ -13,13 +13,16 @@ categories.workspace = true
 
 
 [features]
-default = []
+default = ["beetmash", "net"]
+net = ["dep:beetmash", "beetmash/net"]
+beetmash = ["dep:beetmash"]
 # default = ["reflect"]
 reflect = []
 test = ["dep:sweet"]
 
 [dependencies]
 beet_ecs_macros.workspace = true
+beetmash = { workspace = true, optional = true }
 
 log.workspace = true
 anyhow.workspace = true
@@ -34,8 +37,7 @@ bevy.workspace = true
 sweet = { workspace = true, optional = true }
 
 [dev-dependencies]
+beetmash = { workspace = true, features = ["test"] }
 pretty_env_logger.workspace = true
-bincode.workspace = true
 ron.workspace = true
 sweet.workspace = true
-

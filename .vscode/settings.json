@@ -18,7 +18,6 @@
 		// "**/sdkconfig.defaults": true,
 		"**/build.rs": true,
 		"docs/book/**": true,
-		// "crates/beet_esp": true,
 	},
 	// "rust-analyzer.cargo.features": "all",
 	// "rust-analyzer.cargo.features": [
@@ -27,9 +26,6 @@
 	// "rust-analyzer.cargo.target": "x86_64-unknown-linux-gnu",
 	// "rust-analyzer.procMacro.enable": false,
 	// "rust-analyzer.procMacro.attributes.enable": false,
-	"rust-analyzer.files.excludeDirs": [
-		"crates/beet_esp"
-	],
 	// "rust-analyzer.cargo.target": "wasm32-unknown-unknown",
 	"search.exclude": {
 		"docs/deps/mermaid-init.js": true,

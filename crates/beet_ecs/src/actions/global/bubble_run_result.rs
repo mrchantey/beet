@@ -38,8 +38,7 @@ mod test {
 	use anyhow::Result;
 	use bevy::prelude::*;
 	use sweet::*;
-
-
+	use beetmash::prelude::*;
 
 	#[test]
 	fn works() -> Result<()> {

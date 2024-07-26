@@ -1,6 +1,6 @@
-use crate::beet::prelude::AppReady;
 use crate::prelude::*;
-use beet_net::prelude::*;
+use beet_ecs::prelude::*;
+use beetmash::prelude::*;
 use bevy::prelude::*;
 use std::marker::PhantomData;
 

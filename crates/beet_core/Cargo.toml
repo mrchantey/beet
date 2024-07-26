@@ -31,11 +31,38 @@ serde.workspace = true
 strum.workspace = true
 strum_macros.workspace = true
 
-flume.workspace = true
-bincode.workspace = true
-
 pretty_env_logger.workspace = true
 
 [dev-dependencies]
 sweet.workspace = true
 
+
+[[package.metadata.project]]
+name = "flock"
+description = "Demonstration of flocking behaviors."
+thumb-url = "https://storage.googleapis.com/beet-examples/screenshots/flock.png"
+scene.path = "scenes/flock.ron"
+scene.dependencies = ["beet-debug", "camera-2d", "space-scene"]
+app = "app-basic"
+
+[[package.metadata.project]]
+name = "seek"
+description = "Demonstration of the seek behavior."
+thumb-url = "https://storage.googleapis.com/beet-examples/screenshots/seek.png"
+scene.path = "scenes/seek.ron"
+scene.dependencies = ["beet-debug", "camera-2d", "space-scene"]
+
+[[package.metadata.project]]
+name = "seek-3d"
+description = "A 3D demonstration of the seek behavior."
+thumb-url = "https://storage.googleapis.com/beet-examples/screenshots/seek-3d.png"
+scene.path = "scenes/seek-3d.ron"
+scene.dependencies = ["beet-debug", "lighting-3d", "ground-3d"]
+
+
+[[package.metadata.project]]
+name = "hello-animation"
+description = "A simple behavior demonstrating animation control."
+thumb-url = "https://storage.googleapis.com/beet-examples/screenshots/hello-animation.png"
+scene.path = "scenes/hello-animation.ron"
+scene.dependencies = ["beet-debug", "ui-terminal", "lighting-3d", "ground-3d"]

@@ -1,8 +1,8 @@
 // #![allow(unused, dead_code)]
-pub mod serde_utils;
 pub mod components;
 pub mod plugins;
 pub mod scenes;
+pub mod serde_utils;
 
 
 pub mod prelude {
@@ -12,11 +12,11 @@ pub mod prelude {
 	pub use crate::serde_utils::*;
 }
 
+// i forget why i did this
 pub mod beet {
 	pub mod prelude {
 		pub use beet_core::prelude::*;
 		pub use beet_ecs::prelude::*;
 		pub use beet_ml::prelude::*;
-		pub use beet_net::prelude::*;
 	}
 }

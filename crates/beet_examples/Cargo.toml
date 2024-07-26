@@ -14,13 +14,13 @@ categories.workspace = true
 default = []
 # to enable reflect we need OnInsert to derive reflect https://github.com/bevyengine/bevy/pull/14259
 reflect = ["beet_ecs/reflect"]
-tokio = ["beet_net/tokio"]
+tokio = ["beetmash/tokio"]
 
 [dependencies]
 forky_core.workspace = true
 beet_ecs.workspace = true
 beet_core.workspace = true
-beet_net.workspace = true
+beetmash.workspace = true
 beet_ml.workspace = true
 # beet = { workspace = true, features = ["reflect"] }
 bevy = { workspace = true, default-features = true }
@@ -29,7 +29,6 @@ log.workspace = true
 pretty_env_logger.workspace = true
 forky_bevy.workspace = true
 rand.workspace = true
-flume.workspace = true
 serde.workspace = true
 anyhow.workspace = true
 
@@ -50,3 +49,72 @@ tokio.workspace = true
 [[example]]
 name = "export_scenes"
 path = "./examples/export_scenes.rs"
+
+
+[[package.metadata.project]]
+name = "app-basic"
+thumb-text = "🔨"
+description = "Basic Beet App with debugging, camera, and UI."
+app.js-url = "https://storage.googleapis.com/beet-examples/app_basics/main.js"
+app.wasm-url = "https://storage.googleapis.com/beet-examples/app_basics/main_bg.wasm"
+
+[[package.metadata.project]]
+name = "app-full"
+thumb-text = "🔨"
+description = "Full Beet App with machine learning, networking, and UI."
+app.js-url = "https://storage.googleapis.com/beet-examples/app_full/main.js"
+app.wasm-url = "https://storage.googleapis.com/beet-examples/app_full/main_bg.wasm"
+
+[[package.metadata.project]]
+name = "beet-debug"
+thumb-text = "🐛"
+description = "Enable debugging for printing to the console, and screen if used with ui-terminal."
+scene.path = "scenes/beet-debug.ron"
+
+[[package.metadata.project]]
+name = "beet-debug"
+thumb-text = "🐛"
+description = "Enable debugging for printing to the console, and screen if used with ui-terminal."
+scene.path = "scenes/beet-debug.ron"
+
+[[package.metadata.project]]
+name = "ui-terminal"
+thumb-text = "🖥️"
+description = "On-screen terminal outputs beet-debug messages."
+scene.path = "scenes/ui-terminal.ron"
+
+[[package.metadata.project]]
+name = "ui-terminal-input"
+thumb-text = "🖥️"
+description = "On-screen terminal with support for user input."
+scene.path = "scenes/ui-terminal-input.ron"
+
+[[package.metadata.project]]
+name = "camera-2d"
+thumb-text = "📸"
+description = "2D camera for rendering 2D scenes."
+scene.path = "scenes/camera-2d.ron"
+
+[[package.metadata.project]]
+name = "camera-3d"
+thumb-text = "📸"
+description = "3D camera for rendering 3D scenes."
+scene.path = "scenes/camera-3d.ron"
+
+[[package.metadata.project]]
+name = "ground-3d"
+thumb-text = "🏝️"
+description = "A simple 3D ground plane."
+scene.path = "scenes/ground-3d.ron"
+
+[[package.metadata.project]]
+name = "lighting-3d"
+thumb-text = "💡"
+description = "A directional light configured with shadows."
+scene.path = "scenes/lighting-3d.ron"
+
+[[package.metadata.project]]
+name = "space-scene"
+thumb-text = "🌌"
+description = "A 2D space scene with a starry background and transform wrap-around."
+scene.path = "scenes/space-scene.ron"

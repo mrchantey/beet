@@ -25,10 +25,10 @@
 
 		const replicationRegistry =
 		{
-			"beet_net::events::common_events::AppStartup": 0,
-			"beet_net::events::common_events::AppReady": 1,
-			"beet_net::events::spawn_scene_file::SpawnSceneFile": 2,
-			"beet_net::events::spawn_scene_file::SpawnSceneFileResponse": 3,
+			"beetmash_net::events::common_events::AppStartup": 0,
+			"beetmash_net::events::common_events::AppReady": 1,
+			"beetmash_net::events::spawn_scene_file::SpawnSceneFile": 2,
+			"beetmash_net::events::spawn_scene_file::SpawnSceneFileResponse": 3,
 			"beet_examples::net::example_replicate_plugin::OnUserMessage": 4
 		}
 
@@ -36,9 +36,9 @@
 			const response = await fetch(`/target/scenes/${name}.ron`)
 			const json = await response.text()
 			let hashmap = await sendMessage(
-				"beet_net::events::spawn_scene_file::SpawnSceneFile",
+				"beetmash_net::events::spawn_scene_file::SpawnSceneFile",
 				json,
-				"beet_net::events::spawn_scene_file::SpawnSceneFileResponse"
+				"beetmash_net::events::spawn_scene_file::SpawnSceneFileResponse"
 			)
 			console.log('hashmap received')
 			console.dir(hashmap)
@@ -84,7 +84,7 @@
 		window.addEventListener('wasm-message', async (event) => {
 			const messages = JSON.parse(event.detail)
 			for (const message of messages) {
-				if (message?.SendEvent?.reg_id === replicationRegistry["beet_net::events::common_events::AppStartup"]) {
+				if (message?.SendEvent?.reg_id === replicationRegistry["beetmash_net::events::common_events::AppStartup"]) {
 					console.log('AppStartup')
 					await loadScene('beet-debug')
 					await loadScene('camera-2d')

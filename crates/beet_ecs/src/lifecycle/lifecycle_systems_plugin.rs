@@ -40,4 +40,4 @@ impl Plugin for LifecycleSystemsPlugin {
 	}
 }
 
-pub const NUM_GLOBAL_OBSERVERS: u32 = 3;
+pub const NUM_GLOBAL_OBSERVERS: u32 = 5;

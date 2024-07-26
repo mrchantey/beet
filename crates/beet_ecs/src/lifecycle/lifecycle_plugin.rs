@@ -44,6 +44,10 @@ impl Plugin for LifecyclePlugin {
 		.register_type::<TargetAgent>()
 		/*-*/;
 
+		// net
+		#[cfg(feature = "net")]
+		app.add_plugins(BeetNetPlugin);
+
 		let world = app.world_mut();
 
 		// running

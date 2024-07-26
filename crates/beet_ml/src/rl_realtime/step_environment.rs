@@ -109,6 +109,7 @@ mod test {
 	use crate::prelude::*;
 	use anyhow::Result;
 	use beet_ecs::prelude::*;
+	use beetmash::prelude::*;
 	use bevy::prelude::*;
 	use sweet::*;
 

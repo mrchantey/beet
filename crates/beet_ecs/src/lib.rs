@@ -6,6 +6,8 @@ pub mod events;
 pub mod extensions;
 pub mod graph;
 pub mod lifecycle;
+#[cfg(feature = "net")]
+pub mod net;
 pub mod observers;
 pub mod reflect;
 #[cfg(any(test, feature = "test"))]
@@ -32,6 +34,8 @@ pub mod prelude {
 	pub use crate::lifecycle::components::*;
 	pub use crate::lifecycle::lifecycle_plugin::*;
 	pub use crate::lifecycle::lifecycle_systems_plugin::*;
+	#[cfg(feature = "net")]
+	pub use crate::net::*;
 	pub use crate::observers::*;
 	// pub use crate::lifecycle::*;
 	pub use crate::reflect::*;

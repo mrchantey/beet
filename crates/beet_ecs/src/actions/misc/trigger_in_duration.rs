@@ -56,6 +56,7 @@ pub fn trigger_in_duration<T: GenericActionEvent>(
 mod test {
 	use crate::prelude::*;
 	use anyhow::Result;
+	use beetmash::prelude::*;
 	use bevy::prelude::*;
 	use std::time::Duration;
 	use sweet::*;

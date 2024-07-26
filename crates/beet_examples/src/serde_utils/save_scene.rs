@@ -1,5 +1,5 @@
 use anyhow::Result;
-use beet_net::events::OnUserMessage;
+use beetmash::prelude::*;
 use bevy::audio::DefaultSpatialScale;
 use bevy::ecs::observer::Observer;
 use bevy::ecs::observer::ObserverState;
