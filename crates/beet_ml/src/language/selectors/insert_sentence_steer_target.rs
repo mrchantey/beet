@@ -1,7 +1,7 @@
-#![cfg(feature = "beet_core")]
+#![cfg(feature = "beet_spatial")]
 use crate::prelude::*;
-use beet_core::prelude::*;
 use beet_flow::prelude::*;
+use beet_spatial::prelude::*;
 use bevy::prelude::*;
 use std::marker::PhantomData;
 
@@ -73,8 +73,8 @@ fn insert_sentence_steer_target<T: GenericActionComponent>(
 mod test {
 	use crate::prelude::*;
 	use anyhow::Result;
-	use beet_core::steer::SteerTarget;
 	use beet_flow::prelude::*;
+	use beet_spatial::steer::SteerTarget;
 	use bevy::prelude::*;
 	use sweet::*;
 

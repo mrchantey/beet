@@ -19,7 +19,7 @@ impl Plugin for BertPlugin {
 			.register_type::<Sentence>()
 			/*-*/;
 
-		#[cfg(feature = "beet_core")]
+		#[cfg(feature = "beet_spatial")]
 		app.add_plugins(
 			ActionPlugin::<InsertSentenceSteerTarget<Sentence>>::default(),
 		);

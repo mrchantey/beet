@@ -463,10 +463,10 @@ name = "beet"
 version = "0.0.3"
 dependencies = [
  "anyhow",
- "beet_core",
  "beet_examples",
  "beet_flow",
  "beet_ml",
+ "beet_spatial",
  "beetmash",
  "bevy",
  "console_log",
@@ -481,30 +481,13 @@ dependencies = [
 ]
 
 [[package]]
-name = "beet_core"
-version = "0.0.3"
-dependencies = [
- "anyhow",
- "beet_flow",
- "bevy",
- "forky_bevy",
- "forky_core",
- "log",
- "pretty_env_logger",
- "serde",
- "strum",
- "strum_macros",
- "sweet",
-]
-
-[[package]]
 name = "beet_examples"
 version = "0.0.3"
 dependencies = [
  "anyhow",
- "beet_core",
  "beet_flow",
  "beet_ml",
+ "beet_spatial",
  "beetmash",
  "bevy",
  "bevy-inspector-egui",
@@ -559,8 +542,8 @@ name = "beet_ml"
 version = "0.0.3"
 dependencies = [
  "anyhow",
- "beet_core",
  "beet_flow",
+ "beet_spatial",
  "beetmash",
  "bevy",
  "candle-core",
@@ -588,6 +571,23 @@ dependencies = [
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "web-sys",
+]
+
+[[package]]
+name = "beet_spatial"
+version = "0.0.3"
+dependencies = [
+ "anyhow",
+ "beet_flow",
+ "bevy",
+ "forky_bevy",
+ "forky_core",
+ "log",
+ "pretty_env_logger",
+ "serde",
+ "strum",
+ "strum_macros",
+ "sweet",
 ]
 
 [[package]]

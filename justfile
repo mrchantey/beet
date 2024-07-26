@@ -1,6 +1,6 @@
 set windows-shell := ["C:/tools/cygwin/bin/sh.exe","-c"]
 set dotenv-load
-crates := 'beet beet_core beet_flow'
+crates := 'beet beet_spatial beet_flow'
 
 default:
 	just --list --unsorted
@@ -27,7 +27,7 @@ test-all *args:
 	just watch 'cargo test --workspace --lib -- {{args}}'
 
 test-core *args:
-	just watch 'cargo test -p beet_core --lib -- {{args}}'
+	just watch 'cargo test -p beet_spatial --lib -- {{args}}'
 
 test-ecs *args:
 	just watch 'cargo test -p beet_flow --lib -- {{args}}'
@@ -130,7 +130,7 @@ publish crate *args:
 publish-all *args:
 	just publish beet_flow_macros {{args}}	|| true
 	just publish beet_flow {{args}}				|| true
-	just publish beet_core {{args}}				|| true
+	just publish beet_spatial {{args}}				|| true
 	just publish beet_ml {{args}}					|| true
 	just publish beet_examples {{args}}		|| true
 	just publish beet {{args}}						|| true

@@ -1,5 +1,5 @@
 [package]
-name = "beet_core"
+name = "beet_spatial"
 version = { workspace = true }
 edition = { workspace = true }
 description = { workspace = true }

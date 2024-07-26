@@ -19,7 +19,7 @@ tokio = ["beetmash/tokio"]
 [dependencies]
 forky_core.workspace = true
 beet_flow.workspace = true
-beet_core.workspace = true
+beet_spatial.workspace = true
 beetmash.workspace = true
 beet_ml.workspace = true
 # beet = { workspace = true, features = ["reflect"] }
