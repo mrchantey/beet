@@ -98,15 +98,16 @@ beet_examples = { path = "crates/beet_examples", version = "0.0.3" }
 
 ## local
 beetmash = { path = "../beetmash" }
-# forky_core = { path = "../forky/crates/forky/forky_core" }
-# forky_bevy = { path = "../forky/crates/forky/forky_bevy" }
-# forky_web = { path = "../forky/crates/forky/forky_web", default-features = false }
-# sweet = { path = "../forky/crates/sweet", features = ["bevy"] }
+forky_core = { path = "../forky/crates/forky_core" }
+forky_bevy = { path = "../forky/crates/forky_bevy" }
+forky_web = { path = "../forky/crates/forky_web", default-features = false }
+sweet = { path = "../sweet", features = ["bevy"] }
 
-forky_core = "0.1.50"
-forky_bevy = "0.1.50"
-forky_web = "0.1.50"
-sweet = { version = "0.1.50", features = ["bevy"] }
+# beetmash = "0."
+# forky_core = "0.1.50"
+# forky_bevy = "0.1.50"
+# forky_web = { version = "0.1.50", default-features = false }
+# sweet = { version = "0.1.50", features = ["bevy"] }
 
 ## logging
 log = "0.4"

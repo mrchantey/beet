@@ -109,9 +109,9 @@ fn assert_scene_match(
 		// let scene_entity =
 		// 	.expect("just checked entity count");
 
-		for component in world.inspect_entity(dyn_entity.entity).iter() {
+		for component in world.inspect_entity(dyn_entity.entity) {
 			let num_components_world =
-				world.inspect_entity(dyn_entity.entity).len();
+				world.inspect_entity(dyn_entity.entity).count();
 			let num_components_scene = dyn_entity.components.len();
 			if num_components_world != num_components_scene {
 				// issues.push(format!(

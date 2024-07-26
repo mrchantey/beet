@@ -71,7 +71,7 @@ fn play_animation_on_run(
 	// safe unwrap, just checked
 	let (mut player, mut transitions) = animators.get_mut(target).unwrap();
 
-	if !player.is_playing_animation(play_animation.animation)
+	if !player.animation_is_playing(play_animation.animation)
 		|| play_animation.trigger_if_playing
 	{
 		transitions
@@ -107,7 +107,7 @@ fn play_animation_on_load(
 		else {
 			continue;
 		};
-		if !player.is_playing_animation(play_animation.animation)
+		if !player.animation_is_playing(play_animation.animation)
 			|| play_animation.trigger_if_playing
 		{
 			transitions
