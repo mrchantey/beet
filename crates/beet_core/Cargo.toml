@@ -38,3 +38,4 @@ pretty_env_logger.workspace = true
 
 [dev-dependencies]
 sweet.workspace = true
+

@@ -248,3 +248,165 @@ features = [
 	"IdbVersionChangeEvent",
 	"IdbVersionChangeEventInit",
 ]
+
+[[package.metadata.project]]
+name = "app-basic"
+thumb-text = "🐛"
+description = "Basic Beet App with debugging, camera, and UI."
+
+[[package.metadata.project]]
+name = "app-full"
+thumb-text = "🐛"
+description = "Full Beet App with machine learning, networking, and UI."
+
+[[package.metadata.project]]
+name = "beet-debug"
+thumb-text = "🐛"
+description = "Enable debugging for printing to the console, and screen if used with ui-terminal."
+scene.path = "scenes/beet-debug.ron"
+
+[[package.metadata.project]]
+name = "beet-debug"
+thumb-text = "🐛"
+description = "Enable debugging for printing to the console, and screen if used with ui-terminal."
+scene.path = "scenes/beet-debug.ron"
+
+[[package.metadata.project]]
+name = "ui-terminal"
+thumb-text = "🖥️"
+description = "On-screen terminal outputs beet-debug messages."
+scene.path = "scenes/ui-terminal.ron"
+
+[[package.metadata.project]]
+name = "ui-terminal-input"
+thumb-text = "🖥️"
+description = "On-screen terminal with support for user input."
+scene.path = "scenes/ui-terminal-input.ron"
+
+[[package.metadata.project]]
+name = "camera-2d"
+thumb-text = "📸"
+description = "2D camera for rendering 2D scenes."
+scene.path = "scenes/camera-2d.ron"
+
+[[package.metadata.project]]
+name = "camera-3d"
+thumb-text = "📸"
+description = "3D camera for rendering 3D scenes."
+scene.path = "scenes/camera-3d.ron"
+
+[[package.metadata.project]]
+name = "ground-3d"
+thumb-text = "🏝️"
+description = "A simple 3D ground plane."
+scene.path = "scenes/ground-3d.ron"
+
+[[package.metadata.project]]
+name = "lighting-3d"
+thumb-text = "💡"
+description = "A directional light configured with shadows."
+scene.path = "scenes/lighting-3d.ron"
+
+[[package.metadata.project]]
+name = "space-scene"
+thumb-text = "🌌"
+description = "A 2D space scene with a starry background and transform wrap-around."
+scene.path = "scenes/space-scene.ron"
+
+[[package.metadata.project]]
+name = "hello-world"
+thumb-text = "🌍"
+description = "A simple behavior that prints 'Hello' then 'World' to the console."
+scene.path = "scenes/hello-world.ron"
+scene.dependencies = ["beet-debug", "camera-2d", "ui-terminal"]
+
+
+[[package.metadata.project]]
+name = "hello-net"
+description = "A simple behavior demonstrating triggering and reacting to network events."
+scene.path = "scenes/hello-net.ron"
+scene.dependencies = ["beet-debug", "camera-2d", "ui-terminal"]
+
+[[package.metadata.project]]
+name = "hello-animation"
+description = "A simple behavior demonstrating animation control."
+scene.path = "scenes/hello-animation.ron"
+scene.dependencies = ["beet-debug", "ui-terminal", "lighting-3d", "ground-3d"]
+
+[[package.metadata.project]]
+name = "flock"
+description = "Demonstration of flocking behaviors."
+scene.path = "scenes/flock.ron"
+scene.dependencies = ["beet-debug", "camera-2d", "space-scene"]
+
+[[package.metadata.project]]
+name = "seek"
+description = "Demonstration of the seek behavior."
+scene.path = "scenes/seek.ron"
+scene.dependencies = ["beet-debug", "camera-2d", "space-scene"]
+
+[[package.metadata.project]]
+name = "seek-3d"
+description = "A 3D demonstration of the seek behavior."
+scene.path = "scenes/seek-3d.ron"
+scene.dependencies = ["beet-debug", "lighting-3d", "ground-3d"]
+
+[[package.metadata.project]]
+name = "hello-llm"
+description = "A behavior that uses a Sentence Selector to score child behaviors, deciding which will run next."
+scene.path = "scenes/hello-llm.ron"
+scene.dependencies = ["beet-debug", "camera-2d", "ui-terminal"]
+
+[[package.metadata.project]]
+name = "fetch-npc"
+thumb-text = "🐶"
+description = "The fetch character that will interact with the player."
+scene.path = "scenes/fetch-npc.ron"
+
+[[package.metadata.project]]
+name = "fetch-scene"
+thumb-text = "🏠"
+description = "A camera and the items that the fetch character can go to."
+scene.path = "scenes/fetch-scene.ron"
+
+[[package.metadata.project]]
+name = "frozen-lake-scene"
+thumb-text = "❄️"
+description = "The static scene for the frozen lake environment."
+scene.path = "scenes/frozen-lake-scene.ron"
+
+[[package.metadata.project]]
+name = "fetch"
+description = "Combining LLM, steering and animation behaviors."
+scene.path = "scenes/fetch.ron"
+scene.dependencies = [
+	"beet-debug",
+	"fetch-scene",
+	"ui-terminal-input",
+	"lighting-3d",
+	"ground-3d",
+	"fetch-npc",
+]
+events.playerMessage.initial = "I'm hungry!"
+
+[[package.metadata.project]]
+name = "train"
+description = "Train a Q-learning agent to navigate the frozen lake environment."
+scene.path = "scenes/frozen-lake-train.ron"
+scene.dependencies = [
+	"beet-debug",
+	"frozen-lake-scene",
+	"ui-terminal",
+	"lighting-3d",
+]
+
+[[package.metadata.project]]
+name = "infer"
+description = "Use a trained Q-learning agent to navigate the frozen lake environment."
+scene.path = "scenes/frozen-lake-run.ron"
+scene.dependencies = [
+	"beet-debug",
+	"frozen-lake-scene",
+	"ui-terminal",
+	"lighting-3d",
+]
