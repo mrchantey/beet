@@ -18,7 +18,7 @@ beetmash = ["dep:beetmash"]
 # tokio = ["dep:tokio"]
 
 [dependencies]
-beet_ecs.workspace = true
+beet_flow.workspace = true
 beet_core = { workspace = true, optional = true }
 beetmash = { workspace = true, optional = true }
 
@@ -56,7 +56,7 @@ wasm-bindgen-futures.workspace = true
 console_error_panic_hook.workspace = true
 
 [dev-dependencies]
-beet_ecs = { workspace = true, features = ["test"] }
+beet_flow = { workspace = true, features = ["test"] }
 pretty_env_logger.workspace = true
 sweet.workspace = true
 

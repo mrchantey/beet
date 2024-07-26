@@ -13,12 +13,12 @@ categories.workspace = true
 [features]
 default = []
 # to enable reflect we need OnInsert to derive reflect https://github.com/bevyengine/bevy/pull/14259
-reflect = ["beet_ecs/reflect"]
+reflect = ["beet_flow/reflect"]
 tokio = ["beetmash/tokio"]
 
 [dependencies]
 forky_core.workspace = true
-beet_ecs.workspace = true
+beet_flow.workspace = true
 beet_core.workspace = true
 beetmash.workspace = true
 beet_ml.workspace = true

@@ -15,7 +15,7 @@ pub mod test;
 pub mod tree;
 
 // required for action macros
-extern crate self as beet_ecs;
+extern crate self as beet_flow;
 
 pub mod prelude {
 	pub use crate::action_builder::*;
@@ -42,5 +42,5 @@ pub mod prelude {
 	#[cfg(any(test, feature = "test"))]
 	pub use crate::test::*;
 	pub use crate::tree::*;
-	pub use beet_ecs_macros::*;
+	pub use beet_flow_macros::*;
 }

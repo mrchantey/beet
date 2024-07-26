@@ -1,4 +1,4 @@
-use beet_ecs::prelude::*;
+use beet_flow::prelude::*;
 use bevy::prelude::*;
 
 #[derive(Component, Action, Reflect)]

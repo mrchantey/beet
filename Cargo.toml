@@ -26,12 +26,12 @@ beetmash = ["dep:beetmash"]
 ui = ["beet_core/ui"]
 assets = ["beet_core/assets"]
 animation = ["beet_core/animation"]
-reflect = ["beet_ecs/reflect"]
+reflect = ["beet_flow/reflect"]
 
 # dynamic_linking = ["bevy/dynamic_linking"]
 
 [dependencies]
-beet_ecs.workspace = true
+beet_flow.workspace = true
 beet_core.workspace = true
 beet_ml = { workspace = true, optional = true }
 beetmash = { workspace = true, optional = true }
@@ -80,8 +80,8 @@ publish = false
 # default resolver
 resolver = "2"
 members = [
-	"crates/beet_ecs/macros",
-	"crates/beet_ecs",
+	"crates/beet_flow/macros",
+	"crates/beet_flow",
 	"crates/beet_ml",
 	"crates/beet_core",
 	"crates/beet_examples",
@@ -91,8 +91,8 @@ members = [
 ## internal
 beet = { path = "./", version = "0.0.3" }
 beet_core = { path = "crates/beet_core", version = "0.0.3", default-features = false }
-beet_ecs = { path = "crates/beet_ecs", version = "0.0.3" }
-beet_ecs_macros = { path = "crates/beet_ecs/macros", version = "0.0.3" }
+beet_flow = { path = "crates/beet_flow", version = "0.0.3" }
+beet_flow_macros = { path = "crates/beet_flow/macros", version = "0.0.3" }
 beet_ml = { path = "crates/beet_ml", version = "0.0.3" }
 beet_examples = { path = "crates/beet_examples", version = "0.0.3" }
 

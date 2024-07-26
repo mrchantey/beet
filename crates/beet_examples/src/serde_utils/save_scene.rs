@@ -66,7 +66,7 @@ pub fn save_scene(
 const ALLOWED_IGNORES: &[&str] = &[
 	"bevy_ui::ui_node::BorderRadius",
 	"bevy_animation::transition::AnimationTransitions",
-	"beet_ecs::observers::action_observer_map::ActionObserverMap",
+	"beet_flow::observers::action_observer_map::ActionObserverMap",
 	"bevy_ecs::observer::entity_observer::ObservedBy",
 ];
 

@@ -16,12 +16,12 @@ pub fn derive_action(
 fn parse(input: DeriveInput) -> syn::Result<TokenStream> {
 	let attributes = ActionAttributes::parse(&input.attrs)?;
 
-	let beet_ecs_path = BeetManifest::get_path_direct("beet_ecs");
+	let beet_flow_path = BeetManifest::get_path_direct("beet_flow");
 	let impl_action_systems = impl_action_builder(&input, &attributes)?;
 	let impl_action_meta = impl_action_meta(&input, &attributes)?;
 
 	Ok(quote! {
-		use #beet_ecs_path::prelude::*;
+		use #beet_flow_path::prelude::*;
 		use bevy::prelude::*;
 		#impl_action_systems
 		#impl_action_meta
@@ -32,7 +32,6 @@ fn impl_component_hooks(
 	_input: &DeriveInput,
 	attributes: &ActionAttributes,
 ) -> syn::Result<Option<TokenStream>> {
-
 	if attributes.observers.len() == 0 {
 		return Ok(None);
 	}

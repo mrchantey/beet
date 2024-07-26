@@ -1,7 +1,7 @@
 #![cfg(feature = "beet_core")]
 use crate::prelude::*;
 use beet_core::prelude::*;
-use beet_ecs::prelude::*;
+use beet_flow::prelude::*;
 use bevy::prelude::*;
 use std::marker::PhantomData;
 
@@ -74,7 +74,7 @@ mod test {
 	use crate::prelude::*;
 	use anyhow::Result;
 	use beet_core::steer::SteerTarget;
-	use beet_ecs::prelude::*;
+	use beet_flow::prelude::*;
 	use bevy::prelude::*;
 	use sweet::*;
 

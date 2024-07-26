@@ -1,5 +1,5 @@
 use super::*;
-use beet_ecs::prelude::*;
+use beet_flow::prelude::*;
 use bevy::animation::RepeatAnimation;
 use bevy::prelude::*;
 use std::time::Duration;

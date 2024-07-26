@@ -1,5 +1,5 @@
 [package]
-name = "beet_ecs"
+name = "beet_flow"
 version.workspace = true
 edition.workspace = true
 description.workspace = true
@@ -21,7 +21,7 @@ reflect = []
 test = ["dep:sweet"]
 
 [dependencies]
-beet_ecs_macros.workspace = true
+beet_flow_macros.workspace = true
 beetmash = { workspace = true, optional = true }
 
 log.workspace = true

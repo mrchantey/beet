@@ -464,8 +464,8 @@ version = "0.0.3"
 dependencies = [
  "anyhow",
  "beet_core",
- "beet_ecs",
  "beet_examples",
+ "beet_flow",
  "beet_ml",
  "beetmash",
  "bevy",
@@ -485,7 +485,7 @@ name = "beet_core"
 version = "0.0.3"
 dependencies = [
  "anyhow",
- "beet_ecs",
+ "beet_flow",
  "bevy",
  "forky_bevy",
  "forky_core",
@@ -498,44 +498,12 @@ dependencies = [
 ]
 
 [[package]]
-name = "beet_ecs"
-version = "0.0.3"
-dependencies = [
- "anyhow",
- "beet_ecs_macros",
- "beetmash",
- "bevy",
- "extend",
- "heck 0.4.1",
- "log",
- "num-traits",
- "petgraph",
- "pretty_env_logger",
- "ron",
- "serde",
- "sweet",
-]
-
-[[package]]
-name = "beet_ecs_macros"
-version = "0.0.3"
-dependencies = [
- "anyhow",
- "extend",
- "heck 0.4.1",
- "proc-macro2",
- "quote",
- "syn 2.0.59",
- "toml_edit 0.22.14",
-]
-
-[[package]]
 name = "beet_examples"
 version = "0.0.3"
 dependencies = [
  "anyhow",
  "beet_core",
- "beet_ecs",
+ "beet_flow",
  "beet_ml",
  "beetmash",
  "bevy",
@@ -555,12 +523,44 @@ dependencies = [
 ]
 
 [[package]]
+name = "beet_flow"
+version = "0.0.3"
+dependencies = [
+ "anyhow",
+ "beet_flow_macros",
+ "beetmash",
+ "bevy",
+ "extend",
+ "heck 0.4.1",
+ "log",
+ "num-traits",
+ "petgraph",
+ "pretty_env_logger",
+ "ron",
+ "serde",
+ "sweet",
+]
+
+[[package]]
+name = "beet_flow_macros"
+version = "0.0.3"
+dependencies = [
+ "anyhow",
+ "extend",
+ "heck 0.4.1",
+ "proc-macro2",
+ "quote",
+ "syn 2.0.59",
+ "toml_edit 0.22.14",
+]
+
+[[package]]
 name = "beet_ml"
 version = "0.0.3"
 dependencies = [
  "anyhow",
  "beet_core",
- "beet_ecs",
+ "beet_flow",
  "beetmash",
  "bevy",
  "candle-core",

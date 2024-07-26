@@ -23,7 +23,7 @@ forky_core.workspace = true
 forky_bevy.workspace = true
 log.workspace = true
 
-beet_ecs.workspace = true
+beet_flow.workspace = true
 bevy.workspace = true
 
 anyhow.workspace = true

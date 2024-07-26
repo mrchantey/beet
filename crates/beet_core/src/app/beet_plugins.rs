@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use beet_ecs::prelude::*;
+use beet_flow::prelude::*;
 use bevy::app::PluginGroupBuilder;
 use bevy::prelude::*;
 

@@ -16,7 +16,7 @@ pub mod prelude {
 pub mod beet {
 	pub mod prelude {
 		pub use beet_core::prelude::*;
-		pub use beet_ecs::prelude::*;
+		pub use beet_flow::prelude::*;
 		pub use beet_ml::prelude::*;
 	}
 }

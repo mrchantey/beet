@@ -1,5 +1,5 @@
 // use crate::prelude::*;
-// use beet_ecs::prelude::*;
+// use beet_flow::prelude::*;
 use bevy::prelude::*;
 // use std::time::Duration;
 
@@ -46,7 +46,7 @@ impl AutoSpawn {
 
 // use crate::prelude::*;
 // 	use anyhow::Result;
-// 	use beet_ecs::prelude::*;
+// 	use beet_flow::prelude::*;
 // 	use bevy::prelude::*;
 // 	use sweet::*;
 

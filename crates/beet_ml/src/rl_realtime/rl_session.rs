@@ -1,4 +1,4 @@
-use beet_ecs::prelude::*;
+use beet_flow::prelude::*;
 use bevy::prelude::*;
 use std::borrow::Cow;
 use std::fmt::Debug;
@@ -170,7 +170,7 @@ pub fn handle_episode_end<T: EpisodeParams>(
 mod test {
 	use crate::prelude::*;
 	use anyhow::Result;
-	use beet_ecs::prelude::*;
+	use beet_flow::prelude::*;
 	use bevy::prelude::*;
 	use sweet::*;
 

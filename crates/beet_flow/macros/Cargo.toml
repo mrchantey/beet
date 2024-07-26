@@ -1,5 +1,5 @@
 [package]
-name = "beet_ecs_macros"
+name = "beet_flow_macros"
 version.workspace = true
 edition.workspace = true
 description.workspace = true

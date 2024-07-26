@@ -1,4 +1,4 @@
-use beet_ecs::extensions::ParentExt;
+use beet_flow::extensions::ParentExt;
 use bevy::prelude::*;
 
 

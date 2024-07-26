@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use beet_ecs::prelude::*;
+use beet_flow::prelude::*;
 use bevy::prelude::*;
 use std::borrow::Cow;
 
@@ -55,7 +55,7 @@ fn sentence_flow(
 mod test {
 	use crate::prelude::*;
 	use anyhow::Result;
-	use beet_ecs::prelude::*;
+	use beet_flow::prelude::*;
 	use beetmash::prelude::*;
 	use bevy::prelude::*;
 	use sweet::*;

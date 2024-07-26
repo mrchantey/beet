@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use beet_ecs::prelude::*;
+use beet_flow::prelude::*;
 use bevy::prelude::*;
 
 /// Sets the [`SteerTarget`] when an entity with the given name is nearby.

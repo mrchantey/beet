@@ -1,4 +1,4 @@
-use beet_ecs::prelude::*;
+use beet_flow::prelude::*;
 use bevy::prelude::*;
 use std::f32::consts::TAU;
 

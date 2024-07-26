@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use beet_ecs::prelude::*;
+use beet_flow::prelude::*;
 use bevy::prelude::*;
 use forky_core::ResultTEExt;
 
@@ -57,7 +57,7 @@ fn seek(
 mod test {
 	use crate::prelude::*;
 	use anyhow::Result;
-	use beet_ecs::prelude::*;
+	use beet_flow::prelude::*;
 	use bevy::prelude::*;
 	use sweet::*;
 
@@ -76,7 +76,11 @@ mod test {
 				SteerBundle::default().with_target(Vec3::new(1.0, 0., 0.)),
 			))
 			.with_children(|parent| {
-				parent.spawn((TargetAgent(parent.parent_entity()), Running, Seek));
+				parent.spawn((
+					TargetAgent(parent.parent_entity()),
+					Running,
+					Seek,
+				));
 			})
 			.id();
 
