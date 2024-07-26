@@ -1,3 +1,4 @@
+# Identical to beetmash
 name: 🔎 Test Crates
 on:
   push:
@@ -11,13 +12,7 @@ env:
 jobs:
   build_and_test:
     name: Build and Test
-    strategy:
-      matrix:
-        # os: [windows-latest, ubuntu-latest, macos-latest]
-        os: [ubuntu-latest]   # 1x  gh minutes
-        # os: [windows-latest] # 2x  gh minutes
-        # os: [macos-latest]   # 10x gh minutes
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-latest
     steps:
     - name: 📂 Checkout
       uses: actions/checkout@v4
@@ -31,41 +26,14 @@ jobs:
           ~/.cargo/git/db/
           target/
         key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-    - name: 🔨 Install Cygwin
-      uses: cygwin/cygwin-install-action@master
-      if: runner.os == 'Windows'
-      with:
-        install-dir: C:\tools\cygwin
     - name: 🔨 Install Bevy Dependencies
       if: runner.os == 'Linux'
       run: sudo apt-get update && sudo apt-get install g++ pkg-config libx11-dev libasound2-dev libudev-dev mold
-    - name: 🔨 Install Just
-      uses: extractions/setup-just@v1
     - name: 🔨 Install Rust
       uses: actions-rs/toolchain@v1
       with:
         toolchain: nightly
         override: true
         default: true
-        # components: rustfmt, clippy
-    # - name: 🔨 Install Chromedriver
-    #   uses: nanasess/setup-chromedriver@v2  
-    # - name: 🔨 Install Wasm Target
-    #   run: rustup target add wasm32-unknown-unknown
-    # - name: 🔨 Install Wasm Bindgen
-    #   uses: baptiste0928/cargo-install@v2
-    #   with:
-    #     crate: wasm-bindgen-cli
-    #     version: '0.2.88'
-    # - name: 🔨 Build Crates
-    #   run: just all build
-    # - name: 🔎 Test Fantoccini
-    #   run: just run sweet fantoccini
     - name: 🔎 Test Native
       run: cargo test --workspace --lib
-    # - name: 🔎 Test Wasm - Windows # TODO sweet not compiling since cli added
-    #   if: runner.os == 'Windows'
-    #   run: just test-all-wasm-no-bevy
-    # - name: 🔎 Test Wasm - Linux & MacOS
-    #   if: runner.os != 'Windows'
-    #   run: just test-all-wasm
