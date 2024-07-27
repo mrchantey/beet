@@ -6,59 +6,8 @@ opt-level = 1
 [profile.dev.package."*"]
 opt-level = 3
 
-[package]
-name = "beet"
-version.workspace = true
-edition.workspace = true
-description.workspace = true
-documentation.workspace = true
-readme.workspace = true
-homepage.workspace = true
-repository.workspace = true
-license.workspace = true
-keywords.workspace = true
-categories.workspace = true
-
-[features]
-default = ["ml", "animation", "assets", "ui"]
-ml = ["dep:beet_ml"]
-beetmash = ["dep:beetmash"]
-ui = ["beet_spatial/ui"]
-assets = ["beet_spatial/assets"]
-animation = ["beet_spatial/animation"]
-reflect = ["beet_flow/reflect"]
-
-# dynamic_linking = ["bevy/dynamic_linking"]
-
-[dependencies]
-beet_flow.workspace = true
-beet_spatial.workspace = true
-beet_ml = { workspace = true, optional = true }
-beetmash = { workspace = true, optional = true }
-
-[dev-dependencies]
-beet_examples.workspace = true
-bevy = { workspace = true, default-features = true }
-log.workspace = true
-pretty_env_logger.workspace = true
-forky_bevy.workspace = true
-anyhow.workspace = true
-serde.workspace = true
-serde_json.workspace = true
-
-[target.'cfg(target_arch = "wasm32")'.dev-dependencies]
-console_log.workspace = true
-web-sys.workspace = true
-wasm-bindgen.workspace = true
-
-[target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
-tokio.workspace = true
-
-
-### WORKSPACE ################################################################################################z###########################
-
 [workspace.package]
-version = "0.0.3"
+version = "0.0.4-rc.1"
 edition = "2021"
 description = "A very flexible AI behavior library for games and robotics."
 documentation = "https://beetmash.com/docs/beet"
@@ -89,19 +38,19 @@ members = [
 
 [workspace.dependencies]
 ## internal
-beet = { path = "./", version = "0.0.3" }
-beet_spatial = { path = "crates/beet_spatial", version = "0.0.3", default-features = false }
-beet_flow = { path = "crates/beet_flow", version = "0.0.3" }
-beet_flow_macros = { path = "crates/beet_flow/macros", version = "0.0.3" }
-beet_ml = { path = "crates/beet_ml", version = "0.0.3" }
-beet_examples = { path = "crates/beet_examples", version = "0.0.3" }
+beet = { path = "./", version = "0.0.4-rc.1" }
+beet_spatial = { path = "crates/beet_spatial", version = "0.0.4-rc.1", default-features = false }
+beet_flow = { path = "crates/beet_flow", version = "0.0.4-rc.1" }
+beet_flow_macros = { path = "crates/beet_flow/macros", version = "0.0.4-rc.1" }
+beet_ml = { path = "crates/beet_ml", version = "0.0.4-rc.1" }
+beet_examples = { path = "crates/beet_examples", version = "0.0.4-rc.1" }
 
 ## local
-beetmash = { path = "../beetmash" }
-forky_core = { path = "../forky/crates/forky_core" }
-forky_bevy = { path = "../forky/crates/forky_bevy" }
-forky_web = { path = "../forky/crates/forky_web", default-features = false }
-sweet = { path = "../sweet", features = ["bevy"] }
+beetmash = { version = "0.0.6-rc.1", path = "../beetmash" }
+forky_core = { version = "0.1.50", path = "../forky/crates/forky_core" }
+forky_bevy = { version = "0.1.50", path = "../forky/crates/forky_bevy" }
+forky_web = { version = "0.1.50", path = "../forky/crates/forky_web", default-features = false }
+sweet = { version = "0.1.50", path = "../sweet", features = ["bevy"] }
 
 # beetmash = "0."
 # forky_core = "0.1.50"
@@ -153,7 +102,7 @@ ron = "0.8"
 # 	# "bevy_color",
 # ] }
 #💡 observer reflect attributes, required until 0.14.1
-bevy = { path = "../bevy", default-features = false, features = [
+bevy = { version = "0.14", path = "../bevy", default-features = false, features = [
 	"bevy_scene",
 	"serialize",
 	# "bevy_color",
@@ -165,6 +114,59 @@ js-sys = "0.3"
 wasm-bindgen = "0.2"
 wasm-bindgen-futures = "0.4"
 console_error_panic_hook = "0.1"
+
+#💡💡 Package
+
+[package]
+name = "beet"
+version.workspace = true
+edition.workspace = true
+description.workspace = true
+documentation.workspace = true
+readme.workspace = true
+homepage.workspace = true
+repository.workspace = true
+license.workspace = true
+keywords.workspace = true
+categories.workspace = true
+
+[features]
+default = ["ml", "animation", "assets", "ui"]
+ml = ["dep:beet_ml"]
+beetmash = ["dep:beetmash"]
+ui = ["beet_spatial/ui"]
+assets = ["beet_spatial/assets"]
+animation = ["beet_spatial/animation"]
+reflect = ["beet_flow/reflect"]
+
+# dynamic_linking = ["bevy/dynamic_linking"]
+
+[dependencies]
+beet_flow.workspace = true
+beet_spatial.workspace = true
+beet_ml = { workspace = true, optional = true }
+beetmash = { workspace = true, optional = true }
+
+[dev-dependencies]
+beet_examples.workspace = true
+bevy = { workspace = true, default-features = true }
+log.workspace = true
+pretty_env_logger.workspace = true
+forky_bevy.workspace = true
+anyhow.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+
+[target.'cfg(target_arch = "wasm32")'.dev-dependencies]
+console_log.workspace = true
+web-sys.workspace = true
+wasm-bindgen.workspace = true
+
+[target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
+tokio.workspace = true
+
+
+### WORKSPACE ################################################################################################z###########################
 
 [workspace.dependencies.web-sys]
 # [target.'cfg(target_arch = "wasm32")'.dependencies.web-sys]

@@ -1,9 +1,6 @@
 pub mod auto_spawn;
 #[allow(unused_imports)]
 pub use self::auto_spawn::*;
-pub mod beet_finished_loading;
-#[allow(unused_imports)]
-pub use self::beet_finished_loading::*;
 pub mod bundles;
 #[allow(unused_imports)]
 pub use self::bundles::*;
