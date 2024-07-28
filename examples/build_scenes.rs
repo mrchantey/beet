@@ -19,8 +19,8 @@ fn main() -> Result<()> {
 	.with_dir(DIR)
 	.with_query::<(Without<ObserverState>, Without<Observer<OnLogMessage, ()>>)>(
 	)
-	.add_scene("beet-debug", beet::flow::scenes::beet_debug)
-	.add_scene("hello-world", beet::flow::scenes::hello_world)
+	.add_scene("beet-debug", beet_examples::scenes::flow::beet_debug)
+	.add_scene("hello-world", beet_examples::scenes::flow::hello_world)
 	.build()?;
 
 	// BeetmashSceneBuilder::new((

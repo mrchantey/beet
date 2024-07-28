@@ -1,0 +1,26 @@
+(
+  resources: {},
+  entities: {
+    4294967298: (
+      components: {
+        "bevy_core::name::Name": "Hello World Sequence",
+        "bevy_hierarchy::components::children::Children": ([
+          4294967299,
+          4294967300,
+        ]),
+      },
+    ),
+    4294967299: (
+      components: {
+        "bevy_core::name::Name": "Hello",
+        "bevy_hierarchy::components::parent::Parent": (4294967298),
+      },
+    ),
+    4294967300: (
+      components: {
+        "bevy_core::name::Name": "World",
+        "bevy_hierarchy::components::parent::Parent": (4294967298),
+      },
+    ),
+  },
+)

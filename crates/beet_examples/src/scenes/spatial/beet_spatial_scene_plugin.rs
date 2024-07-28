@@ -1,4 +1,4 @@
-use crate::prelude::*;
+use beet_spatial::prelude::*;
 use beet_flow::prelude::*;
 use bevy::prelude::*;
 

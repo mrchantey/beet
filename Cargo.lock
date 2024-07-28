@@ -452,6 +452,8 @@ version = "0.0.4-rc.1"
 dependencies = [
  "anyhow",
  "beet_flow",
+ "beet_ml",
+ "beet_spatial",
  "beetmash",
  "bevy",
  "forky_bevy",
