@@ -48,9 +48,9 @@ fn main() -> Result<()> {
 		.without_clear_target()
 		.with_query::<(Without<ObserverState>, Without<Observer<OnLogMessage, ()>>)>(
 		)
+		.add_scene("hello-ml", beet_examples::scenes::ml::hello_ml)
 		.add_scene("fetch-scene", beet_examples::scenes::ml::fetch_scene)
 		.add_scene("fetch-npc", beet_examples::scenes::ml::fetch_npc)
-		.add_scene("sentence-selector", beet_examples::scenes::ml::hello_ml)
 		// frozen-lake
 		.add_scene(
 			"frozen-lake-scene",

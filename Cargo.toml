@@ -240,11 +240,143 @@ features = [
 	"IdbVersionChangeEventInit",
 ]
 
+[[package.metadata.project]]
+name = "app"
+thumb-text = "🔨"
+description = "Basic Beet App with debugging, camera, and UI."
+app.js-url = "https://storage.googleapis.com/beet-examples/app_basics/main.js"
+app.wasm-url = "https://storage.googleapis.com/beet-examples/app_basics/main_bg.wasm"
+
+[[package.metadata.project]]
+name = "app-ml"
+thumb-text = "🔨"
+description = "Full Beet App with machine learning, networking, and UI."
+app.js-url = "https://storage.googleapis.com/beet-examples/app_full/main.js"
+app.wasm-url = "https://storage.googleapis.com/beet-examples/app_full/main_bg.wasm"
+
+[[package.metadata.project]]
+name = "beet-debug"
+thumb-text = "🐛"
+description = "Enable debugging for printing to the console, and screen if used with beetmash/ui-terminal."
+scene.path = "scenes/beet-debug.ron"
 
 [[package.metadata.project]]
 name = "hello-world"
 thumb-text = "🌍"
 thumb-url = "https://storage.googleapis.com/beet-examples/screenshots/hello-world.png"
 description = "A simple behavior that prints 'Hello' then 'World' to the console."
+app = "app"
 scene.path = "scenes/hello-world.ron"
-scene.dependencies = ["beet-debug", "camera-2d", "ui-terminal"]
+scene.dependencies = [
+	"beet-debug",
+	"beetmash/camera-2d",
+	"beetmash/ui-terminal",
+]
+
+
+[[package.metadata.project]]
+name = "flock"
+description = "Demonstration of flocking behaviors."
+thumb-url = "https://storage.googleapis.com/beet-examples/screenshots/flock.png"
+app = "app"
+scene.path = "scenes/flock.ron"
+scene.dependencies = ["beet-debug", "beetmash/camera-2d", "space-scene"]
+
+[[package.metadata.project]]
+name = "seek"
+description = "Demonstration of the seek behavior."
+thumb-url = "https://storage.googleapis.com/beet-examples/screenshots/seek.png"
+app = "app"
+scene.path = "scenes/seek.ron"
+scene.dependencies = ["beet-debug", "beetmash/camera-2d", "space-scene"]
+
+[[package.metadata.project]]
+name = "seek-3d"
+description = "A 3D demonstration of the seek behavior."
+thumb-url = "https://storage.googleapis.com/beet-examples/screenshots/seek-3d.png"
+app = "app"
+scene.path = "scenes/seek-3d.ron"
+scene.dependencies = [
+	"beet-debug",
+	"beetmash/lighting-3d",
+	"beetmash/ground-3d",
+]
+
+
+[[package.metadata.project]]
+name = "hello-animation"
+description = "A simple behavior demonstrating animation control."
+thumb-url = "https://storage.googleapis.com/beet-examples/screenshots/hello-animation.png"
+app = "app"
+scene.path = "scenes/hello-animation.ron"
+scene.dependencies = [
+	"beetmash/ui-terminal",
+	"beetmash/lighting-3d",
+	"beetmash/ground-3d",
+	"beet-debug",
+]
+
+[[package.metadata.project]]
+name = "hello-ml"
+description = "A behavior that uses a Sentence Selector to score child behaviors, deciding which will run next."
+thumb-url = "https://storage.googleapis.com/beet-examples/screenshots/hello-llm.png"
+scene.path = "scenes/hello-ml.ron"
+scene.dependencies = [
+	"beetmash/camera-2d",
+	"beetmash/ui-terminal",
+	"beet-debug",
+]
+
+[[package.metadata.project]]
+name = "fetch-scene"
+thumb-text = "🏠"
+description = "A camera and the items that the fetch character can go to."
+scene.path = "scenes/fetch-scene.ron"
+
+[[package.metadata.project]]
+name = "fetch"
+description = "Combining LLM, steering and animation behaviors."
+thumb-url = "https://storage.googleapis.com/beet-examples/screenshots/fetch.png"
+app = "app-ml"
+scene.path = "scenes/fetch-npc.ron"
+scene.dependencies = [
+	"beetmash/ui-terminal-input",
+	"beetmash/lighting-3d",
+	"beetmash/ground-3d",
+	"fetch-scene",
+	"fetch-scene",
+]
+events.playerMessage.initial = "I'm hungry!"
+
+[[package.metadata.project]]
+name = "frozen-lake-scene"
+thumb-text = "❄️"
+description = "The static scene for the frozen lake environment."
+scene.path = "scenes/frozen-lake-scene.ron"
+
+
+[[package.metadata.project]]
+name = "frozen-lake-train"
+description = "Train a Q-learning agent to navigate the frozen lake environment."
+thumb-url = "https://storage.googleapis.com/beet-examples/screenshots/frozen-lake-run.png"
+app = "app-ml"
+scene.path = "scenes/frozen-lake-train.ron"
+scene.dependencies = [
+	"beetmash/ui-terminal",
+	"beetmash/lighting-3d",
+	"beet-debug",
+	"frozen-lake-scene",
+]
+
+[[package.metadata.project]]
+name = "frozen-lake-run"
+description = "Use a trained Q-learning agent to navigate the frozen lake environment."
+thumb-url = "https://storage.googleapis.com/beet-examples/screenshots/frozen-lake-run.png"
+app = "app-ml"
+scene.path = "scenes/frozen-lake-run.ron"
+scene.dependencies = [
+	"beetmash/ui-terminal",
+	"beetmash/lighting-3d",
+	"beet-debug",
+	"frozen-lake-scene",
+]

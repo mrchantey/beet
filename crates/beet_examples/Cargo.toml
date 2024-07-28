@@ -31,30 +31,3 @@ anyhow.workspace = true
 [[example]]
 name = "export_scenes"
 path = "./examples/export_scenes.rs"
-
-
-[[package.metadata.project]]
-name = "app-basic"
-thumb-text = "🔨"
-description = "Basic Beet App with debugging, camera, and UI."
-app.js-url = "https://storage.googleapis.com/beet-examples/app_basics/main.js"
-app.wasm-url = "https://storage.googleapis.com/beet-examples/app_basics/main_bg.wasm"
-
-[[package.metadata.project]]
-name = "app-full"
-thumb-text = "🔨"
-description = "Full Beet App with machine learning, networking, and UI."
-app.js-url = "https://storage.googleapis.com/beet-examples/app_full/main.js"
-app.wasm-url = "https://storage.googleapis.com/beet-examples/app_full/main_bg.wasm"
-
-[[package.metadata.project]]
-name = "beet-debug"
-thumb-text = "🐛"
-description = "Enable debugging for printing to the console, and screen if used with ui-terminal."
-scene.path = "scenes/beet-debug.ron"
-
-[[package.metadata.project]]
-name = "space-scene"
-thumb-text = "🌌"
-description = "A 2D space scene with a starry background and transform wrap-around."
-scene.path = "scenes/space-scene.ron"
