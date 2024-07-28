@@ -11,9 +11,10 @@ keywords.workspace = true
 categories.workspace = true
 
 [features]
-default = ["beet_spatial", "beetmash"]
+default = ["beet_spatial", "beetmash", "render"]
 beet_spatial = ["dep:beet_spatial"]
 beetmash = ["dep:beetmash"]
+render = ["dep:beet_examples"]
 
 # tokio = ["dep:tokio"]
 
@@ -21,6 +22,7 @@ beetmash = ["dep:beetmash"]
 beet_flow.workspace = true
 beet_spatial = { workspace = true, optional = true }
 beetmash = { workspace = true, optional = true }
+beet_examples = { workspace = true, optional = true }
 
 futures = "0.3.30"
 thiserror.workspace = true

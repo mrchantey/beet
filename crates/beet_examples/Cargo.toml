@@ -12,16 +12,11 @@ categories.workspace = true
 
 [features]
 default = []
-# to enable reflect we need OnInsert to derive reflect https://github.com/bevyengine/bevy/pull/14259
-reflect = ["beet_flow/reflect"]
-tokio = ["beetmash/tokio"]
 
 [dependencies]
 forky_core.workspace = true
 beet_flow.workspace = true
-beet_spatial.workspace = true
 beetmash.workspace = true
-beet_ml.workspace = true
 # beet = { workspace = true, features = ["reflect"] }
 bevy = { workspace = true, default-features = true }
 # bevy-inspector-egui = "0.25.0"
@@ -29,22 +24,7 @@ log.workspace = true
 pretty_env_logger.workspace = true
 forky_bevy.workspace = true
 rand.workspace = true
-serde.workspace = true
 anyhow.workspace = true
-
-[target.'cfg(target_arch = "wasm32")'.dependencies]
-forky_web.workspace = true
-wasm-bindgen.workspace = true
-js-sys.workspace = true
-web-sys.workspace = true
-
-[dev-dependencies]
-anyhow.workspace = true
-rayon = "1.10.0"
-
-[target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
-tokio.workspace = true
-
 
 [[example]]
 name = "export_scenes"
@@ -70,48 +50,6 @@ name = "beet-debug"
 thumb-text = "🐛"
 description = "Enable debugging for printing to the console, and screen if used with ui-terminal."
 scene.path = "scenes/beet-debug.ron"
-
-[[package.metadata.project]]
-name = "beet-debug"
-thumb-text = "🐛"
-description = "Enable debugging for printing to the console, and screen if used with ui-terminal."
-scene.path = "scenes/beet-debug.ron"
-
-[[package.metadata.project]]
-name = "ui-terminal"
-thumb-text = "🖥️"
-description = "On-screen terminal outputs beet-debug messages."
-scene.path = "scenes/ui-terminal.ron"
-
-[[package.metadata.project]]
-name = "ui-terminal-input"
-thumb-text = "🖥️"
-description = "On-screen terminal with support for user input."
-scene.path = "scenes/ui-terminal-input.ron"
-
-[[package.metadata.project]]
-name = "camera-2d"
-thumb-text = "📸"
-description = "2D camera for rendering 2D scenes."
-scene.path = "scenes/camera-2d.ron"
-
-[[package.metadata.project]]
-name = "camera-3d"
-thumb-text = "📸"
-description = "3D camera for rendering 3D scenes."
-scene.path = "scenes/camera-3d.ron"
-
-[[package.metadata.project]]
-name = "ground-3d"
-thumb-text = "🏝️"
-description = "A simple 3D ground plane."
-scene.path = "scenes/ground-3d.ron"
-
-[[package.metadata.project]]
-name = "lighting-3d"
-thumb-text = "💡"
-description = "A directional light configured with shadows."
-scene.path = "scenes/lighting-3d.ron"
 
 [[package.metadata.project]]
 name = "space-scene"

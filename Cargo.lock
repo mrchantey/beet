@@ -452,22 +452,13 @@ version = "0.0.4-rc.1"
 dependencies = [
  "anyhow",
  "beet_flow",
- "beet_ml",
- "beet_spatial",
  "beetmash",
  "bevy",
  "forky_bevy",
  "forky_core",
- "forky_web",
- "js-sys",
  "log",
  "pretty_env_logger",
  "rand",
- "rayon",
- "serde",
- "tokio",
- "wasm-bindgen",
- "web-sys",
 ]
 
 [[package]]
@@ -507,6 +498,7 @@ name = "beet_ml"
 version = "0.0.4-rc.1"
 dependencies = [
  "anyhow",
+ "beet_examples",
  "beet_flow",
  "beet_spatial",
  "beetmash",
@@ -543,6 +535,7 @@ name = "beet_spatial"
 version = "0.0.4-rc.1"
 dependencies = [
  "anyhow",
+ "beet_examples",
  "beet_flow",
  "beetmash",
  "bevy",
@@ -563,7 +556,6 @@ dependencies = [
  "beetmash_core",
  "beetmash_net",
  "beetmash_scene",
- "bevy",
 ]
 
 [[package]]
@@ -575,6 +567,7 @@ dependencies = [
  "beetmash_scene",
  "bevy",
  "extend",
+ "forky_bevy",
  "forky_core",
  "log",
  "serde",
@@ -592,7 +585,6 @@ dependencies = [
  "flume",
  "forky_core",
  "forky_web",
- "futures-util",
  "js-sys",
  "log",
  "ron",
@@ -600,8 +592,6 @@ dependencies = [
  "serde_json",
  "strum",
  "strum_macros",
- "tokio",
- "tokio-tungstenite",
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "web-sys",
@@ -614,6 +604,7 @@ dependencies = [
  "anyhow",
  "bevy",
  "extend",
+ "forky_core",
  "log",
  "serde",
 ]
@@ -3394,12 +3385,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "httparse"
-version = "1.9.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0fcc0b4a115bf80b728eb8ea024ad5bd707b615bfed49e0665b6e0f86fd082d9"
-
-[[package]]
 name = "humantime"
 version = "1.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5576,17 +5561,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "sha1"
-version = "0.10.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e3bf829a2d51ab4a5ddf1352d8470c140cadc8301b2ae1789db023f01cedd6ba"
-dependencies = [
- "cfg-if",
- "cpufeatures",
- "digest",
-]
-
-[[package]]
 name = "sha2"
 version = "0.10.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6071,18 +6045,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "tokio-tungstenite"
-version = "0.21.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c83b561d025642014097b66e6c1bb422783339e0909e4429cde4749d1990bc38"
-dependencies = [
- "futures-util",
- "log",
- "tokio",
- "tungstenite",
-]
-
-[[package]]
 name = "toml"
 version = "0.8.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6210,25 +6172,6 @@ name = "ttf-parser"
 version = "0.21.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2c591d83f69777866b9126b24c6dd9a18351f177e49d625920d19f989fd31cf8"
-
-[[package]]
-name = "tungstenite"
-version = "0.21.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9ef1a641ea34f399a848dea702823bbecfb4c486f911735368f1f137cb8257e1"
-dependencies = [
- "byteorder",
- "bytes",
- "data-encoding",
- "http 1.1.0",
- "httparse",
- "log",
- "rand",
- "sha1",
- "thiserror",
- "url",
- "utf-8",
-]
 
 [[package]]
 name = "twox-hash"
@@ -6391,12 +6334,6 @@ dependencies = [
  "idna",
  "percent-encoding",
 ]
-
-[[package]]
-name = "utf-8"
-version = "0.7.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "09cc8ee72d2a9becf2f2febe0205bbed8fc6615b7cb429ad062dc7b7ddd036a9"
 
 [[package]]
 name = "utf8-width"

@@ -1,6 +1,3 @@
-pub mod example_default_plugins;
+pub mod beet_example_plugin;
 #[allow(unused_imports)]
-pub use self::example_default_plugins::*;
-pub mod example_plugin_group;
-#[allow(unused_imports)]
-pub use self::example_plugin_group::*;
+pub use self::beet_example_plugin::*;

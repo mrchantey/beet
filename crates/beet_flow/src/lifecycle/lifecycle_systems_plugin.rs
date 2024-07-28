@@ -40,4 +40,5 @@ impl Plugin for LifecycleSystemsPlugin {
 	}
 }
 
-pub const NUM_GLOBAL_OBSERVERS: u32 = 5;
+// a brittle hack
+pub const NUM_GLOBAL_OBSERVERS: u32 = 4;

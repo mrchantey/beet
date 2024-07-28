@@ -14,9 +14,7 @@ impl Plugin for BeetNetPlugin {
 		app.add_plugins(
 			ActionPlugin::<(TriggerOnRun<AppReady>, RunOnAppReady)>::default(),
 		)
-		.observe(log_on_user_message);
-
-		app.configure_sets(
+		.configure_sets(
 			Update,
 			(
 				beetmash::prelude::MessageIncomingSet.in_set(PreTickSet),
@@ -24,12 +22,4 @@ impl Plugin for BeetNetPlugin {
 			),
 		);
 	}
-}
-
-
-fn log_on_user_message(
-	trigger: Trigger<OnUserMessage>,
-	mut commands: Commands,
-) {
-	commands.trigger(OnLogMessage::new(format!("User: {}", &trigger.event().0)))
 }

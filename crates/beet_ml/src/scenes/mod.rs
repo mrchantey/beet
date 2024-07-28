@@ -1,3 +1,6 @@
+pub mod fetch;
+#[allow(unused_imports)]
+pub use self::fetch::*;
 pub mod frozen_lake_run;
 #[allow(unused_imports)]
 pub use self::frozen_lake_run::*;

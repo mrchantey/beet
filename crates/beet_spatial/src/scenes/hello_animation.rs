@@ -1,12 +1,10 @@
-use super::*;
-use crate::beet::prelude::*;
 use crate::prelude::*;
+use beet_flow::prelude::*;
+use beetmash::core::scenes::Foxie;
+use beetmash::prelude::*;
 use bevy::animation::RepeatAnimation;
 use bevy::prelude::*;
 use std::time::Duration;
-
-
-
 
 pub fn hello_animation(mut commands: Commands) {
 	// camera
@@ -22,7 +20,7 @@ pub fn hello_animation(mut commands: Commands) {
 		idle_index,
 		walk_clip,
 		walk_index,
-	} = load_foxie();
+	} = default();
 
 
 	let transition_duration = Duration::from_secs_f32(0.5);

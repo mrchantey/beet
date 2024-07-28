@@ -1,8 +1,11 @@
-use super::*;
-use crate::beet::prelude::*;
 use crate::prelude::*;
+use beet_examples::prelude::*;
+use beet_flow::prelude::*;
+use beetmash::core::scenes::Foxie;
+use beetmash::prelude::*;
 use bevy::prelude::*;
 use std::time::Duration;
+
 
 pub fn seek_3d(mut commands: Commands) {
 	// camera
@@ -26,7 +29,7 @@ pub fn seek_3d(mut commands: Commands) {
 		idle_index,
 		walk_index,
 		..
-	} = load_foxie();
+	} = Foxie::default();
 
 	let transition_duration = Duration::from_secs_f32(0.5);
 

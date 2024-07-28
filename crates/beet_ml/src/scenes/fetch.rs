@@ -1,6 +1,9 @@
-use super::*;
-use crate::beet::prelude::*;
 use crate::prelude::*;
+use beet_examples::prelude::*;
+use beet_flow::prelude::*;
+use beet_spatial::prelude::*;
+use beetmash::core::scenes::Foxie;
+use beetmash::prelude::*;
 use bevy::prelude::*;
 
 
@@ -12,7 +15,7 @@ pub fn fetch_npc(mut commands: Commands) {
 		idle_index,
 		walk_index,
 		..
-	} = load_foxie();
+	} = default();
 
 	commands
 		.spawn((

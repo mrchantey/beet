@@ -1,9 +1,9 @@
 pub mod avoid_obstacles;
 #[allow(unused_imports)]
 pub use self::avoid_obstacles::*;
-pub mod fetch;
+pub mod beet_spatial_scene_plugin;
 #[allow(unused_imports)]
-pub use self::fetch::*;
+pub use self::beet_spatial_scene_plugin::*;
 pub mod flock;
 #[allow(unused_imports)]
 pub use self::flock::*;

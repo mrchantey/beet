@@ -10,7 +10,17 @@
 //! - frozen lake - train:	`beet-debug ui-terminal lighting-3d frozen-lake-scene frozen-lake-train`
 //! - frozen lake - run:		`beet-debug ui-terminal lighting-3d frozen-lake-scene frozen-lake-run`
 //!
+use beet::prelude::FrozenLakePlugin;
 use beet_examples::prelude::*;
 use bevy::prelude::*;
 
-fn main() { App::new().add_plugins(ExamplePluginFull).run(); }
+fn main() {
+	App::new()
+		.add_plugins((
+			BeetmashDefaultPlugins::with_beetmash_assets(),
+			ExamplePluginTypesFull,
+			MlPlugin,
+			FrozenLakePlugin
+		))
+		.run();
+}

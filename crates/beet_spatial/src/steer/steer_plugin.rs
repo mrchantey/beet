@@ -35,12 +35,12 @@ impl Plugin for SteerPlugin {
 		let world = app.world_mut();
 		world.init_bundle::<SteerBundle>();
 
-		#[cfg(feature = "gizmos")]
+		#[cfg(feature = "debug_gizmos")]
 		app.add_systems(Update, debug_group_steer.in_set(PostTickSet));
 	}
 }
 
-#[cfg(feature = "gizmos")]
+#[cfg(feature = "debug_gizmos")]
 pub fn debug_group_steer(
 	mut gizmos: Gizmos,
 	query: Query<(&Transform, &GroupParams)>,

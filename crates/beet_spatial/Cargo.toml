@@ -12,17 +12,16 @@ keywords = { workspace = true }
 categories = { workspace = true }
 
 [features]
-default = ["animation", "assets", "ui"]
-ui = ["bevy/bevy_ui"]
-assets = ["bevy/bevy_asset"]
-animation = ["bevy/bevy_animation"]
-gizmos = ["bevy/bevy_gizmos"]
+default = ["render"]
+render = ["dep:beet_examples", "bevy/default"]
+debug_gizmos = []
 
 [dependencies]
 forky_core.workspace = true
 forky_bevy.workspace = true
 beetmash.workspace = true
 beet_flow.workspace = true
+beet_examples = { workspace = true, optional = true }
 
 log.workspace = true
 bevy.workspace = true
