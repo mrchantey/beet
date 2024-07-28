@@ -5,6 +5,8 @@ use beet_spatial::prelude::*;
 use beetmash::prelude::*;
 use bevy::prelude::*;
 
+
+/// A running app with flow and spatial
 pub fn running_beet_example_plugin(app: &mut App) {
 	app.add_plugins((
 		BeetmashDefaultPlugins::with_beetmash_assets(),

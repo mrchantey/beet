@@ -1,17 +1,12 @@
 use beet::prelude::*;
-use bevy::log::LogPlugin;
+use beet_examples::prelude::*;
 use bevy::prelude::*;
 
 #[rustfmt::skip]
 fn main() {
 	App::new()
     .insert_resource(BeetDebugConfig::default())
-		.add_plugins((
-			LogPlugin::default(), 
-			BeetDebugPluginBase,
-			BeetDebugPluginStdout,
-			LifecyclePlugin,
-		))
+		.add_plugins(running_beet_example_plugin)
 		.world_mut()
 		.spawn((
 			Name::new("ScoreFlow will select the highest score"), 

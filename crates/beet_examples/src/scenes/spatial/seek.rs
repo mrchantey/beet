@@ -6,9 +6,9 @@ use bevy::prelude::*;
 
 
 pub fn seek(mut commands: Commands) {
-	// target
 	let target = commands
 		.spawn((
+			Name::new("Target"),
 			FollowCursor2d,
 			AssetLoadBlockAppReady,
 			BundlePlaceholder::Sprite("spaceship_pack/planet_6.png".into()),
@@ -16,10 +16,9 @@ pub fn seek(mut commands: Commands) {
 		))
 		.id();
 
-	// agent
 	commands
 		.spawn((
-			// Transform::default(),
+			Name::new("Agent"),
 			BundlePlaceholder::Sprite("spaceship_pack/ship_2.png".into()),
 			AssetLoadBlockAppReady,
 			RotateToVelocity2d,
@@ -27,7 +26,6 @@ pub fn seek(mut commands: Commands) {
 			SteerBundle::default().scaled_to(500.).with_target(target),
 		))
 		.with_children(|parent| {
-			// behavior
 			parent.spawn((
 				Name::new("Seek"),
 				RunOnAppReady::default(),

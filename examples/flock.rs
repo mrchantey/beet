@@ -3,14 +3,14 @@ use bevy::prelude::*;
 
 pub fn main() {
 	App::new()
-		.add_plugins(ExamplePluginBasics)
+		.add_plugins(running_beet_example_plugin)
 		.add_systems(
 			Startup,
 			(
-				scenes::beet_debug,
-				scenes::camera_2d,
-				scenes::space_scene,
-				scenes::flock,
+				beetmash::core::scenes::camera_2d,
+				beetmash::core::scenes::space_scene,
+				beet_examples::scenes::flow::beet_debug,
+				beet_examples::scenes::spatial::flock,
 			),
 		)
 		.run();

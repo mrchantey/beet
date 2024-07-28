@@ -10,16 +10,16 @@ use bevy::prelude::*;
 
 pub fn main() {
 	App::new()
-		.add_plugins(ExamplePluginFull)
+		.add_plugins((running_beet_example_plugin, plugin_ml))
 		.add_systems(
 			Startup,
 			(
-				scenes::beet_debug,
-				scenes::ui_terminal_input,
-				scenes::lighting_3d,
-				scenes::ground_3d,
-				scenes::fetch_scene,
-				scenes::fetch_npc,
+				beetmash::core::scenes::ui_terminal_input,
+				beetmash::core::scenes::lighting_3d,
+				beetmash::core::scenes::ground_3d,
+				beet_examples::scenes::flow::beet_debug,
+				beet_examples::scenes::ml::fetch_scene,
+				beet_examples::scenes::ml::fetch_npc,
 			),
 		)
 		.run();

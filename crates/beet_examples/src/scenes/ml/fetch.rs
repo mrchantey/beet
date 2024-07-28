@@ -42,12 +42,12 @@ pub fn fetch_npc(mut commands: Commands) {
 					Name::new("Fetch Behavior"),
 					TargetAgent(agent),
 					AssetRunOnReady::<Bert>::new("default-bert.ron"),
-					// InsertSentenceOnUserInput::default(),
-					// InsertSentenceSteerTarget::<Collectable>::default(),
-					// RunOnSteerTargetInsert::default().with_source(agent),
-					// RunOnSteerTargetRemove::default().with_source(agent),
-					// ScoreFlow::default(),
-					// RemoveOnTrigger::<OnRunResult, Sentence>::default(),
+					InsertSentenceOnUserInput::default(),
+					InsertSentenceSteerTarget::<Collectable>::default(),
+					RunOnSteerTargetInsert::default().with_source(agent),
+					RunOnSteerTargetRemove::default().with_source(agent),
+					ScoreFlow::default(),
+					RemoveOnTrigger::<OnRunResult, Sentence>::default(),
 				))
 				.with_children(|parent| {
 					parent.spawn((

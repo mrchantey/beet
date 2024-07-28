@@ -3,15 +3,15 @@ use bevy::prelude::*;
 
 pub fn main() {
 	App::new()
-		.add_plugins(ExamplePluginFull)
+		.add_plugins((running_beet_example_plugin, plugin_ml))
 		.add_systems(
 			Startup,
 			(
-				scenes::beet_debug,
-				scenes::ui_terminal,
-				scenes::lighting_3d,
-				scenes::frozen_lake::frozen_lake_scene,
-				scenes::frozen_lake::frozen_lake_train,
+				// beetmash::core::scenes::ui_terminal,
+				beetmash::core::scenes::lighting_3d,
+				// beet_examples::scenes::flow::beet_debug,
+				beet_examples::scenes::ml::frozen_lake_scene,
+				beet_examples::scenes::ml::frozen_lake_train,
 			),
 		)
 		.run();

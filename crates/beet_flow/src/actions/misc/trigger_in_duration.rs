@@ -42,7 +42,6 @@ pub fn trigger_in_duration<T: GenericActionEvent>(
 	mut query: Query<(Entity, &RunTimer, &TriggerInDuration<T>), With<Running>>,
 ) {
 	for (entity, timer, insert_in_duration) in query.iter_mut() {
-		println!("here!{:?}", timer.last_started.elapsed());
 		if timer.last_started.elapsed() >= insert_in_duration.duration {
 			commands
 				.entity(entity)
