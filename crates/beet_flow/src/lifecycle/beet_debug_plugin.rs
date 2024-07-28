@@ -25,6 +25,7 @@ impl Default for BeetDebugConfig {
 /// A plugin that logs lifecycle events for behaviors with a [`Name`].
 /// It triggers [OnLogMessage] events, and also adds a listener that
 /// will print to stdout if [`BeetDebugConfig::log_to_stdout`] is true.
+#[derive(Clone)]
 pub struct BeetDebugPlugin;
 impl Plugin for BeetDebugPlugin {
 	fn build(&self, app: &mut App) {

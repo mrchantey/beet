@@ -15,17 +15,5 @@
 use beet_examples::prelude::*;
 use bevy::prelude::*;
 
-fn main() {
-	App::new()
-		.add_plugins((
-			BeetmashDefaultPlugins::with_beetmash_assets(),
-			BeetPlugins,
-			BeetDebugPlugin,
-			ExamplePluginTy1pesBasic,
-			DefaultReplicatePlugin,
-			CliSceneLoadPlugin,
-			DefaultPlaceholderPlugin,
-			UiTerminalPlugin,
-		))
-		.run();
-}
+
+fn main() { App::new().add_plugins(running_beet_example_plugin).run(); }

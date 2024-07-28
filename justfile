@@ -17,6 +17,14 @@ build-scenes *args:
 app *args:
 	cargo run --example app_full {{args}}
 
+# blocked on #https://github.com/bevyengine/bevy/issues/14300
+hello-world:
+	cargo run --example app \
+	./scenes/beet-debug.ron \
+	../beetmash/scenes/camera-2d.ron \
+	../beetmash/scenes/ui-terminal-input.ron \
+	./scenes/hello-world.ron
+
 doc:
 	just watch 'cargo doc'
 

@@ -13,10 +13,9 @@ categories.workspace = true
 
 
 [features]
-default = ["net"]
+default = ["net", "reflect"]
 # beetmash = ["dep:beetmash"]
 net = ["dep:beetmash", "beetmash/net"]
-# default = ["reflect"]
 reflect = []
 test = ["dep:sweet"]
 
