@@ -1,4 +1,3 @@
-use crate::prelude::*;
 use bevy::asset::AssetMetaCheck;
 // use bevy::input::common_conditions::input_toggle_active;
 use bevy::prelude::*;
@@ -35,7 +34,6 @@ impl Plugin for ExampleDefaultPlugins {
 			// WorldInspectorPlugin::default()
 				// .run_if(input_toggle_active(false, KeyCode::Tab)),
 		))
-		.add_systems(Startup, load_scenes_from_args)
 		.add_systems(Update, close_on_esc)
 		/*-*/;
 	}

@@ -7,6 +7,8 @@ use bevy::prelude::*;
 
 
 pub fn flock(mut commands: Commands) {
+	commands.insert_resource(WrapAround::default());
+
 	for _ in 0..300 {
 		let position = Vec3::ZERO;
 		// Vec3::random_in_sphere() * 500.,

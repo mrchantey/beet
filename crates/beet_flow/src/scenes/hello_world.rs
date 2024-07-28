@@ -1,4 +1,4 @@
-use crate::beet::prelude::*;
+use crate::prelude::*;
 use bevy::prelude::*;
 
 pub fn hello_world(mut commands: Commands) {

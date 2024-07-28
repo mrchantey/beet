@@ -5,6 +5,8 @@ use bevy::prelude::*;
 
 
 pub fn fetch_npc(mut commands: Commands) {
+	commands.insert_resource(WrapAround::default());
+
 	let Foxie {
 		graph,
 		idle_index,

@@ -544,6 +544,7 @@ version = "0.0.4-rc.1"
 dependencies = [
  "anyhow",
  "beet_flow",
+ "beetmash",
  "bevy",
  "forky_bevy",
  "forky_core",
@@ -561,6 +562,7 @@ version = "0.0.6-rc.1"
 dependencies = [
  "beetmash_core",
  "beetmash_net",
+ "beetmash_scene",
  "bevy",
 ]
 
@@ -569,9 +571,13 @@ name = "beetmash_core"
 version = "0.0.6-rc.1"
 dependencies = [
  "anyhow",
+ "beetmash_net",
+ "beetmash_scene",
  "bevy",
  "extend",
+ "forky_core",
  "log",
+ "serde",
  "sweet",
 ]
 
@@ -580,7 +586,6 @@ name = "beetmash_net"
 version = "0.0.6-rc.1"
 dependencies = [
  "anyhow",
- "beetmash_core",
  "bevy",
  "bincode",
  "extend",
@@ -600,6 +605,17 @@ dependencies = [
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "web-sys",
+]
+
+[[package]]
+name = "beetmash_scene"
+version = "0.0.6-rc.1"
+dependencies = [
+ "anyhow",
+ "bevy",
+ "extend",
+ "log",
+ "serde",
 ]
 
 [[package]]

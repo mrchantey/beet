@@ -1,5 +1,6 @@
 use crate::beet::prelude::*;
 use crate::prelude::*;
+use beetmash::prelude::*;
 use bevy::prelude::*;
 
 /// Some types, and ui elements
@@ -31,12 +32,12 @@ pub struct ExamplePluginTypesBasic;
 impl Plugin for ExamplePluginTypesBasic {
 	fn build(&self, app: &mut App) {
 		app.add_plugins((
-			ExampleReplicatePlugin,
+			DefaultReplicatePlugin,
 			BeetPlugins,
+			CliSceneLoadPlugin,
 			BundlePlaceholderPlugin,
 			UiTerminalPlugin,
-			BeetDebugPluginBase,
-			BeetDebugPluginStdout,
+			BeetDebugPlugin,
 			Example2dPlugin,
 			Example3dPlugin,
 		))

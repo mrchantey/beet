@@ -1,8 +1,6 @@
 use crate::prelude::*;
+use beetmash::prelude::*;
 use bevy::prelude::*;
-use std::borrow::Cow;
-use std::marker::PhantomData;
-
 
 #[derive(Resource, Clone, Reflect)]
 #[reflect(Resource)]
@@ -10,6 +8,7 @@ pub struct BeetDebugConfig {
 	pub log_on_start: bool,
 	pub log_on_update: bool,
 	pub log_on_stop: bool,
+	pub log_to_stdout: bool,
 }
 
 impl Default for BeetDebugConfig {
@@ -18,116 +17,80 @@ impl Default for BeetDebugConfig {
 			log_on_start: true,
 			log_on_update: false,
 			log_on_stop: false,
+			log_to_stdout: true,
 		}
 	}
 }
 
-pub struct BeetDebugPluginBase;
-impl Plugin for BeetDebugPluginBase {
+/// A plugin that logs lifecycle events for behaviors with a [`Name`].
+/// It triggers [OnLogMessage] events, and also adds a listener that
+/// will print to stdout if [`BeetDebugConfig::log_to_stdout`] is true.
+pub struct BeetDebugPlugin;
+impl Plugin for BeetDebugPlugin {
 	fn build(&self, app: &mut App) {
-		app.observe(log_on_start_observer)
-			.observe(log_on_stop_observer);
-	}
-}
+		app.observe(log_on_start)
+			.observe(log_on_stop)
+			.add_systems(Update, log_log_on_run)
+			.init_resource::<BeetConfig>()
+			.register_type::<BeetDebugConfig>();
 
-
-pub struct BeetDebugPluginStdout;
-impl Plugin for BeetDebugPluginStdout {
-	fn build(&self, app: &mut App) {
-		app
-		.add_plugins(BeetDebugPlugin::new(log_stdout))
+		let config = app.world().resource::<BeetConfig>();
+		let schedule = config.schedule.clone();
+		app.add_systems(
+		schedule,
+			log_on_update.run_if(
+				|config: Option<Res<BeetDebugConfig>>| {
+					config.map(|c| c.log_on_update).unwrap_or_default()
+				},
+			)
+			.in_set(PostTickSet)
+	)
 		.observe(
-			|trigger: Trigger<OnLogMessage>| {
+			|trigger: Trigger<OnLogMessage>,config:Res<BeetDebugConfig>| {
+				if config.log_to_stdout {
 				log::info!("{}", **trigger.event());
+				}
 			},
 		)
 		/*-*/;
 	}
 }
-fn log_stdout(In(messages): In<Vec<String>>) {
-	for message in messages.into_iter() {
-		log::info!("{message}");
+
+fn log_log_on_run(
+	mut commands: Commands,
+	query: Query<&LogOnRun, Added<Running>>,
+) {
+	for log in query.iter() {
+		let msg = format!("LogOnRun: {}", log.0.to_string());
+		commands.trigger(OnLogMessage::new(msg));
 	}
 }
 
-/// A plugin that logs lifecycle events for behaviors with a [`Name`].
-pub struct BeetDebugPlugin<
-	M: 'static + Send + Sync,
-	T: 'static + Send + Sync + Clone + IntoSystem<Vec<String>, (), M>,
-> {
-	log_system: T,
-	_marker: PhantomData<M>,
-}
-
-impl<
-		M: 'static + Send + Sync,
-		T: 'static + Send + Sync + Clone + IntoSystem<Vec<String>, (), M>,
-	> BeetDebugPlugin<M, T>
-{
-	pub fn new(log_system: T) -> Self {
-		Self {
-			log_system,
-			_marker: PhantomData,
-		}
-	}
-}
-
-impl<
-		M: 'static + Send + Sync,
-		T: 'static + Send + Sync + Clone + IntoSystem<Vec<String>, (), M>,
-	> Plugin for BeetDebugPlugin<M, T>
-{
-	fn build(&self, app: &mut App) {
-		app.init_resource::<BeetConfig>()
-			.register_type::<BeetDebugConfig>();
-		let config = app.world().resource::<BeetConfig>();
-		let schedule = config.schedule.clone();
-
-		app.add_systems(
-			schedule,
-				log_on_update.pipe(self.log_system.clone()).run_if(
-					|config: Option<Res<BeetDebugConfig>>| {
-						config.map(|c| c.log_on_update).unwrap_or_default()
-					},
-				)
-				.in_set(PostTickSet)
-		)
-		/*-*/;
-	}
-}
-
-fn log_on_update(query: Query<&Name, With<Running>>) -> Vec<String> {
-	query
-		.iter()
-		.map(|name| format!("Continue: {name}"))
-		.collect()
-}
-
-#[derive(Event, Deref)]
-pub struct OnLogMessage(pub Cow<'static, str>);
-
-impl OnLogMessage {
-	pub fn new(message: impl Into<Cow<'static, str>>) -> Self {
-		Self(message.into())
-	}
-}
-fn log_on_start_observer(
+fn log_on_start(
 	trigger: Trigger<OnRun>,
+	mut commands: Commands,
 	config: Option<Res<BeetDebugConfig>>,
 	query: Query<&Name>,
-	mut commands: Commands,
 ) {
 	// TODO run_if https://github.com/bevyengine/bevy/issues/14157
 	if !config.map(|c| c.log_on_start).unwrap_or_default() {
 		return;
 	}
-	let name = query
+	let msg = query
 		.get(trigger.entity())
 		.map(|n| format!("Started: {n}"))
 		.unwrap_or_else(|_| format!("Started: {}", trigger.entity()));
-	commands.trigger(OnLogMessage::new(name));
+	commands.trigger(OnLogMessage::new(msg));
 }
-fn log_on_stop_observer(
+
+fn log_on_update(mut commands: Commands, query: Query<&Name, With<Running>>) {
+	for name in query.iter() {
+		let msg = format!("Continue: {name}");
+		commands.trigger(OnLogMessage::new(msg));
+	}
+}
+
+fn log_on_stop(
 	trigger: Trigger<OnRunResult>,
 	config: Option<Res<BeetDebugConfig>>,
 	query: Query<&Name>,
@@ -137,9 +100,9 @@ fn log_on_stop_observer(
 	if !config.map(|c| c.log_on_stop).unwrap_or_default() {
 		return;
 	}
-	let name = query
+	let msg = query
 		.get(trigger.entity())
 		.map(|n| format!("Stopped: {n}"))
 		.unwrap_or_else(|_| format!("Stopped: {}", trigger.entity()));
-	commands.trigger(OnLogMessage::new(name));
+	commands.trigger(OnLogMessage::new(msg));
 }

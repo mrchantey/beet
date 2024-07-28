@@ -21,9 +21,10 @@ gizmos = ["bevy/bevy_gizmos"]
 [dependencies]
 forky_core.workspace = true
 forky_bevy.workspace = true
-log.workspace = true
-
+beetmash.workspace = true
 beet_flow.workspace = true
+
+log.workspace = true
 bevy.workspace = true
 
 anyhow.workspace = true
