@@ -1,5 +1,4 @@
 use crate::prelude::*;
-use beet_examples::prelude::*;
 use beet_flow::prelude::*;
 use beet_spatial::prelude::*;
 use beetmash::core::scenes::Foxie;

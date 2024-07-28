@@ -10,7 +10,6 @@ pub mod lifecycle;
 pub mod net;
 pub mod observers;
 pub mod reflect;
-pub mod scenes;
 #[cfg(any(test, feature = "test"))]
 pub mod test;
 pub mod tree;
@@ -40,7 +39,6 @@ pub mod prelude {
 	pub use crate::observers::*;
 	// pub use crate::lifecycle::*;
 	pub use crate::reflect::*;
-	pub use crate::scenes::*;
 	#[cfg(any(test, feature = "test"))]
 	pub use crate::test::*;
 	pub use crate::tree::*;

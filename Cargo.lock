@@ -498,7 +498,6 @@ name = "beet_ml"
 version = "0.0.4-rc.1"
 dependencies = [
  "anyhow",
- "beet_examples",
  "beet_flow",
  "beet_spatial",
  "beetmash",
@@ -535,7 +534,6 @@ name = "beet_spatial"
 version = "0.0.4-rc.1"
 dependencies = [
  "anyhow",
- "beet_examples",
  "beet_flow",
  "beetmash",
  "bevy",

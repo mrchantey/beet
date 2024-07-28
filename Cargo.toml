@@ -131,11 +131,13 @@ keywords.workspace = true
 categories.workspace = true
 
 [features]
-default = ["ml", "render", "beetmash"]
+default = ["ml", "animation", "assets", "ui", "beetmash"]
 ml = ["dep:beet_ml"]
-beetmash = ["dep:beetmash"]
-render = ["beet_spatial/render"]
 reflect = ["beet_flow/reflect"]
+beetmash = ["dep:beetmash"]
+animation = ["beet_spatial/animation"]
+assets = ["beet_spatial/assets"]
+ui = ["beet_spatial/ui"]
 
 # dynamic_linking = ["bevy/dynamic_linking"]
 

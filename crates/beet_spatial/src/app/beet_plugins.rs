@@ -16,7 +16,7 @@ impl PluginGroup for BeetPlugins {
 			.add(SteerPlugin::default());
 
 
-		#[cfg(feature = "render")]
+		#[cfg(feature = "animation")]
 		(builder = builder.add(crate::prelude::AnimationPlugin::default()));
 
 		builder

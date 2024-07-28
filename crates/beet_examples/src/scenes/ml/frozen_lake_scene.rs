@@ -1,6 +1,5 @@
 use crate::prelude::*;
 use bevy::prelude::*;
-use beet_examples::prelude::*;
 use beetmash::prelude::*;
 
 pub const FROZEN_LAKE_SCENE_SCALE: f32 = 1.;

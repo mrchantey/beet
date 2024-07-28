@@ -4,8 +4,6 @@ pub mod environments;
 pub mod language;
 pub mod rl;
 pub mod rl_realtime;
-#[cfg(feature = "render")]
-pub mod scenes;
 #[cfg(target_arch = "wasm32")]
 pub mod wasm;
 
