@@ -10,24 +10,26 @@ fn plugin(app: &mut App) {
 	app.add_plugins((MostDefaultPlugins, beet_example_plugin));
 }
 
-const CHECKS: DynamicSceneChecks = DynamicSceneChecks {
-	asset_checks: false,
-	entity_checks: true,
-	component_checks: true,
-};
-
 fn main() -> Result<()> {
-	SceneExporter::new(plugin)
-		.with_checks(CHECKS)
+	let checks = DynamicSceneChecks {
+		resource_checks: false,
+		entity_checks: true,
+		component_checks: true,
+		..Default::default()
+	};
+
+
+	SceneGroupExporter::new(plugin)
+		.with_checks(checks.clone())
 		.with_dir(DIR)
 		.with_query::<(Without<ObserverState>, Without<Observer<OnLogMessage, ()>>)>(
 		)
 		.add_scene("beet-debug", beet_examples::scenes::flow::beet_debug)
 		.add_scene("hello-world", beet_examples::scenes::flow::hello_world)
-		.build()?;
+		.export()?;
 
-	SceneExporter::new(plugin)
-		.with_checks(CHECKS)
+	SceneGroupExporter::new(plugin)
+		.with_checks(checks.clone())
 		.with_dir(DIR)
 		.with_query::<(Without<ObserverState>, Without<Observer<OnLogMessage, ()>>)>(
 		)
@@ -39,11 +41,11 @@ fn main() -> Result<()> {
 			"hello-animation",
 			beet_examples::scenes::spatial::hello_animation,
 		)
-		.build()?;
+		.export()?;
 
 
-	SceneExporter::new((plugin, plugin_ml))
-		.with_checks(CHECKS)
+	SceneGroupExporter::new((plugin, plugin_ml))
+		.with_checks(checks)
 		.with_dir(DIR)
 		.without_clear_target()
 		.with_query::<(Without<ObserverState>, Without<Observer<OnLogMessage, ()>>)>(
@@ -64,6 +66,6 @@ fn main() -> Result<()> {
 			"frozen-lake-run",
 			beet_examples::scenes::ml::frozen_lake_run,
 		)
-		.build()?;
+		.export()?;
 	Ok(())
 }
