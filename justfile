@@ -12,8 +12,8 @@ example example *args:
 cmd *args:
 	cd /cygdrive/c/work/beet && {{args}}
 
-build-scenes *args:
-	cargo run --example build_scenes {{args}}
+export-scenes *args:
+	cargo run --example export_scenes {{args}}
 app *args:
 	cargo run --example app_full {{args}}
 

@@ -1,38 +1,38 @@
 (
-  resources: {},
-  entities: {
-    4294967309: (
-      components: {
-        "bevy_hierarchy::components::children::Children": ([
-          4294967310,
-          4294967311,
-        ]),
-        "beet_flow::actions::flow::sequence_flow::SequenceFlow": (),
-        "bevy_core::name::Name": "Hello World Sequence",
-        "beet_flow::actions::on_trigger::run_on_spawn::RunOnSpawn": (),
-      },
-    ),
-    4294967310: (
-      components: {
-        "bevy_hierarchy::components::parent::Parent": (4294967309),
-        "beet_flow::actions::on_trigger::on_trigger_action::OnTrigger<beet_flow::actions::on_trigger::trigger_on_trigger::TriggerHandler<beet_flow::actions::on_trigger::on_trigger_handler::DefaultMapFunc<beet_flow::events::on_run::OnRun, beet_flow::events::on_run_result::OnRunResult, ()>>>": (
-          params: (Success),
-          sources: [],
-          target: This,
+    resources: {},
+    entities: {
+        4294967309: (
+            components: {
+                "bevy_hierarchy::components::children::Children": ([
+                    4294967310,
+                    4294967311,
+                ]),
+                "beet_flow::actions::flow::sequence_flow::SequenceFlow": (),
+                "bevy_core::name::Name": "Hello World Sequence",
+                "beet_flow::actions::on_trigger::run_on_spawn::RunOnSpawn": (),
+            },
         ),
-        "bevy_core::name::Name": "Hello",
-      },
-    ),
-    4294967311: (
-      components: {
-        "bevy_hierarchy::components::parent::Parent": (4294967309),
-        "beet_flow::actions::on_trigger::on_trigger_action::OnTrigger<beet_flow::actions::on_trigger::trigger_on_trigger::TriggerHandler<beet_flow::actions::on_trigger::on_trigger_handler::DefaultMapFunc<beet_flow::events::on_run::OnRun, beet_flow::events::on_run_result::OnRunResult, ()>>>": (
-          params: (Success),
-          sources: [],
-          target: This,
+        4294967310: (
+            components: {
+                "bevy_hierarchy::components::parent::Parent": (4294967309),
+                "beet_flow::actions::on_trigger::on_trigger_action::OnTrigger<beet_flow::actions::on_trigger::trigger_on_trigger::TriggerHandler<beet_flow::actions::on_trigger::on_trigger_handler::DefaultMapFunc<beet_flow::events::on_run::OnRun, beet_flow::events::on_run_result::OnRunResult, ()>>>": (
+                    params: (Success),
+                    sources: [],
+                    target: This,
+                ),
+                "bevy_core::name::Name": "Hello",
+            },
         ),
-        "bevy_core::name::Name": "World",
-      },
-    ),
-  },
+        4294967311: (
+            components: {
+                "bevy_hierarchy::components::parent::Parent": (4294967309),
+                "beet_flow::actions::on_trigger::on_trigger_action::OnTrigger<beet_flow::actions::on_trigger::trigger_on_trigger::TriggerHandler<beet_flow::actions::on_trigger::on_trigger_handler::DefaultMapFunc<beet_flow::events::on_run::OnRun, beet_flow::events::on_run_result::OnRunResult, ()>>>": (
+                    params: (Success),
+                    sources: [],
+                    target: This,
+                ),
+                "bevy_core::name::Name": "World",
+            },
+        ),
+    },
 )

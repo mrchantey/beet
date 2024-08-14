@@ -1,501 +1,501 @@
 (
-  resources: {},
-  entities: {
-    4294967310: (
-      components: {
-        "beet_examples::components::camera_distance::CameraDistance": (
-          width: 0.77,
-          offset: (
-            x: 0.0,
-            y: 0.7,
-            z: 0.7,
-          ),
+    resources: {},
+    entities: {
+        4294967310: (
+            components: {
+                "beet_examples::components::camera_distance::CameraDistance": (
+                    width: 0.77,
+                    offset: (
+                        x: 0.0,
+                        y: 0.7,
+                        z: 0.7,
+                    ),
+                ),
+                "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": Camera3d,
+            },
         ),
-        "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": Camera3d,
-      },
-    ),
-    4294967311: (
-      components: {
-        "bevy_transform::components::transform::Transform": (
-          translation: (
-            x: -0.375,
-            y: -0.25,
-            z: -0.375,
-          ),
-          rotation: (
-            x: 0.0,
-            y: 0.0,
-            z: 0.0,
-            w: 1.0,
-          ),
-          scale: (
-            x: 0.25,
-            y: 0.25,
-            z: 0.25,
-          ),
+        4294967311: (
+            components: {
+                "bevy_transform::components::transform::Transform": (
+                    translation: (
+                        x: -0.375,
+                        y: -0.25,
+                        z: -0.375,
+                    ),
+                    rotation: (
+                        x: 0.0,
+                        y: 0.0,
+                        z: 0.0,
+                        w: 1.0,
+                    ),
+                    scale: (
+                        x: 0.25,
+                        y: 0.25,
+                        z: 0.25,
+                    ),
+                ),
+                "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": Scene("kaykit-minigame/tileSmall_teamBlue.gltf.glb#Scene0"),
+            },
         ),
-        "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": Scene("kaykit-minigame/tileSmall_teamBlue.gltf.glb#Scene0"),
-      },
-    ),
-    4294967312: (
-      components: {
-        "bevy_transform::components::transform::Transform": (
-          translation: (
-            x: -0.375,
-            y: -0.25,
-            z: -0.125,
-          ),
-          rotation: (
-            x: 0.0,
-            y: 0.0,
-            z: 0.0,
-            w: 1.0,
-          ),
-          scale: (
-            x: 0.25,
-            y: 0.25,
-            z: 0.25,
-          ),
+        4294967312: (
+            components: {
+                "bevy_transform::components::transform::Transform": (
+                    translation: (
+                        x: -0.375,
+                        y: -0.25,
+                        z: -0.125,
+                    ),
+                    rotation: (
+                        x: 0.0,
+                        y: 0.0,
+                        z: 0.0,
+                        w: 1.0,
+                    ),
+                    scale: (
+                        x: 0.25,
+                        y: 0.25,
+                        z: 0.25,
+                    ),
+                ),
+                "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": Scene("kaykit-minigame/tileSmall_teamBlue.gltf.glb#Scene0"),
+            },
         ),
-        "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": Scene("kaykit-minigame/tileSmall_teamBlue.gltf.glb#Scene0"),
-      },
-    ),
-    4294967313: (
-      components: {
-        "bevy_transform::components::transform::Transform": (
-          translation: (
-            x: -0.375,
-            y: -0.25,
-            z: 0.125,
-          ),
-          rotation: (
-            x: 0.0,
-            y: 0.0,
-            z: 0.0,
-            w: 1.0,
-          ),
-          scale: (
-            x: 0.25,
-            y: 0.25,
-            z: 0.25,
-          ),
+        4294967313: (
+            components: {
+                "bevy_transform::components::transform::Transform": (
+                    translation: (
+                        x: -0.375,
+                        y: -0.25,
+                        z: 0.125,
+                    ),
+                    rotation: (
+                        x: 0.0,
+                        y: 0.0,
+                        z: 0.0,
+                        w: 1.0,
+                    ),
+                    scale: (
+                        x: 0.25,
+                        y: 0.25,
+                        z: 0.25,
+                    ),
+                ),
+                "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": Scene("kaykit-minigame/tileSmall_teamBlue.gltf.glb#Scene0"),
+            },
         ),
-        "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": Scene("kaykit-minigame/tileSmall_teamBlue.gltf.glb#Scene0"),
-      },
-    ),
-    4294967314: (
-      components: {
-        "bevy_transform::components::transform::Transform": (
-          translation: (
-            x: -0.375,
-            y: -0.25,
-            z: 0.375,
-          ),
-          rotation: (
-            x: 0.0,
-            y: 0.0,
-            z: 0.0,
-            w: 1.0,
-          ),
-          scale: (
-            x: 0.25,
-            y: 0.25,
-            z: 0.25,
-          ),
+        4294967314: (
+            components: {
+                "bevy_transform::components::transform::Transform": (
+                    translation: (
+                        x: -0.375,
+                        y: -0.25,
+                        z: 0.375,
+                    ),
+                    rotation: (
+                        x: 0.0,
+                        y: 0.0,
+                        z: 0.0,
+                        w: 1.0,
+                    ),
+                    scale: (
+                        x: 0.25,
+                        y: 0.25,
+                        z: 0.25,
+                    ),
+                ),
+                "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": Scene("kaykit-minigame/tileSmall_teamBlue.gltf.glb#Scene0"),
+            },
         ),
-        "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": Scene("kaykit-minigame/tileSmall_teamBlue.gltf.glb#Scene0"),
-      },
-    ),
-    4294967315: (
-      components: {
-        "bevy_transform::components::transform::Transform": (
-          translation: (
-            x: -0.125,
-            y: -0.25,
-            z: -0.375,
-          ),
-          rotation: (
-            x: 0.0,
-            y: 0.0,
-            z: 0.0,
-            w: 1.0,
-          ),
-          scale: (
-            x: 0.25,
-            y: 0.25,
-            z: 0.25,
-          ),
+        4294967315: (
+            components: {
+                "bevy_transform::components::transform::Transform": (
+                    translation: (
+                        x: -0.125,
+                        y: -0.25,
+                        z: -0.375,
+                    ),
+                    rotation: (
+                        x: 0.0,
+                        y: 0.0,
+                        z: 0.0,
+                        w: 1.0,
+                    ),
+                    scale: (
+                        x: 0.25,
+                        y: 0.25,
+                        z: 0.25,
+                    ),
+                ),
+                "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": Scene("kaykit-minigame/tileSmall_teamBlue.gltf.glb#Scene0"),
+            },
         ),
-        "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": Scene("kaykit-minigame/tileSmall_teamBlue.gltf.glb#Scene0"),
-      },
-    ),
-    4294967316: (
-      components: {
-        "bevy_transform::components::transform::Transform": (
-          translation: (
-            x: -0.125,
-            y: -0.25,
-            z: -0.125,
-          ),
-          rotation: (
-            x: 0.0,
-            y: 0.0,
-            z: 0.0,
-            w: 1.0,
-          ),
-          scale: (
-            x: 0.25,
-            y: 0.25,
-            z: 0.25,
-          ),
+        4294967316: (
+            components: {
+                "bevy_transform::components::transform::Transform": (
+                    translation: (
+                        x: -0.125,
+                        y: -0.25,
+                        z: -0.125,
+                    ),
+                    rotation: (
+                        x: 0.0,
+                        y: 0.0,
+                        z: 0.0,
+                        w: 1.0,
+                    ),
+                    scale: (
+                        x: 0.25,
+                        y: 0.25,
+                        z: 0.25,
+                    ),
+                ),
+                "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": Scene("kaykit-minigame/tileSmall_teamBlue.gltf.glb#Scene0"),
+            },
         ),
-        "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": Scene("kaykit-minigame/tileSmall_teamBlue.gltf.glb#Scene0"),
-      },
-    ),
-    4294967317: (
-      components: {
-        "bevy_transform::components::transform::Transform": (
-          translation: (
-            x: -0.125,
-            y: -0.25,
-            z: 0.125,
-          ),
-          rotation: (
-            x: 0.0,
-            y: 0.0,
-            z: 0.0,
-            w: 1.0,
-          ),
-          scale: (
-            x: 0.25,
-            y: 0.25,
-            z: 0.25,
-          ),
+        4294967317: (
+            components: {
+                "bevy_transform::components::transform::Transform": (
+                    translation: (
+                        x: -0.125,
+                        y: -0.25,
+                        z: 0.125,
+                    ),
+                    rotation: (
+                        x: 0.0,
+                        y: 0.0,
+                        z: 0.0,
+                        w: 1.0,
+                    ),
+                    scale: (
+                        x: 0.25,
+                        y: 0.25,
+                        z: 0.25,
+                    ),
+                ),
+                "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": Scene("kaykit-minigame/tileSmall_teamBlue.gltf.glb#Scene0"),
+            },
         ),
-        "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": Scene("kaykit-minigame/tileSmall_teamBlue.gltf.glb#Scene0"),
-      },
-    ),
-    4294967318: (
-      components: {
-        "bevy_transform::components::transform::Transform": (
-          translation: (
-            x: -0.125,
-            y: -0.25,
-            z: 0.375,
-          ),
-          rotation: (
-            x: 0.0,
-            y: 0.0,
-            z: 0.0,
-            w: 1.0,
-          ),
-          scale: (
-            x: 0.25,
-            y: 0.25,
-            z: 0.25,
-          ),
+        4294967318: (
+            components: {
+                "bevy_transform::components::transform::Transform": (
+                    translation: (
+                        x: -0.125,
+                        y: -0.25,
+                        z: 0.375,
+                    ),
+                    rotation: (
+                        x: 0.0,
+                        y: 0.0,
+                        z: 0.0,
+                        w: 1.0,
+                    ),
+                    scale: (
+                        x: 0.25,
+                        y: 0.25,
+                        z: 0.25,
+                    ),
+                ),
+                "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": Scene("kaykit-minigame/tileSmall_teamBlue.gltf.glb#Scene0"),
+            },
         ),
-        "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": Scene("kaykit-minigame/tileSmall_teamBlue.gltf.glb#Scene0"),
-      },
-    ),
-    4294967319: (
-      components: {
-        "bevy_transform::components::transform::Transform": (
-          translation: (
-            x: 0.125,
-            y: -0.25,
-            z: -0.375,
-          ),
-          rotation: (
-            x: 0.0,
-            y: 0.0,
-            z: 0.0,
-            w: 1.0,
-          ),
-          scale: (
-            x: 0.25,
-            y: 0.25,
-            z: 0.25,
-          ),
+        4294967319: (
+            components: {
+                "bevy_transform::components::transform::Transform": (
+                    translation: (
+                        x: 0.125,
+                        y: -0.25,
+                        z: -0.375,
+                    ),
+                    rotation: (
+                        x: 0.0,
+                        y: 0.0,
+                        z: 0.0,
+                        w: 1.0,
+                    ),
+                    scale: (
+                        x: 0.25,
+                        y: 0.25,
+                        z: 0.25,
+                    ),
+                ),
+                "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": Scene("kaykit-minigame/tileSmall_teamBlue.gltf.glb#Scene0"),
+            },
         ),
-        "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": Scene("kaykit-minigame/tileSmall_teamBlue.gltf.glb#Scene0"),
-      },
-    ),
-    4294967320: (
-      components: {
-        "bevy_transform::components::transform::Transform": (
-          translation: (
-            x: 0.125,
-            y: -0.25,
-            z: -0.125,
-          ),
-          rotation: (
-            x: 0.0,
-            y: 0.0,
-            z: 0.0,
-            w: 1.0,
-          ),
-          scale: (
-            x: 0.25,
-            y: 0.25,
-            z: 0.25,
-          ),
+        4294967320: (
+            components: {
+                "bevy_transform::components::transform::Transform": (
+                    translation: (
+                        x: 0.125,
+                        y: -0.25,
+                        z: -0.125,
+                    ),
+                    rotation: (
+                        x: 0.0,
+                        y: 0.0,
+                        z: 0.0,
+                        w: 1.0,
+                    ),
+                    scale: (
+                        x: 0.25,
+                        y: 0.25,
+                        z: 0.25,
+                    ),
+                ),
+                "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": Scene("kaykit-minigame/tileSmall_teamBlue.gltf.glb#Scene0"),
+            },
         ),
-        "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": Scene("kaykit-minigame/tileSmall_teamBlue.gltf.glb#Scene0"),
-      },
-    ),
-    4294967321: (
-      components: {
-        "bevy_transform::components::transform::Transform": (
-          translation: (
-            x: 0.125,
-            y: -0.25,
-            z: 0.125,
-          ),
-          rotation: (
-            x: 0.0,
-            y: 0.0,
-            z: 0.0,
-            w: 1.0,
-          ),
-          scale: (
-            x: 0.25,
-            y: 0.25,
-            z: 0.25,
-          ),
+        4294967321: (
+            components: {
+                "bevy_transform::components::transform::Transform": (
+                    translation: (
+                        x: 0.125,
+                        y: -0.25,
+                        z: 0.125,
+                    ),
+                    rotation: (
+                        x: 0.0,
+                        y: 0.0,
+                        z: 0.0,
+                        w: 1.0,
+                    ),
+                    scale: (
+                        x: 0.25,
+                        y: 0.25,
+                        z: 0.25,
+                    ),
+                ),
+                "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": Scene("kaykit-minigame/tileSmall_teamBlue.gltf.glb#Scene0"),
+            },
         ),
-        "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": Scene("kaykit-minigame/tileSmall_teamBlue.gltf.glb#Scene0"),
-      },
-    ),
-    4294967322: (
-      components: {
-        "bevy_transform::components::transform::Transform": (
-          translation: (
-            x: 0.125,
-            y: -0.25,
-            z: 0.375,
-          ),
-          rotation: (
-            x: 0.0,
-            y: 0.0,
-            z: 0.0,
-            w: 1.0,
-          ),
-          scale: (
-            x: 0.25,
-            y: 0.25,
-            z: 0.25,
-          ),
+        4294967322: (
+            components: {
+                "bevy_transform::components::transform::Transform": (
+                    translation: (
+                        x: 0.125,
+                        y: -0.25,
+                        z: 0.375,
+                    ),
+                    rotation: (
+                        x: 0.0,
+                        y: 0.0,
+                        z: 0.0,
+                        w: 1.0,
+                    ),
+                    scale: (
+                        x: 0.25,
+                        y: 0.25,
+                        z: 0.25,
+                    ),
+                ),
+                "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": Scene("kaykit-minigame/tileSmall_teamBlue.gltf.glb#Scene0"),
+            },
         ),
-        "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": Scene("kaykit-minigame/tileSmall_teamBlue.gltf.glb#Scene0"),
-      },
-    ),
-    4294967323: (
-      components: {
-        "bevy_transform::components::transform::Transform": (
-          translation: (
-            x: 0.375,
-            y: -0.25,
-            z: -0.375,
-          ),
-          rotation: (
-            x: 0.0,
-            y: 0.0,
-            z: 0.0,
-            w: 1.0,
-          ),
-          scale: (
-            x: 0.25,
-            y: 0.25,
-            z: 0.25,
-          ),
+        4294967323: (
+            components: {
+                "bevy_transform::components::transform::Transform": (
+                    translation: (
+                        x: 0.375,
+                        y: -0.25,
+                        z: -0.375,
+                    ),
+                    rotation: (
+                        x: 0.0,
+                        y: 0.0,
+                        z: 0.0,
+                        w: 1.0,
+                    ),
+                    scale: (
+                        x: 0.25,
+                        y: 0.25,
+                        z: 0.25,
+                    ),
+                ),
+                "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": Scene("kaykit-minigame/tileSmall_teamBlue.gltf.glb#Scene0"),
+            },
         ),
-        "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": Scene("kaykit-minigame/tileSmall_teamBlue.gltf.glb#Scene0"),
-      },
-    ),
-    4294967324: (
-      components: {
-        "bevy_transform::components::transform::Transform": (
-          translation: (
-            x: 0.375,
-            y: -0.25,
-            z: -0.125,
-          ),
-          rotation: (
-            x: 0.0,
-            y: 0.0,
-            z: 0.0,
-            w: 1.0,
-          ),
-          scale: (
-            x: 0.25,
-            y: 0.25,
-            z: 0.25,
-          ),
+        4294967324: (
+            components: {
+                "bevy_transform::components::transform::Transform": (
+                    translation: (
+                        x: 0.375,
+                        y: -0.25,
+                        z: -0.125,
+                    ),
+                    rotation: (
+                        x: 0.0,
+                        y: 0.0,
+                        z: 0.0,
+                        w: 1.0,
+                    ),
+                    scale: (
+                        x: 0.25,
+                        y: 0.25,
+                        z: 0.25,
+                    ),
+                ),
+                "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": Scene("kaykit-minigame/tileSmall_teamBlue.gltf.glb#Scene0"),
+            },
         ),
-        "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": Scene("kaykit-minigame/tileSmall_teamBlue.gltf.glb#Scene0"),
-      },
-    ),
-    4294967325: (
-      components: {
-        "bevy_transform::components::transform::Transform": (
-          translation: (
-            x: 0.375,
-            y: -0.25,
-            z: 0.125,
-          ),
-          rotation: (
-            x: 0.0,
-            y: 0.0,
-            z: 0.0,
-            w: 1.0,
-          ),
-          scale: (
-            x: 0.25,
-            y: 0.25,
-            z: 0.25,
-          ),
+        4294967325: (
+            components: {
+                "bevy_transform::components::transform::Transform": (
+                    translation: (
+                        x: 0.375,
+                        y: -0.25,
+                        z: 0.125,
+                    ),
+                    rotation: (
+                        x: 0.0,
+                        y: 0.0,
+                        z: 0.0,
+                        w: 1.0,
+                    ),
+                    scale: (
+                        x: 0.25,
+                        y: 0.25,
+                        z: 0.25,
+                    ),
+                ),
+                "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": Scene("kaykit-minigame/tileSmall_teamBlue.gltf.glb#Scene0"),
+            },
         ),
-        "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": Scene("kaykit-minigame/tileSmall_teamBlue.gltf.glb#Scene0"),
-      },
-    ),
-    4294967326: (
-      components: {
-        "bevy_transform::components::transform::Transform": (
-          translation: (
-            x: 0.375,
-            y: -0.25,
-            z: 0.375,
-          ),
-          rotation: (
-            x: 0.0,
-            y: 0.0,
-            z: 0.0,
-            w: 1.0,
-          ),
-          scale: (
-            x: 0.25,
-            y: 0.25,
-            z: 0.25,
-          ),
+        4294967326: (
+            components: {
+                "bevy_transform::components::transform::Transform": (
+                    translation: (
+                        x: 0.375,
+                        y: -0.25,
+                        z: 0.375,
+                    ),
+                    rotation: (
+                        x: 0.0,
+                        y: 0.0,
+                        z: 0.0,
+                        w: 1.0,
+                    ),
+                    scale: (
+                        x: 0.25,
+                        y: 0.25,
+                        z: 0.25,
+                    ),
+                ),
+                "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": Scene("kaykit-minigame/tileSmall_teamBlue.gltf.glb#Scene0"),
+            },
         ),
-        "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": Scene("kaykit-minigame/tileSmall_teamBlue.gltf.glb#Scene0"),
-      },
-    ),
-    4294967327: (
-      components: {
-        "bevy_transform::components::transform::Transform": (
-          translation: (
-            x: -0.125,
-            y: 0.0625,
-            z: -0.125,
-          ),
-          rotation: (
-            x: 0.0,
-            y: 0.0,
-            z: 0.0,
-            w: 1.0,
-          ),
-          scale: (
-            x: 0.125,
-            y: 0.125,
-            z: 0.125,
-          ),
+        4294967327: (
+            components: {
+                "bevy_transform::components::transform::Transform": (
+                    translation: (
+                        x: -0.125,
+                        y: 0.0625,
+                        z: -0.125,
+                    ),
+                    rotation: (
+                        x: 0.0,
+                        y: 0.0,
+                        z: 0.0,
+                        w: 1.0,
+                    ),
+                    scale: (
+                        x: 0.125,
+                        y: 0.125,
+                        z: 0.125,
+                    ),
+                ),
+                "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": Scene("kaykit-minigame/bomb_teamRed.gltf.glb#Scene0"),
+            },
         ),
-        "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": Scene("kaykit-minigame/bomb_teamRed.gltf.glb#Scene0"),
-      },
-    ),
-    4294967328: (
-      components: {
-        "bevy_transform::components::transform::Transform": (
-          translation: (
-            x: 0.375,
-            y: 0.0625,
-            z: -0.125,
-          ),
-          rotation: (
-            x: 0.0,
-            y: 0.0,
-            z: 0.0,
-            w: 1.0,
-          ),
-          scale: (
-            x: 0.125,
-            y: 0.125,
-            z: 0.125,
-          ),
+        4294967328: (
+            components: {
+                "bevy_transform::components::transform::Transform": (
+                    translation: (
+                        x: 0.375,
+                        y: 0.0625,
+                        z: -0.125,
+                    ),
+                    rotation: (
+                        x: 0.0,
+                        y: 0.0,
+                        z: 0.0,
+                        w: 1.0,
+                    ),
+                    scale: (
+                        x: 0.125,
+                        y: 0.125,
+                        z: 0.125,
+                    ),
+                ),
+                "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": Scene("kaykit-minigame/bomb_teamRed.gltf.glb#Scene0"),
+            },
         ),
-        "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": Scene("kaykit-minigame/bomb_teamRed.gltf.glb#Scene0"),
-      },
-    ),
-    4294967329: (
-      components: {
-        "bevy_transform::components::transform::Transform": (
-          translation: (
-            x: 0.375,
-            y: 0.0625,
-            z: 0.125,
-          ),
-          rotation: (
-            x: 0.0,
-            y: 0.0,
-            z: 0.0,
-            w: 1.0,
-          ),
-          scale: (
-            x: 0.125,
-            y: 0.125,
-            z: 0.125,
-          ),
+        4294967329: (
+            components: {
+                "bevy_transform::components::transform::Transform": (
+                    translation: (
+                        x: 0.375,
+                        y: 0.0625,
+                        z: 0.125,
+                    ),
+                    rotation: (
+                        x: 0.0,
+                        y: 0.0,
+                        z: 0.0,
+                        w: 1.0,
+                    ),
+                    scale: (
+                        x: 0.125,
+                        y: 0.125,
+                        z: 0.125,
+                    ),
+                ),
+                "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": Scene("kaykit-minigame/bomb_teamRed.gltf.glb#Scene0"),
+            },
         ),
-        "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": Scene("kaykit-minigame/bomb_teamRed.gltf.glb#Scene0"),
-      },
-    ),
-    4294967330: (
-      components: {
-        "bevy_transform::components::transform::Transform": (
-          translation: (
-            x: -0.375,
-            y: 0.0625,
-            z: 0.375,
-          ),
-          rotation: (
-            x: 0.0,
-            y: 0.0,
-            z: 0.0,
-            w: 1.0,
-          ),
-          scale: (
-            x: 0.125,
-            y: 0.125,
-            z: 0.125,
-          ),
+        4294967330: (
+            components: {
+                "bevy_transform::components::transform::Transform": (
+                    translation: (
+                        x: -0.375,
+                        y: 0.0625,
+                        z: 0.375,
+                    ),
+                    rotation: (
+                        x: 0.0,
+                        y: 0.0,
+                        z: 0.0,
+                        w: 1.0,
+                    ),
+                    scale: (
+                        x: 0.125,
+                        y: 0.125,
+                        z: 0.125,
+                    ),
+                ),
+                "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": Scene("kaykit-minigame/bomb_teamRed.gltf.glb#Scene0"),
+            },
         ),
-        "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": Scene("kaykit-minigame/bomb_teamRed.gltf.glb#Scene0"),
-      },
-    ),
-    4294967331: (
-      components: {
-        "bevy_transform::components::transform::Transform": (
-          translation: (
-            x: 0.375,
-            y: 0.0,
-            z: 0.375,
-          ),
-          rotation: (
-            x: 0.0,
-            y: 0.0,
-            z: 0.0,
-            w: 1.0,
-          ),
-          scale: (
-            x: 0.125,
-            y: 0.125,
-            z: 0.125,
-          ),
+        4294967331: (
+            components: {
+                "bevy_transform::components::transform::Transform": (
+                    translation: (
+                        x: 0.375,
+                        y: 0.0,
+                        z: 0.375,
+                    ),
+                    rotation: (
+                        x: 0.0,
+                        y: 0.0,
+                        z: 0.0,
+                        w: 1.0,
+                    ),
+                    scale: (
+                        x: 0.125,
+                        y: 0.125,
+                        z: 0.125,
+                    ),
+                ),
+                "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": Scene("kaykit-minigame/flag_teamYellow.gltf.glb#Scene0"),
+            },
         ),
-        "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": Scene("kaykit-minigame/flag_teamYellow.gltf.glb#Scene0"),
-      },
-    ),
-  },
+    },
 )

@@ -11,16 +11,20 @@ fn plugin(app: &mut App) {
 }
 
 fn main() -> Result<()> {
-	let checks = DynamicSceneChecks {
-		resource_checks: false,
-		entity_checks: true,
-		component_checks: true,
-		..Default::default()
+	let config = SceneExportConfig {
+		format: SceneExportFormat::Ron,
+		checks: DynamicSceneChecks {
+			resource_checks: false,
+			entity_checks: true,
+			component_checks: true,
+			..Default::default()
+		},
+		..default()
 	};
 
 
 	SceneGroupExporter::new(plugin)
-		.with_checks(checks.clone())
+		.with_config(config.clone())
 		.with_dir(DIR)
 		.with_query::<(Without<ObserverState>, Without<Observer<OnLogMessage, ()>>)>(
 		)
@@ -29,7 +33,7 @@ fn main() -> Result<()> {
 		.export()?;
 
 	SceneGroupExporter::new(plugin)
-		.with_checks(checks.clone())
+		.with_config(config.clone())
 		.with_dir(DIR)
 		.with_query::<(Without<ObserverState>, Without<Observer<OnLogMessage, ()>>)>(
 		)
@@ -45,7 +49,7 @@ fn main() -> Result<()> {
 
 
 	SceneGroupExporter::new((plugin, plugin_ml))
-		.with_checks(checks)
+		.with_config(config.clone())
 		.with_dir(DIR)
 		.without_clear_target()
 		.with_query::<(Without<ObserverState>, Without<Observer<OnLogMessage, ()>>)>(

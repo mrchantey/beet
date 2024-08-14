@@ -1,98 +1,100 @@
 (
-  resources: {},
-  entities: {
-    4294967309: (
-      components: {
-        "bevy_transform::components::transform::Transform": (
-          translation: (
-            x: 200.0,
-            y: 0.0,
-            z: 0.0,
-          ),
-          rotation: (
-            x: 0.0,
-            y: 0.0,
-            z: 0.0,
-            w: 1.0,
-          ),
-          scale: (
-            x: 1.0,
-            y: 1.0,
-            z: 1.0,
-          ),
+    resources: {},
+    entities: {
+        4294967309: (
+            components: {
+                "bevy_core::name::Name": "Target",
+                "bevy_transform::components::transform::Transform": (
+                    translation: (
+                        x: 200.0,
+                        y: 0.0,
+                        z: 0.0,
+                    ),
+                    rotation: (
+                        x: 0.0,
+                        y: 0.0,
+                        z: 0.0,
+                        w: 1.0,
+                    ),
+                    scale: (
+                        x: 1.0,
+                        y: 1.0,
+                        z: 1.0,
+                    ),
+                ),
+                "beet_examples::components::follow_cursor::FollowCursor2d": (),
+                "beetmash_core::render::block_app_ready::AssetLoadBlockAppReady": (),
+                "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": Sprite("spaceship_pack/planet_6.png"),
+            },
         ),
-        "beet_examples::components::follow_cursor::FollowCursor2d": (),
-        "beetmash_core::render::block_app_ready::AssetLoadBlockAppReady": (),
-        "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": Sprite("spaceship_pack/planet_6.png"),
-      },
-    ),
-    4294967310: (
-      components: {
-        "bevy_hierarchy::components::children::Children": ([
-          4294967311,
-        ]),
-        "beet_spatial::movement::force_bundle::Mass": (1.0),
-        "beet_spatial::movement::force_bundle::Velocity": ((
-          x: 0.0,
-          y: 0.0,
-          z: 0.0,
-        )),
-        "beet_spatial::movement::force_bundle::Impulse": ((
-          x: 0.0,
-          y: 0.0,
-          z: 0.0,
-        )),
-        "beet_spatial::movement::force_bundle::Force": ((
-          x: 0.0,
-          y: 0.0,
-          z: 0.0,
-        )),
-        "beet_spatial::steer::steer_bundle::MaxForce": (5.0),
-        "beet_spatial::steer::steer_bundle::MaxSpeed": (500.0),
-        "beet_spatial::steer::steer_actions::arrive::ArriveRadius": (350.0),
-        "beet_spatial::steer::algo::wander_impulse::WanderParams": (
-          outer_distance: 500.0,
-          outer_radius: 250.0,
-          inner_radius: 25.0,
-          last_local_target: (
-            x: 0.0,
-            y: 0.0,
-            z: 0.0,
-          ),
+        4294967310: (
+            components: {
+                "bevy_hierarchy::components::children::Children": ([
+                    4294967311,
+                ]),
+                "bevy_core::name::Name": "Agent",
+                "beet_spatial::movement::force_bundle::Mass": (1.0),
+                "beet_spatial::movement::force_bundle::Velocity": ((
+                    x: 0.0,
+                    y: 0.0,
+                    z: 0.0,
+                )),
+                "beet_spatial::movement::force_bundle::Impulse": ((
+                    x: 0.0,
+                    y: 0.0,
+                    z: 0.0,
+                )),
+                "beet_spatial::movement::force_bundle::Force": ((
+                    x: 0.0,
+                    y: 0.0,
+                    z: 0.0,
+                )),
+                "beet_spatial::steer::steer_bundle::MaxForce": (5.0),
+                "beet_spatial::steer::steer_bundle::MaxSpeed": (500.0),
+                "beet_spatial::steer::steer_actions::arrive::ArriveRadius": (350.0),
+                "beet_spatial::steer::algo::wander_impulse::WanderParams": (
+                    outer_distance: 500.0,
+                    outer_radius: 250.0,
+                    inner_radius: 25.0,
+                    last_local_target: (
+                        x: 0.0,
+                        y: 0.0,
+                        z: 0.0,
+                    ),
+                ),
+                "beet_spatial::steer::algo::group_params::GroupParams": (
+                    separate_radius: 100.0,
+                    align_radius: 250.0,
+                    cohere_radius: 250.0,
+                ),
+                "beetmash_core::render::block_app_ready::AssetLoadBlockAppReady": (),
+                "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": Sprite("spaceship_pack/ship_2.png"),
+                "beet_spatial::movement::rotate_to_velocity::RotateToVelocity2d": (),
+                "beet_spatial::steer::steer_target::SteerTarget": Entity(4294967309),
+            },
         ),
-        "beet_spatial::steer::algo::group_params::GroupParams": (
-          separate_radius: 100.0,
-          align_radius: 250.0,
-          cohere_radius: 250.0,
+        4294967311: (
+            components: {
+                "bevy_hierarchy::components::parent::Parent": (4294967310),
+                "beet_flow::actions::on_trigger::on_trigger_action::OnTrigger<beet_flow::actions::on_trigger::insert_on_trigger::InsertHandler<beet_flow::actions::on_trigger::on_trigger_handler::DefaultMapFunc<beet_flow::events::on_run::OnRun, beet_flow::lifecycle::components::running::Running, ()>>>": (
+                    params: (),
+                    sources: [],
+                    target: This,
+                ),
+                "beet_flow::actions::on_trigger::on_trigger_action::OnTrigger<beet_flow::actions::on_trigger::remove_on_trigger::RemoveHandler<beet_flow::events::on_run_result::OnRunResult, beet_flow::lifecycle::components::running::Running, ()>>": (
+                    params: (),
+                    sources: [],
+                    target: This,
+                ),
+                "beet_flow::actions::on_trigger::on_global_trigger::OnGlobalTrigger<beet_flow::actions::on_trigger::trigger_on_trigger::TriggerHandler<beet_flow::actions::on_trigger::on_trigger_handler::DefaultMapFunc<beetmash_net::events::common_events::AppReady, beet_flow::events::on_run::OnRun, ()>>>": ((
+                    params: (),
+                    sources: [],
+                    target: This,
+                )),
+                "beet_flow::lifecycle::components::target_agent::TargetAgent": (4294967310),
+                "bevy_core::name::Name": "Seek",
+                "beet_spatial::steer::steer_actions::seek::Seek": (),
+            },
         ),
-        "beetmash_core::render::block_app_ready::AssetLoadBlockAppReady": (),
-        "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": Sprite("spaceship_pack/ship_2.png"),
-        "beet_spatial::movement::rotate_to_velocity::RotateToVelocity2d": (),
-        "beet_spatial::steer::steer_target::SteerTarget": Entity(4294967309),
-      },
-    ),
-    4294967311: (
-      components: {
-        "bevy_hierarchy::components::parent::Parent": (4294967310),
-        "beet_flow::actions::on_trigger::on_trigger_action::OnTrigger<beet_flow::actions::on_trigger::insert_on_trigger::InsertHandler<beet_flow::actions::on_trigger::on_trigger_handler::DefaultMapFunc<beet_flow::events::on_run::OnRun, beet_flow::lifecycle::components::running::Running, ()>>>": (
-          params: (),
-          sources: [],
-          target: This,
-        ),
-        "beet_flow::actions::on_trigger::on_trigger_action::OnTrigger<beet_flow::actions::on_trigger::remove_on_trigger::RemoveHandler<beet_flow::events::on_run_result::OnRunResult, beet_flow::lifecycle::components::running::Running, ()>>": (
-          params: (),
-          sources: [],
-          target: This,
-        ),
-        "beet_flow::actions::on_trigger::on_global_trigger::OnGlobalTrigger<beet_flow::actions::on_trigger::trigger_on_trigger::TriggerHandler<beet_flow::actions::on_trigger::on_trigger_handler::DefaultMapFunc<beetmash_net::events::common_events::AppReady, beet_flow::events::on_run::OnRun, ()>>>": ((
-          params: (),
-          sources: [],
-          target: This,
-        )),
-        "beet_flow::lifecycle::components::target_agent::TargetAgent": (4294967310),
-        "bevy_core::name::Name": "Seek",
-        "beet_spatial::steer::steer_actions::seek::Seek": (),
-      },
-    ),
-  },
+    },
 )
