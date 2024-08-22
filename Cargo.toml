@@ -46,7 +46,7 @@ beet_ml = { path = "crates/beet_ml", version = "0.0.4-rc.1" }
 beet_examples = { path = "crates/beet_examples", version = "0.0.4-rc.1" }
 
 ## local
-beetmash = { version = "0.0.6-rc.1", path = "../beetmash" }
+beetmash = { version = "0.0.6-rc.2", path = "../beetmash" }
 forky_core = { version = "0.1.50", path = "../forky/crates/forky_core" }
 forky_bevy = { version = "0.1.50", path = "../forky/crates/forky_bevy" }
 forky_web = { version = "0.1.50", path = "../forky/crates/forky_web", default-features = false }
@@ -267,11 +267,7 @@ thumb-url = "https://storage.googleapis.com/beet-examples/screenshots/hello-worl
 description = "A simple behavior that prints 'Hello' then 'World' to the console."
 app = "app"
 ron-path = "scenes/hello-world.ron"
-include = [
-	"beet-debug",
-	"beetmash/camera-2d",
-	"beetmash/ui-terminal",
-]
+include = ["beet-debug", "beetmash/camera-2d", "beetmash/ui-terminal"]
 
 
 [[package.metadata.scene]]
@@ -280,11 +276,7 @@ description = "Demonstration of flocking behaviors."
 thumb-url = "https://storage.googleapis.com/beet-examples/screenshots/flock.png"
 app = "app"
 ron-path = "scenes/flock.ron"
-include = [
-	"beet-debug",
-	"beetmash/camera-2d",
-	"beetmash/space-scene",
-]
+include = ["beet-debug", "beetmash/camera-2d", "beetmash/space-scene"]
 
 [[package.metadata.scene]]
 name = "seek"
@@ -292,11 +284,7 @@ description = "Demonstration of the seek behavior."
 thumb-url = "https://storage.googleapis.com/beet-examples/screenshots/seek.png"
 app = "app"
 ron-path = "scenes/seek.ron"
-include = [
-	"beet-debug",
-	"beetmash/camera-2d",
-	"beetmash/space-scene",
-]
+include = ["beet-debug", "beetmash/camera-2d", "beetmash/space-scene"]
 
 [[package.metadata.scene]]
 name = "seek-3d"
@@ -304,11 +292,7 @@ description = "A 3D demonstration of the seek behavior."
 thumb-url = "https://storage.googleapis.com/beet-examples/screenshots/seek-3d.png"
 app = "app"
 ron-path = "scenes/seek-3d.ron"
-include = [
-	"beet-debug",
-	"beetmash/lighting-3d",
-	"beetmash/ground-3d",
-]
+include = ["beet-debug", "beetmash/lighting-3d", "beetmash/ground-3d"]
 
 
 [[package.metadata.scene]]
@@ -329,11 +313,7 @@ name = "hello-ml"
 description = "A behavior that uses a Sentence Selector to score child behaviors, deciding which will run next."
 thumb-url = "https://storage.googleapis.com/beet-examples/screenshots/hello-llm.png"
 ron-path = "scenes/hello-ml.ron"
-include = [
-	"beetmash/camera-2d",
-	"beetmash/ui-terminal",
-	"beet-debug",
-]
+include = ["beetmash/camera-2d", "beetmash/ui-terminal", "beet-debug"]
 
 [[package.metadata.scene]]
 name = "fetch-scene"
