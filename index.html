@@ -33,7 +33,7 @@
 		}
 
 		async function loadScene(name) {
-			const response = await fetch(`/target/scenes/${name}.ron`)
+			const response = await fetch(`/target/scenes/${name}.json`)
 			const json = await response.text()
 			let hashmap = await sendMessage(
 				"beetmash_net::events::spawn_scene_file::SpawnSceneFile",

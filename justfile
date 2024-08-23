@@ -20,10 +20,10 @@ app *args:
 # blocked on #https://github.com/bevyengine/bevy/issues/14300
 hello-world:
 	cargo run --example app \
-	./scenes/beet-debug.ron \
-	../beetmash/scenes/camera-2d.ron \
-	../beetmash/scenes/ui-terminal-input.ron \
-	./scenes/hello-world.ron
+	./scenes/beet-debug.json \
+	../beetmash/scenes/camera-2d.json \
+	../beetmash/scenes/ui-terminal-input.json \
+	./scenes/hello-world.json
 
 doc:
 	just watch 'cargo doc'

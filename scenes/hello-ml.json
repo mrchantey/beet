@@ -1,0 +1,65 @@
+{
+  "resources": {},
+  "entities": {
+    "4294967311": {
+      "components": {
+        "bevy_hierarchy::components::children::Children": [
+          [
+            4294967312,
+            4294967313
+          ]
+        ],
+        "beet_flow::actions::on_trigger::on_global_trigger::OnGlobalTrigger<beet_flow::actions::on_trigger::trigger_on_trigger::TriggerHandler<beet_flow::actions::on_trigger::on_trigger_handler::DefaultMapFunc<beetmash_net::events::common_events::AppReady, beet_flow::events::on_run::OnRun, ()>>>": [
+          {
+            "params": {},
+            "sources": [],
+            "target": "This"
+          }
+        ],
+        "bevy_core::name::Name": "Sentence Flow",
+        "beet_ml::language::selectors::sentence_flow::SentenceFlow": {},
+        "beet_flow::actions::on_trigger::on_global_trigger::OnGlobalTrigger<beet_flow::actions::on_trigger::insert_on_trigger::InsertHandler<beet_ml::language::selectors::sentence_actions::MapUserMessageToSentence>>": [
+          {
+            "params": [],
+            "sources": [],
+            "target": "This"
+          }
+        ],
+        "beet_flow::actions::on_trigger::on_trigger_action::OnTrigger<beet_flow::actions::on_trigger::trigger_on_trigger::TriggerHandler<beet_flow::actions::on_trigger::on_trigger_handler::DefaultMapFunc<bevy_ecs::world::component_constants::OnInsert, beet_flow::events::on_run::OnRun, beet_ml::language::selectors::sentence_flow::Sentence>>>": {
+          "params": {},
+          "sources": [],
+          "target": "This"
+        },
+        "beet_ml::language::selectors::sentence_flow::Sentence": [
+          "please kill the baddies"
+        ],
+        "beetmash_core::render::block_app_ready::AssetLoadBlockAppReady": {},
+        "beetmash_scene::utils::asset_placeholder::AssetPlaceholder<beet_ml::language::bert::Bert>": {
+          "path": "default-bert.ron"
+        }
+      }
+    },
+    "4294967312": {
+      "components": {
+        "bevy_hierarchy::components::parent::Parent": [
+          4294967311
+        ],
+        "bevy_core::name::Name": "Heal Behavior",
+        "beet_ml::language::selectors::sentence_flow::Sentence": [
+          "heal"
+        ]
+      }
+    },
+    "4294967313": {
+      "components": {
+        "bevy_hierarchy::components::parent::Parent": [
+          4294967311
+        ],
+        "bevy_core::name::Name": "Attack Behavior",
+        "beet_ml::language::selectors::sentence_flow::Sentence": [
+          "attack"
+        ]
+      }
+    }
+  }
+}

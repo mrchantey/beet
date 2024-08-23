@@ -1,0 +1,11 @@
+{
+  "resources": {
+    "beet_flow::lifecycle::beet_debug_plugin::BeetDebugConfig": {
+      "log_on_start": true,
+      "log_on_update": false,
+      "log_on_stop": false,
+      "log_to_stdout": true
+    }
+  },
+  "entities": {}
+}

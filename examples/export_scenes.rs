@@ -12,7 +12,6 @@ fn plugin(app: &mut App) {
 
 fn main() -> Result<()> {
 	let config = SceneExportConfig {
-		format: SceneFormat::Ron,
 		checks: DynamicSceneChecks {
 			resource_checks: false,
 			entity_checks: true,

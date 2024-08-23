@@ -258,7 +258,7 @@ app.wasm-url = "https://storage.googleapis.com/beet-examples/app_full/main_bg.wa
 name = "beet-debug"
 thumb-text = "🐛"
 description = "Enable debugging for printing to the console, and screen if used with beetmash/ui-terminal."
-ron-path = "scenes/beet-debug.ron"
+path = "scenes/beet-debug.json"
 
 [[package.metadata.scene]]
 name = "hello-world"
@@ -266,7 +266,7 @@ thumb-text = "🌍"
 thumb-url = "https://storage.googleapis.com/beet-examples/screenshots/hello-world.png"
 description = "A simple behavior that prints 'Hello' then 'World' to the console."
 app = "app"
-ron-path = "scenes/hello-world.ron"
+path = "scenes/hello-world.json"
 include = ["beet-debug", "beetmash/camera-2d", "beetmash/ui-terminal"]
 
 
@@ -275,7 +275,7 @@ name = "flock"
 description = "Demonstration of flocking behaviors."
 thumb-url = "https://storage.googleapis.com/beet-examples/screenshots/flock.png"
 app = "app"
-ron-path = "scenes/flock.ron"
+path = "scenes/flock.json"
 include = ["beet-debug", "beetmash/camera-2d", "beetmash/space-scene"]
 
 [[package.metadata.scene]]
@@ -283,7 +283,7 @@ name = "seek"
 description = "Demonstration of the seek behavior."
 thumb-url = "https://storage.googleapis.com/beet-examples/screenshots/seek.png"
 app = "app"
-ron-path = "scenes/seek.ron"
+path = "scenes/seek.json"
 include = ["beet-debug", "beetmash/camera-2d", "beetmash/space-scene"]
 
 [[package.metadata.scene]]
@@ -291,7 +291,7 @@ name = "seek-3d"
 description = "A 3D demonstration of the seek behavior."
 thumb-url = "https://storage.googleapis.com/beet-examples/screenshots/seek-3d.png"
 app = "app"
-ron-path = "scenes/seek-3d.ron"
+path = "scenes/seek-3d.json"
 include = ["beet-debug", "beetmash/lighting-3d", "beetmash/ground-3d"]
 
 
@@ -300,7 +300,7 @@ name = "hello-animation"
 description = "A simple behavior demonstrating animation control."
 thumb-url = "https://storage.googleapis.com/beet-examples/screenshots/hello-animation.png"
 app = "app"
-ron-path = "scenes/hello-animation.ron"
+path = "scenes/hello-animation.json"
 include = [
 	"beetmash/ui-terminal",
 	"beetmash/lighting-3d",
@@ -312,21 +312,21 @@ include = [
 name = "hello-ml"
 description = "A behavior that uses a Sentence Selector to score child behaviors, deciding which will run next."
 thumb-url = "https://storage.googleapis.com/beet-examples/screenshots/hello-llm.png"
-ron-path = "scenes/hello-ml.ron"
+path = "scenes/hello-ml.json"
 include = ["beetmash/camera-2d", "beetmash/ui-terminal", "beet-debug"]
 
 [[package.metadata.scene]]
 name = "fetch-scene"
 thumb-text = "🏠"
 description = "A camera and the items that the fetch character can go to."
-ron-path = "scenes/fetch-scene.ron"
+path = "scenes/fetch-scene.json"
 
 [[package.metadata.scene]]
 name = "fetch"
 description = "Combining LLM, steering and animation behaviors."
 thumb-url = "https://storage.googleapis.com/beet-examples/screenshots/fetch.png"
 app = "app-ml"
-ron-path = "scenes/fetch-npc.ron"
+path = "scenes/fetch-npc.json"
 include = [
 	"beetmash/ui-terminal-input",
 	"beetmash/lighting-3d",
@@ -340,7 +340,7 @@ events.playerMessage.initial = "I'm hungry!"
 name = "frozen-lake-scene"
 thumb-text = "❄️"
 description = "The static scene for the frozen lake environment."
-ron-path = "scenes/frozen-lake-scene.ron"
+path = "scenes/frozen-lake-scene.json"
 
 
 [[package.metadata.scene]]
@@ -348,7 +348,7 @@ name = "frozen-lake-train"
 description = "Train a Q-learning agent to navigate the frozen lake environment."
 thumb-url = "https://storage.googleapis.com/beet-examples/screenshots/frozen-lake-run.png"
 app = "app-ml"
-ron-path = "scenes/frozen-lake-train.ron"
+path = "scenes/frozen-lake-train.json"
 include = [
 	"beetmash/ui-terminal",
 	"beetmash/lighting-3d",
@@ -361,7 +361,7 @@ name = "frozen-lake-run"
 description = "Use a trained Q-learning agent to navigate the frozen lake environment."
 thumb-url = "https://storage.googleapis.com/beet-examples/screenshots/frozen-lake-run.png"
 app = "app-ml"
-ron-path = "scenes/frozen-lake-run.ron"
+path = "scenes/frozen-lake-run.json"
 include = [
 	"beetmash/ui-terminal",
 	"beetmash/lighting-3d",
