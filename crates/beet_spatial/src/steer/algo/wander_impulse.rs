@@ -1,6 +1,6 @@
 use crate::prelude::*;
 use bevy::prelude::*;
-use forky_bevy::extensions::Vec3Ext;
+use forky::bevy::extensions::Vec3Ext;
 
 /// The distance at which an agent should begin to slow down, defaults to `0.5`
 #[derive(Debug, Clone, PartialEq, Component, Reflect)]

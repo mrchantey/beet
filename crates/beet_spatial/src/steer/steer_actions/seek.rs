@@ -1,9 +1,7 @@
 use crate::prelude::*;
 use beet_flow::prelude::*;
 use bevy::prelude::*;
-use forky_core::ResultTEExt;
-
-
+use forky::prelude::ResultTEExt;
 
 
 /// Go to the agent's [`SteerTarget`] with an optional [`ArriveRadius`]

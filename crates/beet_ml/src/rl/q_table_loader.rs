@@ -1,6 +1,7 @@
 use crate::prelude::*;
 use bevy::asset::io::Reader;
 use bevy::asset::AssetLoader;
+use bevy::asset::AsyncReadExt;
 use bevy::asset::LoadContext;
 use bevy::utils::ConditionalSendFuture;
 use serde::de::DeserializeOwned;
@@ -22,7 +23,7 @@ impl<
 
 	fn load<'a>(
 		&'a self,
-		reader: &'a mut dyn Reader,
+		reader: &'a mut Reader,
 		_settings: &'a Self::Settings,
 		_load_context: &'a mut LoadContext,
 	) -> impl ConditionalSendFuture

@@ -1,6 +1,6 @@
 use beet_flow::prelude::*;
 use bevy::prelude::*;
-use forky_core::ResultTEExt;
+use forky::prelude::ResultTEExt;
 
 /// Applies constant translation, multiplied by [`Time::delta_seconds`]
 #[derive(Debug, Default, Clone, PartialEq, Component, Action, Reflect)]

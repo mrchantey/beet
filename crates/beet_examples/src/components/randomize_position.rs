@@ -1,6 +1,5 @@
 use bevy::prelude::*;
-use forky_bevy::extensions::Vec3Ext;
-
+use forky::prelude::Vec3Ext;
 
 #[derive(Clone, Component, Reflect)]
 #[reflect(Component, Default)]

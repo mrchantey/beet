@@ -19,8 +19,7 @@ assets = ["bevy/bevy_asset"]
 animation = ["bevy/bevy_animation"]
 
 [dependencies]
-forky_core.workspace = true
-forky_bevy.workspace = true
+forky.workspace = true
 beetmash.workspace = true
 beet_flow.workspace = true
 

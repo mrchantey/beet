@@ -1,5 +1,5 @@
-use forky_web::HtmlEventListener;
-use forky_web::HtmlEventWaiter;
+use forky::web::HtmlEventListener;
+use forky::web::HtmlEventWaiter;
 use js_sys::Uint8Array;
 use std::time::Duration;
 use wasm_bindgen::prelude::*;

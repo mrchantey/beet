@@ -1,6 +1,6 @@
 use crate::prelude::*;
 use bevy::prelude::*;
-use forky_bevy::extensions::QuatExt;
+use forky::bevy::extensions::QuatExt;
 use std::f32::consts::PI;
 
 /// Rotate an entity to face its [`Velocity`] in 2D space
