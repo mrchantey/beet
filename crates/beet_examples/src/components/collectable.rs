@@ -1,4 +1,5 @@
 use bevy::prelude::*;
+use std::f32::consts::TAU;
 
 
 
@@ -7,13 +8,14 @@ use bevy::prelude::*;
 pub struct Collectable;
 
 
-
+const TURNS_PER_SECOND: f32 = 0.5;
 
 pub fn rotate_collectables(
 	time: Res<Time>,
 	mut query: Query<&mut Transform, With<Collectable>>,
 ) {
 	for mut transform in query.iter_mut() {
-		transform.rotate(Quat::from_rotation_y(time.delta_seconds() * 0.5));
+		let angle = time.delta_seconds() * TAU * TURNS_PER_SECOND;
+		transform.rotate_y(angle);
 	}
 }
