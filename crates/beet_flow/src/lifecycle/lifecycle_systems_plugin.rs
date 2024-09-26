@@ -14,7 +14,7 @@ pub struct TickSet;
 pub struct PostTickSet;
 
 #[derive(Debug, Clone, Default)]
-// Helpers that clean up run state, this is included in the [`LifecyclePlugin`]
+/// Helpers that clean up run state, this is included in the [`LifecyclePlugin`]
 pub struct LifecycleSystemsPlugin;
 
 impl Plugin for LifecycleSystemsPlugin {

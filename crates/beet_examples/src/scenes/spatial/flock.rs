@@ -1,8 +1,7 @@
 use crate::prelude::*;
-use beet_flow::prelude::*;
+use beet::prelude::*;
 use beetmash::prelude::*;
 use bevy::prelude::*;
-use beet_spatial::prelude::*;
 
 pub fn flock(mut commands: Commands) {
 	commands.insert_resource(WrapAround::default());

@@ -134,6 +134,7 @@ beet_flow.workspace = true
 beet_spatial.workspace = true
 beet_ml = { workspace = true, optional = true }
 beetmash = { workspace = true, optional = true }
+bevy.workspace = true
 
 [dev-dependencies]
 beet_examples.workspace = true

@@ -1,5 +1,4 @@
-use beet_ml::prelude::*;
-use beet_spatial::prelude::*;
+use beet::prelude::*;
 use bevy::prelude::*;
 
 #[rustfmt::skip]

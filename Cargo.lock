@@ -474,9 +474,7 @@ name = "beet_examples"
 version = "0.0.4-rc.1"
 dependencies = [
  "anyhow",
- "beet_flow",
- "beet_ml",
- "beet_spatial",
+ "beet",
  "beetmash",
  "bevy",
  "forky 0.2.0-rc.6",

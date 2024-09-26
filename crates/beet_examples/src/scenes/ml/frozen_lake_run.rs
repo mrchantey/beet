@@ -1,6 +1,5 @@
 use super::*;
-use beet_flow::prelude::*;
-use beet_ml::prelude::*;
+use beet::prelude::*;
 use beetmash::prelude::*;
 use bevy::prelude::*;
 use std::time::Duration;

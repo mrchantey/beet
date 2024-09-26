@@ -1,7 +1,5 @@
 use crate::prelude::*;
-use beet_flow::prelude::*;
-use beet_ml::prelude::*;
-use beet_spatial::prelude::*;
+use beet::prelude::*;
 use beetmash::prelude::*;
 use bevy::prelude::*;
 
@@ -19,8 +17,7 @@ pub fn beet_example_plugin(app: &mut App) {
 		// BeetmashDefaultPlugins::with_beetmash_assets(),
 		DefaultPlaceholderPlugin,
 		UiTerminalPlugin,
-		LifecyclePlugin::default(),
-		BeetSpatialPlugins,
+		BeetDefaultPlugins,
 		BeetDebugPlugin,
 		DefaultReplicatePlugin,
 	))
