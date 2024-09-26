@@ -1,20 +1,21 @@
 use crate::prelude::*;
+use beet_flow::prelude::GenericActionComponent;
 use bevy::prelude::*;
 
 /// Calculate a separation impulse
 /// as described [here](https://natureofcode.com/autonomous-agents/#example-59-separation).
-pub fn separate_impulse(
+pub fn separate_impulse<T: GenericActionComponent>(
 	target_entity: Entity,
 	position: Vec3,
 	max_speed: MaxSpeed,
-	params: &GroupParams,
+	separate: &Separate<T>,
 	agents: impl IntoIterator<Item = (Entity, &Transform)>,
 ) -> Impulse {
 	let mut average = Vec3::default();
 	let mut total = 0;
 	for (entity, transform) in agents.into_iter() {
 		let sq_dist = Vec3::distance_squared(position, transform.translation);
-		let sq_max = params.separate_radius * params.separate_radius;
+		let sq_max = separate.radius * separate.radius;
 
 		if entity == target_entity || sq_dist > sq_max {
 			continue;
@@ -29,7 +30,7 @@ pub fn separate_impulse(
 		average /= total as f32;
 		average = average.normalize_or_zero() * *max_speed;
 	}
-	Impulse(average)
+	Impulse(average * separate.scalar)
 }
 
 
@@ -58,11 +59,12 @@ mod test {
 			entity,
 			Vec3::ZERO,
 			MaxSpeed(2.),
-			&GroupParams::default(),
+			&Separate::<GroupSteerAgent>::default(),
 			agents,
 		))
 		.map(|i| i.0)
-		.to_be_close_to(Vec3::new(-1.41, -1.41, 0.))?;
+		.to_be_close_to(Vec3::new(-1.6174722, -1.1763434, 0.0))?;
+		// .to_be_close_to(Vec3::new(-1.41, -1.41, 0.))?;
 
 		Ok(())
 	}

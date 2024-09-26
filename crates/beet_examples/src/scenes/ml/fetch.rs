@@ -28,7 +28,6 @@ pub fn fetch_npc(mut commands: Commands) {
 				max_speed: MaxSpeed(2.),
 				..default()
 			}
-			.scaled_to(1.),
 			// Uncomment this to have an initial target
 			// Sentence::new("tasty"),
 		))

@@ -1,13 +1,14 @@
 use crate::prelude::*;
+use beet_flow::prelude::GenericActionComponent;
 use bevy::prelude::*;
 
 /// Calculate a cohesion impulse
 /// as described [here](https://natureofcode.com/autonomous-agents/#exercise-515).
-pub fn cohere_impulse(
+pub fn cohere_impulse<T: GenericActionComponent>(
 	target_entity: Entity,
 	position: Vec3,
 	max_speed: MaxSpeed,
-	params: &GroupParams,
+	cohere: &Cohere<T>,
 	agents: impl IntoIterator<Item = (Entity, &Transform)>,
 ) -> Impulse {
 	let mut average = Vec3::default();
@@ -15,7 +16,7 @@ pub fn cohere_impulse(
 	for (entity, transform) in agents.into_iter() {
 		if entity == target_entity
 			|| Vec3::distance_squared(position, transform.translation)
-				> params.align_radius * params.align_radius
+				> cohere.radius * cohere.radius
 		{
 			continue;
 		}
@@ -30,7 +31,7 @@ pub fn cohere_impulse(
 		average /= total as f32;
 		average = average.normalize_or_zero() * *max_speed;
 	}
-	Impulse(average)
+	Impulse(average * cohere.scalar)
 }
 
 #[cfg(test)]
@@ -57,7 +58,7 @@ mod test {
 			entity,
 			Vec3::ZERO,
 			MaxSpeed(2.),
-			&GroupParams::default(),
+			&Cohere::<GroupSteerAgent>::default(),
 			agents,
 		))
 		.map(|i| i.0)

@@ -1,4 +1,7 @@
 pub mod algo;
+pub mod debug_group_steer;
+#[allow(unused_imports)]
+pub use self::debug_group_steer::*;
 pub mod steer_actions;
 pub mod steer_bundle;
 #[allow(unused_imports)]

@@ -13,7 +13,6 @@ categories = { workspace = true }
 
 [features]
 default = ["animation", "assets", "ui"]
-debug_gizmos = ["bevy/bevy_gizmos"]
 ui = ["bevy/bevy_ui"]
 assets = ["bevy/bevy_asset"]
 animation = ["bevy/bevy_animation"]

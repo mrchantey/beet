@@ -3,7 +3,7 @@ use bevy::prelude::*;
 
 
 /// A component that turns into an [`OnRun`] event on add,
-/// useful for scene-based workflows
+/// useful for scene-based workflows.
 /// This will likely be deprecated if/when bsn observers are implemented
 #[derive(Default, Clone, Component, Action, Reflect)]
 #[reflect(Default, Component)]

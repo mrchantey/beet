@@ -44,7 +44,7 @@ pub fn seek_3d(mut commands: Commands) {
 				max_force: MaxForce(0.05),
 				..default()
 			}
-			.scaled_to(10.)
+			.scaled_dist(10.)
 			.with_target(target),
 		))
 		.with_children(|parent| {

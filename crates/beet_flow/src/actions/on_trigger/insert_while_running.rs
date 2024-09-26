@@ -1,6 +1,12 @@
 use crate::prelude::*;
 use bevy::prelude::*;
 
+
+/// This will add the [`Running`] component to the behavior when [`OnRun`] is called.
+/// 
+/// It will be removed automatically when [`OnRunResult`] is called.
+/// 
+/// Add this to continuous behaviors, like go to point A.
 pub type ContinueRun = InsertWhileRunning<Running>;
 
 /// 1. Adds the provided component when [`OnRun`] is called

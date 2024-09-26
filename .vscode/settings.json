@@ -30,6 +30,7 @@
 	"search.exclude": {
 		"docs/deps/mermaid-init.js": true,
 		"docs/deps/mermaid.min.js": true,
+		"scenes/": true,
 		// "**/assets/*": true,
 		"**.svg": true,
 		"Cargo.lock": true,

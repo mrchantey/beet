@@ -52,19 +52,15 @@ pub struct SteerBundle {
 	pub max_force: MaxForce,
 	pub max_speed: MaxSpeed,
 	pub arrive_radius: ArriveRadius,
-	pub wander_params: WanderParams,
-	pub group_params: GroupParams,
 }
 
 impl SteerBundle {
 	/// Defaults are in a range 0..1, this is a convenience method for scaling all parameters in the bundle.
 	/// For instance if using pixel space, you might want to scale all parameters by 100.
-	pub fn scaled_to(mut self, val: f32) -> Self {
+	pub fn scaled_dist(mut self, val: f32) -> Self {
 		self.max_force.0 *= val;
 		self.max_speed.0 *= val;
 		self.arrive_radius.0 *= val;
-		self.wander_params = self.wander_params.scaled_to(val);
-		self.group_params = self.group_params.scaled_to(val);
 		self
 	}
 

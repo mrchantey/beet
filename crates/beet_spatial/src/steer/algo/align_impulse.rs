@@ -1,12 +1,13 @@
 use crate::prelude::*;
+use beet_flow::prelude::GenericActionComponent;
 use bevy::prelude::*;
 
 /// Calculate an align impulse
 /// as described [here](https://youtu.be/fWqOdLI944M?list=PLRqwX-V7Uu6YHt0dtyf4uiw8tKOxQLvlW&t=349).
-pub fn align_impulse(
+pub fn align_impulse<T: GenericActionComponent>(
 	target_entity: Entity,
 	position: Vec3,
-	params: &GroupParams,
+	align: &Align<T>,
 	agents: impl IntoIterator<Item = (Entity, &Transform, &Velocity)>,
 ) -> Impulse {
 	let mut average = Vec3::default();
@@ -14,7 +15,7 @@ pub fn align_impulse(
 	for (entity, transform, velocity) in agents.into_iter() {
 		if entity == target_entity
 			|| Vec3::distance_squared(position, transform.translation)
-				> params.align_radius * params.align_radius
+				> align.radius * align.radius
 		{
 			continue;
 		}
@@ -25,7 +26,7 @@ pub fn align_impulse(
 	if total > 0 {
 		average /= total as f32;
 	}
-	Impulse(average)
+	Impulse(average * align.scalar)
 }
 
 
@@ -59,7 +60,7 @@ mod test {
 		expect(align_impulse(
 			entity,
 			Vec3::ZERO,
-			&GroupParams::default(),
+			&Align::<GroupSteerAgent>::default(),
 			agents,
 		))
 		.map(|i| i.0)
