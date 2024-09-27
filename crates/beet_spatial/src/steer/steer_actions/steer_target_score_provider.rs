@@ -25,8 +25,8 @@ impl Default for SteerTargetScoreProvider {
 fn provide_score(
 	trigger: Trigger<RequestScore>,
 	mut commands: Commands,
-	transforms: Query<&Transform>,
-	agents: Query<(&Transform, &SteerTarget)>,
+	transforms: Query<&GlobalTransform>,
+	agents: Query<(&GlobalTransform, &SteerTarget)>,
 	query: Query<(&SteerTargetScoreProvider, &TargetAgent, &Parent)>,
 ) {
 	let (action, agent, parent) = query
@@ -34,10 +34,12 @@ fn provide_score(
 		.expect(expect_action::ACTION_QUERY_MISSING);
 
 	let score = if let Ok((transform, target)) = agents.get(**agent)
-		&& let Ok(target) = target.position(&transforms)
+		&& let Ok(target) = target.get_position(&transforms)
 	{
-		let dist = Vec3::distance(transform.translation, target);
-		if dist >= action.min_radius && dist <= action.max_radius {
+		let dist = transform.translation().distance_squared(target);
+		if dist >= action.min_radius.powi(2)
+			&& dist <= action.max_radius.powi(2)
+		{
 			1.
 		} else {
 			0.

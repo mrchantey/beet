@@ -31,7 +31,7 @@ pub fn seek(mut commands: Commands) {
 				RunOnAppReady::default(),
 				ContinueRun::default(),
 				TargetAgent(parent.parent_entity()),
-				Seek,
+				Seek::default(),
 			));
 		});
 }

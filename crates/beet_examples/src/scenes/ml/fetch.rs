@@ -63,7 +63,7 @@ pub fn fetch_npc(mut commands: Commands) {
 						InsertOnTrigger::<OnRun, Velocity>::default()
 							.with_target(agent),
 						ContinueRun::default(),
-						Seek,
+						Seek::default(),
 						EndOnArrive::new(1.),
 						RemoveOnTrigger::<OnRunResult, SteerTarget>::default()
 							.with_target(agent),

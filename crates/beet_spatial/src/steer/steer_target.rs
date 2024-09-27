@@ -24,13 +24,15 @@ impl Default for SteerTarget {
 }
 
 impl SteerTarget {
-	/// Get either the fixed position or the entity's transform, dependent on the variant.
-	pub fn position(&self, query: &Query<&Transform>) -> Result<Vec3> {
+	/// Get either the fixed position or the entity's `Transform.translation`, dependent on the variant.
+	/// # Errors
+	/// If the variant is `SteerTarget::Entity` and no `Transform` could be found.
+	pub fn get_position(&self, query: &Query<&GlobalTransform>) -> Result<Vec3> {
 		match self {
 			Self::Position(position) => Ok(*position),
 			Self::Entity(entity) => {
 				if let Ok(transform) = query.get(*entity) {
-					Ok(transform.translation)
+					Ok(transform.translation())
 				} else {
 					anyhow::bail!("transform not found for entity {entity:?}")
 				}

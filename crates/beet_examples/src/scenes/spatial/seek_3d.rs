@@ -76,7 +76,7 @@ pub fn seek_3d(mut commands: Commands) {
 						Name::new("Seek"),
 						ContinueRun::default(),
 						TargetAgent(agent),
-						Seek,
+						Seek::default(),
 						InsertOnTrigger::<OnRun, Velocity>::default()
 							.with_target(agent),
 						PlayAnimation::new(walk_index)

@@ -23,15 +23,15 @@ impl EndOnArrive {
 
 pub fn end_on_arrive(
 	mut commands: Commands,
-	agents: Query<(&Transform, &SteerTarget)>,
-	transforms: Query<&Transform>,
+	agents: Query<(&GlobalTransform, &SteerTarget)>,
+	transforms: Query<&GlobalTransform>,
 	mut query: Query<(Entity, &TargetAgent, &EndOnArrive), With<Running>>,
 ) {
 	for (entity, agent, action) in query.iter_mut() {
 		if let Ok((transform, target)) = agents.get(**agent) {
-			if let Ok(target) = target.position(&transforms) {
-				if Vec3::distance(transform.translation, target)
-					<= action.radius
+			if let Ok(target) = target.get_position(&transforms) {
+				if transform.translation().distance_squared(target)
+					<= action.radius.powi(2)
 				{
 					commands.entity(entity).trigger(OnRunResult::success());
 				}

@@ -1,31 +1,55 @@
 use crate::prelude::*;
 use beet_flow::prelude::*;
 use bevy::prelude::*;
-use forky::prelude::ResultTEExt;
-
 
 /// Go to the agent's [`SteerTarget`] with an optional [`ArriveRadius`]
 #[derive(Debug, Default, Clone, PartialEq, Component, Action, Reflect)]
 #[reflect(Default, Component, ActionMeta)]
 #[category(ActionCategory::Agent)]
 #[systems(seek.in_set(TickSet))]
-pub struct Seek;
+pub struct Seek {
+	pub on_not_found: OnTargetNotFound,
+}
+
+impl Seek {
+	pub fn new(on_not_found: OnTargetNotFound) -> Self { Self { on_not_found } }
+}
+
+
+#[derive(Debug, Default, Clone, PartialEq, Reflect)]
+pub enum OnTargetNotFound {
+	/// Warn
+	#[default]
+	Warn,
+	/// Remove the [`SteerTarget`]
+	Clear,
+	/// Remove the [`SteerTarget`] and emit [`OnRunResult::failure()`]
+	Fail,
+	/// Remove the [`SteerTarget`] and emit [`OnRunResult::success()`]
+	Succeed,
+	/// Do nothing
+	Ignore,
+}
+
 
 // TODO if target has Velocity, pursue
 fn seek(
-	transforms: Query<&Transform>,
+	mut commands: Commands,
+	transforms: Query<&GlobalTransform>,
 	mut agents: Query<(
-		&Transform,
+		Entity,
+		&GlobalTransform,
 		&Velocity,
 		&SteerTarget,
 		&MaxSpeed,
 		&mut Impulse,
 		Option<&ArriveRadius>,
 	)>,
-	query: Query<(&TargetAgent, &Seek), With<Running>>,
+	query: Query<(Entity, &TargetAgent, &Seek), With<Running>>,
 ) {
-	for (target, _) in query.iter() {
+	for (entity, target, seek) in query.iter() {
 		if let Ok((
+			agent_entity,
 			transform,
 			velocity,
 			steer_target,
@@ -35,17 +59,31 @@ fn seek(
 		)) = agents.get_mut(**target)
 		// if agent has no steer_target thats ok
 		{
-			if let Some(target_position) = steer_target
-				.position(&transforms)
-				.ok_or(|e| log::warn!("{e}"))
-			{
-				*impulse = seek_impulse(
-					&transform.translation,
-					&velocity,
-					&target_position,
-					*max_speed,
-					arrive_radius.copied(),
-				);
+			match (&seek.on_not_found, steer_target.get_position(&transforms)) {
+				(_, Ok(target_position)) => {
+					*impulse = seek_impulse(
+						&transform.translation(),
+						&velocity,
+						&target_position,
+						*max_speed,
+						arrive_radius.copied(),
+					);
+				}
+				(OnTargetNotFound::Clear, Err(_)) => {
+					commands.entity(agent_entity).remove::<SteerTarget>();
+				}
+				(OnTargetNotFound::Fail, Err(_)) => {
+					commands.entity(agent_entity).remove::<SteerTarget>();
+					commands.entity(entity).trigger(OnRunResult::failure());
+				}
+				(OnTargetNotFound::Succeed, Err(_)) => {
+					commands.entity(agent_entity).remove::<SteerTarget>();
+					commands.entity(entity).trigger(OnRunResult::success());
+				}
+				(OnTargetNotFound::Ignore, Err(_)) => {}
+				(OnTargetNotFound::Warn, Err(msg)) => {
+					log::warn!("{}", msg);
+				}
 			}
 		}
 	}
@@ -78,7 +116,7 @@ mod test {
 				parent.spawn((
 					TargetAgent(parent.parent_entity()),
 					Running,
-					Seek,
+					Seek::default(),
 				));
 			})
 			.id();
