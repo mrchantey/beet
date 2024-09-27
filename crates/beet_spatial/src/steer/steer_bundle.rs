@@ -63,8 +63,4 @@ impl SteerBundle {
 		self.arrive_radius.0 *= val;
 		self
 	}
-
-	pub fn with_target(self, target: impl Into<SteerTarget>) -> impl Bundle {
-		(self, target.into())
-	}
 }

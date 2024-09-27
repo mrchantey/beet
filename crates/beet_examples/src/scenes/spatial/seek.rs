@@ -22,7 +22,8 @@ pub fn seek(mut commands: Commands) {
 			AssetLoadBlockAppReady,
 			RotateToVelocity2d,
 			ForceBundle::default(),
-			SteerBundle::default().scaled_dist(500.).with_target(target),
+			SteerBundle::default().scaled_dist(500.),
+			SteerTarget::Entity(target),
 		))
 		.with_children(|parent| {
 			parent.spawn((

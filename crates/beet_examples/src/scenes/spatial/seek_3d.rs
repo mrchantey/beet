@@ -44,8 +44,8 @@ pub fn seek_3d(mut commands: Commands) {
 				max_force: MaxForce(0.05),
 				..default()
 			}
-			.scaled_dist(10.)
-			.with_target(target),
+			.scaled_dist(10.),
+			SteerTarget::Entity(target),
 		))
 		.with_children(|parent| {
 			let agent = parent.parent_entity();

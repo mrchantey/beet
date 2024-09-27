@@ -71,7 +71,8 @@ mod test {
 			.spawn((
 				TransformBundle::default(),
 				ForceBundle::default(),
-				SteerBundle::default().with_target(Vec3::new(1.0, 0., 0.)),
+				SteerBundle::default(),
+				SteerTarget::Position(Vec3::new(1.0, 0., 0.)),
 			))
 			.with_children(|parent| {
 				parent.spawn((
