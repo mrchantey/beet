@@ -8,6 +8,7 @@ use bevy::prelude::*;
 #[category(ActionCategory::Agent)]
 #[systems(seek.in_set(TickSet))]
 pub struct Seek {
+	// TODO this should be a seperate component used by other actions as well
 	pub on_not_found: OnTargetNotFound,
 }
 

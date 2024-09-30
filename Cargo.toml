@@ -186,6 +186,7 @@ features = [
 	'Request',
 	'RequestInit',
 	'RequestMode',
+	'RequestCache',
 	'Response',
 	# Blob
 	'Blob',
