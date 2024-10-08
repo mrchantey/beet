@@ -1,3 +1,4 @@
+use bevy::ecs::entity::MapEntities;
 use bevy::prelude::*;
 
 
@@ -11,6 +12,23 @@ pub enum TriggerTarget {
 	Entities(Vec<Entity>),
 	Global,
 }
+
+
+impl MapEntities for TriggerTarget {
+	fn map_entities<M: EntityMapper>(&mut self, entity_mapper: &mut M) {
+		match self {
+			Self::This => {}
+			Self::Entity(entity) => *entity = entity_mapper.map_entity(*entity),
+			Self::Entities(entities) => {
+				for entity in entities.iter_mut() {
+					*entity = entity_mapper.map_entity(*entity);
+				}
+			}
+			Self::Global => {}
+		}
+	}
+}
+
 
 impl TriggerTarget {
 	pub fn trigger(

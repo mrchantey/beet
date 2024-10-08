@@ -23,6 +23,7 @@ where
 		trigger: &Trigger<Self::Event, Self::TriggerBundle>,
 		(entity, action): (Entity, &OnTrigger<Self>),
 	) {
+		// log::info!("InsertOnTrigger: {:?}", std::any::type_name::<M::Out>());
 		let out = M::map(trigger, (entity, &action.params));
 		action.target.insert(commands, entity, out);
 	}

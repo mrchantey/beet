@@ -1,4 +1,6 @@
 use crate::prelude::*;
+use bevy::ecs::entity::MapEntities;
+use bevy::ecs::reflect::ReflectMapEntities;
 use bevy::prelude::*;
 use std::marker::PhantomData;
 
@@ -8,7 +10,7 @@ use std::marker::PhantomData;
 /// The default behavior is to watch and modify itsself.
 ///
 #[derive(Component, Reflect)]
-#[reflect(Default, Component)]
+#[reflect(Default, Component, MapEntities)]
 pub struct OnTrigger<Handler: OnTriggerHandler> {
 	pub params: Handler::Params,
 	/// The entities to watch, defaults to [`Self`] if this is empty
@@ -24,6 +26,15 @@ where
 	Handler::Params: Default,
 {
 	fn default() -> Self { Self::new(Handler::Params::default()) }
+}
+
+impl<Handler: OnTriggerHandler> MapEntities for OnTrigger<Handler> {
+	fn map_entities<M: EntityMapper>(&mut self, entity_mapper: &mut M) {
+		for entity in self.sources.iter_mut() {
+			*entity = entity_mapper.map_entity(*entity);
+		}
+		self.target.map_entities(entity_mapper);
+	}
 }
 
 impl<Handler: OnTriggerHandler> OnTrigger<Handler> {

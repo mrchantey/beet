@@ -53,7 +53,6 @@ pub fn integrate_force(
 			if let Some(max_velocity) = max_velocity {
 				**velocity = velocity.0.clamp_length_max(**max_velocity);
 			}
-
 			transform.translation += **velocity * time.delta_seconds();
 		}
 	}
