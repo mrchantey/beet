@@ -7,9 +7,9 @@ pub fn main() {
 		.add_systems(
 			Startup,
 			(
-				beet_examples::scenes::flow::beet_debug,
 				beetmash::core::scenes::camera_2d,
 				beetmash::core::scenes::ui_terminal,
+				beet_examples::scenes::flow::beet_debug,
 				beet_examples::scenes::flow::hello_world,
 			),
 		)

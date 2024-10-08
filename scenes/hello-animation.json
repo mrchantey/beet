@@ -1,57 +1,45 @@
 {
   "resources": {},
   "entities": {
-    "4294967310": {
+    "4294967333": {
       "components": {
-        "bevy_transform::components::transform::Transform": {
-          "translation": {
-            "x": 10.0,
-            "y": 10.0,
-            "z": 15.0
-          },
-          "rotation": {
-            "x": -0.19841658,
-            "y": 0.28348857,
-            "z": 0.060075704,
-            "w": 0.9362991
-          },
-          "scale": {
-            "x": 1.0,
-            "y": 1.0,
-            "z": 1.0
-          }
-        },
-        "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": "Camera3d"
-      }
-    },
-    "4294967311": {
-      "components": {
-        "bevy_hierarchy::components::children::Children": [
-          [
-            4294967312
-          ]
+        "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": "Camera3d",
+        "bevy_transform::components::global_transform::GlobalTransform": [
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0
         ],
         "bevy_transform::components::transform::Transform": {
-          "translation": {
-            "x": 0.0,
-            "y": 0.0,
-            "z": 0.0
-          },
-          "rotation": {
-            "x": 0.0,
-            "y": 0.0,
-            "z": 0.0,
-            "w": 1.0
-          },
-          "scale": {
-            "x": 0.1,
-            "y": 0.1,
-            "z": 0.1
-          }
-        },
-        "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
-          "Scene": "Fox.glb#Scene0"
-        },
+          "translation": [
+            10.0,
+            10.0,
+            15.0
+          ],
+          "rotation": [
+            -0.19841658,
+            0.28348857,
+            0.060075704,
+            0.9362991
+          ],
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ]
+        }
+      }
+    },
+    "4294967334": {
+      "components": {
         "beetmash_scene::utils::animation_graph_placeholder::AnimationGraphPlaceholder": {
           "root": 0,
           "clips": [
@@ -71,38 +59,75 @@
             }
           ]
         },
+        "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
+          "Scene": "Fox.glb#Scene0"
+        },
         "bevy_animation::transition::AnimationTransitions": {
           "main_animation": null,
           "transitions": []
+        },
+        "bevy_hierarchy::components::children::Children": [
+          [
+            4294967335
+          ]
+        ],
+        "bevy_transform::components::global_transform::GlobalTransform": [
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "bevy_transform::components::transform::Transform": {
+          "translation": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "rotation": [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "scale": [
+            0.1,
+            0.1,
+            0.1
+          ]
         }
       }
     },
-    "4294967312": {
+    "4294967335": {
       "components": {
-        "bevy_hierarchy::components::parent::Parent": [
-          4294967311
-        ],
-        "bevy_hierarchy::components::children::Children": [
-          [
-            4294967313,
-            4294967314
-          ]
-        ],
+        "beet_flow::actions::flow::sequence_flow::SequenceFlow": {},
         "beet_flow::actions::on_trigger::on_trigger_action::OnTrigger<beet_flow::actions::on_trigger::insert_on_trigger::InsertHandler<beet_flow::actions::on_trigger::on_trigger_handler::DefaultMapFunc<beet_flow::events::on_run_result::OnRunResult, beet_flow::actions::on_trigger::run_on_spawn::RunOnSpawn, ()>>>": {
           "params": {},
           "sources": [],
           "target": "This"
         },
-        "beet_flow::actions::flow::sequence_flow::SequenceFlow": {},
+        "beet_flow::actions::on_trigger::run_on_spawn::RunOnSpawn": {},
         "bevy_core::name::Name": "Animation Behavior",
-        "beet_flow::actions::on_trigger::run_on_spawn::RunOnSpawn": {}
+        "bevy_hierarchy::components::children::Children": [
+          [
+            4294967336,
+            4294967337
+          ]
+        ],
+        "bevy_hierarchy::components::parent::Parent": [
+          4294967334
+        ]
       }
     },
-    "4294967313": {
+    "4294967336": {
       "components": {
-        "bevy_hierarchy::components::parent::Parent": [
-          4294967312
-        ],
         "beet_flow::actions::on_trigger::on_trigger_action::OnTrigger<beet_flow::actions::on_trigger::insert_on_trigger::InsertHandler<beet_flow::actions::on_trigger::on_trigger_handler::DefaultMapFunc<beet_flow::events::on_run::OnRun, beet_flow::lifecycle::components::running::Running, ()>>>": {
           "params": {},
           "sources": [],
@@ -114,20 +139,8 @@
           "target": "This"
         },
         "beet_flow::lifecycle::components::target_agent::TargetAgent": [
-          4294967311
+          4294967334
         ],
-        "bevy_core::name::Name": "Idle",
-        "beet_spatial::animation::play_animation::PlayAnimation": {
-          "animation": 1,
-          "trigger_if_playing": false,
-          "repeat": {
-            "Count": 1
-          },
-          "transition_duration": {
-            "secs": 0,
-            "nanos": 500000000
-          }
-        },
         "beet_spatial::animation::insert_on_animation_end::TriggerOnAnimationEnd<beet_flow::events::on_run_result::OnRunResult>": {
           "value": [
             "Success"
@@ -139,16 +152,28 @@
             "nanos": 500000000
           }
         },
+        "beet_spatial::animation::play_animation::PlayAnimation": {
+          "animation": 1,
+          "trigger_if_playing": false,
+          "repeat": {
+            "Count": 1
+          },
+          "transition_duration": {
+            "secs": 0,
+            "nanos": 500000000
+          }
+        },
         "beetmash_scene::utils::asset_placeholder::AssetPlaceholder<bevy_animation::AnimationClip>": {
           "path": "Fox.glb#Animation0"
-        }
+        },
+        "bevy_core::name::Name": "Idle",
+        "bevy_hierarchy::components::parent::Parent": [
+          4294967335
+        ]
       }
     },
-    "4294967314": {
+    "4294967337": {
       "components": {
-        "bevy_hierarchy::components::parent::Parent": [
-          4294967312
-        ],
         "beet_flow::actions::on_trigger::on_trigger_action::OnTrigger<beet_flow::actions::on_trigger::insert_on_trigger::InsertHandler<beet_flow::actions::on_trigger::on_trigger_handler::DefaultMapFunc<beet_flow::events::on_run::OnRun, beet_flow::lifecycle::components::running::Running, ()>>>": {
           "params": {},
           "sources": [],
@@ -160,20 +185,8 @@
           "target": "This"
         },
         "beet_flow::lifecycle::components::target_agent::TargetAgent": [
-          4294967311
+          4294967334
         ],
-        "bevy_core::name::Name": "Walking",
-        "beet_spatial::animation::play_animation::PlayAnimation": {
-          "animation": 2,
-          "trigger_if_playing": false,
-          "repeat": {
-            "Count": 4
-          },
-          "transition_duration": {
-            "secs": 0,
-            "nanos": 500000000
-          }
-        },
         "beet_spatial::animation::insert_on_animation_end::TriggerOnAnimationEnd<beet_flow::events::on_run_result::OnRunResult>": {
           "value": [
             "Success"
@@ -185,9 +198,24 @@
             "nanos": 500000000
           }
         },
+        "beet_spatial::animation::play_animation::PlayAnimation": {
+          "animation": 2,
+          "trigger_if_playing": false,
+          "repeat": {
+            "Count": 4
+          },
+          "transition_duration": {
+            "secs": 0,
+            "nanos": 500000000
+          }
+        },
         "beetmash_scene::utils::asset_placeholder::AssetPlaceholder<bevy_animation::AnimationClip>": {
           "path": "Fox.glb#Animation1"
-        }
+        },
+        "bevy_core::name::Name": "Walking",
+        "bevy_hierarchy::components::parent::Parent": [
+          4294967335
+        ]
       }
     }
   }

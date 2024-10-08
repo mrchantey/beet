@@ -2,6 +2,9 @@ use crate::prelude::*;
 use bevy::prelude::*;
 use bevy::utils::all_tuples;
 
+
+/// Trait implemented for actions, allowing them to register their
+/// components, systems and observers.
 pub trait ActionBuilder: Sized {
 	fn build(app: &mut App, config: &BeetConfig);
 }

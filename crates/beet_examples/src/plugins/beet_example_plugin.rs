@@ -20,6 +20,7 @@ pub fn beet_example_plugin(app: &mut App) {
 		BeetDefaultPlugins,
 		BeetDebugPlugin,
 		DefaultReplicatePlugin,
+		temp_patches,
 	))
 	.add_plugins((plugin_spatial, plugin_2d, plugin_3d))
 	.register_type::<Collectable>();

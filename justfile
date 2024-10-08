@@ -14,12 +14,13 @@ cmd *args:
 
 export-scenes *args:
 	cargo run --example export_scenes {{args}}
+
 app *args:
-	cargo run --example app_full {{args}}
+	cargo run --example app {{args}}
 
 # blocked on #https://github.com/bevyengine/bevy/issues/14300
 hello-world:
-	cargo run --example app \
+	just app \
 	./scenes/beet-debug.json \
 	../beetmash/scenes/camera-2d.json \
 	../beetmash/scenes/ui-terminal-input.json \
@@ -43,6 +44,9 @@ test-ecs *args:
 
 test-ml *args:
 	just watch 'cargo test -p beet_ml --lib -- {{args}}'
+
+test-examples *args:
+	just watch 'cargo test -p beet_examples --lib -- {{args}}'
 
 run crate example *args:
 	cargo run -p {{crate}} --example {{example}} {{args}}
@@ -215,3 +219,85 @@ view-cors:
 	gcloud storage buckets describe gs://beet-examples --format="default(cors_config)"
 update-cors:
 	gcloud storage buckets update gs://beet-examples --cors-file=cors.json
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+### TEST SCENE LOADS
+
+test-fetch:
+	cargo run --example app_ml \
+	../beetmash/scenes/ui-terminal-input.json \
+	../beetmash/scenes/lighting-3d.json \
+	../beetmash/scenes/ground-3d.json \
+	./scenes/beet-debug.json \
+	./scenes/fetch-scene.json \
+	./scenes/fetch-npc.json \
+
+
+test-flock:
+	cargo run --example app \
+	../beetmash/scenes/camera-2d.json \
+	../beetmash/scenes/space-scene.json \
+	./scenes/beet-debug.json \
+	./scenes/flock.json \
+
+test-seek:
+	cargo run --example app \
+	../beetmash/scenes/camera-2d.json \
+	../beetmash/scenes/space-scene.json \
+	./scenes/beet-debug.json \
+	./scenes/seek.json \
+
+test-frozen-lake-train:
+	cargo run --example app_ml \
+	../beetmash/scenes/lighting-3d.json \
+	./scenes/frozen-lake-scene.json \
+	./scenes/frozen-lake-train.json \
+
+test-frozen-lake-run:
+	cargo run --example app_ml \
+	../beetmash/scenes/lighting-3d.json \
+	./scenes/frozen-lake-scene.json \
+	./scenes/frozen-lake-run.json \
+
+test-hello-animation:
+	cargo run --example app \
+	../beetmash/scenes/ui-terminal.json \
+	../beetmash/scenes/lighting-3d.json \
+	../beetmash/scenes/ground-3d.json \
+	./scenes/beet-debug.json \
+	./scenes/hello-animation.json \
+
+test-hello-ml:
+	cargo run --example app_ml \
+	../beetmash/scenes/camera-2d.json \
+	../beetmash/scenes/ui-terminal-input.json \
+	./scenes/beet-debug.json \
+	./scenes/hello-ml.json \
+
+test-hello-world:
+	cargo run --example app \
+	../beetmash/scenes/camera-2d.json \
+	../beetmash/scenes/ui-terminal.json \
+	./scenes/beet-debug.json \
+	./scenes/hello-world.json \
+
+test-seek-3d:
+	cargo run --example app \
+	../beetmash/scenes/ui-terminal.json \
+	../beetmash/scenes/lighting-3d.json \
+	../beetmash/scenes/ground-3d.json \
+	./scenes/beet-debug.json \
+	./scenes/seek-3d.json \

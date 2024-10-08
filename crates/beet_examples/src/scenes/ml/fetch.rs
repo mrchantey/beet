@@ -6,7 +6,6 @@ use bevy::prelude::*;
 
 
 pub fn fetch_npc(mut commands: Commands) {
-
 	let Foxie {
 		graph,
 		idle_index,
@@ -27,9 +26,7 @@ pub fn fetch_npc(mut commands: Commands) {
 				max_force: MaxForce(0.05),
 				max_speed: MaxSpeed(2.),
 				..default()
-			}
-			// Uncomment this to have an initial target
-			// Sentence::new("tasty"),
+			},
 		))
 		.with_children(|parent| {
 			let agent = parent.parent_entity();

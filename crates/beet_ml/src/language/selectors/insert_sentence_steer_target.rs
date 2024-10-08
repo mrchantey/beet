@@ -42,6 +42,7 @@ fn insert_sentence_steer_target<T: GenericActionComponent>(
 	items: Query<Entity, With<T>>,
 	mut berts: ResMut<Assets<Bert>>,
 ) {
+	
 	let (agent, target_sentence, handle, _) = query
 		.get(trigger.entity())
 		.expect(expect_action::ACTION_QUERY_MISSING);
