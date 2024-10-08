@@ -31,7 +31,7 @@ impl Plugin for SteerPlugin {
 		/*_*/;
 
 		let world = app.world_mut();
-		world.init_bundle::<SteerBundle>();
+		world.register_bundle::<SteerBundle>();
 	}
 }
 

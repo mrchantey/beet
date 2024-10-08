@@ -46,7 +46,7 @@ mod test {
 		let func = observe_run_results(world);
 
 		world.spawn((RunOnSpawn, EndOnRun::failure()));
-		world.run_system_once(run_on_spawn);
+		world.run_system_once(run_on_spawn)?;
 		world.flush();
 		expect(world.entities().len()).to_be(3)?;
 		expect(&func).to_have_been_called()?;

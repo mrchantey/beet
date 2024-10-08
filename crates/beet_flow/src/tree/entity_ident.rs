@@ -70,7 +70,7 @@ impl EntityIdent {
 		};
 		let bundle_info = world.bundles().get(bundle_id).expect("just checked");
 		for component in bundle_info
-			.iter_components()
+			.iter_explicit_components()
 			.collect::<Vec<_>>()
 			.into_iter()
 		{
@@ -88,7 +88,7 @@ impl EntityIdent {
 
 
 	pub fn despawn_recursive(self, world: &mut World) {
-		despawn_with_children_recursive(world, *self);
+		despawn_with_children_recursive(world, *self, false);
 	}
 
 	pub fn components(self, world: &World) -> Vec<ComponentIdent> {

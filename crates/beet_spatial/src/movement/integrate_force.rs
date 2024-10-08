@@ -76,21 +76,21 @@ mod test {
 
 		let velocity_entity = app
 			.world_mut()
-			.spawn((TransformBundle::default(), ForceBundle {
+			.spawn((Transform::default(), ForceBundle {
 				velocity: Velocity(Vec3::new(1., 0., 0.)),
 				..default()
 			}))
 			.id();
 		let force_entity = app
 			.world_mut()
-			.spawn((TransformBundle::default(), ForceBundle {
+			.spawn((Transform::default(), ForceBundle {
 				force: Force(Vec3::new(1., 0., 0.)),
 				..default()
 			}))
 			.id();
 		let impulse_entity = app
 			.world_mut()
-			.spawn((TransformBundle::default(), ForceBundle {
+			.spawn((Transform::default(), ForceBundle {
 				impulse: Impulse(Vec3::new(1., 0., 0.)),
 				..default()
 			}))
@@ -98,7 +98,7 @@ mod test {
 
 		let mass_entity = app
 			.world_mut()
-			.spawn((TransformBundle::default(), ForceBundle {
+			.spawn((Transform::default(), ForceBundle {
 				mass: Mass(2.),
 				impulse: Impulse(Vec3::new(1., 0., 0.)),
 				..default()

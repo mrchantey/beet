@@ -13,8 +13,8 @@ impl EntityIdent {
 	/// Add a node as a child of the given entity
 	pub fn add_child_behavior(self, world: &mut World) -> EntityIdent {
 		let entity = world.spawn(Name::new("New Node")).id();
-		
-		if let Some(mut parent) = world.get_entity_mut(*self) {
+
+		if let Ok(mut parent) = world.get_entity_mut(*self) {
 			parent.add_child(entity);
 		} else {
 			log::warn!("parent not found when adding node");

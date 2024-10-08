@@ -46,12 +46,8 @@ pub fn spawn_frozen_lake_episode(
 
 		commands
 			.spawn((
-				SceneBundle {
-					scene: asset_server.load(frozen_lake_assets::CHARACTER),
-					transform: Transform::from_translation(agent_pos)
-						.with_scale(object_scale),
-					..default()
-				},
+				SceneRoot(asset_server.load(frozen_lake_assets::CHARACTER)),
+				Transform::from_translation(agent_pos).with_scale(object_scale),
 				grid_to_world.clone(),
 				RlAgentBundle {
 					state: map.agent_position(),

@@ -57,7 +57,7 @@ pub async fn open_or_fetch_cache(url: &str) -> Result<Uint8Array, JsValue> {
 		return Ok(Uint8Array::new(&data));
 	}
 
-	let mut opts = RequestInit::new();
+	let opts = RequestInit::new();
 	opts.set_cache(web_sys::RequestCache::ForceCache);
 
 	let res_promise = web_sys::window()

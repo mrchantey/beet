@@ -63,8 +63,8 @@ impl Plugin for FrozenLakePlugin {
 		/*-*/;
 
 		let world = app.world_mut();
-		world.init_component::<GridPos>();
-		world.init_component::<GridDirection>();
+		world.register_component::<GridPos>();
+		world.register_component::<GridDirection>();
 	}
 }
 

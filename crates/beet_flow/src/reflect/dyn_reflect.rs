@@ -1,12 +1,14 @@
 use super::*;
 use bevy::prelude::*;
 
-/// A wrapper of [`Reflect`] that is [`Clone`] and [`PartialEq`]
+/// A wrapper of [`PartialReflect`] that is [`Clone`] and [`PartialEq`]
 #[derive(Deref, DerefMut)]
-pub struct DynReflect(pub Box<dyn Reflect>);
+pub struct DynReflect(pub Box<dyn PartialReflect>);
 
 impl Clone for DynReflect {
-	fn clone(&self) -> Self { Self(self.clone_value()) }
+	fn clone(&self) -> Self {
+		Self(self.clone_value())
+	}
 }
 impl PartialEq for DynReflect {
 	fn eq(&self, other: &Self) -> bool {
@@ -14,7 +16,9 @@ impl PartialEq for DynReflect {
 	}
 }
 impl DynReflect {
-	pub fn new_cloned(value: &dyn Reflect) -> Self { Self(value.clone_value()) }
+	pub fn new_cloned(value: &dyn PartialReflect) -> Self {
+		Self(value.clone_value())
+	}
 	pub fn short_path(&self) -> String {
 		ReflectUtils::short_path(self.0.as_ref())
 	}

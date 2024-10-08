@@ -12,12 +12,10 @@ pub fn spawn_frozen_lake_scene(
 		for y in 0..map.num_rows() {
 			let mut pos = grid_to_world.world_pos(UVec2::new(x, y));
 			pos.y -= grid_to_world.cell_width;
-			commands.spawn(SceneBundle {
-				scene: asset_server.load(frozen_lake_assets::TILE),
-				transform: Transform::from_translation(pos)
-					.with_scale(tile_scale),
-				..default()
-			});
+			commands.spawn((
+				SceneRoot(asset_server.load(frozen_lake_assets::TILE)),
+				Transform::from_translation(pos).with_scale(tile_scale),
+			));
 		}
 	}
 
@@ -29,20 +27,16 @@ pub fn spawn_frozen_lake_scene(
 		match cell {
 			FrozenLakeCell::Hole => {
 				pos.y += grid_to_world.cell_width * 0.25; // this asset is a bit too low
-				commands.spawn(SceneBundle {
-					scene: asset_server.load(frozen_lake_assets::HAZARD),
-					transform: Transform::from_translation(pos)
-						.with_scale(object_scale),
-					..default()
-				});
+				commands.spawn((
+					SceneRoot(asset_server.load(frozen_lake_assets::HAZARD)),
+					Transform::from_translation(pos).with_scale(object_scale),
+				));
 			}
 			FrozenLakeCell::Goal => {
-				commands.spawn(SceneBundle {
-					scene: asset_server.load(frozen_lake_assets::GOAL),
-					transform: Transform::from_translation(pos)
-						.with_scale(object_scale),
-					..default()
-				});
+				commands.spawn((
+					SceneRoot(asset_server.load(frozen_lake_assets::GOAL)),
+					Transform::from_translation(pos).with_scale(object_scale),
+				));
 			}
 			FrozenLakeCell::Ice => {}
 			FrozenLakeCell::Agent => { /*spawns on episode */ }

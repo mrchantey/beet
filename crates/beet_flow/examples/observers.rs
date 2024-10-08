@@ -80,11 +80,11 @@ fn main() {
 	let entity = world
 		.spawn(Name::new("Root"))
 		.with_children(|parent| {
-			parent.spawn(Name::new("Hello")).observe(succeed_on_run);
-			parent.spawn(Name::new("World")).observe(succeed_on_run);
+			parent.spawn(Name::new("Hello")).observe_entity(succeed_on_run);
+			parent.spawn(Name::new("World")).observe_entity(succeed_on_run);
 		})
-		.observe(sequence_start)
-		.observe(sequence_next)
+		.observe_entity(sequence_start)
+		.observe_entity(sequence_next)
 		.id();
 
 	init_observers(&mut world);

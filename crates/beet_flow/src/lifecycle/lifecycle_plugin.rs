@@ -51,16 +51,16 @@ impl Plugin for LifecyclePlugin {
 		let world = app.world_mut();
 
 		// running
-		world.init_component::<Running>();
+		world.register_component::<Running>();
 		// graph
-		world.init_component::<Parent>();
-		world.init_component::<Children>();
-		world.init_component::<BeetRoot>();
-		world.init_component::<RootIsTargetAgent>();
-		world.init_component::<TargetAgent>();
+		world.register_component::<Parent>();
+		world.register_component::<Children>();
+		world.register_component::<BeetRoot>();
+		world.register_component::<RootIsTargetAgent>();
+		world.register_component::<TargetAgent>();
 		// bevy
-		world.init_component::<Name>();
-		world.init_component::<Transform>();
-		world.init_component::<GlobalTransform>();
+		world.register_component::<Name>();
+		world.register_component::<Transform>();
+		world.register_component::<GlobalTransform>();
 	}
 }

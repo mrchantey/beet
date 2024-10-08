@@ -9,8 +9,8 @@ pub impl DynamicEntity {
 	where
 		Self: Sized,
 	{
-		if world.get_entity(entity).is_none() {
-			anyhow::bail!("Entity not found");
+		if world.get_entity(entity).is_err() {
+			anyhow::bail!("Entity not found: {}", entity);
 		}
 		let scene = DynamicSceneBuilder::from_world(world)
 			.extract_entities(vec![entity].into_iter())

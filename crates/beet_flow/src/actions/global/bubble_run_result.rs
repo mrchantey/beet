@@ -51,7 +51,7 @@ mod test {
 
 		world
 			.spawn((Name::new("root"), EndOnRun::success()))
-			.observe(passthrough_run_result)
+			.observe_entity(passthrough_run_result)
 			.with_children(|parent| {
 				parent
 					.spawn((Name::new("child1"), EndOnRun::success()))

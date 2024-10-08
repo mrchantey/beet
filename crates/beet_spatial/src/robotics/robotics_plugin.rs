@@ -15,7 +15,7 @@ impl Plugin for RoboticsPlugin {
 			.register_type::<DualMotorValue>();
 
 		let world = app.world_mut();
-		world.init_bundle::<DepthValue>();
-		world.init_bundle::<DualMotorValue>();
+		world.register_bundle::<DepthValue>();
+		world.register_bundle::<DualMotorValue>();
 	}
 }

@@ -10,7 +10,7 @@ pub struct ComponentUtils;
 
 impl ComponentUtils {
 	pub fn get(world: &World, entity: Entity) -> Vec<TypeId> {
-		if world.get_entity(entity).is_none() {
+		if world.get_entity(entity).is_err() {
 			Default::default()
 		} else {
 			world
@@ -32,18 +32,20 @@ impl ComponentUtils {
 		entity: Entity,
 		component: T,
 	) -> Result<()> {
-		world
-			.get_entity_mut(entity)
-			.map(|mut e| {
-				e.insert(component);
-			})
-			.ok_or_else(|| anyhow::anyhow!("entity not found: {entity:?}"))
+		let val = world.get_entity_mut(entity).map(|mut e| {
+			e.insert(component);
+		})?;
+		Ok(val)
 	}
 	pub fn get_typed<T: Component>(
 		world: &mut World,
 		entity: Entity,
 	) -> Option<&T> {
-		world.get_entity(entity).map(|e| e.get::<T>()).flatten()
+		world
+			.get_entity(entity)
+			.map(|e| e.get::<T>())
+			.ok()
+			.flatten()
 	}
 
 	pub fn add(
@@ -62,16 +64,18 @@ impl ComponentUtils {
 			})?;
 		let new_value: Box<dyn Reflect> = reflect_default.default();
 		let component_id = Self::component_id(world, type_id)?;
-		if let Some(mut entity) = world.get_entity_mut(entity) {
-			unsafe {
-				let non_null =
-					NonNull::new_unchecked(Box::into_raw(new_value) as *mut _);
-				let ptr = OwningPtr::new(non_null);
-				entity.insert_by_id(component_id, ptr);
+		match world.get_entity_mut(entity) {
+			Ok(mut entity) => {
+				unsafe {
+					let non_null = NonNull::new_unchecked(Box::into_raw(
+						new_value,
+					) as *mut _);
+					let ptr = OwningPtr::new(non_null);
+					entity.insert_by_id(component_id, ptr);
+				}
+				Ok(())
 			}
-			Ok(())
-		} else {
-			anyhow::bail!("entity not found: {entity:?}")
+			Err(err) => Err(err.into()),
 		}
 	}
 
@@ -84,7 +88,7 @@ impl ComponentUtils {
 			anyhow::bail!("component not registered: {type_id:?}")
 		};
 
-		let Some(mut entity) = world.get_entity_mut(entity) else {
+		let Ok(mut entity) = world.get_entity_mut(entity) else {
 			anyhow::bail!("entity not found: {entity:?}")
 		};
 		entity.remove_by_id(component_id);
@@ -104,10 +108,10 @@ impl ComponentUtils {
 			anyhow::bail!("type not registered: {type_id:?}")
 		};
 		let component_id = Self::component_id(world, type_id)?;
-		let Some(entity) = world.get_entity(entity) else {
+		let Ok(entity) = world.get_entity(entity) else {
 			anyhow::bail!("entity not found: {entity:?}")
 		};
-		let Some(component) = entity.get_by_id(component_id) else {
+		let Ok(component) = entity.get_by_id(component_id) else {
 			anyhow::bail!("component not in entity: {type_id:?}")
 		};
 		let value = unsafe {
@@ -131,10 +135,10 @@ impl ComponentUtils {
 			anyhow::bail!("type not registered: {type_id:?}")
 		};
 		let component_id = Self::component_id(world, type_id)?;
-		let Some(mut entity) = world.get_entity_mut(entity) else {
+		let Ok(mut entity) = world.get_entity_mut(entity) else {
 			anyhow::bail!("entity not found: {entity:?}")
 		};
-		let Some(component) = entity.get_mut_by_id(component_id) else {
+		let Ok(component) = entity.get_mut_by_id(component_id) else {
 			let name = registration.type_info().type_path();
 			anyhow::bail!("component not in entity: {name:?}")
 		};
@@ -185,7 +189,7 @@ mod test {
 		world.init_resource::<AppTypeRegistry>();
 		let registry = world.resource::<AppTypeRegistry>();
 		registry.write().register::<MyStruct>();
-		world.init_component::<MyStruct>();
+		world.register_component::<MyStruct>();
 		let entity = world.spawn_empty().id();
 		let type_id = TypeId::of::<MyStruct>();
 

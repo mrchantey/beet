@@ -49,7 +49,7 @@ fn build_common<T: 'static + Send + Sync + Bundle + ActionBuilder>(
 	app: &mut App,
 ) {
 	let world = app.world_mut();
-	world.init_bundle::<T>();
+	world.register_bundle::<T>();
 
 	app.init_resource::<BeetConfig>();
 	let settings = app.world().resource::<BeetConfig>();

@@ -22,7 +22,7 @@ impl IntoActionObservers<()> for () {
 
 
 impl<E: Event, B: Bundle, M>
-	IntoActionObservers<(E, B, M, IntoActionObserversObserver)> for Observer<E, B>
+	IntoActionObservers<(E, B, M, IntoActionObserversObserver)> for Observer
 {
 	fn spawn_observers(
 		self,

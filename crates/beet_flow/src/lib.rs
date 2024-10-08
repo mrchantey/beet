@@ -1,5 +1,10 @@
 #![allow(deprecated)] // TODO remove deprecated
-#![feature(result_flattening, let_chains, associated_type_defaults)]
+#![feature(
+	result_flattening,
+	let_chains,
+	associated_type_defaults,
+	trait_upcasting
+)]
 pub mod action_builder;
 pub mod actions;
 pub mod events;

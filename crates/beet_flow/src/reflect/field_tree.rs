@@ -16,6 +16,9 @@ impl FieldIdent {
 				bevy::reflect::ReflectRef::Array(val) => {
 					list_items(&self, val.iter())
 				}
+				bevy::reflect::ReflectRef::Set(val) => {
+					list_items(&self, val.iter())
+				}
 				bevy::reflect::ReflectRef::Tuple(val) => {
 					tuple_items(&self, val.iter_fields())
 				}
@@ -31,7 +34,7 @@ impl FieldIdent {
 				bevy::reflect::ReflectRef::Enum(_val) => {
 					vec![]
 				}
-				bevy::reflect::ReflectRef::Value(_val) => {
+				bevy::reflect::ReflectRef::Opaque(_val) => {
 					vec![]
 				}
 			};
@@ -72,7 +75,7 @@ fn struct_items(
 }
 fn tuple_items<'a>(
 	ident: &FieldIdent,
-	val: impl Iterator<Item = &'a dyn Reflect>,
+	val: impl Iterator<Item = &'a dyn PartialReflect>,
 ) -> Vec<(Option<String>, FieldIdent)> {
 	val.into_iter()
 		.enumerate()
@@ -81,15 +84,16 @@ fn tuple_items<'a>(
 }
 fn list_items<'a>(
 	ident: &FieldIdent,
-	val: impl Iterator<Item = &'a dyn Reflect>,
+	val: impl Iterator<Item = &'a dyn PartialReflect>,
 ) -> Vec<(Option<String>, FieldIdent)> {
 	val.enumerate()
 		.map(|(i, _)| (None, ident.child(Access::ListIndex(i))))
 		.collect()
 }
+
 fn map_items<'a>(
 	ident: &FieldIdent,
-	val: impl Iterator<Item = (&'a dyn Reflect, &'a dyn Reflect)>,
+	val: impl Iterator<Item = (&'a dyn PartialReflect, &'a dyn PartialReflect)>,
 ) -> Vec<(Option<String>, FieldIdent)> {
 	val.enumerate()
 		.map(|(i, (k, _))| {

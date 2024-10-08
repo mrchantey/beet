@@ -41,7 +41,7 @@ fn debug_group_steer<M: GenericActionComponent>(
 	for (agent, params) in separate.iter() {
 		if let Ok(transform) = transforms.get(**agent) {
 			gizmos.circle_2d(
-				transform.translation.xy(),
+				Isometry2d::from_translation(transform.translation.xy()),
 				params.radius,
 				tailwind::AMBER_500,
 			);
@@ -51,7 +51,7 @@ fn debug_group_steer<M: GenericActionComponent>(
 	for (agent, params) in align.iter() {
 		if let Ok(transform) = transforms.get(**agent) {
 			gizmos.circle_2d(
-				transform.translation.xy(),
+				Isometry2d::from_translation(transform.translation.xy()),
 				params.radius,
 				tailwind::GREEN_500,
 			);
@@ -61,7 +61,7 @@ fn debug_group_steer<M: GenericActionComponent>(
 	for (agent, params) in cohere.iter() {
 		if let Ok(transform) = transforms.get(**agent) {
 			gizmos.circle_2d(
-				transform.translation.xy(),
+				Isometry2d::from_translation(transform.translation.xy()),
 				params.radius,
 				tailwind::CYAN_500,
 			);

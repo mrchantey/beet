@@ -25,6 +25,6 @@ impl Plugin for BertPlugin {
 		);
 
 		let world = app.world_mut();
-		world.init_component::<Sentence>();
+		world.register_component::<Sentence>();
 	}
 }

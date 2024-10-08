@@ -50,7 +50,7 @@ mod test {
 
 		world.spawn(RunOnSpawn);
 		expect(&func).not().to_have_been_called()?;
-		world.run_system_once(run_on_spawn);
+		world.run_system_once(run_on_spawn)?;
 		world.flush();
 		expect(&func).to_have_been_called_times(1)?;
 		world.flush();

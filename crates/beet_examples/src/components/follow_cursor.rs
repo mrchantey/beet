@@ -13,11 +13,16 @@ pub fn follow_cursor_2d(
 		return;
 	};
 
-	let Some(cursor_position) = windows.get_single().ok().map(|w|w.cursor_position()).flatten() else {
+	let Some(cursor_position) = windows
+		.get_single()
+		.ok()
+		.map(|w| w.cursor_position())
+		.flatten()
+	else {
 		return;
 	};
 
-	let Some(point) =
+	let Ok(point) =
 		camera.viewport_to_world_2d(camera_transform, cursor_position)
 	else {
 		return;
@@ -42,10 +47,15 @@ pub fn follow_cursor_3d(
 		return;
 	};
 
-	let Some(cursor_position) = windows.get_single().ok().map(|w|w.cursor_position()).flatten() else {
+	let Some(cursor_position) = windows
+		.get_single()
+		.ok()
+		.map(|w| w.cursor_position())
+		.flatten()
+	else {
 		return;
 	};
-	let Some(ray) = camera.viewport_to_world(camera_transform, cursor_position)
+	let Ok(ray) = camera.viewport_to_world(camera_transform, cursor_position)
 	else {
 		return;
 	};

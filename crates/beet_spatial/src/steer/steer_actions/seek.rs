@@ -108,7 +108,7 @@ mod test {
 		let agent = app
 			.world_mut()
 			.spawn((
-				TransformBundle::default(),
+				Transform::default(),
 				ForceBundle::default(),
 				SteerBundle::default(),
 				SteerTarget::Position(Vec3::new(1.0, 0., 0.)),

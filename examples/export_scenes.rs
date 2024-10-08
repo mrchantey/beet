@@ -1,7 +1,6 @@
 use anyhow::Result;
 use beet_examples::prelude::*;
 use beetmash::prelude::*;
-use bevy::ecs::observer::ObserverState;
 use bevy::prelude::*;
 
 const DIR: &str = "scenes";
@@ -25,8 +24,7 @@ fn main() -> Result<()> {
 	SceneGroupExporter::new(plugin)
 		.with_config(config.clone())
 		.with_dir(DIR)
-		.with_query::<(Without<ObserverState>, Without<Observer<OnLogMessage, ()>>)>(
-		)
+		.with_filter::<DefaultSceneExportFilter>()
 		.add_scene("beet-debug", beet_examples::scenes::flow::beet_debug)
 		.add_scene("hello-world", beet_examples::scenes::flow::hello_world)
 		.export()?;
@@ -34,8 +32,7 @@ fn main() -> Result<()> {
 	SceneGroupExporter::new(plugin)
 		.with_config(config.clone())
 		.with_dir(DIR)
-		.with_query::<(Without<ObserverState>, Without<Observer<OnLogMessage, ()>>)>(
-		)
+		.with_filter::<DefaultSceneExportFilter>()
 		.without_clear_target()
 		.add_scene("seek", beet_examples::scenes::spatial::seek)
 		.add_scene("flock", beet_examples::scenes::spatial::flock)
@@ -51,8 +48,7 @@ fn main() -> Result<()> {
 		.with_config(config.clone())
 		.with_dir(DIR)
 		.without_clear_target()
-		.with_query::<(Without<ObserverState>, Without<Observer<OnLogMessage, ()>>)>(
-		)
+		.with_filter::<DefaultSceneExportFilter>()
 		.add_scene("hello-ml", beet_examples::scenes::ml::hello_ml)
 		.add_scene("fetch-scene", beet_examples::scenes::ml::fetch_scene)
 		.add_scene("fetch-npc", beet_examples::scenes::ml::fetch_npc)

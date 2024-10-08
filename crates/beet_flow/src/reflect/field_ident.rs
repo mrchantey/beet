@@ -53,7 +53,9 @@ impl FieldIdent {
 			let field = component
 				.reflect_path(self.path())
 				.map_err(|e| anyhow::anyhow!("{e}"))?;
-			Ok(func(field))
+			Ok(func(field.try_as_reflect().ok_or_else(|| {
+				anyhow::anyhow!("PartialReflect is not Reflect")
+			})?))
 		})?
 	}
 	pub fn map_mut<O>(
@@ -65,11 +67,17 @@ impl FieldIdent {
 			let field = component
 				.reflect_path_mut(self.path())
 				.map_err(|e| anyhow::anyhow!("{e}"))?;
-			Ok(func(field))
+			Ok(func(field.try_as_reflect_mut().ok_or_else(|| {
+				anyhow::anyhow!("PartialReflect is not Reflect")
+			})?))
 		})?
 	}
 	pub fn get(&self, world: &World) -> Result<Box<dyn Reflect>> {
-		self.map(world, |c| c.clone_value())
+		self.map(world, |c| {
+			c.clone_value()
+				.try_into_reflect()
+				.expect("PartialReflect is not Reflect")
+		})
 	}
 
 	pub fn set(
@@ -89,5 +97,4 @@ impl FieldIdent {
 			_ => Err(anyhow::anyhow!("field is not an enum")),
 		})?
 	}
-
 }

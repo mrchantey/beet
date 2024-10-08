@@ -120,7 +120,7 @@ mod test {
 		TriggerTarget::This.insert(&mut commands, e1, Name::new("bar"));
 		TriggerTarget::Entity(e2).remove::<Name>(&mut commands, e1);
 		drop(commands);
-		world.flush_commands();
+		world.flush();
 		expect(&world).to_have_component::<Name>(e1)?;
 		expect(&world).not().to_have_component::<Name>(e2)?;
 		Ok(())

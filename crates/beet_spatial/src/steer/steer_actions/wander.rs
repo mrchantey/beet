@@ -105,7 +105,7 @@ mod test {
 		let agent = app
 			.world_mut()
 			.spawn((
-				TransformBundle::default(),
+				Transform::default(),
 				ForceBundle::default(),
 				SteerBundle::default(),
 			))

@@ -28,6 +28,6 @@ impl Plugin for MovementPlugin {
 		/*-*/;
 
 		let world = app.world_mut();
-		world.init_bundle::<ForceBundle>();
+		world.register_bundle::<ForceBundle>();
 	}
 }

@@ -1,7 +1,6 @@
 use crate::prelude::*;
 use bevy::asset::io::Reader;
 use bevy::asset::AssetLoader;
-use bevy::asset::AsyncReadExt;
 use bevy::asset::LoadContext;
 use bevy::prelude::*;
 use bevy::utils::ConditionalSendFuture;
@@ -14,18 +13,13 @@ impl AssetLoader for BertLoader {
 	type Settings = ();
 	type Error = anyhow::Error;
 
-	fn load<'a>(
-		&'a self,
-		reader: &'a mut Reader,
-		_settings: &'a Self::Settings,
-		_load_context: &'a mut LoadContext,
-	) -> impl ConditionalSendFuture
-	       + futures::Future<
-		Output = Result<
-			<Self as AssetLoader>::Asset,
-			<Self as AssetLoader>::Error,
-		>,
-	> {
+	fn load(
+		&self,
+		reader: &mut dyn Reader,
+		_settings: &Self::Settings,
+		_load_context: &mut LoadContext,
+	) -> impl ConditionalSendFuture<Output = Result<Self::Asset, Self::Error>>
+	{
 		Box::pin(async move {
 			let mut bytes = Vec::new();
 			reader.read_to_end(&mut bytes).await?;
