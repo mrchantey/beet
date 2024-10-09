@@ -75,6 +75,7 @@ pws *args:
 #### WEB EXAMPLES #####################################################
 
 build-wasm:
+	just export-scenes
 	beetmash build \
 	--example app \
 	--release \
