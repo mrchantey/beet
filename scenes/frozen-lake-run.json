@@ -3,7 +3,7 @@
   "entities": {
     "4294967334": {
       "components": {
-        "beet_ml::environments::frozen_lake::grid::GridDirection": "Up",
+        "beet_ml::environments::frozen_lake::grid::GridDirection": "Right",
         "beet_ml::environments::frozen_lake::grid::GridPos": [
           [
             0,

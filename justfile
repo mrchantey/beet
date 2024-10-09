@@ -74,60 +74,18 @@ pws *args:
 
 #### WEB EXAMPLES #####################################################
 
-wasm-dir:= './target/web-examples'
-web-examples:= 'app_basics app_full'
-# web-examples:= 'animation app_basics app_full fetch flock frozen_lake_run frozen_lake_train hello_ml hello_world seek_3d seek'
-
-web-example-build example *args:
-	mkdir -p {{wasm-dir}}/{{example}} || true
-	cargo build --example {{example}} --target wasm32-unknown-unknown --release {{args}}
-	wasm-bindgen \
-	--out-name main \
-	--out-dir {{wasm-dir}}/{{example}} \
-	--target web \
-	$CARGO_TARGET_DIR/wasm32-unknown-unknown/release/examples/{{example}}.wasm \
-	--no-typescript \
-
-web-example-watch example *args:
-	just copy-web-assets
-	just watch 'just web-example-build {{example}} {{args}}'
-
-web-examples-build-and-deploy:
-	just web-examples-build
-	just web-examples-deploy
-
-copy-web-assets:
-	mkdir -p {{wasm-dir}}/assets || true
-	cp -r ./assets/* {{wasm-dir}}/assets
-
-web-examples-build:
-	rm -rf {{wasm-dir}} || true
-	just copy-web-assets
-	for file in {{web-examples}}; do \
-		just web-example-build ${file}; \
-	done
-
-web-examples-size:
-	for file in {{web-examples}}; do \
-		du -sh {{wasm-dir}}/${file}; \
-	done
-
-web-examples-serve:
-	cd {{wasm-dir}} && forky serve --any-origin --port=3002
-
-web-examples-deploy:
-	gsutil -m -h "Cache-Control:public, max-age=1" rsync -c -d -r {{wasm-dir}} gs://beet-examples
-# -m  		= parallel 
-# -c 			= use checksum instead of timestamp for compare
-# rsync  	=	copy 
-# -d 			= delete if not in local 
-# -r 			= recursive
-
+build-wasm:
+	beetmash build \
+	--example app \
+	--release \
+	--copy-local ../beetmash-apps \
+	--copy-scenes scenes
+	beetmash build \
+	--example app_ml \
+	--release \
+	--copy-local ../beetmash-apps
 
 ### MISC
-
-env:
-	@echo $RUST_LOG
 
 expand crate example *args:
 	just watch 'cargo expand -p {{crate}} --example {{example}} {{args}}'
@@ -157,28 +115,10 @@ watch *command:
 	-i '**/mod.rs' \
 	-- {{command}}
 
+copy-web-assets:
+	mkdir -p target/wasm/assets || true
+	cp -r ./assets/* target/wasm/assets
 
-
-
-build-wasm-release crate example *args:
-	just _build-wasm release {{crate}} {{example}} --release {{args}}
-build-wasm crate example *args:
-	just _build-wasm debug {{crate}} {{example}} {{args}}
-watch-wasm-release crate example *args:
-	just _watch-wasm release {{crate}} {{example}} --release {{args}}
-watch-wasm crate example *args:
-	just _watch-wasm debug {{crate}} {{example}} {{args}}
-
-_build-wasm build_config crate example *args:
-	cargo build -p {{crate}} --example {{example}} --target wasm32-unknown-unknown {{args}}
-	wasm-bindgen \
-	--out-dir ./target/static/wasm \
-	--target web \
-	./target/wasm32-unknown-unknown/{{build_config}}/examples/{{example}}.wasm \
-	--no-typescript \
-
-_watch-wasm build_config crate example *args:
-	just watch 'just _build-wasm {{build_config}} {{crate}} {{example}} {{args}}'
 
 copy-wasm-assets:
 	rm -rf ./target/static/assets
@@ -186,14 +126,6 @@ copy-wasm-assets:
 	
 serve-wasm *args:
 	cd ./target/static && forky serve {{args}}
-
-# npx live-server \
-
-# --no-browser \
-
-# --host=0.0.0.0 \
-
-# --watch=wasm/site_bg.wasm,wasm/simulator_bg.wasm,index.html,style.css \
 
 watch-assets:
 	just watch-web 'just copy-wasm-assets'
