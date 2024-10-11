@@ -7,7 +7,7 @@ opt-level = 1
 opt-level = 3
 
 [workspace.package]
-version = "0.0.4-rc.1"
+version = "0.0.4-rc.2"
 edition = "2021"
 description = "A very flexible AI behavior library for games and robotics."
 documentation = "https://beetmash.com/docs/beet"
@@ -38,12 +38,12 @@ members = [
 
 [workspace.dependencies]
 ## internal
-beet = { path = "./", version = "0.0.4-rc.1" }
-beet_spatial = { path = "crates/beet_spatial", version = "0.0.4-rc.1", default-features = false }
-beet_flow = { path = "crates/beet_flow", version = "0.0.4-rc.1" }
-beet_flow_macros = { path = "crates/beet_flow/macros", version = "0.0.4-rc.1" }
-beet_ml = { path = "crates/beet_ml", version = "0.0.4-rc.1" }
-beet_examples = { path = "crates/beet_examples", version = "0.0.4-rc.1" }
+beet = { path = "./", version = "0.0.4-rc.2" }
+beet_spatial = { path = "crates/beet_spatial", version = "0.0.4-rc.2", default-features = false }
+beet_flow = { path = "crates/beet_flow", version = "0.0.4-rc.2" }
+beet_flow_macros = { path = "crates/beet_flow/macros", version = "0.0.4-rc.2" }
+beet_ml = { path = "crates/beet_ml", version = "0.0.4-rc.2" }
+beet_examples = { path = "crates/beet_examples", version = "0.0.4-rc.2" }
 
 ## local
 beetmash = { version = "0.0.6-rc.2", path = "../beetmash" }
@@ -91,8 +91,8 @@ serde_json = "1"
 ron = "0.8"
 
 #💡 game
-# bevy = { version = "0.14", default-features = false, features = [
-bevy = { git = "https://github.com/bevyengine/bevy", rev = "0c959f77007c29eead7f902bddd3342a1ecbca20", default-features = false, features = [
+bevy = { version = "0.14", default-features = false, features = [
+# bevy = { git = "https://github.com/bevyengine/bevy", rev = "0c959f77007c29eead7f902bddd3342a1ecbca20", default-features = false, features = [
 	"bevy_scene",
 	"serialize",
 	# "bevy_color",
@@ -139,7 +139,6 @@ beetmash = { workspace = true, optional = true }
 bevy.workspace = true
 
 [dev-dependencies]
-beet_examples.workspace = true
 bevy = { workspace = true, default-features = true }
 log.workspace = true
 pretty_env_logger.workspace = true
@@ -236,15 +235,15 @@ features = [
 name = "app"
 thumb-text = "🔨"
 description = "Basic Beet App with debugging, camera, and UI."
-app.js-url = "https://storage.googleapis.com/beet-examples/app_basics/main.js"
-app.wasm-url = "https://storage.googleapis.com/beet-examples/app_basics/main_bg.wasm"
+app.js-url = "https://mrchantey.github.io/beetmash-apps/beet/app.js"
+app.wasm-url = "https://mrchantey.github.io/beetmash-apps/beet/app_bg.wasm"
 
 [[package.metadata.scene]]
 name = "app-ml"
 thumb-text = "🔨"
 description = "Full Beet App with machine learning, networking, and UI."
-app.js-url = "https://storage.googleapis.com/beet-examples/app_full/main.js"
-app.wasm-url = "https://storage.googleapis.com/beet-examples/app_full/main_bg.wasm"
+app.js-url = "https://mrchantey.github.io/beetmash-apps/beet/app_ml.js"
+app.wasm-url = "https://mrchantey.github.io/beetmash-apps/beet/app_ml_bg.wasm"
 
 [[package.metadata.scene]]
 name = "beet-debug"
