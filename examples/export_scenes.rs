@@ -18,7 +18,6 @@ fn main() -> Result<()> {
 		..default()
 	};
 
-
 	SceneGroupExporter::new(plugin)
 		.with_config(config.clone())
 		.add_scene("beet-debug", beet_examples::scenes::flow::beet_debug)

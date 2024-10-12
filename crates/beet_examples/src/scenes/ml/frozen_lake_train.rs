@@ -1,5 +1,5 @@
 use super::FROZEN_LAKE_SCENE_SCALE;
-use beet::prelude::*;
+use crate::beet::prelude::*;
 use bevy::prelude::*;
 
 pub fn frozen_lake_train(mut commands: Commands) {

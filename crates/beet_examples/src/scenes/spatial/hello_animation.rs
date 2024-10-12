@@ -1,4 +1,4 @@
-use beet::prelude::*;
+use crate::beet::prelude::*;
 use beetmash::core::scenes::Foxie;
 use beetmash::prelude::*;
 use bevy::animation::RepeatAnimation;

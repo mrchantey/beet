@@ -1,4 +1,5 @@
 use crate::prelude::*;
+use beet_flow::prelude::*;
 use bevy::app::PluginGroupBuilder;
 use bevy::prelude::*;
 
@@ -25,8 +26,6 @@ pub struct BeetMinimalPlugins;
 
 impl PluginGroup for BeetMinimalPlugins {
 	fn build(self) -> PluginGroupBuilder {
-		let mut group = PluginGroupBuilder::start::<Self>();
-		group = group.add(LifecyclePlugin::default());
-		group
+		PluginGroupBuilder::start::<Self>().add(LifecyclePlugin::default())
 	}
 }

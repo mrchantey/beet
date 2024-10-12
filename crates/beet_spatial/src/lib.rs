@@ -1,7 +1,7 @@
 #![feature(let_chains, anonymous_lifetime_in_impl_trait)]
 #[cfg(feature = "animation")]
 pub mod animation;
-pub mod app;
+pub mod plugins;
 #[cfg(feature = "assets")]
 pub mod asset_actions;
 pub mod movement;
@@ -13,7 +13,7 @@ pub mod ui;
 pub mod prelude {
 	#[cfg(feature = "animation")]
 	pub use crate::animation::*;
-	pub use crate::app::*;
+	pub use crate::plugins::*;
 	#[cfg(feature = "assets")]
 	pub use crate::asset_actions::*;
 	pub use crate::movement::*;
