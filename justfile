@@ -74,17 +74,20 @@ pws *args:
 
 #### WEB EXAMPLES #####################################################
 
-build-wasm:
+
+# Build wasm files, pass --no-build to just update scenes and registries
+build-wasm *args:
 	just export-scenes
 	beetmash build \
 	--example app \
 	--release \
 	--copy-local ../beetmash-apps \
-	--copy-scenes scenes
+	--copy-scenes scenes \
+	--copy-registries target/registries {{args}}
 	beetmash build \
 	--example app_ml \
 	--release \
-	--copy-local ../beetmash-apps
+	--copy-local ../beetmash-apps {{args}}
 
 ### MISC
 

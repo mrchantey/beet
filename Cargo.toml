@@ -91,8 +91,8 @@ serde_json = "1"
 ron = "0.8"
 
 #💡 game
-# bevy = { version = "0.14", default-features = false, features = [
-bevy = { git = "https://github.com/bevyengine/bevy", rev = "0c959f77007c29eead7f902bddd3342a1ecbca20", default-features = false, features = [
+bevy = { version = "0.14", default-features = false, features = [
+# bevy = { git = "https://github.com/bevyengine/bevy", rev = "0c959f77007c29eead7f902bddd3342a1ecbca20", default-features = false, features = [
 	"bevy_scene",
 	"serialize",
 	# "bevy_color",
@@ -101,7 +101,7 @@ bevy = { git = "https://github.com/bevyengine/bevy", rev = "0c959f77007c29eead7f
 
 # [target.'cfg(target_arch = "wasm32")'.dependencies]
 js-sys = "0.3"
-wasm-bindgen = "0.2"
+wasm-bindgen = "0.2.93"
 wasm-bindgen-futures = "0.4"
 console_error_panic_hook = "0.1"
 
@@ -238,6 +238,8 @@ thumb-text = "🔨"
 description = "Basic Beet App with debugging, camera, and UI."
 app.js-url = "https://mrchantey.github.io/beetmash-apps/beet/app.js"
 app.wasm-url = "https://mrchantey.github.io/beetmash-apps/beet/app_bg.wasm"
+app.type-registry-url = "https://mrchantey.github.io/beetmash-apps/beet/registries/type_registry.json"
+app.replication-registry-url = "https://mrchantey.github.io/beetmash-apps/beet/registries/replication_registry.json"
 
 [[package.metadata.scene]]
 name = "app-ml"
@@ -245,6 +247,9 @@ thumb-text = "🔨"
 description = "Full Beet App with machine learning, networking, and UI."
 app.js-url = "https://mrchantey.github.io/beetmash-apps/beet/app_ml.js"
 app.wasm-url = "https://mrchantey.github.io/beetmash-apps/beet/app_ml_bg.wasm"
+app.type-registry-url = "https://mrchantey.github.io/beetmash-apps/beet/registries/type_registry_ml.json"
+app.replication-registry-url = "https://mrchantey.github.io/beetmash-apps/beet/registries/replication_registry_ml.json"
+
 
 [[package.metadata.scene]]
 name = "beet-debug"
@@ -323,7 +328,6 @@ include = [
 	"beetmash/ui-terminal-input",
 	"beetmash/lighting-3d",
 	"beetmash/ground-3d",
-	"fetch-scene",
 	"fetch-scene",
 ]
 events.playerMessage.initial = "I'm hungry!"
