@@ -8,7 +8,9 @@ use std::time::Duration;
 
 pub fn seek_3d(mut commands: Commands) {
 	// camera
-	commands.spawn((BundlePlaceholder::Camera3d, CameraDistance {
+	commands.spawn((
+		Name::new("Camera"),
+		BundlePlaceholder::Camera3d, CameraDistance {
 		width: 80.,
 		offset: Vec3::new(0., 20., 40.),
 	}));
@@ -34,6 +36,7 @@ pub fn seek_3d(mut commands: Commands) {
 
 	commands
 		.spawn((
+			Name::new("Foxie"),
 			Transform::from_scale(Vec3::splat(0.1)),
 			BundlePlaceholder::Scene("Fox.glb#Scene0".into()),
 			graph,

@@ -8,6 +8,7 @@ use std::time::Duration;
 pub fn hello_animation(mut commands: Commands) {
 	// camera
 	commands.spawn((
+		Name::new("Camera"),
 		BundlePlaceholder::Camera3d,
 		Transform::from_xyz(10.0, 10.0, 15.0)
 			.looking_at(Vec3::new(0.0, 2.0, 0.0), Vec3::Y),
@@ -26,6 +27,7 @@ pub fn hello_animation(mut commands: Commands) {
 
 	commands
 		.spawn((
+			Name::new("Foxie"),
 			Transform::from_scale(Vec3::splat(0.1)),
 			BundlePlaceholder::Scene("Fox.glb#Scene0".into()),
 			graph,

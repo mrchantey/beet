@@ -14,6 +14,7 @@ pub fn flock(mut commands: Commands) {
 		// let position = Vec3::random_in_sphere().with_y(0.) * 500.;
 		commands
 			.spawn((
+				Name::new("Spaceship"),
 				BundlePlaceholder::Sprite("spaceship_pack/ship_2.png".into()),
 				Transform::from_translation(position)
 					.with_scale(Vec3::splat(0.5)),
@@ -24,8 +25,8 @@ pub fn flock(mut commands: Commands) {
 				GroupSteerAgent,
 			))
 			.with_children(|agent| {
-				// behavior
 				agent.spawn((
+					Name::new("Flock Behavior"),
 					RunOnSpawn,
 					ContinueRun::default(),
 					TargetAgent(agent.parent_entity()),
