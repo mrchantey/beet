@@ -1,5 +1,5 @@
-use crate::prelude::*;
 use crate::beet::prelude::*;
+use crate::prelude::*;
 use beetmash::core::scenes::Foxie;
 use beetmash::prelude::*;
 use bevy::prelude::*;
@@ -10,15 +10,17 @@ pub fn seek_3d(mut commands: Commands) {
 	// camera
 	commands.spawn((
 		Name::new("Camera"),
-		BundlePlaceholder::Camera3d, CameraDistance {
-		width: 80.,
-		offset: Vec3::new(0., 20., 40.),
-	}));
+		BundlePlaceholder::Camera3d,
+		CameraDistance {
+			width: 80.,
+			offset: Vec3::new(0., 20., 40.),
+		},
+	));
 
 	// cheese
 	let target = commands
 		.spawn((
-			FollowCursor3d,
+			FollowCursor3d::default(),
 			Transform::from_xyz(20., 0., 40.).with_scale(Vec3::splat(3.)),
 			BundlePlaceholder::Scene("kaykit/cheese.glb#Scene0".into()),
 		))

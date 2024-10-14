@@ -35,7 +35,7 @@ serve-doc:
 test-all *args:
 	just watch 'cargo test --workspace --lib -- {{args}}'
 
-test-core *args:
+test-spatial *args:
 	just watch 'cargo test -p beet_spatial --lib -- {{args}}'
 
 test-ecs *args:
