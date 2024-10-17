@@ -1,5 +1,5 @@
-use crate::prelude::*;
 use crate::beet::prelude::*;
+use crate::prelude::*;
 use beetmash::prelude::*;
 use bevy::prelude::*;
 
@@ -81,9 +81,10 @@ fn plugin_2d(app: &mut App) {
 fn plugin_3d(app: &mut App) {
 	app.add_systems(
 			Update,
-			(follow_cursor_3d, camera_distance, rotate_collectables),
+			(follow_cursor_3d, camera_distance, rotate_collectables,keyboard_controller),
 		)
 		.register_type::<FollowCursor3d>()
+		.register_type::<KeyboardController>()
 		.register_type::<CameraDistance>()
 		/*-*/;
 }

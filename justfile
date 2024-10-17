@@ -5,8 +5,15 @@ crates := 'beet beet_spatial beet_flow'
 default:
 	just --list --unsorted
 
-example example *args:
+run example *args:
 	cargo run --example {{example}} {{args}}
+
+run-w example *args:
+	just watch 'just run {{example}} {{args}}'
+
+run-p crate example *args:
+	cargo run -p {{crate}} --example {{example}} {{args}}
+
 
 ## common
 cmd *args:
@@ -47,12 +54,6 @@ test-ml *args:
 
 test-examples *args:
 	just watch 'cargo test -p beet_examples --lib -- {{args}}'
-
-run crate example *args:
-	cargo run -p {{crate}} --example {{example}} {{args}}
-
-run-w crate example *args:
-	just watch 'just run {{crate}} {{example}} {{args}}'
 
 serve-web:
 	just serve-wasm

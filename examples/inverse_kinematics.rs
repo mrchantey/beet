@@ -7,6 +7,8 @@ pub fn main() {
 		.add_systems(
 			Startup,
 			(
+				beetmash::core::scenes::lighting_3d,
+				beetmash::core::scenes::ground_3d,
 				beet_examples::scenes::spatial::inverse_kinematics,
 			),
 		)
