@@ -141,6 +141,7 @@ watch-web *command:
 	-- {{command}}
 
 assets-push:
+	aws s3 sync ./assets s3://beetmash-public/assets --delete
 	tar -czvf ./assets.tar.gz ./assets
 	aws s3 cp ./assets.tar.gz s3://beetmash-public/assets.tar.gz
 	rm ./assets.tar.gz

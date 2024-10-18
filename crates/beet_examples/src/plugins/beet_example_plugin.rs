@@ -80,9 +80,14 @@ fn plugin_2d(app: &mut App) {
 
 fn plugin_3d(app: &mut App) {
 	app.add_systems(
-			Update,
-			(follow_cursor_3d, camera_distance, rotate_collectables,keyboard_controller),
-		)
+			Update,(
+			follow_cursor_3d,
+			camera_distance,
+			rotate_collectables,
+			keyboard_controller,
+			ik_spawner
+		))
+		.register_type::<IkSpawner>()
 		.register_type::<FollowCursor3d>()
 		.register_type::<KeyboardController>()
 		.register_type::<CameraDistance>()

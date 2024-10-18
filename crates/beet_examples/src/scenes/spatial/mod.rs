@@ -13,6 +13,9 @@ pub use self::hello_animation::*;
 pub mod inverse_kinematics;
 #[allow(unused_imports)]
 pub use self::inverse_kinematics::*;
+pub mod phone_screen;
+#[allow(unused_imports)]
+pub use self::phone_screen::*;
 pub mod seek;
 #[allow(unused_imports)]
 pub use self::seek::*;

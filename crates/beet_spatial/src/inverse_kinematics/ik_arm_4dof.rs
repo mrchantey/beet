@@ -81,17 +81,12 @@ impl IkArm4Dof {
 
 		// if the target is not reachable, clamp the target to the maximum reach
 		if target.length_squared() > reach.powi(2) {
-			// println!(
-			// 	"Target out of reach, clamping to max reach, was: {}, now: {}",
-			// 	target,
-			// 	target.normalize_or_zero() * (reach * 0.9)
-			// );
 			target = target.normalize_or_zero() * (reach * 0.999);
 		}
 
 		// in the case of negative x, flip the target to positive x
 		let is_neg = target.x < 0.0;
-		if target.x < 0. {
+		if is_neg {
 			target.x = -target.x;
 			target.y = -target.y;
 		};

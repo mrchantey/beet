@@ -18,7 +18,7 @@ pub fn spawn_arm(mut commands: Commands) {
 
 	commands.spawn((
 		Name::new("scene"),
-		BundlePlaceholder::Gltf("robot-arm/robot-arm.glb".into()),
+		BundlePlaceholder::Gltf("robot-arm/robot-arm-phone.glb".into()),
 		Transform::from_scale(Vec3::splat(10.)),
 		TargetAgent(target),
 		IkSpawner::default(),
@@ -31,7 +31,7 @@ fn spawn_target(commands: &mut Commands) -> Entity {
 			Name::new("Target"),
 			KeyboardController::default(),
 			// FollowCursor3d::ORIGIN_Z,
-			Transform::from_xyz(2.5, 1., 0.).looking_to(-Vec3::Z, Vec3::Y),
+			Transform::from_xyz(0., 1.5, 2.5).looking_to(-Vec3::Z, Vec3::Y),
 			BundlePlaceholder::Pbr {
 				mesh: Sphere::new(0.2).into(),
 				material: MaterialPlaceholder::unlit(tailwind::BLUE_500),

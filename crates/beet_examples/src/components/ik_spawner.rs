@@ -1,5 +1,4 @@
-use crate::prelude::*;
-use beet_flow::prelude::TargetAgent;
+use crate::beet::prelude::*;
 use bevy::prelude::*;
 use std::f32::consts::FRAC_PI_2;
 
@@ -9,11 +8,12 @@ use std::f32::consts::FRAC_PI_2;
 pub struct IkSpawner;
 
 
-
 pub fn ik_spawner(
 	mut commands: Commands,
 	mut events: EventReader<AssetEvent<Scene>>,
+	mut meshes: ResMut<Assets<Mesh>>,
 	child_nodes_query: Query<(Entity, &Name, &GlobalTransform, &Children)>,
+	camera_2d: Single<&Handle<StandardMaterial>, With<Camera2d>>,
 	children_query: Query<&Children>,
 	query: Populated<
 		(Entity, &Children, &SceneRoot, &TargetAgent),
@@ -46,6 +46,7 @@ pub fn ik_spawner(
 		let Some(items) =
 			find_by_name_recursive(&child_nodes_query, &arm_root.3, vec![
 				"Base", "Segment1", "Segment2", "Segment3", "Gripper",
+				"Target", "Phone",
 			])
 		else {
 			continue;
@@ -56,6 +57,8 @@ pub fn ik_spawner(
 		let segment2 = items[2];
 		let segment3 = items[3];
 		let gripper = items[4];
+		// let target = items[5];
+		let phone = items[6];
 
 
 		// let base_to_segment1 = segment1.2.translation - base.2.translation;
@@ -75,13 +78,20 @@ pub fn ik_spawner(
 		let ik_transforms = IkArm4DofTransforms::new(
 			ik, **target, base.0, segment1.0, segment2.0, segment3.0,
 		);
-		println!("here we arrr: {:?}", ik_transforms);
 
 		commands.entity(scene_root_entity).insert(ik_transforms);
+
+
+		commands.entity(phone.0).with_child((
+			Name::new("Phone Texture"),
+			Transform::from_xyz(0., 0.1, 0.).looking_to(Dir3::Z, Dir3::Y),
+			Mesh3d(meshes.add(Plane3d::new(Vec3::Y, Vec2::splat(0.9)))),
+			MeshMaterial3d(camera_2d.clone()),
+		));
 	}
 }
 
-
+/// Provided a list of names, each being a child of the previous, returns that list of entities.
 fn find_by_name_recursive<'a>(
 	query: &'a Query<(Entity, &Name, &GlobalTransform, &Children)>,
 	children: &Children,
