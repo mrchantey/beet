@@ -140,15 +140,13 @@ watch-web *command:
 	-w '**/*/assets/**/*' \
 	-- {{command}}
 
-### GSUTIL
-push-assets:
+assets-push:
 	tar -czvf ./assets.tar.gz ./assets
-	gsutil cp ./assets.tar.gz gs://beet-misc/assets.tar.gz
-	gsutil cp ./assets.tar.gz gs://beet-misc/assets-backup.tar.gz
+	aws s3 cp ./assets.tar.gz s3://beetmash-public/assets.tar.gz
 	rm ./assets.tar.gz
 
-pull-assets:
-	curl -o ./assets.tar.gz https://storage.googleapis.com/beet-misc/assets.tar.gz
+assets-pull:
+	curl -o ./assets.tar.gz https://beetmash-public.s3.us-west-2.amazonaws.com/assets.tar.gz
 	tar -xzvf ./assets.tar.gz
 	rm ./assets.tar.gz
 
