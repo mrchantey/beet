@@ -17,11 +17,12 @@ pub type RemoveOnGlobalTrigger<Event, Params, TriggerBundle = ()> =
 /// Trigger the given event on a global trigger.
 pub type TriggerOnGlobalTrigger<Event, Params, TriggerBundle = ()> =
 	OnGlobalTrigger<
-		TriggerHandler<DefaultMapFunc<Event, Params, TriggerBundle>>,
+		TriggerOnTriggerHandler<DefaultMapFunc<Event, Params, TriggerBundle>>,
 	>;
 
 /// Map to a trigger event on global trigger.
-pub type TriggerMappedOnGlobalTrigger<M> = OnGlobalTrigger<TriggerHandler<M>>;
+pub type TriggerMappedOnGlobalTrigger<M> =
+	OnGlobalTrigger<TriggerOnTriggerHandler<M>>;
 
 #[derive(Component, Action, Reflect)]
 #[reflect(Default, Component)]
@@ -44,7 +45,7 @@ impl<Handler: OnTriggerHandler> OnGlobalTrigger<Handler> {
 }
 
 fn on_trigger<Handler: OnTriggerHandler>(
-	trigger: Trigger<Handler::Event, Handler::TriggerBundle>,
+	trigger: Trigger<Handler::TriggerEvent, Handler::TriggerBundle>,
 	query: Query<(Entity, &OnGlobalTrigger<Handler>)>,
 	mut commands: Commands,
 ) {

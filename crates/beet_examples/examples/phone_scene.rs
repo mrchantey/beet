@@ -11,9 +11,10 @@ fn main() {
 				setup,
 				beetmash::core::scenes::lighting_3d,
 				beetmash::core::scenes::ground_3d,
-				spawn_barbarian, // emoji,
+				spawn_barbarian,
 			),
 		)
+		// .add_systems(Update,disable_barbarian)
 		.run();
 }
 
@@ -21,7 +22,7 @@ fn main() {
 fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
 	commands.spawn((
 		Camera3d::default(),
-		Transform::from_xyz(0., 5., 5.).looking_at(Vec3::ZERO, Vec3::Y),
+		Transform::from_xyz(0., 1.6, 5.), // .looking_at(Vec3::ZERO, Vec3::Y),
 	));
 
 	commands.insert_resource(EmojiMap::new(&asset_server));

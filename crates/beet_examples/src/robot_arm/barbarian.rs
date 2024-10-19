@@ -1,8 +1,10 @@
+use crate::beet::prelude::*;
+use crate::prelude::*;
+use beetmash::prelude::*;
+use bevy::animation::RepeatAnimation;
+use bevy::prelude::*;
 use std::time::Duration;
 
-use beetmash::prelude::*;
-use bevy::{animation::RepeatAnimation, prelude::*};
-use crate::beet::prelude::*;
 
 pub struct Barbarian {
 	pub graph: AnimationGraphPlaceholder,
@@ -49,9 +51,11 @@ pub fn spawn_barbarian(mut commands: Commands) {
 
 	commands
 		.spawn((
-			Name::new("Foxie"),
-			Transform::from_scale(Vec3::splat(0.1)),
-			BundlePlaceholder::Scene("kaykit-adventurers/Barbarian.glb#Scene0".into()),
+			Name::new("Barbarian"),
+			// Transform::from_scale(Vec3::splat(0.1)),
+			BundlePlaceholder::Scene(
+				"kaykit-adventurers/Barbarian_NoProps.glb#Scene0".into(),
+			),
 			graph,
 			AnimationTransitions::new(),
 		))
@@ -70,7 +74,7 @@ pub fn spawn_barbarian(mut commands: Commands) {
 						ContinueRun::default(),
 						TargetAgent(agent),
 						PlayAnimation::new(idle_index)
-							.repeat(RepeatAnimation::Count(1))
+							.repeat(RepeatAnimation::Count(4))
 							.with_transition_duration(transition_duration),
 						idle_clip,
 						TriggerOnAnimationEnd::new(
@@ -94,11 +98,49 @@ pub fn spawn_barbarian(mut commands: Commands) {
 						.with_transition_duration(transition_duration),
 					));
 				});
+
+			spawn_emote_bubble(
+				&mut parent.spawn(Transform::from_xyz(0.5, 2.5, 0.5)),
+			);
 		});
 }
 
 
 
+
+
+// pub fn disable_barbarian(
+// 	mut commands: Commands,
+// 	mut events: EventReader<AssetEvent<Scene>>,
+// 	query: Populated<(Entity, &SceneRoot)>,
+// 	names: Query<&Name>,
+// 	children: Query<&Children>,
+// ) {
+// 	for ev in events.read() {
+// 		let AssetEvent::LoadedWithDependencies { id } = ev else {
+// 			continue;
+// 		};
+// 		let Some((entity, _)) =
+// 			query.iter().find(|(_, scene)| scene.id() == *id)
+// 		else {
+// 			continue;
+// 		};
+
+// 		let to_disable: HashSet<&'static str> =
+// 			vec!["Mug"].into_iter().collect();
+
+// 		for entity in children.iter_descendants(entity) {
+// 			if let Ok(name) = names.get(entity) {
+// 				println!("it has name: {}", name);
+// 				if to_disable.contains(name.as_str()) {
+// 					commands.entity(entity).insert(Visibility::Hidden);
+// 				}
+// 			}else{
+// 				println!("it has no name");
+// 			}
+// 		}
+// 	}
+// }
 
 
 

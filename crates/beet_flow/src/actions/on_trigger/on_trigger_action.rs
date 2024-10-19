@@ -77,7 +77,7 @@ impl<Handler: OnTriggerHandler> ActionBuilder for OnTrigger<Handler> {
 				let action = world.get::<Self>(entity).unwrap();
 				let mut observer = Observer::new(
 					move |trigger: Trigger<
-						Handler::Event,
+						Handler::TriggerEvent,
 						Handler::TriggerBundle,
 					>,
 					      query: Query<(Entity, &OnTrigger<Handler>)>,

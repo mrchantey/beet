@@ -8,19 +8,21 @@ pub type InsertOnTrigger<Event, Params, TriggerBundle = ()> =
 pub type InsertMappedOnTrigger<M> = OnTrigger<InsertHandler<M>>;
 
 #[derive(Reflect)]
-pub struct InsertHandler<T: MapFunc>(#[reflect(ignore)] PhantomData<T>);
+pub struct InsertHandler<T: OnTriggerMapFunc>(
+	#[reflect(ignore)] PhantomData<T>,
+);
 
 
-impl<M: MapFunc> OnTriggerHandler for InsertHandler<M>
+impl<M: OnTriggerMapFunc> OnTriggerHandler for InsertHandler<M>
 where
 	M::Out: Bundle + Clone,
 {
-	type Event = M::Event;
+	type TriggerEvent = M::Event;
 	type TriggerBundle = M::TriggerBundle;
 	type Params = M::Params;
 	fn handle(
 		commands: &mut Commands,
-		trigger: &Trigger<Self::Event, Self::TriggerBundle>,
+		trigger: &Trigger<Self::TriggerEvent, Self::TriggerBundle>,
 		(entity, action): (Entity, &OnTrigger<Self>),
 	) {
 		// log::info!("InsertOnTrigger: {:?}", std::any::type_name::<M::Out>());
@@ -56,7 +58,7 @@ mod test {
 
 	#[derive(Reflect)]
 	struct MapRunResult;
-	impl MapFunc for MapRunResult {
+	impl OnTriggerMapFunc for MapRunResult {
 		type Event = OnRun;
 		type Params = RunResult;
 		type Out = Name;

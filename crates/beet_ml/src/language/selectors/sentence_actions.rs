@@ -6,7 +6,7 @@ use std::borrow::Cow;
 
 #[derive(Reflect)]
 pub struct MapUserMessageToSentence;
-impl MapFunc for MapUserMessageToSentence {
+impl OnTriggerMapFunc for MapUserMessageToSentence {
 	type Event = OnUserMessage;
 	type Params = ();
 	type Out = Sentence;

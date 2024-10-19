@@ -4,25 +4,29 @@ use std::marker::PhantomData;
 
 pub type TriggerOnRun<T> = TriggerOnTrigger<OnRun, T>;
 
-pub type TriggerOnTrigger<Event, Params, TriggerBundle = ()> =
-	TriggerMappedOnTrigger<DefaultMapFunc<Event, Params, TriggerBundle>>;
+/// Trigger `EventOut` when `EventIn` is triggered.
+/// Optionally accepts a `TriggerBundle` for the `EventIn`
+pub type TriggerOnTrigger<EventIn, EventOut, TriggerBundle = ()> =
+	TriggerMappedOnTrigger<DefaultMapFunc<EventIn, EventOut, TriggerBundle>>;
 
-pub type TriggerMappedOnTrigger<M> = OnTrigger<TriggerHandler<M>>;
+pub type TriggerMappedOnTrigger<M> = OnTrigger<TriggerOnTriggerHandler<M>>;
 
 #[derive(Reflect)]
-pub struct TriggerHandler<T: MapFunc>(#[reflect(ignore)] PhantomData<T>);
+pub struct TriggerOnTriggerHandler<T: OnTriggerMapFunc>(
+	#[reflect(ignore)] PhantomData<T>,
+);
 
 
-impl<M: MapFunc> OnTriggerHandler for TriggerHandler<M>
+impl<M: OnTriggerMapFunc> OnTriggerHandler for TriggerOnTriggerHandler<M>
 where
 	M::Out: Event + Clone,
 {
-	type Event = M::Event;
+	type TriggerEvent = M::Event;
 	type TriggerBundle = M::TriggerBundle;
 	type Params = M::Params;
 	fn handle(
 		commands: &mut Commands,
-		trigger: &Trigger<Self::Event, Self::TriggerBundle>,
+		trigger: &Trigger<Self::TriggerEvent, Self::TriggerBundle>,
 		(entity, on_trigger): (Entity, &OnTrigger<Self>),
 	) {
 		let out = M::map(trigger, (entity, &on_trigger.params));
