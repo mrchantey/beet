@@ -1,6 +1,6 @@
+use crate::prelude::*;
 use beetmash::prelude::*;
 use bevy::prelude::*;
-use crate::prelude::*;
 
 #[derive(Default, Component, Reflect)]
 #[reflect(Default, Component)]
@@ -8,7 +8,7 @@ pub struct EmoteBubble;
 
 
 
-pub fn spawn_emote_bubble(commands:&mut EntityCommands) {
+pub fn spawn_emote_bubble(commands: &mut EntityCommands) -> Entity {
 	commands
 		.insert((Name::new("Emote Bubble"), BundlePlaceholder::Pbr {
 			mesh: MeshPlaceholder::Plane3d(Plane3d::new(
@@ -35,5 +35,6 @@ pub fn spawn_emote_bubble(commands:&mut EntityCommands) {
 					unlit: true,
 				},
 			},
-		));
+		))
+		.id()
 }

@@ -61,6 +61,12 @@ pub fn spawn_barbarian(mut commands: Commands) {
 		))
 		.with_children(|parent| {
 			let agent = parent.parent_entity();
+
+
+			let _emote_bubble = spawn_emote_bubble(
+				&mut parent.spawn(Transform::from_xyz(0.5, 2.5, 0.5)),
+			);
+
 			parent
 				.spawn((
 					Name::new("Animation Behavior"),
@@ -98,10 +104,6 @@ pub fn spawn_barbarian(mut commands: Commands) {
 						.with_transition_duration(transition_duration),
 					));
 				});
-
-			spawn_emote_bubble(
-				&mut parent.spawn(Transform::from_xyz(0.5, 2.5, 0.5)),
-			);
 		});
 }
 
