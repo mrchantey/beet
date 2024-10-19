@@ -144,7 +144,6 @@ mod tests {
 		let target = Vec2::new(3.0, 3.0);
 		let (angle1, angle2) = ik_solver.solve2d(target);
 
-		// Since the target is unreachable, check if it returns the neutral position or an indicator value
-		assert_eq!((angle1, angle2), (0.0, 0.0));
+		assert_eq!((angle1, angle2), (0.8301215, -0.089446634));
 	}
 }

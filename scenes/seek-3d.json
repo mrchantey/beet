@@ -11,12 +11,26 @@
             40.0
           ]
         },
-        "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": "Camera3d"
+        "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": "Camera3d",
+        "bevy_core::name::Name": "Camera"
       }
     },
     "4294967334": {
       "components": {
-        "beet_examples::components::follow_cursor::FollowCursor3d": {},
+        "beet_examples::components::follow_cursor::FollowCursor3d": {
+          "intersect_point": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "intersect_plane": {
+            "normal": [
+              0.0,
+              1.0,
+              0.0
+            ]
+          }
+        },
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Scene": "kaykit/cheese.glb#Scene0"
         },
@@ -121,6 +135,7 @@
           "main_animation": null,
           "transitions": []
         },
+        "bevy_core::name::Name": "Foxie",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967336

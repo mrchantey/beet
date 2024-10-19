@@ -2,7 +2,6 @@ use crate::prelude::*;
 use bevy::asset::io::Reader;
 use bevy::asset::AssetLoader;
 use bevy::asset::LoadContext;
-use bevy::prelude::*;
 use bevy::utils::ConditionalSendFuture;
 
 #[derive(Default)]
@@ -31,29 +30,11 @@ impl AssetLoader for BertLoader {
 	}
 }
 
-pub fn block_on_asset_load<'a, A: Asset>(app: &'a mut App, path: &'static str) {
-	let handle = app
-		.world_mut()
-		.resource_mut::<AssetServer>()
-		.load::<A>(path)
-		.clone();
-	loop {
-		match app
-			.world_mut()
-			.resource_mut::<AssetServer>()
-			.load_state(handle.id())
-		{
-			bevy::asset::LoadState::Loaded => return,
-			_ => {}
-		}
-		app.update();
-	}
-}
-
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
 	use anyhow::Result;
+	use beet_flow::prelude::*;
 	use bevy::prelude::*;
 	use sweet::*;
 
@@ -65,7 +46,7 @@ mod test {
 			.init_asset::<Bert>()
 			.init_asset_loader::<BertLoader>();
 
-		block_on_asset_load::<Bert>(&mut app, "default-bert.ron");
+		block_on_asset_load::<Bert>(&mut app, "ml/default-bert.ron");
 
 		expect(true).to_be_true()?;
 

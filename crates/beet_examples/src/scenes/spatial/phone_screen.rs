@@ -15,7 +15,7 @@ pub fn phone_screen(
 		SpriteBundle {
 			transform: Transform::from_scale(Vec3::splat(10.)),
 			// transform: Transform::default().with_scale(Vec3::splat(10.)),
-			texture: asset_server.load("openmoji-smileys-emotion.png"),
+			texture: asset_server.load("openmoji/smileys-emotion.png"),
 			..default()
 		},
 		TextureAtlas {

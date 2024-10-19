@@ -1,5 +1,5 @@
-use crate::prelude::*;
 use crate::beet::prelude::*;
+use crate::prelude::*;
 use beetmash::core::scenes::Foxie;
 use beetmash::prelude::*;
 use bevy::prelude::*;
@@ -17,7 +17,7 @@ pub fn fetch_npc(mut commands: Commands) {
 		.spawn((
 			Name::new("Fox"),
 			Transform::from_xyz(0., 0., 0.).with_scale(Vec3::splat(0.01)),
-			BundlePlaceholder::Scene("Fox.glb#Scene0".into()),
+			BundlePlaceholder::Scene("misc/fox.glb#Scene0".into()),
 			graph,
 			AnimationTransitions::new(),
 			RotateToVelocity3d::default(),
@@ -34,7 +34,7 @@ pub fn fetch_npc(mut commands: Commands) {
 				.spawn((
 					Name::new("Fetch Behavior"),
 					TargetAgent(agent),
-					AssetRunOnReady::<Bert>::new("default-bert.ron"),
+					AssetRunOnReady::<Bert>::new("ml/default-bert.ron"),
 					InsertSentenceOnUserInput::default(),
 					InsertSentenceSteerTarget::<Collectable>::default(),
 					RunOnSteerTargetInsert::default().with_source(agent),

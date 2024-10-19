@@ -4,6 +4,7 @@
     "4294967333": {
       "components": {
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": "Camera3d",
+        "bevy_core::name::Name": "Camera",
         "bevy_transform::components::global_transform::GlobalTransform": [
           1.0,
           0.0,
@@ -66,6 +67,7 @@
           "main_animation": null,
           "transitions": []
         },
+        "bevy_core::name::Name": "Foxie",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967335

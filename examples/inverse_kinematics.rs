@@ -9,7 +9,7 @@ pub fn main() {
 			(
 				beetmash::core::scenes::lighting_3d,
 				beetmash::core::scenes::ground_3d,
-				beet_examples::components::create_render_camera,
+				beet_examples::robot_arm::create_render_camera,
 				beet_examples::scenes::spatial::phone_screen,
 				beet_examples::scenes::spatial::inverse_kinematics,
 			),

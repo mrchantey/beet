@@ -11,7 +11,7 @@ pub struct RenderTexture {
 	pub handle: Handle<StandardMaterial>,
 }
 
-
+/// The layer used for rendering to a texture instead of the main camera.
 pub const RENDER_TEXTURE_LAYER: usize = 1;
 
 
@@ -50,7 +50,7 @@ pub fn create_render_camera(
 	let material_handle = materials.add(StandardMaterial {
 		base_color_texture: Some(image_handle.clone()),
 		reflectance: 0.02,
-		unlit: false,
+		unlit: true,
 		..default()
 	});
 

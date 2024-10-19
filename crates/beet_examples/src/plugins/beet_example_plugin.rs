@@ -12,6 +12,17 @@ pub fn running_beet_example_plugin(app: &mut App) {
 	));
 }
 
+/// Simple default plugins
+pub fn crate_test_beet_example_plugin(app: &mut App) {
+	app.add_plugins((
+		BeetmashDefaultPlugins {
+			default_asset_path: "../../assets".into(),
+			..default()
+		},
+		beet_example_plugin,
+	));
+}
+
 pub fn beet_example_plugin(app: &mut App) {
 	app.add_plugins((
 		// BeetmashDefaultPlugins::with_beetmash_assets(),
@@ -85,7 +96,8 @@ fn plugin_3d(app: &mut App) {
 			camera_distance,
 			rotate_collectables,
 			keyboard_controller,
-			ik_spawner
+			ik_spawner.never_param_warn(),
+			update_emoji_swapper.never_param_warn()
 		))
 		.register_type::<IkSpawner>()
 		.register_type::<FollowCursor3d>()

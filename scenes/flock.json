@@ -56,6 +56,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967334
@@ -134,6 +135,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967333
         ]
@@ -186,6 +188,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967336
@@ -264,6 +267,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967335
         ]
@@ -316,6 +320,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967338
@@ -394,6 +399,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967337
         ]
@@ -446,6 +452,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967340
@@ -524,6 +531,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967339
         ]
@@ -576,6 +584,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967342
@@ -654,6 +663,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967341
         ]
@@ -706,6 +716,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967344
@@ -784,6 +795,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967343
         ]
@@ -836,6 +848,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967346
@@ -914,6 +927,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967345
         ]
@@ -966,6 +980,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967348
@@ -1044,6 +1059,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967347
         ]
@@ -1096,6 +1112,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967350
@@ -1174,6 +1191,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967349
         ]
@@ -1226,6 +1244,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967352
@@ -1304,6 +1323,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967351
         ]
@@ -1356,6 +1376,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967354
@@ -1434,6 +1455,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967353
         ]
@@ -1486,6 +1508,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967356
@@ -1564,6 +1587,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967355
         ]
@@ -1616,6 +1640,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967358
@@ -1694,6 +1719,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967357
         ]
@@ -1746,6 +1772,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967360
@@ -1824,6 +1851,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967359
         ]
@@ -1876,6 +1904,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967362
@@ -1954,6 +1983,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967361
         ]
@@ -2006,6 +2036,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967364
@@ -2084,6 +2115,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967363
         ]
@@ -2136,6 +2168,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967366
@@ -2214,6 +2247,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967365
         ]
@@ -2266,6 +2300,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967368
@@ -2344,6 +2379,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967367
         ]
@@ -2396,6 +2432,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967370
@@ -2474,6 +2511,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967369
         ]
@@ -2526,6 +2564,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967372
@@ -2604,6 +2643,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967371
         ]
@@ -2656,6 +2696,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967374
@@ -2734,6 +2775,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967373
         ]
@@ -2786,6 +2828,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967376
@@ -2864,6 +2907,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967375
         ]
@@ -2916,6 +2960,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967378
@@ -2994,6 +3039,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967377
         ]
@@ -3046,6 +3092,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967380
@@ -3124,6 +3171,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967379
         ]
@@ -3176,6 +3224,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967382
@@ -3254,6 +3303,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967381
         ]
@@ -3306,6 +3356,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967384
@@ -3384,6 +3435,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967383
         ]
@@ -3436,6 +3488,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967386
@@ -3514,6 +3567,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967385
         ]
@@ -3566,6 +3620,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967388
@@ -3644,6 +3699,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967387
         ]
@@ -3696,6 +3752,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967390
@@ -3774,6 +3831,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967389
         ]
@@ -3826,6 +3884,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967392
@@ -3904,6 +3963,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967391
         ]
@@ -3956,6 +4016,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967394
@@ -4034,6 +4095,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967393
         ]
@@ -4086,6 +4148,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967396
@@ -4164,6 +4227,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967395
         ]
@@ -4216,6 +4280,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967398
@@ -4294,6 +4359,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967397
         ]
@@ -4346,6 +4412,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967400
@@ -4424,6 +4491,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967399
         ]
@@ -4476,6 +4544,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967402
@@ -4554,6 +4623,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967401
         ]
@@ -4606,6 +4676,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967404
@@ -4684,6 +4755,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967403
         ]
@@ -4736,6 +4808,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967406
@@ -4814,6 +4887,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967405
         ]
@@ -4866,6 +4940,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967408
@@ -4944,6 +5019,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967407
         ]
@@ -4996,6 +5072,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967410
@@ -5074,6 +5151,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967409
         ]
@@ -5126,6 +5204,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967412
@@ -5204,6 +5283,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967411
         ]
@@ -5256,6 +5336,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967414
@@ -5334,6 +5415,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967413
         ]
@@ -5386,6 +5468,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967416
@@ -5464,6 +5547,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967415
         ]
@@ -5516,6 +5600,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967418
@@ -5594,6 +5679,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967417
         ]
@@ -5646,6 +5732,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967420
@@ -5724,6 +5811,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967419
         ]
@@ -5776,6 +5864,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967422
@@ -5854,6 +5943,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967421
         ]
@@ -5906,6 +5996,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967424
@@ -5984,6 +6075,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967423
         ]
@@ -6036,6 +6128,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967426
@@ -6114,6 +6207,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967425
         ]
@@ -6166,6 +6260,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967428
@@ -6244,6 +6339,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967427
         ]
@@ -6296,6 +6392,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967430
@@ -6374,6 +6471,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967429
         ]
@@ -6426,6 +6524,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967432
@@ -6504,6 +6603,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967431
         ]
@@ -6556,6 +6656,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967434
@@ -6634,6 +6735,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967433
         ]
@@ -6686,6 +6788,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967436
@@ -6764,6 +6867,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967435
         ]
@@ -6816,6 +6920,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967438
@@ -6894,6 +6999,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967437
         ]
@@ -6946,6 +7052,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967440
@@ -7024,6 +7131,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967439
         ]
@@ -7076,6 +7184,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967442
@@ -7154,6 +7263,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967441
         ]
@@ -7206,6 +7316,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967444
@@ -7284,6 +7395,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967443
         ]
@@ -7336,6 +7448,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967446
@@ -7414,6 +7527,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967445
         ]
@@ -7466,6 +7580,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967448
@@ -7544,6 +7659,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967447
         ]
@@ -7596,6 +7712,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967450
@@ -7674,6 +7791,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967449
         ]
@@ -7726,6 +7844,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967452
@@ -7804,6 +7923,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967451
         ]
@@ -7856,6 +7976,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967454
@@ -7934,6 +8055,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967453
         ]
@@ -7986,6 +8108,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967456
@@ -8064,6 +8187,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967455
         ]
@@ -8116,6 +8240,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967458
@@ -8194,6 +8319,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967457
         ]
@@ -8246,6 +8372,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967460
@@ -8324,6 +8451,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967459
         ]
@@ -8376,6 +8504,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967462
@@ -8454,6 +8583,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967461
         ]
@@ -8506,6 +8636,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967464
@@ -8584,6 +8715,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967463
         ]
@@ -8636,6 +8768,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967466
@@ -8714,6 +8847,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967465
         ]
@@ -8766,6 +8900,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967468
@@ -8844,6 +8979,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967467
         ]
@@ -8896,6 +9032,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967470
@@ -8974,6 +9111,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967469
         ]
@@ -9026,6 +9164,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967472
@@ -9104,6 +9243,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967471
         ]
@@ -9156,6 +9296,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967474
@@ -9234,6 +9375,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967473
         ]
@@ -9286,6 +9428,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967476
@@ -9364,6 +9507,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967475
         ]
@@ -9416,6 +9560,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967478
@@ -9494,6 +9639,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967477
         ]
@@ -9546,6 +9692,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967480
@@ -9624,6 +9771,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967479
         ]
@@ -9676,6 +9824,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967482
@@ -9754,6 +9903,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967481
         ]
@@ -9806,6 +9956,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967484
@@ -9884,6 +10035,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967483
         ]
@@ -9936,6 +10088,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967486
@@ -10014,6 +10167,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967485
         ]
@@ -10066,6 +10220,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967488
@@ -10144,6 +10299,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967487
         ]
@@ -10196,6 +10352,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967490
@@ -10274,6 +10431,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967489
         ]
@@ -10326,6 +10484,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967492
@@ -10404,6 +10563,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967491
         ]
@@ -10456,6 +10616,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967494
@@ -10534,6 +10695,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967493
         ]
@@ -10586,6 +10748,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967496
@@ -10664,6 +10827,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967495
         ]
@@ -10716,6 +10880,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967498
@@ -10794,6 +10959,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967497
         ]
@@ -10846,6 +11012,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967500
@@ -10924,6 +11091,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967499
         ]
@@ -10976,6 +11144,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967502
@@ -11054,6 +11223,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967501
         ]
@@ -11106,6 +11276,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967504
@@ -11184,6 +11355,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967503
         ]
@@ -11236,6 +11408,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967506
@@ -11314,6 +11487,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967505
         ]
@@ -11366,6 +11540,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967508
@@ -11444,6 +11619,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967507
         ]
@@ -11496,6 +11672,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967510
@@ -11574,6 +11751,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967509
         ]
@@ -11626,6 +11804,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967512
@@ -11704,6 +11883,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967511
         ]
@@ -11756,6 +11936,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967514
@@ -11834,6 +12015,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967513
         ]
@@ -11886,6 +12068,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967516
@@ -11964,6 +12147,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967515
         ]
@@ -12016,6 +12200,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967518
@@ -12094,6 +12279,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967517
         ]
@@ -12146,6 +12332,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967520
@@ -12224,6 +12411,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967519
         ]
@@ -12276,6 +12464,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967522
@@ -12354,6 +12543,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967521
         ]
@@ -12406,6 +12596,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967524
@@ -12484,6 +12675,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967523
         ]
@@ -12536,6 +12728,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967526
@@ -12614,6 +12807,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967525
         ]
@@ -12666,6 +12860,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967528
@@ -12744,6 +12939,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967527
         ]
@@ -12796,6 +12992,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967530
@@ -12874,6 +13071,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967529
         ]
@@ -12926,6 +13124,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967532
@@ -13004,6 +13203,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967531
         ]
@@ -13056,6 +13256,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967534
@@ -13134,6 +13335,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967533
         ]
@@ -13186,6 +13388,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967536
@@ -13264,6 +13467,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967535
         ]
@@ -13316,6 +13520,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967538
@@ -13394,6 +13599,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967537
         ]
@@ -13446,6 +13652,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967540
@@ -13524,6 +13731,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967539
         ]
@@ -13576,6 +13784,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967542
@@ -13654,6 +13863,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967541
         ]
@@ -13706,6 +13916,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967544
@@ -13784,6 +13995,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967543
         ]
@@ -13836,6 +14048,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967546
@@ -13914,6 +14127,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967545
         ]
@@ -13966,6 +14180,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967548
@@ -14044,6 +14259,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967547
         ]
@@ -14096,6 +14312,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967550
@@ -14174,6 +14391,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967549
         ]
@@ -14226,6 +14444,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967552
@@ -14304,6 +14523,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967551
         ]
@@ -14356,6 +14576,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967554
@@ -14434,6 +14655,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967553
         ]
@@ -14486,6 +14708,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967556
@@ -14564,6 +14787,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967555
         ]
@@ -14616,6 +14840,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967558
@@ -14694,6 +14919,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967557
         ]
@@ -14746,6 +14972,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967560
@@ -14824,6 +15051,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967559
         ]
@@ -14876,6 +15104,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967562
@@ -14954,6 +15183,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967561
         ]
@@ -15006,6 +15236,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967564
@@ -15084,6 +15315,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967563
         ]
@@ -15136,6 +15368,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967566
@@ -15214,6 +15447,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967565
         ]
@@ -15266,6 +15500,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967568
@@ -15344,6 +15579,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967567
         ]
@@ -15396,6 +15632,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967570
@@ -15474,6 +15711,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967569
         ]
@@ -15526,6 +15764,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967572
@@ -15604,6 +15843,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967571
         ]
@@ -15656,6 +15896,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967574
@@ -15734,6 +15975,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967573
         ]
@@ -15786,6 +16028,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967576
@@ -15864,6 +16107,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967575
         ]
@@ -15916,6 +16160,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967578
@@ -15994,6 +16239,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967577
         ]
@@ -16046,6 +16292,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967580
@@ -16124,6 +16371,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967579
         ]
@@ -16176,6 +16424,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967582
@@ -16254,6 +16503,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967581
         ]
@@ -16306,6 +16556,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967584
@@ -16384,6 +16635,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967583
         ]
@@ -16436,6 +16688,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967586
@@ -16514,6 +16767,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967585
         ]
@@ -16566,6 +16820,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967588
@@ -16644,6 +16899,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967587
         ]
@@ -16696,6 +16952,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967590
@@ -16774,6 +17031,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967589
         ]
@@ -16826,6 +17084,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967592
@@ -16904,6 +17163,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967591
         ]
@@ -16956,6 +17216,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967594
@@ -17034,6 +17295,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967593
         ]
@@ -17086,6 +17348,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967596
@@ -17164,6 +17427,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967595
         ]
@@ -17216,6 +17480,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967598
@@ -17294,6 +17559,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967597
         ]
@@ -17346,6 +17612,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967600
@@ -17424,6 +17691,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967599
         ]
@@ -17476,6 +17744,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967602
@@ -17554,6 +17823,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967601
         ]
@@ -17606,6 +17876,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967604
@@ -17684,6 +17955,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967603
         ]
@@ -17736,6 +18008,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967606
@@ -17814,6 +18087,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967605
         ]
@@ -17866,6 +18140,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967608
@@ -17944,6 +18219,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967607
         ]
@@ -17996,6 +18272,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967610
@@ -18074,6 +18351,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967609
         ]
@@ -18126,6 +18404,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967612
@@ -18204,6 +18483,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967611
         ]
@@ -18256,6 +18536,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967614
@@ -18334,6 +18615,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967613
         ]
@@ -18386,6 +18668,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967616
@@ -18464,6 +18747,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967615
         ]
@@ -18516,6 +18800,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967618
@@ -18594,6 +18879,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967617
         ]
@@ -18646,6 +18932,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967620
@@ -18724,6 +19011,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967619
         ]
@@ -18776,6 +19064,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967622
@@ -18854,6 +19143,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967621
         ]
@@ -18906,6 +19196,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967624
@@ -18984,6 +19275,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967623
         ]
@@ -19036,6 +19328,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967626
@@ -19114,6 +19407,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967625
         ]
@@ -19166,6 +19460,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967628
@@ -19244,6 +19539,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967627
         ]
@@ -19296,6 +19592,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967630
@@ -19374,6 +19671,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967629
         ]
@@ -19426,6 +19724,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967632
@@ -19504,6 +19803,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967631
         ]
@@ -19556,6 +19856,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967634
@@ -19634,6 +19935,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967633
         ]
@@ -19686,6 +19988,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967636
@@ -19764,6 +20067,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967635
         ]
@@ -19816,6 +20120,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967638
@@ -19894,6 +20199,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967637
         ]
@@ -19946,6 +20252,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967640
@@ -20024,6 +20331,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967639
         ]
@@ -20076,6 +20384,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967642
@@ -20154,6 +20463,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967641
         ]
@@ -20206,6 +20516,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967644
@@ -20284,6 +20595,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967643
         ]
@@ -20336,6 +20648,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967646
@@ -20414,6 +20727,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967645
         ]
@@ -20466,6 +20780,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967648
@@ -20544,6 +20859,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967647
         ]
@@ -20596,6 +20912,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967650
@@ -20674,6 +20991,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967649
         ]
@@ -20726,6 +21044,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967652
@@ -20804,6 +21123,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967651
         ]
@@ -20856,6 +21176,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967654
@@ -20934,6 +21255,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967653
         ]
@@ -20986,6 +21308,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967656
@@ -21064,6 +21387,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967655
         ]
@@ -21116,6 +21440,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967658
@@ -21194,6 +21519,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967657
         ]
@@ -21246,6 +21572,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967660
@@ -21324,6 +21651,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967659
         ]
@@ -21376,6 +21704,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967662
@@ -21454,6 +21783,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967661
         ]
@@ -21506,6 +21836,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967664
@@ -21584,6 +21915,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967663
         ]
@@ -21636,6 +21968,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967666
@@ -21714,6 +22047,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967665
         ]
@@ -21766,6 +22100,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967668
@@ -21844,6 +22179,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967667
         ]
@@ -21896,6 +22232,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967670
@@ -21974,6 +22311,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967669
         ]
@@ -22026,6 +22364,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967672
@@ -22104,6 +22443,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967671
         ]
@@ -22156,6 +22496,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967674
@@ -22234,6 +22575,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967673
         ]
@@ -22286,6 +22628,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967676
@@ -22364,6 +22707,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967675
         ]
@@ -22416,6 +22760,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967678
@@ -22494,6 +22839,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967677
         ]
@@ -22546,6 +22892,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967680
@@ -22624,6 +22971,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967679
         ]
@@ -22676,6 +23024,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967682
@@ -22754,6 +23103,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967681
         ]
@@ -22806,6 +23156,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967684
@@ -22884,6 +23235,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967683
         ]
@@ -22936,6 +23288,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967686
@@ -23014,6 +23367,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967685
         ]
@@ -23066,6 +23420,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967688
@@ -23144,6 +23499,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967687
         ]
@@ -23196,6 +23552,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967690
@@ -23274,6 +23631,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967689
         ]
@@ -23326,6 +23684,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967692
@@ -23404,6 +23763,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967691
         ]
@@ -23456,6 +23816,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967694
@@ -23534,6 +23895,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967693
         ]
@@ -23586,6 +23948,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967696
@@ -23664,6 +24027,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967695
         ]
@@ -23716,6 +24080,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967698
@@ -23794,6 +24159,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967697
         ]
@@ -23846,6 +24212,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967700
@@ -23924,6 +24291,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967699
         ]
@@ -23976,6 +24344,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967702
@@ -24054,6 +24423,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967701
         ]
@@ -24106,6 +24476,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967704
@@ -24184,6 +24555,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967703
         ]
@@ -24236,6 +24608,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967706
@@ -24314,6 +24687,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967705
         ]
@@ -24366,6 +24740,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967708
@@ -24444,6 +24819,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967707
         ]
@@ -24496,6 +24872,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967710
@@ -24574,6 +24951,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967709
         ]
@@ -24626,6 +25004,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967712
@@ -24704,6 +25083,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967711
         ]
@@ -24756,6 +25136,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967714
@@ -24834,6 +25215,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967713
         ]
@@ -24886,6 +25268,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967716
@@ -24964,6 +25347,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967715
         ]
@@ -25016,6 +25400,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967718
@@ -25094,6 +25479,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967717
         ]
@@ -25146,6 +25532,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967720
@@ -25224,6 +25611,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967719
         ]
@@ -25276,6 +25664,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967722
@@ -25354,6 +25743,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967721
         ]
@@ -25406,6 +25796,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967724
@@ -25484,6 +25875,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967723
         ]
@@ -25536,6 +25928,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967726
@@ -25614,6 +26007,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967725
         ]
@@ -25666,6 +26060,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967728
@@ -25744,6 +26139,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967727
         ]
@@ -25796,6 +26192,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967730
@@ -25874,6 +26271,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967729
         ]
@@ -25926,6 +26324,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967732
@@ -26004,6 +26403,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967731
         ]
@@ -26056,6 +26456,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967734
@@ -26134,6 +26535,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967733
         ]
@@ -26186,6 +26588,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967736
@@ -26264,6 +26667,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967735
         ]
@@ -26316,6 +26720,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967738
@@ -26394,6 +26799,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967737
         ]
@@ -26446,6 +26852,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967740
@@ -26524,6 +26931,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967739
         ]
@@ -26576,6 +26984,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967742
@@ -26654,6 +27063,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967741
         ]
@@ -26706,6 +27116,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967744
@@ -26784,6 +27195,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967743
         ]
@@ -26836,6 +27248,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967746
@@ -26914,6 +27327,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967745
         ]
@@ -26966,6 +27380,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967748
@@ -27044,6 +27459,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967747
         ]
@@ -27096,6 +27512,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967750
@@ -27174,6 +27591,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967749
         ]
@@ -27226,6 +27644,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967752
@@ -27304,6 +27723,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967751
         ]
@@ -27356,6 +27776,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967754
@@ -27434,6 +27855,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967753
         ]
@@ -27486,6 +27908,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967756
@@ -27564,6 +27987,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967755
         ]
@@ -27616,6 +28040,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967758
@@ -27694,6 +28119,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967757
         ]
@@ -27746,6 +28172,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967760
@@ -27824,6 +28251,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967759
         ]
@@ -27876,6 +28304,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967762
@@ -27954,6 +28383,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967761
         ]
@@ -28006,6 +28436,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967764
@@ -28084,6 +28515,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967763
         ]
@@ -28136,6 +28568,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967766
@@ -28214,6 +28647,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967765
         ]
@@ -28266,6 +28700,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967768
@@ -28344,6 +28779,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967767
         ]
@@ -28396,6 +28832,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967770
@@ -28474,6 +28911,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967769
         ]
@@ -28526,6 +28964,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967772
@@ -28604,6 +29043,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967771
         ]
@@ -28656,6 +29096,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967774
@@ -28734,6 +29175,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967773
         ]
@@ -28786,6 +29228,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967776
@@ -28864,6 +29307,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967775
         ]
@@ -28916,6 +29360,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967778
@@ -28994,6 +29439,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967777
         ]
@@ -29046,6 +29492,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967780
@@ -29124,6 +29571,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967779
         ]
@@ -29176,6 +29624,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967782
@@ -29254,6 +29703,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967781
         ]
@@ -29306,6 +29756,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967784
@@ -29384,6 +29835,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967783
         ]
@@ -29436,6 +29888,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967786
@@ -29514,6 +29967,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967785
         ]
@@ -29566,6 +30020,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967788
@@ -29644,6 +30099,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967787
         ]
@@ -29696,6 +30152,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967790
@@ -29774,6 +30231,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967789
         ]
@@ -29826,6 +30284,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967792
@@ -29904,6 +30363,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967791
         ]
@@ -29956,6 +30416,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967794
@@ -30034,6 +30495,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967793
         ]
@@ -30086,6 +30548,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967796
@@ -30164,6 +30627,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967795
         ]
@@ -30216,6 +30680,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967798
@@ -30294,6 +30759,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967797
         ]
@@ -30346,6 +30812,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967800
@@ -30424,6 +30891,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967799
         ]
@@ -30476,6 +30944,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967802
@@ -30554,6 +31023,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967801
         ]
@@ -30606,6 +31076,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967804
@@ -30684,6 +31155,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967803
         ]
@@ -30736,6 +31208,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967806
@@ -30814,6 +31287,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967805
         ]
@@ -30866,6 +31340,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967808
@@ -30944,6 +31419,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967807
         ]
@@ -30996,6 +31472,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967810
@@ -31074,6 +31551,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967809
         ]
@@ -31126,6 +31604,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967812
@@ -31204,6 +31683,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967811
         ]
@@ -31256,6 +31736,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967814
@@ -31334,6 +31815,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967813
         ]
@@ -31386,6 +31868,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967816
@@ -31464,6 +31947,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967815
         ]
@@ -31516,6 +32000,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967818
@@ -31594,6 +32079,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967817
         ]
@@ -31646,6 +32132,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967820
@@ -31724,6 +32211,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967819
         ]
@@ -31776,6 +32264,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967822
@@ -31854,6 +32343,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967821
         ]
@@ -31906,6 +32396,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967824
@@ -31984,6 +32475,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967823
         ]
@@ -32036,6 +32528,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967826
@@ -32114,6 +32607,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967825
         ]
@@ -32166,6 +32660,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967828
@@ -32244,6 +32739,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967827
         ]
@@ -32296,6 +32792,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967830
@@ -32374,6 +32871,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967829
         ]
@@ -32426,6 +32924,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967832
@@ -32504,6 +33003,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967831
         ]
@@ -32556,6 +33056,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967834
@@ -32634,6 +33135,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967833
         ]
@@ -32686,6 +33188,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967836
@@ -32764,6 +33267,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967835
         ]
@@ -32816,6 +33320,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967838
@@ -32894,6 +33399,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967837
         ]
@@ -32946,6 +33452,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967840
@@ -33024,6 +33531,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967839
         ]
@@ -33076,6 +33584,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967842
@@ -33154,6 +33663,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967841
         ]
@@ -33206,6 +33716,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967844
@@ -33284,6 +33795,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967843
         ]
@@ -33336,6 +33848,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967846
@@ -33414,6 +33927,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967845
         ]
@@ -33466,6 +33980,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967848
@@ -33544,6 +34059,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967847
         ]
@@ -33596,6 +34112,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967850
@@ -33674,6 +34191,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967849
         ]
@@ -33726,6 +34244,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967852
@@ -33804,6 +34323,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967851
         ]
@@ -33856,6 +34376,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967854
@@ -33934,6 +34455,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967853
         ]
@@ -33986,6 +34508,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967856
@@ -34064,6 +34587,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967855
         ]
@@ -34116,6 +34640,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967858
@@ -34194,6 +34719,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967857
         ]
@@ -34246,6 +34772,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967860
@@ -34324,6 +34851,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967859
         ]
@@ -34376,6 +34904,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967862
@@ -34454,6 +34983,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967861
         ]
@@ -34506,6 +35036,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967864
@@ -34584,6 +35115,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967863
         ]
@@ -34636,6 +35168,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967866
@@ -34714,6 +35247,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967865
         ]
@@ -34766,6 +35300,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967868
@@ -34844,6 +35379,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967867
         ]
@@ -34896,6 +35432,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967870
@@ -34974,6 +35511,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967869
         ]
@@ -35026,6 +35564,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967872
@@ -35104,6 +35643,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967871
         ]
@@ -35156,6 +35696,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967874
@@ -35234,6 +35775,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967873
         ]
@@ -35286,6 +35828,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967876
@@ -35364,6 +35907,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967875
         ]
@@ -35416,6 +35960,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967878
@@ -35494,6 +36039,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967877
         ]
@@ -35546,6 +36092,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967880
@@ -35624,6 +36171,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967879
         ]
@@ -35676,6 +36224,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967882
@@ -35754,6 +36303,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967881
         ]
@@ -35806,6 +36356,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967884
@@ -35884,6 +36435,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967883
         ]
@@ -35936,6 +36488,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967886
@@ -36014,6 +36567,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967885
         ]
@@ -36066,6 +36620,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967888
@@ -36144,6 +36699,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967887
         ]
@@ -36196,6 +36752,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967890
@@ -36274,6 +36831,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967889
         ]
@@ -36326,6 +36884,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967892
@@ -36404,6 +36963,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967891
         ]
@@ -36456,6 +37016,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967894
@@ -36534,6 +37095,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967893
         ]
@@ -36586,6 +37148,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967896
@@ -36664,6 +37227,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967895
         ]
@@ -36716,6 +37280,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967898
@@ -36794,6 +37359,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967897
         ]
@@ -36846,6 +37412,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967900
@@ -36924,6 +37491,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967899
         ]
@@ -36976,6 +37544,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967902
@@ -37054,6 +37623,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967901
         ]
@@ -37106,6 +37676,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967904
@@ -37184,6 +37755,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967903
         ]
@@ -37236,6 +37808,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967906
@@ -37314,6 +37887,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967905
         ]
@@ -37366,6 +37940,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967908
@@ -37444,6 +38019,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967907
         ]
@@ -37496,6 +38072,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967910
@@ -37574,6 +38151,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967909
         ]
@@ -37626,6 +38204,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967912
@@ -37704,6 +38283,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967911
         ]
@@ -37756,6 +38336,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967914
@@ -37834,6 +38415,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967913
         ]
@@ -37886,6 +38468,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967916
@@ -37964,6 +38547,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967915
         ]
@@ -38016,6 +38600,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967918
@@ -38094,6 +38679,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967917
         ]
@@ -38146,6 +38732,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967920
@@ -38224,6 +38811,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967919
         ]
@@ -38276,6 +38864,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967922
@@ -38354,6 +38943,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967921
         ]
@@ -38406,6 +38996,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967924
@@ -38484,6 +39075,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967923
         ]
@@ -38536,6 +39128,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967926
@@ -38614,6 +39207,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967925
         ]
@@ -38666,6 +39260,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967928
@@ -38744,6 +39339,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967927
         ]
@@ -38796,6 +39392,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967930
@@ -38874,6 +39471,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967929
         ]
@@ -38926,6 +39524,7 @@
         "beetmash_scene::utils::bundle_placeholder::BundlePlaceholder": {
           "Sprite": "spaceship_pack/ship_2.png"
         },
+        "bevy_core::name::Name": "Spaceship",
         "bevy_hierarchy::components::children::Children": [
           [
             4294967932
@@ -39004,6 +39603,7 @@
             0.0
           ]
         },
+        "bevy_core::name::Name": "Flock Behavior",
         "bevy_hierarchy::components::parent::Parent": [
           4294967931
         ]

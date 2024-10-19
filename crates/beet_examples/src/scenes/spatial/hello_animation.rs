@@ -29,7 +29,7 @@ pub fn hello_animation(mut commands: Commands) {
 		.spawn((
 			Name::new("Foxie"),
 			Transform::from_scale(Vec3::splat(0.1)),
-			BundlePlaceholder::Scene("Fox.glb#Scene0".into()),
+			BundlePlaceholder::Scene("misc/fox.glb#Scene0".into()),
 			graph,
 			AnimationTransitions::new(),
 		))

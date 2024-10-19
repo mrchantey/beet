@@ -25,3 +25,25 @@ pub fn observe_run_results(world: &mut World) -> Func<RunResult> {
 	});
 	func
 }
+
+
+
+
+pub fn block_on_asset_load<'a, A: Asset>(app: &'a mut App, path: &'static str) {
+	let handle = app
+		.world_mut()
+		.resource_mut::<AssetServer>()
+		.load::<A>(path)
+		.clone();
+	loop {
+		match app
+			.world_mut()
+			.resource_mut::<AssetServer>()
+			.load_state(handle.id())
+		{
+			bevy::asset::LoadState::Loaded => return,
+			_ => {}
+		}
+		app.update();
+	}
+}

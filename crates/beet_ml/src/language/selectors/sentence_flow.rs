@@ -74,12 +74,12 @@ mod test {
 		.finish();
 		let on_run = observe_trigger_names::<OnRun>(app.world_mut());
 
-		block_on_asset_load::<Bert>(&mut app, "default-bert.ron");
+		block_on_asset_load::<Bert>(&mut app, "ml/default-bert.ron");
 
 		let handle = app
 			.world_mut()
 			.resource_mut::<AssetServer>()
-			.load::<Bert>("default-bert.ron");
+			.load::<Bert>("ml/default-bert.ron");
 
 		app.world_mut()
 			.spawn((

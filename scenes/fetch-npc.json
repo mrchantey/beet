@@ -149,7 +149,7 @@
         "beet_ml::language::selectors::insert_sentence_steer_target::InsertSentenceSteerTarget<beet_examples::components::collectable::Collectable>": {},
         "beetmash_core::render::block_app_ready::AssetLoadBlockAppReady": {},
         "beetmash_scene::utils::asset_placeholder::AssetPlaceholder<beet_ml::language::bert::Bert>": {
-          "path": "default-bert.ron"
+          "path": "ml/default-bert.ron"
         },
         "bevy_core::name::Name": "Fetch Behavior",
         "bevy_hierarchy::components::children::Children": [

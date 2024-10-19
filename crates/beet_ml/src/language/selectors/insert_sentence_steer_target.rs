@@ -42,7 +42,6 @@ fn insert_sentence_steer_target<T: GenericActionComponent>(
 	items: Query<Entity, With<T>>,
 	mut berts: ResMut<Assets<Bert>>,
 ) {
-	
 	let (agent, target_sentence, handle, _) = query
 		.get(trigger.entity())
 		.expect(expect_action::ACTION_QUERY_MISSING);
@@ -92,13 +91,13 @@ mod test {
 		))
 		.finish();
 
-		block_on_asset_load::<Bert>(&mut app, "default-bert.ron");
+		block_on_asset_load::<Bert>(&mut app, "ml/default-bert.ron");
 
 		let world = app.world_mut();
 
 		let handle = world
 			.resource_mut::<AssetServer>()
-			.load::<Bert>("default-bert.ron");
+			.load::<Bert>("ml/default-bert.ron");
 
 
 		let agent = world.spawn_empty().id();
