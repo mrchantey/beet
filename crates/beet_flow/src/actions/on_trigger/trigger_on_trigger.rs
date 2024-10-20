@@ -1,12 +1,18 @@
 use crate::prelude::*;
 use bevy::prelude::*;
+use bevy::scene::SceneInstanceReady;
 use std::marker::PhantomData;
 
 
 /// Trigger [`OnRun`] for the [`TriggerOnTrigger::target`]
 /// whenever [`OnRunResult`] is triggered on one of the [`TriggerOnTrigger::sources`].
+/// This is used by state machines and other paradigms that require
+/// arbitary triggering of behaviors.
 pub type RunOnRunResult = TriggerOnTrigger<OnRunResult, OnRun>;
 
+/// Trigger [`OnRun`] for the [`TriggerOnTrigger::target`]
+/// whenever [`SceneInstanceReady`] is triggered on one of the [`TriggerOnTrigger::sources`].
+pub type RunOnSceneReady = TriggerOnTrigger<SceneInstanceReady, OnRun>;
 
 pub type TriggerOnRun<T> = TriggerOnTrigger<OnRun, T>;
 

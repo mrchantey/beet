@@ -37,8 +37,8 @@ pub fn fetch_npc(mut commands: Commands) {
 					AssetRunOnReady::<Bert>::new("ml/default-bert.ron"),
 					InsertSentenceOnUserInput::default(),
 					InsertSentenceSteerTarget::<Collectable>::default(),
-					RunOnSteerTargetInsert::default().with_source(agent),
-					RunOnSteerTargetRemove::default().with_source(agent),
+					RunOnSteerTargetInsert::new_with_source(agent),
+					RunOnSteerTargetRemove::new_with_source(agent),
 					ScoreFlow::default(),
 					RemoveOnTrigger::<OnRunResult, Sentence>::default(),
 				))
@@ -57,15 +57,12 @@ pub fn fetch_npc(mut commands: Commands) {
 							max_radius: 10.,
 						},
 						PlayAnimation::new(walk_index).repeat_forever(),
-						InsertOnTrigger::<OnRun, Velocity>::default()
-							.with_target(agent),
+						InsertOnTrigger::<OnRun, Velocity>::new_with_target(agent),
 						ContinueRun::default(),
 						Seek::default(),
 						EndOnArrive::new(1.),
-						RemoveOnTrigger::<OnRunResult, SteerTarget>::default()
-							.with_target(agent),
-						RemoveOnTrigger::<OnRunResult, Velocity>::default()
-							.with_target(agent),
+						RemoveOnTrigger::<OnRunResult, SteerTarget>::new_with_target(agent),
+						RemoveOnTrigger::<OnRunResult, Velocity>::new_with_target(agent),
 					));
 				});
 		});

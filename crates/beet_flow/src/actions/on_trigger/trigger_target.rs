@@ -118,7 +118,7 @@ mod test {
 
 		let target = world.spawn(EndOnRun::success()).id();
 		world
-			.spawn((TriggerOnRun::new(OnRun).with_target(target),))
+			.spawn(TriggerOnRun::new(OnRun).with_target(target))
 			.flush_trigger(OnRun);
 		world.flush();
 

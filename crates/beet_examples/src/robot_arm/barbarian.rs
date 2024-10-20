@@ -49,6 +49,8 @@ pub fn spawn_barbarian(mut commands: Commands) {
 
 	let transition_duration = Duration::from_secs_f32(0.5);
 
+	let mut idle_behavior = Entity::PLACEHOLDER;
+
 	commands
 		.spawn((
 			Name::new("Barbarian"),
@@ -56,6 +58,7 @@ pub fn spawn_barbarian(mut commands: Commands) {
 			BundlePlaceholder::Scene(
 				"kaykit-adventurers/Barbarian_NoProps.glb#Scene0".into(),
 			),
+			AssetLoadBlockAppReady,
 			graph,
 			AnimationTransitions::default(),
 		))
@@ -66,46 +69,42 @@ pub fn spawn_barbarian(mut commands: Commands) {
 				&mut parent.spawn(Transform::from_xyz(0.5, 2.5, 0.5)),
 			);
 
-			parent
+			idle_behavior = parent
 				.spawn((
-					Name::new("Animation Behavior"),
-					RunOnSpawn,
-					SequenceFlow,
-					Repeat::default(),
+					Name::new("Idle"),
+					// RunOnAppReady::default(),
+					ContinueRun::default(),
+					// Repeat
+					TargetAgent(agent),
+					PlayAnimation::new(idle_index)
+						.repeat(RepeatAnimation::Forever)
+						.with_transition_duration(transition_duration),
+					idle_clip,
+					TriggerOnAnimationEnd::new(
+						idle_index,
+						OnRunResult::success(),
+					)
+					.with_transition_duration(transition_duration),
 				))
-				.with_children(|parent| {
-					parent.spawn((
-						Name::new("Idle"),
-						ContinueRun::default(),
-						TargetAgent(agent),
-						PlayAnimation::new(idle_index)
-							.repeat(RepeatAnimation::Count(4))
-							.with_transition_duration(transition_duration),
-						idle_clip,
-						TriggerOnAnimationEnd::new(
-							idle_index,
-							OnRunResult::success(),
-						)
-						.with_transition_duration(transition_duration),
-					));
-					parent.spawn((
-						Name::new("Respond To User"),
-						RunOnInsertSentence::default(),
-						InsertSentenceOnUserInput::default(),
-						ContinueRun::default(),
-						TargetAgent(agent),
-						PlayAnimation::new(walk_index)
-							.repeat(RepeatAnimation::Count(4))
-							.with_transition_duration(transition_duration),
-						walk_clip,
-						TriggerOnAnimationEnd::new(
-							walk_index,
-							OnRunResult::success(),
-						)
-						.with_transition_duration(transition_duration),
-					));
-				});
-		});
+				.id();
+
+			parent.spawn((
+				Name::new("Respond To User"),
+				EndOnRun::success().with_target(idle_behavior),
+				RunOnInsertSentence::default(),
+				InsertSentenceOnUserInput::default(),
+				ContinueRun::default(),
+				TargetAgent(agent),
+				PlayAnimation::new(walk_index)
+					.repeat(RepeatAnimation::Count(4))
+					.with_transition_duration(transition_duration),
+				walk_clip,
+				TriggerOnAnimationEnd::new(walk_index, OnRunResult::success())
+					.with_transition_duration(transition_duration),
+				RunOnRunResult::new_with_target(idle_behavior),
+			));
+		})
+		.insert(RunOnSceneReady::new_with_target(idle_behavior));
 }
 
 

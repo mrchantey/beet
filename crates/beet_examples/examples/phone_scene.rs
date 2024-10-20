@@ -1,10 +1,12 @@
 use beet_examples::prelude::*;
+use beet_flow::prelude::*;
 use bevy::prelude::*;
 
 
 fn main() {
 	App::new()
 		.add_plugins(crate_test_beet_example_plugin)
+		.insert_resource(BeetDebugConfig::default())
 		.add_systems(
 			Startup,
 			(

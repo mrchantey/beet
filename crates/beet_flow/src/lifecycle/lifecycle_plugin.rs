@@ -16,7 +16,10 @@ impl Plugin for LifecyclePlugin {
 				TriggerInDuration<OnRunResult>,
 				InsertOnTrigger<OnRun, Running>,
 				RemoveOnTrigger<OnRunResult, Running>,
+				RunOnRunResult,
+				RunOnSceneReady,
 			)>::default(),
+			// other actions
 			ActionPlugin::<(
 			EmptyAction,
 			RunTimer,
@@ -28,7 +31,6 @@ impl Plugin for LifecyclePlugin {
 			ScoreFlow,
 			ScoreProvider,
 			RunOnSpawn,
-			RunOnRunResult,
 		)>::default()
 		))
 		// observers

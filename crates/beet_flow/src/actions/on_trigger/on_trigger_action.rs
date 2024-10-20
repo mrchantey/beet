@@ -46,6 +46,19 @@ impl<Handler: OnTriggerHandler> OnTrigger<Handler> {
 			phantom: PhantomData,
 		}
 	}
+	pub fn new_with_target(target: impl Into<TriggerTarget>) -> Self {
+		Self {
+			target: target.into(),
+			..default()
+		}
+	}
+	pub fn new_with_source(source: Entity) -> Self {
+		Self {
+			sources: vec![source],
+			..default()
+		}
+	}
+
 	pub fn with_target(self, target: impl Into<TriggerTarget>) -> Self {
 		Self {
 			target: target.into(),

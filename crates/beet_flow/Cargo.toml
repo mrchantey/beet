@@ -13,7 +13,9 @@ categories.workspace = true
 
 
 [features]
-default = ["net", "reflect"]
+# temp disable reflect until https://github.com/bevyengine/bevy/pull/16018
+default = ["net"] 
+# default = ["net", "reflect"]
 # beetmash = ["dep:beetmash"]
 net = ["dep:beetmash", "beetmash/net"]
 reflect = []

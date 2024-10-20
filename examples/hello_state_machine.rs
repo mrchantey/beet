@@ -18,12 +18,12 @@ fn main() {
 	world.spawn((
 		Name::new("Hello"),
 		EndOnRun::success(), 
-		RunOnRunResult::default().with_target(say_world),
+		RunOnRunResult::new_with_target(say_world),
 	)).flush_trigger(OnRun);
 
 	world.spawn((
 		Name::new("G'day"),
 		EndOnRun::success(), 
-		RunOnRunResult::default().with_target(say_world),
+		RunOnRunResult::new_with_target(say_world),
 	)).flush_trigger(OnRun);
 }

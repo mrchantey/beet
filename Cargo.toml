@@ -123,7 +123,8 @@ categories.workspace = true
 [features]
 default = ["ml", "animation", "assets", "ui", "beetmash"]
 ml = ["dep:beet_ml"]
-reflect = ["beet_flow/reflect"]
+# this is on by default, do we need to re-expose it?
+# reflect = ["beet_flow/reflect"] 
 beetmash = ["dep:beetmash"]
 animation = ["beet_spatial/animation"]
 assets = ["beet_spatial/assets"]
