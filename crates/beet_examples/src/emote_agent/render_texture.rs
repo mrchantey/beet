@@ -15,18 +15,16 @@ pub struct RenderTexture {
 pub const RENDER_TEXTURE_LAYER: usize = 1;
 
 
-pub fn create_render_camera(
-	mut commands: Commands,
-	mut images: ResMut<Assets<Image>>,
-	mut materials: ResMut<Assets<StandardMaterial>>,
-) {
+pub fn render_texture_bundle(
+	images: &mut Assets<Image>,
+	materials: &mut Assets<StandardMaterial>,
+) -> impl Bundle {
 	let size = Extent3d {
 		width: 512,
 		height: 512,
 		..default()
 	};
 
-	// This is the texture that will be rendered to.
 	let mut image = Image {
 		texture_descriptor: TextureDescriptor {
 			label: None,
@@ -42,7 +40,6 @@ pub fn create_render_camera(
 		},
 		..default()
 	};
-
 	// fill image.data with zeroes
 	image.resize(size);
 
@@ -54,8 +51,7 @@ pub fn create_render_camera(
 		..default()
 	});
 
-	commands.spawn((
-		Camera2d,
+	(
 		Camera {
 			order: -1,
 			target: image_handle.into(),
@@ -64,5 +60,5 @@ pub fn create_render_camera(
 		},
 		RenderLayers::layer(RENDER_TEXTURE_LAYER),
 		material_handle,
-	));
+	)
 }

@@ -3,6 +3,7 @@
 pub mod animation;
 #[cfg(feature = "assets")]
 pub mod asset_actions;
+pub mod procedural_animation;
 pub mod inverse_kinematics;
 pub mod movement;
 pub mod plugins;
@@ -16,6 +17,7 @@ pub mod prelude {
 	pub use crate::animation::*;
 	#[cfg(feature = "assets")]
 	pub use crate::asset_actions::*;
+	pub use crate::procedural_animation::*;
 	pub use crate::inverse_kinematics::*;
 	pub use crate::movement::*;
 	pub use crate::plugins::*;
