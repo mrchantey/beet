@@ -14,7 +14,7 @@ fn main() {
 				beetmash::core::scenes::lighting_3d,
 				beetmash::core::scenes::ground_3d,
 				beetmash::core::scenes::ui_terminal_input,
-				spawn_barbarian,
+				beet_examples::emote_agent::scenes::spawn_barbarian,
 			),
 		)
 		// .add_systems(Update,disable_barbarian)

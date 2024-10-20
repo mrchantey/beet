@@ -1,6 +1,3 @@
-pub mod barbarian;
-#[allow(unused_imports)]
-pub use self::barbarian::*;
 pub mod emoji;
 #[allow(unused_imports)]
 pub use self::emoji::*;
@@ -19,3 +16,4 @@ pub use self::ik_spawner::*;
 pub mod render_texture;
 #[allow(unused_imports)]
 pub use self::render_texture::*;
+pub mod scenes;
