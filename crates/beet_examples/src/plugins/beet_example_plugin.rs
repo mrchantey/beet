@@ -49,7 +49,7 @@ pub fn beet_example_plugin(app: &mut App) {
 
 
 /// For apps and scenes that use beet_spatial
-pub fn plugin_spatial(app: &mut App) {
+fn plugin_spatial(app: &mut App) {
 	app
 		.add_plugins(ActionPlugin::<(
 			RemoveOnTrigger<OnRunResult, SteerTarget>,

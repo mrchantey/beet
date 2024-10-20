@@ -3,51 +3,20 @@ use crate::prelude::*;
 use beetmash::prelude::*;
 use bevy::animation::RepeatAnimation;
 use bevy::prelude::*;
-use std::time::Duration;
-
-
-pub struct Barbarian {
-	pub graph: AnimationGraphPlaceholder,
-	pub idle_clip: AssetPlaceholder<AnimationClip>,
-	pub idle_index: AnimationNodeIndex,
-	pub walk_clip: AssetPlaceholder<AnimationClip>,
-	pub walk_index: AnimationNodeIndex,
-}
-
-impl Default for Barbarian {
-	fn default() -> Self {
-		let mut graph = AnimationGraphPlaceholder::default();
-
-		let idle_clip = AssetPlaceholder::<AnimationClip>::new(
-			"kaykit-adventurers/Barbarian.glb#Animation36",
-		);
-		let idle_index = graph.add_clip(idle_clip.clone(), 1.0, graph.root);
-		let walk_clip = AssetPlaceholder::<AnimationClip>::new(
-			"kaykit-adventurers/Barbarian.glb#Animation72",
-		);
-		let walk_index = graph.add_clip(walk_clip.clone(), 1.0, graph.root);
-
-		Self {
-			graph,
-			idle_clip,
-			idle_index,
-			walk_clip,
-			walk_index,
-		}
-	}
-}
-
 
 pub fn spawn_barbarian(mut commands: Commands) {
-	let Barbarian {
-		graph,
-		idle_clip,
-		idle_index,
-		walk_clip,
-		walk_index,
-	} = default();
+	let mut graph = AnimationGraphPlaceholder::default();
 
-	let transition_duration = Duration::from_secs_f32(0.5);
+	let idle_animation_bundle = AnimationActionBundle::new(
+		&mut graph,
+		"kaykit-adventurers/Barbarian.glb#Animation36",
+	)
+	.repeat(RepeatAnimation::Forever);
+
+	let cheer_animation_bundle = AnimationActionBundle::new(
+		&mut graph,
+		"kaykit-adventurers/Barbarian.glb#Animation22",
+	);
 
 	let mut idle_behavior = Entity::PLACEHOLDER;
 
@@ -72,35 +41,18 @@ pub fn spawn_barbarian(mut commands: Commands) {
 			idle_behavior = parent
 				.spawn((
 					Name::new("Idle"),
-					// RunOnAppReady::default(),
-					ContinueRun::default(),
-					// Repeat
 					TargetAgent(agent),
-					PlayAnimation::new(idle_index)
-						.repeat(RepeatAnimation::Forever)
-						.with_transition_duration(transition_duration),
-					idle_clip,
-					TriggerOnAnimationEnd::new(
-						idle_index,
-						OnRunResult::success(),
-					)
-					.with_transition_duration(transition_duration),
+					idle_animation_bundle,
 				))
 				.id();
 
 			parent.spawn((
 				Name::new("Respond To User"),
 				EndOnRun::success().with_target(idle_behavior),
-				RunOnInsertSentence::default(),
 				InsertSentenceOnUserInput::default(),
-				ContinueRun::default(),
+				RunOnInsertSentence::default(),
 				TargetAgent(agent),
-				PlayAnimation::new(walk_index)
-					.repeat(RepeatAnimation::Count(4))
-					.with_transition_duration(transition_duration),
-				walk_clip,
-				TriggerOnAnimationEnd::new(walk_index, OnRunResult::success())
-					.with_transition_duration(transition_duration),
+				cheer_animation_bundle,
 				RunOnRunResult::new_with_target(idle_behavior),
 			));
 		})

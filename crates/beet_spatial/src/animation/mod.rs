@@ -1,3 +1,6 @@
+pub mod animation_action_bundle;
+#[allow(unused_imports)]
+pub use self::animation_action_bundle::*;
 pub mod animation_plugin;
 #[allow(unused_imports)]
 pub use self::animation_plugin::*;

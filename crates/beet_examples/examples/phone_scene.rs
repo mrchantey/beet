@@ -5,7 +5,7 @@ use bevy::prelude::*;
 
 fn main() {
 	App::new()
-		.add_plugins(crate_test_beet_example_plugin)
+		.add_plugins((crate_test_beet_example_plugin, plugin_ml))
 		.insert_resource(BeetDebugConfig::default())
 		.add_systems(
 			Startup,

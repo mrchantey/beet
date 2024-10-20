@@ -20,11 +20,11 @@ fn main() -> Result<()> {
 
 	SceneGroupExporter::new(plugin)
 		.with_config(config.clone())
-		.add_scene("app",||{})
+		.add_scene("app", || {})
 		.add_scene("beet-debug", beet_examples::scenes::flow::beet_debug)
 		.add_scene("hello-world", beet_examples::scenes::flow::hello_world)
 		.export()?;
-	
+
 	SceneGroupExporter::new(plugin)
 		.with_config(config.clone())
 		.without_clear_target()
@@ -37,11 +37,11 @@ fn main() -> Result<()> {
 		)
 		.export()?;
 
-	
+
 	SceneGroupExporter::new((plugin, plugin_ml))
 		.with_config(config.clone())
 		.without_clear_target()
-		.add_scene("app-ml",||{})
+		.add_scene("app-ml", || {})
 		.add_scene("hello-ml", beet_examples::scenes::ml::hello_ml)
 		.add_scene("fetch-scene", beet_examples::scenes::ml::fetch_scene)
 		.add_scene("fetch-npc", beet_examples::scenes::ml::fetch_npc)
@@ -52,7 +52,7 @@ fn main() -> Result<()> {
 		)
 		.add_scene(
 			"frozen-lake-train",
-				beet_examples::scenes::ml::frozen_lake_train,
+			beet_examples::scenes::ml::frozen_lake_train,
 		)
 		.add_scene(
 			"frozen-lake-run",

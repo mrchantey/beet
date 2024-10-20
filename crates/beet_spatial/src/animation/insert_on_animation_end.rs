@@ -37,6 +37,8 @@ impl<T: GenericActionEvent> TriggerOnAnimationEnd<T> {
 		self.target = target;
 		self
 	}
+	/// The duration before the end of the animation to trigger the event.
+	/// This is commonly the same as the transition duration of the animation.
 	pub fn with_transition_duration(mut self, duration: Duration) -> Self {
 		self.transition_duration = duration;
 		self

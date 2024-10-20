@@ -48,7 +48,6 @@ pub fn hello_animation(mut commands: Commands) {
 						ContinueRun::default(),
 						TargetAgent(agent),
 						PlayAnimation::new(idle_index)
-							.repeat(RepeatAnimation::Count(1))
 							.with_transition_duration(transition_duration),
 						idle_clip,
 						TriggerOnAnimationEnd::new(

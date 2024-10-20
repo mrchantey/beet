@@ -29,6 +29,7 @@ impl PlayAnimation {
 			transition_duration: DEFAULT_ANIMATION_TRANSITION,
 		}
 	}
+	/// Lerps into this animation over this duration.
 	pub fn with_transition_duration(mut self, duration: Duration) -> Self {
 		self.transition_duration = duration;
 		self
