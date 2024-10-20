@@ -7,7 +7,10 @@ use std::time::Duration;
 #[derive(Debug, Clone, Component, Action, Reflect)]
 #[reflect(Component, ActionMeta)]
 #[category(ActionCategory::Agent)]
-#[systems(insert_on_animation_end::<T>.in_set(TickSet))]
+#[systems(insert_on_animation_end::<T>
+	.never_param_warn()
+	.in_set(TickSet)
+)]
 /// Inserts the given component when an animation is almost finished.
 /// Requires a [`Handle<AnimationClip>`] component.
 pub struct TriggerOnAnimationEnd<T: GenericActionEvent> {

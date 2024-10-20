@@ -2,12 +2,18 @@ use crate::prelude::*;
 use bevy::prelude::*;
 use std::marker::PhantomData;
 
+
+/// Trigger [`OnRun`] for the [`TriggerOnTrigger::target`]
+/// whenever [`OnRunResult`] is triggered on one of the [`TriggerOnTrigger::sources`].
+pub type RunOnRunResult = TriggerOnTrigger<OnRunResult, OnRun>;
+
+
 pub type TriggerOnRun<T> = TriggerOnTrigger<OnRun, T>;
 
 /// Trigger `EventOut` when `EventIn` is triggered.
-/// Optionally accepts a `TriggerBundle` for the `EventIn`
-pub type TriggerOnTrigger<EventIn, EventOut, TriggerBundle = ()> =
-	TriggerMappedOnTrigger<DefaultMapFunc<EventIn, EventOut, TriggerBundle>>;
+/// Optionally accepts a `EventInBundle` for the `EventIn` trigger.
+pub type TriggerOnTrigger<EventIn, EventOut, EventInBundle = ()> =
+	TriggerMappedOnTrigger<DefaultMapFunc<EventIn, EventOut, EventInBundle>>;
 
 pub type TriggerMappedOnTrigger<M> = OnTrigger<TriggerOnTriggerHandler<M>>;
 

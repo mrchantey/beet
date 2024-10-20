@@ -28,11 +28,11 @@ impl Plugin for LifecyclePlugin {
 			ScoreFlow,
 			ScoreProvider,
 			RunOnSpawn,
+			RunOnRunResult,
 		)>::default()
 		))
 		// observers
 		.register_type::<ContinueRun>()
-		.register_type::<RunOnSpawn>()
 		// running
 		.register_type::<Running>()
 		.register_type::<RunResult>()

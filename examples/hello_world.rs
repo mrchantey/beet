@@ -1,3 +1,4 @@
+//! A basic behavior tree example
 use beet::prelude::*;
 use beet_examples::prelude::*;
 use bevy::prelude::*;
@@ -6,7 +7,7 @@ use bevy::prelude::*;
 fn main() {
 	App::new()
     .insert_resource(BeetDebugConfig::default())
-		.add_plugins(running_beet_example_plugin)
+		.add_plugins(minimal_beet_example_plugin)
 		.world_mut()
 		.spawn((
 			Name::new("root"), 

@@ -2,8 +2,12 @@ use crate::prelude::*;
 use bevy::prelude::*;
 use std::marker::PhantomData;
 
-pub type InsertOnTrigger<Event, Params, TriggerBundle = ()> =
-	InsertMappedOnTrigger<DefaultMapFunc<Event, Params, TriggerBundle>>;
+
+
+/// Inserts the provided `Bundle` on the [`TriggerOnTrigger::target`] when
+/// the `EventIn` is triggered on one of the [`TriggerOnTrigger::sources`].
+pub type InsertOnTrigger<EventIn, Bundle, EventInBundle = ()> =
+	InsertMappedOnTrigger<DefaultMapFunc<EventIn, Bundle, EventInBundle>>;
 
 pub type InsertMappedOnTrigger<M> = OnTrigger<InsertHandler<M>>;
 

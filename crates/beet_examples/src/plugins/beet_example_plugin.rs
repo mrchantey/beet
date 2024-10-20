@@ -1,8 +1,18 @@
 use crate::beet::prelude::*;
 use crate::prelude::*;
 use beetmash::prelude::*;
+use bevy::log::LogPlugin;
 use bevy::prelude::*;
 
+
+/// A minimal app with flow and spatial
+pub fn minimal_beet_example_plugin(app: &mut App) {
+	app.add_plugins((
+		MinimalPlugins,
+		LogPlugin::default(),
+		beet_example_plugin,
+	));
+}
 
 /// A running app with flow and spatial
 pub fn running_beet_example_plugin(app: &mut App) {

@@ -2,6 +2,8 @@ use crate::prelude::*;
 use beetmash::prelude::*;
 use bevy::prelude::*;
 
+
+/// Config for logging the lifecycle of behaviors, see [`BeetDebugPlugin`].
 #[derive(Resource, Clone, Reflect)]
 #[reflect(Resource)]
 pub struct BeetDebugConfig {
@@ -18,6 +20,15 @@ impl Default for BeetDebugConfig {
 			log_on_update: false,
 			log_on_stop: false,
 			log_to_stdout: true,
+		}
+	}
+}
+
+impl BeetDebugConfig {
+	pub fn start_and_stop() -> Self {
+		Self {
+			log_on_stop: true,
+			..default()
 		}
 	}
 }
