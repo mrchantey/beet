@@ -57,11 +57,10 @@ pub fn spawn_barbarian(mut commands: Commands) {
 				"kaykit-adventurers/Barbarian_NoProps.glb#Scene0".into(),
 			),
 			graph,
-			AnimationTransitions::new(),
+			AnimationTransitions::default(),
 		))
 		.with_children(|parent| {
 			let agent = parent.parent_entity();
-
 
 			let _emote_bubble = spawn_emote_bubble(
 				&mut parent.spawn(Transform::from_xyz(0.5, 2.5, 0.5)),
@@ -90,7 +89,9 @@ pub fn spawn_barbarian(mut commands: Commands) {
 						.with_transition_duration(transition_duration),
 					));
 					parent.spawn((
-						Name::new("Walking"),
+						Name::new("Respond To User"),
+						RunOnSentenceChange::default(),
+						InsertSentenceOnUserInput::default(),					
 						ContinueRun::default(),
 						TargetAgent(agent),
 						PlayAnimation::new(walk_index)

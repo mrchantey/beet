@@ -1,3 +1,4 @@
+//! A dependency free scratchpad for exploring observer ideas.
 use bevy::prelude::*;
 
 #[derive(Event)]

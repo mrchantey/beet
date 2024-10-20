@@ -72,5 +72,10 @@ rm ./assets.tar.gz
 
 | `bevy` | `beet` |
 | ------ | ------ |
+| 0.15   | 0.0.4  |
 | 0.14   | 0.0.2  |
 | 0.12   | 0.0.1  |
+
+## TODO
+
+- When we get [`OnMutate`](https://github.com/bevyengine/bevy/pull/14520) observers, they should probably replace most `OnInsert` observers we're using

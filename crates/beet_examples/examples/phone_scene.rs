@@ -11,6 +11,7 @@ fn main() {
 				setup,
 				beetmash::core::scenes::lighting_3d,
 				beetmash::core::scenes::ground_3d,
+				beetmash::core::scenes::ui_terminal_input,
 				spawn_barbarian,
 			),
 		)

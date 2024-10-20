@@ -47,11 +47,11 @@ impl Plugin for BeetDebugPlugin {
 			.in_set(PostTickSet)
 	)
 		.observe(
-			|trigger: Trigger<OnLogMessage>,config:Res<BeetDebugConfig>| {
+			(|trigger: Trigger<OnLogMessage>,config:Res<BeetDebugConfig>| {
 				if config.log_to_stdout {
 				log::info!("{}", **trigger.event());
 				}
-			},
+			}).never_param_warn(),
 		)
 		/*-*/;
 	}

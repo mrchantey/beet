@@ -31,7 +31,7 @@ pub fn hello_animation(mut commands: Commands) {
 			Transform::from_scale(Vec3::splat(0.1)),
 			BundlePlaceholder::Scene("misc/fox.glb#Scene0".into()),
 			graph,
-			AnimationTransitions::new(),
+			AnimationTransitions::default(),
 		))
 		.with_children(|parent| {
 			let agent = parent.parent_entity();
