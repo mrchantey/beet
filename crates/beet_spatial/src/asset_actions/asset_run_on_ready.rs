@@ -4,7 +4,7 @@ use beetmash::prelude::*;
 use bevy::prelude::*;
 
 
-/// A helper bundle that combines AssetLoadBlockAppReady, AssetPlaceholder, and RunOnAppReady.
+/// A helper bundle that combines [`AssetLoadBlockAppReady`], [`AssetPlaceholder`], and [`RunOnAppReady`].
 #[derive(Bundle)]
 pub struct AssetRunOnReady<A: Asset> {
 	pub block_asset_ready: AssetLoadBlockAppReady,

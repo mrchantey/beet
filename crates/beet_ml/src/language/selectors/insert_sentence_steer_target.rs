@@ -85,20 +85,15 @@ mod test {
 		let mut app = App::new();
 		app.add_plugins((
 			MinimalPlugins,
-			AssetPlugin::default(),
+			workspace_asset_plugin(),
 			BertPlugin::default(),
 			LifecyclePlugin,
 		))
 		.finish();
 
-		block_on_asset_load::<Bert>(&mut app, "ml/default-bert.ron");
+		let handle = block_on_asset_load::<Bert>(&mut app, "ml/default-bert.ron")?;
 
 		let world = app.world_mut();
-
-		let handle = world
-			.resource_mut::<AssetServer>()
-			.load::<Bert>("ml/default-bert.ron");
-
 
 		let agent = world.spawn_empty().id();
 

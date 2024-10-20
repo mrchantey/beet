@@ -42,11 +42,11 @@ mod test {
 	fn works() -> Result<()> {
 		let mut app = App::new();
 
-		app.add_plugins((TaskPoolPlugin::default(), AssetPlugin::default()))
+		app.add_plugins((TaskPoolPlugin::default(), workspace_asset_plugin()))
 			.init_asset::<Bert>()
 			.init_asset_loader::<BertLoader>();
 
-		block_on_asset_load::<Bert>(&mut app, "ml/default-bert.ron");
+		block_on_asset_load::<Bert>(&mut app, "ml/default-bert.ron")?;
 
 		expect(true).to_be_true()?;
 
