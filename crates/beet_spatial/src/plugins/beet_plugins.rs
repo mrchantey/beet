@@ -1,4 +1,5 @@
 use crate::prelude::*;
+use beet_flow::prelude::*;
 use bevy::app::PluginGroupBuilder;
 use bevy::prelude::*;
 
@@ -12,12 +13,21 @@ impl PluginGroup for BeetSpatialPlugins {
 		let mut builder = PluginGroupBuilder::start::<Self>()
 			.add(MovementPlugin::default())
 			.add(SteerPlugin::default())
-			.add(ik_plugin);
-
+			.add(ik_plugin)
+			.add(spatial_observers_plugin)
+			/*-*/;
 
 		#[cfg(feature = "animation")]
 		(builder = builder.add(crate::prelude::AnimationPlugin::default()));
 
 		builder
 	}
+}
+
+
+pub fn spatial_observers_plugin(app: &mut App) {
+	app.add_plugins(ActionPlugin::<(
+		InsertOnTrigger<OnRun, Visibility>,
+		InsertOnTrigger<OnRunResult, Visibility>,
+	)>::default());
 }

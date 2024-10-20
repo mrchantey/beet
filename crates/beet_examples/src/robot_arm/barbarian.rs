@@ -34,9 +34,10 @@ pub fn spawn_barbarian(mut commands: Commands) {
 		.with_children(|parent| {
 			let agent = parent.parent_entity();
 
-			let _emote_bubble = spawn_emote_bubble(
-				&mut parent.spawn(Transform::from_xyz(0.5, 2.5, 0.5)),
-			);
+			let emote_bubble = spawn_emote_bubble(&mut parent.spawn((
+				Transform::from_xyz(0.5, 2.5, 0.5),
+				Visibility::Hidden,
+			)));
 
 			idle_behavior = parent
 				.spawn((
@@ -51,6 +52,12 @@ pub fn spawn_barbarian(mut commands: Commands) {
 				EndOnRun::success().with_target(idle_behavior),
 				InsertSentenceOnUserInput::default(),
 				RunOnInsertSentence::default(),
+				InsertOnTrigger::<OnRun, Visibility>::new(Visibility::Visible)
+					.with_target(emote_bubble),
+				InsertOnTrigger::<OnRunResult, Visibility>::new(
+					Visibility::Hidden,
+				)
+				.with_target(emote_bubble),
 				TargetAgent(agent),
 				cheer_animation_bundle,
 				RunOnRunResult::new_with_target(idle_behavior),
