@@ -90,8 +90,8 @@ pub fn spawn_barbarian(mut commands: Commands) {
 					));
 					parent.spawn((
 						Name::new("Respond To User"),
-						RunOnSentenceChange::default(),
-						InsertSentenceOnUserInput::default(),					
+						RunOnInsertSentence::default(),
+						InsertSentenceOnUserInput::default(),
 						ContinueRun::default(),
 						TargetAgent(agent),
 						PlayAnimation::new(walk_index)

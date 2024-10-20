@@ -21,12 +21,12 @@ impl OnTriggerMapFunc for MapUserMessageToSentence {
 pub type InsertSentenceOnUserInput =
 	InsertMappedOnGlobalTrigger<MapUserMessageToSentence>;
 
-pub type RunOnSentenceChange = TriggerOnTrigger<OnInsert, OnRun, Sentence>;
+pub type RunOnInsertSentence = TriggerOnTrigger<OnInsert, OnRun, Sentence>;
 
 #[derive(Bundle, Default)]
 pub struct SentenceBundle {
 	pub flow: SentenceFlow,
-	pub run_on_change: RunOnSentenceChange,
+	pub run_on_change: RunOnInsertSentence,
 	pub set_on_input: InsertSentenceOnUserInput,
 }
 impl SentenceBundle {
