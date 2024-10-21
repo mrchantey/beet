@@ -15,7 +15,9 @@ pub mod child_expect {
 pub struct OnRunResult(RunResult);
 impl OnRunResult {
 	pub fn new(result: RunResult) -> Self { Self(result) }
+	/// Populate with [`RunResult::Success`]
 	pub fn success() -> Self { Self(RunResult::Success) }
+	/// Populate with [`RunResult::Failure`]
 	pub fn failure() -> Self { Self(RunResult::Failure) }
 	pub fn result(&self) -> RunResult { **self }
 }

@@ -11,39 +11,50 @@ pub struct PlayProceduralAnimation {
 	pub shape: ProceduralAnimationShape,
 	pub speed: ProceduralAnimationSpeed,
 	pub repeat: RepeatAnimation,
-	pub num_animations: u32,
-	pub last_t: f32,
+	pub completions: u32,
+	pub elapsed_t: f32,
 }
 
 impl Default for PlayProceduralAnimation {
 	fn default() -> Self {
 		Self {
-			shape:default(),
+			shape: default(),
 			repeat: default(),
 			speed: default(),
-			num_animations: 0,
-			last_t: 0.0,
+			completions: 0,
+			elapsed_t: 0.0,
 		}
 	}
 }
 
 impl PlayProceduralAnimation {
-	pub fn get_fraction(&self,time:Res<Time>) -> f32 {
-		match self.speed{
-			ProceduralAnimationSpeed::MetersPerSecond(mps) => mps * time.delta_seconds(),
-			ProceduralAnimationSpeed::FractionPerSecond(fps) => fps,
+	pub fn is_finished(&self) -> bool {
+		match self.repeat {
+			RepeatAnimation::Forever => false,
+			RepeatAnimation::Never => self.completions >= 1,
+			RepeatAnimation::Count(n) => self.completions >= n,
 		}
 	}
-
+	pub fn get_fraction(&self, time: Res<Time>) -> f32 {
+		match self.speed {
+			ProceduralAnimationSpeed::FractionPerSecond(d_t) => {
+				d_t * time.delta_seconds()
+			}
+			ProceduralAnimationSpeed::MetersPerSecond(d_m) => {
+				(d_m * time.delta_seconds()) / self.shape.total_length()
+			}
+		}
+	}
 }
 
 fn play_procedural_animation(
 	trigger: Trigger<OnRun>,
-	time:Res<Time>,
+	mut commands: Commands,
+	time: Res<Time>,
 	mut transforms: Query<&mut Transform>,
 	mut query: Query<(&mut PlayProceduralAnimation, &TargetAgent)>,
 ) {
-	let (mut play_procedural_animation, target_agent) = query
+	let (mut action, target_agent) = query
 		.get_mut(trigger.entity())
 		.expect(expect_action::ACTION_QUERY_MISSING);
 
@@ -51,6 +62,33 @@ fn play_procedural_animation(
 		.get_mut(target_agent.0)
 		.expect(expect_action::TARGET_MISSING);
 
-	// let t = 
+	let t = action.elapsed_t + action.get_fraction(time);
+	action.elapsed_t = t;
 
+	if t >= 1.0 {
+		action.completions += 1;
+		if action.is_finished() {
+			commands
+				.entity(trigger.entity())
+				.insert(OnRunResult::success());
+		}
+	}
+
+	transform.translation = action.shape.fraction_to_pos(t);
+}
+
+
+#[cfg(test)]
+mod test {
+	use crate::prelude::*;
+	use anyhow::Result;
+	use sweet::*;
+	
+	#[test]
+	fn works() -> Result<()> {
+		expect(true).to_be_false()?;
+		
+		Ok(())
+	}
+	
 }
