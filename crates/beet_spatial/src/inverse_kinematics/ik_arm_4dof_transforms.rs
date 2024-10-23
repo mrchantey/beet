@@ -119,13 +119,13 @@ pub fn ik_arm_transforms_test(
 ) {
 	for ik_transforms in query.iter() {
 		if let Ok(mut segment1) = transforms.get_mut(ik_transforms.segment1) {
-			let angle1 = time.elapsed_seconds().sin();
+			let angle1 = time.elapsed_secs().sin();
 			// let dir = Vec3::new(angle1.cos(), angle1.sin(), 0.0);
 			segment1.rotation = Quat::from_rotation_x(angle1);
 			// segment1.rotation = Quat::look_at(dir);
 		}
 		if let Ok(mut segment2) = transforms.get_mut(ik_transforms.segment2) {
-			let angle2 = time.elapsed_seconds().sin();
+			let angle2 = time.elapsed_secs().sin();
 			// let dir = Vec3::new(angle2.cos(), angle2.sin(), 0.0);
 			// segment2.translation = Vec3::new(ik_transforms.ik.segment1.len, 0.0, 0.0);
 			// segment2.rotation = Quat::look_at(dir);

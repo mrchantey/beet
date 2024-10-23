@@ -167,11 +167,11 @@ mod test {
 		let _parent = app.world_mut().spawn_empty().add_child(child1);
 		app.add_systems(Update, changes_name);
 
-		expect(&app)
+		expect(app.world())
 			.component(child1)?
 			.to_be(&Name::new("foo"))?;
 		app.update();
-		expect(&app)
+		expect(app.world())
 			.component(child1)?
 			.to_be(&Name::new("bar"))?;
 
@@ -181,10 +181,7 @@ mod test {
 	}
 
 
-	fn changes_name(
-		parents: Query<&Children>,
-		mut scores: Query<&mut Name>,
-	) {
+	fn changes_name(parents: Query<&Children>, mut scores: Query<&mut Name>) {
 		for children in parents.iter() {
 			for child in children.iter() {
 				if let Ok(mut name) = scores.get_mut(*child) {

@@ -36,6 +36,6 @@ pub fn keyboard_controller(
 			direction -= Vec3::Y;
 		}
 		transform.translation +=
-			direction * controller.speed * time.delta_seconds();
+			direction * controller.speed * time.delta_secs();
 	}
 }

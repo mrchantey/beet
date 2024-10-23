@@ -12,12 +12,9 @@ pub fn phone_texture(
 	let texture_atlas_layout = texture_atlas_layouts.add(layout);
 	commands.spawn((
 		Name::new("PhoneTexture"),
-		SpriteBundle {
-			transform: Transform::from_scale(Vec3::splat(10.)),
-			// transform: Transform::default().with_scale(Vec3::splat(10.)),
-			texture: asset_server.load("openmoji/smileys-emotion.png"),
-			..default()
-		},
+		Transform::from_scale(Vec3::splat(10.)),
+		// transform: Transform::default().with_scale(Vec3::splat(10.)),
+		Sprite::from_image(asset_server.load("openmoji/smileys-emotion.png")),
 		TextureAtlas {
 			layout: texture_atlas_layout,
 			index: 0,

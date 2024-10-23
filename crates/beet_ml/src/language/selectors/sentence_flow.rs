@@ -1,5 +1,6 @@
 use crate::prelude::*;
 use beet_flow::prelude::*;
+use beetmash::prelude::HandleWrapper;
 use bevy::prelude::*;
 use std::borrow::Cow;
 
@@ -29,7 +30,7 @@ fn sentence_flow(
 	mut berts: ResMut<Assets<Bert>>,
 	sentences: Query<&Sentence>,
 	// TODO double query, ie added running and added asset
-	query: Query<(&SentenceFlow, &Sentence, &Handle<Bert>, &Children)>,
+	query: Query<(&SentenceFlow, &Sentence, &HandleWrapper<Bert>, &Children)>,
 ) {
 	let (_scorer, target_sentence, handle, children) = query
 		.get(trigger.entity())
@@ -74,13 +75,14 @@ mod test {
 		.finish();
 		let on_run = observe_trigger_names::<OnRun>(app.world_mut());
 
-		let handle = block_on_asset_load::<Bert>(&mut app, "ml/default-bert.ron")?;
+		let handle =
+			block_on_asset_load::<Bert>(&mut app, "ml/default-bert.ron")?;
 
 		app.world_mut()
 			.spawn((
 				Name::new("root"),
 				Sentence::new("destroy"),
-				handle,
+				HandleWrapper(handle),
 				SentenceFlow::default(),
 			))
 			.with_children(|parent| {

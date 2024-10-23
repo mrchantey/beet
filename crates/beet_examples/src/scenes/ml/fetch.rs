@@ -89,10 +89,7 @@ pub fn fetch_scene(mut commands: Commands) {
 			Name::new("Potion"),
 			Sentence::new("red healing potion"),
 			Collectable,
-			SpatialBundle {
-				transform: Transform::from_xyz(ITEM_OFFSET, 0., ITEM_OFFSET),
-				..default()
-			},
+			Transform::from_xyz(ITEM_OFFSET, 0., ITEM_OFFSET),
 		))
 		.with_children(|parent| {
 			parent.spawn((
@@ -105,10 +102,7 @@ pub fn fetch_scene(mut commands: Commands) {
 			Name::new("Coin"),
 			Sentence::new("gold coin"),
 			Collectable,
-			SpatialBundle {
-				transform: Transform::from_xyz(ITEM_OFFSET, 0., -ITEM_OFFSET),
-				..default()
-			},
+			Transform::from_xyz(ITEM_OFFSET, 0., -ITEM_OFFSET),
 		))
 		.with_children(|parent| {
 			parent.spawn((
@@ -121,10 +115,7 @@ pub fn fetch_scene(mut commands: Commands) {
 			Name::new("Sword"),
 			Sentence::new("silver sword"),
 			Collectable,
-			SpatialBundle {
-				transform: Transform::from_xyz(-ITEM_OFFSET, 0., ITEM_OFFSET),
-				..default()
-			},
+			Transform::from_xyz(-ITEM_OFFSET, 0., ITEM_OFFSET),
 		))
 		.with_children(|parent| {
 			parent.spawn((
@@ -137,10 +128,7 @@ pub fn fetch_scene(mut commands: Commands) {
 			Name::new("Cheese"),
 			Sentence::new("tasty cheese"),
 			Collectable,
-			SpatialBundle {
-				transform: Transform::from_xyz(-ITEM_OFFSET, 0., -ITEM_OFFSET),
-				..default()
-			},
+			Transform::from_xyz(-ITEM_OFFSET, 0., -ITEM_OFFSET),
 		))
 		.with_children(|parent| {
 			parent.spawn((

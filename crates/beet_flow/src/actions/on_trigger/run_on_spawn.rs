@@ -45,7 +45,7 @@ mod test {
 	#[test]
 	fn works() -> Result<()> {
 		let mut world = World::new();
-		// world.observe(trigger_run_on_spawn);
+		// world.add_observer(trigger_run_on_spawn);
 		let func = observe_triggers::<OnRun>(&mut world);
 
 		world.spawn(RunOnSpawn);

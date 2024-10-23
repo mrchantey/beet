@@ -1,3 +1,4 @@
+use beetmash::prelude::HandleWrapper;
 use bevy::prelude::*;
 use bevy::render::render_resource::*;
 use bevy::render::view::RenderLayers;
@@ -59,6 +60,6 @@ pub fn render_texture_bundle(
 			..default()
 		},
 		RenderLayers::layer(RENDER_TEXTURE_LAYER),
-		material_handle,
+		HandleWrapper(material_handle),
 	)
 }

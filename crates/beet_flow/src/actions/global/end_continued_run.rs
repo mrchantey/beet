@@ -26,7 +26,7 @@ mod test {
 	#[test]
 	fn works() -> Result<()> {
 		let mut world = World::new();
-		world.observe(end_continued_run);
+		world.add_observer(end_continued_run);
 
 		let entity = world
 			.spawn(Running)

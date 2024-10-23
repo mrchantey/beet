@@ -42,6 +42,6 @@ pub fn rotate_to_velocity_3d(
 		};
 		transform.rotation = transform
 			.rotation
-			.slerp(Quat::look_at(dir), **rotate * time.delta_seconds());
+			.slerp(Quat::look_at(dir), **rotate * time.delta_secs());
 	}
 }

@@ -53,6 +53,15 @@ forky = { path = "../forky", version = "0.2.0-rc.3", features = [
 ] }
 sweet = { path = "../sweet", version = "0.2.0-rc.3", features = ["bevy"] }
 
+#💡 game
+bevy = { version = "0.15.0-rc.1", default-features = false, features = [
+# bevy = { git = "https://github.com/bevyengine/bevy", rev = "0c959f77007c29eead7f902bddd3342a1ecbca20", default-features = false, features = [
+	"bevy_scene",
+	"serialize",
+	# "bevy_color",
+] }
+
+
 ## logging
 log = "0.4"
 pretty_env_logger = "0.4"
@@ -89,15 +98,6 @@ extend = "1.1.2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 ron = "0.8"
-
-#💡 game
-# bevy = { version = "0.14", default-features = false, features = [
-bevy = { git = "https://github.com/bevyengine/bevy", rev = "0c959f77007c29eead7f902bddd3342a1ecbca20", default-features = false, features = [
-	"bevy_scene",
-	"serialize",
-	# "bevy_color",
-] }
-
 
 # [target.'cfg(target_arch = "wasm32")'.dependencies]
 js-sys = "0.3"

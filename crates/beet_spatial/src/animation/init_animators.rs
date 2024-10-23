@@ -1,4 +1,5 @@
 use beet_flow::extensions::ParentExt;
+use beetmash::prelude::HandleWrapper;
 use bevy::prelude::*;
 
 
@@ -6,7 +7,7 @@ use bevy::prelude::*;
 pub fn init_animators(
 	mut commands: Commands,
 	parents: Query<&Parent>,
-	graphs: Query<&Handle<AnimationGraph>>,
+	graphs: Query<&HandleWrapper<AnimationGraph>>,
 	mut players: Query<Entity, Added<AnimationPlayer>>,
 ) {
 	for entity in &mut players {

@@ -31,7 +31,7 @@ pub fn integrate_force(
 	{
 		let mut summed_force = Vec3::ZERO;
 		if let Some(force) = force.as_mut() {
-			summed_force += ***force * time.delta_seconds();
+			summed_force += ***force * time.delta_secs();
 			***force = Vec3::ZERO;
 		}
 		if let Some(impulse) = impulse.as_mut() {
@@ -53,7 +53,7 @@ pub fn integrate_force(
 			if let Some(max_velocity) = max_velocity {
 				**velocity = velocity.0.clamp_length_max(**max_velocity);
 			}
-			transform.translation += **velocity * time.delta_seconds();
+			transform.translation += **velocity * time.delta_secs();
 		}
 	}
 }
@@ -106,41 +106,41 @@ mod test {
 
 		app.update_with_secs(1);
 
-		expect(&app)
+		expect(app.world())
 			.component::<Transform>(velocity_entity)?
 			.map(|t| t.translation)
 			.to_be(Vec3::new(1., 0., 0.))?;
-		expect(&app)
+		expect(app.world())
 			.component::<Transform>(force_entity)?
 			.map(|t| t.translation)
 			.to_be(Vec3::new(1., 0., 0.))?;
-		expect(&app)
+		expect(app.world())
 			.component::<Transform>(impulse_entity)?
 			.map(|t| t.translation)
 			.to_be(Vec3::new(1., 0., 0.))?;
-		expect(&app) // impulses are cleared each frame
+		expect(app.world()) // impulses are cleared each frame
 			.component(impulse_entity)?
 			.to_be(&Impulse(Vec3::ZERO))?;
-		expect(&app)
+		expect(app.world())
 			.component::<Transform>(mass_entity)?
 			.map(|t| t.translation)
 			.to_be(Vec3::new(0.5, 0., 0.))?;
 
 		app.update_with_secs(1);
 
-		expect(&app)
+		expect(app.world())
 			.component::<Transform>(velocity_entity)?
 			.map(|t| t.translation)
 			.to_be(Vec3::new(2., 0., 0.))?;
-		expect(&app)
+		expect(app.world())
 			.component::<Transform>(force_entity)?
 			.map(|t| t.translation)
 			.to_be(Vec3::new(2., 0., 0.))?;
-		expect(&app)
+		expect(app.world())
 			.component::<Transform>(impulse_entity)?
 			.map(|t| t.translation)
 			.to_be(Vec3::new(2., 0., 0.))?;
-		expect(&app)
+		expect(app.world())
 			.component::<Transform>(mass_entity)?
 			.map(|t| t.translation)
 			.to_be(Vec3::new(1., 0., 0.))?;

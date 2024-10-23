@@ -40,8 +40,8 @@ impl BeetDebugConfig {
 pub struct BeetDebugPlugin;
 impl Plugin for BeetDebugPlugin {
 	fn build(&self, app: &mut App) {
-		app.observe(log_on_start)
-			.observe(log_on_stop)
+		app.add_observer(log_on_start)
+			.add_observer(log_on_stop)
 			.add_systems(Update, log_log_on_run)
 			.init_resource::<BeetConfig>()
 			.register_type::<BeetDebugConfig>();
@@ -57,7 +57,7 @@ impl Plugin for BeetDebugPlugin {
 			)
 			.in_set(PostTickSet)
 	)
-		.observe(
+		.add_observer(
 			(|trigger: Trigger<OnLogMessage>,config:Res<BeetDebugConfig>| {
 				if config.log_to_stdout {
 				log::info!("{}", **trigger.event());

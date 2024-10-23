@@ -38,10 +38,10 @@ impl PlayProceduralAnimation {
 	pub fn get_fraction(&self, time: Res<Time>) -> f32 {
 		match self.speed {
 			ProceduralAnimationSpeed::FractionPerSecond(d_t) => {
-				d_t * time.delta_seconds()
+				d_t * time.delta_secs()
 			}
 			ProceduralAnimationSpeed::MetersPerSecond(d_m) => {
-				(d_m * time.delta_seconds()) / self.shape.total_length()
+				(d_m * time.delta_secs()) / self.shape.total_length()
 			}
 		}
 	}
@@ -80,7 +80,6 @@ fn play_procedural_animation(
 
 #[cfg(test)]
 mod test {
-	use crate::prelude::*;
 	use anyhow::Result;
 	use sweet::*;
 	

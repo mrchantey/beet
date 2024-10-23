@@ -121,7 +121,7 @@ mod test {
 		app.update();
 		app.update_with_secs(1);
 
-		expect(&app)
+		expect(app.world())
 			.component::<Transform>(agent)?
 			.map(|t| t.translation)
 			.not()

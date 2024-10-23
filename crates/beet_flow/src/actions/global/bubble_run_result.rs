@@ -36,22 +36,22 @@ pub fn passthrough_run_result(
 mod test {
 	use crate::prelude::*;
 	use anyhow::Result;
+	use beetmash::prelude::*;
 	use bevy::prelude::*;
 	use sweet::*;
-	use beetmash::prelude::*;
 
 	#[test]
 	fn works() -> Result<()> {
 		let mut app = App::new();
 		app.add_plugins(ActionPlugin::<EndOnRun>::default());
 		let world = app.world_mut();
-		world.observe(bubble_run_result);
+		world.add_observer(bubble_run_result);
 		let on_run = observe_triggers::<OnRun>(world);
 		let on_run_result = observe_triggers::<OnRunResult>(world);
 
 		world
 			.spawn((Name::new("root"), EndOnRun::success()))
-			.observe_entity(passthrough_run_result)
+			.observe(passthrough_run_result)
 			.with_children(|parent| {
 				parent
 					.spawn((Name::new("child1"), EndOnRun::success()))

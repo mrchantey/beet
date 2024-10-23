@@ -61,13 +61,13 @@ mod test {
 
 		app.update();
 
-		expect(&app)
+		expect(app.world())
 			.not()
 			.to_have_component::<TargetAgent>(grandparent)?;
-		expect(&app)
+		expect(app.world())
 			.component(parent)?
 			.to_be(&TargetAgent(grandparent))?;
-		expect(&app)
+		expect(app.world())
 			.component(child)?
 			.to_be(&TargetAgent(grandparent))?;
 

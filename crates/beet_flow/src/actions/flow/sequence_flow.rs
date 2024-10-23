@@ -72,7 +72,7 @@ mod test {
 		let mut app = App::new();
 		app.add_plugins(ActionPlugin::<(SequenceFlow, EndOnRun)>::default());
 		let world = app.world_mut();
-		world.observe(bubble_run_result);
+		world.add_observer(bubble_run_result);
 
 		let on_result = observe_trigger_names::<OnRunResult>(world);
 		let on_run = observe_triggers::<OnRun>(world);

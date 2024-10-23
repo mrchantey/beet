@@ -78,7 +78,7 @@ fn impl_action_builder(
 			.global_observers
 			.iter()
 			.map(|obs| {
-				quote! { world.observe(#obs); }
+				quote! { world.add_observer(#obs); }
 			})
 			.collect();
 		quote! {

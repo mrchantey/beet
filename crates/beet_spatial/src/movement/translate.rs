@@ -2,7 +2,7 @@ use beet_flow::prelude::*;
 use bevy::prelude::*;
 use forky::prelude::ResultTEExt;
 
-/// Applies constant translation, multiplied by [`Time::delta_seconds`]
+/// Applies constant translation, multiplied by [`Time::delta_secs`]
 #[derive(Debug, Default, Clone, PartialEq, Component, Action, Reflect)]
 #[reflect(Default, Component, ActionMeta)]
 #[category(ActionCategory::Agent)]
@@ -28,7 +28,7 @@ fn translate(
 			transforms.get_mut(**target).ok_or(|e| log::warn!("{e}"))
 		{
 			transform.translation +=
-				translate.translation * time.delta_seconds();
+				translate.translation * time.delta_secs();
 		}
 	}
 }

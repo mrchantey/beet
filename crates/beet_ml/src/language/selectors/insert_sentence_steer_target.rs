@@ -2,6 +2,7 @@
 use crate::prelude::*;
 use beet_flow::prelude::*;
 use beet_spatial::prelude::*;
+use beetmash::prelude::HandleWrapper;
 use bevy::prelude::*;
 use std::marker::PhantomData;
 
@@ -33,7 +34,7 @@ fn insert_sentence_steer_target<T: GenericActionComponent>(
 	query: Query<(
 		&TargetAgent,
 		Option<&Sentence>,
-		&Handle<Bert>,
+		&HandleWrapper<Bert>,
 		&InsertSentenceSteerTarget<T>,
 	)>,
 	sentences: Query<&Sentence>,
@@ -75,6 +76,7 @@ mod test {
 	use anyhow::Result;
 	use beet_flow::prelude::*;
 	use beet_spatial::steer::SteerTarget;
+	use beetmash::prelude::HandleWrapper;
 	use bevy::prelude::*;
 	use sweet::*;
 
@@ -91,7 +93,8 @@ mod test {
 		))
 		.finish();
 
-		let handle = block_on_asset_load::<Bert>(&mut app, "ml/default-bert.ron")?;
+		let handle =
+			block_on_asset_load::<Bert>(&mut app, "ml/default-bert.ron")?;
 
 		let world = app.world_mut();
 
@@ -104,7 +107,7 @@ mod test {
 			.spawn((
 				TargetAgent(agent),
 				InsertSentenceSteerTarget::<Sentence>::default(),
-				handle,
+				HandleWrapper(handle),
 			))
 			.id();
 		world.flush();

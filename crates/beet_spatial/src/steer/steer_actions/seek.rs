@@ -126,7 +126,7 @@ mod test {
 		app.update();
 		app.update_with_secs(1);
 
-		expect(&app)
+		expect(app.world())
 			.component::<Transform>(agent)?
 			.map(|t| t.translation)
 			.to_be(Vec3::new(0.02, 0., 0.))?;

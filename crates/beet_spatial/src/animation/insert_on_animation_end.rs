@@ -1,5 +1,6 @@
 use super::*;
 use beet_flow::prelude::*;
+use beetmash::prelude::*;
 use bevy::animation::RepeatAnimation;
 use bevy::prelude::*;
 use std::time::Duration;
@@ -55,7 +56,7 @@ pub fn insert_on_animation_end<T: GenericActionEvent>(
 			Entity,
 			&TargetAgent,
 			&TriggerOnAnimationEnd<T>,
-			&Handle<AnimationClip>,
+			&HandleWrapper<AnimationClip>,
 		),
 		With<Running>,
 	>,
@@ -69,7 +70,7 @@ pub fn insert_on_animation_end<T: GenericActionEvent>(
 		// safe unwrap, just checked
 		let player = animators.get(target).unwrap();
 
-		let Some(clip) = clips.get(handle) else {
+		let Some(clip) = clips.get(&**handle) else {
 			continue;
 		};
 

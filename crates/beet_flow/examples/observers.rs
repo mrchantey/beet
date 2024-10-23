@@ -76,16 +76,16 @@ fn succeed_on_run(
 fn main() {
 	let mut world = World::new();
 
-	world.observe(log_on_run);
+	world.add_observer(log_on_run);
 
 	let entity = world
 		.spawn(Name::new("Root"))
 		.with_children(|parent| {
-			parent.spawn(Name::new("Hello")).observe_entity(succeed_on_run);
-			parent.spawn(Name::new("World")).observe_entity(succeed_on_run);
+			parent.spawn(Name::new("Hello")).observe(succeed_on_run);
+			parent.spawn(Name::new("World")).observe(succeed_on_run);
 		})
-		.observe_entity(sequence_start)
-		.observe_entity(sequence_next)
+		.observe(sequence_start)
+		.observe(sequence_next)
 		.id();
 
 	init_observers(&mut world);
@@ -97,7 +97,7 @@ fn main() {
 
 /// its a bug, without this other observers dont run?
 fn init_observers(world: &mut World) {
-	world.observe(|_: Trigger<OnAdd>| {
+	world.add_observer(|_: Trigger<OnAdd>| {
 		// println!("here");
 	});
 }

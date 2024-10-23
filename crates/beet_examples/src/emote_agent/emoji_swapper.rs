@@ -1,8 +1,8 @@
 use crate::prelude::*;
+use beetmash::prelude::HandleWrapper;
 use bevy::prelude::*;
 use rand::Rng;
 use std::time::Duration;
-
 
 #[derive(Debug, Component, Reflect)]
 #[reflect(Component)]
@@ -43,7 +43,7 @@ impl EmojiSwapper {
 pub fn update_emoji_swapper(
 	time: Res<Time>,
 	map: Res<EmojiMap>,
-	mut query: Populated<(&mut EmojiSwapper, &mut Handle<Image>)>,
+	mut query: Populated<(&mut EmojiSwapper, &mut HandleWrapper<Image>)>,
 ) {
 	for (mut swapper, mut handle) in query.iter_mut() {
 		println!("swapper: {:?}", swapper);
@@ -51,7 +51,7 @@ pub fn update_emoji_swapper(
 			let next_duration = swapper.random_duration();
 			swapper.timer.set_duration(next_duration);
 			swapper.index = (swapper.index + 1) % swapper.hexcodes.len();
-			*handle =
+			**handle =
 				map.get(&swapper.hexcodes[swapper.index]).unwrap().clone();
 		}
 	}

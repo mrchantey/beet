@@ -1,5 +1,6 @@
 use crate::prelude::*;
 use beet_flow::prelude::*;
+use beetmash::prelude::HandleWrapper;
 use bevy::prelude::*;
 use std::marker::PhantomData;
 
@@ -25,7 +26,7 @@ fn read_q_policy<P: QPolicy + Asset>(
 	mut commands: Commands,
 	assets: Res<Assets<P>>,
 	mut agents: Query<(&P::State, &mut P::Action)>,
-	query: Query<(&ReadQPolicy<P>, &Handle<P>, &TargetAgent)>,
+	query: Query<(&ReadQPolicy<P>, &HandleWrapper<P>, &TargetAgent)>,
 ) {
 	let (_, handle, agent) = query
 		.get(trigger.entity())

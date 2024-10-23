@@ -15,7 +15,7 @@ pub fn rotate_collectables(
 	mut query: Query<&mut Transform, With<Collectable>>,
 ) {
 	for mut transform in query.iter_mut() {
-		let angle = time.delta_seconds() * TAU * TURNS_PER_SECOND;
+		let angle = time.delta_secs() * TAU * TURNS_PER_SECOND;
 		transform.rotate_y(angle);
 	}
 }

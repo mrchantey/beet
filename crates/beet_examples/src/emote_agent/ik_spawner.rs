@@ -1,4 +1,5 @@
 use crate::beet::prelude::*;
+use beetmash::prelude::HandleWrapper;
 use bevy::prelude::*;
 use std::f32::consts::FRAC_PI_2;
 
@@ -13,7 +14,7 @@ pub fn ik_spawner(
 	mut events: EventReader<AssetEvent<Scene>>,
 	mut meshes: ResMut<Assets<Mesh>>,
 	child_nodes_query: Query<(Entity, &Name, &GlobalTransform, &Children)>,
-	camera_2d: Single<&Handle<StandardMaterial>, With<Camera2d>>,
+	render_texture: Single<&HandleWrapper<StandardMaterial>, With<Camera>>,
 	children_query: Query<&Children>,
 	query: Populated<
 		(Entity, &Children, &SceneRoot, &TargetAgent),
@@ -86,7 +87,7 @@ pub fn ik_spawner(
 			Name::new("Phone Texture"),
 			Transform::from_xyz(0., 0.1, 0.).looking_to(Dir3::Z, Dir3::Y),
 			Mesh3d(meshes.add(Plane3d::new(Vec3::Y, Vec2::splat(0.9)))),
-			MeshMaterial3d(camera_2d.clone()),
+			MeshMaterial3d(render_texture.0.clone()),
 		));
 	}
 }

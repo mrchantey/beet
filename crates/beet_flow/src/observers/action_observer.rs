@@ -39,7 +39,7 @@ impl<T: ObserverType> ActionObserver<T> {
 				})
 				.collect(),
 			TriggerTarget::Global => {
-				vec![commands.observe(self.observer.clone()).id()]
+				vec![commands.add_observer(self.observer.clone()).id()]
 			}
 		}
 	}

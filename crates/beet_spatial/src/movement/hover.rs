@@ -28,7 +28,7 @@ fn hover(
 	query: Query<(&TargetAgent, &Hover), With<Running>>,
 ) {
 	for (target, hover) in query.iter() {
-		let elapsed = time.elapsed_seconds();
+		let elapsed = time.elapsed_secs();
 		let y = f32::sin(TAU * elapsed * hover.speed) * hover.height;
 		transforms.get_mut(**target).unwrap().translation.y = y;
 	}

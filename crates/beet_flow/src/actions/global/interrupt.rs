@@ -40,7 +40,7 @@ mod test {
 	fn works() -> Result<()> {
 		let mut world = World::new();
 
-		world.observe(interrupt_running);
+		world.add_observer(interrupt_running);
 
 		let entity = world
 			// root is running
