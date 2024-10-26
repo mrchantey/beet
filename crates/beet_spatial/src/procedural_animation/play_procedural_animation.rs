@@ -8,8 +8,9 @@ use bevy::prelude::*;
 #[observers(play_procedural_animation)]
 #[reflect(Default, Component, ActionMeta)]
 pub struct PlayProceduralAnimation {
-	pub shape: ProceduralAnimationShape,
-	pub speed: ProceduralAnimationSpeed,
+	pub curve: SerdeCurve,
+	/// t per second, 1.0 will complete the curve in 1 second
+	pub speed: f32,
 	pub repeat: RepeatAnimation,
 	pub completions: u32,
 	pub elapsed_t: f32,
@@ -18,11 +19,11 @@ pub struct PlayProceduralAnimation {
 impl Default for PlayProceduralAnimation {
 	fn default() -> Self {
 		Self {
-			shape: default(),
+			curve: default(),
 			repeat: default(),
-			speed: default(),
+			speed: 1.,
 			completions: 0,
-			elapsed_t: 0.0,
+			elapsed_t: 0.,
 		}
 	}
 }
@@ -35,25 +36,16 @@ impl PlayProceduralAnimation {
 			RepeatAnimation::Count(n) => self.completions >= n,
 		}
 	}
-	pub fn get_fraction(&self, time: Res<Time>) -> f32 {
-		match self.speed {
-			ProceduralAnimationSpeed::FractionPerSecond(d_t) => {
-				d_t * time.delta_secs()
-			}
-			ProceduralAnimationSpeed::MetersPerSecond(d_m) => {
-				(d_m * time.delta_secs()) / self.shape.total_length()
-			}
-		}
-	}
 }
 
-fn play_procedural_animation(
+pub fn play_procedural_animation(
 	trigger: Trigger<OnRun>,
 	mut commands: Commands,
 	time: Res<Time>,
 	mut transforms: Query<&mut Transform>,
 	mut query: Query<(&mut PlayProceduralAnimation, &TargetAgent)>,
 ) {
+	println!("🚀🚀🚀");
 	let (mut action, target_agent) = query
 		.get_mut(trigger.entity())
 		.expect(expect_action::ACTION_QUERY_MISSING);
@@ -62,10 +54,10 @@ fn play_procedural_animation(
 		.get_mut(target_agent.0)
 		.expect(expect_action::TARGET_MISSING);
 
-	let t = action.elapsed_t + action.get_fraction(time);
-	action.elapsed_t = t;
+	action.elapsed_t += action.speed * time.delta_secs();
+	transform.translation = action.curve.sample_clamped(action.elapsed_t);
 
-	if t >= 1.0 {
+	if action.elapsed_t >= 1.0 {
 		action.completions += 1;
 		if action.is_finished() {
 			commands
@@ -73,21 +65,51 @@ fn play_procedural_animation(
 				.insert(OnRunResult::success());
 		}
 	}
-
-	transform.translation = action.shape.fraction_to_pos(t);
 }
 
 
 #[cfg(test)]
 mod test {
+	use crate::prelude::*;
 	use anyhow::Result;
+	use beet_flow::prelude::*;
+	use bevy::prelude::*;
 	use sweet::*;
-	
+
 	#[test]
 	fn works() -> Result<()> {
-		expect(true).to_be_false()?;
-		
+		let mut app = App::new();
+		app.add_plugins(ActionPlugin::<PlayProceduralAnimation>::default())
+			.insert_time();
+
+		let agent = app.world_mut().spawn(Transform::default()).id();
+		let behavior = app
+			.world_mut()
+			.spawn((PlayProceduralAnimation::default(), TargetAgent(agent)))
+			.id();
+
+		app.world_mut().entity_mut(behavior).flush_trigger(OnRun);
+
+		expect(
+			app.world()
+				.entity(agent)
+				.get::<Transform>()
+				.unwrap()
+				.translation,
+		)
+		.to_be(Vec3::new(1., 0., 0.))?;
+
+		app.update_with_millis(500);
+
+		expect(
+			app.world()
+				.entity(agent)
+				.get::<Transform>()
+				.unwrap()
+				.translation,
+		)
+		.to_be(Vec3::new(1., 0., 0.))?;
+
 		Ok(())
 	}
-	
 }
