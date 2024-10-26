@@ -21,6 +21,20 @@ pub struct OnTrigger<Handler: OnTriggerHandler> {
 	phantom: PhantomData<Handler>,
 }
 
+impl<Handler: OnTriggerHandler> Clone for OnTrigger<Handler>
+where
+	Handler::Params: Clone,
+{
+	fn clone(&self) -> Self {
+		Self {
+			params: self.params.clone(),
+			sources: self.sources.clone(),
+			target: self.target.clone(),
+			phantom: PhantomData,
+		}
+	}
+}
+
 impl<Handler: OnTriggerHandler> Default for OnTrigger<Handler>
 where
 	Handler::Params: Default,

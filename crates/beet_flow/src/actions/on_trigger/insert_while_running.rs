@@ -1,21 +1,45 @@
 use crate::prelude::*;
+use bevy::ecs::component::ComponentHooks;
+use bevy::ecs::component::StorageType;
 use bevy::prelude::*;
 
 
-/// This will add the [`Running`] component to the behavior when [`OnRun`] is called.
-/// 
-/// It will be removed automatically when [`OnRunResult`] is called.
-/// 
-/// Add this to continuous behaviors, like go to point A.
+/// This will add the [`Running`] component to the behavior when [`OnRun`] is triggered.
+/// It will be removed automatically when [`OnRunResult`] is triggered.
+///
+/// **Note**: This should usually be added as a required component
+/// on continuous actions, not added to behaviors directly, because its easy to forget.
 pub type ContinueRun = InsertWhileRunning<Running>;
 
-/// 1. Adds the provided component when [`OnRun`] is called
-/// 2. Removes the component when [`OnRunResult`] is called
-#[derive(Bundle, Reflect)]
+/// 1. Adds the provided component when [`OnRun`] is triggered
+/// 2. Removes the component when [`OnRunResult`] is triggered
+// #[derive(Bundle,Reflect)]
+#[derive(Reflect)]
 pub struct InsertWhileRunning<T: Default + GenericActionComponent> {
 	add: InsertOnTrigger<OnRun, T>,
 	remove: RemoveOnTrigger<OnRunResult, T>,
 }
+
+impl<T: Default + GenericActionComponent> Component for InsertWhileRunning<T> {
+	const STORAGE_TYPE: StorageType = StorageType::Table;
+
+	fn register_component_hooks(hooks: &mut ComponentHooks) {
+		// Whenever this component is removed, or an entity with
+		// this component is despawned...
+		hooks.on_add(|mut world, entity, _| {
+			let action = world.get::<InsertWhileRunning<T>>(entity).unwrap();
+			let add = action.add.clone();
+			let remove = action.remove.clone();
+			world
+				.commands()
+				.entity(entity)
+				.insert((add, remove))
+				.remove::<InsertWhileRunning<T>>();
+		});
+	}
+}
+
+
 impl<T: Default + GenericActionComponent> Default for InsertWhileRunning<T> {
 	fn default() -> Self {
 		Self {
