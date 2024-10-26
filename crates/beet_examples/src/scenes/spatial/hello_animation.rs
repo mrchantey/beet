@@ -45,7 +45,6 @@ pub fn hello_animation(mut commands: Commands) {
 				.with_children(|parent| {
 					parent.spawn((
 						Name::new("Idle"),
-						ContinueRun::default(),
 						TargetAgent(agent),
 						PlayAnimation::new(idle_index)
 							.with_transition_duration(transition_duration),
@@ -58,7 +57,6 @@ pub fn hello_animation(mut commands: Commands) {
 					));
 					parent.spawn((
 						Name::new("Walking"),
-						ContinueRun::default(),
 						TargetAgent(agent),
 						PlayAnimation::new(walk_index)
 							.repeat(RepeatAnimation::Count(4))

@@ -8,6 +8,7 @@ use forky::prelude::Vec3Ext;
 #[reflect(Default, Component, ActionMeta)]
 #[category(ActionCategory::Agent)]
 #[systems(wander.in_set(TickSet))]
+#[require(ContinueRun)]
 pub struct Wander {
 	/// The scalar to apply to the impulse
 	pub scalar: f32,

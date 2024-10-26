@@ -8,6 +8,7 @@ use std::time::Duration;
 #[reflect(Default, Component, ActionMeta)]
 #[category(ActionCategory::Behavior)]
 #[systems(translate_grid.in_set(TickSet))]
+#[require(ContinueRun)]
 pub struct TranslateGrid {
 	pub anim_duration: Duration,
 }

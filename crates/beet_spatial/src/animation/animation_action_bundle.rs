@@ -11,7 +11,6 @@ use std::time::Duration;
 /// required to play an animation on run and end the run on animation end.
 #[derive(Bundle)]
 pub struct AnimationActionBundle {
-	continue_run: ContinueRun,
 	clip: AssetPlaceholder<AnimationClip>,
 	play_animation: PlayAnimation,
 	on_end: TriggerOnAnimationEnd<OnRunResult>,
@@ -28,7 +27,6 @@ impl AnimationActionBundle {
 		let transition_duration = Duration::from_millis(500);
 
 		Self {
-			continue_run: ContinueRun::default(),
 			clip,
 			play_animation: PlayAnimation::new(index)
 				.with_transition_duration(transition_duration),

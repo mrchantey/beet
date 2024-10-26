@@ -4,12 +4,11 @@ use std::time::Duration;
 
 /// Triggers the given event after running for a given duration. Has no effect if
 /// the action completes before the duration.
-/// # Requires
-/// - [`RunTimer`]
 #[derive(Debug, Clone, Component, Action, Reflect)]
 #[reflect(Component, ActionMeta)]
 #[category(ActionCategory::Behavior)]
 #[systems(trigger_in_duration::<T>.in_set(TickSet))]
+#[require(ContinueRun)]
 pub struct TriggerInDuration<T: GenericActionEvent> {
 	pub duration: Duration,
 	pub value: T,
@@ -77,7 +76,6 @@ mod test {
 
 		app.world_mut().spawn((
 			Running,
-			RunTimer::default(),
 			TriggerInDuration::<OnRunResult>::new(
 				OnRunResult::default(),
 				Duration::from_secs(2),

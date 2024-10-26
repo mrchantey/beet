@@ -12,6 +12,7 @@ use std::time::Duration;
 	.never_param_warn()
 	.in_set(TickSet)
 )]
+#[require(ContinueRun)]
 /// Inserts the given component when an animation is almost finished.
 /// Requires a [`Handle<AnimationClip>`] component.
 pub struct TriggerOnAnimationEnd<T: GenericActionEvent> {

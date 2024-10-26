@@ -9,7 +9,7 @@ use std::time::Duration;
 #[derive(Debug, Clone, Component, Reflect, Action)]
 #[systems(play_procedural_animation.in_set(TickSet))]
 #[reflect(Default, Component, ActionMeta)]
-#[require(ContinueRun, RunTimer)]
+#[require(ContinueRun)]
 pub struct PlayProceduralAnimation {
 	pub curve: SerdeCurve,
 	/// t per second, 1.0 will complete the curve in 1 second

@@ -9,6 +9,7 @@ use bevy::prelude::*;
 #[reflect(Default, Component, ActionMeta)]
 #[category(ActionCategory::Behavior)]
 #[systems(end_on_arrive.in_set(TickSet))]
+#[require(ContinueRun)]
 pub struct EndOnArrive {
 	pub radius: f32,
 }

@@ -9,6 +9,7 @@ use std::marker::PhantomData;
 #[reflect(Default, Component, ActionMeta)]
 #[category(ActionCategory::Behavior)]
 #[systems(cohere::<M>.in_set(TickSet))]
+#[require(ContinueRun)]
 pub struct Cohere<M: GenericActionComponent> {
 	/// The scalar to apply to the impulse
 	pub scalar: f32,

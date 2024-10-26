@@ -4,6 +4,7 @@ use bevy::time::Stopwatch;
 use std::fmt::Debug;
 
 /// Tracks the last time a node was run.
+/// This action is required by [`ContinueRun`] so is rarely added manually.
 #[derive(Default, Debug, Component, Action, Reflect)]
 #[reflect(Component, Default)]
 #[observers(on_start, on_stop)]

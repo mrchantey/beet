@@ -29,7 +29,6 @@ pub fn seek(mut commands: Commands) {
 			parent.spawn((
 				Name::new("Seek"),
 				RunOnAppReady::default(),
-				ContinueRun::default(),
 				TargetAgent(parent.parent_entity()),
 				Seek::default(),
 			));

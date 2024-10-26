@@ -58,7 +58,6 @@ pub fn fetch_npc(mut commands: Commands) {
 						},
 						PlayAnimation::new(walk_index).repeat_forever(),
 						InsertOnTrigger::<OnRun, Velocity>::new_with_target(agent),
-						ContinueRun::default(),
 						Seek::default(),
 						EndOnArrive::new(1.),
 						RemoveOnTrigger::<OnRunResult, SteerTarget>::new_with_target(agent),

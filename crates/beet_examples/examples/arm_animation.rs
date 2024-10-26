@@ -55,7 +55,6 @@ fn setup(mut commands: Commands) {
 					));
 					parent.spawn((
 						Name::new("Pause"),
-						RunTimer::default(),
 						TriggerInDuration::new(
 							OnRunResult::success(),
 							Duration::from_secs(3),

@@ -7,6 +7,7 @@ use bevy::prelude::*;
 #[reflect(Default, Component, ActionMeta)]
 #[category(ActionCategory::Agent)]
 #[systems(seek.in_set(TickSet))]
+#[require(ContinueRun)]
 pub struct Seek {
 	// TODO this should be a seperate component used by other actions as well
 	pub on_not_found: OnTargetNotFound,

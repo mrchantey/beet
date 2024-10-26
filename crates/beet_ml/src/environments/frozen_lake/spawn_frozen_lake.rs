@@ -70,10 +70,8 @@ pub fn spawn_frozen_lake_episode(
 					.with_children(|parent| {
 						parent.spawn((
 							Name::new("Go to grid cell"),
-							ContinueRun::default(),
 							TranslateGrid::new(Duration::from_millis(100)),
 							TargetAgent(agent),
-							RunTimer::default(),
 						));
 						parent.spawn((
 							Name::new("Step environment"),

@@ -45,10 +45,8 @@ pub fn frozen_lake_run(mut commands: Commands) {
 					));
 					parent.spawn((
 						Name::new("Perform action"),
-						ContinueRun::default(),
 						TranslateGrid::new(Duration::from_secs(1)),
 						TargetAgent(agent),
-						RunTimer::default(),
 					));
 				});
 		});

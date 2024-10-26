@@ -28,7 +28,6 @@ pub fn flock(mut commands: Commands) {
 				agent.spawn((
 					Name::new("Flock Behavior"),
 					RunOnSpawn,
-					ContinueRun::default(),
 					TargetAgent(agent.parent_entity()),
 					Separate::<GroupSteerAgent>::new(1.).scaled_dist(SCALE),
 					Align::<GroupSteerAgent>::new(1.).scaled_dist(SCALE),
