@@ -1,5 +1,5 @@
 use crate::beet::prelude::*;
-use beetmash::prelude::HandleWrapper;
+// use beetmash::prelude::HandleWrapper;
 use bevy::prelude::*;
 use std::f32::consts::FRAC_PI_2;
 
@@ -12,9 +12,9 @@ pub struct IkSpawner;
 pub fn ik_spawner(
 	mut commands: Commands,
 	mut events: EventReader<AssetEvent<Scene>>,
-	mut meshes: ResMut<Assets<Mesh>>,
+	// mut meshes: ResMut<Assets<Mesh>>,
 	child_nodes_query: Query<(Entity, &Name, &GlobalTransform, &Children)>,
-	render_texture: Single<&HandleWrapper<StandardMaterial>, With<Camera>>,
+	// render_texture: Single<&HandleWrapper<StandardMaterial>, With<Camera>>,
 	children_query: Query<&Children>,
 	query: Populated<
 		(Entity, &Children, &SceneRoot, &TargetAgent),
@@ -59,7 +59,7 @@ pub fn ik_spawner(
 		let segment3 = items[3];
 		let gripper = items[4];
 		// let target = items[5];
-		let phone = items[6];
+		// let phone = items[6];
 
 
 		// let base_to_segment1 = segment1.2.translation - base.2.translation;
@@ -83,12 +83,12 @@ pub fn ik_spawner(
 		commands.entity(scene_root_entity).insert(ik_transforms);
 
 
-		commands.entity(phone.0).with_child((
-			Name::new("Phone Texture"),
-			Transform::from_xyz(0., 0.1, 0.).looking_to(Dir3::Z, Dir3::Y),
-			Mesh3d(meshes.add(Plane3d::new(Vec3::Y, Vec2::splat(0.9)))),
-			MeshMaterial3d(render_texture.0.clone()),
-		));
+		// commands.entity(phone.0).with_child((
+		// 	Name::new("Phone Texture"),
+		// 	Transform::from_xyz(0., 0.1, 0.).looking_to(Dir3::Z, Dir3::Y),
+		// 	Mesh3d(meshes.add(Plane3d::new(Vec3::Y, Vec2::splat(0.9)))),
+		// 	MeshMaterial3d(render_texture.0.clone()),
+		// ));
 	}
 }
 

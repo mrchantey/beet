@@ -2,7 +2,7 @@
 use bevy::prelude::*;
 
 
-/// Signifies an action has started running.
+/// Signifies a behavior has started running.
 #[derive(Debug, Default, Clone, Event, Reflect)]
 #[reflect(Default)]
 pub struct OnRun;

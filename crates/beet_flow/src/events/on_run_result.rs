@@ -10,6 +10,7 @@ pub mod child_expect {
 }
 
 
+/// Signifies a behavior has stopped running.
 #[derive(Debug, Default, Clone, Copy, Event, PartialEq, Deref, Reflect)]
 #[reflect(Default)]
 pub struct OnRunResult(RunResult);

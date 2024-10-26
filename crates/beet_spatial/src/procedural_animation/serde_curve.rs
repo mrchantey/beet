@@ -1,18 +1,16 @@
 use bevy::prelude::*;
+use std::f32::consts::TAU;
 
 
 /// Enum of common curves that can be serialized
-#[derive(Debug, Clone, PartialEq, Component, Reflect)]
-#[reflect(Debug, Default, PartialEq)]
+#[derive(Debug, Default, Clone, Component, Reflect)]
+#[reflect(Debug, Default)]
 pub enum SerdeCurve {
+	#[default]
 	Circle,
 	Square,
+	EaseDir2(EasingCurve<Dir2>),
 }
-
-impl Default for SerdeCurve {
-	fn default() -> Self { Self::Circle }
-}
-
 
 impl Curve<Vec3> for SerdeCurve {
 	fn domain(&self) -> Interval { Interval::EVERYWHERE }
@@ -21,14 +19,20 @@ impl Curve<Vec3> for SerdeCurve {
 		match self {
 			SerdeCurve::Circle => circle_curve(t),
 			SerdeCurve::Square => square_curve(t),
+			SerdeCurve::EaseDir2(ease) => ease.sample_unchecked(t).extend(0.),
 		}
 	}
 }
 
+impl Into<SerdeCurve> for EasingCurve<Dir2> {
+	fn into(self) -> SerdeCurve { SerdeCurve::EaseDir2(self) }
+}
 
 
-
-fn circle_curve(t: f32) -> Vec3 { Vec3::new(t.cos(), t.sin(), 0.) }
+fn circle_curve(t: f32) -> Vec3 {
+	let angle = t * TAU;
+	Vec3::new(angle.cos(), angle.sin(), 0.)
+}
 
 fn square_curve(t: f32) -> Vec3 {
 	let t = t * 4.;

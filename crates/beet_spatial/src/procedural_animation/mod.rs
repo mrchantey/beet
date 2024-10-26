@@ -1,3 +1,6 @@
+pub mod insert_procedural_animation;
+#[allow(unused_imports)]
+pub use self::insert_procedural_animation::*;
 pub mod play_procedural_animation;
 #[allow(unused_imports)]
 pub use self::play_procedural_animation::*;

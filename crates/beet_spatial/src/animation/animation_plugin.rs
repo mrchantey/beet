@@ -1,4 +1,4 @@
-use super::*;
+use crate::prelude::*;
 use beet_flow::prelude::*;
 use bevy::prelude::*;
 
@@ -12,6 +12,7 @@ impl Plugin for AnimationPlugin {
     	.add_systems(Update, init_animators)
 			.add_plugins(ActionPlugin::<(
 				PlayAnimation,
+				PlayProceduralAnimation,
 				TriggerOnAnimationEnd<OnRunResult>
 			)>::default())
 		;

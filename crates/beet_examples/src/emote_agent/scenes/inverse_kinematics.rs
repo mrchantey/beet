@@ -5,17 +5,20 @@ use bevy::color::palettes::tailwind;
 use bevy::prelude::*;
 
 
-pub fn inverse_kinematics(mut commands: Commands) {
+pub fn spawn_ik_camera(mut commands: Commands) {
 	commands.spawn((
 		Name::new("Camera"),
 		BundlePlaceholder::Camera3d,
 		Transform::from_xyz(0., 7., 7.).looking_at(Vec3::ZERO, Vec3::Y),
 	));
-	spawn_arm(commands);
 }
-pub fn spawn_arm(mut commands: Commands) {
-	let target = spawn_target(&mut commands);
 
+pub fn spawn_arm_with_keyboard_target(mut commands: Commands) {
+	let target = spawn_keyboard_target(&mut commands);
+	spawn_arm(&mut commands, target);
+}
+
+pub fn spawn_arm(commands: &mut Commands, target: Entity) {
 	commands.spawn((
 		Name::new("scene"),
 		BundlePlaceholder::Gltf("robot-arm/robot-arm-phone.glb".into()),
@@ -25,7 +28,7 @@ pub fn spawn_arm(mut commands: Commands) {
 	));
 }
 
-fn spawn_target(commands: &mut Commands) -> Entity {
+fn spawn_keyboard_target(commands: &mut Commands) -> Entity {
 	commands
 		.spawn((
 			Name::new("Target"),
@@ -42,7 +45,7 @@ fn spawn_target(commands: &mut Commands) -> Entity {
 
 
 pub fn spawn_test_arm(mut commands: Commands) {
-	let target = spawn_target(&mut commands);
+	let target = spawn_keyboard_target(&mut commands);
 
 	let ik_solver = IkArm4Dof::new(
 		0.,

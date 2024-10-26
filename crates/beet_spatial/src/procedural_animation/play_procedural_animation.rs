@@ -1,68 +1,60 @@
 use crate::prelude::*;
 use beet_flow::prelude::*;
-use bevy::animation::RepeatAnimation;
 use bevy::prelude::*;
+use std::time::Duration;
 
-
-#[derive(Debug, Clone, PartialEq, Component, Reflect, Action)]
-#[observers(play_procedural_animation)]
+/// Play a procedural animation with a provided [`SerdeCurve`] for
+/// a given [`Duration`]. Add a [`Transform`] to this behavior to
+/// offset the target position.
+#[derive(Debug, Clone, Component, Reflect, Action)]
+#[systems(play_procedural_animation.in_set(TickSet))]
 #[reflect(Default, Component, ActionMeta)]
+#[require(ContinueRun, RunTimer)]
 pub struct PlayProceduralAnimation {
 	pub curve: SerdeCurve,
 	/// t per second, 1.0 will complete the curve in 1 second
-	pub speed: f32,
-	pub repeat: RepeatAnimation,
-	pub completions: u32,
-	pub elapsed_t: f32,
+	pub duration: Duration,
 }
 
 impl Default for PlayProceduralAnimation {
 	fn default() -> Self {
 		Self {
 			curve: default(),
-			repeat: default(),
-			speed: 1.,
-			completions: 0,
-			elapsed_t: 0.,
+			duration: Duration::from_secs(1),
 		}
 	}
 }
 
 impl PlayProceduralAnimation {
-	pub fn is_finished(&self) -> bool {
-		match self.repeat {
-			RepeatAnimation::Forever => false,
-			RepeatAnimation::Never => self.completions >= 1,
-			RepeatAnimation::Count(n) => self.completions >= n,
-		}
+	pub fn with_duration(self, duration: Duration) -> Self {
+		Self { duration, ..self }
 	}
 }
 
 pub fn play_procedural_animation(
-	trigger: Trigger<OnRun>,
 	mut commands: Commands,
-	time: Res<Time>,
 	mut transforms: Query<&mut Transform>,
-	mut query: Query<(&mut PlayProceduralAnimation, &TargetAgent)>,
+	query: Query<
+		(Entity, &PlayProceduralAnimation, &TargetAgent, &RunTimer),
+		With<Running>,
+	>,
 ) {
-	println!("🚀🚀🚀");
-	let (mut action, target_agent) = query
-		.get_mut(trigger.entity())
-		.expect(expect_action::ACTION_QUERY_MISSING);
+	for (entity, action, target_agent, run_timer) in query.iter() {
+		let t = run_timer.last_started.elapsed().as_secs_f32()
+			/ action.duration.as_secs_f32();
+		let mut target_pos = action.curve.sample_clamped(t);
 
-	let mut transform = transforms
-		.get_mut(target_agent.0)
-		.expect(expect_action::TARGET_MISSING);
+		if let Ok(transform) = transforms.get(entity) {
+			target_pos = transform.transform_point(target_pos);
+		}
 
-	action.elapsed_t += action.speed * time.delta_secs();
-	transform.translation = action.curve.sample_clamped(action.elapsed_t);
+		transforms
+			.get_mut(target_agent.0)
+			.expect(expect_action::TARGET_MISSING)
+			.translation = target_pos;
 
-	if action.elapsed_t >= 1.0 {
-		action.completions += 1;
-		if action.is_finished() {
-			commands
-				.entity(trigger.entity())
-				.insert(OnRunResult::success());
+		if t >= 1.0 {
+			commands.entity(entity).trigger(OnRunResult::success());
 		}
 	}
 }
@@ -83,12 +75,13 @@ mod test {
 			.insert_time();
 
 		let agent = app.world_mut().spawn(Transform::default()).id();
-		let behavior = app
-			.world_mut()
-			.spawn((PlayProceduralAnimation::default(), TargetAgent(agent)))
-			.id();
+		app.world_mut().spawn((
+			Running,
+			PlayProceduralAnimation::default(),
+			TargetAgent(agent),
+		));
 
-		app.world_mut().entity_mut(behavior).flush_trigger(OnRun);
+		app.update();
 
 		expect(
 			app.world()

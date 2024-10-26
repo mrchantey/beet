@@ -22,15 +22,15 @@ forky.workspace = true
 beetmash.workspace = true
 beet_flow.workspace = true
 
-log.workspace = true
 bevy.workspace = true
+rand.workspace = true
 
 anyhow.workspace = true
+log.workspace = true
+pretty_env_logger.workspace = true
 serde.workspace = true
 strum.workspace = true
 strum_macros.workspace = true
-
-pretty_env_logger.workspace = true
 
 [dev-dependencies]
 sweet.workspace = true

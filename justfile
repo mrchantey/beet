@@ -45,7 +45,7 @@ test-all *args:
 test-spatial *args:
 	just watch 'cargo test -p beet_spatial --lib -- {{args}}'
 
-test-ecs *args:
+test-flow *args:
 	just watch 'cargo test -p beet_flow --lib -- {{args}}'
 # just watch 'cargo test -p beet_flow --lib -- --nocapture {{args}}'
 
