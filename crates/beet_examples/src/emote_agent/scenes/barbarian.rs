@@ -31,7 +31,7 @@ pub fn spawn_barbarian(mut commands: Commands) {
 			AssetLoadBlockAppReady,
 			graph,
 			AnimationTransitions::default(),
-			// RenderLayers::layer(RENDER_TEXTURE_LAYER),
+			RenderLayers::layer(RENDER_TEXTURE_LAYER),
 		))
 		.with_children(|parent| {
 			let agent = parent.parent_entity();
