@@ -25,7 +25,7 @@ use bevy::prelude::*;
 /// ```
 #[derive(Debug, Default, Component, Reflect)]
 #[reflect(Default, Component)]
-#[require(RunTimer, InsertOnTrigger<OnRun, Running>, RemoveOnTrigger<OnRunResult, Running>)]
+#[require(RunTimer, InsertOnRun<Running>, RemoveOnRunResult<Running>)]
 pub struct ContinueRun;
 
 #[cfg(test)]
@@ -39,15 +39,12 @@ mod test {
 	fn works() -> Result<()> {
 		let mut app = App::new();
 		app.add_plugins(ActionPlugin::<(
-			InsertOnTrigger<OnRun, Running>,
-			RemoveOnTrigger<OnRunResult, Running>,
+			InsertOnRun<Running>,
+			RemoveOnRunResult<Running>,
 		)>::default());
 		let world = app.world_mut();
 
-		let entity = world
-			.spawn(ContinueRun)
-			.flush_trigger(OnRun)
-			.id();
+		let entity = world.spawn(ContinueRun).flush_trigger(OnRun).id();
 		expect(world.entities().len()).to_be(3)?;
 		expect(&*world).to_have_component::<Running>(entity)?;
 		world

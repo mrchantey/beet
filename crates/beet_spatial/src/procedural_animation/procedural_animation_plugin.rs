@@ -4,7 +4,7 @@ use bevy::prelude::*;
 
 
 pub fn procedural_animation_plugin(app: &mut App) {
-	app.add_plugins(ActionPlugin::<(
-		InsertOnTrigger<OnRun, PlayProceduralAnimation>,
-	)>::default());
+	app.add_plugins(
+		ActionPlugin::<InsertOnRun<PlayProceduralAnimation>>::default(),
+	);
 }

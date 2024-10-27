@@ -14,8 +14,8 @@ impl Plugin for LifecyclePlugin {
 			ActionPlugin::<(
 				EndOnRun,
 				TriggerInDuration<OnRunResult>,
-				InsertOnTrigger<OnRun, Running>,
-				RemoveOnTrigger<OnRunResult, Running>,
+				InsertOnRun<Running>,
+				RemoveOnRunResult<Running>,
 				RunOnRunResult,
 				RunOnSceneReady,
 			)>::default(),

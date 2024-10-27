@@ -3,6 +3,7 @@ use crate::prelude::*;
 use beetmash::prelude::*;
 use bevy::animation::RepeatAnimation;
 use bevy::prelude::*;
+use bevy::render::view::RenderLayers;
 
 pub fn spawn_barbarian(mut commands: Commands) {
 	let mut graph = AnimationGraphPlaceholder::default();
@@ -30,6 +31,7 @@ pub fn spawn_barbarian(mut commands: Commands) {
 			AssetLoadBlockAppReady,
 			graph,
 			AnimationTransitions::default(),
+			// RenderLayers::layer(RENDER_TEXTURE_LAYER),
 		))
 		.with_children(|parent| {
 			let agent = parent.parent_entity();
@@ -37,6 +39,7 @@ pub fn spawn_barbarian(mut commands: Commands) {
 			let emote_bubble = spawn_emote_bubble(&mut parent.spawn((
 				Transform::from_xyz(0.5, 2.5, 0.5),
 				Visibility::Hidden,
+				RenderLayers::layer(RENDER_TEXTURE_LAYER),
 			)));
 
 			idle_behavior = parent
@@ -52,12 +55,9 @@ pub fn spawn_barbarian(mut commands: Commands) {
 				EndOnRun::success().with_target(idle_behavior),
 				InsertSentenceOnUserInput::default(),
 				RunOnInsertSentence::default(),
-				InsertOnTrigger::<OnRun, Visibility>::new(Visibility::Visible)
+				InsertOnRun::new(Visibility::Visible).with_target(emote_bubble),
+				InsertOnRunResult::new(Visibility::Hidden)
 					.with_target(emote_bubble),
-				InsertOnTrigger::<OnRunResult, Visibility>::new(
-					Visibility::Hidden,
-				)
-				.with_target(emote_bubble),
 				TargetAgent(agent),
 				cheer_animation_bundle,
 				RunOnRunResult::new_with_target(idle_behavior),

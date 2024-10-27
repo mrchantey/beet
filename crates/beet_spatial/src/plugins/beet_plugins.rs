@@ -27,7 +27,7 @@ impl PluginGroup for BeetSpatialPlugins {
 
 pub fn spatial_observers_plugin(app: &mut App) {
 	app.add_plugins(ActionPlugin::<(
-		InsertOnTrigger<OnRun, Visibility>,
-		InsertOnTrigger<OnRunResult, Visibility>,
+		InsertOnRun<Visibility>,
+		InsertOnRunResult<Visibility>,
 	)>::default());
 }

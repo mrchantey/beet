@@ -40,7 +40,7 @@ pub fn fetch_npc(mut commands: Commands) {
 					RunOnSteerTargetInsert::new_with_source(agent),
 					RunOnSteerTargetRemove::new_with_source(agent),
 					ScoreFlow::default(),
-					RemoveOnTrigger::<OnRunResult, Sentence>::default(),
+					RemoveOnRunResult::<Sentence>::default(),
 				))
 				.with_children(|parent| {
 					parent.spawn((
@@ -57,11 +57,13 @@ pub fn fetch_npc(mut commands: Commands) {
 							max_radius: 10.,
 						},
 						PlayAnimation::new(walk_index).repeat_forever(),
-						InsertOnTrigger::<OnRun, Velocity>::new_with_target(agent),
+						InsertOnRun::<Velocity>::new_with_target(agent),
 						Seek::default(),
 						EndOnArrive::new(1.),
-						RemoveOnTrigger::<OnRunResult, SteerTarget>::new_with_target(agent),
-						RemoveOnTrigger::<OnRunResult, Velocity>::new_with_target(agent),
+						RemoveOnRunResult::<SteerTarget>::new_with_target(
+							agent,
+						),
+						RemoveOnRunResult::<Velocity>::new_with_target(agent),
 					));
 				});
 		});

@@ -3,8 +3,6 @@ use bevy::prelude::*;
 use std::marker::PhantomData;
 
 
-pub type InsertOnRun<T> = InsertOnTrigger<OnRun, T>;
-
 
 /// Inserts the provided `Bundle` on the [`TriggerOnTrigger::target`] when
 /// the `EventIn` is triggered on one of the [`TriggerOnTrigger::sources`].
@@ -48,13 +46,11 @@ mod test {
 	#[test]
 	fn works() -> Result<()> {
 		let mut app = App::new();
-		app.add_plugins(
-			ActionPlugin::<InsertOnTrigger<OnRun, Running>>::default(),
-		);
+		app.add_plugins(ActionPlugin::<InsertOnRun<Running>>::default());
 		let world = app.world_mut();
 
 		let entity = world
-			.spawn(InsertOnTrigger::<OnRun, Running>::default())
+			.spawn(InsertOnRun::<Running>::default())
 			.flush_trigger(OnRun)
 			.id();
 		expect(world.entities().len()).to_be(2)?;

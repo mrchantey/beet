@@ -144,13 +144,11 @@ mod test {
 	#[test]
 	fn works() -> Result<()> {
 		let mut app = App::new();
-		app.add_plugins(
-			ActionPlugin::<InsertOnTrigger<OnRun, Running>>::default(),
-		);
+		app.add_plugins(ActionPlugin::<InsertOnRun<Running>>::default());
 		let world = app.world_mut();
 
 		let entity = world
-			.spawn(InsertOnTrigger::<OnRun, Running>::default())
+			.spawn(InsertOnRun::<Running>::default())
 			.flush_trigger(OnRun)
 			.id();
 		expect(world.entities().len()).to_be(2)?;
@@ -160,17 +158,12 @@ mod test {
 	#[test]
 	fn other_sources() -> Result<()> {
 		let mut app = App::new();
-		app.add_plugins(
-			ActionPlugin::<InsertOnTrigger<OnRun, Running>>::default(),
-		);
+		app.add_plugins(ActionPlugin::<InsertOnRun<Running>>::default());
 		let world = app.world_mut();
 
 		let source = world.spawn_empty().id();
 		let entity = world
-			.spawn(
-				InsertOnTrigger::<OnRun, Running>::default()
-					.with_source(source),
-			)
+			.spawn(InsertOnRun::<Running>::default().with_source(source))
 			.id();
 
 		world.entity_mut(source).flush_trigger(OnRun);

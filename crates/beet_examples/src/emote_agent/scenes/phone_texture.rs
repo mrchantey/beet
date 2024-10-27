@@ -2,7 +2,7 @@ use crate::prelude::*;
 use bevy::prelude::*;
 use bevy::render::view::RenderLayers;
 
-pub fn phone_texture(
+pub fn phone_texture_emoji(
 	mut commands: Commands,
 	asset_server: Res<AssetServer>,
 	mut texture_atlas_layouts: ResMut<Assets<TextureAtlasLayout>>,
@@ -23,7 +23,7 @@ pub fn phone_texture(
 	));
 }
 
-pub fn phone_texture_camera(
+pub fn phone_texture_camera_2d(
 	mut commands: Commands,
 	mut images: ResMut<Assets<Image>>,
 	mut materials: ResMut<Assets<StandardMaterial>>,
@@ -32,5 +32,15 @@ pub fn phone_texture_camera(
 		render_texture_bundle(&mut images, &mut materials),
 		// Camera3d::default(),
 		Camera2d,
+	));
+}
+pub fn phone_texture_camera_3d(
+	mut commands: Commands,
+	mut images: ResMut<Assets<Image>>,
+	mut materials: ResMut<Assets<StandardMaterial>>,
+) {
+	commands.spawn((
+		render_texture_bundle(&mut images, &mut materials),
+		Camera3d::default(),
 	));
 }

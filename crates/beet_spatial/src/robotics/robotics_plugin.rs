@@ -8,7 +8,7 @@ pub struct RoboticsPlugin;
 impl Plugin for RoboticsPlugin {
 	fn build(&self, app: &mut App) {
 		app.add_plugins(ActionPlugin::<(
-			InsertOnTrigger<OnRun, DualMotorValue>,
+			InsertOnRun<DualMotorValue>,
 			DepthSensorScorer,
 		)>::default())
 			.register_type::<DepthValue>()

@@ -10,6 +10,9 @@ pub use self::insert_on_trigger::*;
 pub mod on_global_trigger;
 #[allow(unused_imports)]
 pub use self::on_global_trigger::*;
+pub mod aliases;
+#[allow(unused_imports)]
+pub use self::aliases::*;
 pub mod on_trigger_action;
 #[allow(unused_imports)]
 pub use self::on_trigger_action::*;

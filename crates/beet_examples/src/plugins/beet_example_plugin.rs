@@ -43,7 +43,7 @@ pub fn beet_example_plugin(app: &mut App) {
 		DefaultReplicatePlugin,
 		temp_patches,
 	))
-	.add_plugins((plugin_spatial, plugin_2d, plugin_3d))
+	.add_plugins((plugin_spatial, plugin_2d, plugin_3d, emote_agent_plugin))
 	.register_type::<Collectable>();
 }
 
@@ -52,10 +52,10 @@ pub fn beet_example_plugin(app: &mut App) {
 fn plugin_spatial(app: &mut App) {
 	app
 		.add_plugins(ActionPlugin::<(
-			RemoveOnTrigger<OnRunResult, SteerTarget>,
-			RemoveOnTrigger<OnRunResult, Velocity>,
-			InsertOnTrigger<OnRun, Velocity>,
-			RemoveOnTrigger<OnRun, Velocity>,
+			RemoveOnRunResult<SteerTarget>,
+			RemoveOnRunResult<Velocity>,
+			InsertOnRun<Velocity>,
+			RemoveOnRun<Velocity>,
 		)>::default())
 		/*-*/;
 }
@@ -75,7 +75,7 @@ pub fn plugin_ml(app: &mut App) {
 	// fetch
 	.add_plugins(ActionPlugin::<(
 		InsertSentenceSteerTarget<Collectable>,
-		RemoveOnTrigger<OnRunResult, Sentence>,
+		RemoveOnRunResult<Sentence>,
 	)>::default())
 		/*-*/;
 }
@@ -106,10 +106,7 @@ fn plugin_3d(app: &mut App) {
 			camera_distance,
 			rotate_collectables,
 			keyboard_controller,
-			ik_spawner.never_param_warn(),
-			update_emoji_swapper.never_param_warn()
 		))
-		.register_type::<IkSpawner>()
 		.register_type::<FollowCursor3d>()
 		.register_type::<KeyboardController>()
 		.register_type::<CameraDistance>()
