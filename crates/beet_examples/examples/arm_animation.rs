@@ -57,7 +57,8 @@ fn setup(mut commands: Commands) {
 				TargetAgent(target),
 				InsertProceduralAnimation::default(),
 				PlayProceduralAnimation::default()
-					.with_duration(Duration::from_secs_f32(3.)),
+					.with_meter_per_second(1.),
+					// .with_duration(Duration::from_secs_f32(3.)),
 			));
 			parent.spawn((
 				Name::new("Pause"),

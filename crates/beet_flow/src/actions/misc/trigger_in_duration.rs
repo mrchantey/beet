@@ -63,10 +63,10 @@ pub fn trigger_in_duration<T: GenericActionEvent>(
 	for (entity, timer, mut action) in query.iter_mut() {
 		if timer.last_started.elapsed() >= action.duration {
 			commands.entity(entity).trigger(action.value.clone());
-		}
-		// Randomize the next duration if a range is provided
-		if let Some(range) = &action.range {
-			action.duration = rand::thread_rng().gen_range(range.clone());
+			// Randomize the next duration if a range is provided
+			if let Some(range) = &action.range {
+				action.duration = rand::thread_rng().gen_range(range.clone());
+			}
 		}
 	}
 }
