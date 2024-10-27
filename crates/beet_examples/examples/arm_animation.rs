@@ -4,6 +4,7 @@ use beet_spatial::prelude::*;
 use beetmash::prelude::*;
 use bevy::color::palettes::tailwind;
 use bevy::prelude::*;
+use forky::prelude::TransformExt;
 use scenes::spawn_arm;
 use std::time::Duration;
 
@@ -25,44 +26,47 @@ pub fn main() {
 
 
 fn setup(mut commands: Commands) {
-	let target = commands
+	let mut target = Entity::PLACEHOLDER;
+	commands
+		// target parent is used to define offset transform
 		.spawn((
-			Name::new("Target"),
-			Transform::from_xyz(0., 1.5, 2.5).looking_to(-Vec3::Z, Vec3::Y),
-			BundlePlaceholder::Pbr {
-				mesh: Sphere::new(0.2).into(),
-				material: MaterialPlaceholder::unlit(tailwind::BLUE_500),
-			},
+			Name::new("Target Parent"),
+			Transform::from_xyz(0., 1.5, 0.)
+				.with_scale_value(2.)
+				.looking_to(Dir3::NEG_Y, Dir3::NEG_Z),
+			// .with_rotation_x(PI),
 		))
 		.with_children(|parent| {
-			let agent = parent.parent_entity();
-			parent
-				.spawn((
-					Name::new("Behavior"),
-					RunOnSpawn,
-					Repeat::default(),
-					SequenceFlow,
-				))
-				.with_children(|parent| {
-					parent.spawn((
-						Name::new("New Pos"),
-						PlayProceduralAnimation::default()
-							.with_duration(Duration::from_secs_f32(3.)),
-						InsertProceduralAnimation::default(),
-						TargetAgent(agent),
-						Transform::from_xyz(0., 1., 2.)
-							.with_scale(Vec3::splat(0.5)),
-					));
-					parent.spawn((
-						Name::new("Pause"),
-						TriggerInDuration::new(
-							OnRunResult::success(),
-							Duration::from_secs(3),
-						),
-					));
-				});
-		})
-		.id();
+			target = parent
+				.spawn((Name::new("Target"), BundlePlaceholder::Pbr {
+					mesh: Sphere::new(0.2).into(),
+					material: MaterialPlaceholder::unlit(tailwind::BLUE_500),
+				}))
+				.id();
+		});
+	commands
+		.spawn((
+			Name::new("Behavior"),
+			RunOnSpawn,
+			Repeat::default(),
+			SequenceFlow,
+		))
+		.with_children(|parent| {
+			parent.spawn((
+				Name::new("New Pos"),
+				TargetAgent(target),
+				InsertProceduralAnimation::default(),
+				PlayProceduralAnimation::default()
+					.with_duration(Duration::from_secs_f32(3.)),
+			));
+			parent.spawn((
+				Name::new("Pause"),
+				TriggerInDuration::with_range(
+					OnRunResult::success(),
+					Duration::from_secs(1)..Duration::from_secs(4),
+				),
+			));
+		});
 
 	spawn_arm(&mut commands, target);
 }

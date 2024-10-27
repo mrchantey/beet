@@ -23,8 +23,9 @@ beetmash.workspace = true
 beet_flow.workspace = true
 
 bevy.workspace = true
-rand.workspace = true
 
+rand.workspace = true
+extend.workspace = true
 anyhow.workspace = true
 log.workspace = true
 pretty_env_logger.workspace = true

@@ -1,5 +1,7 @@
 use crate::prelude::*;
 use bevy::prelude::*;
+use rand::Rng;
+use std::ops::Range;
 use std::time::Duration;
 
 /// Triggers the given event after running for a given duration. Has no effect if
@@ -11,6 +13,8 @@ use std::time::Duration;
 #[require(ContinueRun)]
 pub struct TriggerInDuration<T: GenericActionEvent> {
 	pub duration: Duration,
+	/// Optionally randomize the duration within this range
+	pub range: Option<Range<Duration>>,
 	pub value: T,
 }
 
@@ -20,31 +24,49 @@ impl<T: Default + GenericActionEvent> Default for TriggerInDuration<T> {
 
 impl<T: GenericActionEvent> TriggerInDuration<T> {
 	pub fn new(value: T, duration: Duration) -> Self {
-		Self { value, duration }
+		Self {
+			value,
+			duration,
+			range: None,
+		}
 	}
 	pub fn with_secs(value: T, secs: u64) -> Self {
 		Self {
 			value,
 			duration: Duration::from_secs(secs),
+			range: None,
 		}
 	}
 	pub fn with_millis(value: T, millis: u64) -> Self {
 		Self {
 			value,
 			duration: Duration::from_millis(millis),
+			range: None,
+		}
+	}
+	pub fn with_range(value: T, range: Range<Duration>) -> Self {
+		Self {
+			value,
+			duration: range.start,
+			range: Some(range),
 		}
 	}
 }
 
 pub fn trigger_in_duration<T: GenericActionEvent>(
 	mut commands: Commands,
-	mut query: Query<(Entity, &RunTimer, &TriggerInDuration<T>), With<Running>>,
+	mut query: Query<
+		(Entity, &RunTimer, &mut TriggerInDuration<T>),
+		With<Running>,
+	>,
 ) {
-	for (entity, timer, insert_in_duration) in query.iter_mut() {
-		if timer.last_started.elapsed() >= insert_in_duration.duration {
-			commands
-				.entity(entity)
-				.trigger(insert_in_duration.value.clone());
+	for (entity, timer, mut action) in query.iter_mut() {
+		if timer.last_started.elapsed() >= action.duration {
+			commands.entity(entity).trigger(action.value.clone());
+		}
+		// Randomize the next duration if a range is provided
+		if let Some(range) = &action.range {
+			action.duration = rand::thread_rng().gen_range(range.clone());
 		}
 	}
 }
@@ -68,11 +90,9 @@ mod test {
 		app.add_plugins(ActionPlugin::<(
 			RunTimer,
 			TriggerInDuration<OnRunResult>,
-		)>::default());
-
-		app.configure_sets(Update, PreTickSet.before(TickSet));
-
-		app.insert_time();
+		)>::default())
+			.configure_sets(Update, PreTickSet.before(TickSet))
+			.insert_time();
 
 		app.world_mut().spawn((
 			Running,

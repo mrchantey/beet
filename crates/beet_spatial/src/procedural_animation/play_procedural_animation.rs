@@ -13,6 +13,7 @@ use std::time::Duration;
 pub struct PlayProceduralAnimation {
 	pub curve: SerdeCurve,
 	/// t per second, 1.0 will complete the curve in 1 second
+	// meters per second and turns per second are probably better
 	pub duration: Duration,
 }
 
@@ -42,11 +43,11 @@ pub fn play_procedural_animation(
 	for (entity, action, target_agent, run_timer) in query.iter() {
 		let t = run_timer.last_started.elapsed().as_secs_f32()
 			/ action.duration.as_secs_f32();
-		let mut target_pos = action.curve.sample_clamped(t);
+		let target_pos = action.curve.sample_clamped(t);
 
-		if let Ok(transform) = transforms.get(entity) {
-			target_pos = transform.transform_point(target_pos);
-		}
+		// if let Ok(transform) = transforms.get(entity) {
+		// 	target_pos = transform.transform_point(target_pos);
+		// }
 
 		transforms
 			.get_mut(target_agent.0)

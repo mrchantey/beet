@@ -7,6 +7,7 @@ pub mod procedural_animation;
 pub mod inverse_kinematics;
 pub mod movement;
 pub mod plugins;
+pub mod extensions;
 pub mod robotics;
 pub mod steer;
 #[cfg(feature = "ui")]
@@ -21,6 +22,7 @@ pub mod prelude {
 	pub use crate::inverse_kinematics::*;
 	pub use crate::movement::*;
 	pub use crate::plugins::*;
+	pub use crate::extensions::*;
 	pub use crate::robotics::*;
 	pub use crate::steer::algo::*;
 	pub use crate::steer::steer_actions::*;

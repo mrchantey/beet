@@ -27,6 +27,7 @@ beetmash = { workspace = true, optional = true }
 
 log.workspace = true
 anyhow.workspace = true
+rand.workspace = true
 heck.workspace = true
 petgraph.workspace = true
 serde.workspace = true
