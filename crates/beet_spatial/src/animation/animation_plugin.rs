@@ -13,7 +13,7 @@ impl Plugin for AnimationPlugin {
 			.add_plugins(ActionPlugin::<(
 				PlayAnimation,
 				PlayProceduralAnimation,
-				InsertProceduralAnimation,
+				SetCurveOnRun,
 				TriggerOnAnimationEnd<OnRunResult>
 			)>::default())
 		;

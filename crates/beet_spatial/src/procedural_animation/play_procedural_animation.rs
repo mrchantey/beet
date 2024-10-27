@@ -25,9 +25,11 @@ impl Default for PlayProceduralAnimation {
 }
 
 impl PlayProceduralAnimation {
-	pub fn with_duration(self, duration: Duration) -> Self {
+	pub fn with_duration_secs(self, secs: f32) -> Self {
 		Self {
-			speed: ProceduralAnimationSpeed::Duration(duration),
+			speed: ProceduralAnimationSpeed::Duration(Duration::from_secs_f32(
+				secs,
+			)),
 			..self
 		}
 	}
@@ -36,6 +38,10 @@ impl PlayProceduralAnimation {
 			speed: ProceduralAnimationSpeed::MetersPerSecond(mps),
 			..self
 		}
+	}
+
+	pub fn with_curve(self, curve: SerdeCurve) -> Self {
+		Self { curve, ..self }
 	}
 }
 

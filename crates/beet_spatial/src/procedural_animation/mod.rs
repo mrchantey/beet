@@ -1,6 +1,6 @@
-pub mod insert_procedural_animation;
+pub mod set_curve_on_run;
 #[allow(unused_imports)]
-pub use self::insert_procedural_animation::*;
+pub use self::set_curve_on_run::*;
 pub mod play_procedural_animation;
 #[allow(unused_imports)]
 pub use self::play_procedural_animation::*;

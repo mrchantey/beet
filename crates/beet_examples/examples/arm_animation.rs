@@ -27,15 +27,18 @@ pub fn main() {
 
 fn setup(mut commands: Commands) {
 	let mut target = Entity::PLACEHOLDER;
-	commands
+	let pos_happy = Vec3::new(0., 3., 0.);
+	let pos_idle = Vec3::new(0., 2., 0.);
+
+	let transform_idle = Transform::from_translation(pos_idle)
+		.with_scale_value(2.)
+		.looking_to(Dir3::NEG_Y, Dir3::X);
+
+
+
+	let target_parent = commands
 		// target parent is used to define offset transform
-		.spawn((
-			Name::new("Target Parent"),
-			Transform::from_xyz(0., 1.5, 0.)
-				.with_scale_value(2.)
-				.looking_to(Dir3::NEG_Y, Dir3::NEG_Z),
-			// .with_rotation_x(PI),
-		))
+		.spawn((Name::new("Target Parent"), transform_idle))
 		.with_children(|parent| {
 			target = parent
 				.spawn((Name::new("Target"), BundlePlaceholder::Pbr {
@@ -43,7 +46,8 @@ fn setup(mut commands: Commands) {
 					material: MaterialPlaceholder::unlit(tailwind::BLUE_500),
 				}))
 				.id();
-		});
+		})
+		.id();
 	commands
 		.spawn((
 			Name::new("Behavior"),
@@ -54,18 +58,29 @@ fn setup(mut commands: Commands) {
 		.with_children(|parent| {
 			parent.spawn((
 				Name::new("New Pos"),
+				InsertOnRun::new(transform_idle).with_target(target_parent),
 				TargetAgent(target),
-				InsertProceduralAnimation::default(),
+				SetCurveOnRun::default(),
 				PlayProceduralAnimation::default()
-					.with_meter_per_second(1.),
-					// .with_duration(Duration::from_secs_f32(3.)),
+					// .with_meter_per_second(1.),
+					.with_duration_secs(2.),
 			));
 			parent.spawn((
-				Name::new("Pause"),
+				Name::new("Idle Pause"),
 				TriggerInDuration::with_range(
 					OnRunResult::success(),
 					Duration::from_secs(1)..Duration::from_secs(4),
 				),
+			));
+			parent.spawn((
+				Name::new("Happy"),
+				TargetAgent(target_parent),
+				SetCurveOnRun::PingPongPause {
+					target: pos_happy,
+					pause: 1.,
+					func: EaseFunction::CubicInOut,
+				},
+				PlayProceduralAnimation::default().with_duration_secs(4.),
 			));
 		});
 

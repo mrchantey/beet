@@ -9,7 +9,10 @@ pub enum SerdeCurve {
 	#[default]
 	Circle,
 	Square,
+	/// Easing curve in xy space, with the z component set to 0.
 	EaseDir2(EasingCurve<Dir2>),
+	EaseVec3(EasingCurve<Vec3>),
+	Samples(SampleAutoCurve<Vec3>),
 }
 
 
@@ -25,7 +28,8 @@ impl SerdeCurve {
 
 
 	/// Calculate the total length of the curve by sampling it at
-	/// regular intervals.
+	/// regular intervals. The number of samples determines the accuracy
+	/// and the returned length is <= the actual length.
 	pub fn total_len_with_samples(&self, num_samples: usize) -> f32 {
 		let mut total_len = 0.;
 		let delta_t = 1.0 / (num_samples as f32);
@@ -45,15 +49,24 @@ impl Curve<Vec3> for SerdeCurve {
 
 	fn sample_unchecked(&self, t: f32) -> Vec3 {
 		match self {
-			SerdeCurve::Circle => circle_curve(t),
-			SerdeCurve::Square => square_curve(t),
-			SerdeCurve::EaseDir2(ease) => ease.sample_unchecked(t).extend(0.),
+			Self::Circle => circle_curve(t),
+			Self::Square => square_curve(t),
+			Self::EaseDir2(ease) => ease.sample_unchecked(t).extend(0.),
+			Self::EaseVec3(ease) => ease.sample_unchecked(t),
+			Self::Samples(samples) => samples.sample_unchecked(t),
 		}
 	}
 }
 
 impl Into<SerdeCurve> for EasingCurve<Dir2> {
 	fn into(self) -> SerdeCurve { SerdeCurve::EaseDir2(self) }
+}
+impl Into<SerdeCurve> for EasingCurve<Vec3> {
+	fn into(self) -> SerdeCurve { SerdeCurve::EaseVec3(self) }
+}
+
+impl Into<SerdeCurve> for SampleAutoCurve<Vec3> {
+	fn into(self) -> SerdeCurve { SerdeCurve::Samples(self) }
 }
 
 

@@ -3,6 +3,8 @@ use bevy::prelude::*;
 use std::marker::PhantomData;
 
 
+pub type InsertOnRun<T> = InsertOnTrigger<OnRun, T>;
+
 
 /// Inserts the provided `Bundle` on the [`TriggerOnTrigger::target`] when
 /// the `EventIn` is triggered on one of the [`TriggerOnTrigger::sources`].
