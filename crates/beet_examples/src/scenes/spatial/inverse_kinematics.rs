@@ -1,6 +1,5 @@
+use crate::beet::prelude::*;
 use crate::prelude::*;
-use beet::prelude::*;
-use beet_examples::prelude::KeyboardController;
 use beetmash::prelude::*;
 use bevy::color::palettes::tailwind;
 use bevy::prelude::*;
@@ -22,7 +21,7 @@ pub fn spawn_arm_with_keyboard_target(mut commands: Commands) {
 pub fn spawn_arm(commands: &mut Commands, target: Entity) {
 	commands.spawn((
 		Name::new("scene"),
-		BundlePlaceholder::Gltf("robot-arm/robot-arm-phone.glb".into()),
+		BundlePlaceholder::Gltf("robot-arm/robot-arm.glb".into()),
 		Transform::from_scale(Vec3::splat(10.)),
 		TargetAgent(target),
 		IkSpawner::default(),

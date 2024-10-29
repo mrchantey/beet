@@ -16,7 +16,7 @@ pub fn main() {
 				beetmash::core::scenes::lighting_3d,
 				beetmash::core::scenes::ground_3d,
 				beet_examples::scenes::flow::beet_debug_start_and_stop,
-				emby::scenes::spawn_ik_camera,
+				beet_examples::scenes::spatial::spawn_ik_camera,
 				setup,
 			),
 		)
@@ -83,5 +83,5 @@ fn setup(mut commands: Commands) {
 			));
 		});
 
-	spawn_arm(&mut commands, target);
+		beet_examples::scenes::spatial::spawn_arm(&mut commands, target);
 }

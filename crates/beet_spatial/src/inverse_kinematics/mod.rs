@@ -10,3 +10,6 @@ pub use self::ik_plugin::*;
 pub mod ik_segment;
 #[allow(unused_imports)]
 pub use self::ik_segment::*;
+pub mod ik_spawner;
+#[allow(unused_imports)]
+pub use self::ik_spawner::*;

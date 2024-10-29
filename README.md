@@ -30,20 +30,18 @@ Currently implemented paradigms:
 ## Hello World
 
 ```rust
-// A demonstration of Fallback control flow
-world.spawn(FallbackFlow)
-  .with_children(|parent| {
-    parent.spawn((
-      LogOnRun::("Hello"),
-      EndOnRun::failure(),
-    ));
-    parent.spawn((
-      LogOnRun::("World"),
-      EndOnRun::success(),
-    ));
-  })
+// A demonstration of Sequence control flow
+world.spawn(SequenceFlow)
+	.with_child((
+		Name::new("Hello"),
+		EndOnRun::success(),
+	))
+	.with_child((
+		Name::new("World"),
+		EndOnRun::success(),
+	))
+	.trigger(OnRun);
 ```
-
 
 [bevy-observers]:https://docs.rs/bevy/latest/bevy/ecs/observer/struct.Observer.html#
 

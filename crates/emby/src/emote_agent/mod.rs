@@ -16,9 +16,6 @@ pub use self::emote_agent_plugin::*;
 pub mod emote_bubble;
 #[allow(unused_imports)]
 pub use self::emote_bubble::*;
-pub mod ik_spawner;
-#[allow(unused_imports)]
-pub use self::ik_spawner::*;
 pub mod render_texture;
 #[allow(unused_imports)]
 pub use self::render_texture::*;
