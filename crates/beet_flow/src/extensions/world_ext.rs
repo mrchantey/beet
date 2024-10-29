@@ -1,4 +1,5 @@
 use bevy::ecs::system::IntoObserverSystem;
+use bevy::ecs::system::SystemState;
 use bevy::prelude::*;
 
 
@@ -25,6 +26,17 @@ pub impl World {
 		self.trigger(event);
 		self.flush();
 		self
+	}
+	fn collect_descendants(&mut self, entity: Entity) -> Vec<Entity> {
+		let mut state = SystemState::<Query<&Children>>::new(self);
+		state.get(&self).iter_descendants(entity).collect()
+	}
+	fn collect_descendants_inclusive(&mut self, entity: Entity) -> Vec<Entity> {
+		let mut state = SystemState::<Query<&Children>>::new(self);
+		let state = state.get(&self);
+		std::iter::once(entity)
+			.chain(state.iter_descendants(entity))
+			.collect()
 	}
 }
 

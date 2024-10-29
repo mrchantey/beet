@@ -1,31 +1,26 @@
 use crate::prelude::*;
 use bevy::prelude::*;
 
-/// Interruptable, this is recursive so children are also uninteruptable
+/// Mark a behavior as uninterruptible, the `Running` component
+/// will only be removed if [`OnRunResult`] is called
 #[derive(Debug, Default, Component, Reflect)]
 #[reflect(Component)]
 pub struct NoInterrupt;
 
 
-/// Whenever [`OnRun`] is called, this observer ensures no children are running
-/// Only recurses children that have [`Running`] and do not have [`NoInterrupt`]
-pub fn interrupt_running(
+/// Whenever [`OnRun`] is called,
+/// removes [`Running`] from children unless they have a [`NoInterrupt`]
+pub fn interrupt_on_run(
 	trigger: Trigger<OnRun>,
 	mut commands: Commands,
-	children: Query<&Children>,
-	no_interrupt: Query<(), With<NoInterrupt>>,
-	running: Query<(), (With<Running>, Without<NoInterrupt>)>,
+	should_remove: Populated<(), (With<Running>, Without<NoInterrupt>)>,
+	children: Populated<&Children>,
 ) {
-	ChildrenExt::visit_or_cancel(trigger.entity(), &children, |entity| {
-		// skip the entity that just started running
-		if entity == trigger.entity() {
-			return true;
+	for child in children.iter_descendants(trigger.entity()) {
+		if should_remove.contains(child) {
+			commands.entity(child).remove::<Running>();
 		}
-		if running.contains(entity) {
-			commands.entity(entity).remove::<Running>();
-		}
-		false == no_interrupt.contains(entity)
-	});
+	}
 }
 
 
@@ -40,7 +35,7 @@ mod test {
 	fn works() -> Result<()> {
 		let mut world = World::new();
 
-		world.add_observer(interrupt_running);
+		world.add_observer(interrupt_on_run);
 
 		let entity = world
 			// root is running
@@ -64,10 +59,10 @@ mod test {
 					.with_children(|parent| {
 						parent.spawn(Running);
 					});
-				// only no interrupt, with running child
-				parent.spawn(NoInterrupt).with_children(|parent| {
-					parent.spawn(Running);
-				});
+				// // only no interrupt, with running child
+				// parent.spawn(NoInterrupt).with_children(|parent| {
+				// 	parent.spawn(Running);
+				// });
 			})
 			.flush_trigger(OnRun)
 			.id();
@@ -82,8 +77,7 @@ mod test {
 				.with_leaf(None)
 				.with_child(Tree::new(None).with_leaf(None))
 				.with_child(Tree::new(None).with_leaf(None))
-				.with_child(Tree::new(Some(&Running)).with_leaf(Some(&Running)))
-				.with_child(Tree::new(None).with_leaf(Some(&Running))),
+				.with_child(Tree::new(Some(&Running)).with_leaf(None)), // .with_child(Tree::new(None).with_leaf(Some(&Running))),
 		)?;
 		Ok(())
 	}

@@ -63,9 +63,10 @@ pub fn insert_on_animation_end<T: GenericActionEvent>(
 	>,
 ) {
 	for (entity, agent, action, handle) in query.iter_mut() {
-		let Some(target) = ChildrenExt::first(**agent, &children, |entity| {
-			animators.contains(entity)
-		}) else {
+		let Some(target) = children
+			.iter_descendants_inclusive(**agent)
+			.find(|entity| animators.contains(*entity))
+		else {
 			continue;
 		};
 		// safe unwrap, just checked

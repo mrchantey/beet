@@ -63,9 +63,10 @@ fn play_animation_on_run(
 	// let Ok((mut player, mut transitions)) = agents.get_mut(agent.0) else {
 	// 	continue;
 	// };
-	let Some(target) = ChildrenExt::first(**agent, &children, |entity| {
-		animators.contains(entity)
-	}) else {
+	let Some(target) = children
+		.iter_descendants_inclusive(**agent)
+		.find(|entity| animators.contains(*entity))
+	else {
 		log::warn!("PlayAnimation: agent {:?} has no animator", **agent);
 		return;
 	};
@@ -96,7 +97,7 @@ fn play_animation_on_load(
 ) {
 	for (entity, mut player, mut transitions) in loaded_animators.iter_mut() {
 		let Some(play_animation) =
-			ParentExt::find(entity, &parents, |parent| {
+			parents.iter_ancestors_inclusive(entity).find_map(|parent| {
 				query.iter().find_map(|(target, play_animation)| {
 					if **target == parent {
 						Some(play_animation)

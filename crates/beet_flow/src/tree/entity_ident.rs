@@ -14,7 +14,7 @@ impl EntityIdent {
 	pub fn new(entity: Entity) -> Self { Self(entity) }
 
 	pub fn deep_clone(self, world: &mut World) -> Result<Self> {
-		let entities = ChildrenExt::collect_world(*self, world);
+		let entities = world.collect_descendants_inclusive(*self);
 		let scene = DynamicSceneBuilder::from_world(world)
 			.extract_entities(entities.into_iter())
 			.build();
@@ -26,7 +26,7 @@ impl EntityIdent {
 		src_world: &mut World,
 		dst_world: &mut World,
 	) -> Result<Self> {
-		let entities = ChildrenExt::collect_world(*self, src_world);
+		let entities = src_world.collect_descendants_inclusive(*self);
 		let scene = DynamicSceneBuilder::from_world(src_world)
 			.extract_entities(entities.into_iter())
 			.build();

@@ -1,7 +1,6 @@
 use bevy::ecs::entity::MapEntities;
 use bevy::ecs::reflect::ReflectMapEntities;
 use bevy::prelude::*;
-use crate::prelude::*;
 
 /// This component will be replaced with a [`TargetAgent`] that points to the root [`Parent`] of this entity.
 #[derive(Debug, Default, Component, Reflect)]
@@ -22,10 +21,10 @@ impl MapEntities for TargetAgent {
 pub fn set_root_as_target_agent(
 	mut commands: Commands,
 	parents: Query<&Parent>,
-	query: Query<(Entity, &Parent), With<RootIsTargetAgent>>,
+	query: Query<Entity, With<RootIsTargetAgent>>,
 ) {
-	for (entity, parent) in query.iter() {
-		let root = ParentExt::get_root(parent, &parents);
+	for entity in query.iter() {
+		let root = parents.root_ancestor(entity);
 		commands
 			.entity(entity)
 			.remove::<RootIsTargetAgent>()

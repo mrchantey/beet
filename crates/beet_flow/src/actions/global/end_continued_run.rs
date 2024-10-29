@@ -2,16 +2,22 @@ use crate::prelude::*;
 use bevy::prelude::*;
 
 
-/// Whenever [`OnRun`] is called, this observer ensures no children are running
-/// Only recurses children that have [`Running`] and do not have [`NoInterrupt`]
+/// Removes [`Running`] from the entity when [`OnRunResult`] is triggered.
+/// Also removes [`Running`] from children unless they have a [`NoInterrupt`]
 pub fn end_continued_run(
 	trigger: Trigger<OnRunResult>,
 	mut commands: Commands,
-	running: Query<Entity, With<Running>>,
+	running: Populated<Entity, With<Running>>,
+	children: Query<&Children>,
+	children_should_remove: Populated<(), (With<Running>, Without<NoInterrupt>)>,
 ) {
 	if let Some(entity) = running.get(trigger.entity()).ok() {
-		// log::info!("end_continued_run: {entity}");
 		commands.entity(entity).remove::<Running>();
+	}
+	for child in children.iter_descendants(trigger.entity()) {
+		if children_should_remove.contains(child) {
+			commands.entity(child).remove::<Running>();
+		}
 	}
 }
 
