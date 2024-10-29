@@ -1,12 +1,10 @@
 use crate::prelude::*;
 use bevy::prelude::*;
 
-/// Logs the [`Name`] of the entity when it runs.
-#[derive(Default, Component, Action, Reflect)]
-#[reflect(Default, Component)]
-#[observers(log_name_on_run)]
-pub struct BubbleRunResult;
 
+
+/// When [`OnRunResult`] is triggered, propagate to parent with [`OnChildResult`].
+/// We can't use bevy event propagation because that does not track the 'bubbler'.
 pub fn bubble_run_result(
 	trigger: Trigger<OnRunResult>,
 	mut commands: Commands,

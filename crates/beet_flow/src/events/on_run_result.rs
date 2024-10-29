@@ -11,7 +11,7 @@ pub mod child_expect {
 
 
 /// Signifies a behavior has stopped running.
-#[derive(Debug, Default, Clone, Copy, Event, PartialEq, Deref, Reflect)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Deref, Event, Reflect)]
 #[reflect(Default)]
 pub struct OnRunResult(RunResult);
 impl OnRunResult {
@@ -22,6 +22,13 @@ impl OnRunResult {
 	pub fn failure() -> Self { Self(RunResult::Failure) }
 	pub fn result(&self) -> RunResult { **self }
 }
+
+// impl Event for OnRunResult {
+// 	type Traversal = &'static Parent;
+// 	const AUTO_PROPAGATE: bool = false;
+// }
+
+
 
 pub type OnChildResult = OnChildValue<RunResult>;
 impl OnChildResult {

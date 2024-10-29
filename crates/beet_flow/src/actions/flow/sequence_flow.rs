@@ -12,6 +12,8 @@ use bevy::prelude::*;
 #[observers(on_start, on_next)]
 pub struct SequenceFlow;
 
+/// When [`OnRun`] is called, trigger the first child if it exists.
+/// Otherwise immediately succeed.
 fn on_start(
 	trigger: Trigger<OnRun>,
 	mut commands: Commands,
@@ -28,6 +30,7 @@ fn on_start(
 			.trigger(OnRunResult::success());
 	}
 }
+
 
 fn on_next(
 	trigger: Trigger<OnChildResult>,
