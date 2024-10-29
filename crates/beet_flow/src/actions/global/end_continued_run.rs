@@ -9,7 +9,10 @@ pub fn end_continued_run(
 	mut commands: Commands,
 	running: Populated<Entity, With<Running>>,
 	children: Query<&Children>,
-	children_should_remove: Populated<(), (With<Running>, Without<NoInterrupt>)>,
+	children_should_remove: Populated<
+		(),
+		(With<Running>, Without<NoInterrupt>),
+	>,
 ) {
 	if let Some(entity) = running.get(trigger.entity()).ok() {
 		commands.entity(entity).remove::<Running>();

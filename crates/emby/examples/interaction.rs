@@ -1,6 +1,7 @@
 use beet::prelude::*;
 use beet_examples::prelude::*;
 use bevy::prelude::*;
+use bevy::render::view::RenderLayers;
 use emby::prelude::*;
 
 fn main() {
@@ -23,6 +24,7 @@ fn main() {
 fn setup(mut commands: Commands) {
 	commands.spawn((
 		Camera3d::default(),
-		Transform::from_xyz(0., 1.6, 5.)
+		RenderLayers::layer(0).with(RENDER_TEXTURE_LAYER),
+		Transform::from_xyz(0., 1.6, 5.),
 	));
 }

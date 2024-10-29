@@ -1,14 +1,26 @@
 use beet::prelude::*;
 use beetmash::prelude::*;
-use bevy::color::palettes::tailwind;
 use bevy::prelude::*;
 use forky::prelude::TransformExt;
+use std::f32::consts::TAU;
 use std::time::Duration;
+
+
+
+
+pub fn emote_arm_camera(mut commands: Commands) {
+	commands.spawn((
+		Name::new("Camera"),
+		BundlePlaceholder::Camera3d,
+		Transform::from_xyz(0., 2., 5.)
+			.looking_at(Vec3::new(0., 2., 0.), Vec3::Y),
+	));
+}
 
 
 pub fn emote_arm(mut commands: Commands) {
 	let mut target = Entity::PLACEHOLDER;
-	let pos_happy = Vec3::new(0., 3., 0.);
+	let pos_happy = Vec3::new(0., 2.5, 0.);
 	let pos_idle = Vec3::new(0., 2., 0.);
 
 	let transform_idle = Transform::from_translation(pos_idle)
@@ -22,10 +34,14 @@ pub fn emote_arm(mut commands: Commands) {
 		.spawn((Name::new("Target Parent"), transform_idle))
 		.with_children(|parent| {
 			target = parent
-				.spawn((Name::new("Target"), BundlePlaceholder::Pbr {
-					mesh: Sphere::new(0.2).into(),
-					material: MaterialPlaceholder::unlit(tailwind::BLUE_500),
-				}))
+				.spawn((
+					Name::new("Target"),
+					Transform::default(),
+					// BundlePlaceholder::Pbr {
+					// 	mesh: Sphere::new(0.2).into(),
+					// 	material: MaterialPlaceholder::unlit(tailwind::BLUE_500),
+					// }
+				))
 				.id();
 		})
 		.id();
@@ -39,9 +55,9 @@ pub fn emote_arm(mut commands: Commands) {
 		IkSpawner::default(),
 	));
 
-	commands
+	let idle_behavior = commands
 		.spawn((
-			Name::new("Behavior"),
+			Name::new("Idle Behavior"),
 			RunOnSpawn,
 			Repeat::default(),
 			SequenceFlow,
@@ -51,7 +67,10 @@ pub fn emote_arm(mut commands: Commands) {
 				Name::new("New Pos"),
 				InsertOnRun::new(transform_idle).with_target(target_parent),
 				TargetAgent(target),
-				SetCurveOnRun::default(),
+				SetCurveOnRun::EaseRangeDir2 {
+					range: -TAU * 0.1..TAU * 0.1,
+					func: EaseFunction::CubicInOut,
+				},
 				PlayProceduralAnimation::default()
 					// .with_meter_per_second(1.),
 					.with_duration_secs(2.),
@@ -63,15 +82,23 @@ pub fn emote_arm(mut commands: Commands) {
 					Duration::from_secs(1)..Duration::from_secs(4),
 				),
 			));
-			parent.spawn((
-				Name::new("Happy"),
-				TargetAgent(target_parent),
-				SetCurveOnRun::PingPongPause {
-					target: pos_happy,
-					pause: 1.,
-					func: EaseFunction::CubicInOut,
-				},
-				PlayProceduralAnimation::default().with_duration_secs(4.),
-			));
-		});
+		})
+		.id();
+
+	commands.spawn((
+		Name::new("Happy"),
+		RemoveOnRun::<Repeat>::default().with_target(idle_behavior),
+		EndOnRun::success().with_target(idle_behavior),
+		TargetAgent(target_parent),
+		InsertSentenceOnUserInput::default(),
+		RunOnInsertSentence::default(),
+		SetCurveOnRun::PingPongPause {
+			target: pos_happy,
+			pause: 0.1,
+			func: EaseFunction::CubicInOut,
+		},
+		PlayProceduralAnimation::default().with_duration_secs(2.),
+		RunOnRunResult::new_with_target(idle_behavior),
+		InsertOnRunResult::<Repeat>::default().with_target(idle_behavior),
+	));
 }
