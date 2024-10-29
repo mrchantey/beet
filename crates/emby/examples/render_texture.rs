@@ -1,12 +1,13 @@
+use beet::prelude::*;
 use beet_examples::prelude::*;
-use beet_flow::prelude::*;
 use bevy::prelude::*;
+use emby::prelude::*;
 // use bevy::render::view::RenderLayers;
 
 
 fn main() {
 	App::new()
-		.add_plugins((crate_test_beet_example_plugin, plugin_ml))
+		.add_plugins((crate_test_beet_example_plugin, plugin_ml, EmbyPlugin))
 		.insert_resource(BeetDebugConfig::default())
 		.add_systems(
 			Startup,
@@ -15,7 +16,7 @@ fn main() {
 				beetmash::core::scenes::lighting_3d,
 				beetmash::core::scenes::ground_3d,
 				beetmash::core::scenes::ui_terminal_input,
-				beet_examples::emote_agent::scenes::spawn_barbarian,
+				emby::scenes::spawn_barbarian,
 			),
 		)
 		// .add_systems(Update,disable_barbarian)

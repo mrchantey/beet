@@ -1,5 +1,6 @@
-use crate::beet::prelude::*;
 use crate::prelude::*;
+use beet::prelude::*;
+use beet_examples::prelude::KeyboardController;
 use beetmash::prelude::*;
 use bevy::color::palettes::tailwind;
 use bevy::prelude::*;

@@ -34,6 +34,7 @@ members = [
 	"crates/beet_ml",
 	"crates/beet_spatial",
 	"crates/beet_examples",
+	"crates/emby",
 ]
 
 [workspace.dependencies]
@@ -44,6 +45,7 @@ beet_flow = { path = "crates/beet_flow", version = "0.0.4-rc.3" }
 beet_flow_macros = { path = "crates/beet_flow/macros", version = "0.0.4-rc.3" }
 beet_ml = { path = "crates/beet_ml", version = "0.0.4-rc.3" }
 beet_examples = { path = "crates/beet_examples", version = "0.0.4-rc.3" }
+emby = { path = "crates/emby", version = "0.0.4-rc.3" }
 
 ## local
 beetmash = { version = "0.0.6-rc.2", path = "../beetmash" }

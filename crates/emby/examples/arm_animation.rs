@@ -1,23 +1,22 @@
+use beet::prelude::*;
 use beet_examples::prelude::*;
-use beet_flow::prelude::*;
-use beet_spatial::prelude::*;
 use beetmash::prelude::*;
 use bevy::color::palettes::tailwind;
 use bevy::prelude::*;
+use emby::prelude::*;
 use forky::prelude::TransformExt;
-use scenes::spawn_arm;
 use std::time::Duration;
 
 pub fn main() {
 	App::new()
-		.add_plugins(crate_test_beet_example_plugin)
+		.add_plugins((crate_test_beet_example_plugin, EmbyPlugin))
 		.add_systems(
 			Startup,
 			(
 				beetmash::core::scenes::lighting_3d,
 				beetmash::core::scenes::ground_3d,
 				beet_examples::scenes::flow::beet_debug_start_and_stop,
-				beet_examples::emote_agent::scenes::spawn_ik_camera,
+				emby::scenes::spawn_ik_camera,
 				setup,
 			),
 		)

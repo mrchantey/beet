@@ -2520,6 +2520,24 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "60b1af1c220855b6ceac025d3f6ecdd2b7c4894bfe9cd9bda4fbb4bc7c0d4cf0"
 
 [[package]]
+name = "emby"
+version = "0.0.4-rc.3"
+dependencies = [
+ "anyhow",
+ "beet",
+ "beet_examples",
+ "beetmash",
+ "bevy",
+ "forky 0.2.0-rc.6",
+ "log",
+ "pretty_env_logger",
+ "rand",
+ "serde",
+ "serde_json",
+ "sweet",
+]
+
+[[package]]
 name = "encase"
 version = "0.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"

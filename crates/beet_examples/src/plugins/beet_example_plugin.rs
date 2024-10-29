@@ -43,7 +43,7 @@ pub fn beet_example_plugin(app: &mut App) {
 		DefaultReplicatePlugin,
 		temp_patches,
 	))
-	.add_plugins((plugin_spatial, plugin_2d, plugin_3d, emote_agent_plugin))
+	.add_plugins((plugin_spatial, plugin_2d, plugin_3d))
 	.register_type::<Collectable>();
 }
 

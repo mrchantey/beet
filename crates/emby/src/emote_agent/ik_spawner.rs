@@ -1,5 +1,4 @@
-use crate::beet::prelude::*;
-// use beetmash::prelude::HandleWrapper;
+use beet::prelude::*;
 use bevy::prelude::*;
 use std::f32::consts::FRAC_PI_2;
 
@@ -81,7 +80,6 @@ pub fn ik_spawner(
 		);
 
 		commands.entity(scene_root_entity).insert(ik_transforms);
-
 
 		// commands.entity(phone.0).with_child((
 		// 	Name::new("Phone Texture"),

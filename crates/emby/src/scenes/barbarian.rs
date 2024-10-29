@@ -1,4 +1,4 @@
-use crate::beet::prelude::*;
+use beet::prelude::*;
 use crate::prelude::*;
 use beetmash::prelude::*;
 use bevy::animation::RepeatAnimation;
