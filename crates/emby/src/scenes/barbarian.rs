@@ -68,46 +68,6 @@ pub fn spawn_barbarian(mut commands: Commands) {
 
 
 
-
-
-// pub fn disable_barbarian(
-// 	mut commands: Commands,
-// 	mut events: EventReader<AssetEvent<Scene>>,
-// 	query: Populated<(Entity, &SceneRoot)>,
-// 	names: Query<&Name>,
-// 	children: Query<&Children>,
-// ) {
-// 	for ev in events.read() {
-// 		let AssetEvent::LoadedWithDependencies { id } = ev else {
-// 			continue;
-// 		};
-// 		let Some((entity, _)) =
-// 			query.iter().find(|(_, scene)| scene.id() == *id)
-// 		else {
-// 			continue;
-// 		};
-
-// 		let to_disable: HashSet<&'static str> =
-// 			vec!["Mug"].into_iter().collect();
-
-// 		for entity in children.iter_descendants(entity) {
-// 			if let Ok(name) = names.get(entity) {
-// 				println!("it has name: {}", name);
-// 				if to_disable.contains(name.as_str()) {
-// 					commands.entity(entity).insert(Visibility::Hidden);
-// 				}
-// 			}else{
-// 				println!("it has no name");
-// 			}
-// 		}
-// 	}
-// }
-
-
-
-
-
-
 /*
 
 # meshes

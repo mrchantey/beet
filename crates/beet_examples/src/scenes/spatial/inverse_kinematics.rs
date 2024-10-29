@@ -15,10 +15,6 @@ pub fn spawn_ik_camera(mut commands: Commands) {
 
 pub fn spawn_arm_with_keyboard_target(mut commands: Commands) {
 	let target = spawn_keyboard_target(&mut commands);
-	spawn_arm(&mut commands, target);
-}
-
-pub fn spawn_arm(commands: &mut Commands, target: Entity) {
 	commands.spawn((
 		Name::new("scene"),
 		BundlePlaceholder::Gltf("robot-arm/robot-arm.glb".into()),

@@ -13,6 +13,8 @@ pub fn main() {
 				beet_examples::scenes::flow::beet_debug_start_and_stop,
 				beet_examples::scenes::spatial::spawn_ik_camera,
 				emby::scenes::emote_arm,
+				emby::scenes::spawn_barbarian,
+				emby::scenes::phone_texture_camera_3d,
 			),
 		)
 		.run();

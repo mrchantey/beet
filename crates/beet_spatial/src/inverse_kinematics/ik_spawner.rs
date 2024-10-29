@@ -49,11 +49,8 @@ pub fn ik_spawner(
 	};
 
 	let Some(items) =
-		find_by_name_recursive(&child_nodes_query, &arm_root.3, vec![
-			"Base", "Segment1", "Segment2", "Segment3",
-			"Gripper",
-			// "Target",
-			// "Phone",
+		map_names_to_query_entries(&child_nodes_query, &arm_root.3, vec![
+			"Base", "Segment1", "Segment2", "Segment3", "Gripper",
 		])
 	else {
 		return;
@@ -64,9 +61,6 @@ pub fn ik_spawner(
 	let segment2 = items[2];
 	let segment3 = items[3];
 	let gripper = items[4];
-	// let target = items[5];
-	// let phone = items[6];
-
 
 	// hack until globaltransform calculated in sceneinstanceready
 	let scale = transform.scale.x;
@@ -83,8 +77,6 @@ pub fn ik_spawner(
 		IkSegment::DEG_360.with_len(segment3_to_gripper),
 	);
 
-	println!("ik: {:?}", ik);
-
 	let ik_transforms = IkArm4DofTransforms::new(
 		ik, **target, base.0, segment1.0, segment2.0, segment3.0,
 	);
@@ -99,8 +91,9 @@ pub fn ik_spawner(
 	// ));
 }
 
-/// Provided a list of names, each being a child of the previous, returns that list of entities.
-fn find_by_name_recursive<'a>(
+/// Provided a list of names, each being a child of the previous,
+/// returns that list of entities.
+fn map_names_to_query_entries<'a>(
 	query: &'a Query<(Entity, &Name, &Transform, &Children)>,
 	children: &Children,
 	names: Vec<&str>,

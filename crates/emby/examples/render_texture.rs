@@ -2,8 +2,6 @@ use beet::prelude::*;
 use beet_examples::prelude::*;
 use bevy::prelude::*;
 use emby::prelude::*;
-// use bevy::render::view::RenderLayers;
-
 
 fn main() {
 	App::new()
@@ -17,18 +15,13 @@ fn main() {
 				beetmash::core::scenes::ground_3d,
 				beetmash::core::scenes::ui_terminal_input,
 				emby::scenes::spawn_barbarian,
+				emby::scenes::phone_texture_camera_3d,
 			),
 		)
-		// .add_systems(Update,disable_barbarian)
+		.add_observer(emby::scenes::add_phone_render_texture_to_arm)
 		.run();
 }
 
-
-fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
-	commands.spawn((
-		Camera3d::default(),
-		Transform::from_xyz(0., 1.6, 5.), // .looking_at(Vec3::ZERO, Vec3::Y),
-	));
-
-	commands.insert_resource(EmojiMap::new(&asset_server));
+fn setup(mut commands: Commands) {
+	commands.spawn((Camera3d::default(), Transform::from_xyz(0., 1.6, 5.)));
 }

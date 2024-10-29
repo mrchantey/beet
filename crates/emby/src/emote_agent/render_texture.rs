@@ -1,4 +1,3 @@
-use beetmash::prelude::HandleWrapper;
 use bevy::prelude::*;
 use bevy::render::render_resource::*;
 use bevy::render::view::RenderLayers;
@@ -10,6 +9,10 @@ use bevy::render::view::RenderLayers;
 #[reflect(Default, Component)]
 pub struct RenderTexture {
 	pub handle: Handle<StandardMaterial>,
+}
+
+impl RenderTexture {
+	pub fn new(handle: Handle<StandardMaterial>) -> Self { Self { handle } }
 }
 
 /// The layer used for rendering to a texture instead of the main camera.
@@ -56,10 +59,11 @@ pub fn render_texture_bundle(
 		Camera {
 			order: -1,
 			target: image_handle.into(),
-			clear_color: Color::WHITE.into(),
+			clear_color: Color::srgba_u8(0, 0, 0, 0).into(),
+			// clear_color: Color::WHITE.into(),
 			..default()
 		},
 		RenderLayers::layer(RENDER_TEXTURE_LAYER),
-		HandleWrapper(material_handle),
+		RenderTexture::new(material_handle),
 	)
 }
