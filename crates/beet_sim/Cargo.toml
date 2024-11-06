@@ -1,0 +1,22 @@
+[package]
+name = "beet_sim"
+version.workspace = true
+edition.workspace = true
+description = "Simulated environments in which behaviors can be run."
+documentation.workspace = true
+readme = "README.md"
+homepage.workspace = true
+repository.workspace = true
+license.workspace = true
+keywords.workspace = true
+categories.workspace = true
+publish = true
+
+
+
+[dependencies]
+beet_flow.workspace = true
+beet_spatial.workspace = true
+bevy.workspace = true
+
+num-traits.workspace = true

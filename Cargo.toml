@@ -28,14 +28,7 @@ publish = false
 [workspace]
 # default resolver
 resolver = "2"
-members = [
-	"crates/beet_flow/macros",
-	"crates/beet_flow",
-	"crates/beet_ml",
-	"crates/beet_spatial",
-	"crates/beet_examples",
-	"crates/emby",
-]
+members = ["crates/*", "crates/beet_flow/macros"]
 
 [workspace.dependencies]
 ## internal
@@ -90,7 +83,7 @@ quote = "1.0"
 proc-macro2 = "1.0"
 
 ## attributes
-num-traits = "0.2.15"
+num-traits = "0.2.19"
 derive_deref = "1.1.1"
 strum = { version = "0.26.0", features = ["derive"] }
 strum_macros = "0.26.0"

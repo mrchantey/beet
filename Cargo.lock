@@ -532,6 +532,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "beet_sim"
+version = "0.0.4-rc.3"
+dependencies = [
+ "beet_flow",
+ "beet_spatial",
+ "bevy",
+ "num-traits",
+]
+
+[[package]]
 name = "beet_spatial"
 version = "0.0.4-rc.3"
 dependencies = [
