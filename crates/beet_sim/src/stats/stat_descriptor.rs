@@ -1,4 +1,3 @@
-use crate::prelude::*;
 use bevy::prelude::*;
 use std::any::TypeId;
 
@@ -7,6 +6,7 @@ use std::any::TypeId;
 pub struct StatDescriptor {
 	pub name: String,
 	pub description: String,
-	pub emoji: String,
+	pub emoji_hexcode: String,
+	/// The id of the stat, ie for f32 stat `type_id::of::<f32>()`
 	pub type_id: TypeId,
 }

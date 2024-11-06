@@ -22,9 +22,14 @@ beet_flow.workspace = true
 beet_spatial.workspace = true
 bevy.workspace = true
 
+anyhow.workspace = true
 num-traits.workspace = true
 # temp, just for bundle placeholders
 beetmash.workspace = true
 
+
+
+
 [dev-dependencies]
 bevy = { workspace = true, default-features = true }
+sweet.workspace = true

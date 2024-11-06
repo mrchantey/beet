@@ -11,7 +11,7 @@
 // 			Name::new("Avoid Obstacles"),
 // 			Running,
 // 			BeetRoot,
-// 			ScoreSelector::default(),
+// 			ScoreFlow::default(),
 // 		))
 // 		.with_children(|parent| {
 // 			parent.spawn((

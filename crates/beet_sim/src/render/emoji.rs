@@ -20,19 +20,7 @@ pub fn emoji_plugin(app: &mut App) {
 			world
 				.commands()
 				.entity(entity)
-				.insert(BundlePlaceholder::Pbr {
-					mesh: MeshPlaceholder::Plane3d(Plane3d::new(
-						Vec3::Z,
-						Vec2::splat(0.4),
-					)),
-					material: MaterialPlaceholder::Texture {
-						path: format!(
-							"openmoji/openmoji-618x618-color/{hexcode}.png"
-						),
-						alpha_mode: AlphaMode::Blend,
-						unlit: true,
-					},
-				});
+				.insert(Emoji::bundle(&hexcode));
 		});
 }
 
@@ -45,5 +33,19 @@ impl Emoji {
 	pub fn hexcode(&self) -> &str { &self.hexcode }
 	pub fn set_hexcode(&mut self, hexcode: &str) {
 		self.hexcode = hexcode.to_uppercase();
+	}
+
+	pub fn bundle(hexcode: &str) -> BundlePlaceholder {
+		BundlePlaceholder::Pbr {
+			mesh: MeshPlaceholder::Plane3d(Plane3d::new(
+				Vec3::Z,
+				Vec2::splat(0.5),
+			)),
+			material: MaterialPlaceholder::Texture {
+				path: format!("openmoji/openmoji-618x618-color/{hexcode}.png"),
+				alpha_mode: AlphaMode::Blend,
+				unlit: true,
+			},
+		}
 	}
 }

@@ -9,7 +9,7 @@
 // 		.spawn((
 // 			Name::new("Forage"),
 // 			Repeat::default(),
-// 			ScoreSelector::default(),
+// 			ScoreFlow::default(),
 // 			FindSteerTarget::new("flower", awareness_radius),
 // 		))
 // 		.with_children(|parent| {

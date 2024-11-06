@@ -1,15 +1,9 @@
 use crate::prelude::*;
+use bevy::prelude::*;
 
 
 
-
-pub struct SimDescriptor{
-	pub stats:Vec<SimStatDescriptor>,
-	
-}
-
-/// Definition of a stat before it is turned into a component
-pub struct SimStatDescriptor{
-
-
+#[derive(Debug, Default, Clone, PartialEq, Reflect)]
+pub struct SimDescriptor {
+	pub stats: Vec<StatDescriptor>,
 }

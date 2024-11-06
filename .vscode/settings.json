@@ -29,6 +29,7 @@
 	// "rust-analyzer.cargo.target": "wasm32-unknown-unknown",
 	"search.exclude": {
 		"assets/": true,
+		// "assets/openmoji/openmoji.json":false,
 		"docs/deps/mermaid-init.js": true,
 		"docs/deps/mermaid.min.js": true,
 		"scenes/": true,

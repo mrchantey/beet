@@ -1,4 +1,4 @@
-pub mod abilities;
+pub mod behavior;
 pub mod plugins;
 #[cfg(feature = "render")]
 pub mod render;
@@ -11,7 +11,7 @@ pub mod stats;
 
 
 pub mod prelude {
-	pub use crate::abilities::*;
+	pub use crate::behavior::*;
 	pub use crate::plugins::*;
 	#[cfg(feature = "render")]
 	pub use crate::render::*;
