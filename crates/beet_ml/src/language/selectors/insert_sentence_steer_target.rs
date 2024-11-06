@@ -32,7 +32,7 @@ fn insert_sentence_steer_target<T: GenericActionComponent>(
 	trigger: Trigger<OnInsert, Sentence>,
 	mut commands: Commands,
 	query: Query<(
-		&TargetAgent,
+		&TargetEntity,
 		Option<&Sentence>,
 		&HandleWrapper<Bert>,
 		&InsertSentenceSteerTarget<T>,
@@ -105,7 +105,7 @@ mod test {
 
 		let behavior = world
 			.spawn((
-				TargetAgent(agent),
+				TargetEntity(agent),
 				InsertSentenceSteerTarget::<Sentence>::default(),
 				HandleWrapper(handle),
 			))

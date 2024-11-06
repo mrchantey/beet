@@ -35,7 +35,7 @@ fn translate_grid(
 		&GridToWorld,
 	)>,
 	query: Query<
-		(Entity, &TranslateGrid, &TargetAgent, &RunTimer),
+		(Entity, &TranslateGrid, &TargetEntity, &RunTimer),
 		With<Running>,
 	>,
 ) {

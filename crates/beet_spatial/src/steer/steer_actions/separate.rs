@@ -47,7 +47,7 @@ impl<M: GenericActionComponent> Separate<M> {
 fn separate<M: GenericActionComponent>(
 	boids: Query<(Entity, &Transform), With<M>>,
 	mut agents: Query<(Entity, &Transform, &mut Impulse, &MaxSpeed)>,
-	query: Query<(&TargetAgent, &Separate<M>), With<Running>>,
+	query: Query<(&TargetEntity, &Separate<M>), With<Running>>,
 ) {
 	for (target, separate) in query.iter() {
 		let Ok((entity, transform, mut impulse, max_speed)) =

@@ -29,7 +29,7 @@ impl Plugin for LifecycleSystemsPlugin {
 			.configure_sets(schedule, PostTickSet.after(TickSet))
 			.add_systems(
 				schedule,
-				set_root_as_target_agent.in_set(PreTickSet),
+				set_root_as_target_entity.in_set(PreTickSet),
 			)
 			/*-*/;
 

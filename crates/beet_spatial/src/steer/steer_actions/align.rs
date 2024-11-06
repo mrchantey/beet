@@ -47,7 +47,7 @@ impl<M: GenericActionComponent> Align<M> {
 fn align<M: GenericActionComponent>(
 	boids: Query<(Entity, &Transform, &Velocity), With<M>>,
 	mut agents: Query<(Entity, &Transform, &mut Impulse)>,
-	query: Query<(&TargetAgent, &Align<M>), With<Running>>,
+	query: Query<(&TargetEntity, &Align<M>), With<Running>>,
 ) {
 	for (target, align) in query.iter() {
 		let Ok((entity, transform, mut impulse)) = agents.get_mut(**target)

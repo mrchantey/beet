@@ -37,7 +37,7 @@ fn find_steer_target(
 	mut commands: Commands,
 	agents: Query<&Transform>,
 	names: Query<(Entity, &Transform, &Name)>,
-	query: Query<(&TargetAgent, &FindSteerTarget), With<Running>>,
+	query: Query<(&TargetEntity, &FindSteerTarget), With<Running>>,
 ) {
 	for (agent_entity, find_target) in query.iter() {
 		if let Ok(agent_transform) = agents.get(**agent_entity) {

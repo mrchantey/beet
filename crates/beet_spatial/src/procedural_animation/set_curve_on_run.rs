@@ -41,7 +41,7 @@ fn set_curve_on_run(
 	trigger: Trigger<OnRun>,
 	transforms: Query<&Transform>,
 	mut query: Query<(
-		&TargetAgent,
+		&TargetEntity,
 		&SetCurveOnRun,
 		&mut PlayProceduralAnimation,
 	)>,

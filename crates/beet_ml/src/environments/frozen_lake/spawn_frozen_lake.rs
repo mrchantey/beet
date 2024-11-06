@@ -71,11 +71,11 @@ pub fn spawn_frozen_lake_episode(
 						parent.spawn((
 							Name::new("Go to grid cell"),
 							TranslateGrid::new(Duration::from_millis(100)),
-							TargetAgent(agent),
+							TargetEntity(agent),
 						));
 						parent.spawn((
 							Name::new("Step environment"),
-							TargetAgent(agent),
+							TargetEntity(agent),
 							StepEnvironment::<FrozenLakeQTableSession>::new(
 								event.episode,
 							),

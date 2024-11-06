@@ -70,7 +70,7 @@ impl Wander {
 fn wander(
 	mut agents: Query<(&Transform, &Velocity, &MaxSpeed, &mut Impulse)>,
 	mut query: Query<
-		(&TargetAgent, &mut Wander),
+		(&TargetEntity, &mut Wander),
 		(With<Running>, With<Wander>),
 	>,
 ) {
@@ -112,7 +112,7 @@ mod test {
 			))
 			.with_children(|parent| {
 				parent.spawn((
-					TargetAgent(parent.parent_entity()),
+					TargetEntity(parent.parent_entity()),
 					Running,
 					Wander::default(),
 				));

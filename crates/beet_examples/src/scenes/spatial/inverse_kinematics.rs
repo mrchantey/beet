@@ -19,7 +19,7 @@ pub fn spawn_arm_with_keyboard_target(mut commands: Commands) {
 		Name::new("scene"),
 		BundlePlaceholder::Gltf("robot-arm/robot-arm.glb".into()),
 		Transform::from_scale(Vec3::splat(10.)),
-		TargetAgent(target),
+		TargetEntity(target),
 		IkSpawner::default(),
 	));
 }

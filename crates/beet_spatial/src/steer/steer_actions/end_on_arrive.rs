@@ -26,7 +26,7 @@ pub fn end_on_arrive(
 	mut commands: Commands,
 	agents: Query<(&GlobalTransform, &SteerTarget)>,
 	transforms: Query<&GlobalTransform>,
-	mut query: Query<(Entity, &TargetAgent, &EndOnArrive), With<Running>>,
+	mut query: Query<(Entity, &TargetEntity, &EndOnArrive), With<Running>>,
 ) {
 	for (entity, agent, action) in query.iter_mut() {
 		if let Ok((transform, target)) = agents.get(**agent) {

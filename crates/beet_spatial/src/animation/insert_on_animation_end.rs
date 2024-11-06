@@ -55,7 +55,7 @@ pub fn insert_on_animation_end<T: GenericActionEvent>(
 	mut query: Query<
 		(
 			Entity,
-			&TargetAgent,
+			&TargetEntity,
 			&TriggerOnAnimationEnd<T>,
 			&HandleWrapper<AnimationClip>,
 		),

@@ -46,8 +46,8 @@ impl Plugin for LifecyclePlugin {
 		.register_type::<Parent>()
 		.register_type::<Children>()
 		.register_type::<BeetRoot>()
-		.register_type::<RootIsTargetAgent>()
-		.register_type::<TargetAgent>()
+		.register_type::<RootIsTargetEntity>()
+		.register_type::<TargetEntity>()
 		/*-*/;
 
 		// net
@@ -62,8 +62,8 @@ impl Plugin for LifecyclePlugin {
 		world.register_component::<Parent>();
 		world.register_component::<Children>();
 		world.register_component::<BeetRoot>();
-		world.register_component::<RootIsTargetAgent>();
-		world.register_component::<TargetAgent>();
+		world.register_component::<RootIsTargetEntity>();
+		world.register_component::<TargetEntity>();
 		// bevy
 		world.register_component::<Name>();
 		world.register_component::<Transform>();

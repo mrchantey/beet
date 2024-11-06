@@ -53,7 +53,7 @@ fn play_animation_on_run(
 	trigger: Trigger<OnRun>,
 	mut animators: Query<(&mut AnimationPlayer, &mut AnimationTransitions)>,
 	children: Query<&Children>,
-	query: Query<(&TargetAgent, &PlayAnimation)>,
+	query: Query<(&TargetEntity, &PlayAnimation)>,
 ) {
 	let (agent, play_animation) = query
 		.get(trigger.entity())
@@ -93,7 +93,7 @@ fn play_animation_on_load(
 		(Entity, &mut AnimationPlayer, &mut AnimationTransitions),
 		Added<AnimationPlayer>,
 	>,
-	query: Query<(&TargetAgent, &PlayAnimation), With<Running>>,
+	query: Query<(&TargetEntity, &PlayAnimation), With<Running>>,
 ) {
 	for (entity, mut player, mut transitions) in loaded_animators.iter_mut() {
 		let Some(play_animation) =

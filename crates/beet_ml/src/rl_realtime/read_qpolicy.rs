@@ -26,7 +26,7 @@ fn read_q_policy<P: QPolicy + Asset>(
 	mut commands: Commands,
 	assets: Res<Assets<P>>,
 	mut agents: Query<(&P::State, &mut P::Action)>,
-	query: Query<(&ReadQPolicy<P>, &HandleWrapper<P>, &TargetAgent)>,
+	query: Query<(&ReadQPolicy<P>, &HandleWrapper<P>, &TargetEntity)>,
 ) {
 	let (_, handle, agent) = query
 		.get(trigger.entity())

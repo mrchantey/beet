@@ -17,7 +17,7 @@ pub enum ActionCategory {
 	Behavior,
 	/// This action will effect children of this behavior.
 	ChildBehaviors,
-	/// This action will effect the [`TargetAgent`] of this entity
+	/// This action will effect the [`TargetEntity`] of this entity
 	Agent,
 	/// This action will effect some other aspect of the world
 	World,

@@ -37,7 +37,7 @@ pub fn depth_sensor_scorer(
 	trigger: Trigger<RequestScore>,
 	mut commands: Commands,
 	sensors: Query<&DepthValue, Changed<DepthValue>>,
-	query: Query<(&TargetAgent, &DepthSensorScorer, &Parent)>,
+	query: Query<(&TargetEntity, &DepthSensorScorer, &Parent)>,
 ) {
 	let (target, scorer, parent) = query
 		.get(trigger.entity())

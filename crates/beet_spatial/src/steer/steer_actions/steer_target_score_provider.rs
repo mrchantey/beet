@@ -27,7 +27,7 @@ fn provide_score(
 	mut commands: Commands,
 	transforms: Query<&GlobalTransform>,
 	agents: Query<(&GlobalTransform, &SteerTarget)>,
-	query: Query<(&SteerTargetScoreProvider, &TargetAgent, &Parent)>,
+	query: Query<(&SteerTargetScoreProvider, &TargetEntity, &Parent)>,
 ) {
 	let (action, agent, parent) = query
 		.get(trigger.entity())

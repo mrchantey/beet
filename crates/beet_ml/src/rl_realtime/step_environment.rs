@@ -50,7 +50,7 @@ fn step_environment<S: RlSessionTypes>(
 		&QLearnParams,
 		&SessionEntity,
 	)>,
-	mut query: Query<(&TargetAgent, &mut StepEnvironment<S>)>,
+	mut query: Query<(&TargetEntity, &mut StepEnvironment<S>)>,
 ) where
 	S::State: Component,
 	S::Action: Component,
@@ -144,7 +144,7 @@ mod test {
 			.with_children(|parent| {
 				parent
 					.spawn((
-						TargetAgent(parent.parent_entity()),
+						TargetEntity(parent.parent_entity()),
 						StepEnvironment::<FrozenLakeQTableSession>::new(0),
 					))
 					.flush_trigger(OnRun);

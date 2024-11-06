@@ -49,7 +49,7 @@ pub fn play_procedural_animation(
 	mut commands: Commands,
 	mut transforms: Query<&mut Transform>,
 	query: Query<
-		(Entity, &PlayProceduralAnimation, &TargetAgent, &RunTimer),
+		(Entity, &PlayProceduralAnimation, &TargetEntity, &RunTimer),
 		With<Running>,
 	>,
 ) {
@@ -93,7 +93,7 @@ mod test {
 		app.world_mut().spawn((
 			Running,
 			PlayProceduralAnimation::default(),
-			TargetAgent(agent),
+			TargetEntity(agent),
 		));
 
 		app.update();

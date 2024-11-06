@@ -51,7 +51,7 @@ pub fn emote_arm(mut commands: Commands) {
 		Name::new("Emote Arm"),
 		BundlePlaceholder::Gltf("robot-arm/robot-arm-phone.glb".into()),
 		Transform::from_scale(Vec3::splat(10.)),
-		TargetAgent(target),
+		TargetEntity(target),
 		IkSpawner::default(),
 	));
 
@@ -66,7 +66,7 @@ pub fn emote_arm(mut commands: Commands) {
 			parent.spawn((
 				Name::new("New Pos"),
 				InsertOnRun::new(transform_idle).with_target(target_parent),
-				TargetAgent(target),
+				TargetEntity(target),
 				SetCurveOnRun::EaseRangeDir2 {
 					range: -TAU * 0.1..TAU * 0.1,
 					func: EaseFunction::CubicInOut,
@@ -89,7 +89,7 @@ pub fn emote_arm(mut commands: Commands) {
 		Name::new("Happy"),
 		RemoveOnRun::<Repeat>::default().with_target(idle_behavior),
 		EndOnRun::success().with_target(idle_behavior),
-		TargetAgent(target_parent),
+		TargetEntity(target_parent),
 		InsertSentenceOnUserInput::default(),
 		RunOnInsertSentence::default(),
 		SetCurveOnRun::PingPongPause {

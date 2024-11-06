@@ -1,5 +1,5 @@
-use beet::prelude::*;
 use crate::prelude::*;
+use beet::prelude::*;
 use beetmash::prelude::*;
 use bevy::animation::RepeatAnimation;
 use bevy::prelude::*;
@@ -45,7 +45,7 @@ pub fn spawn_barbarian(mut commands: Commands) {
 			idle_behavior = parent
 				.spawn((
 					Name::new("Idle"),
-					TargetAgent(agent),
+					TargetEntity(agent),
 					idle_animation_bundle,
 				))
 				.id();
@@ -58,7 +58,7 @@ pub fn spawn_barbarian(mut commands: Commands) {
 				InsertOnRun::new(Visibility::Visible).with_target(emote_bubble),
 				InsertOnRunResult::new(Visibility::Hidden)
 					.with_target(emote_bubble),
-				TargetAgent(agent),
+				TargetEntity(agent),
 				cheer_animation_bundle,
 				RunOnRunResult::new_with_target(idle_behavior),
 			));

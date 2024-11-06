@@ -36,7 +36,7 @@ pub fn frozen_lake_run(mut commands: Commands) {
 				.with_children(|parent| {
 					parent.spawn((
 						Name::new("Get next action"),
-						TargetAgent(agent),
+						TargetEntity(agent),
 						AssetLoadBlockAppReady,
 						AssetPlaceholder::<FrozenLakeQTable>::new(
 							"ml/frozen_lake_qtable.ron",
@@ -46,7 +46,7 @@ pub fn frozen_lake_run(mut commands: Commands) {
 					parent.spawn((
 						Name::new("Perform action"),
 						TranslateGrid::new(Duration::from_secs(1)),
-						TargetAgent(agent),
+						TargetEntity(agent),
 					));
 				});
 		});

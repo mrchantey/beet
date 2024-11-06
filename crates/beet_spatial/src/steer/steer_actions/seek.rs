@@ -47,7 +47,7 @@ fn seek(
 		&mut Impulse,
 		Option<&ArriveRadius>,
 	)>,
-	query: Query<(Entity, &TargetAgent, &Seek), With<Running>>,
+	query: Query<(Entity, &TargetEntity, &Seek), With<Running>>,
 ) {
 	for (entity, target, seek) in query.iter() {
 		if let Ok((
@@ -116,7 +116,7 @@ mod test {
 			))
 			.with_children(|parent| {
 				parent.spawn((
-					TargetAgent(parent.parent_entity()),
+					TargetEntity(parent.parent_entity()),
 					Running,
 					Seek::default(),
 				));

@@ -21,14 +21,13 @@ fn translate(
 	mut _commands: Commands,
 	time: Res<Time>,
 	mut transforms: Query<&mut Transform>,
-	query: Query<(&TargetAgent, &Translate), With<Running>>,
+	query: Query<(&TargetEntity, &Translate), With<Running>>,
 ) {
 	for (target, translate) in query.iter() {
 		if let Some(mut transform) =
 			transforms.get_mut(**target).ok_or(|e| log::warn!("{e}"))
 		{
-			transform.translation +=
-				translate.translation * time.delta_secs();
+			transform.translation += translate.translation * time.delta_secs();
 		}
 	}
 }

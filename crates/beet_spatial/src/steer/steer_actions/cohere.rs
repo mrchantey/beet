@@ -47,7 +47,7 @@ impl<M: GenericActionComponent> Cohere<M> {
 fn cohere<M: GenericActionComponent>(
 	boids: Query<(Entity, &Transform), With<M>>,
 	mut agents: Query<(Entity, &Transform, &mut Impulse, &MaxSpeed)>,
-	query: Query<(&TargetAgent, &Cohere<M>), With<Running>>,
+	query: Query<(&TargetEntity, &Cohere<M>), With<Running>>,
 ) {
 	for (target, cohere) in query.iter() {
 		let Ok((entity, transform, mut impulse, max_speed)) =

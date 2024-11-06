@@ -65,7 +65,7 @@ pub fn seek_3d(mut commands: Commands) {
 					parent.spawn((
 						Name::new("Idle"),
 						RemoveOnRun::<Velocity>::new_with_target(agent),
-						TargetAgent(agent),
+						TargetEntity(agent),
 						PlayAnimation::new(idle_index)
 							.with_transition_duration(transition_duration),
 						idle_clip,
@@ -77,7 +77,7 @@ pub fn seek_3d(mut commands: Commands) {
 					));
 					parent.spawn((
 						Name::new("Seek"),
-						TargetAgent(agent),
+						TargetEntity(agent),
 						Seek::default(),
 						InsertOnRun::<Velocity>::new_with_target(agent),
 						PlayAnimation::new(walk_index)

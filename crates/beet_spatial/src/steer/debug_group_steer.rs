@@ -34,9 +34,9 @@ impl<M: GenericActionComponent> Plugin for DebugGroupSteerPlugin<M> {
 fn debug_group_steer<M: GenericActionComponent>(
 	mut gizmos: Gizmos,
 	transforms: Query<&Transform>,
-	separate: Query<(&TargetAgent, &Separate<M>)>,
-	align: Query<(&TargetAgent, &Align<M>)>,
-	cohere: Query<(&TargetAgent, &Cohere<M>)>,
+	separate: Query<(&TargetEntity, &Separate<M>)>,
+	align: Query<(&TargetEntity, &Align<M>)>,
+	cohere: Query<(&TargetEntity, &Cohere<M>)>,
 ) {
 	for (agent, params) in separate.iter() {
 		if let Ok(transform) = transforms.get(**agent) {

@@ -1,5 +1,5 @@
-use crate::prelude::*;
 use crate::beet::prelude::*;
+use crate::prelude::*;
 use beetmash::prelude::*;
 use bevy::prelude::*;
 
@@ -28,7 +28,7 @@ pub fn flock(mut commands: Commands) {
 				agent.spawn((
 					Name::new("Flock Behavior"),
 					RunOnSpawn,
-					TargetAgent(agent.parent_entity()),
+					TargetEntity(agent.parent_entity()),
 					Separate::<GroupSteerAgent>::new(1.).scaled_dist(SCALE),
 					Align::<GroupSteerAgent>::new(1.).scaled_dist(SCALE),
 					Cohere::<GroupSteerAgent>::new(1.).scaled_dist(SCALE),

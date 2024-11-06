@@ -28,7 +28,7 @@ pub fn ik_spawner(
 	mut commands: Commands,
 	child_nodes_query: Query<(Entity, &Name, &Transform, &Children)>,
 	children_query: Query<&Children>,
-	query: Populated<(Entity, &Transform, &Children, &SceneRoot, &TargetAgent)>,
+	query: Populated<(Entity, &Transform, &Children, &SceneRoot, &TargetEntity)>,
 ) {
 	let Ok((scene_root_entity, transform, scene_root_children, _, target)) =
 		query.get(trigger.entity())
