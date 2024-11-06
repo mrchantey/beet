@@ -15,7 +15,13 @@ fn main() {
 
 
 fn setup(mut commands: Commands) {
-	commands.spawn((Camera3d::default(), Transform::from_xyz(0., 0., 5.)));
+	commands.spawn((
+		Name::new("Camera"),
+		Camera3d::default(), Transform::from_xyz(0., 0., 5.)));
 
-	commands.spawn(Emoji::new("1F600"));
+	commands.spawn((
+		Name::new("Agent"),
+		Emoji::new("1F600"))).with_child((
+			
+	));
 }
