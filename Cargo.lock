@@ -537,6 +537,7 @@ version = "0.0.4-rc.3"
 dependencies = [
  "beet_flow",
  "beet_spatial",
+ "beetmash",
  "bevy",
  "num-traits",
 ]
