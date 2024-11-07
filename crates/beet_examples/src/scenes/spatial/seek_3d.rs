@@ -59,7 +59,7 @@ pub fn seek_3d(mut commands: Commands) {
 					Name::new("Seek Behavior"),
 					RunOnSpawn,
 					SequenceFlow,
-					Repeat::default(),
+					RepeatFlow::default(),
 				))
 				.with_children(|parent| {
 					parent.spawn((

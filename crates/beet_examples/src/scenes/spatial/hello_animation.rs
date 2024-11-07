@@ -40,7 +40,7 @@ pub fn hello_animation(mut commands: Commands) {
 					Name::new("Animation Behavior"),
 					RunOnSpawn,
 					SequenceFlow,
-					Repeat::default(),
+					RepeatFlow::default(),
 				))
 				.with_children(|parent| {
 					parent.spawn((

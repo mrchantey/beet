@@ -10,12 +10,12 @@ use bevy::prelude::*;
 #[reflect(Default, Component, ActionMeta)]
 #[category(ActionCategory::Behavior)]
 #[observers(repeat)]
-pub struct Repeat {
+pub struct RepeatFlow {
 	// TODO times
 	// pub times: RepeatAnimation,
 }
 
-impl Default for Repeat {
+impl Default for RepeatFlow {
 	fn default() -> Self {
 		Self {
 			// times: RepeatAnimation::Forever,

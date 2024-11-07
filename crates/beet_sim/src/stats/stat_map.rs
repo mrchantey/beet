@@ -3,13 +3,6 @@ use bevy::prelude::*;
 use bevy::utils::HashMap;
 
 
-/// A unique identifier for a stat,
-/// when defined by [`StatMap::from_sim_descriptor`] this is the index in the [`SimDescriptor`].
-#[derive(
-	Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Reflect, Component,
-)]
-pub struct StatId(pub usize);
-
 
 #[derive(Debug, Default, Clone, PartialEq, Resource)]
 pub struct StatMap {
@@ -42,7 +35,37 @@ impl StatMap {
 		self.map.insert(id, stat);
 		id
 	}
+	/// Get the first stat with the given name.
+	pub fn get_by_name(&self, name: &str) -> Option<StatId> {
+		self.map
+			.iter()
+			.find(|(_, stat)| stat.name == name)
+			.map(|(id, _)| *id)
+	}
+	#[cfg(test)]
+	pub fn default_with_test_stats() -> Self {
+		let mut stat_map = StatMap::default();
+		stat_map.add_stat(StatDescriptor {
+			name: "Health".to_string(),
+			description: "The health of the agent".to_string(),
+			emoji_hexcode: "2764".to_string(),
+			global_range: StatValue::range(0.0..1.),
+		});
+		stat_map.add_stat(StatDescriptor {
+			name: "Pleasantness".to_string(),
+			description: "How groovy the agent is feeling".to_string(),
+			emoji_hexcode: "1F600".to_string(),
+			global_range: StatValue::range(-5.0..5.0),
+		});
+		stat_map
+	}
+	#[cfg(test)]
+	pub const TEST_HEALTH_ID: StatId = StatId(0);
+	#[cfg(test)]
+	pub const TEST_PLEASENTNESS_ID: StatId = StatId(1);
 }
+
+
 
 
 #[cfg(test)]
@@ -58,7 +81,7 @@ mod test {
 			name: "Health".to_string(),
 			description: "The health of the entity".to_string(),
 			emoji_hexcode: "❤️".to_string(),
-			type_id: std::any::TypeId::of::<f32>(),
+			global_range: StatValue::range(0.0..1.),
 		};
 
 		sim_descriptor.stats.push(stat.clone());

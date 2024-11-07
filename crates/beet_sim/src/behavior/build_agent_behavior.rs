@@ -20,7 +20,7 @@ pub fn build_agent_behavior(
 			Emoji::new("1F600"),
 			TargetEntity(agent),
 			ScoreFlow::default(),
-			Repeat::default(),
+			RepeatFlow::default(),
 		))
 		.id();
 

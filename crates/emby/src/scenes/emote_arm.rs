@@ -59,7 +59,7 @@ pub fn emote_arm(mut commands: Commands) {
 		.spawn((
 			Name::new("Idle Behavior"),
 			RunOnSpawn,
-			Repeat::default(),
+			RepeatFlow::default(),
 			SequenceFlow,
 		))
 		.with_children(|parent| {
@@ -87,7 +87,7 @@ pub fn emote_arm(mut commands: Commands) {
 
 	commands.spawn((
 		Name::new("Happy"),
-		RemoveOnRun::<Repeat>::default().with_target(idle_behavior),
+		RemoveOnRun::<RepeatFlow>::default().with_target(idle_behavior),
 		EndOnRun::success().with_target(idle_behavior),
 		TargetEntity(target_parent),
 		InsertSentenceOnUserInput::default(),
@@ -99,6 +99,6 @@ pub fn emote_arm(mut commands: Commands) {
 		},
 		PlayProceduralAnimation::default().with_duration_secs(2.),
 		RunOnRunResult::new_with_target(idle_behavior),
-		InsertOnRunResult::<Repeat>::default().with_target(idle_behavior),
+		InsertOnRunResult::<RepeatFlow>::default().with_target(idle_behavior),
 	));
 }

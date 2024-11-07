@@ -1,5 +1,6 @@
+use super::StatValue;
 use bevy::prelude::*;
-use std::any::TypeId;
+use std::ops::Range;
 
 
 #[derive(Debug, Clone, PartialEq, Reflect)]
@@ -7,6 +8,7 @@ pub struct StatDescriptor {
 	pub name: String,
 	pub description: String,
 	pub emoji_hexcode: String,
-	/// The id of the stat, ie for f32 stat `type_id::of::<f32>()`
-	pub type_id: TypeId,
+	/// The absolute range for this stat
+	/// Individual values may have a local subset range
+	pub global_range: Range<StatValue>,
 }

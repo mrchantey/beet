@@ -20,6 +20,7 @@ fn on_start(
 	mut commands: Commands,
 	mut query: Query<(&mut ScoreFlow, &Children)>,
 ) {
+
 	let (mut score_flow, children) = query
 		.get_mut(trigger.entity())
 		.expect(child_expect::NO_CHILDREN);

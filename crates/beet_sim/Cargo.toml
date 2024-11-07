@@ -32,4 +32,5 @@ beetmash.workspace = true
 
 [dev-dependencies]
 bevy = { workspace = true, default-features = true }
+beetmash = { workspace = true, features = ["test"] }
 sweet.workspace = true

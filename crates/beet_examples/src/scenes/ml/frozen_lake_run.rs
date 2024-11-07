@@ -31,7 +31,7 @@ pub fn frozen_lake_run(mut commands: Commands) {
 					Name::new("Run Frozen Lake Agent"),
 					RunOnAppReady::default(),
 					SequenceFlow,
-					Repeat::default(),
+					RepeatFlow::default(),
 				))
 				.with_children(|parent| {
 					parent.spawn((

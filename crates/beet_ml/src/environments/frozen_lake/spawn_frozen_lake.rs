@@ -65,7 +65,7 @@ pub fn spawn_frozen_lake_episode(
 					.spawn((
 						Name::new("Train Frozen Lake Agent"),
 						SequenceFlow::default(),
-						Repeat::default(),
+						RepeatFlow::default(),
 					))
 					.with_children(|parent| {
 						parent.spawn((
