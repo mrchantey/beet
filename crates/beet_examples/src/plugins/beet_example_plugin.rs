@@ -85,7 +85,6 @@ fn plugin_2d(app: &mut App) {
 			Update,
 			(update_wrap_around, wrap_around)
 			.chain()
-			.run_if(|res: Option<Res<WrapAround>>| res.is_some())
 			.in_set(PostTickSet),
 		)
 		.register_type::<AutoSpawn>()

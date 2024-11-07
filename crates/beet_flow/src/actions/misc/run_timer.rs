@@ -10,7 +10,6 @@ use std::fmt::Debug;
 #[observers(on_start, on_stop)]
 #[systems(
 	update_run_timers
-		.run_if(|time: Option<Res<Time>>| time.is_some())
 		.in_set(PreTickSet)
 )]
 pub struct RunTimer {

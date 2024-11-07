@@ -51,8 +51,8 @@ impl Plugin for BeetDebugPlugin {
 		app.add_systems(
 		schedule,
 			log_on_update.run_if(
-				|config: Option<Res<BeetDebugConfig>>| {
-					config.map(|c| c.log_on_update).unwrap_or_default()
+				|config: Res<BeetDebugConfig>| {
+					config.log_on_update
 				},
 			)
 			.in_set(PostTickSet)
@@ -81,11 +81,11 @@ fn log_log_on_run(
 fn log_on_start(
 	trigger: Trigger<OnRun>,
 	mut commands: Commands,
-	config: Option<Res<BeetDebugConfig>>,
+	config: Res<BeetDebugConfig>,
 	query: Query<&Name>,
 ) {
 	// TODO run_if https://github.com/bevyengine/bevy/issues/14157
-	if !config.map(|c| c.log_on_start).unwrap_or_default() {
+	if !config.log_on_start {
 		return;
 	}
 	let msg = query
@@ -104,12 +104,12 @@ fn log_on_update(mut commands: Commands, query: Query<&Name, With<Running>>) {
 
 fn log_on_stop(
 	trigger: Trigger<OnRunResult>,
-	config: Option<Res<BeetDebugConfig>>,
+	config: Res<BeetDebugConfig>,
 	query: Query<&Name>,
 	mut commands: Commands,
 ) {
 	// TODO run_if https://github.com/bevyengine/bevy/issues/14157
-	if !config.map(|c| c.log_on_stop).unwrap_or_default() {
+	if !config.log_on_stop {
 		return;
 	}
 	let msg = query
