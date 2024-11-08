@@ -3,7 +3,7 @@ use bevy::ecs::system::IntoObserverSystem;
 use bevy::prelude::*;
 
 pub struct ActionObserver<T: ObserverType> {
-	pub trigger_target: TriggerTarget,
+	pub trigger_target: ActionTarget,
 	pub observer: T::System,
 }
 
@@ -11,7 +11,7 @@ impl<T: ObserverType> ActionObserver<T> {
 	pub fn new(observer: T::System) -> Self {
 		Self {
 			observer,
-			trigger_target: TriggerTarget::default(),
+			trigger_target: ActionTarget::default(),
 		}
 	}
 	pub fn observe(
@@ -20,25 +20,25 @@ impl<T: ObserverType> ActionObserver<T> {
 		caller: Entity,
 	) -> Vec<Entity> {
 		match &self.trigger_target {
-			TriggerTarget::This => {
+			ActionTarget::This => {
 				vec![commands
 					.entity(caller)
 					.observe(self.observer.clone())
 					.id()]
 			}
-			TriggerTarget::Entity(entity) => {
+			ActionTarget::Entity(entity) => {
 				vec![commands
 					.entity(*entity)
 					.observe(self.observer.clone())
 					.id()]
 			}
-			TriggerTarget::Entities(entities) => entities
+			ActionTarget::Entities(entities) => entities
 				.iter()
 				.map(|entity| {
 					commands.entity(*entity).observe(self.observer.clone()).id()
 				})
 				.collect(),
-			TriggerTarget::Global => {
+			ActionTarget::Global => {
 				vec![commands.add_observer(self.observer.clone()).id()]
 			}
 		}

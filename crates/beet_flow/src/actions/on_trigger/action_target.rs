@@ -5,7 +5,7 @@ use bevy::prelude::*;
 /// Used by systems and observers that trigger observers, to specify the target of the trigger.
 #[derive(Debug, Default, Clone, Reflect)]
 #[reflect(Default)]
-pub enum TriggerTarget {
+pub enum ActionTarget {
 	#[default]
 	This,
 	Entity(Entity),
@@ -14,7 +14,7 @@ pub enum TriggerTarget {
 }
 
 
-impl MapEntities for TriggerTarget {
+impl MapEntities for ActionTarget {
 	fn map_entities<M: EntityMapper>(&mut self, entity_mapper: &mut M) {
 		match self {
 			Self::This => {}
@@ -30,7 +30,7 @@ impl MapEntities for TriggerTarget {
 }
 
 
-impl TriggerTarget {
+impl ActionTarget {
 	pub fn trigger(
 		&self,
 		commands: &mut Commands,
@@ -87,13 +87,22 @@ impl TriggerTarget {
 			Self::Global => panic!("Cannot remove from global target"),
 		};
 	}
+
+	pub fn contains(&self, entity: Entity) -> bool {
+		match self {
+			Self::This => false,
+			Self::Entity(e) => entity == *e,
+			Self::Entities(entities) => entities.contains(&entity),
+			Self::Global => false,
+		}
+	}
 }
 
-impl Into<TriggerTarget> for Entity {
-	fn into(self) -> TriggerTarget { TriggerTarget::Entity(self) }
+impl Into<ActionTarget> for Entity {
+	fn into(self) -> ActionTarget { ActionTarget::Entity(self) }
 }
-impl Into<TriggerTarget> for Vec<Entity> {
-	fn into(self) -> TriggerTarget { TriggerTarget::Entities(self) }
+impl Into<ActionTarget> for Vec<Entity> {
+	fn into(self) -> ActionTarget { ActionTarget::Entities(self) }
 }
 
 
@@ -135,8 +144,8 @@ mod test {
 		let e2 = world.spawn(Name::new("foo")).id();
 
 		let mut commands = world.commands();
-		TriggerTarget::This.insert(&mut commands, e1, Name::new("bar"));
-		TriggerTarget::Entity(e2).remove::<Name>(&mut commands, e1);
+		ActionTarget::This.insert(&mut commands, e1, Name::new("bar"));
+		ActionTarget::Entity(e2).remove::<Name>(&mut commands, e1);
 		drop(commands);
 		world.flush();
 		expect(&world).to_have_component::<Name>(e1)?;

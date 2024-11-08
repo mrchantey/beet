@@ -17,7 +17,7 @@ use std::time::Duration;
 /// Requires a [`Handle<AnimationClip>`] component.
 pub struct TriggerOnAnimationEnd<T: GenericActionEvent> {
 	pub value: T,
-	pub target: TriggerTarget,
+	pub target: ActionTarget,
 	pub animation_index: AnimationNodeIndex,
 	/// The duration of the transition to the next action.
 	/// This should be greater than frame delta time or there will be no chance
@@ -30,12 +30,12 @@ impl<T: GenericActionEvent> TriggerOnAnimationEnd<T> {
 	pub fn new(index: AnimationNodeIndex, value: T) -> Self {
 		Self {
 			value,
-			target: TriggerTarget::default(),
+			target: ActionTarget::default(),
 			animation_index: index,
 			transition_duration: DEFAULT_ANIMATION_TRANSITION,
 		}
 	}
-	pub fn with_target(mut self, target: TriggerTarget) -> Self {
+	pub fn with_target(mut self, target: ActionTarget) -> Self {
 		self.target = target;
 		self
 	}

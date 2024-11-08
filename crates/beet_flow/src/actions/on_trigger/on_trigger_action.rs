@@ -16,7 +16,7 @@ pub struct OnTrigger<Handler: OnTriggerHandler> {
 	/// The entities to watch, defaults to [`Self`] if this is empty
 	pub sources: Vec<Entity>,
 	/// The entities to modify, defaults to [`Self`]
-	pub target: TriggerTarget,
+	pub target: ActionTarget,
 	#[reflect(ignore)]
 	phantom: PhantomData<Handler>,
 }
@@ -60,7 +60,7 @@ impl<Handler: OnTriggerHandler> OnTrigger<Handler> {
 			phantom: PhantomData,
 		}
 	}
-	pub fn new_with_target(target: impl Into<TriggerTarget>) -> Self {
+	pub fn new_with_target(target: impl Into<ActionTarget>) -> Self {
 		Self {
 			target: target.into(),
 			..default()
@@ -73,7 +73,7 @@ impl<Handler: OnTriggerHandler> OnTrigger<Handler> {
 		}
 	}
 
-	pub fn with_target(self, target: impl Into<TriggerTarget>) -> Self {
+	pub fn with_target(self, target: impl Into<ActionTarget>) -> Self {
 		Self {
 			target: target.into(),
 			..self

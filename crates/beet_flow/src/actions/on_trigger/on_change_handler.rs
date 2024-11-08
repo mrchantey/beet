@@ -1,16 +1,16 @@
+use super::OnChange;
 use bevy::prelude::*;
 
-/// Trait for handling a trigger event
+/// Trait for handling an OnChange event
 pub trait OnChangeHandler: 'static + Send + Sync + Sized {
-	/// The event used for the trigger, ie [`Trigger<TriggerEvent>`]
 	type ChangedComponent: Component;
-	/// The bundle used for the Trigger, ie [`Trigger<TriggerEvent,TriggerBundle>`]
-	type TriggerBundle: Bundle = ();
 	/// Parameters used by the handler
 	type Params: 'static + Send + Sync + Default + Reflect;
 	fn handle(
 		commands: &mut Commands,
-		entity: Entity,
+		action_entity: Entity,
+		action_component: &OnChange<Self>,
+		changed_entity: Entity,
 		changed_component: &Self::ChangedComponent,
 	);
 }

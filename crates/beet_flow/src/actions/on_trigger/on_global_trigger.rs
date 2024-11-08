@@ -39,7 +39,7 @@ where
 
 impl<Handler: OnTriggerHandler> OnGlobalTrigger<Handler> {
 	pub fn new(params: Handler::Params) -> Self { Self(OnTrigger::new(params)) }
-	pub fn with_target(self, target: impl Into<TriggerTarget>) -> Self {
+	pub fn with_target(self, target: impl Into<ActionTarget>) -> Self {
 		Self(self.0.with_target(target))
 	}
 }
