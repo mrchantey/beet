@@ -10,6 +10,12 @@ pub use self::end_on_run::*;
 pub mod insert_on_trigger;
 #[allow(unused_imports)]
 pub use self::insert_on_trigger::*;
+pub mod on_change;
+#[allow(unused_imports)]
+pub use self::on_change::*;
+pub mod on_change_handler;
+#[allow(unused_imports)]
+pub use self::on_change_handler::*;
 pub mod on_global_trigger;
 #[allow(unused_imports)]
 pub use self::on_global_trigger::*;

@@ -27,6 +27,10 @@ impl StatMap {
 		}
 		map
 	}
+	pub fn with_stat(mut self, stat: StatDescriptor) -> Self {
+		self.add_stat(stat);
+		self
+	}
 
 
 	pub fn add_stat(&mut self, stat: StatDescriptor) -> StatId {
@@ -36,12 +40,20 @@ impl StatMap {
 		id
 	}
 	/// Get the first stat with the given name.
-	pub fn get_by_name(&self, name: &str) -> Option<StatId> {
-		self.map
-			.iter()
-			.find(|(_, stat)| stat.name == name)
-			.map(|(id, _)| *id)
+	pub fn get_by_name(
+		&self,
+		name: &str,
+	) -> Option<(&StatId, &StatDescriptor)> {
+		self.map.iter().find(|(_, stat)| stat.name == name)
 	}
+
+	pub fn get_id_by_name(&self, name: &str) -> Option<StatId> {
+		self.get_by_name(name).map(|(id, _)| *id)
+	}
+	pub fn get_default_by_name(&self, name: &str) -> Option<StatValue> {
+		self.get_by_name(name).map(|(_, desc)| desc.default_value)
+	}
+
 	#[cfg(test)]
 	pub fn default_with_test_stats() -> Self {
 		let mut stat_map = StatMap::default();
@@ -50,12 +62,14 @@ impl StatMap {
 			description: "The health of the agent".to_string(),
 			emoji_hexcode: "2764".to_string(),
 			global_range: StatValue::range(0.0..1.),
+			default_value: StatValue(1.),
 		});
 		stat_map.add_stat(StatDescriptor {
 			name: "Pleasantness".to_string(),
 			description: "How groovy the agent is feeling".to_string(),
 			emoji_hexcode: "1F600".to_string(),
 			global_range: StatValue::range(-5.0..5.0),
+			default_value: StatValue(0.),
 		});
 		stat_map
 	}
@@ -82,6 +96,7 @@ mod test {
 			description: "The health of the entity".to_string(),
 			emoji_hexcode: "❤️".to_string(),
 			global_range: StatValue::range(0.0..1.),
+			default_value: StatValue(1.),
 		};
 
 		sim_descriptor.stats.push(stat.clone());

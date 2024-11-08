@@ -11,4 +11,6 @@ pub struct StatDescriptor {
 	/// The absolute range for this stat
 	/// Individual values may have a local subset range
 	pub global_range: Range<StatValue>,
+	/// Unless overridden this is the default value for this stat
+	pub default_value: StatValue,
 }

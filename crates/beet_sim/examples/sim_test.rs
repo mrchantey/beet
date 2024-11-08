@@ -5,20 +5,26 @@ use beetmash::prelude::*;
 use bevy::prelude::*;
 use std::f32::consts::TAU;
 
+
+const STRESS: &str = "Stress";
+const SELF_CONTROL: &str = "Self-Control";
+
 fn main() {
-	let mut stat_map = StatMap::default();
-	stat_map.add_stat(StatDescriptor {
-		name: "Health".to_string(),
-		description: "The health of the agent".to_string(),
-		emoji_hexcode: "2764".to_string(),
-		global_range: StatValue::range(0.0..1.),
-	});
-	stat_map.add_stat(StatDescriptor {
-		name: "Energy".to_string(),
-		description: "The energy of the agent".to_string(),
-		emoji_hexcode: "26A1".to_string(),
-		global_range: StatValue::range(0.0..1.),
-	});
+	let stat_map = StatMap::default()
+		.with_stat(StatDescriptor {
+			name: SELF_CONTROL.to_string(),
+			description: "Ability to make good decisions".to_string(),
+			emoji_hexcode: "1F9D8".to_string(),
+			global_range: StatValue::range(0.0..1.),
+			default_value: StatValue(1.),
+		})
+		.with_stat(StatDescriptor {
+			name: STRESS.to_string(),
+			description: "Current stress level".to_string(),
+			emoji_hexcode: "1F92F".to_string(),
+			global_range: StatValue::range(0.0..1.),
+			default_value: StatValue(0.),
+		});
 	App::new()
 		.add_plugins((
 			BeetmashDefaultPlugins::with_native_asset_path("../../assets"),
@@ -27,7 +33,10 @@ fn main() {
 			BeetDebugPlugin,
 			BeetSimPlugin,
 		))
-		.add_systems(Startup, (camera, agent, cupcake, gym))
+		.add_systems(
+			Startup,
+			(camera, agent, alcohol, kids_crying, short_stroll),
+		)
 		.insert_resource(stat_map)
 		.insert_resource(BeetDebugConfig::default())
 		.run();
@@ -42,10 +51,10 @@ fn camera(mut commands: Commands) {
 	));
 }
 
-fn orbital_pos(index: usize, total: usize) -> Vec3 {
+fn orbital_transform(index: usize, total: usize) -> Transform {
 	let angle = TAU / total as f32 * index as f32;
 	let pos = Vec3::new(f32::cos(angle), f32::sin(angle), 0.);
-	pos * 0.7
+	Transform::from_translation(pos * 0.7).with_scale(CHILD_SCALE)
 }
 
 
@@ -58,32 +67,30 @@ const CHILD_SCALE: Vec3 = Vec3 {
 
 fn agent(mut commands: Commands, stat_map: Res<StatMap>) {
 	commands
-		.spawn((Name::new("Agent"), Emoji::new("1F600")))
+		.spawn((
+			Name::new("Agent"),
+			Emoji::new("1F600"),
+			Transform::from_xyz(0., 1., 0.),
+		))
 		.with_children(|parent| {
 			let total_children = 4;
 
-			let energy_stat_id = stat_map.get_by_name("Energy").unwrap();
-			let health_stat_id = stat_map.get_by_name("Health").unwrap();
-
 			let agent = parent.parent_entity();
 			parent.spawn((
-				Name::new("Health"),
-				Transform::from_translation(orbital_pos(0, total_children))
-					.with_scale(CHILD_SCALE),
-				health_stat_id,
-				StatValue::new(1.),
+				Name::new(STRESS),
+				orbital_transform(0, total_children),
+				stat_map.get_id_by_name(STRESS).unwrap(),
+				stat_map.get_default_by_name(STRESS).unwrap(),
 			));
 			parent.spawn((
-				Name::new("Energy"),
-				Transform::from_translation(orbital_pos(1, total_children))
-					.with_scale(CHILD_SCALE),
-				energy_stat_id,
-				StatValue::new(1.),
+				Name::new(SELF_CONTROL),
+				orbital_transform(1, total_children),
+				stat_map.get_id_by_name(SELF_CONTROL).unwrap(),
+				stat_map.get_default_by_name(SELF_CONTROL).unwrap(),
 			));
 			parent.spawn((
 				Name::new("Walk"),
-				Transform::from_translation(orbital_pos(2, total_children))
-					.with_scale(CHILD_SCALE),
+				orbital_transform(2, total_children),
 				TargetEntity(agent),
 				Walk::default(),
 			));
@@ -92,8 +99,7 @@ fn agent(mut commands: Commands, stat_map: Res<StatMap>) {
 				.spawn((
 					Name::new("Behavior"),
 					Emoji::new("1F5FA"),
-					Transform::from_translation(orbital_pos(3, total_children))
-						.with_scale(CHILD_SCALE),
+					orbital_transform(3, total_children),
 					RunOnSpawn,
 					ScoreFlow::default(),
 					RepeatFlow::default(),
@@ -105,65 +111,74 @@ fn agent(mut commands: Commands, stat_map: Res<StatMap>) {
 						ScoreProvider::NEUTRAL,
 					));
 					parent.spawn((
-						Name::new("Desire Health"),
+						Name::new("Desire Low Stress"),
 						TargetEntity(agent),
-						StatScoreProvider::new(health_stat_id),
+						StatScoreProvider::new(
+							stat_map.get_id_by_name(STRESS).unwrap(),
+						)
+						.with_low_desired(), // we want stress to be low
 					));
 					parent.spawn((
-						Name::new("Desire Energy"),
+						Name::new("Desire High Self Control"),
 						TargetEntity(agent),
-						StatScoreProvider::new(energy_stat_id)
-							.in_negative_direction(),
+						StatScoreProvider::new(
+							stat_map.get_id_by_name(SELF_CONTROL).unwrap(),
+						),
 					));
 				});
 		});
 }
 
 
-fn cupcake(mut commands: Commands, stat_map: Res<StatMap>) {
+fn kids_crying(mut commands: Commands, stat_map: Res<StatMap>) {
 	commands
 		.spawn((
-			Name::new("Cupcake"),
-			Emoji::new("1F9C1"),
+			Name::new("Baby Crying"),
+			Emoji::new("1F476"),
+			CollectableStat::default(),
+			Transform::from_xyz(0., -1., 0.),
+		))
+		.with_child((
+			Name::new(STRESS),
+			orbital_transform(0, 2),
+			stat_map.get_id_by_name(STRESS).unwrap(),
+			StatValue::new(0.1),
+		));
+}
+fn alcohol(mut commands: Commands, stat_map: Res<StatMap>) {
+	commands
+		.spawn((
+			Name::new("Alcohol"),
+			Emoji::new("1F37A"),
 			CollectableStat::default(),
 			Transform::from_xyz(-3., -1., 0.),
 		))
 		.with_child((
-			Name::new("Health"),
-			Transform::from_translation(orbital_pos(0, 2))
-				.with_scale(CHILD_SCALE),
-			stat_map.get_by_name("Health").unwrap(),
+			Name::new(SELF_CONTROL),
+			orbital_transform(0, 2),
+			stat_map.get_id_by_name(SELF_CONTROL).unwrap(),
 			StatValue::new(-0.1),
-		))
-		.with_child((
-			Name::new("Energy"),
-			Transform::from_translation(orbital_pos(1, 2))
-				.with_scale(CHILD_SCALE),
-			stat_map.get_by_name("Energy").unwrap(),
-			StatValue::new(0.1),
 		));
 }
 
-fn gym(mut commands: Commands, stat_map: Res<StatMap>) {
+fn short_stroll(mut commands: Commands, stat_map: Res<StatMap>) {
 	commands
 		.spawn((
-			Name::new("Gym"),
-			Emoji::new("1F3CB"),
+			Name::new("Short Stroll"),
+			Emoji::new("1F6B6"),
 			CollectableStat::default(),
 			Transform::from_xyz(3., -1., 0.),
 		))
 		.with_child((
-			Name::new("Health"),
-			Transform::from_translation(orbital_pos(0, 2))
-				.with_scale(CHILD_SCALE),
-			stat_map.get_by_name("Health").unwrap(),
-			StatValue::new(0.1),
+			Name::new(STRESS),
+			orbital_transform(0, 2),
+			stat_map.get_id_by_name(STRESS).unwrap(),
+			StatValue::new(-0.1),
 		))
 		.with_child((
-			Name::new("Energy"),
-			Transform::from_translation(orbital_pos(1, 2))
-				.with_scale(CHILD_SCALE),
-			stat_map.get_by_name("Energy").unwrap(),
-			StatValue::new(-0.1),
+			Name::new(SELF_CONTROL),
+			orbital_transform(1, 2),
+			stat_map.get_id_by_name(SELF_CONTROL).unwrap(),
+			StatValue::new(0.1),
 		));
 }

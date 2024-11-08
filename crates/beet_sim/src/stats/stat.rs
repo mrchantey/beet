@@ -59,6 +59,11 @@ impl StatValue {
 	pub fn range(range: Range<f32>) -> Range<StatValue> {
 		StatValue(range.start)..StatValue(range.end)
 	}
+
+
+	pub fn normalize(&self, range: Range<StatValue>) -> f32 {
+		(self.0 - *range.start) / (*range.end - *range.start)
+	}
 }
 
 

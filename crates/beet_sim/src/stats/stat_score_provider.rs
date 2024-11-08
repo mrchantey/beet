@@ -15,8 +15,8 @@ pub struct StatScoreProvider {
 #[derive(Debug, Default, Clone, PartialEq, Reflect, Action)]
 pub enum DesiredDirection {
 	#[default]
-	Positive,
-	Negative,
+	High,
+	Low,
 }
 
 
@@ -33,8 +33,8 @@ impl StatScoreProvider {
 		self
 	}
 
-	pub fn in_negative_direction(mut self) -> Self {
-		self.desired_direction = DesiredDirection::Negative;
+	pub fn with_low_desired(mut self) -> Self {
+		self.desired_direction = DesiredDirection::Low;
 		self
 	}
 
@@ -43,15 +43,17 @@ impl StatScoreProvider {
 		value: StatValue,
 		range: Range<StatValue>,
 	) -> ScoreValue {
-		let normal_value =
-			(*value - *range.start) / (*range.end - *range.start);
+		let normal_value = value.normalize(range);
 
 		let curved_value =
 			easing_curve(0., 1., self.curve).sample_unchecked(normal_value);
 
 		match self.desired_direction {
-			DesiredDirection::Positive => curved_value,
-			DesiredDirection::Negative => 1.0 - curved_value,
+			// if the value is high and the desired direction is high,
+			// the score should be low
+			DesiredDirection::High => 1. - curved_value,
+			// vice versa
+			DesiredDirection::Low => curved_value,
 		}
 	}
 }
@@ -101,14 +103,14 @@ mod test {
 		let provider = StatScoreProvider::new(StatId::default());
 		let range = StatValue::range(-3.0..7.0);
 
-		expect(provider.sample(StatValue(-3.), range.clone())).to_be(0.0)?;
-		expect(provider.sample(StatValue(2.0), range.clone())).to_be(0.5)?;
-		expect(provider.sample(StatValue(7.0), range.clone())).to_be(1.0)?;
-
-		let provider = provider.in_negative_direction();
 		expect(provider.sample(StatValue(-3.), range.clone())).to_be(1.0)?;
 		expect(provider.sample(StatValue(2.0), range.clone())).to_be(0.5)?;
 		expect(provider.sample(StatValue(7.0), range.clone())).to_be(0.0)?;
+
+		let provider = provider.with_low_desired();
+		expect(provider.sample(StatValue(-3.), range.clone())).to_be(0.0)?;
+		expect(provider.sample(StatValue(2.0), range.clone())).to_be(0.5)?;
+		expect(provider.sample(StatValue(7.0), range.clone())).to_be(1.0)?;
 
 		Ok(())
 	}
@@ -145,15 +147,15 @@ mod test {
 				parent.spawn((
 					TargetEntity(agent),
 					StatScoreProvider::new(StatMap::TEST_PLEASENTNESS_ID)
-						.in_negative_direction(),
+						.with_low_desired(),
 				));
 			})
 			.flush_trigger(OnRun);
 
 		expect(&on_child_score).to_have_been_called_times(2)?;
 
-		expect(&on_child_score).to_have_returned_nth_with(0, &0.7)?;
-		expect(&on_child_score).to_have_returned_nth_with(1, &0.3)?;
+		expect(&on_child_score).to_have_returned_nth_with(0, &0.3)?;
+		expect(&on_child_score).to_have_returned_nth_with(1, &0.7)?;
 
 		Ok(())
 	}
