@@ -14,3 +14,10 @@ pub struct StatDescriptor {
 	/// Unless overridden this is the default value for this stat
 	pub default_value: StatValue,
 }
+
+
+impl StatDescriptor {
+	pub fn total_range(&self) -> StatValue {
+		StatValue(*self.global_range.end - *self.global_range.start)
+	}
+}

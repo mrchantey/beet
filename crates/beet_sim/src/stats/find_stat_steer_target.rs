@@ -22,11 +22,8 @@ impl FindStatSteerTarget {}
 fn find_steer_target(
 	trigger: Trigger<OnRun>,
 	mut commands: Commands,
-	agents: Query<&Transform>,
-	targets: Query<
-		(Entity, &Transform, &StatId, &StatValue),
-		Or<(With<CollectableStat>, With<ZoneStat>)>,
-	>,
+	transforms: Query<&Transform>,
+	targets: Query<(&StatId, &StatValue, &Parent), With<StatProvider>>,
 	query: Populated<(
 		&TargetEntity,
 		&FindStatSteerTarget,
@@ -38,19 +35,21 @@ fn find_steer_target(
 		.get(trigger.entity())
 		.expect(expect_action::ACTION_QUERY_MISSING);
 
-	let agent_transform = agents
+	let agent_transform = transforms
 		.get(**agent_entity)
 		.expect(expect_action::TARGET_MISSING);
 
 	let mut best_score = f32::MAX;
 	let mut closest_target = None;
 
-	for (pickup_entity, pickup_transform, pickup_id, pickup_value) in
-		targets.iter()
-	{
+	for (pickup_id, pickup_value, pickup_parent) in targets.iter() {
 		if pickup_id != goal_id {
 			continue;
 		}
+		let pickup_transform = transforms
+			.get(**pickup_parent)
+			.expect(expect_action::TARGET_MISSING);
+
 		let new_dist = Vec3::distance(
 			agent_transform.translation,
 			pickup_transform.translation,
@@ -68,7 +67,7 @@ fn find_steer_target(
 
 		if new_score < best_score {
 			best_score = new_score;
-			closest_target = Some(pickup_entity);
+			closest_target = Some(**pickup_parent);
 		}
 	}
 

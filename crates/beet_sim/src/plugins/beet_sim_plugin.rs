@@ -15,6 +15,7 @@ impl Plugin for BeetSimPlugin {
 				RunOnChange<StatValue>,
 				FindStatSteerTarget,
 			)>::default(),
-		));
+		))
+		.add_systems(Update, render_valency);
 	}
 }

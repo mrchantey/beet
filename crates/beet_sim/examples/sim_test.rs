@@ -3,7 +3,6 @@ use beet_sim::prelude::*;
 use beet_spatial::prelude::*;
 use beetmash::prelude::*;
 use bevy::prelude::*;
-use std::f32::consts::TAU;
 
 
 const STRESS: &str = "Stress";
@@ -51,20 +50,6 @@ fn camera(mut commands: Commands) {
 	));
 }
 
-fn orbital_transform(index: usize, total: usize) -> Transform {
-	let angle = TAU / total as f32 * index as f32;
-	let pos = Vec3::new(f32::cos(angle), f32::sin(angle), 0.);
-	Transform::from_translation(pos * 0.7).with_scale(CHILD_SCALE)
-}
-
-
-const CHILD_SCALE: Vec3 = Vec3 {
-	x: 0.5,
-	y: 0.5,
-	z: 0.5,
-};
-
-
 fn agent(mut commands: Commands, stat_map: Res<StatMap>) {
 	commands
 		.spawn((
@@ -81,7 +66,7 @@ fn agent(mut commands: Commands, stat_map: Res<StatMap>) {
 			let stress = parent
 				.spawn((
 					Name::new(STRESS),
-					orbital_transform(0, total_children),
+					orbital_child(0, total_children),
 					stat_map.get_id_by_name(STRESS).unwrap(),
 					stat_map.get_default_by_name(STRESS).unwrap(),
 				))
@@ -89,14 +74,14 @@ fn agent(mut commands: Commands, stat_map: Res<StatMap>) {
 			let self_control = parent
 				.spawn((
 					Name::new(SELF_CONTROL),
-					orbital_transform(1, total_children),
+					orbital_child(1, total_children),
 					stat_map.get_id_by_name(SELF_CONTROL).unwrap(),
 					stat_map.get_default_by_name(SELF_CONTROL).unwrap(),
 				))
 				.id();
 			parent.spawn((
 				Name::new("Walk"),
-				orbital_transform(2, total_children),
+				orbital_child(2, total_children),
 				TargetEntity(agent),
 				Walk::default(),
 			));
@@ -105,7 +90,7 @@ fn agent(mut commands: Commands, stat_map: Res<StatMap>) {
 				.spawn((
 					Name::new("Behavior"),
 					Emoji::new("1F5FA"),
-					orbital_transform(3, total_children),
+					orbital_child(3, total_children),
 					RunOnSpawn,
 					RunOnChange::<StatValue>::default()
 						.with_source(vec![stress, self_control]),
@@ -149,7 +134,7 @@ fn kids_crying(mut commands: Commands, stat_map: Res<StatMap>) {
 		))
 		.with_child((
 			Name::new(STRESS),
-			orbital_transform(0, 2),
+			orbital_child(0, 2),
 			stat_map.get_id_by_name(STRESS).unwrap(),
 			StatValue::new(0.1),
 			CollectableStat::default(),
@@ -165,14 +150,14 @@ fn alcohol(mut commands: Commands, stat_map: Res<StatMap>) {
 		))
 		.with_child((
 			Name::new(STRESS),
-			orbital_transform(0, 2),
+			orbital_child(0, 2),
 			stat_map.get_id_by_name(STRESS).unwrap(),
 			StatValue::new(-0.1),
 			CollectableStat::default(),
 		))
 		.with_child((
 			Name::new(SELF_CONTROL),
-			orbital_transform(1, 2),
+			orbital_child(1, 2),
 			stat_map.get_id_by_name(SELF_CONTROL).unwrap(),
 			StatValue::new(-0.1),
 			CollectableStat::default(),
@@ -185,18 +170,18 @@ fn short_stroll(mut commands: Commands, stat_map: Res<StatMap>) {
 			Name::new("Short Stroll"),
 			Emoji::new("1F6B6"),
 			CollectableStat::default(),
-			Transform::from_xyz(3., -1., 0.),
+			Transform::from_xyz(3., -1.5, 0.),
 		))
 		.with_child((
 			Name::new(STRESS),
-			orbital_transform(0, 2),
+			orbital_child(0, 2),
 			stat_map.get_id_by_name(STRESS).unwrap(),
 			StatValue::new(-0.1),
 			ZoneStat::default(),
 		))
 		.with_child((
 			Name::new(SELF_CONTROL),
-			orbital_transform(1, 2),
+			orbital_child(1, 2),
 			stat_map.get_id_by_name(SELF_CONTROL).unwrap(),
 			StatValue::new(0.1),
 			ZoneStat::default(),
