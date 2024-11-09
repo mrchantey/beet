@@ -26,7 +26,7 @@ impl CameraDistance {
 
 pub fn camera_distance(
 	mut resize: EventReader<WindowResized>,
-	main_window: Query<&Window, With<PrimaryWindow>>,
+	main_window: Single<&Window, With<PrimaryWindow>>,
 	camera_added: Query<
 		(),
 		(
@@ -34,16 +34,13 @@ pub fn camera_distance(
 			Or<(Added<Camera>, Added<CameraDistance>)>,
 		),
 	>,
-	mut query: Query<(&mut Transform, &Projection, &CameraDistance)>,
+	mut query: Populated<(&mut Transform, &Projection, &CameraDistance)>,
 ) {
 	if camera_added.iter().count() == 0 && resize.read().count() == 0 {
 		return;
 	}
-	let Ok(window) = main_window.get_single() else {
-		return;
-	};
 
-	let aspect_ratio = window.width() as f32 / window.height() as f32;
+	let aspect_ratio = main_window.width() as f32 / main_window.height() as f32;
 
 	for (mut transform, projection, camera_distance) in query.iter_mut() {
 		let Projection::Perspective(perspective) = projection else {

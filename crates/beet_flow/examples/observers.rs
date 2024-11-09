@@ -17,7 +17,7 @@ enum OnRunResult {
 fn sequence_start(
 	trigger: Trigger<OnRun>,
 	mut commands: Commands,
-	query: Query<&Children>,
+	query: Populated<&Children>,
 ) {
 	if let Ok(children) = query.get(trigger.entity()) {
 		if let Some(first_child) = children.iter().next() {
@@ -28,7 +28,7 @@ fn sequence_start(
 fn sequence_next(
 	trigger: Trigger<OnChildResult>,
 	mut commands: Commands,
-	query: Query<&Children>,
+	query: Populated<&Children>,
 ) {
 	if trigger.event().result == OnRunResult::Failure {
 		commands.trigger_targets(OnRunResult::Failure, trigger.entity());
@@ -48,7 +48,7 @@ fn sequence_next(
 	}
 }
 
-fn log_on_run(trigger: Trigger<OnRun>, names: Query<&Name>) {
+fn log_on_run(trigger: Trigger<OnRun>, names: Populated<&Name>) {
 	let name = names
 		.get(trigger.entity())
 		.map(|n| n.as_str())
@@ -59,7 +59,7 @@ fn log_on_run(trigger: Trigger<OnRun>, names: Query<&Name>) {
 fn succeed_on_run(
 	trigger: Trigger<OnRun>,
 	mut commands: Commands,
-	parents: Query<&Parent>,
+	parents: Populated<&Parent>,
 ) {
 	commands.trigger_targets(OnRunResult::Success, trigger.entity());
 	if let Some(parent) = parents.get(trigger.entity()).ok() {

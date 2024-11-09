@@ -32,7 +32,7 @@ impl WrapAround {
 
 pub fn wrap_around(
 	wrap: Res<WrapAround>,
-	mut query: Query<&mut Transform, Changed<Transform>>,
+	mut query: Populated<&mut Transform, Changed<Transform>>,
 ) {
 	for mut transform in query.iter_mut() {
 		if transform.translation.x > wrap.half_extents.x {
@@ -62,7 +62,7 @@ pub fn wrap_around(
 
 pub fn update_wrap_around(
 	mut wrap_around: ResMut<WrapAround>,
-	windows: Query<&Window, Changed<Window>>,
+	windows: Populated<&Window, Changed<Window>>,
 ) {
 	for window in windows.iter() {
 		wrap_around.set_if_neq(WrapAround::from_window_size(window.size()));

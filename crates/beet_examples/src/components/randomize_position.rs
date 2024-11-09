@@ -19,7 +19,7 @@ impl Default for RandomizePosition {
 
 pub fn randomize_position(
 	mut commands: Commands,
-	mut query: Query<
+	mut query: Populated<
 		(Entity, &mut Transform, &RandomizePosition),
 		Added<RandomizePosition>,
 	>,

@@ -7,7 +7,7 @@ struct LogOnRun<T: 'static + Send + Sync + ToString>(pub T);
 
 fn log_on_run<T: 'static + Send + Sync + ToString>(
 	trigger: Trigger<OnRun>,
-	query: Query<&LogOnRun<T>>,
+	query: Populated<&LogOnRun<T>>,
 ) {
 	let name = query
 		.get(trigger.entity())
@@ -16,11 +16,11 @@ fn log_on_run<T: 'static + Send + Sync + ToString>(
 	println!("log_on_run: {name}");
 }
 
-fn log_name_on_run(trigger: Trigger<OnRun>, query: Query<&Name>) {
+fn log_name_on_run(trigger: Trigger<OnRun>, query: Populated<&Name>) {
 	let name = query
 		.get(trigger.entity())
 		.map(|n| n.as_str())
-		.unwrap_or("");
+		.unwrap_or("unnamed");
 	println!("log_name_on_run: {name}");
 }
 

@@ -7,9 +7,8 @@ use bevy::prelude::*;
 #[category(ActionCategory::Agent)]
 struct LogOnRun(pub String);
 
-fn log_on_run(query: Query<&LogOnRun, Added<Running>>) {
-	let name = &query.single().0;
-	println!("log_on_run: {name}");
+fn log_on_run(query: Single<&LogOnRun, Added<Running>>) {
+	println!("log_on_run: {}", &query.0);
 }
 
 fn main() {

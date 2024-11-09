@@ -7,7 +7,7 @@ use bevy::prelude::*;
 #[global_observers(log_name_on_run, log_name_on_run)]
 struct LogOnRun(pub String);
 
-fn log_name_on_run(trigger: Trigger<OnRun>, query: Query<&LogOnRun>) {
+fn log_name_on_run(trigger: Trigger<OnRun>, query: Populated<&LogOnRun>) {
 	let name = query.get(trigger.entity()).map(|n| n.0.as_str()).unwrap();
 	println!("log_name_on_run: {name}");
 }

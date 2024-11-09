@@ -5,20 +5,13 @@ use bevy::prelude::*;
 pub struct FollowCursor2d;
 
 pub fn follow_cursor_2d(
-	camera_query: Query<(&Camera, &GlobalTransform)>,
-	mut cursor_query: Query<&mut Transform, With<FollowCursor2d>>,
-	windows: Query<&Window>,
+	camera_query: Single<(&Camera, &GlobalTransform)>,
+	windows: Single<&Window>,
+	mut cursor_query: Populated<&mut Transform, With<FollowCursor2d>>,
 ) {
-	let Ok((camera, camera_transform)) = camera_query.get_single() else {
-		return;
-	};
+	let (camera, camera_transform) = *camera_query;
 
-	let Some(cursor_position) = windows
-		.get_single()
-		.ok()
-		.map(|w| w.cursor_position())
-		.flatten()
-	else {
+	let Some(cursor_position) = windows.cursor_position() else {
 		return;
 	};
 
@@ -80,22 +73,16 @@ impl Default for FollowCursor3d {
 }
 
 pub fn follow_cursor_3d(
-	camera_query: Query<(&Camera, &GlobalTransform)>,
-	mut cursor_query: Query<(&mut Transform, &FollowCursor3d)>,
-	windows: Query<&Window>,
+	camera_query: Single<(&Camera, &GlobalTransform)>,
+	windows: Single<&Window>,
+	mut cursor_query: Populated<(&mut Transform, &FollowCursor3d)>,
 ) {
-	let Ok((camera, camera_transform)) = camera_query.get_single() else {
+	let (camera, camera_transform) = *camera_query;
+
+	let Some(cursor_position) = windows.cursor_position() else {
 		return;
 	};
 
-	let Some(cursor_position) = windows
-		.get_single()
-		.ok()
-		.map(|w| w.cursor_position())
-		.flatten()
-	else {
-		return;
-	};
 	let Ok(ray) = camera.viewport_to_world(camera_transform, cursor_position)
 	else {
 		return;

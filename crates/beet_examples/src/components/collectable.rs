@@ -12,7 +12,7 @@ const TURNS_PER_SECOND: f32 = 0.5;
 
 pub fn rotate_collectables(
 	time: Res<Time>,
-	mut query: Query<&mut Transform, With<Collectable>>,
+	mut query: Populated<&mut Transform, With<Collectable>>,
 ) {
 	for mut transform in query.iter_mut() {
 		let angle = time.delta_secs() * TAU * TURNS_PER_SECOND;
