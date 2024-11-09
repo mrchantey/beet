@@ -9,7 +9,7 @@ pub trait OnTriggerHandler: 'static + Send + Sync + Sized {
 	/// The bundle used for the Trigger, ie [`Trigger<TriggerEvent,TriggerBundle>`]
 	type TriggerBundle: Bundle = ();
 	/// Parameters used by the handler
-	type Params: 'static + Send + Sync + Default + Reflect;
+	type Params: 'static + Send + Sync + Default + Reflect = ();
 	fn handle(
 		commands: &mut Commands,
 		ev: &Trigger<Self::TriggerEvent, Self::TriggerBundle>,

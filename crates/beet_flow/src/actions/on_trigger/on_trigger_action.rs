@@ -12,9 +12,11 @@ use std::marker::PhantomData;
 #[derive(Component, Reflect)]
 #[reflect(Default, Component, MapEntities)]
 pub struct OnTrigger<Handler: OnTriggerHandler> {
+	/// Multi-purpose parameters for the handler,
+	/// for instance in the case of InsertOnTrigger, this is the component to insert.
 	pub params: Handler::Params,
 	/// The entities to watch, defaults to [`Self`] if this is empty
-	pub sources: Vec<Entity>,
+	pub source: ActionTarget,
 	/// The entities to modify, defaults to [`Self`]
 	pub target: ActionTarget,
 	#[reflect(ignore)]
@@ -28,7 +30,7 @@ where
 	fn clone(&self) -> Self {
 		Self {
 			params: self.params.clone(),
-			sources: self.sources.clone(),
+			source: self.source.clone(),
 			target: self.target.clone(),
 			phantom: PhantomData,
 		}
@@ -44,9 +46,7 @@ where
 
 impl<Handler: OnTriggerHandler> MapEntities for OnTrigger<Handler> {
 	fn map_entities<M: EntityMapper>(&mut self, entity_mapper: &mut M) {
-		for entity in self.sources.iter_mut() {
-			*entity = entity_mapper.map_entity(*entity);
-		}
+		self.source.map_entities(entity_mapper);
 		self.target.map_entities(entity_mapper);
 	}
 }
@@ -55,9 +55,15 @@ impl<Handler: OnTriggerHandler> OnTrigger<Handler> {
 	pub fn new(params: Handler::Params) -> Self {
 		Self {
 			params,
-			sources: default(),
+			source: default(),
 			target: default(),
 			phantom: PhantomData,
+		}
+	}
+	pub fn new_with_source(source: impl Into<ActionTarget>) -> Self {
+		Self {
+			source: source.into(),
+			..default()
 		}
 	}
 	pub fn new_with_target(target: impl Into<ActionTarget>) -> Self {
@@ -66,42 +72,24 @@ impl<Handler: OnTriggerHandler> OnTrigger<Handler> {
 			..default()
 		}
 	}
-	pub fn new_with_source(source: Entity) -> Self {
-		Self {
-			sources: vec![source],
-			..default()
-		}
+	pub fn with_source(mut self, source: impl Into<ActionTarget>) -> Self {
+		self.source = source.into();
+		self
 	}
 
-	pub fn with_target(self, target: impl Into<ActionTarget>) -> Self {
-		Self {
-			target: target.into(),
-			..self
-		}
-	}
-	pub fn with_source(mut self, source: Entity) -> Self {
-		self.sources.push(source);
+	pub fn with_target(mut self, target: impl Into<ActionTarget>) -> Self {
+		self.target = target.into();
 		self
 	}
 }
-
-// fn on_trigger<Handler: OnTriggerHandler>(
-// 	trigger: Trigger<Handler::Event, Handler::TriggerBundle>,
-// 	query: Query<(Entity, &OnTrigger<Handler>)>,
-// 	mut commands: Commands,
-// ) {
-// 	let action = query
-// 		.get(trigger.entity())
-// 		.expect(expect_action::ACTION_QUERY_MISSING);
-// 	Handler::handle(&mut commands, &trigger, action);
-// }
 
 impl<Handler: OnTriggerHandler> ActionBuilder for OnTrigger<Handler> {
 	fn build(app: &mut App, _config: &BeetConfig) {
 		app.world_mut()
 			.register_component_hooks::<Self>()
-			.on_add(|mut world, entity, _| {
-				let action = world.get::<Self>(entity).unwrap();
+			.on_add(|mut world, action_entity, _| {
+				let action = world.get::<Self>(action_entity).unwrap();
+				// use closure to capture the action entity
 				let mut observer = Observer::new(
 					move |trigger: Trigger<
 						Handler::TriggerEvent,
@@ -110,18 +98,25 @@ impl<Handler: OnTriggerHandler> ActionBuilder for OnTrigger<Handler> {
 					      query: Query<(Entity, &OnTrigger<Handler>)>,
 					      mut commands: Commands| {
 						let action = query
-							.get(entity)
+							.get(action_entity)
 							.expect(expect_action::ACTION_QUERY_MISSING);
 						Handler::handle(&mut commands, &trigger, action);
 					},
 				);
-				if action.sources.is_empty() {
-					observer.watch_entity(entity);
-				} else {
-					for entity in action.sources.iter() {
-						observer.watch_entity(*entity);
+				match &action.source {
+					ActionTarget::This => observer.watch_entity(action_entity),
+					ActionTarget::Entity(entity) => {
+						observer.watch_entity(*entity)
 					}
-				}
+					ActionTarget::Entities(vec) => {
+						for entity in vec.iter() {
+							observer.watch_entity(*entity);
+						}
+					}
+					ActionTarget::Global => {
+						// do nothing, observers are global by default.
+					}
+				};
 				let mut commands = world.commands();
 				let entity = commands.spawn(observer).id();
 				commands

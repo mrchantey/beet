@@ -3,7 +3,7 @@ use bevy::prelude::*;
 
 
 /// Used by systems and observers that trigger observers, to specify the target of the trigger.
-#[derive(Debug, Default, Clone, Reflect)]
+#[derive(Debug, Default, PartialEq, Clone, Reflect)]
 #[reflect(Default)]
 pub enum ActionTarget {
 	#[default]

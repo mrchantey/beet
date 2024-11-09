@@ -30,6 +30,7 @@ pub mod prelude {
 	pub use crate::actions::misc::*;
 	#[allow(ambiguous_glob_reexports)]
 	pub use crate::actions::on_trigger::*;
+	#[allow(ambiguous_glob_reexports)]
 	pub use crate::actions::*;
 	pub use crate::build_observer_hooks;
 	pub use crate::events::*;
