@@ -13,14 +13,14 @@ fn main() {
 		.with_stat(StatDescriptor {
 			name: SELF_CONTROL.to_string(),
 			description: "Ability to make good decisions".to_string(),
-			emoji_hexcode: "1F9D8".to_string(),
+			emoji_hexcode: "1F9D8".to_string(), //🧘
 			global_range: StatValue::range(0.0..1.),
 			default_value: StatValue(1.),
 		})
 		.with_stat(StatDescriptor {
 			name: STRESS.to_string(),
 			description: "Current stress level".to_string(),
-			emoji_hexcode: "1F92F".to_string(),
+			emoji_hexcode: "1F92F".to_string(), //🤯
 			global_range: StatValue::range(0.0..1.),
 			default_value: StatValue(0.),
 		});
@@ -54,9 +54,8 @@ fn agent(mut commands: Commands, stat_map: Res<StatMap>) {
 	commands
 		.spawn((
 			Name::new("Agent"),
-			Emoji::new("1F600"),
+			Emoji::new("1F600"), //😀
 			Transform::from_xyz(0., 1., 0.),
-			Impulse::default(),
 			MaxSpeed::default(),
 		))
 		.with_children(|parent| {
@@ -89,7 +88,7 @@ fn agent(mut commands: Commands, stat_map: Res<StatMap>) {
 			parent
 				.spawn((
 					Name::new("Behavior"),
-					Emoji::new("1F5FA"),
+					Emoji::new("1F5FA"), //🗺️
 					orbital_child(3, total_children),
 					RunOnSpawn,
 					RunOnChange::<StatValue>::default()
@@ -98,11 +97,11 @@ fn agent(mut commands: Commands, stat_map: Res<StatMap>) {
 					// RepeatFlow::default(),
 				))
 				.with_children(|parent| {
-					// parent.spawn((
-					// 	Name::new("Idle"),
-					// 	TargetEntity(agent),
-					// 	ScoreProvider::NEUTRAL,
-					// ));
+					parent.spawn((
+						Name::new("Idle"),
+						TargetEntity(agent),
+						ScoreProvider::NEUTRAL,
+					));
 					parent.spawn((
 						Name::new("Desire Low Stress"),
 						TargetEntity(agent),
@@ -129,22 +128,36 @@ fn kids_crying(mut commands: Commands, stat_map: Res<StatMap>) {
 	commands
 		.spawn((
 			Name::new("Baby Crying"),
-			Emoji::new("1F476"),
+			Emoji::new("1F476"), //👶
 			Transform::from_xyz(0., -1., 0.),
+			MaxSpeed::default(),
 		))
-		.with_child((
-			Name::new(STRESS),
-			orbital_child(0, 2),
-			stat_map.get_id_by_name(STRESS).unwrap(),
-			StatValue::new(0.1),
-			CollectableStat::default(),
-		));
+		.with_children(|parent| {
+			let agent = parent.parent_entity();
+			parent.spawn((
+				Name::new("Behavior"),
+				Emoji::new("1F5FA"), //🗺️
+				orbital_child(0, 2),
+				TargetEntity(agent),
+				RunOnSpawn,
+				Seek::default(),
+				FindSteerTarget::new("Agent", f32::MAX),
+			));
+
+			parent.spawn((
+				Name::new(STRESS),
+				orbital_child(1, 2),
+				stat_map.get_id_by_name(STRESS).unwrap(),
+				StatValue::new(0.1),
+				CollectableStat::default(),
+			));
+		});
 }
 fn alcohol(mut commands: Commands, stat_map: Res<StatMap>) {
 	commands
 		.spawn((
 			Name::new("Alcohol"),
-			Emoji::new("1F37A"),
+			Emoji::new("1F37A"), //🍺
 			CollectableStat::default(),
 			Transform::from_xyz(-3., -1., 0.),
 		))
@@ -168,7 +181,7 @@ fn short_stroll(mut commands: Commands, stat_map: Res<StatMap>) {
 	commands
 		.spawn((
 			Name::new("Short Stroll"),
-			Emoji::new("1F6B6"),
+			Emoji::new("1F6B6"), //🚶
 			CollectableStat::default(),
 			Transform::from_xyz(3., -1.5, 0.),
 		))
