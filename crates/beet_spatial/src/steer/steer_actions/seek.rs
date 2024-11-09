@@ -59,7 +59,6 @@ fn seek(
 			mut impulse,
 			arrive_radius,
 		)) = agents.get_mut(**target)
-		// if agent has no steer_target thats ok
 		{
 			match (&seek.on_not_found, steer_target.get_position(&transforms)) {
 				(_, Ok(target_position)) => {
@@ -87,6 +86,8 @@ fn seek(
 					log::warn!("{}", msg);
 				}
 			}
+		} else {
+			// if agent has no steer_target thats ok
 		}
 	}
 }

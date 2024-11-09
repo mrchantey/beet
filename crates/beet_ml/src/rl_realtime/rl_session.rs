@@ -206,11 +206,14 @@ mod test {
 		app.world_mut().spawn(RlSession::new(params));
 
 		// expect these to change as global observers are added etc
-		expect(app.world().entities().len()).to_be(NUM_GLOBAL_OBSERVERS + 1)?;
+		expect(app.world().entities().len())
+			.to_be(LifecycleSystemsPlugin::NUM_OBSERVERS + 1)?;
 		app.update();
-		expect(app.world().entities().len()).to_be(NUM_GLOBAL_OBSERVERS + 2)?;
+		expect(app.world().entities().len())
+			.to_be(LifecycleSystemsPlugin::NUM_OBSERVERS + 2)?;
 		app.update();
-		expect(app.world().entities().len()).to_be(NUM_GLOBAL_OBSERVERS + 1)?;
+		expect(app.world().entities().len())
+			.to_be(LifecycleSystemsPlugin::NUM_OBSERVERS + 1)?;
 
 		Ok(())
 	}

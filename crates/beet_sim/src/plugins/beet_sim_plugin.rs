@@ -10,7 +10,11 @@ impl Plugin for BeetSimPlugin {
 			emoji_plugin,
 			walk_plugin,
 			stat_plugin,
-			ActionPlugin::<StatScoreProvider>::default(),
+			ActionPlugin::<(
+				StatScoreProvider,
+				RunOnChange<StatValue>,
+				FindStatSteerTarget,
+			)>::default(),
 		));
 	}
 }

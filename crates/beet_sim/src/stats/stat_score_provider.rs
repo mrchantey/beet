@@ -6,41 +6,40 @@ use std::ops::Range;
 #[derive(Debug, Clone, PartialEq, Component, Reflect, Action)]
 #[observers(provide_score)]
 #[reflect(Component)]
+#[require(StatId, StatValueGoal)]
 pub struct StatScoreProvider {
-	pub stat_id: StatId,
 	pub curve: EaseFunction,
-	pub desired_direction: DesiredDirection,
 }
 
-#[derive(Debug, Default, Clone, PartialEq, Reflect, Action)]
-pub enum DesiredDirection {
+#[derive(Debug, Default, Copy, Clone, PartialEq, Reflect, Component)]
+pub enum StatValueGoal {
+	// the stat should be as high as possible
 	#[default]
 	High,
+	// the stat should be as low as possible
 	Low,
+}
+
+impl Default for StatScoreProvider {
+	fn default() -> Self {
+		Self {
+			curve: EaseFunction::Linear,
+		}
+	}
 }
 
 
 impl StatScoreProvider {
-	pub fn new(stat_id: StatId) -> Self {
-		Self {
-			stat_id,
-			curve: EaseFunction::Linear,
-			desired_direction: default(),
-		}
-	}
+	pub fn new() -> Self { Self::default() }
 	pub fn with_curve(mut self, curve: EaseFunction) -> Self {
 		self.curve = curve;
-		self
-	}
-
-	pub fn with_low_desired(mut self) -> Self {
-		self.desired_direction = DesiredDirection::Low;
 		self
 	}
 
 	pub fn sample(
 		&self,
 		value: StatValue,
+		target_value: StatValueGoal,
 		range: Range<StatValue>,
 	) -> ScoreValue {
 		let normal_value = value.normalize(range);
@@ -48,12 +47,12 @@ impl StatScoreProvider {
 		let curved_value =
 			easing_curve(0., 1., self.curve).sample_unchecked(normal_value);
 
-		match self.desired_direction {
+		match target_value {
 			// if the value is high and the desired direction is high,
 			// the score should be low
-			DesiredDirection::High => 1. - curved_value,
+			StatValueGoal::High => 1. - curved_value,
 			// vice versa
-			DesiredDirection::Low => curved_value,
+			StatValueGoal::Low => curved_value,
 		}
 	}
 }
@@ -65,22 +64,28 @@ fn provide_score(
 	stat_map: Res<StatMap>,
 	children: Query<&Children>,
 	stats: Query<(&StatId, &StatValue)>,
-	query: Query<(&StatScoreProvider, &Parent, &TargetEntity)>,
+	query: Query<(
+		&StatScoreProvider,
+		&StatId,
+		&StatValueGoal,
+		&Parent,
+		&TargetEntity,
+	)>,
 ) {
-	let (score_provider, parent, target_entity) = query
+	let (score_provider, stat_id, target_value, parent, target_entity) = query
 		.get(trigger.entity())
 		.expect(expect_action::ACTION_QUERY_MISSING);
 
-	let value = StatValue::find_by_id(
-		**target_entity,
-		children,
-		stats,
-		score_provider.stat_id,
-	)
-	.expect(expect_action::TARGET_MISSING);
+	let value =
+		StatValue::find_by_id(**target_entity, children, stats, *stat_id)
+			.expect(expect_action::TARGET_MISSING);
 
-	let descriptor = stat_map.get(&score_provider.stat_id).unwrap();
-	let score = score_provider.sample(value, descriptor.global_range.clone());
+	let descriptor = stat_map.get(stat_id).unwrap();
+	let score = score_provider.sample(
+		value,
+		*target_value,
+		descriptor.global_range.clone(),
+	);
 
 	commands
 		.entity(parent.get())
@@ -100,17 +105,24 @@ mod test {
 
 	#[test]
 	fn sample() -> Result<()> {
-		let provider = StatScoreProvider::new(StatId::default());
+		let provider = StatScoreProvider::new();
 		let range = StatValue::range(-3.0..7.0);
+		let target = StatValueGoal::High;
 
-		expect(provider.sample(StatValue(-3.), range.clone())).to_be(1.0)?;
-		expect(provider.sample(StatValue(2.0), range.clone())).to_be(0.5)?;
-		expect(provider.sample(StatValue(7.0), range.clone())).to_be(0.0)?;
+		expect(provider.sample(StatValue(-3.), target, range.clone()))
+			.to_be(1.0)?;
+		expect(provider.sample(StatValue(2.0), target, range.clone()))
+			.to_be(0.5)?;
+		expect(provider.sample(StatValue(7.0), target, range.clone()))
+			.to_be(0.0)?;
 
-		let provider = provider.with_low_desired();
-		expect(provider.sample(StatValue(-3.), range.clone())).to_be(0.0)?;
-		expect(provider.sample(StatValue(2.0), range.clone())).to_be(0.5)?;
-		expect(provider.sample(StatValue(7.0), range.clone())).to_be(1.0)?;
+		let target = StatValueGoal::Low;
+		expect(provider.sample(StatValue(-3.), target, range.clone()))
+			.to_be(0.0)?;
+		expect(provider.sample(StatValue(2.0), target, range.clone()))
+			.to_be(0.5)?;
+		expect(provider.sample(StatValue(7.0), target, range.clone()))
+			.to_be(1.0)?;
 
 		Ok(())
 	}
@@ -142,12 +154,14 @@ mod test {
 			.with_children(|parent| {
 				parent.spawn((
 					TargetEntity(agent),
-					StatScoreProvider::new(StatMap::TEST_PLEASENTNESS_ID),
+					StatMap::TEST_PLEASENTNESS_ID,
+					StatScoreProvider::default(),
 				));
 				parent.spawn((
 					TargetEntity(agent),
-					StatScoreProvider::new(StatMap::TEST_PLEASENTNESS_ID)
-						.with_low_desired(),
+					StatMap::TEST_PLEASENTNESS_ID,
+					StatScoreProvider::default(),
+					StatValueGoal::Low,
 				));
 			})
 			.flush_trigger(OnRun);

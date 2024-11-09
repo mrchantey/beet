@@ -6,6 +6,7 @@ use bevy::prelude::*;
 #[reflect(Component, Default)]
 /// A vector measured in (m/s).
 /// This is multiplied by delta time.
+/// This is the only component alongside [`Transform`] required for force integration.
 pub struct Velocity(pub Vec3);
 
 
@@ -15,6 +16,7 @@ impl Velocity {
 
 #[derive(Debug, Clone, PartialEq, Deref, DerefMut, Component, Reflect)]
 #[reflect(Component, Default)]
+#[require(Velocity)]
 /// A constant value for constraining axes
 pub struct VelocityScalar(pub Vec3);
 
@@ -26,6 +28,7 @@ impl Default for VelocityScalar {
 	Debug, Default, Clone, PartialEq, Deref, DerefMut, Component, Reflect,
 )]
 #[reflect(Component, Default)]
+#[require(Velocity)]
 /// An instant force, ie jump, that is cleared each frame.
 /// This is not multiplied by delta time.
 pub struct Impulse(pub Vec3);
@@ -33,6 +36,7 @@ pub struct Impulse(pub Vec3);
 	Debug, Default, Clone, PartialEq, Deref, DerefMut, Component, Reflect,
 )]
 #[reflect(Component, Default)]
+#[require(Velocity)]
 /// A constant force, ie gravity, that is cleared each frame.
 /// This is multiplied by delta time.
 pub struct Force(pub Vec3);
@@ -41,6 +45,7 @@ pub struct Force(pub Vec3);
 	Debug, Copy, Clone, PartialEq, Deref, DerefMut, Component, Reflect,
 )]
 #[reflect(Component, Default)]
+#[require(Velocity)]
 /// Larger masses are less effected by forces, defaults to `1.0`.
 pub struct Mass(pub f32);
 

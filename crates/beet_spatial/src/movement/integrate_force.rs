@@ -7,7 +7,7 @@ use bevy::prelude::*;
 /// https://natureofcode.com/vectors/#acceleration
 pub fn integrate_force(
 	time: Res<Time>,
-	mut query: Query<(
+	mut query: Populated<(
 		&mut Transform,
 		&mut Velocity,
 		Option<&Mass>,

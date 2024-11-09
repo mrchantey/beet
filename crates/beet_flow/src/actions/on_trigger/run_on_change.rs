@@ -5,7 +5,7 @@ use bevy::prelude::*;
 use std::marker::PhantomData;
 
 
-/// Do something whenever `OnChange` is called on a component
+/// Run whenever `OnChange` is called on a component
 /// This may be deprecated if we get `OnChange` observers
 #[derive(Component, Action, Reflect)]
 #[reflect(Default, Component, MapEntities)]

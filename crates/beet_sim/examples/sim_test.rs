@@ -1,6 +1,6 @@
 use beet_flow::prelude::*;
 use beet_sim::prelude::*;
-use beet_spatial::prelude::BeetDefaultPlugins;
+use beet_spatial::prelude::*;
 use beetmash::prelude::*;
 use bevy::prelude::*;
 use std::f32::consts::TAU;
@@ -71,23 +71,29 @@ fn agent(mut commands: Commands, stat_map: Res<StatMap>) {
 			Name::new("Agent"),
 			Emoji::new("1F600"),
 			Transform::from_xyz(0., 1., 0.),
+			Impulse::default(),
+			MaxSpeed::default(),
 		))
 		.with_children(|parent| {
 			let total_children = 4;
 
 			let agent = parent.parent_entity();
-			parent.spawn((
-				Name::new(STRESS),
-				orbital_transform(0, total_children),
-				stat_map.get_id_by_name(STRESS).unwrap(),
-				stat_map.get_default_by_name(STRESS).unwrap(),
-			));
-			parent.spawn((
-				Name::new(SELF_CONTROL),
-				orbital_transform(1, total_children),
-				stat_map.get_id_by_name(SELF_CONTROL).unwrap(),
-				stat_map.get_default_by_name(SELF_CONTROL).unwrap(),
-			));
+			let stress = parent
+				.spawn((
+					Name::new(STRESS),
+					orbital_transform(0, total_children),
+					stat_map.get_id_by_name(STRESS).unwrap(),
+					stat_map.get_default_by_name(STRESS).unwrap(),
+				))
+				.id();
+			let self_control = parent
+				.spawn((
+					Name::new(SELF_CONTROL),
+					orbital_transform(1, total_children),
+					stat_map.get_id_by_name(SELF_CONTROL).unwrap(),
+					stat_map.get_default_by_name(SELF_CONTROL).unwrap(),
+				))
+				.id();
 			parent.spawn((
 				Name::new("Walk"),
 				orbital_transform(2, total_children),
@@ -101,29 +107,33 @@ fn agent(mut commands: Commands, stat_map: Res<StatMap>) {
 					Emoji::new("1F5FA"),
 					orbital_transform(3, total_children),
 					RunOnSpawn,
+					RunOnChange::<StatValue>::default()
+						.with_source(vec![stress, self_control]),
 					ScoreFlow::default(),
-					RepeatFlow::default(),
+					// RepeatFlow::default(),
 				))
 				.with_children(|parent| {
-					parent.spawn((
-						Name::new("Idle"),
-						TargetEntity(agent),
-						ScoreProvider::NEUTRAL,
-					));
+					// parent.spawn((
+					// 	Name::new("Idle"),
+					// 	TargetEntity(agent),
+					// 	ScoreProvider::NEUTRAL,
+					// ));
 					parent.spawn((
 						Name::new("Desire Low Stress"),
 						TargetEntity(agent),
-						StatScoreProvider::new(
-							stat_map.get_id_by_name(STRESS).unwrap(),
-						)
-						.with_low_desired(), // we want stress to be low
+						stat_map.get_id_by_name(STRESS).unwrap(),
+						StatScoreProvider::default(), // we want stress to be low
+						StatValueGoal::Low,
+						FindStatSteerTarget::default(),
+						Seek::default(),
 					));
 					parent.spawn((
 						Name::new("Desire High Self Control"),
 						TargetEntity(agent),
-						StatScoreProvider::new(
-							stat_map.get_id_by_name(SELF_CONTROL).unwrap(),
-						),
+						stat_map.get_id_by_name(SELF_CONTROL).unwrap(),
+						StatScoreProvider::default(),
+						FindStatSteerTarget::default(),
+						Seek::default(),
 					));
 				});
 		});
@@ -135,7 +145,6 @@ fn kids_crying(mut commands: Commands, stat_map: Res<StatMap>) {
 		.spawn((
 			Name::new("Baby Crying"),
 			Emoji::new("1F476"),
-			CollectableStat::default(),
 			Transform::from_xyz(0., -1., 0.),
 		))
 		.with_child((
@@ -143,6 +152,7 @@ fn kids_crying(mut commands: Commands, stat_map: Res<StatMap>) {
 			orbital_transform(0, 2),
 			stat_map.get_id_by_name(STRESS).unwrap(),
 			StatValue::new(0.1),
+			CollectableStat::default(),
 		));
 }
 fn alcohol(mut commands: Commands, stat_map: Res<StatMap>) {
@@ -154,10 +164,18 @@ fn alcohol(mut commands: Commands, stat_map: Res<StatMap>) {
 			Transform::from_xyz(-3., -1., 0.),
 		))
 		.with_child((
-			Name::new(SELF_CONTROL),
+			Name::new(STRESS),
 			orbital_transform(0, 2),
+			stat_map.get_id_by_name(STRESS).unwrap(),
+			StatValue::new(-0.1),
+			CollectableStat::default(),
+		))
+		.with_child((
+			Name::new(SELF_CONTROL),
+			orbital_transform(1, 2),
 			stat_map.get_id_by_name(SELF_CONTROL).unwrap(),
 			StatValue::new(-0.1),
+			CollectableStat::default(),
 		));
 }
 
@@ -174,11 +192,13 @@ fn short_stroll(mut commands: Commands, stat_map: Res<StatMap>) {
 			orbital_transform(0, 2),
 			stat_map.get_id_by_name(STRESS).unwrap(),
 			StatValue::new(-0.1),
+			ZoneStat::default(),
 		))
 		.with_child((
 			Name::new(SELF_CONTROL),
 			orbital_transform(1, 2),
 			stat_map.get_id_by_name(SELF_CONTROL).unwrap(),
 			StatValue::new(0.1),
+			ZoneStat::default(),
 		));
 }

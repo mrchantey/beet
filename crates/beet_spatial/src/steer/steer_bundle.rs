@@ -15,6 +15,7 @@ pub struct GroupSteerAgent;
 	Debug, Copy, Clone, PartialEq, Deref, DerefMut, Component, Reflect,
 )]
 #[reflect(Component, Default)]
+#[require(Velocity)]
 pub struct MaxForce(pub f32);
 
 impl Default for MaxForce {
@@ -26,6 +27,7 @@ impl Default for MaxForce {
 	Debug, Copy, Clone, PartialEq, Deref, DerefMut, Component, Reflect,
 )]
 #[reflect(Component, Default)]
+#[require(Velocity)]
 pub struct MaxSpeed(pub f32);
 
 impl Default for MaxSpeed {
