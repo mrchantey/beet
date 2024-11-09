@@ -1,6 +1,9 @@
 pub mod collectable_stat;
 #[allow(unused_imports)]
 pub use self::collectable_stat::*;
+pub mod collector;
+#[allow(unused_imports)]
+pub use self::collector::*;
 pub mod find_stat_steer_target;
 #[allow(unused_imports)]
 pub use self::find_stat_steer_target::*;

@@ -131,11 +131,12 @@ fn kids_crying(mut commands: Commands, stat_map: Res<StatMap>) {
 			Emoji::new("1F476"), //👶
 			Transform::from_xyz(0., -1., 0.),
 			MaxSpeed::default(),
+			CollectableStat::default(),
 		))
 		.with_children(|parent| {
 			let agent = parent.parent_entity();
 			parent.spawn((
-				Name::new("Behavior"),
+				Name::new("Seek Agent"),
 				Emoji::new("1F5FA"), //🗺️
 				orbital_child(0, 2),
 				TargetEntity(agent),
@@ -149,7 +150,7 @@ fn kids_crying(mut commands: Commands, stat_map: Res<StatMap>) {
 				orbital_child(1, 2),
 				stat_map.get_id_by_name(STRESS).unwrap(),
 				StatValue::new(0.1),
-				CollectableStat::default(),
+				StatProvider::default(),
 			));
 		});
 }
@@ -166,14 +167,14 @@ fn alcohol(mut commands: Commands, stat_map: Res<StatMap>) {
 			orbital_child(0, 2),
 			stat_map.get_id_by_name(STRESS).unwrap(),
 			StatValue::new(-0.1),
-			CollectableStat::default(),
+			StatProvider::default(),
 		))
 		.with_child((
 			Name::new(SELF_CONTROL),
 			orbital_child(1, 2),
 			stat_map.get_id_by_name(SELF_CONTROL).unwrap(),
 			StatValue::new(-0.1),
-			CollectableStat::default(),
+			StatProvider::default(),
 		));
 }
 
@@ -182,7 +183,7 @@ fn short_stroll(mut commands: Commands, stat_map: Res<StatMap>) {
 		.spawn((
 			Name::new("Short Stroll"),
 			Emoji::new("1F6B6"), //🚶
-			CollectableStat::default(),
+			ZoneStat::default(),
 			Transform::from_xyz(3., -1.5, 0.),
 		))
 		.with_child((
@@ -190,13 +191,13 @@ fn short_stroll(mut commands: Commands, stat_map: Res<StatMap>) {
 			orbital_child(0, 2),
 			stat_map.get_id_by_name(STRESS).unwrap(),
 			StatValue::new(-0.1),
-			ZoneStat::default(),
+			StatProvider::default(),
 		))
 		.with_child((
 			Name::new(SELF_CONTROL),
 			orbital_child(1, 2),
 			stat_map.get_id_by_name(SELF_CONTROL).unwrap(),
 			StatValue::new(0.1),
-			ZoneStat::default(),
+			StatProvider::default(),
 		));
 }

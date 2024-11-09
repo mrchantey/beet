@@ -16,6 +16,6 @@ impl Plugin for BeetSimPlugin {
 				FindStatSteerTarget,
 			)>::default(),
 		))
-		.add_systems(Update, render_valency);
+		.add_systems(Update, (render_valency, pickup_collectable));
 	}
 }
