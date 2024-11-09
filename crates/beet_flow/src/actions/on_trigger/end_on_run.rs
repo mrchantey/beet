@@ -1,7 +1,7 @@
 use crate::prelude::*;
 
 /// Immediately end the run with the provided result
-pub type EndOnRun = TriggerOnTrigger<OnRun, OnRunResult>;
+pub type EndOnRun = TriggerOnTrigger<OnRunResult, OnRun>;
 
 
 impl EndOnRun {

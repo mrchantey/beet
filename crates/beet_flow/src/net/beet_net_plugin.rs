@@ -6,7 +6,7 @@ use bevy::prelude::*;
 pub struct BeetNetPlugin;
 
 
-pub type RunOnAppReady = TriggerOnGlobalTrigger<AppReady, OnRun>;
+pub type RunOnAppReady = TriggerOnGlobalTrigger<OnRun, AppReady>;
 
 
 impl Plugin for BeetNetPlugin {

@@ -15,9 +15,9 @@ pub struct OnTrigger<Handler: OnTriggerHandler> {
 	/// Multi-purpose parameters for the handler,
 	/// for instance in the case of InsertOnTrigger, this is the component to insert.
 	pub params: Handler::Params,
-	/// The entities to watch, defaults to [`Self`] if this is empty
+	/// The entities to watch, defaults to [`ActionTarget::This`]
 	pub source: ActionTarget,
-	/// The entities to modify, defaults to [`Self`]
+	/// The entities to modify, defaults to [`ActionTarget::This`]
 	pub target: ActionTarget,
 	#[reflect(ignore)]
 	phantom: PhantomData<Handler>,
@@ -41,7 +41,14 @@ impl<Handler: OnTriggerHandler> Default for OnTrigger<Handler>
 where
 	Handler::Params: Default,
 {
-	fn default() -> Self { Self::new(Handler::Params::default()) }
+	fn default() -> Self {
+		Self {
+			source: Handler::default_source(),
+			target: Handler::default_target(),
+			params: default(),
+			phantom: default(),
+		}
+	}
 }
 
 impl<Handler: OnTriggerHandler> MapEntities for OnTrigger<Handler> {
@@ -55,11 +62,10 @@ impl<Handler: OnTriggerHandler> OnTrigger<Handler> {
 	pub fn new(params: Handler::Params) -> Self {
 		Self {
 			params,
-			source: default(),
-			target: default(),
-			phantom: PhantomData,
+			..default()
 		}
 	}
+
 	pub fn new_with_source(source: impl Into<ActionTarget>) -> Self {
 		Self {
 			source: source.into(),

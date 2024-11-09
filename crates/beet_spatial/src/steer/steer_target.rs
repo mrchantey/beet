@@ -6,9 +6,9 @@ use bevy::prelude::*;
 
 
 pub type RunOnSteerTargetInsert =
-	TriggerOnTrigger<OnInsert, OnRun, SteerTarget>;
+	TriggerOnTrigger<OnRun, OnInsert, SteerTarget>;
 pub type RunOnSteerTargetRemove =
-	TriggerOnTrigger<OnRemove, OnRun, SteerTarget>;
+	TriggerOnTrigger<OnRun, OnRemove, SteerTarget>;
 
 #[derive(Debug, Copy, Clone, PartialEq, Component, Reflect)]
 #[reflect(Component, MapEntities)]
@@ -27,7 +27,10 @@ impl SteerTarget {
 	/// Get either the fixed position or the entity's `Transform.translation`, dependent on the variant.
 	/// # Errors
 	/// If the variant is `SteerTarget::Entity` and no `Transform` could be found.
-	pub fn get_position(&self, query: &Query<&GlobalTransform>) -> Result<Vec3> {
+	pub fn get_position(
+		&self,
+		query: &Query<&GlobalTransform>,
+	) -> Result<Vec3> {
 		match self {
 			Self::Position(position) => Ok(*position),
 			Self::Entity(entity) => {

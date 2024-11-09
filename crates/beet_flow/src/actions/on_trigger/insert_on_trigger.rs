@@ -6,32 +6,32 @@ use std::marker::PhantomData;
 
 /// Inserts the provided `Bundle` on the [`TriggerOnTrigger::target`] when
 /// the `EventIn` is triggered on one of the [`TriggerOnTrigger::sources`].
-pub type InsertOnTrigger<EventIn, Bundle, EventInBundle = ()> =
-	InsertMappedOnTrigger<DefaultMapFunc<EventIn, Bundle, EventInBundle>>;
-
-pub type InsertMappedOnTrigger<M> = OnTrigger<InsertHandler<M>>;
+pub type InsertOnTrigger<Params, TriggerEvent, TriggerBundle = ()> =
+	OnTrigger<InsertHandler<Params, TriggerEvent, TriggerBundle>>;
 
 #[derive(Reflect)]
-pub struct InsertHandler<T: OnTriggerMapFunc>(
-	#[reflect(ignore)] PhantomData<T>,
+pub struct InsertHandler<Params, TriggerEvent, TriggerBundle>(
+	#[reflect(ignore)] PhantomData<(Params, TriggerEvent, TriggerBundle)>,
 );
 
 
-impl<M: OnTriggerMapFunc> OnTriggerHandler for InsertHandler<M>
-where
-	M::Out: Bundle + Clone,
+impl<
+		Params: Default + Bundle + Reflect + Clone,
+		TriggerEvent: Event,
+		TriggerBundle: Bundle,
+	> OnTriggerHandler for InsertHandler<Params, TriggerEvent, TriggerBundle>
 {
-	type TriggerEvent = M::Event;
-	type TriggerBundle = M::TriggerBundle;
-	type Params = M::Params;
+	type TriggerEvent = TriggerEvent;
+	type TriggerBundle = TriggerBundle;
+	type Params = Params;
 	fn handle(
 		commands: &mut Commands,
-		trigger: &Trigger<Self::TriggerEvent, Self::TriggerBundle>,
+		_trigger: &Trigger<Self::TriggerEvent, Self::TriggerBundle>,
 		(entity, action): (Entity, &OnTrigger<Self>),
 	) {
-		// log::info!("InsertOnTrigger: {:?}", std::any::type_name::<M::Out>());
-		let out = M::map(trigger, (entity, &action.params));
-		action.target.insert(commands, entity, out);
+		action
+			.target
+			.insert(commands, entity, action.params.clone());
 	}
 }
 
@@ -58,36 +58,21 @@ mod test {
 		Ok(())
 	}
 
-	#[derive(Reflect)]
-	struct MapRunResult;
-	impl OnTriggerMapFunc for MapRunResult {
-		type Event = OnRun;
-		type Params = RunResult;
-		type Out = Name;
-		fn map(
-			_ev: &Trigger<Self::Event>,
-			(_, params): (Entity, &Self::Params),
-		) -> Self::Out {
-			Name::new(format!("{:?}", params))
-		}
-	}
-
 	#[test]
 	fn with_map() -> Result<()> {
 		let mut app = App::new();
 		app.add_plugins(
-			ActionPlugin::<InsertMappedOnTrigger<MapRunResult>>::default(),
+			ActionPlugin::<InsertOnTrigger<Running, OnRun>>::default(),
 		);
 		let world = app.world_mut();
 
 		let entity = world
-			.spawn(InsertMappedOnTrigger::<MapRunResult>::default())
+			.spawn(InsertOnTrigger::<Running, OnRun>::default())
 			.flush_trigger(OnRun)
 			.id();
+
 		expect(world.entities().len()).to_be(2)?;
-		expect(&*world)
-			.component(entity)?
-			.to_be(&Name::new("Success"))?;
+		expect(world.get::<Running>(entity)).to_be_some()?;
 		Ok(())
 	}
 }

@@ -6,22 +6,25 @@ use std::borrow::Cow;
 
 #[derive(Reflect)]
 pub struct MapUserMessageToSentence;
-impl OnTriggerMapFunc for MapUserMessageToSentence {
-	type Event = OnUserMessage;
-	type Params = ();
-	type Out = Sentence;
-	fn map(
-		ev: &Trigger<Self::Event, Self::TriggerBundle>,
-		_params: (Entity, &Self::Params),
-	) -> Self::Out {
-		Sentence::new(ev.event().0.clone())
+impl OnTriggerHandler for MapUserMessageToSentence {
+	type TriggerEvent = OnUserMessage;
+
+	fn default_source() -> ActionTarget { ActionTarget::Global }
+
+	fn handle(
+		commands: &mut Commands,
+		ev: &Trigger<Self::TriggerEvent, Self::TriggerBundle>,
+		query: (Entity, &OnTrigger<Self>),
+	) {
+		let msg = ev.event().to_string();
+		commands.entity(query.0).insert(Sentence::new(msg));
 	}
 }
 
-pub type InsertSentenceOnUserInput =
-	InsertMappedOnGlobalTrigger<MapUserMessageToSentence>;
 
-pub type RunOnInsertSentence = TriggerOnTrigger<OnInsert, OnRun, Sentence>;
+pub type InsertSentenceOnUserInput = OnTrigger<MapUserMessageToSentence>;
+
+pub type RunOnInsertSentence = TriggerOnTrigger<OnRun, OnInsert, Sentence>;
 
 #[derive(Bundle, Default)]
 pub struct SentenceBundle {
