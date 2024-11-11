@@ -37,6 +37,7 @@ pub fn pickup_collectable(
 			{
 				continue;
 			}
+			todo!("pickup_collectable");
 		}
 	}
 }
