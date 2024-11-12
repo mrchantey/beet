@@ -57,6 +57,7 @@ fn agent(mut commands: Commands, stat_map: Res<StatMap>) {
 			Emoji::new("1F600"), //😀
 			Transform::from_xyz(0., 1., 0.),
 			MaxSpeed::default(),
+			Collector,
 		))
 		.with_children(|parent| {
 			let total_children = 4;

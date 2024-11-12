@@ -1,3 +1,4 @@
+#![feature(let_chains)]
 pub mod behavior;
 pub mod plugins;
 #[cfg(feature = "render")]

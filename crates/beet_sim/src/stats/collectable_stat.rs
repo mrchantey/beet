@@ -20,16 +20,27 @@ impl Default for CollectableStat {
 	fn default() -> Self { Self { radius: 0.5 } }
 }
 
+impl CollectableStat {}
+
 
 pub fn pickup_collectable(
 	mut commands: Commands,
 	stat_map: Res<StatMap>,
-	collectors: Query<&GlobalTransform, With<Collector>>,
-	query: Populated<(&GlobalTransform, &CollectableStat, &StatId, &StatValue)>,
+	children: Query<&Children>,
+	mut stats: Query<(&mut StatId, &mut StatValue)>,
+	collectors: Query<(Entity, &GlobalTransform), With<Collector>>,
+	query: Populated<(Entity, &GlobalTransform, &CollectableStat)>,
 ) {
-	for (transform, collectable_stat, stat_id, stat_value) in query.iter() {
+	for (
+		collectable_entity,
+		transform,
+		collectable_stat,
+		// stat_id,
+		// stat_value,
+	) in query.iter()
+	{
 		let rad_sq = collectable_stat.radius * collectable_stat.radius;
-		for collector_transform in collectors.iter() {
+		for (collector_entity, collector_transform) in collectors.iter() {
 			if transform
 				.translation()
 				.distance_squared(collector_transform.translation())
@@ -37,7 +48,15 @@ pub fn pickup_collectable(
 			{
 				continue;
 			}
-			todo!("pickup_collectable");
+			apply_stats(
+				&mut commands,
+				&stat_map,
+				collector_entity,
+				collectable_entity,
+				&children,
+				&mut stats,
+			);
+			commands.entity(collectable_entity).try_despawn_recursive();
 		}
 	}
 }
