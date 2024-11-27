@@ -41,12 +41,12 @@ beet_examples = { path = "crates/beet_examples", version = "0.0.4-rc.4" }
 emby = { path = "crates/emby", version = "0.0.4-rc.4" }
 
 ## local
-beetmash = { version = "0.0.6-rc.7" }
-forky = { version = "0.2.0-rc.6", features = [
+beetmash = { version = "0.0.6-rc.8" }
+forky = { version = "0.2.0-rc.8", features = [
 	"bevy",
 	"web",
 ] }
-sweet = { version = "0.2.0-rc.4", features = ["bevy"] }
+sweet = { version = "0.2.0-rc.5", features = ["bevy"] }
 
 #💡 game
 bevy = { version = "0.15.0-rc.1", default-features = false, features = [
