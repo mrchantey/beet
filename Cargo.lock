@@ -584,8 +584,6 @@ dependencies = [
 [[package]]
 name = "beetmash"
 version = "0.0.6-rc.8"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "59b481770ef158c539a65849d5eb4a4f5a3416e68ab8e000c05ab5dd5b8cba61"
 dependencies = [
  "beetmash_core",
  "beetmash_net",
@@ -595,8 +593,6 @@ dependencies = [
 [[package]]
 name = "beetmash_core"
 version = "0.0.6-rc.8"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d3755e60e3dda8ea4d9bd4150a61568b332846bc8c30970c7f23427c427fc772"
 dependencies = [
  "anyhow",
  "beetmash_net",
@@ -612,8 +608,6 @@ dependencies = [
 [[package]]
 name = "beetmash_net"
 version = "0.0.6-rc.8"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7a277cb86ac5c73bafd8dd34b6990418633b442c5dbe685a37cca7789d73faea"
 dependencies = [
  "anyhow",
  "bevy",
@@ -636,8 +630,6 @@ dependencies = [
 [[package]]
 name = "beetmash_scene"
 version = "0.0.6-rc.8"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7854eec6c63d113448b938f8687da2c29c5bc3e992d8d0a88c18a0d1ff5d222f"
 dependencies = [
  "anyhow",
  "bevy",

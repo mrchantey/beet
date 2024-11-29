@@ -19,23 +19,26 @@ impl Plugin for LifecyclePlugin {
 				RunOnRunResult,
 				RunOnSceneReady,
 			)>::default(),
-			// other actions
+			// repeat flow
 			ActionPlugin::<(
-			EmptyAction,
-			RunTimer,
-			LogOnRun,
-			RepeatFlow,
-			InsertOnRun<RepeatFlow>,
-			RemoveOnRun<RepeatFlow>,
-			InsertOnRunResult<RepeatFlow>,
-			RemoveOnRunResult<RepeatFlow>,
-			SequenceFlow,
-			FallbackFlow,
-			ParallelFlow,
-			ScoreFlow,
-			ScoreProvider,
-			RunOnSpawn,
-		)>::default()
+				RepeatFlow,
+				InsertOnRun<RepeatFlow>,
+				RemoveOnRun<RepeatFlow>,
+				InsertOnRunResult<RepeatFlow>,
+				RemoveOnRunResult<RepeatFlow>,
+			)>::default(),
+			// misc
+			ActionPlugin::<(
+				EmptyAction,
+				RunTimer,
+				LogOnRun,
+				SequenceFlow,
+				FallbackFlow,
+				ParallelFlow,
+				ScoreFlow,
+				ScoreProvider,
+				RunOnSpawn,
+			)>::default()
 		))
 		// observers
 		.register_type::<ContinueRun>()
