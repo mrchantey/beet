@@ -3,3 +3,5 @@ assets
 docs/book
 out.txt
 rustc-ice*
+
+.env

@@ -133,6 +133,7 @@ beet_spatial.workspace = true
 beet_ml = { workspace = true, optional = true }
 beetmash = { workspace = true, optional = true }
 bevy.workspace = true
+thiserror.workspace = true
 
 [dev-dependencies]
 bevy = { workspace = true, default-features = true }

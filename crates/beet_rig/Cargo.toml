@@ -1,0 +1,35 @@
+[package]
+name = "beet_rig"
+version.workspace = true
+edition.workspace = true
+description = "Integration with Rig."
+documentation.workspace = true
+readme.workspace = true
+homepage.workspace = true
+repository.workspace = true
+license.workspace = true
+keywords.workspace = true
+categories.workspace = true
+publish = true
+
+[features]
+default = ["render"]
+render = []
+
+
+[dependencies]
+beet_flow.workspace = true
+beet_spatial.workspace = true
+bevy.workspace = true
+thiserror.workspace = true
+
+tokio.workspace = true
+anyhow.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+rig-core = "0.4"
+
+[dev-dependencies]
+bevy = { workspace = true, default-features = true }
+beetmash = { workspace = true, features = ["test"] }
+sweet.workspace = true
