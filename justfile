@@ -5,6 +5,12 @@ crates := 'beet beet_spatial beet_flow'
 default:
 	just --list --unsorted
 
+init-repo:
+	curl -o ./assets.tar.gz https://beetmash-public.s3.us-west-2.amazonaws.com/assets.tar.gz
+	tar -xzvf ./assets.tar.gz
+	rm ./assets.tar.gz
+	just export-scenes
+
 run example *args:
 	cargo run --example {{example}} {{args}}
 

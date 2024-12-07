@@ -45,7 +45,7 @@ impl StatScoreProvider {
 		let normal_value = value.normalize(range);
 
 		let curved_value =
-			easing_curve(0., 1., self.curve).sample_unchecked(normal_value);
+			EasingCurve::new(0., 1., self.curve).sample_unchecked(normal_value);
 
 		match target_value {
 			// if the value is high and the desired direction is high,

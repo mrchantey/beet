@@ -41,12 +41,15 @@ beet_examples = { path = "crates/beet_examples", version = "0.0.4-rc.4" }
 emby = { path = "crates/emby", version = "0.0.4-rc.4" }
 
 ## local
-beetmash = { version = "0.0.6-rc.8", path = "../beetmash" }
-forky = { version = "0.2.0-rc.8", features = ["bevy", "web"] }
-sweet = { version = "0.2.0-rc.5", features = ["bevy"] }
+beetmash = { version = "0.0.7" }
+forky = { version = "0.2", features = [
+	"bevy",
+	"web",
+] }
+sweet = { version = "0.2", features = ["bevy"] }
 
 #💡 game
-bevy = { version = "0.15.0-rc.1", default-features = false, features = [
+bevy = { version = "0.15", default-features = false, features = [
 	# bevy = { git = "https://github.com/bevyengine/bevy", rev = "0c959f77007c29eead7f902bddd3342a1ecbca20", default-features = false, features = [
 	"bevy_scene",
 	"serialize",
@@ -111,6 +114,10 @@ repository.workspace = true
 license.workspace = true
 keywords.workspace = true
 categories.workspace = true
+
+include = [
+	"scenes/*",
+]
 
 [features]
 default = ["ml", "animation", "assets", "ui", "beetmash", "reflect"]

@@ -104,7 +104,7 @@ mod test {
 		expect(SerdeCurve::Square.total_len()).to_be_greater_than(3.8)?;
 
 
-		let ease = SerdeCurve::EaseDir2(easing_curve(
+		let ease = SerdeCurve::EaseDir2(EasingCurve::new(
 			Dir2::X,
 			Dir2::Y,
 			EaseFunction::CubicInOut,

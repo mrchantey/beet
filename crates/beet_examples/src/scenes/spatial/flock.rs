@@ -15,7 +15,10 @@ pub fn flock(mut commands: Commands) {
 		commands
 			.spawn((
 				Name::new("Spaceship"),
-				BundlePlaceholder::Sprite("spaceship_pack/ship_2.png".into()),
+				BundlePlaceholder::Sprite {
+					path: "spaceship_pack/ship_2.png".into(),
+					image_mode: default(),
+				},
 				Transform::from_translation(position)
 					.with_scale(Vec3::splat(0.5)),
 				RotateToVelocity2d,
