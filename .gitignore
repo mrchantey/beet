@@ -1,5 +1,6 @@
 assets
-/target/
+target
+scenes
 docs/book
 out.txt
 rustc-ice*

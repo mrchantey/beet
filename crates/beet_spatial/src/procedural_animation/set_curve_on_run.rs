@@ -63,7 +63,7 @@ fn set_curve_on_run(
 				range.start + (range.end - range.start) * rand::random::<f32>();
 			let end = Dir2::new_unchecked(Vec2::new(angle.cos(), angle.sin()));
 
-			easing_curve(start, end, *func).into()
+			EasingCurve::new(start, end, *func).into()
 		}
 		SetCurveOnRun::PingPongPause {
 			target,
@@ -72,10 +72,12 @@ fn set_curve_on_run(
 		} => {
 			let start = transform.translation;
 
-			let from = easing_curve(start, *target, *func);
+			let from = EasingCurve::new(start, *target, *func);
 			let pause =
-				function_curve(Interval::new(0., *pause).unwrap(), |_| *target);
-			let to = easing_curve(*target, start, *func);
+				FunctionCurve::new(Interval::new(0., *pause).unwrap(), |_| {
+					*target
+				});
+			let to = EasingCurve::new(*target, start, *func);
 
 			from.chain(pause)
 				.unwrap()

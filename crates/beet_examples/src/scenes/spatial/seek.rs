@@ -1,5 +1,5 @@
-use crate::prelude::*;
 use crate::beet::prelude::*;
+use crate::prelude::*;
 use beetmash::prelude::*;
 use bevy::prelude::*;
 
@@ -10,7 +10,10 @@ pub fn seek(mut commands: Commands) {
 			Name::new("Target"),
 			FollowCursor2d,
 			AssetLoadBlockAppReady,
-			BundlePlaceholder::Sprite("spaceship_pack/planet_6.png".into()),
+			BundlePlaceholder::Sprite {
+				path: "spaceship_pack/planet_6.png".into(),
+				image_mode: default(),
+			},
 			Transform::from_translation(Vec3::new(200., 0., 0.)),
 		))
 		.id();
@@ -18,7 +21,10 @@ pub fn seek(mut commands: Commands) {
 	commands
 		.spawn((
 			Name::new("Agent"),
-			BundlePlaceholder::Sprite("spaceship_pack/ship_2.png".into()),
+			BundlePlaceholder::Sprite {
+				path: "spaceship_pack/ship_2.png".into(),
+				image_mode: default(),
+			},
 			AssetLoadBlockAppReady,
 			RotateToVelocity2d,
 			ForceBundle::default(),
