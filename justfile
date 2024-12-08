@@ -6,9 +6,7 @@ default:
 	just --list --unsorted
 
 init-repo:
-	curl -o ./assets.tar.gz https://beetmash-public.s3.us-west-2.amazonaws.com/assets.tar.gz
-	tar -xzvf ./assets.tar.gz
-	rm ./assets.tar.gz
+	just assets-pull
 	just export-scenes
 
 run example *args:
@@ -159,25 +157,6 @@ assets-pull:
 	curl -o ./assets.tar.gz https://beetmash-public.s3.us-west-2.amazonaws.com/assets.tar.gz
 	tar -xzvf ./assets.tar.gz
 	rm ./assets.tar.gz
-
-view-cors:
-	gcloud storage buckets describe gs://beet-examples --format="default(cors_config)"
-update-cors:
-	gcloud storage buckets update gs://beet-examples --cors-file=cors.json
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 ### TEST SCENE LOADS
 

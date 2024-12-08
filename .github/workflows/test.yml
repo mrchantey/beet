@@ -38,7 +38,6 @@ jobs:
     - name: 🔨📋 Install just
       uses: extractions/setup-just@v1
     - name: 🔨📋 Init repo
-  # temp until web assets
-      run: just assets-pull
+      run: just init-repo
     - name: 🔎 Test Native
       run: cargo test --workspace --lib

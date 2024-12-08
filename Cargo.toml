@@ -96,7 +96,7 @@ ron = "0.8"
 
 # [target.'cfg(target_arch = "wasm32")'.dependencies]
 js-sys = "0.3"
-wasm-bindgen = "0.2.93"
+wasm-bindgen = "0.2"
 wasm-bindgen-futures = "0.4"
 console_error_panic_hook = "0.1"
 
