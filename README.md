@@ -48,13 +48,6 @@ world.spawn(SequenceFlow)
 
 ## Examples
 
-
-> ⚠️⚠️⚠️ If you'd like to check out this repo please use the stable [v0.0.3](https://github.com/mrchantey/beet/tree/v0.0.3) commit ⚠️⚠️⚠️ 
->
-> Beet and my other crates it depends on are currently on a scene serialization  bugfix Bevy fork, see [this issue](https://github.com/bevyengine/bevy/issues/14300) for details. The fix is scheduled for the `0.14.2` milestone so fingers crossed we'll be back on bevy main from then.
-
-
-
 The examples for beet are *scene-based*, meaning each example provides a scene for a common base app. As Bevy scene workflows are a wip, there are a few `Placeholder` types used for not-yet-serializable types like cameras, asset handles etc.
 
 Most examples rely on assets that can be downloaded with the following commands, or manually from [here](https://beetmash-public.s3.us-west-2.amazonaws.com/assets.tar.gz).

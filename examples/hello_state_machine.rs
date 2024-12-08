@@ -11,19 +11,25 @@ fn main() {
   app.insert_resource(BeetDebugConfig::default())
 		.add_plugins(minimal_beet_example_plugin);
 	let world = app.world_mut();
-	let say_world = world.spawn((
-		Name::new("World"), 
-	)).id();
+		
 	
-	world.spawn((
-		Name::new("Hello"),
-		EndOnRun::success(), 
-		RunOnRunResult::new_with_target(say_world),
-	)).flush_trigger(OnRun);
+	let state2 = world.spawn((
+		Name::new("state2"),
+		EndOnRun::success(),
+	)).id();
+
+	// transitions are just behaviors that always trigger the next behavior
+	let transition = world.spawn((
+		Name::new("transition"),
+		EndOnRun::success(),
+		RunOnRunResult::new_with_target(state2),
+	)).id();
 
 	world.spawn((
-		Name::new("G'day"),
-		EndOnRun::success(), 
-		RunOnRunResult::new_with_target(say_world),
+		Name::new("state1"),
+		EndOnRun::success(),
+		// here RunOnRunResult can be swapped out with a control flow action
+		// that decides which state to go to next
+		RunOnRunResult::new_with_target(transition),
 	)).flush_trigger(OnRun);
 }

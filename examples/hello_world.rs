@@ -21,8 +21,8 @@ fn main() {
 			EndOnRun::success(),
 		))
 		.with_child((
-				Name::new("child2"),
-				EndOnRun::success(),
+			Name::new("child2"),
+			EndOnRun::success(),
 		))
 		.flush_trigger(OnRun);
 }
