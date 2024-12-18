@@ -8,8 +8,8 @@ pub fn main() {
 		.add_systems(
 			Startup,
 			(
-				beetmash::core::scenes::lighting_3d,
-				beetmash::core::scenes::ground_3d,
+				bevyhub::core::scenes::lighting_3d,
+				bevyhub::core::scenes::ground_3d,
 				beet_examples::scenes::flow::beet_debug_start_and_stop,
 				beet_examples::scenes::spatial::spawn_ik_camera,
 				emby::scenes::emote_arm,

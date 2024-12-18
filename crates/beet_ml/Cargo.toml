@@ -11,16 +11,16 @@ keywords.workspace = true
 categories.workspace = true
 
 [features]
-default = ["beet_spatial", "beetmash"]
+default = ["beet_spatial", "bevyhub"]
 beet_spatial = ["dep:beet_spatial"]
-beetmash = ["dep:beetmash"]
+bevyhub = ["dep:bevyhub"]
 
 # tokio = ["dep:tokio"]
 
 [dependencies]
 beet_flow.workspace = true
 beet_spatial = { workspace = true, optional = true }
-beetmash = { workspace = true, optional = true }
+bevyhub = { workspace = true, optional = true }
 
 futures = "0.3.30"
 thiserror.workspace = true

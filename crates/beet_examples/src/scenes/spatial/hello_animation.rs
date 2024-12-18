@@ -1,8 +1,8 @@
 use crate::beet::prelude::*;
-use beetmash::core::scenes::Foxie;
-use beetmash::prelude::*;
 use bevy::animation::RepeatAnimation;
 use bevy::prelude::*;
+use bevyhub::core::scenes::Foxie;
+use bevyhub::prelude::*;
 use std::time::Duration;
 
 pub fn hello_animation(mut commands: Commands) {

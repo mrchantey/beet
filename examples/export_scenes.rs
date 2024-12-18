@@ -1,6 +1,6 @@
 use anyhow::Result;
 use beet_examples::prelude::*;
-use beetmash::prelude::*;
+use bevyhub::prelude::*;
 use bevy::prelude::*;
 
 fn plugin(app: &mut App) {

@@ -1,6 +1,6 @@
 use crate::beet::prelude::*;
 use crate::prelude::*;
-use beetmash::prelude::*;
+use bevyhub::prelude::*;
 use bevy::log::LogPlugin;
 use bevy::prelude::*;
 
@@ -17,7 +17,7 @@ pub fn minimal_beet_example_plugin(app: &mut App) {
 /// A running app with flow and spatial
 pub fn running_beet_example_plugin(app: &mut App) {
 	app.add_plugins((
-		BeetmashDefaultPlugins::with_beetmash_assets(),
+		BevyhubDefaultPlugins::with_bevyhub_assets(),
 		beet_example_plugin,
 	));
 }
@@ -25,7 +25,7 @@ pub fn running_beet_example_plugin(app: &mut App) {
 /// Simple default plugins
 pub fn crate_test_beet_example_plugin(app: &mut App) {
 	app.add_plugins((
-		BeetmashDefaultPlugins::with_native_asset_path("../../assets"),
+		BevyhubDefaultPlugins::with_native_asset_path("../../assets"),
 		beet_example_plugin,
 	));
 }

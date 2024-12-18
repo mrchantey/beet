@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use beetmash::prelude::HandleWrapper;
+use bevyhub::prelude::HandleWrapper;
 use bevy::prelude::*;
 use rand::Rng;
 use std::time::Duration;

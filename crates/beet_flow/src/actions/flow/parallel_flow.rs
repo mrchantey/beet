@@ -26,7 +26,7 @@ fn on_start(
 mod test {
 	use crate::prelude::*;
 	use anyhow::Result;
-	use beetmash::prelude::*;
+	use bevyhub::prelude::*;
 	use bevy::prelude::*;
 	use sweet::*;
 

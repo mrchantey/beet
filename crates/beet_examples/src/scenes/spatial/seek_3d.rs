@@ -1,7 +1,7 @@
 use crate::beet::prelude::*;
 use crate::prelude::*;
-use beetmash::core::scenes::Foxie;
-use beetmash::prelude::*;
+use bevyhub::core::scenes::Foxie;
+use bevyhub::prelude::*;
 use bevy::prelude::*;
 use std::time::Duration;
 

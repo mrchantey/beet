@@ -7,8 +7,8 @@ pub fn main() {
 		.add_systems(
 			Startup,
 			(
-				beetmash::core::scenes::camera_2d,
-				beetmash::core::scenes::ui_terminal,
+				bevyhub::core::scenes::camera_2d,
+				bevyhub::core::scenes::ui_terminal,
 				beet_examples::scenes::flow::beet_debug,
 				beet_examples::scenes::flow::hello_world,
 			),

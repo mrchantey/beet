@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use beetmash::prelude::*;
+use bevyhub::prelude::*;
 use bevy::prelude::*;
 
 
@@ -17,8 +17,8 @@ impl Plugin for BeetNetPlugin {
 		.configure_sets(
 			Update,
 			(
-				beetmash::prelude::MessageIncomingSet.in_set(PreTickSet),
-				beetmash::prelude::MessageOutgoingSet.in_set(PostTickSet),
+				bevyhub::prelude::MessageIncomingSet.in_set(PreTickSet),
+				bevyhub::prelude::MessageOutgoingSet.in_set(PostTickSet),
 			),
 		);
 	}

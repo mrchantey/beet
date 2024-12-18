@@ -37,9 +37,9 @@ mod test {
 	use super::RunOnSpawn;
 	use crate::prelude::*;
 	use anyhow::Result;
-	use beetmash::prelude::*;
 	use bevy::ecs::system::RunSystemOnce;
 	use bevy::prelude::*;
+	use bevyhub::prelude::*;
 	use sweet::*;
 
 	#[test]

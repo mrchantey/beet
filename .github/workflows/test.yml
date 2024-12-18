@@ -1,4 +1,4 @@
-# Identical to beetmash
+# Copied from https://github.com/mrchantey/bevyhub/blob/main/.github/workflows/test.yml
 name: 🔎 Test Crates
 on:
   push:
@@ -40,4 +40,4 @@ jobs:
     - name: 🔨📋 Init repo
       run: just init-repo
     - name: 🔎 Test Native
-      run: cargo test --workspace --lib
+      run: just test-ci

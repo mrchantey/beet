@@ -1,6 +1,6 @@
 use crate::prelude::*;
 use beet_flow::prelude::*;
-use beetmash::prelude::HandleWrapper;
+use bevyhub::prelude::HandleWrapper;
 use bevy::prelude::*;
 use std::borrow::Cow;
 
@@ -57,7 +57,7 @@ mod test {
 	use crate::prelude::*;
 	use anyhow::Result;
 	use beet_flow::prelude::*;
-	use beetmash::prelude::*;
+	use bevyhub::prelude::*;
 	use bevy::prelude::*;
 	use sweet::*;
 

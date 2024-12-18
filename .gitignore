@@ -1,10 +1,7 @@
 assets
 target
-scenes
 docs/book
 out.txt
 rustc-ice*
-
-scenes
 
 .env

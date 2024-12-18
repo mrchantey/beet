@@ -407,15 +407,15 @@ checksum = "72b3254f16251a8381aa12e40e3c4d2f0199f8c6508fbecb9d91f575e0fbb8c6"
 
 [[package]]
 name = "beet"
-version = "0.0.4"
+version = "0.0.5-rc.1"
 dependencies = [
  "anyhow",
  "beet_examples",
  "beet_flow",
  "beet_ml",
  "beet_spatial",
- "beetmash",
  "bevy",
+ "bevyhub",
  "console_log",
  "forky",
  "log",
@@ -430,14 +430,14 @@ dependencies = [
 
 [[package]]
 name = "beet_examples"
-version = "0.0.4"
+version = "0.0.5-rc.1"
 dependencies = [
  "anyhow",
  "beet_flow",
  "beet_ml",
  "beet_spatial",
- "beetmash",
  "bevy",
+ "bevyhub",
  "forky",
  "log",
  "pretty_env_logger",
@@ -449,12 +449,12 @@ dependencies = [
 
 [[package]]
 name = "beet_flow"
-version = "0.0.4"
+version = "0.0.5-rc.1"
 dependencies = [
  "anyhow",
  "beet_flow_macros",
- "beetmash",
  "bevy",
+ "bevyhub",
  "extend",
  "heck 0.4.1",
  "log",
@@ -469,7 +469,7 @@ dependencies = [
 
 [[package]]
 name = "beet_flow_macros"
-version = "0.0.4"
+version = "0.0.5-rc.1"
 dependencies = [
  "anyhow",
  "extend",
@@ -482,13 +482,13 @@ dependencies = [
 
 [[package]]
 name = "beet_ml"
-version = "0.0.4"
+version = "0.0.5-rc.1"
 dependencies = [
  "anyhow",
  "beet_flow",
  "beet_spatial",
- "beetmash",
  "bevy",
+ "bevyhub",
  "candle-core",
  "candle-nn",
  "candle-transformers",
@@ -517,13 +517,13 @@ dependencies = [
 
 [[package]]
 name = "beet_rig"
-version = "0.0.4"
+version = "0.0.5-rc.1"
 dependencies = [
  "anyhow",
  "beet_flow",
  "beet_spatial",
- "beetmash",
  "bevy",
+ "bevyhub",
  "rig-core",
  "serde",
  "serde_json",
@@ -534,25 +534,25 @@ dependencies = [
 
 [[package]]
 name = "beet_sim"
-version = "0.0.4"
+version = "0.0.5-rc.1"
 dependencies = [
  "anyhow",
  "beet_flow",
  "beet_spatial",
- "beetmash",
  "bevy",
+ "bevyhub",
  "num-traits",
  "sweet",
 ]
 
 [[package]]
 name = "beet_spatial"
-version = "0.0.4"
+version = "0.0.5-rc.1"
 dependencies = [
  "anyhow",
  "beet_flow",
- "beetmash",
  "bevy",
+ "bevyhub",
  "extend",
  "forky",
  "log",
@@ -562,76 +562,6 @@ dependencies = [
  "strum",
  "strum_macros",
  "sweet",
-]
-
-[[package]]
-name = "beetmash"
-version = "0.0.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c492c9bf46090d87bec9263be6a45ff540c000a245019fac67f94131bd31fc51"
-dependencies = [
- "beetmash_core",
- "beetmash_net",
- "beetmash_scene",
-]
-
-[[package]]
-name = "beetmash_core"
-version = "0.0.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f18ff62ca0492f0b56392e03d71b1625eaf70cd1449ed4cf2037c9a984f4ebdf"
-dependencies = [
- "anyhow",
- "beetmash_net",
- "beetmash_scene",
- "bevy",
- "extend",
- "forky",
- "log",
- "serde",
- "sweet",
-]
-
-[[package]]
-name = "beetmash_net"
-version = "0.0.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e60b3e582b3abd1f5986a5ad160d2c035af944843b423e79cb86f977c75e1b02"
-dependencies = [
- "anyhow",
- "bevy",
- "bincode",
- "extend",
- "flume",
- "forky",
- "js-sys",
- "log",
- "ron",
- "serde",
- "serde_json",
- "strum",
- "strum_macros",
- "wasm-bindgen",
- "wasm-bindgen-futures",
- "web-sys",
-]
-
-[[package]]
-name = "beetmash_scene"
-version = "0.0.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e585bd67596cb46ee9230fe569515918013abe146a3f1debb2887cd030c498ce"
-dependencies = [
- "anyhow",
- "bevy",
- "bevy_reflect",
- "extend",
- "forky",
- "log",
- "serde",
- "serde_json",
- "sweet",
- "ts-rs",
 ]
 
 [[package]]
@@ -1576,6 +1506,76 @@ dependencies = [
 ]
 
 [[package]]
+name = "bevyhub"
+version = "0.0.1-rc.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1b1b4ba79dd35f1e2fd43e1dc42025def99e2083d86c06e1653cc0b4db548706"
+dependencies = [
+ "bevyhub_core",
+ "bevyhub_net",
+ "bevyhub_scene",
+]
+
+[[package]]
+name = "bevyhub_core"
+version = "0.0.1-rc.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c7312ad5b9008726d1dfdf3edc5ebfa92158e2ab32d17bdf244391981dce8a30"
+dependencies = [
+ "anyhow",
+ "bevy",
+ "bevyhub_net",
+ "bevyhub_scene",
+ "extend",
+ "forky",
+ "log",
+ "serde",
+ "sweet",
+]
+
+[[package]]
+name = "bevyhub_net"
+version = "0.0.1-rc.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7438c3d17cd1d513d942afd3ce548c9e8045df66bf880ca03888d3b668a7280f"
+dependencies = [
+ "anyhow",
+ "bevy",
+ "bincode",
+ "extend",
+ "flume",
+ "forky",
+ "js-sys",
+ "log",
+ "ron",
+ "serde",
+ "serde_json",
+ "strum",
+ "strum_macros",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
+ "web-sys",
+]
+
+[[package]]
+name = "bevyhub_scene"
+version = "0.0.1-rc.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1685f8d2573a148f09010f8d68bb904c25af7533c83753e3343e74f02b41c708"
+dependencies = [
+ "anyhow",
+ "bevy",
+ "bevy_reflect",
+ "extend",
+ "forky",
+ "log",
+ "serde",
+ "serde_json",
+ "sweet",
+ "ts-rs",
+]
+
+[[package]]
 name = "bincode"
 version = "1.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2478,13 +2478,13 @@ checksum = "60b1af1c220855b6ceac025d3f6ecdd2b7c4894bfe9cd9bda4fbb4bc7c0d4cf0"
 
 [[package]]
 name = "emby"
-version = "0.0.4"
+version = "0.0.5-rc.1"
 dependencies = [
  "anyhow",
  "beet",
  "beet_examples",
- "beetmash",
  "bevy",
+ "bevyhub",
  "forky",
  "log",
  "pretty_env_logger",

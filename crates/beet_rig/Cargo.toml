@@ -31,5 +31,5 @@ rig-core = "0.4"
 
 [dev-dependencies]
 bevy = { workspace = true, default-features = true }
-beetmash = { workspace = true, features = ["test"] }
+bevyhub = { workspace = true, features = ["test"] }
 sweet.workspace = true

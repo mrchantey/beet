@@ -1,6 +1,6 @@
 use super::*;
 use beet_flow::prelude::*;
-use beetmash::prelude::*;
+use bevyhub::prelude::*;
 use bevy::animation::RepeatAnimation;
 use bevy::prelude::*;
 use std::time::Duration;

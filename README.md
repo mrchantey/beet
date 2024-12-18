@@ -10,7 +10,7 @@
     <a href="https://docs.rs/beet"><img src="https://img.shields.io/badge/docs-latest-blue.svg?style=flat-square" alt="docs.rs docs" /></a>
   </p>
   <h3>
-    <a href="https://beetmash.com/docs/beet">Guidebook</a>
+    <a href="https://bevyhub.dev/docs/beet">Guidebook</a>
     <span> | </span>
     <a href="https://docs.rs/beet">API Docs</a>
     <!-- <span> | </span>
@@ -22,7 +22,8 @@ Beet is behavior expressed as entity trees, using [Observers][bevy-observers] fo
 
 Currently implemented paradigms:
 - [Behavior Trees](./examples/hello_world.rs)
-- [Basic Utility AI](./examples/hello_utility_ai.rs)
+- [State Machines](./examples/hello_state_machine.rs)
+- [Utility AI](./examples/hello_utility_ai.rs)
 - [LLM Sentence Similarity](./examples/hello_ml.rs)
 - [Reinforcement Learning](./examples/frozen_lake_train.rs)
 

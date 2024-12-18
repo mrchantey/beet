@@ -1,9 +1,9 @@
 use crate::prelude::*;
 use beet::prelude::*;
-use beetmash::prelude::*;
 use bevy::animation::RepeatAnimation;
 use bevy::prelude::*;
 use bevy::render::view::RenderLayers;
+use bevyhub::prelude::*;
 
 pub fn spawn_barbarian(mut commands: Commands) {
 	let mut graph = AnimationGraphPlaceholder::default();

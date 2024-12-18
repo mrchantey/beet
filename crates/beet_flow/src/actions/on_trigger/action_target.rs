@@ -110,8 +110,8 @@ impl Into<ActionTarget> for Vec<Entity> {
 mod test {
 	use crate::prelude::*;
 	use anyhow::Result;
-	use beetmash::prelude::*;
 	use bevy::prelude::*;
+	use bevyhub::prelude::*;
 	use sweet::*;
 
 	#[test]

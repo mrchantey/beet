@@ -1,4 +1,4 @@
-use beetmash::prelude::*;
+use bevyhub::prelude::*;
 use bevy::prelude::*;
 
 

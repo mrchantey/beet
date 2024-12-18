@@ -11,8 +11,8 @@ pub fn main() {
 		.add_systems(
 			Startup,
 			(
-				beetmash::core::scenes::camera_2d,
-				beetmash::core::scenes::ui_terminal_input,
+				bevyhub::core::scenes::camera_2d,
+				bevyhub::core::scenes::ui_terminal_input,
 				beet_examples::scenes::flow::beet_debug,
 				beet_examples::scenes::ml::hello_ml,
 			),

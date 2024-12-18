@@ -1,6 +1,6 @@
 use crate::prelude::*;
-use beetmash::prelude::*;
 use bevy::prelude::*;
+use bevyhub::prelude::*;
 
 #[derive(Default, Component, Reflect)]
 #[reflect(Default, Component)]

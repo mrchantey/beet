@@ -1,5 +1,5 @@
 use beet::prelude::*;
-use beetmash::prelude::*;
+use bevyhub::prelude::*;
 use bevy::prelude::*;
 use forky::prelude::TransformExt;
 use std::f32::consts::TAU;

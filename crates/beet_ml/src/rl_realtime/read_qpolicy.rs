@@ -1,6 +1,6 @@
 use crate::prelude::*;
 use beet_flow::prelude::*;
-use beetmash::prelude::HandleWrapper;
+use bevyhub::prelude::HandleWrapper;
 use bevy::prelude::*;
 use std::marker::PhantomData;
 

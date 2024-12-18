@@ -1,7 +1,7 @@
 use beet_flow::prelude::*;
 use beet_sim::prelude::*;
 use beet_spatial::prelude::*;
-use beetmash::prelude::*;
+use bevyhub::prelude::*;
 use bevy::prelude::*;
 
 
@@ -26,7 +26,7 @@ fn main() {
 		});
 	App::new()
 		.add_plugins((
-			BeetmashDefaultPlugins::with_native_asset_path("../../assets"),
+			BevyhubDefaultPlugins::with_native_asset_path("../../assets"),
 			DefaultPlaceholderPlugin,
 			BeetDefaultPlugins,
 			BeetDebugPlugin,

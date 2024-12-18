@@ -12,9 +12,9 @@ fn main() {
 			Startup,
 			(
 				setup,
-				beetmash::core::scenes::lighting_3d,
-				beetmash::core::scenes::ground_3d,
-				beetmash::core::scenes::ui_terminal_input,
+				bevyhub::core::scenes::lighting_3d,
+				bevyhub::core::scenes::ground_3d,
+				bevyhub::core::scenes::ui_terminal_input,
 				emby::scenes::spawn_barbarian,
 			),
 		)

@@ -1,7 +1,7 @@
 use crate::beet::prelude::*;
 use crate::prelude::*;
-use beetmash::prelude::*;
 use bevy::prelude::*;
+use bevyhub::prelude::*;
 
 
 const SCALE: f32 = 100.;

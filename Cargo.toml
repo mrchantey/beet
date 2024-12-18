@@ -7,15 +7,15 @@ opt-level = 1
 opt-level = 3
 
 [workspace.package]
-version = "0.0.4"
+version = "0.0.5-rc.1"
 edition = "2021"
 description = "A modular behavior library for the Bevy Engine."
-documentation = "https://beetmash.com/docs/beet"
+documentation = "https://bevyhub.dev/docs/beet"
 readme = "README.md"
-homepage = "https://beetmash.com/docs/beet"
+homepage = "https://bevyhub.dev/docs/beet"
 repository = "https://github.com/mrchantey/beet"
 license = "MIT OR Apache-2.0"
-keywords = ["beet", "beetmash", "behavior", "game-ai", "robotics"]
+keywords = ["beet", "bevyhub", "behavior", "game-ai", "robotics"]
 categories = [
 	"science::robotics",
 	"game-development",
@@ -32,16 +32,16 @@ members = ["crates/*", "crates/beet_flow/macros"]
 
 [workspace.dependencies]
 ## internal
-beet = { path = "./", version = "0.0.4" }
-beet_spatial = { path = "crates/beet_spatial", version = "0.0.4", default-features = false }
-beet_flow = { path = "crates/beet_flow", version = "0.0.4" }
-beet_flow_macros = { path = "crates/beet_flow/macros", version = "0.0.4" }
-beet_ml = { path = "crates/beet_ml", version = "0.0.4" }
-beet_examples = { path = "crates/beet_examples", version = "0.0.4" }
-emby = { path = "crates/emby", version = "0.0.4" }
+beet = { path = "./", version = "0.0.5-rc.1" }
+beet_spatial = { path = "crates/beet_spatial", version = "0.0.5-rc.1", default-features = false }
+beet_flow = { path = "crates/beet_flow", version = "0.0.5-rc.1" }
+beet_flow_macros = { path = "crates/beet_flow/macros", version = "0.0.5-rc.1" }
+beet_ml = { path = "crates/beet_ml", version = "0.0.5-rc.1" }
+beet_examples = { path = "crates/beet_examples", version = "0.0.5-rc.1" }
+emby = { path = "crates/emby", version = "0.0.5-rc.1" }
 
 ## local
-beetmash = { version = "0.0.7" }
+bevyhub = { version = "0.0.1-rc.1" }
 forky = { version = "0.2", features = [
 	"bevy",
 	"web",
@@ -124,10 +124,10 @@ include = [
 ]
 
 [features]
-default = ["ml", "animation", "assets", "ui", "beetmash", "reflect"]
+default = ["ml", "animation", "assets", "ui", "bevyhub", "reflect"]
 ml = ["dep:beet_ml"]
 reflect = ["beet_flow/reflect"]
-beetmash = ["dep:beetmash"]
+bevyhub = ["dep:bevyhub"]
 animation = ["beet_spatial/animation"]
 assets = ["beet_spatial/assets"]
 ui = ["beet_spatial/ui"]
@@ -138,7 +138,7 @@ ui = ["beet_spatial/ui"]
 beet_flow.workspace = true
 beet_spatial.workspace = true
 beet_ml = { workspace = true, optional = true }
-beetmash = { workspace = true, optional = true }
+bevyhub = { workspace = true, optional = true }
 bevy.workspace = true
 thiserror.workspace = true
 
@@ -240,25 +240,25 @@ features = [
 name = "app"
 thumb-text = "🔨"
 description = "Basic Beet App with debugging, camera, and UI."
-app.js-url = "https://mrchantey.github.io/beetmash-apps/beet/app.js"
-app.wasm-url = "https://mrchantey.github.io/beetmash-apps/beet/app_bg.wasm"
-app.type-registry-url = "https://mrchantey.github.io/beetmash-apps/beet/registries/type_registry.json"
-app.replication-registry-url = "https://mrchantey.github.io/beetmash-apps/beet/registries/replication_registry.json"
+app.js-url = "https://mrchantey.github.io/bevyhub-apps/beet/app.js"
+app.wasm-url = "https://mrchantey.github.io/bevyhub-apps/beet/app_bg.wasm"
+app.type-registry-url = "https://mrchantey.github.io/bevyhub-apps/beet/registries/type_registry.json"
+app.replication-registry-url = "https://mrchantey.github.io/bevyhub-apps/beet/registries/replication_registry.json"
 
 [[package.metadata.scene]]
 name = "app-ml"
 thumb-text = "🔨"
 description = "Full Beet App with machine learning, networking, and UI."
-app.js-url = "https://mrchantey.github.io/beetmash-apps/beet/app_ml.js"
-app.wasm-url = "https://mrchantey.github.io/beetmash-apps/beet/app_ml_bg.wasm"
-app.type-registry-url = "https://mrchantey.github.io/beetmash-apps/beet/registries/type_registry_ml.json"
-app.replication-registry-url = "https://mrchantey.github.io/beetmash-apps/beet/registries/replication_registry_ml.json"
+app.js-url = "https://mrchantey.github.io/bevyhub-apps/beet/app_ml.js"
+app.wasm-url = "https://mrchantey.github.io/bevyhub-apps/beet/app_ml_bg.wasm"
+app.type-registry-url = "https://mrchantey.github.io/bevyhub-apps/beet/registries/type_registry_ml.json"
+app.replication-registry-url = "https://mrchantey.github.io/bevyhub-apps/beet/registries/replication_registry_ml.json"
 
 
 [[package.metadata.scene]]
 name = "beet-debug"
 thumb-text = "🐛"
-description = "Enable debugging for printing to the console, and screen if used with beetmash/ui-terminal."
+description = "Enable debugging for printing to the console, and screen if used with bevyhub/ui-terminal."
 path = "scenes/beet-debug.json"
 
 [[package.metadata.scene]]
@@ -268,7 +268,7 @@ thumb-url = "https://storage.googleapis.com/beet-examples/screenshots/hello-worl
 description = "A simple behavior that prints 'Hello' then 'World' to the console."
 app = "app"
 path = "scenes/hello-world.json"
-include = ["beet-debug", "beetmash/camera-2d", "beetmash/ui-terminal"]
+include = ["beet-debug", "bevyhub/camera-2d", "bevyhub/ui-terminal"]
 
 
 [[package.metadata.scene]]
@@ -277,7 +277,7 @@ description = "Demonstration of flocking behaviors."
 thumb-url = "https://storage.googleapis.com/beet-examples/screenshots/flock.png"
 app = "app"
 path = "scenes/flock.json"
-include = ["beet-debug", "beetmash/camera-2d", "beetmash/space-scene"]
+include = ["beet-debug", "bevyhub/camera-2d", "bevyhub/space-scene"]
 
 [[package.metadata.scene]]
 name = "seek"
@@ -285,7 +285,7 @@ description = "Demonstration of the seek behavior."
 thumb-url = "https://storage.googleapis.com/beet-examples/screenshots/seek.png"
 app = "app"
 path = "scenes/seek.json"
-include = ["beet-debug", "beetmash/camera-2d", "beetmash/space-scene"]
+include = ["beet-debug", "bevyhub/camera-2d", "bevyhub/space-scene"]
 
 [[package.metadata.scene]]
 name = "seek-3d"
@@ -293,7 +293,7 @@ description = "A 3D demonstration of the seek behavior."
 thumb-url = "https://storage.googleapis.com/beet-examples/screenshots/seek-3d.png"
 app = "app"
 path = "scenes/seek-3d.json"
-include = ["beet-debug", "beetmash/lighting-3d", "beetmash/ground-3d"]
+include = ["beet-debug", "bevyhub/lighting-3d", "bevyhub/ground-3d"]
 
 
 [[package.metadata.scene]]
@@ -303,9 +303,9 @@ thumb-url = "https://storage.googleapis.com/beet-examples/screenshots/hello-anim
 app = "app"
 path = "scenes/hello-animation.json"
 include = [
-	"beetmash/ui-terminal",
-	"beetmash/lighting-3d",
-	"beetmash/ground-3d",
+	"bevyhub/ui-terminal",
+	"bevyhub/lighting-3d",
+	"bevyhub/ground-3d",
 	"beet-debug",
 ]
 
@@ -314,7 +314,7 @@ name = "hello-ml"
 description = "A behavior that uses a Sentence Selector to score child behaviors, deciding which will run next."
 thumb-url = "https://storage.googleapis.com/beet-examples/screenshots/hello-llm.png"
 path = "scenes/hello-ml.json"
-include = ["beetmash/camera-2d", "beetmash/ui-terminal", "beet-debug"]
+include = ["bevyhub/camera-2d", "bevyhub/ui-terminal", "beet-debug"]
 
 [[package.metadata.scene]]
 name = "fetch-scene"
@@ -329,9 +329,9 @@ thumb-url = "https://storage.googleapis.com/beet-examples/screenshots/fetch.png"
 app = "app-ml"
 path = "scenes/fetch-npc.json"
 include = [
-	"beetmash/ui-terminal-input",
-	"beetmash/lighting-3d",
-	"beetmash/ground-3d",
+	"bevyhub/ui-terminal-input",
+	"bevyhub/lighting-3d",
+	"bevyhub/ground-3d",
 	"fetch-scene",
 ]
 events.playerMessage.initial = "I'm hungry!"
@@ -350,8 +350,8 @@ thumb-url = "https://storage.googleapis.com/beet-examples/screenshots/frozen-lak
 app = "app-ml"
 path = "scenes/frozen-lake-train.json"
 include = [
-	"beetmash/ui-terminal",
-	"beetmash/lighting-3d",
+	"bevyhub/ui-terminal",
+	"bevyhub/lighting-3d",
 	"beet-debug",
 	"frozen-lake-scene",
 ]
@@ -363,8 +363,8 @@ thumb-url = "https://storage.googleapis.com/beet-examples/screenshots/frozen-lak
 app = "app-ml"
 path = "scenes/frozen-lake-run.json"
 include = [
-	"beetmash/ui-terminal",
-	"beetmash/lighting-3d",
+	"bevyhub/ui-terminal",
+	"bevyhub/lighting-3d",
 	"beet-debug",
 	"frozen-lake-scene",
 ]

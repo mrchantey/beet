@@ -1,6 +1,6 @@
 use crate::beet::prelude::*;
 use crate::prelude::*;
-use beetmash::prelude::*;
+use bevyhub::prelude::*;
 use bevy::color::palettes::tailwind;
 use bevy::prelude::*;
 

@@ -1,6 +1,6 @@
 use crate::prelude::*;
 use beet_flow::prelude::*;
-use beetmash::prelude::*;
+use bevyhub::prelude::*;
 use bevy::prelude::*;
 use std::borrow::Cow;
 
