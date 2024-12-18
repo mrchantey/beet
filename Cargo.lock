@@ -1507,9 +1507,9 @@ dependencies = [
 
 [[package]]
 name = "bevyhub"
-version = "0.0.1-rc.1"
+version = "0.0.1-rc.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1b1b4ba79dd35f1e2fd43e1dc42025def99e2083d86c06e1653cc0b4db548706"
+checksum = "9c7f5b8408841435bf9d4810784594a3f55e33b783404c37d86ec473d324f44b"
 dependencies = [
  "bevyhub_core",
  "bevyhub_net",
@@ -1518,9 +1518,9 @@ dependencies = [
 
 [[package]]
 name = "bevyhub_core"
-version = "0.0.1-rc.1"
+version = "0.0.1-rc.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c7312ad5b9008726d1dfdf3edc5ebfa92158e2ab32d17bdf244391981dce8a30"
+checksum = "95654c0ae77fc2b075d908e0e0b1d0676da2bcc79ea3e141477aa6aaabee393e"
 dependencies = [
  "anyhow",
  "bevy",
@@ -1535,9 +1535,9 @@ dependencies = [
 
 [[package]]
 name = "bevyhub_net"
-version = "0.0.1-rc.1"
+version = "0.0.1-rc.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7438c3d17cd1d513d942afd3ce548c9e8045df66bf880ca03888d3b668a7280f"
+checksum = "de895cc39b236e3f83d4372fa7ab6eea1ca4bdc35f59beceff76f8abcba11475"
 dependencies = [
  "anyhow",
  "bevy",
@@ -1559,9 +1559,9 @@ dependencies = [
 
 [[package]]
 name = "bevyhub_scene"
-version = "0.0.1-rc.1"
+version = "0.0.1-rc.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1685f8d2573a148f09010f8d68bb904c25af7533c83753e3343e74f02b41c708"
+checksum = "b4e4489d6daf2ab820b48cf179a42f1402d63a28d134c4058c895de2163bead6"
 dependencies = [
  "anyhow",
  "bevy",

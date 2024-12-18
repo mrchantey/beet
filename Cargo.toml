@@ -41,7 +41,7 @@ beet_examples = { path = "crates/beet_examples", version = "0.0.5-rc.1" }
 emby = { path = "crates/emby", version = "0.0.5-rc.1" }
 
 ## local
-bevyhub = { version = "0.0.1-rc.1" }
+bevyhub = { version = "0.0.1-rc.2" }
 forky = { version = "0.2", features = [
 	"bevy",
 	"web",
