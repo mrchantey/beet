@@ -1,0 +1,296 @@
+{
+  "resources": {},
+  "entities": {
+    "4294967313": {
+      "components": {
+        "beet_examples::components::camera_distance::CameraDistance": {
+          "width": 80.0,
+          "offset": [
+            0.0,
+            20.0,
+            40.0
+          ]
+        },
+        "bevy_core::name::Name": "Camera",
+        "bevyhub_scene::utils::bundle_placeholder::BundlePlaceholder": "Camera3d"
+      }
+    },
+    "4294967314": {
+      "components": {
+        "beet_examples::components::follow_cursor::FollowCursor3d": {
+          "intersect_point": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "intersect_plane": {
+            "normal": [
+              0.0,
+              1.0,
+              0.0
+            ]
+          }
+        },
+        "bevy_transform::components::global_transform::GlobalTransform": [
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "bevy_transform::components::transform::Transform": {
+          "translation": [
+            20.0,
+            0.0,
+            40.0
+          ],
+          "rotation": [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "scale": [
+            3.0,
+            3.0,
+            3.0
+          ]
+        },
+        "bevyhub_scene::utils::bundle_placeholder::BundlePlaceholder": {
+          "Scene": "kaykit/cheese.glb#Scene0"
+        }
+      }
+    },
+    "4294967315": {
+      "components": {
+        "beet_spatial::movement::force_bundle::Force": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "beet_spatial::movement::force_bundle::Impulse": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "beet_spatial::movement::force_bundle::Mass": 1.0,
+        "beet_spatial::movement::force_bundle::Velocity": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "beet_spatial::movement::rotate_to_velocity::RotateToVelocity3d": 5.0,
+        "beet_spatial::steer::steer_actions::arrive::ArriveRadius": 7.0,
+        "beet_spatial::steer::steer_bundle::MaxForce": 0.5,
+        "beet_spatial::steer::steer_bundle::MaxSpeed": 10.0,
+        "beet_spatial::steer::steer_target::SteerTarget": {
+          "Entity": 4294967314
+        },
+        "bevy_animation::transition::AnimationTransitions": {
+          "main_animation": null,
+          "transitions": []
+        },
+        "bevy_core::name::Name": "Foxie",
+        "bevy_hierarchy::components::children::Children": [
+          4294967316
+        ],
+        "bevy_transform::components::global_transform::GlobalTransform": [
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "bevy_transform::components::transform::Transform": {
+          "translation": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "rotation": [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "scale": [
+            0.1,
+            0.1,
+            0.1
+          ]
+        },
+        "bevyhub_scene::utils::animation_graph_placeholder::AnimationGraphPlaceholder": {
+          "root": 0,
+          "clips": [
+            {
+              "clip": {
+                "path": "misc/fox.glb#Animation0"
+              },
+              "parent": 0,
+              "weight": 1.0
+            },
+            {
+              "clip": {
+                "path": "misc/fox.glb#Animation1"
+              },
+              "parent": 0,
+              "weight": 1.0
+            }
+          ]
+        },
+        "bevyhub_scene::utils::bundle_placeholder::BundlePlaceholder": {
+          "Scene": "misc/fox.glb#Scene0"
+        }
+      }
+    },
+    "4294967316": {
+      "components": {
+        "beet_flow::actions::flow::repeat_flow::RepeatFlow": {},
+        "beet_flow::actions::flow::sequence_flow::SequenceFlow": {},
+        "beet_flow::actions::on_trigger::run_on_spawn::RunOnSpawn": {},
+        "bevy_core::name::Name": "Seek Behavior",
+        "bevy_hierarchy::components::children::Children": [
+          4294967317,
+          4294967318
+        ],
+        "bevy_hierarchy::components::parent::Parent": 4294967315
+      }
+    },
+    "4294967317": {
+      "components": {
+        "beet_flow::actions::misc::run_timer::RunTimer": {
+          "last_started": {
+            "elapsed": {
+              "secs": 0,
+              "nanos": 0
+            },
+            "is_paused": false
+          },
+          "last_stopped": {
+            "elapsed": {
+              "secs": 0,
+              "nanos": 0
+            },
+            "is_paused": false
+          }
+        },
+        "beet_flow::actions::on_trigger::continue_run::ContinueRun": {},
+        "beet_flow::actions::on_trigger::on_trigger_action::OnTrigger<beet_flow::actions::on_trigger::insert_on_trigger::InsertHandler<beet_flow::lifecycle::components::running::Running, beet_flow::events::on_run::OnRun, ()>>": {
+          "params": {},
+          "source": "This",
+          "target": "This"
+        },
+        "beet_flow::actions::on_trigger::on_trigger_action::OnTrigger<beet_flow::actions::on_trigger::remove_on_trigger::RemoveHandler<beet_flow::events::on_run::OnRun, beet_spatial::movement::force_bundle::Velocity, ()>>": {
+          "params": [],
+          "source": "This",
+          "target": {
+            "Entity": 4294967315
+          }
+        },
+        "beet_flow::actions::on_trigger::on_trigger_action::OnTrigger<beet_flow::actions::on_trigger::remove_on_trigger::RemoveHandler<beet_flow::events::on_run_result::OnRunResult, beet_flow::lifecycle::components::running::Running, ()>>": {
+          "params": [],
+          "source": "This",
+          "target": "This"
+        },
+        "beet_flow::lifecycle::components::target_entity::TargetEntity": 4294967315,
+        "beet_spatial::animation::insert_on_animation_end::TriggerOnAnimationEnd<beet_flow::events::on_run_result::OnRunResult>": {
+          "value": "Success",
+          "target": "This",
+          "animation_index": 1,
+          "transition_duration": {
+            "secs": 0,
+            "nanos": 500000000
+          }
+        },
+        "beet_spatial::animation::play_animation::PlayAnimation": {
+          "animation": 1,
+          "trigger_if_playing": false,
+          "repeat": "Never",
+          "transition_duration": {
+            "secs": 0,
+            "nanos": 500000000
+          }
+        },
+        "bevy_core::name::Name": "Idle",
+        "bevy_hierarchy::components::parent::Parent": 4294967316,
+        "bevyhub_scene::utils::asset_placeholder::AssetPlaceholder<bevy_animation::AnimationClip>": {
+          "path": "misc/fox.glb#Animation0"
+        }
+      }
+    },
+    "4294967318": {
+      "components": {
+        "beet_flow::actions::misc::run_timer::RunTimer": {
+          "last_started": {
+            "elapsed": {
+              "secs": 0,
+              "nanos": 0
+            },
+            "is_paused": false
+          },
+          "last_stopped": {
+            "elapsed": {
+              "secs": 0,
+              "nanos": 0
+            },
+            "is_paused": false
+          }
+        },
+        "beet_flow::actions::on_trigger::continue_run::ContinueRun": {},
+        "beet_flow::actions::on_trigger::on_trigger_action::OnTrigger<beet_flow::actions::on_trigger::insert_on_trigger::InsertHandler<beet_flow::lifecycle::components::running::Running, beet_flow::events::on_run::OnRun, ()>>": {
+          "params": {},
+          "source": "This",
+          "target": "This"
+        },
+        "beet_flow::actions::on_trigger::on_trigger_action::OnTrigger<beet_flow::actions::on_trigger::insert_on_trigger::InsertHandler<beet_spatial::movement::force_bundle::Velocity, beet_flow::events::on_run::OnRun, ()>>": {
+          "params": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "source": "This",
+          "target": {
+            "Entity": 4294967315
+          }
+        },
+        "beet_flow::actions::on_trigger::on_trigger_action::OnTrigger<beet_flow::actions::on_trigger::remove_on_trigger::RemoveHandler<beet_flow::events::on_run_result::OnRunResult, beet_flow::lifecycle::components::running::Running, ()>>": {
+          "params": [],
+          "source": "This",
+          "target": "This"
+        },
+        "beet_flow::lifecycle::components::target_entity::TargetEntity": 4294967315,
+        "beet_spatial::animation::play_animation::PlayAnimation": {
+          "animation": 2,
+          "trigger_if_playing": false,
+          "repeat": "Forever",
+          "transition_duration": {
+            "secs": 0,
+            "nanos": 500000000
+          }
+        },
+        "beet_spatial::steer::steer_actions::end_on_arrive::EndOnArrive": {
+          "radius": 6.0
+        },
+        "beet_spatial::steer::steer_actions::seek::Seek": {
+          "on_not_found": "Warn"
+        },
+        "bevy_core::name::Name": "Seek",
+        "bevy_hierarchy::components::parent::Parent": 4294967316
+      }
+    }
+  }
+}

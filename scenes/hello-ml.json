@@ -1,0 +1,49 @@
+{
+  "resources": {},
+  "entities": {
+    "4294967313": {
+      "components": {
+        "beet_flow::actions::on_trigger::on_trigger_action::OnTrigger<beet_flow::actions::on_trigger::trigger_on_global_trigger::TriggerOnGlobalTriggerHandler<beet_flow::events::on_run::OnRun, bevyhub_net::events::common_events::AppReady, ()>>": {
+          "params": {},
+          "source": "Global",
+          "target": "This"
+        },
+        "beet_flow::actions::on_trigger::on_trigger_action::OnTrigger<beet_flow::actions::on_trigger::trigger_on_trigger::TriggerOnTriggerHandler<beet_flow::events::on_run::OnRun, bevy_ecs::world::component_constants::OnInsert, beet_ml::language::selectors::sentence_flow::Sentence>>": {
+          "params": {},
+          "source": "This",
+          "target": "This"
+        },
+        "beet_flow::actions::on_trigger::on_trigger_action::OnTrigger<beet_ml::language::selectors::sentence_actions::MapUserMessageToSentence>": {
+          "params": [],
+          "source": "Global",
+          "target": "This"
+        },
+        "beet_ml::language::selectors::sentence_flow::Sentence": "please kill the baddies",
+        "beet_ml::language::selectors::sentence_flow::SentenceFlow": {},
+        "bevy_core::name::Name": "Sentence Flow",
+        "bevy_hierarchy::components::children::Children": [
+          4294967314,
+          4294967315
+        ],
+        "bevyhub_core::render::block_app_ready::AssetLoadBlockAppReady": {},
+        "bevyhub_scene::utils::asset_placeholder::AssetPlaceholder<beet_ml::language::bert::Bert>": {
+          "path": "ml/default-bert.ron"
+        }
+      }
+    },
+    "4294967314": {
+      "components": {
+        "beet_ml::language::selectors::sentence_flow::Sentence": "heal",
+        "bevy_core::name::Name": "Heal Behavior",
+        "bevy_hierarchy::components::parent::Parent": 4294967313
+      }
+    },
+    "4294967315": {
+      "components": {
+        "beet_ml::language::selectors::sentence_flow::Sentence": "attack",
+        "bevy_core::name::Name": "Attack Behavior",
+        "bevy_hierarchy::components::parent::Parent": 4294967313
+      }
+    }
+  }
+}

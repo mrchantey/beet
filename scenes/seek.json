@@ -1,0 +1,130 @@
+{
+  "resources": {},
+  "entities": {
+    "4294967313": {
+      "components": {
+        "beet_examples::components::follow_cursor::FollowCursor2d": {},
+        "bevy_core::name::Name": "Target",
+        "bevy_transform::components::global_transform::GlobalTransform": [
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "bevy_transform::components::transform::Transform": {
+          "translation": [
+            200.0,
+            0.0,
+            0.0
+          ],
+          "rotation": [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ]
+        },
+        "bevyhub_core::render::block_app_ready::AssetLoadBlockAppReady": {},
+        "bevyhub_scene::utils::bundle_placeholder::BundlePlaceholder": {
+          "Sprite": {
+            "path": "spaceship_pack/planet_6.png",
+            "image_mode": "Auto"
+          }
+        }
+      }
+    },
+    "4294967314": {
+      "components": {
+        "beet_spatial::movement::force_bundle::Force": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "beet_spatial::movement::force_bundle::Impulse": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "beet_spatial::movement::force_bundle::Mass": 1.0,
+        "beet_spatial::movement::force_bundle::Velocity": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "beet_spatial::movement::rotate_to_velocity::RotateToVelocity2d": {},
+        "beet_spatial::steer::steer_actions::arrive::ArriveRadius": 350.0,
+        "beet_spatial::steer::steer_bundle::MaxForce": 5.0,
+        "beet_spatial::steer::steer_bundle::MaxSpeed": 500.0,
+        "beet_spatial::steer::steer_target::SteerTarget": {
+          "Entity": 4294967313
+        },
+        "bevy_core::name::Name": "Agent",
+        "bevy_hierarchy::components::children::Children": [
+          4294967315
+        ],
+        "bevyhub_core::render::block_app_ready::AssetLoadBlockAppReady": {},
+        "bevyhub_scene::utils::bundle_placeholder::BundlePlaceholder": {
+          "Sprite": {
+            "path": "spaceship_pack/ship_2.png",
+            "image_mode": "Auto"
+          }
+        }
+      }
+    },
+    "4294967315": {
+      "components": {
+        "beet_flow::actions::misc::run_timer::RunTimer": {
+          "last_started": {
+            "elapsed": {
+              "secs": 0,
+              "nanos": 0
+            },
+            "is_paused": false
+          },
+          "last_stopped": {
+            "elapsed": {
+              "secs": 0,
+              "nanos": 0
+            },
+            "is_paused": false
+          }
+        },
+        "beet_flow::actions::on_trigger::continue_run::ContinueRun": {},
+        "beet_flow::actions::on_trigger::on_trigger_action::OnTrigger<beet_flow::actions::on_trigger::insert_on_trigger::InsertHandler<beet_flow::lifecycle::components::running::Running, beet_flow::events::on_run::OnRun, ()>>": {
+          "params": {},
+          "source": "This",
+          "target": "This"
+        },
+        "beet_flow::actions::on_trigger::on_trigger_action::OnTrigger<beet_flow::actions::on_trigger::remove_on_trigger::RemoveHandler<beet_flow::events::on_run_result::OnRunResult, beet_flow::lifecycle::components::running::Running, ()>>": {
+          "params": [],
+          "source": "This",
+          "target": "This"
+        },
+        "beet_flow::actions::on_trigger::on_trigger_action::OnTrigger<beet_flow::actions::on_trigger::trigger_on_global_trigger::TriggerOnGlobalTriggerHandler<beet_flow::events::on_run::OnRun, bevyhub_net::events::common_events::AppReady, ()>>": {
+          "params": {},
+          "source": "Global",
+          "target": "This"
+        },
+        "beet_flow::lifecycle::components::target_entity::TargetEntity": 4294967314,
+        "beet_spatial::steer::steer_actions::seek::Seek": {
+          "on_not_found": "Warn"
+        },
+        "bevy_core::name::Name": "Seek",
+        "bevy_hierarchy::components::parent::Parent": 4294967314
+      }
+    }
+  }
+}

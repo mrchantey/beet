@@ -1,0 +1,346 @@
+{
+  "resources": {},
+  "entities": {
+    "4294967313": {
+      "components": {
+        "beet_examples::components::camera_distance::CameraDistance": {
+          "width": 2.8,
+          "offset": [
+            0.0,
+            1.6,
+            2.0
+          ]
+        },
+        "bevyhub_scene::utils::bundle_placeholder::BundlePlaceholder": "Camera3d"
+      }
+    },
+    "4294967314": {
+      "components": {
+        "beet_examples::components::collectable::Collectable": {},
+        "beet_ml::language::selectors::sentence_flow::Sentence": "red healing potion",
+        "bevy_core::name::Name": "Potion",
+        "bevy_hierarchy::components::children::Children": [
+          4294967315
+        ],
+        "bevy_transform::components::global_transform::GlobalTransform": [
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "bevy_transform::components::transform::Transform": {
+          "translation": [
+            2.0,
+            0.0,
+            2.0
+          ],
+          "rotation": [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ]
+        }
+      }
+    },
+    "4294967315": {
+      "components": {
+        "bevy_hierarchy::components::parent::Parent": 4294967314,
+        "bevy_transform::components::global_transform::GlobalTransform": [
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "bevy_transform::components::transform::Transform": {
+          "translation": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "rotation": [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "scale": [
+            0.5,
+            0.5,
+            0.5
+          ]
+        },
+        "bevyhub_scene::utils::bundle_placeholder::BundlePlaceholder": {
+          "Scene": "kaykit/potion.glb#Scene0"
+        }
+      }
+    },
+    "4294967316": {
+      "components": {
+        "beet_examples::components::collectable::Collectable": {},
+        "beet_ml::language::selectors::sentence_flow::Sentence": "gold coin",
+        "bevy_core::name::Name": "Coin",
+        "bevy_hierarchy::components::children::Children": [
+          4294967317
+        ],
+        "bevy_transform::components::global_transform::GlobalTransform": [
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "bevy_transform::components::transform::Transform": {
+          "translation": [
+            2.0,
+            0.0,
+            -2.0
+          ],
+          "rotation": [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ]
+        }
+      }
+    },
+    "4294967317": {
+      "components": {
+        "bevy_hierarchy::components::parent::Parent": 4294967316,
+        "bevy_transform::components::global_transform::GlobalTransform": [
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "bevy_transform::components::transform::Transform": {
+          "translation": [
+            0.0,
+            0.2,
+            0.0
+          ],
+          "rotation": [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "scale": [
+            0.5,
+            0.5,
+            0.5
+          ]
+        },
+        "bevyhub_scene::utils::bundle_placeholder::BundlePlaceholder": {
+          "Scene": "kaykit/coin.glb#Scene0"
+        }
+      }
+    },
+    "4294967318": {
+      "components": {
+        "beet_examples::components::collectable::Collectable": {},
+        "beet_ml::language::selectors::sentence_flow::Sentence": "silver sword",
+        "bevy_core::name::Name": "Sword",
+        "bevy_hierarchy::components::children::Children": [
+          4294967319
+        ],
+        "bevy_transform::components::global_transform::GlobalTransform": [
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "bevy_transform::components::transform::Transform": {
+          "translation": [
+            -2.0,
+            0.0,
+            2.0
+          ],
+          "rotation": [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ]
+        }
+      }
+    },
+    "4294967319": {
+      "components": {
+        "bevy_hierarchy::components::parent::Parent": 4294967318,
+        "bevy_transform::components::global_transform::GlobalTransform": [
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "bevy_transform::components::transform::Transform": {
+          "translation": [
+            0.0,
+            0.15,
+            0.0
+          ],
+          "rotation": [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "scale": [
+            0.5,
+            0.5,
+            0.5
+          ]
+        },
+        "bevyhub_scene::utils::bundle_placeholder::BundlePlaceholder": {
+          "Scene": "kaykit/sword.glb#Scene0"
+        }
+      }
+    },
+    "4294967320": {
+      "components": {
+        "beet_examples::components::collectable::Collectable": {},
+        "beet_ml::language::selectors::sentence_flow::Sentence": "tasty cheese",
+        "bevy_core::name::Name": "Cheese",
+        "bevy_hierarchy::components::children::Children": [
+          4294967321
+        ],
+        "bevy_transform::components::global_transform::GlobalTransform": [
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "bevy_transform::components::transform::Transform": {
+          "translation": [
+            -2.0,
+            0.0,
+            -2.0
+          ],
+          "rotation": [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ]
+        }
+      }
+    },
+    "4294967321": {
+      "components": {
+        "bevy_hierarchy::components::parent::Parent": 4294967320,
+        "bevy_transform::components::global_transform::GlobalTransform": [
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "bevy_transform::components::transform::Transform": {
+          "translation": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "rotation": [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "scale": [
+            0.5,
+            0.5,
+            0.5
+          ]
+        },
+        "bevyhub_scene::utils::bundle_placeholder::BundlePlaceholder": {
+          "Scene": "kaykit/cheese.glb#Scene0"
+        }
+      }
+    }
+  }
+}

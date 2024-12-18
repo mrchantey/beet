@@ -271,13 +271,13 @@ path = "scenes/hello-world.json"
 include = ["beet-debug", "bevyhub/camera-2d", "bevyhub/ui-terminal"]
 
 
-[[package.metadata.scene]]
-name = "flock"
-description = "Demonstration of flocking behaviors."
-thumb-url = "https://bevyhub-crate-assets.s3.us-west-2.amazonaws.com/assets/screenshots/flock.png"
-app = "app"
-path = "scenes/flock.json"
-include = ["beet-debug", "bevyhub/camera-2d", "bevyhub/space-scene"]
+# [[package.metadata.scene]]
+# name = "flock"
+# description = "Demonstration of flocking behaviors."
+# thumb-url = "https://bevyhub-crate-assets.s3.us-west-2.amazonaws.com/assets/screenshots/flock.png"
+# app = "app"
+# path = "scenes/flock.json"
+# include = ["beet-debug", "bevyhub/camera-2d", "bevyhub/space-scene"]
 
 [[package.metadata.scene]]
 name = "seek"

@@ -1,0 +1,63 @@
+{
+  "resources": {},
+  "entities": {
+    "4294967313": {
+      "components": {
+        "beet_ml::rl::q_table::QTable<beet_ml::environments::frozen_lake::grid::GridPos, beet_ml::environments::frozen_lake::grid::GridDirection>": {},
+        "beet_ml::rl_realtime::rl_session::RlSession<beet_ml::environments::frozen_lake::frozen_lake_plugin::FrozenLakeEpParams>": {
+          "params": {
+            "learn_params": {
+              "n_training_episodes": 10000,
+              "n_eval_episodes": 100,
+              "learning_rate": 0.7,
+              "max_steps": 99,
+              "gamma": 0.95,
+              "max_epsilon": 1.0,
+              "min_epsilon": 0.05,
+              "decay_rate": 0.0005
+            },
+            "map": {
+              "cells": [
+                "Agent",
+                "Ice",
+                "Ice",
+                "Ice",
+                "Ice",
+                "Hole",
+                "Ice",
+                "Hole",
+                "Ice",
+                "Ice",
+                "Ice",
+                "Hole",
+                "Hole",
+                "Ice",
+                "Ice",
+                "Goal"
+              ],
+              "size": [
+                4,
+                4
+              ]
+            },
+            "grid_to_world": {
+              "map_width": 1.0,
+              "cell_width": 0.25,
+              "map_size": [
+                4,
+                4
+              ],
+              "offset": [
+                -0.375,
+                0.0,
+                -0.375
+              ]
+            }
+          },
+          "filename": null,
+          "episode": 0
+        }
+      }
+    }
+  }
+}

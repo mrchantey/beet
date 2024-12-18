@@ -29,7 +29,8 @@ fn main() -> Result<()> {
 		.with_config(config.clone())
 		.without_clear_target()
 		.add_scene("seek", beet_examples::scenes::spatial::seek)
-		.add_scene("flock", beet_examples::scenes::spatial::flock)
+		// TODO flock scene is >1MB, use a for loop helper
+		// .add_scene("flock", beet_examples::scenes::spatial::flock)
 		.add_scene("seek-3d", beet_examples::scenes::spatial::seek_3d)
 		.add_scene(
 			"hello-animation",

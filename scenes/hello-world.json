@@ -1,0 +1,38 @@
+{
+  "resources": {},
+  "entities": {
+    "4294967313": {
+      "components": {
+        "beet_flow::actions::flow::sequence_flow::SequenceFlow": {},
+        "beet_flow::actions::on_trigger::run_on_spawn::RunOnSpawn": {},
+        "bevy_core::name::Name": "Hello World Sequence",
+        "bevy_hierarchy::components::children::Children": [
+          4294967314,
+          4294967315
+        ]
+      }
+    },
+    "4294967314": {
+      "components": {
+        "beet_flow::actions::on_trigger::on_trigger_action::OnTrigger<beet_flow::actions::on_trigger::trigger_on_trigger::TriggerOnTriggerHandler<beet_flow::events::on_run_result::OnRunResult, beet_flow::events::on_run::OnRun, ()>>": {
+          "params": "Success",
+          "source": "This",
+          "target": "This"
+        },
+        "bevy_core::name::Name": "Hello",
+        "bevy_hierarchy::components::parent::Parent": 4294967313
+      }
+    },
+    "4294967315": {
+      "components": {
+        "beet_flow::actions::on_trigger::on_trigger_action::OnTrigger<beet_flow::actions::on_trigger::trigger_on_trigger::TriggerOnTriggerHandler<beet_flow::events::on_run_result::OnRunResult, beet_flow::events::on_run::OnRun, ()>>": {
+          "params": "Success",
+          "source": "This",
+          "target": "This"
+        },
+        "bevy_core::name::Name": "World",
+        "bevy_hierarchy::components::parent::Parent": 4294967313
+      }
+    }
+  }
+}
