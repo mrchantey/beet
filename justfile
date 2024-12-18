@@ -151,13 +151,13 @@ watch-web *command:
 	-- {{command}}
 
 assets-push:
-	aws s3 sync ./assets s3://beetmash-public/assets --delete
+	aws s3 sync ./assets s3://bevyhub-crate-assets/assets --delete
 	tar -czvf ./assets.tar.gz ./assets
-	aws s3 cp ./assets.tar.gz s3://beetmash-public/assets.tar.gz
+	aws s3 cp ./assets.tar.gz s3://bevyhub-crate-assets/assets.tar.gz
 	rm ./assets.tar.gz
 
 assets-pull:
-	curl -o ./assets.tar.gz https://beetmash-public.s3.us-west-2.amazonaws.com/assets.tar.gz
+	curl -o ./assets.tar.gz https://bevyhub-crate-assets.s3.us-west-2.amazonaws.com/assets.tar.gz
 	tar -xzvf ./assets.tar.gz
 	rm ./assets.tar.gz
 
