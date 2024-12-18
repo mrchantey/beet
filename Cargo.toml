@@ -42,10 +42,7 @@ emby = { path = "crates/emby", version = "0.0.5-rc.1" }
 
 ## local
 bevyhub = { version = "0.0.1-rc.2" }
-forky = { version = "0.2", features = [
-	"bevy",
-	"web",
-] }
+forky = { version = "0.2", features = ["bevy", "web"] }
 sweet = { version = "0.2", features = ["bevy"] }
 
 #💡 game
@@ -115,13 +112,7 @@ license.workspace = true
 keywords.workspace = true
 categories.workspace = true
 
-include = [
-	"CHANGELOG.md",
-	"README.md",
-	"/src",
-	"/examples",
-	"/scenes",
-]
+include = ["CHANGELOG.md", "README.md", "/src", "/examples", "/scenes"]
 
 [features]
 default = ["ml", "animation", "assets", "ui", "bevyhub", "reflect"]
@@ -264,7 +255,7 @@ path = "scenes/beet-debug.json"
 [[package.metadata.scene]]
 name = "hello-world"
 thumb-text = "🌍"
-thumb-url = "https://bevyhub-crate-assets.s3.us-west-2.amazonaws.com/assets/screenshots/hello-world.png"
+thumb-url = "https://bevyhub-public.s3.us-west-2.amazonaws.com/assets/screenshots/hello-world.png"
 description = "A simple behavior that prints 'Hello' then 'World' to the console."
 app = "app"
 path = "scenes/hello-world.json"
@@ -274,7 +265,7 @@ include = ["beet-debug", "bevyhub/camera-2d", "bevyhub/ui-terminal"]
 # [[package.metadata.scene]]
 # name = "flock"
 # description = "Demonstration of flocking behaviors."
-# thumb-url = "https://bevyhub-crate-assets.s3.us-west-2.amazonaws.com/assets/screenshots/flock.png"
+# thumb-url = "https://bevyhub-public.s3.us-west-2.amazonaws.com/assets/screenshots/flock.png"
 # app = "app"
 # path = "scenes/flock.json"
 # include = ["beet-debug", "bevyhub/camera-2d", "bevyhub/space-scene"]
@@ -282,7 +273,7 @@ include = ["beet-debug", "bevyhub/camera-2d", "bevyhub/ui-terminal"]
 [[package.metadata.scene]]
 name = "seek"
 description = "Demonstration of the seek behavior."
-thumb-url = "https://bevyhub-crate-assets.s3.us-west-2.amazonaws.com/assets/screenshots/seek.png"
+thumb-url = "https://bevyhub-public.s3.us-west-2.amazonaws.com/assets/screenshots/seek.png"
 app = "app"
 path = "scenes/seek.json"
 include = ["beet-debug", "bevyhub/camera-2d", "bevyhub/space-scene"]
@@ -290,7 +281,7 @@ include = ["beet-debug", "bevyhub/camera-2d", "bevyhub/space-scene"]
 [[package.metadata.scene]]
 name = "seek-3d"
 description = "A 3D demonstration of the seek behavior."
-thumb-url = "https://bevyhub-crate-assets.s3.us-west-2.amazonaws.com/assets/screenshots/seek-3d.png"
+thumb-url = "https://bevyhub-public.s3.us-west-2.amazonaws.com/assets/screenshots/seek-3d.png"
 app = "app"
 path = "scenes/seek-3d.json"
 include = ["beet-debug", "bevyhub/lighting-3d", "bevyhub/ground-3d"]
@@ -299,7 +290,7 @@ include = ["beet-debug", "bevyhub/lighting-3d", "bevyhub/ground-3d"]
 [[package.metadata.scene]]
 name = "hello-animation"
 description = "A simple behavior demonstrating animation control."
-thumb-url = "https://bevyhub-crate-assets.s3.us-west-2.amazonaws.com/assets/screenshots/hello-animation.png"
+thumb-url = "https://bevyhub-public.s3.us-west-2.amazonaws.com/assets/screenshots/hello-animation.png"
 app = "app"
 path = "scenes/hello-animation.json"
 include = [
@@ -312,7 +303,7 @@ include = [
 [[package.metadata.scene]]
 name = "hello-ml"
 description = "A behavior that uses a Sentence Selector to score child behaviors, deciding which will run next."
-thumb-url = "https://bevyhub-crate-assets.s3.us-west-2.amazonaws.com/assets/screenshots/hello-llm.png"
+thumb-url = "https://bevyhub-public.s3.us-west-2.amazonaws.com/assets/screenshots/hello-llm.png"
 path = "scenes/hello-ml.json"
 include = ["bevyhub/camera-2d", "bevyhub/ui-terminal", "beet-debug"]
 
@@ -325,7 +316,7 @@ path = "scenes/fetch-scene.json"
 [[package.metadata.scene]]
 name = "fetch"
 description = "Combining LLM, steering and animation behaviors."
-thumb-url = "https://bevyhub-crate-assets.s3.us-west-2.amazonaws.com/assets/screenshots/fetch.png"
+thumb-url = "https://bevyhub-public.s3.us-west-2.amazonaws.com/assets/screenshots/fetch.png"
 app = "app-ml"
 path = "scenes/fetch-npc.json"
 include = [
@@ -346,7 +337,7 @@ path = "scenes/frozen-lake-scene.json"
 [[package.metadata.scene]]
 name = "frozen-lake-train"
 description = "Train a Q-learning agent to navigate the frozen lake environment."
-thumb-url = "https://bevyhub-crate-assets.s3.us-west-2.amazonaws.com/assets/screenshots/frozen-lake-run.png"
+thumb-url = "https://bevyhub-public.s3.us-west-2.amazonaws.com/assets/screenshots/frozen-lake-run.png"
 app = "app-ml"
 path = "scenes/frozen-lake-train.json"
 include = [
@@ -359,7 +350,7 @@ include = [
 [[package.metadata.scene]]
 name = "frozen-lake-run"
 description = "Use a trained Q-learning agent to navigate the frozen lake environment."
-thumb-url = "https://bevyhub-crate-assets.s3.us-west-2.amazonaws.com/assets/screenshots/frozen-lake-run.png"
+thumb-url = "https://bevyhub-public.s3.us-west-2.amazonaws.com/assets/screenshots/frozen-lake-run.png"
 app = "app-ml"
 path = "scenes/frozen-lake-run.json"
 include = [

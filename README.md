@@ -51,10 +51,10 @@ world.spawn(SequenceFlow)
 
 The examples for beet are *scene-based*, meaning each example provides a scene for a common base app. As Bevy scene workflows are a wip, there are a few `Placeholder` types used for not-yet-serializable types like cameras, asset handles etc.
 
-Most examples rely on assets that can be downloaded with the following commands, or manually from [here](https://bevyhub-crate-assets.s3.us-west-2.amazonaws.com/assets.tar.gz).
+Most examples rely on assets that can be downloaded with the following commands, or manually from [here](https://bevyhub-public.s3.us-west-2.amazonaws.com/assets.tar.gz).
 
 ```sh
-curl -o ./assets.tar.gz https://bevyhub-crate-assets.s3.us-west-2.amazonaws.com/assets.tar.gz
+curl -o ./assets.tar.gz https://bevyhub-public.s3.us-west-2.amazonaws.com/assets.tar.gz
 tar -xzvf ./assets.tar.gz
 rm ./assets.tar.gz
 ```
