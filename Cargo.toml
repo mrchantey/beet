@@ -97,6 +97,56 @@ wasm-bindgen = "0.2"
 wasm-bindgen-futures = "0.4"
 console_error_panic_hook = "0.1"
 
+
+[workspace.dependencies.web-sys]
+# [target.'cfg(target_arch = "wasm32")'.dependencies.web-sys]
+version = "0.3"
+features = [
+	# HTML
+	'Headers',
+	'Document',
+	'Element',
+	'Window',
+	"Cache",
+	"CacheStorage",
+	'HtmlIFrameElement',
+	'DomRectReadOnly',
+	# Style
+	'MediaQueryList',
+	# Events
+	'MouseEvent',
+	'KeyboardEvent',
+	'CustomEvent',
+	'CustomEventInit',
+	# JS
+	'Gpu',
+	'console',
+	'Navigator',
+	'Performance',
+	# Fetch
+	'Request',
+	'RequestInit',
+	'RequestMode',
+	'RequestCache',
+	'Response',
+	# Blob
+	'Blob',
+	'BlobEvent',
+	'BlobEventInit',
+	'BlobPropertyBag',
+	# Elements
+	'HtmlAnchorElement',
+	'HtmlCanvasElement',
+	'HtmlInputElement',
+	'File',
+	'FileList',
+	# Url
+	'Url',
+	'History',
+	'Location',
+	'UrlSearchParams',
+]
+
 #💡 Package
 
 [package]
@@ -152,80 +202,22 @@ wasm-bindgen.workspace = true
 tokio.workspace = true
 
 
-### WORKSPACE ################################################################################################z###########################
+[[example]]
+name = "app_ml"
+path = "examples/scenes/app_ml.rs"
 
-[workspace.dependencies.web-sys]
-# [target.'cfg(target_arch = "wasm32")'.dependencies.web-sys]
-version = "0.3"
-features = [
-	# HTML
-	'Headers',
-	'Document',
-	'Element',
-	'Window',
-	"Cache",
-	"CacheStorage",
-	'HtmlIFrameElement',
-	'DomRectReadOnly',
-	# Style
-	'MediaQueryList',
-	# Events
-	'MouseEvent',
-	'KeyboardEvent',
-	'CustomEvent',
-	'CustomEventInit',
-	# JS
-	'Gpu',
-	'console',
-	'Navigator',
-	'Performance',
-	# Fetch
-	'Request',
-	'RequestInit',
-	'RequestMode',
-	'RequestCache',
-	'Response',
-	# Blob
-	'Blob',
-	'BlobEvent',
-	'BlobEventInit',
-	'BlobPropertyBag',
-	# Elements
-	'HtmlAnchorElement',
-	'HtmlCanvasElement',
-	'HtmlInputElement',
-	'File',
-	'FileList',
-	# Url
-	'Url',
-	'History',
-	'Location',
-	'UrlSearchParams',
-	# indexedDB
-	"IdbCursor",
-	"IdbCursorDirection",
-	"IdbCursorWithValue",
-	"IdbDatabase",
-	"IdbFactory",
-	"IdbFileHandle",
-	"IdbFileMetadataParameters",
-	"IdbFileRequest",
-	"IdbIndex",
-	"IdbIndexParameters",
-	"IdbKeyRange",
-	"IdbLocaleAwareKeyRange",
-	"IdbMutableFile",
-	"IdbObjectStore",
-	"IdbObjectStoreParameters",
-	"IdbOpenDbOptions",
-	"IdbOpenDbRequest",
-	"IdbRequest",
-	"IdbRequestReadyState",
-	"IdbTransaction",
-	"IdbTransactionMode",
-	"IdbVersionChangeEvent",
-	"IdbVersionChangeEventInit",
-]
+[[package.metadata.scene]]
+name = "app-ml"
+thumb-text = "🔨"
+description = "Full Beet App with machine learning, networking, and UI."
+app.js-url = "https://mrchantey.github.io/bevyhub-apps/beet/app_ml.js"
+app.wasm-url = "https://mrchantey.github.io/bevyhub-apps/beet/app_ml_bg.wasm"
+app.type-registry-url = "https://mrchantey.github.io/bevyhub-apps/beet/registries/type_registry_ml.json"
+app.replication-registry-url = "https://mrchantey.github.io/bevyhub-apps/beet/registries/replication_registry_ml.json"
+
+[[example]]
+name = "app"
+path = "examples/scenes/app.rs"
 
 [[package.metadata.scene]]
 name = "app"
@@ -237,75 +229,15 @@ app.type-registry-url = "https://mrchantey.github.io/bevyhub-apps/beet/registrie
 app.replication-registry-url = "https://mrchantey.github.io/bevyhub-apps/beet/registries/replication_registry.json"
 
 [[package.metadata.scene]]
-name = "app-ml"
-thumb-text = "🔨"
-description = "Full Beet App with machine learning, networking, and UI."
-app.js-url = "https://mrchantey.github.io/bevyhub-apps/beet/app_ml.js"
-app.wasm-url = "https://mrchantey.github.io/bevyhub-apps/beet/app_ml_bg.wasm"
-app.type-registry-url = "https://mrchantey.github.io/bevyhub-apps/beet/registries/type_registry_ml.json"
-app.replication-registry-url = "https://mrchantey.github.io/bevyhub-apps/beet/registries/replication_registry_ml.json"
-
-
-[[package.metadata.scene]]
 name = "beet-debug"
 thumb-text = "🐛"
 description = "Enable debugging for printing to the console, and screen if used with bevyhub/ui-terminal."
 path = "scenes/beet-debug.json"
 
-[[package.metadata.scene]]
-name = "hello-world"
-thumb-text = "🌍"
-thumb-url = "https://bevyhub-public.s3.us-west-2.amazonaws.com/assets/screenshots/hello-world.png"
-description = "A simple behavior that prints 'Hello' then 'World' to the console."
-app = "app"
-path = "scenes/hello-world.json"
-include = ["beet-debug", "bevyhub/camera-2d", "bevyhub/ui-terminal"]
+[[example]]
+name = "export_scenes"
+path = "examples/scenes/export_scenes.rs"
 
-
-# [[package.metadata.scene]]
-# name = "flock"
-# description = "Demonstration of flocking behaviors."
-# thumb-url = "https://bevyhub-public.s3.us-west-2.amazonaws.com/assets/screenshots/flock.png"
-# app = "app"
-# path = "scenes/flock.json"
-# include = ["beet-debug", "bevyhub/camera-2d", "bevyhub/space-scene"]
-
-[[package.metadata.scene]]
-name = "seek"
-description = "Demonstration of the seek behavior."
-thumb-url = "https://bevyhub-public.s3.us-west-2.amazonaws.com/assets/screenshots/seek.png"
-app = "app"
-path = "scenes/seek.json"
-include = ["beet-debug", "bevyhub/camera-2d", "bevyhub/space-scene"]
-
-[[package.metadata.scene]]
-name = "seek-3d"
-description = "A 3D demonstration of the seek behavior."
-thumb-url = "https://bevyhub-public.s3.us-west-2.amazonaws.com/assets/screenshots/seek-3d.png"
-app = "app"
-path = "scenes/seek-3d.json"
-include = ["beet-debug", "bevyhub/lighting-3d", "bevyhub/ground-3d"]
-
-
-[[package.metadata.scene]]
-name = "hello-animation"
-description = "A simple behavior demonstrating animation control."
-thumb-url = "https://bevyhub-public.s3.us-west-2.amazonaws.com/assets/screenshots/hello-animation.png"
-app = "app"
-path = "scenes/hello-animation.json"
-include = [
-	"bevyhub/ui-terminal",
-	"bevyhub/lighting-3d",
-	"bevyhub/ground-3d",
-	"beet-debug",
-]
-
-[[package.metadata.scene]]
-name = "hello-ml"
-description = "A behavior that uses a Sentence Selector to score child behaviors, deciding which will run next."
-thumb-url = "https://bevyhub-public.s3.us-west-2.amazonaws.com/assets/screenshots/hello-llm.png"
-path = "scenes/hello-ml.json"
-include = ["bevyhub/camera-2d", "bevyhub/ui-terminal", "beet-debug"]
 
 [[package.metadata.scene]]
 name = "fetch-scene"
@@ -359,3 +291,60 @@ include = [
 	"beet-debug",
 	"frozen-lake-scene",
 ]
+
+
+
+
+# [[package.metadata.scene]]
+# name = "flock"
+# description = "Demonstration of flocking behaviors."
+# thumb-url = "https://bevyhub-public.s3.us-west-2.amazonaws.com/assets/screenshots/flock.png"
+# app = "app"
+# path = "scenes/flock.json"
+# include = ["beet-debug", "bevyhub/camera-2d", "bevyhub/space-scene"]
+
+[[package.metadata.scene]]
+name = "seek"
+description = "Demonstration of the seek behavior."
+thumb-url = "https://bevyhub-public.s3.us-west-2.amazonaws.com/assets/screenshots/seek.png"
+app = "app"
+path = "scenes/seek.json"
+include = ["beet-debug", "bevyhub/camera-2d", "bevyhub/space-scene"]
+
+[[package.metadata.scene]]
+name = "seek-3d"
+description = "A 3D demonstration of the seek behavior."
+thumb-url = "https://bevyhub-public.s3.us-west-2.amazonaws.com/assets/screenshots/seek-3d.png"
+app = "app"
+path = "scenes/seek-3d.json"
+include = ["beet-debug", "bevyhub/lighting-3d", "bevyhub/ground-3d"]
+
+
+[[package.metadata.scene]]
+name = "hello-animation"
+description = "A simple behavior demonstrating animation control."
+thumb-url = "https://bevyhub-public.s3.us-west-2.amazonaws.com/assets/screenshots/hello-animation.png"
+app = "app"
+path = "scenes/hello-animation.json"
+include = [
+	"bevyhub/ui-terminal",
+	"bevyhub/lighting-3d",
+	"bevyhub/ground-3d",
+	"beet-debug",
+]
+
+[[package.metadata.scene]]
+name = "hello-ml"
+description = "A behavior that uses a Sentence Selector to score child behaviors, deciding which will run next."
+thumb-url = "https://bevyhub-public.s3.us-west-2.amazonaws.com/assets/screenshots/hello-llm.png"
+path = "scenes/hello-ml.json"
+include = ["bevyhub/camera-2d", "bevyhub/ui-terminal", "beet-debug"]
+
+[[package.metadata.scene]]
+name = "hello-world"
+thumb-text = "🌍"
+thumb-url = "https://bevyhub-public.s3.us-west-2.amazonaws.com/assets/screenshots/hello-world.png"
+description = "A simple behavior that prints 'Hello' then 'World' to the console."
+app = "app"
+path = "scenes/hello-world.json"
+include = ["beet-debug", "bevyhub/camera-2d", "bevyhub/ui-terminal"]

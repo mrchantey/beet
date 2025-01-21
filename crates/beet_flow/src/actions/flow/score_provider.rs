@@ -2,8 +2,8 @@ use crate::prelude::*;
 use bevy::prelude::*;
 pub type ScoreValue = f32;
 
-pub mod score{
-    use super::flow::ScoreValue;
+pub mod score {
+	use super::flow::ScoreValue;
 	pub const FAIL: ScoreValue = 0.0;
 	pub const PASS: ScoreValue = 1.0;
 	pub const NEUTRAL: ScoreValue = 0.5;
