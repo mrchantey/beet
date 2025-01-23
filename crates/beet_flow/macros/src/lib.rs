@@ -8,9 +8,12 @@ mod utils;
 /// `observers`
 /// Observers that are spawned when this component is added and despawned when it is removed.
 ///
+/// `systems`
+/// Systems for long running behaviors
+///
 /// ```rust
 /// #[derive(Component, Action)]
-/// #[observers(log_name_on_run,log_name_on_run)]
+/// #[observers(log_name_on_run)]
 /// struct LogOnRun(pub String);
 ///
 /// fn log_name_on_run(trigger: Trigger<OnRun>, query: Query<&LogOnRun>) {
@@ -20,6 +23,7 @@ mod utils;
 /// 		.unwrap();
 /// 	println!("log_name_on_run: {name}");
 /// }
+///
 ///
 /// ```
 #[proc_macro_derive(

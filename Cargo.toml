@@ -66,6 +66,7 @@ bytemuck = "1.13.1"
 petgraph = { version = "0.6.4", features = ["serde-1"] }
 heck = "0.4"
 rand = "0.8"
+rand_chacha = "0"
 
 ## async
 futures = "0.3"
@@ -192,6 +193,8 @@ forky.workspace = true
 anyhow.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+rand.workspace = true
+rand_chacha.workspace = true
 
 [target.'cfg(target_arch = "wasm32")'.dev-dependencies]
 console_log.workspace = true
@@ -245,6 +248,10 @@ thumb-text = "🏠"
 description = "A camera and the items that the fetch character can go to."
 path = "scenes/fetch-scene.json"
 
+[[example]]
+name = "fetch"
+path = "examples/scenes/fetch.rs"
+
 [[package.metadata.scene]]
 name = "fetch"
 description = "Combining LLM, steering and animation behaviors."
@@ -266,6 +273,10 @@ description = "The static scene for the frozen lake environment."
 path = "scenes/frozen-lake-scene.json"
 
 
+[[example]]
+name = "frozen_lake_train"
+path = "examples/scenes/frozen_lake_train.rs"
+
 [[package.metadata.scene]]
 name = "frozen-lake-train"
 description = "Train a Q-learning agent to navigate the frozen lake environment."
@@ -278,6 +289,10 @@ include = [
 	"beet-debug",
 	"frozen-lake-scene",
 ]
+
+[[example]]
+name = "frozen_lake_run"
+path = "examples/scenes/frozen_lake_run.rs"
 
 [[package.metadata.scene]]
 name = "frozen-lake-run"
@@ -292,9 +307,7 @@ include = [
 	"frozen-lake-scene",
 ]
 
-
-
-
+# Too big, we need to handle for loops in scene files
 # [[package.metadata.scene]]
 # name = "flock"
 # description = "Demonstration of flocking behaviors."
@@ -302,6 +315,57 @@ include = [
 # app = "app"
 # path = "scenes/flock.json"
 # include = ["beet-debug", "bevyhub/camera-2d", "bevyhub/space-scene"]
+
+[[example]]
+name = "hello_animation"
+path = "examples/scenes/hello_animation.rs"
+
+
+[[package.metadata.scene]]
+name = "hello-animation"
+description = "A simple behavior demonstrating animation control."
+thumb-url = "https://bevyhub-public.s3.us-west-2.amazonaws.com/assets/screenshots/hello-animation.png"
+app = "app"
+path = "scenes/hello-animation.json"
+include = [
+	"bevyhub/ui-terminal",
+	"bevyhub/lighting-3d",
+	"bevyhub/ground-3d",
+	"beet-debug",
+]
+
+
+[[example]]
+name = "hello_ml"
+path = "examples/scenes/hello_ml.rs"
+
+
+[[package.metadata.scene]]
+name = "hello-ml"
+description = "A behavior that uses a Sentence Selector to score child behaviors, deciding which will run next."
+thumb-url = "https://bevyhub-public.s3.us-west-2.amazonaws.com/assets/screenshots/hello-llm.png"
+path = "scenes/hello-ml.json"
+include = ["bevyhub/camera-2d", "bevyhub/ui-terminal", "beet-debug"]
+
+
+[[example]]
+name = "hello_world"
+path = "examples/scenes/hello_world.rs"
+
+[[package.metadata.scene]]
+name = "hello-world"
+thumb-text = "🌍"
+thumb-url = "https://bevyhub-public.s3.us-west-2.amazonaws.com/assets/screenshots/hello-world.png"
+description = "A simple behavior that prints 'Hello' then 'World' to the console."
+app = "app"
+path = "scenes/hello-world.json"
+include = ["beet-debug", "bevyhub/camera-2d", "bevyhub/ui-terminal"]
+
+
+[[example]]
+name = "inverse_kinematics"
+path = "examples/scenes/inverse_kinematics.rs"
+
 
 [[package.metadata.scene]]
 name = "seek"
@@ -318,33 +382,3 @@ thumb-url = "https://bevyhub-public.s3.us-west-2.amazonaws.com/assets/screenshot
 app = "app"
 path = "scenes/seek-3d.json"
 include = ["beet-debug", "bevyhub/lighting-3d", "bevyhub/ground-3d"]
-
-
-[[package.metadata.scene]]
-name = "hello-animation"
-description = "A simple behavior demonstrating animation control."
-thumb-url = "https://bevyhub-public.s3.us-west-2.amazonaws.com/assets/screenshots/hello-animation.png"
-app = "app"
-path = "scenes/hello-animation.json"
-include = [
-	"bevyhub/ui-terminal",
-	"bevyhub/lighting-3d",
-	"bevyhub/ground-3d",
-	"beet-debug",
-]
-
-[[package.metadata.scene]]
-name = "hello-ml"
-description = "A behavior that uses a Sentence Selector to score child behaviors, deciding which will run next."
-thumb-url = "https://bevyhub-public.s3.us-west-2.amazonaws.com/assets/screenshots/hello-llm.png"
-path = "scenes/hello-ml.json"
-include = ["bevyhub/camera-2d", "bevyhub/ui-terminal", "beet-debug"]
-
-[[package.metadata.scene]]
-name = "hello-world"
-thumb-text = "🌍"
-thumb-url = "https://bevyhub-public.s3.us-west-2.amazonaws.com/assets/screenshots/hello-world.png"
-description = "A simple behavior that prints 'Hello' then 'World' to the console."
-app = "app"
-path = "scenes/hello-world.json"
-include = ["beet-debug", "bevyhub/camera-2d", "bevyhub/ui-terminal"]
