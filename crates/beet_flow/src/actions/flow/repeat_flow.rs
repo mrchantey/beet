@@ -5,7 +5,7 @@ use bevy::prelude::*;
 
 
 /// Reattaches the [`RunOnSpawn`] component whenever [`OnRunResult`] is called.
-/// This does **not** trigger observers, which avoids infinite loops.
+/// Using [`RunOnSpawn`] means this does **not** directly trigger observers, which avoids infinite loops.
 #[derive(Debug, Clone, PartialEq, Component, Action, Reflect)]
 #[reflect(Default, Component, ActionMeta)]
 #[category(ActionCategory::Behavior)]

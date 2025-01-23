@@ -7,18 +7,19 @@ use bevy::prelude::*;
 pub fn interrupt_on_run_result(
 	trigger: Trigger<OnRunResult>,
 	mut commands: Commands,
-	running: Populated<Entity, With<Running>>,
 	children: Query<&Children>,
-	children_should_remove: Populated<
-		(),
-		(With<Running>, Without<NoInterrupt>),
-	>,
+	should_remove: Populated<(), (With<Running>, Without<NoInterrupt>)>,
 ) {
-	if let Some(entity) = running.get(trigger.entity()).ok() {
+	let entity = trigger.entity();
+
+	if should_remove.contains(entity) {
+		println!("stopped entity: {}",entity);
 		commands.entity(entity).remove::<Running>();
 	}
-	for child in children.iter_descendants(trigger.entity()) {
-		if children_should_remove.contains(child) {
+	
+	for child in children.iter_descendants(entity) {
+		println!("stopped child: {}",child);
+		if should_remove.contains(child) {
 			commands.entity(child).remove::<Running>();
 		}
 	}
@@ -37,12 +38,14 @@ mod test {
 		let mut world = World::new();
 		world.add_observer(interrupt_on_run_result);
 
-		let entity = world
+		world
 			.spawn(Running)
-			.flush_trigger(OnRunResult::success())
-			.id();
+			.with_child(Running)
+			.flush_trigger(OnRunResult::success());
 
-		expect(&world).not().to_have_component::<Running>(entity)?;
+		expect(world.query::<&Running>().iter(&world).count()).to_be(0)?;
+
+		// expect(&world).not().to_have_component::<Running>(entity)?;
 
 		Ok(())
 	}

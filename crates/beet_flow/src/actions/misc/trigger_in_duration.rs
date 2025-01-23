@@ -65,6 +65,7 @@ pub fn trigger_in_duration<T: GenericActionEvent>(
 			commands.entity(entity).trigger(action.value.clone());
 			// Randomize the next duration if a range is provided
 			if let Some(range) = &action.range {
+				// TODO cache the rng, see malenia
 				action.duration = rand::thread_rng().gen_range(range.clone());
 			}
 		}

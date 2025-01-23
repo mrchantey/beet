@@ -49,31 +49,11 @@ test-ci:
 test-all *args:
 	just watch 'cargo test --workspace --lib -- {{args}}'
 
-test-spatial *args:
-	just watch 'cargo test -p beet_spatial --lib -- {{args}}'
-
-test-sim *args:
-	just watch 'cargo test -p beet_sim --lib -- {{args}}'
-
-test-flow *args:
-	just watch 'cargo test -p beet_flow --lib -- {{args}}'
-# just watch 'cargo test -p beet_flow --lib -- --nocapture {{args}}'
-
-test-ml *args:
-	just watch 'cargo test -p beet_ml --lib -- {{args}}'
-
-test-examples *args:
-	just watch 'cargo test -p beet_examples --lib -- {{args}}'
+test crate *args:
+	just watch 'cargo test -p {{crate}} --lib -- {{args}}'
 
 serve-web:
 	just serve-wasm
-
-book:
-	cd docs && mdbook serve --port 3001
-
-# mdbooks server is busted on wsl so I use live-server
-serve-book:
-	cd docs/book && live-server --no-browser
 
 clean-repo:
 	cargo clean
