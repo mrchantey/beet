@@ -4,7 +4,7 @@ use bevy::prelude::*;
 
 /// Removes [`Running`] from the entity when [`OnRunResult`] is triggered.
 /// Also removes [`Running`] from children unless they have a [`NoInterrupt`]
-pub fn end_continued_run(
+pub fn interrupt_on_run_result(
 	trigger: Trigger<OnRunResult>,
 	mut commands: Commands,
 	running: Populated<Entity, With<Running>>,
@@ -35,7 +35,7 @@ mod test {
 	#[test]
 	fn works() -> Result<()> {
 		let mut world = World::new();
-		world.add_observer(end_continued_run);
+		world.add_observer(interrupt_on_run_result);
 
 		let entity = world
 			.spawn(Running)

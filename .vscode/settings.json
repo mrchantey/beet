@@ -13,7 +13,7 @@
 		"LICENSE-MIT.txt": true,
 		"**/.embuild/": true,
 		// "**/.cargo/": true,
-		"**/mod.rs": true,
+		// "**/mod.rs": true,
 		// "**/target/": true,
 		// "**/sdkconfig.defaults": true,
 		"**/build.rs": true,

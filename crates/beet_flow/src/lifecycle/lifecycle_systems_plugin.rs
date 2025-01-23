@@ -41,6 +41,6 @@ impl Plugin for LifecycleSystemsPlugin {
 		let world = app.world_mut();
 		world.add_observer(bubble_run_result);
 		world.add_observer(interrupt_on_run);
-		world.add_observer(end_continued_run);
+		world.add_observer(interrupt_on_run_result);
 	}
 }

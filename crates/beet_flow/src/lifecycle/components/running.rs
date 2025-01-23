@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 use std::fmt::Debug;
 
-/// Indicate this node is currently running.
+/// Indicate this node is currently long-running.
 /// As this is frequently added and removed, it is `SparseSet`.
 #[derive(Default, Debug, Copy, Clone, Component, PartialEq, Reflect)]
 #[component(storage = "SparseSet")]
