@@ -1,6 +1,9 @@
 {
-	// "files.autoSave": "off",
-	// "files.autoSaveDelay": 2000,
+	"rust-analyzer.cargo.features": "all",
+	// "rust-analyzer.cargo.target": "x86_64-unknown-linux-gnu",
+	// "rust-analyzer.procMacro.enable": false,
+	// "rust-analyzer.procMacro.attributes.enable": false,
+	// "rust-analyzer.cargo.target": "wasm32-unknown-unknown",
 	"files.exclude": {
 		"**/.git": true,
 		// ".vscode": true,
@@ -19,14 +22,6 @@
 		"**/build.rs": true,
 		"docs/book/**": true,
 	},
-	// "rust-analyzer.cargo.features": "all",
-	// "rust-analyzer.cargo.features": [
-	// 	"web_sys_unstable_apis"
-	// ],
-	// "rust-analyzer.cargo.target": "x86_64-unknown-linux-gnu",
-	// "rust-analyzer.procMacro.enable": false,
-	// "rust-analyzer.procMacro.attributes.enable": false,
-	// "rust-analyzer.cargo.target": "wasm32-unknown-unknown",
 	"search.exclude": {
 		"assets/": true,
 		// "assets/openmoji/openmoji.json":false,

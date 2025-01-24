@@ -13,14 +13,15 @@ categories.workspace = true
 [features]
 # default = ["beet_spatial", "bevyhub"]
 spatial = ["dep:beet_spatial"]
-bevyhub = ["dep:bevyhub"]
+# bevyhub = ["dep:bevyhub"]
 
 # tokio = ["dep:tokio"]
 
 [dependencies]
+bevyhub.workspace = true
 beet_flow.workspace = true
 beet_spatial = { workspace = true, optional = true }
-bevyhub = { workspace = true, optional = true }
+# bevyhub = { workspace = true, optional = true }
 
 futures = "0.3.30"
 thiserror.workspace = true

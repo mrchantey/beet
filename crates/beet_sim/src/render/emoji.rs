@@ -1,5 +1,6 @@
-use bevyhub::prelude::*;
 use bevy::prelude::*;
+#[cfg(feature = "bevyhub")]
+use bevyhub::prelude::*;
 
 
 #[derive(Default, Component, Reflect)]
@@ -35,6 +36,14 @@ impl Emoji {
 		self.hexcode = hexcode.to_uppercase();
 	}
 
+	#[cfg(not(feature = "bevyhub"))]
+	#[allow(unreachable_code)]
+	pub fn bundle(_hexcode: &str) -> impl Bundle { 
+		todo!("non bevyhub bundle");
+		()
+	}
+
+	#[cfg(feature = "bevyhub")]
 	pub fn bundle(hexcode: &str) -> BundlePlaceholder {
 		BundlePlaceholder::Pbr {
 			mesh: MeshPlaceholder::Plane3d(Plane3d::new(

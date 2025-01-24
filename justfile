@@ -43,13 +43,18 @@ doc:
 serve-doc:
 	cd ./target/doc/beet && forky serve
 
-test-ci:
-	just test-all
+# 1. test with no features
+# 2. test with all features
+test-ci *args:
+	cargo test --workspace -- {{args}}
+	cargo test --workspace --all-features -- {{args}}
 
 test-all *args:
-	just watch 'cargo test --workspace -- {{args}}'
+	just watch 'just test-ci {{args}}'
 
 test crate *args:
+	just watch 'cargo test -p {{crate}} --lib --all-features -- {{args}}'
+test-min crate *args:
 	just watch 'cargo test -p {{crate}} --lib -- {{args}}'
 
 serve-web:

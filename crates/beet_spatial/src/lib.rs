@@ -8,6 +8,8 @@ pub mod asset_actions;
 pub mod procedural_animation;
 pub mod inverse_kinematics;
 pub mod movement;
+#[cfg(feature = "bevyhub")]
+pub mod bevyhub;
 pub mod plugins;
 pub mod extensions;
 pub mod robotics;
@@ -20,6 +22,8 @@ pub mod prelude {
 	pub use crate::animation::*;
 	#[cfg(feature = "assets")]
 	pub use crate::asset_actions::*;
+	#[cfg(feature = "bevyhub")]
+	pub use crate::bevyhub::*;
 	pub use crate::procedural_animation::*;
 	pub use crate::inverse_kinematics::*;
 	pub use crate::movement::*;

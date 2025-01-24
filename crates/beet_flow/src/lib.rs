@@ -15,7 +15,7 @@ pub mod events;
 pub mod extensions;
 pub mod graph;
 pub mod lifecycle;
-#[cfg(feature = "net")]
+#[cfg(feature = "bevyhub")]
 pub mod net;
 pub mod observers;
 pub mod reflect;
@@ -43,7 +43,7 @@ pub mod prelude {
 	pub use crate::lifecycle::components::*;
 	pub use crate::lifecycle::lifecycle_plugin::*;
 	pub use crate::lifecycle::lifecycle_systems_plugin::*;
-	#[cfg(feature = "net")]
+	#[cfg(feature = "bevyhub")]
 	pub use crate::net::*;
 	pub use crate::observers::*;
 	// pub use crate::lifecycle::*;

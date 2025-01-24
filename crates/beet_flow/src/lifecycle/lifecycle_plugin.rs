@@ -54,7 +54,7 @@ impl Plugin for LifecyclePlugin {
 		/*-*/;
 
 		// net
-		#[cfg(feature = "net")]
+		#[cfg(feature = "bevyhub")]
 		app.add_plugins(BeetNetPlugin);
 
 		let world = app.world_mut();

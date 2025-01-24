@@ -13,13 +13,9 @@ categories.workspace = true
 
 
 [features]
-# temp disable reflect until https://github.com/bevyengine/bevy/pull/16018
-# default = ["net"]
-# default = ["net", "reflect"]
-# bevyhub = ["dep:bevyhub"]
-net = ["bevyhub", "bevyhub/net"]
-bevyhub = ["dep:bevyhub"]
+# default = ["bevyhub"]
 reflect = []
+bevyhub = ["dep:bevyhub","bevyhub/net", "bevyhub/core"]
 
 [dependencies]
 beet_flow_macros.workspace = true

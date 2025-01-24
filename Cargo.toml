@@ -37,6 +37,7 @@ beet_spatial = { path = "crates/beet_spatial", version = "0.0.5-rc.2", default-f
 beet_flow = { path = "crates/beet_flow", version = "0.0.5-rc.2" }
 beet_flow_macros = { path = "crates/beet_flow/macros", version = "0.0.5-rc.2" }
 beet_ml = { path = "crates/beet_ml", version = "0.0.5-rc.2" }
+beet_sim = { path = "crates/beet_sim", version = "0.0.5-rc.2" }
 beet_examples = { path = "crates/beet_examples", version = "0.0.5-rc.2" }
 emby = { path = "crates/emby", version = "0.0.5-rc.2" }
 
@@ -59,7 +60,6 @@ bevy = { version = "0.15", default-features = false, features = [
 	"serialize",
 	# "bevy_color",
 ] }
-bevy_reflect = { version = "0.15", features = ["documentation"] }
 
 
 ## logging
@@ -174,20 +174,23 @@ categories.workspace = true
 include = ["CHANGELOG.md", "README.md", "/src", "/examples", "/scenes"]
 
 [features]
-default = ["ml", "animation", "assets", "ui", "bevyhub", "reflect"]
+# default = ["ml", "animation", "assets", "ui", "bevyhub", "reflect"]
 ml = ["dep:beet_ml"]
 reflect = ["beet_flow/reflect"]
-bevyhub = ["beet_flow/bevyhub", "beet_ml?/bevyhub"]
-animation = ["beet_spatial/animation"]
-assets = ["beet_spatial/assets"]
-ui = ["beet_spatial/ui"]
+spatial = ["dep:beet_spatial"]
+sim = ["dep:beet_sim"]
+bevyhub = ["beet_flow/bevyhub", "beet_spatial?/bevyhub", "beet_sim?/bevyhub"]
+animation = ["beet_spatial?/animation"]
+assets = ["beet_spatial?/assets"]
+ui = ["beet_spatial?/ui"]
 
 # dynamic_linking = ["bevy/dynamic_linking"]
 
 [dependencies]
 beet_flow.workspace = true
-beet_spatial.workspace = true
+beet_spatial = { workspace = true, optional = true }
 beet_ml = { workspace = true, optional = true }
+beet_sim = { workspace = true, optional = true }
 # bevyhub = { workspace = true, optional = true }
 # thiserror.workspace = true
 

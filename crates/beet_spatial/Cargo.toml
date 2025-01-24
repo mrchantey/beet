@@ -12,7 +12,8 @@ keywords = { workspace = true }
 categories = { workspace = true }
 
 [features]
-default = ["animation", "assets", "ui"]
+# default = ["animation", "assets", "ui"]
+bevyhub = ["beet_flow/bevyhub"]
 ui = ["bevy/bevy_ui"]
 assets = ["bevy/bevy_asset", "dep:bevyhub"]
 animation = ["bevy/bevy_animation", "dep:bevyhub"]
@@ -20,7 +21,7 @@ animation = ["bevy/bevy_animation", "dep:bevyhub"]
 [dependencies]
 forky.workspace = true
 bevyhub = { workspace = true, optional = true, features = ["core"] }
-beet_flow = { workspace = true, features = ["net"] }
+beet_flow = { workspace = true }
 
 bevy.workspace = true
 

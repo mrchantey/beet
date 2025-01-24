@@ -52,7 +52,7 @@ fn main() {
 						))
 						.with_child((
 							Name::new("Patrol Left"),
-							Patrol::new("Patrol Left Terrace: "),
+							Patrol::new("Patrol Left Flank: "),
 							TriggerInDuration::new(
 								OnRunResult::success(),
 								Duration::from_millis(300),
@@ -60,7 +60,7 @@ fn main() {
 						))
 						.with_child((
 							Name::new("Patrol Right"),
-							Patrol::new("Patrol Right Terrace: "),
+							Patrol::new("Patrol Right Flank: "),
 							TriggerInDuration::new(
 								OnRunResult::success(),
 								Duration::from_millis(300),
@@ -99,10 +99,9 @@ impl Patrol {
 	}
 }
 
-
-fn patrol(mut query: Query<&mut Patrol, With<Running>>) {
-	for mut action in query.iter_mut() {
+fn patrol(mut query: Query<(&mut Patrol, &Name), With<Running>>) {
+	for (mut action, name) in query.iter_mut() {
 		action.count += 1;
-		println!("{}{}", action.prefix, action.count);
+		println!("{}: {}", name, action.count);
 	}
 }

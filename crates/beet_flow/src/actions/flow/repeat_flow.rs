@@ -31,10 +31,23 @@ fn repeat(trigger: Trigger<OnRunResult>, mut commands: Commands) {
 
 #[cfg(test)]
 mod test {
+	use crate::prelude::*;
+	use bevy::prelude::*;
+
+
 	// use sweet::prelude::*;
 
 	#[test]
-	fn works() {
+	fn removes_running() {
+		let mut app = App::new();
+		app.add_plugins((
+			LifecycleSystemsPlugin,
+			ActionPlugin::<(SequenceFlow, RepeatFlow)>::default(),
+		));
+		let world = app.world_mut();
+		let root = world
+			.spawn((Name::new("root"), Running, RepeatFlow::default()))
+			.with_child(Running);
 
 		// expect(true).to_be_false();
 	}

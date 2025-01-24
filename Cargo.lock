@@ -414,6 +414,7 @@ dependencies = [
  "beet_examples",
  "beet_flow",
  "beet_ml",
+ "beet_sim",
  "beet_spatial",
  "bevy",
  "bevyhub",
@@ -1510,7 +1511,7 @@ dependencies = [
 [[package]]
 name = "bevyhub"
 version = "0.0.1-rc.5"
-source = "git+https://github.com/mrchantey/bevyhub#fbc53084561ac3e3d46015fb1d1fe3d1e5a4565e"
+source = "git+https://github.com/mrchantey/bevyhub#e97dd7491a47c7aa629fe18644f2dcb0d0a8cace"
 dependencies = [
  "bevyhub_core",
  "bevyhub_net",
@@ -1520,7 +1521,7 @@ dependencies = [
 [[package]]
 name = "bevyhub_core"
 version = "0.0.1-rc.5"
-source = "git+https://github.com/mrchantey/bevyhub#fbc53084561ac3e3d46015fb1d1fe3d1e5a4565e"
+source = "git+https://github.com/mrchantey/bevyhub#e97dd7491a47c7aa629fe18644f2dcb0d0a8cace"
 dependencies = [
  "anyhow",
  "bevy",
@@ -1535,7 +1536,7 @@ dependencies = [
 [[package]]
 name = "bevyhub_net"
 version = "0.0.1-rc.5"
-source = "git+https://github.com/mrchantey/bevyhub#fbc53084561ac3e3d46015fb1d1fe3d1e5a4565e"
+source = "git+https://github.com/mrchantey/bevyhub#e97dd7491a47c7aa629fe18644f2dcb0d0a8cace"
 dependencies = [
  "anyhow",
  "bevy",
@@ -1558,11 +1559,10 @@ dependencies = [
 [[package]]
 name = "bevyhub_scene"
 version = "0.0.1-rc.5"
-source = "git+https://github.com/mrchantey/bevyhub#fbc53084561ac3e3d46015fb1d1fe3d1e5a4565e"
+source = "git+https://github.com/mrchantey/bevyhub#e97dd7491a47c7aa629fe18644f2dcb0d0a8cace"
 dependencies = [
  "anyhow",
  "bevy",
- "bevy_reflect",
  "extend",
  "forky 0.2.1-rc.1 (git+https://github.com/mrchantey/forky)",
  "log",
