@@ -38,10 +38,9 @@ pub impl DynamicEntity {
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use anyhow::Result;
 	use bevy::prelude::*;
 	use bevy::scene::DynamicEntity;
-	use sweet::*;
+	use sweet::prelude::*;
 
 	fn node_name(entity: &DynamicEntity) -> String {
 		for component in entity.components.iter() {
@@ -55,26 +54,23 @@ mod test {
 	}
 
 	#[test]
-	fn works() -> Result<()> {
+	fn works() {
 		let mut app = App::new();
 		app.register_type::<Name>();
 		let entity_id = app.world_mut().spawn(Name::new("Bob")).id();
-		let mut entity = DynamicEntity::new(app.world(), entity_id)?;
-		expect(entity.components.len()).to_be(1)?;
+		let mut entity = DynamicEntity::new(app.world(), entity_id).unwrap();
+		expect(entity.components.len()).to_be(1);
 		let name = node_name(&entity);
-		expect(name.as_str()).to_be("Bob")?;
+		expect(name.as_str()).to_be("Bob");
 
 		entity.components[0].apply(&Name::new("Alice"));
 
 		expect(app.world())
-			.component(entity_id)?
-			.to_be(&Name::new("Bob"))?;
-		entity.apply(app.world_mut())?;
+			.component::<Name>(entity_id)
+			.to_be(&Name::new("Bob"));
+		entity.apply(app.world_mut()).unwrap();
 		expect(app.world())
-			.component(entity_id)?
-			.to_be(&Name::new("Alice"))?;
-
-
-		Ok(())
+			.component::<Name>(entity_id)
+			.to_be(&Name::new("Alice"));
 	}
 }

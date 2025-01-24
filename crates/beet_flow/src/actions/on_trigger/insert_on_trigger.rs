@@ -39,12 +39,11 @@ impl<
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use anyhow::Result;
 	use bevy::prelude::*;
-	use sweet::*;
+	use sweet::prelude::*;
 
 	#[test]
-	fn works() -> Result<()> {
+	fn works() {
 		let mut app = App::new();
 		app.add_plugins(ActionPlugin::<InsertOnRun<Running>>::default());
 		let world = app.world_mut();
@@ -53,13 +52,12 @@ mod test {
 			.spawn(InsertOnRun::<Running>::default())
 			.flush_trigger(OnRun)
 			.id();
-		expect(world.entities().len()).to_be(2)?;
-		expect(&*world).to_have_component::<Running>(entity)?;
-		Ok(())
+		expect(world.entities().len()).to_be(2);
+		expect(&*world).to_have_component::<Running>(entity);
 	}
 
 	#[test]
-	fn with_map() -> Result<()> {
+	fn with_map() {
 		let mut app = App::new();
 		app.add_plugins(
 			ActionPlugin::<InsertOnTrigger<Running, OnRun>>::default(),
@@ -71,8 +69,7 @@ mod test {
 			.flush_trigger(OnRun)
 			.id();
 
-		expect(world.entities().len()).to_be(2)?;
-		expect(world.get::<Running>(entity)).to_be_some()?;
-		Ok(())
+		expect(world.entities().len()).to_be(2);
+		expect(world.get::<Running>(entity)).to_be_some();
 	}
 }

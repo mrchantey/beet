@@ -37,12 +37,11 @@ pub fn cohere_impulse<T: GenericActionComponent>(
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use anyhow::Result;
 	use bevy::prelude::*;
-	use sweet::*;
+	use sweet::prelude::*;
 
 	#[test]
-	fn works() -> Result<()> {
+	fn works() {
 		let mut world = World::new();
 
 
@@ -62,8 +61,6 @@ mod test {
 			agents,
 		))
 		.map(|i| i.0)
-		.to_be_close_to(Vec3::new(1.41, 1.41, 0.))?;
-
-		Ok(())
+		.to_be_close_to(Vec3::new(1.41, 1.41, 0.));
 	}
 }

@@ -76,14 +76,12 @@ pub fn trigger_in_duration<T: GenericActionEvent>(
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use anyhow::Result;
-	use bevyhub::prelude::*;
 	use bevy::prelude::*;
 	use std::time::Duration;
-	use sweet::*;
+	use sweet::prelude::*;
 
 	#[test]
-	fn works() -> Result<()> {
+	fn works() {
 		let mut app = App::new();
 
 		let on_result = observe_triggers::<OnRunResult>(app.world_mut());
@@ -105,12 +103,10 @@ mod test {
 
 		app.update_with_secs(1);
 
-		expect(&on_result).not().to_have_been_called()?;
+		expect(&on_result).not().to_have_been_called();
 
 		app.update_with_secs(10);
 
-		expect(&on_result).to_have_been_called()?;
-
-		Ok(())
+		expect(&on_result).to_have_been_called();
 	}
 }

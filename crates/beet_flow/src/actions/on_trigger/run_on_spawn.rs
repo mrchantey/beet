@@ -36,25 +36,22 @@ pub fn run_on_spawn(
 mod test {
 	use super::RunOnSpawn;
 	use crate::prelude::*;
-	use anyhow::Result;
 	use bevy::ecs::system::RunSystemOnce;
 	use bevy::prelude::*;
-	use bevyhub::prelude::*;
-	use sweet::*;
+	use sweet::prelude::*;
 
 	#[test]
-	fn works() -> Result<()> {
+	fn works() {
 		let mut world = World::new();
 		// world.add_observer(trigger_run_on_spawn);
 		let func = observe_triggers::<OnRun>(&mut world);
 
 		world.spawn(RunOnSpawn);
-		expect(&func).not().to_have_been_called()?;
-		world.run_system_once(run_on_spawn)?;
+		expect(&func).not().to_have_been_called();
+		world.run_system_once(run_on_spawn).unwrap();
 		world.flush();
-		expect(&func).to_have_been_called_times(1)?;
+		expect(&func).to_have_been_called_times(1);
 		world.flush();
-		expect(&func).to_have_been_called_times(1)?;
-		Ok(())
+		expect(&func).to_have_been_called_times(1);
 	}
 }

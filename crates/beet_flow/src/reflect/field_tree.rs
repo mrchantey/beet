@@ -107,17 +107,16 @@ fn map_items<'a>(
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use anyhow::Result;
 	use bevy::prelude::*;
 	use std::any::TypeId;
-	use sweet::*;
+	use sweet::prelude::*;
 
 	#[derive(Debug, Default, PartialEq, Component, Reflect)]
 	#[reflect(Default, Component)]
 	struct MyVecStruct(pub Vec3);
 
 	#[test]
-	fn tuple_struct() -> Result<()> {
+	fn tuple_struct() {
 		// setup
 		pretty_env_logger::try_init().ok();
 		let mut app = App::new();
@@ -129,11 +128,9 @@ mod test {
 		let field = ComponentIdent::new(entity, TypeId::of::<MyVecStruct>())
 			.into_field();
 
-		let tree = field.tree(app.world(), None)?;
+		let tree = field.tree(app.world(), None).unwrap();
 
-		expect(tree.children.len()).to_be(1)?;
-		expect(tree.children[0].children.len()).to_be(3)?;
-
-		Ok(())
+		expect(tree.children.len()).to_be(1);
+		expect(tree.children[0].children.len()).to_be(3);
 	}
 }

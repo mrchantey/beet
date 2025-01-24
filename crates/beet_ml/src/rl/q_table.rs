@@ -78,16 +78,15 @@ impl<State: StateSpace, Action: ActionSpace> QPolicy for QTable<State, Action> {
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use anyhow::Result;
 	use rand::rngs::StdRng;
 	use rand::SeedableRng;
-	use sweet::*;
+	use sweet::prelude::*;
 
 
 	/// This test is *almost* identical to a [`QTableTrainer`] but demonstrates
 	/// that we can do realtime stuff and dont need to use an [`Environment`]
 	#[test]
-	fn works() -> Result<()> {
+	fn works() {
 		let mut source = QTable::<GridPos, GridDirection>::default();
 		let params = QLearnParams::default();
 		let mut rng = StdRng::seed_from_u64(0);
@@ -130,11 +129,8 @@ mod test {
 		)
 		.evaluate();
 
-		expect(eval.mean).to_be(1.)?;
-		expect(eval.std).to_be(0.)?;
-		expect(eval.total_steps).to_be(600)?;
-
-
-		Ok(())
+		expect(eval.mean).to_be(1.);
+		expect(eval.std).to_be(0.);
+		expect(eval.total_steps).to_be(600);
 	}
 }

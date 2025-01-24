@@ -33,13 +33,11 @@ pub fn passthrough_run_result(
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use anyhow::Result;
-	use bevyhub::prelude::*;
 	use bevy::prelude::*;
-	use sweet::*;
+	use sweet::prelude::*;
 
 	#[test]
-	fn works() -> Result<()> {
+	fn works(){
 		let mut app = App::new();
 		app.add_plugins(ActionPlugin::<EndOnRun>::default());
 		let world = app.world_mut();
@@ -57,9 +55,7 @@ mod test {
 					.flush_trigger(OnRun);
 			});
 
-		expect(&on_run).to_have_been_called_times(1)?;
-		expect(&on_run_result).to_have_been_called_times(2)?;
-
-		Ok(())
+		expect(&on_run).to_have_been_called_times(1);
+		expect(&on_run_result).to_have_been_called_times(2);
 	}
 }

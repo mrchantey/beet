@@ -103,10 +103,20 @@ impl EntityIdent {
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use anyhow::Result;
 	use bevy::prelude::*;
-	use sweet::*;
-
+	use sweet::prelude::*;
+	fn test_no_action_behavior_tree(world: &mut World) -> EntityTree {
+		let entity = world
+			.spawn(Running)
+			.with_children(|parent| {
+				parent.spawn_empty();
+				parent.spawn_empty().with_children(|parent| {
+					parent.spawn_empty();
+				});
+			})
+			.id();
+		EntityTree::new_with_world(entity, world)
+	}
 
 	fn world() -> World {
 		let mut world = World::new();
@@ -120,46 +130,42 @@ mod test {
 	}
 
 	#[test]
-	fn deep_clone() -> Result<()> {
+	fn deep_clone() {
 		let mut world = world();
 		let entity1 = world
 			.spawn((BeetRoot::default(), Running, Name::new("Foo")))
 			.id();
 		let entity1 = EntityIdent::new(entity1);
 
-		expect(world.entities().len()).to_be(1)?;
+		expect(world.entities().len()).to_be(1);
 
-		let node2 = entity1.deep_clone(&mut world)?;
+		let node2 = entity1.deep_clone(&mut world).unwrap();
 
-		expect(world.entities().len()).to_be(2)?;
+		expect(world.entities().len()).to_be(2);
 
-		expect(&world).component(*node2)?.to_be(&Name::new("Foo"))?;
+		expect(&world)
+			.component::<Name>(*node2)
+			.to_be(&Name::new("Foo"));
 
-		expect(EntityIdent::get_roots(&mut world).len()).to_be(2)?;
-
-		Ok(())
+		expect(EntityIdent::get_roots(&mut world).len()).to_be(2);
 	}
 
 	#[test]
-	fn children() -> Result<()> {
+	fn children() {
 		let mut world = World::new();
 		let node = test_no_action_behavior_tree(&mut world).ident();
 
-		expect(node.children(&world).len()).to_be(2)?;
+		expect(node.children(&world).len()).to_be(2);
 		let child = node.add_child_behavior(&mut world);
-		expect(node.children(&world).len()).to_be(3)?;
+		expect(node.children(&world).len()).to_be(3);
 		child.despawn_recursive(&mut world);
-		expect(node.children(&world).len()).to_be(2)?;
-
-		Ok(())
+		expect(node.children(&world).len()).to_be(2);
 	}
 	#[test]
-	fn components() -> Result<()> {
+	fn components() {
 		let mut world = World::new();
 		let node = test_no_action_behavior_tree(&mut world).ident();
 
-		expect(node.components(&world).len()).to_be_greater_than(0)?;
-
-		Ok(())
+		expect(node.components(&world).len()).to_be_greater_than(0);
 	}
 }

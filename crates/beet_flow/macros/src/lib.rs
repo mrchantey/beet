@@ -2,7 +2,6 @@ mod action;
 mod utils;
 
 
-
 ///
 /// ## Attributes
 /// `observers`
@@ -12,6 +11,9 @@ mod utils;
 /// Systems for long running behaviors
 ///
 /// ```rust
+///	# use bevy::prelude::*;
+///	# use beet_flow::prelude::*;
+///
 /// #[derive(Component, Action)]
 /// #[observers(log_name_on_run)]
 /// struct LogOnRun(pub String);

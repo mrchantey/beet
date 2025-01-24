@@ -6,9 +6,7 @@ use bevy::prelude::*;
 pub struct DynReflect(pub Box<dyn PartialReflect>);
 
 impl Clone for DynReflect {
-	fn clone(&self) -> Self {
-		Self(self.clone_value())
-	}
+	fn clone(&self) -> Self { Self(self.clone_value()) }
 }
 impl PartialEq for DynReflect {
 	fn eq(&self, other: &Self) -> bool {
@@ -31,22 +29,17 @@ impl DynReflect {
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use anyhow::Result;
 	use bevy::prelude::*;
-	use sweet::*;
+	use sweet::prelude::*;
 
 	#[derive(Debug, Clone, PartialEq, Reflect)]
 	struct MyStruct(pub i32);
 
 	#[test]
-	fn works() -> Result<()> {
+	fn works() {
 		let val = MyStruct(7);
 		let mut dyn_val = DynReflect::new_cloned(&val);
 		dyn_val.apply(&MyStruct(3));
-		expect(dyn_val.try_into_reflect::<MyStruct>())
-			.as_some()?
-			.to_be(MyStruct(3))?;
-
-		Ok(())
+		expect(dyn_val.try_into_reflect::<MyStruct>()).to_be(Some(MyStruct(3)));
 	}
 }

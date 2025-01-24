@@ -203,15 +203,12 @@ impl<T: Display> Tree<T> {
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use anyhow::Result;
-	use sweet::*;
+	use sweet::prelude::*;
 
 	#[test]
-	fn works() -> Result<()> {
+	fn works() {
 		let tree = Tree::new(0).with_leaf(1).with_leaf(2);
 		let tree2 = tree.map(|x| x + 1);
-		expect(tree2).to_be(Tree::new(1).with_leaf(2).with_leaf(3))?;
-
-		Ok(())
+		expect(tree2).to_be(Tree::new(1).with_leaf(2).with_leaf(3));
 	}
 }

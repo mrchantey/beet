@@ -14,12 +14,12 @@ categories.workspace = true
 
 [features]
 # temp disable reflect until https://github.com/bevyengine/bevy/pull/16018
-default = ["net"] 
+# default = ["net"]
 # default = ["net", "reflect"]
 # bevyhub = ["dep:bevyhub"]
-net = ["dep:bevyhub", "bevyhub/net"]
+net = ["bevyhub", "bevyhub/net"]
+bevyhub = ["dep:bevyhub"]
 reflect = []
-test = ["dep:sweet"]
 
 [dependencies]
 beet_flow_macros.workspace = true
@@ -36,10 +36,8 @@ extend.workspace = true
 num-traits.workspace = true
 
 bevy.workspace = true
-sweet = { workspace = true, optional = true }
 
 [dev-dependencies]
-bevyhub = { workspace = true, features = ["test"] }
 pretty_env_logger.workspace = true
 ron.workspace = true
 sweet.workspace = true

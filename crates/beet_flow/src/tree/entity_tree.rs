@@ -45,9 +45,8 @@ impl EntityTree {
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use anyhow::Result;
 	use bevy::prelude::*;
-	use sweet::*;
+	use sweet::prelude::*;
 
 
 	fn create_tree(world: &mut World) -> EntityTree {
@@ -65,22 +64,21 @@ mod test {
 
 
 	#[test]
-	fn component_tree() -> Result<()> {
+	fn component_tree() {
 		let mut world = World::new();
 		let tree = create_tree(&mut world);
-		expect(tree.children.len()).to_be(2)?;
+		expect(tree.children.len()).to_be(2);
 
 		let entity = tree.children[1].value;
 		world.entity_mut(entity).insert(Name::new("child2new"));
 		let scores = tree.component_tree::<Name>(&world);
 
-		expect(scores.value).to_be(Some(&Name::new("parent")))?;
-		expect(scores.children[0].value).to_be(Some(&Name::new("child1")))?;
+		expect(scores.value).to_be(Some(&Name::new("parent")));
+		expect(scores.children[0].value).to_be(Some(&Name::new("child1")));
 		expect(scores.children[1].value)
-			.to_be(Some(&Name::new("child2new")))?;
+			.to_be(Some(&Name::new("child2new")));
 		expect(scores.children[1].children[0].value)
-			.to_be(Some(&Name::new("grandchild1")))?;
+			.to_be(Some(&Name::new("grandchild1")));
 
-		Ok(())
 	}
 }

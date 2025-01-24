@@ -248,29 +248,28 @@ fn normalize_l2(v: &Tensor) -> Result<Tensor> {
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use anyhow::Result;
-	use sweet::*;
+	use sweet::prelude::*;
 
 	#[tokio::test]
-	async fn works() -> Result<()> {
+	async fn works() {
 		pretty_env_logger::try_init().ok();
 
-		let mut bert = Bert::new(BertConfig::default()).await?;
-		let embeddings = bert.get_embeddings(vec![
-			"The cat sits outside".into(),
-			"A man is playing guitar".into(),
-			"I love pasta".into(),
-			"The new movie is awesome".into(),
-			"The cat plays in the garden".into(),
-			"A woman watches TV".into(),
-			"The new movie is so great".into(),
-			"Do you like pizza?".into(),
-		])?;
+		let mut bert = Bert::new(BertConfig::default()).await.unwrap();
+		let embeddings = bert
+			.get_embeddings(vec![
+				"The cat sits outside".into(),
+				"A man is playing guitar".into(),
+				"I love pasta".into(),
+				"The new movie is awesome".into(),
+				"The cat plays in the garden".into(),
+				"A woman watches TV".into(),
+				"The new movie is so great".into(),
+				"Do you like pizza?".into(),
+			])
+			.unwrap();
 
-		let results = embeddings.scores_sorted(0)?;
+		let results = embeddings.scores_sorted(0).unwrap();
 		expect(embeddings.sentences[results[0].0].as_ref())
-			.to_be("The cat plays in the garden")?;
-
-		Ok(())
+			.to_be("The cat plays in the garden");
 	}
 }

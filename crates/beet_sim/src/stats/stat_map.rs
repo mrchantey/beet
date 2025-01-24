@@ -85,11 +85,10 @@ impl StatMap {
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use anyhow::Result;
-	use sweet::*;
+	use sweet::prelude::*;
 
 	#[test]
-	fn works() -> Result<()> {
+	fn works() {
 		let mut sim_descriptor = SimDescriptor::default();
 		let stat = StatDescriptor {
 			name: "Health".to_string(),
@@ -103,14 +102,12 @@ mod test {
 
 		let mut stat_map = StatMap::from_sim_descriptor(&sim_descriptor);
 
-		expect(stat_map.map.len()).to_be(1)?;
-		expect(stat_map.map.get(&StatId(0)).unwrap()).to_be(&stat)?;
+		expect(stat_map.map.len()).to_be(1);
+		expect(stat_map.map.get(&StatId(0)).unwrap()).to_be(&stat);
 
 		stat_map.add_stat(stat.clone());
-		expect(stat_map.map.len()).to_be(2)?;
-		expect(stat_map.map.get(&StatId(1)).unwrap()).to_be(&stat)?;
+		expect(stat_map.map.len()).to_be(2);
+		expect(stat_map.map.get(&StatId(1)).unwrap()).to_be(&stat);
 
-
-		Ok(())
 	}
 }

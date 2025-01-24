@@ -157,10 +157,9 @@ impl ComponentUtils {
 #[cfg(test)]
 mod test {
 	use super::ComponentUtils;
-	use anyhow::Result;
 	use bevy::prelude::*;
 	use std::any::TypeId;
-	use sweet::*;
+	use sweet::prelude::*;
 
 	#[derive(Component, Debug, Default, Reflect, PartialEq)]
 	#[reflect(Default)]
@@ -168,23 +167,22 @@ mod test {
 
 
 	#[test]
-	fn get_set() -> Result<()> {
+	fn get_set() {
 		let mut world = World::new();
 		let entity = world.spawn(MyStruct(2)).id();
 		let type_id = TypeId::of::<MyStruct>();
 
-		expect(ComponentUtils::get(&world, entity)).to_be(vec![type_id])?;
+		expect(ComponentUtils::get(&world, entity)).to_be(vec![type_id]);
 
-		let _component_id = ComponentUtils::component_id(&world, type_id)?;
+		let _component_id =
+			ComponentUtils::component_id(&world, type_id).unwrap();
 
-		ComponentUtils::set_typed(&mut world, entity, MyStruct(3))?;
+		ComponentUtils::set_typed(&mut world, entity, MyStruct(3)).unwrap();
 		expect(ComponentUtils::get_typed::<MyStruct>(&mut world, entity))
-			.to_be(Some(&MyStruct(3)))?;
-
-		Ok(())
+			.to_be(Some(&MyStruct(3)));
 	}
 	#[test]
-	fn get_set_by_id() -> Result<()> {
+	fn get_set_by_id() {
 		let mut world = World::new();
 		world.init_resource::<AppTypeRegistry>();
 		let registry = world.resource::<AppTypeRegistry>();
@@ -193,17 +191,16 @@ mod test {
 		let entity = world.spawn_empty().id();
 		let type_id = TypeId::of::<MyStruct>();
 
-		ComponentUtils::add(&mut world, entity, type_id)?;
-		expect(ComponentUtils::get(&world, entity)).to_be(vec![type_id])?;
+		ComponentUtils::add(&mut world, entity, type_id).unwrap();
+		expect(ComponentUtils::get(&world, entity)).to_be(vec![type_id]);
 
 		let type_id2 = ComponentUtils::map(&world, entity, type_id, |e| {
 			e.get_represented_type_info().unwrap().type_id()
-		})?;
-		expect(type_id2).to_be(type_id)?;
+		})
+		.unwrap();
+		expect(type_id2).to_be(type_id);
 
-		ComponentUtils::remove(&mut world, entity, type_id)?;
-		expect(ComponentUtils::get(&world, entity).len()).to_be(0)?;
-
-		Ok(())
+		ComponentUtils::remove(&mut world, entity, type_id).unwrap();
+		expect(ComponentUtils::get(&world, entity).len()).to_be(0);
 	}
 }

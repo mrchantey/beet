@@ -11,7 +11,7 @@ keywords.workspace = true
 categories.workspace = true
 
 [features]
-default = ["beet_spatial", "bevyhub"]
+# default = ["beet_spatial", "bevyhub"]
 beet_spatial = ["dep:beet_spatial"]
 bevyhub = ["dep:bevyhub"]
 
@@ -56,7 +56,6 @@ wasm-bindgen-futures.workspace = true
 console_error_panic_hook.workspace = true
 
 [dev-dependencies]
-beet_flow = { workspace = true, features = ["test"] }
 pretty_env_logger.workspace = true
 sweet.workspace = true
 

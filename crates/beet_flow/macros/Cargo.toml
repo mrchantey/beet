@@ -22,3 +22,8 @@ syn.version = "2.0"
 quote.version = "1.0"
 toml_edit = "0.22.14"
 extend.workspace = true
+
+
+[dev-dependencies]
+bevy.workspace = true
+beet_flow.workspace = true

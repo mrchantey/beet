@@ -25,13 +25,11 @@ fn on_start(
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use anyhow::Result;
-	use bevyhub::prelude::*;
 	use bevy::prelude::*;
-	use sweet::*;
+	use sweet::prelude::*;
 
 	#[test]
-	fn works() -> Result<()> {
+	fn works() {
 		let mut app = App::new();
 		app.add_plugins(ActionPlugin::<(ParallelFlow, EndOnRun)>::default());
 		let world = app.world_mut();
@@ -48,15 +46,11 @@ mod test {
 			})
 			.flush_trigger(OnRun);
 
-		expect(&on_run).to_have_been_called_times(3)?;
-		expect(&on_result).to_have_been_called_times(4)?;
-		expect(&on_result)
-			.to_have_returned_nth_with(0, &"child1".to_string())?;
-		expect(&on_result).to_have_returned_nth_with(1, &"root".to_string())?;
-		expect(&on_result)
-			.to_have_returned_nth_with(2, &"child2".to_string())?;
-		expect(&on_result).to_have_returned_nth_with(3, &"root".to_string())?;
-
-		Ok(())
+		expect(&on_run).to_have_been_called_times(3);
+		expect(&on_result).to_have_been_called_times(4);
+		expect(&on_result).to_have_returned_nth_with(0, &"child1".to_string());
+		expect(&on_result).to_have_returned_nth_with(1, &"root".to_string());
+		expect(&on_result).to_have_returned_nth_with(2, &"child2".to_string());
+		expect(&on_result).to_have_returned_nth_with(3, &"root".to_string());
 	}
 }

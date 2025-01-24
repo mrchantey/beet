@@ -9,13 +9,16 @@ use bevy::prelude::*;
 ///
 /// Actions with long running systems may look like this:
 /// ```
+///	# use bevy::prelude::*;
+///	# use beet_flow::prelude::*;
 ///
-/// #[derive(Action)]
+///
+/// #[derive(Component, Action)]
 /// #[systems(my_long_action)]
 /// #[require(ContinueRun)]
 /// struct MyLongAction;
 ///
-/// fn my_long_action(query: Query<&MyLongAction, With<Running>){
+/// fn my_long_action(query: Query<&MyLongAction, With<Running>>){
 ///
 /// for action in query.iter(){
 ///   // etc.
@@ -31,12 +34,11 @@ pub struct ContinueRun;
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use anyhow::Result;
 	use bevy::prelude::*;
-	use sweet::*;
+	use sweet::prelude::*;
 
 	#[test]
-	fn works() -> Result<()> {
+	fn works() {
 		let mut app = App::new();
 		app.add_plugins(ActionPlugin::<(
 			InsertOnRun<Running>,
@@ -45,12 +47,11 @@ mod test {
 		let world = app.world_mut();
 
 		let entity = world.spawn(ContinueRun).flush_trigger(OnRun).id();
-		expect(world.entities().len()).to_be(3)?;
-		expect(&*world).to_have_component::<Running>(entity)?;
+		expect(world.entities().len()).to_be(3);
+		expect(&*world).to_have_component::<Running>(entity);
 		world
 			.entity_mut(entity)
 			.flush_trigger(OnRunResult::success());
-		expect(&*world).not().to_have_component::<Running>(entity)?;
-		Ok(())
+		expect(&*world).not().to_have_component::<Running>(entity);
 	}
 }

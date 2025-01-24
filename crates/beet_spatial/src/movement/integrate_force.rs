@@ -62,12 +62,11 @@ pub fn integrate_force(
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use anyhow::Result;
 	use bevy::prelude::*;
-	use sweet::*;
+	use sweet::prelude::*;
 
 	#[test]
-	pub fn works() -> Result<()> {
+	pub fn works() {
 		let mut app = App::new();
 
 		app.add_systems(Update, integrate_force);
@@ -107,45 +106,42 @@ mod test {
 		app.update_with_secs(1);
 
 		expect(app.world())
-			.component::<Transform>(velocity_entity)?
+			.component::<Transform>(velocity_entity)
 			.map(|t| t.translation)
-			.to_be(Vec3::new(1., 0., 0.))?;
+			.to_be(Vec3::new(1., 0., 0.));
 		expect(app.world())
-			.component::<Transform>(force_entity)?
+			.component::<Transform>(force_entity)
 			.map(|t| t.translation)
-			.to_be(Vec3::new(1., 0., 0.))?;
+			.to_be(Vec3::new(1., 0., 0.));
 		expect(app.world())
-			.component::<Transform>(impulse_entity)?
+			.component::<Transform>(impulse_entity)
 			.map(|t| t.translation)
-			.to_be(Vec3::new(1., 0., 0.))?;
+			.to_be(Vec3::new(1., 0., 0.));
 		expect(app.world()) // impulses are cleared each frame
-			.component(impulse_entity)?
-			.to_be(&Impulse(Vec3::ZERO))?;
+			.component::<Impulse>(impulse_entity)
+			.to_be(&Impulse(Vec3::ZERO));
 		expect(app.world())
-			.component::<Transform>(mass_entity)?
+			.component::<Transform>(mass_entity)
 			.map(|t| t.translation)
-			.to_be(Vec3::new(0.5, 0., 0.))?;
+			.to_be(Vec3::new(0.5, 0., 0.));
 
 		app.update_with_secs(1);
 
 		expect(app.world())
-			.component::<Transform>(velocity_entity)?
+			.component::<Transform>(velocity_entity)
 			.map(|t| t.translation)
-			.to_be(Vec3::new(2., 0., 0.))?;
+			.to_be(Vec3::new(2., 0., 0.));
 		expect(app.world())
-			.component::<Transform>(force_entity)?
+			.component::<Transform>(force_entity)
 			.map(|t| t.translation)
-			.to_be(Vec3::new(2., 0., 0.))?;
+			.to_be(Vec3::new(2., 0., 0.));
 		expect(app.world())
-			.component::<Transform>(impulse_entity)?
+			.component::<Transform>(impulse_entity)
 			.map(|t| t.translation)
-			.to_be(Vec3::new(2., 0., 0.))?;
+			.to_be(Vec3::new(2., 0., 0.));
 		expect(app.world())
-			.component::<Transform>(mass_entity)?
+			.component::<Transform>(mass_entity)
 			.map(|t| t.translation)
-			.to_be(Vec3::new(1., 0., 0.))?;
-
-
-		Ok(())
+			.to_be(Vec3::new(1., 0., 0.));
 	}
 }

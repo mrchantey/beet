@@ -126,15 +126,14 @@ where
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use anyhow::Result;
 	use rand::rngs::StdRng;
 	use rand::SeedableRng;
 	use std::time::Duration;
 	use std::time::Instant;
-	use sweet::*;
+	use sweet::prelude::*;
 
 	#[test]
-	fn works() -> Result<()> {
+	fn works() {
 		let mut policy_rng = StdRng::seed_from_u64(0);
 		let map = FrozenLakeMap::default_four_by_four();
 		let initial_state = map.agent_position();
@@ -154,17 +153,15 @@ mod test {
 		let elapsed = now.elapsed();
 		// println!("\nTrained in: {:.3?} seconds\n", elapsed.as_secs_f32());
 		// println!("trained table: {:?}", table);
-		expect(elapsed).to_be_greater_than(Duration::from_millis(2))?;
+		expect(elapsed).to_be_greater_than(Duration::from_millis(2));
 		// expect(elapsed).to_be_less_than(Duration::from_millis(30))?;
 
 		let eval = trainer.evaluate();
 		// println!("{eval:?}\n");
 
 		// optimal policy = 6 steps & 100
-		expect(eval.mean).to_be(1.)?;
-		expect(eval.std).to_be(0.)?;
-		expect(eval.total_steps).to_be(600)?; //
-
-		Ok(())
+		expect(eval.mean).to_be(1.);
+		expect(eval.std).to_be(0.);
+		expect(eval.total_steps).to_be(600);
 	}
 }

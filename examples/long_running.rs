@@ -46,10 +46,12 @@ fn main() {
 					// *under* the trigger, so it will be interrupted.
 					parent
 						.spawn((
+							Name::new("Patrol Sequence"),
 							SequenceFlow,
-							// RepeatFlow::default()
+							RepeatFlow::default(),
 						))
 						.with_child((
+							Name::new("Patrol Left"),
 							Patrol::new("Patrol Left Terrace: "),
 							TriggerInDuration::new(
 								OnRunResult::success(),
@@ -57,6 +59,7 @@ fn main() {
 							),
 						))
 						.with_child((
+							Name::new("Patrol Right"),
 							Patrol::new("Patrol Right Terrace: "),
 							TriggerInDuration::new(
 								OnRunResult::success(),

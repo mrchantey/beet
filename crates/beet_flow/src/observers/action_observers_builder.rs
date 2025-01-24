@@ -68,28 +68,25 @@ impl<T: 'static + Send + Sync, M, O: IntoActionObservers<M> + Clone>
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use anyhow::Result;
 	use bevy::prelude::*;
-	use sweet::*;
+	use sweet::prelude::*;
 
 	#[test]
-	fn works() -> Result<()> {
+	fn works() {
 		let mut app = App::new();
 		app.add_plugins(ActionPlugin::<SequenceFlow>::default());
 		let world = app.world_mut();
 
 		let entity = world.spawn(SequenceFlow).id();
 
-		expect(world.entities().len()).to_be(1)?;
+		expect(world.entities().len()).to_be(1);
 		world.flush();
-		expect(world.entities().len()).to_be(3)?;
+		expect(world.entities().len()).to_be(3);
 
 		world.entity_mut(entity).remove::<SequenceFlow>();
 		// world.entity_mut(entity).despawn();
-		expect(world.entities().len()).to_be(3)?;
+		expect(world.entities().len()).to_be(3);
 		world.flush();
-		expect(world.entities().len()).to_be(1)?;
-
-		Ok(())
+		expect(world.entities().len()).to_be(1);
 	}
 }

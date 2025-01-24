@@ -78,13 +78,12 @@ pub fn play_procedural_animation(
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use anyhow::Result;
 	use beet_flow::prelude::*;
 	use bevy::prelude::*;
-	use sweet::*;
+	use sweet::prelude::*;
 
 	#[test]
-	fn works() -> Result<()> {
+	fn works() {
 		let mut app = App::new();
 		app.add_plugins(ActionPlugin::<PlayProceduralAnimation>::default())
 			.insert_time();
@@ -105,7 +104,7 @@ mod test {
 				.unwrap()
 				.translation,
 		)
-		.to_be(Vec3::new(1., 0., 0.))?;
+		.to_be(Vec3::new(1., 0., 0.));
 
 		app.update_with_millis(500);
 
@@ -116,8 +115,6 @@ mod test {
 				.unwrap()
 				.translation,
 		)
-		.to_be(Vec3::new(1., 0., 0.))?;
-
-		Ok(())
+		.to_be(Vec3::new(1., 0., 0.));
 	}
 }

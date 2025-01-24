@@ -31,7 +31,6 @@ impl<
 		_ev: &Trigger<Self::TriggerEvent, Self::TriggerBundle>,
 		query: (Entity, &OnTrigger<Self>),
 	) {
-		println!("🚀🚀🚀");
 		commands.entity(query.0).trigger(query.1.params.clone());
 	}
 }
@@ -40,18 +39,17 @@ impl<
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use anyhow::Result;
 	use bevy::prelude::*;
-	use sweet::*;
+	use sweet::prelude::*;
 
 	#[test]
-	fn works() -> Result<()> {
+	fn works() {
 		let mut app = App::new();
 		app.add_plugins(ActionPlugin::<
 			TriggerOnGlobalTrigger<OnRunResult, OnRun>,
 		>::default());
 		let world = app.world_mut();
-		let func = observe_run_results(world);
+		let func = observe_triggers::<OnRunResult>(world);
 
 		world.spawn(TriggerOnGlobalTrigger::<OnRunResult, OnRun>::new(
 			OnRunResult::failure(),
@@ -60,7 +58,6 @@ mod test {
 		// global trigger
 		world.trigger(OnRun);
 		world.flush();
-		expect(&func).to_have_returned_nth_with(0, &RunResult::Failure)?;
-		Ok(())
+		expect(&func).to_have_returned_nth_with(0, &OnRunResult::failure());
 	}
 }

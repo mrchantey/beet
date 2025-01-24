@@ -95,13 +95,12 @@ fn seek(
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use anyhow::Result;
 	use beet_flow::prelude::*;
 	use bevy::prelude::*;
-	use sweet::*;
+	use sweet::prelude::*;
 
 	#[test]
-	fn works() -> Result<()> {
+	fn works() {
 		let mut app = App::new();
 
 		app.add_plugins((LifecyclePlugin, MovementPlugin, SteerPlugin))
@@ -129,11 +128,8 @@ mod test {
 		app.update_with_secs(1);
 
 		expect(app.world())
-			.component::<Transform>(agent)?
+			.component::<Transform>(agent)
 			.map(|t| t.translation)
-			.to_be(Vec3::new(0.02, 0., 0.))?;
-
-
-		Ok(())
+			.to_be(Vec3::new(0.02, 0., 0.));
 	}
 }

@@ -90,18 +90,17 @@ fn square_curve(t: f32) -> Vec3 {
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use anyhow::Result;
 	use bevy::prelude::*;
 	use std::f32::consts::PI;
 	use std::f32::consts::TAU;
-	use sweet::*;
+	use sweet::prelude::*;
 
 	#[test]
-	fn calculates_length() -> Result<()> {
-		expect(SerdeCurve::Circle.total_len()).to_be_less_than(TAU)?;
-		expect(SerdeCurve::Circle.total_len()).to_be_greater_than(6.)?;
-		expect(SerdeCurve::Square.total_len()).to_be_less_than(4.)?;
-		expect(SerdeCurve::Square.total_len()).to_be_greater_than(3.8)?;
+	fn calculates_length() {
+		expect(SerdeCurve::Circle.total_len()).to_be_less_than(TAU);
+		expect(SerdeCurve::Circle.total_len()).to_be_greater_than(6.);
+		expect(SerdeCurve::Square.total_len()).to_be_less_than(4.);
+		expect(SerdeCurve::Square.total_len()).to_be_greater_than(3.8);
 
 
 		let ease = SerdeCurve::EaseDir2(EasingCurve::new(
@@ -109,9 +108,7 @@ mod test {
 			Dir2::Y,
 			EaseFunction::CubicInOut,
 		));
-		expect(ease.total_len()).to_be_less_than(PI)?;
-		expect(ease.total_len()).to_be_greater_than(1.5)?;
-
-		Ok(())
+		expect(ease.total_len()).to_be_less_than(PI);
+		expect(ease.total_len()).to_be_greater_than(1.5);
 	}
 }

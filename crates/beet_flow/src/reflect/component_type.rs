@@ -52,13 +52,12 @@ impl ComponentType {
 mod test {
 	#![cfg(feature = "reflect")]
 	use crate::prelude::*;
-	use anyhow::Result;
 	use bevy::app::App;
 	use std::any::TypeId;
-	use sweet::*;
+	use sweet::prelude::*;
 
 	#[test]
-	fn component_types() -> Result<()> {
+	fn component_types() {
 		pretty_env_logger::try_init().ok();
 
 		let mut app = App::new();
@@ -66,7 +65,7 @@ mod test {
 
 		let types = ComponentType::from_world(app.world());
 
-		expect(types.len()).to_be_greater_than(0)?;
+		expect(types.len()).to_be_greater_than(0);
 
 		// for ty in types.iter() {
 		// 	log::info!("Type: {:?}", ty);
@@ -77,8 +76,6 @@ mod test {
 			type_name: "EmptyAction".to_string(),
 			type_id: TypeId::of::<EmptyAction>(),
 		}))
-		.to_be_true()?;
-
-		Ok(())
+		.to_be_true();
 	}
 }

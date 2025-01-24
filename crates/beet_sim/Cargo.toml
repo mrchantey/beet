@@ -28,9 +28,6 @@ num-traits.workspace = true
 bevyhub.workspace = true
 
 
-
-
 [dev-dependencies]
 bevy = { workspace = true, default-features = true }
-bevyhub = { workspace = true, features = ["test"] }
 sweet.workspace = true

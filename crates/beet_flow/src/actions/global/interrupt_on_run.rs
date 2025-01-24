@@ -28,12 +28,11 @@ pub fn interrupt_on_run(
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use anyhow::Result;
 	use bevy::prelude::*;
-	use sweet::*;
+	use sweet::prelude::*;
 
 	#[test]
-	fn works() -> Result<()> {
+	fn works() {
 		let mut world = World::new();
 
 		world.add_observer(interrupt_on_run);
@@ -79,7 +78,6 @@ mod test {
 				.with_child(Tree::new(None).with_leaf(None))
 				.with_child(Tree::new(None).with_leaf(None))
 				.with_child(Tree::new(Some(&Running)).with_leaf(None)), // .with_child(Tree::new(None).with_leaf(Some(&Running))),
-		)?;
-		Ok(())
+		);
 	}
 }

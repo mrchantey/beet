@@ -1,4 +1,3 @@
-#![cfg(feature = "beet_spatial")]
 use crate::prelude::*;
 use beet_flow::prelude::*;
 use beet_spatial::prelude::*;
@@ -73,15 +72,14 @@ fn insert_sentence_steer_target<T: GenericActionComponent>(
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use anyhow::Result;
 	use beet_flow::prelude::*;
 	use beet_spatial::steer::SteerTarget;
 	use bevyhub::prelude::HandleWrapper;
 	use bevy::prelude::*;
-	use sweet::*;
+	use sweet::prelude::*;
 
 	#[test]
-	fn works() -> Result<()> {
+	fn works() {
 		pretty_env_logger::try_init().ok();
 
 		let mut app = App::new();
@@ -94,7 +92,7 @@ mod test {
 		.finish();
 
 		let handle =
-			block_on_asset_load::<Bert>(&mut app, "ml/default-bert.ron")?;
+			block_on_asset_load::<Bert>(&mut app, "ml/default-bert.ron").unwrap();
 
 		let world = app.world_mut();
 
@@ -117,9 +115,7 @@ mod test {
 		let target = world.entity(agent).get::<SteerTarget>();
 		expect(target)
 			.not()
-			.to_be(Some(&SteerTarget::Entity(heal)))?;
-		expect(target).to_be(Some(&SteerTarget::Entity(kill)))?;
-
-		Ok(())
+			.to_be(Some(&SteerTarget::Entity(heal)));
+		expect(target).to_be(Some(&SteerTarget::Entity(kill)));
 	}
 }

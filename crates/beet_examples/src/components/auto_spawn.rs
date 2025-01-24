@@ -48,7 +48,7 @@ impl AutoSpawn {
 // 	use anyhow::Result;
 // 	use beet_flow::prelude::*;
 // 	use bevy::prelude::*;
-// 	use sweet::*;
+// 	use sweet::prelude::*;
 
 // 	#[test]
 // 	fn serializes() -> Result<()> {

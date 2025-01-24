@@ -1,3 +1,5 @@
+#![cfg_attr(test, feature(test, custom_test_frameworks))]
+#![cfg_attr(test, test_runner(sweet::test_runner))]
 #![allow(deprecated)] // TODO remove deprecated
 #![feature(
 	result_flattening,
@@ -7,6 +9,8 @@
 )]
 pub mod action_builder;
 pub mod actions;
+#[cfg(feature = "bevyhub")]
+pub mod bevyhub_plugins;
 pub mod events;
 pub mod extensions;
 pub mod graph;
@@ -15,8 +19,6 @@ pub mod lifecycle;
 pub mod net;
 pub mod observers;
 pub mod reflect;
-#[cfg(any(test, feature = "test"))]
-pub mod test;
 pub mod tree;
 
 // required for action macros
@@ -32,11 +34,12 @@ pub mod prelude {
 	pub use crate::actions::on_trigger::*;
 	#[allow(ambiguous_glob_reexports)]
 	pub use crate::actions::*;
+	#[cfg(feature = "bevyhub")]
+	pub use crate::bevyhub_plugins::*;
 	pub use crate::build_observer_hooks;
 	pub use crate::events::*;
 	pub use crate::extensions::*;
 	pub use crate::graph::*;
-	pub use crate::lifecycle::beet_debug_plugin::*;
 	pub use crate::lifecycle::components::*;
 	pub use crate::lifecycle::lifecycle_plugin::*;
 	pub use crate::lifecycle::lifecycle_systems_plugin::*;
@@ -45,8 +48,6 @@ pub mod prelude {
 	pub use crate::observers::*;
 	// pub use crate::lifecycle::*;
 	pub use crate::reflect::*;
-	#[cfg(any(test, feature = "test"))]
-	pub use crate::test::*;
 	pub use crate::tree::*;
 	pub use beet_flow_macros::*;
 }

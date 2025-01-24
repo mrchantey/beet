@@ -94,13 +94,12 @@ impl ComponentIdent {
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use anyhow::Result;
 	use bevy::prelude::*;
 	use std::any::TypeId;
-	use sweet::*;
+	use sweet::prelude::*;
 
 	#[test]
-	fn works() -> Result<()> {
+	fn works() {
 		let mut world = World::new();
 		world.init_resource::<AppTypeRegistry>();
 		let mut registry = world.resource::<AppTypeRegistry>().write();
@@ -111,9 +110,7 @@ mod test {
 		let entity = world.spawn(EmptyAction).id();
 		let component = ComponentIdent::new(entity, type_id);
 
-		expect(component.category(&world)?).to_be(ActionCategory::Behavior)?;
-
-
-		Ok(())
+		expect(component.category(&world).unwrap())
+			.to_be(ActionCategory::Behavior);
 	}
 }

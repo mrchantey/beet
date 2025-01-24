@@ -14,43 +14,40 @@ impl EndOnRun {
 mod test {
 	use super::EndOnRun;
 	use crate::prelude::*;
-	use anyhow::Result;
 	use bevy::ecs::system::RunSystemOnce;
 	use bevy::prelude::*;
-	use sweet::*;
+	use sweet::prelude::*;
 
 	#[test]
-	fn works() -> Result<()> {
+	fn works() {
 		let mut app = App::new();
 		app.add_plugins(ActionPlugin::<EndOnRun>::default());
 		let world = app.world_mut();
-		let func = observe_run_results(world);
+		let func = observe_triggers(world);
 
-		expect(world.entities().len()).to_be(1)?;
+		expect(world.entities().len()).to_be(1);
 		let entity = world.spawn(EndOnRun::failure()).id();
-		expect(world.entities().len()).to_be(2)?;
+		expect(world.entities().len()).to_be(2);
 		world.flush();
-		expect(world.entities().len()).to_be(3)?;
-		expect(&func).not().to_have_been_called()?;
+		expect(world.entities().len()).to_be(3);
+		expect(&func).not().to_have_been_called();
 		world.trigger_targets(OnRun, entity);
 		world.flush();
-		expect(&func).to_have_been_called()?;
-		expect(&func).to_have_returned_nth_with(0, &RunResult::Failure)?;
-		Ok(())
+		expect(&func).to_have_been_called();
+		expect(&func).to_have_returned_nth_with(0, &OnRunResult::failure());
 	}
 	#[test]
-	fn works_with_run_on_spawn() -> Result<()> {
+	fn works_with_run_on_spawn() {
 		let mut app = App::new();
 		app.add_plugins(ActionPlugin::<EndOnRun>::default());
 		let world = app.world_mut();
-		let func = observe_run_results(world);
+		let func = observe_triggers::<OnRunResult>(world);
 
 		world.spawn((RunOnSpawn, EndOnRun::failure()));
-		world.run_system_once(run_on_spawn)?;
+		world.run_system_once(run_on_spawn).unwrap();
 		world.flush();
-		expect(world.entities().len()).to_be(3)?;
-		expect(&func).to_have_been_called()?;
-		expect(&func).to_have_returned_nth_with(0, &RunResult::Failure)?;
-		Ok(())
+		expect(world.entities().len()).to_be(3);
+		expect(&func).to_have_been_called();
+		expect(&func).to_have_returned_nth_with(0, &OnRunResult::failure());
 	}
 }

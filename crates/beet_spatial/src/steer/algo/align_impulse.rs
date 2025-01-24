@@ -34,9 +34,8 @@ pub fn align_impulse<T: GenericActionComponent>(
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use anyhow::Result;
 	use bevy::prelude::*;
-	use sweet::*;
+	use sweet::prelude::*;
 
 
 	fn spawn(world: &mut World, pos: Vec3, vel: Vec3) -> Entity {
@@ -46,7 +45,7 @@ mod test {
 	}
 
 	#[test]
-	fn works() -> Result<()> {
+	fn works() {
 		let mut world = World::new();
 
 		let entity = spawn(&mut world, Vec3::ZERO, Vec3::new(1., 0., 0.));
@@ -64,9 +63,7 @@ mod test {
 			agents,
 		))
 		.map(|i| i.0)
-		.to_be(Vec3::new(0.5, 0.5, 0.))?;
+		.to_be(Vec3::new(0.5, 0.5, 0.));
 		// .to_be_close_to(Vec3::new(1.41, 1.41, 0.))?;
-
-		Ok(())
 	}
 }

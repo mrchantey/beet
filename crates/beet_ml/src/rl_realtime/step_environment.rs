@@ -107,14 +107,12 @@ fn step_environment<S: RlSessionTypes>(
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use anyhow::Result;
 	use beet_flow::prelude::*;
-	use bevyhub::prelude::*;
 	use bevy::prelude::*;
-	use sweet::*;
+	use sweet::prelude::*;
 
 	#[test]
-	fn works() -> Result<()> {
+	fn works() {
 		let mut app = App::new();
 
 		let on_result = observe_triggers::<OnRunResult>(app.world_mut());
@@ -155,14 +153,12 @@ mod test {
 
 		app.update();
 
-		expect(&on_result).to_have_been_called()?;
+		expect(&on_result).to_have_been_called();
 
 
 		let table = app.world().get::<FrozenLakeQTable>(session).unwrap();
-		expect(table.keys().next()).to_be(Some(&GridPos(UVec2::new(0, 0))))?;
+		expect(table.keys().next()).to_be(Some(&GridPos(UVec2::new(0, 0))));
 		let inner = table.values().next().unwrap();
-		expect(inner.iter().next().unwrap().1).to_be(&0.)?;
-
-		Ok(())
+		expect(inner.iter().next().unwrap().1).to_be(&0.);
 	}
 }

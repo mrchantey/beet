@@ -97,38 +97,34 @@ fn provide_score(
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use anyhow::Result;
 	use beet_flow::prelude::*;
 	use bevy::prelude::*;
-	use bevyhub::prelude::*;
-	use sweet::*;
+	use sweet::prelude::*;
 
 	#[test]
-	fn sample() -> Result<()> {
+	fn sample() {
 		let provider = StatScoreProvider::new();
 		let range = StatValue::range(-3.0..7.0);
 		let target = StatValueGoal::High;
 
 		expect(provider.sample(StatValue(-3.), target, range.clone()))
-			.to_be(1.0)?;
+			.to_be(1.0);
 		expect(provider.sample(StatValue(2.0), target, range.clone()))
-			.to_be(0.5)?;
+			.to_be(0.5);
 		expect(provider.sample(StatValue(7.0), target, range.clone()))
-			.to_be(0.0)?;
+			.to_be(0.0);
 
 		let target = StatValueGoal::Low;
 		expect(provider.sample(StatValue(-3.), target, range.clone()))
-			.to_be(0.0)?;
+			.to_be(0.0);
 		expect(provider.sample(StatValue(2.0), target, range.clone()))
-			.to_be(0.5)?;
+			.to_be(0.5);
 		expect(provider.sample(StatValue(7.0), target, range.clone()))
-			.to_be(1.0)?;
-
-		Ok(())
+			.to_be(1.0);
 	}
 
 	#[test]
-	fn action() -> Result<()> {
+	fn action() {
 		let mut app = App::new();
 
 		app.add_plugins(
@@ -167,11 +163,9 @@ mod test {
 			})
 			.flush_trigger(OnRun);
 
-		expect(&on_child_score).to_have_been_called_times(2)?;
+		expect(&on_child_score).to_have_been_called_times(2);
 
 		// expect(&on_child_score).to_have_returned_nth_with(0, &0.3)?;
 		// expect(&on_child_score).to_have_returned_nth_with(1, &0.7)?;
-
-		Ok(())
 	}
 }

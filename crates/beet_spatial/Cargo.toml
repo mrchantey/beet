@@ -14,13 +14,13 @@ categories = { workspace = true }
 [features]
 default = ["animation", "assets", "ui"]
 ui = ["bevy/bevy_ui"]
-assets = ["bevy/bevy_asset"]
-animation = ["bevy/bevy_animation"]
+assets = ["bevy/bevy_asset", "dep:bevyhub"]
+animation = ["bevy/bevy_animation", "dep:bevyhub"]
 
 [dependencies]
 forky.workspace = true
-bevyhub.workspace = true
-beet_flow.workspace = true
+bevyhub = { workspace = true, optional = true, features = ["core"] }
+beet_flow = { workspace = true, features = ["net"] }
 
 bevy.workspace = true
 

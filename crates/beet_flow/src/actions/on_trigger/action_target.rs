@@ -109,13 +109,11 @@ impl Into<ActionTarget> for Vec<Entity> {
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use anyhow::Result;
 	use bevy::prelude::*;
-	use bevyhub::prelude::*;
-	use sweet::*;
+	use sweet::prelude::*;
 
 	#[test]
-	fn trigger() -> Result<()> {
+	fn trigger() {
 		let mut app = App::new();
 		app.add_plugins(
 			ActionPlugin::<(TriggerOnRun<OnRun>, EndOnRun)>::default(),
@@ -123,7 +121,7 @@ mod test {
 		let world = app.world_mut();
 
 		let on_run = observe_triggers::<OnRun>(world);
-		let on_result = observe_run_results(world);
+		let on_result = observe_triggers::<OnRunResult>(world);
 
 		let target = world.spawn(EndOnRun::success()).id();
 		world
@@ -131,14 +129,12 @@ mod test {
 			.flush_trigger(OnRun);
 		world.flush();
 
-		expect(&on_run).to_have_been_called_times(2)?;
-		expect(&on_result).to_have_been_called_times(1)?;
-
-		Ok(())
+		expect(&on_run).to_have_been_called_times(2);
+		expect(&on_result).to_have_been_called_times(1);
 	}
 
 	#[test]
-	fn insert_remove() -> Result<()> {
+	fn insert_remove() {
 		let mut world = World::new();
 		let e1 = world.spawn_empty().id();
 		let e2 = world.spawn(Name::new("foo")).id();
@@ -148,8 +144,7 @@ mod test {
 		ActionTarget::Entity(e2).remove::<Name>(&mut commands, e1);
 		drop(commands);
 		world.flush();
-		expect(&world).to_have_component::<Name>(e1)?;
-		expect(&world).not().to_have_component::<Name>(e2)?;
-		Ok(())
+		expect(&world).to_have_component::<Name>(e1);
+		expect(&world).not().to_have_component::<Name>(e2);
 	}
 }

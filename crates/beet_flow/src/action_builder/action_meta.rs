@@ -29,12 +29,11 @@ pub enum ActionCategory {
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use anyhow::Result;
 	use bevy::prelude::*;
 	use bevy::reflect::ReflectFromPtr;
 	use bevy::reflect::TypeRegistry;
 	use std::any::Any;
-	use sweet::*;
+	use sweet::prelude::*;
 
 	#[derive(Component, Action, Reflect)]
 	#[reflect(ActionMeta)]
@@ -42,24 +41,22 @@ mod test {
 	struct MyStruct;
 
 	#[test]
-	fn works() -> Result<()> {
+	fn works() {
 		let mut registry = TypeRegistry::default();
 		registry.register::<MyStruct>();
 
 		let val = MyStruct;
-		expect(val.category()).to_be(ActionCategory::Behavior)?;
+		expect(val.category()).to_be(ActionCategory::Behavior);
 		let data = registry
 			.get_type_data::<ReflectActionMeta>(MyStruct.type_id())
 			.unwrap();
 		let val: &dyn ActionMeta = data.get(&val).unwrap();
-		expect(val.category()).to_be(ActionCategory::Behavior)?;
+		expect(val.category()).to_be(ActionCategory::Behavior);
 
-
-		Ok(())
 	}
 
 	#[test]
-	fn works_ptr() -> Result<()> {
+	fn works_ptr() {
 		let mut world = World::new();
 		world.init_resource::<AppTypeRegistry>();
 		let mut registry = world.resource::<AppTypeRegistry>().write();
@@ -85,8 +82,6 @@ mod test {
 			.unwrap();
 		let component: &dyn ActionMeta = data.get(component).unwrap();
 
-		expect(component.category()).to_be(ActionCategory::Behavior)?;
-
-		Ok(())
+		expect(component.category()).to_be(ActionCategory::Behavior);
 	}
 }

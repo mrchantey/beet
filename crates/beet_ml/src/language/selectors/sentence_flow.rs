@@ -1,7 +1,7 @@
 use crate::prelude::*;
 use beet_flow::prelude::*;
-use bevyhub::prelude::HandleWrapper;
 use bevy::prelude::*;
+use bevyhub::prelude::HandleWrapper;
 use std::borrow::Cow;
 
 /// This component is for use with [`SentenceFlow`]. Add to either the agent or a child behavior.
@@ -55,14 +55,13 @@ fn sentence_flow(
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use anyhow::Result;
 	use beet_flow::prelude::*;
-	use bevyhub::prelude::*;
 	use bevy::prelude::*;
-	use sweet::*;
+	use bevyhub::prelude::*;
+	use sweet::prelude::*;
 
 	#[test]
-	fn works() -> Result<()> {
+	fn works() {
 		pretty_env_logger::try_init().ok();
 
 		let mut app = App::new();
@@ -76,7 +75,7 @@ mod test {
 		let on_run = observe_trigger_names::<OnRun>(app.world_mut());
 
 		let handle =
-			block_on_asset_load::<Bert>(&mut app, "ml/default-bert.ron")?;
+			block_on_asset_load::<Bert>(&mut app, "ml/default-bert.ron").unwrap();
 
 		app.world_mut()
 			.spawn((
@@ -92,10 +91,8 @@ mod test {
 			.flush_trigger(OnRun);
 
 
-		expect(&on_run).to_have_been_called_times(2)?;
-		expect(&on_run).to_have_returned_nth_with(0, &"root".to_string())?;
-		expect(&on_run).to_have_returned_nth_with(1, &"kill".to_string())?;
-
-		Ok(())
+		expect(&on_run).to_have_been_called_times(2);
+		expect(&on_run).to_have_returned_nth_with(0, &"root".to_string());
+		expect(&on_run).to_have_returned_nth_with(1, &"kill".to_string());
 	}
 }

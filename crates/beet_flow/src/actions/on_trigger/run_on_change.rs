@@ -84,12 +84,11 @@ fn on_change<C: Component>(
 mod test {
 	use super::RunOnChange;
 	use crate::prelude::*;
-	use anyhow::Result;
 	use bevy::prelude::*;
-	use sweet::*;
+	use sweet::prelude::*;
 
 	#[test]
-	fn works() -> Result<()> {
+	fn works() {
 		let mut app = App::new();
 		app.add_plugins(ActionPlugin::<RunOnChange<Running>>::default());
 
@@ -100,9 +99,7 @@ mod test {
 
 		app.update();
 
-		expect(app.world_mut().get::<Running>(entity)).to_be_some()?;
+		expect(app.world_mut().get::<Running>(entity)).to_be_some();
 
-
-		Ok(())
 	}
 }

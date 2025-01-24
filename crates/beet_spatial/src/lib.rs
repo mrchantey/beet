@@ -1,3 +1,5 @@
+#![cfg_attr(test, feature(test, custom_test_frameworks))]
+#![cfg_attr(test, test_runner(sweet::test_runner))]
 #![feature(let_chains, anonymous_lifetime_in_impl_trait)]
 #[cfg(feature = "animation")]
 pub mod animation;

@@ -24,5 +24,18 @@ impl Default for RepeatFlow {
 }
 
 fn repeat(trigger: Trigger<OnRunResult>, mut commands: Commands) {
+	println!("repeat!");
 	commands.entity(trigger.entity()).insert(RunOnSpawn);
+}
+
+
+#[cfg(test)]
+mod test {
+	// use sweet::prelude::*;
+
+	#[test]
+	fn works() {
+
+		// expect(true).to_be_false();
+	}
 }

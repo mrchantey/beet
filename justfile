@@ -47,7 +47,7 @@ test-ci:
 	just test-all
 
 test-all *args:
-	just watch 'cargo test --workspace --lib -- {{args}}'
+	just watch 'cargo test --workspace -- {{args}}'
 
 test crate *args:
 	just watch 'cargo test -p {{crate}} --lib -- {{args}}'

@@ -169,10 +169,9 @@ pub fn handle_episode_end<T: EpisodeParams>(
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use anyhow::Result;
 	use beet_flow::prelude::*;
 	use bevy::prelude::*;
-	use sweet::*;
+	use sweet::prelude::*;
 
 	fn start_ep(
 		mut commands: Commands,
@@ -193,10 +192,11 @@ mod test {
 	}
 
 	#[test]
-	fn spawns_and_cleans_up_ep() -> Result<()> {
+	fn spawns_and_cleans_up_ep() {
 		let mut app = App::new();
 
 		app.add_plugins((
+			MinimalPlugins,
 			LifecyclePlugin::default(),
 			RlSessionPlugin::<FrozenLakeEpParams>::default(),
 		))
@@ -207,14 +207,12 @@ mod test {
 
 		// expect these to change as global observers are added etc
 		expect(app.world().entities().len())
-			.to_be(LifecycleSystemsPlugin::NUM_OBSERVERS + 1)?;
+			.to_be(LifecycleSystemsPlugin::NUM_OBSERVERS + 1);
 		app.update();
 		expect(app.world().entities().len())
-			.to_be(LifecycleSystemsPlugin::NUM_OBSERVERS + 2)?;
+			.to_be(LifecycleSystemsPlugin::NUM_OBSERVERS + 2);
 		app.update();
 		expect(app.world().entities().len())
-			.to_be(LifecycleSystemsPlugin::NUM_OBSERVERS + 1)?;
-
-		Ok(())
+			.to_be(LifecycleSystemsPlugin::NUM_OBSERVERS + 1);
 	}
 }

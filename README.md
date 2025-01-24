@@ -30,7 +30,10 @@ Currently implemented paradigms:
 
 ## Hello World
 
-```rust
+```rust ignore
+use bevy::prelude::*;
+use beet::prelude::*;
+
 // A demonstration of Sequence control flow
 world.spawn(SequenceFlow)
 	.with_child((

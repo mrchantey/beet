@@ -13,12 +13,12 @@ pub fn interrupt_on_run_result(
 	let entity = trigger.entity();
 
 	if should_remove.contains(entity) {
-		println!("stopped entity: {}",entity);
+		println!("stopped entity: {}", entity);
 		commands.entity(entity).remove::<Running>();
 	}
-	
+
 	for child in children.iter_descendants(entity) {
-		println!("stopped child: {}",child);
+		println!("stopped child: {}", child);
 		if should_remove.contains(child) {
 			commands.entity(child).remove::<Running>();
 		}
@@ -29,12 +29,11 @@ pub fn interrupt_on_run_result(
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use anyhow::Result;
 	use bevy::prelude::*;
-	use sweet::*;
+	use sweet::prelude::*;
 
 	#[test]
-	fn works() -> Result<()> {
+	fn works() {
 		let mut world = World::new();
 		world.add_observer(interrupt_on_run_result);
 
@@ -43,10 +42,6 @@ mod test {
 			.with_child(Running)
 			.flush_trigger(OnRunResult::success());
 
-		expect(world.query::<&Running>().iter(&world).count()).to_be(0)?;
-
-		// expect(&world).not().to_have_component::<Running>(entity)?;
-
-		Ok(())
+		expect(world.query::<&Running>().iter(&world).count()).to_be(0);
 	}
 }

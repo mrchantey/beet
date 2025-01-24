@@ -9,6 +9,10 @@ pub struct RequestScore;
 
 pub type OnChildScore = OnChildValue<ScoreValue>;
 
+
+/// The score flow is a utility ai selector.
+/// Children should provide a score on request, see [`ScoreProvider`].
+/// 
 #[derive(Default, Deref, DerefMut, Component, Action, Reflect)]
 #[reflect(Default, Component)]
 #[category(ActionCategory::ChildBehaviors)]
@@ -56,13 +60,11 @@ fn on_receive_score(
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use anyhow::Result;
-	use bevyhub::prelude::*;
 	use bevy::prelude::*;
-	use sweet::*;
+	use sweet::prelude::*;
 
 	#[test]
-	fn works() -> Result<()> {
+	fn works() {
 		let mut app = App::new();
 		app.add_plugins(
 			ActionPlugin::<(ScoreFlow, ScoreProvider, EndOnRun)>::default(),
@@ -89,12 +91,10 @@ mod test {
 			})
 			.flush_trigger(OnRun);
 
-		expect(&on_run).to_have_been_called_times(2)?;
-		expect(&on_result).to_have_been_called_times(2)?;
+		expect(&on_run).to_have_been_called_times(2);
+		expect(&on_result).to_have_been_called_times(2);
 		expect(&on_result)
-			.to_have_returned_nth_with(0, &"child2".to_string())?;
-		expect(&on_result).to_have_returned_nth_with(1, &"root".to_string())?;
-
-		Ok(())
+			.to_have_returned_nth_with(0, &"child2".to_string());
+		expect(&on_result).to_have_returned_nth_with(1, &"root".to_string());
 	}
 }

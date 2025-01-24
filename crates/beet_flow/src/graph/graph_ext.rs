@@ -157,38 +157,33 @@ pub impl<N> DiGraph<N, ()> {
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use anyhow::Result;
 	use petgraph::{graph::{DiGraph, NodeIndex}, Graph};
-	use sweet::*;
+	use sweet::prelude::*;
 
 	#[test]
-	fn works() -> Result<()> {
+	fn works() {
 		let tree = Tree::new(7).with_leaf(8).with_leaf(89);
 		let graph = DiGraph::from_tree(tree.clone());
-		expect(graph.into_tree()).to_be(tree)?;
-
-		Ok(())
+		expect(graph.into_tree()).to_be(tree);
 	}
 
 	#[test]
-	pub fn is_identical() -> Result<()> {
+	pub fn is_identical() {
 		let mut graph1 = Graph::<i32, ()>::new();
 		graph1.add_node(0);
 		let mut graph2 = Graph::<i32, ()>::new();
 		graph2.add_node(0);
 
-		expect(graph1.is_identical(&graph2)).to_be_true()?;
+		expect(graph1.is_identical(&graph2)).to_be_true();
 		graph1.add_node(7);
-		expect(graph1.is_identical(&graph2)).to_be_false()?;
+		expect(graph1.is_identical(&graph2)).to_be_false();
 		graph2.add_node(7);
-		expect(graph1.is_identical(&graph2)).to_be_true()?;
+		expect(graph1.is_identical(&graph2)).to_be_true();
 		graph1.add_edge(NodeIndex::new(0), NodeIndex::new(1), ());
-		expect(graph1.is_identical(&graph2)).to_be_false()?;
-
-		Ok(())
+		expect(graph1.is_identical(&graph2)).to_be_false();
 	}
 	#[test]
-	pub fn remove_node_recursive() -> Result<()> {
+	pub fn remove_node_recursive() {
 		let mut graph = Graph::<i32, ()>::new();
 		for i in 0..10 {
 			graph.add_node(i);
@@ -199,8 +194,7 @@ mod test {
 		}
 
 		graph.remove_node_recursive(NodeIndex::new(5));
-		expect(graph.node_count()).to_be(5)?;
-		Ok(())
+		expect(graph.node_count()).to_be(5);
 	}
 }
 

@@ -33,23 +33,16 @@ impl AssetLoader for BertLoader {
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use anyhow::Result;
-	use beet_flow::prelude::*;
 	use bevy::prelude::*;
-	use sweet::*;
 
 	#[test]
-	fn works() -> Result<()> {
+	fn works() {
 		let mut app = App::new();
 
 		app.add_plugins((TaskPoolPlugin::default(), workspace_asset_plugin()))
 			.init_asset::<Bert>()
 			.init_asset_loader::<BertLoader>();
 
-		block_on_asset_load::<Bert>(&mut app, "ml/default-bert.ron")?;
-
-		expect(true).to_be_true()?;
-
-		Ok(())
+		block_on_asset_load::<Bert>(&mut app, "ml/default-bert.ron").unwrap();
 	}
 }

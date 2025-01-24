@@ -52,27 +52,24 @@ where
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use anyhow::Result;
 	use bevy::ecs::system::SystemState;
 	use bevy::prelude::*;
-	use sweet::*;
+	use sweet::prelude::*;
 
 	#[test]
-	fn works() -> Result<()> {
+	fn works() {
 		let mut world = World::new();
 		let entity = world.spawn_empty().with_child(()).id();
 		world.spawn_empty().add_children(&[entity]);
 
 		let mut state = SystemState::<Query<&Children>>::new(&mut world);
 		let state = state.get(&world);
-		expect(state.iter_descendants(entity).count()).to_be(1)?;
-		expect(state.iter_descendants_inclusive(entity).count()).to_be(2)?;
+		expect(state.iter_descendants(entity).count()).to_be(1);
+		expect(state.iter_descendants_inclusive(entity).count()).to_be(2);
 
 		let mut state = SystemState::<Query<&Parent>>::new(&mut world);
 		let state = state.get(&world);
-		expect(state.iter_ancestors(entity).count()).to_be(1)?;
-		expect(state.iter_ancestors_inclusive(entity).count()).to_be(2)?;
-
-		Ok(())
+		expect(state.iter_ancestors(entity).count()).to_be(1);
+		expect(state.iter_ancestors_inclusive(entity).count()).to_be(2);
 	}
 }
