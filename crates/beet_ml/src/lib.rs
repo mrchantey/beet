@@ -5,6 +5,8 @@
 pub mod environments;
 pub mod language;
 pub mod rl;
+#[cfg(feature = "spatial")]
+pub mod spatial;
 #[cfg(test)]
 pub mod test_utils;
 
@@ -19,6 +21,8 @@ pub mod prelude {
 	pub use crate::language::*;
 	pub use crate::rl::*;
 	pub use crate::rl_realtime::*;
+	#[cfg(feature = "spatial")]
+	pub use crate::spatial::*;
 	#[cfg(test)]
 	pub use crate::test_utils::*;
 	#[cfg(target_arch = "wasm32")]

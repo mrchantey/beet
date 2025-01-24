@@ -25,17 +25,15 @@ reflect = []
 beet_flow_macros.workspace = true
 bevyhub = { workspace = true, optional = true }
 
+bevy.workspace = true
+
 log.workspace = true
 anyhow.workspace = true
 rand.workspace = true
 heck.workspace = true
 petgraph.workspace = true
 serde.workspace = true
-
 extend.workspace = true
-num-traits.workspace = true
-
-bevy.workspace = true
 
 [dev-dependencies]
 pretty_env_logger.workspace = true

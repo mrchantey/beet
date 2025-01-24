@@ -416,6 +416,7 @@ dependencies = [
  "beet_ml",
  "beet_spatial",
  "bevy",
+ "bevyhub",
  "console_log",
  "forky 0.2.1-rc.1 (git+https://github.com/mrchantey/forky)",
  "log",
@@ -459,7 +460,6 @@ dependencies = [
  "extend",
  "heck 0.4.1",
  "log",
- "num-traits",
  "petgraph",
  "pretty_env_logger",
  "rand",
@@ -1510,7 +1510,7 @@ dependencies = [
 [[package]]
 name = "bevyhub"
 version = "0.0.1-rc.5"
-source = "git+https://github.com/mrchantey/bevyhub#704be44f61c3b382bf8f8c831bebd26cb13540fd"
+source = "git+https://github.com/mrchantey/bevyhub#fbc53084561ac3e3d46015fb1d1fe3d1e5a4565e"
 dependencies = [
  "bevyhub_core",
  "bevyhub_net",
@@ -1520,7 +1520,7 @@ dependencies = [
 [[package]]
 name = "bevyhub_core"
 version = "0.0.1-rc.5"
-source = "git+https://github.com/mrchantey/bevyhub#704be44f61c3b382bf8f8c831bebd26cb13540fd"
+source = "git+https://github.com/mrchantey/bevyhub#fbc53084561ac3e3d46015fb1d1fe3d1e5a4565e"
 dependencies = [
  "anyhow",
  "bevy",
@@ -1535,7 +1535,7 @@ dependencies = [
 [[package]]
 name = "bevyhub_net"
 version = "0.0.1-rc.5"
-source = "git+https://github.com/mrchantey/bevyhub#704be44f61c3b382bf8f8c831bebd26cb13540fd"
+source = "git+https://github.com/mrchantey/bevyhub#fbc53084561ac3e3d46015fb1d1fe3d1e5a4565e"
 dependencies = [
  "anyhow",
  "bevy",
@@ -1558,15 +1558,17 @@ dependencies = [
 [[package]]
 name = "bevyhub_scene"
 version = "0.0.1-rc.5"
-source = "git+https://github.com/mrchantey/bevyhub#704be44f61c3b382bf8f8c831bebd26cb13540fd"
+source = "git+https://github.com/mrchantey/bevyhub#fbc53084561ac3e3d46015fb1d1fe3d1e5a4565e"
 dependencies = [
  "anyhow",
  "bevy",
+ "bevy_reflect",
  "extend",
  "forky 0.2.1-rc.1 (git+https://github.com/mrchantey/forky)",
  "log",
  "serde",
  "serde_json",
+ "ts-rs",
 ]
 
 [[package]]
@@ -6336,6 +6338,28 @@ name = "try-lock"
 version = "0.2.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e421abadd41a4225275504ea4d6566923418b7f05506fbc9c0fe86ba7396114b"
+
+[[package]]
+name = "ts-rs"
+version = "9.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b44017f9f875786e543595076374b9ef7d13465a518dd93d6ccdbf5b432dde8c"
+dependencies = [
+ "thiserror 1.0.69",
+ "ts-rs-macros",
+]
+
+[[package]]
+name = "ts-rs-macros"
+version = "9.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c88cc88fd23b5a04528f3a8436024f20010a16ec18eb23c164b1242f65860130"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+ "termcolor",
+]
 
 [[package]]
 name = "ttf-parser"

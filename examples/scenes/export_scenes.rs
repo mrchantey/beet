@@ -1,7 +1,7 @@
 use anyhow::Result;
 use beet_examples::prelude::*;
-use bevyhub::prelude::*;
 use bevy::prelude::*;
+use bevyhub::prelude::*;
 
 fn plugin(app: &mut App) {
 	app.add_plugins((MostDefaultPlugins, beet_example_plugin));

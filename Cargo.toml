@@ -59,7 +59,7 @@ bevy = { version = "0.15", default-features = false, features = [
 	"serialize",
 	# "bevy_color",
 ] }
-# bevy_reflect = { version = "0.15", features = ["documentation"] }
+bevy_reflect = { version = "0.15", features = ["documentation"] }
 
 
 ## logging
@@ -189,7 +189,6 @@ beet_flow.workspace = true
 beet_spatial.workspace = true
 beet_ml = { workspace = true, optional = true }
 # bevyhub = { workspace = true, optional = true }
-# bevy.workspace = true
 # thiserror.workspace = true
 
 [dev-dependencies]
@@ -198,6 +197,7 @@ beet_examples.workspace = true
 log.workspace = true
 pretty_env_logger.workspace = true
 forky.workspace = true
+bevyhub = { workspace = true, features = ["export_types"] }
 anyhow.workspace = true
 serde.workspace = true
 serde_json.workspace = true

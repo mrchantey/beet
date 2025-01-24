@@ -12,7 +12,7 @@ categories.workspace = true
 
 [features]
 # default = ["beet_spatial", "bevyhub"]
-beet_spatial = ["dep:beet_spatial"]
+spatial = ["dep:beet_spatial"]
 bevyhub = ["dep:bevyhub"]
 
 # tokio = ["dep:tokio"]

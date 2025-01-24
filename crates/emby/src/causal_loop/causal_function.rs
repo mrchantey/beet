@@ -1,5 +1,5 @@
-use serde::Serialize;
 use serde::Deserialize;
+use serde::Serialize;
 
 
 
@@ -18,6 +18,7 @@ pub enum CausalFunction {
 	///
 	/// Example usage:
 	/// ```rust
+	/// # use emby::prelude::*;
 	/// // Population grows linearly based on available resources
 	/// CausalFunction::LinearGrowth { rate: 0.1 }
 	/// // If resources = 1000, and current population = 500, with time_step = 1
@@ -35,6 +36,7 @@ pub enum CausalFunction {
 	///
 	/// Example usage:
 	/// ```rust
+	/// # use emby::prelude::*;
 	/// // Virus spread grows exponentially
 	/// CausalFunction::ExponentialGrowth { rate: 0.05 }
 	/// // If current infected = 100, with time_step = 1
@@ -52,6 +54,7 @@ pub enum CausalFunction {
 	///
 	/// Example usage:
 	/// ```rust
+	/// # use emby::prelude::*;
 	/// // Resources decay based on population size
 	/// CausalFunction::LinearDecay { rate: 0.05 }
 	/// // If population = 1000, and current resources = 500, with time_step = 1
@@ -90,6 +93,7 @@ pub enum CausalFunction {
 	///
 	/// Example usage:
 	/// ```rust
+	/// # use emby::prelude::*;
 	/// // Stress level changes based on work hours threshold
 	/// CausalFunction::ThresholdEffect {
 	///     threshold: 40.0,  // 40 hours per week
@@ -116,6 +120,8 @@ pub enum CausalFunction {
 	///
 	/// Example usage:
 	/// ```rust
+	/// # use emby::prelude::*;
+	///
 	/// // Temperature variations throughout the day
 	/// CausalFunction::Oscillation {
 	///     amplitude: 5.0,   // 5 degree variation
@@ -142,6 +148,7 @@ impl CausalFunction {
 	///
 	/// Example:
 	/// ```rust
+	/// # use emby::prelude::*;
 	/// let function = CausalFunction::LinearGrowth { rate: 0.1 };
 	/// let new_value = function.apply(100.0, 50.0, 1.0);
 	/// ```

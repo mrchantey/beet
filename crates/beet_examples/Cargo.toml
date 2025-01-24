@@ -13,7 +13,7 @@ categories.workspace = true
 [dependencies]
 forky.workspace = true
 beet_flow.workspace = true
-beet_ml.workspace = true
+beet_ml = { workspace = true, features = ["spatial"] }
 beet_spatial = { workspace = true, features = ["animation", "assets", "ui"] }
 bevyhub.workspace = true
 serde.workspace = true
