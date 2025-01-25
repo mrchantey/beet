@@ -455,15 +455,14 @@ name = "beet_flow"
 version = "0.0.5-rc.3"
 dependencies = [
  "anyhow",
+ "beet_flow",
  "beet_flow_macros",
  "bevy",
  "bevyhub",
  "extend",
  "heck 0.4.1",
  "log",
- "petgraph",
  "pretty_env_logger",
- "rand",
  "ron",
  "serde",
  "sweet",

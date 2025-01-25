@@ -1,7 +1,6 @@
 //! # Beet Mainfest
 //! copied from bevy/crates/bevy_macro_utils/src/bevy_manifest.rs
 //!
-//!
 
 extern crate proc_macro;
 

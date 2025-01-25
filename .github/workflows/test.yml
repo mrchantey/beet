@@ -28,7 +28,7 @@ jobs:
         key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
     - name: 🔨 Install Bevy Dependencies
       if: runner.os == 'Linux'
-      run: sudo apt-get update && sudo apt-get install g++ pkg-config libx11-dev libasound2-dev libudev-dev mold
+      run: sudo apt-get update; sudo apt-get install --no-install-recommends g++ pkg-config libx11-dev libasound2-dev libudev-dev libxkbcommon-x11-0 mold
     - name: 🔨 Install Rust
       uses: actions-rs/toolchain@v1
       with:

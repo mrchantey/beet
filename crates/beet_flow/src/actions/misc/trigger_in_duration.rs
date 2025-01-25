@@ -1,7 +1,5 @@
 use crate::prelude::*;
 use bevy::prelude::*;
-use rand::Rng;
-use std::ops::Range;
 use std::time::Duration;
 
 /// Triggers the given event after running for a given duration. Has no effect if
@@ -13,8 +11,6 @@ use std::time::Duration;
 #[require(ContinueRun)]
 pub struct TriggerInDuration<T: GenericActionEvent> {
 	pub duration: Duration,
-	/// Optionally randomize the duration within this range
-	pub range: Option<Range<Duration>>,
 	pub value: T,
 }
 
@@ -24,31 +20,18 @@ impl<T: Default + GenericActionEvent> Default for TriggerInDuration<T> {
 
 impl<T: GenericActionEvent> TriggerInDuration<T> {
 	pub fn new(value: T, duration: Duration) -> Self {
-		Self {
-			value,
-			duration,
-			range: None,
-		}
+		Self { value, duration }
 	}
 	pub fn with_secs(value: T, secs: u64) -> Self {
 		Self {
 			value,
 			duration: Duration::from_secs(secs),
-			range: None,
 		}
 	}
 	pub fn with_millis(value: T, millis: u64) -> Self {
 		Self {
 			value,
 			duration: Duration::from_millis(millis),
-			range: None,
-		}
-	}
-	pub fn with_range(value: T, range: Range<Duration>) -> Self {
-		Self {
-			value,
-			duration: range.start,
-			range: Some(range),
 		}
 	}
 }
@@ -60,14 +43,9 @@ pub fn trigger_in_duration<T: GenericActionEvent>(
 		With<Running>,
 	>,
 ) {
-	for (entity, timer, mut action) in query.iter_mut() {
+	for (entity, timer, action) in query.iter_mut() {
 		if timer.last_started.elapsed() >= action.duration {
 			commands.entity(entity).trigger(action.value.clone());
-			// Randomize the next duration if a range is provided
-			if let Some(range) = &action.range {
-				// TODO cache the rng, see malenia
-				action.duration = rand::thread_rng().gen_range(range.clone());
-			}
 		}
 	}
 }

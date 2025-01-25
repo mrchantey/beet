@@ -13,12 +13,13 @@ pub mod actions;
 pub mod bevyhub_plugins;
 pub mod events;
 pub mod extensions;
-pub mod graph;
 pub mod lifecycle;
 #[cfg(feature = "bevyhub")]
 pub mod net;
 pub mod observers;
+#[cfg(feature = "reflect")]
 pub mod reflect;
+#[cfg(feature = "reflect")]
 pub mod tree;
 
 // required for action macros
@@ -39,7 +40,7 @@ pub mod prelude {
 	pub use crate::build_observer_hooks;
 	pub use crate::events::*;
 	pub use crate::extensions::*;
-	pub use crate::graph::*;
+	pub use crate::lifecycle::beet_root::*;
 	pub use crate::lifecycle::components::*;
 	pub use crate::lifecycle::lifecycle_plugin::*;
 	pub use crate::lifecycle::lifecycle_systems_plugin::*;
@@ -47,7 +48,9 @@ pub mod prelude {
 	pub use crate::net::*;
 	pub use crate::observers::*;
 	// pub use crate::lifecycle::*;
+	#[cfg(feature = "reflect")]
 	pub use crate::reflect::*;
+	#[cfg(feature = "reflect")]
 	pub use crate::tree::*;
 	pub use beet_flow_macros::*;
 }

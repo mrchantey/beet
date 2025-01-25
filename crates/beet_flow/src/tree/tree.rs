@@ -1,5 +1,3 @@
-use crate::prelude::*;
-use petgraph::graph::DiGraph;
 use serde::ser::SerializeStruct;
 use serde::Deserialize;
 use serde::Serialize;
@@ -112,8 +110,6 @@ impl<T> Tree<T> {
 		self.children.push(Tree::new(child));
 		self
 	}
-
-	pub fn into_graph(self) -> DiGraph<T, ()> { DiGraph::from_tree(self) }
 
 	pub fn flatten(self) -> Vec<T> {
 		let mut vec = vec![self.value];

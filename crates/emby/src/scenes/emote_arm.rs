@@ -1,6 +1,6 @@
 use beet::prelude::*;
-use bevyhub::prelude::*;
 use bevy::prelude::*;
+use bevyhub::prelude::*;
 use forky::prelude::TransformExt;
 use std::f32::consts::TAU;
 use std::time::Duration;
@@ -77,9 +77,9 @@ pub fn emote_arm(mut commands: Commands) {
 			));
 			parent.spawn((
 				Name::new("Idle Pause"),
-				TriggerInDuration::with_range(
+				TriggerInDuration::new(
 					OnRunResult::success(),
-					Duration::from_secs(1)..Duration::from_secs(4),
+					Duration::from_secs(2),
 				),
 			));
 		})

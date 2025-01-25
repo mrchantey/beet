@@ -13,9 +13,9 @@ categories.workspace = true
 
 
 [features]
+reflect = ["dep:heck", "dep:serde", "bevy/bevy_scene", "bevy/serialize"]
 # default = ["bevyhub"]
-reflect = []
-bevyhub = ["dep:bevyhub","bevyhub/net", "bevyhub/core"]
+bevyhub = ["dep:bevyhub", "bevyhub/net", "bevyhub/core"]
 
 [dependencies]
 beet_flow_macros.workspace = true
@@ -25,13 +25,12 @@ bevy.workspace = true
 
 log.workspace = true
 anyhow.workspace = true
-rand.workspace = true
-heck.workspace = true
-petgraph.workspace = true
-serde.workspace = true
 extend.workspace = true
+serde = { workspace = true, optional = true }
+heck = { workspace = true, optional = true }
 
 [dev-dependencies]
 pretty_env_logger.workspace = true
 ron.workspace = true
 sweet.workspace = true
+beet_flow = { path = ".", features = ["reflect"] }

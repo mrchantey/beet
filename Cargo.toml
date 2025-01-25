@@ -56,8 +56,8 @@ sweet = { git = "https://github.com/mrchantey/sweet", default-features = false, 
 #💡 game
 bevy = { version = "0.15", default-features = false, features = [
 	# bevy = { git = "https://github.com/bevyengine/bevy", rev = "0c959f77007c29eead7f902bddd3342a1ecbca20", default-features = false, features = [
-	"bevy_scene",
-	"serialize",
+	# "bevy_scene",
+	# "serialize",
 	# "bevy_color",
 ] }
 
@@ -71,7 +71,6 @@ console_log = { version = "1.0", features = ["color"] }
 anyhow = "1.0.75"
 thiserror = "1.0.60"
 bytemuck = "1.13.1"
-petgraph = { version = "0.6.4", features = ["serde-1"] }
 heck = "0.4"
 rand = "0.8"
 rand_chacha = "0"
