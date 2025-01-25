@@ -2,14 +2,17 @@
 //! by multiple sources from arbitary positions in a graph.
 //! In beet this is achieved using the [`RunOnRunResult`] action.
 use beet::prelude::*;
-use beet_examples::prelude::*;
 use bevy::prelude::*;
 
 #[rustfmt::skip]
 fn main() {
 	let mut app = App::new();
   app.insert_resource(BeetDebugConfig::default())
-		.add_plugins(minimal_beet_example_plugin);
+		.add_plugins((
+			LifecyclePlugin,
+			BeetDebugPlugin, 
+			bevy::log::LogPlugin::default()
+		));
 	let world = app.world_mut();
 		
 	

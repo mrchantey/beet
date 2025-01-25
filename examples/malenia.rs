@@ -17,7 +17,7 @@ fn main() {
 	let mut app = App::new();
 	app.add_plugins((
 		MinimalPlugins,
-		BeetDefaultPlugins,
+		LifecyclePlugin,
 		// here we register all our actions that are used
 		ActionPlugin::<(
 			RandomScoreProvider, 
@@ -28,8 +28,13 @@ fn main() {
 	.add_systems(Update, health_handler)
 	.insert_resource(RandomSource::default());
 
+	// in this example the player doesnt do anything 
 	app.world_mut()
-		.spawn((Name::new("Elden Lord"), Health::default()));
+		.spawn((
+			Name::new("Elden Lord"), 
+			Health::default()
+		));
+	
 	app.world_mut()
 		// this is our agent, here the behavior (FallbackFlow) is attached directly
 		// but it could be a child or completely seperate

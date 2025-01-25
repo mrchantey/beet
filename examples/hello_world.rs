@@ -7,7 +7,7 @@ fn main() {
 	App::new()
     .insert_resource(BeetDebugConfig::default())
 		.add_plugins((
-			BeetDefaultPlugins,
+			LifecyclePlugin,
 			BeetDebugPlugin,
 			bevy::log::LogPlugin::default()
 		))

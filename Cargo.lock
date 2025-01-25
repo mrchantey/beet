@@ -408,7 +408,7 @@ checksum = "72b3254f16251a8381aa12e40e3c4d2f0199f8c6508fbecb9d91f575e0fbb8c6"
 
 [[package]]
 name = "beet"
-version = "0.0.5-rc.2"
+version = "0.0.5-rc.3"
 dependencies = [
  "anyhow",
  "beet_examples",
@@ -433,7 +433,7 @@ dependencies = [
 
 [[package]]
 name = "beet_examples"
-version = "0.0.5-rc.2"
+version = "0.0.5-rc.3"
 dependencies = [
  "anyhow",
  "beet_flow",
@@ -452,7 +452,7 @@ dependencies = [
 
 [[package]]
 name = "beet_flow"
-version = "0.0.5-rc.2"
+version = "0.0.5-rc.3"
 dependencies = [
  "anyhow",
  "beet_flow_macros",
@@ -471,7 +471,7 @@ dependencies = [
 
 [[package]]
 name = "beet_flow_macros"
-version = "0.0.5-rc.2"
+version = "0.0.5-rc.3"
 dependencies = [
  "anyhow",
  "beet_flow",
@@ -486,7 +486,7 @@ dependencies = [
 
 [[package]]
 name = "beet_ml"
-version = "0.0.5-rc.2"
+version = "0.0.5-rc.3"
 dependencies = [
  "anyhow",
  "beet_flow",
@@ -521,7 +521,7 @@ dependencies = [
 
 [[package]]
 name = "beet_rig"
-version = "0.0.5-rc.2"
+version = "0.0.5-rc.3"
 dependencies = [
  "anyhow",
  "beet_flow",
@@ -537,7 +537,7 @@ dependencies = [
 
 [[package]]
 name = "beet_sim"
-version = "0.0.5-rc.2"
+version = "0.0.5-rc.3"
 dependencies = [
  "anyhow",
  "beet_flow",
@@ -550,7 +550,7 @@ dependencies = [
 
 [[package]]
 name = "beet_spatial"
-version = "0.0.5-rc.2"
+version = "0.0.5-rc.3"
 dependencies = [
  "anyhow",
  "beet_flow",
@@ -2474,7 +2474,7 @@ checksum = "60b1af1c220855b6ceac025d3f6ecdd2b7c4894bfe9cd9bda4fbb4bc7c0d4cf0"
 
 [[package]]
 name = "emby"
-version = "0.0.5-rc.2"
+version = "0.0.5-rc.3"
 dependencies = [
  "anyhow",
  "beet",

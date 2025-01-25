@@ -1,12 +1,18 @@
+//! This example demonstrates utility ai with constant score providers,
+//! see `malenia.rs` for custom score providers
+//!
 use beet::prelude::*;
-use beet_examples::prelude::*;
 use bevy::prelude::*;
 
 #[rustfmt::skip]
 fn main() {
 	App::new()
     .insert_resource(BeetDebugConfig::default())
-		.add_plugins(running_beet_example_plugin)
+		.add_plugins((
+			LifecyclePlugin,
+			BeetDebugPlugin, 
+			bevy::log::LogPlugin::default()
+		))
 		.world_mut()
 		.spawn((
 			Name::new("ScoreFlow will select the highest score"), 

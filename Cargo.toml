@@ -7,7 +7,7 @@ opt-level = 1
 opt-level = 3
 
 [workspace.package]
-version = "0.0.5-rc.2"
+version = "0.0.5-rc.3"
 edition = "2021"
 description = "A modular behavior library for the Bevy Engine."
 documentation = "https://bevyhub.dev/docs/beet"
@@ -32,14 +32,14 @@ members = ["crates/*", "crates/beet_flow/macros"]
 
 [workspace.dependencies]
 ## internal
-beet = { path = "./", version = "0.0.5-rc.2" }
-beet_spatial = { path = "crates/beet_spatial", version = "0.0.5-rc.2", default-features = false }
-beet_flow = { path = "crates/beet_flow", version = "0.0.5-rc.2" }
-beet_flow_macros = { path = "crates/beet_flow/macros", version = "0.0.5-rc.2" }
-beet_ml = { path = "crates/beet_ml", version = "0.0.5-rc.2" }
-beet_sim = { path = "crates/beet_sim", version = "0.0.5-rc.2" }
-beet_examples = { path = "crates/beet_examples", version = "0.0.5-rc.2" }
-emby = { path = "crates/emby", version = "0.0.5-rc.2" }
+beet = { path = "./", version = "0.0.5-rc.3" }
+beet_spatial = { path = "crates/beet_spatial", version = "0.0.5-rc.3", default-features = false }
+beet_flow = { path = "crates/beet_flow", version = "0.0.5-rc.3" }
+beet_flow_macros = { path = "crates/beet_flow/macros", version = "0.0.5-rc.3" }
+beet_ml = { path = "crates/beet_ml", version = "0.0.5-rc.3" }
+beet_sim = { path = "crates/beet_sim", version = "0.0.5-rc.3" }
+beet_examples = { path = "crates/beet_examples", version = "0.0.5-rc.3" }
+emby = { path = "crates/emby", version = "0.0.5-rc.3" }
 
 ## local
 bevyhub = { git = "https://github.com/mrchantey/bevyhub", default-features = false }
@@ -360,8 +360,8 @@ include = ["bevyhub/camera-2d", "bevyhub/ui-terminal", "beet-debug"]
 
 
 [[example]]
-name = "hello_world"
-path = "examples/scenes/hello_world.rs"
+name = "hello_world_scene"
+path = "examples/scenes/hello_world_scene.rs"
 
 [[package.metadata.scene]]
 name = "hello-world"
