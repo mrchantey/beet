@@ -68,6 +68,9 @@ clean-repo:
 pws *args:
 	just --shell powershell.exe --shell-arg -c {{args}}
 
+tree:
+	cargo tree --depth=2 -e=no-dev
+
 #### WEB EXAMPLES #####################################################
 
 
