@@ -1,8 +1,4 @@
-//! An example of a simple repeat while pattern.
-//!
-//! This example
-//! Here we use [SucceedTimes] to
-//!
+//! A simple 'repeat while' pattern.
 use beet::prelude::*;
 use bevy::prelude::*;
 
@@ -25,12 +21,11 @@ fn main() {
 	.with_child((
 		Name::new("fails on third run"), 
 		// this action behaves as a while predicate, it will succeed twice
-		// then fail the third time
-		// put the predicate child first for a `while pattern`, 
-		// or last for a `do while pattern` which will always run once
+		// then fail the third time.
 		SucceedTimes::new(2)
 	))
 	.with_child((
+		// this action will only run twice
 		Name::new("some action to perform"), 
 		EndOnRun::success()
 	))
