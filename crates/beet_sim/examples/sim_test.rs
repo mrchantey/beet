@@ -37,7 +37,6 @@ fn main() {
 			(camera, agent, alcohol, kids_crying, short_stroll),
 		)
 		.insert_resource(stat_map)
-		.insert_resource(BeetDebugConfig::default())
 		.run();
 }
 

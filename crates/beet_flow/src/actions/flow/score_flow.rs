@@ -12,7 +12,7 @@ pub type OnChildScore = OnChildValue<ScoreValue>;
 
 /// The score flow is a utility ai selector.
 /// Children should provide a score on request, see [`ScoreProvider`].
-/// 
+///
 #[derive(Default, Deref, DerefMut, Component, Action, Reflect)]
 #[reflect(Default, Component)]
 #[category(ActionCategory::ChildBehaviors)]
@@ -24,10 +24,9 @@ fn on_start(
 	mut commands: Commands,
 	mut query: Query<(&mut ScoreFlow, &Children)>,
 ) {
-
 	let (mut score_flow, children) = query
 		.get_mut(trigger.entity())
-		.expect(child_expect::NO_CHILDREN);
+		.expect(expect_action::ACTION_QUERY_MISSING);
 
 	score_flow.clear();
 
@@ -93,8 +92,7 @@ mod test {
 
 		expect(&on_run).to_have_been_called_times(2);
 		expect(&on_result).to_have_been_called_times(2);
-		expect(&on_result)
-			.to_have_returned_nth_with(0, &"child2".to_string());
+		expect(&on_result).to_have_returned_nth_with(0, &"child2".to_string());
 		expect(&on_result).to_have_returned_nth_with(1, &"root".to_string());
 	}
 }

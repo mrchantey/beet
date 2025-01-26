@@ -10,10 +10,10 @@ init-repo:
 	just export-scenes
 
 run example *args:
-	cargo run --example {{example}} {{args}}
+	just watch 'just run-ci {{example}} {{args}}'
 
-run-w example *args:
-	just watch 'just run {{example}} {{args}}'
+run-ci example *args:
+	cargo run --example {{example}} {{args}}
 
 run-p crate example *args:
 	cargo run -p {{crate}} --example {{example}} {{args}}

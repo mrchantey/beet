@@ -1,6 +1,6 @@
 use crate::prelude::*;
-use bevyhub::prelude::*;
 use bevy::prelude::*;
+use bevyhub::prelude::*;
 
 
 /// Config for logging the lifecycle of behaviors, see [`BeetDebugPlugin`].
@@ -36,6 +36,8 @@ impl BeetDebugConfig {
 /// A plugin that logs lifecycle events for behaviors with a [`Name`].
 /// It triggers [OnLogMessage] events, and also adds a listener that
 /// will print to stdout if [`BeetDebugConfig::log_to_stdout`] is true.
+///
+/// If a [`BeetDebugConfig`] is not present, it will use the default.
 #[derive(Clone)]
 pub struct BeetDebugPlugin;
 impl Plugin for BeetDebugPlugin {
@@ -44,6 +46,7 @@ impl Plugin for BeetDebugPlugin {
 			.add_observer(log_on_stop)
 			.add_systems(Update, log_log_on_run)
 			.init_resource::<BeetConfig>()
+			.init_resource::<BeetDebugConfig>()
 			.register_type::<BeetDebugConfig>();
 
 		let config = app.world().resource::<BeetConfig>();

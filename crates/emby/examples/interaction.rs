@@ -1,4 +1,3 @@
-use beet::prelude::*;
 use beet_examples::prelude::*;
 use bevy::prelude::*;
 use bevy::render::view::RenderLayers;
@@ -7,7 +6,6 @@ use emby::prelude::*;
 fn main() {
 	App::new()
 		.add_plugins((crate_test_beet_example_plugin, plugin_ml, EmbyPlugin))
-		.insert_resource(BeetDebugConfig::default())
 		.add_systems(
 			Startup,
 			(

@@ -18,14 +18,13 @@ use std::time::Duration;
 // #[rustfmt::skip]
 fn main() {
 	let mut app = App::new();
-	app.insert_resource(BeetDebugConfig::default())
-		.add_plugins((
-			MinimalPlugins,
-			LifecyclePlugin,
-			BeetDebugPlugin,
-			bevy::log::LogPlugin::default(),
-			ActionPlugin::<Patrol>::default(),
-		));
+	app.add_plugins((
+		MinimalPlugins,
+		LifecyclePlugin,
+		BeetDebugPlugin,
+		bevy::log::LogPlugin::default(),
+		ActionPlugin::<Patrol>::default(),
+	));
 
 	app.world_mut()
 		.spawn((Name::new("root"), SequenceFlow))

@@ -28,7 +28,16 @@ publish = false
 [workspace]
 # default resolver
 resolver = "2"
-members = ["crates/*", "crates/beet_flow/macros"]
+members = [
+	"crates/beet_examples",
+	"crates/beet_flow",
+	"crates/beet_ml",
+	"crates/beet_rig",
+	"crates/beet_sim",
+	"crates/beet_spatial",
+	# "crates/emby",
+	"crates/beet_flow/macros",
+]
 
 [workspace.dependencies]
 ## internal
@@ -39,7 +48,7 @@ beet_flow_macros = { path = "crates/beet_flow/macros", version = "0.0.5-rc.3" }
 beet_ml = { path = "crates/beet_ml", version = "0.0.5-rc.3" }
 beet_sim = { path = "crates/beet_sim", version = "0.0.5-rc.3" }
 beet_examples = { path = "crates/beet_examples", version = "0.0.5-rc.3" }
-emby = { path = "crates/emby", version = "0.0.5-rc.3" }
+# emby = { path = "crates/emby", version = "0.0.5-rc.3" }
 
 ## local
 bevyhub = { git = "https://github.com/mrchantey/bevyhub", default-features = false }

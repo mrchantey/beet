@@ -7,7 +7,7 @@ use bevy::prelude::*;
 #[rustfmt::skip]
 fn main() {
 	let mut app = App::new();
-  app.insert_resource(BeetDebugConfig::default())
+  app
 		.add_plugins((
 			LifecyclePlugin,
 			BeetDebugPlugin, 

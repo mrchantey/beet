@@ -22,6 +22,7 @@ impl Plugin for LifecyclePlugin {
 			// repeat flow
 			ActionPlugin::<(
 				RepeatFlow,
+				SucceedTimes,
 				InsertOnRun<RepeatFlow>,
 				RemoveOnRun<RepeatFlow>,
 				InsertOnRunResult<RepeatFlow>,

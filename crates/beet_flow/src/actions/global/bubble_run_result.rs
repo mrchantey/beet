@@ -2,6 +2,9 @@ use crate::prelude::*;
 use bevy::prelude::*;
 
 /// Add this to an entity to prevent the run result from bubbling up.
+///
+/// Any action that requires this needs to manually call OnChildResult
+/// on the parent entity. For an example, see [`RepeatFlow`].
 #[derive(Default, Component, Reflect)]
 pub struct NoBubble;
 
@@ -12,9 +15,14 @@ pub struct NoBubble;
 pub fn bubble_run_result(
 	trigger: Trigger<OnRunResult>,
 	mut commands: Commands,
-	parents: Query<&Parent, Without<NoBubble>>,
+	no_bubble: Query<(), With<NoBubble>>,
+	parents: Query<&Parent>,
 ) {
-	if let Some(parent) = parents.get(trigger.entity()).ok() {
+	if no_bubble.contains(trigger.entity()) {
+		return;
+	}
+
+	if let Ok(parent) = parents.get(trigger.entity()) {
 		commands.entity(parent.get()).trigger(OnChildResult::new(
 			trigger.entity(),
 			trigger.event().result(),
