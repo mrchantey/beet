@@ -23,6 +23,9 @@ impl<T> Default for ActionObserversBuilder<T, (), ()> {
 
 impl ActionObserversBuilder<(), (), ()> {
 	pub fn new<T>() -> ActionObserversBuilder<T, (), ()> { Default::default() }
+	/// Bevy guarantees that if all entities watched by a given Observer are despawned,
+	/// the Observer entity will also be despawned.
+	/// This function should only be used in situations other than the above.
 	pub fn cleanup<'w, T: 'static + Send + Sync>(
 		world: &mut DeferredWorld<'w>,
 		entity: Entity,

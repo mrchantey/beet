@@ -32,7 +32,7 @@ fn impl_component_hooks(
 	_input: &DeriveInput,
 	attributes: &ActionAttributes,
 ) -> syn::Result<Option<TokenStream>> {
-	if attributes.observers.len() == 0 {
+	if attributes.observers.is_empty() {
 		return Ok(None);
 	}
 
@@ -44,10 +44,8 @@ fn impl_component_hooks(
 				ActionObserversBuilder::new::<Self>()
 				.add_observers((#observers))
 				.build(world.commands(), entity);
-			})
-		.on_remove(|mut world, entity, _|{
-				ActionObserversBuilder::cleanup::<Self>(&mut world,entity);
 			});
+		// bevy automatically despawns observers when the entities they are watching are despawned
 	}))
 }
 
