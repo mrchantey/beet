@@ -1,13 +1,15 @@
 use crate::prelude::*;
 use beet_flow::prelude::*;
-use bevyhub::prelude::*;
 use bevy::prelude::*;
+use bevyhub::prelude::*;
 use std::borrow::Cow;
 
 #[derive(Reflect)]
 pub struct MapUserMessageToSentence;
 impl OnTriggerHandler for MapUserMessageToSentence {
 	type TriggerEvent = OnUserMessage;
+	type TriggerBundle = ();
+	type Params = ();
 
 	fn default_source() -> ActionTarget { ActionTarget::Global }
 

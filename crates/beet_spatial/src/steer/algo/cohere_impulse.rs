@@ -4,12 +4,12 @@ use bevy::prelude::*;
 
 /// Calculate a cohesion impulse
 /// as described [here](https://natureofcode.com/autonomous-agents/#exercise-515).
-pub fn cohere_impulse<T: GenericActionComponent>(
+pub fn cohere_impulse<'a, T: GenericActionComponent>(
 	target_entity: Entity,
 	position: Vec3,
 	max_speed: MaxSpeed,
 	cohere: &Cohere<T>,
-	agents: impl IntoIterator<Item = (Entity, &Transform)>,
+	agents: impl IntoIterator<Item = (Entity, &'a Transform)>,
 ) -> Impulse {
 	let mut average = Vec3::default();
 	let mut total = 0;

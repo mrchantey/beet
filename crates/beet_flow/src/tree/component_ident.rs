@@ -72,17 +72,17 @@ impl ComponentIdent {
 		world: &World,
 		func: impl FnOnce(&dyn ActionMeta) -> O,
 	) -> Result<O> {
-		let out = self
-			.map_type_data::<ReflectActionMeta, _>(world, move |reflect| {
-				self.map(world, move |c| {
+		let out = self.map_type_data::<ReflectActionMeta, _>(
+			world,
+			move |reflect| {
+				self.map(world, move |c| -> anyhow::Result<O> {
 					let meta = reflect
 						.get(&*c)
 						.ok_or_else(|| anyhow::anyhow!("mismatch"))?;
 					Ok(func(meta))
 				})
-			})
-			.flatten()
-			.flatten()?;
+			},
+		)???;
 		Ok(out)
 	}
 	pub fn category(self, world: &World) -> Result<ActionCategory> {

@@ -33,14 +33,16 @@ fn provide_score(
 		.get(trigger.entity())
 		.expect(expect_action::ACTION_QUERY_MISSING);
 
-	let score = if let Ok((transform, target)) = agents.get(**agent)
-		&& let Ok(target) = target.get_position(&transforms)
-	{
-		let dist = transform.translation().distance_squared(target);
-		if dist >= action.min_radius.powi(2)
-			&& dist <= action.max_radius.powi(2)
-		{
-			1.
+	let score = if let Ok((transform, target)) = agents.get(**agent) {
+		if let Ok(target) = target.get_position(&transforms) {
+			let dist = transform.translation().distance_squared(target);
+			if dist >= action.min_radius.powi(2)
+				&& dist <= action.max_radius.powi(2)
+			{
+				1.
+			} else {
+				0.
+			}
 		} else {
 			0.
 		}

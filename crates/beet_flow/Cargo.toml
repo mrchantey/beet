@@ -13,6 +13,7 @@ categories.workspace = true
 
 
 [features]
+# reflect requires trait upcasting so is nightly only
 reflect = ["dep:heck", "dep:serde", "bevy/bevy_scene", "bevy/serialize"]
 # default = ["bevyhub"]
 bevyhub = ["dep:bevyhub", "bevyhub/net", "bevyhub/core"]

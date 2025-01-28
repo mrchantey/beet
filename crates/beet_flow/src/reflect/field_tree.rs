@@ -39,8 +39,7 @@ impl FieldIdent {
 				}
 			};
 			Ok(children)
-		})
-		.flatten()
+		})?
 	}
 
 	pub fn tree(

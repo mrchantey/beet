@@ -1,12 +1,7 @@
 #![cfg_attr(test, feature(test, custom_test_frameworks))]
 #![cfg_attr(test, test_runner(sweet::test_runner))]
 #![allow(deprecated)] // TODO remove deprecated
-#![feature(
-	result_flattening,
-	let_chains,
-	associated_type_defaults,
-	trait_upcasting
-)]
+#![cfg_attr(feature = "reflect", feature(trait_upcasting))]
 pub mod action_builder;
 pub mod actions;
 #[cfg(feature = "bevyhub")]

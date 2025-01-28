@@ -43,10 +43,12 @@ pub fn depth_sensor_scorer(
 		.get(trigger.entity())
 		.expect(expect_action::ACTION_QUERY_MISSING);
 	if let Ok(depth) = sensors.get(**target) {
-		let next_score = if let Some(depth) = **depth
-			&& depth < scorer.threshold_dist
-		{
-			scorer.close_score
+		let next_score = if let Some(depth) = **depth {
+			if depth < scorer.threshold_dist {
+				scorer.close_score
+			} else {
+				scorer.far_score
+			}
 		} else {
 			scorer.far_score
 		};

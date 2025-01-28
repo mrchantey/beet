@@ -4,12 +4,12 @@ use bevy::prelude::*;
 
 /// Calculate a separation impulse
 /// as described [here](https://natureofcode.com/autonomous-agents/#example-59-separation).
-pub fn separate_impulse<T: GenericActionComponent>(
+pub fn separate_impulse<'a, T: GenericActionComponent>(
 	target_entity: Entity,
 	position: Vec3,
 	max_speed: MaxSpeed,
 	separate: &Separate<T>,
-	agents: impl IntoIterator<Item = (Entity, &Transform)>,
+	agents: impl IntoIterator<Item = (Entity, &'a Transform)>,
 ) -> Impulse {
 	let mut average = Vec3::default();
 	let mut total = 0;
@@ -42,7 +42,7 @@ mod test {
 	use sweet::prelude::*;
 
 	#[test]
-	fn works()  {
+	fn works() {
 		let mut world = World::new();
 
 
