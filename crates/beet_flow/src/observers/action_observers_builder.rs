@@ -98,13 +98,14 @@ mod test {
 
 		let entity = world.spawn(SequenceFlow).id();
 
-		expect(world.entities().len()).to_be(1);
+		// each action component type spawns a global observer (that's the +1)
+		expect(world.entities().len()).to_be(1 + 1);
 		world.flush();
-		expect(world.entities().len()).to_be(3);
+		expect(world.entities().len()).to_be(3 + 1);
 
 		world.entity_mut(entity).despawn();
 		// observers automatically removed
-		expect(world.entities().len()).to_be(0);
+		expect(world.entities().len()).to_be(0 + 1);
 	}
 	#[test]
 	fn works() {
@@ -114,14 +115,15 @@ mod test {
 
 		let entity = world.spawn(SequenceFlow).id();
 
-		expect(world.entities().len()).to_be(1);
+		// each action component type spawns a global observer (that's the +1)
+		expect(world.entities().len()).to_be(1 + 1);
 		world.flush();
-		expect(world.entities().len()).to_be(3);
+		expect(world.entities().len()).to_be(3 + 1);
 
 		// just removing an action will remove the observers
 		world.entity_mut(entity).remove::<SequenceFlow>();
-		expect(world.entities().len()).to_be(3);
+		expect(world.entities().len()).to_be(3 + 1);
 		world.flush();
-		expect(world.entities().len()).to_be(1);
+		expect(world.entities().len()).to_be(1 + 1);
 	}
 }

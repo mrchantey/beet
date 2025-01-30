@@ -45,9 +45,9 @@ mod test {
 			RemoveOnRunResult<Running>,
 		)>::default());
 		let world = app.world_mut();
-
 		let entity = world.spawn(ContinueRun).flush_trigger(OnRun).id();
-		expect(world.entities().len()).to_be(3);
+		// each action component type spawns a global observer (that's the +2)
+		expect(world.entities().len()).to_be(3 + 2);
 		expect(&*world).to_have_component::<Running>(entity);
 		world
 			.entity_mut(entity)

@@ -52,7 +52,8 @@ mod test {
 			.spawn(InsertOnRun::<Running>::default())
 			.flush_trigger(OnRun)
 			.id();
-		expect(world.entities().len()).to_be(2);
+		// each action component type spawns a global observer (that's the +1)
+		expect(world.entities().len()).to_be(2 + 1);
 		expect(&*world).to_have_component::<Running>(entity);
 	}
 
@@ -69,7 +70,8 @@ mod test {
 			.flush_trigger(OnRun)
 			.id();
 
-		expect(world.entities().len()).to_be(2);
+		// each action component type spawns a global observer (that's the +1)
+		expect(world.entities().len()).to_be(2 + 1);
 		expect(world.get::<Running>(entity)).to_be_some();
 	}
 }
