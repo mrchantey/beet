@@ -7,7 +7,7 @@ default:
 
 init-repo:
 	just assets-pull
-	just export-scenes
+# just export-scenes
 
 run example *args:
 	just watch 'just run-ci {{example}} {{args}}'
