@@ -6,7 +6,7 @@ use std::marker::PhantomData;
 
 
 /// Use this builder inside `Component::register_component_hooks` to add observers to an entity.
-/// They will be removed when the component is removed.
+/// They will be removed when the action component is removed.
 pub struct ActionObserversBuilder<T, M, Observers: IntoActionObservers<M>> {
 	observers: Observers,
 	phantom: PhantomData<(T, M)>,
@@ -23,9 +23,15 @@ impl<T> Default for ActionObserversBuilder<T, (), ()> {
 
 impl ActionObserversBuilder<(), (), ()> {
 	pub fn new<T>() -> ActionObserversBuilder<T, (), ()> { Default::default() }
-	/// Bevy guarantees that if all entities watched by a given Observer are despawned,
-	/// the Observer entity will also be despawned.
-	/// This function should only be used in situations other than the above.
+
+	/// Enables clean runtime modification of actions.
+	/// Removing a behavior entity will automatically remove all its observers.
+	/// In addition to this Beet extends this to the removal of particular action components,
+	/// which will remove that action's observers.
+	///
+	/// this function is called for the removal of an action component
+	/// as well as the removal of the entity itself, if the entity is removed
+	/// bevy will handle the clean up for us so `try_despawn` is used.
 	pub fn cleanup<'w, T: 'static + Send + Sync>(
 		world: &mut DeferredWorld<'w>,
 		entity: Entity,
@@ -37,7 +43,7 @@ impl ActionObserversBuilder<(), (), ()> {
 		{
 			let mut commands = world.commands();
 			for observer in observers.observers.iter() {
-				commands.entity(*observer).despawn();
+				commands.entity(*observer).try_despawn();
 			}
 		}
 	}
@@ -75,6 +81,22 @@ mod test {
 	use sweet::prelude::*;
 
 	#[test]
+	fn default_removal() {
+		let mut app = App::new();
+		app.add_plugins(ActionPlugin::<SequenceFlow>::default());
+		let world = app.world_mut();
+
+		let entity = world.spawn(SequenceFlow).id();
+
+		expect(world.entities().len()).to_be(1);
+		world.flush();
+		expect(world.entities().len()).to_be(3);
+
+		world.entity_mut(entity).despawn();
+		// observers automatically removed
+		expect(world.entities().len()).to_be(0);
+	}
+	#[test]
 	fn works() {
 		let mut app = App::new();
 		app.add_plugins(ActionPlugin::<SequenceFlow>::default());
@@ -86,8 +108,8 @@ mod test {
 		world.flush();
 		expect(world.entities().len()).to_be(3);
 
+		// just removing an action will remove the observers
 		world.entity_mut(entity).remove::<SequenceFlow>();
-		// world.entity_mut(entity).despawn();
 		expect(world.entities().len()).to_be(3);
 		world.flush();
 		expect(world.entities().len()).to_be(1);
