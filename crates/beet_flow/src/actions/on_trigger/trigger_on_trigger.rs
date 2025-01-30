@@ -1,6 +1,5 @@
 use crate::prelude::*;
 use bevy::prelude::*;
-use bevy::scene::SceneInstanceReady;
 use std::marker::PhantomData;
 
 
@@ -12,7 +11,9 @@ pub type RunOnRunResult = TriggerOnTrigger<OnRun, OnRunResult>;
 
 /// Trigger [`OnRun`] for the [`TriggerOnTrigger::target`]
 /// whenever [`SceneInstanceReady`] is triggered on one of the [`TriggerOnTrigger::sources`].
-pub type RunOnSceneReady = TriggerOnTrigger<OnRun, SceneInstanceReady>;
+#[cfg(feature = "scene")]
+pub type RunOnSceneReady =
+	TriggerOnTrigger<OnRun, bevy::scene::SceneInstanceReady>;
 
 pub type TriggerOnRun<T> = TriggerOnTrigger<T, OnRun>;
 

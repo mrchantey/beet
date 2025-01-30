@@ -1,5 +1,8 @@
+#[cfg(feature = "reflect")]
 use serde::ser::SerializeStruct;
+#[cfg(feature = "reflect")]
 use serde::Deserialize;
+#[cfg(feature = "reflect")]
 use serde::Serialize;
 use std::fmt;
 use std::fmt::Debug;
@@ -11,6 +14,7 @@ pub struct Tree<T> {
 	pub children: Vec<Tree<T>>,
 }
 
+#[cfg(feature = "reflect")]
 impl<T: Serialize> Serialize for Tree<T> {
 	fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
 	where
@@ -23,6 +27,7 @@ impl<T: Serialize> Serialize for Tree<T> {
 	}
 }
 
+#[cfg(feature = "reflect")]
 impl<'de, T: Deserialize<'de>> Deserialize<'de> for Tree<T> {
 	fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
 	where

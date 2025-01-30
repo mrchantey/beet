@@ -14,7 +14,8 @@ categories.workspace = true
 
 [features]
 # reflect requires trait upcasting so is nightly only
-reflect = ["dep:heck", "dep:serde", "bevy/bevy_scene", "bevy/serialize"]
+reflect = ["dep:heck", "dep:serde", "scene", "bevy/serialize"]
+scene = ["bevy/bevy_scene"]
 # default = ["bevyhub"]
 bevyhub = ["dep:bevyhub", "bevyhub/net", "bevyhub/core"]
 
@@ -34,4 +35,4 @@ heck = { workspace = true, optional = true }
 pretty_env_logger.workspace = true
 ron.workspace = true
 sweet.workspace = true
-beet_flow = { path = ".", features = ["reflect"] }
+# beet_flow = { path = ".", features = ["reflect"] }

@@ -19,3 +19,12 @@ pub use self::reflect_utils::*;
 pub mod type_registry_utils;
 #[allow(unused_imports)]
 pub use self::type_registry_utils::*;
+pub mod component_ident;
+#[allow(unused_imports)]
+pub use self::component_ident::*;
+pub mod entity_ident;
+#[allow(unused_imports)]
+pub use self::entity_ident::*;
+pub mod entity_ident_behavior;
+#[allow(unused_imports)]
+pub use self::entity_ident_behavior::*;

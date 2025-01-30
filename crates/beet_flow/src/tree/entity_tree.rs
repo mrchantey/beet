@@ -38,6 +38,7 @@ impl EntityTree {
 	) -> Tree<Option<&'a T>> {
 		self.0.map(|e| world.get::<T>(*e))
 	}
+	#[cfg(feature = "reflect")]
 	pub fn ident(&self) -> EntityIdent { EntityIdent::new(self.0.value) }
 }
 
@@ -75,10 +76,8 @@ mod test {
 
 		expect(scores.value).to_be(Some(&Name::new("parent")));
 		expect(scores.children[0].value).to_be(Some(&Name::new("child1")));
-		expect(scores.children[1].value)
-			.to_be(Some(&Name::new("child2new")));
+		expect(scores.children[1].value).to_be(Some(&Name::new("child2new")));
 		expect(scores.children[1].children[0].value)
 			.to_be(Some(&Name::new("grandchild1")));
-
 	}
 }

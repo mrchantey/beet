@@ -455,7 +455,6 @@ name = "beet_flow"
 version = "0.0.5-rc.3"
 dependencies = [
  "anyhow",
- "beet_flow",
  "beet_flow_macros",
  "bevy",
  "bevyhub",
@@ -5832,39 +5831,14 @@ dependencies = [
 [[package]]
 name = "sweet"
 version = "0.3.0-rc.2"
-source = "git+https://github.com/mrchantey/sweet#b7ae6bb7a7a80b96f0c142149e4b27132a2e021e"
 dependencies = [
- "sweet_core",
  "sweet_test",
-]
-
-[[package]]
-name = "sweet_core"
-version = "0.3.0-rc.2"
-source = "git+https://github.com/mrchantey/sweet#b7ae6bb7a7a80b96f0c142149e4b27132a2e021e"
-dependencies = [
- "anyhow",
- "console_error_panic_hook",
- "console_log",
- "flume",
- "forky 0.2.1-rc.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "getrandom",
- "js-sys",
- "once_cell",
- "strum",
- "strum_macros",
- "sweet_tree",
- "thiserror 2.0.11",
- "tokio",
- "wasm-bindgen",
- "wasm-bindgen-futures",
- "web-sys",
+ "sweet_utils",
 ]
 
 [[package]]
 name = "sweet_test"
 version = "0.3.0-rc.2"
-source = "git+https://github.com/mrchantey/sweet#b7ae6bb7a7a80b96f0c142149e4b27132a2e021e"
 dependencies = [
  "anyhow",
  "backtrace",
@@ -5884,8 +5858,8 @@ dependencies = [
  "pin-project-lite",
  "pretty_env_logger",
  "rayon",
- "sweet_core",
  "sweet_test_macros",
+ "sweet_utils",
  "thread_local",
  "tokio",
  "wasm-bindgen",
@@ -5896,7 +5870,6 @@ dependencies = [
 [[package]]
 name = "sweet_test_macros"
 version = "0.3.0-rc.2"
-source = "git+https://github.com/mrchantey/sweet#b7ae6bb7a7a80b96f0c142149e4b27132a2e021e"
 dependencies = [
  "anyhow",
  "proc-macro2",
@@ -5905,15 +5878,22 @@ dependencies = [
 ]
 
 [[package]]
-name = "sweet_tree"
+name = "sweet_utils"
 version = "0.3.0-rc.2"
-source = "git+https://github.com/mrchantey/sweet#b7ae6bb7a7a80b96f0c142149e4b27132a2e021e"
 dependencies = [
  "anyhow",
- "flume",
+ "console_error_panic_hook",
+ "console_log",
+ "forky 0.2.1-rc.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "getrandom",
+ "js-sys",
  "strum",
  "strum_macros",
  "thiserror 2.0.11",
+ "tokio",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
+ "web-sys",
 ]
 
 [[package]]

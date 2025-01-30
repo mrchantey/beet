@@ -17,7 +17,6 @@ impl Plugin for LifecyclePlugin {
 				InsertOnRun<Running>,
 				RemoveOnRunResult<Running>,
 				RunOnRunResult,
-				RunOnSceneReady,
 			)>::default(),
 			// repeat flow
 			ActionPlugin::<(
@@ -57,6 +56,9 @@ impl Plugin for LifecyclePlugin {
 		// net
 		#[cfg(feature = "bevyhub")]
 		app.add_plugins(BeetNetPlugin);
+
+		#[cfg(feature = "scene")]
+		app.add_plugins(ActionPlugin::<RunOnSceneReady>::default());
 
 		let world = app.world_mut();
 

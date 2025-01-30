@@ -56,7 +56,8 @@ forky = { git = "https://github.com/mrchantey/forky", features = [
 	"bevy",
 	"web",
 ] }
-sweet = { git = "https://github.com/mrchantey/sweet", default-features = false, features = [
+sweet = { path = "../sweet", default-features = false, features = [
+	# sweet = { git = "https://github.com/mrchantey/sweet", default-features = false, features = [
 	"test",
 	"bevy",
 ] }
