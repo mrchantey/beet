@@ -91,9 +91,8 @@ impl<Handler: OnTriggerHandler> OnTrigger<Handler> {
 
 impl<Handler: OnTriggerHandler> ActionBuilder for OnTrigger<Handler> {
 	fn build(app: &mut App, _config: &BeetConfig) {
-		app.world_mut()
-			.register_component_hooks::<Self>()
-			.on_add(|mut world, action_entity, _| {
+		app.world_mut().register_component_hooks::<Self>().on_add(
+			|mut world, action_entity, _| {
 				let action = world.get::<Self>(action_entity).unwrap();
 				// use closure to capture the action entity
 				let mut observer = Observer::new(
@@ -128,10 +127,9 @@ impl<Handler: OnTriggerHandler> ActionBuilder for OnTrigger<Handler> {
 				commands
 					.entity(entity)
 					.insert(ActionObserverMap::<Self>::new(vec![entity]));
-			})
-			.on_remove(|mut world, entity, _| {
-				ActionObserversBuilder::cleanup::<Self>(&mut world, entity);
-			});
+			},
+		);
+		app.add_observer(ActionObserversBuilder::cleanup_trigger::<Self>);
 	}
 }
 
@@ -155,7 +153,7 @@ mod test {
 		expect(&*world).to_have_component::<Running>(entity);
 	}
 	#[test]
-	fn other_sources()  {
+	fn other_sources() {
 		let mut app = App::new();
 		app.add_plugins(ActionPlugin::<InsertOnRun<Running>>::default());
 		let world = app.world_mut();

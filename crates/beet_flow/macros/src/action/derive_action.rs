@@ -39,17 +39,17 @@ fn impl_component_hooks(
 	let observers = attributes.observers.collect_comma_punct();
 
 	Ok(Some(quote! {
-		app.world_mut().register_component_hooks::<Self>()
+		app.world_mut()
+		.register_component_hooks::<Self>()
 		.on_add(|mut world, entity, _| {
-				ActionObserversBuilder::new::<Self>()
-				.add_observers((#observers))
-				.build(world.commands(), entity);
-			})
-			.on_remove(|mut world, entity, _|{
-				ActionObserversBuilder::cleanup::<Self>(&mut world,entity)
-			});
+			ActionObserversBuilder::new::<Self>()
+			.add_observers((#observers))
+			.build(world.commands(), entity);
+		});
+		app.add_observer(ActionObserversBuilder::cleanup_trigger::<Self>);
 	}))
 }
+
 
 
 fn impl_action_builder(

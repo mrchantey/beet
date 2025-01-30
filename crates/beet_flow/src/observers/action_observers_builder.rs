@@ -1,5 +1,8 @@
 use crate::prelude::*;
-use bevy::ecs::world::DeferredWorld;
+use bevy::ecs::component::Component;
+use bevy::ecs::observer::Trigger;
+use bevy::ecs::system::Query;
+use bevy::ecs::world::OnRemove;
 use bevy::prelude::Commands;
 use bevy::prelude::Entity;
 use std::marker::PhantomData;
@@ -25,24 +28,31 @@ impl ActionObserversBuilder<(), (), ()> {
 	pub fn new<T>() -> ActionObserversBuilder<T, (), ()> { Default::default() }
 
 	/// Enables clean runtime modification of actions.
-	/// Removing a behavior entity will automatically remove all its observers.
-	/// In addition to this Beet extends this to the removal of particular action components,
+	/// Removing a behavior entity will automatically remove all its observers (bevy does this).
+	///
+	/// Beet extends this to the removal of particular action components,
 	/// which will remove that action's observers.
 	///
-	/// this function is called for the removal of an action component
-	/// as well as the removal of the entity itself, if the entity is removed
-	/// bevy will handle the clean up for us so `try_despawn` is used.
-	pub fn cleanup<'w, T: 'static + Send + Sync>(
-		world: &mut DeferredWorld<'w>,
-		entity: Entity,
+	/// This is registered as an OnRemove observer, so that it runs AFTER bevy's built-in
+	/// on_remove hook on the internal `ObservedBy` component, which tracks observers watching the
+	/// entity and potentially despawns them when the entity despawns.
+	///
+	/// This is important because the built-in on_remove hook for ObservedBy uses `despawn`, not
+	/// `try_despawn`, so upon despawning the entity with the action component, we want the built-in
+	/// ObservedBy on_remove hook to run first, and then we follow-up using `try_despawn` here.
+	pub fn cleanup_trigger<T: Component>(
+		trigger: Trigger<OnRemove, T>,
+		q: Query<&ActionObserverMap<T>>,
+		mut commands: Commands,
 	) {
-		if let Some(observers) = world
-			.entity(entity)
-			.get::<ActionObserverMap<T>>()
-			.map(|obs| (*obs).clone())
-		{
-			let mut commands = world.commands();
-			for observer in observers.observers.iter() {
+		if let Ok(observer_map) = q.get(trigger.entity()) {
+			for observer in observer_map.observers.iter() {
+				// if t.entity() was just despawned (triggering this OnRemove), then this
+				// try_despawn will be a no-op, because bevy will have already despawned the
+				// observers in the ObservedBy on_remove hook.
+				//
+				// If OnRemove was triggered because the action component was removed, but the
+				// trigger.entity() still lives, then this will correctly remove the observers.
 				commands.entity(*observer).try_despawn();
 			}
 		}
