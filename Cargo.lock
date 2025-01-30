@@ -5831,6 +5831,7 @@ dependencies = [
 [[package]]
 name = "sweet"
 version = "0.3.0-rc.2"
+source = "git+https://github.com/mrchantey/sweet#c91094907a2eb67aa85a76c202d6bde738d37f85"
 dependencies = [
  "sweet_test",
  "sweet_utils",
@@ -5839,6 +5840,7 @@ dependencies = [
 [[package]]
 name = "sweet_test"
 version = "0.3.0-rc.2"
+source = "git+https://github.com/mrchantey/sweet#c91094907a2eb67aa85a76c202d6bde738d37f85"
 dependencies = [
  "anyhow",
  "backtrace",
@@ -5870,6 +5872,7 @@ dependencies = [
 [[package]]
 name = "sweet_test_macros"
 version = "0.3.0-rc.2"
+source = "git+https://github.com/mrchantey/sweet#c91094907a2eb67aa85a76c202d6bde738d37f85"
 dependencies = [
  "anyhow",
  "proc-macro2",
@@ -5880,6 +5883,7 @@ dependencies = [
 [[package]]
 name = "sweet_utils"
 version = "0.3.0-rc.2"
+source = "git+https://github.com/mrchantey/sweet#c91094907a2eb67aa85a76c202d6bde738d37f85"
 dependencies = [
  "anyhow",
  "console_error_panic_hook",
