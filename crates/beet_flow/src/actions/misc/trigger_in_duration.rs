@@ -45,7 +45,9 @@ pub fn trigger_in_duration<T: GenericActionEvent>(
 ) {
 	for (entity, timer, action) in query.iter_mut() {
 		if timer.last_started.elapsed() >= action.duration {
-			commands.entity(entity).trigger(action.value.clone());
+			if let Some(mut e) = commands.get_entity(entity) {
+				e.trigger(action.value.clone());
+			}
 		}
 	}
 }
