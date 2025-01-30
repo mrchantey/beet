@@ -41,5 +41,7 @@ pub trait ReflectEvent: Event + FromReflect + GetTypeRegistration {}
 impl<T: Event + FromReflect + GetTypeRegistration> ReflectEvent for T {}
 
 /// Minimal traits generally required for an action asset type.
+#[cfg(feature = "scene")]
 pub trait GenericActionAsset: 'static + Send + Sync + TypePath + Asset {}
+#[cfg(feature = "scene")]
 impl<T: 'static + Send + Sync + TypePath + Asset> GenericActionAsset for T {}

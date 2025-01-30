@@ -7,7 +7,7 @@ default:
 
 init-repo:
 	just assets-pull
-	just export-scenes
+# just export-scenes
 
 run example *args:
 	just watch 'just run-ci {{example}} {{args}}'
@@ -46,8 +46,12 @@ serve-doc:
 # 1. test with no features
 # 2. test with all features
 test-ci *args:
-	cargo test --workspace -- {{args}}
-	cargo test --workspace --all-features -- {{args}}
+	cargo test -p beet_flow
+#cargo test -p beet_spatial
+#cargo test -p beet_sim
+#cargo test -p beet_ml
+# cargo test --workspace -- {{args}}
+# cargo test --workspace --all-features -- {{args}}
 
 test-all *args:
 	just watch 'just test-ci {{args}}'

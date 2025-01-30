@@ -14,7 +14,6 @@ pub mod net;
 pub mod observers;
 #[cfg(feature = "reflect")]
 pub mod reflect;
-#[cfg(feature = "reflect")]
 pub mod tree;
 
 // required for action macros
@@ -45,7 +44,6 @@ pub mod prelude {
 	// pub use crate::lifecycle::*;
 	#[cfg(feature = "reflect")]
 	pub use crate::reflect::*;
-	#[cfg(feature = "reflect")]
 	pub use crate::tree::*;
 	pub use beet_flow_macros::*;
 }

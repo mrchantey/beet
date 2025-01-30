@@ -44,12 +44,12 @@ fn impl_component_hooks(
 				ActionObserversBuilder::new::<Self>()
 				.add_observers((#observers))
 				.build(world.commands(), entity);
+			})
+			.on_remove(|mut world, entity, _|{
+				ActionObserversBuilder::cleanup::<Self>(&mut world,entity)
 			});
-		// bevy automatically despawns observers when the entities they are watching are despawned
 	}))
 }
-
-
 
 
 fn impl_action_builder(
