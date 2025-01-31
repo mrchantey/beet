@@ -88,7 +88,7 @@ globalThis.{event_handler} = (id,event) => globalThis.{prehydrate_events}.push([
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use ::sweet::prelude::*;
+	use sweet::prelude::*;
 
 	#[test]
 	fn plain() {

@@ -204,7 +204,7 @@ impl<T: Display> Tree<T> {
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use ::sweet::prelude::*;
+	use sweet::prelude::*;
 
 	#[test]
 	fn works() {

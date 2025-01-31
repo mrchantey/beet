@@ -35,7 +35,7 @@ pub fn align_impulse<'a, T: GenericActionComponent>(
 mod test {
 	use crate::prelude::*;
 	use bevy::prelude::*;
-	use ::sweet::prelude::*;
+	use sweet::prelude::*;
 
 
 	fn spawn(world: &mut World, pos: Vec3, vel: Vec3) -> Entity {

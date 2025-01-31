@@ -57,7 +57,7 @@ pub fn update_run_timers(
 mod test {
 	use crate::prelude::*;
 	use bevy::prelude::*;
-	use ::sweet::prelude::*;
+	use sweet::prelude::*;
 
 	#[test]
 	pub fn works() {

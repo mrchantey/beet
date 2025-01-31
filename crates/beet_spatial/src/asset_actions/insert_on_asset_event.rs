@@ -4,6 +4,11 @@ use bevy::asset::LoadState;
 // use bevy::asset::LoadState;
 use bevy::prelude::*;
 
+/// Minimal traits generally required for an action asset type.
+pub trait GenericActionAsset: 'static + Send + Sync + TypePath + Asset {}
+impl<T: 'static + Send + Sync + TypePath + Asset> GenericActionAsset for T {}
+
+
 /// Inserts the given component when a matching asset event is received.
 /// This requires the entity to have a Handle<T>
 #[derive(Debug, Clone, PartialEq, Component, Action, Reflect)]

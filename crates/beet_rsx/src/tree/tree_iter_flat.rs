@@ -199,7 +199,7 @@ mod test {
 	// use crate::prelude::*;
 	use super::TreeIterFlat;
 	use crate::tree::Node;
-	use ::sweet::prelude::*;
+	use sweet::prelude::*;
 
 
 	/// create a tree labeled in dfs order

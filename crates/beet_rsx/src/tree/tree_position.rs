@@ -177,7 +177,7 @@ impl TreePosition {
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use ::sweet::prelude::*;
+	use sweet::prelude::*;
 
 	fn create_tree() -> Node<i32> {
 		Node::new(0).with_children(vec![

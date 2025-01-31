@@ -221,7 +221,7 @@ impl TextBlockPosition {
 mod test {
 	use super::*;
 	use crate::prelude::*;
-	use ::sweet::prelude::*;
+	use sweet::prelude::*;
 
 	struct Adjective;
 	impl Component for Adjective {

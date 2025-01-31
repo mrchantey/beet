@@ -248,7 +248,7 @@ fn normalize_l2(v: &Tensor) -> Result<Tensor> {
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use ::sweet::prelude::*;
+	use sweet::prelude::*;
 
 	#[tokio::test]
 	async fn works() {

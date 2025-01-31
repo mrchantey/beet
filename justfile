@@ -48,8 +48,10 @@ serve-doc:
 test-all *args:
 	cargo test -p beet_flow
 	cargo test -p beet_rsx
+	cargo test -p beet_spatial
 	cargo test -p beet_flow --target wasm32-unknown-unknown
 	cargo test -p beet_rsx --target wasm32-unknown-unknown
+	cargo test -p beet_spatial --target wasm32-unknown-unknown
 
 #cargo test -p beet_spatial
 #cargo test -p beet_sim
@@ -89,7 +91,7 @@ tree:
 
 
 # Build wasm files, pass --no-build to just update scenes and registries
-build-wasm *args:
+bevyhub-build *args:
 	just export-scenes
 	bevyhub build \
 	--example app \
@@ -101,6 +103,16 @@ build-wasm *args:
 	--example app_ml \
 	--release \
 	--copy-local ../bevyhub-apps {{args}}
+
+
+build-wasm crate example *args:
+	cargo build -p {{crate}} --example {{example}} --target wasm32-unknown-unknown {{args}}
+	wasm-bindgen \
+	--out-dir ./target/wasm \
+	--out-name bindgen \
+	--target web \
+	--no-typescript \
+	~/.cargo_target/wasm32-unknown-unknown/debug/examples/{{example}}.wasm
 
 ### MISC
 
@@ -164,7 +176,7 @@ expand-rsx:
 	just watch cargo expand -p beet_rsx --example rsx_macro
 wasm-example:
 	forky serve | \
-	just watch 'just build-wasm sweet dom_renderer'
+	just watch 'just build-wasm beet dom_renderer'
 
 
 ### TEST SCENE LOADS

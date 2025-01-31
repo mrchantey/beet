@@ -6,7 +6,7 @@
 mod test {
 	// use beet_rsx::string_rsx::StringRsx;
 	// use beet_rsx_parser::prelude::*;
-	// use ::sweet::prelude::*;
+	// use sweet::prelude::*;
 
 	#[test]
 	fn works() {

@@ -35,7 +35,7 @@ fn render() {}
 
 #[cfg(target_arch = "wasm32")]
 fn render() {
-	use ::sweet::prelude::dom_mounter::DomMounter;
+	use sweet::prelude::dom_mounter::DomMounter;
 	use sweet::utils::wasm::set_timeout_ms;
 
 	console_error_panic_hook::set_once();

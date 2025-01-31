@@ -52,7 +52,7 @@ where
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use ::sweet::prelude::*;
+	use sweet::prelude::*;
 	use bevy::ecs::system::SystemState;
 	use bevy::prelude::*;
 

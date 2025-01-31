@@ -77,7 +77,7 @@ impl SignalsRsx {
 mod test {
 	use super::signal;
 	use crate::prelude::*;
-	use ::sweet::prelude::*;
+	use sweet::prelude::*;
 
 	#[test]
 	fn works() {

@@ -190,7 +190,7 @@ impl<'a, T: Tree> Iterator for TreeIterDfs<'a, T> {
 mod test {
 	use super::TreeIter;
 	use crate::prelude::*;
-	// use ::sweet::prelude::*;
+	// use sweet::prelude::*;
 
 
 	/// create a tree labeled in dfs order

@@ -104,7 +104,7 @@ impl EntityIdent {
 mod test {
 	use crate::prelude::*;
 	use bevy::prelude::*;
-	use ::sweet::prelude::*;
+	use sweet::prelude::*;
 	fn test_no_action_behavior_tree(world: &mut World) -> EntityTree {
 		let entity = world
 			.spawn(Running)

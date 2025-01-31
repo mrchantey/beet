@@ -45,7 +45,7 @@ pub fn interrupt_on_run_result(
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use ::sweet::prelude::*;
+	use sweet::prelude::*;
 	use bevy::prelude::*;
 
 	#[test]

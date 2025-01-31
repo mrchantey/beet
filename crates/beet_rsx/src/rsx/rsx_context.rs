@@ -282,7 +282,7 @@ impl<T> HtmlElementPosition<T> {
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use ::sweet::prelude::*;
+	use sweet::prelude::*;
 
 
 	#[test]

@@ -58,7 +58,7 @@ mod test {
 	use beet_flow::prelude::*;
 	use bevy::prelude::*;
 	use bevyhub::prelude::*;
-	use ::sweet::prelude::*;
+	use sweet::prelude::*;
 
 	#[test]
 	fn works() {
@@ -75,7 +75,8 @@ mod test {
 		let on_run = observe_trigger_names::<OnRun>(app.world_mut());
 
 		let handle =
-			block_on_asset_load::<Bert>(&mut app, "ml/default-bert.ron").unwrap();
+			block_on_asset_load::<Bert>(&mut app, "ml/default-bert.ron")
+				.unwrap();
 
 		app.world_mut()
 			.spawn((

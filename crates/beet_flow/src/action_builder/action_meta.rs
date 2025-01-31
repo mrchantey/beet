@@ -33,7 +33,7 @@ mod test {
 	use bevy::reflect::ReflectFromPtr;
 	use bevy::reflect::TypeRegistry;
 	use std::any::Any;
-	use ::sweet::prelude::*;
+	use sweet::prelude::*;
 
 	#[derive(Component, Action, Reflect)]
 	#[reflect(ActionMeta)]

@@ -138,7 +138,7 @@ impl<Handler: OnTriggerHandler> ActionBuilder for OnTrigger<Handler> {
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use ::sweet::prelude::*;
+	use sweet::prelude::*;
 	use bevy::prelude::*;
 
 	#[test]

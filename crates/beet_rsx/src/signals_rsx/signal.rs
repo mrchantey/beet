@@ -71,7 +71,7 @@ pub fn signal<T: Clone + 'static>(
 #[cfg(test)]
 mod tests {
 	use super::*;
-	use ::sweet::prelude::*;
+	use sweet::prelude::*;
 
 	#[test]
 	fn test_signals_and_effects() {

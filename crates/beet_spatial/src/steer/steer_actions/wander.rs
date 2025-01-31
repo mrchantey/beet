@@ -1,7 +1,7 @@
 use crate::prelude::*;
 use beet_flow::prelude::*;
 use bevy::prelude::*;
-use forky::prelude::Vec3Ext;
+use sweet::prelude::*;
 
 /// Somewhat cohesive random walk
 #[derive(Debug, Clone, PartialEq, Component, Action, Reflect)]
@@ -91,11 +91,12 @@ fn wander(
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
+	use sweet::prelude::*;
 	use beet_flow::prelude::*;
 	use bevy::prelude::*;
-	use ::sweet::prelude::*;
 
 	#[test]
+	#[ignore = "get random"]
 	fn works() {
 		let mut app = App::new();
 

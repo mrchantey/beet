@@ -82,7 +82,7 @@ impl<T: RsxRustTokens> RsxParser<T> {
 
 		*tokens = syn::parse_quote! {{
 			#errors
-			use ::sweet::prelude::*;
+			use sweet::prelude::*;
 			#[allow(unused_braces)]
 			{
 				RsxNode::Fragment(Vec::from([#(#nodes),*]))

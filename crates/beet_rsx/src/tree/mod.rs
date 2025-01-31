@@ -167,7 +167,7 @@ impl<T: Tree> FromIterator<(TreePosition, T)> for Node<T> {
 mod test {
 	// use super::tree_iter::TreeIter;
 	// use crate::prelude::*;
-	// use ::sweet::prelude::*;
+	// use sweet::prelude::*;
 
 	// fn create_tree() -> Node<i32> {
 	// 	Node::new(1).with_children(vec![
