@@ -47,7 +47,7 @@ impl EntityTree {
 mod test {
 	use crate::prelude::*;
 	use bevy::prelude::*;
-	use sweet::prelude::*;
+	use ::sweet::prelude::*;
 
 
 	fn create_tree(world: &mut World) -> EntityTree {

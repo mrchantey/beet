@@ -76,7 +76,7 @@ mod test {
 	use beet_spatial::steer::SteerTarget;
 	use bevyhub::prelude::HandleWrapper;
 	use bevy::prelude::*;
-	use sweet::prelude::*;
+	use ::sweet::prelude::*;
 
 	#[test]
 	fn works() {

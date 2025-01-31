@@ -56,7 +56,7 @@ mod test {
 	use crate::prelude::*;
 	use bevy::prelude::*;
 	use std::time::Duration;
-	use sweet::prelude::*;
+	use ::sweet::prelude::*;
 
 	#[test]
 	fn works() {

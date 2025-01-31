@@ -80,7 +80,7 @@ mod test {
 	use crate::prelude::*;
 	use rand::rngs::StdRng;
 	use rand::SeedableRng;
-	use sweet::prelude::*;
+	use ::sweet::prelude::*;
 
 
 	/// This test is *almost* identical to a [`QTableTrainer`] but demonstrates

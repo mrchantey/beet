@@ -58,7 +58,7 @@ mod test {
 	use beet_flow::prelude::*;
 	use bevy::prelude::*;
 	use bevyhub::prelude::*;
-	use sweet::prelude::*;
+	use ::sweet::prelude::*;
 
 	#[test]
 	fn works() {

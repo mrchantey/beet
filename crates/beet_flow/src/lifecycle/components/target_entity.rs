@@ -134,9 +134,9 @@ mod tests {
 			let Ok((name, target_entity)) = q.get(t.entity()) else {
 				panic!("OnRun trigger failed to find entity");
 			};
-			println!(
-				"OnRun triggered for: {name:?}, target_entity: {target_entity:?}, expected: {target_entity_should_be:?}"
-			);
+			// println!(
+			// 	"OnRun triggered for: {name:?}, target_entity: {target_entity:?}, expected: {target_entity_should_be:?}"
+			// );
 			let target_entity = target_entity.map(|te| te.0);
 			assert_eq!(
 				target_entity,
@@ -241,7 +241,7 @@ mod tests {
 		// we'll spawn the behaviour tree, then add it as a child of the character.
 		let character =
 			app.world_mut().spawn(Name::new("Character Entity")).id();
-		println!("character: {character:?}");
+		// println!("character: {character:?}");
 		// spawn a standalone behaviour tree, then add it as a child to the character.
 		// We would expect "B", having "RootIsTargetEntity", to have a TargetEntity of the character,
 		// because of the presence of the DynamicRootIsTargetEntity component.
@@ -259,7 +259,7 @@ mod tests {
 				});
 			})
 			.id();
-		println!("bt, before reparenting: {bt:?}");
+		// println!("bt, before reparenting: {bt:?}");
 		// An update now will set the TargetEntity of B to "bt", the *current* root ancestor of B.
 		// Doing it to verify the presence of DynamicRootIsTargetEntity hasn't broken this.
 		app.update();

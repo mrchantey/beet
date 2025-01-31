@@ -130,7 +130,7 @@ mod test {
 	use rand::SeedableRng;
 	use std::time::Duration;
 	use std::time::Instant;
-	use sweet::prelude::*;
+	use ::sweet::prelude::*;
 
 	#[test]
 	fn works() {

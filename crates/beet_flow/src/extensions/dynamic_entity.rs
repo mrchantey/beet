@@ -40,7 +40,7 @@ mod test {
 	use crate::prelude::*;
 	use bevy::prelude::*;
 	use bevy::scene::DynamicEntity;
-	use sweet::prelude::*;
+	use ::sweet::prelude::*;
 
 	fn node_name(entity: &DynamicEntity) -> String {
 		for component in entity.components.iter() {

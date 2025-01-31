@@ -93,7 +93,7 @@ mod test {
 	use bevy::prelude::*;
 	use std::f32::consts::PI;
 	use std::f32::consts::TAU;
-	use sweet::prelude::*;
+	use ::sweet::prelude::*;
 
 	#[test]
 	fn calculates_length() {

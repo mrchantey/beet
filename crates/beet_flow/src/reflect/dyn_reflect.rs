@@ -30,7 +30,7 @@ impl DynReflect {
 mod test {
 	use crate::prelude::*;
 	use bevy::prelude::*;
-	use sweet::prelude::*;
+	use ::sweet::prelude::*;
 
 	#[derive(Debug, Clone, PartialEq, Reflect)]
 	struct MyStruct(pub i32);

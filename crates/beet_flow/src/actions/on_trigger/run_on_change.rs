@@ -85,7 +85,7 @@ mod test {
 	use super::RunOnChange;
 	use crate::prelude::*;
 	use bevy::prelude::*;
-	use sweet::prelude::*;
+	use ::sweet::prelude::*;
 
 	#[test]
 	fn works() {

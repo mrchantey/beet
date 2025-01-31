@@ -109,7 +109,7 @@ mod test {
 	use crate::prelude::*;
 	use beet_flow::prelude::*;
 	use bevy::prelude::*;
-	use sweet::prelude::*;
+	use ::sweet::prelude::*;
 
 	#[test]
 	fn works() {

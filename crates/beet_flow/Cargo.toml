@@ -34,5 +34,4 @@ heck = { workspace = true, optional = true }
 [dev-dependencies]
 pretty_env_logger.workspace = true
 ron.workspace = true
-sweet.workspace = true
-# beet_flow = { path = ".", features = ["reflect"] }
+sweet = { workspace = true, features = ["test", "bevy"] }

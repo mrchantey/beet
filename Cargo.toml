@@ -6,8 +6,15 @@ opt-level = 1
 [profile.dev.package."*"]
 opt-level = 3
 
+# sweet_test backtracing
+[profile.test]
+opt-level = 0
+[profile.test.package.sweet_test]
+opt-level = 0
+
 [workspace.package]
-version = "0.0.5-rc.3"
+version = "0.0.5-rc.4"
+authors = ["Peter Hayman"]
 edition = "2021"
 description = "A modular behavior library for the Bevy Engine."
 documentation = "https://bevyhub.dev/docs/beet"
@@ -33,6 +40,9 @@ members = [
 	"crates/beet_flow",
 	"crates/beet_ml",
 	"crates/beet_rig",
+	"crates/beet_rsx",
+	"crates/beet_rsx/macros",
+	"crates/beet_rsx/parser",
 	"crates/beet_sim",
 	"crates/beet_spatial",
 	# "crates/emby",
@@ -41,75 +51,64 @@ members = [
 
 [workspace.dependencies]
 ## internal
-beet = { path = "./", version = "0.0.5-rc.3" }
-beet_spatial = { path = "crates/beet_spatial", version = "0.0.5-rc.3", default-features = false }
-beet_flow = { path = "crates/beet_flow", version = "0.0.5-rc.3" }
-beet_flow_macros = { path = "crates/beet_flow/macros", version = "0.0.5-rc.3" }
-beet_ml = { path = "crates/beet_ml", version = "0.0.5-rc.3" }
-beet_sim = { path = "crates/beet_sim", version = "0.0.5-rc.3" }
-beet_examples = { path = "crates/beet_examples", version = "0.0.5-rc.3" }
-# emby = { path = "crates/emby", version = "0.0.5-rc.3" }
+beet = { path = "./", version = "0.0.5-rc.4" }
+beet_spatial = { path = "crates/beet_spatial", version = "0.0.5-rc.4", default-features = false }
+beet_flow = { path = "crates/beet_flow", version = "0.0.5-rc.4" }
+beet_flow_macros = { path = "crates/beet_flow/macros", version = "0.0.5-rc.4" }
+beet_ml = { path = "crates/beet_ml", version = "0.0.5-rc.4" }
+beet_rsx = { path = "crates/beet_rsx", version = "0.0.5-rc.4" }
+beet_rsx_macros = { path = "crates/beet_rsx/macros", version = "0.0.5-rc.4" }
+beet_rsx_parser = { path = "crates/beet_rsx/parser", version = "0.0.5-rc.4" }
+beet_sim = { path = "crates/beet_sim", version = "0.0.5-rc.4" }
+beet_examples = { path = "crates/beet_examples", version = "0.0.5-rc.4" }
+# emby = { path = "crates/emby", version = "0.0.5-rc.4" }
 
-## local
+#💡 local
 bevyhub = { git = "https://github.com/mrchantey/bevyhub", default-features = false }
-forky = { git = "https://github.com/mrchantey/forky", features = [
-	"bevy",
-	"web",
-] }
-# sweet = { path = "../sweet", default-features = false, features = [
-sweet = { git = "https://github.com/mrchantey/sweet", default-features = false, features = [
-	"test",
-	"bevy",
-] }
-# sweet = { version = "0.2", features = ["bevy"] }
+# sweet = { path = "../sweet" }
+sweet = { git = "https://github.com/mrchantey/sweet" }
 
 #💡 game
-bevy = { version = "0.15", default-features = false, features = [
-	# bevy = { git = "https://github.com/bevyengine/bevy", rev = "0c959f77007c29eead7f902bddd3342a1ecbca20", default-features = false, features = [
-	# "bevy_scene",
-	# "serialize",
-	# "bevy_color",
-] }
+bevy = { version = "0.15", default-features = false }
 
-
-## logging
+#💡 logging
 log = "0.4"
 pretty_env_logger = "0.4"
 console_log = { version = "1.0", features = ["color"] }
 
-## utility
+#💡 utility
 anyhow = "1.0.75"
 thiserror = "1.0.60"
 bytemuck = "1.13.1"
 heck = "0.4"
 rand = "0.8"
 rand_chacha = "0"
+once_cell = "1.20"
 
-## async
+#💡 async
 futures = "0.3"
 
-
-## async-native
+#💡 async-native
 tokio = { version = "1.35", features = ["full"] }
 
-## macros
+#💡 macros
 syn = "2.0"
 quote = "1.0"
 proc-macro2 = "1.0"
 
-## attributes
+#💡 attributes
 num-traits = "0.2.19"
 derive_deref = "1.1.1"
 strum = { version = "0.26.0", features = ["derive"] }
 strum_macros = "0.26.0"
 extend = "1.1.2"
 
-## io
+#💡 io
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 ron = "0.8"
 
-# [target.'cfg(target_arch = "wasm32")'.dependencies]
+#💡 web
 js-sys = "0.3"
 wasm-bindgen = "0.2"
 wasm-bindgen-futures = "0.4"
@@ -165,7 +164,7 @@ features = [
 	'UrlSearchParams',
 ]
 
-#💡 Package
+#💡💡 Package
 
 [package]
 name = "beet"
@@ -208,7 +207,6 @@ bevy = { workspace = true, default-features = true }
 beet_examples.workspace = true
 log.workspace = true
 pretty_env_logger.workspace = true
-forky.workspace = true
 bevyhub = { workspace = true, features = ["export_types"] }
 anyhow.workspace = true
 serde.workspace = true

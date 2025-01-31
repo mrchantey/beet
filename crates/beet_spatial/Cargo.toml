@@ -19,7 +19,6 @@ assets = ["bevy/bevy_asset", "dep:bevyhub"]
 animation = ["bevy/bevy_animation", "dep:bevyhub"]
 
 [dependencies]
-forky.workspace = true
 bevyhub = { workspace = true, optional = true, features = ["core"] }
 beet_flow = { workspace = true }
 

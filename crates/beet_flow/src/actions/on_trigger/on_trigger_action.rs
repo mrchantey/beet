@@ -138,8 +138,8 @@ impl<Handler: OnTriggerHandler> ActionBuilder for OnTrigger<Handler> {
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
+	use ::sweet::prelude::*;
 	use bevy::prelude::*;
-	use sweet::prelude::*;
 
 	#[test]
 	fn works() {
@@ -155,7 +155,7 @@ mod test {
 		expect(&*world).to_have_component::<Running>(entity);
 	}
 	#[test]
-	fn other_sources()  {
+	fn other_sources() {
 		let mut app = App::new();
 		app.add_plugins(ActionPlugin::<InsertOnRun<Running>>::default());
 		let world = app.world_mut();
