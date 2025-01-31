@@ -46,7 +46,7 @@ jobs:
       with:
         deno-version: v2.x  
     - name: 🔨 Install sweet cli
-      run: cargo install sweet-cli
+      run: cargo install sweet-cli || true
     - name: 🔨📋 Init repo
       run: just init-repo
     - name: 🔎 Test
