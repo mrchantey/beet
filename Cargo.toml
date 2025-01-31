@@ -65,8 +65,8 @@ beet_examples = { path = "crates/beet_examples", version = "0.0.5-rc.4" }
 
 #💡 local
 bevyhub = { git = "https://github.com/mrchantey/bevyhub", default-features = false }
-sweet = { path = "../sweet" }
-# sweet = { git = "https://github.com/mrchantey/sweet" }
+# sweet = { path = "../sweet" }
+sweet = { git = "https://github.com/mrchantey/sweet" }
 
 #💡 game
 bevy = { version = "0.15", default-features = false }
