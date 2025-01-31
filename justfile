@@ -45,21 +45,33 @@ serve-doc:
 
 # 1. test with no features
 # 2. test with all features
-test-ci *args:
+test-all *args:
 	cargo test -p beet_flow
+	cargo test -p beet_rsx
+	cargo test -p beet_spatial
+	cargo test -p beet_flow --target wasm32-unknown-unknown
+	cargo test -p beet_rsx --target wasm32-unknown-unknown
+	cargo test -p beet_spatial --target wasm32-unknown-unknown
+
 #cargo test -p beet_spatial
 #cargo test -p beet_sim
 #cargo test -p beet_ml
 # cargo test --workspace -- {{args}}
 # cargo test --workspace --all-features -- {{args}}
 
-test-all *args:
-	just watch 'just test-ci {{args}}'
-
+# copied from sweet
 test crate *args:
+	just watch 'cargo test -p {{crate}} --lib -- --watch {{args}}'
+test-e2e crate test_name *args:
+	just watch 'cargo test -p {{crate}} --test {{test_name}} -- --watch {{args}}'
+test-feat crate *args:
 	just watch 'cargo test -p {{crate}} --lib --all-features -- {{args}}'
-test-min crate *args:
-	just watch 'cargo test -p {{crate}} --lib -- {{args}}'
+test-wasm crate *args:
+	just watch 'cargo test -p {{crate}} --lib --target wasm32-unknown-unknown -- --watch {{args}}'
+test-wasm-feat crate *args:
+	just watch 'cargo test -p {{crate}} --lib --target wasm32-unknown-unknown --all-features -- {{args}}'
+test-wasm-e2e crate test_name *args:
+	just watch 'cargo test -p {{crate}} --test {{test_name}} --target wasm32-unknown-unknown -- --watch {{args}}'
 
 serve-web:
 	just serve-wasm
@@ -79,7 +91,7 @@ tree:
 
 
 # Build wasm files, pass --no-build to just update scenes and registries
-build-wasm *args:
+bevyhub-build *args:
 	just export-scenes
 	bevyhub build \
 	--example app \
@@ -91,6 +103,16 @@ build-wasm *args:
 	--example app_ml \
 	--release \
 	--copy-local ../bevyhub-apps {{args}}
+
+
+build-wasm crate example *args:
+	cargo build -p {{crate}} --example {{example}} --target wasm32-unknown-unknown {{args}}
+	wasm-bindgen \
+	--out-dir ./target/wasm \
+	--out-name bindgen \
+	--target web \
+	--no-typescript \
+	~/.cargo_target/wasm32-unknown-unknown/debug/examples/{{example}}.wasm
 
 ### MISC
 
@@ -111,9 +133,6 @@ publish-all *args:
 	just publish beet_ml {{args}}						|| true
 	just publish beet_examples {{args}}			|| true
 	just publish beet {{args}}							|| true
-
-test-wasm crate *args:
-	sweet -p {{crate}} --example test_{{crate}} --interactive --watch {{args}}
 
 watch *command:
 	forky watch \
@@ -152,6 +171,13 @@ assets-pull:
 	curl -o ./assets.tar.gz https://bevyhub-public.s3.us-west-2.amazonaws.com/assets.tar.gz
 	tar -xzvf ./assets.tar.gz
 	rm ./assets.tar.gz
+
+expand-rsx:
+	just watch cargo expand -p beet_rsx --example rsx_macro
+wasm-example:
+	forky serve | \
+	just watch 'just build-wasm beet dom_renderer'
+
 
 ### TEST SCENE LOADS
 

@@ -52,9 +52,9 @@ impl ComponentType {
 mod test {
 	#![cfg(feature = "reflect")]
 	use crate::prelude::*;
+	use sweet::prelude::*;
 	use bevy::app::App;
 	use std::any::TypeId;
-	use sweet::prelude::*;
 
 	#[test]
 	fn component_types() {

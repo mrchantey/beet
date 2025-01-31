@@ -157,9 +157,9 @@ impl ComponentUtils {
 #[cfg(test)]
 mod test {
 	use super::ComponentUtils;
+	use sweet::prelude::*;
 	use bevy::prelude::*;
 	use std::any::TypeId;
-	use sweet::prelude::*;
 
 	#[derive(Component, Debug, Default, Reflect, PartialEq)]
 	#[reflect(Default)]

@@ -74,8 +74,8 @@ fn repeat(
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use bevy::prelude::*;
 	use sweet::prelude::*;
+	use bevy::prelude::*;
 	use world_ext::EntityWorldMutwExt;
 
 

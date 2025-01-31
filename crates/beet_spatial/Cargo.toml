@@ -15,13 +15,15 @@ categories = { workspace = true }
 # default = ["animation", "assets", "ui"]
 bevyhub = ["beet_flow/bevyhub"]
 ui = ["bevy/bevy_ui"]
+scene = ["bevy/bevy_scene"]
+render = ["bevy/bevy_color", "bevy/bevy_gizmos"]
 assets = ["bevy/bevy_asset", "dep:bevyhub"]
 animation = ["bevy/bevy_animation", "dep:bevyhub"]
 
 [dependencies]
-forky.workspace = true
-bevyhub = { workspace = true, optional = true, features = ["core"] }
 beet_flow = { workspace = true }
+sweet = { workspace = true, features = ["bevy"] }
+bevyhub = { workspace = true, optional = true, features = ["core"] }
 
 bevy.workspace = true
 
@@ -34,5 +36,8 @@ serde.workspace = true
 strum.workspace = true
 strum_macros.workspace = true
 
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+web-sys.workspace = true
+
 [dev-dependencies]
-sweet.workspace = true
+sweet = { workspace = true, features = ["test"] }

@@ -108,6 +108,5 @@ mod test {
 		stat_map.add_stat(stat.clone());
 		expect(stat_map.map.len()).to_be(2);
 		expect(stat_map.map.get(&StatId(1)).unwrap()).to_be(&stat);
-
 	}
 }

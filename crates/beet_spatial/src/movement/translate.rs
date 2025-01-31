@@ -1,6 +1,6 @@
 use beet_flow::prelude::*;
 use bevy::prelude::*;
-use forky::prelude::ResultTEExt;
+use sweet::prelude::*;
 
 /// Applies constant translation, multiplied by [`Time::delta_secs`]
 #[derive(Debug, Default, Clone, PartialEq, Component, Action, Reflect)]
@@ -25,7 +25,7 @@ fn translate(
 ) {
 	for (target, translate) in query.iter() {
 		if let Some(mut transform) =
-			transforms.get_mut(**target).ok_or(|e| log::warn!("{e}"))
+			transforms.get_mut(**target).ok_or(|e| sweet::elog!("{e}"))
 		{
 			transform.translation += translate.translation * time.delta_secs();
 		}

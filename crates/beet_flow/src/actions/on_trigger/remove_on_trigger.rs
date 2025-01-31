@@ -32,8 +32,8 @@ impl<E: Event, T: Bundle, TrigBundle: Bundle> OnTriggerHandler
 mod test {
 	use super::RemoveOnTrigger;
 	use crate::prelude::*;
-	use bevy::prelude::*;
 	use sweet::prelude::*;
+	use bevy::prelude::*;
 
 	#[test]
 	fn works() {

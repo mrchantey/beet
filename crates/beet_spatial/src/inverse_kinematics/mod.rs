@@ -10,6 +10,7 @@ pub use self::ik_plugin::*;
 pub mod ik_segment;
 #[allow(unused_imports)]
 pub use self::ik_segment::*;
+#[cfg(feature = "scene")]
 pub mod ik_spawner;
-#[allow(unused_imports)]
+#[cfg(feature = "scene")]
 pub use self::ik_spawner::*;

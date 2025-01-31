@@ -21,6 +21,7 @@ pub fn ik_spawner_plugin(app: &mut App) {
 				.remove::<IkSpawner>()
 				.observe(ik_spawner);
 		});
+	app.register_type::<IkSpawner>();
 }
 
 pub fn ik_spawner(
@@ -28,9 +29,9 @@ pub fn ik_spawner(
 	mut commands: Commands,
 	child_nodes_query: Query<(Entity, &Name, &Transform, &Children)>,
 	children_query: Query<&Children>,
-	query: Populated<(Entity, &Transform, &Children, &SceneRoot, &TargetEntity)>,
+	query: Populated<(Entity, &Transform, &Children, &TargetEntity)>,
 ) {
-	let Ok((scene_root_entity, transform, scene_root_children, _, target)) =
+	let Ok((scene_root_entity, transform, scene_root_children, target)) =
 		query.get(trigger.entity())
 	else {
 		return;

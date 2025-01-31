@@ -1,0 +1,53 @@
+[package]
+name = "beet_rsx"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+readme.workspace = true
+description.workspace = true
+documentation.workspace = true
+repository.workspace = true
+categories.workspace = true
+keywords.workspace = true
+
+
+[features]
+default = ["macros"]
+macros = ["dep:beet_rsx_macros"]
+parser = ["dep:beet_rsx_parser"]
+serde = ["dep:serde"]
+
+[dependencies]
+beet_rsx_parser = { workspace = true, optional = true }
+beet_rsx_macros = { workspace = true, optional = true }
+sweet.workspace = true
+
+#💡 utils
+thiserror.workspace = true
+anyhow.workspace = true
+strum.workspace = true
+strum_macros.workspace = true
+prettyplease = "0.2"
+once_cell.workspace = true
+serde = { workspace = true, optional = true }
+
+#💡 native
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+sweet = { workspace = true, features = ["fs"] }
+tokio.workspace = true
+
+#💡 wasm
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+sweet = { workspace = true, features = ["web"] }
+console_error_panic_hook.workspace = true
+console_log.workspace = true
+js-sys.workspace = true
+wasm-bindgen.workspace = true
+wasm-bindgen-futures.workspace = true
+web-sys.workspace = true
+
+
+[dev-dependencies]
+beet_rsx = { workspace = true, features = ["parser"] }
+sweet = { workspace = true, features = ["test"] }

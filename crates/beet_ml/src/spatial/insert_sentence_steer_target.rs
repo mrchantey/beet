@@ -1,8 +1,8 @@
 use crate::prelude::*;
 use beet_flow::prelude::*;
 use beet_spatial::prelude::*;
-use bevyhub::prelude::HandleWrapper;
 use bevy::prelude::*;
+use bevyhub::prelude::HandleWrapper;
 use std::marker::PhantomData;
 
 // #[serde(bound = "")]
@@ -74,8 +74,8 @@ mod test {
 	use crate::prelude::*;
 	use beet_flow::prelude::*;
 	use beet_spatial::steer::SteerTarget;
-	use bevyhub::prelude::HandleWrapper;
 	use bevy::prelude::*;
+	use bevyhub::prelude::HandleWrapper;
 	use sweet::prelude::*;
 
 	#[test]
@@ -92,7 +92,8 @@ mod test {
 		.finish();
 
 		let handle =
-			block_on_asset_load::<Bert>(&mut app, "ml/default-bert.ron").unwrap();
+			block_on_asset_load::<Bert>(&mut app, "ml/default-bert.ron")
+				.unwrap();
 
 		let world = app.world_mut();
 
@@ -113,9 +114,7 @@ mod test {
 		world.flush();
 
 		let target = world.entity(agent).get::<SteerTarget>();
-		expect(target)
-			.not()
-			.to_be(Some(&SteerTarget::Entity(heal)));
+		expect(target).not().to_be(Some(&SteerTarget::Entity(heal)));
 		expect(target).to_be(Some(&SteerTarget::Entity(kill)));
 	}
 }
