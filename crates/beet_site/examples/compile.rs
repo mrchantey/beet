@@ -2,7 +2,7 @@ use beet::prelude::*;
 use beet_site::prelude::*;
 
 fn main() {
-	RoutesFileBuilder::default().build_and_write().unwrap();
+	// RoutesFileBuilder::default().build_and_write().unwrap();
 
 	let routes = routes();
 
