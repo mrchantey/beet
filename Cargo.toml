@@ -167,6 +167,12 @@ web-sys.workspace = true
 name = "dom_renderer"
 path = "examples/rsx/dom_renderer.rs"
 
+#💡flow
+
+[[example]]
+name = "global_observers"
+path = "examples/flow/global_observers.rs"
+
 [[example]]
 name = "long_running"
 path = "examples/flow/long_running.rs"
