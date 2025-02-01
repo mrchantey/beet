@@ -78,10 +78,7 @@ impl<State: StateSpace, Action: ActionSpace> QPolicy for QTable<State, Action> {
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use rand::rngs::StdRng;
-	use rand::SeedableRng;
 	use sweet::prelude::*;
-
 
 	/// This test is *almost* identical to a [`QTableTrainer`] but demonstrates
 	/// that we can do realtime stuff and dont need to use an [`Environment`]
@@ -89,7 +86,7 @@ mod test {
 	fn works() {
 		let mut source = QTable::<GridPos, GridDirection>::default();
 		let params = QLearnParams::default();
-		let mut rng = StdRng::seed_from_u64(0);
+		let mut rng = RandomSource::from_seed(0);
 		let map = FrozenLakeMap::default_four_by_four();
 		let initial_state = map.agent_position();
 		let env = QTableEnv::new(map.transition_outcomes());

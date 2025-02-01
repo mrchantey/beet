@@ -5,6 +5,7 @@ use std::fs::{
 	self,
 };
 use std::io::Write;
+use sweet::prelude::*;
 
 fn main() -> anyhow::Result<()> {
 	let map = FrozenLakeMap::default_four_by_four();
@@ -18,7 +19,7 @@ fn main() -> anyhow::Result<()> {
 		params,
 		initial_state,
 	);
-	trainer.train();
+	trainer.train(&mut RandomSource::default());
 	let eval = trainer.evaluate();
 	assert_eq!(eval.mean, 1.);
 	assert_eq!(eval.std, 0.);

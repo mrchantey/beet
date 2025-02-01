@@ -51,15 +51,14 @@ doc:
 serve-doc:
 	cd ./target/doc/beet && forky serve
 
-# 1. test with no features
-# 2. test with all features
 test-all *args:
-	cargo test -p beet_flow
-	cargo test -p beet_rsx
-	cargo test -p beet_spatial
-	cargo test -p beet_flow --target wasm32-unknown-unknown
-	cargo test -p beet_rsx --target wasm32-unknown-unknown
-	cargo test -p beet_spatial --target wasm32-unknown-unknown
+	cargo test 																 --all-features -p beet_flow
+	cargo test 																								-p beet_rsx
+	cargo test 																								-p beet_spatial
+	cargo test 																								-p beet_ml
+	cargo test --target wasm32-unknown-unknown --all-features -p beet_flow 
+	cargo test --target wasm32-unknown-unknown --all-features -p beet_rsx
+	cargo test --target wasm32-unknown-unknown 								-p beet_spatial
 
 #cargo test -p beet_spatial
 #cargo test -p beet_sim

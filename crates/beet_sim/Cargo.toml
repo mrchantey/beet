@@ -15,8 +15,6 @@ publish = true
 [features]
 default = ["render"]
 render = []
-bevyhub = ["dep:bevyhub", "beet_flow/bevyhub"]
-
 
 [dependencies]
 beet_flow.workspace = true

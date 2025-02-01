@@ -2,6 +2,7 @@ use crate::prelude::*;
 use beet_flow::prelude::*;
 use bevy::prelude::*;
 use std::time::Duration;
+use sweet::prelude::*;
 
 pub mod frozen_lake_assets {
 	pub const TILE: &str = "kaykit-minigame/tileSmall_teamBlue.gltf.glb#Scene0";
@@ -31,6 +32,7 @@ pub mod frozen_lake_assets {
 
 pub fn spawn_frozen_lake_episode(
 	mut events: EventReader<StartEpisode<FrozenLakeEpParams>>,
+	mut rng: ResMut<RandomSource>,
 	mut commands: Commands,
 	asset_server: Res<AssetServer>,
 ) {
@@ -51,7 +53,7 @@ pub fn spawn_frozen_lake_episode(
 				grid_to_world.clone(),
 				RlAgentBundle {
 					state: map.agent_position(),
-					action: GridDirection::sample(),
+					action: GridDirection::sample(&mut rng),
 					env: QTableEnv::new(map.transition_outcomes()),
 					params: event.params.learn_params.clone(),
 					session: SessionEntity(event.session),

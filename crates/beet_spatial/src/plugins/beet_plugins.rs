@@ -16,7 +16,7 @@ impl PluginGroup for BeetSpatialPlugins {
 		/*-*/;
 
 		#[cfg(feature = "render")]
-		buulder.add(spatial_observers_plugin);
+		builder.add(spatial_observers_plugin);
 
 
 		#[cfg(feature = "animation")]

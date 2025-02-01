@@ -11,14 +11,9 @@ keywords.workspace = true
 categories.workspace = true
 
 [dependencies]
-beet_flow = { workspace = true, features = ["bevyhub"] }
+beet_flow = { workspace = true, features = ["reflect"] }
 beet_ml = { workspace = true, features = ["spatial"] }
-beet_spatial = { workspace = true, features = [
-	"bevyhub",
-	"animation",
-	"assets",
-	"ui",
-] }
+beet_spatial = { workspace = true, features = ["animation", "assets", "ui"] }
 bevyhub.workspace = true
 serde.workspace = true
 serde_json.workspace = true

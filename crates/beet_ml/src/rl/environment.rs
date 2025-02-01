@@ -1,7 +1,7 @@
 use bevy::prelude::*;
-use rand::Rng;
 use std::fmt::Debug;
 use std::hash::Hash;
+use sweet::prelude::*;
 
 #[derive(Deref)]
 pub struct Readonly<T>(T);
@@ -31,7 +31,16 @@ pub struct StepOutcome<State> {
 }
 
 pub trait DiscreteSpace:
-	'static + Send + Sync + Debug + Hash + Clone + PartialEq + Eq + Component + TypePath
+	'static
+	+ Send
+	+ Sync
+	+ Debug
+	+ Hash
+	+ Clone
+	+ PartialEq
+	+ Eq
+	+ Component
+	+ TypePath
 {
 	// type Value;
 	// const LEN: usize;
@@ -49,7 +58,7 @@ impl<
 			+ PartialEq
 			+ Eq
 			+ Component
-			+ TypePath
+			+ TypePath,
 	> DiscreteSpace for T
 {
 }
@@ -65,7 +74,6 @@ pub trait StateSpace: DiscreteSpace {}
 impl<T: DiscreteSpace> StateSpace for T {}
 
 pub trait ActionSpace: DiscreteSpace + Default {
-	fn sample_with_rng(rng: &mut impl Rng) -> Self;
-	fn sample() -> Self { Self::sample_with_rng(&mut rand::thread_rng()) }
+	fn sample(rng: &mut impl Rng) -> Self;
 }
 // impl<T: DiscreteSpace + TryFrom<usize>> ActionSpace for T {}

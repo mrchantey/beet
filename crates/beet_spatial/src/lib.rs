@@ -4,8 +4,6 @@
 pub mod animation;
 #[cfg(feature = "assets")]
 pub mod asset_actions;
-#[cfg(feature = "bevyhub")]
-pub mod bevyhub;
 pub mod extensions;
 pub mod inverse_kinematics;
 pub mod movement;
@@ -21,8 +19,8 @@ pub mod prelude {
 	pub use crate::animation::*;
 	#[cfg(feature = "assets")]
 	pub use crate::asset_actions::*;
-	#[cfg(feature = "bevyhub")]
-	pub use crate::bevyhub::*;
+	// todo wait for serializable asset handles
+	// pub use crate::bevyhub::*;
 	pub use crate::extensions::*;
 	pub use crate::inverse_kinematics::*;
 	pub use crate::movement::*;

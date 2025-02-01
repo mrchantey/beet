@@ -2,6 +2,7 @@ use crate::prelude::*;
 use beet_flow::prelude::*;
 use bevy::prelude::*;
 use std::marker::PhantomData;
+use sweet::prelude::RandomSource;
 
 #[derive(Debug, Clone, PartialEq, Component, Action, Reflect)]
 #[reflect(Component, ActionMeta)]
@@ -39,7 +40,7 @@ where
 
 fn step_environment<S: RlSessionTypes>(
 	trigger: Trigger<OnRun>,
-	mut rng: Option<ResMut<RlRng>>,
+	mut rng: ResMut<RandomSource>,
 	mut end_episode_events: EventWriter<EndEpisode<S::EpisodeParams>>,
 	mut commands: Commands,
 	mut sessions: Query<&mut S::QLearnPolicy>,
@@ -72,12 +73,6 @@ fn step_environment<S: RlSessionTypes>(
 	let outcome = env.step(&state, &action);
 	// we ignore the state of the outcome, allow simulation to determine
 	let epsilon = params.epsilon(step.episode);
-
-	let rng = if let Some(rng) = &mut rng {
-		rng.as_mut()
-	} else {
-		&mut RlRng::default()
-	};
 
 	*action = table.step(
 		params,
@@ -122,18 +117,19 @@ mod test {
 			ActionPlugin::<StepEnvironment<FrozenLakeQTableSession>>::default(),
 			RlSessionPlugin::<FrozenLakeEpParams>::default(),
 		))
+		.init_resource::<RandomSource>()
 		.insert_time();
 
 		let map = FrozenLakeMap::default_four_by_four();
 
-		let mut rng = RlRng::deterministic();
+		let mut rng = RandomSource::from_seed(0);
 
 		let session = app.world_mut().spawn(FrozenLakeQTable::default()).id();
 
 		app.world_mut()
 			.spawn(RlAgentBundle {
 				state: map.agent_position(),
-				action: GridDirection::sample_with_rng(&mut *rng),
+				action: GridDirection::sample(&mut *rng),
 				env: QTableEnv::new(map.transition_outcomes()),
 				params: QLearnParams::default(),
 				session: SessionEntity(session),

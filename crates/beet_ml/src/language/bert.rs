@@ -12,12 +12,27 @@ use std::borrow::Cow;
 use tokenizers::PaddingParams;
 use tokenizers::Tokenizer;
 
-
 #[derive(Asset, TypePath)]
 pub struct Bert {
 	config: BertConfig,
 	model: BertModel,
 	tokenizer: Tokenizer,
+}
+
+
+
+
+/// Temp workaround since handle:Component removed in 0.15
+#[derive(Debug, Clone, Component, Reflect, Deref, DerefMut)]
+#[reflect(Component)]
+pub struct HandleWrapper<T: Asset>(pub Handle<T>);
+
+
+impl<T: Asset> Into<AssetId<T>> for HandleWrapper<T> {
+	fn into(self) -> AssetId<T> { self.id() }
+}
+impl<T: Asset> Into<AssetId<T>> for &HandleWrapper<T> {
+	fn into(self) -> AssetId<T> { self.id() }
 }
 
 impl Bert {

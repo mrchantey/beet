@@ -2,7 +2,6 @@ use crate::prelude::*;
 use beet_flow::prelude::*;
 use beet_spatial::prelude::*;
 use bevy::prelude::*;
-use bevyhub::prelude::HandleWrapper;
 use std::marker::PhantomData;
 
 // #[serde(bound = "")]
@@ -75,7 +74,6 @@ mod test {
 	use beet_flow::prelude::*;
 	use beet_spatial::steer::SteerTarget;
 	use bevy::prelude::*;
-	use bevyhub::prelude::HandleWrapper;
 	use sweet::prelude::*;
 
 	#[test]

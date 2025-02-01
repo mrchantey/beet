@@ -1,7 +1,6 @@
 use super::*;
 use crate::prelude::RlSessionTypes;
-use rand::Rng;
-
+use sweet::prelude::*;
 
 
 /// Used for training a QTable to completion with a provided [`Environment`].
@@ -62,7 +61,7 @@ impl<S: RlSessionTypes> QTrainer for QTableTrainer<S>
 where
 	S::State: Clone,
 {
-	fn train_with_rng(&mut self, rng: &mut impl Rng) {
+	fn train(&mut self, rng: &mut impl Rng) {
 		let params = &self.params;
 
 		for episode in 0..params.n_training_episodes {
@@ -126,15 +125,13 @@ where
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use rand::rngs::StdRng;
-	use rand::SeedableRng;
 	use std::time::Duration;
 	use std::time::Instant;
 	use sweet::prelude::*;
 
 	#[test]
 	fn works() {
-		let mut policy_rng = StdRng::seed_from_u64(0);
+		let mut policy_rng = RandomSource::from_seed(0);
 		let map = FrozenLakeMap::default_four_by_four();
 		let initial_state = map.agent_position();
 		let env = QTableEnv::new(map.transition_outcomes());
@@ -147,7 +144,7 @@ mod test {
 			initial_state,
 		);
 		let now = Instant::now();
-		trainer.train_with_rng(&mut policy_rng);
+		trainer.train(&mut policy_rng);
 		// My PC: 10ms
 		// Github Actions: 50ms
 		let elapsed = now.elapsed();

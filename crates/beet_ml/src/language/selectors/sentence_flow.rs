@@ -1,7 +1,6 @@
 use crate::prelude::*;
 use beet_flow::prelude::*;
 use bevy::prelude::*;
-use bevyhub::prelude::HandleWrapper;
 use std::borrow::Cow;
 
 /// This component is for use with [`SentenceFlow`]. Add to either the agent or a child behavior.
@@ -57,7 +56,6 @@ mod test {
 	use crate::prelude::*;
 	use beet_flow::prelude::*;
 	use bevy::prelude::*;
-	use bevyhub::prelude::*;
 	use sweet::prelude::*;
 
 	#[test]

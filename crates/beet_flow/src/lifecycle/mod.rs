@@ -62,8 +62,9 @@ impl Plugin for LifecyclePlugin {
 		/*-*/;
 
 		// net
-		#[cfg(feature = "bevyhub")]
-		app.add_plugins(BeetNetPlugin);
+		// todo refactor bevyhub
+		// #[cfg(feature = "bevyhub")]
+		// app.add_plugins(BeetNetPlugin);
 
 		#[cfg(feature = "scene")]
 		app.add_plugins(ActionPlugin::<RunOnSceneReady>::default());

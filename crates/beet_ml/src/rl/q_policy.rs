@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use rand::Rng;
+use sweet::prelude::*;
 
 pub trait QPolicy: 'static + Send + Sync {
 	type State: StateSpace;
@@ -50,13 +50,13 @@ pub trait QPolicy: 'static + Send + Sync {
 		epsilon: f32,
 		rng: &mut impl Rng,
 	) -> (Self::Action, QValue) {
-		let random_num: f32 = rng.gen(); // generates a float between 0 and 1
+		let random_num: f32 = rng.random(); // generates a float between 0 and 1
 		if random_num > epsilon {
 			// Exploitation: Take the action with the highest value given a state
 			self.greedy_policy(state)
 		} else {
 			// Exploration: Take a random action
-			(Self::Action::sample_with_rng(rng), QValue::default())
+			(Self::Action::sample(rng), QValue::default())
 		}
 	}
 

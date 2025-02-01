@@ -10,8 +10,6 @@ pub mod actions;
 pub mod events;
 pub mod extensions;
 pub mod lifecycle;
-#[cfg(feature = "bevyhub")]
-pub mod net;
 pub mod observers;
 #[cfg(feature = "reflect")]
 pub mod reflect;
@@ -35,8 +33,6 @@ pub mod prelude {
 	pub use crate::events::*;
 	pub use crate::extensions::*;
 	pub use crate::lifecycle::*;
-	#[cfg(feature = "bevyhub")]
-	pub use crate::net::*;
 	pub use crate::observers::*;
 	// pub use crate::lifecycle::*;
 	#[cfg(feature = "reflect")]

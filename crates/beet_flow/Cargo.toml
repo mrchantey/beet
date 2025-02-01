@@ -16,12 +16,12 @@ categories.workspace = true
 # reflect requires trait upcasting so is nightly only
 reflect = ["dep:heck", "dep:serde", "scene", "bevy/serialize"]
 scene = ["bevy/bevy_scene"]
-# default = ["bevyhub"]
-bevyhub = ["dep:bevyhub", "bevyhub/net", "bevyhub/core"]
+
+# bevyhub = ["dep:bevyhub", "bevyhub/net", "bevyhub/core"]
 
 [dependencies]
 beet_flow_macros.workspace = true
-bevyhub = { workspace = true, optional = true }
+# bevyhub = { workspace = true, optional = true }
 
 bevy.workspace = true
 

@@ -11,23 +11,21 @@ keywords.workspace = true
 categories.workspace = true
 
 [features]
-# default = ["beet_spatial", "bevyhub"]
+bevyhub = ["dep:bevyhub"]
 spatial = ["dep:beet_spatial"]
-# bevyhub = ["dep:bevyhub"]
-
-# tokio = ["dep:tokio"]
 
 [dependencies]
-bevyhub.workspace = true
 beet_flow.workspace = true
+sweet = { workspace = true, features = ["bevy", "rand"] }
+
+bevy = { workspace = true, features = ["bevy_asset", "bevy_scene"] }
+bevyhub = { workspace = true, optional = true }
 beet_spatial = { workspace = true, optional = true }
-# bevyhub = { workspace = true, optional = true }
 
 futures = "0.3.30"
 thiserror.workspace = true
 anyhow.workspace = true
 log.workspace = true
-bevy.workspace = true
 ron.workspace = true
 serde.workspace = true
 serde_json.workspace = true
@@ -54,8 +52,8 @@ wasm-bindgen-futures.workspace = true
 console_error_panic_hook.workspace = true
 
 [dev-dependencies]
-pretty_env_logger.workspace = true
-sweet.workspace = true
+sweet = { workspace = true, features = ["test"] }
 
+pretty_env_logger.workspace = true
 [target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
 tokio.workspace = true

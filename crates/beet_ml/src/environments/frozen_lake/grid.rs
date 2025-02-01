@@ -1,13 +1,12 @@
 use super::frozen_lake_map::FrozenLakeMap;
 use crate::prelude::ActionSpace;
 use bevy::prelude::*;
-use rand::rngs::StdRng;
-use rand::Rng;
 use serde::Deserialize;
 use serde::Serialize;
 use strum::EnumCount;
 use strum::EnumIter;
 use strum::VariantArray;
+use sweet::prelude::*;
 
 #[derive(
 	Debug,
@@ -92,8 +91,8 @@ impl Into<Vec3> for GridDirection {
 }
 
 impl GridDirection {
-	pub fn as_slippery(&self, rng: &mut StdRng) -> Self {
-		match rng.gen_range(0..3) {
+	pub fn as_slippery(&self, rng: &mut impl Rng) -> Self {
+		match rng.random_range(0..3) {
 			0 => self.clone(),
 			1 => self.rotate_left(),
 			2 => self.rotate_right(),
@@ -120,8 +119,8 @@ impl GridDirection {
 
 
 impl ActionSpace for GridDirection {
-	fn sample_with_rng(rng: &mut impl Rng) -> Self {
-		match rng.gen_range(0..4) {
+	fn sample(rng: &mut impl Rng) -> Self {
+		match rng.random_range(0..4) {
 			0 => Self::Up,
 			1 => Self::Right,
 			2 => Self::Down,

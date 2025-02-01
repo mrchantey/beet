@@ -448,7 +448,6 @@ dependencies = [
  "anyhow",
  "beet_flow_macros",
  "bevy",
- "bevyhub",
  "extend",
  "heck 0.4.1",
  "log",
@@ -594,7 +593,6 @@ dependencies = [
  "anyhow",
  "beet_flow",
  "bevy",
- "bevyhub",
  "extend",
  "log",
  "pretty_env_logger",
@@ -5830,7 +5828,7 @@ dependencies = [
 [[package]]
 name = "sweet"
 version = "0.3.0-rc.3"
-source = "git+https://github.com/mrchantey/sweet#030e2252c8eb9e0c1bfa6c88ce932a7345f48ac8"
+source = "git+https://github.com/mrchantey/sweet#a60034b7a34072f18d47af6a782e19700c8ee09e"
 dependencies = [
  "sweet_bevy",
  "sweet_fs",
@@ -5842,7 +5840,7 @@ dependencies = [
 [[package]]
 name = "sweet_bevy"
 version = "0.3.0-rc.3"
-source = "git+https://github.com/mrchantey/sweet#030e2252c8eb9e0c1bfa6c88ce932a7345f48ac8"
+source = "git+https://github.com/mrchantey/sweet#a60034b7a34072f18d47af6a782e19700c8ee09e"
 dependencies = [
  "anyhow",
  "bevy",
@@ -5858,7 +5856,7 @@ dependencies = [
 [[package]]
 name = "sweet_fs"
 version = "0.3.0-rc.3"
-source = "git+https://github.com/mrchantey/sweet#030e2252c8eb9e0c1bfa6c88ce932a7345f48ac8"
+source = "git+https://github.com/mrchantey/sweet#a60034b7a34072f18d47af6a782e19700c8ee09e"
 dependencies = [
  "anyhow",
  "clap",
@@ -5876,7 +5874,7 @@ dependencies = [
 [[package]]
 name = "sweet_test"
 version = "0.3.0-rc.3"
-source = "git+https://github.com/mrchantey/sweet#030e2252c8eb9e0c1bfa6c88ce932a7345f48ac8"
+source = "git+https://github.com/mrchantey/sweet#a60034b7a34072f18d47af6a782e19700c8ee09e"
 dependencies = [
  "anyhow",
  "backtrace",
@@ -5908,7 +5906,7 @@ dependencies = [
 [[package]]
 name = "sweet_test_macros"
 version = "0.3.0-rc.3"
-source = "git+https://github.com/mrchantey/sweet#030e2252c8eb9e0c1bfa6c88ce932a7345f48ac8"
+source = "git+https://github.com/mrchantey/sweet#a60034b7a34072f18d47af6a782e19700c8ee09e"
 dependencies = [
  "anyhow",
  "proc-macro2",
@@ -5919,11 +5917,15 @@ dependencies = [
 [[package]]
 name = "sweet_utils"
 version = "0.3.0-rc.3"
-source = "git+https://github.com/mrchantey/sweet#030e2252c8eb9e0c1bfa6c88ce932a7345f48ac8"
+source = "git+https://github.com/mrchantey/sweet#a60034b7a34072f18d47af6a782e19700c8ee09e"
 dependencies = [
  "anyhow",
+ "bevy",
  "extend",
+ "getrandom 0.3.1",
  "js-sys",
+ "rand 0.9.0",
+ "rand_chacha 0.9.0",
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "web-sys",
@@ -5932,7 +5934,7 @@ dependencies = [
 [[package]]
 name = "sweet_web"
 version = "0.3.0-rc.3"
-source = "git+https://github.com/mrchantey/sweet#030e2252c8eb9e0c1bfa6c88ce932a7345f48ac8"
+source = "git+https://github.com/mrchantey/sweet#a60034b7a34072f18d47af6a782e19700c8ee09e"
 dependencies = [
  "anyhow",
  "console_error_panic_hook",

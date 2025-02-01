@@ -46,7 +46,7 @@ impl FieldIdent {
 		&self,
 		world: &World,
 		name: Option<String>,
-	) -> Result<Tree<(Option<String>, FieldIdent)>> {
+	) -> Result<TreeNode<(Option<String>, FieldIdent)>> {
 		let children = self.children(world)?;
 
 		let children = children
@@ -54,7 +54,7 @@ impl FieldIdent {
 			.map(|(name, field)| field.tree(world, name))
 			.collect::<Result<Vec<_>>>()?;
 
-		Ok(Tree::new_with_children((name, self.clone()), children))
+		Ok(TreeNode::new_with_children((name, self.clone()), children))
 	}
 }
 
