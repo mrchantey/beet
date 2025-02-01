@@ -424,6 +424,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "beet-cli"
+version = "0.0.5-rc.4"
+dependencies = [
+ "anyhow",
+ "clap",
+ "sweet",
+]
+
+[[package]]
 name = "beet_examples"
 version = "0.0.5-rc.4"
 dependencies = [

@@ -6,6 +6,7 @@
 # just test-all
 # ```
 #
+#💡 Init
 set windows-shell := ["C:/tools/cygwin/bin/sh.exe","-c"]
 set dotenv-load
 crates := 'beet beet_spatial beet_flow'
@@ -16,6 +17,11 @@ default:
 init-repo:
 	just assets-pull
 # just export-scenes
+
+#💡 CLI
+
+cli *args:
+	cargo run -p beet-cli -- {{args}}
 
 run example *args:
 	just watch 'just run-ci {{example}} {{args}}'

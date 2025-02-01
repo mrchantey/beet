@@ -1,5 +1,5 @@
 [package]
-name = "beet_site"
+name = "beet-cli"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -11,10 +11,15 @@ repository.workspace = true
 categories.workspace = true
 keywords.workspace = true
 
+[[bin]]
+name = "beet"
+path = "src/main.rs"
 
-[dependencies]
-beet = { workspace = true, features = ["router"] }
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+anyhow.workspace = true
+sweet = { workspace = true, features = ["fs"] }
+clap.workspace = true
 
 
-# [dev-dependencies]
-# beet = { workspace = true, default-features = false, features = ["router"] }
+[dev-dependencies]
+sweet = { workspace = true, features = ["test"] }
