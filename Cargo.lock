@@ -413,6 +413,7 @@ dependencies = [
  "beet",
  "beet_flow",
  "beet_ml",
+ "beet_router",
  "beet_rsx",
  "beet_sim",
  "beet_spatial",
@@ -524,6 +525,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "beet_router"
+version = "0.0.5-rc.4"
+dependencies = [
+ "anyhow",
+ "beet_rsx",
+ "http 1.2.0",
+ "prettyplease",
+ "proc-macro2",
+ "quote",
+ "sweet",
+ "syn",
+ "uuid",
+]
+
+[[package]]
 name = "beet_rsx"
 version = "0.0.5-rc.4"
 dependencies = [
@@ -533,6 +549,7 @@ dependencies = [
  "beet_rsx_parser",
  "console_error_panic_hook",
  "console_log",
+ "http 1.2.0",
  "js-sys",
  "once_cell",
  "prettyplease",
@@ -586,6 +603,13 @@ dependencies = [
  "bevyhub",
  "num-traits",
  "sweet",
+]
+
+[[package]]
+name = "beet_site"
+version = "0.0.5-rc.4"
+dependencies = [
+ "beet",
 ]
 
 [[package]]
@@ -3328,7 +3352,7 @@ dependencies = [
  "futures-core",
  "futures-sink",
  "futures-util",
- "http",
+ "http 0.2.12",
  "indexmap",
  "slab",
  "tokio",
@@ -3449,13 +3473,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "http"
+version = "1.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f16ca2af56261c99fba8bac40a10251ce8188205a4c448fbb745a2e4daa76fea"
+dependencies = [
+ "bytes",
+ "fnv",
+ "itoa",
+]
+
+[[package]]
 name = "http-body"
 version = "0.4.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7ceab25649e9960c0311ea418d17bee82c0dcec1bd053b5f9a66e265a693bed2"
 dependencies = [
  "bytes",
- "http",
+ "http 0.2.12",
  "pin-project-lite",
 ]
 
@@ -3491,7 +3526,7 @@ dependencies = [
  "futures-core",
  "futures-util",
  "h2",
- "http",
+ "http 0.2.12",
  "http-body",
  "httparse",
  "httpdate",
@@ -5250,7 +5285,7 @@ dependencies = [
  "futures-core",
  "futures-util",
  "h2",
- "http",
+ "http 0.2.12",
  "http-body",
  "hyper",
  "hyper-tls",

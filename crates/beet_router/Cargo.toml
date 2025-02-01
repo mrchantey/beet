@@ -1,0 +1,28 @@
+[package]
+name = "beet_router"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+readme.workspace = true
+description.workspace = true
+documentation.workspace = true
+repository.workspace = true
+categories.workspace = true
+keywords.workspace = true
+
+
+[dependencies]
+sweet = { workspace = true, features = ["fs"] }
+beet_rsx = { workspace = true, features = ["parser"] }
+uuid = { version = "1", features = ["v4"] }
+anyhow.workspace = true
+http.workspace = true
+
+quote.workspace = true
+proc-macro2.workspace = true
+prettyplease.workspace = true
+syn.workspace = true
+
+[dev-dependencies]
+sweet = { workspace = true, features = ["test"] }

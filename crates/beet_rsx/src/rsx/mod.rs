@@ -63,7 +63,7 @@ pub trait Component {
 	fn render(self) -> impl Rsx;
 }
 
-impl<T: FnOnce() -> RsxNode> Component for T {
+impl<T: FnOnce() -> U, U: Rsx> Component for T {
 	fn render(self) -> impl Rsx { self() }
 }
 

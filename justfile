@@ -88,6 +88,9 @@ clean-repo:
 	rm -rf ./target
 # rm -rf ./Cargo.lock
 
+clean-analyzer:
+	rm -rf $CARGO_TARGET_DIR/rust-analyzer
+
 pws *args:
 	just --shell powershell.exe --shell-arg -c {{args}}
 

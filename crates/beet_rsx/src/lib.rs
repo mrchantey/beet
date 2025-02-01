@@ -4,6 +4,7 @@
 pub mod error;
 pub mod html;
 pub mod hydration;
+pub mod routes;
 pub mod rsx;
 pub mod signals_rsx;
 pub mod string_rsx;
@@ -15,6 +16,7 @@ pub mod prelude {
 	pub use beet_rsx_macros::rsx;
 	pub use crate::hydration::*;
 	pub use crate::error::*;
+	pub use crate::routes::*;
 	pub use crate::html::*;
 	pub use crate::tree::*;
 	pub use crate::rsx::*;

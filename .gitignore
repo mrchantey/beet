@@ -5,3 +5,5 @@ out.txt
 rustc-ice*
 
 .env
+
+crates/beet_router/compilecheck_*
