@@ -19,7 +19,20 @@ pub mod prelude {
 	pub use crate::tree::*;
 	pub use crate::rsx::*;
 
-	// rsx macro expects `beet`
 	#[cfg(test)]
-	pub use crate as beet;
+	pub use crate::as_beet::beet;
+}
+
+// rsx macro expects `beet::rsx::signals_rsx`
+// so import this
+// `use beet_rsx::as_beet::beet;`
+// only for internal examples
+#[cfg(debug_assertions)]
+pub mod as_beet {
+	pub mod beet {
+		pub use crate::prelude;
+		pub mod rsx {
+			pub use crate::*;
+		}
+	}
 }

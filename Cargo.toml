@@ -110,56 +110,7 @@ js-sys = "0.3"
 wasm-bindgen = "0.2"
 wasm-bindgen-futures = "0.4"
 console_error_panic_hook = "0.1"
-
-
-[workspace.dependencies.web-sys]
-# [target.'cfg(target_arch = "wasm32")'.dependencies.web-sys]
-version = "0.3"
-features = [
-	# HTML
-	'Headers',
-	'Document',
-	'Element',
-	'Window',
-	"Cache",
-	"CacheStorage",
-	'HtmlIFrameElement',
-	'DomRectReadOnly',
-	# Style
-	'MediaQueryList',
-	# Events
-	'MouseEvent',
-	'KeyboardEvent',
-	'CustomEvent',
-	'CustomEventInit',
-	# JS
-	'Gpu',
-	'console',
-	'Navigator',
-	'Performance',
-	# Fetch
-	'Request',
-	'RequestInit',
-	'RequestMode',
-	'RequestCache',
-	'Response',
-	# Blob
-	'Blob',
-	'BlobEvent',
-	'BlobEventInit',
-	'BlobPropertyBag',
-	# Elements
-	'HtmlAnchorElement',
-	'HtmlCanvasElement',
-	'HtmlInputElement',
-	'File',
-	'FileList',
-	# Url
-	'Url',
-	'History',
-	'Location',
-	'UrlSearchParams',
-]
+web-sys = "0.3"
 
 #💡💡 Package
 
@@ -207,6 +158,10 @@ beet = { workspace = true, features = ["rsx"] }
 bevy.workspace = true
 sweet = { workspace = true, features = ["test", "bevy", "rand"] }
 
+
+[target.'cfg(target_arch = "wasm32")'.dev-dependencies]
+console_error_panic_hook.workspace = true
+web-sys.workspace = true
 
 [[example]]
 name = "dom_renderer"

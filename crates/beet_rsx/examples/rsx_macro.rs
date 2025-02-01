@@ -1,4 +1,4 @@
-use beet_rsx as beet;
+use beet_rsx::as_beet::beet;
 use beet_rsx::prelude::*;
 
 /// its my component

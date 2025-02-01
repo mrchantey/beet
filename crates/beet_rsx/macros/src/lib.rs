@@ -21,9 +21,9 @@ struct ParseStrategy;
 impl RsxRustTokens for ParseStrategy {
 	fn ident() -> proc_macro2::TokenStream {
 		#[cfg(feature = "signals")]
-		return quote::quote! {beet::signals_rsx::SignalsRsx};
+		return quote::quote! {beet::rsx::signals_rsx::SignalsRsx};
 		#[cfg(not(feature = "signals"))]
-		return quote::quote! {beet::string_rsx::StringRsx};
+		return quote::quote! {beet::rsx::string_rsx::StringRsx};
 	}
 }
 

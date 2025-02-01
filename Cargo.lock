@@ -417,7 +417,9 @@ dependencies = [
  "beet_sim",
  "beet_spatial",
  "bevy",
+ "console_error_panic_hook",
  "sweet",
+ "web-sys",
 ]
 
 [[package]]
