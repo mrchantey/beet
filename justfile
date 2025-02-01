@@ -23,7 +23,7 @@ run example *args:
 run-ci example *args:
 	cargo run --example {{example}} {{args}}
 
-run-p crate example *args:
+runp crate example *args:
 	cargo run -p {{crate}} --example {{example}} {{args}}
 
 

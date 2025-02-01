@@ -4,7 +4,8 @@ use beet::prelude::*;
 pub fn routes() -> Vec<Route> {
     vec![
         { #[path = "/home/pete/me/beet/crates/beet_site/src/pages/index.rs"] mod route;
+        fn func() -> RsxNode { route::get().into_rsx() }
         Route::build("/home/pete/me/beet/crates/beet_site/src/pages/index.rs", "get",
-        route::get) }
+        func) }
     ]
 }

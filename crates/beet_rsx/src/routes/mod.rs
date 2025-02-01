@@ -1,8 +1,7 @@
-use crate::rsx::Rsx;
+use crate::rsx::RsxNode;
 use http::Method;
 use std::path::PathBuf;
 use std::str::FromStr;
-
 
 
 /// A type used by `beet_router` to store route information.
@@ -10,14 +9,14 @@ pub struct Route {
 	/// the file path
 	pub path: PathBuf,
 	pub method: Method,
-	pub handler: Box<dyn Rsx>,
+	pub handler: Box<dyn Fn() -> RsxNode>,
 }
 impl Route {
 	/// the method used by `beet_router`
 	pub fn build(
 		path: &str,
 		method: &str,
-		handler: impl 'static + Rsx,
+		handler: impl 'static + Fn() -> RsxNode,
 	) -> Self {
 		Self {
 			path: PathBuf::from(path),

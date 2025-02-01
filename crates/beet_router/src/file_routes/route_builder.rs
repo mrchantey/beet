@@ -1,8 +1,8 @@
+use anyhow::Result;
 use std::path::Path;
 use sweet::prelude::*;
 use syn::Block;
 use syn::Visibility;
-
 
 pub struct RouteBuilder<'a> {
 	pub path: &'a Path,
@@ -43,7 +43,11 @@ impl<'a> RouteBuilder<'a> {
 						// some route thingie
 						#[path=#path_str]
 						mod route;
-						Route::build(#path_str,#method,route::#ident)
+						fn func() -> RsxNode{
+							route::#ident().into_rsx()
+						}
+
+						Route::build(#path_str,#method,func)
 					}
 				}
 			})
