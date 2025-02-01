@@ -3,7 +3,7 @@ use beet_flow::prelude::*;
 use bevy::prelude::*;
 use std::f32::consts::FRAC_PI_2;
 use std::ops::Range;
-
+use sweet::prelude::RandomSource;
 
 /// Updates the curve of [`PlayProceduralAnimation`] with a random direction curve
 /// whenever an [`OnRun`] trigger is received.
@@ -40,6 +40,7 @@ impl SetCurveOnRun {}
 fn set_curve_on_run(
 	trigger: Trigger<OnRun>,
 	transforms: Query<&Transform>,
+	mut rng: ResMut<RandomSource>,
 	mut query: Query<(
 		&TargetEntity,
 		&SetCurveOnRun,
@@ -60,7 +61,7 @@ fn set_curve_on_run(
 				.unwrap_or_else(|_| Dir2::X);
 
 			let angle =
-				range.start + (range.end - range.start) * rand::random::<f32>();
+				range.start + (range.end - range.start) * rng.random::<f32>();
 			let end = Dir2::new_unchecked(Vec2::new(angle.cos(), angle.sin()));
 
 			EasingCurve::new(start, end, *func).into()

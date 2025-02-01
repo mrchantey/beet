@@ -22,3 +22,11 @@ pub enum RunResult {
 	/// The Action was unsuccessful.
 	Failure,
 }
+impl std::fmt::Display for RunResult {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		match self {
+			RunResult::Success => write!(f, "Success"),
+			RunResult::Failure => write!(f, "Failure"),
+		}
+	}
+}

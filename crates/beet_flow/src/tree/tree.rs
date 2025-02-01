@@ -9,13 +9,13 @@ use std::fmt::Debug;
 use std::fmt::Display;
 use std::fmt::Formatter;
 
-pub struct Tree<T> {
+pub struct TreeNode<T> {
 	pub value: T,
-	pub children: Vec<Tree<T>>,
+	pub children: Vec<TreeNode<T>>,
 }
 
 #[cfg(feature = "reflect")]
-impl<T: Serialize> Serialize for Tree<T> {
+impl<T: Serialize> Serialize for TreeNode<T> {
 	fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
 	where
 		S: serde::Serializer,
@@ -28,7 +28,7 @@ impl<T: Serialize> Serialize for Tree<T> {
 }
 
 #[cfg(feature = "reflect")]
-impl<'de, T: Deserialize<'de>> Deserialize<'de> for Tree<T> {
+impl<'de, T: Deserialize<'de>> Deserialize<'de> for TreeNode<T> {
 	fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
 	where
 		D: serde::Deserializer<'de>,
@@ -36,7 +36,7 @@ impl<'de, T: Deserialize<'de>> Deserialize<'de> for Tree<T> {
 		#[derive(Deserialize)]
 		struct TreeHelper<T> {
 			value: T,
-			children: Vec<Tree<T>>,
+			children: Vec<TreeNode<T>>,
 		}
 		let helper = TreeHelper::deserialize(deserializer)?;
 		Ok(Self {
@@ -47,7 +47,7 @@ impl<'de, T: Deserialize<'de>> Deserialize<'de> for Tree<T> {
 }
 
 
-impl<T: Debug> Debug for Tree<T> {
+impl<T: Debug> Debug for TreeNode<T> {
 	fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
 		if self.children.len() > 0 {
 			f.debug_struct("Tree")
@@ -60,7 +60,7 @@ impl<T: Debug> Debug for Tree<T> {
 	}
 }
 
-impl<T: Default> Default for Tree<T> {
+impl<T: Default> Default for TreeNode<T> {
 	fn default() -> Self {
 		Self {
 			value: T::default(),
@@ -69,13 +69,13 @@ impl<T: Default> Default for Tree<T> {
 	}
 }
 
-impl<T: Display> Display for Tree<T> {
+impl<T: Display> Display for TreeNode<T> {
 	fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
 		write!(f, "{}", self.pretty_string_display(0))
 	}
 }
 
-impl<T: Clone> Clone for Tree<T> {
+impl<T: Clone> Clone for TreeNode<T> {
 	fn clone(&self) -> Self {
 		Self {
 			value: self.value.clone(),
@@ -84,13 +84,13 @@ impl<T: Clone> Clone for Tree<T> {
 	}
 }
 
-impl<T: PartialEq> PartialEq for Tree<T> {
+impl<T: PartialEq> PartialEq for TreeNode<T> {
 	fn eq(&self, other: &Self) -> bool {
 		self.value == other.value && self.children == other.children
 	}
 }
 
-impl<T> Tree<T> {
+impl<T> TreeNode<T> {
 	pub fn new(value: T) -> Self {
 		Self {
 			value,
@@ -101,18 +101,18 @@ impl<T> Tree<T> {
 		Self { value, children }
 	}
 	/// Add a child tree, which may have children
-	pub fn with_child(mut self, child: impl Into<Tree<T>>) -> Self {
+	pub fn with_child(mut self, child: impl Into<TreeNode<T>>) -> Self {
 		self.children.push(child.into());
 		self
 	}
 	/// Add child trees, which may have children
-	pub fn with_children(mut self, children: Vec<Tree<T>>) -> Self {
+	pub fn with_children(mut self, children: Vec<TreeNode<T>>) -> Self {
 		self.children.extend(children);
 		self
 	}
 	/// Add a terminating (childless) child node
 	pub fn with_leaf(mut self, child: T) -> Self {
-		self.children.push(Tree::new(child));
+		self.children.push(TreeNode::new(child));
 		self
 	}
 
@@ -124,11 +124,11 @@ impl<T> Tree<T> {
 		vec
 	}
 
-	pub fn map<O>(&self, mut map_func: impl FnMut(&T) -> O) -> Tree<O> {
+	pub fn map<O>(&self, mut map_func: impl FnMut(&T) -> O) -> TreeNode<O> {
 		self.map_ref(&mut map_func)
 	}
-	fn map_ref<O>(&self, map_func: &mut impl FnMut(&T) -> O) -> Tree<O> {
-		Tree {
+	fn map_ref<O>(&self, map_func: &mut impl FnMut(&T) -> O) -> TreeNode<O> {
+		TreeNode {
 			value: map_func(&self.value),
 			children: self
 				.children
@@ -137,11 +137,14 @@ impl<T> Tree<T> {
 				.collect(),
 		}
 	}
-	pub fn map_owned<O>(self, mut map_func: impl FnMut(T) -> O) -> Tree<O> {
+	pub fn map_owned<O>(self, mut map_func: impl FnMut(T) -> O) -> TreeNode<O> {
 		self.map_owned_ref(&mut map_func)
 	}
-	fn map_owned_ref<O>(self, map_func: &mut impl FnMut(T) -> O) -> Tree<O> {
-		Tree {
+	fn map_owned_ref<O>(
+		self,
+		map_func: &mut impl FnMut(T) -> O,
+	) -> TreeNode<O> {
+		TreeNode {
 			value: map_func(self.value),
 			children: self
 				.children
@@ -153,7 +156,7 @@ impl<T> Tree<T> {
 }
 
 
-impl<T: Debug> Tree<T> {
+impl<T: Debug> TreeNode<T> {
 	/// Creates a string from this tree, in the format
 	/// ```ignore
 	/// value
@@ -175,7 +178,7 @@ impl<T: Debug> Tree<T> {
 		string
 	}
 }
-impl<T: Display> Tree<T> {
+impl<T: Display> TreeNode<T> {
 	/// Creates a string from this tree, in the format
 	/// ```ignore
 	/// value
@@ -208,8 +211,8 @@ mod test {
 
 	#[test]
 	fn works() {
-		let tree = Tree::new(0).with_leaf(1).with_leaf(2);
+		let tree = TreeNode::new(0).with_leaf(1).with_leaf(2);
 		let tree2 = tree.map(|x| x + 1);
-		expect(tree2).to_be(Tree::new(1).with_leaf(2).with_leaf(3));
+		expect(tree2).to_be(TreeNode::new(1).with_leaf(2).with_leaf(3));
 	}
 }

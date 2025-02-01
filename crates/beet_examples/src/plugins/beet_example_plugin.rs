@@ -1,8 +1,8 @@
 use crate::beet::prelude::*;
 use crate::prelude::*;
-use bevyhub::prelude::*;
 use bevy::log::LogPlugin;
 use bevy::prelude::*;
+use bevyhub::prelude::*;
 
 
 /// A minimal app with flow and spatial
@@ -38,6 +38,7 @@ pub fn beet_example_plugin(app: &mut App) {
 		BeetDebugPlugin,
 		DefaultReplicatePlugin,
 	))
+	.init_resource::<RandomSource>()
 	.add_plugins((plugin_spatial, plugin_2d, plugin_3d))
 	.register_type::<Collectable>();
 }

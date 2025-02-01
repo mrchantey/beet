@@ -38,6 +38,7 @@ resolver = "2"
 members = [
 	"crates/beet_examples",
 	"crates/beet_flow",
+	"crates/beet_flow/macros",
 	"crates/beet_ml",
 	"crates/beet_rig",
 	"crates/beet_rsx",
@@ -45,13 +46,12 @@ members = [
 	"crates/beet_rsx/parser",
 	"crates/beet_sim",
 	"crates/beet_spatial",
-	# "crates/emby",
-	"crates/beet_flow/macros",
 ]
 
 [workspace.dependencies]
 ## internal
 beet = { path = "./", version = "0.0.5-rc.4" }
+beet_examples = { path = "crates/beet_examples", version = "0.0.5-rc.4" }
 beet_spatial = { path = "crates/beet_spatial", version = "0.0.5-rc.4", default-features = false }
 beet_flow = { path = "crates/beet_flow", version = "0.0.5-rc.4" }
 beet_flow_macros = { path = "crates/beet_flow/macros", version = "0.0.5-rc.4" }
@@ -60,7 +60,6 @@ beet_rsx = { path = "crates/beet_rsx", version = "0.0.5-rc.4" }
 beet_rsx_macros = { path = "crates/beet_rsx/macros", version = "0.0.5-rc.4" }
 beet_rsx_parser = { path = "crates/beet_rsx/parser", version = "0.0.5-rc.4" }
 beet_sim = { path = "crates/beet_sim", version = "0.0.5-rc.4" }
-beet_examples = { path = "crates/beet_examples", version = "0.0.5-rc.4" }
 # emby = { path = "crates/emby", version = "0.0.5-rc.4" }
 
 #💡 local
@@ -81,8 +80,6 @@ anyhow = "1.0.75"
 thiserror = "1.0.60"
 bytemuck = "1.13.1"
 heck = "0.4"
-rand = "0.8"
-rand_chacha = "0"
 once_cell = "1.20"
 
 #💡 async
@@ -182,6 +179,9 @@ categories.workspace = true
 include = ["CHANGELOG.md", "README.md", "/src", "/examples", "/scenes"]
 
 [features]
+default = ["flow"]
+flow = ["dep:beet_flow"]
+rsx = ["dep:beet_rsx"]
 # default = ["ml", "animation", "assets", "ui", "bevyhub", "reflect"]
 ml = ["dep:beet_ml"]
 reflect = ["beet_flow/reflect"]
@@ -195,7 +195,8 @@ ui = ["beet_spatial?/ui"]
 # dynamic_linking = ["bevy/dynamic_linking"]
 
 [dependencies]
-beet_flow.workspace = true
+beet_flow = { workspace = true, optional = true }
+beet_rsx = { workspace = true, optional = true }
 beet_spatial = { workspace = true, optional = true }
 beet_ml = { workspace = true, optional = true }
 beet_sim = { workspace = true, optional = true }
@@ -203,24 +204,9 @@ beet_sim = { workspace = true, optional = true }
 # thiserror.workspace = true
 
 [dev-dependencies]
-bevy = { workspace = true, default-features = true }
-beet_examples.workspace = true
-log.workspace = true
-pretty_env_logger.workspace = true
-bevyhub = { workspace = true, features = ["export_types"] }
-anyhow.workspace = true
-serde.workspace = true
-serde_json.workspace = true
-rand.workspace = true
-rand_chacha.workspace = true
-
-[target.'cfg(target_arch = "wasm32")'.dev-dependencies]
-console_log.workspace = true
-web-sys.workspace = true
-wasm-bindgen.workspace = true
-
-[target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
-tokio.workspace = true
+beet = { workspace = true, features = ["rsx"] }
+bevy.workspace = true
+sweet = { workspace = true, features = ["test", "bevy", "rand"] }
 
 
 [[example]]
@@ -228,179 +214,29 @@ name = "dom_renderer"
 path = "examples/rsx/dom_renderer.rs"
 
 [[example]]
-name = "app_ml"
-path = "examples/scenes/app_ml.rs"
-
-[[package.metadata.scene]]
-name = "app-ml"
-thumb-text = "🔨"
-description = "Full Beet App with machine learning, networking, and UI."
-app.js-url = "https://mrchantey.github.io/bevyhub-apps/beet/app_ml.js"
-app.wasm-url = "https://mrchantey.github.io/bevyhub-apps/beet/app_ml_bg.wasm"
-app.type-registry-url = "https://mrchantey.github.io/bevyhub-apps/beet/registries/type_registry_ml.json"
-app.replication-registry-url = "https://mrchantey.github.io/bevyhub-apps/beet/registries/replication_registry_ml.json"
+name = "long_running"
+path = "examples/flow/long_running.rs"
 
 [[example]]
-name = "app"
-path = "examples/scenes/app.rs"
-
-[[package.metadata.scene]]
-name = "app"
-thumb-text = "🔨"
-description = "Basic Beet App with debugging, camera, and UI."
-app.js-url = "https://mrchantey.github.io/bevyhub-apps/beet/app.js"
-app.wasm-url = "https://mrchantey.github.io/bevyhub-apps/beet/app_bg.wasm"
-app.type-registry-url = "https://mrchantey.github.io/bevyhub-apps/beet/registries/type_registry.json"
-app.replication-registry-url = "https://mrchantey.github.io/bevyhub-apps/beet/registries/replication_registry.json"
-
-[[package.metadata.scene]]
-name = "beet-debug"
-thumb-text = "🐛"
-description = "Enable debugging for printing to the console, and screen if used with bevyhub/ui-terminal."
-path = "scenes/beet-debug.json"
+name = "malenia"
+path = "examples/flow/malenia.rs"
 
 [[example]]
-name = "export_scenes"
-path = "examples/scenes/export_scenes.rs"
-
-
-[[package.metadata.scene]]
-name = "fetch-scene"
-thumb-text = "🏠"
-description = "A camera and the items that the fetch character can go to."
-path = "scenes/fetch-scene.json"
+name = "repeat_while"
+path = "examples/flow/repeat_while.rs"
 
 [[example]]
-name = "fetch"
-path = "examples/scenes/fetch.rs"
-
-[[package.metadata.scene]]
-name = "fetch"
-description = "Combining LLM, steering and animation behaviors."
-thumb-url = "https://bevyhub-public.s3.us-west-2.amazonaws.com/assets/screenshots/fetch.png"
-app = "app-ml"
-path = "scenes/fetch-npc.json"
-include = [
-	"bevyhub/ui-terminal-input",
-	"bevyhub/lighting-3d",
-	"bevyhub/ground-3d",
-	"fetch-scene",
-]
-events.playerMessage.initial = "I'm hungry!"
-
-[[package.metadata.scene]]
-name = "frozen-lake-scene"
-thumb-text = "❄️"
-description = "The static scene for the frozen lake environment."
-path = "scenes/frozen-lake-scene.json"
-
+name = "simple_action"
+path = "examples/flow/simple_action.rs"
 
 [[example]]
-name = "frozen_lake_train"
-path = "examples/scenes/frozen_lake_train.rs"
-
-[[package.metadata.scene]]
-name = "frozen-lake-train"
-description = "Train a Q-learning agent to navigate the frozen lake environment."
-thumb-url = "https://bevyhub-public.s3.us-west-2.amazonaws.com/assets/screenshots/frozen-lake-run.png"
-app = "app-ml"
-path = "scenes/frozen-lake-train.json"
-include = [
-	"bevyhub/ui-terminal",
-	"bevyhub/lighting-3d",
-	"beet-debug",
-	"frozen-lake-scene",
-]
+name = "state_machine"
+path = "examples/flow/state_machine.rs"
 
 [[example]]
-name = "frozen_lake_run"
-path = "examples/scenes/frozen_lake_run.rs"
-
-[[package.metadata.scene]]
-name = "frozen-lake-run"
-description = "Use a trained Q-learning agent to navigate the frozen lake environment."
-thumb-url = "https://bevyhub-public.s3.us-west-2.amazonaws.com/assets/screenshots/frozen-lake-run.png"
-app = "app-ml"
-path = "scenes/frozen-lake-run.json"
-include = [
-	"bevyhub/ui-terminal",
-	"bevyhub/lighting-3d",
-	"beet-debug",
-	"frozen-lake-scene",
-]
-
-# Too big, we need to handle for loops in scene files
-# [[package.metadata.scene]]
-# name = "flock"
-# description = "Demonstration of flocking behaviors."
-# thumb-url = "https://bevyhub-public.s3.us-west-2.amazonaws.com/assets/screenshots/flock.png"
-# app = "app"
-# path = "scenes/flock.json"
-# include = ["beet-debug", "bevyhub/camera-2d", "bevyhub/space-scene"]
+name = "utility_ai"
+path = "examples/flow/utility_ai.rs"
 
 [[example]]
-name = "hello_animation"
-path = "examples/scenes/hello_animation.rs"
-
-
-[[package.metadata.scene]]
-name = "hello-animation"
-description = "A simple behavior demonstrating animation control."
-thumb-url = "https://bevyhub-public.s3.us-west-2.amazonaws.com/assets/screenshots/hello-animation.png"
-app = "app"
-path = "scenes/hello-animation.json"
-include = [
-	"bevyhub/ui-terminal",
-	"bevyhub/lighting-3d",
-	"bevyhub/ground-3d",
-	"beet-debug",
-]
-
-
-[[example]]
-name = "hello_ml"
-path = "examples/scenes/hello_ml.rs"
-
-
-[[package.metadata.scene]]
-name = "hello-ml"
-description = "A behavior that uses a Sentence Selector to score child behaviors, deciding which will run next."
-thumb-url = "https://bevyhub-public.s3.us-west-2.amazonaws.com/assets/screenshots/hello-llm.png"
-path = "scenes/hello-ml.json"
-include = ["bevyhub/camera-2d", "bevyhub/ui-terminal", "beet-debug"]
-
-
-[[example]]
-name = "hello_world_scene"
-path = "examples/scenes/hello_world_scene.rs"
-
-[[package.metadata.scene]]
-name = "hello-world"
-thumb-text = "🌍"
-thumb-url = "https://bevyhub-public.s3.us-west-2.amazonaws.com/assets/screenshots/hello-world.png"
-description = "A simple behavior that prints 'Hello' then 'World' to the console."
-app = "app"
-path = "scenes/hello-world.json"
-include = ["beet-debug", "bevyhub/camera-2d", "bevyhub/ui-terminal"]
-
-
-[[example]]
-name = "inverse_kinematics"
-path = "examples/scenes/inverse_kinematics.rs"
-
-
-[[package.metadata.scene]]
-name = "seek"
-description = "Demonstration of the seek behavior."
-thumb-url = "https://bevyhub-public.s3.us-west-2.amazonaws.com/assets/screenshots/seek.png"
-app = "app"
-path = "scenes/seek.json"
-include = ["beet-debug", "bevyhub/camera-2d", "bevyhub/space-scene"]
-
-[[package.metadata.scene]]
-name = "seek-3d"
-description = "A 3D demonstration of the seek behavior."
-thumb-url = "https://bevyhub-public.s3.us-west-2.amazonaws.com/assets/screenshots/seek-3d.png"
-app = "app"
-path = "scenes/seek-3d.json"
-include = ["beet-debug", "bevyhub/lighting-3d", "bevyhub/ground-3d"]
+name = "vanilla_bevy"
+path = "examples/flow/vanilla_bevy.rs"

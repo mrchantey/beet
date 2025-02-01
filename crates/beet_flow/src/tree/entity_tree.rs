@@ -4,7 +4,7 @@ use std::fmt;
 
 /// A tree of entities, useful for tests and debugging.
 #[derive(Debug, Clone, Deref, DerefMut, Component)]
-pub struct EntityTree(pub Tree<Entity>);
+pub struct EntityTree(pub TreeNode<Entity>);
 
 impl fmt::Display for EntityTree {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -13,16 +13,16 @@ impl fmt::Display for EntityTree {
 }
 
 impl EntityTree {
-	pub fn new(entity: Entity) -> Self { Self(Tree::new(entity)) }
+	pub fn new(entity: Entity) -> Self { Self(TreeNode::new(entity)) }
 	pub fn new_with_children(
 		entity: Entity,
-		children: Vec<Tree<Entity>>,
+		children: Vec<TreeNode<Entity>>,
 	) -> Self {
-		Self(Tree::new_with_children(entity, children))
+		Self(TreeNode::new_with_children(entity, children))
 	}
 
 	pub fn new_with_world(entity: Entity, world: &World) -> Self {
-		let mut tree = Tree::new(entity);
+		let mut tree = TreeNode::new(entity);
 		if let Some(children) = world.entity(entity).get::<Children>() {
 			for child in children {
 				tree = tree.with_child(Self::new_with_world(*child, world).0);
@@ -35,7 +35,7 @@ impl EntityTree {
 	pub fn component_tree<'a, T: Component>(
 		&self,
 		world: &'a World,
-	) -> Tree<Option<&'a T>> {
+	) -> TreeNode<Option<&'a T>> {
 		self.0.map(|e| world.get::<T>(*e))
 	}
 	#[cfg(feature = "reflect")]

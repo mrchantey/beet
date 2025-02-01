@@ -104,6 +104,7 @@ mod test {
 		let mut app = App::new();
 
 		app.add_plugins((LifecyclePlugin, MovementPlugin, SteerPlugin))
+			.init_resource::<RandomSource>()
 			.insert_time();
 
 		let agent = app

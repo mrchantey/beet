@@ -11,9 +11,9 @@ pub fn wander_impulse(
 	velocity: &Velocity,
 	wander: &mut Wander,
 	max_speed: MaxSpeed,
+	rng: &mut impl Rng,
 ) -> Impulse {
-	todo!("random");
-	let inner_delta = Vec3::default() * wander.inner_radius;
+	let inner_delta = Vec3::random_in_sphere(rng) * wander.inner_radius;
 	// for the first iteration, last_local_target is Vec3::ZERO, this is
 	// allowed and means the first target will be a random point
 	let local_target = (wander.last_local_target + inner_delta)
@@ -41,12 +41,15 @@ mod test {
 	#[test]
 	#[ignore = "get random"]
 	fn works() {
+		let mut source = RandomSource::from_seed(0);
+
 		let impulse = wander_impulse(
 			&Vec3::default(),
 			&Velocity::default(),
 			&mut Wander::default(),
 			MaxSpeed::default(),
+			&mut source,
 		);
-		expect(*impulse).not().to_be(Vec3::ZERO);
+		expect(*impulse).to_be(Vec3::ZERO);
 	}
 }

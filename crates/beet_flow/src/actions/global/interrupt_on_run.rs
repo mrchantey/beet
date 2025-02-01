@@ -72,12 +72,12 @@ mod test {
 				.component_tree::<Running>(&world),
 		)
 		.to_be(
-			Tree::new(Some(&Running))
+			TreeNode::new(Some(&Running))
 				.with_leaf(None)
 				.with_leaf(None)
-				.with_child(Tree::new(None).with_leaf(None))
-				.with_child(Tree::new(None).with_leaf(None))
-				.with_child(Tree::new(Some(&Running)).with_leaf(None)), // .with_child(Tree::new(None).with_leaf(Some(&Running))),
+				.with_child(TreeNode::new(None).with_leaf(None))
+				.with_child(TreeNode::new(None).with_leaf(None))
+				.with_child(TreeNode::new(Some(&Running)).with_leaf(None)), // .with_child(Tree::new(None).with_leaf(Some(&Running))),
 		);
 	}
 }

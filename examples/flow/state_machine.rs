@@ -8,11 +8,7 @@ use bevy::prelude::*;
 fn main() {
 	let mut app = App::new();
   app
-		.add_plugins((
-			LifecyclePlugin,
-			BeetDebugPlugin, 
-			bevy::log::LogPlugin::default()
-		));
+		.add_plugins(BeetFlowPlugin::default().log_on_run());
 	let world = app.world_mut();
 		
 	

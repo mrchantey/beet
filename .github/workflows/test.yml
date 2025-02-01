@@ -40,7 +40,7 @@ jobs:
     - name: 🔨 Add wasm target
       run: rustup target add wasm32-unknown-unknown
     - name: 🔨 Install wasm bindgen cli
-      run: which wasm-bindgen || cargo install wasm-bindgen-cli --version 0.2.99
+      run: which wasm-bindgen || cargo install wasm-bindgen-cli --version 0.2.100
     - name: 🔨 Install Deno
       uses: denoland/setup-deno@v2
       with:

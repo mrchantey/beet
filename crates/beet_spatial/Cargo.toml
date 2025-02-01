@@ -22,12 +22,11 @@ animation = ["bevy/bevy_animation", "dep:bevyhub"]
 
 [dependencies]
 beet_flow = { workspace = true }
-sweet = { workspace = true, features = ["bevy"] }
+sweet = { workspace = true, features = ["bevy", "rand"] }
 bevyhub = { workspace = true, optional = true, features = ["core"] }
 
 bevy.workspace = true
 
-rand.workspace = true
 extend.workspace = true
 anyhow.workspace = true
 log.workspace = true

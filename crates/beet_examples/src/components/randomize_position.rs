@@ -1,5 +1,6 @@
 use bevy::prelude::*;
 use forky::prelude::Vec3Ext;
+use sweet::prelude::RandomSource;
 
 #[derive(Clone, Component, Reflect)]
 #[reflect(Component, Default)]
@@ -19,13 +20,14 @@ impl Default for RandomizePosition {
 
 pub fn randomize_position(
 	mut commands: Commands,
+	rand: ResMut<RandomSource>,
 	mut query: Populated<
 		(Entity, &mut Transform, &RandomizePosition),
 		Added<RandomizePosition>,
 	>,
 ) {
 	for (entity, mut transform, pos) in query.iter_mut() {
-		let mut position = Vec3::random_in_cube();
+		let mut position = Vec3::random_in_cube(&mut rand);
 		position.x *= pos.scale.x;
 		position.y *= pos.scale.y;
 		position.z *= pos.scale.z;

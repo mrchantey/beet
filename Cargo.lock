@@ -410,24 +410,14 @@ checksum = "72b3254f16251a8381aa12e40e3c4d2f0199f8c6508fbecb9d91f575e0fbb8c6"
 name = "beet"
 version = "0.0.5-rc.4"
 dependencies = [
- "anyhow",
- "beet_examples",
+ "beet",
  "beet_flow",
  "beet_ml",
+ "beet_rsx",
  "beet_sim",
  "beet_spatial",
  "bevy",
- "bevyhub",
- "console_log",
- "log",
- "pretty_env_logger",
- "rand",
- "rand_chacha 0.9.0",
- "serde",
- "serde_json",
- "tokio",
- "wasm-bindgen",
- "web-sys",
+ "sweet",
 ]
 
 [[package]]
@@ -440,12 +430,15 @@ dependencies = [
  "beet_spatial",
  "bevy",
  "bevyhub",
+ "console_log",
  "log",
  "pretty_env_logger",
- "rand",
  "serde",
  "serde_json",
  "sweet",
+ "tokio",
+ "wasm-bindgen",
+ "web-sys",
 ]
 
 [[package]]
@@ -499,7 +492,6 @@ dependencies = [
  "js-sys",
  "log",
  "pretty_env_logger",
- "rand",
  "ron",
  "serde",
  "serde_json",
@@ -606,7 +598,6 @@ dependencies = [
  "extend",
  "log",
  "pretty_env_logger",
- "rand",
  "serde",
  "strum",
  "strum_macros",
@@ -1102,7 +1093,7 @@ dependencies = [
  "derive_more",
  "glam",
  "itertools 0.13.0",
- "rand",
+ "rand 0.8.5",
  "rand_distr",
  "serde",
  "smallvec",
@@ -1803,7 +1794,7 @@ dependencies = [
  "memmap2",
  "num-traits",
  "num_cpus",
- "rand",
+ "rand 0.8.5",
  "rand_distr",
  "rayon",
  "safetensors",
@@ -1838,7 +1829,7 @@ dependencies = [
  "candle-nn",
  "fancy-regex",
  "num-traits",
- "rand",
+ "rand 0.8.5",
  "rayon",
  "serde",
  "serde_json",
@@ -1848,9 +1839,9 @@ dependencies = [
 
 [[package]]
 name = "cc"
-version = "1.2.10"
+version = "1.2.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "13208fcbb66eaeffe09b99fffbe1af420f00a7b35aa99ad683dfc1aa76145229"
+checksum = "e4730490333d58093109dc02c23174c3f4d490998c3fed3cc8e82d57afedb9cf"
 dependencies = [
  "jobserver",
  "libc",
@@ -2831,7 +2822,7 @@ dependencies = [
  "forky_core",
  "forky_web",
  "js-sys",
- "rand",
+ "rand 0.8.5",
 ]
 
 [[package]]
@@ -2841,7 +2832,7 @@ source = "git+https://github.com/mrchantey/forky#50f067b80787cd40b6d2ef5e698ced3
 dependencies = [
  "anyhow",
  "extend",
- "rand",
+ "rand 0.8.5",
 ]
 
 [[package]]
@@ -3127,8 +3118,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "43a49c392881ce6d5c3b8cb70f98717b7c07aabbdff06687b9030dbfbe2725f8"
 dependencies = [
  "cfg-if",
+ "js-sys",
  "libc",
  "wasi 0.13.3+wasi-0.2.2",
+ "wasm-bindgen",
  "windows-targets 0.52.6",
 ]
 
@@ -3190,7 +3183,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dc46dd3ec48fdd8e693a98d2b8bafae273a2d54c1de02a2a7e3d57d501f39677"
 dependencies = [
  "bytemuck",
- "rand",
+ "rand 0.8.5",
  "serde",
 ]
 
@@ -3353,7 +3346,7 @@ dependencies = [
  "cfg-if",
  "crunchy",
  "num-traits",
- "rand",
+ "rand 0.8.5",
  "rand_distr",
 ]
 
@@ -3437,7 +3430,7 @@ dependencies = [
  "indicatif",
  "log",
  "native-tls",
- "rand",
+ "rand 0.8.5",
  "serde",
  "serde_json",
  "thiserror 1.0.69",
@@ -3847,9 +3840,9 @@ dependencies = [
 
 [[package]]
 name = "js-sys"
-version = "0.3.76"
+version = "0.3.77"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6717b6b5b077764fb5966237269cb3c64edddde4b14ce42647430a78ced9e7b7"
+checksum = "1cfaf33c695fc6e08064efbc1f72ec937429614f25eef83af942d0e227c3a28f"
 dependencies = [
  "once_cell",
  "wasm-bindgen",
@@ -5027,6 +5020,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "rand"
+version = "0.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3779b94aeb87e8bd4e834cee3650289ee9e0d5677f976ecdb6d219e5f4f6cd94"
+dependencies = [
+ "rand_chacha 0.9.0",
+ "rand_core 0.9.0",
+ "zerocopy 0.8.14",
+]
+
+[[package]]
 name = "rand_chacha"
 version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5072,7 +5076,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "32cb0b9bc82b0a0876c2dd994a7e7a2683d3e7390ca40e6886785ef0c7e3ee31"
 dependencies = [
  "num-traits",
- "rand",
+ "rand 0.8.5",
 ]
 
 [[package]]
@@ -5826,7 +5830,7 @@ dependencies = [
 [[package]]
 name = "sweet"
 version = "0.3.0-rc.3"
-source = "git+https://github.com/mrchantey/sweet#10ec418fb6666189bf1b402654c07981ab6026ac"
+source = "git+https://github.com/mrchantey/sweet#030e2252c8eb9e0c1bfa6c88ce932a7345f48ac8"
 dependencies = [
  "sweet_bevy",
  "sweet_fs",
@@ -5838,12 +5842,15 @@ dependencies = [
 [[package]]
 name = "sweet_bevy"
 version = "0.3.0-rc.3"
-source = "git+https://github.com/mrchantey/sweet#10ec418fb6666189bf1b402654c07981ab6026ac"
+source = "git+https://github.com/mrchantey/sweet#030e2252c8eb9e0c1bfa6c88ce932a7345f48ac8"
 dependencies = [
  "anyhow",
  "bevy",
  "extend",
+ "getrandom 0.3.1",
  "js-sys",
+ "rand 0.9.0",
+ "rand_chacha 0.9.0",
  "sweet_utils",
  "sweet_web",
 ]
@@ -5851,7 +5858,7 @@ dependencies = [
 [[package]]
 name = "sweet_fs"
 version = "0.3.0-rc.3"
-source = "git+https://github.com/mrchantey/sweet#10ec418fb6666189bf1b402654c07981ab6026ac"
+source = "git+https://github.com/mrchantey/sweet#030e2252c8eb9e0c1bfa6c88ce932a7345f48ac8"
 dependencies = [
  "anyhow",
  "clap",
@@ -5869,7 +5876,7 @@ dependencies = [
 [[package]]
 name = "sweet_test"
 version = "0.3.0-rc.3"
-source = "git+https://github.com/mrchantey/sweet#10ec418fb6666189bf1b402654c07981ab6026ac"
+source = "git+https://github.com/mrchantey/sweet#030e2252c8eb9e0c1bfa6c88ce932a7345f48ac8"
 dependencies = [
  "anyhow",
  "backtrace",
@@ -5901,7 +5908,7 @@ dependencies = [
 [[package]]
 name = "sweet_test_macros"
 version = "0.3.0-rc.3"
-source = "git+https://github.com/mrchantey/sweet#10ec418fb6666189bf1b402654c07981ab6026ac"
+source = "git+https://github.com/mrchantey/sweet#030e2252c8eb9e0c1bfa6c88ce932a7345f48ac8"
 dependencies = [
  "anyhow",
  "proc-macro2",
@@ -5912,7 +5919,7 @@ dependencies = [
 [[package]]
 name = "sweet_utils"
 version = "0.3.0-rc.3"
-source = "git+https://github.com/mrchantey/sweet#10ec418fb6666189bf1b402654c07981ab6026ac"
+source = "git+https://github.com/mrchantey/sweet#030e2252c8eb9e0c1bfa6c88ce932a7345f48ac8"
 dependencies = [
  "anyhow",
  "extend",
@@ -5925,7 +5932,7 @@ dependencies = [
 [[package]]
 name = "sweet_web"
 version = "0.3.0-rc.3"
-source = "git+https://github.com/mrchantey/sweet#10ec418fb6666189bf1b402654c07981ab6026ac"
+source = "git+https://github.com/mrchantey/sweet#030e2252c8eb9e0c1bfa6c88ce932a7345f48ac8"
 dependencies = [
  "anyhow",
  "console_error_panic_hook",
@@ -6171,7 +6178,7 @@ dependencies = [
  "macro_rules_attribute",
  "monostate",
  "paste",
- "rand",
+ "rand 0.8.5",
  "rayon",
  "rayon-cond",
  "regex",
@@ -6608,20 +6615,21 @@ dependencies = [
 
 [[package]]
 name = "wasm-bindgen"
-version = "0.2.99"
+version = "0.2.100"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a474f6281d1d70c17ae7aa6a613c87fce69a127e2624002df63dcb39d6cf6396"
+checksum = "1edc8929d7499fc4e8f0be2262a241556cfc54a0bea223790e71446f2aab1ef5"
 dependencies = [
  "cfg-if",
  "once_cell",
+ "rustversion",
  "wasm-bindgen-macro",
 ]
 
 [[package]]
 name = "wasm-bindgen-backend"
-version = "0.2.99"
+version = "0.2.100"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5f89bb38646b4f81674e8f5c3fb81b562be1fd936d84320f3264486418519c79"
+checksum = "2f0a0651a5c2bc21487bde11ee802ccaf4c51935d0d3d42a6101f98161700bc6"
 dependencies = [
  "bumpalo",
  "log",
@@ -6633,9 +6641,9 @@ dependencies = [
 
 [[package]]
 name = "wasm-bindgen-futures"
-version = "0.4.49"
+version = "0.4.50"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "38176d9b44ea84e9184eff0bc34cc167ed044f816accfe5922e54d84cf48eca2"
+checksum = "555d470ec0bc3bb57890405e5d4322cc9ea83cebb085523ced7be4144dac1e61"
 dependencies = [
  "cfg-if",
  "js-sys",
@@ -6646,9 +6654,9 @@ dependencies = [
 
 [[package]]
 name = "wasm-bindgen-macro"
-version = "0.2.99"
+version = "0.2.100"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2cc6181fd9a7492eef6fef1f33961e3695e4579b9872a6f7c83aee556666d4fe"
+checksum = "7fe63fc6d09ed3792bd0897b314f53de8e16568c2b3f7982f468c0bf9bd0b407"
 dependencies = [
  "quote",
  "wasm-bindgen-macro-support",
@@ -6656,9 +6664,9 @@ dependencies = [
 
 [[package]]
 name = "wasm-bindgen-macro-support"
-version = "0.2.99"
+version = "0.2.100"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "30d7a95b763d3c45903ed6c81f156801839e5ee968bb07e534c44df0fcd330c2"
+checksum = "8ae87ea40c9f689fc23f209965b6fb8a99ad69aeeb0231408be24920604395de"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -6669,15 +6677,18 @@ dependencies = [
 
 [[package]]
 name = "wasm-bindgen-shared"
-version = "0.2.99"
+version = "0.2.100"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "943aab3fdaaa029a6e0271b35ea10b72b943135afe9bffca82384098ad0e06a6"
+checksum = "1a05d73b933a847d6cccdda8f838a22ff101ad9bf93e33684f39c1f5f0eece3d"
+dependencies = [
+ "unicode-ident",
+]
 
 [[package]]
 name = "web-sys"
-version = "0.3.76"
+version = "0.3.77"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "04dd7223427d52553d3702c004d3b2fe07c148165faa56313cb00211e31c12bc"
+checksum = "33b6dd2ef9186f1f2072e409e99cd22a975331a6b3591b12c764e0e55c60d5d2"
 dependencies = [
  "js-sys",
  "wasm-bindgen",

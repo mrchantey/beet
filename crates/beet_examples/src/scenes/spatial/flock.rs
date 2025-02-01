@@ -1,5 +1,6 @@
 use crate::beet::prelude::*;
 use crate::prelude::*;
+use sweet::prelude::*;
 use bevy::prelude::*;
 use bevyhub::prelude::*;
 
@@ -7,11 +8,12 @@ use bevyhub::prelude::*;
 const SCALE: f32 = 100.;
 
 pub fn flock(mut commands: Commands) {
+	let mut rand = RandomSource::default();
 	commands.insert_resource(WrapAround::default());
 
 	for _ in 0..300 {
 		let position = Vec3::ZERO;
-		// let position = Vec3::random_in_sphere().with_y(0.) * 500.;
+		let position = Vec3::random_in_sphere(&mut rand).with_y(0.) * 500.;
 		commands
 			.spawn((
 				Name::new("Spaceship"),

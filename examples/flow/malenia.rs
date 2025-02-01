@@ -7,17 +7,15 @@
 //! https://eldenring.wiki.fextralife.com/Malenia+Blade+of+Miquella
 use beet::prelude::*;
 use bevy::prelude::*;
-use rand::Rng;
-use rand::SeedableRng;
-use rand_chacha::ChaCha8Rng;
+use sweet::prelude::RandomSource;
 
 fn main() {
-	println!("🙂\tMalenia says: 'I dreamt for so long..'\n");
+	println!("👩\tMalenia says: {INTRO}");
 
 	let mut app = App::new();
 	app.add_plugins((
 		MinimalPlugins,
-		LifecyclePlugin,
+		BeetFlowPlugin::default(),
 		// here we register all our actions that are used
 		ActionPlugin::<(
 			RandomScoreProvider, 
@@ -26,7 +24,7 @@ fn main() {
 		)>::default(),
 	))
 	.add_systems(Update, health_handler)
-	.insert_resource(RandomSource::default());
+	.init_resource::<RandomSource>();
 
 	// in this example the player doesnt do anything 
 	app.world_mut()
@@ -47,7 +45,7 @@ fn main() {
 		))
 		// actions can be declared inline if they have no parameters
 		.observe(|_: Trigger<OnRun>| {
-			println!("🙂\tMalenia is thinking..");
+			println!("👩\tMalenia is thinking..");
 		})
 		.with_children(|behavior_root| {
 			// A common behavior tree pattern is to 'try' actions, ie try to heal self
@@ -109,17 +107,17 @@ fn attack_player(
 	let (attack,attack_name) = attacks
 		.get(trigger.entity())
 		.expect(expect_action::TARGET_MISSING);
-	println!("⚔️  \tMalenia attacks with {}", attack_name);
+	println!("🔪  \tMalenia attacks with {}", attack_name);
 	
 	for (mut health, name) in query.iter_mut() {
 		if name.as_str() == "Malenia" {
-			let damage:f32 = random_source.0.gen_range(0.0..attack.max_recoil).round();
+			let damage:f32 = random_source.random_range(0.0..attack.max_recoil).round();
 			health.0 -= damage;
-			println!("⚔️  \tMalenia takes {} recoil damage, current health: {}", damage,health.0);
+			println!("❗  \tMalenia takes {} recoil damage, current health: {}", damage,health.0);
 		} else {
-			let damage:f32 = random_source.0.gen_range(0.0..attack.max_damage).round();
+			let damage:f32 = random_source.random_range(0.0..attack.max_damage).round();
 			health.0 -= damage;
-			println!("⚔️  \tPlayer takes {} damage, current health: {}", damage, health.0);
+			println!("❗  \tPlayer takes {} damage, current health: {}", damage, health.0);
 		}
 	}
 	println!();
@@ -131,24 +129,11 @@ fn health_handler(query: Query<(&Health, &Name), Changed<Health>>) {
 		if health.0 > 0. {
 			continue;
 		} else if name.as_str() == "Malenia" {
-			println!("🙂\tMalenia says: 'Your strength, extraordinary...'\n✅\tYou win!");
+			println!("👩\tMalenia says: 'Your strength, extraordinary...'\n✅\tYou win!");
 		} else {
-			println!("🙂\tMalenia says: 'I am Malenia. Blade of Miquella'\n❌\tYou lose");
+			println!("👩\tMalenia says: 'I am Malenia. Blade of Miquella'\n❌\tYou lose");
 		}
 		std::process::exit(0);
-	}
-}
-
-
-///https://bevyengine.org/examples/math/random-sampling/
-#[derive(Resource)]
-pub struct RandomSource(ChaCha8Rng);
-
-impl Default for RandomSource {
-	fn default() -> Self {
-		let rng = ChaCha8Rng::from_entropy();
-		// let rng = ChaCha8Rng::seed_from_u64(123412341234);
-		Self(rng)
 	}
 }
 
@@ -188,7 +173,7 @@ fn provide_random_score(
 		.get(trigger.entity())
 		.expect(expect_action::ACTION_QUERY_MISSING);
 
-	let rnd: f32 = random_source.0.gen();
+	let rnd: f32 = random_source.random();
 
 	commands.entity(parent.get()).trigger(OnChildScore::new(
 		trigger.entity(),
@@ -228,3 +213,13 @@ fn try_heal_self(
 			.trigger(OnRunResult::failure());
 	}
 }
+
+const INTRO:&str = r#"
+			I dreamt for so long.
+			My flesh was dull gold...and my blood, rotted.
+			Corpse after corpse, left in my wake...
+			As I awaited... his return.
+			... Heed my words.
+			I am Malenia. Blade of Miquella.
+			And I have never known defeat.
+"#;

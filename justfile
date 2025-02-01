@@ -1,3 +1,11 @@
+# Beet uses Just for common tasks
+#
+# ```rust 
+# cargo binstall just
+# just --list
+# just test-all
+# ```
+#
 set windows-shell := ["C:/tools/cygwin/bin/sh.exe","-c"]
 set dotenv-load
 crates := 'beet beet_spatial beet_flow'

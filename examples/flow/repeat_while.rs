@@ -7,9 +7,7 @@ fn main() {
 	let mut app = App::new();
 	app.add_plugins((
 		MinimalPlugins,
-		LifecyclePlugin,
-		BeetDebugPlugin,
-		bevy::log::LogPlugin::default(),
+		BeetFlowPlugin::default().log_on_run(),
 	))
 	.world_mut()
 	.spawn((

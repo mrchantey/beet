@@ -5,11 +5,7 @@ use bevy::prelude::*;
 #[rustfmt::skip]
 fn main() {
 	App::new()
-		.add_plugins((
-			LifecyclePlugin,
-			BeetDebugPlugin,
-			bevy::log::LogPlugin::default()
-		))
+		.add_plugins(BeetFlowPlugin::default().log_on_run())
 		.world_mut()
 		.spawn((
 			Name::new("root"), 

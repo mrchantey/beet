@@ -11,7 +11,9 @@ fn log_on_run(trigger: Trigger<OnRun>, query: Query<&LogOnRun>) {
 }
 
 fn main() {
-	World::new()
+	App::new()
+		.add_plugins(ActionPlugin::<LogOnRun>::default())
+		.world_mut()
 		.spawn(LogOnRun("root".to_string()))
 		.flush_trigger(OnRun);
 }

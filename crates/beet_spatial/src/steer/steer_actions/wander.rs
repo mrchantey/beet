@@ -68,6 +68,7 @@ impl Wander {
 }
 
 fn wander(
+	mut rng: ResMut<RandomSource>,
 	mut agents: Query<(&Transform, &Velocity, &MaxSpeed, &mut Impulse)>,
 	mut query: Query<
 		(&TargetEntity, &mut Wander),
@@ -83,6 +84,7 @@ fn wander(
 				&velocity,
 				&mut wander,
 				*max_speed,
+				&mut rng,
 			);
 		}
 	}
@@ -91,9 +93,9 @@ fn wander(
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use sweet::prelude::*;
 	use beet_flow::prelude::*;
 	use bevy::prelude::*;
+	use sweet::prelude::*;
 
 	#[test]
 	#[ignore = "get random"]
