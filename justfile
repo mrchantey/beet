@@ -16,6 +16,7 @@ default:
 
 init-repo:
 	just assets-pull
+	just test-site
 # just export-scenes
 
 #💡 CLI
@@ -32,6 +33,16 @@ run-ci example *args:
 runp crate example *args:
 	cargo run -p {{crate}} --example {{example}} {{args}}
 
+
+fmt *args:
+	just watch 'just leptosfmt {{args}}'
+
+leptosfmt *args:
+	leptosfmt \
+	crates/beet_rsx/**/* \
+	crates/beet_router/**/* \
+	crates/beet_site/**/* \
+	{{args}}
 
 #💡 HTML
 
@@ -72,6 +83,7 @@ doc:
 serve-doc:
 	cd ./target/doc/beet && forky serve
 
+# just leptosfmt --check
 test-all *args:
 	cargo test 																 --all-features -p beet_flow
 	cargo test 																								-p beet_rsx
