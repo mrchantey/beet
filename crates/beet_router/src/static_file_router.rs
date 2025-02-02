@@ -32,9 +32,7 @@ pub struct StaticFileRouter<T> {
 	/// a constant state that can be used by routes for rendering
 	pub state: T,
 	pub page_routes: Vec<StaticPageRoute<T>>,
-	/// a path that will be replaced with `dst_dir`, defaults to "src"
-	pub src_dir: PathBuf,
-	/// a path that will replace `src_dir`, defaults to "target/client"
+	/// The directory to save the html files to
 	pub dst_dir: PathBuf,
 }
 
@@ -43,7 +41,6 @@ impl<T: Default> Default for StaticFileRouter<T> {
 		Self {
 			state: Default::default(),
 			page_routes: Default::default(),
-			src_dir: "src".into(),
 			dst_dir: "target/client".into(),
 		}
 	}
@@ -96,8 +93,6 @@ impl<T: 'static> StaticFileRouter<T> {
 	pub async fn routes_to_html_files(&self) -> Result<()> {
 		FsExt::remove(&self.dst_dir).ok();
 		let html = self.routes_to_html().await?;
-		let src = self.src_dir.to_string_lossy();
-		let dst = self.dst_dir.to_string_lossy();
 		for (info, doc) in html {
 			let mut path = info.path.clone();
 			if path.file_stem().map(|s| s == "index").unwrap_or(false) {
@@ -107,10 +102,14 @@ impl<T: 'static> StaticFileRouter<T> {
 				path.set_extension("");
 				path.push("index.html");
 			}
-			let path = path.to_string_lossy();
-			let path = path.replace(&*src, &dst);
-			let path = path.replace("pages/", "");
-			FsExt::write(&path, &doc.render())?;
+			let full_path = self.dst_dir.join(&path);
+			println!(
+				"writing:\n{}\n{}",
+				self.dst_dir.display(),
+				full_path.display(),
+				// self.dst_dir.join(full_path).display()
+			);
+			FsExt::write(&full_path, &doc.render())?;
 		}
 		Ok(())
 	}
@@ -209,13 +208,11 @@ mod test {
 
 		expect(html.len()).to_be(2);
 
-		expect(&html[0].0.path.to_string_lossy()).to_end_with(
-			"beet/crates/beet_router/src/test_site/pages/contributing.rs",
-		);
+		expect(&html[0].0.path.to_string_lossy())
+			.to_end_with("routes/contributing.rs");
 		expect(&html[0].1.render()).to_be("<!DOCTYPE html><html><head></head><body><div><h1>Beet</h1>\n\t\t\t\tparty time dude!\n\t\t</div></body></html>");
-		expect(&html[1].0.path.to_string_lossy()).to_end_with(
-			"beet/crates/beet_router/src/test_site/pages/index.rs",
-		);
+		expect(&html[1].0.path.to_string_lossy())
+			.to_end_with("routes/index.rs");
 		expect(&html[1].1.render()).to_be("<!DOCTYPE html><html><head></head><body><div><h1>My Site</h1>\n\t\t\t\tparty time!\n\t\t</div></body></html>");
 	}
 }
