@@ -16,7 +16,7 @@ default:
 
 init-repo:
 	just assets-pull
-	just test-site
+# just test-site
 # just export-scenes
 
 #💡 CLI
