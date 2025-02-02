@@ -9,9 +9,9 @@ fn parser() -> ParseFileRouter {
 		file_router_ident: "crate::DefaultFileRouter".into(),
 		file_router_path: "test_site_router.rs".into(),
 		file_router_tokens: Some(
-			r#" {
+			r#"
 				use crate::prelude::*;
-			}"#
+			"#
 			.to_string(),
 		),
 		..Default::default()

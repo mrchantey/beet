@@ -4,6 +4,7 @@ use beet_rsx::prelude::*;
 use std::future::Future;
 use std::path::PathBuf;
 use std::pin::Pin;
+use sweet::prelude::ReadFile;
 
 
 
@@ -90,15 +91,14 @@ impl<T: 'static> StaticFileRouter<T> {
 		Ok(html)
 	}
 
-	pub async fn routes_to_html_files(&self)->Result<()>{
+	pub async fn routes_to_html_files(&self) -> Result<()> {
 		let html = self.routes_to_html().await?;
+		let src = self.src_dir.to_string_lossy();
+		let dst = self.dst_dir.to_string_lossy();
 		for (info, doc) in html {
-			let path = self.dst_dir.join(&info.path);
-			let dir = path.parent().unwrap();
-			std::fs::create_dir_all(dir)?;
-			let mut html = String::new();
-			doc.render_html_with_buf(&mut html);
-			std::fs::write(path, html)?;
+			let path = info.path.to_string_lossy();
+			let path = path.replace(&*src, &dst);
+			ReadFile::write(&path, &doc.render())?;
 		}
 		Ok(())
 	}
