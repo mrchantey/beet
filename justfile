@@ -6,6 +6,7 @@
 # just test-all
 # ```
 #
+#💡 Init
 set windows-shell := ["C:/tools/cygwin/bin/sh.exe","-c"]
 set dotenv-load
 crates := 'beet beet_spatial beet_flow'
@@ -17,14 +18,34 @@ init-repo:
 	just assets-pull
 # just export-scenes
 
+#💡 CLI
+
+cli *args:
+	cargo run -p beet-cli -- {{args}}
+
 run example *args:
 	just watch 'just run-ci {{example}} {{args}}'
 
 run-ci example *args:
 	cargo run --example {{example}} {{args}}
 
-run-p crate example *args:
+runp crate example *args:
 	cargo run -p {{crate}} --example {{example}} {{args}}
+
+
+#💡 HTML
+
+test-site:
+	just runp beet_router test_site_router
+	just runp beet_router test_site_html
+	sweet serve crates/beet_router/target/client
+
+
+beet-site:
+	just cli serve \
+	-p beet_site \
+	--src crates/beet_site/src \
+	--serve-dir crates/beet_site/target/client
 
 
 ## common
@@ -87,6 +108,9 @@ clean-repo:
 	cargo clean
 	rm -rf ./target
 # rm -rf ./Cargo.lock
+
+clean-analyzer:
+	rm -rf $CARGO_TARGET_DIR/rust-analyzer
 
 pws *args:
 	just --shell powershell.exe --shell-arg -c {{args}}

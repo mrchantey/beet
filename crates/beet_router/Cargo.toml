@@ -1,0 +1,30 @@
+[package]
+name = "beet_router"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+readme.workspace = true
+description.workspace = true
+documentation.workspace = true
+repository.workspace = true
+categories.workspace = true
+keywords.workspace = true
+
+[features]
+parser = ["dep:beet_router_parser"]
+# for internal testing
+_test_site = []
+
+[dependencies]
+beet_router_parser = { workspace = true, optional = true }
+sweet = { workspace = true, features = ["fs"] }
+beet_rsx = { workspace = true }
+anyhow.workspace = true
+http.workspace = true
+futures.workspace = true
+
+[dev-dependencies]
+beet_router = { path = "", features = ["parser", "_test_site"] }
+sweet = { workspace = true, features = ["test"] }
+tokio.workspace = true

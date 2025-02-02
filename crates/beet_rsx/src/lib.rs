@@ -8,11 +8,17 @@ pub mod rsx;
 pub mod signals_rsx;
 pub mod string_rsx;
 pub mod tree;
+#[cfg(feature = "macros")]
 pub use beet_rsx_macros::rsx;
+#[cfg(feature = "parser")]
+pub use beet_rsx_parser;
 
 #[rustfmt::skip]
 pub mod prelude {
+	#[cfg(feature = "macros")]
 	pub use beet_rsx_macros::rsx;
+	#[cfg(feature = "parser")]
+	pub use beet_rsx_parser::prelude::*;
 	pub use crate::hydration::*;
 	pub use crate::error::*;
 	pub use crate::html::*;
