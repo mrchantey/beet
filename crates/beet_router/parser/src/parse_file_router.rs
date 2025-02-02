@@ -49,7 +49,7 @@ impl ParseFileRouter {
 	pub fn build_string(&self) -> Result<String> {
 		let page_routes = ReadDir::files_recursive(self.pages_dir())?
 			.iter()
-			.map(|path| ParseRouteFile::parse(&path))
+			.map(|path| ParseRouteFile::parse(&path.canonicalize()?))
 			.collect::<Result<Vec<_>>>()?
 			.into_iter()
 			.flatten();
@@ -93,7 +93,6 @@ impl ParseFileRouter {
 		ReadFile::write(self.file_router_path(), &data)?;
 		Ok(())
 	}
-
 }
 
 

@@ -1,5 +1,5 @@
-mod components;
-mod file_router;
+pub mod components;
+pub mod file_router;
 
 pub mod prelude {
 	pub use crate::components::*;
