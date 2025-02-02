@@ -40,7 +40,9 @@ pub trait PageRoute {
 
 #[derive(Debug, Clone)]
 pub struct RouteInfo {
+	/// the url path
 	pub path: PathBuf,
+	/// the http method
 	pub method: Method,
 }
 impl RouteInfo {
