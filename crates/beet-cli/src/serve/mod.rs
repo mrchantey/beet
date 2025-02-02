@@ -1,14 +1,12 @@
 use anyhow::Result;
+use beet_router::prelude::*;
 use clap::Parser;
 mod cargo_run;
-
 ///
 #[derive(Debug, Parser)]
 pub struct Serve {
-	/// Path to the source directory
-	///
-	#[arg(long, default_value = "src")]
-	src: String,
+	#[command(flatten)]
+	parse_page_router: ParseFileRouter,
 	/// 🦀 cargo run args 🦀
 	#[command(flatten)]
 	cargo_run: cargo_run::CargoRun,
@@ -16,7 +14,10 @@ pub struct Serve {
 
 impl Serve {
 	pub fn run(self) -> Result<()> {
-		self.cargo_run.run()?;
+		let str = self.parse_page_router.build_string()?;
+		println!("{}", str);
+
+		// self.cargo_run.run()?;
 
 		Ok(())
 	}

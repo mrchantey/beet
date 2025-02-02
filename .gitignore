@@ -6,4 +6,4 @@ rustc-ice*
 
 .env
 
-crates/beet_router/compilecheck_*
+crates/beet_router/parser/compilecheck_*

@@ -1,14 +1,15 @@
 use beet::prelude::*;
 use beet_site::prelude::*;
 
-fn main() {
-	// RoutesFileBuilder::default().build_and_write().unwrap();
 
-	let routes = routes();
+#[tokio::main]
+async fn main() {
+	let mut router = DefaultFileRouter::default();
+	collect_file_routes(&mut router);
+	let files = router.collect_rsx().await.unwrap();
 
-	for route in routes {
-		let rsx = route.handler.into_rsx();
-		let html = RsxToHtml::render_body(&rsx).to_string();
-		println!("route: {}", html);
+	for (path, node) in files {
+		let html = RsxToHtml::render_body(&node);
+		println!("{}:\n{}", path, html);
 	}
 }

@@ -1,9 +1,9 @@
 mod components;
-mod routes;
+mod file_router;
 
 pub mod prelude {
 	pub use crate::components::*;
-	pub use crate::routes::*;
+	pub use crate::file_router::*;
 }
 
 pub fn run() {}

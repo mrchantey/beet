@@ -4,7 +4,10 @@ use sweet::prelude::*;
 use syn::Block;
 use syn::Visibility;
 
-pub struct RouteBuilder<'a> {
+
+/// create the tokens for a specific route, it may contain
+/// one or more http methods.
+pub struct ParseRouteFile<'a> {
 	pub path: &'a Path,
 }
 
@@ -13,10 +16,10 @@ const HTTP_METHODS: [&str; 9] = [
 	"patch",
 ];
 
-impl<'a> RouteBuilder<'a> {
+impl<'a> ParseRouteFile<'a> {
 	/// reads a file and discovers all top level pub functions
 	/// that match a http method
-	pub fn map_routes(path: &Path) -> Result<Vec<Block>> {
+	pub fn parse(path: &Path) -> Result<Vec<Block>> {
 		let file = ReadFile::to_string(path)?;
 		let path_str = path.to_string_lossy();
 		let items = syn::parse_file(&file)?
@@ -38,16 +41,13 @@ impl<'a> RouteBuilder<'a> {
 			.map(|func| {
 				let ident = &func.sig.ident;
 				let method = func.sig.ident.to_string();
+
 				syn::parse_quote! {
 					{
 						// some route thingie
 						#[path=#path_str]
 						mod route;
-						fn func() -> RsxNode{
-							route::#ident().into_rsx()
-						}
-
-						Route::build(#path_str,#method,func)
+						(RouteInfo::new(#path_str,#method),route::#ident)
 					}
 				}
 			})

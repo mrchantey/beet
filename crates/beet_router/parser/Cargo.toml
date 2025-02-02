@@ -1,5 +1,5 @@
 [package]
-name = "beet-cli"
+name = "beet_router_parser"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -11,16 +11,18 @@ repository.workspace = true
 categories.workspace = true
 keywords.workspace = true
 
-[[bin]]
-name = "beet"
-path = "src/main.rs"
-
-[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-beet_router = { workspace = true, features = ["parser"] }
-anyhow.workspace = true
+[dependencies]
 sweet = { workspace = true, features = ["fs"] }
+beet_rsx = { workspace = true, features = ["parser"] }
+uuid = { version = "1", features = ["v4"] }
+anyhow.workspace = true
+http.workspace = true
 clap.workspace = true
 
+quote.workspace = true
+proc-macro2.workspace = true
+prettyplease.workspace = true
+syn.workspace = true
 
 [dev-dependencies]
 sweet = { workspace = true, features = ["test"] }

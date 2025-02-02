@@ -12,7 +12,7 @@
 		"LICENSE-APACHE.txt": true,
 		"LICENSE-MIT.txt": true,
 		// "**/mod.rs": true,
-		"crates/beet_router/compilecheck**": true,
+		// "crates/beet_router/parser/compilecheck**": true,
 	},
 	"search.exclude": {
 		"assets/": true,

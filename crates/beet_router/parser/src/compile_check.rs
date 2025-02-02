@@ -45,6 +45,7 @@ mod test {
 	use sweet::prelude::*;
 
 	#[test]
+	#[ignore = "need to suppress output files"]
 	fn works() {
 		expect(CompileCheck::string("fn main(){}")).to_be_ok();
 		expect(CompileCheck::string("dsajk923")).to_be_err();

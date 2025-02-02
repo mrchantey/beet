@@ -428,6 +428,7 @@ name = "beet-cli"
 version = "0.0.5-rc.4"
 dependencies = [
  "anyhow",
+ "beet_router",
  "clap",
  "sweet",
 ]
@@ -538,7 +539,22 @@ name = "beet_router"
 version = "0.0.5-rc.4"
 dependencies = [
  "anyhow",
+ "beet_router",
+ "beet_router_parser",
  "beet_rsx",
+ "futures",
+ "http 1.2.0",
+ "sweet",
+ "tokio",
+]
+
+[[package]]
+name = "beet_router_parser"
+version = "0.0.5-rc.4"
+dependencies = [
+ "anyhow",
+ "beet_rsx",
+ "clap",
  "http 1.2.0",
  "prettyplease",
  "proc-macro2",
@@ -619,6 +635,7 @@ name = "beet_site"
 version = "0.0.5-rc.4"
 dependencies = [
  "beet",
+ "tokio",
 ]
 
 [[package]]

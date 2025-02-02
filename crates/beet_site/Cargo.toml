@@ -15,6 +15,7 @@ keywords.workspace = true
 [dependencies]
 beet = { workspace = true, features = ["router"] }
 
+tokio.workspace = true
 
 # [dev-dependencies]
 # beet = { workspace = true, default-features = false, features = ["router"] }
