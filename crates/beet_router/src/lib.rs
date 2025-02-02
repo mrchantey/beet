@@ -23,8 +23,8 @@ pub type DefaultFileRouter =
 
 
 
-#[cfg(test)]
-mod test_site {
+#[cfg(any(test, feature = "_test_site"))]
+pub mod test_site {
 	mod components;
 	#[path = "pages/contributing.rs"]
 	mod contributing;

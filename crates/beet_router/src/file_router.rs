@@ -34,10 +34,11 @@ pub trait PageRoute {
 	type Context;
 
 
-	async fn render(&self, context: &Self::Context) -> Result<RsxNode>;
+	async fn into_node(&self, context: &Self::Context) -> Result<RsxNode>;
 }
 
 
+#[derive(Debug, Clone)]
 pub struct RouteInfo {
 	pub path: PathBuf,
 	pub method: Method,
@@ -51,5 +52,3 @@ impl RouteInfo {
 		}
 	}
 }
-
-

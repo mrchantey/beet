@@ -1,5 +1,3 @@
-//! just runp beet_router_parser build_test_site
-//!
 use beet_router_parser::prelude::*;
 use sweet::prelude::FsExt;
 
@@ -11,9 +9,9 @@ fn parser() -> ParseFileRouter {
 		file_router_ident: "crate::DefaultFileRouter".into(),
 		file_router_path: "test_site_router.rs".into(),
 		file_router_tokens: Some(
-			quote::quote! {
+			r#" {
 				use crate::prelude::*;
-			}
+			}"#
 			.to_string(),
 		),
 		..Default::default()

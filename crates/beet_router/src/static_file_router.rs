@@ -2,6 +2,7 @@ use crate::prelude::*;
 use anyhow::Result;
 use beet_rsx::prelude::*;
 use std::future::Future;
+use std::path::PathBuf;
 use std::pin::Pin;
 
 
@@ -28,11 +29,25 @@ type StaticRsxFunc<T> =
 /// A simple static server, it allows for a state value
 /// that can be passed by reference to all routes,
 /// this is where site constants can be stored.
-#[derive(Default)]
 pub struct StaticFileRouter<T> {
 	/// a constant state that can be used by routes for rendering
 	pub state: T,
 	pub page_routes: Vec<StaticPageRoute<T>>,
+	/// a path that will be replaced with `dst_dir`, defaults to "src"
+	pub src_dir: PathBuf,
+	/// a path that will replace `src_dir`, defaults to "target/client"
+	pub dst_dir: PathBuf,
+}
+
+impl<T: Default> Default for StaticFileRouter<T> {
+	fn default() -> Self {
+		Self {
+			state: Default::default(),
+			page_routes: Default::default(),
+			src_dir: "src".into(),
+			dst_dir: "target/client".into(),
+		}
+	}
 }
 
 
@@ -44,20 +59,48 @@ impl<T: 'static> StaticFileRouter<T> {
 		self.page_routes
 			.push(StaticPageRoute::new(info, route.into_rsx_func()));
 	}
-	pub async fn collect_rsx(&self) -> Result<Vec<(String, RsxNode)>> {
+	pub async fn routes_to_rsx(&self) -> Result<Vec<(RouteInfo, RsxNode)>> {
 		futures::future::try_join_all(
 			self.page_routes
 				.iter()
-				.map(|route| self.collect_route_rsx(route)),
+				.map(|route| self.route_to_rsx(route)),
 		)
 		.await
 	}
-	async fn collect_route_rsx(
+	async fn route_to_rsx(
 		&self,
 		route: &StaticPageRoute<T>,
-	) -> Result<(String, RsxNode)> {
-		let node = route.render(&self.state).await?;
-		Ok((route.route_info.path.to_string_lossy().to_string(), node))
+	) -> Result<(RouteInfo, RsxNode)> {
+		let node = route.into_node(&self.state).await?;
+		Ok((route.route_info.clone(), node))
+	}
+
+
+	pub async fn routes_to_html(
+		&self,
+	) -> Result<Vec<(RouteInfo, HtmlDocument)>> {
+		let html = self
+			.routes_to_rsx()
+			.await?
+			.into_iter()
+			.map(|(p, f)| {
+				(p, RsxToHtml::default().map_node(&f).into_document())
+			})
+			.collect::<Vec<(RouteInfo, HtmlDocument)>>();
+		Ok(html)
+	}
+
+	pub async fn routes_to_html_files(&self)->Result<()>{
+		let html = self.routes_to_html().await?;
+		for (info, doc) in html {
+			let path = self.dst_dir.join(&info.path);
+			let dir = path.parent().unwrap();
+			std::fs::create_dir_all(dir)?;
+			let mut html = String::new();
+			doc.render_html_with_buf(&mut html);
+			std::fs::write(path, html)?;
+		}
+		Ok(())
 	}
 }
 
@@ -80,7 +123,7 @@ impl<T> StaticPageRoute<T> {
 
 impl<T: 'static> PageRoute for StaticPageRoute<T> {
 	type Context = T;
-	async fn render(&self, context: &Self::Context) -> Result<RsxNode> {
+	async fn into_node(&self, context: &Self::Context) -> Result<RsxNode> {
 		(self.func)(context).await
 	}
 }
@@ -143,24 +186,24 @@ where
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use beet_rsx::html::RsxToHtml;
+	use beet_rsx::html::RenderHtml;
 	use sweet::prelude::*;
 
 	#[sweet::test]
 	async fn works() {
 		let mut router = DefaultFileRouter::default();
 		crate::test_site::test_site_router::collect_file_routes(&mut router);
-		let files = router
-			.collect_rsx()
-			.await
-			.unwrap()
-			.into_iter()
-			.map(|(p, f)| (p, RsxToHtml::render_body(&f)))
-			.collect::<Vec<_>>();
+		let html = router.routes_to_html().await.unwrap();
 
-		expect(files.len()).to_be(2);
+		expect(html.len()).to_be(2);
 
-		expect(&files[0].1).to_be("<html><div><h1>Beet</h1>\n\t\t\t\tparty time dude!\n\t\t</div></html>");
-		expect(&files[1].1).to_be("<html><div><h1>My Site</h1>\n\t\t\t\tparty time!\n\t\t</div></html>");
+		expect(&html[0].0.path.to_string_lossy()).to_end_with(
+			"beet/crates/beet_router/src/test_site/pages/contributing.rs",
+		);
+		expect(&html[0].1.render()).to_be("<!DOCTYPE html><html><head></head><body><div><h1>Beet</h1>\n\t\t\t\tparty time dude!\n\t\t</div></body></html>");
+		expect(&html[1].0.path.to_string_lossy()).to_end_with(
+			"beet/crates/beet_router/src/test_site/pages/index.rs",
+		);
+		expect(&html[1].1.render()).to_be("<!DOCTYPE html><html><head></head><body><div><h1>My Site</h1>\n\t\t\t\tparty time!\n\t\t</div></body></html>");
 	}
 }
