@@ -18,8 +18,9 @@ path = "src/main.rs"
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 beet_router = { workspace = true, features = ["parser"] }
 anyhow.workspace = true
-sweet = { workspace = true, features = ["fs"] }
+sweet = { workspace = true, features = ["fs", "server"] }
 clap.workspace = true
+tokio.workspace = true
 
 
 [dev-dependencies]

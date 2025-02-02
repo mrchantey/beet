@@ -38,11 +38,15 @@ runp crate example *args:
 test-site:
 	just runp beet_router test_site_router
 	just runp beet_router test_site_html
-	forky serve crates/beet_router/target/client
+	sweet serve crates/beet_router/target/client
 
 
 beet-site:
-	just cli serve -p beet_site --src crates/beet_site/src
+	just cli serve \
+	-p beet_site \
+	--src crates/beet_site/src \
+	--serve-dir crates/beet_site/target/client
+
 
 ## common
 cmd *args:

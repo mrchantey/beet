@@ -3,7 +3,7 @@ use std::process::Command;
 
 
 /// Verbatim clone of cargo run args
-#[derive(Debug, Parser)]
+#[derive(Debug, Clone, Parser)]
 #[command(name = "cargo-run")]
 pub struct CargoRun {
 	/// Error format
@@ -83,9 +83,13 @@ pub struct CargoRun {
 	/// Equivalent to specifying both --locked and --offline
 	#[arg(long)]
 	frozen: bool,
-    /// Arguments for the binary or example to run
+	/// Arguments for the binary or example to run
 	#[arg(trailing_var_arg = true)]
 	args: Vec<String>,
+}
+
+impl Default for CargoRun {
+	fn default() -> Self { Self::parse_from(&[""]) }
 }
 
 impl CargoRun {

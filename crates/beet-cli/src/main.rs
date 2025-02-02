@@ -17,9 +17,9 @@ struct Cli {
 enum Commands {
 	Serve(Serve),
 }
-
-fn main() -> Result<()> {
+#[tokio::main]
+async fn main() -> Result<()> {
 	match Cli::parse().command {
-		Commands::Serve(cmd) => cmd.run(),
+		Commands::Serve(cmd) => cmd.run().await,
 	}
 }

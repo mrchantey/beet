@@ -33,9 +33,9 @@ impl Default for ParseFileRouter {
 }
 
 impl ParseFileRouter {
-	fn src_dir(&self) -> &PathBuf { &self.src }
-	fn pages_dir(&self) -> PathBuf { self.src_dir().join(&self.pages_dir) }
-	fn file_router_path(&self) -> PathBuf {
+	pub fn src_dir(&self) -> &PathBuf { &self.src }
+	pub fn pages_dir(&self) -> PathBuf { self.src_dir().join(&self.pages_dir) }
+	pub fn file_router_path(&self) -> PathBuf {
 		self.src_dir().join(&self.file_router_path)
 	}
 
