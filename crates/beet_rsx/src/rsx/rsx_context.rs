@@ -29,39 +29,28 @@ pub struct RsxContext {
 	/// Simple counter that increments after any [RsxNode] is visited.
 	/// The nature of the algorithm means this will start with 1, so we
 	/// saturating_sub for the getter
-	node_idx: usize,
+	pub(super) node_idx: usize,
+	/// The number of components visited
+	pub(super) component_idx: usize,
 	/// the number of rsx rust blocks visited,
 	/// this is useful for hot reloading because it will not change
 	/// even if the html structure changes
-	block_idx: BlockIdx,
+	pub(super) block_idx: BlockIdx,
 	/// In the case of a rust block this is the parent element.
 	/// in the case of visiting an element this is the element itself
-	element_count: ElementIdx,
+	pub(super) element_count: ElementIdx,
 	/// the *uncollapsed* index of this block relative to its parent element.
 	/// That is the [RsxNode] child index, not the [HtmlNode] child index
 	/// which merges rust text blocks with static text blocks
-	child_idx: usize,
+	pub(super) child_idx: usize,
 }
 
 impl RsxContext {
 	pub fn node_idx(&self) -> usize { self.node_idx }
+	pub fn component_idx(&self) -> usize { self.component_idx }
 	pub fn block_idx(&self) -> usize { self.block_idx }
 	pub fn element_idx(&self) -> usize { self.element_count.saturating_sub(1) }
 	pub fn child_idx(&self) -> usize { self.child_idx }
-
-	pub fn new(
-		node_idx: usize,
-		block_idx: usize,
-		element_count: usize,
-		child_idx: usize,
-	) -> Self {
-		Self {
-			node_idx,
-			block_idx,
-			element_count,
-			child_idx,
-		}
-	}
 
 	fn before_visit_node(
 		&mut self,
@@ -92,6 +81,9 @@ impl RsxContext {
 			RsxNodeDiscriminants::Block => {
 				self.block_idx += 1;
 			}
+			RsxNodeDiscriminants::Component => {
+				self.component_idx += 1;
+			}
 			RsxNodeDiscriminants::Fragment => {}
 			RsxNodeDiscriminants::Element
 			| RsxNodeDiscriminants::Text
@@ -112,8 +104,10 @@ impl RsxContext {
 
 
 	pub fn to_csv(&self) -> String {
+		// must keep in sync with from_csv
 		vec![
 			self.node_idx.to_string(),
+			self.component_idx.to_string(),
 			self.block_idx.to_string(),
 			self.element_count.to_string(),
 			self.child_idx.to_string(),
@@ -122,27 +116,26 @@ impl RsxContext {
 	}
 	pub fn from_csv(csv: &str) -> ParseResult<Self> {
 		let mut parts = csv.split(',');
-		let node_idx = parts
-			.next()
-			.ok_or_else(|| ParseError::serde("missing rust node index"))?
-			.parse()?;
-		let block_idx = parts
-			.next()
-			.ok_or_else(|| ParseError::serde("missing rust node index"))?
-			.parse()?;
-		let element_idx = parts
-			.next()
-			.ok_or_else(|| ParseError::serde("missing rust node index"))?
-			.parse()?;
-		let child_idx = parts
-			.next()
-			.ok_or_else(|| ParseError::serde("missing rust node index"))?
-			.parse()?;
+		let mut next = || -> Result<usize, ParseError> {
+			let next = parts
+				.next()
+				.ok_or_else(|| ParseError::serde("invalid rsx context csv"))?
+				.parse()?;
+			Ok(next)
+		};
+
+		// must keep in sync with to_csv
+		let node_idx = next()?;
+		let component_idx = next()?;
+		let block_idx = next()?;
+		let element_count = next()?;
+		let child_idx = next()?;
 
 		Ok(Self {
 			node_idx,
+			component_idx,
 			block_idx,
-			element_count: element_idx,
+			element_count,
 			child_idx,
 		})
 	}
@@ -289,6 +282,7 @@ mod test {
 	fn csv() {
 		let a = RsxContext {
 			block_idx: 1,
+			component_idx: 2,
 			element_count: 2,
 			child_idx: 3,
 			node_idx: 4,
@@ -306,13 +300,20 @@ mod test {
 	}
 
 	#[test]
+	fn component_idx() {
+		expect(RsxContext::visit(&rsx! {<div></div>}, |_, _| {}).component_idx)
+			.to_be(0);
+		expect(RsxContext::visit(&rsx! {<Child/>}, |_, _| {}).component_idx)
+			.to_be(1);
+	}
+	#[test]
 	fn rust_blocks() {
 		expect(RsxContext::visit(&rsx! {<div></div>}, |_, _| {}).block_idx)
 			.to_be(0);
 		expect(
 			RsxContext::visit(&rsx! {{7}{8}{9}<Child/>}, |_, _| {}).block_idx,
 		)
-		.to_be(4);
+		.to_be(3);
 	}
 
 	#[test]
@@ -358,30 +359,35 @@ mod test {
 		expect(&bucket).to_have_been_called_times(5);
 		expect(&bucket).to_have_returned_nth_with(0, &RsxContext {
 			node_idx: 1,
+			component_idx: 0,
 			block_idx: 0,
 			element_count: 1,
 			child_idx: 0,
 		});
 		expect(&bucket).to_have_returned_nth_with(1, &RsxContext {
 			node_idx: 2,
+			component_idx: 0,
 			block_idx: 0,
 			element_count: 2,
 			child_idx: 0,
 		});
 		expect(&bucket).to_have_returned_nth_with(2, &RsxContext {
 			node_idx: 3,
+			component_idx: 0,
 			block_idx: 0,
 			element_count: 3,
 			child_idx: 1,
 		});
 		expect(&bucket).to_have_returned_nth_with(3, &RsxContext {
 			node_idx: 4,
+			component_idx: 0,
 			block_idx: 0,
 			element_count: 3,
 			child_idx: 0,
 		});
 		expect(&bucket).to_have_returned_nth_with(4, &RsxContext {
 			node_idx: 5,
+			component_idx: 0,
 			block_idx: 0,
 			element_count: 3,
 			child_idx: 0,

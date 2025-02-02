@@ -4,15 +4,10 @@ use strum_macros::EnumDiscriminants;
 
 
 
-
+// TODO return result, this can certainly be fallible
 pub type RegisterEffect = Box<dyn FnOnce(&RsxContext)>;
 
 
-
-/// This struct represents one of the core concepts of sweet rsx!
-///
-// #[derive(Debug, Clone, PartialEq)]
-// #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[derive(AsRefStr, EnumDiscriminants)]
 pub enum RsxNode {
 	/// A transparent node that simply contains children
@@ -27,6 +22,10 @@ pub enum RsxNode {
 	/// may have been Text or RawText
 	Text(String),
 	Element(RsxElement),
+	Component {
+		tag: String,
+		node: Box<RsxNode>,
+	},
 }
 
 impl Default for RsxNode {
@@ -52,6 +51,11 @@ impl std::fmt::Debug for RsxNode {
 			Self::Element(arg0) => {
 				f.debug_tuple("Element").field(arg0).finish()
 			}
+			Self::Component { tag, node } => f
+				.debug_struct("Component")
+				.field("tag", tag)
+				.field("node", node)
+				.finish(),
 		}
 	}
 }

@@ -4,6 +4,8 @@ pub use rsx_context::*;
 pub use rsx_node::*;
 pub use text_block_encoder::*;
 mod text_block_encoder;
+pub use rsx_context_map::*;
+mod rsx_context_map;
 
 pub trait Rsx {
 	fn into_rsx(self) -> RsxNode;

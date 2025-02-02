@@ -8,15 +8,18 @@ pub enum RsxNodeTokens<T> {
 	Doctype,
 	Text(String),
 	Comment(String),
-	Block(TokenStream),
+	Fragment(Vec<RsxNodeTokens<T>>),
+	Component {
+		tag: String,
+		tokens: TokenStream,
+	},
 	Element {
 		tag: String,
 		attributes: Vec<RsxAttributeTokens<T>>,
 		children: Vec<RsxNodeTokens<T>>,
 		self_closing: bool,
 	},
-	Fragment(Vec<RsxNodeTokens<T>>),
-	Component(TokenStream),
+	Block(TokenStream),
 }
 
 impl<T> RsxNodeTokens<T> {
@@ -60,49 +63,29 @@ impl<T: RsxRustTokens> ToTokens for RsxNodeTokens<T> {
 				children,
 				self_closing,
 			} => {
-				let children = children_to_tokens(children);
+				let children =
+					children.iter().map(|child| child.to_token_stream());
+				// let children = children_to_tokens(children);
 				quote!(RsxNode::Element(RsxElement {
 					tag: #tag.to_string(),
 					attributes: vec![#(#attributes),*],
-					children: #children,
+					children: vec![#(#children),*],
 					self_closing: #self_closing,
 				}))
 			}
 			RsxNodeTokens::Fragment(vec) => {
 				quote!(RsxNode::Fragment(Vec::from([#(#vec),*])))
 			}
-			RsxNodeTokens::Component(token_stream) => quote!(#token_stream),
+			RsxNodeTokens::Component { tag, tokens } => quote!({
+				RsxNode::Component{
+					tag: #tag.to_string(),
+					node: Box::new(#tokens)
+				}
+			}),
 		}
 		.to_tokens(tokens);
 	}
 }
-
-/// Map children to tokens,
-/// flattening fragments and components
-fn children_to_tokens<T: RsxRustTokens>(
-	children: &Vec<RsxNodeTokens<T>>,
-) -> TokenStream {
-	let add = children.into_iter().map(|child| match child {
-		RsxNodeTokens::Phantom(_) => unreachable!(),
-		RsxNodeTokens::Fragment(children) => {
-			let children = children_to_tokens(children);
-			quote!(vec.extend(#children);)
-		}
-		RsxNodeTokens::Component(component) => quote!(vec.push(#component)),
-		RsxNodeTokens::Block(block) => {
-			let block = T::map_node_block(block);
-			quote!(vec.push(#block))
-		}
-		_ => quote!(vec.push(#child)),
-	});
-
-	quote!({
-		let mut vec = Vec::new();
-		#(#add;)*
-		vec
-	})
-}
-
 pub enum RsxAttributeTokens<T> {
 	Phantom(std::marker::PhantomData<T>),
 	Key { key: String },

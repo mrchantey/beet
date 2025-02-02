@@ -1,6 +1,7 @@
 use super::self_closing_elements;
 use super::RsxAttributeTokens;
 use super::RsxNodeTokens;
+use crate::prelude::*;
 use proc_macro2::TokenStream;
 use proc_macro2_diagnostics::Diagnostic;
 use proc_macro2_diagnostics::Level;
@@ -13,7 +14,6 @@ use rstml::node::NodeFragment;
 use rstml::node::NodeName;
 use std::collections::HashMap;
 use std::collections::HashSet;
-use crate::prelude::*;
 use syn::spanned::Spanned;
 
 #[derive(Debug, Clone)]
@@ -85,7 +85,6 @@ impl<T: RsxRustTokens> RstmlToRsx<T> {
 				let is_component = tag.starts_with(|c: char| c.is_uppercase());
 				if is_component {
 					self.map_component(&tag, &open_tag.attributes, children)
-					// vec![RsxNode::Component(children)]
 				} else {
 					let attributes = open_tag
 						.attributes
@@ -134,7 +133,10 @@ impl<T: RsxRustTokens> RstmlToRsx<T> {
 				}
 				.into_rsx()#children_slot
 		};
-		RsxNodeTokens::Component(rsx_node)
+		RsxNodeTokens::Component {
+			tag: tag.to_string(),
+			tokens: rsx_node,
+		}
 	}
 
 	fn check_self_closing_children<C>(&mut self, element: &NodeElement<C>) {

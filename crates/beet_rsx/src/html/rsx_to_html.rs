@@ -38,6 +38,7 @@ impl RsxToHtml {
 			RsxNode::Doctype => {
 				vec![HtmlNode::Doctype]
 			}
+			RsxNode::Component { node, .. } => self.map_node(node),
 			RsxNode::Comment(str) => {
 				vec![HtmlNode::Comment(str.clone())]
 			}

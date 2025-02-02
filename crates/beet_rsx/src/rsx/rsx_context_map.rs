@@ -121,9 +121,26 @@ mod test {
 			.into_iter()
 			.collect(),
 		);
-
-		expect(&map.rust_blocks[0]).to_be(&RsxContext::new(3, 0, 1, 1));
-		expect(&map.rust_blocks[1]).to_be(&RsxContext::new(5, 1, 1, 2));
-		expect(&map.rust_blocks[2]).to_be(&RsxContext::new(7, 2, 2, 3));
+		expect(&map.rust_blocks[0]).to_be(&RsxContext {
+			node_idx: 3,
+			component_idx: 0,
+			block_idx: 0,
+			element_count: 1,
+			child_idx: 1,
+		});
+		expect(&map.rust_blocks[1]).to_be(&RsxContext {
+			node_idx: 5,
+			component_idx: 0,
+			block_idx: 1,
+			element_count: 1,
+			child_idx: 2,
+		});
+		expect(&map.rust_blocks[2]).to_be(&RsxContext {
+			node_idx: 7,
+			component_idx: 0,
+			block_idx: 2,
+			element_count: 2,
+			child_idx: 3,
+		});
 	}
 }

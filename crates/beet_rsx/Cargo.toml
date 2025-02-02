@@ -13,7 +13,8 @@ keywords.workspace = true
 
 
 [features]
-default = ["macros"]
+default = ["macros", "css"]
+css = ["dep:lightningcss", "dep:parcel_selectors"]
 macros = ["dep:beet_rsx_macros"]
 parser = ["dep:beet_rsx_parser"]
 serde = ["dep:serde"]
@@ -32,6 +33,9 @@ prettyplease.workspace = true
 once_cell.workspace = true
 serde = { workspace = true, optional = true }
 http.workspace = true
+
+parcel_selectors = { version = "0.28", optional = true }
+lightningcss = { version = "1.0.0-alpha.63", optional = true }
 
 #💡 native
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
