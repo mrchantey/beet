@@ -89,16 +89,21 @@ impl<T: 'static> StaticFileRouter<T> {
 		Ok(html)
 	}
 
+	/// map the routes to html and save to disk
 	pub async fn routes_to_html_files(&self) -> Result<()> {
-		FsExt::remove(&self.dst_dir.canonicalize()?)?;
+		FsExt::remove(&self.dst_dir).ok();
 		let html = self.routes_to_html().await?;
 		let src = self.src_dir.to_string_lossy();
 		let dst = self.dst_dir.to_string_lossy();
 		for (info, doc) in html {
 			let mut path = info.path.clone();
-			path.set_extension("");
-			path.push("index.html");
-
+			if path.file_stem().map(|s| s == "index").unwrap_or(false) {
+				path.set_extension("html");
+			} else {
+				// routers expect index.html for any path without an extension
+				path.set_extension("");
+				path.push("index.html");
+			}
 			let path = path.to_string_lossy();
 			let path = path.replace(&*src, &dst);
 			let path = path.replace("pages/", "");
