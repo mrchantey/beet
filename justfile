@@ -33,6 +33,17 @@ runp crate example *args:
 	cargo run -p {{crate}} --example {{example}} {{args}}
 
 
+#💡 HTML
+
+test-site:
+	just runp beet_router test_site_router
+	just runp beet_router test_site_html
+	forky serve crates/beet_router/target/client
+
+
+beet-site:
+	just cli serve -p beet_site --src crates/beet_site/src
+
 ## common
 cmd *args:
 	cd /cygdrive/c/work/beet && {{args}}

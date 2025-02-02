@@ -96,8 +96,12 @@ impl<T: 'static> StaticFileRouter<T> {
 		let src = self.src_dir.to_string_lossy();
 		let dst = self.dst_dir.to_string_lossy();
 		for (info, doc) in html {
-			let path = info.path.to_string_lossy();
+			let mut path = info.path.clone();
+
+			path.set_extension("html");
+			let path = path.to_string_lossy();
 			let path = path.replace(&*src, &dst);
+			let path = path.replace("pages/", "");
 			ReadFile::write(&path, &doc.render())?;
 		}
 		Ok(())
