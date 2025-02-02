@@ -78,14 +78,17 @@ impl<T: 'static> StaticFileRouter<T> {
 	pub async fn routes_to_html(
 		&self,
 	) -> Result<Vec<(RouteInfo, HtmlDocument)>> {
+		let scoped_style = ScopedStyle::default();
 		let html = self
 			.routes_to_rsx()
 			.await?
 			.into_iter()
-			.map(|(p, f)| {
-				(p, RsxToHtml::default().map_node(&f).into_document())
+			.map(|(p, mut node)| {
+				scoped_style.apply(&mut node)?;
+				let doc = RsxToHtml::default().map_node(&node).into_document();
+				Ok((p, doc))
 			})
-			.collect::<Vec<(RouteInfo, HtmlDocument)>>();
+			.collect::<Result<Vec<(RouteInfo, HtmlDocument)>>>()?;
 		Ok(html)
 	}
 

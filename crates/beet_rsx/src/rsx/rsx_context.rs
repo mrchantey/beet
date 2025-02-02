@@ -140,6 +140,7 @@ impl RsxContext {
 		})
 	}
 	/// Depth-first traversal of the tree
+	/// identical impl to visit_mut
 	pub fn visit(
 		node: &RsxNode,
 		mut func: impl FnMut(&Self, &RsxNode),
@@ -177,8 +178,7 @@ impl RsxContext {
 	}
 
 	/// Breadth-first traversal of the rsx tree
-	/// identical impl to visit	/// identical impl to visit_mut
-
+	/// identical impl to visit
 	pub fn visit_mut(
 		node: &mut RsxNode,
 		mut func: impl FnMut(&Self, &mut RsxNode),
