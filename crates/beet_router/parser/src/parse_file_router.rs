@@ -90,7 +90,7 @@ impl ParseFileRouter {
 
 	pub fn build_and_write(&self) -> Result<()> {
 		let data = self.build_string()?;
-		ReadFile::write(self.file_router_path(), &data)?;
+		FsExt::write(self.file_router_path(), &data)?;
 		Ok(())
 	}
 }
