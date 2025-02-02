@@ -56,7 +56,7 @@ beet-site:
 	just cli serve \
 	-p beet_site \
 	--src crates/beet_site/src \
-	--serve-dir crates/beet_site/target/client
+	--serve-dir target/client
 
 
 ## common

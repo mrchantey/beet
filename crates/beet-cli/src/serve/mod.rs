@@ -23,7 +23,7 @@ impl Serve {
 
 		let cargo_run = std::mem::take(&mut self.cargo_run);
 		let watch_dir = self.parse_file_router.src;
-		tokio::spawn(async move {
+		let watcher_handle = tokio::spawn(async move {
 			FsWatcher::new()
 				.with_path(watch_dir.to_string_lossy().to_string())
 				.watch_async(|_| {
@@ -41,6 +41,8 @@ impl Serve {
 		};
 
 		server.run().await?;
+		watcher_handle.abort();
+
 		Ok(())
 	}
 }

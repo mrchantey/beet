@@ -92,6 +92,8 @@ impl<T: 'static> StaticFileRouter<T> {
 	/// map the routes to html and save to disk
 	pub async fn routes_to_html_files(&self) -> Result<()> {
 		let dst = &self.dst_dir;
+		// in debug mode this breaks FsWatcher
+		#[cfg(not(debug_assertions))]
 		FsExt::remove(&dst).ok();
 		let html = self.routes_to_html().await?;
 		std::fs::create_dir_all(&dst)?;
