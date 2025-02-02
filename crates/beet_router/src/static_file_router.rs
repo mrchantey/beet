@@ -91,8 +91,11 @@ impl<T: 'static> StaticFileRouter<T> {
 
 	/// map the routes to html and save to disk
 	pub async fn routes_to_html_files(&self) -> Result<()> {
-		FsExt::remove(&self.dst_dir).ok();
+		let dst = &self.dst_dir;
+		FsExt::remove(&dst).ok();
 		let html = self.routes_to_html().await?;
+		std::fs::create_dir_all(&dst)?;
+		let dst = dst.canonicalize()?;
 		for (info, doc) in html {
 			let mut path = info.path.clone();
 			if path.file_stem().map(|s| s == "index").unwrap_or(false) {
@@ -102,13 +105,8 @@ impl<T: 'static> StaticFileRouter<T> {
 				path.set_extension("");
 				path.push("index.html");
 			}
-			let full_path = self.dst_dir.join(&path);
-			println!(
-				"writing:\n{}\n{}",
-				self.dst_dir.display(),
-				full_path.display(),
-				// self.dst_dir.join(full_path).display()
-			);
+			path = path.strip_prefix("/").unwrap().to_path_buf();
+			let full_path = &dst.join(path);
 			FsExt::write(&full_path, &doc.render())?;
 		}
 		Ok(())

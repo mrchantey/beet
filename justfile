@@ -49,7 +49,7 @@ leptosfmt *args:
 test-site:
 	just runp beet_router test_site_router
 	just runp beet_router test_site_html
-	sweet serve crates/beet_router/target/client
+	sweet serve target/test_site
 
 
 beet-site:
