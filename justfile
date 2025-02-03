@@ -24,13 +24,13 @@ init-repo:
 cli *args:
 	cargo run -p beet-cli -- {{args}}
 
-run example *args:
+run-ex example *args:
 	just watch 'just run-ci {{example}} {{args}}'
 
 run-ci example *args:
 	cargo run --example {{example}} {{args}}
 
-runp crate example *args:
+run crate example *args:
 	just watch cargo run -p {{crate}} --example {{example}} {{args}}
 
 
@@ -219,7 +219,7 @@ assets-pull:
 expand-rsx:
 	just watch cargo expand -p beet_rsx --example rsx_macro
 expand-reverse-rsx:
-	just watch cargo expand -p beet_rsx --example reverse_rsx_macro
+	just watch cargo expand -p beet_rsx --example rsx_template_macro
 
 wasm-example:
 	forky serve | \

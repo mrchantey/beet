@@ -1,8 +1,8 @@
-mod reverse_rsx;
-mod reverse_rsx_node;
+mod rsx_template_io;
+mod rsx_template_node;
 mod scoped_style;
-pub use reverse_rsx_node::*;
-pub use reverse_rsx::*;
+pub use rsx_template_io::*;
+pub use rsx_template_node::*;
 pub use scoped_style::*;
 mod rsx_context;
 pub use rsx_context::*;
@@ -79,4 +79,3 @@ impl<T: FnOnce() -> U, U: Rsx> Component for T {
 impl<T: Component> Rsx for T {
 	fn into_rsx(self) -> RsxNode { self.render().into_rsx() }
 }
-

@@ -1,9 +1,9 @@
-mod rstml_to_reverse_rsx;
+mod rstml_to_rsx_template;
 mod utils;
 pub use utils::*;
 pub mod tokens_to_rstml;
 #[allow(unused_imports)]
-pub use self::rstml_to_reverse_rsx::*;
+pub use self::rstml_to_rsx_template::*;
 pub use self::tokens_to_rstml::*;
 mod rsx_rust_tokens;
 pub use rsx_rust_tokens::*;

@@ -40,7 +40,7 @@ impl RstmlToRsx {
 
 	pub fn location_hash(&self, span: impl Spanned) -> TokenStream {
 		if self.hash_location {
-			let tokens = location_hash_tokens(&span.span());
+			let tokens = span_to_line_col(&span.span());
 			quote! {Some(#tokens)}
 		} else {
 			quote! {None}

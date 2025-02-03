@@ -8,25 +8,25 @@ use sweet::prelude::ReadFile;
 
 
 #[derive(Debug, Parser)]
-pub struct BuildHtmlPartials {
+pub struct BuildRsxTemplates {
 	#[arg(long, default_value = "src")]
 	pub src: PathBuf,
-	#[arg(long, default_value = "target/html-partials")]
+	#[arg(long, default_value = "target/rsx-templates.bin")]
 	pub dst: PathBuf,
 }
 
 
 
-impl Default for BuildHtmlPartials {
+impl Default for BuildRsxTemplates {
 	fn default() -> Self { clap::Parser::parse_from(&[""]) }
 }
 
-impl BuildHtmlPartials {
+impl BuildRsxTemplates {
 	pub fn run(&self) -> Result<()> {
 		ReadDir::files_recursive(&self.src)?
-		.into_iter()
-		.map(|path| self.file_to_partial(path))
-		.collect::<Result<Vec<_>>>()?;
+			.into_iter()
+			.map(|path| self.file_to_partial(path))
+			.collect::<Result<Vec<_>>>()?;
 		Ok(())
 	}
 

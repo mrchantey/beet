@@ -3,9 +3,10 @@ use anyhow::Result;
 use strum_macros::AsRefStr;
 use strum_macros::EnumDiscriminants;
 
-/// File location of an rsx macro, used by [ReverseRsx]
+/// File location of an rsx macro, used by [RsxTemplate]
 /// to reconcile rsx nodes with html partials
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct RsxLocation {
 	/// in the macro this is set via file!(),
 	/// in the cli its set via the file path,
@@ -37,14 +38,11 @@ pub struct Effect {
 	/// the location of the effect in the rsx macro,
 	/// this may or may not be populated depending
 	/// on the settings of the parser
-	pub location: Option<RustLocationHash>,
+	pub location: Option<LineColumn>,
 }
 
 impl Effect {
-	pub fn new(
-		register: RegisterEffect,
-		location: Option<RustLocationHash>,
-	) -> Self {
+	pub fn new(register: RegisterEffect, location: Option<LineColumn>) -> Self {
 		Self { register, location }
 	}
 
@@ -68,7 +66,7 @@ impl std::fmt::Debug for Effect {
 #[derive(Debug, AsRefStr, EnumDiscriminants)]
 pub enum RsxNode {
 	/// The root node of an rsx! macro.
-	/// The location is used for [ReverseRsx]
+	/// The location is used for [RsxTemplate]
 	Root {
 		nodes: Vec<RsxNode>,
 		location: RsxLocation,
@@ -345,7 +343,7 @@ mod test {
 			let Some(location) = &effect.location else {
 				panic!()
 			};
-			location.inner()
+			location.to_hash()
 		}
 		#[rustfmt::skip]
 		expect(get_hash(rsx! {{39}})).not().to_be(get_hash(rsx! {{39}}));

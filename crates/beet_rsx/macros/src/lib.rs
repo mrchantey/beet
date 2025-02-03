@@ -40,11 +40,11 @@ pub fn rsx(tokens: TokenStream) -> TokenStream {
 }
 
 
-/// This macro expands to a Vec<ReverseRsxNode>, it is used for
+/// This macro expands to a Vec<RsxTemplateNode>, it is used for
 /// things like hot reloading.
 #[proc_macro]
-pub fn reverse_rsx(tokens: TokenStream) -> TokenStream {
-	RstmlToReverseRsx::default()
+pub fn rsx_template(tokens: TokenStream) -> TokenStream {
+	RstmlToRsxTemplate::default()
 		.map_tokens(tokens.into())
 		.into()
 }
