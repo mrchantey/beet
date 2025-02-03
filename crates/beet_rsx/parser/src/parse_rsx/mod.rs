@@ -1,4 +1,6 @@
 mod rstml_to_reverse_rsx;
+mod utils;
+pub use utils::*;
 pub mod tokens_to_rstml;
 #[allow(unused_imports)]
 pub use self::rstml_to_reverse_rsx::*;

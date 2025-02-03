@@ -30,6 +30,8 @@ fn idents() -> RsxIdents {
 #[proc_macro]
 pub fn rsx(tokens: TokenStream) -> TokenStream {
 	RstmlToRsx {
+		// perhaps we can feature gate this if it proves expensive
+		hash_location: true,
 		idents: idents(),
 		..Default::default()
 	}

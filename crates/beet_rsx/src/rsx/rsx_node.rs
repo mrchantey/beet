@@ -37,24 +37,15 @@ pub struct Effect {
 	/// the location of the effect in the rsx macro,
 	/// this may or may not be populated depending
 	/// on the settings of the parser
-	pub location: Option<RsxLocation>,
+	pub location: Option<RustLocationHash>,
 }
 
 impl Effect {
-	pub fn new(register: RegisterEffect) -> Self {
-		Self {
-			register,
-			location: None,
-		}
-	}
-	pub fn new_with_location(
+	pub fn new(
 		register: RegisterEffect,
-		location: RsxLocation,
+		location: Option<RustLocationHash>,
 	) -> Self {
-		Self {
-			register,
-			location: Some(location),
-		}
+		Self { register, location }
 	}
 
 	/// call the FnOnce register func and replace it
@@ -332,7 +323,7 @@ mod test {
 	use sweet::prelude::*;
 
 	#[test]
-	fn location() {
+	fn root_location() {
 		let line = line!();
 		let node = rsx! {<div>hello world</div>};
 		let RsxNode::Root { location, .. } = node else {
@@ -341,5 +332,22 @@ mod test {
 		expect(location.file()).to_be("crates/beet_rsx/src/rsx/rsx_node.rs");
 		expect(location.line()).to_be((line + 1) as usize);
 		expect(location.col()).to_be(19);
+	}
+	#[test]
+	fn block_location() {
+		fn get_hash(node: RsxNode) -> u64 {
+			let RsxNode::Root { nodes, .. } = node else {
+				panic!()
+			};
+			let RsxNode::Block { effect, .. } = &nodes[0] else {
+				panic!()
+			};
+			let Some(location) = &effect.location else {
+				panic!()
+			};
+			location.inner()
+		}
+		#[rustfmt::skip]
+		expect(get_hash(rsx! {{39}})).not().to_be(get_hash(rsx! {{39}}));
 	}
 }

@@ -18,6 +18,7 @@ use syn::spanned::Spanned;
 /// Convert rstml nodes to a Vec<RsxNode> token stream
 #[derive(Debug, Default, Clone)]
 pub struct RstmlToRsx {
+	pub hash_location: bool,
 	pub idents: RsxIdents,
 	// Additional error and warning messages.
 	pub errors: Vec<TokenStream>,
@@ -34,6 +35,15 @@ impl RstmlToRsx {
 		Self {
 			idents,
 			..Default::default()
+		}
+	}
+
+	pub fn location_hash(&self, span: impl Spanned) -> TokenStream {
+		if self.hash_location {
+			let tokens = location_hash_tokens(&span.span());
+			quote! {Some(#tokens)}
+		} else {
+			quote! {None}
 		}
 	}
 
@@ -82,12 +92,13 @@ impl RstmlToRsx {
 			Node::Block(block) => {
 				let ident = &self.idents.effect;
 				// block is a {block} so assign to a value to unwrap
+				let location = self.location_hash(&block);
 				quote! {
 					{
 						let value = #block;
 						RsxNode::Block {
 							initial: Box::new(value.clone().into_rsx()),
-							effect: Effect::new(#ident::register_block(value)),
+							effect: Effect::new(#ident::register_block(value), #location),
 						}
 					}
 				}
@@ -237,10 +248,11 @@ impl RstmlToRsx {
 		let ident = &self.idents.effect;
 		match attr {
 			NodeAttribute::Block(block) => {
+				let location = self.location_hash(&block);
 				quote! {
 					RsxAttribute::Block{
 						initial: vec![#block.clone().into_rsx()],
-						effect: Effect::new(#ident::register_attribute_block(#block))
+						effect: Effect::new(#ident::register_attribute_block(#block), #location)
 					}
 				}
 			}
@@ -266,6 +278,7 @@ impl RstmlToRsx {
 								block.span(),
 							);
 							let register_event = &self.idents.event;
+							let location = self.location_hash(&block);
 							quote! {
 								RsxAttribute::BlockValue {
 									key: #key.to_string(),
@@ -273,15 +286,16 @@ impl RstmlToRsx {
 									effect: Effect::new(Box::new(move |cx| {
 										#register_event::#register_func(#key,cx,#block);
 										Ok(())
-									}))
+									}), #location)
 								}
 							}
 						} else {
+							let location = self.location_hash(&block);
 							quote! {
 								RsxAttribute::BlockValue{
 									key: #key.to_string(),
 									initial: #block.clone().into_attribute_value(),
-									effect: Effect::new(#ident::register_attribute_value(#key, #block))
+									effect: Effect::new(#ident::register_attribute_value(#key, #block), #location)
 								}
 							}
 						}

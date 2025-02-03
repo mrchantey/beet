@@ -1,5 +1,4 @@
-use crate::prelude::tokens_to_rstml;
-use proc_macro2::Span;
+use crate::prelude::*;
 use proc_macro2::TokenStream;
 use quote::quote;
 use quote::ToTokens;
@@ -8,18 +7,7 @@ use rstml::node::NodeAttribute;
 use rstml::node::NodeComment;
 use rstml::node::NodeElement;
 use rstml::node::NodeText;
-use std::hash::DefaultHasher;
-use std::hash::Hash;
-use std::hash::Hasher;
 use syn::spanned::Spanned;
-
-/// Hash a span based on the start location
-pub fn span_to_hash(span: &Span) -> TokenStream {
-	let mut hash = DefaultHasher::new();
-	span.start().hash(&mut hash);
-	let hash = hash.finish();
-	quote! {RustLocationHash::new(#hash)}
-}
 
 /// Convert rstml nodes to serializable html nodes.
 /// Rust block token streams will be hashed by [Span::start]
@@ -62,7 +50,7 @@ impl RstmlToReverseRsx {
 				}
 			}
 			Node::Block(node_block) => {
-				let hash = span_to_hash(&node_block.span());
+				let hash = location_hash_tokens(&node_block.span());
 				quote! {ReverseRsxNode::RustBlock(#hash)}
 			}
 			Node::Text(NodeText { value }) => {
@@ -94,7 +82,7 @@ impl RstmlToReverseRsx {
 				if is_component {
 					// components disregard all the context, they are known
 					// to the rsx node
-					let hash = span_to_hash(&span);
+					let hash = location_hash_tokens(&span);
 					quote! {
 						ReverseRsxNode::Component {
 							hash: #hash,
@@ -121,7 +109,7 @@ impl RstmlToReverseRsx {
 	fn map_attribute(&self, attr: NodeAttribute) -> TokenStream {
 		match attr {
 			NodeAttribute::Block(block) => {
-				let hash = span_to_hash(&block.span());
+				let hash = location_hash_tokens(&block.span());
 				quote! {ReverseRsxAttribute::Block(#hash)}
 			}
 			NodeAttribute::Attribute(attr) => {
@@ -143,7 +131,7 @@ impl RstmlToReverseRsx {
 						}
 					}
 					Some(tokens) => {
-						let hash = span_to_hash(&tokens.span());
+						let hash = location_hash_tokens(&tokens.span());
 						quote! {
 							ReverseRsxAttribute::BlockValue {
 								key: #key.to_string(),
