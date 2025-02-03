@@ -3,9 +3,11 @@
 #![cfg_attr(test, test_runner(sweet::test_runner))]
 pub mod compile_check;
 pub mod routes_mod;
+pub mod html_partials;
 
 
 pub mod prelude {
 	pub use crate::compile_check::*;
 	pub use crate::routes_mod::*;
+	pub use crate::html_partials::*;
 }

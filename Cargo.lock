@@ -5240,9 +5240,9 @@ checksum = "1261fe7e33c73b354eab43b1273a57c8f967d0391e80353e51f764ac02cf6775"
 
 [[package]]
 name = "openssl"
-version = "0.10.69"
+version = "0.10.70"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f5e534d133a060a3c19daec1eb3e98ec6f4685978834f2dbadfe2ec215bab64e"
+checksum = "61cfb4e166a8bb8c9b55c500bc2308550148ece889be90f609377e58140f42c6"
 dependencies = [
  "bitflags 2.8.0",
  "cfg-if",
@@ -5272,9 +5272,9 @@ checksum = "d05e27ee213611ffe7d6348b942e8f942b37114c00cc03cec254295a4a17852e"
 
 [[package]]
 name = "openssl-sys"
-version = "0.9.104"
+version = "0.9.105"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "45abf306cbf99debc8195b66b7346498d7b10c210de50418b5ccd7ceba08c741"
+checksum = "8b22d5b84be05a8d6947c7cb71f7c849aa0f112acd4bf51c2a7c1c988ac0a9dc"
 dependencies = [
  "cc",
  "libc",
@@ -6623,7 +6623,7 @@ dependencies = [
 [[package]]
 name = "sweet"
 version = "0.3.0-rc.3"
-source = "git+https://github.com/mrchantey/sweet#4b52361eb157e5341242cdced728157ba7c20d18"
+source = "git+https://github.com/mrchantey/sweet#bdd5e856df1402dd79e85d75da4e0f09004eba2c"
 dependencies = [
  "sweet_bevy",
  "sweet_fs",
@@ -6636,7 +6636,7 @@ dependencies = [
 [[package]]
 name = "sweet_bevy"
 version = "0.3.0-rc.3"
-source = "git+https://github.com/mrchantey/sweet#4b52361eb157e5341242cdced728157ba7c20d18"
+source = "git+https://github.com/mrchantey/sweet#bdd5e856df1402dd79e85d75da4e0f09004eba2c"
 dependencies = [
  "anyhow",
  "bevy",
@@ -6652,7 +6652,7 @@ dependencies = [
 [[package]]
 name = "sweet_fs"
 version = "0.3.0-rc.3"
-source = "git+https://github.com/mrchantey/sweet#4b52361eb157e5341242cdced728157ba7c20d18"
+source = "git+https://github.com/mrchantey/sweet#bdd5e856df1402dd79e85d75da4e0f09004eba2c"
 dependencies = [
  "anyhow",
  "clap",
@@ -6670,7 +6670,7 @@ dependencies = [
 [[package]]
 name = "sweet_server"
 version = "0.3.0-rc.3"
-source = "git+https://github.com/mrchantey/sweet#4b52361eb157e5341242cdced728157ba7c20d18"
+source = "git+https://github.com/mrchantey/sweet#bdd5e856df1402dd79e85d75da4e0f09004eba2c"
 dependencies = [
  "anyhow",
  "axum",
@@ -6693,7 +6693,7 @@ dependencies = [
 [[package]]
 name = "sweet_test"
 version = "0.3.0-rc.3"
-source = "git+https://github.com/mrchantey/sweet#4b52361eb157e5341242cdced728157ba7c20d18"
+source = "git+https://github.com/mrchantey/sweet#bdd5e856df1402dd79e85d75da4e0f09004eba2c"
 dependencies = [
  "anyhow",
  "backtrace",
@@ -6725,7 +6725,7 @@ dependencies = [
 [[package]]
 name = "sweet_test_macros"
 version = "0.3.0-rc.3"
-source = "git+https://github.com/mrchantey/sweet#4b52361eb157e5341242cdced728157ba7c20d18"
+source = "git+https://github.com/mrchantey/sweet#bdd5e856df1402dd79e85d75da4e0f09004eba2c"
 dependencies = [
  "anyhow",
  "proc-macro2",
@@ -6736,7 +6736,7 @@ dependencies = [
 [[package]]
 name = "sweet_utils"
 version = "0.3.0-rc.3"
-source = "git+https://github.com/mrchantey/sweet#4b52361eb157e5341242cdced728157ba7c20d18"
+source = "git+https://github.com/mrchantey/sweet#bdd5e856df1402dd79e85d75da4e0f09004eba2c"
 dependencies = [
  "anyhow",
  "bevy",
@@ -6753,7 +6753,7 @@ dependencies = [
 [[package]]
 name = "sweet_web"
 version = "0.3.0-rc.3"
-source = "git+https://github.com/mrchantey/sweet#4b52361eb157e5341242cdced728157ba7c20d18"
+source = "git+https://github.com/mrchantey/sweet#bdd5e856df1402dd79e85d75da4e0f09004eba2c"
 dependencies = [
  "anyhow",
  "console_error_panic_hook",
