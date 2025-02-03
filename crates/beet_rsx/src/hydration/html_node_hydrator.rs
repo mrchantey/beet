@@ -76,7 +76,7 @@ fn apply_rsx(
 		RsxNode::Component { tag, node } => todo!(),
 		RsxNode::Block {
 			initial,
-			register_effect,
+			effect,
 		} => todo!(),
 		RsxNode::Element(rsx_element) => todo!(),
 		RsxNode::Text(text) => {

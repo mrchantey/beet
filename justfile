@@ -31,7 +31,7 @@ run-ci example *args:
 	cargo run --example {{example}} {{args}}
 
 runp crate example *args:
-	cargo run -p {{crate}} --example {{example}} {{args}}
+	just watch cargo run -p {{crate}} --example {{example}} {{args}}
 
 
 fmt *args:

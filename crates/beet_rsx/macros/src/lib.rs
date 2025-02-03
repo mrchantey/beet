@@ -1,18 +1,20 @@
 use beet_rsx_parser::prelude::*;
 use proc_macro::TokenStream;
 
+/// Demonstrates how to select a different reactive runtime
 /// this is quite unsophisticated at the moment, we can work on a nicer
 /// way to expose it to library authors
-struct ParseStrategy;
-
-impl RsxRustTokens for ParseStrategy {
-	fn ident() -> proc_macro2::TokenStream {
-		#[cfg(feature = "signals")]
-		return quote::quote! {beet::rsx::signals_rsx::SignalsRsx};
-		#[cfg(not(feature = "signals"))]
-		return quote::quote! {beet::rsx::string_rsx::StringRsx};
+#[allow(unused_mut)]
+fn idents() -> RsxIdents {
+	let mut idents = RsxIdents::default();
+	#[cfg(not(feature = "signals"))]
+	{
+		idents.effect = syn::parse_quote!(beet::rsx::string_rsx::StringRsx);
 	}
+	idents
 }
+
+
 
 /// This macro expands to an [RsxNode](beet_rsx::prelude::RsxNode).
 ///
@@ -27,11 +29,12 @@ impl RsxRustTokens for ParseStrategy {
 ///
 #[proc_macro]
 pub fn rsx(tokens: TokenStream) -> TokenStream {
-	let mut tokens: proc_macro2::TokenStream = tokens.into();
-	let _output = RsxParser::<ParseStrategy>::default().parse_rsx(&mut tokens);
-	// output is used by other parsers but for the macro
-	// the errors are included in the token stream
-	tokens.into()
+	RstmlToRsx {
+		idents: idents(),
+		..Default::default()
+	}
+	.map_tokens(tokens.into())
+	.into()
 }
 
 

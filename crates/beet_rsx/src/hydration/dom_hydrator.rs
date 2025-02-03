@@ -149,7 +149,7 @@ impl Hydrator for DomHydrator {
 			RsxNode::Component { .. } => todo!(),
 			RsxNode::Block {
 				initial,
-				register_effect,
+				effect,
 			} => {
 				todo!()
 			}

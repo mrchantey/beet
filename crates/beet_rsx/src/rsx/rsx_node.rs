@@ -1,7 +1,7 @@
 use crate::prelude::*;
+use anyhow::Result;
 use strum_macros::AsRefStr;
 use strum_macros::EnumDiscriminants;
-
 
 /// File location of an rsx macro, used by [ReverseRsx]
 /// to reconcile rsx nodes with html partials
@@ -29,13 +29,52 @@ impl RsxLocation {
 	pub fn col(&self) -> usize { self.col }
 }
 
+pub type RegisterEffect = Box<dyn FnOnce(&RsxContext) -> Result<()>>;
+pub struct Effect {
+	/// the function for registering the effect with
+	/// its reactive framework
+	pub register: RegisterEffect,
+	/// the location of the effect in the rsx macro,
+	/// this may or may not be populated depending
+	/// on the settings of the parser
+	pub location: Option<RsxLocation>,
+}
 
+impl Effect {
+	pub fn new(register: RegisterEffect) -> Self {
+		Self {
+			register,
+			location: None,
+		}
+	}
+	pub fn new_with_location(
+		register: RegisterEffect,
+		location: RsxLocation,
+	) -> Self {
+		Self {
+			register,
+			location: Some(location),
+		}
+	}
 
-// TODO return result, this can certainly be fallible
-pub type RegisterEffect = Box<dyn FnOnce(&RsxContext)>;
+	/// call the FnOnce register func and replace it
+	/// with an empty one.
+	pub fn register_take(&mut self, cx: &RsxContext) -> Result<()> {
+		let func = std::mem::replace(&mut self.register, Box::new(|_| Ok(())));
+		func(cx)
+	}
+}
 
+impl std::fmt::Debug for Effect {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		f.debug_struct("Effect")
+			.field("location", &self.location)
+			.field("register", &std::any::type_name_of_val(&self.register))
+			.finish()
+	}
+}
 
-#[derive(AsRefStr, EnumDiscriminants)]
+#[derive(Debug, AsRefStr, EnumDiscriminants)]
 pub enum RsxNode {
 	/// The root node of an rsx! macro.
 	/// The location is used for [ReverseRsx]
@@ -44,6 +83,8 @@ pub enum RsxNode {
 		location: RsxLocation,
 	},
 	/// A transparent node that simply contains children
+	/// This may be deprecated in the future if no patterns
+	/// require it. The RstmlToRsx could support it
 	Fragment(Vec<RsxNode>),
 	Component {
 		tag: String,
@@ -52,7 +93,7 @@ pub enum RsxNode {
 	/// a rust block that returns text
 	Block {
 		initial: Box<RsxNode>,
-		register_effect: RegisterEffect,
+		effect: Effect,
 	},
 	/// a html element
 	Element(RsxElement),
@@ -66,45 +107,6 @@ pub enum RsxNode {
 
 impl Default for RsxNode {
 	fn default() -> Self { Self::Fragment(Vec::new()) }
-}
-
-impl std::fmt::Debug for RsxNode {
-	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		match self {
-			Self::Root { nodes, location } => f
-				.debug_struct("Root")
-				.field("items", nodes)
-				.field("location", location)
-				.finish(),
-			Self::Fragment(arg0) => {
-				f.debug_tuple("Fragment").field(arg0).finish()
-			}
-			Self::Block {
-				initial,
-				register_effect,
-			} => f
-				.debug_struct("Block")
-				.field("initial", initial)
-				.field(
-					"register_effect",
-					&std::any::type_name_of_val(register_effect),
-				)
-				.finish(),
-			Self::Doctype => write!(f, "Doctype"),
-			Self::Comment(arg0) => {
-				f.debug_tuple("Comment").field(arg0).finish()
-			}
-			Self::Text(arg0) => f.debug_tuple("Text").field(arg0).finish(),
-			Self::Element(arg0) => {
-				f.debug_tuple("Element").field(arg0).finish()
-			}
-			Self::Component { tag, node } => f
-				.debug_struct("Component")
-				.field("tag", tag)
-				.field("node", node)
-				.finish(),
-		}
-	}
 }
 
 impl RsxNode {
@@ -230,26 +232,22 @@ impl RsxNode {
 	}
 
 	/// takes all the register_effect functions
+	/// # Panics
+	/// If the register function fails
 	pub fn register_effects(&mut self) {
-		fn call_effect(cx: &RsxContext, register_effect: &mut RegisterEffect) {
-			let func = std::mem::replace(register_effect, Box::new(|_| {}));
-			func(cx);
-		}
 		RsxContext::visit_mut(self, |cx, node| match node {
-			RsxNode::Block {
-				register_effect, ..
-			} => {
-				call_effect(cx, register_effect);
+			RsxNode::Block { effect, .. } => {
+				effect.register_take(cx).unwrap();
 			}
 			RsxNode::Element(e) => {
 				for a in &mut e.attributes {
 					match a {
-						RsxAttribute::Block {
-							register_effect, ..
-						} => call_effect(cx, register_effect),
-						RsxAttribute::BlockValue {
-							register_effect, ..
-						} => call_effect(cx, register_effect),
+						RsxAttribute::Block { effect, .. } => {
+							effect.register_take(cx).unwrap();
+						}
+						RsxAttribute::BlockValue { effect, .. } => {
+							effect.register_take(cx).unwrap();
+						}
 						_ => {}
 					}
 				}
@@ -259,6 +257,75 @@ impl RsxNode {
 	}
 }
 
+#[derive(Debug)]
+pub struct RsxElement {
+	/// ie `div, span, input`
+	pub tag: String,
+	/// ie `class="my-class"`
+	pub attributes: Vec<RsxAttribute>,
+	/// ie `<div>childtext<childel/>{childblock}</div>`
+	pub children: Vec<RsxNode>,
+	/// ie `<input/>`
+	pub self_closing: bool,
+}
+
+
+impl RsxElement {
+	pub fn new(tag: String, self_closing: bool) -> Self {
+		Self {
+			tag,
+			self_closing,
+			attributes: Vec::new(),
+			children: Vec::new(),
+		}
+	}
+
+
+
+	/// non-recursive check for blocks in children
+	pub fn contains_blocks(&self) -> bool {
+		self.children
+			.iter()
+			.any(|c| matches!(c, RsxNode::Block { .. }))
+	}
+
+	/// Whether any children or attributes are blocks,
+	/// used to determine whether the node requires an id
+	pub fn contains_rust(&self) -> bool {
+		self.contains_blocks()
+			|| self.attributes.iter().any(|a| {
+				matches!(
+					a,
+					RsxAttribute::Block { .. }
+						| RsxAttribute::BlockValue { .. }
+				)
+			})
+	}
+}
+
+// #[derive(Debug, Clone, PartialEq)]
+// #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[derive(Debug)]
+pub enum RsxAttribute {
+	Key {
+		key: String,
+	},
+	KeyValue {
+		key: String,
+		value: String,
+	},
+	BlockValue {
+		key: String,
+		initial: String,
+		effect: Effect,
+	},
+	// kind of like a fragment, but for attributes
+	Block {
+		initial: Vec<RsxAttribute>,
+		effect: Effect,
+	},
+}
+
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
@@ -266,12 +333,13 @@ mod test {
 
 	#[test]
 	fn location() {
+		let line = line!();
 		let node = rsx! {<div>hello world</div>};
 		let RsxNode::Root { location, .. } = node else {
 			panic!()
 		};
 		expect(location.file()).to_be("crates/beet_rsx/src/rsx/rsx_node.rs");
-		expect(location.line()).to_be(269);
+		expect(location.line()).to_be((line + 1) as usize);
 		expect(location.col()).to_be(19);
 	}
 }

@@ -21,7 +21,7 @@ pub trait RsxRustTokens {
 
 	/// This should return an [RsxAttribute::Block](crate::prelude::RsxAttribute::Block)
 	/// but can technically be any valid RsxAttribute or comma seperated list of RsxAttributes
-	fn map_attribute_block(block: &TokenStream) -> TokenStream {
+	fn register_attribute_block(block: &TokenStream) -> TokenStream {
 		let ident = Self::ident();
 		quote! {#ident::map_attribute_block(#block)}
 	}
@@ -32,6 +32,9 @@ pub trait RsxRustTokens {
 		let ident = Self::ident();
 		quote! {#ident::map_attribute_value(#key, #value)}
 	}
+
+	/// Events are a special case, they are handled by the event registry not the
+	/// reactive framework.
 	/// This should return an [RsxAttribute::BlockValue](crate::prelude::RsxAttribute::BlockValue)
 	/// but can technically be any valid RsxAttribute or comma seperated list of RsxAttributes
 	fn map_event(key: &str, value: &TokenStream) -> TokenStream {
@@ -43,8 +46,8 @@ pub trait RsxRustTokens {
 			RsxAttribute::BlockValue {
 				key: #key.to_string(),
 				initial: "needs-event-cx".to_string(),
-				register_effect: Box::new(move |cx| {
-					beet::prelude::EventRegistry::#register_func(#key,cx,#value);
+				effect: Box::new(move |cx| {
+					::#register_func(#key,cx,#value);
 				}),
 			}
 		}

@@ -23,48 +23,29 @@ pub fn span_to_hash(span: &Span) -> TokenStream {
 
 /// Convert rstml nodes to serializable html nodes.
 /// Rust block token streams will be hashed by [Span::start]
-#[derive(Debug, Clone)]
-pub struct RstmlToReverseRsx {
-	include_errors: bool,
-}
-impl Default for RstmlToReverseRsx {
-	fn default() -> Self {
-		Self {
-			include_errors: true,
-		}
-	}
-}
+#[derive(Debug, Default, Clone)]
+pub struct RstmlToReverseRsx {}
 
 
 impl RstmlToReverseRsx {
 	/// returns a Vec<HtmlNode>
 	pub fn map_tokens(&self, tokens: TokenStream) -> TokenStream {
 		let (nodes, rstml_errors) = tokens_to_rstml(tokens.clone());
-		let nodes = nodes.into_iter().map(|node| self.map_node(node));
-		let errors = if self.include_errors {
-			quote::quote! {
-				#(#rstml_errors;)*
-			}
-		} else {
-			Default::default()
-		};
+		let nodes = self.map_nodes(nodes);
 		quote! {
 			{
-				#errors
+				#(#rstml_errors;)*
 				use beet::prelude::*;
-				vec![(#(#nodes),*)]
+				vec![#(#nodes),*]
 			}
 		}
 	}
 	/// comma separated ReverseRsxNode
-	pub fn map_nodes<C>(&self, nodes: Vec<Node<C>>) -> TokenStream {
-		let nodes = nodes.into_iter().map(|node| self.map_node(node));
-		quote! {
-			#(#nodes),*
-		}
+	pub fn map_nodes<C>(&self, nodes: Vec<Node<C>>) -> Vec<TokenStream> {
+		nodes.into_iter().map(|node| self.map_node(node)).collect()
 	}
 
-	/// may return comma sepereated ReverseRsxNode
+	/// comma sepereated ReverseRsxNode, due to fragments
 	pub fn map_node<C>(&self, node: Node<C>) -> TokenStream {
 		match node {
 			Node::Doctype(_) => quote! {ReverseRsxNode::Doctype},
@@ -120,7 +101,7 @@ impl RstmlToReverseRsx {
 							tag: #tag_name.to_string(),
 							self_closing: #self_closing,
 							attributes: vec![#(#attributes),*],
-							children: vec![#children],
+							children: vec![#(#children),*],
 						}
 					}
 				} else {
@@ -129,7 +110,7 @@ impl RstmlToReverseRsx {
 								tag: #tag_name.to_string(),
 								self_closing: #self_closing,
 								attributes: vec![#(#attributes),*],
-								children: vec![#children],
+								children: vec![#(#children),*],
 						}
 					}
 				}
