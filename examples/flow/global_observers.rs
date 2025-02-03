@@ -6,29 +6,35 @@
 use bevy::prelude::*;
 use std::marker::PhantomData;
 
-#[derive(Component)]
-struct Health(i32);
+#[derive(Default, Component)]
+struct TriggerCount(i32);
 
 fn main() {
-	let mut app = App::new();
+  let mut app = App::new();
 
-	// these would both be automatically added
-	// when the first [Health] is spawned
-	app.add_observer(run_to_action::<Health>)
-		.add_observer(log_health);
+  // these would both be automatically added
+  // when the first [Health] is spawned
+  app.add_observer(run_to_action::<TriggerCount>)
+    .add_observer(increment);
 
-	let agent = app.world_mut().spawn(Health(1)).id();
+  let start = std::time::Instant::now();
+  for _ in 0..10_u64.pow(6) {
+    let entity = app.world_mut().spawn(TriggerCount::default()).id();
 
-	app.world_mut().flush();
-	app.world_mut().trigger(OnRun::new(agent));
-	app.world_mut().flush();
+    app.world_mut().flush();
+    app.world_mut().trigger(OnRun::new(entity));
+    app.world_mut().flush();
+  }
+  println!("Time: {}", start.elapsed().as_millis());
+	// 300ms
+	// assert_eq!(app.world().get::<TriggerCount>(entity).unwrap().0, 1);
 }
 
 
-fn log_health(trigger: Trigger<OnAction<Health>>, query: Query<&Health>) {
-	let health = query.get(trigger.target).unwrap().0;
-	println!("health: {}", health);
+fn increment(trigger: Trigger<OnRun>, mut query: Query<&mut TriggerCount>) {
+	query.get_mut(trigger.tree).unwrap().as_mut().0 += 1;
 }
+
 
 
 /// A general observer triggered globally that can be mapped to specific actions.

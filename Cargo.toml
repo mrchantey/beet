@@ -211,5 +211,5 @@ name = "utility_ai"
 path = "examples/flow/utility_ai.rs"
 
 [[example]]
-name = "vanilla_bevy"
-path = "examples/flow/vanilla_bevy.rs"
+name = "local_observers"
+path = "examples/flow/local_observers.rs"
