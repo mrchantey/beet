@@ -13,7 +13,7 @@ categories.workspace = true
 publish = true
 
 [features]
-default = ["render"]
+# default = ["render"]
 render = []
 
 [dependencies]
@@ -28,7 +28,7 @@ bevyhub = { workspace = true, optional = true }
 
 
 [dev-dependencies]
-bevy = { workspace = true, default-features = true }
+# bevy = { workspace = true, default-features = true }
 sweet.workspace = true
 
 

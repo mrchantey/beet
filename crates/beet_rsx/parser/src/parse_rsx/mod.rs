@@ -1,6 +1,8 @@
+mod rstml_to_reverse_rsx;
 mod rsx_node_tokens;
 pub mod tokens_to_rstml;
 #[allow(unused_imports)]
+pub use self::rstml_to_reverse_rsx::*;
 pub use self::tokens_to_rstml::*;
 mod rsx_rust_tokens;
 pub use rsx_node_tokens::*;
@@ -72,11 +74,10 @@ impl<T: RsxRustTokens> RsxParser<T> {
 		let _ = collected_elements;
 
 		let errors = if self.include_errors {
-			let errs = rstml_errors
-				.into_iter()
-				.map(|e| e.emit_as_expr_tokens())
-				.chain(errors.clone());
-			quote::quote! {#(#errs;)*}
+			quote::quote! {
+				#(#errors;)*
+				#(#rstml_errors;)*
+			}
 		} else {
 			Default::default()
 		};

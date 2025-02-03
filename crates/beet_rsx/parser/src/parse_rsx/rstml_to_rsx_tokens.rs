@@ -58,15 +58,15 @@ impl<T: RsxRustTokens> RstmlToRsx<T> {
 	fn map_node<C>(&mut self, node: Node<C>) -> RsxNodeTokens<T> {
 		match node {
 			Node::Doctype(_) => RsxNodeTokens::Doctype,
-			Node::Text(text) => RsxNodeTokens::Text(text.value_string()),
-			Node::RawText(raw) => RsxNodeTokens::Text(raw.to_string_best()),
 			Node::Comment(comment) => {
 				RsxNodeTokens::Comment(comment.value.value())
 			}
+			Node::Text(text) => RsxNodeTokens::Text(text.value_string()),
+			Node::RawText(raw) => RsxNodeTokens::Text(raw.to_string_best()),
+			Node::Block(block) => RsxNodeTokens::Block(block.to_token_stream()),
 			Node::Fragment(NodeFragment { children, .. }) => {
 				RsxNodeTokens::Fragment(self.map_nodes(children))
 			}
-			Node::Block(block) => RsxNodeTokens::Block(block.to_token_stream()),
 			Node::Element(el) => {
 				self.check_self_closing_children(&el);
 				let NodeElement {
@@ -181,25 +181,23 @@ impl<T: RsxRustTokens> RstmlToRsx<T> {
 			NodeAttribute::Block(block) => {
 				RsxAttributeTokens::Block(block.to_token_stream())
 			}
-			NodeAttribute::Attribute(attr) => match attr.value() {
-				None => RsxAttributeTokens::Key {
-					key: attr.key.to_string(),
-				},
-				Some(syn::Expr::Lit(expr_lit)) => {
-					let value = match &expr_lit.lit {
-						syn::Lit::Str(s) => s.value(),
-						other => other.to_token_stream().to_string(),
-					};
-					RsxAttributeTokens::KeyValue {
-						key: attr.key.to_string(),
-						value,
+			NodeAttribute::Attribute(attr) => {
+				let key = attr.key.to_string();
+				match attr.value() {
+					None => RsxAttributeTokens::Key { key },
+					Some(syn::Expr::Lit(expr_lit)) => {
+						let value = match &expr_lit.lit {
+							syn::Lit::Str(s) => s.value(),
+							other => other.to_token_stream().to_string(),
+						};
+						RsxAttributeTokens::KeyValue { key, value }
 					}
+					Some(tokens) => RsxAttributeTokens::BlockValue {
+						key,
+						value: tokens.to_token_stream(),
+					},
 				}
-				Some(tokens) => RsxAttributeTokens::BlockValue {
-					key: attr.key.to_string(),
-					value: tokens.to_token_stream(),
-				},
-			},
+			}
 		}
 	}
 }

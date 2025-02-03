@@ -1,6 +1,8 @@
 mod reverse_rsx;
+mod reverse_rsx_node;
 mod rsx_element;
 mod scoped_style;
+pub use reverse_rsx_node::*;
 pub use reverse_rsx::*;
 pub use rsx_element::*;
 pub use scoped_style::*;

@@ -218,10 +218,12 @@ assets-pull:
 
 expand-rsx:
 	just watch cargo expand -p beet_rsx --example rsx_macro
+expand-reverse-rsx:
+	just watch cargo expand -p beet_rsx --example reverse_rsx_macro
+
 wasm-example:
 	forky serve | \
 	just watch 'just build-wasm beet dom_renderer'
-
 
 ### TEST SCENE LOADS
 
