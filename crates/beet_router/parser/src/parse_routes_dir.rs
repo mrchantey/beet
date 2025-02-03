@@ -6,14 +6,10 @@ use sweet::prelude::*;
 use syn::File;
 
 /// Parse a 'routes' dir, collecting all the routes,
-/// and create a file called `routes.rs` which contains
-/// a ServerRoutes struct with all the routes.
+/// and create a `mod.rs` which contains
+/// a [ServerRoutes] struct with all the routes.
 #[derive(Debug, Parser)]
 pub struct ParseRoutesDir {
-	/// location of the file router relative to the src directory.
-	/// This must be one level above the routes_dir.
-	#[arg(long, default_value = "file_router.rs")]
-	pub file_router_path: PathBuf,
 	/// Optionally specify additional tokens to be added to the top of the file.
 	#[arg(long)]
 	pub file_router_tokens: Option<String>,
@@ -42,16 +38,10 @@ impl ParseRoutesDir {
 	pub fn routes_dir(&self) -> PathBuf {
 		self.src_dir().join(&self.routes_dir)
 	}
-	pub fn file_router_path(&self) -> PathBuf {
-		self.src_dir().join(&self.file_router_path)
+	pub fn routes_mod_path(&self) -> PathBuf {
+		self.routes_dir().join("mod.rs")
 	}
 
-	pub fn write_to_file(&self) -> Result<()> {
-		let routes = self.build_string()?;
-		let routes_file = self.file_router_path();
-		std::fs::write(&routes_file, routes)?;
-		Ok(())
-	}
 
 	pub fn build_string(&self) -> Result<String> {
 		let routes_dir_name = self.routes_dir.to_string_lossy();
@@ -98,7 +88,7 @@ impl ParseRoutesDir {
 
 	pub fn build_and_write(&self) -> Result<()> {
 		let data = self.build_string()?;
-		FsExt::write(self.file_router_path(), &data)?;
+		FsExt::write(self.routes_mod_path(), &data)?;
 		Ok(())
 	}
 }

@@ -6,7 +6,6 @@ fn parser() -> ParseRoutesDir {
 	ParseRoutesDir {
 		src,
 		file_router_ident: "crate::DefaultFileRouter".into(),
-		file_router_path: "test_site_router.rs".into(),
 		file_router_tokens: Some(
 			r#"
 				use crate::prelude::*;

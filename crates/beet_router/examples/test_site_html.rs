@@ -9,6 +9,6 @@ async fn main() {
 	// 	.canonicalize()
 	// 	.unwrap();"
 	router.dst_dir = "target/test_site".into();
-	beet_router::test_site::test_site_router::collect_file_routes(&mut router);
+	beet_router::test_site::routes::collect_file_routes(&mut router);
 	router.routes_to_html_files().await.unwrap();
 }

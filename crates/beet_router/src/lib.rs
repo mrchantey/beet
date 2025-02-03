@@ -30,6 +30,6 @@ pub mod test_site {
 	mod contributing;
 	#[path = "routes/index.rs"]
 	pub mod index;
-	pub mod test_site_router;
+	pub mod routes;
 	pub use components::*;
 }

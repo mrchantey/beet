@@ -24,7 +24,10 @@ impl ParseRouteFile {
 		let route_path = path.to_string_lossy();
 		let route_relative_path =
 			route_path.split(routes_dir).last().or_err()?;
-		let route_mod_path = format!("{routes_dir}{route_relative_path}");
+		let route_file_path = route_relative_path
+			.strip_prefix("/")
+			.unwrap_or(&route_relative_path);
+		// let route_mod_path = format!("{routes_dir}{route_relative_path}");
 		let mut route_url_path = route_relative_path.replace(".rs", "");
 		if route_url_path.ends_with("index") {
 			route_url_path = route_url_path.replace("index", "");
@@ -54,7 +57,7 @@ impl ParseRouteFile {
 				syn::parse_quote! {
 					{
 						// some route thingie
-						#[path=#route_mod_path]
+						#[path=#route_file_path]
 						mod route;
 						(RouteInfo::new(#route_url_path,#method),route::#ident)
 					}

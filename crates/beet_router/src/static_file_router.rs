@@ -203,7 +203,7 @@ mod test {
 	#[sweet::test]
 	async fn works() {
 		let mut router = DefaultFileRouter::default();
-		crate::test_site::test_site_router::collect_file_routes(&mut router);
+		crate::test_site::routes::collect_file_routes(&mut router);
 		let html = router.routes_to_html().await.unwrap();
 
 		expect(html.len()).to_be(2);
