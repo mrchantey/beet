@@ -4,12 +4,14 @@ use clap::Parser;
 use std::path::PathBuf;
 use sweet::prelude::*;
 use syn::File;
+mod file_routes;
+use file_routes::FileRoutes;
 
 /// Parse a 'routes' dir, collecting all the routes,
 /// and create a `mod.rs` which contains
 /// a [ServerRoutes] struct with all the routes.
 #[derive(Debug, Parser)]
-pub struct ParseRoutesDir {
+pub struct BuildRoutesMod {
 	/// Optionally specify additional tokens to be added to the top of the file.
 	#[arg(long)]
 	pub file_router_tokens: Option<String>,
@@ -29,11 +31,11 @@ pub struct ParseRoutesDir {
 	pub routes_dir: PathBuf,
 }
 
-impl Default for ParseRoutesDir {
+impl Default for BuildRoutesMod {
 	fn default() -> Self { clap::Parser::parse_from(&[""]) }
 }
 
-impl ParseRoutesDir {
+impl BuildRoutesMod {
 	pub fn src_dir(&self) -> &PathBuf { &self.src }
 	pub fn routes_dir(&self) -> PathBuf {
 		self.src_dir().join(&self.routes_dir)
@@ -47,7 +49,7 @@ impl ParseRoutesDir {
 		let routes_dir_name = self.routes_dir.to_string_lossy();
 		let page_routes = ReadDir::files_recursive(self.routes_dir())?
 			.into_iter()
-			.map(|path| ParseRouteFile::parse(&routes_dir_name, path))
+			.map(|path| FileRoutes::parse(&routes_dir_name, path))
 			.collect::<Result<Vec<_>>>()?
 			.into_iter()
 			.flatten();

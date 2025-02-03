@@ -8,7 +8,7 @@ mod cargo_run;
 #[derive(Debug, Parser)]
 pub struct Serve {
 	#[command(flatten)]
-	parse_file_router: ParseRoutesDir,
+	parse_file_router: BuildRoutesMod,
 	/// 🦀 cargo run args 🦀
 	#[command(flatten)]
 	cargo_run: cargo_run::CargoRun,

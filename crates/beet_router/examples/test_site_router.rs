@@ -1,9 +1,9 @@
 use beet_router_parser::prelude::*;
 use sweet::prelude::FsExt;
 
-fn parser() -> ParseRoutesDir {
+fn parser() -> BuildRoutesMod {
 	let src = FsExt::workspace_root().join("crates/beet_router/src/test_site");
-	ParseRoutesDir {
+	BuildRoutesMod {
 		src,
 		file_router_ident: "crate::DefaultFileRouter".into(),
 		file_router_tokens: Some(

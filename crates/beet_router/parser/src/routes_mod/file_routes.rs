@@ -5,16 +5,17 @@ use syn::Block;
 use syn::Visibility;
 
 
-/// create the tokens for a specific route, it may contain
-/// one or more http methods.
-pub struct ParseRouteFile {}
+/// create the tokens for a specific route, ie `routes/index.rs`
+/// any top level public function that matches a http method
+/// will be parsed and returned as a block.
+pub struct FileRoutes;
 
 const HTTP_METHODS: [&str; 9] = [
 	"get", "post", "put", "delete", "head", "options", "connect", "trace",
 	"patch",
 ];
 
-impl ParseRouteFile {
+impl FileRoutes {
 	/// reads a file and discovers all top level pub functions
 	/// that match a http method
 	pub fn parse(routes_dir: &str, path: PathBuf) -> Result<Vec<Block>> {
