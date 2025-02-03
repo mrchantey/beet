@@ -93,16 +93,29 @@ impl std::fmt::Debug for RsxAttribute {
 				.field("key", key)
 				.field("value", value)
 				.finish(),
-			Self::BlockValue { key, initial, .. } => f
+			Self::BlockValue {
+				key,
+				initial,
+				register_effect,
+			} => f
 				.debug_struct("BlockValue")
 				.field("key", key)
 				.field("initial", initial)
-				.field("register_effect", &"..")
+				.field(
+					"register_effect",
+					&std::any::type_name_of_val(register_effect),
+				)
 				.finish(),
-			Self::Block { initial, .. } => f
+			Self::Block {
+				initial,
+				register_effect,
+			} => f
 				.debug_struct("Block")
 				.field("initial", initial)
-				.field("register_effect", &"..")
+				.field(
+					"register_effect",
+					&&std::any::type_name_of_val(register_effect),
+				)
 				.finish(),
 		}
 	}

@@ -40,23 +40,26 @@ impl RsxToHtml {
 
 	pub fn map_node(&mut self, rsx_node: &RsxNode) -> Vec<HtmlNode> {
 		match rsx_node {
-			RsxNode::Doctype => {
-				vec![HtmlNode::Doctype]
+			RsxNode::Root { items, .. } => {
+				items.iter().map(|n| self.map_node(n)).flatten().collect()
+			}
+			RsxNode::Fragment(nodes) => {
+				nodes.iter().map(|n| self.map_node(n)).flatten().collect()
 			}
 			RsxNode::Component { node, .. } => self.map_node(node),
-			RsxNode::Comment(str) => {
-				vec![HtmlNode::Comment(str.clone())]
+			RsxNode::Block { initial, .. } => self.map_node(initial),
+			RsxNode::Element(e) => {
+				vec![HtmlNode::Element(self.map_element(e))]
 			}
 			RsxNode::Text(str) => {
 				let str = if self.trim { str.trim() } else { str };
 				vec![HtmlNode::Text(str.into())]
 			}
-			RsxNode::Block { initial, .. } => self.map_node(initial),
-			RsxNode::Element(e) => {
-				vec![HtmlNode::Element(self.map_element(e))]
+			RsxNode::Comment(str) => {
+				vec![HtmlNode::Comment(str.clone())]
 			}
-			RsxNode::Fragment(nodes) => {
-				nodes.iter().map(|n| self.map_node(n)).flatten().collect()
+			RsxNode::Doctype => {
+				vec![HtmlNode::Doctype]
 			}
 		}
 	}

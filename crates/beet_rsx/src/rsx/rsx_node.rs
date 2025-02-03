@@ -3,6 +3,25 @@ use strum_macros::AsRefStr;
 use strum_macros::EnumDiscriminants;
 
 
+/// File location of an rsx macro, used by [ReverseRsx]
+/// to reconcile rsx nodes with html partials
+#[derive(Debug, Clone)]
+pub struct RsxLocation {
+	/// in the macro this is set via file!(),
+	/// in the cli its set via the file path,
+	/// when setting this it must be in the same
+	/// format as file!() would return
+	file: String,
+	line: usize,
+	col: usize,
+}
+impl RsxLocation {
+	pub fn file(&self) -> &str { &self.file }
+	pub fn line(&self) -> usize { self.line }
+	pub fn col(&self) -> usize { self.col }
+}
+
+
 
 // TODO return result, this can certainly be fallible
 pub type RegisterEffect = Box<dyn FnOnce(&RsxContext)>;
@@ -10,22 +29,31 @@ pub type RegisterEffect = Box<dyn FnOnce(&RsxContext)>;
 
 #[derive(AsRefStr, EnumDiscriminants)]
 pub enum RsxNode {
+	/// The root node of an rsx! macro.
+	/// The location is used for [ReverseRsx]
+	Root {
+		items: Vec<RsxNode>,
+		location: RsxLocation,
+	},
 	/// A transparent node that simply contains children
 	Fragment(Vec<RsxNode>),
+	Component {
+		tag: String,
+		node: Box<RsxNode>,
+	},
 	/// a rust block that returns text
 	Block {
 		initial: Box<RsxNode>,
 		register_effect: RegisterEffect,
 	},
-	Doctype,
-	Comment(String),
-	/// may have been Text or RawText
-	Text(String),
+	/// a html element
 	Element(RsxElement),
-	Component {
-		tag: String,
-		node: Box<RsxNode>,
-	},
+	/// a html text node
+	Text(String),
+	/// a html comment node
+	Comment(String),
+	/// a html doctype node
+	Doctype,
 }
 
 impl Default for RsxNode {
@@ -35,13 +63,24 @@ impl Default for RsxNode {
 impl std::fmt::Debug for RsxNode {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		match self {
+			Self::Root { items, location } => f
+				.debug_struct("Root")
+				.field("items", items)
+				.field("location", location)
+				.finish(),
 			Self::Fragment(arg0) => {
 				f.debug_tuple("Fragment").field(arg0).finish()
 			}
-			Self::Block { initial, .. } => f
+			Self::Block {
+				initial,
+				register_effect,
+			} => f
 				.debug_struct("Block")
 				.field("initial", initial)
-				.field("register_effect", &"..")
+				.field(
+					"register_effect",
+					&std::any::type_name_of_val(register_effect),
+				)
 				.finish(),
 			Self::Doctype => write!(f, "Doctype"),
 			Self::Comment(arg0) => {
@@ -64,20 +103,33 @@ impl RsxNode {
 	pub fn discriminant(&self) -> RsxNodeDiscriminants { self.into() }
 	pub fn is_element(&self) -> bool { matches!(self, RsxNode::Element(_)) }
 
+
+	/// chidren of root, fragment or element.
+	/// Blocks and components have no children
 	pub fn children(&self) -> &[RsxNode] {
 		match self {
+			RsxNode::Root { items, .. } => items,
 			RsxNode::Fragment(rsx_nodes) => rsx_nodes,
+			RsxNode::Component { .. } => &[],
 			RsxNode::Block { initial, .. } => initial.children(),
 			RsxNode::Element(RsxElement { children, .. }) => &children,
-			_ => &[],
+			RsxNode::Text(_) => &[],
+			RsxNode::Comment(_) => &[],
+			RsxNode::Doctype => &[],
 		}
 	}
+	/// chidren of root, fragment or element.
+	/// Blocks and components have no children
 	pub fn children_mut(&mut self) -> &mut [RsxNode] {
 		match self {
+			RsxNode::Root { items, .. } => items,
 			RsxNode::Fragment(rsx_nodes) => rsx_nodes,
+			RsxNode::Component { .. } => &mut [],
 			RsxNode::Block { initial, .. } => initial.children_mut(),
 			RsxNode::Element(RsxElement { children, .. }) => children,
-			_ => &mut [],
+			RsxNode::Text(_) => &mut [],
+			RsxNode::Comment(_) => &mut [],
+			RsxNode::Doctype => &mut [],
 		}
 	}
 
@@ -94,22 +146,34 @@ impl RsxNode {
 		}
 	}
 
-	// try to insert nodes into a slot, returning any nodes that were not inserted
-	// If the slot is not a direct child, recursively search children
+	/// try to insert nodes into the first slot found,
+	/// returning any nodes that were not inserted.
+	/// If the slot is not a direct child, recursively search children.
+	/// Components are not searched because they would steal the slot
+	/// from next siblings.
 	pub fn try_insert_slots(
 		&mut self,
 		name: &str,
-		mut nodes: Vec<Self>,
+		mut to_insert: Vec<Self>,
 	) -> Option<Vec<Self>> {
 		match self {
-			RsxNode::Fragment(fragment) => {
-				for node in fragment.iter_mut() {
-					match node.try_insert_slots(name, nodes) {
-						Some(returned_nodes) => nodes = returned_nodes,
+			RsxNode::Root { items, .. } => {
+				for node in items.iter_mut() {
+					match node.try_insert_slots(name, to_insert) {
+						Some(returned_nodes) => to_insert = returned_nodes,
 						None => return None,
 					}
 				}
-				Some(nodes)
+				Some(to_insert)
+			}
+			RsxNode::Fragment(children) => {
+				for node in children.iter_mut() {
+					match node.try_insert_slots(name, to_insert) {
+						Some(returned_nodes) => to_insert = returned_nodes,
+						None => return None,
+					}
+				}
+				Some(to_insert)
 			}
 			RsxNode::Element(element) => {
 				if element.tag == "slot" {
@@ -130,20 +194,30 @@ impl RsxNode {
 						// unnamed slots are called 'default'
 						.unwrap_or("default");
 					if slot_name == name {
-						element.children.extend(nodes);
+						element.children.extend(to_insert);
 						return None;
 					}
 				}
 				// if we didnt find the slot, recursively search children
 				for child in &mut element.children {
-					match child.try_insert_slots(name, nodes) {
-						Some(returned_nodes) => nodes = returned_nodes,
+					match child.try_insert_slots(name, to_insert) {
+						Some(returned_nodes) => to_insert = returned_nodes,
 						None => return None,
 					}
 				}
-				Some(nodes)
+				Some(to_insert)
 			}
-			_ => Some(nodes),
+			RsxNode::Component { .. } => {
+				Some(to_insert)
+				// dont recurse into component because it would steal the slot
+				// from next siblings
+			}
+			RsxNode::Block { initial, .. } => {
+				initial.try_insert_slots(name, to_insert)
+			}
+			RsxNode::Text(_) => Some(to_insert),
+			RsxNode::Comment(_) => Some(to_insert),
+			RsxNode::Doctype => Some(to_insert),
 		}
 	}
 
@@ -175,5 +249,4 @@ impl RsxNode {
 			_ => {}
 		});
 	}
-
 }

@@ -49,13 +49,15 @@ impl<T: RsxRustTokens> ToTokens for RsxNodeTokens<T> {
 	fn to_tokens(&self, tokens: &mut TokenStream) {
 		match self {
 			RsxNodeTokens::Phantom(_) => unreachable!(),
-			RsxNodeTokens::Doctype => quote!(RsxNode::Doctype),
-			RsxNodeTokens::Text(text) => {
-				quote!(RsxNode::Text(#text.to_string()))
+			RsxNodeTokens::Fragment(vec) => {
+				quote!(RsxNode::Fragment(Vec::from([#(#vec),*])))
 			}
-			RsxNodeTokens::Comment(comment) => {
-				quote!(RsxNode::Comment(#comment.to_string()))
-			}
+			RsxNodeTokens::Component { tag, tokens } => quote!({
+				RsxNode::Component{
+					tag: #tag.to_string(),
+					node: Box::new(#tokens)
+				}
+			}),
 			RsxNodeTokens::Block(block) => T::map_node_block(block),
 			RsxNodeTokens::Element {
 				tag,
@@ -73,15 +75,13 @@ impl<T: RsxRustTokens> ToTokens for RsxNodeTokens<T> {
 					self_closing: #self_closing,
 				}))
 			}
-			RsxNodeTokens::Fragment(vec) => {
-				quote!(RsxNode::Fragment(Vec::from([#(#vec),*])))
+			RsxNodeTokens::Text(text) => {
+				quote!(RsxNode::Text(#text.to_string()))
 			}
-			RsxNodeTokens::Component { tag, tokens } => quote!({
-				RsxNode::Component{
-					tag: #tag.to_string(),
-					node: Box::new(#tokens)
-				}
-			}),
+			RsxNodeTokens::Comment(comment) => {
+				quote!(RsxNode::Comment(#comment.to_string()))
+			}
+			RsxNodeTokens::Doctype => quote!(RsxNode::Doctype),
 		}
 		.to_tokens(tokens);
 	}

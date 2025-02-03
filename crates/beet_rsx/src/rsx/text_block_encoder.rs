@@ -161,6 +161,9 @@ impl CollapsedNode {
 	fn from_node(node: &RsxNode) -> Vec<CollapsedNode> {
 		let mut out = Vec::new();
 		match node {
+			RsxNode::Root { items, .. } => {
+				out.extend(items.iter().flat_map(Self::from_node));
+			}
 			RsxNode::Fragment(nodes) => {
 				out.extend(nodes.into_iter().flat_map(Self::from_node));
 			}

@@ -78,6 +78,7 @@ impl RsxContext {
 	) {
 		self.node_idx += 1;
 		match node_disc {
+			RsxNodeDiscriminants::Root => {}
 			RsxNodeDiscriminants::Block => {
 				self.block_idx += 1;
 			}
@@ -153,10 +154,18 @@ impl RsxContext {
 				node
 			},
 			|queue, node| match node {
+				RsxNode::Root { items, .. } => {
+					for node in items {
+						queue.push_back(HtmlElementPosition::MiddleChild(node));
+					}
+				}
 				RsxNode::Fragment(rsx_nodes) => {
 					for node in rsx_nodes {
 						queue.push_back(HtmlElementPosition::MiddleChild(node));
 					}
+				}
+				RsxNode::Component { node, .. } => {
+					queue.push_back(HtmlElementPosition::MiddleChild(node));
 				}
 				RsxNode::Block { initial, .. } => {
 					queue.push_back(HtmlElementPosition::MiddleChild(initial));
@@ -171,7 +180,9 @@ impl RsxContext {
 						));
 					}
 				}
-				_ => {}
+				RsxNode::Text(_) => {}
+				RsxNode::Comment(_) => {}
+				RsxNode::Doctype => {}
 			},
 		);
 		visitor
@@ -191,10 +202,18 @@ impl RsxContext {
 				node
 			},
 			|queue, node| match node {
+				RsxNode::Root { items, .. } => {
+					for node in items {
+						queue.push_back(HtmlElementPosition::MiddleChild(node));
+					}
+				}
 				RsxNode::Fragment(rsx_nodes) => {
 					for node in rsx_nodes {
 						queue.push_back(HtmlElementPosition::MiddleChild(node));
 					}
+				}
+				RsxNode::Component { node, .. } => {
+					queue.push_back(HtmlElementPosition::MiddleChild(node));
 				}
 				RsxNode::Block { initial, .. } => {
 					queue.push_back(HtmlElementPosition::MiddleChild(initial));
@@ -209,7 +228,9 @@ impl RsxContext {
 						));
 					}
 				}
-				_ => {}
+				RsxNode::Text(_) => {}
+				RsxNode::Comment(_) => {}
+				RsxNode::Doctype => {}
 			},
 		);
 		visitor
@@ -313,7 +334,7 @@ mod test {
 		expect(
 			RsxContext::visit(&rsx! {{7}{8}{9}<Child/>}, |_, _| {}).block_idx,
 		)
-		.to_be(3);
+		.to_be(4);
 	}
 
 	#[test]

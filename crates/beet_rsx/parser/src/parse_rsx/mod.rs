@@ -5,6 +5,7 @@ pub use self::tokens_to_rstml::*;
 mod rsx_rust_tokens;
 pub use rsx_node_tokens::*;
 pub use rsx_rust_tokens::*;
+use syn::spanned::Spanned;
 pub mod rsx_file_visitor;
 #[allow(unused_imports)]
 pub use self::rsx_file_visitor::*;
@@ -79,6 +80,10 @@ impl<T: RsxRustTokens> RsxParser<T> {
 		} else {
 			Default::default()
 		};
+
+		let span = tokens.span();
+		let line = span.start().line;
+		let col = span.start().column;
 
 		*tokens = syn::parse_quote! {{
 			#errors

@@ -144,12 +144,16 @@ impl Hydrator for DomHydrator {
 
 		#[allow(unused)]
 		match rsx {
+			RsxNode::Root { .. } => todo!(),
+			RsxNode::Fragment(vec) => todo!(),
+			RsxNode::Component { .. } => todo!(),
 			RsxNode::Block {
 				initial,
 				register_effect,
 			} => {
 				todo!()
 			}
+			RsxNode::Element(rsx_element) => todo!(),
 			RsxNode::Text(val) => {
 				if let Some(child) = child.dyn_ref::<Text>() {
 					child.set_text_content(Some(&val));
@@ -157,11 +161,8 @@ impl Hydrator for DomHydrator {
 					todo!("replace with text node");
 				}
 			}
-			RsxNode::Component { .. } => todo!(),
-			RsxNode::Fragment(vec) => todo!(),
-			RsxNode::Doctype => todo!(),
 			RsxNode::Comment(_) => todo!(),
-			RsxNode::Element(rsx_element) => todo!(),
+			RsxNode::Doctype => todo!(),
 		}
 
 

@@ -71,21 +71,22 @@ fn apply_rsx(
 	constants: &HtmlConstants,
 ) -> ParseResult<()> {
 	match rsx {
+		RsxNode::Root { .. } => todo!(),
 		RsxNode::Fragment(vec) => todo!(),
 		RsxNode::Component { tag, node } => todo!(),
 		RsxNode::Block {
 			initial,
 			register_effect,
 		} => todo!(),
-		RsxNode::Doctype => todo!(),
-		RsxNode::Comment(_) => todo!(),
+		RsxNode::Element(rsx_element) => todo!(),
 		RsxNode::Text(text) => {
 			let child = parent_el.children.get_mut(cx.child_idx()).ok_or_else(
 				|| ParseError::Hydration("Could not find child".into()),
 			)?;
 			*child = HtmlNode::Text(text);
 		}
-		RsxNode::Element(rsx_element) => todo!(),
+		RsxNode::Comment(_) => todo!(),
+		RsxNode::Doctype => todo!(),
 	}
 	Ok(())
 }
