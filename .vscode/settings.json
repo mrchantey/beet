@@ -1,4 +1,5 @@
 {
+	"files.autoSaveDelay": 32,
 	// "rust-analyzer.cargo.features": ["sweet/rand"],
 	// "rust-analyzer.cargo.features": "all",
 	// "rust-analyzer.cargo.target": "x86_64-unknown-linux-gnu",

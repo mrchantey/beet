@@ -96,6 +96,7 @@ impl RsxContextMap {
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
+	use std::collections::HashMap;
 	use sweet::prelude::*;
 
 	#[test]
@@ -119,11 +120,28 @@ mod test {
 				split_positions: vec![vec![4, 5, 5], vec![10, 10]],
 			})]
 			.into_iter()
-			.collect(),
+			.collect::<HashMap<_, _>>(),
 		);
-
-		expect(&map.rust_blocks[0]).to_be(&RsxContext::new(3, 0, 1, 1));
-		expect(&map.rust_blocks[1]).to_be(&RsxContext::new(5, 1, 1, 2));
-		expect(&map.rust_blocks[2]).to_be(&RsxContext::new(7, 2, 2, 3));
+		expect(&map.rust_blocks[0]).to_be(&RsxContext {
+			node_idx: 3,
+			component_idx: 0,
+			block_idx: 0,
+			element_count: 1,
+			child_idx: 1,
+		});
+		expect(&map.rust_blocks[1]).to_be(&RsxContext {
+			node_idx: 5,
+			component_idx: 0,
+			block_idx: 1,
+			element_count: 1,
+			child_idx: 2,
+		});
+		expect(&map.rust_blocks[2]).to_be(&RsxContext {
+			node_idx: 7,
+			component_idx: 0,
+			block_idx: 2,
+			element_count: 2,
+			child_idx: 3,
+		});
 	}
 }

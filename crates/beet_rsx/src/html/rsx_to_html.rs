@@ -1,8 +1,13 @@
 use crate::prelude::*;
 
+
+
+
+
+/// 
 pub struct RsxToHtml {
-	/// on elements that have children, give them a `needs-id` attribute
-	/// to be mapped by [RsxToResumableHtml]
+	/// on elements that directly contain rust code (non recursive), 
+	/// give them a `needs-id` attribute to be mapped by [RsxToResumableHtml]
 	pub mark_needs_id: bool,
 	/// text node content will be trimmed
 	pub trim: bool,
@@ -38,6 +43,7 @@ impl RsxToHtml {
 			RsxNode::Doctype => {
 				vec![HtmlNode::Doctype]
 			}
+			RsxNode::Component { node, .. } => self.map_node(node),
 			RsxNode::Comment(str) => {
 				vec![HtmlNode::Comment(str.clone())]
 			}

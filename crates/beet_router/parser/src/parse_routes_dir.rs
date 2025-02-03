@@ -5,12 +5,13 @@ use std::path::PathBuf;
 use sweet::prelude::*;
 use syn::File;
 
-/// Parse a 'pages' dir, collecting all the routes,
+/// Parse a 'routes' dir, collecting all the routes,
 /// and create a file called `routes.rs` which contains
 /// a ServerRoutes struct with all the routes.
 #[derive(Debug, Parser)]
-pub struct ParseFileRouter {
-	/// location of the file router relative to the src directory
+pub struct ParseRoutesDir {
+	/// location of the file router relative to the src directory.
+	/// This must be one level above the routes_dir.
 	#[arg(long, default_value = "file_router.rs")]
 	pub file_router_path: PathBuf,
 	/// Optionally specify additional tokens to be added to the top of the file.
@@ -23,18 +24,24 @@ pub struct ParseFileRouter {
 	/// location of the src directory,
 	#[arg(long, default_value = "src")]
 	pub src: PathBuf,
-	/// location of the pages directory relative to the src directory
-	#[arg(long, default_value = "pages")]
-	pub pages_dir: PathBuf,
+	/// location of the routes directory relative to the src directory.
+	/// This will be used to split the path and discover the route path,
+	/// the last part will be taken so it should not occur in the path twice.
+	/// ✅ `src/routes/foo/bar.rs` will be `foo/bar.rs`
+	/// ❌ `src/routes/foo/routes/bar.rs` will be `routes/bar.rs`
+	#[arg(long, default_value = "routes")]
+	pub routes_dir: PathBuf,
 }
 
-impl Default for ParseFileRouter {
+impl Default for ParseRoutesDir {
 	fn default() -> Self { clap::Parser::parse_from(&[""]) }
 }
 
-impl ParseFileRouter {
+impl ParseRoutesDir {
 	pub fn src_dir(&self) -> &PathBuf { &self.src }
-	pub fn pages_dir(&self) -> PathBuf { self.src_dir().join(&self.pages_dir) }
+	pub fn routes_dir(&self) -> PathBuf {
+		self.src_dir().join(&self.routes_dir)
+	}
 	pub fn file_router_path(&self) -> PathBuf {
 		self.src_dir().join(&self.file_router_path)
 	}
@@ -47,9 +54,10 @@ impl ParseFileRouter {
 	}
 
 	pub fn build_string(&self) -> Result<String> {
-		let page_routes = ReadDir::files_recursive(self.pages_dir())?
-			.iter()
-			.map(|path| ParseRouteFile::parse(&path.canonicalize()?))
+		let routes_dir_name = self.routes_dir.to_string_lossy();
+		let page_routes = ReadDir::files_recursive(self.routes_dir())?
+			.into_iter()
+			.map(|path| ParseRouteFile::parse(&routes_dir_name, path))
 			.collect::<Result<Vec<_>>>()?
 			.into_iter()
 			.flatten();
