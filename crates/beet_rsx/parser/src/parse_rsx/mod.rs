@@ -90,7 +90,10 @@ impl<T: RsxRustTokens> RsxParser<T> {
 			use beet::prelude::*;
 			#[allow(unused_braces)]
 			{
-				RsxNode::Fragment(Vec::from([#(#nodes),*]))
+				RsxNode::Root{
+					location: RsxLocation::new(std::file!(), #line, #col),
+					nodes: Vec::from([#(#nodes),*])
+				}
 			}
 		}};
 		output

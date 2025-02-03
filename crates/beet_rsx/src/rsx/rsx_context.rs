@@ -154,8 +154,8 @@ impl RsxContext {
 				node
 			},
 			|queue, node| match node {
-				RsxNode::Root { items, .. } => {
-					for node in items {
+				RsxNode::Root { nodes, .. } => {
+					for node in nodes {
 						queue.push_back(HtmlElementPosition::MiddleChild(node));
 					}
 				}
@@ -202,8 +202,8 @@ impl RsxContext {
 				node
 			},
 			|queue, node| match node {
-				RsxNode::Root { items, .. } => {
-					for node in items {
+				RsxNode::Root { nodes, .. } => {
+					for node in nodes {
 						queue.push_back(HtmlElementPosition::MiddleChild(node));
 					}
 				}

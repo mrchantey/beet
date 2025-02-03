@@ -16,6 +16,14 @@ pub struct RsxLocation {
 	col: usize,
 }
 impl RsxLocation {
+	pub fn new(file: impl Into<String>, line: usize, col: usize) -> Self {
+		Self {
+			file: file.into(),
+			line,
+			col,
+		}
+	}
+
 	pub fn file(&self) -> &str { &self.file }
 	pub fn line(&self) -> usize { self.line }
 	pub fn col(&self) -> usize { self.col }
@@ -32,7 +40,7 @@ pub enum RsxNode {
 	/// The root node of an rsx! macro.
 	/// The location is used for [ReverseRsx]
 	Root {
-		items: Vec<RsxNode>,
+		nodes: Vec<RsxNode>,
 		location: RsxLocation,
 	},
 	/// A transparent node that simply contains children
@@ -63,9 +71,9 @@ impl Default for RsxNode {
 impl std::fmt::Debug for RsxNode {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		match self {
-			Self::Root { items, location } => f
+			Self::Root { nodes, location } => f
 				.debug_struct("Root")
-				.field("items", items)
+				.field("items", nodes)
 				.field("location", location)
 				.finish(),
 			Self::Fragment(arg0) => {
@@ -108,7 +116,7 @@ impl RsxNode {
 	/// Blocks and components have no children
 	pub fn children(&self) -> &[RsxNode] {
 		match self {
-			RsxNode::Root { items, .. } => items,
+			RsxNode::Root { nodes, .. } => nodes,
 			RsxNode::Fragment(rsx_nodes) => rsx_nodes,
 			RsxNode::Component { .. } => &[],
 			RsxNode::Block { initial, .. } => initial.children(),
@@ -122,7 +130,7 @@ impl RsxNode {
 	/// Blocks and components have no children
 	pub fn children_mut(&mut self) -> &mut [RsxNode] {
 		match self {
-			RsxNode::Root { items, .. } => items,
+			RsxNode::Root { nodes, .. } => nodes,
 			RsxNode::Fragment(rsx_nodes) => rsx_nodes,
 			RsxNode::Component { .. } => &mut [],
 			RsxNode::Block { initial, .. } => initial.children_mut(),
@@ -157,8 +165,8 @@ impl RsxNode {
 		mut to_insert: Vec<Self>,
 	) -> Option<Vec<Self>> {
 		match self {
-			RsxNode::Root { items, .. } => {
-				for node in items.iter_mut() {
+			RsxNode::Root { nodes, .. } => {
+				for node in nodes.iter_mut() {
 					match node.try_insert_slots(name, to_insert) {
 						Some(returned_nodes) => to_insert = returned_nodes,
 						None => return None,
@@ -248,5 +256,22 @@ impl RsxNode {
 			}
 			_ => {}
 		});
+	}
+}
+
+#[cfg(test)]
+mod test {
+	use crate::prelude::*;
+	use sweet::prelude::*;
+
+	#[test]
+	fn location() {
+		let node = rsx! {<div>hello world</div>};
+		let RsxNode::Root { location, .. } = node else {
+			panic!()
+		};
+		expect(location.file()).to_be("crates/beet_rsx/src/rsx/rsx_node.rs");
+		expect(location.line()).to_be(269);
+		expect(location.col()).to_be(19);
 	}
 }

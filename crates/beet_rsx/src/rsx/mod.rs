@@ -79,3 +79,4 @@ impl<T: FnOnce() -> U, U: Rsx> Component for T {
 impl<T: Component> Rsx for T {
 	fn into_rsx(self) -> RsxNode { self.render().into_rsx() }
 }
+
