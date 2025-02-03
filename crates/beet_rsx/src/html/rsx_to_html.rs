@@ -1,9 +1,16 @@
 use crate::prelude::*;
 
+
+
+
+
+/// 
 pub struct RsxToHtml {
-	/// on elements that have children, give them a `needs-id` attribute
-	/// to be mapped by [RsxToResumableHtml]
+	/// on elements that directly contain rust code (non recursive), 
+	/// give them a `needs-id` attribute to be mapped by [RsxToResumableHtml]
 	pub mark_needs_id: bool,
+	/// text node content will be trimmed
+	pub trim: bool,
 }
 
 
@@ -11,6 +18,7 @@ impl Default for RsxToHtml {
 	fn default() -> Self {
 		Self {
 			mark_needs_id: false,
+			trim: false,
 		}
 	}
 }
@@ -20,6 +28,7 @@ impl RsxToHtml {
 	pub fn as_resumable() -> Self {
 		Self {
 			mark_needs_id: true,
+			trim: false,
 		}
 	}
 
@@ -34,11 +43,13 @@ impl RsxToHtml {
 			RsxNode::Doctype => {
 				vec![HtmlNode::Doctype]
 			}
-			RsxNode::Comment(s) => {
-				vec![HtmlNode::Comment(s.clone())]
+			RsxNode::Component { node, .. } => self.map_node(node),
+			RsxNode::Comment(str) => {
+				vec![HtmlNode::Comment(str.clone())]
 			}
-			RsxNode::Text(s) => {
-				vec![HtmlNode::Text(s.clone())]
+			RsxNode::Text(str) => {
+				let str = if self.trim { str.trim() } else { str };
+				vec![HtmlNode::Text(str.into())]
 			}
 			RsxNode::Block { initial, .. } => self.map_node(initial),
 			RsxNode::Element(e) => {
@@ -240,5 +251,19 @@ mod test {
 
 		expect(RsxToHtml::render_body(&node))
 			.to_be("<article><h1>welcome</h1><p><b>what a cool article</b></p><main><div>direct child</div></main></article>");
+	}
+
+
+	#[test]
+	fn trims() {
+		expect(
+			RsxToHtml {
+				trim: true,
+				..Default::default()
+			}
+			.map_node(&rsx! { "  hello  " })
+			.render(),
+		)
+		.to_be("hello");
 	}
 }

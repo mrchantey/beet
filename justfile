@@ -6,6 +6,7 @@
 # just test-all
 # ```
 #
+#💡 Init
 set windows-shell := ["C:/tools/cygwin/bin/sh.exe","-c"]
 set dotenv-load
 crates := 'beet beet_spatial beet_flow'
@@ -15,7 +16,13 @@ default:
 
 init-repo:
 	just assets-pull
+# just test-site
 # just export-scenes
+
+#💡 CLI
+
+cli *args:
+	cargo run -p beet-cli -- {{args}}
 
 run example *args:
 	just watch 'just run-ci {{example}} {{args}}'
@@ -23,8 +30,33 @@ run example *args:
 run-ci example *args:
 	cargo run --example {{example}} {{args}}
 
-run-p crate example *args:
+runp crate example *args:
 	cargo run -p {{crate}} --example {{example}} {{args}}
+
+
+fmt *args:
+	just watch 'just leptosfmt {{args}}'
+
+leptosfmt *args:
+	leptosfmt \
+	crates/beet_rsx/**/* \
+	crates/beet_router/**/* \
+	crates/beet_site/**/* \
+	{{args}}
+
+#💡 HTML
+
+test-site:
+	just runp beet_router test_site_router
+	just runp beet_router test_site_html
+	sweet serve target/test_site
+
+
+beet-site:
+	just cli serve \
+	-p beet_site \
+	--src crates/beet_site/src \
+	--serve-dir target/client
 
 
 ## common
@@ -51,12 +83,14 @@ doc:
 serve-doc:
 	cd ./target/doc/beet && forky serve
 
+# just leptosfmt --check
 test-all *args:
 	cargo test 																 --all-features -p beet_flow
 	cargo test 																								-p beet_rsx
+	cargo test 																								-p beet_router
 	cargo test 																								-p beet_spatial
 	cargo test 																								-p beet_ml
-	cargo test --target wasm32-unknown-unknown --all-features -p beet_flow 
+	cargo test --target wasm32-unknown-unknown --all-features -p beet_flow
 	cargo test --target wasm32-unknown-unknown --all-features -p beet_rsx
 	cargo test --target wasm32-unknown-unknown 								-p beet_spatial
 
@@ -87,6 +121,9 @@ clean-repo:
 	cargo clean
 	rm -rf ./target
 # rm -rf ./Cargo.lock
+
+clean-analyzer:
+	rm -rf $CARGO_TARGET_DIR/rust-analyzer
 
 pws *args:
 	just --shell powershell.exe --shell-arg -c {{args}}

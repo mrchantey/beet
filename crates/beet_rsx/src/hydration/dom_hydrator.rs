@@ -1,4 +1,3 @@
-use super::rsx_context_map::RsxContextMap;
 use crate::prelude::*;
 use wasm_bindgen::JsCast;
 use web_sys::window;
@@ -158,6 +157,7 @@ impl Hydrator for DomHydrator {
 					todo!("replace with text node");
 				}
 			}
+			RsxNode::Component { .. } => todo!(),
 			RsxNode::Fragment(vec) => todo!(),
 			RsxNode::Doctype => todo!(),
 			RsxNode::Comment(_) => todo!(),

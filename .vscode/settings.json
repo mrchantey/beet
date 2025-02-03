@@ -1,4 +1,5 @@
 {
+	"files.autoSaveDelay": 32,
 	// "rust-analyzer.cargo.features": ["sweet/rand"],
 	// "rust-analyzer.cargo.features": "all",
 	// "rust-analyzer.cargo.target": "x86_64-unknown-linux-gnu",
@@ -12,6 +13,7 @@
 		"LICENSE-APACHE.txt": true,
 		"LICENSE-MIT.txt": true,
 		// "**/mod.rs": true,
+		// "crates/beet_router/parser/compilecheck**": true,
 	},
 	"search.exclude": {
 		"assets/": true,

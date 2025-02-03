@@ -1,0 +1,21 @@
+[package]
+name = "beet_site"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+readme.workspace = true
+description.workspace = true
+documentation.workspace = true
+repository.workspace = true
+categories.workspace = true
+keywords.workspace = true
+
+
+[dependencies]
+beet = { workspace = true, features = ["router"] }
+
+tokio.workspace = true
+
+# [dev-dependencies]
+# beet = { workspace = true, default-features = false, features = ["router"] }

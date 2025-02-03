@@ -12,11 +12,9 @@ pub use dom_mounter::*;
 mod html_node_hydrator;
 #[cfg(not(target_arch = "wasm32"))]
 mod native_event_registry;
-mod rsx_context_map;
 pub use html_node_hydrator::*;
 #[cfg(not(target_arch = "wasm32"))]
 pub use native_event_registry::EventRegistry;
-pub use rsx_context_map::*;
 use std::cell::RefCell;
 
 

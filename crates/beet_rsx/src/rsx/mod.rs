@@ -1,9 +1,16 @@
+mod rsx_element;
+mod scoped_style;
+pub use rsx_element::*;
+pub use scoped_style::*;
 mod rsx_context;
-mod rsx_node;
 pub use rsx_context::*;
+mod rsx_node;
+mod rsx_node_visitor;
 pub use rsx_node::*;
 pub use text_block_encoder::*;
 mod text_block_encoder;
+pub use rsx_context_map::*;
+mod rsx_context_map;
 
 pub trait Rsx {
 	fn into_rsx(self) -> RsxNode;
@@ -63,7 +70,7 @@ pub trait Component {
 	fn render(self) -> impl Rsx;
 }
 
-impl<T: FnOnce() -> RsxNode> Component for T {
+impl<T: FnOnce() -> U, U: Rsx> Component for T {
 	fn render(self) -> impl Rsx { self() }
 }
 

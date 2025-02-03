@@ -41,21 +41,27 @@ members = [
 	"crates/beet_flow/macros",
 	"crates/beet_ml",
 	"crates/beet_rig",
+	"crates/beet_router",
+	"crates/beet_router/parser",
 	"crates/beet_rsx",
 	"crates/beet_rsx/macros",
 	"crates/beet_rsx/parser",
 	"crates/beet_sim",
 	"crates/beet_spatial",
+	"crates/beet_site",
+	"crates/beet-cli",
 ]
 
 [workspace.dependencies]
 ## internal
-beet = { path = "./", version = "0.0.5-rc.4" }
+beet = { path = "./", version = "0.0.5-rc.4", default-features = false }
 beet_examples = { path = "crates/beet_examples", version = "0.0.5-rc.4" }
 beet_spatial = { path = "crates/beet_spatial", version = "0.0.5-rc.4", default-features = false }
 beet_flow = { path = "crates/beet_flow", version = "0.0.5-rc.4" }
 beet_flow_macros = { path = "crates/beet_flow/macros", version = "0.0.5-rc.4" }
 beet_ml = { path = "crates/beet_ml", version = "0.0.5-rc.4" }
+beet_router = { path = "crates/beet_router", version = "0.0.5-rc.4" }
+beet_router_parser = { path = "crates/beet_router/parser", version = "0.0.5-rc.4" }
 beet_rsx = { path = "crates/beet_rsx", version = "0.0.5-rc.4" }
 beet_rsx_macros = { path = "crates/beet_rsx/macros", version = "0.0.5-rc.4" }
 beet_rsx_parser = { path = "crates/beet_rsx/parser", version = "0.0.5-rc.4" }
@@ -92,6 +98,7 @@ tokio = { version = "1.35", features = ["full"] }
 syn = "2.0"
 quote = "1.0"
 proc-macro2 = "1.0"
+prettyplease = "0.2"
 
 #💡 attributes
 num-traits = "0.2.19"
@@ -104,6 +111,10 @@ extend = "1.1.2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 ron = "0.8"
+clap = "4"
+
+#💡 http
+http = "1"
 
 #💡 web
 js-sys = "0.3"
@@ -132,6 +143,7 @@ include = ["CHANGELOG.md", "README.md", "/src", "/examples", "/scenes"]
 [features]
 default = ["flow"]
 flow = ["dep:beet_flow"]
+router = ["rsx", "dep:beet_router"]
 rsx = ["dep:beet_rsx"]
 ml = ["dep:beet_ml"]
 reflect = ["beet_flow/reflect"]
@@ -146,10 +158,11 @@ ui = ["beet_spatial?/ui"]
 
 [dependencies]
 beet_flow = { workspace = true, optional = true }
+beet_ml = { workspace = true, optional = true }
+beet_router = { workspace = true, optional = true }
+beet_sim = { workspace = true, optional = true }
 beet_rsx = { workspace = true, optional = true }
 beet_spatial = { workspace = true, optional = true }
-beet_ml = { workspace = true, optional = true }
-beet_sim = { workspace = true, optional = true }
 # bevyhub = { workspace = true, optional = true }
 # thiserror.workspace = true
 
