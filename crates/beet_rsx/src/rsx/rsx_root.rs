@@ -82,9 +82,7 @@ mod test {
 	}
 	impl Component for MyComponent {
 		fn render(self) -> RsxRoot {
-			rsx! {
-				<div>the value is {self.value}<slot/></div>
-			}
+			rsx! { <div>the value is {self.value}<slot /></div> }
 		}
 	}
 
@@ -94,14 +92,9 @@ mod test {
 		let some_val = 3;
 
 		let node = rsx! {
-			<div
-				key
-				str="value"
-				num=32
-				ident=some_val
-				>
-				<p>hello
-					<MyComponent value=3>
+			<div key str="value" num=32 ident=some_val>
+				<p>
+					hello <MyComponent value=3>
 						<div>some child</div>
 					</MyComponent>
 				</p>
@@ -121,14 +114,9 @@ mod test {
 		let some_val = 3;
 
 		let node = rsx! {
-			<div
-				key
-				str="value"
-				num=32
-				ident=some_val
-				>
-				<p>hello
-					<MyComponent value=3>
+			<div key str="value" num=32 ident=some_val>
+				<p>
+					hello <MyComponent value=3>
 						<div>some child</div>
 					</MyComponent>
 				</p>

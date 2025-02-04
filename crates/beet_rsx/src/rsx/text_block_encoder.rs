@@ -229,7 +229,10 @@ mod test {
 	struct Adjective;
 	impl Component for Adjective {
 		fn render(self) -> RsxRoot {
-			rsx! {"lazy"<slot/>}
+			rsx! {
+				"lazy"
+				<slot />
+			}
 		}
 	}
 
@@ -239,7 +242,12 @@ mod test {
 		let color = "brown";
 		let action = "jumps over";
 
-		let tree = rsx! {<div>"The "{desc}" and "{color}<b> fox </b> {action}" the "<Adjective> and fat </Adjective>dog</div>};
+		let tree = rsx! {
+			<div>
+				"The "{desc}" and "{color}<b>fox</b> {action}" the "
+				<Adjective>and fat</Adjective>dog
+			</div>
+		};
 		let RsxNode::Element(el) = &tree.node else {
 			panic!("expected element");
 		};

@@ -105,7 +105,11 @@ mod test {
 		let color = "brown";
 		let action = "jumps over";
 
-		let root = rsx! {<div>"The "{desc}" and "{color}<b> fox </b> {action}" the lazy " and fat dog</div>};
+		let root = rsx! {
+			<div>
+				"The "{desc}" and "{color}<b>fox</b> {action}" the lazy "and fat dog
+			</div>
+		};
 
 		let map = RsxContextMap::from_node(&root);
 

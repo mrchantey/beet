@@ -48,7 +48,7 @@ pub fn apply_stats(
 					Name::new(stat_entry.name.clone()),
 					stat_id.clone(),
 					stat_value.clone(),
-					orbital_child(0, 0), //TODO reposition all children
+					// orbital_child(0, 0), //TODO reposition all children
 				))
 				.id();
 			commands.entity(collector_entity).add_child(new_stat);

@@ -17,7 +17,7 @@ pub fn build_agent_behavior(
 	let behavior = world
 		.spawn((
 			Name::new("Behavior"),
-			Emoji::new("1F600"),
+			// Emoji::new("1F600"),
 			TargetEntity(agent),
 			ScoreFlow::default(),
 			RepeatFlow::default(),

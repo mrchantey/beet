@@ -93,13 +93,17 @@ mod test {
 
 	#[test]
 	fn plain() {
-		expect(RsxToResumableHtml::render_body(&rsx! { <br/> }))
+		expect(RsxToResumableHtml::render_body(&rsx! { <br /> }))
 			.to_contain("<br/>");
 	}
 	#[test]
 	fn id() {
 		expect(RsxToResumableHtml::render_body(
-			&rsx! { <main><article>{7}</article></main> },
+			&rsx! {
+				<main>
+					<article>{7}</article>
+				</main>
+			},
 		))
 		.to_contain("<main><article data-sweet-id=\"1\">7</article></main>");
 	}

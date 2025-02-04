@@ -84,17 +84,14 @@ doc:
 serve-doc:
 	cd ./target/doc/beet && forky serve
 
-# just leptosfmt --check
 test-all *args:
-	cargo test 																 --all-features -p beet_flow
-	cargo test 																								-p beet_rsx
-	cargo test 																								-p beet_router
-	cargo test 																								-p beet_router_parser
-	cargo test 																								-p beet_spatial
-	cargo test 																								-p beet_ml
-	cargo test --target wasm32-unknown-unknown --all-features -p beet_flow
-	cargo test --target wasm32-unknown-unknown --all-features -p beet_rsx
-	cargo test --target wasm32-unknown-unknown 								-p beet_spatial
+	just leptosfmt --check
+	cargo test --workspace
+	cargo test 																 --all-features -p beet_flow 			{{args}}
+	cargo test 																 --all-features -p beet_rsx 			{{args}}
+	cargo test --target wasm32-unknown-unknown --all-features -p beet_flow 			{{args}}
+	cargo test --target wasm32-unknown-unknown --all-features -p beet_rsx 			{{args}}
+	cargo test --target wasm32-unknown-unknown 								-p beet_spatial 	{{args}}
 
 #cargo test -p beet_spatial
 #cargo test -p beet_sim

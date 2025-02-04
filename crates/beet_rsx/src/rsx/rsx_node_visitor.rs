@@ -63,7 +63,10 @@ mod test {
 	struct Child;
 	impl Component for Child {
 		fn render(self) -> RsxRoot {
-			rsx! {<div/><slot/>}
+			rsx! {
+				<div />
+				<slot />
+			}
 		}
 	}
 
@@ -73,9 +76,9 @@ mod test {
 		rsx! {
 			<div>
 				<Child>
-					<br/>
+					<br />
 				</Child>
-				<br/>
+				<br />
 			</div>
 		}
 		.visit_ignore_components(|_| {
@@ -89,9 +92,9 @@ mod test {
 		rsx! {
 			<div>
 				<Child>
-					<br/>
+					<br />
 				</Child>
-				<br/>
+				<br />
 			</div>
 		}
 		.visit_ignore_components_mut(|_| {

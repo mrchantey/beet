@@ -254,7 +254,7 @@ mod test {
 	#[test]
 	fn root_location() {
 		let line = line!() + 1;
-		let RsxRoot { location, .. } = rsx! {<div>hello world</div>};
+		let RsxRoot { location, .. } = rsx! { <div>hello world</div> };
 		expect(location.file()).to_be("crates/beet_rsx/src/rsx/rsx_node.rs");
 		expect(location.line()).to_be(line as usize);
 		expect(location.col()).to_be(39);
@@ -271,6 +271,6 @@ mod test {
 			location.to_hash()
 		}
 		#[rustfmt::skip]
-		expect(get_hash(rsx! {{39}})).not().to_be(get_hash(rsx! {{39}}));
+		expect(get_hash(rsx! { {39} })).not().to_be(get_hash(rsx! { {39} }));
 	}
 }

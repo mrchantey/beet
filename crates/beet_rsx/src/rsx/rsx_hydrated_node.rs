@@ -115,9 +115,9 @@ mod test {
 	#[test]
 	fn works() {
 		let bar = 2;
-		expect(RsxHydratedNode::collect(rsx! {<div/>}).len()).to_be(0);
-		expect(RsxHydratedNode::collect(rsx! {<div foo=bar/>}).len()).to_be(1);
-		expect(RsxHydratedNode::collect(rsx! {<div>{bar}</div>}).len())
+		expect(RsxHydratedNode::collect(rsx! { <div /> }).len()).to_be(0);
+		expect(RsxHydratedNode::collect(rsx! { <div foo=bar /> }).len()).to_be(1);
+		expect(RsxHydratedNode::collect(rsx! { <div>{bar}</div> }).len())
 			.to_be(1);
 	}
 }

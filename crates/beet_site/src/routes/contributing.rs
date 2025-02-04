@@ -3,9 +3,5 @@ use beet::prelude::*;
 
 
 pub fn get() -> RsxRoot {
-	rsx! {
-		<PageLayout title="Beet".into()>
-				party time dude!
-		</PageLayout>
-	}
+	rsx! { <PageLayout title="Beet".into()>party time dude!</PageLayout> }
 }

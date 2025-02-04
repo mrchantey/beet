@@ -144,20 +144,20 @@ mod test {
 		let _key = "hidden";
 		let _key_value = "class=\"pretty\"";
 		let food = "pizza";
-		expect(RsxToHtml::render_body(&rsx! { <div
-			name="pete"
-			age=9
-			// {key}
-			// {key_value}
-			favorite_food={food}
-			>
-			</div>
+		expect(RsxToHtml::render_body(&rsx! {
+			<div
+				name="pete"
+				age=9
+				// {key}
+				// {key_value}
+				favorite_food=food
+			></div>
 		}))
 		.to_be("<div name=\"pete\" age=\"9\" favorite_food=\"pizza\"></div>");
 	}
 	#[test]
 	fn element_self_closing() {
-		expect(RsxToHtml::render_body(&rsx! { <br/> })).to_be("<br/>");
+		expect(RsxToHtml::render_body(&rsx! { <br /> })).to_be("<br/>");
 	}
 	#[test]
 	fn element_children() {
@@ -200,10 +200,10 @@ mod test {
 		}
 		impl Component for Child {
 			fn render(self) -> RsxRoot {
-				rsx! {<p>hello {self.value}</p>}
+				rsx! { <p>hello {self.value}</p> }
 			}
 		}
-		let node = rsx! {<div> the child is <Child value=38/>! </div>};
+		let node = rsx! { <div>the child is <Child value=38 />!</div> };
 
 		expect(RsxToHtml::render_body(&node))
 			.to_be("<div> the child is <p>hello 38</p>! </div>");
@@ -216,12 +216,18 @@ mod test {
 				rsx! {
 					<div>
 						<h1>welcome</h1>
-						<p><slot/></p>
+						<p>
+							<slot />
+						</p>
 					</div>
 				}
 			}
 		}
-		let node = rsx! {<Layout><b>foo</b></Layout>};
+		let node = rsx! {
+			<Layout>
+				<b>foo</b>
+			</Layout>
+		};
 
 		expect(RsxToHtml::render_body(&node))
 			.to_be("<div><h1>welcome</h1><p><b>foo</b></p></div>");
@@ -234,9 +240,11 @@ mod test {
 				rsx! {
 					<article>
 						<h1>welcome</h1>
-						<p><slot name="tagline"/></p>
+						<p>
+							<slot name="tagline" />
+						</p>
 						<main>
-							<slot/>
+							<slot />
 						</main>
 					</article>
 				}

@@ -25,7 +25,7 @@ pub fn tokens_to_rstml(tokens: TokenStream) -> (Vec<Node>, Vec<TokenStream>) {
 		.recover_block(true)
 		.always_self_closed_elements(empty_elements)
 		.raw_text_elements(["script", "style"].into_iter().collect())
-		.macro_call_pattern(quote!(html! {%%}));
+		.macro_call_pattern(quote!(rsx! {%%}));
 
 	let parser = Parser::new(config);
 	let (nodes, errors) = parser.parse_recoverable(tokens).split_vec();

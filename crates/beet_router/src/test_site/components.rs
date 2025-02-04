@@ -12,8 +12,8 @@ impl Component for PageLayout {
 		rsx! {
 			<html>
 				<div>
-						<h1>{self.title}</h1>
-						<slot/>
+					<h1>{self.title}</h1>
+					<slot />
 				</div>
 			</html>
 		}

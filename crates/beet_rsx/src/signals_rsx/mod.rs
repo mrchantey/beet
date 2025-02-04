@@ -76,7 +76,7 @@ mod test {
 	fn works() {
 		let (get, set) = signal(7);
 
-		let rsx = || rsx! {<div>value is {get}</div>};
+		let rsx = || rsx! { <div>value is {get}</div> };
 		CurrentHydrator::set(HtmlNodeHydrator::new(rsx.clone()));
 
 		rsx().register_effects();

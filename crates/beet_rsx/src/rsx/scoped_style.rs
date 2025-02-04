@@ -122,7 +122,11 @@ mod test {
 
 	impl Component for Child {
 		fn render(self) -> RsxRoot {
-			rsx! {<div><slot/></div>}
+			rsx! {
+				<div>
+					<slot />
+				</div>
+			}
 		}
 	}
 

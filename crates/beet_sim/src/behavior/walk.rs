@@ -12,9 +12,9 @@ pub fn walk_plugin(app: &mut App) {
 		.register_component_hooks::<Walk>()
 		.on_add(|mut world, entity, _| {
 			
-			world
-				.commands()
-				.entity(entity)
-				.insert(Emoji::bundle("1F43E"));
+			// world
+			// 	.commands()
+			// 	.entity(entity)
+			// 	.insert(Emoji::bundle("1F43E"));
 		});
 }

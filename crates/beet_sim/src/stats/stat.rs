@@ -83,9 +83,9 @@ pub fn stat_plugin(app: &mut App) {
 				.emoji_hexcode
 				.clone();
 
-			world
-				.commands()
-				.entity(entity)
-				.insert(Emoji::bundle(&hexcode));
+			// world
+			// 	.commands()
+			// 	.entity(entity)
+				// .insert(Emoji::bundle(&hexcode));
 		});
 }

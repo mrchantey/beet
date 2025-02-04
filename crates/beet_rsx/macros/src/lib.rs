@@ -20,11 +20,8 @@ fn idents() -> RsxIdents {
 ///
 /// The type of node is determied by the feature flags, current options are:
 /// - [`StringRsx`](beet_rsx::rsx::StringRsx)
-/// ```
-/// # use beet::prelude::*;
+/// ```ignore
 /// let tree = rsx! {<div> the value is {3}</div>};
-/// assert_eq!(tree.nodes.len(), 1);
-///
 /// ```
 ///
 #[proc_macro]

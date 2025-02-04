@@ -6,16 +6,18 @@ struct MyComponent {
 }
 impl Component for MyComponent {
 	fn render(self) -> RsxRoot {
-		rsx! {
-			<div>{self.value}<slot/></div>
-		}
+		rsx! { <div>{self.value}<slot /></div> }
 	}
 }
 
 fn main() {
 	let foo = rsx! {
 		<div>
-			<p>hello <MyComponent value=38><div>some child</div></MyComponent></p>
+			<p>
+				hello <MyComponent value=38>
+					<div>some child</div>
+				</MyComponent>
+			</p>
 		</div>
 	};
 	// let foo = rsx! {<div></div>};
