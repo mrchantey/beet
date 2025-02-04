@@ -1,9 +1,11 @@
-mod rstml_to_rsx_template;
+mod rstml_to_template;
+mod rstml_to_template_ron;
 mod utils;
 pub use utils::*;
 pub mod tokens_to_rstml;
 #[allow(unused_imports)]
-pub use self::rstml_to_rsx_template::*;
+pub use self::rstml_to_template_ron::*;
+pub use self::rstml_to_template::*;
 pub use self::tokens_to_rstml::*;
 mod rsx_rust_tokens;
 pub use rsx_rust_tokens::*;

@@ -217,9 +217,9 @@ assets-pull:
 	rm ./assets.tar.gz
 
 expand-rsx:
-	just watch cargo expand -p beet_rsx --example rsx_macro
-expand-reverse-rsx:
-	just watch cargo expand -p beet_rsx --example rsx_template_macro
+	just watch cargo expand -p beet_rsx --example macro
+expand-rsx-template:
+	just watch cargo expand -p beet_rsx --example template_macro
 
 wasm-example:
 	forky serve | \

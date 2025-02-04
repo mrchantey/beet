@@ -48,3 +48,11 @@ pub fn rsx_template(tokens: TokenStream) -> TokenStream {
 		.map_tokens(tokens.into())
 		.into()
 }
+/// Mostly used for testing,
+/// this macro expands to a valid ron file.
+#[proc_macro]
+pub fn rsx_template_ron(tokens: TokenStream) -> TokenStream {
+	RstmlToRsxTemplateRon::default()
+		.map_tokens(tokens.into())
+		.into()
+}

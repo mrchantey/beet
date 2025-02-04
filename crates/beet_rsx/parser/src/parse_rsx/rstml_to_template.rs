@@ -12,9 +12,7 @@ use syn::spanned::Spanned;
 /// Convert rstml nodes to serializable html nodes.
 /// Rust block token streams will be hashed by [Span::start]
 #[derive(Debug, Default, Clone)]
-pub struct RstmlToRsxTemplate {
-	pub exclude_errors: bool,
-}
+pub struct RstmlToRsxTemplate {}
 
 
 impl RstmlToRsxTemplate {
@@ -22,14 +20,9 @@ impl RstmlToRsxTemplate {
 	pub fn map_tokens(&self, tokens: TokenStream) -> TokenStream {
 		let (nodes, rstml_errors) = tokens_to_rstml(tokens);
 		let nodes = self.map_nodes(nodes);
-		let errors = if self.exclude_errors {
-			vec![]
-		} else {
-			rstml_errors
-		};
 		quote! {
 			{
-				#(#errors;)*
+				#(#rstml_errors;)*
 				use beet::prelude::*;
 				vec![#(#nodes),*]
 			}

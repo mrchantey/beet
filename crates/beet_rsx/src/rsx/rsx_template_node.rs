@@ -153,4 +153,80 @@ mod test {
 			}],
 		});
 	}
+
+	#[test]
+	fn ron() {
+		let mut template = rsx_template! {
+			<div
+				key
+				str="value"
+				num=32
+				ident=some_val
+				>
+				<p>hello
+					<MyComponent>
+						<div>some child</div>
+					</MyComponent>
+				</p>
+			</div>
+		};
+		let template_ron = rsx_template_ron! {
+			<div
+				key
+				str="value"
+				num=32
+				ident=some_val
+				>
+				<p>hello
+					<MyComponent>
+						<div>some child</div>
+					</MyComponent>
+				</p>
+			</div>
+		};
+
+		let mut parsed =
+			ron::de::from_str::<Vec<RsxTemplateNode>>(&template_ron).unwrap();
+		zero_out_linecol(&mut template);
+		zero_out_linecol(&mut parsed);
+
+		expect(template).to_be(parsed);
+	}
+
+	fn zero_out_linecol(nodes: &mut Vec<RsxTemplateNode>) {
+		for item in nodes {
+			match item {
+				RsxTemplateNode::Component { hash, .. } => {
+					hash.line = 0;
+					hash.column = 0;
+				}
+				RsxTemplateNode::RustBlock(loc) => {
+					loc.line = 0;
+					loc.column = 0;
+				}
+				RsxTemplateNode::Element {
+					attributes,
+					children,
+					..
+				} => {
+					for attr in attributes {
+						if let RsxTemplateAttribute::BlockValue {
+							value, ..
+						} = attr
+						{
+							value.line = 0;
+							value.column = 0;
+						}
+						if let RsxTemplateAttribute::Block(loc) = attr {
+							loc.line = 0;
+							loc.column = 0;
+						}
+					}
+					// Recursively process children
+					zero_out_linecol(children);
+				}
+				_ => {}
+			}
+		}
+	}
 }

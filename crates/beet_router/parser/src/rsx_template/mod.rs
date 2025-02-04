@@ -1,6 +1,6 @@
 pub use crate::prelude::*;
 use anyhow::Result;
-use beet_rsx::prelude::RstmlToRsxTemplate;
+use beet_rsx::prelude::*;
 use clap::Parser;
 use proc_macro2::TokenStream;
 use std::path::PathBuf;
@@ -83,11 +83,8 @@ impl<'a> Visit<'a> for RsxVisitor {
 			.last()
 			.map_or(false, |seg| seg.ident == self.mac)
 		{
-			let tokens = RstmlToRsxTemplate {
-				exclude_errors: true,
-				..Default::default()
-			}
-			.map_tokens(mac.tokens.clone());
+			let tokens =
+				RstmlToRsxTemplateRon::default().map_tokens(mac.tokens.clone());
 
 			self.templates.push(tokens);
 		}

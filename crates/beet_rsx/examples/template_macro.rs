@@ -2,7 +2,7 @@ use beet_rsx::as_beet::beet;
 use beet_rsx::prelude::*;
 
 fn main() {
-	let reverse_node = rsx_template! {
+	let template = rsx_template! {
 		<div
 			key
 			str="value"
@@ -16,5 +16,5 @@ fn main() {
 			</p>
 		</div>
 	};
-	sweet::log!("success! {:?}", reverse_node);
+	sweet::log!("success! {:?}", template);
 }
