@@ -7,20 +7,21 @@ use rstml::node::NodeAttribute;
 use rstml::node::NodeComment;
 use rstml::node::NodeElement;
 use rstml::node::NodeText;
-use syn::spanned::Spanned;
 
 /// Convert rstml nodes to a ron file.
 /// Rust block token streams will be hashed by [Span::start]
-#[derive(Debug, Default, Clone)]
-pub struct RstmlToRsxTemplateRon {}
+#[derive(Debug, Default)]
+pub struct RstmlToRsxTemplateRon {
+	tracker: RustyTrackerBuilder,
+}
 
 
 impl RstmlToRsxTemplateRon {
 	/// returns a "[RsxTemplateNode]" ron string
-	pub fn map_tokens_to_string(&self, tokens: TokenStream) -> TokenStream {
+	pub fn map_tokens_to_string(&mut self, tokens: TokenStream) -> TokenStream {
 		self.map_tokens(tokens).to_string().to_token_stream()
 	}
-	pub fn map_tokens(&self, tokens: TokenStream) -> TokenStream {
+	pub fn map_tokens(&mut self, tokens: TokenStream) -> TokenStream {
 		let (nodes, _rstml_errors) = tokens_to_rstml(tokens);
 		let mut nodes = self.map_nodes(nodes);
 		if nodes.len() == 1 {
@@ -29,12 +30,12 @@ impl RstmlToRsxTemplateRon {
 			quote! {Fragment([#(#nodes),*])}
 		}
 	}
-	pub fn map_nodes<C>(&self, nodes: Vec<Node<C>>) -> Vec<TokenStream> {
+	pub fn map_nodes<C>(&mut self, nodes: Vec<Node<C>>) -> Vec<TokenStream> {
 		nodes.into_iter().map(|node| self.map_node(node)).collect()
 	}
 
 	/// returns an RsxTemplateNode
-	pub fn map_node<C>(&self, node: Node<C>) -> TokenStream {
+	pub fn map_node<C>(&mut self, node: Node<C>) -> TokenStream {
 		match node {
 			Node::Doctype(_) => quote! {Doctype},
 			Node::Comment(NodeComment { value, .. }) => {
@@ -50,8 +51,8 @@ impl RstmlToRsxTemplateRon {
 				}
 			}
 			Node::Block(node_block) => {
-				let hash = span_to_line_col_ron(&node_block.span());
-				quote! {RustBlock(#hash)}
+				let tracker = self.tracker.next_ron(&node_block);
+				quote! {RustBlock(#tracker)}
 			}
 			Node::Text(NodeText { value }) => {
 				quote! {Text(#value)}
@@ -65,15 +66,8 @@ impl RstmlToRsxTemplateRon {
 				children,
 				close_tag,
 			}) => {
-				let span = open_tag.span();
 				let tag_name = open_tag.name.to_string();
 				let self_closing = close_tag.is_none();
-				let attributes = open_tag
-					.attributes
-					.into_iter()
-					.map(|a| self.map_attribute(a));
-				let children = self.map_nodes(children);
-
 				let is_component = tag_name
 					.chars()
 					.next()
@@ -82,15 +76,21 @@ impl RstmlToRsxTemplateRon {
 				if is_component {
 					// components disregard all the context, they are known
 					// to the rsx node
-					let loc = span_to_line_col_ron(&span);
+					let tracker = self.tracker.next_ron(open_tag);
 					// we rely on the hydrated node to provide the attributes and children
 					quote! {
 						Component (
-							loc: #loc,
+							tracker: #tracker,
 							tag: #tag_name,
 						)
 					}
 				} else {
+					let children = self.map_nodes(children);
+					let attributes = open_tag
+						.attributes
+						.into_iter()
+						.map(|a| self.map_attribute(a));
+
 					quote! {
 							Element (
 								tag: #tag_name,
@@ -104,11 +104,11 @@ impl RstmlToRsxTemplateRon {
 			Node::Custom(_) => unimplemented!(),
 		}
 	}
-	fn map_attribute(&self, attr: NodeAttribute) -> TokenStream {
+	fn map_attribute(&mut self, attr: NodeAttribute) -> TokenStream {
 		match attr {
 			NodeAttribute::Block(block) => {
-				let hash = span_to_line_col_ron(&block.span());
-				quote! {Block(#hash)}
+				let tracker = self.tracker.next_ron(&block);
+				quote! {Block(#tracker)}
 			}
 			NodeAttribute::Attribute(attr) => {
 				let key = attr.key.to_string();
@@ -126,11 +126,11 @@ impl RstmlToRsxTemplateRon {
 						}
 					}
 					Some(tokens) => {
-						let hash = span_to_line_col_ron(&tokens.span());
+						let tracker = self.tracker.next_ron(&tokens);
 						quote! {
 							BlockValue (
 								key: #key,
-								value: #hash
+								tracker: #tracker
 							)
 						}
 					}

@@ -43,7 +43,7 @@ impl RsxRoot {
 pub struct SplitRsx {
 	pub location: RsxLocation,
 	pub template: RsxTemplateNode,
-	pub hydrated: HashMap<LineColumn, RsxHydratedNode>,
+	pub hydrated: HashMap<RustyTracker, RsxHydratedNode>,
 }
 
 
@@ -116,7 +116,7 @@ mod test {
 		let node = rsx! {
 			<div key str="value" num=32 ident=some_val>
 				<p>
-					hello 
+					hello
 					<MyComponent value=3>
 						<div>some child</div>
 					</MyComponent>
@@ -142,8 +142,8 @@ mod test {
 			..
 		} = node.split().unwrap();
 		// println!("{:#?}", split);
-		node1_template.zero_out_linecol();
-		node2_template.zero_out_linecol();
+		node1_template.clear_rusty_trackers();
+		node2_template.clear_rusty_trackers();
 		expect(&node1_template).not().to_be(&node2_template);
 	}
 }

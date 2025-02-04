@@ -7,17 +7,18 @@ use rstml::node::NodeAttribute;
 use rstml::node::NodeComment;
 use rstml::node::NodeElement;
 use rstml::node::NodeText;
-use syn::spanned::Spanned;
 
 /// Convert rstml nodes to serializable html nodes.
 /// Rust block token streams will be hashed by [Span::start]
-#[derive(Debug, Default, Clone)]
-pub struct RstmlToRsxTemplate {}
+#[derive(Debug, Default)]
+pub struct RstmlToRsxTemplate {
+	tracker: RustyTrackerBuilder,
+}
 
 
 impl RstmlToRsxTemplate {
 	/// returns a Vec<HtmlNode>
-	pub fn map_tokens(&self, tokens: TokenStream) -> TokenStream {
+	pub fn map_tokens(&mut self, tokens: TokenStream) -> TokenStream {
 		let (nodes, rstml_errors) = tokens_to_rstml(tokens);
 		let mut nodes = self.map_nodes(nodes);
 
@@ -35,12 +36,12 @@ impl RstmlToRsxTemplate {
 		}
 	}
 	/// comma separated RsxTemplateNode
-	pub fn map_nodes<C>(&self, nodes: Vec<Node<C>>) -> Vec<TokenStream> {
+	pub fn map_nodes<C>(&mut self, nodes: Vec<Node<C>>) -> Vec<TokenStream> {
 		nodes.into_iter().map(|node| self.map_node(node)).collect()
 	}
 
 	/// comma sepereated RsxTemplateNode, due to fragments
-	pub fn map_node<C>(&self, node: Node<C>) -> TokenStream {
+	pub fn map_node<C>(&mut self, node: Node<C>) -> TokenStream {
 		match node {
 			Node::Doctype(_) => quote! {RsxTemplateNode::Doctype},
 			Node::Comment(NodeComment { value, .. }) => {
@@ -56,8 +57,8 @@ impl RstmlToRsxTemplate {
 				}
 			}
 			Node::Block(node_block) => {
-				let hash = span_to_line_col(&node_block.span());
-				quote! {RsxTemplateNode::RustBlock(#hash)}
+				let tracker = self.tracker.next(&node_block);
+				quote! {RsxTemplateNode::RustBlock(#tracker)}
 			}
 			Node::Text(NodeText { value }) => {
 				quote! {RsxTemplateNode::Text(#value.to_string())}
@@ -71,14 +72,8 @@ impl RstmlToRsxTemplate {
 				children,
 				close_tag,
 			}) => {
-				let span = open_tag.span();
 				let tag_name = open_tag.name.to_string();
 				let self_closing = close_tag.is_none();
-				let attributes = open_tag
-					.attributes
-					.into_iter()
-					.map(|a| self.map_attribute(a));
-				let children = self.map_nodes(children);
 
 				let is_component = tag_name
 					.chars()
@@ -88,15 +83,20 @@ impl RstmlToRsxTemplate {
 				if is_component {
 					// components disregard all the context, they are known
 					// to the rsx node
-					let loc = span_to_line_col(&span);
+					let tracker = self.tracker.next(open_tag);
 					// we rely on the hydrated node to provide the attributes and children
 					quote! {
 						RsxTemplateNode::Component {
-							loc: #loc,
+							tracker: #tracker,
 							tag: #tag_name.to_string(),
 						}
 					}
 				} else {
+					let children = self.map_nodes(children);
+					let attributes = open_tag
+						.attributes
+						.into_iter()
+						.map(|a| self.map_attribute(a));
 					quote! {
 							RsxTemplateNode::Element {
 								tag: #tag_name.to_string(),
@@ -110,11 +110,11 @@ impl RstmlToRsxTemplate {
 			Node::Custom(_) => unimplemented!(),
 		}
 	}
-	fn map_attribute(&self, attr: NodeAttribute) -> TokenStream {
+	fn map_attribute(&mut self, attr: NodeAttribute) -> TokenStream {
 		match attr {
 			NodeAttribute::Block(block) => {
-				let hash = span_to_line_col(&block.span());
-				quote! {RsxTemplateAttribute::Block(#hash)}
+				let tracker = self.tracker.next(&block);
+				quote! {RsxTemplateAttribute::Block(#tracker)}
 			}
 			NodeAttribute::Attribute(attr) => {
 				let key = attr.key.to_string();
@@ -135,11 +135,11 @@ impl RstmlToRsxTemplate {
 						}
 					}
 					Some(tokens) => {
-						let hash = span_to_line_col(&tokens.span());
+						let tracker = self.tracker.next(&tokens);
 						quote! {
 							RsxTemplateAttribute::BlockValue {
 								key: #key.to_string(),
-								value: #hash,
+								tracker: #tracker,
 							}
 						}
 					}

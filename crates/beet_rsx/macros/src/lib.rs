@@ -28,7 +28,7 @@ fn idents() -> RsxIdents {
 pub fn rsx(tokens: TokenStream) -> TokenStream {
 	RstmlToRsx {
 		// perhaps we can feature gate this if it proves expensive
-		hash_location: true,
+		build_trackers: true,
 		idents: idents(),
 		..Default::default()
 	}

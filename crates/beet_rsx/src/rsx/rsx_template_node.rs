@@ -11,10 +11,10 @@ pub enum RsxTemplateNode {
 	// only used by the rsx_template! macro,
 	// components are already collapsed when traversing [RsxNode]
 	Component {
-		loc: LineColumn,
+		tracker: RustyTracker,
 		tag: String,
 	},
-	RustBlock(LineColumn),
+	RustBlock(RustyTracker),
 	Element {
 		tag: String,
 		self_closing: bool,
@@ -39,12 +39,12 @@ impl RsxTemplateNode {
 					.collect::<Result<Vec<_>>>()?;
 				Ok(Self::Fragment(nodes))
 			}
-			RsxNode::Component { tag, loc, .. } => Ok(Self::Component {
-				loc: loc.clone().ok_or_else(no_location)?,
+			RsxNode::Component { tag, tracker, .. } => Ok(Self::Component {
+				tracker: tracker.clone().ok_or_else(no_location)?,
 				tag: tag.clone(),
 			}),
 			RsxNode::Block { effect, .. } => Ok(Self::RustBlock(
-				effect.location.clone().ok_or_else(no_location)?,
+				effect.tracker.clone().ok_or_else(no_location)?,
 			)),
 			RsxNode::Element(RsxElement {
 				tag,
@@ -72,7 +72,7 @@ impl RsxTemplateNode {
 	/// drain the effect map into an RsxNode
 	pub fn into_rsx_node(
 		self,
-		effect_map: &mut HashMap<LineColumn, RsxHydratedNode>,
+		effect_map: &mut HashMap<RustyTracker, RsxHydratedNode>,
 	) -> Result<RsxNode> {
 		match self {
 			RsxTemplateNode::Doctype => Ok(RsxNode::Doctype),
@@ -85,27 +85,27 @@ impl RsxTemplateNode {
 					.collect::<Result<Vec<_>>>()?;
 				Ok(RsxNode::Fragment(nodes))
 			}
-			RsxTemplateNode::Component { loc, tag, .. } => {
+			RsxTemplateNode::Component { tracker, tag, .. } => {
 				let RsxHydratedNode::Component { node } =
-					effect_map.remove(&loc).ok_or_else(no_location)?
+					effect_map.remove(&tracker).ok_or_else(no_location)?
 				else {
 					anyhow::bail!("expected Component")
 				};
 				Ok(RsxNode::Component {
 					tag: tag.clone(),
-					loc: Some(loc),
+					tracker: Some(tracker),
 					node: Box::new(node),
 				})
 			}
-			RsxTemplateNode::RustBlock(line_column) => {
+			RsxTemplateNode::RustBlock(tracker) => {
 				let RsxHydratedNode::RustBlock { initial, register } =
-					effect_map.remove(&line_column).ok_or_else(no_location)?
+					effect_map.remove(&tracker).ok_or_else(no_location)?
 				else {
 					anyhow::bail!("expected Rust Block")
 				};
 				Ok(RsxNode::Block {
 					initial: Box::new(initial),
-					effect: Effect::new(register, Some(line_column)),
+					effect: Effect::new(register, Some(tracker)),
 				})
 			}
 			RsxTemplateNode::Element {
@@ -130,20 +130,18 @@ impl RsxTemplateNode {
 
 	/// allow two templates to be compared without considering line and column
 	#[cfg(test)]
-	pub fn zero_out_linecol(&mut self) {
+	pub fn clear_rusty_trackers(&mut self) {
 		match self {
-			RsxTemplateNode::Component { loc: hash, .. } => {
-				hash.line = 0;
-				hash.column = 0;
+			RsxTemplateNode::Component { tracker, .. } => {
+				tracker.clear();
 			}
 			RsxTemplateNode::Fragment(children) => {
 				for child in children {
-					child.zero_out_linecol();
+					child.clear_rusty_trackers();
 				}
 			}
-			RsxTemplateNode::RustBlock(loc) => {
-				loc.line = 0;
-				loc.column = 0;
+			RsxTemplateNode::RustBlock(tracker) => {
+				tracker.clear();
 			}
 			RsxTemplateNode::Element {
 				attributes,
@@ -151,19 +149,19 @@ impl RsxTemplateNode {
 				..
 			} => {
 				for attr in attributes {
-					if let RsxTemplateAttribute::BlockValue { value, .. } = attr
+					if let RsxTemplateAttribute::BlockValue {
+						tracker, ..
+					} = attr
 					{
-						value.line = 0;
-						value.column = 0;
+						tracker.clear();
 					}
-					if let RsxTemplateAttribute::Block(loc) = attr {
-						loc.line = 0;
-						loc.column = 0;
+					if let RsxTemplateAttribute::Block(tracker) = attr {
+						tracker.clear();
 					}
 				}
 				// Recursively process children
 				for child in children {
-					child.zero_out_linecol();
+					child.clear_rusty_trackers();
 				}
 			}
 			_ => {}
@@ -176,8 +174,8 @@ impl RsxTemplateNode {
 pub enum RsxTemplateAttribute {
 	Key { key: String },
 	KeyValue { key: String, value: String },
-	Block(LineColumn),
-	BlockValue { key: String, value: LineColumn },
+	Block(RustyTracker),
+	BlockValue { key: String, tracker: RustyTracker },
 }
 
 impl RsxTemplateAttribute {
@@ -191,45 +189,45 @@ impl RsxTemplateAttribute {
 			RsxAttribute::BlockValue { key, effect, .. } => {
 				Ok(Self::BlockValue {
 					key: key.clone(),
-					value: effect.location.clone().ok_or_else(no_location)?,
+					tracker: effect.tracker.clone().ok_or_else(no_location)?,
 				})
 			}
-			RsxAttribute::Block { effect, .. } => Ok(Self::Block(
-				effect.location.clone().ok_or_else(no_location)?,
-			)),
+			RsxAttribute::Block { effect, .. } => {
+				Ok(Self::Block(effect.tracker.clone().ok_or_else(no_location)?))
+			}
 		}
 	}
 	/// drain the effect map into the template
 	pub fn into_rsx_node(
 		self,
-		effect_map: &mut HashMap<LineColumn, RsxHydratedNode>,
+		effect_map: &mut HashMap<RustyTracker, RsxHydratedNode>,
 	) -> Result<RsxAttribute> {
 		match self {
 			RsxTemplateAttribute::Key { key } => Ok(RsxAttribute::Key { key }),
 			RsxTemplateAttribute::KeyValue { key, value } => {
 				Ok(RsxAttribute::KeyValue { key, value })
 			}
-			RsxTemplateAttribute::Block(line_column) => {
+			RsxTemplateAttribute::Block(tracker) => {
 				let RsxHydratedNode::AttributeBlock { initial, register } =
-					effect_map.remove(&line_column).ok_or_else(no_location)?
+					effect_map.remove(&tracker).ok_or_else(no_location)?
 				else {
 					anyhow::bail!("expected Attribute Block")
 				};
 				Ok(RsxAttribute::Block {
 					initial,
-					effect: Effect::new(register, Some(line_column)),
+					effect: Effect::new(register, Some(tracker)),
 				})
 			}
-			RsxTemplateAttribute::BlockValue { key, value } => {
+			RsxTemplateAttribute::BlockValue { key, tracker } => {
 				let RsxHydratedNode::AttributeValue { initial, register } =
-					effect_map.remove(&value).ok_or_else(no_location)?
+					effect_map.remove(&tracker).ok_or_else(no_location)?
 				else {
 					anyhow::bail!("expected Attribute Block")
 				};
 				Ok(RsxAttribute::BlockValue {
 					key,
 					initial,
-					effect: Effect::new(register, Some(value)),
+					effect: Effect::new(register, Some(tracker)),
 				})
 			}
 		}
@@ -261,7 +259,7 @@ mod test {
 
 	#[test]
 	fn simple() {
-		let loc = LineColumn::new(line!() + 1, 33);
+		let loc = RustyTracker::new(0, 18046130629154014124);
 		let node = rsx_template! {<div>{value}</div>};
 
 		expect(&node).to_be(&RsxTemplateNode::Element {
@@ -273,8 +271,8 @@ mod test {
 	}
 	#[test]
 	fn complex() {
-		let ident_linecol = LineColumn::new(line!() + 7, 10);
-		let component_linecol = LineColumn::new(line!() + 9, 5);
+		let ident_tracker = RustyTracker::new(1, 13779576133490827230);
+		let component_tracker = RustyTracker::new(0, 7661018779846923955);
 		let template = rsx_template! {
 			<div
 				key
@@ -307,7 +305,7 @@ mod test {
 				},
 				RsxTemplateAttribute::BlockValue {
 					key: "ident".to_string(),
-					value: ident_linecol,
+					tracker: ident_tracker,
 				},
 			],
 			children: vec![RsxTemplateNode::Element {
@@ -317,7 +315,7 @@ mod test {
 				children: vec![
 					RsxTemplateNode::Text("hello\n\t\t\t\t\t".to_string()),
 					RsxTemplateNode::Component {
-						loc: component_linecol,
+						tracker: component_tracker,
 						tag: "MyComponent".to_string(),
 					},
 				],
@@ -358,8 +356,8 @@ mod test {
 
 		let mut parsed =
 			ron::de::from_str::<RsxTemplateNode>(&template_ron).unwrap();
-		template.zero_out_linecol();
-		parsed.zero_out_linecol();
+		template.clear_rusty_trackers();
+		parsed.clear_rusty_trackers();
 
 		expect(template).to_be(parsed);
 	}

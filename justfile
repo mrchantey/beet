@@ -216,11 +216,6 @@ assets-pull:
 	tar -xzvf ./assets.tar.gz
 	rm ./assets.tar.gz
 
-expand-rsx:
-	just watch cargo expand -p beet_rsx --example macro
-expand-rsx-template:
-	just watch cargo expand -p beet_rsx --example template_macro
-
 wasm-example:
 	forky serve | \
 	just watch 'just build-wasm beet dom_renderer'

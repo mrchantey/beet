@@ -11,12 +11,18 @@ pub struct Effect {
 	/// the location of the effect in the rsx macro,
 	/// this may or may not be populated depending
 	/// on the settings of the parser
-	pub location: Option<LineColumn>,
+	pub tracker: Option<RustyTracker>,
 }
 
 impl Effect {
-	pub fn new(register: RegisterEffect, location: Option<LineColumn>) -> Self {
-		Self { register, location }
+	pub fn new(
+		register: RegisterEffect,
+		tracker: Option<RustyTracker>,
+	) -> Self {
+		Self {
+			register,
+			tracker,
+		}
 	}
 
 	/// call the FnOnce register func and replace it
@@ -24,8 +30,11 @@ impl Effect {
 	pub fn take(&mut self) -> Self {
 		let register =
 			std::mem::replace(&mut self.register, Box::new(|_| Ok(())));
-		let location = self.location.take();
-		Self { register, location }
+		let tracker = self.tracker.take();
+		Self {
+			register,
+			tracker,
+		}
 	}
 
 	pub fn register(self, cx: &RsxContext) -> Result<()> { (self.register)(cx) }
@@ -34,7 +43,7 @@ impl Effect {
 impl std::fmt::Debug for Effect {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		f.debug_struct("Effect")
-			.field("location", &self.location)
+			.field("tracker", &self.tracker)
 			.field("register", &std::any::type_name_of_val(&self.register))
 			.finish()
 	}

@@ -6,14 +6,10 @@ use rstml::visitor::visit_nodes;
 use rstml::visitor::Visitor;
 use std::hash::DefaultHasher;
 use std::hash::Hash;
-use syn::spanned::Spanned;
-
 
 
 ///
 /// Hash all the 'rusty' parts of the rsx macro
-/// <div {vec![]} key=73 key=ident key={block_value}>other text{block_node}</div>
-///      ^^^^^^^^            ^^^^^     ^^^^^^^^^^^^^           ^^^^^^^^^^^^
 pub struct RstmlRustToHash<'a> {
 	hasher: &'a mut DefaultHasher,
 }
@@ -41,24 +37,21 @@ where
 		&mut self,
 		element: &mut rstml::node::NodeElement<C>,
 	) -> bool {
-        // we must hash component open tags because if the keys change
-        // thats also a recompile.
-        // for now we must hash component positions,
-        // they are used for joining with template
+		// we must hash component open tags because if the keys change
+		// thats also a recompile.
 		if element
 			.open_tag
 			.name
 			.to_string()
 			.starts_with(|c: char| c.is_uppercase())
 		{
-			// hash component
 			element
 				.open_tag
 				.to_token_stream()
 				.to_string()
 				.hash(self.hasher);
-			element.open_tag.span().start().hash(self.hasher);
 		}
+		// visit children
 		true
 	}
 	fn visit_attribute(&mut self, attribute: &mut NodeAttribute) -> bool {

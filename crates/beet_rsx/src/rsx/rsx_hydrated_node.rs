@@ -48,21 +48,21 @@ impl std::fmt::Debug for RsxHydratedNode {
 }
 
 impl RsxHydratedNode {
-	pub fn collect(node: impl Rsx) -> HashMap<LineColumn, Self> {
+	pub fn collect(node: impl Rsx) -> HashMap<RustyTracker, Self> {
 		let mut effects = HashMap::new();
 
 		let take_effect = |effect: &mut Effect| {
 			let effect = effect.take();
-			let location = effect
-				.location
-				.expect("effect has no location, ensure they are collected");
-			(effect.register, location)
+			let tracker = effect
+				.tracker
+				.expect("effect has no tracker, ensure they are collected");
+			(effect.register, tracker)
 		};
 
 		node.into_rsx().visit_mut(|node| match node {
 			RsxNode::Block { effect, initial } => {
-				let (register, location) = take_effect(effect);
-				effects.insert(location, Self::RustBlock {
+				let (register, tracker) = take_effect(effect);
+				effects.insert(tracker, Self::RustBlock {
 					initial: std::mem::take(initial),
 					register,
 				});
@@ -75,15 +75,15 @@ impl RsxHydratedNode {
 						RsxAttribute::BlockValue {
 							initial, effect, ..
 						} => {
-							let (register, location) = take_effect(effect);
-							effects.insert(location, Self::AttributeValue {
+							let (register, tracker) = take_effect(effect);
+							effects.insert(tracker, Self::AttributeValue {
 								initial: std::mem::take(initial),
 								register,
 							});
 						}
 						RsxAttribute::Block { initial, effect } => {
-							let (register, location) = take_effect(effect);
-							effects.insert(location, Self::AttributeBlock {
+							let (register, tracker) = take_effect(effect);
+							effects.insert(tracker, Self::AttributeBlock {
 								initial: std::mem::take(initial),
 								register,
 							});
@@ -91,11 +91,11 @@ impl RsxHydratedNode {
 					}
 				}
 			}
-			RsxNode::Component { loc, node, .. } => {
-				let loc = std::mem::take(loc).expect(
-					"component has no location, ensure they are collected",
+			RsxNode::Component { tracker, node, .. } => {
+				let tracker = std::mem::take(tracker).expect(
+					"component has no tracker, ensure they are collected",
 				);
-				effects.insert(loc, Self::Component {
+				effects.insert(tracker, Self::Component {
 					node: std::mem::take(node),
 				});
 			}
@@ -116,7 +116,8 @@ mod test {
 	fn works() {
 		let bar = 2;
 		expect(RsxHydratedNode::collect(rsx! { <div /> }).len()).to_be(0);
-		expect(RsxHydratedNode::collect(rsx! { <div foo=bar /> }).len()).to_be(1);
+		expect(RsxHydratedNode::collect(rsx! { <div foo=bar /> }).len())
+			.to_be(1);
 		expect(RsxHydratedNode::collect(rsx! { <div>{bar}</div> }).len())
 			.to_be(1);
 	}

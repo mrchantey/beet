@@ -12,7 +12,7 @@ pub enum RsxNode {
 	Component {
 		tag: String,
 		/// used to resolve with templates
-		loc: Option<LineColumn>,
+		tracker: Option<RustyTracker>,
 		node: Box<RsxNode>,
 	},
 	/// a rust block that returns text
@@ -265,12 +265,12 @@ mod test {
 			let RsxNode::Block { effect, .. } = &node else {
 				panic!()
 			};
-			let Some(location) = &effect.location else {
+			let Some(location) = &effect.tracker else {
 				panic!()
 			};
 			location.to_hash()
 		}
 		#[rustfmt::skip]
-		expect(get_hash(rsx! { {39} })).not().to_be(get_hash(rsx! { {39} }));
+		expect(get_hash(rsx! { {39} })).not().to_be(get_hash(rsx! { {40} }));
 	}
 }

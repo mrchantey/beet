@@ -17,9 +17,9 @@ use syn::spanned::Spanned;
 
 
 /// Convert rstml nodes to a Vec<RsxNode> token stream
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default)]
 pub struct RstmlToRsx {
-	pub hash_location: bool,
+	pub build_trackers: bool,
 	pub idents: RsxIdents,
 	// Additional error and warning messages.
 	pub errors: Vec<TokenStream>,
@@ -29,6 +29,7 @@ pub struct RstmlToRsx {
 	// because we need to mark each of them.
 	pub collected_elements: Vec<NodeName>,
 	pub self_closing_elements: HashSet<&'static str>,
+	pub rusty_tracker: RustyTrackerBuilder,
 }
 
 impl RstmlToRsx {
@@ -36,15 +37,6 @@ impl RstmlToRsx {
 		Self {
 			idents,
 			..Default::default()
-		}
-	}
-
-	pub fn location_hash(&self, span: impl Spanned) -> TokenStream {
-		if self.hash_location {
-			let tokens = span_to_line_col(&span.span());
-			quote! {Some(#tokens)}
-		} else {
-			quote! {None}
 		}
 	}
 
@@ -97,15 +89,17 @@ impl RstmlToRsx {
 				quote!(RsxNode::Text(#text.to_string()))
 			}
 			Node::Block(block) => {
+				let tracker = self
+					.rusty_tracker
+					.next_optional(&block, self.build_trackers);
 				let ident = &self.idents.effect;
 				// block is a {block} so assign to a value to unwrap
-				let location = self.location_hash(&block);
 				quote! {
 					{
 						let value = #block;
 						RsxNode::Block {
 							initial: Box::new(value.clone().into_rsx()),
-							effect: Effect::new(#ident::register_block(value), #location),
+							effect: Effect::new(#ident::register_block(value), #tracker),
 						}
 					}
 				}
@@ -157,7 +151,9 @@ impl RstmlToRsx {
 		open_tag: OpenTag,
 		children: Vec<Node<C>>,
 	) -> TokenStream {
-		let loc = self.location_hash(&open_tag);
+		let tracker = self
+			.rusty_tracker
+			.next_optional(&open_tag, self.build_trackers);
 		let props = open_tag.attributes.into_iter().map(|attr| match attr {
 			NodeAttribute::Block(node_block) => {
 				quote! {#node_block}
@@ -181,7 +177,7 @@ impl RstmlToRsx {
 		quote!({
 			RsxNode::Component{
 				tag: #tag.to_string(),
-				loc: #loc,
+				tracker: #tracker,
 				node: Box::new(#ident{
 					#(#props,)*
 				}
@@ -253,14 +249,16 @@ impl RstmlToRsx {
 
 
 	fn map_attribute(&mut self, attr: NodeAttribute) -> TokenStream {
+		let tracker = &mut self.rusty_tracker;
+		let build_tracker = self.build_trackers;
 		let ident = &self.idents.effect;
 		match attr {
 			NodeAttribute::Block(block) => {
-				let location = self.location_hash(&block);
+				let tracker = tracker.next_optional(&block, build_tracker);
 				quote! {
 					RsxAttribute::Block{
 						initial: vec![#block.clone().into_rsx()],
-						effect: Effect::new(#ident::register_attribute_block(#block), #location)
+						effect: Effect::new(#ident::register_attribute_block(#block), #tracker)
 					}
 				}
 			}
@@ -286,7 +284,9 @@ impl RstmlToRsx {
 								block.span(),
 							);
 							let register_event = &self.idents.event;
-							let location = self.location_hash(&block);
+							let tracker = self
+								.rusty_tracker
+								.next_optional(&block, self.build_trackers);
 							quote! {
 								RsxAttribute::BlockValue {
 									key: #key.to_string(),
@@ -294,16 +294,18 @@ impl RstmlToRsx {
 									effect: Effect::new(Box::new(move |cx| {
 										#register_event::#register_func(#key,cx,#block);
 										Ok(())
-									}), #location)
+									}), #tracker)
 								}
 							}
 						} else {
-							let location = self.location_hash(&block);
+							let tracker = self
+								.rusty_tracker
+								.next_optional(&block, self.build_trackers);
 							quote! {
 								RsxAttribute::BlockValue{
 									key: #key.to_string(),
 									initial: #block.clone().into_attribute_value(),
-									effect: Effect::new(#ident::register_attribute_value(#key, #block), #location)
+									effect: Effect::new(#ident::register_attribute_value(#key, #block), #tracker)
 								}
 							}
 						}
