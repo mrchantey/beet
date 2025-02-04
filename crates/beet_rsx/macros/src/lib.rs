@@ -39,8 +39,8 @@ pub fn rsx(tokens: TokenStream) -> TokenStream {
 	.into()
 }
 
-
-/// This macro expands to a Vec<RsxTemplateNode>, it is used for
+/// Mostly used for testing,
+/// this macro expands to a Vec<RsxTemplateNode>, it is used for
 /// things like hot reloading.
 #[proc_macro]
 pub fn rsx_template(tokens: TokenStream) -> TokenStream {

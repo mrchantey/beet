@@ -25,7 +25,7 @@ pub struct RsxIdents {
 	/// ie `SignalsRsx`, it will be called like `#register_ident::register_block(#block)`
 	pub effect: syn::Path,
 	pub event: syn::Path,
-	pub macro_: syn::Ident,
+	pub mac: syn::Ident,
 }
 
 impl Default for RsxIdents {
@@ -33,7 +33,7 @@ impl Default for RsxIdents {
 		Self {
 			effect: syn::parse_quote!(beet::rsx::signals_rsx::SignalsRsx),
 			event: syn::parse_quote!(beet::prelude::EventRegistry),
-			macro_: syn::parse_quote!(rsx),
+			mac: syn::parse_quote!(rsx),
 		}
 	}
 }
@@ -86,7 +86,7 @@ impl ParseRsx {
 	pub fn path_matches(&self, path: &syn::Path) -> bool {
 		path.segments
 			.last()
-			.map_or(false, |seg| seg.ident == self.idents.macro_)
+			.map_or(false, |seg| seg.ident == self.idents.mac)
 	}
 }
 

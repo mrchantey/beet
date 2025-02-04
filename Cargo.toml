@@ -50,6 +50,7 @@ members = [
 	"crates/beet_spatial",
 	"crates/beet_site",
 	"crates/beet-cli",
+	"crates/emby",
 ]
 
 [workspace.dependencies]
