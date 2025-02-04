@@ -40,17 +40,17 @@ members = [
 	"crates/beet_flow",
 	"crates/beet_flow/macros",
 	"crates/beet_ml",
-	"crates/beet_rig",
+	# "crates/beet_rig",
 	"crates/beet_router",
 	"crates/beet_router/parser",
 	"crates/beet_rsx",
 	"crates/beet_rsx/macros",
 	"crates/beet_rsx/parser",
-	"crates/beet_sim",
+	# "crates/beet_sim",
 	"crates/beet_spatial",
 	"crates/beet_site",
 	"crates/beet-cli",
-	"crates/emby",
+	# "crates/emby",
 ]
 
 [workspace.dependencies]

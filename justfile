@@ -47,9 +47,9 @@ leptosfmt *args:
 #💡 HTML
 
 test-site:
-	just run beet_router routes_mod
-	just run beet_router templates
-	just run beet_router html
+	cargo run -p beet_router --example routes_mod
+	cargo run -p beet_router --example templates
+	cargo run -p beet_router --example html
 	sweet serve target/test_site
 
 
