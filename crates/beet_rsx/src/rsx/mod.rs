@@ -1,7 +1,9 @@
-mod rsx_template_io;
+mod effect;
+mod rsx_location;
 mod rsx_template_node;
 mod scoped_style;
-pub use rsx_template_io::*;
+mod rsx_hydrated_node;
+pub use rsx_hydrated_node::*;
 pub use rsx_template_node::*;
 pub use scoped_style::*;
 mod rsx_context;
@@ -14,6 +16,8 @@ mod text_block_encoder;
 pub use rsx_context_map::*;
 mod rsx_context_map;
 mod rsx_root;
+pub use effect::*;
+pub use rsx_location::*;
 pub use rsx_root::*;
 
 pub trait Rsx {

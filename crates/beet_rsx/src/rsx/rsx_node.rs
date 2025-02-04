@@ -1,67 +1,7 @@
 use crate::prelude::*;
-use anyhow::Result;
 use strum_macros::AsRefStr;
 use strum_macros::EnumDiscriminants;
 
-/// File location of an rsx macro, used by [RsxTemplate]
-/// to reconcile rsx nodes with html partials
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct RsxLocation {
-	/// in the macro this is set via file!(),
-	/// in the cli its set via the file path,
-	/// when setting this it must be in the same
-	/// format as file!() would return
-	pub file: String,
-	pub line: usize,
-	pub col: usize,
-}
-impl RsxLocation {
-	pub fn new(file: impl Into<String>, line: usize, col: usize) -> Self {
-		Self {
-			file: file.into(),
-			line,
-			col,
-		}
-	}
-
-	pub fn file(&self) -> &str { &self.file }
-	pub fn line(&self) -> usize { self.line }
-	pub fn col(&self) -> usize { self.col }
-}
-
-pub type RegisterEffect = Box<dyn FnOnce(&RsxContext) -> Result<()>>;
-pub struct Effect {
-	/// the function for registering the effect with
-	/// its reactive framework
-	pub register: RegisterEffect,
-	/// the location of the effect in the rsx macro,
-	/// this may or may not be populated depending
-	/// on the settings of the parser
-	pub location: Option<LineColumn>,
-}
-
-impl Effect {
-	pub fn new(register: RegisterEffect, location: Option<LineColumn>) -> Self {
-		Self { register, location }
-	}
-
-	/// call the FnOnce register func and replace it
-	/// with an empty one.
-	pub fn register_take(&mut self, cx: &RsxContext) -> Result<()> {
-		let func = std::mem::replace(&mut self.register, Box::new(|_| Ok(())));
-		func(cx)
-	}
-}
-
-impl std::fmt::Debug for Effect {
-	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		f.debug_struct("Effect")
-			.field("location", &self.location)
-			.field("register", &std::any::type_name_of_val(&self.register))
-			.finish()
-	}
-}
 
 #[derive(Debug, AsRefStr, EnumDiscriminants)]
 pub enum RsxNode {
@@ -129,16 +69,16 @@ impl RsxNode {
 	pub fn register_effects(&mut self) {
 		RsxContext::visit_mut(self, |cx, node| match node {
 			RsxNode::Block { effect, .. } => {
-				effect.register_take(cx).unwrap();
+				effect.take().register(cx).unwrap();
 			}
 			RsxNode::Element(e) => {
 				for a in &mut e.attributes {
 					match a {
 						RsxAttribute::Block { effect, .. } => {
-							effect.register_take(cx).unwrap();
+							effect.take().register(cx).unwrap();
 						}
 						RsxAttribute::BlockValue { effect, .. } => {
-							effect.register_take(cx).unwrap();
+							effect.take().register(cx).unwrap();
 						}
 						_ => {}
 					}
