@@ -1,6 +1,7 @@
 use crate::prelude::*;
 use anyhow::Result;
 use beet_rsx::prelude::*;
+use std::collections::HashMap;
 use std::future::Future;
 use std::path::PathBuf;
 use std::pin::Pin;
@@ -75,21 +76,51 @@ impl<T: 'static> StaticFileRouter<T> {
 		Ok((route.route_info.clone(), node))
 	}
 
-
+	fn load_templates(&self) -> Result<HashMap<RsxLocation, RsxTemplateNode>> {
+		let tokens = ReadFile::to_string(&self.templates_src)?;
+		let templates: HashMap<RsxLocation, RsxTemplateNode> =
+			ron::de::from_str(&tokens.to_string())?;
+		Ok(templates)
+	}
 	pub async fn routes_to_html(
 		&self,
 	) -> Result<Vec<(RouteInfo, HtmlDocument)>> {
 		let scoped_style = ScopedStyle::default();
 
-		// let templates = ReadFile::to_string(&self.templates_src)?;
+		let mut templates = self
+			.load_templates()
+			.map_err(|err| {
+				eprintln!("No templates found at {:?}", self.templates_src);
+				err
+			})
+			.ok();
+
+
+		let mut apply_templates = |root: RsxRoot| -> Result<RsxRoot> {
+			if let Some(templates) = &mut templates {
+				let mut split = root.split()?;
+				split.template =
+					templates.remove(&split.location).ok_or_else(|| {
+						anyhow::anyhow!(
+							"No template found for {:?}",
+							&split.location
+						)
+					})?;
+				Ok(RsxRoot::join(split)?)
+			} else {
+				// we already warned about missing templates
+				Ok(root)
+			}
+		};
 
 		let html = self
 			.routes_to_rsx()
 			.await?
 			.into_iter()
-			.map(|(p, mut node)| {
-				scoped_style.apply(&mut node)?;
-				let doc = RsxToHtml::default().map_node(&node).into_document();
+			.map(|(p, root)| {
+				let mut root = apply_templates(root)?;
+				scoped_style.apply(&mut root)?;
+				let doc = RsxToHtml::default().map_node(&root).into_document();
 				Ok((p, doc))
 			})
 			.collect::<Result<Vec<(RouteInfo, HtmlDocument)>>>()?;

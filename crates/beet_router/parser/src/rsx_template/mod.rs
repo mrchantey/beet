@@ -102,7 +102,8 @@ impl<'a> Visit<'a> for RsxVisitor {
 			.last()
 			.map_or(false, |seg| seg.ident == self.mac)
 		{
-			let span = mac.span();
+			// take the span of the first tokens in the macro to match the rsx! macro
+			let span = mac.tokens.span();
 			let start = span.start();
 			let loc = RsxLocation::new(&self.file, start.line, start.column);
 			let tokens =

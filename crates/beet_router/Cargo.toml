@@ -21,6 +21,7 @@ beet_router_parser = { workspace = true, optional = true }
 sweet = { workspace = true, features = ["fs"] }
 beet_rsx = { workspace = true }
 anyhow.workspace = true
+ron.workspace = true
 http.workspace = true
 futures.workspace = true
 

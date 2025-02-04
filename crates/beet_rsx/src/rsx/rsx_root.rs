@@ -41,9 +41,9 @@ impl RsxRoot {
 
 #[derive(Debug)]
 pub struct SplitRsx {
-	location: RsxLocation,
-	template: RsxTemplateNode,
-	hydrated: HashMap<LineColumn, RsxHydratedNode>,
+	pub location: RsxLocation,
+	pub template: RsxTemplateNode,
+	pub hydrated: HashMap<LineColumn, RsxHydratedNode>,
 }
 
 
