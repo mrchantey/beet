@@ -1,6 +1,11 @@
 #![cfg_attr(test, feature(test, custom_test_frameworks))]
 #![cfg_attr(test, test_runner(sweet::test_runner))]
-
+//! 
+//! All about rsx trees, html, hydrating patterns, signals.
+//! beet_rsx has many features but by default it is quite
+//! lightweight and intended to run on constrained devices like the ESP32
+//! 
+//! 
 pub mod error;
 pub mod html;
 pub mod hydration;

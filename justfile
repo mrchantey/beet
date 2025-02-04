@@ -16,6 +16,7 @@ default:
 
 init-repo:
 	just assets-pull
+	mkdir -p crates/beet_ml/assets/ml && cp ./assets/ml/default-bert.ron crates/beet_ml/assets/ml/default.bert.ron
 # just test-site
 # just export-scenes
 
