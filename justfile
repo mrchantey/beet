@@ -292,3 +292,18 @@ test-seek-3d:
 	../bevyhub/scenes/ground-3d.json \
 	./scenes/beet-debug.json \
 	./scenes/seek-3d.json \
+
+
+# https://gist.github.com/stephenhardy/5470814
+# 1. Remove the history from 
+# 2. recreate the repos from the current content only
+# 3. push to the github remote repos ensuring you overwrite history
+very-scary-purge-commit-history:
+	rm -rf .git
+
+	git init
+	git add .
+	git commit -m "Initial commit"
+
+	git remote add origin git@github.com:<YOUR ACCOUNT>/<YOUR REPOS>.git
+	git push -u --force origin master
