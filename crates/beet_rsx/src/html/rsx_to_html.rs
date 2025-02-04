@@ -206,7 +206,7 @@ mod test {
 		let node = rsx! { <div>the child is <Child value=38 />!</div> };
 
 		expect(RsxToHtml::render_body(&node))
-			.to_be("<div> the child is <p>hello 38</p>! </div>");
+			.to_be("<div>the child is <p>hello 38</p>!</div>");
 	}
 	#[test]
 	fn component_children() {

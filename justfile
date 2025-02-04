@@ -38,22 +38,22 @@ fmt *args:
 	just watch 'just leptosfmt {{args}}'
 
 leptosfmt *args:
-	leptosfmt \
-	crates/beet_rsx/**/* \
-	crates/beet_router/**/* \
-	crates/beet_site/**/* \
+	leptosfmt 									\
+	crates/beet_rsx/**/*.rs 		\
+	crates/beet_router/**/*.rs 	\
+	crates/beet_site/**/*.rs 		\
 	{{args}}
 
 #💡 HTML
 
-test-site:
+run-test-site:
 	cargo run -p beet_router --example routes_mod
 	cargo run -p beet_router --example templates
 	cargo run -p beet_router --example html
 	sweet serve target/test_site
 
 
-beet-site:
+run-beet-site:
 	just cli serve \
 	-p beet_site \
 	--src crates/beet_site/src \

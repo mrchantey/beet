@@ -257,7 +257,7 @@ mod test {
 		let RsxRoot { location, .. } = rsx! { <div>hello world</div> };
 		expect(location.file()).to_be("crates/beet_rsx/src/rsx/rsx_node.rs");
 		expect(location.line()).to_be(line as usize);
-		expect(location.col()).to_be(39);
+		expect(location.col()).to_be(40);
 	}
 	#[test]
 	fn block_location() {

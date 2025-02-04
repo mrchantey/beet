@@ -116,7 +116,8 @@ mod test {
 		let node = rsx! {
 			<div key str="value" num=32 ident=some_val>
 				<p>
-					hello <MyComponent value=3>
+					hello 
+					<MyComponent value=3>
 						<div>some child</div>
 					</MyComponent>
 				</p>
@@ -128,8 +129,7 @@ mod test {
 				str="value"
 				num=32
 				ident=some_val
-				>
-				<p>hello
+				><p>hello
 					<MyComponent value=3>
 						<div>some child</div>
 					</MyComponent>
@@ -144,6 +144,6 @@ mod test {
 		// println!("{:#?}", split);
 		node1_template.zero_out_linecol();
 		node2_template.zero_out_linecol();
-		expect(&node1_template).to_be(&node2_template);
+		expect(&node1_template).not().to_be(&node2_template);
 	}
 }

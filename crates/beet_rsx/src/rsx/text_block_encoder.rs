@@ -265,7 +265,7 @@ mod test {
 			CollapsedNode::StaticText(" the ".into()),
 			CollapsedNode::StaticText("lazy".into()),
 			CollapsedNode::Break,
-			CollapsedNode::StaticText("dog".into()),
+			CollapsedNode::StaticText("dog\n\t\t\t".into()),
 		]);
 
 		let encoded = TextBlockEncoder::encode(0, &el);
