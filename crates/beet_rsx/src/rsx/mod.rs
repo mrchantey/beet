@@ -1,8 +1,8 @@
 mod effect;
+mod rsx_hydrated_node;
 mod rsx_location;
 mod rsx_template_node;
 mod scoped_style;
-mod rsx_hydrated_node;
 pub use rsx_hydrated_node::*;
 pub use rsx_template_node::*;
 pub use scoped_style::*;
@@ -78,11 +78,11 @@ impl<T: FnOnce() -> U, U: IntoRsxAttributeValue<M2>, M2>
 
 
 pub trait Component {
-	fn render(self) -> impl Rsx;
+	fn render(self) -> RsxRoot;
 }
 
-impl<T: FnOnce() -> U, U: Rsx> Component for T {
-	fn render(self) -> impl Rsx { self() }
+impl<T: FnOnce() -> RsxRoot> Component for T {
+	fn render(self) -> RsxRoot { self() }
 }
 
 impl<T: Component> Rsx for T {

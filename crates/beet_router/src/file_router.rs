@@ -18,7 +18,7 @@ pub trait FileRouter {
 	/// collect all page routes
 	fn page_routes(&self) -> impl Iterator<Item = &Self::PageRoute>;
 
-	async fn render(&self) -> Result<Vec<RsxNode>> {
+	async fn render(&self) -> Result<Vec<RsxRoot>> {
 		futures::future::try_join_all(
 			self.page_routes()
 				.into_iter()
@@ -27,14 +27,14 @@ pub trait FileRouter {
 		.await
 	}
 
-	async fn render_route(&self, route: &Self::PageRoute) -> Result<RsxNode>;
+	async fn render_route(&self, route: &Self::PageRoute) -> Result<RsxRoot>;
 }
 
 pub trait PageRoute {
 	type Context;
 
 
-	async fn into_node(&self, context: &Self::Context) -> Result<RsxNode>;
+	async fn into_node(&self, context: &Self::Context) -> Result<RsxRoot>;
 }
 
 

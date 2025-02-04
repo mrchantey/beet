@@ -23,7 +23,7 @@ impl Default for DefaultAppState {
 	}
 }
 type StaticRsxFunc<T> =
-	Box<dyn Fn(&T) -> Pin<Box<dyn Future<Output = Result<RsxNode>>>>>;
+	Box<dyn Fn(&T) -> Pin<Box<dyn Future<Output = Result<RsxRoot>>>>>;
 
 
 /// A simple static server, it allows for a state value
@@ -59,7 +59,7 @@ impl<T: 'static> StaticFileRouter<T> {
 		self.page_routes
 			.push(StaticPageRoute::new(info, route.into_rsx_func()));
 	}
-	pub async fn routes_to_rsx(&self) -> Result<Vec<(RouteInfo, RsxNode)>> {
+	pub async fn routes_to_rsx(&self) -> Result<Vec<(RouteInfo, RsxRoot)>> {
 		futures::future::try_join_all(
 			self.page_routes
 				.iter()
@@ -70,7 +70,7 @@ impl<T: 'static> StaticFileRouter<T> {
 	async fn route_to_rsx(
 		&self,
 		route: &StaticPageRoute<T>,
-	) -> Result<(RouteInfo, RsxNode)> {
+	) -> Result<(RouteInfo, RsxRoot)> {
 		let node = route.into_node(&self.state).await?;
 		Ok((route.route_info.clone(), node))
 	}
@@ -141,7 +141,7 @@ impl<T> StaticPageRoute<T> {
 
 impl<T: 'static> PageRoute for StaticPageRoute<T> {
 	type Context = T;
-	async fn into_node(&self, context: &Self::Context) -> Result<RsxNode> {
+	async fn into_node(&self, context: &Self::Context) -> Result<RsxRoot> {
 		(self.func)(context).await
 	}
 }
@@ -152,14 +152,12 @@ pub trait StaticPageRouteFunc<T, M>: 'static {
 
 
 
-impl<F: 'static + Clone + Fn() -> R, R: Rsx, T> StaticPageRouteFunc<T, ()>
-	for F
-{
+impl<F: 'static + Clone + Fn() -> RsxRoot, T> StaticPageRouteFunc<T, ()> for F {
 	fn into_rsx_func(&self) -> StaticRsxFunc<T> {
 		let func = self.clone();
 		Box::new(move |_context| {
 			let func = func.clone();
-			Box::pin(async move { Ok(func().into_rsx()) })
+			Box::pin(async move { Ok(func()) })
 		})
 	}
 }
@@ -169,33 +167,31 @@ impl<F: 'static + Clone + Fn() -> R, R: Rsx, T> StaticPageRouteFunc<T, ()>
 pub struct WithArgsMarker;
 
 
-impl<F, T, R> StaticPageRouteFunc<T, WithArgsMarker> for F
+impl<F, T> StaticPageRouteFunc<T, WithArgsMarker> for F
 where
-	R: Rsx,
 	T: 'static + Clone,
-	F: 'static + Clone + Fn(T) -> R,
+	F: 'static + Clone + Fn(T) -> RsxRoot,
 {
 	fn into_rsx_func(&self) -> StaticRsxFunc<T> {
 		let func = self.clone();
 		Box::new(move |context| {
 			let func = func.clone();
 			let context = context.clone();
-			Box::pin(async move { Ok(func(context).into_rsx()) })
+			Box::pin(async move { Ok(func(context)) })
 		})
 	}
 }
-impl<F, T, R> StaticPageRouteFunc<T, &WithArgsMarker> for F
+impl<F, T> StaticPageRouteFunc<T, &WithArgsMarker> for F
 where
-	R: Rsx,
 	T: 'static + Clone,
-	F: 'static + Clone + Fn(&T) -> R,
+	F: 'static + Clone + Fn(&T) -> RsxRoot,
 {
 	fn into_rsx_func(&self) -> StaticRsxFunc<T> {
 		let func = self.clone();
 		Box::new(move |context| {
 			let func = func.clone();
 			let context = context.clone();
-			Box::pin(async move { Ok(func(&context).into_rsx()) })
+			Box::pin(async move { Ok(func(&context)) })
 		})
 	}
 }

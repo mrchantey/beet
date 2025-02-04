@@ -306,7 +306,7 @@ mod test {
 
 	struct Child;
 	impl Component for Child {
-		fn render(self) -> impl Rsx {
+		fn render(self) -> RsxRoot {
 			rsx! {<div>{8}</div>}
 		}
 	}

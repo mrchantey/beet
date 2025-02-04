@@ -81,7 +81,7 @@ mod test {
 		value: usize,
 	}
 	impl Component for MyComponent {
-		fn render(self) -> impl Rsx {
+		fn render(self) -> RsxRoot {
 			rsx! {
 				<div>the value is {self.value}<slot/></div>
 			}

@@ -228,7 +228,7 @@ mod test {
 
 	struct Adjective;
 	impl Component for Adjective {
-		fn render(self) -> impl Rsx {
+		fn render(self) -> RsxRoot {
 			rsx! {"lazy"<slot/>}
 		}
 	}

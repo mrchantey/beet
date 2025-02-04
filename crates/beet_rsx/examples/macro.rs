@@ -6,7 +6,7 @@ struct MyComponent {
 	value: u32,
 }
 impl Component for MyComponent {
-	fn render(self) -> impl Rsx {
+	fn render(self) -> RsxRoot {
 		rsx! {
 			<div>{self.value}<slot/></div>
 		}

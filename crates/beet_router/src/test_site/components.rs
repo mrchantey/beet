@@ -8,7 +8,7 @@ pub struct PageLayout {
 
 
 impl Component for PageLayout {
-	fn render(self) -> impl Rsx {
+	fn render(self) -> RsxRoot {
 		rsx! {
 			<html>
 				<div>

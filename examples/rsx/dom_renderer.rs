@@ -8,7 +8,7 @@ struct MyComponent {
 }
 #[allow(unused)]
 impl Component for MyComponent {
-	fn render(self) -> impl Rsx {
+	fn render(self) -> RsxRoot {
 		let (value, set_value) = signal(self.initial);
 		let value2 = value.clone();
 		let value3 = value.clone();
