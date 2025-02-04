@@ -36,8 +36,10 @@ pub struct RsxContext {
 	/// this is useful for hot reloading because it will not change
 	/// even if the html structure changes
 	pub(super) block_idx: BlockIdx,
+	/// Element count is a special case, it goes up and down,
+	/// so should be zero by the time the tree is finished.
 	/// In the case of a rust block this is the parent element.
-	/// in the case of visiting an element this is the element itself
+	/// in the case of visiting an element this is the element itself.
 	pub(super) element_count: ElementIdx,
 	/// the *uncollapsed* index of this block relative to its parent element.
 	/// That is the [RsxNode] child index, not the [HtmlNode] child index
@@ -78,7 +80,6 @@ impl RsxContext {
 	) {
 		self.node_idx += 1;
 		match node_disc {
-			RsxNodeDiscriminants::Root => {}
 			RsxNodeDiscriminants::Block => {
 				self.block_idx += 1;
 			}
@@ -143,22 +144,17 @@ impl RsxContext {
 	/// Depth-first traversal of the tree
 	/// identical impl to visit_mut
 	pub fn visit(
-		node: &RsxNode,
+		node: impl AsRef<RsxNode>,
 		mut func: impl FnMut(&Self, &RsxNode),
 	) -> Self {
 		let mut visitor = Self::default();
 		visitor.visit_impl(
-			node,
+			node.as_ref(),
 			|cx, node| {
 				func(cx, node);
 				node
 			},
 			|queue, node| match node {
-				RsxNode::Root { nodes, .. } => {
-					for node in nodes {
-						queue.push_back(HtmlElementPosition::MiddleChild(node));
-					}
-				}
 				RsxNode::Fragment(rsx_nodes) => {
 					for node in rsx_nodes {
 						queue.push_back(HtmlElementPosition::MiddleChild(node));
@@ -191,22 +187,17 @@ impl RsxContext {
 	/// Breadth-first traversal of the rsx tree
 	/// identical impl to visit
 	pub fn visit_mut(
-		node: &mut RsxNode,
+		mut node: impl AsMut<RsxNode>,
 		mut func: impl FnMut(&Self, &mut RsxNode),
 	) -> Self {
 		let mut visitor = Self::default();
 		visitor.visit_impl(
-			node,
+			node.as_mut(),
 			|cx, node| {
 				func(cx, node);
 				node
 			},
 			|queue, node| match node {
-				RsxNode::Root { nodes, .. } => {
-					for node in nodes {
-						queue.push_back(HtmlElementPosition::MiddleChild(node));
-					}
-				}
 				RsxNode::Fragment(rsx_nodes) => {
 					for node in rsx_nodes {
 						queue.push_back(HtmlElementPosition::MiddleChild(node));
@@ -340,7 +331,7 @@ mod test {
 	#[test]
 	fn element_count() {
 		expect(RsxContext::visit(&rsx! {<div></div>}, |_, _| {}).element_count)
-			.to_be(1);
+			.to_be(0);
 
 		expect(
 			RsxContext::visit(&rsx! {<div>738</div>}, |_, _| {}).element_count,
@@ -379,38 +370,38 @@ mod test {
 
 		expect(&bucket).to_have_been_called_times(5);
 		expect(&bucket).to_have_returned_nth_with(0, &RsxContext {
-			node_idx: 1,
+			node_idx: 0,
 			component_idx: 0,
 			block_idx: 0,
 			element_count: 1,
 			child_idx: 0,
 		});
 		expect(&bucket).to_have_returned_nth_with(1, &RsxContext {
+			node_idx: 1,
+			component_idx: 0,
+			block_idx: 0,
+			element_count: 1,
+			child_idx: 0,
+		});
+		expect(&bucket).to_have_returned_nth_with(2, &RsxContext {
 			node_idx: 2,
+			component_idx: 0,
+			block_idx: 0,
+			element_count: 2,
+			child_idx: 1,
+		});
+		expect(&bucket).to_have_returned_nth_with(3, &RsxContext {
+			node_idx: 3,
 			component_idx: 0,
 			block_idx: 0,
 			element_count: 2,
 			child_idx: 0,
 		});
-		expect(&bucket).to_have_returned_nth_with(2, &RsxContext {
-			node_idx: 3,
-			component_idx: 0,
-			block_idx: 0,
-			element_count: 3,
-			child_idx: 1,
-		});
-		expect(&bucket).to_have_returned_nth_with(3, &RsxContext {
+		expect(&bucket).to_have_returned_nth_with(4, &RsxContext {
 			node_idx: 4,
 			component_idx: 0,
 			block_idx: 0,
-			element_count: 3,
-			child_idx: 0,
-		});
-		expect(&bucket).to_have_returned_nth_with(4, &RsxContext {
-			node_idx: 5,
-			component_idx: 0,
-			block_idx: 0,
-			element_count: 3,
+			element_count: 2,
 			child_idx: 0,
 		});
 	}

@@ -12,11 +12,12 @@ pub struct RsxToResumableHtml {
 	pub num_html_elements: usize,
 }
 impl RsxToResumableHtml {
-	pub fn render_body(node: &RsxNode) -> String {
+	pub fn render_body(node: impl AsRef<RsxNode>) -> String {
 		Self::default().map_node(node).render()
 	}
 
-	pub fn map_node(&mut self, node: &RsxNode) -> HtmlDocument {
+	pub fn map_node(&mut self, node: impl AsRef<RsxNode>) -> HtmlDocument {
+		let node = node.as_ref();
 		let mut html = RsxToHtml::as_resumable().map_node(node).into_document();
 		for node in html.iter_mut() {
 			self.visit_node(node);

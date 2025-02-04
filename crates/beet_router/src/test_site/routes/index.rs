@@ -4,7 +4,7 @@ use crate::test_site::*;
 use beet_rsx as beet;
 use beet_rsx::prelude::*;
 
-pub fn get(state: DefaultAppState) -> RsxNode {
+pub fn get(state: DefaultAppState) -> impl Rsx {
 	rsx! {
 		<PageLayout title=state.app_name.into()>
 				party time!

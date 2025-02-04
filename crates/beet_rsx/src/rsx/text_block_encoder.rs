@@ -161,9 +161,6 @@ impl CollapsedNode {
 	fn from_node(node: &RsxNode) -> Vec<CollapsedNode> {
 		let mut out = Vec::new();
 		match node {
-			RsxNode::Root { nodes, .. } => {
-				out.extend(nodes.iter().flat_map(Self::from_node));
-			}
 			RsxNode::Fragment(nodes) => {
 				out.extend(nodes.into_iter().flat_map(Self::from_node));
 			}
@@ -243,7 +240,7 @@ mod test {
 		let action = "jumps over";
 
 		let tree = rsx! {<div>"The "{desc}" and "{color}<b> fox </b> {action}" the "<Adjective> and fat </Adjective>dog</div>};
-		let RsxNode::Element(el) = &tree.children()[0] else {
+		let RsxNode::Element(el) = &tree.node else {
 			panic!("expected element");
 		};
 

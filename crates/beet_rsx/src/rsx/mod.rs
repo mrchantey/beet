@@ -13,6 +13,8 @@ pub use text_block_encoder::*;
 mod text_block_encoder;
 pub use rsx_context_map::*;
 mod rsx_context_map;
+mod rsx_root;
+pub use rsx_root::*;
 
 pub trait Rsx {
 	fn into_rsx(self) -> RsxNode;
@@ -20,6 +22,9 @@ pub trait Rsx {
 
 impl Rsx for RsxNode {
 	fn into_rsx(self) -> RsxNode { self }
+}
+impl Rsx for RsxRoot {
+	fn into_rsx(self) -> RsxNode { self.node }
 }
 impl Rsx for () {
 	fn into_rsx(self) -> RsxNode { RsxNode::default() }

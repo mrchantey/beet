@@ -65,12 +65,6 @@ impl std::fmt::Debug for Effect {
 
 #[derive(Debug, AsRefStr, EnumDiscriminants)]
 pub enum RsxNode {
-	/// The root node of an rsx! macro.
-	/// The location is used for [RsxTemplate]
-	Root {
-		nodes: Vec<RsxNode>,
-		location: RsxLocation,
-	},
 	/// A transparent node that simply contains children
 	/// This may be deprecated in the future if no patterns
 	/// require it. The RstmlToRsx could support it
@@ -107,7 +101,6 @@ impl RsxNode {
 	/// Blocks and components have no children
 	pub fn children(&self) -> &[RsxNode] {
 		match self {
-			RsxNode::Root { nodes, .. } => nodes,
 			RsxNode::Fragment(rsx_nodes) => rsx_nodes,
 			RsxNode::Component { .. } => &[],
 			RsxNode::Block { initial, .. } => initial.children(),
@@ -121,7 +114,6 @@ impl RsxNode {
 	/// Blocks and components have no children
 	pub fn children_mut(&mut self) -> &mut [RsxNode] {
 		match self {
-			RsxNode::Root { nodes, .. } => nodes,
 			RsxNode::Fragment(rsx_nodes) => rsx_nodes,
 			RsxNode::Component { .. } => &mut [],
 			RsxNode::Block { initial, .. } => initial.children_mut(),
@@ -131,7 +123,30 @@ impl RsxNode {
 			RsxNode::Doctype => &mut [],
 		}
 	}
-
+	/// takes all the register_effect functions
+	/// # Panics
+	/// If the register function fails
+	pub fn register_effects(&mut self) {
+		RsxContext::visit_mut(self, |cx, node| match node {
+			RsxNode::Block { effect, .. } => {
+				effect.register_take(cx).unwrap();
+			}
+			RsxNode::Element(e) => {
+				for a in &mut e.attributes {
+					match a {
+						RsxAttribute::Block { effect, .. } => {
+							effect.register_take(cx).unwrap();
+						}
+						RsxAttribute::BlockValue { effect, .. } => {
+							effect.register_take(cx).unwrap();
+						}
+						_ => {}
+					}
+				}
+			}
+			_ => {}
+		});
+	}
 
 	/// A method used by macros to insert nodes into a slot
 	/// # Panics
@@ -156,15 +171,6 @@ impl RsxNode {
 		mut to_insert: Vec<Self>,
 	) -> Option<Vec<Self>> {
 		match self {
-			RsxNode::Root { nodes, .. } => {
-				for node in nodes.iter_mut() {
-					match node.try_insert_slots(name, to_insert) {
-						Some(returned_nodes) => to_insert = returned_nodes,
-						None => return None,
-					}
-				}
-				Some(to_insert)
-			}
 			RsxNode::Fragment(children) => {
 				for node in children.iter_mut() {
 					match node.try_insert_slots(name, to_insert) {
@@ -218,31 +224,6 @@ impl RsxNode {
 			RsxNode::Comment(_) => Some(to_insert),
 			RsxNode::Doctype => Some(to_insert),
 		}
-	}
-
-	/// takes all the register_effect functions
-	/// # Panics
-	/// If the register function fails
-	pub fn register_effects(&mut self) {
-		RsxContext::visit_mut(self, |cx, node| match node {
-			RsxNode::Block { effect, .. } => {
-				effect.register_take(cx).unwrap();
-			}
-			RsxNode::Element(e) => {
-				for a in &mut e.attributes {
-					match a {
-						RsxAttribute::Block { effect, .. } => {
-							effect.register_take(cx).unwrap();
-						}
-						RsxAttribute::BlockValue { effect, .. } => {
-							effect.register_take(cx).unwrap();
-						}
-						_ => {}
-					}
-				}
-			}
-			_ => {}
-		});
 	}
 }
 
@@ -315,6 +296,14 @@ pub enum RsxAttribute {
 	},
 }
 
+impl AsRef<RsxNode> for &RsxNode {
+	fn as_ref(&self) -> &RsxNode { *self }
+}
+
+impl AsMut<RsxNode> for &mut RsxNode {
+	fn as_mut(&mut self) -> &mut RsxNode { *self }
+}
+
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
@@ -322,22 +311,16 @@ mod test {
 
 	#[test]
 	fn root_location() {
-		let line = line!();
-		let node = rsx! {<div>hello world</div>};
-		let RsxNode::Root { location, .. } = node else {
-			panic!()
-		};
+		let line = line!() + 1;
+		let RsxRoot { location, .. } = rsx! {<div>hello world</div>};
 		expect(location.file()).to_be("crates/beet_rsx/src/rsx/rsx_node.rs");
-		expect(location.line()).to_be((line + 1) as usize);
-		expect(location.col()).to_be(19);
+		expect(location.line()).to_be(line as usize);
+		expect(location.col()).to_be(39);
 	}
 	#[test]
 	fn block_location() {
-		fn get_hash(node: RsxNode) -> u64 {
-			let RsxNode::Root { nodes, .. } = node else {
-				panic!()
-			};
-			let RsxNode::Block { effect, .. } = &nodes[0] else {
+		fn get_hash(RsxRoot { node, .. }: RsxRoot) -> u64 {
+			let RsxNode::Block { effect, .. } = &node else {
 				panic!()
 			};
 			let Some(location) = &effect.location else {

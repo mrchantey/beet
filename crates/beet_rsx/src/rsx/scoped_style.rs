@@ -11,7 +11,7 @@ use parcel_selectors::attr::ParsedCaseSensitivity;
 /// The approach is inspired by astro https://docs.astro.build/en/guides/styling/
 /// In --release the css will be minified
 pub struct ScopedStyle {
-	/// the attribute to use as a selector for the component, 
+	/// the attribute to use as a selector for the component,
 	/// defaults to "data-bcid"
 	attr: String,
 }
@@ -120,8 +120,8 @@ mod test {
 
 	struct Child;
 
-	impl Rsx for Child {
-		fn into_rsx(self) -> RsxNode {
+	impl Component for Child {
+		fn render(self) -> impl Rsx {
 			rsx! {<div><slot/></div>}
 		}
 	}

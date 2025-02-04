@@ -61,8 +61,8 @@ mod test {
 	use sweet::prelude::*;
 
 	struct Child;
-	impl Rsx for Child {
-		fn into_rsx(self) -> RsxNode {
+	impl Component for Child {
+		fn render(self) -> impl Rsx {
 			rsx! {<div/><slot/>}
 		}
 	}
@@ -70,7 +70,7 @@ mod test {
 	#[test]
 	fn visit_ignore_components() {
 		let mut count = 0;
-		rsx! {// fragment
+		rsx! {
 			<div>
 				<Child>
 					<br/>
@@ -81,12 +81,12 @@ mod test {
 		.visit_ignore_components(|_| {
 			count += 1;
 		});
-		expect(count).to_be(3);
+		expect(count).to_be(2);
 	}
 	#[test]
 	fn visit_ignore_components_mut() {
 		let mut count = 0;
-		rsx! {// fragment
+		rsx! {
 			<div>
 				<Child>
 					<br/>
@@ -97,6 +97,6 @@ mod test {
 		.visit_ignore_components_mut(|_| {
 			count += 1;
 		});
-		expect(count).to_be(3);
+		expect(count).to_be(2);
 	}
 }

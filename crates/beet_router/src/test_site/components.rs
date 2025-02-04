@@ -7,8 +7,8 @@ pub struct PageLayout {
 }
 
 
-impl Rsx for PageLayout {
-	fn into_rsx(self) -> RsxNode {
+impl Component for PageLayout {
+	fn render(self) -> impl Rsx {
 		rsx! {
 			<html>
 				<div>

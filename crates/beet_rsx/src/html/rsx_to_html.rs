@@ -34,15 +34,12 @@ impl RsxToHtml {
 
 	/// convenience so you dont have to add
 	/// a `.render()` at the end of a long rsx macro
-	pub fn render_body(node: &RsxNode) -> String {
+	pub fn render_body(node: impl AsRef<RsxNode>) -> String {
 		Self::default().map_node(node).render()
 	}
 
-	pub fn map_node(&mut self, rsx_node: &RsxNode) -> Vec<HtmlNode> {
-		match rsx_node {
-			RsxNode::Root { nodes, .. } => {
-				nodes.iter().map(|n| self.map_node(n)).flatten().collect()
-			}
+	pub fn map_node(&mut self, rsx_node: impl AsRef<RsxNode>) -> Vec<HtmlNode> {
+		match rsx_node.as_ref() {
 			RsxNode::Fragment(nodes) => {
 				nodes.iter().map(|n| self.map_node(n)).flatten().collect()
 			}

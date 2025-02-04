@@ -144,7 +144,6 @@ impl Hydrator for DomHydrator {
 
 		#[allow(unused)]
 		match rsx {
-			RsxNode::Root { .. } => todo!(),
 			RsxNode::Fragment(vec) => todo!(),
 			RsxNode::Component { .. } => todo!(),
 			RsxNode::Block {

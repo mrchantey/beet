@@ -49,19 +49,25 @@ impl RstmlToRsx {
 
 	pub fn map_tokens(&mut self, tokens: TokenStream) -> TokenStream {
 		let (nodes, rstml_errors) = tokens_to_rstml(tokens.clone());
-		let nodes = self.map_nodes(nodes);
+		let mut nodes = self.map_nodes(nodes);
 		let span = tokens.span();
 		let line = span.start().line;
 		let col = span.start().column;
+
+		let node = if nodes.len() == 1 {
+			nodes.pop().unwrap()
+		} else {
+			quote!(RsxNode::Fragment(Vec::from([#(#nodes),*])))
+		};
 
 		quote! {
 			{
 				#(#rstml_errors;)*
 				use beet::prelude::*;
 				#[allow(unused_braces)]
-				RsxNode::Root{
+				RsxRoot{
 					location: RsxLocation::new(std::file!(), #line, #col),
-					nodes: Vec::from([#(#nodes),*])
+					node: #node
 				}
 
 			}

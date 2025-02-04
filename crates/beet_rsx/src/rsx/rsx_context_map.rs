@@ -105,9 +105,9 @@ mod test {
 		let color = "brown";
 		let action = "jumps over";
 
-		let tree = rsx! {<div>"The "{desc}" and "{color}<b> fox </b> {action}" the lazy " and fat dog</div>};
+		let root = rsx! {<div>"The "{desc}" and "{color}<b> fox </b> {action}" the lazy " and fat dog</div>};
 
-		let map = RsxContextMap::from_node(&tree);
+		let map = RsxContextMap::from_node(&root);
 
 		let csv = map.to_csv();
 		let map2 = RsxContextMap::from_csv(&csv).unwrap();
@@ -123,24 +123,24 @@ mod test {
 			.collect::<HashMap<_, _>>(),
 		);
 		expect(&map.rust_blocks[0]).to_be(&RsxContext {
-			node_idx: 3,
+			node_idx: 2,
 			component_idx: 0,
 			block_idx: 0,
-			element_count: 1,
+			element_count: 0,
 			child_idx: 1,
 		});
 		expect(&map.rust_blocks[1]).to_be(&RsxContext {
-			node_idx: 5,
+			node_idx: 4,
 			component_idx: 0,
 			block_idx: 1,
-			element_count: 1,
+			element_count: 0,
 			child_idx: 2,
 		});
 		expect(&map.rust_blocks[2]).to_be(&RsxContext {
-			node_idx: 7,
+			node_idx: 6,
 			component_idx: 0,
 			block_idx: 2,
-			element_count: 2,
+			element_count: 1,
 			child_idx: 3,
 		});
 	}
