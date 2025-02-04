@@ -2,10 +2,14 @@ pub use crate::prelude::*;
 use anyhow::Result;
 use beet_rsx::prelude::*;
 use clap::Parser;
+use proc_macro2::Literal;
 use proc_macro2::TokenStream;
+use quote::quote;
 use std::path::PathBuf;
+use sweet::prelude::FsExt;
 use sweet::prelude::ReadDir;
 use sweet::prelude::ReadFile;
+use syn::spanned::Spanned;
 use syn::visit::Visit;
 // use syn::File;
 
@@ -14,7 +18,7 @@ use syn::visit::Visit;
 pub struct BuildRsxTemplates {
 	#[arg(long, default_value = "src")]
 	pub src: PathBuf,
-	#[arg(long, default_value = "target/rsx-templates.bin")]
+	#[arg(long, default_value = "target/rsx-templates.ron")]
 	pub dst: PathBuf,
 }
 
@@ -25,53 +29,67 @@ impl Default for BuildRsxTemplates {
 }
 
 impl BuildRsxTemplates {
-	pub fn run(&self) -> Result<()> {
-		ReadDir::files_recursive(&self.src)?
-			.into_iter()
-			.map(|path| self.file_templates(path))
-			.collect::<Result<Vec<_>>>()?;
+	pub fn build_and_write(&self) -> Result<()> {
+		let ron = self.build_ron()?;
+		FsExt::write(&self.dst, &ron.to_string())?;
 		Ok(())
 	}
 
 
-	fn file_templates(&self, path: PathBuf) -> Result<()> {
+	pub fn build_ron(&self) -> Result<TokenStream> {
+		let items = ReadDir::files_recursive(&self.src)?
+			.into_iter()
+			.map(|path| self.file_templates(path))
+			.collect::<Result<Vec<_>>>()?
+			.into_iter()
+			.flatten()
+			.map(|(RsxLocation { file, line, col }, tokens)| {
+				let line = Literal::usize_unsuffixed(line);
+				let col = Literal::usize_unsuffixed(col);
+
+				quote! {
+					RsxLocation(
+						file: #file,
+						line: #line,
+						col: #col
+					):#tokens
+				}
+			});
+
+		let map = quote! {{#(#items),*}};
+		Ok(map)
+	}
+
+
+	fn file_templates(
+		&self,
+		path: PathBuf,
+	) -> Result<Vec<(RsxLocation, TokenStream)>> {
 		let file = ReadFile::to_string(&path)?;
 		let file = syn::parse_file(&file)?;
-		let mut visitor = RsxVisitor::default();
+		let mac = syn::parse_quote!(rsx);
+		let mut visitor = RsxVisitor::new(path.to_string_lossy(), mac);
+
 		visitor.visit_file(&file);
-		println!("{:?}", path);
-		println!(
-			"{}",
-			visitor
-				.templates
-				.iter()
-				.map(|t| t.to_string())
-				.collect::<Vec<_>>()
-				.join("\n")
-		);
-
-		// Ok((path, file))
-
-		// let file = syn::parse_file(&file.to_token_stream().to_string())?;
-		Ok(())
+		Ok(visitor.templates)
 	}
 }
 
 #[derive(Debug)]
 struct RsxVisitor {
-	templates: Vec<TokenStream>,
+	file: String,
+	templates: Vec<(RsxLocation, TokenStream)>,
 	mac: syn::Ident,
 }
-
-impl Default for RsxVisitor {
-	fn default() -> Self {
+impl RsxVisitor {
+	pub fn new(file: impl Into<String>, mac: syn::Ident) -> Self {
 		Self {
+			file: file.into(),
 			templates: Default::default(),
-			mac: syn::parse_quote!(rsx),
+			mac,
 		}
 	}
 }
-
 
 
 impl<'a> Visit<'a> for RsxVisitor {
@@ -83,10 +101,12 @@ impl<'a> Visit<'a> for RsxVisitor {
 			.last()
 			.map_or(false, |seg| seg.ident == self.mac)
 		{
+			let span = mac.span();
+			let start = span.start();
+			let loc = RsxLocation::new(&self.file, start.line, start.column);
 			let tokens =
 				RstmlToRsxTemplateRon::default().map_tokens(mac.tokens.clone());
-
-			self.templates.push(tokens);
+			self.templates.push((loc, tokens));
 		}
 	}
 }

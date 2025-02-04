@@ -16,11 +16,16 @@ pub struct RstmlToRsxTemplateRon {}
 
 
 impl RstmlToRsxTemplateRon {
-	/// returns a Vec<HtmlNode>
+	/// returns a "[RsxTemplateNode]" ron string
+	pub fn map_tokens_to_string(&self, tokens: TokenStream) -> TokenStream {
+		self.map_tokens(tokens)
+			.to_string()
+			.to_token_stream()
+	}
 	pub fn map_tokens(&self, tokens: TokenStream) -> TokenStream {
 		let (nodes, _rstml_errors) = tokens_to_rstml(tokens);
 		let nodes = self.map_nodes(nodes);
-		quote! {[#(#nodes),*]}.to_string().to_token_stream()
+		quote! {[#(#nodes),*]}
 	}
 	/// comma separated RsxTemplateNode
 	pub fn map_nodes<C>(&self, nodes: Vec<Node<C>>) -> Vec<TokenStream> {

@@ -40,8 +40,8 @@ pub enum RsxTemplateAttribute {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct LineColumn {
-	line: u32,
-	column: u32,
+	pub line: u32,
+	pub column: u32,
 }
 
 

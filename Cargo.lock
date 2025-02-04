@@ -646,6 +646,7 @@ dependencies = [
  "beet_rsx",
  "futures",
  "http 1.2.0",
+ "ron",
  "sweet",
  "tokio",
 ]

@@ -12,9 +12,9 @@ pub struct RsxLocation {
 	/// in the cli its set via the file path,
 	/// when setting this it must be in the same
 	/// format as file!() would return
-	file: String,
-	line: usize,
-	col: usize,
+	pub file: String,
+	pub line: usize,
+	pub col: usize,
 }
 impl RsxLocation {
 	pub fn new(file: impl Into<String>, line: usize, col: usize) -> Self {
