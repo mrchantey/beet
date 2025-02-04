@@ -18,21 +18,22 @@ pub struct RstmlToRsxTemplateRon {}
 impl RstmlToRsxTemplateRon {
 	/// returns a "[RsxTemplateNode]" ron string
 	pub fn map_tokens_to_string(&self, tokens: TokenStream) -> TokenStream {
-		self.map_tokens(tokens)
-			.to_string()
-			.to_token_stream()
+		self.map_tokens(tokens).to_string().to_token_stream()
 	}
 	pub fn map_tokens(&self, tokens: TokenStream) -> TokenStream {
 		let (nodes, _rstml_errors) = tokens_to_rstml(tokens);
-		let nodes = self.map_nodes(nodes);
-		quote! {[#(#nodes),*]}
+		let mut nodes = self.map_nodes(nodes);
+		if nodes.len() == 1 {
+			nodes.pop().unwrap()
+		} else {
+			quote! {Fragment([#(#nodes),*])}
+		}
 	}
-	/// comma separated RsxTemplateNode
 	pub fn map_nodes<C>(&self, nodes: Vec<Node<C>>) -> Vec<TokenStream> {
 		nodes.into_iter().map(|node| self.map_node(node)).collect()
 	}
 
-	/// comma sepereated RsxTemplateNode, due to fragments
+	/// returns an RsxTemplateNode
 	pub fn map_node<C>(&self, node: Node<C>) -> TokenStream {
 		match node {
 			Node::Doctype(_) => quote! {Doctype},
@@ -45,7 +46,7 @@ impl RstmlToRsxTemplateRon {
 					.into_iter()
 					.map(|n| self.map_node(n));
 				quote! {
-					#(#children),*
+					Fragment([#(#children),*])
 				}
 			}
 			Node::Block(node_block) => {
@@ -82,13 +83,11 @@ impl RstmlToRsxTemplateRon {
 					// components disregard all the context, they are known
 					// to the rsx node
 					let loc = span_to_line_col_ron(&span);
+					// we rely on the hydrated node to provide the attributes and children
 					quote! {
 						Component (
 							loc: #loc,
 							tag: #tag_name,
-							self_closing: #self_closing,
-							attributes: [#(#attributes),*],
-							children: [#(#children),*]
 						)
 					}
 				} else {

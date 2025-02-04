@@ -13,9 +13,6 @@ pub enum RsxTemplateNode {
 	Component {
 		loc: LineColumn,
 		tag: String,
-		self_closing: bool,
-		children: Vec<Self>,
-		attributes: Vec<RsxTemplateAttribute>,
 	},
 	RustBlock(LineColumn),
 	Element {
@@ -42,7 +39,10 @@ impl RsxTemplateNode {
 					.collect::<Result<Vec<_>>>()?;
 				Ok(Self::Fragment(nodes))
 			}
-			RsxNode::Component { node, .. } => Self::from_rsx_node(node),
+			RsxNode::Component { tag, loc, .. } => Ok(Self::Component {
+				loc: loc.clone().ok_or_else(no_location)?,
+				tag: tag.clone(),
+			}),
 			RsxNode::Block { effect, .. } => Ok(Self::RustBlock(
 				effect.location.clone().ok_or_else(no_location)?,
 			)),
@@ -130,40 +130,43 @@ impl RsxTemplateNode {
 
 	/// allow two templates to be compared without considering line and column
 	#[cfg(test)]
-	pub fn zero_out_linecol(nodes: &mut Vec<RsxTemplateNode>) {
-		for item in nodes {
-			match item {
-				RsxTemplateNode::Component { loc: hash, .. } => {
-					hash.line = 0;
-					hash.column = 0;
-				}
-				RsxTemplateNode::RustBlock(loc) => {
-					loc.line = 0;
-					loc.column = 0;
-				}
-				RsxTemplateNode::Element {
-					attributes,
-					children,
-					..
-				} => {
-					for attr in attributes {
-						if let RsxTemplateAttribute::BlockValue {
-							value, ..
-						} = attr
-						{
-							value.line = 0;
-							value.column = 0;
-						}
-						if let RsxTemplateAttribute::Block(loc) = attr {
-							loc.line = 0;
-							loc.column = 0;
-						}
-					}
-					// Recursively process children
-					Self::zero_out_linecol(children);
-				}
-				_ => {}
+	pub fn zero_out_linecol(&mut self) {
+		match self {
+			RsxTemplateNode::Component { loc: hash, .. } => {
+				hash.line = 0;
+				hash.column = 0;
 			}
+			RsxTemplateNode::Fragment(children) => {
+				for child in children {
+					child.zero_out_linecol();
+				}
+			}
+			RsxTemplateNode::RustBlock(loc) => {
+				loc.line = 0;
+				loc.column = 0;
+			}
+			RsxTemplateNode::Element {
+				attributes,
+				children,
+				..
+			} => {
+				for attr in attributes {
+					if let RsxTemplateAttribute::BlockValue { value, .. } = attr
+					{
+						value.line = 0;
+						value.column = 0;
+					}
+					if let RsxTemplateAttribute::Block(loc) = attr {
+						loc.line = 0;
+						loc.column = 0;
+					}
+				}
+				// Recursively process children
+				for child in children {
+					child.zero_out_linecol();
+				}
+			}
+			_ => {}
 		}
 	}
 }
@@ -261,7 +264,7 @@ mod test {
 		let loc = LineColumn::new(line!() + 1, 33);
 		let node = rsx_template! {<div>{value}</div>};
 
-		expect(&node[0]).to_be(&RsxTemplateNode::Element {
+		expect(&node).to_be(&RsxTemplateNode::Element {
 			tag: "div".to_string(),
 			self_closing: false,
 			attributes: vec![],
@@ -287,7 +290,7 @@ mod test {
 			</div>
 		};
 
-		expect(&template[0]).to_be(&RsxTemplateNode::Element {
+		expect(&template).to_be(&RsxTemplateNode::Element {
 			tag: "div".to_string(),
 			self_closing: false,
 			attributes: vec![
@@ -316,16 +319,6 @@ mod test {
 					RsxTemplateNode::Component {
 						loc: component_linecol,
 						tag: "MyComponent".to_string(),
-						self_closing: false,
-						children: vec![RsxTemplateNode::Element {
-							tag: "div".to_string(),
-							self_closing: false,
-							attributes: vec![],
-							children: vec![RsxTemplateNode::Text(
-								"some child".to_string(),
-							)],
-						}],
-						attributes: vec![],
 					},
 				],
 			}],
@@ -364,9 +357,9 @@ mod test {
 		};
 
 		let mut parsed =
-			ron::de::from_str::<Vec<RsxTemplateNode>>(&template_ron).unwrap();
-		RsxTemplateNode::zero_out_linecol(&mut template);
-		RsxTemplateNode::zero_out_linecol(&mut parsed);
+			ron::de::from_str::<RsxTemplateNode>(&template_ron).unwrap();
+		template.zero_out_linecol();
+		parsed.zero_out_linecol();
 
 		expect(template).to_be(parsed);
 	}

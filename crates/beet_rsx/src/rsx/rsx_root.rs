@@ -39,6 +39,7 @@ impl RsxRoot {
 	}
 }
 
+#[derive(Debug)]
 pub struct SplitRsx {
 	location: RsxLocation,
 	template: RsxTemplateNode,
@@ -76,17 +77,21 @@ mod test {
 	use crate::prelude::*;
 	use sweet::prelude::*;
 
-	#[test]
-	fn from_rsx() {
-		let some_val = 3;
-		struct MyComponent;
-		impl Component for MyComponent {
-			fn render(self) -> impl Rsx {
-				rsx! {
-					<div><slot/></div>
-				}
+	struct MyComponent {
+		value: usize,
+	}
+	impl Component for MyComponent {
+		fn render(self) -> impl Rsx {
+			rsx! {
+				<div>the value is {self.value}<slot/></div>
 			}
 		}
+	}
+
+	// test a roundtrip split/join,
+	#[test]
+	fn split_join() {
+		let some_val = 3;
 
 		let node = rsx! {
 			<div
@@ -96,7 +101,7 @@ mod test {
 				ident=some_val
 				>
 				<p>hello
-					<MyComponent>
+					<MyComponent value=3>
 						<div>some child</div>
 					</MyComponent>
 				</p>
@@ -105,9 +110,52 @@ mod test {
 
 		let html1 = RsxToHtml::render_body(&node);
 		let split = node.split().unwrap();
+		// println!("{:#?}", split);
 
 		let node2 = RsxRoot::join(split).unwrap();
 		let html2 = RsxToHtml::render_body(&node2);
 		expect(html1).to_be(html2);
+	}
+	#[test]
+	fn split_join_seperate_sources() {
+		let some_val = 3;
+
+		let node = rsx! {
+			<div
+				key
+				str="value"
+				num=32
+				ident=some_val
+				>
+				<p>hello
+					<MyComponent value=3>
+						<div>some child</div>
+					</MyComponent>
+				</p>
+			</div>
+		};
+		let mut node2_template = rsx_template! {
+			<div
+				key
+				str="value"
+				num=32
+				ident=some_val
+				>
+				<p>hello
+					<MyComponent value=3>
+						<div>some child</div>
+					</MyComponent>
+				</p>
+			</div>
+		};
+
+		let SplitRsx {
+			template: mut node1_template,
+			..
+		} = node.split().unwrap();
+		// println!("{:#?}", split);
+		node1_template.zero_out_linecol();
+		node2_template.zero_out_linecol();
+		expect(&node1_template).to_be(&node2_template);
 	}
 }

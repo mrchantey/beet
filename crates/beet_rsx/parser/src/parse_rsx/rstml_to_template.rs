@@ -19,12 +19,18 @@ impl RstmlToRsxTemplate {
 	/// returns a Vec<HtmlNode>
 	pub fn map_tokens(&self, tokens: TokenStream) -> TokenStream {
 		let (nodes, rstml_errors) = tokens_to_rstml(tokens);
-		let nodes = self.map_nodes(nodes);
+		let mut nodes = self.map_nodes(nodes);
+
+		let node = if nodes.len() == 1 {
+			nodes.pop().unwrap()
+		} else {
+			quote! {RsxTemplateNode::Fragment(vec![#(#nodes),*])}
+		};
 		quote! {
 			{
 				#(#rstml_errors;)*
 				use beet::prelude::*;
-				vec![#(#nodes),*]
+				#node
 			}
 		}
 	}
@@ -46,7 +52,7 @@ impl RstmlToRsxTemplate {
 					.into_iter()
 					.map(|n| self.map_node(n));
 				quote! {
-					#(#children),*
+					RsxTemplateNode::Fragment(vec![#(#children),*])
 				}
 			}
 			Node::Block(node_block) => {
@@ -83,13 +89,11 @@ impl RstmlToRsxTemplate {
 					// components disregard all the context, they are known
 					// to the rsx node
 					let loc = span_to_line_col(&span);
+					// we rely on the hydrated node to provide the attributes and children
 					quote! {
 						RsxTemplateNode::Component {
 							loc: #loc,
 							tag: #tag_name.to_string(),
-							self_closing: #self_closing,
-							attributes: vec![#(#attributes),*],
-							children: vec![#(#children),*],
 						}
 					}
 				} else {

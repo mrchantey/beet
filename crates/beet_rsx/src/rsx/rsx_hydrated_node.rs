@@ -22,6 +22,31 @@ pub enum RsxHydratedNode {
 	},
 }
 
+impl std::fmt::Debug for RsxHydratedNode {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		match self {
+			Self::Component { node } => {
+				f.debug_struct("Component").field("node", node).finish()
+			}
+			Self::RustBlock { initial, register } => f
+				.debug_struct("RustBlock")
+				.field("initial", initial)
+				.field("register", &std::any::type_name_of_val(&register))
+				.finish(),
+			Self::AttributeBlock { initial, register } => f
+				.debug_struct("AttributeBlock")
+				.field("initial", initial)
+				.field("register", &std::any::type_name_of_val(&register))
+				.finish(),
+			Self::AttributeValue { initial, register } => f
+				.debug_struct("AttributeValue")
+				.field("initial", initial)
+				.field("register", &std::any::type_name_of_val(&register))
+				.finish(),
+		}
+	}
+}
+
 impl RsxHydratedNode {
 	pub fn collect(node: impl Rsx) -> HashMap<LineColumn, Self> {
 		let mut effects = HashMap::new();
@@ -68,7 +93,7 @@ impl RsxHydratedNode {
 			}
 			RsxNode::Component { loc, node, .. } => {
 				let loc = std::mem::take(loc).expect(
-					"effect has no location, ensure they are collected",
+					"component has no location, ensure they are collected",
 				);
 				effects.insert(loc, Self::Component {
 					node: std::mem::take(node),
