@@ -19,7 +19,7 @@ async fn main() {
 
 	builder.build_and_write().unwrap();
 	let tokens = builder.build_ron().unwrap();
-	let map: HashMap<RsxLocation, Vec<RsxTemplateNode>> =
+	let map: HashMap<RsxLocation, RsxTemplateNode> =
 		ron::de::from_str(&tokens.to_string()).unwrap();
 	println!("wrote to {}\n{:#?}", builder.dst.display(), map);
 }

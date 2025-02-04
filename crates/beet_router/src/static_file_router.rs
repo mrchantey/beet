@@ -5,6 +5,7 @@ use std::future::Future;
 use std::path::PathBuf;
 use std::pin::Pin;
 use sweet::prelude::FsExt;
+use sweet::prelude::ReadFile;
 
 /// Simple default state for the static server,
 /// you will likely outgrow this quickly but it
@@ -34,6 +35,7 @@ pub struct StaticFileRouter<T> {
 	pub page_routes: Vec<StaticPageRoute<T>>,
 	/// The directory to save the html files to
 	pub dst_dir: PathBuf,
+	pub templates_src: PathBuf,
 }
 
 impl<T: Default> Default for StaticFileRouter<T> {
@@ -42,6 +44,8 @@ impl<T: Default> Default for StaticFileRouter<T> {
 			state: Default::default(),
 			page_routes: Default::default(),
 			dst_dir: "target/client".into(),
+			// keep in sync with BuildRsxTemplates
+			templates_src: "target/rsx-templates.ron".into(),
 		}
 	}
 }
@@ -76,6 +80,9 @@ impl<T: 'static> StaticFileRouter<T> {
 		&self,
 	) -> Result<Vec<(RouteInfo, HtmlDocument)>> {
 		let scoped_style = ScopedStyle::default();
+
+		// let templates = ReadFile::to_string(&self.templates_src)?;
+
 		let html = self
 			.routes_to_rsx()
 			.await?
@@ -208,11 +215,9 @@ mod test {
 
 		expect(html.len()).to_be(2);
 
-		expect(&html[0].0.path.to_string_lossy())
-			.to_be("/contributing");
+		expect(&html[0].0.path.to_string_lossy()).to_be("/contributing");
 		expect(&html[0].1.render()).to_be("<!DOCTYPE html><html><head></head><body><div><h1>Beet</h1>\n\t\t\t\tparty time dude!\n\t\t</div></body></html>");
-		expect(&html[1].0.path.to_string_lossy())
-			.to_be("/");
+		expect(&html[1].0.path.to_string_lossy()).to_be("/");
 		expect(&html[1].1.render()).to_be("<!DOCTYPE html><html><head></head><body><div><h1>My Site</h1>\n\t\t\t\tparty time!\n\t\t</div></body></html>");
 	}
 }

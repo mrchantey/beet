@@ -40,7 +40,7 @@ pub fn rsx(tokens: TokenStream) -> TokenStream {
 }
 
 /// Mostly used for testing,
-/// this macro expands to a Vec<RsxTemplateNode>, it is used for
+/// this macro expands to an RsxTemplateNode, it is used for
 /// things like hot reloading.
 #[proc_macro]
 pub fn rsx_template(tokens: TokenStream) -> TokenStream {
@@ -49,7 +49,7 @@ pub fn rsx_template(tokens: TokenStream) -> TokenStream {
 		.into()
 }
 /// Mostly used for testing,
-/// this macro expands to a ron string.
+/// this macro expands to a ron string of an RsxTemplateNode.
 #[proc_macro]
 pub fn rsx_template_ron(tokens: TokenStream) -> TokenStream {
 	RstmlToRsxTemplateRon::default()

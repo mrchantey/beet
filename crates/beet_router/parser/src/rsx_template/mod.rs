@@ -18,6 +18,7 @@ use syn::visit::Visit;
 pub struct BuildRsxTemplates {
 	#[arg(long, default_value = "src")]
 	pub src: PathBuf,
+	// keep default in sync with StaticFileRouter
 	#[arg(long, default_value = "target/rsx-templates.ron")]
 	pub dst: PathBuf,
 }
