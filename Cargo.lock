@@ -715,7 +715,6 @@ dependencies = [
  "beet_flow",
  "beet_spatial",
  "bevy",
- "bevyhub",
  "num-traits",
  "sweet",
 ]

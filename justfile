@@ -89,6 +89,7 @@ test-all *args:
 	cargo test 																 --all-features -p beet_flow
 	cargo test 																								-p beet_rsx
 	cargo test 																								-p beet_router
+	cargo test 																								-p beet_router_parser
 	cargo test 																								-p beet_spatial
 	cargo test 																								-p beet_ml
 	cargo test --target wasm32-unknown-unknown --all-features -p beet_flow

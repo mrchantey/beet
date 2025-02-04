@@ -1,11 +1,13 @@
+mod rstml_rust_to_hash;
 mod rstml_to_template;
 mod rstml_to_template_ron;
 mod utils;
 pub use utils::*;
 pub mod tokens_to_rstml;
+pub use self::rstml_to_template::*;
 #[allow(unused_imports)]
 pub use self::rstml_to_template_ron::*;
-pub use self::rstml_to_template::*;
+pub use self::rstml_rust_to_hash::*;
 pub use self::tokens_to_rstml::*;
 mod rsx_rust_tokens;
 pub use rsx_rust_tokens::*;

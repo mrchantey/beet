@@ -5,13 +5,14 @@ use clap::Parser;
 use proc_macro2::Literal;
 use proc_macro2::TokenStream;
 use quote::quote;
+use syn::visit::Visit;
 use std::path::PathBuf;
 use sweet::prelude::FsExt;
 use sweet::prelude::ReadDir;
 use sweet::prelude::ReadFile;
 use syn::spanned::Spanned;
-use syn::visit::Visit;
-// use syn::File;
+mod hash_file;
+pub use hash_file::*;
 
 
 #[derive(Debug, Parser)]
