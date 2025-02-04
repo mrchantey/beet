@@ -19,7 +19,7 @@ _test_site = []
 [dependencies]
 beet_router_parser = { workspace = true, optional = true }
 sweet = { workspace = true, features = ["fs"] }
-beet_rsx = { workspace = true }
+beet_rsx = { workspace = true, features = ["serde"] }
 anyhow.workspace = true
 ron.workspace = true
 http.workspace = true
@@ -27,7 +27,6 @@ futures.workspace = true
 
 [dev-dependencies]
 ron.workspace = true
-beet_rsx = { workspace = true, features = ["serde"] }
 beet_router = { path = "", features = ["parser", "_test_site"] }
 sweet = { workspace = true, features = ["test"] }
 tokio.workspace = true

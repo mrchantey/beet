@@ -2,7 +2,7 @@ use crate::prelude::*;
 use beet::prelude::*;
 
 
-pub fn get(state: DefaultAppState) -> impl Rsx {
+pub fn get(state: DefaultAppState) -> RsxRoot {
 	rsx! {
 		<PageLayout title=state.app_name.into()>
 			<meta slot="head" name="description" content="A simple page layout component" />
