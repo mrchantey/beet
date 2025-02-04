@@ -41,13 +41,13 @@ jobs:
     - name: 🔨 Add wasm target
       run: rustup target add wasm32-unknown-unknown
     # - name: 🔨 Install cargo binstall
-    #   run: which cargo-binstall || cargo install cargo-binstall
+    #   run: cargo install cargo-binstall || true
     - name: 🔨 Install wasm bindgen cli
-      run: which wasm-bindgen || cargo install wasm-bindgen-cli --version 0.2.100
+      run: cargo install wasm-bindgen-cli --version 0.2.100 || true
     - name: 🔨 Install sweet cli
-      run: which sweet-cli || cargo install sweet-cli --version 0.3.0-rc.3
+      run: cargo install sweet-cli --version 0.3.0-rc.3 || true
     # - name: 🔨 Install leptosfmt
-    #   run: which leptosfmt || cargo install leptosfmt
+    #   run: which leptosfmt || cargo install leptosfmt || true
     - name: 🔨📋 Init repo
       run: just init-repo
     - name: 🔎 Test

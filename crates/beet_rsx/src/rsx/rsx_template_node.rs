@@ -118,6 +118,10 @@ impl RsxTemplateNode {
 			})),
 		}
 	}
+
+
+	#[cfg(test)]
+	pub fn 
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
