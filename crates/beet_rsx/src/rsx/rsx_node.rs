@@ -11,6 +11,8 @@ pub enum RsxNode {
 	Fragment(Vec<RsxNode>),
 	Component {
 		tag: String,
+		/// used to resolve with templates
+		loc: Option<LineColumn>,
 		node: Box<RsxNode>,
 	},
 	/// a rust block that returns text

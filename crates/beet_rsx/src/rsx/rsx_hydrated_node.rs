@@ -3,6 +3,11 @@ use std::collections::HashMap;
 
 
 pub enum RsxHydratedNode {
+	// we also collect components because they
+	// cannot be statically resolved
+	Component {
+		node: RsxNode,
+	},
 	RustBlock {
 		initial: RsxNode,
 		register: RegisterEffect,
@@ -60,6 +65,14 @@ impl RsxHydratedNode {
 						}
 					}
 				}
+			}
+			RsxNode::Component { loc, node, .. } => {
+				let loc = std::mem::take(loc).expect(
+					"effect has no location, ensure they are collected",
+				);
+				effects.insert(loc, Self::Component {
+					node: std::mem::take(node),
+				});
 			}
 			_ => {}
 		});

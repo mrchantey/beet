@@ -81,10 +81,10 @@ impl RstmlToRsxTemplateRon {
 				if is_component {
 					// components disregard all the context, they are known
 					// to the rsx node
-					let hash = span_to_line_col_ron(&span);
+					let loc = span_to_line_col_ron(&span);
 					quote! {
 						Component (
-							hash: #hash,
+							loc: #loc,
 							tag: #tag_name,
 							self_closing: #self_closing,
 							attributes: [#(#attributes),*],

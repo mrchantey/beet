@@ -108,9 +108,6 @@ mod test {
 
 		let node2 = RsxRoot::join(split).unwrap();
 		let html2 = RsxToHtml::render_body(&node2);
-		println!("html1: {}", html1);
-		println!("html2: {}", html2);
-
 		expect(html1).to_be(html2);
 	}
 }

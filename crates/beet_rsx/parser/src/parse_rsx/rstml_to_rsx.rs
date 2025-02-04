@@ -4,6 +4,7 @@ use proc_macro2_diagnostics::Diagnostic;
 use proc_macro2_diagnostics::Level;
 use quote::quote;
 use quote::ToTokens;
+use rstml::atoms::OpenTag;
 use rstml::node::KeyedAttribute;
 use rstml::node::Node;
 use rstml::node::NodeAttribute;
@@ -130,7 +131,7 @@ impl RstmlToRsx {
 
 				let is_component = tag.starts_with(|c: char| c.is_uppercase());
 				if is_component {
-					self.map_component(&tag, &open_tag.attributes, children)
+					self.map_component(tag, open_tag, children)
 				} else {
 					let attributes = open_tag
 						.attributes
@@ -152,11 +153,12 @@ impl RstmlToRsx {
 
 	fn map_component<C>(
 		&mut self,
-		tag: &str,
-		attributes: &Vec<NodeAttribute>,
+		tag: String,
+		open_tag: OpenTag,
 		children: Vec<Node<C>>,
 	) -> TokenStream {
-		let props = attributes.into_iter().map(|attr| match attr {
+		let loc = self.location_hash(&open_tag);
+		let props = open_tag.attributes.into_iter().map(|attr| match attr {
 			NodeAttribute::Block(node_block) => {
 				quote! {#node_block}
 			}
@@ -176,10 +178,10 @@ impl RstmlToRsx {
 		});
 		let ident = syn::Ident::new(&tag, tag.span());
 		let children_slot = self.map_slots(children);
-
 		quote!({
 			RsxNode::Component{
 				tag: #tag.to_string(),
+				loc: #loc,
 				node: Box::new(#ident{
 					#(#props,)*
 				}

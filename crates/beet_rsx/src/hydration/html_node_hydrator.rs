@@ -72,7 +72,7 @@ fn apply_rsx(
 ) -> ParseResult<()> {
 	match rsx {
 		RsxNode::Fragment(vec) => todo!(),
-		RsxNode::Component { tag, node } => todo!(),
+		RsxNode::Component { .. } => todo!(),
 		RsxNode::Block { initial, effect } => todo!(),
 		RsxNode::Element(rsx_element) => todo!(),
 		RsxNode::Text(text) => {

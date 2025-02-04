@@ -11,7 +11,7 @@ pub enum RsxTemplateNode {
 	// only used by the rsx_template! macro,
 	// components are already collapsed when traversing [RsxNode]
 	Component {
-		hash: LineColumn,
+		loc: LineColumn,
 		tag: String,
 		self_closing: bool,
 		children: Vec<Self>,
@@ -85,8 +85,17 @@ impl RsxTemplateNode {
 					.collect::<Result<Vec<_>>>()?;
 				Ok(RsxNode::Fragment(nodes))
 			}
-			RsxTemplateNode::Component { .. } => {
-				todo!("we'll also need the macro map to resolve components")
+			RsxTemplateNode::Component { loc, tag, .. } => {
+				let RsxHydratedNode::Component { node } =
+					effect_map.remove(&loc).ok_or_else(no_location)?
+				else {
+					anyhow::bail!("expected Component")
+				};
+				Ok(RsxNode::Component {
+					tag: tag.clone(),
+					loc: Some(loc),
+					node: Box::new(node),
+				})
 			}
 			RsxTemplateNode::RustBlock(line_column) => {
 				let RsxHydratedNode::RustBlock { initial, register } =
@@ -119,9 +128,44 @@ impl RsxTemplateNode {
 		}
 	}
 
-
+	/// allow two templates to be compared without considering line and column
 	#[cfg(test)]
-	pub fn 
+	pub fn zero_out_linecol(nodes: &mut Vec<RsxTemplateNode>) {
+		for item in nodes {
+			match item {
+				RsxTemplateNode::Component { loc: hash, .. } => {
+					hash.line = 0;
+					hash.column = 0;
+				}
+				RsxTemplateNode::RustBlock(loc) => {
+					loc.line = 0;
+					loc.column = 0;
+				}
+				RsxTemplateNode::Element {
+					attributes,
+					children,
+					..
+				} => {
+					for attr in attributes {
+						if let RsxTemplateAttribute::BlockValue {
+							value, ..
+						} = attr
+						{
+							value.line = 0;
+							value.column = 0;
+						}
+						if let RsxTemplateAttribute::Block(loc) = attr {
+							loc.line = 0;
+							loc.column = 0;
+						}
+					}
+					// Recursively process children
+					Self::zero_out_linecol(children);
+				}
+				_ => {}
+			}
+		}
+	}
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -270,7 +314,7 @@ mod test {
 				children: vec![
 					RsxTemplateNode::Text("hello\n\t\t\t\t\t".to_string()),
 					RsxTemplateNode::Component {
-						hash: component_linecol,
+						loc: component_linecol,
 						tag: "MyComponent".to_string(),
 						self_closing: false,
 						children: vec![RsxTemplateNode::Element {
@@ -321,48 +365,9 @@ mod test {
 
 		let mut parsed =
 			ron::de::from_str::<Vec<RsxTemplateNode>>(&template_ron).unwrap();
-		zero_out_linecol(&mut template);
-		zero_out_linecol(&mut parsed);
+		RsxTemplateNode::zero_out_linecol(&mut template);
+		RsxTemplateNode::zero_out_linecol(&mut parsed);
 
 		expect(template).to_be(parsed);
 	}
-
-	fn zero_out_linecol(nodes: &mut Vec<RsxTemplateNode>) {
-		for item in nodes {
-			match item {
-				RsxTemplateNode::Component { hash, .. } => {
-					hash.line = 0;
-					hash.column = 0;
-				}
-				RsxTemplateNode::RustBlock(loc) => {
-					loc.line = 0;
-					loc.column = 0;
-				}
-				RsxTemplateNode::Element {
-					attributes,
-					children,
-					..
-				} => {
-					for attr in attributes {
-						if let RsxTemplateAttribute::BlockValue {
-							value, ..
-						} = attr
-						{
-							value.line = 0;
-							value.column = 0;
-						}
-						if let RsxTemplateAttribute::Block(loc) = attr {
-							loc.line = 0;
-							loc.column = 0;
-						}
-					}
-					// Recursively process children
-					zero_out_linecol(children);
-				}
-				_ => {}
-			}
-		}
-	}
-
-
 }
