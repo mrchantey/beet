@@ -2,11 +2,8 @@
 name: 🔎 Test Crates
 on:
   push:
-    branches: [main,dev]
-    paths: ['**','!**/*.md']
   pull_request:
     branches: main
-    paths: ['**','!**/*.md']
 env:
   CARGO_TERM_COLOR: always
 jobs:
