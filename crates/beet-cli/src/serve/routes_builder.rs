@@ -76,10 +76,13 @@ impl RoutesBuilder {
 						let new_hash = HashRsxFile::file_to_hash(&ev.path)?;
 						if let Some(curr_hash) = self.file_cache.get(&ev.path) {
 							if curr_hash == &new_hash {
-								// match!
 								hotreload_reason = Some(ev.display());
 								continue;
 							}
+							println!(
+								"the hash changed\nprev: {}\nnew: {}",
+								curr_hash, new_hash
+							);
 						}
 						self.file_cache.insert(ev.path.clone(), new_hash);
 						return self.compile_and_run(&ev.display());

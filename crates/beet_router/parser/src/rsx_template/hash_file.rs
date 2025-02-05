@@ -27,6 +27,8 @@ impl Default for HashRsxFile {
 impl HashRsxFile {
 	pub fn file_to_hash(path: &Path) -> Result<u64> {
 		let file = ReadFile::to_string(path)?;
+		// parse to file or it will be a string literal
+		let file = syn::parse_file(&file)?;
 		let mut this = Self::default();
 		this.walk_tokens(file.to_token_stream())?;
 		Ok(this.hasher.finish())
@@ -37,12 +39,15 @@ impl HashRsxFile {
 	pub fn walk_tokens(&mut self, tokens: TokenStream) -> Result<()> {
 		let mut iter = tokens.into_iter().peekable();
 		while let Some(tree) = iter.next() {
+			// println!("visiting tree: {}", tree.to_string());
 			match &tree {
 				TokenTree::Ident(ident) if ident.to_string() == "rsx" => {
+					// println!("visiting ident: {}", ident.to_string());
 					if let Some(TokenTree::Punct(punct)) = iter.peek() {
 						if punct.as_char() == '!' {
 							iter.next(); // consume !
 							if let Some(TokenTree::Group(group)) = iter.next() {
+								// println!("visiting rsx");
 								RstmlRustToHash::visit_and_hash(
 									&mut self.hasher,
 									group.stream(),
@@ -50,6 +55,11 @@ impl HashRsxFile {
 								continue;
 							}
 						}
+					} else {
+						ident
+							.to_string()
+							.replace(" ", "")
+							.hash(&mut self.hasher);
 					}
 				}
 				TokenTree::Group(group) => {

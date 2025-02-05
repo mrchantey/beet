@@ -8,6 +8,7 @@ use beet::prelude::*;
 //dskdsdkls;dsakkjkkjkkjl
 
 pub fn get(state: DefaultAppState) -> RsxRoot {
+	let val = 33333;
 	rsx! {
 		<PageLayout title=state.app_name.into()>
 			<metasdjdsk
@@ -15,11 +16,11 @@ pub fn get(state: DefaultAppState) -> RsxRoot {
 				name="description"
 				content="A simple page layout component"
 			/>
-			party time i think, yep it is. ok for sure it party m,
+			{1 + 33293893}
+			parj is. ok fut pkjjkklrty m,
 		</PageLayout>
 	}
 }
-
 
 
 

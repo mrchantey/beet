@@ -32,13 +32,16 @@ impl<'a> RstmlRustToHash<'a> {
 }
 impl<'a> syn::visit_mut::VisitMut for RstmlRustToHash<'a> {}
 
+/// we could visit_rust_block but this feels more explicit
+/// and easier to understand
 impl<'a, C> Visitor<C> for RstmlRustToHash<'a>
 where
 	C: rstml::node::CustomNode + 'static,
 {
 	fn visit_block(&mut self, block: &mut rstml::node::NodeBlock) -> bool {
+		// println!("visiting block: {}", block.into_token_stream().to_string());
 		self.hash(block);
-		false
+		true
 	}
 	fn visit_element(
 		&mut self,
@@ -71,6 +74,6 @@ where
 				None => {}
 			},
 		}
-		false
+		true
 	}
 }

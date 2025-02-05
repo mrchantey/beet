@@ -27,13 +27,11 @@ impl Serve {
 			serve_dir,
 		} = self;
 
-		//let watch_handle =  tokio::spawn(async move {
-
-		// });
-
-		RoutesBuilder::new(build_routes_mod, cargo_run)
-			.watch()
-			.await?;
+		let watch_handle = tokio::spawn(async move {
+			RoutesBuilder::new(build_routes_mod, cargo_run)
+				.watch()
+				.await
+		});
 
 		println!("🥁 Server running at {}", serve_dir.display());
 		let server = Server {
@@ -43,7 +41,7 @@ impl Serve {
 		};
 
 		server.run().await?;
-		// watch_handle.abort();
+		watch_handle.abort();
 
 		Ok(())
 	}
