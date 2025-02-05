@@ -34,9 +34,9 @@ async fn main() {
 	else {
 		panic!();
 	};
-	let RsxNode::Component {
+	let RsxNode::Component(RsxComponent {
 		tracker: tracker2, ..
-	} = rsx.node
+	}) = rsx.node
 	else {
 		panic!();
 	};

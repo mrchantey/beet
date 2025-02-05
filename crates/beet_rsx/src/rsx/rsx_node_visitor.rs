@@ -26,7 +26,7 @@ impl RsxNode {
 	/// this is useful for patterns like [ScopedStyle]
 	pub fn visit_ignore_components(&self, mut func: impl FnMut(&RsxNode)) {
 		fn inner(node: &RsxNode, func: &mut impl FnMut(&RsxNode)) {
-			if let RsxNode::Component { .. } = node {
+			if let RsxNode::Component(_) = node {
 				return;
 			}
 			func(node);
@@ -43,7 +43,7 @@ impl RsxNode {
 		mut func: impl FnMut(&mut RsxNode),
 	) {
 		fn inner(node: &mut RsxNode, func: &mut impl FnMut(&mut RsxNode)) {
-			if let RsxNode::Component { .. } = node {
+			if let RsxNode::Component(_) = node {
 				return;
 			}
 			func(node);

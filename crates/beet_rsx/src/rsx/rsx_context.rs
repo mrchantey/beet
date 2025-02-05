@@ -160,7 +160,7 @@ impl RsxContext {
 						queue.push_back(HtmlElementPosition::MiddleChild(node));
 					}
 				}
-				RsxNode::Component { node, .. } => {
+				RsxNode::Component(RsxComponent { node, .. }) => {
 					queue.push_back(HtmlElementPosition::MiddleChild(node));
 				}
 				RsxNode::Block(RsxBlock { initial, .. }) => {
@@ -203,7 +203,7 @@ impl RsxContext {
 						queue.push_back(HtmlElementPosition::MiddleChild(node));
 					}
 				}
-				RsxNode::Component { node, .. } => {
+				RsxNode::Component(RsxComponent { node, .. }) => {
 					queue.push_back(HtmlElementPosition::MiddleChild(node));
 				}
 				RsxNode::Block(RsxBlock { initial, .. }) => {

@@ -1,5 +1,6 @@
 use super::ElementIdx;
 use super::RsxBlock;
+use super::RsxComponent;
 use super::RsxElement;
 use super::RsxNode;
 use crate::error::ParseError;
@@ -165,7 +166,7 @@ impl CollapsedNode {
 			RsxNode::Fragment(nodes) => {
 				out.extend(nodes.into_iter().flat_map(Self::from_node));
 			}
-			RsxNode::Component { node, .. } => {
+			RsxNode::Component(RsxComponent { node, .. }) => {
 				out.extend(Self::from_node(node));
 			}
 			RsxNode::Block(RsxBlock { initial, .. }) => {

@@ -9,12 +9,7 @@ pub enum RsxNode {
 	/// This may be deprecated in the future if no patterns
 	/// require it. The RstmlToRsx could support it
 	Fragment(Vec<RsxNode>),
-	Component {
-		tag: String,
-		/// used to resolve with templates
-		tracker: Option<RustyTracker>,
-		node: Box<RsxNode>,
-	},
+	Component(RsxComponent),
 	/// a rust block that returns text
 	Block(RsxBlock),
 	/// a html element
@@ -41,7 +36,7 @@ impl RsxNode {
 	pub fn children(&self) -> &[RsxNode] {
 		match self {
 			RsxNode::Fragment(rsx_nodes) => rsx_nodes,
-			RsxNode::Component { .. } => &[],
+			RsxNode::Component(_) => &[],
 			RsxNode::Block(RsxBlock { initial, .. }) => initial.children(),
 			RsxNode::Element(RsxElement { children, .. }) => &children,
 			RsxNode::Text(_) => &[],
@@ -54,7 +49,7 @@ impl RsxNode {
 	pub fn children_mut(&mut self) -> &mut [RsxNode] {
 		match self {
 			RsxNode::Fragment(rsx_nodes) => rsx_nodes,
-			RsxNode::Component { .. } => &mut [],
+			RsxNode::Component(_) => &mut [],
 			RsxNode::Block(RsxBlock { initial, .. }) => initial.children_mut(),
 			RsxNode::Element(RsxElement { children, .. }) => children,
 			RsxNode::Text(_) => &mut [],
@@ -151,7 +146,7 @@ impl RsxNode {
 				}
 				Some(to_insert)
 			}
-			RsxNode::Component { .. } => {
+			RsxNode::Component(_) => {
 				Some(to_insert)
 				// dont recurse into component because it would steal the slot
 				// from next siblings
@@ -192,10 +187,10 @@ pub struct RsxComponent {
 	pub tracker: Option<RustyTracker>,
 	/// the node returned by [Component::render]
 	pub node: Box<RsxNode>,
-	/// the children passed in by this components parent:
-	///
-	/// `rsx! { <MyComponent>slot_children</MyComponent> }`
-	pub slot_children: Box<RsxNode>,
+	// /// the children passed in by this components parent:
+	// ///
+	// /// `rsx! { <MyComponent>slot_children</MyComponent> }`
+	// pub slot_children: Box<RsxNode>,
 }
 
 /// Representation of an RsxElement

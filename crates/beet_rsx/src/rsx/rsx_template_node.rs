@@ -55,13 +55,15 @@ impl RsxTemplateNode {
 					.collect::<Result<Vec<_>>>()?;
 				Ok(Self::Fragment(nodes))
 			}
-			RsxNode::Component { tag, tracker, node } => Ok(Self::Component {
-				children: vec![Self::from_rsx_node(node)?],
-				tracker: tracker
-					.clone()
-					.ok_or_else(|| from_node_tracker_error("Component"))?,
-				tag: tag.clone(),
-			}),
+			RsxNode::Component(RsxComponent { tag, tracker, node }) => {
+				Ok(Self::Component {
+					children: vec![Self::from_rsx_node(node)?],
+					tracker: tracker
+						.clone()
+						.ok_or_else(|| from_node_tracker_error("Component"))?,
+					tag: tag.clone(),
+				})
+			}
 			RsxNode::Block(RsxBlock { effect, .. }) => Ok(Self::RustBlock(
 				effect
 					.tracker
@@ -119,11 +121,11 @@ impl RsxTemplateNode {
 				else {
 					anyhow::bail!("expected Component")
 				};
-				Ok(RsxNode::Component {
+				Ok(RsxNode::Component(RsxComponent {
 					tag: tag.clone(),
 					tracker: Some(tracker),
 					node: Box::new(node),
-				})
+				}))
 			}
 			RsxTemplateNode::RustBlock(tracker) => {
 				let RsxHydratedNode::RustBlock { initial, register } =

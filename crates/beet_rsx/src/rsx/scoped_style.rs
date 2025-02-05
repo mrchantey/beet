@@ -32,7 +32,7 @@ impl ScopedStyle {
 	pub fn apply(&self, node: &mut RsxNode) -> ParseResult<()> {
 		let mut result = Ok(());
 		RsxContext::visit_mut(node, |cx, node| match node {
-			RsxNode::Component { node, .. } => {
+			RsxNode::Component(RsxComponent { node, .. }) => {
 				let mut contains_style = false;
 				node.visit_ignore_components_mut(|node| {
 					if let RsxNode::Element(e) = node {

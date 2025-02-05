@@ -91,7 +91,7 @@ impl RsxHydratedNode {
 					}
 				}
 			}
-			RsxNode::Component { tracker, node, .. } => {
+			RsxNode::Component(RsxComponent { tracker, node, .. }) => {
 				let tracker = std::mem::take(tracker).expect(
 					"component has no tracker, ensure they are collected",
 				);

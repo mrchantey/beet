@@ -175,14 +175,14 @@ impl RstmlToRsx {
 		let ident = syn::Ident::new(&tag, tag.span());
 		let children_slot = self.map_slots(children);
 		quote!({
-			RsxNode::Component{
+			RsxNode::Component(RsxComponent{
 				tag: #tag.to_string(),
 				tracker: #tracker,
 				node: Box::new(#ident{
 					#(#props,)*
 				}
 				.into_rsx()#children_slot)
-			}
+			})
 		})
 	}
 
