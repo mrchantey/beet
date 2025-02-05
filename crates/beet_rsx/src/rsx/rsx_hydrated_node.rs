@@ -55,7 +55,7 @@ impl RsxHydratedNode {
 			let effect = effect.take();
 			let tracker = effect
 				.tracker
-				.expect("effect has no tracker, ensure they are collected");
+				.expect("Hydrator - rusty code has no tracker, ensure they are collected");
 			(effect.register, tracker)
 		};
 

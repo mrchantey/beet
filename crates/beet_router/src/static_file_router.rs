@@ -98,7 +98,7 @@ impl<T: 'static> StaticFileRouter<T> {
 
 		let mut apply_templates = |root: RsxRoot| -> Result<RsxRoot> {
 			if let Some(templates) = &mut templates {
-				let mut split = root.split()?;
+				let mut split = root.split_hydration()?;
 				split.template =
 					templates.remove(&split.location).ok_or_else(|| {
 						anyhow::anyhow!(
@@ -106,7 +106,7 @@ impl<T: 'static> StaticFileRouter<T> {
 							&split.location
 						)
 					})?;
-				Ok(RsxRoot::join(split)?)
+				Ok(RsxRoot::join_hydration(split)?)
 			} else {
 				// we already warned about missing templates
 				Ok(root)

@@ -25,8 +25,8 @@ pub enum RsxTemplateNode {
 	Text(String),
 	Comment(String),
 }
-fn no_location() -> anyhow::Error {
-	anyhow::anyhow!("effect has no location, ensure they are collected")
+fn no_tracker() -> anyhow::Error {
+	anyhow::anyhow!("Template Builder rusty code has no tracker, ensure they are collected")
 }
 
 impl RsxTemplateNode {
@@ -40,11 +40,11 @@ impl RsxTemplateNode {
 				Ok(Self::Fragment(nodes))
 			}
 			RsxNode::Component { tag, tracker, .. } => Ok(Self::Component {
-				tracker: tracker.clone().ok_or_else(no_location)?,
+				tracker: tracker.clone().ok_or_else(no_tracker)?,
 				tag: tag.clone(),
 			}),
 			RsxNode::Block { effect, .. } => Ok(Self::RustBlock(
-				effect.tracker.clone().ok_or_else(no_location)?,
+				effect.tracker.clone().ok_or_else(no_tracker)?,
 			)),
 			RsxNode::Element(RsxElement {
 				tag,
@@ -87,7 +87,7 @@ impl RsxTemplateNode {
 			}
 			RsxTemplateNode::Component { tracker, tag, .. } => {
 				let RsxHydratedNode::Component { node } =
-					effect_map.remove(&tracker).ok_or_else(no_location)?
+					effect_map.remove(&tracker).ok_or_else(no_tracker)?
 				else {
 					anyhow::bail!("expected Component")
 				};
@@ -99,7 +99,7 @@ impl RsxTemplateNode {
 			}
 			RsxTemplateNode::RustBlock(tracker) => {
 				let RsxHydratedNode::RustBlock { initial, register } =
-					effect_map.remove(&tracker).ok_or_else(no_location)?
+					effect_map.remove(&tracker).ok_or_else(no_tracker)?
 				else {
 					anyhow::bail!("expected Rust Block")
 				};
@@ -189,11 +189,11 @@ impl RsxTemplateAttribute {
 			RsxAttribute::BlockValue { key, effect, .. } => {
 				Ok(Self::BlockValue {
 					key: key.clone(),
-					tracker: effect.tracker.clone().ok_or_else(no_location)?,
+					tracker: effect.tracker.clone().ok_or_else(no_tracker)?,
 				})
 			}
 			RsxAttribute::Block { effect, .. } => {
-				Ok(Self::Block(effect.tracker.clone().ok_or_else(no_location)?))
+				Ok(Self::Block(effect.tracker.clone().ok_or_else(no_tracker)?))
 			}
 		}
 	}
@@ -209,7 +209,7 @@ impl RsxTemplateAttribute {
 			}
 			RsxTemplateAttribute::Block(tracker) => {
 				let RsxHydratedNode::AttributeBlock { initial, register } =
-					effect_map.remove(&tracker).ok_or_else(no_location)?
+					effect_map.remove(&tracker).ok_or_else(no_tracker)?
 				else {
 					anyhow::bail!("expected Attribute Block")
 				};
@@ -220,7 +220,7 @@ impl RsxTemplateAttribute {
 			}
 			RsxTemplateAttribute::BlockValue { key, tracker } => {
 				let RsxHydratedNode::AttributeValue { initial, register } =
-					effect_map.remove(&tracker).ok_or_else(no_location)?
+					effect_map.remove(&tracker).ok_or_else(no_tracker)?
 				else {
 					anyhow::bail!("expected Attribute Block")
 				};

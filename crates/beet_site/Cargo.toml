@@ -11,6 +11,9 @@ repository.workspace = true
 categories.workspace = true
 keywords.workspace = true
 
+[[bin]]
+name = "beet_site"
+path = "src/main.rs"
 
 [dependencies]
 beet = { workspace = true, features = ["router"] }

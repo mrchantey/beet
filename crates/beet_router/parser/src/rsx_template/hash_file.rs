@@ -106,4 +106,6 @@ mod test {
 			.not()
 			.to_be(hash(quote! {rsx!{<el>{8}</el>}}));
 	}
+	
 }
+

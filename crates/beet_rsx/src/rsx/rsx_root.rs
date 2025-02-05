@@ -15,7 +15,7 @@ pub struct RsxRoot {
 // type HydratedMap = HashMap<RsxLocation, RsxHydratedNode>;
 
 impl RsxRoot {
-	pub fn split(self) -> Result<SplitRsx> {
+	pub fn split_hydration(self) -> Result<SplitRsx> {
 		let template = RsxTemplateNode::from_rsx_node(&self.node)?;
 		let effects = RsxHydratedNode::collect(self.node);
 		let location = self.location;
@@ -26,7 +26,7 @@ impl RsxRoot {
 		})
 	}
 
-	pub fn join(mut dehydrated: SplitRsx) -> Result<Self> {
+	pub fn join_hydration(mut dehydrated: SplitRsx) -> Result<Self> {
 		let node = RsxTemplateNode::into_rsx_node(
 			dehydrated.template,
 			&mut dehydrated.hydrated,
@@ -102,10 +102,10 @@ mod test {
 		};
 
 		let html1 = RsxToHtml::render_body(&node);
-		let split = node.split().unwrap();
+		let split = node.split_hydration().unwrap();
 		// println!("{:#?}", split);
 
-		let node2 = RsxRoot::join(split).unwrap();
+		let node2 = RsxRoot::join_hydration(split).unwrap();
 		let html2 = RsxToHtml::render_body(&node2);
 		expect(html1).to_be(html2);
 	}
@@ -140,7 +140,7 @@ mod test {
 		let SplitRsx {
 			template: mut node1_template,
 			..
-		} = node.split().unwrap();
+		} = node.split_hydration().unwrap();
 		// println!("{:#?}", split);
 		node1_template.clear_rusty_trackers();
 		node2_template.clear_rusty_trackers();

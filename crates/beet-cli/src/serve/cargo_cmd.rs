@@ -1,6 +1,6 @@
+use anyhow::Result;
 use clap::Parser;
 use std::process::Command;
-use anyhow::Result;
 
 /// Verbatim clone of cargo run args
 #[derive(Debug, Clone, Parser)]
@@ -8,86 +8,86 @@ use anyhow::Result;
 pub struct CargoCmd {
 	/// Error format
 	#[arg(long, default_value = "run")]
-	cargo_cmd: String,
+	pub cargo_cmd: String,
 	#[arg(long)]
-	message_format: Option<String>,
+	pub message_format: Option<String>,
 	/// Use verbose output (-vv very verbose/build.rs output)
 	#[arg(short = 'v', long, action = clap::ArgAction::Count)]
-	verbose: u8,
+	pub verbose: u8,
 	/// Do not print cargo log messages
 	#[arg(short, long)]
-	quiet: bool,
+	pub quiet: bool,
 	/// Coloring: auto, always, never
 	#[arg(long)]
-	color: Option<String>,
+	pub color: Option<String>,
 	/// Override a configuration value
-	config: Option<String>,
+	pub config: Option<String>,
 	/// Unstable (nightly-only) flags to Cargo, see 'cargo -Z help' for details
 	#[arg(short = 'Z', long)]
-	z: Option<String>,
+	pub z: Option<String>,
 	/// Package with the target to run
 	#[arg(short = 'p', long = "package")]
-	package: Option<String>,
+	pub package: Option<String>,
 	/// Name of the bin target to run
 	#[arg(long)]
-	bin: Option<String>,
+	pub bin: Option<String>,
 	/// Name of the example target to run
 	#[arg(long)]
-	example: Option<String>,
+	pub example: Option<String>,
 	/// Space or comma separated list of features to activate
 	#[arg(short = 'F', long = "features")]
-	features: Option<String>,
+	pub features: Option<String>,
 	/// Activate all available features
 	#[arg(long)]
-	all_features: bool,
+	pub all_features: bool,
 	/// Do not activate the `default` feature
 	#[arg(long)]
-	no_default_features: bool,
+	pub no_default_features: bool,
 	/// Number of parallel jobs, defaults to # of CPUs.
 	#[arg(short = 'j', long)]
-	jobs: Option<String>,
+	pub jobs: Option<String>,
 	/// Do not abort the build as soon as there is an error
 	#[arg(long)]
-	keep_going: bool,
+	pub keep_going: bool,
 	/// Build artifacts in release mode, with optimizations
 	#[arg(long)]
-	release: bool,
+	pub release: bool,
 	/// Build artifacts with the specified profile
 	#[arg(long)]
-	profile: Option<String>,
+	pub profile: Option<String>,
 	/// Build for the target triple
 	#[arg(long)]
-	target: Option<String>,
+	pub target: Option<String>,
 	/// Directory for all generated artifacts
 	#[arg(long)]
-	target_dir: Option<String>,
+	pub target_dir: Option<String>,
 	/// Output build graph in JSON (unstable)
 	#[arg(long)]
-	unit_graph: bool,
+	pub unit_graph: bool,
 	/// Timing output formats (unstable) (comma separated): html, json
 	#[arg(long)]
-	timings: Option<String>,
+	pub timings: Option<String>,
 	/// Path to Cargo.toml
 	#[arg(long)]
-	manifest_path: Option<String>,
+	pub manifest_path: Option<String>,
 	/// Path to Cargo.lock (unstable)
 	#[arg(long)]
-	lockfile_path: Option<String>,
+	pub lockfile_path: Option<String>,
 	/// Ignore `rust-version` specification in packages
 	#[arg(long)]
-	ignore_rust_version: bool,
+	pub ignore_rust_version: bool,
 	/// Assert that `Cargo.lock` will remain unchanged
 	#[arg(long)]
-	locked: bool,
+	pub locked: bool,
 	/// Run without accessing the network
 	#[arg(long)]
-	offline: bool,
+	pub offline: bool,
 	/// Equivalent to specifying both --locked and --offline
 	#[arg(long)]
-	frozen: bool,
+	pub frozen: bool,
 	/// Arguments for the binary or example to run
 	#[arg(trailing_var_arg = true)]
-	args: Vec<String>,
+	pub args: Vec<String>,
 }
 
 impl Default for CargoCmd {
@@ -95,15 +95,6 @@ impl Default for CargoCmd {
 }
 
 impl CargoCmd {
-	pub fn cargo_run(&mut self) -> Result<()> {
-		self.cargo_cmd = "run".to_string();
-		self.spawn()
-	}
-	pub fn cargo_build(&mut self) -> Result<()> {
-		self.cargo_cmd = "build".to_string();
-		self.spawn()
-	}
-
 	pub fn spawn(&self) -> Result<()> {
 		let CargoCmd {
 			cargo_cmd,
@@ -245,7 +236,12 @@ impl CargoCmd {
 
 		cmd.args(args);
 
-		cmd.status()?;
-		Ok(())
+		if cmd.status()?.success() {
+			Ok(())
+		} else {
+			anyhow::bail!("cargo run failed");
+		}
 	}
 }
+
+//cargo build -p beet_site --message-format=json | jq -r 'select(.reason == "compiler-artifact" and .target.kind == ["bin"]) | .filenames[]'

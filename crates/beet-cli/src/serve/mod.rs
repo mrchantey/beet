@@ -1,16 +1,16 @@
 use anyhow::Result;
 use beet_router::prelude::*;
 use clap::Parser;
-use diff_file::RoutesBuilder;
+use routes_builder::RoutesBuilder;
 use std::path::PathBuf;
 use sweet::prelude::Server;
 mod cargo_cmd;
-mod diff_file;
+mod routes_builder;
 ///
 #[derive(Debug, Parser)]
 pub struct Serve {
 	#[command(flatten)]
-	parse_file_router: BuildRoutesMod,
+	build_routes_mod: BuildRoutesMod,
 	/// 🦀 the commands that will be used to build the route1s 🦀
 	#[command(flatten)]
 	cargo_run: cargo_cmd::CargoCmd,
@@ -20,23 +20,30 @@ pub struct Serve {
 }
 
 impl Serve {
-	pub async fn run(mut self) -> Result<()> {
-		self.parse_file_router.build_and_write()?;
+	pub async fn run(self) -> Result<()> {
+		let Serve {
+			build_routes_mod,
+			cargo_run,
+			serve_dir,
+		} = self;
 
-		let watch_handle = RoutesBuilder::new(
-			self.parse_file_router.src,
-			std::mem::take(&mut self.cargo_run),
-		)
-		.watch();
+		//let watch_handle =  tokio::spawn(async move {
 
-		println!("🥁 Server running at {}", &self.serve_dir.display());
+		// });
+
+		RoutesBuilder::new(build_routes_mod, cargo_run)
+			.watch()
+			.await?;
+
+		println!("🥁 Server running at {}", serve_dir.display());
 		let server = Server {
-			dir: self.serve_dir.clone(),
+			dir: serve_dir,
+			no_clear: true,
 			..Default::default()
 		};
 
 		server.run().await?;
-		watch_handle.abort();
+		// watch_handle.abort();
 
 		Ok(())
 	}
