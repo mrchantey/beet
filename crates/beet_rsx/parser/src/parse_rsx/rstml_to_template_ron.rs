@@ -51,7 +51,7 @@ impl RstmlToRsxTemplateRon {
 				}
 			}
 			Node::Block(node_block) => {
-				let tracker = self.tracker.next_ron(&node_block);
+				let tracker = self.tracker.next_tracker_ron(&node_block);
 				quote! {RustBlock(#tracker)}
 			}
 			Node::Text(NodeText { value }) => {
@@ -76,7 +76,13 @@ impl RstmlToRsxTemplateRon {
 				if is_component {
 					// components disregard all the context, they are known
 					// to the rsx node
-					let tracker = self.tracker.next_ron(open_tag);
+					let tracker = self.tracker.next_tracker_ron(&open_tag);
+					println!(
+						"ron\ntag:{}\ntracker{}",
+						open_tag.to_token_stream().to_string(),
+						tracker.to_string()
+					);
+			
 					// we rely on the hydrated node to provide the attributes and children
 					quote! {
 						Component (
@@ -107,7 +113,7 @@ impl RstmlToRsxTemplateRon {
 	fn map_attribute(&mut self, attr: NodeAttribute) -> TokenStream {
 		match attr {
 			NodeAttribute::Block(block) => {
-				let tracker = self.tracker.next_ron(&block);
+				let tracker = self.tracker.next_tracker_ron(&block);
 				quote! {Block(#tracker)}
 			}
 			NodeAttribute::Attribute(attr) => {
@@ -126,7 +132,7 @@ impl RstmlToRsxTemplateRon {
 						}
 					}
 					Some(tokens) => {
-						let tracker = self.tracker.next_ron(&tokens);
+						let tracker = self.tracker.next_tracker_ron(&tokens);
 						quote! {
 							BlockValue (
 								key: #key,

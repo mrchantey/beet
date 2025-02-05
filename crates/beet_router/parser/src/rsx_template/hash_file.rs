@@ -11,6 +11,7 @@ use sweet::prelude::ReadFile;
 
 
 /// determine if a compilation is required due to rust code changes
+/// by hashing an entire file
 #[derive(Default)]
 pub struct HashRsxFile;
 

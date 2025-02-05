@@ -76,28 +76,32 @@ impl<T: 'static> StaticFileRouter<T> {
 		Ok((route.route_info.clone(), node))
 	}
 
-	fn load_templates(&self) -> Result<HashMap<RsxLocation, RsxTemplateNode>> {
+	fn load_template_map(
+		&self,
+	) -> Result<HashMap<RsxLocation, RsxTemplateNode>> {
 		let tokens = ReadFile::to_string(&self.templates_src)?;
 		let templates: HashMap<RsxLocation, RsxTemplateNode> =
 			ron::de::from_str(&tokens.to_string())?;
 		Ok(templates)
 	}
+
+	/// try applying templates, otherwise warn and use
+	/// the compiled rsx
 	pub async fn routes_to_html(
 		&self,
 	) -> Result<Vec<(RouteInfo, HtmlDocument)>> {
 		let scoped_style = ScopedStyle::default();
 
-		let mut templates = self
-			.load_templates()
+		let mut template_map = self
+			.load_template_map()
 			.map_err(|err| {
 				eprintln!("No templates found at {:?}", self.templates_src);
 				err
 			})
 			.ok();
 
-
 		let mut apply_templates = |root: RsxRoot| -> Result<RsxRoot> {
-			if let Some(templates) = &mut templates {
+			if let Some(templates) = &mut template_map {
 				let mut split = root.split_hydration()?;
 				split.template =
 					templates.remove(&split.location).ok_or_else(|| {
@@ -106,7 +110,15 @@ impl<T: 'static> StaticFileRouter<T> {
 							&split.location
 						)
 					})?;
-				Ok(RsxRoot::join_hydration(split)?)
+				let location = split.location.clone();
+				// println!("split: {:#?}", split);
+				Ok(RsxRoot::join_hydration(split).map_err(|err| {
+					anyhow::anyhow!(
+						"Failed to join hydration at location: {:#?}\n{:?}",
+						location,
+						err
+					)
+				})?)
 			} else {
 				// we already warned about missing templates
 				Ok(root)
@@ -117,11 +129,11 @@ impl<T: 'static> StaticFileRouter<T> {
 			.routes_to_rsx()
 			.await?
 			.into_iter()
-			.map(|(p, root)| {
+			.map(|(route, root)| {
 				let mut root = apply_templates(root)?;
 				scoped_style.apply(&mut root)?;
 				let doc = RsxToHtml::default().map_node(&root).into_document();
-				Ok((p, doc))
+				Ok((route, doc))
 			})
 			.collect::<Result<Vec<(RouteInfo, HtmlDocument)>>>()?;
 		Ok(html)
@@ -133,15 +145,16 @@ impl<T: 'static> StaticFileRouter<T> {
 		// in debug mode this breaks FsWatcher
 		#[cfg(not(debug_assertions))]
 		FsExt::remove(&dst).ok();
-		let html = self.routes_to_html().await?;
 		std::fs::create_dir_all(&dst)?;
+
 		let dst = dst.canonicalize()?;
-		for (info, doc) in html {
+		for (info, doc) in self.routes_to_html().await? {
 			let mut path = info.path.clone();
+			// map foo/index.rs to foo/index.html
 			if path.file_stem().map(|s| s == "index").unwrap_or(false) {
 				path.set_extension("html");
 			} else {
-				// routers expect index.html for any path without an extension
+				// map foo/contributing.rs to foo/contributing/index.html
 				path.set_extension("");
 				path.push("index.html");
 			}

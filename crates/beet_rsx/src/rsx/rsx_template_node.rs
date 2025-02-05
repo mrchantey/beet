@@ -25,8 +25,16 @@ pub enum RsxTemplateNode {
 	Text(String),
 	Comment(String),
 }
-fn no_tracker() -> anyhow::Error {
-	anyhow::anyhow!("Template Builder rusty code has no tracker, ensure they are collected")
+
+fn from_node_tracker_error(cx: &str) -> anyhow::Error {
+	anyhow::anyhow!("Template Builder - RsxNode has no tracker for {cx}, ensure they are included in RstmlToRsx settings")
+}
+fn to_node_tracker_error(
+	rusty_map: &HashMap<RustyTracker, RsxHydratedNode>,
+	tracker: &RustyTracker,
+	cx: &str,
+) -> anyhow::Error {
+	anyhow::anyhow!("Template Builder - Rusty Map is missing a tracker for {cx}\nExpected: {:#?}\nReceived: {:#?}",tracker,rusty_map.keys())
 }
 
 impl RsxTemplateNode {
@@ -40,11 +48,16 @@ impl RsxTemplateNode {
 				Ok(Self::Fragment(nodes))
 			}
 			RsxNode::Component { tag, tracker, .. } => Ok(Self::Component {
-				tracker: tracker.clone().ok_or_else(no_tracker)?,
+				tracker: tracker
+					.clone()
+					.ok_or_else(|| from_node_tracker_error("Component"))?,
 				tag: tag.clone(),
 			}),
 			RsxNode::Block { effect, .. } => Ok(Self::RustBlock(
-				effect.tracker.clone().ok_or_else(no_tracker)?,
+				effect
+					.tracker
+					.clone()
+					.ok_or_else(|| from_node_tracker_error("NodeBlock"))?,
 			)),
 			RsxNode::Element(RsxElement {
 				tag,
@@ -72,7 +85,7 @@ impl RsxTemplateNode {
 	/// drain the effect map into an RsxNode
 	pub fn into_rsx_node(
 		self,
-		effect_map: &mut HashMap<RustyTracker, RsxHydratedNode>,
+		rusty_map: &mut HashMap<RustyTracker, RsxHydratedNode>,
 	) -> Result<RsxNode> {
 		match self {
 			RsxTemplateNode::Doctype => Ok(RsxNode::Doctype),
@@ -81,13 +94,15 @@ impl RsxTemplateNode {
 			RsxTemplateNode::Fragment(rsx_template_nodes) => {
 				let nodes = rsx_template_nodes
 					.into_iter()
-					.map(|node| node.into_rsx_node(effect_map))
+					.map(|node| node.into_rsx_node(rusty_map))
 					.collect::<Result<Vec<_>>>()?;
 				Ok(RsxNode::Fragment(nodes))
 			}
 			RsxTemplateNode::Component { tracker, tag, .. } => {
 				let RsxHydratedNode::Component { node } =
-					effect_map.remove(&tracker).ok_or_else(no_tracker)?
+					rusty_map.remove(&tracker).ok_or_else(|| {
+						to_node_tracker_error(rusty_map, &tracker, "Component")
+					})?
 				else {
 					anyhow::bail!("expected Component")
 				};
@@ -99,7 +114,9 @@ impl RsxTemplateNode {
 			}
 			RsxTemplateNode::RustBlock(tracker) => {
 				let RsxHydratedNode::RustBlock { initial, register } =
-					effect_map.remove(&tracker).ok_or_else(no_tracker)?
+					rusty_map.remove(&tracker).ok_or_else(|| {
+						to_node_tracker_error(rusty_map, &tracker, "RustBlock")
+					})?
 				else {
 					anyhow::bail!("expected Rust Block")
 				};
@@ -118,11 +135,11 @@ impl RsxTemplateNode {
 				self_closing,
 				attributes: attributes
 					.into_iter()
-					.map(|attr| attr.into_rsx_node(effect_map))
+					.map(|attr| attr.into_rsx_node(rusty_map))
 					.collect::<Result<Vec<_>>>()?,
 				children: children
 					.into_iter()
-					.map(|node| node.into_rsx_node(effect_map))
+					.map(|node| node.into_rsx_node(rusty_map))
 					.collect::<Result<Vec<_>>>()?,
 			})),
 		}
@@ -189,18 +206,22 @@ impl RsxTemplateAttribute {
 			RsxAttribute::BlockValue { key, effect, .. } => {
 				Ok(Self::BlockValue {
 					key: key.clone(),
-					tracker: effect.tracker.clone().ok_or_else(no_tracker)?,
+					tracker: effect.tracker.clone().ok_or_else(|| {
+						from_node_tracker_error("AttributeValue")
+					})?,
 				})
 			}
 			RsxAttribute::Block { effect, .. } => {
-				Ok(Self::Block(effect.tracker.clone().ok_or_else(no_tracker)?))
+				Ok(Self::Block(effect.tracker.clone().ok_or_else(|| {
+					from_node_tracker_error("AttributeBlock")
+				})?))
 			}
 		}
 	}
 	/// drain the effect map into the template
 	pub fn into_rsx_node(
 		self,
-		effect_map: &mut HashMap<RustyTracker, RsxHydratedNode>,
+		rusty_map: &mut HashMap<RustyTracker, RsxHydratedNode>,
 	) -> Result<RsxAttribute> {
 		match self {
 			RsxTemplateAttribute::Key { key } => Ok(RsxAttribute::Key { key }),
@@ -209,7 +230,13 @@ impl RsxTemplateAttribute {
 			}
 			RsxTemplateAttribute::Block(tracker) => {
 				let RsxHydratedNode::AttributeBlock { initial, register } =
-					effect_map.remove(&tracker).ok_or_else(no_tracker)?
+					rusty_map.remove(&tracker).ok_or_else(|| {
+						to_node_tracker_error(
+							rusty_map,
+							&tracker,
+							"AttributeBlock",
+						)
+					})?
 				else {
 					anyhow::bail!("expected Attribute Block")
 				};
@@ -220,7 +247,13 @@ impl RsxTemplateAttribute {
 			}
 			RsxTemplateAttribute::BlockValue { key, tracker } => {
 				let RsxHydratedNode::AttributeValue { initial, register } =
-					effect_map.remove(&tracker).ok_or_else(no_tracker)?
+					rusty_map.remove(&tracker).ok_or_else(|| {
+						to_node_tracker_error(
+							rusty_map,
+							&tracker,
+							"AttributeValue",
+						)
+					})?
 				else {
 					anyhow::bail!("expected Attribute Block")
 				};

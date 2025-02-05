@@ -8,7 +8,6 @@ use std::hash::DefaultHasher;
 use std::hash::Hash;
 
 
-///
 /// Hash all the 'rusty' parts of the rsx macro
 pub struct RstmlRustToHash<'a> {
 	hasher: &'a mut DefaultHasher,

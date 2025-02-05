@@ -11,31 +11,28 @@ pub struct RsxRoot {
 	pub location: RsxLocation,
 }
 
-// type TemplateMap = HashMap<RsxLocation, RsxTemplateNode>;
-// type HydratedMap = HashMap<RsxLocation, RsxHydratedNode>;
-
 impl RsxRoot {
 	pub fn split_hydration(self) -> Result<SplitRsx> {
 		let template = RsxTemplateNode::from_rsx_node(&self.node)?;
-		let effects = RsxHydratedNode::collect(self.node);
+		let hydrated = RsxHydratedNode::collect(self.node);
 		let location = self.location;
 		Ok(SplitRsx {
 			location,
 			template,
-			hydrated: effects,
+			hydrated,
 		})
 	}
 
-	pub fn join_hydration(mut dehydrated: SplitRsx) -> Result<Self> {
-		let node = RsxTemplateNode::into_rsx_node(
-			dehydrated.template,
-			&mut dehydrated.hydrated,
-		)?;
+	pub fn join_hydration(
+		SplitRsx {
+			mut hydrated,
+			location,
+			template,
+		}: SplitRsx,
+	) -> Result<Self> {
+		let node = RsxTemplateNode::into_rsx_node(template, &mut hydrated)?;
 
-		Ok(Self {
-			node,
-			location: dehydrated.location,
-		})
+		Ok(Self { node, location })
 	}
 }
 

@@ -91,7 +91,7 @@ impl RstmlToRsx {
 			Node::Block(block) => {
 				let tracker = self
 					.rusty_tracker
-					.next_optional(&block, self.build_trackers);
+					.next_tracker_optional(&block, self.build_trackers);
 				let ident = &self.idents.effect;
 				// block is a {block} so assign to a value to unwrap
 				quote! {
@@ -153,7 +153,12 @@ impl RstmlToRsx {
 	) -> TokenStream {
 		let tracker = self
 			.rusty_tracker
-			.next_optional(&open_tag, self.build_trackers);
+			.next_tracker_optional(&open_tag, self.build_trackers);
+		println!(
+			"rsx!\ntag:{}\ntracker{}",
+			open_tag.to_token_stream().to_string(),
+			tracker.to_string()
+		);
 		let props = open_tag.attributes.into_iter().map(|attr| match attr {
 			NodeAttribute::Block(node_block) => {
 				quote! {#node_block}
@@ -254,7 +259,8 @@ impl RstmlToRsx {
 		let ident = &self.idents.effect;
 		match attr {
 			NodeAttribute::Block(block) => {
-				let tracker = tracker.next_optional(&block, build_tracker);
+				let tracker =
+					tracker.next_tracker_optional(&block, build_tracker);
 				quote! {
 					RsxAttribute::Block{
 						initial: vec![#block.clone().into_rsx()],
@@ -284,9 +290,11 @@ impl RstmlToRsx {
 								block.span(),
 							);
 							let register_event = &self.idents.event;
-							let tracker = self
-								.rusty_tracker
-								.next_optional(&block, self.build_trackers);
+							let tracker =
+								self.rusty_tracker.next_tracker_optional(
+									&block,
+									self.build_trackers,
+								);
 							quote! {
 								RsxAttribute::BlockValue {
 									key: #key.to_string(),
@@ -298,9 +306,11 @@ impl RstmlToRsx {
 								}
 							}
 						} else {
-							let tracker = self
-								.rusty_tracker
-								.next_optional(&block, self.build_trackers);
+							let tracker =
+								self.rusty_tracker.next_tracker_optional(
+									&block,
+									self.build_trackers,
+								);
 							quote! {
 								RsxAttribute::BlockValue{
 									key: #key.to_string(),

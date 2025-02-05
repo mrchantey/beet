@@ -26,20 +26,20 @@ impl RustyTrackerBuilder {
 
 
 	/// tokens for the next next `RustyTracker` to build
-	pub fn next(&mut self, val: impl ToTokens) -> TokenStream {
+	pub fn next_tracker(&mut self, val: impl ToTokens) -> TokenStream {
 		let (index, tokens_hash) = self.next_index_hash(val.to_token_stream());
 		quote! {RustyTracker::new(#index, #tokens_hash)}
 	}
 
 	/// convenience method for RstmlToRsx where we may not want to build trackers
 	// #[deprecated = "these should be options on the builder"]
-	pub fn next_optional(
+	pub fn next_tracker_optional(
 		&mut self,
 		val: impl ToTokens,
 		build_trackers: bool,
 	) -> TokenStream {
 		if build_trackers {
-			let tokens = self.next(val);
+			let tokens = self.next_tracker(val);
 			quote! {Some(#tokens)}
 		} else {
 			quote! {None}
@@ -48,7 +48,7 @@ impl RustyTrackerBuilder {
 
 	/// [`Self::Next`] but outputs to ron syntax
 	// #[deprecated = "these should be options on the builder"]
-	pub fn next_ron(&mut self, val: impl ToTokens) -> TokenStream {
+	pub fn next_tracker_ron(&mut self, val: impl ToTokens) -> TokenStream {
 		let (index, tokens_hash) = self.next_index_hash(val.to_token_stream());
 		let index = Literal::u32_unsuffixed(index);
 		let tokens_hash = Literal::u64_unsuffixed(tokens_hash);

@@ -8,6 +8,7 @@ async fn main() {
 	// router.dst_dir = PathBuf::from("crates/beet_router/target/client")
 	// 	.canonicalize()
 	// 	.unwrap();"
+	// router.dst_dir = "target/test_site".into();
 	router.dst_dir = "target/test_site".into();
 	router.templates_src = "target/test_site/rsx-templates.ron".into();
 	beet_router::test_site::routes::collect_file_routes(&mut router);
