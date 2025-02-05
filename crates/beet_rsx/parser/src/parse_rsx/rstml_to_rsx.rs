@@ -97,10 +97,10 @@ impl RstmlToRsx {
 				quote! {
 					{
 						let value = #block;
-						RsxNode::Block {
+						RsxNode::Block (RsxBlock{
 							initial: Box::new(value.clone().into_rsx()),
 							effect: Effect::new(#ident::register_block(value), #tracker),
-						}
+						})
 					}
 				}
 			}

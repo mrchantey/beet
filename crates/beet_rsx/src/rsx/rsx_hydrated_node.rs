@@ -60,7 +60,7 @@ impl RsxHydratedNode {
 		};
 
 		node.into_rsx().visit_mut(|node| match node {
-			RsxNode::Block { effect, initial } => {
+			RsxNode::Block(RsxBlock { effect, initial }) => {
 				let (register, tracker) = take_effect(effect);
 				effects.insert(tracker, Self::RustBlock {
 					initial: std::mem::take(initial),

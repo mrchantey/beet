@@ -62,7 +62,7 @@ impl RsxTemplateNode {
 					.ok_or_else(|| from_node_tracker_error("Component"))?,
 				tag: tag.clone(),
 			}),
-			RsxNode::Block { effect, .. } => Ok(Self::RustBlock(
+			RsxNode::Block(RsxBlock { effect, .. }) => Ok(Self::RustBlock(
 				effect
 					.tracker
 					.clone()
@@ -133,10 +133,10 @@ impl RsxTemplateNode {
 				else {
 					anyhow::bail!("expected Rust Block")
 				};
-				Ok(RsxNode::Block {
+				Ok(RsxNode::Block(RsxBlock {
 					initial: Box::new(initial),
 					effect: Effect::new(register, Some(tracker)),
-				})
+				}))
 			}
 			RsxTemplateNode::Element {
 				tag,

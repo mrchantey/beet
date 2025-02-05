@@ -73,7 +73,7 @@ fn apply_rsx(
 	match rsx {
 		RsxNode::Fragment(vec) => todo!(),
 		RsxNode::Component { .. } => todo!(),
-		RsxNode::Block { initial, effect } => todo!(),
+		RsxNode::Block(RsxBlock { initial, effect }) => todo!(),
 		RsxNode::Element(rsx_element) => todo!(),
 		RsxNode::Text(text) => {
 			let child = parent_el.children.get_mut(cx.child_idx()).ok_or_else(

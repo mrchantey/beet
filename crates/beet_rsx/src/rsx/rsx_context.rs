@@ -163,7 +163,7 @@ impl RsxContext {
 				RsxNode::Component { node, .. } => {
 					queue.push_back(HtmlElementPosition::MiddleChild(node));
 				}
-				RsxNode::Block { initial, .. } => {
+				RsxNode::Block(RsxBlock { initial, .. }) => {
 					queue.push_back(HtmlElementPosition::MiddleChild(initial));
 				}
 				RsxNode::Element(RsxElement { children, .. }) => {
@@ -206,7 +206,7 @@ impl RsxContext {
 				RsxNode::Component { node, .. } => {
 					queue.push_back(HtmlElementPosition::MiddleChild(node));
 				}
-				RsxNode::Block { initial, .. } => {
+				RsxNode::Block(RsxBlock { initial, .. }) => {
 					queue.push_back(HtmlElementPosition::MiddleChild(initial));
 				}
 				RsxNode::Element(RsxElement { children, .. }) => {
@@ -313,8 +313,10 @@ mod test {
 
 	#[test]
 	fn component_idx() {
-		expect(RsxContext::visit(&rsx! { <div></div> }, |_, _| {}).component_idx)
-			.to_be(0);
+		expect(
+			RsxContext::visit(&rsx! { <div></div> }, |_, _| {}).component_idx,
+		)
+		.to_be(0);
 		expect(RsxContext::visit(&rsx! { <Child /> }, |_, _| {}).component_idx)
 			.to_be(1);
 	}
@@ -323,33 +325,43 @@ mod test {
 		expect(RsxContext::visit(&rsx! { <div></div> }, |_, _| {}).block_idx)
 			.to_be(0);
 		expect(
-			RsxContext::visit(&rsx! {
-				{7}
-				{8}
-				{9}
-				<Child />
-			}, |_, _| {}).block_idx,
+			RsxContext::visit(
+				&rsx! {
+					{7}
+					{8}
+					{9}
+					<Child />
+				},
+				|_, _| {},
+			)
+			.block_idx,
 		)
 		.to_be(4);
 	}
 
 	#[test]
 	fn element_count() {
-		expect(RsxContext::visit(&rsx! { <div></div> }, |_, _| {}).element_count)
-			.to_be(0);
+		expect(
+			RsxContext::visit(&rsx! { <div></div> }, |_, _| {}).element_count,
+		)
+		.to_be(0);
 
 		expect(
-			RsxContext::visit(&rsx! { <div>738</div> }, |_, _| {}).element_count,
+			RsxContext::visit(&rsx! { <div>738</div> }, |_, _| {})
+				.element_count,
 		)
 		.to_be(0);
 		expect(
-			RsxContext::visit(&rsx! {
-				<div>
-					<b>pow</b>
-				</div>
-				<Child />
-			}, |_, _| {})
-				.element_count,
+			RsxContext::visit(
+				&rsx! {
+					<div>
+						<b>pow</b>
+					</div>
+					<Child />
+				},
+				|_, _| {},
+			)
+			.element_count,
 		)
 		.to_be(0);
 	}

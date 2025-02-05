@@ -146,10 +146,7 @@ impl Hydrator for DomHydrator {
 		match rsx {
 			RsxNode::Fragment(vec) => todo!(),
 			RsxNode::Component { .. } => todo!(),
-			RsxNode::Block {
-				initial,
-				effect,
-			} => {
+			RsxNode::Block(RsxBlock { initial, effect }) => {
 				todo!()
 			}
 			RsxNode::Element(rsx_element) => todo!(),

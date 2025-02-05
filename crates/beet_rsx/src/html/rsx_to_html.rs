@@ -44,7 +44,7 @@ impl RsxToHtml {
 				nodes.iter().map(|n| self.map_node(n)).flatten().collect()
 			}
 			RsxNode::Component { node, .. } => self.map_node(node),
-			RsxNode::Block { initial, .. } => self.map_node(initial),
+			RsxNode::Block(RsxBlock { initial, .. }) => self.map_node(initial),
 			RsxNode::Element(e) => {
 				vec![HtmlNode::Element(self.map_element(e))]
 			}

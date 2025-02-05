@@ -16,10 +16,7 @@ pub enum RsxNode {
 		node: Box<RsxNode>,
 	},
 	/// a rust block that returns text
-	Block {
-		initial: Box<RsxNode>,
-		effect: Effect,
-	},
+	Block(RsxBlock),
 	/// a html element
 	Element(RsxElement),
 	/// a html text node
@@ -45,7 +42,7 @@ impl RsxNode {
 		match self {
 			RsxNode::Fragment(rsx_nodes) => rsx_nodes,
 			RsxNode::Component { .. } => &[],
-			RsxNode::Block { initial, .. } => initial.children(),
+			RsxNode::Block(RsxBlock { initial, .. }) => initial.children(),
 			RsxNode::Element(RsxElement { children, .. }) => &children,
 			RsxNode::Text(_) => &[],
 			RsxNode::Comment(_) => &[],
@@ -58,7 +55,7 @@ impl RsxNode {
 		match self {
 			RsxNode::Fragment(rsx_nodes) => rsx_nodes,
 			RsxNode::Component { .. } => &mut [],
-			RsxNode::Block { initial, .. } => initial.children_mut(),
+			RsxNode::Block(RsxBlock { initial, .. }) => initial.children_mut(),
 			RsxNode::Element(RsxElement { children, .. }) => children,
 			RsxNode::Text(_) => &mut [],
 			RsxNode::Comment(_) => &mut [],
@@ -70,7 +67,7 @@ impl RsxNode {
 	/// If the register function fails
 	pub fn register_effects(&mut self) {
 		RsxContext::visit_mut(self, |cx, node| match node {
-			RsxNode::Block { effect, .. } => {
+			RsxNode::Block(RsxBlock { effect, .. }) => {
 				effect.take().register(cx).unwrap();
 			}
 			RsxNode::Element(e) => {
@@ -159,7 +156,7 @@ impl RsxNode {
 				// dont recurse into component because it would steal the slot
 				// from next siblings
 			}
-			RsxNode::Block { initial, .. } => {
+			RsxNode::Block(RsxBlock { initial, .. }) => {
 				initial.try_insert_slots(name, to_insert)
 			}
 			RsxNode::Text(_) => Some(to_insert),
@@ -170,13 +167,35 @@ impl RsxNode {
 }
 
 
+/// Representation of a rusty node.
+///
+/// ```
+/// # use beet_rsx::as_beet::*;
+/// let my_block = 3;
+/// let el = rsx! { <div>{my_block}</div> };
+/// ```
+#[derive(Debug)]
+pub struct RsxBlock {
+	pub initial: Box<RsxNode>,
+	pub effect: Effect,
+}
+
+
+/// A component is a struct that implements the [Component] trait.
+/// When it is used in an `rsx!` macro it will be instantiated
+/// with the [`Component::render`] method and any slot children.
 #[derive(Debug)]
 pub struct RsxComponent {
 	pub tag: String,
 	/// even key value attribute changes must be tracked
 	/// because components are structs not elements
 	pub tracker: Option<RustyTracker>,
+	/// the node returned by [Component::render]
 	pub node: Box<RsxNode>,
+	/// the children passed in by this components parent:
+	///
+	/// `rsx! { <MyComponent>slot_children</MyComponent> }`
+	pub slot_children: Box<RsxNode>,
 }
 
 /// Representation of an RsxElement

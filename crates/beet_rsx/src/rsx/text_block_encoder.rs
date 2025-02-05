@@ -1,4 +1,5 @@
 use super::ElementIdx;
+use super::RsxBlock;
 use super::RsxElement;
 use super::RsxNode;
 use crate::error::ParseError;
@@ -167,7 +168,7 @@ impl CollapsedNode {
 			RsxNode::Component { node, .. } => {
 				out.extend(Self::from_node(node));
 			}
-			RsxNode::Block { initial, .. } => {
+			RsxNode::Block(RsxBlock { initial, .. }) => {
 				out.push(CollapsedNode::RustText(
 					RsxToHtml::default().map_node(initial).render(),
 				));
