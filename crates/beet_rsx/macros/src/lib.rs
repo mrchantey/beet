@@ -41,15 +41,10 @@ pub fn rsx(tokens: TokenStream) -> TokenStream {
 /// things like hot reloading.
 #[proc_macro]
 pub fn rsx_template(tokens: TokenStream) -> TokenStream {
-	RstmlToRsxTemplate::default()
-		.map_tokens(tokens.into())
-		.into()
-}
-/// Mostly used for testing,
-/// this macro expands to a ron string of an RsxTemplateNode.
-#[proc_macro]
-pub fn rsx_template_ron(tokens: TokenStream) -> TokenStream {
-	RstmlToRsxTemplateRon::default()
-		.map_tokens_to_string(tokens.into())
-		.into()
+	let tokens =
+		RstmlToRsxTemplateRon::default().map_tokens_to_string(tokens.into());
+	quote::quote! {
+		RsxTemplateNode::from_ron(#tokens).unwrap()
+	}
+	.into()
 }

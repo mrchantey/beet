@@ -2,6 +2,12 @@ use beet_router::prelude::*;
 use beet_rsx::prelude::*;
 use std::collections::HashMap;
 
+/// TODO this should be a test
+/// it asserts that the process of loading tokens from macros
+/// matches the process of loading tokens from the file system.
+/// There are several ways this can go wrong:
+/// - compile time hasher entropy differs from runtime
+/// - macros discard whitespace but files do not
 #[tokio::main]
 async fn main() {
 	let mut builder = BuildRsxTemplates::default();

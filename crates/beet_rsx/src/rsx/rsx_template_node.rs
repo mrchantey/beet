@@ -13,6 +13,8 @@ pub enum RsxTemplateNode {
 	Component {
 		tracker: RustyTracker,
 		tag: String,
+		// the constant elements that are chiddren of this component
+		children: Vec<Self>,
 	},
 	RustBlock(RustyTracker),
 	Element {
@@ -38,6 +40,12 @@ fn to_node_tracker_error(
 }
 
 impl RsxTemplateNode {
+	#[cfg(feature = "serde")]
+	pub fn from_ron(ron: &str) -> Result<Self> {
+		ron::de::from_str(ron).map_err(Into::into)
+	}
+
+
 	pub fn from_rsx_node(node: impl AsRef<RsxNode>) -> Result<Self> {
 		match node.as_ref() {
 			RsxNode::Fragment(rsx_nodes) => {
@@ -47,7 +55,8 @@ impl RsxTemplateNode {
 					.collect::<Result<Vec<_>>>()?;
 				Ok(Self::Fragment(nodes))
 			}
-			RsxNode::Component { tag, tracker, .. } => Ok(Self::Component {
+			RsxNode::Component { tag, tracker, node } => Ok(Self::Component {
+				children: vec![Self::from_rsx_node(node)?],
 				tracker: tracker
 					.clone()
 					.ok_or_else(|| from_node_tracker_error("Component"))?,
@@ -98,7 +107,11 @@ impl RsxTemplateNode {
 					.collect::<Result<Vec<_>>>()?;
 				Ok(RsxNode::Fragment(nodes))
 			}
-			RsxTemplateNode::Component { tracker, tag, .. } => {
+			RsxTemplateNode::Component {
+				tracker,
+				tag,
+				children: _,
+			} => {
 				let RsxHydratedNode::Component { node } =
 					rusty_map.remove(&tracker).ok_or_else(|| {
 						to_node_tracker_error(rusty_map, &tracker, "Component")
@@ -147,6 +160,7 @@ impl RsxTemplateNode {
 
 	/// allow two templates to be compared without considering line and column
 	#[cfg(test)]
+	#[deprecated = "from linecol locations"]
 	pub fn clear_rusty_trackers(&mut self) {
 		match self {
 			RsxTemplateNode::Component { tracker, .. } => {
@@ -348,6 +362,14 @@ mod test {
 				children: vec![
 					RsxTemplateNode::Text("hello\n\t\t\t\t\t".to_string()),
 					RsxTemplateNode::Component {
+						children: vec![RsxTemplateNode::Element {
+							tag: "div".to_string(),
+							self_closing: false,
+							attributes: vec![],
+							children: vec![RsxTemplateNode::Text(
+								"some child".to_string(),
+							)],
+						}],
 						tracker: component_tracker,
 						tag: "MyComponent".to_string(),
 					},
@@ -358,7 +380,7 @@ mod test {
 
 	#[test]
 	fn ron() {
-		let mut template = rsx_template! {
+		let template = rsx_template! {
 			<div
 				key
 				str="value"
@@ -372,7 +394,7 @@ mod test {
 				</p>
 			</div>
 		};
-		let template_ron = rsx_template_ron! {
+		let template_ron = rsx_template! {
 			<div
 				key
 				str="value"
@@ -386,12 +408,6 @@ mod test {
 				</p>
 			</div>
 		};
-
-		let mut parsed =
-			ron::de::from_str::<RsxTemplateNode>(&template_ron).unwrap();
-		template.clear_rusty_trackers();
-		parsed.clear_rusty_trackers();
-
-		expect(template).to_be(parsed);
+		expect(template).to_be(template_ron);
 	}
 }

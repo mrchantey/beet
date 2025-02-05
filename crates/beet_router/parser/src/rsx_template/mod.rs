@@ -5,12 +5,12 @@ use clap::Parser;
 use proc_macro2::Literal;
 use proc_macro2::TokenStream;
 use quote::quote;
-use syn::visit::Visit;
 use std::path::PathBuf;
 use sweet::prelude::FsExt;
 use sweet::prelude::ReadDir;
 use sweet::prelude::ReadFile;
 use syn::spanned::Spanned;
+use syn::visit::Visit;
 mod hash_file;
 pub use hash_file::*;
 
@@ -48,7 +48,6 @@ impl BuildRsxTemplates {
 			.map(|(RsxLocation { file, line, col }, tokens)| {
 				let line = Literal::usize_unsuffixed(line);
 				let col = Literal::usize_unsuffixed(col);
-
 				quote! {
 					RsxLocation(
 						file: #file,

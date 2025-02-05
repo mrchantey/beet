@@ -1,4 +1,3 @@
-use beet_rsx::as_beet::beet;
 use beet_rsx::prelude::*;
 
 fn main() {

@@ -73,6 +73,7 @@ impl RstmlToRsxTemplateRon {
 					.next()
 					.map(char::is_uppercase)
 					.unwrap_or(false);
+				let children = self.map_nodes(children);
 				if is_component {
 					// components disregard all the context, they are known
 					// to the rsx node
@@ -82,10 +83,10 @@ impl RstmlToRsxTemplateRon {
 						Component (
 							tracker: #tracker,
 							tag: #tag_name,
+							children: [#(#children),*]
 						)
 					}
 				} else {
-					let children = self.map_nodes(children);
 					let attributes = open_tag
 						.attributes
 						.into_iter()

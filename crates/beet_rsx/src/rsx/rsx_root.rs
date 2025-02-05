@@ -4,10 +4,13 @@ use std::borrow::Borrow;
 use std::borrow::BorrowMut;
 use std::collections::HashMap;
 
+
+/// The struct returned from an rsx! macro.
 #[derive(Debug)]
 pub struct RsxRoot {
-	/// in the rsx! macro this will always be a fragment
+	/// the root node
 	pub node: RsxNode,
+	/// unique location with file, line, col
 	pub location: RsxLocation,
 }
 
@@ -120,7 +123,7 @@ mod test {
 				</p>
 			</div>
 		};
-		let mut node2_template = rsx_template! {
+		let node2_template = rsx_template! {
 			<div
 				key
 				str="value"
@@ -135,12 +138,9 @@ mod test {
 		};
 
 		let SplitRsx {
-			template: mut node1_template,
+			template: node1_template,
 			..
 		} = node.split_hydration().unwrap();
-		// println!("{:#?}", split);
-		node1_template.clear_rusty_trackers();
-		node2_template.clear_rusty_trackers();
 		expect(&node1_template).not().to_be(&node2_template);
 	}
 }

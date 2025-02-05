@@ -110,17 +110,18 @@ impl RoutesBuilder {
 		let start = Instant::now();
 		// 🤪 disable build routes for now
 		// self.build_routes_mod.build_and_write()?;
-		self.build_templates.build_and_write()?;
 		self.cargo.spawn()?;
+		self.build_templates.build_and_write()?;
 		Command::new(self.exe_path()).status()?;
 		println!("Recompiled in {:?}", start.elapsed());
 		Ok(())
 	}
-
+	
 	fn run(&mut self, reason: &str) -> Result<()> {
 		// terminal::clear()?;
 		println!("Watcher::HotReload: {}", reason);
 		let start = Instant::now();
+		self.build_templates.build_and_write()?;
 		Command::new(self.exe_path()).status()?;
 		println!("Ran in {:?}", start.elapsed());
 		Ok(())
