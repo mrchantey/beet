@@ -2,10 +2,15 @@ use crate::prelude::*;
 use beet::prelude::*;
 
 
+
+
+
+//dskdsdkls;dsakkjkkjkkjl
+
 pub fn get(state: DefaultAppState) -> RsxRoot {
 	rsx! {
 		<PageLayout title=state.app_name.into()>
-			<meta
+			<metasdjdsk
 				slot="head"
 				name="description"
 				content="A simple page layout component"
@@ -14,6 +19,8 @@ pub fn get(state: DefaultAppState) -> RsxRoot {
 		</PageLayout>
 	}
 }
+
+
 
 
 

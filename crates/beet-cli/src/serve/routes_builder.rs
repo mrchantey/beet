@@ -36,77 +36,78 @@ impl RoutesBuilder {
 	}
 
 	pub async fn watch(mut self) -> Result<()> {
-		self.compile_and_run()?;
 		let watcher = FsWatcher::default()
 			.with_path(&self.build_routes_mod.routes_dir())
 			.with_exclude("*.git*")
 			.with_exclude("*target*");
 		println!("{:#?}", watcher);
-		watcher.watch_async(move |ev| self.on_change(ev)).await?;
+
+		self.compile_and_run("Init")?;
+
+		watcher
+			.watch_async(move |ev| {
+				self.on_change(ev).ok_or(|e| {
+					eprintln!("{:#?}", e);
+				});
+				Ok(())
+			})
+			.await?;
 		Ok(())
 	}
 
 	/// find any reason to `cargo build`, if none, just `cargo run`
-	fn on_change(&mut self, ev: WatchEvent) -> Result<()> {
-		if !ev.has_mutate() {
+	fn on_change(&mut self, watch_event: WatchEvent) -> Result<()> {
+		if !watch_event.has_mutate() {
 			return Ok(());
 		}
-		terminal::clear()?;
-		// println!("{:#?}", ev);
-		// return Ok(());
-		// 1. handle created and changed
-		for path in ev
-			.events
-			.iter()
-			.filter_map(|ev| match ev.kind {
-				EventKind::Create(CreateKind::File) => Some(ev),
-				EventKind::Modify(ModifyKind::Data(_)) => Some(ev),
-				_ => None,
-			})
-			.map(|ev| &ev.paths)
-			.flatten()
-		{
-			if path.extension().map(|x| x == "rs").unwrap_or_default() {
-				let new_hash = HashRsxFile::hash_file(&path)?;
-				if let Some(curr_hash) = self.file_cache.get(path) {
-					if curr_hash == &new_hash {
-						continue;
+
+		let mut hotreload_reason = None;
+
+		for ev in watch_event.events.into_iter() {
+			match ev.kind {
+				EventKind::Create(CreateKind::File)
+				| EventKind::Modify(ModifyKind::Data(_))
+				| EventKind::Modify(ModifyKind::Name(_)) => {
+					if ev
+						.path
+						.extension()
+						.map(|x| x == "rs")
+						.unwrap_or_default()
+					{
+						let new_hash = HashRsxFile::hash_file(&ev.path)?;
+						if let Some(curr_hash) = self.file_cache.get(&ev.path) {
+							if curr_hash == &new_hash {
+								// match!
+								hotreload_reason = Some(ev.display());
+								continue;
+							}
+						}
+						self.file_cache.insert(ev.path.clone(), new_hash);
+						return self.compile_and_run(&ev.display());
+					} else {
+						return self.compile_and_run(&ev.display());
 					}
 				}
-				self.file_cache.insert(path.clone(), new_hash);
-				println!(
-					"Watcher::Recompile(RustChanged) - {}",
-					path.display()
-				);
-				return self.compile_and_run();
-			} else {
-				println!("Watcher::Recompile(NewFile) - {}", path.display());
-				return self.compile_and_run();
+				EventKind::Remove(RemoveKind::File)
+				| EventKind::Remove(RemoveKind::Folder) => {
+					return self.compile_and_run(&ev.display());
+				}
+				_ => {}
 			}
 		}
-		// 2. handle removed
-		for removed in ev
-			.events
-			.iter()
-			.filter_map(|e| {
-				if e.kind.is_remove() {
-					Some(&e.paths)
-				} else {
-					None
-				}
-			})
-			.flatten()
-		{
-			println!("Watcher::Recompile(Removed) - {}", removed.display());
-			return self.compile_and_run();
+
+		if let Some(reason) = hotreload_reason {
+			return self.run(&reason);
 		}
-		println!("Watcher::HotReload");
-		self.run()
+		Ok(())
 	}
 
-	fn compile_and_run(&mut self) -> Result<()> {
+	fn compile_and_run(&mut self, reason: &str) -> Result<()> {
+		// terminal::clear()?;
+		println!("Watcher::Recompile: {}", reason);
 		let start = Instant::now();
-		self.build_routes_mod.build_and_write()?;
+		// 🤪 disable build routes for now
+		// self.build_routes_mod.build_and_write()?;
 		self.build_templates.build_and_write()?;
 		self.cargo.spawn()?;
 		Command::new(self.exe_path()).status()?;
@@ -114,7 +115,9 @@ impl RoutesBuilder {
 		Ok(())
 	}
 
-	fn run(&mut self) -> Result<()> {
+	fn run(&mut self, reason: &str) -> Result<()> {
+		// terminal::clear()?;
+		println!("Watcher::HotReload: {}", reason);
 		let start = Instant::now();
 		Command::new(self.exe_path()).status()?;
 		println!("Ran in {:?}", start.elapsed());

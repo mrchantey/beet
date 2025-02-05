@@ -14,12 +14,20 @@ pub struct RstmlRustToHash<'a> {
 }
 
 
+
 impl<'a> RstmlRustToHash<'a> {
 	/// visit and hash without validating the rsx
-	pub fn hash(hasher: &'a mut RapidHasher, tokens: TokenStream) {
+	pub fn visit_and_hash(hasher: &'a mut RapidHasher, tokens: TokenStream) {
 		let (mut nodes, _) = tokens_to_rstml(tokens.clone());
 		let this = Self { hasher };
 		visit_nodes(&mut nodes, this);
+	}
+	fn hash(&mut self, tokens: impl ToTokens) {
+		tokens
+			.to_token_stream()
+			.to_string()
+			.replace(" ", "")
+			.hash(self.hasher);
 	}
 }
 impl<'a> syn::visit_mut::VisitMut for RstmlRustToHash<'a> {}
@@ -29,7 +37,7 @@ where
 	C: rstml::node::CustomNode + 'static,
 {
 	fn visit_block(&mut self, block: &mut rstml::node::NodeBlock) -> bool {
-		block.to_token_stream().to_string().hash(self.hasher);
+		self.hash(block);
 		false
 	}
 	fn visit_element(
@@ -44,11 +52,7 @@ where
 			.to_string()
 			.starts_with(|c: char| c.is_uppercase())
 		{
-			element
-				.open_tag
-				.to_token_stream()
-				.to_string()
-				.hash(self.hasher);
+			self.hash(&element.open_tag);
 		}
 		// visit children
 		true
@@ -57,12 +61,12 @@ where
 		// attributes
 		match attribute {
 			NodeAttribute::Block(block) => {
-				block.to_token_stream().to_string().hash(self.hasher);
+				self.hash(block);
 			}
 			NodeAttribute::Attribute(attr) => match attr.value() {
 				Some(syn::Expr::Lit(_)) => {}
 				Some(value) => {
-					value.to_token_stream().to_string().hash(self.hasher)
+					self.hash(value);
 				}
 				None => {}
 			},
