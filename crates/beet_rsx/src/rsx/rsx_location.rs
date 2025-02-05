@@ -1,6 +1,3 @@
-use std::hash::DefaultHasher;
-use std::hash::Hash;
-use std::hash::Hasher;
 
 /// File location of an rsx macro, used by [RsxTemplate]
 /// to reconcile rsx nodes with html partials
@@ -59,11 +56,6 @@ pub struct RustyTracker {
 impl RustyTracker {
 	pub fn new(index: u32, tokens_hash: u64) -> Self {
 		Self { index, tokens_hash }
-	}
-	pub fn to_hash(&self) -> u64 {
-		let mut hasher = DefaultHasher::new();
-		self.hash(&mut hasher);
-		hasher.finish()
 	}
 	/// sometimes we want to diff a tree without the trackers
 	pub fn clear(&mut self) {

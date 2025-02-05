@@ -76,13 +76,7 @@ impl RstmlToRsxTemplateRon {
 				if is_component {
 					// components disregard all the context, they are known
 					// to the rsx node
-					let tracker = self.tracker.next_tracker_ron(&open_tag);
-					println!(
-						"ron\ntag:{}\ntracker{}",
-						open_tag.to_token_stream().to_string(),
-						tracker.to_string()
-					);
-			
+					let tracker = self.tracker.next_tracker_ron(&open_tag);			
 					// we rely on the hydrated node to provide the attributes and children
 					quote! {
 						Component (

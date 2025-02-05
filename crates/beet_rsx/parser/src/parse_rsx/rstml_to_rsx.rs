@@ -154,11 +154,6 @@ impl RstmlToRsx {
 		let tracker = self
 			.rusty_tracker
 			.next_tracker_optional(&open_tag, self.build_trackers);
-		println!(
-			"rsx!\ntag:{}\ntracker{}",
-			open_tag.to_token_stream().to_string(),
-			tracker.to_string()
-		);
 		let props = open_tag.attributes.into_iter().map(|attr| match attr {
 			NodeAttribute::Block(node_block) => {
 				quote! {#node_block}

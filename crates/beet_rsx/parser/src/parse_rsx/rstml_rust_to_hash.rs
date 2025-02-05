@@ -1,22 +1,22 @@
 use super::tokens_to_rstml;
 use proc_macro2::TokenStream;
 use quote::ToTokens;
+use rapidhash::RapidHasher;
 use rstml::node::NodeAttribute;
 use rstml::visitor::visit_nodes;
 use rstml::visitor::Visitor;
-use std::hash::DefaultHasher;
 use std::hash::Hash;
 
 
 /// Hash all the 'rusty' parts of the rsx macro
 pub struct RstmlRustToHash<'a> {
-	hasher: &'a mut DefaultHasher,
+	hasher: &'a mut RapidHasher,
 }
 
 
 impl<'a> RstmlRustToHash<'a> {
 	/// visit and hash without validating the rsx
-	pub fn hash(hasher: &'a mut DefaultHasher, tokens: TokenStream) {
+	pub fn hash(hasher: &'a mut RapidHasher, tokens: TokenStream) {
 		let (mut nodes, _) = tokens_to_rstml(tokens.clone());
 		let this = Self { hasher };
 		visit_nodes(&mut nodes, this);

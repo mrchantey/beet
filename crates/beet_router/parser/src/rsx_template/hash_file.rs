@@ -3,7 +3,7 @@ use beet_rsx::prelude::RstmlRustToHash;
 use proc_macro2::TokenStream;
 use proc_macro2::TokenTree;
 use quote::ToTokens;
-use std::collections::hash_map::DefaultHasher;
+use rapidhash::RapidHasher;
 use std::hash::Hash;
 use std::hash::Hasher;
 use std::path::Path;
@@ -20,7 +20,7 @@ impl HashRsxFile {
 	/// # Errors
 	/// If the file cannot be read or parsed as tokens
 	pub fn hash_file(path: &Path) -> Result<u64> {
-		let file = syn::parse_file(&ReadFile::to_string(path)?).unwrap();
+		let file = syn::parse_file(&ReadFile::to_string(path)?)?;
 		Ok(hash(file.to_token_stream()))
 	}
 	/// # Errors
@@ -33,7 +33,7 @@ impl HashRsxFile {
 }
 
 fn hash(tokens: TokenStream) -> u64 {
-	let mut hasher = DefaultHasher::new();
+	let mut hasher = RapidHasher::default_const();
 	let mut iter = tokens.into_iter().peekable();
 
 	while let Some(token) = iter.next() {
@@ -107,6 +107,4 @@ mod test {
 			.not()
 			.to_be(hash(quote! {rsx!{<el>{8}</el>}}));
 	}
-	
 }
-

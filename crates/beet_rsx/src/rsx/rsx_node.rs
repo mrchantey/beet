@@ -259,18 +259,4 @@ mod test {
 		expect(location.line()).to_be(line as usize);
 		expect(location.col()).to_be(40);
 	}
-	#[test]
-	fn block_location() {
-		fn get_hash(RsxRoot { node, .. }: RsxRoot) -> u64 {
-			let RsxNode::Block { effect, .. } = &node else {
-				panic!()
-			};
-			let Some(location) = &effect.tracker else {
-				panic!()
-			};
-			location.to_hash()
-		}
-		#[rustfmt::skip]
-		expect(get_hash(rsx! { {39} })).not().to_be(get_hash(rsx! { {40} }));
-	}
 }

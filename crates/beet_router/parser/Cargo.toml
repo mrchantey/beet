@@ -16,6 +16,7 @@ sweet = { workspace = true, features = ["fs"] }
 beet_rsx = { workspace = true, features = ["parser"] }
 uuid = { version = "1", features = ["v4"] }
 anyhow.workspace = true
+rapidhash.workspace = true
 http.workspace = true
 clap.workspace = true
 

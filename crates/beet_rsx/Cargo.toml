@@ -28,6 +28,7 @@ sweet.workspace = true
 thiserror.workspace = true
 anyhow.workspace = true
 strum.workspace = true
+rapidhash.workspace = true
 strum_macros.workspace = true
 prettyplease.workspace = true
 once_cell.workspace = true

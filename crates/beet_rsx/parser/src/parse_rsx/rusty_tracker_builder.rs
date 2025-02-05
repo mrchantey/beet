@@ -2,9 +2,7 @@ use proc_macro2::Literal;
 use proc_macro2::TokenStream;
 use quote::quote;
 use quote::ToTokens;
-use std::hash::DefaultHasher;
-use std::hash::Hash;
-use std::hash::Hasher;
+use rapidhash::rapidhash;
 
 /// See [RustyTracker](beet_rsx::prelude::RustyTracker)
 ///
@@ -16,9 +14,11 @@ pub struct RustyTrackerBuilder {
 
 impl RustyTrackerBuilder {
 	pub fn next_index_hash(&mut self, tokens: TokenStream) -> (u32, u64) {
-		let mut hasher = DefaultHasher::new();
-		tokens.to_string().hash(&mut hasher);
-		let tokens_hash = hasher.finish();
+		// the rsx! macro splits whitespace in the tokens
+		// but visiting tokens via runtime  file loading does not,
+		// so we remove whitespace to ensure the hash is the same
+		let tokens_hash =
+			rapidhash(tokens.to_string().replace(" ", "").as_bytes());
 		let index = self.current_index;
 		self.current_index += 1;
 		(index, tokens_hash)
