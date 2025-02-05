@@ -7,7 +7,6 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::process::Command;
 use std::time::Instant;
-use sweet::prelude::WatchEvent;
 use sweet::prelude::*;
 
 
@@ -56,7 +55,7 @@ impl RoutesBuilder {
 	}
 
 	/// find any reason to `cargo build`, if none, just `cargo run`
-	fn on_change(&mut self, watch_event: WatchEvent) -> Result<()> {
+	fn on_change(&mut self, watch_event: WatchEventVec) -> Result<()> {
 		if !watch_event.has_mutate() {
 			return Ok(());
 		}

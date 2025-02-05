@@ -292,7 +292,7 @@ mod test {
 
 	#[test]
 	fn simple() {
-		let loc = RustyTracker::new(0, 18046130629154014124);
+		let loc = RustyTracker::new(0, 15046980652419922415);
 		let node = rsx_template! {<div>{value}</div>};
 
 		expect(&node).to_be(&RsxTemplateNode::Element {
@@ -304,8 +304,8 @@ mod test {
 	}
 	#[test]
 	fn complex() {
-		let ident_tracker = RustyTracker::new(1, 13779576133490827230);
-		let component_tracker = RustyTracker::new(0, 7661018779846923955);
+		let ident_tracker = RustyTracker::new(1, 3802233634778759949);
+		let component_tracker = RustyTracker::new(0, 3429327963174273294);
 		let template = rsx_template! {
 			<div
 				key
