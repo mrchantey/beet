@@ -1,12 +1,14 @@
 use clap::Parser;
 use std::process::Command;
-
+use anyhow::Result;
 
 /// Verbatim clone of cargo run args
 #[derive(Debug, Clone, Parser)]
 #[command(name = "cargo-run")]
-pub struct CargoRun {
+pub struct CargoCmd {
 	/// Error format
+	#[arg(long, default_value = "run")]
+	cargo_cmd: String,
 	#[arg(long)]
 	message_format: Option<String>,
 	/// Use verbose output (-vv very verbose/build.rs output)
@@ -88,16 +90,23 @@ pub struct CargoRun {
 	args: Vec<String>,
 }
 
-impl Default for CargoRun {
+impl Default for CargoCmd {
 	fn default() -> Self { Self::parse_from(&[""]) }
 }
 
-impl CargoRun {
-	pub fn run(&self) -> std::io::Result<()> {
-		let mut cmd = Command::new("cargo");
-		cmd.arg("run");
+impl CargoCmd {
+	pub fn cargo_run(&mut self) -> Result<()> {
+		self.cargo_cmd = "run".to_string();
+		self.spawn()
+	}
+	pub fn cargo_build(&mut self) -> Result<()> {
+		self.cargo_cmd = "build".to_string();
+		self.spawn()
+	}
 
-		let CargoRun {
+	pub fn spawn(&self) -> Result<()> {
+		let CargoCmd {
+			cargo_cmd,
 			args,
 			message_format,
 			verbose,
@@ -126,6 +135,9 @@ impl CargoRun {
 			offline,
 			frozen,
 		} = self;
+		let mut cmd = Command::new("cargo");
+		cmd.arg(cargo_cmd);
+
 
 		if let Some(format) = message_format {
 			cmd.arg("--message-format").arg(format);

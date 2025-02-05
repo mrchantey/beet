@@ -68,30 +68,42 @@ mod test {
 	#[test]
 	fn works() {
 		// ignore element names
-		// expect(hash(quote! {rsx!{<el1/>}})).to_be(hash(quote! {rsx!{<el2>}}));
-		// // ignore literals
-		// expect(hash(quote! {rsx!{<el key="lit"/>}}))
-		// 	.to_be(hash(quote! {rsx!{<el key=28/>}}));
-		// // blocks ignore location
-		// expect(hash(quote! {rsx!{<el>{7}</el>}}))
-		// 	.to_be(hash(quote! {rsx!{<el><el>{7}</el></el>}}));
-		// elements ignore location
+		expect(hash(quote! {rsx!{<el1/>}})).to_be(hash(quote! {rsx!{<el2>}}));
+		// ignore literals
+		expect(hash(quote! {rsx!{<el key="lit"/>}}))
+			.to_be(hash(quote! {rsx!{<el key=28/>}}));
+		// ignore attr keys
+		expect(hash(quote! {rsx!{<el foo={7}/>}}))
+			.to_be(hash(quote! {rsx!{<el bar={7}>}}));
+		// ignore html location - block
+		expect(hash(quote! {rsx!{<el>{7}</el>}}))
+			.to_be(hash(quote! {rsx!{<el><el>{7}</el></el>}}));
+		// ignore html location - component
 		expect(hash(quote! {rsx!{<el><Component></el>}}))
 			.to_be(hash(quote! {rsx!{<el><el><Component></el></el>}}));
+		// hash external pre
+		expect(hash(quote! {let foo = rsx!{<el/>}}))
+			.not()
+			.to_be(hash(quote! {let bar = rsx!{<el/>}}));
+		// hash external post
+		expect(hash(quote! {rsx!{<el/>}foo}))
+			.not()
+			.to_be(hash(quote! {rsx!{<el/>}bar}));
 		// hash order
-		// expect(hash(quote! {rsx!{<el>{7}{8}</el>}}))
-		// 	.not()
-		// 	.to_be(hash(quote! {rsx!{<el>{8}{7}</el>}}));
-		// // hash attr idents
-		// expect(hash(quote! {rsx!{<el foo=bar/>}}))
-		// 	.not()
-		// 	.to_be(hash(quote! {rsx!{<el foo=bazz>}}));
-		// // hash node blocks
-		// expect(hash(quote! {rsx!{<el>{7}</el>}}))
-		// 	.not()
-		// 	.to_be(hash(quote! {rsx!{<el>{8}</el>}}));
-
-		// expect(hash(quote! {rsx!{<span ><Component {38}</span>}}))
-		// .to_be(hash(quote! {rsx!{<span foo=bazz>{38}</span>}}));
+		expect(hash(quote! {rsx!{<el>{7}{8}</el>}}))
+			.not()
+			.to_be(hash(quote! {rsx!{<el>{8}{7}</el>}}));
+		// hash attr idents
+		expect(hash(quote! {rsx!{<el foo=bar/>}}))
+			.not()
+			.to_be(hash(quote! {rsx!{<el foo=bazz>}}));
+		// hash attr blocks
+		expect(hash(quote! {rsx!{<el {7}/>}}))
+			.not()
+			.to_be(hash(quote! {rsx!{<el {8}>}}));
+		// hash node blocks
+		expect(hash(quote! {rsx!{<el>{7}</el>}}))
+			.not()
+			.to_be(hash(quote! {rsx!{<el>{8}</el>}}));
 	}
 }
