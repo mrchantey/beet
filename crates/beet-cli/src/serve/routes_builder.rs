@@ -73,7 +73,7 @@ impl RoutesBuilder {
 						.map(|x| x == "rs")
 						.unwrap_or_default()
 					{
-						let new_hash = HashRsxFile::hash_file(&ev.path)?;
+						let new_hash = HashRsxFile::file_to_hash(&ev.path)?;
 						if let Some(curr_hash) = self.file_cache.get(&ev.path) {
 							if curr_hash == &new_hash {
 								// match!

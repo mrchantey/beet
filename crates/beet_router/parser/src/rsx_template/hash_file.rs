@@ -12,55 +12,61 @@ use sweet::prelude::ReadFile;
 
 /// determine if a compilation is required due to rust code changes
 /// by hashing an entire file
-#[derive(Default)]
-pub struct HashRsxFile;
-
-
-impl HashRsxFile {
-	/// # Errors
-	/// If the file cannot be read or parsed as tokens
-	pub fn hash_file(path: &Path) -> Result<u64> {
-		let file = syn::parse_file(&ReadFile::to_string(path)?)?;
-		Ok(hash(file.to_token_stream()))
-	}
-	/// # Errors
-	/// If the string cannot be parsed as tokens
-	pub fn hash_string(string: &str) -> Result<u64> {
-		let file = syn::parse_file(&string)?;
-		Ok(hash(file.to_token_stream()))
-	}
-	pub fn hash_tokens(tokens: TokenStream) -> u64 { hash(tokens) }
+pub struct HashRsxFile {
+	hasher: RapidHasher,
 }
 
-fn hash(tokens: TokenStream) -> u64 {
-	let mut hasher = RapidHasher::default_const();
-	let mut iter = tokens.into_iter().peekable();
+impl Default for HashRsxFile {
+	fn default() -> Self {
+		Self {
+			hasher: RapidHasher::default_const(),
+		}
+	}
+}
 
-	while let Some(token) = iter.next() {
-		match &token {
-			TokenTree::Ident(ident) if ident.to_string() == "rsx" => {
-				if let Some(TokenTree::Punct(punct)) = iter.peek() {
-					if punct.as_char() == '!' {
-						iter.next(); // consume !
-						if let Some(TokenTree::Group(group)) = iter.next() {
-							RstmlRustToHash::visit_and_hash(
-								&mut hasher,
-								group.stream(),
-							);
-							continue;
+impl HashRsxFile {
+	pub fn file_to_hash(path: &Path) -> Result<u64> {
+		let file = ReadFile::to_string(path)?;
+		let mut this = Self::default();
+		this.walk_tokens(file.to_token_stream())?;
+		Ok(this.hasher.finish())
+	}
+
+	/// # Errors
+	/// If the file cannot be read or parsed as tokens
+	pub fn walk_tokens(&mut self, tokens: TokenStream) -> Result<()> {
+		let mut iter = tokens.into_iter().peekable();
+		while let Some(tree) = iter.next() {
+			match &tree {
+				TokenTree::Ident(ident) if ident.to_string() == "rsx" => {
+					if let Some(TokenTree::Punct(punct)) = iter.peek() {
+						if punct.as_char() == '!' {
+							iter.next(); // consume !
+							if let Some(TokenTree::Group(group)) = iter.next() {
+								RstmlRustToHash::visit_and_hash(
+									&mut self.hasher,
+									group.stream(),
+								);
+								continue;
+							}
 						}
 					}
 				}
-			}
-			_ => {
-				// Hash everything else
-				token.to_string().hash(&mut hasher);
+				TokenTree::Group(group) => {
+					// recurse into groups
+					self.walk_tokens(group.stream())?;
+				}
+				tree => {
+					// Hash everything else
+					tree.to_string().replace(" ", "").hash(&mut self.hasher);
+				}
 			}
 		}
+		Ok(())
 	}
-
-	hasher.finish()
 }
+
+
 
 
 #[cfg(test)]
@@ -69,10 +75,15 @@ mod test {
 	use quote::quote;
 	use sweet::prelude::*;
 	#[test]
-	#[ignore = "todo visitor pattern for nesting"]
+	// #[ignore = "todo visitor pattern for nesting"]
 	#[rustfmt::skip]
-	fn works() {
-		
+	fn works() {		
+		fn hash(tokens: TokenStream) -> u64 {
+			let mut hasher = HashRsxFile::default();
+			hasher.walk_tokens(tokens).unwrap();
+			hasher.hasher.finish()
+		}
+
 		// ignore element names
 		expect(hash(quote! {rsx!{<el1/>}}))
 		.to_be(hash(quote! {rsx!{<el2/>}}));
@@ -114,7 +125,10 @@ mod test {
 		.to_be(hash(quote! {rsx!{<el>{8}</el>}}));
 		
 		// visits nested
-		expect(hash(quote! {rsx!{{<el1/>}}}))
-		.to_be(hash(quote! {rsx!{{<el2/>}}}));
+		expect(hash(quote! {{v1}}))
+    .not()
+		.to_be(hash(quote! {{v2}}));
+		expect(hash(quote! {{rsx!{<el1/>}}}))
+		.to_be(hash(quote! {{rsx!{<el2/>}}}));
 	}
 }
