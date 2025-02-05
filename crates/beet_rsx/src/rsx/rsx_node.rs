@@ -169,6 +169,22 @@ impl RsxNode {
 	}
 }
 
+
+#[derive(Debug)]
+pub struct RsxComponent {
+	pub tag: String,
+	/// even key value attribute changes must be tracked
+	/// because components are structs not elements
+	pub tracker: Option<RustyTracker>,
+	pub node: Box<RsxNode>,
+}
+
+/// Representation of an RsxElement
+///
+/// ```
+/// # use beet_rsx::as_beet::*;
+/// let el = rsx! { <div class="my-class">hello world</div> };
+/// ```
 #[derive(Debug)]
 pub struct RsxElement {
 	/// ie `div, span, input`

@@ -1,7 +1,7 @@
 #![allow(unused)]
 use crate::prelude::*;
 use crate::test_site::*;
-use beet_rsx::as_beet::beet;
+use beet_rsx::as_beet::*;
 use beet_rsx::prelude::*;
 
 pub fn get(state: DefaultAppState) -> RsxRoot {
