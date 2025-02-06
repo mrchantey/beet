@@ -32,32 +32,7 @@ impl RsxNode {
 	pub fn walk(&self, visitor: &mut impl RsxVisitor) {
 		visitor.walk_node(self)
 	}
-	/// chidren of root, fragment or element.
-	/// Blocks and components have no children
-	pub fn children(&self) -> &[RsxNode] {
-		match self {
-			RsxNode::Fragment(rsx_nodes) => rsx_nodes,
-			RsxNode::Component(_) => &[],
-			RsxNode::Block(RsxBlock { initial, .. }) => initial.children(),
-			RsxNode::Element(RsxElement { children, .. }) => &children,
-			RsxNode::Text(_) => &[],
-			RsxNode::Comment(_) => &[],
-			RsxNode::Doctype => &[],
-		}
-	}
-	/// chidren of root, fragment or element.
-	/// Blocks and components have no children
-	pub fn children_mut(&mut self) -> &mut [RsxNode] {
-		match self {
-			RsxNode::Fragment(rsx_nodes) => rsx_nodes,
-			RsxNode::Component(_) => &mut [],
-			RsxNode::Block(RsxBlock { initial, .. }) => initial.children_mut(),
-			RsxNode::Element(RsxElement { children, .. }) => children,
-			RsxNode::Text(_) => &mut [],
-			RsxNode::Comment(_) => &mut [],
-			RsxNode::Doctype => &mut [],
-		}
-	}
+
 	/// takes all the register_effect functions
 	/// # Panics
 	/// If the register function fails

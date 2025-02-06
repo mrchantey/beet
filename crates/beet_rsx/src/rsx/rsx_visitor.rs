@@ -198,29 +198,6 @@ pub trait RsxVisitorMut {
 	}
 }
 
-impl RsxNode {
-	/// Depth first traversal of the tree
-	pub fn visit(&self, mut func: impl FnMut(&RsxNode)) {
-		fn inner(node: &RsxNode, func: &mut impl FnMut(&RsxNode)) {
-			func(node);
-			for child in node.children() {
-				inner(child, func);
-			}
-		}
-		inner(self, &mut func);
-	}
-	/// Depth first mutable traversal of the tree
-	pub fn visit_mut(&mut self, mut func: impl FnMut(&mut RsxNode)) {
-		fn inner(node: &mut RsxNode, func: &mut impl FnMut(&mut RsxNode)) {
-			func(node);
-			for child in node.children_mut() {
-				inner(child, func);
-			}
-		}
-		inner(self, &mut func);
-	}
-}
-
 #[cfg(test)]
 mod test {
 	use super::RsxVisitor;
