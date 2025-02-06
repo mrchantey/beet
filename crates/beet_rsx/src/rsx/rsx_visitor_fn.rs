@@ -1,21 +1,5 @@
 use crate::prelude::*;
 
-#[derive(Debug, Default, Clone)]
-pub struct VisitRsxOptions {
-	ignore_element_children: bool,
-	ignore_component_node: bool,
-	ignore_component_slot_children: bool,
-}
-
-impl VisitRsxOptions {
-	pub fn ignore_component_node() -> Self {
-		Self {
-			ignore_component_node: true,
-			..Default::default()
-		}
-	}
-}
-
 macro_rules! impl_visitor {
 	($visitor_name:ident, $node_type:ty, $visit_method:ident) => {
 		/// Convenience struct for when only one type needs to be visited
@@ -50,18 +34,7 @@ macro_rules! impl_visitor {
 		}
 
 		impl<F: FnMut(&$node_type)> RsxVisitor for $visitor_name<F> {
-			fn ignore_element_children(&self) -> bool {
-				self.options.ignore_element_children
-			}
-
-			fn ignore_component_node(&self) -> bool {
-				self.options.ignore_component_node
-			}
-
-			fn ignore_component_slot_children(&self) -> bool {
-				self.options.ignore_component_slot_children
-			}
-
+			fn options(&self) -> &VisitRsxOptions { &self.options }
 			fn $visit_method(&mut self, value: &$node_type) {
 				(self.func)(value);
 			}
@@ -102,18 +75,7 @@ macro_rules! impl_visitor_mut {
 		}
 
 		impl<F: FnMut(&mut $node_type)> RsxVisitorMut for $visitor_name<F> {
-			fn ignore_element_children(&self) -> bool {
-				self.options.ignore_element_children
-			}
-
-			fn ignore_component_node(&self) -> bool {
-				self.options.ignore_component_node
-			}
-
-			fn ignore_component_slot_children(&self) -> bool {
-				self.options.ignore_component_slot_children
-			}
-
+			fn options(&self) -> &VisitRsxOptions { &self.options }
 			fn $visit_method(&mut self, value: &mut $node_type) {
 				(self.func)(value);
 			}

@@ -13,7 +13,7 @@ pub fn get(state: DefaultAppState) -> RsxRoot {
 		<div>{state.app_name} hello   {val}</div>
 		<style>
 			body{
-				background-color: black;
+				background-color: white;
 				color:white;
 			}
 		</style>
