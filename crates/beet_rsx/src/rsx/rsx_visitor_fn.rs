@@ -25,6 +25,18 @@ macro_rules! impl_visitor {
 		}
 
 		impl<F: FnMut(&$node_type)> $visitor_name<F> {
+			pub fn walk(node: &RsxNode, func: F) {
+				$visitor_name::new(func).walk_node(node);
+			}
+			pub fn walk_with_opts(
+				node: &RsxNode,
+				options: VisitRsxOptions,
+				func: F,
+			) {
+				$visitor_name::new_with_options(options, func).walk_node(node);
+			}
+
+
 			pub fn new(func: F) -> Self {
 				Self {
 					func,
@@ -72,6 +84,17 @@ macro_rules! impl_visitor_mut {
 					options: Default::default(),
 				}
 			}
+			pub fn walk(node: &mut RsxNode, func: F) {
+				$visitor_name::new(func).walk_node(node);
+			}
+			pub fn walk_with_opts(
+				node: &mut RsxNode,
+				options: VisitRsxOptions,
+				func: F,
+			) {
+				$visitor_name::new_with_options(options, func).walk_node(node);
+			}
+
 
 			pub fn new_with_options(options: VisitRsxOptions, func: F) -> Self {
 				Self { func, options }

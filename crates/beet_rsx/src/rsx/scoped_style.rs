@@ -27,40 +27,52 @@ impl Default for ScopedStyle {
 }
 
 impl ScopedStyle {
+	///
+	///
+	/// # Implementation
+	///
+	///	A triple tiered visitor:
+	/// 1. visit all components
+	/// 2. apply the idx to all style bodies
+	/// 3. if contains style, apply tag to all elements in the component
 	pub fn apply(&mut self, node: &mut RsxNode) -> ParseResult<()> {
 		let mut parse_err = Ok(());
-		VisitRsxComponentMut::new(|component| {
+		VisitRsxComponentMut::walk(node, |component| {
 			let opts = VisitRsxOptions::ignore_component_node();
 			let mut contains_style = false;
 
-			VisitRsxElementMut::new_with_options(opts.clone(), |el| {
-				if el.tag == "style" {
-					contains_style = true;
-					// currently only recurse top level, we could create another
-					// visitor to go deeper
-					for child in &mut el.children {
-						if let RsxNode::Text(text) = child {
-							if let Err(err) = self.apply_styles(text) {
-								parse_err = Err(err);
+			VisitRsxElementMut::walk_with_opts(
+				&mut component.node,
+				opts.clone(),
+				|el| {
+					if el.tag == "style" {
+						contains_style = true;
+						// currently only recurse top level, we could create another
+						// visitor to go deeper
+						for child in &mut el.children {
+							if let RsxNode::Text(text) = child {
+								if let Err(err) = self.apply_styles(text) {
+									parse_err = Err(err);
+								}
 							}
 						}
 					}
-				}
-			})
-			.walk_node(&mut component.node);
+				},
+			);
 			if contains_style {
-				println!("contains style");
-				VisitRsxElementMut::new_with_options(opts.clone(), |el| {
-					el.attributes.push(RsxAttribute::KeyValue {
-						key: self.attr.to_string(),
-						value: self.idx.to_string(),
-					});
-				})
-				.walk_node(&mut component.node);
+				VisitRsxElementMut::walk_with_opts(
+					&mut component.node,
+					opts.clone(),
+					|el| {
+						el.attributes.push(RsxAttribute::KeyValue {
+							key: self.attr.to_string(),
+							value: self.idx.to_string(),
+						});
+					},
+				);
 				self.idx += 1;
 			}
-		})
-		.walk_node(node);
+		});
 		parse_err
 	}
 	fn apply_styles(&self, css: &mut String) -> ParseResult<()> {
@@ -102,10 +114,6 @@ impl ScopedStyle {
 		*css = new_css;
 		Ok(())
 	}
-}
-
-impl RsxVisitorMut for ScopedStyle {
-	fn visit_component(&mut self, component: &mut RsxComponent) {}
 }
 
 #[cfg(test)]
