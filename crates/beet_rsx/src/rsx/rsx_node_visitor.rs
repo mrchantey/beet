@@ -3,7 +3,6 @@ use crate::prelude::*;
 /// Walking trees like rsx is deceptively difficult.
 /// The visitor pattern handles the 'walking' and allows implementers
 /// to focus on the 'visiting'.
-/// implement options
 ///
 /// Visiting fragments is intentionally not supported,
 /// they are by definition transparent so depending on them
@@ -16,50 +15,47 @@ pub trait RsxNodeVisitor {
 	fn walk_component_node(&self) -> bool { true }
 	/// defaults to true, override for custom behavior
 	fn walk_component_slot_children(&self) -> bool { true }
-	/// begin walking the nodes
-	fn walk(&mut self, node: &RsxNode) -> RsxContext {
-		let mut cx = RsxContext::default();
-		let mut queue = std::collections::VecDeque::new();
-		queue.push_back(node);
-
-		while let Some(current) = queue.pop_front() {
-			let node_type = current.discriminant();
+	/// begin walking the nodes.
+	fn walk(&mut self, node: &RsxNode) {
+		let mut stack = Vec::new();
+		stack.push(node);
+		while let Some(current) = stack.pop() {
 			match current {
-				RsxNode::Doctype => self.visit_doctype(&cx),
-				RsxNode::Comment(c) => self.visit_comment(&cx, c),
-				RsxNode::Text(t) => self.visit_text(&cx, t),
-				RsxNode::Block(b) => self.visit_block(&cx, b),
+				RsxNode::Doctype => {
+					self.visit_doctype();
+				}
+				RsxNode::Comment(c) => self.visit_comment(c),
+				RsxNode::Text(t) => self.visit_text(t),
+				RsxNode::Block(b) => self.visit_block(b),
 				RsxNode::Fragment(f) => {
-					queue.extend(f);
+					stack.extend(f);
 				}
 				RsxNode::Element(e) => {
-					self.visit_element(&cx, e);
+					self.visit_element(e);
 					for attr in &e.attributes {
-						self.visit_attribute(&cx, attr);
+						self.visit_attribute(attr);
 					}
 					if self.walk_element_children() {
-						queue.extend(&e.children);
+						stack.extend(&e.children);
 					}
 				}
 				RsxNode::Component(c) => {
-					self.visit_component(&cx, c);
+					self.visit_component(c);
 					if self.walk_component_node() {
-						queue.push_back(&c.node);
+						stack.push(&c.node);
 					}
 				}
 			}
-			cx.node_idx += 1;
 		}
-		cx
 	}
 
-	fn visit_doctype(&mut self, cx: &RsxContext) {}
-	fn visit_comment(&mut self, cx: &RsxContext, comment: &str) {}
-	fn visit_text(&mut self, cx: &RsxContext, text: &str) {}
-	fn visit_block(&mut self, cx: &RsxContext, block: &RsxBlock) {}
-	fn visit_component(&mut self, cx: &RsxContext, component: &RsxComponent) {}
-	fn visit_element(&mut self, cx: &RsxContext, element: &RsxElement) {}
-	fn visit_attribute(&mut self, cx: &RsxContext, attribute: &RsxAttribute) {}
+	fn visit_doctype(&mut self) {}
+	fn visit_comment(&mut self, comment: &str) {}
+	fn visit_text(&mut self, text: &str) {}
+	fn visit_block(&mut self, block: &RsxBlock) {}
+	fn visit_component(&mut self, component: &RsxComponent) {}
+	fn visit_element(&mut self, element: &RsxElement) {}
+	fn visit_attribute(&mut self, attribute: &RsxAttribute) {}
 }
 
 impl RsxNode {
@@ -172,32 +168,18 @@ mod test {
 		fn walk_component_slot_children(&self) -> bool {
 			self.walk_component_slot_children
 		}
-		fn visit_doctype(&mut self, cx: &RsxContext) { self.doctype += 1; }
-		fn visit_comment(&mut self, cx: &RsxContext, comment: &str) {
-			self.comment += 1;
-		}
-		fn visit_text(&mut self, cx: &RsxContext, text: &str) {
-			self.text += 1;
-		}
-		fn visit_block(&mut self, cx: &RsxContext, block: &RsxBlock) {
-			self.block += 1;
-		}
-		fn visit_component(
-			&mut self,
-			cx: &RsxContext,
-			component: &RsxComponent,
-		) {
+		fn visit_doctype(&mut self) { self.doctype += 1; }
+		fn visit_comment(&mut self, comment: &str) { self.comment += 1; }
+		fn visit_text(&mut self, text: &str) { self.text += 1; }
+		fn visit_block(&mut self, block: &RsxBlock) { self.block += 1; }
+		fn visit_component(&mut self, component: &RsxComponent) {
 			self.component += 1;
 		}
-		fn visit_element(&mut self, cx: &RsxContext, element: &RsxElement) {
+		fn visit_element(&mut self, element: &RsxElement) {
 			// println!("visit element: {}", element.tag);
 			self.element += 1;
 		}
-		fn visit_attribute(
-			&mut self,
-			cx: &RsxContext,
-			attribute: &RsxAttribute,
-		) {
+		fn visit_attribute(&mut self, attribute: &RsxAttribute) {
 			self.attribute += 1;
 		}
 	}

@@ -12,14 +12,14 @@ use parcel_selectors::attr::ParsedCaseSensitivity;
 /// In --release the css will be minified
 pub struct ScopedStyle {
 	/// the attribute to use as a selector for the component,
-	/// defaults to "data-bcid"
+	/// defaults to "data-styleid"
 	attr: String,
 }
 
 impl Default for ScopedStyle {
 	fn default() -> Self {
 		ScopedStyle {
-			attr: "data-bcid".to_string(),
+			attr: "data-styleid".to_string(),
 		}
 	}
 }
@@ -34,6 +34,7 @@ impl ScopedStyle {
 		RsxContext::visit_mut(node, |cx, node| match node {
 			RsxNode::Component(RsxComponent { node, .. }) => {
 				let mut contains_style = false;
+				// 1. apply the class to each style tag
 				node.visit_ignore_components_mut(|node| {
 					if let RsxNode::Element(e) = node {
 						if e.tag == "style" {
@@ -50,6 +51,7 @@ impl ScopedStyle {
 						}
 					}
 				});
+				// 2. ensure the component has the id attribute
 				if contains_style {
 					node.visit_ignore_components_mut(|node| {
 						if let RsxNode::Element(e) = node {
@@ -68,7 +70,7 @@ impl ScopedStyle {
 		result
 	}
 
-	/// apply [data-bcid=cid] attribute selector to all style rules in the CSS
+	/// apply [data-styleid=cid] attribute selector to all style rules in the CSS
 	fn apply_styles(&self, cid: usize, css: &mut String) -> ParseResult<()> {
 		// Parse the stylesheet
 		let mut stylesheet = StyleSheet::parse(css, ParserOptions::default())
@@ -158,6 +160,6 @@ mod test {
 		ScopedStyle::default().apply(&mut node).unwrap();
 		let html = RsxToHtml::render_body(&node);
 		expect(html)
-			.to_be("<div data-bcid=\"0\"><br data-bcid=\"0\"/><style>span[data-bcid=\"0\"] {\n  color: red;\n}\n</style><div><br/></div></div>");
+			.to_be("<div data-styleid=\"0\"><br data-styleid=\"0\"/><style>span[data-styleid=\"0\"] {\n  color: red;\n}\n</style><div><br/></div></div>");
 	}
 }
