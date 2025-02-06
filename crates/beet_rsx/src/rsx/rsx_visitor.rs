@@ -47,9 +47,13 @@ impl VisitRsxOptions {
 	}
 }
 
+///
 /// Walking trees like rsx is deceptively difficult.
 /// The visitor pattern handles the 'walking' and allows implementers
 /// to focus on the 'visiting'.
+///
+/// This implementation is depth-first call stack based,
+/// visiting parent elements, components and blocks before walking children.
 ///
 /// Visiting fragments is intentionally not supported,
 /// they are by definition transparent so depending on them
@@ -82,6 +86,8 @@ pub trait RsxVisitor {
 	fn visit_component(&mut self, component: &RsxComponent) {}
 	fn visit_element(&mut self, element: &RsxElement) {}
 	fn visit_attribute(&mut self, attribute: &RsxAttribute) {}
+	fn before_element_children(&mut self, element: &RsxElement) {}
+	fn after_element_children(&mut self, element: &RsxElement) {}
 	fn walk_node(&mut self, node: &RsxNode) {
 		self.visit_node(node);
 		match node {
@@ -115,9 +121,11 @@ pub trait RsxVisitor {
 			self.visit_attribute(attr);
 		}
 		if !self.ignore_element_children() {
+			self.before_element_children(element);
 			for child in &element.children {
 				self.walk_node(child);
 			}
+			self.after_element_children(element);
 		}
 	}
 	fn walk_component(&mut self, component: &RsxComponent) {
@@ -152,6 +160,8 @@ pub trait RsxVisitorMut {
 	fn visit_component(&mut self, component: &mut RsxComponent) {}
 	fn visit_element(&mut self, element: &mut RsxElement) {}
 	fn visit_attribute(&mut self, attribute: &mut RsxAttribute) {}
+	fn before_element_children(&mut self, element: &mut RsxElement) {}
+	fn after_element_children(&mut self, element: &mut RsxElement) {}
 	fn walk_node(&mut self, node: &mut RsxNode) {
 		self.visit_node(node);
 		match node {
@@ -185,9 +195,11 @@ pub trait RsxVisitorMut {
 			self.visit_attribute(attr);
 		}
 		if !self.ignore_element_children() {
+			self.before_element_children(element);
 			for child in &mut element.children {
 				self.walk_node(child);
 			}
+			self.after_element_children(element);
 		}
 	}
 	fn walk_component(&mut self, component: &mut RsxComponent) {

@@ -73,7 +73,7 @@ impl RsxContextMap {
 		let mut map = Self::default();
 
 		let visitor = RsxContext::visit(node, |cx, node| match node {
-			RsxNode::Block { .. } => {
+			RsxNode::Block(_) => {
 				assert_eq!(cx.block_idx(), map.rust_blocks.len());
 				map.rust_blocks.push(cx.clone());
 			}

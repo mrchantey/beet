@@ -33,6 +33,18 @@ impl RsxNode {
 		visitor.walk_node(self)
 	}
 
+
+	/// Returns true if the node is an html node
+	pub fn is_html_node(&self) -> bool {
+		match self {
+			RsxNode::Doctype
+			| RsxNode::Comment(_)
+			| RsxNode::Text(_)
+			| RsxNode::Element(_) => true,
+			_ => false,
+		}
+	}
+
 	/// takes all the register_effect functions
 	/// # Panics
 	/// If the register function fails
