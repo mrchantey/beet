@@ -45,7 +45,11 @@ leptosfmt *args:
 	crates/beet_site/**/*.rs 		\
 	{{args}}
 
-#💡 HTML
+#💡 e2e examples
+
+run-reactive:
+	sweet serve | \
+	just watch 'just build-wasm beet dom_renderer'
 
 run-test-site:
 	cargo run -p beet_router --example routes_mod
@@ -216,9 +220,7 @@ assets-pull:
 	tar -xzvf ./assets.tar.gz
 	rm ./assets.tar.gz
 
-wasm-example:
-	forky serve | \
-	just watch 'just build-wasm beet dom_renderer'
+
 
 ### TEST SCENE LOADS
 
