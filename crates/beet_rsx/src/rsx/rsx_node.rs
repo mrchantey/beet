@@ -5,21 +5,21 @@ use strum_macros::EnumDiscriminants;
 
 #[derive(Debug, AsRefStr, EnumDiscriminants)]
 pub enum RsxNode {
+	/// a html doctype node
+	Doctype,
+	/// a html comment node
+	Comment(String),
+	/// a html text node
+	Text(String),
+	/// a rust block that returns text
+	Block(RsxBlock),
 	/// A transparent node that simply contains children
 	/// This may be deprecated in the future if no patterns
 	/// require it. The RstmlToRsx could support it
 	Fragment(Vec<RsxNode>),
-	Component(RsxComponent),
-	/// a rust block that returns text
-	Block(RsxBlock),
 	/// a html element
 	Element(RsxElement),
-	/// a html text node
-	Text(String),
-	/// a html comment node
-	Comment(String),
-	/// a html doctype node
-	Doctype,
+	Component(RsxComponent),
 }
 
 impl Default for RsxNode {
@@ -28,9 +28,10 @@ impl Default for RsxNode {
 
 impl RsxNode {
 	pub fn discriminant(&self) -> RsxNodeDiscriminants { self.into() }
-	pub fn is_element(&self) -> bool { matches!(self, RsxNode::Element(_)) }
-
-
+	/// helper method to kick off a visitor
+	pub fn walk(&self, visitor: &mut impl RsxNodeVisitor) -> RsxContext {
+		visitor.walk(self)
+	}
 	/// chidren of root, fragment or element.
 	/// Blocks and components have no children
 	pub fn children(&self) -> &[RsxNode] {
@@ -174,7 +175,22 @@ pub struct RsxBlock {
 	pub initial: Box<RsxNode>,
 	pub effect: Effect,
 }
-
+/// Representation of a rusty node.
+///
+/// ```
+/// # use beet_rsx::as_beet::*;
+/// let my_block = 3;
+/// let el = rsx! { <div>{my_block}</div> };
+/// ```
+#[derive(Debug)]
+pub struct RsxFragment(pub Vec<RsxNode>);
+impl std::ops::Deref for RsxFragment {
+	type Target = Vec<RsxNode>;
+	fn deref(&self) -> &Self::Target { &self.0 }
+}
+impl std::ops::DerefMut for RsxFragment {
+	fn deref_mut(&mut self) -> &mut Self::Target { &mut self.0 }
+}
 
 /// A component is a struct that implements the [Component] trait.
 /// When it is used in an `rsx!` macro it will be instantiated

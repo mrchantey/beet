@@ -11,6 +11,7 @@ pub use rsx_context::*;
 mod rsx_node;
 mod rsx_node_visitor;
 pub use rsx_node::*;
+pub use rsx_node_visitor::*;
 pub use text_block_encoder::*;
 mod text_block_encoder;
 pub use rsx_context_map::*;

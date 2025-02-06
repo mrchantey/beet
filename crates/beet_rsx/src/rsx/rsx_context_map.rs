@@ -130,21 +130,21 @@ mod test {
 			node_idx: 2,
 			component_idx: 0,
 			block_idx: 0,
-			element_count: 0,
+			element_idx: 0,
 			child_idx: 1,
 		});
 		expect(&map.rust_blocks[1]).to_be(&RsxContext {
 			node_idx: 4,
 			component_idx: 0,
 			block_idx: 1,
-			element_count: 0,
+			element_idx: 0,
 			child_idx: 2,
 		});
 		expect(&map.rust_blocks[2]).to_be(&RsxContext {
 			node_idx: 6,
 			component_idx: 0,
 			block_idx: 2,
-			element_count: 1,
+			element_idx: 1,
 			child_idx: 3,
 		});
 	}

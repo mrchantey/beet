@@ -1,7 +1,6 @@
 use crate::prelude::*;
 use std::borrow::Borrow;
 use std::collections::VecDeque;
-use strum_macros::EnumDiscriminants;
 
 /// Used to identify an element in a tree.
 /// This is incremented in a breadth-first pattern
@@ -40,7 +39,7 @@ pub struct RsxContext {
 	/// so should be zero by the time the tree is finished.
 	/// In the case of a rust block this is the parent element.
 	/// in the case of visiting an element this is the element itself.
-	pub(super) element_count: ElementIdx,
+	pub(super) element_idx: ElementIdx,
 	/// the *uncollapsed* index of this block relative to its parent element.
 	/// That is the [RsxNode] child index, not the [HtmlNode] child index
 	/// which merges rust text blocks with static text blocks
@@ -51,32 +50,28 @@ impl RsxContext {
 	pub fn node_idx(&self) -> usize { self.node_idx }
 	pub fn component_idx(&self) -> usize { self.component_idx }
 	pub fn block_idx(&self) -> usize { self.block_idx }
-	pub fn element_idx(&self) -> usize { self.element_count.saturating_sub(1) }
+	pub fn element_idx(&self) -> usize { self.element_idx.saturating_sub(1) }
 	pub fn child_idx(&self) -> usize { self.child_idx }
 
 	fn before_visit_node(
 		&mut self,
 		node_disc: &RsxNodeDiscriminants,
-		pos_disc: &HtmlElementPositionDiscriminants,
+		instruction: &CxInstruction,
 	) {
 		match node_disc {
 			RsxNodeDiscriminants::Element => {
-				self.element_count += 1;
+				self.element_idx += 1;
 			}
 			_ => {}
 		}
-		match pos_disc {
-			HtmlElementPositionDiscriminants::FirstChild
-			| HtmlElementPositionDiscriminants::OnlyChild => {
-				self.child_idx = 0;
-			}
-			_ => {}
+		if instruction.is_first_el_child() {
+			self.child_idx = 0;
 		}
 	}
 	fn after_visit_node(
 		&mut self,
 		node_disc: &RsxNodeDiscriminants,
-		pos_disc: &HtmlElementPositionDiscriminants,
+		instruction: &CxInstruction,
 	) {
 		self.node_idx += 1;
 		match node_disc {
@@ -94,13 +89,8 @@ impl RsxContext {
 				self.child_idx += 1;
 			}
 		}
-		match pos_disc {
-			HtmlElementPositionDiscriminants::LastChild
-			| HtmlElementPositionDiscriminants::OnlyChild => {
-				// root parent may be a fragment so saturate
-				self.element_count = self.element_count.saturating_sub(1);
-			}
-			_ => {}
+		if instruction.is_last_el_child() {
+			self.element_idx = self.element_idx.saturating_sub(1);
 		}
 	}
 
@@ -111,7 +101,7 @@ impl RsxContext {
 			self.node_idx.to_string(),
 			self.component_idx.to_string(),
 			self.block_idx.to_string(),
-			self.element_count.to_string(),
+			self.element_idx.to_string(),
 			self.child_idx.to_string(),
 		]
 		.join(",")
@@ -137,7 +127,7 @@ impl RsxContext {
 			node_idx,
 			component_idx,
 			block_idx,
-			element_count,
+			element_idx: element_count,
 			child_idx,
 		})
 	}
@@ -157,21 +147,20 @@ impl RsxContext {
 			|queue, node| match node {
 				RsxNode::Fragment(rsx_nodes) => {
 					for node in rsx_nodes {
-						queue.push_back(HtmlElementPosition::MiddleChild(node));
+						queue.push_back((CxInstruction::None, node));
 					}
 				}
 				RsxNode::Component(RsxComponent { node, .. }) => {
-					queue.push_back(HtmlElementPosition::MiddleChild(node));
+					queue.push_back((CxInstruction::None, node));
 				}
 				RsxNode::Block(RsxBlock { initial, .. }) => {
-					queue.push_back(HtmlElementPosition::MiddleChild(initial));
+					queue.push_back((CxInstruction::None, initial));
 				}
 				RsxNode::Element(RsxElement { children, .. }) => {
 					let num_children = children.len();
-					for (i, child) in children.into_iter().enumerate() {
-						queue.push_back(HtmlElementPosition::new_child(
-							num_children,
-							i,
+					for (index, child) in children.into_iter().enumerate() {
+						queue.push_back((
+							CxInstruction::from_el_child(index, num_children),
 							child,
 						));
 					}
@@ -200,21 +189,20 @@ impl RsxContext {
 			|queue, node| match node {
 				RsxNode::Fragment(rsx_nodes) => {
 					for node in rsx_nodes {
-						queue.push_back(HtmlElementPosition::MiddleChild(node));
+						queue.push_back((CxInstruction::None, node));
 					}
 				}
 				RsxNode::Component(RsxComponent { node, .. }) => {
-					queue.push_back(HtmlElementPosition::MiddleChild(node));
+					queue.push_back((CxInstruction::None, node));
 				}
 				RsxNode::Block(RsxBlock { initial, .. }) => {
-					queue.push_back(HtmlElementPosition::MiddleChild(initial));
+					queue.push_back((CxInstruction::None, initial));
 				}
 				RsxNode::Element(RsxElement { children, .. }) => {
 					let num_children = children.len();
-					for (i, child) in children.into_iter().enumerate() {
-						queue.push_back(HtmlElementPosition::new_child(
-							num_children,
-							i,
+					for (index, child) in children.into_iter().enumerate() {
+						queue.push_back((
+							CxInstruction::from_el_child(index, num_children),
 							child,
 						));
 					}
@@ -231,58 +219,58 @@ impl RsxContext {
 		&mut self,
 		node: T,
 		mut func: impl FnMut(&mut Self, T) -> T,
-		mut map_children: impl FnMut(&mut VecDeque<HtmlElementPosition<T>>, T),
+		mut map_children: impl FnMut(&mut VecDeque<(CxInstruction, T)>, T),
 	) {
 		let mut queue = VecDeque::new();
-		queue.push_back(HtmlElementPosition::OnlyChild(node));
+		// not correct, we need to revisit why element_idx must start with 1
+		queue.push_back((CxInstruction::OnlyElementChild, node));
 
 
-		while let Some(pos_node) = queue.pop_front() {
-			let pos_disc = pos_node.discriminant();
-			let node = pos_node.into_inner();
+		while let Some((cx_instruction, node)) = queue.pop_front() {
 			let node_disc = node.borrow().discriminant();
-			self.before_visit_node(&node_disc, &pos_disc);
-			// let num_children = node.borrow().children().len();
+			self.before_visit_node(&node_disc, &cx_instruction);
 			let node = func(self, node);
-			self.after_visit_node(&node_disc, &pos_disc);
+			self.after_visit_node(&node_disc, &cx_instruction);
 			map_children(&mut queue, node);
 		}
 	}
 }
 
-#[derive(EnumDiscriminants)]
-enum HtmlElementPosition<T> {
-	OnlyChild(T),
-	FirstChild(T),
-	MiddleChild(T),
-	LastChild(T),
-}
 
-impl<T> HtmlElementPosition<T> {
-	fn new_child(num_children: usize, i: usize, child: T) -> Self {
+#[derive(Debug, Default)]
+enum CxInstruction {
+	#[default]
+	None,
+	FirstElementChild,
+	LastElementChild,
+	OnlyElementChild,
+}
+impl CxInstruction {
+	/// create the correct instruction for a new child
+	fn from_el_child(index: usize, num_children: usize) -> Self {
 		if num_children == 1 {
-			HtmlElementPosition::OnlyChild(child)
-		} else if i == 0 {
-			HtmlElementPosition::FirstChild(child)
-		} else if i == num_children - 1 {
-			HtmlElementPosition::LastChild(child)
+			Self::OnlyElementChild
+		} else if index == 0 {
+			Self::FirstElementChild
+		} else if index == num_children - 1 {
+			Self::LastElementChild
 		} else {
-			HtmlElementPosition::MiddleChild(child)
+			Self::None
 		}
 	}
-
-
-	fn discriminant(&self) -> HtmlElementPositionDiscriminants { self.into() }
-	pub fn into_inner(self) -> T {
+	fn is_first_el_child(&self) -> bool {
 		match self {
-			Self::OnlyChild(val)
-			| Self::FirstChild(val)
-			| Self::MiddleChild(val)
-			| Self::LastChild(val) => val,
+			Self::FirstElementChild | Self::OnlyElementChild => true,
+			_ => false,
+		}
+	}
+	fn is_last_el_child(&self) -> bool {
+		match self {
+			Self::LastElementChild | Self::OnlyElementChild => true,
+			_ => false,
 		}
 	}
 }
-
 
 #[cfg(test)]
 mod test {
@@ -295,7 +283,7 @@ mod test {
 		let a = RsxContext {
 			block_idx: 1,
 			component_idx: 2,
-			element_count: 2,
+			element_idx: 2,
 			child_idx: 3,
 			node_idx: 4,
 		};
@@ -341,14 +329,11 @@ mod test {
 
 	#[test]
 	fn element_count() {
-		expect(
-			RsxContext::visit(&rsx! { <div></div> }, |_, _| {}).element_count,
-		)
-		.to_be(0);
+		expect(RsxContext::visit(&rsx! { <div></div> }, |_, _| {}).element_idx)
+			.to_be(0);
 
 		expect(
-			RsxContext::visit(&rsx! { <div>738</div> }, |_, _| {})
-				.element_count,
+			RsxContext::visit(&rsx! { <div>738</div> }, |_, _| {}).element_idx,
 		)
 		.to_be(0);
 		expect(
@@ -361,7 +346,7 @@ mod test {
 				},
 				|_, _| {},
 			)
-			.element_count,
+			.element_idx,
 		)
 		.to_be(0);
 	}
@@ -400,35 +385,35 @@ mod test {
 			node_idx: 0,
 			component_idx: 0,
 			block_idx: 0,
-			element_count: 1,
+			element_idx: 1,
 			child_idx: 0,
 		});
 		expect(&bucket).to_have_returned_nth_with(1, &RsxContext {
 			node_idx: 1,
 			component_idx: 0,
 			block_idx: 0,
-			element_count: 1,
+			element_idx: 1,
 			child_idx: 0,
 		});
 		expect(&bucket).to_have_returned_nth_with(2, &RsxContext {
 			node_idx: 2,
 			component_idx: 0,
 			block_idx: 0,
-			element_count: 2,
+			element_idx: 2,
 			child_idx: 1,
 		});
 		expect(&bucket).to_have_returned_nth_with(3, &RsxContext {
 			node_idx: 3,
 			component_idx: 0,
 			block_idx: 0,
-			element_count: 2,
+			element_idx: 2,
 			child_idx: 0,
 		});
 		expect(&bucket).to_have_returned_nth_with(4, &RsxContext {
 			node_idx: 4,
 			component_idx: 0,
 			block_idx: 0,
-			element_count: 2,
+			element_idx: 2,
 			child_idx: 0,
 		});
 	}
