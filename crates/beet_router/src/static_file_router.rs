@@ -90,7 +90,7 @@ impl<T: 'static> StaticFileRouter<T> {
 	pub async fn routes_to_html(
 		&self,
 	) -> Result<Vec<(RouteInfo, HtmlDocument)>> {
-		let scoped_style = ScopedStyle::default();
+		let mut scoped_style = ScopedStyle::default();
 
 		let mut template_map = self
 			.load_template_map()

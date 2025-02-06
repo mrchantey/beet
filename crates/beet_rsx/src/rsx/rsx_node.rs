@@ -29,8 +29,8 @@ impl Default for RsxNode {
 impl RsxNode {
 	pub fn discriminant(&self) -> RsxNodeDiscriminants { self.into() }
 	/// helper method to kick off a visitor
-	pub fn walk(&self, visitor: &mut impl RsxNodeVisitor) {
-		visitor.walk(self)
+	pub fn walk(&self, visitor: &mut impl RsxVisitor) {
+		visitor.walk_node(self)
 	}
 	/// chidren of root, fragment or element.
 	/// Blocks and components have no children

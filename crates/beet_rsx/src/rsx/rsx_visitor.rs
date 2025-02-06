@@ -1,5 +1,6 @@
 use crate::prelude::*;
 
+
 /// Walking trees like rsx is deceptively difficult.
 /// The visitor pattern handles the 'walking' and allows implementers
 /// to focus on the 'visiting'.
@@ -8,47 +9,11 @@ use crate::prelude::*;
 /// they are by definition transparent so depending on them
 /// is considered an antipattern.
 #[allow(unused_variables)]
-pub trait RsxNodeVisitor {
-	/// defaults to true, override for custom behavior
-	fn walk_element_children(&self) -> bool { true }
-	/// defaults to true, override for custom behavior
-	fn walk_component_node(&self) -> bool { true }
-	/// defaults to true, override for custom behavior
-	fn walk_component_slot_children(&self) -> bool { true }
-	/// begin walking the nodes.
-	fn walk(&mut self, node: &RsxNode) {
-		let mut stack = Vec::new();
-		stack.push(node);
-		while let Some(current) = stack.pop() {
-			match current {
-				RsxNode::Doctype => {
-					self.visit_doctype();
-				}
-				RsxNode::Comment(c) => self.visit_comment(c),
-				RsxNode::Text(t) => self.visit_text(t),
-				RsxNode::Block(b) => self.visit_block(b),
-				RsxNode::Fragment(f) => {
-					stack.extend(f);
-				}
-				RsxNode::Element(e) => {
-					self.visit_element(e);
-					for attr in &e.attributes {
-						self.visit_attribute(attr);
-					}
-					if self.walk_element_children() {
-						stack.extend(&e.children);
-					}
-				}
-				RsxNode::Component(c) => {
-					self.visit_component(c);
-					if self.walk_component_node() {
-						stack.push(&c.node);
-					}
-				}
-			}
-		}
-	}
-
+pub trait RsxVisitor {
+	fn ignore_element_children(&self) -> bool { false }
+	fn ignore_component_node(&self) -> bool { false }
+	fn ignore_component_slot_children(&self) -> bool { false }
+	fn visit_node(&mut self, node: &RsxNode) {}
 	fn visit_doctype(&mut self) {}
 	fn visit_comment(&mut self, comment: &str) {}
 	fn visit_text(&mut self, text: &str) {}
@@ -56,6 +21,100 @@ pub trait RsxNodeVisitor {
 	fn visit_component(&mut self, component: &RsxComponent) {}
 	fn visit_element(&mut self, element: &RsxElement) {}
 	fn visit_attribute(&mut self, attribute: &RsxAttribute) {}
+	fn walk_node(&mut self, node: &RsxNode) {
+		self.visit_node(node);
+		match node {
+			RsxNode::Doctype => {
+				self.visit_doctype();
+			}
+			RsxNode::Comment(c) => self.visit_comment(c),
+			RsxNode::Text(t) => self.visit_text(t),
+			RsxNode::Block(b) => self.visit_block(b),
+			RsxNode::Fragment(f) => {
+				for child in f {
+					self.walk_node(child);
+				}
+			}
+			RsxNode::Element(e) => {
+				self.walk_element(e);
+			}
+			RsxNode::Component(c) => {
+				self.walk_component(c);
+			}
+		}
+	}
+	fn walk_element(&mut self, element: &RsxElement) {
+		self.visit_element(element);
+		for attr in &element.attributes {
+			self.visit_attribute(attr);
+		}
+		if !self.ignore_element_children() {
+			for child in &element.children {
+				self.walk_node(child);
+			}
+		}
+	}
+	fn walk_component(&mut self, component: &RsxComponent) {
+		self.visit_component(component);
+		if !self.ignore_component_node() {
+			self.walk_node(&component.node);
+		}
+	}
+}
+
+/// See [`RsxNodeVisitor`]
+#[allow(unused_variables)]
+pub trait RsxVisitorMut {
+	fn ignore_element_children(&self) -> bool { false }
+	fn ignore_component_node(&self) -> bool { false }
+	fn ignore_component_slot_children(&self) -> bool { false }
+	fn visit_node(&mut self, node: &mut RsxNode) {}
+	fn visit_doctype(&mut self) {}
+	fn visit_comment(&mut self, comment: &mut str) {}
+	fn visit_text(&mut self, text: &mut str) {}
+	fn visit_block(&mut self, block: &mut RsxBlock) {}
+	fn visit_component(&mut self, component: &mut RsxComponent) {}
+	fn visit_element(&mut self, element: &mut RsxElement) {}
+	fn visit_attribute(&mut self, attribute: &mut RsxAttribute) {}
+	fn walk_node(&mut self, node: &mut RsxNode) {
+		self.visit_node(node);
+		match node {
+			RsxNode::Doctype => {
+				self.visit_doctype();
+			}
+			RsxNode::Comment(c) => self.visit_comment(c),
+			RsxNode::Text(t) => self.visit_text(t),
+			RsxNode::Block(b) => self.visit_block(b),
+			RsxNode::Fragment(f) => {
+				for child in f {
+					self.walk_node(child);
+				}
+			}
+			RsxNode::Element(e) => {
+				self.walk_element(e);
+			}
+			RsxNode::Component(c) => {
+				self.walk_component(c);
+			}
+		}
+	}
+	fn walk_element(&mut self, element: &mut RsxElement) {
+		self.visit_element(element);
+		for attr in &mut element.attributes {
+			self.visit_attribute(attr);
+		}
+		if !self.ignore_element_children() {
+			for child in &mut element.children {
+				self.walk_node(child);
+			}
+		}
+	}
+	fn walk_component(&mut self, component: &mut RsxComponent) {
+		self.visit_component(component);
+		if !self.ignore_component_node() {
+			self.walk_node(&mut component.node);
+		}
+	}
 }
 
 impl RsxNode {
@@ -115,10 +174,9 @@ impl RsxNode {
 
 #[cfg(test)]
 mod test {
-	use super::RsxNodeVisitor;
+	use super::RsxVisitor;
 	use crate::prelude::*;
 	use sweet::prelude::*;
-
 
 
 	struct Child;
@@ -131,11 +189,13 @@ mod test {
 	}
 
 
+	#[derive(Default)]
 	struct Counter {
-		walk_element_children: bool,
-		walk_component_node: bool,
-		walk_component_slot_children: bool,
+		ignore_element_children: bool,
+		ignore_component_node: bool,
+		ignore_component_slot_children: bool,
 		//
+		node: usize,
 		doctype: usize,
 		comment: usize,
 		text: usize,
@@ -144,30 +204,17 @@ mod test {
 		element: usize,
 		attribute: usize,
 	}
-	impl Default for Counter {
-		fn default() -> Self {
-			Self {
-				walk_element_children: true,
-				walk_component_node: true,
-				walk_component_slot_children: true,
-				doctype: 0,
-				comment: 0,
-				text: 0,
-				block: 0,
-				component: 0,
-				element: 0,
-				attribute: 0,
-			}
-		}
-	}
 
 	#[allow(unused_variables)]
-	impl RsxNodeVisitor for Counter {
-		fn walk_element_children(&self) -> bool { self.walk_element_children }
-		fn walk_component_node(&self) -> bool { self.walk_component_node }
-		fn walk_component_slot_children(&self) -> bool {
-			self.walk_component_slot_children
+	impl RsxVisitor for Counter {
+		fn ignore_element_children(&self) -> bool {
+			self.ignore_element_children
 		}
+		fn ignore_component_node(&self) -> bool { self.ignore_component_node }
+		fn ignore_component_slot_children(&self) -> bool {
+			self.ignore_component_slot_children
+		}
+		fn visit_node(&mut self, node: &RsxNode) { self.node += 1; }
 		fn visit_doctype(&mut self) { self.doctype += 1; }
 		fn visit_comment(&mut self, comment: &str) { self.comment += 1; }
 		fn visit_text(&mut self, text: &str) { self.text += 1; }
@@ -190,31 +237,35 @@ mod test {
 	fn test_visitor_counter() {
 		let mut counter = Counter::default();
 		rsx! {
-			<!DOCTYPE html>
-			<!-- "comment" -->
-			<div class="test">
-				"text"
-				{7}
-				<Child>
-					<span />
+			<!DOCTYPE html>					// doctype
+			<!-- "comment" -->			// comment
+			<div class="test">			// attribute
+				"text"								// text node
+				{7}										// block node
+				<Child>								// component
+					<span />						// component child
+					<Child> 						// nested component
+						<span />					// nested child
+					</Child>
 				</Child>
 			</div>
 		}
 		.walk(&mut counter);
 
+		expect(counter.node).to_be(14);
 		expect(counter.doctype).to_be(1);
 		expect(counter.comment).to_be(1);
 		expect(counter.text).to_be(1);
 		expect(counter.block).to_be(1);
-		expect(counter.element).to_be(4); // div + span + child div + child slot
+		expect(counter.element).to_be(7); // div + span + child div + child slot
 		expect(counter.attribute).to_be(1); // class
-		expect(counter.component).to_be(1); // Child
+		expect(counter.component).to_be(2); // Child
 	}
 
 	#[test]
 	fn test_visitor_no_element_children() {
 		let mut counter = Counter {
-			walk_element_children: false,
+			ignore_element_children: true,
 			..Default::default()
 		};
 
@@ -231,7 +282,7 @@ mod test {
 	#[test]
 	fn test_visitor_no_component_node() {
 		let mut counter = Counter {
-			walk_component_node: false,
+			ignore_component_node: true,
 			..Default::default()
 		};
 

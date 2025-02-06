@@ -46,7 +46,6 @@ impl RstmlToRsx {
 		let span = tokens.span();
 		let line = span.start().line;
 		let col = span.start().column;
-
 		let node = if nodes.len() == 1 {
 			nodes.pop().unwrap()
 		} else {

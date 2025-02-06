@@ -1,4 +1,3 @@
-use super::RsxContext;
 use super::RsxNode;
 use crate::prelude::*;
 use lightningcss::printer::PrinterOptions;
@@ -14,64 +13,57 @@ pub struct ScopedStyle {
 	/// the attribute to use as a selector for the component,
 	/// defaults to "data-styleid"
 	attr: String,
+	/// an index used to track the current component being styled
+	idx: usize,
 }
 
 impl Default for ScopedStyle {
 	fn default() -> Self {
 		ScopedStyle {
 			attr: "data-styleid".to_string(),
+			idx: 0,
 		}
 	}
 }
 
-
 impl ScopedStyle {
-	/// apply scoped style to all child components,
-	/// the root is only applied if it is a component,
-	/// so style tags in a root fragment will not be scoped.
-	pub fn apply(&self, node: &mut RsxNode) -> ParseResult<()> {
-		let mut result = Ok(());
-		RsxContext::visit_mut(node, |cx, node| match node {
-			RsxNode::Component(RsxComponent { node, .. }) => {
-				let mut contains_style = false;
-				// 1. apply the class to each style tag
-				node.visit_ignore_components_mut(|node| {
-					if let RsxNode::Element(e) = node {
-						if e.tag == "style" {
-							contains_style = true;
-							node.visit_mut(|node| {
-								if let RsxNode::Text(text) = node {
-									if let Err(err) = self
-										.apply_styles(cx.component_idx(), text)
-									{
-										result = Err(err);
-									}
-								}
-							});
-						}
-					}
-				});
-				// 2. ensure the component has the id attribute
-				if contains_style {
-					node.visit_ignore_components_mut(|node| {
-						if let RsxNode::Element(e) = node {
-							if e.tag != "style" {
-								e.attributes.push(RsxAttribute::KeyValue {
-									key: self.attr.to_string(),
-									value: cx.component_idx().to_string(),
-								});
+	pub fn apply(&mut self, node: &mut RsxNode) -> ParseResult<()> {
+		let mut parse_err = Ok(());
+		VisitRsxComponentMut::new(|component| {
+			let opts = VisitRsxOptions::ignore_component_node();
+			let mut contains_style = false;
+
+			VisitRsxElementMut::new_with_options(opts.clone(), |el| {
+				if el.tag == "style" {
+					contains_style = true;
+					// currently only recurse top level, we could create another
+					// visitor to go deeper
+					for child in &mut el.children {
+						if let RsxNode::Text(text) = child {
+							if let Err(err) = self.apply_styles(text) {
+								parse_err = Err(err);
 							}
 						}
-					});
+					}
 				}
+			})
+			.walk_node(&mut component.node);
+			if contains_style {
+				println!("contains style");
+				VisitRsxElementMut::new_with_options(opts.clone(), |el| {
+					el.attributes.push(RsxAttribute::KeyValue {
+						key: self.attr.to_string(),
+						value: self.idx.to_string(),
+					});
+				})
+				.walk_node(&mut component.node);
+				self.idx += 1;
 			}
-			_ => {}
-		});
-		result
+		})
+		.walk_node(node);
+		parse_err
 	}
-
-	/// apply [data-styleid=cid] attribute selector to all style rules in the CSS
-	fn apply_styles(&self, cid: usize, css: &mut String) -> ParseResult<()> {
+	fn apply_styles(&self, css: &mut String) -> ParseResult<()> {
 		// Parse the stylesheet
 		let mut stylesheet = StyleSheet::parse(css, ParserOptions::default())
 			.map_err(|e| ParseError::Serde(e.to_string()))?;
@@ -84,7 +76,7 @@ impl ScopedStyle {
 						lightningcss::selector::Component::AttributeInNoNamespace {
 							local_name: self.attr.clone().into(),
 							operator: AttrSelectorOperator::Equal,
-							value: cid.to_string().into(),
+							value: self.idx.to_string().into(),
 							case_sensitivity:
 								ParsedCaseSensitivity::CaseSensitive,
 							never_matches: false,
@@ -112,8 +104,9 @@ impl ScopedStyle {
 	}
 }
 
-
-
+impl RsxVisitorMut for ScopedStyle {
+	fn visit_component(&mut self, component: &mut RsxComponent) {}
+}
 
 #[cfg(test)]
 mod test {
@@ -160,6 +153,6 @@ mod test {
 		ScopedStyle::default().apply(&mut node).unwrap();
 		let html = RsxToHtml::render_body(&node);
 		expect(html)
-			.to_be("<div data-styleid=\"0\"><br data-styleid=\"0\"/><style>span[data-styleid=\"0\"] {\n  color: red;\n}\n</style><div><br/></div></div>");
+			.to_be("<div data-styleid=\"0\"><br data-styleid=\"0\"/><style data-styleid=\"0\">span[data-styleid=\"0\"] {\n  color: red;\n}\n</style><div><br/></div></div>");
 	}
 }
