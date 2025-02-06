@@ -17,7 +17,7 @@ pub struct RsxRoot {
 impl RsxRoot {
 	pub fn split_hydration(self) -> Result<SplitRsx> {
 		let template = RsxTemplateNode::from_rsx_node(&self.node)?;
-		let hydrated = RsxHydratedNode::collect(self.node);
+		let hydrated = RsxHydratedNode::collect(self.node)?;
 		let location = self.location;
 		Ok(SplitRsx {
 			location,

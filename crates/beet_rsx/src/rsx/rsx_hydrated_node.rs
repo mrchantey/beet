@@ -47,61 +47,102 @@ impl std::fmt::Debug for RsxHydratedNode {
 	}
 }
 
-impl RsxHydratedNode {
-	pub fn collect(node: impl Rsx) -> HashMap<RustyTracker, Self> {
-		let mut effects = HashMap::new();
+/// take the effects from a node recursively
+#[derive(Default)]
+struct RsxHydratedVisitor {
+	effect_map: HashMap<RustyTracker, RsxHydratedNode>,
+	err: Option<ParseError>,
+}
 
-		let take_effect = |effect: &mut Effect| {
-			let effect = effect.take();
-			let tracker = effect
-				.tracker
-				.expect("Hydrator - rusty code has no tracker, ensure they are collected");
-			(effect.register, tracker)
-		};
-
-		node.into_rsx().visit_mut(|node| match node {
-			RsxNode::Block(RsxBlock { effect, initial }) => {
-				let (register, tracker) = take_effect(effect);
-				effects.insert(tracker, Self::RustBlock {
-					initial: std::mem::take(initial),
-					register,
-				});
+impl RsxHydratedVisitor {
+	fn take_effect(
+		&mut self,
+		effect: &mut Effect,
+	) -> Option<(RegisterEffect, RustyTracker)> {
+		let effect = effect.take();
+		let tracker = effect.tracker.ok_or_else(|| {
+			ParseError::Hydration(format!("effect has no tracker, this can happen if collect tracker was disabled or they were already collected"))
+		});
+		match tracker {
+			Err(err) => {
+				self.err = Some(err);
+				return None;
 			}
-			RsxNode::Element(rsx_element) => {
-				for attr in rsx_element.attributes.iter_mut() {
-					match attr {
-						RsxAttribute::Key { .. } => {}
-						RsxAttribute::KeyValue { .. } => {}
-						RsxAttribute::BlockValue {
-							initial, effect, ..
-						} => {
-							let (register, tracker) = take_effect(effect);
-							effects.insert(tracker, Self::AttributeValue {
-								initial: std::mem::take(initial),
-								register,
-							});
-						}
-						RsxAttribute::Block { initial, effect } => {
-							let (register, tracker) = take_effect(effect);
-							effects.insert(tracker, Self::AttributeBlock {
-								initial: std::mem::take(initial),
-								register,
-							});
-						}
-					}
+			Ok(tracker) => Some((effect.register, tracker)),
+		}
+	}
+}
+
+impl RsxVisitorMut for RsxHydratedVisitor {
+	fn ignore_block_node_initial(&self) -> bool {
+		// we dont want to recurse into initial?
+		true
+	}
+
+	fn visit_block(&mut self, block: &mut RsxBlock) {
+		if let Some((register, tracker)) = self.take_effect(&mut block.effect) {
+			self.effect_map.insert(tracker, RsxHydratedNode::RustBlock {
+				initial: std::mem::take(&mut block.initial),
+				register,
+			});
+		}
+	}
+	fn visit_attribute(&mut self, attribute: &mut RsxAttribute) {
+		match attribute {
+			RsxAttribute::Key { .. } => {}
+			RsxAttribute::KeyValue { .. } => {}
+			RsxAttribute::BlockValue {
+				initial, effect, ..
+			} => {
+				if let Some((register, tracker)) = self.take_effect(effect) {
+					self.effect_map.insert(
+						tracker,
+						RsxHydratedNode::AttributeValue {
+							initial: std::mem::take(initial),
+							register,
+						},
+					);
 				}
 			}
-			RsxNode::Component(RsxComponent { tracker, node, .. }) => {
-				let tracker = std::mem::take(tracker).expect(
-					"component has no tracker, ensure they are collected",
-				);
-				effects.insert(tracker, Self::Component {
-					node: std::mem::take(node),
+			RsxAttribute::Block { initial, effect } => {
+				if let Some((register, tracker)) = self.take_effect(effect) {
+					self.effect_map.insert(
+						tracker,
+						RsxHydratedNode::AttributeBlock {
+							initial: std::mem::take(initial),
+							register,
+						},
+					);
+				}
+			}
+		}
+	}
+	fn visit_component(&mut self, component: &mut RsxComponent) {
+		match std::mem::take(&mut component.tracker) {
+			Some(tracker) => {
+				self.effect_map.insert(tracker, RsxHydratedNode::Component {
+					node: std::mem::take(&mut component.node),
 				});
 			}
-			_ => {}
-		});
-		effects
+			None => {
+				self.err = Some(ParseError::Hydration(
+					"component has no tracker, this can happen if collect tracker was disabled or they were already collected".into(),
+				));
+			}
+		}
+	}
+}
+
+impl RsxHydratedNode {
+	pub fn collect(node: impl Rsx) -> ParseResult<HashMap<RustyTracker, Self>> {
+		let mut visitor = RsxHydratedVisitor::default();
+		let mut node = node.into_rsx();
+		visitor.walk_node(&mut node);
+		if let Some(err) = visitor.err {
+			Err(err)
+		} else {
+			Ok(visitor.effect_map)
+		}
 	}
 }
 
@@ -115,10 +156,19 @@ mod test {
 	#[test]
 	fn works() {
 		let bar = 2;
-		expect(RsxHydratedNode::collect(rsx! { <div /> }).len()).to_be(0);
-		expect(RsxHydratedNode::collect(rsx! { <div foo=bar /> }).len())
-			.to_be(1);
-		expect(RsxHydratedNode::collect(rsx! { <div>{bar}</div> }).len())
-			.to_be(1);
+		expect(RsxHydratedNode::collect(rsx! { <div /> }).unwrap().len())
+			.to_be(0);
+		expect(
+			RsxHydratedNode::collect(rsx! { <div foo=bar /> })
+				.unwrap()
+				.len(),
+		)
+		.to_be(1);
+		expect(
+			RsxHydratedNode::collect(rsx! { <div>{bar}</div> })
+				.unwrap()
+				.len(),
+		)
+		.to_be(1);
 	}
 }
