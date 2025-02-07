@@ -281,14 +281,16 @@ mod test {
 				</Child>
 			</div>
 		}
+		.node
+		.apply_slots()
+		.unwrap()
 		.walk(&mut counter);
-
-		expect(counter.node).to_be(15);
+		expect(counter.node).to_be(14);
 		expect(counter.doctype).to_be(1);
 		expect(counter.comment).to_be(1);
 		expect(counter.text).to_be(2);
 		expect(counter.block).to_be(1);
-		expect(counter.element).to_be(7); // div + span + child div + child slot
+		expect(counter.element).to_be(5); // div + span + child div
 		expect(counter.attribute).to_be(1); // class
 		expect(counter.component).to_be(2); // Child
 	}

@@ -73,17 +73,24 @@ impl RstmlToRsxTemplateRon {
 					.next()
 					.map(char::is_uppercase)
 					.unwrap_or(false);
-				let children = self.map_nodes(children);
+				let mut children = self.map_nodes(children);
 				if is_component {
 					// components disregard all the context, they are known
 					// to the rsx node
-					let tracker = self.tracker.next_tracker_ron(&open_tag);			
+					let tracker = self.tracker.next_tracker_ron(&open_tag);
 					// we rely on the hydrated node to provide the attributes and children
+					let slot_children = if children.len() == 1 {
+						children.pop().unwrap().to_token_stream()
+					} else {
+						quote! {Fragment([#(#children),*])}
+					};
+
+
 					quote! {
 						Component (
 							tracker: #tracker,
 							tag: #tag_name,
-							children: [#(#children),*]
+							slot_children: #slot_children
 						)
 					}
 				} else {

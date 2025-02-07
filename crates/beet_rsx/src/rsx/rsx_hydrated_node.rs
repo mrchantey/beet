@@ -1,7 +1,6 @@
 use crate::prelude::*;
 use std::collections::HashMap;
 
-
 pub enum RsxHydratedNode {
 	// we also collect components because they
 	// cannot be statically resolved
@@ -120,6 +119,7 @@ impl RsxVisitorMut for RsxHydratedVisitor {
 	fn visit_component(&mut self, component: &mut RsxComponent) {
 		match std::mem::take(&mut component.tracker) {
 			Some(tracker) => {
+				// note how we ignore slot_children, they are handled by RsxTemplateNode
 				self.effect_map.insert(tracker, RsxHydratedNode::Component {
 					node: std::mem::take(&mut component.node),
 				});

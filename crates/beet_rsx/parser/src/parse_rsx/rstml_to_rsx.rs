@@ -11,7 +11,6 @@ use rstml::node::NodeAttribute;
 use rstml::node::NodeElement;
 use rstml::node::NodeFragment;
 use rstml::node::NodeName;
-use std::collections::HashMap;
 use std::collections::HashSet;
 use syn::spanned::Spanned;
 
@@ -148,7 +147,7 @@ impl RstmlToRsx {
 		&mut self,
 		tag: String,
 		open_tag: OpenTag,
-		children: Vec<Node<C>>,
+		mut children: Vec<Node<C>>,
 	) -> TokenStream {
 		let tracker = self
 			.rusty_tracker
@@ -172,7 +171,13 @@ impl RstmlToRsx {
 			}
 		});
 		let ident = syn::Ident::new(&tag, tag.span());
-		let children_slot = self.map_slots(children);
+		let children = if children.len() == 1 {
+			self.map_node(children.pop().unwrap()).to_token_stream()
+		} else {
+			let children = self.map_nodes(children);
+			quote!(RsxNode::Fragment(vec![#(#children),*]))
+		};
+
 		quote!({
 			RsxNode::Component(RsxComponent{
 				tag: #tag.to_string(),
@@ -180,7 +185,8 @@ impl RstmlToRsx {
 				node: Box::new(#ident{
 					#(#props,)*
 				}
-				.into_rsx()#children_slot)
+				.into_rsx()),
+				slot_children: Box::new(#children)
 			})
 		})
 	}
@@ -200,52 +206,6 @@ impl RstmlToRsx {
 		);
 		self.errors.push(warning.emit_as_expr_tokens());
 	}
-
-	fn map_slots<C>(&mut self, children: Vec<Node<C>>) -> TokenStream {
-		if children.is_empty() {
-			TokenStream::default()
-		} else {
-			let mut slot_buckets = HashMap::new();
-			for child in children.into_iter() {
-				let slot_name = self.slot_name(&child);
-				slot_buckets
-					.entry(slot_name)
-					.or_insert_with(Vec::new)
-					.push(self.map_node(child));
-			}
-			let with_slots = slot_buckets.into_iter().map(
-				|(name, children)| quote!(.with_slots(#name,vec![#(#children),*])),
-			);
-			quote! {#(#with_slots)*}
-		}
-	}
-
-	/// given a node, try to find the attribute called 'slot' and
-	/// return its value, otherwise return 'default'
-	fn slot_name<C>(&self, node: &Node<C>) -> String {
-		match node {
-			Node::Element(NodeElement { open_tag, .. }) => {
-				for attr in &open_tag.attributes {
-					match attr {
-						NodeAttribute::Attribute(attr) => {
-							match attr.key.to_string().as_str() {
-								"slot" => {
-									return attr_val_str(&attr).expect(
-										"slot values must be string literals",
-									)
-								}
-								_ => {}
-							}
-						}
-						_ => {}
-					}
-				}
-			}
-			_ => {}
-		}
-		"default".to_string()
-	}
-
 
 	fn map_attribute(&mut self, attr: NodeAttribute) -> TokenStream {
 		let tracker = &mut self.rusty_tracker;

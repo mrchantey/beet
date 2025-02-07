@@ -159,6 +159,7 @@ mod test {
 			</Child>
 		};
 		ScopedStyle::default().apply(&mut node).unwrap();
+		let node = node.node.apply_slots().unwrap();
 		let html = RsxToHtml::render_body(&node);
 		expect(html)
 			.to_be("<div data-styleid=\"0\"><br data-styleid=\"0\"/><style data-styleid=\"0\">span[data-styleid=\"0\"] {\n  color: red;\n}\n</style><div><br/></div></div>");

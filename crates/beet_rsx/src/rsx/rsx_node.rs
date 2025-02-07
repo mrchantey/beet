@@ -27,10 +27,26 @@ impl Default for RsxNode {
 }
 
 impl RsxNode {
+	/// Returns true if the node is an empty fragment,
+	/// or all children are empty fragments
+	pub fn is_empty_fragment(&self) -> bool {
+		match self {
+			RsxNode::Fragment(children) => {
+				children.iter().all(|c| c.is_empty_fragment())
+			}
+			_ => false,
+		}
+	}
+
 	pub fn discriminant(&self) -> RsxNodeDiscriminants { self.into() }
 	/// helper method to kick off a visitor
 	pub fn walk(&self, visitor: &mut impl RsxVisitor) {
 		visitor.walk_node(self)
+	}
+	/// convenience method for applying slots
+	pub fn apply_slots(mut self) -> Result<Self, SlotsError> {
+		SlotsVisitor::apply(&mut self)?;
+		Ok(self)
 	}
 
 
@@ -68,84 +84,6 @@ impl RsxNode {
 			}
 			_ => {}
 		});
-	}
-
-	/// A method used by macros to insert nodes into a slot
-	/// # Panics
-	/// If the slot is not found
-	pub fn with_slots(mut self, name: &str, nodes: Vec<RsxNode>) -> Self {
-		match self.try_insert_slots(name, nodes) {
-			Some(_) => {
-				panic!("slot not found: {name}");
-			}
-			None => return self,
-		}
-	}
-
-	/// try to insert nodes into the first slot found,
-	/// returning any nodes that were not inserted.
-	/// If the slot is not a direct child, recursively search children.
-	/// Components are not searched because they would steal the slot
-	/// from next siblings.
-	pub fn try_insert_slots(
-		&mut self,
-		name: &str,
-		mut to_insert: Vec<Self>,
-	) -> Option<Vec<Self>> {
-		match self {
-			RsxNode::Fragment(children) => {
-				for node in children.iter_mut() {
-					match node.try_insert_slots(name, to_insert) {
-						Some(returned_nodes) => to_insert = returned_nodes,
-						None => return None,
-					}
-				}
-				Some(to_insert)
-			}
-			RsxNode::Element(element) => {
-				if element.tag == "slot" {
-					let slot_name = element
-						.attributes
-						.iter()
-						.find_map(|a| match a {
-							RsxAttribute::KeyValue { key, value } => {
-								if key == "name" {
-									Some(value.as_str())
-								} else {
-									None
-								}
-							}
-							// even block values are not allowed because we need slot names at macro time
-							_ => None,
-						})
-						// unnamed slots are called 'default'
-						.unwrap_or("default");
-					if slot_name == name {
-						element.children.extend(to_insert);
-						return None;
-					}
-				}
-				// if we didnt find the slot, recursively search children
-				for child in &mut element.children {
-					match child.try_insert_slots(name, to_insert) {
-						Some(returned_nodes) => to_insert = returned_nodes,
-						None => return None,
-					}
-				}
-				Some(to_insert)
-			}
-			RsxNode::Component(_) => {
-				Some(to_insert)
-				// dont recurse into component because it would steal the slot
-				// from next siblings
-			}
-			RsxNode::Block(RsxBlock { initial, .. }) => {
-				initial.try_insert_slots(name, to_insert)
-			}
-			RsxNode::Text(_) => Some(to_insert),
-			RsxNode::Comment(_) => Some(to_insert),
-			RsxNode::Doctype => Some(to_insert),
-		}
 	}
 }
 
@@ -193,7 +131,7 @@ pub struct RsxComponent {
 	// /// the children passed in by this components parent:
 	// ///
 	// /// `rsx! { <MyComponent>slot_children</MyComponent> }`
-	// pub slot_children: Box<RsxNode>,
+	pub slot_children: Box<RsxNode>,
 }
 
 /// Representation of an RsxElement
@@ -245,6 +183,16 @@ impl RsxElement {
 						| RsxAttribute::BlockValue { .. }
 				)
 			})
+	}
+
+	/// Try to find a matching value for a key
+	pub fn get_key_value_attr(&self, key: &str) -> Option<&str> {
+		self.attributes.iter().find_map(|a| match a {
+			RsxAttribute::KeyValue { key: k, value } if k == key => {
+				Some(value.as_str())
+			}
+			_ => None,
+		})
 	}
 }
 

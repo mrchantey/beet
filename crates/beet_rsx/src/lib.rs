@@ -30,6 +30,10 @@ pub mod prelude {
 	pub use crate::tree::*;
 	pub use crate::rsx::*;
 
+
+	pub type HashMap<K,V> = rapidhash::RapidHashMap<K,V>;
+	pub type HashSet<K> = rapidhash::RapidHashSet<K>;
+
 	#[cfg(test)]
 	pub use crate::as_beet::*;
 }
@@ -40,6 +44,7 @@ pub mod prelude {
 // only for internal examples
 #[cfg(debug_assertions)]
 pub mod as_beet {
+	pub use crate::prelude::*;
 	// expose macro for single import in docs
 	pub use beet_rsx_macros::rsx;
 	pub mod beet {

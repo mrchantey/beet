@@ -4,6 +4,8 @@ use std::collections::HashMap;
 /// An rsx template is conceptually similar to a html template
 /// but instead of {{PLACEHOLDER}} there is a hash for a known
 /// location of the associated rust code.
+///
+///
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum RsxTemplateNode {
@@ -13,8 +15,10 @@ pub enum RsxTemplateNode {
 	Component {
 		tracker: RustyTracker,
 		tag: String,
-		// the constant elements that are chiddren of this component
-		children: Vec<Self>,
+		// /// mapped from [RsxComponent::node]
+		// node: Box<Self>,
+		/// mapped from [RsxComponent::slot_children]
+		slot_children: Box<Self>,
 	},
 	RustBlock(RustyTracker),
 	Element {
@@ -26,6 +30,10 @@ pub enum RsxTemplateNode {
 	Doctype,
 	Text(String),
 	Comment(String),
+}
+
+impl Default for RsxTemplateNode {
+	fn default() -> Self { Self::Fragment(vec![]) }
 }
 
 fn from_node_tracker_error(cx: &str) -> anyhow::Error {
@@ -55,15 +63,21 @@ impl RsxTemplateNode {
 					.collect::<Result<Vec<_>>>()?;
 				Ok(Self::Fragment(nodes))
 			}
-			RsxNode::Component(RsxComponent { tag, tracker, node }) => {
-				Ok(Self::Component {
-					children: vec![Self::from_rsx_node(node)?],
-					tracker: tracker
-						.clone()
-						.ok_or_else(|| from_node_tracker_error("Component"))?,
-					tag: tag.clone(),
-				})
-			}
+			RsxNode::Component(RsxComponent {
+				tag,
+				tracker,
+				// ignore the node, it is the responsibility of rsx_hydrate_node
+				node: _,
+
+				slot_children,
+			}) => Ok(Self::Component {
+				// node: Box::new(Self::from_rsx_node(node)?),
+				slot_children: Box::new(Self::from_rsx_node(slot_children)?),
+				tracker: tracker
+					.clone()
+					.ok_or_else(|| from_node_tracker_error("Component"))?,
+				tag: tag.clone(),
+			}),
 			RsxNode::Block(RsxBlock { effect, .. }) => Ok(Self::RustBlock(
 				effect
 					.tracker
@@ -112,7 +126,7 @@ impl RsxTemplateNode {
 			RsxTemplateNode::Component {
 				tracker,
 				tag,
-				children: _,
+				slot_children,
 			} => {
 				let RsxHydratedNode::Component { node } =
 					rusty_map.remove(&tracker).ok_or_else(|| {
@@ -125,6 +139,9 @@ impl RsxTemplateNode {
 					tag: tag.clone(),
 					tracker: Some(tracker),
 					node: Box::new(node),
+					slot_children: Box::new(
+						slot_children.into_rsx_node(rusty_map)?,
+					),
 				}))
 			}
 			RsxTemplateNode::RustBlock(tracker) => {
@@ -364,16 +381,16 @@ mod test {
 				children: vec![
 					RsxTemplateNode::Text("hello\n\t\t\t\t\t".to_string()),
 					RsxTemplateNode::Component {
-						children: vec![RsxTemplateNode::Element {
+						tracker: component_tracker,
+						tag: "MyComponent".to_string(),
+						slot_children: Box::new(RsxTemplateNode::Element {
 							tag: "div".to_string(),
 							self_closing: false,
 							attributes: vec![],
 							children: vec![RsxTemplateNode::Text(
 								"some child".to_string(),
 							)],
-						}],
-						tracker: component_tracker,
-						tag: "MyComponent".to_string(),
+						}),
 					},
 				],
 			}],

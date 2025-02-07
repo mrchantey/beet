@@ -63,7 +63,14 @@ impl RsxToHtml {
 				tag: _,
 				tracker: _,
 				node,
-			}) => self.map_node(node),
+				slot_children,
+			}) => {
+				// TODO assertion, why does it have html tag?
+				if !slot_children.is_empty_fragment() {
+					panic!("RsxToHtml: Slot children must be empty before mapping to html, please do a HtmlSlotsVisitor walk\n{:?}", slot_children);
+				}
+				self.map_node(node)
+			}
 		}
 	}
 
@@ -86,7 +93,6 @@ impl RsxToHtml {
 			tag: rsx_el.tag.clone(),
 			self_closing: rsx_el.self_closing,
 			attributes: html_attributes,
-			// visitor pattern - children will be applied in map_node
 			children: rsx_el
 				.children
 				.iter()
@@ -133,6 +139,7 @@ impl RsxToHtml {
 		}
 	}
 }
+
 
 
 
@@ -248,7 +255,10 @@ mod test {
 			<Layout>
 				<b>foo</b>
 			</Layout>
-		};
+		}
+		.node
+		.apply_slots()
+		.unwrap();
 
 		expect(RsxToHtml::render_body(&node))
 			.to_be("<div><h1>welcome</h1><p><b>foo</b></p></div>");
@@ -276,7 +286,10 @@ mod test {
 				<b slot="tagline">what a cool article</b>
 				<div>direct child</div>
 			</Layout>
-		};
+		}
+		.node
+		.apply_slots()
+		.unwrap();
 
 		expect(RsxToHtml::render_body(&node))
 			.to_be("<article><h1>welcome</h1><p><b>what a cool article</b></p><main><div>direct child</div></main></article>");

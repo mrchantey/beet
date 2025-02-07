@@ -5,6 +5,9 @@ use std::borrow::BorrowMut;
 use std::collections::HashMap;
 
 
+/// This is an RsxNode and a location, which is required for hydration.
+/// 
+/// 
 /// The struct returned from an rsx! macro.
 #[derive(Debug)]
 pub struct RsxRoot {
@@ -15,6 +18,8 @@ pub struct RsxRoot {
 }
 
 impl RsxRoot {
+
+	/// Split the RsxRoot into a template and hydrated nodes.
 	pub fn split_hydration(self) -> Result<SplitRsx> {
 		let template = RsxTemplateNode::from_rsx_node(&self.node)?;
 		let hydrated = RsxHydratedNode::collect(self.node)?;
@@ -26,6 +31,7 @@ impl RsxRoot {
 		})
 	}
 
+	/// Create an RsxRoot from a template and hydrated nodes.
 	pub fn join_hydration(
 		SplitRsx {
 			mut hydrated,
