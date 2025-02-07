@@ -31,26 +31,27 @@ impl Hydrator for HtmlNodeHydrator {
 	fn update_rsx_node(
 		&mut self,
 		rsx: RsxNode,
-		cx: &RsxContext,
+		loc: DomLocation,
 	) -> ParseResult<()> {
 		let parent_idx = self
 			.loc_map
 			.rusty_locations
-			.get(cx.block_idx())
+			.get(&loc.rsx_idx)
 			.ok_or_else(|| {
 				ParseError::Hydration(format!(
 					"Could not find block parent for index: {}",
-					cx.block_idx()
+					loc.rsx_idx
 				))
 			})?
 			.parent_idx
 			.to_string();
 
 		for html in self.html.iter_mut() {
-			if let Some(parent_el) = html
-				.query_selector_attr(self.constants.id_key, Some(&parent_idx))
-			{
-				return apply_rsx(parent_el, rsx, cx, &self.constants);
+			if let Some(parent_el) = html.query_selector_attr(
+				self.constants.dom_idx_key,
+				Some(&parent_idx),
+			) {
+				return apply_rsx(parent_el, rsx, loc, &self.constants);
 			}
 		}
 
@@ -67,7 +68,7 @@ impl Hydrator for HtmlNodeHydrator {
 fn apply_rsx(
 	parent_el: &mut HtmlElementNode,
 	rsx: RsxNode,
-	cx: &RsxContext,
+	loc: DomLocation,
 	constants: &HtmlConstants,
 ) -> ParseResult<()> {
 	match rsx {
@@ -76,9 +77,13 @@ fn apply_rsx(
 		RsxNode::Block(RsxBlock { initial, effect }) => todo!(),
 		RsxNode::Element(rsx_element) => todo!(),
 		RsxNode::Text(text) => {
-			let child = parent_el.children.get_mut(cx.child_idx()).ok_or_else(
-				|| ParseError::Hydration("Could not find child".into()),
-			)?;
+			let child =
+				parent_el.children.get_mut(loc.child_idx as usize).ok_or_else(|| {
+					ParseError::Hydration(format!(
+						"child node at index: {} is out of bounds. Maybe the text nodes weren't expanded",
+						loc.child_idx,
+					))
+				})?;
 			*child = HtmlNode::Text(text);
 		}
 		RsxNode::Comment(_) => todo!(),

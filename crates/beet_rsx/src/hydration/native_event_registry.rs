@@ -12,10 +12,11 @@ pub struct MockTarget {
 
 
 impl EventRegistry {
+	#[allow(unused_variables)]
 	pub fn register_onclick(
-		_key: &str,
-		_cx: &RsxContext,
-		_value: impl Fn(MockEvent) -> (),
+		key: &str,
+		loc: DomLocation,
+		value: impl Fn(MockEvent) -> (),
 	) {
 		todo!()
 	}

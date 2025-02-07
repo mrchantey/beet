@@ -49,18 +49,18 @@ impl RsxNode {
 	/// # Panics
 	/// If the register function fails
 	pub fn register_effects(&mut self) {
-		RsxContext::visit_mut(self, |cx, node| match node {
+		DomLocationVisitor::visit_mut(self, |loc, node| match node {
 			RsxNode::Block(RsxBlock { effect, .. }) => {
-				effect.take().register(cx).unwrap();
+				effect.take().register(loc).unwrap();
 			}
 			RsxNode::Element(e) => {
 				for a in &mut e.attributes {
 					match a {
 						RsxAttribute::Block { effect, .. } => {
-							effect.take().register(cx).unwrap();
+							effect.take().register(loc).unwrap();
 						}
 						RsxAttribute::BlockValue { effect, .. } => {
-							effect.take().register(cx).unwrap();
+							effect.take().register(loc).unwrap();
 						}
 						_ => {}
 					}

@@ -11,6 +11,7 @@ pub struct DomHydrator {
 	// cache document reference
 	document: Document,
 	/// sparse set element array, cached for fast reference
+	/// TODO bench this
 	elements: Vec<Option<Element>>,
 	loc_map: Option<DomLocationMap>,
 }
@@ -47,29 +48,33 @@ impl DomHydrator {
 		&self,
 		el: Element,
 		rsx: RsxNode,
-		cx: &RsxContext,
+		loc: DomLocation,
 	) -> ParseResult<()> {
 		Ok(())
 	}
 
 	/// try to get cached element or find it in the dom.
-	/// This also uncollapses the child text nodes
-	fn get_or_find_element(&mut self, cx: &RsxContext) -> ParseResult<Element> {
-		if let Some(Some(el)) = self.elements.get(cx.element_idx() as usize) {
+	/// When it is found it will uncollapse text nodes,
+	/// ie expand into the locations referenced by the [DomLocation]
+	fn get_or_find_element(
+		&mut self,
+		loc: DomLocation,
+	) -> ParseResult<Element> {
+		if let Some(Some(el)) = self.elements.get(loc.dom_idx as usize) {
 			return Ok(el.clone());
 		}
-		let id = cx.element_idx();
+		let dom_idx = loc.dom_idx;
 
-		let query = format!("[{}='{}']", self.constants.id_key, id);
+		let query = format!("[{}='{}']", self.constants.dom_idx_key, dom_idx);
 		if let Some(el) = self.document.query_selector(&query).unwrap() {
-			self.elements.resize((id + 1) as usize, None);
-			self.elements[id as usize] = Some(el.clone());
-			self.uncollapse_child_text_nodes(&el, id)?;
+			self.elements.resize((dom_idx + 1) as usize, None);
+			self.elements[dom_idx as usize] = Some(el.clone());
+			self.uncollapse_child_text_nodes(&el, dom_idx)?;
 			Ok(el)
 		} else {
 			Err(ParseError::Hydration(format!(
 				"Could not find collapsed text node parent with id: {}",
-				id
+				dom_idx
 			)))
 		}
 	}
@@ -78,12 +83,13 @@ impl DomHydrator {
 	fn uncollapse_child_text_nodes(
 		&mut self,
 		el: &Element,
-		rsx_id: NodeIdx,
+		dom_idx: DomIdx,
 	) -> ParseResult<()> {
 		let children = el.child_nodes();
 		let cx_map = self.get_dom_location_map()?;
-		let Some(el_cx) = cx_map.collapsed_elements.get(&rsx_id)
-		else {
+		let Some(el_cx) = cx_map.collapsed_elements.get(&dom_idx) else {
+			// here we assume this is because the element has no children
+			// so was not tracked
 			// elements without rust children are not tracked
 			return Ok(());
 		};
@@ -133,15 +139,13 @@ impl Hydrator for DomHydrator {
 	fn update_rsx_node(
 		&mut self,
 		rsx: RsxNode,
-		cx: &RsxContext,
+		loc: DomLocation,
 	) -> ParseResult<()> {
-		let el = self.get_or_find_element(cx)?;
+		let el = self.get_or_find_element(loc)?;
 		let child =
-			el.child_nodes()
-				.item(cx.child_idx() as u32)
-				.ok_or_else(|| {
-					ParseError::Hydration("Could not find child".into())
-				})?;
+			el.child_nodes().item(loc.child_idx as u32).ok_or_else(|| {
+				ParseError::Hydration("Could not find child".into())
+			})?;
 
 		#[allow(unused)]
 		match rsx {

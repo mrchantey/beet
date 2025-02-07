@@ -1,7 +1,7 @@
 use crate::prelude::*;
 use anyhow::Result;
 
-pub type RegisterEffect = Box<dyn FnOnce(&RsxContext) -> Result<()>>;
+pub type RegisterEffect = Box<dyn FnOnce(DomLocation) -> Result<()>>;
 
 
 pub struct Effect {
@@ -37,7 +37,7 @@ impl Effect {
 		}
 	}
 
-	pub fn register(self, cx: &RsxContext) -> Result<()> { (self.register)(cx) }
+	pub fn register(self, loc: DomLocation) -> Result<()> { (self.register)(loc) }
 }
 
 impl std::fmt::Debug for Effect {

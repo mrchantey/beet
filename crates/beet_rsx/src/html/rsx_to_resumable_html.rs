@@ -8,8 +8,9 @@ use crate::prelude::*;
 pub struct RsxToResumableHtml {
 	/// add attributes required for resumability
 	pub html_constants: HtmlConstants,
-	/// tracking this allows us to match with [RsxContext]
-	pub num_html_elements: usize,
+	/// tracking this allows us to match with [DomLocation]
+	/// TODO this is terrifying we should somehow use [DomLocationVisitor]?
+	pub dom_idx_incr: usize,
 }
 impl RsxToResumableHtml {
 	pub fn render_body(node: impl AsRef<RsxNode>) -> String {
@@ -28,22 +29,26 @@ impl RsxToResumableHtml {
 	}
 
 	fn visit_node(&mut self, node: &mut HtmlNode) {
+		// TODO to feature parity with [DomLocation] we should
+		// increment after every single node visited, not just elements
+		self.dom_idx_incr += 1;
 		match node {
 			HtmlNode::Element(el) => {
+				let actual_this_sucks_dom_idx_incr = self.dom_idx_incr - 1;
 				for attr in el.attributes.iter_mut() {
 					if attr.key == "needs-id" {
-						attr.key = self.html_constants.id_key.to_string();
-						attr.value = Some(self.num_html_elements.to_string());
+						attr.key = self.html_constants.dom_idx_key.to_string();
+						attr.value =
+							Some(actual_this_sucks_dom_idx_incr.to_string());
 					} else if attr.key.starts_with("on") {
 						attr.value = Some(format!(
 							"{}({}, event)",
 							self.html_constants.event_handler,
-							self.num_html_elements,
+							actual_this_sucks_dom_idx_incr,
 						));
 					}
 				}
 
-				self.num_html_elements += 1;
 
 
 				for child in &mut el.children {
@@ -58,12 +63,10 @@ impl RsxToResumableHtml {
 	/// otherwise append it to the end of the html
 	fn insert_dom_location_map(&self, node: &RsxNode, doc: &mut HtmlDocument) {
 		let loc_map = DomLocationMap::from_node(node).to_csv();
-		let el = HtmlElementNode::inline_script(loc_map, vec![
-			HtmlAttribute {
-				key: self.html_constants.cx_map_key.to_string(),
-				value: None,
-			},
-		]);
+		let el = HtmlElementNode::inline_script(loc_map, vec![HtmlAttribute {
+			key: self.html_constants.cx_map_key.to_string(),
+			value: None,
+		}]);
 		doc.body.push(el.into());
 	}
 
@@ -98,14 +101,14 @@ mod test {
 	}
 	#[test]
 	fn id() {
-		expect(RsxToResumableHtml::render_body(
-			&rsx! {
-				<main>
-					<article>{7}</article>
-				</main>
-			},
-		))
-		.to_contain("<main><article data-sweet-id=\"1\">7</article></main>");
+		expect(RsxToResumableHtml::render_body(&rsx! {
+			<main>
+				<article>{7}</article>
+			</main>
+		}))
+		.to_contain(
+			"<main><article data-beet-dom-idx=\"1\">7</article></main>",
+		);
 	}
 	#[test]
 	fn events() {
@@ -114,6 +117,6 @@ mod test {
 		expect(RsxToResumableHtml::render_body(
 			&rsx! { <main onclick=on_click></main> },
 		))
-		.to_contain("<main onclick=\"_sweet_event_handler(0, event)\" data-sweet-id=\"0\"></main>");
+		.to_contain("<main onclick=\"_sweet_event_handler(0, event)\" data-beet-dom-idx=\"0\"></main>");
 	}
 }

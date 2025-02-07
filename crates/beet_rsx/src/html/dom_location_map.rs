@@ -6,12 +6,19 @@ use std::collections::HashMap;
 /// of a rust block in the tree can change
 #[derive(Debug, Default, Clone, PartialEq)]
 pub struct DomLocationMap {
-	pub rusty_locations: Vec<DomLocation>,
-	pub collapsed_elements: HashMap<NodeIdx, TextBlockEncoder>,
+	// we could technically use a vec where the indices are 'block_idx',
+	// and track block_idx in the [DomLocation]
+	// but at this stage of the project thats harder to reason about
+	// and this provides symmetry with [Self::collapsed_elements]
+	pub rusty_locations: HashMap<RsxIdx, DomLocation>,
+	pub collapsed_elements: HashMap<DomIdx, TextBlockEncoder>,
 }
 
-// const RUST_BLOCK_DELIMITER
-
+///	Delimiter Reference:
+/// - `,` `-` `.` are used by [DomLocation::to_csv] and [TextBlockEncoder::to_csv]
+/// - `*` seperates key value pairs
+/// - `;` seperates items in hash maps
+/// - `_` seperates [Self::rusty_locations] and [Self::collapsed_elements]
 impl DomLocationMap {
 	pub fn to_csv(&self) -> String {
 		let mut csv = String::new();
@@ -19,9 +26,9 @@ impl DomLocationMap {
 			&self
 				.rusty_locations
 				.iter()
-				.map(DomLocation::to_csv)
+				.map(|(k, v)| format!("{}*{}", k, v.to_csv()))
 				.collect::<Vec<_>>()
-				.join("-"),
+				.join(";"),
 		);
 		csv.push_str("_");
 		csv.push_str(
@@ -37,16 +44,28 @@ impl DomLocationMap {
 
 	pub fn from_csv(csv: &str) -> ParseResult<Self> {
 		let mut parts = csv.split('_');
+
+
 		let rusty_locations = parts
 			.next()
-			.ok_or_else(|| ParseError::Serde("missing rust blocks".into()))?
-			.split("-")
-			.map(|s| DomLocation::from_csv(s))
-			.collect::<ParseResult<Vec<_>>>()?;
+			.ok_or_else(|| ParseError::Serde("missing rusty locations".into()))?
+			.split(";")
+			.map(|s| {
+				let mut parts = s.split('*');
+				let key = parts
+					.next()
+					.ok_or_else(|| ParseError::Serde("missing key".into()))?
+					.parse()?;
+				let value = parts
+					.next()
+					.ok_or_else(|| ParseError::Serde("missing value".into()))?;
 
+				Ok((key, DomLocation::from_csv(value)?))
+			})
+			.collect::<ParseResult<HashMap<_, _>>>()?;
 		let collapsed_elements = parts
 			.next()
-			.ok_or_else(|| ParseError::Serde("missing rust blocks".into()))?
+			.ok_or_else(|| ParseError::Serde("missing text encoders".into()))?
 			.split(";")
 			.map(|s| {
 				let mut parts = s.split('*');
@@ -74,12 +93,12 @@ impl DomLocationMap {
 
 		DomLocationVisitor::visit(node, |loc, node| match node {
 			RsxNode::Block(_) => {
-				map.rusty_locations.push(loc);
+				map.rusty_locations.insert(loc.rsx_idx, loc);
 			}
 			RsxNode::Element(el) => {
 				if el.contains_blocks() {
-					let encoded = TextBlockEncoder::encode(loc.node_idx, el);
-					map.collapsed_elements.insert(loc.node_idx, encoded);
+					let encoded = TextBlockEncoder::encode(loc.dom_idx, el);
+					map.collapsed_elements.insert(loc.dom_idx, encoded);
 				}
 			}
 			_ => {}
@@ -109,10 +128,11 @@ mod test {
 
 		let map = DomLocationMap::from_node(&root);
 
+		// test csv
 		let csv = map.to_csv();
 		let map2 = DomLocationMap::from_csv(&csv).unwrap();
 		expect(&map2).to_be(&map);
-
+		// println!("{:#?}", map);
 
 		expect(map.collapsed_elements).to_be(
 			vec![(0, TextBlockEncoder {
@@ -123,22 +143,25 @@ mod test {
 			.collect::<HashMap<_, _>>(),
 		);
 		// {desc}
-		expect(&map.rusty_locations[0]).to_be(&DomLocation {
+		expect(&map.rusty_locations[&2]).to_be(&DomLocation {
 			parent_idx: 0,
-			node_idx: 2,
+			dom_idx: 2,
 			child_idx: 1,
+			rsx_idx: 2,
 		});
 		// {color}
-		expect(&map.rusty_locations[1]).to_be(&DomLocation {
+		expect(&map.rusty_locations[&5]).to_be(&DomLocation {
 			parent_idx: 0,
-			node_idx: 4,
+			dom_idx: 4,
 			child_idx: 3,
+			rsx_idx: 5,
 		});
 		// {action}
-		expect(&map.rusty_locations[2]).to_be(&DomLocation {
+		expect(&map.rusty_locations[&9]).to_be(&DomLocation {
 			parent_idx: 0,
-			node_idx: 7,
+			dom_idx: 7,
 			child_idx: 5,
+			rsx_idx: 9,
 		});
 	}
 }

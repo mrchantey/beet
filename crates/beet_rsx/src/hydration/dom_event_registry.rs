@@ -12,11 +12,11 @@ use web_sys::Event;
 pub struct EventRegistry;
 
 thread_local! {
-	static REGISTERED_EVENTS: RefCell<HashMap<(NodeIdx,String),Box<dyn Fn(JsValue)>>> = Default::default();
+	static REGISTERED_EVENTS: RefCell<HashMap<(DomIdx,String),Box<dyn Fn(JsValue)>>> = Default::default();
 }
 
 impl EventRegistry {
-	fn trigger(key: &str, el_id: NodeIdx, value: JsValue) {
+	fn trigger(key: &str, el_id: DomIdx, value: JsValue) {
 		REGISTERED_EVENTS.with(|current| {
 			if let Some(func) = current.borrow().get(&(el_id, key.to_string()))
 			{
@@ -27,12 +27,12 @@ impl EventRegistry {
 
 	fn register<T: 'static + JsCast>(
 		key: &str,
-		cx: &RsxContext,
+		loc: DomLocation,
 		func: impl 'static + Fn(T),
 	) {
 		REGISTERED_EVENTS.with(|current| {
 			current.borrow_mut().insert(
-				(cx.element_idx(), key.to_string()),
+				(loc.dom_idx, key.to_string()),
 				Box::new(move |e: JsValue| {
 					func(e.unchecked_into());
 				}),
@@ -41,10 +41,10 @@ impl EventRegistry {
 	}
 	pub fn register_onclick(
 		key: &str,
-		cx: &RsxContext,
+		loc: DomLocation,
 		value: impl 'static + Fn(Event),
 	) {
-		Self::register(key, cx, value);
+		Self::register(key, loc, value);
 	}
 
 	pub fn initialize() -> ParseResult<()> {
@@ -102,13 +102,13 @@ fn hook_up_event_listeners(constants: &HtmlConstants) -> ParseResult<()> {
 		let mut current = current.borrow_mut();
 		let document = window().unwrap().document().unwrap();
 		for ((el_id, key), func) in current.drain() {
-			let query = format!("[{}='{}']", constants.id_key, el_id);
+			let query = format!("[{}='{}']", constants.dom_idx_key, el_id);
 
 			let el =
 				document.query_selector(&query).ok().flatten().ok_or_else(
 					|| {
 						ParseError::Hydration(format!(
-							"could not find element with id: {}",
+							"could not find element with dom idx: {}",
 							query
 						))
 					},
