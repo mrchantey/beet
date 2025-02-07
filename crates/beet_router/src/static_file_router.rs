@@ -126,20 +126,13 @@ impl<T: 'static> StaticFileRouter<T> {
 			}
 		};
 
-
-
 		let html = self
 			.routes_to_rsx()
 			.await?
 			.into_iter()
 			.map(|(route, root)| {
-				// we must use a global
-				let mut root = apply_templates(root)?;
-
-				ScopedStyle::default().apply(&mut root)?;
-
-				SlotsVisitor::apply(&mut root)?;
-				let doc = RsxToHtml::default().map_node(&root).into_document();
+				let root = apply_templates(root)?;
+				let doc = root.build_document()?;
 				Ok((route, doc))
 			})
 			.collect::<Result<Vec<(RouteInfo, HtmlDocument)>>>()?;

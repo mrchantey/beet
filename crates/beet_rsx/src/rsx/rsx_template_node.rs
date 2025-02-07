@@ -130,7 +130,11 @@ impl RsxTemplateNode {
 			} => {
 				let RsxHydratedNode::Component { node } =
 					rusty_map.remove(&tracker).ok_or_else(|| {
-						to_node_tracker_error(rusty_map, &tracker, "Component")
+						to_node_tracker_error(
+							rusty_map,
+							&tracker,
+							&format!("Component: {}", &tag),
+						)
 					})?
 				else {
 					anyhow::bail!("expected Component")

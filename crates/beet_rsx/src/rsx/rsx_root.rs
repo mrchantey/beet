@@ -32,6 +32,14 @@ impl RsxRoot {
 		let html = RsxToHtml::default().map_node(&self);
 		html.render()
 	}
+	/// Apply styles and scopes, returning an HtmlDocument.
+	pub fn build_document(mut self) -> Result<HtmlDocument> {
+		ScopedStyle::default().apply(&mut self)?;
+		SlotsVisitor::apply(&mut self)?;
+		let html = RsxToHtml::default().map_node(&self);
+		let doc = html.into_document();
+		Ok(doc)
+	}
 
 
 	/// Split the RsxRoot into a template and hydrated nodes.

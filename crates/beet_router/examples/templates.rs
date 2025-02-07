@@ -36,11 +36,11 @@ async fn main() {
 	};
 	let RsxNode::Component(RsxComponent {
 		tracker: tracker2, ..
-	}) = rsx.node
+	}) = &rsx.node
 	else {
 		panic!();
 	};
-	assert_eq!(tracker1, &tracker2.unwrap());
+	assert_eq!(tracker1, &tracker2.clone().unwrap());
 
 	// println!("RSX:::: {:#?}", rsx);
 }
