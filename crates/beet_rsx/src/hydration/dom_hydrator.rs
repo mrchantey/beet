@@ -55,15 +55,15 @@ impl DomHydrator {
 	/// try to get cached element or find it in the dom.
 	/// This also uncollapses the child text nodes
 	fn get_or_find_element(&mut self, cx: &RsxContext) -> ParseResult<Element> {
-		if let Some(Some(el)) = self.elements.get(cx.element_idx()) {
+		if let Some(Some(el)) = self.elements.get(cx.element_idx() as usize) {
 			return Ok(el.clone());
 		}
 		let id = cx.element_idx();
 
 		let query = format!("[{}='{}']", self.constants.id_key, id);
 		if let Some(el) = self.document.query_selector(&query).unwrap() {
-			self.elements.resize(id + 1, None);
-			self.elements[id] = Some(el.clone());
+			self.elements.resize((id + 1) as usize, None);
+			self.elements[id as usize] = Some(el.clone());
 			self.uncollapse_child_text_nodes(&el, id)?;
 			Ok(el)
 		} else {
@@ -78,11 +78,12 @@ impl DomHydrator {
 	fn uncollapse_child_text_nodes(
 		&mut self,
 		el: &Element,
-		rsx_id: usize,
+		rsx_id: NodeIdx,
 	) -> ParseResult<()> {
 		let children = el.child_nodes();
 		let cx_map = self.get_cx_map()?;
-		let Some(el_cx) = cx_map.collapsed_elements.get(&rsx_id) else {
+		let Some(el_cx) = cx_map.collapsed_elements.get(&(rsx_id as usize))
+		else {
 			// elements without rust children are not tracked
 			return Ok(());
 		};

@@ -7,7 +7,7 @@
 	// "rust-analyzer.cargo.target": "x86_64-unknown-linux-gnu",
 	// "rust-analyzer.procMacro.enable": false,
 	// "rust-analyzer.procMacro.attributes.enable": false,
-	// "rust-analyzer.cargo.target": "wasm32-unknown-unknown",
+	"rust-analyzer.cargo.target": "wasm32-unknown-unknown",
 	"deno.enable": true,
 	"files.exclude": {
 		"**/.git": true,

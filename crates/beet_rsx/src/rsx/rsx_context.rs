@@ -2,7 +2,7 @@ use crate::prelude::*;
 use std::borrow::Borrow;
 use std::collections::VecDeque;
 
-/// Used to identify an element in a tree.
+/// Used to identify a html node.
 /// This is incremented in a breadth-first pattern
 /// as we visit each element in the tree.
 pub type NodeIdx = u32;

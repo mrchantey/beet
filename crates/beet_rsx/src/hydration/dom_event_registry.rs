@@ -12,11 +12,11 @@ use web_sys::Event;
 pub struct EventRegistry;
 
 thread_local! {
-	static REGISTERED_EVENTS: RefCell<HashMap<(ElementIdx,String),Box<dyn Fn(JsValue)>>> = Default::default();
+	static REGISTERED_EVENTS: RefCell<HashMap<(NodeIdx,String),Box<dyn Fn(JsValue)>>> = Default::default();
 }
 
 impl EventRegistry {
-	fn trigger(key: &str, el_id: ElementIdx, value: JsValue) {
+	fn trigger(key: &str, el_id: NodeIdx, value: JsValue) {
 		REGISTERED_EVENTS.with(|current| {
 			if let Some(func) = current.borrow().get(&(el_id, key.to_string()))
 			{
@@ -74,7 +74,7 @@ fn playback_prehydrate_events(constants: &HtmlConstants) -> ParseResult<()> {
 			let event_arr = Array::from(&item);
 			if event_arr.length() == 2 {
 				let id =
-					event_arr.get(0).as_f64().expect("bad event id") as usize;
+					event_arr.get(0).as_f64().expect("bad event id") as u32;
 				let event: Event = event_arr.get(1).unchecked_into();
 				let event_type = format!("on{}", event.type_());
 				EventRegistry::trigger(&event_type, id, event.unchecked_into());
