@@ -56,14 +56,10 @@ impl DomHydrator {
 	/// try to get cached element or find it in the dom.
 	/// When it is found it will uncollapse text nodes,
 	/// ie expand into the locations referenced by the [DomLocation]
-	fn get_or_find_element(
-		&mut self,
-		loc: DomLocation,
-	) -> ParseResult<Element> {
-		if let Some(Some(el)) = self.elements.get(loc.rsx_idx as usize) {
+	fn get_or_find_element(&mut self, rsx_idx: RsxIdx) -> ParseResult<Element> {
+		if let Some(Some(el)) = self.elements.get(rsx_idx as usize) {
 			return Ok(el.clone());
 		}
-		let rsx_idx = loc.rsx_idx;
 
 		let query = format!("[{}='{}']", self.constants.rsx_idx_key, rsx_idx);
 		if let Some(el) = self.document.query_selector(&query).unwrap() {
@@ -141,11 +137,11 @@ impl Hydrator for DomHydrator {
 		rsx: RsxNode,
 		loc: DomLocation,
 	) -> ParseResult<()> {
-		let el = self.get_or_find_element(loc)?;
+		let parent = self.get_or_find_element(loc.parent_idx)?;
 		let child =
-			el.child_nodes().item(loc.child_idx as u32).ok_or_else(|| {
-				ParseError::Hydration("Could not find child".into())
-			})?;
+			parent.child_nodes().item(loc.child_idx as u32).ok_or_else(
+				|| ParseError::Hydration("Could not find child".into()),
+			)?;
 
 		#[allow(unused)]
 		match rsx {

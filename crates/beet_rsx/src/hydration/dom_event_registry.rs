@@ -18,7 +18,8 @@ thread_local! {
 impl EventRegistry {
 	fn trigger(key: &str, rsx_idx: RsxIdx, value: JsValue) {
 		REGISTERED_EVENTS.with(|current| {
-			if let Some(func) = current.borrow().get(&(rsx_idx, key.to_string()))
+			if let Some(func) =
+				current.borrow().get(&(rsx_idx, key.to_string()))
 			{
 				func(value);
 			}

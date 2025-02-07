@@ -48,7 +48,8 @@ leptosfmt *args:
 #💡 e2e examples
 
 run-reactive:
-	sweet serve | \
+	cp ./index.html ./target/index.html
+	sweet serve ./target | \
 	just watch 'just build-wasm beet dom_renderer'
 
 run-test-site:
@@ -87,7 +88,7 @@ doc:
 	just watch 'cargo doc'
 
 serve-doc:
-	cd ./target/doc/beet && forky serve
+	cd ./target/doc/beet && sweet serve
 
 test-all *args:
 	just leptosfmt --check

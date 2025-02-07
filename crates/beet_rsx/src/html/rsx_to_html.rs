@@ -4,33 +4,34 @@ use crate::prelude::*;
 
 
 
-///
+#[derive(Debug, Default)]
 pub struct RsxToHtml {
+	/// add attributes required for resumability
+	pub html_constants: HtmlConstants,
 	/// on elements that directly contain rust code (non recursive),
 	/// give them a `needs-id` attribute to be mapped by [RsxToResumableHtml]
-	pub mark_needs_id: bool,
+	pub no_beet_attributes: bool,
 	/// text node content will be trimmed
 	pub trim: bool,
-}
 
-
-impl Default for RsxToHtml {
-	fn default() -> Self {
-		Self {
-			mark_needs_id: false,
-			trim: false,
-		}
-	}
+	/// 1 based incrementer, be sure to subtract 1
+	/// to get the actual id.
+	/// This is very error prone because we're trying to recreate the [DomLocation]
+	/// visitor pattern in a mapper.
+	rsx_idx_incr: RsxIdx,
 }
 
 
 impl RsxToHtml {
 	pub fn as_resumable() -> Self {
 		Self {
-			mark_needs_id: true,
-			trim: false,
+			no_beet_attributes: false,
+			..Default::default()
 		}
 	}
+
+	/// the correct rsx idx, created by subtracting 1
+	fn rsx_idx(&self) -> RsxIdx { self.rsx_idx_incr - 1 }
 
 	/// convenience so you dont have to add
 	/// a `.render()` at the end of a long rsx macro
@@ -38,28 +39,31 @@ impl RsxToHtml {
 		Self::default().map_node(node).render()
 	}
 
-	pub fn map_node(&mut self, rsx_node: impl AsRef<RsxNode>) -> Vec<HtmlNode> {
-		match rsx_node.as_ref() {
-			RsxNode::Fragment(nodes) => {
-				nodes.iter().map(|n| self.map_node(n)).flatten().collect()
-			}
-			RsxNode::Component(RsxComponent { node, .. }) => {
-				self.map_node(node)
-			}
-			RsxNode::Block(RsxBlock { initial, .. }) => self.map_node(initial),
-			RsxNode::Element(e) => {
-				vec![HtmlNode::Element(self.map_element(e))]
-			}
+	/// recursively map rsx nodes to html nodes
+	pub fn map_node(&mut self, node: impl AsRef<RsxNode>) -> Vec<HtmlNode> {
+		self.rsx_idx_incr += 1;
+		match node.as_ref() {
+			RsxNode::Doctype => vec![HtmlNode::Doctype],
+			RsxNode::Comment(str) => vec![HtmlNode::Comment(str.clone())],
 			RsxNode::Text(str) => {
 				let str = if self.trim { str.trim() } else { str };
 				vec![HtmlNode::Text(str.into())]
 			}
-			RsxNode::Comment(str) => {
-				vec![HtmlNode::Comment(str.clone())]
+			RsxNode::Element(e) => {
+				vec![HtmlNode::Element(self.map_element(e))]
 			}
-			RsxNode::Doctype => {
-				vec![HtmlNode::Doctype]
-			}
+			RsxNode::Fragment(rsx_nodes) => rsx_nodes
+				.iter()
+				.map(|n| self.map_node(n))
+				.flatten()
+				.collect(),
+			RsxNode::Block(rsx_block) => self.map_node(&rsx_block.initial),
+
+			RsxNode::Component(RsxComponent {
+				tag: _,
+				tracker: _,
+				node,
+			}) => self.map_node(node),
 		}
 	}
 
@@ -71,10 +75,10 @@ impl RsxToHtml {
 			.flatten()
 			.collect::<Vec<_>>();
 
-		if self.mark_needs_id && rsx_el.contains_rust() {
+		if !self.no_beet_attributes && rsx_el.contains_rust() {
 			html_attributes.push(HtmlAttribute {
-				key: "needs-id".to_string(),
-				value: None,
+				key: self.html_constants.rsx_idx_key.to_string(),
+				value: Some(self.rsx_idx().to_string()),
 			});
 		}
 
@@ -82,10 +86,11 @@ impl RsxToHtml {
 			tag: rsx_el.tag.clone(),
 			self_closing: rsx_el.self_closing,
 			attributes: html_attributes,
+			// visitor pattern - children will be applied in map_node
 			children: rsx_el
 				.children
 				.iter()
-				.map(|c| self.map_node(c))
+				.map(|n| self.map_node(n))
 				.flatten()
 				.collect(),
 		}
@@ -97,15 +102,28 @@ impl RsxToHtml {
 				key: key.clone(),
 				value: None,
 			}],
-			RsxAttribute::KeyValue { key, value } => vec![HtmlAttribute {
-				key: key.clone(),
-				value: Some(value.clone()),
-			}],
-			RsxAttribute::BlockValue { key, initial, .. } => {
+			RsxAttribute::KeyValue { key, value } => {
 				vec![HtmlAttribute {
 					key: key.clone(),
-					value: Some(initial.clone()),
+					value: Some(value.clone()),
 				}]
+			}
+			RsxAttribute::BlockValue { key, initial, .. } => {
+				if !self.no_beet_attributes && key.starts_with("on") {
+					vec![HtmlAttribute {
+						key: key.clone(),
+						value: Some(format!(
+							"{}({}, event)",
+							self.html_constants.event_handler,
+							self.rsx_idx(),
+						)),
+					}]
+				} else {
+					vec![HtmlAttribute {
+						key: key.clone(),
+						value: Some(initial.clone()),
+					}]
+				}
 			}
 			RsxAttribute::Block { initial, .. } => initial
 				.iter()
@@ -155,7 +173,7 @@ mod test {
 				favorite_food=food
 			></div>
 		}))
-		.to_be("<div name=\"pete\" age=\"9\" favorite_food=\"pizza\"></div>");
+		.to_be("<div name=\"pete\" age=\"9\" favorite_food=\"pizza\" data-beet-rsx-idx=\"0\"></div>");
 	}
 	#[test]
 	fn element_self_closing() {
@@ -181,7 +199,7 @@ mod test {
 				<p>hello {world}</p>
 			</div>
 		}))
-		.to_be("<div><p>hello mars</p></div>");
+		.to_be("<div><p data-beet-rsx-idx=\"1\">hello mars</p></div>");
 	}
 	#[test]
 	fn events() {
@@ -192,7 +210,7 @@ mod test {
 				<p>hello {world}</p>
 			</div>
 		}))
-		.to_be("<div onclick=\"event-placeholder\"><p>hello mars</p></div>");
+		.to_be("<div onclick=\"_beet_event_handler(0, event)\" data-beet-rsx-idx=\"0\"><p data-beet-rsx-idx=\"1\">hello mars</p></div>");
 	}
 
 	#[test]
@@ -207,8 +225,9 @@ mod test {
 		}
 		let node = rsx! { <div>the child is <Child value=38 />!</div> };
 
-		expect(RsxToHtml::render_body(&node))
-			.to_be("<div>the child is <p>hello 38</p>!</div>");
+		expect(RsxToHtml::render_body(&node)).to_be(
+			"<div>the child is <p data-beet-rsx-idx=\"3\">hello 38</p>!</div>",
+		);
 	}
 	#[test]
 	fn component_children() {

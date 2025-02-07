@@ -8,8 +8,6 @@ pub use rsx_hydrated_node::*;
 pub use rsx_template_node::*;
 pub use rsx_visitor_fn::*;
 pub use scoped_style::*;
-mod rsx_context;
-pub use rsx_context::*;
 mod rsx_node;
 mod rsx_visitor;
 pub use rsx_node::*;

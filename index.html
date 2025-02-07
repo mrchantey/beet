@@ -10,8 +10,8 @@
 
 <body>
 	<script type="module">
-		import init from './target/wasm/bindgen.js'
-		init('./target/wasm/bindgen_bg.wasm')
+		import init from './wasm/bindgen.js'
+		init('./wasm/bindgen_bg.wasm')
 			.catch((error) => {
 				if (!error.message.startsWith("Using exceptions for control flow,"))
 					throw error
