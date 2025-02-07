@@ -12,7 +12,7 @@ pub struct DomHydrator {
 	document: Document,
 	/// sparse set element array, cached for fast reference
 	elements: Vec<Option<Element>>,
-	cx_map: Option<RsxContextMap>,
+	loc_map: Option<DomLocationMap>,
 }
 
 impl Default for DomHydrator {
@@ -21,18 +21,18 @@ impl Default for DomHydrator {
 			constants: Default::default(),
 			document: window().unwrap().document().unwrap(),
 			elements: Default::default(),
-			cx_map: Default::default(),
+			loc_map: Default::default(),
 		}
 	}
 }
 
 impl DomHydrator {
-	fn get_cx_map(&mut self) -> ParseResult<&RsxContextMap> {
+	fn get_dom_location_map(&mut self) -> ParseResult<&DomLocationMap> {
 		let query = format!("[{}]", self.constants.cx_map_key,);
 		if let Some(cx) = self.document.query_selector(&query).unwrap() {
 			let inner_text = cx.text_content().unwrap();
-			self.cx_map = Some(RsxContextMap::from_csv(&inner_text)?);
-			Ok(&self.cx_map.as_ref().unwrap())
+			self.loc_map = Some(DomLocationMap::from_csv(&inner_text)?);
+			Ok(&self.loc_map.as_ref().unwrap())
 		} else {
 			Err(ParseError::serde(format!(
 				"Could not find context attribute: {}",
@@ -81,8 +81,8 @@ impl DomHydrator {
 		rsx_id: NodeIdx,
 	) -> ParseResult<()> {
 		let children = el.child_nodes();
-		let cx_map = self.get_cx_map()?;
-		let Some(el_cx) = cx_map.collapsed_elements.get(&(rsx_id as usize))
+		let cx_map = self.get_dom_location_map()?;
+		let Some(el_cx) = cx_map.collapsed_elements.get(&rsx_id)
 		else {
 			// elements without rust children are not tracked
 			return Ok(());

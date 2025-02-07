@@ -5,7 +5,7 @@ use crate::prelude::*;
 pub struct HtmlNodeHydrator {
 	pub html: HtmlDocument,
 	constants: HtmlConstants,
-	rust_node_map: RsxContextMap,
+	loc_map: DomLocationMap,
 }
 
 impl HtmlNodeHydrator {
@@ -13,12 +13,12 @@ impl HtmlNodeHydrator {
 		let rsx = rsx.into_rsx();
 		let html = RsxToResumableHtml::default().map_node(&rsx);
 
-		let rust_node_map = RsxContextMap::from_node(&rsx);
+		let loc_map = DomLocationMap::from_node(&rsx);
 
 		Self {
 			html,
 			constants: Default::default(),
-			rust_node_map,
+			loc_map,
 		}
 	}
 }
@@ -33,9 +33,9 @@ impl Hydrator for HtmlNodeHydrator {
 		rsx: RsxNode,
 		cx: &RsxContext,
 	) -> ParseResult<()> {
-		let id = self
-			.rust_node_map
-			.rust_blocks
+		let parent_idx = self
+			.loc_map
+			.rusty_locations
 			.get(cx.block_idx())
 			.ok_or_else(|| {
 				ParseError::Hydration(format!(
@@ -43,12 +43,12 @@ impl Hydrator for HtmlNodeHydrator {
 					cx.block_idx()
 				))
 			})?
-			.element_idx()
+			.parent_idx
 			.to_string();
 
 		for html in self.html.iter_mut() {
-			if let Some(parent_el) =
-				html.query_selector_attr(self.constants.id_key, Some(&id))
+			if let Some(parent_el) = html
+				.query_selector_attr(self.constants.id_key, Some(&parent_idx))
 			{
 				return apply_rsx(parent_el, rsx, cx, &self.constants);
 			}
@@ -56,7 +56,7 @@ impl Hydrator for HtmlNodeHydrator {
 
 		return Err(ParseError::Hydration(format!(
 			"Could not find node with id: {}",
-			id
+			parent_idx
 		)));
 	}
 }

@@ -22,7 +22,7 @@ impl RsxToResumableHtml {
 		for node in html.iter_mut() {
 			self.visit_node(node);
 		}
-		self.insert_rsx_context_map(node, &mut html);
+		self.insert_dom_location_map(node, &mut html);
 		self.insert_catch_prehydrated_events(&mut html);
 		html
 	}
@@ -56,9 +56,9 @@ impl RsxToResumableHtml {
 
 	/// attempt to insert the rsx context map into the html body,
 	/// otherwise append it to the end of the html
-	fn insert_rsx_context_map(&self, node: &RsxNode, doc: &mut HtmlDocument) {
-		let rsx_context_map = RsxContextMap::from_node(node).to_csv();
-		let el = HtmlElementNode::inline_script(rsx_context_map, vec![
+	fn insert_dom_location_map(&self, node: &RsxNode, doc: &mut HtmlDocument) {
+		let loc_map = DomLocationMap::from_node(node).to_csv();
+		let el = HtmlElementNode::inline_script(loc_map, vec![
 			HtmlAttribute {
 				key: self.html_constants.cx_map_key.to_string(),
 				value: None,
