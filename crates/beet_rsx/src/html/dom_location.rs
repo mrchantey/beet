@@ -5,15 +5,21 @@ use crate::prelude::*;
 /// but text nodes don't have ids, and to make things even more exciting adjacent
 /// nodes are collapsed when rendered.
 ///
+/// ## Footgun
+/// Both `node_idx` and `child_idx` are *uncollapsed* indices.
+/// When we render html adjacent text nodes are collapsed into a single text node.
+/// We use [TextBlockEncoder] to track this behavior, and re-expand the text nodes
+/// before using this location.
+/// 
 #[derive(Debug, Default, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct DomLocation {
-	/// the index of the current element, for text nodes
-	/// this is the same as `parent_idx`
-	pub element_idx: u32,
-	/// the index of this node's parent. This is used by
+	/// the *uncollapsed* index of the current node.
+	/// This is unique for every html node in a tree.
+	pub node_idx: NodeIdx,
+	/// the index of this node's parent *element*. This is used by
 	/// text nodes to determine their location in the dom.
-	pub parent_idx: u32,
-	/// The *pre-collapsed* child index of this node, for
+	pub parent_idx: NodeIdx,
+	/// The *uncollapsed* child index of this node, for
 	/// example the following has two child nodes, indexed
 	/// as 0 and 1. When it is rendered they will be collapsed
 	/// into a single text node, but we will split them up before
@@ -23,7 +29,38 @@ pub struct DomLocation {
 	pub child_idx: u32,
 }
 
-impl DomLocation {}
+impl DomLocation {
+	pub fn to_csv(&self) -> String {
+		// must keep in sync with from_csv
+		vec![
+			self.node_idx.to_string(),
+			self.parent_idx.to_string(),
+			self.child_idx.to_string(),
+		]
+		.join(",")
+	}
+	pub fn from_csv(csv: &str) -> ParseResult<Self> {
+		let mut parts = csv.split(',');
+		let mut next = || -> Result<u32, ParseError> {
+			let next = parts
+				.next()
+				.ok_or_else(|| ParseError::serde("invalid rsx context csv"))?
+				.parse()?;
+			Ok(next)
+		};
+
+		// must keep in sync with to_csv
+		let element_idx = next()?;
+		let parent_idx = next()?;
+		let child_idx = next()?;
+
+		Ok(Self {
+			node_idx: element_idx,
+			parent_idx,
+			child_idx,
+		})
+	}
+}
 
 
 
@@ -39,7 +76,8 @@ pub struct DomLocationVisitor<Func> {
 	func: Func,
 }
 impl<Func> DomLocationVisitor<Func> {
-	pub fn new(func: Func) -> Self
+	/// Visit a node and return the total number of elements visited
+	pub fn visit(node: &RsxNode, func: Func)
 	where
 		Func: FnMut(DomLocation, &RsxNode),
 	{
@@ -50,9 +88,14 @@ impl<Func> DomLocationVisitor<Func> {
 			options: Default::default(),
 			func,
 		}
+		.walk_node(node);
 	}
-	pub fn new_with_options(options: VisitRsxOptions, func: Func) -> Self
-	where
+
+	pub fn visit_with_options(
+		node: &RsxNode,
+		options: VisitRsxOptions,
+		func: Func,
+	) where
 		Func: FnMut(DomLocation, &RsxNode),
 	{
 		Self {
@@ -62,8 +105,9 @@ impl<Func> DomLocationVisitor<Func> {
 			options,
 			func,
 		}
+		.walk_node(node);
 	}
-	pub fn new_mut(func: Func) -> Self
+	pub fn visit_mut(node: &mut RsxNode, func: Func)
 	where
 		Func: FnMut(DomLocation, &mut RsxNode),
 	{
@@ -74,9 +118,13 @@ impl<Func> DomLocationVisitor<Func> {
 			options: Default::default(),
 			func,
 		}
+		.walk_node(node);
 	}
-	pub fn new_with_options_mut(options: VisitRsxOptions, func: Func) -> Self
-	where
+	pub fn visit_with_options_mut(
+		node: &mut RsxNode,
+		options: VisitRsxOptions,
+		func: Func,
+	) where
 		Func: FnMut(DomLocation, &mut RsxNode),
 	{
 		Self {
@@ -86,6 +134,7 @@ impl<Func> DomLocationVisitor<Func> {
 			options,
 			func,
 		}
+		.walk_node(node);
 	}
 
 	/// Get the current item in the stack, or default
@@ -101,7 +150,7 @@ impl<Func> DomLocationVisitor<Func> {
 		let parent_idx = self.parent_idxs.last().cloned().unwrap_or_default();
 		let child_idx = self.child_idxs.last().cloned().unwrap_or_default();
 		DomLocation {
-			element_idx: self.curr_element_idx,
+			node_idx: self.curr_element_idx,
 			parent_idx,
 			child_idx,
 		}
@@ -168,14 +217,21 @@ mod test {
 	use sweet::prelude::*;
 
 	#[test]
+	fn csv() {
+		let a = DomLocation {
+			node_idx: 1,
+			parent_idx: 2,
+			child_idx: 3,
+		};
+		let csv = a.to_csv();
+		let b = DomLocation::from_csv(&csv).unwrap();
+		expect(a).to_be(b);
+	}
+	#[test]
 	fn works() {
 		let bucket = mock_bucket();
 		let bucket2 = bucket.clone();
-		DomLocationVisitor::new(move |loc, _| {
-			bucket2.call(loc);
-		})
-		.walk_node(
-			&rsx! {
+		let rsx = rsx! {
 			   <div>				// 0 - root
 				   <div>			// 1 - child
 					   <div/>		// 2 - nested child
@@ -183,31 +239,32 @@ mod test {
 				   </div>
 				   <div/>			// 4 - child 1
 			   </div>
-			}
-			.node,
-		);
+		};
+		DomLocationVisitor::visit(&rsx, move |loc, _| {
+			bucket2.call(loc);
+		});
 		expect(&bucket).to_have_returned_nth_with(0, &DomLocation {
-			element_idx: 0,
+			node_idx: 0,
 			parent_idx: 0,
 			child_idx: 0,
 		});
 		expect(&bucket).to_have_returned_nth_with(1, &DomLocation {
-			element_idx: 1,
+			node_idx: 1,
 			parent_idx: 0,
 			child_idx: 0,
 		});
 		expect(&bucket).to_have_returned_nth_with(2, &DomLocation {
-			element_idx: 2,
+			node_idx: 2,
 			parent_idx: 1,
 			child_idx: 0,
 		});
 		expect(&bucket).to_have_returned_nth_with(3, &DomLocation {
-			element_idx: 3,
+			node_idx: 3,
 			parent_idx: 1,
 			child_idx: 1,
 		});
 		expect(&bucket).to_have_returned_nth_with(4, &DomLocation {
-			element_idx: 4,
+			node_idx: 4,
 			parent_idx: 0,
 			child_idx: 1,
 		});

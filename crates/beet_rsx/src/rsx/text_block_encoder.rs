@@ -1,12 +1,4 @@
-use super::ElementIdx;
-use super::RsxBlock;
-use super::RsxComponent;
-use super::RsxElement;
-use super::RsxNode;
-use crate::error::ParseError;
-use crate::error::ParseResult;
-use crate::html::RenderHtml;
-use crate::html::RsxToHtml;
+use crate::prelude::*;
 
 /// This module is for handling rsx text blocks in html text node.
 ///
@@ -23,14 +15,14 @@ use crate::html::RsxToHtml;
 /// ```
 #[derive(Debug, Clone, PartialEq)]
 pub struct TextBlockEncoder {
-	pub parent_id: ElementIdx,
+	pub parent_id: NodeIdx,
 	/// the index of the child text node that collapsed
 	/// a vec of 'next index to split at'
 	pub split_positions: Vec<Vec<usize>>,
 }
 
 impl TextBlockEncoder {
-	pub fn new(parent_id: ElementIdx) -> Self {
+	pub fn new(parent_id: NodeIdx) -> Self {
 		Self {
 			parent_id,
 			split_positions: Vec::new(),
@@ -39,7 +31,7 @@ impl TextBlockEncoder {
 
 
 	/// Store the indices
-	pub fn encode(id: ElementIdx, el: &RsxElement) -> Self {
+	pub fn encode(id: NodeIdx, el: &RsxElement) -> Self {
 		let mut encoder = Self::new(id);
 		// the index is the child index and the value is a vec of 'next index to split at'
 		// let indices: Vec<Vec<usize>> = Vec::new();
@@ -225,7 +217,6 @@ impl TextBlockPosition {
 #[cfg(test)]
 mod test {
 	use super::*;
-	use crate::prelude::*;
 	use sweet::prelude::*;
 
 	struct Adjective;

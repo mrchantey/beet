@@ -2,6 +2,8 @@ mod dom_location;
 mod html_document;
 mod html_node;
 mod rsx_to_resumable_html;
+mod dom_location_map;
+pub use dom_location_map::*;
 pub use dom_location::*;
 pub use html_document::*;
 pub use html_node::*;

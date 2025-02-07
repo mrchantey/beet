@@ -5,24 +5,21 @@ use std::collections::HashMap;
 /// This map is updated every hot reload, the position
 /// of a rust block in the tree can change
 #[derive(Debug, Default, Clone, PartialEq)]
-pub struct RsxContextMap {
-	pub rust_blocks: Vec<RsxContext>,
-	pub collapsed_elements: HashMap<usize, TextBlockEncoder>,
+pub struct DomLocationMap {
+	pub rusty_locations: Vec<DomLocation>,
+	pub collapsed_elements: HashMap<NodeIdx, TextBlockEncoder>,
 }
 
-/// Delimiter reference:
-/// - '-' separates items in [Self::rust_blocks]
-/// - '_' separates [Self::rust_blocks] from [Self::collapsed_elements]
-/// - '*' separates key and value in [Self::collapsed_elements]
-/// - ';' separates items in [Self::collapsed_elements]
-impl RsxContextMap {
+// const RUST_BLOCK_DELIMITER
+
+impl DomLocationMap {
 	pub fn to_csv(&self) -> String {
 		let mut csv = String::new();
 		csv.push_str(
 			&self
-				.rust_blocks
+				.rusty_locations
 				.iter()
-				.map(RsxContext::to_csv)
+				.map(DomLocation::to_csv)
 				.collect::<Vec<_>>()
 				.join("-"),
 		);
@@ -40,11 +37,11 @@ impl RsxContextMap {
 
 	pub fn from_csv(csv: &str) -> ParseResult<Self> {
 		let mut parts = csv.split('_');
-		let rust_blocks = parts
+		let rusty_locations = parts
 			.next()
 			.ok_or_else(|| ParseError::Serde("missing rust blocks".into()))?
 			.split("-")
-			.map(|s| RsxContext::from_csv(s))
+			.map(|s| DomLocation::from_csv(s))
 			.collect::<ParseResult<Vec<_>>>()?;
 
 		let collapsed_elements = parts
@@ -66,7 +63,7 @@ impl RsxContextMap {
 			.collect::<ParseResult<HashMap<_, _>>>()?;
 
 		Ok(Self {
-			rust_blocks,
+			rusty_locations,
 			collapsed_elements,
 		})
 	}
@@ -75,23 +72,18 @@ impl RsxContextMap {
 	pub fn from_node(node: &RsxNode) -> Self {
 		let mut map = Self::default();
 
-		let visitor = RsxContext::visit(node, |cx, node| match node {
+		DomLocationVisitor::visit(node, |loc, node| match node {
 			RsxNode::Block(_) => {
-				assert_eq!(cx.block_idx(), map.rust_blocks.len());
-				map.rust_blocks.push(cx.clone());
+				map.rusty_locations.push(loc);
 			}
 			RsxNode::Element(el) => {
 				if el.contains_blocks() {
-					let encoded =
-						TextBlockEncoder::encode(cx.element_idx(), el);
-					map.collapsed_elements
-						.insert(cx.element_idx() as usize, encoded);
+					let encoded = TextBlockEncoder::encode(loc.node_idx, el);
+					map.collapsed_elements.insert(loc.node_idx, encoded);
 				}
 			}
 			_ => {}
 		});
-		assert_eq!(visitor.block_idx(), map.rust_blocks.len());
-
 		map
 	}
 }
@@ -111,14 +103,14 @@ mod test {
 
 		let root = rsx! {
 			<div>
-				"The "{desc}" and "{color}<b>fox</b> {action}" the lazy "andfatdog
+				"The "{desc}" and "{color}<b>fox</b>{action}" the lazy "andfatdog
 			</div>
 		};
 
-		let map = RsxContextMap::from_node(&root);
+		let map = DomLocationMap::from_node(&root);
 
 		let csv = map.to_csv();
-		let map2 = RsxContextMap::from_csv(&csv).unwrap();
+		let map2 = DomLocationMap::from_csv(&csv).unwrap();
 		expect(&map2).to_be(&map);
 
 
@@ -130,26 +122,23 @@ mod test {
 			.into_iter()
 			.collect::<HashMap<_, _>>(),
 		);
-		expect(&map.rust_blocks[0]).to_be(&RsxContext {
+		// {desc}
+		expect(&map.rusty_locations[0]).to_be(&DomLocation {
+			parent_idx: 0,
 			node_idx: 2,
-			component_idx: 0,
-			block_idx: 0,
-			element_idx: 0,
 			child_idx: 1,
 		});
-		expect(&map.rust_blocks[1]).to_be(&RsxContext {
+		// {color}
+		expect(&map.rusty_locations[1]).to_be(&DomLocation {
+			parent_idx: 0,
 			node_idx: 4,
-			component_idx: 0,
-			block_idx: 1,
-			element_idx: 0,
-			child_idx: 2,
-		});
-		expect(&map.rust_blocks[2]).to_be(&RsxContext {
-			node_idx: 6,
-			component_idx: 0,
-			block_idx: 2,
-			element_idx: 1,
 			child_idx: 3,
+		});
+		// {action}
+		expect(&map.rusty_locations[2]).to_be(&DomLocation {
+			parent_idx: 0,
+			node_idx: 7,
+			child_idx: 5,
 		});
 	}
 }

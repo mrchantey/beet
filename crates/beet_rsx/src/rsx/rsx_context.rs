@@ -5,7 +5,7 @@ use std::collections::VecDeque;
 /// Used to identify an element in a tree.
 /// This is incremented in a breadth-first pattern
 /// as we visit each element in the tree.
-pub type ElementIdx = usize;
+pub type NodeIdx = u32;
 /// Used to identify a rust block in a tree.
 /// This is key to being able to reconcile a changed html tree
 /// with precompiled rust blocks.
@@ -39,7 +39,7 @@ pub struct RsxContext {
 	/// so should be zero by the time the tree is finished.
 	/// In the case of a rust block this is the parent element.
 	/// in the case of visiting an element this is the element itself.
-	pub(super) element_idx: ElementIdx,
+	pub(super) element_idx: NodeIdx,
 	/// the *uncollapsed* index of this block relative to its parent element.
 	/// That is the [RsxNode] child index, not the [HtmlNode] child index
 	/// which merges rust text blocks with static text blocks
@@ -50,7 +50,7 @@ impl RsxContext {
 	pub fn node_idx(&self) -> usize { self.node_idx }
 	pub fn component_idx(&self) -> usize { self.component_idx }
 	pub fn block_idx(&self) -> usize { self.block_idx }
-	pub fn element_idx(&self) -> usize { self.element_idx.saturating_sub(1) }
+	pub fn element_idx(&self) -> NodeIdx { self.element_idx.saturating_sub(1) }
 	pub fn child_idx(&self) -> usize { self.child_idx }
 
 	fn before_visit_node(
@@ -127,7 +127,7 @@ impl RsxContext {
 			node_idx,
 			component_idx,
 			block_idx,
-			element_idx: element_count,
+			element_idx: element_count as NodeIdx,
 			child_idx,
 		})
 	}
