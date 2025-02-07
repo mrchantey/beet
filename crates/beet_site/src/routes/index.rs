@@ -1,11 +1,7 @@
-// use crate::prelude::*;
+use crate::prelude::*;
 use beet::prelude::*;
 
 
-
-
-
-//dskdsdkls;dsakkjkkjkkjl
 
 pub fn get(state: DefaultAppState) -> RsxRoot {
 	let val = 33333333;
@@ -13,7 +9,7 @@ pub fn get(state: DefaultAppState) -> RsxRoot {
 		<div>{state.app_name} hello   {val}</div>
 		<style>
 			body{
-				background-color: white;
+				background-color: black;
 				color:white;
 			}
 		</style>
