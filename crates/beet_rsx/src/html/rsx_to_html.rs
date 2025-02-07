@@ -192,7 +192,7 @@ mod test {
 				<p>hello {world}</p>
 			</div>
 		}))
-		.to_be("<div onclick=\"needs-event-cx\"><p>hello mars</p></div>");
+		.to_be("<div onclick=\"event-placeholder\"><p>hello mars</p></div>");
 	}
 
 	#[test]

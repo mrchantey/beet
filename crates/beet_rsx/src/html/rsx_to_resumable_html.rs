@@ -37,7 +37,7 @@ impl RsxToResumableHtml {
 				let actual_this_sucks_dom_idx_incr = self.dom_idx_incr - 1;
 				for attr in el.attributes.iter_mut() {
 					if attr.key == "needs-id" {
-						attr.key = self.html_constants.dom_idx_key.to_string();
+						attr.key = self.html_constants.rsx_idx_key.to_string();
 						attr.value =
 							Some(actual_this_sucks_dom_idx_incr.to_string());
 					} else if attr.key.starts_with("on") {
@@ -64,7 +64,7 @@ impl RsxToResumableHtml {
 	fn insert_dom_location_map(&self, node: &RsxNode, doc: &mut HtmlDocument) {
 		let loc_map = DomLocationMap::from_node(node).to_csv();
 		let el = HtmlElementNode::inline_script(loc_map, vec![HtmlAttribute {
-			key: self.html_constants.cx_map_key.to_string(),
+			key: self.html_constants.loc_map_key.to_string(),
 			value: None,
 		}]);
 		doc.body.push(el.into());
@@ -107,7 +107,7 @@ mod test {
 			</main>
 		}))
 		.to_contain(
-			"<main><article data-beet-dom-idx=\"1\">7</article></main>",
+			"<main><article data-beet-rsx-idx=\"1\">7</article></main>",
 		);
 	}
 	#[test]
@@ -117,6 +117,6 @@ mod test {
 		expect(RsxToResumableHtml::render_body(
 			&rsx! { <main onclick=on_click></main> },
 		))
-		.to_contain("<main onclick=\"_sweet_event_handler(0, event)\" data-beet-dom-idx=\"0\"></main>");
+		.to_contain("<main onclick=\"_beet_event_handler(0, event)\" data-beet-rsx-idx=\"0\"></main>");
 	}
 }

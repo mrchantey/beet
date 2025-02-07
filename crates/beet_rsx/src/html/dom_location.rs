@@ -2,11 +2,10 @@ use crate::prelude::*;
 
 pub type RustyIdx = u32;
 
-/// Used to identify a html node.
-/// Incremented via dfs
-pub type DomIdx = u32;
-/// Used to identify a rsx node.
-/// Incremented via dfs
+/// Unique identifier for every node in an rsx tree,
+/// and assigned to html elements that need it.
+/// The value is incremented every time an rsx node is encountered
+/// in a dfs pattern like [RsxVisitor].
 pub type RsxIdx = u32;
 
 
@@ -24,12 +23,13 @@ pub type RsxIdx = u32;
 ///
 #[derive(Debug, Default, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct DomLocation {
-	/// the *uncollapsed* index of the current node.
-	/// This is unique for every html node in a tree.
-	pub dom_idx: DomIdx,
+	/// Incremented every time an rsx node is encountered,
+	/// used for reconciliation with the [DomLocationMap::rusty_locations].
+	/// It is required because not all rsx nodes are html nodes.
+	pub rsx_idx: RsxIdx,
 	/// the index of this node's parent *element*. This is used by
 	/// text nodes to determine their location in the dom.
-	pub parent_idx: DomIdx,
+	pub parent_idx: RsxIdx,
 	/// The *uncollapsed* child index of this node, for
 	/// example the following has two child nodes, indexed
 	/// as 0 and 1. When it is rendered they will be collapsed
@@ -38,20 +38,16 @@ pub struct DomLocation {
 	///
 	/// `<div> hello {"world"}</div>`
 	pub child_idx: u32,
-	/// Incremented every time an rsx node is encountered,
-	/// used for reconciliation with the [DomLocationMap::rusty_locations].
-	/// It is required because not all rsx nodes are html nodes.
-	pub rsx_idx: RsxIdx,
+	// _padding: u32,
 }
 
 impl DomLocation {
 	pub fn to_csv(&self) -> String {
 		// must keep in sync with from_csv
 		vec![
-			self.dom_idx.to_string(),
+			self.rsx_idx.to_string(),
 			self.parent_idx.to_string(),
 			self.child_idx.to_string(),
-			self.rsx_idx.to_string(),
 		]
 		.join(",")
 	}
@@ -66,16 +62,14 @@ impl DomLocation {
 		};
 
 		// must keep in sync with to_csv
-		let dom_idx = next()?;
+		let rsx_idx = next()?;
 		let parent_idx = next()?;
 		let child_idx = next()?;
-		let rsx_idx = next()?;
 
 		Ok(Self {
-			dom_idx,
+			rsx_idx,
 			parent_idx,
 			child_idx,
-			rsx_idx,
 		})
 	}
 }
@@ -87,10 +81,9 @@ impl DomLocation {
 pub struct DomLocationVisitor<Func> {
 	/// we use a stack because [RsxVisitor] is depth-first.
 	/// This stack is an immutable breadcrumb trail of parents
-	parent_idxs: Vec<u32>,
+	parent_idxs: Vec<RsxIdx>,
 	/// pushed when visiting children, incremented after visiting dom node
 	child_idxs: Vec<u32>,
-	dom_idx_incr: u32,
 	rsx_idx_incr: u32,
 	options: VisitRsxOptions,
 	func: Func,
@@ -104,7 +97,6 @@ impl<Func> DomLocationVisitor<Func> {
 		Self {
 			parent_idxs: vec![Default::default()],
 			child_idxs: vec![Default::default()],
-			dom_idx_incr: 0,
 			rsx_idx_incr: 0,
 			options: Default::default(),
 			func,
@@ -122,7 +114,6 @@ impl<Func> DomLocationVisitor<Func> {
 		Self {
 			parent_idxs: vec![Default::default()],
 			child_idxs: vec![Default::default()],
-			dom_idx_incr: 0,
 			rsx_idx_incr: 0,
 			options,
 			func,
@@ -136,7 +127,6 @@ impl<Func> DomLocationVisitor<Func> {
 		Self {
 			parent_idxs: vec![Default::default()],
 			child_idxs: vec![Default::default()],
-			dom_idx_incr: 0,
 			rsx_idx_incr: 0,
 			options: Default::default(),
 			func,
@@ -153,7 +143,6 @@ impl<Func> DomLocationVisitor<Func> {
 		Self {
 			parent_idxs: Default::default(),
 			child_idxs: Default::default(),
-			dom_idx_incr: 0,
 			rsx_idx_incr: 0,
 			options,
 			func,
@@ -174,7 +163,6 @@ impl<Func> DomLocationVisitor<Func> {
 		let parent_idx = self.parent_idxs.last().cloned().unwrap_or_default();
 		let child_idx = self.child_idxs.last().cloned().unwrap_or_default();
 		DomLocation {
-			dom_idx: self.dom_idx_incr,
 			rsx_idx: self.rsx_idx_incr,
 			parent_idx,
 			child_idx,
@@ -186,15 +174,14 @@ impl<Func> DomLocationVisitor<Func> {
 			if let Some(child_idx) = self.child_idxs.last_mut() {
 				*child_idx += 1;
 			}
-			self.dom_idx_incr += 1;
 		}
 	}
 
 	pub fn before_children(&mut self) {
-		// idx was incremented after visit node so subtract one 
-		// to get parent idx
-		// no need to saturating sub because we must've already visited node
-		self.parent_idxs.push(self.dom_idx_incr - 1);
+		// the reason why we can get the parent idx is because this is called directly after
+		// visit_node in RsxVisitor. It also means we can safely decrement by 1 to get
+		// the parent index
+		self.parent_idxs.push(self.rsx_idx_incr - 1);
 		self.child_idxs.push(0);
 	}
 	pub fn after_children(&mut self) {
@@ -246,10 +233,9 @@ mod test {
 	#[test]
 	fn csv() {
 		let a = DomLocation {
-			dom_idx: 1,
+			rsx_idx: 4,
 			parent_idx: 2,
 			child_idx: 3,
-			rsx_idx: 4,
 		};
 		let csv = a.to_csv();
 		let b = DomLocation::from_csv(&csv).unwrap();
@@ -272,34 +258,29 @@ mod test {
 			bucket2.call(loc);
 		});
 		expect(&bucket).to_have_returned_nth_with(0, &DomLocation {
-			dom_idx: 0,
+			rsx_idx: 0,
 			parent_idx: 0,
 			child_idx: 0,
-			rsx_idx: 0,
 		});
 		expect(&bucket).to_have_returned_nth_with(1, &DomLocation {
-			dom_idx: 1,
+			rsx_idx: 1,
 			parent_idx: 0,
 			child_idx: 0,
-			rsx_idx: 1,
 		});
 		expect(&bucket).to_have_returned_nth_with(2, &DomLocation {
-			dom_idx: 2,
+			rsx_idx: 2,
 			parent_idx: 1,
 			child_idx: 0,
-			rsx_idx: 2,
 		});
 		expect(&bucket).to_have_returned_nth_with(3, &DomLocation {
-			dom_idx: 3,
+			rsx_idx: 3,
 			parent_idx: 1,
 			child_idx: 1,
-			rsx_idx: 3,
 		});
 		expect(&bucket).to_have_returned_nth_with(4, &DomLocation {
-			dom_idx: 4,
+			rsx_idx: 4,
 			parent_idx: 0,
 			child_idx: 1,
-			rsx_idx: 4,
 		});
 	}
 }

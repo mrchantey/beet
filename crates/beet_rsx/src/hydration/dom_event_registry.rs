@@ -12,13 +12,13 @@ use web_sys::Event;
 pub struct EventRegistry;
 
 thread_local! {
-	static REGISTERED_EVENTS: RefCell<HashMap<(DomIdx,String),Box<dyn Fn(JsValue)>>> = Default::default();
+	static REGISTERED_EVENTS: RefCell<HashMap<(RsxIdx,String),Box<dyn Fn(JsValue)>>> = Default::default();
 }
 
 impl EventRegistry {
-	fn trigger(key: &str, el_id: DomIdx, value: JsValue) {
+	fn trigger(key: &str, rsx_idx: RsxIdx, value: JsValue) {
 		REGISTERED_EVENTS.with(|current| {
-			if let Some(func) = current.borrow().get(&(el_id, key.to_string()))
+			if let Some(func) = current.borrow().get(&(rsx_idx, key.to_string()))
 			{
 				func(value);
 			}
@@ -32,7 +32,7 @@ impl EventRegistry {
 	) {
 		REGISTERED_EVENTS.with(|current| {
 			current.borrow_mut().insert(
-				(loc.dom_idx, key.to_string()),
+				(loc.rsx_idx, key.to_string()),
 				Box::new(move |e: JsValue| {
 					func(e.unchecked_into());
 				}),
@@ -101,8 +101,8 @@ fn hook_up_event_listeners(constants: &HtmlConstants) -> ParseResult<()> {
 	REGISTERED_EVENTS.with(|current| -> ParseResult<()> {
 		let mut current = current.borrow_mut();
 		let document = window().unwrap().document().unwrap();
-		for ((el_id, key), func) in current.drain() {
-			let query = format!("[{}='{}']", constants.dom_idx_key, el_id);
+		for ((rsx_idx, key), func) in current.drain() {
+			let query = format!("[{}='{}']", constants.rsx_idx_key, rsx_idx);
 
 			let el =
 				document.query_selector(&query).ok().flatten().ok_or_else(

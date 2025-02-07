@@ -35,7 +35,7 @@ pub struct RsxContext {
 	/// so should be zero by the time the tree is finished.
 	/// In the case of a rust block this is the parent element.
 	/// in the case of visiting an element this is the element itself.
-	pub(super) element_idx: DomIdx,
+	pub(super) element_idx: RsxIdx,
 	/// the *uncollapsed* index of this block relative to its parent element.
 	/// That is the [RsxNode] child index, not the [HtmlNode] child index
 	/// which merges rust text blocks with static text blocks
@@ -46,7 +46,7 @@ impl RsxContext {
 	pub fn node_idx(&self) -> usize { self.node_idx }
 	pub fn component_idx(&self) -> usize { self.component_idx }
 	pub fn block_idx(&self) -> usize { self.block_idx }
-	pub fn element_idx(&self) -> DomIdx { self.element_idx.saturating_sub(1) }
+	pub fn element_idx(&self) -> RsxIdx { self.element_idx.saturating_sub(1) }
 	pub fn child_idx(&self) -> usize { self.child_idx }
 
 	fn before_visit_node(
@@ -123,7 +123,7 @@ impl RsxContext {
 			node_idx,
 			component_idx,
 			block_idx,
-			element_idx: element_count as DomIdx,
+			element_idx: element_count as RsxIdx,
 			child_idx,
 		})
 	}

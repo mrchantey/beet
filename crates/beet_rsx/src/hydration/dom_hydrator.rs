@@ -29,7 +29,7 @@ impl Default for DomHydrator {
 
 impl DomHydrator {
 	fn get_dom_location_map(&mut self) -> ParseResult<&DomLocationMap> {
-		let query = format!("[{}]", self.constants.cx_map_key,);
+		let query = format!("[{}]", self.constants.loc_map_key);
 		if let Some(cx) = self.document.query_selector(&query).unwrap() {
 			let inner_text = cx.text_content().unwrap();
 			self.loc_map = Some(DomLocationMap::from_csv(&inner_text)?);
@@ -60,34 +60,34 @@ impl DomHydrator {
 		&mut self,
 		loc: DomLocation,
 	) -> ParseResult<Element> {
-		if let Some(Some(el)) = self.elements.get(loc.dom_idx as usize) {
+		if let Some(Some(el)) = self.elements.get(loc.rsx_idx as usize) {
 			return Ok(el.clone());
 		}
-		let dom_idx = loc.dom_idx;
+		let rsx_idx = loc.rsx_idx;
 
-		let query = format!("[{}='{}']", self.constants.dom_idx_key, dom_idx);
+		let query = format!("[{}='{}']", self.constants.rsx_idx_key, rsx_idx);
 		if let Some(el) = self.document.query_selector(&query).unwrap() {
-			self.elements.resize((dom_idx + 1) as usize, None);
-			self.elements[dom_idx as usize] = Some(el.clone());
-			self.uncollapse_child_text_nodes(&el, dom_idx)?;
+			self.elements.resize((rsx_idx + 1) as usize, None);
+			self.elements[rsx_idx as usize] = Some(el.clone());
+			self.uncollapse_child_text_nodes(&el, rsx_idx)?;
 			Ok(el)
 		} else {
 			Err(ParseError::Hydration(format!(
-				"Could not find collapsed text node parent with id: {}",
-				dom_idx
+				"Could not find parent for collapsed text node with rsx idx: {}",
+				rsx_idx
 			)))
 		}
 	}
 
-	/// use the cx_map to uncollapse text nodes
+	/// use the [RsxLocationMap] to uncollapse text nodes
 	fn uncollapse_child_text_nodes(
 		&mut self,
 		el: &Element,
-		dom_idx: DomIdx,
+		rsx_idx: RsxIdx,
 	) -> ParseResult<()> {
 		let children = el.child_nodes();
-		let cx_map = self.get_dom_location_map()?;
-		let Some(el_cx) = cx_map.collapsed_elements.get(&dom_idx) else {
+		let loc_map = self.get_dom_location_map()?;
+		let Some(el_cx) = loc_map.collapsed_elements.get(&rsx_idx) else {
 			// here we assume this is because the element has no children
 			// so was not tracked
 			// elements without rust children are not tracked

@@ -34,7 +34,7 @@ impl SignalsRsx {
 				let attrs = block();
 				println!(
 					"would update attributes for {}\n{}",
-					loc.dom_idx,
+					loc.rsx_idx,
 					RsxToHtml::default().map_attribute(&attrs).render()
 				);
 				todo!();
@@ -52,7 +52,7 @@ impl SignalsRsx {
 				let value = block.clone().into_attribute_value();
 				println!(
 					"would update attribute for {}\n{key}: {value}",
-					loc.dom_idx
+					loc.rsx_idx
 				);
 				todo!();
 			});
@@ -77,12 +77,12 @@ mod test {
 
 		rsx().register_effects();
 		expect(&CurrentHydrator::with(|h| h.render()))
-			.to_contain("<div data-beet-dom-idx=\"0\">value is 7</div>");
+			.to_contain("<div data-beet-rsx-idx=\"0\">value is 7</div>");
 		set(8);
 		expect(&CurrentHydrator::with(|h| h.render()))
-			.to_contain("<div data-beet-dom-idx=\"0\">value is 8</div>");
+			.to_contain("<div data-beet-rsx-idx=\"0\">value is 8</div>");
 		set(9);
 		expect(&CurrentHydrator::with(|h| h.render()))
-			.to_contain("<div data-beet-dom-idx=\"0\">value is 9</div>");
+			.to_contain("<div data-beet-rsx-idx=\"0\">value is 9</div>");
 	}
 }

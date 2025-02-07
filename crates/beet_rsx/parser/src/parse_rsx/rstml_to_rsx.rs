@@ -292,7 +292,7 @@ impl RstmlToRsx {
 							quote! {
 								RsxAttribute::BlockValue {
 									key: #key.to_string(),
-									initial: "needs-event-cx".to_string(),
+									initial: "event-placeholder".to_string(),
 									effect: Effect::new(Box::new(move |cx| {
 										#register_event::#register_func(#key,cx,#block);
 										Ok(())

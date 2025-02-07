@@ -11,7 +11,7 @@ pub struct DomLocationMap {
 	// but at this stage of the project thats harder to reason about
 	// and this provides symmetry with [Self::collapsed_elements]
 	pub rusty_locations: HashMap<RsxIdx, DomLocation>,
-	pub collapsed_elements: HashMap<DomIdx, TextBlockEncoder>,
+	pub collapsed_elements: HashMap<RsxIdx, TextBlockEncoder>,
 }
 
 ///	Delimiter Reference:
@@ -97,8 +97,8 @@ impl DomLocationMap {
 			}
 			RsxNode::Element(el) => {
 				if el.contains_blocks() {
-					let encoded = TextBlockEncoder::encode(loc.dom_idx, el);
-					map.collapsed_elements.insert(loc.dom_idx, encoded);
+					let encoded = TextBlockEncoder::encode(loc.rsx_idx, el);
+					map.collapsed_elements.insert(loc.rsx_idx, encoded);
 				}
 			}
 			_ => {}
@@ -144,24 +144,21 @@ mod test {
 		);
 		// {desc}
 		expect(&map.rusty_locations[&2]).to_be(&DomLocation {
-			parent_idx: 0,
-			dom_idx: 2,
-			child_idx: 1,
 			rsx_idx: 2,
+			parent_idx: 0,
+			child_idx: 1,
 		});
 		// {color}
 		expect(&map.rusty_locations[&5]).to_be(&DomLocation {
-			parent_idx: 0,
-			dom_idx: 4,
-			child_idx: 3,
 			rsx_idx: 5,
+			parent_idx: 0,
+			child_idx: 3,
 		});
 		// {action}
 		expect(&map.rusty_locations[&9]).to_be(&DomLocation {
-			parent_idx: 0,
-			dom_idx: 7,
-			child_idx: 5,
 			rsx_idx: 9,
+			parent_idx: 0,
+			child_idx: 5,
 		});
 	}
 }

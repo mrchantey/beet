@@ -48,7 +48,7 @@ impl Hydrator for HtmlNodeHydrator {
 
 		for html in self.html.iter_mut() {
 			if let Some(parent_el) = html.query_selector_attr(
-				self.constants.dom_idx_key,
+				self.constants.rsx_idx_key,
 				Some(&parent_idx),
 			) {
 				return apply_rsx(parent_el, rsx, loc, &self.constants);
