@@ -179,6 +179,14 @@ impl RsxElement {
 			})
 	}
 
+	/// only checks [RsxAttribute::Key]
+	pub fn contains_attr_key(&self, key: &str) -> bool {
+		self.attributes.iter().any(|a| match a {
+			RsxAttribute::Key { key: k } if k == key => true,
+			_ => false,
+		})
+	}
+
 	/// Try to find a matching value for a key
 	pub fn get_key_value_attr(&self, key: &str) -> Option<&str> {
 		self.attributes.iter().find_map(|a| match a {

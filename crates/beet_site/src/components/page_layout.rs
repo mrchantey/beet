@@ -30,6 +30,12 @@ impl Component for PageLayout {
 					flex-direction: column;
 				}
 			</style>
+			<style scope:global>
+			body{
+				background-color: black;
+				color:white;
+			}
+			</style>
 		}
 	}
 }
