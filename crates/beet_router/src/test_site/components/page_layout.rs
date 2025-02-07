@@ -1,6 +1,4 @@
 use beet_rsx::as_beet::*;
-use beet_rsx::prelude::*;
-
 
 pub struct PageLayout {
 	pub title: String,

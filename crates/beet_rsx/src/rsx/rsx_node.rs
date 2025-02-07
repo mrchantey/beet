@@ -43,12 +43,6 @@ impl RsxNode {
 	pub fn walk(&self, visitor: &mut impl RsxVisitor) {
 		visitor.walk_node(self)
 	}
-	/// convenience method for applying slots
-	pub fn apply_slots(mut self) -> Result<Self, SlotsError> {
-		SlotsVisitor::apply(&mut self)?;
-		Ok(self)
-	}
-
 
 	/// Returns true if the node is an html node
 	pub fn is_html_node(&self) -> bool {

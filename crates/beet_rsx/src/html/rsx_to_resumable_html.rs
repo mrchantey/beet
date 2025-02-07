@@ -25,7 +25,6 @@ impl RsxToResumableHtml {
 	/// attempt to insert the rsx context map into the html body,
 	/// otherwise append it to the end of the html
 	fn insert_dom_location_map(&self, node: &RsxNode, doc: &mut HtmlDocument) {
-		sweet::log!("html: {:#?}", DomLocationMap::from_node(node));
 		let loc_map = DomLocationMap::from_node(node).to_csv();
 		let el = HtmlElementNode::inline_script(loc_map, vec![HtmlAttribute {
 			key: self.html_constants.loc_map_key.to_string(),

@@ -3,13 +3,13 @@ use crate::prelude::*;
 
 #[derive(Debug, Default, Clone)]
 pub struct VisitRsxOptions {
-	/// do not visit the initial block node
+	/// do not visit [RsxBlock::initial]
 	pub ignore_block_node_initial: bool,
-	/// do not visit the children of an element
+	/// do not visit [RsxElement::children]
 	pub ignore_element_children: bool,
-	/// do not visit the component *node*
+	/// do not visit [RsxComponent::node]
 	pub ignore_component_node: bool,
-	/// do not visit the component *slot children*
+	/// do not visit [RsxComponent::slot_children]
 	pub ignore_component_slot_children: bool,
 }
 
@@ -21,24 +21,37 @@ pub const DEFAULT_VISIT_RSX_OPTIONS: VisitRsxOptions = VisitRsxOptions {
 };
 
 impl VisitRsxOptions {
+	/// do not visit [RsxBlock::initial]
 	pub fn ignore_block_node_initial() -> Self {
 		Self {
 			ignore_block_node_initial: true,
 			..Default::default()
 		}
 	}
+	/// do not visit [RsxElement::children]
 	pub fn ignore_element_children() -> Self {
 		Self {
 			ignore_element_children: true,
 			..Default::default()
 		}
 	}
+	/// - do not visit [RsxComponent::node]
+	/// - do not visit [RsxComponent::slot_children]
+	pub fn ignore_component() -> Self {
+		Self {
+			ignore_component_node: true,
+			ignore_component_slot_children: true,
+			..Default::default()
+		}
+	}
+	/// do not visit [RsxComponent::node]
 	pub fn ignore_component_node() -> Self {
 		Self {
 			ignore_component_node: true,
 			..Default::default()
 		}
 	}
+	/// do not visit [RsxComponent::slot_children]
 	pub fn ignore_component_slot_children() -> Self {
 		Self {
 			ignore_component_slot_children: true,
@@ -133,6 +146,9 @@ pub trait RsxVisitor {
 		if !self.ignore_component_node() {
 			self.walk_node(&component.node);
 		}
+		if !self.ignore_component_slot_children() {
+			self.walk_node(&component.slot_children);
+		}
 	}
 }
 
@@ -207,6 +223,9 @@ pub trait RsxVisitorMut {
 		if !self.ignore_component_node() {
 			self.walk_node(&mut component.node);
 		}
+		if !self.ignore_component_slot_children() {
+			self.walk_node(&mut component.slot_children);
+		}
 	}
 }
 
@@ -266,7 +285,7 @@ mod test {
 		// let child_block = rsx! { <div> {"text"} </div> };
 
 		let mut counter = Counter::default();
-		rsx! {
+		let mut rsx = rsx! {
 			<!DOCTYPE html>					// doctype
 			<!-- "comment" -->			// comment
 			<div class="test">			// attribute
@@ -280,12 +299,10 @@ mod test {
 					</Child>
 				</Child>
 			</div>
-		}
-		.node
-		.apply_slots()
-		.unwrap()
-		.walk(&mut counter);
-		expect(counter.node).to_be(14);
+		};
+		SlotsVisitor::apply(&mut rsx.node).unwrap();
+		rsx.walk(&mut counter);
+		expect(counter.node).to_be(19);
 		expect(counter.doctype).to_be(1);
 		expect(counter.comment).to_be(1);
 		expect(counter.text).to_be(2);
@@ -329,6 +346,6 @@ mod test {
 		.walk(&mut counter);
 
 		expect(counter.component).to_be(1); // Child component
-		expect(counter.element).to_be(1); // just div, Child's span not visited
+		expect(counter.element).to_be(2); // just div and span, Child's div not visited
 	}
 }

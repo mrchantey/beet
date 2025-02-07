@@ -40,6 +40,8 @@ impl RsxToHtml {
 	}
 
 	/// recursively map rsx nodes to html nodes
+	/// # Panics
+	/// If slot children have not been applied
 	pub fn map_node(&mut self, node: impl AsRef<RsxNode>) -> Vec<HtmlNode> {
 		self.rsx_idx_incr += 1;
 		match node.as_ref() {
@@ -67,7 +69,7 @@ impl RsxToHtml {
 			}) => {
 				// TODO assertion, why does it have html tag?
 				if !slot_children.is_empty_fragment() {
-					panic!("RsxToHtml: Slot children must be empty before mapping to html, please do a HtmlSlotsVisitor walk\n{:?}", slot_children);
+					panic!("RsxToHtml: Slot children must be empty before mapping to html, please call HtmlSlotsVisitor::apply\nunmapped slots: {:#?}", slot_children);
 				}
 				self.map_node(node)
 			}
@@ -251,17 +253,15 @@ mod test {
 				}
 			}
 		}
-		let node = rsx! {
-			<Layout>
-				<b>foo</b>
-			</Layout>
-		}
-		.node
-		.apply_slots()
-		.unwrap();
-
-		expect(RsxToHtml::render_body(&node))
-			.to_be("<div><h1>welcome</h1><p><b>foo</b></p></div>");
+		expect(
+			rsx! {
+				<Layout>
+					<b>foo</b>
+				</Layout>
+			}
+			.render_body(),
+		)
+		.to_be("<div><h1>welcome</h1><p><b>foo</b></p></div>");
 	}
 	#[test]
 	fn component_slots() {
@@ -281,17 +281,13 @@ mod test {
 				}
 			}
 		}
-		let node = rsx! {
+
+		expect(rsx! {
 			<Layout>
 				<b slot="tagline">what a cool article</b>
 				<div>direct child</div>
 			</Layout>
-		}
-		.node
-		.apply_slots()
-		.unwrap();
-
-		expect(RsxToHtml::render_body(&node))
+		}.render_body())
 			.to_be("<article><h1>welcome</h1><p><b>what a cool article</b></p><main><div>direct child</div></main></article>");
 	}
 

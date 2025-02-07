@@ -1,5 +1,4 @@
 use beet_rsx::as_beet::*;
-use beet_rsx::prelude::*;
 
 struct MyComponent {
 	value: u32,

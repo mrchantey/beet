@@ -1,4 +1,5 @@
 use crate::prelude::*;
+use thiserror::Error;
 
 /// Slotting is the process of traversing the [RsxComponent::slot_children]
 /// and applying them to the [RsxComponent::node] in the corresponding slots.
@@ -20,17 +21,13 @@ use crate::prelude::*;
 /// 	}
 /// }
 ///
-/// let slot_example = rsx!{
+/// assert_eq!(rsx!{
 /// 	<MyComponent>
 ///  		<div slot="header">Header</div>
 /// 		<div>Default</div>
 ///  	</MyComponent>
-/// };
+/// }.render_body(),"<html><div>Header</div><div>Default</div></html>");
 ///
-/// let RsxNode::Component(mut component) = slot_example.node else{
-/// 	panic!("not a component");
-/// };
-/// SlotsVisitor::apply_slots(&mut component).unwrap();
 /// ```
 ///
 /// # Slot Rules
@@ -49,8 +46,26 @@ pub struct SlotsVisitor {
 	named_slots: HashMap<String, Vec<RsxNode>>,
 }
 
-#[derive(Debug)]
-pub struct SlotsError(pub Vec<(String, Vec<RsxNode>)>);
+#[derive(Debug, Error)]
+#[error("some slots were not consumed: {unconsumed:?}")]
+pub struct SlotsError {
+	unconsumed: Vec<(String, Vec<RsxNodeDiscriminants>)>,
+}
+impl SlotsError {
+	pub fn new(unconsumed: Vec<(String, Vec<RsxNode>)>) -> Self {
+		Self {
+			unconsumed: unconsumed
+				.into_iter()
+				.map(|(name, nodes)| {
+					(
+						name,
+						nodes.into_iter().map(|n| n.discriminant()).collect(),
+					)
+				})
+				.collect(),
+		}
+	}
+}
 
 impl SlotsVisitor {
 	/// apply slots to all top level components,
@@ -124,7 +139,7 @@ impl SlotsVisitor {
 		if unconsumed.is_empty() {
 			Ok(())
 		} else {
-			Err(SlotsError(unconsumed))
+			Err(SlotsError::new(unconsumed))
 		}
 	}
 }
@@ -194,16 +209,17 @@ mod test {
 			}
 		}
 
-		let mut slot_example = rsx! {
-			<MyComponent>
-				 <div slot="header">Header</div>
-				<div>Default</div>
-			 </MyComponent>
-		};
-		SlotsVisitor::apply(&mut slot_example.node).unwrap();
 		// println!("{:?}", slot_example);
-		expect(RsxToHtml::render_body(slot_example))
-			.to_be("<html><div>Header</div><div>Default</div></html>");
+		expect(
+			rsx! {
+				<MyComponent>
+					 <div slot="header">Header</div>
+					<div>Default</div>
+				 </MyComponent>
+			}
+			.render_body(),
+		)
+		.to_be("<html><div>Header</div><div>Default</div></html>");
 	}
 	#[test]
 	fn recursive() {

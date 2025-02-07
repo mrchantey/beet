@@ -6,8 +6,8 @@ use std::collections::HashMap;
 
 
 /// This is an RsxNode and a location, which is required for hydration.
-/// 
-/// 
+///
+///
 /// The struct returned from an rsx! macro.
 #[derive(Debug)]
 pub struct RsxRoot {
@@ -18,6 +18,21 @@ pub struct RsxRoot {
 }
 
 impl RsxRoot {
+	/// convenience method usually for testing:
+	/// - [ScopedStyle::apply]
+	/// - [SlotsVisitor::apply]
+	/// - [RsxToHtml::map_node]
+	/// - [HtmlNode::render]
+	///
+	/// # Panics
+	/// If the slots cannot be applied.
+	pub fn render_body(mut self) -> String {
+		ScopedStyle::default().apply(&mut self).unwrap();
+		SlotsVisitor::apply(&mut self).unwrap();
+		let html = RsxToHtml::default().map_node(&self);
+		html.render()
+	}
+
 
 	/// Split the RsxRoot into a template and hydrated nodes.
 	pub fn split_hydration(self) -> Result<SplitRsx> {
@@ -97,22 +112,22 @@ mod test {
 	fn split_join() {
 		let some_val = 3;
 
-		let node = rsx! {
-			<div key str="value" num=32 ident=some_val>
-				<p>
-					hello <MyComponent value=3>
-						<div>some child</div>
-					</MyComponent>
-				</p>
-			</div>
+		let node = || {
+			rsx! {
+				<div key str="value" num=32 ident=some_val>
+					<p>
+						hello <MyComponent value=3>
+							<div>some child</div>
+						</MyComponent>
+					</p>
+				</div>
+			}
 		};
 
-		let html1 = RsxToHtml::render_body(&node);
-		let split = node.split_hydration().unwrap();
-		// println!("{:#?}", split);
-
+		let html1 = node().render_body();
+		let split = node().split_hydration().unwrap();
 		let node2 = RsxRoot::join_hydration(split).unwrap();
-		let html2 = RsxToHtml::render_body(&node2);
+		let html2 = node2.render_body();
 		expect(html1).to_be(html2);
 	}
 	#[test]

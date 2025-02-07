@@ -90,12 +90,13 @@ impl<T: 'static> StaticFileRouter<T> {
 	pub async fn routes_to_html(
 		&self,
 	) -> Result<Vec<(RouteInfo, HtmlDocument)>> {
-		let mut scoped_style = ScopedStyle::default();
-
 		let mut template_map = self
 			.load_template_map()
 			.map_err(|err| {
-				eprintln!("No templates found at {:?}", self.templates_src);
+				eprintln!(
+					"No templates found at {:?}\nusing routes",
+					self.templates_src
+				);
 				err
 			})
 			.ok();
@@ -125,13 +126,19 @@ impl<T: 'static> StaticFileRouter<T> {
 			}
 		};
 
+
+
 		let html = self
 			.routes_to_rsx()
 			.await?
 			.into_iter()
 			.map(|(route, root)| {
+				// we must use a global
 				let mut root = apply_templates(root)?;
-				scoped_style.apply(&mut root)?;
+
+				ScopedStyle::default().apply(&mut root)?;
+
+				SlotsVisitor::apply(&mut root)?;
 				let doc = RsxToHtml::default().map_node(&root).into_document();
 				Ok((route, doc))
 			})
