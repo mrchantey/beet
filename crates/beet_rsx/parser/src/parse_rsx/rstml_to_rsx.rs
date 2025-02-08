@@ -154,64 +154,6 @@ impl RstmlToRsx {
 		}
 	}
 
-	fn map_component<C>(
-		&mut self,
-		tag: String,
-		open_tag: OpenTag,
-		children: Vec<Node<C>>,
-	) -> TokenStream {
-		let tracker = self
-			.rusty_tracker
-			.next_tracker_optional(&open_tag, self.build_trackers);
-		let props = open_tag.attributes.into_iter().map(|attr| match attr {
-			NodeAttribute::Block(node_block) => {
-				quote! {#node_block}
-			}
-			NodeAttribute::Attribute(attr) => {
-				if let Some(value) = attr.value() {
-					let key = &attr.key;
-					// apply the value to the field
-					quote! {
-						#key: #value
-					}
-				} else {
-					let key = &attr.key;
-					// for components a key is treated as bool
-					quote! {#key: true}
-				}
-			}
-		});
-		let ident = syn::Ident::new(&tag, tag.span());
-		let slot_children = self.map_nodes(children);
-		quote!({
-			RsxNode::Component(RsxComponent{
-				tag: #tag.to_string(),
-				tracker: #tracker,
-				root: Box::new(#ident{
-					#(#props,)*
-				}
-				.render()),
-				slot_children: Box::new(#slot_children)
-			})
-		})
-	}
-
-	fn check_self_closing_children<C>(&mut self, element: &NodeElement<C>) {
-		if element.children.is_empty()
-			|| !self
-				.self_closing_elements
-				.contains(element.open_tag.name.to_string().as_str())
-		{
-			return;
-		}
-		let warning = Diagnostic::spanned(
-			element.open_tag.name.span(),
-			Level::Warning,
-			"Element is processed as empty, and cannot have any child",
-		);
-		self.errors.push(warning.emit_as_expr_tokens());
-	}
-
 	fn map_attribute(&mut self, attr: NodeAttribute) -> TokenStream {
 		let build_tracker = self.build_trackers;
 		let ident = &self.idents.effect;
@@ -277,5 +219,62 @@ impl RstmlToRsx {
 				}
 			}
 		}
+	}
+	fn map_component<C>(
+		&mut self,
+		tag: String,
+		open_tag: OpenTag,
+		children: Vec<Node<C>>,
+	) -> TokenStream {
+		let tracker = self
+			.rusty_tracker
+			.next_tracker_optional(&open_tag, self.build_trackers);
+		let props = open_tag.attributes.into_iter().map(|attr| match attr {
+			NodeAttribute::Block(node_block) => {
+				quote! {#node_block}
+			}
+			NodeAttribute::Attribute(attr) => {
+				if let Some(value) = attr.value() {
+					let key = &attr.key;
+					// apply the value to the field
+					quote! {
+						#key: #value
+					}
+				} else {
+					let key = &attr.key;
+					// for components a key is treated as bool
+					quote! {#key: true}
+				}
+			}
+		});
+		let ident = syn::Ident::new(&tag, tag.span());
+		let slot_children = self.map_nodes(children);
+		quote!({
+			RsxNode::Component(RsxComponent{
+				tag: #tag.to_string(),
+				tracker: #tracker,
+				root: Box::new(#ident{
+					#(#props,)*
+				}
+				.render()),
+				slot_children: Box::new(#slot_children)
+			})
+		})
+	}
+
+	fn check_self_closing_children<C>(&mut self, element: &NodeElement<C>) {
+		if element.children.is_empty()
+			|| !self
+				.self_closing_elements
+				.contains(element.open_tag.name.to_string().as_str())
+		{
+			return;
+		}
+		let warning = Diagnostic::spanned(
+			element.open_tag.name.span(),
+			Level::Warning,
+			"Element is processed as empty, and cannot have any child",
+		);
+		self.errors.push(warning.emit_as_expr_tokens());
 	}
 }

@@ -110,61 +110,54 @@ mod test {
 		let html2 = node2.render_body();
 		expect(html1).to_be(html2);
 	}
-	// #[test]
-	// fn split_join_seperate_sources_simple() {
-	// 	let some_val = 3;
-	// 	let some_val2 = 3;
-	// 	let node1 = rsx! {
-	// 		<div ident=some_val>
-	// 		// <MyComponent value=34/>
-	// 		<div ident=some_val2>
-	// 		// <MyComponent value=34/>
-	// 		</div>
-	// 		</div>
-	// 	};
-	// 	let node2_template = rsx_template! {
-	// 		<div ident=some_val>
-	// 		// <MyComponent value=34/>
-	// 		<div ident=some_val2>
-	// 		// <MyComponent value=34/>
-	// 		</div>
-	// 		</div>
-	// 	};
-	// 	let (node1_template, _) = node1.split_hydration().unwrap();
-	// 	expect(&node1_template).not().to_be(&node2_template);
-	// 	expect(&node1_template.node).to_be(&node2_template.node);
-	// }
-	// #[test]
-	// fn split_join_seperate_sources() {
-	// 	let some_val = 3;
+	#[test]
+	fn rsx_template_match_simple() {
+		let some_val = 3;
+		let node1 = rsx! {
+			<div ident=some_val>
+				<div ident=some_val/>
+			</div>
+		};
+		let node2_template = rsx_template! {
+			<div ident=some_val>
+				<div ident=some_val/>
+			</div>
+		};
+		let (node1_template, _) = node1.split_hydration().unwrap();
+		expect(&node1_template).not().to_be(&node2_template);
+		expect(&node1_template.node).to_be(&node2_template.node);
+	}
+	#[test]
+	fn rsx_template_match_complex() {
+		let some_val = 3;
 
-	// 	let node1 = rsx! {
-	// 		<div key str="value" num=32 ident=some_val>
-	// 			<p>
-	// 				hello
-	// 				<MyComponent value=3>
-	// 					<div>some child</div>
-	// 				</MyComponent>
-	// 			</p>
-	// 		</div>
-	// 	};
-	// 	let node2_template = rsx_template! {
-	// 		<div
-	// 		key
-	// 		str="value"
-	// 		num=32
-	// 		ident=some_val
-	// 		><p>hello
-	// 		<MyComponent value=3>
-	// 		<div>some child</div>
-	// 		</MyComponent>
-	// 		</p>
-	// 		</div>
-	// 	};
-
-	// 	// println!("whoppdiedoo:\n{:#?}", node1);
-	// 	let (node1_template, _) = node1.split_hydration().unwrap();
-	// 	expect(&node1_template).not().to_be(&node2_template);
-	// 	expect(&node1_template.node).to_be(&node2_template.node);
-	// }
+		let node1 = rsx! {
+			<div key str="value" num=32 ident=some_val onclick=|_|{}
+			>
+				<p>
+					hello
+					<MyComponent value=3>
+						<div>some child</div>
+					</MyComponent>
+				</p>
+			</div>
+		};
+		let node2_template = rsx_template! {
+			<div
+			key
+			str="value"
+			num=32
+			ident=some_val
+			onclick=|_|{}
+			><p>hello
+			<MyComponent value=3>
+			<div>some child</div>
+			</MyComponent>
+			</p>
+			</div>
+		};
+		let (node1_template, _) = node1.split_hydration().unwrap();
+		expect(&node1_template).not().to_be(&node2_template);
+		expect(&node1_template.node).to_be(&node2_template.node);
+	}
 }

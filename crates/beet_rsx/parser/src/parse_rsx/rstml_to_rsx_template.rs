@@ -111,12 +111,12 @@ impl RstmlToRsxTemplate {
 				if tag.starts_with(|c: char| c.is_uppercase()) {
 					self.map_component(tag, open_tag, children)
 				} else {
-					let children = self.map_nodes(children);
 					let attributes = open_tag
 						.attributes
 						.into_iter()
-						.map(|a| self.map_attribute(a));
-
+						.map(|a| self.map_attribute(a))
+						.collect::<Vec<_>>();
+					let children = self.map_nodes(children);
 					quote! {
 							Element (
 								tag: #tag,
@@ -130,25 +130,7 @@ impl RstmlToRsxTemplate {
 			Node::Custom(_) => unimplemented!(),
 		}
 	}
-	fn map_component<C: CustomNode>(
-		&mut self,
-		tag: String,
-		open_tag: OpenTag,
-		children: Vec<Node<C>>,
-	) -> TokenStream {
-		let tracker = self.rusty_tracker.next_tracker_ron(&open_tag);
-		// components disregard all the context and rely on the tracker
-		// we rely on the hydrated node to provide the attributes and children
-		let slot_children = self.map_nodes(children);
 
-		quote! {
-			Component (
-				tracker: #tracker,
-				tag: #tag,
-				slot_children: #slot_children,
-			)
-		}
-	}
 	fn map_attribute(&mut self, attr: NodeAttribute) -> TokenStream {
 		match attr {
 			NodeAttribute::Block(block) => {
@@ -184,6 +166,25 @@ impl RstmlToRsxTemplate {
 					}
 				}
 			}
+		}
+	}
+	fn map_component<C: CustomNode>(
+		&mut self,
+		tag: String,
+		open_tag: OpenTag,
+		children: Vec<Node<C>>,
+	) -> TokenStream {
+		let tracker = self.rusty_tracker.next_tracker_ron(&open_tag);
+		// components disregard all the context and rely on the tracker
+		// we rely on the hydrated node to provide the attributes and children
+		let slot_children = self.map_nodes(children);
+
+		quote! {
+			Component (
+				tracker: #tracker,
+				tag: #tag,
+				slot_children: #slot_children,
+			)
 		}
 	}
 }
