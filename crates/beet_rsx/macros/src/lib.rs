@@ -41,10 +41,7 @@ pub fn rsx(tokens: TokenStream) -> TokenStream {
 /// things like hot reloading.
 #[proc_macro]
 pub fn rsx_template(tokens: TokenStream) -> TokenStream {
-	let tokens =
-		RstmlToRsxTemplate::default().map_tokens_to_string(tokens.into());
-	quote::quote! {
-		RsxTemplateNode::from_ron(#tokens).unwrap()
-	}
-	.into()
+	RstmlToRsxTemplate::default()
+		.from_macro(tokens.into())
+		.into()
 }

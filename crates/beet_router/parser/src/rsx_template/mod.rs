@@ -106,8 +106,8 @@ impl<'a> Visit<'a> for RsxVisitor {
 			let span = mac.tokens.span();
 			let start = span.start();
 			let loc = RsxLocation::new(&self.file, start.line, start.column);
-			let tokens =
-				RstmlToRsxTemplate::default().map_tokens(mac.tokens.clone());
+			let tokens = RstmlToRsxTemplate::default()
+				.map_tokens(mac.tokens.clone(), &self.file);
 			self.templates.push((loc, tokens));
 		}
 	}

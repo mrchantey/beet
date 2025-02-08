@@ -4,23 +4,25 @@ use std::collections::HashMap;
 
 
 
-/// Serializable version of an rsx node, that can be rehydrated
-/// with a hashmap of RustyTrackers
-/// An rsx template is conceptually similar to a html template
+/// Serializable version of an rsx node that can be rehydrated.
+///
+/// This has absolute symmetry with [RsxNode] but with each rusty bit
+/// replaced by [RustyTracker].
+///
+/// An [RsxTemplateNode] is conceptually similar to a html template
 /// but instead of {{PLACEHOLDER}} there is a hash for a known
 /// location of the associated rust code.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum RsxTemplateNode {
 	Fragment(Vec<Self>),
-	// only used by the rsx_template! macro,
-	// components are already collapsed when traversing [RsxNode]
+	/// We dont know much about components, for example when parsing
+	/// a file we just get the name.
+	/// The [RsxLocation] etc is is tracked by the [RsxHydratedNode::Component::root]
 	Component {
+		/// the hydrated part has the juicy details
 		tracker: RustyTracker,
 		tag: String,
-		// location: RsxLocation,
-		// /// mapped from [RsxComponent::node]
-		// node: Box<Self>,
 		/// mapped from [RsxComponent::slot_children]
 		slot_children: Box<Self>,
 	},
@@ -52,12 +54,6 @@ fn to_node_tracker_error(
 }
 
 impl RsxTemplateNode {
-	#[cfg(feature = "serde")]
-	pub fn from_ron(ron: &str) -> Result<Self> {
-		ron::de::from_str(ron).map_err(Into::into)
-	}
-
-
 	pub fn from_rsx_node(node: impl AsRef<RsxNode>) -> Result<Self> {
 		match node.as_ref() {
 			RsxNode::Fragment(rsx_nodes) => {
@@ -336,9 +332,9 @@ mod test {
 	#[test]
 	fn simple() {
 		let loc = RustyTracker::new(0, 15046980652419922415);
-		let node = rsx_template! {<div>{value}</div>};
+		let root = rsx_template! {<div>{value}</div>};
 
-		expect(&node).to_be(&RsxTemplateNode::Element {
+		expect(&root.node).to_be(&RsxTemplateNode::Element {
 			tag: "div".to_string(),
 			self_closing: false,
 			attributes: vec![],
@@ -364,7 +360,7 @@ mod test {
 			</div>
 		};
 
-		expect(&template).to_be(&RsxTemplateNode::Element {
+		expect(&template.node).to_be(&RsxTemplateNode::Element {
 			tag: "div".to_string(),
 			self_closing: false,
 			attributes: vec![
@@ -437,6 +433,6 @@ mod test {
 				</p>
 			</div>
 		};
-		expect(template).to_be(template_ron);
+		expect(template.node).to_be(template_ron.node);
 	}
 }

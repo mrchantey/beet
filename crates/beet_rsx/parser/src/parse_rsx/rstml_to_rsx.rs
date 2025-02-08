@@ -14,6 +14,19 @@ use rstml::node::NodeName;
 use std::collections::HashSet;
 use syn::spanned::Spanned;
 
+/// given a span, for example the inner block
+/// of an rsx! or rsx_template! macro,
+/// return a RsxLocation token stream
+pub fn rsx_location_tokens(tokens: impl Spanned) -> TokenStream {
+	let span = tokens.span();
+	let line = span.start().line;
+	let col = span.start().column;
+	quote! {
+		{
+			RsxLocation::new(std::file!(), #line, #col)
+		}
+	}
+}
 
 /// Convert rstml nodes to a Vec<RsxNode> token stream
 #[derive(Debug, Default)]
@@ -42,22 +55,20 @@ impl RstmlToRsx {
 	pub fn map_tokens(&mut self, tokens: TokenStream) -> TokenStream {
 		let (nodes, rstml_errors) = tokens_to_rstml(tokens.clone());
 		let mut nodes = self.map_nodes(nodes);
-		let span = tokens.span();
-		let line = span.start().line;
-		let col = span.start().column;
+
 		let node = if nodes.len() == 1 {
 			nodes.pop().unwrap()
 		} else {
 			quote!(RsxNode::Fragment(Vec::from([#(#nodes),*])))
 		};
-
+		let location = rsx_location_tokens(tokens);
 		quote! {
 			{
 				#(#rstml_errors;)*
 				use beet::prelude::*;
 				#[allow(unused_braces)]
 				RsxRoot{
-					location: RsxLocation::new(std::file!(), #line, #col),
+					location: #location,
 					node: #node
 				}
 

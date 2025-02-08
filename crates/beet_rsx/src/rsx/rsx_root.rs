@@ -2,8 +2,6 @@ use crate::prelude::*;
 use anyhow::Result;
 use std::borrow::Borrow;
 use std::borrow::BorrowMut;
-use std::collections::HashMap;
-
 
 /// This is an RsxNode and a location, which is required for hydration.
 ///
@@ -43,39 +41,12 @@ impl RsxRoot {
 
 
 	/// Split the RsxRoot into a template and hydrated nodes.
-	pub fn split_hydration(self) -> Result<SplitRsx> {
-		let template = RsxTemplateNode::from_rsx_node(&self.node)?;
-		let hydrated = RsxHydratedNode::collect(self.node)?;
-		let location = self.location;
-		Ok(SplitRsx {
-			location,
-			template,
-			hydrated,
-		})
-	}
-
-	/// Create an RsxRoot from a template and hydrated nodes.
-	/// 		todo!("this is wrong, we need template map for each component");
-	pub fn join_hydration(
-		SplitRsx {
-			mut hydrated,
-			location,
-			template,
-		}: SplitRsx,
-	) -> Result<Self> {
-		let node = RsxTemplateNode::into_rsx_node(template, &mut hydrated)?;
-
-		Ok(Self { node, location })
+	pub fn split_hydration(self) -> Result<(RsxTemplateRoot, RsxHydratedMap)> {
+		let template = RsxTemplateRoot::from_rsx(&self)?;
+		let hydrated = RsxHydratedMap::collect(self.node)?;
+		Ok((template, hydrated))
 	}
 }
-
-#[derive(Debug)]
-pub struct SplitRsx {
-	pub location: RsxLocation,
-	pub template: RsxTemplateNode,
-	pub hydrated: HashMap<RustyTracker, RsxHydratedNode>,
-}
-
 
 impl std::ops::Deref for RsxRoot {
 	type Target = RsxNode;
@@ -134,8 +105,8 @@ mod test {
 		};
 
 		let html1 = node().render_body();
-		let split = node().split_hydration().unwrap();
-		let node2 = RsxRoot::join_hydration(split).unwrap();
+		let (template, mut hydrated) = node().split_hydration().unwrap();
+		let node2 = template.into_rsx(&mut hydrated).unwrap();
 		let html2 = node2.render_body();
 		expect(html1).to_be(html2);
 	}
@@ -167,10 +138,7 @@ mod test {
 			</div>
 		};
 
-		let SplitRsx {
-			template: node1_template,
-			..
-		} = node.split_hydration().unwrap();
+		let (node1_template, _) = node.split_hydration().unwrap();
 		expect(&node1_template).not().to_be(&node2_template);
 	}
 }

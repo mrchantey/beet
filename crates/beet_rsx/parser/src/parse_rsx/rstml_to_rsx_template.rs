@@ -1,4 +1,5 @@
 use crate::prelude::*;
+use proc_macro2::Literal;
 use proc_macro2::TokenStream;
 use quote::quote;
 use quote::ToTokens;
@@ -7,6 +8,7 @@ use rstml::node::NodeAttribute;
 use rstml::node::NodeComment;
 use rstml::node::NodeElement;
 use rstml::node::NodeText;
+use syn::spanned::Spanned;
 
 /// Convert rstml nodes to a ron file.
 /// Rust block token streams will be hashed by [Span::start]
@@ -18,16 +20,44 @@ pub struct RstmlToRsxTemplate {
 
 impl RstmlToRsxTemplate {
 	/// returns a "[RsxTemplateNode]" ron string
-	pub fn map_tokens_to_string(&mut self, tokens: TokenStream) -> TokenStream {
-		self.map_tokens(tokens).to_string().to_token_stream()
+	pub fn from_macro(&mut self, tokens: TokenStream) -> TokenStream {
+		let str_tokens = self
+			.map_tokens(tokens, "unknown")
+			.to_string()
+			.to_token_stream();
+		quote! {
+			{
+				let mut root = RsxTemplateRoot::from_ron(#str_tokens).unwrap();
+				root.location.file = std::file!().to_string();
+				root
+			}
+		}
 	}
-	pub fn map_tokens(&mut self, tokens: TokenStream) -> TokenStream {
+	pub fn map_tokens(
+		&mut self,
+		tokens: TokenStream,
+		file: &str,
+	) -> TokenStream {
+		let span = tokens.span();
 		let (nodes, _rstml_errors) = tokens_to_rstml(tokens);
 		let mut nodes = self.map_nodes(nodes);
-		if nodes.len() == 1 {
+		let node = if nodes.len() == 1 {
 			nodes.pop().unwrap()
 		} else {
 			quote! {Fragment([#(#nodes),*])}
+		};
+		let line = Literal::usize_unsuffixed(span.start().line);
+		let col = Literal::usize_unsuffixed(span.start().column);
+
+		quote! {
+			RsxTemplateRoot (
+				node: #node,
+				location: RsxLocation(
+					file: #file,
+					line: #line,
+					col: #col
+				)
+			)
 		}
 	}
 	pub fn map_nodes<C>(&mut self, nodes: Vec<Node<C>>) -> Vec<TokenStream> {

@@ -1,6 +1,18 @@
 use crate::prelude::*;
 use std::collections::HashMap;
 
+
+impl std::ops::Deref for RsxHydratedMap {
+	type Target = HashMap<RustyTracker, RsxHydratedNode>;
+	fn deref(&self) -> &Self::Target { &self.0 }
+}
+
+impl std::ops::DerefMut for RsxHydratedMap {
+	fn deref_mut(&mut self) -> &mut Self::Target { &mut self.0 }
+}
+
+
+
 pub enum RsxHydratedNode {
 	// we also collect components because they
 	// cannot be statically resolved
@@ -42,6 +54,24 @@ impl std::fmt::Debug for RsxHydratedNode {
 				.field("initial", initial)
 				.field("register", &std::any::type_name_of_val(&register))
 				.finish(),
+		}
+	}
+}
+
+
+
+
+pub struct RsxHydratedMap(pub HashMap<RustyTracker, RsxHydratedNode>);
+
+impl RsxHydratedMap {
+	pub fn collect(node: impl Rsx) -> ParseResult<Self> {
+		let mut visitor = RsxHydratedVisitor::default();
+		let mut node = node.into_rsx();
+		visitor.walk_node(&mut node);
+		if let Some(err) = visitor.err {
+			Err(err)
+		} else {
+			Ok(Self(visitor.rusty_map))
 		}
 	}
 }
@@ -133,20 +163,6 @@ impl RsxVisitorMut for RsxHydratedVisitor {
 	}
 }
 
-impl RsxHydratedNode {
-	pub fn collect(node: impl Rsx) -> ParseResult<HashMap<RustyTracker, Self>> {
-		let mut visitor = RsxHydratedVisitor::default();
-		let mut node = node.into_rsx();
-		visitor.walk_node(&mut node);
-		if let Some(err) = visitor.err {
-			Err(err)
-		} else {
-			Ok(visitor.rusty_map)
-		}
-	}
-}
-
-
 
 #[cfg(test)]
 mod test {
@@ -156,16 +172,16 @@ mod test {
 	#[test]
 	fn works() {
 		let bar = 2;
-		expect(RsxHydratedNode::collect(rsx! { <div /> }).unwrap().len())
+		expect(RsxHydratedMap::collect(rsx! { <div /> }).unwrap().len())
 			.to_be(0);
 		expect(
-			RsxHydratedNode::collect(rsx! { <div foo=bar /> })
+			RsxHydratedMap::collect(rsx! { <div foo=bar /> })
 				.unwrap()
 				.len(),
 		)
 		.to_be(1);
 		expect(
-			RsxHydratedNode::collect(rsx! { <div>{bar}</div> })
+			RsxHydratedMap::collect(rsx! { <div>{bar}</div> })
 				.unwrap()
 				.len(),
 		)
