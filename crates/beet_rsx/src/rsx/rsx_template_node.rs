@@ -382,7 +382,7 @@ mod test {
 	#[test]
 	fn simple() {
 		let loc = RustyTracker::new(0, 15046980652419922415);
-		let root = rsx_template! {<div>{value}</div>};
+		let root = rsx_template! { <div>{value}</div> };
 
 		expect(&root.node).to_be(&RsxTemplateNode::Element {
 			tag: "div".to_string(),
@@ -393,17 +393,12 @@ mod test {
 	}
 	#[test]
 	fn complex() {
-		let ident_tracker = RustyTracker::new(1, 3802233634778759949);
-		let component_tracker = RustyTracker::new(0, 3429327963174273294);
+		let ident_tracker = RustyTracker::new(0, 3802233634778759949);
+		let component_tracker = RustyTracker::new(1, 3429327963174273294);
 		let template = rsx_template! {
-			<div
-				key
-				str="value"
-				num=32
-				ident=some_val
-				>
-				<p>hello
-					<MyComponent>
+			<div key str="value" num=32 ident=some_val>
+				<p>
+					hello <MyComponent>
 						<div>some child</div>
 					</MyComponent>
 				</p>
@@ -435,7 +430,7 @@ mod test {
 				self_closing: false,
 				attributes: vec![],
 				children: Box::new(RsxTemplateNode::Fragment(vec![
-					RsxTemplateNode::Text("hello\n\t\t\t\t\t".to_string()),
+					RsxTemplateNode::Text("\n\t\t\t\t\thello ".to_string()),
 					RsxTemplateNode::Component {
 						tracker: component_tracker,
 						tag: "MyComponent".to_string(),
@@ -456,28 +451,18 @@ mod test {
 	#[test]
 	fn ron() {
 		let template = rsx_template! {
-			<div
-				key
-				str="value"
-				num=32
-				ident=some_val
-				>
-				<p>hello
-					<MyComponent>
+			<div key str="value" num=32 ident=some_val>
+				<p>
+					hello <MyComponent>
 						<div>some child</div>
 					</MyComponent>
 				</p>
 			</div>
 		};
 		let template_ron = rsx_template! {
-			<div
-				key
-				str="value"
-				num=32
-				ident=some_val
-				>
-				<p>hello
-					<MyComponent>
+			<div key str="value" num=32 ident=some_val>
+				<p>
+					hello <MyComponent>
 						<div>some child</div>
 					</MyComponent>
 				</p>

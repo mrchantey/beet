@@ -115,12 +115,12 @@ mod test {
 		let some_val = 3;
 		let node1 = rsx! {
 			<div ident=some_val>
-				<div ident=some_val/>
+				<div ident=some_val />
 			</div>
 		};
 		let node2_template = rsx_template! {
 			<div ident=some_val>
-				<div ident=some_val/>
+				<div ident=some_val />
 			</div>
 		};
 		let (node1_template, _) = node1.split_hydration().unwrap();
@@ -132,28 +132,21 @@ mod test {
 		let some_val = 3;
 
 		let node1 = rsx! {
-			<div key str="value" num=32 ident=some_val onclick=|_|{}
-			>
+			<div key str="value" num=32 ident=some_val onclick=|_| {}>
 				<p>
-					hello
-					<MyComponent value=3>
+					hello <MyComponent value=3>
 						<div>some child</div>
 					</MyComponent>
 				</p>
 			</div>
 		};
 		let node2_template = rsx_template! {
-			<div
-			key
-			str="value"
-			num=32
-			ident=some_val
-			onclick=|_|{}
-			><p>hello
-			<MyComponent value=3>
-			<div>some child</div>
-			</MyComponent>
-			</p>
+			<div key str="value" num=32 ident=some_val onclick=|_| {}>
+				<p>
+					hello <MyComponent value=3>
+						<div>some child</div>
+					</MyComponent>
+				</p>
 			</div>
 		};
 		let (node1_template, _) = node1.split_hydration().unwrap();

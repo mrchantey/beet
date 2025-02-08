@@ -209,14 +209,14 @@ mod test {
 
 	#[test]
 	fn applies_to_component_node() {
-		expect(rsx!{<Child/>}.render_body())
+		expect(rsx! { <Child /> }.render_body())
 		.to_be("<div data-styleid=\"0\"><style data-styleid=\"0\">span[data-styleid=\"0\"] {\n  color: #00f;\n}\n</style></div>");
 	}
 	#[test]
 	fn applies_to_nested_component() {
 		expect(rsx! {
 			<Child>
-				<Child/>
+				<Child />
 			</Child>
 		}.render_body())
 			.to_be("<div data-styleid=\"0\"><style data-styleid=\"0\">span[data-styleid=\"0\"] {\n  color: #00f;\n}\n</style><div data-styleid=\"1\"><style data-styleid=\"1\">span[data-styleid=\"1\"] {\n  color: #00f;\n}\n</style></div></div>");

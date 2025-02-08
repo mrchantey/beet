@@ -39,10 +39,14 @@ fmt *args:
 	just watch 'just leptosfmt {{args}}'
 
 leptosfmt *args:
-	leptosfmt 									\
-	crates/beet_rsx/**/*.rs 		\
-	crates/beet_router/**/*.rs 	\
-	crates/beet_site/**/*.rs 		\
+	leptosfmt 												\
+	crates/beet_rsx/**/*.rs 					\
+	crates/beet_rsx/**/**/*.rs 				\
+	crates/beet_rsx/**/**/**/*.rs 		\
+	crates/beet_router/**/*.rs 				\
+	crates/beet_router/**/**/*.rs 		\
+	crates/beet_router/**/**/**/*.rs 	\
+	crates/beet_site/**/*.rs 					\
 	{{args}}
 
 #💡 e2e examples

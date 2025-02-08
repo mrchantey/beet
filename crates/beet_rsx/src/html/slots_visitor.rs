@@ -202,8 +202,9 @@ mod test {
 			fn render(self) -> RsxRoot {
 				rsx! {
 					<html>
-						<slot name="header"/>
-						<slot/> //default
+						<slot name="header" />
+						// default
+						<slot />
 					</html>
 				}
 			}
@@ -213,9 +214,9 @@ mod test {
 		expect(
 			rsx! {
 				<MyComponent>
-					 <div slot="header">Header</div>
+					<div slot="header">Header</div>
 					<div>Default</div>
-				 </MyComponent>
+				</MyComponent>
 			}
 			.render_body(),
 		)
@@ -229,8 +230,9 @@ mod test {
 			fn render(self) -> RsxRoot {
 				rsx! {
 					<html>
-						<slot name="header"/>
-						<slot/> //default
+						<slot name="header" />
+						// default
+						<slot />
 					</html>
 				}
 			}
@@ -238,11 +240,11 @@ mod test {
 
 		let mut slot_example = rsx! {
 			<MyComponent>
-			<MyComponent>
-				 <div slot="header">Header</div>
-				<div>Default</div>
+				<MyComponent>
+					<div slot="header">Header</div>
+					<div>Default</div>
 				</MyComponent>
-			 </MyComponent>
+			</MyComponent>
 		};
 		SlotsVisitor::apply(&mut slot_example.node).unwrap();
 		// println!("{:?}", slot_example);

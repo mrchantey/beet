@@ -246,7 +246,9 @@ mod test {
 	impl Component for Child {
 		fn render(self) -> RsxRoot {
 			rsx! {
-				<div><slot /></div>
+				<div>
+					<slot />
+				</div>
 			}
 		}
 	}
@@ -292,16 +294,23 @@ mod test {
 
 		let mut counter = Counter::default();
 		let mut rsx = rsx! {
-			<!DOCTYPE html>					// doctype
-			<!-- "comment" -->			// comment
-			<div class="test">			// attribute
-				"text"								// text node
-				{7}										// block node
-				// {child_block}					// block child
-				<Child>								// component
-					<span />						// component child
-					<Child> 						// nested component
-						<span />					// nested child
+			// doctype
+			<!DOCTYPE html>
+			// comment
+			<!-- "comment" -->
+			// attribute
+			<div class="test">
+				// text node
+				// block node
+				"text" // {child_block}					// block child
+				{7} // component
+				<Child>
+					// component child
+					<span />
+					// nested component
+					<Child>
+						// nested child
+						<span />
 					</Child>
 				</Child>
 			</div>

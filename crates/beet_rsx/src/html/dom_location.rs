@@ -246,13 +246,18 @@ mod test {
 		let bucket = mock_bucket();
 		let bucket2 = bucket.clone();
 		let rsx = rsx! {
-			   <div>				// 0 - root
-				   <div>			// 1 - child
-					   <div/>		// 2 - nested child
-					   <div/>		// 3 - second child
-				   </div>
-				   <div/>			// 4 - child 1
-			   </div>
+			// 0 - root
+			<div>
+				// 1 - child
+				<div>
+					// 2 - nested child
+					<div />
+					// 3 - second child
+					<div />
+				</div>
+				// 4 - child 1
+				<div />
+			</div>
 		};
 		DomLocationVisitor::visit(&rsx, move |loc, node| {
 			if let RsxNode::Element(_) = node {
