@@ -17,12 +17,6 @@ pub struct PostTickSet;
 /// Helpers that clean up run state, this is included in the [`LifecyclePlugin`]
 pub struct LifecycleSystemsPlugin;
 
-impl LifecycleSystemsPlugin {
-	/// a brittle hack, keeps track of the number of observers added by the LifecycleSystemsPlugin
-	/// for validating scene exports
-	pub const NUM_OBSERVERS: u32 = 3;
-}
-
 impl Plugin for LifecycleSystemsPlugin {
 	fn build(&self, app: &mut App) {
 		app.init_resource::<BeetConfig>();

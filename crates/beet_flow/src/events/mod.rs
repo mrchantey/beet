@@ -1,4 +1,6 @@
 mod on_message;
+pub use on_run_global::*;
+mod on_run_global;
 pub use on_message::*;
 mod on_child_value;
 pub use self::on_child_value::*;

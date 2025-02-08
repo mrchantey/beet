@@ -28,6 +28,7 @@ bevy.workspace = true
 log.workspace = true
 anyhow.workspace = true
 extend.workspace = true
+thiserror.workspace = true
 serde = { workspace = true, optional = true }
 heck = { workspace = true, optional = true }
 

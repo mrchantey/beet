@@ -17,6 +17,7 @@ pub struct LifecyclePlugin;
 impl Plugin for LifecyclePlugin {
 	fn build(&self, app: &mut App) {
 		app
+		.add_plugins(on_run_global_plugin)
 		.add_plugins((
 			LifecycleSystemsPlugin,
 			ActionPlugin::<(

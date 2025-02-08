@@ -35,3 +35,12 @@ mod utils;
 pub fn action(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 	action::derive_action(input)
 }
+#[proc_macro_derive(
+	GlobalAction,
+	attributes(observers, systems, category, storage)
+)]
+pub fn global_action(
+	input: proc_macro::TokenStream,
+) -> proc_macro::TokenStream {
+	action::derive_action_global(input)
+}
