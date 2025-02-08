@@ -101,15 +101,8 @@ pub struct RsxBlock {
 /// let my_block = 3;
 /// let el = rsx! { <div>{my_block}</div> };
 /// ```
-#[derive(Debug)]
+#[derive(Debug, Deref, DerefMut)]
 pub struct RsxFragment(pub Vec<RsxNode>);
-impl std::ops::Deref for RsxFragment {
-	type Target = Vec<RsxNode>;
-	fn deref(&self) -> &Self::Target { &self.0 }
-}
-impl std::ops::DerefMut for RsxFragment {
-	fn deref_mut(&mut self) -> &mut Self::Target { &mut self.0 }
-}
 
 /// A component is a struct that implements the [Component] trait.
 /// When it is used in an `rsx!` macro it will be instantiated
@@ -117,12 +110,13 @@ impl std::ops::DerefMut for RsxFragment {
 #[derive(Debug)]
 pub struct RsxComponent {
 	pub tag: String,
+	/// Tracks the <MyComponent ..> opening tag for this component
 	/// even key value attribute changes must be tracked
 	/// because components are structs not elements
 	pub tracker: Option<RustyTracker>,
 	/// the root returned by [Component::render]
 	pub root: Box<RsxRoot>,
-	// /// the children passed in by this components parent:
+	// /// the children passed in by this component's parent:
 	// ///
 	// /// `rsx! { <MyComponent>slot_children</MyComponent> }`
 	pub slot_children: Box<RsxNode>,

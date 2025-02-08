@@ -16,7 +16,7 @@ pub use hash_file::*;
 
 
 #[derive(Debug, Parser)]
-pub struct BuildRsxTemplates {
+pub struct BuildRsxTemplateMap {
 	#[arg(long, default_value = "src")]
 	pub src: PathBuf,
 	// keep default in sync with StaticFileRouter
@@ -26,11 +26,11 @@ pub struct BuildRsxTemplates {
 
 
 
-impl Default for BuildRsxTemplates {
+impl Default for BuildRsxTemplateMap {
 	fn default() -> Self { clap::Parser::parse_from(&[""]) }
 }
 
-impl BuildRsxTemplates {
+impl BuildRsxTemplateMap {
 	pub fn build_and_write(&self) -> Result<()> {
 		let ron = self.build_ron()?;
 		FsExt::write(&self.dst, &ron.to_string())?;
@@ -57,7 +57,9 @@ impl BuildRsxTemplates {
 				}
 			});
 
-		let map = quote! {{#(#items),*}};
+		let map = quote! {
+			RsxTemplateMap({#(#items),*})
+		};
 		Ok(map)
 	}
 

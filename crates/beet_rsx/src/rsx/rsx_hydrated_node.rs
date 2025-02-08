@@ -1,18 +1,6 @@
 use crate::prelude::*;
 use std::collections::HashMap;
 
-
-impl std::ops::Deref for RsxHydratedMap {
-	type Target = HashMap<RustyTracker, RsxHydratedNode>;
-	fn deref(&self) -> &Self::Target { &self.0 }
-}
-
-impl std::ops::DerefMut for RsxHydratedMap {
-	fn deref_mut(&mut self) -> &mut Self::Target { &mut self.0 }
-}
-
-
-
 pub enum RsxHydratedNode {
 	// we also collect components because they
 	// cannot be statically resolved
@@ -60,7 +48,7 @@ impl std::fmt::Debug for RsxHydratedNode {
 
 
 
-
+#[derive(Deref, DerefMut)]
 pub struct RsxHydratedMap(pub HashMap<RustyTracker, RsxHydratedNode>);
 
 impl RsxHydratedMap {

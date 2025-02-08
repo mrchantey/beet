@@ -1,6 +1,5 @@
 use beet_router::prelude::*;
 use beet_rsx::prelude::*;
-use std::collections::HashMap;
 
 /// TODO this should be a test
 /// it asserts that the process of loading tokens from macros
@@ -10,7 +9,7 @@ use std::collections::HashMap;
 /// - macros discard whitespace but files do not
 #[tokio::main]
 async fn main() {
-	let mut builder = BuildRsxTemplates::default();
+	let mut builder = BuildRsxTemplateMap::default();
 	// builder.src = "crates/beet_router/src/test_site".into();
 	builder.src = "crates/beet_router/src/test_site".into();
 	builder.dst = "target/test_site/rsx-templates.ron".into();
@@ -20,17 +19,16 @@ async fn main() {
 
 	// 2. build, parse and compare
 	let tokens = builder.build_ron().unwrap();
-	let map: HashMap<RsxLocation, RsxTemplateNode> =
-		ron::de::from_str(&tokens.to_string()).unwrap();
+	let map: RsxTemplateMap = ron::de::from_str(&tokens.to_string()).unwrap();
 
 	// println!("wrote to {}\n{:#?}", builder.dst.display(), map);
 	// println!("TEMPLATE_MAP::::{:#?}", map);
 
 	let rsx = beet_router::test_site::index::get(DefaultAppState::default());
-	let node = map.get(&rsx.location).unwrap();
+	let root1 = map.get(&rsx.location).unwrap();
 	let RsxTemplateNode::Component {
 		tracker: tracker1, ..
-	} = node
+	} = &root1.node
 	else {
 		panic!();
 	};

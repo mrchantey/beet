@@ -1,12 +1,10 @@
 use crate::prelude::*;
 use anyhow::Result;
 use beet_rsx::prelude::*;
-use std::collections::HashMap;
 use std::future::Future;
 use std::path::PathBuf;
 use std::pin::Pin;
 use sweet::prelude::FsExt;
-use sweet::prelude::ReadFile;
 
 /// Simple default state for the static server,
 /// you will likely outgrow this quickly but it
@@ -76,62 +74,32 @@ impl<T: 'static> StaticFileRouter<T> {
 		Ok((route.route_info.clone(), node))
 	}
 
-	fn load_template_map(
-		&self,
-	) -> Result<HashMap<RsxLocation, RsxTemplateNode>> {
-		let tokens = ReadFile::to_string(&self.templates_src)?;
-		let templates: HashMap<RsxLocation, RsxTemplateNode> =
-			ron::de::from_str(&tokens.to_string())?;
-		Ok(templates)
-	}
 
 	/// try applying templates, otherwise warn and use
 	/// the compiled rsx
 	pub async fn routes_to_html(
 		&self,
 	) -> Result<Vec<(RouteInfo, HtmlDocument)>> {
-		let mut template_map = self
-			.load_template_map()
+		// we will still without 'hot reload' if we can't load templates
+		let mut template_map = RsxTemplateMap::load(&self.templates_src)
 			.map_err(|err| {
 				eprintln!(
 					"No templates found at {:?}\nusing routes",
-					self.templates_src
+					&self.templates_src
 				);
 				err
 			})
 			.ok();
 
-		let mut apply_templates = |root: RsxRoot| -> Result<RsxRoot> {
-			if let Some(templates) = &mut template_map {
-				let mut split = root.split_hydration()?;
-				split.template =
-					templates.remove(&split.location).ok_or_else(|| {
-						anyhow::anyhow!(
-							"No template found for {:?}",
-							&split.location
-						)
-					})?;
-				let location = split.location.clone();
-				// println!("split: {:#?}", split);
-				Ok(RsxRoot::join_hydration(split).map_err(|err| {
-					anyhow::anyhow!(
-						"Failed to join hydration at location: {:#?}\n{:?}",
-						location,
-						err
-					)
-				})?)
-			} else {
-				// we already warned about missing templates
-				Ok(root)
-			}
-		};
-
 		let html = self
 			.routes_to_rsx()
 			.await?
 			.into_iter()
-			.map(|(route, root)| {
-				let root = apply_templates(root)?;
+			.map(|(route, mut root)| {
+				// only hydrate if we have templates
+				if let Some(map) = &mut template_map {
+					root = map.hydrate(root)?;
+				}
 				let doc = root.build_document()?;
 				Ok((route, doc))
 			})

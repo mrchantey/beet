@@ -1,7 +1,7 @@
 use super::cargo_cmd::CargoCmd;
 use anyhow::Result;
 use beet_router::prelude::BuildRoutesMod;
-use beet_router::prelude::BuildRsxTemplates;
+use beet_router::prelude::BuildRsxTemplateMap;
 use beet_router::prelude::HashRsxFile;
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -17,14 +17,14 @@ pub struct RoutesBuilder {
 	// depending on the diff
 	cargo: CargoCmd,
 	build_routes_mod: BuildRoutesMod,
-	build_templates: BuildRsxTemplates,
+	build_templates: BuildRsxTemplateMap,
 	file_cache: HashMap<PathBuf, u64>,
 }
 
 impl RoutesBuilder {
 	pub fn new(build_routes_mod: BuildRoutesMod, mut cargo: CargoCmd) -> Self {
 		cargo.cargo_cmd = "build".to_string();
-		let mut build_templates = BuildRsxTemplates::default();
+		let mut build_templates = BuildRsxTemplateMap::default();
 		build_templates.src = build_routes_mod.routes_dir().clone();
 		Self {
 			cargo,
@@ -116,7 +116,7 @@ impl RoutesBuilder {
 		println!("Recompiled in {:?}", start.elapsed());
 		Ok(())
 	}
-	
+
 	fn run(&mut self, reason: &str) -> Result<()> {
 		// terminal::clear()?;
 		println!("Watcher::HotReload: {}", reason);

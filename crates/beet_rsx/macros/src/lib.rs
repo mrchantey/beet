@@ -1,5 +1,6 @@
 use beet_rsx_parser::prelude::*;
 use proc_macro::TokenStream;
+mod derive_deref;
 
 /// Demonstrates how to select a different reactive runtime
 /// this is quite unsophisticated at the moment, we can work on a nicer
@@ -44,4 +45,17 @@ pub fn rsx_template(tokens: TokenStream) -> TokenStream {
 	RstmlToRsxTemplate::default()
 		.from_macro(tokens.into())
 		.into()
+}
+
+
+
+
+#[proc_macro_derive(Deref)]
+pub fn derive_deref(input: TokenStream) -> TokenStream {
+	derive_deref::derive_deref(input)
+}
+
+#[proc_macro_derive(DerefMut)]
+pub fn derive_deref_mut(input: TokenStream) -> TokenStream {
+	derive_deref::derive_deref_mut(input)
 }
