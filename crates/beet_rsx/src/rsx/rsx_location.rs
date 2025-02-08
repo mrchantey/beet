@@ -46,13 +46,14 @@ impl RsxLocation {
 /// This struct performs two roles:
 /// 1. hydration splitting and joining
 /// 2. hashing the token stream of a block, for hot reload diffing
+/// 
 /// The combination of an index and tokens hash guarantees uniqueness
 /// ```rust ignore
 /// let tree = rsx!{<div {rusty} key=73 key=rusty key={rusty}>other text{rusty}</div>}
 /// //							      ^^^^^             ^^^^^      ^^^^^             ^^^^^
 /// //							      attr blocks       idents     value blocks      node blocks
 /// ```
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct RustyTracker {
 	/// the order in which this part was visited by the syn::Visitor

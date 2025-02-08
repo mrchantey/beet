@@ -219,13 +219,12 @@ impl RstmlToRsx {
 	}
 
 	fn map_attribute(&mut self, attr: NodeAttribute) -> TokenStream {
-		let tracker = &mut self.rusty_tracker;
 		let build_tracker = self.build_trackers;
 		let ident = &self.idents.effect;
 		match attr {
 			NodeAttribute::Block(block) => {
 				let tracker =
-					tracker.next_tracker_optional(&block, build_tracker);
+					self.rusty_tracker.next_tracker_optional(&block, build_tracker);
 				quote! {
 					RsxAttribute::Block{
 						initial: vec![#block.clone().into_rsx()],
@@ -240,11 +239,11 @@ impl RstmlToRsx {
 						key: #key.to_string()
 					}),
 					Some(block) => {
-						if let Some(val) = attr_val_str(&attr) {
+						if let Some(lit) = attr_val_lit(&attr) {
 							quote! {
 								RsxAttribute::KeyValue {
 									key: #key.to_string(),
-									value: #val.to_string()
+									value: #lit.to_string()
 								}
 							}
 						} else if key.starts_with("on") {
@@ -292,7 +291,7 @@ impl RstmlToRsx {
 }
 
 /// if the value is a literal, parse as string
-fn attr_val_str(attr: &KeyedAttribute) -> Option<String> {
+fn attr_val_lit(attr: &KeyedAttribute) -> Option<String> {
 	match &attr.value() {
 		Some(syn::Expr::Lit(expr_lit)) => {
 			let value = match &expr_lit.lit {

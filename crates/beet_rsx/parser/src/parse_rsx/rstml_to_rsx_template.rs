@@ -14,7 +14,7 @@ use syn::spanned::Spanned;
 /// Rust block token streams will be hashed by [Span::start]
 #[derive(Debug, Default)]
 pub struct RstmlToRsxTemplate {
-	tracker: RustyTrackerBuilder,
+	rusty_tracker: RustyTrackerBuilder,
 }
 
 
@@ -80,8 +80,8 @@ impl RstmlToRsxTemplate {
 					Fragment([#(#children),*])
 				}
 			}
-			Node::Block(node_block) => {
-				let tracker = self.tracker.next_tracker_ron(&node_block);
+			Node::Block(block) => {
+				let tracker = self.rusty_tracker.next_tracker_ron(&block);
 				quote! {RustBlock(#tracker)}
 			}
 			Node::Text(NodeText { value }) => {
@@ -107,7 +107,7 @@ impl RstmlToRsxTemplate {
 				if is_component {
 					// components disregard all the context, they are known
 					// to the rsx node
-					let tracker = self.tracker.next_tracker_ron(&open_tag);
+					let tracker = self.rusty_tracker.next_tracker_ron(&open_tag);
 					// we rely on the hydrated node to provide the attributes and children
 					let slot_children = if children.len() == 1 {
 						children.pop().unwrap().to_token_stream()
@@ -145,7 +145,7 @@ impl RstmlToRsxTemplate {
 	fn map_attribute(&mut self, attr: NodeAttribute) -> TokenStream {
 		match attr {
 			NodeAttribute::Block(block) => {
-				let tracker = self.tracker.next_tracker_ron(&block);
+				let tracker = self.rusty_tracker.next_tracker_ron(&block);
 				quote! {Block(#tracker)}
 			}
 			NodeAttribute::Attribute(attr) => {
@@ -163,8 +163,8 @@ impl RstmlToRsxTemplate {
 								)
 						}
 					}
-					Some(tokens) => {
-						let tracker = self.tracker.next_tracker_ron(&tokens);
+					Some(value) => {
+						let tracker = self.rusty_tracker.next_tracker_ron(&value);
 						quote! {
 							BlockValue (
 								key: #key,

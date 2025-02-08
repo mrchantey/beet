@@ -83,8 +83,9 @@ impl<T: 'static> StaticFileRouter<T> {
 		// we will still without 'hot reload' if we can't load templates
 		let mut template_map = RsxTemplateMap::load(&self.templates_src)
 			.map_err(|err| {
+				// notify user that we are using routes
 				eprintln!(
-					"No templates found at {:?}\nusing routes",
+					"Live reload disabled - no templates found at {:?}",
 					&self.templates_src
 				);
 				err
