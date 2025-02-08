@@ -2,7 +2,6 @@ use crate::prelude::*;
 use js_sys::Array;
 use js_sys::Reflect;
 use std::cell::RefCell;
-use std::collections::HashMap;
 use wasm_bindgen::prelude::Closure;
 use wasm_bindgen::JsCast;
 use wasm_bindgen::JsValue;

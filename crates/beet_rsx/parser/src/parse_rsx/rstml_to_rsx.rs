@@ -4,6 +4,7 @@ use proc_macro2_diagnostics::Diagnostic;
 use proc_macro2_diagnostics::Level;
 use quote::quote;
 use quote::ToTokens;
+use rapidhash::RapidHashSet as HashSet;
 use rstml::atoms::OpenTag;
 use rstml::node::KeyedAttribute;
 use rstml::node::Node;
@@ -11,7 +12,6 @@ use rstml::node::NodeAttribute;
 use rstml::node::NodeElement;
 use rstml::node::NodeFragment;
 use rstml::node::NodeName;
-use std::collections::HashSet;
 use syn::spanned::Spanned;
 
 /// given a span, for example the inner block

@@ -1,6 +1,4 @@
 use crate::prelude::*;
-use std::collections::HashMap;
-
 
 /// This map is updated every hot reload, the position
 /// of a rust block in the tree can change
@@ -111,7 +109,6 @@ impl DomLocationMap {
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use std::collections::HashMap;
 	use sweet::prelude::*;
 
 	#[test]

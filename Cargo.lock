@@ -552,6 +552,7 @@ dependencies = [
  "anyhow",
  "beet_router",
  "clap",
+ "rapidhash",
  "sweet",
  "tokio",
 ]

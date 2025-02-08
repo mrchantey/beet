@@ -3,7 +3,7 @@ use anyhow::Result;
 use beet_router::prelude::BuildRoutesMod;
 use beet_router::prelude::BuildRsxTemplateMap;
 use beet_router::prelude::HashRsxFile;
-use std::collections::HashMap;
+use rapidhash::RapidHashMap as HashMap;
 use std::path::PathBuf;
 use std::process::Command;
 use std::time::Instant;
