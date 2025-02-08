@@ -95,12 +95,7 @@ impl RsxToHtml {
 			tag: rsx_el.tag.clone(),
 			self_closing: rsx_el.self_closing,
 			attributes: html_attributes,
-			children: rsx_el
-				.children
-				.iter()
-				.map(|n| self.map_node(n))
-				.flatten()
-				.collect(),
+			children: self.map_node(&rsx_el.children),
 		}
 	}
 
@@ -235,7 +230,7 @@ mod test {
 		let node = rsx! { <div>the child is <Child value=38 />!</div> };
 
 		expect(RsxToHtml::render_body(&node)).to_be(
-			"<div>the child is <p data-beet-rsx-idx=\"3\">hello 38</p>!</div>",
+			"<div>the child is <p data-beet-rsx-idx=\"4\">hello 38</p>!</div>",
 		);
 	}
 	#[test]

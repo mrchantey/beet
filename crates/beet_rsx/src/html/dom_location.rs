@@ -254,31 +254,36 @@ mod test {
 				   <div/>			// 4 - child 1
 			   </div>
 		};
-		DomLocationVisitor::visit(&rsx, move |loc, _| {
-			bucket2.call(loc);
+		DomLocationVisitor::visit(&rsx, move |loc, node| {
+			if let RsxNode::Element(_) = node {
+				bucket2.call(loc);
+			}
 		});
+		expect(&bucket).to_have_been_called_times(5);
+		// keep in mind that fragments will also increment
+		// the rsx_idx.. maybe they shouldnt?
 		expect(&bucket).to_have_returned_nth_with(0, &DomLocation {
 			rsx_idx: 0,
 			parent_idx: 0,
 			child_idx: 0,
 		});
 		expect(&bucket).to_have_returned_nth_with(1, &DomLocation {
-			rsx_idx: 1,
+			rsx_idx: 2,
 			parent_idx: 0,
 			child_idx: 0,
 		});
 		expect(&bucket).to_have_returned_nth_with(2, &DomLocation {
-			rsx_idx: 2,
-			parent_idx: 1,
+			rsx_idx: 4,
+			parent_idx: 2,
 			child_idx: 0,
 		});
 		expect(&bucket).to_have_returned_nth_with(3, &DomLocation {
-			rsx_idx: 3,
-			parent_idx: 1,
+			rsx_idx: 6,
+			parent_idx: 2,
 			child_idx: 1,
 		});
 		expect(&bucket).to_have_returned_nth_with(4, &DomLocation {
-			rsx_idx: 4,
+			rsx_idx: 8,
 			parent_idx: 0,
 			child_idx: 1,
 		});

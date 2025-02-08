@@ -97,11 +97,9 @@ impl ScopedStyle {
 				scope_found = Some(scope);
 				// currently only recurse top level style children, we could create another
 				// visitor to go deeper if we start supporting style body components
-				for child in &mut el.children {
-					if let RsxNode::Text(text) = child {
-						if let Err(err) = self.apply_styles(text, scope) {
-							parse_err = Err(err);
-						}
+				if let RsxNode::Text(text) = &mut *el.children {
+					if let Err(err) = self.apply_styles(text, scope) {
+						parse_err = Err(err);
 					}
 				}
 			}

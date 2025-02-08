@@ -21,6 +21,16 @@ pub const DEFAULT_VISIT_RSX_OPTIONS: VisitRsxOptions = VisitRsxOptions {
 };
 
 impl VisitRsxOptions {
+	/// do not visit any nodes aside from direct child and fragments
+	pub fn ignore_all() -> Self {
+		Self {
+			ignore_block_node_initial: true,
+			ignore_element_children: true,
+			ignore_component_node: true,
+			ignore_component_slot_children: true,
+		}
+	}
+
 	/// do not visit [RsxBlock::initial]
 	pub fn ignore_block_node_initial() -> Self {
 		Self {
@@ -135,9 +145,7 @@ pub trait RsxVisitor {
 		}
 		if !self.ignore_element_children() {
 			self.before_element_children(element);
-			for child in &element.children {
-				self.walk_node(child);
-			}
+			self.walk_node(&element.children);
 			self.after_element_children(element);
 		}
 	}
@@ -212,9 +220,7 @@ pub trait RsxVisitorMut {
 		}
 		if !self.ignore_element_children() {
 			self.before_element_children(element);
-			for child in &mut element.children {
-				self.walk_node(child);
-			}
+			self.walk_node(&mut element.children);
 			self.after_element_children(element);
 		}
 	}
@@ -302,7 +308,7 @@ mod test {
 		};
 		SlotsVisitor::apply(&mut rsx.node).unwrap();
 		rsx.walk(&mut counter);
-		expect(counter.node).to_be(19);
+		expect(counter.node).to_be(22);
 		expect(counter.doctype).to_be(1);
 		expect(counter.comment).to_be(1);
 		expect(counter.text).to_be(2);

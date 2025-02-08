@@ -53,13 +53,8 @@ impl RstmlToRsx {
 
 	pub fn map_tokens(&mut self, tokens: TokenStream) -> TokenStream {
 		let (nodes, rstml_errors) = tokens_to_rstml(tokens.clone());
-		let mut nodes = self.map_nodes(nodes);
+		let node = self.map_nodes(nodes);
 
-		let node = if nodes.len() == 1 {
-			nodes.pop().unwrap()
-		} else {
-			quote!(RsxNode::Fragment(Vec::from([#(#nodes),*])))
-		};
 		let location = rsx_location_tokens(tokens);
 		quote! {
 			{
@@ -76,8 +71,16 @@ impl RstmlToRsx {
 	}
 	/// the number of actual html nodes will likely be different
 	/// due to fragments, blocks etc
-	pub fn map_nodes<C>(&mut self, nodes: Vec<Node<C>>) -> Vec<TokenStream> {
-		nodes.into_iter().map(|node| self.map_node(node)).collect()
+	pub fn map_nodes<C>(&mut self, nodes: Vec<Node<C>>) -> TokenStream {
+		let mut nodes = nodes
+			.into_iter()
+			.map(|node| self.map_node(node))
+			.collect::<Vec<_>>();
+		if nodes.len() == 1 {
+			nodes.pop().unwrap().to_token_stream()
+		} else {
+			quote!(RsxNode::Fragment(Vec::from([#(#nodes),*])))
+		}
 	}
 
 	/// returns an RsxNode
@@ -113,8 +116,7 @@ impl RstmlToRsx {
 				}
 			}
 			Node::Fragment(NodeFragment { children, .. }) => {
-				let children = self.map_nodes(children);
-				quote!(RsxNode::Fragment(Vec::from([#(#children),*])))
+				self.map_nodes(children)
 			}
 			Node::Element(el) => {
 				self.check_self_closing_children(&el);
@@ -143,7 +145,7 @@ impl RstmlToRsx {
 					quote!(RsxNode::Element(RsxElement {
 						tag: #tag.to_string(),
 						attributes: vec![#(#attributes),*],
-						children: vec![#(#children),*],
+						children: Box::new(#children),
 						self_closing: #self_closing,
 					}))
 				}
@@ -156,7 +158,7 @@ impl RstmlToRsx {
 		&mut self,
 		tag: String,
 		open_tag: OpenTag,
-		mut children: Vec<Node<C>>,
+		children: Vec<Node<C>>,
 	) -> TokenStream {
 		let tracker = self
 			.rusty_tracker
@@ -180,13 +182,7 @@ impl RstmlToRsx {
 			}
 		});
 		let ident = syn::Ident::new(&tag, tag.span());
-		let children = if children.len() == 1 {
-			self.map_node(children.pop().unwrap()).to_token_stream()
-		} else {
-			let children = self.map_nodes(children);
-			quote!(RsxNode::Fragment(vec![#(#children),*]))
-		};
-
+		let slot_children = self.map_nodes(children);
 		quote!({
 			RsxNode::Component(RsxComponent{
 				tag: #tag.to_string(),
@@ -195,7 +191,7 @@ impl RstmlToRsx {
 					#(#props,)*
 				}
 				.render()),
-				slot_children: Box::new(#children)
+				slot_children: Box::new(#slot_children)
 			})
 		})
 	}

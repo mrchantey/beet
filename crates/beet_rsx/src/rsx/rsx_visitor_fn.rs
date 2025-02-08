@@ -86,16 +86,18 @@ macro_rules! impl_visitor_mut {
 
 
 impl_visitor!(VisitRsxNode, RsxNode, visit_node);
+impl_visitor!(VisitRsxComment, str, visit_comment);
+impl_visitor!(VisitRsxText, str, visit_text);
+impl_visitor!(VisitRsxBlock, RsxBlock, visit_block);
 impl_visitor!(VisitRsxElement, RsxElement, visit_element);
 impl_visitor!(VisitRsxComponent, RsxComponent, visit_component);
-impl_visitor!(VisitRsxText, str, visit_text);
-impl_visitor!(VisitRsxComment, str, visit_comment);
 
 impl_visitor_mut!(VisitRsxNodeMut, RsxNode, visit_node);
+impl_visitor_mut!(VisitRsxCommentMut, str, visit_comment);
+impl_visitor_mut!(VisitRsxTextMut, str, visit_text);
+impl_visitor_mut!(VisitRsxBlockMut, RsxBlock, visit_block);
 impl_visitor_mut!(VisitRsxElementMut, RsxElement, visit_element);
 impl_visitor_mut!(VisitRsxComponentMut, RsxComponent, visit_component);
-impl_visitor_mut!(VisitRsxTextMut, str, visit_text);
-impl_visitor_mut!(VisitRsxCommentMut, str, visit_comment);
 
 
 
@@ -111,6 +113,7 @@ mod test {
 
 		VisitRsxNodeMut::new(|_| count += 1)
 			.walk_node(&mut rsx! { <div /> }.node);
-		expect(count).to_be(1);
+		// includes empty children fragment
+		expect(count).to_be(2);
 	}
 }

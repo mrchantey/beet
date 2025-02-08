@@ -42,12 +42,7 @@ impl RstmlToRsxTemplate {
 	) -> TokenStream {
 		let span = tokens.span();
 		let (nodes, _rstml_errors) = tokens_to_rstml(tokens);
-		let mut nodes = self.map_nodes(nodes);
-		let node = if nodes.len() == 1 {
-			nodes.pop().unwrap()
-		} else {
-			quote! {Fragment([#(#nodes),*])}
-		};
+		let node = self.map_nodes(nodes);
 		let line = Literal::usize_unsuffixed(span.start().line);
 		let col = Literal::usize_unsuffixed(span.start().column);
 
@@ -62,11 +57,21 @@ impl RstmlToRsxTemplate {
 			)
 		}
 	}
+
+	/// wraps in fragment if multiple nodes
 	pub fn map_nodes<C: CustomNode>(
 		&mut self,
 		nodes: Vec<Node<C>>,
-	) -> Vec<TokenStream> {
-		nodes.into_iter().map(|node| self.map_node(node)).collect()
+	) -> TokenStream {
+		let mut nodes = nodes
+			.into_iter()
+			.map(|node| self.map_node(node))
+			.collect::<Vec<_>>();
+		if nodes.len() == 1 {
+			nodes.pop().unwrap().to_token_stream()
+		} else {
+			quote! {Fragment([#(#nodes),*])}
+		}
 	}
 
 	/// returns an RsxTemplateNode
@@ -117,7 +122,7 @@ impl RstmlToRsxTemplate {
 								tag: #tag,
 								self_closing: #self_closing,
 								attributes: [#(#attributes),*],
-								children: [#(#children),*]
+								children: #children
 							)
 					}
 				}
@@ -134,12 +139,7 @@ impl RstmlToRsxTemplate {
 		let tracker = self.rusty_tracker.next_tracker_ron(&open_tag);
 		// components disregard all the context and rely on the tracker
 		// we rely on the hydrated node to provide the attributes and children
-		let mut children = self.map_nodes(children);
-		let slot_children = if children.len() == 1 {
-			children.pop().unwrap().to_token_stream()
-		} else {
-			quote! {Fragment([#(#children),*])}
-		};
+		let slot_children = self.map_nodes(children);
 
 		quote! {
 			Component (

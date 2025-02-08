@@ -79,6 +79,25 @@ impl RsxNode {
 			_ => {}
 		});
 	}
+
+	/// non-recursive check for blocks in self, accounting for fragments
+	pub fn directly_contains_rust_node(&self) -> bool {
+		fn walk(node: &RsxNode) -> bool {
+			match node {
+				RsxNode::Block(_) => true,
+				RsxNode::Fragment(rsx_nodes) => {
+					for node in rsx_nodes {
+						if walk(node) {
+							return true;
+						}
+					}
+					false
+				}
+				_ => false,
+			}
+		}
+		walk(self)
+	}
 }
 
 
@@ -135,35 +154,17 @@ pub struct RsxElement {
 	/// ie `class="my-class"`
 	pub attributes: Vec<RsxAttribute>,
 	/// ie `<div>childtext<childel/>{childblock}</div>`
-	pub children: Vec<RsxNode>,
+	pub children: Box<RsxNode>,
 	/// ie `<input/>`
 	pub self_closing: bool,
 }
 
 
 impl RsxElement {
-	pub fn new(tag: String, self_closing: bool) -> Self {
-		Self {
-			tag,
-			self_closing,
-			attributes: Vec::new(),
-			children: Vec::new(),
-		}
-	}
-
-
-
-	/// non-recursive check for blocks in children
-	pub fn contains_blocks(&self) -> bool {
-		self.children
-			.iter()
-			.any(|c| matches!(c, RsxNode::Block { .. }))
-	}
-
 	/// Whether any children or attributes are blocks,
 	/// used to determine whether the node requires an id
 	pub fn contains_rust(&self) -> bool {
-		self.contains_blocks()
+		self.children.directly_contains_rust_node()
 			|| self.attributes.iter().any(|a| {
 				matches!(
 					a,

@@ -94,7 +94,7 @@ impl DomLocationMap {
 				map.rusty_locations.insert(loc.rsx_idx, loc);
 			}
 			RsxNode::Element(el) => {
-				if el.contains_blocks() {
+				if el.children.directly_contains_rust_node() {
 					let encoded = TextBlockEncoder::encode(loc.rsx_idx, el);
 					map.collapsed_elements.insert(loc.rsx_idx, encoded);
 				}
@@ -140,20 +140,20 @@ mod test {
 			.collect::<HashMap<_, _>>(),
 		);
 		// {desc}
-		expect(&map.rusty_locations[&2]).to_be(&DomLocation {
-			rsx_idx: 2,
+		expect(&map.rusty_locations[&3]).to_be(&DomLocation {
+			rsx_idx: 3,
 			parent_idx: 0,
 			child_idx: 1,
 		});
 		// {color}
-		expect(&map.rusty_locations[&5]).to_be(&DomLocation {
-			rsx_idx: 5,
+		expect(&map.rusty_locations[&6]).to_be(&DomLocation {
+			rsx_idx: 6,
 			parent_idx: 0,
 			child_idx: 3,
 		});
 		// {action}
-		expect(&map.rusty_locations[&9]).to_be(&DomLocation {
-			rsx_idx: 9,
+		expect(&map.rusty_locations[&10]).to_be(&DomLocation {
+			rsx_idx: 10,
 			parent_idx: 0,
 			child_idx: 5,
 		});

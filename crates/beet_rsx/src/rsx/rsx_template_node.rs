@@ -29,7 +29,7 @@ pub enum RsxTemplateNode {
 		tag: String,
 		self_closing: bool,
 		attributes: Vec<RsxTemplateAttribute>,
-		children: Vec<Self>,
+		children: Box<Self>,
 	},
 	Doctype,
 	Text(String),
@@ -119,10 +119,7 @@ impl RsxTemplateNode {
 					.iter()
 					.map(|attr| RsxTemplateAttribute::from_rsx_attribute(attr))
 					.collect::<HydrationResult<Vec<_>>>()?,
-				children: (children
-					.iter()
-					.map(Self::from_rsx_node)
-					.collect::<HydrationResult<Vec<_>>>()?),
+				children: Box::new(Self::from_rsx_node(children)?),
 			}),
 			RsxNode::Text(text) => Ok(Self::Text(text.clone())),
 			RsxNode::Comment(comment) => Ok(Self::Comment(comment.clone())),
@@ -214,10 +211,7 @@ impl RsxTemplateNode {
 					.into_iter()
 					.map(|attr| attr.into_rsx_node(rusty_map))
 					.collect::<HydrationResult<Vec<_>>>()?,
-				children: children
-					.into_iter()
-					.map(|node| node.into_rsx_node(rusty_map))
-					.collect::<HydrationResult<Vec<_>>>()?,
+				children: Box::new(children.into_rsx_node(rusty_map)?),
 			})),
 		}
 	}
@@ -254,10 +248,7 @@ impl RsxTemplateNode {
 						tracker.clear();
 					}
 				}
-				// Recursively process children
-				for child in children {
-					child.clear_rusty_trackers();
-				}
+				children.clear_rusty_trackers();
 			}
 			_ => {}
 		}
@@ -335,18 +326,24 @@ impl RsxTemplateAttribute {
 				})
 			}
 			RsxTemplateAttribute::BlockValue { key, tracker } => {
-				let (initial, register) = match rusty_map.remove(&tracker).ok_or_else(|| {
-					HydrationError::hydration_failed(
-						"AttributeValue",
-						rusty_map,
-						tracker,
-					)
-				})? {
-					RsxHydratedNode::AttributeValue { initial, register } => Ok((initial, register)),
-					other => HydrationResult::Err(HydrationError::UnexpectedRusty {
-						expected: "AttributeValue",
-						received: format!("{:?}", other),
-					}),
+				let (initial, register) = match rusty_map
+					.remove(&tracker)
+					.ok_or_else(|| {
+						HydrationError::hydration_failed(
+							"AttributeValue",
+							rusty_map,
+							tracker,
+						)
+					})? {
+					RsxHydratedNode::AttributeValue { initial, register } => {
+						Ok((initial, register))
+					}
+					other => {
+						HydrationResult::Err(HydrationError::UnexpectedRusty {
+							expected: "AttributeValue",
+							received: format!("{:?}", other),
+						})
+					}
 				}?;
 
 				Ok(RsxAttribute::BlockValue {
@@ -391,7 +388,7 @@ mod test {
 			tag: "div".to_string(),
 			self_closing: false,
 			attributes: vec![],
-			children: vec![RsxTemplateNode::RustBlock(loc)],
+			children: Box::new(RsxTemplateNode::RustBlock(loc)),
 		});
 	}
 	#[test]
@@ -433,11 +430,11 @@ mod test {
 					tracker: ident_tracker,
 				},
 			],
-			children: vec![RsxTemplateNode::Element {
+			children: Box::new(RsxTemplateNode::Element {
 				tag: "p".to_string(),
 				self_closing: false,
 				attributes: vec![],
-				children: vec![
+				children: Box::new(RsxTemplateNode::Fragment(vec![
 					RsxTemplateNode::Text("hello\n\t\t\t\t\t".to_string()),
 					RsxTemplateNode::Component {
 						tracker: component_tracker,
@@ -446,13 +443,13 @@ mod test {
 							tag: "div".to_string(),
 							self_closing: false,
 							attributes: vec![],
-							children: vec![RsxTemplateNode::Text(
+							children: Box::new(RsxTemplateNode::Text(
 								"some child".to_string(),
-							)],
+							)),
 						}),
 					},
-				],
-			}],
+				])),
+			}),
 		});
 	}
 

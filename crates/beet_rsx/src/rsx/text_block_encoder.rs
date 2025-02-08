@@ -150,7 +150,7 @@ impl CollapsedNode {
 
 impl CollapsedNode {
 	fn from_element(el: &RsxElement) -> Vec<CollapsedNode> {
-		el.children.iter().flat_map(Self::from_node).collect()
+		Self::from_node(&el.children)
 	}
 	fn from_node(node: &RsxNode) -> Vec<CollapsedNode> {
 		let mut out = Vec::new();
