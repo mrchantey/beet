@@ -158,8 +158,8 @@ impl CollapsedNode {
 			RsxNode::Fragment(nodes) => {
 				out.extend(nodes.into_iter().flat_map(Self::from_node));
 			}
-			RsxNode::Component(RsxComponent { node, .. }) => {
-				out.extend(Self::from_node(node));
+			RsxNode::Component(RsxComponent { root, .. }) => {
+				out.extend(Self::from_node(root));
 			}
 			RsxNode::Block(RsxBlock { initial, .. }) => {
 				out.push(CollapsedNode::RustText(

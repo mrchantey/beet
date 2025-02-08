@@ -144,7 +144,7 @@ pub trait RsxVisitor {
 	fn walk_component(&mut self, component: &RsxComponent) {
 		self.visit_component(component);
 		if !self.ignore_component_node() {
-			self.walk_node(&component.node);
+			self.walk_node(&component.root);
 		}
 		if !self.ignore_component_slot_children() {
 			self.walk_node(&component.slot_children);
@@ -221,7 +221,7 @@ pub trait RsxVisitorMut {
 	fn walk_component(&mut self, component: &mut RsxComponent) {
 		self.visit_component(component);
 		if !self.ignore_component_node() {
-			self.walk_node(&mut component.node);
+			self.walk_node(&mut component.root);
 		}
 		if !self.ignore_component_slot_children() {
 			self.walk_node(&mut component.slot_children);

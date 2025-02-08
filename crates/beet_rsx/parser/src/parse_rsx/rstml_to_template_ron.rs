@@ -11,12 +11,12 @@ use rstml::node::NodeText;
 /// Convert rstml nodes to a ron file.
 /// Rust block token streams will be hashed by [Span::start]
 #[derive(Debug, Default)]
-pub struct RstmlToRsxTemplateRon {
+pub struct RstmlToRsxTemplate {
 	tracker: RustyTrackerBuilder,
 }
 
 
-impl RstmlToRsxTemplateRon {
+impl RstmlToRsxTemplate {
 	/// returns a "[RsxTemplateNode]" ron string
 	pub fn map_tokens_to_string(&mut self, tokens: TokenStream) -> TokenStream {
 		self.map_tokens(tokens).to_string().to_token_stream()
@@ -90,7 +90,7 @@ impl RstmlToRsxTemplateRon {
 						Component (
 							tracker: #tracker,
 							tag: #tag_name,
-							slot_children: #slot_children
+							slot_children: #slot_children,
 						)
 					}
 				} else {

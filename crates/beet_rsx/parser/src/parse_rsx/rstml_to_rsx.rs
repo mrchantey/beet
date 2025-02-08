@@ -182,10 +182,10 @@ impl RstmlToRsx {
 			RsxNode::Component(RsxComponent{
 				tag: #tag.to_string(),
 				tracker: #tracker,
-				node: Box::new(#ident{
+				root: Box::new(#ident{
 					#(#props,)*
 				}
-				.into_rsx()),
+				.render()),
 				slot_children: Box::new(#children)
 			})
 		})

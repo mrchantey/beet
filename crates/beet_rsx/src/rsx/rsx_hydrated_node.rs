@@ -5,7 +5,7 @@ pub enum RsxHydratedNode {
 	// we also collect components because they
 	// cannot be statically resolved
 	Component {
-		node: RsxNode,
+		root: RsxRoot,
 	},
 	RustBlock {
 		initial: RsxNode,
@@ -24,8 +24,8 @@ pub enum RsxHydratedNode {
 impl std::fmt::Debug for RsxHydratedNode {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		match self {
-			Self::Component { node } => {
-				f.debug_struct("Component").field("node", node).finish()
+			Self::Component { root } => {
+				f.debug_struct("Component").field("root", root).finish()
 			}
 			Self::RustBlock { initial, register } => f
 				.debug_struct("RustBlock")
@@ -49,7 +49,7 @@ impl std::fmt::Debug for RsxHydratedNode {
 /// take the effects from a node recursively
 #[derive(Default)]
 struct RsxHydratedVisitor {
-	effect_map: HashMap<RustyTracker, RsxHydratedNode>,
+	rusty_map: HashMap<RustyTracker, RsxHydratedNode>,
 	err: Option<ParseError>,
 }
 
@@ -80,7 +80,7 @@ impl RsxVisitorMut for RsxHydratedVisitor {
 
 	fn visit_block(&mut self, block: &mut RsxBlock) {
 		if let Some((register, tracker)) = self.take_effect(&mut block.effect) {
-			self.effect_map.insert(tracker, RsxHydratedNode::RustBlock {
+			self.rusty_map.insert(tracker, RsxHydratedNode::RustBlock {
 				initial: std::mem::take(&mut block.initial),
 				register,
 			});
@@ -94,7 +94,7 @@ impl RsxVisitorMut for RsxHydratedVisitor {
 				initial, effect, ..
 			} => {
 				if let Some((register, tracker)) = self.take_effect(effect) {
-					self.effect_map.insert(
+					self.rusty_map.insert(
 						tracker,
 						RsxHydratedNode::AttributeValue {
 							initial: std::mem::take(initial),
@@ -105,7 +105,7 @@ impl RsxVisitorMut for RsxHydratedVisitor {
 			}
 			RsxAttribute::Block { initial, effect } => {
 				if let Some((register, tracker)) = self.take_effect(effect) {
-					self.effect_map.insert(
+					self.rusty_map.insert(
 						tracker,
 						RsxHydratedNode::AttributeBlock {
 							initial: std::mem::take(initial),
@@ -120,8 +120,8 @@ impl RsxVisitorMut for RsxHydratedVisitor {
 		match std::mem::take(&mut component.tracker) {
 			Some(tracker) => {
 				// note how we ignore slot_children, they are handled by RsxTemplateNode
-				self.effect_map.insert(tracker, RsxHydratedNode::Component {
-					node: std::mem::take(&mut component.node),
+				self.rusty_map.insert(tracker, RsxHydratedNode::Component {
+					root: std::mem::take(&mut component.root),
 				});
 			}
 			None => {
@@ -141,7 +141,7 @@ impl RsxHydratedNode {
 		if let Some(err) = visitor.err {
 			Err(err)
 		} else {
-			Ok(visitor.effect_map)
+			Ok(visitor.rusty_map)
 		}
 	}
 }

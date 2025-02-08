@@ -64,14 +64,14 @@ impl RsxToHtml {
 			RsxNode::Component(RsxComponent {
 				tag: _,
 				tracker: _,
-				node,
+				root,
 				slot_children,
 			}) => {
 				// TODO assertion, why does it have html tag?
 				if !slot_children.is_empty_fragment() {
 					panic!("RsxToHtml: Slot children must be empty before mapping to html, please call HtmlSlotsVisitor::apply\nunmapped slots: {:#?}", slot_children);
 				}
-				self.map_node(node)
+				self.map_node(root.as_ref())
 			}
 		}
 	}

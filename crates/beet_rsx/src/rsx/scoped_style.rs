@@ -71,7 +71,7 @@ impl ScopedStyle {
 		// visit all components
 		VisitRsxComponentMut::walk(&mut root.node, |component| {
 			// 2. apply to component node
-			if let Err(err) = self.apply_inner(&mut component.node) {
+			if let Err(err) = self.apply_inner(&mut component.root) {
 				parse_err = Err(err);
 			};
 			// 3. apply to component slot children

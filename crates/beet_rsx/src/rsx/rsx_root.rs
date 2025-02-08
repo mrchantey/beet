@@ -9,7 +9,7 @@ use std::collections::HashMap;
 ///
 ///
 /// The struct returned from an rsx! macro.
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct RsxRoot {
 	/// the root node
 	pub node: RsxNode,
@@ -55,6 +55,7 @@ impl RsxRoot {
 	}
 
 	/// Create an RsxRoot from a template and hydrated nodes.
+	/// 		todo!("this is wrong, we need template map for each component");
 	pub fn join_hydration(
 		SplitRsx {
 			mut hydrated,

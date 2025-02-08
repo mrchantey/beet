@@ -1,11 +1,14 @@
 use crate::prelude::*;
 use anyhow::Result;
 use std::collections::HashMap;
+
+
+
+/// Serializable version of an rsx node, that can be rehydrated
+/// with a hashmap of RustyTrackers
 /// An rsx template is conceptually similar to a html template
 /// but instead of {{PLACEHOLDER}} there is a hash for a known
 /// location of the associated rust code.
-///
-///
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum RsxTemplateNode {
@@ -15,6 +18,7 @@ pub enum RsxTemplateNode {
 	Component {
 		tracker: RustyTracker,
 		tag: String,
+		// location: RsxLocation,
 		// /// mapped from [RsxComponent::node]
 		// node: Box<Self>,
 		/// mapped from [RsxComponent::slot_children]
@@ -67,10 +71,11 @@ impl RsxTemplateNode {
 				tag,
 				tracker,
 				// ignore the node, it is the responsibility of rsx_hydrate_node
-				node: _,
+				root: _,
 
 				slot_children,
 			}) => Ok(Self::Component {
+				// location: node.location.clone(),
 				// node: Box::new(Self::from_rsx_node(node)?),
 				slot_children: Box::new(Self::from_rsx_node(slot_children)?),
 				tracker: tracker
@@ -110,6 +115,7 @@ impl RsxTemplateNode {
 	/// drain the effect map into an RsxNode
 	pub fn into_rsx_node(
 		self,
+		// incorrect! we need a map for each component
 		rusty_map: &mut HashMap<RustyTracker, RsxHydratedNode>,
 	) -> Result<RsxNode> {
 		match self {
@@ -128,7 +134,7 @@ impl RsxTemplateNode {
 				tag,
 				slot_children,
 			} => {
-				let RsxHydratedNode::Component { node } =
+				let RsxHydratedNode::Component { root } =
 					rusty_map.remove(&tracker).ok_or_else(|| {
 						to_node_tracker_error(
 							rusty_map,
@@ -142,7 +148,7 @@ impl RsxTemplateNode {
 				Ok(RsxNode::Component(RsxComponent {
 					tag: tag.clone(),
 					tracker: Some(tracker),
-					node: Box::new(node),
+					root: Box::new(root),
 					slot_children: Box::new(
 						slot_children.into_rsx_node(rusty_map)?,
 					),

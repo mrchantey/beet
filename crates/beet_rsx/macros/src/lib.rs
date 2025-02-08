@@ -42,7 +42,7 @@ pub fn rsx(tokens: TokenStream) -> TokenStream {
 #[proc_macro]
 pub fn rsx_template(tokens: TokenStream) -> TokenStream {
 	let tokens =
-		RstmlToRsxTemplateRon::default().map_tokens_to_string(tokens.into());
+		RstmlToRsxTemplate::default().map_tokens_to_string(tokens.into());
 	quote::quote! {
 		RsxTemplateNode::from_ron(#tokens).unwrap()
 	}

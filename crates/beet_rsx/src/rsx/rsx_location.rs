@@ -1,4 +1,3 @@
-
 /// File location of an rsx macro, used by [RsxTemplate]
 /// to reconcile rsx nodes with html partials
 ///
@@ -18,6 +17,16 @@ pub struct RsxLocation {
 	pub line: usize,
 	pub col: usize,
 }
+impl Default for RsxLocation {
+	fn default() -> Self {
+		Self {
+			file: "placeholder".to_string(),
+			line: 0,
+			col: 0,
+		}
+	}
+}
+
 impl RsxLocation {
 	pub fn new(file: impl Into<String>, line: usize, col: usize) -> Self {
 		Self {
