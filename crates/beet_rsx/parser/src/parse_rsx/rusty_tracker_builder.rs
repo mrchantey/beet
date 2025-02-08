@@ -25,6 +25,7 @@ impl RustyTrackerBuilder {
 			rapidhash(tokens.to_string().replace(" ", "").as_bytes());
 		let index = self.current_index;
 		self.current_index += 1;
+		// println!("index: {}, hash: {}", index, tokens_hash);
 		(index, tokens_hash)
 	}
 

@@ -6,7 +6,6 @@ use quote::quote;
 use quote::ToTokens;
 use rapidhash::RapidHashSet as HashSet;
 use rstml::atoms::OpenTag;
-use rstml::node::KeyedAttribute;
 use rstml::node::Node;
 use rstml::node::NodeAttribute;
 use rstml::node::NodeElement;
@@ -132,8 +131,7 @@ impl RstmlToRsx {
 				}
 				let tag = open_tag.name.to_string();
 
-				let is_component = tag.starts_with(|c: char| c.is_uppercase());
-				if is_component {
+				if tag.starts_with(|c: char| c.is_uppercase()) {
 					self.map_component(tag, open_tag, children)
 				} else {
 					let attributes = open_tag
@@ -160,7 +158,6 @@ impl RstmlToRsx {
 		open_tag: OpenTag,
 		mut children: Vec<Node<C>>,
 	) -> TokenStream {
-		// get tracker before visiting children
 		let tracker = self
 			.rusty_tracker
 			.next_tracker_optional(&open_tag, self.build_trackers);
@@ -240,15 +237,20 @@ impl RstmlToRsx {
 					None => quote!(RsxAttribute::Key {
 						key: #key.to_string()
 					}),
-					Some(block) => {
-						if let Some(lit) = attr_val_lit(&attr) {
-							quote! {
-								RsxAttribute::KeyValue {
-									key: #key.to_string(),
-									value: #lit.to_string()
-								}
+					Some(syn::Expr::Lit(expr_lit)) => {
+						let value = lit_to_string(&expr_lit.lit);
+						quote! {
+							RsxAttribute::KeyValue {
+								key: #key.to_string(),
+								value: #value.to_string()
 							}
-						} else if key.starts_with("on") {
+						}
+					}
+					Some(block) => {
+						let tracker = self
+							.rusty_tracker
+							.next_tracker_optional(&block, self.build_trackers);
+						if key.starts_with("on") {
 							let key = key.to_string();
 
 							let register_func = syn::Ident::new(
@@ -256,11 +258,6 @@ impl RstmlToRsx {
 								block.span(),
 							);
 							let register_event = &self.idents.event;
-							let tracker =
-								self.rusty_tracker.next_tracker_optional(
-									&block,
-									self.build_trackers,
-								);
 							quote! {
 								RsxAttribute::BlockValue {
 									key: #key.to_string(),
@@ -272,11 +269,6 @@ impl RstmlToRsx {
 								}
 							}
 						} else {
-							let tracker =
-								self.rusty_tracker.next_tracker_optional(
-									&block,
-									self.build_trackers,
-								);
 							quote! {
 								RsxAttribute::BlockValue{
 									key: #key.to_string(),
@@ -289,19 +281,5 @@ impl RstmlToRsx {
 				}
 			}
 		}
-	}
-}
-
-/// if the value is a literal, parse as string
-fn attr_val_lit(attr: &KeyedAttribute) -> Option<String> {
-	match &attr.value() {
-		Some(syn::Expr::Lit(expr_lit)) => {
-			let value = match &expr_lit.lit {
-				syn::Lit::Str(s) => s.value(),
-				other => other.to_token_stream().to_string(),
-			};
-			Some(value)
-		}
-		_ => None,
 	}
 }

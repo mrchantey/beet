@@ -3,6 +3,7 @@ use proc_macro2::Literal;
 use proc_macro2::TokenStream;
 use quote::quote;
 use quote::ToTokens;
+use rstml::atoms::OpenTag;
 use rstml::node::CustomNode;
 use rstml::node::Node;
 use rstml::node::NodeAttribute;
@@ -70,8 +71,6 @@ impl RstmlToRsxTemplate {
 
 	/// returns an RsxTemplateNode
 	pub fn map_node<C: CustomNode>(&mut self, node: Node<C>) -> TokenStream {
-		println!("visiting node: {}", node.to_token_stream().to_string());
-
 		match node {
 			Node::Doctype(_) => quote! {Doctype},
 			Node::Comment(NodeComment { value, .. }) => {
@@ -102,33 +101,10 @@ impl RstmlToRsxTemplate {
 				children,
 				close_tag,
 			}) => {
-				let tag_name = open_tag.name.to_string();
+				let tag = open_tag.name.to_string();
 				let self_closing = close_tag.is_none();
-				let is_component = tag_name
-					.chars()
-					.next()
-					.map(char::is_uppercase)
-					.unwrap_or(false);
-				if is_component {
-					// get tracker before visiting children
-					let tracker =
-						self.rusty_tracker.next_tracker_ron(&open_tag);
-					// components disregard all the context and rely on the tracker
-					// we rely on the hydrated node to provide the attributes and children
-					let mut children = self.map_nodes(children);
-					let slot_children = if children.len() == 1 {
-						children.pop().unwrap().to_token_stream()
-					} else {
-						quote! {Fragment([#(#children),*])}
-					};
-
-					quote! {
-						Component (
-							tracker: #tracker,
-							tag: #tag_name,
-							slot_children: #slot_children,
-						)
-					}
+				if tag.starts_with(|c: char| c.is_uppercase()) {
+					self.map_component(tag, open_tag, children)
 				} else {
 					let children = self.map_nodes(children);
 					let attributes = open_tag
@@ -138,7 +114,7 @@ impl RstmlToRsxTemplate {
 
 					quote! {
 							Element (
-								tag: #tag_name,
+								tag: #tag,
 								self_closing: #self_closing,
 								attributes: [#(#attributes),*],
 								children: [#(#children),*]
@@ -147,6 +123,30 @@ impl RstmlToRsxTemplate {
 				}
 			}
 			Node::Custom(_) => unimplemented!(),
+		}
+	}
+	fn map_component<C: CustomNode>(
+		&mut self,
+		tag: String,
+		open_tag: OpenTag,
+		children: Vec<Node<C>>,
+	) -> TokenStream {
+		let tracker = self.rusty_tracker.next_tracker_ron(&open_tag);
+		// components disregard all the context and rely on the tracker
+		// we rely on the hydrated node to provide the attributes and children
+		let mut children = self.map_nodes(children);
+		let slot_children = if children.len() == 1 {
+			children.pop().unwrap().to_token_stream()
+		} else {
+			quote! {Fragment([#(#children),*])}
+		};
+
+		quote! {
+			Component (
+				tracker: #tracker,
+				tag: #tag,
+				slot_children: #slot_children,
+			)
 		}
 	}
 	fn map_attribute(&mut self, attr: NodeAttribute) -> TokenStream {
@@ -173,6 +173,8 @@ impl RstmlToRsxTemplate {
 					Some(value) => {
 						let tracker =
 							self.rusty_tracker.next_tracker_ron(&value);
+						// we dont need to handle events for serialization,
+						// thats an rstml_to_rsx concern so having the tracker is enough
 						quote! {
 							BlockValue (
 								key: #key,
@@ -185,7 +187,7 @@ impl RstmlToRsxTemplate {
 		}
 	}
 }
-fn lit_to_string(lit: &syn::Lit) -> String {
+pub fn lit_to_string(lit: &syn::Lit) -> String {
 	match lit {
 		syn::Lit::Int(lit_int) => lit_int.base10_digits().to_string(),
 		syn::Lit::Float(lit_float) => lit_float.base10_digits().to_string(),
