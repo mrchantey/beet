@@ -3,7 +3,7 @@ use beet::prelude::*;
 
 
 
-pub fn get(state: DefaultAppState) -> RsxRoot {
+pub fn get(_state: DefaultAppState) -> RsxRoot {
 	let val = 43333;
 	rsx! {
 		<PageLayout title="foobar".into()>
