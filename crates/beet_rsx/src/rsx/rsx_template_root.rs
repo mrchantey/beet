@@ -30,7 +30,7 @@ impl RsxTemplateRoot {
 	pub fn into_rsx(self, hydrated: &mut RsxHydratedMap) -> Result<RsxRoot> {
 		let node = self.node.into_rsx_node(hydrated).map_err(|err| {
 			anyhow::anyhow!(
-				"Failed to hydrate template at location: {:#?}\n{:?}",
+				"Failed to hydrate template at location: {:#?}\n{}",
 				self.location,
 				err
 			)

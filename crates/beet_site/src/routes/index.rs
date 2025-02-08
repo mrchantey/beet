@@ -7,12 +7,12 @@ pub fn get(state: DefaultAppState) -> RsxRoot {
 	let val = 43333;
 	rsx! {
 		<PageLayout title="foobar".into()>
-			<metasdjdsk
+			<meta
 				slot="head"
 				name="description"
-				content="A simple page layout component"
+				content="This is the main file"
 			/>
-			{val + val}
+			{val + 3}
 			hello world
 		</PageLayout>
 	}

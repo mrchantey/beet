@@ -3,6 +3,7 @@ use proc_macro2::Literal;
 use proc_macro2::TokenStream;
 use quote::quote;
 use quote::ToTokens;
+use rstml::node::CustomNode;
 use rstml::node::Node;
 use rstml::node::NodeAttribute;
 use rstml::node::NodeComment;
@@ -19,7 +20,7 @@ pub struct RstmlToRsxTemplate {
 
 
 impl RstmlToRsxTemplate {
-	/// returns a "[RsxTemplateNode]" ron string
+	/// for use with rsx_template! macro
 	pub fn from_macro(&mut self, tokens: TokenStream) -> TokenStream {
 		let str_tokens = self
 			.map_tokens(tokens, "unknown")
@@ -60,12 +61,17 @@ impl RstmlToRsxTemplate {
 			)
 		}
 	}
-	pub fn map_nodes<C>(&mut self, nodes: Vec<Node<C>>) -> Vec<TokenStream> {
+	pub fn map_nodes<C: CustomNode>(
+		&mut self,
+		nodes: Vec<Node<C>>,
+	) -> Vec<TokenStream> {
 		nodes.into_iter().map(|node| self.map_node(node)).collect()
 	}
 
 	/// returns an RsxTemplateNode
-	pub fn map_node<C>(&mut self, node: Node<C>) -> TokenStream {
+	pub fn map_node<C: CustomNode>(&mut self, node: Node<C>) -> TokenStream {
+		println!("visiting node: {}", node.to_token_stream().to_string());
+
 		match node {
 			Node::Doctype(_) => quote! {Doctype},
 			Node::Comment(NodeComment { value, .. }) => {
@@ -103,18 +109,18 @@ impl RstmlToRsxTemplate {
 					.next()
 					.map(char::is_uppercase)
 					.unwrap_or(false);
-				let mut children = self.map_nodes(children);
 				if is_component {
-					// components disregard all the context, they are known
-					// to the rsx node
-					let tracker = self.rusty_tracker.next_tracker_ron(&open_tag);
+					// get tracker before visiting children
+					let tracker =
+						self.rusty_tracker.next_tracker_ron(&open_tag);
+					// components disregard all the context and rely on the tracker
 					// we rely on the hydrated node to provide the attributes and children
+					let mut children = self.map_nodes(children);
 					let slot_children = if children.len() == 1 {
 						children.pop().unwrap().to_token_stream()
 					} else {
 						quote! {Fragment([#(#children),*])}
 					};
-
 
 					quote! {
 						Component (
@@ -124,6 +130,7 @@ impl RstmlToRsxTemplate {
 						)
 					}
 				} else {
+					let children = self.map_nodes(children);
 					let attributes = open_tag
 						.attributes
 						.into_iter()
@@ -164,7 +171,8 @@ impl RstmlToRsxTemplate {
 						}
 					}
 					Some(value) => {
-						let tracker = self.rusty_tracker.next_tracker_ron(&value);
+						let tracker =
+							self.rusty_tracker.next_tracker_ron(&value);
 						quote! {
 							BlockValue (
 								key: #key,

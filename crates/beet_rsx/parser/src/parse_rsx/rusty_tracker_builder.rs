@@ -4,8 +4,12 @@ use quote::quote;
 use quote::ToTokens;
 use rapidhash::rapidhash;
 
-/// See [RustyTracker](beet_rsx::prelude::RustyTracker)
+/// Used by [RstmlToRsx] *and* [RstmlToRsxTemplate] to assign a rusty tracker,
+///  
+/// # Footgun
+/// Both of these structs must be identical in their call ordering
 ///
+///  See [RustyTracker](beet_rsx::prelude::RustyTracker)
 ///
 #[derive(Debug, Default)]
 pub struct RustyTrackerBuilder {

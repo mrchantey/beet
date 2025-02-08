@@ -160,6 +160,7 @@ impl RstmlToRsx {
 		open_tag: OpenTag,
 		mut children: Vec<Node<C>>,
 	) -> TokenStream {
+		// get tracker before visiting children
 		let tracker = self
 			.rusty_tracker
 			.next_tracker_optional(&open_tag, self.build_trackers);
@@ -223,8 +224,9 @@ impl RstmlToRsx {
 		let ident = &self.idents.effect;
 		match attr {
 			NodeAttribute::Block(block) => {
-				let tracker =
-					self.rusty_tracker.next_tracker_optional(&block, build_tracker);
+				let tracker = self
+					.rusty_tracker
+					.next_tracker_optional(&block, build_tracker);
 				quote! {
 					RsxAttribute::Block{
 						initial: vec![#block.clone().into_rsx()],

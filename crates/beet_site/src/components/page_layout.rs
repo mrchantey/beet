@@ -25,6 +25,9 @@ impl Component for PageLayout {
 				</body>
 			</html>
 			<style>
+				h1{
+					padding-top: 20px;
+				}
 				nav{
 					display: flex;
 					flex-direction: column;
@@ -32,6 +35,7 @@ impl Component for PageLayout {
 			</style>
 			<style scope:global>
 			body{
+				margin:0;
 				background-color: black;
 				color:white;
 			}
