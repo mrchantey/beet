@@ -1,10 +1,4 @@
-use super::ElementIdx;
-use super::RsxElement;
-use super::RsxNode;
-use crate::error::ParseError;
-use crate::error::ParseResult;
-use crate::html::RenderHtml;
-use crate::html::RsxToHtml;
+use crate::prelude::*;
 
 /// This module is for handling rsx text blocks in html text node.
 ///
@@ -21,14 +15,14 @@ use crate::html::RsxToHtml;
 /// ```
 #[derive(Debug, Clone, PartialEq)]
 pub struct TextBlockEncoder {
-	pub parent_id: ElementIdx,
+	pub parent_id: RsxIdx,
 	/// the index of the child text node that collapsed
 	/// a vec of 'next index to split at'
 	pub split_positions: Vec<Vec<usize>>,
 }
 
 impl TextBlockEncoder {
-	pub fn new(parent_id: ElementIdx) -> Self {
+	pub fn new(parent_id: RsxIdx) -> Self {
 		Self {
 			parent_id,
 			split_positions: Vec::new(),
@@ -37,7 +31,7 @@ impl TextBlockEncoder {
 
 
 	/// Store the indices
-	pub fn encode(id: ElementIdx, el: &RsxElement) -> Self {
+	pub fn encode(id: RsxIdx, el: &RsxElement) -> Self {
 		let mut encoder = Self::new(id);
 		// the index is the child index and the value is a vec of 'next index to split at'
 		// let indices: Vec<Vec<usize>> = Vec::new();
@@ -156,7 +150,7 @@ impl CollapsedNode {
 
 impl CollapsedNode {
 	fn from_element(el: &RsxElement) -> Vec<CollapsedNode> {
-		el.children.iter().flat_map(Self::from_node).collect()
+		Self::from_node(&el.children)
 	}
 	fn from_node(node: &RsxNode) -> Vec<CollapsedNode> {
 		let mut out = Vec::new();
@@ -164,10 +158,10 @@ impl CollapsedNode {
 			RsxNode::Fragment(nodes) => {
 				out.extend(nodes.into_iter().flat_map(Self::from_node));
 			}
-			RsxNode::Component { node, .. } => {
-				out.extend(Self::from_node(node));
+			RsxNode::Component(RsxComponent { root, .. }) => {
+				out.extend(Self::from_node(root));
 			}
-			RsxNode::Block { initial, .. } => {
+			RsxNode::Block(RsxBlock { initial, .. }) => {
 				out.push(CollapsedNode::RustText(
 					RsxToHtml::default().map_node(initial).render(),
 				));
@@ -223,13 +217,15 @@ impl TextBlockPosition {
 #[cfg(test)]
 mod test {
 	use super::*;
-	use crate::prelude::*;
 	use sweet::prelude::*;
 
 	struct Adjective;
 	impl Component for Adjective {
-		fn render(self) -> impl Rsx {
-			rsx! {"lazy"<slot/>}
+		fn render(self) -> RsxRoot {
+			rsx! {
+				"lazy"
+				<slot />
+			}
 		}
 	}
 
@@ -239,8 +235,13 @@ mod test {
 		let color = "brown";
 		let action = "jumps over";
 
-		let tree = rsx! {<div>"The "{desc}" and "{color}<b> fox </b> {action}" the "<Adjective> and fat </Adjective>dog</div>};
-		let RsxNode::Element(el) = &tree.children()[0] else {
+		let tree = rsx! {
+			<div>
+				"The "{desc}" and "{color}<b>fox</b> {action}" the "
+				<Adjective>and fat</Adjective>dog
+			</div>
+		};
+		let RsxNode::Element(el) = &tree.node else {
 			panic!("expected element");
 		};
 
@@ -257,7 +258,7 @@ mod test {
 			CollapsedNode::StaticText(" the ".into()),
 			CollapsedNode::StaticText("lazy".into()),
 			CollapsedNode::Break,
-			CollapsedNode::StaticText("dog".into()),
+			CollapsedNode::StaticText("dog\n\t\t\t".into()),
 		]);
 
 		let encoded = TextBlockEncoder::encode(0, &el);

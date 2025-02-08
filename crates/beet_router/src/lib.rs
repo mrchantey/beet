@@ -25,11 +25,11 @@ pub type DefaultFileRouter =
 
 #[cfg(any(test, feature = "_test_site"))]
 pub mod test_site {
-	mod components;
+	pub mod components;
 	#[path = "routes/contributing.rs"]
 	mod contributing;
 	#[path = "routes/index.rs"]
 	pub mod index;
-	pub mod test_site_router;
+	pub mod routes;
 	pub use components::*;
 }

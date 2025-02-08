@@ -51,7 +51,7 @@ pub trait Hydrator {
 	fn update_rsx_node(
 		&mut self,
 		node: RsxNode,
-		cx: &RsxContext,
+		loc: DomLocation,
 	) -> ParseResult<()>;
 	/// just used for testing atm
 	fn render(&self) -> String;

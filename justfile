@@ -16,6 +16,7 @@ default:
 
 init-repo:
 	just assets-pull
+	mkdir -p crates/beet_ml/assets/ml && cp ./assets/ml/default-bert.ron crates/beet_ml/assets/ml/default.bert.ron
 # just test-site
 # just export-scenes
 
@@ -24,35 +25,45 @@ init-repo:
 cli *args:
 	cargo run -p beet-cli -- {{args}}
 
-run example *args:
+run-ex example *args:
 	just watch 'just run-ci {{example}} {{args}}'
 
 run-ci example *args:
 	cargo run --example {{example}} {{args}}
 
-runp crate example *args:
-	cargo run -p {{crate}} --example {{example}} {{args}}
+run crate example *args:
+	just watch cargo run -p {{crate}} --example {{example}} {{args}}
 
 
 fmt *args:
 	just watch 'just leptosfmt {{args}}'
 
 leptosfmt *args:
-	leptosfmt \
-	crates/beet_rsx/**/* \
-	crates/beet_router/**/* \
-	crates/beet_site/**/* \
+	leptosfmt 												\
+	crates/beet_rsx/**/*.rs 					\
+	crates/beet_rsx/**/**/*.rs 				\
+	crates/beet_rsx/**/**/**/*.rs 		\
+	crates/beet_router/**/*.rs 				\
+	crates/beet_router/**/**/*.rs 		\
+	crates/beet_router/**/**/**/*.rs 	\
+	crates/beet_site/**/*.rs 					\
 	{{args}}
 
-#💡 HTML
+#💡 e2e examples
 
-test-site:
-	just runp beet_router test_site_router
-	just runp beet_router test_site_html
+run-reactive:
+	cp ./index.html ./target/index.html
+	sweet serve ./target | \
+	just watch 'just build-wasm beet dom_renderer'
+
+run-test-site:
+	cargo run -p beet_router --example routes_mod
+	cargo run -p beet_router --example templates
+	cargo run -p beet_router --example html
 	sweet serve target/test_site
 
 
-beet-site:
+run-beet-site:
 	just cli serve \
 	-p beet_site \
 	--src crates/beet_site/src \
@@ -81,18 +92,16 @@ doc:
 	just watch 'cargo doc'
 
 serve-doc:
-	cd ./target/doc/beet && forky serve
+	cd ./target/doc/beet && sweet serve
 
-# just leptosfmt --check
 test-all *args:
-	cargo test 																 --all-features -p beet_flow
-	cargo test 																								-p beet_rsx
-	cargo test 																								-p beet_router
-	cargo test 																								-p beet_spatial
-	cargo test 																								-p beet_ml
-	cargo test --target wasm32-unknown-unknown --all-features -p beet_flow
-	cargo test --target wasm32-unknown-unknown --all-features -p beet_rsx
-	cargo test --target wasm32-unknown-unknown 								-p beet_spatial
+	just leptosfmt --check
+	cargo test --workspace
+	cargo test 																 --all-features -p beet_flow 			{{args}}
+	cargo test 																 --all-features -p beet_rsx 			{{args}}
+	cargo test --target wasm32-unknown-unknown --all-features -p beet_flow 			{{args}}
+	cargo test --target wasm32-unknown-unknown --all-features -p beet_rsx 			{{args}}
+	cargo test --target wasm32-unknown-unknown 								-p beet_spatial 	{{args}}
 
 #cargo test -p beet_spatial
 #cargo test -p beet_sim
@@ -216,11 +225,6 @@ assets-pull:
 	tar -xzvf ./assets.tar.gz
 	rm ./assets.tar.gz
 
-expand-rsx:
-	just watch cargo expand -p beet_rsx --example rsx_macro
-wasm-example:
-	forky serve | \
-	just watch 'just build-wasm beet dom_renderer'
 
 
 ### TEST SCENE LOADS
@@ -290,3 +294,18 @@ test-seek-3d:
 	../bevyhub/scenes/ground-3d.json \
 	./scenes/beet-debug.json \
 	./scenes/seek-3d.json \
+
+
+# https://gist.github.com/stephenhardy/5470814
+# 1. Remove the history from 
+# 2. recreate the repos from the current content only
+# 3. push to the github remote repos ensuring you overwrite history
+very-scary-purge-commit-history:
+	rm -rf .git
+
+	git init
+	git add .
+	git commit -m "Initial commit"
+
+	git remote add origin git@github.com:<YOUR ACCOUNT>/<YOUR REPOS>.git
+	git push -u --force origin master

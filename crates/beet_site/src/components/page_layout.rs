@@ -8,8 +8,8 @@ pub struct PageLayout {
 }
 
 
-impl Rsx for PageLayout {
-	fn into_rsx(self) -> RsxNode {
+impl Component for PageLayout {
+	fn render(self) -> RsxRoot {
 		rsx! {
 			<html>
 			<head>
@@ -25,10 +25,20 @@ impl Rsx for PageLayout {
 				</body>
 			</html>
 			<style>
+				h1{
+					padding-top: 20px;
+				}
 				nav{
 					display: flex;
 					flex-direction: column;
 				}
+			</style>
+			<style scope:global>
+			body{
+				margin:0;
+				background-color: black;
+				color:white;
+			}
 			</style>
 		}
 	}

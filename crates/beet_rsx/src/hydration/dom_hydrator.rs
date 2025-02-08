@@ -11,8 +11,9 @@ pub struct DomHydrator {
 	// cache document reference
 	document: Document,
 	/// sparse set element array, cached for fast reference
+	/// TODO bench this
 	elements: Vec<Option<Element>>,
-	cx_map: Option<RsxContextMap>,
+	loc_map: Option<DomLocationMap>,
 }
 
 impl Default for DomHydrator {
@@ -21,18 +22,18 @@ impl Default for DomHydrator {
 			constants: Default::default(),
 			document: window().unwrap().document().unwrap(),
 			elements: Default::default(),
-			cx_map: Default::default(),
+			loc_map: Default::default(),
 		}
 	}
 }
 
 impl DomHydrator {
-	fn get_cx_map(&mut self) -> ParseResult<&RsxContextMap> {
-		let query = format!("[{}]", self.constants.cx_map_key,);
+	fn get_dom_location_map(&mut self) -> ParseResult<&DomLocationMap> {
+		let query = format!("[{}]", self.constants.loc_map_key);
 		if let Some(cx) = self.document.query_selector(&query).unwrap() {
 			let inner_text = cx.text_content().unwrap();
-			self.cx_map = Some(RsxContextMap::from_csv(&inner_text)?);
-			Ok(&self.cx_map.as_ref().unwrap())
+			self.loc_map = Some(DomLocationMap::from_csv(&inner_text)?);
+			Ok(&self.loc_map.as_ref().unwrap())
 		} else {
 			Err(ParseError::serde(format!(
 				"Could not find context attribute: {}",
@@ -47,42 +48,44 @@ impl DomHydrator {
 		&self,
 		el: Element,
 		rsx: RsxNode,
-		cx: &RsxContext,
+		loc: DomLocation,
 	) -> ParseResult<()> {
 		Ok(())
 	}
 
 	/// try to get cached element or find it in the dom.
-	/// This also uncollapses the child text nodes
-	fn get_or_find_element(&mut self, cx: &RsxContext) -> ParseResult<Element> {
-		if let Some(Some(el)) = self.elements.get(cx.element_idx()) {
+	/// When it is found it will uncollapse text nodes,
+	/// ie expand into the locations referenced by the [DomLocation]
+	fn get_or_find_element(&mut self, rsx_idx: RsxIdx) -> ParseResult<Element> {
+		if let Some(Some(el)) = self.elements.get(rsx_idx as usize) {
 			return Ok(el.clone());
 		}
-		let id = cx.element_idx();
 
-		let query = format!("[{}='{}']", self.constants.id_key, id);
+		let query = format!("[{}='{}']", self.constants.rsx_idx_key, rsx_idx);
 		if let Some(el) = self.document.query_selector(&query).unwrap() {
-			self.elements.resize(id + 1, None);
-			self.elements[id] = Some(el.clone());
-			self.uncollapse_child_text_nodes(&el, id)?;
+			self.elements.resize((rsx_idx + 1) as usize, None);
+			self.elements[rsx_idx as usize] = Some(el.clone());
+			self.uncollapse_child_text_nodes(&el, rsx_idx)?;
 			Ok(el)
 		} else {
 			Err(ParseError::Hydration(format!(
-				"Could not find collapsed text node parent with id: {}",
-				id
+				"Could not find parent for collapsed text node with rsx idx: {}",
+				rsx_idx
 			)))
 		}
 	}
 
-	/// use the cx_map to uncollapse text nodes
+	/// use the [RsxLocationMap] to uncollapse text nodes
 	fn uncollapse_child_text_nodes(
 		&mut self,
 		el: &Element,
-		rsx_id: usize,
+		rsx_idx: RsxIdx,
 	) -> ParseResult<()> {
 		let children = el.child_nodes();
-		let cx_map = self.get_cx_map()?;
-		let Some(el_cx) = cx_map.collapsed_elements.get(&rsx_id) else {
+		let loc_map = self.get_dom_location_map()?;
+		let Some(el_cx) = loc_map.collapsed_elements.get(&rsx_idx) else {
+			// here we assume this is because the element has no children
+			// so was not tracked
 			// elements without rust children are not tracked
 			return Ok(());
 		};
@@ -132,24 +135,22 @@ impl Hydrator for DomHydrator {
 	fn update_rsx_node(
 		&mut self,
 		rsx: RsxNode,
-		cx: &RsxContext,
+		loc: DomLocation,
 	) -> ParseResult<()> {
-		let el = self.get_or_find_element(cx)?;
+		let parent = self.get_or_find_element(loc.parent_idx)?;
 		let child =
-			el.child_nodes()
-				.item(cx.child_idx() as u32)
-				.ok_or_else(|| {
-					ParseError::Hydration("Could not find child".into())
-				})?;
+			parent.child_nodes().item(loc.child_idx as u32).ok_or_else(
+				|| ParseError::Hydration("Could not find child".into()),
+			)?;
 
 		#[allow(unused)]
 		match rsx {
-			RsxNode::Block {
-				initial,
-				register_effect,
-			} => {
+			RsxNode::Fragment(vec) => todo!(),
+			RsxNode::Component(_) => todo!(),
+			RsxNode::Block(RsxBlock { initial, effect }) => {
 				todo!()
 			}
+			RsxNode::Element(rsx_element) => todo!(),
 			RsxNode::Text(val) => {
 				if let Some(child) = child.dyn_ref::<Text>() {
 					child.set_text_content(Some(&val));
@@ -157,11 +158,8 @@ impl Hydrator for DomHydrator {
 					todo!("replace with text node");
 				}
 			}
-			RsxNode::Component { .. } => todo!(),
-			RsxNode::Fragment(vec) => todo!(),
-			RsxNode::Doctype => todo!(),
 			RsxNode::Comment(_) => todo!(),
-			RsxNode::Element(rsx_element) => todo!(),
+			RsxNode::Doctype => todo!(),
 		}
 
 

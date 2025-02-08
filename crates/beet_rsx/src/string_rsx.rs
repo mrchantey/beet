@@ -6,32 +6,22 @@ use crate::rsx::RsxAttribute;
 #[derive(Debug)]
 pub struct StringRsx;
 
-
+fn noop() -> RegisterEffect { Box::new(|_| Ok(())) }
 impl StringRsx {
-	pub fn map_node_block<M>(
-		block: impl 'static + Clone + IntoRsx<M>,
-	) -> RsxNode {
-		RsxNode::Block {
-			initial: Box::new(block.clone().into_rsx()),
-			register_effect: Box::new(move |_| {}),
-		}
+	pub fn register_block<M>(
+		_block: impl 'static + Clone + IntoRsx<M>,
+	) -> RegisterEffect {
+		noop()
 	}
-	pub fn map_attribute_block(
-		mut block: impl 'static + FnMut() -> RsxAttribute,
-	) -> RsxAttribute {
-		RsxAttribute::Block {
-			initial: vec![block()],
-			register_effect: Box::new(move |_| {}),
-		}
+	pub fn register_attribute_block(
+		_block: impl 'static + FnMut() -> RsxAttribute,
+	) -> RegisterEffect {
+		noop()
 	}
-	pub fn map_attribute_value<M>(
-		key: &str,
-		block: impl 'static + Clone + IntoRsxAttributeValue<M>,
-	) -> RsxAttribute {
-		let key = key.to_string();
-		RsxAttribute::KeyValue {
-			key: key.clone(),
-			value: block.clone().into_attribute_value(),
-		}
+	pub fn register_attribute_value<M>(
+		_key: &str,
+		_block: impl 'static + Clone + IntoRsxAttributeValue<M>,
+	) -> RegisterEffect {
+		noop()
 	}
 }

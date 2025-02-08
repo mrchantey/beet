@@ -30,5 +30,5 @@ serde_json.workspace = true
 rig-core = "0.4"
 
 [dev-dependencies]
-bevy = { workspace = true, default-features = true }
+# bevy = { workspace = true, default-features = true }
 sweet.workspace = true

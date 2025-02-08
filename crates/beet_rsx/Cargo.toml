@@ -17,7 +17,7 @@ default = ["macros", "css"]
 css = ["dep:lightningcss", "dep:parcel_selectors"]
 macros = ["dep:beet_rsx_macros"]
 parser = ["dep:beet_rsx_parser"]
-serde = ["dep:serde"]
+serde = ["dep:serde", "dep:ron"]
 
 [dependencies]
 beet_rsx_parser = { workspace = true, optional = true }
@@ -28,10 +28,12 @@ sweet.workspace = true
 thiserror.workspace = true
 anyhow.workspace = true
 strum.workspace = true
+rapidhash.workspace = true
 strum_macros.workspace = true
 prettyplease.workspace = true
 once_cell.workspace = true
 serde = { workspace = true, optional = true }
+ron = { workspace = true, optional = true }
 http.workspace = true
 
 parcel_selectors = { version = "0.28", optional = true }
@@ -54,5 +56,5 @@ web-sys.workspace = true
 
 
 [dev-dependencies]
-beet_rsx = { workspace = true, features = ["parser"] }
+beet_rsx = { workspace = true, features = ["parser", "serde"] }
 sweet = { workspace = true, features = ["test"] }

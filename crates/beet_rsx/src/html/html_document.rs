@@ -7,6 +7,7 @@ use super::RenderHtml;
 /// Requirements for a valid html document are that
 /// 1. head and body tags are present
 
+#[derive(Debug, Clone)]
 pub struct HtmlDocument {
 	pub head: Vec<HtmlNode>,
 	pub body: Vec<HtmlNode>,
