@@ -15,7 +15,7 @@ pub struct RsxTemplateMap(pub HashMap<RsxLocation, RsxTemplateRoot>);
 
 impl RsxTemplateMap {
 	/// used by routers, load a serialized template map
-	#[cfg(not(target_arch = "wasm32"))]
+	#[cfg(all(feature = "serde", not(target_arch = "wasm32")))]
 	pub fn load(src: &std::path::Path) -> Result<Self> {
 		use sweet::prelude::ReadFile;
 		{
