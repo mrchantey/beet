@@ -2,7 +2,16 @@
 #![cfg_attr(test, test_runner(sweet::test_runner))]
 #![allow(deprecated)] // TODO remove deprecated
 #![cfg_attr(feature = "reflect", feature(trait_upcasting))]
-
+/// # BeetFlow
+///
+///
+/// Definitions:
+///
+/// - `Action Entity`: A single global entity that is a trigger
+/// 	target
+///	- `Node Entity`: The entity representing a node in an action
+/// 	graph, it is linked to the `Action Entity` via the [ActionMap].
+///
 use bevy::app::PluginGroup;
 use bevy::app::PluginGroupBuilder;
 pub mod action_builder;
