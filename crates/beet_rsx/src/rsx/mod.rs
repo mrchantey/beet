@@ -1,16 +1,29 @@
-mod rsx_element;
+mod effect;
+mod rsx_root_map;
+mod rsx_hydrated_node;
+mod rsx_location;
+mod rsx_template_map;
+mod rsx_template_node;
+mod rsx_template_root;
+mod rsx_visitor_fn;
 mod scoped_style;
-pub use rsx_element::*;
+pub use rsx_root_map::*;
+pub use rsx_hydrated_node::*;
+pub use rsx_template_map::*;
+pub use rsx_template_node::*;
+pub use rsx_template_root::*;
+pub use rsx_visitor_fn::*;
 pub use scoped_style::*;
-mod rsx_context;
-pub use rsx_context::*;
 mod rsx_node;
-mod rsx_node_visitor;
+mod rsx_visitor;
 pub use rsx_node::*;
+pub use rsx_visitor::*;
 pub use text_block_encoder::*;
+mod rsx_root;
 mod text_block_encoder;
-pub use rsx_context_map::*;
-mod rsx_context_map;
+pub use effect::*;
+pub use rsx_location::*;
+pub use rsx_root::*;
 
 pub trait Rsx {
 	fn into_rsx(self) -> RsxNode;
@@ -18,6 +31,9 @@ pub trait Rsx {
 
 impl Rsx for RsxNode {
 	fn into_rsx(self) -> RsxNode { self }
+}
+impl Rsx for RsxRoot {
+	fn into_rsx(self) -> RsxNode { self.node }
 }
 impl Rsx for () {
 	fn into_rsx(self) -> RsxNode { RsxNode::default() }
@@ -67,11 +83,11 @@ impl<T: FnOnce() -> U, U: IntoRsxAttributeValue<M2>, M2>
 
 
 pub trait Component {
-	fn render(self) -> impl Rsx;
+	fn render(self) -> RsxRoot;
 }
 
-impl<T: FnOnce() -> U, U: Rsx> Component for T {
-	fn render(self) -> impl Rsx { self() }
+impl<T: FnOnce() -> RsxRoot> Component for T {
+	fn render(self) -> RsxRoot { self() }
 }
 
 impl<T: Component> Rsx for T {

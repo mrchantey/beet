@@ -213,9 +213,9 @@ impl RenderHtml for Vec<HtmlAttribute> {
 #[derive(Debug, Clone)]
 pub struct HtmlConstants {
 	/// the attribute for element ids, used for encoding the [TreePosition],
-	pub id_key: &'static str,
+	pub rsx_idx_key: &'static str,
 	/// used for describing the location of rust blocks in text nodes,
-	pub cx_map_key: &'static str,
+	pub loc_map_key: &'static str,
 	/// the global event handler for all events
 	pub event_handler: &'static str,
 	/// the global vec that stores prehydrated events
@@ -225,10 +225,10 @@ pub struct HtmlConstants {
 impl Default for HtmlConstants {
 	fn default() -> Self {
 		Self {
-			id_key: "data-sweet-id",
-			cx_map_key: "data-sweet-cx-map",
-			event_handler: "_sweet_event_handler",
-			event_store: "_sweet_event_store",
+			rsx_idx_key: "data-beet-rsx-idx",
+			loc_map_key: "data-beet-loc-map",
+			event_handler: "_beet_event_handler",
+			event_store: "_beet_event_store",
 		}
 	}
 }

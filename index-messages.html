@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+	<meta charset="utf-8">
+	<title>A Cool Site</title>
+	<meta name="description" content="An amazing website">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<style>
+		body {
+			margin: 0;
+			background-color: black;
+			overflow: hidden;
+		}
+
+		canvas {
+			width: 100dvw;
+			height: 100dvh;
+		}
+	</style>
+</head>
+
+<body>
+	<script>
+
+		const replicationRegistry =
+		{
+			"bevyhub_net::events::common_events::AppStartup": 0,
+			"bevyhub_net::events::common_events::AppReady": 1,
+			"bevyhub_net::events::spawn_scene_file::SpawnSceneFile": 2,
+			"bevyhub_net::events::spawn_scene_file::SpawnSceneFileResponse": 3,
+			"beet_examples::net::example_replicate_plugin::OnUserMessage": 4
+		}
+
+		async function loadScene(name) {
+			const response = await fetch(`/target/scenes/${name}.json`)
+			const json = await response.text()
+			let hashmap = await sendMessage(
+				"bevyhub_net::events::spawn_scene_file::SpawnSceneFile",
+				json,
+				"bevyhub_net::events::spawn_scene_file::SpawnSceneFileResponse"
+			)
+			console.log('hashmap received')
+			console.dir(hashmap)
+		}
+
+		function sendUserMessage(message) {
+			sendMessage("beet_examples::net::example_replicate_plugin::OnUserMessage", message)
+		}
+
+		async function sendMessage(key, payload, awaitKey) {
+			const detail = JSON.stringify([{
+				SendEvent: {
+					reg_id: replicationRegistry[key],
+					payload: {
+						Json: JSON.stringify(payload)
+					}
+				}
+			}])
+			let awaiter = awaitKey
+				? awaitMessage(awaitKey)
+				: null
+			window.dispatchEvent(new CustomEvent('js-message', { detail }))
+			if (awaiter) {
+				return await awaiter
+			}
+		}
+
+		function awaitMessage(key) {
+			return new Promise((resolve) => {
+				const listener = (event) => {
+					const messages = JSON.parse(event.detail)
+					for (const message of messages) {
+						if (message?.SendEvent?.reg_id === replicationRegistry[key]) {
+							resolve(message.SendEvent.payload.Json)
+							window.removeEventListener('wasm-message', listener)
+						}
+					}
+				}
+				window.addEventListener('wasm-message', listener)
+			})
+		}
+
+		window.addEventListener('wasm-message', async (event) => {
+			const messages = JSON.parse(event.detail)
+			for (const message of messages) {
+				if (message?.SendEvent?.reg_id === replicationRegistry["bevyhub_net::events::common_events::AppStartup"]) {
+					console.log('AppStartup')
+					await loadScene('beet-debug')
+					await loadScene('camera-2d')
+					// await new Promise(resolve => setTimeout(resolve, 1000))
+					await loadScene('ui-terminal-input')
+					await loadScene('hello-world')
+					// await loadScene('sentence-selector')
+					console.log('All scenes sent')
+					sendUserMessage('loud and clear')
+				}
+				// console.log(`message received: ${JSON.stringify(message)}`)
+				// if (message?.SendEvent?.payload?.Json) {
+				// 	const payload = JSON.parse(message.SendEvent.payload.Json)
+				// 	console.log(`payload received: ${JSON.stringify(payload)}`)
+				// 	sendUserMessage('loud and clear')
+				// }
+			}
+		})
+	</script>
+
+
+	<script type="module">
+		// import init from 'https://storage.googleapis.com/beet-examples/hello_ml/main.js'
+		// import init from 'https://storage.googleapis.com/beet-examples/hello_world/main.js'
+		// import init from 'https://storage.googleapis.com/beet-examples/app_basics/main.js'
+		// import init from 'https://storage.googleapis.com/beet-examples/app_full/main.js'
+		import init from './target/web-examples/app_full/main.js'
+		// import init from './target/web-examples/hello_ml/main.js'
+		// init()
+		// init('https://storage.googleapis.com/beet-examples/app_full/main_bg.wasm')
+		init('./target/web-examples/app_full/main_bg.wasm')
+			.catch((error) => {
+				if (!error.message.startsWith("Using exceptions for control flow,"))
+					throw error
+			})
+	</script>
+	<canvas id="beet-canvas"></canvas>
+</body>
+
+</html>

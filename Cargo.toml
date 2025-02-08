@@ -13,10 +13,10 @@ opt-level = 0
 opt-level = 0
 
 [workspace.package]
-version = "0.0.5-rc.4"
+version = "0.0.5-rc.2"
 authors = ["Peter Hayman"]
 edition = "2021"
-description = "A modular behavior library for the Bevy Engine."
+description = "Tools for developing reactive structures"
 documentation = "https://bevyhub.dev/docs/beet"
 readme = "README.md"
 homepage = "https://bevyhub.dev/docs/beet"
@@ -36,11 +36,11 @@ publish = false
 # default resolver
 resolver = "2"
 members = [
-	"crates/beet_examples",
+	# "crates/beet_examples",
 	"crates/beet_flow",
 	"crates/beet_flow/macros",
 	"crates/beet_ml",
-	"crates/beet_rig",
+	# "crates/beet_rig",
 	"crates/beet_router",
 	"crates/beet_router/parser",
 	"crates/beet_rsx",
@@ -50,23 +50,22 @@ members = [
 	"crates/beet_spatial",
 	"crates/beet_site",
 	"crates/beet-cli",
+	# "crates/emby",
 ]
 
 [workspace.dependencies]
 ## internal
-beet = { path = "./", version = "0.0.5-rc.4", default-features = false }
-beet_examples = { path = "crates/beet_examples", version = "0.0.5-rc.4" }
-beet_spatial = { path = "crates/beet_spatial", version = "0.0.5-rc.4", default-features = false }
-beet_flow = { path = "crates/beet_flow", version = "0.0.5-rc.4" }
-beet_flow_macros = { path = "crates/beet_flow/macros", version = "0.0.5-rc.4" }
-beet_ml = { path = "crates/beet_ml", version = "0.0.5-rc.4" }
-beet_router = { path = "crates/beet_router", version = "0.0.5-rc.4" }
-beet_router_parser = { path = "crates/beet_router/parser", version = "0.0.5-rc.4" }
-beet_rsx = { path = "crates/beet_rsx", version = "0.0.5-rc.4" }
-beet_rsx_macros = { path = "crates/beet_rsx/macros", version = "0.0.5-rc.4" }
-beet_rsx_parser = { path = "crates/beet_rsx/parser", version = "0.0.5-rc.4" }
-beet_sim = { path = "crates/beet_sim", version = "0.0.5-rc.4" }
-# emby = { path = "crates/emby", version = "0.0.5-rc.4" }
+beet = { path = "./", version = "0.0.5-rc.2", default-features = false }
+beet_spatial = { path = "crates/beet_spatial", version = "0.0.5-rc.2", default-features = false }
+beet_flow = { path = "crates/beet_flow", version = "0.0.5-rc.2" }
+beet_flow_macros = { path = "crates/beet_flow/macros", version = "0.0.5-rc.2" }
+beet_ml = { path = "crates/beet_ml", version = "0.0.5-rc.2" }
+beet_router = { path = "crates/beet_router", version = "0.0.5-rc.2" }
+beet_router_parser = { path = "crates/beet_router/parser", version = "0.0.5-rc.2" }
+beet_rsx = { path = "crates/beet_rsx", version = "0.0.5-rc.2" }
+beet_rsx_macros = { path = "crates/beet_rsx/macros", version = "0.0.5-rc.2" }
+beet_rsx_parser = { path = "crates/beet_rsx/parser", version = "0.0.5-rc.2" }
+beet_sim = { path = "crates/beet_sim", version = "0.0.5-rc.2" }
 
 #💡 local
 bevyhub = { git = "https://github.com/mrchantey/bevyhub", default-features = false }
@@ -79,33 +78,37 @@ bevy = { version = "0.15", default-features = false }
 #💡 logging
 log = "0.4"
 pretty_env_logger = "0.4"
-console_log = { version = "1.0", features = ["color"] }
+console_log = { version = "1", features = ["color"] }
 
 #💡 utility
-anyhow = "1.0.75"
-thiserror = "1.0.60"
-bytemuck = "1.13.1"
+anyhow = "1"
+thiserror = "1"
 heck = "0.4"
-once_cell = "1.20"
+once_cell = "1"
+rapidhash = "1.3.0"
 
 #💡 async
 futures = "0.3"
 
 #💡 async-native
-tokio = { version = "1.35", features = ["full"] }
+tokio = { version = "1", features = [
+	"macros",
+	"sync",
+	"rt",
+	"rt-multi-thread",
+	"time",
+] }
 
 #💡 macros
-syn = "2.0"
-quote = "1.0"
-proc-macro2 = "1.0"
+syn = "2"
+quote = "1"
+proc-macro2 = "1"
 prettyplease = "0.2"
 
 #💡 attributes
-num-traits = "0.2.19"
-derive_deref = "1.1.1"
-strum = { version = "0.26.0", features = ["derive"] }
-strum_macros = "0.26.0"
-extend = "1.1.2"
+strum = { version = "0.26", features = ["derive"] }
+strum_macros = "0.26"
+extend = "1"
 
 #💡 io
 serde = { version = "1", features = ["derive"] }

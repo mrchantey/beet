@@ -1,4 +1,3 @@
-use super::RsxContext;
 use super::RsxNode;
 use crate::prelude::*;
 use lightningcss::printer::PrinterOptions;
@@ -9,88 +8,138 @@ use parcel_selectors::attr::ParsedCaseSensitivity;
 
 /// ScopedStyle is a utility for applying scoped styles to components.
 /// The approach is inspired by astro https://docs.astro.build/en/guides/styling/
-/// In --release the css will be minified
+///
+/// # Scoped Style Rules:
+///
+/// - Style tags are applied to all elements in a root or component
+///   but not [RsxComponent::node] or [RsxComponent::slot_children]
+/// - In release mode the css will be minified
+/// - Scope rules:
+/// 	- `<style scope:global/>` will not be scoped at all
+///
 pub struct ScopedStyle {
-	/// the attribute to use as a selector for the component, 
-	/// defaults to "data-bcid"
+	/// the attribute to use as a selector for the component,
+	/// defaults to "data-styleid"
 	attr: String,
+	/// an index used to track the current component being styled
+	idx: usize,
 }
 
 impl Default for ScopedStyle {
 	fn default() -> Self {
 		ScopedStyle {
-			attr: "data-bcid".to_string(),
+			attr: "data-styleid".to_string(),
+			idx: 0,
 		}
 	}
 }
 
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+enum Scope {
+	#[default]
+	Component,
+	Global,
+	// Cascade (eargerly apply slots?)
+}
+impl Scope {
+	pub fn from_element(el: &mut RsxElement) -> Self {
+		if el.contains_attr_key("scope:global") {
+			el.attributes.retain(|attr| match attr {
+				RsxAttribute::Key { key } => key != "scope:global",
+				_ => true,
+			});
+
+			Scope::Global
+		} else {
+			Scope::Component
+		}
+	}
+}
 
 impl ScopedStyle {
-	/// apply scoped style to all child components,
-	/// the root is only applied if it is a component,
-	/// so style tags in a root fragment will not be scoped.
-	pub fn apply(&self, node: &mut RsxNode) -> ParseResult<()> {
-		let mut result = Ok(());
-		RsxContext::visit_mut(node, |cx, node| match node {
-			RsxNode::Component { node, .. } => {
-				let mut contains_style = false;
-				node.visit_ignore_components_mut(|node| {
-					if let RsxNode::Element(e) = node {
-						if e.tag == "style" {
-							contains_style = true;
-							node.visit_mut(|node| {
-								if let RsxNode::Text(text) = node {
-									if let Err(err) = self
-										.apply_styles(cx.component_idx(), text)
-									{
-										result = Err(err);
-									}
-								}
-							});
-						}
-					}
-				});
-				if contains_style {
-					node.visit_ignore_components_mut(|node| {
-						if let RsxNode::Element(e) = node {
-							if e.tag != "style" {
-								e.attributes.push(RsxAttribute::KeyValue {
-									key: self.attr.to_string(),
-									value: cx.component_idx().to_string(),
-								});
-							}
-						}
-					});
-				}
-			}
-			_ => {}
+	/// Applies scoped style to:
+	/// 1. root node
+	/// 2. all component nodes
+	/// 3. all component slot children
+	pub fn apply(&mut self, root: &mut RsxRoot) -> ParseResult<()> {
+		// 1. apply to the root node, if its a component nothing happens
+		//    in this step, it will be handled by the component visitor
+		self.apply_inner(&mut root.node)?;
+
+		let mut parse_err = Ok(());
+
+		// visit all components
+		VisitRsxComponentMut::walk(&mut root.node, |component| {
+			// 2. apply to component node
+			if let Err(err) = self.apply_inner(&mut component.root) {
+				parse_err = Err(err);
+			};
+			// 3. apply to component slot children
+			if let Err(err) = self.apply_inner(&mut component.slot_children) {
+				parse_err = Err(err);
+			};
 		});
-		result
+		parse_err
 	}
 
-	/// apply [data-bcid=cid] attribute selector to all style rules in the CSS
-	fn apply_styles(&self, cid: usize, css: &mut String) -> ParseResult<()> {
+	/// 1. apply the idx to all style bodies
+	/// 2. if contains style, apply tag to all elements in the component
+	fn apply_inner(&mut self, node: &mut RsxNode) -> ParseResult<()> {
+		let mut parse_err = Ok(());
+
+		let opts = VisitRsxOptions::ignore_component();
+		let mut scope_found = None;
+
+		// 1. apply to style bodies
+		VisitRsxElementMut::walk_with_opts(node, opts.clone(), |el| {
+			if el.tag == "style" {
+				let scope = Scope::from_element(el);
+				scope_found = Some(scope);
+				// currently only recurse top level style children, we could create another
+				// visitor to go deeper if we start supporting style body components
+				if let RsxNode::Text(text) = &mut *el.children {
+					if let Err(err) = self.apply_styles(text, scope) {
+						parse_err = Err(err);
+					}
+				}
+			}
+		});
+		// 2. tag elements
+		if scope_found == Some(Scope::Component) {
+			VisitRsxElementMut::walk_with_opts(node, opts.clone(), |el| {
+				el.attributes.push(RsxAttribute::KeyValue {
+					key: self.attr.to_string(),
+					value: self.idx.to_string(),
+				});
+			});
+			self.idx += 1;
+		}
+		parse_err
+	}
+	fn apply_styles(&self, css: &mut String, scope: Scope) -> ParseResult<()> {
 		// Parse the stylesheet
 		let mut stylesheet = StyleSheet::parse(css, ParserOptions::default())
 			.map_err(|e| ParseError::Serde(e.to_string()))?;
 
-		stylesheet.rules.0.iter_mut().for_each(|rule| {
-			// we only care about style rules
-			if let lightningcss::rules::CssRule::Style(style_rule) = rule {
-				style_rule.selectors.0.iter_mut().for_each(|selector| {
-					selector.append(
+		if scope == Scope::Component {
+			stylesheet.rules.0.iter_mut().for_each(|rule| {
+				// we only care about style rules
+				if let lightningcss::rules::CssRule::Style(style_rule) = rule {
+					style_rule.selectors.0.iter_mut().for_each(|selector| {
+						selector.append(
 						lightningcss::selector::Component::AttributeInNoNamespace {
 							local_name: self.attr.clone().into(),
 							operator: AttrSelectorOperator::Equal,
-							value: cid.to_string().into(),
+							value: self.idx.to_string().into(),
 							case_sensitivity:
 								ParsedCaseSensitivity::CaseSensitive,
 							never_matches: false,
 						},
 					);
-				});
-			}
-		});
+					});
+				}
+			});
+		}
 
 		#[cfg(debug_assertions)]
 		let options = PrinterOptions::default();
@@ -110,9 +159,6 @@ impl ScopedStyle {
 	}
 }
 
-
-
-
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
@@ -120,40 +166,69 @@ mod test {
 
 	struct Child;
 
-	impl Rsx for Child {
-		fn into_rsx(self) -> RsxNode {
-			rsx! {<div><slot/></div>}
+	impl Component for Child {
+		fn render(self) -> RsxRoot {
+			rsx! {
+				<div>
+					<style>span { color: blue; }</style>
+					<slot />
+				</div>
+			}
 		}
 	}
 
 
 	#[test]
-	fn ignores_root() {
-		let mut node = rsx! {
-			<div>
-				<style>span { color: red; }</style>
-				<Child/>
-			</div>
-		};
-		ScopedStyle::default().apply(&mut node).unwrap();
-		let html = RsxToHtml::render_body(&node);
-		expect(html)
-			.to_be("<div><style>span { color: red; }</style><div></div></div>");
+	fn applies_to_root() {
+		expect(
+			rsx! {
+				<div>
+					<style>span { color: red; }</style>
+					// <Child/>
+				</div>
+			}
+			.render_body(),
+		)
+		.to_be("<div data-styleid=\"0\"><style data-styleid=\"0\">span[data-styleid=\"0\"] {\n  color: red;\n}\n</style></div>");
+	}
+
+	#[test]
+	fn global_scope() {
+		expect(
+			rsx! {
+				<div>
+					<style scope:global>span { color: red; }</style>
+					// <Child/>
+				</div>
+			}
+			.render_body(),
+		)
+		.to_be("<div><style>span {\n  color: red;\n}\n</style></div>");
+	}
+
+
+	#[test]
+	fn applies_to_component_node() {
+		expect(rsx! { <Child /> }.render_body())
+		.to_be("<div data-styleid=\"0\"><style data-styleid=\"0\">span[data-styleid=\"0\"] {\n  color: #00f;\n}\n</style></div>");
 	}
 	#[test]
-	fn applies_to_component_not_children() {
-		let mut node = rsx! {
+	fn applies_to_nested_component() {
+		expect(rsx! {
+			<Child>
+				<Child />
+			</Child>
+		}.render_body())
+			.to_be("<div data-styleid=\"0\"><style data-styleid=\"0\">span[data-styleid=\"0\"] {\n  color: #00f;\n}\n</style><div data-styleid=\"1\"><style data-styleid=\"1\">span[data-styleid=\"1\"] {\n  color: #00f;\n}\n</style></div></div>");
+	}
+	#[test]
+	fn applies_to_slot_children() {
+		expect(rsx! {
 			<Child>
 				<br/>
 				<style>span { color: red; }</style>
-				<Child>
-					<br/>
-				</Child>
 			</Child>
-		};
-		ScopedStyle::default().apply(&mut node).unwrap();
-		let html = RsxToHtml::render_body(&node);
-		expect(html)
-			.to_be("<div data-bcid=\"0\"><br data-bcid=\"0\"/><style>span[data-bcid=\"0\"] {\n  color: red;\n}\n</style><div><br/></div></div>");
+		}.render_body())
+			.to_be("<div data-styleid=\"0\"><style data-styleid=\"0\">span[data-styleid=\"0\"] {\n  color: #00f;\n}\n</style><br data-styleid=\"1\"/><style data-styleid=\"1\">span[data-styleid=\"1\"] {\n  color: red;\n}\n</style></div>");
 	}
 }

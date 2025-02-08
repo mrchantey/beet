@@ -5,7 +5,7 @@ use crate::prelude::*;
 pub struct HtmlNodeHydrator {
 	pub html: HtmlDocument,
 	constants: HtmlConstants,
-	rust_node_map: RsxContextMap,
+	loc_map: DomLocationMap,
 }
 
 impl HtmlNodeHydrator {
@@ -13,12 +13,12 @@ impl HtmlNodeHydrator {
 		let rsx = rsx.into_rsx();
 		let html = RsxToResumableHtml::default().map_node(&rsx);
 
-		let rust_node_map = RsxContextMap::from_node(&rsx);
+		let loc_map = DomLocationMap::from_node(&rsx);
 
 		Self {
 			html,
 			constants: Default::default(),
-			rust_node_map,
+			loc_map,
 		}
 	}
 }
@@ -31,32 +31,33 @@ impl Hydrator for HtmlNodeHydrator {
 	fn update_rsx_node(
 		&mut self,
 		rsx: RsxNode,
-		cx: &RsxContext,
+		loc: DomLocation,
 	) -> ParseResult<()> {
-		let id = self
-			.rust_node_map
-			.rust_blocks
-			.get(cx.block_idx())
+		let parent_idx = self
+			.loc_map
+			.rusty_locations
+			.get(&loc.rsx_idx)
 			.ok_or_else(|| {
 				ParseError::Hydration(format!(
 					"Could not find block parent for index: {}",
-					cx.block_idx()
+					loc.rsx_idx
 				))
 			})?
-			.element_idx()
+			.parent_idx
 			.to_string();
 
 		for html in self.html.iter_mut() {
-			if let Some(parent_el) =
-				html.query_selector_attr(self.constants.id_key, Some(&id))
-			{
-				return apply_rsx(parent_el, rsx, cx, &self.constants);
+			if let Some(parent_el) = html.query_selector_attr(
+				self.constants.rsx_idx_key,
+				Some(&parent_idx),
+			) {
+				return apply_rsx(parent_el, rsx, loc, &self.constants);
 			}
 		}
 
 		return Err(ParseError::Hydration(format!(
 			"Could not find node with id: {}",
-			id
+			parent_idx
 		)));
 	}
 }
@@ -67,25 +68,26 @@ impl Hydrator for HtmlNodeHydrator {
 fn apply_rsx(
 	parent_el: &mut HtmlElementNode,
 	rsx: RsxNode,
-	cx: &RsxContext,
+	loc: DomLocation,
 	constants: &HtmlConstants,
 ) -> ParseResult<()> {
 	match rsx {
 		RsxNode::Fragment(vec) => todo!(),
-		RsxNode::Component { tag, node } => todo!(),
-		RsxNode::Block {
-			initial,
-			register_effect,
-		} => todo!(),
-		RsxNode::Doctype => todo!(),
-		RsxNode::Comment(_) => todo!(),
+		RsxNode::Component(_) => todo!(),
+		RsxNode::Block(RsxBlock { initial, effect }) => todo!(),
+		RsxNode::Element(rsx_element) => todo!(),
 		RsxNode::Text(text) => {
-			let child = parent_el.children.get_mut(cx.child_idx()).ok_or_else(
-				|| ParseError::Hydration("Could not find child".into()),
-			)?;
+			let child =
+				parent_el.children.get_mut(loc.child_idx as usize).ok_or_else(|| {
+					ParseError::Hydration(format!(
+						"child node at index: {} is out of bounds. Maybe the text nodes weren't expanded",
+						loc.child_idx,
+					))
+				})?;
 			*child = HtmlNode::Text(text);
 		}
-		RsxNode::Element(rsx_element) => todo!(),
+		RsxNode::Comment(_) => todo!(),
+		RsxNode::Doctype => todo!(),
 	}
 	Ok(())
 }

@@ -7,7 +7,7 @@ pub struct BeetSimPlugin;
 impl Plugin for BeetSimPlugin {
 	fn build(&self, app: &mut App) {
 		app.add_plugins((
-			emoji_plugin,
+			// emoji_plugin,
 			walk_plugin,
 			stat_plugin,
 			ActionPlugin::<(
@@ -16,6 +16,8 @@ impl Plugin for BeetSimPlugin {
 				FindStatSteerTarget,
 			)>::default(),
 		))
-		.add_systems(Update, (render_valency, pickup_collectable));
+		.add_systems(Update, (
+			// render_valency, 
+			pickup_collectable));
 	}
 }

@@ -4,59 +4,74 @@ use crate::prelude::*;
 
 
 
-/// 
+#[derive(Debug, Default)]
 pub struct RsxToHtml {
-	/// on elements that directly contain rust code (non recursive), 
+	/// add attributes required for resumability
+	pub html_constants: HtmlConstants,
+	/// on elements that directly contain rust code (non recursive),
 	/// give them a `needs-id` attribute to be mapped by [RsxToResumableHtml]
-	pub mark_needs_id: bool,
+	pub no_beet_attributes: bool,
 	/// text node content will be trimmed
 	pub trim: bool,
-}
 
-
-impl Default for RsxToHtml {
-	fn default() -> Self {
-		Self {
-			mark_needs_id: false,
-			trim: false,
-		}
-	}
+	/// 1 based incrementer, be sure to subtract 1
+	/// to get the actual id.
+	/// This is very error prone because we're trying to recreate the [DomLocation]
+	/// visitor pattern in a mapper.
+	rsx_idx_incr: RsxIdx,
 }
 
 
 impl RsxToHtml {
 	pub fn as_resumable() -> Self {
 		Self {
-			mark_needs_id: true,
-			trim: false,
+			no_beet_attributes: false,
+			..Default::default()
 		}
 	}
 
+	/// the correct rsx idx, created by subtracting 1
+	fn rsx_idx(&self) -> RsxIdx { self.rsx_idx_incr - 1 }
+
 	/// convenience so you dont have to add
 	/// a `.render()` at the end of a long rsx macro
-	pub fn render_body(node: &RsxNode) -> String {
+	pub fn render_body(node: impl AsRef<RsxNode>) -> String {
 		Self::default().map_node(node).render()
 	}
 
-	pub fn map_node(&mut self, rsx_node: &RsxNode) -> Vec<HtmlNode> {
-		match rsx_node {
-			RsxNode::Doctype => {
-				vec![HtmlNode::Doctype]
-			}
-			RsxNode::Component { node, .. } => self.map_node(node),
-			RsxNode::Comment(str) => {
-				vec![HtmlNode::Comment(str.clone())]
-			}
+	/// recursively map rsx nodes to html nodes
+	/// # Panics
+	/// If slot children have not been applied
+	pub fn map_node(&mut self, node: impl AsRef<RsxNode>) -> Vec<HtmlNode> {
+		self.rsx_idx_incr += 1;
+		match node.as_ref() {
+			RsxNode::Doctype => vec![HtmlNode::Doctype],
+			RsxNode::Comment(str) => vec![HtmlNode::Comment(str.clone())],
 			RsxNode::Text(str) => {
 				let str = if self.trim { str.trim() } else { str };
 				vec![HtmlNode::Text(str.into())]
 			}
-			RsxNode::Block { initial, .. } => self.map_node(initial),
 			RsxNode::Element(e) => {
 				vec![HtmlNode::Element(self.map_element(e))]
 			}
-			RsxNode::Fragment(nodes) => {
-				nodes.iter().map(|n| self.map_node(n)).flatten().collect()
+			RsxNode::Fragment(rsx_nodes) => rsx_nodes
+				.iter()
+				.map(|n| self.map_node(n))
+				.flatten()
+				.collect(),
+			RsxNode::Block(rsx_block) => self.map_node(&rsx_block.initial),
+
+			RsxNode::Component(RsxComponent {
+				tag: _,
+				tracker: _,
+				root,
+				slot_children,
+			}) => {
+				// TODO assertion, why does it have html tag?
+				if !slot_children.is_empty_fragment() {
+					panic!("RsxToHtml: Slot children must be empty before mapping to html, please call HtmlSlotsVisitor::apply\nunmapped slots: {:#?}", slot_children);
+				}
+				self.map_node(root.as_ref())
 			}
 		}
 	}
@@ -69,10 +84,10 @@ impl RsxToHtml {
 			.flatten()
 			.collect::<Vec<_>>();
 
-		if self.mark_needs_id && rsx_el.contains_rust() {
+		if !self.no_beet_attributes && rsx_el.contains_rust() {
 			html_attributes.push(HtmlAttribute {
-				key: "needs-id".to_string(),
-				value: None,
+				key: self.html_constants.rsx_idx_key.to_string(),
+				value: Some(self.rsx_idx().to_string()),
 			});
 		}
 
@@ -80,12 +95,7 @@ impl RsxToHtml {
 			tag: rsx_el.tag.clone(),
 			self_closing: rsx_el.self_closing,
 			attributes: html_attributes,
-			children: rsx_el
-				.children
-				.iter()
-				.map(|c| self.map_node(c))
-				.flatten()
-				.collect(),
+			children: self.map_node(&rsx_el.children),
 		}
 	}
 
@@ -95,15 +105,28 @@ impl RsxToHtml {
 				key: key.clone(),
 				value: None,
 			}],
-			RsxAttribute::KeyValue { key, value } => vec![HtmlAttribute {
-				key: key.clone(),
-				value: Some(value.clone()),
-			}],
-			RsxAttribute::BlockValue { key, initial, .. } => {
+			RsxAttribute::KeyValue { key, value } => {
 				vec![HtmlAttribute {
 					key: key.clone(),
-					value: Some(initial.clone()),
+					value: Some(value.clone()),
 				}]
+			}
+			RsxAttribute::BlockValue { key, initial, .. } => {
+				if !self.no_beet_attributes && key.starts_with("on") {
+					vec![HtmlAttribute {
+						key: key.clone(),
+						value: Some(format!(
+							"{}({}, event)",
+							self.html_constants.event_handler,
+							self.rsx_idx(),
+						)),
+					}]
+				} else {
+					vec![HtmlAttribute {
+						key: key.clone(),
+						value: Some(initial.clone()),
+					}]
+				}
 			}
 			RsxAttribute::Block { initial, .. } => initial
 				.iter()
@@ -113,6 +136,7 @@ impl RsxToHtml {
 		}
 	}
 }
+
 
 
 
@@ -144,20 +168,20 @@ mod test {
 		let _key = "hidden";
 		let _key_value = "class=\"pretty\"";
 		let food = "pizza";
-		expect(RsxToHtml::render_body(&rsx! { <div
-			name="pete"
-			age=9
-			// {key}
-			// {key_value}
-			favorite_food={food}
-			>
-			</div>
+		expect(RsxToHtml::render_body(&rsx! {
+			<div
+				name="pete"
+				age=9
+				// {key}
+				// {key_value}
+				favorite_food=food
+			></div>
 		}))
-		.to_be("<div name=\"pete\" age=\"9\" favorite_food=\"pizza\"></div>");
+		.to_be("<div name=\"pete\" age=\"9\" favorite_food=\"pizza\" data-beet-rsx-idx=\"0\"></div>");
 	}
 	#[test]
 	fn element_self_closing() {
-		expect(RsxToHtml::render_body(&rsx! { <br/> })).to_be("<br/>");
+		expect(RsxToHtml::render_body(&rsx! { <br /> })).to_be("<br/>");
 	}
 	#[test]
 	fn element_children() {
@@ -179,7 +203,7 @@ mod test {
 				<p>hello {world}</p>
 			</div>
 		}))
-		.to_be("<div><p>hello mars</p></div>");
+		.to_be("<div><p data-beet-rsx-idx=\"1\">hello mars</p></div>");
 	}
 	#[test]
 	fn events() {
@@ -190,7 +214,7 @@ mod test {
 				<p>hello {world}</p>
 			</div>
 		}))
-		.to_be("<div onclick=\"needs-event-cx\"><p>hello mars</p></div>");
+		.to_be("<div onclick=\"_beet_event_handler(0, event)\" data-beet-rsx-idx=\"0\"><p data-beet-rsx-idx=\"1\">hello mars</p></div>");
 	}
 
 	#[test]
@@ -199,57 +223,66 @@ mod test {
 			value: usize,
 		}
 		impl Component for Child {
-			fn render(self) -> impl Rsx {
-				rsx! {<p>hello {self.value}</p>}
+			fn render(self) -> RsxRoot {
+				rsx! { <p>hello {self.value}</p> }
 			}
 		}
-		let node = rsx! {<div> the child is <Child value=38/>! </div>};
+		let node = rsx! { <div>the child is <Child value=38 />!</div> };
 
-		expect(RsxToHtml::render_body(&node))
-			.to_be("<div> the child is <p>hello 38</p>! </div>");
+		expect(RsxToHtml::render_body(&node)).to_be(
+			"<div>the child is <p data-beet-rsx-idx=\"4\">hello 38</p>!</div>",
+		);
 	}
 	#[test]
 	fn component_children() {
 		struct Layout;
 		impl Component for Layout {
-			fn render(self) -> impl Rsx {
+			fn render(self) -> RsxRoot {
 				rsx! {
 					<div>
 						<h1>welcome</h1>
-						<p><slot/></p>
+						<p>
+							<slot />
+						</p>
 					</div>
 				}
 			}
 		}
-		let node = rsx! {<Layout><b>foo</b></Layout>};
-
-		expect(RsxToHtml::render_body(&node))
-			.to_be("<div><h1>welcome</h1><p><b>foo</b></p></div>");
+		expect(
+			rsx! {
+				<Layout>
+					<b>foo</b>
+				</Layout>
+			}
+			.render_body(),
+		)
+		.to_be("<div><h1>welcome</h1><p><b>foo</b></p></div>");
 	}
 	#[test]
 	fn component_slots() {
 		struct Layout;
 		impl Component for Layout {
-			fn render(self) -> impl Rsx {
+			fn render(self) -> RsxRoot {
 				rsx! {
 					<article>
 						<h1>welcome</h1>
-						<p><slot name="tagline"/></p>
+						<p>
+							<slot name="tagline" />
+						</p>
 						<main>
-							<slot/>
+							<slot />
 						</main>
 					</article>
 				}
 			}
 		}
-		let node = rsx! {
+
+		expect(rsx! {
 			<Layout>
 				<b slot="tagline">what a cool article</b>
 				<div>direct child</div>
 			</Layout>
-		};
-
-		expect(RsxToHtml::render_body(&node))
+		}.render_body())
 			.to_be("<article><h1>welcome</h1><p><b>what a cool article</b></p><main><div>direct child</div></main></article>");
 	}
 

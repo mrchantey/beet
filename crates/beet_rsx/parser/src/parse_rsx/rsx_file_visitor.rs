@@ -4,23 +4,23 @@ use syn::visit_mut::VisitMut;
 
 
 /// The rsx visitor is used by file (preprocessor) parsers.
-pub struct RsxFileVisitor<'a, T> {
-	parser: &'a mut RsxParser<T>,
+pub struct RsxFileVisitor<'a> {
+	parser: &'a mut ParseRsx,
 	/// The rsx macros found in the function
-	macros: Vec<RstmlToRsx<T>>,
+	macros: Vec<RstmlToRsx>,
 	/// Errors that occurred while parsing the rsx macro
 	errors: Vec<syn::Error>,
 }
 
 /// Output from a fully parsed file with multiple rsx macros.
-pub struct RsxFileVisitorOut<T> {
+pub struct RsxFileVisitorOut {
 	/// the transformed rust macros
-	pub macros: Vec<RstmlToRsx<T>>,
+	pub macros: Vec<RstmlToRsx>,
 	pub errors: Vec<syn::Error>,
 }
 
-impl<'a, T> Into<RsxFileVisitorOut<T>> for RsxFileVisitor<'a, T> {
-	fn into(self) -> RsxFileVisitorOut<T> {
+impl<'a> Into<RsxFileVisitorOut> for RsxFileVisitor<'a> {
+	fn into(self) -> RsxFileVisitorOut {
 		RsxFileVisitorOut {
 			macros: self.macros,
 			errors: self.errors,
@@ -28,8 +28,8 @@ impl<'a, T> Into<RsxFileVisitorOut<T>> for RsxFileVisitor<'a, T> {
 	}
 }
 
-impl<'a, T> RsxFileVisitor<'a, T> {
-	pub fn new(parser: &'a mut RsxParser<T>) -> Self {
+impl<'a> RsxFileVisitor<'a> {
+	pub fn new(parser: &'a mut ParseRsx) -> Self {
 		Self {
 			parser,
 			macros: Vec::new(),
@@ -38,7 +38,7 @@ impl<'a, T> RsxFileVisitor<'a, T> {
 	}
 	pub fn extend_result(
 		&mut self,
-		result: Result<RsxFileVisitorOut<T>, syn::Error>,
+		result: Result<RsxFileVisitorOut, syn::Error>,
 	) {
 		match result {
 			Ok(out) => {
@@ -50,7 +50,7 @@ impl<'a, T> RsxFileVisitor<'a, T> {
 	}
 }
 
-impl<'a, T: RsxRustTokens> VisitMut for RsxFileVisitor<'a, T> {
+impl<'a> VisitMut for RsxFileVisitor<'a> {
 	fn visit_macro_mut(&mut self, item: &mut syn::Macro) {
 		if self.parser.path_matches(&item.path) {
 			let parts = self.parser.parse_rsx(&mut item.tokens);

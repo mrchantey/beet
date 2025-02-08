@@ -22,7 +22,7 @@ impl Default for DefaultAppState {
 	}
 }
 type StaticRsxFunc<T> =
-	Box<dyn Fn(&T) -> Pin<Box<dyn Future<Output = Result<RsxNode>>>>>;
+	Box<dyn Fn(&T) -> Pin<Box<dyn Future<Output = Result<RsxRoot>>>>>;
 
 
 /// A simple static server, it allows for a state value
@@ -34,6 +34,7 @@ pub struct StaticFileRouter<T> {
 	pub page_routes: Vec<StaticPageRoute<T>>,
 	/// The directory to save the html files to
 	pub dst_dir: PathBuf,
+	pub templates_src: PathBuf,
 }
 
 impl<T: Default> Default for StaticFileRouter<T> {
@@ -42,6 +43,8 @@ impl<T: Default> Default for StaticFileRouter<T> {
 			state: Default::default(),
 			page_routes: Default::default(),
 			dst_dir: "target/client".into(),
+			// keep in sync with BuildRsxTemplates
+			templates_src: "target/rsx-templates.ron".into(),
 		}
 	}
 }
@@ -55,7 +58,7 @@ impl<T: 'static> StaticFileRouter<T> {
 		self.page_routes
 			.push(StaticPageRoute::new(info, route.into_rsx_func()));
 	}
-	pub async fn routes_to_rsx(&self) -> Result<Vec<(RouteInfo, RsxNode)>> {
+	pub async fn routes_to_rsx(&self) -> Result<Vec<(RouteInfo, RsxRoot)>> {
 		futures::future::try_join_all(
 			self.page_routes
 				.iter()
@@ -66,24 +69,40 @@ impl<T: 'static> StaticFileRouter<T> {
 	async fn route_to_rsx(
 		&self,
 		route: &StaticPageRoute<T>,
-	) -> Result<(RouteInfo, RsxNode)> {
+	) -> Result<(RouteInfo, RsxRoot)> {
 		let node = route.into_node(&self.state).await?;
 		Ok((route.route_info.clone(), node))
 	}
 
 
+	/// try applying templates, otherwise warn and use
+	/// the compiled rsx
 	pub async fn routes_to_html(
 		&self,
 	) -> Result<Vec<(RouteInfo, HtmlDocument)>> {
-		let scoped_style = ScopedStyle::default();
+		// we will still without 'hot reload' if we can't load templates
+		let mut template_map = RsxTemplateMap::load(&self.templates_src)
+			.map_err(|err| {
+				// notify user that we are using routes
+				eprintln!(
+					"Live reload disabled - no templates found at {:?}",
+					&self.templates_src
+				);
+				err
+			})
+			.ok();
+
 		let html = self
 			.routes_to_rsx()
 			.await?
 			.into_iter()
-			.map(|(p, mut node)| {
-				scoped_style.apply(&mut node)?;
-				let doc = RsxToHtml::default().map_node(&node).into_document();
-				Ok((p, doc))
+			.map(|(route, mut root)| {
+				// only hydrate if we have templates
+				if let Some(map) = &mut template_map {
+					root = map.hydrate(root)?;
+				}
+				let doc = root.build_document()?;
+				Ok((route, doc))
 			})
 			.collect::<Result<Vec<(RouteInfo, HtmlDocument)>>>()?;
 		Ok(html)
@@ -95,15 +114,16 @@ impl<T: 'static> StaticFileRouter<T> {
 		// in debug mode this breaks FsWatcher
 		#[cfg(not(debug_assertions))]
 		FsExt::remove(&dst).ok();
-		let html = self.routes_to_html().await?;
 		std::fs::create_dir_all(&dst)?;
+
 		let dst = dst.canonicalize()?;
-		for (info, doc) in html {
+		for (info, doc) in self.routes_to_html().await? {
 			let mut path = info.path.clone();
+			// map foo/index.rs to foo/index.html
 			if path.file_stem().map(|s| s == "index").unwrap_or(false) {
 				path.set_extension("html");
 			} else {
-				// routers expect index.html for any path without an extension
+				// map foo/contributing.rs to foo/contributing/index.html
 				path.set_extension("");
 				path.push("index.html");
 			}
@@ -134,7 +154,7 @@ impl<T> StaticPageRoute<T> {
 
 impl<T: 'static> PageRoute for StaticPageRoute<T> {
 	type Context = T;
-	async fn into_node(&self, context: &Self::Context) -> Result<RsxNode> {
+	async fn into_node(&self, context: &Self::Context) -> Result<RsxRoot> {
 		(self.func)(context).await
 	}
 }
@@ -145,14 +165,12 @@ pub trait StaticPageRouteFunc<T, M>: 'static {
 
 
 
-impl<F: 'static + Clone + Fn() -> R, R: Rsx, T> StaticPageRouteFunc<T, ()>
-	for F
-{
+impl<F: 'static + Clone + Fn() -> RsxRoot, T> StaticPageRouteFunc<T, ()> for F {
 	fn into_rsx_func(&self) -> StaticRsxFunc<T> {
 		let func = self.clone();
 		Box::new(move |_context| {
 			let func = func.clone();
-			Box::pin(async move { Ok(func().into_rsx()) })
+			Box::pin(async move { Ok(func()) })
 		})
 	}
 }
@@ -162,33 +180,31 @@ impl<F: 'static + Clone + Fn() -> R, R: Rsx, T> StaticPageRouteFunc<T, ()>
 pub struct WithArgsMarker;
 
 
-impl<F, T, R> StaticPageRouteFunc<T, WithArgsMarker> for F
+impl<F, T> StaticPageRouteFunc<T, WithArgsMarker> for F
 where
-	R: Rsx,
 	T: 'static + Clone,
-	F: 'static + Clone + Fn(T) -> R,
+	F: 'static + Clone + Fn(T) -> RsxRoot,
 {
 	fn into_rsx_func(&self) -> StaticRsxFunc<T> {
 		let func = self.clone();
 		Box::new(move |context| {
 			let func = func.clone();
 			let context = context.clone();
-			Box::pin(async move { Ok(func(context).into_rsx()) })
+			Box::pin(async move { Ok(func(context)) })
 		})
 	}
 }
-impl<F, T, R> StaticPageRouteFunc<T, &WithArgsMarker> for F
+impl<F, T> StaticPageRouteFunc<T, &WithArgsMarker> for F
 where
-	R: Rsx,
 	T: 'static + Clone,
-	F: 'static + Clone + Fn(&T) -> R,
+	F: 'static + Clone + Fn(&T) -> RsxRoot,
 {
 	fn into_rsx_func(&self) -> StaticRsxFunc<T> {
 		let func = self.clone();
 		Box::new(move |context| {
 			let func = func.clone();
 			let context = context.clone();
-			Box::pin(async move { Ok(func(&context).into_rsx()) })
+			Box::pin(async move { Ok(func(&context)) })
 		})
 	}
 }
@@ -203,16 +219,14 @@ mod test {
 	#[sweet::test]
 	async fn works() {
 		let mut router = DefaultFileRouter::default();
-		crate::test_site::test_site_router::collect_file_routes(&mut router);
+		crate::test_site::routes::collect_file_routes(&mut router);
 		let html = router.routes_to_html().await.unwrap();
 
 		expect(html.len()).to_be(2);
 
-		expect(&html[0].0.path.to_string_lossy())
-			.to_be("/contributing");
-		expect(&html[0].1.render()).to_be("<!DOCTYPE html><html><head></head><body><div><h1>Beet</h1>\n\t\t\t\tparty time dude!\n\t\t</div></body></html>");
-		expect(&html[1].0.path.to_string_lossy())
-			.to_be("/");
-		expect(&html[1].1.render()).to_be("<!DOCTYPE html><html><head></head><body><div><h1>My Site</h1>\n\t\t\t\tparty time!\n\t\t</div></body></html>");
+		expect(&html[0].0.path.to_string_lossy()).to_be("/contributing");
+		expect(&html[0].1.render()).to_be("<!DOCTYPE html><html><head></head><body><div><h1 data-beet-rsx-idx=\"4\">Beet</h1>party time dude!</div></body></html>");
+		expect(&html[1].0.path.to_string_lossy()).to_be("/");
+		expect(&html[1].1.render()).to_be("<!DOCTYPE html><html><head></head><body><div><h1 data-beet-rsx-idx=\"4\">My Site</h1>party time!</div></body></html>");
 	}
 }
