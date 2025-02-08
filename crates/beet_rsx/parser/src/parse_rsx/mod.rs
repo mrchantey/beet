@@ -1,11 +1,11 @@
 mod rstml_rust_to_hash;
-mod rstml_to_template_ron;
+mod rstml_to_rsx_template;
 mod rusty_tracker_builder;
 pub use rusty_tracker_builder::*;
 pub mod tokens_to_rstml;
 pub use self::rstml_rust_to_hash::*;
 #[allow(unused_imports)]
-pub use self::rstml_to_template_ron::*;
+pub use self::rstml_to_rsx_template::*;
 pub use self::tokens_to_rstml::*;
 pub mod rsx_file_visitor;
 #[allow(unused_imports)]
