@@ -1,8 +1,5 @@
 use crate::prelude::*;
 use anyhow::Result;
-use std::path::Path;
-use sweet::prelude::ReadFile;
-
 
 
 
@@ -18,7 +15,9 @@ pub struct RsxTemplateMap(pub HashMap<RsxLocation, RsxTemplateRoot>);
 
 impl RsxTemplateMap {
 	/// used by routers, load a serialized template map
-	pub fn load(src: &Path) -> Result<Self> {
+	#[cfg(not(target_arch = "wasm32"))]
+	pub fn load(src: &std::path::Path) -> Result<Self> {
+		use sweet::prelude::ReadFile;
 		{
 			let tokens = ReadFile::to_string(src)?;
 			let this: Self = ron::de::from_str(&tokens.to_string())?;
