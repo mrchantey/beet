@@ -302,9 +302,9 @@ mod test {
 			<div class="test">
 				// text node
 				// block node
-				"text" // {child_block}					// block child
-				{7} // component
-				<Child>
+				// {child_block}					// block child
+				// component
+				"text" {7} <Child>
 					// component child
 					<span />
 					// nested component
