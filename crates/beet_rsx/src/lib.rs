@@ -42,7 +42,7 @@ pub mod prelude {
 // so import this
 // `use beet_rsx::as_beet::*;`
 // only for internal examples
-#[cfg(debug_assertions)]
+// #[cfg(debug_assertions)]
 pub mod as_beet {
 	pub use crate::prelude::*;
 	// expose macro for single import in docs

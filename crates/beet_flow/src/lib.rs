@@ -48,6 +48,12 @@ pub mod prelude {
 	pub use crate::reflect::*;
 	pub use crate::tree::*;
 	pub use beet_flow_macros::*;
+	// allow flush_trigger in examples
+	#[cfg(feature = "sweet")]
+	pub use sweet::prelude::CoreWorldExtSweet;
+	// allow flush_trigger in examples
+	#[cfg(feature = "sweet")]
+	pub use sweet::prelude::EntityWorldMutwExt;
 }
 
 

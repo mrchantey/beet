@@ -13,7 +13,7 @@ pub fn on_run_global_plugin(app: &mut App) {
 		;
 }
 
-
+/// Tracks action observers created when the first action is added to a node.
 #[derive(Debug, Default, Resource)]
 pub struct ActionMap {
 	/// All of the actions that should be triggered
@@ -86,18 +86,15 @@ impl OnRunGlobal {
 	}
 	/// Trigger [OnRun] for a target entity that is also
 	/// the node
-	pub fn with_target(target: Entity) -> Self {
+	pub fn with_action(action: Entity) -> Self {
 		Self {
-			target,
-			action: target,
+			action,
+			target: action,
 		}
 	}
 	/// Trigger [OnRun] for a target entity and node
-	pub fn with_target_and_node(target: Entity, node: Entity) -> Self {
-		Self {
-			target,
-			action: node,
-		}
+	pub fn with_target_and_action(action: Entity, target: Entity) -> Self {
+		Self { target, action }
 	}
 }
 
@@ -141,5 +138,50 @@ pub fn on_run_global(
 			action,
 		};
 		commands.trigger_targets(action, actions.clone());
+	}
+}
+
+
+#[cfg(test)]
+mod test {
+	use beet_flow::prelude::*;
+	use bevy::prelude::*;
+	use sweet::prelude::*;
+
+	#[derive(Default, GlobalAction)]
+	#[observers(trigger_count)]
+	struct TriggerCount(i32);
+
+	fn trigger_count(
+		trigger: Trigger<OnAction>,
+		mut query: Query<&mut TriggerCount>,
+	) {
+		query.get_mut(trigger.action).unwrap().as_mut().0 += 1;
+	}
+
+	#[test]
+	fn inferred_action() {
+		let mut app = App::new();
+
+		app.add_plugins(on_run_global_plugin);
+
+		let entity = app
+			.world_mut()
+			.spawn(TriggerCount::default())
+			.flush_trigger(OnRunGlobal::new())
+			.id();
+		expect(app.world().get::<TriggerCount>(entity).unwrap().0).to_be(1);
+	}
+	#[test]
+	fn explicit_action() {
+		let mut app = App::new();
+
+		app.add_plugins(on_run_global_plugin);
+
+		let entity = app.world_mut().spawn(TriggerCount::default()).id();
+
+		app.world_mut().flush_trigger(OnRunGlobal::with_action(entity));
+
+		expect(app.world().get::<TriggerCount>(entity).unwrap().0).to_be(1);
 	}
 }

@@ -1,8 +1,8 @@
 {
 	// "files.autoSaveDelay": 100,
-	// "files.autoSave": "afterDelay",
+	// "files.autoSave": "off",
 	// "rust-analyzer.diagnostics.disabled":["unlinked-file"],
-	// "rust-analyzer.cargo.features": ["sweet/rand"],
+	"rust-analyzer.cargo.features": ["beet_flow/reflect"],
 	// "rust-analyzer.cargo.features": "all",
 	// "rust-analyzer.cargo.target": "x86_64-unknown-linux-gnu",
 	// "rust-analyzer.procMacro.enable": false,

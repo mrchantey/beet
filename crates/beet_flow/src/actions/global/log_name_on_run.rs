@@ -21,6 +21,7 @@ mod test {
 	use crate::prelude::*;
 	use anyhow::Result;
 	use bevy::prelude::*;
+	use sweet::prelude::*;
 
 	/// run with `--nocapture` to check output
 	#[test]

@@ -50,7 +50,7 @@ members = [
 	"crates/beet_spatial",
 	"crates/beet_site",
 	"crates/beet-cli",
-	# "crates/emby",
+	"crates/emby",
 ]
 
 [workspace.dependencies]
@@ -69,8 +69,8 @@ beet_sim = { path = "crates/beet_sim", version = "0.0.5-rc.2" }
 
 #💡 local
 bevyhub = { git = "https://github.com/mrchantey/bevyhub", default-features = false }
-# sweet = { path = "../sweet" }
-sweet = { git = "https://github.com/mrchantey/sweet" }
+sweet = { path = "../sweet" }
+# sweet = { git = "https://github.com/mrchantey/sweet" }
 
 #💡 game
 bevy = { version = "0.15", default-features = false }
@@ -170,7 +170,8 @@ beet_spatial = { workspace = true, optional = true }
 # thiserror.workspace = true
 
 [dev-dependencies]
-beet = { workspace = true, features = ["rsx"] }
+beet = { path = "", features = ["rsx"] }
+beet_flow = { workspace = true, features = ["sweet"] }
 bevy.workspace = true
 sweet = { workspace = true, features = ["test", "bevy", "rand"] }
 

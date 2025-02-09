@@ -1,6 +1,7 @@
 use crate::prelude::*;
 use anyhow::Result;
 use bevy::ecs::entity::EntityHashMap;
+use bevy::ecs::system::SystemState;
 use bevy::prelude::*;
 use std::any::TypeId;
 
@@ -9,6 +10,25 @@ use std::any::TypeId;
 	Copy, Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, Deref, DerefMut,
 )]
 pub struct EntityIdent(pub Entity);
+
+
+
+
+#[extend::ext]
+impl World {
+	fn collect_descendants(&mut self, entity: Entity) -> Vec<Entity> {
+		let mut state = SystemState::<Query<&Children>>::new(self);
+		state.get(&self).iter_descendants(entity).collect()
+	}
+	fn collect_descendants_inclusive(&mut self, entity: Entity) -> Vec<Entity> {
+		let mut state = SystemState::<Query<&Children>>::new(self);
+		let state = state.get(&self);
+		std::iter::once(entity)
+			.chain(state.iter_descendants(entity))
+			.collect()
+	}
+}
+
 
 impl EntityIdent {
 	pub fn new(entity: Entity) -> Self { Self(entity) }
