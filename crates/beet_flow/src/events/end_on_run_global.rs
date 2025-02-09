@@ -8,15 +8,12 @@ pub struct EndOnRunGlobal(pub RunResult);
 fn end_on_run(
 	trigger: Trigger<OnAction>,
 	actions: Query<&EndOnRunGlobal>,
-	mut commands: Commands,
+	commands: Commands,
 ) {
 	let action = actions
 		.get(trigger.action)
 		.expect(expect_action::ACTION_QUERY_MISSING);
-
-	commands
-		.entity(trigger.action)
-		.trigger(OnRunResultGlobal::new(trigger.action, **action));
+	trigger.on_result(commands, **action);
 }
 
 impl EndOnRunGlobal {
@@ -24,7 +21,6 @@ impl EndOnRunGlobal {
 	pub fn success() -> Self { Self(RunResult::Success) }
 	pub fn failure() -> Self { Self(RunResult::Failure) }
 }
-
 
 #[cfg(test)]
 mod test {

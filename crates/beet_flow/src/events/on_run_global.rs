@@ -20,6 +20,7 @@ pub struct ActionMap {
 	/// when a given tree entity runs
 	// TODO entity relations 0.16
 	pub node_to_actions: HashMap<Entity, Vec<Entity>>,
+	/// TODO add marker to the observer entity instead
 	pub cid_to_action: HashMap<ComponentId, Entity>,
 }
 
@@ -104,11 +105,44 @@ impl OnRunGlobal {
 #[derive(Debug, Copy, Clone, Event)]
 pub struct OnAction {
 	/// The entity targeted by the behavior
-	pub target: Entity,
+	pub origin: Entity,
 	/// The entity containing the actions to perform
 	pub action: Entity,
 }
+impl OnAction {
+	pub fn into_result(self, result: RunResult) -> OnRunResultGlobal {
+		OnRunResultGlobal::new(self.action, result)
+	}
+}
 
+
+// #[derive(SystemParam)]
+// struct RunChild<'w, 's> {
+// 	commands: Commands<'w, 's>,
+// 	children: Query<'w, 's, &'static Children>,
+// }
+
+// impl<'w, 's> RunChild<'w, 's> {
+// 	pub fn run_child(&mut self, entity: Entity) {}
+// }
+
+#[extend::ext(name=ActionTrigger)]
+pub impl<'a> Trigger<'a, OnAction> {
+	fn run_next<'w, 's>(&self, mut commands: Commands<'w, 's>, action: Entity) {
+		commands
+			.entity(action)
+			.trigger(OnRunGlobal::with_target_and_action(action, self.origin));
+	}
+	fn on_result<'w, 's>(
+		&self,
+		mut commands: Commands<'w, 's>,
+		result: RunResult,
+	) {
+		commands
+			.entity(self.action)
+			.trigger(self.event().into_result(result));
+	}
+}
 
 /// Call OnRun for each action registered
 ///
@@ -134,7 +168,7 @@ pub fn on_run_global(
 
 	if let Some(actions) = action_map.node_to_actions.get(&action) {
 		let action = OnAction {
-			target: trigger.target,
+			origin: trigger.target,
 			action,
 		};
 		commands.trigger_targets(action, actions.clone());
