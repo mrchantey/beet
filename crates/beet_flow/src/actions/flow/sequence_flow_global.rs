@@ -30,32 +30,30 @@ fn on_start(
 
 fn on_next(
 	trigger: Trigger<OnRunResultGlobal>,
-	mut commands: Commands,
+	// mut commands: Commands,
 	query: Query<&Children>,
 ) {
 	if trigger.event().result == RunResult::Failure {
 		// trigger.event_mut().call
-		commands
-			.entity(trigger.entity())
-			.trigger(OnRunResult::failure());
+		// commands
+		// 	.entity(trigger.entity())
+		// 	.trigger(OnRunResult::failure());
 		return;
 	}
-	// let children = query
-	// 	.get(trigger.entity())
-	// 	.expect(child_expect::NO_CHILDREN);
-	// {
-	// 	let index = children
-	// 		.iter()
-	// 		.position(|&x| x == trigger.event().child())
-	// 		.expect(child_expect::NOT_MY_CHILD);
-	// 	if index == children.len() - 1 {
-	// 		commands
-	// 			.entity(trigger.entity())
-	// 			.trigger(OnRunResult::success());
-	// 	} else {
-	// 		commands.entity(children[index + 1]).trigger(OnRun);
-	// 	}
-	// }
+	let children = query
+		.get(trigger.context.action)
+		.expect(child_expect::NO_CHILDREN);
+	let index = children
+		.iter()
+		.position(|&x| x == trigger.context.action)
+		.expect(child_expect::NOT_MY_CHILD);
+	if index == children.len() - 1 {
+		// commands
+		// 	.entity(trigger.entity())
+		// 	.trigger(OnRunResult::success());
+	} else {
+		// commands.entity(children[index + 1]).trigger(OnRun);
+	}
 }
 
 
@@ -81,7 +79,7 @@ mod test {
 				parent.spawn((Name::new("child1"), EndOnRunGlobal::success()));
 				parent.spawn((Name::new("child2"), EndOnRunGlobal::success()));
 			})
-			.flush_trigger(OnRunGlobal::new());
+			.flush_trigger(OnRunGlobal::default());
 
 		expect(&on_run).to_have_been_called_times(3);
 		expect(&on_result).to_have_been_called_times(3);

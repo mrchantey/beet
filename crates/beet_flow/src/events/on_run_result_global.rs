@@ -1,83 +1,98 @@
 use crate::prelude::*;
-use bevy::ecs::component::ComponentId;
-use bevy::ecs::world::DeferredWorld;
 use bevy::prelude::*;
 
 /// Signifies a behavior has stopped running. This bubbles
 /// up the tree until it reaches the root node or a [`StopBubble`].
-#[derive(Debug, Component, Clone, Copy, PartialEq, Reflect)]
+#[derive(Debug, Event, Clone, Copy, PartialEq, Reflect)]
 pub struct OnRunResultGlobal {
 	pub result: RunResult,
-	/// The entity that triggered the behavior,
-	/// control flow nodes will generally replace this
-	/// with their own node entity as the event bubbles up.
-	pub caller: Entity,
+	pub context: RunContext,
 }
 
-impl Event for OnRunResultGlobal {
-	type Traversal = &'static Parent;
-	const AUTO_PROPAGATE: bool = true;
-}
+// impl Event for OnRunResultGlobal {
+// 	type Traversal = &'static Parent;
+// 	const AUTO_PROPAGATE: bool = true;
+// }
 
 
 impl OnRunResultGlobal {
-	pub fn new(caller: Entity, result: RunResult) -> Self {
-		Self { result, caller }
+	pub fn new(context: RunContext, result: RunResult) -> Self {
+		Self { result, context }
 	}
 	/// Populate with [`RunResult::Success`]
-	pub fn success(caller: Entity) -> Self {
+	pub fn success(context: RunContext) -> Self {
 		Self {
-			caller,
+			context,
 			result: RunResult::Success,
 		}
 	}
 	/// Populate with [`RunResult::Failure`]
-	pub fn failure(caller: Entity) -> Self {
+	pub fn failure(context: RunContext) -> Self {
 		Self {
-			caller,
+			context,
 			result: RunResult::Failure,
+		}
+	}
+	pub fn into_child_result(self, parent: Entity) -> OnChildResultGlobal {
+		OnChildResultGlobal {
+			context: RunContext {
+				target: self.context.target,
+				action: parent,
+			},
+			result: self.result,
 		}
 	}
 }
 
-#[derive(Debug, Default, Component, Clone, Copy, PartialEq, Reflect)]
-#[component(on_add=stop_bubble_on_add,on_remove=stop_bubble_on_remove)]
-pub struct StopBubble(pub Option<Entity>);
-
-fn stop_bubble_on_add(
-	mut world: DeferredWorld,
-	entity: Entity,
-	_cid: ComponentId,
-) {
-	let observer = world
-		.commands()
-		.spawn(
-			Observer::new(|mut trigger: Trigger<OnRunResultGlobal>| {
-				trigger.propagate(false);
-			})
-			.with_entity(entity),
-		)
-		.id();
-	world
-		.commands()
-		.entity(entity)
-		.insert(StopBubble(Some(observer)));
+#[derive(Debug, Event, Clone, Copy, PartialEq, Reflect)]
+pub struct OnChildResultGlobal {
+	pub result: RunResult,
+	pub context: RunContext,
 }
-
-/// we'll try to clean up the observer but if it isnt there just
-/// fail silently
-fn stop_bubble_on_remove(
-	mut world: DeferredWorld,
-	entity: Entity,
-	_cid: ComponentId,
-) {
-	if let Some(observer) =
-		world.get::<StopBubble>(entity).map(|e| e.0).flatten()
-	{
-		world.commands().entity(observer).try_despawn();
+impl OnChildResultGlobal {
+	pub fn into_run_result(self) -> OnRunResultGlobal {
+		OnRunResultGlobal::new(self.context, self.result)
 	}
 }
 
+
+/// When [`OnRunResult`] is triggered, propagate to parent with [`OnChildResult`].
+/// We can't use bevy event propagation because that does not track the last entity
+/// that called bubble, which is required for selectors.
+pub fn bubble_run_result_global(
+	trigger: Trigger<OnRunResultGlobal>,
+	mut commands: Commands,
+	no_bubble: Query<(), With<NoBubble>>,
+	parents: Query<&Parent>,
+) {
+	if no_bubble.contains(trigger.context.action) {
+		return;
+	}
+
+	if let Ok(parent) = parents.get(trigger.context.action) {
+		let parent = parent.get();
+		println!("bubble_run_result_global: parent: {:?}", parent);
+		commands
+			.entity(parent)
+			.trigger(trigger.into_child_result(parent));
+		// .trigger(trigger.into_child_result(parent));
+	}
+}
+
+
+#[derive(Debug, GlobalAction, Clone, Copy, PartialEq, Reflect)]
+#[observers(bubble_result)]
+pub struct BubbleResult;
+
+pub fn bubble_result(
+	trigger: Trigger<OnChildResultGlobal>,
+	mut commands: Commands,
+) {
+	println!("bubble_result: {:?}", trigger);
+	commands
+		.entity(trigger.context.action)
+		.trigger(trigger.into_run_result());
+}
 
 #[cfg(test)]
 mod test {
@@ -87,48 +102,64 @@ mod test {
 
 	#[test]
 	fn bubbles_up() {
-		let mut world = World::default();
-		let counter = observe_triggers::<OnRunResultGlobal>(&mut world);
+		let mut app = App::new();
+		app.add_plugins(on_run_global_plugin);
+		let world = app.world_mut();
+		let counter = observe_triggers::<OnRunResultGlobal>(world);
+		let mut child = Entity::PLACEHOLDER;
+		let mut grandchild = Entity::PLACEHOLDER;
 
-		world.spawn_empty().with_child(()).with_children(|parent| {
-			parent.spawn_empty().with_children(|parent| {
-				parent
-					.spawn_empty()
-					.trigger(OnRunResultGlobal::success(Entity::PLACEHOLDER));
-			});
+
+		world.spawn(BubbleResult).with_children(|parent| {
+			child = parent
+				.spawn(BubbleResult)
+				.with_children(|parent| {
+					grandchild = parent
+						.spawn((BubbleResult, EndOnRunGlobal::success()))
+						.id();
+				})
+				.id();
 		});
-		world.flush();
+		world
+			.entity_mut(grandchild)
+			.flush_trigger(OnRunGlobal::default());
 
 		expect(&counter).to_have_been_called_times(3);
 	}
 	#[test]
 	fn stop_bubble() {
-		let mut world = World::default();
-		let counter = observe_triggers::<OnRunResultGlobal>(&mut world);
+		let mut app = App::new();
+		app.add_plugins(on_run_global_plugin);
+		let world = app.world_mut();
+		let counter = observe_triggers::<OnRunResultGlobal>(world);
 
-		let mut grandchild = Entity::PLACEHOLDER;
 		let mut child = Entity::PLACEHOLDER;
+		let mut grandchild = Entity::PLACEHOLDER;
 
-		world.spawn_empty().with_child(()).with_children(|parent| {
-			child = parent
-				.spawn(StopBubble::default())
-				.with_children(|parent| {
-					grandchild = parent.spawn_empty().id();
-				})
-				.id();
-		});
+		let _parent =
+			world.spawn_empty().with_child(()).with_children(|parent| {
+				child = parent
+					.spawn(NoBubble::default())
+					.with_children(|parent| {
+						grandchild =
+							parent.spawn(EndOnRunGlobal::success()).id();
+					})
+					.id();
+			});
 
 		world
 			.entity_mut(grandchild)
-			.flush_trigger(OnRunResultGlobal::success(child));
+			.flush_trigger(OnRunGlobal::default());
 
 		// only child and grandchild called
 		expect(&counter).to_have_been_called_times(2);
 
-		world.entity_mut(child).remove::<StopBubble>();
+		world.entity_mut(child).remove::<NoBubble>();
 		world
 			.entity_mut(grandchild)
-			.flush_trigger(OnRunResultGlobal::success(child));
+			.flush_trigger(OnRunResultGlobal::success(
+				RunContext::with_action(child),
+			));
 		// it was removed so all called
 		expect(&counter).to_have_been_called_times(5);
 	}

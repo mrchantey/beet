@@ -17,5 +17,5 @@ fn main() {
 		.add_plugins(on_run_global_plugin)
 		.world_mut()
 		.spawn(LogOnRun("root".to_string()))
-		.flush_trigger(OnRunGlobal::new());
+		.flush_trigger(OnRunGlobal::default());
 }

@@ -10,6 +10,7 @@ pub fn on_run_global_plugin(app: &mut App) {
 	app
 		.init_resource::<ActionMap>()
 		.add_observer(on_run_global)
+		.add_observer(bubble_run_result_global)
 		;
 }
 
@@ -69,49 +70,76 @@ impl ActionMap {
 
 
 /// A general observer triggered globally that can be mapped to specific actions.
-#[derive(Debug, Copy, Clone, Event)]
-pub struct OnRunGlobal {
-	/// The entity targeted by the behavior
+#[derive(Debug, Copy, Clone, Event, Deref, DerefMut)]
+pub struct OnRunGlobal(pub RunContext);
+
+/// Trigger [OnRunGlobal] on a given entity.
+impl Default for OnRunGlobal {
+	fn default() -> Self { Self(RunContext::placeholder()) }
+}
+impl From<RunContext> for OnRunGlobal {
+	fn from(context: RunContext) -> Self { Self(context) }
+}
+
+
+#[derive(Debug, Clone, Copy, PartialEq, Hash, Reflect)]
+pub struct RunContext {
+	/// aka `agent`, this is the entity that is being targetd by this action.
+	/// In most patterns this lies at the root of the tree, but in the case of
+	/// shared trees this can be some arbitrary entity.
 	pub target: Entity,
-	/// The entity containing the actions to perform
+	/// The current node of the tree that is running
 	pub action: Entity,
 }
 
-impl OnRunGlobal {
-	/// Trigger [OnRunGlobal] on a given entity.
-	pub fn new() -> Self {
+impl RunContext {
+	pub fn placeholder() -> Self {
 		Self {
 			target: Entity::PLACEHOLDER,
 			action: Entity::PLACEHOLDER,
 		}
 	}
+}
+
+impl RunContext {}
+
+pub trait HasRunContext {
 	/// Trigger [OnRun] for a target entity that is also
 	/// the node
-	pub fn with_action(action: Entity) -> Self {
-		Self {
+	fn with_action(action: Entity) -> Self;
+	/// Trigger [OnRun] for a target entity and node
+	fn with_target_and_action(action: Entity, target: Entity) -> Self;
+}
+
+impl<T: From<RunContext>> HasRunContext for T {
+	/// Called via `world.trigger()`
+	fn with_action(action: Entity) -> Self {
+		RunContext {
 			action,
 			target: action,
 		}
+		.into()
 	}
-	/// Trigger [OnRun] for a target entity and node
-	pub fn with_target_and_action(action: Entity, target: Entity) -> Self {
-		Self { target, action }
+
+	fn with_target_and_action(action: Entity, target: Entity) -> Self {
+		RunContext { target, action }.into()
 	}
 }
+
 
 /// A general observer triggered globally that can be mapped to specific actions.
 // This is intentionally not generic with a value:T because that would
 // involve cloning the data which is an ecs antipattern
-#[derive(Debug, Copy, Clone, Event)]
-pub struct OnAction {
-	/// The entity targeted by the behavior
-	pub origin: Entity,
-	/// The entity containing the actions to perform
-	pub action: Entity,
+#[derive(Debug, Copy, Clone, Event, Deref, DerefMut)]
+pub struct OnAction(pub RunContext);
+
+impl From<RunContext> for OnAction {
+	fn from(context: RunContext) -> Self { Self(context) }
 }
+
 impl OnAction {
 	pub fn into_result(self, result: RunResult) -> OnRunResultGlobal {
-		OnRunResultGlobal::new(self.action, result)
+		OnRunResultGlobal::new(self.0, result)
 	}
 }
 
@@ -129,9 +157,9 @@ impl OnAction {
 #[extend::ext(name=ActionTrigger)]
 pub impl<'a> Trigger<'a, OnAction> {
 	fn run_next<'w, 's>(&self, mut commands: Commands<'w, 's>, action: Entity) {
-		commands
-			.entity(action)
-			.trigger(OnRunGlobal::with_target_and_action(action, self.origin));
+		commands.entity(action).trigger(OnRunGlobal(
+			RunContext::with_target_and_action(action, self.target),
+		));
 	}
 	fn on_result<'w, 's>(
 		&self,
@@ -144,10 +172,10 @@ pub impl<'a> Trigger<'a, OnAction> {
 	}
 }
 
-/// Call OnRun for each action registered
+/// Global observer to call OnRun for each action registered
+/// on the action entity.
 ///
 /// # Panics
-///
 /// If the trigger does specify an action, usually because
 /// `OnRun` was called directly without `with_target`
 pub fn on_run_global(
@@ -165,13 +193,16 @@ pub fn on_run_global(
 		trigger.action
 	};
 
+	let target = if trigger.target == Entity::PLACEHOLDER {
+		action
+	} else {
+		trigger.target
+	};
+
 
 	if let Some(actions) = action_map.node_to_actions.get(&action) {
-		let action = OnAction {
-			origin: trigger.target,
-			action,
-		};
-		commands.trigger_targets(action, actions.clone());
+		let on_action: OnAction = RunContext { target, action }.into();
+		commands.trigger_targets(on_action, actions.clone());
 	}
 }
 
@@ -202,7 +233,7 @@ mod test {
 		let entity = app
 			.world_mut()
 			.spawn(TriggerCount::default())
-			.flush_trigger(OnRunGlobal::new())
+			.flush_trigger(OnRunGlobal::default())
 			.id();
 		expect(app.world().get::<TriggerCount>(entity).unwrap().0).to_be(1);
 	}

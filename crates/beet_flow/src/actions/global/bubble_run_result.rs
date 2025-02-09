@@ -8,7 +8,6 @@ use bevy::prelude::*;
 #[derive(Default, Component, Reflect)]
 pub struct NoBubble;
 
-
 /// When [`OnRunResult`] is triggered, propagate to parent with [`OnChildResult`].
 /// We can't use bevy event propagation because that does not track the last entity
 /// that called bubble, which is required for selectors.

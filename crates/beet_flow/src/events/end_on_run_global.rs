@@ -36,10 +36,12 @@ mod test {
 		let func = observe_triggers::<OnRunResultGlobal>(world);
 		let entity = world
 			.spawn(EndOnRunGlobal::failure())
-			.flush_trigger(OnRunGlobal::new())
+			.flush_trigger(OnRunGlobal::default())
 			.id();
 		expect(&func).to_have_been_called();
-		expect(&func)
-			.to_have_returned_nth_with(0, &OnRunResultGlobal::failure(entity));
+		expect(&func).to_have_returned_nth_with(
+			0,
+			&OnRunResultGlobal::failure(RunContext::with_action(entity)),
+		);
 	}
 }
