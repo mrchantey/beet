@@ -62,33 +62,40 @@ impl OnChildResultGlobal {
 pub fn bubble_run_result_global(
 	trigger: Trigger<OnRunResultGlobal>,
 	mut commands: Commands,
-	no_bubble: Query<(), With<NoBubble>>,
+	// no_bubble: Query<(), With<NoBubble>>,
+	action_map: Res<ActionMap>,
 	parents: Query<&Parent>,
 ) {
-	if no_bubble.contains(trigger.context.action) {
-		return;
-	}
+	// we dont need this anymore?
+	// if no_bubble.contains(trigger.context.action) {
+	// 	return;
+	// }
 
 	if let Ok(parent) = parents.get(trigger.context.action) {
 		let parent = parent.get();
-		println!("bubble_run_result_global: parent: {:?}", parent);
-		commands
-			.entity(parent)
-			.trigger(trigger.into_child_result(parent));
+		if let Some(action_observers) = action_map.action_observers.get(&parent)
+		{
+			commands.trigger_targets(
+				trigger.into_child_result(parent),
+				action_observers.clone(),
+			);
+		}
+		// commands
+		// 	.entity(parent)
+		// 	.trigger(trigger.into_child_result(parent));
 		// .trigger(trigger.into_child_result(parent));
 	}
 }
 
-
+/// Simply convert an `OnChildResult` into an `OnRunResult`.
 #[derive(Debug, GlobalAction, Clone, Copy, PartialEq, Reflect)]
 #[observers(bubble_result)]
-pub struct BubbleResult;
+pub struct BubbleUpFlow;
 
 pub fn bubble_result(
 	trigger: Trigger<OnChildResultGlobal>,
 	mut commands: Commands,
 ) {
-	println!("bubble_result: {:?}", trigger);
 	commands
 		.entity(trigger.context.action)
 		.trigger(trigger.into_run_result());
@@ -109,22 +116,44 @@ mod test {
 		let mut child = Entity::PLACEHOLDER;
 		let mut grandchild = Entity::PLACEHOLDER;
 
-
-		world.spawn(BubbleResult).with_children(|parent| {
-			child = parent
-				.spawn(BubbleResult)
-				.with_children(|parent| {
-					grandchild = parent
-						.spawn((BubbleResult, EndOnRunGlobal::success()))
-						.id();
-				})
-				.id();
-		});
+		let parent = world
+			.spawn(BubbleUpFlow)
+			.with_children(|parent| {
+				child = parent
+					.spawn(BubbleUpFlow)
+					.with_children(|parent| {
+						grandchild =
+							parent.spawn(EndOnRunGlobal::success()).id();
+					})
+					.id();
+			})
+			.id();
 		world
 			.entity_mut(grandchild)
 			.flush_trigger(OnRunGlobal::default());
 
 		expect(&counter).to_have_been_called_times(3);
+		expect(&counter).to_have_returned_nth_with(0, &OnRunResultGlobal {
+			result: RunResult::Success,
+			context: RunContext {
+				target: grandchild,
+				action: grandchild,
+			},
+		});
+		expect(&counter).to_have_returned_nth_with(1, &OnRunResultGlobal {
+			result: RunResult::Success,
+			context: RunContext {
+				target: grandchild,
+				action: child,
+			},
+		});
+		expect(&counter).to_have_returned_nth_with(2, &OnRunResultGlobal {
+			result: RunResult::Success,
+			context: RunContext {
+				target: grandchild,
+				action: parent,
+			},
+		});
 	}
 	#[test]
 	fn stop_bubble() {

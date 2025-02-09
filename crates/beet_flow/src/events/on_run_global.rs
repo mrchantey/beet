@@ -17,10 +17,10 @@ pub fn on_run_global_plugin(app: &mut App) {
 /// Tracks action observers created when the first action is added to a node.
 #[derive(Debug, Default, Resource)]
 pub struct ActionMap {
-	/// All of the actions that should be triggered
-	/// when a given tree entity runs
+	/// All of the observers that should be triggered
+	/// when a given action is run.
 	// TODO entity relations 0.16
-	pub node_to_actions: HashMap<Entity, Vec<Entity>>,
+	pub action_observers: HashMap<Entity, Vec<Entity>>,
 	/// TODO add marker to the observer entity instead
 	pub cid_to_action: HashMap<ComponentId, Entity>,
 }
@@ -36,7 +36,7 @@ impl ActionMap {
 	) {
 		let action = Self::get_or_insert_action(world, cid, on_create_action);
 		let mut map = world.resource_mut::<ActionMap>();
-		map.node_to_actions
+		map.action_observers
 			.entry(node)
 			.or_insert_with(Vec::new)
 			.push(action);
@@ -45,7 +45,7 @@ impl ActionMap {
 	/// a node.
 	pub fn on_remove(world: &mut DeferredWorld, node: Entity) {
 		let mut map = world.resource_mut::<ActionMap>();
-		if let Some(actions) = map.node_to_actions.get_mut(&node) {
+		if let Some(actions) = map.action_observers.get_mut(&node) {
 			actions.retain(|&e| e != node);
 		}
 	}
@@ -200,7 +200,7 @@ pub fn on_run_global(
 	};
 
 
-	if let Some(actions) = action_map.node_to_actions.get(&action) {
+	if let Some(actions) = action_map.action_observers.get(&action) {
 		let on_action: OnAction = RunContext { target, action }.into();
 		commands.trigger_targets(on_action, actions.clone());
 	}
