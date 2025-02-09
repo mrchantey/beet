@@ -1,10 +1,8 @@
 use super::ActionAttributes;
-use proc_macro2::Span;
+use crate::utils::CrateManifest;
 use proc_macro2::TokenStream;
 use quote::quote;
-use quote::ToTokens;
 use syn::DeriveInput;
-use syn::Ident;
 
 
 pub fn derive_action_global(
@@ -35,6 +33,8 @@ fn impl_component(
 	let (impl_generics, type_generics, where_clause) =
 		&input.generics.split_for_impl();
 
+	let beet_flow_path = CrateManifest::get_path_direct("beet_flow");
+
 	let storage = attributes.storage.clone().unwrap_or_else(|| {
 		syn::parse_quote! { bevy::ecs::component::StorageType::Table }
 	});
@@ -45,7 +45,6 @@ fn impl_component(
 		}
 	});
 
-	let beet_flow_path = beet_flow_path();
 
 	quote! {
 		impl #impl_generics bevy::prelude::Component for #ident #type_generics #where_clause {
@@ -55,6 +54,7 @@ fn impl_component(
 			) {
 				hooks.on_add(|mut world, node, cid| {
 					#beet_flow_path::prelude::ActionMap::on_add(&mut world, node, cid, |world, action| {
+
 						#(#observers)*
 					});
 				});
@@ -62,21 +62,6 @@ fn impl_component(
 					#beet_flow_path::prelude::ActionMap::on_remove(&mut world, node);
 				});
 			}
-		}
-	}
-}
-// replacement for beet_manifest
-fn beet_flow_path() -> TokenStream {
-	use proc_macro_crate::crate_name;
-	use proc_macro_crate::FoundCrate;
-	let found_crate =
-		crate_name("beet_flow").expect("beet_flow is present in `Cargo.toml`");
-
-	match found_crate {
-		FoundCrate::Itself => quote!(crate),
-		FoundCrate::Name(name) => {
-			let ident = Ident::new(&name, Span::call_site());
-			ident.into_token_stream()
 		}
 	}
 }

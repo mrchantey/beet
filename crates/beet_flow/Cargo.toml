@@ -2,7 +2,7 @@
 name = "beet_flow"
 version.workspace = true
 edition.workspace = true
-description.workspace = true
+description = "An ECS control flow library"
 documentation.workspace = true
 readme.workspace = true
 homepage.workspace = true

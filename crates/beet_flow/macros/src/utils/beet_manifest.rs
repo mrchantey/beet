@@ -11,11 +11,11 @@ use toml_edit::DocumentMut;
 use toml_edit::Item;
 
 /// The path to the `Cargo.toml` file for the Beet project.
-pub struct BeetManifest {
+pub struct CrateManifest {
 	manifest: DocumentMut,
 }
 
-impl Default for BeetManifest {
+impl Default for CrateManifest {
 	fn default() -> Self {
 		Self {
 			manifest: env::var_os("CARGO_MANIFEST_DIR")
@@ -50,7 +50,7 @@ const BEET: &str = "beet";
 const PREFIX: &str = "beet_";
 // const BEET_INTERNAL: &str = "bevy_internal";
 
-impl BeetManifest {
+impl CrateManifest {
 	/// Attempt to retrieve the [path](syn::Path) of a particular package in
 	/// the [manifest](BevyManifest) by [name](str).
 	pub fn maybe_get_path(&self, name: &str) -> Option<syn::Path> {

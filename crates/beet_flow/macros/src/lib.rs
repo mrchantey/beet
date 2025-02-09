@@ -35,10 +35,9 @@ mod utils;
 pub fn action(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 	action::derive_action(input)
 }
-#[proc_macro_derive(
-	GlobalAction,
-	attributes(observers, systems, category, storage)
-)]
+
+/// An action is a superset of a [`Component`]
+#[proc_macro_derive(GlobalAction, attributes(observers, category, storage))]
 pub fn global_action(
 	input: proc_macro::TokenStream,
 ) -> proc_macro::TokenStream {

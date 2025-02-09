@@ -5,8 +5,12 @@ use beet::prelude::*;
 use bevy::prelude::*;
 
 #[derive(Default, GlobalAction)]
-#[observers(trigger_count)]
+#[actions(trigger_count)]
 struct TriggerCount(i32);
+
+fn foobar(_trigger: Trigger<OnRunGlobal>) {
+	println!("foobar");
+}
 
 fn trigger_count(
 	trigger: Trigger<OnAction>,

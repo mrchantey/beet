@@ -16,7 +16,7 @@ pub fn derive_action(
 fn parse(input: DeriveInput) -> syn::Result<TokenStream> {
 	let attributes = ActionAttributes::parse(&input.attrs)?;
 
-	let beet_flow_path = BeetManifest::get_path_direct("beet_flow");
+	let beet_flow_path = CrateManifest::get_path_direct("beet_flow");
 	let impl_action_systems = impl_action_builder(&input, &attributes)?;
 	let impl_action_meta = impl_action_meta(&input, &attributes)?;
 
