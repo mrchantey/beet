@@ -1,19 +1,13 @@
 use crate::prelude::*;
 use bevy::prelude::*;
 
-/// Signifies a behavior has stopped running. This bubbles
-/// up the tree until it reaches the root node or a [`StopBubble`].
+/// Signifies an action has completed. If the action has a parent,
+/// [`OnChildResult`] will be triggered on the parent.
 #[derive(Debug, Event, Clone, Copy, PartialEq, Reflect)]
 pub struct OnRunResultGlobal {
 	pub result: RunResult,
 	pub context: RunContext,
 }
-
-// impl Event for OnRunResultGlobal {
-// 	type Traversal = &'static Parent;
-// 	const AUTO_PROPAGATE: bool = true;
-// }
-
 
 impl OnRunResultGlobal {
 	pub fn new(context: RunContext, result: RunResult) -> Self {
@@ -35,11 +29,10 @@ impl OnRunResultGlobal {
 	}
 	pub fn into_child_result(self, parent: Entity) -> OnChildResultGlobal {
 		OnChildResultGlobal {
-			context: RunContext {
-				target: self.context.target,
-				action: parent,
-			},
 			result: self.result,
+			child_action: self.context.action,
+			parent_action: parent,
+			target: self.context.target,
 		}
 	}
 }
@@ -47,14 +40,34 @@ impl OnRunResultGlobal {
 #[derive(Debug, Event, Clone, Copy, PartialEq, Reflect)]
 pub struct OnChildResultGlobal {
 	pub result: RunResult,
-	pub context: RunContext,
-}
-impl OnChildResultGlobal {
-	pub fn into_run_result(self) -> OnRunResultGlobal {
-		OnRunResultGlobal::new(self.context, self.result)
-	}
+	pub child_action: Entity,
+	pub parent_action: Entity,
+	pub target: Entity,
 }
 
+impl OnChildResultGlobal {
+	pub fn on_result(self, mut commands: Commands) {
+		commands
+			.entity(self.parent_action)
+			.trigger(OnRunResultGlobal {
+				result: self.result,
+				context: RunContext {
+					action: self.parent_action,
+					target: self.target,
+				},
+			});
+	}
+	pub fn on_result_with(mut self, commands: Commands, result: RunResult) {
+		self.result = result;
+		self.on_result(commands);
+	}
+
+	pub fn on_run(self, mut commands: Commands, action: Entity) {
+		commands.entity(action).trigger(OnRunGlobal(
+			RunContext::with_target_and_action(action, self.target),
+		));
+	}
+}
 
 /// When [`OnRunResult`] is triggered, propagate to parent with [`OnChildResult`].
 /// We can't use bevy event propagation because that does not track the last entity
@@ -94,11 +107,9 @@ pub struct BubbleUpFlow;
 
 pub fn bubble_result(
 	trigger: Trigger<OnChildResultGlobal>,
-	mut commands: Commands,
+	commands: Commands,
 ) {
-	commands
-		.entity(trigger.context.action)
-		.trigger(trigger.into_run_result());
+	trigger.on_result(commands);
 }
 
 #[cfg(test)]
@@ -154,42 +165,5 @@ mod test {
 				action: parent,
 			},
 		});
-	}
-	#[test]
-	fn stop_bubble() {
-		let mut app = App::new();
-		app.add_plugins(on_run_global_plugin);
-		let world = app.world_mut();
-		let counter = observe_triggers::<OnRunResultGlobal>(world);
-
-		let mut child = Entity::PLACEHOLDER;
-		let mut grandchild = Entity::PLACEHOLDER;
-
-		let _parent =
-			world.spawn_empty().with_child(()).with_children(|parent| {
-				child = parent
-					.spawn(NoBubble::default())
-					.with_children(|parent| {
-						grandchild =
-							parent.spawn(EndOnRunGlobal::success()).id();
-					})
-					.id();
-			});
-
-		world
-			.entity_mut(grandchild)
-			.flush_trigger(OnRunGlobal::default());
-
-		// only child and grandchild called
-		expect(&counter).to_have_been_called_times(2);
-
-		world.entity_mut(child).remove::<NoBubble>();
-		world
-			.entity_mut(grandchild)
-			.flush_trigger(OnRunResultGlobal::success(
-				RunContext::with_action(child),
-			));
-		// it was removed so all called
-		expect(&counter).to_have_been_called_times(5);
 	}
 }

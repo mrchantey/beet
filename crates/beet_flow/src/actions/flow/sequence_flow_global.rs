@@ -21,7 +21,7 @@ fn on_start(
 ) {
 	let children = query.get(trigger.action).expect(child_expect::NO_CHILDREN);
 	if let Some(first_child) = children.iter().next() {
-		trigger.run_next(commands, *first_child);
+		trigger.on_run(commands, *first_child);
 	} else {
 		trigger.on_result(commands, RunResult::Success);
 	}
@@ -29,30 +29,25 @@ fn on_start(
 
 
 fn on_next(
-	trigger: Trigger<OnRunResultGlobal>,
-	// mut commands: Commands,
+	trigger: Trigger<OnChildResultGlobal>,
+	commands: Commands,
 	query: Query<&Children>,
 ) {
-	if trigger.event().result == RunResult::Failure {
-		// trigger.event_mut().call
-		// commands
-		// 	.entity(trigger.entity())
-		// 	.trigger(OnRunResult::failure());
+	if trigger.result == RunResult::Failure {
+		trigger.on_result(commands);
 		return;
 	}
 	let children = query
-		.get(trigger.context.action)
+		.get(trigger.parent_action)
 		.expect(child_expect::NO_CHILDREN);
 	let index = children
 		.iter()
-		.position(|&x| x == trigger.context.action)
+		.position(|&x| x == trigger.child_action)
 		.expect(child_expect::NOT_MY_CHILD);
 	if index == children.len() - 1 {
-		// commands
-		// 	.entity(trigger.entity())
-		// 	.trigger(OnRunResult::success());
+		trigger.on_result(commands);
 	} else {
-		// commands.entity(children[index + 1]).trigger(OnRun);
+		trigger.on_run(commands, children[index + 1]);
 	}
 }
 

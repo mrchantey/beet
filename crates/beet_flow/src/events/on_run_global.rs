@@ -138,37 +138,15 @@ impl From<RunContext> for OnAction {
 }
 
 impl OnAction {
-	pub fn into_result(self, result: RunResult) -> OnRunResultGlobal {
-		OnRunResultGlobal::new(self.0, result)
-	}
-}
-
-
-// #[derive(SystemParam)]
-// struct RunChild<'w, 's> {
-// 	commands: Commands<'w, 's>,
-// 	children: Query<'w, 's, &'static Children>,
-// }
-
-// impl<'w, 's> RunChild<'w, 's> {
-// 	pub fn run_child(&mut self, entity: Entity) {}
-// }
-
-#[extend::ext(name=ActionTrigger)]
-pub impl<'a> Trigger<'a, OnAction> {
-	fn run_next<'w, 's>(&self, mut commands: Commands<'w, 's>, action: Entity) {
+	pub fn on_run(self, mut commands: Commands, action: Entity) {
 		commands.entity(action).trigger(OnRunGlobal(
 			RunContext::with_target_and_action(action, self.target),
 		));
 	}
-	fn on_result<'w, 's>(
-		&self,
-		mut commands: Commands<'w, 's>,
-		result: RunResult,
-	) {
+	pub fn on_result(self, mut commands: Commands, result: RunResult) {
 		commands
 			.entity(self.action)
-			.trigger(self.event().into_result(result));
+			.trigger(OnRunResultGlobal::new(self.0, result));
 	}
 }
 
