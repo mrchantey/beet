@@ -13,30 +13,15 @@ categories.workspace = true
 
 
 [features]
-# reflect requires trait upcasting so is nightly only
-reflect = ["dep:heck", "dep:serde", "scene", "bevy/serialize"]
-scene = ["bevy/bevy_scene"]
-# use sweet and reexport in the prelude
-sweet = ["dep:sweet"]
-
-# bevyhub = ["dep:bevyhub", "bevyhub/net", "bevyhub/core"]
-
+reflect = ["dep:serde", "bevy/serialize"]
 [dependencies]
 beet_flow_macros.workspace = true
-# bevyhub = { workspace = true, optional = true }
-
 bevy.workspace = true
-
 log.workspace = true
 anyhow.workspace = true
-extend.workspace = true
 thiserror.workspace = true
 serde = { workspace = true, optional = true }
-heck = { workspace = true, optional = true }
-sweet = { workspace = true, optional = true }
 
 [dev-dependencies]
-beet_flow = { path = "", features = ["sweet"] }
-pretty_env_logger.workspace = true
-ron.workspace = true
+# beet_flow = { path = "" }
 sweet = { workspace = true, features = ["test", "bevy"] }

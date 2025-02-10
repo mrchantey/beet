@@ -3,7 +3,7 @@ target
 docs/book
 out.txt
 rustc-ice*
-
+crates/beet_flow_old
 .env
 
 crates/beet_router/parser/compilecheck_*
