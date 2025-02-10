@@ -10,6 +10,26 @@ pub trait Request: ActionPayload {
 	type Res: Response<Req = Self>;
 }
 
+impl<T: Request> On<T> {
+	pub fn trigger_next(&self, mut commands: Commands, next_action: Entity) {
+		commands.entity(next_action).trigger(On {
+			payload: self.payload.clone(),
+			origin: self.origin,
+			action: next_action,
+			prev_action: self.action,
+		});
+	}
+
+	pub fn trigger_response(&self, mut commands: Commands, payload: T::Res) {
+		commands.entity(self.action).trigger(On {
+			payload,
+			origin: self.origin,
+			action: self.action,
+			prev_action: self.prev_action,
+		});
+	}
+}
+
 /// Global observer to call OnRun for each action registered
 /// on the action entity.
 ///
@@ -20,7 +40,7 @@ pub trait Request: ActionPayload {
 /// Unlike [propagate_response_to_parent_observers], this will trigger
 /// for the action observerse directly
 pub fn propagate_request_to_observers<R: Request>(
-	req: Trigger<ActionContext<R>>,
+	req: Trigger<On<R>>,
 	mut commands: Commands,
 	action_observers: Query<&ActionObservers>,
 	action_observer_markers: Query<(), With<ActionObserverMarker>>,
@@ -32,7 +52,7 @@ pub fn propagate_request_to_observers<R: Request>(
 	let action = if req.action == Entity::PLACEHOLDER {
 		let trigger_entity = req.entity();
 		if trigger_entity == Entity::PLACEHOLDER {
-			panic!("{}", expect_action::to_specify_action(req.action));
+			panic!("{}", expect_action::to_specify_action(&req));
 		}
 		trigger_entity
 	} else {
@@ -68,7 +88,7 @@ mod test {
 	struct TriggerCount(i32);
 
 	fn trigger_count(
-		trigger: Trigger<ActionContext<Run>>,
+		trigger: Trigger<On<Run>>,
 		mut query: Query<&mut TriggerCount>,
 	) {
 		query.get_mut(trigger.action).unwrap().as_mut().0 += 1;
@@ -82,7 +102,7 @@ mod test {
 		let entity = app
 			.world_mut()
 			.spawn(TriggerCount::default())
-			.flush_trigger(ActionContext::new(Run))
+			.flush_trigger(On::new(Run))
 			.id();
 
 		expect(app.world().get::<TriggerCount>(entity).unwrap().0).to_be(1);
@@ -94,7 +114,7 @@ mod test {
 
 		let entity = app.world_mut().spawn(TriggerCount::default()).id();
 		app.world_mut()
-			.flush_trigger(ActionContext::new_with_action(entity, Run));
+			.flush_trigger(On::new_with_action(entity, Run));
 
 		expect(app.world().get::<TriggerCount>(entity).unwrap().0).to_be(1);
 	}

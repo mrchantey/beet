@@ -1,5 +1,7 @@
 use crate::prelude::*;
+use bevy::prelude::*;
 
+pub type OnRun<'w> = Trigger<'w, On<Run>>;
 
 #[derive(Debug, Default, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Run;

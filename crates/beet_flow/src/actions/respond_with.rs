@@ -9,18 +9,16 @@ use bevy::prelude::*;
 pub struct RespondWith<R: Response>(pub R);
 
 fn respond_with<R: Response>(
-	trig: ActionTrigger<R::Req>,
-	mut commands: Commands,
+	trig: Trigger<On<R::Req>>,
+	commands: Commands,
 	action: Query<&RespondWith<R>>,
 ) {
 	let payload = action
 		.get(trig.action)
-		.expect(&expect_action::to_have_action(trig.action))
+		.expect(&expect_action::to_have_action(&trig))
 		.0
 		.clone();
-	commands
-		.entity(trig.action)
-		.trigger(trig.into_response(payload));
+	trig.trigger_response(commands, payload);
 }
 
 #[cfg(test)]
@@ -34,8 +32,7 @@ mod test {
 		let mut app = App::new();
 		app.add_plugins(BeetFlowPlugin::default());
 
-		let observed =
-			observe_triggers::<ActionContext<RunResult>>(app.world_mut());
+		let observed = observe_triggers::<On<RunResult>>(app.world_mut());
 		let entity = app
 			.world_mut()
 			.spawn(RespondWith(RunResult::Success))

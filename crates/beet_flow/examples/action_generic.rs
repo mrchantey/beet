@@ -8,18 +8,16 @@ use bevy::prelude::*;
 pub struct ConstResponse<R: Request>(pub R::Res);
 
 fn const_response<R: Request>(
-	req: Trigger<ActionContext<R>>,
-	mut commands: Commands,
+	req: Trigger<On<R>>,
+	commands: Commands,
 	action: Query<&ConstResponse<R>>,
 ) {
 	let payload = action
 		.get(req.action)
-		.expect(&expect_action::to_have_action(req.action))
+		.expect(&expect_action::to_have_action(&req))
 		.0
 		.clone();
-	commands
-		.entity(req.action)
-		.trigger(req.into_response(payload));
+	req.trigger_response(commands, payload);
 }
 
 

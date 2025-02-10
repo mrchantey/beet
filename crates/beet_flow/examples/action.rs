@@ -10,7 +10,7 @@ struct LogOnRun(pub String);
 
 
 fn log_name_on_run(
-	trigger: Trigger<ActionContext<Run>>,
+	trigger: Trigger<On<Run>>,
 	query: Populated<&LogOnRun>,
 ) {
 	let name = query.get(trigger.action).unwrap();
