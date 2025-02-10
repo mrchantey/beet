@@ -18,6 +18,7 @@ reflect = ["dep:serde", "bevy/serialize"]
 beet_flow_macros.workspace = true
 bevy.workspace = true
 log.workspace = true
+extend.workspace = true
 anyhow.workspace = true
 thiserror.workspace = true
 serde = { workspace = true, optional = true }

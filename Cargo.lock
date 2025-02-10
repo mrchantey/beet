@@ -364,6 +364,7 @@ dependencies = [
  "anyhow",
  "beet_flow_macros",
  "bevy",
+ "extend",
  "log",
  "serde",
  "sweet",
