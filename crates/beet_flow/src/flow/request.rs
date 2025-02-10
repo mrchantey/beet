@@ -4,11 +4,21 @@ use bevy::prelude::*;
 
 pub fn request_plugin<T: Request>(app: &mut App) {
 	app.add_observer(propagate_request_to_observers::<T>);
+	app.add_observer(propagate_response_to_observers::<T>);
 }
 
 
 #[derive(
-	Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Event, Deref, DerefMut,
+	Debug,
+	Default,
+	Clone,
+	PartialEq,
+	Eq,
+	PartialOrd,
+	Ord,
+	Event,
+	Deref,
+	DerefMut,
 )]
 pub struct OnRequest<T: Request>(pub ActionContext<T>);
 
@@ -48,39 +58,9 @@ impl<T: Request> OnRequest<T> {
 	}
 }
 
-#[derive(
-	Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Event, Deref, DerefMut,
-)]
-pub struct OnResponse<T: Request>(pub ActionContext<T::Res>);
-
-impl<T: Request> OnResponse<T> {
-	pub fn new(payload: T::Res) -> Self {
-		Self(ActionContext {
-			payload,
-			target: Entity::PLACEHOLDER,
-			action: Entity::PLACEHOLDER,
-		})
-	}
-	pub fn new_with_action(action: Entity, payload: T::Res) -> Self {
-		Self(ActionContext {
-			payload,
-			target: action,
-			action,
-		})
-	}
-	pub fn new_with_action_and_target(
-		payload: T::Res,
-		action: Entity,
-		target: Entity,
-	) -> Self {
-		Self(ActionContext {
-			payload,
-			target,
-			action,
-		})
-	}
+pub trait Request: 'static + Send + Sync + Clone {
+	type Res: 'static + Send + Sync + Clone;
 }
-
 
 
 
@@ -89,6 +69,16 @@ pub struct ActionContext<T> {
 	pub payload: T,
 	pub target: Entity,
 	pub action: Entity,
+}
+
+impl<T: Default> Default for ActionContext<T> {
+	fn default() -> Self {
+		Self {
+			payload: Default::default(),
+			target: Entity::PLACEHOLDER,
+			action: Entity::PLACEHOLDER,
+		}
+	}
 }
 
 impl<T> ActionContext<T> {
@@ -101,9 +91,6 @@ impl<T> ActionContext<T> {
 	}
 }
 
-pub trait Request: 'static + Send + Sync + Clone {
-	type Res: 'static + Send + Sync + Clone;
-}
 
 
 /// Global observer to call OnRun for each action registered
@@ -114,9 +101,9 @@ pub trait Request: 'static + Send + Sync + Clone {
 /// `OnRun` was called directly without `with_target`
 pub fn propagate_request_to_observers<R: Request>(
 	req: Trigger<OnRequest<R>>,
-	action_observer_markers: Query<&ActionObserverMarker>,
-	action_observers: Query<&ActionObservers>,
 	mut commands: Commands,
+	action_observers: Query<&ActionObservers>,
+	action_observer_markers: Query<(), With<ActionObserverMarker>>,
 ) {
 	if action_observer_markers.contains(req.entity()) {
 		return;
