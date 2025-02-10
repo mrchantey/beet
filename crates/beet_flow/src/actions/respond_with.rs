@@ -4,21 +4,21 @@ use bevy::prelude::*;
 
 /// Immediately respond to a given request with a response,
 /// no matter the state of the world or the content of the request.
-#[action(respond_with::<R>)]
+#[action(respond_with::<T>)]
 #[derive(Debug, Component, PartialEq, Eq)]
-pub struct RespondWith<R: Response>(pub R);
+pub struct RespondWith<T: ResultPayload>(pub T);
 
-fn respond_with<R: Response>(
-	trig: Trigger<On<R::Req>>,
+fn respond_with<T: ResultPayload>(
+	trig: Trigger<OnRun<T::Run>>,
 	commands: Commands,
-	action: Query<&RespondWith<R>>,
+	action: Query<&RespondWith<T>>,
 ) {
 	let payload = action
 		.get(trig.action)
 		.expect(&expect_action::to_have_action(&trig))
 		.0
 		.clone();
-	trig.trigger_response(commands, payload);
+	trig.trigger_result(commands, payload);
 }
 
 #[cfg(test)]
@@ -32,17 +32,17 @@ mod test {
 		let mut app = App::new();
 		app.add_plugins(BeetFlowPlugin::default());
 
-		let observed = observe_triggers::<On<RunResult>>(app.world_mut());
+		let observed = observe_triggers::<OnResult>(app.world_mut());
 		let entity = app
 			.world_mut()
 			.spawn(RespondWith(RunResult::Success))
-			.flush_trigger(Run.trigger())
+			.flush_trigger(OnRun::local())
 			.id();
 
 		expect(&observed).to_have_been_called_times(1);
 		expect(&observed).to_have_returned_nth_with(
 			0,
-			&RunResult::Success.trigger_for_action(entity),
+			&OnResult::new_global(entity, RunResult::Success),
 		);
 	}
 }

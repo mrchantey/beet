@@ -1,31 +1,28 @@
 pub mod expect_action {
-	use crate::prelude::*;
 	use bevy::prelude::*;
+	use std::fmt::Debug;
 
-	pub fn to_have_child<T: ActionPayload>(
-		trig: &On<T>,
-		child: Entity,
-	) -> String {
+	pub fn to_have_child(cx: impl Debug, child: Entity) -> String {
 		format!(
 			"The child {:?} does not belong to the action {:?}",
-			child, trig
+			child, cx
 		)
 	}
-	pub fn to_have_children<T: ActionPayload>(trig: &On<T>) -> String {
-		format!("Action entity has no children: {:?}", trig)
+	pub fn to_have_children(cx: impl Debug) -> String {
+		format!("Action entity has no children: {:?}", cx)
 	}
 
 	/// Error for for when an [ActionContext] uses a placeholder
 	/// and the request was made globally.
-	pub fn to_have_action<T: ActionPayload>(trig: &On<T>) -> String {
-		format!("Action entity is missing from query: {:?}", trig)
+	pub fn to_have_action(cx: impl Debug) -> String {
+		format!("Action entity is missing from query: {:?}", cx)
 	}
 	/// Error for for when an [ActionContext] uses a placeholder
 	/// and the request was made globally.
-	pub fn to_specify_action<T: ActionPayload>(trig: &On<T>) -> String {
+	pub fn to_specify_action(cx: impl Debug) -> String {
 		format!(
 			"Globally triggered ActionContext must specify an action: {:?}",
-			trig
+			cx
 		)
 	}
 }

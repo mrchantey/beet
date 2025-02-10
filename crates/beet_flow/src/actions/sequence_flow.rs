@@ -9,24 +9,20 @@ pub struct SequenceFlow;
 
 /// When [`OnRun`] is called, trigger the first child if it exists.
 /// Otherwise immediately succeed.
-fn on_start(
-	trig: Trigger<On<Run>>,
-	commands: Commands,
-	query: Query<&Children>,
-) {
+fn on_start(trig: Trigger<OnRun>, commands: Commands, query: Query<&Children>) {
 	let children = query
 		.get(trig.action)
 		.expect(&expect_action::to_have_children(&trig));
 	if let Some(first_child) = children.iter().next() {
 		trig.trigger_next(commands, *first_child);
 	} else {
-		trig.trigger_response(commands, RunResult::Success);
+		trig.trigger_result(commands, RunResult::Success);
 	}
 }
 
 
 fn on_next(
-	trig: Trigger<On<RunResult>>,
+	trig: Trigger<OnResult>,
 	commands: Commands,
 	query: Query<&Children>,
 ) {
@@ -44,7 +40,7 @@ fn on_next(
 	if index == children.len() - 1 {
 		trig.trigger_bubble(commands);
 	} else {
-		trig.trigger_next_with(commands, children[index + 1], Run);
+		trig.trigger_run(commands, children[index + 1], ());
 	}
 }
 
@@ -60,8 +56,8 @@ mod test {
 		app.add_plugins(BeetFlowPlugin::default());
 		let world = app.world_mut();
 
-		let on_result = observe_trigger_names::<On<RunResult>>(world);
-		let on_run = observe_triggers::<On<Run>>(world);
+		let on_result = observe_trigger_names::<OnResult>(world);
+		let on_run = observe_triggers::<OnRun>(world);
 
 		world
 			.spawn((Name::new("root"), SequenceFlow))
@@ -75,7 +71,7 @@ mod test {
 					RespondWith(RunResult::Success),
 				));
 			})
-			.flush_trigger(Run.trigger());
+			.flush_trigger(OnRun::local());
 
 		expect(&on_run).to_have_been_called_times(6);
 		expect(&on_result).to_have_been_called_times(3);

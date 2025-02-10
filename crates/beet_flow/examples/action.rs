@@ -9,10 +9,7 @@ struct LogOnRun(pub String);
 // action_observers!(log_name_on_run);
 
 
-fn log_name_on_run(
-	trigger: Trigger<On<Run>>,
-	query: Populated<&LogOnRun>,
-) {
+fn log_name_on_run(trigger: Trigger<OnRun>, query: Populated<&LogOnRun>) {
 	let name = query.get(trigger.action).unwrap();
 	println!("log_name_on_run: {}", name.0);
 }
@@ -23,5 +20,5 @@ fn main() {
 		.add_plugins(BeetFlowPlugin::default())
 		.world_mut()
 		.spawn(LogOnRun("root".to_string()))
-		.flush_trigger(Run.trigger());
+		.flush_trigger(OnRun::local());
 }
