@@ -46,6 +46,14 @@ impl<T: ResultPayload> OnResult<T> {
 	pub fn trigger_bubble(&self, mut commands: Commands) {
 		commands.entity(self.action).trigger(self.clone());
 	}
+	pub fn trigger_bubble_with(&self, mut commands: Commands, payload: T) {
+		commands.entity(self.action).trigger(OnResult {
+			payload,
+			origin: self.origin,
+			action: self.action,
+			prev_action: self.prev_action,
+		});
+	}
 	pub fn trigger_run(
 		&self,
 		mut commands: Commands,
