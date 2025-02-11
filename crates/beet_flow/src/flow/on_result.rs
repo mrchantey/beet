@@ -36,9 +36,8 @@ impl<T: ResultPayload> OnChildResult<T> {
 		next_action: Entity,
 		next_payload: T::Run,
 	) {
-		commands.entity(next_action).trigger(OnRun {
+		commands.entity(next_action).trigger(OnRunLocal {
 			payload: next_payload,
-			action: next_action,
 			origin: self.origin,
 		});
 	}
@@ -82,7 +81,7 @@ impl<T: ResultPayload> OnResult<T> {
 ///
 /// Unlike [propagate_request_to_observers], this is called on parent
 /// observers.
-pub fn run_child_result_observers<T: ResultPayload>(
+pub fn propagate_on_result<T: ResultPayload>(
 	res: Trigger<OnResult<T>>,
 	mut commands: Commands,
 	action_observers: Query<&ActionObservers>,

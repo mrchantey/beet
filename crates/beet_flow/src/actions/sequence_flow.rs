@@ -73,7 +73,7 @@ mod test {
 			})
 			.flush_trigger(OnRun::local());
 
-		expect(&on_run).to_have_been_called_times(6);
+		expect(&on_run).to_have_been_called_times(3);
 		expect(&on_result).to_have_been_called_times(3);
 		expect(&on_result).to_have_returned_nth_with(0, &"child1".to_string());
 		expect(&on_result).to_have_returned_nth_with(1, &"child2".to_string());

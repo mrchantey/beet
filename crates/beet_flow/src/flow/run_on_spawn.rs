@@ -19,11 +19,14 @@ impl Default for RunOnSpawn<()> {
 }
 
 // we use a system instead of observer to avoid infinite loops
-pub fn run_on_spawn(mut commands: Commands, query: Query<(Entity, &RunOnSpawn)>) {
+pub fn run_on_spawn(
+	mut commands: Commands,
+	query: Query<(Entity, &RunOnSpawn)>,
+) {
 	for (entity, run_on_spawn) in query.iter() {
 		commands
 			.entity(entity)
 			.remove::<RunOnSpawn>()
-			.trigger(OnRun::new_local(run_on_spawn.payload.clone()));
+			.trigger(OnRunLocal::new(run_on_spawn.payload.clone()));
 	}
 }

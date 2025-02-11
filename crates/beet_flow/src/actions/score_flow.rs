@@ -60,7 +60,7 @@ fn on_start(
 	for child in children.iter() {
 		commands
 			.entity(*child)
-			.trigger(OnRun::new_local(RequestScore));
+			.trigger(OnRunLocal::new(RequestScore));
 	}
 }
 
@@ -117,8 +117,8 @@ mod test {
 			})
 			.flush_trigger(OnRun::local());
 
-		expect(&on_run).to_have_been_called_times(6);
-		expect(&on_request_score).to_have_been_called_times(6);
+		expect(&on_run).to_have_been_called_times(4);
+		expect(&on_request_score).to_have_been_called_times(4);
 		expect(&on_score).to_have_been_called_times(2);
 		expect(&on_result).to_have_been_called_times(2);
 		expect(&on_result).to_have_returned_nth_with(0, &"child2".to_string());
