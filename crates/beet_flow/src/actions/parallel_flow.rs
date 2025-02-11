@@ -15,9 +15,7 @@ fn on_start(
 	mut commands: Commands,
 	query: Query<&Children>,
 ) {
-	let children = query
-		.get(trigger.entity())
-		.expect(child_expect::NO_CHILDREN);
+	let children = query.get(trigger.action).expect(child_expect::NO_CHILDREN);
 	commands
 		.trigger_targets(OnRun, children.iter().cloned().collect::<Vec<_>>());
 }

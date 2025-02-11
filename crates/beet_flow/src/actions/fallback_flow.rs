@@ -11,9 +11,8 @@ use bevy::prelude::*;
 pub struct FallbackFlow;
 
 fn on_start(ev: Trigger<OnRun>, commands: Commands, query: Query<&Children>) {
-	println!("FallbackFlow on_start");
 	let children = query
-		.get(ev.entity())
+		.get(ev.action)
 		.expect(&expect_action::to_have_children(&ev));
 	if let Some(first_child) = children.iter().next() {
 		ev.trigger_next(commands, *first_child);
@@ -28,7 +27,7 @@ fn on_next(ev: Trigger<OnResult>, commands: Commands, query: Query<&Children>) {
 		return;
 	}
 	let children = query
-		.get(ev.entity())
+		.get(ev.action)
 		.expect(&expect_action::to_have_children(&ev));
 
 	let index = children
@@ -72,7 +71,7 @@ mod test {
 			})
 			.flush_trigger(OnRun::local());
 
-		expect(&on_run).to_have_been_called_times(3);
+		expect(&on_run).to_have_been_called_times(6);
 		expect(&on_result).to_have_been_called_times(3);
 		expect(&on_result).to_have_returned_nth_with(0, &"child1".to_string());
 		expect(&on_result).to_have_returned_nth_with(1, &"child2".to_string());

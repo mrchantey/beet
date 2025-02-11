@@ -2,15 +2,6 @@ use crate::prelude::*;
 use bevy::prelude::*;
 use std::fmt::Debug;
 
-
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Reflect)]
-pub struct DefaultRun;
-
-pub fn run_plugin<Run: RunPayload, Result: ResultPayload>(app: &mut App) {
-	app.add_observer(run_action_observers::<Run>);
-	app.add_observer(trigger_result_on_parent_observers::<Result>);
-}
-
 pub trait RunPayload: 'static + Send + Sync + Clone + Debug {
 	type Result: ResultPayload<Run = Self>;
 }
@@ -99,37 +90,38 @@ impl OnRun<()> {
 /// Unlike [propagate_response_to_parent_observers], this will trigger
 /// for the action observerse directly
 pub fn run_action_observers<T: RunPayload>(
-	req: Trigger<OnRun<T>>,
+	ev: Trigger<OnRun<T>>,
 	mut commands: Commands,
 	action_observers: Query<&ActionObservers>,
 	action_observer_markers: Query<(), With<ActionObserverMarker>>,
 ) {
-	if action_observer_markers.contains(req.entity()) {
+	if action_observer_markers.contains(ev.entity()) {
 		return;
 	}
 
-	let action = if req.action == Entity::PLACEHOLDER {
-		let trigger_entity = req.entity();
+	let action = if ev.action == Entity::PLACEHOLDER {
+		let trigger_entity = ev.entity();
 		if trigger_entity == Entity::PLACEHOLDER {
-			panic!("{}", expect_action::to_specify_action(&req));
+			panic!("{}", expect_action::to_specify_action(&ev));
 		}
 		trigger_entity
 	} else {
-		req.action
+		ev.action
 	};
 
-	let target = if req.origin == Entity::PLACEHOLDER {
+	let origin = if ev.origin == Entity::PLACEHOLDER {
 		action
 	} else {
-		req.origin
+		ev.origin
 	};
 
 
 	if let Ok(actions) = action_observers.get(action) {
-		let mut req = (*req).clone();
-		req.action = action;
-		req.origin = target;
-		commands.trigger_targets(req, (**actions).clone());
+		let mut on_run = (*ev).clone();
+		on_run.action = action;
+		on_run.origin = origin;
+		// println!("run_action_observers: {:?}\nactions: {:?}", on_run, actions);
+		commands.trigger_targets(on_run, (**actions).clone());
 	}
 }
 

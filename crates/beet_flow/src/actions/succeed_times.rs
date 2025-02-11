@@ -26,17 +26,13 @@ fn succeed_times(
 	mut query: Query<&mut SucceedTimes>,
 ) {
 	let mut action = query
-		.get_mut(trigger.entity())
+		.get_mut(trigger.action)
 		.expect(expect_action::ACTION_QUERY_MISSING);
 
 	if action.times < action.max_times {
 		action.times += 1;
-		commands
-			.entity(trigger.entity())
-			.trigger(OnResult::success());
+		commands.entity(trigger.action).trigger(OnResult::success());
 	} else {
-		commands
-			.entity(trigger.entity())
-			.trigger(OnResult::failure());
+		commands.entity(trigger.action).trigger(OnResult::failure());
 	}
 }

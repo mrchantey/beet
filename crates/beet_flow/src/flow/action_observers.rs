@@ -11,7 +11,7 @@ pub struct ActionObserverMarker;
 
 /// This is added to any entity with an action, it tracks
 /// the observers that are listening to the action.
-#[derive(Debug, Component, Deref, DerefMut)]
+#[derive(Debug, Default, Component, Deref, DerefMut)]
 pub struct ActionObservers(pub Vec<Entity>);
 
 /// Tracks action observers created when the first instance of an action is
@@ -56,7 +56,9 @@ impl ActionObservers {
 			world
 				.commands()
 				.entity(action)
-				.insert(ActionObservers(vec![observer_entity]));
+				.entry::<ActionObservers>()
+				.or_default()
+				.and_modify(move |mut actions| actions.push(observer_entity));
 		}
 	}
 	// called by the Action component hooks.
@@ -73,4 +75,30 @@ pub fn on_remove_action(
 	_cid: ComponentId,
 ) {
 	ActionObservers::on_remove(&mut world, action);
+}
+
+
+#[cfg(test)]
+mod test {
+	use crate::prelude::*;
+	use bevy::prelude::*;
+	use sweet::prelude::*;
+
+	#[test]
+	fn multiple_actions() {
+		let mut app = App::new();
+		app.add_plugins(BeetFlowPlugin::default());
+		let world = app.world_mut();
+
+		let entity = world
+			.spawn((
+				RespondWith(ScoreValue::NEUTRAL),
+				RespondWith(RunResult::Success),
+			))
+			.id();
+
+		world.flush();
+		let observers = world.get::<ActionObservers>(entity).unwrap();
+		expect(observers.len()).to_be(2);
+	}
 }

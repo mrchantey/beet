@@ -9,16 +9,16 @@ use bevy::prelude::*;
 pub struct RespondWith<T: ResultPayload>(pub T);
 
 fn respond_with<T: ResultPayload>(
-	trig: Trigger<OnRun<T::Run>>,
+	ev: Trigger<OnRun<T::Run>>,
 	commands: Commands,
 	action: Query<&RespondWith<T>>,
 ) {
 	let payload = action
-		.get(trig.action)
-		.expect(&expect_action::to_have_action(&trig))
+		.get(ev.action)
+		.expect(&expect_action::to_have_action(&ev))
 		.0
 		.clone();
-	trig.trigger_result(commands, payload);
+	ev.trigger_result(commands, payload);
 }
 
 #[cfg(test)]

@@ -51,23 +51,23 @@ fn repeat(
 	mut commands: Commands,
 ) {
 	let flow = query
-		.get(trigger.entity())
+		.get(trigger.action)
 		.expect(expect_action::ACTION_QUERY_MISSING);
 	if let Some(check) = flow.if_result_matches {
 		let result = trigger.event().result();
 		if result != check {
 			// repeat is completed, try to bubble up the result
-			if let Ok(parent) = parents.get(trigger.entity()) {
+			if let Ok(parent) = parents.get(trigger.action) {
 				commands
 					.entity(parent.get())
-					.trigger(OnChildResult::new(trigger.entity(), result));
+					.trigger(OnChildResult::new(trigger.action, result));
 			}
 			return;
 		}
 	}
 
-	// println!("repeat for {}", name_or_entity(&names, trigger.entity()));
-	commands.entity(trigger.entity()).insert(RunOnSpawn);
+	// println!("repeat for {}", name_or_entity(&names, trigger.action));
+	commands.entity(trigger.action).insert(RunOnSpawn);
 }
 
 
