@@ -14,10 +14,10 @@ impl Default for BubbleResult {
 
 /// An action is usually triggered
 fn bubble_result<T: ResultPayload>(
-	trig: Trigger<OnChildResult<T>>,
+	ev: Trigger<OnChildResult<T>>,
 	commands: Commands,
 ) {
-	trig.trigger_bubble(commands);
+	ev.trigger_bubble(commands);
 }
 
 #[cfg(test)]
@@ -31,7 +31,7 @@ mod test {
 		let mut app = App::new();
 		app.add_plugins(BeetFlowPlugin::default());
 		let world = app.world_mut();
-		let counter = observe_triggers::<OnResult>(world);
+		let counter = observe_triggers::<OnResultAction>(world);
 		let mut child = Entity::PLACEHOLDER;
 		let mut grandchild = Entity::PLACEHOLDER;
 
@@ -50,17 +50,17 @@ mod test {
 		world.entity_mut(grandchild).flush_trigger(OnRun::local());
 
 		expect(&counter).to_have_been_called_times(3);
-		expect(&counter).to_have_returned_nth_with(0, &OnResult {
+		expect(&counter).to_have_returned_nth_with(0, &OnResultAction {
 			payload: RunResult::Success,
 			origin: grandchild,
 			action: grandchild,
 		});
-		expect(&counter).to_have_returned_nth_with(1, &OnResult {
+		expect(&counter).to_have_returned_nth_with(1, &OnResultAction {
 			payload: RunResult::Success,
 			origin: grandchild,
 			action: child,
 		});
-		expect(&counter).to_have_returned_nth_with(2, &OnResult {
+		expect(&counter).to_have_returned_nth_with(2, &OnResultAction {
 			payload: RunResult::Success,
 			origin: grandchild,
 			action: parent,

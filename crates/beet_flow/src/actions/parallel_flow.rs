@@ -58,7 +58,7 @@ mod test {
 		app.add_plugins(BeetFlowPlugin::default());
 		let world = app.world_mut();
 
-		let on_result = observe_triggers::<OnResult>(world);
+		let on_result = observe_triggers::<OnResultAction>(world);
 		let on_run = observe_triggers::<OnRun>(world);
 
 		let action = world
@@ -72,7 +72,7 @@ mod test {
 		expect(&on_result).to_have_been_called_times(3);
 		expect(&on_result).to_have_returned_nth_with(
 			2,
-			&OnResult::new_global(action, RunResult::Failure),
+			&OnResultAction::global(action, RunResult::Failure),
 		);
 	}
 	#[test]
@@ -81,7 +81,7 @@ mod test {
 		app.add_plugins(BeetFlowPlugin::default());
 		let world = app.world_mut();
 
-		let on_result = observe_triggers::<OnResult>(world);
+		let on_result = observe_triggers::<OnResultAction>(world);
 		let on_run = observe_triggers::<OnRun>(world);
 
 		let action = world
@@ -95,7 +95,7 @@ mod test {
 		expect(&on_result).to_have_been_called_times(3);
 		expect(&on_result).to_have_returned_nth_with(
 			2,
-			&OnResult::new_global(action, RunResult::Success),
+			&OnResultAction::global(action, RunResult::Success),
 		);
 	}
 }

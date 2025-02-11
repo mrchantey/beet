@@ -50,33 +50,31 @@ mod test {
 	use bevy::prelude::*;
 	use sweet::prelude::*;
 
+	#[rustfmt::skip]
 	#[test]
 	fn works() {
 		let mut app = App::new();
 		app.add_plugins(BeetFlowPlugin::default());
 		let world = app.world_mut();
 
-		let on_result = observe_trigger_names::<OnResult>(world);
-		let on_run = observe_triggers::<OnRun>(world);
+		let on_result = collect_on_result(world);
+		let on_run = collect_on_run(world);
 
 		world
 			.spawn((Name::new("root"), SequenceFlow))
-			.with_children(|parent| {
-				parent.spawn((
-					Name::new("child1"),
-					RespondWith(RunResult::Success),
-				));
-				parent.spawn((
-					Name::new("child2"),
-					RespondWith(RunResult::Success),
-				));
-			})
+			.with_child((Name::new("child1"), RespondWith(RunResult::Success)))
+			.with_child((Name::new("child2"), RespondWith(RunResult::Success)))
 			.flush_trigger(OnRun::local());
 
-		expect(&on_run).to_have_been_called_times(3);
-		expect(&on_result).to_have_been_called_times(3);
-		expect(&on_result).to_have_returned_nth_with(0, &"child1".to_string());
-		expect(&on_result).to_have_returned_nth_with(1, &"child2".to_string());
-		expect(&on_result).to_have_returned_nth_with(2, &"root".to_string());
+		expect(on_run()).to_be(vec![
+			"root".to_string(),
+			"child1".to_string(),
+			"child2".to_string(),
+		]);
+		expect(on_result()).to_be(vec![
+			("child1".to_string(), RunResult::Success),
+			("child2".to_string(), RunResult::Success),
+			("root".to_string(), RunResult::Success),
+		]);
 	}
 }

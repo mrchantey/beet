@@ -68,7 +68,7 @@ mod test {
 		let mut app = App::new();
 		app.add_plugins(BeetFlowPlugin::default());
 		let world = app.world_mut();
-		let func = observe_triggers::<OnResult>(world);
+		let func = observe_triggers::<OnResultAction>(world);
 
 		world
 			.spawn((SequenceFlow, RepeatFlow::default()))
@@ -90,7 +90,7 @@ mod test {
 		let mut app = App::new();
 		app.add_plugins(BeetFlowPlugin::default());
 		let world = app.world_mut();
-		let func = observe_triggers::<OnResult>(world);
+		let func = observe_triggers::<OnResultAction>(world);
 
 		world
 			.spawn((SequenceFlow, RepeatFlow::if_success()))

@@ -96,32 +96,35 @@ mod test {
 		app.add_plugins(BeetFlowPlugin::default());
 		let world = app.world_mut();
 
-		let on_run = observe_triggers::<OnRun>(world);
+		let on_run = collect_on_run(world);
+		let on_result = collect_on_result(world);
 		let on_request_score = observe_triggers::<OnRun<RequestScore>>(world);
-		let on_score = observe_trigger_names::<OnResult<ScoreValue>>(world);
-		let on_result = observe_trigger_names::<OnResult>(world);
+		let on_score = observe_triggers::<OnResultAction<ScoreValue>>(world);
 
 		world
 			.spawn((Name::new("root"), ScoreFlow::default()))
-			.with_children(|parent| {
-				parent.spawn((
-					Name::new("child1"),
-					RespondWith(ScoreValue::NEUTRAL),
-					RespondWith(RunResult::Success),
-				));
-				parent.spawn((
-					Name::new("child2"),
-					RespondWith(ScoreValue::PASS),
-					RespondWith(RunResult::Success),
-				));
-			})
+			.with_child((
+				Name::new("child1"),
+				RespondWith(ScoreValue::NEUTRAL),
+				RespondWith(RunResult::Success),
+			))
+			.with_child((
+				Name::new("child2"),
+				RespondWith(ScoreValue::PASS),
+				RespondWith(RunResult::Success),
+			))
 			.flush_trigger(OnRun::local());
-
-		expect(&on_run).to_have_been_called_times(4);
 		expect(&on_request_score).to_have_been_called_times(4);
 		expect(&on_score).to_have_been_called_times(2);
-		expect(&on_result).to_have_been_called_times(2);
-		expect(&on_result).to_have_returned_nth_with(0, &"child2".to_string());
-		expect(&on_result).to_have_returned_nth_with(1, &"root".to_string());
+
+		#[rustfmt::skip]
+		expect(on_run()).to_be(vec![
+			"root".to_string(), 
+			"child2".to_string()
+		]);
+		expect(on_result()).to_be(vec![
+			("child2".to_string(), RunResult::Success),
+			("root".to_string(), RunResult::Success),
+		]);
 	}
 }

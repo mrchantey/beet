@@ -32,7 +32,7 @@ mod test {
 		let mut app = App::new();
 		app.add_plugins(BeetFlowPlugin::default());
 
-		let observed = observe_triggers::<OnResult>(app.world_mut());
+		let observed = observe_triggers::<OnResultAction>(app.world_mut());
 		let entity = app
 			.world_mut()
 			.spawn(RespondWith(RunResult::Success))
@@ -42,7 +42,7 @@ mod test {
 		expect(&observed).to_have_been_called_times(1);
 		expect(&observed).to_have_returned_nth_with(
 			0,
-			&OnResult::new_global(entity, RunResult::Success),
+			&OnResultAction::global(entity, RunResult::Success),
 		);
 	}
 }

@@ -1,4 +1,4 @@
-mod action_context;
+mod action_event;
 mod action_observers;
 mod continue_run;
 mod expect;
@@ -6,7 +6,7 @@ mod on_result;
 mod on_run;
 mod run_on_spawn;
 use crate::prelude::*;
-pub use action_context::*;
+pub use action_event::*;
 pub use action_observers::*;
 use bevy::prelude::*;
 pub use continue_run::*;
@@ -41,6 +41,8 @@ pub struct BeetTickSet;
 
 
 pub fn run_plugin<Run: RunPayload, Result: ResultPayload>(app: &mut App) {
-	app.add_observer(propagate_on_run_action::<Run>);
+	app.add_observer(propagate_on_run::<Run>);
 	app.add_observer(propagate_on_result::<Result>);
 }
+
+

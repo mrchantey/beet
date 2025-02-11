@@ -1,11 +1,50 @@
 use crate::prelude::*;
 use bevy::prelude::*;
 
+
+/// An event triggered on the action entities, propagated to the observers automatically.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Event)]
+pub struct OnResultAction<T = RunResult> {
+	pub payload: T,
+	pub origin: Entity,
+	pub action: Entity,
+}
+impl<T> OnResultAction<T> {
+	pub fn local(payload: T) -> Self {
+		Self {
+			payload,
+			origin: Entity::PLACEHOLDER,
+			action: Entity::PLACEHOLDER,
+		}
+	}
+	pub fn global(action: Entity, payload: T) -> Self {
+		Self {
+			payload,
+			origin: action,
+			action,
+		}
+	}
+	pub fn global_with_origin(
+		action: Entity,
+		origin: Entity,
+		payload: T,
+	) -> Self {
+		Self {
+			payload,
+			origin,
+			action,
+		}
+	}
+}
+
+
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Event)]
 pub struct OnResult<T = RunResult> {
 	pub payload: T,
 	pub origin: Entity,
 	pub action: Entity,
+	// only OnResultAction is allowed to create this struct
+	_sealed: (),
 }
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Event)]
 pub struct OnChildResult<T = RunResult> {
@@ -17,18 +56,18 @@ pub struct OnChildResult<T = RunResult> {
 
 impl<T: ResultPayload> OnChildResult<T> {
 	pub fn trigger_bubble(&self, mut commands: Commands) {
-		commands.entity(self.action).trigger(OnResult {
-			payload: self.payload.clone(),
-			origin: self.origin,
-			action: self.action,
-		});
+		commands.trigger(OnResultAction::global_with_origin(
+			self.action,
+			self.origin,
+			self.payload.clone(),
+		));
 	}
 	pub fn trigger_bubble_with(&self, mut commands: Commands, payload: T) {
-		commands.entity(self.action).trigger(OnResult {
+		commands.trigger(OnResultAction::global_with_origin(
+			self.action,
+			self.origin,
 			payload,
-			origin: self.origin,
-			action: self.action,
-		});
+		));
 	}
 	pub fn trigger_run(
 		&self,
@@ -36,9 +75,11 @@ impl<T: ResultPayload> OnChildResult<T> {
 		next_action: Entity,
 		next_payload: T::Run,
 	) {
-		commands
-			.entity(next_action)
-			.trigger(OnRunAction::local_with_origin(next_payload, self.origin));
+		commands.trigger(OnRunAction::global_with_origin(
+			next_action,
+			self.origin,
+			next_payload,
+		));
 	}
 }
 
@@ -54,24 +95,10 @@ pub enum RunResult {
 /// Any action that requires this needs to manually call OnChildResult
 /// on the parent entity. For an example, see [`RepeatFlow`].
 #[derive(Default, Component, Reflect)]
+// do we need this?
 pub struct NoBubble;
 
-impl<T: ResultPayload> OnResult<T> {
-	pub fn new_local(payload: T) -> Self {
-		Self {
-			payload,
-			origin: Entity::PLACEHOLDER,
-			action: Entity::PLACEHOLDER,
-		}
-	}
-	pub fn new_global(action: Entity, payload: T) -> Self {
-		Self {
-			payload,
-			origin: action,
-			action,
-		}
-	}
-}
+impl<T: ResultPayload> OnResult<T> {}
 
 
 
@@ -81,27 +108,34 @@ impl<T: ResultPayload> OnResult<T> {
 /// Unlike [propagate_request_to_observers], this is called on parent
 /// observers.
 pub fn propagate_on_result<T: ResultPayload>(
-	res: Trigger<OnResult<T>>,
+	ev: Trigger<OnResultAction<T>>,
 	mut commands: Commands,
 	action_observers: Query<&ActionObservers>,
-	action_observer_markers: Query<(), With<ActionObserverMarker>>,
 	no_bubble: Query<(), With<NoBubble>>,
 	parents: Query<&Parent>,
 ) {
-	if action_observer_markers.contains(res.entity())
-		|| no_bubble.contains(res.action)
-	{
-		return;
+	if let Ok(action_observers) = action_observers.get(ev.action) {
+		let res = OnResult {
+			payload: ev.payload.clone(),
+			origin: ev.origin,
+			action: ev.action,
+			_sealed: (),
+		};
+		commands.trigger_targets(res, (*action_observers).clone());
 	}
 
-	if let Ok(parent) = parents.get(res.action) {
+	if no_bubble.contains(ev.action) {
+		return;
+	}
+	// propagate result to parents
+	if let Ok(parent) = parents.get(ev.action) {
 		let parent = parent.get();
 		if let Ok(action_observers) = action_observers.get(parent) {
 			let res = OnChildResult {
-				payload: res.payload.clone(),
-				origin: res.origin,
+				payload: ev.payload.clone(),
+				origin: ev.origin,
 				action: parent,
-				child: res.action,
+				child: ev.action,
 			};
 			commands.trigger_targets(res, (*action_observers).clone());
 		}

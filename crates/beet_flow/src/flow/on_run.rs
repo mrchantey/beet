@@ -16,16 +16,19 @@ impl ResultPayload for RunResult {
 	type Run = ();
 }
 
+
+/// An event triggered on *action observers*, never on the action entity (tree node) itself.
 /// This should never be called directly, instead use [`OnRunLocal`] or [`OnRunGlobal`].
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Event)]
 pub struct OnRun<T = ()> {
 	pub payload: T,
 	pub origin: Entity,
 	pub action: Entity,
-	// ensure users can't create this directly
+	// only OnRunAction is allowed to create this struct
 	_sealed: (),
 }
 
+/// An event triggered on the action entities, propagated to the observers automatically.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Event)]
 pub struct OnRunAction<T = ()> {
 	pub payload: T,
@@ -91,11 +94,11 @@ impl<T: RunPayload> OnRun<T> {
 	}
 
 	pub fn trigger_result(&self, mut commands: Commands, payload: T::Result) {
-		commands.entity(self.action).trigger(OnResult {
+		commands.trigger(OnResultAction::global_with_origin(
+			self.action,
+			self.origin,
 			payload,
-			origin: self.origin,
-			action: self.action,
-		});
+		));
 	}
 }
 
@@ -108,7 +111,7 @@ impl OnRun<()> {
 	}
 }
 
-pub(crate) fn propagate_on_run_action<T: RunPayload>(
+pub(crate) fn propagate_on_run<T: RunPayload>(
 	ev: Trigger<OnRunAction<T>>,
 	mut commands: Commands,
 	action_observers: Query<&ActionObservers>,
