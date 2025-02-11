@@ -2,16 +2,16 @@
 use crate::prelude::*;
 use bevy::prelude::*;
 
-/// Immediately respond to a given request with a response,
-/// no matter the state of the world or the content of the request.
-#[action(respond_with::<T>)]
+/// Immediately return a provided value when [`OnRun`] is called,
+/// regardless of the world state.
+#[action(return_with::<T>)]
 #[derive(Debug, Component, PartialEq, Eq)]
-pub struct RespondWith<T: ResultPayload>(pub T);
+pub struct ReturnWith<T: ResultPayload>(pub T);
 
-fn respond_with<T: ResultPayload>(
+fn return_with<T: ResultPayload>(
 	ev: Trigger<OnRun<T::Run>>,
 	commands: Commands,
-	action: Query<&RespondWith<T>>,
+	action: Query<&ReturnWith<T>>,
 ) {
 	let payload = action
 		.get(ev.action)
@@ -35,7 +35,7 @@ mod test {
 		let observed = observe_triggers::<OnResultAction>(app.world_mut());
 		let entity = app
 			.world_mut()
-			.spawn(RespondWith(RunResult::Success))
+			.spawn(ReturnWith(RunResult::Success))
 			.flush_trigger(OnRun::local())
 			.id();
 

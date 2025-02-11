@@ -105,13 +105,13 @@ mod test {
 			.spawn((Name::new("root"), ScoreFlow::default()))
 			.with_child((
 				Name::new("child1"),
-				RespondWith(ScoreValue::NEUTRAL),
-				RespondWith(RunResult::Success),
+				ReturnWith(ScoreValue::NEUTRAL),
+				ReturnWith(RunResult::Success),
 			))
 			.with_child((
 				Name::new("child2"),
-				RespondWith(ScoreValue::PASS),
-				RespondWith(RunResult::Success),
+				ReturnWith(ScoreValue::PASS),
+				ReturnWith(RunResult::Success),
 			))
 			.flush_trigger(OnRun::local());
 		expect(&on_request_score).to_have_been_called_times(4);

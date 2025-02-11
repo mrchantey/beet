@@ -62,8 +62,8 @@ mod test {
 
 		world
 			.spawn((Name::new("root"), SequenceFlow))
-			.with_child((Name::new("child1"), RespondWith(RunResult::Success)))
-			.with_child((Name::new("child2"), RespondWith(RunResult::Success)))
+			.with_child((Name::new("child1"), ReturnWith(RunResult::Success)))
+			.with_child((Name::new("child2"), ReturnWith(RunResult::Success)))
 			.flush_trigger(OnRun::local());
 
 		expect(on_run()).to_be(vec![

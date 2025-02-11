@@ -92,8 +92,8 @@ mod test {
 
 		let entity = world
 			.spawn((
-				RespondWith(ScoreValue::NEUTRAL),
-				RespondWith(RunResult::Success),
+				ReturnWith(ScoreValue::NEUTRAL),
+				ReturnWith(RunResult::Success),
 			))
 			.id();
 

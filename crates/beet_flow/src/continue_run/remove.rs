@@ -52,7 +52,7 @@ mod test {
 			.spawn((
 				Running,
 				Remove::<OnResult, Running>::default(),
-				RespondWith(RunResult::Success),
+				ReturnWith(RunResult::Success),
 			))
 			.flush_trigger(OnRun::local())
 			.id();

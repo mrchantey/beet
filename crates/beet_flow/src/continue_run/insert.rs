@@ -69,7 +69,7 @@ mod test {
 		let entity = world
 			.spawn((
 				Insert::<OnResult, Running>::default(),
-				RespondWith(RunResult::Success),
+				ReturnWith(RunResult::Success),
 			))
 			.flush_trigger(OnRun::local())
 			.id();

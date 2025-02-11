@@ -4,10 +4,8 @@ use std::borrow::Cow;
 
 /// Mostly used for hello-world programs, logs a message when the action is run.
 /// Use [`BeetDebugPlugin`] for debugging run-state.
-#[derive(Debug, Clone, PartialEq, Component, Action, Reflect)]
-#[reflect(Default, Component, ActionMeta)]
-#[category(ActionCategory::Behavior)]
-#[systems(log_on_run.in_set(TickSet))]
+#[action(log_on_run)]
+#[derive(Debug, Clone, PartialEq, Component, Reflect)]
 pub struct LogOnRun(pub Cow<'static, str>);
 
 impl Default for LogOnRun {
@@ -20,8 +18,9 @@ impl LogOnRun {
 	}
 }
 
-fn log_on_run(query: Query<&LogOnRun, Added<Running>>) {
-	for log in query.iter() {
-		log::info!("{}", log.0)
-	}
+fn log_on_run(ev: Trigger<OnRun>, query: Query<&LogOnRun>) {
+	let action = query
+		.get(ev.action)
+		.expect(&expect_action::to_have_action(&ev));
+	log::info!("{}", action.0);
 }

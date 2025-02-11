@@ -42,7 +42,7 @@ mod test {
 					.spawn(BubbleResult::default())
 					.with_children(|parent| {
 						grandchild =
-							parent.spawn(RespondWith(RunResult::Success)).id();
+							parent.spawn(ReturnWith(RunResult::Success)).id();
 					})
 					.id();
 			})

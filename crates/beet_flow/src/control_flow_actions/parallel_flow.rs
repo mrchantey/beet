@@ -63,8 +63,8 @@ mod test {
 
 		let action = world
 			.spawn((Name::new("root"), ParallelFlow::default()))
-			.with_child((Name::new("child1"), RespondWith(RunResult::Success)))
-			.with_child((Name::new("child2"), RespondWith(RunResult::Failure)))
+			.with_child((Name::new("child1"), ReturnWith(RunResult::Success)))
+			.with_child((Name::new("child2"), ReturnWith(RunResult::Failure)))
 			.flush_trigger(OnRun::local())
 			.id();
 
@@ -86,8 +86,8 @@ mod test {
 
 		let action = world
 			.spawn((Name::new("root"), ParallelFlow::default()))
-			.with_child((Name::new("child1"), RespondWith(RunResult::Success)))
-			.with_child((Name::new("child2"), RespondWith(RunResult::Success)))
+			.with_child((Name::new("child1"), ReturnWith(RunResult::Success)))
+			.with_child((Name::new("child2"), ReturnWith(RunResult::Success)))
 			.flush_trigger(OnRun::local())
 			.id();
 

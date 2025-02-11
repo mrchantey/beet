@@ -63,8 +63,8 @@ mod test {
 
 		world
 			.spawn((Name::new("root"), FallbackFlow))
-			.with_child((Name::new("child1"), RespondWith(RunResult::Failure)))
-			.with_child((Name::new("child2"), RespondWith(RunResult::Success)))
+			.with_child((Name::new("child1"), ReturnWith(RunResult::Failure)))
+			.with_child((Name::new("child2"), ReturnWith(RunResult::Success)))
 			.flush_trigger(OnRun::local());
 
 
