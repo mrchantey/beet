@@ -49,13 +49,28 @@ mod test {
 	use sweet::prelude::*;
 
 	#[test]
-	fn works() {
+	fn on_run() {
 		let mut app = App::new();
 		app.add_plugins(BeetFlowPlugin::default());
 		let world = app.world_mut();
 
 		let entity = world
 			.spawn(Insert::<OnRun, Running>::default())
+			.flush_trigger(OnRun::local())
+			.id();
+		expect(world.get::<Running>(entity)).to_be_some();
+	}
+	#[test]
+	fn on_result() {
+		let mut app = App::new();
+		app.add_plugins(BeetFlowPlugin::default());
+		let world = app.world_mut();
+
+		let entity = world
+			.spawn((
+				Insert::<OnResult, Running>::default(),
+				RespondWith(RunResult::Success),
+			))
 			.flush_trigger(OnRun::local())
 			.id();
 		expect(world.get::<Running>(entity)).to_be_some();

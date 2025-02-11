@@ -43,31 +43,30 @@ pub struct ContinueRun;
 pub struct Running;
 
 
-// #[cfg(test)]
-// mod test {
-// 	use crate::prelude::*;
-// 	use bevy::prelude::*;
-// 	use sweet::prelude::*;
+#[cfg(test)]
+mod test {
+	use crate::prelude::*;
+	use bevy::prelude::*;
+	use sweet::prelude::*;
 
-// 	#[test]
-// 	fn works() {
-// 		let mut app = App::new();
-// 		app.add_plugins(BeetFlowPlugin::default());
-// 		let world = app.world_mut();
+	#[test]
+	fn adds() {
+		let mut app = App::new();
+		app.add_plugins(BeetFlowPlugin::default());
+		let world = app.world_mut();
 
-// 		// adds
-// 		let entity =
-// 			world.spawn(ContinueRun).flush_trigger(OnRun::local()).id();
-// 		expect(world.get::<Running>(entity)).to_be_some();
-
-// 		// removes
-// 		let entity = world
-// 			.spawn((Running, ContinueRun, RespondWith(RunResult::Success)))
-// 			.observe(|t: Trigger<OnResult>| {
-// 				println!("observed {:?}", t);
-// 			})
-// 			.id();
-// 		world.entity_mut(entity).flush_trigger(OnRun::local());
-// 		expect(world.get::<Running>(entity)).to_be_none();
-// 	}
-// }
+		// adds
+		let entity =
+			world.spawn(ContinueRun).flush_trigger(OnRun::local()).id();
+		expect(world.get::<Running>(entity)).to_be_some();
+	}
+	#[test]
+	fn removes() {
+		let mut app = App::new();
+		app.add_plugins(BeetFlowPlugin::default());
+		let world = app.world_mut();
+		let entity = world.spawn((Running, ContinueRun)).id();
+		world.flush_trigger(OnResultAction::global(entity, RunResult::Success));
+		expect(world.get::<Running>(entity)).to_be_none();
+	}
+}

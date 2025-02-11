@@ -31,13 +31,29 @@ mod test {
 	use sweet::prelude::*;
 
 	#[test]
-	fn works() {
+	fn on_run() {
 		let mut app = App::new();
 		app.add_plugins(BeetFlowPlugin::default());
 		let world = app.world_mut();
 
 		let entity = world
 			.spawn((Running, Remove::<OnRun, Running>::default()))
+			.flush_trigger(OnRun::local())
+			.id();
+		expect(world.get::<Running>(entity)).to_be_none();
+	}
+	#[test]
+	fn on_result() {
+		let mut app = App::new();
+		app.add_plugins(BeetFlowPlugin::default());
+		let world = app.world_mut();
+
+		let entity = world
+			.spawn((
+				Running,
+				Remove::<OnResult, Running>::default(),
+				RespondWith(RunResult::Success),
+			))
 			.flush_trigger(OnRun::local())
 			.id();
 		expect(world.get::<Running>(entity)).to_be_none();

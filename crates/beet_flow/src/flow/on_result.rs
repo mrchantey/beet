@@ -10,13 +10,13 @@ pub struct OnResultAction<T = RunResult> {
 	pub action: Entity,
 }
 impl<T> OnResultAction<T> {
-	pub fn local(payload: T) -> Self {
-		Self {
-			payload,
-			origin: Entity::PLACEHOLDER,
-			action: Entity::PLACEHOLDER,
-		}
-	}
+	// pub fn local(payload: T) -> Self {
+	// 	Self {
+	// 		payload,
+	// 		origin: Entity::PLACEHOLDER,
+	// 		action: Entity::PLACEHOLDER,
+	// 	}
+	// }
 	pub fn global(action: Entity, payload: T) -> Self {
 		Self {
 			payload,
@@ -46,6 +46,13 @@ pub struct OnResult<T = RunResult> {
 	// only OnResultAction is allowed to create this struct
 	_sealed: (),
 }
+
+impl<T: ResultPayload> OnResult<T> {
+	// pub fn local(payload: T) -> OnResultAction<T> {
+	// 	OnResultAction::local(payload)
+	// }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Event)]
 pub struct OnChildResult<T = RunResult> {
 	pub payload: T,
