@@ -21,7 +21,7 @@ impl Default for RunOnSpawn<()> {
 // we use a system instead of observer to avoid infinite loops
 pub fn run_on_spawn(
 	mut commands: Commands,
-	query: Query<(Entity, &RunOnSpawn)>,
+	query: Populated<(Entity, &RunOnSpawn)>,
 ) {
 	for (entity, run_on_spawn) in query.iter() {
 		commands
