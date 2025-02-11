@@ -1,5 +1,6 @@
 mod bubble_result;
 mod fallback_flow;
+mod parallel_flow;
 mod repeat_flow;
 mod respond_with;
 mod score_flow;
@@ -7,6 +8,7 @@ mod sequence_flow;
 mod succeed_times;
 pub use bubble_result::*;
 pub use fallback_flow::*;
+pub use parallel_flow::*;
 pub use repeat_flow::*;
 pub use respond_with::*;
 pub use score_flow::*;

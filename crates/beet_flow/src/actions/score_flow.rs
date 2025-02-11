@@ -51,11 +51,11 @@ fn on_start(
 	mut commands: Commands,
 	mut query: Query<(&mut ScoreFlow, &Children)>,
 ) {
-	let (mut score_flow, children) = query
+	let (mut action, children) = query
 		.get_mut(ev.action)
 		.expect(&expect_action::to_have_action(&ev));
 
-	score_flow.clear();
+	action.clear();
 
 	for child in children.iter() {
 		commands
@@ -71,7 +71,7 @@ fn on_receive_score(
 ) {
 	let (mut action, children) = query
 		.get_mut(ev.action)
-		.expect(&expect_action::to_have_children(&ev));
+		.expect(&expect_action::to_have_action(&ev));
 
 	action.insert(ev.child, ev.payload);
 

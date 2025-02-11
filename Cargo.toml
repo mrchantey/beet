@@ -128,92 +128,92 @@ web-sys = "0.3"
 
 #💡💡 Package
 
-# [package]
-# name = "beet"
-# version.workspace = true
-# edition.workspace = true
-# description.workspace = true
-# documentation.workspace = true
-# readme.workspace = true
-# homepage.workspace = true
-# repository.workspace = true
-# license.workspace = true
-# keywords.workspace = true
-# categories.workspace = true
+[package]
+name = "beet"
+version.workspace = true
+edition.workspace = true
+description.workspace = true
+documentation.workspace = true
+readme.workspace = true
+homepage.workspace = true
+repository.workspace = true
+license.workspace = true
+keywords.workspace = true
+categories.workspace = true
 
-# include = ["CHANGELOG.md", "README.md", "/src", "/examples", "/scenes"]
+include = ["CHANGELOG.md", "README.md", "/src", "/examples", "/scenes"]
 
-# [features]
-# default = ["flow"]
-# flow = ["dep:beet_flow"]
+[features]
+default = ["flow"]
+flow = ["dep:beet_flow"]
 # router = ["rsx", "dep:beet_router"]
 # rsx = ["dep:beet_rsx"]
 # ml = ["dep:beet_ml"]
 # reflect = ["beet_flow/reflect"]
 # spatial = ["dep:beet_spatial"]
 # sim = ["dep:beet_sim"]
-# # bevyhub = ["beet_spatial?/bevyhub", "beet_sim?/bevyhub"]
 # animation = ["beet_spatial?/animation"]
 # assets = ["beet_spatial?/assets"]
 # ui = ["beet_spatial?/ui"]
 
-# # dynamic_linking = ["bevy/dynamic_linking"]
+# bevyhub = ["beet_spatial?/bevyhub", "beet_sim?/bevyhub"]
+# dynamic_linking = ["bevy/dynamic_linking"]
 
-# [dependencies]
-# beet_flow = { workspace = true, optional = true }
+[dependencies]
+beet_flow = { workspace = true, optional = true }
 # beet_ml = { workspace = true, optional = true }
 # beet_router = { workspace = true, optional = true }
 # beet_sim = { workspace = true, optional = true }
 # beet_rsx = { workspace = true, optional = true }
 # beet_spatial = { workspace = true, optional = true }
-# # bevyhub = { workspace = true, optional = true }
-# # thiserror.workspace = true
 
-# [dev-dependencies]
+# bevyhub = { workspace = true, optional = true }
+
+[dev-dependencies]
 # beet = { path = "", features = ["rsx"] }
 # beet_flow = { workspace = true, features = ["sweet"] }
-# bevy.workspace = true
-# sweet = { workspace = true, features = ["test", "bevy", "rand"] }
+bevy.workspace = true
+sweet = { workspace = true, features = ["test", "bevy", "rand"] }
 
 
-# [target.'cfg(target_arch = "wasm32")'.dev-dependencies]
-# console_error_panic_hook.workspace = true
-# web-sys.workspace = true
+[target.'cfg(target_arch = "wasm32")'.dev-dependencies]
+console_error_panic_hook.workspace = true
+web-sys.workspace = true
 
-# [[example]]
-# name = "dom_renderer"
-# path = "examples/rsx/dom_renderer.rs"
+[[example]]
+name = "dom_renderer"
+path = "examples/rsx/dom_renderer.rs"
 
-# #💡flow
+#💡flow
 
-# [[example]]
-# name = "global_observers"
-# path = "examples/flow/global_observers.rs"
+[[example]]
+name = "bench_local"
+path = "examples/flow/bench_local.rs"
+[[example]]
+name = "bench_global"
+path = "examples/flow/bench_global.rs"
 
-# [[example]]
-# name = "long_running"
-# path = "examples/flow/long_running.rs"
+[[example]]
+name = "long_running"
+path = "examples/flow/long_running.rs"
 
-# [[example]]
-# name = "malenia"
-# path = "examples/flow/malenia.rs"
+[[example]]
+name = "malenia"
+path = "examples/flow/malenia.rs"
 
-# [[example]]
-# name = "repeat_while"
-# path = "examples/flow/repeat_while.rs"
+[[example]]
+name = "repeat_while"
+path = "examples/flow/repeat_while.rs"
 
-# [[example]]
-# name = "simple_action"
-# path = "examples/flow/simple_action.rs"
+[[example]]
+name = "simple_action"
+path = "examples/flow/simple_action.rs"
 
-# [[example]]
-# name = "state_machine"
-# path = "examples/flow/state_machine.rs"
+[[example]]
+name = "state_machine"
+path = "examples/flow/state_machine.rs"
 
-# [[example]]
-# name = "utility_ai"
-# path = "examples/flow/utility_ai.rs"
+[[example]]
+name = "utility_ai"
+path = "examples/flow/utility_ai.rs"
 
-# [[example]]
-# name = "local_observers"
-# path = "examples/flow/local_observers.rs"

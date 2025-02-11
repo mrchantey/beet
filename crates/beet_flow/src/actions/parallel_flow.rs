@@ -1,23 +1,49 @@
 use crate::prelude::*;
 use bevy::prelude::*;
+use bevy::utils::HashSet;
 
 
 /// An action that runs all of its children in parallel.
 /// - All results will bubble up, so expect multiple [`OnResult`] triggers
-#[derive(Default, Component, Action, Reflect)]
+#[action(on_start, on_next)]
+#[derive(Default, Component, Deref, DerefMut, Reflect)]
 #[reflect(Default, Component)]
-#[category(ActionCategory::ChildBehaviors)]
-#[observers(on_start, passthrough_run_result)]
-pub struct ParallelFlow;
+pub struct ParallelFlow(pub HashSet<Entity>);
 
 fn on_start(
-	trigger: Trigger<OnRun>,
+	ev: Trigger<OnRun>,
 	mut commands: Commands,
-	query: Query<&Children>,
+	mut query: Query<(&mut ParallelFlow, &Children)>,
 ) {
-	let children = query.get(trigger.action).expect(child_expect::NO_CHILDREN);
-	commands
-		.trigger_targets(OnRun, children.iter().cloned().collect::<Vec<_>>());
+	let (mut action, children) = query
+		.get_mut(ev.action)
+		.expect(&expect_action::to_have_children(&ev));
+	action.clear();
+
+	for child in children {
+		ev.trigger_next(commands.reborrow(), *child);
+	}
+}
+
+
+fn on_next(
+	ev: Trigger<OnChildResult>,
+	commands: Commands,
+	mut query: Query<(&mut ParallelFlow, &Children)>,
+) {
+	if ev.payload == RunResult::Failure {
+		ev.trigger_bubble(commands);
+		return;
+	}
+	let (mut action, children) = query
+		.get_mut(ev.action)
+		.expect(&expect_action::to_have_action(&ev));
+	action.insert(ev.child);
+
+	if action.len() == children.iter().len() {
+		ev.trigger_bubble(commands);
+		return;
+	}
 }
 
 #[cfg(test)]
@@ -27,28 +53,49 @@ mod test {
 	use sweet::prelude::*;
 
 	#[test]
-	fn works() {
+	fn fails() {
 		let mut app = App::new();
-		app.add_plugins(ActionPlugin::<(ParallelFlow, EndOnRun)>::default());
+		app.add_plugins(BeetFlowPlugin::default());
 		let world = app.world_mut();
-		world.add_observer(bubble_run_result);
 
-		let on_result = observe_trigger_names::<OnResult>(world);
+		let on_result = observe_triggers::<OnResult>(world);
 		let on_run = observe_triggers::<OnRun>(world);
 
-		world
-			.spawn((Name::new("root"), ParallelFlow))
-			.with_children(|parent| {
-				parent.spawn((Name::new("child1"), EndOnRun::success()));
-				parent.spawn((Name::new("child2"), EndOnRun::success()));
-			})
-			.flush_trigger(OnRun);
+		let action = world
+			.spawn((Name::new("root"), ParallelFlow::default()))
+			.with_child((Name::new("child1"), RespondWith(RunResult::Success)))
+			.with_child((Name::new("child2"), RespondWith(RunResult::Failure)))
+			.flush_trigger(OnRun::local())
+			.id();
 
 		expect(&on_run).to_have_been_called_times(3);
-		expect(&on_result).to_have_been_called_times(4);
-		expect(&on_result).to_have_returned_nth_with(0, &"child1".to_string());
-		expect(&on_result).to_have_returned_nth_with(1, &"root".to_string());
-		expect(&on_result).to_have_returned_nth_with(2, &"child2".to_string());
-		expect(&on_result).to_have_returned_nth_with(3, &"root".to_string());
+		expect(&on_result).to_have_been_called_times(3);
+		expect(&on_result).to_have_returned_nth_with(
+			2,
+			&OnResult::new_global(action, RunResult::Failure),
+		);
+	}
+	#[test]
+	fn succeeds() {
+		let mut app = App::new();
+		app.add_plugins(BeetFlowPlugin::default());
+		let world = app.world_mut();
+
+		let on_result = observe_triggers::<OnResult>(world);
+		let on_run = observe_triggers::<OnRun>(world);
+
+		let action = world
+			.spawn((Name::new("root"), ParallelFlow::default()))
+			.with_child((Name::new("child1"), RespondWith(RunResult::Success)))
+			.with_child((Name::new("child2"), RespondWith(RunResult::Success)))
+			.flush_trigger(OnRun::local())
+			.id();
+
+		expect(&on_run).to_have_been_called_times(3);
+		expect(&on_result).to_have_been_called_times(3);
+		expect(&on_result).to_have_returned_nth_with(
+			2,
+			&OnResult::new_global(action, RunResult::Success),
+		);
 	}
 }
