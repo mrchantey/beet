@@ -21,7 +21,6 @@ pub struct OnRun<T = ()> {
 	pub payload: T,
 	pub origin: Entity,
 	pub action: Entity,
-	pub prev_action: Entity,
 }
 
 impl<T: RunPayload> OnRun<T> {
@@ -31,7 +30,6 @@ impl<T: RunPayload> OnRun<T> {
 			origin: Entity::PLACEHOLDER,
 			// inferred action, it will be set by [run_action_observers]
 			action: Entity::PLACEHOLDER,
-			prev_action: Entity::PLACEHOLDER,
 		}
 	}
 	pub fn new_global(action: Entity, payload: T) -> Self {
@@ -39,7 +37,6 @@ impl<T: RunPayload> OnRun<T> {
 			payload,
 			origin: action,
 			action,
-			prev_action: Entity::PLACEHOLDER,
 		}
 	}
 	pub fn trigger_next(&self, mut commands: Commands, next_action: Entity) {
@@ -47,7 +44,6 @@ impl<T: RunPayload> OnRun<T> {
 			payload: self.payload.clone(),
 			origin: self.origin,
 			action: next_action,
-			prev_action: self.action,
 		});
 	}
 	pub fn trigger_next_with(
@@ -60,7 +56,6 @@ impl<T: RunPayload> OnRun<T> {
 			payload: next_payload,
 			action: next_action,
 			origin: self.origin,
-			prev_action: self.action,
 		});
 	}
 
@@ -69,7 +64,6 @@ impl<T: RunPayload> OnRun<T> {
 			payload,
 			origin: self.origin,
 			action: self.action,
-			prev_action: self.prev_action,
 		});
 	}
 }

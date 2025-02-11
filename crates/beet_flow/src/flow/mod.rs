@@ -24,5 +24,5 @@ pub fn observer_plugin(app: &mut App) {
 
 pub fn run_plugin<Run: RunPayload, Result: ResultPayload>(app: &mut App) {
 	app.add_observer(run_action_observers::<Run>);
-	app.add_observer(trigger_result_on_parent_observers::<Result>);
+	app.add_observer(run_child_result_observers::<Result>);
 }

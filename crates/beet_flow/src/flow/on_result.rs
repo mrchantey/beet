@@ -6,7 +6,42 @@ pub struct OnResult<T = RunResult> {
 	pub payload: T,
 	pub origin: Entity,
 	pub action: Entity,
-	pub prev_action: Entity,
+}
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Event)]
+pub struct OnChildResult<T = RunResult> {
+	pub payload: T,
+	pub origin: Entity,
+	pub action: Entity,
+	pub child: Entity,
+}
+
+impl<T: ResultPayload> OnChildResult<T> {
+	pub fn trigger_bubble(&self, mut commands: Commands) {
+		commands.entity(self.action).trigger(OnResult {
+			payload: self.payload.clone(),
+			origin: self.origin,
+			action: self.action,
+		});
+	}
+	pub fn trigger_bubble_with(&self, mut commands: Commands, payload: T) {
+		commands.entity(self.action).trigger(OnResult {
+			payload,
+			origin: self.origin,
+			action: self.action,
+		});
+	}
+	pub fn trigger_run(
+		&self,
+		mut commands: Commands,
+		next_action: Entity,
+		next_payload: T::Run,
+	) {
+		commands.entity(next_action).trigger(OnRun {
+			payload: next_payload,
+			action: next_action,
+			origin: self.origin,
+		});
+	}
 }
 
 #[derive(Debug, Default, Clone, PartialEq, Eq, PartialOrd, Ord, Reflect)]
@@ -29,7 +64,6 @@ impl<T: ResultPayload> OnResult<T> {
 			payload,
 			origin: Entity::PLACEHOLDER,
 			action: Entity::PLACEHOLDER,
-			prev_action: Entity::PLACEHOLDER,
 		}
 	}
 	pub fn new_global(action: Entity, payload: T) -> Self {
@@ -37,34 +71,7 @@ impl<T: ResultPayload> OnResult<T> {
 			payload,
 			origin: action,
 			action,
-			prev_action: Entity::PLACEHOLDER,
 		}
-	}
-
-
-	pub fn trigger_bubble(&self, mut commands: Commands) {
-		commands.entity(self.action).trigger(self.clone());
-	}
-	pub fn trigger_bubble_with(&self, mut commands: Commands, payload: T) {
-		commands.entity(self.action).trigger(OnResult {
-			payload,
-			origin: self.origin,
-			action: self.action,
-			prev_action: self.prev_action,
-		});
-	}
-	pub fn trigger_run(
-		&self,
-		mut commands: Commands,
-		next_action: Entity,
-		next_payload: T::Run,
-	) {
-		commands.entity(next_action).trigger(OnRun {
-			payload: next_payload,
-			action: next_action,
-			origin: self.origin,
-			prev_action: self.action,
-		});
 	}
 }
 
@@ -75,7 +82,7 @@ impl<T: ResultPayload> OnResult<T> {
 ///
 /// Unlike [propagate_request_to_observers], this is called on parent
 /// observers.
-pub fn trigger_result_on_parent_observers<T: ResultPayload>(
+pub fn run_child_result_observers<T: ResultPayload>(
 	res: Trigger<OnResult<T>>,
 	mut commands: Commands,
 	action_observers: Query<&ActionObservers>,
@@ -92,9 +99,12 @@ pub fn trigger_result_on_parent_observers<T: ResultPayload>(
 	if let Ok(parent) = parents.get(res.action) {
 		let parent = parent.get();
 		if let Ok(action_observers) = action_observers.get(parent) {
-			let mut res = (*res).clone();
-			res.prev_action = res.action;
-			res.action = parent;
+			let res = OnChildResult {
+				payload: res.payload.clone(),
+				origin: res.origin,
+				action: parent,
+				child: res.action,
+			};
 			commands.trigger_targets(res, (*action_observers).clone());
 		}
 	}

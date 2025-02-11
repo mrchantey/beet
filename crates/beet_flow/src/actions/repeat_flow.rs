@@ -38,7 +38,7 @@ impl Default for RepeatFlow {
 }
 
 fn repeat(
-	ev: Trigger<OnResult>,
+	ev: Trigger<OnChildResult>,
 	// parents: Query<&Parent>,
 	query: Query<&RepeatFlow>,
 	mut commands: Commands,
@@ -48,17 +48,11 @@ fn repeat(
 		.expect(&expect_action::to_have_action(&ev));
 	if let Some(check) = &action.if_result_matches {
 		if &ev.payload != check {
-			// repeat is completed, try to bubble up the result
-			// ev.trigger_bubble(commands);
-			// if let Ok(parent) = parents.get(ev.action) {
-			// commands
-			// 	.entity(parent.get())
-			// 	.trigger(OnChildResult::new(ev.action, result));
-			// }
+			// repeat is completed, call OnResult
+			ev.trigger_bubble(commands);
 			return;
 		}
 	}
-	// println!("repeat for {}", name_or_entity(&names, trigger.action));
 	commands.entity(ev.action).insert(RunOnSpawn::default());
 }
 
@@ -81,14 +75,14 @@ mod test {
 			.with_child(SucceedTimes::new(2))
 			.flush_trigger(OnRun::local());
 
+		expect(&func).to_have_been_called_times(2);
+		app.update();
 		expect(&func).to_have_been_called_times(4);
 		app.update();
-		expect(&func).to_have_been_called_times(8);
-		app.update();
-		expect(&func).to_have_been_called_times(12);
+		expect(&func).to_have_been_called_times(6);
 		app.update();
 		// even though child failed, it keeps repeating
-		expect(&func).to_have_been_called_times(16);
+		expect(&func).to_have_been_called_times(8);
 	}
 
 	#[test]
@@ -103,13 +97,15 @@ mod test {
 			.with_child(SucceedTimes::new(2))
 			.flush_trigger(OnRun::local());
 
+		expect(&func).to_have_been_called_times(2);
+		app.update();
 		expect(&func).to_have_been_called_times(4);
 		app.update();
-		expect(&func).to_have_been_called_times(8);
+		expect(&func).to_have_been_called_times(7);
 		app.update();
-		expect(&func).to_have_been_called_times(12);
+		expect(&func).to_have_been_called_times(7);
 		app.update();
 		// last one, it stopped repeating
-		expect(&func).to_have_been_called_times(12);
+		expect(&func).to_have_been_called_times(7);
 	}
 }

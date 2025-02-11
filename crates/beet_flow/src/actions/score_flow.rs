@@ -42,7 +42,7 @@ impl ResultPayload for ScoreValue {
 #[action(on_start, on_receive_score)]
 #[derive(Default, Deref, DerefMut, Component, Reflect)]
 #[reflect(Default, Component)]
-#[require(BubbleUpFlow)]
+#[require(BubbleResult)]
 // TODO SparseSet
 pub struct ScoreFlow(HashMap<Entity, ScoreValue>);
 
@@ -65,7 +65,7 @@ fn on_start(
 }
 
 fn on_receive_score(
-	ev: Trigger<OnResult<ScoreValue>>,
+	ev: Trigger<OnChildResult<ScoreValue>>,
 	mut commands: Commands,
 	mut query: Query<(&mut ScoreFlow, &Children)>,
 ) {
@@ -73,7 +73,7 @@ fn on_receive_score(
 		.get_mut(ev.action)
 		.expect(&expect_action::to_have_children(&ev));
 
-	action.insert(ev.prev_action, ev.payload);
+	action.insert(ev.child, ev.payload);
 
 	if action.len() == children.iter().len() {
 		let (highest, _) = action

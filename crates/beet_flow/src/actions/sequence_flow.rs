@@ -21,7 +21,11 @@ fn on_start(ev: Trigger<OnRun>, commands: Commands, query: Query<&Children>) {
 	}
 }
 
-fn on_next(ev: Trigger<OnResult>, commands: Commands, query: Query<&Children>) {
+fn on_next(
+	ev: Trigger<OnChildResult>,
+	commands: Commands,
+	query: Query<&Children>,
+) {
 	if ev.payload == RunResult::Failure {
 		ev.trigger_bubble(commands);
 		return;
@@ -31,8 +35,8 @@ fn on_next(ev: Trigger<OnResult>, commands: Commands, query: Query<&Children>) {
 		.expect(&expect_action::to_have_children(&ev));
 	let index = children
 		.iter()
-		.position(|&x| x == ev.prev_action)
-		.expect(&expect_action::to_have_child(&ev, ev.prev_action));
+		.position(|&x| x == ev.child)
+		.expect(&expect_action::to_have_child(&ev, ev.child));
 	if index == children.len() - 1 {
 		ev.trigger_bubble(commands);
 	} else {
