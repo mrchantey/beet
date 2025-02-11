@@ -9,7 +9,7 @@ use sweet::prelude::EntityWorldMutwExt;
 #[derive(Default, Component)]
 struct TriggerCount(i32);
 
-fn foobar(_trigger: Trigger<OnRunGlobal>) {
+fn foobar(_trigger: Trigger<OnRunAction>) {
 	println!("foobar");
 }
 

@@ -2,7 +2,7 @@ use crate::prelude::*;
 use bevy::prelude::*;
 use std::marker::PhantomData;
 
-
+/// If any child triggers a result, bubble it up to the parent.
 #[action(bubble_result::<T>)]
 #[derive(Debug, Component, Clone, Copy, PartialEq, Reflect)]
 pub struct BubbleResult<T: ResultPayload = RunResult>(PhantomData<T>);

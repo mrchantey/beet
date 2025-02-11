@@ -36,10 +36,9 @@ impl<T: ResultPayload> OnChildResult<T> {
 		next_action: Entity,
 		next_payload: T::Run,
 	) {
-		commands.entity(next_action).trigger(OnRunLocal {
-			payload: next_payload,
-			origin: self.origin,
-		});
+		commands
+			.entity(next_action)
+			.trigger(OnRunAction::local_with_origin(next_payload, self.origin));
 	}
 }
 

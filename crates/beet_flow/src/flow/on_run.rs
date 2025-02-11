@@ -27,40 +27,40 @@ pub struct OnRun<T = ()> {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Event)]
-pub struct OnRunLocal<T = ()> {
-	pub payload: T,
-	pub origin: Entity,
-}
-
-impl<T> OnRunLocal<T> {
-	/// Create a new OnRun trigger, called on the current entity.
-	pub fn new(payload: T) -> OnRunLocal<T> {
-		OnRunLocal {
-			payload,
-			origin: Entity::PLACEHOLDER,
-		}
-	}
-	pub fn new_with_origin(payload: T, origin: Entity) -> OnRunLocal<T> {
-		OnRunLocal { payload, origin }
-	}
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Event)]
-pub struct OnRunGlobal<T = ()> {
+pub struct OnRunAction<T = ()> {
 	pub payload: T,
 	pub origin: Entity,
 	pub action: Entity,
 }
 
-impl<T> OnRunGlobal<T> {
-	pub fn new(action: Entity, payload: T) -> Self {
+impl<T> OnRunAction<T> {
+	/// Create a new OnRun trigger, called on the current entity.
+	pub fn local(payload: T) -> Self {
+		Self {
+			payload,
+			action: Entity::PLACEHOLDER,
+			origin: Entity::PLACEHOLDER,
+		}
+	}
+	pub fn local_with_origin(payload: T, origin: Entity) -> Self {
+		Self {
+			payload,
+			origin,
+			action: Entity::PLACEHOLDER,
+		}
+	}
+	pub fn global(action: Entity, payload: T) -> Self {
 		Self {
 			payload,
 			origin: action,
 			action,
 		}
 	}
-	pub fn new_with_origin(action: Entity, origin: Entity, payload: T) -> Self {
+	pub fn global_with_origin(
+		action: Entity,
+		origin: Entity,
+		payload: T,
+	) -> Self {
 		Self {
 			payload,
 			origin,
@@ -71,9 +71,10 @@ impl<T> OnRunGlobal<T> {
 
 impl<T: RunPayload> OnRun<T> {
 	pub fn trigger_next(&self, mut commands: Commands, next_action: Entity) {
-		commands.entity(next_action).trigger(OnRunLocal {
+		commands.trigger(OnRunAction {
 			payload: self.payload.clone(),
 			origin: self.origin,
+			action: next_action,
 		});
 	}
 	pub fn trigger_next_with(
@@ -82,9 +83,10 @@ impl<T: RunPayload> OnRun<T> {
 		next_action: Entity,
 		next_payload: T,
 	) {
-		commands.entity(next_action).trigger(OnRunLocal {
+		commands.trigger(OnRunAction {
 			payload: next_payload,
 			origin: self.origin,
+			action: next_action,
 		});
 	}
 
@@ -99,23 +101,28 @@ impl<T: RunPayload> OnRun<T> {
 
 impl OnRun<()> {
 	/// Usability helper, see [`OnRunLocal::new`].
-	pub fn local() -> OnRunLocal { OnRunLocal::new(()) }
+	pub fn local() -> OnRunAction { OnRunAction::local(()) }
 	/// Usability helper, see [`OnRunGlobal::new`].
-	pub fn global(action: Entity) -> OnRunGlobal {
-		OnRunGlobal::new(action, ())
+	pub fn global(action: Entity) -> OnRunAction {
+		OnRunAction::global(action, ())
 	}
 }
 
-pub(crate) fn propagate_on_run_local<T: RunPayload>(
-	ev: Trigger<OnRunLocal<T>>,
+pub(crate) fn propagate_on_run_action<T: RunPayload>(
+	ev: Trigger<OnRunAction<T>>,
 	mut commands: Commands,
 	action_observers: Query<&ActionObservers>,
 ) {
-	let action = ev.entity();
-	if action == Entity::PLACEHOLDER {
-		panic!("OnRunLocal must be triggered on an action entity");
-	}
-	if let Ok(observers) = action_observers.get(ev.entity()) {
+	let action = if ev.action == Entity::PLACEHOLDER {
+		if ev.entity() == Entity::PLACEHOLDER {
+			panic!("OnRunAction must either specify an action or be triggered on an action entity");
+		} else {
+			ev.entity()
+		}
+	} else {
+		ev.action
+	};
+	if let Ok(observers) = action_observers.get(action) {
 		// OnRunLocal::new uses placeholder, replace with action entity
 		let origin = if ev.origin == Entity::PLACEHOLDER {
 			action
@@ -133,24 +140,7 @@ pub(crate) fn propagate_on_run_local<T: RunPayload>(
 		);
 	}
 }
-pub(crate) fn propagate_on_run_global<T: RunPayload>(
-	ev: Trigger<OnRunGlobal<T>>,
-	mut commands: Commands,
-	action_observers: Query<&ActionObservers>,
-) {
-	let action = ev.action;
-	if let Ok(observers) = action_observers.get(action) {
-		commands.trigger_targets(
-			OnRun {
-				payload: ev.payload.clone(),
-				origin: ev.origin,
-				action,
-				_sealed: (),
-			},
-			(**observers).clone(),
-		);
-	}
-}
+
 
 #[cfg(test)]
 mod test {

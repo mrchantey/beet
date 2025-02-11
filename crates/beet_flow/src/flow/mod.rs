@@ -41,7 +41,6 @@ pub struct BeetTickSet;
 
 
 pub fn run_plugin<Run: RunPayload, Result: ResultPayload>(app: &mut App) {
-	app.add_observer(propagate_on_run_local::<Run>);
-	app.add_observer(propagate_on_run_global::<Run>);
+	app.add_observer(propagate_on_run_action::<Run>);
 	app.add_observer(propagate_on_result::<Result>);
 }

@@ -60,7 +60,7 @@ fn on_start(
 	for child in children.iter() {
 		commands
 			.entity(*child)
-			.trigger(OnRunLocal::new(RequestScore));
+			.trigger(OnRunAction::local(RequestScore));
 	}
 }
 

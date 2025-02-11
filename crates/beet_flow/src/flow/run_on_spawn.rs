@@ -27,6 +27,6 @@ pub fn run_on_spawn(
 		commands
 			.entity(entity)
 			.remove::<RunOnSpawn>()
-			.trigger(OnRunLocal::new(run_on_spawn.payload.clone()));
+			.trigger(OnRunAction::local(run_on_spawn.payload.clone()));
 	}
 }
