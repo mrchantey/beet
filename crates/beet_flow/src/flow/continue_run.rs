@@ -65,8 +65,10 @@ mod test {
 		let mut app = App::new();
 		app.add_plugins(BeetFlowPlugin::default());
 		let world = app.world_mut();
-		let entity = world.spawn((Running, ContinueRun)).id();
-		world.flush_trigger(OnResultAction::global(entity, RunResult::Success));
+		let entity = world
+			.spawn((Running, ContinueRun))
+			.flush_trigger(OnResultAction::local(RunResult::Success))
+			.id();
 		expect(world.get::<Running>(entity)).to_be_none();
 	}
 }

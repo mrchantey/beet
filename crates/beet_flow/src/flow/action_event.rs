@@ -5,9 +5,21 @@ use std::fmt::Debug;
 pub trait ActionEvent: Event + Debug {
 	fn action(&self) -> Entity;
 	fn origin(&self) -> Entity;
+
+	fn origin_or_action(&self) -> Entity {
+		if self.origin() == Entity::PLACEHOLDER {
+			self.action()
+		} else {
+			self.origin()
+		}
+	}
 }
 
 impl<T: RunPayload> ActionEvent for OnRun<T> {
+	fn action(&self) -> Entity { self.action }
+	fn origin(&self) -> Entity { self.origin }
+}
+impl<T: RunPayload> ActionEvent for OnRunAction<T> {
 	fn action(&self) -> Entity { self.action }
 	fn origin(&self) -> Entity { self.origin }
 }
@@ -18,6 +30,10 @@ impl<T: ResultPayload> ActionEvent for OnResult<T> {
 	fn origin(&self) -> Entity { self.origin }
 }
 
+impl<T: ResultPayload> ActionEvent for OnResultAction<T> {
+	fn action(&self) -> Entity { self.action }
+	fn origin(&self) -> Entity { self.origin }
+}
 
 /// Collect all [OnRunAction] with a [Name]
 #[cfg(test)]

@@ -10,13 +10,13 @@ pub struct OnResultAction<T = RunResult> {
 	pub action: Entity,
 }
 impl<T> OnResultAction<T> {
-	// pub fn local(payload: T) -> Self {
-	// 	Self {
-	// 		payload,
-	// 		origin: Entity::PLACEHOLDER,
-	// 		action: Entity::PLACEHOLDER,
-	// 	}
-	// }
+	pub fn local(payload: T) -> Self {
+		Self {
+			payload,
+			origin: Entity::PLACEHOLDER,
+			action: Entity::PLACEHOLDER,
+		}
+	}
 	pub fn global(action: Entity, payload: T) -> Self {
 		Self {
 			payload,
@@ -45,12 +45,6 @@ pub struct OnResult<T = RunResult> {
 	pub action: Entity,
 	// only OnResultAction is allowed to create this struct
 	_sealed: (),
-}
-
-impl<T: ResultPayload> OnResult<T> {
-	// pub fn local(payload: T) -> OnResultAction<T> {
-	// 	OnResultAction::local(payload)
-	// }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Event)]
@@ -121,28 +115,34 @@ pub fn propagate_on_result<T: ResultPayload>(
 	no_bubble: Query<(), With<NoBubble>>,
 	parents: Query<&Parent>,
 ) {
-	if let Ok(action_observers) = action_observers.get(ev.action) {
+	let action = action_entity(&ev);
+	let origin = if ev.origin == Entity::PLACEHOLDER {
+		action
+	} else {
+		ev.origin
+	};
+	if let Ok(action_observers) = action_observers.get(action) {
 		let res = OnResult {
 			payload: ev.payload.clone(),
-			origin: ev.origin,
-			action: ev.action,
+			origin,
+			action,
 			_sealed: (),
 		};
 		commands.trigger_targets(res, (*action_observers).clone());
 	}
 
-	if no_bubble.contains(ev.action) {
+	if no_bubble.contains(action) {
 		return;
 	}
 	// propagate result to parents
-	if let Ok(parent) = parents.get(ev.action) {
+	if let Ok(parent) = parents.get(action) {
 		let parent = parent.get();
 		if let Ok(action_observers) = action_observers.get(parent) {
 			let res = OnChildResult {
 				payload: ev.payload.clone(),
-				origin: ev.origin,
+				origin,
 				action: parent,
-				child: ev.action,
+				child: action,
 			};
 			commands.trigger_targets(res, (*action_observers).clone());
 		}
