@@ -12,7 +12,10 @@ pub use expect::*;
 pub use on_result::*;
 pub use on_run::*;
 pub use run_on_spawn::*;
-
+mod interrupt_on_run;
+mod interrupt_on_result;
+pub use interrupt_on_run::*;
+pub use interrupt_on_result::*;
 
 pub fn observer_plugin(app: &mut App) {
 	app.init_resource::<ActionObserverMap>()
@@ -34,5 +37,7 @@ pub struct BeetTickSet;
 
 pub fn run_plugin<Run: RunPayload, Result: ResultPayload>(app: &mut App) {
 	app.add_observer(propagate_on_run::<Run>);
+	app.add_observer(interrupt_on_run::<Run>);
 	app.add_observer(propagate_on_result::<Result>);
+	app.add_observer(interrupt_on_result::<Result>);
 }

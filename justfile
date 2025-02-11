@@ -25,7 +25,7 @@ init-repo:
 cli *args:
 	cargo run -p beet-cli -- {{args}}
 
-run-ex example *args:
+run-ws example *args:
 	just watch 'just run-ci {{example}} {{args}}'
 
 run-ci example *args:

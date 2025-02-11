@@ -8,6 +8,7 @@ use bevy::app::PluginGroup;
 use bevy::app::PluginGroupBuilder;
 pub mod continue_run;
 pub mod control_flow;
+pub mod tree;
 pub mod control_flow_actions;
 
 pub mod prelude {
@@ -16,6 +17,7 @@ pub mod prelude {
 	pub use crate as beet_flow;
 	pub use crate::continue_run::*;
 	pub use crate::control_flow::*;
+	pub use crate::tree::*;
 	pub use crate::control_flow_actions::*;
 	pub use beet_flow_macros::*;
 	// allow flush_trigger in examples
@@ -46,8 +48,8 @@ impl BeetFlowPlugin {
 impl PluginGroup for BeetFlowPlugin {
 	fn build(self) -> PluginGroupBuilder {
 		PluginGroupBuilder::start::<Self>()
+		.add(control_flow::observer_plugin)
 			.add(continue_run::continue_run_plugin)
-			.add(control_flow::observer_plugin)
 			.build()
 	}
 }

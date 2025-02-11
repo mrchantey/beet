@@ -6,8 +6,10 @@ use bevy::prelude::*;
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Event)]
 pub struct OnResultAction<T = RunResult> {
 	pub payload: T,
-	pub origin: Entity,
-	pub action: Entity,
+	/// this is not exposed as it may be placeholder, instead use [Trigger::resolve_origin]
+	pub(crate) origin: Entity,
+	/// this is not exposed as it may be placeholder, instead use [Trigger::resolve_action]
+	pub(crate) action: Entity,
 }
 impl<T> OnResultAction<T> {
 	pub fn local(payload: T) -> Self {
@@ -115,12 +117,8 @@ pub fn propagate_on_result<T: ResultPayload>(
 	no_bubble: Query<(), With<NoBubble>>,
 	parents: Query<&Parent>,
 ) {
-	let action = action_entity(&ev);
-	let origin = if ev.origin == Entity::PLACEHOLDER {
-		action
-	} else {
-		ev.origin
-	};
+	let action = ev.resolve_action();
+	let origin = ev.resolve_origin();
 	if let Ok(action_observers) = action_observers.get(action) {
 		let res = OnResult {
 			payload: ev.payload.clone(),

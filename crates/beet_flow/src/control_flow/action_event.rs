@@ -15,6 +15,38 @@ pub trait ActionEvent: Event + Debug {
 	}
 }
 
+#[extend::ext(name=ActionEventTriggerExt)]
+pub impl<'w, T: ActionEvent> Trigger<'w, T> {
+	/// Get the action entity, or the entity that triggered the action.
+	/// Its assumed that if the action is [Entity::PLACEHOLDER] this event
+	/// was called with ::local() and the action entity is the trigger entity.
+	/// # Panics
+	///
+	/// If this trigger was called globally and the action entity is [Entity::PLACEHOLDER]
+	fn resolve_action(&self) -> Entity {
+		if self.action() == Entity::PLACEHOLDER {
+			if self.entity() == Entity::PLACEHOLDER {
+				panic!("OnRunAction must either specify an action or be triggered on an action entity");
+			} else {
+				self.entity()
+			}
+		} else {
+			self.action()
+		}
+	}
+
+	/// Get the origin entity, or the entity that triggered the action.
+	fn resolve_origin(&self) -> Entity {
+		if self.origin() == Entity::PLACEHOLDER {
+			self.resolve_action()
+		} else {
+			self.origin()
+		}
+	}
+}
+
+
+
 impl<T: RunPayload> ActionEvent for OnRun<T> {
 	fn action(&self) -> Entity { self.action }
 	fn origin(&self) -> Entity { self.origin }
@@ -62,7 +94,7 @@ pub fn collect_on_result(
 	let func2 = func.clone();
 	world.add_observer(
 		move |ev: Trigger<OnResultAction>, query: Query<&Name>| {
-			if let Ok(name) = query.get(ev.action) {
+			if let Ok(name) = query.get(ev.resolve_action()) {
 				func2.call((name.to_string(), ev.payload.clone()));
 			}
 		},

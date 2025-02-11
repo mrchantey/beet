@@ -18,11 +18,11 @@ use std::time::Duration;
 // #[rustfmt::skip]
 fn main() {
 	let mut app = App::new();
-	app.add_plugins((
-		MinimalPlugins,
-		BeetFlowPlugin::default().log_on_run(),
-		ActionPlugin::<Patrol>::default(),
-	));
+	app.add_plugins((MinimalPlugins, BeetFlowPlugin::default().log_on_run()))
+		.add_systems(
+			Update,
+			patrol.run_if(on_timer(Duration::from_millis(123))),
+		);
 
 	app.world_mut()
 		.spawn((Name::new("root"), SequenceFlow))
@@ -33,7 +33,7 @@ fn main() {
 					SequenceFlow,
 					// this is the end condition, triggering OnRunResult::success() after 1 second
 					ReturnInDuration::new(
-						OnRunResult::success(),
+						RunResult::Success,
 						Duration::from_secs(3),
 					),
 				))
@@ -53,7 +53,7 @@ fn main() {
 							Name::new("Patrol Left"),
 							Patrol::default(),
 							ReturnInDuration::new(
-								OnRunResult::success(),
+								RunResult::Success,
 								Duration::from_millis(300),
 							),
 						))
@@ -62,7 +62,7 @@ fn main() {
 							Name::new("Patrol Right"),
 							Patrol::default(),
 							ReturnInDuration::new(
-								OnRunResult::success(),
+								RunResult::Success,
 								Duration::from_millis(300),
 							),
 						));
@@ -74,14 +74,13 @@ fn main() {
 				},
 			);
 		})
-		.trigger(OnRun);
+		.trigger(OnRun::local());
 
 	app.run();
 }
 
 
-#[derive(Default, Component, Action, Reflect)]
-#[systems(patrol.run_if(on_timer(Duration::from_millis(123))))]
+#[derive(Default, Component, Reflect)]
 // any action that uses the [`Running`] component should require [`ContinueRun`]
 #[require(ContinueRun)]
 struct Patrol {

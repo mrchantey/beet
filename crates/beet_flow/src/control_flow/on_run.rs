@@ -116,14 +116,10 @@ pub(crate) fn propagate_on_run<T: RunPayload>(
 	mut commands: Commands,
 	action_observers: Query<&ActionObservers>,
 ) {
-	let action = action_entity(&ev);
+	let action = ev.resolve_action();
 	if let Ok(observers) = action_observers.get(action) {
 		// OnRunLocal::new uses placeholder, replace with action entity
-		let origin = if ev.origin == Entity::PLACEHOLDER {
-			action
-		} else {
-			ev.origin
-		};
+		let origin = ev.resolve_origin();
 		commands.trigger_targets(
 			OnRun {
 				payload: ev.payload.clone(),
@@ -137,17 +133,7 @@ pub(crate) fn propagate_on_run<T: RunPayload>(
 }
 
 
-pub(crate) fn action_entity<T: ActionEvent>(ev: &Trigger<T>) -> Entity {
-	if ev.action() == Entity::PLACEHOLDER {
-		if ev.entity() == Entity::PLACEHOLDER {
-			panic!("OnRunAction must either specify an action or be triggered on an action entity");
-		} else {
-			ev.entity()
-		}
-	} else {
-		ev.action()
-	}
-}
+
 
 
 #[cfg(test)]

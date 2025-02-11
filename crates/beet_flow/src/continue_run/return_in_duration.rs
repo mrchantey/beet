@@ -59,10 +59,10 @@ mod test {
 	#[test]
 	fn works() {
 		let mut app = App::new();
+		app.add_plugins(BeetFlowPlugin::default()).insert_time();
 
 		let on_result = observe_triggers::<OnResult>(app.world_mut());
 
-		app.add_plugins(BeetFlowPlugin::default()).insert_time();
 
 		app.world_mut().spawn((
 			Running,
