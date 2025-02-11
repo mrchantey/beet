@@ -2,8 +2,8 @@ use crate::prelude::*;
 use bevy::prelude::*;
 
 /// A simple action that will succeed a certain number of times before failing.
-#[derive(Debug, Default, Clone, PartialEq, Component, Reflect, Action)]
-#[observers(succeed_times)]
+#[action(succeed_times)]
+#[derive(Debug, Default, Clone, PartialEq, Component, Reflect)]
 #[reflect(Default, Component)]
 pub struct SucceedTimes {
 	pub times: usize,
@@ -21,18 +21,22 @@ impl SucceedTimes {
 }
 
 fn succeed_times(
-	trigger: Trigger<OnRun>,
-	mut commands: Commands,
+	ev: Trigger<OnRun>,
+	commands: Commands,
 	mut query: Query<&mut SucceedTimes>,
 ) {
 	let mut action = query
-		.get_mut(trigger.action)
-		.expect(expect_action::ACTION_QUERY_MISSING);
+		.get_mut(ev.action)
+		.expect(&expect_action::to_have_action(&ev));
 
 	if action.times < action.max_times {
 		action.times += 1;
-		commands.entity(trigger.action).trigger(OnResult::success());
+		ev.trigger_result(commands, RunResult::Success);
 	} else {
-		commands.entity(trigger.action).trigger(OnResult::failure());
+		ev.trigger_result(commands, RunResult::Failure);
 	}
 }
+
+
+
+// tested with RepeatFlow

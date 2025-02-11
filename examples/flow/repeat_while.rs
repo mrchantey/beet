@@ -18,12 +18,13 @@ fn main() {
 	))
 	.with_child((
 		Name::new("fails on third run"), 
-		// this action behaves as a while predicate, it will succeed twice
+		// this action behaves as a 'while predicate', it will succeed twice
 		// then fail the third time.
 		SucceedTimes::new(2)
 	))
 	.with_child((
-		// this action will only run twice
+		// this action would be the thing you want to do n times 
+		// it will only run twice
 		Name::new("some action to perform"), 
 		EndOnRun::success()
 	))
