@@ -1,9 +1,8 @@
 #![cfg_attr(test, feature(test, custom_test_frameworks))]
 #![cfg_attr(test, test_runner(sweet::test_runner))]
-#![allow(deprecated)] // TODO remove deprecated
-#![cfg_attr(feature = "reflect", feature(trait_upcasting))]
-/// # BeetFlow
-///
+#![allow(deprecated)]
+// #![deny(missing_docs)]
+#![doc = include_str!("../README.md")]
 use bevy::app::PluginGroup;
 use bevy::app::PluginGroupBuilder;
 pub mod continue_run;

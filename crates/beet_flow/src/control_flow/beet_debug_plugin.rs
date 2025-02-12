@@ -68,7 +68,7 @@ impl Plugin for BeetDebugPlugin {
 		}
 
 		if self.log_on_run_result {
-			app.init_resource::<LogOnRunResultMarker>();
+			app.init_resource::<LogOnResultMarker>();
 		}
 
 		if self.log_running {
@@ -117,7 +117,7 @@ pub struct LogOnRunMarker;
 /// marker resource for [log_on_run_result]
 #[derive(Debug, Default, Clone, Resource, Reflect)]
 #[reflect(Resource)]
-pub struct LogOnRunResultMarker;
+pub struct LogOnResultMarker;
 /// marker resource for [log_running]
 #[derive(Debug, Default, Clone, Resource, Reflect)]
 #[reflect(Resource)]
@@ -149,7 +149,7 @@ fn log_on_run_result(
 	ev: Trigger<OnResultAction>,
 	mut commands: Commands,
 	query: Query<&Name>,
-	_m: Res<LogOnRunResultMarker>,
+	_m: Res<LogOnResultMarker>,
 ) {
 	let msg = OnLogMessage::new_with_query(
 		ev.resolve_action(),

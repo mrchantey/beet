@@ -198,6 +198,11 @@ required-features = ["flow"]
 path = "examples/flow/bench_global.rs"
 
 [[example]]
+name = "hello_world"
+required-features = ["flow"]
+path = "examples/flow/hello_world.rs"
+
+[[example]]
 name = "long_running"
 required-features = ["flow"]
 path = "examples/flow/long_running.rs"

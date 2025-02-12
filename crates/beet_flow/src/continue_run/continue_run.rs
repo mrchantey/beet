@@ -3,7 +3,7 @@ use bevy::prelude::*;
 
 
 /// This will add the [`Running`] component to the behavior when [`OnRun`] is triggered,
-/// and remove it when [`OnRunResult`] is triggered.
+/// and remove it when [`OnResult`] is triggered.
 ///
 /// This should be added as a required component on any action that has a `With<Running>` query filter,
 /// not added to behaviors directly, because its easy to forget.

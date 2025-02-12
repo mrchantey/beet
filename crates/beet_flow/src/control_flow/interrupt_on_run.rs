@@ -2,7 +2,7 @@ use crate::prelude::*;
 use bevy::prelude::*;
 
 /// Mark a behavior as uninterruptible, the `Running` component
-/// will only be removed if [`OnRunResult`] is called on it,
+/// will only be removed if [`OnResult`] is called on it,
 /// either directly or via bubbling.
 #[derive(Debug, Default, Component, Reflect)]
 #[reflect(Component)]

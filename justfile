@@ -35,6 +35,9 @@ run crate example *args:
 	just watch cargo run -p {{crate}} --example {{example}} {{args}}
 
 
+doc crate *args:
+	just watch cargo doc -p {{crate}} --open {{args}}
+
 fmt *args:
 	just watch 'just leptosfmt {{args}}'
 
@@ -87,12 +90,6 @@ hello-world:
 	../bevyhub/scenes/camera-2d.json \
 	../bevyhub/scenes/ui-terminal-input.json \
 	./scenes/hello-world.json
-
-doc:
-	just watch 'cargo doc'
-
-serve-doc:
-	cd ./target/doc/beet && sweet serve
 
 test-all *args:
 	just leptosfmt --check

@@ -2,7 +2,7 @@
 
 <div align="center">
   <p>
-    <strong>A modular behavior library for the Bevy Engine.</strong>
+    <strong>Tools for developing reactive structures.</strong>
   </p>
   <p>
     <a href="https://crates.io/crates/beet"><img src="https://img.shields.io/crates/v/beet.svg?style=flat-square" alt="Crates.io version" /></a>
@@ -18,51 +18,6 @@
   </h3>
 </div>
 
-Beet is behavior expressed as entity trees, using [Observers][bevy-observers] for control flow. The entity-based approach is very flexible and allows for multiple behavior paradigms to be used together as needed.
-
-Currently implemented paradigms:
-- [Behavior Trees](./examples/hello_world.rs)
-- [State Machines](./examples/hello_state_machine.rs)
-- [Utility AI](./examples/hello_utility_ai.rs)
-- [LLM Sentence Similarity](./examples/hello_ml.rs)
-- [Reinforcement Learning](./examples/frozen_lake_train.rs)
-
-
-## Hello World
-
-```rust ignore
-use bevy::prelude::*;
-use beet::prelude::*;
-
-// A demonstration of Sequence control flow
-world.spawn(SequenceFlow)
-	.with_child((
-		Name::new("Hello"),
-		EndOnRun::success(),
-	))
-	.with_child((
-		Name::new("World"),
-		EndOnRun::success(),
-	))
-	.trigger(OnRun);
-```
-
-[bevy-observers]:https://docs.rs/bevy/latest/bevy/ecs/observer/struct.Observer.html#
-
-
-## Examples
-
-The examples for beet are *scene-based*, meaning each example provides a scene for a common base app. As Bevy scene workflows are a wip, there are a few `Placeholder` types used for not-yet-serializable types like cameras, asset handles etc.
-
-Most examples rely on assets that can be downloaded with the following commands, or manually from [here](https://bevyhub-public.s3.us-west-2.amazonaws.com/assets.tar.gz).
-
-```sh
-curl -o ./assets.tar.gz https://bevyhub-public.s3.us-west-2.amazonaws.com/assets.tar.gz
-tar -xzvf ./assets.tar.gz
-rm ./assets.tar.gz
-```
-
-
 ## Bevy Versions
 
 | `bevy` | `beet` |
@@ -71,6 +26,3 @@ rm ./assets.tar.gz
 | 0.14   | 0.0.2  |
 | 0.12   | 0.0.1  |
 
-## TODO
-
-- When we get [`OnMutate`](https://github.com/bevyengine/bevy/pull/14520) observers, they should probably replace most `OnInsert` observers we're using

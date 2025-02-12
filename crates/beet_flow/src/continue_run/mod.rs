@@ -1,3 +1,12 @@
+//! A module for long running actions.
+//! The core of long running actions in Beet is
+//! systems that filter by the [`Running`] component.
+//! 
+//! 
+//! 
+//! 
+//! 
+//! 
 mod continue_run;
 mod insert;
 mod remove;
