@@ -3,6 +3,7 @@
 //! In beet this is achieved using the [`RunOnRunResult`] action.
 use beet::prelude::*;
 use bevy::prelude::*;
+use sweet::prelude::EntityWorldMutwExt;
 
 #[rustfmt::skip]
 fn main() {
@@ -21,7 +22,7 @@ fn main() {
 	let transition = world.spawn((
 		Name::new("transition"),
 		ReturnWith(RunResult::Success),
-		RunOnRunResult::new_with_target(state2),
+		RunNext::new(state2),
 	)).id();
 
 	world.spawn((
@@ -29,6 +30,6 @@ fn main() {
 		ReturnWith(RunResult::Success),
 		// here RunOnRunResult can be swapped out with a control flow action
 		// that decides which state to go to next
-		RunOnRunResult::new_with_target(transition),
-	)).flush_trigger(OnRun);
+		RunNext::new(transition),
+	)).flush_trigger(OnRun::local());
 }
