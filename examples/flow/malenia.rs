@@ -4,6 +4,10 @@
 //! The enemy, Malenia, will try to heal herself if her health is below 50% and she has potions.
 //! Otherwise she will attack the player.
 //!
+//! A scorer will determine whether Malenia uses the Waterfoul Dance or the
+//! dreaded Scarlet Aeonia. In this case it is random, but in a real scenario
+//! this may be determined by distance to player etc.
+//!
 //! https://eldenring.wiki.fextralife.com/Malenia+Blade+of+Miquella
 use beet::prelude::*;
 use bevy::prelude::*;
@@ -14,19 +18,21 @@ use std::io::{
 use sweet::prelude::RandomSource;
 
 
-fn await_key() {
+fn main() {
+	run_app();
 	loop {
-		print!("Press any key...");
+		println!("Press Enter to try again...");
 		io::stdout().flush().unwrap();
-		let mut input = String::new();
-		io::stdin().read_line(&mut input).unwrap();
-		println!("hello");
+		io::stdin()
+			.read_line(&mut String::new())
+			.expect("Failed to read line");
+		run_app();
 	}
 }
 
 
-fn main() {
-	await_key();d
+fn run_app() {
+	// await_key();
 	println!("👩\tMalenia says: {INTRO}");
 
 	let mut app = App::new();
@@ -34,13 +40,12 @@ fn main() {
 		.add_systems(Update, health_handler)
 		.init_resource::<RandomSource>();
 
-	// in this example the player is a pacifist that doesnt do anything
+	// in this example the player is a pacifist that doesn't do anything
 	app.world_mut()
 		.spawn((Name::new("Elden Lord"), Health::default()));
 
+	// this is our agent, Malenia
 	app.world_mut()
-		// this is our agent, here the behavior (FallbackFlow) is attached directly
-		// but it could be a child or completely seperate
 		.spawn((
 			Name::new("Malenia"),
 			Health::default(),
@@ -49,7 +54,7 @@ fn main() {
 			RepeatFlow::default(),
 		))
 		.with_children(|root| {
-			// A common behavior tree pattern is to 'try' actions, ie try to heal self
+			// In the Fallback pattern we 'try' actions until one succeeds, ie try to heal self
 			// if low health and has potions, else attack player
 			root.spawn((Name::new("Try Heal Self"), TryHealSelf));
 
@@ -86,7 +91,6 @@ fn main() {
 		// })
 		.trigger(OnRun::local());
 	app.run();
-	println!("done");
 }
 
 
@@ -144,8 +148,6 @@ fn health_handler(
 			println!("👩\tMalenia says: 'I am Malenia. Blade of Miquella'\n❌\tYou lose");
 		}
 		exit.send(AppExit::Success);
-		println!("here");
-		// std::process::exit(0);
 	}
 }
 

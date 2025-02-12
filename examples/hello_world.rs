@@ -1,11 +1,18 @@
 //! A basic behavior tree sequence example
 use beet::prelude::*;
 use bevy::prelude::*;
+// flush_trigger test utils
+use sweet::prelude::EntityWorldMutwExt;
 
 #[rustfmt::skip]
 fn main() {
 	App::new()
-		.add_plugins(BeetFlowPlugin::default().log_on_run())
+		.add_plugins((
+			// register the run and result routing observers
+			BeetFlowPlugin::default(),
+			// this will log any running entity
+			BeetDebugPlugin::default()
+		))
 		.world_mut()
 		.spawn((
 			Name::new("root"), 
@@ -13,11 +20,11 @@ fn main() {
 		))
 		.with_child((
 			Name::new("child1"),
-			EndOnRun::success(),
+			ReturnWith(RunResult::Success),
 		))
 		.with_child((
 			Name::new("child2"),
-			EndOnRun::success(),
+			ReturnWith(RunResult::Success),
 		))
-		.flush_trigger(OnRun);
+		.flush_trigger(OnRun::local());
 }
