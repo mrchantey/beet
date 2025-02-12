@@ -34,10 +34,10 @@ fn main() {
 					Name::new("Long Running"),
 					SequenceFlow,
 					// this is the end condition, triggering OnRunResult::success() after 1 second
-					// ReturnInDuration::new(
-					// 	RunResult::Success,
-					// 	Duration::from_secs(10),
-					// ),
+					ReturnInDuration::new(
+						RunResult::Success,
+						Duration::from_secs(5),
+					),
 				))
 				.with_children(|parent| {
 					// we need a nested sequence so that `RepeatFlow` is scoped

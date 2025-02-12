@@ -38,22 +38,32 @@ impl Default for RepeatFlow {
 }
 
 fn repeat(
-	ev: Trigger<OnChildResult>,
-	// parents: Query<&Parent>,
+	ev: Trigger<OnResult>,
+	parents: Query<&Parent>,
+	action_observers: Query<&ActionObservers>,
 	query: Query<&RepeatFlow>,
 	mut commands: Commands,
 ) {
-	let action = query
-		.get(ev.action)
+	let action = ev.resolve_action();
+	let repeat = query
+		.get(action)
 		.expect(&expect_action::to_have_action(&ev));
-	if let Some(check) = &action.if_result_matches {
+	if let Some(check) = &repeat.if_result_matches {
 		if &ev.payload != check {
 			// repeat is completed, call OnResult
-			ev.trigger_bubble(commands);
+			OnChildResult::try_trigger(
+				commands,
+				parents,
+				action_observers,
+				action,
+				ev.resolve_origin(),
+				ev.payload.clone(),
+			);
 			return;
 		}
 	}
-	commands.entity(ev.action).insert(RunOnSpawn::default());
+	// otherwise run again on the next tick
+	commands.entity(action).insert(RunOnSpawn::default());
 }
 
 
@@ -71,22 +81,45 @@ mod test {
 		let func = observe_triggers::<OnResultAction>(world);
 
 		world
-			.spawn((SequenceFlow, RepeatFlow::default()))
-			.with_child(SucceedTimes::new(2))
+			.spawn((RepeatFlow::default(), SucceedTimes::new(2)))
 			.flush_trigger(OnRun::local());
 
+		expect(&func).to_have_been_called_times(1);
+		app.update();
 		expect(&func).to_have_been_called_times(2);
 		app.update();
+		expect(&func).to_have_been_called_times(3);
+		app.update();
+		// // even though child failed, it keeps repeating
 		expect(&func).to_have_been_called_times(4);
 		app.update();
-		expect(&func).to_have_been_called_times(6);
-		app.update();
-		// even though child failed, it keeps repeating
-		expect(&func).to_have_been_called_times(8);
+		expect(&func).to_have_been_called_times(5);
 	}
 
 	#[test]
 	fn repeat_if() {
+		let mut app = App::new();
+		app.add_plugins(BeetFlowPlugin::default());
+		let world = app.world_mut();
+		let func = observe_triggers::<OnResultAction>(world);
+
+		world
+			.spawn((RepeatFlow::if_success(), SucceedTimes::new(2)))
+			.flush_trigger(OnRun::local());
+
+		expect(&func).to_have_been_called_times(1);
+		app.update();
+		expect(&func).to_have_been_called_times(2);
+		app.update();
+		expect(&func).to_have_been_called_times(3);
+		app.update();
+		// it stopped repeating
+		expect(&func).to_have_been_called_times(3);
+		app.update();
+		expect(&func).to_have_been_called_times(3);
+	}
+	#[test]
+	fn repeat_child() {
 		let mut app = App::new();
 		app.add_plugins(BeetFlowPlugin::default());
 		let world = app.world_mut();
@@ -101,11 +134,11 @@ mod test {
 		app.update();
 		expect(&func).to_have_been_called_times(4);
 		app.update();
-		expect(&func).to_have_been_called_times(7);
+		expect(&func).to_have_been_called_times(6);
 		app.update();
-		expect(&func).to_have_been_called_times(7);
+		expect(&func).to_have_been_called_times(6);
 		app.update();
 		// last one, it stopped repeating
-		expect(&func).to_have_been_called_times(7);
+		expect(&func).to_have_been_called_times(6);
 	}
 }

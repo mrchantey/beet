@@ -60,10 +60,6 @@ impl<T: ResultPayload> ActionEvent for OnResult<T> {
 	fn _origin(&self) -> Entity { self.origin }
 }
 
-impl<T: ResultPayload> ActionEvent for OnResultAction<T> {
-	fn _action(&self) -> Entity { self.action }
-	fn _origin(&self) -> Entity { self.origin }
-}
 
 /// Collect all [OnRunAction] with a [Name]
 #[cfg(test)]

@@ -50,20 +50,29 @@ mod test {
 		world.entity_mut(grandchild).flush_trigger(OnRun::local());
 
 		expect(&counter).to_have_been_called_times(3);
-		expect(&counter).to_have_returned_nth_with(0, &OnResultAction {
-			payload: RunResult::Success,
-			origin: grandchild,
-			action: grandchild,
-		});
-		expect(&counter).to_have_returned_nth_with(1, &OnResultAction {
-			payload: RunResult::Success,
-			origin: grandchild,
-			action: child,
-		});
-		expect(&counter).to_have_returned_nth_with(2, &OnResultAction {
-			payload: RunResult::Success,
-			origin: grandchild,
-			action: parent,
-		});
+		expect(&counter).to_have_returned_nth_with(
+			0,
+			&OnResultAction::global_with_origin(
+				grandchild,
+				grandchild,
+				RunResult::Success,
+			),
+		);
+		expect(&counter).to_have_returned_nth_with(
+			1,
+			&OnResultAction::global_with_origin(
+				child,
+				grandchild,
+				RunResult::Success,
+			),
+		);
+		expect(&counter).to_have_returned_nth_with(
+			2,
+			&OnResultAction::global_with_origin(
+				parent,
+				grandchild,
+				RunResult::Success,
+			),
+		);
 	}
 }

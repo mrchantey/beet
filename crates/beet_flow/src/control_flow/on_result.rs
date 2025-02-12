@@ -7,11 +7,17 @@ use bevy::prelude::*;
 pub struct OnResultAction<T = RunResult> {
 	pub payload: T,
 	/// this is not exposed as it may be placeholder, instead use [Trigger::resolve_origin]
-	pub(crate) origin: Entity,
+	origin: Entity,
 	/// this is not exposed as it may be placeholder, instead use [Trigger::resolve_action]
-	pub(crate) action: Entity,
+	action: Entity,
 }
-impl<T> OnResultAction<T> {
+
+impl<T: ResultPayload> ActionEvent for OnResultAction<T> {
+	fn _action(&self) -> Entity { self.action }
+	fn _origin(&self) -> Entity { self.origin }
+}
+
+impl<T: ResultPayload> OnResultAction<T> {
 	pub fn local(payload: T) -> Self {
 		Self {
 			payload,
@@ -58,6 +64,31 @@ pub struct OnChildResult<T = RunResult> {
 }
 
 impl<T: ResultPayload> OnChildResult<T> {
+	/// Call [OnChildResult] on the action's parent entity.
+	/// This is called by default unless [NoBubble] is present
+	/// on the action entity.
+	pub fn try_trigger(
+		mut commands: Commands,
+		parents: Query<&Parent>,
+		action_observers: Query<&ActionObservers>,
+		action: Entity,
+		origin: Entity,
+		payload: T,
+	) {
+		if let Ok(parent) = parents.get(action) {
+			let parent = parent.get();
+			if let Ok(action_observers) = action_observers.get(parent) {
+				let res = OnChildResult {
+					payload,
+					origin,
+					action: parent,
+					child: action,
+				};
+				commands.trigger_targets(res, (*action_observers).clone());
+			}
+		}
+	}
+
 	pub fn trigger_bubble(&self, mut commands: Commands) {
 		commands.trigger(OnResultAction::global_with_origin(
 			self.action,
@@ -94,7 +125,6 @@ pub enum RunResult {
 }
 
 /// Add this to an entity to prevent the run result from bubbling up.
-///
 /// Any action that requires this needs to manually call OnChildResult
 /// on the parent entity. For an example, see [`RepeatFlow`].
 #[derive(Default, Component, Reflect)]
@@ -110,11 +140,13 @@ impl<T: ResultPayload> OnResult<T> {}
 ///
 /// Unlike [propagate_request_to_observers], this is called on parent
 /// observers.
+///
+///
 pub fn propagate_on_result<T: ResultPayload>(
 	ev: Trigger<OnResultAction<T>>,
 	mut commands: Commands,
 	action_observers: Query<&ActionObservers>,
-	no_bubble: Query<(), With<NoBubble>>,
+	should_bubble: Query<(), Without<NoBubble>>,
 	parents: Query<&Parent>,
 ) {
 	let action = ev.resolve_action();
@@ -129,20 +161,15 @@ pub fn propagate_on_result<T: ResultPayload>(
 		commands.trigger_targets(res, (*action_observers).clone());
 	}
 
-	if no_bubble.contains(action) {
-		return;
-	}
 	// propagate result to parents
-	if let Ok(parent) = parents.get(action) {
-		let parent = parent.get();
-		if let Ok(action_observers) = action_observers.get(parent) {
-			let res = OnChildResult {
-				payload: ev.payload.clone(),
-				origin,
-				action: parent,
-				child: action,
-			};
-			commands.trigger_targets(res, (*action_observers).clone());
-		}
+	if should_bubble.contains(action) {
+		OnChildResult::try_trigger(
+			commands,
+			parents,
+			action_observers,
+			action,
+			ev.resolve_origin(),
+			ev.payload.clone(),
+		);
 	}
 }
