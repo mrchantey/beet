@@ -37,9 +37,9 @@ fn insert<E: ActionEvent, B: Bundle + Clone>(
 	query: Query<&Insert<E, B>>,
 ) {
 	let action = query
-		.get(ev.action())
+		.get(ev._action())
 		.expect(&expect_action::to_have_action(&ev));
-	commands.entity(ev.action()).insert(action.bundle.clone());
+	commands.entity(ev._action()).insert(action.bundle.clone());
 }
 
 #[cfg(test)]

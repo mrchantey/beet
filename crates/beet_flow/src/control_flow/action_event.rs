@@ -2,17 +2,20 @@ use crate::prelude::*;
 use bevy::prelude::*;
 use std::fmt::Debug;
 
+/// used internally for patterns common to
+/// - [OnRun]
+/// - [OnRunAction]
+/// - [OnResult]
+/// - [OnResultAction]
+/// It is not exposed, primarily because calling
+/// [Self::action()] or [Self::origin()] on
+/// [OnRunAction] or [OnResultAction] would be incorrect,
+/// instead resolve_action etc should be used.
 pub trait ActionEvent: Event + Debug {
-	fn action(&self) -> Entity;
-	fn origin(&self) -> Entity;
-
-	fn origin_or_action(&self) -> Entity {
-		if self.origin() == Entity::PLACEHOLDER {
-			self.action()
-		} else {
-			self.origin()
-		}
-	}
+	/// Internal use only, use Trigger::resolve_action
+	fn _action(&self) -> Entity;
+	/// Internal use only, use Trigger::resolve_origin
+	fn _origin(&self) -> Entity;
 }
 
 #[extend::ext(name=ActionEventTriggerExt)]
@@ -24,47 +27,42 @@ pub impl<'w, T: ActionEvent> Trigger<'w, T> {
 	///
 	/// If this trigger was called globally and the action entity is [Entity::PLACEHOLDER]
 	fn resolve_action(&self) -> Entity {
-		if self.action() == Entity::PLACEHOLDER {
+		if self._action() == Entity::PLACEHOLDER {
 			if self.entity() == Entity::PLACEHOLDER {
 				panic!("OnRunAction must either specify an action or be triggered on an action entity");
 			} else {
 				self.entity()
 			}
 		} else {
-			self.action()
+			self._action()
 		}
 	}
 
 	/// Get the origin entity, or the entity that triggered the action.
 	fn resolve_origin(&self) -> Entity {
-		if self.origin() == Entity::PLACEHOLDER {
+		if self._origin() == Entity::PLACEHOLDER {
 			self.resolve_action()
 		} else {
-			self.origin()
+			self._origin()
 		}
 	}
 }
 
 
-
 impl<T: RunPayload> ActionEvent for OnRun<T> {
-	fn action(&self) -> Entity { self.action }
-	fn origin(&self) -> Entity { self.origin }
-}
-impl<T: RunPayload> ActionEvent for OnRunAction<T> {
-	fn action(&self) -> Entity { self.action }
-	fn origin(&self) -> Entity { self.origin }
+	fn _action(&self) -> Entity { self.action }
+	fn _origin(&self) -> Entity { self.origin }
 }
 
 
 impl<T: ResultPayload> ActionEvent for OnResult<T> {
-	fn action(&self) -> Entity { self.action }
-	fn origin(&self) -> Entity { self.origin }
+	fn _action(&self) -> Entity { self.action }
+	fn _origin(&self) -> Entity { self.origin }
 }
 
 impl<T: ResultPayload> ActionEvent for OnResultAction<T> {
-	fn action(&self) -> Entity { self.action }
-	fn origin(&self) -> Entity { self.origin }
+	fn _action(&self) -> Entity { self.action }
+	fn _origin(&self) -> Entity { self.origin }
 }
 
 /// Collect all [OnRunAction] with a [Name]
@@ -73,11 +71,7 @@ pub fn collect_on_run(world: &mut World) -> impl Fn() -> Vec<String> {
 	let func = sweet::prelude::mock_bucket();
 	let func2 = func.clone();
 	world.add_observer(move |ev: Trigger<OnRunAction>, query: Query<&Name>| {
-		let action = if ev.action == Entity::PLACEHOLDER {
-			ev.entity()
-		} else {
-			ev.action
-		};
+		let action = ev.resolve_action();
 		if let Ok(name) = query.get(action) {
 			func2.call(name.to_string());
 		}

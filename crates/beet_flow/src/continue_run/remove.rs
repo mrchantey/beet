@@ -21,7 +21,7 @@ impl<E: ActionEvent, B: Bundle + Default> Default for Remove<E, B> {
 }
 
 fn remove<E: ActionEvent, B: Bundle>(ev: Trigger<E>, mut commands: Commands) {
-	commands.entity(ev.action()).remove::<B>();
+	commands.entity(ev._action()).remove::<B>();
 }
 
 #[cfg(test)]

@@ -18,6 +18,7 @@ pub(crate) fn reset_run_time_started(
 	ev: Trigger<OnAdd, Running>,
 	mut query: Query<&mut RunTimer>,
 ) {
+	// println!("reset_run_time_started");
 	query
 		.get_mut(ev.entity())
 		.map(|mut timer| timer.last_started.reset())
@@ -27,6 +28,7 @@ pub(crate) fn reset_run_timer_stopped(
 	ev: Trigger<OnRemove, Running>,
 	mut query: Query<&mut RunTimer>,
 ) {
+	// println!("reset_run_time_stopped");
 	query
 		.get_mut(ev.entity())
 		.map(|mut timer| timer.last_stopped.reset())

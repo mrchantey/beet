@@ -21,7 +21,7 @@ pub fn continue_run_plugin(app: &mut App) {
 			return_in_duration::<RunResult>.never_param_warn(),
 		)
 			.chain() // return_in_duration must be after tick_run_timers
-			.in_set(BeetTickSet),
+			.in_set(TickSet),
 	)
 	.add_observer(reset_run_time_started)
 	.add_observer(reset_run_timer_stopped);

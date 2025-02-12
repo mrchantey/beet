@@ -9,6 +9,7 @@
 //!
 //! Note that long running terminators should require [ContinueRun]
 //! which sets up the [Running] component lifecycle.
+#![allow(unused)]
 use beet::prelude::*;
 use bevy::prelude::*;
 use bevy::time::common_conditions::on_timer;
@@ -18,11 +19,12 @@ use std::time::Duration;
 // #[rustfmt::skip]
 fn main() {
 	let mut app = App::new();
-	app.add_plugins((MinimalPlugins, BeetFlowPlugin::default().log_on_run()))
-		.add_systems(
-			Update,
-			patrol.run_if(on_timer(Duration::from_millis(123))),
-		);
+	app.add_plugins((
+		MinimalPlugins,
+		BeetFlowPlugin::default(),
+		BeetDebugPlugin::with_result(),
+	));
+	// .add_systems(Update, patrol.run_if(on_timer(Duration::from_millis(123))));
 
 	app.world_mut()
 		.spawn((Name::new("root"), SequenceFlow))
@@ -32,10 +34,10 @@ fn main() {
 					Name::new("Long Running"),
 					SequenceFlow,
 					// this is the end condition, triggering OnRunResult::success() after 1 second
-					ReturnInDuration::new(
-						RunResult::Success,
-						Duration::from_secs(3),
-					),
+					// ReturnInDuration::new(
+					// 	RunResult::Success,
+					// 	Duration::from_secs(10),
+					// ),
 				))
 				.with_children(|parent| {
 					// we need a nested sequence so that `RepeatFlow` is scoped
@@ -54,7 +56,7 @@ fn main() {
 							Patrol::default(),
 							ReturnInDuration::new(
 								RunResult::Success,
-								Duration::from_millis(300),
+								Duration::from_secs(1),
 							),
 						))
 						.with_child((
@@ -63,7 +65,7 @@ fn main() {
 							Patrol::default(),
 							ReturnInDuration::new(
 								RunResult::Success,
-								Duration::from_millis(300),
+								Duration::from_secs(1),
 							),
 						));
 				});

@@ -15,6 +15,10 @@ impl RunPayload for () {
 impl ResultPayload for RunResult {
 	type Run = ();
 }
+impl<T: RunPayload> ActionEvent for OnRunAction<T> {
+	fn _action(&self) -> Entity { self.action }
+	fn _origin(&self) -> Entity { self.origin }
+}
 
 
 /// An event triggered on *action observers*, never on the action entity (tree node) itself.
@@ -32,8 +36,8 @@ pub struct OnRun<T = ()> {
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Event)]
 pub struct OnRunAction<T = ()> {
 	pub payload: T,
-	pub origin: Entity,
-	pub action: Entity,
+	origin: Entity,
+	action: Entity,
 }
 
 impl<T> OnRunAction<T> {
