@@ -1,6 +1,4 @@
 #![allow(dead_code)]
-//! An example of the general pattern used by beet in vanilla bevy
-//! Hopefully this makes how beet works a bit clearer
 use beet::prelude::*;
 use bevy::prelude::*;
 use sweet::prelude::EntityWorldMutwExt;

@@ -12,6 +12,9 @@ pub mod expect_action {
 		format!("Action entity has no children: {:#?}", ev)
 	}
 
+	pub fn to_have_origin(ev: impl Debug) -> String {
+		format!("Origin entity is missing from query: {:#?}", ev)
+	}
 	/// Error for for when an [ActionContext] uses a placeholder
 	/// and the request was made globally.
 	pub fn to_have_action(ev: impl Debug) -> String {

@@ -23,8 +23,8 @@ fn main() {
 		MinimalPlugins,
 		BeetFlowPlugin::default(),
 		BeetDebugPlugin::with_result(),
-	));
-	// .add_systems(Update, patrol.run_if(on_timer(Duration::from_millis(123))));
+	))
+	.add_systems(Update, patrol.run_if(on_timer(Duration::from_millis(100))));
 
 	app.world_mut()
 		.spawn((Name::new("root"), SequenceFlow))
@@ -33,7 +33,7 @@ fn main() {
 				.spawn((
 					Name::new("Long Running"),
 					SequenceFlow,
-					// this is the end condition, triggering OnRunResult::success() after 1 second
+					// this is the end condition, triggering OnRunResult::success() after a duration
 					ReturnInDuration::new(
 						RunResult::Success,
 						Duration::from_secs(5),
