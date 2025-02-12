@@ -12,11 +12,11 @@ use bevy::prelude::*;
 #[derive(Debug, Clone, PartialEq, Component, Reflect)]
 #[reflect(Default, Component)]
 #[require(NoBubble)]
-pub struct RepeatFlow {
+pub struct Repeat {
 	pub if_result_matches: Option<RunResult>,
 }
 
-impl RepeatFlow {
+impl Repeat {
 	pub fn if_success() -> Self {
 		Self {
 			if_result_matches: Some(RunResult::Success),
@@ -29,7 +29,7 @@ impl RepeatFlow {
 	}
 }
 
-impl Default for RepeatFlow {
+impl Default for Repeat {
 	fn default() -> Self {
 		Self {
 			if_result_matches: None,
@@ -41,7 +41,7 @@ fn repeat(
 	ev: Trigger<OnResult>,
 	parents: Query<&Parent>,
 	action_observers: Query<&ActionObservers>,
-	query: Query<&RepeatFlow>,
+	query: Query<&Repeat>,
 	mut commands: Commands,
 ) {
 	let action = ev.resolve_action();
@@ -81,7 +81,7 @@ mod test {
 		let func = observe_triggers::<OnResultAction>(world);
 
 		world
-			.spawn((RepeatFlow::default(), SucceedTimes::new(2)))
+			.spawn((Repeat::default(), SucceedTimes::new(2)))
 			.flush_trigger(OnRun::local());
 
 		expect(&func).to_have_been_called_times(1);
@@ -104,7 +104,7 @@ mod test {
 		let func = observe_triggers::<OnResultAction>(world);
 
 		world
-			.spawn((RepeatFlow::if_success(), SucceedTimes::new(2)))
+			.spawn((Repeat::if_success(), SucceedTimes::new(2)))
 			.flush_trigger(OnRun::local());
 
 		expect(&func).to_have_been_called_times(1);
@@ -126,7 +126,7 @@ mod test {
 		let func = observe_triggers::<OnResultAction>(world);
 
 		world
-			.spawn((SequenceFlow, RepeatFlow::if_success()))
+			.spawn((Sequence, Repeat::if_success()))
 			.with_child(SucceedTimes::new(2))
 			.flush_trigger(OnRun::local());
 

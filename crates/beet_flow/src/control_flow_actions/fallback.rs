@@ -1,6 +1,7 @@
 use crate::prelude::*;
 use bevy::prelude::*;
 
+/// # Action Type: Control Flow
 /// An action that runs all of its children in order until one succeeds.
 /// - If a child succeeds it succeed.
 /// - If a child fails it will run the next child.
@@ -8,7 +9,7 @@ use bevy::prelude::*;
 #[action(on_start, on_next)]
 #[derive(Debug, Default, Component, Reflect)]
 #[reflect(Default, Component)]
-pub struct FallbackFlow;
+pub struct Fallback;
 
 fn on_start(ev: Trigger<OnRun>, commands: Commands, query: Query<&Children>) {
 	let children = query
@@ -62,7 +63,7 @@ mod test {
 		let on_result = collect_on_result(world);
 
 		world
-			.spawn((Name::new("root"), FallbackFlow))
+			.spawn((Name::new("root"), Fallback))
 			.with_child((Name::new("child1"), ReturnWith(RunResult::Failure)))
 			.with_child((Name::new("child2"), ReturnWith(RunResult::Success)))
 			.flush_trigger(OnRun::local());

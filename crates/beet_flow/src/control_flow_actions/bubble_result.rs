@@ -2,6 +2,9 @@ use crate::prelude::*;
 use bevy::prelude::*;
 use std::marker::PhantomData;
 
+
+/// Tags: [ControlFlow](ActionTag::ControlFlow)
+///
 /// If any child triggers a result, bubble it up to the parent.
 #[action(bubble_result::<T>)]
 #[derive(Debug, Component, Clone, Copy, PartialEq, Reflect)]

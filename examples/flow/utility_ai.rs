@@ -12,7 +12,7 @@ fn main() {
 		.world_mut()
 		.spawn((
 			Name::new("ScoreFlow will select the highest score"), 
-			ScoreFlow::default(),
+			HighestScore::default(),
 		))
 		.with_children(|parent| {
 			parent.spawn((

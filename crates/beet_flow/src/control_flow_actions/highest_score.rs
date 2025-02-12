@@ -44,12 +44,12 @@ impl ResultPayload for ScoreValue {
 #[reflect(Default, Component)]
 #[require(BubbleResult)]
 // TODO SparseSet
-pub struct ScoreFlow(HashMap<Entity, ScoreValue>);
+pub struct HighestScore(HashMap<Entity, ScoreValue>);
 
 fn on_start(
 	ev: Trigger<OnRun>,
 	mut commands: Commands,
-	mut query: Query<(&mut ScoreFlow, &Children)>,
+	mut query: Query<(&mut HighestScore, &Children)>,
 ) {
 	let (mut action, children) = query
 		.get_mut(ev.action)
@@ -67,7 +67,7 @@ fn on_start(
 fn on_receive_score(
 	ev: Trigger<OnChildResult<ScoreValue>>,
 	mut commands: Commands,
-	mut query: Query<(&mut ScoreFlow, &Children)>,
+	mut query: Query<(&mut HighestScore, &Children)>,
 ) {
 	let (mut action, children) = query
 		.get_mut(ev.action)
@@ -102,7 +102,7 @@ mod test {
 		let on_score = observe_triggers::<OnResultAction<ScoreValue>>(world);
 
 		world
-			.spawn((Name::new("root"), ScoreFlow::default()))
+			.spawn((Name::new("root"), HighestScore::default()))
 			.with_child((
 				Name::new("child1"),
 				ReturnWith(ScoreValue::NEUTRAL),

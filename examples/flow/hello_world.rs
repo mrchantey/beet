@@ -16,7 +16,7 @@ fn main() {
 		.world_mut()
 		.spawn((
 			Name::new("root"), 
-			SequenceFlow
+			Sequence
 		))
 		.with_child((
 			Name::new("child1"),

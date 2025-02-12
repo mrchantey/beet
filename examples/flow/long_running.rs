@@ -27,12 +27,12 @@ fn main() {
 	.add_systems(Update, patrol.run_if(on_timer(Duration::from_millis(100))));
 
 	app.world_mut()
-		.spawn((Name::new("root"), SequenceFlow))
+		.spawn((Name::new("root"), Sequence))
 		.with_children(|parent| {
 			parent
 				.spawn((
 					Name::new("Long Running"),
-					SequenceFlow,
+					Sequence,
 					// this is the end condition, triggering OnRunResult::success() after a duration
 					ReturnInDuration::new(
 						RunResult::Success,
@@ -46,9 +46,9 @@ fn main() {
 					parent
 						.spawn((
 							Name::new("Patrol Sequence"),
-							SequenceFlow,
+							Sequence,
 							// the patrol sequence will repeat indefinitely
-							RepeatFlow::default(),
+							Repeat::default(),
 						))
 						.with_child((
 							// patrol the left flank for a bit

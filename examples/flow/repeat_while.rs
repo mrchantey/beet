@@ -12,9 +12,9 @@ fn main() {
 	.world_mut()
 	.spawn((
 		Name::new("root"),
-		SequenceFlow,
+		Sequence,
 		// will repeat while the sequence returns [RunResult::Success]
-		RepeatFlow::if_success(),
+		Repeat::if_success(),
 	))
 	.with_child((
 		Name::new("fails on third run"),

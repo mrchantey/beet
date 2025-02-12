@@ -8,12 +8,12 @@ use bevy::utils::HashSet;
 #[action(on_start, on_next)]
 #[derive(Default, Component, Deref, DerefMut, Reflect)]
 #[reflect(Default, Component)]
-pub struct ParallelFlow(pub HashSet<Entity>);
+pub struct Parallel(pub HashSet<Entity>);
 
 fn on_start(
 	ev: Trigger<OnRun>,
 	mut commands: Commands,
-	mut query: Query<(&mut ParallelFlow, &Children)>,
+	mut query: Query<(&mut Parallel, &Children)>,
 ) {
 	let (mut action, children) = query
 		.get_mut(ev.action)
@@ -29,7 +29,7 @@ fn on_start(
 fn on_next(
 	ev: Trigger<OnChildResult>,
 	commands: Commands,
-	mut query: Query<(&mut ParallelFlow, &Children)>,
+	mut query: Query<(&mut Parallel, &Children)>,
 ) {
 	if ev.payload == RunResult::Failure {
 		ev.trigger_bubble(commands);
@@ -62,7 +62,7 @@ mod test {
 		let on_run = observe_triggers::<OnRun>(world);
 
 		let action = world
-			.spawn((Name::new("root"), ParallelFlow::default()))
+			.spawn((Name::new("root"), Parallel::default()))
 			.with_child((Name::new("child1"), ReturnWith(RunResult::Success)))
 			.with_child((Name::new("child2"), ReturnWith(RunResult::Failure)))
 			.flush_trigger(OnRun::local())
@@ -85,7 +85,7 @@ mod test {
 		let on_run = observe_triggers::<OnRun>(world);
 
 		let action = world
-			.spawn((Name::new("root"), ParallelFlow::default()))
+			.spawn((Name::new("root"), Parallel::default()))
 			.with_child((Name::new("child1"), ReturnWith(RunResult::Success)))
 			.with_child((Name::new("child2"), ReturnWith(RunResult::Success)))
 			.flush_trigger(OnRun::local())

@@ -50,8 +50,8 @@ fn run_app() {
 			Name::new("Malenia"),
 			Health::default(),
 			HealingPotions(2),
-			FallbackFlow::default(),
-			RepeatFlow::default(),
+			Fallback::default(),
+			Repeat::default(),
 		))
 		.with_children(|root| {
 			// In the Fallback pattern we 'try' actions until one succeeds, ie try to heal self
@@ -60,7 +60,7 @@ fn run_app() {
 
 			// if TryHeal fails the tree will 'fallback' to the next action
 			// lets use utility ai to determine which attack to use
-			root.spawn((Name::new("Attack"), ScoreFlow::default()))
+			root.spawn((Name::new("Attack"), HighestScore::default()))
 				.with_child((
 					Name::new("Waterfoul Dance"),
 					// swap this out for a more advanced score provider based on

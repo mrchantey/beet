@@ -8,7 +8,7 @@ use bevy::prelude::*;
 #[action(on_start, on_next)]
 #[derive(Debug, Default, Component, Reflect)]
 #[reflect(Default, Component)]
-pub struct SequenceFlow;
+pub struct Sequence;
 
 fn on_start(ev: Trigger<OnRun>, commands: Commands, query: Query<&Children>) {
 	let children = query
@@ -61,7 +61,7 @@ mod test {
 		let on_run = collect_on_run(world);
 
 		world
-			.spawn((Name::new("root"), SequenceFlow))
+			.spawn((Name::new("root"), Sequence))
 			.with_child((Name::new("child1"), ReturnWith(RunResult::Success)))
 			.with_child((Name::new("child2"), ReturnWith(RunResult::Success)))
 			.flush_trigger(OnRun::local());
