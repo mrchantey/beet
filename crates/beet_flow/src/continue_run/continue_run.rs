@@ -1,4 +1,6 @@
 use crate::prelude::*;
+use bevy::ecs::component::ComponentId;
+use bevy::ecs::world::DeferredWorld;
 use bevy::prelude::*;
 
 
@@ -11,7 +13,7 @@ use bevy::prelude::*;
 /// For usage see the [`Running`] component.
 #[derive(Debug, Default, Component, Reflect)]
 #[reflect(Default, Component)]
-#[require(RunTimer, Insert<OnRun,Running>, Remove<OnResult, Running>)]
+#[require(RunTimer,Insert<OnRun,Running>,Remove<OnResult,Running>)]
 pub struct ContinueRun;
 
 
@@ -31,10 +33,34 @@ pub struct ContinueRun;
 /// }
 /// ```
 /// As this is frequently added and removed, it is `SparseSet`.
-#[derive(Default, Debug, Copy, Clone, Component, PartialEq, Reflect)]
-#[component(storage = "SparseSet")]
-#[reflect(Component, Default)]
-pub struct Running;
+#[derive(Debug, Copy, Clone, Component, PartialEq, Reflect)]
+#[component(storage = "SparseSet",on_add = on_add_running)]
+#[reflect(Component)]
+pub struct Running {
+	/// The entity upon which actions can perform some work, often the
+	/// root of the action tree but can be any entity.
+	pub origin: Entity,
+}
+impl Running {
+	/// Create a new instance of `Running` with the provided origin.
+	pub fn new(origin: Entity) -> Self { Self { origin } }
+}
+
+fn on_add_running(mut world: DeferredWorld, entity: Entity, _cid: ComponentId) {
+	let mut running = world.get_mut::<Running>(entity).unwrap();
+	if running.origin == Entity::PLACEHOLDER {
+		running.origin = entity;
+	}
+}
+/// Like [`OnRun::local`], this will resolve to the entity it was placed on
+/// in the `on_add` component hook.
+impl Default for Running {
+	fn default() -> Self {
+		Self {
+			origin: Entity::PLACEHOLDER,
+		}
+	}
+}
 
 
 #[cfg(test)]
@@ -60,7 +86,7 @@ mod test {
 		app.add_plugins(BeetFlowPlugin::default());
 		let world = app.world_mut();
 		let entity = world
-			.spawn((Running, ContinueRun))
+			.spawn((Running::default(), ContinueRun))
 			.flush_trigger(OnResultAction::local(RunResult::Success))
 			.id();
 		expect(world.get::<Running>(entity)).to_be_none();

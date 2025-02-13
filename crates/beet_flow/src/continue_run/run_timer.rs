@@ -62,7 +62,7 @@ mod test {
 		app.add_plugins(BeetFlowPlugin::default());
 		app.insert_time();
 
-		let entity = app.world_mut().spawn((Running, RunTimer::default())).id();
+		let entity = app.world_mut().spawn((Running::default(), RunTimer::default())).id();
 
 		app.update_with_secs(1);
 

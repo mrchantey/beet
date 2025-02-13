@@ -2,7 +2,7 @@
 	"files.autoSaveDelay": 1000,
 	// "files.autoSave": "off",
 	// "rust-analyzer.diagnostics.disabled":["unlinked-file"],
-	// "rust-analyzer.cargo.features": ["beet_flow/reflect"],
+	"rust-analyzer.cargo.features": ["beet_flow/_doctest"],
 	// "rust-analyzer.cargo.features": "all",
 	// "rust-analyzer.cargo.target": "x86_64-unknown-linux-gnu",
 	// "rust-analyzer.procMacro.enable": false,

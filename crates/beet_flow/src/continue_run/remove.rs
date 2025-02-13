@@ -50,7 +50,7 @@ mod test {
 		let world = app.world_mut();
 
 		let entity = world
-			.spawn((Running, Remove::<OnRun, Running>::default()))
+			.spawn((Running::default(), Remove::<OnRun, Running>::default()))
 			.flush_trigger(OnRun::local())
 			.id();
 		expect(world.get::<Running>(entity)).to_be_none();
@@ -63,7 +63,7 @@ mod test {
 
 		let entity = world
 			.spawn((
-				Running,
+				Running::default(),
 				Remove::<OnResult, Running>::default(),
 				ReturnWith(RunResult::Success),
 			))

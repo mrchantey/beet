@@ -47,7 +47,7 @@ members = [
 	# "crates/beet_rsx/macros",
 	# "crates/beet_rsx/parser",
 	# "crates/beet_sim",
-	# "crates/beet_spatial",
+	"crates/beet_spatial",
 	# "crates/beet_site",
 	# "crates/beet-cli",
 	# "crates/emby",
@@ -56,7 +56,7 @@ members = [
 [workspace.dependencies]
 ## internal
 # beet = { path = "./", version = "0.0.5-rc.2", default-features = false }
-# beet_spatial = { path = "crates/beet_spatial", version = "0.0.5-rc.2", default-features = false }
+beet_spatial = { path = "crates/beet_spatial", version = "0.0.5-rc.2", default-features = false }
 beet_flow = { path = "crates/beet_flow", version = "0.0.5-rc.2" }
 beet_flow_macros = { path = "crates/beet_flow/macros", version = "0.0.5-rc.2" }
 # beet_ml = { path = "crates/beet_ml", version = "0.0.5-rc.2" }

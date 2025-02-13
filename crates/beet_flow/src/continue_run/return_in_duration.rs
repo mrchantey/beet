@@ -12,7 +12,7 @@ use std::time::Duration;
 /// # let mut world = world();
 /// # use std::time::Duration;
 /// world.spawn((
-///		Running,
+///		Running::default(),
 ///		ReturnInDuration::new(RunResult::Success, Duration::from_secs(2)),
 ///	));
 ///
@@ -85,7 +85,7 @@ mod test {
 
 
 		app.world_mut().spawn((
-			Running,
+			Running::default(),
 			ReturnInDuration::new(RunResult::Success, Duration::from_secs(2)),
 		));
 

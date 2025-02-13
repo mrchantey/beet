@@ -37,8 +37,8 @@ mod test {
 		let world = app.world_mut();
 
 		world
-			.spawn(Running)
-			.with_child(Running)
+			.spawn(Running::default())
+			.with_child(Running::default())
 			.flush_trigger(OnResultAction::local(RunResult::Success));
 
 		expect(world.query::<&Running>().iter(&world).count()).to_be(0);

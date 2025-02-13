@@ -6,7 +6,6 @@ use std::f32::consts::TAU;
 #[derive(Debug, Default, Clone, PartialEq, Component, Action, Reflect)]
 #[reflect(Default, Component, ActionMeta)]
 #[category(ActionCategory::Agent)]
-#[systems(hover.in_set(TickSet))]
 /// Translate the agent up and down in a sine wave
 pub struct Hover {
 	/// Measured in Hz
@@ -21,7 +20,7 @@ impl Hover {
 	pub fn new(speed: f32, height: f32) -> Self { Self { speed, height } }
 }
 
-fn hover(
+pub(crate) fn hover(
 	mut _commands: Commands,
 	time: Res<Time>,
 	mut transforms: Query<&mut Transform>,

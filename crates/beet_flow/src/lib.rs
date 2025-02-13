@@ -1,6 +1,5 @@
 #![cfg_attr(test, feature(test, custom_test_frameworks))]
 #![cfg_attr(test, test_runner(sweet::test_runner))]
-#![allow(deprecated)]
 #![deny(missing_docs)]
 #![doc = include_str!("../README.md")]
 pub mod continue_run;
@@ -22,15 +21,10 @@ pub mod prelude {
 	pub use crate::control_flow_actions::*;
 	pub use crate::tree::*;
 	pub use beet_flow_macros::*;
-	// allow flush_trigger in examples
-	// #[cfg(feature = "sweet")]
-	// pub use sweet::prelude::CoreWorldExtSweet;
-	// // allow flush_trigger in examples
-	// #[cfg(feature = "sweet")]
-	// pub use sweet::prelude::EntityWorldMutwExt;
+	// reexport bevy for docs
 	#[cfg(feature = "_doctest")]
 	pub use bevy::prelude::*;
-	/// for use in docs, ie:
+	/// for docs, create a world with BeetFlowPlugin
 	/// ```
 	/// use beet_flow::prelude::*;
 	/// let world = world();

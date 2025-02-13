@@ -43,29 +43,29 @@ mod test {
 
 		let entity = world
 			// root is running
-			.spawn(Running)
+			.spawn(Running::default())
 			.with_children(|parent| {
 				// not running
 				parent.spawn_empty();
 				// running
-				parent.spawn(Running);
+				parent.spawn(Running::default());
 				// running with child
-				parent.spawn(Running).with_children(|parent| {
-					parent.spawn(Running);
+				parent.spawn(Running::default()).with_children(|parent| {
+					parent.spawn(Running::default());
 				});
 				//only child running
 				parent.spawn_empty().with_children(|parent| {
-					parent.spawn(Running);
+					parent.spawn(Running::default());
 				});
 				// running with no interrupt, with running child
 				parent
-					.spawn((Running, NoInterrupt))
+					.spawn((Running::default(), NoInterrupt))
 					.with_children(|parent| {
-						parent.spawn(Running);
+						parent.spawn(Running::default());
 					});
 				// // only no interrupt, with running child
 				// parent.spawn(NoInterrupt).with_children(|parent| {
-				// 	parent.spawn(Running);
+				// 	parent.spawn(Running::default());
 				// });
 			})
 			.flush_trigger(OnRun::local())
@@ -76,12 +76,17 @@ mod test {
 				.component_tree::<Running>(&world),
 		)
 		.to_be(
-			TreeNode::new(Some(&Running))
+			TreeNode::new(Some(&Running { origin: entity }))
 				.with_leaf(None)
 				.with_leaf(None)
 				.with_child(TreeNode::new(None).with_leaf(None))
 				.with_child(TreeNode::new(None).with_leaf(None))
-				.with_child(TreeNode::new(Some(&Running)).with_leaf(None)), // .with_child(Tree::new(None).with_leaf(Some(&Running))),
+				.with_child(
+					TreeNode::new(Some(&Running {
+						origin: Entity::from_raw(17), // so flaky
+					}))
+					.with_leaf(None),
+				), // .with_child(Tree::new(None).with_leaf(Some(&Running))),
 		);
 	}
 }
