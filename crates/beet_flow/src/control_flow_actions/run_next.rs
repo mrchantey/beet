@@ -7,9 +7,19 @@ use bevy::prelude::*;
 /// in terms of control flow this is essentially a [`goto`](https://xkcd.com/292/) statement.
 ///
 /// The `origin` will be preserved in calling the next OnRun.
+/// ```
+/// # use bevy::prelude::*;
+/// # use beet_flow::prelude::*;
+/// let mut world = World::new();
+/// let action1 = world.spawn(ReturnWith(RunResult::Success)).id();
+/// world
+/// 	.spawn(ReturnWith(RunResult::Success),(RunNext::new(action1)))
+/// 	.trigger(OnRun::local());
+/// ```
 #[action(run_next)]
 #[derive(Debug, Component, PartialEq, Eq)]
 pub struct RunNext {
+	/// The next action to run.
 	pub action: Entity,
 	/// if set, this will only run next if the result matches this,
 	/// otherwise it will stop repeating and trigger OnChildResult<RunResult>
@@ -18,18 +28,21 @@ pub struct RunNext {
 }
 
 impl RunNext {
+	/// Create a new RunNext action.
 	pub fn new(action: Entity) -> Self {
 		Self {
 			action,
 			if_result_matches: None,
 		}
 	}
+	/// Create a new RunNext action that only runs if the result is [`RunResult::Success`].
 	pub fn if_success(action: Entity) -> Self {
 		Self {
 			action,
 			if_result_matches: Some(RunResult::Success),
 		}
 	}
+	/// Create a new RunNext action that only runs if the result is [`RunResult::Failure`].
 	pub fn if_failure(action: Entity) -> Self {
 		Self {
 			action,

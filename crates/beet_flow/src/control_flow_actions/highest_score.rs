@@ -3,7 +3,15 @@ use bevy::prelude::*;
 use bevy::utils::HashMap;
 use std::cmp::Ordering;
 
-
+/// Wrapper for an f32, representing a score. This should be between 0 and 1.
+///
+/// ```rust
+/// # use bevy::prelude::*;
+/// # use beet_flow::prelude::*;
+/// // create a passing score value
+/// World::new()
+/// 	.spawn(ReturnWith(ScoreValue(1.)));
+/// ```
 #[derive(
 	Debug,
 	Default,
@@ -19,11 +27,20 @@ use std::cmp::Ordering;
 pub struct ScoreValue(pub f32);
 
 impl ScoreValue {
+	/// Its best practice to keep scores between 0 and 1,
+	/// so a passing score is 1
 	pub const PASS: Self = Self(1.0);
+	/// Its best practice to keep scores between 0 and 1,
+	/// so a neutral score is 0.5
 	pub const NEUTRAL: Self = Self(0.5);
+	/// Its best practice to keep scores between 0 and 1,
+	/// so a failing score is 0
 	pub const FAIL: Self = Self(0.0);
 }
 
+
+/// The payload for requesting a score,
+/// for usage see [`HighestScore`].
 #[derive(
 	Debug, Default, Copy, Clone, PartialEq, PartialOrd, Component, Reflect,
 )]
@@ -35,15 +52,37 @@ impl RunPayload for RequestScore {
 impl ResultPayload for ScoreValue {
 	type Run = RequestScore;
 }
-
-/// The score flow is a utility ai selector.
-/// Children should provide a score on request, see [`ScoreProvider`].
+/// ## Tags
+/// - [ControlFlow](ActionTag::ControlFlow)
 ///
+/// ## AKA
+/// - UtilitySelector
+///
+/// This action uses the principles of Utility AI to run the
+/// child who provides a score with the highest value.
+/// The mechanisim for requesting and returning a score is the same
+/// as that for requesting and returning a result, which is why
+/// we are able to use [`ReturnWith`] for each case.
+/// ```rust
+///	# use bevy::prelude::*;
+///	# use beet_flow::prelude::*;
+///	World::new()
+///		.spawn(HighestScore::default())
+///		.with_child((
+///			ReturnWith(ScoreValue::NEUTRAL),
+///			ReturnWith(RunResult::Success),
+///		))
+///		.with_child((
+///			ReturnWith(ScoreValue::PASS),
+///			ReturnWith(RunResult::Success),
+///		))
+///		.flush_trigger(OnRun::local());
+/// ```
 #[action(on_start, on_receive_score)]
 #[derive(Default, Deref, DerefMut, Component, Reflect)]
 #[reflect(Default, Component)]
 #[require(BubbleResult)]
-// TODO SparseSet
+// TODO sparseset instead of hashmap
 pub struct HighestScore(HashMap<Entity, ScoreValue>);
 
 fn on_start(

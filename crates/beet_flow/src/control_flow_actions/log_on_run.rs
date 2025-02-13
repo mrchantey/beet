@@ -2,17 +2,23 @@ use crate::prelude::*;
 use bevy::prelude::*;
 use std::borrow::Cow;
 
-/// Mostly used for hello-world programs, logs a message when the action is run.
-/// Use [`BeetDebugPlugin`] for debugging run-state.
+/// ## Tags
+/// - [InputOutput](ActionTag::InputOutput)
+/// 
+/// Can be used for debugging, logs a provided message when it runs.
+/// ```
+/// # use bevy::prelude::*;
+/// # use beet_flow::prelude::*;
+/// World::new()
+///		.spawn(LogOnRun::new("Running..."))
+///		.flush_trigger(OnRun::local());
+/// ```
 #[action(log_on_run)]
 #[derive(Debug, Clone, PartialEq, Component, Reflect)]
 pub struct LogOnRun(pub Cow<'static, str>);
 
-impl Default for LogOnRun {
-	fn default() -> Self { Self(Cow::Borrowed("Running...")) }
-}
-
 impl LogOnRun {
+	/// Create a new [`LogOnRun`] action with the provided message.
 	pub fn new(message: impl Into<Cow<'static, str>>) -> Self {
 		Self(message.into())
 	}

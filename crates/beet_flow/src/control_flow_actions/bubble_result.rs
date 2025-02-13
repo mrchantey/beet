@@ -3,9 +3,25 @@ use bevy::prelude::*;
 use std::marker::PhantomData;
 
 
-/// Tags: [ControlFlow](ActionTag::ControlFlow)
-///
+//* ## Tags
+/// - [ControlFlow](ActionTag::ControlFlow)
 /// If any child triggers a result, bubble it up to the parent.
+/// ```
+/// # use bevy::prelude::*;
+/// # use beet_flow::prelude::*;
+///	// this example will trigger OnResult for each parent
+/// World::new()
+/// .spawn(BubbleResult::default())
+/// .with_children(|parent| {
+/// 	parent
+/// 		.spawn(BubbleResult::default())
+/// 		.with_children(|parent| {
+/// 			parent.spawn(ReturnWith(RunResult::Success))
+/// 				.trigger(OnRun::local());
+/// 		});
+/// });
+///
+/// ```
 #[action(bubble_result::<T>)]
 #[derive(Debug, Component, Clone, Copy, PartialEq, Reflect)]
 pub struct BubbleResult<T: ResultPayload = RunResult>(PhantomData<T>);
@@ -14,8 +30,6 @@ impl Default for BubbleResult {
 	fn default() -> Self { Self(PhantomData) }
 }
 
-
-/// An action is usually triggered
 fn bubble_result<T: ResultPayload>(
 	ev: Trigger<OnChildResult<T>>,
 	commands: Commands,

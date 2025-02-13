@@ -1,7 +1,7 @@
 #![cfg_attr(test, feature(test, custom_test_frameworks))]
 #![cfg_attr(test, test_runner(sweet::test_runner))]
 #![allow(deprecated)]
-// #![deny(missing_docs)]
+#![deny(missing_docs)]
 #![doc = include_str!("../README.md")]
 pub mod continue_run;
 pub mod control_flow;
@@ -63,4 +63,7 @@ pub enum ActionTag {
 	MutateWorld,
 	/// This action makes changes to the [`origin`](OnRun::origin] entity.
 	MutateOrigin,
+	/// This action is concerned with providing output to the user or
+	/// receiving input.
+	InputOutput,
 }

@@ -1,3 +1,5 @@
+//! A collection of built-in actions for controlling the flow of a tree.
+//! If you think that a missing action should be built-in, please open an issue.
 mod bubble_result;
 mod fallback;
 mod highest_score;

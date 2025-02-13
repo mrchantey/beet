@@ -1,11 +1,25 @@
 use crate::prelude::*;
 use bevy::prelude::*;
 
-/// # Action Type: Control Flow
+/// ## Tags
+/// - [ControlFlow](ActionTag::ControlFlow)
+///
+/// ## AKA
+/// - Selector
+///
 /// An action that runs all of its children in order until one succeeds.
 /// - If a child succeeds it succeed.
 /// - If a child fails it will run the next child.
 /// - If there are no more children to run it will succeed.
+///
+/// ```
+/// // this example will run the first child, then the second child
+/// World::new()
+///		.spawn(Fallback)
+///		.with_child(ReturnWith(RunResult::Failure))
+///		.with_child(ReturnWith(RunResult::Success))
+///		.flush_trigger(OnRun::local());
+/// ```
 #[action(on_start, on_next)]
 #[derive(Debug, Default, Component, Reflect)]
 #[reflect(Default, Component)]

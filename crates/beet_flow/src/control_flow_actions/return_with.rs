@@ -4,6 +4,15 @@ use bevy::prelude::*;
 
 /// Immediately return a provided value when [`OnRun`] is called,
 /// regardless of the world state.
+/// As an analogy this is similar to a `const` variable, although
+/// it technically can be changed by some external system.
+/// ```
+/// # use bevy::prelude::*;
+/// # use beet_flow::prelude::*;
+/// World::new()
+/// 	.spawn(ReturnWith(RunResult::Success))
+/// 	.trigger(OnRun::local());
+/// ```
 #[action(return_with::<T>)]
 #[derive(Debug, Component, PartialEq, Eq)]
 pub struct ReturnWith<T: ResultPayload>(pub T);

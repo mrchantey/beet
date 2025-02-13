@@ -1,16 +1,27 @@
 use crate::prelude::*;
 use bevy::prelude::*;
 
+/// ## Tags
+/// - [InputOutput](ActionTag::InputOutput)
 /// Logs the [`Name`] of the entity when it runs.
+///
+/// ```
+/// # use bevy::prelude::*;
+/// # use beet_flow::prelude::*;
+/// World::new()
+///		.spawn((Name::new("root"), LogNameOnRun))
+///		.flush_trigger(OnRun::local());
+/// ```
 #[action(log_name_on_run)]
 #[derive(Default, Component, Reflect)]
 #[reflect(Default, Component)]
+#[require(Name)]
 pub struct LogNameOnRun;
 
 
 /// Logs the [`Name`] of the entity when it runs.
 fn log_name_on_run(trigger: Trigger<OnRun>, query: Query<&Name>) {
-	if let Ok(name) = query.get(trigger.entity()) {
+	if let Ok(name) = query.get(trigger.action) {
 		log::info!("Running: {name}");
 	}
 }

@@ -9,8 +9,12 @@ use std::fmt::Debug;
 use std::fmt::Display;
 use std::fmt::Formatter;
 
+
+/// A simple tree structure with a value and children
 pub struct TreeNode<T> {
+	/// The value of this node
 	pub value: T,
+	/// The children of this node
 	pub children: Vec<TreeNode<T>>,
 }
 
@@ -91,12 +95,14 @@ impl<T: PartialEq> PartialEq for TreeNode<T> {
 }
 
 impl<T> TreeNode<T> {
+	/// Create a new tree with a value and no children
 	pub fn new(value: T) -> Self {
 		Self {
 			value,
 			children: Vec::new(),
 		}
 	}
+	/// Create a new tree with a value and children
 	pub fn new_with_children(value: T, children: Vec<Self>) -> Self {
 		Self { value, children }
 	}
@@ -116,6 +122,7 @@ impl<T> TreeNode<T> {
 		self
 	}
 
+	/// Flatten the tree into a vector
 	pub fn flatten(self) -> Vec<T> {
 		let mut vec = vec![self.value];
 		for child in self.children {
@@ -124,6 +131,7 @@ impl<T> TreeNode<T> {
 		vec
 	}
 
+	/// Map a function over the tree, returning a new tree with the same structure
 	pub fn map<O>(&self, mut map_func: impl FnMut(&T) -> O) -> TreeNode<O> {
 		self.map_ref(&mut map_func)
 	}
@@ -137,6 +145,7 @@ impl<T> TreeNode<T> {
 				.collect(),
 		}
 	}
+	/// Map a function over the tree, returning a new tree with the same structure
 	pub fn map_owned<O>(self, mut map_func: impl FnMut(T) -> O) -> TreeNode<O> {
 		self.map_owned_ref(&mut map_func)
 	}

@@ -2,12 +2,25 @@ use crate::prelude::*;
 use bevy::prelude::*;
 use bevy::utils::HashSet;
 
-
+/// ## Tags
+/// - [ControlFlow](ActionTag::ControlFlow)
+///
 /// An action that runs all of its children in parallel.
-/// - All results will bubble up, so expect multiple [`OnResult`] triggers
+/// - If a child fails it will fail immediately.
+/// - If all children succeed it will succeed.
+///
+/// ```
+/// // this example will run two children in parallel
+/// World::new()
+///		.spawn(Parallel::default())
+///		.with_child(ReturnWith(RunResult::Success))
+///		.with_child(ReturnWith(RunResult::Success))
+///		.flush_trigger(OnRun::local());
+/// ```
 #[action(on_start, on_next)]
 #[derive(Default, Component, Deref, DerefMut, Reflect)]
 #[reflect(Default, Component)]
+// TODO sparseset
 pub struct Parallel(pub HashSet<Entity>);
 
 fn on_start(
