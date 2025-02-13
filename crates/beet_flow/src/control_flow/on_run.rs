@@ -2,46 +2,55 @@ use crate::prelude::*;
 use bevy::prelude::*;
 use std::fmt::Debug;
 
-pub trait RunPayload: 'static + Send + Sync + Clone + Debug {
-	type Result: ResultPayload<Run = Self>;
-}
-pub trait ResultPayload: 'static + Send + Sync + Clone + Debug {
-	type Run: RunPayload<Result = Self>;
+
+/// An event triggered on an [`ActionEntity`], propagated to the observers automatically
+/// with observers registered by the [run_plugin].
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Event)]
+pub struct OnRunAction<T = ()> {
+	/// The payload of the run.
+	/// By analogy if an action is a function, this would be the arguments.
+	pub payload: T,
+	/// this is not exposed as it may be placeholder, instead use [Trigger::resolve_origin]
+	origin: Entity,
+	/// this is not exposed as it may be placeholder, instead use [Trigger::resolve_action]
+	action: Entity,
 }
 
-impl RunPayload for () {
-	type Result = RunResult;
-}
-impl ResultPayload for RunResult {
-	type Run = ();
-}
-impl<T: RunPayload> ActionEvent for OnRunAction<T> {
+impl<T> ActionEvent for OnRunAction<T> {
 	fn action(&self) -> Entity { self.action }
 	fn origin(&self) -> Entity { self.origin }
 }
 
-
-/// An event triggered on *action observers*, never on the action entity (tree node) itself.
-/// This should never be called directly, instead use [`OnRunLocal`] or [`OnRunGlobal`].
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Event)]
-pub struct OnRun<T = ()> {
-	pub payload: T,
-	pub origin: Entity,
-	pub action: Entity,
-	// only OnRunAction is allowed to create this struct
-	_sealed: (),
-}
-
-/// An event triggered on the action entities, propagated to the observers automatically.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Event)]
-pub struct OnRunAction<T = ()> {
-	pub payload: T,
-	origin: Entity,
-	action: Entity,
-}
-
 impl<T> OnRunAction<T> {
-	/// Create a new OnRun trigger, called on the current entity.
+	/// Create a new [`OnRunAction`] event, where the origin
+	/// may be a seperate entity from the action.
+	/// ```
+	/// # use bevy::prelude::*;
+	/// # use beet_flow::prelude::*;
+	/// let mut world = World::new();
+	/// let origin = world.spawn(Name::new("My Agent")).id();
+	/// let action = world
+	/// 	.spawn(ReturnWith(RunResult::Success))
+	/// 	.id();
+	/// world.trigger(OnRunAction::new(action, origin, ()));
+	/// ```
+	pub fn new(action: Entity, origin: Entity, payload: T) -> Self {
+		Self {
+			payload,
+			origin,
+			action,
+		}
+	}
+	/// Convenience function to trigger directly on an [`ActionEntity`]
+	/// where the origin is the [`ActionEntity`].
+	/// When triggering the default [`OnRun<()>`], prefer using [`OnRun::local`].
+	/// ```
+	/// # use bevy::prelude::*;
+	/// # use beet_flow::prelude::*;
+	/// World::new()
+	/// 	.spawn(ReturnWith(RunResult::Success))
+	/// 	.trigger(OnRunAction::local(()));
+	/// ```
 	pub fn local(payload: T) -> Self {
 		Self {
 			payload,
@@ -49,13 +58,18 @@ impl<T> OnRunAction<T> {
 			origin: Entity::PLACEHOLDER,
 		}
 	}
-	pub fn local_with_origin(payload: T, origin: Entity) -> Self {
-		Self {
-			payload,
-			origin,
-			action: Entity::PLACEHOLDER,
-		}
-	}
+	/// Convenience function to trigger globally for an existing [`ActionEntity`]
+	/// where the origin is the [`ActionEntity`].
+	/// When triggering the default [`OnRun<()>`], prefer using [`OnRun::global`].
+	/// ```
+	/// # use bevy::prelude::*;
+	/// # use beet_flow::prelude::*;
+	/// let mut world = World::new();
+	/// let action = world
+	/// 	.spawn(ReturnWith(RunResult::Success))
+	/// 	.id();
+	/// world.trigger(OnRunAction::global(action, ()));
+	/// ```
 	pub fn global(action: Entity, payload: T) -> Self {
 		Self {
 			payload,
@@ -63,20 +77,32 @@ impl<T> OnRunAction<T> {
 			action,
 		}
 	}
-	pub fn global_with_origin(
-		action: Entity,
-		origin: Entity,
-		payload: T,
-	) -> Self {
-		Self {
-			payload,
-			origin,
-			action,
-		}
-	}
+}
+
+
+
+/// An event triggered on an [`ActionObserver`] which can be listened to
+/// by actions.
+///
+/// It is not allowed to trigger this directly because that would
+/// break the routing model of beet, instead see [OnRunAction].
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Event)]
+pub struct OnRun<T = ()> {
+	/// The payload of the run.
+	/// By analogy if an action is a function, this would be the arguments.
+	pub payload: T,
+	/// The entity upon which actions can perform some work, often the
+	/// root of the action tree but can be any entity.
+	pub origin: Entity,
+	/// The [ActionEntity] that triggered this event.
+	pub action: Entity,
+	// only OnRunAction is allowed to create this struct
+	_sealed: (),
 }
 
 impl<T: RunPayload> OnRun<T> {
+	/// Call [`OnRunAction`] for the provided action, cloning this event's
+	/// origin and payload.
 	pub fn trigger_next(&self, mut commands: Commands, next_action: Entity) {
 		commands.trigger(OnRunAction {
 			payload: self.payload.clone(),
@@ -84,6 +110,8 @@ impl<T: RunPayload> OnRun<T> {
 			action: next_action,
 		});
 	}
+	/// Call [`OnRunAction`] for the provided action and payload, cloning this event's
+	/// origin.
 	pub fn trigger_next_with(
 		&self,
 		mut commands: Commands,
@@ -96,9 +124,10 @@ impl<T: RunPayload> OnRun<T> {
 			action: next_action,
 		});
 	}
-
+	/// Call [`OnResultAction`] for this event's action, cloning this event's
+	/// origin.
 	pub fn trigger_result(&self, mut commands: Commands, payload: T::Result) {
-		commands.trigger(OnResultAction::global_with_origin(
+		commands.trigger(OnResultAction::new(
 			self.action,
 			self.origin,
 			payload,
@@ -107,14 +136,33 @@ impl<T: RunPayload> OnRun<T> {
 }
 
 impl OnRun<()> {
-	/// Usability helper, see [`OnRunLocal::new`].
+	/// Convenience function to trigger directly on an [`ActionEntity`]
+	/// where the origin is the [`ActionEntity`].
+	/// ```
+	/// # use bevy::prelude::*;
+	/// # use beet_flow::prelude::*;
+	/// World::new()
+	/// 	.spawn(ReturnWith(RunResult::Success))
+	/// 	.trigger(OnRun::local());
+	/// ```
 	pub fn local() -> OnRunAction { OnRunAction::local(()) }
-	/// Usability helper, see [`OnRunGlobal::new`].
+	/// Convenience function to trigger globally for an existing [`ActionEntity`]
+	/// where the origin is the [`ActionEntity`].
+	/// ```
+	/// # use bevy::prelude::*;
+	/// # use beet_flow::prelude::*;
+	/// let mut world = World::new();
+	/// let action = world
+	/// 	.spawn(ReturnWith(RunResult::Success))
+	/// 	.id();
+	/// world.trigger(OnRun::global(action));
+	/// ```
 	pub fn global(action: Entity) -> OnRunAction {
 		OnRunAction::global(action, ())
 	}
 }
 
+/// Propagate the [`OnRunAction`] event to all [`ActionObservers`].
 pub(crate) fn propagate_on_run<T: RunPayload>(
 	ev: Trigger<OnRunAction<T>>,
 	mut commands: Commands,

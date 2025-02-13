@@ -55,27 +55,15 @@ mod test {
 		expect(&counter).to_have_been_called_times(3);
 		expect(&counter).to_have_returned_nth_with(
 			0,
-			&OnResultAction::global_with_origin(
-				grandchild,
-				grandchild,
-				RunResult::Success,
-			),
+			&OnResultAction::new(grandchild, grandchild, RunResult::Success),
 		);
 		expect(&counter).to_have_returned_nth_with(
 			1,
-			&OnResultAction::global_with_origin(
-				child,
-				grandchild,
-				RunResult::Success,
-			),
+			&OnResultAction::new(child, grandchild, RunResult::Success),
 		);
 		expect(&counter).to_have_returned_nth_with(
 			2,
-			&OnResultAction::global_with_origin(
-				parent,
-				grandchild,
-				RunResult::Success,
-			),
+			&OnResultAction::new(parent, grandchild, RunResult::Success),
 		);
 	}
 }

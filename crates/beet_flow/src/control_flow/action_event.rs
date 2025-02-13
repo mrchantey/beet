@@ -2,17 +2,15 @@ use crate::prelude::*;
 use bevy::prelude::*;
 use std::fmt::Debug;
 
-/// used internally for patterns common to
-/// - [OnRun]
-/// - [OnRunAction]
-/// - [OnResult]
-/// - [OnResultAction]
-///
+/// Common functions for [`OnRunAction`] and [`OnResultAction`] triggers.
 /// This crate is private, primarily because calling
-/// [Self::action()] or [Self::origin()] on
-/// [OnRunAction] or [OnResultAction] would be incorrect,
-/// instead resolve_action etc should be used.
-pub(crate) trait ActionEvent: Event + Debug {
+/// [ActionEvent::action] or [ActionEvent::origin] is incorrect,
+/// ie when created via [OnRunAction::local] etc, the action will
+/// be [Entity::PLACEHOLDER].
+/// Instead the extensions on [Trigger] should be used:
+/// - [ActionEventTriggerExt::resolve_action]
+/// - [ActionEventTriggerExt::resolve_origin]
+pub(crate) trait ActionEvent {
 	/// Internal use only, use Trigger::resolve_action
 	fn action(&self) -> Entity;
 	/// Internal use only, use Trigger::resolve_origin
@@ -67,18 +65,6 @@ impl<T: ResultPayload> ObserverEvent for OnResult<T> {
 	fn origin(&self) -> Entity { self.origin }
 }
 
-impl<T: RunPayload> ActionEvent for OnRun<T> {
-	fn action(&self) -> Entity { self.action }
-	fn origin(&self) -> Entity { self.origin }
-}
-
-
-impl<T: ResultPayload> ActionEvent for OnResult<T> {
-	fn action(&self) -> Entity { self.action }
-	fn origin(&self) -> Entity { self.origin }
-}
-
-
 /// Collect all [OnRunAction] with a [Name]
 #[cfg(test)]
 pub fn collect_on_run(world: &mut World) -> impl Fn() -> Vec<String> {
@@ -86,9 +72,12 @@ pub fn collect_on_run(world: &mut World) -> impl Fn() -> Vec<String> {
 	let func2 = func.clone();
 	world.add_observer(move |ev: Trigger<OnRunAction>, query: Query<&Name>| {
 		let action = ev.resolve_action();
-		if let Ok(name) = query.get(action) {
-			func2.call(name.to_string());
-		}
+		let name = if let Ok(name) = query.get(action) {
+			name.to_string()
+		} else {
+			"".to_string()
+		};
+		func2.call(name);
 	});
 	move || func.called.lock().unwrap().clone()
 }
@@ -102,9 +91,13 @@ pub fn collect_on_result(
 	let func2 = func.clone();
 	world.add_observer(
 		move |ev: Trigger<OnResultAction>, query: Query<&Name>| {
-			if let Ok(name) = query.get(ev.resolve_action()) {
-				func2.call((name.to_string(), ev.payload.clone()));
-			}
+			let action = ev.resolve_action();
+			let name = if let Ok(name) = query.get(action) {
+				name.to_string()
+			} else {
+				"".to_string()
+			};
+			func2.call((name, ev.payload.clone()));
 		},
 	);
 	move || func.called.lock().unwrap().clone()

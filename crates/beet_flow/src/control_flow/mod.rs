@@ -1,10 +1,10 @@
 //! The core functionality of beet_flow, this module primarily
 //! handles routing [`OnRun`] and [`OnResult`] between each
-//! [`ActionEntity`] and any corresponding [`ActionObserverEntity`].
+//! [`ActionEntity`] and any corresponding [`ActionObserver`].
 mod action_event;
 mod action_observers;
 mod beet_debug_plugin;
-mod expect;
+pub mod expect_action;
 mod on_result;
 mod on_run;
 mod run_on_spawn;
@@ -13,14 +13,14 @@ pub use action_event::*;
 pub use action_observers::*;
 pub use beet_debug_plugin::*;
 use bevy::prelude::*;
-pub use expect::*;
 pub use on_result::*;
 pub use on_run::*;
 pub use run_on_spawn::*;
 mod interrupt_on_result;
 mod interrupt_on_run;
-pub use interrupt_on_result::*;
+use interrupt_on_result::*;
 pub use interrupt_on_run::*;
+use std::fmt::Debug;
 
 /// Sets up the base functionality for [`OnRun`] and [`OnResult`] routing.
 pub(crate) fn control_flow_plugin(app: &mut App) {
@@ -57,4 +57,25 @@ pub fn run_plugin<Run: RunPayload, Result: ResultPayload>(app: &mut App) {
 	app.add_observer(interrupt_on_run::<Run>);
 	app.add_observer(propagate_on_result::<Result>);
 	app.add_observer(interrupt_on_result::<Result>);
+}
+
+
+/// Every [RunPayload] must have a corresponding [ResultPayload],
+/// a clear example of this is the [RequestScore] and [ScoreValue] pair.
+pub trait RunPayload: 'static + Send + Sync + Clone + Debug {
+	/// Specifies the [ResultPayload] that corresponds to this [RunPayload].
+	type Result: ResultPayload<Run = Self>;
+}
+/// Every [ResultPayload] must have a corresponding [RunPayload],
+/// a clear example of this is the [RequestScore] and [ScoreValue] pair.
+pub trait ResultPayload: 'static + Send + Sync + Clone + Debug {
+	/// Specifies the [RunPayload] that corresponds to this [ResultPayload].
+	type Run: RunPayload<Result = Self>;
+}
+
+impl RunPayload for () {
+	type Result = RunResult;
+}
+impl ResultPayload for RunResult {
+	type Run = ();
 }

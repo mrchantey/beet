@@ -11,9 +11,12 @@ use std::borrow::Cow;
 /// If a [`BeetDebugConfig`] is not present, it will use the default.
 #[derive(Debug, Clone)]
 pub struct BeetDebugPlugin {
+	/// Log whenever [OnRunAction] is triggered.
 	pub log_on_run: bool,
+	/// Log whenever [Running] entities are updated.
 	pub log_running: bool,
-	pub log_on_run_result: bool,
+	/// Log whenever [OnResultAction] is triggered.
+	pub log_on_result: bool,
 	/// disable logging to stdout, useful if instead using rendered terminal,
 	/// networking etc.
 	pub no_stdout: bool,
@@ -23,26 +26,33 @@ impl Default for BeetDebugPlugin {
 		Self {
 			log_on_run: true,
 			log_running: false,
-			log_on_run_result: false,
+			log_on_result: false,
 			no_stdout: true,
 		}
 	}
 }
 
 impl BeetDebugPlugin {
+	/// Include:
+	/// - [`log_on_run`](Self::log_on_run)
+	/// - [`log_on_run_result`](Self::log_on_result)
 	pub fn with_result() -> Self {
 		Self {
 			log_on_run: true,
-			log_on_run_result: true,
+			log_on_result: true,
 			log_running: false,
 			no_stdout: true,
 		}
 	}
+	/// Include:
+	/// - [`log_on_run`](Self::log_on_run)
+	/// - [`log_running`](Self::log_running)
+	/// - [`log_on_run_result`](Self::log_on_result)
 	pub fn with_all() -> Self {
 		Self {
 			log_on_run: true,
 			log_running: true,
-			log_on_run_result: true,
+			log_on_result: true,
 			no_stdout: true,
 		}
 	}
@@ -67,7 +77,7 @@ impl Plugin for BeetDebugPlugin {
 			app.init_resource::<LogOnRunMarker>();
 		}
 
-		if self.log_on_run_result {
+		if self.log_on_result {
 			app.init_resource::<LogOnResultMarker>();
 		}
 
@@ -82,12 +92,14 @@ impl Plugin for BeetDebugPlugin {
 }
 
 
-/// An 'stdout observer', triggering this will log to the ui terminal.
+/// A helper event for logging messages.
 #[derive(Debug, Event, Deref)]
 pub struct OnLogMessage(pub Cow<'static, str>);
 
 impl OnLogMessage {
+	/// Create a new log message.
 	pub fn new(msg: impl Into<Cow<'static, str>>) -> Self { Self(msg.into()) }
+	/// Create a new log message, with a [`Name`] query.
 	pub fn new_with_query(
 		entity: Entity,
 		query: &Query<&Name>,
@@ -95,6 +107,8 @@ impl OnLogMessage {
 	) -> Self {
 		Self::new_with_optional(entity, query.get(entity).ok(), prefix)
 	}
+	/// Create a new log message, with an [`Option<Name>`],
+	/// falling back to the [`Entity`] if `None`.
 	pub fn new_with_optional(
 		entity: Entity,
 		name: Option<&Name>,
@@ -105,6 +119,7 @@ impl OnLogMessage {
 			.unwrap_or_else(|| format!("{prefix}: {entity}"));
 		Self(msg.into())
 	}
+	/// Call [`log::info`] with the message.
 	pub fn log(&self) {
 		log::info!("{}", self.0);
 	}
@@ -140,6 +155,7 @@ fn log_on_run(
 ) {
 	let msg =
 		OnLogMessage::new_with_query(ev.resolve_action(), &query, "OnRun");
+	// log immediately for correct ordering
 	msg.log();
 	commands.trigger(msg);
 }
@@ -156,6 +172,7 @@ fn log_on_run_result(
 		&query,
 		&format!("{:?}", &ev.payload),
 	);
+	// log immediately for correct ordering
 	msg.log();
 	commands.trigger(msg);
 }
@@ -169,6 +186,7 @@ fn log_running(
 			.map(|n| n.to_string())
 			.unwrap_or_else(|| entity.to_string());
 		let msg = OnLogMessage::new(format!("Running: {}", name));
+		// log immediately for correct ordering
 		msg.log();
 		commands.trigger(msg);
 	}

@@ -12,6 +12,7 @@ use crate::prelude::*;
 use bevy::app::PluginGroup;
 use bevy::app::PluginGroupBuilder;
 
+/// Include the kitchen sink for beet_flow.
 pub mod prelude {
 	// required for macros to work internally
 	pub use super::*;
@@ -29,15 +30,15 @@ pub mod prelude {
 	// pub use sweet::prelude::EntityWorldMutwExt;
 }
 
-
+/// All plugins required for a beet_flow application.
+/// - [control_flow::control_flow_plugin]
+/// - [continue_run::continue_run_plugin]
 #[derive(Default)]
 pub struct BeetFlowPlugin {
 	// lifecycle_plugin: lifecycle::LifecyclePlugin,
 }
 
-impl BeetFlowPlugin {
-	pub fn new() -> Self { Self::default() }
-}
+impl BeetFlowPlugin {}
 
 
 impl PluginGroup for BeetFlowPlugin {
@@ -58,6 +59,8 @@ pub enum ActionTag {
 	/// Actions that use the [Running] component to run
 	/// over multiple frames.
 	LongRunning,
+	/// This action makes global changes to the world.
+	MutateWorld,
+	/// This action makes changes to the [`origin`](OnRun::origin] entity.
+	MutateOrigin,
 }
-
-

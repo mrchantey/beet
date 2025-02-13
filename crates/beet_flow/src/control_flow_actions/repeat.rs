@@ -44,9 +44,8 @@ fn repeat(
 	query: Query<&Repeat>,
 	mut commands: Commands,
 ) {
-	let action = ev.resolve_action();
 	let repeat = query
-		.get(action)
+		.get(ev.action)
 		.expect(&expect_action::to_have_action(&ev));
 	if let Some(check) = &repeat.if_result_matches {
 		if &ev.payload != check {
@@ -55,15 +54,16 @@ fn repeat(
 				commands,
 				parents,
 				action_observers,
-				action,
-				ev.resolve_origin(),
+				ev.action,
+				ev.origin,
 				ev.payload.clone(),
 			);
 			return;
 		}
 	}
 	// otherwise run again on the next tick
-	commands.entity(action).insert(RunOnSpawn::default());
+	let action = OnRunAction::new(ev.action, ev.origin, ());
+	commands.entity(ev.action).insert(RunOnSpawn::new(action));
 }
 
 

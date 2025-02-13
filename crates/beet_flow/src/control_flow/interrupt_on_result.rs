@@ -4,7 +4,7 @@ use bevy::prelude::*;
 
 /// Removes [`Running`] from the entity when [`OnResult`] is triggered.
 /// Also removes [`Running`] from children unless they have a [`NoInterrupt`].
-pub fn interrupt_on_result<T: ResultPayload>(
+pub(super) fn interrupt_on_result<T: ResultPayload>(
 	ev: Trigger<OnResultAction<T>>,
 	mut commands: Commands,
 	// names: Query<&Name>,

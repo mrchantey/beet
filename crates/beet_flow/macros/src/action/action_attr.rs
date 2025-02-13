@@ -36,9 +36,10 @@ fn parse(attr: TokenStream, mut item: DeriveInput) -> syn::Result<TokenStream> {
 	};
 
 	item.attrs
-	.push(syn::parse_quote!(#[component(on_add=#on_add_ident #turbofish, on_remove = #beet_flow_path::prelude::on_remove_action)]));
-	item.attrs
-		.push(syn::parse_quote!(#[require(#beet_flow_path::prelude::ActionObservers)]));
+	.push(syn::parse_quote!(#[component(on_add=#on_add_ident #turbofish, on_remove = #beet_flow_path::prelude::ActionObservers::on_remove)]));
+	item.attrs.push(
+		syn::parse_quote!(#[require(#beet_flow_path::prelude::ActionObservers)]),
+	);
 
 	let observers = punctuated_args(attr)?.into_iter().map(|observer| {
 		quote! {cmd.observe(#observer);}

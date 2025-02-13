@@ -31,7 +31,7 @@ fn on_next(
 		return;
 	}
 	let children = query
-		.get(ev.action)
+		.get(ev.parent)
 		.expect(&expect_action::to_have_children(&ev));
 	let index = children
 		.iter()

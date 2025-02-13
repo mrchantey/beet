@@ -70,7 +70,7 @@ fn on_receive_score(
 	mut query: Query<(&mut HighestScore, &Children)>,
 ) {
 	let (mut action, children) = query
-		.get_mut(ev.action)
+		.get_mut(ev.parent)
 		.expect(&expect_action::to_have_action(&ev));
 
 	action.insert(ev.child, ev.payload);

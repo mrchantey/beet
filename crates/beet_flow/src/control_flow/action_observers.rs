@@ -6,7 +6,7 @@ use bevy::utils::HashMap;
 /// An Action Entity is any node on a control flow graph,
 /// containing the action components.
 #[allow(unused, reason = "docs only")]
-pub(crate) type ActionEntity = ActionObservers;
+pub type ActionEntity = ActionObservers;
 
 
 /// An Action Observer Entity is a single entity created
@@ -18,14 +18,14 @@ pub(crate) type ActionEntity = ActionObservers;
 pub struct ActionObserver;
 
 
-/// A component added to any entity with an action, it tracks
-/// the observers that are listening to the action.
+/// A component added to any entity with an action,
+/// it tracks each [ActionObserver] that is listening to the action.
 /// This will likely become a many-many relationship when bevy supports it.
 #[derive(Debug, Default, Component, Deref, DerefMut)]
 pub struct ActionObservers(pub Vec<Entity>);
 
-/// Tracks action observers created when the first instance of an action is
-/// created.
+/// Tracks each [ActionObserver] created when the first instance
+/// of an action is spawned.
 #[derive(Debug, Default, Resource, Deref, DerefMut)]
 pub struct ActionObserverMap(pub HashMap<ComponentId, Entity>);
 
@@ -71,21 +71,16 @@ impl ActionObservers {
 	}
 	/// Called whenever an action is removed from an [`ActionEntity`].
 	/// Do not call this directly, it is called by the `#[action]` macro component hooks.
-	pub fn on_remove(world: &mut DeferredWorld, action: Entity) {
+	pub fn on_remove(
+		mut world: DeferredWorld,
+		action: Entity,
+		_cid: ComponentId,
+	) {
 		if let Some(mut actions) = world.get_mut::<ActionObservers>(action) {
 			actions.retain(|&e| e != action);
 		}
 	}
 }
-
-pub fn on_remove_action(
-	mut world: DeferredWorld,
-	action: Entity,
-	_cid: ComponentId,
-) {
-	ActionObservers::on_remove(&mut world, action);
-}
-
 
 #[cfg(test)]
 mod test {

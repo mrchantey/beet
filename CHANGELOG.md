@@ -17,6 +17,13 @@ Both as a usability improvement and to facilitate global observer spawning.
 ## Changed
 - `ParallelFlow` now awaits all child results before returning, if any fail it will fail immediately.
 
+- The `Flow` prefix has been replaced by [ActionTag], used as a convention in the docs:
+	```rust
+	/// ## Tags:
+	/// - [`ControlFlow`](ActionTag::ControlFlow)
+	/// - [`LongRunning`](ActionTag::LongRunning)
+	```
+
 
 ## Removed
 - `ActionPlugin`: observers now automatically added

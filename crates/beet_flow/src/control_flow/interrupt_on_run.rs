@@ -13,7 +13,7 @@ pub struct NoInterrupt;
 /// removes [`Running`] from children unless they have a [`NoInterrupt`].
 /// Unlike [`interrupt_on_result`], this does not remove the `Running` component
 /// from the action entity.
-pub fn interrupt_on_run<T: RunPayload>(
+pub(super) fn interrupt_on_run<T: RunPayload>(
 	ev: Trigger<OnRunAction<T>>,
 	mut commands: Commands,
 	should_remove: Populated<(), (With<Running>, Without<NoInterrupt>)>,

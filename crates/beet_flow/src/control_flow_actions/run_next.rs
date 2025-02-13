@@ -5,7 +5,7 @@ use bevy::prelude::*;
 /// Chain runs together, even if they are not in the same hierarchy,
 /// this is useful for a State Machine pattern, but be aware that
 /// in terms of control flow this is essentially a [`goto`](https://xkcd.com/292/) statement.
-/// 
+///
 /// The `origin` will be preserved in calling the next OnRun.
 #[action(run_next)]
 #[derive(Debug, Component, PartialEq, Eq)]
@@ -52,11 +52,7 @@ fn run_next(
 			return;
 		}
 	}
-	commands.trigger(OnRunAction::global_with_origin(
-		run_next.action,
-		ev.origin,
-		(),
-	));
+	commands.trigger(OnRunAction::new(run_next.action, ev.origin, ()));
 }
 
 #[cfg(test)]
@@ -85,11 +81,7 @@ mod test {
 		);
 		expect(&observed).to_have_returned_nth_with(
 			1,
-			&OnResultAction::global_with_origin(
-				action1,
-				action2,
-				RunResult::Success,
-			),
+			&OnResultAction::new(action1, action2, RunResult::Success),
 		);
 	}
 }
