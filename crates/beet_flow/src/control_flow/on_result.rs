@@ -23,10 +23,10 @@ impl<T> ActionEvent for OnResultAction<T> {
 impl<T> OnResultAction<T> {
 	/// Create a new [`OnResultAction`] event, where the origin
 	/// may be a seperate entity from the action.
+	/// ## Example
 	/// ```
-	/// # use bevy::prelude::*;
 	/// # use beet_flow::prelude::*;
-	/// let mut world = World::new();
+	/// # let mut world = world();
 	/// let origin = world.spawn(Name::new("My Agent")).id();
 	/// let action = world
 	/// 	.spawn(Remove::<OnResult, Running>::default())
@@ -42,10 +42,11 @@ impl<T> OnResultAction<T> {
 	}
 	/// Convenience function to trigger directly on an [`ActionEntity`]
 	/// where the origin is the [`ActionEntity`].
+	/// ## Example
 	/// ```
-	/// # use bevy::prelude::*;
 	/// # use beet_flow::prelude::*;
-	/// World::new()
+	/// # let mut world = world();
+	/// world
 	/// 	.spawn(Remove::<OnResult, Running>::default())
 	/// 	.trigger(OnResultAction::local(RunResult::Success));
 	/// ```
@@ -58,10 +59,10 @@ impl<T> OnResultAction<T> {
 	}
 	/// Convenience function to trigger globally for an existing [`ActionEntity`]
 	/// where the origin is the [`ActionEntity`].
+	/// ## Example
 	/// ```
-	/// # use bevy::prelude::*;
 	/// # use beet_flow::prelude::*;
-	/// let mut world = World::new();
+	/// # let mut world = world();
 	/// let action = world
 	/// 	.spawn(Remove::<OnResult, Running>::default())
 	/// 	.id();

@@ -1,11 +1,11 @@
 use crate::prelude::*;
 use bevy::prelude::*;
 
-/// ## Tags:
+/// Succeed a certain number of times before failing.
+/// ## Tags
 /// - [`ControlFlow`](ActionTag::ControlFlow)
 /// - [`LongRunning`](ActionTag::LongRunning)
 ///
-/// This action will succeed a certain number of times before failing.
 /// For example usage see [`Repeat`].
 #[action(succeed_times)]
 #[derive(Debug, Default, Clone, PartialEq, Component, Reflect)]

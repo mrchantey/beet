@@ -2,24 +2,26 @@ use crate::prelude::*;
 use bevy::prelude::*;
 use std::marker::PhantomData;
 
-
-//* ## Tags
-/// - [ControlFlow](ActionTag::ControlFlow)
 /// If any child triggers a result, bubble it up to the parent.
+/// This bubbling is done automatically by [Sequence], [Fallback] etc. 
+/// according to their logic.
+/// ## Tags
+/// - [ControlFlow](ActionTag::ControlFlow)
+/// ## Example
+///	This example will trigger OnResult for each parent.
 /// ```
-/// # use bevy::prelude::*;
 /// # use beet_flow::prelude::*;
-///	// this example will trigger OnResult for each parent
-/// World::new()
-/// .spawn(BubbleResult::default())
-/// .with_children(|parent| {
-/// 	parent
-/// 		.spawn(BubbleResult::default())
-/// 		.with_children(|parent| {
-/// 			parent.spawn(ReturnWith(RunResult::Success))
-/// 				.trigger(OnRun::local());
-/// 		});
-/// });
+/// # let mut world = world();
+/// world
+/// 	.spawn(BubbleResult::default())
+/// 	.with_children(|parent| {
+/// 		parent
+/// 			.spawn(BubbleResult::default())
+/// 			.with_children(|parent| {
+/// 				parent.spawn(ReturnWith(RunResult::Success))
+/// 					.trigger(OnRun::local());
+/// 			});
+/// 	});
 ///
 /// ```
 #[action(bubble_result::<T>)]

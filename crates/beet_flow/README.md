@@ -12,21 +12,30 @@ Currently implemented paradigms:
 
 ## Hello World
 
+A demonstration of a Sequence control flow common in behavior trees
+
+Using `BeetDebugPlugin` will log the name of each action as it is triggered.
 ```rust
 use bevy::prelude::*;
-use beet::prelude::*;
-
-// A demonstration of Sequence control flow
-world.spawn(SequenceFlow)
-	.with_child((
-		Name::new("Hello"),
-		EndOnRun::success(),
+use beet_flow::prelude::*;
+let mut app = App::new();
+app
+	.add_plugins((
+		BeetFlowPlugin::default(),
+		BeetDebugPlugin::default()
 	))
-	.with_child((
-		Name::new("World"),
-		EndOnRun::success(),
-	))
-	.trigger(OnRun);
+	.world_mut()
+	.spawn(Sequence)
+		.with_child((
+			Name::new("Hello"),
+			ReturnWith(RunResult::Success),
+		))
+		.with_child((
+			Name::new("World"),
+			ReturnWith(RunResult::Success),
+		))
+		.trigger(OnRun::local());
+app.world_mut().flush();
 ```
 
 [bevy-observers]:https://docs.rs/bevy/latest/bevy/ecs/observer/struct.Observer.html#

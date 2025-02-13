@@ -28,6 +28,20 @@ pub mod prelude {
 	// // allow flush_trigger in examples
 	// #[cfg(feature = "sweet")]
 	// pub use sweet::prelude::EntityWorldMutwExt;
+	#[cfg(feature = "_doctest")]
+	pub use bevy::prelude::*;
+	/// for use in docs, ie:
+	/// ```
+	/// use beet_flow::prelude::*;
+	/// let world = world();
+	/// ```
+	#[cfg(feature = "_doctest")]
+	pub fn world() -> World {
+		let mut app = App::new();
+		app.add_plugins(beet_flow::BeetFlowPlugin::default());
+		let world = std::mem::take(app.world_mut());
+		world
+	}
 }
 
 /// All plugins required for a beet_flow application.

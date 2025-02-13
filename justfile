@@ -93,7 +93,7 @@ hello-world:
 
 test-all *args:
 	just leptosfmt --check
-	cargo test --workspace
+	cargo test --workspace										 --features=_doctest							{{args}}
 	cargo test 																 --all-features -p beet_flow 			{{args}}
 	cargo test 																 --all-features -p beet_rsx 			{{args}}
 	cargo test --target wasm32-unknown-unknown --all-features -p beet_flow 			{{args}}

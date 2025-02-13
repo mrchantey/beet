@@ -2,20 +2,22 @@ use crate::prelude::*;
 use bevy::prelude::*;
 use bevy::utils::HashSet;
 
+/// An action that runs all of its children in parallel.
 /// ## Tags
 /// - [ControlFlow](ActionTag::ControlFlow)
-///
-/// An action that runs all of its children in parallel.
+/// ## Logic
 /// - If a child fails it will fail immediately.
 /// - If all children succeed it will succeed.
-///
+/// ## Example
+/// Run two children in parallel
 /// ```
-/// // this example will run two children in parallel
-/// World::new()
+/// # use beet_flow::prelude::*;
+/// # let mut world = world();
+/// world
 ///		.spawn(Parallel::default())
 ///		.with_child(ReturnWith(RunResult::Success))
 ///		.with_child(ReturnWith(RunResult::Success))
-///		.flush_trigger(OnRun::local());
+///		.trigger(OnRun::local());
 /// ```
 #[action(on_start, on_next)]
 #[derive(Default, Component, Deref, DerefMut, Reflect)]

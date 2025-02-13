@@ -7,13 +7,21 @@ use bevy::prelude::*;
 /// in terms of control flow this is essentially a [`goto`](https://xkcd.com/292/) statement.
 ///
 /// The `origin` will be preserved in calling the next OnRun.
+/// ## Tags
+/// - [ControlFlow](ActionTag::ControlFlow)
+/// ## Example
+/// Triggering the second action will run the first `action`.
 /// ```
-/// # use bevy::prelude::*;
 /// # use beet_flow::prelude::*;
-/// let mut world = World::new();
-/// let action1 = world.spawn(ReturnWith(RunResult::Success)).id();
+/// # let mut world = world();
+/// let action = world
+/// 	.spawn(ReturnWith(RunResult::Success))
+/// 	.id();
 /// world
-/// 	.spawn(ReturnWith(RunResult::Success),(RunNext::new(action1)))
+/// 	.spawn((
+/// 		ReturnWith(RunResult::Success),
+/// 		RunNext::new(action)
+/// 	))
 /// 	.trigger(OnRun::local());
 /// ```
 #[action(run_next)]

@@ -6,16 +6,17 @@ use std::marker::PhantomData;
 /// This action will remove the specified bundle when the specified action is triggered.
 /// It is designed to work for both [`OnRun`] and [`OnResult`] events.
 /// This action also has a corresponding [`Insert`] action.
+/// ## Example
+/// Removes the `Running` bundle when the `OnResult` event is triggered.
 /// ```
 /// # use beet_flow::prelude::*;
-/// # use bevy::prelude::*;
-/// // removes the `Running` bundle when the `OnResult` event is triggered.
-/// World::new()
+/// # let mut world = world();
+/// world
 ///		.spawn((
 /// 		ReturnWith(RunResult::Success),
 /// 		Remove::<OnResult, Running>::default()
 /// 	))
-///		.trigger(OnRun::local())
+///		.trigger(OnRun::local());
 /// ```
 #[action(remove::<E , B>)]
 #[derive(Debug, Component, Reflect)]

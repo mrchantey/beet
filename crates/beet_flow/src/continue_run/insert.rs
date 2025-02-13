@@ -6,14 +6,14 @@ use std::marker::PhantomData;
 /// This action will insert the provided bundle when the specified action is triggered.
 /// It is designed to work for both [`OnRun`] and [`OnResult`] events.
 /// This action also has a corresponding [`Remove`] action.
+/// ## Example
+/// Inserts the `Running` bundle when the `OnRun` event is triggered.
 /// ```
 /// # use beet_flow::prelude::*;
-/// # use bevy::prelude::*;
-/// // inserts the `Running` bundle when the `OnRun` event is triggered.
-/// World::new()
+/// # let mut world = world();
+/// world
 ///		.spawn(Insert::<OnRun, Running>::default())
-///		.trigger(OnRun::local())
-///
+///		.trigger(OnRun::local());
 /// ```
 #[action(insert::<E , B>)]
 #[derive(Debug, Component, Reflect)]

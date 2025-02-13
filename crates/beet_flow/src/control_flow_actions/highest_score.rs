@@ -4,13 +4,12 @@ use bevy::utils::HashMap;
 use std::cmp::Ordering;
 
 /// Wrapper for an f32, representing a score. This should be between 0 and 1.
-///
+///	## Example
 /// ```rust
-/// # use bevy::prelude::*;
 /// # use beet_flow::prelude::*;
+/// # let mut world = world();
 /// // create a passing score value
-/// World::new()
-/// 	.spawn(ReturnWith(ScoreValue(1.)));
+/// world.spawn(ReturnWith(ScoreValue(1.)));
 /// ```
 #[derive(
 	Debug,
@@ -52,21 +51,19 @@ impl RunPayload for RequestScore {
 impl ResultPayload for ScoreValue {
 	type Run = RequestScore;
 }
-/// ## Tags
-/// - [ControlFlow](ActionTag::ControlFlow)
-///
-/// ## AKA
-/// - UtilitySelector
-///
-/// This action uses the principles of Utility AI to run the
-/// child who provides a score with the highest value.
+/// Aka `UtilitySelector`, Runs the child with the highest score.
+/// This action uses the principles of Utility AI.
 /// The mechanisim for requesting and returning a score is the same
 /// as that for requesting and returning a result, which is why
 /// we are able to use [`ReturnWith`] for each case.
+/// ## Tags
+/// - [ControlFlow](ActionTag::ControlFlow)
+///
+/// ## Example
 /// ```rust
-///	# use bevy::prelude::*;
-///	# use beet_flow::prelude::*;
-///	World::new()
+/// # use beet_flow::prelude::*;
+/// # let mut world = world();
+/// world
 ///		.spawn(HighestScore::default())
 ///		.with_child((
 ///			ReturnWith(ScoreValue::NEUTRAL),
@@ -76,7 +73,7 @@ impl ResultPayload for ScoreValue {
 ///			ReturnWith(ScoreValue::PASS),
 ///			ReturnWith(RunResult::Success),
 ///		))
-///		.flush_trigger(OnRun::local());
+///		.trigger(OnRun::local());
 /// ```
 #[action(on_start, on_receive_score)]
 #[derive(Default, Deref, DerefMut, Component, Reflect)]

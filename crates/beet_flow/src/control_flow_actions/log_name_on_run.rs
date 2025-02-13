@@ -1,16 +1,16 @@
 use crate::prelude::*;
 use bevy::prelude::*;
 
+/// Logs the [`Name`] of the entity when it runs.
 /// ## Tags
 /// - [InputOutput](ActionTag::InputOutput)
-/// Logs the [`Name`] of the entity when it runs.
-///
+/// ## Example
 /// ```
-/// # use bevy::prelude::*;
 /// # use beet_flow::prelude::*;
-/// World::new()
+/// # let mut world = world();
+/// world
 ///		.spawn((Name::new("root"), LogNameOnRun))
-///		.flush_trigger(OnRun::local());
+///		.trigger(OnRun::local());
 /// ```
 #[action(log_name_on_run)]
 #[derive(Default, Component, Reflect)]

@@ -1,21 +1,22 @@
 use crate::prelude::*;
 use bevy::prelude::*;
 
+/// An action that runs all of its children in order until one fails.
 /// ## Tags
 /// - [ControlFlow](ActionTag::ControlFlow)
-///
-/// An action that runs all of its children in order until one fails.
+/// ## Logic
 /// - If a child succeeds it will run the next child.
 /// - If there are no more children to run it will succeed.
 /// - If a child fails it will fail.
-/// 
+/// ## Example
+/// Runs the first child, then the second child.
 /// ```
-/// // this example will run the first child, then the second child
-/// World::new()
-///		.spawn(Sequence)
+/// # use beet_flow::prelude::*;
+/// # let mut world = world();
+///	world.spawn(Sequence)
 ///		.with_child(ReturnWith(RunResult::Success))
 ///		.with_child(ReturnWith(RunResult::Success))
-///		.flush_trigger(OnRun::local());
+///		.trigger(OnRun::local());
 /// ```
 #[action(on_start, on_next)]
 #[derive(Debug, Default, Component, Reflect)]

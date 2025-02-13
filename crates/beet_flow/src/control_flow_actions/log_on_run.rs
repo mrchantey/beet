@@ -2,16 +2,16 @@ use crate::prelude::*;
 use bevy::prelude::*;
 use std::borrow::Cow;
 
+/// Logs a provided message when it runs, useful for debugging.
 /// ## Tags
 /// - [InputOutput](ActionTag::InputOutput)
-/// 
-/// Can be used for debugging, logs a provided message when it runs.
+/// # Example
 /// ```
-/// # use bevy::prelude::*;
 /// # use beet_flow::prelude::*;
-/// World::new()
+/// # let mut world = world();
+/// world
 ///		.spawn(LogOnRun::new("Running..."))
-///		.flush_trigger(OnRun::local());
+///		.trigger(OnRun::local());
 /// ```
 #[action(log_on_run)]
 #[derive(Debug, Clone, PartialEq, Component, Reflect)]

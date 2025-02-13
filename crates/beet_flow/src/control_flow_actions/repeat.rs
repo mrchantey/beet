@@ -7,12 +7,17 @@ use bevy::prelude::*;
 /// Reattaches the [`RunOnSpawn`] component whenever [`OnResult`] is called.
 /// Using [`RunOnSpawn`] means this does **not** directly trigger observers, which avoids infinite loops.
 ///
-/// Note that [`RepeatFlow`] requires [`NoBubble`] so results must be bubbled up manually.
+/// Note that [`RepeatFlow`] requires [`NoBubble`] so results must be bubbled up manually
+/// if the [`Self::if_result_matches`] option is unused.
+///
+/// ## Tags
+/// - [ControlFlow](ActionTag::ControlFlow)
+/// ## Example
+/// Repeat the action twice, then bubble up the failure
 /// ```
-/// # use bevy::prelude::*;
 /// # use beet_flow::prelude::*;
-/// // this example will repeat the action twice, then bubble up the failure
-/// World::new()
+/// # let mut world = world();
+/// world
 /// .spawn((Repeat::if_success(), SucceedTimes::new(2)))
 /// .trigger(OnRun::local());
 /// ```

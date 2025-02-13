@@ -8,16 +8,13 @@ use bevy::prelude::*;
 /// infinite loops or await updated world state.
 /// The [`RunOnSpawn`] component will be removed immediately
 /// and the [`OnRunAction`] will be triggered.
+/// ## Example
 /// ```
-/// # use bevy::prelude::*;
 /// # use beet_flow::prelude::*;
-/// let mut app = App::new();
-/// app.world_mut()
-/// 	.spawn(RunOnSpawn())
-
+/// # let mut world = world();
+/// world.spawn(RunOnSpawn::default());
 /// ```
-///
-///
+/// ## Notes
 /// This component is SparsSet as it is frequently added and removed.
 #[derive(Debug, Clone, Component)]
 #[component(storage = "SparseSet")]

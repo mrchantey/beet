@@ -6,10 +6,14 @@ use bevy::prelude::*;
 /// regardless of the world state.
 /// As an analogy this is similar to a `const` variable, although
 /// it technically can be changed by some external system.
+/// ## Tags
+/// - [ControlFlow](ActionTag::ControlFlow)
+/// ## Example
+/// returns `RunResult::Success` when triggered.
 /// ```
-/// # use bevy::prelude::*;
 /// # use beet_flow::prelude::*;
-/// World::new()
+/// # let mut world = world();
+/// world
 /// 	.spawn(ReturnWith(RunResult::Success))
 /// 	.trigger(OnRun::local());
 /// ```

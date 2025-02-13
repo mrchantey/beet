@@ -24,10 +24,10 @@ impl<T> ActionEvent for OnRunAction<T> {
 impl<T> OnRunAction<T> {
 	/// Create a new [`OnRunAction`] event, where the origin
 	/// may be a seperate entity from the action.
+	/// ## Example
 	/// ```
-	/// # use bevy::prelude::*;
 	/// # use beet_flow::prelude::*;
-	/// let mut world = World::new();
+	/// # let mut world = world();
 	/// let origin = world.spawn(Name::new("My Agent")).id();
 	/// let action = world
 	/// 	.spawn(ReturnWith(RunResult::Success))
@@ -44,10 +44,11 @@ impl<T> OnRunAction<T> {
 	/// Convenience function to trigger directly on an [`ActionEntity`]
 	/// where the origin is the [`ActionEntity`].
 	/// When triggering the default [`OnRun<()>`], prefer using [`OnRun::local`].
+	/// ## Example
 	/// ```
-	/// # use bevy::prelude::*;
 	/// # use beet_flow::prelude::*;
-	/// World::new()
+	/// # let mut world = world();
+	/// world
 	/// 	.spawn(ReturnWith(RunResult::Success))
 	/// 	.trigger(OnRunAction::local(()));
 	/// ```
@@ -61,10 +62,10 @@ impl<T> OnRunAction<T> {
 	/// Convenience function to trigger globally for an existing [`ActionEntity`]
 	/// where the origin is the [`ActionEntity`].
 	/// When triggering the default [`OnRun<()>`], prefer using [`OnRun::global`].
+	/// ## Example
 	/// ```
-	/// # use bevy::prelude::*;
 	/// # use beet_flow::prelude::*;
-	/// let mut world = World::new();
+	/// # let mut world = world();
 	/// let action = world
 	/// 	.spawn(ReturnWith(RunResult::Success))
 	/// 	.id();
@@ -138,20 +139,21 @@ impl<T: RunPayload> OnRun<T> {
 impl OnRun<()> {
 	/// Convenience function to trigger directly on an [`ActionEntity`]
 	/// where the origin is the [`ActionEntity`].
+	/// ## Example
 	/// ```
-	/// # use bevy::prelude::*;
 	/// # use beet_flow::prelude::*;
-	/// World::new()
+	/// # let mut world = world();
+	/// world
 	/// 	.spawn(ReturnWith(RunResult::Success))
 	/// 	.trigger(OnRun::local());
 	/// ```
 	pub fn local() -> OnRunAction { OnRunAction::local(()) }
 	/// Convenience function to trigger globally for an existing [`ActionEntity`]
 	/// where the origin is the [`ActionEntity`].
+	/// ## Example
 	/// ```
-	/// # use bevy::prelude::*;
 	/// # use beet_flow::prelude::*;
-	/// let mut world = World::new();
+	/// # let mut world = world();
 	/// let action = world
 	/// 	.spawn(ReturnWith(RunResult::Success))
 	/// 	.id();

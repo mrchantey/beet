@@ -6,11 +6,12 @@ use std::time::Duration;
 /// This has no effect if the action completes before the duration.
 ///
 /// The default duration is 1 second.
-///
+/// ## Example
 /// ```
 /// # use beet_flow::prelude::*;
-/// # use bevy::prelude::*;
-/// World::new().spawn((
+/// # let mut world = world();
+/// # use std::time::Duration;
+/// world.spawn((
 ///		Running,
 ///		ReturnInDuration::new(RunResult::Success, Duration::from_secs(2)),
 ///	));
