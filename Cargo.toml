@@ -41,11 +41,11 @@ members = [
 	"crates/beet_flow/macros",
 	# "crates/beet_ml",
 	# "crates/beet_rig",
-	"crates/beet_router",
-	"crates/beet_router/parser",
-	"crates/beet_rsx",
-	"crates/beet_rsx/macros",
-	"crates/beet_rsx/parser",
+	# "crates/beet_router",
+	# "crates/beet_router/parser",
+	# "crates/beet_rsx",
+	# "crates/beet_rsx/macros",
+	# "crates/beet_rsx/parser",
 	# "crates/beet_sim",
 	# "crates/beet_spatial",
 	# "crates/beet_site",
@@ -60,11 +60,11 @@ members = [
 beet_flow = { path = "crates/beet_flow", version = "0.0.5-rc.2" }
 beet_flow_macros = { path = "crates/beet_flow/macros", version = "0.0.5-rc.2" }
 # beet_ml = { path = "crates/beet_ml", version = "0.0.5-rc.2" }
-beet_router = { path = "crates/beet_router", version = "0.0.5-rc.2" }
-beet_router_parser = { path = "crates/beet_router/parser", version = "0.0.5-rc.2" }
-beet_rsx = { path = "crates/beet_rsx", version = "0.0.5-rc.2" }
-beet_rsx_macros = { path = "crates/beet_rsx/macros", version = "0.0.5-rc.2" }
-beet_rsx_parser = { path = "crates/beet_rsx/parser", version = "0.0.5-rc.2" }
+# beet_router = { path = "crates/beet_router", version = "0.0.5-rc.2" }
+# beet_router_parser = { path = "crates/beet_router/parser", version = "0.0.5-rc.2" }
+# beet_rsx = { path = "crates/beet_rsx", version = "0.0.5-rc.2" }
+# beet_rsx_macros = { path = "crates/beet_rsx/macros", version = "0.0.5-rc.2" }
+# beet_rsx_parser = { path = "crates/beet_rsx/parser", version = "0.0.5-rc.2" }
 # beet_sim = { path = "crates/beet_sim", version = "0.0.5-rc.2" }
 
 #💡 local
@@ -128,106 +128,106 @@ web-sys = "0.3"
 
 #💡💡 Package
 
-[package]
-name = "beet"
-version.workspace = true
-edition.workspace = true
-description.workspace = true
-documentation.workspace = true
-readme.workspace = true
-homepage.workspace = true
-repository.workspace = true
-license.workspace = true
-keywords.workspace = true
-categories.workspace = true
+# [package]
+# name = "beet"
+# version.workspace = true
+# edition.workspace = true
+# description.workspace = true
+# documentation.workspace = true
+# readme.workspace = true
+# homepage.workspace = true
+# repository.workspace = true
+# license.workspace = true
+# keywords.workspace = true
+# categories.workspace = true
 
-include = ["CHANGELOG.md", "README.md", "/src", "/examples", "/scenes"]
+# include = ["CHANGELOG.md", "README.md", "/src", "/examples", "/scenes"]
 
-[features]
-default = ["flow"]
-flow = ["dep:beet_flow"]
-router = ["rsx", "dep:beet_router"]
-rsx = ["dep:beet_rsx"]
-# ml = ["dep:beet_ml"]
-# reflect = ["beet_flow/reflect"]
-# spatial = ["dep:beet_spatial"]
-# sim = ["dep:beet_sim"]
-# animation = ["beet_spatial?/animation"]
-# assets = ["beet_spatial?/assets"]
-# ui = ["beet_spatial?/ui"]
+# [features]
+# default = ["flow"]
+# flow = ["dep:beet_flow"]
+# router = ["rsx", "dep:beet_router"]
+# rsx = ["dep:beet_rsx"]
+# # ml = ["dep:beet_ml"]
+# # reflect = ["beet_flow/reflect"]
+# # spatial = ["dep:beet_spatial"]
+# # sim = ["dep:beet_sim"]
+# # animation = ["beet_spatial?/animation"]
+# # assets = ["beet_spatial?/assets"]
+# # ui = ["beet_spatial?/ui"]
 
-# bevyhub = ["beet_spatial?/bevyhub", "beet_sim?/bevyhub"]
-# dynamic_linking = ["bevy/dynamic_linking"]
+# # bevyhub = ["beet_spatial?/bevyhub", "beet_sim?/bevyhub"]
+# # dynamic_linking = ["bevy/dynamic_linking"]
 
-[dependencies]
-beet_flow = { workspace = true, optional = true }
-# beet_ml = { workspace = true, optional = true }
-beet_router = { workspace = true, optional = true }
-beet_rsx = { workspace = true, optional = true }
-# beet_sim = { workspace = true, optional = true }
-# beet_spatial = { workspace = true, optional = true }
+# [dependencies]
+# beet_flow = { workspace = true, optional = true }
+# # beet_ml = { workspace = true, optional = true }
+# beet_router = { workspace = true, optional = true }
+# beet_rsx = { workspace = true, optional = true }
+# # beet_sim = { workspace = true, optional = true }
+# # beet_spatial = { workspace = true, optional = true }
 
-# bevyhub = { workspace = true, optional = true }
+# # bevyhub = { workspace = true, optional = true }
 
-[dev-dependencies]
-beet = { path = "", features = ["rsx"] }
-# beet_flow = { workspace = true, features = ["sweet"] }
-bevy.workspace = true
-sweet = { workspace = true, features = ["test", "bevy", "rand"] }
+# [dev-dependencies]
+# beet = { path = "", features = ["rsx"] }
+# # beet_flow = { workspace = true, features = ["sweet"] }
+# bevy.workspace = true
+# sweet = { workspace = true, features = ["test", "bevy", "rand"] }
 
 
-[target.'cfg(target_arch = "wasm32")'.dev-dependencies]
-console_error_panic_hook.workspace = true
-web-sys.workspace = true
+# [target.'cfg(target_arch = "wasm32")'.dev-dependencies]
+# console_error_panic_hook.workspace = true
+# web-sys.workspace = true
 
-[[example]]
-name = "dom_renderer"
-required-features = ["rsx"]
-path = "examples/rsx/dom_renderer.rs"
+# [[example]]
+# name = "dom_renderer"
+# required-features = ["rsx"]
+# path = "examples/rsx/dom_renderer.rs"
 
-#💡flow
+# #💡flow
 
-[[example]]
-name = "bench_local"
-required-features = ["flow"]
-path = "examples/flow/bench_local.rs"
+# [[example]]
+# name = "bench_local"
+# required-features = ["flow"]
+# path = "examples/flow/bench_local.rs"
 
-[[example]]
-name = "bench_global"
-required-features = ["flow"]
-path = "examples/flow/bench_global.rs"
+# [[example]]
+# name = "bench_global"
+# required-features = ["flow"]
+# path = "examples/flow/bench_global.rs"
 
-[[example]]
-name = "hello_world"
-required-features = ["flow"]
-path = "examples/flow/hello_world.rs"
+# [[example]]
+# name = "hello_world"
+# required-features = ["flow"]
+# path = "examples/flow/hello_world.rs"
 
-[[example]]
-name = "long_running"
-required-features = ["flow"]
-path = "examples/flow/long_running.rs"
+# [[example]]
+# name = "long_running"
+# required-features = ["flow"]
+# path = "examples/flow/long_running.rs"
 
-[[example]]
-name = "malenia"
-required-features = ["flow"]
-path = "examples/flow/malenia.rs"
+# [[example]]
+# name = "malenia"
+# required-features = ["flow"]
+# path = "examples/flow/malenia.rs"
 
-[[example]]
-name = "repeat_while"
-required-features = ["flow"]
-path = "examples/flow/repeat_while.rs"
+# [[example]]
+# name = "repeat_while"
+# required-features = ["flow"]
+# path = "examples/flow/repeat_while.rs"
 
-[[example]]
-name = "simple_action"
-required-features = ["flow"]
-path = "examples/flow/simple_action.rs"
+# [[example]]
+# name = "simple_action"
+# required-features = ["flow"]
+# path = "examples/flow/simple_action.rs"
 
-[[example]]
-name = "state_machine"
-required-features = ["flow"]
-path = "examples/flow/state_machine.rs"
+# [[example]]
+# name = "state_machine"
+# required-features = ["flow"]
+# path = "examples/flow/state_machine.rs"
 
-[[example]]
-name = "utility_ai"
-required-features = ["flow"]
-path = "examples/flow/utility_ai.rs"
+# [[example]]
+# name = "utility_ai"
+# required-features = ["flow"]
+# path = "examples/flow/utility_ai.rs"

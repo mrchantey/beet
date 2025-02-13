@@ -16,8 +16,8 @@ impl ResultPayload for RunResult {
 	type Run = ();
 }
 impl<T: RunPayload> ActionEvent for OnRunAction<T> {
-	fn _action(&self) -> Entity { self.action }
-	fn _origin(&self) -> Entity { self.origin }
+	fn action(&self) -> Entity { self.action }
+	fn origin(&self) -> Entity { self.origin }
 }
 
 

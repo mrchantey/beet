@@ -7,17 +7,18 @@ use std::fmt::Debug;
 /// - [OnRunAction]
 /// - [OnResult]
 /// - [OnResultAction]
-/// It is not exposed, primarily because calling
+///
+/// This crate is private, primarily because calling
 /// [Self::action()] or [Self::origin()] on
 /// [OnRunAction] or [OnResultAction] would be incorrect,
 /// instead resolve_action etc should be used.
-pub trait ActionEvent: Event + Debug {
+pub(crate) trait ActionEvent: Event + Debug {
 	/// Internal use only, use Trigger::resolve_action
-	fn _action(&self) -> Entity;
+	fn action(&self) -> Entity;
 	/// Internal use only, use Trigger::resolve_origin
-	fn _origin(&self) -> Entity;
+	fn origin(&self) -> Entity;
 }
-
+/// Common functions for [ActionEvent] triggers.
 #[extend::ext(name=ActionEventTriggerExt)]
 pub impl<'w, T: ActionEvent> Trigger<'w, T> {
 	/// Get the action entity, or the entity that triggered the action.
@@ -27,37 +28,54 @@ pub impl<'w, T: ActionEvent> Trigger<'w, T> {
 	///
 	/// If this trigger was called globally and the action entity is [Entity::PLACEHOLDER]
 	fn resolve_action(&self) -> Entity {
-		if self._action() == Entity::PLACEHOLDER {
+		if self.action() == Entity::PLACEHOLDER {
 			if self.entity() == Entity::PLACEHOLDER {
 				panic!("OnRunAction must either specify an action or be triggered on an action entity");
 			} else {
 				self.entity()
 			}
 		} else {
-			self._action()
+			self.action()
 		}
 	}
 
 	/// Get the origin entity, or the entity that triggered the action.
 	fn resolve_origin(&self) -> Entity {
-		if self._origin() == Entity::PLACEHOLDER {
+		if self.origin() == Entity::PLACEHOLDER {
 			self.resolve_action()
 		} else {
-			self._origin()
+			self.origin()
 		}
 	}
 }
+/// Common functions for [`OnRun`] and [`OnResult`] triggers.
+pub trait ObserverEvent: Event + Debug {
+	/// Get the action entity for this event.
+	fn action(&self) -> Entity;
+	/// Get the origin entity for this event.
+	fn origin(&self) -> Entity;
+}
 
+impl<T: RunPayload> ObserverEvent for OnRun<T> {
+	fn action(&self) -> Entity { self.action }
+	fn origin(&self) -> Entity { self.origin }
+}
+
+
+impl<T: ResultPayload> ObserverEvent for OnResult<T> {
+	fn action(&self) -> Entity { self.action }
+	fn origin(&self) -> Entity { self.origin }
+}
 
 impl<T: RunPayload> ActionEvent for OnRun<T> {
-	fn _action(&self) -> Entity { self.action }
-	fn _origin(&self) -> Entity { self.origin }
+	fn action(&self) -> Entity { self.action }
+	fn origin(&self) -> Entity { self.origin }
 }
 
 
 impl<T: ResultPayload> ActionEvent for OnResult<T> {
-	fn _action(&self) -> Entity { self.action }
-	fn _origin(&self) -> Entity { self.origin }
+	fn action(&self) -> Entity { self.action }
+	fn origin(&self) -> Entity { self.origin }
 }
 
 

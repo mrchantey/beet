@@ -1,3 +1,6 @@
+//! The core functionality of beet_flow, this module primarily
+//! handles routing [`OnRun`] and [`OnResult`] between each
+//! [`ActionEntity`] and any corresponding [`ActionObserverEntity`].
 mod action_event;
 mod action_observers;
 mod beet_debug_plugin;
@@ -19,7 +22,8 @@ mod interrupt_on_run;
 pub use interrupt_on_result::*;
 pub use interrupt_on_run::*;
 
-pub fn observer_plugin(app: &mut App) {
+/// Sets up the base functionality for [`OnRun`] and [`OnResult`] routing.
+pub(crate) fn control_flow_plugin(app: &mut App) {
 	app.init_resource::<ActionObserverMap>()
 		.add_plugins((
 			run_plugin::<(), RunResult>,
@@ -46,7 +50,8 @@ pub struct TickSet;
 pub struct PostTickSet;
 
 
-
+/// This plugin should be registered for any [`RunPayload`] and [`ResultPayload`] pair,
+/// ensuring events are properly propagated and interrupted.
 pub fn run_plugin<Run: RunPayload, Result: ResultPayload>(app: &mut App) {
 	app.add_observer(propagate_on_run::<Run>);
 	app.add_observer(interrupt_on_run::<Run>);

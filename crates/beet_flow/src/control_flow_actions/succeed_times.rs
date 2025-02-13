@@ -1,22 +1,31 @@
 use crate::prelude::*;
 use bevy::prelude::*;
 
-/// A simple action that will succeed a certain number of times before failing.
+/// ## Tags:
+/// - [`ControlFlow`](ActionTag::ControlFlow)
+/// - [`LongRunning`](ActionTag::LongRunning)
+///
+/// This action will succeed a certain number of times before failing.
+/// For example usage see [`Repeat`].
 #[action(succeed_times)]
 #[derive(Debug, Default, Clone, PartialEq, Component, Reflect)]
 #[reflect(Default, Component)]
 pub struct SucceedTimes {
+	/// The number of times the action has executed.
 	pub times: usize,
+	/// The number of times the action should succeed before failing.
 	pub max_times: usize,
 }
 
 impl SucceedTimes {
+	/// Specify the number of times the action should succeed before failing.
 	pub fn new(max_times: usize) -> Self {
 		Self {
 			times: 0,
 			max_times,
 		}
 	}
+	/// Reset the number of times the action has executed.
 	pub fn reset(&mut self) { self.times = 0; }
 }
 
@@ -38,5 +47,4 @@ fn succeed_times(
 }
 
 
-
-// tested with RepeatFlow
+// tested with [Repeat]

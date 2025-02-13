@@ -13,8 +13,8 @@ pub struct OnResultAction<T = RunResult> {
 }
 
 impl<T: ResultPayload> ActionEvent for OnResultAction<T> {
-	fn _action(&self) -> Entity { self.action }
-	fn _origin(&self) -> Entity { self.origin }
+	fn action(&self) -> Entity { self.action }
+	fn origin(&self) -> Entity { self.origin }
 }
 
 impl<T: ResultPayload> OnResultAction<T> {

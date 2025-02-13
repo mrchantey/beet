@@ -3,14 +3,14 @@
 #![allow(deprecated)]
 // #![deny(missing_docs)]
 #![doc = include_str!("../README.md")]
-use bevy::app::PluginGroup;
-use bevy::app::PluginGroupBuilder;
 pub mod continue_run;
 pub mod control_flow;
 pub mod control_flow_actions;
 pub mod tree;
 #[allow(unused, reason = "docs")]
 use crate::prelude::*;
+use bevy::app::PluginGroup;
+use bevy::app::PluginGroupBuilder;
 
 pub mod prelude {
 	// required for macros to work internally
@@ -43,7 +43,7 @@ impl BeetFlowPlugin {
 impl PluginGroup for BeetFlowPlugin {
 	fn build(self) -> PluginGroupBuilder {
 		PluginGroupBuilder::start::<Self>()
-			.add(control_flow::observer_plugin)
+			.add(control_flow::control_flow_plugin)
 			.add(continue_run::continue_run_plugin)
 			.build()
 	}
@@ -55,4 +55,9 @@ pub enum ActionTag {
 	/// Actions concerned with control flow, usually
 	/// triggering [OnRun] and [OnResult] events.
 	ControlFlow,
+	/// Actions that use the [Running] component to run
+	/// over multiple frames.
+	LongRunning,
 }
+
+

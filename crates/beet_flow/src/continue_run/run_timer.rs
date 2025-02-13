@@ -5,6 +5,9 @@ use std::fmt::Debug;
 
 /// Tracks the last time a node was run.
 /// This action is required by [`ContinueRun`] so is rarely added manually.
+/// Note that even when not running the timers will still tick, which
+/// allows for 'Run if inactive for duration' etc.
+/// For an example usage see [`ReturnInDuration`].
 #[derive(Default, Debug, Component, Reflect)]
 #[reflect(Component, Default)]
 pub struct RunTimer {
@@ -35,11 +38,8 @@ pub(crate) fn reset_run_timer_stopped(
 		.ok();
 }
 
-/// Syncs [`RunTimer`] components, by default added to [`PreTickSet`].
-/// This is added to the [`PreTickSet`], any changes detected were from the previous frame.
-/// For this reason timers are reset before they tick to accuratly indicate when the [`Running`]
-/// component was *actually* added or removed.
-pub fn tick_run_timers(
+/// Ticks all [`RunTimer`] timers in the [`PreTickSet`].
+pub(crate) fn tick_run_timers(
 	// TODO run_if
 	time: Res<Time>,
 	mut timers: Populated<&mut RunTimer>,

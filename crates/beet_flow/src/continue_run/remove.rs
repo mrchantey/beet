@@ -4,15 +4,27 @@ use std::marker::PhantomData;
 
 
 /// This action will remove the specified bundle when the specified action is triggered.
-/// It can work for both `OnRun` and `OnResult` events.
+/// It is designed to work for both [`OnRun`] and [`OnResult`] events.
+/// This action also has a corresponding [`Insert`] action.
+/// ```
+/// # use beet_flow::prelude::*;
+/// # use bevy::prelude::*;
+/// // removes the `Running` bundle when the `OnResult` event is triggered.
+/// World::new()
+///		.spawn((
+/// 		ReturnWith(RunResult::Success),
+/// 		Remove::<OnResult, Running>::default()
+/// 	))
+///		.trigger(OnRun::local())
+/// ```
 #[action(remove::<E , B>)]
 #[derive(Debug, Component, Reflect)]
 #[reflect(Component)]
-pub struct Remove<E: ActionEvent, B: Bundle> {
+pub struct Remove<E: ObserverEvent, B: Bundle> {
 	phantom: PhantomData<(E, B)>,
 }
 
-impl<E: ActionEvent, B: Bundle + Default> Default for Remove<E, B> {
+impl<E: ObserverEvent, B: Bundle + Default> Default for Remove<E, B> {
 	fn default() -> Self {
 		Self {
 			phantom: PhantomData,
@@ -20,8 +32,8 @@ impl<E: ActionEvent, B: Bundle + Default> Default for Remove<E, B> {
 	}
 }
 
-fn remove<E: ActionEvent, B: Bundle>(ev: Trigger<E>, mut commands: Commands) {
-	commands.entity(ev._action()).remove::<B>();
+fn remove<E: ObserverEvent, B: Bundle>(ev: Trigger<E>, mut commands: Commands) {
+	commands.entity(ev.action()).remove::<B>();
 }
 
 #[cfg(test)]

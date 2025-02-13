@@ -3,14 +3,24 @@ use bevy::ecs::world::DeferredWorld;
 use bevy::prelude::*;
 use bevy::utils::HashMap;
 
-/// Marker applied to all action observers used to halt recursion
-/// for global observers amongst other things.
+/// An Action Entity is any node on a control flow graph,
+/// containing the action components.
+#[allow(unused, reason = "docs only")]
+pub(crate) type ActionEntity = ActionObservers;
+
+
+/// An Action Observer Entity is a single entity created
+/// for each action definition, forming a many-to-many
+/// relationship with each [ActionEntity] that holds that
+/// action. This structure ensures that only the observers
+/// that are needed are run.
 #[derive(Debug, Component)]
-pub struct ActionObserverMarker;
+pub struct ActionObserver;
 
 
-/// This is added to any entity with an action, it tracks
+/// A component added to any entity with an action, it tracks
 /// the observers that are listening to the action.
+/// This will likely become a many-many relationship when bevy supports it.
 #[derive(Debug, Default, Component, Deref, DerefMut)]
 pub struct ActionObservers(pub Vec<Entity>);
 
@@ -29,7 +39,7 @@ impl ActionObserverMap {
 		if let Some(action) = map.get(&cid) {
 			return *action;
 		}
-		let observer_entity = world.commands().spawn(ActionObserverMarker).id();
+		let observer_entity = world.commands().spawn(ActionObserver).id();
 		on_spawn(world, observer_entity);
 		let mut map = world.resource_mut::<Self>();
 		map.insert(cid, observer_entity);
@@ -38,7 +48,8 @@ impl ActionObserverMap {
 }
 
 impl ActionObservers {
-	// called by the Action component hooks.
+	/// Called whenever an action is added to an [`ActionEntity`].
+	/// Do not call this directly, it is called by the `#[action]` macro component hooks.
 	pub fn on_add(
 		world: &mut DeferredWorld,
 		action: Entity,
@@ -48,20 +59,18 @@ impl ActionObservers {
 		let observer_entity =
 			ActionObserverMap::get_or_spawn(world, cid, on_spawn_observer);
 
-		if let Some(mut action_observers) =
-			world.get_mut::<ActionObservers>(action)
-		{
-			action_observers.0.push(observer_entity);
-		} else {
-			world
-				.commands()
-				.entity(action)
-				.entry::<ActionObservers>()
-				.or_default()
-				.and_modify(move |mut actions| actions.push(observer_entity));
-		}
+
+		world
+			.commands()
+			.entity(action)
+			.entry::<ActionObservers>()
+			// should always exist because macro adds
+			// #[require(ActionObservers)]
+			.or_default()
+			.and_modify(move |mut actions| actions.push(observer_entity));
 	}
-	// called by the Action component hooks.
+	/// Called whenever an action is removed from an [`ActionEntity`].
+	/// Do not call this directly, it is called by the `#[action]` macro component hooks.
 	pub fn on_remove(world: &mut DeferredWorld, action: Entity) {
 		if let Some(mut actions) = world.get_mut::<ActionObservers>(action) {
 			actions.retain(|&e| e != action);

@@ -2,13 +2,27 @@ use crate::prelude::*;
 use bevy::prelude::*;
 use std::time::Duration;
 
-/// Triggers the given event after running for a given duration. Has no effect if
-/// the action completes before the duration.
+/// Triggers the given event after running for a given duration.
+/// This has no effect if the action completes before the duration.
+///
+/// The default duration is 1 second.
+///
+/// ```
+/// # use beet_flow::prelude::*;
+/// # use bevy::prelude::*;
+/// World::new().spawn((
+///		Running,
+///		ReturnInDuration::new(RunResult::Success, Duration::from_secs(2)),
+///	));
+///
+/// ```
 #[derive(Debug, Clone, Component, Reflect)]
 #[require(ContinueRun)]
 pub struct ReturnInDuration<T: ResultPayload = RunResult> {
+	/// The length of time the action will run for before triggering the event.
 	pub duration: Duration,
-	pub value: T,
+	/// The payload to return with
+	pub payload: T,
 }
 
 impl<T: Default + ResultPayload> Default for ReturnInDuration<T> {
@@ -16,24 +30,27 @@ impl<T: Default + ResultPayload> Default for ReturnInDuration<T> {
 }
 
 impl<T: ResultPayload> ReturnInDuration<T> {
-	pub fn new(value: T, duration: Duration) -> Self {
-		Self { value, duration }
+	/// Specify the payload and duration
+	pub fn new(payload: T, duration: Duration) -> Self {
+		Self { payload, duration }
 	}
-	pub fn with_secs(value: T, secs: u64) -> Self {
+	/// Specify the payload and duration in seconds
+	pub fn with_secs(payload: T, secs: u64) -> Self {
 		Self {
-			value,
+			payload,
 			duration: Duration::from_secs(secs),
 		}
 	}
-	pub fn with_millis(value: T, millis: u64) -> Self {
+	/// Specify the payload and duration in milliseconds
+	pub fn with_millis(payload: T, millis: u64) -> Self {
 		Self {
-			value,
+			payload,
 			duration: Duration::from_millis(millis),
 		}
 	}
 }
 
-pub fn return_in_duration<T: ResultPayload>(
+pub(crate) fn return_in_duration<T: ResultPayload>(
 	mut commands: Commands,
 	mut query: Populated<
 		(Entity, &RunTimer, &mut ReturnInDuration<T>),
@@ -42,8 +59,10 @@ pub fn return_in_duration<T: ResultPayload>(
 ) {
 	for (entity, timer, action) in query.iter_mut() {
 		if timer.last_started.elapsed() >= action.duration {
-			commands
-				.trigger(OnResultAction::global(entity, action.value.clone()));
+			commands.trigger(OnResultAction::global(
+				entity,
+				action.payload.clone(),
+			));
 		}
 	}
 }
