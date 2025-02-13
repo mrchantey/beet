@@ -1,10 +1,9 @@
 use crate::prelude::*;
-use beet_flow::prelude::GenericActionComponent;
 use bevy::prelude::*;
 
 /// Calculate a separation impulse
 /// as described [here](https://natureofcode.com/autonomous-agents/#example-59-separation).
-pub fn separate_impulse<'a, T: GenericActionComponent>(
+pub fn separate_impulse<'a, T>(
 	target_entity: Entity,
 	position: Vec3,
 	max_speed: MaxSpeed,

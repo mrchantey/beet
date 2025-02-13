@@ -2,10 +2,9 @@ use crate::prelude::*;
 use beet_flow::prelude::*;
 use bevy::prelude::*;
 
-#[derive(Debug, Clone, PartialEq, Component, Action, Reflect)]
-#[reflect(Default, Component, ActionMeta)]
-#[category(ActionCategory::Behavior)]
-#[observers(provide_score)]
+#[action(provide_score)]
+#[derive(Debug, Clone, PartialEq, Component, Reflect)]
+#[reflect(Default, Component)]
 /// Provides a [`ScoreValue`] based on distance to the [`SteerTarget`]
 pub struct SteerTargetScoreProvider {
 	/// fail if already at location
@@ -23,33 +22,29 @@ impl Default for SteerTargetScoreProvider {
 }
 
 fn provide_score(
-	trigger: Trigger<RequestScore>,
-	mut commands: Commands,
+	ev: Trigger<OnRun<RequestScore>>,
+	commands: Commands,
 	transforms: Query<&GlobalTransform>,
 	agents: Query<(&GlobalTransform, &SteerTarget)>,
-	query: Query<(&SteerTargetScoreProvider, &TargetEntity, &Parent)>,
+	query: Query<&SteerTargetScoreProvider>,
 ) {
-	let (action, agent, parent) = query
-		.get(trigger.entity())
-		.expect(expect_action::ACTION_QUERY_MISSING);
-
-	let score = if let Ok((transform, target)) = agents.get(**agent) {
-		if let Ok(target) = target.get_position(&transforms) {
-			let dist = transform.translation().distance_squared(target);
-			if dist >= action.min_radius.powi(2)
-				&& dist <= action.max_radius.powi(2)
-			{
-				1.
-			} else {
-				0.
-			}
+	let action = query
+		.get(ev.action)
+		.expect(&expect_action::to_have_action(&ev));
+	let (transform, target) = agents
+		.get(ev.origin)
+		.expect(&expect_action::to_have_origin(&ev));
+	let score = if let Ok(target) = target.get_position(&transforms) {
+		let dist = transform.translation().distance_squared(target);
+		if dist >= action.min_radius.powi(2)
+			&& dist <= action.max_radius.powi(2)
+		{
+			1.
 		} else {
 			0.
 		}
 	} else {
 		0.
 	};
-	commands
-		.entity(parent.get())
-		.trigger(OnChildScore::new(trigger.entity(), score));
+	ev.trigger_result(commands, ScoreValue::new(score));
 }

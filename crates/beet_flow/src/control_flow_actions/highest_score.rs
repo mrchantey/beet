@@ -35,6 +35,8 @@ impl ScoreValue {
 	/// Its best practice to keep scores between 0 and 1,
 	/// so a failing score is 0
 	pub const FAIL: Self = Self(0.0);
+	/// Create a new instance of `ScoreValue` with the provided score.
+	pub fn new(score: f32) -> Self { Self(score) }
 }
 
 

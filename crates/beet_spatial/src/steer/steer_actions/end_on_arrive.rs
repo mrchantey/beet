@@ -5,10 +5,8 @@ use bevy::prelude::*;
 
 /// Succeeds when the agent arrives at the [`SteerTarget`].
 /// Fails if the target is not found.
-#[derive(Debug, Clone, PartialEq, Component, Action, Reflect)]
-#[reflect(Default, Component, ActionMeta)]
-#[category(ActionCategory::Behavior)]
-#[systems(end_on_arrive.in_set(TickSet))]
+#[derive(Debug, Clone, PartialEq, Component, Reflect)]
+#[reflect(Default, Component)]
 #[require(ContinueRun)]
 pub struct EndOnArrive {
 	pub radius: f32,
@@ -22,23 +20,28 @@ impl EndOnArrive {
 	pub fn new(radius: f32) -> Self { Self { radius } }
 }
 
-pub fn end_on_arrive(
+pub(crate) fn end_on_arrive(
 	mut commands: Commands,
 	agents: Query<(&GlobalTransform, &SteerTarget)>,
 	transforms: Query<&GlobalTransform>,
-	mut query: Query<(Entity, &TargetEntity, &EndOnArrive), With<Running>>,
+	mut query: Query<(Entity, &Running, &EndOnArrive), With<Running>>,
 ) {
-	for (entity, agent, action) in query.iter_mut() {
-		if let Ok((transform, target)) = agents.get(**agent) {
-			if let Ok(target) = target.get_position(&transforms) {
-				if transform.translation().distance_squared(target)
-					<= action.radius.powi(2)
-				{
-					commands.entity(entity).trigger(OnRunResult::success());
-				}
-			} else {
-				commands.entity(entity).trigger(OnRunResult::failure());
+	for (action, running, end_on_arrive) in query.iter_mut() {
+		let (transform, target) = agents
+			.get(running.origin)
+			.expect(&expect_action::to_have_origin(&running));
+		if let Ok(target) = target.get_position(&transforms) {
+			if transform.translation().distance_squared(target)
+				<= end_on_arrive.radius.powi(2)
+			{
+				running.trigger_result(
+					&mut commands,
+					action,
+					RunResult::Success,
+				);
 			}
+		} else {
+			running.trigger_result(&mut commands, action, RunResult::Failure);
 		}
 	}
 }

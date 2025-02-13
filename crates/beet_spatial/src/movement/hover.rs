@@ -3,9 +3,9 @@ use bevy::prelude::*;
 use std::f32::consts::TAU;
 
 
-#[derive(Debug, Default, Clone, PartialEq, Component, Action, Reflect)]
-#[reflect(Default, Component, ActionMeta)]
-#[category(ActionCategory::Agent)]
+#[derive(Debug, Default, Clone, PartialEq, Component, Reflect)]
+#[reflect(Default, Component)]
+#[require(ContinueRun)]
 /// Translate the agent up and down in a sine wave
 pub struct Hover {
 	/// Measured in Hz
@@ -24,11 +24,15 @@ pub(crate) fn hover(
 	mut _commands: Commands,
 	time: Res<Time>,
 	mut transforms: Query<&mut Transform>,
-	query: Query<(&TargetEntity, &Hover), With<Running>>,
+	query: Query<(&Running, &Hover)>,
 ) {
-	for (target, hover) in query.iter() {
+	for (running, hover) in query.iter() {
 		let elapsed = time.elapsed_secs();
 		let y = f32::sin(TAU * elapsed * hover.speed) * hover.height;
-		transforms.get_mut(**target).unwrap().translation.y = y;
+		transforms
+			.get_mut(running.origin)
+			.expect(&expect_action::to_have_origin(&running))
+			.translation
+			.y = y;
 	}
 }

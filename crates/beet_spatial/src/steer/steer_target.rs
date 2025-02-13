@@ -5,11 +5,6 @@ use bevy::ecs::reflect::ReflectMapEntities;
 use bevy::prelude::*;
 
 
-pub type RunOnSteerTargetInsert =
-	TriggerOnTrigger<OnRun, OnInsert, SteerTarget>;
-pub type RunOnSteerTargetRemove =
-	TriggerOnTrigger<OnRun, OnRemove, SteerTarget>;
-
 #[derive(Debug, Copy, Clone, PartialEq, Component, Reflect)]
 #[reflect(Component, MapEntities)]
 // Description of a target used by steering behaviors.

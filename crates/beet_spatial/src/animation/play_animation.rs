@@ -56,7 +56,7 @@ fn play_animation_on_run(
 	query: Query<(&TargetEntity, &PlayAnimation)>,
 ) {
 	let (agent, play_animation) = query
-		.get(trigger.entity())
+		.get(trigger.action)
 		.expect(expect_action::ACTION_QUERY_MISSING);
 
 	// log::info!("playonrun {}", agents.iter().count());

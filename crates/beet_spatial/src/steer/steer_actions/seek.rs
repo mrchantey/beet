@@ -3,10 +3,8 @@ use beet_flow::prelude::*;
 use bevy::prelude::*;
 
 /// Go to the agent's [`SteerTarget`] with an optional [`ArriveRadius`]
-#[derive(Debug, Default, Clone, PartialEq, Component, Action, Reflect)]
-#[reflect(Default, Component, ActionMeta)]
-#[category(ActionCategory::Agent)]
-#[systems(seek.in_set(TickSet))]
+#[derive(Debug, Default, Clone, PartialEq, Component, Reflect)]
+#[reflect(Default, Component)]
 #[require(ContinueRun)]
 pub struct Seek {
 	// TODO this should be a seperate component used by other actions as well
@@ -35,7 +33,7 @@ pub enum OnTargetNotFound {
 
 
 // TODO if target has Velocity, pursue
-fn seek(
+pub(crate) fn seek(
 	mut commands: Commands,
 	transforms: Query<&GlobalTransform>,
 	mut agents: Query<(
@@ -47,10 +45,10 @@ fn seek(
 		&mut Impulse,
 		Option<&ArriveRadius>,
 	)>,
-	query: Query<(Entity, &TargetEntity, &Seek), With<Running>>,
+	query: Query<(Entity, &Running, &Seek)>,
 ) {
-	for (entity, target, seek) in query.iter() {
-		if let Ok((
+	for (action, running, seek) in query.iter() {
+		let (
 			agent_entity,
 			transform,
 			velocity,
@@ -58,39 +56,46 @@ fn seek(
 			max_speed,
 			mut impulse,
 			arrive_radius,
-		)) = agents.get_mut(**target)
-		{
-			match (&seek.on_not_found, steer_target.get_position(&transforms)) {
-				(_, Ok(target_position)) => {
-					*impulse = seek_impulse(
-						&transform.translation(),
-						&velocity,
-						&target_position,
-						*max_speed,
-						arrive_radius.copied(),
-					);
-				}
-				(OnTargetNotFound::Clear, Err(_)) => {
-					commands.entity(agent_entity).remove::<SteerTarget>();
-				}
-				(OnTargetNotFound::Fail, Err(_)) => {
-					commands.entity(agent_entity).remove::<SteerTarget>();
-					commands.entity(entity).trigger(OnRunResult::failure());
-				}
-				(OnTargetNotFound::Succeed, Err(_)) => {
-					commands.entity(agent_entity).remove::<SteerTarget>();
-					commands.entity(entity).trigger(OnRunResult::success());
-				}
-				(OnTargetNotFound::Ignore, Err(_)) => {}
-				(OnTargetNotFound::Warn, Err(msg)) => {
-					log::warn!("{}", msg);
-				}
+		) = agents
+			.get_mut(running.origin)
+			.expect(&expect_action::to_have_origin(&running));
+		match (&seek.on_not_found, steer_target.get_position(&transforms)) {
+			(_, Ok(target_position)) => {
+				*impulse = seek_impulse(
+					&transform.translation(),
+					&velocity,
+					&target_position,
+					*max_speed,
+					arrive_radius.copied(),
+				);
 			}
-		} else {
-			// if agent has no steer_target thats ok
+			(OnTargetNotFound::Clear, Err(_)) => {
+				commands.entity(agent_entity).remove::<SteerTarget>();
+			}
+			(OnTargetNotFound::Fail, Err(_)) => {
+				commands.entity(agent_entity).remove::<SteerTarget>();
+				running.trigger_result(
+					&mut commands,
+					action,
+					RunResult::Failure,
+				);
+			}
+			(OnTargetNotFound::Succeed, Err(_)) => {
+				commands.entity(agent_entity).remove::<SteerTarget>();
+				running.trigger_result(
+					&mut commands,
+					action,
+					RunResult::Success,
+				);
+			}
+			(OnTargetNotFound::Ignore, Err(_)) => {}
+			(OnTargetNotFound::Warn, Err(msg)) => {
+				log::warn!("{}", msg);
+			}
 		}
 	}
 }
+
 
 #[cfg(test)]
 mod test {
@@ -103,8 +108,7 @@ mod test {
 	fn works() {
 		let mut app = App::new();
 
-		app.add_plugins((LifecyclePlugin, MovementPlugin, SteerPlugin))
-			.init_resource::<RandomSource>()
+		app.add_plugins((BeetFlowPlugin::default(), BeetSpatialPlugins))
 			.insert_time();
 
 		let agent = app
@@ -117,8 +121,7 @@ mod test {
 			))
 			.with_children(|parent| {
 				parent.spawn((
-					TargetEntity(parent.parent_entity()),
-					Running,
+					Running::new(parent.parent_entity()),
 					Seek::default(),
 				));
 			})

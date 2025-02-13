@@ -5,12 +5,10 @@ use std::marker::PhantomData;
 
 /// Ensures that boids avoid crowding neighbors by maintaining a minimum distance from each other.
 /// This is done by updating the [`Velocity`] component.
-#[derive(Debug, Clone, PartialEq, Component, Action, Reflect)]
-#[reflect(Default, Component, ActionMeta)]
-#[category(ActionCategory::Agent)]
-#[systems(separate::<M>.in_set(TickSet))]
+#[derive(Debug, Clone, PartialEq, Component, Reflect)]
+#[reflect(Default, Component)]
 #[require(ContinueRun)]
-pub struct Separate<M: GenericActionComponent> {
+pub struct Separate<M> {
 	/// The scalar to apply to the impulse
 	pub scalar: f32,
 	/// The radius within which to avoid other boids
@@ -19,7 +17,7 @@ pub struct Separate<M: GenericActionComponent> {
 	phantom: PhantomData<M>,
 }
 
-impl<M: GenericActionComponent> Default for Separate<M> {
+impl<M> Default for Separate<M> {
 	fn default() -> Self {
 		Self {
 			scalar: 1.,
@@ -29,7 +27,7 @@ impl<M: GenericActionComponent> Default for Separate<M> {
 	}
 }
 
-impl<M: GenericActionComponent> Separate<M> {
+impl<M> Separate<M> {
 	/// Set impulse strength with default radius
 	pub fn new(scalar: f32) -> Self {
 		Self {
@@ -44,17 +42,15 @@ impl<M: GenericActionComponent> Separate<M> {
 	}
 }
 
-fn separate<M: GenericActionComponent>(
+pub(crate) fn separate<M: Component>(
 	boids: Query<(Entity, &Transform), With<M>>,
 	mut agents: Query<(Entity, &Transform, &mut Impulse, &MaxSpeed)>,
-	query: Query<(&TargetEntity, &Separate<M>), With<Running>>,
+	query: Query<(&Running, &Separate<M>)>,
 ) {
-	for (target, separate) in query.iter() {
-		let Ok((entity, transform, mut impulse, max_speed)) =
-			agents.get_mut(**target)
-		else {
-			continue;
-		};
+	for (running, separate) in query.iter() {
+		let (entity, transform, mut impulse, max_speed) = agents
+			.get_mut(running.origin)
+			.expect(&expect_action::to_have_origin(&running));
 
 		**impulse += *separate_impulse(
 			entity,

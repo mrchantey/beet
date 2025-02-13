@@ -18,17 +18,26 @@ pub struct ContinueRun;
 
 
 /// A marker component added to an [ActionEntity] indicate this action is currently running.
+/// ## Example
+/// This is the `Translate` action found in `beet_spatial`.
 /// ```
 ///	# use bevy::prelude::*;
 ///	# use beet_flow::prelude::*;
 ///
 /// #[derive(Component)]
 /// #[require(ContinueRun)]
-/// struct MyLongAction;
+/// struct Translate(pub Vec3);
 ///
-/// fn my_long_action(query: Query<&MyLongAction, With<Running>>){
-/// 	for action in query.iter(){
-/// 	  // etc.
+/// fn translate(
+/// 	time: Res<Time>,
+/// 	action: Query<(&Running, &Translate)>,
+/// 	mut transforms: Query<&mut Transform>,
+/// ){
+/// 	for (running, translate) in action.iter(){
+/// 		let mut transform = transforms
+/// 			.get_mut(running.origin)
+/// 			.expect(&expect_action::to_have_origin(&running));
+/// 		transform.translation += translate.0 * time.delta_secs();
 /// 	}
 /// }
 /// ```
@@ -36,6 +45,7 @@ pub struct ContinueRun;
 #[derive(Debug, Copy, Clone, Component, PartialEq, Reflect)]
 #[component(storage = "SparseSet",on_add = on_add_running)]
 #[reflect(Component)]
+#[require(RunTimer)] // mostly for tests where we added running directly
 pub struct Running {
 	/// The entity upon which actions can perform some work, often the
 	/// root of the action tree but can be any entity.
@@ -44,6 +54,17 @@ pub struct Running {
 impl Running {
 	/// Create a new instance of `Running` with the provided origin.
 	pub fn new(origin: Entity) -> Self { Self { origin } }
+
+
+	/// Trigger a result, the action must be the entity containing this [`Running`] component.
+	pub fn trigger_result<T: ResultPayload>(
+		&self,
+		commands: &mut Commands,
+		action: Entity,
+		payload: T,
+	) {
+		commands.trigger(OnResultAction::new(action, self.origin, payload));
+	}
 }
 
 fn on_add_running(mut world: DeferredWorld, entity: Entity, _cid: ComponentId) {
@@ -69,6 +90,13 @@ mod test {
 	use bevy::prelude::*;
 	use sweet::prelude::*;
 
+	#[test]
+	fn sets_running_origin() {
+		let mut world = World::new();
+		let entity = world.spawn(Running::default()).id();
+		expect(world.get::<Running>(entity).unwrap())
+			.to_be(&Running { origin: entity });
+	}
 	#[test]
 	fn adds() {
 		let mut app = App::new();

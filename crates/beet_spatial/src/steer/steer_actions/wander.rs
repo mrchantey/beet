@@ -3,11 +3,9 @@ use beet_flow::prelude::*;
 use bevy::prelude::*;
 use sweet::prelude::*;
 
-/// Somewhat cohesive random walk
-#[derive(Debug, Clone, PartialEq, Component, Action, Reflect)]
-#[reflect(Default, Component, ActionMeta)]
-#[category(ActionCategory::Agent)]
-#[systems(wander.in_set(TickSet))]
+/// Somewhat cohesive random walk, see [wander_impulse]
+#[derive(Debug, Clone, PartialEq, Component, Reflect)]
+#[reflect(Default, Component)]
 #[require(ContinueRun)]
 pub struct Wander {
 	/// The scalar to apply to the impulse
@@ -67,26 +65,22 @@ impl Wander {
 	}
 }
 
-fn wander(
+pub(crate) fn wander(
 	mut rng: ResMut<RandomSource>,
 	mut agents: Query<(&Transform, &Velocity, &MaxSpeed, &mut Impulse)>,
-	mut query: Query<
-		(&TargetEntity, &mut Wander),
-		(With<Running>, With<Wander>),
-	>,
+	mut query: Query<(&Running, &mut Wander), With<Wander>>,
 ) {
-	for (agent, mut wander) in query.iter_mut() {
-		if let Ok((transform, velocity, max_speed, mut impulse)) =
-			agents.get_mut(**agent)
-		{
-			**impulse += *wander_impulse(
-				&transform.translation,
-				&velocity,
-				&mut wander,
-				*max_speed,
-				&mut rng,
-			);
-		}
+	for (running, mut wander) in query.iter_mut() {
+		let (transform, velocity, max_speed, mut impulse) = agents
+			.get_mut(running.origin)
+			.expect(&expect_action::to_have_origin(&running));
+		**impulse += *wander_impulse(
+			&transform.translation,
+			&velocity,
+			&mut wander,
+			*max_speed,
+			&mut rng,
+		);
 	}
 }
 
@@ -102,8 +96,11 @@ mod test {
 	fn works() {
 		let mut app = App::new();
 
-		app.add_plugins((LifecyclePlugin, MovementPlugin, SteerPlugin))
-			.insert_time();
+		app.add_plugins((
+			BeetFlowPlugin::default(),
+			BeetSpatialPlugins::default(),
+		))
+		.insert_time();
 
 		let agent = app
 			.world_mut()
@@ -114,8 +111,7 @@ mod test {
 			))
 			.with_children(|parent| {
 				parent.spawn((
-					TargetEntity(parent.parent_entity()),
-					Running,
+					Running::new(parent.parent_entity()),
 					Wander::default(),
 				));
 			})

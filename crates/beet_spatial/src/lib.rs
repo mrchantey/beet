@@ -44,8 +44,9 @@ impl PluginGroup for BeetSpatialPlugins {
 	fn build(self) -> PluginGroupBuilder {
 		#[allow(unused_mut)]
 		let mut builder = PluginGroupBuilder::start::<Self>()
-		.add(MovementPlugin::default())
-		.add(SteerPlugin::default())
+		.add(movement_plugin)
+		.add(procedural_animation_plugin)
+		.add(steer_plugin)
 		.add(ik_plugin)
 		/*-*/;
 

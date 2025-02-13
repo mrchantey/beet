@@ -7,8 +7,8 @@ use sweet::prelude::RandomSource;
 
 /// Updates the curve of [`PlayProceduralAnimation`] with a random direction curve
 /// whenever an [`OnRun`] trigger is received.
-#[derive(Debug, Clone, PartialEq, Component, Reflect, Action)]
-#[observers(set_curve_on_run)]
+#[action(set_curve_on_run)]
+#[derive(Debug, Clone, PartialEq, Component, Reflect)]
 #[reflect(Default, Component)]
 #[require(PlayProceduralAnimation)]
 pub enum SetCurveOnRun {
@@ -38,22 +38,18 @@ impl Default for SetCurveOnRun {
 impl SetCurveOnRun {}
 
 fn set_curve_on_run(
-	trigger: Trigger<OnRun>,
+	ev: Trigger<OnRun>,
 	transforms: Query<&Transform>,
 	mut rng: ResMut<RandomSource>,
-	mut query: Query<(
-		&TargetEntity,
-		&SetCurveOnRun,
-		&mut PlayProceduralAnimation,
-	)>,
+	mut query: Query<(&SetCurveOnRun, &mut PlayProceduralAnimation)>,
 ) {
-	let (agent, action, mut anim) = query
-		.get_mut(trigger.entity())
-		.expect(expect_action::ACTION_QUERY_MISSING);
+	let (action, mut anim) = query
+		.get_mut(ev.action)
+		.expect(&expect_action::to_have_action(&ev));
 
 	let transform = transforms
-		.get(**agent)
-		.expect(expect_action::TARGET_MISSING);
+		.get(ev.origin)
+		.expect(&expect_action::to_have_origin(&ev));
 
 	anim.curve = match action {
 		SetCurveOnRun::EaseRangeDir2 { func, range } => {

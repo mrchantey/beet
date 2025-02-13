@@ -5,12 +5,10 @@ use std::marker::PhantomData;
 
 /// Encourages boids to move towards the average position of their neighbors, keeping the flock together.
 /// This is done by updating the [`Velocity`] component.
-#[derive(Debug, Clone, PartialEq, Component, Action, Reflect)]
-#[reflect(Default, Component, ActionMeta)]
-#[category(ActionCategory::Behavior)]
-#[systems(cohere::<M>.in_set(TickSet))]
+#[derive(Debug, Clone, PartialEq, Component, Reflect)]
+#[reflect(Default, Component)]
 #[require(ContinueRun)]
-pub struct Cohere<M: GenericActionComponent> {
+pub struct Cohere<M> {
 	/// The scalar to apply to the impulse
 	pub scalar: f32,
 	/// The radius within which to cohere with other boids
@@ -19,7 +17,7 @@ pub struct Cohere<M: GenericActionComponent> {
 	phantom: PhantomData<M>,
 }
 
-impl<M: GenericActionComponent> Default for Cohere<M> {
+impl<M> Default for Cohere<M> {
 	fn default() -> Self {
 		Self {
 			scalar: 1.,
@@ -29,7 +27,7 @@ impl<M: GenericActionComponent> Default for Cohere<M> {
 	}
 }
 
-impl<M: GenericActionComponent> Cohere<M> {
+impl<M> Cohere<M> {
 	/// Set impulse strength with default radius
 	pub fn new(scalar: f32) -> Self {
 		Self {
@@ -44,17 +42,16 @@ impl<M: GenericActionComponent> Cohere<M> {
 	}
 }
 
-fn cohere<M: GenericActionComponent>(
+pub(crate) fn cohere<M: Component>(
 	boids: Query<(Entity, &Transform), With<M>>,
 	mut agents: Query<(Entity, &Transform, &mut Impulse, &MaxSpeed)>,
-	query: Query<(&TargetEntity, &Cohere<M>), With<Running>>,
+	query: Query<(&Running, &Cohere<M>)>,
 ) {
-	for (target, cohere) in query.iter() {
-		let Ok((entity, transform, mut impulse, max_speed)) =
-			agents.get_mut(**target)
-		else {
-			continue;
-		};
+	for (running, cohere) in query.iter() {
+		let (entity, transform, mut impulse, max_speed) = agents
+			.get_mut(running.origin)
+			.expect(&expect_action::to_have_origin(&running));
+
 
 		**impulse += *cohere_impulse(
 			entity,

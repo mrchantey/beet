@@ -5,12 +5,10 @@ use std::marker::PhantomData;
 
 /// Steers boids towards the average heading of their neighbors, promoting synchronized movement.
 /// This is done by updating the [`Velocity`] component.
-#[derive(Debug, Clone, PartialEq, Component, Action, Reflect)]
-#[reflect(Default, Component, ActionMeta)]
-#[category(ActionCategory::Agent)]
-#[systems(align::<M>.in_set(TickSet))]
+#[derive(Debug, Clone, PartialEq, Component, Reflect)]
+#[reflect(Default, Component)]
 #[require(ContinueRun)]
-pub struct Align<M: GenericActionComponent> {
+pub struct Align<M> {
 	/// The scalar to apply to the impulse
 	pub scalar: f32,
 	/// The radius within which to align with other boids
@@ -19,7 +17,7 @@ pub struct Align<M: GenericActionComponent> {
 	phantom: PhantomData<M>,
 }
 
-impl<M: GenericActionComponent> Default for Align<M> {
+impl<M> Default for Align<M> {
 	fn default() -> Self {
 		Self {
 			scalar: 1.,
@@ -29,7 +27,7 @@ impl<M: GenericActionComponent> Default for Align<M> {
 	}
 }
 
-impl<M: GenericActionComponent> Align<M> {
+impl<M> Align<M> {
 	/// Set impulse strength with default radius
 	pub fn new(scalar: f32) -> Self {
 		Self {
@@ -44,17 +42,15 @@ impl<M: GenericActionComponent> Align<M> {
 	}
 }
 
-fn align<M: GenericActionComponent>(
+pub(crate) fn align<M: Component>(
 	boids: Query<(Entity, &Transform, &Velocity), With<M>>,
 	mut agents: Query<(Entity, &Transform, &mut Impulse)>,
-	query: Query<(&TargetEntity, &Align<M>), With<Running>>,
+	query: Query<(&Running, &Align<M>)>,
 ) {
-	for (target, align) in query.iter() {
-		let Ok((entity, transform, mut impulse)) = agents.get_mut(**target)
-		else {
-			continue;
-		};
-
+	for (running, align) in query.iter() {
+		let (entity, transform, mut impulse) = agents
+			.get_mut(running.origin)
+			.expect(&expect_action::to_have_origin(&running));
 		**impulse +=
 			*align_impulse(entity, transform.translation, align, boids.iter());
 	}
