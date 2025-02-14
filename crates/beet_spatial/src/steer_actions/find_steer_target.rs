@@ -6,8 +6,10 @@ use bevy::prelude::*;
 #[derive(Debug, Clone, PartialEq, Component, Reflect)]
 #[reflect(Default, Component)]
 pub struct FindSteerTarget {
+	/// The name of the entity to find
 	pub name: String,
 	// #[inspector(min = 0., max = 3., step = 0.1)]
+	/// The maximum distance to search for the entity
 	pub radius: f32,
 }
 
@@ -21,6 +23,7 @@ impl Default for FindSteerTarget {
 }
 
 impl FindSteerTarget {
+	/// Create a new [`FindSteerTarget`] action with the given name and radius
 	pub fn new(name: impl Into<String>, radius: f32) -> Self {
 		Self {
 			name: name.into(),

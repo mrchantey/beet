@@ -14,14 +14,18 @@ use sweet::prelude::RandomSource;
 pub enum SetCurveOnRun {
 	/// Create a [`SerdeCurve::EaseDir2`]. The `from` position is the `xy` component of the target agent's [`Transform::translation`].
 	EaseRangeDir2 {
+		/// The range of angles to animate between.
 		range: Range<f32>,
+		/// The easing function to use.
 		func: EaseFunction,
 	},
 	/// Three step animation, with `In`, `Pause` and `Out` phases.
 	PingPongPause {
+		/// The target position to animate to.
 		target: Vec3,
 		/// The length of the `Pause` relative to the `In` and `Out` animations.
 		pause: f32,
+		/// The easing function to use.
 		func: EaseFunction,
 	},
 }

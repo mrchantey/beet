@@ -3,14 +3,17 @@ use beet_flow::prelude::*;
 use bevy::prelude::*;
 use sweet::prelude::*;
 
-/// Somewhat cohesive random walk, see [wander_impulse]
+/// Random walk that uses a pair of circles 
+/// to create somewhat cohesive movement, see [wander_impulse]
 #[derive(Debug, Clone, PartialEq, Component, Reflect)]
 #[reflect(Default, Component)]
 #[require(ContinueRun)]
 pub struct Wander {
 	/// The scalar to apply to the impulse
 	pub scalar: f32,
+	/// The distance from the agent to the outer wander circle
 	pub outer_distance: f32,
+	/// The radius of the outer circle
 	pub outer_radius: f32,
 	/// This effects the responsiveness of the wander
 	pub inner_radius: f32,
@@ -32,6 +35,7 @@ impl Default for Wander {
 }
 
 impl Wander {
+	/// Create a new wander with the given scalar
 	pub fn new(scalar: f32) -> Self {
 		Self {
 			scalar,
@@ -46,17 +50,14 @@ impl Wander {
 		self
 	}
 
-	pub fn with_impulse(mut self, impulse: f32) -> Self {
-		self.scalar = impulse;
-		self
-	}
-
+	/// Create a new wander with an initial forward direction
 	pub fn default_forward() -> Self {
 		Self {
 			last_local_target: Vec3::new(0., 0., -1.),
 			..default()
 		}
 	}
+	/// Create a new wander with an initial right direction
 	pub fn default_right() -> Self {
 		Self {
 			last_local_target: Vec3::RIGHT,

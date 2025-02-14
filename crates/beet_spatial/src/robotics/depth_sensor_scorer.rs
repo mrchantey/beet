@@ -2,14 +2,20 @@ use super::*;
 use beet_flow::prelude::*;
 use bevy::prelude::*;
 
-/// Sets the [`Score`] based on the [`DepthValue`].
+/// Sets the [`Score`] based on the [`DepthValue`], usually
+/// updated by a sensor.
+/// ## Tags
+/// - [ControlFlow](ActionTag::ControlFlow)
 #[action(depth_sensor_scorer)]
 #[derive(Debug, Clone, PartialEq, Component, Reflect)]
 #[reflect(Default, Component)]
 pub struct DepthSensorScorer {
-	// #[inspector(step = 0.1)]
+	/// The distance at which the sensor will toggle from
+	/// `far_score` to `close_score`.
 	pub threshold_dist: f32,
+	/// The score to set when the depth is more than the threshold.
 	pub far_score: ScoreValue,
+	/// The score to set when the depth is less than the threshold.
 	pub close_score: ScoreValue,
 }
 
@@ -24,6 +30,7 @@ impl Default for DepthSensorScorer {
 }
 
 impl DepthSensorScorer {
+	/// Create a new depth sensor scorer with the given threshold distance.
 	pub fn new(threshold_dist: f32) -> Self {
 		Self {
 			threshold_dist,
@@ -34,11 +41,11 @@ impl DepthSensorScorer {
 
 fn depth_sensor_scorer(
 	ev: Trigger<OnRun<RequestScore>>,
-	mut commands: Commands,
+	commands: Commands,
 	sensors: Query<&DepthValue, Changed<DepthValue>>,
-	query: Query<(&DepthSensorScorer, &Parent)>,
+	query: Query<&DepthSensorScorer>,
 ) {
-	let (scorer, parent) = query
+	let scorer = query
 		.get(ev.action)
 		.expect(&expect_action::to_have_action(&ev));
 	let depth = sensors

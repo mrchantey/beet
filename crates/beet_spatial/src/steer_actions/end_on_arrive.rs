@@ -9,6 +9,7 @@ use bevy::prelude::*;
 #[reflect(Default, Component)]
 #[require(ContinueRun)]
 pub struct EndOnArrive {
+	/// The radius at which the agent should arrive, defaults to `0.5`
 	pub radius: f32,
 }
 
@@ -17,6 +18,7 @@ impl Default for EndOnArrive {
 }
 
 impl EndOnArrive {
+	/// Create a new [`EndOnArrive`] action with the given radius
 	pub fn new(radius: f32) -> Self { Self { radius } }
 }
 

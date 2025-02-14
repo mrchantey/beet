@@ -9,7 +9,7 @@ use std::f32::consts::PI;
 pub struct RotateToVelocity2d;
 
 
-pub fn rotate_to_velocity_2d(
+pub(crate) fn rotate_to_velocity_2d(
 	mut query: Query<(&mut Transform, &Velocity), With<RotateToVelocity2d>>,
 ) {
 	for (mut transform, velocity) in query.iter_mut() {
@@ -32,7 +32,7 @@ impl Default for RotateToVelocity3d {
 	fn default() -> Self { Self(5.) }
 }
 
-pub fn rotate_to_velocity_3d(
+pub(crate) fn rotate_to_velocity_3d(
 	time: Res<Time>,
 	mut query: Query<(&mut Transform, &Velocity, &RotateToVelocity3d)>,
 ) {

@@ -6,7 +6,9 @@ use std::time::Duration;
 /// consistent speed. This enum allows for both.
 #[derive(Debug, Copy, Clone, Reflect)]
 pub enum ProceduralAnimationSpeed {
+	/// A fixed duration for the animation.
 	Duration(Duration),
+	/// A fixed speed in meters per second.
 	MetersPerSecond(f32),
 }
 

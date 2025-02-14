@@ -3,10 +3,13 @@ use bevy::prelude::*;
 use std::f32::consts::TAU;
 
 
+/// Translates the agent up and down in a sine wave.
+/// ## Tags
+/// - [LongRunning](ActionTag::LongRunning)
+/// - [MutateOrigin](ActionTag::MutateOrigin)
 #[derive(Debug, Default, Clone, PartialEq, Component, Reflect)]
 #[reflect(Default, Component)]
 #[require(ContinueRun)]
-/// Translate the agent up and down in a sine wave
 pub struct Hover {
 	/// Measured in Hz
 	// #[inspector(min = 0.1, max = 3., step = 0.1)]
@@ -17,6 +20,7 @@ pub struct Hover {
 }
 
 impl Hover {
+	/// Create a new hover action with the given speed and height.
 	pub fn new(speed: f32, height: f32) -> Self { Self { speed, height } }
 }
 

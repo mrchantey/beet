@@ -1,5 +1,7 @@
 // use beet_flow::action_observers;
 use beet_flow::prelude::*;
+#[allow(unused_imports, reason = "beet_flow reexport")]
+use bevy::prelude::*;
 use sweet::prelude::*;
 
 #[action(log_name_on_run)]

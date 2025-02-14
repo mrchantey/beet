@@ -1,3 +1,4 @@
+//! Steering actions addded by the [steer_plugin](crate::steer::steer_plugin).
 mod align;
 pub use self::align::*;
 mod arrive;
@@ -16,6 +17,3 @@ mod steer_target_score_provider;
 pub use self::steer_target_score_provider::*;
 mod wander;
 pub use self::wander::*;
-
-
-

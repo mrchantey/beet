@@ -10,7 +10,9 @@ use std::time::Duration;
 #[reflect(Default, Component)]
 #[require(ContinueRun)]
 pub struct PlayProceduralAnimation {
+	/// The type of curve to animate along.
 	pub curve: SerdeCurve,
+	/// The speed of the animation, either as a [`Duration`] or in meters per second.
 	pub speed: ProceduralAnimationSpeed,
 }
 
@@ -24,6 +26,7 @@ impl Default for PlayProceduralAnimation {
 }
 
 impl PlayProceduralAnimation {
+	/// Set the speed of the animation to a given duration in seconds.
 	pub fn with_duration_secs(self, secs: f32) -> Self {
 		Self {
 			speed: ProceduralAnimationSpeed::Duration(Duration::from_secs_f32(
@@ -32,13 +35,14 @@ impl PlayProceduralAnimation {
 			..self
 		}
 	}
+	/// Set the speed of the animation to a given duration in meters per second.
 	pub fn with_meter_per_second(self, mps: f32) -> Self {
 		Self {
 			speed: ProceduralAnimationSpeed::MetersPerSecond(mps),
 			..self
 		}
 	}
-
+	/// Set the curve to animate along.
 	pub fn with_curve(self, curve: SerdeCurve) -> Self {
 		Self { curve, ..self }
 	}

@@ -1,3 +1,5 @@
+//! Systems and components related to 'unintelligent' movement,
+//! for more natural and advanced movement see the [`crate::steer`] module.
 mod force_bundle;
 pub use self::force_bundle::*;
 mod hover;
@@ -11,6 +13,11 @@ pub use self::translate::*;
 use beet_flow::prelude::*;
 use bevy::prelude::*;
 
+/// Add all systems and types for the base movement actions:
+/// - [`Translate`]
+/// - [`Hover`]
+/// - [`RotateToVelocity2d`]
+/// - [`RotateToVelocity3d`]
 pub fn movement_plugin(app: &mut App) {
 	app.add_systems(
 		Update,

@@ -2,13 +2,16 @@ use crate::prelude::*;
 use beet_flow::prelude::*;
 use bevy::prelude::*;
 
+/// Provides a [`ScoreValue`] based on distance to the [`SteerTarget`],
+/// This scorer is binary, if the distance is within the min and max radius, the score is 1,
+/// otherwise it is 0.
 #[action(provide_score)]
 #[derive(Debug, Clone, PartialEq, Component, Reflect)]
 #[reflect(Default, Component)]
-/// Provides a [`ScoreValue`] based on distance to the [`SteerTarget`]
 pub struct SteerTargetScoreProvider {
-	/// fail if already at location
+	/// if the distance is less than this, the score is 0.
 	pub min_radius: f32,
+	/// If the distance is greater than this, the score is 0.
 	pub max_radius: f32,
 }
 

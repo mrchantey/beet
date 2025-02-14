@@ -60,6 +60,15 @@ impl PluginGroup for BeetFlowPlugin {
 
 
 /// Actions can take many forms, these tags help categorize them.
+/// The convention is to add these in a list just after the description
+/// of the action, and before the example:
+/// ```
+/// # use beet_flow::prelude::*;
+/// /// ## Tags
+/// /// - [LongRunning](ActionTag::LongRunning)
+/// /// - [MutateOrigin](ActionTag::MutateOrigin)
+/// struct MyAction;
+/// ```
 pub enum ActionTag {
 	/// Actions concerned with control flow, usually
 	/// triggering [OnRun] and [OnResult] events.

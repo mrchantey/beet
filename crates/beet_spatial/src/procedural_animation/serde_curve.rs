@@ -3,15 +3,20 @@ use std::f32::consts::TAU;
 
 
 /// Enum of common curves that can be serialized.
+/// This will likely be deprecated when bevy_curve gets better support for serde.
 #[derive(Debug, Default, Clone, Component, Reflect)]
 #[reflect(Debug, Default)]
 pub enum SerdeCurve {
+	/// Animate along a unit circle in xy space, with the z component set to 0.
 	#[default]
 	Circle,
+	/// Animate along a unit square in xy space, with the z component set to 0.
 	Square,
 	/// Easing curve in xy space, with the z component set to 0.
 	EaseDir2(EasingCurve<Dir2>),
+	/// Easing curve in xyz space.
 	EaseVec3(EasingCurve<Vec3>),
+	/// A curve defined by a set of samples.
 	Samples(SampleAutoCurve<Vec3>),
 }
 

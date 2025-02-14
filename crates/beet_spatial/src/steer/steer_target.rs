@@ -5,9 +5,10 @@ use bevy::ecs::reflect::ReflectMapEntities;
 use bevy::prelude::*;
 
 
+/// Description of a target used by steering behaviors.
+/// This can either be a fixed position or an entity with a [`Transform`] component.
 #[derive(Debug, Copy, Clone, PartialEq, Component, Reflect)]
 #[reflect(Component, MapEntities)]
-// Description of a target used by steering behaviors.
 pub enum SteerTarget {
 	/// The target is a fixed position
 	Position(Vec3),

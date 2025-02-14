@@ -7,15 +7,17 @@ use bevy::prelude::*;
 #[reflect(Default, Component)]
 #[require(ContinueRun)]
 pub struct Seek {
+	/// What to do when the target is not found
 	// TODO this should be a seperate component used by other actions as well
 	pub on_not_found: OnTargetNotFound,
 }
 
 impl Seek {
+	/// Create a new [`Seek`] action with the given [`OnTargetNotFound`] behavior
 	pub fn new(on_not_found: OnTargetNotFound) -> Self { Self { on_not_found } }
 }
 
-
+/// Instructions for how to behave when a specified [`SteerTarget::Entity`] is not found
 #[derive(Debug, Default, Clone, PartialEq, Reflect)]
 pub enum OnTargetNotFound {
 	/// Warn
@@ -118,22 +120,14 @@ mod test {
 				ForceBundle::default(),
 				SteerBundle::default(),
 				SteerTarget::Position(Vec3::new(1.0, 0., 0.)),
+				Seek::default(),
 			))
-			.with_children(|parent| {
-				parent.spawn((
-					Running::new(parent.parent_entity()),
-					Seek::default(),
-				));
-			})
+			.flush_trigger(OnRun::local())
 			.id();
 
-
-		app.update();
 		app.update_with_secs(1);
 
-		expect(app.world())
-			.component::<Transform>(agent)
-			.map(|t| t.translation)
-			.to_be(Vec3::new(0.02, 0., 0.));
+		expect(app.world().get::<Transform>(agent).unwrap().translation)
+			.to_be(Vec3::new(0.01, 0., 0.));
 	}
 }

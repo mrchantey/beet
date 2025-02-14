@@ -1,13 +1,20 @@
 use crate::prelude::*;
 use bevy::prelude::*;
 
+
+
+/// A handy abstraction over two motor values,
+/// one for the left motor and one for the right motor.
 #[derive(Default, Debug, Copy, Clone, PartialEq, Component, Reflect)]
 pub struct DualMotorValue {
+	/// The value for the left motor
 	pub left: MotorValue,
+	/// The value for the right motor
 	pub right: MotorValue,
 }
 
 impl DualMotorValue {
+	/// Create a new dual motor value with the given left and right motor values
 	pub fn new(left: MotorValue, right: MotorValue) -> Self {
 		Self { left, right }
 	}
@@ -19,6 +26,6 @@ impl DualMotorValue {
 			right: MotorValue::from_signed_normal(dir.y - dir.x),
 		}
 	}
-
+	/// Apply the given value to both motors
 	pub fn splat(value: MotorValue) -> Self { Self::new(value, value) }
 }

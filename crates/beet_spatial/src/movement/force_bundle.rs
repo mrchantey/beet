@@ -11,6 +11,7 @@ pub struct Velocity(pub Vec3);
 
 
 impl Velocity {
+	/// Create a new velocity from the given x, y, and z values.
 	pub fn from_xyz(x: f32, y: f32, z: f32) -> Self { Self(Vec3::new(x, y, z)) }
 }
 
@@ -54,6 +55,7 @@ impl Default for Mass {
 }
 
 /// The components required for force integration, for use with a [`TransformBundle`] or equivalent.
+#[allow(missing_docs)]
 #[derive(Default, Bundle)]
 pub struct ForceBundle {
 	pub mass: Mass,
