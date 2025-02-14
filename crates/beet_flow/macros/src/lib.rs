@@ -16,14 +16,14 @@ pub fn derive_action(
 
 
 /// Add observers to a global action observer entity.
-/// This macro must be placed above `#[derive(Component)]` as it 
+/// This macro must be placed above `#[derive(Component)]` as it
 /// sets the `on_add` and `on_remove` hooks.
 /// ## Example
 /// ```rust ignore
 /// #[action(log_on_run)]
 /// #[derive(Component)]
 /// struct LogOnRun(pub String);
-/// 
+///
 /// fn log_on_run(trigger: Trigger<OnRun>, query: Populated<&LogOnRun>) {
 /// 	let name = query.get(trigger.action).unwrap();
 /// 	println!("log_name_on_run: {}", name.0);
