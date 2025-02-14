@@ -25,7 +25,10 @@ app
 		BeetDebugPlugin::default()
 	))
 	.world_mut()
-	.spawn(Sequence)
+  .spawn((
+		Name::new("My Behavior"), 
+		Sequence
+	))
 		.with_child((
 			Name::new("Hello"),
 			ReturnWith(RunResult::Success),

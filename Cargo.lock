@@ -400,7 +400,7 @@ dependencies = [
 
 [[package]]
 name = "beet"
-version = "0.0.5-dev-0"
+version = "0.0.5-rc.1"
 dependencies = [
  "beet",
  "beet_flow",
@@ -417,7 +417,7 @@ dependencies = [
 
 [[package]]
 name = "beet_flow"
-version = "0.0.5-dev-0"
+version = "0.0.5-rc.1"
 dependencies = [
  "anyhow",
  "beet_flow_macros",
@@ -431,11 +431,9 @@ dependencies = [
 
 [[package]]
 name = "beet_flow_macros"
-version = "0.0.5-dev-0"
+version = "0.0.5-rc.1"
 dependencies = [
  "anyhow",
- "beet_flow",
- "bevy",
  "extend",
  "heck 0.4.1",
  "proc-macro2",
@@ -446,7 +444,7 @@ dependencies = [
 
 [[package]]
 name = "beet_ml"
-version = "0.0.5-dev-0"
+version = "0.0.5-rc.1"
 dependencies = [
  "anyhow",
  "beet_flow",
@@ -478,7 +476,7 @@ dependencies = [
 
 [[package]]
 name = "beet_router"
-version = "0.0.5-dev-0"
+version = "0.0.5-rc.1"
 dependencies = [
  "anyhow",
  "beet_router",
@@ -493,7 +491,7 @@ dependencies = [
 
 [[package]]
 name = "beet_router_parser"
-version = "0.0.5-dev-0"
+version = "0.0.5-rc.1"
 dependencies = [
  "anyhow",
  "beet_rsx",
@@ -510,7 +508,7 @@ dependencies = [
 
 [[package]]
 name = "beet_rsx"
-version = "0.0.5-dev-0"
+version = "0.0.5-rc.1"
 dependencies = [
  "anyhow",
  "beet_rsx",
@@ -539,7 +537,7 @@ dependencies = [
 
 [[package]]
 name = "beet_rsx_macros"
-version = "0.0.5-dev-0"
+version = "0.0.5-rc.1"
 dependencies = [
  "anyhow",
  "beet_rsx_parser",
@@ -553,10 +551,9 @@ dependencies = [
 
 [[package]]
 name = "beet_rsx_parser"
-version = "0.0.5-dev-0"
+version = "0.0.5-rc.1"
 dependencies = [
  "anyhow",
- "beet_rsx_macros",
  "proc-macro2",
  "proc-macro2-diagnostics",
  "quote",
@@ -568,7 +565,7 @@ dependencies = [
 
 [[package]]
 name = "beet_sim"
-version = "0.0.5-dev-0"
+version = "0.0.5-rc.1"
 dependencies = [
  "anyhow",
  "beet_flow",
@@ -579,7 +576,7 @@ dependencies = [
 
 [[package]]
 name = "beet_spatial"
-version = "0.0.5-dev-0"
+version = "0.0.5-rc.1"
 dependencies = [
  "anyhow",
  "beet_flow",

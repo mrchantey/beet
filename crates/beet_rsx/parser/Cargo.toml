@@ -24,7 +24,6 @@ proc-macro2-diagnostics = "0.10"
 
 [dev-dependencies]
 sweet = { workspace = true, features = ["test"] }
-beet_rsx_macros.workspace = true
 
 [target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
 sweet = { workspace = true, features = ["fs"] }

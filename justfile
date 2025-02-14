@@ -182,12 +182,18 @@ publish crate *args:
 	sleep 2
 
 publish-all *args:
-	just publish beet_flow_macros {{args}}	|| true
-	just publish beet_flow {{args}}					|| true
-	just publish beet_spatial {{args}}			|| true
-	just publish beet_ml {{args}}						|| true
-	just publish beet_examples {{args}}			|| true
-	just publish beet {{args}}							|| true
+	just publish beet_flow_macros     {{args}} || true
+	just publish beet_flow            {{args}} || true
+	just publish beet_spatial         {{args}} || true
+	just publish beet_ml              {{args}} || true
+	just publish beet_sim          		{{args}} || true
+	just publish beet_rsx_parser      {{args}} || true
+	just publish beet_rsx_macros      {{args}} || true
+	just publish beet_rsx             {{args}} || true
+	just publish beet_router_parser   {{args}} || true
+	just publish beet_router          {{args}} || true
+	just publish beet                 {{args}} || true
+# just publish beet_examples        {{args}} || true
 
 watch *command:
 	forky watch \

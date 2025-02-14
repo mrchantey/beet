@@ -56,5 +56,5 @@ web-sys.workspace = true
 
 
 [dev-dependencies]
-beet_rsx = { workspace = true, features = ["parser", "serde"] }
+beet_rsx = { path = "", features = ["parser", "serde"] }
 sweet = { workspace = true, features = ["test"] }

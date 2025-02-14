@@ -13,7 +13,7 @@ opt-level = 0
 opt-level = 0
 
 [workspace.package]
-version = "0.0.5-dev-0"
+version = "0.0.5-rc.1"
 authors = ["Peter Hayman"]
 edition = "2021"
 description = "Tools for developing reactive structures"
@@ -55,17 +55,17 @@ members = [
 
 [workspace.dependencies]
 ## internal
-beet = { path = "", version = "0.0.5-dev-0", default-features = false }
-beet_spatial = { path = "crates/beet_spatial", version = "0.0.5-dev-0", default-features = false }
-beet_flow = { path = "crates/beet_flow", version = "0.0.5-dev-0" }
-beet_flow_macros = { path = "crates/beet_flow/macros", version = "0.0.5-dev-0" }
-beet_ml = { path = "crates/beet_ml", version = "0.0.5-dev-0" }
-beet_router = { path = "crates/beet_router", version = "0.0.5-dev-0" }
-beet_router_parser = { path = "crates/beet_router/parser", version = "0.0.5-dev-0" }
-beet_rsx = { path = "crates/beet_rsx", version = "0.0.5-dev-0" }
-beet_rsx_macros = { path = "crates/beet_rsx/macros", version = "0.0.5-dev-0" }
-beet_rsx_parser = { path = "crates/beet_rsx/parser", version = "0.0.5-dev-0" }
-beet_sim = { path = "crates/beet_sim", version = "0.0.5-dev-0" }
+beet = { path = "", version = "0.0.5-rc.1", default-features = false }
+beet_spatial = { path = "crates/beet_spatial", version = "0.0.5-rc.1", default-features = false }
+beet_flow = { path = "crates/beet_flow", version = "0.0.5-rc.1" }
+beet_flow_macros = { path = "crates/beet_flow/macros", version = "0.0.5-rc.1" }
+beet_ml = { path = "crates/beet_ml", version = "0.0.5-rc.1" }
+beet_router = { path = "crates/beet_router", version = "0.0.5-rc.1" }
+beet_router_parser = { path = "crates/beet_router/parser", version = "0.0.5-rc.1" }
+beet_rsx = { path = "crates/beet_rsx", version = "0.0.5-rc.1" }
+beet_rsx_macros = { path = "crates/beet_rsx/macros", version = "0.0.5-rc.1" }
+beet_rsx_parser = { path = "crates/beet_rsx/parser", version = "0.0.5-rc.1" }
+beet_sim = { path = "crates/beet_sim", version = "0.0.5-rc.1" }
 
 #💡 local
 # bevyhub = { git = "https://github.com/mrchantey/bevyhub", default-features = false }
