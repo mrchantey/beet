@@ -8,7 +8,7 @@ use std::time::Duration;
 /// The default duration is 1 second.
 /// ## Example
 /// ```
-/// # use beet_flow::prelude::*;
+/// # use beet_flow::doctest::*;
 /// # let mut world = world();
 /// # use std::time::Duration;
 /// world.spawn((

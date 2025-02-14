@@ -3,14 +3,14 @@ use bevy::prelude::*;
 use std::marker::PhantomData;
 
 /// If any child triggers a result, bubble it up to the parent.
-/// This bubbling is done automatically by [Sequence], [Fallback] etc. 
+/// This bubbling is done automatically by [Sequence], [Fallback] etc.
 /// according to their logic.
 /// ## Tags
 /// - [ControlFlow](ActionTag::ControlFlow)
 /// ## Example
 ///	This example will trigger OnResult for each parent.
 /// ```
-/// # use beet_flow::prelude::*;
+/// # use beet_flow::doctest::*;
 /// # let mut world = world();
 /// world
 /// 	.spawn(BubbleResult::default())

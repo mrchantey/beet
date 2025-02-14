@@ -10,7 +10,7 @@ use bevy::prelude::*;
 /// and the [`OnRunAction`] will be triggered.
 /// ## Example
 /// ```
-/// # use beet_flow::prelude::*;
+/// # use beet_flow::doctest::*;
 /// # let mut world = world();
 /// world.spawn(RunOnSpawn::default());
 /// ```

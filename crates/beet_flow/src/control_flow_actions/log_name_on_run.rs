@@ -6,7 +6,7 @@ use bevy::prelude::*;
 /// - [InputOutput](ActionTag::InputOutput)
 /// ## Example
 /// ```
-/// # use beet_flow::prelude::*;
+/// # use beet_flow::doctest::*;
 /// # let mut world = world();
 /// world
 ///		.spawn((Name::new("root"), LogNameOnRun))

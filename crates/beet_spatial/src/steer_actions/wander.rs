@@ -3,8 +3,11 @@ use beet_flow::prelude::*;
 use bevy::prelude::*;
 use sweet::prelude::*;
 
-/// Random walk that uses a pair of circles 
+/// Random walk that uses a pair of circles
 /// to create somewhat cohesive movement, see [wander_impulse]
+/// ## Tags
+/// - [LongRunning](ActionTag::LongRunning)
+/// - [MutateOrigin](ActionTag::MutateOrigin)
 #[derive(Debug, Clone, PartialEq, Component, Reflect)]
 #[reflect(Default, Component)]
 #[require(ContinueRun)]

@@ -15,7 +15,7 @@ use bevy::prelude::*;
 /// ## Example
 /// Repeat the action twice, then bubble up the failure
 /// ```
-/// # use beet_flow::prelude::*;
+/// # use beet_flow::doctest::*;
 /// # let mut world = world();
 /// world
 /// .spawn((Repeat::if_success(), SucceedTimes::new(2)))

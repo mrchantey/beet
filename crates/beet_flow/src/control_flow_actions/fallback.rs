@@ -11,7 +11,7 @@ use bevy::prelude::*;
 /// ## Example
 /// This example will run the first child, then the second child.
 /// ```
-/// # use beet_flow::prelude::*;
+/// # use beet_flow::doctest::*;
 /// # let mut world = world();
 /// world
 ///		.spawn(Fallback)

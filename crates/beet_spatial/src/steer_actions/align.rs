@@ -5,6 +5,9 @@ use std::marker::PhantomData;
 
 /// Steers boids towards the average heading of their neighbors, promoting synchronized movement.
 /// This is done by updating the [`Velocity`] component.
+/// ## Tags
+/// - [LongRunning](ActionTag::LongRunning)
+/// - [MutateOrigin](ActionTag::MutateOrigin)
 #[derive(Debug, Clone, PartialEq, Component, Reflect)]
 #[reflect(Default, Component)]
 #[require(ContinueRun)]

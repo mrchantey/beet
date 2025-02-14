@@ -9,7 +9,7 @@ use std::marker::PhantomData;
 /// ## Example
 /// Removes the `Running` bundle when the `OnResult` event is triggered.
 /// ```
-/// # use beet_flow::prelude::*;
+/// # use beet_flow::doctest::*;
 /// # let mut world = world();
 /// world
 ///		.spawn((

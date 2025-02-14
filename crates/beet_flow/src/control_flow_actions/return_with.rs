@@ -11,7 +11,7 @@ use bevy::prelude::*;
 /// ## Example
 /// returns `RunResult::Success` when triggered.
 /// ```
-/// # use beet_flow::prelude::*;
+/// # use beet_flow::doctest::*;
 /// # let mut world = world();
 /// world
 /// 	.spawn(ReturnWith(RunResult::Success))

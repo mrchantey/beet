@@ -12,7 +12,7 @@ use bevy::prelude::*;
 /// ## Example
 /// Triggering the second action will run the first `action`.
 /// ```
-/// # use beet_flow::prelude::*;
+/// # use beet_flow::doctest::*;
 /// # let mut world = world();
 /// let action = world
 /// 	.spawn(ReturnWith(RunResult::Success))

@@ -26,7 +26,7 @@ impl<T> OnRunAction<T> {
 	/// may be a seperate entity from the action.
 	/// ## Example
 	/// ```
-	/// # use beet_flow::prelude::*;
+	/// # use beet_flow::doctest::*;
 	/// # let mut world = world();
 	/// let origin = world.spawn(Name::new("My Agent")).id();
 	/// let action = world
@@ -46,7 +46,7 @@ impl<T> OnRunAction<T> {
 	/// When triggering the default [`OnRun<()>`], prefer using [`OnRun::local`].
 	/// ## Example
 	/// ```
-	/// # use beet_flow::prelude::*;
+	/// # use beet_flow::doctest::*;
 	/// # let mut world = world();
 	/// world
 	/// 	.spawn(ReturnWith(RunResult::Success))
@@ -64,7 +64,7 @@ impl<T> OnRunAction<T> {
 	/// When triggering the default [`OnRun<()>`], prefer using [`OnRun::global`].
 	/// ## Example
 	/// ```
-	/// # use beet_flow::prelude::*;
+	/// # use beet_flow::doctest::*;
 	/// # let mut world = world();
 	/// let action = world
 	/// 	.spawn(ReturnWith(RunResult::Success))
@@ -141,7 +141,7 @@ impl OnRun<()> {
 	/// where the origin is the [`ActionEntity`].
 	/// ## Example
 	/// ```
-	/// # use beet_flow::prelude::*;
+	/// # use beet_flow::doctest::*;
 	/// # let mut world = world();
 	/// world
 	/// 	.spawn(ReturnWith(RunResult::Success))
@@ -152,7 +152,7 @@ impl OnRun<()> {
 	/// where the origin is the [`ActionEntity`].
 	/// ## Example
 	/// ```
-	/// # use beet_flow::prelude::*;
+	/// # use beet_flow::doctest::*;
 	/// # let mut world = world();
 	/// let action = world
 	/// 	.spawn(ReturnWith(RunResult::Success))

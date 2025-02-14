@@ -21,12 +21,16 @@ pub mod prelude {
 	pub use crate::control_flow_actions::*;
 	pub use crate::tree::*;
 	pub use beet_flow_macros::*;
-	// reexport bevy for docs
-	#[cfg(feature = "_doctest")]
+}
+
+/// doctest reexports and utilities
+#[cfg(feature = "_doctest")]
+pub mod doctest {
+	pub use crate::prelude::*;
 	pub use bevy::prelude::*;
 	/// for docs, create a world with BeetFlowPlugin
 	/// ```
-	/// use beet_flow::prelude::*;
+	/// use beet_flow::doctest::*;
 	/// let world = world();
 	/// ```
 	#[cfg(feature = "_doctest")]
@@ -63,7 +67,7 @@ impl PluginGroup for BeetFlowPlugin {
 /// The convention is to add these in a list just after the description
 /// of the action, and before the example:
 /// ```
-/// # use beet_flow::prelude::*;
+/// # use beet_flow::doctest::*;
 /// /// ## Tags
 /// /// - [LongRunning](ActionTag::LongRunning)
 /// /// - [MutateOrigin](ActionTag::MutateOrigin)

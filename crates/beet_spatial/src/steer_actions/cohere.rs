@@ -5,6 +5,9 @@ use std::marker::PhantomData;
 
 /// Encourages boids to move towards the average position of their neighbors, keeping the flock together.
 /// This is done by updating the [`Velocity`] component.
+/// ## Tags
+/// - [LongRunning](ActionTag::LongRunning)
+/// - [MutateOrigin](ActionTag::MutateOrigin)
 #[derive(Debug, Clone, PartialEq, Component, Reflect)]
 #[reflect(Default, Component)]
 #[require(ContinueRun)]

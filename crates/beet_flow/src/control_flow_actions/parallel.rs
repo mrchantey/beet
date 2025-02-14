@@ -11,7 +11,7 @@ use bevy::utils::HashSet;
 /// ## Example
 /// Run two children in parallel
 /// ```
-/// # use beet_flow::prelude::*;
+/// # use beet_flow::doctest::*;
 /// # let mut world = world();
 /// world
 ///		.spawn(Parallel::default())

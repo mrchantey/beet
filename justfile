@@ -106,7 +106,7 @@ test-all *args:
 # cargo test --workspace -- {{args}}
 # cargo test --workspace --all-features -- {{args}}
 
-test-docs crate *args:
+test-doc crate *args:
 	just watch 'cargo test -p {{crate}} --doc --features=_doctest {{args}}'
 # copied from sweet
 test crate *args:

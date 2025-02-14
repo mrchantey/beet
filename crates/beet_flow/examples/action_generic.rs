@@ -1,6 +1,5 @@
 // use beet_flow::action_observers;
 use beet_flow::prelude::*;
-#[allow(unused_imports, reason = "beet_flow reexport")]
 use bevy::prelude::*;
 
 #[action(const_response::<T>)]

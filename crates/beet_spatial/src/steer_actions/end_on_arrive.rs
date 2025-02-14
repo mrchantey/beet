@@ -5,6 +5,8 @@ use bevy::prelude::*;
 
 /// Succeeds when the agent arrives at the [`SteerTarget`].
 /// Fails if the target is not found.
+/// ## Tags
+/// - [ControlFlow](ActionTag::ControlFlow)
 #[derive(Debug, Clone, PartialEq, Component, Reflect)]
 #[reflect(Default, Component)]
 #[require(ContinueRun)]

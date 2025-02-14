@@ -5,6 +5,8 @@ use bevy::prelude::*;
 /// Provides a [`ScoreValue`] based on distance to the [`SteerTarget`],
 /// This scorer is binary, if the distance is within the min and max radius, the score is 1,
 /// otherwise it is 0.
+/// ## Tags
+/// - [ControlFlow](ActionTag::ControlFlow)
 #[action(provide_score)]
 #[derive(Debug, Clone, PartialEq, Component, Reflect)]
 #[reflect(Default, Component)]

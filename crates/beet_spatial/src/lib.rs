@@ -71,3 +71,26 @@ pub fn spatial_observers_plugin(app: &mut App) {
 		InsertOnRunResult<Visibility>,
 	)>::default());
 }
+
+
+
+/// doctest reexports and utilities
+#[cfg(feature = "_doctest")]
+#[allow(ambiguous_glob_reexports)]
+pub mod doctest {
+	pub use crate::prelude::*;
+	pub use beet_flow::prelude::*;
+	pub use bevy::prelude::*;
+	/// for docs, create a world with BeetFlowPlugin
+	/// ```
+	/// use beet_spatial::doctest::*;
+	/// let world = world();
+	/// ```
+	#[cfg(feature = "_doctest")]
+	pub fn world() -> World {
+		let mut app = App::new();
+		app.add_plugins((BeetFlowPlugin::default(), BeetSpatialPlugins));
+		let world = std::mem::take(app.world_mut());
+		world
+	}
+}

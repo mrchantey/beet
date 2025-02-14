@@ -5,6 +5,9 @@ use std::marker::PhantomData;
 
 /// Ensures that boids avoid crowding neighbors by maintaining a minimum distance from each other.
 /// This is done by updating the [`Velocity`] component.
+/// ## Tags
+/// - [LongRunning](ActionTag::LongRunning)
+/// - [MutateOrigin](ActionTag::MutateOrigin)
 #[derive(Debug, Clone, PartialEq, Component, Reflect)]
 #[reflect(Default, Component)]
 #[require(ContinueRun)]

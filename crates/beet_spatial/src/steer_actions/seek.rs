@@ -3,6 +3,9 @@ use beet_flow::prelude::*;
 use bevy::prelude::*;
 
 /// Go to the agent's [`SteerTarget`] with an optional [`ArriveRadius`]
+/// ## Tags
+/// - [LongRunning](ActionTag::LongRunning)
+/// - [MutateOrigin](ActionTag::MutateOrigin)
 #[derive(Debug, Default, Clone, PartialEq, Component, Reflect)]
 #[reflect(Default, Component)]
 #[require(ContinueRun)]

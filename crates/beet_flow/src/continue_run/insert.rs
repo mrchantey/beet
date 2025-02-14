@@ -9,7 +9,7 @@ use std::marker::PhantomData;
 /// ## Example
 /// Inserts the `Running` bundle when the `OnRun` event is triggered.
 /// ```
-/// # use beet_flow::prelude::*;
+/// # use beet_flow::doctest::*;
 /// # let mut world = world();
 /// world
 ///		.spawn(Insert::<OnRun, Running>::default())

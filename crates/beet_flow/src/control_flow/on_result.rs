@@ -25,7 +25,7 @@ impl<T> OnResultAction<T> {
 	/// may be a seperate entity from the action.
 	/// ## Example
 	/// ```
-	/// # use beet_flow::prelude::*;
+	/// # use beet_flow::doctest::*;
 	/// # let mut world = world();
 	/// let origin = world.spawn(Name::new("My Agent")).id();
 	/// let action = world
@@ -44,7 +44,7 @@ impl<T> OnResultAction<T> {
 	/// where the origin is the [`ActionEntity`].
 	/// ## Example
 	/// ```
-	/// # use beet_flow::prelude::*;
+	/// # use beet_flow::doctest::*;
 	/// # let mut world = world();
 	/// world
 	/// 	.spawn(Remove::<OnResult, Running>::default())
@@ -61,7 +61,7 @@ impl<T> OnResultAction<T> {
 	/// where the origin is the [`ActionEntity`].
 	/// ## Example
 	/// ```
-	/// # use beet_flow::prelude::*;
+	/// # use beet_flow::doctest::*;
 	/// # let mut world = world();
 	/// let action = world
 	/// 	.spawn(Remove::<OnResult, Running>::default())

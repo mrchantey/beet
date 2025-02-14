@@ -1,10 +1,22 @@
 use beet_flow::prelude::*;
 use bevy::prelude::*;
 
-/// Applies constant translation, multiplied by [`Time::delta_secs`]
+/// Applies constant translation to [`Running::origin`],
+/// multiplied by [`Time::delta_secs`]
 /// ## Tags
 /// - [LongRunning](ActionTag::LongRunning)
 /// - [MutateOrigin](ActionTag::MutateOrigin)
+/// ## Example
+/// Translates to the right at 1 unit per second.
+/// ```
+/// # use beet_spatial::doctest::*;
+/// # let mut world = world();
+///	world.spawn((
+/// 	Transform::default(),
+///		Translate::new(Vec3::new(1.0, 0., 0.)),
+///		))
+///		.trigger(OnRun::local());
+/// ```
 #[derive(Debug, Default, Clone, PartialEq, Component, Reflect)]
 #[reflect(Default, Component)]
 #[require(ContinueRun)]
@@ -20,14 +32,14 @@ impl Translate {
 }
 pub(crate) fn translate(
 	time: Res<Time>,
-	action: Query<(&Running, &Translate)>,
+	action: Populated<(&Running, &Translate)>,
 	mut transforms: Query<&mut Transform>,
 ) {
 	for (running, translate) in action.iter() {
-		let mut transform = transforms
+		transforms
 			.get_mut(running.origin)
-			.expect(&expect_action::to_have_origin(&running));
-		transform.translation += translate.translation * time.delta_secs();
+			.expect(&expect_action::to_have_origin(&running))
+			.translation += translate.translation * time.delta_secs();
 	}
 }
 

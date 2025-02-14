@@ -3,6 +3,8 @@ use beet_flow::prelude::*;
 use bevy::prelude::*;
 
 /// Sets the [`SteerTarget`] when an entity with the given name is nearby.
+/// ## Tags
+/// - [MutateOrigin](ActionTag::MutateOrigin)
 #[derive(Debug, Clone, PartialEq, Component, Reflect)]
 #[reflect(Default, Component)]
 pub struct FindSteerTarget {

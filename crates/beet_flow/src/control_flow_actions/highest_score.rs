@@ -6,7 +6,7 @@ use std::cmp::Ordering;
 /// Wrapper for an f32, representing a score. This should be between 0 and 1.
 ///	## Example
 /// ```rust
-/// # use beet_flow::prelude::*;
+/// # use beet_flow::doctest::*;
 /// # let mut world = world();
 /// // create a passing score value
 /// world.spawn(ReturnWith(ScoreValue(1.)));
@@ -63,7 +63,7 @@ impl ResultPayload for ScoreValue {
 ///
 /// ## Example
 /// ```rust
-/// # use beet_flow::prelude::*;
+/// # use beet_flow::doctest::*;
 /// # let mut world = world();
 /// world
 ///		.spawn(HighestScore::default())
