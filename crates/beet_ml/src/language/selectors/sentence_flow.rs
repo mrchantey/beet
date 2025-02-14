@@ -13,10 +13,9 @@ impl Sentence {
 
 /// Runs the child with the [`Sentence`] that is most similar to that of the agent.
 /// for use with [`ScoreFlow`]
-#[derive(Debug, Default, Clone, PartialEq, Component, Action, Reflect)]
-#[reflect(Component, ActionMeta)]
-#[category(ActionCategory::ChildBehaviors)]
-#[observers(sentence_flow)]
+#[action(sentence_flow)]
+#[derive(Debug, Default, Clone, PartialEq, Component, Reflect)]
+#[reflect(Component)]
 pub struct SentenceFlow;
 
 impl SentenceFlow {
@@ -24,28 +23,26 @@ impl SentenceFlow {
 }
 
 fn sentence_flow(
-	trigger: Trigger<OnRun>,
-	mut commands: Commands,
+	ev: Trigger<OnRun>,
+	commands: Commands,
 	mut berts: ResMut<Assets<Bert>>,
 	sentences: Query<&Sentence>,
 	// TODO double query, ie added running and added asset
 	query: Query<(&SentenceFlow, &Sentence, &HandleWrapper<Bert>, &Children)>,
 ) {
 	let (_scorer, target_sentence, handle, children) = query
-		.get(trigger.entity())
-		.expect(expect_action::ACTION_QUERY_MISSING);
-	let Some(bert) = berts.get_mut(handle) else {
-		log::warn!("{}", expect_asset::NOT_READY);
-		return;
-	};
-
+		.get(ev.action)
+		.expect(&expect_action::to_have_action(&ev));
+	let bert = berts
+		.get_mut(handle)
+		.expect(&expect_action::to_have_asset(&ev));
 	match bert.closest_sentence_entity(
 		target_sentence.0.clone(),
 		children.iter().map(|e| e.clone()),
 		&sentences,
 	) {
 		Ok(entity) => {
-			commands.entity(entity).trigger(OnRun);
+			ev.trigger_next(commands, entity);
 		}
 		Err(e) => log::error!("SentenceFlow: {}", e),
 	}
@@ -67,7 +64,7 @@ mod test {
 			MinimalPlugins,
 			workspace_asset_plugin(),
 			BertPlugin::default(),
-			LifecyclePlugin,
+			BeetFlowPlugin::default(),
 		))
 		.finish();
 		let on_run = observe_trigger_names::<OnRun>(app.world_mut());
@@ -87,7 +84,7 @@ mod test {
 				parent.spawn((Name::new("heal"), Sentence::new("heal")));
 				parent.spawn((Name::new("kill"), Sentence::new("kill")));
 			})
-			.flush_trigger(OnRun);
+			.flush_trigger(OnRun::local());
 
 
 		expect(&on_run).to_have_been_called_times(2);

@@ -8,6 +8,15 @@ use crate::prelude::*;
 use bevy::prelude::*;
 use std::fmt::Debug;
 
+/// The action, ie [`OnRun::action`] could not be found.
+pub fn to_have_action(ev: impl Debug) -> String {
+	format!("Action entity is missing from query: {:#?}", ev)
+}
+/// The origin, ie [`OnRun::origin`] could not be found.
+pub fn to_have_origin(ev: impl Debug) -> String {
+	format!("Origin entity is missing from query: {:#?}", ev)
+}
+
 /// This event is missing a child entity, either because
 /// it doesnt have a [`Children`] component or the child
 /// was not found in the [`Children`] component.
@@ -23,19 +32,22 @@ pub fn to_have_children(ev: impl Debug) -> String {
 	format!("Action entity has no children: {:#?}", ev)
 }
 
-/// The origin, ie [`OnRun::origin`] could not be found.
-pub fn to_have_origin(ev: impl Debug) -> String {
-	format!("Origin entity is missing from query: {:#?}", ev)
+/// Error for for when an action expected an asset handle
+/// to be loaded.
+pub fn to_have_asset(ev: impl Debug) -> String {
+	format!("Action asset was not loaded: {:#?}", ev)
 }
-/// The action, ie [`OnRun::action`] could not be found.
-pub fn to_have_action(ev: impl Debug) -> String {
-	format!("Action entity is missing from query: {:#?}", ev)
-}
-/// Error for for when an [ActionContext] uses a placeholder
+
+/// Error for for when an [`OnRunAction`] or [`OnResultAction`] uses a placeholder
 /// and the request was made globally.
 pub fn to_specify_action(ev: impl Debug) -> String {
 	format!(
 		"Globally triggered ActionContext must specify an action: {:#?}",
 		ev
 	)
+}
+
+/// Error for for when an arbitrary entity is missing.
+pub fn to_have_other(ev: impl Debug) -> String {
+	format!("Other entity is missing from query: {:#?}", ev)
 }

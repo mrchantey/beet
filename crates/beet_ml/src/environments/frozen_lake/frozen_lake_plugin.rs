@@ -38,14 +38,11 @@ pub struct FrozenLakePlugin;
 impl Plugin for FrozenLakePlugin {
 	fn build(&self, app: &mut App) {
 		app.add_plugins((
-			ActionPlugin::<(
-				TranslateGrid,
-				StepEnvironment<FrozenLakeQTableSession>,
-				ReadQPolicy<FrozenLakeQTable>,
-			)>::default(),
 			RlSessionPlugin::<FrozenLakeEpParams>::default(),
 		))
-		.add_systems(Update, reward_grid.in_set(PostTickSet))
+		.add_systems(Update, (
+			translate_grid.in_set(TickSet),
+			reward_grid.in_set(PostTickSet)))
 		.add_systems(
 			Update,
 			spawn_frozen_lake_episode

@@ -198,22 +198,18 @@ mod test {
 
 		app.add_plugins((
 			MinimalPlugins,
-			LifecyclePlugin::default(),
+			BeetFlowPlugin::default(),
 			RlSessionPlugin::<FrozenLakeEpParams>::default(),
 		))
 		.add_systems(Update, (start_ep, end_ep).in_set(TickSet));
 		let mut params = FrozenLakeEpParams::default();
 		params.learn_params.n_training_episodes = 1;
+		let len = app.world().entities().len();
 		app.world_mut().spawn(RlSession::new(params));
-
-		// expect these to change as global observers are added etc
-		expect(app.world().entities().len())
-			.to_be(LifecycleSystemsPlugin::NUM_OBSERVERS + 1);
+		expect(app.world().entities().len()).to_be(len + 1);
 		app.update();
-		expect(app.world().entities().len())
-			.to_be(LifecycleSystemsPlugin::NUM_OBSERVERS + 2);
+		expect(app.world().entities().len()).to_be(len + 2);
 		app.update();
-		expect(app.world().entities().len())
-			.to_be(LifecycleSystemsPlugin::NUM_OBSERVERS + 1);
+		expect(app.world().entities().len()).to_be(len + 1);
 	}
 }

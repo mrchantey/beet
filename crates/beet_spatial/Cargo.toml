@@ -2,9 +2,9 @@
 name = "beet_spatial"
 version = { workspace = true }
 edition = { workspace = true }
-description = { workspace = true }
+description = "Spatial actions built upon beet_flow"
 documentation = { workspace = true }
-readme = { workspace = true }
+readme = "README.md"
 homepage = { workspace = true }
 repository = { workspace = true }
 license = { workspace = true }

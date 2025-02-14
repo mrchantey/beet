@@ -3,10 +3,13 @@ use beet_flow::prelude::*;
 use bevy::prelude::*;
 use std::marker::PhantomData;
 
-#[derive(Debug, Clone, PartialEq, Component, Action, Reflect)]
-#[reflect(Component, ActionMeta)]
-#[category(ActionCategory::Behavior)]
-#[observers(read_q_policy::<P>)]
+
+/// Read the QPolicy from the asset and update the agent's action.
+/// ## Tags
+/// - [MutateOrigin](ActionTag::MutateOrigin)
+#[action(read_q_policy::<P>)]
+#[derive(Debug, Clone, PartialEq, Component, Reflect)]
+#[reflect(Component)]
 pub struct ReadQPolicy<P: QPolicy + Asset> {
 	#[reflect(ignore)]
 	phantom: PhantomData<P>,
@@ -21,26 +24,25 @@ impl<P: QPolicy + Asset> Default for ReadQPolicy<P> {
 }
 
 fn read_q_policy<P: QPolicy + Asset>(
-	trigger: Trigger<OnRun>,
-	mut commands: Commands,
+	ev: Trigger<OnRun>,
+	commands: Commands,
 	assets: Res<Assets<P>>,
 	mut agents: Query<(&P::State, &mut P::Action)>,
-	query: Query<(&ReadQPolicy<P>, &HandleWrapper<P>, &TargetEntity)>,
+	query: Query<(&ReadQPolicy<P>, &HandleWrapper<P>)>,
 ) {
-	let (_, handle, agent) = query
-		.get(trigger.entity())
-		.expect(expect_action::ACTION_QUERY_MISSING);
+	let (_, handle) = query
+		.get(ev.action)
+		.expect(&expect_action::to_have_action(&ev));
 
-	let policy = assets.get(handle).expect(expect_asset::NOT_READY);
+	let policy = assets
+		.get(handle)
+		.expect(&expect_action::to_have_asset(&ev));
 
 	let (state, mut action) = agents
-		.get_mut(agent.0)
-		.expect(expect_action::TARGET_MISSING);
+		.get_mut(ev.origin)
+		.expect(&expect_action::to_have_origin(&ev));
 
 
 	*action = policy.greedy_policy(state).0;
-	// log::info!("ReadQPolicy: \n{:?}\n{:?}", state, action);
-	commands
-		.entity(trigger.entity())
-		.trigger(OnRunResult::success());
+	ev.trigger_result(commands, RunResult::Success);
 }

@@ -39,7 +39,7 @@ members = [
 	# "crates/beet_examples",
 	"crates/beet_flow",
 	"crates/beet_flow/macros",
-	# "crates/beet_ml",
+	"crates/beet_ml",
 	# "crates/beet_rig",
 	# "crates/beet_router",
 	# "crates/beet_router/parser",
@@ -59,7 +59,7 @@ members = [
 beet_spatial = { path = "crates/beet_spatial", version = "0.0.5-rc.2", default-features = false }
 beet_flow = { path = "crates/beet_flow", version = "0.0.5-rc.2" }
 beet_flow_macros = { path = "crates/beet_flow/macros", version = "0.0.5-rc.2" }
-# beet_ml = { path = "crates/beet_ml", version = "0.0.5-rc.2" }
+beet_ml = { path = "crates/beet_ml", version = "0.0.5-rc.2" }
 # beet_router = { path = "crates/beet_router", version = "0.0.5-rc.2" }
 # beet_router_parser = { path = "crates/beet_router/parser", version = "0.0.5-rc.2" }
 # beet_rsx = { path = "crates/beet_rsx", version = "0.0.5-rc.2" }
