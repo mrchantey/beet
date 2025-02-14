@@ -1,8 +1,8 @@
 use super::*;
 use beet_flow::prelude::*;
-use bevyhub::prelude::*;
 use bevy::animation::RepeatAnimation;
 use bevy::prelude::*;
+use bevyhub::prelude::*;
 use std::time::Duration;
 
 #[derive(Debug, Clone, Component, Action, Reflect)]

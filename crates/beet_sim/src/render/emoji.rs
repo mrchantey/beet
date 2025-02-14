@@ -38,7 +38,7 @@ impl Emoji {
 
 	#[cfg(not(feature = "bevyhub"))]
 	#[allow(unreachable_code)]
-	pub fn bundle(_hexcode: &str) -> impl Bundle { 
+	pub fn bundle(_hexcode: &str) -> impl Bundle {
 		todo!("non bevyhub bundle");
 		()
 	}

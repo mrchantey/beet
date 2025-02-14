@@ -48,9 +48,7 @@ impl<A: Asset> From<AssetEvent<A>> for ReflectedAssetEvent<A> {
 
 
 impl<A: Asset> Clone for ReflectedAssetEvent<A> {
-    fn clone(&self) -> Self {
-        *self
-    }
+	fn clone(&self) -> Self { *self }
 }
 
 impl<A: Asset> Copy for ReflectedAssetEvent<A> {}

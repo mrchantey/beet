@@ -1,4 +1,3 @@
-
 #[derive(Debug, Clone)]
 pub struct Evaluation {
 	pub total_steps: u128,

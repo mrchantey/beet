@@ -95,7 +95,7 @@ mod test {
 	use sweet::prelude::*;
 
 	#[test]
-	fn algo(){
+	fn algo() {
 		let impulse = seek_impulse(
 			&Vec3::default(),
 			&Velocity::default(),
