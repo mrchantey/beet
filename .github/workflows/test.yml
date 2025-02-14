@@ -1,9 +1,12 @@
 # Copied from https://github.com/mrchantey/bevyhub/blob/main/.github/workflows/test.yml
 name: 🔎 Test Crates
 on:
-  push:
+  merge_group:
   pull_request:
-    branches: main
+  push:
+    branches:
+      - main
+      - release-*
 env:
   CARGO_TERM_COLOR: always
 jobs:
