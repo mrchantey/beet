@@ -7,11 +7,9 @@ use std::time::Duration;
 pub const DEFAULT_ANIMATION_TRANSITION: Duration = Duration::from_millis(250);
 
 /// Play an animation on the agent when this action starts running.
-#[derive(Debug, Default, Clone, PartialEq, Component, Action, Reflect)]
-#[reflect(Default, Component, ActionMeta)]
-#[observers(play_animation_on_run)]
-#[systems(play_animation_on_load.in_set(TickSet))]
-#[category(ActionCategory::Agent)]
+#[action(play_animation_on_run)]
+#[derive(Debug, Default, Clone, PartialEq, Component, Reflect)]
+#[reflect(Default, Component)]
 pub struct PlayAnimation {
 	animation: AnimationNodeIndex,
 	/// Trigger once again if the animation is already playing
@@ -50,26 +48,23 @@ impl PlayAnimation {
 
 /// Play animations for behaviors that run after the agent loads
 fn play_animation_on_run(
-	trigger: Trigger<OnRun>,
+	ev: Trigger<OnRun>,
 	mut animators: Query<(&mut AnimationPlayer, &mut AnimationTransitions)>,
 	children: Query<&Children>,
-	query: Query<(&TargetEntity, &PlayAnimation)>,
+	query: Query<&PlayAnimation>,
 ) {
-	let (agent, play_animation) = query
-		.get(trigger.action)
-		.expect(expect_action::ACTION_QUERY_MISSING);
+	let play_animation = query
+		.get(ev.action)
+		.expect(&expect_action::to_have_action(&ev));
 
 	// log::info!("playonrun {}", agents.iter().count());
 	// let Ok((mut player, mut transitions)) = agents.get_mut(agent.0) else {
 	// 	continue;
 	// };
-	let Some(target) = children
-		.iter_descendants_inclusive(**agent)
+	let target = children
+		.iter_descendants_inclusive(ev.origin)
 		.find(|entity| animators.contains(*entity))
-	else {
-		log::warn!("PlayAnimation: agent {:?} has no animator", **agent);
-		return;
-	};
+		.expect(&expect_action::to_have_origin(&ev));
 	// safe unwrap, just checked
 	let (mut player, mut transitions) = animators.get_mut(target).unwrap();
 
@@ -87,19 +82,19 @@ fn play_animation_on_run(
 }
 
 /// Play animations for animators that load after the behavior starts
-fn play_animation_on_load(
+pub(super) fn play_animation_on_load(
 	parents: Query<&Parent>,
 	mut loaded_animators: Query<
 		(Entity, &mut AnimationPlayer, &mut AnimationTransitions),
 		Added<AnimationPlayer>,
 	>,
-	query: Query<(&TargetEntity, &PlayAnimation), With<Running>>,
+	query: Query<(&Running, &PlayAnimation)>,
 ) {
 	for (entity, mut player, mut transitions) in loaded_animators.iter_mut() {
 		let Some(play_animation) =
 			parents.iter_ancestors_inclusive(entity).find_map(|parent| {
 				query.iter().find_map(|(target, play_animation)| {
-					if **target == parent {
+					if target.origin == parent {
 						Some(play_animation)
 					} else {
 						None

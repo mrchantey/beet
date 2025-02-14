@@ -2,8 +2,8 @@
 #![cfg_attr(test, test_runner(sweet::test_runner))]
 #![deny(missing_docs)]
 #![doc = include_str!("../README.md")]
-#[cfg(feature = "animation")]
-pub mod animation;
+// #[cfg(feature = "animation")]
+// pub mod animation;
 #[cfg(feature = "assets")]
 pub mod asset_actions;
 mod extensions;
@@ -19,8 +19,8 @@ pub mod ui;
 /// Re-exports of the most commonly used types and functions in `beet_spatial`.
 pub mod prelude {
 	pub use super::*;
-	#[cfg(feature = "animation")]
-	pub use crate::animation::*;
+	// #[cfg(feature = "animation")]
+	// pub use crate::animation::*;
 	#[cfg(feature = "assets")]
 	pub use crate::asset_actions::*;
 	// todo wait for construct
@@ -53,9 +53,8 @@ impl PluginGroup for BeetSpatialPlugins {
 		.add(ik_plugin)
 		/*-*/;
 
-		#[cfg(feature = "animation")]
-		(builder = builder.add(crate::prelude::AnimationPlugin::default()));
-
+		// #[cfg(feature = "animation")]
+		// (builder = builder.add(crate::prelude::AnimationPlugin::default()));
 		builder
 	}
 }

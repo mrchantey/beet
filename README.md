@@ -20,8 +20,8 @@
 
 Beet is a collection of crates for authoring and running web pages, games and AI behaviors. Your mileage may vary depending on the crate of interest:
 
-- 🦢 documented and tested, usage is recommended
-- 🐣 documented and tested but still new
+- 🦢 documented and tested
+- 🐣 docs and tests are incomplete
 - 🐉 highly experimental, here be dragons
 
 | Crate                                            | Status | Description                                                       |

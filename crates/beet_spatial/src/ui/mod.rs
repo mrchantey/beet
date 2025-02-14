@@ -1,3 +1,3 @@
-pub mod set_text_on_run;
-#[allow(unused_imports)]
-pub use self::set_text_on_run::*;
+//! Actions related to UI events.
+mod set_text_on_run;
+pub use set_text_on_run::*;

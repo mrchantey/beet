@@ -1,11 +1,11 @@
 
-# Unreleased
+# Unreleased (0.0.5)
 
 ## Features
 
 ### Global Observers
 
-We're going global! Using global action observers provides several performance and usability improvements:
+Beet is going global! Using global action observers provides several performance and usability improvements:
 - 5x faster action spawning/despawning
 - OnRun 
 

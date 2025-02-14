@@ -4,40 +4,34 @@ use bevy::asset::LoadState;
 // use bevy::asset::LoadState;
 use bevy::prelude::*;
 
-/// Minimal traits generally required for an action asset type.
-pub trait GenericActionAsset: 'static + Send + Sync + TypePath + Asset {}
-impl<T: 'static + Send + Sync + TypePath + Asset> GenericActionAsset for T {}
-
-
 /// Inserts the given component when a matching asset event is received.
-/// This requires the entity to have a Handle<T>
-#[derive(Debug, Clone, PartialEq, Component, Action, Reflect)]
-#[reflect(Component, ActionMeta)]
-#[category(ActionCategory::Behavior)]
-#[systems(
-(insert_on_asset_status::<T, A>, insert_on_asset_event::<T, A>).in_set(TickSet)
-)]
-pub struct InsertOnAssetEvent<T: GenericActionComponent, A: GenericActionAsset>
-{
+/// This requires the entity to have a Handle<T>.
+/// For each type the [insert_on_asset_event_plugin] must be registered.
+#[derive(Debug, Clone, PartialEq, Component, Reflect)]
+#[reflect(Component)]
+pub struct InsertOnAssetEvent<T, A: Asset> {
+	/// The component to insert.
 	pub value: T,
+	/// The asset event to match.
 	pub asset_event: ReflectedAssetEvent<A>,
 }
 
-impl<T: GenericActionComponent, A: GenericActionAsset>
-	InsertOnAssetEvent<T, A>
-{
+impl<T, A: Asset> InsertOnAssetEvent<T, A> {
+	/// Creates a new InsertOnAssetEvent.
 	pub fn new(value: T, asset_event: AssetEvent<A>) -> Self {
 		Self {
 			value,
 			asset_event: asset_event.into(),
 		}
 	}
+	/// Creates a new InsertOnAssetEvent that matches the [AssetEvent::LoadedWithDependencies] event.
 	pub fn loaded(value: T, handle: &Handle<A>) -> Self {
 		Self::new(value, AssetEvent::LoadedWithDependencies {
 			id: handle.id(),
 		})
 	}
 
+	/// Checks if the given state matches the asset event.
 	pub fn matches_load_state(&self, state: LoadState) -> bool {
 		match (self.asset_event, state) {
 			(ReflectedAssetEvent::Added { .. }, LoadState::Loaded) => true,
@@ -51,7 +45,7 @@ impl<T: GenericActionComponent, A: GenericActionAsset>
 	}
 }
 
-fn insert_on_asset_event<T: GenericActionComponent, A: GenericActionAsset>(
+pub(crate) fn insert_on_asset_event<T: Component + Clone, A: Asset>(
 	mut commands: Commands,
 	mut asset_events: EventReader<AssetEvent<A>>,
 	query: Query<(Entity, &InsertOnAssetEvent<T, A>), With<Running>>,
@@ -65,7 +59,7 @@ fn insert_on_asset_event<T: GenericActionComponent, A: GenericActionAsset>(
 		}
 	}
 }
-fn insert_on_asset_status<T: GenericActionComponent, A: GenericActionAsset>(
+pub(crate) fn insert_on_asset_status<T: Component + Clone, A: Asset>(
 	mut commands: Commands,
 	asset_server: Res<AssetServer>,
 	query: Query<(Entity, &InsertOnAssetEvent<T, A>), Added<Running>>,

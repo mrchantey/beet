@@ -6,15 +6,30 @@ use bevy::prelude::*;
 #[derive(Debug, Reflect, PartialEq, Event)]
 pub enum ReflectedAssetEvent<A: Asset> {
 	/// Emitted whenever an [`Asset`] is added.
-	Added { id: AssetId<A> },
+	Added {
+		/// The id of the asset that was added.
+		id: AssetId<A>,
+	},
 	/// Emitted whenever an [`Asset`] value is modified.
-	Modified { id: AssetId<A> },
+	Modified {
+		/// The id of the asset that was modified.
+		id: AssetId<A>,
+	},
 	/// Emitted whenever an [`Asset`] is removed.
-	Removed { id: AssetId<A> },
+	Removed {
+		/// The id of the asset that was removed.
+		id: AssetId<A>,
+	},
 	/// Emitted when the last [`super::Handle::Strong`] of an [`Asset`] is dropped.
-	Unused { id: AssetId<A> },
+	Unused {
+		/// The id of the asset that is now unused.
+		id: AssetId<A>,
+	},
 	/// Emitted whenever an [`Asset`] has been fully loaded (including its dependencies and all "recursive dependencies").
-	LoadedWithDependencies { id: AssetId<A> },
+	LoadedWithDependencies {
+		/// The id of the asset that was loaded.
+		id: AssetId<A>,
+	},
 }
 
 
