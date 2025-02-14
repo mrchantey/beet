@@ -18,6 +18,20 @@
   </h3>
 </div>
 
+Beet is a collection of crates for developing web pages, game scenes and AI behaviors. Your mileage may vary depending on the crate of interest:
+
+- 🦆: documented and tested
+- 🐉: highly experimental, here be dragons
+
+| Crate          | Status | Description                                                       |
+| -------------- | ------ | ----------------------------------------------------------------- |
+| `beet_flow`    | 🦆      | scenes-as-control-flow bevy library for behavior trees etc        |
+| `beet_spatial` | 🦆      | Extend `beet_flow` with steering, robotics etc                    |
+| `beet_ml`      | 🐉      | Extend `beet_flow` with machine learning using `candle`           |
+| `beet_sim`     | 🐉      | Extend `beet_flow` with generalized simulation tooling like stats |
+| `beet_rsx`     | 🐉      | Exploration of authoring tools for html and bevy                  |
+| `beet_router`  | 🐉      | File based router for web docs                                    |
+
 ## Bevy Versions
 
 | `bevy` | `beet` |

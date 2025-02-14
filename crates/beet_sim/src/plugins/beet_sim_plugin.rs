@@ -10,14 +10,13 @@ impl Plugin for BeetSimPlugin {
 			// emoji_plugin,
 			walk_plugin,
 			stat_plugin,
-			ActionPlugin::<(
-				StatScoreProvider,
-				RunOnChange<StatValue>,
-				FindStatSteerTarget,
-			)>::default(),
 		))
-		.add_systems(Update, (
-			// render_valency, 
-			pickup_collectable));
+		.add_systems(
+			Update,
+			(
+				// render_valency,
+				pickup_collectable
+			),
+		);
 	}
 }

@@ -4,10 +4,9 @@ use beet_spatial::prelude::*;
 use bevy::prelude::*;
 
 /// Sets the [`SteerTarget`] when an entity with the given name is nearby.
-#[derive(Debug, Clone, PartialEq, Component, Action, Reflect)]
-#[reflect(Default, Component, ActionMeta)]
-#[category(ActionCategory::Agent)]
-#[observers(find_steer_target)]
+#[action(find_steer_target)]
+#[derive(Debug, Clone, PartialEq, Component, Reflect)]
+#[reflect(Default, Component)]
 #[require(StatId, StatValueGoal)]
 pub struct FindStatSteerTarget {}
 
@@ -20,24 +19,19 @@ impl FindStatSteerTarget {}
 // TODO this shouldnt run every frame?
 
 fn find_steer_target(
-	trigger: Trigger<OnRun>,
+	ev: Trigger<OnRun>,
 	mut commands: Commands,
 	transforms: Query<&Transform>,
 	targets: Query<(&StatId, &StatValue, &Parent), With<StatProvider>>,
-	query: Populated<(
-		&TargetEntity,
-		&FindStatSteerTarget,
-		&StatId,
-		&StatValueGoal,
-	)>,
+	query: Populated<(&FindStatSteerTarget, &StatId, &StatValueGoal)>,
 ) {
-	let (agent_entity, _action, goal_id, value_goal) = query
-		.get(trigger.entity())
-		.expect(expect_action::ACTION_QUERY_MISSING);
+	let (_action, goal_id, value_goal) = query
+		.get(ev.action)
+		.expect(&expect_action::to_have_action(&ev));
 
 	let agent_transform = transforms
-		.get(**agent_entity)
-		.expect(expect_action::TARGET_MISSING);
+		.get(ev.origin)
+		.expect(&expect_action::to_have_origin(&ev));
 
 	let mut best_score = f32::MAX;
 	let mut closest_target = None;
@@ -48,7 +42,7 @@ fn find_steer_target(
 		}
 		let pickup_transform = transforms
 			.get(**pickup_parent)
-			.expect(expect_action::TARGET_MISSING);
+			.expect(&expect_action::to_have_other(pickup_parent));
 
 		let new_dist = Vec3::distance(
 			agent_transform.translation,
@@ -73,7 +67,7 @@ fn find_steer_target(
 
 	if let Some(closest_target) = closest_target {
 		commands
-			.entity(**agent_entity)
+			.entity(ev.origin)
 			.insert(SteerTarget::Entity(closest_target));
 	}
 }
