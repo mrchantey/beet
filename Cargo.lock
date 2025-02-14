@@ -5587,8 +5587,9 @@ dependencies = [
 
 [[package]]
 name = "sweet"
-version = "0.3.0-rc.3"
-source = "git+https://github.com/mrchantey/sweet#0f08ff484639ba7f8e2f2f859c25654336a386d4"
+version = "0.3.0-rc.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1360ef9c7bddf2c67078456a0e131ecdc58b0fbea87e5536854c91a3a6952e8a"
 dependencies = [
  "sweet_bevy",
  "sweet_fs",
@@ -5599,8 +5600,9 @@ dependencies = [
 
 [[package]]
 name = "sweet_bevy"
-version = "0.3.0-rc.3"
-source = "git+https://github.com/mrchantey/sweet#0f08ff484639ba7f8e2f2f859c25654336a386d4"
+version = "0.3.0-rc.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d033c36b03e7e2adabbcf9297b4c04e9db74d264d6da4fdb9cce7cde3e127740"
 dependencies = [
  "anyhow",
  "bevy",
@@ -5615,8 +5617,9 @@ dependencies = [
 
 [[package]]
 name = "sweet_fs"
-version = "0.3.0-rc.3"
-source = "git+https://github.com/mrchantey/sweet#0f08ff484639ba7f8e2f2f859c25654336a386d4"
+version = "0.3.0-rc.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "aaf45e789ccd6f6f428814e10bf431e51a308f4bd22e808a6463bdfd642bd1e2"
 dependencies = [
  "anyhow",
  "clap",
@@ -5633,8 +5636,9 @@ dependencies = [
 
 [[package]]
 name = "sweet_test"
-version = "0.3.0-rc.3"
-source = "git+https://github.com/mrchantey/sweet#0f08ff484639ba7f8e2f2f859c25654336a386d4"
+version = "0.3.0-rc.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "db745be4f2e6081ef9e513f6b8e5bf123780f1fae36e87c933c787aa931e1431"
 dependencies = [
  "anyhow",
  "backtrace",
@@ -5665,8 +5669,9 @@ dependencies = [
 
 [[package]]
 name = "sweet_test_macros"
-version = "0.3.0-rc.3"
-source = "git+https://github.com/mrchantey/sweet#0f08ff484639ba7f8e2f2f859c25654336a386d4"
+version = "0.3.0-rc.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a4b4530a651aadf49c8199f8d75cc03b3477931b57125ab655fb4cea6b4cf39c"
 dependencies = [
  "anyhow",
  "proc-macro2",
@@ -5676,8 +5681,9 @@ dependencies = [
 
 [[package]]
 name = "sweet_utils"
-version = "0.3.0-rc.3"
-source = "git+https://github.com/mrchantey/sweet#0f08ff484639ba7f8e2f2f859c25654336a386d4"
+version = "0.3.0-rc.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7559decd3871168a2ba819d787d31d600f24e29ddf1d5fbbba3f4f000e543806"
 dependencies = [
  "anyhow",
  "bevy",
@@ -5693,8 +5699,9 @@ dependencies = [
 
 [[package]]
 name = "sweet_web"
-version = "0.3.0-rc.3"
-source = "git+https://github.com/mrchantey/sweet#0f08ff484639ba7f8e2f2f859c25654336a386d4"
+version = "0.3.0-rc.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2b8c9b0449d89bec5cfc075ae1189cfb5748390789831aa0e9e8d3607f505677"
 dependencies = [
  "anyhow",
  "console_error_panic_hook",

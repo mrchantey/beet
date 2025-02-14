@@ -96,11 +96,12 @@ test-all *args:
 	just leptosfmt 		--check
 	cargo test --workspace										 --features=_doctest							{{args}}
 	cargo test 																 --all-features -p beet_flow 			{{args}}
-	cargo test 																 --all-features -p beet_spatial 	{{args}}
 	cargo test 																 --all-features -p beet_rsx 			{{args}}
 	cargo test --target wasm32-unknown-unknown --all-features -p beet_flow 			{{args}}
 	cargo test --target wasm32-unknown-unknown --all-features -p beet_spatial 	{{args}}
 	cargo test --target wasm32-unknown-unknown --all-features -p beet_rsx 			{{args}}
+# no space left on device
+# cargo test 																 --all-features -p beet_spatial 	{{args}} 
 
 #cargo test -p beet_spatial
 #cargo test -p beet_sim
