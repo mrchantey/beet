@@ -297,7 +297,7 @@ test-seek-3d:
 
 
 # https://gist.github.com/stephenhardy/5470814
-# 1. Remove the history from 
+# 1. Remove the history
 # 2. recreate the repos from the current content only
 # 3. push to the github remote repos ensuring you overwrite history
 very-scary-purge-commit-history:
@@ -307,5 +307,5 @@ very-scary-purge-commit-history:
 	git add .
 	git commit -m "Initial commit"
 
-	git remote add origin git@github.com:<YOUR ACCOUNT>/<YOUR REPOS>.git
-	git push -u --force origin master
+	git remote add origin git@github.com:mrchantey/beet.git
+	git push -u --force origin main
