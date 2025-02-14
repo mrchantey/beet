@@ -7,7 +7,7 @@ use std::marker::PhantomData;
 
 
 /// Provides debug visualization for the `Separate`, `Align`, and `Cohere` actions.
-pub struct DebugGroupSteerPlugin<M: GenericActionComponent> {
+pub struct DebugGroupSteerPlugin<M> {
 	toggle_key: KeyCode,
 	phantom: PhantomData<M>,
 }
@@ -21,7 +21,7 @@ impl Default for DebugGroupSteerPlugin<GroupSteerAgent> {
 	}
 }
 
-impl<M: GenericActionComponent> Plugin for DebugGroupSteerPlugin<M> {
+impl<M: 'static + Send + Sync> Plugin for DebugGroupSteerPlugin<M> {
 	fn build(&self, app: &mut App) {
 		app.add_systems(
 			Update,
@@ -31,15 +31,15 @@ impl<M: GenericActionComponent> Plugin for DebugGroupSteerPlugin<M> {
 	}
 }
 
-fn debug_group_steer<M: GenericActionComponent>(
+fn debug_group_steer<M: 'static + Send + Sync>(
 	mut gizmos: Gizmos,
 	transforms: Query<&Transform>,
-	separate: Query<(&TargetEntity, &Separate<M>)>,
-	align: Query<(&TargetEntity, &Align<M>)>,
-	cohere: Query<(&TargetEntity, &Cohere<M>)>,
+	separate: Query<(&Running, &Separate<M>)>,
+	align: Query<(&Running, &Align<M>)>,
+	cohere: Query<(&Running, &Cohere<M>)>,
 ) {
-	for (agent, params) in separate.iter() {
-		if let Ok(transform) = transforms.get(**agent) {
+	for (running, params) in separate.iter() {
+		if let Ok(transform) = transforms.get(running.origin) {
 			gizmos.circle_2d(
 				Isometry2d::from_translation(transform.translation.xy()),
 				params.radius,
@@ -48,8 +48,8 @@ fn debug_group_steer<M: GenericActionComponent>(
 		}
 	}
 
-	for (agent, params) in align.iter() {
-		if let Ok(transform) = transforms.get(**agent) {
+	for (running, params) in align.iter() {
+		if let Ok(transform) = transforms.get(running.origin) {
 			gizmos.circle_2d(
 				Isometry2d::from_translation(transform.translation.xy()),
 				params.radius,
@@ -58,8 +58,8 @@ fn debug_group_steer<M: GenericActionComponent>(
 		}
 	}
 
-	for (agent, params) in cohere.iter() {
-		if let Ok(transform) = transforms.get(**agent) {
+	for (running, params) in cohere.iter() {
+		if let Ok(transform) = transforms.get(running.origin) {
 			gizmos.circle_2d(
 				Isometry2d::from_translation(transform.translation.xy()),
 				params.radius,

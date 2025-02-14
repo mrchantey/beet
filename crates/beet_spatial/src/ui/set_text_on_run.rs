@@ -4,18 +4,20 @@ use std::borrow::Cow;
 use std::marker::PhantomData;
 
 
-#[derive(Debug, Clone, PartialEq, Component, Action, Reflect)]
-#[reflect(Component, ActionMeta)]
-#[category(ActionCategory::World)]
-#[systems(set_text_on_run::<F>.in_set(TickSet))]
 /// Sets the [`Text`] of all entities with the filter component `F`.
-pub struct SetTextOnRun<F: GenericActionComponent> {
+/// Be sure to add the [`set_text_on_run_plugin`] to your app.
+#[action(set_text_on_run::<F>)]
+#[derive(Debug, Clone, PartialEq, Component, Reflect)]
+#[reflect(Component)]
+pub struct SetTextOnRun<F: Component> {
+	/// The text to set
 	pub value: Cow<'static, str>,
 	#[reflect(ignore)]
 	phantom: PhantomData<F>,
 }
 
-impl<F: GenericActionComponent> SetTextOnRun<F> {
+impl<F: Component> SetTextOnRun<F> {
+	/// Creates a new `SetTextOnRun` action.
 	pub fn new(value: impl Into<Cow<'static, str>>) -> Self {
 		Self {
 			value: value.into(),
@@ -24,17 +26,19 @@ impl<F: GenericActionComponent> SetTextOnRun<F> {
 	}
 }
 
-fn set_text_on_run<F: GenericActionComponent>(
+fn set_text_on_run<F: Component>(
+	ev: Trigger<OnRun>,
+	query: Query<&SetTextOnRun<F>, Added<Running>>,
 	mut texts: Query<&mut Text, With<F>>,
 	mut text_spans: Query<&mut TextSpan, With<F>>,
-	query: Query<&SetTextOnRun<F>, Added<Running>>,
 ) {
-	for set_text_on_run in query.iter() {
-		for mut text in texts.iter_mut() {
-			**text = set_text_on_run.value.to_string();
-		}
-		for mut text in text_spans.iter_mut() {
-			**text = set_text_on_run.value.to_string();
-		}
+	let set_text_on_run = query
+		.get(ev.action)
+		.expect(&expect_action::to_have_action(&ev));
+	for mut text in texts.iter_mut() {
+		**text = set_text_on_run.value.to_string();
+	}
+	for mut text in text_spans.iter_mut() {
+		**text = set_text_on_run.value.to_string();
 	}
 }

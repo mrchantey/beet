@@ -9,6 +9,7 @@
 //!
 //! Note that long running terminators should require [ContinueRun]
 //! which sets up the [Running] component lifecycle.
+#![allow(unused)]
 use beet::prelude::*;
 use bevy::prelude::*;
 use bevy::time::common_conditions::on_timer;
@@ -20,21 +21,22 @@ fn main() {
 	let mut app = App::new();
 	app.add_plugins((
 		MinimalPlugins,
-		BeetFlowPlugin::default().log_on_run(),
-		ActionPlugin::<Patrol>::default(),
-	));
+		BeetFlowPlugin::default(),
+		BeetDebugPlugin::with_result(),
+	))
+	.add_systems(Update, patrol.run_if(on_timer(Duration::from_millis(100))));
 
 	app.world_mut()
-		.spawn((Name::new("root"), SequenceFlow))
+		.spawn((Name::new("root"), Sequence))
 		.with_children(|parent| {
 			parent
 				.spawn((
 					Name::new("Long Running"),
-					SequenceFlow,
-					// this is the end condition, triggering OnRunResult::success() after 1 second
-					TriggerInDuration::new(
-						OnRunResult::success(),
-						Duration::from_secs(3),
+					Sequence,
+					// this is the end condition, triggering OnRunResult::success() after a duration
+					ReturnInDuration::new(
+						RunResult::Success,
+						Duration::from_secs(5),
 					),
 				))
 				.with_children(|parent| {
@@ -44,26 +46,26 @@ fn main() {
 					parent
 						.spawn((
 							Name::new("Patrol Sequence"),
-							SequenceFlow,
+							Sequence,
 							// the patrol sequence will repeat indefinitely
-							RepeatFlow::default(),
+							Repeat::default(),
 						))
 						.with_child((
 							// patrol the left flank for a bit
 							Name::new("Patrol Left"),
 							Patrol::default(),
-							TriggerInDuration::new(
-								OnRunResult::success(),
-								Duration::from_millis(300),
+							ReturnInDuration::new(
+								RunResult::Success,
+								Duration::from_secs(1),
 							),
 						))
 						.with_child((
 							// patrol the right flank for a bit
 							Name::new("Patrol Right"),
 							Patrol::default(),
-							TriggerInDuration::new(
-								OnRunResult::success(),
-								Duration::from_millis(300),
+							ReturnInDuration::new(
+								RunResult::Success,
+								Duration::from_secs(1),
 							),
 						));
 				});
@@ -74,14 +76,13 @@ fn main() {
 				},
 			);
 		})
-		.trigger(OnRun);
+		.trigger(OnRun::local());
 
 	app.run();
 }
 
 
-#[derive(Default, Component, Action, Reflect)]
-#[systems(patrol.run_if(on_timer(Duration::from_millis(123))))]
+#[derive(Default, Component, Reflect)]
 // any action that uses the [`Running`] component should require [`ContinueRun`]
 #[require(ContinueRun)]
 struct Patrol {

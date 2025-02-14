@@ -1,15 +1,17 @@
-pub mod play_procedural_animation;
-#[allow(unused_imports)]
+//! Actions for procedural animations like following curves.
+mod play_procedural_animation;
 pub use self::play_procedural_animation::*;
-pub mod procedural_animation_plugin;
-#[allow(unused_imports)]
-pub use self::procedural_animation_plugin::*;
-pub mod procedural_animation_speed;
-#[allow(unused_imports)]
+mod procedural_animation_speed;
 pub use self::procedural_animation_speed::*;
-pub mod serde_curve;
-#[allow(unused_imports)]
+mod serde_curve;
 pub use self::serde_curve::*;
-pub mod set_curve_on_run;
-#[allow(unused_imports)]
+mod set_curve_on_run;
 pub use self::set_curve_on_run::*;
+use beet_flow::prelude::*;
+use bevy::prelude::*;
+
+/// Add all systems and types for procedural animation actions:
+/// - [`PlayProceduralAnimation`]
+pub fn procedural_animation_plugin(app: &mut App) {
+	app.add_systems(Update, play_procedural_animation.in_set(TickSet));
+}

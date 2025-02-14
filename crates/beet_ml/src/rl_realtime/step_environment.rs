@@ -4,10 +4,9 @@ use bevy::prelude::*;
 use std::marker::PhantomData;
 use sweet::prelude::RandomSource;
 
-#[derive(Debug, Clone, PartialEq, Component, Action, Reflect)]
-#[reflect(Component, ActionMeta)]
-#[category(ActionCategory::Behavior)]
-#[observers(step_environment::<S>)]
+#[action(step_environment::<S>)]
+#[derive(Debug, Clone, PartialEq, Component, Reflect)]
+#[reflect(Component)]
 pub struct StepEnvironment<S: RlSessionTypes>
 where
 	S::State: Component,
@@ -39,10 +38,10 @@ where
 
 
 fn step_environment<S: RlSessionTypes>(
-	trigger: Trigger<OnRun>,
+	ev: Trigger<OnRun>,
 	mut rng: ResMut<RandomSource>,
 	mut end_episode_events: EventWriter<EndEpisode<S::EpisodeParams>>,
-	mut commands: Commands,
+	commands: Commands,
 	mut sessions: Query<&mut S::QLearnPolicy>,
 	mut agents: Query<(
 		&S::State,
@@ -51,24 +50,22 @@ fn step_environment<S: RlSessionTypes>(
 		&QLearnParams,
 		&SessionEntity,
 	)>,
-	mut query: Query<(&TargetEntity, &mut StepEnvironment<S>)>,
+	mut query: Query<&mut StepEnvironment<S>>,
 ) where
 	S::State: Component,
 	S::Action: Component,
 	S::QLearnPolicy: Component,
 	S::Env: Component,
 {
-	let (agent, mut step) = query
-		.get_mut(trigger.entity())
-		.expect(expect_action::ACTION_QUERY_MISSING);
-	let Ok((state, mut action, mut env, params, session_entity)) =
-		agents.get_mut(**agent)
-	else {
-		return;
-	};
-	let Ok(mut table) = sessions.get_mut(**session_entity) else {
-		return;
-	};
+	let mut step = query
+		.get_mut(ev.action)
+		.expect(&expect_action::to_have_action(&ev));
+	let (state, mut action, mut env, params, session_entity) = agents
+		.get_mut(ev.origin)
+		.expect(&expect_action::to_have_origin(&ev));
+	let mut table = sessions
+		.get_mut(**session_entity)
+		.expect(&expect_action::to_have_other(&ev));
 
 	let outcome = env.step(&state, &action);
 	// we ignore the state of the outcome, allow simulation to determine
@@ -88,10 +85,7 @@ fn step_environment<S: RlSessionTypes>(
 	// 	action,
 	// 	outcome.reward
 	// );
-
-	commands
-		.entity(trigger.entity())
-		.trigger(OnRunResult::success());
+	ev.trigger_result(commands, RunResult::Success);
 	step.step += 1;
 
 	if outcome.done || step.step >= params.max_steps {
@@ -110,11 +104,10 @@ mod test {
 	fn works() {
 		let mut app = App::new();
 
-		let on_result = observe_triggers::<OnRunResult>(app.world_mut());
+		let on_result = observe_triggers::<OnResult>(app.world_mut());
 
 		app.add_plugins((
-			LifecyclePlugin,
-			ActionPlugin::<StepEnvironment<FrozenLakeQTableSession>>::default(),
+			BeetFlowPlugin::default(),
 			RlSessionPlugin::<FrozenLakeEpParams>::default(),
 		))
 		.init_resource::<RandomSource>()
@@ -127,22 +120,18 @@ mod test {
 		let session = app.world_mut().spawn(FrozenLakeQTable::default()).id();
 
 		app.world_mut()
-			.spawn(RlAgentBundle {
-				state: map.agent_position(),
-				action: GridDirection::sample(&mut *rng),
-				env: QTableEnv::new(map.transition_outcomes()),
-				params: QLearnParams::default(),
-				session: SessionEntity(session),
-				despawn: DespawnOnEpisodeEnd,
-			})
-			.with_children(|parent| {
-				parent
-					.spawn((
-						TargetEntity(parent.parent_entity()),
-						StepEnvironment::<FrozenLakeQTableSession>::new(0),
-					))
-					.flush_trigger(OnRun);
-			});
+			.spawn((
+				RlAgentBundle {
+					state: map.agent_position(),
+					action: GridDirection::sample(&mut *rng),
+					env: QTableEnv::new(map.transition_outcomes()),
+					params: QLearnParams::default(),
+					session: SessionEntity(session),
+					despawn: DespawnOnEpisodeEnd,
+				},
+				StepEnvironment::<FrozenLakeQTableSession>::new(0),
+			))
+			.flush_trigger(OnRun::local());
 
 
 		app.world_mut().insert_resource(rng);

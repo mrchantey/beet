@@ -1,14 +1,14 @@
 mod effect;
-mod rsx_root_map;
 mod rsx_hydrated_node;
 mod rsx_location;
+mod rsx_root_map;
 mod rsx_template_map;
 mod rsx_template_node;
 mod rsx_template_root;
 mod rsx_visitor_fn;
 mod scoped_style;
-pub use rsx_root_map::*;
 pub use rsx_hydrated_node::*;
+pub use rsx_root_map::*;
 pub use rsx_template_map::*;
 pub use rsx_template_node::*;
 pub use rsx_template_root::*;

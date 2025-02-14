@@ -3,14 +3,21 @@ use bevy::prelude::*;
 use std::f32::consts::PI;
 use std::f32::consts::TAU;
 
+/// A type alias for radians as f32.
+pub type Radians = f32;
+
 /// Inverse Kinematics solver for a 2dof planar arm, for instance shoulder & elbow hinge joints.
 #[derive(Debug, Clone, Copy, Reflect)]
 pub struct IkArm4Dof {
-	/// offset angle
-	pub base_offset_angle: f32,
+	/// Set the offset from a Vec3::RIGHT direction in radians.
+	pub base_offset_angle: Radians,
+	/// The base segment (shoulder to elbow) of the arm.
 	pub segment1: IkSegment,
+	/// The second segment (elbow to wrist) of the arm.
 	pub segment2: IkSegment,
+	/// The third segment (wrist to fingertip) of the arm.
 	pub segment3: IkSegment,
+	/// The preferred style of the arm, overarm or underarm.
 	pub arm_style: IkArmStyle,
 }
 
@@ -26,16 +33,20 @@ impl Default for IkArm4Dof {
 	}
 }
 
+/// The preferred style of the arm, overarm or underarm.
 #[derive(Debug, Default, Clone, Copy, Reflect)]
 pub enum IkArmStyle {
+	/// The 'elbow' is generally above the 'wrist' joint.
 	#[default]
 	Overarm,
+	/// The 'elbow' is generally below the 'wrist' joint.
 	Underarm,
 }
 
 impl IkArm4Dof {
+	/// Create a new 4DOF arm with the given segments and offset angle in radians.
 	pub fn new(
-		base_offset_angle: f32,
+		base_offset_angle: Radians,
 		segment1: IkSegment,
 		segment2: IkSegment,
 		segment3: IkSegment,
@@ -49,8 +60,10 @@ impl IkArm4Dof {
 		}
 	}
 
+	/// The maximum reach (length) of the arm.
 	pub fn reach(&self) -> f32 { self.segment1.len + self.segment2.len }
 
+	/// Solve the inverse kinematics problem for a 4DOF arm with a base and three segments.
 	pub fn solve4d(&self, delta_pos: Vec3) -> (f32, f32, f32, f32) {
 		let angles = self.solve3d(delta_pos);
 		let theta4 = TAU - angles.1 - angles.2;

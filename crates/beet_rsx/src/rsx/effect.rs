@@ -19,10 +19,7 @@ impl Effect {
 		register: RegisterEffect,
 		tracker: Option<RustyTracker>,
 	) -> Self {
-		Self {
-			register,
-			tracker,
-		}
+		Self { register, tracker }
 	}
 
 	/// call the FnOnce register func and replace it
@@ -31,13 +28,12 @@ impl Effect {
 		let register =
 			std::mem::replace(&mut self.register, Box::new(|_| Ok(())));
 		let tracker = self.tracker.take();
-		Self {
-			register,
-			tracker,
-		}
+		Self { register, tracker }
 	}
 
-	pub fn register(self, loc: DomLocation) -> Result<()> { (self.register)(loc) }
+	pub fn register(self, loc: DomLocation) -> Result<()> {
+		(self.register)(loc)
+	}
 }
 
 impl std::fmt::Debug for Effect {

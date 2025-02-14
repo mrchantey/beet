@@ -2,7 +2,6 @@ use crate::prelude::*;
 use beet_flow::prelude::*;
 use bevy::animation::RepeatAnimation;
 use bevy::prelude::*;
-use bevyhub::prelude::*;
 use std::time::Duration;
 
 
@@ -30,8 +29,12 @@ impl AnimationActionBundle {
 			clip,
 			play_animation: PlayAnimation::new(index)
 				.with_transition_duration(transition_duration),
-			on_end: TriggerOnAnimationEnd::new(index, OnRunResult::success())
-				.with_transition_duration(transition_duration),
+			on_end: TriggerOnAnimationEnd::new(
+				index,
+				// should this specify the action?
+				// OnResultAction::local(RunResult::Success),
+			)
+			.with_transition_duration(transition_duration),
 		}
 	}
 

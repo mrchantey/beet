@@ -2,7 +2,7 @@
 
 <div align="center">
   <p>
-    <strong>A modular behavior library for the Bevy Engine.</strong>
+    <strong>Tools for developing reactive structures.</strong>
   </p>
   <p>
     <a href="https://crates.io/crates/beet"><img src="https://img.shields.io/crates/v/beet.svg?style=flat-square" alt="Crates.io version" /></a>
@@ -10,58 +10,30 @@
     <a href="https://docs.rs/beet"><img src="https://img.shields.io/badge/docs-latest-blue.svg?style=flat-square" alt="docs.rs docs" /></a>
   </p>
   <h3>
-    <a href="https://bevyhub.dev/docs/beet">Guidebook</a>
-    <span> | </span>
+    <!-- <a href="https://bevyhub.dev/docs/beet">Guidebook</a> -->
+    <!-- <span> | </span> -->
     <a href="https://docs.rs/beet">API Docs</a>
     <!-- <span> | </span>
     <a href="https://mrchantey.github.io/beet/other/contributing.html">Contributing</a> -->
   </h3>
 </div>
 
-Beet is behavior expressed as entity trees, using [Observers][bevy-observers] for control flow. The entity-based approach is very flexible and allows for multiple behavior paradigms to be used together as needed.
+Beet is a collection of crates for authoring and running web pages, games and AI behaviors. Your mileage may vary depending on the crate of interest:
 
-Currently implemented paradigms:
-- [Behavior Trees](./examples/hello_world.rs)
-- [State Machines](./examples/hello_state_machine.rs)
-- [Utility AI](./examples/hello_utility_ai.rs)
-- [LLM Sentence Similarity](./examples/hello_ml.rs)
-- [Reinforcement Learning](./examples/frozen_lake_train.rs)
+- 🦢 documented and tested
+- 🐣 docs and tests are incomplete
+- 🐉 highly experimental, here be dragons
 
+| Crate                                            | Status | Description                                                       |
+| ------------------------------------------------ | ------ | ----------------------------------------------------------------- |
+| [`beet_flow`](crates/beet_flow/Cargo.toml)       | 🦢      | Scenes-as-control-flow bevy library for behavior trees etc        |
+| [`beet_spatial`](crates/beet_spatial/Cargo.toml) | 🐣      | Extend `beet_flow` with spatial behaviors like steering           |
+| [`beet_ml`](crates/beet_ml/Cargo.toml)           | 🐉      | Extend `beet_flow` with machine learning using `candle`           |
+| [`beet_sim`](crates/beet_sim/Cargo.toml)         | 🐉      | Extend `beet_flow` with generalized simulation tooling like stats |
+| [`beet_rsx`](crates/beet_rsx/Cargo.toml)         | 🐉      | Exploration of authoring tools for html and bevy                  |
+| [`beet_router`](crates/beet_router/Cargo.toml)   | 🐉      | File based router for web docs                                    |
 
-## Hello World
-
-```rust ignore
-use bevy::prelude::*;
-use beet::prelude::*;
-
-// A demonstration of Sequence control flow
-world.spawn(SequenceFlow)
-	.with_child((
-		Name::new("Hello"),
-		EndOnRun::success(),
-	))
-	.with_child((
-		Name::new("World"),
-		EndOnRun::success(),
-	))
-	.trigger(OnRun);
-```
-
-[bevy-observers]:https://docs.rs/bevy/latest/bevy/ecs/observer/struct.Observer.html#
-
-
-## Examples
-
-The examples for beet are *scene-based*, meaning each example provides a scene for a common base app. As Bevy scene workflows are a wip, there are a few `Placeholder` types used for not-yet-serializable types like cameras, asset handles etc.
-
-Most examples rely on assets that can be downloaded with the following commands, or manually from [here](https://bevyhub-public.s3.us-west-2.amazonaws.com/assets.tar.gz).
-
-```sh
-curl -o ./assets.tar.gz https://bevyhub-public.s3.us-west-2.amazonaws.com/assets.tar.gz
-tar -xzvf ./assets.tar.gz
-rm ./assets.tar.gz
-```
-
+The `beet` crate serves as a base crate that re-exports any combination of sub-crates according to feature flags, much like the `bevy` crate structure.
 
 ## Bevy Versions
 
@@ -70,7 +42,3 @@ rm ./assets.tar.gz
 | 0.15   | 0.0.4  |
 | 0.14   | 0.0.2  |
 | 0.12   | 0.0.1  |
-
-## TODO
-
-- When we get [`OnMutate`](https://github.com/bevyengine/bevy/pull/14520) observers, they should probably replace most `OnInsert` observers we're using

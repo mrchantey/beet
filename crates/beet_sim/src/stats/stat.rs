@@ -86,6 +86,6 @@ pub fn stat_plugin(app: &mut App) {
 			// world
 			// 	.commands()
 			// 	.entity(entity)
-				// .insert(Emoji::bundle(&hexcode));
+			// .insert(Emoji::bundle(&hexcode));
 		});
 }

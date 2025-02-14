@@ -10,7 +10,7 @@ use std::f32::consts::FRAC_PI_2;
 #[reflect(Default, Component)]
 pub struct IkSpawner;
 
-
+/// Registers the observer for the IkSpawner component.
 pub fn ik_spawner_plugin(app: &mut App) {
 	app.world_mut()
 		.register_component_hooks::<IkSpawner>()
@@ -24,14 +24,14 @@ pub fn ik_spawner_plugin(app: &mut App) {
 	app.register_type::<IkSpawner>();
 }
 
-pub fn ik_spawner(
+fn ik_spawner(
 	trigger: Trigger<SceneInstanceReady>,
 	mut commands: Commands,
 	child_nodes_query: Query<(Entity, &Name, &Transform, &Children)>,
 	children_query: Query<&Children>,
-	query: Populated<(Entity, &Transform, &Children, &TargetEntity)>,
+	query: Populated<(Entity, &Transform, &Children)>,
 ) {
-	let Ok((scene_root_entity, transform, scene_root_children, target)) =
+	let Ok((scene_root_entity, transform, scene_root_children)) =
 		query.get(trigger.entity())
 	else {
 		return;
@@ -79,7 +79,12 @@ pub fn ik_spawner(
 	);
 
 	let ik_transforms = IkArm4DofTransforms::new(
-		ik, **target, base.0, segment1.0, segment2.0, segment3.0,
+		ik,
+		trigger.entity(),
+		base.0,
+		segment1.0,
+		segment2.0,
+		segment3.0,
 	);
 
 	commands.entity(scene_root_entity).insert(ik_transforms);

@@ -2,9 +2,9 @@
 name = "beet_spatial"
 version = { workspace = true }
 edition = { workspace = true }
-description = { workspace = true }
+description = "Spatial actions built upon beet_flow"
 documentation = { workspace = true }
-readme = { workspace = true }
+readme = "README.md"
 homepage = { workspace = true }
 repository = { workspace = true }
 license = { workspace = true }
@@ -15,10 +15,12 @@ categories = { workspace = true }
 # default = ["animation", "assets", "ui"]
 # bevyhub = []
 ui = ["bevy/bevy_ui"]
-scene = ["bevy/bevy_scene", "beet_flow/scene"]
+scene = ["bevy/bevy_scene"]
 render = ["bevy/bevy_color", "bevy/bevy_gizmos"]
 assets = ["bevy/bevy_asset"]
-animation = ["bevy/bevy_animation"]
+# revisit when we get construct
+# animation = ["bevy/bevy_animation"]
+_doctest = []
 
 [dependencies]
 beet_flow = { workspace = true }

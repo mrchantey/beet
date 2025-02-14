@@ -1,8 +1,8 @@
 use beet_flow::prelude::*;
 use beet_sim::prelude::*;
 use beet_spatial::prelude::*;
-use bevyhub::prelude::*;
 use bevy::prelude::*;
+use bevyhub::prelude::*;
 
 
 const STRESS: &str = "Stress";

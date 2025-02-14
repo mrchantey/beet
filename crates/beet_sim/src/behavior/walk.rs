@@ -11,7 +11,7 @@ pub fn walk_plugin(app: &mut App) {
 		.world_mut()
 		.register_component_hooks::<Walk>()
 		.on_add(|mut world, entity, _| {
-			
+
 			// world
 			// 	.commands()
 			// 	.entity(entity)

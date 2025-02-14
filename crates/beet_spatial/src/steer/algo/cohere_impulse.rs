@@ -1,10 +1,9 @@
 use crate::prelude::*;
-use beet_flow::prelude::GenericActionComponent;
 use bevy::prelude::*;
 
 /// Calculate a cohesion impulse
 /// as described [here](https://natureofcode.com/autonomous-agents/#exercise-515).
-pub fn cohere_impulse<'a, T: GenericActionComponent>(
+pub fn cohere_impulse<'a, T>(
 	target_entity: Entity,
 	position: Vec3,
 	max_speed: MaxSpeed,

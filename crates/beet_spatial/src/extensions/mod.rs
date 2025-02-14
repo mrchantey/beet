@@ -1,3 +1,2 @@
-pub mod global_transform;
-#[allow(unused_imports)]
+mod global_transform;
 pub use self::global_transform::*;

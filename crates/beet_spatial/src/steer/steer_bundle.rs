@@ -48,12 +48,18 @@ impl Default for ForceScalar {
 
 
 
-
+/// The components required for steering behaviors.
 /// This should be used in conjunction with the [`ForceBundle`] and [`TransformBundle`]
 #[derive(Default, Bundle)]
 pub struct SteerBundle {
+	/// The maximum force that can be applied to the agent,
+	/// see [`integrate_force`] for example usage
 	pub max_force: MaxForce,
+	/// The maximum speed that the agent can move,
+	/// see [`arrive_speed`] for example usage
 	pub max_speed: MaxSpeed,
+	/// The radius at which the agent will begin to slow down,
+	/// see [`arrive_speed`] for example usage
 	pub arrive_radius: ArriveRadius,
 }
 

@@ -11,7 +11,7 @@ pub struct RlAgentBundle<Env: Component + Environment> {
 	pub env: Env,
 	pub params: QLearnParams,
 	pub session: SessionEntity,
-	pub despawn:DespawnOnEpisodeEnd
+	pub despawn: DespawnOnEpisodeEnd,
 }
 
 // #[derive(Bundle)]

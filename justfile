@@ -25,7 +25,7 @@ init-repo:
 cli *args:
 	cargo run -p beet-cli -- {{args}}
 
-run-ex example *args:
+run-ws example *args:
 	just watch 'just run-ci {{example}} {{args}}'
 
 run-ci example *args:
@@ -34,6 +34,9 @@ run-ci example *args:
 run crate example *args:
 	just watch cargo run -p {{crate}} --example {{example}} {{args}}
 
+
+doc crate *args:
+	just watch cargo doc -p {{crate}} --open {{args}}
 
 fmt *args:
 	just watch 'just leptosfmt {{args}}'
@@ -88,20 +91,17 @@ hello-world:
 	../bevyhub/scenes/ui-terminal-input.json \
 	./scenes/hello-world.json
 
-doc:
-	just watch 'cargo doc'
-
-serve-doc:
-	cd ./target/doc/beet && sweet serve
-
 test-all *args:
-	just leptosfmt --check
-	cargo test --workspace
+	cargo fmt 				--check
+	just leptosfmt 		--check
+	cargo test --workspace										 --features=_doctest							{{args}}
 	cargo test 																 --all-features -p beet_flow 			{{args}}
 	cargo test 																 --all-features -p beet_rsx 			{{args}}
 	cargo test --target wasm32-unknown-unknown --all-features -p beet_flow 			{{args}}
+	cargo test --target wasm32-unknown-unknown --all-features -p beet_spatial 	{{args}}
 	cargo test --target wasm32-unknown-unknown --all-features -p beet_rsx 			{{args}}
-	cargo test --target wasm32-unknown-unknown 								-p beet_spatial 	{{args}}
+# no space left on device
+# cargo test 																 --all-features -p beet_spatial 	{{args}} 
 
 #cargo test -p beet_spatial
 #cargo test -p beet_sim
@@ -109,6 +109,8 @@ test-all *args:
 # cargo test --workspace -- {{args}}
 # cargo test --workspace --all-features -- {{args}}
 
+test-doc crate *args:
+	just watch 'cargo test -p {{crate}} --doc --features=_doctest {{args}}'
 # copied from sweet
 test crate *args:
 	just watch 'cargo test -p {{crate}} --lib -- --watch {{args}}'
@@ -297,7 +299,7 @@ test-seek-3d:
 
 
 # https://gist.github.com/stephenhardy/5470814
-# 1. Remove the history from 
+# 1. Remove the history
 # 2. recreate the repos from the current content only
 # 3. push to the github remote repos ensuring you overwrite history
 very-scary-purge-commit-history:
@@ -307,5 +309,5 @@ very-scary-purge-commit-history:
 	git add .
 	git commit -m "Initial commit"
 
-	git remote add origin git@github.com:<YOUR ACCOUNT>/<YOUR REPOS>.git
-	git push -u --force origin master
+	git remote add origin git@github.com:mrchantey/beet.git
+	git push -u --force origin main

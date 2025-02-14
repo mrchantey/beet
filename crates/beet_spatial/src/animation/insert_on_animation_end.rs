@@ -1,21 +1,15 @@
 use super::*;
 use beet_flow::prelude::*;
-use bevyhub::prelude::*;
 use bevy::animation::RepeatAnimation;
 use bevy::prelude::*;
 use std::time::Duration;
 
-#[derive(Debug, Clone, Component, Action, Reflect)]
-#[reflect(Component, ActionMeta)]
-#[category(ActionCategory::Agent)]
-#[systems(insert_on_animation_end::<T>
-	.never_param_warn()
-	.in_set(TickSet)
-)]
+#[derive(Debug, Clone, Component, Reflect)]
+#[reflect(Component)]
 #[require(ContinueRun)]
 /// Inserts the given component when an animation is almost finished.
 /// Requires a [`Handle<AnimationClip>`] component.
-pub struct TriggerOnAnimationEnd<T: GenericActionEvent> {
+pub struct TriggerOnAnimationEnd<T> {
 	pub value: T,
 	pub target: ActionTarget,
 	pub animation_index: AnimationNodeIndex,
@@ -26,7 +20,7 @@ pub struct TriggerOnAnimationEnd<T: GenericActionEvent> {
 }
 
 
-impl<T: GenericActionEvent> TriggerOnAnimationEnd<T> {
+impl<T: Event> TriggerOnAnimationEnd<T> {
 	pub fn new(index: AnimationNodeIndex, value: T) -> Self {
 		Self {
 			value,
@@ -47,24 +41,21 @@ impl<T: GenericActionEvent> TriggerOnAnimationEnd<T> {
 	}
 }
 
-pub fn insert_on_animation_end<T: GenericActionEvent>(
+pub fn trigger_on_animation_end<T: Event>(
 	mut commands: Commands,
 	animators: Query<&AnimationPlayer>,
 	children: Query<&Children>,
 	clips: Res<Assets<AnimationClip>>,
-	mut query: Query<
-		(
-			Entity,
-			&TargetEntity,
-			&TriggerOnAnimationEnd<T>,
-			&HandleWrapper<AnimationClip>,
-		),
-		With<Running>,
-	>,
+	mut query: Query<(
+		Entity,
+		&Running,
+		&TriggerOnAnimationEnd<T>,
+		&Handle<AnimationClip>,
+	)>,
 ) {
-	for (entity, agent, action, handle) in query.iter_mut() {
+	for (action, running, trigger_on_end, handle) in query.iter_mut() {
 		let Some(target) = children
-			.iter_descendants_inclusive(**agent)
+			.iter_descendants_inclusive(running.origin)
 			.find(|entity| animators.contains(*entity))
 		else {
 			continue;
@@ -76,7 +67,8 @@ pub fn insert_on_animation_end<T: GenericActionEvent>(
 			continue;
 		};
 
-		let Some(active_animation) = player.animation(action.animation_index)
+		let Some(active_animation) =
+			player.animation(trigger_on_end.animation_index)
 		else {
 			continue;
 		};
@@ -97,12 +89,14 @@ pub fn insert_on_animation_end<T: GenericActionEvent>(
 		};
 
 		let nearly_finished =
-			remaining_time < action.transition_duration.as_secs_f32();
+			remaining_time < trigger_on_end.transition_duration.as_secs_f32();
 
 		if nearly_finished {
-			action
-				.target
-				.trigger(&mut commands, entity, action.value.clone());
+			trigger_on_end.target.trigger(
+				&mut commands,
+				action,
+				trigger_on_end.value.clone(),
+			);
 			// commands.entity(entity).trigger();
 		}
 	}

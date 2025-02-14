@@ -3,18 +3,29 @@ use bevy::ecs::entity::MapEntities;
 use bevy::ecs::reflect::ReflectMapEntities;
 use bevy::prelude::*;
 
+
+/// A wrapper around the [`IkArm4Dof`] that will use the [`GlobalTransform`] pose of
+/// the entities to solve the IK.
 #[derive(Debug, Clone, Component, Reflect)]
 #[reflect(Component, MapEntities)]
 pub struct IkArm4DofTransforms {
+	/// Settings for arm parameters (lengths, angles, etc.)
 	pub ik: IkArm4Dof,
+	/// The target entity to reach.
 	pub target: Entity,
+	/// The base entity (shoulder) of the arm.
 	pub base: Entity,
+	/// The first entity (elbow) of the arm.
 	pub segment1: Entity,
+	/// The second entity (wrist) of the arm.
 	pub segment2: Entity,
+	/// The third entity (fingertip) of the arm.
 	pub segment3: Entity,
 }
 
 impl IkArm4DofTransforms {
+	/// Create a new [`IkArm4DofTransforms`] with the given entities.
+	/// Their locations will resolve each step with the [Self::solve] method.
 	pub fn new(
 		ik: IkArm4Dof,
 		target: Entity,
@@ -33,7 +44,8 @@ impl IkArm4DofTransforms {
 		}
 	}
 
-
+	/// Solve the IK for the target entity using the [`GlobalTransform`] of the entities.
+	/// If any of the entities are missing, this will return None.
 	pub fn solve(
 		&self,
 		transforms: &Query<&GlobalTransform>,
@@ -86,11 +98,11 @@ impl MapEntities for IkArm4DofTransforms {
 	}
 }
 
-
-pub fn update_ik_arm_transforms(
+/// A system for updating the [`IkArm4DofTransforms`] based on the target position.
+pub(crate) fn update_ik_arm_transforms(
+	query: Populated<&IkArm4DofTransforms>,
 	global_transforms: Query<&GlobalTransform>,
 	mut transforms: Query<&mut Transform>,
-	query: Populated<&IkArm4DofTransforms>,
 ) {
 	for ik_transforms in query.iter() {
 		let Some(angles) = ik_transforms.solve(&global_transforms) else {
@@ -109,27 +121,6 @@ pub fn update_ik_arm_transforms(
 		}
 		if let Ok(mut seg) = transforms.get_mut(ik_transforms.segment3) {
 			seg.rotation = Quat::from_rotation_x(angles.3);
-		}
-	}
-}
-pub fn ik_arm_transforms_test(
-	time: Res<Time>,
-	mut transforms: Query<&mut Transform>,
-	query: Populated<&IkArm4DofTransforms>,
-) {
-	for ik_transforms in query.iter() {
-		if let Ok(mut segment1) = transforms.get_mut(ik_transforms.segment1) {
-			let angle1 = time.elapsed_secs().sin();
-			// let dir = Vec3::new(angle1.cos(), angle1.sin(), 0.0);
-			segment1.rotation = Quat::from_rotation_x(angle1);
-			// segment1.rotation = Quat::look_at(dir);
-		}
-		if let Ok(mut segment2) = transforms.get_mut(ik_transforms.segment2) {
-			let angle2 = time.elapsed_secs().sin();
-			// let dir = Vec3::new(angle2.cos(), angle2.sin(), 0.0);
-			// segment2.translation = Vec3::new(ik_transforms.ik.segment1.len, 0.0, 0.0);
-			// segment2.rotation = Quat::look_at(dir);
-			segment2.rotation = Quat::from_rotation_x(angle2);
 		}
 	}
 }

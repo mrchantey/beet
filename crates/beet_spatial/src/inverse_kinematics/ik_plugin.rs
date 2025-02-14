@@ -1,7 +1,7 @@
 use crate::prelude::*;
 use bevy::prelude::*;
 
-
+/// Add the update methods for IK.
 pub fn ik_plugin(app: &mut App) {
 	app /*-*/
 		.add_systems(Update, update_ik_arm_transforms)

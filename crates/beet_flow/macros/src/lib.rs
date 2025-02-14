@@ -1,37 +1,25 @@
 mod action;
 mod utils;
+use action::*;
+
+/// Declare an action, this is a component that also
+/// defines a relation between actions and the singleton observer.
+///
+/// This may be deprecated once we get many-many relations
+#[proc_macro_derive(Action, attributes(observers, category, storage))]
+pub fn derive_action(
+	input: proc_macro::TokenStream,
+) -> proc_macro::TokenStream {
+	impl_derive_action(input)
+}
 
 
-///
-/// ## Attributes
-/// `observers`
-/// Observers that are spawned when this component is added and despawned when it is removed.
-///
-/// `systems`
-/// Systems for long running behaviors
-///
-/// ```rust
-///	# use bevy::prelude::*;
-///	# use beet_flow::prelude::*;
-///
-/// #[derive(Component, Action)]
-/// #[observers(log_name_on_run)]
-/// struct LogOnRun(pub String);
-///
-/// fn log_name_on_run(trigger: Trigger<OnRun>, query: Query<&LogOnRun>) {
-/// 	let name = query
-/// 		.get(trigger.entity())
-/// 		.map(|n| n.0.as_str())
-/// 		.unwrap();
-/// 	println!("log_name_on_run: {name}");
-/// }
-///
-///
-/// ```
-#[proc_macro_derive(
-	Action,
-	attributes(observers, global_observers, systems, category, storage)
-)]
-pub fn action(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
-	action::derive_action(input)
+
+/// Mark an observer type for use with the Action derive macro
+#[proc_macro_attribute]
+pub fn action(
+	attr: proc_macro::TokenStream,
+	item: proc_macro::TokenStream,
+) -> proc_macro::TokenStream {
+	impl_action_attr(attr, item)
 }

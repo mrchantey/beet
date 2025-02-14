@@ -1,9 +1,12 @@
 # Copied from https://github.com/mrchantey/bevyhub/blob/main/.github/workflows/test.yml
 name: 🔎 Test Crates
 on:
-  push:
+  merge_group:
   pull_request:
-    branches: main
+  push:
+    branches:
+      - main
+      - release-*
 env:
   CARGO_TERM_COLOR: always
 jobs:
@@ -38,6 +41,7 @@ jobs:
         toolchain: nightly
         override: true
         default: true
+        components: rustfmt
     - name: 🔨 Add wasm target
       run: rustup target add wasm32-unknown-unknown
     # - name: 🔨 Install cargo binstall

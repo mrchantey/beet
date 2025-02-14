@@ -1,34 +1,22 @@
 use crate::prelude::*;
 use bevy::prelude::*;
-use std::fmt;
 
-/// A tree of entities, useful for tests and debugging.
-#[derive(Debug, Clone, Deref, DerefMut, Component)]
-pub struct EntityTree(pub TreeNode<Entity>);
 
-impl fmt::Display for EntityTree {
-	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		write!(f, "{}", self.0)
-	}
-}
+/// A tree where each node is an [`Entity`].
+pub type EntityTree = TreeNode<Entity>;
+
 
 impl EntityTree {
-	pub fn new(entity: Entity) -> Self { Self(TreeNode::new(entity)) }
-	pub fn new_with_children(
-		entity: Entity,
-		children: Vec<TreeNode<Entity>>,
-	) -> Self {
-		Self(TreeNode::new_with_children(entity, children))
-	}
-
+	/// Create a new [`EntityTree`] from a root [`Entity`],
+	/// mapping its children.
 	pub fn new_with_world(entity: Entity, world: &World) -> Self {
 		let mut tree = TreeNode::new(entity);
 		if let Some(children) = world.entity(entity).get::<Children>() {
 			for child in children {
-				tree = tree.with_child(Self::new_with_world(*child, world).0);
+				tree = tree.with_child(Self::new_with_world(*child, world));
 			}
 		}
-		Self(tree)
+		tree
 	}
 
 	/// Get a tree of `Option<&T>` from the [`EntityTree`].
@@ -36,10 +24,10 @@ impl EntityTree {
 		&self,
 		world: &'a World,
 	) -> TreeNode<Option<&'a T>> {
-		self.0.map(|e| world.get::<T>(*e))
+		self.map(|e| world.get::<T>(*e))
 	}
-	#[cfg(feature = "reflect")]
-	pub fn ident(&self) -> EntityIdent { EntityIdent::new(self.0.value) }
+	// #[cfg(feature = "reflect")]
+	// pub fn ident(&self) -> EntityIdent { EntityIdent::new(self.0.value) }
 }
 
 

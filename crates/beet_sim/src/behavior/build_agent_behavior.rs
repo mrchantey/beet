@@ -18,9 +18,8 @@ pub fn build_agent_behavior(
 		.spawn((
 			Name::new("Behavior"),
 			// Emoji::new("1F600"),
-			TargetEntity(agent),
-			ScoreFlow::default(),
-			RepeatFlow::default(),
+			HighestScore::default(),
+			Repeat::default(),
 		))
 		.id();
 

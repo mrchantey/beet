@@ -1,11 +1,11 @@
 use super::ActionAttributes;
-use crate::utils::*;
+use crate::utils::CrateManifest;
 use proc_macro2::TokenStream;
 use quote::quote;
 use syn::DeriveInput;
 
 
-pub fn derive_action(
+pub fn impl_derive_action(
 	input: proc_macro::TokenStream,
 ) -> proc_macro::TokenStream {
 	let input = syn::parse_macro_input!(input as syn::DeriveInput);
@@ -16,102 +16,49 @@ pub fn derive_action(
 fn parse(input: DeriveInput) -> syn::Result<TokenStream> {
 	let attributes = ActionAttributes::parse(&input.attrs)?;
 
-	let beet_flow_path = BeetManifest::get_path_direct("beet_flow");
-	let impl_action_systems = impl_action_builder(&input, &attributes)?;
-	let impl_action_meta = impl_action_meta(&input, &attributes)?;
+	let impl_component = impl_component(&input, &attributes);
 
 	Ok(quote! {
-		use #beet_flow_path::prelude::*;
-		use bevy::prelude::*;
-		#impl_action_systems
-		#impl_action_meta
+		#impl_component
 	})
 }
 
-fn impl_component_hooks(
-	_input: &DeriveInput,
-	attributes: &ActionAttributes,
-) -> syn::Result<Option<TokenStream>> {
-	if attributes.observers.is_empty() {
-		return Ok(None);
-	}
-
-	let observers = attributes.observers.collect_comma_punct();
-
-	Ok(Some(quote! {
-		app.world_mut().register_component_hooks::<Self>()
-		.on_add(|mut world, entity, _| {
-				ActionObserversBuilder::new::<Self>()
-				.add_observers((#observers))
-				.build(world.commands(), entity);
-			})
-			.on_remove(|mut world, entity, _|{
-				ActionObserversBuilder::cleanup::<Self>(&mut world,entity)
-			});
-	}))
-}
-
-
-fn impl_action_builder(
+fn impl_component(
 	input: &DeriveInput,
 	attributes: &ActionAttributes,
-) -> syn::Result<TokenStream> {
+) -> TokenStream {
 	let ident = &input.ident;
 	let (impl_generics, type_generics, where_clause) =
 		&input.generics.split_for_impl();
 
-	let add_systems = if attributes.systems.len() == 0 {
-		quote! {}
-	} else {
-		let systems = attributes.systems.collect_comma_punct();
-		quote! { config.add_systems(app, (#systems)); }
-	};
+	let beet_flow_path = CrateManifest::get_path_direct("beet_flow");
 
-	let add_component_hooks = impl_component_hooks(input, attributes)?;
+	let storage = attributes.storage.clone().unwrap_or_else(|| {
+		syn::parse_quote! { bevy::ecs::component::StorageType::Table }
+	});
 
-	let add_global_observers = if attributes.global_observers.len() == 0 {
-		quote! {}
-	} else {
-		let adds: TokenStream = attributes
-			.global_observers
-			.iter()
-			.map(|obs| {
-				quote! { world.add_observer(#obs); }
-			})
-			.collect();
+	let observers = attributes.observers.iter().map(|observer| {
 		quote! {
-			let world = app.world_mut();
-			#adds
-		}
-	};
-
-	Ok(quote! {
-		impl #impl_generics ActionBuilder for #ident #type_generics #where_clause {
-			fn build(app: &mut App, config: &BeetConfig) {
-				#add_systems
-				#add_global_observers
-				#add_component_hooks
-			}
-		}
-	})
-}
-fn impl_action_meta(
-	input: &DeriveInput,
-	attributes: &ActionAttributes,
-) -> syn::Result<TokenStream> {
-	let ident = &input.ident;
-	let (impl_generics, type_generics, where_clause) =
-		&input.generics.split_for_impl();
-
-	let fn_category = attributes.category.as_ref().map(|c| {
-		quote! {
-			fn category(&self) -> ActionCategory { #c }
+			world.commands().entity(action).observe(#observer);
 		}
 	});
 
-	Ok(quote! {
-		impl #impl_generics ActionMeta for #ident #type_generics #where_clause {
-			#fn_category
+
+	quote! {
+		impl #impl_generics bevy::prelude::Component for #ident #type_generics #where_clause {
+			const STORAGE_TYPE: bevy::ecs::component::StorageType = #storage;
+			fn register_component_hooks(
+				hooks: &mut bevy::ecs::component::ComponentHooks,
+			) {
+				hooks.on_add(|mut world, node, cid| {
+					#beet_flow_path::prelude::ActionObservers::on_add(&mut world, node, cid, |world, action| {
+						#(#observers)*
+					});
+				});
+				hooks.on_remove(|mut world, node, _cid| {
+					#beet_flow_path::prelude::ActionObservers::on_remove(&mut world, node);
+				});
+			}
 		}
-	})
+	}
 }

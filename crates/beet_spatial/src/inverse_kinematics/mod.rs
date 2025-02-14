@@ -1,16 +1,15 @@
-pub mod ik_arm_4dof;
-#[allow(unused_imports)]
+//! Various functions and structs for inverse kinematics.
+//! These are rendering independent so can be used in robotics.
+//!
+mod ik_arm_4dof;
 pub use self::ik_arm_4dof::*;
-pub mod ik_arm_4dof_transforms;
-#[allow(unused_imports)]
+mod ik_arm_4dof_transforms;
 pub use self::ik_arm_4dof_transforms::*;
-pub mod ik_plugin;
-#[allow(unused_imports)]
+mod ik_plugin;
 pub use self::ik_plugin::*;
-pub mod ik_segment;
-#[allow(unused_imports)]
+mod ik_segment;
 pub use self::ik_segment::*;
 #[cfg(feature = "scene")]
-pub mod ik_spawner;
+mod ik_spawner;
 #[cfg(feature = "scene")]
 pub use self::ik_spawner::*;
