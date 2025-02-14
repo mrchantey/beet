@@ -26,8 +26,8 @@ impl EntityTree {
 	) -> TreeNode<Option<&'a T>> {
 		self.map(|e| world.get::<T>(*e))
 	}
-	#[cfg(feature = "reflect")]
-	pub fn ident(&self) -> EntityIdent { EntityIdent::new(self.0.value) }
+	// #[cfg(feature = "reflect")]
+	// pub fn ident(&self) -> EntityIdent { EntityIdent::new(self.0.value) }
 }
 
 

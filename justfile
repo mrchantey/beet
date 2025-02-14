@@ -92,7 +92,8 @@ hello-world:
 	./scenes/hello-world.json
 
 test-all *args:
-	just leptosfmt --check
+	cargo fmt 				--check
+	just leptosfmt 		--check
 	cargo test --workspace										 --features=_doctest							{{args}}
 	cargo test 																 --all-features -p beet_flow 			{{args}}
 	cargo test 																 --all-features -p beet_rsx 			{{args}}

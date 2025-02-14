@@ -53,26 +53,12 @@ impl PluginGroup for BeetSpatialPlugins {
 		.add(ik_plugin)
 		/*-*/;
 
-		#[cfg(feature = "render")]
-		builder.add(spatial_observers_plugin);
-
-
 		#[cfg(feature = "animation")]
 		(builder = builder.add(crate::prelude::AnimationPlugin::default()));
 
 		builder
 	}
 }
-
-#[cfg(feature = "render")]
-pub fn spatial_observers_plugin(app: &mut App) {
-	app.add_plugins(beet_flow::prelude::ActionPlugin::<(
-		InsertOnRun<Visibility>,
-		InsertOnRunResult<Visibility>,
-	)>::default());
-}
-
-
 
 /// doctest reexports and utilities
 #[cfg(feature = "_doctest")]
