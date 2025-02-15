@@ -23,7 +23,11 @@ use bevy::prelude::*;
 #[reflect(Default, Component)]
 pub struct Sequence;
 
-fn on_start(ev: Trigger<OnRun>, mut commands: Commands, query: Query<&Children>) {
+fn on_start(
+	ev: Trigger<OnRun>,
+	mut commands: Commands,
+	query: Query<&Children>,
+) {
 	let children = query
 		.get(ev.action)
 		.expect(&expect_action::to_have_children(&ev));
