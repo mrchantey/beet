@@ -99,7 +99,7 @@ impl<T: 'static> StaticFileRouter<T> {
 			.map(|(route, mut root)| {
 				// only hydrate if we have templates
 				if let Some(map) = &mut template_map {
-					root = map.hydrate(root)?;
+					root = map.apply_template(root)?;
 				}
 				let doc = root.build_document()?;
 				Ok((route, doc))

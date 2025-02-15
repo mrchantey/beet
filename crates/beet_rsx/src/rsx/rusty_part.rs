@@ -1,6 +1,5 @@
 use crate::prelude::*;
 
-
 /// A serializable counterpart to a [`RustyPart`]
 /// This struct performs two roles:
 /// 1. hydration splitting and joining
@@ -87,7 +86,7 @@ impl std::fmt::Debug for RustyPart {
 pub struct RustyPartMap(pub HashMap<RustyTracker, RustyPart>);
 
 impl RustyPartMap {
-	pub fn collect(node: impl Rsx) -> ParseResult<Self> {
+	pub fn collect(node: impl Rsx) -> TemplateResult<Self> {
 		let mut visitor = RustyPartVisitor::default();
 		let mut node = node.into_rsx();
 		visitor.walk_node(&mut node);
@@ -103,7 +102,7 @@ impl RustyPartMap {
 #[derive(Default)]
 struct RustyPartVisitor {
 	rusty_map: HashMap<RustyTracker, RustyPart>,
-	err: Option<ParseError>,
+	err: Option<TemplateError>,
 }
 
 impl RustyPartVisitor {
@@ -112,9 +111,9 @@ impl RustyPartVisitor {
 		effect: &mut Effect,
 	) -> Option<(RegisterEffect, RustyTracker)> {
 		let effect = effect.take();
-		let tracker = effect.tracker.ok_or_else(|| {
-			ParseError::Hydration(format!("effect has no tracker, this can happen if collect tracker was disabled or they were already collected"))
-		});
+		let tracker = effect
+			.tracker
+			.ok_or_else(|| TemplateError::NoRustyPart("Effect"));
 		match tracker {
 			Err(err) => {
 				self.err = Some(err);
@@ -172,9 +171,7 @@ impl RsxVisitorMut for RustyPartVisitor {
 				});
 			}
 			None => {
-				self.err = Some(ParseError::Hydration(
-					"component has no tracker, this can happen if collect tracker was disabled or they were already collected".into(),
-				));
+				self.err = Some(TemplateError::NoRustyPart("Component"));
 			}
 		}
 	}

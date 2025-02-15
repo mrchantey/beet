@@ -25,19 +25,4 @@ impl RsxTemplateRoot {
 		Ok(Self { node, location })
 	}
 
-	/// Create an [`RsxRoot`] from a template and hydrated nodes.
-	/// 		todo!("this is wrong, we need template map for each component?;
-	pub fn hydrate(self, hydrated: &mut RustyPartMap) -> Result<RsxRoot> {
-		let node = self.node.into_rsx_node(hydrated).map_err(|err| {
-			anyhow::anyhow!(
-				"Failed to hydrate template at location: {:#?}\n{}",
-				self.location,
-				err
-			)
-		})?;
-		Ok(RsxRoot {
-			node,
-			location: self.location,
-		})
-	}
 }
