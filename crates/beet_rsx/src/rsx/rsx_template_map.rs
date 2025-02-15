@@ -38,6 +38,7 @@ impl RsxTemplateMap {
 	pub fn hydrate(&mut self, root: RsxRoot) -> Result<RsxRoot> {
 		let mut hydrated = RsxHydratedMap::collect(root.node)?;
 		let location = root.location;
+		// i think here we need to pass the whole map for component template reloading
 		let template = self.remove(&location).ok_or_else(|| {
 			anyhow::anyhow!("No template found for {:?}", &location)
 		})?;

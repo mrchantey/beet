@@ -16,6 +16,15 @@ pub struct RsxRoot {
 }
 
 impl RsxRoot {
+	/// This is the method used by routers,
+	/// applies styles and slots, returning an HtmlDocument.
+	pub fn build_document(mut self) -> Result<HtmlDocument> {
+		ScopedStyle::default().apply(&mut self)?;
+		SlotsVisitor::apply(&mut self)?;
+		let html = RsxToHtml::default().map_node(&self);
+		let doc = html.into_document();
+		Ok(doc)
+	}
 	/// convenience method usually for testing:
 	/// - [ScopedStyle::apply]
 	/// - [SlotsVisitor::apply]
@@ -29,14 +38,6 @@ impl RsxRoot {
 		SlotsVisitor::apply(&mut self).unwrap();
 		let html = RsxToHtml::default().map_node(&self);
 		html.render()
-	}
-	/// Apply styles and scopes, returning an HtmlDocument.
-	pub fn build_document(mut self) -> Result<HtmlDocument> {
-		ScopedStyle::default().apply(&mut self)?;
-		SlotsVisitor::apply(&mut self)?;
-		let html = RsxToHtml::default().map_node(&self);
-		let doc = html.into_document();
-		Ok(doc)
 	}
 
 

@@ -48,8 +48,8 @@ members = [
 	"crates/beet_rsx/parser",
 	"crates/beet_sim",
 	"crates/beet_spatial",
-	# "crates/beet_site",
-	# "crates/beet-cli",
+	"crates/beet_site",
+	"crates/beet-cli",
 	# "crates/emby",
 ]
 

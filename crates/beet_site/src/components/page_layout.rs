@@ -22,24 +22,24 @@ impl Component for PageLayout {
 					<a href="/contributing">Contributing</a>
 				</nav>
 					<slot/>
+					<style>
+						h1{
+							padding-top: 20px;
+						}
+						nav{
+							display: flex;
+							flex-direction: column;
+						}
+					</style>
+					<style scope:global>
+					body{
+						margin:0;
+						background-color: black;
+						color:white;
+					}
+					</style>
 				</body>
 			</html>
-			<style>
-				h1{
-					padding-top: 20px;
-				}
-				nav{
-					display: flex;
-					flex-direction: column;
-				}
-			</style>
-			<style scope:global>
-			body{
-				margin:0;
-				background-color: black;
-				color:white;
-			}
-			</style>
 		}
 	}
 }
