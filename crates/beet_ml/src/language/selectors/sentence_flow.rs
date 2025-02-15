@@ -24,7 +24,7 @@ impl SentenceFlow {
 
 fn sentence_flow(
 	ev: Trigger<OnRun>,
-	commands: Commands,
+	mut commands: Commands,
 	mut berts: ResMut<Assets<Bert>>,
 	sentences: Query<&Sentence>,
 	// TODO double query, ie added running and added asset
@@ -42,7 +42,7 @@ fn sentence_flow(
 		&sentences,
 	) {
 		Ok(entity) => {
-			ev.trigger_next(commands, entity);
+			ev.trigger_next(&mut commands, entity);
 		}
 		Err(e) => log::error!("SentenceFlow: {}", e),
 	}

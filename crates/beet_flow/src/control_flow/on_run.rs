@@ -104,7 +104,7 @@ pub struct OnRun<T = ()> {
 impl<T: RunPayload> OnRun<T> {
 	/// Call [`OnRunAction`] for the provided action, cloning this event's
 	/// origin and payload.
-	pub fn trigger_next(&self, mut commands: Commands, next_action: Entity) {
+	pub fn trigger_next(&self, commands: &mut Commands, next_action: Entity) {
 		commands.trigger(OnRunAction {
 			payload: self.payload.clone(),
 			origin: self.origin,
@@ -127,7 +127,7 @@ impl<T: RunPayload> OnRun<T> {
 	}
 	/// Call [`OnResultAction`] for this event's action, cloning this event's
 	/// origin.
-	pub fn trigger_result(&self, mut commands: Commands, payload: T::Result) {
+	pub fn trigger_result(&self, commands: &mut Commands, payload: T::Result) {
 		commands.trigger(OnResultAction::new(
 			self.action,
 			self.origin,

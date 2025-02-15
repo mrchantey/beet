@@ -179,7 +179,7 @@ impl Default for RandomScoreProvider {
 
 fn provide_random_score(
 	ev: Trigger<OnRun<RequestScore>>,
-	commands: Commands,
+	mut commands: Commands,
 	mut random_source: ResMut<RandomSource>,
 	query: Query<&RandomScoreProvider>,
 ) {
@@ -189,7 +189,7 @@ fn provide_random_score(
 
 	let rnd: f32 = random_source.random();
 	ev.trigger_result(
-		commands,
+		&mut commands,
 		ScoreValue(rnd * score_provider.scalar + score_provider.offset),
 	);
 }
@@ -201,7 +201,7 @@ struct TryHealSelf;
 
 fn try_heal_self(
 	ev: Trigger<OnRun>,
-	commands: Commands,
+	mut commands: Commands,
 	mut query: Query<(&mut Health, &mut HealingPotions)>,
 ) {
 	let (mut health, mut potions) = query
@@ -212,10 +212,10 @@ fn try_heal_self(
 		health.0 += 30.;
 		potions.0 -= 1;
 		println!("💊\tMalenia heals herself, current health: {}\n", health.0);
-		ev.trigger_result(commands, RunResult::Success);
+		ev.trigger_result(&mut commands, RunResult::Success);
 	} else {
 		// we didnt do anything so action was a failure
-		ev.trigger_result(commands, RunResult::Failure);
+		ev.trigger_result(&mut commands, RunResult::Failure);
 	}
 }
 

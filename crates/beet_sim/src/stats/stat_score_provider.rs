@@ -82,7 +82,7 @@ fn provide_score(
 		descriptor.global_range.clone(),
 	);
 
-	ev.trigger_result(commands, score);
+	ev.trigger_result(&mut commands, score);
 }
 
 

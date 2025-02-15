@@ -36,7 +36,7 @@ fn on_start(
 	action.clear();
 
 	for child in children {
-		ev.trigger_next(commands.reborrow(), *child);
+		ev.trigger_next(&mut commands.reborrow(), *child);
 	}
 }
 
