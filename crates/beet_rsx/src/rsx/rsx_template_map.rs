@@ -41,13 +41,16 @@ impl RsxTemplateMap {
 	}
 
 	// should live elsewhere, maybe RustyPart
-	pub fn hydrate(&mut self, root: RsxRoot) -> Result<RsxRoot> {
+	pub fn hydrate(&self, root: RsxRoot) -> Result<RsxRoot> {
 		let mut hydrated = RustyPartMap::collect(root.node)?;
 		let location = root.location;
 		// i think here we need to pass the whole map for component template reloading
-		let template = self.remove(&location).ok_or_else(|| {
-			anyhow::anyhow!("No template found for {:?}", &location)
-		})?;
+		let template = self
+			.get(&location)
+			.ok_or_else(|| {
+				anyhow::anyhow!("No template found for {:?}", &location)
+			})?
+			.clone();
 		let node = template.hydrate(&mut hydrated)?;
 		Ok(node)
 	}

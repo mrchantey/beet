@@ -39,15 +39,6 @@ impl RsxRoot {
 		let html = RsxToHtml::default().map_node(&self);
 		html.render()
 	}
-
-
-	/// Split the RsxRoot into a template and hydrated nodes.
-	#[cfg(test)]
-	fn split_hydration(self) -> Result<(RsxTemplateRoot, RustyPartMap)> {
-		let template = RsxTemplateRoot::from_rsx(&self)?;
-		let hydrated = RustyPartMap::collect(self.node)?;
-		Ok((template, hydrated))
-	}
 }
 
 impl std::ops::Deref for RsxRoot {
@@ -107,8 +98,9 @@ mod test {
 		};
 
 		let html1 = node().render_body();
-		let (template, mut hydrated) = node().split_hydration().unwrap();
-		let node2 = template.hydrate(&mut hydrated).unwrap();
+		let template = RsxTemplateRoot::from_rsx(&node()).unwrap();
+		let map = RsxTemplateMap::from_template_roots(vec![template]);
+		let node2 = map.hydrate(node()).unwrap();
 		let html2 = node2.render_body();
 		expect(html1).to_be(html2);
 	}
@@ -125,7 +117,7 @@ mod test {
 				<div ident=some_val />
 			</div>
 		};
-		let (node1_template, _) = node1.split_hydration().unwrap();
+		let node1_template = RsxTemplateRoot::from_rsx(&node1).unwrap();
 		expect(&node1_template).not().to_be(&node2_template);
 		expect(&node1_template.node).to_be(&node2_template.node);
 	}
@@ -151,7 +143,7 @@ mod test {
 				</p>
 			</div>
 		};
-		let (node1_template, _) = node1.split_hydration().unwrap();
+		let node1_template = RsxTemplateRoot::from_rsx(&node1).unwrap();
 		expect(&node1_template).not().to_be(&node2_template);
 		expect(&node1_template.node).to_be(&node2_template.node);
 	}
