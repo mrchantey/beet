@@ -4,13 +4,14 @@ use crate::prelude::*;
 /// A serializable counterpart to a [`RustyPart`]
 /// This struct performs two roles:
 /// 1. hydration splitting and joining
-/// 2. hashing the token stream of a block, for hot reload diffing
+/// 2. storing the hash of a rusty part token stream, for hot reload diffing
 ///
-/// The combination of an index and tokens hash guarantees uniqueness
+/// The combination of an index and tokens hash guarantees the level of
+/// diffing required to detect when a recompile is necessary.
 /// ```rust ignore
-/// let tree = rsx!{<div {rusty} key=73 key=rusty key={rusty}>other text{rusty}</div>}
-/// //							      ^^^^^             ^^^^^      ^^^^^             ^^^^^
-/// //							      attr blocks       idents     value blocks      node blocks
+/// let tree = rsx!{<div {rusty} key=73 key=rusty key={rusty}>other text{rusty}more text <Component key=value/></div>}
+/// //							      ^^^^^             ^^^^^      ^^^^^             ^^^^^            ^^^^^^^^^^^^^^^^^^^
+/// //							      attr blocks       idents     value blocks      node blocks      Component open tags
 /// ```
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -80,7 +81,6 @@ impl std::fmt::Debug for RustyPart {
 		}
 	}
 }
-
 
 
 #[derive(Deref, DerefMut)]

@@ -108,7 +108,7 @@ mod test {
 
 		let html1 = node().render_body();
 		let (template, mut hydrated) = node().split_hydration().unwrap();
-		let node2 = template.into_rsx(&mut hydrated).unwrap();
+		let node2 = template.hydrate(&mut hydrated).unwrap();
 		let html2 = node2.render_body();
 		expect(html1).to_be(html2);
 	}
