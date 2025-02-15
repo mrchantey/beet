@@ -25,7 +25,7 @@ impl<P: QPolicy + Asset> Default for ReadQPolicy<P> {
 
 fn read_q_policy<P: QPolicy + Asset>(
 	ev: Trigger<OnRun>,
-	commands: Commands,
+	mut commands: Commands,
 	assets: Res<Assets<P>>,
 	mut agents: Query<(&P::State, &mut P::Action)>,
 	query: Query<(&ReadQPolicy<P>, &HandleWrapper<P>)>,
@@ -44,5 +44,5 @@ fn read_q_policy<P: QPolicy + Asset>(
 
 
 	*action = policy.greedy_policy(state).0;
-	ev.trigger_result(commands, RunResult::Success);
+	ev.trigger_result(&mut commands, RunResult::Success);
 }

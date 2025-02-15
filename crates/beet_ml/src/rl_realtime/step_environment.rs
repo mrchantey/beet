@@ -41,7 +41,7 @@ fn step_environment<S: RlSessionTypes>(
 	ev: Trigger<OnRun>,
 	mut rng: ResMut<RandomSource>,
 	mut end_episode_events: EventWriter<EndEpisode<S::EpisodeParams>>,
-	commands: Commands,
+	mut commands: Commands,
 	mut sessions: Query<&mut S::QLearnPolicy>,
 	mut agents: Query<(
 		&S::State,
@@ -85,7 +85,7 @@ fn step_environment<S: RlSessionTypes>(
 	// 	action,
 	// 	outcome.reward
 	// );
-	ev.trigger_result(commands, RunResult::Success);
+	ev.trigger_result(&mut commands, RunResult::Success);
 	step.step += 1;
 
 	if outcome.done || step.step >= params.max_steps {

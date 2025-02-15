@@ -41,7 +41,7 @@ impl DepthSensorScorer {
 
 fn depth_sensor_scorer(
 	ev: Trigger<OnRun<RequestScore>>,
-	commands: Commands,
+	mut commands: Commands,
 	sensors: Query<&DepthValue, Changed<DepthValue>>,
 	query: Query<&DepthSensorScorer>,
 ) {
@@ -60,5 +60,5 @@ fn depth_sensor_scorer(
 	} else {
 		scorer.far_score
 	};
-	ev.trigger_result(commands, next_score);
+	ev.trigger_result(&mut commands, next_score);
 }

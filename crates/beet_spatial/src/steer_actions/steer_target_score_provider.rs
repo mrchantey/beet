@@ -28,7 +28,7 @@ impl Default for SteerTargetScoreProvider {
 
 fn provide_score(
 	ev: Trigger<OnRun<RequestScore>>,
-	commands: Commands,
+	mut commands: Commands,
 	transforms: Query<&GlobalTransform>,
 	agents: Query<(&GlobalTransform, &SteerTarget)>,
 	query: Query<&SteerTargetScoreProvider>,
@@ -51,5 +51,5 @@ fn provide_score(
 	} else {
 		0.
 	};
-	ev.trigger_result(commands, ScoreValue::new(score));
+	ev.trigger_result(&mut commands, ScoreValue::new(score));
 }

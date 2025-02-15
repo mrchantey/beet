@@ -31,7 +31,7 @@ impl SucceedTimes {
 
 fn succeed_times(
 	ev: Trigger<OnRun>,
-	commands: Commands,
+	mut commands: Commands,
 	mut query: Query<&mut SucceedTimes>,
 ) {
 	let mut action = query
@@ -40,9 +40,9 @@ fn succeed_times(
 
 	if action.times < action.max_times {
 		action.times += 1;
-		ev.trigger_result(commands, RunResult::Success);
+		ev.trigger_result(&mut commands, RunResult::Success);
 	} else {
-		ev.trigger_result(commands, RunResult::Failure);
+		ev.trigger_result(&mut commands, RunResult::Failure);
 	}
 }
 

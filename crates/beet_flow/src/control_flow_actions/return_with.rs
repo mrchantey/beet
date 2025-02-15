@@ -23,7 +23,7 @@ pub struct ReturnWith<T: ResultPayload>(pub T);
 
 fn return_with<T: ResultPayload>(
 	ev: Trigger<OnRun<T::Run>>,
-	commands: Commands,
+	mut commands: Commands,
 	action: Query<&ReturnWith<T>>,
 ) {
 	let payload = action
@@ -31,7 +31,7 @@ fn return_with<T: ResultPayload>(
 		.expect(&expect_action::to_have_action(&ev))
 		.0
 		.clone();
-	ev.trigger_result(commands, payload);
+	ev.trigger_result(&mut commands, payload);
 }
 
 #[cfg(test)]

@@ -8,7 +8,7 @@ pub struct ConstResponse<T: ResultPayload>(pub T);
 
 fn const_response<T: ResultPayload>(
 	req: Trigger<OnRun<T::Run>>,
-	commands: Commands,
+	mut commands: Commands,
 	action: Query<&ConstResponse<T>>,
 ) {
 	let payload = action
@@ -16,7 +16,7 @@ fn const_response<T: ResultPayload>(
 		.expect(&expect_action::to_have_action(&req))
 		.0
 		.clone();
-	req.trigger_result(commands, payload);
+	req.trigger_result(&mut commands, payload);
 }
 
 
