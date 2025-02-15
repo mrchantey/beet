@@ -106,7 +106,7 @@ impl ScopedStyle {
 				}
 			}
 		});
-		// 2. tag elements
+		// 2. tag elements if *any* component scoped styles were found
 		if component_scope_found {
 			VisitRsxElementMut::walk_with_opts(node, opts.clone(), |el| {
 				el.attributes.push(RsxAttribute::KeyValue {

@@ -5,7 +5,7 @@ use anyhow::Result;
 
 ///	Mapping of each component or route to a template.
 ///
-/// When joining an [RsxTemplateRoot] with an [RsxHydratedMap],
+/// When joining an [RsxTemplateRoot] with an [RustyPartMap],
 /// we need the entire [RsxTemplateMap] to resolve components.
 ///
 #[derive(Debug, Clone, PartialEq, Eq, Deref, DerefMut)]
@@ -36,7 +36,7 @@ impl RsxTemplateMap {
 	}
 
 	pub fn hydrate(&mut self, root: RsxRoot) -> Result<RsxRoot> {
-		let mut hydrated = RsxHydratedMap::collect(root.node)?;
+		let mut hydrated = RustyPartMap::collect(root.node)?;
 		let location = root.location;
 		// i think here we need to pass the whole map for component template reloading
 		let template = self.remove(&location).ok_or_else(|| {

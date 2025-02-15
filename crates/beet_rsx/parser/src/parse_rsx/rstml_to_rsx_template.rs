@@ -21,7 +21,8 @@ pub struct RstmlToRsxTemplate {
 
 
 impl RstmlToRsxTemplate {
-	/// for use with rsx_template! macro
+	/// for use with rsx_template! macro, which is usually just used for
+	/// tests, routers use [RstmlToRsxTemplate::map_tokens]
 	pub fn from_macro(&mut self, tokens: TokenStream) -> TokenStream {
 		let str_tokens = self
 			.map_tokens(tokens, "unknown")
@@ -35,6 +36,8 @@ impl RstmlToRsxTemplate {
 			}
 		}
 	}
+	/// The entry point for parsing the content of an rsx! macro
+	/// into a serializable RON format.
 	pub fn map_tokens(
 		&mut self,
 		tokens: TokenStream,

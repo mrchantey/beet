@@ -16,7 +16,7 @@ pub enum RsxTemplateNode {
 	Fragment(Vec<Self>),
 	/// We dont know much about components, for example when parsing
 	/// a file we just get the name.
-	/// The [RsxLocation] etc is is tracked by the [RsxHydratedNode::Component::root]
+	/// The [RsxLocation] etc is is tracked by the [RustyPart::Component::root]
 	Component {
 		/// the hydrated part has the juicy details
 		tracker: RustyTracker,
@@ -65,7 +65,7 @@ impl HydrationError {
 
 	pub fn hydration_failed(
 		cx: &str,
-		expected: &HashMap<RustyTracker, RsxHydratedNode>,
+		expected: &HashMap<RustyTracker, RustyPart>,
 		received: RustyTracker,
 	) -> Self {
 		Self::HydrationFailed {
@@ -131,7 +131,7 @@ impl RsxTemplateNode {
 	pub fn into_rsx_node(
 		self,
 		// incorrect! we need a map for each component
-		rusty_map: &mut HashMap<RustyTracker, RsxHydratedNode>,
+		rusty_map: &mut HashMap<RustyTracker, RustyPart>,
 	) -> HydrationResult<RsxNode> {
 		match self {
 			RsxTemplateNode::Doctype => Ok(RsxNode::Doctype),
@@ -157,7 +157,7 @@ impl RsxTemplateNode {
 							tracker,
 						)
 					})? {
-						RsxHydratedNode::Component { root } => Ok(root),
+						RustyPart::Component { root } => Ok(root),
 						other => HydrationResult::Err(
 							HydrationError::UnexpectedRusty {
 								expected: "Component",
@@ -184,7 +184,7 @@ impl RsxTemplateNode {
 							tracker,
 						)
 					})? {
-						RsxHydratedNode::RustBlock { initial, register } => {
+						RustyPart::RustBlock { initial, register } => {
 							Ok((initial, register))
 						}
 						other => HydrationResult::Err(
@@ -292,7 +292,7 @@ impl RsxTemplateAttribute {
 	/// drain the effect map into the template
 	pub fn into_rsx_node(
 		self,
-		rusty_map: &mut HashMap<RustyTracker, RsxHydratedNode>,
+		rusty_map: &mut HashMap<RustyTracker, RustyPart>,
 	) -> HydrationResult<RsxAttribute> {
 		match self {
 			RsxTemplateAttribute::Key { key } => Ok(RsxAttribute::Key { key }),
@@ -300,25 +300,24 @@ impl RsxTemplateAttribute {
 				Ok(RsxAttribute::KeyValue { key, value })
 			}
 			RsxTemplateAttribute::Block(tracker) => {
-				let (initial, register) = match rusty_map
-					.remove(&tracker)
-					.ok_or_else(|| {
+				let (initial, register) =
+					match rusty_map.remove(&tracker).ok_or_else(|| {
 						HydrationError::hydration_failed(
 							"AttributeBlock",
 							rusty_map,
 							tracker,
 						)
 					})? {
-					RsxHydratedNode::AttributeBlock { initial, register } => {
-						Ok((initial, register))
-					}
-					other => {
-						HydrationResult::Err(HydrationError::UnexpectedRusty {
-							expected: "AttributeBlock",
-							received: format!("{:?}", other),
-						})
-					}
-				}?;
+						RustyPart::AttributeBlock { initial, register } => {
+							Ok((initial, register))
+						}
+						other => HydrationResult::Err(
+							HydrationError::UnexpectedRusty {
+								expected: "AttributeBlock",
+								received: format!("{:?}", other),
+							},
+						),
+					}?;
 
 				Ok(RsxAttribute::Block {
 					initial,
@@ -326,25 +325,24 @@ impl RsxTemplateAttribute {
 				})
 			}
 			RsxTemplateAttribute::BlockValue { key, tracker } => {
-				let (initial, register) = match rusty_map
-					.remove(&tracker)
-					.ok_or_else(|| {
+				let (initial, register) =
+					match rusty_map.remove(&tracker).ok_or_else(|| {
 						HydrationError::hydration_failed(
 							"AttributeValue",
 							rusty_map,
 							tracker,
 						)
 					})? {
-					RsxHydratedNode::AttributeValue { initial, register } => {
-						Ok((initial, register))
-					}
-					other => {
-						HydrationResult::Err(HydrationError::UnexpectedRusty {
-							expected: "AttributeValue",
-							received: format!("{:?}", other),
-						})
-					}
-				}?;
+						RustyPart::AttributeValue { initial, register } => {
+							Ok((initial, register))
+						}
+						other => HydrationResult::Err(
+							HydrationError::UnexpectedRusty {
+								expected: "AttributeValue",
+								received: format!("{:?}", other),
+							},
+						),
+					}?;
 
 				Ok(RsxAttribute::BlockValue {
 					key,

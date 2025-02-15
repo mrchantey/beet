@@ -1,6 +1,42 @@
 use crate::prelude::*;
 
-pub enum RsxHydratedNode {
+
+/// A serializable counterpart to a [`RustyPart`]
+/// This struct performs two roles:
+/// 1. hydration splitting and joining
+/// 2. hashing the token stream of a block, for hot reload diffing
+///
+/// The combination of an index and tokens hash guarantees uniqueness
+/// ```rust ignore
+/// let tree = rsx!{<div {rusty} key=73 key=rusty key={rusty}>other text{rusty}</div>}
+/// //							      ^^^^^             ^^^^^      ^^^^^             ^^^^^
+/// //							      attr blocks       idents     value blocks      node blocks
+/// ```
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct RustyTracker {
+	/// the order in which this part was visited by the syn::Visitor
+	pub index: u32,
+	/// a hash of the token stream for this part
+	pub tokens_hash: u64,
+}
+
+
+impl RustyTracker {
+	pub fn new(index: u32, tokens_hash: u64) -> Self {
+		Self { index, tokens_hash }
+	}
+	/// sometimes we want to diff a tree without the trackers
+	pub fn clear(&mut self) {
+		self.index = 0;
+		self.tokens_hash = 0;
+	}
+}
+
+
+/// The parts of an rsx! macro that are not serializable are
+/// called Rusty Parts.
+pub enum RustyPart {
 	// we also collect components because they
 	// cannot be statically resolved
 	Component {
@@ -20,7 +56,7 @@ pub enum RsxHydratedNode {
 	},
 }
 
-impl std::fmt::Debug for RsxHydratedNode {
+impl std::fmt::Debug for RustyPart {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		match self {
 			Self::Component { root } => {
@@ -48,11 +84,11 @@ impl std::fmt::Debug for RsxHydratedNode {
 
 
 #[derive(Deref, DerefMut)]
-pub struct RsxHydratedMap(pub HashMap<RustyTracker, RsxHydratedNode>);
+pub struct RustyPartMap(pub HashMap<RustyTracker, RustyPart>);
 
-impl RsxHydratedMap {
+impl RustyPartMap {
 	pub fn collect(node: impl Rsx) -> ParseResult<Self> {
-		let mut visitor = RsxHydratedVisitor::default();
+		let mut visitor = RustyPartVisitor::default();
 		let mut node = node.into_rsx();
 		visitor.walk_node(&mut node);
 		if let Some(err) = visitor.err {
@@ -65,12 +101,12 @@ impl RsxHydratedMap {
 
 /// take the effects from a node recursively
 #[derive(Default)]
-struct RsxHydratedVisitor {
-	rusty_map: HashMap<RustyTracker, RsxHydratedNode>,
+struct RustyPartVisitor {
+	rusty_map: HashMap<RustyTracker, RustyPart>,
 	err: Option<ParseError>,
 }
 
-impl RsxHydratedVisitor {
+impl RustyPartVisitor {
 	fn take_effect(
 		&mut self,
 		effect: &mut Effect,
@@ -89,7 +125,7 @@ impl RsxHydratedVisitor {
 	}
 }
 
-impl RsxVisitorMut for RsxHydratedVisitor {
+impl RsxVisitorMut for RustyPartVisitor {
 	fn ignore_block_node_initial(&self) -> bool {
 		// we dont want to recurse into initial?
 		true
@@ -97,7 +133,7 @@ impl RsxVisitorMut for RsxHydratedVisitor {
 
 	fn visit_block(&mut self, block: &mut RsxBlock) {
 		if let Some((register, tracker)) = self.take_effect(&mut block.effect) {
-			self.rusty_map.insert(tracker, RsxHydratedNode::RustBlock {
+			self.rusty_map.insert(tracker, RustyPart::RustBlock {
 				initial: std::mem::take(&mut block.initial),
 				register,
 			});
@@ -111,24 +147,18 @@ impl RsxVisitorMut for RsxHydratedVisitor {
 				initial, effect, ..
 			} => {
 				if let Some((register, tracker)) = self.take_effect(effect) {
-					self.rusty_map.insert(
-						tracker,
-						RsxHydratedNode::AttributeValue {
-							initial: std::mem::take(initial),
-							register,
-						},
-					);
+					self.rusty_map.insert(tracker, RustyPart::AttributeValue {
+						initial: std::mem::take(initial),
+						register,
+					});
 				}
 			}
 			RsxAttribute::Block { initial, effect } => {
 				if let Some((register, tracker)) = self.take_effect(effect) {
-					self.rusty_map.insert(
-						tracker,
-						RsxHydratedNode::AttributeBlock {
-							initial: std::mem::take(initial),
-							register,
-						},
-					);
+					self.rusty_map.insert(tracker, RustyPart::AttributeBlock {
+						initial: std::mem::take(initial),
+						register,
+					});
 				}
 			}
 		}
@@ -137,7 +167,7 @@ impl RsxVisitorMut for RsxHydratedVisitor {
 		match std::mem::take(&mut component.tracker) {
 			Some(tracker) => {
 				// note how we ignore slot_children, they are handled by RsxTemplateNode
-				self.rusty_map.insert(tracker, RsxHydratedNode::Component {
+				self.rusty_map.insert(tracker, RustyPart::Component {
 					root: std::mem::take(&mut component.root),
 				});
 			}
@@ -159,16 +189,15 @@ mod test {
 	#[test]
 	fn works() {
 		let bar = 2;
-		expect(RsxHydratedMap::collect(rsx! { <div /> }).unwrap().len())
-			.to_be(0);
+		expect(RustyPartMap::collect(rsx! { <div /> }).unwrap().len()).to_be(0);
 		expect(
-			RsxHydratedMap::collect(rsx! { <div foo=bar /> })
+			RustyPartMap::collect(rsx! { <div foo=bar /> })
 				.unwrap()
 				.len(),
 		)
 		.to_be(1);
 		expect(
-			RsxHydratedMap::collect(rsx! { <div>{bar}</div> })
+			RustyPartMap::collect(rsx! { <div>{bar}</div> })
 				.unwrap()
 				.len(),
 		)

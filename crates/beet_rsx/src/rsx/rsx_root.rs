@@ -42,9 +42,10 @@ impl RsxRoot {
 
 
 	/// Split the RsxRoot into a template and hydrated nodes.
-	pub fn split_hydration(self) -> Result<(RsxTemplateRoot, RsxHydratedMap)> {
+	#[cfg(test)]
+	fn split_hydration(self) -> Result<(RsxTemplateRoot, RustyPartMap)> {
 		let template = RsxTemplateRoot::from_rsx(&self)?;
-		let hydrated = RsxHydratedMap::collect(self.node)?;
+		let hydrated = RustyPartMap::collect(self.node)?;
 		Ok((template, hydrated))
 	}
 }
