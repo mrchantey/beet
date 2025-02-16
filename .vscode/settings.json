@@ -18,7 +18,7 @@
 	// "rust-analyzer.cargo.target": "wasm32-unknown-unknown",
 	"deno.enable": true,
 	"files.exclude": {
-		"**/.git": true,
+		// "**/.git": true,
 		".gitattributes": true,
 		"LICENSE-APACHE.txt": true,
 		"LICENSE-MIT.txt": true,
