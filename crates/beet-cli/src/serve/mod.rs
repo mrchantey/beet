@@ -10,7 +10,7 @@ mod routes_builder;
 #[derive(Debug, Parser)]
 pub struct Serve {
 	#[command(flatten)]
-	build_routes_mod: BuildRoutesMod,
+	collect_routes: CollectRoutes,
 	/// 🦀 the commands that will be used to build the route1s 🦀
 	#[command(flatten)]
 	cargo_run: cargo_cmd::CargoCmd,
@@ -22,13 +22,13 @@ pub struct Serve {
 impl Serve {
 	pub async fn run(self) -> Result<()> {
 		let Serve {
-			build_routes_mod,
+			collect_routes,
 			cargo_run,
 			serve_dir,
 		} = self;
 
 		let watch_handle = tokio::spawn(async move {
-			RoutesBuilder::new(build_routes_mod, cargo_run)?
+			RoutesBuilder::new(collect_routes, cargo_run)?
 				.watch()
 				.await
 		});

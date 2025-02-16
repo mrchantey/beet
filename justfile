@@ -65,7 +65,7 @@ run-reactive:
 	just watch 'just build-wasm beet dom_renderer'
 
 run-test-site:
-	cargo run -p beet_router --example routes_mod
+	cargo run -p beet_router --example collect_routes
 	cargo run -p beet_router --example templates
 	cargo run -p beet_router --example html
 	sweet serve target/test_site

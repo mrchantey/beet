@@ -1,7 +1,7 @@
 use super::cargo_cmd::CargoCmd;
 use anyhow::Result;
-use beet_router::prelude::BuildRoutesMod;
 use beet_router::prelude::BuildRsxTemplateMap;
+use beet_router::prelude::CollectRoutes;
 use beet_router::prelude::HashRsxFile;
 use rapidhash::RapidHashMap as HashMap;
 use std::path::Path;
@@ -11,21 +11,21 @@ use std::time::Instant;
 use sweet::prelude::*;
 
 
-/// Watch the [BuildRoutesMod::src_dir] for changes, and determine if the rust code
+/// Watch the [CollectRoutes::src_dir] for changes, and determine if the rust code
 /// changed in a file, or if it was just the html template
 #[derive(Default)]
 pub struct RoutesBuilder {
 	// we will be swapping out the `run` and `build` methods of this command,
 	// depending on the diff
 	cargo: CargoCmd,
-	build_routes_mod: BuildRoutesMod,
+	collect_routes: CollectRoutes,
 	build_templates: BuildRsxTemplateMap,
 	file_cache: HashMap<PathBuf, u64>,
 }
 
 impl RoutesBuilder {
 	pub fn new(
-		build_routes_mod: BuildRoutesMod,
+		collect_routes: CollectRoutes,
 		mut cargo: CargoCmd,
 	) -> Result<Self> {
 		cargo.cargo_cmd = "build".to_string();
@@ -33,19 +33,19 @@ impl RoutesBuilder {
 			pretty: true,
 			..Default::default()
 		};
-		build_templates.src = build_routes_mod.src_dir().clone();
-		let file_cache = Self::preheat_cache(build_routes_mod.src_dir())?;
+		build_templates.src = collect_routes.src_dir().clone();
+		let file_cache = Self::preheat_cache(collect_routes.src_dir())?;
 		Ok(Self {
 			cargo,
 			build_templates,
-			build_routes_mod,
+			collect_routes,
 			file_cache,
 		})
 	}
 
 	pub async fn watch(mut self) -> Result<()> {
 		let watcher = FsWatcher::default()
-			.with_path(&self.build_routes_mod.src_dir())
+			.with_path(&self.collect_routes.src_dir())
 			.with_exclude("*.git*")
 			.with_exclude("*target*");
 		println!("{:#?}", watcher);
@@ -132,7 +132,7 @@ impl RoutesBuilder {
 		println!("Watcher::Recompile: {}", reason);
 		let start = Instant::now();
 		// 🤪 disable build routes for now
-		// self.build_routes_mod.build_and_write()?;
+		// self.collect_routes.build_and_write()?;
 		self.cargo.spawn()?;
 		self.build_templates.build_and_write()?;
 		Command::new(self.exe_path()).status()?;
