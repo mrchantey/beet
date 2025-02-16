@@ -35,7 +35,6 @@ impl ParseFileRoutes {
 		let mod_name =
 			syn::Ident::new(&mod_name, proc_macro2::Span::call_site());
 
-		println!("{:#?}", mod_name);
 		let items = syn::parse_file(&file)?
 			.items
 			.into_iter()
