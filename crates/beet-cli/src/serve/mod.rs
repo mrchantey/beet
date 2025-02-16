@@ -28,7 +28,7 @@ impl Serve {
 		} = self;
 
 		let watch_handle = tokio::spawn(async move {
-			RoutesBuilder::new(build_routes_mod, cargo_run)
+			RoutesBuilder::new(build_routes_mod, cargo_run)?
 				.watch()
 				.await
 		});
