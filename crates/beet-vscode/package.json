@@ -1,0 +1,48 @@
+{
+  "name": "beet",
+  "displayName": "beet",
+  "publisher": "beet",
+  "description": "Language support and other tools for beet projects.",
+  "version": "0.0.1",
+  "engines": {
+    "vscode": "^1.96.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "activationEvents": [
+    "onLanguage:rs"
+  ],
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./tsconfig.json",
+    "watch": "tsc -watch -p ./tsconfig.json",
+    "postinstall": "node ./out/install.js"
+  },
+  "contributes": {
+    "languages": [{
+      "id": "rust",
+      "aliases": ["Rust+RSX", "rust"],
+      "extensions": [".rs"],
+      "configuration": "./language-configuration.json"
+    }],
+    "grammars": [{
+      "language": "rust",
+      "scopeName": "source.rust",
+      "path": "./rsx.tmLanguage.json"
+    }],
+    "completionProvider": [{
+      "language": "rsx",
+      "provider": "./src/providers/completionProvider.ts"
+    }],
+    "hoverProvider": [{
+      "language": "rsx",
+      "provider": "./src/providers/hoverProvider.ts"
+    }]
+
+  },
+  "devDependencies": {
+    "typescript": "^4.0.0",
+    "vscode": "^1.1.36"
+  }
+}

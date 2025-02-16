@@ -1,0 +1,65 @@
+{
+  "scopeName": "source.rust",
+  "patterns": [
+    {
+      "include": "#html"
+    },
+    {
+      "include": "#css"
+    }
+  ],
+  "repository": {
+    "html": {
+      "patterns": [
+        {
+          "name": "meta.embedded.html.rsx",
+          "begin": "<",
+          "end": ">",
+          "beginCaptures": {
+            "0": {
+              "name": "punctuation.definition.tag.begin.rsx"
+            }
+          },
+          "endCaptures": {
+            "0": {
+              "name": "punctuation.definition.tag.end.rsx"
+            }
+          },
+          "patterns": [
+            {
+              "include": "#attributes"
+            }
+          ]
+        }
+      ]
+    },
+    "css": {
+      "patterns": [
+        {
+          "name": "meta.embedded.css.rsx",
+          "begin": "\\{",
+          "end": "\\}",
+          "beginCaptures": {
+            "0": {
+              "name": "punctuation.definition.style.begin.rsx"
+            }
+          },
+          "endCaptures": {
+            "0": {
+              "name": "punctuation.definition.style.end.rsx"
+            }
+          }
+        }
+      ]
+    },
+    "attributes": {
+      "patterns": [
+        {
+          "name": "attribute.name.html.rsx",
+          "match": "[a-zA-Z-]+"
+        }
+      ]
+    }
+  },
+  "scopeName": "text.html.rsx"
+}
