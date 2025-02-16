@@ -22,7 +22,7 @@ use syn::File;
 #[derive(Debug, Clone)]
 pub struct RsxIdents {
 	/// the identifier that contains the effect registration functions,
-	/// ie `SignalsRsx`, it will be called like `#register_ident::register_block(#block)`
+	/// ie `Sigfault`, it will be called like `#register_ident::register_block(#block)`
 	pub effect: syn::Path,
 	pub event: syn::Path,
 	pub mac: syn::Ident,
@@ -36,7 +36,7 @@ pub struct RsxIdents {
 impl Default for RsxIdents {
 	fn default() -> Self {
 		Self {
-			effect: syn::parse_quote!(beet::rsx::signals_rsx::SignalsRsx),
+			effect: syn::parse_quote!(beet::rsx::sigfault::Sigfault),
 			event: syn::parse_quote!(beet::prelude::EventRegistry),
 			mac: syn::parse_quote!(rsx),
 		}

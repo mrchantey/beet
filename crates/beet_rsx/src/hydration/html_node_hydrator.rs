@@ -1,7 +1,7 @@
 use crate::prelude::*;
 
-/// An implementation of hydrated that simply updates a tree of
-/// html nodes
+/// An implementation of hydrator that simply updates a tree of
+/// html nodes.
 pub struct HtmlNodeHydrator {
 	pub html: HtmlDocument,
 	constants: HtmlConstants,
@@ -23,7 +23,7 @@ impl HtmlNodeHydrator {
 	}
 }
 
-impl Hydrator for HtmlNodeHydrator {
+impl DomHydrator for HtmlNodeHydrator {
 	fn html_constants(&self) -> &HtmlConstants { &self.constants }
 
 	fn render(&self) -> String { self.html.render() }

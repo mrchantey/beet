@@ -254,6 +254,7 @@ mod test {
 			.to_be(Some(&Transform::from_xyz(0., 1., 2.)));
 	}
 	#[test]
+	#[ignore = "requires multiple runtimes"]
 	fn attribute_block_value() {
 		let mut app = App::new();
 		let val = Vec3::new(0., 1., 2.);

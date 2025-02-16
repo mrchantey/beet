@@ -24,12 +24,12 @@ mod dom_hydrator;
 pub use dom_hydrator::*;
 
 thread_local! {
-	static CURRENT_HYDRATOR: RefCell<Box<dyn Hydrator>> = RefCell::new(Box::new(HtmlNodeHydrator::new(())));
+	static CURRENT_HYDRATOR: RefCell<Box<dyn DomHydrator>> = RefCell::new(Box::new(HtmlNodeHydrator::new(())));
 }
 pub struct CurrentHydrator;
 
 impl CurrentHydrator {
-	pub fn with<R>(mut func: impl FnMut(&mut dyn Hydrator) -> R) -> R {
+	pub fn with<R>(mut func: impl FnMut(&mut dyn DomHydrator) -> R) -> R {
 		CURRENT_HYDRATOR.with(|current| {
 			let mut current = current.borrow_mut();
 			func(current.as_mut())
@@ -37,14 +37,14 @@ impl CurrentHydrator {
 	}
 
 
-	pub fn set(item: impl 'static + Sized + Hydrator) {
+	pub fn set(item: impl 'static + Sized + DomHydrator) {
 		CURRENT_HYDRATOR.with(|current| {
 			*current.borrow_mut() = Box::new(item);
 		});
 	}
 }
 
-pub trait Hydrator {
+pub trait DomHydrator {
 	fn html_constants(&self) -> &HtmlConstants;
 
 	// type Event;

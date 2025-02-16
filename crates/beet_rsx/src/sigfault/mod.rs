@@ -7,10 +7,12 @@ pub use signal::*;
 
 
 
-/// a signals implementation of an rsx mapper
-pub struct SignalsRsx;
+/// a woefully basic implementation of signals, intended
+/// only for testing and as an example implementation for 
+/// authors of actual reactivity libraries.
+pub struct Sigfault;
 
-impl SignalsRsx {
+impl Sigfault {
 	pub fn register_block<M>(
 		block: impl 'static + Clone + IntoRsx<M>,
 	) -> RegisterEffect {

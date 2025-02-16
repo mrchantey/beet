@@ -1,7 +1,7 @@
 // use beet_rsx as beet;
 use beet::prelude::*;
-use beet::rsx::signals_rsx::effect;
-use beet::rsx::signals_rsx::signal;
+use beet::rsx::sigfault::effect;
+use beet::rsx::sigfault::signal;
 
 struct MyComponent {
 	initial: u32,

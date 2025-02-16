@@ -11,7 +11,7 @@ pub mod error;
 pub mod html;
 pub mod hydration;
 pub mod rsx;
-pub mod signals_rsx;
+pub mod sigfault;
 pub mod string_rsx;
 pub mod tree;
 #[cfg(feature = "macros")]
