@@ -28,6 +28,11 @@ pub struct RsxIdents {
 	pub mac: syn::Ident,
 }
 
+
+/// Get the default RsxIdents.
+/// Usually implementers of [`beet_rsx_parser`] will have their
+/// own mechanism for overriding defaults, ie [`beet_rsx_macros`] would use
+/// feature flags and [`beet_cli`] would use cli args.
 impl Default for RsxIdents {
 	fn default() -> Self {
 		Self {
@@ -37,6 +42,7 @@ impl Default for RsxIdents {
 		}
 	}
 }
+
 
 
 #[derive(Debug, Clone)]

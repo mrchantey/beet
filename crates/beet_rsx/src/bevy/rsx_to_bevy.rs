@@ -138,6 +138,7 @@ impl RsxToBevy {
 				initial,
 				effect,
 			} => {
+				println!("initial: {:?}", initial);
 				todo!()
 			}
 			RsxAttribute::Block { initial, effect: _ } => {
@@ -244,10 +245,22 @@ mod test {
 		app.init_resource::<AppTypeRegistry>()
 			.register_type::<Transform>();
 
-		let node = rsx! {<div
-			Transform.translation="(0.,1.,2.)"
-			/>
-		};
+		let node = rsx! {<div Transform.translation="(0.,1.,2.)"/>};
+		let entity = RsxToBevy::default()
+			.spawn_node(app.world_mut(), node)
+			.unwrap()[0];
+
+		expect(app.world_mut().entity(entity).get::<Transform>())
+			.to_be(Some(&Transform::from_xyz(0., 1., 2.)));
+	}
+	#[test]
+	fn attribute_block_value() {
+		let mut app = App::new();
+		let val = Vec3::new(0., 1., 2.);
+		app.init_resource::<AppTypeRegistry>()
+			.register_type::<Transform>();
+
+		let node = rsx! {<div runtime:bevy Transform.translation={val}/>};
 		let entity = RsxToBevy::default()
 			.spawn_node(app.world_mut(), node)
 			.unwrap()[0];

@@ -3,10 +3,8 @@ use proc_macro::TokenStream;
 mod derive_deref;
 
 /// Demonstrates how to select a different reactive runtime
-/// this is quite unsophisticated at the moment, we can work on a nicer
-/// way to expose it to library authors
 #[allow(unused_mut)]
-fn idents() -> RsxIdents {
+fn feature_flag_idents() -> RsxIdents {
 	let mut idents = RsxIdents::default();
 	#[cfg(not(feature = "signals"))]
 	{
@@ -30,7 +28,7 @@ pub fn rsx(tokens: TokenStream) -> TokenStream {
 	RstmlToRsx {
 		// perhaps we can feature gate this if it proves expensive
 		build_trackers: true,
-		idents: idents(),
+		idents: feature_flag_idents(),
 		..Default::default()
 	}
 	.map_tokens(tokens.into())
