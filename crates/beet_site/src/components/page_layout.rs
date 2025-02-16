@@ -20,26 +20,27 @@ impl Component for PageLayout {
 				<nav>
 					<a href="/">Home</a>
 					<a href="/contributing">Contributing</a>
+					<a href="/contributing">Foobarbazz</a>
 				</nav>
 					<slot/>
+					<style>
+						h1{
+							padding-top: 20px;
+						}
+						nav{
+							display: flex;
+							flex-direction: column;
+						}
+					</style>
+					<style scope:global>
+					body{
+						margin:0;
+						background-color: black;
+						color:white;
+					}
+					</style>
 				</body>
 			</html>
-			<style>
-				h1{
-					padding-top: 20px;
-				}
-				nav{
-					display: flex;
-					flex-direction: column;
-				}
-			</style>
-			<style scope:global>
-			body{
-				margin:0;
-				background-color: black;
-				color:white;
-			}
-			</style>
 		}
 	}
 }

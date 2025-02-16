@@ -14,6 +14,7 @@ crates := 'beet beet_spatial beet_flow'
 default:
 	just --list --unsorted
 
+# Initialize the repository, pulling assets into their respective crates
 init-repo:
 	just assets-pull
 	mkdir -p crates/beet_ml/assets/ml && cp ./assets/ml/default-bert.ron crates/beet_ml/assets/ml/default.bert.ron
@@ -22,15 +23,19 @@ init-repo:
 
 #💡 CLI
 
+# Run a cli command as if it was installed
 cli *args:
 	cargo run -p beet-cli -- {{args}}
 
+# Run and watch a workspace example
 run-ws example *args:
 	just watch 'just run-ci {{example}} {{args}}'
 
+# Run an example without watching
 run-ci example *args:
 	cargo run --example {{example}} {{args}}
 
+# Run and watch a crate example
 run crate example *args:
 	just watch cargo run -p {{crate}} --example {{example}} {{args}}
 
@@ -39,7 +44,7 @@ doc crate *args:
 	just watch cargo doc -p {{crate}} --open {{args}}
 
 fmt *args:
-	just watch 'just leptosfmt {{args}}'
+	just watch 'cargo fmt {{args}} && just leptosfmt {{args}}'
 
 leptosfmt *args:
 	leptosfmt 												\
@@ -193,6 +198,7 @@ publish-all *args:
 	just publish beet_router_parser   {{args}} || true
 	just publish beet_router          {{args}} || true
 	just publish beet                 {{args}} || true
+	just publish beet-cli             {{args}} || true
 # just publish beet_examples        {{args}} || true
 
 watch *command:

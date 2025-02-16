@@ -17,6 +17,10 @@ pub use hash_file::*;
 
 #[derive(Debug, Parser)]
 pub struct BuildRsxTemplateMap {
+	/// use [ron::ser::to_string_pretty] instead of
+	/// directly serializing the ron tokens.
+	#[arg(long)]
+	pub pretty: bool,
 	#[arg(long, default_value = "src")]
 	pub src: PathBuf,
 	// keep default in sync with StaticFileRouter
@@ -32,8 +36,13 @@ impl Default for BuildRsxTemplateMap {
 
 impl BuildRsxTemplateMap {
 	pub fn build_and_write(&self) -> Result<()> {
-		let ron = self.build_ron()?;
-		FsExt::write(&self.dst, &ron.to_string())?;
+		let map_tokens = self.build_ron()?;
+		let mut map_str = map_tokens.to_string();
+		if self.pretty {
+			let map = ron::de::from_str::<RsxTemplateMap>(&map_str)?;
+			map_str = ron::ser::to_string_pretty(&map, Default::default())?;
+		}
+		FsExt::write(&self.dst, &map_str)?;
 		Ok(())
 	}
 
@@ -97,21 +106,19 @@ impl RsxVisitor {
 
 impl<'a> Visit<'a> for RsxVisitor {
 	fn visit_macro(&mut self, mac: &syn::Macro) {
-		// println!("{:?}", i.tokens);
 		if mac
 			.path
 			.segments
 			.last()
 			.map_or(false, |seg| seg.ident == self.mac)
 		{
-			// take the span of the first tokens in the macro to match the rsx! macro
+			// use the span of the inner tokens to match the behavior of
+			// the rsx! macro
 			let span = mac.tokens.span();
 			let start = span.start();
 			let loc = RsxLocation::new(&self.file, start.line, start.column);
-			println!("start: {:#?}", mac.tokens.to_string());
 			let tokens = RstmlToRsxTemplate::default()
 				.map_tokens(mac.tokens.clone(), &self.file);
-			println!("end");
 			self.templates.push((loc, tokens));
 		}
 	}

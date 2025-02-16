@@ -1,5 +1,6 @@
 #![cfg_attr(test, feature(test, custom_test_frameworks))]
 #![cfg_attr(test, test_runner(sweet::test_runner))]
+// #![deny(missing_docs)]
 //!
 //! All about rsx trees, html, hydrating patterns, signals.
 //! beet_rsx has many features but by default it is quite

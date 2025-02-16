@@ -88,13 +88,15 @@ impl ScopedStyle {
 		let mut parse_err = Ok(());
 
 		let opts = VisitRsxOptions::ignore_component();
-		let mut scope_found = None;
+		let mut component_scope_found = false;
 
 		// 1. apply to style bodies
 		VisitRsxElementMut::walk_with_opts(node, opts.clone(), |el| {
 			if el.tag == "style" {
 				let scope = Scope::from_element(el);
-				scope_found = Some(scope);
+				if scope == Scope::Component {
+					component_scope_found = true;
+				}
 				// currently only recurse top level style children, we could create another
 				// visitor to go deeper if we start supporting style body components
 				if let RsxNode::Text(text) = &mut *el.children {
@@ -104,8 +106,8 @@ impl ScopedStyle {
 				}
 			}
 		});
-		// 2. tag elements
-		if scope_found == Some(Scope::Component) {
+		// 2. tag elements if *any* component scoped styles were found
+		if component_scope_found {
 			VisitRsxElementMut::walk_with_opts(node, opts.clone(), |el| {
 				el.attributes.push(RsxAttribute::KeyValue {
 					key: self.attr.to_string(),
@@ -204,6 +206,19 @@ mod test {
 			.render_body(),
 		)
 		.to_be("<div><style>span {\n  color: red;\n}\n</style></div>");
+	}
+	#[test]
+	fn local_and_global_scope() {
+		expect(
+			rsx! {
+				<div>
+					<style>div { color: blue; }</style>
+					<style scope:global>span { color: red; }</style>
+				</div>
+			}
+			.render_body(),
+		)
+		.to_be("<div data-styleid=\"0\"><style data-styleid=\"0\">div[data-styleid=\"0\"] {\n  color: #00f;\n}\n</style><style data-styleid=\"0\">span {\n  color: red;\n}\n</style></div>");
 	}
 
 

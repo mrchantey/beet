@@ -99,7 +99,7 @@ impl<T: 'static> StaticFileRouter<T> {
 			.map(|(route, mut root)| {
 				// only hydrate if we have templates
 				if let Some(map) = &mut template_map {
-					root = map.hydrate(root)?;
+					root = map.apply_template(root)?;
 				}
 				let doc = root.build_document()?;
 				Ok((route, doc))
@@ -108,10 +108,10 @@ impl<T: 'static> StaticFileRouter<T> {
 		Ok(html)
 	}
 
-	/// map the routes to html and save to disk
+	/// Calls [Self::routes_to_html] and writes the html to disk
 	pub async fn routes_to_html_files(&self) -> Result<()> {
 		let dst = &self.dst_dir;
-		// in debug mode this breaks FsWatcher
+		// in debug mode removing a watched dir breaks FsWatcher
 		#[cfg(not(debug_assertions))]
 		FsExt::remove(&dst).ok();
 		std::fs::create_dir_all(&dst)?;

@@ -4,13 +4,15 @@ use beet_router::prelude::BuildRoutesMod;
 use beet_router::prelude::BuildRsxTemplateMap;
 use beet_router::prelude::HashRsxFile;
 use rapidhash::RapidHashMap as HashMap;
+use std::path::Path;
 use std::path::PathBuf;
 use std::process::Command;
 use std::time::Instant;
 use sweet::prelude::*;
 
 
-/// Determine if the rust code changed in a file, or if it was just the html
+/// Watch the [BuildRoutesMod::src_dir] for changes, and determine if the rust code
+/// changed in a file, or if it was just the html template
 #[derive(Default)]
 pub struct RoutesBuilder {
 	// we will be swapping out the `run` and `build` methods of this command,
@@ -22,21 +24,28 @@ pub struct RoutesBuilder {
 }
 
 impl RoutesBuilder {
-	pub fn new(build_routes_mod: BuildRoutesMod, mut cargo: CargoCmd) -> Self {
+	pub fn new(
+		build_routes_mod: BuildRoutesMod,
+		mut cargo: CargoCmd,
+	) -> Result<Self> {
 		cargo.cargo_cmd = "build".to_string();
-		let mut build_templates = BuildRsxTemplateMap::default();
-		build_templates.src = build_routes_mod.routes_dir().clone();
-		Self {
+		let mut build_templates = BuildRsxTemplateMap {
+			pretty: true,
+			..Default::default()
+		};
+		build_templates.src = build_routes_mod.src_dir().clone();
+		let file_cache = Self::preheat_cache(build_routes_mod.src_dir())?;
+		Ok(Self {
 			cargo,
 			build_templates,
 			build_routes_mod,
-			file_cache: Default::default(),
-		}
+			file_cache,
+		})
 	}
 
 	pub async fn watch(mut self) -> Result<()> {
 		let watcher = FsWatcher::default()
-			.with_path(&self.build_routes_mod.routes_dir())
+			.with_path(&self.build_routes_mod.src_dir())
 			.with_exclude("*.git*")
 			.with_exclude("*target*");
 		println!("{:#?}", watcher);
@@ -52,6 +61,20 @@ impl RoutesBuilder {
 			})
 			.await?;
 		Ok(())
+	}
+
+	/// Create a file cache with every file in the src directory
+	pub fn preheat_cache(src: &Path) -> Result<HashMap<PathBuf, u64>> {
+		let mut cache = HashMap::default();
+		let files = ReadDir::files_recursive(src)?;
+		let now = Instant::now();
+		for file in files {
+			let path = file.canonicalize()?;
+			let hash = HashRsxFile::file_to_hash(&path)?;
+			cache.insert(path, hash);
+		}
+		println!("Preheated cache in {:?}\n{:#?}", now.elapsed(), cache);
+		Ok(cache)
 	}
 
 	/// find any reason to `cargo build`, if none, just `cargo run`
