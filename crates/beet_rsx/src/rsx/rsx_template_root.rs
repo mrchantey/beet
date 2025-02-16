@@ -24,5 +24,4 @@ impl RsxTemplateRoot {
 		let node = RsxTemplateNode::from_rsx_node(&node.node)?;
 		Ok(Self { node, location })
 	}
-
 }

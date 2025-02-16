@@ -44,7 +44,7 @@ doc crate *args:
 	just watch cargo doc -p {{crate}} --open {{args}}
 
 fmt *args:
-	just watch 'just leptosfmt {{args}}'
+	just watch 'cargo fmt {{args}} && just leptosfmt {{args}}'
 
 leptosfmt *args:
 	leptosfmt 												\

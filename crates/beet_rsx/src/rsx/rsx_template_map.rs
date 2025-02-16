@@ -92,7 +92,7 @@ mod test {
 		let page = || {
 			rsx! {
 				<div key str="value" num=32 ident=some_val>
-				hello world
+					hello world
 				</div>
 			}
 		};
@@ -155,7 +155,7 @@ mod test {
 			rsx! {
 				<div>
 					<MyComponent value=3>
-							<div>some child</div>
+						<div>some child</div>
 					</MyComponent>
 				</div>
 			}
