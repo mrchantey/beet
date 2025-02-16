@@ -42,7 +42,10 @@ parcel_selectors = { version = "0.28", optional = true }
 lightningcss = { version = "1.0.0-alpha.63", optional = true }
 
 #💡 bevy
-bevy = { workspace = true, optional = true, features = ["bevy_ui"] }
+bevy = { workspace = true, optional = true, features = [
+	"bevy_ui",
+	"bevy_remote",
+] }
 
 #💡 native
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]

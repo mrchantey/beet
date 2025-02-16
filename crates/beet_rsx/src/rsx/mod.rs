@@ -7,6 +7,7 @@ mod rsx_template_root;
 mod rsx_visitor_fn;
 mod rusty_part;
 mod scoped_style;
+mod rsx_diff;
 pub use rsx_root_map::*;
 pub use rsx_template_map::*;
 pub use rsx_template_node::*;

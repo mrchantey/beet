@@ -1,11 +1,14 @@
 use crate::prelude::*;
 
-/// An id incrementer that maps to the [DomLocation] visitor pattern.
+/// An id incrementer for mappers, similar to the [DomLocation] visitor pattern.
+/// This pattern only works if implemented consistently between mappers.
+/// The #1 rule is that [`Self::next`] must be called for *every* *single* [`RsxNode`],
+/// including fragments, unused doctypes etc.
 #[derive(Debug, Default)]
 pub(crate) struct RsxIdxIncr(RsxIdx);
 
-
 impl RsxIdxIncr {
+	/// Call this before visiting any node including fragments.
 	pub fn next(&mut self) -> RsxIdx {
 		let idx = self.0;
 		self.0 += 1;

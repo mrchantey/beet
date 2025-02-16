@@ -80,7 +80,7 @@ impl<T: 'static> StaticFileRouter<T> {
 	pub async fn routes_to_html(
 		&self,
 	) -> Result<Vec<(RouteInfo, HtmlDocument)>> {
-		// we will still without 'hot reload' if we can't load templates
+		// if we can't load templates just warn and run without template reload
 		let mut template_map = RsxTemplateMap::load(&self.templates_src)
 			.map_err(|err| {
 				// notify user that we are using routes
@@ -98,6 +98,7 @@ impl<T: 'static> StaticFileRouter<T> {
 			.into_iter()
 			.map(|(route, mut root)| {
 				// only hydrate if we have templates
+				// we already warned otherwise
 				if let Some(map) = &mut template_map {
 					root = map.apply_template(root)?;
 				}

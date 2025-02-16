@@ -9,6 +9,7 @@ macro_rules! impl_visitor {
 		}
 
 		impl<F: FnMut(&$node_type)> $visitor_name<F> {
+			/// Walk the node with the default [`VisitRsxOptions`]
 			pub fn walk(node: &RsxNode, func: F) {
 				$visitor_name::new(func).walk_node(node);
 			}
