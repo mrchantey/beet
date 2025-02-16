@@ -35,7 +35,7 @@ impl SignalsRsx {
 				println!(
 					"would update attributes for {}\n{}",
 					loc.rsx_idx,
-					RsxToHtml::default().map_attribute(&attrs).render()
+					RsxToHtml::default().map_attribute(999999, &attrs).render()
 				);
 				todo!();
 			});

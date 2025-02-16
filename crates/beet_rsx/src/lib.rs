@@ -18,6 +18,11 @@ pub mod tree;
 pub use beet_rsx_macros::*;
 #[cfg(feature = "parser")]
 pub use beet_rsx_parser;
+#[cfg(feature = "bevy")]
+pub mod bevy;
+#[cfg(feature = "bevy")]
+pub use crate::bevy as bevy2;
+
 
 #[rustfmt::skip]
 pub mod prelude {
@@ -30,6 +35,8 @@ pub mod prelude {
 	pub use crate::html::*;
 	pub use crate::tree::*;
 	pub use crate::rsx::*;
+	#[cfg(feature = "bevy")]
+	pub use crate::bevy::*;
 
 
 	pub type HashMap<K,V> = rapidhash::RapidHashMap<K,V>;

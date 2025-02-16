@@ -64,7 +64,8 @@ impl ParseDirRoutes {
 					syn::Ident::new(&name, proc_macro2::Span::call_site());
 				quote! {pub mod #ident; }
 			});
-		let include_dirs = dir_idents.iter().map(|ident| quote! {pub mod #ident;});
+		let include_dirs =
+			dir_idents.iter().map(|ident| quote! {pub mod #ident;});
 		let collect_dirs = dir_idents.iter().map(|ident| {
 			quote! {	#ident::collect_file_routes(router);}
 		});

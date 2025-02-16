@@ -29,13 +29,17 @@ impl Default for RsxNode {
 impl RsxNode {
 	/// Returns true if the node is an empty fragment,
 	/// or all children are empty fragments
-	pub fn is_empty_fragment(&self) -> bool {
+	pub fn assert_empty(&self) {
 		match self {
 			RsxNode::Fragment(children) => {
-				children.iter().all(|c| c.is_empty_fragment())
+				for child in children {
+					child.assert_empty();
+				}
+				return;
 			}
-			_ => false,
-		}
+			_ => {}
+		};
+		panic!("Expected empty fragment. Slot children must be empty before mapping to html, please call HtmlSlotsVisitor::apply\nreceived: {:#?}", self);
 	}
 
 	pub fn discriminant(&self) -> RsxNodeDiscriminants { self.into() }

@@ -222,7 +222,7 @@ mod test {
 		crate::test_site::routes::collect_file_routes(&mut router);
 		let html = router.routes_to_html().await.unwrap();
 
-		expect(html.len()).to_be(2);
+		expect(html.len()).to_be(3);
 
 		expect(&html[0].0.path.to_string_lossy()).to_be("/contributing");
 		expect(&html[0].1.render()).to_be("<!DOCTYPE html><html><head></head><body><div><h1 data-beet-rsx-idx=\"4\">Beet</h1>party time dude!</div></body></html>");

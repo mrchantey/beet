@@ -1,7 +1,17 @@
 use crate::prelude::*;
 
+/// An id incrementer that maps to the [DomLocation] visitor pattern.
+#[derive(Debug, Default)]
+pub(crate) struct RsxIdxIncr(RsxIdx);
 
 
+impl RsxIdxIncr {
+	pub fn next(&mut self) -> RsxIdx {
+		let idx = self.0;
+		self.0 += 1;
+		idx
+	}
+}
 
 
 #[derive(Debug, Default)]
@@ -18,7 +28,7 @@ pub struct RsxToHtml {
 	/// to get the actual id.
 	/// This is very error prone because we're trying to recreate the [DomLocation]
 	/// visitor pattern in a mapper.
-	rsx_idx_incr: RsxIdx,
+	rsx_idx_incr: RsxIdxIncr,
 }
 
 
@@ -30,9 +40,6 @@ impl RsxToHtml {
 		}
 	}
 
-	/// the correct rsx idx, created by subtracting 1
-	fn rsx_idx(&self) -> RsxIdx { self.rsx_idx_incr - 1 }
-
 	/// convenience so you dont have to add
 	/// a `.render()` at the end of a long rsx macro
 	pub fn render_body(node: impl AsRef<RsxNode>) -> String {
@@ -43,7 +50,7 @@ impl RsxToHtml {
 	/// # Panics
 	/// If slot children have not been applied
 	pub fn map_node(&mut self, node: impl AsRef<RsxNode>) -> Vec<HtmlNode> {
-		self.rsx_idx_incr += 1;
+		let idx = self.rsx_idx_incr.next();
 		match node.as_ref() {
 			RsxNode::Doctype => vec![HtmlNode::Doctype],
 			RsxNode::Comment(str) => vec![HtmlNode::Comment(str.clone())],
@@ -52,7 +59,7 @@ impl RsxToHtml {
 				vec![HtmlNode::Text(str.into())]
 			}
 			RsxNode::Element(e) => {
-				vec![HtmlNode::Element(self.map_element(e))]
+				vec![HtmlNode::Element(self.map_element(idx, e))]
 			}
 			RsxNode::Fragment(rsx_nodes) => rsx_nodes
 				.iter()
@@ -67,27 +74,28 @@ impl RsxToHtml {
 				root,
 				slot_children,
 			}) => {
-				// TODO assertion, why does it have html tag?
-				if !slot_children.is_empty_fragment() {
-					panic!("RsxToHtml: Slot children must be empty before mapping to html, please call HtmlSlotsVisitor::apply\nunmapped slots: {:#?}", slot_children);
-				}
+				slot_children.assert_empty();
 				self.map_node(root.as_ref())
 			}
 		}
 	}
 
-	pub fn map_element(&mut self, rsx_el: &RsxElement) -> HtmlElementNode {
+	pub fn map_element(
+		&mut self,
+		idx: RsxIdx,
+		rsx_el: &RsxElement,
+	) -> HtmlElementNode {
 		let mut html_attributes = rsx_el
 			.attributes
 			.iter()
-			.map(|a| self.map_attribute(a))
+			.map(|a| self.map_attribute(idx, a))
 			.flatten()
 			.collect::<Vec<_>>();
 
 		if !self.no_beet_attributes && rsx_el.contains_rust() {
 			html_attributes.push(HtmlAttribute {
 				key: self.html_constants.rsx_idx_key.to_string(),
-				value: Some(self.rsx_idx().to_string()),
+				value: Some(idx.to_string()),
 			});
 		}
 
@@ -99,7 +107,11 @@ impl RsxToHtml {
 		}
 	}
 
-	pub fn map_attribute(&self, attr: &RsxAttribute) -> Vec<HtmlAttribute> {
+	pub fn map_attribute(
+		&self,
+		idx: RsxIdx,
+		attr: &RsxAttribute,
+	) -> Vec<HtmlAttribute> {
 		match attr {
 			RsxAttribute::Key { key } => vec![HtmlAttribute {
 				key: key.clone(),
@@ -117,8 +129,7 @@ impl RsxToHtml {
 						key: key.clone(),
 						value: Some(format!(
 							"{}({}, event)",
-							self.html_constants.event_handler,
-							self.rsx_idx(),
+							self.html_constants.event_handler, idx,
 						)),
 					}]
 				} else {
@@ -130,7 +141,7 @@ impl RsxToHtml {
 			}
 			RsxAttribute::Block { initial, .. } => initial
 				.iter()
-				.map(|a| self.map_attribute(a))
+				.map(|a| self.map_attribute(idx, a))
 				.flatten()
 				.collect(),
 		}
