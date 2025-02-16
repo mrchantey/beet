@@ -24,8 +24,11 @@ pub struct RoutesBuilder {
 impl RoutesBuilder {
 	pub fn new(build_routes_mod: BuildRoutesMod, mut cargo: CargoCmd) -> Self {
 		cargo.cargo_cmd = "build".to_string();
-		let mut build_templates = BuildRsxTemplateMap::default();
-		build_templates.src = build_routes_mod.routes_dir().clone();
+		let mut build_templates = BuildRsxTemplateMap {
+			pretty: true,
+			..Default::default()
+		};
+		build_templates.src = build_routes_mod.src_dir().clone();
 		Self {
 			cargo,
 			build_templates,

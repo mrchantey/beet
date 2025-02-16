@@ -643,6 +643,7 @@ dependencies = [
  "proc-macro2",
  "quote",
  "rapidhash",
+ "ron",
  "sweet",
  "syn 2.0.98",
  "uuid",

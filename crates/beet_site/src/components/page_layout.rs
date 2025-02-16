@@ -20,6 +20,7 @@ impl Component for PageLayout {
 				<nav>
 					<a href="/">Home</a>
 					<a href="/contributing">Contributing</a>
+					<a href="/contributing">Foobar</a>
 				</nav>
 					<slot/>
 					<style>

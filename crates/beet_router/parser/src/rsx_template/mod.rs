@@ -17,6 +17,10 @@ pub use hash_file::*;
 
 #[derive(Debug, Parser)]
 pub struct BuildRsxTemplateMap {
+	/// use [ron::ser::to_string_pretty] instead of
+	/// directly serializing the ron tokens.
+	#[arg(long)]
+	pub pretty: bool,
 	#[arg(long, default_value = "src")]
 	pub src: PathBuf,
 	// keep default in sync with StaticFileRouter
@@ -32,8 +36,13 @@ impl Default for BuildRsxTemplateMap {
 
 impl BuildRsxTemplateMap {
 	pub fn build_and_write(&self) -> Result<()> {
-		let ron = self.build_ron()?;
-		FsExt::write(&self.dst, &ron.to_string())?;
+		let map_tokens = self.build_ron()?;
+		let mut map_str = map_tokens.to_string();
+		if self.pretty {
+			let map = ron::de::from_str::<RsxTemplateMap>(&map_str)?;
+			map_str = ron::ser::to_string_pretty(&map, Default::default())?;
+		}
+		FsExt::write(&self.dst, &map_str)?;
 		Ok(())
 	}
 

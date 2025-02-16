@@ -129,6 +129,8 @@ impl RsxTemplateNode {
 	}
 
 	/// drain the effect map into an RsxNode
+	/// We need the [`RsxTemplateMap`] to apply the template
+	/// for nested components
 	pub fn into_rsx_node(
 		self,
 		template_map: &RsxTemplateMap,
@@ -166,6 +168,7 @@ impl RsxTemplateNode {
 							},
 						),
 					}?;
+				// here we need apply the template for the component
 				let root = template_map.apply_template(root)?;
 				Ok(RsxNode::Component(RsxComponent {
 					tag: tag.clone(),
