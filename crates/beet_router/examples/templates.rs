@@ -24,7 +24,7 @@ async fn main() {
 	// println!("wrote to {}\n{:#?}", builder.dst.display(), map);
 	// println!("TEMPLATE_MAP::::{:#?}", map);
 
-	let rsx = beet_router::test_site::index::get(DefaultAppState::default());
+	let rsx = beet_router::test_site::routes::index::get(DefaultAppState::default());
 	let root1 = map.get(&rsx.location).unwrap();
 	let RsxTemplateNode::Component {
 		tracker: tracker1, ..

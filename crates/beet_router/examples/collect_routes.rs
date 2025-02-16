@@ -18,9 +18,9 @@ pub fn main() {
 		..Default::default()
 	};
 	parser.build_and_write().unwrap();
-	let routes = parser.build_string().unwrap();
+	let routes = parser.build_strings().unwrap();
 	println!(
-		"wrote crates/beet_router/src/test_site_router.rs\n{}",
+		"wrote crates/beet_router/src/test_site_router.rs\n{:#?}",
 		routes
 	);
 }
