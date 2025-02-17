@@ -39,6 +39,10 @@ impl EventRegistry {
 			);
 		});
 	}
+	/// A simple example of how to register an event listener.
+	/// Here the [`Event`] should be swapped out for the type
+	/// specific to that event. This is what allows for inferred
+	/// types and intellisence inside rsx macros.
 	pub fn register_onclick(
 		key: &str,
 		loc: DomLocation,

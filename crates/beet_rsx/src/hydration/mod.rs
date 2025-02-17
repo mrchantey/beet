@@ -53,6 +53,10 @@ pub trait DomHydrator {
 		node: RsxNode,
 		loc: DomLocation,
 	) -> ParseResult<()>;
+
+	// TODO update attriute block, update block value
+
+
 	/// just used for testing atm
 	fn render(&self) -> String;
 

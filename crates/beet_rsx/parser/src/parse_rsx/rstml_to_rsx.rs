@@ -56,9 +56,11 @@ impl RstmlToRsx {
 		let node = self.map_nodes(nodes);
 
 		let location = rsx_location_tokens(tokens);
+		let rstml_to_rsx_errors = &self.errors;
 		quote! {
 			{
 				#(#rstml_errors;)*
+				#(#rstml_to_rsx_errors;)*
 				use beet::prelude::*;
 				#[allow(unused_braces)]
 				RsxRoot{
@@ -121,10 +123,12 @@ impl RstmlToRsx {
 			Node::Element(el) => {
 				self.check_self_closing_children(&el);
 				let NodeElement {
-					open_tag,
+					mut open_tag,
 					children,
 					close_tag,
 				} = el;
+				// we must parse runtime attr before anything else
+				self.parse_runtime_attribute(&mut open_tag.attributes);
 
 				self.collected_elements.push(open_tag.name.clone());
 				let self_closing = close_tag.is_none();
@@ -262,6 +266,7 @@ impl RstmlToRsx {
 		})
 	}
 
+	/// Ensure that self-closing elements do not have children.
 	fn check_self_closing_children<C>(&mut self, element: &NodeElement<C>) {
 		if element.children.is_empty()
 			|| !self
@@ -276,5 +281,29 @@ impl RstmlToRsx {
 			"Element is processed as empty, and cannot have any child",
 		);
 		self.errors.push(warning.emit_as_expr_tokens());
+	}
+
+
+	/// Update [`Self::idents`] with the specified runtime and removes it from
+	/// the list of attributes. See [`RsxIdents::set_runtime`] for more information.
+	fn parse_runtime_attribute(&mut self, attrs: &mut Vec<NodeAttribute>) {
+		attrs.retain(|attr| {
+			if let NodeAttribute::Attribute(attr) = attr {
+				let key = attr.key.to_string();
+				if key.starts_with("runtime:") {
+					let runtime = key.replace("runtime:", "");
+					if let Err(err) = self.idents.set_runtime(&runtime) {
+						let diagnostic = Diagnostic::spanned(
+							attr.span(),
+							Level::Error,
+							err.to_string(),
+						);
+						self.errors.push(diagnostic.emit_as_expr_tokens());
+					}
+					return false;
+				}
+			}
+			true
+		});
 	}
 }

@@ -36,13 +36,32 @@ pub struct RsxIdents {
 impl Default for RsxIdents {
 	fn default() -> Self {
 		Self {
-			effect: syn::parse_quote!(beet::rsx::sigfault::Sigfault),
+			effect: Self::sigfault_ident(),
 			event: syn::parse_quote!(beet::prelude::EventRegistry),
 			mac: syn::parse_quote!(rsx),
 		}
 	}
 }
 
+impl RsxIdents {
+	fn sigfault_ident() -> syn::Path {
+		syn::parse_quote!(beet::rsx::sigfault::Sigfault)
+	}
+	
+
+	/// Updates [`Self::effect`] to the given runtime. Built-in runtimes
+	/// have a shorthand:
+	/// - `sigfault` -> `beet::rsx::sigfault::Sigfault`
+	/// - `bevy` -> `beet::rsx::bevy::BevyRuntime`
+	pub fn set_runtime(&mut self, runtime: &str) -> syn::Result<()> {
+		self.effect = match runtime {
+			"sigfault" => Self::sigfault_ident(),
+			"bevy" => syn::parse_quote!(beet::rsx::bevy::BevyRuntime),
+			_ => syn::parse_str(&runtime)?,
+		};
+		Ok(())
+	}
+}
 
 
 #[derive(Debug, Clone)]

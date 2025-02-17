@@ -230,7 +230,7 @@ mod test {
 		app.init_resource::<AppTypeRegistry>()
 			.register_type::<Transform>();
 
-		let node = rsx! {<div Transform/>};
+		let node = rsx! {<entity Transform/>};
 		let entity = RsxToBevy::default()
 			.spawn_node(app.world_mut(), node)
 			.unwrap()[0];
@@ -245,7 +245,7 @@ mod test {
 		app.init_resource::<AppTypeRegistry>()
 			.register_type::<Transform>();
 
-		let node = rsx! {<div Transform.translation="(0.,1.,2.)"/>};
+		let node = rsx! {<entity Transform.translation="(0.,1.,2.)"/>};
 		let entity = RsxToBevy::default()
 			.spawn_node(app.world_mut(), node)
 			.unwrap()[0];
@@ -261,7 +261,7 @@ mod test {
 		app.init_resource::<AppTypeRegistry>()
 			.register_type::<Transform>();
 
-		let node = rsx! {<div runtime:bevy Transform.translation={val}/>};
+		let node = rsx! {<entity runtime:bevy Transform.translation={val}/>};
 		let entity = RsxToBevy::default()
 			.spawn_node(app.world_mut(), node)
 			.unwrap()[0];
