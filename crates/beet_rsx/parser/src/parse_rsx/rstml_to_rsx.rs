@@ -103,15 +103,8 @@ impl RstmlToRsx {
 			Node::Block(block) => {
 				let tracker = self.rusty_tracker.next_tracker(&block);
 				let ident = &self.idents.effect;
-				// block is a {block} so assign to a value to unwrap
 				quote! {
-					{
-						let value = #block;
-						RsxNode::Block (RsxBlock{
-							initial: Box::new(value.clone().into_rsx()),
-							effect: Effect::new(#ident::register_block(value), #tracker),
-						})
-					}
+					#ident::parse_block_node(#tracker, #block)
 				}
 			}
 			Node::Fragment(NodeFragment { children, .. }) => {
@@ -161,10 +154,10 @@ impl RstmlToRsx {
 			NodeAttribute::Block(block) => {
 				let tracker = self.rusty_tracker.next_tracker(&block);
 				quote! {
-					RsxAttribute::Block{
-						initial: vec![#block.clone().into_rsx()],
-						effect: Effect::new(#ident::register_attribute_block(#block), #tracker)
-					}
+					#ident::parse_attribute_block(
+						#tracker,
+						#block,
+					)
 				}
 			}
 			NodeAttribute::Attribute(attr) => {
@@ -184,6 +177,8 @@ impl RstmlToRsx {
 					}
 					Some(block) => {
 						let tracker = self.rusty_tracker.next_tracker(&block);
+						// we need to handle events at the tokens level for inferred
+						// event types and intellisense.
 						if key.starts_with("on") {
 							let key = key.to_string();
 

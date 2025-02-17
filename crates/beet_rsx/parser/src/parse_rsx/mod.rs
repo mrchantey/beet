@@ -22,7 +22,7 @@ use syn::File;
 #[derive(Debug, Clone)]
 pub struct RsxIdents {
 	/// the identifier that contains the effect registration functions,
-	/// ie `Sigfault`, it will be called like `#register_ident::register_block(#block)`
+	/// ie `Sigfault`, it will be called like `#effect::parse_block_node(#block)`
 	pub effect: syn::Path,
 	pub event: syn::Path,
 	pub mac: syn::Ident,

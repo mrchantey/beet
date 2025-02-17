@@ -14,37 +14,55 @@ pub use signal::*;
 pub struct Sigfault;
 
 impl Sigfault {
-	pub fn register_block<M>(
+	/// Used by [`RstmlToRsx`] when it encounters a block node:
+	/// ```
+	/// # use beet_rsx::prelude::*;
+	/// let block = "hello";
+	/// let node = rsx!{<div>{block}</div>};
+	/// ```
+	pub fn parse_block_node<M>(
+		tracker: RustyTracker,
 		block: impl 'static + Clone + IntoRsx<M>,
-	) -> RegisterEffect {
-		Box::new(move |loc: DomLocation| {
-			effect(move || {
-				let block = block.clone();
-				CurrentHydrator::with(move |hydrator| {
-					let node = block.clone().into_rsx();
-					hydrator.update_rsx_node(node, loc).unwrap()
-				});
-			});
-			Ok(())
+	) -> RsxNode {
+		RsxNode::Block(RsxBlock {
+			initial: Box::new(block.clone().into_rsx()),
+			effect: Effect::new(
+				Box::new(move |loc: DomLocation| {
+					effect(move || {
+						let block = block.clone();
+						CurrentHydrator::with(move |hydrator| {
+							let node = block.clone().into_rsx();
+							hydrator.update_rsx_node(node, loc).unwrap()
+						});
+					});
+					Ok(())
+				}),
+				tracker,
+			),
 		})
 	}
-	pub fn register_attribute_block(
-		&self,
-		mut block: impl 'static + FnMut() -> RsxAttribute,
-	) -> RegisterEffect {
-		Box::new(move |loc| {
-			effect(move || {
-				let attrs = block();
-				println!(
-					"would update attributes for {}\n{}",
-					loc.rsx_idx,
-					RsxToHtml::default().map_attribute(999999, &attrs).render()
-				);
-				todo!();
-			});
-			Ok(())
-		})
+
+	/// Used by [`RstmlToRsx`] when it encounters an attribute block:
+	/// ```
+	/// # use beet_rsx::prelude::*;
+	/// let value = || vec![RsxAttribute::Key{key:"foo".to_string()}];
+	/// let node = rsx!{<el {value}/>};
+	/// ```
+	pub fn parse_attribute_block(
+		tracker: RustyTracker,
+		mut block: impl 'static + FnMut() -> Vec<RsxAttribute>,
+	) -> RsxAttribute {
+		RsxAttribute::Block {
+			initial: block(),
+			effect: Effect::new(
+				Box::new(|_loc| {
+					todo!();
+				}),
+				tracker,
+			),
+		}
 	}
+
 	/// Used by [`RstmlToRsx`] when it encounters an attribute with a block value:
 	/// ```
 	/// # use beet_rsx::prelude::*;

@@ -2,22 +2,44 @@ use crate::prelude::*;
 use crate::rsx::IntoRsx;
 use crate::rsx::RsxAttribute;
 
-/// A simple non-reactive rsx implementation
+/// A simple non-reactive rsx runtime
 #[derive(Debug)]
 pub struct StringRsx;
 
 fn noop() -> RegisterEffect { Box::new(|_| Ok(())) }
 impl StringRsx {
-	pub fn register_block<M>(
-		_block: impl 'static + Clone + IntoRsx<M>,
-	) -> RegisterEffect {
-		noop()
+	/// Used by [`RstmlToRsx`] when it encounters a block node:
+	/// ```
+	/// # use beet_rsx::prelude::*;
+	/// let block = "hello";
+	/// let node = rsx!{<div>{block}</div>};
+	/// ```
+	pub fn parse_block_node<M>(
+		tracker: RustyTracker,
+		block: impl 'static + Clone + IntoRsx<M>,
+	) -> RsxNode {
+		RsxNode::Block(RsxBlock {
+			initial: Box::new(block.clone().into_rsx()),
+			effect: Effect::new(noop(), tracker),
+		})
 	}
-	pub fn register_attribute_block(
-		_block: impl 'static + FnMut() -> RsxAttribute,
-	) -> RegisterEffect {
-		noop()
+
+	/// Used by [`RstmlToRsx`] when it encounters an attribute block:
+	/// ```
+	/// # use beet_rsx::prelude::*;
+	/// let value = || vec![RsxAttribute::Key{key:"foo".to_string()}];
+	/// let node = rsx!{<el {value}/>};
+	/// ```
+	pub fn parse_attribute_block(
+		tracker: RustyTracker,
+		mut block: impl 'static + FnMut() -> Vec<RsxAttribute>,
+	) -> RsxAttribute {
+		RsxAttribute::Block {
+			initial: block(),
+			effect: Effect::new(noop(), tracker),
+		}
 	}
+
 
 	/// Used by [`RstmlToRsx`] when it encounters an attribute with a block value:
 	/// ```
