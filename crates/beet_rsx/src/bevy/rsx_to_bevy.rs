@@ -3,6 +3,11 @@ use anyhow::Result;
 use bevy::prelude::*;
 use bevy::reflect::TypeRegistry;
 
+
+/// RsxToBevy is different from RsxToHtml, its a lot simpler
+/// because we dont need to deal with collapsing text nodes or
+/// output a tree. Instead we can just use a visitor to spawn
+/// nodes.
 #[derive(Debug, Default)]
 pub struct RsxToBevy {
 	pub rsx_idx_map: RsxIdxMap,
@@ -27,6 +32,7 @@ impl RsxToBevy {
 		node: impl AsRef<RsxNode>,
 	) -> Result<Vec<Entity>> {
 		let idx = self.rsx_idx_incr.next();
+		// println!("rsx_to_bevy found node: {:?}", node.as_ref().discriminant());
 		let nodes = match node.as_ref() {
 			RsxNode::Doctype => unimplemented!(),
 			RsxNode::Comment(_) => {
@@ -35,7 +41,9 @@ impl RsxToBevy {
 			RsxNode::Text(str) => {
 				#[cfg(feature = "bevy_ui")]
 				{
-					let entity = world.spawn(Text::new(str)).id();
+					let entity = world
+						.spawn((BevyRsxIdx::new(idx), Text::new(str)))
+						.id();
 					vec![entity]
 				}
 				#[cfg(not(feature = "bevy_ui"))]
@@ -82,10 +90,9 @@ impl RsxToBevy {
 
 		let children = self.spawn_node(world, &element.children)?;
 
-		let mut entity = world.spawn(BevyRsxElement {
+		let mut entity = world.spawn((BevyRsxIdx::new(idx), BevyRsxElement {
 			tag: element.tag.clone(),
-			idx,
-		});
+		}));
 		entity.add_children(&children);
 
 		// println!("here");

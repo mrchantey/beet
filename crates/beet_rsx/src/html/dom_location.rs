@@ -9,6 +9,25 @@ pub type RustyIdx = u32;
 pub type RsxIdx = u32;
 
 
+/// An id incrementer for mappers, similar to the [DomLocation] visitor pattern.
+/// This pattern only works if implemented consistently between mappers.
+/// The #1 rule is that [`Self::next`] must be called for *every* *single* [`RsxNode`]:
+/// - [`RsxNode::Fragment`]
+/// - [`RsxNode::Block`]
+/// - [`RsxBlock::initial`]
+#[derive(Debug, Default)]
+pub(crate) struct RsxIdxIncr(RsxIdx);
+
+impl RsxIdxIncr {
+	/// Call this before visiting any node.
+	pub fn next(&mut self) -> RsxIdx {
+		let idx = self.0;
+		self.0 += 1;
+		idx
+	}
+}
+
+
 ///	This struct is the binding between a [RsxNode] and an [HtmlNode].
 ///
 /// Hydrating elements is relatively simple, we can just slap an id on them,

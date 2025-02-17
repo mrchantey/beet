@@ -53,12 +53,9 @@ impl BevyEventRegistry {
 	{
 		BevyRuntime::with(move |app| {
 			let mut query =
-				app.world_mut().query::<(Entity, &BevyRsxElement)>();
-			let entity = query
-				.iter(app.world_mut())
-				.find(|(_, rsx)| rsx.idx == loc.rsx_idx)
-				.expect(&expect_rsx_element::to_be_at_location(&loc))
-				.0;
+				app.world_mut().query::<(Entity, &BevyRsxIdx)>();
+			let entity = BevyRsxIdx::find(query.iter(app.world()), loc)
+				.expect(&expect_rsx_element::to_be_at_location(&loc));
 
 			app.world_mut().entity_mut(entity).observe(observer);
 			app.world_mut().flush();

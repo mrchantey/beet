@@ -29,26 +29,13 @@ impl BevyRuntime {
 	/// let block = "hello";
 	/// let node = rsx!{<div>{block}</div>};
 	/// ```
-	pub fn parse_block_node<M>(
+	pub fn parse_block_node<M1, M2>(
 		tracker: RustyTracker,
-		block: impl 'static + Clone + IntoRsx<M>,
+		block: impl Clone + IntoRsx<M1> + SignalOrComponent<M2>,
 	) -> RsxNode {
 		RsxNode::Block(RsxBlock {
 			initial: Box::new(block.clone().into_rsx()),
-			effect: Effect::new(
-				Box::new(move |_loc: DomLocation| {
-					todo!();
-					// effect(move || {
-					// 	let block = block.clone();
-					// 	CurrentHydrator::with(move |hydrator| {
-					// 		let node = block.clone().into_rsx();
-					// 		hydrator.update_rsx_node(node, loc).unwrap()
-					// 	});
-					// });
-					// Ok(())
-				}),
-				tracker,
-			),
+			effect: Effect::new(block.into_node_block_effect(), tracker),
 		})
 	}
 	/// Used by [`RstmlToRsx`] when it encounters an attribute block:
@@ -87,49 +74,13 @@ impl BevyRuntime {
 	) -> RsxAttribute {
 		let initial = value.into_ron_str();
 
-		let register_effect: RegisterEffect = if let Some(sig_entity) =
-			value.signal_entity()
-		{
-			Box::new(move |loc| {
-				Self::with(move |app| {
-					app.world_mut().entity_mut(sig_entity).observe(
-						move |ev: Trigger<BevySignal<T::Inner>>,
-						      registry: Res<AppTypeRegistry>,
-						      mut elements: Query<
-							EntityMut,
-							With<BevyRsxElement>,
-						>| {
-							let entity =
-								BevyRsxElement::find_mut(&mut elements, loc)
-									.expect(
-										&expect_rsx_element::to_be_at_location(
-											&loc,
-										),
-									);
-							let registry = registry.read();
-							ReflectUtils::apply_at_path(
-								&registry,
-								entity,
-								field_path,
-								ev.event().value.clone(),
-							)
-							.unwrap();
-						},
-					);
-					app.world_mut().flush();
-				});
-				Ok(())
-			})
-		} else {
-			// its a constant
-			Box::new(|_loc| Ok(()))
-		};
-
-
 		RsxAttribute::BlockValue {
 			key: field_path.to_string(),
 			initial,
-			effect: Effect::new(register_effect, tracker),
+			effect: Effect::new(
+				value.into_attribute_value_effect(field_path.to_string()),
+				tracker,
+			),
 		}
 	}
 

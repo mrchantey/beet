@@ -63,24 +63,32 @@ impl RsxNode {
 	/// # Panics
 	/// If the register function fails
 	pub fn register_effects(&mut self) {
-		DomLocationVisitor::visit_mut(self, |loc, node| match node {
-			RsxNode::Block(RsxBlock { effect, .. }) => {
-				effect.take().register(loc).unwrap();
-			}
-			RsxNode::Element(e) => {
-				for a in &mut e.attributes {
-					match a {
-						RsxAttribute::Block { effect, .. } => {
-							effect.take().register(loc).unwrap();
+		DomLocationVisitor::visit_mut(self, |loc, node| {
+			// println!(
+			// 	"registering effect at loc: {:?}:{:?}",
+			// 	loc,
+			// 	node.discriminant()
+			// );
+
+			match node {
+				RsxNode::Block(RsxBlock { effect, .. }) => {
+					effect.take().register(loc).unwrap();
+				}
+				RsxNode::Element(e) => {
+					for a in &mut e.attributes {
+						match a {
+							RsxAttribute::Block { effect, .. } => {
+								effect.take().register(loc).unwrap();
+							}
+							RsxAttribute::BlockValue { effect, .. } => {
+								effect.take().register(loc).unwrap();
+							}
+							_ => {}
 						}
-						RsxAttribute::BlockValue { effect, .. } => {
-							effect.take().register(loc).unwrap();
-						}
-						_ => {}
 					}
 				}
+				_ => {}
 			}
-			_ => {}
 		});
 	}
 
