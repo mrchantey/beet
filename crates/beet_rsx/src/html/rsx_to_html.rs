@@ -221,7 +221,7 @@ mod test {
 	}
 	#[test]
 	fn events() {
-		let onclick = |_| {};
+		let onclick = move |_| {};
 		let world = "mars";
 		expect(RsxToHtml::render_body(&rsx! {
 			<div onclick=onclick>

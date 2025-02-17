@@ -20,6 +20,9 @@ impl BevyRsxElement {
 		query: &'a mut Query<EntityMut, With<BevyRsxElement>>,
 		loc: DomLocation,
 	) -> Option<EntityMut<'a>> {
+		// O(n) search, if we have more than a few hundred entities
+		// we should consider a hashmap
+
 		query.iter_mut().find(|entity| {
 			entity
 				.get::<BevyRsxElement>()

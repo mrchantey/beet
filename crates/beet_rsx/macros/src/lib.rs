@@ -6,9 +6,13 @@ mod derive_deref;
 #[allow(unused_mut)]
 fn feature_flag_idents() -> RsxIdents {
 	let mut idents = RsxIdents::default();
-	#[cfg(not(feature = "signals"))]
+	#[cfg(feature = "sigfault")]
 	{
-		idents.effect = syn::parse_quote!(beet::rsx::string_rsx::StringRsx);
+		idents.runtime = RsxRuntime::sigfault();
+	}
+	#[cfg(feature = "bevy")]
+	{
+		idents.runtime = RsxRuntime::bevy();
 	}
 	idents
 }

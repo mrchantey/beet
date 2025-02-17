@@ -90,11 +90,6 @@ impl BevyRuntime {
 		{
 			Box::new(move |loc| {
 				Self::with(move |app| {
-					// let registry = app.world().resource::<AppTypeRegistry>();
-					// let registry = registry.read();
-					// let registration = registry.get(TypeId::of::<T::Inner>()).expect(
-					// 			"Type not registered, please call BevyRuntime::with(|app|app.register_type::<T>())");
-
 					app.world_mut().entity_mut(sig_entity).observe(
 						move |ev: Trigger<BevySignal<T::Inner>>,
 						      registry: Res<AppTypeRegistry>,
@@ -118,8 +113,6 @@ impl BevyRuntime {
 							)
 							.unwrap();
 
-							// O(n) search, if we have more than a few hundred entities
-							// we should consider a hashmap
 						},
 					);
 					app.world_mut().flush();
@@ -174,6 +167,22 @@ mod test {
 		expect(&key).to_be("Transform.translation");
 		expect(&initial).to_be("(0.0,1.0,2.0)");
 	}
+
+	#[test]
+	fn block_node() {
+		let (get, set) = BevySignal::signal(1);
+
+		let node = rsx! {<entity runtime:bevy>{get}</entity>};
+		RsxToBevy::spawn(node).unwrap();
+		set(3);
+
+		let mut app = BevyRuntime::with(|app| std::mem::take(app));
+		let world = app.world_mut();
+		let mut query = world.query::<&Text>();
+		let text = query.iter(world).next().unwrap();
+		expect(&text.0).to_be("3");
+	}
+
 	#[test]
 	fn attr_value() {
 		BevyRuntime::with(|app| {
