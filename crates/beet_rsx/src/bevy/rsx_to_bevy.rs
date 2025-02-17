@@ -101,36 +101,8 @@ impl RsxToBevy {
 					registry,
 				);
 			}
-			#[allow(unused)]
 			RsxAttribute::KeyValue { key, value } => {
-				let mut parts = key.split('.');
-				let key = parts.next().unwrap();
-				let field_path = parts.collect::<Vec<_>>().join(".");
-				let (reflect_default, reflect_component) =
-					parse_attribute_key(key, registry)?;
-				if let Some(mut target) =
-					reflect_component.reflect_mut(&mut *entity)
-				{
-					apply_reflect(
-						registry,
-						&field_path,
-						target.as_reflect_mut(),
-						value,
-					)?;
-				} else {
-					let mut default = reflect_default.default();
-					apply_reflect(
-						registry,
-						&field_path,
-						default.as_mut(),
-						value,
-					)?;
-					reflect_component.insert(
-						entity,
-						default.as_partial_reflect(),
-						registry,
-					);
-				}
+				Self::apply_attribute(registry, entity, key, value)?;
 			}
 			#[allow(unused)]
 			RsxAttribute::BlockValue {
@@ -138,14 +110,42 @@ impl RsxToBevy {
 				initial,
 				effect,
 			} => {
-				println!("initial: {:?}", initial);
-				todo!()
+				Self::apply_attribute(registry, entity, key, initial)?;
 			}
 			RsxAttribute::Block { initial, effect: _ } => {
 				for attr in initial.iter() {
 					self.spawn_bevy_components(registry, entity, attr)?;
 				}
 			}
+		}
+		Ok(())
+	}
+	fn apply_attribute(
+		registry: &TypeRegistry,
+		entity: &mut EntityWorldMut,
+		key: &str,
+		value: &str,
+	) -> Result<()> {
+		let mut parts = key.split('.');
+		let key = parts.next().unwrap();
+		let field_path = parts.collect::<Vec<_>>().join(".");
+		let (reflect_default, reflect_component) =
+			parse_attribute_key(key, registry)?;
+		if let Some(mut target) = reflect_component.reflect_mut(&mut *entity) {
+			apply_reflect(
+				registry,
+				&field_path,
+				target.as_reflect_mut(),
+				value,
+			)?;
+		} else {
+			let mut default = reflect_default.default();
+			apply_reflect(registry, &field_path, default.as_mut(), value)?;
+			reflect_component.insert(
+				entity,
+				default.as_partial_reflect(),
+				registry,
+			);
 		}
 		Ok(())
 	}
@@ -254,11 +254,20 @@ mod test {
 			.to_be(Some(&Transform::from_xyz(0., 1., 2.)));
 	}
 	#[test]
-	#[ignore = "requires multiple runtimes"]
+	// #[ignore = "requires multiple runtimes"]
 	fn attribute_block_value() {
+		// without the runtime registration it will still serialize
+		// but with the wrong vec3 format, ie:
+		// (x:0.0,y:1.0,z:2.0) instead of the custom glam serde
+		// of (0.,1.,2.)
+		BevyRuntime::with(|app| {
+			app.register_type::<Transform>();
+		});
+
 		let mut app = App::new();
 		let val = Vec3::new(0., 1., 2.);
 		app.init_resource::<AppTypeRegistry>()
+			.register_type::<Vec3>()
 			.register_type::<Transform>();
 
 		let node = rsx! {<entity runtime:bevy Transform.translation={val}/>};
