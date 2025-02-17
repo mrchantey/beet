@@ -6,7 +6,7 @@ use web_sys::Element;
 use web_sys::Text;
 
 /// A hydrator for working with the dom
-pub struct DomHydrator {
+pub struct BrowserDomTarget {
 	constants: HtmlConstants,
 	// cache document reference
 	document: Document,
@@ -16,7 +16,7 @@ pub struct DomHydrator {
 	loc_map: Option<DomLocationMap>,
 }
 
-impl Default for DomHydrator {
+impl Default for BrowserDomTarget {
 	fn default() -> Self {
 		Self {
 			constants: Default::default(),
@@ -27,7 +27,7 @@ impl Default for DomHydrator {
 	}
 }
 
-impl DomHydrator {
+impl BrowserDomTarget {
 	fn get_dom_location_map(&mut self) -> ParseResult<&DomLocationMap> {
 		let query = format!("[{}]", self.constants.loc_map_key);
 		if let Some(cx) = self.document.query_selector(&query).unwrap() {
@@ -118,7 +118,7 @@ impl DomHydrator {
 }
 
 
-impl Hydrator for DomHydrator {
+impl DomTargetImpl for BrowserDomTarget {
 	fn html_constants(&self) -> &HtmlConstants { &self.constants }
 
 	/// returns body inner html

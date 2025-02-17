@@ -2,13 +2,13 @@ use crate::prelude::*;
 
 /// An implementation of hydrator that simply updates a tree of
 /// html nodes.
-pub struct HtmlNodeHydrator {
+pub struct RsDomTarget {
 	pub html: HtmlDocument,
 	constants: HtmlConstants,
 	loc_map: DomLocationMap,
 }
 
-impl HtmlNodeHydrator {
+impl RsDomTarget {
 	pub fn new(rsx: impl Rsx) -> Self {
 		let rsx = rsx.into_rsx();
 		let html = RsxToResumableHtml::default().map_node(&rsx);
@@ -23,7 +23,7 @@ impl HtmlNodeHydrator {
 	}
 }
 
-impl DomHydrator for HtmlNodeHydrator {
+impl DomTargetImpl for RsDomTarget {
 	fn html_constants(&self) -> &HtmlConstants { &self.constants }
 
 	fn render(&self) -> String { self.html.render() }

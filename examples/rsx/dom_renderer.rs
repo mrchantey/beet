@@ -50,8 +50,7 @@ fn render() {
 	// give the dom time to mount
 	set_timeout_ms(100, move || {
 		// sweet_utils::log!("hydrating");
-		let hydrator = DomHydrator::default();
-		CurrentHydrator::set(hydrator);
+		DomTarget::set(BrowserDomTarget::default());
 		// effects called here too
 		app().register_effects();
 		EventRegistry::initialize().unwrap();

@@ -12,7 +12,7 @@
 //!
 pub mod error;
 pub mod html;
-pub mod hydration;
+pub mod dom;
 pub mod rsx;
 pub mod sigfault;
 pub mod string_rsx;
@@ -33,7 +33,7 @@ pub mod prelude {
 	pub use beet_rsx_macros::*;
 	#[cfg(feature = "parser")]
 	pub use beet_rsx_parser::prelude::*;
-	pub use crate::hydration::*;
+	pub use crate::dom::*;
 	pub use crate::error::*;
 	pub use crate::html::*;
 	pub use crate::tree::*;

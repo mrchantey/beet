@@ -9,42 +9,46 @@ mod dom_mounter;
 pub use dom_event_registry::EventRegistry;
 #[cfg(target_arch = "wasm32")]
 pub use dom_mounter::*;
-mod html_node_hydrator;
+mod rs_dom_target;
 #[cfg(not(target_arch = "wasm32"))]
 mod native_event_registry;
-pub use html_node_hydrator::*;
+pub use rs_dom_target::*;
 #[cfg(not(target_arch = "wasm32"))]
 pub use native_event_registry::EventRegistry;
 use std::cell::RefCell;
 
 
 #[cfg(target_arch = "wasm32")]
-mod dom_hydrator;
+mod browser_dom_target;
 #[cfg(target_arch = "wasm32")]
-pub use dom_hydrator::*;
+pub use browser_dom_target::*;
 
 thread_local! {
-	static CURRENT_HYDRATOR: RefCell<Box<dyn DomHydrator>> = RefCell::new(Box::new(HtmlNodeHydrator::new(())));
+	static DOM_TARGET: RefCell<Box<dyn DomTargetImpl>> = RefCell::new(Box::new(RsDomTarget::new(())));
 }
-pub struct CurrentHydrator;
 
-impl CurrentHydrator {
-	pub fn with<R>(mut func: impl FnMut(&mut dyn DomHydrator) -> R) -> R {
-		CURRENT_HYDRATOR.with(|current| {
+/// Mechanism for swapping out:
+/// - [`BrowserDomTarget`]
+/// - [`RsDomTarget`]
+pub struct DomTarget;
+
+impl DomTarget {
+	pub fn with<R>(mut func: impl FnMut(&mut dyn DomTargetImpl) -> R) -> R {
+		DOM_TARGET.with(|current| {
 			let mut current = current.borrow_mut();
 			func(current.as_mut())
 		})
 	}
 
 
-	pub fn set(item: impl 'static + Sized + DomHydrator) {
-		CURRENT_HYDRATOR.with(|current| {
+	pub fn set(item: impl 'static + Sized + DomTargetImpl) {
+		DOM_TARGET.with(|current| {
 			*current.borrow_mut() = Box::new(item);
 		});
 	}
 }
 
-pub trait DomHydrator {
+pub trait DomTargetImpl {
 	fn html_constants(&self) -> &HtmlConstants;
 
 	// type Event;

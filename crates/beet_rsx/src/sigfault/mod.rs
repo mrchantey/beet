@@ -30,7 +30,7 @@ impl Sigfault {
 				Box::new(move |loc: DomLocation| {
 					effect(move || {
 						let block = block.clone();
-						CurrentHydrator::with(move |hydrator| {
+						DomTarget::with(move |hydrator| {
 							let node = block.clone().into_rsx();
 							hydrator.update_rsx_node(node, loc).unwrap()
 						});
@@ -123,16 +123,16 @@ mod test {
 		let (get, set) = signal(7);
 
 		let rsx = || rsx! { <div>value is {get}</div> };
-		CurrentHydrator::set(HtmlNodeHydrator::new(rsx.clone()));
+		DomTarget::set(RsDomTarget::new(rsx.clone()));
 
 		rsx().register_effects();
-		expect(&CurrentHydrator::with(|h| h.render()))
+		expect(&DomTarget::with(|h| h.render()))
 			.to_contain("<div data-beet-rsx-idx=\"0\">value is 7</div>");
 		set(8);
-		expect(&CurrentHydrator::with(|h| h.render()))
+		expect(&DomTarget::with(|h| h.render()))
 			.to_contain("<div data-beet-rsx-idx=\"0\">value is 8</div>");
 		set(9);
-		expect(&CurrentHydrator::with(|h| h.render()))
+		expect(&DomTarget::with(|h| h.render()))
 			.to_contain("<div data-beet-rsx-idx=\"0\">value is 9</div>");
 	}
 }
