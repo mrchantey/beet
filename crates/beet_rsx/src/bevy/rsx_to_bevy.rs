@@ -1,11 +1,7 @@
 use crate::prelude::*;
 use anyhow::Result;
 use bevy::prelude::*;
-use bevy::reflect::serde::TypedReflectDeserializer;
-use bevy::reflect::DynamicStruct;
-use bevy::reflect::TypeInfo;
 use bevy::reflect::TypeRegistry;
-use serde::de::DeserializeSeed;
 
 #[derive(Debug, Default)]
 pub struct RsxToBevy {
@@ -27,8 +23,17 @@ impl RsxToBevy {
 				unimplemented!()
 			}
 			RsxNode::Text(str) => {
-				let entity = world.spawn(Text::new(str)).id();
-				vec![entity]
+				#[cfg(feature = "bevy_ui")]
+				{
+					let entity = world.spawn(Text::new(str)).id();
+					vec![entity]
+				}
+				#[cfg(not(feature = "bevy_ui"))]
+				{
+					unimplemented!(
+						"cannot add {str},add feature bevy_ui to enable"
+					)
+				}
 			}
 			RsxNode::Fragment(rsx_nodes) => rsx_nodes
 				.iter()
@@ -58,7 +63,7 @@ impl RsxToBevy {
 	fn spawn_element(
 		&mut self,
 		world: &mut World,
-		_idx: RsxIdx,
+		idx: RsxIdx,
 		element: &RsxElement,
 	) -> Result<Entity> {
 		// Arc::clone
@@ -67,8 +72,9 @@ impl RsxToBevy {
 
 		let children = self.spawn_node(world, &element.children)?;
 
-		let mut entity = world.spawn(ElementTag {
+		let mut entity = world.spawn(BevyRsxElement {
 			tag: element.tag.clone(),
+			idx,
 		});
 		entity.add_children(&children);
 
@@ -89,7 +95,7 @@ impl RsxToBevy {
 		match attr {
 			RsxAttribute::Key { key } => {
 				let (reflect_default, reflect_component) =
-					parse_attribute_key(key, registry)?;
+					ReflectUtils::reflect_component(key, registry)?;
 				let default = reflect_default.default();
 				// how to cast?
 				// if reflect_component.contains(entity) {
@@ -102,7 +108,9 @@ impl RsxToBevy {
 				);
 			}
 			RsxAttribute::KeyValue { key, value } => {
-				Self::apply_attribute(registry, entity, key, value)?;
+				ReflectUtils::apply_or_insert_at_path(
+					registry, entity, key, value,
+				)?;
 			}
 			#[allow(unused)]
 			RsxAttribute::BlockValue {
@@ -110,7 +118,9 @@ impl RsxToBevy {
 				initial,
 				effect,
 			} => {
-				Self::apply_attribute(registry, entity, key, initial)?;
+				ReflectUtils::apply_or_insert_at_path(
+					registry, entity, key, initial,
+				)?;
 			}
 			RsxAttribute::Block { initial, effect: _ } => {
 				for attr in initial.iter() {
@@ -120,103 +130,7 @@ impl RsxToBevy {
 		}
 		Ok(())
 	}
-	fn apply_attribute(
-		registry: &TypeRegistry,
-		entity: &mut EntityWorldMut,
-		key: &str,
-		value: &str,
-	) -> Result<()> {
-		let mut parts = key.split('.');
-		let key = parts.next().unwrap();
-		let field_path = parts.collect::<Vec<_>>().join(".");
-		let (reflect_default, reflect_component) =
-			parse_attribute_key(key, registry)?;
-		if let Some(mut target) = reflect_component.reflect_mut(&mut *entity) {
-			apply_reflect(
-				registry,
-				&field_path,
-				target.as_reflect_mut(),
-				value,
-			)?;
-		} else {
-			let mut default = reflect_default.default();
-			apply_reflect(registry, &field_path, default.as_mut(), value)?;
-			reflect_component.insert(
-				entity,
-				default.as_partial_reflect(),
-				registry,
-			);
-		}
-		Ok(())
-	}
 }
-
-
-fn parse_attribute_key<'a>(
-	key: &str,
-	registry: &'a TypeRegistry,
-) -> Result<(&'a ReflectDefault, &'a ReflectComponent)> {
-	let registration =
-		registry.get_with_short_type_path(key).ok_or_else(|| {
-			anyhow::anyhow!("Could not find short type path for key: {}", key)
-		})?;
-	let reflect_default =
-		registration.data::<ReflectDefault>().ok_or_else(|| {
-			anyhow::anyhow!("Could not find reflect default for key: {}", key)
-		})?;
-	let reflect_component =
-		registration.data::<ReflectComponent>().ok_or_else(|| {
-			anyhow::anyhow!("Could not find reflect component for key: {}", key)
-		})?;
-
-	Ok((reflect_default, reflect_component))
-}
-
-/// Path may be empty, in which case the value is applied to the type itself.
-fn apply_reflect(
-	registry: &TypeRegistry,
-	path: &str,
-	target: &mut dyn Reflect,
-	value: &str,
-) -> Result<()> {
-	match target.reflect_type_info() {
-		TypeInfo::Struct(info) => {
-			if path.is_empty() {
-				todo!();
-			} else {
-				let field = info
-					.field(path)
-					.ok_or_else(|| {
-						anyhow::anyhow!(
-							"Could not find field {} in struct",
-							path
-						)
-					})?
-					.type_info()
-					.unwrap();
-				let registration =
-					registry.get(field.type_id()).ok_or_else(|| {
-						anyhow::anyhow!(
-							"Could not find registration for field type"
-						)
-					})?;
-				let reflect_deserializer =
-					TypedReflectDeserializer::new(registration, registry);
-				let mut deserializer = ron::de::Deserializer::from_str(&value)?;
-				let reflect_value =
-					reflect_deserializer.deserialize(&mut deserializer)?;
-				let mut dyn_struct = DynamicStruct::default();
-				dyn_struct.insert_boxed(path, reflect_value);
-				target.apply(&dyn_struct);
-			}
-		}
-		_ => {
-			todo!();
-		}
-	}
-	Ok(())
-}
-
 
 #[cfg(test)]
 mod test {

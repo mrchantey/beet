@@ -1,6 +1,7 @@
 use crate::prelude::*;
 use crate::rsx::IntoRsx;
 use crate::rsx::RsxAttribute;
+use crate::sigfault::IntoSigfaultAttrVal;
 
 /// A simple non-reactive rsx runtime
 #[derive(Debug)]
@@ -50,11 +51,11 @@ impl StringRsx {
 	pub fn parse_attribute_value<M>(
 		key: &'static str,
 		tracker: RustyTracker,
-		block: impl 'static + Clone + IntoRsxAttributeValue<M>,
+		block: impl 'static + Clone + IntoSigfaultAttrVal<M>,
 	) -> RsxAttribute {
 		RsxAttribute::BlockValue {
 			key: key.to_string(),
-			initial: block.clone().into_attribute_value(),
+			initial: block.clone().into_sigfault_val(),
 			effect: Effect::new(noop(), tracker),
 		}
 	}

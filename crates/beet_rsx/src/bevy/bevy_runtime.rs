@@ -1,6 +1,5 @@
 use crate::prelude::*;
 use bevy::prelude::*;
-use bevy::reflect::serde::TypedReflectSerializer;
 use std::cell::RefCell;
 
 thread_local! {
@@ -79,29 +78,61 @@ impl BevyRuntime {
 	/// let value = 3;
 	/// let node = rsx!{<el key={value}/>};
 	/// ```
-	pub fn parse_attribute_value<T: 'static + Clone + PartialReflect>(
-		key: &'static str,
+	pub fn parse_attribute_value<M, T: IntoBevyAttrVal<M>>(
+		field_path: &'static str,
 		tracker: RustyTracker,
 		value: T,
 	) -> RsxAttribute {
-		let initial = Self::with(|app| {
-			// let type_id = TypeId::of::<T>();
-			let registry = app.world().resource::<AppTypeRegistry>();
-			let registry = registry.read();
-			let reflect_serializer =
-				TypedReflectSerializer::new(&value, &registry);
-			ron::to_string(&reflect_serializer).unwrap()
-		});
+		let initial = value.into_bevy_val();
+
+		let register_effect: RegisterEffect =
+			if let Some(sig_entity) = value.signal_entity() {
+				Box::new(move |loc| {
+					Self::with(move |app| {
+						// let registry = app.world().resource::<AppTypeRegistry>();
+						// let registry = registry.read();
+						// let registration = registry.get(TypeId::of::<T::Inner>()).expect(
+						// 			"Type not registered, please call BevyRuntime::with(|app|app.register_type::<T>())");
+
+						app.world_mut().entity_mut(sig_entity).observe(
+							move |ev: Trigger<BevySignal<T::Inner>>,
+							      registry: Res<AppTypeRegistry>,
+							      mut elements: Query<
+								EntityMut,
+								With<BevyRsxElement>,
+							>| {
+								// O(n) search, if we have more than a few hundred entities
+								// we should consider a hashmap
+								for entity in elements.iter_mut() {
+									let el =
+										entity.get::<BevyRsxElement>().unwrap();
+									if el.idx == loc.rsx_idx {
+										let registry = registry.read();
+										ReflectUtils::apply_at_path(
+											&registry,
+											entity,
+											field_path,
+											ev.event().value.clone(),
+										)
+										.unwrap();
+									}
+								}
+							},
+						);
+						app.world_mut().flush();
+					});
+					Ok(())
+				})
+			} else {
+				// its a constant
+				Box::new(|_loc| Ok(()))
+			};
+
 
 		RsxAttribute::BlockValue {
-			key: key.to_string(),
+			key: field_path.to_string(),
 			initial,
-			effect: Effect::new(
-				Box::new(|_loc| {
-					todo!();
-				}),
-				tracker,
-			),
+			effect: Effect::new(register_effect, tracker),
 		}
 	}
 }
@@ -110,16 +141,14 @@ impl BevyRuntime {
 
 #[cfg(test)]
 mod test {
-	// use crate::prelude::*;
 	use super::BevyRuntime;
-	use crate::rsx::RsxAttribute;
-	use crate::rsx::RustyTracker;
+	use crate::prelude::*;
 	// use bevy::ecs::reflect::AppTypeRegistry;
 	use bevy::prelude::*;
 	use sweet::prelude::*;
 
 	#[test]
-	fn works() {
+	fn initial() {
 		BevyRuntime::with(|app| {
 			// app.init_resource::<AppTypeRegistry>();
 			app.register_type::<Vec3>();
@@ -141,5 +170,30 @@ mod test {
 		};
 		expect(&key).to_be("Transform.translation");
 		expect(&initial).to_be("(0.0,1.0,2.0)");
+	}
+	#[test]
+	fn attr_value() {
+		BevyRuntime::with(|app| {
+			app.register_type::<Transform>();
+		});
+
+		let (get, set) = BevySignal::signal(Vec3::new(0., 1., 2.));
+		let rsx = || rsx! {<entity runtime:bevy Transform.translation={get}/>};
+		rsx().register_effects();
+
+		let rsx = rsx();
+		BevyRuntime::with(|app| {
+			RsxToBevy::default()
+				.spawn_node(app.world_mut(), &rsx.node)
+				.unwrap();
+		});
+
+		set(Vec3::new(3., 4., 5.));
+
+		let mut app = BevyRuntime::with(|app| std::mem::take(app));
+		let world = app.world_mut();
+		let mut query = world.query::<&Transform>();
+		let transform = query.iter(world).next().unwrap();
+		expect(transform.translation).to_be(Vec3::new(3., 4., 5.));
 	}
 }

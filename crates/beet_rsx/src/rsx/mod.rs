@@ -1,4 +1,5 @@
 mod effect;
+mod rsx_diff;
 mod rsx_location;
 mod rsx_root_map;
 mod rsx_template_map;
@@ -6,14 +7,15 @@ mod rsx_template_node;
 mod rsx_template_root;
 mod rsx_visitor_fn;
 mod rusty_part;
+#[cfg(feature = "css")]
 mod scoped_style;
-mod rsx_diff;
 pub use rsx_root_map::*;
 pub use rsx_template_map::*;
 pub use rsx_template_node::*;
 pub use rsx_template_root::*;
 pub use rsx_visitor_fn::*;
 pub use rusty_part::*;
+#[cfg(feature = "css")]
 pub use scoped_style::*;
 mod rsx_node;
 mod rsx_visitor;
@@ -61,26 +63,6 @@ pub struct FuncIntoRsx;
 impl<T: FnOnce() -> U, U: IntoRsx<M2>, M2> IntoRsx<(M2, FuncIntoRsx)> for T {
 	fn into_rsx(self) -> RsxNode { self().into_rsx() }
 }
-
-pub trait IntoRsxAttributeValue<M> {
-	fn into_attribute_value(self) -> String;
-}
-
-pub struct ToStringIntoRsxAttributeValue;
-impl<T: ToString> IntoRsxAttributeValue<(T, ToStringIntoRsxAttributeValue)>
-	for T
-{
-	fn into_attribute_value(self) -> String { self.to_string() }
-}
-pub struct FuncIntoRsxAttribute;
-impl<T: FnOnce() -> U, U: IntoRsxAttributeValue<M2>, M2>
-	IntoRsxAttributeValue<(M2, FuncIntoRsxAttribute)> for T
-{
-	fn into_attribute_value(self) -> String { self().into_attribute_value() }
-}
-
-
-
 
 
 pub trait Component {

@@ -1,6 +1,10 @@
 mod bevy_runtime;
+mod bevy_signal;
+mod reflect_utils;
 mod rsx_to_bevy;
 pub use bevy_runtime::*;
+pub use bevy_signal::*;
+pub use reflect_utils::*;
 pub use rsx_to_bevy::*;
 mod components;
 pub use components::*;

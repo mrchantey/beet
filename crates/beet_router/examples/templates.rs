@@ -39,7 +39,7 @@ async fn main() {
 	else {
 		panic!();
 	};
-	assert_eq!(tracker1, &tracker2.clone().unwrap());
+	assert_eq!(tracker1, &tracker2.clone());
 
 	// println!("RSX:::: {:#?}", rsx);
 }

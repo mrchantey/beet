@@ -19,6 +19,7 @@ impl RsxRoot {
 	/// This is the method used by routers,
 	/// applies styles and slots, returning an HtmlDocument.
 	pub fn build_document(mut self) -> Result<HtmlDocument> {
+		#[cfg(feature = "css")]
 		ScopedStyle::default().apply(&mut self)?;
 		SlotsVisitor::apply(&mut self)?;
 		let html = RsxToHtml::default().map_node(&self);
@@ -34,6 +35,7 @@ impl RsxRoot {
 	/// # Panics
 	/// If the slots cannot be applied.
 	pub fn render_body(mut self) -> String {
+		#[cfg(feature = "css")]
 		ScopedStyle::default().apply(&mut self).unwrap();
 		SlotsVisitor::apply(&mut self).unwrap();
 		let html = RsxToHtml::default().map_node(&self);

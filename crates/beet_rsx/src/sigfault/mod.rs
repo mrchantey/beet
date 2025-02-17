@@ -72,15 +72,15 @@ impl Sigfault {
 	pub fn parse_attribute_value<M>(
 		key: &'static str,
 		tracker: RustyTracker,
-		block: impl 'static + Clone + IntoRsxAttributeValue<M>,
+		block: impl 'static + Clone + IntoSigfaultAttrVal<M>,
 	) -> RsxAttribute {
 		RsxAttribute::BlockValue {
 			key: key.to_string(),
-			initial: block.clone().into_attribute_value(),
+			initial: block.clone().into_sigfault_val(),
 			effect: Effect::new(
 				Box::new(move |loc| {
 					effect(move || {
-						let value = block.clone().into_attribute_value();
+						let value = block.clone().into_sigfault_val();
 						println!(
 							"would update attribute for {}\n{key}: {value}",
 							loc.rsx_idx
@@ -93,6 +93,22 @@ impl Sigfault {
 			),
 		}
 	}
+}
+
+
+pub trait IntoSigfaultAttrVal<M> {
+	fn into_sigfault_val(self) -> String;
+}
+
+pub struct ToStringIntoSigfaultAttrVal;
+impl<T: ToString> IntoSigfaultAttrVal<(T, ToStringIntoSigfaultAttrVal)> for T {
+	fn into_sigfault_val(self) -> String { self.to_string() }
+}
+pub struct FuncIntoSigfaultAttrVal;
+impl<T: FnOnce() -> U, U: IntoSigfaultAttrVal<M2>, M2>
+	IntoSigfaultAttrVal<(M2, FuncIntoSigfaultAttrVal)> for T
+{
+	fn into_sigfault_val(self) -> String { self().into_sigfault_val() }
 }
 
 

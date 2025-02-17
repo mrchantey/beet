@@ -13,8 +13,9 @@ keywords.workspace = true
 
 
 [features]
-default = ["macros", "css"]
-bevy = ["dep:bevy"]
+default = ["macros"]
+bevy = ["dep:bevy", "serde"]
+bevy_ui = ["bevy", "bevy/bevy_ui"]
 css = ["dep:lightningcss", "dep:parcel_selectors"]
 macros = ["dep:beet_rsx_macros"]
 parser = ["dep:beet_rsx_parser"]
@@ -43,8 +44,8 @@ lightningcss = { version = "1.0.0-alpha.63", optional = true }
 
 #💡 bevy
 bevy = { workspace = true, optional = true, features = [
-	"bevy_ui",
-	"bevy_remote",
+	# "bevy_ui",
+	# "bevy_remote",
 ] }
 
 #💡 native

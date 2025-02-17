@@ -1,5 +1,8 @@
 #![cfg_attr(test, feature(test, custom_test_frameworks))]
 #![cfg_attr(test, test_runner(sweet::test_runner))]
+
+#![cfg_attr(feature = "bevy", feature(unboxed_closures,fn_traits))]
+
 // #![deny(missing_docs)]
 //!
 //! All about rsx trees, html, hydrating patterns, signals.
