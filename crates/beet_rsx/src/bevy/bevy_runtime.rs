@@ -21,16 +21,27 @@ impl BevyRuntime {
 	}
 
 
-	///
-	///
+	/// Used by [`RstmlToRsx`] when it encounters an attribute with a block value:
 	/// ```
-	/// let node = rsx!{<entity runtime:bevy Transform.translation={val}/>};
+	/// # use beet_rsx::prelude::*;
+	/// let value = 3;
+	/// let node = rsx!{<el key={value}/>};
 	/// ```
-	pub fn register_attribute_value<M>(
-		key: &str,
+	pub fn parse_attribute_value<M>(
+		key: &'static str,
+		tracker: RustyTracker,
 		block: impl 'static + Clone + IntoRsxAttributeValue<M>,
-	) -> RegisterEffect {
-		Box::new(move |loc| todo!())
+	) -> RsxAttribute {
+		RsxAttribute::BlockValue {
+			key: key.to_string(),
+			initial: block.clone().into_attribute_value(),
+			effect: Effect::new(
+				Box::new(|_loc| {
+					todo!();
+				}),
+				tracker,
+			),
+		}
 	}
 }
 

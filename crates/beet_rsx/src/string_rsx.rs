@@ -18,12 +18,22 @@ impl StringRsx {
 	) -> RegisterEffect {
 		noop()
 	}
-	pub fn register_attribute_value<M>(
-		_key: &str,
-		_block: impl 'static + Clone + IntoRsxAttributeValue<M>,
-	) -> RegisterEffect {
-		noop()
+
+	/// Used by [`RstmlToRsx`] when it encounters an attribute with a block value:
+	/// ```
+	/// # use beet_rsx::prelude::*;
+	/// let value = 3;
+	/// let node = rsx!{<el key={value}/>};
+	/// ```
+	pub fn parse_attribute_value<M>(
+		key: &'static str,
+		tracker: RustyTracker,
+		block: impl 'static + Clone + IntoRsxAttributeValue<M>,
+	) -> RsxAttribute {
+		RsxAttribute::BlockValue {
+			key: key.to_string(),
+			initial: block.clone().into_attribute_value(),
+			effect: Effect::new(noop(), tracker),
+		}
 	}
-	// pub fn parse_attribute_block<M>(key:&'static str,
-	// tracker:
 }

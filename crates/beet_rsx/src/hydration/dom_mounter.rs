@@ -9,7 +9,7 @@ pub struct DomMounter;
 
 
 impl DomMounter {
-	/// by deffault the dom mounter will not collapse text nodes
+	/// by default the dom mounter will not collapse text nodes
 	/// this recursively collapses text nodes into their parent element
 	pub fn normalize() {
 		web_sys::window().unwrap().document().unwrap().normalize();

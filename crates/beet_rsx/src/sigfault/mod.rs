@@ -8,8 +8,9 @@ pub use signal::*;
 
 
 /// a woefully basic implementation of signals, intended
-/// only for testing and as an example implementation for 
+/// only for testing and as an example implementation for
 /// authors of actual reactivity libraries.
+/// It aint a segfault, but it's not great.
 pub struct Sigfault;
 
 impl Sigfault {
@@ -44,22 +45,35 @@ impl Sigfault {
 			Ok(())
 		})
 	}
-	pub fn register_attribute_value<M>(
-		key: &str,
+	/// Used by [`RstmlToRsx`] when it encounters an attribute with a block value:
+	/// ```
+	/// # use beet_rsx::prelude::*;
+	/// let value = 3;
+	/// let node = rsx!{<el key={value}/>};
+	/// ```
+	pub fn parse_attribute_value<M>(
+		key: &'static str,
+		tracker: RustyTracker,
 		block: impl 'static + Clone + IntoRsxAttributeValue<M>,
-	) -> RegisterEffect {
-		let key = key.to_string();
-		Box::new(move |loc| {
-			effect(move || {
-				let value = block.clone().into_attribute_value();
-				println!(
-					"would update attribute for {}\n{key}: {value}",
-					loc.rsx_idx
-				);
-				todo!();
-			});
-			Ok(())
-		})
+	) -> RsxAttribute {
+		RsxAttribute::BlockValue {
+			key: key.to_string(),
+			initial: block.clone().into_attribute_value(),
+			effect: Effect::new(
+				Box::new(move |loc| {
+					effect(move || {
+						let value = block.clone().into_attribute_value();
+						println!(
+							"would update attribute for {}\n{key}: {value}",
+							loc.rsx_idx
+						);
+						todo!();
+					});
+					Ok(())
+				}),
+				tracker,
+			),
+		}
 	}
 }
 

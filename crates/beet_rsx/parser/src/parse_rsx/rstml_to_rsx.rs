@@ -204,11 +204,11 @@ impl RstmlToRsx {
 							}
 						} else {
 							quote! {
-								RsxAttribute::BlockValue{
-									key: #key.to_string(),
-									initial: #block.clone().into_attribute_value(),
-									effect: Effect::new(#ident::register_attribute_value(#key, #block), #tracker)
-								}
+								#ident::parse_attribute_value(
+									#key,
+									#tracker,
+									#block
+								)
 							}
 						}
 					}
