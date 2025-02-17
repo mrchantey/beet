@@ -47,8 +47,6 @@ pub enum TemplateError {
 	DehydrationFailed(String),
 	#[error("No template found for {0:?}")]
 	NoTemplate(RsxLocation),
-	#[error("{0} has no tracker, this can happen if RstmlToRsx::build_trackers was disabled or they were already collected")]
-	NoRustyPart(&'static str),
 	#[error("Rusty Map is missing a tracker for {cx}\nExpected: {expected:#?}\nReceived: {received:#?}")]
 	NoRustyMap {
 		cx: String,
@@ -97,17 +95,12 @@ impl RsxTemplateNode {
 				// location: node.location.clone(),
 				// node: Box::new(Self::from_rsx_node(node)?),
 				slot_children: Box::new(Self::from_rsx_node(slot_children)?),
-				tracker: tracker
-					.clone()
-					.ok_or_else(|| TemplateError::NoRustyPart("Component"))?,
+				tracker: tracker.clone(),
 				tag: tag.clone(),
 			}),
-			RsxNode::Block(RsxBlock { effect, .. }) => Ok(Self::RustBlock(
-				effect
-					.tracker
-					.clone()
-					.ok_or_else(|| TemplateError::NoRustyPart("NodeBlock"))?,
-			)),
+			RsxNode::Block(RsxBlock { effect, .. }) => {
+				Ok(Self::RustBlock(effect.tracker.clone()))
+			}
 			RsxNode::Element(RsxElement {
 				tag,
 				attributes,
@@ -172,7 +165,7 @@ impl RsxTemplateNode {
 				let root = template_map.apply_template(root)?;
 				Ok(RsxNode::Component(RsxComponent {
 					tag: tag.clone(),
-					tracker: Some(tracker),
+					tracker,
 					root: Box::new(root),
 					slot_children: Box::new(
 						slot_children.into_rsx_node(template_map, rusty_map)?,
@@ -200,7 +193,7 @@ impl RsxTemplateNode {
 					}?;
 				Ok(RsxNode::Block(RsxBlock {
 					initial: Box::new(initial),
-					effect: Effect::new(register, Some(tracker)),
+					effect: Effect::new(register, tracker),
 				}))
 			}
 			RsxTemplateNode::Element {
@@ -281,17 +274,11 @@ impl RsxTemplateAttribute {
 			RsxAttribute::BlockValue { key, effect, .. } => {
 				Ok(Self::BlockValue {
 					key: key.clone(),
-					tracker: effect.tracker.clone().ok_or_else(|| {
-						TemplateError::DehydrationFailed(
-							"AttributeValue".into(),
-						)
-					})?,
+					tracker: effect.tracker,
 				})
 			}
 			RsxAttribute::Block { effect, .. } => {
-				Ok(Self::Block(effect.tracker.clone().ok_or_else(|| {
-					TemplateError::DehydrationFailed("AttributeBlock".into())
-				})?))
+				Ok(Self::Block(effect.tracker))
 			}
 		}
 	}
@@ -327,7 +314,7 @@ impl RsxTemplateAttribute {
 
 				Ok(RsxAttribute::Block {
 					initial,
-					effect: Effect::new(register, Some(tracker)),
+					effect: Effect::new(register, tracker),
 				})
 			}
 			RsxTemplateAttribute::BlockValue { key, tracker } => {
@@ -353,7 +340,7 @@ impl RsxTemplateAttribute {
 				Ok(RsxAttribute::BlockValue {
 					key,
 					initial,
-					effect: Effect::new(register, Some(tracker)),
+					effect: Effect::new(register, tracker),
 				})
 			}
 		}

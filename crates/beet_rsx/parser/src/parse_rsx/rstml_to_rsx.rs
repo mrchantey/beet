@@ -30,7 +30,6 @@ pub fn rsx_location_tokens(tokens: impl Spanned) -> TokenStream {
 /// Convert rstml nodes to a Vec<RsxNode> token stream
 #[derive(Debug, Default)]
 pub struct RstmlToRsx {
-	pub build_trackers: bool,
 	pub idents: RsxIdents,
 	// Additional error and warning messages.
 	pub errors: Vec<TokenStream>,
@@ -102,9 +101,7 @@ impl RstmlToRsx {
 				quote!(RsxNode::Text(#text.to_string()))
 			}
 			Node::Block(block) => {
-				let tracker = self
-					.rusty_tracker
-					.next_tracker_optional(&block, self.build_trackers);
+				let tracker = self.rusty_tracker.next_tracker(&block);
 				let ident = &self.idents.effect;
 				// block is a {block} so assign to a value to unwrap
 				quote! {
@@ -159,13 +156,10 @@ impl RstmlToRsx {
 	}
 
 	fn map_attribute(&mut self, attr: NodeAttribute) -> TokenStream {
-		let build_tracker = self.build_trackers;
 		let ident = &self.idents.effect;
 		match attr {
 			NodeAttribute::Block(block) => {
-				let tracker = self
-					.rusty_tracker
-					.next_tracker_optional(&block, build_tracker);
+				let tracker = self.rusty_tracker.next_tracker(&block);
 				quote! {
 					RsxAttribute::Block{
 						initial: vec![#block.clone().into_rsx()],
@@ -189,9 +183,7 @@ impl RstmlToRsx {
 						}
 					}
 					Some(block) => {
-						let tracker = self
-							.rusty_tracker
-							.next_tracker_optional(&block, self.build_trackers);
+						let tracker = self.rusty_tracker.next_tracker(&block);
 						if key.starts_with("on") {
 							let key = key.to_string();
 
@@ -230,9 +222,7 @@ impl RstmlToRsx {
 		open_tag: OpenTag,
 		children: Vec<Node<C>>,
 	) -> TokenStream {
-		let tracker = self
-			.rusty_tracker
-			.next_tracker_optional(&open_tag, self.build_trackers);
+		let tracker = self.rusty_tracker.next_tracker(&open_tag);
 		let props = open_tag.attributes.into_iter().map(|attr| match attr {
 			NodeAttribute::Block(node_block) => {
 				quote! {#node_block}

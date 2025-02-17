@@ -27,7 +27,6 @@ fn feature_flag_idents() -> RsxIdents {
 pub fn rsx(tokens: TokenStream) -> TokenStream {
 	RstmlToRsx {
 		// perhaps we can feature gate this if it proves expensive
-		build_trackers: true,
 		idents: feature_flag_idents(),
 		..Default::default()
 	}

@@ -136,7 +136,7 @@ pub struct RsxComponent {
 	/// Tracks the <MyComponent ..> opening tag for this component
 	/// even key value attribute changes must be tracked
 	/// because components are structs not elements
-	pub tracker: Option<RustyTracker>,
+	pub tracker: RustyTracker,
 	/// the root returned by [Component::render]
 	pub root: Box<RsxRoot>,
 	// /// the children passed in by this component's parent:

@@ -43,7 +43,7 @@ impl RsxTemplateMap {
 
 	// should live elsewhere, maybe RustyPart
 	pub fn apply_template(&self, root: RsxRoot) -> TemplateResult<RsxRoot> {
-		let mut rusty_map = RustyPartMap::collect(root.node)?;
+		let mut rusty_map = RustyPartMap::collect(root.node);
 		let location = root.location;
 		// i think here we need to pass the whole map for component template reloading
 		let template_root = self
