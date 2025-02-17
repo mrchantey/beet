@@ -16,7 +16,7 @@ thread_local! {
 pub struct BevyRuntime;
 
 impl BevyRuntime {
-	pub fn with<R>(mut func: impl FnMut(&mut App) -> R) -> R {
+	pub fn with<R>(func: impl FnOnce(&mut App) -> R) -> R {
 		CURRENT_APP.with(|current| {
 			let mut current = current.borrow_mut();
 			func(&mut current)
@@ -85,48 +85,51 @@ impl BevyRuntime {
 	) -> RsxAttribute {
 		let initial = value.into_bevy_val();
 
-		let register_effect: RegisterEffect =
-			if let Some(sig_entity) = value.signal_entity() {
-				Box::new(move |loc| {
-					Self::with(move |app| {
-						// let registry = app.world().resource::<AppTypeRegistry>();
-						// let registry = registry.read();
-						// let registration = registry.get(TypeId::of::<T::Inner>()).expect(
-						// 			"Type not registered, please call BevyRuntime::with(|app|app.register_type::<T>())");
+		let register_effect: RegisterEffect = if let Some(sig_entity) =
+			value.signal_entity()
+		{
+			Box::new(move |loc| {
+				Self::with(move |app| {
+					// let registry = app.world().resource::<AppTypeRegistry>();
+					// let registry = registry.read();
+					// let registration = registry.get(TypeId::of::<T::Inner>()).expect(
+					// 			"Type not registered, please call BevyRuntime::with(|app|app.register_type::<T>())");
 
-						app.world_mut().entity_mut(sig_entity).observe(
-							move |ev: Trigger<BevySignal<T::Inner>>,
-							      registry: Res<AppTypeRegistry>,
-							      mut elements: Query<
-								EntityMut,
-								With<BevyRsxElement>,
-							>| {
-								// O(n) search, if we have more than a few hundred entities
-								// we should consider a hashmap
-								for entity in elements.iter_mut() {
-									let el =
-										entity.get::<BevyRsxElement>().unwrap();
-									if el.idx == loc.rsx_idx {
-										let registry = registry.read();
-										ReflectUtils::apply_at_path(
-											&registry,
-											entity,
-											field_path,
-											ev.event().value.clone(),
-										)
-										.unwrap();
-									}
-								}
-							},
-						);
-						app.world_mut().flush();
-					});
-					Ok(())
-				})
-			} else {
-				// its a constant
-				Box::new(|_loc| Ok(()))
-			};
+					app.world_mut().entity_mut(sig_entity).observe(
+						move |ev: Trigger<BevySignal<T::Inner>>,
+						      registry: Res<AppTypeRegistry>,
+						      mut elements: Query<
+							EntityMut,
+							With<BevyRsxElement>,
+						>| {
+							let entity =
+								BevyRsxElement::find_mut(&mut elements, loc)
+									.expect(
+										&expect_rsx_element::to_be_at_location(
+											&loc,
+										),
+									);
+							let registry = registry.read();
+							ReflectUtils::apply_at_path(
+								&registry,
+								entity,
+								field_path,
+								ev.event().value.clone(),
+							)
+							.unwrap();
+
+							// O(n) search, if we have more than a few hundred entities
+							// we should consider a hashmap
+						},
+					);
+					app.world_mut().flush();
+				});
+				Ok(())
+			})
+		} else {
+			// its a constant
+			Box::new(|_loc| Ok(()))
+		};
 
 
 		RsxAttribute::BlockValue {
@@ -178,16 +181,8 @@ mod test {
 		});
 
 		let (get, set) = BevySignal::signal(Vec3::new(0., 1., 2.));
-		let rsx = || rsx! {<entity runtime:bevy Transform.translation={get}/>};
-		rsx().register_effects();
-
-		let rsx = rsx();
-		BevyRuntime::with(|app| {
-			RsxToBevy::default()
-				.spawn_node(app.world_mut(), &rsx.node)
-				.unwrap();
-		});
-
+		let rsx = rsx! {<entity runtime:bevy Transform.translation={get}/>};
+		RsxToBevy::spawn(rsx).unwrap();
 		set(Vec3::new(3., 4., 5.));
 
 		let mut app = BevyRuntime::with(|app| std::mem::take(app));

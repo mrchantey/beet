@@ -11,6 +11,16 @@ pub struct RsxToBevy {
 
 
 impl RsxToBevy {
+	/// Registers effects and spawns the node
+	pub fn spawn(node: impl Rsx) -> Result<Vec<Entity>> {
+		let mut rsx = node.into_rsx();
+		let entities = BevyRuntime::with(|app| {
+			Self::default().spawn_node(app.world_mut(), &rsx)
+		});
+		rsx.register_effects();
+		entities
+	}
+
 	pub fn spawn_node(
 		&mut self,
 		world: &mut World,
@@ -118,9 +128,12 @@ impl RsxToBevy {
 				initial,
 				effect,
 			} => {
-				ReflectUtils::apply_or_insert_at_path(
-					registry, entity, key, initial,
-				)?;
+				// events are registered by register_effects
+				if !key.starts_with("on") {
+					ReflectUtils::apply_or_insert_at_path(
+						registry, entity, key, initial,
+					)?;
+				}
 			}
 			RsxAttribute::Block { initial, effect: _ } => {
 				for attr in initial.iter() {
@@ -178,6 +191,8 @@ mod test {
 			app.register_type::<Transform>();
 		});
 
+		// here we can get away with using two apps, as long as they
+		// both register transform
 		let mut app = App::new();
 		let val = Vec3::new(0., 1., 2.);
 		app.init_resource::<AppTypeRegistry>()

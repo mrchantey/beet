@@ -102,7 +102,7 @@ impl RstmlToRsx {
 			}
 			Node::Block(block) => {
 				let tracker = self.rusty_tracker.next_tracker(&block);
-				let ident = &self.idents.effect;
+				let ident = &self.idents.runtime.effect;
 				quote! {
 					#ident::parse_block_node(#tracker, #block)
 				}
@@ -149,7 +149,7 @@ impl RstmlToRsx {
 	}
 
 	fn map_attribute(&mut self, attr: NodeAttribute) -> TokenStream {
-		let ident = &self.idents.effect;
+		let ident = &self.idents.runtime.effect;
 		match attr {
 			NodeAttribute::Block(block) => {
 				let tracker = self.rusty_tracker.next_tracker(&block);
@@ -186,13 +186,13 @@ impl RstmlToRsx {
 								&format!("register_{key}"),
 								block.span(),
 							);
-							let register_event = &self.idents.event;
+							let event_registry = &self.idents.runtime.event;
 							quote! {
 								RsxAttribute::BlockValue {
 									key: #key.to_string(),
 									initial: "event-placeholder".to_string(),
 									effect: Effect::new(Box::new(move |cx| {
-										#register_event::#register_func(#key,cx,#block);
+										#event_registry::#register_func(#key,cx,#block);
 										Ok(())
 									}), #tracker)
 								}
@@ -277,7 +277,7 @@ impl RstmlToRsx {
 				let key = attr.key.to_string();
 				if key.starts_with("runtime:") {
 					let runtime = key.replace("runtime:", "");
-					if let Err(err) = self.idents.set_runtime(&runtime) {
+					if let Err(err) = self.idents.runtime.set(&runtime) {
 						let diagnostic = Diagnostic::spanned(
 							attr.span(),
 							Level::Error,
