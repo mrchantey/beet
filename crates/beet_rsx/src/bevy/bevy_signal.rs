@@ -1,6 +1,5 @@
 use crate::prelude::*;
 use bevy::prelude::*;
-use bevy::reflect::serde::TypedReflectSerializer;
 use bevy::reflect::Reflectable;
 
 pub trait SignalPayload: 'static + Send + Sync + Clone + Reflectable {}
@@ -94,41 +93,61 @@ impl<T: SignalPayload> Fn<()> for SignalGetter<T> {
 }
 
 
+/// Trait for signals, literals and blocks that can be converted to
+/// bevy entities
+pub trait BundleOrSignal<M>: 'static + Send + Sync + Clone {
+	type Inner: Bundle + Reflectable;
+	/// Serialize using ron
+	fn into_bundle(self) -> Self::Inner;
+	/// if this is a signal, return the entity containing
+	/// the [`BevySignal`] component
+	fn signal_entity(self) -> Option<Entity> { None }
+}
+
+pub struct ToStringMarker;
+impl<T: 'static + Send + Sync + Clone + ToString>
+	BundleOrSignal<(T, ToStringMarker)> for T
+{
+	type Inner = Text;
+	fn into_bundle(self) -> Self::Inner { Text(self.to_string()) }
+
+	fn signal_entity(self) -> Option<Entity> { None }
+}
+pub struct GetterMarker;
+impl<T: Reflectable + BundleOrSignal<M>, M> BundleOrSignal<(M, GetterMarker)>
+	for SignalGetter<T>
+{
+	type Inner = T::Inner;
+	fn into_bundle(self) -> Self::Inner { self.get().into_bundle() }
+	fn signal_entity(self) -> Option<Entity> { Some(self.entity) }
+}
 
 
-///
-///
-///
-pub trait IntoBevyAttrVal<M>: 'static + Send + Sync + Clone {
+
+
+
+/// Trait for signals, literals and blocks that can be converted to
+/// bevy attribute values
+pub trait SignalOrRon<M>: 'static + Send + Sync + Clone {
 	type Inner: SignalPayload;
-	fn into_bevy_val(&self) -> String;
+	/// Serialize using ron
+	fn into_ron_str(&self) -> String;
 	/// if this is a signal, return the entity containing
 	/// the [`BevySignal`] component
 	fn signal_entity(&self) -> Option<Entity> { None }
 }
 
 pub struct PayloadIntoBevyAttributeValue;
-impl<T: SignalPayload> IntoBevyAttrVal<(T, PayloadIntoBevyAttributeValue)>
-	for T
-{
+impl<T: SignalPayload> SignalOrRon<(T, PayloadIntoBevyAttributeValue)> for T {
 	type Inner = T;
-	fn into_bevy_val(&self) -> String {
-		BevyRuntime::with(|app| {
-			// let type_id = TypeId::of::<T>();
-			let registry = app.world().resource::<AppTypeRegistry>();
-			let registry = registry.read();
-			let reflect_serializer =
-				TypedReflectSerializer::new(self, &registry);
-			ron::to_string(&reflect_serializer).unwrap()
-		})
-	}
+	fn into_ron_str(&self) -> String { BevyRuntime::serialize(self).unwrap() }
 }
 pub struct GetterIntoRsxAttribute;
-impl<T: SignalPayload + IntoBevyAttrVal<M>, M>
-	IntoBevyAttrVal<(M, GetterIntoRsxAttribute)> for SignalGetter<T>
+impl<T: SignalPayload + SignalOrRon<M>, M>
+	SignalOrRon<(M, GetterIntoRsxAttribute)> for SignalGetter<T>
 {
-	type Inner = T;
-	fn into_bevy_val(&self) -> String { self.get().into_bevy_val() }
+	type Inner = T::Inner;
+	fn into_ron_str(&self) -> String { self.get().into_ron_str() }
 	fn signal_entity(&self) -> Option<Entity> { Some(self.entity) }
 }
 

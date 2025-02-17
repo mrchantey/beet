@@ -1,5 +1,6 @@
 use crate::prelude::*;
 use bevy::prelude::*;
+use bevy::reflect::serde::TypedReflectSerializer;
 use std::cell::RefCell;
 
 thread_local! {
@@ -56,12 +57,13 @@ impl BevyRuntime {
 	/// let value = || vec![RsxAttribute::Key{key:"foo".to_string()}];
 	/// let node = rsx!{<el {value}/>};
 	/// ```
-	pub fn parse_attribute_block(
+	#[allow(unused)]
+	pub fn parse_attribute_block<M, T: SignalOrRon<M>>(
 		tracker: RustyTracker,
-		mut block: impl 'static + FnMut() -> Vec<RsxAttribute>,
+		mut block: T,
 	) -> RsxAttribute {
 		RsxAttribute::Block {
-			initial: block(),
+			initial: todo!(),
 			effect: Effect::new(
 				Box::new(|_loc| {
 					todo!();
@@ -78,12 +80,12 @@ impl BevyRuntime {
 	/// let value = 3;
 	/// let node = rsx!{<el key={value}/>};
 	/// ```
-	pub fn parse_attribute_value<M, T: IntoBevyAttrVal<M>>(
+	pub fn parse_attribute_value<M, T: SignalOrRon<M>>(
 		field_path: &'static str,
 		tracker: RustyTracker,
 		value: T,
 	) -> RsxAttribute {
-		let initial = value.into_bevy_val();
+		let initial = value.into_ron_str();
 
 		let register_effect: RegisterEffect = if let Some(sig_entity) =
 			value.signal_entity()
@@ -112,7 +114,6 @@ impl BevyRuntime {
 								ev.event().value.clone(),
 							)
 							.unwrap();
-
 						},
 					);
 					app.world_mut().flush();
@@ -130,6 +131,17 @@ impl BevyRuntime {
 			initial,
 			effect: Effect::new(register_effect, tracker),
 		}
+	}
+
+	pub fn serialize(val: &impl PartialReflect) -> ron::Result<String> {
+		Self::with(|app| {
+			// let type_id = TypeId::of::<T>();
+			let registry = app.world().resource::<AppTypeRegistry>();
+			let registry = registry.read();
+			let reflect_serializer =
+				TypedReflectSerializer::new(val, &registry);
+			ron::to_string(&reflect_serializer)
+		})
 	}
 }
 
