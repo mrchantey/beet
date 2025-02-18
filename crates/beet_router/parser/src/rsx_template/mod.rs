@@ -27,7 +27,13 @@ pub struct BuildRsxTemplateMap {
 }
 
 impl BuildRsxTemplateMap {
-	pub fn new(src: impl Into<PathBuf>, dst: impl Into<PathBuf>) -> Self {
+	pub fn new(src: impl Into<PathBuf>) -> Self {
+		Self::new_with_dst(src, "target/rsx-templates.ron")
+	}
+	pub fn new_with_dst(
+		src: impl Into<PathBuf>,
+		dst: impl Into<PathBuf>,
+	) -> Self {
 		Self {
 			pretty: true,
 			src: src.into(),

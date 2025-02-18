@@ -4,8 +4,12 @@ use bevy::winit::WinitSettings;
 
 fn main() {
 	BevyRuntime::with(|app| {
-		app.add_plugins((DefaultPlugins, BevyEventRegistry))
-			.insert_resource(WinitSettings::desktop_app());
+		app.add_plugins((
+			DefaultPlugins,
+			BevyEventRegistry,
+			BevyTemplateReloader::default(),
+		))
+		.insert_resource(WinitSettings::desktop_app());
 	});
 	let scene = rsx! {
 		<Counter initial=7/>
@@ -29,10 +33,9 @@ impl beet::prelude::Component for Counter {
 		rsx! {
 			<entity runtime:bevy Button onclick=move |_|{
 				let val = get2.clone().get();
-				println!("clickesd: {}", val);
 				set(val + 2);
 			}>
-				"The value is certain "{get}
+				"The value is "{get}
 			</entity>
 		}
 	}

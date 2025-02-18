@@ -28,7 +28,7 @@ impl WatchTemplates {
 		}
 		let dst = self.dst.clone();
 		TemplateWatcher::new(
-			BuildRsxTemplateMap::new(self.src, self.dst),
+			BuildRsxTemplateMap::new_with_dst(self.src, self.dst),
 			|| {
 				print_dst(&dst)?;
 				Ok(())

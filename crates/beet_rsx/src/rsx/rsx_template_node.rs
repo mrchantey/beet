@@ -5,7 +5,8 @@ use thiserror::Error;
 /// Serializable version of an rsx node that can be rehydrated.
 ///
 /// This has absolute symmetry with [RsxNode] but with each rusty bit
-/// replaced by [RustyTracker].
+/// replaced by [RustyTracker]. Because of this symmetry it is perfectly
+/// valid to perform a dfs using an [`RsxIdxIncr`].
 ///
 /// An [RsxTemplateNode] is conceptually similar to a html template
 /// but instead of {{PLACEHOLDER}} there is a hash for a known
@@ -282,7 +283,7 @@ impl RsxTemplateAttribute {
 			}
 		}
 	}
-	/// drain the effect map into the template
+	/// drain the rusty map into the template
 	pub fn into_rsx_node(
 		self,
 		rusty_map: &mut HashMap<RustyTracker, RustyPart>,

@@ -28,7 +28,7 @@ impl FileRoutesWatcher {
 	}
 
 	pub async fn watch(self) -> Result<()> {
-		let build_templates = BuildRsxTemplateMap::new(
+		let build_templates = BuildRsxTemplateMap::new_with_dst(
 			self.collect_routes.src_dir(),
 			"target/rsx-templates.ron",
 		);

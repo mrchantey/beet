@@ -652,6 +652,8 @@ dependencies = [
  "beet_router",
  "beet_router_parser",
  "beet_rsx",
+ "bevy",
+ "flume",
  "futures",
  "http",
  "ron",
