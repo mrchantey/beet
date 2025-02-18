@@ -10,8 +10,7 @@ use beet_rsx::prelude::*;
 #[tokio::main]
 async fn main() {
 	let src = "crates/beet_router/src/test_site";
-	let dst = "target/test_site/rsx-templates.ron";
-	let builder = BuildRsxTemplateMap::new(src, dst);
+	let builder = BuildRsxTemplateMap::new(src);
 
 	// 1. build
 	builder.build_and_write().unwrap();

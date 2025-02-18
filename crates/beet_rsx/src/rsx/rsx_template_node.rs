@@ -5,8 +5,7 @@ use thiserror::Error;
 /// Serializable version of an rsx node that can be rehydrated.
 ///
 /// This has absolute symmetry with [RsxNode] but with each rusty bit
-/// replaced by [RustyTracker]. Because of this symmetry it is perfectly
-/// valid to perform a dfs using an [`RsxIdxIncr`].
+/// replaced by [RustyTracker].
 ///
 /// An [RsxTemplateNode] is conceptually similar to a html template
 /// but instead of {{PLACEHOLDER}} there is a hash for a known

@@ -16,7 +16,7 @@ pub struct Sigfault;
 impl Sigfault {
 	/// Used by [`RstmlToRsx`] when it encounters a block node:
 	/// ```
-	/// # use beet_rsx::prelude::*;
+	/// # use beet_rsx::as_beet::*;
 	/// let block = "hello";
 	/// let node = rsx!{<div>{block}</div>};
 	/// ```
@@ -44,7 +44,7 @@ impl Sigfault {
 
 	/// Used by [`RstmlToRsx`] when it encounters an attribute block:
 	/// ```
-	/// # use beet_rsx::prelude::*;
+	/// # use beet_rsx::as_beet::*;
 	/// let value = || vec![RsxAttribute::Key{key:"foo".to_string()}];
 	/// let node = rsx!{<el {value}/>};
 	/// ```
@@ -65,7 +65,7 @@ impl Sigfault {
 
 	/// Used by [`RstmlToRsx`] when it encounters an attribute with a block value:
 	/// ```
-	/// # use beet_rsx::prelude::*;
+	/// # use beet_rsx::as_beet::*;
 	/// let value = 3;
 	/// let node = rsx!{<el key={value}/>};
 	/// ```
