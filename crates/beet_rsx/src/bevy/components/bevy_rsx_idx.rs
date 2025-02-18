@@ -11,8 +11,6 @@ pub struct BevyRsxElement {
 	/// The element tag, ie <div>
 	pub tag: String,
 }
-
-
 /// Represents an element in the rsx tree. This may be changed
 /// in the future for the tag to be its own component.
 #[derive(Debug, Default, Component, Reflect, Deref)]
@@ -25,7 +23,7 @@ impl BevyRsxIdx {
 
 	pub fn find<'a>(
 		query: QueryIter<(Entity, &BevyRsxIdx), ()>,
-		loc: DomLocation,
+		loc: TreeLocation,
 	) -> Option<Entity> {
 		// O(n) search, if we have more than a few hundred entities
 		// we should consider a hashmap
@@ -36,7 +34,7 @@ impl BevyRsxIdx {
 	}
 	pub fn find_mut<'a>(
 		query: &'a mut Query<EntityMut, With<BevyRsxIdx>>,
-		loc: DomLocation,
+		loc: TreeLocation,
 	) -> Option<EntityMut<'a>> {
 		// O(n) search, if we have more than a few hundred entities
 		// we should consider a hashmap
@@ -51,10 +49,10 @@ impl BevyRsxIdx {
 
 
 pub mod expect_rsx_element {
-	use crate::html::DomLocation;
+	use crate::prelude::*;
 
 
-	pub fn to_be_at_location(location: &DomLocation) -> String {
+	pub fn to_be_at_location(location: &TreeLocation) -> String {
 		format!("failed to find entity at location: {:?}", location)
 	}
 }

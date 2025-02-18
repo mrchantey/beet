@@ -170,7 +170,7 @@ impl<T: Reflectable + SignalOrComponent<M>, M>
 	}
 
 	fn into_node_block_effect(self) -> RegisterEffect {
-		Box::new(move |block_loc: DomLocation| {
+		Box::new(move |block_loc: TreeLocation| {
 			// register_effect provides the location of the block, not the initial which is +1.
 			// i guess its guaranteed to be +1 so we can just increment?
 			let inner_idx = block_loc.rsx_idx + 1;

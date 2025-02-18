@@ -27,7 +27,7 @@ impl Sigfault {
 		RsxNode::Block(RsxBlock {
 			initial: Box::new(block.clone().into_rsx()),
 			effect: Effect::new(
-				Box::new(move |loc: DomLocation| {
+				Box::new(move |loc: TreeLocation| {
 					effect(move || {
 						let block = block.clone();
 						DomTarget::with(move |hydrator| {

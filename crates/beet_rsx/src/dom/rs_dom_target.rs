@@ -5,7 +5,7 @@ use crate::prelude::*;
 pub struct RsDomTarget {
 	pub html: HtmlDocument,
 	constants: HtmlConstants,
-	loc_map: DomLocationMap,
+	loc_map: TreeLocationMap,
 }
 
 impl RsDomTarget {
@@ -13,7 +13,7 @@ impl RsDomTarget {
 		let rsx = rsx.into_rsx();
 		let html = RsxToResumableHtml::default().map_node(&rsx);
 
-		let loc_map = DomLocationMap::from_node(&rsx);
+		let loc_map = TreeLocationMap::from_node(&rsx);
 
 		Self {
 			html,
@@ -31,7 +31,7 @@ impl DomTargetImpl for RsDomTarget {
 	fn update_rsx_node(
 		&mut self,
 		rsx: RsxNode,
-		loc: DomLocation,
+		loc: TreeLocation,
 	) -> ParseResult<()> {
 		let parent_idx = self
 			.loc_map
@@ -68,7 +68,7 @@ impl DomTargetImpl for RsDomTarget {
 fn apply_rsx(
 	parent_el: &mut HtmlElementNode,
 	rsx: RsxNode,
-	loc: DomLocation,
+	loc: TreeLocation,
 	constants: &HtmlConstants,
 ) -> ParseResult<()> {
 	match rsx {

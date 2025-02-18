@@ -3,21 +3,21 @@ use crate::prelude::*;
 /// This map is updated every hot reload, the position
 /// of a rust block in the tree can change
 #[derive(Debug, Default, Clone, PartialEq)]
-pub struct DomLocationMap {
+pub struct TreeLocationMap {
 	// we could technically use a vec where the indices are 'block_idx',
-	// and track block_idx in the [DomLocation]
+	// and track block_idx in the [TreeLocation]
 	// but at this stage of the project thats harder to reason about
 	// and this provides symmetry with [Self::collapsed_elements]
-	pub rusty_locations: HashMap<RsxIdx, DomLocation>,
+	pub rusty_locations: HashMap<RsxIdx, TreeLocation>,
 	pub collapsed_elements: HashMap<RsxIdx, TextBlockEncoder>,
 }
 
 ///	Delimiter Reference:
-/// - `,` `-` `.` are used by [DomLocation::to_csv] and [TextBlockEncoder::to_csv]
+/// - `,` `-` `.` are used by [TreeLocation::to_csv] and [TextBlockEncoder::to_csv]
 /// - `*` seperates key value pairs
 /// - `;` seperates items in hash maps
 /// - `_` seperates [Self::rusty_locations] and [Self::collapsed_elements]
-impl DomLocationMap {
+impl TreeLocationMap {
 	pub fn to_csv(&self) -> String {
 		let mut csv = String::new();
 		csv.push_str(
@@ -58,7 +58,7 @@ impl DomLocationMap {
 					.next()
 					.ok_or_else(|| ParseError::Serde("missing value".into()))?;
 
-				Ok((key, DomLocation::from_csv(value)?))
+				Ok((key, TreeLocation::from_csv(value)?))
 			})
 			.collect::<ParseResult<HashMap<_, _>>>()?;
 		let collapsed_elements = parts
@@ -89,7 +89,7 @@ impl DomLocationMap {
 	pub fn from_node(node: &RsxNode) -> Self {
 		let mut map = Self::default();
 
-		DomLocationVisitor::visit(node, |loc, node| match node {
+		TreeLocationVisitor::visit(node, |loc, node| match node {
 			RsxNode::Block(_) => {
 				map.rusty_locations.insert(loc.rsx_idx, loc);
 			}
@@ -123,11 +123,11 @@ mod test {
 			</div>
 		};
 
-		let map = DomLocationMap::from_node(&root);
+		let map = TreeLocationMap::from_node(&root);
 
 		// test csv
 		let csv = map.to_csv();
-		let map2 = DomLocationMap::from_csv(&csv).unwrap();
+		let map2 = TreeLocationMap::from_csv(&csv).unwrap();
 		expect(&map2).to_be(&map);
 		// println!("{:#?}", map);
 
@@ -140,19 +140,19 @@ mod test {
 			.collect::<HashMap<_, _>>(),
 		);
 		// {desc}
-		expect(&map.rusty_locations[&3]).to_be(&DomLocation {
+		expect(&map.rusty_locations[&3]).to_be(&TreeLocation {
 			rsx_idx: 3,
 			parent_idx: 0,
 			child_idx: 1,
 		});
 		// {color}
-		expect(&map.rusty_locations[&6]).to_be(&DomLocation {
+		expect(&map.rusty_locations[&6]).to_be(&TreeLocation {
 			rsx_idx: 6,
 			parent_idx: 0,
 			child_idx: 3,
 		});
 		// {action}
-		expect(&map.rusty_locations[&10]).to_be(&DomLocation {
+		expect(&map.rusty_locations[&10]).to_be(&TreeLocation {
 			rsx_idx: 10,
 			parent_idx: 0,
 			child_idx: 5,

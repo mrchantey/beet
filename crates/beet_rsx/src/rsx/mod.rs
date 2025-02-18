@@ -1,3 +1,9 @@
+mod slots_visitor;
+mod tree_location;
+mod tree_location_map;
+pub use slots_visitor::*;
+pub use tree_location::*;
+pub use tree_location_map::*;
 mod effect;
 mod rsx_diff;
 mod rsx_idx_incr;

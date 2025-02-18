@@ -27,7 +27,7 @@ impl EventRegistry {
 
 	fn register<T: 'static + JsCast>(
 		key: &str,
-		loc: DomLocation,
+		loc: TreeLocation,
 		func: impl 'static + Fn(T),
 	) {
 		REGISTERED_EVENTS.with(|current| {
@@ -45,7 +45,7 @@ impl EventRegistry {
 	/// types and intellisence inside rsx macros.
 	pub fn register_onclick(
 		key: &str,
-		loc: DomLocation,
+		loc: TreeLocation,
 		value: impl 'static + Fn(Event),
 	) {
 		Self::register(key, loc, value);

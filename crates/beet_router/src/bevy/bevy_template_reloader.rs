@@ -71,7 +71,10 @@ fn handle_recv(
 			TemplateReloaderMessage::Reload => {
 				let map = RsxTemplateMap::load(&template_reload.dst).unwrap();
 				for (loc, root) in map.iter() {
-					todo!()
+					root.node.visit(|node| {
+						todo!("assign to existing nodes");
+						// println!("{:?}", node);
+					});
 				}
 			}
 			TemplateReloaderMessage::Recompile => {

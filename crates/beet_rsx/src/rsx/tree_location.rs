@@ -15,9 +15,9 @@ pub type RustyIdx = u32;
 /// before using this location.
 ///
 #[derive(Debug, Default, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct DomLocation {
+pub struct TreeLocation {
 	/// Incremented every time an rsx node is encountered,
-	/// used for reconciliation with the [DomLocationMap::rusty_locations].
+	/// used for reconciliation with the [TreeLocationMap::rusty_locations].
 	/// It is required because not all rsx nodes are html nodes.
 	pub rsx_idx: RsxIdx,
 	/// the index of this node's parent *element*. This is used by
@@ -34,7 +34,7 @@ pub struct DomLocation {
 	// _padding: u32,
 }
 
-impl DomLocation {
+impl TreeLocation {
 	pub fn to_csv(&self) -> String {
 		// must keep in sync with from_csv
 		vec![
@@ -71,7 +71,7 @@ impl DomLocation {
 
 /// Wrapper of a visitor but
 #[derive(Debug)]
-pub struct DomLocationVisitor<Func> {
+pub struct TreeLocationVisitor<Func> {
 	/// we use a stack because [RsxVisitor] is depth-first.
 	/// This stack is an immutable breadcrumb trail of parents
 	parent_idxs: Vec<RsxIdx>,
@@ -81,11 +81,11 @@ pub struct DomLocationVisitor<Func> {
 	options: VisitRsxOptions,
 	func: Func,
 }
-impl<Func> DomLocationVisitor<Func> {
+impl<Func> TreeLocationVisitor<Func> {
 	/// Visit a node and return the total number of elements visited
 	pub fn visit(node: &RsxNode, func: Func)
 	where
-		Func: FnMut(DomLocation, &RsxNode),
+		Func: FnMut(TreeLocation, &RsxNode),
 	{
 		Self {
 			parent_idxs: vec![Default::default()],
@@ -102,7 +102,7 @@ impl<Func> DomLocationVisitor<Func> {
 		options: VisitRsxOptions,
 		func: Func,
 	) where
-		Func: FnMut(DomLocation, &RsxNode),
+		Func: FnMut(TreeLocation, &RsxNode),
 	{
 		Self {
 			parent_idxs: vec![Default::default()],
@@ -115,7 +115,7 @@ impl<Func> DomLocationVisitor<Func> {
 	}
 	pub fn visit_mut(node: &mut RsxNode, func: Func)
 	where
-		Func: FnMut(DomLocation, &mut RsxNode),
+		Func: FnMut(TreeLocation, &mut RsxNode),
 	{
 		Self {
 			parent_idxs: vec![Default::default()],
@@ -131,7 +131,7 @@ impl<Func> DomLocationVisitor<Func> {
 		options: VisitRsxOptions,
 		func: Func,
 	) where
-		Func: FnMut(DomLocation, &mut RsxNode),
+		Func: FnMut(TreeLocation, &mut RsxNode),
 	{
 		Self {
 			parent_idxs: Default::default(),
@@ -146,16 +146,16 @@ impl<Func> DomLocationVisitor<Func> {
 	/// Get the current item in the stack, or default
 	/// # Panics
 	/// Panics if the stack is empty
-	// pub fn parent(&mut self) -> &mut DomLocation {
+	// pub fn parent(&mut self) -> &mut TreeLocation {
 	// 	self.parents
 	// 		.last_mut()
-	// 		.expect("DomLocationVisitor stack is empty")
+	// 		.expect("TreeLocationVisitor stack is empty")
 	// }
 
-	pub fn current_location(&self) -> DomLocation {
+	pub fn current_location(&self) -> TreeLocation {
 		let parent_idx = self.parent_idxs.last().cloned().unwrap_or_default();
 		let child_idx = self.child_idxs.last().cloned().unwrap_or_default();
-		DomLocation {
+		TreeLocation {
 			rsx_idx: self.rsx_idx_incr,
 			parent_idx,
 			child_idx,
@@ -184,8 +184,8 @@ impl<Func> DomLocationVisitor<Func> {
 }
 
 
-impl<Func: FnMut(DomLocation, &RsxNode)> RsxVisitor
-	for DomLocationVisitor<Func>
+impl<Func: FnMut(TreeLocation, &RsxNode)> RsxVisitor
+	for TreeLocationVisitor<Func>
 {
 	fn options(&self) -> &VisitRsxOptions { &self.options }
 	fn visit_node(&mut self, node: &RsxNode) {
@@ -200,8 +200,8 @@ impl<Func: FnMut(DomLocation, &RsxNode)> RsxVisitor
 		self.after_children();
 	}
 }
-impl<Func: FnMut(DomLocation, &mut RsxNode)> RsxVisitorMut
-	for DomLocationVisitor<Func>
+impl<Func: FnMut(TreeLocation, &mut RsxNode)> RsxVisitorMut
+	for TreeLocationVisitor<Func>
 {
 	fn options(&self) -> &VisitRsxOptions { &self.options }
 	fn visit_node(&mut self, node: &mut RsxNode) {
@@ -225,13 +225,13 @@ mod test {
 
 	#[test]
 	fn csv() {
-		let a = DomLocation {
+		let a = TreeLocation {
 			rsx_idx: 4,
 			parent_idx: 2,
 			child_idx: 3,
 		};
 		let csv = a.to_csv();
-		let b = DomLocation::from_csv(&csv).unwrap();
+		let b = TreeLocation::from_csv(&csv).unwrap();
 		expect(a).to_be(b);
 	}
 	#[test]
@@ -252,7 +252,7 @@ mod test {
 				<div />
 			</div>
 		};
-		DomLocationVisitor::visit(&rsx, move |loc, node| {
+		TreeLocationVisitor::visit(&rsx, move |loc, node| {
 			if let RsxNode::Element(_) = node {
 				bucket2.call(loc);
 			}
@@ -260,27 +260,27 @@ mod test {
 		expect(&bucket).to_have_been_called_times(5);
 		// keep in mind that fragments will also increment
 		// the rsx_idx.. maybe they shouldnt?
-		expect(&bucket).to_have_returned_nth_with(0, &DomLocation {
+		expect(&bucket).to_have_returned_nth_with(0, &TreeLocation {
 			rsx_idx: 0,
 			parent_idx: 0,
 			child_idx: 0,
 		});
-		expect(&bucket).to_have_returned_nth_with(1, &DomLocation {
+		expect(&bucket).to_have_returned_nth_with(1, &TreeLocation {
 			rsx_idx: 2,
 			parent_idx: 0,
 			child_idx: 0,
 		});
-		expect(&bucket).to_have_returned_nth_with(2, &DomLocation {
+		expect(&bucket).to_have_returned_nth_with(2, &TreeLocation {
 			rsx_idx: 4,
 			parent_idx: 2,
 			child_idx: 0,
 		});
-		expect(&bucket).to_have_returned_nth_with(3, &DomLocation {
+		expect(&bucket).to_have_returned_nth_with(3, &TreeLocation {
 			rsx_idx: 6,
 			parent_idx: 2,
 			child_idx: 1,
 		});
-		expect(&bucket).to_have_returned_nth_with(4, &DomLocation {
+		expect(&bucket).to_have_returned_nth_with(4, &TreeLocation {
 			rsx_idx: 8,
 			parent_idx: 0,
 			child_idx: 1,

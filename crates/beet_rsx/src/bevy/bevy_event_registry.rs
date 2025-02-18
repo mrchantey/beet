@@ -45,7 +45,7 @@ impl BevyEventRegistry {
 	/// Any observer is accepted here and will be attached to the entity
 	pub fn register_on<E, B, M>(
 		_key: &str,
-		loc: DomLocation,
+		loc: TreeLocation,
 		observer: impl IntoObserverSystem<E, B, M>,
 	) where
 		E: Event,
@@ -66,7 +66,7 @@ impl BevyEventRegistry {
 	/// been mounted.
 	pub fn register_onclick(
 		_key: &str,
-		loc: DomLocation,
+		loc: TreeLocation,
 		value: impl 'static + Send + Sync + Fn(Trigger<ClickEvt>),
 	) {
 		Self::register_on(_key, loc, value);

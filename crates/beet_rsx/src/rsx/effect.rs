@@ -1,7 +1,7 @@
 use crate::prelude::*;
 use anyhow::Result;
 
-pub type RegisterEffect = Box<dyn FnOnce(DomLocation) -> Result<()>>;
+pub type RegisterEffect = Box<dyn FnOnce(TreeLocation) -> Result<()>>;
 
 
 pub struct Effect {
@@ -30,7 +30,7 @@ impl Effect {
 		}
 	}
 
-	pub fn register(self, loc: DomLocation) -> Result<()> {
+	pub fn register(self, loc: TreeLocation) -> Result<()> {
 		(self.register)(loc)
 	}
 }

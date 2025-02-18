@@ -53,7 +53,7 @@ pub trait DomTargetImpl {
 	fn update_rsx_node(
 		&mut self,
 		node: RsxNode,
-		loc: DomLocation,
+		loc: TreeLocation,
 	) -> ParseResult<()>;
 
 	// TODO update attriute block, update block value

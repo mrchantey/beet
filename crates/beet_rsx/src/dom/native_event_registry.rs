@@ -15,7 +15,7 @@ impl EventRegistry {
 	#[allow(unused_variables)]
 	pub fn register_onclick(
 		key: &str,
-		loc: DomLocation,
+		loc: TreeLocation,
 		value: impl Fn(MockEvent) -> (),
 	) {
 		todo!()

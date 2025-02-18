@@ -17,15 +17,15 @@ impl RsxToResumableHtml {
 	pub fn map_node(&mut self, node: impl AsRef<RsxNode>) -> HtmlDocument {
 		let node = node.as_ref();
 		let mut html = RsxToHtml::default().map_node(node).into_document();
-		self.insert_dom_location_map(node, &mut html);
+		self.insert_tree_location_map(node, &mut html);
 		self.insert_catch_prehydrated_events(&mut html);
 		html
 	}
 
 	/// attempt to insert the rsx context map into the html body,
 	/// otherwise append it to the end of the html
-	fn insert_dom_location_map(&self, node: &RsxNode, doc: &mut HtmlDocument) {
-		let loc_map = DomLocationMap::from_node(node).to_csv();
+	fn insert_tree_location_map(&self, node: &RsxNode, doc: &mut HtmlDocument) {
+		let loc_map = TreeLocationMap::from_node(node).to_csv();
 		let el = HtmlElementNode::inline_script(loc_map, vec![HtmlAttribute {
 			key: self.html_constants.loc_map_key.to_string(),
 			value: None,

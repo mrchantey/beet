@@ -59,6 +59,7 @@ impl Default for RsxTemplateNode {
 		}
 	}
 }
+
 #[derive(Debug, Error)]
 pub enum TemplateError {
 	#[error("RsxNode has no tracker for {0}, ensure they are included in RstmlToRsx settings")]
@@ -93,6 +94,19 @@ impl TemplateError {
 }
 
 impl RsxTemplateNode {
+	/// get the rsx idx of the node
+	pub fn rsx_idx(&self) -> RsxIdx {
+		match self {
+			RsxTemplateNode::Doctype { idx } => *idx,
+			RsxTemplateNode::Comment { idx, .. } => *idx,
+			RsxTemplateNode::Text { idx, .. } => *idx,
+			RsxTemplateNode::Fragment { idx, .. } => *idx,
+			RsxTemplateNode::RustBlock { idx, .. } => *idx,
+			RsxTemplateNode::Element { idx, .. } => *idx,
+			RsxTemplateNode::Component { idx, .. } => *idx,
+		}
+	}
+
 	pub fn from_rsx_node(node: impl AsRef<RsxNode>) -> TemplateResult<Self> {
 		Self::from_rsx_node_inner(node, &mut RsxIdxIncr::default())
 	}
@@ -262,6 +276,26 @@ impl RsxTemplateNode {
 					children.into_rsx_node(template_map, rusty_map)?,
 				),
 			})),
+		}
+	}
+
+	/// A simple dfs visitor for an rsx template node
+	pub fn visit(&self, func: impl Fn(&Self)) { self.visit_inner(&func); }
+	fn visit_inner(&self, func: &impl Fn(&Self)) {
+		func(self);
+		match self {
+			RsxTemplateNode::Fragment { items, .. } => {
+				for item in items {
+					item.visit(func);
+				}
+			}
+			RsxTemplateNode::Component { slot_children, .. } => {
+				slot_children.visit(func);
+			}
+			RsxTemplateNode::Element { children, .. } => {
+				children.visit(func);
+			}
+			_ => {}
 		}
 	}
 }

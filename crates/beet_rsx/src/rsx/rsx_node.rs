@@ -63,7 +63,7 @@ impl RsxNode {
 	/// # Panics
 	/// If the register function fails
 	pub fn register_effects(&mut self) {
-		DomLocationVisitor::visit_mut(self, |loc, node| {
+		TreeLocationVisitor::visit_mut(self, |loc, node| {
 			// println!(
 			// 	"registering effect at loc: {:?}:{:?}",
 			// 	loc,

@@ -13,7 +13,7 @@ pub struct BrowserDomTarget {
 	/// sparse set element array, cached for fast reference
 	/// TODO bench this
 	elements: Vec<Option<Element>>,
-	loc_map: Option<DomLocationMap>,
+	loc_map: Option<TreeLocationMap>,
 }
 
 impl Default for BrowserDomTarget {
@@ -28,11 +28,11 @@ impl Default for BrowserDomTarget {
 }
 
 impl BrowserDomTarget {
-	fn get_dom_location_map(&mut self) -> ParseResult<&DomLocationMap> {
+	fn get_tree_location_map(&mut self) -> ParseResult<&TreeLocationMap> {
 		let query = format!("[{}]", self.constants.loc_map_key);
 		if let Some(cx) = self.document.query_selector(&query).unwrap() {
 			let inner_text = cx.text_content().unwrap();
-			self.loc_map = Some(DomLocationMap::from_csv(&inner_text)?);
+			self.loc_map = Some(TreeLocationMap::from_csv(&inner_text)?);
 			Ok(&self.loc_map.as_ref().unwrap())
 		} else {
 			Err(ParseError::serde(format!(
@@ -48,14 +48,14 @@ impl BrowserDomTarget {
 		&self,
 		el: Element,
 		rsx: RsxNode,
-		loc: DomLocation,
+		loc: TreeLocation,
 	) -> ParseResult<()> {
 		Ok(())
 	}
 
 	/// try to get cached element or find it in the dom.
 	/// When it is found it will uncollapse text nodes,
-	/// ie expand into the locations referenced by the [DomLocation]
+	/// ie expand into the locations referenced by the [TreeLocation]
 	fn get_or_find_element(&mut self, rsx_idx: RsxIdx) -> ParseResult<Element> {
 		if let Some(Some(el)) = self.elements.get(rsx_idx as usize) {
 			return Ok(el.clone());
@@ -82,7 +82,7 @@ impl BrowserDomTarget {
 		rsx_idx: RsxIdx,
 	) -> ParseResult<()> {
 		let children = el.child_nodes();
-		let loc_map = self.get_dom_location_map()?;
+		let loc_map = self.get_tree_location_map()?;
 		let Some(el_cx) = loc_map.collapsed_elements.get(&rsx_idx) else {
 			// here we assume this is because the element has no children
 			// so was not tracked
@@ -135,7 +135,7 @@ impl DomTargetImpl for BrowserDomTarget {
 	fn update_rsx_node(
 		&mut self,
 		rsx: RsxNode,
-		loc: DomLocation,
+		loc: TreeLocation,
 	) -> ParseResult<()> {
 		let parent = self.get_or_find_element(loc.parent_idx)?;
 		let child =
