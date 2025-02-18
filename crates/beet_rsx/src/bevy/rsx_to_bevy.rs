@@ -10,7 +10,6 @@ use bevy::reflect::TypeRegistry;
 /// nodes.
 #[derive(Debug, Default)]
 pub struct RsxToBevy {
-	pub rsx_idx_map: RsxIdxMap,
 	rsx_idx_incr: RsxIdxIncr,
 }
 

@@ -34,6 +34,7 @@ impl BevyRsxIdx {
 	}
 	pub fn find_mut<'a>(
 		query: &'a mut Query<EntityMut, With<BevyRsxIdx>>,
+		// TODO GlobalRsxIdx
 		loc: TreeLocation,
 	) -> Option<EntityMut<'a>> {
 		// O(n) search, if we have more than a few hundred entities

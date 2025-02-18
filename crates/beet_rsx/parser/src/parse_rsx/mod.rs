@@ -1,6 +1,8 @@
 mod rstml_rust_to_hash;
 mod rstml_to_rsx_template;
 mod rusty_tracker_builder;
+use proc_macro2::Literal;
+use quote::ToTokens;
 pub use rusty_tracker_builder::*;
 pub mod tokens_to_rstml;
 pub use self::rstml_rust_to_hash::*;
@@ -82,7 +84,19 @@ impl Default for RsxIdents {
 		}
 	}
 }
+/// A tokens version of the [beet_rsx::RsxIdxIncr] with the same rules:
+/// Next must be called before visiting every single rstml node.
+#[derive(Debug, Default)]
+pub struct TokensRsxIdxIncr(usize);
 
+impl TokensRsxIdxIncr {
+	pub fn next(&mut self) -> TokenStream {
+		let idx = self.0;
+		self.0 += 1;
+		let idx = Literal::usize_unsuffixed(idx);
+		idx.to_token_stream()
+	}
+}
 #[derive(Debug, Clone)]
 pub struct ParseRsx {
 	pub include_errors: bool,

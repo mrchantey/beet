@@ -17,20 +17,9 @@ use syn::spanned::Spanned;
 #[derive(Debug, Default)]
 pub struct RstmlToRsxTemplate {
 	rusty_tracker: RustyTrackerBuilder,
-	idx_incr: RsxIdxIncr,
+	idx_incr: TokensRsxIdxIncr,
 }
 
-#[derive(Debug, Default)]
-struct RsxIdxIncr(usize);
-
-impl RsxIdxIncr {
-	pub fn next(&mut self) -> TokenStream {
-		let idx = self.0;
-		self.0 += 1;
-		let idx = Literal::usize_unsuffixed(idx);
-		idx.to_token_stream()
-	}
-}
 
 impl RstmlToRsxTemplate {
 	/// for use with rsx_template! macro, which is usually just used for
@@ -79,8 +68,7 @@ impl RstmlToRsxTemplate {
 		&mut self,
 		nodes: Vec<Node<C>>,
 	) -> TokenStream {
-		// before visiting nodes determine if we're
-		// creating the root fragment
+		// if we're creating a fragment it needs idx before children
 		let fragment_idx = if nodes.len() == 1 {
 			TokenStream::default()
 		} else {

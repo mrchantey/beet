@@ -40,6 +40,7 @@ pub struct RstmlToRsx {
 	pub collected_elements: Vec<NodeName>,
 	pub self_closing_elements: HashSet<&'static str>,
 	pub rusty_tracker: RustyTrackerBuilder,
+	pub idx_incr: TokensRsxIdxIncr,
 }
 
 impl RstmlToRsx {
@@ -73,6 +74,13 @@ impl RstmlToRsx {
 	/// the number of actual html nodes will likely be different
 	/// due to fragments, blocks etc
 	pub fn map_nodes<C>(&mut self, nodes: Vec<Node<C>>) -> TokenStream {
+		// if we're creating a fragment it needs idx before children
+		let fragment_idx = if nodes.len() == 1 {
+			TokenStream::default()
+		} else {
+			self.idx_incr.next()
+		};
+
 		let mut nodes = nodes
 			.into_iter()
 			.map(|node| self.map_node(node))
@@ -231,7 +239,7 @@ impl RstmlToRsx {
 					}
 				} else {
 					let key = &attr.key;
-					// for components a key is treated as bool
+					// for components a key is treated as a bool 'flag'
 					quote! {#key: true}
 				}
 			}
