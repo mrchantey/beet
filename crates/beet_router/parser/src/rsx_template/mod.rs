@@ -1,7 +1,6 @@
 pub use crate::prelude::*;
 use anyhow::Result;
 use beet_rsx::prelude::*;
-use clap::Parser;
 use proc_macro2::Literal;
 use proc_macro2::TokenStream;
 use quote::quote;
@@ -12,29 +11,30 @@ use sweet::prelude::ReadFile;
 use syn::spanned::Spanned;
 use syn::visit::Visit;
 mod hash_file;
+mod template_watcher;
 pub use hash_file::*;
+pub use template_watcher::*;
 
 
-#[derive(Debug, Parser)]
+#[derive(Debug)]
 pub struct BuildRsxTemplateMap {
 	/// use [ron::ser::to_string_pretty] instead of
 	/// directly serializing the ron tokens.
-	#[arg(long)]
 	pub pretty: bool,
-	#[arg(long, default_value = "src")]
 	pub src: PathBuf,
 	// keep default in sync with StaticFileRouter
-	#[arg(long, default_value = "target/rsx-templates.ron")]
 	pub dst: PathBuf,
 }
 
-
-
-impl Default for BuildRsxTemplateMap {
-	fn default() -> Self { clap::Parser::parse_from(&[""]) }
-}
-
 impl BuildRsxTemplateMap {
+	pub fn new(src: impl Into<PathBuf>, dst: impl Into<PathBuf>) -> Self {
+		Self {
+			pretty: true,
+			src: src.into(),
+			dst: dst.into(),
+		}
+	}
+
 	pub fn build_and_write(&self) -> Result<()> {
 		let map_tokens = self.build_ron()?;
 		let mut map_str = map_tokens.to_string();

@@ -9,10 +9,9 @@ use beet_rsx::prelude::*;
 /// - macros discard whitespace but files do not
 #[tokio::main]
 async fn main() {
-	let mut builder = BuildRsxTemplateMap::default();
-	// builder.src = "crates/beet_router/src/test_site".into();
-	builder.src = "crates/beet_router/src/test_site".into();
-	builder.dst = "target/test_site/rsx-templates.ron".into();
+	let src = "crates/beet_router/src/test_site";
+	let dst = "target/test_site/rsx-templates.ron";
+	let builder = BuildRsxTemplateMap::new(src, dst);
 
 	// 1. build
 	builder.build_and_write().unwrap();

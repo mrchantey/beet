@@ -153,6 +153,11 @@ rsx = ["dep:beet_rsx"]
 ml = ["dep:beet_ml"]
 spatial = ["dep:beet_spatial"]
 sim = ["dep:beet_sim"]
+# bevy = [
+
+
+
+
 # animation = ["beet_spatial?/animation"]
 # assets = ["beet_spatial?/assets"]
 # ui = ["beet_spatial?/ui"]
@@ -171,7 +176,8 @@ beet_spatial = { workspace = true, optional = true }
 
 [dev-dependencies]
 beet = { path = "", features = ["rsx"] }
-bevy.workspace = true
+# bevy.workspace = true
+bevy = { workspace = true, default_features = true }
 sweet = { workspace = true, features = ["test", "bevy", "rand"] }
 
 
@@ -180,13 +186,13 @@ console_error_panic_hook.workspace = true
 web-sys.workspace = true
 
 [[example]]
-name = "dom_reactivity"
+name = "dom_reactive"
 required-features = ["rsx"]
-path = "examples/rsx/dom_reactivity.rs"
+path = "examples/rsx/dom_reactive.rs"
 [[example]]
-name = "bevy_reactivity"
+name = "bevy_reactive"
 required-features = ["rsx"]
-path = "examples/rsx/bevy_reactivity.rs"
+path = "examples/rsx/bevy_reactive.rs"
 
 #💡flow
 

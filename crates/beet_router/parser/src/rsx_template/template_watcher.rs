@@ -1,59 +1,48 @@
-use super::cargo_cmd::CargoCmd;
+use crate::prelude::*;
 use anyhow::Result;
-use beet_router::prelude::BuildRsxTemplateMap;
-use beet_router::prelude::CollectRoutes;
-use beet_router::prelude::HashRsxFile;
 use rapidhash::RapidHashMap as HashMap;
 use std::path::Path;
 use std::path::PathBuf;
-use std::process::Command;
 use std::time::Instant;
 use sweet::prelude::*;
 
 
 /// Watch the [CollectRoutes::src_dir] for changes, and determine if the rust code
 /// changed in a file, or if it was just the html template
-#[derive(Default)]
-pub struct RoutesBuilder {
+pub struct TemplateWatcher<Reload, Recompile> {
 	// we will be swapping out the `run` and `build` methods of this command,
 	// depending on the diff
-	cargo: CargoCmd,
-	collect_routes: CollectRoutes,
 	build_templates: BuildRsxTemplateMap,
+	reload_func: Reload,
+	recompile_func: Recompile,
 	file_cache: HashMap<PathBuf, u64>,
 }
 
-impl RoutesBuilder {
+impl<
+		Reload: FnMut() -> Result<()>,
+		Recompile: FnMut() -> Result<()>,
+	> TemplateWatcher<Reload, Recompile>
+{
 	pub fn new(
-		collect_routes: CollectRoutes,
-		mut cargo: CargoCmd,
+		build_templates: BuildRsxTemplateMap,
+		reload: Reload,
+		recompile: Recompile,
 	) -> Result<Self> {
-		cargo.cargo_cmd = "build".to_string();
-		let mut build_templates = BuildRsxTemplateMap {
-			pretty: true,
-			..Default::default()
-		};
-		build_templates.src = collect_routes.src_dir().clone();
-		let file_cache = Self::preheat_cache(collect_routes.src_dir())?;
+		let file_cache = Self::preheat_cache(&build_templates.src)?;
 		Ok(Self {
-			cargo,
 			build_templates,
-			collect_routes,
 			file_cache,
+			reload_func: reload,
+			recompile_func: recompile,
 		})
 	}
 
 	pub async fn watch(mut self) -> Result<()> {
-		// TODO recollect if routes change
-		self.collect_routes.build_and_write()?;
-
 		let watcher = FsWatcher::default()
-			.with_path(&self.collect_routes.src_dir())
+			.with_path(&self.build_templates.src)
 			.with_exclude("*.git*")
 			.with_exclude("*target*");
 		println!("{:#?}", watcher);
-
-		self.compile_and_run("Init")?;
 
 		watcher
 			.watch_async(move |ev| {
@@ -80,8 +69,11 @@ impl RoutesBuilder {
 		Ok(cache)
 	}
 
-	/// find any reason to `cargo build`, if none, just `cargo run`
+	/// OnChange will iterate over the watch events,
+	/// - if any break the file hash cache, [`Self::recompile`] will be called
+	/// - otherwise if it was a file change, [`Self::reload`] will be called
 	fn on_change(&mut self, watch_event: WatchEventVec) -> Result<()> {
+		// if no file was mutated just exit
 		if !watch_event.has_mutate() {
 			return Ok(());
 		}
@@ -111,53 +103,41 @@ impl RoutesBuilder {
 							);
 						}
 						self.file_cache.insert(ev.path.clone(), new_hash);
-						return self.compile_and_run(&ev.display());
+						return self.recompile(&ev.display());
 					} else {
-						return self.compile_and_run(&ev.display());
+						return self.recompile(&ev.display());
 					}
 				}
 				EventKind::Remove(RemoveKind::File)
 				| EventKind::Remove(RemoveKind::Folder) => {
-					return self.compile_and_run(&ev.display());
+					return self.recompile(&ev.display());
 				}
 				_ => {}
 			}
 		}
 
 		if let Some(reason) = hotreload_reason {
-			return self.run(&reason);
+			return self.reload(&reason);
 		}
 		Ok(())
 	}
 
-	fn compile_and_run(&mut self, reason: &str) -> Result<()> {
+	fn recompile(&mut self, reason: &str) -> Result<()> {
 		// terminal::clear()?;
 		println!("Watcher::Recompile: {}", reason);
 		let start = Instant::now();
-		// 🤪 disable build routes for now
-		// self.collect_routes.build_and_write()?;
-		self.cargo.spawn()?;
-		self.build_templates.build_and_write()?;
-		Command::new(self.exe_path()).status()?;
+		(self.recompile_func)()?;
 		println!("Recompiled in {:?}", start.elapsed());
 		Ok(())
 	}
 
-	fn run(&mut self, reason: &str) -> Result<()> {
-		// terminal::clear()?;
+	fn reload(&mut self, reason: &str) -> Result<()> {
 		println!("Watcher::HotReload: {}", reason);
 		let start = Instant::now();
+		// first rebuild templates
 		self.build_templates.build_and_write()?;
-		Command::new(self.exe_path()).status()?;
+		(self.reload_func)()?;
 		println!("Ran in {:?}", start.elapsed());
 		Ok(())
 	}
-
-	fn exe_path(&self) -> String {
-		let target_dir = std::env::var("CARGO_TARGET_DIR")
-			.unwrap_or_else(|_| "target".to_string());
-		format! {"{target_dir}/debug/beet_site"}
-	}
-
-	// fn recompile(&self,
 }
