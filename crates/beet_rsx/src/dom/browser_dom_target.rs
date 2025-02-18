@@ -75,7 +75,7 @@ impl BrowserDomTarget {
 		}
 	}
 
-	/// use the [RsxLocationMap] to uncollapse text nodes
+	/// use the [TreeLocationMap] to uncollapse text nodes
 	fn uncollapse_child_text_nodes(
 		&mut self,
 		el: &Element,

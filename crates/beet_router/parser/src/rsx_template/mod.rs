@@ -60,11 +60,11 @@ impl BuildRsxTemplateMap {
 			.collect::<Result<Vec<_>>>()?
 			.into_iter()
 			.flatten()
-			.map(|(RsxLocation { file, line, col }, tokens)| {
+			.map(|(RsxMacroLocation { file, line, col }, tokens)| {
 				let line = Literal::usize_unsuffixed(line);
 				let col = Literal::usize_unsuffixed(col);
 				quote! {
-					RsxLocation(
+					RsxMacroLocation(
 						file: #file,
 						line: #line,
 						col: #col
@@ -82,7 +82,7 @@ impl BuildRsxTemplateMap {
 	fn file_templates(
 		&self,
 		path: PathBuf,
-	) -> Result<Vec<(RsxLocation, TokenStream)>> {
+	) -> Result<Vec<(RsxMacroLocation, TokenStream)>> {
 		let file = ReadFile::to_string(&path)?;
 		let file = syn::parse_file(&file)?;
 		let mac = syn::parse_quote!(rsx);
@@ -96,7 +96,7 @@ impl BuildRsxTemplateMap {
 #[derive(Debug)]
 struct RsxSynVisitor {
 	file: String,
-	templates: Vec<(RsxLocation, TokenStream)>,
+	templates: Vec<(RsxMacroLocation, TokenStream)>,
 	mac: syn::Ident,
 }
 impl RsxSynVisitor {
@@ -122,7 +122,8 @@ impl<'a> Visit<'a> for RsxSynVisitor {
 			// the rsx! macro
 			let span = mac.tokens.span();
 			let start = span.start();
-			let loc = RsxLocation::new(&self.file, start.line, start.column);
+			let loc =
+				RsxMacroLocation::new(&self.file, start.line, start.column);
 			let tokens = RstmlToRsxTemplate::default()
 				.map_tokens(mac.tokens.clone(), &self.file);
 			self.templates.push((loc, tokens));

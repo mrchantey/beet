@@ -65,7 +65,7 @@ impl RstmlToRsxTemplate {
 		quote! {
 			RsxTemplateRoot (
 				node: #node,
-				location: RsxLocation(
+				location: RsxMacroLocation(
 					file: #file,
 					line: #line,
 					col: #col

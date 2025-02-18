@@ -3,7 +3,7 @@ use crate::prelude::*;
 
 
 
-pub struct RsxRootMap(pub HashMap<RsxLocation, RsxRoot>);
+pub struct RsxRootMap(pub HashMap<RsxMacroLocation, RsxRoot>);
 
 
 

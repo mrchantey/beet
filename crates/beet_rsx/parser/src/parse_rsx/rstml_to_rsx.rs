@@ -15,14 +15,14 @@ use syn::spanned::Spanned;
 
 /// given a span, for example the inner block
 /// of an rsx! or rsx_template! macro,
-/// return a RsxLocation token stream
-pub fn rsx_location_tokens(tokens: impl Spanned) -> TokenStream {
+/// return a [RsxMacroLocation] token stream
+pub fn macro_location_tokens(tokens: impl Spanned) -> TokenStream {
 	let span = tokens.span();
 	let line = span.start().line;
 	let col = span.start().column;
 	quote! {
 		{
-			RsxLocation::new(std::file!(), #line, #col)
+			RsxMacroLocation::new(std::file!(), #line, #col)
 		}
 	}
 }
@@ -54,7 +54,7 @@ impl RstmlToRsx {
 		let (nodes, rstml_errors) = tokens_to_rstml(tokens.clone());
 		let node = self.map_nodes(nodes);
 
-		let location = rsx_location_tokens(tokens);
+		let location = macro_location_tokens(tokens);
 		let rstml_to_rsx_errors = &self.errors;
 		quote! {
 			{

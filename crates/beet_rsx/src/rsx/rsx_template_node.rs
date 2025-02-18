@@ -38,7 +38,7 @@ pub enum RsxTemplateNode {
 	},
 	/// We dont know much about components, for example when parsing
 	/// a file we just get the name.
-	/// The [RsxLocation] etc is is tracked by the [RustyPart::Component::root]
+	/// The [RsxMacroLocation] etc is is tracked by the [RustyPart::Component::root]
 	Component {
 		idx: RsxIdx,
 		/// the hydrated part has the juicy details
@@ -65,7 +65,7 @@ pub enum TemplateError {
 	#[error("RsxNode has no tracker for {0}, ensure they are included in RstmlToRsx settings")]
 	DehydrationFailed(String),
 	#[error("No template found for {0:?}")]
-	NoTemplate(RsxLocation),
+	NoTemplate(RsxMacroLocation),
 	#[error("Rusty Map is missing a tracker for {cx}\nExpected: {expected:#?}\nReceived: {received:#?}")]
 	NoRustyMap {
 		cx: String,

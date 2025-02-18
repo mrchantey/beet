@@ -12,7 +12,7 @@ pub struct RsxRoot {
 	/// the root node
 	pub node: RsxNode,
 	/// unique location with file, line, col
-	pub location: RsxLocation,
+	pub location: RsxMacroLocation,
 }
 
 impl RsxRoot {

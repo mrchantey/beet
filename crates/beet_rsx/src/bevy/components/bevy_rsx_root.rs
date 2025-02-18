@@ -7,8 +7,8 @@ use bevy::prelude::*;
 /// Added to each entity at the root of an rsx tree,
 /// there may be serveral, ie if the root was a fragment.
 #[derive(Debug, Default, PartialEq, Component, Deref)]
-pub struct BevyRsxRoot(RsxLocation);
+pub struct BevyRsxRoot(RsxMacroLocation);
 
 impl BevyRsxRoot {
-	pub fn new(location: RsxLocation) -> Self { Self(location) }
+	pub fn new(location: RsxMacroLocation) -> Self { Self(location) }
 }

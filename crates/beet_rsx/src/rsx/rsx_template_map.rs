@@ -16,7 +16,7 @@ use anyhow::Result;
 /// we need the entire [RsxTemplateMap] to resolve components.
 #[derive(Debug, Clone, PartialEq, Eq, Deref, DerefMut)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct RsxTemplateMap(pub HashMap<RsxLocation, RsxTemplateRoot>);
+pub struct RsxTemplateMap(pub HashMap<RsxMacroLocation, RsxTemplateRoot>);
 
 
 impl RsxTemplateMap {
