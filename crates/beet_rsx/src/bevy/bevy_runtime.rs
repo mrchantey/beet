@@ -101,7 +101,7 @@ impl BevyRuntime {
 #[cfg(test)]
 mod test {
 	use super::BevyRuntime;
-	use crate::prelude::*;
+	use crate::as_beet::*;
 	// use bevy::ecs::reflect::AppTypeRegistry;
 	use bevy::prelude::*;
 	use sweet::prelude::*;
@@ -135,7 +135,7 @@ mod test {
 	fn block_node() {
 		let (get, set) = BevySignal::signal(1);
 
-		let node = rsx! {<entity runtime:bevy>{get}</entity>};
+		let node = rsx! { <entity runtime:bevy>{get}</entity> };
 		RsxToBevy::spawn(node).unwrap();
 		set(3);
 
@@ -155,7 +155,7 @@ mod test {
 		});
 
 		let (get, set) = BevySignal::signal(Vec3::new(0., 1., 2.));
-		let rsx = rsx! {<entity runtime:bevy Transform.translation={get}/>};
+		let rsx = rsx! { <entity runtime:bevy Transform.translation=get /> };
 		RsxToBevy::spawn(rsx).unwrap();
 		set(Vec3::new(3., 4., 5.));
 

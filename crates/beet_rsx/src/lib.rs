@@ -1,8 +1,6 @@
 #![cfg_attr(test, feature(test, custom_test_frameworks))]
 #![cfg_attr(test, test_runner(sweet::test_runner))]
-
-#![cfg_attr(feature = "bevy", feature(unboxed_closures,fn_traits))]
-
+#![cfg_attr(feature = "bevy", feature(unboxed_closures, fn_traits))]
 // #![deny(missing_docs)]
 //!
 //! All about rsx trees, html, hydrating patterns, signals.
@@ -10,9 +8,9 @@
 //! lightweight and intended to run on constrained devices like the ESP32
 //!
 //!
+pub mod dom;
 pub mod error;
 pub mod html;
-pub mod dom;
 pub mod rsx;
 pub mod sigfault;
 pub mod string_rsx;
@@ -45,8 +43,8 @@ pub mod prelude {
 	pub type HashMap<K,V> = rapidhash::RapidHashMap<K,V>;
 	pub type HashSet<K> = rapidhash::RapidHashSet<K>;
 
-	#[cfg(test)]
-	pub use crate::as_beet::*;
+	// #[cfg(test)]
+	// pub use crate::as_beet::*;
 }
 
 // rsx macros expect 'beet'

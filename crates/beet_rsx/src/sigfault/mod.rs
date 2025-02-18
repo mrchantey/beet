@@ -115,7 +115,7 @@ impl<T: FnOnce() -> U, U: IntoSigfaultAttrVal<M2>, M2>
 #[cfg(test)]
 mod test {
 	use super::signal;
-	use crate::prelude::*;
+	use crate::as_beet::*;
 	use sweet::prelude::*;
 
 	#[test]

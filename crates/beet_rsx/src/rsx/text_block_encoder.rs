@@ -216,7 +216,8 @@ impl TextBlockPosition {
 
 #[cfg(test)]
 mod test {
-	use super::*;
+	use super::CollapsedNode;
+	use crate::as_beet::*;
 	use sweet::prelude::*;
 
 	struct Adjective;

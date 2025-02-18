@@ -156,7 +156,7 @@ impl RsxVisitorMut for RustyPartVisitor {
 
 #[cfg(test)]
 mod test {
-	use crate::prelude::*;
+	use crate::as_beet::*;
 	use sweet::prelude::*;
 
 	#[test]

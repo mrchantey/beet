@@ -11,8 +11,8 @@ fn main() {
 		// .add_systems(Startup, setup);
 	});
 	let scene = rsx! {
-		<Counter initial=7/>
-		<cam Camera2d/>
+		<Counter initial=7 />
+		<cam Camera2d />
 	};
 	let _entity = RsxToBevy::spawn(scene).unwrap()[0];
 	BevyRuntime::with(|app| {
@@ -33,12 +33,17 @@ impl Component for Counter {
 		let (get, set) = BevySignal::signal(self.initial);
 		let get2 = get.clone();
 		rsx! {
-			<entity runtime:bevy Button onclick=move |_|{
-				let val = get2.clone().get();
-				println!("clicked: {}", val);
-				set(val + 1);
-			}>
-				"The value is "{get}
+			<entity
+				runtime:bevy
+				Button
+				onclick=move |_| {
+					let val = get2.clone().get();
+					println!("clicked: {}", val);
+					set(val + 1);
+				}
+			>
+				"The value is "
+				{get}
 			</entity>
 		}
 	}

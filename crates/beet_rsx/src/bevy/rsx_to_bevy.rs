@@ -154,7 +154,7 @@ impl RsxToBevy {
 
 #[cfg(test)]
 mod test {
-	use crate::prelude::*;
+	use crate::as_beet::*;
 	use bevy::prelude::*;
 	use sweet::prelude::*;
 
@@ -164,7 +164,7 @@ mod test {
 		app.init_resource::<AppTypeRegistry>()
 			.register_type::<Transform>();
 
-		let node = rsx! {<entity Transform/>};
+		let node = rsx! { <entity Transform /> };
 		let entity = RsxToBevy::default()
 			.spawn_node(app.world_mut(), node)
 			.unwrap()[0];
@@ -179,7 +179,7 @@ mod test {
 		app.init_resource::<AppTypeRegistry>()
 			.register_type::<Transform>();
 
-		let node = rsx! {<entity Transform.translation="(0.,1.,2.)"/>};
+		let node = rsx! { <entity Transform.translation="(0.,1.,2.)" /> };
 		let entity = RsxToBevy::default()
 			.spawn_node(app.world_mut(), node)
 			.unwrap()[0];
@@ -206,7 +206,7 @@ mod test {
 			.register_type::<Vec3>()
 			.register_type::<Transform>();
 
-		let node = rsx! {<entity runtime:bevy Transform.translation={val}/>};
+		let node = rsx! { <entity runtime:bevy Transform.translation=val /> };
 		let entity = RsxToBevy::default()
 			.spawn_node(app.world_mut(), node)
 			.unwrap()[0];

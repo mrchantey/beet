@@ -63,7 +63,7 @@ leptosfmt *args:
 run-reactive:
 	cp ./index.html ./target/index.html
 	sweet serve ./target | \
-	just watch 'just build-wasm beet dom_renderer'
+	just watch 'just build-wasm beet dom_reactivity'
 
 run-test-site:
 	cargo run -p beet_router --example collect_routes

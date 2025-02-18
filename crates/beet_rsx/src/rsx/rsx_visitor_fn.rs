@@ -105,7 +105,7 @@ impl_visitor_mut!(VisitRsxComponentMut, RsxComponent, visit_component);
 
 #[cfg(test)]
 mod test {
-	use crate::prelude::*;
+	use crate::as_beet::*;
 	use sweet::prelude::*;
 
 	#[test]

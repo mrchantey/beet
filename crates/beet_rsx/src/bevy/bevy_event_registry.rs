@@ -52,8 +52,7 @@ impl BevyEventRegistry {
 		B: Bundle,
 	{
 		BevyRuntime::with(move |app| {
-			let mut query =
-				app.world_mut().query::<(Entity, &BevyRsxIdx)>();
+			let mut query = app.world_mut().query::<(Entity, &BevyRsxIdx)>();
 			let entity = BevyRsxIdx::find(query.iter(app.world()), loc)
 				.expect(&expect_rsx_element::to_be_at_location(&loc));
 
@@ -77,7 +76,7 @@ impl BevyEventRegistry {
 
 #[cfg(test)]
 mod test {
-	use crate::prelude::*;
+	use crate::as_beet::*;
 	use bevy::prelude::*;
 	use sweet::prelude::*;
 
@@ -109,8 +108,14 @@ mod test {
 		let bucket = mock_bucket();
 		let bucket2 = bucket.clone();
 
-		let rsx =
-			rsx! {<entity runtime:bevy onclick=move |_|{bucket2.call(());}/>};
+		let rsx = rsx! {
+			<entity
+				runtime:bevy
+				onclick=move |_| {
+					bucket2.call(());
+				}
+			/>
+		};
 		let entity = RsxToBevy::spawn(rsx).unwrap()[0];
 
 		BevyRuntime::with(|app| {

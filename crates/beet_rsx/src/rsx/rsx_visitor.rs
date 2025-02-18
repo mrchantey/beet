@@ -237,8 +237,7 @@ pub trait RsxVisitorMut {
 
 #[cfg(test)]
 mod test {
-	use super::RsxVisitor;
-	use crate::prelude::*;
+	use crate::as_beet::*;
 	use sweet::prelude::*;
 
 

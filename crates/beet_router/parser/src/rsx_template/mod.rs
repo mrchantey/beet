@@ -80,7 +80,7 @@ impl BuildRsxTemplateMap {
 		let file = ReadFile::to_string(&path)?;
 		let file = syn::parse_file(&file)?;
 		let mac = syn::parse_quote!(rsx);
-		let mut visitor = RsxVisitor::new(path.to_string_lossy(), mac);
+		let mut visitor = RsxSynVisitor::new(path.to_string_lossy(), mac);
 
 		visitor.visit_file(&file);
 		Ok(visitor.templates)
@@ -88,12 +88,12 @@ impl BuildRsxTemplateMap {
 }
 
 #[derive(Debug)]
-struct RsxVisitor {
+struct RsxSynVisitor {
 	file: String,
 	templates: Vec<(RsxLocation, TokenStream)>,
 	mac: syn::Ident,
 }
-impl RsxVisitor {
+impl RsxSynVisitor {
 	pub fn new(file: impl Into<String>, mac: syn::Ident) -> Self {
 		Self {
 			file: file.into(),
@@ -104,7 +104,7 @@ impl RsxVisitor {
 }
 
 
-impl<'a> Visit<'a> for RsxVisitor {
+impl<'a> Visit<'a> for RsxSynVisitor {
 	fn visit_macro(&mut self, mac: &syn::Macro) {
 		if mac
 			.path

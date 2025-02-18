@@ -44,6 +44,9 @@ impl RoutesBuilder {
 	}
 
 	pub async fn watch(mut self) -> Result<()> {
+		// TODO recollect if routes change
+		self.collect_routes.build_and_write()?;
+
 		let watcher = FsWatcher::default()
 			.with_path(&self.collect_routes.src_dir())
 			.with_exclude("*.git*")

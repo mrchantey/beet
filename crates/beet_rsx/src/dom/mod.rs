@@ -7,12 +7,12 @@ mod dom_mounter;
 pub use dom_event_registry::EventRegistry;
 #[cfg(target_arch = "wasm32")]
 pub use dom_mounter::*;
-mod rs_dom_target;
 #[cfg(not(target_arch = "wasm32"))]
 mod native_event_registry;
-pub use rs_dom_target::*;
+mod rs_dom_target;
 #[cfg(not(target_arch = "wasm32"))]
 pub use native_event_registry::EventRegistry;
+pub use rs_dom_target::*;
 use std::cell::RefCell;
 
 

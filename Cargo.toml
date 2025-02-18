@@ -180,9 +180,13 @@ console_error_panic_hook.workspace = true
 web-sys.workspace = true
 
 [[example]]
-name = "dom_renderer"
+name = "dom_reactivity"
 required-features = ["rsx"]
-path = "examples/rsx/dom_renderer.rs"
+path = "examples/rsx/dom_reactivity.rs"
+[[example]]
+name = "bevy_reactivity"
+required-features = ["rsx"]
+path = "examples/rsx/bevy_reactivity.rs"
 
 #💡flow
 
