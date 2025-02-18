@@ -17,8 +17,20 @@ use syn::spanned::Spanned;
 #[derive(Debug, Default)]
 pub struct RstmlToRsxTemplate {
 	rusty_tracker: RustyTrackerBuilder,
+	idx_incr: RsxIdxIncr,
 }
 
+#[derive(Debug, Default)]
+struct RsxIdxIncr(usize);
+
+impl RsxIdxIncr {
+	pub fn next(&mut self) -> TokenStream {
+		let idx = self.0;
+		self.0 += 1;
+		let idx = Literal::usize_unsuffixed(idx);
+		idx.to_token_stream()
+	}
+}
 
 impl RstmlToRsxTemplate {
 	/// for use with rsx_template! macro, which is usually just used for
@@ -28,6 +40,7 @@ impl RstmlToRsxTemplate {
 			.map_tokens(tokens, "unknown")
 			.to_string()
 			.to_token_stream();
+		// println!("generated ron:\n{}", str_tokens);
 		quote! {
 			{
 				let mut root = RsxTemplateRoot::from_ron(#str_tokens).unwrap();
@@ -66,6 +79,14 @@ impl RstmlToRsxTemplate {
 		&mut self,
 		nodes: Vec<Node<C>>,
 	) -> TokenStream {
+		// before visiting nodes determine if we're
+		// creating the root fragment
+		let fragment_idx = if nodes.len() == 1 {
+			TokenStream::default()
+		} else {
+			self.idx_incr.next()
+		};
+
 		let mut nodes = nodes
 			.into_iter()
 			.map(|node| self.map_node(node))
@@ -73,36 +94,55 @@ impl RstmlToRsxTemplate {
 		if nodes.len() == 1 {
 			nodes.pop().unwrap().to_token_stream()
 		} else {
-			quote! {Fragment([#(#nodes),*])}
+			quote! { Fragment (
+				idx: #fragment_idx,
+				items: [#(#nodes),*]
+			)}
 		}
 	}
 
 	/// returns an RsxTemplateNode
 	pub fn map_node<C: CustomNode>(&mut self, node: Node<C>) -> TokenStream {
+		let idx = self.idx_incr.next();
 		match node {
-			Node::Doctype(_) => quote! {Doctype},
+			Node::Doctype(_) => quote! { Doctype (
+				idx: #idx
+			)},
 			Node::Comment(NodeComment { value, .. }) => {
-				quote! {Comment(#value)}
+				quote! { Comment (
+					idx: #idx,
+					value: #value
+				)}
+			}
+			Node::Text(NodeText { value }) => {
+				quote! { Text (
+					idx: #idx,
+					value: #value
+				)}
+			}
+			Node::RawText(raw) => {
+				let value = raw.to_string_best();
+				quote! { Text (
+					idx: #idx,
+					value: #value
+				)}
 			}
 			Node::Fragment(node_fragment) => {
 				let children = node_fragment
 					.children
 					.into_iter()
 					.map(|n| self.map_node(n));
-				quote! {
-					Fragment([#(#children),*])
-				}
+				quote! { Fragment (
+					idx: #idx,
+					items:[#(#children),*]
+				)}
 			}
 			Node::Block(block) => {
 				let tracker = self.rusty_tracker.next_tracker_ron(&block);
-				quote! {RustBlock(#tracker)}
-			}
-			Node::Text(NodeText { value }) => {
-				quote! {Text(#value)}
-			}
-			Node::RawText(raw) => {
-				let val = raw.to_string_best();
-				quote! {Text(#val)}
+				quote! { RustBlock (
+					idx: #idx,
+					tracker:#tracker
+				)}
 			}
 			Node::Element(NodeElement {
 				open_tag,
@@ -112,7 +152,7 @@ impl RstmlToRsxTemplate {
 				let tag = open_tag.name.to_string();
 				let self_closing = close_tag.is_none();
 				if tag.starts_with(|c: char| c.is_uppercase()) {
-					self.map_component(tag, open_tag, children)
+					self.map_component(idx, tag, open_tag, children)
 				} else {
 					let attributes = open_tag
 						.attributes
@@ -120,14 +160,13 @@ impl RstmlToRsxTemplate {
 						.map(|a| self.map_attribute(a))
 						.collect::<Vec<_>>();
 					let children = self.map_nodes(children);
-					quote! {
-							Element (
-								tag: #tag,
-								self_closing: #self_closing,
-								attributes: [#(#attributes),*],
-								children: #children
-							)
-					}
+					quote! { Element (
+						idx: #idx,
+						tag: #tag,
+						self_closing: #self_closing,
+						attributes: [#(#attributes),*],
+						children: #children
+					)}
 				}
 			}
 			Node::Custom(_) => unimplemented!(),
@@ -138,7 +177,7 @@ impl RstmlToRsxTemplate {
 		match attr {
 			NodeAttribute::Block(block) => {
 				let tracker = self.rusty_tracker.next_tracker_ron(&block);
-				quote! {Block(#tracker)}
+				quote! { Block (#tracker)}
 			}
 			NodeAttribute::Attribute(attr) => {
 				let key = attr.key.to_string();
@@ -148,24 +187,20 @@ impl RstmlToRsxTemplate {
 					}
 					Some(syn::Expr::Lit(expr_lit)) => {
 						let value = lit_to_string(&expr_lit.lit);
-						quote! {
-								KeyValue (
-								key: #key,
-								value: #value
-								)
-						}
+						quote! { KeyValue (
+						key: #key,
+						value: #value
+						)}
 					}
 					Some(value) => {
 						let tracker =
 							self.rusty_tracker.next_tracker_ron(&value);
 						// we dont need to handle events for serialization,
 						// thats an rstml_to_rsx concern so having the tracker is enough
-						quote! {
-							BlockValue (
-								key: #key,
-								tracker: #tracker
-							)
-						}
+						quote! { BlockValue (
+							key: #key,
+							tracker: #tracker
+						)}
 					}
 				}
 			}
@@ -173,6 +208,7 @@ impl RstmlToRsxTemplate {
 	}
 	fn map_component<C: CustomNode>(
 		&mut self,
+		idx: TokenStream,
 		tag: String,
 		open_tag: OpenTag,
 		children: Vec<Node<C>>,
@@ -182,13 +218,12 @@ impl RstmlToRsxTemplate {
 		// we rely on the hydrated node to provide the attributes and children
 		let slot_children = self.map_nodes(children);
 
-		quote! {
-			Component (
-				tracker: #tracker,
-				tag: #tag,
-				slot_children: #slot_children,
-			)
-		}
+		quote! { Component (
+			idx: #idx,
+			tracker: #tracker,
+			tag: #tag,
+			slot_children: #slot_children
+		)}
 	}
 }
 pub fn lit_to_string(lit: &syn::Lit) -> String {

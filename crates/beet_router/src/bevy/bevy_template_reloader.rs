@@ -30,16 +30,16 @@ impl Plugin for BevyTemplateReloader {
 			Ok(())
 		};
 		let builder = BuildRsxTemplateMap::new(&src);
-		app.insert_resource(TemplateReload {
-			recv,
-			dst: builder.dst.clone(),
-		});
+		let dst = builder.dst.clone();
 
 		let _handle = tokio::spawn(async move {
 			TemplateWatcher::new(builder, reload, recompile)?
 				.watch()
 				.await
 		});
+
+		app.insert_resource(TemplateReload { recv, dst })
+			.add_systems(Update, handle_recv);
 	}
 }
 
@@ -58,21 +58,22 @@ struct TemplateReload {
 }
 
 
-impl TemplateReload {
-	pub fn reload(&self) {
-		let mut template_map = RsxTemplateMap::load(&self.dst).unwrap();
-	}
-}
 
-
+#[allow(unused)]
 fn handle_recv(
 	template_reload: Res<TemplateReload>,
 	mut commands: Commands,
 	mut app_exit: EventWriter<AppExit>,
+	// roots: Query<&RsxRoot>,
 ) {
 	while let Ok(recv) = template_reload.recv.try_recv() {
 		match recv {
-			TemplateReloaderMessage::Reload => template_reload.reload(),
+			TemplateReloaderMessage::Reload => {
+				let map = RsxTemplateMap::load(&template_reload.dst).unwrap();
+				for (loc, root) in map.iter() {
+					todo!()
+				}
+			}
 			TemplateReloaderMessage::Recompile => {
 				println!("recompilation required, exiting..");
 				app_exit.send(AppExit::Success);
