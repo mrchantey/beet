@@ -1,5 +1,6 @@
 mod effect;
 mod rsx_diff;
+mod rsx_idx_incr;
 mod rsx_location;
 mod rsx_root_map;
 mod rsx_template_map;
@@ -9,6 +10,7 @@ mod rsx_visitor_fn;
 mod rusty_part;
 #[cfg(feature = "css")]
 mod scoped_style;
+pub use rsx_idx_incr::*;
 pub use rsx_root_map::*;
 pub use rsx_template_map::*;
 pub use rsx_template_node::*;
@@ -27,6 +29,14 @@ mod text_block_encoder;
 pub use effect::*;
 pub use rsx_location::*;
 pub use rsx_root::*;
+
+
+/// Unique identifier for every node in an rsx tree,
+/// and assigned to html elements that need it.
+/// The value is incremented every time an rsx node is encountered
+/// in a dfs pattern like [RsxVisitor].
+pub type RsxIdx = u32;
+
 
 pub trait Rsx {
 	fn into_rsx(self) -> RsxNode;

@@ -17,15 +17,28 @@ pub struct RsxToBevy {
 
 impl RsxToBevy {
 	/// Registers effects and spawns the node
-	pub fn spawn(node: impl Rsx) -> Result<Vec<Entity>> {
-		let mut rsx = node.into_rsx();
+	pub fn spawn(mut root: RsxRoot) -> Result<Vec<Entity>> {
 		let entities = BevyRuntime::with(|app| {
-			Self::default().spawn_node(app.world_mut(), &rsx)
-		});
-		rsx.register_effects();
-		entities
+			Self::default().spawn_root(app.world_mut(), &root)
+		})?;
+		root.register_effects();
+		Ok(entities)
 	}
 
+	pub fn spawn_root(
+		&mut self,
+		world: &mut World,
+		root: &RsxRoot,
+	) -> Result<Vec<Entity>> {
+		let entities = self.spawn_node(world, &root.node)?;
+		for entity in entities.iter() {
+			world
+				.entity_mut(*entity)
+				.insert(BevyRsxRoot::new(root.location.clone()));
+		}
+
+		Ok(entities)
+	}
 	pub fn spawn_node(
 		&mut self,
 		world: &mut World,
@@ -164,14 +177,16 @@ mod test {
 		app.init_resource::<AppTypeRegistry>()
 			.register_type::<Transform>();
 
-		let node = rsx! { <entity Transform /> };
+		let root = rsx! { <entity Transform /> };
 		let entity = RsxToBevy::default()
-			.spawn_node(app.world_mut(), node)
+			.spawn_root(app.world_mut(), &root)
 			.unwrap()[0];
 
 
 		expect(app.world_mut().entity(entity).get::<Transform>())
 			.to_be(Some(&Transform::default()));
+		expect(app.world_mut().entity(entity).get::<BevyRsxRoot>())
+			.to_be(Some(&BevyRsxRoot::new(root.location)));
 	}
 	#[test]
 	fn attribute_key_value() {

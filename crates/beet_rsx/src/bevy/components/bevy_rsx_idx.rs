@@ -1,8 +1,7 @@
-use crate::html::DomLocation;
-use crate::html::RsxIdx;
+use crate::prelude::*;
 use bevy::ecs::query::QueryIter;
+use bevy::prelude::Deref;
 use bevy::prelude::*;
-
 
 /// Represents an element in the rsx tree. This may be changed
 /// in the future for the tag to be its own component.
@@ -12,6 +11,8 @@ pub struct BevyRsxElement {
 	/// The element tag, ie <div>
 	pub tag: String,
 }
+
+
 /// Represents an element in the rsx tree. This may be changed
 /// in the future for the tag to be its own component.
 #[derive(Debug, Default, Component, Reflect, Deref)]

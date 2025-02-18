@@ -4,9 +4,6 @@ use thiserror::Error;
 
 /// Serializable version of an rsx node that can be rehydrated.
 ///
-/// This has absolute symmetry with [RsxNode] but with each rusty bit
-/// replaced by [RustyTracker].
-///
 /// An [RsxTemplateNode] is conceptually similar to a html template
 /// but instead of {{PLACEHOLDER}} there is a hash for a known
 /// location of the associated rust code.
@@ -212,44 +209,6 @@ impl RsxTemplateNode {
 					children.into_rsx_node(template_map, rusty_map)?,
 				),
 			})),
-		}
-	}
-
-	/// allow two templates to be compared without considering line and column
-	#[cfg(test)]
-	#[deprecated = "from linecol locations"]
-	pub fn clear_rusty_trackers(&mut self) {
-		match self {
-			RsxTemplateNode::Component { tracker, .. } => {
-				tracker.clear();
-			}
-			RsxTemplateNode::Fragment(children) => {
-				for child in children {
-					child.clear_rusty_trackers();
-				}
-			}
-			RsxTemplateNode::RustBlock(tracker) => {
-				tracker.clear();
-			}
-			RsxTemplateNode::Element {
-				attributes,
-				children,
-				..
-			} => {
-				for attr in attributes {
-					if let RsxTemplateAttribute::BlockValue {
-						tracker, ..
-					} = attr
-					{
-						tracker.clear();
-					}
-					if let RsxTemplateAttribute::Block(tracker) = attr {
-						tracker.clear();
-					}
-				}
-				children.clear_rusty_trackers();
-			}
-			_ => {}
 		}
 	}
 }

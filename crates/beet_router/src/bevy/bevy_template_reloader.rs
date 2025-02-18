@@ -1,36 +1,14 @@
 use crate::prelude::*;
-use beet_rsx::rsx::RsxTemplateMap;
+use beet_rsx::prelude::*;
 use bevy::prelude::*;
 use flume::Receiver;
 use std::path::PathBuf;
-
 
 #[derive(Default)]
 pub struct BevyTemplateReloader {
 	/// The source directory to watch, defaults to cwd.
 	src: Option<PathBuf>,
 }
-
-#[derive(Debug, Copy, Clone)]
-enum TemplateReloaderMessage {
-	Reload,
-	Recompile,
-}
-
-#[derive(Resource)]
-struct TemplateReload {
-	pub recv: Receiver<TemplateReloaderMessage>,
-	/// Location of the rsx-templates.ron file
-	pub dst: PathBuf,
-}
-
-
-impl TemplateReload {
-	pub fn reload(&self) {
-		let mut template_map = RsxTemplateMap::load(&self.dst).unwrap();
-	}
-}
-
 
 impl Plugin for BevyTemplateReloader {
 	fn build(&self, app: &mut App) {
@@ -62,6 +40,27 @@ impl Plugin for BevyTemplateReloader {
 				.watch()
 				.await
 		});
+	}
+}
+
+
+#[derive(Debug, Copy, Clone)]
+enum TemplateReloaderMessage {
+	Reload,
+	Recompile,
+}
+
+#[derive(Resource)]
+struct TemplateReload {
+	pub recv: Receiver<TemplateReloaderMessage>,
+	/// Location of the rsx-templates.ron file
+	pub dst: PathBuf,
+}
+
+
+impl TemplateReload {
+	pub fn reload(&self) {
+		let mut template_map = RsxTemplateMap::load(&self.dst).unwrap();
 	}
 }
 

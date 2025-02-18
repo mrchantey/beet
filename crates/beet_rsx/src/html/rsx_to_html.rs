@@ -10,11 +10,7 @@ pub struct RsxToHtml {
 	pub no_beet_attributes: bool,
 	/// text node content will be trimmed
 	pub trim: bool,
-
-	/// 1 based incrementer, be sure to subtract 1
-	/// to get the actual id.
-	/// This is very error prone because we're trying to recreate the [DomLocation]
-	/// visitor pattern in a mapper.
+	/// Incrementer to get the Rsx id
 	rsx_idx_incr: RsxIdxIncr,
 }
 
@@ -34,7 +30,7 @@ impl RsxToHtml {
 	}
 
 	/// recursively map rsx nodes to html nodes
-	/// # Panics
+	/// ## Panics
 	/// If slot children have not been applied
 	pub fn map_node(&mut self, node: impl AsRef<RsxNode>) -> Vec<HtmlNode> {
 		let idx = self.rsx_idx_incr.next();
