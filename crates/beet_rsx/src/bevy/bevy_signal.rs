@@ -1,10 +1,45 @@
 use crate::prelude::*;
 use bevy::prelude::*;
 use bevy::reflect::Reflectable;
+use flume::Receiver;
+use flume::Sender;
 
 pub trait SignalPayload: 'static + Send + Sync + Clone + Reflectable {}
 impl<T: 'static + Send + Sync + Clone + Reflectable> SignalPayload for T {}
 
+/// Simple channels mechanism for sending signals to entities.
+#[derive(Clone, Resource)]
+pub struct SignalChannel<T> {
+	pub send: Sender<(Entity, T)>,
+	pub recv: Receiver<(Entity, T)>,
+}
+impl<T> Default for SignalChannel<T> {
+	fn default() -> Self {
+		let (send, recv) = flume::unbounded();
+		Self { send, recv }
+	}
+}
+
+impl<T: SignalPayload> SignalChannel<T> {
+	pub fn get_or_init(app: &mut App) -> Sender<(Entity, T)> {
+		if let Some(channel) = app.world().get_resource::<SignalChannel<T>>() {
+			channel.send.clone()
+		} else {
+			let channel = SignalChannel::default();
+			let send = channel.send.clone();
+			app.insert_resource(channel);
+			app.add_systems(
+				Update,
+				|res: Res<SignalChannel<T>>, mut commands: Commands| {
+					while let Ok((entity, value)) = res.recv.try_recv() {
+						commands.entity(entity).trigger(BevySignal::new(value));
+					}
+				},
+			);
+			send
+		}
+	}
+}
 
 
 /// An example implementation of bevy signals. The machinery is quite straightforward,
@@ -17,18 +52,17 @@ pub struct BevySignal<T> {
 }
 
 impl<T: SignalPayload> BevySignal<T> {
+	pub fn new(value: T) -> Self { Self { value } }
+
 	pub fn signal(initial: T) -> (SignalGetter<T>, impl Fn(T) -> ()) {
+		let initial2 = initial.clone();
 		let entity = BevyRuntime::with(move |app| {
 			// app.init_resource::<AppTypeRegistry>();
 			app.register_type::<T>();
 
-			let sig = BevySignal {
-				value: initial.clone(),
-			};
-
 			let entity = app
 				.world_mut()
-				.spawn(sig)
+				.spawn(BevySignal::new(initial2))
 				.observe(
 					|ev: Trigger<BevySignal<T>>,
 					 mut commands: Commands,
@@ -47,57 +81,65 @@ impl<T: SignalPayload> BevySignal<T> {
 		});
 
 
+		// we need two channels. one to update bevy, and one to update the getter directly
+		let send_to_bevy =
+			BevyRuntime::with(|app| SignalChannel::<T>::get_or_init(app));
+
+		let (send_to_getter, recv_from_setter) = flume::unbounded();
+
+		let get = SignalGetter::new(entity, recv_from_setter, initial.clone());
 		let set = move |val: T| {
-			BevyRuntime::with(move |app| {
-				app.world_mut()
-					.entity_mut(entity)
-					.trigger(BevySignal { value: val.clone() });
-				app.world_mut().flush();
-			})
+			// if the getter was dropped thats ok
+			let err1 = send_to_getter.send(val.clone()).is_err();
+			// if the bevy resource was removed thats ok
+			let err2 = send_to_bevy.send((entity, val)).is_err();
+			// if both error, better warn
+			if err1 && err2 {
+				eprintln!(
+					"Signal setter failed to send to both getter and bevy"
+				);
+			}
 		};
-		(SignalGetter::new(entity), set)
+
+		(get, set)
 	}
 }
 
 /// The 'get' function of a signal. These can be applied to
 /// attribute values or node blocks.
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Clone)]
 pub struct SignalGetter<T> {
+	value: T,
+	recv: Receiver<T>,
 	pub entity: Entity,
 	phantom: std::marker::PhantomData<T>,
 }
 impl<T: SignalPayload> SignalGetter<T> {
-	pub fn new(entity: Entity) -> Self {
+	pub fn new(entity: Entity, recv: Receiver<T>, initial: T) -> Self {
 		Self {
 			entity,
+			recv,
+			value: initial,
 			phantom: std::marker::PhantomData,
 		}
 	}
 
-	pub fn get(&self) -> T {
-		BevyRuntime::with(|app| {
-			app.world()
-				.get::<BevySignal<T>>(self.entity)
-				.unwrap()
-				.value
-				.clone()
-		})
+	pub fn get(&mut self) -> T {
+		while let Ok(val) = self.recv.try_recv() {
+			self.value = val;
+		}
+		self.value.clone()
 	}
 }
 
 impl<T: SignalPayload> FnOnce<()> for SignalGetter<T> {
 	type Output = T;
-	extern "rust-call" fn call_once(self, _args: ()) -> T { self.get() }
+	extern "rust-call" fn call_once(mut self, _args: ()) -> T { self.get() }
 }
 
 impl<T: SignalPayload> FnMut<()> for SignalGetter<T> {
 	extern "rust-call" fn call_mut(&mut self, _args: ()) -> T { self.get() }
 }
-
-impl<T: SignalPayload> Fn<()> for SignalGetter<T> {
-	extern "rust-call" fn call(&self, _args: ()) -> T { self.get() }
-}
-
 
 /// Trait for signals, literals and blocks that can be converted to
 /// bevy entities
@@ -123,23 +165,24 @@ impl<T: Reflectable + SignalOrComponent<M>, M>
 	SignalOrComponent<(M, GetterMarker)> for SignalGetter<T>
 {
 	type Component = T::Component;
-	fn into_component(self) -> Self::Component { self.get().into_component() }
+	fn into_component(mut self) -> Self::Component {
+		self.get().into_component()
+	}
 
 	fn into_node_block_effect(self) -> RegisterEffect {
-		Box::new(move |loc: DomLocation| {
+		Box::new(move |block_loc: DomLocation| {
+			// register_effect provides the location of the block, not the initial which is +1.
+			// i guess its guaranteed to be +1 so we can just increment?
+			let inner_idx = block_loc.rsx_idx + 1;
 			BevyRuntime::with(move |app| {
 				app.world_mut().entity_mut(self.entity).observe(
 					move |ev: Trigger<BevySignal<T>>,
-					      // idx_query: Query<&BevyRsxIdx>,
 					      mut query: Query<(
 						&BevyRsxIdx,
 						&mut T::Component,
 					)>| {
 						for (idx, mut component) in query.iter_mut() {
-							// isnt working as expected because register_effect provides
-							// the location of the block, not the initial which is +1
-							println!("{:?} {:?}", idx, loc);
-							if **idx == loc.rsx_idx {
+							if **idx == inner_idx {
 								*component =
 									ev.event().value.clone().into_component();
 							}
@@ -162,14 +205,16 @@ impl<T: Reflectable + SignalOrComponent<M>, M>
 pub trait SignalOrRon<M>: 'static + Send + Sync + Clone {
 	type Inner: SignalPayload;
 	/// Serialize using ron
-	fn into_ron_str(&self) -> String;
+	fn into_ron_str(&mut self) -> String;
 	fn into_attribute_value_effect(self, field_path: String) -> RegisterEffect;
 }
 
 pub struct PayloadIntoBevyAttributeValue;
 impl<T: SignalPayload> SignalOrRon<(T, PayloadIntoBevyAttributeValue)> for T {
 	type Inner = T;
-	fn into_ron_str(&self) -> String { BevyRuntime::serialize(self).unwrap() }
+	fn into_ron_str(&mut self) -> String {
+		BevyRuntime::serialize(self).unwrap()
+	}
 	fn into_attribute_value_effect(
 		self,
 		_field_path: String,
@@ -182,7 +227,7 @@ impl<T: SignalPayload + SignalOrRon<M>, M>
 	SignalOrRon<(M, GetterIntoRsxAttribute)> for SignalGetter<T>
 {
 	type Inner = T::Inner;
-	fn into_ron_str(&self) -> String { self.get().into_ron_str() }
+	fn into_ron_str(&mut self) -> String { self.get().into_ron_str() }
 
 	/// A registration function that will update the attribute value,
 	/// which can either be a bevy Component or a field of that component,
@@ -224,10 +269,11 @@ mod test {
 
 	#[test]
 	fn signal() {
-		let (get, set) = BevySignal::signal(7);
+		let (mut get, set) = BevySignal::signal(7);
 		expect(get()).to_be(7);
 		set(8);
-		BevyRuntime::with(|a| a.world_mut().flush());
+		// flush signals
+		BevyRuntime::with(|a| a.update());
 		expect(get()).to_be(8);
 	}
 }

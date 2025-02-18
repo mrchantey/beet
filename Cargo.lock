@@ -688,6 +688,7 @@ dependencies = [
  "bevy",
  "console_error_panic_hook",
  "console_log",
+ "flume",
  "http",
  "js-sys",
  "lightningcss",

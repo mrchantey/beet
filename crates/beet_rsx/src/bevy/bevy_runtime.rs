@@ -70,7 +70,7 @@ impl BevyRuntime {
 	pub fn parse_attribute_value<M, T: SignalOrRon<M>>(
 		field_path: &'static str,
 		tracker: RustyTracker,
-		value: T,
+		mut value: T,
 	) -> RsxAttribute {
 		let initial = value.into_ron_str();
 
@@ -140,6 +140,8 @@ mod test {
 		set(3);
 
 		let mut app = BevyRuntime::with(|app| std::mem::take(app));
+		// flush signals
+		app.update();
 		let world = app.world_mut();
 		let mut query = world.query::<&Text>();
 		let text = query.iter(world).next().unwrap();
@@ -158,6 +160,8 @@ mod test {
 		set(Vec3::new(3., 4., 5.));
 
 		let mut app = BevyRuntime::with(|app| std::mem::take(app));
+		// flush signals
+		app.update();
 		let world = app.world_mut();
 		let mut query = world.query::<&Transform>();
 		let transform = query.iter(world).next().unwrap();

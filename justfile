@@ -324,3 +324,10 @@ very-scary-purge-commit-history:
 
 	git remote add origin git@github.com:mrchantey/beet.git
 	git push -u --force origin main
+
+
+#💡 Misc
+
+# Cargo search but returns one line
+search *args:
+	cargo search {{args}} | head -n 1

@@ -14,7 +14,7 @@ keywords.workspace = true
 
 [features]
 default = ["macros"]
-bevy = ["dep:bevy", "serde"]
+bevy = ["dep:bevy", "serde", "dep:flume"]
 bevy_ui = ["bevy", "bevy/bevy_ui"]
 css = ["dep:lightningcss", "dep:parcel_selectors"]
 macros = ["dep:beet_rsx_macros"]
@@ -47,6 +47,7 @@ bevy = { workspace = true, optional = true, features = [
 	# "bevy_ui",
 	# "bevy_remote",
 ] }
+flume = { workspace = true, optional = true }
 
 #💡 native
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
