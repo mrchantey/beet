@@ -29,10 +29,10 @@ impl beet::prelude::Component for Counter {
 		rsx! {
 			<entity runtime:bevy Button onclick=move |_|{
 				let val = get2.clone().get();
-				println!("clicked: {}", val);
-				set(val + 1);
+				println!("clickesd: {}", val);
+				set(val + 2);
 			}>
-				"The value is "{get}
+				"The value is certain "{get}
 			</entity>
 		}
 	}

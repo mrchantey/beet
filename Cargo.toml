@@ -13,7 +13,7 @@ opt-level = 0
 opt-level = 0
 
 [workspace.package]
-version = "0.0.5-dev"
+version = "0.0.5-dev.1"
 authors = ["Peter Hayman"]
 edition = "2021"
 description = "Tools for developing reactive structures"
@@ -55,22 +55,22 @@ members = [
 
 [workspace.dependencies]
 ## internal
-beet = { path = "", version = "0.0.5-dev", default-features = false }
-beet_spatial = { path = "crates/beet_spatial", version = "0.0.5-dev", default-features = false }
-beet_flow = { path = "crates/beet_flow", version = "0.0.5-dev" }
-beet_flow_macros = { path = "crates/beet_flow/macros", version = "0.0.5-dev" }
-beet_ml = { path = "crates/beet_ml", version = "0.0.5-dev" }
-beet_router = { path = "crates/beet_router", version = "0.0.5-dev" }
-beet_router_parser = { path = "crates/beet_router/parser", version = "0.0.5-dev" }
-beet_rsx = { path = "crates/beet_rsx", version = "0.0.5-dev" }
-beet_rsx_macros = { path = "crates/beet_rsx/macros", version = "0.0.5-dev" }
-beet_rsx_parser = { path = "crates/beet_rsx/parser", version = "0.0.5-dev" }
-beet_sim = { path = "crates/beet_sim", version = "0.0.5-dev" }
+beet = { path = "", version = "0.0.5-dev.1", default-features = false }
+beet_spatial = { path = "crates/beet_spatial", version = "0.0.5-dev.1", default-features = false }
+beet_flow = { path = "crates/beet_flow", version = "0.0.5-dev.1" }
+beet_flow_macros = { path = "crates/beet_flow/macros", version = "0.0.5-dev.1" }
+beet_ml = { path = "crates/beet_ml", version = "0.0.5-dev.1" }
+beet_router = { path = "crates/beet_router", version = "0.0.5-dev.1" }
+beet_router_parser = { path = "crates/beet_router/parser", version = "0.0.5-dev.1" }
+beet_rsx = { path = "crates/beet_rsx", version = "0.0.5-dev.1" }
+beet_rsx_macros = { path = "crates/beet_rsx/macros", version = "0.0.5-dev.1" }
+beet_rsx_parser = { path = "crates/beet_rsx/parser", version = "0.0.5-dev.1" }
+beet_sim = { path = "crates/beet_sim", version = "0.0.5-dev.1" }
 
 #💡 local
 # bevyhub = { git = "https://github.com/mrchantey/bevyhub", default-features = false }
-sweet = { version = "0.3.0-rc.4" }
-# sweet = { path = "../sweet" }
+# sweet = { version = "0.3.0-rc.4" }
+sweet = { path = "../sweet" }
 # sweet = { git = "https://github.com/mrchantey/sweet" }
 
 #💡 game
@@ -153,9 +153,7 @@ rsx = ["dep:beet_rsx"]
 ml = ["dep:beet_ml"]
 spatial = ["dep:beet_spatial"]
 sim = ["dep:beet_sim"]
-# bevy = [
-
-
+bevy = ["beet_rsx?/bevy", "beet_rsx?/bevy_ui"]
 
 
 # animation = ["beet_spatial?/animation"]
@@ -175,7 +173,7 @@ beet_sim = { workspace = true, optional = true }
 beet_spatial = { workspace = true, optional = true }
 
 [dev-dependencies]
-beet = { path = "", features = ["rsx"] }
+beet = { path = "", features = ["rsx", "bevy"] }
 # bevy.workspace = true
 bevy = { workspace = true, default_features = true }
 sweet = { workspace = true, features = ["test", "bevy", "rand"] }
@@ -186,12 +184,16 @@ console_error_panic_hook.workspace = true
 web-sys.workspace = true
 
 [[example]]
+name = "hello_rsx"
+required-features = ["rsx"]
+path = "examples/rsx/hello_rsx.rs"
+[[example]]
 name = "dom_reactive"
 required-features = ["rsx"]
 path = "examples/rsx/dom_reactive.rs"
 [[example]]
 name = "bevy_reactive"
-required-features = ["rsx"]
+required-features = ["rsx", "bevy"]
 path = "examples/rsx/bevy_reactive.rs"
 
 #💡flow

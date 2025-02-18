@@ -18,10 +18,8 @@ pub struct TemplateWatcher<Reload, Recompile> {
 	file_cache: HashMap<PathBuf, u64>,
 }
 
-impl<
-		Reload: FnMut() -> Result<()>,
-		Recompile: FnMut() -> Result<()>,
-	> TemplateWatcher<Reload, Recompile>
+impl<Reload: FnMut() -> Result<()>, Recompile: FnMut() -> Result<()>>
+	TemplateWatcher<Reload, Recompile>
 {
 	pub fn new(
 		build_templates: BuildRsxTemplateMap,
@@ -42,7 +40,6 @@ impl<
 			.with_path(&self.build_templates.src)
 			.with_exclude("*.git*")
 			.with_exclude("*target*");
-		println!("{:#?}", watcher);
 
 		watcher
 			.watch_async(move |ev| {
@@ -61,11 +58,12 @@ impl<
 		let files = ReadDir::files_recursive(src)?;
 		let now = Instant::now();
 		for file in files {
+			println!("canonicalizing file: {}", file.display());
 			let path = file.canonicalize()?;
 			let hash = HashRsxFile::file_to_hash(&path)?;
 			cache.insert(path, hash);
 		}
-		println!("Preheated cache in {:?}\n{:#?}", now.elapsed(), cache);
+		println!("Preheated cache in {:?}", now.elapsed());
 		Ok(cache)
 	}
 
@@ -97,10 +95,10 @@ impl<
 								hotreload_reason = Some(ev.display());
 								continue;
 							}
-							println!(
-								"the hash changed\nprev: {}\nnew: {}",
-								curr_hash, new_hash
-							);
+							// println!(
+							// 	"the hash changed\nprev: {}\nnew: {}",
+							// 	curr_hash, new_hash
+							// );
 						}
 						self.file_cache.insert(ev.path.clone(), new_hash);
 						return self.recompile(&ev.display());
@@ -127,17 +125,17 @@ impl<
 		println!("Watcher::Recompile: {}", reason);
 		let start = Instant::now();
 		(self.recompile_func)()?;
-		println!("Recompiled in {:?}", start.elapsed());
+		println!("Watcher::Recompile Duration: {:?}", start.elapsed());
 		Ok(())
 	}
 
 	fn reload(&mut self, reason: &str) -> Result<()> {
-		println!("Watcher::HotReload: {}", reason);
+		println!("Watcher::Reload: {}", reason);
 		let start = Instant::now();
 		// first rebuild templates
 		self.build_templates.build_and_write()?;
 		(self.reload_func)()?;
-		println!("Ran in {:?}", start.elapsed());
+		println!("Watcher::Reload Duration: {:?}", start.elapsed());
 		Ok(())
 	}
 }

@@ -558,7 +558,7 @@ dependencies = [
 
 [[package]]
 name = "beet"
-version = "0.0.5-dev"
+version = "0.0.5-dev.1"
 dependencies = [
  "beet",
  "beet_flow",
@@ -575,7 +575,7 @@ dependencies = [
 
 [[package]]
 name = "beet-cli"
-version = "0.0.5-dev"
+version = "0.0.5-dev.1"
 dependencies = [
  "anyhow",
  "beet_router",
@@ -587,7 +587,7 @@ dependencies = [
 
 [[package]]
 name = "beet_flow"
-version = "0.0.5-dev"
+version = "0.0.5-dev.1"
 dependencies = [
  "anyhow",
  "beet_flow_macros",
@@ -601,7 +601,7 @@ dependencies = [
 
 [[package]]
 name = "beet_flow_macros"
-version = "0.0.5-dev"
+version = "0.0.5-dev.1"
 dependencies = [
  "anyhow",
  "extend",
@@ -614,7 +614,7 @@ dependencies = [
 
 [[package]]
 name = "beet_ml"
-version = "0.0.5-dev"
+version = "0.0.5-dev.1"
 dependencies = [
  "anyhow",
  "beet_flow",
@@ -646,7 +646,7 @@ dependencies = [
 
 [[package]]
 name = "beet_router"
-version = "0.0.5-dev"
+version = "0.0.5-dev.1"
 dependencies = [
  "anyhow",
  "beet_router",
@@ -661,7 +661,7 @@ dependencies = [
 
 [[package]]
 name = "beet_router_parser"
-version = "0.0.5-dev"
+version = "0.0.5-dev.1"
 dependencies = [
  "anyhow",
  "beet_rsx",
@@ -679,7 +679,7 @@ dependencies = [
 
 [[package]]
 name = "beet_rsx"
-version = "0.0.5-dev"
+version = "0.0.5-dev.1"
 dependencies = [
  "anyhow",
  "beet_rsx",
@@ -710,7 +710,7 @@ dependencies = [
 
 [[package]]
 name = "beet_rsx_macros"
-version = "0.0.5-dev"
+version = "0.0.5-dev.1"
 dependencies = [
  "anyhow",
  "beet_rsx_parser",
@@ -724,7 +724,7 @@ dependencies = [
 
 [[package]]
 name = "beet_rsx_parser"
-version = "0.0.5-dev"
+version = "0.0.5-dev.1"
 dependencies = [
  "anyhow",
  "proc-macro2",
@@ -738,7 +738,7 @@ dependencies = [
 
 [[package]]
 name = "beet_sim"
-version = "0.0.5-dev"
+version = "0.0.5-dev.1"
 dependencies = [
  "anyhow",
  "beet_flow",
@@ -749,7 +749,7 @@ dependencies = [
 
 [[package]]
 name = "beet_site"
-version = "0.0.5-dev"
+version = "0.0.5-dev.1"
 dependencies = [
  "beet",
  "tokio",
@@ -757,7 +757,7 @@ dependencies = [
 
 [[package]]
 name = "beet_spatial"
-version = "0.0.5-dev"
+version = "0.0.5-dev.1"
 dependencies = [
  "anyhow",
  "beet_flow",
@@ -6353,8 +6353,6 @@ dependencies = [
 [[package]]
 name = "sweet"
 version = "0.3.0-rc.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1360ef9c7bddf2c67078456a0e131ecdc58b0fbea87e5536854c91a3a6952e8a"
 dependencies = [
  "sweet_bevy",
  "sweet_fs",
@@ -6367,8 +6365,6 @@ dependencies = [
 [[package]]
 name = "sweet_bevy"
 version = "0.3.0-rc.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d033c36b03e7e2adabbcf9297b4c04e9db74d264d6da4fdb9cce7cde3e127740"
 dependencies = [
  "anyhow",
  "bevy",
@@ -6384,8 +6380,6 @@ dependencies = [
 [[package]]
 name = "sweet_fs"
 version = "0.3.0-rc.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "aaf45e789ccd6f6f428814e10bf431e51a308f4bd22e808a6463bdfd642bd1e2"
 dependencies = [
  "anyhow",
  "clap",
@@ -6403,8 +6397,6 @@ dependencies = [
 [[package]]
 name = "sweet_server"
 version = "0.3.0-rc.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6d53a96d746c9c366986b4b51b8e4797ae53391af26dffcec338790138341249"
 dependencies = [
  "anyhow",
  "axum",
@@ -6428,8 +6420,6 @@ dependencies = [
 [[package]]
 name = "sweet_test"
 version = "0.3.0-rc.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "db745be4f2e6081ef9e513f6b8e5bf123780f1fae36e87c933c787aa931e1431"
 dependencies = [
  "anyhow",
  "backtrace",
@@ -6461,8 +6451,6 @@ dependencies = [
 [[package]]
 name = "sweet_test_macros"
 version = "0.3.0-rc.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a4b4530a651aadf49c8199f8d75cc03b3477931b57125ab655fb4cea6b4cf39c"
 dependencies = [
  "anyhow",
  "proc-macro2",
@@ -6473,8 +6461,6 @@ dependencies = [
 [[package]]
 name = "sweet_utils"
 version = "0.3.0-rc.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7559decd3871168a2ba819d787d31d600f24e29ddf1d5fbbba3f4f000e543806"
 dependencies = [
  "anyhow",
  "bevy",
@@ -6491,8 +6477,6 @@ dependencies = [
 [[package]]
 name = "sweet_web"
 version = "0.3.0-rc.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2b8c9b0449d89bec5cfc075ae1189cfb5748390789831aa0e9e8d3607f505677"
 dependencies = [
  "anyhow",
  "console_error_panic_hook",
