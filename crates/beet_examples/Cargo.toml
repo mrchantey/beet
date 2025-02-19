@@ -14,9 +14,7 @@ categories.workspace = true
 beet_flow = { workspace = true, features = ["reflect"] }
 beet_ml = { workspace = true, features = ["spatial"] }
 beet_spatial = { workspace = true, features = [
-	"animation",
-	"assets",
-	"bevy_ui",
+	"bevy_default",
 ] }
 bevyhub.workspace = true
 serde.workspace = true

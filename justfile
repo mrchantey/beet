@@ -61,10 +61,12 @@ leptosfmt *args:
 #💡 e2e examples
 
 # Run bevy reactive example on an endless loop, it exits on recompile required
-run-reactive-bevy:
-	while true; do cargo run --example bevy_reactive; done
+run-bevy-reactive:
+	while true; do cargo run --example bevy_reactive --features=bevy_default; done
+run-bevy-reactive-if-ok:
+	while cargo run --example bevy_reactive --features=bevy_default && [ $? -eq 0 ]; do :; done
 
-run-reactive-html:
+run-dom-reactive:
 	cp ./index.html ./target/index.html
 	sweet serve ./target | \
 	just watch 'just build-wasm beet dom_reactive'
@@ -110,11 +112,11 @@ test-ci *args:
 
 # no space left on device
 test-all *args:
-	just test-ci 																																{{args}}
-	cargo test 																 --all-features	-p beet_rsx 			{{args}}
-	cargo test --target wasm32-unknown-unknown --all-features -p beet_rsx 			{{args}}
-	cargo test 																 --all-features -p beet_spatial 	{{args}} 
-	cargo test --target wasm32-unknown-unknown --all-features -p beet_spatial 	{{args}}
+	just test-ci 																																			{{args}}
+	cargo test --lib 																 --all-features	-p beet_rsx 			{{args}}
+	cargo test --lib --target wasm32-unknown-unknown --all-features -p beet_rsx 			{{args}}
+	cargo test --lib 																 --all-features -p beet_spatial 	{{args}} 
+	cargo test --lib --target wasm32-unknown-unknown --all-features -p beet_spatial 	{{args}}
 
 #cargo test -p beet_spatial
 #cargo test -p beet_sim

@@ -17,12 +17,12 @@ version = "0.0.5-dev.3"
 authors = ["Peter Hayman"]
 edition = "2021"
 description = "Tools for developing reactive structures"
-documentation = "https://bevyhub.dev/docs/beet"
+documentation = "https://docs.rs/beet"
 readme = "README.md"
-homepage = "https://bevyhub.dev/docs/beet"
+homepage = "https://docs.rs/beet"
 repository = "https://github.com/mrchantey/beet"
 license = "MIT OR Apache-2.0"
-keywords = ["beet", "bevyhub", "behavior", "game-ai", "robotics"]
+keywords = ["beet", "beetmash", "behavior", "game-ai", "robotics"]
 categories = [
 	"science::robotics",
 	"game-development",
@@ -154,10 +154,10 @@ ml = ["dep:beet_ml"]
 spatial = ["dep:beet_spatial"]
 sim = ["dep:beet_sim"]
 bevy = ["dep:bevy", "beet_rsx?/bevy", "beet_router?/bevy"]
-bevy-default = [
+bevy_default = [
 	"bevy",
-	"beet_rsx?/bevy_ui",
-	"beet_spatial?/bevy_ui",
+	"beet_rsx?/bevy_default",
+	"beet_spatial?/bevy_default",
 	"bevy/default",
 ]
 
@@ -199,10 +199,10 @@ path = "examples/rsx/hello_rsx.rs"
 name = "dom_reactive"
 required-features = ["rsx"]
 path = "examples/rsx/dom_reactive.rs"
-# [[example]]
-# name = "bevy_reactive"
-# required-features = ["rsx", "bevy-default"]
-# path = "examples/rsx/bevy_reactive.rs"
+[[example]]
+name = "bevy_reactive"
+required-features = ["rsx", "bevy_default"]
+path = "examples/rsx/bevy_reactive.rs"
 
 #💡flow
 

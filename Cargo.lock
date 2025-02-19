@@ -691,6 +691,7 @@ dependencies = [
  "bevy",
  "console_error_panic_hook",
  "console_log",
+ "extend",
  "flume",
  "http",
  "js-sys",

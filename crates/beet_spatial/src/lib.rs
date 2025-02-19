@@ -4,7 +4,7 @@
 #![doc = include_str!("../README.md")]
 // #[cfg(feature = "animation")]
 // pub mod animation;
-#[cfg(feature = "assets")]
+#[cfg(feature = "bevy_default")]
 pub mod asset_actions;
 mod extensions;
 pub mod inverse_kinematics;
@@ -13,7 +13,7 @@ pub mod procedural_animation;
 pub mod robotics;
 pub mod steer;
 pub mod steer_actions;
-#[cfg(feature = "bevy_ui")]
+#[cfg(feature = "bevy_default")]
 pub mod ui;
 
 /// Re-exports of the most commonly used types and functions in `beet_spatial`.
@@ -21,7 +21,7 @@ pub mod prelude {
 	pub use super::*;
 	// #[cfg(feature = "animation")]
 	// pub use crate::animation::*;
-	#[cfg(feature = "assets")]
+	#[cfg(feature = "bevy_default")]
 	pub use crate::asset_actions::*;
 	// todo wait for construct
 	// pub use crate::bevyhub::*;
@@ -32,7 +32,7 @@ pub mod prelude {
 	pub use crate::robotics::*;
 	pub use crate::steer::*;
 	pub use crate::steer_actions::*;
-	#[cfg(feature = "bevy_ui")]
+	#[cfg(feature = "bevy_default")]
 	pub use crate::ui::*;
 }
 use crate::prelude::*;
