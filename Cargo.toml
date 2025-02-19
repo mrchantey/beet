@@ -17,12 +17,12 @@ version = "0.0.5-dev.3"
 authors = ["Peter Hayman"]
 edition = "2021"
 description = "Tools for developing reactive structures"
-documentation = "https://bevyhub.dev/docs/beet"
+documentation = "https://docs.rs/beet"
 readme = "README.md"
-homepage = "https://bevyhub.dev/docs/beet"
+homepage = "https://docs.rs/beet"
 repository = "https://github.com/mrchantey/beet"
 license = "MIT OR Apache-2.0"
-keywords = ["beet", "bevyhub", "behavior", "game-ai", "robotics"]
+keywords = ["beet", "beetmash", "behavior", "game-ai", "robotics"]
 categories = [
 	"science::robotics",
 	"game-development",
