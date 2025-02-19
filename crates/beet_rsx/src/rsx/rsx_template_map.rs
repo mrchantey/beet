@@ -1,4 +1,5 @@
 use crate::prelude::*;
+#[allow(unused)]
 use anyhow::Result;
 
 
@@ -15,7 +16,7 @@ use anyhow::Result;
 /// we need the entire [RsxTemplateMap] to resolve components.
 #[derive(Debug, Clone, PartialEq, Eq, Deref, DerefMut)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct RsxTemplateMap(pub HashMap<RsxLocation, RsxTemplateRoot>);
+pub struct RsxTemplateMap(pub HashMap<RsxMacroLocation, RsxTemplateRoot>);
 
 
 impl RsxTemplateMap {
@@ -42,7 +43,7 @@ impl RsxTemplateMap {
 
 	// should live elsewhere, maybe RustyPart
 	pub fn apply_template(&self, root: RsxRoot) -> TemplateResult<RsxRoot> {
-		let mut rusty_map = RustyPartMap::collect(root.node)?;
+		let mut rusty_map = RustyPartMap::collect(root.node);
 		let location = root.location;
 		// i think here we need to pass the whole map for component template reloading
 		let template_root = self
@@ -72,7 +73,7 @@ impl RsxTemplateMap {
 
 #[cfg(test)]
 mod test {
-	use crate::prelude::*;
+	use crate::as_beet::*;
 	use sweet::prelude::*;
 
 	struct MyComponent {

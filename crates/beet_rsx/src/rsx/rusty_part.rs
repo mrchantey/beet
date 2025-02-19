@@ -43,7 +43,7 @@ pub enum RustyPart {
 		root: RsxRoot,
 	},
 	RustBlock {
-		initial: RsxNode,
+		initial: RsxRoot,
 		register: RegisterEffect,
 	},
 	AttributeBlock {
@@ -86,15 +86,11 @@ impl std::fmt::Debug for RustyPart {
 pub struct RustyPartMap(pub HashMap<RustyTracker, RustyPart>);
 
 impl RustyPartMap {
-	pub fn collect(node: impl Rsx) -> TemplateResult<Self> {
+	pub fn collect(node: impl Rsx) -> Self {
 		let mut visitor = RustyPartVisitor::default();
 		let mut node = node.into_rsx();
 		visitor.walk_node(&mut node);
-		if let Some(err) = visitor.err {
-			Err(err)
-		} else {
-			Ok(Self(visitor.rusty_map))
-		}
+		Self(visitor.rusty_map)
 	}
 }
 
@@ -102,27 +98,9 @@ impl RustyPartMap {
 #[derive(Default)]
 struct RustyPartVisitor {
 	rusty_map: HashMap<RustyTracker, RustyPart>,
-	err: Option<TemplateError>,
 }
 
-impl RustyPartVisitor {
-	fn take_effect(
-		&mut self,
-		effect: &mut Effect,
-	) -> Option<(RegisterEffect, RustyTracker)> {
-		let effect = effect.take();
-		let tracker = effect
-			.tracker
-			.ok_or_else(|| TemplateError::NoRustyPart("Effect"));
-		match tracker {
-			Err(err) => {
-				self.err = Some(err);
-				return None;
-			}
-			Ok(tracker) => Some((effect.register, tracker)),
-		}
-	}
-}
+impl RustyPartVisitor {}
 
 impl RsxVisitorMut for RustyPartVisitor {
 	fn ignore_block_node_initial(&self) -> bool {
@@ -131,12 +109,12 @@ impl RsxVisitorMut for RustyPartVisitor {
 	}
 
 	fn visit_block(&mut self, block: &mut RsxBlock) {
-		if let Some((register, tracker)) = self.take_effect(&mut block.effect) {
-			self.rusty_map.insert(tracker, RustyPart::RustBlock {
-				initial: std::mem::take(&mut block.initial),
-				register,
-			});
-		}
+		let effect = block.effect.take();
+		self.rusty_map.insert(effect.tracker, RustyPart::RustBlock {
+			initial: std::mem::take(&mut block.initial),
+			register: effect.register,
+		});
+		// }
 	}
 	fn visit_attribute(&mut self, attribute: &mut RsxAttribute) {
 		match attribute {
@@ -145,59 +123,47 @@ impl RsxVisitorMut for RustyPartVisitor {
 			RsxAttribute::BlockValue {
 				initial, effect, ..
 			} => {
-				if let Some((register, tracker)) = self.take_effect(effect) {
-					self.rusty_map.insert(tracker, RustyPart::AttributeValue {
+				let effect = effect.take();
+				self.rusty_map.insert(
+					effect.tracker,
+					RustyPart::AttributeValue {
 						initial: std::mem::take(initial),
-						register,
-					});
-				}
+						register: effect.register,
+					},
+				);
 			}
 			RsxAttribute::Block { initial, effect } => {
-				if let Some((register, tracker)) = self.take_effect(effect) {
-					self.rusty_map.insert(tracker, RustyPart::AttributeBlock {
+				let effect = effect.take();
+				self.rusty_map.insert(
+					effect.tracker,
+					RustyPart::AttributeBlock {
 						initial: std::mem::take(initial),
-						register,
-					});
-				}
+						register: effect.register,
+					},
+				);
 			}
 		}
 	}
 	fn visit_component(&mut self, component: &mut RsxComponent) {
-		match std::mem::take(&mut component.tracker) {
-			Some(tracker) => {
-				// note how we ignore slot_children, they are handled by RsxTemplateNode
-				self.rusty_map.insert(tracker, RustyPart::Component {
-					root: std::mem::take(&mut component.root),
-				});
-			}
-			None => {
-				self.err = Some(TemplateError::NoRustyPart("Component"));
-			}
-		}
+		// note how we ignore slot_children, they are handled by RsxTemplateNode
+		self.rusty_map
+			.insert(component.tracker, RustyPart::Component {
+				root: std::mem::take(&mut component.root),
+			});
 	}
 }
 
 
 #[cfg(test)]
 mod test {
-	use crate::prelude::*;
+	use crate::as_beet::*;
 	use sweet::prelude::*;
 
 	#[test]
 	fn works() {
 		let bar = 2;
-		expect(RustyPartMap::collect(rsx! { <div /> }).unwrap().len()).to_be(0);
-		expect(
-			RustyPartMap::collect(rsx! { <div foo=bar /> })
-				.unwrap()
-				.len(),
-		)
-		.to_be(1);
-		expect(
-			RustyPartMap::collect(rsx! { <div>{bar}</div> })
-				.unwrap()
-				.len(),
-		)
-		.to_be(1);
+		expect(RustyPartMap::collect(rsx! { <div /> }).len()).to_be(0);
+		expect(RustyPartMap::collect(rsx! { <div foo=bar /> }).len()).to_be(1);
+		expect(RustyPartMap::collect(rsx! { <div>{bar}</div> }).len()).to_be(1);
 	}
 }

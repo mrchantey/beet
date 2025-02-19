@@ -76,13 +76,13 @@ mod test {
 				.component_tree::<Running>(&world),
 		)
 		.to_be(
-			TreeNode::new(Some(&Running::new(Entity::PLACEHOLDER)))
+			TreeNode::new(Some(&Running::new(Entity::from_raw(10))))
 				.with_leaf(None)
 				.with_leaf(None)
 				.with_child(TreeNode::new(None).with_leaf(None))
 				.with_child(TreeNode::new(None).with_leaf(None))
 				.with_child(
-					TreeNode::new(Some(&Running::new(Entity::PLACEHOLDER)))
+					TreeNode::new(Some(&Running::new(Entity::from_raw(17))))
 						.with_leaf(None),
 				), // .with_child(Tree::new(None).with_leaf(Some(&Running))),
 		);

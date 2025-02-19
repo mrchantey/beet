@@ -2,13 +2,6 @@ use crate::prelude::*;
 
 pub type RustyIdx = u32;
 
-/// Unique identifier for every node in an rsx tree,
-/// and assigned to html elements that need it.
-/// The value is incremented every time an rsx node is encountered
-/// in a dfs pattern like [RsxVisitor].
-pub type RsxIdx = u32;
-
-
 ///	This struct is the binding between a [RsxNode] and an [HtmlNode].
 ///
 /// Hydrating elements is relatively simple, we can just slap an id on them,
@@ -22,14 +15,14 @@ pub type RsxIdx = u32;
 /// before using this location.
 ///
 #[derive(Debug, Default, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct DomLocation {
+pub struct TreeLocation {
 	/// Incremented every time an rsx node is encountered,
-	/// used for reconciliation with the [DomLocationMap::rusty_locations].
+	/// used for reconciliation with the [TreeLocationMap::rusty_locations].
 	/// It is required because not all rsx nodes are html nodes.
-	pub rsx_idx: RsxIdx,
+	pub tree_idx: TreeIdx,
 	/// the index of this node's parent *element*. This is used by
 	/// text nodes to determine their location in the dom.
-	pub parent_idx: RsxIdx,
+	pub parent_idx: TreeIdx,
 	/// The *uncollapsed* child index of this node, for
 	/// example the following has two child nodes, indexed
 	/// as 0 and 1. When it is rendered they will be collapsed
@@ -41,11 +34,23 @@ pub struct DomLocation {
 	// _padding: u32,
 }
 
-impl DomLocation {
+impl TreeLocation {
+	pub fn new(
+		tree_idx: impl Into<TreeIdx>,
+		parent_idx: impl Into<TreeIdx>,
+		child_idx: u32,
+	) -> Self {
+		Self {
+			tree_idx: tree_idx.into(),
+			parent_idx: parent_idx.into(),
+			child_idx,
+		}
+	}
+
 	pub fn to_csv(&self) -> String {
 		// must keep in sync with from_csv
 		vec![
-			self.rsx_idx.to_string(),
+			self.tree_idx.to_string(),
 			self.parent_idx.to_string(),
 			self.child_idx.to_string(),
 		]
@@ -62,13 +67,13 @@ impl DomLocation {
 		};
 
 		// must keep in sync with to_csv
-		let rsx_idx = next()?;
+		let tree_idx = next()?;
 		let parent_idx = next()?;
 		let child_idx = next()?;
 
 		Ok(Self {
-			rsx_idx,
-			parent_idx,
+			tree_idx: TreeIdx::new(tree_idx),
+			parent_idx: TreeIdx::new(parent_idx),
 			child_idx,
 		})
 	}
@@ -78,26 +83,26 @@ impl DomLocation {
 
 /// Wrapper of a visitor but
 #[derive(Debug)]
-pub struct DomLocationVisitor<Func> {
+pub struct TreeLocationVisitor<Func> {
 	/// we use a stack because [RsxVisitor] is depth-first.
 	/// This stack is an immutable breadcrumb trail of parents
-	parent_idxs: Vec<RsxIdx>,
+	parent_idxs: Vec<TreeIdx>,
 	/// pushed when visiting children, incremented after visiting dom node
 	child_idxs: Vec<u32>,
-	rsx_idx_incr: u32,
+	tree_idx_incr: u32,
 	options: VisitRsxOptions,
 	func: Func,
 }
-impl<Func> DomLocationVisitor<Func> {
+impl<Func> TreeLocationVisitor<Func> {
 	/// Visit a node and return the total number of elements visited
 	pub fn visit(node: &RsxNode, func: Func)
 	where
-		Func: FnMut(DomLocation, &RsxNode),
+		Func: FnMut(TreeLocation, &RsxNode),
 	{
 		Self {
 			parent_idxs: vec![Default::default()],
 			child_idxs: vec![Default::default()],
-			rsx_idx_incr: 0,
+			tree_idx_incr: 0,
 			options: Default::default(),
 			func,
 		}
@@ -109,12 +114,12 @@ impl<Func> DomLocationVisitor<Func> {
 		options: VisitRsxOptions,
 		func: Func,
 	) where
-		Func: FnMut(DomLocation, &RsxNode),
+		Func: FnMut(TreeLocation, &RsxNode),
 	{
 		Self {
 			parent_idxs: vec![Default::default()],
 			child_idxs: vec![Default::default()],
-			rsx_idx_incr: 0,
+			tree_idx_incr: 0,
 			options,
 			func,
 		}
@@ -122,12 +127,12 @@ impl<Func> DomLocationVisitor<Func> {
 	}
 	pub fn visit_mut(node: &mut RsxNode, func: Func)
 	where
-		Func: FnMut(DomLocation, &mut RsxNode),
+		Func: FnMut(TreeLocation, &mut RsxNode),
 	{
 		Self {
 			parent_idxs: vec![Default::default()],
 			child_idxs: vec![Default::default()],
-			rsx_idx_incr: 0,
+			tree_idx_incr: 0,
 			options: Default::default(),
 			func,
 		}
@@ -138,12 +143,12 @@ impl<Func> DomLocationVisitor<Func> {
 		options: VisitRsxOptions,
 		func: Func,
 	) where
-		Func: FnMut(DomLocation, &mut RsxNode),
+		Func: FnMut(TreeLocation, &mut RsxNode),
 	{
 		Self {
 			parent_idxs: Default::default(),
 			child_idxs: Default::default(),
-			rsx_idx_incr: 0,
+			tree_idx_incr: 0,
 			options,
 			func,
 		}
@@ -153,23 +158,19 @@ impl<Func> DomLocationVisitor<Func> {
 	/// Get the current item in the stack, or default
 	/// # Panics
 	/// Panics if the stack is empty
-	// pub fn parent(&mut self) -> &mut DomLocation {
+	// pub fn parent(&mut self) -> &mut TreeLocation {
 	// 	self.parents
 	// 		.last_mut()
-	// 		.expect("DomLocationVisitor stack is empty")
+	// 		.expect("TreeLocationVisitor stack is empty")
 	// }
 
-	pub fn current_location(&self) -> DomLocation {
+	pub fn current_location(&self) -> TreeLocation {
 		let parent_idx = self.parent_idxs.last().cloned().unwrap_or_default();
 		let child_idx = self.child_idxs.last().cloned().unwrap_or_default();
-		DomLocation {
-			rsx_idx: self.rsx_idx_incr,
-			parent_idx,
-			child_idx,
-		}
+		TreeLocation::new(self.tree_idx_incr, parent_idx, child_idx)
 	}
 	pub fn after_node(&mut self, node: &RsxNode) {
-		self.rsx_idx_incr += 1;
+		self.tree_idx_incr += 1;
 		if node.is_html_node() {
 			if let Some(child_idx) = self.child_idxs.last_mut() {
 				*child_idx += 1;
@@ -181,7 +182,7 @@ impl<Func> DomLocationVisitor<Func> {
 		// the reason why we can get the parent idx is because this is called directly after
 		// visit_node in RsxVisitor. It also means we can safely decrement by 1 to get
 		// the parent index
-		self.parent_idxs.push(self.rsx_idx_incr - 1);
+		self.parent_idxs.push(TreeIdx::new(self.tree_idx_incr - 1));
 		self.child_idxs.push(0);
 	}
 	pub fn after_children(&mut self) {
@@ -191,8 +192,8 @@ impl<Func> DomLocationVisitor<Func> {
 }
 
 
-impl<Func: FnMut(DomLocation, &RsxNode)> RsxVisitor
-	for DomLocationVisitor<Func>
+impl<Func: FnMut(TreeLocation, &RsxNode)> RsxVisitor
+	for TreeLocationVisitor<Func>
 {
 	fn options(&self) -> &VisitRsxOptions { &self.options }
 	fn visit_node(&mut self, node: &RsxNode) {
@@ -207,8 +208,8 @@ impl<Func: FnMut(DomLocation, &RsxNode)> RsxVisitor
 		self.after_children();
 	}
 }
-impl<Func: FnMut(DomLocation, &mut RsxNode)> RsxVisitorMut
-	for DomLocationVisitor<Func>
+impl<Func: FnMut(TreeLocation, &mut RsxNode)> RsxVisitorMut
+	for TreeLocationVisitor<Func>
 {
 	fn options(&self) -> &VisitRsxOptions { &self.options }
 	fn visit_node(&mut self, node: &mut RsxNode) {
@@ -227,18 +228,14 @@ impl<Func: FnMut(DomLocation, &mut RsxNode)> RsxVisitorMut
 
 #[cfg(test)]
 mod test {
-	use crate::prelude::*;
+	use crate::as_beet::*;
 	use sweet::prelude::*;
 
 	#[test]
 	fn csv() {
-		let a = DomLocation {
-			rsx_idx: 4,
-			parent_idx: 2,
-			child_idx: 3,
-		};
+		let a = TreeLocation::new(4, 2, 3);
 		let csv = a.to_csv();
-		let b = DomLocation::from_csv(&csv).unwrap();
+		let b = TreeLocation::from_csv(&csv).unwrap();
 		expect(a).to_be(b);
 	}
 	#[test]
@@ -259,38 +256,23 @@ mod test {
 				<div />
 			</div>
 		};
-		DomLocationVisitor::visit(&rsx, move |loc, node| {
+		TreeLocationVisitor::visit(&rsx, move |loc, node| {
 			if let RsxNode::Element(_) = node {
 				bucket2.call(loc);
 			}
 		});
 		expect(&bucket).to_have_been_called_times(5);
 		// keep in mind that fragments will also increment
-		// the rsx_idx.. maybe they shouldnt?
-		expect(&bucket).to_have_returned_nth_with(0, &DomLocation {
-			rsx_idx: 0,
-			parent_idx: 0,
-			child_idx: 0,
-		});
-		expect(&bucket).to_have_returned_nth_with(1, &DomLocation {
-			rsx_idx: 2,
-			parent_idx: 0,
-			child_idx: 0,
-		});
-		expect(&bucket).to_have_returned_nth_with(2, &DomLocation {
-			rsx_idx: 4,
-			parent_idx: 2,
-			child_idx: 0,
-		});
-		expect(&bucket).to_have_returned_nth_with(3, &DomLocation {
-			rsx_idx: 6,
-			parent_idx: 2,
-			child_idx: 1,
-		});
-		expect(&bucket).to_have_returned_nth_with(4, &DomLocation {
-			rsx_idx: 8,
-			parent_idx: 0,
-			child_idx: 1,
-		});
+		// the tree_idx..
+		expect(&bucket)
+			.to_have_returned_nth_with(0, &TreeLocation::new(0, 0, 0));
+		expect(&bucket)
+			.to_have_returned_nth_with(1, &TreeLocation::new(2, 0, 0));
+		expect(&bucket)
+			.to_have_returned_nth_with(2, &TreeLocation::new(4, 2, 0));
+		expect(&bucket)
+			.to_have_returned_nth_with(3, &TreeLocation::new(6, 2, 1));
+		expect(&bucket)
+			.to_have_returned_nth_with(4, &TreeLocation::new(8, 0, 1));
 	}
 }

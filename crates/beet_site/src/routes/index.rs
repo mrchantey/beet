@@ -4,7 +4,7 @@ use beet::prelude::*;
 
 
 pub fn get(_state: DefaultAppState) -> RsxRoot {
-	let val = 433;
+	let val = 43;
 	rsx! {
 		<PageLayout title="foobarbasszz".into()>
 			<meta
@@ -22,9 +22,3 @@ pub fn get(_state: DefaultAppState) -> RsxRoot {
 		</PageLayout>
 	}
 }
-
-
-
-
-//
-//

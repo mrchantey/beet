@@ -1,20 +1,17 @@
 use crate::prelude::*;
 
-/// An implementation of hydrated that simply updates a tree of
-/// html nodes
-pub struct HtmlNodeHydrator {
+/// An implementation of hydrator that simply updates a tree of
+/// html nodes.
+pub struct RsDomTarget {
 	pub html: HtmlDocument,
 	constants: HtmlConstants,
-	loc_map: DomLocationMap,
+	loc_map: TreeLocationMap,
 }
 
-impl HtmlNodeHydrator {
-	pub fn new(rsx: impl Rsx) -> Self {
-		let rsx = rsx.into_rsx();
-		let html = RsxToResumableHtml::default().map_node(&rsx);
-
-		let loc_map = DomLocationMap::from_node(&rsx);
-
+impl RsDomTarget {
+	pub fn new(root: &RsxRoot) -> Self {
+		let html = RsxToResumableHtml::default().map_root(root);
+		let loc_map = TreeLocationMap::from_node(root);
 		Self {
 			html,
 			constants: Default::default(),
@@ -23,7 +20,7 @@ impl HtmlNodeHydrator {
 	}
 }
 
-impl Hydrator for HtmlNodeHydrator {
+impl DomTargetImpl for RsDomTarget {
 	fn html_constants(&self) -> &HtmlConstants { &self.constants }
 
 	fn render(&self) -> String { self.html.render() }
@@ -31,24 +28,25 @@ impl Hydrator for HtmlNodeHydrator {
 	fn update_rsx_node(
 		&mut self,
 		rsx: RsxNode,
-		loc: DomLocation,
+		loc: TreeLocation,
 	) -> ParseResult<()> {
 		let parent_idx = self
 			.loc_map
 			.rusty_locations
-			.get(&loc.rsx_idx)
+			.get(&loc.tree_idx)
 			.ok_or_else(|| {
 				ParseError::Hydration(format!(
-					"Could not find block parent for index: {}",
-					loc.rsx_idx
+					"Could not find block parent for tree index: {}",
+					loc.tree_idx
 				))
 			})?
 			.parent_idx
 			.to_string();
 
 		for html in self.html.iter_mut() {
+			// let parent_hash =
 			if let Some(parent_el) = html.query_selector_attr(
-				self.constants.rsx_idx_key,
+				self.constants.tree_idx_key,
 				Some(&parent_idx),
 			) {
 				return apply_rsx(parent_el, rsx, loc, &self.constants);
@@ -68,15 +66,15 @@ impl Hydrator for HtmlNodeHydrator {
 fn apply_rsx(
 	parent_el: &mut HtmlElementNode,
 	rsx: RsxNode,
-	loc: DomLocation,
+	loc: TreeLocation,
 	constants: &HtmlConstants,
 ) -> ParseResult<()> {
 	match rsx {
-		RsxNode::Fragment(vec) => todo!(),
+		RsxNode::Fragment { .. } => todo!(),
 		RsxNode::Component(_) => todo!(),
-		RsxNode::Block(RsxBlock { initial, effect }) => todo!(),
+		RsxNode::Block(RsxBlock { .. }) => todo!(),
 		RsxNode::Element(rsx_element) => todo!(),
-		RsxNode::Text(text) => {
+		RsxNode::Text { value, .. } => {
 			let child =
 				parent_el.children.get_mut(loc.child_idx as usize).ok_or_else(|| {
 					ParseError::Hydration(format!(
@@ -84,10 +82,10 @@ fn apply_rsx(
 						loc.child_idx,
 					))
 				})?;
-			*child = HtmlNode::Text(text);
+			*child = HtmlNode::Text(value);
 		}
-		RsxNode::Comment(_) => todo!(),
-		RsxNode::Doctype => todo!(),
+		RsxNode::Comment { .. } => todo!(),
+		RsxNode::Doctype { .. } => todo!(),
 	}
 	Ok(())
 }

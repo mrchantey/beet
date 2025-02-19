@@ -1,7 +1,7 @@
 use crate::prelude::*;
 use anyhow::Result;
 
-pub type RegisterEffect = Box<dyn FnOnce(DomLocation) -> Result<()>>;
+pub type RegisterEffect = Box<dyn FnOnce(TreeLocation) -> Result<()>>;
 
 
 pub struct Effect {
@@ -11,14 +11,11 @@ pub struct Effect {
 	/// the location of the effect in the rsx macro,
 	/// this may or may not be populated depending
 	/// on the settings of the parser
-	pub tracker: Option<RustyTracker>,
+	pub tracker: RustyTracker,
 }
 
 impl Effect {
-	pub fn new(
-		register: RegisterEffect,
-		tracker: Option<RustyTracker>,
-	) -> Self {
+	pub fn new(register: RegisterEffect, tracker: RustyTracker) -> Self {
 		Self { register, tracker }
 	}
 
@@ -27,11 +24,13 @@ impl Effect {
 	pub fn take(&mut self) -> Self {
 		let register =
 			std::mem::replace(&mut self.register, Box::new(|_| Ok(())));
-		let tracker = self.tracker.take();
-		Self { register, tracker }
+		Self {
+			register,
+			tracker: self.tracker,
+		}
 	}
 
-	pub fn register(self, loc: DomLocation) -> Result<()> {
+	pub fn register(self, loc: TreeLocation) -> Result<()> {
 		(self.register)(loc)
 	}
 }

@@ -1,14 +1,8 @@
-mod dom_location;
-mod dom_location_map;
 mod html_document;
 mod html_node;
 mod rsx_to_resumable_html;
-mod slots_visitor;
-pub use dom_location::*;
-pub use dom_location_map::*;
 pub use html_document::*;
 pub use html_node::*;
-pub use slots_visitor::*;
 mod rsx_to_html;
 pub use rsx_to_html::*;
 pub use rsx_to_resumable_html::*;

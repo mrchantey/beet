@@ -3,21 +3,21 @@ use crate::prelude::*;
 /// This map is updated every hot reload, the position
 /// of a rust block in the tree can change
 #[derive(Debug, Default, Clone, PartialEq)]
-pub struct DomLocationMap {
+pub struct TreeLocationMap {
 	// we could technically use a vec where the indices are 'block_idx',
-	// and track block_idx in the [DomLocation]
+	// and track block_idx in the [TreeLocation]
 	// but at this stage of the project thats harder to reason about
 	// and this provides symmetry with [Self::collapsed_elements]
-	pub rusty_locations: HashMap<RsxIdx, DomLocation>,
-	pub collapsed_elements: HashMap<RsxIdx, TextBlockEncoder>,
+	pub rusty_locations: HashMap<TreeIdx, TreeLocation>,
+	pub collapsed_elements: HashMap<TreeIdx, TextBlockEncoder>,
 }
 
 ///	Delimiter Reference:
-/// - `,` `-` `.` are used by [DomLocation::to_csv] and [TextBlockEncoder::to_csv]
+/// - `,` `-` `.` are used by [TreeLocation::to_csv] and [TextBlockEncoder::to_csv]
 /// - `*` seperates key value pairs
 /// - `;` seperates items in hash maps
 /// - `_` seperates [Self::rusty_locations] and [Self::collapsed_elements]
-impl DomLocationMap {
+impl TreeLocationMap {
 	pub fn to_csv(&self) -> String {
 		let mut csv = String::new();
 		csv.push_str(
@@ -58,7 +58,7 @@ impl DomLocationMap {
 					.next()
 					.ok_or_else(|| ParseError::Serde("missing value".into()))?;
 
-				Ok((key, DomLocation::from_csv(value)?))
+				Ok((key, TreeLocation::from_csv(value)?))
 			})
 			.collect::<ParseResult<HashMap<_, _>>>()?;
 		let collapsed_elements = parts
@@ -89,14 +89,14 @@ impl DomLocationMap {
 	pub fn from_node(node: &RsxNode) -> Self {
 		let mut map = Self::default();
 
-		DomLocationVisitor::visit(node, |loc, node| match node {
+		TreeLocationVisitor::visit(node, |loc, node| match node {
 			RsxNode::Block(_) => {
-				map.rusty_locations.insert(loc.rsx_idx, loc);
+				map.rusty_locations.insert(loc.tree_idx, loc);
 			}
 			RsxNode::Element(el) => {
 				if el.children.directly_contains_rust_node() {
-					let encoded = TextBlockEncoder::encode(loc.rsx_idx, el);
-					map.collapsed_elements.insert(loc.rsx_idx, encoded);
+					let encoded = TextBlockEncoder::encode(loc.tree_idx, el);
+					map.collapsed_elements.insert(loc.tree_idx, encoded);
 				}
 			}
 			_ => {}
@@ -108,7 +108,7 @@ impl DomLocationMap {
 
 #[cfg(test)]
 mod test {
-	use crate::prelude::*;
+	use crate::as_beet::*;
 	use sweet::prelude::*;
 
 	#[test]
@@ -123,39 +123,30 @@ mod test {
 			</div>
 		};
 
-		let map = DomLocationMap::from_node(&root);
+		let map = TreeLocationMap::from_node(&root);
 
 		// test csv
 		let csv = map.to_csv();
-		let map2 = DomLocationMap::from_csv(&csv).unwrap();
+		let map2 = TreeLocationMap::from_csv(&csv).unwrap();
 		expect(&map2).to_be(&map);
 		// println!("{:#?}", map);
 
 		expect(map.collapsed_elements).to_be(
-			vec![(0, TextBlockEncoder {
-				parent_id: 0,
+			vec![(0.into(), TextBlockEncoder {
+				parent_id: 0.into(),
 				split_positions: vec![vec![4, 5, 5], vec![10]],
 			})]
 			.into_iter()
 			.collect::<HashMap<_, _>>(),
 		);
 		// {desc}
-		expect(&map.rusty_locations[&3]).to_be(&DomLocation {
-			rsx_idx: 3,
-			parent_idx: 0,
-			child_idx: 1,
-		});
+		expect(&map.rusty_locations[&3.into()])
+			.to_be(&TreeLocation::new(3, 0, 1));
 		// {color}
-		expect(&map.rusty_locations[&6]).to_be(&DomLocation {
-			rsx_idx: 6,
-			parent_idx: 0,
-			child_idx: 3,
-		});
+		expect(&map.rusty_locations[&6.into()])
+			.to_be(&TreeLocation::new(6, 0, 3));
 		// {action}
-		expect(&map.rusty_locations[&10]).to_be(&DomLocation {
-			rsx_idx: 10,
-			parent_idx: 0,
-			child_idx: 5,
-		});
+		expect(&map.rusty_locations[&10.into()])
+			.to_be(&TreeLocation::new(10, 0, 5));
 	}
 }

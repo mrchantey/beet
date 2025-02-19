@@ -1,6 +1,8 @@
 mod rstml_rust_to_hash;
 mod rstml_to_rsx_template;
 mod rusty_tracker_builder;
+use proc_macro2::Literal;
+use quote::ToTokens;
 pub use rusty_tracker_builder::*;
 pub mod tokens_to_rstml;
 pub use self::rstml_rust_to_hash::*;
@@ -21,24 +23,79 @@ use syn::File;
 
 #[derive(Debug, Clone)]
 pub struct RsxIdents {
-	/// the identifier that contains the effect registration functions,
-	/// ie `SignalsRsx`, it will be called like `#register_ident::register_block(#block)`
-	pub effect: syn::Path,
-	pub event: syn::Path,
 	pub mac: syn::Ident,
+	pub runtime: RsxRuntime,
 }
 
-impl Default for RsxIdents {
-	fn default() -> Self {
+#[derive(Debug, Clone)]
+pub struct RsxRuntime {
+	/// the identifier that contains the effect registration functions,
+	/// ie `Sigfault`, it will be called like `#effect::parse_block_node(#block)`
+	pub effect: syn::Path,
+	pub event: syn::Path,
+}
+
+impl Default for RsxRuntime {
+	fn default() -> Self { Self::sigfault() }
+}
+
+impl RsxRuntime {
+	pub fn sigfault() -> Self {
 		Self {
-			effect: syn::parse_quote!(beet::rsx::signals_rsx::SignalsRsx),
+			effect: syn::parse_quote!(beet::rsx::sigfault::Sigfault),
 			event: syn::parse_quote!(beet::prelude::EventRegistry),
-			mac: syn::parse_quote!(rsx),
 		}
+	}
+	pub fn bevy() -> Self {
+		Self {
+			effect: syn::parse_quote!(beet::rsx::bevy::BevyRuntime),
+			event: syn::parse_quote!(beet::rsx::bevy::BevyEventRegistry),
+		}
+	}
+	/// Updates [`Self::effect`] to the given runtime. Built-in runtimes
+	/// have a shorthand:
+	/// - `sigfault` -> `beet::rsx::sigfault::Sigfault`
+	/// - `bevy` -> `beet::rsx::bevy::BevyRuntime`
+	pub fn set(&mut self, runtime: &str) -> syn::Result<()> {
+		*self = match runtime {
+			"sigfault" => Self::sigfault(),
+			"bevy" => Self::bevy(),
+			_ => {
+				let path: syn::Path = syn::parse_str(&runtime)?;
+				Self {
+					effect: path.clone(),
+					event: path,
+				}
+			}
+		};
+		Ok(())
 	}
 }
 
+/// Get the default RsxIdents.
+/// Usually implementers of [`beet_rsx_parser`] will have their
+/// own mechanism for overriding defaults, ie [`beet_rsx_macros`] would use
+/// feature flags and [`beet_cli`] would use cli args.
+impl Default for RsxIdents {
+	fn default() -> Self {
+		Self {
+			mac: syn::parse_quote!(rsx),
+			runtime: RsxRuntime::default(),
+		}
+	}
+}
+/// An incrementer for assigning unique indexes to each node in a given rsx tree.
+#[derive(Debug, Default)]
+pub struct TokensRsxIdxIncr(usize);
 
+impl TokensRsxIdxIncr {
+	pub fn next(&mut self) -> TokenStream {
+		let idx = self.0;
+		self.0 += 1;
+		let idx = Literal::usize_unsuffixed(idx);
+		idx.to_token_stream()
+	}
+}
 #[derive(Debug, Clone)]
 pub struct ParseRsx {
 	pub include_errors: bool,

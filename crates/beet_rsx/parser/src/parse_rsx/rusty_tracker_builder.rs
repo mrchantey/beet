@@ -36,21 +36,6 @@ impl RustyTrackerBuilder {
 		quote! {RustyTracker::new(#index, #tokens_hash)}
 	}
 
-	/// convenience method for RstmlToRsx where we may not want to build trackers
-	// #[deprecated = "these should be options on the builder"]
-	pub fn next_tracker_optional(
-		&mut self,
-		val: impl ToTokens,
-		build_trackers: bool,
-	) -> TokenStream {
-		if build_trackers {
-			let tokens = self.next_tracker(val);
-			quote! {Some(#tokens)}
-		} else {
-			quote! {None}
-		}
-	}
-
 	/// [`Self::Next`] but outputs to ron syntax
 	// #[deprecated = "these should be options on the builder"]
 	pub fn next_tracker_ron(&mut self, val: impl ToTokens) -> TokenStream {

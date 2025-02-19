@@ -1,5 +1,6 @@
 #![cfg_attr(test, feature(test, custom_test_frameworks))]
 #![cfg_attr(test, test_runner(sweet::test_runner))]
+#![cfg_attr(feature = "bevy", feature(unboxed_closures, fn_traits))]
 // #![deny(missing_docs)]
 //!
 //! All about rsx trees, html, hydrating patterns, signals.
@@ -7,17 +8,22 @@
 //! lightweight and intended to run on constrained devices like the ESP32
 //!
 //!
+pub mod dom;
 pub mod error;
 pub mod html;
-pub mod hydration;
 pub mod rsx;
-pub mod signals_rsx;
+pub mod sigfault;
 pub mod string_rsx;
 pub mod tree;
 #[cfg(feature = "macros")]
 pub use beet_rsx_macros::*;
 #[cfg(feature = "parser")]
 pub use beet_rsx_parser;
+#[cfg(feature = "bevy")]
+pub mod bevy;
+#[cfg(feature = "bevy")]
+pub use crate::bevy as bevy2;
+
 
 #[rustfmt::skip]
 pub mod prelude {
@@ -25,18 +31,20 @@ pub mod prelude {
 	pub use beet_rsx_macros::*;
 	#[cfg(feature = "parser")]
 	pub use beet_rsx_parser::prelude::*;
-	pub use crate::hydration::*;
+	pub use crate::dom::*;
 	pub use crate::error::*;
 	pub use crate::html::*;
 	pub use crate::tree::*;
 	pub use crate::rsx::*;
+	#[cfg(feature = "bevy")]
+	pub use crate::bevy::*;
 
 
 	pub type HashMap<K,V> = rapidhash::RapidHashMap<K,V>;
 	pub type HashSet<K> = rapidhash::RapidHashSet<K>;
 
-	#[cfg(test)]
-	pub use crate::as_beet::*;
+	// #[cfg(test)]
+	// pub use crate::as_beet::*;
 }
 
 // rsx macros expect 'beet'

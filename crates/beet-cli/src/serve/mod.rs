@@ -1,11 +1,11 @@
 use anyhow::Result;
 use beet_router::prelude::*;
 use clap::Parser;
-use routes_builder::RoutesBuilder;
+use file_routes_watcher::FileRoutesWatcher;
 use std::path::PathBuf;
 use sweet::prelude::Server;
 mod cargo_cmd;
-mod routes_builder;
+mod file_routes_watcher;
 ///
 #[derive(Debug, Parser)]
 pub struct Serve {
@@ -27,8 +27,16 @@ impl Serve {
 			serve_dir,
 		} = self;
 
+		let exe_name = if let Some(pkg) = &cargo_run.package {
+			pkg.clone()
+		} else {
+			unimplemented!()
+		};
+
 		let watch_handle = tokio::spawn(async move {
-			RoutesBuilder::new(collect_routes, cargo_run)?.watch().await
+			FileRoutesWatcher::new(exe_name, collect_routes, cargo_run)?
+				.watch()
+				.await
 		});
 
 		println!("🥁 Server running at {}", serve_dir.display());

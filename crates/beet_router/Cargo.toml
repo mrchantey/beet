@@ -13,6 +13,7 @@ keywords.workspace = true
 
 [features]
 parser = ["dep:beet_router_parser"]
+bevy = ["dep:bevy", "dep:tokio", "dep:flume"]
 # for internal testing
 _test_site = []
 
@@ -20,6 +21,9 @@ _test_site = []
 beet_router_parser = { workspace = true, optional = true }
 sweet = { workspace = true, features = ["fs"] }
 beet_rsx = { workspace = true, features = ["serde"] }
+bevy = { workspace = true, optional = true }
+tokio = { workspace = true, optional = true }
+flume = { workspace = true, optional = true }
 anyhow.workspace = true
 ron.workspace = true
 http.workspace = true
@@ -27,6 +31,6 @@ futures.workspace = true
 
 [dev-dependencies]
 ron.workspace = true
-beet_router = { path = "", features = ["parser", "_test_site"] }
+beet_router = { path = "", features = ["parser", "bevy", "_test_site"] }
 sweet = { workspace = true, features = ["test"] }
 tokio.workspace = true

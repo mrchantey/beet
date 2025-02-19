@@ -11,7 +11,7 @@ mod parse_file_routes;
 /// Parse a 'routes' dir, collecting all the routes,
 /// and create a `mod.rs` which contains
 /// a [ServerRoutes] struct with all the routes.
-#[derive(Debug, Parser)]
+#[derive(Debug, Clone, Parser)]
 pub struct CollectRoutes {
 	/// Optionally specify additional tokens to be added to the top of the file.
 	#[arg(long)]

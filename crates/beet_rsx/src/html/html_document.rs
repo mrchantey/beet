@@ -4,9 +4,10 @@ use super::RenderHtml;
 
 
 
-/// Requirements for a valid html document are that
-/// 1. head and body tags are present
-
+/// A valid html document has a particular structure, if the
+/// structure is missing it is usually inserterd by browsers, its
+/// better to assert the structure before rendering for guaranteed
+/// 1:1 mapping.
 #[derive(Debug, Clone)]
 pub struct HtmlDocument {
 	pub head: Vec<HtmlNode>,

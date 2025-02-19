@@ -1,3 +1,4 @@
+# https://rust-lang.github.io/rustfmt
 hard_tabs = true
 blank_lines_lower_bound = 0
 blank_lines_upper_bound = 10
@@ -10,3 +11,5 @@ group_imports = "One"
 imports_layout = "Vertical"
 overflow_delimited_expr = true
 use_field_init_shorthand = true
+# .gitignore rules
+ignore = ["crates/beet_site/src/routes/**/mod.rs"]

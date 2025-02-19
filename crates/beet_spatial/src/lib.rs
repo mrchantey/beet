@@ -13,7 +13,7 @@ pub mod procedural_animation;
 pub mod robotics;
 pub mod steer;
 pub mod steer_actions;
-#[cfg(feature = "ui")]
+#[cfg(feature = "bevy_ui")]
 pub mod ui;
 
 /// Re-exports of the most commonly used types and functions in `beet_spatial`.
@@ -32,7 +32,7 @@ pub mod prelude {
 	pub use crate::robotics::*;
 	pub use crate::steer::*;
 	pub use crate::steer_actions::*;
-	#[cfg(feature = "ui")]
+	#[cfg(feature = "bevy_ui")]
 	pub use crate::ui::*;
 }
 use crate::prelude::*;

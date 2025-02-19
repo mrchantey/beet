@@ -9,6 +9,7 @@ macro_rules! impl_visitor {
 		}
 
 		impl<F: FnMut(&$node_type)> $visitor_name<F> {
+			/// Walk the node with the default [`VisitRsxOptions`]
 			pub fn walk(node: &RsxNode, func: F) {
 				$visitor_name::new(func).walk_node(node);
 			}
@@ -86,15 +87,15 @@ macro_rules! impl_visitor_mut {
 
 
 impl_visitor!(VisitRsxNode, RsxNode, visit_node);
-impl_visitor!(VisitRsxComment, str, visit_comment);
-impl_visitor!(VisitRsxText, str, visit_text);
+// impl_visitor!(VisitRsxComment, str, visit_comment);
+// impl_visitor!(VisitRsxText, str, visit_text);
 impl_visitor!(VisitRsxBlock, RsxBlock, visit_block);
 impl_visitor!(VisitRsxElement, RsxElement, visit_element);
 impl_visitor!(VisitRsxComponent, RsxComponent, visit_component);
 
 impl_visitor_mut!(VisitRsxNodeMut, RsxNode, visit_node);
-impl_visitor_mut!(VisitRsxCommentMut, str, visit_comment);
-impl_visitor_mut!(VisitRsxTextMut, str, visit_text);
+// impl_visitor_mut!(VisitRsxCommentMut, str, visit_comment);
+// impl_visitor_mut!(VisitRsxTextMut, str, visit_text);
 impl_visitor_mut!(VisitRsxBlockMut, RsxBlock, visit_block);
 impl_visitor_mut!(VisitRsxElementMut, RsxElement, visit_element);
 impl_visitor_mut!(VisitRsxComponentMut, RsxComponent, visit_component);
@@ -104,7 +105,7 @@ impl_visitor_mut!(VisitRsxComponentMut, RsxComponent, visit_component);
 
 #[cfg(test)]
 mod test {
-	use crate::prelude::*;
+	use crate::as_beet::*;
 	use sweet::prelude::*;
 
 	#[test]

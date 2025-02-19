@@ -1,7 +1,7 @@
 // use beet_rsx as beet;
 use beet::prelude::*;
-use beet::rsx::signals_rsx::effect;
-use beet::rsx::signals_rsx::signal;
+use beet::rsx::sigfault::effect;
+use beet::rsx::sigfault::signal;
 
 struct MyComponent {
 	initial: u32,
@@ -42,7 +42,7 @@ fn render() {
 
 	let app = || rsx! {<MyComponent initial=7/>};
 	// effects are called on render
-	let doc = RsxToResumableHtml::default().map_node(&app());
+	let doc = RsxToResumableHtml::default().map_root(&app());
 	DomMounter::mount_doc(&doc);
 	DomMounter::normalize();
 	// sweet_utils::log!("mounted");
@@ -50,8 +50,7 @@ fn render() {
 	// give the dom time to mount
 	set_timeout_ms(100, move || {
 		// sweet_utils::log!("hydrating");
-		let hydrator = DomHydrator::default();
-		CurrentHydrator::set(hydrator);
+		DomTarget::set(BrowserDomTarget::default());
 		// effects called here too
 		app().register_effects();
 		EventRegistry::initialize().unwrap();

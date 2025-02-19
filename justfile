@@ -18,6 +18,7 @@ default:
 init-repo:
 	just assets-pull
 	mkdir -p crates/beet_ml/assets/ml && cp ./assets/ml/default-bert.ron crates/beet_ml/assets/ml/default.bert.ron
+	mkdir -p crates/beet_rsx/assets/fonts && cp ./assets/fonts/* crates/beet_rsx/assets/fonts
 # just test-site
 # just export-scenes
 
@@ -44,7 +45,7 @@ doc crate *args:
 	just watch cargo doc -p {{crate}} --open {{args}}
 
 fmt *args:
-	just watch 'cargo fmt {{args}} && just leptosfmt {{args}}'
+	cargo fmt {{args}} && just leptosfmt {{args}}
 
 leptosfmt *args:
 	leptosfmt 												\
@@ -59,10 +60,14 @@ leptosfmt *args:
 
 #💡 e2e examples
 
-run-reactive:
+# Run bevy reactive example on an endless loop, it exits on recompile required
+run-reactive-bevy:
+	while true; do cargo run --example bevy_reactive; done
+
+run-reactive-html:
 	cp ./index.html ./target/index.html
 	sweet serve ./target | \
-	just watch 'just build-wasm beet dom_renderer'
+	just watch 'just build-wasm beet dom_reactive'
 
 run-test-site:
 	cargo run -p beet_router --example collect_routes
@@ -75,7 +80,7 @@ run-beet-site:
 	just cli serve \
 	-p beet_site \
 	--src crates/beet_site/src \
-	--serve-dir target/client
+	--serve-dir target/client \	
 
 
 ## common
@@ -96,17 +101,20 @@ hello-world:
 	../bevyhub/scenes/ui-terminal-input.json \
 	./scenes/hello-world.json
 
-test-all *args:
+test-ci *args:
 	cargo fmt 				--check
 	just leptosfmt 		--check
 	cargo test --workspace										 --features=_doctest							{{args}}
 	cargo test 																 --all-features -p beet_flow 			{{args}}
-	cargo test 																 --all-features -p beet_rsx 			{{args}}
 	cargo test --target wasm32-unknown-unknown --all-features -p beet_flow 			{{args}}
-	cargo test --target wasm32-unknown-unknown --all-features -p beet_spatial 	{{args}}
-	cargo test --target wasm32-unknown-unknown --all-features -p beet_rsx 			{{args}}
+
 # no space left on device
-# cargo test 																 --all-features -p beet_spatial 	{{args}} 
+test-all *args:
+	just test-ci 																																{{args}}
+	cargo test 																 --all-features	-p beet_rsx 			{{args}}
+	cargo test --target wasm32-unknown-unknown --all-features -p beet_rsx 			{{args}}
+	cargo test 																 --all-features -p beet_spatial 	{{args}} 
+	cargo test --target wasm32-unknown-unknown --all-features -p beet_spatial 	{{args}}
 
 #cargo test -p beet_spatial
 #cargo test -p beet_sim
@@ -323,3 +331,10 @@ very-scary-purge-commit-history:
 
 	git remote add origin git@github.com:mrchantey/beet.git
 	git push -u --force origin main
+
+
+#💡 Misc
+
+# Cargo search but returns one line
+search *args:
+	cargo search {{args}} | head -n 1

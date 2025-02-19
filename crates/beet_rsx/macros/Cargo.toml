@@ -12,8 +12,9 @@ categories.workspace = true
 keywords.workspace = true
 
 [features]
-default = ["signals"]
-signals = []
+default = ["sigfault"]
+sigfault = []
+bevy = []
 
 [lib]
 proc-macro = true
