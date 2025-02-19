@@ -61,15 +61,16 @@ leptosfmt *args:
 #💡 e2e examples
 
 # Run bevy reactive example on an endless loop, it exits on recompile required
-run-bevy-reactive:
-	while true; do cargo run --example bevy_reactive --features=bevy_default; done
-run-bevy-reactive-if-ok:
-	while cargo run --example bevy_reactive --features=bevy_default && [ $? -eq 0 ]; do :; done
+run-bevy-rsx:
+	while true; do cargo run --example bevy_rsx --features=bevy_default; done
+# run-bevy-rsx but stop if there's an error
+run-bevy-rsx-if-ok:
+	while cargo run --example bevy_rsx --features=bevy_default && [ $? -eq 0 ]; do :; done
 
-run-dom-reactive:
+run-dom-rsx:
 	cp ./index.html ./target/index.html
 	sweet serve ./target | \
-	just watch 'just build-wasm beet dom_reactive'
+	just watch 'just build-wasm beet dom_rsx_client'
 
 run-test-site:
 	cargo run -p beet_router --example collect_routes

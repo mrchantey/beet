@@ -196,13 +196,13 @@ name = "hello_rsx"
 required-features = ["rsx"]
 path = "examples/rsx/hello_rsx.rs"
 [[example]]
-name = "dom_reactive"
+name = "dom_rsx_client"
 required-features = ["rsx"]
-path = "examples/rsx/dom_reactive.rs"
+path = "examples/rsx/dom_rsx_client.rs"
 [[example]]
-name = "bevy_reactive"
+name = "bevy_rsx"
 required-features = ["rsx", "bevy_default"]
-path = "examples/rsx/bevy_reactive.rs"
+path = "examples/rsx/bevy_rsx.rs"
 
 #💡flow
 
