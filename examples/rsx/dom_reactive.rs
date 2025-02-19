@@ -42,7 +42,7 @@ fn render() {
 
 	let app = || rsx! {<MyComponent initial=7/>};
 	// effects are called on render
-	let doc = RsxToResumableHtml::default().map_node(&app());
+	let doc = RsxToResumableHtml::default().map_root(&app());
 	DomMounter::mount_doc(&doc);
 	DomMounter::normalize();
 	// sweet_utils::log!("mounted");

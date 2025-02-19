@@ -17,7 +17,8 @@ thread_local! {
 pub struct BevyRuntime;
 
 impl BevyRuntime {
-	pub fn with<R>(func: impl FnOnce(&mut App) -> R) -> R {
+	pub fn reset() { Self::with_mut(|app| *app = App::new()); }
+	pub fn with_mut<R>(func: impl FnOnce(&mut App) -> R) -> R {
 		CURRENT_APP.with(|current| {
 			let mut current = current.borrow_mut();
 			func(&mut current)
@@ -30,11 +31,13 @@ impl BevyRuntime {
 	/// let node = rsx!{<div>{block}</div>};
 	/// ```
 	pub fn parse_block_node<M1, M2>(
+		idx: RsxIdx,
 		tracker: RustyTracker,
-		block: impl Clone + IntoRsx<M1> + SignalOrComponent<M2>,
+		block: impl Clone + IntoRsxRoot<M1> + SignalOrComponent<M2>,
 	) -> RsxNode {
 		RsxNode::Block(RsxBlock {
-			initial: Box::new(block.clone().into_rsx()),
+			idx,
+			initial: Box::new(block.clone().into_root()),
 			effect: Effect::new(block.into_node_block_effect(), tracker),
 		})
 	}
@@ -85,7 +88,7 @@ impl BevyRuntime {
 	}
 
 	pub fn serialize(val: &impl PartialReflect) -> ron::Result<String> {
-		Self::with(|app| {
+		Self::with_mut(|app| {
 			// let type_id = TypeId::of::<T>();
 			let registry = app.world().resource::<AppTypeRegistry>();
 			let registry = registry.read();
@@ -108,7 +111,8 @@ mod test {
 
 	#[test]
 	fn initial() {
-		BevyRuntime::with(|app| {
+		BevyRuntime::reset();
+		BevyRuntime::with_mut(|app| {
 			// app.init_resource::<AppTypeRegistry>();
 			app.register_type::<Vec3>();
 		});
@@ -133,13 +137,14 @@ mod test {
 
 	#[test]
 	fn block_node() {
+		BevyRuntime::reset();
 		let (get, set) = BevySignal::signal(1);
 
 		let node = rsx! { <entity runtime:bevy>{get}</entity> };
 		RsxToBevy::spawn(node).unwrap();
 		set(3);
 
-		let mut app = BevyRuntime::with(|app| std::mem::take(app));
+		let mut app = BevyRuntime::with_mut(|app| std::mem::take(app));
 		// flush signals
 		app.update();
 		let world = app.world_mut();
@@ -150,7 +155,8 @@ mod test {
 
 	#[test]
 	fn attr_value() {
-		BevyRuntime::with(|app| {
+		BevyRuntime::reset();
+		BevyRuntime::with_mut(|app| {
 			app.register_type::<Transform>();
 		});
 
@@ -159,7 +165,7 @@ mod test {
 		RsxToBevy::spawn(rsx).unwrap();
 		set(Vec3::new(3., 4., 5.));
 
-		let mut app = BevyRuntime::with(|app| std::mem::take(app));
+		let mut app = BevyRuntime::with_mut(|app| std::mem::take(app));
 		// flush signals
 		app.update();
 		let world = app.world_mut();

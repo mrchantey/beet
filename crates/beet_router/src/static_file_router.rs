@@ -43,8 +43,8 @@ impl<T: Default> Default for StaticFileRouter<T> {
 			state: Default::default(),
 			page_routes: Default::default(),
 			dst_dir: "target/client".into(),
-			// keep in sync with BuildRsxTemplates
-			templates_src: "target/rsx-templates.ron".into(),
+			// use the default from BuildRsxTemplateMap
+			templates_src: BuildRsxTemplateMap::new("").dst,
 		}
 	}
 }
@@ -85,8 +85,8 @@ impl<T: 'static> StaticFileRouter<T> {
 			.map_err(|err| {
 				// notify user that we are using routes
 				eprintln!(
-					"Live reload disabled - no templates found at {:?}",
-					&self.templates_src
+					"Live reload disabled - Error loading template map at: {:?}\n{:#?}",
+					self.templates_src, err,
 				);
 				err
 			})

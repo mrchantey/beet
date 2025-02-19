@@ -10,14 +10,13 @@ pub struct RsxToResumableHtml {
 	pub html_constants: HtmlConstants,
 }
 impl RsxToResumableHtml {
-	pub fn render_body(node: impl AsRef<RsxNode>) -> String {
-		Self::default().map_node(node).render()
+	pub fn render_body(root: &RsxRoot) -> String {
+		Self::default().map_root(root).render()
 	}
 
-	pub fn map_node(&mut self, node: impl AsRef<RsxNode>) -> HtmlDocument {
-		let node = node.as_ref();
-		let mut html = RsxToHtml::default().map_node(node).into_document();
-		self.insert_tree_location_map(node, &mut html);
+	pub fn map_root(&mut self, root: &RsxRoot) -> HtmlDocument {
+		let mut html = RsxToHtml::default().map_root(root).into_document();
+		self.insert_tree_location_map(root, &mut html);
 		self.insert_catch_prehydrated_events(&mut html);
 		html
 	}

@@ -1,13 +1,14 @@
+mod rsx_idx;
 mod slots_visitor;
 mod tree_location;
 mod tree_location_map;
-use rapidhash::rapidhash;
+pub use rsx_idx::*;
 pub use slots_visitor::*;
 pub use tree_location::*;
 pub use tree_location_map::*;
 mod effect;
 mod rsx_diff;
-mod rsx_idx_incr;
+mod tree_idx;
 mod rsx_location;
 mod rsx_root_map;
 mod rsx_template_map;
@@ -17,7 +18,7 @@ mod rsx_visitor_fn;
 mod rusty_part;
 #[cfg(feature = "css")]
 mod scoped_style;
-pub use rsx_idx_incr::*;
+pub use tree_idx::*;
 pub use rsx_root_map::*;
 pub use rsx_template_map::*;
 pub use rsx_template_node::*;
@@ -37,42 +38,6 @@ pub use effect::*;
 pub use rsx_location::*;
 pub use rsx_root::*;
 
-
-/// Unique identifier for every node in an rsx tree,
-/// and assigned to html elements that need it.
-/// The value is incremented every time an rsx node is encountered
-/// in a dfs pattern like [RsxVisitor].
-pub type RsxIdx = u32;
-
-/// An RsxIdx is unique only to the macro the node was created in,
-/// but for techniques like hot reloading we need to know not only
-/// the local index but enough to distinguish it from nodes
-/// in other trees.
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
-pub struct GlobalRsxIdx {
-	idx: RsxIdx,
-	/// The actual filename string is too expensive to store, 
-	/// it can be found at every [RsxRoot] so propagate it from there if needed.
-	/// Rapidhash seed is consistent across macro and runtime hashing
-	filename_hash: u64,
-	line: u32,
-	col: u32,
-}
-
-impl GlobalRsxIdx {
-	pub fn filename_hash(&self) -> u64 { self.filename_hash }
-	pub fn line(&self) -> u32 { self.line }
-	pub fn col(&self) -> u32 { self.col }
-	pub fn idx(&self) -> RsxIdx { self.idx }
-	pub fn new(filename: &str, line: u32, col: u32, idx: RsxIdx) -> Self {
-		Self {
-			filename_hash: rapidhash(filename.as_bytes()),
-			line,
-			col,
-			idx,
-		}
-	}
-}
 
 
 pub trait Rsx {
@@ -96,21 +61,6 @@ impl Rsx for () {
 // impl Rsx for String {
 // 	fn into_rsx(self) -> RsxNode { RsxNode::Text(self) }
 // }
-
-
-pub trait IntoRsx<M> {
-	fn into_rsx(self) -> RsxNode;
-}
-
-pub struct ToStringIntoRsx;
-impl<T: ToString> IntoRsx<(T, ToStringIntoRsx)> for T {
-	fn into_rsx(self) -> RsxNode { RsxNode::Text(self.to_string()) }
-}
-pub struct FuncIntoRsx;
-impl<T: FnOnce() -> U, U: IntoRsx<M2>, M2> IntoRsx<(M2, FuncIntoRsx)> for T {
-	fn into_rsx(self) -> RsxNode { self().into_rsx() }
-}
-
 
 pub trait Component {
 	fn render(self) -> RsxRoot;

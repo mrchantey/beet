@@ -21,18 +21,20 @@ impl Sigfault {
 	/// let node = rsx!{<div>{block}</div>};
 	/// ```
 	pub fn parse_block_node<M>(
+		idx: RsxIdx,
 		tracker: RustyTracker,
-		block: impl 'static + Clone + IntoRsx<M>,
+		block: impl 'static + Clone + IntoRsxRoot<M>,
 	) -> RsxNode {
 		RsxNode::Block(RsxBlock {
-			initial: Box::new(block.clone().into_rsx()),
+			idx,
+			initial: Box::new(block.clone().into_root()),
 			effect: Effect::new(
 				Box::new(move |loc: TreeLocation| {
 					effect(move || {
 						let block = block.clone();
-						DomTarget::with(move |hydrator| {
-							let node = block.clone().into_rsx();
-							hydrator.update_rsx_node(node, loc).unwrap()
+						DomTarget::with(move |target| {
+							let node = block.clone().into_root();
+							target.update_rsx_node(node.node, loc).unwrap()
 						});
 					});
 					Ok(())
@@ -83,7 +85,7 @@ impl Sigfault {
 						let value = block.clone().into_sigfault_val();
 						println!(
 							"would update attribute for {}\n{key}: {value}",
-							loc.rsx_idx
+							loc.tree_idx
 						);
 						todo!();
 					});
@@ -122,10 +124,10 @@ mod test {
 	fn works() {
 		let (get, set) = signal(7);
 
-		let rsx = || rsx! { <div>value is {get}</div> };
-		DomTarget::set(RsDomTarget::new(rsx.clone()));
+		let mut rsx = rsx! { <div>value is {get}</div> };
+		DomTarget::set(RsDomTarget::new(&rsx));
 
-		rsx().register_effects();
+		rsx.register_effects();
 		expect(&DomTarget::with(|h| h.render()))
 			.to_contain("<div data-beet-rsx-idx=\"0\">value is 7</div>");
 		set(8);

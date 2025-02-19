@@ -27,8 +27,14 @@ impl Serve {
 			serve_dir,
 		} = self;
 
+		let exe_name = if let Some(pkg) = &cargo_run.package {
+			pkg.clone()
+		} else {
+			unimplemented!()
+		};
+
 		let watch_handle = tokio::spawn(async move {
-			FileRoutesWatcher::new(collect_routes, cargo_run)?
+			FileRoutesWatcher::new(exe_name, collect_routes, cargo_run)?
 				.watch()
 				.await
 		});

@@ -51,9 +51,9 @@ impl BevyEventRegistry {
 		E: Event,
 		B: Bundle,
 	{
-		BevyRuntime::with(move |app| {
-			let mut query = app.world_mut().query::<(Entity, &BevyRsxIdx)>();
-			let entity = BevyRsxIdx::find(query.iter(app.world()), loc)
+		BevyRuntime::with_mut(move |app| {
+			let mut query = app.world_mut().query::<(Entity, &TreeIdx)>();
+			let entity = TreeIdx::find(query.iter(app.world()), loc)
 				.expect(&expect_rsx_element::to_be_at_location(&loc));
 
 			app.world_mut().entity_mut(entity).observe(observer);
@@ -82,7 +82,8 @@ mod test {
 
 	#[test]
 	fn registers() {
-		BevyRuntime::with(|app| {
+		BevyRuntime::reset();
+		BevyRuntime::with_mut(|app| {
 			app.add_plugins(BevyEventRegistry);
 			let bucket = mock_bucket();
 			let bucket2 = bucket.clone();
@@ -101,7 +102,8 @@ mod test {
 
 	#[test]
 	fn macro_works() {
-		BevyRuntime::with(|app| {
+		BevyRuntime::reset();
+		BevyRuntime::with_mut(|app| {
 			app.add_plugins(BevyEventRegistry);
 		});
 
@@ -118,7 +120,7 @@ mod test {
 		};
 		let entity = RsxToBevy::spawn(rsx).unwrap()[0];
 
-		BevyRuntime::with(|app| {
+		BevyRuntime::with_mut(|app| {
 			app.world_mut().entity_mut(entity).trigger(ClickEvt);
 			app.world_mut().flush();
 		});

@@ -10,14 +10,14 @@ use bevy::reflect::TypeRegistry;
 /// nodes.
 #[derive(Debug, Default)]
 pub struct RsxToBevy {
-	rsx_idx_incr: RsxIdxIncr,
+	tree_idx_incr: TreeIdxIncr,
 }
 
 
 impl RsxToBevy {
 	/// Registers effects and spawns the node
 	pub fn spawn(mut root: RsxRoot) -> Result<Vec<Entity>> {
-		let entities = BevyRuntime::with(|app| {
+		let entities = BevyRuntime::with_mut(|app| {
 			Self::default().spawn_root(app.world_mut(), &root)
 		})?;
 		root.register_effects();
@@ -43,19 +43,17 @@ impl RsxToBevy {
 		world: &mut World,
 		node: impl AsRef<RsxNode>,
 	) -> Result<Vec<Entity>> {
-		let idx = self.rsx_idx_incr.next();
+		let idx = self.tree_idx_incr.next();
 		// println!("rsx_to_bevy found node: {:?}", node.as_ref().discriminant());
 		let nodes = match node.as_ref() {
-			RsxNode::Doctype => unimplemented!(),
-			RsxNode::Comment(_) => {
+			RsxNode::Doctype { .. } => unimplemented!(),
+			RsxNode::Comment { .. } => {
 				unimplemented!()
 			}
-			RsxNode::Text(str) => {
+			RsxNode::Text { value, .. } => {
 				#[cfg(feature = "bevy_ui")]
 				{
-					let entity = world
-						.spawn((BevyRsxIdx::new(idx), Text::new(str)))
-						.id();
+					let entity = world.spawn((idx, Text::new(value))).id();
 					vec![entity]
 				}
 				#[cfg(not(feature = "bevy_ui"))]
@@ -65,7 +63,7 @@ impl RsxToBevy {
 					)
 				}
 			}
-			RsxNode::Fragment(rsx_nodes) => rsx_nodes
+			RsxNode::Fragment { nodes, .. } => nodes
 				.iter()
 				.map(|n| self.spawn_node(world, n))
 				.collect::<Result<Vec<_>>>()?
@@ -73,12 +71,13 @@ impl RsxToBevy {
 				.flatten()
 				.collect(),
 			RsxNode::Block(rsx_block) => {
-				self.spawn_node(world, &rsx_block.initial)?
+				self.spawn_root(world, &rsx_block.initial)?
 			}
 			RsxNode::Element(element) => {
 				vec![self.spawn_element(world, idx, element)?]
 			}
 			RsxNode::Component(RsxComponent {
+				idx: _,
 				tag: _,
 				tracker: _,
 				root,
@@ -93,7 +92,7 @@ impl RsxToBevy {
 	fn spawn_element(
 		&mut self,
 		world: &mut World,
-		idx: RsxIdx,
+		idx: TreeIdx,
 		element: &RsxElement,
 	) -> Result<Entity> {
 		// Arc::clone
@@ -102,7 +101,7 @@ impl RsxToBevy {
 
 		let children = self.spawn_node(world, &element.children)?;
 
-		let mut entity = world.spawn((BevyRsxIdx::new(idx), BevyRsxElement {
+		let mut entity = world.spawn((idx, BevyRsxElement {
 			tag: element.tag.clone(),
 		}));
 		entity.add_children(&children);
@@ -189,6 +188,7 @@ mod test {
 	}
 	#[test]
 	fn attribute_key_value() {
+		BevyRuntime::reset();
 		let mut app = App::new();
 		app.init_resource::<AppTypeRegistry>()
 			.register_type::<Transform>();
@@ -202,13 +202,13 @@ mod test {
 			.to_be(Some(&Transform::from_xyz(0., 1., 2.)));
 	}
 	#[test]
-	// #[ignore = "requires multiple runtimes"]
 	fn attribute_block_value() {
+		BevyRuntime::reset();
 		// without the runtime registration it will still serialize
 		// but with the wrong vec3 format, ie:
 		// (x:0.0,y:1.0,z:2.0) instead of the custom glam serde
 		// of (0.,1.,2.)
-		BevyRuntime::with(|app| {
+		BevyRuntime::with_mut(|app| {
 			app.register_type::<Transform>();
 		});
 

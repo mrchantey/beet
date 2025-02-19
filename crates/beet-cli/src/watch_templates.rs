@@ -38,7 +38,7 @@ impl WatchTemplates {
 				Ok(())
 			},
 		)?
-		.watch()
+		.recompile_and_watch()
 		.await
 	}
 }

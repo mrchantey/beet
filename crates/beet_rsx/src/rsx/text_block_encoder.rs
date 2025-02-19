@@ -15,14 +15,14 @@ use crate::prelude::*;
 /// ```
 #[derive(Debug, Clone, PartialEq)]
 pub struct TextBlockEncoder {
-	pub parent_id: RsxIdx,
+	pub parent_id: TreeIdx,
 	/// the index of the child text node that collapsed
 	/// a vec of 'next index to split at'
 	pub split_positions: Vec<Vec<usize>>,
 }
 
 impl TextBlockEncoder {
-	pub fn new(parent_id: RsxIdx) -> Self {
+	pub fn new(parent_id: TreeIdx) -> Self {
 		Self {
 			parent_id,
 			split_positions: Vec::new(),
@@ -31,8 +31,8 @@ impl TextBlockEncoder {
 
 
 	/// Store the indices
-	pub fn encode(id: RsxIdx, el: &RsxElement) -> Self {
-		let mut encoder = Self::new(id);
+	pub fn encode(idx: TreeIdx, el: &RsxElement) -> Self {
+		let mut encoder = Self::new(idx);
 		// the index is the child index and the value is a vec of 'next index to split at'
 		// let indices: Vec<Vec<usize>> = Vec::new();
 
@@ -155,22 +155,22 @@ impl CollapsedNode {
 	fn from_node(node: &RsxNode) -> Vec<CollapsedNode> {
 		let mut out = Vec::new();
 		match node {
-			RsxNode::Fragment(nodes) => {
+			RsxNode::Fragment { nodes, .. } => {
 				out.extend(nodes.into_iter().flat_map(Self::from_node));
 			}
 			RsxNode::Component(RsxComponent { root, .. }) => {
 				out.extend(Self::from_node(root));
 			}
 			RsxNode::Block(RsxBlock { initial, .. }) => {
-				out.push(CollapsedNode::RustText(
-					RsxToHtml::default().map_node(initial).render(),
-				));
+				out.push(CollapsedNode::RustText(RsxToHtml::render_body(
+					initial,
+				)));
 			}
-			RsxNode::Text(val) => {
-				out.push(CollapsedNode::StaticText(val.clone()))
+			RsxNode::Text { value, .. } => {
+				out.push(CollapsedNode::StaticText(value.clone()))
 			}
-			RsxNode::Doctype => out.push(CollapsedNode::Break),
-			RsxNode::Comment(_) => out.push(CollapsedNode::Break),
+			RsxNode::Doctype { .. } => out.push(CollapsedNode::Break),
+			RsxNode::Comment { .. } => out.push(CollapsedNode::Break),
 			RsxNode::Element(_) => out.push(CollapsedNode::Break),
 		}
 		return out;
@@ -262,7 +262,7 @@ mod test {
 			CollapsedNode::StaticText("dog\n\t\t\t".into()),
 		]);
 
-		let encoded = TextBlockEncoder::encode(0, &el);
+		let encoded = TextBlockEncoder::encode(0.into(), &el);
 		let csv = encoded.to_csv();
 		expect(&csv).to_be("0,4-5-5.10-5");
 

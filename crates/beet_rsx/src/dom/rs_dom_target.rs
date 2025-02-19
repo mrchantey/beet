@@ -9,12 +9,9 @@ pub struct RsDomTarget {
 }
 
 impl RsDomTarget {
-	pub fn new(rsx: impl Rsx) -> Self {
-		let rsx = rsx.into_rsx();
-		let html = RsxToResumableHtml::default().map_node(&rsx);
-
-		let loc_map = TreeLocationMap::from_node(&rsx);
-
+	pub fn new(root: &RsxRoot) -> Self {
+		let html = RsxToResumableHtml::default().map_root(root);
+		let loc_map = TreeLocationMap::from_node(root);
 		Self {
 			html,
 			constants: Default::default(),
@@ -36,19 +33,20 @@ impl DomTargetImpl for RsDomTarget {
 		let parent_idx = self
 			.loc_map
 			.rusty_locations
-			.get(&loc.rsx_idx)
+			.get(&loc.tree_idx)
 			.ok_or_else(|| {
 				ParseError::Hydration(format!(
-					"Could not find block parent for index: {}",
-					loc.rsx_idx
+					"Could not find block parent for tree index: {}",
+					loc.tree_idx
 				))
 			})?
 			.parent_idx
 			.to_string();
 
 		for html in self.html.iter_mut() {
+			// let parent_hash =
 			if let Some(parent_el) = html.query_selector_attr(
-				self.constants.rsx_idx_key,
+				self.constants.tree_idx_key,
 				Some(&parent_idx),
 			) {
 				return apply_rsx(parent_el, rsx, loc, &self.constants);
@@ -72,11 +70,11 @@ fn apply_rsx(
 	constants: &HtmlConstants,
 ) -> ParseResult<()> {
 	match rsx {
-		RsxNode::Fragment(vec) => todo!(),
+		RsxNode::Fragment { .. } => todo!(),
 		RsxNode::Component(_) => todo!(),
-		RsxNode::Block(RsxBlock { initial, effect }) => todo!(),
+		RsxNode::Block(RsxBlock { .. }) => todo!(),
 		RsxNode::Element(rsx_element) => todo!(),
-		RsxNode::Text(text) => {
+		RsxNode::Text { value, .. } => {
 			let child =
 				parent_el.children.get_mut(loc.child_idx as usize).ok_or_else(|| {
 					ParseError::Hydration(format!(
@@ -84,10 +82,10 @@ fn apply_rsx(
 						loc.child_idx,
 					))
 				})?;
-			*child = HtmlNode::Text(text);
+			*child = HtmlNode::Text(value);
 		}
-		RsxNode::Comment(_) => todo!(),
-		RsxNode::Doctype => todo!(),
+		RsxNode::Comment { .. } => todo!(),
+		RsxNode::Doctype { .. } => todo!(),
 	}
 	Ok(())
 }

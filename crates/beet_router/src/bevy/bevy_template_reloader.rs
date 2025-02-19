@@ -34,7 +34,7 @@ impl Plugin for BevyTemplateReloader {
 
 		let _handle = tokio::spawn(async move {
 			TemplateWatcher::new(builder, reload, recompile)?
-				.watch()
+				.recompile_and_watch()
 				.await
 		});
 

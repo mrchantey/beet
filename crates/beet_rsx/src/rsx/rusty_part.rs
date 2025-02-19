@@ -43,7 +43,7 @@ pub enum RustyPart {
 		root: RsxRoot,
 	},
 	RustBlock {
-		initial: RsxNode,
+		initial: RsxRoot,
 		register: RegisterEffect,
 	},
 	AttributeBlock {

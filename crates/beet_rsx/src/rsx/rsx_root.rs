@@ -5,6 +5,10 @@ use std::borrow::BorrowMut;
 
 /// This is an RsxNode and a location, which is required for hydration.
 ///
+/// It is allowed for the [`RsxRoot`] to be default(), which means that
+/// the macro location is a placeholder, this means that the the node
+/// will not be eligible for nested templating etc. which is the case
+/// anyway for Strings and ().
 ///
 /// The struct returned from an rsx! macro.
 #[derive(Debug, Default)]
@@ -38,8 +42,7 @@ impl RsxRoot {
 		#[cfg(feature = "css")]
 		ScopedStyle::default().apply(&mut self).unwrap();
 		SlotsVisitor::apply(&mut self).unwrap();
-		let html = RsxToHtml::default().map_node(&self);
-		html.render()
+		RsxToHtml::render_body(&self)
 	}
 }
 
@@ -63,4 +66,36 @@ impl Borrow<RsxNode> for RsxRoot {
 }
 impl BorrowMut<RsxNode> for RsxRoot {
 	fn borrow_mut(&mut self) -> &mut RsxNode { &mut self.node }
+}
+
+pub trait IntoRsxRoot<M> {
+	fn into_root(self) -> RsxRoot;
+}
+impl IntoRsxRoot<RsxRoot> for RsxRoot {
+	fn into_root(self) -> RsxRoot { self }
+}
+
+impl IntoRsxRoot<()> for () {
+	fn into_root(self) -> RsxRoot { RsxRoot::default() }
+}
+
+/// Strings are allowed to have an RsxMacroLocation::default(),
+/// as they will never be used for complex hydration etc
+pub struct ToStringIntoRsx;
+impl<T: ToString> IntoRsxRoot<(T, ToStringIntoRsx)> for T {
+	fn into_root(self) -> RsxRoot {
+		RsxRoot {
+			location: RsxMacroLocation::default(),
+			node: RsxNode::Text {
+				idx: RsxIdx::default(),
+				value: self.to_string(),
+			},
+		}
+	}
+}
+pub struct FuncIntoRsx;
+impl<T: FnOnce() -> U, U: IntoRsxRoot<M2>, M2> IntoRsxRoot<(M2, FuncIntoRsx)>
+	for T
+{
+	fn into_root(self) -> RsxRoot { self().into_root() }
 }

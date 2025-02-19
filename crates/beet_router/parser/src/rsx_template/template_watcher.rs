@@ -35,7 +35,10 @@ impl<Reload: FnMut() -> Result<()>, Recompile: FnMut() -> Result<()>>
 		})
 	}
 
-	pub async fn watch(mut self) -> Result<()> {
+	/// Run `recompile` once, then watch
+	pub async fn recompile_and_watch(mut self) -> Result<()> {
+		(self.recompile_func)()?;
+
 		let watcher = FsWatcher::default()
 			.with_path(&self.build_templates.src)
 			.with_exclude("*.git*")
@@ -58,7 +61,6 @@ impl<Reload: FnMut() -> Result<()>, Recompile: FnMut() -> Result<()>>
 		let files = ReadDir::files_recursive(src)?;
 		let now = Instant::now();
 		for file in files {
-			println!("canonicalizing file: {}", file.display());
 			let path = file.canonicalize()?;
 			let hash = HashRsxFile::file_to_hash(&path)?;
 			cache.insert(path, hash);

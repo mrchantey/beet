@@ -8,8 +8,8 @@ pub struct TreeLocationMap {
 	// and track block_idx in the [TreeLocation]
 	// but at this stage of the project thats harder to reason about
 	// and this provides symmetry with [Self::collapsed_elements]
-	pub rusty_locations: HashMap<RsxIdx, TreeLocation>,
-	pub collapsed_elements: HashMap<RsxIdx, TextBlockEncoder>,
+	pub rusty_locations: HashMap<TreeIdx, TreeLocation>,
+	pub collapsed_elements: HashMap<TreeIdx, TextBlockEncoder>,
 }
 
 ///	Delimiter Reference:
@@ -91,12 +91,12 @@ impl TreeLocationMap {
 
 		TreeLocationVisitor::visit(node, |loc, node| match node {
 			RsxNode::Block(_) => {
-				map.rusty_locations.insert(loc.rsx_idx, loc);
+				map.rusty_locations.insert(loc.tree_idx, loc);
 			}
 			RsxNode::Element(el) => {
 				if el.children.directly_contains_rust_node() {
-					let encoded = TextBlockEncoder::encode(loc.rsx_idx, el);
-					map.collapsed_elements.insert(loc.rsx_idx, encoded);
+					let encoded = TextBlockEncoder::encode(loc.tree_idx, el);
+					map.collapsed_elements.insert(loc.tree_idx, encoded);
 				}
 			}
 			_ => {}
@@ -132,30 +132,21 @@ mod test {
 		// println!("{:#?}", map);
 
 		expect(map.collapsed_elements).to_be(
-			vec![(0, TextBlockEncoder {
-				parent_id: 0,
+			vec![(0.into(), TextBlockEncoder {
+				parent_id: 0.into(),
 				split_positions: vec![vec![4, 5, 5], vec![10]],
 			})]
 			.into_iter()
 			.collect::<HashMap<_, _>>(),
 		);
 		// {desc}
-		expect(&map.rusty_locations[&3]).to_be(&TreeLocation {
-			rsx_idx: 3,
-			parent_idx: 0,
-			child_idx: 1,
-		});
+		expect(&map.rusty_locations[&3.into()])
+			.to_be(&TreeLocation::new(3, 0, 1));
 		// {color}
-		expect(&map.rusty_locations[&6]).to_be(&TreeLocation {
-			rsx_idx: 6,
-			parent_idx: 0,
-			child_idx: 3,
-		});
+		expect(&map.rusty_locations[&6.into()])
+			.to_be(&TreeLocation::new(6, 0, 3));
 		// {action}
-		expect(&map.rusty_locations[&10]).to_be(&TreeLocation {
-			rsx_idx: 10,
-			parent_idx: 0,
-			child_idx: 5,
-		});
+		expect(&map.rusty_locations[&10.into()])
+			.to_be(&TreeLocation::new(10, 0, 5));
 	}
 }

@@ -84,8 +84,7 @@ impl Default for RsxIdents {
 		}
 	}
 }
-/// A tokens version of the [beet_rsx::RsxIdxIncr] with the same rules:
-/// Next must be called before visiting every single rstml node.
+/// An incrementer for assigning unique indexes to each node in a given rsx tree.
 #[derive(Debug, Default)]
 pub struct TokensRsxIdxIncr(usize);
 

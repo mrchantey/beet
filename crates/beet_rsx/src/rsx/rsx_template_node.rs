@@ -25,6 +25,7 @@ pub enum RsxTemplateNode {
 		idx: RsxIdx,
 		items: Vec<Self>,
 	},
+	/// the initial value is the responsibility of the [RustyPart::RustBlock]
 	RustBlock {
 		idx: RsxIdx,
 		tracker: RustyTracker,
@@ -108,75 +109,64 @@ impl RsxTemplateNode {
 	}
 
 	pub fn from_rsx_node(node: impl AsRef<RsxNode>) -> TemplateResult<Self> {
-		Self::from_rsx_node_inner(node, &mut RsxIdxIncr::default())
-	}
-	fn from_rsx_node_inner(
-		node: impl AsRef<RsxNode>,
-		rsx_idx_incr: &mut RsxIdxIncr,
-	) -> TemplateResult<Self> {
-		let idx = rsx_idx_incr.next();
 		match node.as_ref() {
-			RsxNode::Fragment(rsx_nodes) => {
-				let items = rsx_nodes
+			RsxNode::Fragment { idx, nodes } => {
+				let items = nodes
 					.iter()
-					.map(|n| Self::from_rsx_node_inner(n, rsx_idx_incr))
+					.map(|n| Self::from_rsx_node(n))
 					.collect::<TemplateResult<Vec<_>>>()?;
-				Ok(Self::Fragment { idx, items })
+				Ok(Self::Fragment { idx: *idx, items })
 			}
 			RsxNode::Component(RsxComponent {
+				idx,
 				tag,
 				tracker,
-				// ignore the node, it is the responsibility of rsx_hydrate_node
+				// ignore root, its a seperate tree
 				root: _,
 
 				slot_children,
 			}) => Ok(Self::Component {
-				idx,
+				idx: *idx,
 				// location: node.location.clone(),
-				// node: Box::new(Self::from_rsx_node_inner(node)?),
-				slot_children: Box::new(Self::from_rsx_node_inner(
-					slot_children,
-					rsx_idx_incr,
-				)?),
+				// node: Box::new(Self::from_rsx_node(node)?),
+				slot_children: Box::new(Self::from_rsx_node(slot_children)?),
 				tracker: tracker.clone(),
 				tag: tag.clone(),
 			}),
-			RsxNode::Block(RsxBlock { effect, initial }) => {
-				// even though we arent storing the initial, we sill
-				// must visit to increment the idx
-				let _ = Self::from_rsx_node_inner(initial, rsx_idx_incr)?;
-				Ok(Self::RustBlock {
-					idx,
-					tracker: effect.tracker.clone(),
-				})
-			}
+			RsxNode::Block(RsxBlock {
+				idx,
+				effect,
+				// ignore initial, its a seperate tree
+				initial: _,
+			}) => Ok(Self::RustBlock {
+				idx: *idx,
+				tracker: effect.tracker.clone(),
+			}),
 			RsxNode::Element(RsxElement {
+				idx,
 				tag,
 				attributes,
 				children,
 				self_closing,
 			}) => Ok(Self::Element {
 				tag: tag.clone(),
-				idx,
+				idx: *idx,
 				self_closing: *self_closing,
 				attributes: attributes
 					.iter()
 					.map(|attr| RsxTemplateAttribute::from_rsx_attribute(attr))
 					.collect::<TemplateResult<Vec<_>>>()?,
-				children: Box::new(Self::from_rsx_node_inner(
-					children,
-					rsx_idx_incr,
-				)?),
+				children: Box::new(Self::from_rsx_node(children)?),
 			}),
-			RsxNode::Text(text) => Ok(Self::Text {
-				idx,
-				value: text.clone(),
+			RsxNode::Text { idx, value } => Ok(Self::Text {
+				idx: *idx,
+				value: value.clone(),
 			}),
-			RsxNode::Comment(comment) => Ok(Self::Comment {
-				idx,
-				value: comment.clone(),
+			RsxNode::Comment { idx, value } => Ok(Self::Comment {
+				idx: *idx,
+				value: value.clone(),
 			}),
-			RsxNode::Doctype => Ok(Self::Doctype { idx }),
+			RsxNode::Doctype { idx } => Ok(Self::Doctype { idx: *idx }),
 		}
 	}
 
@@ -189,24 +179,26 @@ impl RsxTemplateNode {
 		rusty_map: &mut HashMap<RustyTracker, RustyPart>,
 	) -> TemplateResult<RsxNode> {
 		match self {
-			RsxTemplateNode::Doctype { idx: _ } => Ok(RsxNode::Doctype),
-			RsxTemplateNode::Text { value, idx: _ } => Ok(RsxNode::Text(value)),
-			RsxTemplateNode::Comment { value, idx: _ } => {
-				Ok(RsxNode::Comment(value))
+			RsxTemplateNode::Doctype { idx } => Ok(RsxNode::Doctype { idx }),
+			RsxTemplateNode::Text { value, idx } => {
+				Ok(RsxNode::Text { idx, value })
+			}
+			RsxTemplateNode::Comment { value, idx } => {
+				Ok(RsxNode::Comment { idx, value })
 			}
 
-			RsxTemplateNode::Fragment { items, idx: _ } => {
+			RsxTemplateNode::Fragment { items, idx } => {
 				let nodes = items
 					.into_iter()
 					.map(|node| node.into_rsx_node(template_map, rusty_map))
 					.collect::<TemplateResult<Vec<_>>>()?;
-				Ok(RsxNode::Fragment(nodes))
+				Ok(RsxNode::Fragment { idx, nodes })
 			}
 			RsxTemplateNode::Component {
 				tracker,
 				tag,
 				slot_children,
-				idx: _,
+				idx,
 			} => {
 				let root =
 					match rusty_map.remove(&tracker).ok_or_else(|| {
@@ -227,6 +219,7 @@ impl RsxTemplateNode {
 				// here we need apply the template for the component
 				let root = template_map.apply_template(root)?;
 				Ok(RsxNode::Component(RsxComponent {
+					idx,
 					tag: tag.clone(),
 					tracker,
 					root: Box::new(root),
@@ -235,7 +228,7 @@ impl RsxTemplateNode {
 					),
 				}))
 			}
-			RsxTemplateNode::RustBlock { tracker, idx: _ } => {
+			RsxTemplateNode::RustBlock { tracker, idx } => {
 				let (initial, register) =
 					match rusty_map.remove(&tracker).ok_or_else(|| {
 						TemplateError::no_rusty_map(
@@ -255,17 +248,19 @@ impl RsxTemplateNode {
 						),
 					}?;
 				Ok(RsxNode::Block(RsxBlock {
+					idx,
 					initial: Box::new(initial),
 					effect: Effect::new(register, tracker),
 				}))
 			}
 			RsxTemplateNode::Element {
+				idx,
 				tag,
 				self_closing,
 				attributes,
 				children,
-				idx: _,
 			} => Ok(RsxNode::Element(RsxElement {
+				idx,
 				tag,
 				self_closing,
 				attributes: attributes

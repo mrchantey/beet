@@ -5,7 +5,7 @@ use bevy::prelude::*;
 use bevy::winit::WinitSettings;
 
 fn main() {
-	BevyRuntime::with(|app| {
+	BevyRuntime::with_mut(|app| {
 		app.add_plugins((DefaultPlugins, BevyEventRegistry))
 			.insert_resource(WinitSettings::desktop_app());
 		// .add_systems(Startup, setup);
@@ -15,7 +15,7 @@ fn main() {
 		<cam Camera2d />
 	};
 	let _entity = RsxToBevy::spawn(scene).unwrap()[0];
-	BevyRuntime::with(|app| {
+	BevyRuntime::with_mut(|app| {
 		app.run();
 	});
 

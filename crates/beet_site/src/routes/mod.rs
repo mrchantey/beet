@@ -4,7 +4,6 @@ pub mod contributing;
 pub mod index;
 use beet::prelude::*;
 pub fn collect_file_routes(router: &mut beet::router::DefaultFileRouter) {
-	router
-		.add_route((RouteInfo::new("/contributing", "get"), contributing::get));
-	router.add_route((RouteInfo::new("/", "get"), index::get));
+    router.add_route((RouteInfo::new("/contributing", "get"), contributing::get));
+    router.add_route((RouteInfo::new("/", "get"), index::get));
 }

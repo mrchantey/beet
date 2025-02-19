@@ -56,7 +56,7 @@ impl<T: SignalPayload> BevySignal<T> {
 
 	pub fn signal(initial: T) -> (SignalGetter<T>, impl Fn(T) -> ()) {
 		let initial2 = initial.clone();
-		let entity = BevyRuntime::with(move |app| {
+		let entity = BevyRuntime::with_mut(move |app| {
 			// app.init_resource::<AppTypeRegistry>();
 			app.register_type::<T>();
 
@@ -83,7 +83,7 @@ impl<T: SignalPayload> BevySignal<T> {
 
 		// we need two channels. one to update bevy, and one to update the getter directly
 		let send_to_bevy =
-			BevyRuntime::with(|app| SignalChannel::<T>::get_or_init(app));
+			BevyRuntime::with_mut(|app| SignalChannel::<T>::get_or_init(app));
 
 		let (send_to_getter, recv_from_setter) = flume::unbounded();
 
@@ -173,12 +173,12 @@ impl<T: Reflectable + SignalOrComponent<M>, M>
 		Box::new(move |block_loc: TreeLocation| {
 			// register_effect provides the location of the block, not the initial which is +1.
 			// i guess its guaranteed to be +1 so we can just increment?
-			let inner_idx = block_loc.rsx_idx + 1;
-			BevyRuntime::with(move |app| {
+			let inner_idx = *block_loc.tree_idx + 1;
+			BevyRuntime::with_mut(move |app| {
 				app.world_mut().entity_mut(self.entity).observe(
 					move |ev: Trigger<BevySignal<T>>,
 					      mut query: Query<(
-						&BevyRsxIdx,
+						&TreeIdx,
 						&mut T::Component,
 					)>| {
 						for (idx, mut component) in query.iter_mut() {
@@ -234,15 +234,14 @@ impl<T: SignalPayload + SignalOrRon<M>, M>
 	/// with the value of the signal when it changes.
 	fn into_attribute_value_effect(self, field_path: String) -> RegisterEffect {
 		Box::new(move |loc| {
-			BevyRuntime::with(move |app| {
+			BevyRuntime::with_mut(move |app| {
 				app.world_mut().entity_mut(self.entity).observe(
 					move |ev: Trigger<BevySignal<T>>,
 					      registry: Res<AppTypeRegistry>,
-					      mut query: Query<EntityMut, With<BevyRsxIdx>>| {
-						let entity = BevyRsxIdx::find_mut(&mut query, loc)
-							.expect(&expect_rsx_element::to_be_at_location(
-								&loc,
-							));
+					      mut query: Query<EntityMut, With<TreeIdx>>| {
+						let entity = TreeIdx::find_mut(&mut query, loc).expect(
+							&expect_rsx_element::to_be_at_location(&loc),
+						);
 						let registry = registry.read();
 						ReflectUtils::apply_at_path(
 							&registry,
@@ -269,11 +268,13 @@ mod test {
 
 	#[test]
 	fn signal() {
+		BevyRuntime::reset();
+
 		let (mut get, set) = BevySignal::signal(7);
 		expect(get()).to_be(7);
 		set(8);
 		// flush signals
-		BevyRuntime::with(|a| a.update());
+		BevyRuntime::with_mut(|a| a.update());
 		expect(get()).to_be(8);
 	}
 }

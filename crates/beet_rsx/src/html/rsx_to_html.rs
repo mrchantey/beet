@@ -10,8 +10,7 @@ pub struct RsxToHtml {
 	pub no_beet_attributes: bool,
 	/// text node content will be trimmed
 	pub trim: bool,
-	/// Incrementer to get the Rsx id
-	rsx_idx_incr: RsxIdxIncr,
+	tree_idx_incr: TreeIdxIncr,
 }
 
 
@@ -25,74 +24,78 @@ impl RsxToHtml {
 
 	/// convenience so you dont have to add
 	/// a `.render()` at the end of a long rsx macro
-	pub fn render_body(node: impl AsRef<RsxNode>) -> String {
-		Self::default().map_node(node).render()
+	pub fn render_body(root: &RsxRoot) -> String {
+		Self::default().map_root(root).render()
+	}
+
+	pub fn map_root(&mut self, root: &RsxRoot) -> Vec<HtmlNode> {
+		// do we need to use location?
+		self.map_node(&root.node)
 	}
 
 	/// recursively map rsx nodes to html nodes
 	/// ## Panics
 	/// If slot children have not been applied
 	pub fn map_node(&mut self, node: impl AsRef<RsxNode>) -> Vec<HtmlNode> {
-		let idx = self.rsx_idx_incr.next();
+		let idx = self.tree_idx_incr.next();
 		match node.as_ref() {
-			RsxNode::Doctype => vec![HtmlNode::Doctype],
-			RsxNode::Comment(str) => vec![HtmlNode::Comment(str.clone())],
-			RsxNode::Text(str) => {
-				let str = if self.trim { str.trim() } else { str };
+			RsxNode::Doctype { .. } => vec![HtmlNode::Doctype],
+			RsxNode::Comment { value, .. } => {
+				vec![HtmlNode::Comment(value.clone())]
+			}
+			RsxNode::Text { value, .. } => {
+				let str = if self.trim { value.trim() } else { value };
 				vec![HtmlNode::Text(str.into())]
 			}
 			RsxNode::Element(e) => {
 				vec![HtmlNode::Element(self.map_element(idx, e))]
 			}
-			RsxNode::Fragment(rsx_nodes) => rsx_nodes
-				.iter()
-				.map(|n| self.map_node(n))
-				.flatten()
-				.collect(),
-			RsxNode::Block(rsx_block) => self.map_node(&rsx_block.initial),
-
+			RsxNode::Fragment { nodes, .. } => {
+				nodes.iter().map(|n| self.map_node(n)).flatten().collect()
+			}
+			RsxNode::Block(rsx_block) => self.map_node(&rsx_block.initial.node),
 			RsxNode::Component(RsxComponent {
-				tag: _,
-				tracker: _,
 				root,
 				slot_children,
+				..
 			}) => {
 				slot_children.assert_empty();
-				self.map_node(root.as_ref())
+				// use the location of the root
+				self.map_node(&root.node)
 			}
 		}
 	}
 
 	pub fn map_element(
 		&mut self,
-		idx: RsxIdx,
-		rsx_el: &RsxElement,
+		idx: TreeIdx,
+		el: &RsxElement,
 	) -> HtmlElementNode {
-		let mut html_attributes = rsx_el
+		let mut html_attributes = el
 			.attributes
 			.iter()
 			.map(|a| self.map_attribute(idx, a))
 			.flatten()
 			.collect::<Vec<_>>();
 
-		if !self.no_beet_attributes && rsx_el.contains_rust() {
+		if !self.no_beet_attributes && el.contains_rust() {
 			html_attributes.push(HtmlAttribute {
-				key: self.html_constants.rsx_idx_key.to_string(),
+				key: self.html_constants.tree_idx_key.to_string(),
 				value: Some(idx.to_string()),
 			});
 		}
 
 		HtmlElementNode {
-			tag: rsx_el.tag.clone(),
-			self_closing: rsx_el.self_closing,
+			tag: el.tag.clone(),
+			self_closing: el.self_closing,
 			attributes: html_attributes,
-			children: self.map_node(&rsx_el.children),
+			children: self.map_node(&el.children),
 		}
 	}
 
 	pub fn map_attribute(
 		&self,
-		idx: RsxIdx,
+		idx: TreeIdx,
 		attr: &RsxAttribute,
 	) -> Vec<HtmlAttribute> {
 		match attr {
@@ -112,7 +115,8 @@ impl RsxToHtml {
 						key: key.clone(),
 						value: Some(format!(
 							"{}({}, event)",
-							self.html_constants.event_handler, idx,
+							self.html_constants.event_handler,
+							idx.to_string(),
 						)),
 					}]
 				} else {
@@ -288,7 +292,7 @@ mod test {
 				trim: true,
 				..Default::default()
 			}
-			.map_node(&rsx! { "  hello  " })
+			.map_root(&rsx! { "  hello  " })
 			.render(),
 		)
 		.to_be("hello");

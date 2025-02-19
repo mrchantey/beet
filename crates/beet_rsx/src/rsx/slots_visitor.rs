@@ -97,14 +97,14 @@ impl SlotsVisitor {
 		VisitRsxNodeMut::walk(
 			&mut component.slot_children,
 			|node| match node {
-				RsxNode::Doctype
-				| RsxNode::Comment(_)
-				| RsxNode::Text(_)
+				RsxNode::Doctype { .. }
+				| RsxNode::Comment { .. }
+				| RsxNode::Text { .. }
 				| RsxNode::Block(_) => {
 					// taking a mutable node results in its children not being visited
 					default_slots.push(std::mem::take(node));
 				}
-				RsxNode::Fragment(_) => {
+				RsxNode::Fragment { .. } => {
 					// println!("fragment");
 					// allow traversal
 				}
@@ -160,7 +160,7 @@ impl RsxVisitorMut for SlotsVisitor {
 		self.default_slots.is_empty() && self.named_slots.is_empty()
 	}
 
-	/// visit node so we can replace slot with fragment
+	/// visit node so we can replace slot with fragment of same idx
 	fn visit_node(&mut self, node: &mut RsxNode) {
 		match node {
 			RsxNode::Element(element) => {
@@ -182,7 +182,10 @@ impl RsxVisitorMut for SlotsVisitor {
 						// drains the default slots
 						std::mem::take(&mut self.default_slots)
 					};
-					*node = RsxNode::Fragment(nodes);
+					*node = RsxNode::Fragment {
+						idx: element.idx,
+						nodes,
+					};
 				}
 			}
 			_ => {}
@@ -248,7 +251,7 @@ mod test {
 		};
 		SlotsVisitor::apply(&mut slot_example.node).unwrap();
 		// println!("{:?}", slot_example);
-		expect(RsxToHtml::render_body(slot_example)).to_be(
+		expect(RsxToHtml::render_body(&slot_example)).to_be(
 			"<html><html><div>Header</div><div>Default</div></html></html>",
 		);
 	}

@@ -56,21 +56,24 @@ impl BrowserDomTarget {
 	/// try to get cached element or find it in the dom.
 	/// When it is found it will uncollapse text nodes,
 	/// ie expand into the locations referenced by the [TreeLocation]
-	fn get_or_find_element(&mut self, rsx_idx: RsxIdx) -> ParseResult<Element> {
-		if let Some(Some(el)) = self.elements.get(rsx_idx as usize) {
+	fn get_or_find_element(
+		&mut self,
+		tree_idx: TreeIdx,
+	) -> ParseResult<Element> {
+		if let Some(Some(el)) = self.elements.get(*tree_idx as usize) {
 			return Ok(el.clone());
 		}
 
-		let query = format!("[{}='{}']", self.constants.rsx_idx_key, rsx_idx);
+		let query = format!("[{}='{}']", self.constants.tree_idx_key, tree_idx);
 		if let Some(el) = self.document.query_selector(&query).unwrap() {
-			self.elements.resize((rsx_idx + 1) as usize, None);
-			self.elements[rsx_idx as usize] = Some(el.clone());
-			self.uncollapse_child_text_nodes(&el, rsx_idx)?;
+			self.elements.resize((*tree_idx + 1) as usize, None);
+			self.elements[*tree_idx as usize] = Some(el.clone());
+			self.uncollapse_child_text_nodes(&el, tree_idx)?;
 			Ok(el)
 		} else {
 			Err(ParseError::Hydration(format!(
 				"Could not find parent for collapsed text node with rsx idx: {}",
-				rsx_idx
+				tree_idx
 			)))
 		}
 	}
@@ -79,11 +82,11 @@ impl BrowserDomTarget {
 	fn uncollapse_child_text_nodes(
 		&mut self,
 		el: &Element,
-		rsx_idx: RsxIdx,
+		tree_idx: TreeIdx,
 	) -> ParseResult<()> {
 		let children = el.child_nodes();
 		let loc_map = self.get_tree_location_map()?;
-		let Some(el_cx) = loc_map.collapsed_elements.get(&rsx_idx) else {
+		let Some(el_cx) = loc_map.collapsed_elements.get(&tree_idx) else {
 			// here we assume this is because the element has no children
 			// so was not tracked
 			// elements without rust children are not tracked
@@ -145,21 +148,21 @@ impl DomTargetImpl for BrowserDomTarget {
 
 		#[allow(unused)]
 		match rsx {
-			RsxNode::Fragment(vec) => todo!(),
+			RsxNode::Fragment { .. } => todo!(),
 			RsxNode::Component(_) => todo!(),
-			RsxNode::Block(RsxBlock { initial, effect }) => {
+			RsxNode::Block(RsxBlock { .. }) => {
 				todo!()
 			}
 			RsxNode::Element(rsx_element) => todo!(),
-			RsxNode::Text(val) => {
+			RsxNode::Text { value, .. } => {
 				if let Some(child) = child.dyn_ref::<Text>() {
-					child.set_text_content(Some(&val));
+					child.set_text_content(Some(&value));
 				} else {
 					todo!("replace with text node");
 				}
 			}
-			RsxNode::Comment(_) => todo!(),
-			RsxNode::Doctype => todo!(),
+			RsxNode::Comment { .. } => todo!(),
+			RsxNode::Doctype { .. } => todo!(),
 		}
 
 

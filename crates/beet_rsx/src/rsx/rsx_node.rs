@@ -6,34 +6,51 @@ use strum_macros::EnumDiscriminants;
 #[derive(Debug, AsRefStr, EnumDiscriminants)]
 pub enum RsxNode {
 	/// a html doctype node
-	Doctype,
+	Doctype {
+		idx: RsxIdx,
+	},
 	/// a html comment node
-	Comment(String),
+	Comment {
+		idx: RsxIdx,
+		value: String,
+	},
 	/// a html text node
-	Text(String),
+	Text {
+		idx: RsxIdx,
+		value: String,
+	},
 	/// a rust block that returns text
 	Block(RsxBlock),
 	/// A transparent node that simply contains children
 	/// This may be deprecated in the future if no patterns
 	/// require it. The RstmlToRsx could support it
-	Fragment(Vec<RsxNode>),
+	Fragment {
+		idx: RsxIdx,
+		nodes: Vec<RsxNode>,
+	},
 	/// a html element
 	Element(RsxElement),
 	Component(RsxComponent),
 }
 
 impl Default for RsxNode {
-	fn default() -> Self { Self::Fragment(Vec::new()) }
+	fn default() -> Self {
+		Self::Fragment {
+			idx: RsxIdx::default(),
+			nodes: Vec::new(),
+		}
+	}
 }
+
 
 impl RsxNode {
 	/// Returns true if the node is an empty fragment,
 	/// or all children are empty fragments
 	pub fn assert_empty(&self) {
 		match self {
-			RsxNode::Fragment(children) => {
-				for child in children {
-					child.assert_empty();
+			RsxNode::Fragment { nodes: items, .. } => {
+				for item in items {
+					item.assert_empty();
 				}
 				return;
 			}
@@ -51,9 +68,9 @@ impl RsxNode {
 	/// Returns true if the node is an html node
 	pub fn is_html_node(&self) -> bool {
 		match self {
-			RsxNode::Doctype
-			| RsxNode::Comment(_)
-			| RsxNode::Text(_)
+			RsxNode::Doctype { .. }
+			| RsxNode::Comment { .. }
+			| RsxNode::Text { .. }
 			| RsxNode::Element(_) => true,
 			_ => false,
 		}
@@ -97,9 +114,9 @@ impl RsxNode {
 		fn walk(node: &RsxNode) -> bool {
 			match node {
 				RsxNode::Block(_) => true,
-				RsxNode::Fragment(rsx_nodes) => {
-					for node in rsx_nodes {
-						if walk(node) {
+				RsxNode::Fragment { nodes, .. } => {
+					for item in nodes {
+						if walk(item) {
 							return true;
 						}
 					}
@@ -122,7 +139,9 @@ impl RsxNode {
 /// ```
 #[derive(Debug)]
 pub struct RsxBlock {
-	pub initial: Box<RsxNode>,
+	pub idx: RsxIdx,
+	/// The initial for an rsx block is considered a seperate tree,
+	pub initial: Box<RsxRoot>,
 	pub effect: Effect,
 }
 /// Representation of a rusty node.
@@ -140,6 +159,9 @@ pub struct RsxFragment(pub Vec<RsxNode>);
 /// with the [`Component::render`] method and any slot children.
 #[derive(Debug)]
 pub struct RsxComponent {
+	/// The index of this node in the local tree
+	pub idx: RsxIdx,
+	/// The name of the component, this must start with a capital letter
 	pub tag: String,
 	/// Tracks the <MyComponent ..> opening tag for this component
 	/// even key value attribute changes must be tracked
@@ -161,6 +183,8 @@ pub struct RsxComponent {
 /// ```
 #[derive(Debug)]
 pub struct RsxElement {
+	/// The index of this node in the local tree
+	pub idx: RsxIdx,
 	/// ie `div, span, input`
 	pub tag: String,
 	/// ie `class="my-class"`
