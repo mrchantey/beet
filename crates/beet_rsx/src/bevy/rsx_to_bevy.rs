@@ -70,7 +70,7 @@ impl RsxToBevy {
 				#[cfg(not(feature = "bevy_ui"))]
 				{
 					unimplemented!(
-						"cannot add {str},add feature bevy_ui to enable"
+						"cannot add {value} with {rsx_idx} ,add feature bevy_ui to enable"
 					)
 				}
 			}

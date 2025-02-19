@@ -1,4 +1,6 @@
 use crate::prelude::*;
+use bevy::ecs::component::ComponentId;
+use bevy::ecs::world::DeferredWorld;
 use bevy::prelude::*;
 
 
@@ -45,7 +47,7 @@ fn insert_running(ev: Trigger<OnRun>, mut commands: Commands) {
 /// ```
 /// As this is frequently added and removed, it is `SparseSet`.
 #[derive(Debug, Copy, Clone, Component, PartialEq, Reflect)]
-#[component(storage = "SparseSet")]
+#[component(storage = "SparseSet",on_add = on_add_running)]
 #[reflect(Component)]
 #[require(RunTimer)] // mostly for tests where we added running directly, usually this is required by `ContinueRun`
 pub struct Running {
@@ -53,6 +55,15 @@ pub struct Running {
 	/// root of the action tree but can be any entity.
 	pub origin: Entity,
 }
+
+/// if Running was added with a placeholder origin, set it to the entity it was added to.
+fn on_add_running(mut world: DeferredWorld, entity: Entity, _cid: ComponentId) {
+	let mut running = world.get_mut::<Running>(entity).unwrap();
+	if running.origin == Entity::PLACEHOLDER {
+		running.origin = entity;
+	}
+}
+
 impl Running {
 	/// Create a new instance of `Running` with the provided origin.
 	pub fn new(origin: Entity) -> Self { Self { origin } }
@@ -108,8 +119,17 @@ mod test {
 			.id();
 		expect(world.get::<Running>(entity)).to_be_none();
 	}
+
 	#[test]
-	fn has_correct_origin() {
+	fn sets_orgin_on_add_default() {
+		let mut world = World::new();
+		let entity = world.spawn(Running::default()).id();
+		expect(world.get::<Running>(entity).unwrap())
+			.to_be(&Running { origin: entity });
+	}
+
+	#[test]
+	fn sets_origin_on_continue_run() {
 		let mut app = App::new();
 		app.add_plugins(BeetFlowPlugin::default());
 		let world = app.world_mut();

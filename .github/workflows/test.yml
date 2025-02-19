@@ -26,9 +26,10 @@ jobs:
           ~/.cargo/git/db/
           target/
         key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-    - name: 🔨 Install Bevy Dependencies
-      if: runner.os == 'Linux'
-      run: sudo apt-get update; sudo apt-get install --no-install-recommends g++ pkg-config libx11-dev libasound2-dev libudev-dev libxkbcommon-x11-0 mold
+    # testing with bevy_render is difficult, prefer to test as much as possible without
+    # - name: 🔨 Install Bevy Dependencies
+    #   if: runner.os == 'Linux'
+    #   run: sudo apt-get update; sudo apt-get install --no-install-recommends g++ pkg-config libx11-dev libasound2-dev libudev-dev libxkbcommon-x11-0 mold
     - name: 🔨📋 Install Just
       uses: extractions/setup-just@v1
     - name: 🔨 Install Deno
@@ -55,4 +56,4 @@ jobs:
     - name: 🔨📋 Init repo
       run: just init-repo
     - name: 🔎 Test
-      run: just test-all
+      run: just test-ci

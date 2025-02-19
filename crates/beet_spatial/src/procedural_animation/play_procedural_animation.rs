@@ -51,10 +51,7 @@ impl PlayProceduralAnimation {
 pub(crate) fn play_procedural_animation(
 	mut commands: Commands,
 	mut transforms: Query<&mut Transform>,
-	query: Query<
-		(Entity, &PlayProceduralAnimation, &Running, &RunTimer),
-		With<Running>,
-	>,
+	query: Query<(Entity, &PlayProceduralAnimation, &Running, &RunTimer)>,
 ) {
 	for (action, play_procedural, running, run_timer) in query.iter() {
 		// run_timer.last_started.
@@ -106,6 +103,7 @@ mod test {
 			.id();
 
 		app.update();
+		println!("here");
 
 		expect(
 			app.world()

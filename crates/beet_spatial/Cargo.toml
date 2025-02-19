@@ -12,9 +12,9 @@ keywords = { workspace = true }
 categories = { workspace = true }
 
 [features]
-# default = ["animation", "assets", "ui"]
+# default = ["animation", "assets", "bevy_ui"]
 # bevyhub = []
-ui = ["bevy/bevy_ui"]
+bevy_ui = ["bevy/bevy_ui"]
 scene = ["bevy/bevy_scene"]
 render = ["bevy/bevy_color", "bevy/bevy_gizmos"]
 assets = ["bevy/bevy_asset"]

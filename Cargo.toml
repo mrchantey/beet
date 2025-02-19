@@ -153,8 +153,13 @@ rsx = ["dep:beet_rsx"]
 ml = ["dep:beet_ml"]
 spatial = ["dep:beet_spatial"]
 sim = ["dep:beet_sim"]
-bevy = ["beet_rsx?/bevy", "beet_rsx?/bevy_ui", "beet_router?/bevy"]
-
+bevy = ["dep:bevy", "beet_rsx?/bevy", "beet_router?/bevy"]
+bevy-default = [
+	"bevy",
+	"beet_rsx?/bevy_ui",
+	"beet_spatial?/bevy_ui",
+	"bevy/default",
+]
 
 # animation = ["beet_spatial?/animation"]
 # assets = ["beet_spatial?/assets"]
@@ -171,11 +176,12 @@ beet_router = { workspace = true, optional = true }
 beet_rsx = { workspace = true, optional = true }
 beet_sim = { workspace = true, optional = true }
 beet_spatial = { workspace = true, optional = true }
+bevy = { workspace = true, optional = true }
 
 [dev-dependencies]
 beet = { path = "", features = ["rsx", "router", "bevy"] }
 # bevy.workspace = true
-bevy = { workspace = true, default_features = true }
+# bevy = { workspace = true, default_features = true }
 sweet = { workspace = true, features = ["test", "bevy", "rand"] }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
@@ -193,10 +199,10 @@ path = "examples/rsx/hello_rsx.rs"
 name = "dom_reactive"
 required-features = ["rsx"]
 path = "examples/rsx/dom_reactive.rs"
-[[example]]
-name = "bevy_reactive"
-required-features = ["rsx", "bevy"]
-path = "examples/rsx/bevy_reactive.rs"
+# [[example]]
+# name = "bevy_reactive"
+# required-features = ["rsx", "bevy-default"]
+# path = "examples/rsx/bevy_reactive.rs"
 
 #💡flow
 

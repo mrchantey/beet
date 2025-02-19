@@ -151,6 +151,11 @@ pub trait SignalOrComponent<M>: 'static + Send + Sync + Clone {
 	fn into_node_block_effect(self) -> RegisterEffect;
 }
 
+/// A fill so we can still compile without the feature
+#[cfg(not(feature = "bevy_ui"))]
+#[derive(Component, Reflect)]
+pub struct Text(pub String);
+
 pub struct ToStringMarker;
 impl<T: 'static + Send + Sync + Clone + ToString>
 	SignalOrComponent<(T, ToStringMarker)> for T
