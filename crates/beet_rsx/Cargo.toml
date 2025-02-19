@@ -30,6 +30,7 @@ sweet.workspace = true
 #💡 utils
 thiserror.workspace = true
 anyhow.workspace = true
+extend.workspace = true
 strum.workspace = true
 rapidhash.workspace = true
 strum_macros.workspace = true
