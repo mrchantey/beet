@@ -110,11 +110,11 @@ test-ci *args:
 
 # no space left on device
 test-all *args:
-	just test-ci 																																{{args}}
-	cargo test 																 --all-features	-p beet_rsx 			{{args}}
-	cargo test --target wasm32-unknown-unknown --all-features -p beet_rsx 			{{args}}
-	cargo test 																 --all-features -p beet_spatial 	{{args}} 
-	cargo test --target wasm32-unknown-unknown --all-features -p beet_spatial 	{{args}}
+	just test-ci 																																			{{args}}
+	cargo test --lib 																 --all-features	-p beet_rsx 			{{args}}
+	cargo test --lib --target wasm32-unknown-unknown --all-features -p beet_rsx 			{{args}}
+	cargo test --lib 																 --all-features -p beet_spatial 	{{args}} 
+	cargo test --lib --target wasm32-unknown-unknown --all-features -p beet_spatial 	{{args}}
 
 #cargo test -p beet_spatial
 #cargo test -p beet_sim

@@ -12,14 +12,10 @@ keywords = { workspace = true }
 categories = { workspace = true }
 
 [features]
-# default = ["animation", "assets", "bevy_ui"]
 # bevyhub = []
-bevy_ui = ["bevy/bevy_ui"]
+bevy_default = ["bevy/default"]
 scene = ["bevy/bevy_scene"]
-render = ["bevy/bevy_color", "bevy/bevy_gizmos"]
-assets = ["bevy/bevy_asset"]
 # revisit when we get construct
-# animation = ["bevy/bevy_animation"]
 _doctest = []
 
 [dependencies]

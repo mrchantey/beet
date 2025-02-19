@@ -138,7 +138,7 @@ mod test {
 	}
 
 	#[test]
-	#[cfg(feature = "bevy_ui")]
+	#[cfg(feature = "bevy_default")]
 	fn block_node() {
 		BevyRuntime::reset();
 		let (get, set) = BevySignal::signal(1);

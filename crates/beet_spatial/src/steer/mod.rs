@@ -4,9 +4,9 @@
 //! with implementations derived from Daniel Shiffman's
 //! [The Nature of Code](https://natureofcode.com/).
 mod algo;
-#[cfg(feature = "render")]
+#[cfg(feature = "bevy_default")]
 mod debug_group_steer;
-#[cfg(feature = "render")]
+#[cfg(feature = "bevy_default")]
 pub use self::debug_group_steer::*;
 mod steer_bundle;
 pub use steer_bundle::*;

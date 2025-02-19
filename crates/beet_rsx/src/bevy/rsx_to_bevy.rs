@@ -56,7 +56,7 @@ impl RsxToBevy {
 				value,
 				idx: rsx_idx,
 			} => {
-				#[cfg(feature = "bevy_ui")]
+				#[cfg(feature = "bevy_default")]
 				{
 					let entity = world
 						.spawn((
@@ -67,10 +67,10 @@ impl RsxToBevy {
 						.id();
 					vec![entity]
 				}
-				#[cfg(not(feature = "bevy_ui"))]
+				#[cfg(not(feature = "bevy_default"))]
 				{
 					unimplemented!(
-						"cannot add {value} with {rsx_idx} ,add feature bevy_ui to enable"
+						"cannot add {value} with {rsx_idx} ,add feature bevy_default to enable"
 					)
 				}
 			}

@@ -152,7 +152,7 @@ pub trait SignalOrComponent<M>: 'static + Send + Sync + Clone {
 }
 
 /// A fill so we can still compile without the feature
-#[cfg(not(feature = "bevy_ui"))]
+#[cfg(not(feature = "bevy_default"))]
 #[derive(Component, Reflect)]
 pub struct Text(pub String);
 
