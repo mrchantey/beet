@@ -18,7 +18,6 @@ async fn main() {
 		.run();
 }
 
-
 struct Counter {
 	initial: i32,
 }
@@ -32,7 +31,7 @@ impl beet::prelude::Component for Counter {
 				let val = get2.clone().get();
 				set(val + 1);
 			}>
-				"The value is "{get}
+				"The value "{get}
 			</entity>
 		}
 	}

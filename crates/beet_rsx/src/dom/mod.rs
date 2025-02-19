@@ -2,11 +2,11 @@ use crate::prelude::*;
 #[cfg(target_arch = "wasm32")]
 mod dom_event_registry;
 #[cfg(target_arch = "wasm32")]
-mod dom_mounter;
+mod beet_dom;
 #[cfg(target_arch = "wasm32")]
 pub use dom_event_registry::EventRegistry;
 #[cfg(target_arch = "wasm32")]
-pub use dom_mounter::*;
+pub use beet_dom::*;
 #[cfg(not(target_arch = "wasm32"))]
 mod native_event_registry;
 mod rs_dom_target;

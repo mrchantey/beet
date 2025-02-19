@@ -1,29 +1,49 @@
-use crate::html::HtmlDocument;
-use crate::html::HtmlNode;
+use crate::prelude::*;
 use web_sys::Element;
 
 
 
-pub struct DomMounter;
+pub struct BeetDom;
 
 
 
-impl DomMounter {
+impl BeetDom {
+	pub fn mount(app: impl 'static + Fn() -> RsxRoot) {
+		use sweet::prelude::wasm::set_timeout_ms;
+
+		console_error_panic_hook::set_once();
+
+		// effects are called on render
+		let doc = RsxToResumableHtml::default().map_root(&app());
+		Self::mount_doc(&doc);
+		Self::normalize();
+
+		// give the dom time to mount
+		set_timeout_ms(100, move || {
+			DomTarget::set(BrowserDomTarget::default());
+			// effects called here too
+			app().register_effects();
+			EventRegistry::initialize().unwrap();
+		});
+	}
+
+
+
 	/// by default the dom mounter will not collapse text nodes
 	/// this recursively collapses text nodes into their parent element
-	pub fn normalize() {
+	fn normalize() {
 		web_sys::window().unwrap().document().unwrap().normalize();
 	}
 
 
-	pub fn mount_doc(html_doc: &HtmlDocument) {
+	fn mount_doc(html_doc: &HtmlDocument) {
 		let dom_doc = web_sys::window().unwrap().document().unwrap();
 		let head = dom_doc.head().unwrap().into();
 		Self::mount_nodes(&dom_doc, &head, &html_doc.head);
 		let body = dom_doc.body().unwrap().into();
 		Self::mount_nodes(&dom_doc, &body, &html_doc.body);
 	}
-	pub fn mount_nodes(
+	fn mount_nodes(
 		dom_doc: &web_sys::Document,
 		parent: &Element,
 		nodes: &Vec<HtmlNode>,
@@ -32,7 +52,7 @@ impl DomMounter {
 			Self::mount_node(dom_doc, parent, node);
 		}
 	}
-	pub fn mount_node(
+	fn mount_node(
 		dom_doc: &web_sys::Document,
 		parent: &Element,
 		node: &HtmlNode,

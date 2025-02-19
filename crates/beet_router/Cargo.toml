@@ -17,7 +17,7 @@ bevy = ["dep:bevy", "dep:tokio", "dep:flume"]
 # for internal testing
 _test_site = []
 
-[dependencies]
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 beet_router_parser = { workspace = true, optional = true }
 sweet = { workspace = true, features = ["fs"] }
 beet_rsx = { workspace = true, features = ["serde"] }
@@ -29,7 +29,7 @@ ron.workspace = true
 http.workspace = true
 futures.workspace = true
 
-[dev-dependencies]
+[target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
 ron.workspace = true
 beet_router = { path = "", features = ["parser", "bevy", "_test_site"] }
 sweet = { workspace = true, features = ["test"] }

@@ -3,6 +3,10 @@ use beet::prelude::*;
 use beet::rsx::sigfault::effect;
 use beet::rsx::sigfault::signal;
 
+#[cfg(target_arch = "wasm32")]
+fn main() { BeetDom::mount(|| rsx! {<MyComponent initial=7/>}); }
+
+
 struct MyComponent {
 	initial: u32,
 }
@@ -29,30 +33,5 @@ impl Component for MyComponent {
 }
 
 
-fn main() { render(); }
 #[cfg(not(target_arch = "wasm32"))]
-fn render() {}
-
-#[cfg(target_arch = "wasm32")]
-fn render() {
-	use beet::prelude::*;
-	use sweet::prelude::wasm::set_timeout_ms;
-
-	console_error_panic_hook::set_once();
-
-	let app = || rsx! {<MyComponent initial=7/>};
-	// effects are called on render
-	let doc = RsxToResumableHtml::default().map_root(&app());
-	DomMounter::mount_doc(&doc);
-	DomMounter::normalize();
-	// sweet_utils::log!("mounted");
-
-	// give the dom time to mount
-	set_timeout_ms(100, move || {
-		// sweet_utils::log!("hydrating");
-		DomTarget::set(BrowserDomTarget::default());
-		// effects called here too
-		app().register_effects();
-		EventRegistry::initialize().unwrap();
-	});
-}
+fn main() {}

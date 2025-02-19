@@ -15,7 +15,7 @@ keywords.workspace = true
 name = "beet_site"
 path = "src/main.rs"
 
-[dependencies]
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 beet = { workspace = true, features = ["router"] }
 
 tokio.workspace = true

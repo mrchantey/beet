@@ -17,7 +17,7 @@ default = ["render"]
 render = []
 
 
-[dependencies]
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 beet_flow.workspace = true
 beet_spatial.workspace = true
 bevy.workspace = true
@@ -29,6 +29,6 @@ serde.workspace = true
 serde_json.workspace = true
 rig-core = "0.4"
 
-[dev-dependencies]
+[target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
 # bevy = { workspace = true, default-features = true }
 sweet.workspace = true
