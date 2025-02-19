@@ -12,7 +12,9 @@ env:
 jobs:
   build_and_test:
     name: Build and Test
-    runs-on: ubuntu-latest
+    # runs-on: ubuntu-latest
+    # for bevy render compilation on both native and wasm, as well as lightningcss etc
+    runs-on: ubuntu-latest-large
     steps:
     - name: 📂 Checkout
       uses: actions/checkout@v4
