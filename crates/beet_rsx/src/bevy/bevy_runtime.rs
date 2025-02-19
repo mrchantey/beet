@@ -18,6 +18,8 @@ pub struct BevyRuntime;
 
 impl BevyRuntime {
 	pub fn reset() { Self::with_mut(|app| *app = App::new()); }
+	/// Take the bevy app, replacing it with default.
+	pub fn take() -> App { Self::with_mut(|app| std::mem::take(app)) }
 	pub fn with_mut<R>(func: impl FnOnce(&mut App) -> R) -> R {
 		CURRENT_APP.with(|current| {
 			let mut current = current.borrow_mut();

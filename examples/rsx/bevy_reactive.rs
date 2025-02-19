@@ -1,24 +1,29 @@
 use beet::prelude::*;
 use bevy::prelude::*;
-use bevy::winit::WinitSettings;
 
-fn main() {
+#[tokio::main]
+async fn main() {
+	// 1. Add plugins
 	BevyRuntime::with_mut(|app| {
 		app.add_plugins((
 			DefaultPlugins,
 			BevyEventRegistry,
-			BevyTemplateReloader::default(),
-		))
-		.insert_resource(WinitSettings::desktop_app());
+			BevyTemplateReloader::new(std::file!()),
+		));
 	});
+
+	// 2. Define scene
 	let scene = rsx! {
-		<Counter initial=7/>
 		<cam Camera2d/>
+		<Counter initial=7/>
 	};
-	let _root_entity = RsxToBevy::spawn(scene).unwrap()[0];
-	BevyRuntime::with_mut(|app| {
-		app.run();
-	});
+
+	// 3. Spawn scene
+	let _entities = RsxToBevy::spawn(scene).unwrap();
+
+	// 4. Run app
+	let mut app = BevyRuntime::take();
+	app.run();
 }
 
 
@@ -33,9 +38,9 @@ impl beet::prelude::Component for Counter {
 		rsx! {
 			<entity runtime:bevy Button onclick=move |_|{
 				let val = get2.clone().get();
-				set(val + 2);
+				set(val + 1);
 			}>
-				"The value is "{get}
+				"The value is cdertaly "{get}
 			</entity>
 		}
 	}

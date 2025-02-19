@@ -55,7 +55,6 @@ impl BevyEventRegistry {
 			let mut query = app.world_mut().query::<(Entity, &TreeIdx)>();
 			let entity = TreeIdx::find(query.iter(app.world()), loc)
 				.expect(&expect_rsx_element::to_be_at_location(&loc));
-
 			app.world_mut().entity_mut(entity).observe(observer);
 			app.world_mut().flush();
 		});

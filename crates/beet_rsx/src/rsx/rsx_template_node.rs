@@ -281,14 +281,14 @@ impl RsxTemplateNode {
 		match self {
 			RsxTemplateNode::Fragment { items, .. } => {
 				for item in items {
-					item.visit(func);
+					item.visit_inner(func);
 				}
 			}
 			RsxTemplateNode::Component { slot_children, .. } => {
-				slot_children.visit(func);
+				slot_children.visit_inner(func);
 			}
 			RsxTemplateNode::Element { children, .. } => {
-				children.visit(func);
+				children.visit_inner(func);
 			}
 			_ => {}
 		}

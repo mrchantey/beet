@@ -153,7 +153,7 @@ rsx = ["dep:beet_rsx"]
 ml = ["dep:beet_ml"]
 spatial = ["dep:beet_spatial"]
 sim = ["dep:beet_sim"]
-bevy = ["beet_rsx?/bevy", "beet_rsx?/bevy_ui"]
+bevy = ["beet_rsx?/bevy", "beet_rsx?/bevy_ui", "beet_router?/bevy"]
 
 
 # animation = ["beet_spatial?/animation"]
@@ -173,11 +173,13 @@ beet_sim = { workspace = true, optional = true }
 beet_spatial = { workspace = true, optional = true }
 
 [dev-dependencies]
-beet = { path = "", features = ["rsx", "bevy"] }
+beet = { path = "", features = ["rsx", "router", "bevy"] }
 # bevy.workspace = true
 bevy = { workspace = true, default_features = true }
 sweet = { workspace = true, features = ["test", "bevy", "rand"] }
 
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+tokio.workspace = true
 
 [target.'cfg(target_arch = "wasm32")'.dev-dependencies]
 console_error_panic_hook.workspace = true

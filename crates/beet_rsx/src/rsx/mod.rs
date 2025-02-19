@@ -73,17 +73,3 @@ impl<T: FnOnce() -> RsxRoot> Component for T {
 impl<T: Component> Rsx for T {
 	fn into_rsx(self) -> RsxNode { self.render().into_rsx() }
 }
-
-
-#[cfg(test)]
-mod test {
-	use crate::prelude::*;
-	use sweet::prelude::*;
-
-	#[test]
-	fn works() {
-		expect(GlobalRsxIdx::new("a", 0, 0, 0))
-			.not()
-			.to_be(GlobalRsxIdx::new("b", 0, 0, 0));
-	}
-}

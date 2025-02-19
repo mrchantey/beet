@@ -38,7 +38,9 @@ impl<Reload: FnMut() -> Result<()>, Recompile: FnMut() -> Result<()>>
 	/// Run `recompile` once, then watch
 	pub async fn recompile_and_watch(mut self) -> Result<()> {
 		(self.recompile_func)()?;
-
+		self.watch().await
+	}
+	pub async fn watch(mut self) -> Result<()> {
 		let watcher = FsWatcher::default()
 			.with_path(&self.build_templates.src)
 			.with_exclude("*.git*")

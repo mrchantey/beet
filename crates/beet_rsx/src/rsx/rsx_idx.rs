@@ -2,7 +2,6 @@ use super::RsxMacroLocation;
 use rapidhash::RapidHasher;
 use std::hash::Hasher;
 
-
 /// Unique identifier for every node in an rsx tree,
 /// and assigned to html elements that need it.
 /// The value is incremented every time an rsx node is encountered
@@ -13,6 +12,7 @@ pub type RsxIdx = u32;
 /// but for techniques like hot reloading we need to know not only
 /// the local index but enough to distinguish it from nodes
 /// in other trees.
+#[deprecated = "not in use"]
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub struct GlobalRsxIdx {
 	idx: RsxIdx,
@@ -24,6 +24,7 @@ pub struct GlobalRsxIdx {
 	col: u32,
 }
 
+#[allow(deprecated)]
 impl GlobalRsxIdx {
 	pub fn filename_hash(&self) -> u64 { self.filename_hash }
 	pub fn line(&self) -> u32 { self.line }
@@ -86,6 +87,7 @@ mod test {
 	use sweet::prelude::*;
 
 	#[test]
+	#[allow(deprecated)]
 	fn works() {
 		let idx = GlobalRsxIdx::new("file", 1, 2, 3);
 		let hash = idx.into_hash();

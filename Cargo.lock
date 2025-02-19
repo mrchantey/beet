@@ -570,6 +570,7 @@ dependencies = [
  "bevy",
  "console_error_panic_hook",
  "sweet",
+ "tokio",
  "web-sys",
 ]
 

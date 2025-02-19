@@ -33,7 +33,7 @@ impl RsxToBevy {
 		for entity in entities.iter() {
 			world
 				.entity_mut(*entity)
-				.insert(BevyRsxRoot::new(root.location.clone()));
+				.insert(BevyRsxLocation::new(root.location.clone()));
 		}
 
 		Ok(entities)
@@ -183,8 +183,8 @@ mod test {
 
 		expect(app.world_mut().entity(entity).get::<Transform>())
 			.to_be(Some(&Transform::default()));
-		expect(app.world_mut().entity(entity).get::<BevyRsxRoot>())
-			.to_be(Some(&BevyRsxRoot::new(root.location)));
+		expect(app.world_mut().entity(entity).get::<BevyRsxLocation>())
+			.to_be(Some(&BevyRsxLocation::new(root.location)));
 	}
 	#[test]
 	fn attribute_key_value() {

@@ -10,6 +10,10 @@ pub struct BevyTemplateReloader {
 	src: Option<PathBuf>,
 }
 
+impl BevyTemplateReloader {
+	pub fn new(src: impl Into<PathBuf>) -> Self { Self { src: Some(src.into()) } }
+}
+
 impl Plugin for BevyTemplateReloader {
 	fn build(&self, app: &mut App) {
 		let src = self
@@ -34,7 +38,7 @@ impl Plugin for BevyTemplateReloader {
 
 		let _handle = tokio::spawn(async move {
 			TemplateWatcher::new(builder, reload, recompile)?
-				.recompile_and_watch()
+				.watch()
 				.await
 		});
 
@@ -72,6 +76,9 @@ fn handle_recv(
 				let map = RsxTemplateMap::load(&template_reload.dst).unwrap();
 				for (loc, root) in map.iter() {
 					root.node.visit(|node| {
+						let loc = 
+
+
 						todo!("assign to existing nodes");
 						// println!("{:?}", node);
 					});

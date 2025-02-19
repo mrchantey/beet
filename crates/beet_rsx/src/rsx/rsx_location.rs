@@ -1,4 +1,3 @@
-use crate::prelude::*;
 use rapidhash::rapidhash;
 
 /// File location of an rsx macro, used by [RsxTemplate]
@@ -46,9 +45,5 @@ impl RsxMacroLocation {
 	/// feature gated dependency, it uses the same techinque.
 	pub fn hash_filename(filename: &str) -> u64 {
 		rapidhash(filename.as_bytes())
-	}
-
-	pub fn new_global_idx(&self, idx: u32) -> GlobalRsxIdx {
-		GlobalRsxIdx::new(&self.file, self.line as u32, self.col as u32, idx)
 	}
 }
