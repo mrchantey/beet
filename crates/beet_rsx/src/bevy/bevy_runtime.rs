@@ -12,7 +12,7 @@ thread_local! {
 /// taken or ran:
 /// ```
 /// # use beet_rsx::prelude::*;
-/// BevyRuntime::with(|app|app.run());
+/// BevyRuntime::with_mut(|app|app.run());
 /// ```
 pub struct BevyRuntime;
 
