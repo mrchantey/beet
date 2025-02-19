@@ -13,21 +13,29 @@ keywords.workspace = true
 
 [features]
 parser = ["dep:beet_router_parser"]
-bevy = ["dep:bevy", "dep:tokio", "dep:flume"]
+bevy = [
+	"dep:bevy",
+	"dep:tokio",
+	"dep:flume",
+	"beet_rsx/bevy",
+	"beet_rsx/bevy_default",
+]
 # for internal testing
 _test_site = []
 
-[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-beet_router_parser = { workspace = true, optional = true }
-sweet = { workspace = true, features = ["fs"] }
+[dependencies]
 beet_rsx = { workspace = true, features = ["serde"] }
 bevy = { workspace = true, optional = true }
-tokio = { workspace = true, optional = true }
-flume = { workspace = true, optional = true }
 anyhow.workspace = true
 ron.workspace = true
 http.workspace = true
 futures.workspace = true
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+beet_router_parser = { workspace = true, optional = true }
+sweet = { workspace = true, features = ["fs"] }
+tokio = { workspace = true, optional = true }
+flume = { workspace = true, optional = true }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
 ron.workspace = true
