@@ -18,7 +18,6 @@ use std::str::FromStr;
 	derive(bevy::prelude::Component, bevy::prelude::Reflect)
 )]
 #[cfg_attr(feature = "bevy", reflect(Default, Component))]
-
 pub struct TreeIdx(u32);
 
 impl TreeIdx {

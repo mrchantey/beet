@@ -29,31 +29,42 @@ impl RsxToBevy {
 		world: &mut World,
 		root: &RsxRoot,
 	) -> Result<Vec<Entity>> {
-		let entities = self.spawn_node(world, &root.node)?;
-		for entity in entities.iter() {
-			world
-				.entity_mut(*entity)
-				.insert(BevyRsxLocation::new(root.location.clone()));
-		}
-
+		let macro_location_hash = root.location.into_hash();
+		let entities =
+			self.spawn_node(world, &root.node, macro_location_hash)?;
+		// for entity in entities.iter() {
+		// 	world
+		// 		.entity_mut(*entity)
+		// 		.insert(BevyRsxLocation::new(root.location.clone()));
+		// }
 		Ok(entities)
 	}
 	pub fn spawn_node(
 		&mut self,
 		world: &mut World,
 		node: impl AsRef<RsxNode>,
+		macro_location_hash: u64,
 	) -> Result<Vec<Entity>> {
-		let idx = self.tree_idx_incr.next();
+		let tree_idx = self.tree_idx_incr.next();
 		// println!("rsx_to_bevy found node: {:?}", node.as_ref().discriminant());
 		let nodes = match node.as_ref() {
 			RsxNode::Doctype { .. } => unimplemented!(),
 			RsxNode::Comment { .. } => {
 				unimplemented!()
 			}
-			RsxNode::Text { value, .. } => {
+			RsxNode::Text {
+				value,
+				idx: rsx_idx,
+			} => {
 				#[cfg(feature = "bevy_ui")]
 				{
-					let entity = world.spawn((idx, Text::new(value))).id();
+					let entity = world
+						.spawn((
+							tree_idx,
+							GlobalRsxIdx::new(macro_location_hash, *rsx_idx),
+							Text::new(value),
+						))
+						.id();
 					vec![entity]
 				}
 				#[cfg(not(feature = "bevy_ui"))]
@@ -65,7 +76,7 @@ impl RsxToBevy {
 			}
 			RsxNode::Fragment { nodes, .. } => nodes
 				.iter()
-				.map(|n| self.spawn_node(world, n))
+				.map(|n| self.spawn_node(world, n, macro_location_hash))
 				.collect::<Result<Vec<_>>>()?
 				.into_iter()
 				.flatten()
@@ -74,7 +85,12 @@ impl RsxToBevy {
 				self.spawn_root(world, &rsx_block.initial)?
 			}
 			RsxNode::Element(element) => {
-				vec![self.spawn_element(world, idx, element)?]
+				vec![self.spawn_element(
+					world,
+					element,
+					tree_idx,
+					macro_location_hash,
+				)?]
 			}
 			RsxNode::Component(RsxComponent {
 				idx: _,
@@ -84,7 +100,7 @@ impl RsxToBevy {
 				slot_children,
 			}) => {
 				slot_children.assert_empty();
-				self.spawn_node(world, root.as_ref())?
+				self.spawn_root(world, root)?
 			}
 		};
 		Ok(nodes)
@@ -92,18 +108,24 @@ impl RsxToBevy {
 	fn spawn_element(
 		&mut self,
 		world: &mut World,
-		idx: TreeIdx,
 		element: &RsxElement,
+		tree_idx: TreeIdx,
+		macro_location_hash: u64,
 	) -> Result<Entity> {
 		// Arc::clone
 		let registry = world.resource::<AppTypeRegistry>().clone();
 		let registry = registry.read();
 
-		let children = self.spawn_node(world, &element.children)?;
+		let children =
+			self.spawn_node(world, &element.children, macro_location_hash)?;
 
-		let mut entity = world.spawn((idx, BevyRsxElement {
-			tag: element.tag.clone(),
-		}));
+		let mut entity = world.spawn((
+			tree_idx,
+			GlobalRsxIdx::new(macro_location_hash, element.idx),
+			BevyRsxElement {
+				tag: element.tag.clone(),
+			},
+		));
 		entity.add_children(&children);
 
 		// println!("here");
@@ -183,8 +205,8 @@ mod test {
 
 		expect(app.world_mut().entity(entity).get::<Transform>())
 			.to_be(Some(&Transform::default()));
-		expect(app.world_mut().entity(entity).get::<BevyRsxLocation>())
-			.to_be(Some(&BevyRsxLocation::new(root.location)));
+		expect(app.world_mut().entity(entity).get::<GlobalRsxIdx>())
+			.to_be(Some(&GlobalRsxIdx::new(root.location.into_hash(), 0)));
 	}
 	#[test]
 	fn attribute_key_value() {
@@ -193,13 +215,15 @@ mod test {
 		app.init_resource::<AppTypeRegistry>()
 			.register_type::<Transform>();
 
-		let node = rsx! { <entity Transform.translation="(0.,1.,2.)" /> };
+		let root = rsx! { <entity Transform.translation="(0.,1.,2.)" /> };
 		let entity = RsxToBevy::default()
-			.spawn_node(app.world_mut(), node)
+			.spawn_node(app.world_mut(), &root, root.location.into_hash())
 			.unwrap()[0];
 
 		expect(app.world_mut().entity(entity).get::<Transform>())
 			.to_be(Some(&Transform::from_xyz(0., 1., 2.)));
+		expect(app.world_mut().entity(entity).get::<GlobalRsxIdx>())
+			.to_be(Some(&GlobalRsxIdx::new(root.location.into_hash(), 0)));
 	}
 	#[test]
 	fn attribute_block_value() {
@@ -220,12 +244,14 @@ mod test {
 			.register_type::<Vec3>()
 			.register_type::<Transform>();
 
-		let node = rsx! { <entity runtime:bevy Transform.translation=val /> };
+		let root = rsx! { <entity runtime:bevy Transform.translation=val /> };
 		let entity = RsxToBevy::default()
-			.spawn_node(app.world_mut(), node)
+			.spawn_node(app.world_mut(), &root, root.location.into_hash())
 			.unwrap()[0];
 
 		expect(app.world_mut().entity(entity).get::<Transform>())
 			.to_be(Some(&Transform::from_xyz(0., 1., 2.)));
+		expect(app.world_mut().entity(entity).get::<GlobalRsxIdx>())
+			.to_be(Some(&GlobalRsxIdx::new(root.location.into_hash(), 0)));
 	}
 }

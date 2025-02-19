@@ -45,7 +45,7 @@ doc crate *args:
 	just watch cargo doc -p {{crate}} --open {{args}}
 
 fmt *args:
-	just watch 'cargo fmt {{args}} && just leptosfmt {{args}}'
+	cargo fmt {{args}} && just leptosfmt {{args}}
 
 leptosfmt *args:
 	leptosfmt 												\
@@ -60,7 +60,11 @@ leptosfmt *args:
 
 #💡 e2e examples
 
-run-reactive:
+# Run bevy reactive example on an endless loop, it exits on recompile required
+run-reactive-bevy:
+	while true; do cargo run --example bevy_reactive; done
+
+run-reactive-html:
 	cp ./index.html ./target/index.html
 	sweet serve ./target | \
 	just watch 'just build-wasm beet dom_reactive'

@@ -275,8 +275,10 @@ impl RsxTemplateNode {
 	}
 
 	/// A simple dfs visitor for an rsx template node
-	pub fn visit(&self, func: impl Fn(&Self)) { self.visit_inner(&func); }
-	fn visit_inner(&self, func: &impl Fn(&Self)) {
+	pub fn visit(&self, mut func: impl FnMut(&Self)) {
+		self.visit_inner(&mut func);
+	}
+	fn visit_inner(&self, func: &mut impl FnMut(&Self)) {
 		func(self);
 		match self {
 			RsxTemplateNode::Fragment { items, .. } => {

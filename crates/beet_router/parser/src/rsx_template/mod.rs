@@ -60,29 +60,17 @@ impl BuildRsxTemplateMap {
 			.collect::<Result<Vec<_>>>()?
 			.into_iter()
 			.flatten()
-			.map(
-				|(
-					RsxMacroLocation {
-						file,
-						filename_hash,
-						line,
-						col,
-					},
-					tokens,
-				)| {
-					let line = Literal::usize_unsuffixed(line);
-					let col = Literal::usize_unsuffixed(col);
-					let filename_hash = Literal::u64_unsuffixed(filename_hash);
-					quote! {
-						RsxMacroLocation(
-							file: #file,
-							filename_hash: #filename_hash,
-							line: #line,
-							col: #col
-						):#tokens
-					}
-				},
-			);
+			.map(|(RsxMacroLocation { file, line, col }, tokens)| {
+				let line = Literal::usize_unsuffixed(line);
+				let col = Literal::usize_unsuffixed(col);
+				quote! {
+					RsxMacroLocation(
+						file: #file,
+						line: #line,
+						col: #col
+					):#tokens
+				}
+			});
 
 		let map = quote! {
 			RsxTemplateMap({#(#items),*})

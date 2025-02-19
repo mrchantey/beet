@@ -22,4 +22,3 @@ pub fn get(_state: DefaultAppState) -> RsxRoot {
 		</PageLayout>
 	}
 }
-

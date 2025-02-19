@@ -40,7 +40,7 @@ impl beet::prelude::Component for Counter {
 				let val = get2.clone().get();
 				set(val + 1);
 			}>
-				"The value is cdertaly "{get}
+				"The value is "{get}
 			</entity>
 		}
 	}

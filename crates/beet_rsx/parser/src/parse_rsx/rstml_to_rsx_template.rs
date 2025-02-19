@@ -3,7 +3,6 @@ use proc_macro2::Literal;
 use proc_macro2::TokenStream;
 use quote::quote;
 use quote::ToTokens;
-use rapidhash::rapidhash;
 use rstml::atoms::OpenTag;
 use rstml::node::CustomNode;
 use rstml::node::Node;
@@ -52,16 +51,12 @@ impl RstmlToRsxTemplate {
 		let node = self.map_nodes(nodes);
 		let line = Literal::usize_unsuffixed(span.start().line);
 		let col = Literal::usize_unsuffixed(span.start().column);
-		// ensure consistency with [`RsxMacroLocation::hash_filename`]
-		let filename_hash = rapidhash(file.as_bytes());
-		let filename_hash = Literal::u64_unsuffixed(filename_hash);
 
 		quote! {
 			RsxTemplateRoot (
 				node: #node,
 				location: RsxMacroLocation(
 					file: #file,
-					filename_hash: #filename_hash,
 					line: #line,
 					col: #col
 				)

@@ -1,4 +1,6 @@
 use rapidhash::rapidhash;
+use rapidhash::RapidHasher;
+use std::hash::Hasher;
 
 /// File location of an rsx macro, used by [RsxTemplate]
 /// to reconcile rsx nodes with html partials
@@ -16,7 +18,6 @@ pub struct RsxMacroLocation {
 	/// when setting this it must be in the same
 	/// format as file!() would return
 	pub file: String,
-	pub filename_hash: u64,
 	pub line: usize,
 	pub col: usize,
 }
@@ -27,21 +28,23 @@ impl Default for RsxMacroLocation {
 impl RsxMacroLocation {
 	pub fn new(file: impl Into<String>, line: usize, col: usize) -> Self {
 		let file = file.into();
-		let filename_hash = rapidhash(file.as_bytes());
-		Self {
-			file,
-			filename_hash,
-			line,
-			col,
-		}
+		Self { file, line, col }
 	}
 	pub fn file(&self) -> &str { &self.file }
 	pub fn line(&self) -> usize { self.line }
 	pub fn col(&self) -> usize { self.col }
 
-	/// The only place it is allowed to hash a filename, its easy for 
+	pub fn into_hash(&self) -> u64 {
+		let mut hasher = RapidHasher::default_const();
+		hasher.write(self.file.as_bytes());
+		hasher.write_usize(self.line);
+		hasher.write_usize(self.col);
+		hasher.finish()
+	}
+
+	/// The only place it is allowed to hash a filename, its easy for
 	/// hashing implementations to drift and we depend on consistency.
-	/// The only exception is [RstmlToRsxTemplate], which is an upstream 
+	/// The only exception is [RstmlToRsxTemplate], which is an upstream
 	/// feature gated dependency, it uses the same techinque.
 	pub fn hash_filename(filename: &str) -> u64 {
 		rapidhash(filename.as_bytes())

@@ -1,4 +1,5 @@
-use super::RsxMacroLocation;
+#[cfg(feature = "bevy")]
+use bevy::prelude::*;
 use rapidhash::RapidHasher;
 use std::hash::Hasher;
 
@@ -12,38 +13,35 @@ pub type RsxIdx = u32;
 /// but for techniques like hot reloading we need to know not only
 /// the local index but enough to distinguish it from nodes
 /// in other trees.
-#[deprecated = "not in use"]
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+#[cfg_attr(
+	feature = "bevy",
+	derive(bevy::prelude::Component, bevy::prelude::Reflect)
+)]
+#[cfg_attr(feature = "bevy", reflect(Component))]
 pub struct GlobalRsxIdx {
 	idx: RsxIdx,
-	/// The actual filename string is too expensive to store,
+	/// The actual [`RsxLocationHash`] is too expensive to store,
 	/// it can be found at every [RsxRoot] so propagate it from there if needed.
 	/// Rapidhash seed is consistent across macro and runtime hashing
-	filename_hash: u64,
-	line: u32,
-	col: u32,
+	macro_location_hash: u64,
 }
 
 #[allow(deprecated)]
 impl GlobalRsxIdx {
-	pub fn filename_hash(&self) -> u64 { self.filename_hash }
-	pub fn line(&self) -> u32 { self.line }
-	pub fn col(&self) -> u32 { self.col }
 	pub fn idx(&self) -> RsxIdx { self.idx }
-	pub fn new(filename: &str, line: u32, col: u32, idx: RsxIdx) -> Self {
+	pub fn macro_location_hash(&self) -> u64 { self.macro_location_hash }
+	pub fn new(macro_location_hash: u64, idx: RsxIdx) -> Self {
 		Self {
-			filename_hash: RsxMacroLocation::hash_filename(filename),
-			line,
-			col,
+			macro_location_hash,
+
 			idx,
 		}
 	}
 
 	pub fn into_hash(&self) -> u64 {
 		let mut hasher = RapidHasher::default_const();
-		hasher.write_u64(self.filename_hash);
-		hasher.write_u32(self.line);
-		hasher.write_u32(self.col);
+		hasher.write_u64(self.macro_location_hash);
 		hasher.write_u32(self.idx);
 		hasher.finish()
 	}
@@ -87,12 +85,12 @@ mod test {
 	use sweet::prelude::*;
 
 	#[test]
-	#[allow(deprecated)]
 	fn works() {
-		let idx = GlobalRsxIdx::new("file", 1, 2, 3);
+		let idx =
+			GlobalRsxIdx::new(RsxMacroLocation::default().into_hash(), 123);
 		let hash = idx.into_hash();
 		expect(hash).not().to_be(0);
 		expect(idx.into_hash_str().len()).to_be(8);
-		expect(idx.into_hash_str()).to_be("6cdNt13a");
+		expect(idx.into_hash_str()).to_be("6oeYu54e");
 	}
 }

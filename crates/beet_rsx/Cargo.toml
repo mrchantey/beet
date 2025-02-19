@@ -69,7 +69,3 @@ web-sys.workspace = true
 beet_rsx = { path = "", features = ["parser", "serde", "bevy", "bevy_ui"] }
 sweet = { workspace = true, features = ["test"] }
 bevy = { workspace = true, default_features = true }
-
-[[example]]
-name = "bevy"
-path = "examples/bevy.rs"
