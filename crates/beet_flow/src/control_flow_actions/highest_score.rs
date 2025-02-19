@@ -96,9 +96,7 @@ fn on_start(
 	action.clear();
 
 	for child in children.iter() {
-		commands
-			.entity(*child)
-			.trigger(OnRunAction::local(RequestScore));
+		commands.trigger(OnRunAction::new(*child, ev.origin, RequestScore));
 	}
 }
 

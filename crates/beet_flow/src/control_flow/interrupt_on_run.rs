@@ -76,16 +76,14 @@ mod test {
 				.component_tree::<Running>(&world),
 		)
 		.to_be(
-			TreeNode::new(Some(&Running { origin: entity }))
+			TreeNode::new(Some(&Running::new(Entity::PLACEHOLDER)))
 				.with_leaf(None)
 				.with_leaf(None)
 				.with_child(TreeNode::new(None).with_leaf(None))
 				.with_child(TreeNode::new(None).with_leaf(None))
 				.with_child(
-					TreeNode::new(Some(&Running {
-						origin: Entity::from_raw(17), // so flaky
-					}))
-					.with_leaf(None),
+					TreeNode::new(Some(&Running::new(Entity::PLACEHOLDER)))
+						.with_leaf(None),
 				), // .with_child(Tree::new(None).with_leaf(Some(&Running))),
 		);
 	}
