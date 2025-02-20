@@ -4,7 +4,6 @@ use thiserror::Error;
 /// Slotting is the process of traversing the [RsxComponent::slot_children]
 /// and applying them to the [RsxComponent::node] in the corresponding slots.
 ///
-///
 /// ```
 /// # use beet_rsx::as_beet::*;
 ///
@@ -30,7 +29,7 @@ use thiserror::Error;
 ///
 /// ```
 ///
-/// # Slot Rules
+/// ## Slot Rules
 ///
 /// - Slot children will be inserted into the first slot with a matching name,
 /// 	found via [RsxVisitor] dfs traversal.
@@ -40,6 +39,9 @@ use thiserror::Error;
 /// 	<slot> tag.
 /// - Components are not recursively searched because they would steal the slot
 /// 	from following internal siblings.
+/// - All <slot> elements are replaced with a <fragment> element containing the
+/// 	slot children.
+/// - All slot="foo" attributes are removed.
 #[derive(Debug)]
 pub struct SlotsVisitor {
 	default_slots: Vec<RsxNode>,

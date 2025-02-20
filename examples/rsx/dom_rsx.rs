@@ -1,7 +1,7 @@
 //! Example usage of dom rsx
 //! Run in native mode to generate the static html file,
 //! then build with wasm target for the interactive binary
-//! 
+//!
 //! for live template reloading command see justfile run-dom-rsx
 //!
 use beet::prelude::*;
@@ -47,6 +47,6 @@ fn main() {
 	use sweet::prelude::FsExt;
 	let mut doc = RsxToResumableHtml::default().map_root(&app());
 	doc.insert_wasm_script();
-	let html = doc.render();
+	let html = doc.render_pretty();
 	FsExt::write("target/wasm-example/index.html", &html).unwrap();
 }
