@@ -55,4 +55,4 @@ jobs:
     - name: 🔨📋 Init repo
       run: just init-repo
     - name: 🔎 Test
-      run: just test-all
+      run: just test-ci

@@ -197,10 +197,11 @@ web-sys.workspace = true
 name = "hello_rsx"
 required-features = ["rsx"]
 path = "examples/rsx/hello_rsx.rs"
+
 [[example]]
-name = "dom_rsx_client"
+name = "dom_rsx"
 required-features = ["rsx"]
-path = "examples/rsx/dom_rsx_client.rs"
+path = "examples/rsx/dom_rsx.rs"
 [[example]]
 name = "bevy_rsx"
 required-features = ["rsx", "bevy_default"]

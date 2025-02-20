@@ -1,8 +1,7 @@
+use super::HtmlAttribute;
+use super::HtmlElementNode;
 use super::HtmlNode;
 use super::RenderHtml;
-
-
-
 
 /// A valid html document has a particular structure, if the
 /// structure is missing it is usually inserterd by browsers, its
@@ -21,6 +20,26 @@ impl HtmlDocument {
 			node.render_html_with_buf(&mut html);
 		}
 		html
+	}
+
+	pub fn insert_wasm_script(&mut self) {
+		let script = r#"
+		import init from './wasm/bindgen.js'
+		init('./wasm/bindgen_bg.wasm')
+			.catch((error) => {
+				if (!error.message.startsWith("Using exceptions for control flow,"))
+					throw error
+			})
+"#;
+		self.body.push(HtmlNode::Element(HtmlElementNode {
+			tag: "script".to_string(),
+			self_closing: false,
+			attributes: vec![HtmlAttribute {
+				key: "type".to_string(),
+				value: Some("module".to_string()),
+			}],
+			children: vec![HtmlNode::Text(script.to_string())],
+		}));
 	}
 
 	/// Parses nodes, Appending them to the body unless they are one of
