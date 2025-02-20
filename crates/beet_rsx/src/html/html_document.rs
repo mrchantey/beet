@@ -17,7 +17,7 @@ impl HtmlDocument {
 	pub fn render_body(&self) -> String {
 		let mut html = String::new();
 		for node in &self.body {
-			node.render_html_with_buf(&mut html);
+			node.render_inner(&mut html);
 		}
 		html
 	}
@@ -102,16 +102,37 @@ impl IntoHtmlDocument for Vec<HtmlNode> {
 
 
 impl RenderHtml for HtmlDocument {
-	fn render_html_with_buf(&self, html: &mut String) {
+	fn render_inner(&self, html: &mut String) {
 		html.push_str("<!DOCTYPE html><html><head>");
 		for node in &self.head {
-			node.render_html_with_buf(html);
+			node.render_inner(html);
 		}
 		html.push_str("</head><body>");
 		for node in &self.body {
-			node.render_html_with_buf(html);
+			node.render_inner(html);
 		}
 		html.push_str("</body></html>");
+	}
+	fn render_pretty_inner(&self, html: &mut String, indent: &mut usize) {
+		Self::push_pretty(html, indent, "<!DOCTYPE html>");
+		Self::push_pretty(html, indent, "<html>");
+		*indent += 1;
+		Self::push_pretty(html, indent, "<head>");
+		*indent += 1;
+		for node in &self.head {
+			node.render_pretty_inner(html, indent);
+		}
+		*indent -= 1;
+		Self::push_pretty(html, indent, "</head>");
+		Self::push_pretty(html, indent, "<body>");
+		*indent += 1;
+		for node in &self.body {
+			node.render_pretty_inner(html, indent);
+		}
+		*indent -= 1;
+		Self::push_pretty(html, indent, "</body>");
+		*indent -= 1;
+		Self::push_pretty(html, indent, "</html>");
 	}
 }
 

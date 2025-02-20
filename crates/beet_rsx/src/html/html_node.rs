@@ -3,18 +3,42 @@ pub trait RenderHtml {
 	/// Convert a value, usually [HtmlNode] to a string of HTML
 	fn render(&self) -> String {
 		let mut html = String::new();
-		self.render_html_with_buf(&mut html);
+		self.render_inner(&mut html);
+		html
+	}
+	fn render_inner(&self, html: &mut String);
+	/// Convert a value, usually [HtmlNode] to a string of HTML
+	/// with indentation
+	fn render_pretty(&self) -> String {
+		let mut html = String::new();
+		let mut indent = 0;
+		self.render_pretty_inner(&mut html, &mut indent);
+		html.pop(); // remove the last newline
 		html
 	}
 
-	fn render_html_with_buf(&self, html: &mut String);
+	fn render_pretty_inner(&self, html: &mut String, indent: &mut usize);
+
+	/// push a string with indentation, then add a newline
+	fn push_pretty(html: &mut String, indent: &usize, str: &str) {
+		for _ in 0..*indent {
+			html.push('\t');
+		}
+		html.push_str(str);
+		html.push('\n');
+	}
 }
 
 
 impl RenderHtml for Vec<HtmlNode> {
-	fn render_html_with_buf(&self, html: &mut String) {
+	fn render_inner(&self, html: &mut String) {
 		for node in self {
-			node.render_html_with_buf(html);
+			node.render_inner(html);
+		}
+	}
+	fn render_pretty_inner(&self, html: &mut String, indent: &mut usize) {
+		for node in self {
+			node.render_pretty_inner(html, indent);
 		}
 	}
 }
@@ -81,14 +105,27 @@ impl HtmlNode {
 }
 
 impl RenderHtml for HtmlNode {
-	fn render_html_with_buf(&self, html: &mut String) {
+	fn render_inner(&self, html: &mut String) {
 		match self {
 			HtmlNode::Doctype => html.push_str("<!DOCTYPE html>"),
 			HtmlNode::Comment(val) => {
 				html.push_str(&format!("<!-- {} -->", val))
 			}
 			HtmlNode::Text(val) => html.push_str(val),
-			HtmlNode::Element(node) => node.render_html_with_buf(html),
+			HtmlNode::Element(node) => node.render_inner(html),
+		}
+	}
+
+	fn render_pretty_inner(&self, html: &mut String, indent: &mut usize) {
+		match self {
+			HtmlNode::Doctype => {
+				Self::push_pretty(html, indent, "<!DOCTYPE html>")
+			}
+			HtmlNode::Comment(val) => {
+				Self::push_pretty(html, indent, &format!("<!-- {} -->", val))
+			}
+			HtmlNode::Text(val) => Self::push_pretty(html, indent, val),
+			HtmlNode::Element(node) => node.render_pretty_inner(html, indent),
 		}
 	}
 }
@@ -143,34 +180,43 @@ impl HtmlElementNode {
 }
 
 impl RenderHtml for HtmlElementNode {
-	fn render_html_with_buf(&self, html: &mut String) {
-		// slots are a kind of fragment, just return children
-		if self.tag == "slot" {
-			for child in &self.children {
-				child.render_html_with_buf(html);
-			}
-			return;
-		}
-
+	fn render_inner(&self, html: &mut String) {
 		html.push_str(&format!("<{}", self.tag));
 		for attribute in &self.attributes {
-			attribute.render_html_with_buf(html);
+			attribute.render_inner(html);
 		}
 
 		if self.self_closing {
-			assert!(
-				self.children.is_empty(),
-				"self closing elements should not have children"
-			);
 			html.push_str("/>");
 			return;
 		} else {
 			html.push('>');
 		}
 		for child in &self.children {
-			child.render_html_with_buf(html);
+			child.render_inner(html);
 		}
 		html.push_str(&format!("</{}>", self.tag));
+	}
+	fn render_pretty_inner(&self, html: &mut String, indent: &mut usize) {
+		let mut open_tag = format!("<{}", self.tag);
+		for attribute in &self.attributes {
+			attribute.render_inner(&mut open_tag);
+		}
+		if self.self_closing {
+			open_tag.push_str("/>");
+			Self::push_pretty(html, indent, &open_tag);
+			return;
+		} else {
+			open_tag.push('>');
+		}
+
+		Self::push_pretty(html, indent, &open_tag);
+		*indent += 1;
+		for child in &self.children {
+			child.render_pretty_inner(html, indent);
+		}
+		*indent -= 1;
+		Self::push_pretty(html, indent, &format!("</{}>", self.tag));
 	}
 }
 #[derive(Debug, Clone)]
@@ -181,12 +227,7 @@ pub struct HtmlAttribute {
 
 
 impl RenderHtml for HtmlAttribute {
-	fn render_html_with_buf(&self, html: &mut String) {
-		if self.key == "slot" {
-			// slot attributes are for initial rendering
-			return;
-		}
-
+	fn render_inner(&self, html: &mut String) {
 		html.push(' ');
 		html.push_str(&self.key);
 		if let Some(value) = &self.value {
@@ -195,13 +236,22 @@ impl RenderHtml for HtmlAttribute {
 			html.push_str("\"");
 		}
 	}
+
+	fn render_pretty_inner(&self, _html: &mut String, _indent: &mut usize) {
+		unimplemented!("attributes should be inline via render_inner")
+	}
 }
 
 
 impl RenderHtml for Vec<HtmlAttribute> {
-	fn render_html_with_buf(&self, html: &mut String) {
+	fn render_inner(&self, html: &mut String) {
 		for attr in self {
-			attr.render_html_with_buf(html);
+			attr.render_inner(html);
+		}
+	}
+	fn render_pretty_inner(&self, html: &mut String, indent: &mut usize) {
+		for attr in self {
+			attr.render_pretty_inner(html, indent);
 		}
 	}
 }
@@ -230,5 +280,33 @@ impl Default for HtmlConstants {
 			event_handler: "_beet_event_handler",
 			event_store: "_beet_event_store",
 		}
+	}
+}
+
+
+
+#[cfg(test)]
+mod test {
+	use crate::as_beet::*;
+	use sweet::prelude::*;
+
+	#[test]
+	fn pretty() {
+		let doc = rsx! {
+			<html>
+				<head>
+					<title>Test</title>
+				</head>
+				<body>
+					<div foo="bar" bazz>
+						<p>Test</p>
+					</div>
+				</body>
+			</html>
+		}
+		.build_document()
+		.unwrap();
+		// println!("{}", doc.render_pretty());
+		expect(doc.render_pretty()).to_be("<!DOCTYPE html>\n<html>\n\t<head>\n\t\t<title>\n\t\t\tTest\n\t\t</title>\n\t</head>\n\t<body>\n\t\t<div foo=\"bar\" bazz>\n\t\t\t<p>\n\t\t\t\tTest\n\t\t\t</p>\n\t\t</div>\n\t</body>\n</html>");
 	}
 }

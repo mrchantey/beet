@@ -227,6 +227,19 @@ impl RsxElement {
 			_ => None,
 		})
 	}
+
+	/// Remove all attributes with the given key, checking:
+	/// - [RsxAttribute::Key]
+	/// - [RsxAttribute::KeyValue]
+	/// - [RsxAttribute::BlockValue]
+	pub fn remove_matching_key(&mut self, match_key: &str) {
+		self.attributes.retain(|a| match a {
+			RsxAttribute::Key { key } => key != match_key,
+			RsxAttribute::KeyValue { key, .. } => key != match_key,
+			RsxAttribute::BlockValue { key, .. } => key != match_key,
+			_ => true,
+		});
+	}
 }
 
 // #[derive(Debug, Clone, PartialEq)]

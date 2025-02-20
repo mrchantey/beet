@@ -111,6 +111,8 @@ impl SlotsVisitor {
 				RsxNode::Element(el) => {
 					if let Some(slot_name) = el.get_key_value_attr("slot") {
 						let slot_name = slot_name.to_string();
+						// remove the slot attribute
+						el.remove_matching_key("slot");
 						named_slots
 							.entry(slot_name)
 							.or_insert_with(Vec::new)
@@ -240,19 +242,17 @@ mod test {
 				}
 			}
 		}
-
-		let mut slot_example = rsx! {
-			<MyComponent>
+		expect(
+			rsx! {
 				<MyComponent>
-					<div slot="header">Header</div>
-					<div>Default</div>
+					<MyComponent>
+						<div slot="header">Header</div>
+						<div>Default</div>
+					</MyComponent>
 				</MyComponent>
-			</MyComponent>
-		};
-		SlotsVisitor::apply(&mut slot_example.node).unwrap();
-		// println!("{:?}", slot_example);
-		expect(RsxToHtml::render_body(&slot_example)).to_be(
-			"<html><html><div>Header</div><div>Default</div></html></html>",
-		);
+			}
+			.render_body(),
+		)
+		.to_be("<html><html><div>Header</div><div>Default</div></html></html>");
 	}
 }
