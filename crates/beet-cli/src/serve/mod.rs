@@ -11,7 +11,7 @@ mod file_routes_watcher;
 pub struct Serve {
 	#[command(flatten)]
 	collect_routes: CollectRoutes,
-	/// 🦀 the commands that will be used to build the route1s 🦀
+	/// 🦀 the commands that will be used to build the html files 🦀
 	#[command(flatten)]
 	cargo_run: cargo_cmd::CargoCmd,
 	/// directory to serve from

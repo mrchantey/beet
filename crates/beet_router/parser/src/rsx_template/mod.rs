@@ -27,8 +27,10 @@ pub struct BuildRsxTemplateMap {
 }
 
 impl BuildRsxTemplateMap {
+	pub const DEFAULT_TEMPLATES_DST: &'static str = "target/rsx-templates.ron";
+
 	pub fn new(src: impl Into<PathBuf>) -> Self {
-		Self::new_with_dst(src, "target/rsx-templates.ron")
+		Self::new_with_dst(src, Self::DEFAULT_TEMPLATES_DST)
 	}
 	pub fn new_with_dst(
 		src: impl Into<PathBuf>,

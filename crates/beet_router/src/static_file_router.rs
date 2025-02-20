@@ -44,7 +44,7 @@ impl<T: Default> Default for StaticFileRouter<T> {
 			page_routes: Default::default(),
 			dst_dir: "target/client".into(),
 			// use the default from BuildRsxTemplateMap
-			templates_src: BuildRsxTemplateMap::new("").dst,
+			templates_src: BuildRsxTemplateMap::DEFAULT_TEMPLATES_DST.into(),
 		}
 	}
 }

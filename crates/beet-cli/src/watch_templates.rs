@@ -8,33 +8,41 @@ use sweet::prelude::ReadFile;
 
 #[derive(Debug, Parser)]
 pub struct WatchTemplates {
-	/// File or directory to watch
-	#[arg(long, default_value = "src")]
-	pub src: PathBuf,
+	/// do not log the entire file
+	#[arg(short, long)]
+	pub quiet: bool,
 	// keep default in sync with StaticFileRouter
-	#[arg(long, default_value = "target/rsx-templates.ron")]
+	#[arg(long, default_value = BuildRsxTemplateMap::DEFAULT_TEMPLATES_DST)]
 	pub dst: PathBuf,
+	/// File or directory to watch
+	#[arg(default_value = "src")]
+	pub src: PathBuf,
 }
-
 
 impl WatchTemplates {
 	pub async fn run(self) -> Result<()> {
-		println!("watching templates at {}", self.src.display());
-
-		fn print_dst(dst: &PathBuf) -> Result<()> {
-			let str = ReadFile::to_string(dst)?;
-			println!("wrote to {}\n{}", dst.display(), str);
-			Ok(())
+		if !self.quiet {
+			println!("watching templates at {}", self.src.display());
 		}
-		let dst = self.dst.clone();
+
+		let print_dst = || -> Result<()> {
+			if self.quiet {
+				// println!("
+				return Ok(());
+			}
+			let str = ReadFile::to_string(&self.dst)?;
+			println!("wrote to {}\n{}", self.dst.display(), str);
+			Ok(())
+		};
+
 		TemplateWatcher::new(
-			BuildRsxTemplateMap::new_with_dst(self.src, self.dst),
+			BuildRsxTemplateMap::new_with_dst(self.src, &self.dst),
 			|| {
-				print_dst(&dst)?;
+				print_dst()?;
 				Ok(())
 			},
 			|| {
-				print_dst(&dst)?;
+				print_dst()?;
 				Ok(())
 			},
 		)?

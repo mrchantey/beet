@@ -7,7 +7,7 @@ use std::time::Instant;
 use sweet::prelude::*;
 
 
-/// Watch the [CollectRoutes::src_dir] for changes, and determine if the rust code
+/// Watch the [BuildRsxTemplateMap::src] for changes, and determine if the rust code
 /// changed in a file, or if it was just the html template
 pub struct TemplateWatcher<Reload, Recompile> {
 	// we will be swapping out the `run` and `build` methods of this command,

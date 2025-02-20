@@ -22,7 +22,7 @@ pub struct RsxTemplateMap(pub HashMap<RsxMacroLocation, RsxTemplateRoot>);
 impl RsxTemplateMap {
 	/// Load the template map serialized by [beet_rsx_parser::RstmlToRsxTemplate]
 	#[cfg(all(feature = "serde", not(target_arch = "wasm32")))]
-	pub fn load(src: &std::path::Path) -> Result<Self> {
+	pub fn load(src: impl AsRef<std::path::Path>) -> Result<Self> {
 		use sweet::prelude::ReadFile;
 		{
 			let tokens = ReadFile::to_string(src)?;

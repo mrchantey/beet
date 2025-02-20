@@ -27,7 +27,7 @@ impl Component for MyComponent {
 		let value3 = value.clone();
 
 		let effect = effect(move || {
-			sweet::log!("value change to {}", value2());
+			sweet::log!("value changed to {}", value2());
 		});
 
 		rsx! {
@@ -41,11 +41,16 @@ impl Component for MyComponent {
 	}
 }
 
-
+/// run with watch-templates to live reload
 #[cfg(not(target_arch = "wasm32"))]
 fn main() {
 	use sweet::prelude::FsExt;
-	let mut doc = RsxToResumableHtml::default().map_root(&app());
+	let template_map =
+		RsxTemplateMap::load(BuildRsxTemplateMap::DEFAULT_TEMPLATES_DST)
+			.unwrap();
+	let app = template_map.apply_template(app()).unwrap();
+
+	let mut doc = RsxToResumableHtml::default().map_root(&app);
 	doc.insert_wasm_script();
 	let html = doc.render_pretty();
 	FsExt::write("target/wasm-example/index.html", &html).unwrap();

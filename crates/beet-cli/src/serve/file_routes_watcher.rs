@@ -15,6 +15,9 @@ pub struct FileRoutesWatcher {
 	// depending on the diff
 	cargo: CargoCmd,
 	collect_routes: CollectRoutes,
+	/// name of the executable to run, if this is a main file it will
+	/// just be that name, ie `beet_site`, if its an example, it should
+	/// have that prefix, ie `examples/dom_rsx`
 	exe_name: String,
 }
 
