@@ -2,7 +2,10 @@ use beet::prelude::*;
 
 
 fn main() {
-	let value2 = "ld;rfs";
-	let html = RsxToHtml::render_body(&rsx! {<div>lfdso {value2}</div> });
+	let planet = "world";
+	let html = rsx! {<div>hello {planet}</div> }.apply_and_render();
+
+	assert_eq!(html, "<div data-beet-rsx-idx=\"0\">hello world</div>");
+
 	println!("{}", html);
 }

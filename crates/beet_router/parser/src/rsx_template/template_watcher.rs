@@ -35,12 +35,17 @@ impl<Reload: FnMut() -> Result<()>, Recompile: FnMut() -> Result<()>>
 		})
 	}
 
-	/// Run `recompile` once, then watch
-	pub async fn recompile_and_watch(mut self) -> Result<()> {
+	/// - Run [`Self::recompile_func`] once
+	/// - Run [`Self::watch`] to watch for changes
+	pub async fn compile_and_watch(mut self) -> Result<()> {
+		println!("caching");
 		(self.recompile_func)()?;
 		self.watch().await
 	}
+	/// - Run [`BuildRsxTemplateMap::build_and_write`]
+	/// - Watch for changes
 	pub async fn watch(mut self) -> Result<()> {
+		self.build_templates.build_and_write()?;
 		let watcher = FsWatcher::default()
 			.with_path(&self.build_templates.src)
 			.with_exclude("*.git*")

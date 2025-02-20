@@ -32,6 +32,7 @@ impl WatchTemplates {
 			}
 			let str = ReadFile::to_string(&self.dst)?;
 			println!("wrote to {}\n{}", self.dst.display(), str);
+
 			Ok(())
 		};
 
@@ -46,7 +47,7 @@ impl WatchTemplates {
 				Ok(())
 			},
 		)?
-		.recompile_and_watch()
+		.watch()
 		.await
 	}
 }

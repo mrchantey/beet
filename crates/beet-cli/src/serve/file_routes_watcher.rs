@@ -54,7 +54,7 @@ impl FileRoutesWatcher {
 		};
 		// always compile on first run
 		TemplateWatcher::new(build_templates, reload, recompile_and_reload)?
-			.recompile_and_watch()
+			.compile_and_watch()
 			.await
 	}
 

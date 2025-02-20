@@ -212,8 +212,22 @@ impl RenderHtml for HtmlElementNode {
 
 		Self::push_pretty(html, indent, &open_tag);
 		*indent += 1;
+
+		// unbreak consecutive text nodes
+		let mut prev_text_node = false;
 		for child in &self.children {
+			if prev_text_node {
+				// remove the newline and indent
+				while html.ends_with('\n') || html.ends_with('\t') {
+					html.pop();
+				}
+			}
 			child.render_pretty_inner(html, indent);
+			if let HtmlNode::Text(_) = child {
+				prev_text_node = true;
+			} else {
+				prev_text_node = false;
+			}
 		}
 		*indent -= 1;
 		Self::push_pretty(html, indent, &format!("</{}>", self.tag));
@@ -292,10 +306,11 @@ mod test {
 
 	#[test]
 	fn pretty() {
+		let val = "bar";
 		let doc = rsx! {
 			<html>
 				<head>
-					<title>Test</title>
+					<title>Test "foo" {val}</title>
 				</head>
 				<body>
 					<div foo="bar" bazz>
@@ -307,6 +322,6 @@ mod test {
 		.build_document()
 		.unwrap();
 		// println!("{}", doc.render_pretty());
-		expect(doc.render_pretty()).to_be("<!DOCTYPE html>\n<html>\n\t<head>\n\t\t<title>\n\t\t\tTest\n\t\t</title>\n\t</head>\n\t<body>\n\t\t<div foo=\"bar\" bazz>\n\t\t\t<p>\n\t\t\t\tTest\n\t\t\t</p>\n\t\t</div>\n\t</body>\n</html>");
+		expect(doc.render_pretty()).to_be("<!DOCTYPE html>\n<html>\n\t<head>\n\t\t<title data-beet-rsx-idx=\"3\">\n\t\t\tTest \t\t\tfoo\t\t\tbar\n\t\t</title>\n\t</head>\n\t<body>\n\t\t<div foo=\"bar\" bazz>\n\t\t\t<p>\n\t\t\t\tTest\n\t\t\t</p>\n\t\t</div>\n\t</body>\n</html>");
 	}
 }

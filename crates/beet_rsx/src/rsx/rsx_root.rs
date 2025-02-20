@@ -36,7 +36,7 @@ impl RsxRoot {
 	/// - [RsxToHtml::map_node]
 	/// - [HtmlNode::render]
 	///
-	/// # Panics
+	/// ## Panics
 	/// If the slots cannot be applied.
 	pub fn apply_and_render(mut self) -> String {
 		#[cfg(feature = "css")]
