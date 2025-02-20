@@ -89,7 +89,9 @@ impl SlotsVisitor {
 	}
 
 
-	/// apply all slots, returning any named slots that were not consumed
+	/// apply all slots
+	/// ## Errors
+	/// If any named slots were not consumed
 	fn apply_to_component(
 		component: &mut RsxComponent,
 	) -> Result<(), SlotsError> {
@@ -159,13 +161,13 @@ impl RsxVisitorMut for SlotsVisitor {
 		// avoid 'slot stealing'
 		true
 	}
-	fn ignore_element_children(&self) -> bool {
-		// end if we're done
-		self.default_slots.is_empty() && self.named_slots.is_empty()
-	}
+	// we cant exit early because we still need to find and remove default <slot/>
+	fn ignore_element_children(&self) -> bool { false }
 
 	/// visit node so we can replace slot with fragment of same idx
 	fn visit_node(&mut self, node: &mut RsxNode) {
+		// println!("visiting node: {:?}", node);
+
 		match node {
 			RsxNode::Element(element) => {
 				if element.tag == "slot" {
@@ -181,7 +183,7 @@ impl RsxVisitorMut for SlotsVisitor {
 						} else {
 							Vec::new()
 						}
-						// no matching slot children, thats fine
+						// no matching slot children, thats allowed
 					} else {
 						// drains the default slots
 						std::mem::take(&mut self.default_slots)
@@ -225,7 +227,7 @@ mod test {
 					<div>Default</div>
 				</MyComponent>
 			}
-			.render_body(),
+			.apply_and_render(),
 		)
 		.to_be("<html><div>Header</div><div>Default</div></html>");
 	}
@@ -253,7 +255,7 @@ mod test {
 					</MyComponent>
 				</MyComponent>
 			}
-			.render_body(),
+			.apply_and_render(),
 		)
 		.to_be("<html><html><div>Header</div><div>Default</div></html></html>");
 	}

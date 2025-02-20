@@ -252,7 +252,7 @@ mod test {
 					<b>foo</b>
 				</Layout>
 			}
-			.render_body(),
+			.apply_and_render(),
 		)
 		.to_be("<div><h1>welcome</h1><p><b>foo</b></p></div>");
 	}
@@ -280,7 +280,7 @@ mod test {
 				<b slot="tagline">what a cool article</b>
 				<div>direct child</div>
 			</Layout>
-		}.render_body())
+		}.apply_and_render())
 			.to_be("<article><h1>welcome</h1><p><b>what a cool article</b></p><main><div>direct child</div></main></article>");
 	}
 

@@ -38,7 +38,7 @@ impl RsxRoot {
 	///
 	/// # Panics
 	/// If the slots cannot be applied.
-	pub fn render_body(mut self) -> String {
+	pub fn apply_and_render(mut self) -> String {
 		#[cfg(feature = "css")]
 		ScopedStyle::default().apply(&mut self).unwrap();
 		SlotsVisitor::apply(&mut self).unwrap();

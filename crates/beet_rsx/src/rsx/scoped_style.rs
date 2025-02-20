@@ -189,7 +189,7 @@ mod test {
 					// <Child/>
 				</div>
 			}
-			.render_body(),
+			.apply_and_render(),
 		)
 		.to_be("<div data-styleid=\"0\"><style data-styleid=\"0\">span[data-styleid=\"0\"] {\n  color: red;\n}\n</style></div>");
 	}
@@ -203,7 +203,7 @@ mod test {
 					// <Child/>
 				</div>
 			}
-			.render_body(),
+			.apply_and_render(),
 		)
 		.to_be("<div><style>span {\n  color: red;\n}\n</style></div>");
 	}
@@ -216,7 +216,7 @@ mod test {
 					<style scope:global>span { color: red; }</style>
 				</div>
 			}
-			.render_body(),
+			.apply_and_render(),
 		)
 		.to_be("<div data-styleid=\"0\"><style data-styleid=\"0\">div[data-styleid=\"0\"] {\n  color: #00f;\n}\n</style><style data-styleid=\"0\">span {\n  color: red;\n}\n</style></div>");
 	}
@@ -224,7 +224,7 @@ mod test {
 
 	#[test]
 	fn applies_to_component_node() {
-		expect(rsx! { <Child /> }.render_body())
+		expect(rsx! { <Child /> }.apply_and_render())
 		.to_be("<div data-styleid=\"0\"><style data-styleid=\"0\">span[data-styleid=\"0\"] {\n  color: #00f;\n}\n</style></div>");
 	}
 	#[test]
@@ -233,7 +233,7 @@ mod test {
 			<Child>
 				<Child />
 			</Child>
-		}.render_body())
+		}.apply_and_render())
 			.to_be("<div data-styleid=\"0\"><style data-styleid=\"0\">span[data-styleid=\"0\"] {\n  color: #00f;\n}\n</style><div data-styleid=\"1\"><style data-styleid=\"1\">span[data-styleid=\"1\"] {\n  color: #00f;\n}\n</style></div></div>");
 	}
 	#[test]
@@ -243,7 +243,7 @@ mod test {
 				<br/>
 				<style>span { color: red; }</style>
 			</Child>
-		}.render_body())
+		}.apply_and_render())
 			.to_be("<div data-styleid=\"0\"><style data-styleid=\"0\">span[data-styleid=\"0\"] {\n  color: #00f;\n}\n</style><br data-styleid=\"1\"/><style data-styleid=\"1\">span[data-styleid=\"1\"] {\n  color: red;\n}\n</style></div>");
 	}
 }
