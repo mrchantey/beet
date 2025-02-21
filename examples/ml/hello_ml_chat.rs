@@ -32,9 +32,10 @@ fn setup(
 
 	mut ev: EventWriter<OnLogMessage>,
 ) {
-	ev.send(OnLogMessage::new(
-		"Agent: I can heal or attack, what should i do?",
-	));
+	let msg = "Agent: I can heal or attack, what should i do?";
+	println!("{}", msg);
+	ev.send(OnLogMessage::new(msg));
+
 	let handle = asset_server.load::<Bert>("ml/default-bert.ron");
 	commands
 		.spawn((
