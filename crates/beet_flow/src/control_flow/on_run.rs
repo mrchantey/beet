@@ -25,6 +25,11 @@ impl<T> ActionEvent for OnRunAction<T> {
 	fn origin(&self) -> Entity { self.origin }
 }
 
+/// Create a local [`OnRunAction`] event with a default payload.
+impl<T: Default> Default for OnRunAction<T> {
+	fn default() -> Self { Self::local(Default::default()) }
+}
+
 impl<T> OnRunAction<T> {
 	/// Create a new [`OnRunAction`] event, where the origin
 	/// may be a seperate entity from the action.

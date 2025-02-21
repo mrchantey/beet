@@ -1,4 +1,6 @@
 mod bert;
+mod run_with_user_sentence;
+pub use self::run_with_user_sentence::*;
 pub use self::bert::*;
 mod bert_config;
 pub use self::bert_config::*;

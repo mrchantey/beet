@@ -12,20 +12,21 @@ pub fn main() {
 			plugin_ml
 		))
 		.init_resource::<DebugOnRun>()
+		.init_resource::<DebugToStdOut>()
 		.add_systems(
 			Startup,
 			(
 				scenes::camera_2d,
 				scenes::ui_terminal_input,
-				hello_ml,
+				setup,
 			),
 		)
 
 		.run();
 }
 
-
-fn hello_ml(
+#[rustfmt::skip]
+fn setup(
 	mut commands: Commands,
 	asset_server: Res<AssetServer>,
 
@@ -34,15 +35,19 @@ fn hello_ml(
 	ev.send(OnLogMessage::new(
 		"Agent: I can heal or attack, what should i do?",
 	));
-	// let handle = asset_server.load("ml/default-bert.ron");
-	// commands.spawn((
-	// 	Name::new("Hello ML"),
-	// 	RunOnAssetReady::<Bert>::new(handle),
-	// 	SentenceBundle::with_initial("please kill the baddies"),
-	// ));
-	// .with_children(|parent| {
-	// 	parent.spawn((Name::new("Heal Behavior"), Sentence::new("heal")));
-	// 	parent
-	// 		.spawn((Name::new("Attack Behavior"), Sentence::new("attack")));
-	// });
-}
+	let handle = asset_server.load::<Bert>("ml/default-bert.ron");
+	commands
+		.spawn((
+			Name::new("Hello ML"),
+			HandleWrapper(handle.clone()),
+			RunWithUserSentence::default(),
+			NearestSentence::new(),
+		))
+		.with_child((
+			Name::new("Heal Behavior"), 
+			Sentence::new("heal")
+		))
+		.with_child((
+			Name::new("Attack Behavior"), 
+			Sentence::new("attack")
+		));}

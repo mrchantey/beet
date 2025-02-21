@@ -23,12 +23,12 @@ pub fn main() {
 			RunOnAssetReadyPlugin::<Bert>::default(),
 			BertPlugin::default(),
 		))
-		.add_systems(Startup, (hello_ml,))
+		.add_systems(Startup, setup)
 		.run();
 }
 
 #[rustfmt::skip]
-fn hello_ml(mut commands: Commands, asset_server: Res<AssetServer>) {
+fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
 	let handle = asset_server.load("ml/default-bert.ron");
 	commands
 		.spawn((

@@ -1,30 +1,21 @@
-pub mod environment;
-#[allow(unused_imports)]
+mod environment;
 pub use self::environment::*;
-pub mod evaluation;
-#[allow(unused_imports)]
+mod evaluation;
 pub use self::evaluation::*;
-pub mod hash_q_table;
-#[allow(unused_imports)]
-pub use self::hash_q_table::*;
-pub mod q_learn_params;
-#[allow(unused_imports)]
+mod hash_q_table;
+mod q_learn_params;
 pub use self::q_learn_params::*;
-pub mod q_policy;
-#[allow(unused_imports)]
+mod q_policy;
 pub use self::q_policy::*;
-pub mod q_table;
-#[allow(unused_imports)]
+mod q_table;
 pub use self::q_table::*;
-pub mod q_table_env;
-#[allow(unused_imports)]
+mod q_table_env;
 pub use self::q_table_env::*;
-pub mod q_table_loader;
-#[allow(unused_imports)]
+#[cfg(feature = "bevy_default")]
+mod q_table_loader;
+#[cfg(feature = "bevy_default")]
 pub use self::q_table_loader::*;
-pub mod q_table_trainer;
-#[allow(unused_imports)]
+mod q_table_trainer;
 pub use self::q_table_trainer::*;
-pub mod q_trainer;
-#[allow(unused_imports)]
+mod q_trainer;
 pub use self::q_trainer::*;
