@@ -612,6 +612,7 @@ name = "beet_flow"
 version = "0.0.5-dev.3"
 dependencies = [
  "anyhow",
+ "beet_flow",
  "beet_flow_macros",
  "bevy",
  "extend",
@@ -786,6 +787,7 @@ version = "0.0.5-dev.3"
 dependencies = [
  "anyhow",
  "beet_flow",
+ "beet_spatial",
  "bevy",
  "extend",
  "log",

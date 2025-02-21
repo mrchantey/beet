@@ -135,10 +135,10 @@ test-all *args:
 # cargo test --workspace --all-features -- {{args}}
 
 test-doc crate *args:
-	just watch 'cargo test -p {{crate}} --doc --features=_doctest {{args}}'
+	just watch 'cargo test -p {{crate}} --doc 						{{args}}'
 # copied from sweet
 test crate *args:
-	just watch 'cargo test -p {{crate}} --lib -- --watch {{args}}'
+	just watch 'cargo test -p {{crate}} --lib -- --watch 	{{args}}'
 test-e2e crate test_name *args:
 	just watch 'cargo test -p {{crate}} --test {{test_name}} -- --watch {{args}}'
 test-feat crate *args:

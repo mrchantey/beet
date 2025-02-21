@@ -2,6 +2,7 @@
 //! A popular 'hello world' for machine learning in games is sentence similarity,
 //! where models rank the similarity of sentences.
 //! This example uses a locally run *small* language model to select the child behavior with the most similar sentence.
+use beet::examples::scenes;
 use beet::prelude::*;
 use bevy::prelude::*;
 
@@ -16,6 +17,8 @@ pub fn main() {
 		.add_systems(
 			Startup,
 			(
+				scenes::camera_2d,
+				scenes::ui_terminal_input,
 				hello_ml,
 			),
 		)

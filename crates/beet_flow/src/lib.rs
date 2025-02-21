@@ -26,23 +26,23 @@ pub mod prelude {
 	pub use crate::control_flow_actions::*;
 	pub use crate::tree::*;
 	pub use beet_flow_macros::*;
-	/// doctest reexports and utilities
+}
+/// doctest reexports and utilities
+#[cfg(feature = "_doctest")]
+pub mod doctest {
+	pub use crate::prelude::*;
+	pub use bevy::prelude::*;
+	/// for docs, create a world with BeetFlowPlugin
+	/// ```
+	/// use beet_flow::doctest::*;
+	/// let world = world();
+	/// ```
 	#[cfg(feature = "_doctest")]
-	pub mod doctest {
-		pub use crate::prelude::*;
-		pub use bevy::prelude::*;
-		/// for docs, create a world with BeetFlowPlugin
-		/// ```
-		/// use beet_flow::doctest::*;
-		/// let world = world();
-		/// ```
-		#[cfg(feature = "_doctest")]
-		pub fn world() -> World {
-			let mut app = App::new();
-			app.add_plugins(beet_flow::BeetFlowPlugin::default());
-			let world = std::mem::take(app.world_mut());
-			world
-		}
+	pub fn world() -> World {
+		let mut app = App::new();
+		app.add_plugins(beet_flow::BeetFlowPlugin::default());
+		let world = std::mem::take(app.world_mut());
+		world
 	}
 }
 

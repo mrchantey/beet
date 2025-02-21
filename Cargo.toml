@@ -390,7 +390,8 @@ include = ["beet-debug", "bevyhub/camera-2d", "bevyhub/ui-terminal"]
 [[example]]
 name = "hello_ml"
 path = "examples/ml/hello_ml.rs"
-required-features = ["examples", "ml"]
+# required-features = ["examples", "ml"]
+required-features = ["ml"]
 
 [[package.metadata.scene]]
 name = "hello-ml"
