@@ -17,17 +17,19 @@ impl BeetDom {
 		let doc = RsxToResumableHtml::default().map_root(&app());
 		Self::mount_doc(&doc);
 		Self::normalize();
-
-		// give the dom time to mount
+		// give the dom a moment to mount
 		set_timeout_ms(100, move || {
-			DomTarget::set(BrowserDomTarget::default());
-			// effects called here too
-			app().register_effects();
-			EventRegistry::initialize().unwrap();
+			Self::hydrate(app());
 		});
 	}
 
-
+	pub fn hydrate<M>(app: impl IntoRsxRoot<M>) {
+		console_error_panic_hook::set_once();
+		DomTarget::set(BrowserDomTarget::default());
+		// effects called here too
+		app.into_root().register_effects();
+		EventRegistry::initialize().unwrap();
+	}
 
 	/// by default the dom mounter will not collapse text nodes
 	/// this recursively collapses text nodes into their parent element

@@ -4,9 +4,9 @@ use beet::prelude::*;
 
 
 pub fn get(_state: DefaultAppState) -> RsxRoot {
-	let val = 43;
+	let val = 44;
 	rsx! {
-		<PageLayout title="foobarbasszz".into()>
+		<PageLayout title="fooba".into()>
 			<meta
 				slot="head"
 				name="description"

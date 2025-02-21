@@ -1,13 +1,14 @@
 use anyhow::Result;
 use clap::Parser;
+use std::path::PathBuf;
 use std::process::Command;
 
 /// Verbatim clone of cargo run args
 #[derive(Debug, Clone, Parser)]
-#[command(name = "cargo-run")]
+#[command(name = "cargo-cmd")]
 pub struct CargoCmd {
 	/// Error format
-	#[arg(long, default_value = "run")]
+	#[arg(long, default_value = "build")]
 	pub cargo_cmd: String,
 	#[arg(long)]
 	pub message_format: Option<String>,
@@ -95,6 +96,41 @@ impl Default for CargoCmd {
 }
 
 impl CargoCmd {
+	/// Best effort attempt to retrieve the path to the executable.
+	/// In the case of a wasm target, the path will have a `.wasm` extension.
+	pub fn exe_path(&self) -> PathBuf {
+		let target_dir = std::env::var("CARGO_TARGET_DIR")
+			.unwrap_or_else(|_| "target".to_string());
+		let mut path = PathBuf::from(target_dir);
+
+		if let Some(target) = &self.target {
+			path.push(target);
+		}
+
+		if self.release {
+			path.push("release");
+		} else {
+			path.push("debug");
+		}
+
+		if let Some(example) = &self.example {
+			path.push("examples");
+			path.push(example);
+		// package examples are not nested under package name
+		} else if let Some(pkg) = &self.package {
+			path.push(pkg);
+		}
+		if let Some(bin) = &self.bin {
+			path.push(bin);
+		}
+
+		if let Some("wasm32-unknown-unknown") = self.target.as_deref() {
+			path.set_extension("wasm");
+		}
+
+		path
+	}
+
 	pub fn spawn(&self) -> Result<()> {
 		let CargoCmd {
 			cargo_cmd,

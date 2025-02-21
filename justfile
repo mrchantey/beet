@@ -1,9 +1,9 @@
-# Beet uses Just for common tasks
+# Beet uses the Just command runner
 #
 # ```rust 
 # cargo binstall just
 # just --list
-# just test-all
+# just test-ci
 # ```
 #
 #💡 Init
@@ -69,15 +69,18 @@ run-bevy-rsx:
 run-bevy-rsx-if-ok:
 	while cargo run --example bevy_rsx --features=bevy_default && [ $? -eq 0 ]; do :; done
 
-# Simu
+
 run-dom-rsx:
-	mkdir -p ./target/wasm-example || true
-	cp ./index.html ./target/wasm-example/index.html
-	just cli serve \
-	-p beet \
-	--src examples/rsx/dom_rsx \
+	rm -rf ./target
+	mkdir -p ./target/wasm-example
+	just cli serve-html 						\
+	--package beet 									\
+	--example dom_rsx 							\
+	--src examples/rsx/dom_rsx.rs 	\
 	--serve-dir target/wasm-example \
-	| just watch 'just build-wasm beet dom_rsx'
+	--wasm 													\
+
+# | just watch 'just build-wasm beet dom_rsx'
 # sweet serve ./target/wasm-example | \
 
 run-test-site:
@@ -88,9 +91,10 @@ run-test-site:
 
 
 run-beet-site:
-	just cli serve \
-	-p beet_site \
+	just cli serve-html \
+	--mpa \
 	--src crates/beet_site/src \
+	-p beet_site \
 	--serve-dir target/client \	
 
 
@@ -152,13 +156,12 @@ test-wasm-e2e crate test_name *args:
 serve-web:
 	just serve-wasm
 
-clean-repo:
+# massive purge
+purge:
 	cargo clean
 	rm -rf ./target
-# rm -rf ./Cargo.lock
-
-clean-analyzer:
 	rm -rf $CARGO_TARGET_DIR/rust-analyzer
+# rm -rf ./Cargo.lock
 
 pws *args:
 	just --shell powershell.exe --shell-arg -c {{args}}

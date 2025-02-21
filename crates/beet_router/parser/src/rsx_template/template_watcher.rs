@@ -23,43 +23,25 @@ impl<Reload: FnMut() -> Result<()>, Recompile: FnMut() -> Result<()>>
 {
 	pub fn new(
 		build_templates: BuildRsxTemplateMap,
-		reload: Reload,
-		recompile: Recompile,
+		reload_func: Reload,
+		recompile_func: Recompile,
 	) -> Result<Self> {
 		let file_cache = Self::preheat_cache(&build_templates.src)?;
 		Ok(Self {
 			build_templates,
 			file_cache,
-			reload_func: reload,
-			recompile_func: recompile,
+			reload_func,
+			recompile_func,
 		})
 	}
 
-	/// - Run [`Self::recompile_func`] once
-	/// - Run [`Self::watch`] to watch for changes
-	pub async fn compile_and_watch(mut self) -> Result<()> {
-		println!("caching");
-		(self.recompile_func)()?;
-		self.watch().await
-	}
-	/// - Run [`BuildRsxTemplateMap::build_and_write`]
-	/// - Watch for changes
 	pub async fn watch(mut self) -> Result<()> {
-		self.build_templates.build_and_write()?;
-		let watcher = FsWatcher::default()
+		FsWatcher::default()
 			.with_path(&self.build_templates.src)
 			.with_exclude("*.git*")
-			.with_exclude("*target*");
-
-		watcher
-			.watch_async(move |ev| {
-				self.on_change(ev).ok_or(|e| {
-					eprintln!("{:#?}", e);
-				});
-				Ok(())
-			})
-			.await?;
-		Ok(())
+			.with_exclude("*target*")
+			.watch_async(move |ev| self.on_change(ev))
+			.await
 	}
 
 	/// Create a file cache with every file in the src directory

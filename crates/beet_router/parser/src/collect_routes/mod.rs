@@ -37,10 +37,7 @@ impl Default for CollectRoutes {
 }
 
 impl CollectRoutes {
-	pub fn src_dir(&self) -> &PathBuf { &self.src }
-	pub fn routes_dir(&self) -> PathBuf {
-		self.src_dir().join(&self.routes_dir)
-	}
+	pub fn routes_dir(&self) -> PathBuf { self.src.join(&self.routes_dir) }
 	pub fn routes_mod_path(&self) -> PathBuf {
 		self.routes_dir().join("mod.rs")
 	}
