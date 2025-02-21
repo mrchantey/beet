@@ -2,6 +2,8 @@
 #![cfg_attr(test, test_runner(sweet::test_runner))]
 #![deny(missing_docs)]
 #![doc = include_str!("../README.md")]
+#[cfg(feature = "bevy_default")]
+pub mod asset_actions;
 pub mod continue_run;
 pub mod control_flow;
 pub mod control_flow_actions;
@@ -13,6 +15,8 @@ use bevy::app::PluginGroupBuilder;
 
 /// Include the kitchen sink for beet_flow.
 pub mod prelude {
+	#[cfg(feature = "bevy_default")]
+	pub use crate::asset_actions::*;
 	// required for macros to work internally
 	pub use super::ActionTag;
 	pub use super::BeetFlowPlugin;

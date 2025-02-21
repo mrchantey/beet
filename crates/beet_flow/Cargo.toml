@@ -13,6 +13,7 @@ categories.workspace = true
 
 
 [features]
+bevy_default = ["bevy/default"]
 reflect = ["dep:serde", "bevy/serialize"]
 # for doctest helpers 
 # https://github.com/rust-lang/rust/issues/67295

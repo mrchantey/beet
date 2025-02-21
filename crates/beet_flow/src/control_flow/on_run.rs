@@ -10,9 +10,13 @@ pub struct OnRunAction<T = ()> {
 	/// The payload of the run.
 	/// By analogy if an action is a function, this would be the arguments.
 	pub payload: T,
-	/// this is not exposed as it may be placeholder, instead use [Trigger::resolve_origin]
+	/// this is not exposed as it may be placeholder
+	/// - to set use [OnRunAction::new]
+	/// - to get use [Trigger::resolve_action]
 	origin: Entity,
-	/// this is not exposed as it may be placeholder, instead use [Trigger::resolve_action]
+	/// this is not exposed as it may be placeholder
+	/// - to set use [OnRunAction::new]
+	/// - to get use [Trigger::resolve_action]
 	action: Entity,
 }
 
