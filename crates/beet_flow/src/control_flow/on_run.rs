@@ -5,6 +5,11 @@ use std::fmt::Debug;
 
 /// An event triggered on an [`ActionEntity`], propagated to the observers automatically
 /// with observers registered by the [run_plugin].
+///
+/// This can be triggered on any entity, and [`OnRun`] will be propagated to [`Self::action`].
+/// - If [`Self::action`] is [`Entity::PLACEHOLDER`], the entity this was triggered on will be used.
+/// - If the action is local and the trigger is global, ie `commands.trigger(OnRunAction::local(()))`
+/// 	this will result in a panic.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Event)]
 pub struct OnRunAction<T = ()> {
 	/// The payload of the run.
@@ -174,6 +179,9 @@ impl OnRun<()> {
 }
 
 /// Propagate the [`OnRunAction`] event to all [`ActionObservers`].
+///
+/// The nature of this routing techique allows [`OnRunAction`] to be called
+/// on any entity, ie a different entity to the [`OnRunAction::action`].
 pub(crate) fn propagate_on_run<T: RunPayload>(
 	ev: Trigger<OnRunAction<T>>,
 	mut commands: Commands,

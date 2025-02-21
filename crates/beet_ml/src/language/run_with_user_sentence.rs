@@ -34,8 +34,6 @@ pub fn run_with_user_sentence<P: RunPayload>(
 ) {
 	for (action, run_with_user_sentence, mut sentence) in query.iter_mut() {
 		sentence.0 = (**ev).clone().into();
-		// even if the trigger specifies an action this is sorted out by
-		// propagate_on_run so we trigger on the action entity in case its local
 		commands
 			.entity(action)
 			.trigger(run_with_user_sentence.trigger.clone());
