@@ -8,7 +8,17 @@ use sweet::prelude::*;
 
 
 /// Watch the [BuildRsxTemplateMap::src] for changes, and determine if the rust code
-/// changed in a file, or if it was just the html template
+/// changed in a file, or if it was just the html template.
+/// 
+/// The reload step is as follows:
+/// 1. rebuild templates
+/// 2. call reload
+/// 
+/// The recompile step is as follows:
+/// 1. call recompile
+/// 2. rebuild templates
+/// 3. call reload
+/// 
 pub struct TemplateWatcher<Reload, Recompile> {
 	// we will be swapping out the `run` and `build` methods of this command,
 	// depending on the diff
@@ -92,14 +102,14 @@ impl<Reload: FnMut() -> Result<()>, Recompile: FnMut() -> Result<()>>
 							// );
 						}
 						self.file_cache.insert(ev.path.clone(), new_hash);
-						return self.recompile(&ev.display());
+						return self.recompile_then_reload(&ev.display());
 					} else {
-						return self.recompile(&ev.display());
+						return self.recompile_then_reload(&ev.display());
 					}
 				}
 				EventKind::Remove(RemoveKind::File)
 				| EventKind::Remove(RemoveKind::Folder) => {
-					return self.recompile(&ev.display());
+					return self.recompile_then_reload(&ev.display());
 				}
 				_ => {}
 			}
@@ -111,11 +121,13 @@ impl<Reload: FnMut() -> Result<()>, Recompile: FnMut() -> Result<()>>
 		Ok(())
 	}
 
-	fn recompile(&mut self, reason: &str) -> Result<()> {
+	fn recompile_then_reload(&mut self, reason: &str) -> Result<()> {
 		// terminal::clear()?;
 		println!("Watcher::Recompile: {}", reason);
 		let start = Instant::now();
 		(self.recompile_func)()?;
+		self.build_templates.build_and_write()?;
+		(self.reload_func)()?;
 		println!("Watcher::Recompile Duration: {:?}", start.elapsed());
 		Ok(())
 	}

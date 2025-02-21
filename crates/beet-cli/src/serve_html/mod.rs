@@ -79,7 +79,7 @@ impl ServeHtml {
 			Ok(())
 		};
 
-		let recompile_and_reload = move || -> Result<()> {
+		let recompile = move || -> Result<()> {
 			if self.mpa {
 				// TODO only recollect routes if routes change?
 				self.collect_routes.build_and_write()?;
@@ -91,16 +91,16 @@ impl ServeHtml {
 				wasm_cmd.spawn()?;
 				self.wasm_bindgen(&wasm_cmd.exe_path())?;
 			}
-			reload()?;
 			Ok(())
 		};
 
 		// run once before watching
+		recompile()?;
 		build_templates.build_and_write()?;
-		recompile_and_reload()?;
+		reload()?;
 
 		// always compile on first run
-		TemplateWatcher::new(build_templates, reload, recompile_and_reload)?
+		TemplateWatcher::new(build_templates, reload, recompile)?
 			.watch()
 			.await
 	}

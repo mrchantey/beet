@@ -70,8 +70,8 @@ pub enum TemplateError {
 	#[error("Rusty Map is missing a tracker for {cx}\nExpected: {expected:#?}\nReceived: {received:#?}")]
 	NoRustyMap {
 		cx: String,
-		received: RustyTracker,
-		expected: Vec<RustyTracker>,
+		expected: RustyTracker,
+		received: Vec<RustyTracker>,
 	},
 	#[error("Unexpected Node\nExpected: {expected}\nReceived: {received}")]
 	UnexpectedRusty {
@@ -83,13 +83,13 @@ pub enum TemplateError {
 impl TemplateError {
 	pub fn no_rusty_map(
 		cx: &str,
-		expected: &HashMap<RustyTracker, RustyPart>,
-		received: RustyTracker,
+		received_map: &HashMap<RustyTracker, RustyPart>,
+		expected: RustyTracker,
 	) -> Self {
 		Self::NoRustyMap {
 			cx: cx.to_string(),
-			expected: expected.keys().cloned().collect(),
-			received,
+			received: received_map.keys().cloned().collect(),
+			expected,
 		}
 	}
 }

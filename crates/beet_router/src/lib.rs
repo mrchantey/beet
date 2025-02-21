@@ -5,6 +5,7 @@
 
 #[cfg(feature = "parser")]
 pub use beet_router_parser;
+pub mod beet_html;
 #[cfg(feature = "bevy")]
 pub mod bevy;
 pub mod file_router;
@@ -12,6 +13,7 @@ pub mod static_file_router;
 
 
 pub mod prelude {
+	pub use crate::beet_html::*;
 	#[cfg(feature = "bevy")]
 	pub use crate::bevy::*;
 	pub use crate::file_router::*;
