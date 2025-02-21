@@ -12,11 +12,6 @@ impl Plugin for BertPlugin {
 			.init_asset_loader::<BertLoader>()
 			.register_type::<Sentence>();
 
-		#[cfg(feature = "spatial")]
-		app.add_plugins(
-			ActionPlugin::<InsertSentenceSteerTarget<Sentence>>::default(),
-		);
-
 		let world = app.world_mut();
 		world.register_component::<Sentence>();
 	}

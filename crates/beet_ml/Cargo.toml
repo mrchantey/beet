@@ -13,12 +13,13 @@ categories.workspace = true
 
 [features]
 spatial = ["dep:beet_spatial"]
+bevy_default = ["bevy/default"]
 
 [dependencies]
 beet_flow.workspace = true
 sweet = { workspace = true, features = ["bevy", "rand"] }
 
-bevy = { workspace = true, features = ["bevy_asset", "bevy_scene"] }
+bevy = { workspace = true, features = ["bevy_asset"] }
 beet_spatial = { workspace = true, optional = true }
 
 futures.workspace = true
