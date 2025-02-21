@@ -6,6 +6,7 @@ pub fn main() {
 	App::new()
 		.add_plugins(running_beet_example_plugin)
 		.init_resource::<DebugOnRun>()
+		.init_resource::<DebugToStdOut>()
 		.add_systems(
 			Startup,
 			(

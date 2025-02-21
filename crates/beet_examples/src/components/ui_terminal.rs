@@ -2,14 +2,10 @@ use crate::beet::prelude::*;
 use bevy::input::keyboard::Key;
 use bevy::input::keyboard::KeyboardInput;
 use bevy::input::ButtonState;
-use bevy::prelude::Deref;
-use bevy::prelude::DerefMut;
 use bevy::prelude::Node;
 use bevy::prelude::*;
 use bevy::ui::UiSystem;
 use bevy::window::WindowResized;
-use serde::Deserialize;
-use serde::Serialize;
 
 /// A plugin for rendering a terminal-like UI
 #[derive(Clone)]
@@ -18,7 +14,7 @@ pub struct UiTerminalPlugin;
 impl Plugin for UiTerminalPlugin {
 	fn build(&self, app: &mut App) {
 		app
-			.add_observer(log_user_message)
+
 			.add_systems(Update, (parse_text_input,log_on_message))
 			.add_systems(
 				PostUpdate,
@@ -32,24 +28,6 @@ impl Plugin for UiTerminalPlugin {
 			/*-*/;
 	}
 }
-
-#[derive(
-	Debug,
-	Default,
-	Clone,
-	Deref,
-	DerefMut,
-	Serialize,
-	Deserialize,
-	Event,
-	Reflect,
-)]
-pub struct OnUserMessage(pub String);
-
-impl OnUserMessage {
-	pub fn new(s: impl Into<String>) -> Self { Self(s.into()) }
-}
-
 
 
 #[derive(Debug, Default, Component, Reflect)]
@@ -205,11 +183,4 @@ fn parse_text_input(
 			}
 		}
 	}
-}
-
-fn log_user_message(
-	trigger: Trigger<OnUserMessage>,
-	mut ev: EventWriter<OnLogMessage>,
-) {
-	ev.send(OnLogMessage::new(format!("User: {}", &trigger.event().0)));
 }

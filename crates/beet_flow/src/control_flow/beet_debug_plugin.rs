@@ -84,7 +84,10 @@ impl BeetDebugPlugin {
 impl Plugin for BeetDebugPlugin {
 	fn build(&self, app: &mut App) {
 		// TODO when resolved: [Observers::run_if](https://github.com/bevyengine/bevy/issues/14195)
-		app.add_observer(log_on_run.never_param_warn())
+		app
+			// maybe log_user_message belongs elsewhere
+			.add_observer(log_user_message)
+			.add_observer(log_on_run.never_param_warn())
 			.add_observer(log_on_run_result.never_param_warn())
 			.add_event::<OnLogMessage>()
 			.add_systems(
@@ -146,6 +149,29 @@ impl OnLogMessage {
 		Self(msg.into())
 	}
 }
+
+/// An event triggered to represent user input, useful for
+/// retrieving user text input.
+#[derive(Debug, Default, Clone, Deref, DerefMut, Event, Reflect)]
+pub struct OnUserMessage(pub String);
+
+impl OnUserMessage {
+	/// Create a new user message.
+	pub fn new(s: impl Into<String>) -> Self { Self(s.into()) }
+}
+
+fn log_user_message(
+	trigger: Trigger<OnUserMessage>,
+	mut out: EventWriter<OnLogMessage>,
+	stdout: Option<Res<DebugToStdOut>>,
+) {
+	let msg = OnLogMessage::new(format!("User: {}", &trigger.event().0));
+	if stdout.is_some() {
+		println!("{}", msg.0);
+	}
+	out.send(msg);
+}
+
 
 /// Resource to enable logging for [log_on_run]
 #[derive(Debug, Default, Clone, Resource, Reflect)]
