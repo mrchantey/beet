@@ -1,9 +1,6 @@
 use crate::beet::prelude::*;
 use crate::prelude::*;
 use bevy::prelude::*;
-use bevyhub::core::scenes::Foxie;
-use bevyhub::prelude::*;
-
 
 pub fn fetch_npc(mut commands: Commands) {
 	let Foxie {

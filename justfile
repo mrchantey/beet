@@ -30,15 +30,15 @@ cli *args:
 	cargo run -p beet-cli -- {{args}}
 
 # Run and watch a workspace example
-run-ws example *args:
-	just watch 'just run-ci {{example}} {{args}}'
+run example *args:
+	just watch just run-ci {{example}} {{args}} --features=examples,ml
 
 # Run an example without watching
 run-ci example *args:
 	cargo run --example {{example}} {{args}}
 
 # Run and watch a crate example
-run crate example *args:
+run-p crate example *args:
 	just watch cargo run -p {{crate}} --example {{example}} {{args}}
 
 

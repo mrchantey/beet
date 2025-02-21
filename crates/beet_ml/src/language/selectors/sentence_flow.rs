@@ -16,6 +16,8 @@ impl Sentence {
 #[action(sentence_flow)]
 #[derive(Debug, Default, Clone, PartialEq, Component, Reflect)]
 #[reflect(Component)]
+// TODO OnRun<Sentence>
+// RunResult<SteerTarget?>
 pub struct SentenceFlow;
 
 impl SentenceFlow {

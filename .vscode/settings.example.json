@@ -1,13 +1,9 @@
 {
 	// "rust-analyzer.cargo.target": "wasm32-unknown-unknown",
-	// "rust-analyzer.cargo.features": [],
 	"rust-analyzer.cargo.features": [
-	//		"beet_flow/_doctest",
-			// "beet_spatial/render",
-			// "beet_spatial/assets",
-			// "beet_spatial/ui",
-			// "beet_spatial/animation",
-			// "beet_spatial/scene"
+		"beet/bevy_default",
+		"beet/examples",
+		"beet/ml"
 	],
 	"deno.enable": true,
 	"files.exclude": {
@@ -17,7 +13,7 @@
 		"LICENSE-MIT.txt": true
 	},
 	"search.exclude": {
-		"assets/": true,
+		"**/assets/": true,
 		"**.svg": true,
 		"Cargo.lock": true
 	}

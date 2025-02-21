@@ -1,5 +1,5 @@
+use crate::beet::prelude::*;
 use crate::prelude::*;
-use beet::prelude::*;
 use bevy::asset::AssetMetaCheck;
 use bevy::log::LogPlugin;
 use bevy::prelude::*;
@@ -25,12 +25,11 @@ pub fn running_beet_example_plugin(app: &mut App) {
 			})
 			// .set(bevyhub_window_plugin())
 			.set(AssetPlugin {
-				file_path: "../../assets".into(),
+				// file_path: "../../assets".into(),
 				meta_check: AssetMetaCheck::Never,
 				..default()
 			})
 			.build(),
-		// BevyhubDefaultPlugins::with_bevyhub_assets(),
 		beet_example_plugin,
 	))
 	.add_systems(Update, close_on_esc);
@@ -38,10 +37,7 @@ pub fn running_beet_example_plugin(app: &mut App) {
 
 /// Simple default plugins
 pub fn crate_test_beet_example_plugin(app: &mut App) {
-	app.add_plugins((
-		// BevyhubDefaultPlugins::with_native_asset_path("../../assets"),
-		beet_example_plugin,
-	));
+	app.add_plugins((beet_example_plugin,));
 }
 
 pub fn beet_example_plugin(app: &mut App) {
@@ -62,6 +58,7 @@ pub fn beet_example_plugin(app: &mut App) {
 pub fn plugin_ml(app: &mut App) {
 	app.add_plugins((
 		FrozenLakePlugin,
+		RunOnAssetReadyPlugin::<Bert>::default(),
 		// sentence selector
 		BertPlugin::default(),
 	));

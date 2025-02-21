@@ -561,6 +561,7 @@ name = "beet"
 version = "0.0.5-dev.3"
 dependencies = [
  "beet",
+ "beet_examples",
  "beet_flow",
  "beet_ml",
  "beet_router",
@@ -591,7 +592,9 @@ name = "beet_examples"
 version = "0.0.5-dev.3"
 dependencies = [
  "anyhow",
- "beet",
+ "beet_flow",
+ "beet_ml",
+ "beet_spatial",
  "bevy",
  "console_log",
  "log",

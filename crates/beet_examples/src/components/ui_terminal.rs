@@ -1,4 +1,4 @@
-use beet::prelude::*;
+use crate::beet::prelude::*;
 use bevy::input::keyboard::Key;
 use bevy::input::keyboard::KeyboardInput;
 use bevy::input::ButtonState;
@@ -11,6 +11,7 @@ use bevy::window::WindowResized;
 use serde::Deserialize;
 use serde::Serialize;
 
+/// A plugin for rendering a terminal-like UI
 #[derive(Clone)]
 pub struct UiTerminalPlugin;
 
@@ -206,6 +207,9 @@ fn parse_text_input(
 	}
 }
 
-fn log_user_message(trigger: Trigger<OnUserMessage>, mut commands: Commands) {
-	commands.trigger(OnLogMessage::new(format!("User: {}", &trigger.event().0)))
+fn log_user_message(
+	trigger: Trigger<OnUserMessage>,
+	mut ev: EventWriter<OnLogMessage>,
+) {
+	ev.send(OnLogMessage::new(format!("User: {}", &trigger.event().0)));
 }

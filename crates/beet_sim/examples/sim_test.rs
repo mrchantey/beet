@@ -54,8 +54,8 @@ fn agent(mut commands: Commands, stat_map: Res<StatMap>) {
 		.with_children(|parent| {
 			let total_children = 4;
 
-			let agent = parent.parent_entity();
-			let stress = parent
+			let _agent = parent.parent_entity();
+			let _stress = parent
 				.spawn((
 					Name::new(STRESS),
 					orbital_child(0, total_children),
@@ -63,7 +63,7 @@ fn agent(mut commands: Commands, stat_map: Res<StatMap>) {
 					stat_map.get_default_by_name(STRESS).unwrap(),
 				))
 				.id();
-			let self_control = parent
+			let _self_control = parent
 				.spawn((
 					Name::new(SELF_CONTROL),
 					orbital_child(1, total_children),

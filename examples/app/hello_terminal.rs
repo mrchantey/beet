@@ -1,6 +1,5 @@
+use beet::examples::scenes;
 use beet::prelude::*;
-use beet_examples::prelude::*;
-use beet_examples::scenes;
 use bevy::prelude::*;
 
 pub fn main() {
@@ -11,8 +10,7 @@ pub fn main() {
 			Startup,
 			(
 				scenes::camera_2d,
-				scenes::ui_terminal,
-				// scenes::flow::beet_debug,
+				scenes::ui_terminal_input,
 				scenes::hello_world,
 			),
 		)
