@@ -9,6 +9,6 @@ pub fn ik_plugin(app: &mut App) {
 		.register_type::<IkArm4DofTransforms>()
 		/*-*/;
 
-	#[cfg(feature = "scene")]
+	#[cfg(feature = "bevy_default")]
 	app.add_plugins(ik_spawner_plugin);
 }

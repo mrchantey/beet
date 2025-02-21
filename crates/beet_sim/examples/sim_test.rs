@@ -2,7 +2,6 @@ use beet_flow::prelude::*;
 use beet_sim::prelude::*;
 use beet_spatial::prelude::*;
 use bevy::prelude::*;
-use bevyhub::prelude::*;
 
 
 const STRESS: &str = "Stress";
@@ -25,13 +24,7 @@ fn main() {
 			default_value: StatValue(0.),
 		});
 	App::new()
-		.add_plugins((
-			BevyhubDefaultPlugins::with_native_asset_path("../../assets"),
-			DefaultPlaceholderPlugin,
-			BeetDefaultPlugins,
-			BeetDebugPlugin,
-			BeetSimPlugin,
-		))
+		.add_plugins((BeetFlowPlugin::default(), BeetSimPlugin))
 		.add_systems(
 			Startup,
 			(camera, agent, alcohol, kids_crying, short_stroll),
@@ -81,30 +74,29 @@ fn agent(mut commands: Commands, stat_map: Res<StatMap>) {
 			parent.spawn((
 				Name::new("Walk"),
 				orbital_child(2, total_children),
-				TargetEntity(agent),
 				Walk::default(),
 			));
 
+			todo!("run on change");
+			#[allow(unused)]
 			parent
 				.spawn((
 					Name::new("Behavior"),
 					Emoji::new("1F5FA"), //🗺️
 					orbital_child(3, total_children),
-					RunOnSpawn,
-					RunOnChange::<StatValue>::default()
-						.with_source(vec![stress, self_control]),
-					ScoreFlow::default(),
+					RunOnSpawn::default(),
+					// RunOnChange::<StatValue>::default()
+					// 	.with_source(vec![stress, self_control]),
+					HighestScore::default(),
 					// RepeatFlow::default(),
 				))
 				.with_children(|parent| {
 					parent.spawn((
 						Name::new("Idle"),
-						TargetEntity(agent),
-						ScoreProvider::NEUTRAL,
+						ReturnWith(ScoreValue::NEUTRAL),
 					));
 					parent.spawn((
 						Name::new("Desire Low Stress"),
-						TargetEntity(agent),
 						stat_map.get_id_by_name(STRESS).unwrap(),
 						StatScoreProvider::default(), // we want stress to be low
 						StatValueGoal::Low,
@@ -113,7 +105,6 @@ fn agent(mut commands: Commands, stat_map: Res<StatMap>) {
 					));
 					parent.spawn((
 						Name::new("Desire High Self Control"),
-						TargetEntity(agent),
 						stat_map.get_id_by_name(SELF_CONTROL).unwrap(),
 						StatScoreProvider::default(),
 						FindStatSteerTarget::default(),
@@ -134,13 +125,11 @@ fn kids_crying(mut commands: Commands, stat_map: Res<StatMap>) {
 			CollectableStat::default(),
 		))
 		.with_children(|parent| {
-			let agent = parent.parent_entity();
 			parent.spawn((
 				Name::new("Seek Agent"),
 				Emoji::new("1F5FA"), //🗺️
 				orbital_child(0, 2),
-				TargetEntity(agent),
-				RunOnSpawn,
+				RunOnSpawn::default(),
 				Seek::default(),
 				FindSteerTarget::new("Agent", f32::MAX),
 			));

@@ -1,6 +1,4 @@
 use bevy::prelude::*;
-#[cfg(feature = "bevyhub")]
-use bevyhub::prelude::*;
 
 
 #[derive(Default, Component, Reflect)]
@@ -36,25 +34,19 @@ impl Emoji {
 		self.hexcode = hexcode.to_uppercase();
 	}
 
-	#[cfg(not(feature = "bevyhub"))]
-	#[allow(unreachable_code)]
 	pub fn bundle(_hexcode: &str) -> impl Bundle {
-		todo!("non bevyhub bundle");
+		// BundlePlaceholder::Pbr {
+		// 	mesh: MeshPlaceholder::Plane3d(Plane3d::new(
+		// 		Vec3::Z,
+		// 		Vec2::splat(0.5),
+		// 	)),
+		// 	material: MaterialPlaceholder::Texture {
+		// 		path: format!("openmoji/openmoji-618x618-color/{hexcode}.png"),
+		// 		alpha_mode: AlphaMode::Blend,
+		// 		unlit: true,
+		// 	},
+		// }
+		todo!("construct bundle");
 		()
-	}
-
-	#[cfg(feature = "bevyhub")]
-	pub fn bundle(hexcode: &str) -> BundlePlaceholder {
-		BundlePlaceholder::Pbr {
-			mesh: MeshPlaceholder::Plane3d(Plane3d::new(
-				Vec3::Z,
-				Vec2::splat(0.5),
-			)),
-			material: MaterialPlaceholder::Texture {
-				path: format!("openmoji/openmoji-618x618-color/{hexcode}.png"),
-				alpha_mode: AlphaMode::Blend,
-				unlit: true,
-			},
-		}
 	}
 }

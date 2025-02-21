@@ -13,9 +13,7 @@ categories.workspace = true
 publish = true
 
 [features]
-# default = ["render"]
-render = []
-bevyhub = []
+bevy_default = ["bevy/default"]
 
 [dependencies]
 beet_flow.workspace = true
@@ -24,7 +22,6 @@ bevy.workspace = true
 
 anyhow.workspace = true
 # temp, just for bundle placeholders
-# bevyhub = { workspace = true, optional = true }
 
 
 [dev-dependencies]
@@ -35,4 +32,4 @@ sweet = { workspace = true, features = ["test"] }
 [[example]]
 name = "sim_test"
 path = "examples/sim_test.rs"
-required-features = ["bevyhub"]
+required-features = ["bevy_default"]

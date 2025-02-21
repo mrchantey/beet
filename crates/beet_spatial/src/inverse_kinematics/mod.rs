@@ -9,7 +9,7 @@ mod ik_plugin;
 pub use self::ik_plugin::*;
 mod ik_segment;
 pub use self::ik_segment::*;
-#[cfg(feature = "scene")]
+#[cfg(feature = "bevy_default")]
 mod ik_spawner;
-#[cfg(feature = "scene")]
+#[cfg(feature = "bevy_default")]
 pub use self::ik_spawner::*;

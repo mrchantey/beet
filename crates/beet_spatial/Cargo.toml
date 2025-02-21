@@ -14,7 +14,6 @@ categories = { workspace = true }
 [features]
 # bevyhub = []
 bevy_default = ["bevy/default"]
-scene = ["bevy/bevy_scene"]
 # revisit when we get construct
 _doctest = []
 

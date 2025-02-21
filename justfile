@@ -11,7 +11,6 @@ set windows-shell := ["C:/tools/cygwin/bin/sh.exe","-c"]
 set dotenv-load
 crates := 'beet beet_spatial beet_flow'
 # max cargo build jobs
-jobs := '4'
 
 default:
 	just --list --unsorted
@@ -119,17 +118,15 @@ hello-world:
 test-ci *args:
 	cargo fmt 				--check
 	just leptosfmt 		--check
-	cargo test -j {{jobs}} --workspace										 --features=_doctest							{{args}}
-	cargo test -j {{jobs}} 																 --all-features -p beet_flow 			{{args}}
-	cargo test -j {{jobs}} --target wasm32-unknown-unknown --all-features -p beet_flow 			{{args}}
-	cargo test -j {{jobs}} --lib 													 --all-features	-p beet_rsx 			{{args}}
-	cargo test -j {{jobs}} --lib 													 --all-features -p beet_spatial 	{{args}}
+	cargo test --workspace										 --features=_doctest								{{args}}
+	RUST_MIN_STACK=16777216 	cargo test --workspace --lib --all-features 				{{args}}
+	cargo test --target wasm32-unknown-unknown --all-features	-p beet_flow 				{{args}}
 
 # rebuilding bevy_render for wasm results in 'no space left on device'
 test-all *args:
 	just test-ci 																																			{{args}}
-	cargo test -j {{jobs}} --lib --target wasm32-unknown-unknown --all-features -p beet_rsx 			{{args}}
-	cargo test -j {{jobs}} --lib --target wasm32-unknown-unknown --all-features -p beet_spatial 	{{args}}
+	cargo test --lib --target wasm32-unknown-unknown --all-features -p beet_rsx 			{{args}}
+	cargo test --lib --target wasm32-unknown-unknown --all-features -p beet_spatial 	{{args}}
 
 #cargo test -p beet_spatial
 #cargo test -p beet_sim

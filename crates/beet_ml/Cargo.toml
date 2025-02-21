@@ -12,7 +12,6 @@ keywords.workspace = true
 categories.workspace = true
 
 [features]
-bevyhub = []                   # revisit when we get construct
 spatial = ["dep:beet_spatial"]
 
 [dependencies]
