@@ -74,7 +74,7 @@ mod test {
 		app.add_plugins((
 			MinimalPlugins,
 			workspace_asset_plugin(),
-			BertPlugin::default(),
+			LanguagePlugin::default(),
 			BeetFlowPlugin::default(),
 		))
 		.finish();

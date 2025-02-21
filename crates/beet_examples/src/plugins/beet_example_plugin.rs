@@ -60,7 +60,7 @@ pub fn plugin_ml(app: &mut App) {
 		FrozenLakePlugin,
 		RunOnAssetReadyPlugin::<Bert>::default(),
 		// sentence selector
-		BertPlugin::default(),
+		LanguagePlugin::default(),
 	));
 }
 

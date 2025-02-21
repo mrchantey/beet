@@ -21,7 +21,7 @@ pub fn main() {
 			BeetFlowPlugin::default(),
 			BeetDebugPlugin::default(),
 			RunOnAssetReadyPlugin::<Bert>::default(),
-			BertPlugin::default(),
+			LanguagePlugin::default(),
 		))
 		.add_systems(Startup, setup)
 		.run();

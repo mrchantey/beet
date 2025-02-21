@@ -78,7 +78,7 @@ pub struct InsertSentenceSteerTarget {
 // 			MinimalPlugins,
 // 			BeetFlowPlugin::default(),
 // 			workspace_asset_plugin(),
-// 			BertPlugin::default(),
+// 			Language::default(),
 // 		))
 // 		.finish();
 
