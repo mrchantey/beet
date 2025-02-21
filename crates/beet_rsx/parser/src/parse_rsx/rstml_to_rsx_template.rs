@@ -54,12 +54,12 @@ impl RstmlToRsxTemplate {
 
 		quote! {
 			RsxTemplateRoot (
-				node: #node,
 				location: RsxMacroLocation(
 					file: #file,
 					line: #line,
 					col: #col
-				)
+				),
+				node: #node
 			)
 		}
 	}

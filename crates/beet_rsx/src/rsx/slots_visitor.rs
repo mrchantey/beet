@@ -25,7 +25,7 @@ use thiserror::Error;
 ///  		<div slot="header">Header</div>
 /// 		<div>Default</div>
 ///  	</MyComponent>
-/// }.render_body(),"<html><div>Header</div><div>Default</div></html>");
+/// }.apply_and_render(),"<html><div>Header</div><div>Default</div></html>");
 ///
 /// ```
 ///

@@ -9,16 +9,16 @@ use sweet::prelude::*;
 
 /// Watch the [BuildRsxTemplateMap::src] for changes, and determine if the rust code
 /// changed in a file, or if it was just the html template.
-/// 
+///
 /// The reload step is as follows:
 /// 1. rebuild templates
 /// 2. call reload
-/// 
+///
 /// The recompile step is as follows:
 /// 1. call recompile
 /// 2. rebuild templates
 /// 3. call reload
-/// 
+///
 pub struct TemplateWatcher<Reload, Recompile> {
 	// we will be swapping out the `run` and `build` methods of this command,
 	// depending on the diff
