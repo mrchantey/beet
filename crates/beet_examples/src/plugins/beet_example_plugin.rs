@@ -1,8 +1,9 @@
-use crate::beet::prelude::*;
 use crate::prelude::*;
+use beet::prelude::*;
+use bevy::asset::AssetMetaCheck;
 use bevy::log::LogPlugin;
 use bevy::prelude::*;
-use bevyhub::prelude::*;
+use sweet::prelude::*;
 
 
 /// A minimal app with flow and spatial
@@ -17,63 +18,53 @@ pub fn minimal_beet_example_plugin(app: &mut App) {
 /// A running app with flow and spatial
 pub fn running_beet_example_plugin(app: &mut App) {
 	app.add_plugins((
-		BevyhubDefaultPlugins::with_bevyhub_assets(),
+		DefaultPlugins
+			.set(LogPlugin {
+				level: bevy::log::Level::WARN,
+				..default()
+			})
+			// .set(bevyhub_window_plugin())
+			.set(AssetPlugin {
+				file_path: "../../assets".into(),
+				meta_check: AssetMetaCheck::Never,
+				..default()
+			})
+			.build(),
+		// BevyhubDefaultPlugins::with_bevyhub_assets(),
 		beet_example_plugin,
-	));
+	))
+	.add_systems(Update, close_on_esc);
 }
 
 /// Simple default plugins
 pub fn crate_test_beet_example_plugin(app: &mut App) {
 	app.add_plugins((
-		BevyhubDefaultPlugins::with_native_asset_path("../../assets"),
+		// BevyhubDefaultPlugins::with_native_asset_path("../../assets"),
 		beet_example_plugin,
 	));
 }
 
 pub fn beet_example_plugin(app: &mut App) {
 	app.add_plugins((
-		DefaultPlaceholderPlugin,
+		BeetFlowPlugin::default(),
+		BeetDebugPlugin::with_none(),
+		BeetSpatialPlugins::default(),
+		plugin_2d,
+		plugin_3d,
 		UiTerminalPlugin,
-		BeetDefaultPlugins,
-		BeetDebugPlugin,
-		DefaultReplicatePlugin,
+		// BeetDefaultPlugins,
+		// DefaultReplicatePlugin,
 	))
 	.init_resource::<RandomSource>()
-	.add_plugins((plugin_spatial, plugin_2d, plugin_3d))
 	.register_type::<Collectable>();
 }
-
-
-/// For apps and scenes that use beet_spatial
-fn plugin_spatial(app: &mut App) {
-	app
-		.add_plugins(ActionPlugin::<(
-			RemoveOnRunResult<SteerTarget>,
-			RemoveOnRunResult<Velocity>,
-			InsertOnRun<Velocity>,
-			RemoveOnRun<Velocity>,
-		)>::default())
-		/*-*/;
-}
-
 
 pub fn plugin_ml(app: &mut App) {
 	app.add_plugins((
 		FrozenLakePlugin,
 		// sentence selector
 		BertPlugin::default(),
-		AssetPlaceholderPlugin::<Bert>::default(),
-		ReadyOnAssetLoadPlugin::<Bert>::default(),
-		// qtables (frozen lake)
-		AssetPlaceholderPlugin::<QTable<GridPos, GridDirection>>::default(),
-		ReadyOnAssetLoadPlugin::<QTable<GridPos, GridDirection>>::default(),
-	))
-	// fetch
-	.add_plugins(ActionPlugin::<(
-		InsertSentenceSteerTarget<Collectable>,
-		RemoveOnRunResult<Sentence>,
-	)>::default())
-		/*-*/;
+	));
 }
 
 fn plugin_2d(app: &mut App) {
@@ -83,7 +74,7 @@ fn plugin_2d(app: &mut App) {
 		.add_systems(Update, randomize_position.in_set(PreTickSet))
 		.add_systems(
 			Update,
-			(update_wrap_around, wrap_around)
+			(update_wrap_around.never_param_warn(), wrap_around.never_param_warn())
 			.chain()
 			.in_set(PostTickSet),
 		)

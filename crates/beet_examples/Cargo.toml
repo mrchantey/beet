@@ -11,12 +11,12 @@ keywords.workspace = true
 categories.workspace = true
 
 [dependencies]
-beet_flow = { workspace = true, features = ["reflect"] }
-beet_ml = { workspace = true, features = ["spatial"] }
-beet_spatial = { workspace = true, features = [
+beet = { workspace = true, features = [
+	"flow",
+	"ml",
+	"spatial",
 	"bevy_default",
 ] }
-bevyhub.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 # beet = { workspace = true, features = ["reflect"] }
@@ -25,12 +25,12 @@ bevy = { workspace = true, default-features = true }
 log.workspace = true
 pretty_env_logger.workspace = true
 anyhow.workspace = true
+sweet = { workspace = true, features = ["bevy", "rand"] }
 
 [dev-dependencies]
-sweet.workspace = true
+sweet = { workspace = true, features = ["test"] }
 log.workspace = true
 pretty_env_logger.workspace = true
-bevyhub = { workspace = true, features = ["export_types"] }
 anyhow.workspace = true
 serde.workspace = true
 serde_json.workspace = true
@@ -189,8 +189,8 @@ include = ["bevyhub/camera-2d", "bevyhub/ui-terminal", "beet-debug"]
 
 
 [[example]]
-name = "hello_world_scene"
-path = "examples/hello_world_scene.rs"
+name = "hello_flow"
+path = "examples/hello_flow.rs"
 
 [[package.metadata.scene]]
 name = "hello-world"

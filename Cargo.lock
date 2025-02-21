@@ -587,6 +587,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "beet_examples"
+version = "0.0.5-dev.3"
+dependencies = [
+ "anyhow",
+ "beet",
+ "bevy",
+ "console_log",
+ "log",
+ "pretty_env_logger",
+ "serde",
+ "serde_json",
+ "sweet",
+ "tokio",
+ "wasm-bindgen",
+ "web-sys",
+]
+
+[[package]]
 name = "beet_flow"
 version = "0.0.5-dev.3"
 dependencies = [

@@ -1,21 +1,16 @@
-pub mod auto_spawn;
-#[allow(unused_imports)]
+mod auto_spawn;
 pub use self::auto_spawn::*;
-pub mod camera_distance;
-#[allow(unused_imports)]
+mod camera_distance;
 pub use self::camera_distance::*;
-pub mod collectable;
-#[allow(unused_imports)]
+mod collectable;
 pub use self::collectable::*;
-pub mod follow_cursor;
-#[allow(unused_imports)]
+mod follow_cursor;
 pub use self::follow_cursor::*;
-pub mod keyboard_controller;
-#[allow(unused_imports)]
+mod keyboard_controller;
 pub use self::keyboard_controller::*;
-pub mod randomize_position;
-#[allow(unused_imports)]
+mod randomize_position;
 pub use self::randomize_position::*;
-pub mod wrap_around;
-#[allow(unused_imports)]
+mod wrap_around;
 pub use self::wrap_around::*;
+mod ui_terminal;
+pub use self::ui_terminal::*;

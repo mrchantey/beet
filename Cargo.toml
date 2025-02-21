@@ -36,7 +36,7 @@ publish = false
 # default resolver
 resolver = "2"
 members = [
-	# "crates/beet_examples",
+	"crates/beet_examples",
 	"crates/beet_flow",
 	"crates/beet_flow/macros",
 	"crates/beet_ml",

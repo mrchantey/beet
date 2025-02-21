@@ -14,33 +14,34 @@ use bevy::app::PluginGroupBuilder;
 /// Include the kitchen sink for beet_flow.
 pub mod prelude {
 	// required for macros to work internally
-	pub use super::*;
+	pub use super::ActionTag;
+	pub use super::BeetFlowPlugin;
 	pub use crate as beet_flow;
 	pub use crate::continue_run::*;
 	pub use crate::control_flow::*;
 	pub use crate::control_flow_actions::*;
 	pub use crate::tree::*;
 	pub use beet_flow_macros::*;
-}
-
-/// doctest reexports and utilities
-#[cfg(feature = "_doctest")]
-pub mod doctest {
-	pub use crate::prelude::*;
-	pub use bevy::prelude::*;
-	/// for docs, create a world with BeetFlowPlugin
-	/// ```
-	/// use beet_flow::doctest::*;
-	/// let world = world();
-	/// ```
+	/// doctest reexports and utilities
 	#[cfg(feature = "_doctest")]
-	pub fn world() -> World {
-		let mut app = App::new();
-		app.add_plugins(beet_flow::BeetFlowPlugin::default());
-		let world = std::mem::take(app.world_mut());
-		world
+	pub mod doctest {
+		pub use crate::prelude::*;
+		pub use bevy::prelude::*;
+		/// for docs, create a world with BeetFlowPlugin
+		/// ```
+		/// use beet_flow::doctest::*;
+		/// let world = world();
+		/// ```
+		#[cfg(feature = "_doctest")]
+		pub fn world() -> World {
+			let mut app = App::new();
+			app.add_plugins(beet_flow::BeetFlowPlugin::default());
+			let world = std::mem::take(app.world_mut());
+			world
+		}
 	}
 }
+
 
 /// All plugins required for a beet_flow application.
 /// - [control_flow::control_flow_plugin]

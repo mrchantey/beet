@@ -17,43 +17,68 @@ pub struct BeetDebugPlugin {
 	pub log_running: bool,
 	/// Log whenever [OnResultAction] is triggered.
 	pub log_on_result: bool,
-	/// disable logging to stdout, useful if instead using rendered terminal,
-	/// networking etc.
-	pub no_stdout: bool,
+	/// Log all messages to stdout
+	pub log_to_stdout: bool,
 }
 impl Default for BeetDebugPlugin {
-	fn default() -> Self {
-		Self {
-			log_on_run: true,
-			log_running: false,
-			log_on_result: false,
-			no_stdout: true,
-		}
-	}
+	fn default() -> Self { Self::with_run() }
 }
 
 impl BeetDebugPlugin {
 	/// Include:
 	/// - [`log_on_run`](Self::log_on_run)
+	/// - [`log_to_stdout`](Self::log_to_stdout)
+	pub fn with_run() -> Self {
+		Self {
+			log_on_run: true,
+			log_on_result: false,
+			log_running: false,
+			log_to_stdout: true,
+		}
+	}
+	/// Include:
+	/// - [`log_on_run`](Self::log_on_run)
 	/// - [`log_on_run_result`](Self::log_on_result)
+	/// - [`log_to_stdout`](Self::log_to_stdout)
 	pub fn with_result() -> Self {
 		Self {
 			log_on_run: true,
 			log_on_result: true,
 			log_running: false,
-			no_stdout: true,
+			log_to_stdout: true,
 		}
 	}
 	/// Include:
 	/// - [`log_on_run`](Self::log_on_run)
 	/// - [`log_running`](Self::log_running)
 	/// - [`log_on_run_result`](Self::log_on_result)
+	/// - [`log_to_stdout`](Self::log_to_stdout)
 	pub fn with_all() -> Self {
 		Self {
 			log_on_run: true,
 			log_running: true,
 			log_on_result: true,
-			no_stdout: true,
+			log_to_stdout: true,
+		}
+	}
+	/// Exclude all, add each manually and handle stdout
+	/// ```rust
+	///	# use bevy::prelude::*;
+	///	# use beet_flow::prelude::*;
+	/// fn my_log_func(_ev: EventReader<OnLogMessage>) {
+	///
+	/// }
+	/// App::new()
+	/// 	.add_plugins(BeetDebugPlugin::with_none())
+	/// 	.add_systems(Update, my_log_func)
+	/// 	.init_resource::<DebugOnRun>();
+	/// ```
+	pub fn with_none() -> Self {
+		Self {
+			log_on_run: false,
+			log_running: false,
+			log_on_result: false,
+			log_to_stdout: false,
 		}
 	}
 }
@@ -61,38 +86,45 @@ impl BeetDebugPlugin {
 impl Plugin for BeetDebugPlugin {
 	fn build(&self, app: &mut App) {
 		// TODO when resolved: [Observers::run_if](https://github.com/bevyengine/bevy/issues/14195)
-		app.add_plugins(bevy::log::LogPlugin::default())
-			.add_observer(log_on_run.never_param_warn())
+		app.add_observer(log_on_run.never_param_warn())
 			.add_observer(log_on_run_result.never_param_warn())
-			.add_observer(log_to_stdout.never_param_warn())
+			.add_event::<OnLogMessage>()
 			.add_systems(
 				Update,
-				log_running
-					.never_param_warn()
-					.run_if(resource_exists::<LogRunningMarker>)
+				(
+					log_running
+						.never_param_warn()
+						.run_if(resource_exists::<DebugRunning>),
+					log_to_stdout
+						.never_param_warn()
+						.run_if(resource_exists::<DebugToStdOut>),
+				)
+					.chain()
 					.in_set(PostTickSet),
 			);
 
 		if self.log_on_run {
-			app.init_resource::<LogOnRunMarker>();
+			app.init_resource::<DebugOnRun>();
 		}
 
 		if self.log_on_result {
-			app.init_resource::<LogOnResultMarker>();
+			app.init_resource::<DebugOnResult>();
 		}
 
 		if self.log_running {
-			app.init_resource::<LogRunningMarker>();
+			app.init_resource::<DebugRunning>();
 		}
 
-		if !self.no_stdout {
-			app.init_resource::<LogToStdoutMarker>();
+		if !self.log_to_stdout {
+			app.init_resource::<DebugToStdOut>();
 		}
 	}
 }
 
 
 /// A helper event for logging messages.
+/// This must use the [`EventReader`] pattern instead of observers
+/// because the 'stack' nature of observers results in a reverse order.
 #[derive(Debug, Event, Deref)]
 pub struct OnLogMessage(pub Cow<'static, str>);
 
@@ -119,75 +151,67 @@ impl OnLogMessage {
 			.unwrap_or_else(|| format!("{prefix}: {entity}"));
 		Self(msg.into())
 	}
-	/// Call [`log::info`] with the message.
-	pub fn log(&self) {
-		log::info!("{}", self.0);
-	}
 }
 
-/// marker resource for [log_on_run]
+/// Resource to enable logging for [log_on_run]
 #[derive(Debug, Default, Clone, Resource, Reflect)]
 #[reflect(Resource)]
-pub struct LogOnRunMarker;
-/// marker resource for [log_on_run_result]
+pub struct DebugOnRun;
+/// Resource to enable logging for [log_on_run_result]
 #[derive(Debug, Default, Clone, Resource, Reflect)]
 #[reflect(Resource)]
-pub struct LogOnResultMarker;
-/// marker resource for [log_running]
+pub struct DebugOnResult;
+/// Resource to enable logging for [log_running]
 #[derive(Debug, Default, Clone, Resource, Reflect)]
 #[reflect(Resource)]
-pub struct LogRunningMarker;
-/// marker resource for [log_to_stdout]
+pub struct DebugRunning;
+/// Resource to enable logging for [log_to_stdout]
 #[derive(Debug, Default, Clone, Resource, Reflect)]
 #[reflect(Resource)]
-pub struct LogToStdoutMarker;
+pub struct DebugToStdOut;
 
 
-fn log_to_stdout(trigger: Trigger<OnLogMessage>, _m: Res<LogToStdoutMarker>) {
-	trigger.log();
+fn log_to_stdout(mut read: EventReader<OnLogMessage>, _m: Res<DebugToStdOut>) {
+	for msg in read.read() {
+		println!("{}", msg.0);
+	}
 }
 
 fn log_on_run(
 	ev: Trigger<OnRunAction>,
-	mut commands: Commands,
 	query: Query<&Name>,
-	_m: Res<LogOnRunMarker>,
+	_m: Res<DebugOnRun>,
+	mut out: EventWriter<OnLogMessage>,
 ) {
-	let msg =
-		OnLogMessage::new_with_query(ev.resolve_action(), &query, "OnRun");
-	// log immediately for correct ordering
-	msg.log();
-	commands.trigger(msg);
+	out.send(OnLogMessage::new_with_query(
+		ev.resolve_action(),
+		&query,
+		"OnRun",
+	));
 }
 
 
 fn log_on_run_result(
 	ev: Trigger<OnResultAction>,
-	mut commands: Commands,
 	query: Query<&Name>,
-	_m: Res<LogOnResultMarker>,
+	mut out: EventWriter<OnLogMessage>,
+	_m: Res<DebugOnResult>,
 ) {
-	let msg = OnLogMessage::new_with_query(
+	out.send(OnLogMessage::new_with_query(
 		ev.resolve_action(),
 		&query,
 		&format!("{:?}", &ev.payload),
-	);
-	// log immediately for correct ordering
-	msg.log();
-	commands.trigger(msg);
+	));
 }
 
 fn log_running(
-	mut commands: Commands,
+	mut out: EventWriter<OnLogMessage>,
 	query: Populated<(Entity, Option<&Name>), With<Running>>,
 ) {
 	for (entity, name) in query.iter() {
 		let name = name
 			.map(|n| n.to_string())
 			.unwrap_or_else(|| entity.to_string());
-		let msg = OnLogMessage::new(format!("Running: {}", name));
-		// log immediately for correct ordering
-		msg.log();
-		commands.trigger(msg);
+		out.send(OnLogMessage::new(format!("Running: {}", name)));
 	}
 }
