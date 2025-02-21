@@ -151,14 +151,16 @@ flow = ["dep:beet_flow"]
 router = ["rsx", "dep:beet_router", "beet_router/parser"]
 rsx = ["dep:beet_rsx"]
 ml = ["dep:beet_ml"]
-spatial = ["dep:beet_spatial"]
+spatial = ["dep:beet_spatial", "beet_ml?/spatial"]
 sim = ["dep:beet_sim"]
 bevy = ["dep:bevy", "beet_rsx?/bevy", "beet_router?/bevy"]
 bevy_default = [
 	"bevy",
+	"bevy/default",
 	"beet_rsx?/bevy_default",
 	"beet_spatial?/bevy_default",
-	"bevy/default",
+	"beet_ml?/bevy_default",
+	"beet_sim?/bevy_default",
 ]
 
 # animation = ["beet_spatial?/animation"]

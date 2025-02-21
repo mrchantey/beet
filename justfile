@@ -120,6 +120,7 @@ test-ci *args:
 	just leptosfmt 		--check
 	cargo test --workspace										 --features=_doctest								{{args}}
 	RUST_MIN_STACK=16777216 	cargo test --workspace --lib --all-features 				{{args}}
+	RUST_MIN_STACK=16777216 	cargo test --workspace --lib --all-features --target wasm32-unknown-unknown {{args}}
 	cargo test --target wasm32-unknown-unknown --all-features	-p beet_flow 				{{args}}
 
 # rebuilding bevy_render for wasm results in 'no space left on device'

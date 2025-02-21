@@ -14,7 +14,7 @@ keywords.workspace = true
 [features]
 default = ["sigfault"]
 sigfault = []
-bevy = []
+# bevy = []
 
 [lib]
 proc-macro = true

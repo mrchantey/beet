@@ -10,10 +10,10 @@ fn feature_flag_idents() -> RsxIdents {
 	{
 		idents.runtime = RsxRuntime::sigfault();
 	}
-	#[cfg(feature = "bevy")]
-	{
-		idents.runtime = RsxRuntime::bevy();
-	}
+	// #[cfg(feature = "bevy")]
+	// {
+	// 	idents.runtime = RsxRuntime::bevy();
+	// }
 	idents
 }
 
