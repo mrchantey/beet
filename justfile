@@ -31,7 +31,10 @@ cli *args:
 
 # Run and watch a workspace example
 run example *args:
-	just watch just run-ci {{example}} {{args}} --features=examples,ml
+	just watch just run-ci {{example}} {{args}}
+
+run-feat example *args:
+	just run {{example}} --features=examples,ml {{args}} 
 
 # Run an example without watching
 run-ci example *args:

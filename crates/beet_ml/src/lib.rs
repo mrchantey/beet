@@ -19,7 +19,6 @@ pub mod wasm;
 
 pub mod prelude {
 	pub use crate::frozen_lake::*;
-	pub use crate::language::selectors::*;
 	pub use crate::language::*;
 	pub use crate::rl::*;
 	pub use crate::rl_realtime::*;

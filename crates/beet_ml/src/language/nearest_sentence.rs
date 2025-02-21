@@ -13,24 +13,28 @@ impl Sentence {
 
 /// Runs the child with the [`Sentence`] that is most similar to that of the agent.
 /// for use with [`ScoreFlow`]
-#[action(sentence_flow)]
+#[action(nearest_sentence)]
 #[derive(Debug, Default, Clone, PartialEq, Component, Reflect)]
 #[reflect(Component)]
-// TODO OnRun<Sentence>
-// RunResult<SteerTarget?>
-pub struct SentenceFlow;
+// #[require(Sentence=||Sentence::new("placeholder"))]
+pub struct NearestSentence;
 
-impl SentenceFlow {
+impl NearestSentence {
 	pub fn new() -> Self { Self {} }
 }
 
-fn sentence_flow(
+fn nearest_sentence(
 	ev: Trigger<OnRun>,
 	mut commands: Commands,
 	mut berts: ResMut<Assets<Bert>>,
 	sentences: Query<&Sentence>,
 	// TODO double query, ie added running and added asset
-	query: Query<(&SentenceFlow, &Sentence, &HandleWrapper<Bert>, &Children)>,
+	query: Query<(
+		&NearestSentence,
+		&Sentence,
+		&HandleWrapper<Bert>,
+		&Children,
+	)>,
 ) {
 	let (_scorer, target_sentence, handle, children) = query
 		.get(ev.action)
@@ -81,7 +85,7 @@ mod test {
 				Name::new("root"),
 				Sentence::new("destroy"),
 				HandleWrapper(handle),
-				SentenceFlow::default(),
+				NearestSentence::default(),
 			))
 			.with_children(|parent| {
 				parent.spawn((Name::new("heal"), Sentence::new("heal")));

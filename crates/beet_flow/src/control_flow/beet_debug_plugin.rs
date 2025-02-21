@@ -5,10 +5,8 @@ use std::borrow::Cow;
 
 /// A plugin that logs lifecycle events for action entities.
 /// If they have a [`Name`] that will be used instead of the entity id.
-/// It triggers [OnLogMessage] events, and also adds a listener that
-/// will print to stdout if [`BeetDebugConfig::log_to_stdout`] is true.
-///
-/// If a [`BeetDebugConfig`] is not present, it will use the default.
+/// It emits [OnLogMessage] events, and also
+/// will print to stdout if [`Self::log_to_stdout`] is true.
 #[derive(Debug, Clone)]
 pub struct BeetDebugPlugin {
 	/// Log whenever [OnRunAction] is triggered.
@@ -91,16 +89,13 @@ impl Plugin for BeetDebugPlugin {
 			.add_event::<OnLogMessage>()
 			.add_systems(
 				Update,
-				(
-					log_running
-						.never_param_warn()
-						.run_if(resource_exists::<DebugRunning>),
-					log_to_stdout
-						.never_param_warn()
-						.run_if(resource_exists::<DebugToStdOut>),
-				)
-					.chain()
+				// (
+				log_running
+					.run_if(resource_exists::<DebugRunning>)
 					.in_set(PostTickSet),
+				// log_to_stdout.run_if(resource_exists::<DebugToStdOut>),
+				// )
+				// .chain()
 			);
 
 		if self.log_on_run {
@@ -115,12 +110,11 @@ impl Plugin for BeetDebugPlugin {
 			app.init_resource::<DebugRunning>();
 		}
 
-		if !self.log_to_stdout {
+		if self.log_to_stdout {
 			app.init_resource::<DebugToStdOut>();
 		}
 	}
 }
-
 
 /// A helper event for logging messages.
 /// This must use the [`EventReader`] pattern instead of observers
@@ -171,23 +165,25 @@ pub struct DebugRunning;
 pub struct DebugToStdOut;
 
 
-fn log_to_stdout(mut read: EventReader<OnLogMessage>, _m: Res<DebugToStdOut>) {
-	for msg in read.read() {
-		println!("{}", msg.0);
-	}
-}
+// fn log_to_stdout(mut read: EventReader<OnLogMessage>) {
+// 	for msg in read.read() {
+// 		println!("{}", msg.0);
+// 	}
+// }
 
 fn log_on_run(
 	ev: Trigger<OnRunAction>,
 	query: Query<&Name>,
 	_m: Res<DebugOnRun>,
 	mut out: EventWriter<OnLogMessage>,
+	stdout: Option<Res<DebugToStdOut>>,
 ) {
-	out.send(OnLogMessage::new_with_query(
-		ev.resolve_action(),
-		&query,
-		"OnRun",
-	));
+	let msg =
+		OnLogMessage::new_with_query(ev.resolve_action(), &query, "OnRun");
+	if stdout.is_some() {
+		println!("{}", msg.0);
+	}
+	out.send(msg);
 }
 
 
@@ -196,22 +192,32 @@ fn log_on_run_result(
 	query: Query<&Name>,
 	mut out: EventWriter<OnLogMessage>,
 	_m: Res<DebugOnResult>,
+	stdout: Option<Res<DebugToStdOut>>,
 ) {
-	out.send(OnLogMessage::new_with_query(
+	let msg = OnLogMessage::new_with_query(
 		ev.resolve_action(),
 		&query,
 		&format!("{:?}", &ev.payload),
-	));
+	);
+	if stdout.is_some() {
+		println!("{}", msg.0);
+	}
+	out.send(msg);
 }
 
 fn log_running(
 	mut out: EventWriter<OnLogMessage>,
 	query: Populated<(Entity, Option<&Name>), With<Running>>,
+	stdout: Option<Res<DebugToStdOut>>,
 ) {
 	for (entity, name) in query.iter() {
 		let name = name
 			.map(|n| n.to_string())
 			.unwrap_or_else(|| entity.to_string());
-		out.send(OnLogMessage::new(format!("Running: {}", name)));
+		let msg = OnLogMessage::new(format!("Running: {}", name));
+		if stdout.is_some() {
+			println!("{}", msg.0);
+		}
+		out.send(msg);
 	}
 }

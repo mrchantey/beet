@@ -48,6 +48,9 @@ pub mod doctest {
 
 
 /// All plugins required for a beet_flow application.
+/// The primary role that this plugin plays is as a kind of 
+/// observer router, ensuring the OnRun and OnResult events are propagated
+/// correctly.
 /// - [control_flow::control_flow_plugin]
 /// - [continue_run::continue_run_plugin]
 #[derive(Default)]

@@ -10,6 +10,9 @@ use bevy::prelude::*;
 // #[action(insert_sentence_steer_target)]
 #[derive(Debug, Default, Clone, PartialEq, Component, Reflect)]
 #[reflect(Default, Component)]
+// TODO OnRun<Sentence>
+// RunResult<SteerTarget?>
+
 pub struct InsertSentenceSteerTarget {
 	// / The value below which the agent will ignore the target.
 	// pub threshold:f32,
