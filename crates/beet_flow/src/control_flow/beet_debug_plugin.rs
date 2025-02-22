@@ -148,6 +148,11 @@ impl OnLogMessage {
 			.unwrap_or_else(|| format!("{prefix}: {entity}"));
 		Self(msg.into())
 	}
+	/// Immediately log to stdout, useful for initial messages
+	pub fn and_log(self)->Self {
+		println!("{}", self.0);
+		self
+	}
 }
 
 /// An event triggered to represent user input, useful for

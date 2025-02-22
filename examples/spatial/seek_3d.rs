@@ -1,3 +1,5 @@
+//! A combined example demonstrating a behavior 
+//! that involves animation and steering.
 use beet::examples::scenes;
 use beet::prelude::*;
 use bevy::prelude::*;

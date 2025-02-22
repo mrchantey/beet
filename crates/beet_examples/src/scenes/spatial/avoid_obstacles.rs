@@ -1,3 +1,4 @@
+// a simple robotics wall avoidance behavior
 // use crate::prelude::*;
 // use beet_flow::prelude::*;
 // use bevy::prelude::*;

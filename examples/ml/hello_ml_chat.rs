@@ -27,18 +27,16 @@ pub fn main() {
 fn setup(
 	mut commands: Commands,
 	asset_server: Res<AssetServer>,
-
 	mut ev: EventWriter<OnLogMessage>,
 ) {
-	let msg = "Agent: I can heal or attack, what should i do?";
-	println!("{}", msg);
-	ev.send(OnLogMessage::new(msg));
+	ev.send(OnLogMessage::new("Agent: I can heal or attack, what should i do?")
+		.and_log());
 
-	let handle = asset_server.load::<Bert>("ml/default-bert.ron");
+	let bert = asset_server.load::<Bert>("ml/default-bert.ron");
 	commands
 		.spawn((
 			Name::new("Hello ML"),
-			HandleWrapper(handle.clone()),
+			HandleWrapper(bert),
 			RunWithUserSentence::default(),
 			NearestSentence::new(),
 		))

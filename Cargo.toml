@@ -324,11 +324,10 @@ include = ["beet-debug", "bevyhub/camera-2d", "bevyhub/ui-terminal"]
 # description = "A camera and the items that the fetch character can go to."
 # path = "scenes/fetch-scene.json"
 
-# [[example]]
-# name = "fetch"
-# path = "examples/ml/fetch.rs"
-# required-features = ["examples", "ml"]
-
+[[example]]
+name = "fetch"
+path = "examples/ml/fetch.rs"
+required-features = ["examples", "ml"]
 
 # [[package.metadata.scene]]
 # name = "fetch"

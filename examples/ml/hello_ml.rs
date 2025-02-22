@@ -29,12 +29,12 @@ pub fn main() {
 
 #[rustfmt::skip]
 fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
-	let handle = asset_server.load("ml/default-bert.ron");
+	let bert = asset_server.load("ml/default-bert.ron");
 	commands
 		.spawn((
 			Name::new("Hello ML"),
-			HandleWrapper(handle.clone()),
-			RunOnAssetReady::<Bert>::new(handle),
+			HandleWrapper(bert.clone()),
+			RunOnAssetReady::<Bert>::new(bert),
 			NearestSentence::new(),
 			Sentence::new("please kill the baddies"),
 		))

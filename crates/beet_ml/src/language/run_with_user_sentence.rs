@@ -27,6 +27,11 @@ impl Default for RunWithUserSentence<()> {
 	}
 }
 
+impl<P: RunPayload> RunWithUserSentence<P> {
+	/// Create a new [`RunWithUserSentence`] with the given [`OnRunAction`].
+	pub fn new(trigger: OnRunAction<P>) -> Self { Self { trigger } }
+}
+
 pub fn run_with_user_sentence<P: RunPayload>(
 	ev: Trigger<OnUserMessage>,
 	mut commands: Commands,
