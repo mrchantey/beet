@@ -1,12 +1,9 @@
 pub mod ml;
-// pub mod spatial;
-
-use std::f32::consts::PI;
-
 use crate::beet::prelude::*;
 use crate::prelude::*;
 use bevy::pbr::CascadeShadowConfigBuilder;
 use bevy::prelude::*;
+use std::f32::consts::PI;
 
 
 pub fn ui_terminal_input(commands: Commands) {

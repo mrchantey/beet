@@ -34,11 +34,11 @@ fn setup(mut ev: EventWriter<OnLogMessage>) {
 	ev.send(
 		OnLogMessage::new("Agent: I can fetch the following items:").and_log(),
 	);
-	ev.send(OnLogMessage::new("Agent: - Red healing potions").and_log());
-	ev.send(OnLogMessage::new("Agent: - Gold coins").and_log());
-	ev.send(OnLogMessage::new("Agent: - Silver swords").and_log());
-	ev.send(OnLogMessage::new("Agent: - Tasty cheese").and_log());
-	ev.send(OnLogMessage::new("Agent: What should I fetch?").and_log());
+	ev.send(OnLogMessage::new("         - Red healing potions").and_log());
+	ev.send(OnLogMessage::new("         - Gold coins").and_log());
+	ev.send(OnLogMessage::new("         - Silver swords").and_log());
+	ev.send(OnLogMessage::new("         - Tasty cheese").and_log());
+	ev.send(OnLogMessage::new("       What should I fetch?").and_log());
 }
 
 pub fn fetch_npc(

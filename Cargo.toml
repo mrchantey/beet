@@ -350,10 +350,10 @@ required-features = ["examples", "ml"]
 # path = "scenes/frozen-lake-scene.json"
 
 
-# [[example]]
-# name = "frozen_lake_train"
-# path = "examples/ml/frozen_lake_train.rs"
-# required-features = ["examples", "ml"]
+[[example]]
+name = "frozen_lake_train"
+path = "examples/ml/frozen_lake_train.rs"
+required-features = ["examples", "ml"]
 
 # [[package.metadata.scene]]
 # name = "frozen-lake-train"
@@ -368,10 +368,10 @@ required-features = ["examples", "ml"]
 # 	"frozen-lake-scene",
 # ]
 
-# [[example]]
-# name = "frozen_lake_run"
-# path = "examples/ml/frozen_lake_run.rs"
-# required-features = ["examples", "ml"]
+[[example]]
+name = "frozen_lake_run"
+path = "examples/ml/frozen_lake_run.rs"
+required-features = ["examples", "ml"]
 
 # [[package.metadata.scene]]
 # name = "frozen-lake-run"

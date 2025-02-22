@@ -59,6 +59,7 @@ pub fn plugin_ml(app: &mut App) {
 	app.add_plugins((
 		FrozenLakePlugin,
 		RunOnAssetReadyPlugin::<Bert>::default(),
+		RunOnAssetReadyPlugin::<FrozenLakeQTable>::default(),
 		// sentence selector
 		LanguagePlugin::default(),
 	));
