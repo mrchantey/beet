@@ -35,7 +35,7 @@ pub struct RunOnAssetReady<A: Asset, P = ()> {
 	pub trigger: OnRunAction<P>,
 }
 
-impl<A: Asset, P: Default> RunOnAssetReady<A, P> {
+impl<A: Asset> RunOnAssetReady<A, ()> {
 	/// Create a new [`RunOnAssetReady`] action with a default payload.
 	pub fn new(handle: Handle<A>) -> Self {
 		Self {

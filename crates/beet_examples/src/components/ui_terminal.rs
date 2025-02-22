@@ -15,7 +15,7 @@ impl Plugin for UiTerminalPlugin {
 	fn build(&self, app: &mut App) {
 		app
 
-			.add_systems(Update, (parse_text_input,log_on_message))
+			.add_systems(Update, (parse_text_input,log_on_message.never_param_warn()))
 			.add_systems(
 				PostUpdate,
 				(init_output,resize_output,remove_excessive_lines)

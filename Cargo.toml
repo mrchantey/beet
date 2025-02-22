@@ -438,7 +438,10 @@ include = ["bevyhub/camera-2d", "bevyhub/ui-terminal", "beet-debug"]
 # [[example]]
 # name = "inverse_kinematics"
 # path = "examples/inverse_kinematics.rs"
-
+[[example]]
+name = "seek"
+path = "examples/spatial/seek.rs"
+required-features = ["flow", "spatial", "bevy_default"]
 
 # [[package.metadata.scene]]
 # name = "seek"

@@ -34,7 +34,7 @@ run example *args:
 	just watch just run-ci {{example}} {{args}}
 
 run-feat example *args:
-	just run {{example}} --features=examples,ml {{args}} 
+	just run {{example}} --all-features {{args}} 
 
 # Run an example without watching
 run-ci example *args:

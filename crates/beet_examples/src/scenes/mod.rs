@@ -80,7 +80,7 @@ pub fn space_scene(mut commands: Commands, asset_server: Res<AssetServer>) {
 			image_mode: SpriteImageMode::Tiled {
 				tile_x: true,
 				tile_y: true,
-				stretch_value: 0.01,
+				stretch_value: 0.02,
 			},
 			..default()
 		},
