@@ -3,15 +3,18 @@ use beet_flow::prelude::*;
 use bevy::animation::RepeatAnimation;
 use bevy::prelude::*;
 use std::time::Duration;
+use sweet::prelude::*;
 
-#[derive(Debug, Clone, Component, Reflect)]
-#[reflect(Component)]
+/// Returns with the provided payload when the specified animation
+/// is almost finished.
+#[derive(Debug, Clone, Component)]
 #[require(ContinueRun)]
-/// Inserts the given component when an animation is almost finished.
-/// Requires a [`Handle<AnimationClip>`] component.
-pub struct TriggerOnAnimationEnd<T> {
-	pub value: T,
-	pub target: ActionTarget,
+pub struct ReturnOnAnimationEnd<P> {
+	/// The result payload to return when the animation ends.
+	pub payload: P,
+	/// The animation clip to check for end.
+	pub handle: Handle<AnimationClip>,
+	/// The index of the animation node to check for end.
 	pub animation_index: AnimationNodeIndex,
 	/// The duration of the transition to the next action.
 	/// This should be greater than frame delta time or there will be no chance
@@ -20,18 +23,19 @@ pub struct TriggerOnAnimationEnd<T> {
 }
 
 
-impl<T: Event> TriggerOnAnimationEnd<T> {
-	pub fn new(index: AnimationNodeIndex, value: T) -> Self {
+impl<P: ResultPayload> ReturnOnAnimationEnd<P> {
+	/// Create a new [`TriggerOnAnimationEnd`] action.
+	pub fn new(
+		handle: Handle<AnimationClip>,
+		index: AnimationNodeIndex,
+		payload: P,
+	) -> Self {
 		Self {
-			value,
-			target: ActionTarget::default(),
+			payload,
+			handle,
 			animation_index: index,
 			transition_duration: DEFAULT_ANIMATION_TRANSITION,
 		}
-	}
-	pub fn with_target(mut self, target: ActionTarget) -> Self {
-		self.target = target;
-		self
 	}
 	/// The duration before the end of the animation to trigger the event.
 	/// This is commonly the same as the transition duration of the animation.
@@ -41,19 +45,14 @@ impl<T: Event> TriggerOnAnimationEnd<T> {
 	}
 }
 
-pub fn trigger_on_animation_end<T: Event>(
+pub(crate) fn return_on_animation_end<P: ResultPayload>(
 	mut commands: Commands,
 	animators: Query<&AnimationPlayer>,
 	children: Query<&Children>,
 	clips: Res<Assets<AnimationClip>>,
-	mut query: Query<(
-		Entity,
-		&Running,
-		&TriggerOnAnimationEnd<T>,
-		&Handle<AnimationClip>,
-	)>,
+	mut query: Populated<(Entity, &Running, &ReturnOnAnimationEnd<P>)>,
 ) {
-	for (action, running, trigger_on_end, handle) in query.iter_mut() {
+	for (action, running, return_on_end) in query.iter_mut() {
 		let Some(target) = children
 			.iter_descendants_inclusive(running.origin)
 			.find(|entity| animators.contains(*entity))
@@ -63,12 +62,12 @@ pub fn trigger_on_animation_end<T: Event>(
 		// safe unwrap, just checked
 		let player = animators.get(target).unwrap();
 
-		let Some(clip) = clips.get(&**handle) else {
+		let Some(clip) = clips.get(&return_on_end.handle) else {
 			continue;
 		};
 
 		let Some(active_animation) =
-			player.animation(trigger_on_end.animation_index)
+			player.animation(return_on_end.animation_index)
 		else {
 			continue;
 		};
@@ -89,15 +88,14 @@ pub fn trigger_on_animation_end<T: Event>(
 		};
 
 		let nearly_finished =
-			remaining_time < trigger_on_end.transition_duration.as_secs_f32();
+			remaining_time < return_on_end.transition_duration.as_secs_f32();
 
 		if nearly_finished {
-			trigger_on_end.target.trigger(
+			running.trigger_result(
 				&mut commands,
 				action,
-				trigger_on_end.value.clone(),
+				return_on_end.payload.clone(),
 			);
-			// commands.entity(entity).trigger();
 		}
 	}
 }

@@ -43,7 +43,7 @@ pub fn crate_test_beet_example_plugin(app: &mut App) {
 pub fn beet_example_plugin(app: &mut App) {
 	app.add_plugins((
 		BeetFlowPlugin::default(),
-		BeetDebugPlugin::with_none(),
+		BeetDebugPlugin::default(),
 		BeetSpatialPlugins::default(),
 		plugin_2d,
 		plugin_3d,

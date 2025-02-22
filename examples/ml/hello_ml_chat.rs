@@ -11,8 +11,6 @@ pub fn main() {
 			running_beet_example_plugin, 
 			plugin_ml
 		))
-		.init_resource::<DebugOnRun>()
-		.init_resource::<DebugToStdOut>()
 		.add_systems(
 			Startup,
 			(

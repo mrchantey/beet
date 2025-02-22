@@ -71,8 +71,8 @@ beet_sim = { path = "crates/beet_sim", version = "0.0.5-dev" }
 #💡 local
 # bevyhub = { git = "https://github.com/mrchantey/bevyhub", default-features = false }
 # sweet = { version = "0.3.0-rc.4" }
-# sweet = { path = "../sweet" }
-sweet = { git = "https://github.com/mrchantey/sweet" }
+sweet = { path = "../sweet" }
+# sweet = { git = "https://github.com/mrchantey/sweet" }
 
 #💡 game
 bevy = { version = "0.15", default-features = false }
@@ -417,23 +417,23 @@ include = ["bevyhub/camera-2d", "bevyhub/ui-terminal", "beet-debug"]
 # include = ["beet-debug", "bevyhub/camera-2d", "bevyhub/space-scene"]
 
 
-# [[example]]
-# name = "hello_animation"
-# path = "examples/hello_animation.rs"
+[[example]]
+name = "hello_animation"
+path = "examples/spatial/hello_animation.rs"
 
 
-# [[package.metadata.scene]]
-# name = "hello-animation"
-# description = "A simple behavior demonstrating animation control."
-# thumb-url = "https://bevyhub-public.s3.us-west-2.amazonaws.com/assets/screenshots/hello-animation.png"
-# app = "app"
-# path = "scenes/hello-animation.json"
-# include = [
-# 	"bevyhub/ui-terminal",
-# 	"bevyhub/lighting-3d",
-# 	"bevyhub/ground-3d",
-# 	"beet-debug",
-# ]
+[[package.metadata.scene]]
+name = "hello-animation"
+description = "A simple behavior demonstrating animation control."
+thumb-url = "https://bevyhub-public.s3.us-west-2.amazonaws.com/assets/screenshots/hello-animation.png"
+app = "app"
+path = "scenes/hello-animation.json"
+include = [
+	"bevyhub/ui-terminal",
+	"bevyhub/lighting-3d",
+	"bevyhub/ground-3d",
+	"beet-debug",
+]
 
 # [[example]]
 # name = "inverse_kinematics"
@@ -441,6 +441,10 @@ include = ["bevyhub/camera-2d", "bevyhub/ui-terminal", "beet-debug"]
 [[example]]
 name = "seek"
 path = "examples/spatial/seek.rs"
+required-features = ["flow", "spatial", "bevy_default"]
+[[example]]
+name = "seek_3d"
+path = "examples/spatial/seek_3d.rs"
 required-features = ["flow", "spatial", "bevy_default"]
 
 # [[package.metadata.scene]]
