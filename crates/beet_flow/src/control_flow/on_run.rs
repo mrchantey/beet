@@ -204,8 +204,29 @@ pub(crate) fn propagate_on_run<T: RunPayload>(
 }
 
 
+/// Some actions provide the option to specify a target to perform
+/// an operation on, for example [`Insert`] and [`Remove`].
+#[derive(Debug, Default, Clone, Reflect)]
+pub enum TargetEntity {
+	/// Use The `action` entity as the target
+	#[default]
+	Action,
+	/// Use the `origin` entity as the target
+	Origin,
+	/// Use some other entity as the target
+	Other(Entity),
+}
 
-
+impl TargetEntity {
+	/// Get the target entity for this event.
+	pub fn get_target(&self, ev: &impl ObserverEvent) -> Entity {
+		match self {
+			TargetEntity::Action => ev.action(),
+			TargetEntity::Origin => ev.origin(),
+			TargetEntity::Other(entity) => *entity,
+		}
+	}
+}
 
 #[cfg(test)]
 mod test {

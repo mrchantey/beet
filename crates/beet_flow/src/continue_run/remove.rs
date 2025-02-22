@@ -22,19 +22,40 @@ use std::marker::PhantomData;
 #[derive(Debug, Component, Reflect)]
 #[reflect(Component)]
 pub struct Remove<E: ObserverEvent, B: Bundle> {
+	/// The target entity to remove the bundle from.
+	pub target_entity: TargetEntity,
 	phantom: PhantomData<(E, B)>,
 }
 
-impl<E: ObserverEvent, B: Bundle + Default> Default for Remove<E, B> {
+impl<E: ObserverEvent, B: Bundle> Default for Remove<E, B> {
 	fn default() -> Self {
 		Self {
 			phantom: PhantomData,
+			target_entity: TargetEntity::default(),
 		}
 	}
 }
 
-fn remove<E: ObserverEvent, B: Bundle>(ev: Trigger<E>, mut commands: Commands) {
-	commands.entity(ev.action()).remove::<B>();
+impl<E: ObserverEvent, B: Bundle> Remove<E, B> {
+	/// Specify the target entity for this action.
+	pub fn new_with_target(target_entity: TargetEntity) -> Self {
+		Self {
+			target_entity,
+			..default()
+		}
+	}
+}
+
+fn remove<E: ObserverEvent, B: Bundle>(
+	ev: Trigger<E>,
+	mut commands: Commands,
+	query: Query<&Remove<E, B>>,
+) {
+	let action = query
+		.get(ev.action())
+		.expect(&expect_action::to_have_action(&ev));
+	let target = action.target_entity.get_target(&*ev);
+	commands.entity(target).remove::<B>();
 }
 
 #[cfg(test)]

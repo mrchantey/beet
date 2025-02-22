@@ -3,6 +3,7 @@ use bevy::prelude::*;
 use std::marker::PhantomData;
 
 
+
 /// This action will insert the provided bundle when the specified action is triggered.
 /// It is designed to work for both [`OnRun`] and [`OnResult`] events.
 /// This action also has a corresponding [`Remove`] action.
@@ -21,6 +22,8 @@ use std::marker::PhantomData;
 pub struct Insert<E: ObserverEvent, B: Bundle + Clone> {
 	/// The bundle to be cloned and inserted.
 	pub bundle: B,
+	/// The target entity to insert the bundle into.
+	pub target_entity: TargetEntity,
 	phantom: PhantomData<E>,
 }
 
@@ -30,6 +33,15 @@ impl<E: ObserverEvent, B: Bundle + Clone> Insert<E, B> {
 		Self {
 			bundle,
 			phantom: PhantomData,
+			target_entity: TargetEntity::default(),
+		}
+	}
+	/// Specify the bundle to be inserted and the target entity.
+	pub fn new_with_target(bundle: B, target_entity: TargetEntity) -> Self {
+		Self {
+			bundle,
+			phantom: PhantomData,
+			target_entity,
 		}
 	}
 }
@@ -39,6 +51,7 @@ impl<E: ObserverEvent, B: Bundle + Clone + Default> Default for Insert<E, B> {
 		Self {
 			bundle: B::default(),
 			phantom: PhantomData,
+			target_entity: TargetEntity::default(),
 		}
 	}
 }
@@ -51,7 +64,8 @@ fn insert<E: ObserverEvent, B: Bundle + Clone>(
 	let action = query
 		.get(ev.action())
 		.expect(&expect_action::to_have_action(&ev));
-	commands.entity(ev.action()).insert(action.bundle.clone());
+	let target = action.target_entity.get_target(&*ev);
+	commands.entity(target).insert(action.bundle.clone());
 }
 
 #[cfg(test)]

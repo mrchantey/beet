@@ -42,8 +42,6 @@ fn setup(
 
 	let transition_duration = Duration::from_secs_f32(0.5);
 
-	// a scene root will spawn the scene as a child, so we need the sequence
-	// to be nested so it doesnt try to run the scene as a behavior.
 	commands
 		.spawn((
 			Name::new("Foxie"),
