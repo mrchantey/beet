@@ -406,6 +406,9 @@ include = ["bevyhub/camera-2d", "bevyhub/ui-terminal", "beet-debug"]
 
 # 💡 Examples - spatial
 
+[[example]]
+name = "flock"
+path = "examples/spatial/flock.rs"
 
 # Too big, we need to handle for loops in scene files
 # [[package.metadata.scene]]

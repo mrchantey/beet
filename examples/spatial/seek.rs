@@ -2,10 +2,15 @@ use beet::examples::scenes;
 use beet::prelude::*;
 use bevy::prelude::*;
 
+#[rustfmt::skip]
 pub fn main() {
 	App::new()
 		.add_plugins(running_beet_example_plugin)
-		.add_systems(Startup, (scenes::camera_2d, scenes::space_scene, setup))
+		.add_systems(Startup, (
+			scenes::camera_2d, 
+			scenes::space_scene, 
+			setup
+		))
 		.run();
 }
 
