@@ -29,9 +29,9 @@ fn ik_spawner(
 	mut commands: Commands,
 	child_nodes_query: Query<(Entity, &Name, &Transform, &Children)>,
 	children_query: Query<&Children>,
-	query: Populated<(Entity, &Transform, &Children)>,
+	query: Populated<(Entity, &Transform, &Children, &TargetEntity)>,
 ) {
-	let Ok((scene_root_entity, transform, scene_root_children)) =
+	let Ok((scene_root_entity, transform, scene_root_children, target_entity)) =
 		query.get(trigger.entity())
 	else {
 		return;
@@ -78,13 +78,12 @@ fn ik_spawner(
 		IkSegment::DEG_360.with_len(segment3_to_gripper),
 	);
 
+	let TargetEntity::Other(target) = target_entity else {
+		unimplemented!();
+	};
+
 	let ik_transforms = IkArm4DofTransforms::new(
-		ik,
-		trigger.entity(),
-		base.0,
-		segment1.0,
-		segment2.0,
-		segment3.0,
+		ik, *target, base.0, segment1.0, segment2.0, segment3.0,
 	);
 
 	commands.entity(scene_root_entity).insert(ik_transforms);

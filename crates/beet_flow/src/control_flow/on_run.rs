@@ -206,7 +206,8 @@ pub(crate) fn propagate_on_run<T: RunPayload>(
 
 /// Some actions provide the option to specify a target to perform
 /// an operation on, for example [`Insert`] and [`Remove`].
-#[derive(Debug, Default, Clone, Reflect)]
+#[derive(Debug, Default, Clone, Component, Reflect)]
+#[reflect(Default, Component)]
 pub enum TargetEntity {
 	/// Use The `action` entity as the target
 	#[default]
