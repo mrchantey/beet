@@ -149,7 +149,7 @@ impl OnLogMessage {
 		Self(msg.into())
 	}
 	/// Immediately log to stdout, useful for initial messages
-	pub fn and_log(self)->Self {
+	pub fn and_log(self) -> Self {
 		println!("{}", self.0);
 		self
 	}
