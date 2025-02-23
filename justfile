@@ -30,15 +30,18 @@ cli *args:
 	cargo run -p beet-cli -- {{args}}
 
 # Run and watch a workspace example
-run-ws example *args:
-	just watch 'just run-ci {{example}} {{args}}'
+run example *args:
+	just watch just run-ci {{example}} {{args}}
+
+run-feat example *args:
+	just run {{example}} --all-features {{args}} 
 
 # Run an example without watching
 run-ci example *args:
 	cargo run --example {{example}} {{args}}
 
 # Run and watch a crate example
-run crate example *args:
+run-p crate example *args:
 	just watch cargo run -p {{crate}} --example {{example}} {{args}}
 
 
@@ -49,7 +52,7 @@ fmt *args:
 	cargo fmt {{args}} && just leptosfmt {{args}}
 
 leptosfmt *args:
-	leptosfmt 												\
+	leptosfmt -q											\
 	crates/beet_rsx/**/*.rs 					\
 	crates/beet_rsx/**/**/*.rs 				\
 	crates/beet_rsx/**/**/**/*.rs 		\
@@ -115,16 +118,19 @@ hello-world:
 	../bevyhub/scenes/ui-terminal-input.json \
 	./scenes/hello-world.json
 
+# Run tests for ci,
+# cargo test --workspace runs with 16MB stack and max 8 cores
 test-ci *args:
 	cargo fmt 				--check
 	just leptosfmt 		--check
-	cargo test --workspace										 --features=_doctest								{{args}}
-	RUST_MIN_STACK=16777216 	cargo test --workspace --lib --all-features 				{{args}}
-	cargo test --target wasm32-unknown-unknown --all-features	-p beet_flow 				{{args}}
+	RUST_MIN_STACK=16777216 cargo test --workspace --lib	--features=_doctest 			{{args}} -- --test-threads=8
+	RUST_MIN_STACK=16777216 cargo test --workspace --doc	--features=_doctest 			{{args}} -- --test-threads=8
+	cargo test --target wasm32-unknown-unknown 	--all-features	-p beet_flow 				{{args}} -- --test-threads=8
 
 # rebuilding bevy_render for wasm results in 'no space left on device'
 test-all *args:
 	just test-ci 																																			{{args}}
+	RUST_MIN_STACK=16777216 cargo test --workspace --lib 	--all-features							{{args}} -- --test-threads=8
 	cargo test --lib --target wasm32-unknown-unknown --all-features -p beet_rsx 			{{args}}
 	cargo test --lib --target wasm32-unknown-unknown --all-features -p beet_spatial 	{{args}}
 
@@ -135,10 +141,10 @@ test-all *args:
 # cargo test --workspace --all-features -- {{args}}
 
 test-doc crate *args:
-	just watch 'cargo test -p {{crate}} --doc --features=_doctest {{args}}'
+	just watch 'cargo test -p {{crate}} --doc 						{{args}}'
 # copied from sweet
 test crate *args:
-	just watch 'cargo test -p {{crate}} --lib -- --watch {{args}}'
+	just watch 'cargo test -p {{crate}} --lib -- --watch 	{{args}}'
 test-e2e crate test_name *args:
 	just watch 'cargo test -p {{crate}} --test {{test_name}} -- --watch {{args}}'
 test-feat crate *args:

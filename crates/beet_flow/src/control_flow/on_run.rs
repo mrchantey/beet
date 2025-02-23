@@ -5,20 +5,34 @@ use std::fmt::Debug;
 
 /// An event triggered on an [`ActionEntity`], propagated to the observers automatically
 /// with observers registered by the [run_plugin].
+///
+/// This can be triggered on any entity, and [`OnRun`] will be propagated to [`Self::action`].
+/// - If [`Self::action`] is [`Entity::PLACEHOLDER`], the entity this was triggered on will be used.
+/// - If the action is local and the trigger is global, ie `commands.trigger(OnRunAction::local(()))`
+/// 	this will result in a panic.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Event)]
 pub struct OnRunAction<T = ()> {
 	/// The payload of the run.
 	/// By analogy if an action is a function, this would be the arguments.
 	pub payload: T,
-	/// this is not exposed as it may be placeholder, instead use [Trigger::resolve_origin]
+	/// this is not exposed as it may be placeholder
+	/// - to set use [OnRunAction::new]
+	/// - to get use [Trigger::resolve_action]
 	origin: Entity,
-	/// this is not exposed as it may be placeholder, instead use [Trigger::resolve_action]
+	/// this is not exposed as it may be placeholder
+	/// - to set use [OnRunAction::new]
+	/// - to get use [Trigger::resolve_action]
 	action: Entity,
 }
 
 impl<T> ActionEvent for OnRunAction<T> {
 	fn action(&self) -> Entity { self.action }
 	fn origin(&self) -> Entity { self.origin }
+}
+
+/// Create a local [`OnRunAction`] event with a default payload.
+impl<T: Default> Default for OnRunAction<T> {
+	fn default() -> Self { Self::local(Default::default()) }
 }
 
 impl<T> OnRunAction<T> {
@@ -165,6 +179,9 @@ impl OnRun<()> {
 }
 
 /// Propagate the [`OnRunAction`] event to all [`ActionObservers`].
+///
+/// The nature of this routing techique allows [`OnRunAction`] to be called
+/// on any entity, ie a different entity to the [`OnRunAction::action`].
 pub(crate) fn propagate_on_run<T: RunPayload>(
 	ev: Trigger<OnRunAction<T>>,
 	mut commands: Commands,
@@ -187,8 +204,30 @@ pub(crate) fn propagate_on_run<T: RunPayload>(
 }
 
 
+/// Some actions provide the option to specify a target to perform
+/// an operation on, for example [`Insert`] and [`Remove`].
+#[derive(Debug, Default, Clone, Component, Reflect, PartialEq, Eq, Hash)]
+#[reflect(Default, Component)]
+pub enum TargetEntity {
+	/// Use The `action` entity as the target
+	#[default]
+	Action,
+	/// Use the `origin` entity as the target
+	Origin,
+	/// Use some other entity as the target
+	Other(Entity),
+}
 
-
+impl TargetEntity {
+	/// Get the target entity for this event.
+	pub fn get_target(&self, ev: &impl ObserverEvent) -> Entity {
+		match self {
+			TargetEntity::Action => ev.action(),
+			TargetEntity::Origin => ev.origin(),
+			TargetEntity::Other(entity) => *entity,
+		}
+	}
+}
 
 #[cfg(test)]
 mod test {

@@ -8,13 +8,13 @@ async fn main() {
 			DefaultPlugins,
 			BevyEventRegistry,
 			BevyTemplateReloader::new(std::file!()),
+			BevyRsxPlugin::new(|| {
+				rsx! {
+					<cam Camera2d/>
+					<Counter initial=7/>
+				}
+			}),
 		))
-		.spawn_rsx(|| {
-			rsx! {
-				<cam Camera2d/>
-				<Counter initial=7/>
-			}
-		})
 		.run();
 }
 

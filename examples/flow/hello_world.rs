@@ -8,9 +8,7 @@ use sweet::prelude::EntityWorldMutwExt;
 fn main() {
 	App::new()
 		.add_plugins((
-			// register the run and result routing observers
 			BeetFlowPlugin::default(),
-			// this will log any running entity
 			BeetDebugPlugin::default()
 		))
 		.world_mut()

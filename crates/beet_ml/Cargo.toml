@@ -12,6 +12,15 @@ keywords.workspace = true
 categories.workspace = true
 
 [features]
+# default = ["cuda"]
+# requires cuda to be installed https://developer.nvidia.com/cuda-downloads?target_os=Linux&target_arch=x86_64&Distribution=Ubuntu&target_version=24.04&target_type=deb_local
+cuda = ["candle-transformers/cuda"]
+candle = [
+	"dep:candle-core",
+	"dep:candle-transformers",
+	"dep:candle-nn",
+	"dep:tokenizers",
+]
 spatial = ["dep:beet_spatial"]
 bevy_default = ["bevy/default"]
 
@@ -33,13 +42,14 @@ strum.workspace = true
 strum_macros.workspace = true
 
 #💡 huggingface
-candle-core = "0.5.0"
-candle-transformers = "0.5.0"
-candle-nn = "0.5.0"
-tokenizers = { version = "0.19.1", default-features = false, features = [
+candle-core = { version = "0.8", optional = true }
+candle-transformers = { version = "0.8", optional = true }
+candle-nn = { version = "0.8", optional = true }
+tokenizers = { version = "0.19.1", optional = true, default-features = false, features = [
 	"unstable_wasm",
 ] }
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+reqwest.workspace = true
 hf-hub = "0.4"
 
 #💡 web
@@ -52,6 +62,7 @@ wasm-bindgen-futures.workspace = true
 console_error_panic_hook.workspace = true
 
 [dev-dependencies]
+# beet_ml = { path = "", features = ["bevy_default", "spatial"] }
 sweet = { workspace = true, features = ["test"] }
 
 pretty_env_logger.workspace = true

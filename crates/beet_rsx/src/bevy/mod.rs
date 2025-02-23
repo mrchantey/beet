@@ -16,12 +16,21 @@ mod bevy_tree_idx;
 use crate::prelude::*;
 use bevy::prelude::*;
 
-#[extend::ext(name=MyTypeExt)]
-pub impl App {
-	fn spawn_rsx(&mut self, root: impl Fn() -> RsxRoot) -> &mut Self {
-		BevyRuntime::with_mut(|rt_app| std::mem::swap(rt_app, self));
-		let _entities = RsxToBevy::spawn(root()).unwrap();
-		BevyRuntime::with_mut(|rt_app| std::mem::swap(rt_app, self));
-		self
+
+pub struct BevyRsxPlugin {
+	pub app: Box<dyn 'static + Send + Sync + Fn() -> RsxRoot>,
+}
+
+impl BevyRsxPlugin {
+	pub fn new(app: impl 'static + Send + Sync + Fn() -> RsxRoot) -> Self {
+		Self { app: Box::new(app) }
+	}
+}
+
+impl Plugin for BevyRsxPlugin {
+	fn build(&self, app: &mut App) {
+		BevyRuntime::with_mut(|rt_app| std::mem::swap(rt_app, app));
+		let _entities = RsxToBevy::spawn((self.app)()).unwrap();
+		BevyRuntime::with_mut(|rt_app| std::mem::swap(rt_app, app));
 	}
 }

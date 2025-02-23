@@ -47,18 +47,9 @@ impl Plugin for BevyTemplateReloader {
 		});
 
 		app.insert_resource(TemplateReload { recv, dst })
-			.add_systems(Update, (handle_recv, close_on_esc));
+			.add_systems(Update, handle_recv);
 	}
 }
-fn close_on_esc(
-	mut exit: EventWriter<AppExit>,
-	input: Res<ButtonInput<KeyCode>>,
-) {
-	if input.just_pressed(KeyCode::Escape) {
-		exit.send(AppExit::Success);
-	}
-}
-
 
 #[derive(Debug, Copy, Clone)]
 enum TemplateReloaderMessage {

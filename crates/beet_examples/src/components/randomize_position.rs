@@ -1,6 +1,5 @@
 use bevy::prelude::*;
-use forky::prelude::Vec3Ext;
-use sweet::prelude::RandomSource;
+use sweet::prelude::*;
 
 #[derive(Clone, Component, Reflect)]
 #[reflect(Component, Default)]
@@ -20,7 +19,7 @@ impl Default for RandomizePosition {
 
 pub fn randomize_position(
 	mut commands: Commands,
-	rand: ResMut<RandomSource>,
+	mut rand: ResMut<RandomSource>,
 	mut query: Populated<
 		(Entity, &mut Transform, &RandomizePosition),
 		Added<RandomizePosition>,

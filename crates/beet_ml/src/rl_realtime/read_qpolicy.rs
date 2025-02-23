@@ -35,7 +35,7 @@ fn read_q_policy<P: QPolicy + Asset>(
 		.expect(&expect_action::to_have_action(&ev));
 
 	let policy = assets
-		.get(handle)
+		.get(&**handle)
 		.expect(&expect_action::to_have_asset(&ev));
 
 	let (state, mut action) = agents

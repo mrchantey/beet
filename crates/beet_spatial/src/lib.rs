@@ -2,8 +2,8 @@
 #![cfg_attr(test, test_runner(sweet::test_runner))]
 #![deny(missing_docs)]
 #![doc = include_str!("../README.md")]
-// #[cfg(feature = "animation")]
-// pub mod animation;
+#[cfg(feature = "bevy_default")]
+pub mod animation;
 #[cfg(feature = "bevy_default")]
 pub mod asset_actions;
 mod extensions;
@@ -18,9 +18,9 @@ pub mod ui;
 
 /// Re-exports of the most commonly used types and functions in `beet_spatial`.
 pub mod prelude {
-	pub use super::*;
-	// #[cfg(feature = "animation")]
-	// pub use crate::animation::*;
+	pub use super::BeetSpatialPlugins;
+	#[cfg(feature = "bevy_default")]
+	pub use crate::animation::*;
 	#[cfg(feature = "bevy_default")]
 	pub use crate::asset_actions::*;
 	// todo wait for construct
@@ -34,6 +34,26 @@ pub mod prelude {
 	pub use crate::steer_actions::*;
 	#[cfg(feature = "bevy_default")]
 	pub use crate::ui::*;
+}
+/// doctest reexports and utilities
+#[cfg(feature = "_doctest")]
+#[allow(ambiguous_glob_reexports)]
+pub mod doctest {
+	pub use crate::prelude::*;
+	pub use beet_flow::prelude::*;
+	pub use bevy::prelude::*;
+	/// for docs, create a world with BeetFlowPlugin
+	/// ```
+	/// use beet_spatial::doctest::*;
+	/// let world = world();
+	/// ```
+	#[cfg(feature = "_doctest")]
+	pub fn world() -> World {
+		let mut app = App::new();
+		app.add_plugins((BeetFlowPlugin::default(), BeetSpatialPlugins));
+		let world = std::mem::take(app.world_mut());
+		world
+	}
 }
 use crate::prelude::*;
 use bevy::app::PluginGroupBuilder;
@@ -53,29 +73,8 @@ impl PluginGroup for BeetSpatialPlugins {
 		.add(ik_plugin)
 		/*-*/;
 
-		// #[cfg(feature = "animation")]
-		// (builder = builder.add(crate::prelude::AnimationPlugin::default()));
+		#[cfg(feature = "bevy_default")]
+		(builder = builder.add(crate::prelude::AnimationPlugin::default()));
 		builder
-	}
-}
-
-/// doctest reexports and utilities
-#[cfg(feature = "_doctest")]
-#[allow(ambiguous_glob_reexports)]
-pub mod doctest {
-	pub use crate::prelude::*;
-	pub use beet_flow::prelude::*;
-	pub use bevy::prelude::*;
-	/// for docs, create a world with BeetFlowPlugin
-	/// ```
-	/// use beet_spatial::doctest::*;
-	/// let world = world();
-	/// ```
-	#[cfg(feature = "_doctest")]
-	pub fn world() -> World {
-		let mut app = App::new();
-		app.add_plugins((BeetFlowPlugin::default(), BeetSpatialPlugins));
-		let world = std::mem::take(app.world_mut());
-		world
 	}
 }

@@ -1,3 +1,7 @@
+[build]
+# recommended for cargo test --workspace
+# jobs = 8
+
 [target.wasm32-unknown-unknown]
 runner = 'sweet test-wasm'
 rustflags = ["--cfg", "getrandom_backend=\"wasm_js\""]

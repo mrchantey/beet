@@ -36,4 +36,5 @@ strum_macros.workspace = true
 web-sys.workspace = true
 
 [dev-dependencies]
+beet_spatial = { path = "", features = ["_doctest"] }
 sweet = { workspace = true, features = ["test"] }

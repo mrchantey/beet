@@ -1,15 +1,17 @@
-use crate::prelude::*;
 use crate::beet::prelude::*;
-use bevyhub::prelude::*;
+use crate::prelude::*;
 use bevy::prelude::*;
 
 pub const FROZEN_LAKE_SCENE_SCALE: f32 = 1.;
 
 
-pub fn frozen_lake_scene(mut commands: Commands) {
+pub fn frozen_lake_scene(
+	mut commands: Commands,
+	asset_server: Res<AssetServer>,
+) {
 	commands.spawn((
+		Camera3d::default(),
 		CameraDistance::new(FROZEN_LAKE_SCENE_SCALE * 0.7),
-		BundlePlaceholder::Camera3d,
 	));
 
 	let map = FrozenLakeMap::default_four_by_four();
@@ -23,7 +25,7 @@ pub fn frozen_lake_scene(mut commands: Commands) {
 			pos.y -= grid_to_world.cell_width;
 			commands.spawn((
 				Transform::from_translation(pos).with_scale(tile_scale),
-				BundlePlaceholder::Scene(frozen_lake_assets::TILE.into()),
+				SceneRoot(asset_server.load(frozen_lake_assets::TILE)),
 			));
 		}
 	}
@@ -38,12 +40,12 @@ pub fn frozen_lake_scene(mut commands: Commands) {
 				pos.y += grid_to_world.cell_width * 0.25; // this asset is a bit too low
 				commands.spawn((
 					Transform::from_translation(pos).with_scale(object_scale),
-					BundlePlaceholder::Scene(frozen_lake_assets::HAZARD.into()),
+					SceneRoot(asset_server.load(frozen_lake_assets::HAZARD)),
 				));
 			}
 			FrozenLakeCell::Goal => {
 				commands.spawn((
-					BundlePlaceholder::Scene(frozen_lake_assets::GOAL.into()),
+					SceneRoot(asset_server.load(frozen_lake_assets::GOAL)),
 					Transform::from_translation(pos).with_scale(object_scale),
 				));
 			}
