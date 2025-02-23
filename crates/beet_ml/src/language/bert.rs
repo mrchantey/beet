@@ -40,6 +40,8 @@ impl Bert {
 	/// When native we use the hf-hub which caches the models for use with this and other applications
 	#[cfg(not(target_arch = "wasm32"))]
 	pub async fn new(config: BertConfig) -> Result<Self> {
+		// use std::str::FromStr;
+
 		// TODO more async stuff here
 		use candle_transformers::models::bert::HiddenAct;
 		use candle_transformers::models::bert::DTYPE;
@@ -61,8 +63,16 @@ impl Bert {
 		let config_filename = api.get("config.json")?;
 		let candle_config = std::fs::read_to_string(config_filename)?;
 		let mut candle_config: Config = serde_json::from_str(&candle_config)?;
+
+
+		// let tokenizer_url = config.model.tokenizer_url();
+
+		// let tokenizer_bytes = reqwest::get(tokenizer_url).await?.text().await?;
 		let tokenizer =
 			Tokenizer::from_file(tokenizer_filename).map_err(E::msg)?;
+
+		// let tokenizer =
+		// 	Tokenizer::from_str(&tokenizer_bytes).map_err(E::msg)?;
 
 		let vb = unsafe {
 			VarBuilder::from_mmaped_safetensors(
@@ -164,7 +174,8 @@ impl Bert {
 
 		let token_ids = Tensor::stack(&token_ids, 0)?;
 		let token_type_ids = token_ids.zeros_like()?;
-		let embeddings = self.model.forward(&token_ids, &token_type_ids)?;
+		let embeddings =
+			self.model.forward(&token_ids, &token_type_ids, None)?;
 		// Apply some avg-pooling by taking the mean embedding value for all tokens (including padding)
 		let (_n_sentence, n_tokens, _hidden_size) = embeddings.dims3()?;
 		let embeddings = (embeddings.sum(1)? / (n_tokens as f64))?;
@@ -247,7 +258,7 @@ impl Bert {
 		let token_type_ids = token_ids.zeros_like()?;
 
 		let tensors = (0..iterations)
-			.map(|_| self.model.forward(&token_ids, &token_type_ids))
+			.map(|_| self.model.forward(&token_ids, &token_type_ids, None))
 			.collect::<Result<Vec<_>, candle_core::Error>>()?;
 
 		Ok(tensors)

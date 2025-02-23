@@ -121,6 +121,7 @@ clap = "4"
 
 #💡 http
 http = "1"
+reqwest = "0.12"
 
 #💡 web
 js-sys = "0.3"
