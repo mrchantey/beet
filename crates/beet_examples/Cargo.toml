@@ -12,7 +12,7 @@ categories.workspace = true
 
 [dependencies]
 beet_flow = { workspace = true, features = ["bevy_default", "reflect"] }
-beet_ml = { workspace = true, features = ["bevy_default", "spatial"] }
+beet_ml = { workspace = true, features = ["bevy_default", "candle", "spatial"] }
 beet_spatial = { workspace = true, features = ["bevy_default"] }
 
 

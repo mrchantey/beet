@@ -1,5 +1,4 @@
 //https://github.com/huggingface/candle/blob/main/candle-examples/examples/bert/main.rs
-use crate::language::sentence_embeddings::SentenceEmbeddings;
 use crate::prelude::*;
 use anyhow::Error as E;
 use anyhow::Result;
@@ -19,14 +18,6 @@ pub struct Bert {
 	tokenizer: Tokenizer,
 }
 
-
-
-
-/// Temp workaround since handle:Component removed in 0.15.
-/// revisit with construct
-#[derive(Debug, Clone, Component, Reflect, Deref, DerefMut)]
-#[reflect(Component)]
-pub struct HandleWrapper<T: Asset>(pub Handle<T>);
 
 
 impl<T: Asset> Into<AssetId<T>> for HandleWrapper<T> {

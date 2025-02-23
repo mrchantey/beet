@@ -1,19 +1,6 @@
 use crate::prelude::*;
 use beet_flow::prelude::*;
 use bevy::prelude::*;
-use std::borrow::Cow;
-
-/// This component is for use with [`SentenceFlow`]. Add to either the agent or a child behavior.
-#[derive(Debug, Clone, Component, PartialEq, Reflect)]
-#[reflect(Component)]
-pub struct Sentence(pub Cow<'static, str>);
-impl Sentence {
-	pub fn new(s: impl Into<Cow<'static, str>>) -> Self { Self(s.into()) }
-}
-
-impl Default for Sentence {
-	fn default() -> Self { Self::new("placeholder") }
-}
 
 /// Runs the child with the [`Sentence`] that is most similar to that of the agent.
 /// for use with [`ScoreFlow`]
