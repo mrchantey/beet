@@ -3,7 +3,12 @@
 //! - Animation
 //! - UI
 //!
+//! Unlike [`hello_ml`], this example performs a search for any sentence with
+//! the [`Collectable`] component.
+//!
 //! Please wait for the status to change to `Idle` before issuing commands.
+//!
+//!
 //!
 use beet::examples::scenes;
 use beet::prelude::*;
@@ -32,13 +37,13 @@ pub fn main() {
 
 fn setup(mut ev: EventWriter<OnLogMessage>) {
 	ev.send(
-		OnLogMessage::new("Agent: I can fetch the following items:").and_log(),
+		OnLogMessage::new("Foxie: woof woof! I can fetch the following items:")
+			.and_log(),
 	);
-	ev.send(OnLogMessage::new("         - Red healing potions").and_log());
-	ev.send(OnLogMessage::new("         - Gold coins").and_log());
-	ev.send(OnLogMessage::new("         - Silver swords").and_log());
-	ev.send(OnLogMessage::new("         - Tasty cheese").and_log());
-	ev.send(OnLogMessage::new("       What should I fetch?").and_log());
+	ev.send(OnLogMessage::new("       - Red healing potions").and_log());
+	ev.send(OnLogMessage::new("       - Gold coins").and_log());
+	ev.send(OnLogMessage::new("       - Silver swords").and_log());
+	ev.send(OnLogMessage::new("       - Tasty cheese").and_log());
 }
 
 pub fn fetch_npc(
@@ -83,7 +88,7 @@ pub fn fetch_npc(
 					if let Ok(sentence) = sentences.get(*steer_target) {
 						log.send(
 							OnLogMessage::new(format!(
-								"Agent: woof woof! fetching {}",
+								"Foxie: woof woof! fetching {}",
 								sentence.0
 							))
 							.and_log(),

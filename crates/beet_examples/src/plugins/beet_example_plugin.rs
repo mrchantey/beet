@@ -32,7 +32,7 @@ pub fn running_beet_example_plugin(app: &mut App) {
 			.build(),
 		beet_example_plugin,
 	))
-	.add_systems(Update, close_on_esc);
+	.add_systems(Update, (close_on_esc, toggle_fullscreen.never_param_warn()));
 }
 
 /// Simple default plugins
