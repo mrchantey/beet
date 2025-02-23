@@ -56,6 +56,8 @@ impl BertModelConfig {
 	pub fn config_url(&self) -> String { self.base_url.clone() + "config.json" }
 
 	pub fn tokenizer_url(&self) -> String {
-		self.base_url.clone() + "tokenizer.json"
+		// rejected 403 in github actions, use s3 instead
+		// self.base_url.clone() + "tokenizer.json"
+		"https://bevyhub-public.s3.us-west-2.amazonaws.com/assets/ml/tokenizer.json".into()
 	}
 }

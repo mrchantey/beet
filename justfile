@@ -118,6 +118,7 @@ hello-world:
 	../bevyhub/scenes/ui-terminal-input.json \
 	./scenes/hello-world.json
 
+# Run tests for ci, cargo test --workspace runs with max 8 cores
 test-ci *args:
 	cargo fmt 				--check
 	just leptosfmt 		--check
