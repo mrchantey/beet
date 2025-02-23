@@ -71,8 +71,8 @@ beet_sim = { path = "crates/beet_sim", version = "0.0.5-dev.1" }
 #💡 local
 # bevyhub = { git = "https://github.com/mrchantey/bevyhub", default-features = false }
 # sweet = { version = "0.3.0-rc.4" }
-sweet = { path = "../sweet" }
-# sweet = { git = "https://github.com/mrchantey/sweet" }
+# sweet = { path = "../sweet" }
+sweet = { git = "https://github.com/mrchantey/sweet" }
 
 #💡 game
 bevy = { version = "0.15", default-features = false }
@@ -148,13 +148,13 @@ include = ["CHANGELOG.md", "README.md", "/src", "/examples", "/scenes"]
 
 [features]
 default = ["flow"]
-examples = ["dep:beet_examples"]
+examples = ["bevy_default", "dep:beet_examples"]
 flow = ["dep:beet_flow"]
 router = ["rsx", "dep:beet_router", "beet_router/parser"]
 rsx = ["dep:beet_rsx"]
-ml = ["dep:beet_ml"]
-spatial = ["dep:beet_spatial", "beet_ml?/spatial"]
-sim = ["dep:beet_sim"]
+ml = ["flow", "dep:beet_ml"]
+spatial = ["flow", "dep:beet_spatial", "beet_ml?/spatial"]
+sim = ["flow", "dep:beet_sim"]
 bevy = ["dep:bevy", "beet_rsx?/bevy", "beet_router?/bevy"]
 bevy_default = [
 	"bevy",
@@ -201,67 +201,67 @@ web-sys.workspace = true
 
 # 💡 Examples - rsx
 
-
 [[example]]
 name = "hello_rsx"
-required-features = ["rsx"]
 path = "examples/rsx/hello_rsx.rs"
+required-features = ["rsx"]
 
 [[example]]
 name = "dom_rsx"
-required-features = ["rsx"]
 path = "examples/rsx/dom_rsx.rs"
+required-features = ["rsx"]
+
 [[example]]
 name = "bevy_rsx"
-required-features = ["rsx", "bevy_default"]
 path = "examples/rsx/bevy_rsx.rs"
+required-features = ["rsx", "bevy_default"]
 
 # 💡 Examples - flow
 
 [[example]]
 name = "bench_local"
-required-features = ["flow"]
 path = "examples/flow/bench_local.rs"
+required-features = ["flow"]
 
 [[example]]
 name = "bench_global"
-required-features = ["flow"]
 path = "examples/flow/bench_global.rs"
+required-features = ["flow"]
 
 [[example]]
 name = "hello_world"
-required-features = ["flow"]
 path = "examples/flow/hello_world.rs"
+required-features = ["flow"]
 
 [[example]]
 name = "long_running"
-required-features = ["flow"]
 path = "examples/flow/long_running.rs"
+required-features = ["flow"]
 
 [[example]]
 name = "malenia"
-required-features = ["flow"]
 path = "examples/flow/malenia.rs"
+required-features = ["flow"]
 
 [[example]]
 name = "repeat_while"
-required-features = ["flow"]
 path = "examples/flow/repeat_while.rs"
+required-features = ["flow"]
 
 [[example]]
 name = "simple_action"
-required-features = ["flow"]
 path = "examples/flow/simple_action.rs"
+required-features = ["flow"]
 
 [[example]]
 name = "state_machine"
-required-features = ["flow"]
 path = "examples/flow/state_machine.rs"
+required-features = ["flow"]
 
 [[example]]
 name = "utility_ai"
-required-features = ["flow"]
 path = "examples/flow/utility_ai.rs"
+required-features = ["flow"]
 
 # 💡 Examples - app
 
@@ -394,7 +394,7 @@ required-features = ["examples", "ml"]
 [[example]]
 name = "hello_ml"
 path = "examples/ml/hello_ml.rs"
-required-features = ["ml"]
+required-features = ["examples", "ml"]
 
 [[package.metadata.scene]]
 name = "hello-ml"
@@ -408,6 +408,7 @@ include = ["bevyhub/camera-2d", "bevyhub/ui-terminal", "beet-debug"]
 [[example]]
 name = "flock"
 path = "examples/spatial/flock.rs"
+required-features = ["examples", "spatial"]
 
 # Too big, we need to handle for loops in scene files
 # [[package.metadata.scene]]
@@ -422,6 +423,7 @@ path = "examples/spatial/flock.rs"
 [[example]]
 name = "hello_animation"
 path = "examples/spatial/hello_animation.rs"
+required-features = ["examples", "spatial"]
 
 
 [[package.metadata.scene]]
@@ -440,15 +442,17 @@ include = [
 [[example]]
 name = "inverse_kinematics"
 path = "examples/spatial/inverse_kinematics.rs"
+required-features = ["examples", "spatial"]
 
 [[example]]
 name = "seek"
 path = "examples/spatial/seek.rs"
-required-features = ["flow", "spatial", "bevy_default"]
+required-features = ["examples", "spatial"]
+
 [[example]]
 name = "seek_3d"
 path = "examples/spatial/seek_3d.rs"
-required-features = ["flow", "spatial", "bevy_default"]
+required-features = ["examples", "spatial"]
 
 # [[package.metadata.scene]]
 # name = "seek"

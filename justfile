@@ -52,7 +52,7 @@ fmt *args:
 	cargo fmt {{args}} && just leptosfmt {{args}}
 
 leptosfmt *args:
-	leptosfmt 												\
+	leptosfmt -q											\
 	crates/beet_rsx/**/*.rs 					\
 	crates/beet_rsx/**/**/*.rs 				\
 	crates/beet_rsx/**/**/**/*.rs 		\
@@ -121,9 +121,9 @@ hello-world:
 test-ci *args:
 	cargo fmt 				--check
 	just leptosfmt 		--check
-	cargo test --workspace										 --features=_doctest								{{args}}
-	RUST_MIN_STACK=16777216 	cargo test --workspace --lib --all-features 				{{args}}
-	cargo test --target wasm32-unknown-unknown --all-features	-p beet_flow 				{{args}}
+	RUST_MIN_STACK=16777216 cargo test --workspace					--features=_doctest {{args}} -- --test-threads=8
+	RUST_MIN_STACK=16777216 cargo test --workspace --lib 	--all-features				{{args}} -- --test-threads=8
+	cargo test --target wasm32-unknown-unknown 	--all-features	-p beet_flow 		{{args}} -- --test-threads=8
 
 # rebuilding bevy_render for wasm results in 'no space left on device'
 test-all *args:

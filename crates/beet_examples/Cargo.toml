@@ -24,7 +24,7 @@ bevy = { workspace = true, default-features = true }
 log.workspace = true
 pretty_env_logger.workspace = true
 anyhow.workspace = true
-sweet = { workspace = true, features = ["bevy", "rand"] }
+sweet = { workspace = true, features = ["bevy_default", "rand"] }
 
 [dev-dependencies]
 sweet = { workspace = true, features = ["test"] }
