@@ -35,15 +35,13 @@ pub fn main() {
 		.run();
 }
 
+#[rustfmt::skip]
 fn setup(mut ev: EventWriter<OnLogMessage>) {
-	ev.send(
-		OnLogMessage::new("Foxie: woof woof! I can fetch the following items:")
-			.and_log(),
-	);
-	ev.send(OnLogMessage::new("       - Red healing potions").and_log());
-	ev.send(OnLogMessage::new("       - Gold coins").and_log());
-	ev.send(OnLogMessage::new("       - Silver swords").and_log());
-	ev.send(OnLogMessage::new("       - Tasty cheese").and_log());
+	ev.send(OnLogMessage::new("Foxie: woof woof! I can fetch the following items:",OnLogMessage::GAME_COLOR).and_log());
+	ev.send(OnLogMessage::new("       - Red healing potion",OnLogMessage::GAME_COLOR).and_log());
+	ev.send(OnLogMessage::new("       - Gold coin",OnLogMessage::GAME_COLOR).and_log());
+	ev.send(OnLogMessage::new("       - Silver sword",OnLogMessage::GAME_COLOR).and_log());
+	ev.send(OnLogMessage::new("       - Tasty cheese",OnLogMessage::GAME_COLOR).and_log());
 }
 
 pub fn fetch_npc(
@@ -87,10 +85,13 @@ pub fn fetch_npc(
 				{
 					if let Ok(sentence) = sentences.get(*steer_target) {
 						log.send(
-							OnLogMessage::new(format!(
-								"Foxie: woof woof! fetching {}",
-								sentence.0
-							))
+							OnLogMessage::new(
+								format!(
+									"Foxie: woof woof! fetching {}",
+									sentence.0
+								),
+								OnLogMessage::GAME_COLOR,
+							)
 							.and_log(),
 						);
 					}

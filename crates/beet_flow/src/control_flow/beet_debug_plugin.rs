@@ -1,7 +1,10 @@
 use super::PostTickSet;
 use crate::prelude::*;
+use bevy::color::palettes::tailwind;
 use bevy::prelude::*;
 use std::borrow::Cow;
+
+
 
 /// A plugin that logs lifecycle events for action entities.
 /// If they have a [`Name`] that will be used instead of the entity id.
@@ -122,19 +125,40 @@ impl Plugin for BeetDebugPlugin {
 /// A helper event for logging messages.
 /// This must use the [`EventReader`] pattern instead of observers
 /// because the 'stack' nature of observers results in a reverse order.
-#[derive(Debug, Event, Deref)]
-pub struct OnLogMessage(pub Cow<'static, str>);
+#[derive(Debug, Event)]
+pub struct OnLogMessage {
+	/// The message to log
+	pub msg: Cow<'static, str>,
+	/// The color of the message text
+	pub color: Color,
+}
 
 impl OnLogMessage {
+	/// The color of messages describing flow state.
+	pub const FLOW_COLOR: Srgba = tailwind::NEUTRAL_200;
+	/// The color of messages sent by the user.
+	pub const USER_COLOR: Srgba = tailwind::CYAN_200;
+	/// The color of messages sent by agents in the game.
+	pub const GAME_COLOR: Srgba = tailwind::YELLOW_200;
+
 	/// Create a new log message.
-	pub fn new(msg: impl Into<Cow<'static, str>>) -> Self { Self(msg.into()) }
+	pub fn new(
+		msg: impl Into<Cow<'static, str>>,
+		color: impl Into<Color>,
+	) -> Self {
+		Self {
+			msg: msg.into(),
+			color: color.into(),
+		}
+	}
 	/// Create a new log message, with a [`Name`] query.
 	pub fn new_with_query(
 		entity: Entity,
 		query: &Query<&Name>,
 		prefix: &str,
+		color: impl Into<Color>,
 	) -> Self {
-		Self::new_with_optional(entity, query.get(entity).ok(), prefix)
+		Self::new_with_optional(entity, query.get(entity).ok(), prefix, color)
 	}
 	/// Create a new log message, with an [`Option<Name>`],
 	/// falling back to the [`Entity`] if `None`.
@@ -142,16 +166,21 @@ impl OnLogMessage {
 		entity: Entity,
 		name: Option<&Name>,
 		prefix: &str,
+		color: impl Into<Color>,
 	) -> Self {
 		let msg = name
 			.map(|n| format!("{prefix}: {n}"))
 			.unwrap_or_else(|| format!("{prefix}: {entity}"));
-		Self(msg.into())
+		Self::new(msg, color)
 	}
 	/// Immediately log to stdout, useful for initial messages
 	pub fn and_log(self) -> Self {
-		println!("{}", self.0);
+		println!("{}", self.msg);
 		self
+	}
+	/// Log to stdout
+	pub fn log(&self) {
+		println!("{}", self.msg);
 	}
 }
 
@@ -170,9 +199,12 @@ fn log_user_message(
 	mut out: EventWriter<OnLogMessage>,
 	stdout: Option<Res<DebugToStdOut>>,
 ) {
-	let msg = OnLogMessage::new(format!("User: {}", &trigger.event().0));
+	let msg = OnLogMessage::new(
+		format!("User: {}", &trigger.event().0),
+		OnLogMessage::USER_COLOR,
+	);
 	if stdout.is_some() {
-		println!("{}", msg.0);
+		println!("{}", msg.msg);
 	}
 	out.send(msg);
 }
@@ -209,10 +241,14 @@ fn log_on_run(
 	mut out: EventWriter<OnLogMessage>,
 	stdout: Option<Res<DebugToStdOut>>,
 ) {
-	let msg =
-		OnLogMessage::new_with_query(ev.resolve_action(), &query, "OnRun");
+	let msg = OnLogMessage::new_with_query(
+		ev.resolve_action(),
+		&query,
+		"OnRun",
+		OnLogMessage::FLOW_COLOR,
+	);
 	if stdout.is_some() {
-		println!("{}", msg.0);
+		msg.log();
 	}
 	out.send(msg);
 }
@@ -229,9 +265,10 @@ fn log_on_run_result(
 		ev.resolve_action(),
 		&query,
 		&format!("{:?}", &ev.payload),
+		OnLogMessage::FLOW_COLOR,
 	);
 	if stdout.is_some() {
-		println!("{}", msg.0);
+		msg.log();
 	}
 	out.send(msg);
 }
@@ -245,9 +282,12 @@ fn log_running(
 		let name = name
 			.map(|n| n.to_string())
 			.unwrap_or_else(|| entity.to_string());
-		let msg = OnLogMessage::new(format!("Running: {}", name));
+		let msg = OnLogMessage::new(
+			format!("Running: {}", name),
+			OnLogMessage::FLOW_COLOR,
+		);
 		if stdout.is_some() {
-			println!("{}", msg.0);
+			msg.log();
 		}
 		out.send(msg);
 	}

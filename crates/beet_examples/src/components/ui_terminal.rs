@@ -59,7 +59,12 @@ fn log_on_message(
 			// style.color.set_alpha(0.);
 			parent.spawn(
 				// AccessibilityNode(NodeBuilder::new(Role::ListItem)),
-				(OutputItem, Text::new(&*msg.0), font()),
+				(
+					OutputItem,
+					Text::new(&*msg.msg),
+					TextColor(msg.color),
+					font(),
+				),
 			);
 		});
 	}
