@@ -26,12 +26,12 @@ Beet is a collection of crates for authoring and running web pages, games and AI
 
 | Crate                                            | Status | Description                                                       |
 | ------------------------------------------------ | ------ | ----------------------------------------------------------------- |
-| [`beet_flow`](crates/beet_flow/Cargo.toml)       | 🦢      | Scenes-as-control-flow bevy library for behavior trees etc        |
-| [`beet_spatial`](crates/beet_spatial/Cargo.toml) | 🐣      | Extend `beet_flow` with spatial behaviors like steering           |
-| [`beet_ml`](crates/beet_ml/Cargo.toml)           | 🐉      | Extend `beet_flow` with machine learning using `candle`           |
-| [`beet_sim`](crates/beet_sim/Cargo.toml)         | 🐉      | Extend `beet_flow` with generalized simulation tooling like stats |
-| [`beet_rsx`](crates/beet_rsx/Cargo.toml)         | 🐉      | Exploration of authoring tools for html and bevy                  |
-| [`beet_router`](crates/beet_router/Cargo.toml)   | 🐉      | File based router for web docs                                    |
+| [`beet_flow`](https://crates.io/crates/beet_flow)       | 🦢      | Scenes-as-control-flow bevy library for behavior trees etc        |
+| [`beet_spatial`](https://crates.io/crates/beet_spatial) | 🐣      | Extend `beet_flow` with spatial behaviors like steering           |
+| [`beet_ml`](https://crates.io/crates/beet_ml)           | 🐉      | Extend `beet_flow` with machine learning using `candle`           |
+| [`beet_sim`](https://crates.io/crates/beet_sim)         | 🐉      | Extend `beet_flow` with generalized simulation tooling like stats |
+| [`beet_rsx`](https://crates.io/crates/beet_rsx)         | 🐉      | Exploration of authoring tools for html and bevy                  |
+| [`beet_router`](https://crates.io/crates/beet_router)   | 🐉      | File based router for web docs                                    |
 
 The `beet` crate serves as a base crate that re-exports any combination of sub-crates according to feature flags, much like the `bevy` crate structure.
 

@@ -1,14 +1,14 @@
 # `beet_flow`
 
-Beet Flow is an ECS control flow library, built with [Bevy Observers][bevy-observers]. Being ECS first gives Beet a level of flexibility and modularity not usually found in control flow libraries.
+Beet Flow is an ECS control flow library, built with [Bevy Observers][bevy-observers]. Being ECS first gives Beet a high level of flexibility and modularity.
 
 Currently implemented paradigms:
 - [Behavior Trees](../../examples/flow/hello_world.rs)
 - [Long Running](../../examples/flow/long_running.rs)
 - [State Machines](../../examples/flow/state_machine.rs)
 - [Utility AI](../../examples/flow/utility_ai.rs)
-<!-- - [LLM Sentence Similarity](../../examples/hello_ml.rs)
-- [Reinforcement Learning](../../examples/frozen_lake_train.rs) -->
+- [LLM Sentence Similarity](../../examples/ml/hello_ml.rs)
+- [Reinforcement Learning](../../examples/ml/frozen_lake_train.rs)
 
 ## Hello World
 
@@ -18,6 +18,7 @@ Using `BeetDebugPlugin` will log the name of each action as it is triggered.
 ```rust
 use bevy::prelude::*;
 use beet_flow::prelude::*;
+
 let mut app = App::new();
 app
 	.add_plugins((
