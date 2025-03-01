@@ -41,6 +41,8 @@ pub fn crate_test_beet_example_plugin(app: &mut App) {
 }
 
 pub fn beet_example_plugin(app: &mut App) {
+	assert_local_assets();
+
 	app.add_plugins((
 		BeetFlowPlugin::default(),
 		BeetDebugPlugin::default(),
@@ -95,4 +97,32 @@ fn plugin_3d(app: &mut App) {
 		.register_type::<KeyboardController>()
 		.register_type::<CameraDistance>()
 		/*-*/;
+}
+fn assert_local_assets() {
+	#[cfg(target_arch = "wasm32")]
+	return;
+	#[allow(unreachable_code)]
+	if !std::path::Path::new("assets/README.md").exists() {
+		panic!(
+			r#"
+🥁🥁🥁
+	
+Welcome! This Beet example uses large assets that are stored remotely.
+Until bevy supports http asset sources these must be downloaded manually:
+
+Unix:
+
+curl -o ./assets.tar.gz https://bevyhub-public.s3.us-west-2.amazonaws.com/assets.tar.gz
+tar -xzvf ./assets.tar.gz
+rm ./assets.tar.gz
+
+Windows:
+
+1. Download https://bevyhub-public.s3.us-west-2.amazonaws.com/assets.tar.gz
+2. Unzip into `./assets`
+
+🥁🥁🥁
+"#
+		);
+	}
 }
