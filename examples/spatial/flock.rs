@@ -18,7 +18,7 @@ pub fn main() {
 		.run();
 }
 
-
+const NUM_AGENTS: usize = 300;
 const SCALE: f32 = 100.;
 
 fn setup(
@@ -28,7 +28,7 @@ fn setup(
 ) {
 	let ship = asset_server.load("spaceship_pack/ship_2.png");
 
-	for _ in 0..300 {
+	for _ in 0..NUM_AGENTS {
 		let position = Vec3::random_in_sphere(&mut rand).with_z(0.) * 500.;
 		commands.spawn((
 			Name::new("Spaceship"),

@@ -1,4 +1,4 @@
-//! Fetch is a combined example demonstrating the following behaviors:
+//! Fetch is an example that uses sentence similarity to decide what to do next, demonstrating the following behaviors:
 //! - Machine Learning
 //! - Animation
 //! - UI
@@ -7,8 +7,6 @@
 //! the [`Collectable`] component.
 //!
 //! Please wait for the status to change to `Idle` before issuing commands.
-//!
-//!
 //!
 use beet::examples::scenes;
 use beet::prelude::*;
