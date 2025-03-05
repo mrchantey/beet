@@ -48,7 +48,10 @@ impl RsxTemplateMap {
 		// i think here we need to pass the whole map for component template reloading
 		let template_root = self
 			.get(&location)
-			.ok_or_else(|| TemplateError::NoTemplate(location.clone()))?
+			.ok_or_else(|| TemplateError::NoTemplate {
+				received: self.clone(),
+				expected: location.clone(),
+			})?
 			.clone();
 		let node =
 			self.apply_template_for_node(template_root, &mut rusty_map)?;

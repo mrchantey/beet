@@ -25,7 +25,7 @@ fn app() -> RsxRoot {
 
 	rsx! {
 		<div>
-		<div id="label">The value aint {value}</div>
+		<div id="label">The value is {value}</div>
 		<button onclick={move |_| {
 			set_value(value2() + 2);
 		}}>increment</button>

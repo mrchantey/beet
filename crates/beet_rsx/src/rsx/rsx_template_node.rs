@@ -65,8 +65,13 @@ impl Default for RsxTemplateNode {
 pub enum TemplateError {
 	#[error("RsxNode has no tracker for {0}, ensure they are included in RstmlToRsx settings")]
 	DehydrationFailed(String),
-	#[error("No template found for {0:?}")]
-	NoTemplate(RsxMacroLocation),
+	#[error(
+		"No template found\nExpected: {expected:#?}\nReceived: {received:#?}"
+	)]
+	NoTemplate {
+		expected: RsxMacroLocation,
+		received: RsxTemplateMap,
+	},
 	#[error("Rusty Map is missing a tracker for {cx}\nExpected: {expected:#?}\nReceived: {received:#?}")]
 	NoRustyMap {
 		cx: String,

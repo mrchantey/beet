@@ -14,9 +14,11 @@ use std::hash::Hasher;
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct RsxMacroLocation {
 	/// in the macro this is set via file!(),
-	/// in the cli its set via the file path,
-	/// when setting this it must be in the same
-	/// format as file!() would return
+	/// in the cli its set via the file path.
+	/// When setting this it must be in the same
+	/// format as file!() would return, but with forward slashes.
+	/// We must use forward slashes because sometimes a wasm build will be used
+	/// in combination with a windows build, and the paths must match.
 	pub file: String,
 	pub line: usize,
 	pub col: usize,
@@ -27,7 +29,7 @@ impl Default for RsxMacroLocation {
 
 impl RsxMacroLocation {
 	pub fn new(file: impl Into<String>, line: usize, col: usize) -> Self {
-		let file = file.into();
+		let file = file.into().replace("\\", "/");
 		Self { file, line, col }
 	}
 	pub fn file(&self) -> &str { &self.file }
