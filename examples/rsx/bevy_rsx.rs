@@ -27,11 +27,10 @@ impl beet::prelude::Component for Counter {
 		let (get, set) = BevySignal::signal(self.initial);
 		let get2 = get.clone();
 		rsx! {
-			<entity runtime:bevy Button onclick=move |_|{
-				let val = get2.clone().get();
-				set(val + 1);
-			}>
-				"The value is "{get}
+			<entity runtime:bevy
+				Button
+				onclick=move |_|set(get.clone().get() + 1)>
+				"The value is "{get2}
 			</entity>
 		}
 	}

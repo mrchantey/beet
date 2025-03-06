@@ -29,8 +29,11 @@ fn setup(
 	asset_server: Res<AssetServer>,
 	mut ev: EventWriter<OnLogMessage>,
 ) {
-	ev.send(OnLogMessage::new("Agent: I can heal or attack, what should i do?")
-		.and_log());
+	ev.send(
+		OnLogMessage::new("Agent: I can heal or attack, what should i do?",
+		OnLogMessage::GAME_COLOR)
+		.and_log()
+	);
 
 	let bert = asset_server.load::<Bert>("ml/default-bert.ron");
 	commands

@@ -21,14 +21,14 @@ fn main() { BeetDom::hydrate(app); }
 
 fn app() -> RsxRoot {
 	let (value, set_value) = signal(0);
-	let value2 = value.clone();
 
 	rsx! {
 		<div>
-		<div id="label">The value is {value}</div>
-		<button onclick={move |_| {
-			set_value(value2() + 2);
-		}}>increment</button>
+			<span> howdy</span>
+			<div>"The value is "{value.clone()}</div>
+			<button onclick={move |_| set_value(value() + 1)}>
+				"increment the value"
+			</button>
 		</div>
 	}
 }

@@ -558,7 +558,7 @@ dependencies = [
 
 [[package]]
 name = "beet"
-version = "0.0.5-dev.2"
+version = "0.0.5-dev.3"
 dependencies = [
  "beet",
  "beet_examples",
@@ -577,7 +577,7 @@ dependencies = [
 
 [[package]]
 name = "beet-cli"
-version = "0.0.5-dev.2"
+version = "0.0.5-dev.3"
 dependencies = [
  "anyhow",
  "beet_router",
@@ -589,7 +589,7 @@ dependencies = [
 
 [[package]]
 name = "beet_examples"
-version = "0.0.5-dev.2"
+version = "0.0.5-dev.3"
 dependencies = [
  "anyhow",
  "beet_flow",
@@ -609,7 +609,7 @@ dependencies = [
 
 [[package]]
 name = "beet_flow"
-version = "0.0.5-dev.2"
+version = "0.0.5-dev.3"
 dependencies = [
  "anyhow",
  "beet_flow",
@@ -624,7 +624,7 @@ dependencies = [
 
 [[package]]
 name = "beet_flow_macros"
-version = "0.0.5-dev.2"
+version = "0.0.5-dev.3"
 dependencies = [
  "anyhow",
  "extend",
@@ -637,7 +637,7 @@ dependencies = [
 
 [[package]]
 name = "beet_ml"
-version = "0.0.5-dev.2"
+version = "0.0.5-dev.3"
 dependencies = [
  "anyhow",
  "beet_flow",
@@ -670,7 +670,7 @@ dependencies = [
 
 [[package]]
 name = "beet_router"
-version = "0.0.5-dev.2"
+version = "0.0.5-dev.3"
 dependencies = [
  "anyhow",
  "beet_router",
@@ -687,7 +687,7 @@ dependencies = [
 
 [[package]]
 name = "beet_router_parser"
-version = "0.0.5-dev.2"
+version = "0.0.5-dev.3"
 dependencies = [
  "anyhow",
  "beet_rsx",
@@ -705,7 +705,7 @@ dependencies = [
 
 [[package]]
 name = "beet_rsx"
-version = "0.0.5-dev.2"
+version = "0.0.5-dev.3"
 dependencies = [
  "anyhow",
  "beet_rsx",
@@ -737,7 +737,7 @@ dependencies = [
 
 [[package]]
 name = "beet_rsx_macros"
-version = "0.0.5-dev.2"
+version = "0.0.5-dev.3"
 dependencies = [
  "anyhow",
  "beet_rsx_parser",
@@ -751,7 +751,7 @@ dependencies = [
 
 [[package]]
 name = "beet_rsx_parser"
-version = "0.0.5-dev.2"
+version = "0.0.5-dev.3"
 dependencies = [
  "anyhow",
  "proc-macro2",
@@ -765,7 +765,7 @@ dependencies = [
 
 [[package]]
 name = "beet_sim"
-version = "0.0.5-dev.2"
+version = "0.0.5-dev.3"
 dependencies = [
  "anyhow",
  "beet_flow",
@@ -776,7 +776,7 @@ dependencies = [
 
 [[package]]
 name = "beet_site"
-version = "0.0.5-dev.2"
+version = "0.0.5-dev.3"
 dependencies = [
  "beet",
  "tokio",
@@ -784,7 +784,7 @@ dependencies = [
 
 [[package]]
 name = "beet_spatial"
-version = "0.0.5-dev.2"
+version = "0.0.5-dev.3"
 dependencies = [
  "anyhow",
  "beet_flow",
@@ -6622,7 +6622,6 @@ dependencies = [
 [[package]]
 name = "sweet"
 version = "0.3.0-rc.4"
-source = "git+https://github.com/mrchantey/sweet#bdf7a9a540a6e800d9be6c5a69e90fa11f518bff"
 dependencies = [
  "sweet_bevy",
  "sweet_fs",
@@ -6635,7 +6634,6 @@ dependencies = [
 [[package]]
 name = "sweet_bevy"
 version = "0.3.0-rc.4"
-source = "git+https://github.com/mrchantey/sweet#bdf7a9a540a6e800d9be6c5a69e90fa11f518bff"
 dependencies = [
  "anyhow",
  "bevy",
@@ -6651,7 +6649,6 @@ dependencies = [
 [[package]]
 name = "sweet_fs"
 version = "0.3.0-rc.4"
-source = "git+https://github.com/mrchantey/sweet#bdf7a9a540a6e800d9be6c5a69e90fa11f518bff"
 dependencies = [
  "anyhow",
  "clap",
@@ -6669,7 +6666,6 @@ dependencies = [
 [[package]]
 name = "sweet_server"
 version = "0.3.0-rc.4"
-source = "git+https://github.com/mrchantey/sweet#bdf7a9a540a6e800d9be6c5a69e90fa11f518bff"
 dependencies = [
  "anyhow",
  "axum",
@@ -6693,7 +6689,6 @@ dependencies = [
 [[package]]
 name = "sweet_test"
 version = "0.3.0-rc.4"
-source = "git+https://github.com/mrchantey/sweet#bdf7a9a540a6e800d9be6c5a69e90fa11f518bff"
 dependencies = [
  "anyhow",
  "backtrace",
@@ -6725,7 +6720,6 @@ dependencies = [
 [[package]]
 name = "sweet_test_macros"
 version = "0.3.0-rc.4"
-source = "git+https://github.com/mrchantey/sweet#bdf7a9a540a6e800d9be6c5a69e90fa11f518bff"
 dependencies = [
  "anyhow",
  "proc-macro2",
@@ -6736,7 +6730,6 @@ dependencies = [
 [[package]]
 name = "sweet_utils"
 version = "0.3.0-rc.4"
-source = "git+https://github.com/mrchantey/sweet#bdf7a9a540a6e800d9be6c5a69e90fa11f518bff"
 dependencies = [
  "anyhow",
  "bevy",
@@ -6753,7 +6746,6 @@ dependencies = [
 [[package]]
 name = "sweet_web"
 version = "0.3.0-rc.4"
-source = "git+https://github.com/mrchantey/sweet#bdf7a9a540a6e800d9be6c5a69e90fa11f518bff"
 dependencies = [
  "anyhow",
  "console_error_panic_hook",
