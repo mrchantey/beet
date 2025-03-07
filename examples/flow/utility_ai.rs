@@ -8,7 +8,10 @@ use sweet::prelude::EntityWorldMutwExt;
 #[rustfmt::skip]
 fn main() {
 	App::new()
-		.add_plugins((BeetFlowPlugin::default(),BeetDebugPlugin::default()))
+		.add_plugins((
+			BeetFlowPlugin::default(),
+			BeetDebugPlugin::default()
+		))
 		.world_mut()
 		.spawn((
 			Name::new("ScoreFlow will select the highest score"), 
