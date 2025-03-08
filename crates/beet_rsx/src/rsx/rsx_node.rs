@@ -56,7 +56,10 @@ impl RsxNode {
 			}
 			_ => {}
 		};
-		panic!("Expected empty fragment. Slot children must be empty before mapping to html, please call HtmlSlotsVisitor::apply\nreceived: {:#?}", self);
+		panic!(
+			"Expected empty fragment. Slot children must be empty before mapping to html, please call HtmlSlotsVisitor::apply\nreceived: {:#?}",
+			self
+		);
 	}
 
 	pub fn discriminant(&self) -> RsxNodeDiscriminants { self.into() }

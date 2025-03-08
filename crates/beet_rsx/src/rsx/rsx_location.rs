@@ -1,5 +1,5 @@
-use rapidhash::rapidhash;
 use rapidhash::RapidHasher;
+use rapidhash::rapidhash;
 use std::hash::Hasher;
 
 /// File location of an rsx macro, used by [RsxTemplate]

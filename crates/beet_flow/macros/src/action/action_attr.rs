@@ -1,9 +1,9 @@
-use crate::utils::punctuated_args;
 use crate::utils::CrateManifest;
+use crate::utils::punctuated_args;
 use proc_macro2::TokenStream;
 use quote::quote;
-use syn::parse_macro_input;
 use syn::DeriveInput;
+use syn::parse_macro_input;
 
 pub fn impl_action_attr(
 	attr: proc_macro::TokenStream,

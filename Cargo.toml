@@ -15,7 +15,7 @@ opt-level = 0
 [workspace.package]
 version = "0.0.5"
 authors = ["Peter Hayman"]
-edition = "2021"
+edition = "2024"
 description = "Tools for building reactive structures"
 documentation = "https://docs.rs/beet"
 readme = "README.md"

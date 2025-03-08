@@ -1,10 +1,10 @@
 use proc_macro2::TokenStream;
 use quote::quote;
 use quote::quote_spanned;
-use rstml::node::Node;
-use rstml::node::NodeName;
 use rstml::Parser;
 use rstml::ParserConfig;
+use rstml::node::Node;
+use rstml::node::NodeName;
 use std::collections::HashSet;
 use syn::spanned::Spanned;
 

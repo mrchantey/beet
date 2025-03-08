@@ -34,11 +34,11 @@ impl Bert {
 		// use std::str::FromStr;
 
 		// TODO more async stuff here
-		use candle_transformers::models::bert::HiddenAct;
 		use candle_transformers::models::bert::DTYPE;
-		use hf_hub::api::sync::Api;
+		use candle_transformers::models::bert::HiddenAct;
 		use hf_hub::Repo;
 		use hf_hub::RepoType;
+		use hf_hub::api::sync::Api;
 
 		let device = candle_core::Device::Cpu;
 
@@ -198,11 +198,8 @@ impl Bert {
 			.collect::<Vec<_>>();
 		//todo: async
 
-		self.closest_option_index(
-			target,
-			options.iter().map(|c| c.1 .0.clone()),
-		)
-		.map(|i| options[i].0)
+		self.closest_option_index(target, options.iter().map(|c| c.1.0.clone()))
+			.map(|i| options[i].0)
 	}
 
 	/// Returns the index of the option that is closest to the target.

@@ -28,7 +28,9 @@ pub impl<'w, T: ActionEvent> Trigger<'w, T> {
 	fn resolve_action(&self) -> Entity {
 		if self.action() == Entity::PLACEHOLDER {
 			if self.entity() == Entity::PLACEHOLDER {
-				panic!("OnRunAction must either specify an action or be triggered on an action entity");
+				panic!(
+					"OnRunAction must either specify an action or be triggered on an action entity"
+				);
 			} else {
 				self.entity()
 			}
@@ -67,7 +69,7 @@ impl<T: ResultPayload> ObserverEvent for OnResult<T> {
 
 /// Collect all [OnRunAction] with a [Name]
 #[cfg(test)]
-pub fn collect_on_run(world: &mut World) -> impl Fn() -> Vec<String> {
+pub fn collect_on_run(world: &mut World) -> impl use<> + Fn() -> Vec<String> {
 	let func = sweet::prelude::mock_bucket();
 	let func2 = func.clone();
 	world.add_observer(move |ev: Trigger<OnRunAction>, query: Query<&Name>| {
@@ -86,7 +88,7 @@ pub fn collect_on_run(world: &mut World) -> impl Fn() -> Vec<String> {
 #[cfg(test)]
 pub fn collect_on_result(
 	world: &mut World,
-) -> impl Fn() -> Vec<(String, RunResult)> {
+) -> impl use<> + Fn() -> Vec<(String, RunResult)> {
 	let func = sweet::prelude::mock_bucket();
 	let func2 = func.clone();
 	world.add_observer(

@@ -1,7 +1,7 @@
 use crate::prelude::*;
-use bevy::asset::io::Reader;
 use bevy::asset::AssetLoader;
 use bevy::asset::LoadContext;
+use bevy::asset::io::Reader;
 use bevy::utils::ConditionalSendFuture;
 use serde::de::DeserializeOwned;
 use std::marker::PhantomData;
@@ -12,9 +12,9 @@ pub struct QTableLoader<State: StateSpace, Action: ActionSpace> {
 }
 
 impl<
-		State: StateSpace + DeserializeOwned,
-		Action: ActionSpace + DeserializeOwned,
-	> AssetLoader for QTableLoader<State, Action>
+	State: StateSpace + DeserializeOwned,
+	Action: ActionSpace + DeserializeOwned,
+> AssetLoader for QTableLoader<State, Action>
 {
 	type Asset = QTable<State, Action>;
 	type Settings = ();

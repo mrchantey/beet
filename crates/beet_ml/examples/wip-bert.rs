@@ -1,15 +1,15 @@
 use candle_transformers::models::bert::BertModel;
 use candle_transformers::models::bert::Config;
-use candle_transformers::models::bert::HiddenAct;
 use candle_transformers::models::bert::DTYPE;
+use candle_transformers::models::bert::HiddenAct;
 
 use anyhow::Error as E;
 use anyhow::Result;
 use candle_core::Tensor;
 use candle_nn::VarBuilder;
-use hf_hub::api::sync::Api;
 use hf_hub::Repo;
 use hf_hub::RepoType;
+use hf_hub::api::sync::Api;
 use tokenizers::PaddingParams;
 use tokenizers::Tokenizer;
 

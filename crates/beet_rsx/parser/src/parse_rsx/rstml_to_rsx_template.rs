@@ -1,8 +1,8 @@
 use crate::prelude::*;
 use proc_macro2::Literal;
 use proc_macro2::TokenStream;
-use quote::quote;
 use quote::ToTokens;
+use quote::quote;
 use rstml::atoms::OpenTag;
 use rstml::node::CustomNode;
 use rstml::node::Node;

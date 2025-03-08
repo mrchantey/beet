@@ -2,11 +2,11 @@ use crate::prelude::*;
 use js_sys::Array;
 use js_sys::Reflect;
 use std::cell::RefCell;
-use wasm_bindgen::prelude::Closure;
 use wasm_bindgen::JsCast;
 use wasm_bindgen::JsValue;
-use web_sys::window;
+use wasm_bindgen::prelude::Closure;
 use web_sys::Event;
+use web_sys::window;
 
 pub struct EventRegistry;
 

@@ -49,17 +49,17 @@ pub trait DiscreteSpace:
 	// fn sample(&self) -> Self::Value;
 }
 impl<
-		T: 'static
-			+ Send
-			+ Sync
-			+ Debug
-			+ Hash
-			+ Clone
-			+ PartialEq
-			+ Eq
-			+ Component
-			+ TypePath,
-	> DiscreteSpace for T
+	T: 'static
+		+ Send
+		+ Sync
+		+ Debug
+		+ Hash
+		+ Clone
+		+ PartialEq
+		+ Eq
+		+ Component
+		+ TypePath,
+> DiscreteSpace for T
 {
 }
 

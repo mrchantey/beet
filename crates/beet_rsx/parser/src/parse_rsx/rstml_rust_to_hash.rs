@@ -3,8 +3,8 @@ use proc_macro2::TokenStream;
 use quote::ToTokens;
 use rapidhash::RapidHasher;
 use rstml::node::NodeAttribute;
-use rstml::visitor::visit_nodes;
 use rstml::visitor::Visitor;
+use rstml::visitor::visit_nodes;
 use std::hash::Hash;
 
 

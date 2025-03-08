@@ -31,13 +31,9 @@ Beet is a set of tools for building reactive structures. Your mileage may vary d
 | [`beet_router`](https://crates.io/crates/beet_router)   | 🐉      | File based router for websites                                    |
 | [`beet-cli`](https://crates.io/crates/beet-cli)         | 🐉      | CLI for beet authoring tools                                      |
 
-#### Status Keys
-
-|     |                                      |
-| --- | ------------------------------------ |
-| 🦢   | documented and tested                |
-| 🐣   | docs and tests are incomplete        |
-| 🐉   | highly experimental, here be dragons |
+- 🦢 documented and tested
+- 🐣 docs and tests are incomplete
+- 🐉 highly experimental, here be dragons
 
 
 ## Bevy Versions

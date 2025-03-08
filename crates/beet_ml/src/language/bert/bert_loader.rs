@@ -1,7 +1,7 @@
 use crate::prelude::*;
-use bevy::asset::io::Reader;
 use bevy::asset::AssetLoader;
 use bevy::asset::LoadContext;
+use bevy::asset::io::Reader;
 use bevy::utils::ConditionalSendFuture;
 
 #[derive(Default)]

@@ -1,7 +1,7 @@
 use proc_macro2::Literal;
 use proc_macro2::TokenStream;
-use quote::quote;
 use quote::ToTokens;
+use quote::quote;
 use rapidhash::rapidhash;
 
 /// Used by [RstmlToRsx] *and* [RstmlToRsxTemplate] to assign a rusty tracker,

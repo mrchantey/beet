@@ -1,9 +1,9 @@
 use crate::prelude::*;
 use wasm_bindgen::JsCast;
-use web_sys::window;
 use web_sys::Document;
 use web_sys::Element;
 use web_sys::Text;
+use web_sys::window;
 
 /// A hydrator for working with the dom
 pub struct BrowserDomTarget {

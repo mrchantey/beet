@@ -143,9 +143,13 @@ fn health_handler(
 		if health.0 > 0. {
 			continue;
 		} else if name.as_str() == "Malenia" {
-			println!("👩\tMalenia says: 'Your strength, extraordinary...'\n✅\tYou win!");
+			println!(
+				"👩\tMalenia says: 'Your strength, extraordinary...'\n✅\tYou win!"
+			);
 		} else {
-			println!("👩\tMalenia says: 'I am Malenia. Blade of Miquella'\n❌\tYou lose");
+			println!(
+				"👩\tMalenia says: 'I am Malenia. Blade of Miquella'\n❌\tYou lose"
+			);
 		}
 		exit.send(AppExit::Success);
 	}

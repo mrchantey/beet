@@ -16,9 +16,9 @@ pub mod rstml_to_rsx;
 #[allow(unused_imports)]
 pub use self::rstml_to_rsx::*;
 use proc_macro2::TokenStream;
-use syn::visit_mut::VisitMut;
 use syn::Expr;
 use syn::File;
+use syn::visit_mut::VisitMut;
 
 
 #[derive(Debug, Clone)]

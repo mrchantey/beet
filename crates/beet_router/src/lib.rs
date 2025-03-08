@@ -13,12 +13,12 @@ pub mod static_file_router;
 
 
 pub mod prelude {
+	pub use crate::DefaultFileRouter;
 	pub use crate::beet_html::*;
 	#[cfg(feature = "bevy")]
 	pub use crate::bevy::*;
 	pub use crate::file_router::*;
 	pub use crate::static_file_router::*;
-	pub use crate::DefaultFileRouter;
 	#[cfg(feature = "parser")]
 	pub use beet_router_parser::prelude::*;
 }

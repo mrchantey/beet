@@ -2,16 +2,16 @@ use forky::web::HtmlEventListener;
 use forky::web::HtmlEventWaiter;
 use js_sys::Uint8Array;
 use std::time::Duration;
-use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
+use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::JsFuture;
-use web_sys::window;
 use web_sys::Cache;
 use web_sys::Event;
 use web_sys::IdbDatabase;
 use web_sys::Request;
 use web_sys::RequestInit;
 use web_sys::Response;
+use web_sys::window;
 
 
 //https://developer.mozilla.org/en-US/docs/Web/API/Storage_API/Storage_quotas_and_eviction_criteria#how_much_data_can_be_stored
