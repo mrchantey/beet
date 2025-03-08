@@ -13,10 +13,10 @@ opt-level = 0
 opt-level = 0
 
 [workspace.package]
-version = "0.0.5-dev.3"
+version = "0.0.5"
 authors = ["Peter Hayman"]
 edition = "2021"
-description = "Tools for next-gen applications"
+description = "Tools for building reactive structures"
 documentation = "https://docs.rs/beet"
 readme = "README.md"
 homepage = "https://docs.rs/beet"
@@ -55,23 +55,23 @@ members = [
 
 [workspace.dependencies]
 ## internal
-beet = { path = "", version = "0.0.5-dev.3", default-features = false }
-beet_spatial = { path = "crates/beet_spatial", version = "0.0.5-dev.3", default-features = false }
-beet_examples = { path = "crates/beet_examples", version = "0.0.5-dev.3" }
-beet_flow = { path = "crates/beet_flow", version = "0.0.5-dev.3" }
-beet_flow_macros = { path = "crates/beet_flow/macros", version = "0.0.5-dev.3" }
-beet_ml = { path = "crates/beet_ml", version = "0.0.5-dev.3" }
-beet_router = { path = "crates/beet_router", version = "0.0.5-dev.3" }
-beet_router_parser = { path = "crates/beet_router/parser", version = "0.0.5-dev.3" }
-beet_rsx = { path = "crates/beet_rsx", version = "0.0.5-dev.3" }
-beet_rsx_macros = { path = "crates/beet_rsx/macros", version = "0.0.5-dev.3" }
-beet_rsx_parser = { path = "crates/beet_rsx/parser", version = "0.0.5-dev.3" }
-beet_sim = { path = "crates/beet_sim", version = "0.0.5-dev.3" }
+beet = { path = "", version = "0.0.5", default-features = false }
+beet_spatial = { path = "crates/beet_spatial", version = "0.0.5", default-features = false }
+beet_examples = { path = "crates/beet_examples", version = "0.0.5" }
+beet_flow = { path = "crates/beet_flow", version = "0.0.5" }
+beet_flow_macros = { path = "crates/beet_flow/macros", version = "0.0.5" }
+beet_ml = { path = "crates/beet_ml", version = "0.0.5" }
+beet_router = { path = "crates/beet_router", version = "0.0.5" }
+beet_router_parser = { path = "crates/beet_router/parser", version = "0.0.5" }
+beet_rsx = { path = "crates/beet_rsx", version = "0.0.5" }
+beet_rsx_macros = { path = "crates/beet_rsx/macros", version = "0.0.5" }
+beet_rsx_parser = { path = "crates/beet_rsx/parser", version = "0.0.5" }
+beet_sim = { path = "crates/beet_sim", version = "0.0.5" }
 
 #💡 local
 # bevyhub = { git = "https://github.com/mrchantey/bevyhub", default-features = false }
-# sweet = { version = "0.3.0-rc.4" }
-sweet = { path = "../sweet" }
+sweet = { version = "0.3.0" }
+# sweet = { path = "../sweet" }
 # sweet = { git = "https://github.com/mrchantey/sweet" }
 
 bevy = { version = "0.15", default-features = false, features = ["bevy_color"] }
@@ -129,10 +129,8 @@ wasm-bindgen-futures = "0.4"
 console_error_panic_hook = "0.1"
 web-sys = "0.3"
 
-# 💡 Package
-
 [package]
-name = "beet"                  #💡 game
+name = "beet"                  
 version.workspace = true
 edition.workspace = true
 description.workspace = true
