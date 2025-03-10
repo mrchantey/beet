@@ -6,7 +6,9 @@
 # just test-ci
 # ```
 #
+
 #💡 Init
+
 set windows-shell := ["C:/tools/cygwin/bin/sh.exe","-c"]
 set dotenv-load
 crates := 'beet beet_spatial beet_flow'
@@ -99,24 +101,7 @@ run-beet-site:
 	-p beet_site \
 	--serve-dir target/client \	
 
-
-## common
-cmd *args:
-	cd /cygdrive/c/work/beet && {{args}}
-
-export-scenes *args:
-	cargo run --example export_scenes {{args}}
-
-app *args:
-	cargo run --example app {{args}}
-
-# blocked on #https://github.com/bevyengine/bevy/issues/14300
-hello-world:
-	just app \
-	./scenes/beet-debug.json \
-	../bevyhub/scenes/camera-2d.json \
-	../bevyhub/scenes/ui-terminal-input.json \
-	./scenes/hello-world.json
+#💡 Test
 
 # Run tests for ci,
 # cargo test --workspace runs with 16MB stack and max 8 cores
@@ -172,22 +157,7 @@ pws *args:
 tree:
 	cargo tree --depth=2 -e=no-dev
 
-#### WEB EXAMPLES #####################################################
-
-
-# Build wasm files, pass --no-build to just update scenes and registries
-bevyhub-build *args:
-	just export-scenes
-	bevyhub build \
-	--example app \
-	--release \
-	--copy-local ../bevyhub-apps \
-	--copy-scenes scenes \
-	--copy-registries target/registries {{args}}
-	bevyhub build \
-	--example app_ml \
-	--release \
-	--copy-local ../bevyhub-apps {{args}}
+#💡 WEB EXAMPLES
 
 # Build a wasm example for the given crate and place the
 # generated files in target/wasm-example/wasm
@@ -200,7 +170,7 @@ build-wasm crate example *args:
 	--no-typescript \
 	~/.cargo_target/wasm32-unknown-unknown/debug/examples/{{example}}.wasm
 
-### MISC
+#💡 Misc
 
 expand crate example *args:
 	just watch 'cargo expand -p {{crate}} --example {{example}} {{args}}'
@@ -217,22 +187,23 @@ publish-all *args:
 	just publish beet_flow            {{args}} || true
 	just publish beet_spatial         {{args}} || true
 	just publish beet_ml              {{args}} || true
+	just publish beet_server       		{{args}} || true
 	just publish beet_sim          		{{args}} || true
 	just publish beet_rsx_parser      {{args}} || true
 	just publish beet_rsx_macros      {{args}} || true
 	just publish beet_rsx             {{args}} || true
 	just publish beet_router_parser   {{args}} || true
 	just publish beet_router          {{args}} || true
+	just publish beet_examples        {{args}} || true
 	just publish beet                 {{args}} || true
 	just publish beet-cli             {{args}} || true
 # just publish beet_examples        {{args}} || true
 
 watch *command:
-	forky watch \
-	-w '**/*.rs' \
-	-i '{.git,target,html}/**' \
-	-i '**/mod.rs' \
-	-- {{command}}
+	sweet watch \
+	--include '**/*.rs' \
+	--exclude '{.git,target,html}/**' \
+	--cmd "{{command}}"
 
 copy-web-assets:
 	mkdir -p target/wasm/assets || true
@@ -265,77 +236,6 @@ assets-pull:
 	tar -xzvf ./assets.tar.gz
 	rm ./assets.tar.gz
 
-
-
-### TEST SCENE LOADS
-
-test-fetch:
-	cargo run --example app_ml \
-	../bevyhub/scenes/ui-terminal-input.json \
-	../bevyhub/scenes/lighting-3d.json \
-	../bevyhub/scenes/ground-3d.json \
-	./scenes/beet-debug.json \
-	./scenes/fetch-scene.json \
-	./scenes/fetch-npc.json \
-
-
-test-flock:
-	cargo run --example app \
-	../bevyhub/scenes/camera-2d.json \
-	../bevyhub/scenes/space-scene.json \
-	./scenes/beet-debug.json \
-	./scenes/flock.json \
-
-test-seek:
-	cargo run --example app \
-	../bevyhub/scenes/camera-2d.json \
-	../bevyhub/scenes/space-scene.json \
-	./scenes/beet-debug.json \
-	./scenes/seek.json \
-
-test-frozen-lake-train:
-	cargo run --example app_ml \
-	../bevyhub/scenes/lighting-3d.json \
-	./scenes/frozen-lake-scene.json \
-	./scenes/frozen-lake-train.json \
-
-test-frozen-lake-run:
-	cargo run --example app_ml \
-	../bevyhub/scenes/lighting-3d.json \
-	./scenes/frozen-lake-scene.json \
-	./scenes/frozen-lake-run.json \
-
-test-hello-animation:
-	cargo run --example app \
-	../bevyhub/scenes/ui-terminal.json \
-	../bevyhub/scenes/lighting-3d.json \
-	../bevyhub/scenes/ground-3d.json \
-	./scenes/beet-debug.json \
-	./scenes/hello-animation.json \
-
-test-hello-ml:
-	cargo run --example app_ml \
-	../bevyhub/scenes/camera-2d.json \
-	../bevyhub/scenes/ui-terminal-input.json \
-	./scenes/beet-debug.json \
-	./scenes/hello-ml.json \
-
-test-hello-world:
-	cargo run --example app \
-	../bevyhub/scenes/camera-2d.json \
-	../bevyhub/scenes/ui-terminal.json \
-	./scenes/beet-debug.json \
-	./scenes/hello-world.json \
-
-test-seek-3d:
-	cargo run --example app \
-	../bevyhub/scenes/ui-terminal.json \
-	../bevyhub/scenes/lighting-3d.json \
-	../bevyhub/scenes/ground-3d.json \
-	./scenes/beet-debug.json \
-	./scenes/seek-3d.json \
-
-
 # https://gist.github.com/stephenhardy/5470814
 # 1. Remove the history
 # 2. recreate the repos from the current content only
@@ -356,3 +256,9 @@ very-scary-purge-commit-history:
 # Cargo search but returns one line
 search *args:
 	cargo search {{args}} | head -n 1
+
+
+#💡 Server
+
+lambda-watch:
+	cd crates/beet_server && cargo lambda watch --example lambda_axum

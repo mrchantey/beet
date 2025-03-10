@@ -1,0 +1,40 @@
+[package]
+name = "beet_server"
+version.workspace = true
+edition.workspace = true
+description = "Serve applications with axum and deploy with cargo-lambda."
+documentation.workspace = true
+readme = "README.md"
+homepage.workspace = true
+repository.workspace = true
+license.workspace = true
+keywords.workspace = true
+categories.workspace = true
+publish = true
+
+[features]
+default = ["lambda"]
+lambda = ["dep:lambda_http"]
+toml = ["dep:cargo-manifest", "dep:toml", "dep:semver"]
+
+
+[dependencies]
+anyhow.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+http.workspace = true
+http-body-util.workspace = true
+bytes.workspace = true
+
+tokio.workspace = true
+axum = { version = "0.8", features = ["macros"] }
+tower = "0.5"
+tower-http = { version = "0.6", features = ["trace", "fs"] }
+lambda_http = { version = "0.14", optional = true }
+
+semver = { version = "1", optional = true }
+toml = { version = "0.8", optional = true }
+cargo-manifest = { version = "0.19", optional = true }
+
+[dev-dependencies]
+sweet = { workspace = true, features = ["test"] }

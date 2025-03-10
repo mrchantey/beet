@@ -11,6 +11,8 @@ pub use beet_ml as ml;
 pub use beet_router as router;
 #[cfg(feature = "rsx")]
 pub use beet_rsx as rsx;
+#[cfg(feature = "server")]
+pub use beet_server as server;
 #[cfg(feature = "sim")]
 pub use beet_sim as sim;
 #[cfg(feature = "spatial")]
@@ -27,6 +29,8 @@ pub mod prelude {
 	pub use crate::router::prelude::*;
 	#[cfg(feature = "rsx")]
 	pub use crate::rsx::prelude::*;
+	#[cfg(feature = "server")]
+	pub use crate::server::prelude::*;
 	#[cfg(feature = "sim")]
 	pub use crate::sim::prelude::*;
 	#[cfg(feature = "spatial")]
