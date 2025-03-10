@@ -6,7 +6,7 @@ use beet::prelude::*;
 pub fn get(_state: DefaultAppState) -> RsxRoot {
 	let val = 44;
 	rsx! {
-		<PageLayout title="fooba".into()>
+		<PageLayout title="Beet".into()>
 			<meta
 				slot="head"
 				name="description"

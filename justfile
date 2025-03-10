@@ -262,3 +262,18 @@ search *args:
 
 lambda-watch:
 	cd crates/beet_server && cargo lambda watch --example lambda_axum
+
+
+lambda-deploy *args:
+	cargo lambda build 					\
+	--package beet_site					\
+	--features lambda						\
+	--release
+	cargo lambda deploy			 		\
+	beet 												\
+	--binary-name beet_site			\
+	--region us-west-2 					\
+	--iam-role $AWS_IAM_ROLE 		\
+	--enable-function-url 			\
+	--include target/client 		\
+	{{args}}

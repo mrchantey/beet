@@ -27,8 +27,9 @@ pub fn state_utils_routes() -> Router {
 
 async fn app_info(State(uptime): State<Uptime>) -> Html<String> {
 	// let version = CargoManifest::bevyhub_repo_crate_version();
-	let name = env!("CARGO_PKG_NAME");
-	let version = env!("CARGO_PKG_VERSION");
+	let name = std::env::var("CARGO_PKG_NAME").unwrap_or("unknown".into());
+	let version =
+		std::env::var("CARGO_PKG_VERSION").unwrap_or("unknown".into());
 	Html(format!(
 		r#"
 <h1>App Info</h1>

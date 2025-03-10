@@ -1,6 +1,3 @@
-use anyhow::Result;
-use axum::Router;
-
 mod axum_ext;
 pub use axum_ext::*;
 mod layers;
@@ -8,17 +5,10 @@ pub use layers::*;
 mod state;
 pub use state::*;
 
+use anyhow::Result;
+use axum::Router;
 
-
-pub fn default_router_base() -> Router {
-	Router::new()
-		.merge(state_utils_routes())
-		.fallback_service(file_and_error_handler("target"))
-}
-
-
-
-/// Runs the axum router indefinitely.
+/// Sets up tracing and runs the axum server.
 /// If the router contains an app state ensure it is initialized
 /// using `.with_state()` before passing it to this function.
 pub async fn run_axum(router: Router) -> Result<()> {

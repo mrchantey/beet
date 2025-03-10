@@ -9,7 +9,6 @@ pub mod prelude {
 
 use anyhow::Result;
 use beet::prelude::*;
-use beet::server::axum::Router;
 
 pub async fn build_static() -> Result<()> {
 	println!("rebuilding html files");
@@ -19,8 +18,8 @@ pub async fn build_static() -> Result<()> {
 	Ok(())
 }
 
-#[rustfmt::skip]
-pub async fn router() -> Router {
-	Router::new()
-		.merge(default_router_base())
-}
+// #[rustfmt::skip]
+// pub fn beet_site_server() -> Router {
+// 	Router::new()
+// 		.merge(default_router_base())
+// }

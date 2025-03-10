@@ -11,6 +11,13 @@ repository.workspace = true
 categories.workspace = true
 keywords.workspace = true
 
+# use 'server' feature to build a server
+# no-default-features to build a static site
+[features]
+# default = ["server"]
+axum = []
+lambda = []
+
 [[bin]]
 name = "beet_site"
 path = "src/main.rs"

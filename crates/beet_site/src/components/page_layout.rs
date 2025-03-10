@@ -20,7 +20,7 @@ impl Component for PageLayout {
 				<nav>
 					<a href="/">Home</a>
 					<a href="/contributing">Contributing</a>
-					<a href="/contributing">Foobarbazz</a>
+					<a href="/contributing">Foobarbsazz</a>
 				</nav>
 					<slot/>
 					<style>
@@ -33,11 +33,11 @@ impl Component for PageLayout {
 						}
 					</style>
 					<style scope:global>
-					body{
-						margin:0;
-						background-color: black;
-						color:white;
-					}
+						body{
+							margin:0;
+							background-color: black;
+							color:white;
+						}
 					</style>
 				</body>
 			</html>
