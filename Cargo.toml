@@ -36,6 +36,7 @@ publish = false
 # default resolver
 resolver = "2"
 members = [
+	"crates/beet_design",
 	"crates/beet_examples",
 	"crates/beet_flow",
 	"crates/beet_flow/macros",
@@ -57,6 +58,7 @@ members = [
 [workspace.dependencies]
 ## internal
 beet = { path = "", version = "0.0.5", default-features = false }
+beet_design = { path = "crates/beet_design", version = "0.0.5", default-features = false }
 beet_spatial = { path = "crates/beet_spatial", version = "0.0.5", default-features = false }
 beet_examples = { path = "crates/beet_examples", version = "0.0.5" }
 beet_flow = { path = "crates/beet_flow", version = "0.0.5" }
@@ -153,7 +155,7 @@ default = ["flow"]
 examples = ["bevy_default", "dep:beet_examples"]
 flow = ["dep:beet_flow"]
 router = ["rsx", "dep:beet_router", "beet_router/parser"]
-rsx = ["dep:beet_rsx"]
+rsx = ["dep:beet_rsx", "dep:beet_design"]
 ml = ["flow", "dep:beet_ml"]
 server = ["dep:beet_server"]
 spatial = ["flow", "dep:beet_spatial", "beet_ml?/spatial"]
@@ -178,8 +180,9 @@ bevy_default = [
 # dynamic_linking = ["bevy/dynamic_linking"]
 
 [dependencies]
-beet_flow = { workspace = true, optional = true }
+beet_design = { workspace = true, optional = true }
 beet_examples = { workspace = true, optional = true }
+beet_flow = { workspace = true, optional = true }
 beet_ml = { workspace = true, optional = true }
 beet_router = { workspace = true, optional = true }
 beet_rsx = { workspace = true, optional = true }

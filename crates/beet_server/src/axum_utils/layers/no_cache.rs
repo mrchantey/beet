@@ -1,6 +1,6 @@
 use axum::extract::Request;
-use axum::http::header;
 use axum::http::HeaderValue;
+use axum::http::header;
 use axum::middleware::Next;
 use axum::response::IntoResponse;
 use axum::response::Response;
@@ -25,4 +25,3 @@ pub fn append_no_cache_headers(val: impl IntoResponse) -> Response {
 
 	response
 }
-

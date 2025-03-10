@@ -1,3 +1,4 @@
+#[allow(unused)]
 use beet::prelude::*;
 #[allow(unused)]
 use beet_site::prelude::*;
@@ -10,7 +11,7 @@ async fn main() {
 	#[cfg(all(not(feature = "axum"), not(feature = "lambda")))]
 	build_static().await.unwrap();
 	// 2. build server locally in debug mode
-	#[cfg(all(feature = "axum", not(feature = "lambda")))]
+	#[cfg(feature = "axum")]
 	BeetServer {
 		public_dir: "target/client".into(),
 	}

@@ -1,5 +1,5 @@
 /// Specify the environment of the api
-/// 
+///
 /// The default value will be resolved by [`ApiEnvironment::get`]
 /// 1. if `API_ENV` is set to local,staging,prod, use that value
 /// 2. Otherwise use `debug_assertions` to determine if it should be local or prod

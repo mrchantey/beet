@@ -611,6 +611,7 @@ name = "beet"
 version = "0.0.5"
 dependencies = [
  "beet",
+ "beet_design",
  "beet_examples",
  "beet_flow",
  "beet_ml",
@@ -636,6 +637,13 @@ dependencies = [
  "rapidhash",
  "sweet",
  "tokio",
+]
+
+[[package]]
+name = "beet_design"
+version = "0.0.5"
+dependencies = [
+ "beet_rsx",
 ]
 
 [[package]]
