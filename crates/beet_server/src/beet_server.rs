@@ -4,7 +4,8 @@ use axum::Router;
 
 
 
-
+/// The main server struct for Beet.
+/// By default a file server will be used as a fallback.
 pub struct BeetServer {
 	pub public_dir: String,
 	/// Serve via cargo-lambda instead of axum

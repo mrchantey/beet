@@ -1,6 +1,11 @@
 mod api_environment;
 pub use api_environment::*;
 mod uptime;
+use lambda_http::tracing::Level;
+use tower_http::trace::TraceLayer;
+use tower_http::trace::{
+	self,
+};
 pub use uptime::*;
 
 use axum::Router;
@@ -14,15 +19,15 @@ pub fn state_utils_routes() -> Router {
 		.route("/app-info", get(app_info))
 		.route("/health-check", get(health_check))
 		.with_state(Uptime::new())
-	// .layer(
-	// 	TraceLayer::new_for_http()
-	// 		.make_span_with(
-	// 			trace::DefaultMakeSpan::new().level(Level::INFO),
-	// 		)
-	// 		.on_response(
-	// 			trace::DefaultOnResponse::new().level(Level::INFO),
-	// 		),
-	// )
+		.layer(
+			TraceLayer::new_for_http()
+				.make_span_with(
+					trace::DefaultMakeSpan::new().level(Level::INFO),
+				)
+				.on_response(
+					trace::DefaultOnResponse::new().level(Level::INFO),
+				),
+		)
 }
 
 async fn app_info(State(uptime): State<Uptime>) -> Html<String> {
