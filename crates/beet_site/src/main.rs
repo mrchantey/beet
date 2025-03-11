@@ -16,6 +16,7 @@ async fn main() -> Result<()> {
 		lambda: false,
 		#[cfg(feature = "lambda")]
 		lambda: true,
+		..Default::default()
 	}
 	.serve()
 	.await;

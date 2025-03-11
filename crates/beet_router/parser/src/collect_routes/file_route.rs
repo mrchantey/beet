@@ -38,6 +38,10 @@ impl FileRoute {
 		let mut url_path = file_relative_path.replace(".rs", "");
 		if url_path.ends_with("index") {
 			url_path = url_path.replace("index", "");
+			// remove trailing / from non root paths
+			if url_path.len() > 1 {
+				url_path.pop();
+			}
 		}
 
 
