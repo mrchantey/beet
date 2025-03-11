@@ -12,10 +12,16 @@ pub struct ParseDirRoutes;
 
 
 impl ParseDirRoutes {
+	/// Visit all rust files non-recursively and collect
+	/// any routes in the file.
 	pub fn build_string(config: &CollectRoutes, path: &Path) -> Result<String> {
 		let routes_dir_name = config.routes_dir.to_string_lossy();
 		let page_routes = ReadDir::files(path)?
 			.into_iter()
+			.filter(|path| {
+				path.extension().map_or(false, |ext| ext == "rs")
+					&& path.file_name().map_or(false, |f| f != "mod.rs")
+			})
 			.map(|path| ParseFileRoutes::parse(&routes_dir_name, path))
 			.collect::<Result<Vec<_>>>()?
 			.into_iter()

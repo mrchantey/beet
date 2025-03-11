@@ -66,6 +66,7 @@ impl FsSrcPlugin {
 
 					match ReadFile::to_string(&path) {
 						Ok(value) => {
+							el.self_closing = false;
 							el.children = Box::new(RsxNode::Text {
 								idx: rsx_idx_invalid(),
 								value,
@@ -88,10 +89,20 @@ mod test {
 
 	#[test]
 	fn works() {
-		let mut root = rsx! {<script src="missing" />};
-		expect(FsSrcPlugin::default().apply(&mut root)).to_be_err();
+		// relative ignored
+		expect(
+			FsSrcPlugin::default()
+				.apply(&mut rsx! { <script src="/missing" /> }),
+		)
+		.to_be_ok();
+		// missing errors
+		expect(
+			FsSrcPlugin::default()
+				.apply(&mut rsx! { <script src="missing" /> }),
+		)
+		.to_be_err();
 
-		let mut root = rsx! {<script src="test.js" />};
+		let mut root = rsx! { <script src="test.js" /> };
 		expect(FsSrcPlugin::default().apply(&mut root)).to_be_ok();
 
 		let RsxNode::Element(el) = &root.node else {

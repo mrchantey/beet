@@ -71,8 +71,22 @@ impl CollectRoutes {
 	}
 }
 
-
 #[cfg(test)]
 mod test {
-	// indirectly testd via build_test_site.rs
+	use crate::prelude::*;
+	use sweet::prelude::*;
+
+	#[test]
+	fn works() {
+		let src =
+			FsExt::workspace_root().join("crates/beet_router/src/test_site");
+		let config = CollectRoutes {
+			src,
+			..Default::default()
+		};
+
+		let paths = config.build_strings().unwrap();
+		expect(paths.len()).to_be(2);
+		// println!("{:#?}", paths);
+	}
 }

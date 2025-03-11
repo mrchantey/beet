@@ -11,32 +11,40 @@ use sweet::prelude::ReadFile;
 
 
 /// determine if a compilation is required due to rust code changes
-/// by hashing an entire file
+/// by hashing an entire file.
+/// Non-rust files can also be handled
 pub struct HashRsxFile {
 	hasher: RapidHasher,
 }
 
-impl Default for HashRsxFile {
-	fn default() -> Self {
+impl HashRsxFile {
+	/// (private) create a new hasher
+	fn new() -> Self {
 		Self {
 			hasher: RapidHasher::default_const(),
 		}
 	}
-}
 
-impl HashRsxFile {
+	/// hash only the code parts of a file. if the file does not have a rust extension
+	/// the entire file will be hashed.
 	pub fn file_to_hash(path: &Path) -> Result<u64> {
 		let file = ReadFile::to_string(path)?;
-		// parse to file or it will be a string literal
-		let file = syn::parse_file(&file)?;
-		let mut this = Self::default();
-		this.walk_tokens(file.to_token_stream())?;
-		Ok(this.hasher.finish())
+		if path.extension().map_or(false, |ext| ext == "rs") {
+			// parse to file or it will be a string literal
+			let file = syn::parse_file(&file)?;
+			let mut this = Self::new();
+			this.walk_tokens(file.to_token_stream())?;
+			Ok(this.hasher.finish())
+		} else {
+			let mut hasher = Self::new().hasher;
+			hasher.write(file.as_bytes());
+			return Ok(hasher.finish());
+		}
 	}
 
 	/// # Errors
 	/// If the file cannot be read or parsed as tokens
-	pub fn walk_tokens(&mut self, tokens: TokenStream) -> Result<()> {
+	fn walk_tokens(&mut self, tokens: TokenStream) -> Result<()> {
 		let mut iter = tokens.into_iter().peekable();
 		while let Some(tree) = iter.next() {
 			// println!("visiting tree: {}", tree.to_string());
@@ -89,7 +97,7 @@ mod test {
 	#[rustfmt::skip]
 	fn works() {		
 		fn hash(tokens: TokenStream) -> u64 {
-			let mut hasher = HashRsxFile::default();
+			let mut hasher = HashRsxFile::new();
 			hasher.walk_tokens(tokens).unwrap();
 			hasher.hasher.finish()
 		}

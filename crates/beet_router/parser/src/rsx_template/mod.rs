@@ -80,18 +80,23 @@ impl BuildRsxTemplateMap {
 		Ok(map)
 	}
 
-
+	/// get all the rsx macros in this file.
+	/// If it doesnt have a rust extension an empty vec is returned
 	fn file_templates(
 		&self,
 		path: PathBuf,
 	) -> Result<Vec<(RsxMacroLocation, TokenStream)>> {
-		let file = ReadFile::to_string(&path)?;
-		let file = syn::parse_file(&file)?;
-		let mac = syn::parse_quote!(rsx);
-		let mut visitor = RsxSynVisitor::new(path.to_string_lossy(), mac);
+		if path.extension().map_or(false, |ext| ext == "rs") {
+			let file = ReadFile::to_string(&path)?;
+			let file = syn::parse_file(&file)?;
+			let mac = syn::parse_quote!(rsx);
+			let mut visitor = RsxSynVisitor::new(path.to_string_lossy(), mac);
 
-		visitor.visit_file(&file);
-		Ok(visitor.templates)
+			visitor.visit_file(&file);
+			Ok(visitor.templates)
+		} else {
+			Ok(Default::default())
+		}
 	}
 }
 
@@ -130,5 +135,33 @@ impl<'a> Visit<'a> for RsxSynVisitor {
 				.map_tokens(mac.tokens.clone(), &self.file);
 			self.templates.push((loc, tokens));
 		}
+	}
+}
+
+
+#[cfg(test)]
+mod test {
+	use std::path::PathBuf;
+
+	use crate::prelude::*;
+	use beet_rsx::rsx::RsxTemplateMap;
+	use sweet::prelude::*;
+
+	#[test]
+	fn works() {
+		let src =
+			FsExt::workspace_root().join("crates/beet_router/src/test_site");
+
+		let file = BuildRsxTemplateMap {
+			src,
+			dst: PathBuf::default(),
+			pretty: true,
+		}
+		.build_ron()
+		.unwrap()
+		.to_string();
+		let map: RsxTemplateMap = ron::de::from_str(&file).unwrap();
+		expect(map.len()).to_be(4);
+		// println!("{:#?}", map);
 	}
 }

@@ -36,7 +36,7 @@ impl<Reload: FnMut() -> Result<()>, Recompile: FnMut() -> Result<()>>
 		reload_func: Reload,
 		recompile_func: Recompile,
 	) -> Result<Self> {
-		let file_cache = Self::preheat_cache(&build_templates.src)?;
+		let file_cache = preheat_cache(&build_templates.src)?;
 		Ok(Self {
 			build_templates,
 			file_cache,
@@ -54,19 +54,6 @@ impl<Reload: FnMut() -> Result<()>, Recompile: FnMut() -> Result<()>>
 			.await
 	}
 
-	/// Create a file cache with every file in the src directory
-	pub fn preheat_cache(src: &Path) -> Result<HashMap<PathBuf, u64>> {
-		let mut cache = HashMap::default();
-		let files = ReadDir::files_recursive(src)?;
-		let now = Instant::now();
-		for file in files {
-			let path = file.canonicalize()?;
-			let hash = HashRsxFile::file_to_hash(&path)?;
-			cache.insert(path, hash);
-		}
-		println!("Preheated cache in {:?}", now.elapsed());
-		Ok(cache)
-	}
 
 	/// OnChange will iterate over the watch events,
 	/// - if any break the file hash cache, [`Self::recompile`] will be called
@@ -140,5 +127,38 @@ impl<Reload: FnMut() -> Result<()>, Recompile: FnMut() -> Result<()>>
 		(self.reload_func)()?;
 		println!("Watcher::Reload Duration: {:?}", start.elapsed());
 		Ok(())
+	}
+}
+
+
+/// Create a file cache with every file in the src directory
+fn preheat_cache(src: &Path) -> Result<HashMap<PathBuf, u64>> {
+	// let now = Instant::now();
+	// TODO rayon par_iter
+	let cache: HashMap<PathBuf, u64> = ReadDir::files_recursive(src)?
+		.into_iter()
+		.map(|file| {
+			let path = file.canonicalize()?;
+			let hash = HashRsxFile::file_to_hash(&path)?;
+			Ok((path, hash))
+		})
+		.collect::<Result<_>>()?;
+
+	// println!("Preheated cache in {:?}", now.elapsed());
+	Ok(cache)
+}
+#[cfg(test)]
+mod test {
+	use sweet::prelude::*;
+
+	use super::preheat_cache;
+
+	#[test]
+	fn test_preheat_cache() {
+		let src =
+			FsExt::workspace_root().join("crates/beet_router/src/test_site");
+		let cache = preheat_cache(&src).unwrap();
+		expect(cache.len()).to_be(8);
+		// println!("{:#?}", cache);
 	}
 }
