@@ -1,6 +1,6 @@
-mod apply_mods;
+mod plugins;
 mod rsx_idx;
-pub use apply_mods::*;
+pub use plugins::*;
 mod tree_location;
 mod tree_location_map;
 pub use rsx_idx::*;

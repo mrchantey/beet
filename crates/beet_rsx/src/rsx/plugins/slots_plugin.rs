@@ -1,6 +1,7 @@
 use crate::prelude::*;
 use thiserror::Error;
 
+
 /// Slotting is the process of traversing the [RsxComponent::slot_children]
 /// and applying them to the [RsxComponent::node] in the corresponding slots.
 ///
@@ -42,15 +43,23 @@ use thiserror::Error;
 /// - All <slot> elements are replaced with a <fragment> element containing the
 /// 	slot children.
 /// - All slot="foo" attributes are removed.
+#[derive(Debug, Default, Clone)]
+pub struct SlotsPlugin;
+
+impl RsxPlugin for SlotsPlugin {
+	fn apply(self, root: &mut RsxRoot) -> anyhow::Result<()> {
+		SlotsVisitor::apply(&mut root.node).map_err(|e| anyhow::anyhow!(e))
+	}
+}
 #[derive(Debug)]
-pub struct SlotsVisitor {
+struct SlotsVisitor {
 	default_slots: Vec<RsxNode>,
 	named_slots: HashMap<String, Vec<RsxNode>>,
 }
 
 #[derive(Debug, Error)]
 #[error("some slots were not consumed: {unconsumed:?}")]
-pub struct SlotsError {
+struct SlotsError {
 	unconsumed: Vec<(String, Vec<RsxNodeDiscriminants>)>,
 }
 impl SlotsError {

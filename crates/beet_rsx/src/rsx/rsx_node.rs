@@ -45,21 +45,29 @@ impl Default for RsxNode {
 
 impl RsxNode {
 	/// Returns true if the node is an empty fragment,
-	/// or all children are empty fragments
-	pub fn assert_empty(&self) {
+	/// or if it is recursively a fragment with only empty fragments
+	pub fn is_empty(&self) -> bool {
 		match self {
-			RsxNode::Fragment { nodes: items, .. } => {
-				for item in items {
-					item.assert_empty();
+			RsxNode::Fragment { nodes, .. } => {
+				for node in nodes {
+					if !node.is_empty() {
+						return false;
+					}
 				}
-				return;
+				true
 			}
-			_ => {}
-		};
-		panic!(
-			"Expected empty fragment. Slot children must be empty before mapping to html, please call HtmlSlotsVisitor::apply\nreceived: {:#?}",
-			self
-		);
+			_ => false,
+		}
+	}
+	/// ## Panics
+	/// If the node is not an empty fragment
+	pub fn assert_empty(&self) {
+		if !self.is_empty() {
+			panic!(
+				"Expected empty fragment. Slot children must be empty before mapping to html, please call HtmlSlotsVisitor::apply\nreceived: {:#?}",
+				self
+			);
+		}
 	}
 
 	pub fn discriminant(&self) -> RsxNodeDiscriminants { self.into() }
@@ -67,6 +75,26 @@ impl RsxNode {
 	pub fn walk(&self, visitor: &mut impl RsxVisitor) {
 		visitor.walk_node(self)
 	}
+
+	// this is too dangerous? so easy to expect the rsx idx to be unchanged?
+	//
+	// /// Add another node. If this node is a fragment it will be appended
+	// /// to the end, otherwise a new fragment will be created with the
+	// /// current node and the new node.
+	// pub fn push(&mut self, node: RsxNode) {
+	// 	match self {
+	// 		RsxNode::Fragment { nodes, .. } => nodes.push(node),
+	// 		_ => {
+	// 			// let idx = self
+	// 			let mut nodes = vec![std::mem::take(self)];
+	// 			nodes.push(node);
+	// 			*self = RsxNode::Fragment {
+	// 				idx: RsxIdx::default(),
+	// 				nodes,
+	// 			};
+	// 		}
+	// 	}
+	// }
 
 	/// Returns true if the node is an html node
 	pub fn is_html_node(&self) -> bool {

@@ -9,6 +9,10 @@ use std::hash::Hasher;
 /// in a dfs pattern like [RsxVisitor].
 pub type RsxIdx = u32;
 
+/// Apply to an [`RsxNode`] that was created dynamically, outside of a formal
+/// macro structure.
+pub fn rsx_idx_invalid() -> RsxIdx { u32::MAX }
+
 /// An RsxIdx is unique only to the macro the node was created in,
 /// but for techniques like hot reloading we need to know not only
 /// the local index but enough to distinguish it from nodes

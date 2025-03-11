@@ -19,6 +19,8 @@ pub struct RsxMacroLocation {
 	/// format as file!() would return, but with forward slashes.
 	/// We must use forward slashes because sometimes a wasm build will be used
 	/// in combination with a windows build, and the paths must match.
+	///
+	/// This is relative to the *workspace* not the cwd of the build.
 	pub file: String,
 	pub line: usize,
 	pub col: usize,

@@ -45,7 +45,7 @@ impl VisitRsxOptions {
 			..Default::default()
 		}
 	}
-	/// - do not visit [RsxComponent::node]
+	/// - do not visit [RsxComponent::root]
 	/// - do not visit [RsxComponent::slot_children]
 	pub fn ignore_component() -> Self {
 		Self {
@@ -54,7 +54,7 @@ impl VisitRsxOptions {
 			..Default::default()
 		}
 	}
-	/// do not visit [RsxComponent::node]
+	/// do not visit [RsxComponent::root]
 	pub fn ignore_component_node() -> Self {
 		Self {
 			ignore_component_node: true,
@@ -316,7 +316,7 @@ mod test {
 				</Child>
 			</div>
 		};
-		SlotsVisitor::apply(&mut rsx.node).unwrap();
+		SlotsPlugin::default().apply(&mut rsx).unwrap();
 		rsx.walk(&mut counter);
 		expect(counter.node).to_be(22);
 		expect(counter.doctype).to_be(1);

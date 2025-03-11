@@ -23,7 +23,7 @@ impl RsxRoot {
 	/// Calls [`Self::apply_default_mods`] and then builds an [`HtmlDocument`].
 	/// This is the method used by routers.
 	pub fn build_document(mut self) -> Result<HtmlDocument> {
-		self.apply_default_mods()?;
+		self.apply_default_plugins()?;
 		let html = RsxToHtml::default().map_node(&self);
 		let doc = html.into_document();
 		Ok(doc)
@@ -34,7 +34,7 @@ impl RsxRoot {
 	/// ## Panics
 	/// If the apply step fails.
 	pub fn apply_and_render(mut self) -> String {
-		self.apply_default_mods().unwrap();
+		self.apply_default_plugins().unwrap();
 		RsxToHtml::render_body(&self)
 	}
 }

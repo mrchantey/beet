@@ -16,7 +16,7 @@ use parcel_selectors::attr::ParsedCaseSensitivity;
 /// - Scope rules:
 /// 	- `<style scope:global/>` will not be scoped at all
 ///
-pub struct ScopedStyle {
+pub struct ScopedStylePlugin {
 	/// the attribute to use as a selector for the component,
 	/// defaults to "data-styleid"
 	attr: String,
@@ -24,9 +24,9 @@ pub struct ScopedStyle {
 	idx: usize,
 }
 
-impl Default for ScopedStyle {
+impl Default for ScopedStylePlugin {
 	fn default() -> Self {
-		ScopedStyle {
+		ScopedStylePlugin {
 			attr: "data-styleid".to_string(),
 			idx: 0,
 		}
@@ -55,35 +55,37 @@ impl Scope {
 	}
 }
 
-impl ScopedStyle {
+impl RsxPlugin for ScopedStylePlugin {
 	/// Applies scoped style to:
 	/// 1. root node
 	/// 2. all component nodes
 	/// 3. all component slot children
-	pub fn apply(&mut self, root: &mut RsxRoot) -> ParseResult<()> {
+	fn apply(mut self, root: &mut RsxRoot) -> anyhow::Result<()> {
 		// 1. apply to the root node, if its a component nothing happens
 		//    in this step, it will be handled by the component visitor
-		self.apply_inner(&mut root.node)?;
+		self.apply_node(&mut root.node)?;
 
 		let mut parse_err = Ok(());
 
 		// visit all components
 		VisitRsxComponentMut::walk(&mut root.node, |component| {
 			// 2. apply to component node
-			if let Err(err) = self.apply_inner(&mut component.root) {
+			if let Err(err) = self.apply_node(&mut component.root) {
 				parse_err = Err(err);
 			};
 			// 3. apply to component slot children
-			if let Err(err) = self.apply_inner(&mut component.slot_children) {
+			if let Err(err) = self.apply_node(&mut component.slot_children) {
 				parse_err = Err(err);
 			};
 		});
-		parse_err
+		parse_err.map_err(|e| anyhow::anyhow!(e))
 	}
+}
 
+impl ScopedStylePlugin {
 	/// 1. apply the idx to all style bodies
 	/// 2. if contains style, apply tag to all elements in the component
-	fn apply_inner(&mut self, node: &mut RsxNode) -> ParseResult<()> {
+	fn apply_node(&mut self, node: &mut RsxNode) -> ParseResult<()> {
 		let mut parse_err = Ok(());
 
 		let opts = VisitRsxOptions::ignore_component();
