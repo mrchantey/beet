@@ -2,11 +2,11 @@ pub use crate::prelude::*;
 use anyhow::Result;
 use clap::Parser;
 pub use parse_dir_routes::*;
-pub use parse_file_routes::*;
+pub use file_route::*;
 use std::path::PathBuf;
 use sweet::prelude::*;
 mod parse_dir_routes;
-mod parse_file_routes;
+mod file_route;
 
 /// Parse a 'routes' dir, collecting all the routes,
 /// and create a `mod.rs` which contains
