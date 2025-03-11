@@ -1,4 +1,3 @@
-use super::RsxNode;
 use crate::prelude::*;
 use lightningcss::printer::PrinterOptions;
 use lightningcss::stylesheet::ParserOptions;

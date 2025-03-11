@@ -1,9 +1,9 @@
+mod apply_mods;
 mod rsx_idx;
-mod slots_visitor;
+pub use apply_mods::*;
 mod tree_location;
 mod tree_location_map;
 pub use rsx_idx::*;
-pub use slots_visitor::*;
 pub use tree_location::*;
 pub use tree_location_map::*;
 mod effect;
@@ -15,8 +15,6 @@ mod rsx_template_node;
 mod rsx_template_root;
 mod rsx_visitor_fn;
 mod rusty_part;
-#[cfg(feature = "css")]
-mod scoped_style;
 mod tree_idx;
 pub use rsx_root_map::*;
 pub use rsx_template_map::*;
@@ -24,8 +22,6 @@ pub use rsx_template_node::*;
 pub use rsx_template_root::*;
 pub use rsx_visitor_fn::*;
 pub use rusty_part::*;
-#[cfg(feature = "css")]
-pub use scoped_style::*;
 pub use tree_idx::*;
 mod rsx_node;
 mod rsx_visitor;

@@ -20,28 +20,21 @@ pub struct RsxRoot {
 }
 
 impl RsxRoot {
-	/// This is the method used by routers,
-	/// applies styles and slots, returning an HtmlDocument.
+	/// Calls [`Self::apply_default_mods`] and then builds an [`HtmlDocument`].
+	/// This is the method used by routers.
 	pub fn build_document(mut self) -> Result<HtmlDocument> {
-		#[cfg(feature = "css")]
-		ScopedStyle::default().apply(&mut self)?;
-		SlotsVisitor::apply(&mut self)?;
+		self.apply_default_mods()?;
 		let html = RsxToHtml::default().map_node(&self);
 		let doc = html.into_document();
 		Ok(doc)
 	}
 	/// convenience method usually for testing:
-	/// - [ScopedStyle::apply]
-	/// - [SlotsVisitor::apply]
-	/// - [RsxToHtml::map_node]
-	/// - [HtmlNode::render]
-	///
+	/// - [Self::apply_default_mods]
+	/// - [RsxToHtml::render_body]
 	/// ## Panics
-	/// If the slots cannot be applied.
+	/// If the apply step fails.
 	pub fn apply_and_render(mut self) -> String {
-		#[cfg(feature = "css")]
-		ScopedStyle::default().apply(&mut self).unwrap();
-		SlotsVisitor::apply(&mut self).unwrap();
+		self.apply_default_mods().unwrap();
 		RsxToHtml::render_body(&self)
 	}
 }
