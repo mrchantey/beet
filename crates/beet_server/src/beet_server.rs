@@ -7,12 +7,15 @@ use axum::Router;
 
 pub struct BeetServer {
 	pub public_dir: String,
+	/// Serve via cargo-lambda instead of axum
+	pub lambda: bool,
 }
 
 impl Default for BeetServer {
 	fn default() -> Self {
 		Self {
 			public_dir: "target".into(),
+			lambda: false,
 		}
 	}
 }
@@ -24,11 +27,17 @@ impl BeetServer {
 			.fallback_service(file_and_error_handler(&self.public_dir))
 	}
 
-	pub async fn serve_axum(&self) -> Result<()> {
-		run_axum(self.router()).await
-	}
-	#[cfg(feature = "lambda")]
-	pub async fn serve_lambda(&self) -> Result<(), lambda_http::Error> {
-		run_lambda(self.router()).await
+	pub async fn serve(&self) -> Result<()> {
+		let router = self.router();
+		if self.lambda {
+			#[cfg(feature = "lambda")]
+			return run_lambda(router)
+				.await
+				.map_err(|err| anyhow::anyhow!("{}", err));
+			#[cfg(not(feature = "lambda"))]
+			anyhow::bail!("Feature 'lambda' is not enabled");
+		} else {
+			return run_axum(router).await;
+		}
 	}
 }

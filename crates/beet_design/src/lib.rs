@@ -7,5 +7,5 @@ pub mod components;
 /// Commonly used components for beet_design
 pub mod prelude {
 	pub use crate::components::*;
-	pub use beet_rsx::as_beet::*;
+	pub(crate) use beet_rsx::as_beet::*;
 }

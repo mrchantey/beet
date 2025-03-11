@@ -4,7 +4,7 @@ use beet_server::prelude::*;
 #[tokio::main]
 async fn main() {
 	BeetServer::default()
-		.serve_axum()
+		.serve()
 		.await
 		.unwrap();
 }

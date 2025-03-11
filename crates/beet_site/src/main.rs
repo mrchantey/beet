@@ -1,29 +1,32 @@
+use anyhow::Result;
 #[allow(unused)]
 use beet::prelude::*;
 #[allow(unused)]
 use beet_site::prelude::*;
 
-/// The main entry point for beet site.
-/// There are three options:
 #[tokio::main]
-async fn main() {
-	// 1. build static site
-	#[cfg(all(not(feature = "axum"), not(feature = "lambda")))]
-	build_static().await.unwrap();
-	// 2. build server locally in debug mode
-	#[cfg(feature = "axum")]
-	BeetServer {
+async fn main() -> Result<()> {
+	#[cfg(not(feature = "server"))]
+	return build_static().await;
+
+	#[cfg(feature = "server")]
+	return BeetServer {
 		public_dir: "target/client".into(),
+		#[cfg(not(feature = "lambda"))]
+		lambda: false,
+		#[cfg(feature = "lambda")]
+		lambda: true,
 	}
-	.serve_axum()
-	.await
-	.unwrap();
-	// 3. build server for lambda in release mode
-	#[cfg(all(not(feature = "axum"), feature = "lambda"))]
-	BeetServer {
-		public_dir: "target/client".into(),
-	}
-	.serve_lambda()
-	.await
-	.unwrap();
+	.serve()
+	.await;
+}
+
+
+#[cfg(not(feature = "server"))]
+async fn build_static() -> Result<()> {
+	println!("rebuilding html files");
+	let mut router = DefaultFileRouter::default();
+	routes::collect_file_routes(&mut router);
+	router.routes_to_html_files().await?;
+	Ok(())
 }

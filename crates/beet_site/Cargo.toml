@@ -15,8 +15,8 @@ keywords.workspace = true
 # no-default-features to build a static site
 [features]
 # default = ["server"]
-axum = []
-lambda = []
+server = []
+lambda = ["server"]
 
 [[bin]]
 name = "beet_site"

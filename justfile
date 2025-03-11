@@ -31,6 +31,10 @@ init-repo:
 cli *args:
 	cargo run -p beet-cli -- {{args}}
 
+
+install-cli *args:
+	cargo install --path crates/beet-cli {{args}}
+
 # Run and watch a workspace example
 run example *args:
 	just watch just run-ci {{example}} {{args}}
