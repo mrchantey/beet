@@ -854,6 +854,7 @@ dependencies = [
  "toml",
  "tower 0.5.2",
  "tower-http",
+ "tower-livereload",
  "tracing",
  "tracing-subscriber",
 ]

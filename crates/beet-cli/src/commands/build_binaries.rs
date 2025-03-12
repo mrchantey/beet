@@ -28,29 +28,24 @@ pub struct BuildBinaries {
 }
 
 impl BuildBinaries {
-	/// run the built binary without recompiling.
-	/// In server mode the child process is returned
-	pub fn run_native(&self, watch_args: &WatchArgs) -> Result<Option<Child>> {
-		// we always build the static files
+	/// run the built binary with the `--static` flag, instructing
+	/// it to not spin up a server, and instead just build the static files
+	pub fn build_templates(&self, watch_args: &WatchArgs) -> Result<()> {
 		Command::new(&self.cargo_cmd.exe_path())
 			.arg("--html-dir")
 			.arg(&watch_args.html_dir)
 			.arg("--static")
 			.status()?
 			.exit_ok()?;
+		Ok(())
+	}
 
-		if watch_args.as_static {
-			Ok(None)
-		} else {
-			// maybe this should be in the recompile step, ie only
-			// restart server when we recompiled because live-reload
-			// should be happening in that server right?
-			let child = Command::new(&self.cargo_cmd.exe_path())
-				.arg("--html-dir")
-				.arg(&watch_args.html_dir)
-				.spawn()?;
-			Ok(Some(child))
-		}
+	pub fn run_server(&self, watch_args: &WatchArgs) -> Result<Child> {
+		let child = Command::new(&self.cargo_cmd.exe_path())
+			.arg("--html-dir")
+			.arg(&watch_args.html_dir)
+			.spawn()?;
+		Ok(child)
 	}
 
 	pub fn recompile(&self, watch_args: &WatchArgs) -> Result<()> {

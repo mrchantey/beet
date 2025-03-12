@@ -71,14 +71,21 @@ impl Watch {
 		TemplateWatcher::new(
 			self.build_template_map,
 			|| {
-				if let Some(child) = &mut child_process {
-					child.kill()?;
-				}
-				child_process =
-					self.build_binaries.run_native(&self.watch_args)?;
+				self.build_binaries.build_templates(&self.watch_args)?;
 				Ok(())
 			},
-			|| self.build_binaries.recompile(&self.watch_args),
+			|| {
+				self.build_binaries.recompile(&self.watch_args)?;
+				if !self.watch_args.as_static {
+					if let Some(child) = &mut child_process {
+						child.kill()?;
+					}
+					let child =
+						self.build_binaries.run_server(&self.watch_args)?;
+					child_process = Some(child);
+				}
+				Ok(())
+			},
 		)?
 		.run_once_and_watch()
 		.await

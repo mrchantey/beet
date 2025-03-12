@@ -12,8 +12,8 @@ pub fn get(_state: DefaultAppState) -> RsxRoot {
 				name="description"
 				content="This is the main file"
 			/>
-			{val + 3}
-			<span>hello worldiediedsds</span>
+			{val + 8}
+			<span>hello world</span>
 			<style>
 				span{
 					color: red;

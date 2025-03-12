@@ -13,12 +13,15 @@ categories.workspace = true
 publish = true
 
 [features]
-default = []
+default = ["reload"]
+reload = ["tower-livereload"]
 lambda = ["dep:lambda_http"]
 toml = ["dep:cargo-manifest", "dep:toml", "dep:semver"]
 
 
 [dependencies]
+sweet = { workspace = true, features = ["fs"] }
+
 tracing.workspace = true
 tracing-subscriber.workspace = true
 anyhow.workspace = true
@@ -31,6 +34,7 @@ bytes.workspace = true
 tokio.workspace = true
 axum = { version = "0.8", features = ["macros"] }
 tower = "0.5"
+tower-livereload = { version = "0.9", optional = true }
 tower-http = { version = "0.6", features = ["trace", "fs"] }
 lambda_http = { version = "0.14", optional = true }
 
