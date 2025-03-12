@@ -13,7 +13,7 @@ pub fn get(_state: DefaultAppState) -> RsxRoot {
 				content="This is the main file"
 			/>
 			{val + 3}
-			<span>hello world</span>
+			<span>hello worldiediedsds</span>
 			<style>
 				span{
 					color: red;

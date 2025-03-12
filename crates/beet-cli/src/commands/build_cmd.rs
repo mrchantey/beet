@@ -22,6 +22,7 @@ pub struct BuildCmd {
 	/// Any additional arguments passed to cargo
 	#[arg(long)]
 	pub cargo_args: Option<String>,
+	// used by watcher to also build for wasm
 	pub target: Option<String>,
 }
 

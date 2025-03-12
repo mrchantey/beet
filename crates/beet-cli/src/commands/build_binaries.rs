@@ -3,6 +3,7 @@ use anyhow::Result;
 use beet_router::prelude::CollectRoutes;
 use clap::Parser;
 use std::path::Path;
+use std::process::Child;
 use std::process::Command;
 
 /// Build both the server and wasm client binaries
@@ -27,17 +28,29 @@ pub struct BuildBinaries {
 }
 
 impl BuildBinaries {
-	/// run the built binary without recompiling
-	pub fn run_native(&self, watch_args: &WatchArgs) -> Result<()> {
-		let mut cmd = Command::new(&self.cargo_cmd.exe_path());
-		cmd.arg("--html-dir").arg(&watch_args.html_dir);
+	/// run the built binary without recompiling.
+	/// In server mode the child process is returned
+	pub fn run_native(&self, watch_args: &WatchArgs) -> Result<Option<Child>> {
+		// we always build the static files
+		Command::new(&self.cargo_cmd.exe_path())
+			.arg("--html-dir")
+			.arg(&watch_args.html_dir)
+			.arg("--static")
+			.status()?
+			.exit_ok()?;
 
 		if watch_args.as_static {
-			cmd.arg("--static");
+			Ok(None)
+		} else {
+			// maybe this should be in the recompile step, ie only
+			// restart server when we recompiled because live-reload
+			// should be happening in that server right?
+			let child = Command::new(&self.cargo_cmd.exe_path())
+				.arg("--html-dir")
+				.arg(&watch_args.html_dir)
+				.spawn()?;
+			Ok(Some(child))
 		}
-
-		cmd.status()?.exit_ok()?;
-		Ok(())
 	}
 
 	pub fn recompile(&self, watch_args: &WatchArgs) -> Result<()> {

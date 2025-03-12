@@ -65,9 +65,19 @@ impl Watch {
 	}
 
 	async fn watch(self) -> Result<()> {
+		// in server mode track the running child process
+		let mut child_process: Option<std::process::Child> = None;
+
 		TemplateWatcher::new(
 			self.build_template_map,
-			|| self.build_binaries.run_native(&self.watch_args),
+			|| {
+				if let Some(child) = &mut child_process {
+					child.kill()?;
+				}
+				child_process =
+					self.build_binaries.run_native(&self.watch_args)?;
+				Ok(())
+			},
 			|| self.build_binaries.recompile(&self.watch_args),
 		)?
 		.run_once_and_watch()
