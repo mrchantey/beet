@@ -31,6 +31,15 @@ impl BeetApp {
 		self
 	}
 
+
+
+	#[cfg(target_arch = "wasm32")]
+	pub fn run(self) {
+		todo!("use window.location to determine hydration route");
+		// BeetDom::hydrate(app);
+	}
+
+	#[cfg(not(target_arch = "wasm32"))]
 	pub fn run(self) {
 		let result = tokio::runtime::Builder::new_multi_thread()
 			.enable_all()
