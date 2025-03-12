@@ -21,6 +21,7 @@ where
 	};
 	// required to enable CloudWatch error logging by the runtime
 	tracing::init_default_subscriber();
+	tracing::info!("listening for requests");
 
 	lambda_http::run(handler)
 		.await
