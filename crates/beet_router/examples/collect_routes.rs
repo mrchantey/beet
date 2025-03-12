@@ -5,9 +5,10 @@ use sweet::prelude::FsExt;
 /// Demonstration of how to collect all files in the 'routes' dir
 /// and create a `routes.rs` file containing them all.
 pub fn main() {
-	let src = FsExt::workspace_root().join("crates/beet_router/src/test_site");
+	let routes_dir =
+		FsExt::workspace_root().join("crates/beet_router/src/test_site/routes");
 	let parser = CollectRoutes {
-		src,
+		routes_dir,
 		file_router_ident: "crate::DefaultFileRouter".into(),
 		file_router_tokens: Some(
 			r#"

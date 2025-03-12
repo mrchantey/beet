@@ -15,13 +15,11 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
-	ServeHtml(ServeHtml),
-	WatchTemplates(WatchTemplates),
+	Watch(Watch),
 }
 #[tokio::main]
 async fn main() -> Result<()> {
 	match Cli::parse().command {
-		Commands::ServeHtml(cmd) => cmd.run().await,
-		Commands::WatchTemplates(cmd) => cmd.run().await,
+		Commands::Watch(cmd) => cmd.run().await,
 	}
 }

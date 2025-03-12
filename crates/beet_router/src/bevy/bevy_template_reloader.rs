@@ -37,8 +37,8 @@ impl Plugin for BevyTemplateReloader {
 			send.send(TemplateReloaderMessage::Recompile)?;
 			Ok(())
 		};
-		let builder = BuildRsxTemplateMap::new(&src);
-		let dst = builder.dst.clone();
+		let builder = BuildTemplateMap::new(&src);
+		let dst = builder.templates_map_path.clone();
 
 		let _handle = tokio::spawn(async move {
 			TemplateWatcher::new(builder, reload, recompile)?

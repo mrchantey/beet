@@ -1,13 +1,12 @@
-use lambda_http::Error;
+use anyhow::Result;
 use lambda_http::IntoResponse;
 use lambda_http::Request;
 use lambda_http::Service;
 use lambda_http::lambda_runtime::Diagnostic;
-use lambda_http::run;
 use lambda_http::tracing;
 
 /// Sets up the Lambda runtime and runs the provided handler indefinitely.
-pub async fn run_lambda<'a, R, S, E>(handler: S) -> Result<(), Error>
+pub async fn run_lambda<'a, R, S, E>(handler: S) -> Result<()>
 where
 	S: Service<Request, Response = R, Error = E>,
 	S::Future: Send + 'a,
@@ -23,7 +22,9 @@ where
 	// required to enable CloudWatch error logging by the runtime
 	tracing::init_default_subscriber();
 
-	run(handler).await
+	lambda_http::run(handler)
+		.await
+		.map_err(|err| anyhow::anyhow!("{}", err))
 }
 
 

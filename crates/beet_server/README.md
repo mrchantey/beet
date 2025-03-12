@@ -1,3 +1,6 @@
 # `beet_server`
 
-Serve beet applications with axum and deploy with cargo-lambda.
+Run beet applications with support for several modalities:
+- static: just build static routes
+- server: run as an axum server
+- lambda: deploy server with `cargo-lambda`

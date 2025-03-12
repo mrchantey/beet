@@ -3,6 +3,7 @@ use axum::handler::HandlerWithoutStateExt;
 use axum::response::IntoResponse;
 use http::StatusCode;
 use std::convert::Infallible;
+use std::path::Path;
 use tower::Service;
 use tower_http::services::ServeDir;
 
@@ -10,7 +11,7 @@ use tower_http::services::ServeDir;
 /// TODO its bad practice to serve files from lambda,
 /// this should use a bucket instead
 pub fn file_and_error_handler(
-	file_dir: &str,
+	file_dir: &Path,
 ) -> impl Service<
 	Request,
 	Error = Infallible,

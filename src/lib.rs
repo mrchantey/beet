@@ -1,6 +1,8 @@
 #![cfg_attr(test, feature(test, custom_test_frameworks))]
 #![cfg_attr(test, test_runner(sweet::test_runner))]
 #![doc = include_str!("../README.md")]
+#[cfg(feature = "app")]
+pub use beet_app as app;
 #[cfg(feature = "rsx")]
 pub use beet_design as design;
 #[cfg(feature = "examples")]
@@ -21,6 +23,8 @@ pub use beet_sim as sim;
 pub use beet_spatial as spatial;
 
 pub mod prelude {
+	#[cfg(feature = "app")]
+	pub use crate::app::prelude::*;
 	#[cfg(feature = "rsx")]
 	pub use crate::design::prelude::*;
 	#[cfg(feature = "examples")]

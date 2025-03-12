@@ -25,7 +25,7 @@ type StaticRsxFunc<T> =
 	Box<dyn Fn(&T) -> Pin<Box<dyn Future<Output = Result<RsxRoot>>>>>;
 
 
-/// A simple static server, it allows for a state value
+/// A simple static router, it allows for a state value
 /// that can be passed by reference to all routes,
 /// this is where site constants can be stored.
 pub struct StaticFileRouter<T> {
@@ -33,8 +33,9 @@ pub struct StaticFileRouter<T> {
 	pub state: T,
 	pub page_routes: Vec<StaticPageRoute<T>>,
 	/// The directory to save the html files to
-	pub dst_dir: PathBuf,
-	pub templates_src: PathBuf,
+	pub html_dir: PathBuf,
+	/// Location of the `rsx-templates.ron` file
+	pub templates_map_path: PathBuf,
 }
 
 impl<T: Default> Default for StaticFileRouter<T> {
@@ -42,9 +43,9 @@ impl<T: Default> Default for StaticFileRouter<T> {
 		Self {
 			state: Default::default(),
 			page_routes: Default::default(),
-			dst_dir: "target/client".into(),
-			// use the default from BuildRsxTemplateMap
-			templates_src: BuildRsxTemplateMap::DEFAULT_TEMPLATES_DST.into(),
+			html_dir: "target/client".into(),
+			templates_map_path: BuildTemplateMap::DEFAULT_TEMPLATES_MAP_PATH
+				.into(),
 		}
 	}
 }
@@ -81,12 +82,12 @@ impl<T: 'static> StaticFileRouter<T> {
 		&self,
 	) -> Result<Vec<(RouteInfo, HtmlDocument)>> {
 		// if we can't load templates just warn and run without template reload
-		let mut template_map = RsxTemplateMap::load(&self.templates_src)
+		let mut template_map = RsxTemplateMap::load(&self.templates_map_path)
 			.map_err(|err| {
 				// notify user that we are using routes
 				eprintln!(
 					"Live reload disabled - Error loading template map at: {:?}\n{:#?}",
-					self.templates_src, err,
+					self.templates_map_path, err,
 				);
 				err
 			})
@@ -111,7 +112,7 @@ impl<T: 'static> StaticFileRouter<T> {
 
 	/// Calls [Self::routes_to_html] and writes the html to disk
 	pub async fn routes_to_html_files(&self) -> Result<()> {
-		let dst = &self.dst_dir;
+		let dst = &self.html_dir;
 		// in debug mode removing a watched dir breaks FsWatcher
 		#[cfg(not(debug_assertions))]
 		FsExt::remove(&dst).ok();

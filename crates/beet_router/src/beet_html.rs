@@ -17,7 +17,7 @@ impl BeetHtml {
 		use sweet::prelude::FsExt;
 		// the cli built the template map by looking at this file
 		let template_map =
-			RsxTemplateMap::load(BuildRsxTemplateMap::DEFAULT_TEMPLATES_DST)?;
+			RsxTemplateMap::load(BuildTemplateMap::DEFAULT_TEMPLATES_MAP_PATH)?;
 
 		// we'll create the app even though its static parts are stale
 		// because we need the rusty parts to fill in the html template

@@ -1,6 +1,7 @@
 pub use crate::prelude::*;
 use anyhow::Result;
 use beet_rsx::prelude::*;
+use clap::Parser;
 use proc_macro2::Literal;
 use proc_macro2::TokenStream;
 use quote::quote;
@@ -16,47 +17,66 @@ pub use hash_file::*;
 pub use template_watcher::*;
 
 
-#[derive(Debug)]
-pub struct BuildRsxTemplateMap {
-	/// use [ron::ser::to_string_pretty] instead of
-	/// directly serializing the ron tokens.
-	pub pretty: bool,
-	pub src: PathBuf,
-	// keep default in sync with StaticFileRouter
-	pub dst: PathBuf,
+#[derive(Debug, Parser)]
+pub struct BuildTemplateMap {
+	/// File or directory to watch and create templates for
+	//  TODO this might be better as an include pattern
+	#[arg(long, default_value = "./")]
+	pub templates_root_dir: PathBuf,
+	/// Location of the `rsx-templates.ron` file
+	#[arg(long, default_value = Self::DEFAULT_TEMPLATES_MAP_PATH)]
+	pub templates_map_path: PathBuf,
+	/// Output the contents of the `rsx-templates.ron` file to stdout
+	/// on change
+	#[arg(short, long)]
+	pub templates_map_stdout: bool,
+	/// directly serialize the ron tokens when building templates
+	/// instead of parsing via [ron::ser::to_string_pretty]
+	#[arg(long)]
+	pub minify_templates: bool,
 }
 
-impl BuildRsxTemplateMap {
-	pub const DEFAULT_TEMPLATES_DST: &'static str = "target/rsx-templates.ron";
+impl Default for BuildTemplateMap {
+	fn default() -> Self { clap::Parser::parse_from(&[""]) }
+}
+
+impl BuildTemplateMap {
+	pub const DEFAULT_TEMPLATES_MAP_PATH: &'static str =
+		"target/rsx-templates.ron";
 
 	pub fn new(src: impl Into<PathBuf>) -> Self {
-		Self::new_with_dst(src, Self::DEFAULT_TEMPLATES_DST)
+		Self::new_with_dst(src, Self::DEFAULT_TEMPLATES_MAP_PATH)
 	}
 	pub fn new_with_dst(
 		src: impl Into<PathBuf>,
 		dst: impl Into<PathBuf>,
 	) -> Self {
 		Self {
-			pretty: true,
-			src: src.into(),
-			dst: dst.into(),
+			minify_templates: false,
+			templates_root_dir: src.into(),
+			templates_map_path: dst.into(),
+			templates_map_stdout: false,
 		}
 	}
 
 	pub fn build_and_write(&self) -> Result<()> {
 		let map_tokens = self.build_ron()?;
 		let mut map_str = map_tokens.to_string();
-		if self.pretty {
+		// its already minified, so we prettify if false
+		if self.minify_templates == false {
 			let map = ron::de::from_str::<RsxTemplateMap>(&map_str)?;
 			map_str = ron::ser::to_string_pretty(&map, Default::default())?;
 		}
-		FsExt::write(&self.dst, &map_str)?;
+		if self.templates_map_stdout {
+			println!("{}", map_str);
+		}
+		FsExt::write(&self.templates_map_path, &map_str)?;
 		Ok(())
 	}
 
 
 	pub fn build_ron(&self) -> Result<TokenStream> {
-		let items = ReadDir::files_recursive(&self.src)?
+		let items = ReadDir::files_recursive(&self.templates_root_dir)?
 			.into_iter()
 			.map(|path| self.file_templates(path))
 			.collect::<Result<Vec<_>>>()?
@@ -152,10 +172,10 @@ mod test {
 		let src =
 			FsExt::workspace_root().join("crates/beet_router/src/test_site");
 
-		let file = BuildRsxTemplateMap {
-			src,
-			dst: PathBuf::default(),
-			pretty: true,
+		let file = BuildTemplateMap {
+			templates_root_dir: src,
+			templates_map_path: PathBuf::default(),
+			..Default::default()
 		}
 		.build_ron()
 		.unwrap()

@@ -36,6 +36,7 @@ publish = false
 # default resolver
 resolver = "2"
 members = [
+	"crates/beet_app",
 	"crates/beet_design",
 	"crates/beet_examples",
 	"crates/beet_flow",
@@ -58,6 +59,7 @@ members = [
 [workspace.dependencies]
 ## internal
 beet = { path = "", version = "0.0.5", default-features = false }
+beet_app = { path = "crates/beet_app", version = "0.0.5", default-features = false }
 beet_design = { path = "crates/beet_design", version = "0.0.5", default-features = false }
 beet_spatial = { path = "crates/beet_spatial", version = "0.0.5", default-features = false }
 beet_examples = { path = "crates/beet_examples", version = "0.0.5" }
@@ -74,14 +76,15 @@ beet_sim = { path = "crates/beet_sim", version = "0.0.5" }
 
 #💡 local
 # bevyhub = { git = "https://github.com/mrchantey/bevyhub", default-features = false }
-sweet = { version = "0.3.0" }
-# sweet = { path = "../sweet" }
+# sweet = { version = "0.3.0" }
+sweet = { path = "../sweet" }
 # sweet = { git = "https://github.com/mrchantey/sweet" }
 
 bevy = { version = "0.15", default-features = false, features = ["bevy_color"] }
 
 #💡 logging
 log = "0.4"
+tracing = "0.1"
 pretty_env_logger = "0.4"
 console_log = { version = "1", features = ["color"] }
 
@@ -158,7 +161,8 @@ router = ["rsx", "dep:beet_router", "beet_router/parser"]
 rsx = ["dep:beet_rsx", "dep:beet_design"]
 fs = ["beet_rsx?/fs"]
 ml = ["flow", "dep:beet_ml"]
-server = ["dep:beet_server"]
+app = ["dep:beet_app"]
+server = ["dep:beet_server", "beet_app?/server"]
 spatial = ["flow", "dep:beet_spatial", "beet_ml?/spatial"]
 sim = ["flow", "dep:beet_sim"]
 bevy = ["dep:bevy", "beet_rsx?/bevy", "beet_router?/bevy"]
@@ -181,6 +185,7 @@ bevy_default = [
 # dynamic_linking = ["bevy/dynamic_linking"]
 
 [dependencies]
+beet_app = { workspace = true, optional = true }
 beet_design = { workspace = true, optional = true }
 beet_examples = { workspace = true, optional = true }
 beet_flow = { workspace = true, optional = true }

@@ -4,5 +4,5 @@ pub mod index;
 pub const INDEX: &'static str = "/docs";
 use crate::prelude::*;
 pub fn collect_file_routes(router: &mut crate::DefaultFileRouter) {
-    router.add_route((RouteInfo::new("/docs", "get"), index::get));
+	router.add_route((RouteInfo::new("/docs", "get"), index::get));
 }

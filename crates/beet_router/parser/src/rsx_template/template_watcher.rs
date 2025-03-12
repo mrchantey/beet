@@ -22,9 +22,11 @@ use sweet::prelude::*;
 pub struct TemplateWatcher<Reload, Recompile> {
 	// we will be swapping out the `run` and `build` methods of this command,
 	// depending on the diff
-	build_templates: BuildRsxTemplateMap,
+	build_templates: BuildTemplateMap,
 	reload_func: Reload,
 	recompile_func: Recompile,
+	/// A hash of the *code parts* of each file being watched.
+	/// Used to determine if recompilation is required.
 	file_cache: HashMap<PathBuf, u64>,
 }
 
@@ -32,11 +34,11 @@ impl<Reload: FnMut() -> Result<()>, Recompile: FnMut() -> Result<()>>
 	TemplateWatcher<Reload, Recompile>
 {
 	pub fn new(
-		build_templates: BuildRsxTemplateMap,
+		build_templates: BuildTemplateMap,
 		reload_func: Reload,
 		recompile_func: Recompile,
 	) -> Result<Self> {
-		let file_cache = preheat_cache(&build_templates.src)?;
+		let file_cache = preheat_cache(&build_templates.templates_root_dir)?;
 		Ok(Self {
 			build_templates,
 			file_cache,
@@ -44,10 +46,15 @@ impl<Reload: FnMut() -> Result<()>, Recompile: FnMut() -> Result<()>>
 			recompile_func,
 		})
 	}
+	pub async fn run_once_and_watch(mut self) -> Result<()> {
+		self.recompile_then_reload("Initial build")?;
+		self.watch().await?;
+		Ok(())
+	}
 
 	pub async fn watch(mut self) -> Result<()> {
 		FsWatcher::default()
-			.with_path(&self.build_templates.src)
+			.with_path(&self.build_templates.templates_root_dir)
 			.with_exclude("*.git*")
 			.with_exclude("*target*")
 			.watch_async(move |ev| self.on_change(ev))
@@ -108,7 +115,11 @@ impl<Reload: FnMut() -> Result<()>, Recompile: FnMut() -> Result<()>>
 		Ok(())
 	}
 
-	fn recompile_then_reload(&mut self, reason: &str) -> Result<()> {
+	/// Call the following:
+	/// - [`Self::recompile_func`]
+	/// - [`Self::build_templates::build_and_write`]
+	/// - [`Self::reload_func`]
+	pub fn recompile_then_reload(&mut self, reason: &str) -> Result<()> {
 		// terminal::clear()?;
 		println!("Watcher::Recompile: {}", reason);
 		let start = Instant::now();

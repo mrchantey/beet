@@ -1,8 +1,8 @@
 //! Module containing all plugins to be applied to an [`RsxRoot`]
-#[cfg(feature = "fs")]
+#[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
 mod fs_src_plugin;
 mod slots_plugin;
-#[cfg(feature = "fs")]
+#[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
 pub use fs_src_plugin::*;
 pub use slots_plugin::*;
 #[cfg(feature = "css")]
@@ -26,7 +26,7 @@ impl RsxRoot {
 	/// - [ScopedStylePlugin]
 	/// - [SlotsPlugin]
 	pub fn apply_default_plugins(&mut self) -> Result<()> {
-		#[cfg(feature = "fs")]
+		#[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
 		FsSrcPlugin::default().apply(self)?;
 		#[cfg(feature = "css")]
 		ScopedStylePlugin::default().apply(self)?;

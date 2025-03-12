@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use crate::prelude::*;
 use anyhow::Result;
 use axum::Router;
@@ -7,9 +9,7 @@ use axum::Router;
 /// The main server struct for Beet.
 /// By default a file server will be used as a fallback.
 pub struct BeetServer {
-	pub public_dir: String,
-	/// Serve via cargo-lambda instead of axum
-	pub lambda: bool,
+	pub html_dir: PathBuf,
 	pub no_file_server: bool,
 	pub router: Router,
 }
@@ -17,9 +17,8 @@ pub struct BeetServer {
 impl Default for BeetServer {
 	fn default() -> Self {
 		Self {
-			public_dir: "target".into(),
+			html_dir: "target".into(),
 			router: Router::new().merge(state_utils_routes()),
-			lambda: false,
 			no_file_server: false,
 		}
 	}
@@ -30,18 +29,11 @@ impl BeetServer {
 		if !self.no_file_server {
 			self.router = self
 				.router
-				.fallback_service(file_and_error_handler(&self.public_dir));
+				.fallback_service(file_and_error_handler(&self.html_dir));
 		}
-
-		if self.lambda {
-			#[cfg(feature = "lambda")]
-			return run_lambda(self.router)
-				.await
-				.map_err(|err| anyhow::anyhow!("{}", err));
-			#[cfg(not(feature = "lambda"))]
-			anyhow::bail!("Feature 'lambda' is not enabled");
-		} else {
-			return run_axum(self.router).await;
-		}
+		#[cfg(feature = "lambda")]
+		return run_lambda(self.router).await;
+		#[cfg(not(feature = "lambda"))]
+		return run_axum(self.router).await;
 	}
 }

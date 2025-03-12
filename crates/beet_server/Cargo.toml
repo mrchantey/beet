@@ -13,12 +13,13 @@ categories.workspace = true
 publish = true
 
 [features]
-default = ["lambda"]
+default = []
 lambda = ["dep:lambda_http"]
 toml = ["dep:cargo-manifest", "dep:toml", "dep:semver"]
 
 
 [dependencies]
+tracing.workspace = true
 anyhow.workspace = true
 serde.workspace = true
 serde_json.workspace = true
