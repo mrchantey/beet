@@ -23,37 +23,39 @@ pub struct BuildBinaries {
 	collect_routes: CollectRoutes,
 	/// 🦀 the commands that will be used to build the html files 🦀
 	#[command(flatten)]
-	cargo_cmd: CargoCmd,
+	cargo_cmd: BuildCmd,
 }
 
 impl BuildBinaries {
 	/// run the built binary without recompiling
-	pub fn run_native(&self) -> Result<()> {
-		Command::new(&self.cargo_cmd.exe_path())
-			.status()?
-			.exit_ok()?;
+	pub fn run_native(&self, watch_args: &WatchArgs) -> Result<()> {
+		let mut cmd = Command::new(&self.cargo_cmd.exe_path());
+		cmd.arg("--html-dir").arg(&watch_args.html_dir);
+
+		if watch_args.as_static {
+			cmd.arg("--static");
+		}
+
+		cmd.status()?.exit_ok()?;
 		Ok(())
 	}
 
-	pub fn recompile(&self, html_dir: &Path) -> Result<()> {
-		let build_wasm_cmd = if self.wasm {
-			let mut cmd = self.cargo_cmd.clone();
-			cmd.target = Some("wasm32-unknown-unknown".to_string());
-			Some(cmd)
-		} else {
-			None
-		};
+	pub fn recompile(&self, watch_args: &WatchArgs) -> Result<()> {
 		if self.mpa {
 			// TODO only recollect routes if routes change?
 			self.collect_routes.build_and_write()?;
 		}
 		println!("🥁 building native");
 		self.cargo_cmd.spawn()?;
-		if let Some(wasm_cmd) = &build_wasm_cmd {
+
+		if self.wasm {
+			let mut cmd = self.cargo_cmd.clone();
+			cmd.target = Some("wasm32-unknown-unknown".to_string());
 			println!("🥁 building wasm");
-			wasm_cmd.spawn()?;
-			self.wasm_bindgen(&wasm_cmd.exe_path(), html_dir)?;
+			cmd.spawn()?;
+			self.wasm_bindgen(&cmd.exe_path(), watch_args)?;
 		}
+
 		Ok(())
 	}
 
@@ -62,11 +64,11 @@ impl BuildBinaries {
 	fn wasm_bindgen(
 		&self,
 		wasm_exe_path: &Path,
-		html_dir: &Path,
+		watch_args: &WatchArgs,
 	) -> Result<()> {
 		Command::new("wasm-bindgen")
 			.arg("--out-dir")
-			.arg(html_dir.join("wasm"))
+			.arg(watch_args.html_dir.join("wasm"))
 			.arg("--out-name")
 			.arg("bindgen")
 			.arg("--target")

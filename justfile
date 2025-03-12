@@ -98,12 +98,13 @@ run-test-site:
 	sweet serve target/test_site
 
 
-run-beet-site:
-	just cli serve-html \
-	--mpa \
-	--src crates/beet_site/src \
+run-beet-site *args:
+	just cli watch \
 	-p beet_site \
-	--serve-dir target/client \	
+	--mpa \
+	--templates-root-dir crates/beet_site/src \
+	--routes-dir crates/beet_site/src/routes 	\
+	{{args}}
 
 #💡 Test
 

@@ -86,7 +86,7 @@ pub struct CargoCmd {
 	/// Equivalent to specifying both --locked and --offline
 	#[arg(long)]
 	pub frozen: bool,
-	/// Arguments for the binary or example to run
+	/// Any additional arguments passed to cargo
 	#[arg(trailing_var_arg = true)]
 	pub args: Vec<String>,
 }
@@ -272,11 +272,8 @@ impl CargoCmd {
 
 		cmd.args(args);
 
-		if cmd.status()?.success() {
-			Ok(())
-		} else {
-			anyhow::bail!("cargo run failed");
-		}
+		cmd.status()?.exit_ok()?;
+		Ok(())
 	}
 }
 
