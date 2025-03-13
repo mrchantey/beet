@@ -10,7 +10,7 @@ impl Component for MyComponent {
 }
 
 fn main() {
-	let foo = rsx! {
+	let str = rsx! {
 		<div>
 			<p>
 				hello <MyComponent value=38>
@@ -18,10 +18,10 @@ fn main() {
 				</MyComponent>
 			</p>
 		</div>
-	};
-	// let foo = rsx! {<div></div>};
+	}
+	.pipe(RsxToHtmlString::default())
+	.unwrap();
 
-	let str = RsxToHtml::render_body(&foo);
 	assert_eq!(
 		str,
 		"<div><p>hello <div>38<div>some child</div></div></p></div>"

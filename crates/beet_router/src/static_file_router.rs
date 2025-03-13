@@ -103,7 +103,7 @@ impl<T: 'static> StaticFileRouter<T> {
 				if let Some(map) = &mut template_map {
 					root = map.apply_template(root)?;
 				}
-				let doc = root.build_document()?;
+				let doc = root.pipe(RsxToHtmlDocument::default())?;
 				Ok((route, doc))
 			})
 			.collect::<Result<Vec<(RouteInfo, HtmlDocument)>>>()?;
@@ -131,7 +131,7 @@ impl<T: 'static> StaticFileRouter<T> {
 			}
 			path = path.strip_prefix("/").unwrap().to_path_buf();
 			let full_path = &dst.join(path);
-			FsExt::write(&full_path, &doc.render())?;
+			FsExt::write(&full_path, &doc.pipe(RenderHtml::pretty())?)?;
 		}
 		Ok(())
 	}
@@ -215,7 +215,7 @@ where
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use beet_rsx::html::RenderHtml;
+	use beet_rsx::prelude::*;
 	use sweet::prelude::*;
 
 	#[sweet::test]
@@ -227,8 +227,8 @@ mod test {
 		expect(html.len()).to_be(3);
 
 		expect(&html[0].0.path.to_string_lossy()).to_be("/contributing");
-		expect(&html[0].1.render()).to_be("<!DOCTYPE html><html><head></head><body><div><h1 data-beet-rsx-idx=\"4\">Beet</h1>party time dude!</div></body></html>");
+		expect(&html[0].1.clone().pipe(RenderHtml::default()).unwrap()).to_be("<!DOCTYPE html><html><head></head><body><div><h1 data-beet-rsx-idx=\"4\">Beet</h1>party time dude!</div></body></html>");
 		expect(&html[1].0.path.to_string_lossy()).to_be("/");
-		expect(&html[1].1.render()).to_be("<!DOCTYPE html><html><head></head><body><div><h1 data-beet-rsx-idx=\"4\">My Site</h1>party time!</div></body></html>");
+		expect(&html[1].1.clone().pipe(RenderHtml::default()).unwrap()).to_be("<!DOCTYPE html><html><head></head><body><div><h1 data-beet-rsx-idx=\"4\">My Site</h1>party time!</div></body></html>");
 	}
 }

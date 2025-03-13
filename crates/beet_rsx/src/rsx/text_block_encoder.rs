@@ -162,9 +162,15 @@ impl CollapsedNode {
 				out.extend(Self::from_node(root));
 			}
 			RsxNode::Block(RsxBlock { initial, .. }) => {
-				out.push(CollapsedNode::RustText(RsxToHtml::render_body(
-					initial,
-				)));
+				// let initial: &RsxNode = initial.as_ref();
+				let html = initial
+					.as_ref()
+					.pipe(RsxToHtml::default())
+					.unwrap()
+					.pipe1(RenderHtml::default())
+					.unwrap()
+					.1;
+				out.push(CollapsedNode::RustText(html));
 			}
 			RsxNode::Text { value, .. } => {
 				out.push(CollapsedNode::StaticText(value.clone()))

@@ -1,6 +1,6 @@
 use crate::prelude::*;
+use anyhow::Result;
 use thiserror::Error;
-
 
 /// Slotting is the process of traversing the [RsxComponent::slot_children]
 /// and applying them to the [RsxComponent::node] in the corresponding slots.
@@ -26,7 +26,8 @@ use thiserror::Error;
 ///  		<div slot="header">Header</div>
 /// 		<div>Default</div>
 ///  	</MyComponent>
-/// }.apply_and_render(),"<html><div>Header</div><div>Default</div></html>");
+/// }.pipe(RsxToHtmlString::default()).unwrap(),
+/// "<html><div>Header</div><div>Default</div></html>");
 ///
 /// ```
 ///
@@ -46,9 +47,11 @@ use thiserror::Error;
 #[derive(Debug, Default, Clone)]
 pub struct SlotsPlugin;
 
-impl RsxPlugin for SlotsPlugin {
-	fn apply(self, root: &mut RsxRoot) -> anyhow::Result<()> {
-		SlotsVisitor::apply(&mut root.node).map_err(|e| anyhow::anyhow!(e))
+impl RsxPlugin<RsxRoot> for SlotsPlugin {
+	fn apply(self, mut root: RsxRoot) -> Result<RsxRoot> {
+		SlotsVisitor::apply(&mut root.node)
+			.map(|_| root)
+			.map_err(|e| anyhow::anyhow!(e))
 	}
 }
 #[derive(Debug)]
@@ -236,7 +239,8 @@ mod test {
 					<div>Default</div>
 				</MyComponent>
 			}
-			.apply_and_render(),
+			.pipe(RsxToHtmlString::default())
+			.unwrap(),
 		)
 		.to_be("<html><div>Header</div><div>Default</div></html>");
 	}
@@ -264,7 +268,8 @@ mod test {
 					</MyComponent>
 				</MyComponent>
 			}
-			.apply_and_render(),
+			.pipe(RsxToHtmlString::default())
+			.unwrap(),
 		)
 		.to_be("<html><html><div>Header</div><div>Default</div></html></html>");
 	}

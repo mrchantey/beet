@@ -1,29 +1,33 @@
 use crate::prelude::*;
-
+use anyhow::Result;
 /// An implementation of hydrator that simply updates a tree of
-/// html nodes.
+/// html nodes. This is conceptually similar to JSDom in that
+/// it mocks the dom.
 pub struct RsDomTarget {
-	pub html: HtmlDocument,
+	pub doc: HtmlDocument,
 	constants: HtmlConstants,
 	loc_map: TreeLocationMap,
 }
 
 impl RsDomTarget {
-	pub fn new(root: &RsxRoot) -> Self {
-		let html = RsxToResumableHtml::default().map_root(root);
-		let loc_map = TreeLocationMap::from_node(root);
-		Self {
-			html,
+	pub fn new(root: &RsxRoot) -> Result<Self> {
+		let (root, doc) = root.pipe(RsxToResumableHtml::default())?;
+
+		let loc_map = TreeLocationMap::from_node(&root);
+		Ok(Self {
+			doc,
 			constants: Default::default(),
 			loc_map,
-		}
+		})
 	}
 }
 
 impl DomTargetImpl for RsDomTarget {
 	fn html_constants(&self) -> &HtmlConstants { &self.constants }
 
-	fn render(&self) -> String { self.html.render() }
+	fn render(&self) -> String {
+		self.doc.clone().pipe(RenderHtml::default()).unwrap()
+	}
 
 	fn update_rsx_node(
 		&mut self,
@@ -43,7 +47,7 @@ impl DomTargetImpl for RsDomTarget {
 			.parent_idx
 			.to_string();
 
-		for html in self.html.iter_mut() {
+		for html in self.doc.iter_mut() {
 			// let parent_hash =
 			if let Some(parent_el) = html.query_selector_attr(
 				self.constants.tree_idx_key,

@@ -294,7 +294,7 @@ mod test {
 		// let child_block = rsx! { <div> {"text"} </div> };
 
 		let mut counter = Counter::default();
-		let mut rsx = rsx! {
+		rsx! {
 			// doctype
 			<!DOCTYPE html>
 			// comment
@@ -315,9 +315,10 @@ mod test {
 					</Child>
 				</Child>
 			</div>
-		};
-		SlotsPlugin::default().apply(&mut rsx).unwrap();
-		rsx.walk(&mut counter);
+		}
+		.pipe(SlotsPlugin::default())
+		.unwrap()
+		.walk(&mut counter);
 		expect(counter.node).to_be(22);
 		expect(counter.doctype).to_be(1);
 		expect(counter.comment).to_be(1);

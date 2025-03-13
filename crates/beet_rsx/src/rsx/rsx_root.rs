@@ -1,5 +1,4 @@
 use crate::prelude::*;
-use anyhow::Result;
 use std::borrow::Borrow;
 use std::borrow::BorrowMut;
 
@@ -19,25 +18,7 @@ pub struct RsxRoot {
 	pub location: RsxMacroLocation,
 }
 
-impl RsxRoot {
-	/// Calls [`Self::apply_default_mods`] and then builds an [`HtmlDocument`].
-	/// This is the method used by routers.
-	pub fn build_document(mut self) -> Result<HtmlDocument> {
-		self.apply_default_plugins()?;
-		let html = RsxToHtml::default().map_node(&self);
-		let doc = html.into_document();
-		Ok(doc)
-	}
-	/// convenience method usually for testing:
-	/// - [Self::apply_default_mods]
-	/// - [RsxToHtml::render_body]
-	/// ## Panics
-	/// If the apply step fails.
-	pub fn apply_and_render(mut self) -> String {
-		self.apply_default_plugins().unwrap();
-		RsxToHtml::render_body(&self)
-	}
-}
+impl RsxRoot {}
 
 impl std::ops::Deref for RsxRoot {
 	type Target = RsxNode;

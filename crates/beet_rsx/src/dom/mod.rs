@@ -22,7 +22,9 @@ mod browser_dom_target;
 pub use browser_dom_target::*;
 
 thread_local! {
-	static DOM_TARGET: RefCell<Box<dyn DomTargetImpl>> = RefCell::new(Box::new(RsDomTarget::new(&().into_root())));
+	#[rustfmt::skip]
+	static DOM_TARGET: RefCell<Box<dyn DomTargetImpl>> =
+		RefCell::new(Box::new(RsDomTarget::new(&().into_root()).unwrap()));
 }
 
 /// Mechanism for swapping out:

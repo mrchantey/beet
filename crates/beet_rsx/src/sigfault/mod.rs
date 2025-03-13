@@ -125,7 +125,7 @@ mod test {
 		let (get, set) = signal(7);
 
 		let mut rsx = rsx! { <div>value is {get}</div> };
-		DomTarget::set(RsDomTarget::new(&rsx));
+		DomTarget::set(RsDomTarget::new(&rsx).unwrap());
 
 		rsx.register_effects();
 		expect(&DomTarget::with(|h| h.render()))

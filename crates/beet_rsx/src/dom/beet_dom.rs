@@ -13,8 +13,9 @@ impl BeetDom {
 
 		console_error_panic_hook::set_once();
 
+		let doc = app().pipe(RsxToResumableHtml::default()).unwrap().take1();
+
 		// effects are called on render
-		let doc = RsxToResumableHtml::default().map_root(&app());
 		Self::mount_doc(&doc);
 		Self::normalize();
 		// give the dom a moment to mount

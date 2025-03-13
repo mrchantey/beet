@@ -1,4 +1,5 @@
 use crate::prelude::*;
+use anyhow::Result;
 use lightningcss::printer::PrinterOptions;
 use lightningcss::stylesheet::ParserOptions;
 use lightningcss::stylesheet::StyleSheet;
@@ -55,12 +56,12 @@ impl Scope {
 	}
 }
 
-impl RsxPlugin for ScopedStylePlugin {
+impl RsxPlugin<RsxRoot> for ScopedStylePlugin {
 	/// Applies scoped style to:
 	/// 1. root node
 	/// 2. all component nodes
 	/// 3. all component slot children
-	fn apply(mut self, root: &mut RsxRoot) -> anyhow::Result<()> {
+	fn apply(mut self, mut root: RsxRoot) -> Result<RsxRoot> {
 		// 1. apply to the root node, if its a component nothing happens
 		//    in this step, it will be handled by the component visitor
 		self.apply_node(&mut root.node)?;
@@ -78,7 +79,7 @@ impl RsxPlugin for ScopedStylePlugin {
 				parse_err = Err(err);
 			};
 		});
-		parse_err.map_err(|e| anyhow::anyhow!(e))
+		parse_err.map(|_| root).map_err(|e| anyhow::anyhow!(e))
 	}
 }
 
@@ -190,7 +191,7 @@ mod test {
 					// <Child/>
 				</div>
 			}
-			.apply_and_render(),
+			.pipe(RsxToHtmlString::default()).unwrap(),
 		)
 		.to_be("<div data-styleid=\"0\"><style data-styleid=\"0\">span[data-styleid=\"0\"] {\n  color: red;\n}\n</style></div>");
 	}
@@ -204,7 +205,8 @@ mod test {
 					// <Child/>
 				</div>
 			}
-			.apply_and_render(),
+			.pipe(RsxToHtmlString::default())
+			.unwrap(),
 		)
 		.to_be("<div><style>span {\n  color: red;\n}\n</style></div>");
 	}
@@ -217,7 +219,7 @@ mod test {
 					<style scope:global>span { color: red; }</style>
 				</div>
 			}
-			.apply_and_render(),
+			.pipe(RsxToHtmlString::default()).unwrap(),
 		)
 		.to_be("<div data-styleid=\"0\"><style data-styleid=\"0\">div[data-styleid=\"0\"] {\n  color: #00f;\n}\n</style><style data-styleid=\"0\">span {\n  color: red;\n}\n</style></div>");
 	}
@@ -225,7 +227,7 @@ mod test {
 
 	#[test]
 	fn applies_to_component_node() {
-		expect(rsx! { <Child /> }.apply_and_render())
+		expect(rsx! { <Child /> }.pipe(RsxToHtmlString::default()).unwrap())
 		.to_be("<div data-styleid=\"0\"><style data-styleid=\"0\">span[data-styleid=\"0\"] {\n  color: #00f;\n}\n</style></div>");
 	}
 	#[test]
@@ -234,7 +236,7 @@ mod test {
 			<Child>
 				<Child />
 			</Child>
-		}.apply_and_render())
+		}.pipe(RsxToHtmlString::default()).unwrap())
 			.to_be("<div data-styleid=\"0\"><style data-styleid=\"0\">span[data-styleid=\"0\"] {\n  color: #00f;\n}\n</style><div data-styleid=\"1\"><style data-styleid=\"1\">span[data-styleid=\"1\"] {\n  color: #00f;\n}\n</style></div></div>");
 	}
 	#[test]
@@ -244,7 +246,7 @@ mod test {
 				<br/>
 				<style>span { color: red; }</style>
 			</Child>
-		}.apply_and_render())
+		}.pipe(RsxToHtmlString::default()).unwrap())
 			.to_be("<div data-styleid=\"0\"><style data-styleid=\"0\">span[data-styleid=\"0\"] {\n  color: #00f;\n}\n</style><br data-styleid=\"1\"/><style data-styleid=\"1\">span[data-styleid=\"1\"] {\n  color: red;\n}\n</style></div>");
 	}
 }

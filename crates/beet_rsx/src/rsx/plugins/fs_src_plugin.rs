@@ -16,21 +16,21 @@ impl Default for FsSrcPlugin {
 	fn default() -> Self { Self {} }
 }
 
-impl RsxPlugin for FsSrcPlugin {
-	fn apply(self, root: &mut RsxRoot) -> Result<()> {
+impl RsxPlugin<RsxRoot> for FsSrcPlugin {
+	fn apply(self, mut root: RsxRoot) -> Result<RsxRoot> {
 		//1. apply to root
-		self.apply_root(root)?;
+		self.apply_root(&mut root)?;
 
 		let mut result = Ok(());
 
 		//2. apply to the root of each component
-		VisitRsxComponentMut::walk(root, |component| {
+		VisitRsxComponentMut::walk(&mut root, |component| {
 			if let Err(err) = self.apply_root(&mut component.root) {
 				result = Err(err);
 			}
 		});
 
-		result
+		result.map(|_| root)
 	}
 }
 
@@ -90,20 +90,15 @@ mod test {
 	#[test]
 	fn works() {
 		// relative ignored
-		expect(
-			FsSrcPlugin::default()
-				.apply(&mut rsx! { <script src="/missing" /> }),
-		)
-		.to_be_ok();
+		expect(rsx! { <script src="/missing" /> }.pipe(FsSrcPlugin::default()))
+			.to_be_ok();
 		// missing errors
-		expect(
-			FsSrcPlugin::default()
-				.apply(&mut rsx! { <script src="missing" /> }),
-		)
-		.to_be_err();
+		expect(rsx! { <script src="missing" /> }.pipe(FsSrcPlugin::default()))
+			.to_be_err();
 
-		let mut root = rsx! { <script src="test.js" /> };
-		expect(FsSrcPlugin::default().apply(&mut root)).to_be_ok();
+		let root = rsx! { <script src="test.js" /> }
+			.pipe(FsSrcPlugin::default())
+			.unwrap();
 
 		let RsxNode::Element(el) = &root.node else {
 			panic!()

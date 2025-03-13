@@ -25,13 +25,12 @@ impl BeetHtml {
 
 
 		// apply the template to the app
-		let fresh_app = template_map.apply_template(stale_app)?;
+		let html = template_map
+			.apply_template(stale_app)?
+			.pipe(RsxToResumableHtmlString::default())?;
 
 		// build the doc and save it, the web server will detect a change
 		// and reload the page.
-		let mut doc = RsxToResumableHtml::default().map_root(&fresh_app);
-		doc.insert_wasm_script();
-		let html = doc.render();
 		FsExt::write(dst, &html)?;
 		Ok(())
 	}
