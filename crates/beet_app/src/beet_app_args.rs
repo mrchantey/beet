@@ -26,4 +26,13 @@ impl BeetAppArgs {
 		}
 		Ok(self)
 	}
+
+	#[cfg(target_arch = "wasm32")]
+	pub fn from_url_params() -> Result<Self> {
+		// TODO actually parse from search params
+		Ok(Self {
+			is_static: false,
+			html_dir: "".into(),
+		})
+	}
 }

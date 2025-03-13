@@ -9,7 +9,7 @@ pub fn main() {
 		FsExt::workspace_root().join("crates/beet_router/src/test_site/routes");
 	let parser = CollectRoutes {
 		routes_dir,
-		file_router_ident: "crate::DefaultFileRouter".into(),
+		file_router_ident: "crate::prelude::DefaultFileRouter".into(),
 		file_router_tokens: Some(
 			r#"
 				use crate::prelude::*;

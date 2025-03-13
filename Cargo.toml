@@ -199,7 +199,7 @@ beet_spatial = { workspace = true, optional = true }
 bevy = { workspace = true, optional = true }
 
 [dev-dependencies]
-beet = { path = "", features = ["rsx", "bevy"] }
+beet = { path = "", features = ["app", "rsx", "bevy"] }
 # bevy.workspace = true
 # bevy = { workspace = true, default_features = true }
 sweet = { workspace = true, features = ["test", "bevy", "rand"] }

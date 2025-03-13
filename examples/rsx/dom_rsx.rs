@@ -7,17 +7,12 @@
 use beet::prelude::*;
 use beet::rsx::sigfault::signal;
 
-/// The cli will run the native executable on template reloads
-/// *without* recompiling.
-#[cfg(not(target_arch = "wasm32"))]
-fn main() {
-	BeetHtml::render_to_file(app, "target/wasm-example/index.html").unwrap();
+#[rustfmt::skip]
+fn main() { 
+	BeetApp::new()
+		.add_collection(app)
+		.run(); 
 }
-
-
-#[cfg(target_arch = "wasm32")]
-fn main() { BeetDom::hydrate(app); }
-
 
 fn app() -> RsxRoot {
 	let (value, set_value) = signal(0);

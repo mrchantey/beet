@@ -3,30 +3,23 @@
 #![cfg_attr(test, test_runner(sweet::test_runner))]
 #![allow(async_fn_in_trait)]
 
-#[cfg(feature = "parser")]
+#[cfg(all(feature = "parser", not(target_arch = "wasm32")))]
 pub use beet_router_parser;
-pub mod beet_html;
 #[cfg(feature = "bevy")]
 pub mod bevy;
 pub mod file_router;
-pub mod static_file_router;
+pub mod spa_template;
 
 
 pub mod prelude {
-	pub use crate::DefaultFileRouter;
-	pub use crate::beet_html::*;
 	#[cfg(feature = "bevy")]
+	#[allow(unused_imports)]
 	pub use crate::bevy::*;
 	pub use crate::file_router::*;
-	pub use crate::static_file_router::*;
-	#[cfg(feature = "parser")]
+	pub use crate::spa_template::*;
+	#[cfg(all(feature = "parser", not(target_arch = "wasm32")))]
 	pub use beet_router_parser::prelude::*;
 }
-
-
-pub type DefaultFileRouter =
-	static_file_router::StaticFileRouter<static_file_router::DefaultAppState>;
-
 
 
 #[cfg(any(test, feature = "_test_site"))]

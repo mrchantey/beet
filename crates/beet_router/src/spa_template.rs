@@ -3,9 +3,9 @@ use anyhow::Result;
 use beet_rsx::prelude::*;
 use std::path::Path;
 
-pub struct BeetHtml;
+pub struct SpaTemplate;
 
-impl BeetHtml {
+impl SpaTemplate {
 	/// Renders the app to a html file, useful for a SPA setup
 	/// where there is only one entrypoint, but it still contains
 	/// static html.

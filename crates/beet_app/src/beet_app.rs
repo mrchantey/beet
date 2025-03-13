@@ -1,6 +1,5 @@
 use crate::prelude::*;
 use anyhow::Result;
-use clap::Parser;
 use std::pin::Pin;
 
 
@@ -16,11 +15,14 @@ type OnRun =
 pub struct BeetApp {
 	/// The router which can be extended by adding routers
 	/// as plugins.
-	#[cfg(feature = "server")]
+	#[cfg(all(feature = "server", not(target_arch = "wasm32")))]
 	pub router: beet_server::axum::Router,
 	/// A set of functions to execute when running in static
 	/// mode.
 	pub on_run_static: Vec<OnRun>,
+	#[cfg(target_arch = "wasm32")]
+	pub on_run_wasm:
+		Vec<Box<dyn FnOnce(&BeetAppArgs) -> Result<()> + Send + Sync>>,
 }
 
 impl BeetApp {
@@ -31,13 +33,15 @@ impl BeetApp {
 		self
 	}
 
-
+	#[cfg(target_arch = "wasm32")]
+	pub fn run(self) { self.run_inner().unwrap(); }
 
 	#[cfg(target_arch = "wasm32")]
-	pub fn run(self) {
-		todo!("use window.location to determine hydration route");
-		// BeetDom::hydrate(app);
+	fn run_inner(self) -> Result<()> {
+		let args = BeetAppArgs::from_url_params()?;
+		self.on_run_wasm.into_iter().try_for_each(|f| f(&args))
 	}
+
 
 	#[cfg(not(target_arch = "wasm32"))]
 	pub fn run(self) {
@@ -52,7 +56,10 @@ impl BeetApp {
 		}
 	}
 
+	#[cfg(not(target_arch = "wasm32"))]
 	async fn run_inner(self) -> Result<()> {
+		use clap::Parser;
+
 		let args = BeetAppArgs::parse().validate()?;
 
 		if args.is_static {
@@ -62,7 +69,7 @@ impl BeetApp {
 			.await?;
 			Ok(())
 		} else {
-			#[cfg(feature = "server")]
+			#[cfg(all(feature = "server", not(target_arch = "wasm32")))]
 			beet_server::prelude::BeetServer {
 				html_dir: args.html_dir.into(),
 				router: self.router,

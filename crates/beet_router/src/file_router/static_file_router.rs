@@ -6,6 +6,11 @@ use std::path::PathBuf;
 use std::pin::Pin;
 use sweet::prelude::FsExt;
 
+
+pub type DefaultFileRouter =
+	static_file_router::StaticFileRouter<static_file_router::DefaultAppState>;
+
+
 /// Simple default state for the static server,
 /// you will likely outgrow this quickly but it
 /// will help get up and running.

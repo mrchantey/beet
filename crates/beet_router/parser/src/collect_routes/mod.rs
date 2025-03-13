@@ -18,7 +18,7 @@ pub struct CollectRoutes {
 	pub file_router_tokens: Option<String>,
 	/// Identifier for the router. The router must have
 	/// where T can be a type or trait for each route on the site.
-	#[arg(long, default_value = "beet::router::DefaultFileRouter")]
+	#[arg(long, default_value = "beet::prelude::DefaultFileRouter")]
 	pub file_router_ident: String,
 	/// location of the routes directory
 	/// This will be used to split the path and discover the route path,

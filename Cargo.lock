@@ -646,6 +646,7 @@ version = "0.0.5-dev"
 dependencies = [
  "anyhow",
  "beet_router",
+ "beet_rsx",
  "beet_server",
  "clap",
  "futures",

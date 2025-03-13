@@ -18,6 +18,7 @@ server = ["dep:beet_server", "dep:beet_router"]
 
 
 [dependencies]
+beet_rsx.workspace = true
 anyhow.workspace = true
 futures.workspace = true
 clap.workspace = true

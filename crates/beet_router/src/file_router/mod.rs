@@ -1,9 +1,13 @@
+#[cfg(not(target_arch = "wasm32"))]
+pub mod static_file_router;
+#[cfg(not(target_arch = "wasm32"))]
+pub use static_file_router::*;
+
 use anyhow::Result;
 use beet_rsx::prelude::*;
 use http::Method;
 use std::path::PathBuf;
 use std::str::FromStr;
-
 
 /// This trait serves as both a collection of helper functions
 /// and a marker that the implementer should be able to handle

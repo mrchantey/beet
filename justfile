@@ -77,16 +77,17 @@ run-bevy-rsx:
 run-bevy-rsx-if-ok:
 	while cargo run --example bevy_rsx --features=bevy_default && [ $? -eq 0 ]; do :; done
 
+# rm -rf ./target
+# mkdir -p ./target/wasm-example
+# --html-dir 	target/wasm-example 							\
 
 run-dom-rsx:
-	rm -rf ./target
-	mkdir -p ./target/wasm-example
-	just cli serve-html 						\
-	--package beet 									\
-	--example dom_rsx 							\
-	--src examples/rsx/dom_rsx.rs 	\
-	--serve-dir target/wasm-example \
-	--wasm 													\
+	just cli watch 																\
+	--package beet 																\
+	--example dom_rsx 														\
+	--templates-root-dir examples/rsx/dom_rsx.rs 	\
+	--wasm 																				\
+	--static																			\
 
 # | just watch 'just build-wasm beet dom_rsx'
 # sweet serve ./target/wasm-example | \
