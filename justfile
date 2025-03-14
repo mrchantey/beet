@@ -273,9 +273,9 @@ lambda-watch:
 
 
 lambda-deploy *args:
-	cargo lambda build 							\
-	--package beet_site							\
-	--features beet_server/lambda		\
+	cargo lambda build 					\
+	--package beet_site					\
+	--features beet/lambda			\
 	--release
 	cargo lambda deploy			 		\
 	beet 												\

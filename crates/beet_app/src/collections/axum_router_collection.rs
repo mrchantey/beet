@@ -7,7 +7,7 @@ pub struct AxumRouterCollection;
 impl IntoCollection<AxumRouterCollection> for Router {
 	fn into_collection(self) -> impl Collection {
 		move |app: &mut BeetApp| {
-			app.router = std::mem::take(&mut app.router).merge(self);
+			app.axum_router = std::mem::take(&mut app.axum_router).merge(self);
 		}
 	}
 }

@@ -16,7 +16,7 @@ pub struct BeetApp {
 	/// The router which can be extended by adding routers
 	/// as plugins.
 	#[cfg(all(feature = "server", not(target_arch = "wasm32")))]
-	pub router: beet_server::axum::Router,
+	pub axum_router: beet_server::axum::Router,
 	/// A set of functions to execute when running in static
 	/// mode.
 	pub on_run_static: Vec<OnRun>,
@@ -72,7 +72,7 @@ impl BeetApp {
 			#[cfg(all(feature = "server", not(target_arch = "wasm32")))]
 			beet_server::prelude::BeetServer {
 				html_dir: args.html_dir.into(),
-				router: self.router,
+				router: self.axum_router,
 				..Default::default()
 			}
 			.serve()
