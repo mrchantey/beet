@@ -24,14 +24,14 @@ pub struct BuildBinaries {
 	collect_routes: CollectRoutes,
 	/// 🦀 the commands that will be used to build the html files 🦀
 	#[command(flatten)]
-	cargo_cmd: BuildCmd,
+	build_cmd: BuildCmd,
 }
 
 impl BuildBinaries {
 	/// run the built binary with the `--static` flag, instructing
 	/// it to not spin up a server, and instead just build the static files
 	pub fn build_templates(&self, watch_args: &WatchArgs) -> Result<()> {
-		Command::new(&self.cargo_cmd.exe_path())
+		Command::new(&self.build_cmd.exe_path())
 			.arg("--html-dir")
 			.arg(&watch_args.html_dir)
 			.arg("--static")
@@ -41,7 +41,7 @@ impl BuildBinaries {
 	}
 
 	pub fn run_server(&self, watch_args: &WatchArgs) -> Result<Child> {
-		let child = Command::new(&self.cargo_cmd.exe_path())
+		let child = Command::new(&self.build_cmd.exe_path())
 			.arg("--html-dir")
 			.arg(&watch_args.html_dir)
 			.spawn()?;
@@ -54,10 +54,14 @@ impl BuildBinaries {
 			self.collect_routes.build_and_write()?;
 		}
 		println!("🥁 building native");
-		self.cargo_cmd.spawn()?;
+		let mut cmd = self.build_cmd.clone();
+		if !watch_args.as_static {
+			cmd.cargo_args = Some("--features beet/server".to_string());
+		}
+		cmd.spawn()?;
 
 		if self.wasm {
-			let mut cmd = self.cargo_cmd.clone();
+			let mut cmd = self.build_cmd.clone();
 			cmd.target = Some("wasm32-unknown-unknown".to_string());
 			println!("🥁 building wasm");
 			cmd.spawn()?;

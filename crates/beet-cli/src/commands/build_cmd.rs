@@ -5,7 +5,6 @@ use std::process::Command;
 
 /// Verbatim clone of cargo run args
 #[derive(Debug, Clone, Parser)]
-#[command(name = "cargo-cmd")]
 pub struct BuildCmd {
 	/// Package with the target to run
 	#[arg(short = 'p', long = "package")]
@@ -22,7 +21,7 @@ pub struct BuildCmd {
 	/// Any additional arguments passed to cargo
 	#[arg(long)]
 	pub cargo_args: Option<String>,
-	// used by watcher to also build for wasm
+	/// used by watcher to also build for wasm
 	pub target: Option<String>,
 }
 
@@ -101,6 +100,7 @@ impl BuildCmd {
 		if let Some(args) = cargo_args {
 			cmd.args(args.split_whitespace());
 		}
+
 
 		cmd.status()?.exit_ok()?;
 		Ok(())

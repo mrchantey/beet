@@ -64,6 +64,10 @@ impl Watch {
 		Ok(())
 	}
 
+	/// Create a template watcher that will
+	/// 1. rebuild templates on any file change
+	/// 2. recompile on code changes
+	/// 3. run the process 
 	async fn watch(self) -> Result<()> {
 		// in server mode track the running child process
 		let mut child_process: Option<std::process::Child> = None;

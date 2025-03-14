@@ -48,7 +48,7 @@ cargo lambda build 						\
 	--features lambda						\
 	--release
 cargo lambda deploy			 			\
-	example											\ # no matter the crate name, the function will be called 'example'
+	example											\ # name of the function in the aws console
 	--binary-name my_crate			\
 	--region us-west-2 					\
 	--iam-role $AWS_IAM_ROLE 		\ # this is the arn for the iam role we just created

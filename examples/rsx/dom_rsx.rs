@@ -20,8 +20,8 @@ fn app() -> RsxRoot {
 	rsx! {
 		<div>
 			<div>"The value is "{value.clone()}</div>
-			<button onclick={move |_| set_value(value() + 1)}>
-				"increment"
+			<button onclick={move |_| set_value(value() + 2)}>
+				"increment the number"
 			</button>
 		</div>
 	}
