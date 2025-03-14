@@ -36,7 +36,7 @@ impl<T: Clone> Signal<T> {
 	}
 }
 
-
+/// Very simple implementation of effects used for testing and demos
 pub fn effect<F>(callback: F)
 where
 	F: FnMut() + 'static,
@@ -48,6 +48,7 @@ where
 	EFFECT_CALLBACK.with(|current| *current.borrow_mut() = None);
 }
 
+/// Very simple implementation of signals used for testing and demos
 pub fn signal<T: Clone + 'static>(
 	value: T,
 ) -> (impl Fn() -> T + Clone, impl Fn(T) + Clone) {
