@@ -283,7 +283,7 @@ impl RstmlToRsx {
 					};
 		};
 
-		quote!({
+		quote::quote_spanned!(open_tag.span()=> {
 			RsxNode::Component(RsxComponent{
 				idx: #idx,
 				tag: #tag.to_string(),

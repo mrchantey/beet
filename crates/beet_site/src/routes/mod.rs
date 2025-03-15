@@ -6,7 +6,6 @@ pub const CONTRIBUTING: &'static str = "/contributing";
 pub const INDEX: &'static str = "/";
 use beet::prelude::*;
 pub fn collect_file_routes(router: &mut beet::prelude::DefaultFileRouter) {
-	router
-		.add_route((RouteInfo::new("/contributing", "get"), contributing::get));
-	router.add_route((RouteInfo::new("/", "get"), index::get));
+    router.add_route((RouteInfo::new("/contributing", "get"), contributing::get));
+    router.add_route((RouteInfo::new("/", "get"), index::get));
 }

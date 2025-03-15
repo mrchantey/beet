@@ -240,11 +240,10 @@ mod test {
 		struct Child {
 			value: usize,
 		}
-		impl Component for Child {
-			fn render(self) -> RsxRoot {
-				rsx! { <p>hello {self.value}</p> }
-			}
+		fn child(props: Child) -> RsxRoot {
+			rsx! { <p>hello {props.value}</p> }
 		}
+
 		expect(
 			rsx! { <div>the child is <Child value=38 />!</div> }
 				.pipe(RsxToHtmlString::default())
@@ -258,16 +257,14 @@ mod test {
 	fn component_children() {
 		#[derive(Node)]
 		struct Layout;
-		impl Component for Layout {
-			fn render(self) -> RsxRoot {
-				rsx! {
-					<div>
-						<h1>welcome</h1>
-						<p>
-							<slot />
-						</p>
-					</div>
-				}
+		fn layout(_: Layout) -> RsxRoot {
+			rsx! {
+				<div>
+					<h1>welcome</h1>
+					<p>
+						<slot />
+					</p>
+				</div>
 			}
 		}
 		expect(
@@ -285,19 +282,17 @@ mod test {
 	fn component_slots() {
 		#[derive(Node)]
 		struct Layout;
-		impl Component for Layout {
-			fn render(self) -> RsxRoot {
-				rsx! {
-					<article>
-						<h1>welcome</h1>
-						<p>
-							<slot name="tagline" />
-						</p>
-						<main>
-							<slot />
-						</main>
-					</article>
-				}
+		fn layout(_: Layout) -> RsxRoot {
+			rsx! {
+				<article>
+					<h1>welcome</h1>
+					<p>
+						<slot name="tagline" />
+					</p>
+					<main>
+						<slot />
+					</main>
+				</article>
 			}
 		}
 

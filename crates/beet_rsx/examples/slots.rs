@@ -5,10 +5,8 @@ use beet_rsx::as_beet::*;
 struct MyComponent {
 	value: u32,
 }
-impl Component for MyComponent {
-	fn render(self) -> RsxRoot {
-		rsx! { <div>{self.value}<slot /></div> }
-	}
+fn my_component(props: MyComponent) -> RsxRoot {
+	rsx! { <div>{props.value}<slot /></div> }
 }
 
 fn main() {

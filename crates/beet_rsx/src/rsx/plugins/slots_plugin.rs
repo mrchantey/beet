@@ -12,14 +12,13 @@ use thiserror::Error;
 /// #[derive(Node)]
 /// struct MyComponent;
 ///
-/// impl Component for MyComponent {
-/// 	fn render(self)->RsxRoot{
-/// 		rsx!{
-/// 			<html>
-/// 				<slot name="header"/>
-/// 				<slot/> //default
-/// 			</html>
-/// 		}
+///
+/// fn my_component(_: MyComponent)->RsxRoot{
+/// 	rsx!{
+/// 		<html>
+/// 			<slot name="header"/>
+/// 			<slot/> //default
+/// 		</html>
 /// 	}
 /// }
 ///
@@ -222,15 +221,13 @@ mod test {
 		#[derive(Node)]
 		struct MyComponent;
 
-		impl Component for MyComponent {
-			fn render(self) -> RsxRoot {
-				rsx! {
-					<html>
-						<slot name="header" />
-						// default
-						<slot />
-					</html>
-				}
+		fn my_component(_: MyComponent) -> RsxRoot {
+			rsx! {
+				<html>
+					<slot name="header" />
+					// default
+					<slot />
+				</html>
 			}
 		}
 
@@ -252,17 +249,16 @@ mod test {
 		#[derive(Node)]
 		struct MyComponent;
 
-		impl Component for MyComponent {
-			fn render(self) -> RsxRoot {
-				rsx! {
-					<html>
-						<slot name="header" />
-						// default
-						<slot />
-					</html>
-				}
+		fn my_component(_: MyComponent) -> RsxRoot {
+			rsx! {
+				<html>
+					<slot name="header" />
+					// default
+					<slot />
+				</html>
 			}
 		}
+
 		expect(
 			rsx! {
 				<MyComponent>

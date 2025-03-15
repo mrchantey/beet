@@ -2,12 +2,14 @@ mod props_field;
 use crate::prelude::*;
 use proc_macro2::TokenStream;
 use props_field::*;
+use quote::ToTokens;
 use quote::format_ident;
 use quote::quote;
 use syn::Data;
 use syn::DeriveInput;
 use syn::Expr;
 use syn::Fields;
+use syn::Ident;
 use syn::Result;
 use syn::Type;
 
@@ -55,25 +57,38 @@ fn parse(input: DeriveInput) -> Result<TokenStream> {
 
 fn impl_component(input: &DeriveInput) -> Result<TokenStream> {
 	let attributes = AttributeGroup::parse(&input.attrs, "node")?;
-	if let Some(into_rsx) = attributes.get("into_rsx") {
-		let fallback = Expr::Verbatim(quote! { into_rsx });
-		let into_rsx = into_rsx.value.as_ref().unwrap_or(&fallback);
-
-		let (impl_generics, type_generics, where_clause) =
-			input.generics.split_for_impl();
-		let name = &input.ident;
-
-		Ok(quote! {
-		impl #impl_generics beet::prelude::Component for #name #type_generics #where_clause {
-
-			fn render(self) -> RsxRoot {
-				#into_rsx(self)
-			}
-		}
-		})
-	} else {
-		Ok(Default::default())
+	if attributes.get("no_component").is_some() {
+		return Ok(Default::default());
 	}
+
+	let into_rsx = if let Some(into_rsx) = attributes.get("into_rsx") {
+		into_rsx
+			.value
+			.as_ref()
+			.map(|expr| expr.to_token_stream())
+			.unwrap_or_else(|| {
+				Expr::Verbatim(quote! { into_rsx }).to_token_stream()
+			})
+	} else {
+		Ident::new(
+			&heck::AsSnakeCase(&input.ident.to_string()).to_string(),
+			input.ident.span(),
+		)
+		.to_token_stream()
+	};
+
+	let (impl_generics, type_generics, where_clause) =
+		input.generics.split_for_impl();
+	let name = &input.ident;
+
+	Ok(quote! {
+	impl #impl_generics beet::prelude::Component for #name #type_generics #where_clause {
+
+		fn render(self) -> RsxRoot {
+			#into_rsx(self)
+		}
+	}
+	})
 }
 
 
@@ -136,6 +151,7 @@ fn impl_builder(
 			quote! { Some(value) }
 		};
 		quote! {
+			#[allow(missing_docs)]
 			pub fn #name(mut self, value: #ty) -> Self {
 				self.#name = #rhs;
 				self

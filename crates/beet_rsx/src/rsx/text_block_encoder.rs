@@ -228,12 +228,11 @@ mod test {
 
 	#[derive(Node)]
 	struct Adjective;
-	impl Component for Adjective {
-		fn render(self) -> RsxRoot {
-			rsx! {
-				"lazy"
-				<slot />
-			}
+
+	fn adjective(_: Adjective) -> RsxRoot {
+		rsx! {
+			"lazy"
+			<slot />
 		}
 	}
 

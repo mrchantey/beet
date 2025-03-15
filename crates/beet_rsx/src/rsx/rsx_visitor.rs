@@ -242,16 +242,14 @@ mod test {
 
 	#[derive(Node)]
 	struct Child;
-	impl Component for Child {
-		fn render(self) -> RsxRoot {
-			rsx! {
-				<div>
-					<slot />
-				</div>
-			}
+
+	fn child(_: Child) -> RsxRoot {
+		rsx! {
+			<div>
+				<slot />
+			</div>
 		}
 	}
-
 
 	#[derive(Default)]
 	struct Counter {

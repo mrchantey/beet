@@ -171,17 +171,14 @@ mod test {
 	#[derive(Node)]
 	struct Child;
 
-	impl Component for Child {
-		fn render(self) -> RsxRoot {
-			rsx! {
-				<div>
-					<style>span { color: blue; }</style>
-					<slot />
-				</div>
-			}
+	fn child(_: Child) -> RsxRoot {
+		rsx! {
+			<div>
+				<style>span { color: blue; }</style>
+				<slot />
+			</div>
 		}
 	}
-
 
 	#[test]
 	fn applies_to_root() {

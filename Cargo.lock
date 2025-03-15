@@ -827,6 +827,7 @@ name = "beet_rsx_parser"
 version = "0.0.5-dev"
 dependencies = [
  "anyhow",
+ "heck 0.4.1",
  "proc-macro2",
  "proc-macro2-diagnostics",
  "quote",

@@ -83,10 +83,8 @@ mod test {
 	struct MyComponent {
 		value: usize,
 	}
-	impl Component for MyComponent {
-		fn render(self) -> RsxRoot {
-			rsx! { <div>the value is {self.value}<slot /></div> }
-		}
+	fn my_component(props: MyComponent) -> RsxRoot {
+		rsx! { <div>the value is {props.value}<slot /></div> }
 	}
 
 	// test a roundtrip split/join,

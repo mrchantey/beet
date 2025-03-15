@@ -5,13 +5,10 @@ use crate::prelude::*;
 #[derive(Node)]
 pub struct Button;
 
-
-impl Component for Button {
-	fn render(self) -> RsxRoot {
-		rsx! {
-		<button>
-			<slot/>
-		</button>
-		}
+fn button(_: Button) -> RsxRoot {
+	rsx! {
+	<button>
+		<slot/>
+	</button>
 	}
 }
