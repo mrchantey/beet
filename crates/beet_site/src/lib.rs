@@ -1,3 +1,5 @@
+#![feature(more_qualified_paths)]
+
 pub mod components;
 pub mod routes;
 

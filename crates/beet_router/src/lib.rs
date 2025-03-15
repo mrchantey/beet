@@ -2,6 +2,7 @@
 #![cfg_attr(test, feature(test, custom_test_frameworks))]
 #![cfg_attr(test, test_runner(sweet::test_runner))]
 #![allow(async_fn_in_trait)]
+#![feature(more_qualified_paths)]
 
 #[cfg(all(feature = "parser", not(target_arch = "wasm32")))]
 pub use beet_router_parser;

@@ -136,7 +136,7 @@ fn impl_builder(
 			quote! { Some(value) }
 		};
 		quote! {
-			fn #name(mut self, value: #ty) -> Self {
+			pub fn #name(mut self, value: #ty) -> Self {
 				self.#name = #rhs;
 				self
 			}
@@ -180,10 +180,10 @@ fn impl_builder(
 		}
 
 		impl #impl_generics PropsBuilder for #impl_builder_name #type_generics #where_clause {
-			type Props = #node_name #type_generics;
+			type Component = #node_name #type_generics;
 
-			fn build(self) -> Self::Props {
-				Self::Props{
+			fn build(self) -> Self::Component {
+				Self::Component{
 					#(#unwrap_fields),*
 				}
 			}
@@ -209,7 +209,7 @@ fn impl_required(
 	Ok(quote! {
 		#[allow(missing_docs)]
 		#vis struct #impl_required_name {
-			#(#required_field_names: bool),*
+			#(pub #required_field_names: bool),*
 		}
 	})
 }

@@ -6,6 +6,7 @@ use thiserror::Error;
 /// and applying them to the [RsxComponent::node] in the corresponding slots.
 ///
 /// ```
+/// # #![feature(more_qualified_paths)]
 /// # use beet_rsx::as_beet::*;
 ///
 /// #[derive(Node)]

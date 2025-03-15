@@ -249,35 +249,53 @@ impl RstmlToRsx {
 		children: Vec<Node<C>>,
 	) -> TokenStream {
 		let tracker = self.rusty_tracker.next_tracker(&open_tag);
-		let props = open_tag.attributes.into_iter().map(|attr| match attr {
-			NodeAttribute::Block(node_block) => {
-				quote! {#node_block}
-			}
-			NodeAttribute::Attribute(attr) => {
-				if let Some(value) = attr.value() {
-					let key = &attr.key;
-					// apply the value to the field
-					quote! {
-						#key: #value
-					}
-				} else {
-					let key = &attr.key;
-					// for components a key is treated as a bool 'flag'
-					quote! {#key: true}
+		let prop_assignments =
+			open_tag.attributes.iter().map(|attr| match attr {
+				NodeAttribute::Block(node_block) => {
+					quote! {#node_block}
 				}
-			}
-		});
+				NodeAttribute::Attribute(attr) => {
+					if let Some(value) = attr.value() {
+						let key = &attr.key;
+						// apply the value to the field
+						quote! {.#key(#value)}
+					} else {
+						let key = &attr.key;
+						// for components a key is treated as a bool 'flag'
+						quote! {.#key(true)}
+					}
+				}
+			});
+		let prop_names =
+			open_tag.attributes.iter().filter_map(|attr| match attr {
+				NodeAttribute::Block(_) => {
+					// TODO we probably dont want to check at all if any blocks
+					None
+				}
+				NodeAttribute::Attribute(attr) => Some(&attr.key),
+			});
 		let ident = syn::Ident::new(&tag, tag.span());
 		let slot_children = self.map_nodes(children);
+
+		let impl_required = quote::quote_spanned! {open_tag.span()=>
+					let _ = <#ident as Props>::Required{
+						#(#prop_names: Default::default()),*
+					};
+		};
+
 		quote!({
 			RsxNode::Component(RsxComponent{
 				idx: #idx,
 				tag: #tag.to_string(),
 				tracker: #tracker,
-				root: Box::new(#ident{
-					#(#props,)*
-				}
-				.render()),
+				root: {
+					#impl_required
+					Box::new(
+					<#ident as Props>::Builder::default()
+					#(#prop_assignments)*
+					.build()
+					.render()
+				)},
 				slot_children: Box::new(#slot_children)
 			})
 		})

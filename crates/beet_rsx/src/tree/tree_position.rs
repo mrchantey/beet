@@ -179,11 +179,11 @@ mod test {
 	use crate::prelude::*;
 	use sweet::prelude::*;
 
-	fn create_tree() -> TreeNode<i32> {
-		TreeNode::new(0).with_children(vec![
-			TreeNode::new(1).with_child(TreeNode::new(4)),
-			TreeNode::new(2),
-			TreeNode::new(3),
+	fn create_tree() -> TreeNode2<i32> {
+		TreeNode2::new(0).with_children(vec![
+			TreeNode2::new(1).with_child(TreeNode2::new(4)),
+			TreeNode2::new(2),
+			TreeNode2::new(3),
 		])
 	}
 

@@ -198,16 +198,16 @@ impl<T: Tree> Iterator for TreeIntoIterFlatDfs<T> {
 mod test {
 	// use crate::prelude::*;
 	use super::TreeIterFlat;
-	use crate::tree::TreeNode;
+	use crate::tree::TreeNode2;
 	use sweet::prelude::*;
 
 
 	/// create a tree labeled in dfs order
-	fn tree() -> TreeNode<i32> {
-		TreeNode::new(0).with_children(vec![
-			TreeNode::new(1).with_children(vec![TreeNode::new(2)]),
-			TreeNode::new(3),
-			TreeNode::new(4),
+	fn tree() -> TreeNode2<i32> {
+		TreeNode2::new(0).with_children(vec![
+			TreeNode2::new(1).with_children(vec![TreeNode2::new(2)]),
+			TreeNode2::new(3),
+			TreeNode2::new(4),
 		])
 	}
 
