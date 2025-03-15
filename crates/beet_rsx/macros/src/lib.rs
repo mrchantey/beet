@@ -1,5 +1,6 @@
 use beet_rsx_parser::prelude::*;
 use proc_macro::TokenStream;
+use syn::{parse_macro_input, DeriveInput};
 mod derive_deref;
 
 /// Demonstrates how to select a different reactive runtime
@@ -59,4 +60,11 @@ pub fn derive_deref(input: TokenStream) -> TokenStream {
 #[proc_macro_derive(DerefMut)]
 pub fn derive_deref_mut(input: TokenStream) -> TokenStream {
 	derive_deref::derive_deref_mut(input)
+}
+
+
+#[proc_macro_derive(Node, attributes(node, field))]
+pub fn derive_node(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+	let input = parse_macro_input!(input as DeriveInput);
+	impl_derive_node(input).into()
 }

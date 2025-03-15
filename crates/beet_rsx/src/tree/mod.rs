@@ -39,25 +39,25 @@ pub trait Tree: Sized {
 
 /// A simple tree structure
 #[derive(Debug, Clone, PartialEq)]
-pub struct Node<T> {
+pub struct TreeNode<T> {
 	value: T,
-	children: Vec<Node<T>>,
+	children: Vec<TreeNode<T>>,
 }
 
 
-impl<T> Node<T> {
+impl<T> TreeNode<T> {
 	pub fn new(value: T) -> Self {
 		Self {
 			children: Default::default(),
 			value,
 		}
 	}
-	pub fn with_children(mut self, children: Vec<Node<T>>) -> Self {
+	pub fn with_children(mut self, children: Vec<TreeNode<T>>) -> Self {
 		self.children = children;
 		self
 	}
 
-	pub fn with_child(mut self, child: Node<T>) -> Self {
+	pub fn with_child(mut self, child: TreeNode<T>) -> Self {
 		self.children.push(child);
 		self
 	}
@@ -120,7 +120,7 @@ impl<T> Node<T> {
 }
 
 
-impl<T> Tree for Node<T> {
+impl<T> Tree for TreeNode<T> {
 	type Item = T;
 	fn new_with_value_and_children(
 		value: Self::Item,
@@ -144,10 +144,10 @@ impl<T> Tree for Node<T> {
 }
 
 
-impl<T> From<T> for Node<T> {
+impl<T> From<T> for TreeNode<T> {
 	fn from(value: T) -> Self { Self::new(value) }
 }
-impl<T, U: Into<Node<T>>> From<(T, Vec<U>)> for Node<T> {
+impl<T, U: Into<TreeNode<T>>> From<(T, Vec<U>)> for TreeNode<T> {
 	fn from((value, children): (T, Vec<U>)) -> Self {
 		Self::new_with_value_and_children(
 			value,
@@ -156,9 +156,9 @@ impl<T, U: Into<Node<T>>> From<(T, Vec<U>)> for Node<T> {
 	}
 }
 
-impl<T: Tree> FromIterator<(TreePosition, T)> for Node<T> {
+impl<T: Tree> FromIterator<(TreePosition, T)> for TreeNode<T> {
 	fn from_iter<I: IntoIterator<Item = (TreePosition, T)>>(iter: I) -> Self {
-		Node::collect(iter).unwrap()
+		TreeNode::collect(iter).unwrap()
 	}
 }
 

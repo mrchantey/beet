@@ -194,11 +194,11 @@ mod test {
 
 
 	/// create a tree labeled in dfs order
-	fn tree() -> Node<i32> {
-		Node::new(0).with_children(vec![
-			Node::new(1).with_children(vec![Node::new(2)]),
-			Node::new(3),
-			Node::new(4),
+	fn tree() -> TreeNode<i32> {
+		TreeNode::new(0).with_children(vec![
+			TreeNode::new(1).with_children(vec![TreeNode::new(2)]),
+			TreeNode::new(3),
+			TreeNode::new(4),
 		])
 	}
 
