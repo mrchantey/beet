@@ -1,7 +1,7 @@
-mod node;
+mod props;
 mod plugins;
 mod rsx_idx;
-pub use node::*;
+pub use props::*;
 pub use plugins::*;
 mod tree_location;
 mod tree_location_map;

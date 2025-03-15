@@ -1,10 +1,12 @@
-mod node_field;
-use node_field::NodeField;
+mod props_field;
+use crate::prelude::*;
 use proc_macro2::TokenStream;
+use props_field::*;
 use quote::format_ident;
 use quote::quote;
 use syn::Data;
 use syn::DeriveInput;
+use syn::Expr;
 use syn::Fields;
 use syn::Result;
 use syn::Type;
@@ -32,24 +34,48 @@ fn parse(input: DeriveInput) -> Result<TokenStream> {
 		}
 	}
 	.iter()
-	.map(|f| NodeField::parse(f))
+	.map(|f| PropsField::parse(f))
 	.collect::<Result<Vec<_>>>()?;
 
-
-	let impl_node = impl_node(&input)?;
+	let impl_component = impl_component(&input)?;
+	let impl_props = impl_props(&input)?;
 	let impl_builder = impl_builder(&input, &fields)?;
 	let impl_required = impl_required(&input, &fields)?;
 
 	Ok(quote! {
-		#impl_node
+		#impl_component
+		#impl_props
 		#impl_builder
 		#impl_required
 	})
 }
 
 
+fn impl_component(input: &DeriveInput) -> Result<TokenStream> {
+	let attributes = AttributeGroup::parse(&input.attrs, "node")?;
+	if let Some(into_rsx) = attributes.get("into_rsx") {
+		let fallback = Expr::Verbatim(quote! { into_rsx });
+		let into_rsx = into_rsx.value.as_ref().unwrap_or(&fallback);
 
-fn impl_node(input: &DeriveInput) -> Result<TokenStream> {
+		let (impl_generics, type_generics, where_clause) =
+			input.generics.split_for_impl();
+		let name = &input.ident;
+
+		Ok(quote! {
+		impl #impl_generics Component for #name #type_generics #where_clause {
+
+			fn render(self) -> RsxRoot {
+				#into_rsx(self)
+			}
+		}
+		})
+	} else {
+		Ok(Default::default())
+	}
+}
+
+
+fn impl_props(input: &DeriveInput) -> Result<TokenStream> {
 	let name = &input.ident;
 	let impl_builder_name = format_ident!("{}Builder", &input.ident);
 	let impl_required_name = format_ident!("{}Required", &input.ident);
@@ -59,14 +85,9 @@ fn impl_node(input: &DeriveInput) -> Result<TokenStream> {
 
 	Ok(quote! {
 
-		impl #impl_generics Node for #name #type_generics #where_clause {
+		impl #impl_generics Props for #name #type_generics #where_clause {
 			type Builder = #impl_builder_name #type_generics;
 			type Required = #impl_required_name;
-
-			fn into_rsx(self) -> RsxRoot {
-				// todo use attribute
-				into_rsx(self)
-			}
 		}
 
 
@@ -77,12 +98,12 @@ fn impl_node(input: &DeriveInput) -> Result<TokenStream> {
 
 fn impl_builder(
 	input: &DeriveInput,
-	fields: &[NodeField],
+	fields: &[PropsField],
 ) -> Result<TokenStream> {
 	let builder_fields = fields.iter().map(|field| {
 		let name = &field.inner.ident;
 		let ty = get_inner_type(&field.inner.ty);
-		if field.attribute("default").is_some() {
+		if field.default_attr().is_some() {
 			quote! { #name: #ty }
 		} else {
 			quote! { #name: Option<#ty> }
@@ -93,7 +114,7 @@ fn impl_builder(
 
 	let builder_defaults = fields.iter().map(|field| {
 		let name = &field.inner.ident;
-		if let Some(attr) = field.attribute("default") {
+		if let Some(attr) = field.default_attr() {
 			let val = attr.value.as_ref().unwrap_or(&default_fallback);
 			quote! { #name: #val }
 		} else {
@@ -106,7 +127,7 @@ fn impl_builder(
 		let name = &field.inner.ident;
 		let ty = get_inner_type(&field.inner.ty);
 
-		let rhs = if field.attribute("default").is_some() {
+		let rhs = if field.default_attr().is_some() {
 			quote! { value }
 		} else {
 			quote! { Some(value) }
@@ -121,7 +142,7 @@ fn impl_builder(
 	let unwrap_fields = fields.iter().map(|field| {
 		let name = &field.inner.ident;
 
-		let rhs = if field.attribute("default").is_some() {
+		let rhs = if field.default_attr().is_some() {
 			quote! { self.#name }
 		} else if field.is_optional() {
 			quote! { self.#name }
@@ -155,11 +176,11 @@ fn impl_builder(
 			}
 		}
 
-		impl #impl_generics NodeBuilder for #impl_builder_name #type_generics #where_clause {
-			type Node = #node_name #type_generics;
+		impl #impl_generics PropsBuilder for #impl_builder_name #type_generics #where_clause {
+			type Props = #node_name #type_generics;
 
-			fn build(self) -> Self::Node {
-				Self::Node{
+			fn build(self) -> Self::Props {
+				Self::Props{
 					#(#unwrap_fields),*
 				}
 			}
@@ -169,7 +190,7 @@ fn impl_builder(
 
 fn impl_required(
 	input: &DeriveInput,
-	fields: &[NodeField],
+	fields: &[PropsField],
 ) -> Result<TokenStream> {
 	let required_field_names = fields.iter().filter_map(|field| {
 		if field.is_required() {
