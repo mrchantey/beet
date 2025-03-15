@@ -1,5 +1,6 @@
 use beet_rsx::as_beet::*;
 
+#[derive(Node)]
 struct MyComponent {
 	value: u32,
 }

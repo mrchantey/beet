@@ -2,7 +2,7 @@ use beet::prelude::*;
 
 
 
-
+#[derive(Node)]
 pub struct PageLayout {
 	pub title: String,
 }

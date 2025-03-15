@@ -1,6 +1,5 @@
+use beet_rsx::as_beet::*;
 use std::marker::PhantomData;
-
-use beet_rsx::prelude::*;
 
 #[derive(Default)]
 struct Foo<T>(PhantomData<T>);

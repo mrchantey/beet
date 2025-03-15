@@ -8,6 +8,7 @@ use thiserror::Error;
 /// ```
 /// # use beet_rsx::as_beet::*;
 ///
+/// #[derive(Node)]
 /// struct MyComponent;
 ///
 /// impl Component for MyComponent {
@@ -217,6 +218,7 @@ mod test {
 
 	#[test]
 	fn works() {
+		#[derive(Node)]
 		struct MyComponent;
 
 		impl Component for MyComponent {
@@ -246,6 +248,7 @@ mod test {
 	}
 	#[test]
 	fn recursive() {
+		#[derive(Node)]
 		struct MyComponent;
 
 		impl Component for MyComponent {

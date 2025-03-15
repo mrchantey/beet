@@ -1,6 +1,7 @@
 use beet_rsx_parser::prelude::*;
 use proc_macro::TokenStream;
-use syn::{parse_macro_input, DeriveInput};
+use syn::DeriveInput;
+use syn::parse_macro_input;
 mod derive_deref;
 
 /// Demonstrates how to select a different reactive runtime

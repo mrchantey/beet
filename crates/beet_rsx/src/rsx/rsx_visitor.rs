@@ -240,7 +240,7 @@ mod test {
 	use crate::as_beet::*;
 	use sweet::prelude::*;
 
-
+	#[derive(Node)]
 	struct Child;
 	impl Component for Child {
 		fn render(self) -> RsxRoot {

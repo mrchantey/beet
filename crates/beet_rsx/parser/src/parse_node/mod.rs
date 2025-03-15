@@ -16,13 +16,15 @@ pub fn impl_derive_node(input: DeriveInput) -> TokenStream {
 }
 
 fn parse(input: DeriveInput) -> Result<TokenStream> {
+	let unit_fields = Default::default();
 	let fields = match input.data {
-		Data::Struct(ref data) => match data.fields {
-			Fields::Named(ref fields) => &fields.named,
-			_ => {
+		Data::Struct(ref data) => match &data.fields {
+			Fields::Unit => &unit_fields,
+			Fields::Named(fields) => &fields.named,
+			Fields::Unnamed(_) => {
 				return Err(syn::Error::new_spanned(
 					&input,
-					"Only named fields are supported",
+					"Unnamed structs are not currently supported",
 				));
 			}
 		},
@@ -62,7 +64,7 @@ fn impl_component(input: &DeriveInput) -> Result<TokenStream> {
 		let name = &input.ident;
 
 		Ok(quote! {
-		impl #impl_generics Component for #name #type_generics #where_clause {
+		impl #impl_generics beet::prelude::Component for #name #type_generics #where_clause {
 
 			fn render(self) -> RsxRoot {
 				#into_rsx(self)
@@ -84,6 +86,7 @@ fn impl_props(input: &DeriveInput) -> Result<TokenStream> {
 		input.generics.split_for_impl();
 
 	Ok(quote! {
+		use beet::prelude::*;
 
 		impl #impl_generics Props for #name #type_generics #where_clause {
 			type Builder = #impl_builder_name #type_generics;
@@ -159,7 +162,7 @@ fn impl_builder(
 	let vis = &input.vis;
 
 	Ok(quote! {
-
+		#[allow(missing_docs)]
 		#vis struct #impl_builder_name #impl_generics {
 			#(#builder_fields),*
 		}
@@ -204,6 +207,7 @@ fn impl_required(
 	let vis = &input.vis;
 
 	Ok(quote! {
+		#[allow(missing_docs)]
 		#vis struct #impl_required_name {
 			#(#required_field_names: bool),*
 		}

@@ -2,6 +2,7 @@ use crate::prelude::*;
 
 
 /// A button component
+#[derive(Node)]
 pub struct Button;
 
 

@@ -18,6 +18,7 @@ async fn main() {
 		.run();
 }
 
+#[derive(Node)]
 struct Counter {
 	initial: i32,
 }

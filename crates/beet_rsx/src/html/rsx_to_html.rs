@@ -236,6 +236,7 @@ mod test {
 
 	#[test]
 	fn component_props() {
+		#[derive(Node)]
 		struct Child {
 			value: usize,
 		}
@@ -255,6 +256,7 @@ mod test {
 	}
 	#[test]
 	fn component_children() {
+		#[derive(Node)]
 		struct Layout;
 		impl Component for Layout {
 			fn render(self) -> RsxRoot {
@@ -281,6 +283,7 @@ mod test {
 	}
 	#[test]
 	fn component_slots() {
+		#[derive(Node)]
 		struct Layout;
 		impl Component for Layout {
 			fn render(self) -> RsxRoot {

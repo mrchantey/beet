@@ -79,6 +79,7 @@ mod test {
 	use crate::as_beet::*;
 	use sweet::prelude::*;
 
+	#[derive(Node)]
 	struct MyComponent {
 		value: usize,
 	}

@@ -226,6 +226,7 @@ mod test {
 	use crate::as_beet::*;
 	use sweet::prelude::*;
 
+	#[derive(Node)]
 	struct Adjective;
 	impl Component for Adjective {
 		fn render(self) -> RsxRoot {
