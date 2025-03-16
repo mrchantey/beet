@@ -1,4 +1,7 @@
+#![cfg_attr(test, feature(test, custom_test_frameworks))]
+#![cfg_attr(test, test_runner(sweet::test_runner))]
 #![deny(missing_docs)]
+#![feature(more_qualified_paths)]
 #![doc = include_str!("../README.md")]
 /// Structs for use as context in components
 pub mod context;

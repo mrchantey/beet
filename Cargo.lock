@@ -658,6 +658,7 @@ name = "beet_design"
 version = "0.0.5-dev"
 dependencies = [
  "beet_rsx",
+ "sweet",
 ]
 
 [[package]]

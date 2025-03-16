@@ -8,14 +8,15 @@ use std::borrow::Cow;
 /// In this example we dont need to set any of the Head values
 /// they will fallback to Brand values.
 /// ```
-/// # use beet_rsx::prelude::*;
+/// # #![feature(more_qualified_paths)]
+/// # use beet_rsx::as_beet::*;
 /// # use beet_design::prelude::*;
 ///
 /// fn my_component()-> RsxRoot{
 /// 	set_context(Brand{
 /// 		title: "My Site".into(),
 /// 		description: "A site about stuff".into(),
-///
+///			site_url: "https://myapp.com".into(),
 /// 	});
 ///
 /// 	rsx!{

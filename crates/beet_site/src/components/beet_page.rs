@@ -3,19 +3,25 @@ use beet::prelude::*;
 
 
 #[derive(Node)]
-pub struct PageLayout {
-	pub title: String,
-}
+pub struct BeetPage {}
 
 
-fn page_layout(props: PageLayout) -> RsxRoot {
+fn beet_page(_: BeetPage) -> RsxRoot {
+	set_context(Brand {
+		title: "Beet".into(),
+		description: "A Rust web framework".into(),
+		site_url: "https://beetrsx.dev".into(),
+	});
+
+	let brand = get_context::<Brand>();
+
 	rsx! {
 		<html>
 		<head>
 			<slot name="head"/>
 		</head>
 		<body>
-		<h1>{props.title}</h1>
+		<h1>{brand.title}</h1>
 			<nav>
 				<a href="/">Home</a>
 				<a href="/contributing">Contributing</a>

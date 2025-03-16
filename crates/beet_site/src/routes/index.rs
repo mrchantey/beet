@@ -6,12 +6,7 @@ use beet::prelude::*;
 pub fn get(_state: DefaultAppState) -> RsxRoot {
 	let val = 88;
 	rsx! {
-		<PageLayout title="Beet".into()>
-			<meta
-				slot="head"
-				name="description"
-				content="This is the main file"
-			/>
+		<BeetPage>
 			{val + 8}
 			<span>hello world</span>
 			<style>
@@ -19,6 +14,6 @@ pub fn get(_state: DefaultAppState) -> RsxRoot {
 					color: red;
 				}
 			</style>
-		</PageLayout>
+		</BeetPage>
 	}
 }

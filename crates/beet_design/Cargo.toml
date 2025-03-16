@@ -15,3 +15,7 @@ publish = true
 
 [dependencies]
 beet_rsx = { workspace = true }
+
+
+[dev-dependencies]
+sweet = { workspace = true, features = ["test"] }

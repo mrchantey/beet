@@ -1,2 +1,2 @@
-mod page_layout;
-pub use page_layout::*;
+mod beet_page;
+pub use beet_page::*;

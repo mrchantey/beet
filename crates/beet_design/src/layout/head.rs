@@ -11,6 +11,7 @@ pub struct Head {
 	/// Enable to force the page to be displayed at a fixed scale,
 	/// disabling zooming.
 	/// This is useful for games, but will reduce accessibility in documents.
+	#[field(default)]
 	pub fixed_scale: bool,
 }
 
