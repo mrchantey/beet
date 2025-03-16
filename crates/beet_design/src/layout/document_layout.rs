@@ -14,10 +14,10 @@ fn document_layout(_props: DocumentLayout) -> RsxRoot {
 			<Head>
 				<slot name="head" />
 			</Head>
-		<body>
-			// <script is:inline src="/autoTheme.js"></script>
-			<slot/>
-		</body>
-	</html>
+			<body>
+				// <script is:inline src="/autoTheme.js"></script>
+				<slot/>
+			</body>
+		</html>
 		}
 }

@@ -24,7 +24,7 @@ async fn main() {
 
 	let rsx =
 		beet_router::test_site::routes::index::get(DefaultAppState::default());
-	let root1 = map.get(&rsx.location).unwrap();
+	let root1 = map.templates.get(&rsx.location).unwrap();
 	let RsxTemplateNode::Component {
 		tracker: tracker1, ..
 	} = &root1.node

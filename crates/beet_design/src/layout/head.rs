@@ -57,7 +57,7 @@ fn head(Head { fixed_scale }: Head) -> RsxRoot {
 		// <meta name="twitter:site" content={`@${username}`}>
 
 		// <!-- PWA STUFF -->
-		<link rel="manifest" href="/manifest.webmanifest">
+		// <link rel="manifest" href="/manifest.webmanifest">
 		// <!-- ios -->
 		<meta name="apple-mobile-web-app-capable" content="yes">
 		<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">

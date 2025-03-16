@@ -79,7 +79,7 @@ fn handle_recv(
 		match recv {
 			TemplateReloaderMessage::Reload => {
 				let map = RsxTemplateMap::load(&template_reload.dst).unwrap();
-				for (loc, root) in map.iter() {
+				for (loc, root) in map.templates.iter() {
 					let loc_hash = loc.into_hash();
 					root.node.visit(|template_node| {
 						let loc = GlobalRsxIdx::new(

@@ -94,8 +94,17 @@ impl BuildTemplateMap {
 				}
 			});
 
+		let root =
+			ron::ser::to_string(&self.templates_root_dir.canonicalize()?)?;
+		let root: TokenStream = root
+			.parse()
+			.map_err(|_| anyhow::anyhow!("Failed to parse root path"))?;
+
 		let map = quote! {
-			RsxTemplateMap({#(#items),*})
+			RsxTemplateMap(
+				root: #root,
+				templates: {#(#items),*}
+			)
 		};
 		Ok(map)
 	}
@@ -173,7 +182,7 @@ mod test {
 			FsExt::workspace_root().join("crates/beet_router/src/test_site");
 
 		let file = BuildTemplateMap {
-			templates_root_dir: src,
+			templates_root_dir: src.clone(),
 			templates_map_path: PathBuf::default(),
 			..Default::default()
 		}
@@ -181,7 +190,8 @@ mod test {
 		.unwrap()
 		.to_string();
 		let map: RsxTemplateMap = ron::de::from_str(&file).unwrap();
-		expect(map.len()).to_be(4);
+		expect(map.root).to_be(src);
+		expect(map.templates.len()).to_be(4);
 		// println!("{:#?}", map);
 	}
 }

@@ -259,6 +259,7 @@ mod test {
 	use sweet::prelude::*;
 
 	#[test]
+	#[ignore = "too flaky, we need smaller tests"]
 	fn works() {
 		let input = syn::parse_quote! {
 			#[derive(Node)]

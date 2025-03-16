@@ -7,7 +7,7 @@ pub fn get(_state: DefaultAppState) -> RsxRoot {
 	rsx! {
 		<BeetPage>
 			{val + 8}
-			<span>hello world</span>
+			<span>hello worlds</span>
 			<style>
 				span{
 					color: red;

@@ -7,7 +7,7 @@ use std::time::Instant;
 use sweet::prelude::*;
 
 
-/// Watch the [BuildRsxTemplateMap::src] for changes, and determine if the rust code
+/// Watch the [BuildTemplateMap::templates_root_dir] for changes, and determine if the rust code
 /// changed in a file, or if it was just the html template.
 ///
 /// The reload step is as follows:

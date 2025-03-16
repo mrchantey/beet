@@ -8,21 +8,21 @@ pub struct PageLayout {
 
 fn page_layout(_props: PageLayout) -> RsxRoot {
 	rsx! {
-			<DocumentLayout>
+		<DocumentLayout>
 		<slot name="head" slot="head" />
 		<div class="page">
 			// <Header/>
 			<slot/>
 			// <Footer/>
 		</div>
-	</DocumentLayout>
-	<style>
-	.page {
-		min-height: 100dvh;
-		display: flex;
-		flex-direction: column;
-		/* overflow: hidden; */
-	}
-	</style>
+		</DocumentLayout>
+		<style>
+		.page {
+			min-height: 100dvh;
+			display: flex;
+			flex-direction: column;
+			/* overflow: hidden; */
+		}
+		</style>
 	}
 }
