@@ -102,6 +102,9 @@ impl ScopedStylePlugin {
 				// currently only recurse top level style children, we could create another
 				// visitor to go deeper if we start supporting style body components
 				if let RsxNode::Text { value, .. } = &mut *el.children {
+					// this is a hack to allow for the css unit "em" to be used in the style tag
+					// we should put it somewhere else
+					*value = value.replace(".em", "em");
 					if let Err(err) = self.apply_styles(value, scope) {
 						parse_err = Err(err);
 					}
@@ -257,8 +260,8 @@ mod test {
 	#[test]
 	fn inner_text() {
 		expect(rsx! {
-				<style>span { padding: "1em"; }</style>
+				<style>span { padding: 1.em; }</style>
 		}.pipe(RsxToHtmlString::default()).unwrap())
-			.to_be("<style data-styleid=\"0\">span[data-styleid=\"0\"] {\n  padding: \"1em\";\n}\n</style>");
+			.to_be("<style data-styleid=\"0\">span[data-styleid=\"0\"] {\n  padding: 1em;\n}\n</style>");
 	}
 }

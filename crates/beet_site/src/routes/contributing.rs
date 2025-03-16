@@ -1,8 +1,13 @@
-// use crate::prelude::*;
+use crate::prelude::*;
 use beet::prelude::*;
 
 
 pub fn get() -> RsxRoot {
-	rsx! { <div>party time dude!</div> }
+	rsx! {
+		<BeetPage>
+
+		<div>party time dude!</div>
+		</BeetPage>
+	}
 	// rsx! { <PageLayout title="Beet".into()>party time dude!</PageLayout> }
 }

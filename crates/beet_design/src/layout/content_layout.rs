@@ -15,14 +15,14 @@ fn content_layout(_: ContentLayout) -> RsxRoot {
 			</main>
 			</PageLayout>
 			<style>
-				// main {
-				// 	/* min-height:100dvh; */
-				// 	min-height: var(--bm-main-height);
-				// 	padding: 1em var(--content-padding-width);
-				// }
-				// main img {
-				// 	max-width: 100%;
-				// }
+				main {
+					/* min-height:100dvh; */
+					min-height: var(--bm-main-height);
+					padding: 1.em var(--content-padding-width);
+				}
+				main img {
+					max-width: 100%;
+				}
 			</style>
 	}
 }
