@@ -72,7 +72,7 @@ pub enum TemplateError {
 	)]
 	NoTemplate {
 		expected: RsxMacroLocation,
-		received: RsxTemplateMap,
+		received: Vec<RsxMacroLocation>,
 	},
 	#[error(
 		"Rusty Map is missing a tracker for {cx}\nExpected: {expected:#?}\nReceived: {received:#?}"
@@ -225,7 +225,7 @@ impl RsxTemplateNode {
 							},
 						),
 					}?;
-				// here we need apply the template for the component
+				// very confusing to callback to the map like this
 				let root = template_map.apply_template(root)?;
 				Ok(RsxNode::Component(RsxComponent {
 					idx,

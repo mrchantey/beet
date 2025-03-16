@@ -43,28 +43,28 @@ impl RsxTemplateMap {
 
 	// should live elsewhere, maybe RustyPart
 	pub fn apply_template(&self, root: RsxRoot) -> TemplateResult<RsxRoot> {
-		let mut rusty_map = RustyPartMap::collect(root.node);
 		let location = root.location;
-		// i think here we need to pass the whole map for component template reloading
 		let template_root = self
 			.get(&location)
 			.ok_or_else(|| TemplateError::NoTemplate {
-				received: self.clone(),
+				received: self.values().map(|x| x.location.clone()).collect(),
 				expected: location.clone(),
 			})?
 			.clone();
-		let node =
-			self.apply_template_for_node(template_root, &mut rusty_map)?;
+		let node = self.apply_template_for_node(
+			template_root,
+			&mut RustyPartMap::collect(root.node),
+		)?;
 		Ok(node)
 	}
 
 	/// Create an [`RsxRoot`] from a template and hydrated nodes.
-	/// 		todo!("this is wrong, we need template map for each component?;
 	fn apply_template_for_node(
 		&self,
 		root: RsxTemplateRoot,
 		rusty_map: &mut RustyPartMap,
 	) -> TemplateResult<RsxRoot> {
+		// i dont like passing self like this, kind of hides recursion
 		let node = root.node.into_rsx_node(self, rusty_map)?;
 		Ok(RsxRoot {
 			node,

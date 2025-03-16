@@ -16,11 +16,7 @@ fn beet_page(_: BeetPage) -> RsxRoot {
 	let brand = get_context::<Brand>();
 
 	rsx! {
-		<html>
-		<head>
-			<slot name="head"/>
-		</head>
-		<body>
+		<ContentLayout>
 		<h1>{brand.title}</h1>
 			<nav>
 				<a href="/">Home</a>
@@ -44,7 +40,6 @@ fn beet_page(_: BeetPage) -> RsxRoot {
 						color:white;
 					}
 				</style>
-			</body>
-		</html>
+		</ContentLayout>
 	}
 }

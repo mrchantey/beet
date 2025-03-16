@@ -106,6 +106,8 @@ impl<T: 'static> StaticFileRouter<T> {
 				// only hydrate if we have templates
 				// we already warned otherwise
 				if let Some(map) = &mut template_map {
+					// TODO check if inside templates_root_dir.
+					// if so, error, otherwise do nothing
 					root = map.apply_template(root)?;
 				}
 				let doc = root.pipe(RsxToHtmlDocument::default())?;
