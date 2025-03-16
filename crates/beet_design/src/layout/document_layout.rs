@@ -9,15 +9,15 @@ pub struct DocumentLayout {
 
 fn document_layout(_props: DocumentLayout) -> RsxRoot {
 	rsx! {
-		<!DOCTYPE html>
-		<html lang="en">
-			<Head>
-				<slot name="head" />
-			</Head>
-			<body>
-				// <script is:inline src="/autoTheme.js"></script>
-				<slot/>
-			</body>
-		</html>
-		}
+	<!DOCTYPE html>
+	<html lang="en">
+		<Head>
+			<slot name="head" />
+		</Head>
+		<body>
+			// <script is:inline src="/autoTheme.js"></script>
+			<slot/>
+		</body>
+	</html>
+	}
 }

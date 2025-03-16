@@ -41,7 +41,7 @@ impl FsSrcPlugin {
 
 		VisitRsxElementMut::walk_with_opts(
 			&mut root.node,
-			VisitRsxOptions::ignore_component(),
+			VisitRsxOptions::ignore_component_node(),
 			|el| {
 				if let Some(src) = el.get_key_value_attr("src") {
 					if IGNORED_PREFIX
@@ -87,6 +87,14 @@ mod test {
 	use crate::as_beet::*;
 	use sweet::prelude::*;
 
+	#[derive(Node)]
+	struct Foo;
+
+	fn foo(_: Foo) -> RsxRoot {
+		rsx! { <div><slot /></div> }
+	}
+
+
 	#[test]
 	fn works() {
 		// relative ignored
@@ -95,6 +103,12 @@ mod test {
 		// missing errors
 		expect(rsx! { <script src="missing" /> }.pipe(FsSrcPlugin::default()))
 			.to_be_err();
+		// slot children errors
+		expect(
+			rsx! {<Foo> <script src="missing" /></Foo> }
+				.pipe(FsSrcPlugin::default()),
+		)
+		.to_be_err();
 
 		let root = rsx! { <script src="test.js" /> }
 			.pipe(FsSrcPlugin::default())

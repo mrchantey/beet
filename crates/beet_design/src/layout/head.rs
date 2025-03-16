@@ -36,11 +36,10 @@ fn head(Head { fixed_scale }: Head) -> RsxRoot {
 
 	rsx! {
 		<head>
-		{scale}
 		<title>{title.clone()}</title>
 		<link rel="canonical" href={site_url.clone()}>
+		{scale}
 		<meta name="description" content={description.clone()}>
-
 		// <link rel="alternate" type="application/rss+xml" title="Bevyhub Blog" href={Routes.rss} />
 		// <link rel="sitemap" href="/sitemap-index.xml" />
 
