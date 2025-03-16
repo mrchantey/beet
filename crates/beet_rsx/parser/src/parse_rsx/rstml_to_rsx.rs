@@ -71,6 +71,7 @@ impl RstmlToRsx {
 			}
 		}
 	}
+
 	/// the number of actual html nodes will likely be different
 	/// due to fragments, blocks etc
 	pub fn map_nodes<C>(&mut self, nodes: Vec<Node<C>>) -> TokenStream {
@@ -134,6 +135,7 @@ impl RstmlToRsx {
 			}
 			Node::Block(block) => {
 				let tracker = self.rusty_tracker.next_tracker(&block);
+
 				let ident = &self.idents.runtime.effect;
 				quote! {
 					#ident::parse_block_node(#idx, #tracker, #block)
@@ -341,4 +343,19 @@ impl RstmlToRsx {
 			true
 		});
 	}
+}
+
+#[cfg(test)]
+mod test {
+	use crate::prelude::*;
+	use proc_macro2::TokenStream;
+	use quote::quote;
+
+	fn map(tokens: TokenStream) -> TokenStream {
+		let (nodes, _) = tokens_to_rstml(tokens.clone());
+		RstmlToRsx::default().map_nodes(nodes)
+	}
+
+	#[test]
+	fn works() { let _block = map(quote! {{7}}); }
 }

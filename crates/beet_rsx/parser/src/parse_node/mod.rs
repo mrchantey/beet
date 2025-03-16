@@ -47,6 +47,8 @@ fn parse(input: DeriveInput) -> Result<TokenStream> {
 	let impl_required = impl_required(&input, &fields)?;
 
 	Ok(quote! {
+		use beet::prelude::*;
+
 		#impl_component
 		#impl_props
 		#impl_builder
@@ -101,8 +103,6 @@ fn impl_props(input: &DeriveInput) -> Result<TokenStream> {
 		input.generics.split_for_impl();
 
 	Ok(quote! {
-		use beet::prelude::*;
-
 		impl #impl_generics Props for #name #type_generics #where_clause {
 			type Builder = #impl_builder_name #type_generics;
 			type Required = #impl_required_name;
@@ -249,4 +249,106 @@ fn get_inner_type(ty: &Type) -> &Type {
 		}
 	}
 	ty
+}
+
+
+#[cfg(test)]
+mod test {
+	use crate::prelude::*;
+	use quote::quote;
+	use sweet::prelude::*;
+
+	#[test]
+	fn works() {
+		let input = syn::parse_quote! {
+			#[derive(Node)]
+			#[node(into_rsx = my_node)]
+			struct MyNode {
+				is_required: u32,
+				is_optional: Option<u32>,
+				#[field(default = 7)]
+				is_default: u32,
+				#[field(default)]
+				is_generic_default: Foo<u32>,
+			}
+		};
+
+
+		let expected = quote! {
+			use beet::prelude::*;
+
+			impl beet::prelude::Component for MyNode {
+				fn render (self) -> RsxRoot { my_node (self) }
+			}
+			impl Props for MyNode {
+				type Builder = MyNodeBuilder;
+				type Required = MyNodeRequired;
+			}
+			#[allow(missing_docs)]
+			struct MyNodeBuilder {
+				is_required: Option<u32>,
+				is_optional: Option<u32>,
+				is_default: u32,
+				is_generic_default: Foo<u32>
+			}
+
+			impl MyNodeBuilder {
+				#[allow(missing_docs)]
+				pub fn is_required(mut self, value: u32) -> Self {
+					self.is_required = Some(value);
+					self
+				}
+
+				#[allow(missing_docs)]
+				pub fn is_optional(mut self, value: u32) -> Self {
+					self.is_optional = Some(value);
+					self
+				}
+
+				#[allow(missing_docs)]
+				pub fn is_default(mut self, value: u32) -> Self {
+					self.is_default = value;
+					self
+				}
+
+				#[allow(missing_docs)]
+				pub fn is_generic_default(mut self, value: Foo<u32>) -> Self {
+					self.is_generic_default = value;
+					self
+				}
+			}
+
+			impl Default for MyNodeBuilder {
+				fn default() -> Self {
+					Self {
+						is_required: None,
+						is_optional: None,
+						is_default: 7,
+						is_generic_default: Default::default()
+					}
+				}
+			}
+
+			impl PropsBuilder for MyNodeBuilder {
+				type Component = MyNode;
+
+				fn build(self) -> Self::Component {
+					Self::Component {
+						is_required: self.is_required.unwrap(),
+						is_optional: self.is_optional,
+						is_default: self.is_default,
+						is_generic_default: self.is_generic_default
+					}
+				}
+			}
+
+			#[allow(missing_docs)]
+			struct MyNodeRequired {
+				pub is_required: bool
+			}
+		};
+
+		let actual = impl_derive_node(input);
+		expect(actual.to_string()).to_be(expected.to_string());
+	}
 }

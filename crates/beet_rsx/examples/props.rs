@@ -6,7 +6,7 @@ use std::marker::PhantomData;
 struct Foo<T>(PhantomData<T>);
 
 #[derive(Node)]
-#[node(into_rsx=my_node)]
+#[node(into_rsx=my_node_other)]
 struct MyNode {
 	is_required: u32,
 	is_optional: Option<u32>,
@@ -16,7 +16,7 @@ struct MyNode {
 	is_generic_default: Foo<u32>,
 }
 
-fn my_node(props: MyNode) -> RsxRoot {
+fn my_node_other(props: MyNode) -> RsxRoot {
 	rsx! {
 		<div>
 			<p>is_optional: {format!("{:?}", props.is_optional)}</p>

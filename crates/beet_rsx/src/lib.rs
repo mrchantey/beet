@@ -9,6 +9,7 @@
 //! lightweight and intended to run on constrained devices like the ESP32
 //!
 //!
+pub mod context;
 pub mod dom;
 pub mod error;
 pub mod html;
@@ -32,6 +33,7 @@ pub mod prelude {
 	pub use beet_rsx_macros::*;
 	#[cfg(feature = "parser")]
 	pub use beet_rsx_parser::prelude::*;
+	pub use crate::context::*;
 	pub use crate::dom::*;
 	pub use crate::error::*;
 	pub use crate::html::*;
