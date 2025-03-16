@@ -11,6 +11,7 @@ use rstml::node::NodeAttribute;
 use rstml::node::NodeElement;
 use rstml::node::NodeFragment;
 use rstml::node::NodeName;
+use syn::Ident;
 use syn::spanned::Spanned;
 
 /// given a span, for example the inner block
@@ -276,7 +277,7 @@ impl RstmlToRsx {
 				}
 				NodeAttribute::Attribute(attr) => Some(&attr.key),
 			});
-		let ident = syn::Ident::new(&tag, tag.span());
+		let ident = syn::Ident::new(&tag, open_tag.span());
 		let slot_children = self.map_nodes(children);
 
 		let impl_required = quote::quote_spanned! {open_tag.span()=>
@@ -285,7 +286,15 @@ impl RstmlToRsx {
 					};
 		};
 
-		quote::quote_spanned!(open_tag.span()=> {
+		// attempt to get ide to show the correct type by using
+		// the component as the first spanned quote
+		let ide_helper = Ident::new(
+			&format!("{}Required", &ident.to_string()),
+			open_tag.span(),
+		);
+
+		quote::quote!({
+			let _ = #ide_helper::default();
 			RsxNode::Component(RsxComponent{
 				idx: #idx,
 				tag: #tag.to_string(),
@@ -293,11 +302,12 @@ impl RstmlToRsx {
 				root: {
 					#impl_required
 					Box::new(
-					<#ident as Props>::Builder::default()
-					#(#prop_assignments)*
-					.build()
-					.render()
-				)},
+						<#ident as Props>::Builder::default()
+						#(#prop_assignments)*
+						.build()
+						.render()
+					)
+				},
 				slot_children: Box::new(#slot_children)
 			})
 		})

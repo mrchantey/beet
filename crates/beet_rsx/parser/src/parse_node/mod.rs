@@ -56,7 +56,6 @@ fn parse(input: DeriveInput) -> Result<TokenStream> {
 	})
 }
 
-
 fn impl_component(input: &DeriveInput) -> Result<TokenStream> {
 	let attributes = AttributeGroup::parse(&input.attrs, "node")?;
 	if attributes.get("no_component").is_some() {
@@ -224,6 +223,7 @@ fn impl_required(
 
 	Ok(quote! {
 		#[allow(missing_docs)]
+		#[derive(Default)]
 		#vis struct #impl_required_name {
 			#(pub #required_field_names: bool),*
 		}
