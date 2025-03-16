@@ -367,5 +367,15 @@ mod test {
 	}
 
 	#[test]
-	fn works() { let _block = map(quote! {{7}}); }
+	fn block() { let _block = map(quote! {{7}}); }
+	// #[test]
+	// fn style() { let _block = map(quote! {
+	// 	<style>
+	// 		main {
+	// 			/* min-height:100dvh; */
+	// 			min-height: var(--bm-main-height);
+	// 			padding: 1em var(--content-padding-width);
+	// 		}
+	// </style>
+	// }); }
 }

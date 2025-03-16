@@ -91,7 +91,11 @@ mod test {
 	struct Foo;
 
 	fn foo(_: Foo) -> RsxRoot {
-		rsx! { <div><slot /></div> }
+		rsx! {
+			<div>
+				<slot />
+			</div>
+		}
 	}
 
 
@@ -105,8 +109,12 @@ mod test {
 			.to_be_err();
 		// slot children errors
 		expect(
-			rsx! {<Foo> <script src="missing" /></Foo> }
-				.pipe(FsSrcPlugin::default()),
+			rsx! {
+				<Foo>
+					<script src="missing" />
+				</Foo>
+			}
+			.pipe(FsSrcPlugin::default()),
 		)
 		.to_be_err();
 

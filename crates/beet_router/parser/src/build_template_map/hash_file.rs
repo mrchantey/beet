@@ -13,38 +13,39 @@ use sweet::prelude::ReadFile;
 /// determine if a compilation is required due to rust code changes
 /// by hashing an entire file.
 /// Non-rust files can also be handled
-pub struct HashRsxFile {
-	hasher: RapidHasher,
+#[derive(Default)]
+pub struct HashFile {
+	/// whether non-rust files should also be hashed
+	hash_non_rust: bool,
 }
 
-impl HashRsxFile {
-	/// (private) create a new hasher
-	fn new() -> Self {
-		Self {
-			hasher: RapidHasher::default_const(),
-		}
-	}
-
-	/// hash only the code parts of a file. if the file does not have a rust extension
-	/// the entire file will be hashed.
-	pub fn file_to_hash(path: &Path) -> Result<u64> {
+impl HashFile {
+	/// hash only the code parts of a rust file.
+	pub fn file_to_hash(&self, path: &Path) -> Result<u64> {
 		let file = ReadFile::to_string(path)?;
 		if path.extension().map_or(false, |ext| ext == "rs") {
+			let mut hasher = RapidHasher::default_const();
 			// parse to file or it will be a string literal
 			let file = syn::parse_file(&file)?;
-			let mut this = Self::new();
-			this.walk_tokens(file.to_token_stream())?;
-			Ok(this.hasher.finish())
-		} else {
-			let mut hasher = Self::new().hasher;
+			self.walk_tokens(&mut hasher, file.to_token_stream())?;
+			Ok(hasher.finish())
+		} else if self.hash_non_rust {
+			let mut hasher = RapidHasher::default_const();
 			hasher.write(file.as_bytes());
-			return Ok(hasher.finish());
+			Ok(hasher.finish())
+			// other files will not trigger a recompile by default
+		} else {
+			return Ok(0);
 		}
 	}
 
 	/// # Errors
 	/// If the file cannot be read or parsed as tokens
-	fn walk_tokens(&mut self, tokens: TokenStream) -> Result<()> {
+	fn walk_tokens(
+		&self,
+		hasher: &mut RapidHasher,
+		tokens: TokenStream,
+	) -> Result<()> {
 		let mut iter = tokens.into_iter().peekable();
 		while let Some(tree) = iter.next() {
 			// println!("visiting tree: {}", tree.to_string());
@@ -57,26 +58,23 @@ impl HashRsxFile {
 							if let Some(TokenTree::Group(group)) = iter.next() {
 								// println!("visiting rsx");
 								RstmlRustToHash::visit_and_hash(
-									&mut self.hasher,
+									hasher,
 									group.stream(),
 								);
 								continue;
 							}
 						}
 					} else {
-						ident
-							.to_string()
-							.replace(" ", "")
-							.hash(&mut self.hasher);
+						ident.to_string().replace(" ", "").hash(hasher);
 					}
 				}
 				TokenTree::Group(group) => {
 					// recurse into groups
-					self.walk_tokens(group.stream())?;
+					self.walk_tokens(hasher, group.stream())?;
 				}
 				tree => {
 					// Hash everything else
-					tree.to_string().replace(" ", "").hash(&mut self.hasher);
+					tree.to_string().replace(" ", "").hash(hasher);
 				}
 			}
 		}
@@ -97,9 +95,9 @@ mod test {
 	#[rustfmt::skip]
 	fn works() {		
 		fn hash(tokens: TokenStream) -> u64 {
-			let mut hasher = HashRsxFile::new();
-			hasher.walk_tokens(tokens).unwrap();
-			hasher.hasher.finish()
+			let mut hasher = RapidHasher::default_const();
+			HashFile::default().walk_tokens(&mut hasher,tokens).unwrap();
+			hasher.finish()
 		}
 
 		// ignore element names

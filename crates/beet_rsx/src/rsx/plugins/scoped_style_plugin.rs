@@ -105,6 +105,10 @@ impl ScopedStylePlugin {
 					if let Err(err) = self.apply_styles(value, scope) {
 						parse_err = Err(err);
 					}
+				} else {
+					parse_err = Err(ParseError::Serde(
+						"style tag must contain text".to_string(),
+					));
 				}
 			}
 		});
@@ -246,5 +250,15 @@ mod test {
 			</Child>
 		}.pipe(RsxToHtmlString::default()).unwrap())
 			.to_be("<div data-styleid=\"0\"><style data-styleid=\"0\">span[data-styleid=\"0\"] {\n  color: #00f;\n}\n</style><br data-styleid=\"1\"/><style data-styleid=\"1\">span[data-styleid=\"1\"] {\n  color: red;\n}\n</style></div>");
+	}
+
+
+	// this is invalid css, wrapping in "1em", we need to unwrap somehow
+	#[test]
+	fn inner_text() {
+		expect(rsx! {
+				<style>span { padding: "1em"; }</style>
+		}.pipe(RsxToHtmlString::default()).unwrap())
+			.to_be("<style data-styleid=\"0\">span[data-styleid=\"0\"] {\n  padding: \"1em\";\n}\n</style>");
 	}
 }

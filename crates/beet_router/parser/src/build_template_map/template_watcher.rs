@@ -84,7 +84,8 @@ impl<Reload: FnMut() -> Result<()>, Recompile: FnMut() -> Result<()>>
 						.map(|x| x == "rs")
 						.unwrap_or_default()
 					{
-						let new_hash = HashRsxFile::file_to_hash(&ev.path)?;
+						let new_hash =
+							HashFile::default().file_to_hash(&ev.path)?;
 						if let Some(curr_hash) = self.file_cache.get(&ev.path) {
 							if curr_hash == &new_hash {
 								hotreload_reason = Some(ev.display());
@@ -150,7 +151,7 @@ fn preheat_cache(src: &Path) -> Result<HashMap<PathBuf, u64>> {
 		.into_iter()
 		.map(|file| {
 			let path = file.canonicalize()?;
-			let hash = HashRsxFile::file_to_hash(&path)?;
+			let hash = HashFile::default().file_to_hash(&path)?;
 			Ok((path, hash))
 		})
 		.collect::<Result<_>>()?;
