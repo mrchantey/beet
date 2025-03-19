@@ -36,6 +36,39 @@ impl BuildApp {
 	}
 }
 
+
+pub struct RunSetup;
+
+impl RunSetup {
+	pub fn new(build_native: &BuildCmd) -> Result<BuildStepGroup> {
+		println!("🥁 Build Step 1: Setup");
+
+		let mut build_cmd = build_native.clone();
+		build_cmd.cargo_args = Some("--features setup".to_string());
+		build_cmd.spawn()?;
+
+		let exe_path = build_cmd.exe_path();
+
+		let stdout = Command::new(&exe_path).output()?.stdout;
+		let setup_config: FileGroupConfig = ron::de::from_bytes(&stdout)?;
+
+		let mut group = BuildStepGroup::default();
+		for item in setup_config.groups.into_iter() {
+			match item {
+				FileGroup::Child(_file_group_config) => todo!(),
+				FileGroup::Glob(_glob_file_group) => todo!(),
+				FileGroup::Tree(TreeFileGroup { src_dir }) => {
+					group.items.push(Box::new(CollectRoutes {
+						routes_dir: setup_config.app_cx.resolve_path(src_dir),
+						..Default::default()
+					}));
+				}
+			}
+		}
+		Ok(group)
+	}
+}
+
 pub struct BuildNative {
 	build_cmd: BuildCmd,
 }
@@ -52,6 +85,7 @@ impl BuildNative {
 
 impl BuildStep for BuildNative {
 	fn run(&self) -> Result<()> {
+		println!("🥁 Build Step 2: Native");
 		self.build_cmd.run()?;
 		Ok(())
 	}
@@ -103,41 +137,13 @@ impl BuildWasm {
 
 impl BuildStep for BuildWasm {
 	fn run(&self) -> Result<()> {
-		println!("🥁 building wasm");
+		println!("🥁 Build Step 3: WASM");
 		self.build_cmd.spawn()?;
 		self.wasm_bindgen()?;
 		Ok(())
 	}
 }
 
-pub struct RunSetup;
-impl RunSetup {
-	pub fn new(build_native: &BuildCmd) -> Result<BuildStepGroup> {
-		let mut build_cmd = build_native.clone();
-		build_cmd.cargo_args = Some("--features setup".to_string());
-		build_cmd.spawn()?;
-
-		let exe_path = build_cmd.exe_path();
-
-		let stdout = Command::new(&exe_path).output()?.stdout;
-		let setup_config: FileGroupConfig = ron::de::from_bytes(&stdout)?;
-
-		let mut group = BuildStepGroup::default();
-		for item in setup_config.groups.into_iter() {
-			match item {
-				FileGroup::Child(_file_group_config) => todo!(),
-				FileGroup::Glob(_glob_file_group) => todo!(),
-				FileGroup::Tree(TreeFileGroup { src_dir }) => {
-					group.items.push(Box::new(CollectRoutes {
-						routes_dir: setup_config.app_cx.resolve_path(src_dir),
-						..Default::default()
-					}));
-				}
-			}
-		}
-		Ok(group)
-	}
-}
 
 pub struct BuildTemplates {
 	exe_path: PathBuf,

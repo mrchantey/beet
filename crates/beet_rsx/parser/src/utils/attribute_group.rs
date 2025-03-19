@@ -6,7 +6,7 @@ use syn::Result;
 use syn::Token;
 use syn::parse::ParseStream;
 
-
+#[derive(Debug)]
 pub struct AttributeGroup {
 	pub attributes: Vec<AttributeItem>,
 }
@@ -43,6 +43,7 @@ impl AttributeGroup {
 /// An attribute item.
 /// `#[foo(bar=7)]` would be parsed as `AttributeItem { key: "bar", value: Some(7) }`
 ///
+#[derive(Debug)]
 pub struct AttributeItem {
 	pub key: Member,
 	pub value: Option<Expr>,

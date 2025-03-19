@@ -1,7 +1,7 @@
 use crate::prelude::*;
 use beet::prelude::*;
 
-pub fn get(_state: DefaultAppState) -> RsxRoot {
+pub fn get() -> RsxRoot {
 	let val = 98;
 	rsx! {
 		<BeetPage>

@@ -3,6 +3,7 @@ use crate::prelude::*;
 use syn::Field;
 use syn::Result;
 
+#[derive(Debug)]
 pub struct PropsField<'a> {
 	pub inner: &'a Field,
 	pub attributes: AttributeGroup,

@@ -5,5 +5,5 @@ use beet_rsx::prelude::*;
 
 pub fn get() -> RsxRoot {
 	// rsx! { <div>party time dude!</div> }
-	rsx! { <PageLayout title="Beet".into()>party time dude!</PageLayout> }
+	rsx! { <PageLayout title="Test Site">party time dude!</PageLayout> }
 }

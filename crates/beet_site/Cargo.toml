@@ -15,10 +15,13 @@ keywords.workspace = true
 [features]
 setup = ["beet/setup"]
 
-[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+[dependencies]
 anyhow.workspace = true
-beet = { workspace = true, features = ["router", "server"] }
 
+beet = { workspace = true, features = ["router"] }
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+beet = { workspace = true, features = ["server"] }
 tokio.workspace = true
 
 # [dev-dependencies]

@@ -3,7 +3,7 @@ use beet_router::prelude::*;
 
 #[tokio::main]
 async fn main() {
-	let mut router = DefaultFileRouter::default();
+	let mut router = StaticFileRouter::default();
 	// usually its directly in src but test_site is a subdirectory
 	// router.html_dir = PathBuf::from("crates/beet_router/target/client")
 	// 	.canonicalize()

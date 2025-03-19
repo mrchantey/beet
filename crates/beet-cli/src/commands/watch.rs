@@ -68,7 +68,7 @@ impl Watch {
 	/// 2. recompile on code changes
 	/// 3. run the process
 	async fn watch(self) -> Result<()> {
-		let build_binaries = BuildApp::new(&self.build_cmd, &self.watch_args)?;
+		let build_app = BuildApp::new(&self.build_cmd, &self.watch_args)?;
 
 		let build_templates =
 			BuildTemplates::new(&self.watch_args, &self.build_cmd.exe_path());
@@ -76,7 +76,7 @@ impl Watch {
 		TemplateWatcher::new(
 			self.build_template_map,
 			|| build_templates.run(),
-			|| build_binaries.run(),
+			|| build_app.run(),
 		)?
 		.run_once_and_watch()
 		.await

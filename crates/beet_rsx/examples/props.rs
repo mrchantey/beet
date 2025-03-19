@@ -14,6 +14,8 @@ struct MyNode {
 	is_default: u32,
 	#[field(default)]
 	is_generic_default: Foo<u32>,
+	#[field(into)]
+	is_into: String,
 }
 
 fn my_node_other(props: MyNode) -> RsxRoot {
@@ -23,6 +25,7 @@ fn my_node_other(props: MyNode) -> RsxRoot {
 			<p>is_required: {format!("{:?}", props.is_required)}</p>
 			<p>is_default: {format!("{:?}", props.is_default)}</p>
 			<p>is_generic_default: {format!("{:?}", props.is_generic_default)}</p>
+			<p>is_into: {format!("{:?}", props.is_into)}</p>
 		</div>
 	}
 }
@@ -30,12 +33,12 @@ fn my_node_other(props: MyNode) -> RsxRoot {
 
 
 fn main() {
-	let str = rsx! { <MyNode is_required=38 /> }
+	let str = rsx! { <MyNode is_required=38 is_into="foobar" /> }
 		.pipe(RsxToHtmlString::default())
 		.unwrap();
 	assert_eq!(
 		str,
-		"<div><p data-beet-rsx-idx=\"3\">is_optional: None</p><p data-beet-rsx-idx=\"8\">is_required: 38</p><p data-beet-rsx-idx=\"13\">is_default: 7</p><p data-beet-rsx-idx=\"18\">is_generic_default: Foo(PhantomData<u32>)</p></div>"
+		"<div><p data-beet-rsx-idx=\"3\">is_optional: None</p><p data-beet-rsx-idx=\"8\">is_required: 38</p><p data-beet-rsx-idx=\"13\">is_default: 7</p><p data-beet-rsx-idx=\"18\">is_generic_default: Foo(PhantomData<u32>)</p><p data-beet-rsx-idx=\"23\">is_into: \"foobar\"</p></div>"
 	);
-	sweet::log!("success! {}", str);
+	sweet::log!("success!");
 }

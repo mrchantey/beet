@@ -12,6 +12,8 @@ use syn::Fields;
 use syn::Ident;
 use syn::Result;
 use syn::Type;
+use syn::parse_quote_spanned;
+use syn::spanned::Spanned;
 
 pub fn impl_derive_node(input: DeriveInput) -> TokenStream {
 	parse(input).unwrap_or_else(|err| err.into_compile_error())
@@ -143,11 +145,23 @@ fn impl_builder(
 	let set_val_methods = fields.iter().map(|field| {
 		let name = &field.inner.ident;
 		let ty = get_inner_type(&field.inner.ty);
+		let is_into = field.attributes.get("into").is_some();
+		let value = if is_into {
+			quote! { value.into() }
+		} else {
+			quote! { value }
+		};
+
+		let ty = if is_into {
+			parse_quote_spanned! { ty.span() => impl Into<#ty> }
+		} else {
+			ty.to_token_stream()
+		};
 
 		let rhs = if field.default_attr().is_some() {
-			quote! { value }
+			quote! { #value }
 		} else {
-			quote! { Some(value) }
+			quote! { Some(#value) }
 		};
 		quote! {
 			#[allow(missing_docs)]

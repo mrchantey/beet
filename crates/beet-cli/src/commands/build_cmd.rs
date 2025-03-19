@@ -82,8 +82,8 @@ impl BuildCmd {
 			cmd.arg("--package").arg(pkg);
 		}
 
-		if let Some(b) = bin {
-			cmd.arg("--bin").arg(b);
+		if let Some(bin) = bin {
+			cmd.arg("--bin").arg(bin);
 		}
 
 		if let Some(ex) = example {
@@ -94,8 +94,8 @@ impl BuildCmd {
 			cmd.arg("--release");
 		}
 
-		if let Some(tgt) = target {
-			cmd.arg("--target").arg(tgt);
+		if let Some(target) = target {
+			cmd.arg("--target").arg(target);
 		}
 
 		if let Some(args) = cargo_args {

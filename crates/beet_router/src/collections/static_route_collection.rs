@@ -1,16 +1,16 @@
 use crate::prelude::*;
 
-pub struct FileRouteCollection;
+pub struct StaticRouteCollection;
 
-impl<F> IntoCollection<FileRouteCollection> for F
+impl<F> IntoCollection<StaticRouteCollection> for F
 where
-	F: 'static + FnOnce(&mut DefaultFileRouter),
+	F: 'static + FnOnce(&mut StaticFileRouter),
 {
 	fn into_collection(self) -> impl Collection {
 		move |app: &mut AppRouter| {
 			#[cfg(not(target_arch = "wasm32"))]
 			app.on_run_static.push(Box::new(move |args| {
-				let mut router = DefaultFileRouter {
+				let mut router = StaticFileRouter {
 					html_dir: args.html_dir.clone(),
 					..Default::default()
 				};
