@@ -27,6 +27,13 @@ pub struct RootContext {
 impl RootContext {}
 
 /// Create a `RootContext` struct using local file and env macros.
+///
+/// ## Example
+///
+/// ```rust
+/// # use beet_app::prelude::*;
+/// BeetApp::new(root_cx!())
+/// 	.run();
 #[macro_export]
 macro_rules! root_cx {
 	() => {

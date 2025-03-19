@@ -1,7 +1,6 @@
 use crate::prelude::*;
 use anyhow::Result;
 use beet::prelude::*;
-use clap::Parser;
 use std::os::unix::process::CommandExt;
 use std::path::Path;
 use std::path::PathBuf;
@@ -9,36 +8,12 @@ use std::process::Child;
 use std::process::Command;
 use sweet::prelude::GracefulChild;
 
-/// Build both the server and wasm client binaries
-/// for a beet app.
-
-/// Serve a html application as either a spa or mpa
-#[derive(Debug, Parser)]
-pub struct BuildBinariesArgs {
-	/// If the site contains reactivity, also build the client side wasm
-	// TODO automate by checking for client-load
-	#[arg(long)]
-	wasm: bool,
-	/// 🦀 the commands that will be used to build the html files 🦀
-	#[command(flatten)]
-	build_cmd: BuildCmd,
-}
-
-
-impl BuildBinariesArgs {
-	pub fn into_runner(self, watch_args: &WatchArgs) -> Result<BuildBinaries> {
-		BuildBinaries::new(self, watch_args)
-	}
-}
-
-
 pub struct BuildBinaries<'a> {
-	build_args: BuildBinariesArgs,
+	build_cmd: BuildCmd,
 	watch_args: &'a WatchArgs,
 	exe_path_native: PathBuf,
-	exe_path_wasm: PathBuf,
 	/// command for building in wasm mode
-	build_wasm_cmd: BuildCmd,
+	build_wasm: Option<BuildWasm<'a>>,
 	server_process: GracefulChild,
 	collect_routes: Option<CollectRoutes>,
 }
@@ -46,19 +21,14 @@ pub struct BuildBinaries<'a> {
 
 impl<'a> BuildBinaries<'a> {
 	pub fn new(
-		mut build_args: BuildBinariesArgs,
+		mut build_cmd: BuildCmd,
 		watch_args: &'a WatchArgs,
 	) -> Result<Self> {
 		if !watch_args.as_static {
-			build_args.build_cmd.cargo_args =
-				Some("--features beet/server".to_string());
+			build_cmd.cargo_args = Some("--features beet/server".to_string());
 		}
 
-		let exe_path_native = build_args.build_cmd.exe_path();
-		let mut build_wasm = build_args.build_cmd.clone();
-		build_wasm.target = Some("wasm32-unknown-unknown".to_string());
-		let exe_path_wasm = build_wasm.exe_path();
-
+		let exe_path_native = build_cmd.exe_path();
 
 		// here we're compiling once
 		let cx = Self::get_cx(&exe_path_native)?;
@@ -79,15 +49,21 @@ impl<'a> BuildBinaries<'a> {
 				..Default::default()
 			});
 
+		let should_build_wasm = true;
+
+		let build_wasm = if should_build_wasm {
+			Some(BuildWasm::new(&build_cmd, watch_args)?)
+		} else {
+			None
+		};
 
 
 		let this = Self {
+			build_cmd,
 			exe_path_native,
-			exe_path_wasm,
-			build_args,
 			watch_args,
 			collect_routes,
-			build_wasm_cmd: build_wasm,
+			build_wasm,
 			server_process: GracefulChild::default().as_only_ctrlc_handler(),
 		};
 
@@ -121,26 +97,21 @@ impl<'a> BuildBinaries<'a> {
 			self.server_process.set(child);
 		}
 
-		if self.build_args.wasm {
-			println!("🥁 building wasm");
-			self.build_wasm()?;
+		if let Some(build_wasm) = &self.build_wasm {
+			build_wasm.build()?;
 		}
 		Ok(())
 	}
 
-
-
-	fn recompile(&self) -> Result<()> {
+	pub fn recompile(&self) -> Result<()> {
 		println!("🥁 building native");
-		self.build_args.build_cmd.spawn()?;
+		self.build_cmd.spawn()?;
 		Ok(())
 	}
 
-
-
 	/// run the built binary with the `--static` flag, instructing
 	/// it to not spin up a server, and instead just build the static files
-	fn build_templates(&self) -> Result<()> {
+	pub fn build_templates(&self) -> Result<()> {
 		Command::new(&self.exe_path_native)
 			.arg("--html-dir")
 			.arg(&self.watch_args.html_dir)
@@ -169,13 +140,41 @@ impl<'a> BuildBinaries<'a> {
 			.spawn()?;
 		Ok(child)
 	}
+}
 
+
+struct BuildWasm<'a> {
+	build_cmd: BuildCmd,
+	exe_path: PathBuf,
+	watch_args: &'a WatchArgs,
+}
+
+impl<'a> BuildWasm<'a> {
+	pub fn new(
+		build_native: &BuildCmd,
+		watch_args: &'a WatchArgs,
+	) -> Result<Self> {
+		let mut build_cmd = build_native.clone();
+		build_cmd.target = Some("wasm32-unknown-unknown".to_string());
+		let exe_path = build_cmd.exe_path();
+		let this = Self {
+			build_cmd,
+			exe_path,
+			watch_args,
+		};
+		Ok(this)
+	}
+
+	pub fn build(&self) -> Result<()> {
+		println!("🥁 building wasm");
+		self.build_cmd.spawn()?;
+		self.wasm_bindgen()?;
+		Ok(())
+	}
 
 	/// execute `wasm-bindgen` with inferred locations. The wasm_exe_path
 	/// should be the path to the output of `cargo build`
-	fn build_wasm(&self) -> Result<()> {
-		self.build_wasm_cmd.spawn()?;
-
+	fn wasm_bindgen(&self) -> Result<()> {
 		Command::new("wasm-bindgen")
 			.arg("--out-dir")
 			.arg(self.watch_args.html_dir.join("wasm"))
@@ -184,7 +183,7 @@ impl<'a> BuildBinaries<'a> {
 			.arg("--target")
 			.arg("web")
 			.arg("--no-typescript")
-			.arg(&self.exe_path_wasm)
+			.arg(&self.exe_path)
 			.status()?
 			.exit_ok()?;
 

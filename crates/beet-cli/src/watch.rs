@@ -6,9 +6,7 @@ use std::path::PathBuf;
 use sweet::prelude::Server;
 
 
-/// A general watch command with several capabilities:
-/// - `Build Templates`: Watch a file or directory and build a `rsx-templates.ron` file
-///
+/// Watch the beet project and rebuild on changes
 #[derive(Debug, Parser)]
 pub struct Watch {
 	#[command(flatten)]
@@ -16,7 +14,7 @@ pub struct Watch {
 	#[command(flatten)]
 	build_template_map: BuildTemplateMap,
 	#[command(flatten)]
-	build_binaries: BuildBinariesArgs,
+	build_cmd: BuildCmd,
 }
 
 
@@ -71,7 +69,7 @@ impl Watch {
 	/// 3. run the process
 	async fn watch(self) -> Result<()> {
 		let build_binaries =
-			self.build_binaries.into_runner(&self.watch_args)?;
+			BuildBinaries::new(self.build_cmd, &self.watch_args)?;
 
 		TemplateWatcher::new(
 			self.build_template_map,

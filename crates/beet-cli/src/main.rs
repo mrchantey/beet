@@ -16,6 +16,7 @@ impl Cli {
 	pub async fn run(self) -> Result<()> {
 		match self.command {
 			Commands::Watch(cmd) => cmd.run().await,
+			Commands::Deploy(cmd) => cmd.run(),
 		}
 	}
 }
@@ -23,6 +24,7 @@ impl Cli {
 #[derive(Subcommand)]
 enum Commands {
 	Watch(Watch),
+	Deploy(Deploy),
 }
 
 
