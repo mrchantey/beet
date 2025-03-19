@@ -65,6 +65,7 @@ impl BuildCmd {
 		path
 	}
 
+	/// Blocking spawn of the cargo build command
 	pub fn spawn(&self) -> Result<()> {
 		let BuildCmd {
 			package,

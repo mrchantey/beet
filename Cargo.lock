@@ -6882,6 +6882,7 @@ dependencies = [
  "anyhow",
  "clap",
  "crossterm",
+ "ctrlc",
  "extend",
  "futures",
  "glob",

@@ -18,7 +18,7 @@ pub struct Watch {
 	#[command(flatten)]
 	build_template_map: BuildTemplateMap,
 	#[command(flatten)]
-	build_binaries: BuildBinaries,
+	build_binaries: BuildBinariesArgs,
 }
 
 
@@ -26,7 +26,7 @@ pub struct Watch {
 pub struct WatchArgs {
 	/// Do not build any binaries, just rebuild the templates
 	#[arg(long)]
-	pub templates_only: bool,
+	pub no_build: bool,
 	/// Run a simple file server in this process instead of
 	/// spinning up the native binary with the --server feature
 	#[arg(long = "static")]
@@ -72,34 +72,13 @@ impl Watch {
 	/// 2. recompile on code changes
 	/// 3. run the process
 	async fn watch(self) -> Result<()> {
-		// in server mode track the running child process
-		let mut child_process: Option<std::process::Child> = None;
+		let build_binaries =
+			self.build_binaries.into_runner(&self.watch_args)?;
 
 		TemplateWatcher::new(
 			self.build_template_map,
-			|| {
-				if self.watch_args.templates_only {
-					return Ok(());
-				};
-				self.build_binaries.build_templates(&self.watch_args)?;
-				Ok(())
-			},
-			|| {
-				if self.watch_args.templates_only {
-					return Ok(());
-				};
-
-				self.build_binaries.recompile(&self.watch_args)?;
-				if !self.watch_args.as_static {
-					if let Some(child) = &mut child_process {
-						child.kill()?;
-					}
-					let child =
-						self.build_binaries.run_server(&self.watch_args)?;
-					child_process = Some(child);
-				}
-				Ok(())
-			},
+			|| build_binaries.reload(),
+			|| build_binaries.recompile_and_reload(),
 		)?
 		.run_once_and_watch()
 		.await
