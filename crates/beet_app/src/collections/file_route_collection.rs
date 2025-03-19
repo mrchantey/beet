@@ -8,7 +8,7 @@ where
 	F: 'static + FnOnce(&mut DefaultFileRouter),
 {
 	fn into_collection(self) -> impl Collection {
-		move |app: &mut BeetApp| {
+		move |app: &mut AppRouter| {
 			#[cfg(not(target_arch = "wasm32"))]
 			app.on_run_static.push(Box::new(move |args| {
 				let mut router = DefaultFileRouter {

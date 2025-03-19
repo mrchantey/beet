@@ -11,7 +11,7 @@ type OnRun =
 /// - `static`: building static html files
 /// - `server`: serving routes, including via lambda
 /// - `wasm`: hydrating a client-side app
-pub struct BeetApp {
+pub struct AppRouter {
 	/// The root context for this app
 	pub context: RootContext,
 	/// The router which can be extended by adding routers
@@ -26,7 +26,7 @@ pub struct BeetApp {
 		Vec<Box<dyn FnOnce(&BeetAppArgs) -> Result<()> + Send + Sync>>,
 }
 
-impl BeetApp {
+impl AppRouter {
 	pub fn new(context: RootContext) -> Self {
 		Self {
 			context,
@@ -107,5 +107,5 @@ mod test {
 	use crate::prelude::*;
 
 	#[test]
-	fn works() { let _app = BeetApp::new(root_cx!()); }
+	fn works() { let _app = AppRouter::new(root_cx!()); }
 }

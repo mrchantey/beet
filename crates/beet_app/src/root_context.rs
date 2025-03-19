@@ -10,7 +10,7 @@ use std::path::PathBuf;
 /// ```rust
 /// # use beet_app::prelude::*;
 ///
-/// let app = BeetApp::new(root_cx!());
+/// let app = AppRouter::new(root_cx!());
 ///
 /// ```
 #[derive(Debug, Clone, PartialEq)]
@@ -32,8 +32,7 @@ impl RootContext {}
 ///
 /// ```rust
 /// # use beet_app::prelude::*;
-/// BeetApp::new(root_cx!())
-/// 	.run();
+/// let app = AppRouter::new(root_cx!());
 #[macro_export]
 macro_rules! root_cx {
 	() => {

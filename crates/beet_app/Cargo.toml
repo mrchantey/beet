@@ -22,6 +22,7 @@ server = ["dep:beet_server", "beet_router/parser"]
 [dependencies]
 beet_rsx.workspace = true
 beet_router.workspace = true
+sweet.workspace = true
 
 anyhow.workspace = true
 futures.workspace = true

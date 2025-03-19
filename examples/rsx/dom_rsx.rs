@@ -9,7 +9,7 @@ use beet::rsx::sigfault::signal;
 
 #[rustfmt::skip]
 fn main() { 
-	BeetApp::new(root_cx!())
+	AppRouter::new(root_cx!())
 		.add_collection(app)
 		.run(); 
 }

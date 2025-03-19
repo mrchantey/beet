@@ -60,8 +60,6 @@ impl BeetServer {
 		tower_livereload::LiveReloadLayer,
 		std::thread::JoinHandle<Result<()>>,
 	) {
-		use std::time::Duration;
-
 		use sweet::prelude::FsWatcher;
 
 		let livereload = tower_livereload::LiveReloadLayer::new();
@@ -71,9 +69,7 @@ impl BeetServer {
 		let reload_handle = std::thread::spawn(move || -> Result<()> {
 			FsWatcher {
 				cwd: html_dir,
-				include: Vec::new(),
-				exclude: Vec::new(),
-				debounce: Duration::from_millis(100),
+				..Default::default()
 			}
 			.watch_blocking(move |e| {
 				if let Some(events) = e.mutated_pretty() {

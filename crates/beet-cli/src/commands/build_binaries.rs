@@ -81,14 +81,12 @@ impl<'a> BuildBinaries<'a> {
 		Ok(())
 	}
 
+	/// Performs all steps for a full recompile and reload
 	pub fn recompile_and_reload(&self) -> Result<()> {
 		if self.watch_args.no_build {
 			return Ok(());
 		}
-		if let Some(collect_routes) = &self.collect_routes {
-			// TODO only recollect routes if routes change?
-			collect_routes.build_and_write()?;
-		}
+
 		self.recompile()?;
 
 		if !self.watch_args.as_static {
@@ -104,6 +102,12 @@ impl<'a> BuildBinaries<'a> {
 	}
 
 	pub fn recompile(&self) -> Result<()> {
+		println!("🥁 building routes");
+		// collect routes before recompile
+		if let Some(collect_routes) = &self.collect_routes {
+			// TODO only recollect routes if routes change?
+			collect_routes.build_and_write()?;
+		}
 		println!("🥁 building native");
 		self.build_cmd.spawn()?;
 		Ok(())

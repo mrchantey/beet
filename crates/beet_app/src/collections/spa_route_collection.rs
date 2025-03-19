@@ -12,7 +12,7 @@ where
 	F: 'static + Send + Sync + FnOnce() -> RsxRoot,
 {
 	fn into_collection(self) -> impl Collection {
-		move |app: &mut BeetApp| {
+		move |app: &mut AppRouter| {
 			#[cfg(all(not(target_arch = "wasm32"), feature = "server"))]
 			app.on_run_static.push(Box::new(move |args| {
 				let path = args.html_dir.join("index.html");

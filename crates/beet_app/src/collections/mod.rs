@@ -17,10 +17,10 @@ pub trait IntoCollection<M> {
 }
 
 pub trait Collection {
-	fn register(self, app: &mut BeetApp);
+	fn register(self, app: &mut AppRouter);
 }
 
 
-impl<F: FnOnce(&mut BeetApp)> Collection for F {
-	fn register(self, app: &mut BeetApp) { self(app) }
+impl<F: FnOnce(&mut AppRouter)> Collection for F {
+	fn register(self, app: &mut AppRouter) { self(app) }
 }

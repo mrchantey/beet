@@ -53,18 +53,21 @@ impl<Reload: FnMut() -> Result<()>, Recompile: FnMut() -> Result<()>>
 	}
 
 	pub async fn watch(mut self) -> Result<()> {
-		FsWatcher::default()
-			.with_path(&self.build_templates.templates_root_dir)
-			.with_exclude("*.git*")
-			.with_exclude("*target*")
-			.watch_async(move |ev| {
-				// on_change errors are not fatal, just print the error
-				if let Err(err) = self.on_change(ev) {
-					eprintln!("{}", err);
-				}
-				Ok(())
-			})
-			.await
+		FsWatcher {
+			cwd: self.build_templates.templates_root_dir.clone(),
+			filter: GlobFilter::default()
+				.with_exclude("*.git*")
+				.with_exclude("*target*"),
+			..Default::default()
+		}
+		.watch_async(move |ev| {
+			// on_change errors are not fatal, just print the error
+			if let Err(err) = self.on_change(ev) {
+				eprintln!("{}", err);
+			}
+			Ok(())
+		})
+		.await
 	}
 
 

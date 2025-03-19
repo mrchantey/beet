@@ -12,9 +12,8 @@ homepage.workspace = true
 categories.workspace = true
 keywords.workspace = true
 
-[[bin]]
-name = "beet_site"
-path = "src/main.rs"
+# [features]
+# setup = []
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 anyhow.workspace = true
