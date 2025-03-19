@@ -122,7 +122,7 @@ mod test {
 		)
 		.to_be_err();
 
-		let root = rsx! { <script src="test.js" /> }
+		let root = rsx! { <script src="test-fs-src.js" /> }
 			.pipe(FsSrcPipeline::default())
 			.unwrap();
 
@@ -132,6 +132,6 @@ mod test {
 		let RsxNode::Text { value, .. } = el.children.as_ref() else {
 			panic!()
 		};
-		expect(value).to_be(include_str!("test.js"));
+		expect(value).to_be(include_str!("test-fs-src.js"));
 	}
 }
