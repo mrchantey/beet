@@ -57,7 +57,13 @@ impl<Reload: FnMut() -> Result<()>, Recompile: FnMut() -> Result<()>>
 			.with_path(&self.build_templates.templates_root_dir)
 			.with_exclude("*.git*")
 			.with_exclude("*target*")
-			.watch_async(move |ev| self.on_change(ev))
+			.watch_async(move |ev| {
+				// on_change errors are not fatal, just print the error
+				if let Err(err) = self.on_change(ev) {
+					eprintln!("{}", err);
+				}
+				Ok(())
+			})
 			.await
 	}
 

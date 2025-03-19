@@ -1,4 +1,5 @@
 use crate::prelude::*;
+#[allow(unused)]
 use beet_router::prelude::*;
 use beet_rsx::prelude::*;
 

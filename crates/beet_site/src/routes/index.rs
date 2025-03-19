@@ -2,8 +2,7 @@ use crate::prelude::*;
 use beet::prelude::*;
 
 pub fn get(_state: DefaultAppState) -> RsxRoot {
-	let val = 99;
-
+	let val = 98;
 	rsx! {
 		<BeetPage>
 			{val + 8}
