@@ -31,12 +31,10 @@ pub mod prelude {
 	pub use crate::spa_template::*;
 	#[cfg(all(feature = "parser", not(target_arch = "wasm32")))]
 	pub use beet_router_parser::prelude::*;
+
+	pub use sweet::prelude::GlobFilter;
 }
 
 
 #[cfg(any(test, feature = "_test_site"))]
-pub mod test_site {
-	pub mod components;
-	pub mod routes;
-	pub use components::*;
-}
+pub mod test_site;

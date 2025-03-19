@@ -179,7 +179,8 @@ mod test {
 		let src =
 			FsExt::workspace_root().join("crates/beet_router/src/test_site");
 		let cache = preheat_cache(&src).unwrap();
-		expect(cache.len()).to_be(8);
+		// flaky, depends on number of files in the test_site directory
+		expect(cache.len()).to_be(9);
 		// println!("{:#?}", cache);
 	}
 }

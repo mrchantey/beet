@@ -4,159 +4,70 @@ use beet::prelude::*;
 use std::os::unix::process::CommandExt;
 use std::path::Path;
 use std::path::PathBuf;
-use std::process::Child;
 use std::process::Command;
 use sweet::prelude::GracefulChild;
 
-pub struct BuildBinaries<'a> {
-	build_cmd: BuildCmd,
-	watch_args: &'a WatchArgs,
-	exe_path_native: PathBuf,
-	/// command for building in wasm mode
-	build_wasm: Option<BuildWasm<'a>>,
-	server_process: GracefulChild,
-	collect_routes: Option<CollectRoutes>,
+/// Performs all steps for a full recompile and reload
+pub struct BuildBinaries;
+
+impl BuildBinaries {
+	pub fn new(
+		build_cmd: &BuildCmd,
+		watch_args: &WatchArgs,
+	) -> Result<BuildStepGroup> {
+		let exe_path = build_cmd.exe_path();
+
+		// here we're compiling once
+
+		let mut group = BuildStepGroup::default();
+		// 1. perform all setup steps
+		group
+			.add(RunSetup::new(&build_cmd)?)
+			// 2. rebuild the native binary
+			.add(BuildNative::new(&build_cmd, &watch_args))
+			// 3. run the server
+			.add(RunServer::new(&watch_args, &exe_path))
+			// 4. build the wasm binary
+			.add(BuildWasm::new(&build_cmd, &watch_args)?)
+			// 5. build the templates
+			.add(BuildTemplates::new(watch_args, &exe_path));
+
+		Ok(group)
+	}
 }
 
+pub struct BuildNative {
+	build_cmd: BuildCmd,
+}
 
-impl<'a> BuildBinaries<'a> {
-	pub fn new(
-		mut build_cmd: BuildCmd,
-		watch_args: &'a WatchArgs,
-	) -> Result<Self> {
+impl BuildNative {
+	pub fn new(build_cmd: &BuildCmd, watch_args: &WatchArgs) -> Self {
+		let mut build_cmd = build_cmd.clone();
 		if !watch_args.as_static {
 			build_cmd.cargo_args = Some("--features beet/server".to_string());
 		}
-
-		let exe_path_native = build_cmd.exe_path();
-
-		// here we're compiling once
-		let cx = Self::get_cx(&exe_path_native)?;
-
-		let collect_routes = cx
-			.file
-			.parent()
-			.map(|p| {
-				p.join("routes")
-					.canonicalize()
-					.ok()
-					.map(|p| if !p.exists() { None } else { Some(p) })
-					.flatten()
-			})
-			.flatten()
-			.map(|routes_dir| CollectRoutes {
-				routes_dir,
-				..Default::default()
-			});
-
-		let should_build_wasm = true;
-
-		let build_wasm = if should_build_wasm {
-			Some(BuildWasm::new(&build_cmd, watch_args)?)
-		} else {
-			None
-		};
-
-
-		let this = Self {
-			build_cmd,
-			exe_path_native,
-			watch_args,
-			collect_routes,
-			build_wasm,
-			server_process: GracefulChild::default().as_only_ctrlc_handler(),
-		};
-
-		this.recompile_and_reload()?;
-
-		Ok(this)
+		Self { build_cmd }
 	}
+}
 
-	/// Simply rerun the process with --static to rebuild templates
-	pub fn reload(&self) -> Result<()> {
-		if self.watch_args.no_build {
-			return Ok(());
-		}
-		self.build_templates()?;
+impl BuildStep for BuildNative {
+	fn run(&self) -> Result<()> {
+		self.build_cmd.run()?;
 		Ok(())
-	}
-
-	/// Performs all steps for a full recompile and reload
-	pub fn recompile_and_reload(&self) -> Result<()> {
-		if self.watch_args.no_build {
-			return Ok(());
-		}
-
-		self.recompile()?;
-
-		if !self.watch_args.as_static {
-			self.server_process.kill();
-			let child = self.run_server(&self.watch_args)?;
-			self.server_process.set(child);
-		}
-
-		if let Some(build_wasm) = &self.build_wasm {
-			build_wasm.build()?;
-		}
-		Ok(())
-	}
-
-	pub fn recompile(&self) -> Result<()> {
-		println!("🥁 building routes");
-		// collect routes before recompile
-		if let Some(collect_routes) = &self.collect_routes {
-			// TODO only recollect routes if routes change?
-			collect_routes.build_and_write()?;
-		}
-		println!("🥁 building native");
-		self.build_cmd.spawn()?;
-		Ok(())
-	}
-
-	/// run the built binary with the `--static` flag, instructing
-	/// it to not spin up a server, and instead just build the static files
-	pub fn build_templates(&self) -> Result<()> {
-		Command::new(&self.exe_path_native)
-			.arg("--html-dir")
-			.arg(&self.watch_args.html_dir)
-			.arg("--static")
-			.status()?
-			.exit_ok()?;
-		Ok(())
-	}
-	/// run the built binary with the `--static` flag, instructing
-	/// it to not spin up a server, and instead just build the static files
-	fn get_cx(exe_path_native: &Path) -> Result<AppContext> {
-		let stdout = Command::new(&exe_path_native)
-			.arg("--root-context")
-			.output()?
-			.stdout;
-		let cx = ron::de::from_bytes(&stdout)?;
-		Ok(cx)
-	}
-
-	fn run_server(&self, watch_args: &WatchArgs) -> Result<Child> {
-		let child = Command::new(&self.exe_path_native)
-			.arg("--html-dir")
-			.arg(&watch_args.html_dir)
-			// kill child when parent is killed
-			.process_group(0)
-			.spawn()?;
-		Ok(child)
 	}
 }
 
 
-struct BuildWasm<'a> {
+pub struct BuildWasm {
 	build_cmd: BuildCmd,
 	exe_path: PathBuf,
-	watch_args: &'a WatchArgs,
+	watch_args: WatchArgs,
 }
 
-impl<'a> BuildWasm<'a> {
+impl BuildWasm {
 	pub fn new(
 		build_native: &BuildCmd,
-		watch_args: &'a WatchArgs,
+		watch_args: &WatchArgs,
 	) -> Result<Self> {
 		let mut build_cmd = build_native.clone();
 		build_cmd.target = Some("wasm32-unknown-unknown".to_string());
@@ -164,16 +75,9 @@ impl<'a> BuildWasm<'a> {
 		let this = Self {
 			build_cmd,
 			exe_path,
-			watch_args,
+			watch_args: watch_args.clone(),
 		};
 		Ok(this)
-	}
-
-	pub fn build(&self) -> Result<()> {
-		println!("🥁 building wasm");
-		self.build_cmd.spawn()?;
-		self.wasm_bindgen()?;
-		Ok(())
 	}
 
 	/// execute `wasm-bindgen` with inferred locations. The wasm_exe_path
@@ -193,6 +97,110 @@ impl<'a> BuildWasm<'a> {
 
 		// TODO wasm-opt in release
 
+		Ok(())
+	}
+}
+
+impl BuildStep for BuildWasm {
+	fn run(&self) -> Result<()> {
+		println!("🥁 building wasm");
+		self.build_cmd.spawn()?;
+		self.wasm_bindgen()?;
+		Ok(())
+	}
+}
+
+pub struct RunSetup;
+impl RunSetup {
+	pub fn new(build_native: &BuildCmd) -> Result<BuildStepGroup> {
+		let mut build_cmd = build_native.clone();
+		build_cmd.cargo_args = Some("--features setup".to_string());
+		build_cmd.spawn()?;
+
+		let exe_path = build_cmd.exe_path();
+
+		let stdout = Command::new(&exe_path).output()?.stdout;
+		let setup_config: FileGroupConfig = ron::de::from_bytes(&stdout)?;
+
+		let mut group = BuildStepGroup::default();
+		for item in setup_config.groups.into_iter() {
+			match item {
+				FileGroup::Child(_file_group_config) => todo!(),
+				FileGroup::Glob(_glob_file_group) => todo!(),
+				FileGroup::Tree(TreeFileGroup { src_dir }) => {
+					group.items.push(Box::new(CollectRoutes {
+						routes_dir: setup_config.app_cx.resolve_path(src_dir),
+						..Default::default()
+					}));
+				}
+			}
+		}
+		Ok(group)
+	}
+}
+
+pub struct BuildTemplates {
+	exe_path: PathBuf,
+	watch_args: WatchArgs,
+}
+
+impl BuildTemplates {
+	pub fn new(watch_args: &WatchArgs, exe_path: &Path) -> Self {
+		Self {
+			watch_args: watch_args.clone(),
+			exe_path: exe_path.to_path_buf(),
+		}
+	}
+}
+
+impl BuildStep for BuildTemplates {
+	/// run the built binary with the `--static` flag, instructing
+	/// it to not spin up a server, and instead just build the static files
+	fn run(&self) -> Result<()> {
+		Command::new(&self.exe_path)
+			.arg("--html-dir")
+			.arg(&self.watch_args.html_dir)
+			.arg("--static")
+			.status()?
+			.exit_ok()?;
+		Ok(())
+	}
+}
+
+
+pub struct RunServer {
+	exe_path: PathBuf,
+	watch_args: WatchArgs,
+	child_process: GracefulChild,
+}
+
+impl RunServer {
+	pub fn new(watch_args: &WatchArgs, exe_path: &Path) -> Self {
+		Self {
+			watch_args: watch_args.clone(),
+			exe_path: exe_path.to_path_buf(),
+			child_process: GracefulChild::default().as_only_ctrlc_handler(),
+		}
+	}
+}
+
+impl BuildStep for RunServer {
+	/// run the built binary with the `--static` flag, instructing
+	/// it to not spin up a server, and instead just build the static files
+	fn run(&self) -> Result<()> {
+		if self.watch_args.as_static {
+			return Ok(());
+		}
+
+		self.child_process.kill();
+
+		let child = Command::new(&self.exe_path)
+			.arg("--html-dir")
+			.arg(&self.watch_args.html_dir)
+			// kill child when parent is killed
+			.process_group(0)
+			.spawn()?;
+		self.child_process.set(child);
 		Ok(())
 	}
 }

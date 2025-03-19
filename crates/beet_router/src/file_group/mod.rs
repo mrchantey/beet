@@ -21,7 +21,7 @@ impl FileGroupConfig {
 		}
 	}
 
-	pub fn add_group(&mut self, group: impl Into<FileGroup>) -> &mut Self {
+	pub fn add_group(mut self, group: impl Into<FileGroup>) -> Self {
 		self.groups.push(group.into());
 		self
 	}

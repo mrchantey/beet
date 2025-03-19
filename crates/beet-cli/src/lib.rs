@@ -3,11 +3,7 @@
 #![feature(exit_status_error)]
 
 pub mod commands;
-pub mod deploy;
-pub mod watch;
 
 pub mod prelude {
 	pub use crate::commands::*;
-	pub use crate::deploy::*;
-	pub use crate::watch::*;
 }

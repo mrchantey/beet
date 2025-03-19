@@ -35,13 +35,18 @@ impl Deploy {
 	pub fn run(mut self) -> Result<()> {
 		self.build_template_map.build_and_write()?;
 		self.build_cmd.release = true;
-		let build_binaries =
-			BuildBinaries::new(self.build_cmd.clone(), &self.watch_args)?;
 
-		build_binaries.recompile()?;
-		build_binaries.build_templates()?;
-		self.lambda_build()?;
-		self.lambda_deploy()?;
+		BuildStepGroup::default()
+			.add(RunSetup::new(&self.build_cmd)?)
+			.add(BuildNative::new(&self.build_cmd, &self.watch_args))
+			.add(BuildWasm::new(&self.build_cmd, &self.watch_args)?)
+			.add(BuildTemplates::new(
+				&self.watch_args,
+				&self.build_cmd.exe_path(),
+			))
+			.add(self)
+			.run()?;
+
 		Ok(())
 	}
 
@@ -95,6 +100,14 @@ impl Deploy {
 
 		cmd.spawn()?.wait()?.exit_ok()?;
 
+		Ok(())
+	}
+}
+
+impl BuildStep for Deploy {
+	fn run(&self) -> Result<()> {
+		self.lambda_build()?;
+		self.lambda_deploy()?;
 		Ok(())
 	}
 }

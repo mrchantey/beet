@@ -12,10 +12,13 @@ keywords.workspace = true
 categories.workspace = true
 publish = true
 
+[features]
+setup = []
 
 [dependencies]
-beet_rsx = { workspace = true }
-
+sweet.workspace = true
+beet_rsx.workspace = true
+beet_router.workspace = true
 
 [dev-dependencies]
 sweet = { workspace = true, features = ["test"] }

@@ -13,7 +13,7 @@ categories.workspace = true
 keywords.workspace = true
 
 [features]
-setup = []
+setup = ["beet/setup"]
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 anyhow.workspace = true

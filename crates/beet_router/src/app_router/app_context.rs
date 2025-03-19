@@ -1,3 +1,4 @@
+use std::path::Path;
 use std::path::PathBuf;
 
 /// Collection of cargo environment variables
@@ -8,7 +9,7 @@ use std::path::PathBuf;
 /// ## example
 ///
 /// ```rust
-/// # use beet_app::prelude::*;
+/// # use beet_router::prelude::*;
 ///
 /// let app = AppRouter::new(app_cx!());
 ///
@@ -24,14 +25,19 @@ pub struct AppContext {
 	pub pkg_homepage: String,
 }
 
-impl AppContext {}
+impl AppContext {
+	/// Use the given `file` field as the root for all relative paths.
+	pub fn resolve_path(&self, path: impl AsRef<Path>) -> PathBuf {
+		self.file.parent().unwrap().join(path)
+	}
+}
 
 /// Creates an `AppContext` struct using local file and env macros.
 ///
 /// ## Example
 ///
 /// ```rust
-/// # use beet_app::prelude::*;
+/// # use beet_router::prelude::*;
 /// let app = AppRouter::new(app_cx!());
 #[macro_export]
 macro_rules! app_cx {

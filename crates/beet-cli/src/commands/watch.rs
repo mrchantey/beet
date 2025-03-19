@@ -69,14 +69,17 @@ impl Watch {
 	/// 3. run the process
 	async fn watch(self) -> Result<()> {
 		let build_binaries =
-			BuildBinaries::new(self.build_cmd, &self.watch_args)?;
+			BuildBinaries::new(&self.build_cmd, &self.watch_args)?;
+
+		let build_templates =
+			BuildTemplates::new(&self.watch_args, &self.build_cmd.exe_path());
 
 		TemplateWatcher::new(
 			self.build_template_map,
-			|| build_binaries.reload(),
-			|| build_binaries.recompile_and_reload(),
+			|| build_templates.run(),
+			|| build_binaries.run(),
 		)?
-		.watch()
+		.run_once_and_watch()
 		.await
 	}
 }
