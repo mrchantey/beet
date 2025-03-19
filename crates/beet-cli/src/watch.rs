@@ -1,10 +1,8 @@
-use std::path::PathBuf;
-
 use crate::prelude::*;
 use anyhow::Result;
-use beet_router::prelude::BuildTemplateMap;
-use beet_router::prelude::TemplateWatcher;
+use beet::prelude::*;
 use clap::Parser;
+use std::path::PathBuf;
 use sweet::prelude::Server;
 
 
@@ -80,7 +78,7 @@ impl Watch {
 			|| build_binaries.reload(),
 			|| build_binaries.recompile_and_reload(),
 		)?
-		.run_once_and_watch()
+		.watch()
 		.await
 	}
 }

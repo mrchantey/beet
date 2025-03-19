@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 /// Collection of cargo environment variables
 /// and file paths required to run a beet app.
 ///
@@ -11,11 +13,11 @@
 /// let app = BeetApp::new(root_cx!());
 ///
 /// ```
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct RootContext {
-	pub file: &'static str,
-	pub manifest_path: String,
+	pub file: PathBuf,
+	pub manifest_path: PathBuf,
 	pub pkg_version: String,
 	pub pkg_name: String,
 	pub pkg_description: String,
@@ -29,8 +31,8 @@ impl RootContext {}
 macro_rules! root_cx {
 	() => {
 		RootContext {
-			file: file!(),
-			manifest_path: env!("CARGO_MANIFEST_PATH").to_string(),
+			file: file!().into(),
+			manifest_path: env!("CARGO_MANIFEST_PATH").into(),
 			pkg_version: env!("CARGO_PKG_VERSION").to_string(),
 			pkg_name: env!("CARGO_PKG_NAME").to_string(),
 			pkg_description: env!("CARGO_PKG_DESCRIPTION").to_string(),
@@ -52,8 +54,8 @@ mod test {
 	#[test]
 	fn works() {
 		let cx = root_cx!();
-		expect(cx.file.is_empty()).to_be_false();
-		expect(cx.manifest_path.is_empty()).to_be_false();
+		expect(cx.file.parent()).to_be_some();
+		expect(cx.manifest_path.parent()).to_be_some();
 		expect(cx.pkg_version.is_empty()).to_be_false();
 		expect(cx.pkg_name.is_empty()).to_be_false();
 		expect(cx.pkg_description.is_empty()).to_be_false();

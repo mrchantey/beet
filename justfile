@@ -100,11 +100,7 @@ run-test-site:
 # --templates-root-dir crates \
 
 run-beet-site *args:
-	just cli watch \
-	-p beet_site \
-	--mpa \
-	--routes-dir crates/beet_site/src/routes 	\
-	{{args}}
+	just cli watch -p beet_site {{args}}
 
 #💡 Test
 

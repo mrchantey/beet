@@ -633,9 +633,10 @@ name = "beet-cli"
 version = "0.0.5-dev"
 dependencies = [
  "anyhow",
- "beet_router",
+ "beet",
  "clap",
  "rapidhash",
+ "ron",
  "sweet",
  "tokio",
 ]

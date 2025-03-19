@@ -1,8 +1,9 @@
 use crate::prelude::*;
 use anyhow::Result;
-use beet_router::prelude::CollectRoutes;
+use beet::prelude::*;
 use clap::Parser;
 use std::os::unix::process::CommandExt;
+use std::path::Path;
 use std::path::PathBuf;
 use std::process::Child;
 use std::process::Command;
@@ -14,18 +15,10 @@ use sweet::prelude::GracefulChild;
 /// Serve a html application as either a spa or mpa
 #[derive(Debug, Parser)]
 pub struct BuildBinariesArgs {
-	/// enable default route collection
-	// TODO automate by checking for routes dir
-	#[arg(long)]
-	mpa: bool,
 	/// If the site contains reactivity, also build the client side wasm
 	// TODO automate by checking for client-load
 	#[arg(long)]
 	wasm: bool,
-	/// if --mpa is passed, also regenerate routes before
-	/// recompile
-	#[command(flatten)]
-	collect_routes: CollectRoutes,
 	/// 🦀 the commands that will be used to build the html files 🦀
 	#[command(flatten)]
 	build_cmd: BuildCmd,
@@ -47,6 +40,7 @@ pub struct BuildBinaries<'a> {
 	/// command for building in wasm mode
 	build_wasm_cmd: BuildCmd,
 	server_process: GracefulChild,
+	collect_routes: Option<CollectRoutes>,
 }
 
 
@@ -66,14 +60,40 @@ impl<'a> BuildBinaries<'a> {
 		let exe_path_wasm = build_wasm.exe_path();
 
 
-		Ok(Self {
+		// here we're compiling once
+		let cx = Self::get_cx(&exe_path_native)?;
+
+		let collect_routes = cx
+			.file
+			.parent()
+			.map(|p| {
+				p.join("routes")
+					.canonicalize()
+					.ok()
+					.map(|p| if !p.exists() { None } else { Some(p) })
+					.flatten()
+			})
+			.flatten()
+			.map(|routes_dir| CollectRoutes {
+				routes_dir,
+				..Default::default()
+			});
+
+
+
+		let this = Self {
 			exe_path_native,
 			exe_path_wasm,
 			build_args,
 			watch_args,
+			collect_routes,
 			build_wasm_cmd: build_wasm,
 			server_process: GracefulChild::default().as_only_ctrlc_handler(),
-		})
+		};
+
+		this.recompile_and_reload()?;
+
+		Ok(this)
 	}
 
 	/// Simply rerun the process with --static to rebuild templates
@@ -89,9 +109,9 @@ impl<'a> BuildBinaries<'a> {
 		if self.watch_args.no_build {
 			return Ok(());
 		}
-		if self.build_args.mpa {
+		if let Some(collect_routes) = &self.collect_routes {
 			// TODO only recollect routes if routes change?
-			self.build_args.collect_routes.build_and_write()?;
+			collect_routes.build_and_write()?;
 		}
 		self.recompile()?;
 
@@ -110,7 +130,7 @@ impl<'a> BuildBinaries<'a> {
 
 
 
-	pub fn recompile(&self) -> Result<()> {
+	fn recompile(&self) -> Result<()> {
 		println!("🥁 building native");
 		self.build_args.build_cmd.spawn()?;
 		Ok(())
@@ -120,7 +140,7 @@ impl<'a> BuildBinaries<'a> {
 
 	/// run the built binary with the `--static` flag, instructing
 	/// it to not spin up a server, and instead just build the static files
-	pub fn build_templates(&self) -> Result<()> {
+	fn build_templates(&self) -> Result<()> {
 		Command::new(&self.exe_path_native)
 			.arg("--html-dir")
 			.arg(&self.watch_args.html_dir)
@@ -129,8 +149,18 @@ impl<'a> BuildBinaries<'a> {
 			.exit_ok()?;
 		Ok(())
 	}
+	/// run the built binary with the `--static` flag, instructing
+	/// it to not spin up a server, and instead just build the static files
+	fn get_cx(exe_path_native: &Path) -> Result<RootContext> {
+		let stdout = Command::new(&exe_path_native)
+			.arg("--root-context")
+			.output()?
+			.stdout;
+		let cx = ron::de::from_bytes(&stdout)?;
+		Ok(cx)
+	}
 
-	pub fn run_server(&self, watch_args: &WatchArgs) -> Result<Child> {
+	fn run_server(&self, watch_args: &WatchArgs) -> Result<Child> {
 		let child = Command::new(&self.exe_path_native)
 			.arg("--html-dir")
 			.arg(&watch_args.html_dir)
