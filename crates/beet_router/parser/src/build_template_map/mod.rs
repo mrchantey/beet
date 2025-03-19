@@ -34,6 +34,9 @@ pub struct BuildTemplateMap {
 	/// instead of parsing via [ron::ser::to_string_pretty]
 	#[arg(long)]
 	pub minify_templates: bool,
+	/// dont check if the ron file is valid
+	#[arg(long)]
+	pub skip_ron_check: bool,
 }
 
 impl Default for BuildTemplateMap {
@@ -56,6 +59,7 @@ impl BuildTemplateMap {
 			templates_root_dir: src.into(),
 			templates_map_path: dst.into(),
 			templates_map_stdout: false,
+			skip_ron_check: false,
 		}
 	}
 
@@ -64,7 +68,8 @@ impl BuildTemplateMap {
 		let mut map_str = map_tokens.to_string();
 		// its already minified, so we prettify if false
 		if self.minify_templates == false {
-			let map = ron::de::from_str::<RsxTemplateMap>(&map_str)?;
+			let map = ron::de::from_str::<RsxTemplateMap>(&map_str)
+				.map_err(|e| ron_cx_err(e, &map_str))?;
 			map_str = ron::ser::to_string_pretty(&map, Default::default())?;
 		}
 		if self.templates_map_stdout {
@@ -85,14 +90,22 @@ impl BuildTemplateMap {
 			.map(|(RsxMacroLocation { file, line, col }, tokens)| {
 				let line = Literal::usize_unsuffixed(line);
 				let col = Literal::usize_unsuffixed(col);
-				quote! {
+				let kvp_tokens = quote! {
 					RsxMacroLocation(
 						file: #file,
 						line: #line,
 						col: #col
 					):#tokens
+				};
+				if !self.skip_ron_check {
+					let str = tokens.to_string();
+					let str = str.trim();
+					let _parsed = ron::de::from_str::<RsxTemplateRoot>(&str)
+						.map_err(|e| ron_cx_err(e, &str))?;
 				}
-			});
+				Ok(kvp_tokens)
+			})
+			.collect::<Result<Vec<_>>>()?;
 
 		let root =
 			ron::ser::to_string(&self.templates_root_dir.canonicalize()?)?;
@@ -127,6 +140,26 @@ impl BuildTemplateMap {
 			Ok(Default::default())
 		}
 	}
+}
+
+/// A ron deserialization error with the context of the file and line
+const CX_SIZE: usize = 8;
+fn ron_cx_err(e: ron::error::SpannedError, str: &str) -> anyhow::Error {
+	let start = e.position.col.saturating_sub(CX_SIZE);
+	let end = e.position.col.saturating_add(CX_SIZE);
+	let cx = if e.position.line == 1 {
+		str[start..end].to_string()
+	} else {
+		let lines = str.lines().collect::<Vec<_>>();
+		let str = lines.get(e.position.line - 1).unwrap_or(&"");
+		str[start..end].to_string()
+	};
+	return anyhow::anyhow!(
+		"Failed to parse RsxTemplate from string\nError: {}\nContext: {}\nFull: {}",
+		e.code,
+		cx,
+		str
+	);
 }
 
 #[derive(Debug)]

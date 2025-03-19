@@ -2,12 +2,12 @@ use crate::prelude::*;
 use beet::prelude::*;
 
 pub fn get(_state: DefaultAppState) -> RsxRoot {
-	let val = 88;
+	let val = 90;
 
 	rsx! {
 		<BeetPage>
 			{val + 8}
-			<span>hello worlds</span>
+			<span>hello world</span>
 			<style>
 				span{
 					color: red;

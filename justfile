@@ -97,13 +97,12 @@ run-test-site:
 	cargo run -p beet_router --example templates
 	cargo run -p beet_router --example html
 	sweet serve target/test_site
-
+# --templates-root-dir crates \
 
 run-beet-site *args:
 	just cli watch \
 	-p beet_site \
 	--mpa \
-	--templates-root-dir crates/beet_site/src \
 	--routes-dir crates/beet_site/src/routes 	\
 	{{args}}
 

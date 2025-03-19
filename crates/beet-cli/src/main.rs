@@ -12,14 +12,24 @@ struct Cli {
 	#[command(subcommand)]
 	command: Commands,
 }
+impl Cli {
+	pub async fn run(self) -> Result<()> {
+		match self.command {
+			Commands::Watch(cmd) => cmd.run().await,
+		}
+	}
+}
 
 #[derive(Subcommand)]
 enum Commands {
 	Watch(Watch),
 }
+
+
+
 #[tokio::main]
-async fn main() -> Result<()> {
-	match Cli::parse().command {
-		Commands::Watch(cmd) => cmd.run().await,
+async fn main() {
+	if let Err(err) = Cli::parse().run().await {
+		panic!("Error: {:?}", err);
 	}
 }

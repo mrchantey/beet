@@ -22,16 +22,24 @@ pub struct HashFile {
 impl HashFile {
 	/// hash only the code parts of a rust file.
 	pub fn file_to_hash(&self, path: &Path) -> Result<u64> {
-		let file = ReadFile::to_string(path)?;
 		if path.extension().map_or(false, |ext| ext == "rs") {
+			let file = ReadFile::to_string(path)?;
 			let mut hasher = RapidHasher::default_const();
 			// parse to file or it will be a string literal
-			let file = syn::parse_file(&file)?;
+			let file = syn::parse_file(&file).map_err(|err| {
+				anyhow::anyhow!(
+					"Failed to parse file: {}\n{}",
+					path.display(),
+					err
+				)
+			})?;
 			self.walk_tokens(&mut hasher, file.to_token_stream())?;
 			Ok(hasher.finish())
 		} else if self.hash_non_rust {
+			// bytes better than string, some files not utf-8
+			let bytes = ReadFile::to_bytes(path)?;
 			let mut hasher = RapidHasher::default_const();
-			hasher.write(file.as_bytes());
+			hasher.write(&bytes);
 			Ok(hasher.finish())
 			// other files will not trigger a recompile by default
 		} else {

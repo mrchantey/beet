@@ -24,6 +24,9 @@ pub struct Watch {
 
 #[derive(Debug, Clone, Parser)]
 pub struct WatchArgs {
+	/// Do not build any binaries, just rebuild the templates
+	#[arg(long)]
+	pub templates_only: bool,
 	/// Run a simple file server in this process instead of
 	/// spinning up the native binary with the --server feature
 	#[arg(long = "static")]
@@ -75,10 +78,17 @@ impl Watch {
 		TemplateWatcher::new(
 			self.build_template_map,
 			|| {
+				if self.watch_args.templates_only {
+					return Ok(());
+				};
 				self.build_binaries.build_templates(&self.watch_args)?;
 				Ok(())
 			},
 			|| {
+				if self.watch_args.templates_only {
+					return Ok(());
+				};
+
 				self.build_binaries.recompile(&self.watch_args)?;
 				if !self.watch_args.as_static {
 					if let Some(child) = &mut child_process {

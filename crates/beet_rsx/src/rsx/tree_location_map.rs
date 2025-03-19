@@ -119,7 +119,7 @@ mod test {
 
 		let root = rsx! {
 			<div>
-				"The "{desc}" and "{color}<b>fox</b>{action}" the lazy "andfatdog
+				"The "{desc}" and "{color}<b>fox</b>{action}" the lazy " andfatdog
 			</div>
 		};
 
@@ -134,7 +134,7 @@ mod test {
 		expect(map.collapsed_elements).to_be(
 			vec![(0.into(), TextBlockEncoder {
 				parent_id: 0.into(),
-				split_positions: vec![vec![4, 5, 5], vec![10]],
+				split_positions: vec![vec![4, 5, 5], vec![10, 10]],
 			})]
 			.into_iter()
 			.collect::<HashMap<_, _>>(),
