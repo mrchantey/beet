@@ -8,9 +8,9 @@ use std::process::Command;
 use sweet::prelude::GracefulChild;
 
 /// Performs all steps for a full recompile and reload
-pub struct BuildBinaries;
+pub struct BuildApp;
 
-impl BuildBinaries {
+impl BuildApp {
 	pub fn new(
 		build_cmd: &BuildCmd,
 		watch_args: &WatchArgs,
@@ -20,12 +20,12 @@ impl BuildBinaries {
 		// here we're compiling once
 
 		let mut group = BuildStepGroup::default();
-		// 1. perform all setup steps
 		group
+			// 1. perform setup steps specified in the app
 			.add(RunSetup::new(&build_cmd)?)
 			// 2. rebuild the native binary
 			.add(BuildNative::new(&build_cmd, &watch_args))
-			// 3. run the server
+			// 3. run the server as soon as its ready
 			.add(RunServer::new(&watch_args, &exe_path))
 			// 4. build the wasm binary
 			.add(BuildWasm::new(&build_cmd, &watch_args)?)

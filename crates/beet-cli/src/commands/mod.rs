@@ -1,11 +1,11 @@
-mod cargo_cmd;
 mod build_step;
+mod cargo_cmd;
 pub use cargo_cmd::*;
 mod build_cmd;
 pub use build_cmd::*;
 pub use build_step::*;
-mod build_binaries;
-pub use build_binaries::*;
+mod build_app;
+pub use build_app::*;
 mod deploy;
 mod watch;
 pub use deploy::*;
