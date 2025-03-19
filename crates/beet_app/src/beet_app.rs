@@ -11,8 +11,9 @@ type OnRun =
 /// - `static`: building static html files
 /// - `server`: serving routes, including via lambda
 /// - `wasm`: hydrating a client-side app
-#[derive(Default)]
 pub struct BeetApp {
+	/// The root context for this app
+	pub context: RootContext,
 	/// The router which can be extended by adding routers
 	/// as plugins.
 	#[cfg(all(feature = "server", not(target_arch = "wasm32")))]
@@ -26,7 +27,16 @@ pub struct BeetApp {
 }
 
 impl BeetApp {
-	pub fn new() -> Self { Self::default() }
+	pub fn new(context: RootContext) -> Self {
+		Self {
+			context,
+			#[cfg(all(feature = "server", not(target_arch = "wasm32")))]
+			axum_router: Default::default(),
+			on_run_static: Default::default(),
+			#[cfg(target_arch = "wasm32")]
+			on_run_wasm: Default::default(),
+		}
+	}
 
 	pub fn add_collection<M>(mut self, col: impl IntoCollection<M>) -> Self {
 		col.into_collection().register(&mut self);
@@ -62,6 +72,15 @@ impl BeetApp {
 
 		let args = BeetAppArgs::parse().validate()?;
 
+		#[cfg(feature = "serde")]
+		if args.root_context {
+			let cx =
+				ron::ser::to_string_pretty(&self.context, Default::default())?;
+			println!("{}", cx);
+			return Ok(());
+		}
+
+
 		if args.is_static {
 			futures::future::try_join_all(
 				self.on_run_static.into_iter().map(|f| f(&args)),
@@ -80,4 +99,13 @@ impl BeetApp {
 			Ok(())
 		}
 	}
+}
+
+
+#[cfg(test)]
+mod test {
+	use crate::prelude::*;
+
+	#[test]
+	fn works() { let _app = BeetApp::new(root_cx!()); }
 }

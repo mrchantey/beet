@@ -8,6 +8,11 @@ use clap::Parser;
 #[derive(Parser)]
 #[command(version, about, long_about = None)]
 pub struct BeetAppArgs {
+	/// write the config to stdout in ron format then exit.
+	/// Only available with the serde feature
+	#[cfg(feature = "serde")]
+	#[arg(long)]
+	pub root_context: bool,
 	/// Only build routes, do not run a server
 	#[arg(long = "static")]
 	pub is_static: bool,

@@ -9,6 +9,7 @@ pub use beet_router_parser;
 #[cfg(feature = "bevy")]
 pub mod bevy;
 pub mod file_router;
+#[cfg(all(feature = "parser", not(target_arch = "wasm32")))]
 pub mod spa_template;
 
 
@@ -17,6 +18,7 @@ pub mod prelude {
 	#[allow(unused_imports)]
 	pub use crate::bevy::*;
 	pub use crate::file_router::*;
+	#[cfg(all(feature = "parser", not(target_arch = "wasm32")))]
 	pub use crate::spa_template::*;
 	#[cfg(all(feature = "parser", not(target_arch = "wasm32")))]
 	pub use beet_router_parser::prelude::*;

@@ -12,7 +12,7 @@ where
 {
 	fn into_collection(self) -> impl Collection {
 		move |app: &mut BeetApp| {
-			#[cfg(not(target_arch = "wasm32"))]
+			#[cfg(all(not(target_arch = "wasm32"), feature = "server"))]
 			app.on_run_static.push(Box::new(move |args| {
 				let path = args.html_dir.join("index.html");
 				Box::pin(async move {

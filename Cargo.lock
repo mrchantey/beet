@@ -650,6 +650,9 @@ dependencies = [
  "beet_server",
  "clap",
  "futures",
+ "ron",
+ "serde",
+ "sweet",
  "tokio",
 ]
 

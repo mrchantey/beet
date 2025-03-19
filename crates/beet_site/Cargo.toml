@@ -8,6 +8,7 @@ readme.workspace = true
 description.workspace = true
 documentation.workspace = true
 repository.workspace = true
+homepage.workspace = true
 categories.workspace = true
 keywords.workspace = true
 

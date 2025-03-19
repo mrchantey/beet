@@ -13,8 +13,10 @@ categories.workspace = true
 publish = true
 
 [features]
+default = ["serde"]
 # default = ["server"]
-server = ["dep:beet_server"]
+serde = ["dep:serde", "dep:ron"]
+server = ["dep:beet_server", "beet_router/parser"]
 
 
 [dependencies]
@@ -24,9 +26,14 @@ beet_router.workspace = true
 anyhow.workspace = true
 futures.workspace = true
 clap.workspace = true
+serde = { workspace = true, optional = true }
+ron = { workspace = true, optional = true }
+
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 tokio.workspace = true
 beet_server = { workspace = true, optional = true }
 
 # [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+[dev-dependencies]
+sweet = { workspace = true, features = ["test"] }
