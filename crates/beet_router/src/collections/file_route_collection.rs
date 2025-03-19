@@ -1,5 +1,4 @@
 use crate::prelude::*;
-use beet_router::prelude::*;
 
 pub struct FileRouteCollection;
 

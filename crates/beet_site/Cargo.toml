@@ -7,8 +7,8 @@ authors.workspace = true
 readme.workspace = true
 description.workspace = true
 documentation.workspace = true
-repository.workspace = true
 homepage.workspace = true
+repository.workspace = true
 categories.workspace = true
 keywords.workspace = true
 
@@ -17,7 +17,7 @@ keywords.workspace = true
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 anyhow.workspace = true
-beet = { workspace = true, features = ["app", "server", "router"] }
+beet = { workspace = true, features = ["router", "server"] }
 
 tokio.workspace = true
 

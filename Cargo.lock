@@ -611,7 +611,6 @@ name = "beet"
 version = "0.0.5-dev"
 dependencies = [
  "beet",
- "beet_app",
  "beet_design",
  "beet_examples",
  "beet_flow",
@@ -637,22 +636,6 @@ dependencies = [
  "clap",
  "rapidhash",
  "ron",
- "sweet",
- "tokio",
-]
-
-[[package]]
-name = "beet_app"
-version = "0.0.5-dev"
-dependencies = [
- "anyhow",
- "beet_router",
- "beet_rsx",
- "beet_server",
- "clap",
- "futures",
- "ron",
- "serde",
  "sweet",
  "tokio",
 ]
@@ -754,11 +737,14 @@ dependencies = [
  "beet_router",
  "beet_router_parser",
  "beet_rsx",
+ "beet_server",
  "bevy",
+ "clap",
  "flume",
  "futures",
  "http",
  "ron",
+ "serde",
  "sweet",
  "tokio",
 ]

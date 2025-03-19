@@ -7,11 +7,15 @@ authors.workspace = true
 readme.workspace = true
 description = "File based router for websites"
 documentation.workspace = true
+homepage.workspace = true
 repository.workspace = true
 categories.workspace = true
 keywords.workspace = true
 
 [features]
+default = ["serde"]
+serde = ["dep:serde", "dep:ron", "beet_rsx/serde"]
+server = ["parser", "dep:beet_server"]
 parser = ["dep:beet_router_parser"]
 bevy = [
 	"dep:bevy",
@@ -24,15 +28,22 @@ bevy = [
 _test_site = []
 
 [dependencies]
-beet_rsx = { workspace = true, features = ["serde"] }
-bevy = { workspace = true, optional = true }
 anyhow.workspace = true
-ron.workspace = true
 http.workspace = true
 futures.workspace = true
+clap.workspace = true
+sweet.workspace = true
+
+
+beet_rsx = { workspace = true }
+bevy = { workspace = true, optional = true }
+serde = { workspace = true, optional = true }
+ron = { workspace = true, optional = true }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 beet_router_parser = { workspace = true, optional = true }
+beet_server = { workspace = true, optional = true }
+
 sweet = { workspace = true, features = ["fs"] }
 tokio = { workspace = true, optional = true }
 flume = { workspace = true, optional = true }
