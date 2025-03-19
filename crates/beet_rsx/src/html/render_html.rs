@@ -27,7 +27,7 @@ impl RenderHtml {
 	}
 }
 
-impl<T: RsxPluginTarget + AsRef<Vec<HtmlNode>>> RsxPlugin<T, String>
+impl<T: RsxPipelineTarget + AsRef<Vec<HtmlNode>>> RsxPipeline<T, String>
 	for RenderHtml
 {
 	fn apply(self, target: T) -> Result<String> {
@@ -35,7 +35,7 @@ impl<T: RsxPluginTarget + AsRef<Vec<HtmlNode>>> RsxPlugin<T, String>
 	}
 }
 
-impl RsxPlugin<HtmlDocument, String> for RenderHtml {
+impl RsxPipeline<HtmlDocument, String> for RenderHtml {
 	fn apply(self, target: HtmlDocument) -> Result<String> {
 		Ok(self.render(&target.into_nodes())?)
 	}

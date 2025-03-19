@@ -7,7 +7,7 @@ pub struct RsxToResumableHtmlString {
 	pub render_html: RenderHtml,
 }
 
-impl RsxPlugin<RsxRoot, String> for RsxToResumableHtmlString {
+impl RsxPipeline<RsxRoot, String> for RsxToResumableHtmlString {
 	fn apply(self, root: RsxRoot) -> Result<String> {
 		Ok(root
 			.pipe(self.rsx_to_resumable)?
@@ -23,10 +23,10 @@ pub struct RsxToResumableHtml {
 	pub html_doc_to_resumable: HtmlDocToResumable,
 }
 
-impl<T: AsRef<RsxNode> + RsxPluginTarget> RsxPlugin<T, (T, HtmlDocument)>
+impl<T: AsRef<RsxNode> + RsxPipelineTarget> RsxPipeline<T, (T, HtmlDocument)>
 	for RsxToResumableHtml
 where
-	(T, HtmlDocument): RsxPluginTarget,
+	(T, HtmlDocument): RsxPipelineTarget,
 {
 	fn apply(self, root: T) -> Result<(T, HtmlDocument)> {
 		let html = root
@@ -45,10 +45,10 @@ pub struct HtmlDocToResumable {
 	pub html_constants: HtmlConstants,
 }
 
-impl<T: AsRef<RsxNode> + RsxPluginTarget>
-	RsxPlugin<(T, HtmlDocument), (T, HtmlDocument)> for HtmlDocToResumable
+impl<T: AsRef<RsxNode> + RsxPipelineTarget>
+	RsxPipeline<(T, HtmlDocument), (T, HtmlDocument)> for HtmlDocToResumable
 where
-	(T, HtmlDocument): RsxPluginTarget,
+	(T, HtmlDocument): RsxPipelineTarget,
 {
 	fn apply(
 		self,

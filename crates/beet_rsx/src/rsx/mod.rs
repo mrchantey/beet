@@ -1,7 +1,7 @@
-mod plugins;
+mod pipeline;
 mod props;
 mod rsx_idx;
-pub use plugins::*;
+pub use pipeline::*;
 pub use props::*;
 mod tree_location;
 mod tree_location_map;

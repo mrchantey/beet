@@ -46,9 +46,9 @@ use thiserror::Error;
 /// 	slot children.
 /// - All slot="foo" attributes are removed.
 #[derive(Debug, Default, Clone)]
-pub struct SlotsPlugin;
+pub struct SlotsPipeline;
 
-impl RsxPlugin<RsxRoot> for SlotsPlugin {
+impl RsxPipeline<RsxRoot> for SlotsPipeline {
 	fn apply(self, mut root: RsxRoot) -> Result<RsxRoot> {
 		SlotsVisitor::apply(&mut root.node)
 			.map(|_| root)

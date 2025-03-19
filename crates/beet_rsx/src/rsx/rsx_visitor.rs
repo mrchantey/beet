@@ -314,7 +314,7 @@ mod test {
 				</Child>
 			</div>
 		}
-		.pipe(SlotsPlugin::default())
+		.pipe(SlotsPipeline::default())
 		.unwrap()
 		.walk(&mut counter);
 		expect(counter.node).to_be(22);

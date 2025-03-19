@@ -17,7 +17,7 @@ use parcel_selectors::attr::ParsedCaseSensitivity;
 /// - Scope rules:
 /// 	- `<style scope:global/>` will not be scoped at all
 ///
-pub struct ScopedStylePlugin {
+pub struct ScopedStylePipeline {
 	/// the attribute to use as a selector for the component,
 	/// defaults to "data-styleid"
 	attr: String,
@@ -25,9 +25,9 @@ pub struct ScopedStylePlugin {
 	idx: usize,
 }
 
-impl Default for ScopedStylePlugin {
+impl Default for ScopedStylePipeline {
 	fn default() -> Self {
-		ScopedStylePlugin {
+		ScopedStylePipeline {
 			attr: "data-styleid".to_string(),
 			idx: 0,
 		}
@@ -56,7 +56,7 @@ impl Scope {
 	}
 }
 
-impl RsxPlugin<RsxRoot> for ScopedStylePlugin {
+impl RsxPipeline<RsxRoot> for ScopedStylePipeline {
 	/// Applies scoped style to:
 	/// 1. root node
 	/// 2. all component nodes
@@ -83,7 +83,7 @@ impl RsxPlugin<RsxRoot> for ScopedStylePlugin {
 	}
 }
 
-impl ScopedStylePlugin {
+impl ScopedStylePipeline {
 	/// 1. apply the idx to all style bodies
 	/// 2. if contains style, apply tag to all elements in the component
 	fn apply_node(&mut self, node: &mut RsxNode) -> ParseResult<()> {
