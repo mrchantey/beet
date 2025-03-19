@@ -4,15 +4,10 @@ use anyhow::Result;
 use clap::Parser;
 
 
-/// Cli args parser when running a beet app
+/// Cli args parser when running an [`AppRouter`].
 #[derive(Parser)]
 #[command(version, about, long_about = None)]
-pub struct BeetAppArgs {
-	/// write the config to stdout in ron format then exit.
-	/// Only available with the serde feature
-	#[cfg(feature = "serde")]
-	#[arg(long)]
-	pub root_context: bool,
+pub struct AppRouterArgs {
 	/// Only build routes, do not run a server
 	#[arg(long = "static")]
 	pub is_static: bool,
@@ -22,7 +17,7 @@ pub struct BeetAppArgs {
 }
 
 
-impl BeetAppArgs {
+impl AppRouterArgs {
 	/// Check the arguments parsed in match the compiled feature set
 	pub fn validate(self) -> Result<Self> {
 		#[cfg(not(feature = "server"))]

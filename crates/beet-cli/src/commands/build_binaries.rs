@@ -126,7 +126,7 @@ impl<'a> BuildBinaries<'a> {
 	}
 	/// run the built binary with the `--static` flag, instructing
 	/// it to not spin up a server, and instead just build the static files
-	fn get_cx(exe_path_native: &Path) -> Result<RootContext> {
+	fn get_cx(exe_path_native: &Path) -> Result<AppContext> {
 		let stdout = Command::new(&exe_path_native)
 			.arg("--root-context")
 			.output()?

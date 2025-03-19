@@ -3,19 +3,19 @@ use std::path::PathBuf;
 /// Collection of cargo environment variables
 /// and file paths required to run a beet app.
 ///
-/// This should be created via the `root_cx!` macro.
+/// This should be created via the `app_cx!` macro.
 ///
 /// ## example
 ///
 /// ```rust
 /// # use beet_app::prelude::*;
 ///
-/// let app = AppRouter::new(root_cx!());
+/// let app = AppRouter::new(app_cx!());
 ///
 /// ```
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct RootContext {
+pub struct AppContext {
 	pub file: PathBuf,
 	pub manifest_path: PathBuf,
 	pub pkg_version: String,
@@ -24,19 +24,19 @@ pub struct RootContext {
 	pub pkg_homepage: String,
 }
 
-impl RootContext {}
+impl AppContext {}
 
-/// Create a `RootContext` struct using local file and env macros.
+/// Creates an `AppContext` struct using local file and env macros.
 ///
 /// ## Example
 ///
 /// ```rust
 /// # use beet_app::prelude::*;
-/// let app = AppRouter::new(root_cx!());
+/// let app = AppRouter::new(app_cx!());
 #[macro_export]
-macro_rules! root_cx {
+macro_rules! app_cx {
 	() => {
-		RootContext {
+		AppContext {
 			file: file!().into(),
 			manifest_path: env!("CARGO_MANIFEST_PATH").into(),
 			pkg_version: env!("CARGO_PKG_VERSION").to_string(),
@@ -59,7 +59,7 @@ mod test {
 
 	#[test]
 	fn works() {
-		let cx = root_cx!();
+		let cx = app_cx!();
 		expect(cx.file.parent()).to_be_some();
 		expect(cx.manifest_path.parent()).to_be_some();
 		expect(cx.pkg_version.is_empty()).to_be_false();

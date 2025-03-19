@@ -3,8 +3,9 @@ use anyhow::Result;
 use std::pin::Pin;
 
 
-type OnRun =
-	Box<dyn FnOnce(&BeetAppArgs) -> Pin<Box<dyn Future<Output = Result<()>>>>>;
+type OnRun = Box<
+	dyn FnOnce(&AppRouterArgs) -> Pin<Box<dyn Future<Output = Result<()>>>>,
+>;
 // type OnRun = Box<dyn FnOnce() -> Result<()> + Send + Sync>;
 
 /// Entrypoint for all beet apps:
@@ -13,7 +14,7 @@ type OnRun =
 /// - `wasm`: hydrating a client-side app
 pub struct AppRouter {
 	/// The root context for this app
-	pub context: RootContext,
+	pub context: AppContext,
 	/// The router which can be extended by adding routers
 	/// as plugins.
 	#[cfg(all(feature = "server", not(target_arch = "wasm32")))]
@@ -23,11 +24,11 @@ pub struct AppRouter {
 	pub on_run_static: Vec<OnRun>,
 	#[cfg(target_arch = "wasm32")]
 	pub on_run_wasm:
-		Vec<Box<dyn FnOnce(&BeetAppArgs) -> Result<()> + Send + Sync>>,
+		Vec<Box<dyn FnOnce(&AppRouterArgs) -> Result<()> + Send + Sync>>,
 }
 
 impl AppRouter {
-	pub fn new(context: RootContext) -> Self {
+	pub fn new(context: AppContext) -> Self {
 		Self {
 			context,
 			#[cfg(all(feature = "server", not(target_arch = "wasm32")))]
@@ -48,7 +49,7 @@ impl AppRouter {
 
 	#[cfg(target_arch = "wasm32")]
 	fn run_inner(self) -> Result<()> {
-		let args = BeetAppArgs::from_url_params()?;
+		let args = AppRouterArgs::from_url_params()?;
 		self.on_run_wasm.into_iter().try_for_each(|f| f(&args))
 	}
 
@@ -70,16 +71,7 @@ impl AppRouter {
 	async fn run_inner(self) -> Result<()> {
 		use clap::Parser;
 
-		let args = BeetAppArgs::parse().validate()?;
-
-		#[cfg(feature = "serde")]
-		if args.root_context {
-			let cx =
-				ron::ser::to_string_pretty(&self.context, Default::default())?;
-			println!("{}", cx);
-			return Ok(());
-		}
-
+		let args = AppRouterArgs::parse().validate()?;
 
 		if args.is_static {
 			futures::future::try_join_all(
@@ -107,5 +99,5 @@ mod test {
 	use crate::prelude::*;
 
 	#[test]
-	fn works() { let _app = AppRouter::new(root_cx!()); }
+	fn works() { let _app = AppRouter::new(app_cx!()); }
 }

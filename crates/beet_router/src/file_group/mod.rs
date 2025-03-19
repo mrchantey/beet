@@ -1,12 +1,12 @@
+use crate::prelude::AppContext;
 use std::path::PathBuf;
 use sweet::prelude::GlobFilter;
 
 
-
-
-#[derive(Debug, Default, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct FileGroupConfig {
-	pub cwd: PathBuf,
+	/// The directory from which all file paths are relative.
+	pub app_cx: AppContext,
 	pub groups: Vec<FileGroup>,
 }
 
@@ -14,15 +14,16 @@ impl FileGroupConfig {
 	/// Create a new Collection Builder.
 	/// ## Panics
 	/// Panics if the current working directory cannot be determined.
-	pub fn new() -> Self {
+	pub fn new(app_cx: AppContext) -> Self {
 		Self {
-			cwd: std::env::current_dir().unwrap(),
+			app_cx,
 			groups: Vec::new(),
 		}
 	}
 
-	pub fn add_group(&mut self, group: impl Into<FileGroup>) {
+	pub fn add_group(&mut self, group: impl Into<FileGroup>) -> &mut Self {
 		self.groups.push(group.into());
+		self
 	}
 
 	/// Serializes self and writes to stdout, which is collected by the beet cli.
@@ -38,10 +39,17 @@ impl FileGroupConfig {
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub enum FileGroup {
+	/// Config for an additional [`FileGroupConfig`] that should also be exported.
+	Child(FileGroupConfig),
+	/// Config for a [`GlobFileGroup`].
 	Glob(GlobFileGroup),
+	/// Config for a [`TreeFileGroup`].
 	Tree(TreeFileGroup),
 }
 
+impl Into<FileGroup> for FileGroupConfig {
+	fn into(self) -> FileGroup { FileGroup::Child(self) }
+}
 impl Into<FileGroup> for GlobFileGroup {
 	fn into(self) -> FileGroup { FileGroup::Glob(self) }
 }
@@ -52,8 +60,9 @@ impl Into<FileGroup> for TreeFileGroup {
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct GlobFileGroup {
+	/// The directory relative to the [`FileGroupConfig::root_dir`] where the files are located.
 	pub src_dir: PathBuf,
-	/// The file to be built containing the collected items.
+	/// The directory relative to the [`FileGroupConfig::root_dir`] to build the collected items.
 	pub dst_file: PathBuf,
 	pub filter: GlobFilter,
 }
@@ -72,9 +81,11 @@ impl GlobFileGroup {
 	}
 }
 
-
+/// Will scan a directory for all public http methods in files.
+/// Similar to a next-js or astro `pages` directory.
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct TreeFileGroup {
+	/// The directory relative to the [`FileGroupConfig::root_dir`] where the files are located.
 	pub src_dir: PathBuf,
 }
 
@@ -98,11 +109,19 @@ impl TreeFileGroup {
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
+	use sweet::prelude::*;
 	// use sweet::prelude::*;
 
 	#[test]
 	fn works() {
-		let _builder = FileGroupConfig::new();
-		// expect(true).to_be_false();
+		let _builder = FileGroupConfig::new(app_cx!())
+			.add_group(FileGroupConfig::new(app_cx!()))
+			.add_group(GlobFileGroup::new(
+				".",
+				"my_group.rs",
+				GlobFilter::default(),
+			))
+			.add_group(TreeFileGroup::new("routes"))
+			.export();
 	}
 }

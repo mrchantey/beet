@@ -19,7 +19,6 @@ server = ["parser", "dep:beet_server"]
 parser = ["dep:beet_router_parser"]
 bevy = [
 	"dep:bevy",
-	"dep:tokio",
 	"dep:flume",
 	"beet_rsx/bevy",
 	"beet_rsx/bevy_default", #why
@@ -45,7 +44,7 @@ beet_router_parser = { workspace = true, optional = true }
 beet_server = { workspace = true, optional = true }
 
 sweet = { workspace = true, features = ["fs"] }
-tokio = { workspace = true, optional = true }
+tokio = { workspace = true }
 flume = { workspace = true, optional = true }
 
 [dev-dependencies]
@@ -54,4 +53,3 @@ sweet = { workspace = true, features = ["test"] }
 [target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
 beet_router = { path = "", features = ["parser", "bevy", "_test_site"] }
 ron.workspace = true
-tokio.workspace = true

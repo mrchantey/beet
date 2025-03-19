@@ -18,6 +18,7 @@ pub mod spa_template;
 
 
 pub mod prelude {
+	pub use crate::app_cx;
 	pub use crate::app_router::*;
 	#[cfg(feature = "bevy")]
 	#[allow(unused_imports)]
@@ -26,7 +27,6 @@ pub mod prelude {
 	#[cfg(feature = "serde")]
 	pub use crate::file_group::*;
 	pub use crate::file_router::*;
-	pub use crate::root_cx;
 	#[cfg(all(feature = "parser", not(target_arch = "wasm32")))]
 	pub use crate::spa_template::*;
 	#[cfg(all(feature = "parser", not(target_arch = "wasm32")))]
