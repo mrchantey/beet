@@ -1,7 +1,7 @@
 #[cfg(all(not(target_arch = "wasm32"), feature = "parser"))]
-pub mod static_file_router;
+pub mod static_route;
 #[cfg(all(not(target_arch = "wasm32"), feature = "parser"))]
-pub use static_file_router::*;
+pub use static_route::*;
 
 use anyhow::Result;
 use beet_rsx::rsx::RsxPipelineTarget;
@@ -67,11 +67,20 @@ impl RouteInfo {
 
 impl RsxPipelineTarget for RouteInfo {}
 
-#[derive(Default)]
 pub struct RouteTree<T> {
 	pub routes: Vec<(RouteInfo, T)>,
 	pub children: Vec<RouteTree<T>>,
 }
+
+impl<T> Default for RouteTree<T> {
+	fn default() -> Self {
+		Self {
+			routes: Vec::new(),
+			children: Vec::new(),
+		}
+	}
+}
+
 impl<T> RouteTree<T> {
 	pub fn add_route<M, R: IntoRoute<T, M>>(
 		mut self,
@@ -79,6 +88,13 @@ impl<T> RouteTree<T> {
 	) -> Self {
 		self.routes.push((info, route.into_route()));
 		self
+	}
+	pub fn flatten(self) -> Vec<(RouteInfo, T)> {
+		let mut routes = self.routes;
+		for child in self.children {
+			routes.extend(child.flatten());
+		}
+		routes
 	}
 }
 

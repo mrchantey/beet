@@ -8,7 +8,7 @@ fn main() {
 
 	#[cfg(not(feature = "setup"))]
 	AppRouter::new(app_cx!())
-		.add_collection(beet_site::prelude::routes::collect_file_routes)
+		.add_collection(beet_site::prelude::routes::collect())
 		// .add_plugin(Router::new)
 		.run();
 }

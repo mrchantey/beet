@@ -4,6 +4,8 @@ mod collect_client_islands;
 #[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
 mod fs_src_pipeline;
 mod slots_pipeline;
+use std::pin::Pin;
+
 #[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
 pub use collect_client_islands::*;
 #[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
@@ -61,6 +63,11 @@ impl<T: RsxPipelineTarget> RsxPipelineTarget for &T {}
 impl<T: RsxPipelineTarget> RsxPipelineTarget for Option<T> {}
 impl<T: RsxPipelineTarget> RsxPipelineTarget for Result<T> {}
 impl<T: RsxPipelineTarget> RsxPipelineTarget for Vec<T> {}
+impl<T: RsxPipelineTarget> RsxPipelineTarget for Box<T> {}
+impl<T: RsxPipelineTarget> RsxPipelineTarget
+	for Pin<Box<dyn Future<Output = T>>>
+{
+}
 
 impl<T1: RsxPipelineTarget, T2: RsxPipelineTarget> RsxPipelineTarget
 	for (T1, T2)

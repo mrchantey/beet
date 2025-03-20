@@ -4,20 +4,15 @@ use beet_rsx::prelude::*;
 
 pub struct StaticRouteCollection;
 
-impl<F> IntoCollection<StaticRouteCollection> for F
-where
-	F: 'static + FnOnce(&mut StaticFileRouter),
-{
+impl IntoCollection<StaticRoute> for RouteTree<StaticRoute> {
 	fn into_collection(self) -> impl Collection {
 		move |app: &mut AppRouter| {
 			#[cfg(not(target_arch = "wasm32"))]
 			app.on_run_static.push(Box::new(move |args| {
-				let mut router = StaticFileRouter::default();
-				self(&mut router);
 				let html_dir = args.html_dir.clone();
 				Box::pin(async move {
-					let routes = router
-						.routes_to_rsx()
+					let routes = self
+						.pipe(StaticRoutesToRsx::default())
 						.await?
 						.pipe(ApplyRouteTemplates::default())?;
 					// export client islands after templates are applied

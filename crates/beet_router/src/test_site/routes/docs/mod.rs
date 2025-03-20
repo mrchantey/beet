@@ -3,6 +3,11 @@
 pub mod index;
 pub const INDEX: &'static str = "/docs";
 use crate::prelude::*;
-pub fn collect_file_routes(router: &mut crate::prelude::StaticFileRouter) {
-	router.add_route((RouteInfo::new("/docs", "get"), index::get));
+#[cfg(not(target_arch = "wasm32"))]
+pub fn collect() -> RouteTree<crate::prelude::StaticRoute> {
+    RouteTree {
+        children: vec![],
+        ..Default::default()
+    }
+        .add_route((RouteInfo::new("/docs", "get"), index::get))
 }

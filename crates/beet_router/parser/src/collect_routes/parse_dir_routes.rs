@@ -77,7 +77,7 @@ impl ParseDirRoutes {
 		let include_dirs =
 			dir_idents.iter().map(|ident| quote! {pub mod #ident;});
 		let children = dir_idents.iter().map(|ident| {
-			quote! {#ident::collect(router)}
+			quote! {#ident::collect()}
 		});
 
 		let file: File = syn::parse_quote! {
