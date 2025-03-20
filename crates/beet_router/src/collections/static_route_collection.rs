@@ -19,7 +19,7 @@ where
 					let routes = router
 						.routes_to_rsx()
 						.await?
-						.pipe(ApplyRouteTemplates::new(html_dir))?;
+						.pipe(ApplyRouteTemplates::default())?;
 					// export client islands after templates are applied
 					// but before `DefaultTransformations` are applied.
 					// i dont think its nessecary but if it turns out to be
@@ -28,7 +28,7 @@ where
 
 					routes
 						.pipe(RoutesToHtml::default())?
-						.pipe(HtmlRoutesToDisk::default())?;
+						.pipe(HtmlRoutesToDisk::new(html_dir))?;
 					Ok(())
 				})
 			}));

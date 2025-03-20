@@ -10,4 +10,7 @@ pub mod prelude {
 	pub use crate::build_template_map::*;
 	pub use crate::collect_routes::*;
 	pub use crate::compile_check::*;
+
+	// reexports
+	pub use ron;
 }

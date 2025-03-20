@@ -13,6 +13,7 @@ pub mod collections;
 #[cfg(feature = "serde")]
 pub mod file_group;
 pub mod file_router;
+#[cfg(all(feature = "parser", not(target_arch = "wasm32")))]
 pub mod pipelines;
 #[cfg(all(feature = "parser", not(target_arch = "wasm32")))]
 pub mod spa_template;
@@ -28,6 +29,7 @@ pub mod prelude {
 	#[cfg(feature = "serde")]
 	pub use crate::file_group::*;
 	pub use crate::file_router::*;
+	#[cfg(all(feature = "parser", not(target_arch = "wasm32")))]
 	pub use crate::pipelines::*;
 	#[cfg(all(feature = "parser", not(target_arch = "wasm32")))]
 	pub use crate::spa_template::*;

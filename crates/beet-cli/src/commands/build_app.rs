@@ -27,10 +27,11 @@ impl BuildApp {
 			.add(BuildNative::new(&build_cmd, &watch_args))
 			// 3. run the server as soon as its ready
 			.add(RunServer::new(&watch_args, &exe_path))
-			// 4. build the wasm binary
-			.add(BuildWasm::new(&build_cmd, &watch_args)?)
-			// 5. export all static files from the app
-			.add(ExportStatic::new(watch_args, &exe_path));
+			// 4. export all static files from the app
+			.add(ExportStatic::new(watch_args, &exe_path))
+			// update routes dir with islands
+			// 5. build the wasm binary
+			.add(BuildWasm::new(&build_cmd, &watch_args)?);
 
 		Ok(group)
 	}

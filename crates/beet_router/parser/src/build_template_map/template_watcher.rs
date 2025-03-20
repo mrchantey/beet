@@ -133,8 +133,10 @@ impl<Reload: FnMut() -> Result<()>, Recompile: FnMut() -> Result<()>>
 		// terminal::clear()?;
 		println!("Watcher::Recompile: {}", reason);
 		let start = Instant::now();
-		(self.recompile_func)()?;
+		// recompile depends on a templates file existing
+		// and build_templates doesnt depend on recompile so safe to do first
 		self.build_templates.build_and_write()?;
+		(self.recompile_func)()?;
 		(self.reload_func)()?;
 		println!("Watcher::Recompile Duration: {:?}", start.elapsed());
 		Ok(())

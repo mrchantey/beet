@@ -17,6 +17,7 @@ setup = ["beet/setup"]
 
 [dependencies]
 anyhow.workspace = true
+serde.workspace = true
 
 beet = { workspace = true, features = ["router"] }
 
