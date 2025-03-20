@@ -1,38 +1,12 @@
 use crate::prelude::*;
 use anyhow::Result;
-use beet_router_parser::prelude::*;
 use beet_rsx::prelude::*;
 use std::path::PathBuf;
 use sweet::prelude::*;
 
 /// For a given router export each html file, using the templates map if available
-pub struct RoutesToHtml {
-	/// Location of the `rsx-templates.ron` file
-	pub templates_map_path: Option<PathBuf>,
-}
-
-impl Default for RoutesToHtml {
-	fn default() -> Self {
-		Self {
-			templates_map_path: Some(
-				BuildTemplateMap::DEFAULT_TEMPLATES_MAP_PATH.into(),
-			),
-		}
-	}
-}
-impl RoutesToHtml {
-	/// Create a new instance of `RoutesToHtml` with a custom `templates_map_path`
-	pub fn new(templates_map_path: impl Into<PathBuf>) -> Self {
-		Self {
-			templates_map_path: Some(templates_map_path.into()),
-		}
-	}
-	pub fn without_templates() -> Self {
-		Self {
-			templates_map_path: None,
-		}
-	}
-}
+#[derive(Default)]
+pub struct RoutesToHtml;
 
 
 impl
@@ -45,38 +19,15 @@ impl
 		self,
 		routes: Vec<(RouteInfo, RsxRoot)>,
 	) -> Result<Vec<(RouteInfo, HtmlDocument)>> {
-		// if we can't load templates just warn and run without template reload
-		let mut template_map = self
-			.templates_map_path
-			.as_ref()
-			.map(|path| {
-				RsxTemplateMap::load(&path)
-					.map_err(|err| {
-						// notify user that we are using routes
-						eprintln!(
-							"Live reload disabled - Error loading template map at: {:?}\n{:#?}",
-							self.templates_map_path, err,
-						);
-						err
-					})
-					.ok()
-			})
-			.flatten();
-
 		let html = routes
 			.into_iter()
-			.map(|(route, mut root)| {
+			.map(|(route, root)| {
 				// only hydrate if we have templates
 				// we already warned otherwise
-				if let Some(map) = &mut template_map {
-					// TODO check if inside templates_root_dir.
-					// if so, error, otherwise do nothing
-					root = map.apply_template(root)?;
-				}
 				let doc = root.pipe(RsxToHtmlDocument::default())?;
-				Ok((route, doc))
+				Ok((route.clone(), doc))
 			})
-			.collect::<Result<Vec<(RouteInfo, HtmlDocument)>>>()?;
+			.collect::<Result<Vec<_>>>()?;
 		Ok(html)
 	}
 }

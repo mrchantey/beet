@@ -1,4 +1,6 @@
-mod export_client_islands;
-mod export_html;
-pub use export_client_islands::*;
-pub use export_html::*;
+mod routes_to_client_island_map;
+mod routes_to_html;
+mod apply_route_templates;
+pub use routes_to_client_island_map::*;
+pub use routes_to_html::*;
+pub use apply_route_templates::*;

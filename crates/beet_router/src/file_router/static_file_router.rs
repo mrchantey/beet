@@ -104,7 +104,7 @@ mod test {
 			.routes_to_rsx()
 			.await
 			.unwrap()
-			.pipe(RoutesToHtml::without_templates())
+			.pipe(RoutesToHtml::default())
 			.unwrap();
 
 		expect(html.len()).to_be(3);

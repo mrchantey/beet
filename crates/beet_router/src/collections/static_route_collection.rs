@@ -16,10 +16,18 @@ where
 				self(&mut router);
 				let html_dir = args.html_dir.clone();
 				Box::pin(async move {
-					router
+					let routes = router
 						.routes_to_rsx()
 						.await?
-						.pipe(RoutesToHtml::new(html_dir))?
+						.pipe(ApplyRouteTemplates::new(html_dir))?;
+					// export client islands after templates are applied
+					// but before `DefaultTransformations` are applied.
+					// i dont think its nessecary but if it turns out to be
+					// we can move some pipes around
+					(&routes).pipe(RoutesToClientIslandMap::default())?;
+
+					routes
+						.pipe(RoutesToHtml::default())?
 						.pipe(HtmlRoutesToDisk::default())?;
 					Ok(())
 				})
