@@ -100,9 +100,11 @@ mod test {
 	async fn works() {
 		let mut router = StaticFileRouter::default();
 		crate::test_site::routes::collect_file_routes(&mut router);
-		let html = ExportHtml::default()
-			.routes_to_html(&mut router)
+		let html = router
+			.routes_to_rsx()
 			.await
+			.unwrap()
+			.pipe(RoutesToHtml::without_templates())
 			.unwrap();
 
 		expect(html.len()).to_be(3);

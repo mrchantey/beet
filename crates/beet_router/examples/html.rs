@@ -1,4 +1,5 @@
 use beet_router::prelude::*;
+use beet_rsx::prelude::*;
 
 
 #[tokio::main]
@@ -10,11 +11,12 @@ async fn main() {
 	// 	.unwrap();"
 	// router.html_dir = "target/test_site".into();
 	beet_router::test_site::routes::collect_file_routes(&mut router);
-	ExportHtml {
-		html_dir: "target/test_site".into(),
-		templates_map_path: "target/test_site/rsx-templates.ron".into(),
-	}
-	.routes_to_html_files(&mut router)
-	.await
-	.unwrap();
+	router
+		.routes_to_rsx()
+		.await
+		.unwrap()
+		.pipe(RoutesToHtml::new("target/test_site/rsx-templates.ron"))
+		.unwrap()
+		.pipe(HtmlRoutesToDisk::new("target/test_site"))
+		.unwrap();
 }

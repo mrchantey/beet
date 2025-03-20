@@ -6,6 +6,7 @@ pub use export_html::*;
 pub use static_file_router::*;
 
 use anyhow::Result;
+use beet_rsx::rsx::RsxPipelineTarget;
 use beet_rsx::rsx::RsxRoot;
 use http::Method;
 use std::path::PathBuf;
@@ -33,3 +34,6 @@ impl RouteInfo {
 		}
 	}
 }
+
+
+impl RsxPipelineTarget for RouteInfo {}

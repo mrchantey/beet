@@ -60,12 +60,14 @@ pub trait RsxPipelineTarget: Sized {
 impl<T: RsxPipelineTarget> RsxPipelineTarget for &T {}
 impl<T: RsxPipelineTarget> RsxPipelineTarget for Option<T> {}
 impl<T: RsxPipelineTarget> RsxPipelineTarget for Result<T> {}
+impl<T: RsxPipelineTarget> RsxPipelineTarget for Vec<T> {}
 
 impl<T1: RsxPipelineTarget, T2: RsxPipelineTarget> RsxPipelineTarget
 	for (T1, T2)
 {
 }
 
+impl RsxPipelineTarget for () {}
 impl RsxPipelineTarget for String {}
 impl RsxPipelineTarget for RsxRoot {}
 impl RsxPipelineTarget for RsxNode {}
@@ -75,7 +77,6 @@ impl RsxPipelineTarget for RsxBlock {}
 impl RsxPipelineTarget for RsxComponent {}
 
 impl RsxPipelineTarget for HtmlNode {}
-impl RsxPipelineTarget for Vec<HtmlNode> {}
 impl RsxPipelineTarget for HtmlDocument {}
 
 
