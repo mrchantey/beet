@@ -29,8 +29,8 @@ impl BuildApp {
 			.add(RunServer::new(&watch_args, &exe_path))
 			// 4. build the wasm binary
 			.add(BuildWasm::new(&build_cmd, &watch_args)?)
-			// 5. build the templates
-			.add(BuildTemplates::new(watch_args, &exe_path));
+			// 5. export all static files from the app
+			.add(ExportStatic::new(watch_args, &exe_path));
 
 		Ok(group)
 	}
@@ -145,12 +145,12 @@ impl BuildStep for BuildWasm {
 }
 
 
-pub struct BuildTemplates {
+pub struct ExportStatic {
 	exe_path: PathBuf,
 	watch_args: WatchArgs,
 }
 
-impl BuildTemplates {
+impl ExportStatic {
 	pub fn new(watch_args: &WatchArgs, exe_path: &Path) -> Self {
 		Self {
 			watch_args: watch_args.clone(),
@@ -159,9 +159,10 @@ impl BuildTemplates {
 	}
 }
 
-impl BuildStep for BuildTemplates {
+impl BuildStep for ExportStatic {
 	/// run the built binary with the `--static` flag, instructing
-	/// it to not spin up a server, and instead just build the static files
+	/// it to not spin up a server, and instead just build the static files,
+	/// saving them to the `html_dir`
 	fn run(&self) -> Result<()> {
 		Command::new(&self.exe_path)
 			.arg("--html-dir")

@@ -2,7 +2,9 @@ use crate::prelude::AppContext;
 use std::path::PathBuf;
 use sweet::prelude::GlobFilter;
 
-
+/// File groups are collections of files that should be collected together,
+/// the most common example being a [`TreeFileGroup`] which creates routes
+/// for each file in a directory.
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct FileGroupConfig {
 	/// The directory from which all file paths are relative.

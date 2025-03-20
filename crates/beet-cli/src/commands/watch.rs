@@ -71,7 +71,7 @@ impl Watch {
 		let build_app = BuildApp::new(&self.build_cmd, &self.watch_args)?;
 
 		let build_templates =
-			BuildTemplates::new(&self.watch_args, &self.build_cmd.exe_path());
+			ExportStatic::new(&self.watch_args, &self.build_cmd.exe_path());
 
 		TemplateWatcher::new(
 			self.build_template_map,

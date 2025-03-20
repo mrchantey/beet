@@ -16,7 +16,7 @@ mod template_watcher;
 pub use hash_file::*;
 pub use template_watcher::*;
 
-
+/// Build an [`RsxTemplateMap`] and write it to a file
 #[derive(Debug, Parser)]
 pub struct BuildTemplateMap {
 	/// File or directory to watch and create templates for

@@ -79,7 +79,7 @@ mod test {
 			.pipe(CollectClientIslands::default())[0];
 
 		expect(&island.type_name).to_be(
-			"beet_rsx::rsx::pipeline::collect_islands::test::MyComponent",
+			"beet_rsx::rsx::pipeline::collect_client_islands::test::MyComponent",
 		);
 		expect(&island.location).to_be(&TreeLocation::new(0, 0, 0));
 		expect(&island.ron).to_be("(val:32)");

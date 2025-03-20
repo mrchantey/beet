@@ -10,13 +10,16 @@ where
 		move |app: &mut AppRouter| {
 			#[cfg(not(target_arch = "wasm32"))]
 			app.on_run_static.push(Box::new(move |args| {
-				let mut router = StaticFileRouter {
-					html_dir: args.html_dir.clone(),
-					..Default::default()
-				};
+				let mut router = StaticFileRouter::default();
 				self(&mut router);
+				let html_dir = args.html_dir.clone();
 				Box::pin(async move {
-					router.routes_to_html_files().await?;
+					ExportHtml {
+						html_dir,
+						..Default::default()
+					}
+					.routes_to_html(&mut router)
+					.await?;
 					Ok(())
 				})
 			}));

@@ -1,11 +1,20 @@
+mod export_html;
 #[cfg(all(not(target_arch = "wasm32"), feature = "parser"))]
 pub mod static_file_router;
+pub use export_html::*;
 #[cfg(all(not(target_arch = "wasm32"), feature = "parser"))]
 pub use static_file_router::*;
 
+use anyhow::Result;
+use beet_rsx::rsx::RsxRoot;
 use http::Method;
 use std::path::PathBuf;
 use std::str::FromStr;
+
+
+pub trait RoutesToRsx {
+	async fn routes_to_rsx(&mut self) -> Result<Vec<(RouteInfo, RsxRoot)>>;
+}
 
 
 #[derive(Debug, Clone)]

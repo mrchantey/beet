@@ -1,11 +1,11 @@
 //! Module containing pipelines to be applied to an [`RsxRoot`]
 #[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
-mod collect_islands;
+mod collect_client_islands;
 #[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
 mod fs_src_pipeline;
 mod slots_pipeline;
 #[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
-pub use collect_islands::*;
+pub use collect_client_islands::*;
 #[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
 pub use fs_src_pipeline::*;
 pub use slots_pipeline::*;

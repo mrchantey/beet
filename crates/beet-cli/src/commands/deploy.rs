@@ -40,7 +40,7 @@ impl Deploy {
 			.add(RunSetup::new(&self.build_cmd)?)
 			.add(BuildNative::new(&self.build_cmd, &self.watch_args))
 			.add(BuildWasm::new(&self.build_cmd, &self.watch_args)?)
-			.add(BuildTemplates::new(
+			.add(ExportStatic::new(
 				&self.watch_args,
 				&self.build_cmd.exe_path(),
 			))
