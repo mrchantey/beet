@@ -81,18 +81,22 @@ impl AppRouter {
 			Ok(())
 		} else {
 			#[cfg(all(not(feature = "server"), not(target_arch = "wasm32")))]
-			anyhow::bail!(
-				"Server feature must be enabled if --static is not set"
-			);
-			#[cfg(all(feature = "server", not(target_arch = "wasm32")))]
-			beet_server::prelude::BeetServer {
-				html_dir: args.html_dir.into(),
-				router: self.axum_router,
-				..Default::default()
+			{
+				anyhow::bail!(
+					"Server feature must be enabled if --static is not set"
+				);
 			}
-			.serve()
-			.await?;
-			Ok(())
+			#[cfg(all(feature = "server", not(target_arch = "wasm32")))]
+			{
+				beet_server::prelude::BeetServer {
+					html_dir: args.html_dir.into(),
+					router: self.axum_router,
+					..Default::default()
+				}
+				.serve()
+				.await?;
+				Ok(())
+			}
 		}
 	}
 }

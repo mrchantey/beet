@@ -1,10 +1,9 @@
-use super::RouteInfo;
+use crate::prelude::*;
 use anyhow::Result;
 use beet_router_parser::prelude::*;
 use beet_rsx::prelude::*;
 use std::path::PathBuf;
-use sweet::prelude::FsExt;
-
+use sweet::prelude::*;
 
 /// For a given router export each html file, using the templates map if available
 pub struct RoutesToHtml {

@@ -28,6 +28,7 @@ _test_site = []
 
 [dependencies]
 anyhow.workspace = true
+rapidhash.workspace = true
 http.workspace = true
 futures.workspace = true
 clap.workspace = true

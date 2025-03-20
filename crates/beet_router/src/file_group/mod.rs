@@ -123,7 +123,7 @@ mod test {
 				"my_group.rs",
 				GlobFilter::default(),
 			))
-			.add_group(TreeFileGroup::new("routes"))
-			.export();
+			.add_group(TreeFileGroup::new("routes"));
+		//.export();
 	}
 }

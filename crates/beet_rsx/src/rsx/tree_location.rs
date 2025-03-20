@@ -15,6 +15,7 @@ pub type RustyIdx = u32;
 /// before using this location.
 ///
 #[derive(Debug, Default, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct TreeLocation {
 	/// Incremented every time an rsx node is encountered,
 	/// used for reconciliation with the [TreeLocationMap::rusty_locations].

@@ -39,6 +39,7 @@ impl RsxPipelineTarget for Vec<ClientIsland> {}
 
 /// Representation of a component in an Rsx tree that was marked as an
 /// island by a `client`.
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ClientIsland {
 	/// The location of the component, will be used as the starting point
 	/// with `register_effects`

@@ -1,7 +1,5 @@
-mod export_html;
 #[cfg(all(not(target_arch = "wasm32"), feature = "parser"))]
 pub mod static_file_router;
-pub use export_html::*;
 #[cfg(all(not(target_arch = "wasm32"), feature = "parser"))]
 pub use static_file_router::*;
 
@@ -18,13 +16,44 @@ pub trait RoutesToRsx {
 }
 
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct RouteInfo {
 	/// the url path
 	pub path: PathBuf,
 	/// the http method
+	#[cfg_attr(
+		feature = "serde",
+		serde(
+			serialize_with = "serialize_method",
+			deserialize_with = "deserialize_method"
+		)
+	)]
 	pub method: Method,
 }
+
+#[cfg(feature = "serde")]
+fn serialize_method<S>(
+	method: &Method,
+	serializer: S,
+) -> Result<S::Ok, S::Error>
+where
+	S: serde::Serializer,
+{
+	serializer.serialize_str(method.as_str())
+}
+
+#[cfg(feature = "serde")]
+fn deserialize_method<'de, D>(deserializer: D) -> Result<Method, D::Error>
+where
+	D: serde::Deserializer<'de>,
+{
+	use serde::Deserialize;
+	let s = String::deserialize(deserializer)?;
+	Method::from_str(&s).map_err(serde::de::Error::custom)
+}
+
+
 impl RouteInfo {
 	/// the method used by `beet_router`
 	pub fn new(path: &str, method: &str) -> Self {

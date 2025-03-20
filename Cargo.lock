@@ -744,6 +744,7 @@ dependencies = [
  "flume",
  "futures",
  "http",
+ "rapidhash",
  "ron",
  "serde",
  "sweet",
