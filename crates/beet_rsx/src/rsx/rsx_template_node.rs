@@ -126,6 +126,9 @@ impl RsxTemplateNode {
 				tracker,
 				// ignore root, its a seperate tree
 				root: _,
+				type_name: _,
+				// ron is not currently serialized
+				ron: _,
 				// not sure if we need to serialize these
 				template_directives,
 				slot_children,
@@ -206,7 +209,7 @@ impl RsxTemplateNode {
 				template_directives,
 				idx,
 			} => {
-				let root =
+				let (root, type_name) =
 					match rusty_map.remove(&tracker).ok_or_else(|| {
 						TemplateError::no_rusty_map(
 							&format!("Component: {}", tag),
@@ -214,7 +217,9 @@ impl RsxTemplateNode {
 							tracker,
 						)
 					})? {
-						RustyPart::Component { root } => Ok(root),
+						RustyPart::Component { root, type_name } => {
+							Ok((root, type_name))
+						}
 						other => TemplateResult::Err(
 							TemplateError::UnexpectedRusty {
 								expected: "Component",
@@ -228,6 +233,8 @@ impl RsxTemplateNode {
 					idx,
 					tag: tag.clone(),
 					tracker,
+					type_name,
+					ron: None,
 					root: Box::new(root),
 					slot_children: Box::new(
 						slot_children.into_rsx_node(template_map, rusty_map)?,

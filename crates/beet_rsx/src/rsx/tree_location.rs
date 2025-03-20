@@ -84,11 +84,15 @@ impl TreeLocation {
 /// Wrapper of a visitor but
 #[derive(Debug)]
 pub struct TreeLocationVisitor<Func> {
+	/// Used by [`TreeLocation::parent_idx`].
 	/// we use a stack because [RsxVisitor] is depth-first.
 	/// This stack is a breadcrumb trail of parents
 	parent_idxs: Vec<TreeIdx>,
+	/// Used by [`TreeLocation::child_idx`].
 	/// pushed when visiting children, incremented after visiting dom node
 	child_idxs: Vec<u32>,
+	/// Used by [`TreeLocation::tree_idx`].
+	/// Simple counter that increments on each node visited.
 	tree_idx_incr: u32,
 	options: VisitRsxOptions,
 	func: Func,

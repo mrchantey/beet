@@ -190,24 +190,29 @@ pub struct RsxFragment(pub Vec<RsxNode>);
 /// with the [`Component::render`] method and any slot children.
 #[derive(Debug)]
 pub struct RsxComponent {
-	/// The index of this node in the local tree
+	/// The index of this node relative to its parent [`RsxRoot`]
 	pub idx: RsxIdx,
 	/// The name of the component, this must start with a capital letter
 	pub tag: String,
+	/// The type name extracted via [`std::any::type_name`]
+	pub type_name: String,
+	/// The serialized component, only `Some` if the component has a `client` directive
+	pub ron: Option<String>,
 	/// Tracks the <MyComponent ..> opening tag for this component
 	/// even key value attribute changes must be tracked
 	/// because components are structs not elements
 	pub tracker: RustyTracker,
 	/// the root returned by [Component::render]
 	pub root: Box<RsxRoot>,
-	// /// the children passed in by this component's parent:
-	// ///
-	// /// `rsx! { <MyComponent>slot_children</MyComponent> }`
+	/// the children passed in by this component's parent:
+	///
+	/// `rsx! { <MyComponent>slot_children</MyComponent> }`
 	pub slot_children: Box<RsxNode>,
+	/// Collected template directives
 	pub template_directives: Vec<TemplateDirective>,
 }
 
-/// Attributes with a colon `:` are considered special client directives,
+/// Attributes with a colon `:` are considered special template directives,
 /// for example `client:load`
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]

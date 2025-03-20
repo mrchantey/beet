@@ -258,6 +258,8 @@ impl RstmlToRsx {
 		// currently unused
 		let mut block_attr = None;
 
+		let mut should_serialize = false;
+
 		for attr in open_tag.attributes.iter() {
 			match attr {
 				NodeAttribute::Block(node_block) => {
@@ -274,26 +276,29 @@ impl RstmlToRsx {
 				NodeAttribute::Attribute(attr) => {
 					let attr_key = &attr.key;
 					let attr_key_str = attr_key.to_string();
-					match (attr_key_str.contains(":"), attr.value()) {
+					match attr_key_str.contains(":") {
 						// its a client directive
-						(true, None) => {
+						true => {
+							if attr_key_str.starts_with("client:") {
+								should_serialize = true;
+							}
+							let value = match attr.value() {
+								Some(value) => quote! {Some(#value)},
+								None => quote! {None},
+							};
 							template_directives.push(
-								quote! {TemplateDirective::new(#attr_key_str, None)},
-							);
-						}
-						(true, Some(value)) => {
-							template_directives.push(
-								quote! {TemplateDirective::new(#attr_key_str, Some(#value))},
+								quote! {TemplateDirective::new(#attr_key_str, #value)},
 							);
 						}
 						// its a prop assignemnt
-						(false, None) => {
+						false => {
 							prop_names.push(attr_key);
-							// for components no value means a bool flag
-							prop_assignments.push(quote! {.#attr_key(true)});
-						}
-						(false, Some(value)) => {
-							prop_names.push(attr_key);
+
+							let value = match attr.value() {
+								Some(value) => quote! {#value},
+								// for components no value means a bool flag
+								None => quote! {true},
+							};
 							prop_assignments.push(quote! {.#attr_key(#value)});
 						}
 					}
@@ -312,10 +317,9 @@ impl RstmlToRsx {
 					};
 		};
 
-		let root = if let Some(node_block) = block_attr {
+		let component = if let Some(node_block) = block_attr {
 			quote! {
 				#node_block
-				.render()
 			}
 		} else {
 			quote!({
@@ -323,8 +327,15 @@ impl RstmlToRsx {
 				<#ident as Props>::Builder::default()
 				#(#prop_assignments)*
 				.build()
-				.render()
 			})
+		};
+
+		let ron = if should_serialize {
+			quote! {
+				Some(ron::ser::to_string(&component).unwrap())
+			}
+		} else {
+			quote! {None}
 		};
 
 		// attempt to get ide to show the correct type by using
@@ -336,11 +347,16 @@ impl RstmlToRsx {
 
 		quote::quote!({
 			let _ = #ide_helper::default();
+
+			let component = #component;
+
 			RsxNode::Component(RsxComponent{
 				idx: #idx,
 				tag: #tag.to_string(),
+				type_name: std::any::type_name::<#ident>().to_string(),
 				tracker: #tracker,
-				root: Box::new(#root),
+				ron: #ron,
+				root: Box::new(component.render()),
 				slot_children: Box::new(#slot_children),
 				template_directives: vec![#(#template_directives),*]
 			})

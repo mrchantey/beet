@@ -21,7 +21,7 @@ fn feature_flag_idents() -> RsxIdents {
 
 
 
-/// This macro expands to an [RsxNode](beet_rsx::prelude::RsxNode).
+/// This macro expands to an [RsxRoot](beet_rsx::prelude::RsxRoot).
 ///
 /// The type of node is determied by the feature flags, current options are:
 /// - [`StringRsx`](beet_rsx::rsx::StringRsx)
