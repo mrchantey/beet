@@ -331,9 +331,12 @@ impl RstmlToRsx {
 		};
 
 		let ron = if should_serialize {
-			quote! {
-				Some(ron::ser::to_string(&component).unwrap())
-			}
+			quote! {{
+				#[cfg(target_arch = "wasm32")]
+				{None}
+				#[cfg(not(target_arch = "wasm32"))]
+				{Some(ron::ser::to_string(&component).unwrap())}
+			}}
 		} else {
 			quote! {None}
 		};

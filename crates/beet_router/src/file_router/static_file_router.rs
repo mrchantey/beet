@@ -4,7 +4,7 @@ use beet_rsx::prelude::*;
 use std::future::Future;
 use std::pin::Pin;
 
-type StaticRsxFunc =
+pub type StaticRoute =
 	Box<dyn Fn() -> Pin<Box<dyn Future<Output = Result<RsxRoot>>>>>;
 
 /// A simple static router
@@ -44,25 +44,25 @@ impl RoutesToRsx for StaticFileRouter {
 
 pub struct StaticPageRoute {
 	/// the function collected and placed in `file_routes.rs`
-	pub func: StaticRsxFunc,
+	pub func: StaticRoute,
 	// fn(&T) -> Pin<Box<dyn Future<Output = Result<RsxNode>>>>,
 	pub route_info: RouteInfo,
 }
 impl StaticPageRoute {
-	pub fn new(route_info: RouteInfo, func: StaticRsxFunc) -> Self {
+	pub fn new(route_info: RouteInfo, func: StaticRoute) -> Self {
 		Self { route_info, func }
 	}
 }
 
 
 pub trait IntoStaticRsxFunc<M>: 'static {
-	fn into_rsx_func(&self) -> StaticRsxFunc;
+	fn into_rsx_func(&self) -> StaticRoute;
 }
 
 
 
 impl<F: 'static + Clone + Fn() -> RsxRoot> IntoStaticRsxFunc<()> for F {
-	fn into_rsx_func(&self) -> StaticRsxFunc {
+	fn into_rsx_func(&self) -> StaticRoute {
 		let func = self.clone();
 		Box::new(move || {
 			let func = func.clone();
@@ -80,7 +80,7 @@ impl<F> IntoStaticRsxFunc<AsyncStaticRouteMarker> for F
 where
 	F: 'static + Clone + AsyncFn() -> RsxRoot,
 {
-	fn into_rsx_func(&self) -> StaticRsxFunc {
+	fn into_rsx_func(&self) -> StaticRoute {
 		let func = self.clone();
 		Box::new(move || {
 			let func = func.clone();

@@ -5,6 +5,7 @@ pub mod index;
 pub const CONTRIBUTING: &'static str = "/contributing";
 pub const INDEX: &'static str = "/";
 use beet::prelude::*;
+#[cfg(not(target_arch = "wasm32"))]
 pub fn collect_file_routes(router: &mut beet::prelude::StaticFileRouter) {
     router.add_route((RouteInfo::new("/contributing", "get"), contributing::get));
     router.add_route((RouteInfo::new("/", "get"), index::get));

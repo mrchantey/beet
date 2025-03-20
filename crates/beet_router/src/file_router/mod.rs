@@ -66,3 +66,24 @@ impl RouteInfo {
 
 
 impl RsxPipelineTarget for RouteInfo {}
+
+#[derive(Default)]
+pub struct RouteTree<T> {
+	pub routes: Vec<(RouteInfo, T)>,
+	pub children: Vec<RouteTree<T>>,
+}
+impl<T> RouteTree<T> {
+	pub fn add_route<M, R: IntoRoute<T, M>>(
+		mut self,
+		(info, route): (RouteInfo, R),
+	) -> Self {
+		self.routes.push((info, route.into_route()));
+		self
+	}
+}
+
+/// Routes usually need a level of trait indirection to
+/// allow for multiple types of routes to be added to the same tree
+pub trait IntoRoute<T, M>: 'static {
+	fn into_route(&self) -> T;
+}

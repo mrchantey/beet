@@ -32,13 +32,11 @@ impl ParseDirRoutes {
 		// the pub const INDEX:&'static str =
 		let static_route_paths = page_routes.iter().map(|f| f.static_path());
 
-
-		let router_ident = &config.file_router_ident;
-		let router_ident: syn::Type = syn::parse_str(router_ident)?;
+		let route_type: syn::Type = syn::parse_str(&config.route_type)?;
 
 		// let ident_tokens =
-		// let ident = syn::Ident::new(router_ident, Span::call_site());
-		// let syn_path: syn::Path = parse_quote!(#router_ident);
+		// let ident = syn::Ident::new(route_type, Span::call_site());
+		// let syn_path: syn::Path = parse_quote!(#route_type);
 		// let syn_path = syn_path.to_token_stream();
 
 		let prefix_tokens: File = config
@@ -78,8 +76,8 @@ impl ParseDirRoutes {
 			});
 		let include_dirs =
 			dir_idents.iter().map(|ident| quote! {pub mod #ident;});
-		let collect_dirs = dir_idents.iter().map(|ident| {
-			quote! {	#ident::collect_file_routes(router);}
+		let children = dir_idents.iter().map(|ident| {
+			quote! {#ident::collect(router)}
 		});
 
 		let file: File = syn::parse_quote! {
@@ -92,9 +90,13 @@ impl ParseDirRoutes {
 			// declare static routes
 			#(#static_route_paths)*
 			#prefix_tokens
-			pub fn collect_file_routes(router: &mut #router_ident) {
-				#(router.add_route(#add_routes);)*
-				#(#collect_dirs)*
+			#[cfg(not(target_arch = "wasm32"))]
+			pub fn collect()->RouteTree<#route_type> {
+				RouteTree{
+					children: vec![#(#children),*],
+					..Default::default()
+				}
+				#(.add_route(#add_routes))*
 			}
 		};
 		let file = prettyplease::unparse(&file);

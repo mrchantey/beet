@@ -16,10 +16,10 @@ pub struct CollectRoutes {
 	/// Optionally specify additional tokens to be added to the top of the file.
 	#[arg(long)]
 	pub file_router_tokens: Option<String>,
-	/// Identifier for the router. The router must have
-	/// where T can be a type or trait for each route on the site.
-	#[arg(long, default_value = "beet::prelude::StaticFileRouter")]
-	pub file_router_ident: String,
+	/// Identifier for the route type. Each route must implement
+	/// [`IntoRoute<T>`] where T is this type.
+	#[arg(long, default_value = "beet::prelude::StaticRoute")]
+	pub route_type: String,
 	/// location of the routes directory
 	/// This will be used to split the path and discover the route path,
 	/// the last part will be taken so it should not occur in the path twice.
