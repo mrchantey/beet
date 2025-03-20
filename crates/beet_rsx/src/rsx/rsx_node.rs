@@ -204,7 +204,9 @@ pub struct RsxComponent {
 	// ///
 	// /// `rsx! { <MyComponent>slot_children</MyComponent> }`
 	pub slot_children: Box<RsxNode>,
+	// pub client_directives: Vec<(String, Option<String>)>,
 }
+
 
 /// Representation of an RsxElement
 ///

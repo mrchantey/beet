@@ -56,7 +56,7 @@ impl Scope {
 	}
 }
 
-impl RsxPipeline<RsxRoot> for ScopedStylePipeline {
+impl RsxPipeline<RsxRoot, Result<RsxRoot>> for ScopedStylePipeline {
 	/// Applies scoped style to:
 	/// 1. root node
 	/// 2. all component nodes

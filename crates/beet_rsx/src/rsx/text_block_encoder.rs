@@ -166,10 +166,8 @@ impl CollapsedNode {
 				let html = initial
 					.as_ref()
 					.pipe(RsxToHtml::default())
-					.unwrap()
-					.pipe1(RenderHtml::default())
-					.unwrap()
-					.1;
+					.pipe(RenderHtml::default())
+					.unwrap();
 				out.push(CollapsedNode::RustText(html));
 			}
 			RsxNode::Text { value, .. } => {

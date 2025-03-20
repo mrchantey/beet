@@ -1,5 +1,4 @@
 use crate::prelude::*;
-use anyhow::Result;
 
 #[derive(Debug, Default)]
 pub struct RsxToHtml {
@@ -13,14 +12,11 @@ pub struct RsxToHtml {
 	tree_idx_incr: TreeIdxIncr,
 }
 
-impl<T: RsxPipelineTarget + AsRef<RsxNode>> RsxPipeline<T, (T, Vec<HtmlNode>)>
+impl<T: RsxPipelineTarget + AsRef<RsxNode>> RsxPipeline<T, Vec<HtmlNode>>
 	for RsxToHtml
-where
-	(T, Vec<HtmlNode>): RsxPipelineTarget,
 {
-	fn apply(mut self, node: T) -> Result<(T, Vec<HtmlNode>)> {
-		let html = self.map_node(node.as_ref());
-		Ok((node, html))
+	fn apply(mut self, node: T) -> Vec<HtmlNode> {
+		self.map_node(node.as_ref())
 	}
 }
 

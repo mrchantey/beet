@@ -11,7 +11,7 @@ pub struct RsDomTarget {
 
 impl RsDomTarget {
 	pub fn new(root: &RsxRoot) -> Result<Self> {
-		let (root, doc) = root.pipe(RsxToResumableHtml::default())?;
+		let doc = root.pipe(RsxToResumableHtml::default())?;
 
 		let loc_map = TreeLocationMap::from_node(&root);
 		Ok(Self {

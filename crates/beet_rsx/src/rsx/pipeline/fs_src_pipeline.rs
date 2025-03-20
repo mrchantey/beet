@@ -16,7 +16,7 @@ impl Default for FsSrcPipeline {
 	fn default() -> Self { Self {} }
 }
 
-impl RsxPipeline<RsxRoot> for FsSrcPipeline {
+impl RsxPipeline<RsxRoot, Result<RsxRoot>> for FsSrcPipeline {
 	fn apply(self, mut root: RsxRoot) -> Result<RsxRoot> {
 		//1. apply to root
 		self.apply_root(&mut root)?;

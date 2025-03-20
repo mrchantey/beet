@@ -10,26 +10,32 @@ use thiserror::Error;
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum RsxTemplateNode {
+	/// Serializable [`RsxNode::Doctype`]
 	Doctype {
 		idx: RsxIdx,
 	},
+	/// Serializable [`RsxNode::Comment`]
 	Comment {
 		idx: RsxIdx,
 		value: String,
 	},
+	/// Serializable [`RsxNode::Text`]
 	Text {
 		idx: RsxIdx,
 		value: String,
 	},
+	/// Serializable [`RsxNode::Fragment`]
 	Fragment {
 		idx: RsxIdx,
 		items: Vec<Self>,
 	},
+	/// Serializable [`RsxNode::Block`]
 	/// the initial value is the responsibility of the [RustyPart::RustBlock]
 	RustBlock {
 		idx: RsxIdx,
 		tracker: RustyTracker,
 	},
+	/// Serializable [`RsxNode::Element`]
 	Element {
 		idx: RsxIdx,
 		tag: String,
@@ -37,6 +43,7 @@ pub enum RsxTemplateNode {
 		attributes: Vec<RsxTemplateAttribute>,
 		children: Box<Self>,
 	},
+	/// Serializable [`RsxNode::Component`]
 	/// We dont know much about components, for example when parsing
 	/// a file we just get the name.
 	/// The [RsxMacroLocation] etc is is tracked by the [RustyPart::Component::root]

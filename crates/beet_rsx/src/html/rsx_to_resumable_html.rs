@@ -7,12 +7,11 @@ pub struct RsxToResumableHtmlString {
 	pub render_html: RenderHtml,
 }
 
-impl RsxPipeline<RsxRoot, String> for RsxToResumableHtmlString {
+impl RsxPipeline<RsxRoot, Result<String>> for RsxToResumableHtmlString {
+	#[rustfmt::skip]
 	fn apply(self, root: RsxRoot) -> Result<String> {
-		Ok(root
-			.pipe(self.rsx_to_resumable)?
-			.pipe1(self.render_html)?
-			.take1())
+		root.pipe(self.rsx_to_resumable)?
+			.pipe(self.render_html)
 	}
 }
 
@@ -23,19 +22,14 @@ pub struct RsxToResumableHtml {
 	pub html_doc_to_resumable: HtmlDocToResumable,
 }
 
-impl<T: AsRef<RsxNode> + RsxPipelineTarget> RsxPipeline<T, (T, HtmlDocument)>
+impl<T: AsRef<RsxNode> + RsxPipelineTarget> RsxPipeline<T, Result<HtmlDocument>>
 	for RsxToResumableHtml
-where
-	(T, HtmlDocument): RsxPipelineTarget,
 {
-	fn apply(self, root: T) -> Result<(T, HtmlDocument)> {
-		let html = root
-			.as_ref()
-			.pipe(self.rsx_to_html)?
-			.pipe1(self.html_to_document)?
-			.pipe(self.html_doc_to_resumable)?
-			.take1();
-		Ok((root, html))
+	fn apply(self, root: T) -> Result<HtmlDocument> {
+		root.as_ref()
+			.pipe(self.rsx_to_html)
+			.pipe(self.html_to_document)?
+			.pipe_with(root.as_ref(), self.html_doc_to_resumable)
 	}
 }
 
@@ -46,18 +40,15 @@ pub struct HtmlDocToResumable {
 }
 
 impl<T: AsRef<RsxNode> + RsxPipelineTarget>
-	RsxPipeline<(T, HtmlDocument), (T, HtmlDocument)> for HtmlDocToResumable
+	RsxPipeline<(HtmlDocument, T), HtmlDocument> for HtmlDocToResumable
 where
-	(T, HtmlDocument): RsxPipelineTarget,
+	(HtmlDocument, T): RsxPipelineTarget,
 {
-	fn apply(
-		self,
-		(node, mut doc): (T, HtmlDocument),
-	) -> Result<(T, HtmlDocument)> {
+	fn apply(self, (mut doc, node): (HtmlDocument, T)) -> HtmlDocument {
 		self.insert_tree_location_map(node.as_ref(), &mut doc);
 		self.insert_catch_prehydrated_events(&mut doc);
 		self.insert_wasm_script(&mut doc);
-		Ok((node, doc))
+		doc
 	}
 }
 

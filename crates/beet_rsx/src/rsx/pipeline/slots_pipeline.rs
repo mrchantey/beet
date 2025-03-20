@@ -48,7 +48,7 @@ use thiserror::Error;
 #[derive(Debug, Default, Clone)]
 pub struct SlotsPipeline;
 
-impl RsxPipeline<RsxRoot> for SlotsPipeline {
+impl RsxPipeline<RsxRoot, Result<RsxRoot>> for SlotsPipeline {
 	fn apply(self, mut root: RsxRoot) -> Result<RsxRoot> {
 		SlotsVisitor::apply(&mut root.node)
 			.map(|_| root)

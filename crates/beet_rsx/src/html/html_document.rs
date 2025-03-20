@@ -4,7 +4,7 @@ use anyhow::Result;
 #[derive(Default)]
 pub struct HtmlToDocument;
 
-impl RsxPipeline<Vec<HtmlNode>, HtmlDocument> for HtmlToDocument {
+impl RsxPipeline<Vec<HtmlNode>, Result<HtmlDocument>> for HtmlToDocument {
 	fn apply(self, value: Vec<HtmlNode>) -> Result<HtmlDocument> {
 		Ok(HtmlDocument::from_nodes(value))
 	}

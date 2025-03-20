@@ -2,9 +2,11 @@
 #[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
 mod fs_src_pipeline;
 mod slots_pipeline;
+mod wasm_entry;
 #[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
 pub use fs_src_pipeline::*;
 pub use slots_pipeline::*;
+pub use wasm_entry::*;
 #[cfg(feature = "css")]
 mod scoped_style_pipeline;
 #[cfg(feature = "css")]
@@ -23,7 +25,7 @@ pub struct DefaultRsxTransforms {
 	slots: SlotsPipeline,
 }
 
-impl RsxPipeline<RsxRoot> for DefaultRsxTransforms {
+impl RsxPipeline<RsxRoot, Result<RsxRoot>> for DefaultRsxTransforms {
 	fn apply(self, root: RsxRoot) -> Result<RsxRoot> {
 		#[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
 		let root = root.pipe(self.fs_src)?;
@@ -41,13 +43,11 @@ pub struct RsxToHtmlDocument {
 	pub html_to_document: HtmlToDocument,
 }
 
-impl RsxPipeline<RsxRoot, HtmlDocument> for RsxToHtmlDocument {
+impl RsxPipeline<RsxRoot, Result<HtmlDocument>> for RsxToHtmlDocument {
 	fn apply(self, root: RsxRoot) -> Result<HtmlDocument> {
-		Ok(root
-			.pipe(self.rsx_transforms)?
-			.pipe(self.rsx_to_html)?
-			.pipe1(self.html_to_document)?
-			.take1())
+		root.pipe(self.rsx_transforms)?
+			.pipe(self.rsx_to_html)
+			.pipe(self.html_to_document)
 	}
 }
 
@@ -59,13 +59,11 @@ pub struct RsxToHtmlString {
 	pub render_html: RenderHtml,
 }
 
-impl RsxPipeline<RsxRoot, String> for RsxToHtmlString {
+impl RsxPipeline<RsxRoot, Result<String>> for RsxToHtmlString {
 	fn apply(self, root: RsxRoot) -> Result<String> {
-		Ok(root
-			.pipe(self.rsx_transforms)?
-			.pipe(self.rsx_to_html)?
-			.pipe1(self.render_html)?
-			.take1())
+		root.pipe(self.rsx_transforms)?
+			.pipe(self.rsx_to_html)
+			.pipe(self.render_html)
 	}
 }
 #[derive(Default)]
@@ -76,14 +74,12 @@ pub struct RsxToHtmlDocumentString {
 	pub render_html: RenderHtml,
 }
 
-impl RsxPipeline<RsxRoot, String> for RsxToHtmlDocumentString {
+impl RsxPipeline<RsxRoot, Result<String>> for RsxToHtmlDocumentString {
 	fn apply(self, root: RsxRoot) -> Result<String> {
-		Ok(root
-			.pipe(self.rsx_transforms)?
-			.pipe(self.rsx_to_html)?
-			.pipe1(self.html_to_document)?
-			.pipe1(self.render_html)?
-			.take1())
+		root.pipe(self.rsx_transforms)?
+			.pipe(self.rsx_to_html)
+			.pipe(self.html_to_document)?
+			.pipe(self.render_html)
 	}
 }
 
@@ -91,86 +87,58 @@ impl RsxPipeline<RsxRoot, String> for RsxToHtmlDocumentString {
 /// Trait for pipelines that will mutate an [`RsxPluginTarget`]
 pub trait RsxPipeline<In: RsxPipelineTarget, Out: RsxPipelineTarget = In> {
 	/// Consume self and apply to the target
-	fn apply(self, value: In) -> Result<Out>;
+	fn apply(self, value: In) -> Out;
 }
 
 impl<F, In: RsxPipelineTarget, Out: RsxPipelineTarget> RsxPipeline<In, Out>
 	for F
 where
-	F: FnOnce(In) -> Result<Out>,
+	F: FnOnce(In) -> Out,
 {
-	fn apply(self, value: In) -> Result<Out> { self(value) }
+	fn apply(self, value: In) -> Out { self(value) }
 }
-
-// impl RsxRoot {
-// 	/// Apply default rsx plugins:
-// 	/// - [FsSrcPlugin]
-// 	/// - [ScopedStylePlugin]
-// 	/// - [SlotsPlugin]
-// 	pub fn apply_default_plugins(&mut self) -> Result<()> {
-// 		FsSrcPlugin::default().apply(self)?;
-// 		ScopedStylePlugin::default().apply(self)?;
-// 		SlotsPlugin::default().apply(self)?;
-// 		Ok(())
-// 	}
-// }
-
 
 pub trait RsxPipelineTarget: Sized {
 	fn pipe<P: RsxPipeline<Self, O>, O: RsxPipelineTarget>(
 		self,
 		plugin: P,
-	) -> Result<O> {
-		plugin.apply(self.into())
+	) -> O {
+		plugin.apply(self)
+	}
+	fn pipe_with<
+		P: RsxPipeline<(Self, T2), O>,
+		O: RsxPipelineTarget,
+		T2: RsxPipelineTarget,
+	>(
+		self,
+		other: T2,
+		plugin: P,
+	) -> Result<O>
+	where
+		(Self, T2): RsxPipelineTarget,
+	{
+		Ok(plugin.apply((self, other)))
 	}
 }
 
-
-pub trait RsxPluginTargetTuple<P0: RsxPipelineTarget, P1: RsxPipelineTarget> {
-	fn pipe0<P: RsxPipeline<P0, O>, O: RsxPipelineTarget>(
-		self,
-		plugin: P,
-	) -> Result<(O, P1)>;
-	fn pipe1<P: RsxPipeline<P1, O>, O: RsxPipelineTarget>(
-		self,
-		plugin: P,
-	) -> Result<(P0, O)>;
-	fn take0(self) -> P0;
-	fn take1(self) -> P1;
-}
-impl<P0: RsxPipelineTarget, P1: RsxPipelineTarget> RsxPluginTargetTuple<P0, P1>
-	for (P0, P1)
-{
-	fn take0(self) -> P0 { self.0 }
-	fn take1(self) -> P1 { self.1 }
-	fn pipe0<P: RsxPipeline<P0, O>, O: RsxPipelineTarget>(
-		self,
-		plugin: P,
-	) -> Result<(O, P1)> {
-		Ok((self.0.pipe(plugin)?, self.1))
-	}
-
-	fn pipe1<P: RsxPipeline<P1, O>, O: RsxPipelineTarget>(
-		self,
-		plugin: P,
-	) -> Result<(P0, O)> {
-		Ok((self.0, self.1.pipe(plugin)?))
-	}
-}
 
 impl<T: RsxPipelineTarget> RsxPipelineTarget for &T {}
+impl<T: RsxPipelineTarget> RsxPipelineTarget for Option<T> {}
+impl<T: RsxPipelineTarget> RsxPipelineTarget for Result<T> {}
+
+impl<T1: RsxPipelineTarget, T2: RsxPipelineTarget> RsxPipelineTarget
+	for (T1, T2)
+{
+}
 
 impl RsxPipelineTarget for String {}
 impl RsxPipelineTarget for RsxRoot {}
 impl RsxPipelineTarget for RsxNode {}
+
+impl RsxPipelineTarget for RsxElement {}
+impl RsxPipelineTarget for RsxBlock {}
+impl RsxPipelineTarget for RsxComponent {}
+
 impl RsxPipelineTarget for HtmlNode {}
 impl RsxPipelineTarget for Vec<HtmlNode> {}
 impl RsxPipelineTarget for HtmlDocument {}
-impl RsxPipelineTarget for (RsxRoot, Vec<HtmlNode>) {}
-impl RsxPipelineTarget for (RsxRoot, HtmlDocument) {}
-impl RsxPipelineTarget for (&RsxRoot, Vec<HtmlNode>) {}
-impl RsxPipelineTarget for (&RsxRoot, HtmlDocument) {}
-impl RsxPipelineTarget for (RsxNode, Vec<HtmlNode>) {}
-impl RsxPipelineTarget for (RsxNode, HtmlDocument) {}
-impl RsxPipelineTarget for (&RsxNode, Vec<HtmlNode>) {}
-impl RsxPipelineTarget for (&RsxNode, HtmlDocument) {}
