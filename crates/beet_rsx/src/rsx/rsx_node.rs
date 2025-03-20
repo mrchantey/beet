@@ -352,4 +352,24 @@ mod test {
 		expect(location.line()).to_be(line as usize);
 		expect(location.col()).to_be(40);
 	}
+
+	#[derive(Node)]
+	struct MyComponent {
+		key: u32,
+	}
+	fn my_component(props: MyComponent) -> RsxRoot {
+		rsx! { <div>{props.key}</div> }
+	}
+
+
+	#[test]
+	fn block_attr() {
+		let my_comp = MyComponent { key: 3 };
+		expect(
+			rsx! { <MyComponent {my_comp} /> }
+				.pipe(RsxToHtmlString::default())
+				.unwrap(),
+		)
+		.to_be("<div data-beet-rsx-idx=\"1\">3</div>");
+	}
 }

@@ -314,20 +314,16 @@ impl RstmlToRsx {
 
 		let root = if let Some(node_block) = block_attr {
 			quote! {
-				Box::new(
-					#node_block
-					.render()
-				)
+				#node_block
+				.render()
 			}
 		} else {
 			quote!({
 				#impl_required
-				Box::new(
-					<#ident as Props>::Builder::default()
-					#(#prop_assignments)*
-					.build()
-					.render()
-				)
+				<#ident as Props>::Builder::default()
+				#(#prop_assignments)*
+				.build()
+				.render()
 			})
 		};
 
@@ -344,7 +340,7 @@ impl RstmlToRsx {
 				idx: #idx,
 				tag: #tag.to_string(),
 				tracker: #tracker,
-				root: #root,
+				root: Box::new(#root),
 				slot_children: Box::new(#slot_children),
 				template_directives: vec![#(#template_directives),*]
 			})

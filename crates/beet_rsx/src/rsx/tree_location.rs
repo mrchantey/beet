@@ -85,7 +85,7 @@ impl TreeLocation {
 #[derive(Debug)]
 pub struct TreeLocationVisitor<Func> {
 	/// we use a stack because [RsxVisitor] is depth-first.
-	/// This stack is an immutable breadcrumb trail of parents
+	/// This stack is a breadcrumb trail of parents
 	parent_idxs: Vec<TreeIdx>,
 	/// pushed when visiting children, incremented after visiting dom node
 	child_idxs: Vec<u32>,
