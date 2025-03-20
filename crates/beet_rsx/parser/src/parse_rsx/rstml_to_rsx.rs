@@ -252,38 +252,83 @@ impl RstmlToRsx {
 		children: Vec<Node<C>>,
 	) -> TokenStream {
 		let tracker = self.rusty_tracker.next_tracker(&open_tag);
-		let prop_assignments =
-			open_tag.attributes.iter().map(|attr| match attr {
+		let mut prop_assignments = Vec::new();
+		let mut prop_names = Vec::new();
+		let mut template_directives = Vec::new();
+		// currently unused
+		let mut block_attr = None;
+
+		for attr in open_tag.attributes.iter() {
+			match attr {
 				NodeAttribute::Block(node_block) => {
-					quote! {#node_block}
+					if block_attr.is_some() {
+						let diagnostic = Diagnostic::spanned(
+							node_block.span(),
+							Level::Error,
+							"Only one block attribute is allowed per component",
+						);
+						self.errors.push(diagnostic.emit_as_expr_tokens());
+					}
+					block_attr = Some(node_block);
 				}
 				NodeAttribute::Attribute(attr) => {
-					if let Some(value) = attr.value() {
-						let key = &attr.key;
-						// apply the value to the field
-						quote! {.#key(#value)}
-					} else {
-						let key = &attr.key;
-						// for components a key is treated as a bool 'flag'
-						quote! {.#key(true)}
+					let attr_key = &attr.key;
+					let attr_key_str = attr_key.to_string();
+					match (attr_key_str.contains(":"), attr.value()) {
+						// its a client directive
+						(true, None) => {
+							template_directives.push(
+								quote! {TemplateDirective::new(#attr_key_str, None)},
+							);
+						}
+						(true, Some(value)) => {
+							template_directives.push(
+								quote! {TemplateDirective::new(#attr_key_str, Some(#value))},
+							);
+						}
+						// its a prop assignemnt
+						(false, None) => {
+							prop_names.push(attr_key);
+							// for components no value means a bool flag
+							prop_assignments.push(quote! {.#attr_key(true)});
+						}
+						(false, Some(value)) => {
+							prop_names.push(attr_key);
+							prop_assignments.push(quote! {.#attr_key(#value)});
+						}
 					}
 				}
-			});
-		let prop_names =
-			open_tag.attributes.iter().filter_map(|attr| match attr {
-				NodeAttribute::Block(_) => {
-					// TODO we probably dont want to check at all if any blocks
-					None
-				}
-				NodeAttribute::Attribute(attr) => Some(&attr.key),
-			});
+			}
+		}
+
 		let ident = syn::Ident::new(&tag, open_tag.span());
 		let slot_children = self.map_nodes(children);
 
+
+		// ensures all required fields are set
 		let impl_required = quote::quote_spanned! {open_tag.span()=>
 					let _ = <#ident as Props>::Required{
 						#(#prop_names: Default::default()),*
 					};
+		};
+
+		let root = if let Some(node_block) = block_attr {
+			quote! {
+				Box::new(
+					#node_block
+					.render()
+				)
+			}
+		} else {
+			quote!({
+				#impl_required
+				Box::new(
+					<#ident as Props>::Builder::default()
+					#(#prop_assignments)*
+					.build()
+					.render()
+				)
+			})
 		};
 
 		// attempt to get ide to show the correct type by using
@@ -299,16 +344,9 @@ impl RstmlToRsx {
 				idx: #idx,
 				tag: #tag.to_string(),
 				tracker: #tracker,
-				root: {
-					#impl_required
-					Box::new(
-						<#ident as Props>::Builder::default()
-						#(#prop_assignments)*
-						.build()
-						.render()
-					)
-				},
-				slot_children: Box::new(#slot_children)
+				root: #root,
+				slot_children: Box::new(#slot_children),
+				template_directives: vec![#(#template_directives),*]
 			})
 		})
 	}

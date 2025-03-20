@@ -11,30 +11,16 @@ use thiserror::Error;
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum RsxTemplateNode {
 	/// Serializable [`RsxNode::Doctype`]
-	Doctype {
-		idx: RsxIdx,
-	},
+	Doctype { idx: RsxIdx },
 	/// Serializable [`RsxNode::Comment`]
-	Comment {
-		idx: RsxIdx,
-		value: String,
-	},
+	Comment { idx: RsxIdx, value: String },
 	/// Serializable [`RsxNode::Text`]
-	Text {
-		idx: RsxIdx,
-		value: String,
-	},
+	Text { idx: RsxIdx, value: String },
 	/// Serializable [`RsxNode::Fragment`]
-	Fragment {
-		idx: RsxIdx,
-		items: Vec<Self>,
-	},
+	Fragment { idx: RsxIdx, items: Vec<Self> },
 	/// Serializable [`RsxNode::Block`]
 	/// the initial value is the responsibility of the [RustyPart::RustBlock]
-	RustBlock {
-		idx: RsxIdx,
-		tracker: RustyTracker,
-	},
+	RustBlock { idx: RsxIdx, tracker: RustyTracker },
 	/// Serializable [`RsxNode::Element`]
 	Element {
 		idx: RsxIdx,
@@ -54,6 +40,7 @@ pub enum RsxTemplateNode {
 		tag: String,
 		/// mapped from [RsxComponent::slot_children]
 		slot_children: Box<Self>,
+		template_directives: Vec<TemplateDirective>,
 	},
 }
 
@@ -139,7 +126,8 @@ impl RsxTemplateNode {
 				tracker,
 				// ignore root, its a seperate tree
 				root: _,
-
+				// not sure if we need to serialize these
+				template_directives,
 				slot_children,
 			}) => Ok(Self::Component {
 				idx: *idx,
@@ -148,6 +136,7 @@ impl RsxTemplateNode {
 				slot_children: Box::new(Self::from_rsx_node(slot_children)?),
 				tracker: tracker.clone(),
 				tag: tag.clone(),
+				template_directives: template_directives.clone(),
 			}),
 			RsxNode::Block(RsxBlock {
 				idx,
@@ -214,6 +203,7 @@ impl RsxTemplateNode {
 				tracker,
 				tag,
 				slot_children,
+				template_directives,
 				idx,
 			} => {
 				let root =
@@ -242,6 +232,7 @@ impl RsxTemplateNode {
 					slot_children: Box::new(
 						slot_children.into_rsx_node(template_map, rusty_map)?,
 					),
+					template_directives: template_directives.clone(),
 				}))
 			}
 			RsxTemplateNode::RustBlock { tracker, idx } => {
@@ -503,6 +494,7 @@ mod test {
 									value: "some child".to_string(),
 								}),
 							}),
+							template_directives: vec![],
 						},
 					],
 				}),

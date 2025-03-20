@@ -9,7 +9,7 @@ pub trait Props: Component {
 	type Required;
 }
 
-
+// TODO From<Self::Component>
 pub trait PropsBuilder: Default {
 	type Component: Component;
 	fn build(self) -> Self::Component;

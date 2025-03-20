@@ -93,11 +93,9 @@ impl RsxToBevy {
 				)?]
 			}
 			RsxNode::Component(RsxComponent {
-				idx: _,
-				tag: _,
-				tracker: _,
 				root,
 				slot_children,
+				..
 			}) => {
 				slot_children.assert_empty();
 				self.spawn_root(world, root)?

@@ -206,11 +206,46 @@ impl RstmlToRsxTemplate {
 		// we rely on the hydrated node to provide the attributes and children
 		let slot_children = self.map_nodes(children);
 
+		let template_directives = open_tag
+			.attributes
+			.into_iter()
+			.filter_map(|a| match a {
+				NodeAttribute::Attribute(attr) => {
+					let key = &attr.key.to_string();
+					if key.contains(":") {
+						let value = match attr.value() {
+							Some(expr) => {
+								quote! {Some(#expr)}
+							}
+							None => quote! {None},
+						};
+						let mut parts = key.split(':');
+						let prefix = parts.next().expect(
+							"expected colon prefix in template directive",
+						);
+						let suffix = parts.next().expect(
+							"expected colon suffix in template directive",
+						);
+
+						Some(quote! {TemplateDirective (
+							prefix: #prefix,
+							suffix: #suffix,
+							value: #value
+						)})
+					} else {
+						None
+					}
+				}
+				_ => None,
+			})
+			.collect::<Vec<_>>();
+
 		quote! { Component (
 			idx: #idx,
 			tracker: #tracker,
 			tag: #tag,
-			slot_children: #slot_children
+			slot_children: #slot_children,
+			template_directives: [#(#template_directives),*]
 		)}
 	}
 }
