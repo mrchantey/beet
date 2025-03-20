@@ -68,17 +68,11 @@ impl RouteInfo {
 impl RsxPipelineTarget for RouteInfo {}
 
 pub struct RouteTree<T> {
+	/// The path to the auto generated mod file for this tree,
+	/// usually something like `src/routes/mod.rs`
+	pub mod_path: PathBuf,
 	pub routes: Vec<(RouteInfo, T)>,
 	pub children: Vec<RouteTree<T>>,
-}
-
-impl<T> Default for RouteTree<T> {
-	fn default() -> Self {
-		Self {
-			routes: Vec::new(),
-			children: Vec::new(),
-		}
-	}
 }
 
 impl<T> RouteTree<T> {

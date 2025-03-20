@@ -8,8 +8,9 @@ use beet::prelude::*;
 #[cfg(not(target_arch = "wasm32"))]
 pub fn collect() -> RouteTree<beet::prelude::StaticRoute> {
     RouteTree {
+        mod_path: std::path::PathBuf::from(file!()),
         children: vec![],
-        ..Default::default()
+        routes: Vec::new(),
     }
         .add_route((RouteInfo::new("/contributing", "get"), contributing::get))
         .add_route((RouteInfo::new("/", "get"), index::get))

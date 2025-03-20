@@ -8,20 +8,36 @@ use sweet::prelude::*;
 
 
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct ClientIslandMap(pub RapidHashMap<RouteInfo, Vec<ClientIsland>>);
+pub struct ClientIslandMap {
+	/// The path to the routes/mod.rs file at the root of these routes.
+	/// This is used for editing the routes file.
+	pub routes_mod_path: PathBuf,
+	pub map: RapidHashMap<RouteInfo, Vec<ClientIsland>>,
+}
 
 
 #[derive(Debug, Parser)]
 pub struct RoutesToClientIslandMap {
 	#[arg(long, default_value = Self::DEFAULT_TEMPLATES_MAP_PATH)]
 	pub islands_map_path: PathBuf,
+	pub routes_mod_path: PathBuf,
 }
 
 
-impl Default for RoutesToClientIslandMap {
-	fn default() -> Self {
+impl RoutesToClientIslandMap {
+	pub fn new(routes_mod_path: impl Into<PathBuf>) -> Self {
 		Self {
+			routes_mod_path: routes_mod_path.into(),
 			islands_map_path: Self::DEFAULT_TEMPLATES_MAP_PATH.into(),
+		}
+	}
+	pub fn new_with_islands_map_path(
+		routes_mod_path: impl Into<PathBuf>,
+		islands_map_path: impl Into<PathBuf>,
+	) -> Self {
+		Self {
+			routes_mod_path: routes_mod_path.into(),
+			islands_map_path: islands_map_path.into(),
 		}
 	}
 }
@@ -45,7 +61,10 @@ impl RsxPipeline<&Vec<(RouteInfo, RsxRoot)>, Result<()>>
 
 
 		let ron = ron::ser::to_string_pretty(
-			&ClientIslandMap(map),
+			&ClientIslandMap {
+				routes_mod_path: self.routes_mod_path,
+				map,
+			},
 			Default::default(),
 		)?;
 		FsExt::write(&self.islands_map_path, &ron)?;

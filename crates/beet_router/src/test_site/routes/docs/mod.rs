@@ -6,8 +6,9 @@ use crate::prelude::*;
 #[cfg(not(target_arch = "wasm32"))]
 pub fn collect() -> RouteTree<crate::prelude::StaticRoute> {
     RouteTree {
+        mod_path: std::path::PathBuf::from(file!()),
         children: vec![],
-        ..Default::default()
+        routes: Vec::new(),
     }
         .add_route((RouteInfo::new("/docs", "get"), index::get))
 }
