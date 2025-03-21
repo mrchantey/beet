@@ -1,4 +1,5 @@
 use anyhow::Result;
+use beet::prelude::*;
 use clap::Parser;
 use std::path::PathBuf;
 use std::process::Command;
@@ -27,6 +28,14 @@ pub struct BuildCmd {
 
 impl Default for BuildCmd {
 	fn default() -> Self { Self::parse_from(&[""]) }
+}
+
+
+impl BuildStep for BuildCmd {
+	fn run(&self) -> Result<()> {
+		self.spawn()?;
+		Ok(())
+	}
 }
 
 impl BuildCmd {

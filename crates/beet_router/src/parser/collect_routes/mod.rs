@@ -1,4 +1,5 @@
 use anyhow::Result;
+use beet_rsx::rsx::BuildStep;
 use clap::Parser;
 pub use file_route::*;
 pub use parse_dir_routes::*;
@@ -33,6 +34,16 @@ pub struct CollectRoutes {
 impl Default for CollectRoutes {
 	fn default() -> Self { clap::Parser::parse_from(&[""]) }
 }
+
+
+
+impl BuildStep for CollectRoutes {
+	fn run(&self) -> Result<()> {
+		self.build_and_write()?;
+		Ok(())
+	}
+}
+
 
 impl CollectRoutes {
 	pub fn routes_mod_path(&self) -> PathBuf { self.routes_dir.join("mod.rs") }

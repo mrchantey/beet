@@ -13,10 +13,6 @@ pub mod file_group;
 pub mod file_router;
 #[cfg(all(feature = "parser", not(target_arch = "wasm32")))]
 pub mod parser;
-#[cfg(all(feature = "parser", not(target_arch = "wasm32")))]
-pub mod pipelines;
-#[cfg(all(feature = "parser", not(target_arch = "wasm32")))]
-pub mod spa_template;
 
 
 pub mod prelude {
@@ -31,16 +27,11 @@ pub mod prelude {
 	pub use crate::file_router::*;
 	#[cfg(all(feature = "parser", not(target_arch = "wasm32")))]
 	pub use crate::parser::*;
-	#[cfg(all(feature = "parser", not(target_arch = "wasm32")))]
-	pub use crate::pipelines::*;
-	#[cfg(all(feature = "parser", not(target_arch = "wasm32")))]
-	pub use crate::spa_template::*;
 
-	pub use sweet::prelude::GlobFilter;
-
-
+	// re-exports
 	#[cfg(feature = "parser")]
 	pub use ron;
+	pub use sweet::prelude::GlobFilter;
 }
 
 

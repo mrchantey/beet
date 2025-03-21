@@ -1,8 +1,3 @@
-#[cfg(all(not(target_arch = "wasm32"), feature = "parser"))]
-pub mod static_route;
-#[cfg(all(not(target_arch = "wasm32"), feature = "parser"))]
-pub use static_route::*;
-
 use anyhow::Result;
 use beet_rsx::rsx::RsxPipelineTarget;
 use beet_rsx::rsx::RsxRoot;

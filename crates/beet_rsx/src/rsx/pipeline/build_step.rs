@@ -1,6 +1,4 @@
-use crate::prelude::*;
 use anyhow::Result;
-use beet::prelude::*;
 
 pub trait BuildStep: 'static + Send + Sync {
 	fn run(&self) -> Result<()>;
@@ -15,15 +13,6 @@ impl BuildStep for BuildStepGroup {
 	}
 }
 
-
-impl BuildStep for CollectRoutes {
-	fn run(&self) -> Result<()> {
-		self.build_and_write()?;
-		Ok(())
-	}
-}
-
-
 impl<T> BuildStep for T
 where
 	T: 'static + Send + Sync + Fn() -> Result<()>,
@@ -31,12 +20,6 @@ where
 	fn run(&self) -> Result<()> { self() }
 }
 
-impl BuildStep for BuildCmd {
-	fn run(&self) -> Result<()> {
-		self.spawn()?;
-		Ok(())
-	}
-}
 
 
 #[derive(Default)]

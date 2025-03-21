@@ -6,7 +6,6 @@ use std::path::Path;
 use std::path::PathBuf;
 use std::process::Command;
 use sweet::prelude::GracefulChild;
-use sweet::prelude::ReadFile;
 
 /// Performs all steps for a full recompile and reload
 pub struct BuildApp;
@@ -32,7 +31,8 @@ impl BuildApp {
 			//   - html files
 			//   - client island entries
 			.add(ExportStatic::new(watch_args, &exe_path))
-			// update routes dir with islands
+			// 5. create the wasm routes `collect()` function
+			.add(CollectWasmRoutes::default())
 			// 5. build the wasm binary
 			.add(BuildWasm::new(&build_cmd, &watch_args)?);
 
@@ -62,10 +62,10 @@ impl RunSetup {
 				FileGroup::Child(_file_group_config) => todo!(),
 				FileGroup::Glob(_glob_file_group) => todo!(),
 				FileGroup::Tree(TreeFileGroup { src_dir }) => {
-					group.items.push(Box::new(CollectRoutes {
+					group.add(CollectRoutes {
 						routes_dir: setup_config.app_cx.resolve_path(src_dir),
 						..Default::default()
-					}));
+					});
 				}
 			}
 		}
