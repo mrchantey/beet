@@ -76,8 +76,8 @@ impl IntoCollection<StaticRoute> for RouteTree<StaticRoute> {
 						.pipe(ApplyRouteTemplates::default())?;
 					// export client islands after templates are applied
 					// but before `DefaultTransformations` are applied.
-					// i dont think its nessecary but if it turns out to be
-					// we can move some pipes around
+					// i dont think its nessecary because islands only register effect
+					// but if it turns out to be we can move some pipes around
 					(&routes)
 						.pipe(RoutesToClientIslandMap::new(routes_mod_path))?;
 

@@ -1,4 +1,4 @@
-use beet_router_parser::prelude::*;
+use beet_router::prelude::*;
 use sweet::prelude::FsExt;
 
 

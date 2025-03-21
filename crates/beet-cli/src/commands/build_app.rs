@@ -6,6 +6,7 @@ use std::path::Path;
 use std::path::PathBuf;
 use std::process::Command;
 use sweet::prelude::GracefulChild;
+use sweet::prelude::ReadFile;
 
 /// Performs all steps for a full recompile and reload
 pub struct BuildApp;
@@ -28,6 +29,8 @@ impl BuildApp {
 			// 3. run the server as soon as its ready
 			.add(RunServer::new(&watch_args, &exe_path))
 			// 4. export all static files from the app
+			//   - html files
+			//   - client island entries
 			.add(ExportStatic::new(watch_args, &exe_path))
 			// update routes dir with islands
 			// 5. build the wasm binary
@@ -92,6 +95,38 @@ impl BuildStep for BuildNative {
 	}
 }
 
+pub struct ExportStatic {
+	exe_path: PathBuf,
+	watch_args: WatchArgs,
+}
+
+impl ExportStatic {
+	pub fn new(watch_args: &WatchArgs, exe_path: &Path) -> Self {
+		Self {
+			watch_args: watch_args.clone(),
+			exe_path: exe_path.to_path_buf(),
+		}
+	}
+}
+
+impl BuildStep for ExportStatic {
+	/// run the built binary with the `--static` flag, instructing
+	/// it to not spin up a server, and instead just build the static files,
+	/// saving them to the `html_dir`
+	fn run(&self) -> Result<()> {
+		Command::new(&self.exe_path)
+			.arg("--html-dir")
+			.arg(&self.watch_args.html_dir)
+			.arg("--static")
+			.status()?
+			.exit_ok()?;
+		Ok(())
+	}
+}
+
+
+
+
 
 pub struct BuildWasm {
 	build_cmd: BuildCmd,
@@ -141,36 +176,6 @@ impl BuildStep for BuildWasm {
 		println!("🥁 Build Step 3: WASM");
 		self.build_cmd.spawn()?;
 		self.wasm_bindgen()?;
-		Ok(())
-	}
-}
-
-
-pub struct ExportStatic {
-	exe_path: PathBuf,
-	watch_args: WatchArgs,
-}
-
-impl ExportStatic {
-	pub fn new(watch_args: &WatchArgs, exe_path: &Path) -> Self {
-		Self {
-			watch_args: watch_args.clone(),
-			exe_path: exe_path.to_path_buf(),
-		}
-	}
-}
-
-impl BuildStep for ExportStatic {
-	/// run the built binary with the `--static` flag, instructing
-	/// it to not spin up a server, and instead just build the static files,
-	/// saving them to the `html_dir`
-	fn run(&self) -> Result<()> {
-		Command::new(&self.exe_path)
-			.arg("--html-dir")
-			.arg(&self.watch_args.html_dir)
-			.arg("--static")
-			.status()?
-			.exit_ok()?;
 		Ok(())
 	}
 }

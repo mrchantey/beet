@@ -195,7 +195,6 @@ publish-all *args:
 	just publish beet_rsx_parser      {{args}} || true
 	just publish beet_rsx_macros      {{args}} || true
 	just publish beet_rsx             {{args}} || true
-	just publish beet_router_parser   {{args}} || true
 	just publish beet_router          {{args}} || true
 	just publish beet_examples        {{args}} || true
 	just publish beet                 {{args}} || true

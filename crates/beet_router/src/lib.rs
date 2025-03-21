@@ -4,8 +4,6 @@
 #![allow(async_fn_in_trait)]
 #![feature(more_qualified_paths)]
 
-#[cfg(all(feature = "parser", not(target_arch = "wasm32")))]
-pub use beet_router_parser;
 pub mod app_router;
 #[cfg(feature = "bevy")]
 pub mod bevy;
@@ -13,6 +11,8 @@ pub mod collections;
 #[cfg(feature = "serde")]
 pub mod file_group;
 pub mod file_router;
+#[cfg(all(feature = "parser", not(target_arch = "wasm32")))]
+pub mod parser;
 #[cfg(all(feature = "parser", not(target_arch = "wasm32")))]
 pub mod pipelines;
 #[cfg(all(feature = "parser", not(target_arch = "wasm32")))]
@@ -30,13 +30,17 @@ pub mod prelude {
 	pub use crate::file_group::*;
 	pub use crate::file_router::*;
 	#[cfg(all(feature = "parser", not(target_arch = "wasm32")))]
+	pub use crate::parser::*;
+	#[cfg(all(feature = "parser", not(target_arch = "wasm32")))]
 	pub use crate::pipelines::*;
 	#[cfg(all(feature = "parser", not(target_arch = "wasm32")))]
 	pub use crate::spa_template::*;
-	#[cfg(all(feature = "parser", not(target_arch = "wasm32")))]
-	pub use beet_router_parser::prelude::*;
 
 	pub use sweet::prelude::GlobFilter;
+
+
+	#[cfg(feature = "parser")]
+	pub use ron;
 }
 
 

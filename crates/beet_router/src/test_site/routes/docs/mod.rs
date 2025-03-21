@@ -5,10 +5,10 @@ pub const INDEX: &'static str = "/docs";
 use crate::prelude::*;
 #[cfg(not(target_arch = "wasm32"))]
 pub fn collect() -> RouteTree<crate::prelude::StaticRoute> {
-    RouteTree {
-        mod_path: std::path::PathBuf::from(file!()),
-        children: vec![],
-        routes: Vec::new(),
-    }
-        .add_route((RouteInfo::new("/docs", "get"), index::get))
+	RouteTree {
+		mod_path: std::path::PathBuf::from(file!()),
+		children: vec![],
+		routes: Vec::new(),
+	}
+	.add_route((RouteInfo::new("/docs", "get"), index::get))
 }

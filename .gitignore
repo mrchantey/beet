@@ -8,4 +8,4 @@ crates/beet_flow_old
 .vscode/settings.json
 
 
-crates/beet_router/parser/compilecheck_*
+crates/beet_router/compilecheck_*

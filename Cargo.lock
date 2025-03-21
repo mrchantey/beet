@@ -736,7 +736,6 @@ version = "0.0.5-dev"
 dependencies = [
  "anyhow",
  "beet_router",
- "beet_router_parser",
  "beet_rsx",
  "beet_server",
  "bevy",
@@ -744,28 +743,15 @@ dependencies = [
  "flume",
  "futures",
  "http",
- "rapidhash",
- "ron",
- "serde",
- "sweet",
- "tokio",
-]
-
-[[package]]
-name = "beet_router_parser"
-version = "0.0.5-dev"
-dependencies = [
- "anyhow",
- "beet_rsx",
- "clap",
- "http",
  "prettyplease",
  "proc-macro2",
  "quote",
  "rapidhash",
  "ron",
+ "serde",
  "sweet",
  "syn 2.0.98",
+ "tokio",
  "uuid",
 ]
 

@@ -16,9 +16,10 @@ pub struct ClientIslandMap {
 }
 
 
+
 #[derive(Debug, Parser)]
 pub struct RoutesToClientIslandMap {
-	#[arg(long, default_value = Self::DEFAULT_TEMPLATES_MAP_PATH)]
+	#[arg(long, default_value = Self::DEFAULT_ISLANDS_MAP_PATH)]
 	pub islands_map_path: PathBuf,
 	pub routes_mod_path: PathBuf,
 }
@@ -28,7 +29,7 @@ impl RoutesToClientIslandMap {
 	pub fn new(routes_mod_path: impl Into<PathBuf>) -> Self {
 		Self {
 			routes_mod_path: routes_mod_path.into(),
-			islands_map_path: Self::DEFAULT_TEMPLATES_MAP_PATH.into(),
+			islands_map_path: Self::DEFAULT_ISLANDS_MAP_PATH.into(),
 		}
 	}
 	pub fn new_with_islands_map_path(
@@ -43,7 +44,7 @@ impl RoutesToClientIslandMap {
 }
 
 impl RoutesToClientIslandMap {
-	pub const DEFAULT_TEMPLATES_MAP_PATH: &'static str =
+	pub const DEFAULT_ISLANDS_MAP_PATH: &'static str =
 		"target/client-islands.ron";
 }
 
