@@ -4,7 +4,9 @@ mod build_step;
 mod collect_client_islands;
 #[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
 mod fs_src_pipeline;
+mod register_effects;
 mod slots_pipeline;
+pub use register_effects::*;
 use std::pin::Pin;
 
 pub use build_step::*;

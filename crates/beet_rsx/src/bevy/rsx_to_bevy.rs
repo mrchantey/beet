@@ -16,11 +16,11 @@ pub struct RsxToBevy {
 
 impl RsxToBevy {
 	/// Registers effects and spawns the node
-	pub fn spawn(mut root: RsxRoot) -> Result<Vec<Entity>> {
+	pub fn spawn(root: RsxRoot) -> Result<Vec<Entity>> {
 		let entities = BevyRuntime::with_mut(|app| {
 			Self::default().spawn_root(app.world_mut(), &root)
 		})?;
-		root.register_effects();
+		root.pipe(RegisterEffects::default())?;
 		Ok(entities)
 	}
 
@@ -166,7 +166,7 @@ impl RsxToBevy {
 				initial,
 				effect,
 			} => {
-				// events are registered by register_effects
+				// events are registered by RegisterEffects
 				if !key.starts_with("on") {
 					ReflectUtils::apply_or_insert_at_path(
 						registry, entity, key, initial,

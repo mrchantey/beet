@@ -107,38 +107,6 @@ impl RsxNode {
 		}
 	}
 
-	/// takes all the register_effect functions
-	/// # Panics
-	/// If the register function fails
-	pub fn register_effects(&mut self) {
-		TreeLocationVisitor::visit_mut(self, |loc, node| {
-			// println!(
-			// 	"registering effect at loc: {:?}:{:?}",
-			// 	loc,
-			// 	node.discriminant()
-			// );
-
-			match node {
-				RsxNode::Block(RsxBlock { effect, .. }) => {
-					effect.take().register(loc).unwrap();
-				}
-				RsxNode::Element(e) => {
-					for a in &mut e.attributes {
-						match a {
-							RsxAttribute::Block { effect, .. } => {
-								effect.take().register(loc).unwrap();
-							}
-							RsxAttribute::BlockValue { effect, .. } => {
-								effect.take().register(loc).unwrap();
-							}
-							_ => {}
-						}
-					}
-				}
-				_ => {}
-			}
-		});
-	}
 
 	/// non-recursive check for blocks in self, accounting for fragments
 	pub fn directly_contains_rust_node(&self) -> bool {

@@ -124,10 +124,10 @@ mod test {
 	fn works() {
 		let (get, set) = signal(7);
 
-		let mut rsx = rsx! { <div>value is {get}</div> };
+		let rsx = rsx! { <div>value is {get}</div> };
 		DomTarget::set(RsDomTarget::new(&rsx).unwrap());
 
-		rsx.register_effects();
+		rsx.pipe(RegisterEffects::default()).unwrap();
 		expect(&DomTarget::with(|h| h.render()))
 			.to_contain("<div data-beet-rsx-idx=\"0\">value is 7</div>");
 		set(8);

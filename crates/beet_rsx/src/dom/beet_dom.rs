@@ -28,7 +28,7 @@ impl BeetDom {
 		console_error_panic_hook::set_once();
 		DomTarget::set(BrowserDomTarget::default());
 		// effects called here too
-		app.into_root().register_effects();
+		app.into_root().pipe(RegisterEffects::default()).unwrap();
 		EventRegistry::initialize().unwrap();
 	}
 
