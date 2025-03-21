@@ -23,7 +23,7 @@ impl Sigfault {
 	pub fn parse_block_node<M>(
 		idx: RsxIdx,
 		tracker: RustyTracker,
-		block: impl 'static + Clone + IntoRsxRoot<M>,
+		block: impl 'static + Send + Clone + IntoRsxRoot<M>,
 	) -> RsxNode {
 		RsxNode::Block(RsxBlock {
 			idx,
@@ -74,7 +74,7 @@ impl Sigfault {
 	pub fn parse_attribute_value<M>(
 		key: &'static str,
 		tracker: RustyTracker,
-		block: impl 'static + Clone + IntoSigfaultAttrVal<M>,
+		block: impl 'static + Send + Clone + IntoSigfaultAttrVal<M>,
 	) -> RsxAttribute {
 		RsxAttribute::BlockValue {
 			key: key.to_string(),
@@ -124,10 +124,11 @@ mod test {
 	fn works() {
 		let (get, set) = signal(7);
 
-		let rsx = rsx! { <div>value is {get}</div> };
-		DomTarget::set(RsDomTarget::new(&rsx).unwrap());
-
-		rsx.pipe(RegisterEffects::default()).unwrap();
+		rsx! { <div>value is {get}</div> }
+			.pipe(MountRsDom)
+			.unwrap()
+			.pipe(RegisterEffects::default())
+			.unwrap();
 		expect(&DomTarget::with(|h| h.render()))
 			.to_contain("<div data-beet-rsx-idx=\"0\">value is 7</div>");
 		set(8);
