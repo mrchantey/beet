@@ -98,66 +98,63 @@ pub struct TreeLocationVisitor<Func> {
 	options: VisitRsxOptions,
 	func: Func,
 }
+
+
+
+
 impl<Func> TreeLocationVisitor<Func> {
+	pub fn new(func: Func) -> Self {
+		Self::new_with_options(func, Default::default(), Default::default())
+	}
+	pub fn new_with_options(
+		func: Func,
+		location: TreeLocation,
+		options: VisitRsxOptions,
+	) -> Self {
+		Self {
+			parent_idxs: vec![location.parent_idx],
+			child_idxs: vec![location.child_idx],
+			tree_idx_incr: *location.tree_idx,
+			options,
+			func,
+		}
+	}
+
+
+
 	/// Visit a node and return the total number of elements visited
 	pub fn visit(node: &RsxNode, func: Func)
 	where
 		Func: FnMut(TreeLocation, &RsxNode),
 	{
-		Self {
-			parent_idxs: vec![Default::default()],
-			child_idxs: vec![Default::default()],
-			tree_idx_incr: 0,
-			options: Default::default(),
-			func,
-		}
-		.walk_node(node);
+		Self::new(func).walk_node(node);
 	}
 
 	pub fn visit_with_options(
 		node: &RsxNode,
+		location: TreeLocation,
 		options: VisitRsxOptions,
 		func: Func,
 	) where
 		Func: FnMut(TreeLocation, &RsxNode),
 	{
-		Self {
-			parent_idxs: vec![Default::default()],
-			child_idxs: vec![Default::default()],
-			tree_idx_incr: 0,
-			options,
-			func,
-		}
-		.walk_node(node);
+		Self::new_with_options(func, location, options).walk_node(node);
 	}
 	pub fn visit_mut(node: &mut RsxNode, func: Func)
 	where
 		Func: FnMut(TreeLocation, &mut RsxNode),
 	{
-		Self {
-			parent_idxs: vec![Default::default()],
-			child_idxs: vec![Default::default()],
-			tree_idx_incr: 0,
-			options: Default::default(),
-			func,
-		}
-		.walk_node(node);
+		Self::new(func).walk_node(node);
 	}
 	pub fn visit_with_options_mut(
 		node: &mut RsxNode,
+		location: TreeLocation,
 		options: VisitRsxOptions,
 		func: Func,
 	) where
 		Func: FnMut(TreeLocation, &mut RsxNode),
 	{
-		Self {
-			parent_idxs: Default::default(),
-			child_idxs: Default::default(),
-			tree_idx_incr: 0,
-			options,
-			func,
-		}
-		.walk_node(node);
+		Self::new_with_options(func, location, options).walk_node(node);
 	}
 
 	/// Get the current item in the stack, or default

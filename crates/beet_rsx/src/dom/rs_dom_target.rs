@@ -9,6 +9,16 @@ pub struct RsDomTarget {
 	loc_map: TreeLocationMap,
 }
 
+
+pub struct MountRsDom;
+
+impl RsxPipeline<RsxRoot, Result<RsxRoot>> for MountRsDom {
+	fn apply(self, root: RsxRoot) -> Result<RsxRoot> {
+		DomTarget::set(RsDomTarget::new(&root)?);
+		Ok(root)
+	}
+}
+
 impl RsDomTarget {
 	pub fn new(root: &RsxRoot) -> Result<Self> {
 		let doc = root.pipe(RsxToResumableHtml::default())?;
