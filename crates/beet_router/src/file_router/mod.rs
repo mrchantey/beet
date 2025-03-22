@@ -33,10 +33,7 @@ impl quote::ToTokens for RouteInfo {
 		let path = &self.path.to_string_lossy();
 		let method = &self.method.to_string();
 		tokens.extend(quote::quote! {
-			RouteInfo {
-				path: std::path::PathBuf::from(#path),
-				method: http::Method::from_str(#method).unwrap(),
-			}
+					RouteInfo::new(#path, #method)
 		});
 	}
 }
@@ -122,10 +119,7 @@ mod test {
 
 		expect(RouteInfo::new("/", "GET").to_token_stream().to_string()).to_be(
 			quote::quote! {
-				RouteInfo {
-					path: std::path::PathBuf::from("/"),
-					method: http::Method::from_str("GET").unwrap(),
-				}
+				RouteInfo::new("/", "GET")
 			}
 			.to_string(),
 		);

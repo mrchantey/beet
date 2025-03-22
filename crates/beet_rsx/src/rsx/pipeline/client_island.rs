@@ -1,41 +1,4 @@
-#![allow(unused)]
 use crate::prelude::*;
-
-
-
-
-
-/// Collects all components with a `client:load` directive.
-#[derive(Default)]
-pub struct CollectClientIslands;
-
-
-impl<T: RsxPipelineTarget + AsRef<RsxNode>> RsxPipeline<T, Vec<ClientIsland>>
-	for CollectClientIslands
-{
-	fn apply(self, root: T) -> Vec<ClientIsland> {
-		let mut islands = Vec::new();
-
-		TreeLocationVisitor::visit(root.as_ref(), |loc, node| match node {
-			RsxNode::Component(RsxComponent { ron, type_name, .. }) => {
-				if let Some(ron) = ron {
-					islands.push(ClientIsland {
-						location: loc.clone(),
-						type_name: type_name.clone(),
-						ron: ron.clone(),
-					});
-				}
-			}
-			_ => {}
-		});
-
-		islands
-	}
-}
-
-
-impl RsxPipelineTarget for Vec<ClientIsland> {}
-
 
 /// Representation of a component in an Rsx tree that was marked as an
 /// island by a `client`.
@@ -60,12 +23,43 @@ impl quote::ToTokens for ClientIsland {
 		tokens.extend(quote::quote! {
 			ClientIsland {
 				location: #location,
-				type_name: #type_name.to_string(),
-				ron: #ron.to_string(),
+				type_name: #type_name.into(),
+				ron: #ron.into(),
 			}
 		});
 	}
 }
+
+
+/// Collects all components with a `client:load` directive.
+#[derive(Default)]
+pub struct CollectClientIslands;
+
+impl RsxPipelineTarget for Vec<ClientIsland> {}
+
+impl<T: RsxPipelineTarget + AsRef<RsxNode>> RsxPipeline<T, Vec<ClientIsland>>
+	for CollectClientIslands
+{
+	fn apply(self, root: T) -> Vec<ClientIsland> {
+		let mut islands = Vec::new();
+
+		TreeLocationVisitor::visit(root.as_ref(), |loc, node| match node {
+			RsxNode::Component(RsxComponent { ron, type_name, .. }) => {
+				if let Some(ron) = ron {
+					islands.push(ClientIsland {
+						location: loc.clone(),
+						type_name: type_name.clone(),
+						ron: ron.clone(),
+					});
+				}
+			}
+			_ => {}
+		});
+
+		islands
+	}
+}
+
 
 
 #[cfg(test)]
@@ -96,9 +90,8 @@ mod test {
 		let island = &rsx! { <MyComponent client:load val=32 /> }
 			.pipe(CollectClientIslands::default())[0];
 
-		expect(&island.type_name).to_be(
-			"beet_rsx::rsx::pipeline::collect_client_islands::test::MyComponent",
-		);
+		expect(&island.type_name)
+			.to_be("beet_rsx::rsx::pipeline::client_island::test::MyComponent");
 		expect(&island.location).to_be(&TreeLocation::new(0, 0, 0));
 		expect(&island.ron).to_be("(val:32)");
 		expect(ron::de::from_str::<MyComponent>(&island.ron).unwrap())
@@ -120,8 +113,8 @@ mod test {
 			quote::quote! {
 				ClientIsland {
 					location: TreeLocation::new(1u32, 2u32, 3u32),
-					type_name: "MyComponent".to_string(),
-					ron: "(val:32)".to_string(),
+					type_name: "MyComponent".into(),
+					ron: "(val:32)".into(),
 				}
 			}
 			.to_string(),

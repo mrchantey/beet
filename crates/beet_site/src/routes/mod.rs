@@ -15,3 +15,17 @@ pub fn collect() -> RouteTree<beet::prelude::StaticRoute> {
         .add_route((RouteInfo::new("/contributing", "get"), contributing::get))
         .add_route((RouteInfo::new("/", "get"), index::get))
 }
+#[cfg(target_arch = "wasm32")]
+pub fn collect() -> ClientIslandMap {
+    ClientIslandMap {
+        routes_mod_path: "crates/beet_site/src/routes/mod.rs".into(),
+        map: vec![
+            (RouteInfo::new("/contributing", "get"), vec![]), (RouteInfo::new("/",
+            "get"), vec![ClientIsland { location : TreeLocation::new(94u32, 0u32, 14u32),
+            type_name : "beet_site::routes::index::Counter".into(), ron : "(initial:7)"
+            .into(), }])
+        ]
+            .into_iter()
+            .collect(),
+    }
+}

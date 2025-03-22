@@ -154,7 +154,8 @@ include = ["CHANGELOG.md", "README.md", "/src", "/examples", "/scenes"]
 default = ["flow"]
 examples = ["bevy_default", "dep:beet_examples"]
 flow = ["dep:beet_flow"]
-router = ["rsx", "dep:beet_router", "beet_router/parser"]
+router = ["rsx", "dep:beet_router"]
+parser = ["beet_rsx?/parser", "beet_router?/parser"]
 rsx = ["dep:beet_rsx", "dep:beet_design"]
 fs = ["beet_rsx?/fs"]
 ml = ["flow", "dep:beet_ml"]
@@ -201,7 +202,7 @@ beet = { path = "", features = ["router", "bevy"] }
 sweet = { workspace = true, features = ["test", "bevy", "rand"] }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
-beet = { path = "", features = ["router"] }
+beet = { path = "", features = ["parser"] }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 tokio.workspace = true

@@ -1,7 +1,6 @@
 //! Module containing pipelines to be applied to an [`RsxRoot`]
 mod build_step;
-#[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
-mod collect_client_islands;
+mod client_island;
 #[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
 mod fs_src_pipeline;
 mod register_effects;
@@ -10,8 +9,7 @@ pub use register_effects::*;
 use std::pin::Pin;
 
 pub use build_step::*;
-#[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
-pub use collect_client_islands::*;
+pub use client_island::*;
 #[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
 pub use fs_src_pipeline::*;
 pub use slots_pipeline::*;

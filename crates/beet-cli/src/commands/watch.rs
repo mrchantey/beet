@@ -30,6 +30,10 @@ pub struct WatchArgs {
 	/// root for the emitted html files
 	#[arg(long, default_value = "target/client")]
 	pub html_dir: PathBuf,
+	/// Only execute the provided build steps,
+	/// options are `setup`, `native`, `server`, `static`, `collect-wasm` `build-wasm`
+	#[arg(long, value_delimiter = ',')]
+	pub only: Vec<String>,
 }
 
 impl Watch {

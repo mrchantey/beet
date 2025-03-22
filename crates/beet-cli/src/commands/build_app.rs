@@ -18,25 +18,48 @@ impl BuildApp {
 		let exe_path = build_cmd.exe_path();
 
 		// here we're compiling once
+		if !watch_args.only.is_empty() {
+			let mut group = BuildStepGroup::default();
+			for arg in watch_args.only.iter() {
+				match arg.as_str() {
+					"setup" => group.add(RunSetup::new(&build_cmd)?),
+					"native" => {
+						group.add(BuildNative::new(&build_cmd, &watch_args))
+					}
+					"server" => {
+						group.add(RunServer::new(&watch_args, &exe_path))
+					}
+					"static" => {
+						group.add(ExportStatic::new(watch_args, &exe_path))
+					}
+					"collect-wasm" => group.add(CollectWasmRoutes::default()),
+					"build-wasm" => {
+						group.add(BuildWasm::new(&build_cmd, &watch_args)?)
+					}
+					_ => todo!(),
+				};
+			}
+			Ok(group)
+		} else {
+			let mut group = BuildStepGroup::default();
+			group
+				// 1. perform setup steps specified in the app
+				.add(RunSetup::new(&build_cmd)?)
+				// 2. rebuild the native binary
+				.add(BuildNative::new(&build_cmd, &watch_args))
+				// 3. run the server as soon as its ready
+				.add(RunServer::new(&watch_args, &exe_path))
+				// 4. export all static files from the app
+				//   - html files
+				//   - client island entries
+				.add(ExportStatic::new(watch_args, &exe_path))
+				// 5. create the wasm routes `collect()` function
+				.add(CollectWasmRoutes::default())
+				// 5. build the wasm binary
+				.add(BuildWasm::new(&build_cmd, &watch_args)?);
 
-		let mut group = BuildStepGroup::default();
-		group
-			// 1. perform setup steps specified in the app
-			.add(RunSetup::new(&build_cmd)?)
-			// 2. rebuild the native binary
-			.add(BuildNative::new(&build_cmd, &watch_args))
-			// 3. run the server as soon as its ready
-			.add(RunServer::new(&watch_args, &exe_path))
-			// 4. export all static files from the app
-			//   - html files
-			//   - client island entries
-			.add(ExportStatic::new(watch_args, &exe_path))
-			// 5. create the wasm routes `collect()` function
-			.add(CollectWasmRoutes::default())
-			// 5. build the wasm binary
-			.add(BuildWasm::new(&build_cmd, &watch_args)?);
-
-		Ok(group)
+			Ok(group)
+		}
 	}
 }
 

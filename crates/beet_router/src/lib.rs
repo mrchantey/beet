@@ -29,6 +29,7 @@ pub mod prelude {
 	pub use crate::parser::*;
 
 	// re-exports
+	pub use http;
 	#[cfg(feature = "parser")]
 	pub use ron;
 	pub use sweet::prelude::GlobFilter;

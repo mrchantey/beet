@@ -86,7 +86,6 @@ impl BuildStep for CollectWasmRoutes {
 
 #[cfg(test)]
 mod test {
-	use std::path::PathBuf;
 
 	use crate::prelude::*;
 	use http::Method;
@@ -101,7 +100,7 @@ mod test {
 			routes_mod_path: "routes/mod.rs".into(),
 			map: vec![(
 				RouteInfo {
-					path: PathBuf::from("/"),
+					path: "/".into(),
 					method: Method::GET,
 				},
 				vec![],

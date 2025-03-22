@@ -296,7 +296,8 @@ mod test {
 	fn to_tokens() {
 		use quote::ToTokens;
 
-		expect(TreeLocation::new(4, 2, 3).to_token_stream().to_string())
-			.to_be(quote::quote! { TreeLocation::new(4u32, 2u32, 3u32) }.to_string());
+		expect(TreeLocation::new(4, 2, 3).to_token_stream().to_string()).to_be(
+			quote::quote! { TreeLocation::new(4u32, 2u32, 3u32) }.to_string(),
+		);
 	}
 }

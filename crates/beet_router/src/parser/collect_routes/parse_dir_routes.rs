@@ -96,7 +96,7 @@ impl ParseDirRoutes {
 			#[cfg(not(target_arch = "wasm32"))]
 			pub fn collect()->RouteTree<#route_type> {
 				RouteTree{
-					mod_path: std::path::PathBuf::from(file!()),
+					mod_path: file!().into(),
 					children: vec![#(#children),*],
 					routes: Vec::new()
 				}
