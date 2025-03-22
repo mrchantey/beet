@@ -35,6 +35,10 @@ impl AsMut<RsxNode> for RsxRoot {
 	fn as_mut(&mut self) -> &mut RsxNode { &mut self.node }
 }
 
+impl Into<RsxNode> for RsxRoot {
+	fn into(self) -> RsxNode { self.node }
+}
+
 impl Borrow<RsxNode> for RsxRoot {
 	fn borrow(&self) -> &RsxNode { &self.node }
 }

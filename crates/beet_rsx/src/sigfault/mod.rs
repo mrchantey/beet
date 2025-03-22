@@ -138,4 +138,22 @@ mod test {
 		expect(&DomTarget::with(|h| h.render()))
 			.to_contain("<div data-beet-rsx-idx=\"0\">value is 9</div>");
 	}
+	#[test]
+	fn components() {
+		let (get, set) = signal(7);
+
+		rsx! { <div>value is {get}</div> }
+			.pipe(MountRsDom)
+			.unwrap()
+			.pipe(RegisterEffects::default())
+			.unwrap();
+		expect(&DomTarget::with(|h| h.render()))
+			.to_contain("<div data-beet-rsx-idx=\"0\">value is 7</div>");
+		set(8);
+		expect(&DomTarget::with(|h| h.render()))
+			.to_contain("<div data-beet-rsx-idx=\"0\">value is 8</div>");
+		set(9);
+		expect(&DomTarget::with(|h| h.render()))
+			.to_contain("<div data-beet-rsx-idx=\"0\">value is 9</div>");
+	}
 }

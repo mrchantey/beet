@@ -178,6 +178,11 @@ impl<Func> TreeLocationVisitor<Func> {
 		let child_idx = self.child_idxs.last().cloned().unwrap_or_default();
 		TreeLocation::new(self.tree_idx_incr, parent_idx, child_idx)
 	}
+
+	// pub fn before_node(&mut self) {
+	// 	self.tree_idx_incr += 1;
+	// }
+
 	pub fn after_node(&mut self, node: &RsxNode) {
 		self.tree_idx_incr += 1;
 		if node.is_html_node() {

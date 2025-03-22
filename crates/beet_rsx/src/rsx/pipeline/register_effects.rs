@@ -14,14 +14,15 @@ impl RegisterEffects {
 	pub fn new(root_location: TreeLocation) -> Self { Self { root_location } }
 }
 
-impl<T: RsxPipelineTarget + AsMut<RsxNode>> RsxPipeline<T, Result<()>>
+impl<T: RsxPipelineTarget + Into<RsxNode>> RsxPipeline<T, Result<()>>
 	for RegisterEffects
 {
-	fn apply(self, mut node: T) -> Result<()> {
+	fn apply(self, node: T) -> Result<()> {
+		let mut node: RsxNode = node.into();
 		let mut result = Ok(());
 
 		TreeLocationVisitor::visit_with_location_mut(
-			node.as_mut(),
+			&mut node,
 			self.root_location,
 			|loc, node| {
 				// println!(
