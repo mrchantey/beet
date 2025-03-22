@@ -85,7 +85,7 @@ impl TreeLocationMap {
 		})
 	}
 
-
+	// TODO pipeline
 	pub fn from_node(node: &RsxNode) -> Self {
 		let mut map = Self::default();
 

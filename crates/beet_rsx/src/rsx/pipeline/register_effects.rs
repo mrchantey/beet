@@ -20,10 +20,9 @@ impl<T: RsxPipelineTarget + AsMut<RsxNode>> RsxPipeline<T, Result<()>>
 	fn apply(self, mut node: T) -> Result<()> {
 		let mut result = Ok(());
 
-		TreeLocationVisitor::visit_with_options_mut(
+		TreeLocationVisitor::visit_with_location_mut(
 			node.as_mut(),
 			self.root_location,
-			Default::default(),
 			|loc, node| {
 				// println!(
 				// 	"registering effect at loc: {:?}:{:?}",

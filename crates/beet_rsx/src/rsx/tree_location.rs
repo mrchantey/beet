@@ -94,7 +94,10 @@ impl TreeLocation {
 
 
 
-/// Wrapper of a visitor but
+/// Visit each node in a tree, this struct deliberately does not
+/// provide an [`VisitRsxOptions`] as its essential that the tree is
+/// walked in exactly the same way in all parts of beet for the locations
+/// to be consistent.
 #[derive(Debug)]
 pub struct TreeLocationVisitor<Func> {
 	/// Used by [`TreeLocation::parent_idx`].
@@ -107,7 +110,6 @@ pub struct TreeLocationVisitor<Func> {
 	/// Used by [`TreeLocation::tree_idx`].
 	/// Simple counter that increments on each node visited.
 	tree_idx_incr: u32,
-	options: VisitRsxOptions,
 	func: Func,
 }
 
@@ -116,18 +118,13 @@ pub struct TreeLocationVisitor<Func> {
 
 impl<Func> TreeLocationVisitor<Func> {
 	pub fn new(func: Func) -> Self {
-		Self::new_with_options(func, Default::default(), Default::default())
+		Self::new_with_location(func, Default::default())
 	}
-	pub fn new_with_options(
-		func: Func,
-		location: TreeLocation,
-		options: VisitRsxOptions,
-	) -> Self {
+	pub fn new_with_location(func: Func, location: TreeLocation) -> Self {
 		Self {
 			parent_idxs: vec![location.parent_idx],
 			child_idxs: vec![location.child_idx],
 			tree_idx_incr: *location.tree_idx,
-			options,
 			func,
 		}
 	}
@@ -142,15 +139,14 @@ impl<Func> TreeLocationVisitor<Func> {
 		Self::new(func).walk_node(node);
 	}
 
-	pub fn visit_with_options(
+	pub fn visit_with_location(
 		node: &RsxNode,
 		location: TreeLocation,
-		options: VisitRsxOptions,
 		func: Func,
 	) where
 		Func: FnMut(TreeLocation, &RsxNode),
 	{
-		Self::new_with_options(func, location, options).walk_node(node);
+		Self::new_with_location(func, location).walk_node(node);
 	}
 	pub fn visit_mut(node: &mut RsxNode, func: Func)
 	where
@@ -158,15 +154,14 @@ impl<Func> TreeLocationVisitor<Func> {
 	{
 		Self::new(func).walk_node(node);
 	}
-	pub fn visit_with_options_mut(
+	pub fn visit_with_location_mut(
 		node: &mut RsxNode,
 		location: TreeLocation,
-		options: VisitRsxOptions,
 		func: Func,
 	) where
 		Func: FnMut(TreeLocation, &mut RsxNode),
 	{
-		Self::new_with_options(func, location, options).walk_node(node);
+		Self::new_with_location(func, location).walk_node(node);
 	}
 
 	/// Get the current item in the stack, or default
@@ -209,7 +204,6 @@ impl<Func> TreeLocationVisitor<Func> {
 impl<Func: FnMut(TreeLocation, &RsxNode)> RsxVisitor
 	for TreeLocationVisitor<Func>
 {
-	fn options(&self) -> &VisitRsxOptions { &self.options }
 	fn visit_node(&mut self, node: &RsxNode) {
 		let loc = self.current_location();
 		(self.func)(loc, node);
@@ -225,7 +219,6 @@ impl<Func: FnMut(TreeLocation, &RsxNode)> RsxVisitor
 impl<Func: FnMut(TreeLocation, &mut RsxNode)> RsxVisitorMut
 	for TreeLocationVisitor<Func>
 {
-	fn options(&self) -> &VisitRsxOptions { &self.options }
 	fn visit_node(&mut self, node: &mut RsxNode) {
 		let loc = self.current_location();
 		(self.func)(loc, node);

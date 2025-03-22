@@ -232,6 +232,24 @@ mod test {
 	}
 
 	#[test]
+	fn component() {
+		#[derive(Node)]
+		struct Child;
+		fn child(_: Child) -> RsxRoot {
+			rsx! { <p>hello {1}</p> }
+		}
+		expect(
+			rsx! { <Child/> }
+				.pipe(RsxToHtmlString::default())
+				.unwrap(),
+		)
+		.to_be(
+			// the component itsself is rsx-idx-0
+			"<p data-beet-rsx-idx=\"1\">hello 1</p>",
+		);
+
+	}
+		#[test]
 	fn component_props() {
 		#[derive(Node)]
 		struct Child {
