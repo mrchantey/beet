@@ -21,6 +21,17 @@ use std::str::FromStr;
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct TreeIdx(u32);
 
+#[cfg(feature = "parser")]
+impl quote::ToTokens for TreeIdx {
+	fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
+		let value = self.0;
+		tokens.extend(quote::quote! {
+			TreeIdx::new(#value)
+		});
+	}
+}
+
+
 impl TreeIdx {
 	pub fn new(idx: u32) -> Self { Self(idx) }
 }
@@ -59,4 +70,19 @@ impl FromStr for TreeIdx {
 
 impl Into<TreeIdx> for u32 {
 	fn into(self) -> TreeIdx { TreeIdx::new(self) }
+}
+
+
+#[cfg(test)]
+mod test {
+	use crate::prelude::*;
+	use sweet::prelude::*;
+
+	#[cfg(feature = "parser")]
+	#[test]
+	fn works() {
+		use quote::ToTokens;
+		expect(TreeIdx::new(7).to_token_stream().to_string())
+			.to_be(quote::quote! { TreeIdx::new(7u32) }.to_string());
+	}
 }

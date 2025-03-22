@@ -27,6 +27,22 @@ pub struct RouteInfo {
 	pub method: Method,
 }
 
+#[cfg(feature = "parser")]
+impl quote::ToTokens for RouteInfo {
+	fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
+		let path = &self.path.to_string_lossy();
+		let method = &self.method.to_string();
+		tokens.extend(quote::quote! {
+			RouteInfo {
+				path: std::path::PathBuf::from(#path),
+				method: http::Method::from_str(#method).unwrap(),
+			}
+		});
+	}
+}
+
+
+
 #[cfg(feature = "serde")]
 fn serialize_method<S>(
 	method: &Method,
@@ -91,4 +107,27 @@ impl<T> RouteTree<T> {
 /// allow for multiple types of routes to be added to the same tree
 pub trait IntoRoute<T, M>: 'static {
 	fn into_route(&self) -> T;
+}
+
+
+#[cfg(test)]
+mod test {
+	use crate::prelude::*;
+	use sweet::prelude::*;
+
+	#[cfg(feature = "parser")]
+	#[test]
+	fn to_tokens() {
+		use quote::ToTokens;
+
+		expect(RouteInfo::new("/", "GET").to_token_stream().to_string()).to_be(
+			quote::quote! {
+				RouteInfo {
+					path: std::path::PathBuf::from("/"),
+					method: http::Method::from_str("GET").unwrap(),
+				}
+			}
+			.to_string(),
+		);
+	}
 }

@@ -774,6 +774,8 @@ dependencies = [
  "once_cell",
  "parcel_selectors",
  "prettyplease",
+ "proc-macro2",
+ "quote",
  "rapidhash",
  "ron",
  "serde",

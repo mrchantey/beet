@@ -30,11 +30,11 @@ impl CollectWasmRoutes {
 		}
 	}
 
-	fn generate_collect_fn(_islands_map: &ClientIslandMap) -> ItemFn {
+	fn generate_collect_fn(islands_map: &ClientIslandMap) -> ItemFn {
 		syn::parse_quote! {
 			#[cfg(target_arch = "wasm32")]
-			pub fn collect() -> Vec<Route> {
-				todo!()
+			pub fn collect() -> ClientIslandMap {
+				#islands_map
 			}
 		}
 	}
@@ -122,8 +122,8 @@ mod test {
 		})
 		.to_be(syn::parse_quote! {
 			#[cfg(target_arch = "wasm32")]
-			pub fn collect() -> Vec<Route> {
-				todo!()
+			pub fn collect() -> ClientIslandMap {
+				#island_map
 			}
 		});
 	}
@@ -138,7 +138,7 @@ mod test {
 					todo!()
 				}
 				#[cfg(target_arch = "wasm32")]
-				pub fn collect() -> Vec<Route> {
+				pub fn collect() -> ClientIslandMap {
 					todo!()
 				}
 			};
@@ -151,8 +151,8 @@ mod test {
 				todo!()
 			}
 			#[cfg(target_arch = "wasm32")]
-			pub fn collect() -> Vec<Route> {
-				todo!()
+			pub fn collect() -> ClientIslandMap {
+				#island_map
 			}
 		});
 	}

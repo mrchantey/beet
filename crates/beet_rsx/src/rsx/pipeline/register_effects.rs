@@ -80,6 +80,9 @@ mod test {
 		.to_be_ok();
 	}
 
+	/// This would cause a cannot recursively acquire mutex in wasm
+	/// because of wasm panic catch limitations
+	#[cfg(not(target_arch = "wasm32"))]
 	#[test]
 	#[should_panic]
 	fn bad_location() {

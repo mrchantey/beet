@@ -13,7 +13,8 @@ mod rs_dom_target;
 #[cfg(not(target_arch = "wasm32"))]
 pub use native_event_registry::EventRegistry;
 pub use rs_dom_target::*;
-use std::cell::RefCell;
+use std::sync::Arc;
+use std::sync::Mutex;
 
 
 #[cfg(target_arch = "wasm32")]
@@ -23,8 +24,8 @@ pub use browser_dom_target::*;
 
 thread_local! {
 	#[rustfmt::skip]
-	static DOM_TARGET: RefCell<Box<dyn DomTargetImpl>> =
-		RefCell::new(Box::new(RsDomTarget::new(&().into_root()).unwrap()));
+	static DOM_TARGET: Arc<Mutex<Box<dyn DomTargetImpl>>> =
+		Arc::new(Mutex::new(Box::new(RsDomTarget::new(&().into_root()).unwrap())));
 }
 
 /// Mechanism for swapping out:
@@ -35,7 +36,7 @@ pub struct DomTarget;
 impl DomTarget {
 	pub fn with<R>(mut func: impl FnMut(&mut dyn DomTargetImpl) -> R) -> R {
 		DOM_TARGET.with(|current| {
-			let mut current = current.borrow_mut();
+			let mut current = current.lock().unwrap();
 			func(current.as_mut())
 		})
 	}
@@ -43,7 +44,7 @@ impl DomTarget {
 
 	pub fn set(item: impl 'static + Sized + DomTargetImpl) {
 		DOM_TARGET.with(|current| {
-			*current.borrow_mut() = Box::new(item);
+			*current.lock().unwrap() = Box::new(item);
 		});
 	}
 }

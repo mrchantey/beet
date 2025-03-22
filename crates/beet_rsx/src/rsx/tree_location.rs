@@ -35,6 +35,18 @@ pub struct TreeLocation {
 	// _padding: u32,
 }
 
+#[cfg(feature = "parser")]
+impl quote::ToTokens for TreeLocation {
+	fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
+		let tree_idx = *self.tree_idx;
+		let parent_idx = *self.parent_idx;
+		let child_idx = self.child_idx;
+		tokens.extend(quote::quote! {
+			TreeLocation::new(#tree_idx, #parent_idx, #child_idx)
+		});
+	}
+}
+
 impl TreeLocation {
 	pub fn new(
 		tree_idx: impl Into<TreeIdx>,
@@ -276,5 +288,15 @@ mod test {
 			.to_have_returned_nth_with(3, &TreeLocation::new(6, 2, 1));
 		expect(&bucket)
 			.to_have_returned_nth_with(4, &TreeLocation::new(8, 0, 1));
+	}
+
+
+	#[cfg(feature = "parser")]
+	#[test]
+	fn to_tokens() {
+		use quote::ToTokens;
+
+		expect(TreeLocation::new(4, 2, 3).to_token_stream().to_string())
+			.to_be(quote::quote! { TreeLocation::new(4u32, 2u32, 3u32) }.to_string());
 	}
 }

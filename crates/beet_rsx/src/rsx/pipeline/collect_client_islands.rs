@@ -40,14 +40,31 @@ impl RsxPipelineTarget for Vec<ClientIsland> {}
 /// Representation of a component in an Rsx tree that was marked as an
 /// island by a `client`.
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[derive(Debug, Clone)]
 pub struct ClientIsland {
 	/// The location of the component, will be used as the starting point
 	/// with `register_effects`
-	location: TreeLocation,
+	pub location: TreeLocation,
 	/// The name of the component, retrieved via [`std::any::type_name`].
-	type_name: String,
+	pub type_name: String,
 	/// The serialized component.
-	ron: String,
+	pub ron: String,
+}
+
+#[cfg(feature = "parser")]
+impl quote::ToTokens for ClientIsland {
+	fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
+		let location = &self.location;
+		let type_name = &self.type_name;
+		let ron = &self.ron;
+		tokens.extend(quote::quote! {
+			ClientIsland {
+				location: #location,
+				type_name: #type_name.to_string(),
+				ron: #ron.to_string(),
+			}
+		});
+	}
 }
 
 
@@ -86,5 +103,28 @@ mod test {
 		expect(&island.ron).to_be("(val:32)");
 		expect(ron::de::from_str::<MyComponent>(&island.ron).unwrap())
 			.to_be(MyComponent { val: 32 });
+	}
+
+	#[cfg(feature = "parser")]
+	#[test]
+	fn to_tokens() {
+		use quote::ToTokens;
+
+		let island = ClientIsland {
+			location: TreeLocation::new(1, 2, 3),
+			type_name: "MyComponent".into(),
+			ron: "(val:32)".into(),
+		};
+
+		expect(island.to_token_stream().to_string()).to_be(
+			quote::quote! {
+				ClientIsland {
+					location: TreeLocation::new(1u32, 2u32, 3u32),
+					type_name: "MyComponent".to_string(),
+					ron: "(val:32)".to_string(),
+				}
+			}
+			.to_string(),
+		);
 	}
 }

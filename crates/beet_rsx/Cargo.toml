@@ -21,7 +21,7 @@ bevy = ["dep:bevy", "serde", "dep:flume"]
 bevy_default = ["bevy", "bevy/default"]
 css = ["dep:lightningcss", "dep:parcel_selectors"]
 macros = ["dep:beet_rsx_macros"]
-parser = ["dep:beet_rsx_parser"]
+parser = ["dep:quote", "dep:proc-macro2", "dep:beet_rsx_parser"]
 serde = ["dep:serde", "dep:ron"]
 
 [dependencies]
@@ -38,9 +38,13 @@ rapidhash.workspace = true
 strum_macros.workspace = true
 prettyplease.workspace = true
 once_cell.workspace = true
+http.workspace = true
+
+#💡 serde
 serde = { workspace = true, optional = true }
 ron = { workspace = true, optional = true }
-http.workspace = true
+quote = { workspace = true, optional = true }
+proc-macro2 = { workspace = true, optional = true }
 
 #💡 style
 parcel_selectors = { version = "0.28", optional = true }
