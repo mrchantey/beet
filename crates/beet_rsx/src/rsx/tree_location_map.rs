@@ -128,21 +128,21 @@ mod test {
 		// println!("{:#?}", map);
 
 		expect(map.collapsed_elements).to_be(
-			vec![(0.into(), TextBlockEncoder {
-				parent_id: 0.into(),
+			vec![(1.into(), TextBlockEncoder {
+				parent_id: 1.into(),
 				split_positions: vec![vec![4, 5, 5], vec![10, 9]],
 			})]
 			.into_iter()
 			.collect::<HashMap<_, _>>(),
 		);
 		// {desc}
-		expect(&map.rusty_locations[&3.into()])
-			.to_be(&TreeLocation::new(3, 0, 1));
+		expect(&map.rusty_locations[&4.into()])
+			.to_be(&TreeLocation::new(4, 1, 1));
 		// {color}
-		expect(&map.rusty_locations[&6.into()])
-			.to_be(&TreeLocation::new(6, 0, 3));
+		expect(&map.rusty_locations[&7.into()])
+			.to_be(&TreeLocation::new(7, 1, 3));
 		// {action}
-		expect(&map.rusty_locations[&10.into()])
-			.to_be(&TreeLocation::new(10, 0, 5));
+		expect(&map.rusty_locations[&11.into()])
+			.to_be(&TreeLocation::new(11, 1, 5));
 	}
 }

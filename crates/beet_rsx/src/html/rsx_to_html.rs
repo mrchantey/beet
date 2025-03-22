@@ -181,7 +181,7 @@ mod test {
 				favorite_food=food
 			></div>
 		}.pipe(RsxToHtmlString::default()).unwrap())
-		.to_be("<div name=\"pete\" age=\"9\" favorite_food=\"pizza\" data-beet-rsx-idx=\"0\"></div>");
+		.to_be("<div name=\"pete\" age=\"9\" favorite_food=\"pizza\" data-beet-rsx-idx=\"1\"></div>");
 	}
 	#[test]
 	fn element_self_closing() {
@@ -217,7 +217,7 @@ mod test {
 			.pipe(RsxToHtmlString::default())
 			.unwrap(),
 		)
-		.to_be("<div><p data-beet-rsx-idx=\"1\">hello mars</p></div>");
+		.to_be("<div><p data-beet-rsx-idx=\"2\">hello mars</p></div>");
 	}
 	#[test]
 	fn events() {
@@ -228,7 +228,7 @@ mod test {
 				<p>hello {world}</p>
 			</div>
 		}.pipe(RsxToHtmlString::default()).unwrap())
-		.to_be("<div onclick=\"_beet_event_handler(0, event)\" data-beet-rsx-idx=\"0\"><p data-beet-rsx-idx=\"1\">hello mars</p></div>");
+		.to_be("<div onclick=\"_beet_event_handler(1, event)\" data-beet-rsx-idx=\"1\"><p data-beet-rsx-idx=\"2\">hello mars</p></div>");
 	}
 
 	#[test]
@@ -241,7 +241,7 @@ mod test {
 		expect(rsx! { <Child /> }.pipe(RsxToHtmlString::default()).unwrap())
 			.to_be(
 				// the component itsself is rsx-idx-0
-				"<p data-beet-rsx-idx=\"1\">hello 1</p>",
+				"<p data-beet-rsx-idx=\"2\">hello 1</p>",
 			);
 	}
 	#[test]
@@ -260,7 +260,7 @@ mod test {
 				.unwrap(),
 		)
 		.to_be(
-			"<div>the child is <p data-beet-rsx-idx=\"4\">hello 38</p>!</div>",
+			"<div>the child is <p data-beet-rsx-idx=\"5\">hello 38</p>!</div>",
 		);
 	}
 	#[test]

@@ -26,11 +26,11 @@ pub fn collect() -> ClientIslandMountFuncs {
         vec![
             ("/counter", Box::new(|| { beet::exports::ron::de::from_str:: <
             beet_site::components::counter::Counter > ("(initial:7)") ? .render()
-            .pipe(RegisterEffects::new(TreeLocation::new(0u32, 0u32, 0u32))) ?; Ok(())
+            .pipe(RegisterEffects::new(TreeLocation::new(1u32, 0u32, 0u32))) ?; Ok(())
             })), ("/contributing", Box::new(|| { Ok(()) })), ("/", Box::new(|| {
             beet::exports::ron::de::from_str:: < beet_site::components::counter::Counter
             > ("(initial:2)") ? .render()
-            .pipe(RegisterEffects::new(TreeLocation::new(94u32, 0u32, 14u32))) ?; Ok(())
+            .pipe(RegisterEffects::new(TreeLocation::new(95u32, 0u32, 14u32))) ?; Ok(())
             }))
         ],
     )

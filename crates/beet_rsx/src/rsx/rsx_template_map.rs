@@ -214,7 +214,7 @@ mod test {
 			]);
 		let node2 = map.apply_template(page()).unwrap();
 		let html2 = node2.pipe(RsxToHtmlString::default()).unwrap();
-		expect(&html1).to_be("<div><div data-beet-rsx-idx=\"2\">the value is 3<div>some child</div></div></div>");
+		expect(&html1).to_be("<div><div data-beet-rsx-idx=\"3\">the value is 3<div>some child</div></div></div>");
 		expect(html1).to_be(html2);
 	}
 

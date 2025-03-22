@@ -105,7 +105,7 @@ mod test {
 			</main>
 		}))
 		.to_contain(
-			"<main><article data-beet-rsx-idx=\"1\">7</article></main>",
+			"<main><article data-beet-rsx-idx=\"2\">7</article></main>",
 		);
 	}
 	#[test]
@@ -115,6 +115,6 @@ mod test {
 		expect(
 			pipe(rsx! { <main onclick=on_click></main> })
 		)
-		.to_contain("<main onclick=\"_beet_event_handler(0, event)\" data-beet-rsx-idx=\"0\"></main>");
+		.to_contain("<main onclick=\"_beet_event_handler(1, event)\" data-beet-rsx-idx=\"1\"></main>");
 	}
 }

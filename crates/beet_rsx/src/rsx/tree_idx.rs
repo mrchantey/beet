@@ -9,6 +9,8 @@ use std::str::FromStr;
 /// application before interactivity. This is what allows for reconciliation
 /// in hydration and template reloading.
 ///
+/// The value is **1 indexed** as 0 represents the 'parent' of the root node.
+///
 /// This is different from an [`RsxIdx`] which is unique only to its macro.
 ///
 /// This technique is also the reason there can only be a single entrypoint for
@@ -54,9 +56,10 @@ pub struct TreeIdxIncr(u32);
 impl TreeIdxIncr {
 	/// Call this before visiting any node.
 	pub fn next(&mut self) -> TreeIdx {
-		let idx = self.0;
+		// let idx = self.0;
 		self.0 += 1;
-		TreeIdx(idx)
+
+		TreeIdx(self.0)
 	}
 }
 

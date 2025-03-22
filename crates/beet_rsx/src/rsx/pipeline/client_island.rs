@@ -98,7 +98,7 @@ mod test {
 
 		expect(&island.type_name)
 			.to_be("beet_rsx::rsx::pipeline::client_island::test::MyComponent");
-		expect(&island.location).to_be(&TreeLocation::new(0, 0, 0));
+		expect(&island.location).to_be(&TreeLocation::new(1, 0, 0));
 		expect(&island.ron).to_be("(val:32)");
 		expect(ron::de::from_str::<MyComponent>(&island.ron).unwrap())
 			.to_be(MyComponent { val: 32 });

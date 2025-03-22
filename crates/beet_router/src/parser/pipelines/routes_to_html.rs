@@ -77,8 +77,9 @@ impl RsxPipeline<Vec<(RouteInfo, HtmlDocument)>, Result<()>>
 			}
 			path = path.strip_prefix("/").unwrap().to_path_buf();
 			let full_path = &dst.join(path);
-			let pretty = doc.pipe(RenderHtml::pretty())?;
-			FsExt::write(&full_path, &pretty)?;
+			// pretty rendering currently breaks text node logic
+			let str = doc.pipe(RenderHtml::default())?;
+			FsExt::write(&full_path, &str)?;
 		}
 
 

@@ -173,18 +173,15 @@ impl<Func> TreeLocationVisitor<Func> {
 	// 		.expect("TreeLocationVisitor stack is empty")
 	// }
 
-	pub fn current_location(&self) -> TreeLocation {
+	fn current_location(&self) -> TreeLocation {
 		let parent_idx = self.parent_idxs.last().cloned().unwrap_or_default();
 		let child_idx = self.child_idxs.last().cloned().unwrap_or_default();
 		TreeLocation::new(self.tree_idx_incr, parent_idx, child_idx)
 	}
 
-	// pub fn before_node(&mut self) {
-	// 	self.tree_idx_incr += 1;
-	// }
+	fn before_node(&mut self) { self.tree_idx_incr += 1; }
 
-	pub fn after_node(&mut self, node: &RsxNode) {
-		self.tree_idx_incr += 1;
+	fn after_node(&mut self, node: &RsxNode) {
 		if node.is_html_node() {
 			if let Some(child_idx) = self.child_idxs.last_mut() {
 				*child_idx += 1;
@@ -192,14 +189,11 @@ impl<Func> TreeLocationVisitor<Func> {
 		}
 	}
 
-	pub fn before_children(&mut self) {
-		// the reason why we can get the parent idx is because this is called directly after
-		// visit_node in RsxVisitor. It also means we can safely decrement by 1 to get
-		// the parent index
-		self.parent_idxs.push(TreeIdx::new(self.tree_idx_incr - 1));
+	fn before_children(&mut self) {
+		self.parent_idxs.push(TreeIdx::new(self.tree_idx_incr));
 		self.child_idxs.push(0);
 	}
-	pub fn after_children(&mut self) {
+	fn after_children(&mut self) {
 		self.parent_idxs.pop();
 		self.child_idxs.pop();
 	}
@@ -210,6 +204,7 @@ impl<Func: FnMut(TreeLocation, &RsxNode)> RsxVisitor
 	for TreeLocationVisitor<Func>
 {
 	fn visit_node(&mut self, node: &RsxNode) {
+		self.before_node();
 		let loc = self.current_location();
 		(self.func)(loc, node);
 		self.after_node(node);
@@ -225,6 +220,7 @@ impl<Func: FnMut(TreeLocation, &mut RsxNode)> RsxVisitorMut
 	for TreeLocationVisitor<Func>
 {
 	fn visit_node(&mut self, node: &mut RsxNode) {
+		self.before_node();
 		let loc = self.current_location();
 		(self.func)(loc, node);
 		self.after_node(node);
@@ -277,17 +273,17 @@ mod test {
 		// keep in mind that fragments will also increment
 		// the tree_idx..
 		expect(&bucket)
-			.to_have_returned_nth_with(0, &TreeLocation::new(0, 0, 0));
+			.to_have_returned_nth_with(0, &TreeLocation::new(1, 0, 0));
 		expect(&bucket)
-			.to_have_returned_nth_with(1, &TreeLocation::new(2, 0, 0));
-		expect(&bucket)
-			// 2 because fragment
-			.to_have_returned_nth_with(2, &TreeLocation::new(4, 2, 0));
+			.to_have_returned_nth_with(1, &TreeLocation::new(3, 1, 0));
 		expect(&bucket)
 			// 2 because fragment
-			.to_have_returned_nth_with(3, &TreeLocation::new(6, 2, 1));
+			.to_have_returned_nth_with(2, &TreeLocation::new(5, 3, 0));
 		expect(&bucket)
-			.to_have_returned_nth_with(4, &TreeLocation::new(8, 0, 1));
+			// 2 because fragment
+			.to_have_returned_nth_with(3, &TreeLocation::new(7, 3, 1));
+		expect(&bucket)
+			.to_have_returned_nth_with(4, &TreeLocation::new(9, 1, 1));
 	}
 
 

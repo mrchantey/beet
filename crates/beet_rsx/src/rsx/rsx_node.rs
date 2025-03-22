@@ -343,6 +343,6 @@ mod test {
 				.pipe(RsxToHtmlString::default())
 				.unwrap(),
 		)
-		.to_be("<div data-beet-rsx-idx=\"1\">3</div>");
+		.to_be("<div data-beet-rsx-idx=\"2\">3</div>");
 	}
 }
