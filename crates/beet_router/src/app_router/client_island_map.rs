@@ -35,7 +35,6 @@ impl quote::ToTokens for ClientIslandMap {
 }
 
 
-
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;

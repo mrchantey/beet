@@ -17,7 +17,6 @@ where
 				let path = args.html_dir.join("index.html");
 				Box::pin(async move {
 					SpaTemplate::render_to_file(self, path).unwrap();
-
 					Ok(())
 				})
 			}));

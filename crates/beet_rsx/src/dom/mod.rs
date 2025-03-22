@@ -41,10 +41,10 @@ impl DomTarget {
 		})
 	}
 
-
+	/// Sets the current [`DomTargetImpl`], even if the previous one is poisoned.
 	pub fn set(item: impl 'static + Sized + DomTargetImpl) {
 		DOM_TARGET.with(|current| {
-			*current.lock().unwrap() = Box::new(item);
+			*current.lock().unwrap_or_else(|e| e.into_inner()) = Box::new(item);
 		});
 	}
 }

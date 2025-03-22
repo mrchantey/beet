@@ -69,7 +69,7 @@ mod test {
 	use serde::Serialize;
 	use sweet::prelude::*;
 
-
+	#[allow(unused)]
 	#[derive(Debug, PartialEq, Serialize, Deserialize, Node)]
 	struct MyComponent {
 		val: usize,
@@ -78,8 +78,9 @@ mod test {
 		rsx! { <div>{props.val}</div> }
 	}
 
+	#[cfg(not(target_arch = "wasm32"))]
 	#[test]
-	fn works() {
+	fn collect_islands() {
 		expect(
 			rsx! { <MyComponent val=32 /> }
 				.pipe(CollectClientIslands::default())
