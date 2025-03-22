@@ -54,9 +54,10 @@ impl ClientIslandMountFuncs {
 	pub fn mount(&self) -> Result<()> {
 		DomTarget::set(BrowserDomTarget::default());
 
-		let mut path = web_sys::window().unwrap().location().pathname().unwrap();
+		let mut path =
+			web_sys::window().unwrap().location().pathname().unwrap();
 		if path.len() > 1 && path.ends_with('/') {
-				path.pop();
+			path.pop();
 		}
 
 		if let Some(mount_fn) = self.map.get(path.as_str()) {

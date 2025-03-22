@@ -72,7 +72,7 @@ impl BrowserDomTarget {
 			Ok(el)
 		} else {
 			Err(ParseError::Hydration(format!(
-				"Could not find parent for collapsed text node with rsx idx: {}",
+				"Could not text node parent with rsx idx: {}",
 				tree_idx
 			)))
 		}

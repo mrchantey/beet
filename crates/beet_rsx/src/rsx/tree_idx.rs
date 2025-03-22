@@ -4,9 +4,12 @@ use bevy::prelude::*;
 use std::num::ParseIntError;
 use std::str::FromStr;
 
+
 /// A value guaranteed to be unique for every [`RsxNode`] *instance* in an
 /// application before interactivity. This is what allows for reconciliation
 /// in hydration and template reloading.
+///
+/// This is different from an [`RsxIdx`] which is unique only to its macro.
 ///
 /// This technique is also the reason there can only be a single entrypoint for
 /// a document, app etc, the tree idx is incremented as items are rendered.

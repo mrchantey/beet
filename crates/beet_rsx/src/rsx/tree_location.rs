@@ -21,7 +21,7 @@ pub struct TreeLocation {
 	/// used for reconciliation with the [TreeLocationMap::rusty_locations].
 	/// It is required because not all rsx nodes are html nodes.
 	pub tree_idx: TreeIdx,
-	/// the index of this node's parent *element*. This is used by
+	/// the [`TreeIdx`] of this node's parent *element*. This is used by
 	/// text nodes to determine their location in the dom.
 	pub parent_idx: TreeIdx,
 	/// The *uncollapsed* child index of this node, for
@@ -276,8 +276,10 @@ mod test {
 		expect(&bucket)
 			.to_have_returned_nth_with(1, &TreeLocation::new(2, 0, 0));
 		expect(&bucket)
+			// 2 because fragment
 			.to_have_returned_nth_with(2, &TreeLocation::new(4, 2, 0));
 		expect(&bucket)
+			// 2 because fragment
 			.to_have_returned_nth_with(3, &TreeLocation::new(6, 2, 1));
 		expect(&bucket)
 			.to_have_returned_nth_with(4, &TreeLocation::new(8, 0, 1));
