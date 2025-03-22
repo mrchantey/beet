@@ -14,19 +14,23 @@ pub struct ClientIsland {
 	pub ron: String,
 }
 
-#[cfg(feature = "parser")]
-impl quote::ToTokens for ClientIsland {
-	fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
+impl ClientIsland {
+	/// Convert the island into a token stream that can be used to mount the
+	/// island.
+	///
+	/// ## Panics
+	///
+	/// Panics if the type name or ron string are not valid tokens.
+	#[cfg(feature = "parser")]
+	pub fn into_mount_tokens(&self) -> proc_macro2::TokenStream {
 		let location = &self.location;
-		let type_name = &self.type_name;
-		let ron = &self.ron;
-		tokens.extend(quote::quote! {
-			ClientIsland {
-				location: #location,
-				type_name: #type_name.into(),
-				ron: #ron.into(),
-			}
-		});
+		let type_name =
+			self.type_name.parse::<proc_macro2::TokenStream>().unwrap();
+		let ron = self.ron.parse::<proc_macro2::TokenStream>().unwrap();
+		quote::quote! {
+			beet::exports::ron::de::from_str::<#type_name>(#ron)?
+				.pipe(RegisterEffects::new(#location))?;
+		}
 	}
 }
 
@@ -102,21 +106,17 @@ mod test {
 	#[cfg(feature = "parser")]
 	#[test]
 	fn to_tokens() {
-		use quote::ToTokens;
-
 		let island = ClientIsland {
 			location: TreeLocation::new(1, 2, 3),
 			type_name: "MyComponent".into(),
 			ron: "(val:32)".into(),
 		};
+		let location = &island.location;
 
-		expect(island.to_token_stream().to_string()).to_be(
+		expect(island.into_mount_tokens().to_string()).to_be(
 			quote::quote! {
-				ClientIsland {
-					location: TreeLocation::new(1u32, 2u32, 3u32),
-					type_name: "MyComponent".into(),
-					ron: "(val:32)".into(),
-				}
+				beet::exports::ron::de::from_str::<MyComponent>((val:32))?
+				.pipe(RegisterEffects::new(#location))?;
 			}
 			.to_string(),
 		);

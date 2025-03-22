@@ -40,3 +40,23 @@ pub mod prelude {
 	#[cfg(feature = "spatial")]
 	pub use crate::spatial::prelude::*;
 }
+
+
+pub mod exports {
+	#[cfg(feature = "rsx")]
+	pub use beet_rsx::exports::*;
+	// #[cfg(feature = "examples")]
+	// pub use beet_examples::exports::*;
+	// #[cfg(feature = "flow")]
+	// pub use beet_flow::exports::*;
+	// #[cfg(feature = "ml")]
+	// pub use beet_ml::exports::*;
+	// #[cfg(feature = "router")]
+	// pub use beet_router::exports::*;
+	// #[cfg(feature = "server")]
+	// pub use beet_server::exports::*;
+	// #[cfg(feature = "sim")]
+	// pub use beet_sim::exports::*;
+	// #[cfg(feature = "spatial")]
+	// pub use beet_spatial::exports::*;
+}

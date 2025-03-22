@@ -31,10 +31,11 @@ impl CollectWasmRoutes {
 	}
 
 	fn generate_collect_fn(islands_map: &ClientIslandMap) -> ItemFn {
+		let tokens = islands_map.into_mount_tokens();
 		syn::parse_quote! {
 			#[cfg(target_arch = "wasm32")]
 			pub fn collect() -> ClientIslandMap {
-				#islands_map
+				#tokens
 			}
 		}
 	}
@@ -113,6 +114,7 @@ mod test {
 	#[test]
 	fn empty() {
 		let island_map = island_map();
+		let island_map_tokens = island_map.into_mount_tokens();
 
 		expect({
 			let mut file: File = syn::parse_quote! {};
@@ -122,13 +124,14 @@ mod test {
 		.to_be(syn::parse_quote! {
 			#[cfg(target_arch = "wasm32")]
 			pub fn collect() -> ClientIslandMap {
-				#island_map
+				#island_map_tokens
 			}
 		});
 	}
 	#[test]
 	fn with_both() {
 		let island_map = island_map();
+		let island_map_tokens = island_map.into_mount_tokens();
 
 		expect({
 			let mut file: File = syn::parse_quote! {
@@ -151,7 +154,7 @@ mod test {
 			}
 			#[cfg(target_arch = "wasm32")]
 			pub fn collect() -> ClientIslandMap {
-				#island_map
+				#island_map_tokens
 			}
 		});
 	}

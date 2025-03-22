@@ -60,8 +60,6 @@ where
 	}
 }
 
-pub struct StaticRouteCollection;
-
 impl IntoCollection<StaticRoute> for RouteTree<StaticRoute> {
 	fn into_collection(self) -> impl Collection {
 		move |app: &mut AppRouter| {

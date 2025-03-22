@@ -46,8 +46,22 @@ pub mod prelude {
 	pub type HashMap<K,V> = rapidhash::RapidHashMap<K,V>;
 	pub type HashSet<K> = rapidhash::RapidHashSet<K>;
 
+
+
+		
 	// #[cfg(test)]
 	// pub use crate::as_beet::*;
+}
+
+pub mod exports {
+	#[cfg(feature = "parser")]
+	pub use proc_macro2;
+	#[cfg(feature = "parser")]
+	pub use quote;
+	#[cfg(feature = "serde")]
+	pub use ron;
+	#[cfg(feature = "serde")]
+	pub use serde;
 }
 
 // rsx macros expect 'beet'
