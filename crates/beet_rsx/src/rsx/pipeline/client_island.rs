@@ -26,9 +26,10 @@ impl ClientIsland {
 		let location = &self.location;
 		let type_name =
 			self.type_name.parse::<proc_macro2::TokenStream>().unwrap();
-		let ron = self.ron.parse::<proc_macro2::TokenStream>().unwrap();
+		let ron = &self.ron;
 		quote::quote! {
 			beet::exports::ron::de::from_str::<#type_name>(#ron)?
+				.render()
 				.pipe(RegisterEffects::new(#location))?;
 		}
 	}
@@ -116,7 +117,8 @@ mod test {
 		expect(island.into_mount_tokens().to_string()).to_be(
 			quote::quote! {
 				beet::exports::ron::de::from_str::<MyComponent>((val:32))?
-				.pipe(RegisterEffects::new(#location))?;
+					.render()
+					.pipe(RegisterEffects::new(#location))?;
 			}
 			.to_string(),
 		);

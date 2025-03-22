@@ -753,6 +753,7 @@ dependencies = [
  "syn 2.0.98",
  "tokio",
  "uuid",
+ "web-sys",
 ]
 
 [[package]]

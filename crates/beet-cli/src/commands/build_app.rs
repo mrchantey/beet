@@ -87,6 +87,7 @@ impl RunSetup {
 				FileGroup::Tree(TreeFileGroup { src_dir }) => {
 					group.add(CollectRoutes {
 						routes_dir: setup_config.app_cx.resolve_path(src_dir),
+						pkg_name: Some(setup_config.app_cx.pkg_name.clone()),
 						..Default::default()
 					});
 				}

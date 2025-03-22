@@ -34,7 +34,7 @@ impl CollectWasmRoutes {
 		let tokens = islands_map.into_mount_tokens();
 		syn::parse_quote! {
 			#[cfg(target_arch = "wasm32")]
-			pub fn collect() -> ClientIslandMap {
+			pub fn collect() -> ClientIslandMountFuncs {
 				#tokens
 			}
 		}
@@ -123,7 +123,7 @@ mod test {
 		})
 		.to_be(syn::parse_quote! {
 			#[cfg(target_arch = "wasm32")]
-			pub fn collect() -> ClientIslandMap {
+			pub fn collect() -> ClientIslandMountFuncs {
 				#island_map_tokens
 			}
 		});
@@ -140,7 +140,7 @@ mod test {
 					todo!()
 				}
 				#[cfg(target_arch = "wasm32")]
-				pub fn collect() -> ClientIslandMap {
+				pub fn collect() -> ClientIslandMountFuncs {
 					todo!()
 				}
 			};
@@ -153,7 +153,7 @@ mod test {
 				todo!()
 			}
 			#[cfg(target_arch = "wasm32")]
-			pub fn collect() -> ClientIslandMap {
+			pub fn collect() -> ClientIslandMountFuncs {
 				#island_map_tokens
 			}
 		});

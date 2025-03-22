@@ -21,7 +21,7 @@ pub fn get() -> RsxRoot {
 
 
 #[derive(Node, Serialize, Deserialize)]
-struct Counter {
+pub struct Counter {
 	initial: i32,
 }
 

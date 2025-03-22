@@ -5,10 +5,12 @@ pub mod index;
 pub const CONTRIBUTING: &'static str = "/contributing";
 pub const INDEX: &'static str = "/";
 use beet::prelude::*;
+#[allow(unused_imports)]
+use crate as beet_site;
 #[cfg(not(target_arch = "wasm32"))]
 pub fn collect() -> RouteTree<beet::prelude::StaticRoute> {
     RouteTree {
-        mod_path: std::path::PathBuf::from(file!()),
+        mod_path: file!().into(),
         children: vec![],
         routes: Vec::new(),
     }
@@ -16,16 +18,14 @@ pub fn collect() -> RouteTree<beet::prelude::StaticRoute> {
         .add_route((RouteInfo::new("/", "get"), index::get))
 }
 #[cfg(target_arch = "wasm32")]
-pub fn collect() -> ClientIslandMap {
-    ClientIslandMap {
-        routes_mod_path: "crates/beet_site/src/routes/mod.rs".into(),
-        map: vec![
-            (RouteInfo::new("/contributing", "get"), vec![]), (RouteInfo::new("/",
-            "get"), vec![ClientIsland { location : TreeLocation::new(94u32, 0u32, 14u32),
-            type_name : "beet_site::routes::index::Counter".into(), ron : "(initial:7)"
-            .into(), }])
-        ]
-            .into_iter()
-            .collect(),
-    }
+pub fn collect() -> ClientIslandMountFuncs {
+    ClientIslandMountFuncs::new(
+        vec![
+            ("/contributing", Box::new(|| { Ok(()) })), ("/", Box::new(|| {
+            beet::exports::ron::de::from_str:: < beet_site::routes::index::Counter >
+            ("(initial:7)") ? .render()
+            .pipe(RegisterEffects::new(TreeLocation::new(94u32, 0u32, 14u32))) ?; Ok(())
+            }))
+        ],
+    )
 }

@@ -25,21 +25,25 @@ impl ClientIslandMap {
 			quote::quote! { (#path_str, Box::new(||{
 				#( #islands )*
 				Ok(())
-			}) )}
+			}))}
 		});
 		quote::quote! {
-			ClientIslandMoutFuncs::new(vec![#( #items ),*])
+			ClientIslandMountFuncs::new(vec![#( #items ),*])
 		}
 	}
 }
 
 pub struct ClientIslandMountFuncs {
-	pub map: RapidHashMap<&'static str, Box<dyn Fn() -> Result<()>>>,
+	pub map:
+		RapidHashMap<&'static str, Box<dyn Send + Sync + Fn() -> Result<()>>>,
 }
 
 impl ClientIslandMountFuncs {
 	pub fn new(
-		route_funcs: Vec<(&'static str, Box<dyn Fn() -> Result<()>>)>,
+		route_funcs: Vec<(
+			&'static str,
+			Box<dyn Send + Sync + Fn() -> Result<()>>,
+		)>,
 	) -> Self {
 		Self {
 			map: route_funcs.into_iter().collect(),
@@ -47,16 +51,24 @@ impl ClientIslandMountFuncs {
 	}
 
 	#[cfg(target_arch = "wasm32")]
-	pub fn mount(&self) -> Result<()> {}
+	pub fn mount(&self) -> Result<()> {
+		let path = web_sys::window().unwrap().location().pathname().unwrap();
+		if let Some(mount_fn) = self.map.get(path.as_str()) {
+			mount_fn()?;
+		} else {
+			anyhow::bail!("No mount function found for path: {}\n", path);
+		}
+		Ok(())
+	}
 }
 
 
 impl IntoCollection<ClientIslandMountFuncs> for ClientIslandMountFuncs {
 	fn into_collection(self) -> impl Collection {
 		#[allow(unused)]
-		|app: &mut AppRouter| {
+		move |app: &mut AppRouter| {
 			#[cfg(target_arch = "wasm32")]
-			app.on_run_wasm.push(Box::new(|| self.mount()));
+			app.on_run_wasm.push(Box::new(move |_| self.mount()));
 		}
 	}
 }

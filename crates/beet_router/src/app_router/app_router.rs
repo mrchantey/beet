@@ -24,7 +24,7 @@ pub struct AppRouter {
 	pub on_run_static: Vec<OnRun>,
 	#[cfg(target_arch = "wasm32")]
 	pub on_run_wasm:
-		Vec<Box<dyn FnOnce(&AppRouterArgs) -> Result<()> + Send + Sync>>,
+		Vec<Box<dyn Send + Sync + FnOnce(&AppRouterArgs) -> Result<()>>>,
 }
 
 impl AppRouter {
