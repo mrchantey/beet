@@ -54,11 +54,20 @@ impl ClientIslandMountFuncs {
 	pub fn mount(&self) -> Result<()> {
 		DomTarget::set(BrowserDomTarget::default());
 
-		let path = web_sys::window().unwrap().location().pathname().unwrap();
+		let mut path = web_sys::window().unwrap().location().pathname().unwrap();
+		if path.len() > 1 && path.ends_with('/') {
+				path.pop();
+		}
+
 		if let Some(mount_fn) = self.map.get(path.as_str()) {
 			mount_fn()?;
 		} else {
-			anyhow::bail!("No mount function found for path: {}\n", path);
+			let received_paths = self.map.keys().collect::<Vec<_>>();
+			anyhow::bail!(
+				"No mount function found for path: {}\nreceived paths: {:?}",
+				path,
+				received_paths
+			);
 		}
 
 		EventRegistry::initialize()?;

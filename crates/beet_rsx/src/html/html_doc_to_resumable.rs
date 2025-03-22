@@ -24,10 +24,16 @@ impl HtmlDocToResumable {
 	/// otherwise append it to the end of the html
 	fn insert_tree_location_map(&self, node: &RsxNode, doc: &mut HtmlDocument) {
 		let loc_map = TreeLocationMap::from_node(node).to_csv();
-		let el = HtmlElementNode::inline_script(loc_map, vec![HtmlAttribute {
-			key: self.html_constants.loc_map_key.to_string(),
-			value: None,
-		}]);
+		let el = HtmlElementNode::inline_script(loc_map, vec![
+			HtmlAttribute {
+				key: "type".to_string(),
+				value: Some("beet-content".to_string()),
+			},
+			HtmlAttribute {
+				key: self.html_constants.loc_map_key.to_string(),
+				value: None,
+			},
+		]);
 		doc.body.push(el.into());
 	}
 
@@ -41,31 +47,33 @@ globalThis.{event_handler} = (id,event) => globalThis.{prehydrate_events}.push([
 			prehydrate_events = self.html_constants.event_store,
 			event_handler = self.html_constants.event_handler,
 		);
-		let el = HtmlElementNode::inline_script(script, vec![HtmlAttribute {
-			key: "type".to_string(),
-			value: Some("module".to_string()),
-		}]);
-		doc.body.push(el.into());
+		doc.body.push(
+			HtmlElementNode::inline_script(script, vec![HtmlAttribute {
+				key: "type".to_string(),
+				value: Some("module".to_string()),
+			}])
+			.into(),
+		);
 	}
 
 	fn insert_wasm_script(&self, doc: &mut HtmlDocument) {
 		let script = r#"
-		import init from './wasm/bindgen.js'
-		init('./wasm/bindgen_bg.wasm')
+		import init from '/wasm/bindgen.js'
+		init('/wasm/bindgen_bg.wasm')
 			.catch((error) => {
 				if (!error.message.startsWith("Using exceptions for control flow,"))
 					throw error
 			})
 "#;
-		doc.body.push(HtmlNode::Element(HtmlElementNode {
-			tag: "script".to_string(),
-			self_closing: false,
-			attributes: vec![HtmlAttribute {
-				key: "type".to_string(),
-				value: Some("module".to_string()),
-			}],
-			children: vec![HtmlNode::Text(script.to_string())],
-		}));
+		doc.body.push(
+			HtmlElementNode::inline_script(script.to_string(), vec![
+				HtmlAttribute {
+					key: "type".to_string(),
+					value: Some("module".to_string()),
+				},
+			])
+			.into(),
+		);
 	}
 }
 
