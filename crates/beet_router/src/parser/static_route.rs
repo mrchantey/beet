@@ -71,7 +71,15 @@ impl IntoCollection<StaticRoute> for RouteTree<StaticRoute> {
 					let routes = self
 						.pipe(StaticRoutesToRsx::default())
 						.await?
-						.pipe(ApplyRouteTemplates::default())?;
+						.pipe(ApplyRouteTemplates::default())?
+						.into_iter()
+						// TODO this is a hack, we are also applying slots pipeline
+						// in RoutesToHtml
+						.map(|(info, root)| {
+							Ok((info, root.pipe(SlotsPipeline::default())?))
+						})
+						.collect::<Result<Vec<_>>>()?;
+
 					// export client islands after templates are applied
 					// but before `DefaultTransformations` are applied.
 					// i dont think its nessecary because islands only register effect

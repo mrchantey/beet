@@ -30,7 +30,7 @@ pub fn collect() -> ClientIslandMountFuncs {
             })), ("/contributing", Box::new(|| { Ok(()) })), ("/", Box::new(|| {
             beet::exports::ron::de::from_str:: < beet_site::components::counter::Counter
             > ("(initial:2)") ? .render()
-            .pipe(RegisterEffects::new(TreeLocation::new(95u32, 0u32, 14u32))) ?; Ok(())
+            .pipe(RegisterEffects::new(TreeLocation::new(75u32, 58u32, 4u32))) ?; Ok(())
             }))
         ],
     )

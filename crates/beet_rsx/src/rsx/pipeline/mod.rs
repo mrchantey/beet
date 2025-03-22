@@ -40,9 +40,9 @@ where
 pub trait RsxPipelineTarget: Sized {
 	fn pipe<P: RsxPipeline<Self, O>, O: RsxPipelineTarget>(
 		self,
-		plugin: P,
+		pipeline: P,
 	) -> O {
-		plugin.apply(self)
+		pipeline.apply(self)
 	}
 	fn pipe_with<
 		P: RsxPipeline<(Self, T2), O>,
@@ -51,13 +51,29 @@ pub trait RsxPipelineTarget: Sized {
 	>(
 		self,
 		other: T2,
-		plugin: P,
+		pipeline: P,
 	) -> Result<O>
 	where
 		(Self, T2): RsxPipelineTarget,
 	{
-		Ok(plugin.apply((self, other)))
+		Ok(pipeline.apply((self, other)))
 	}
+}
+pub trait RsxPipelineTargetIter<T: RsxPipelineTarget>:
+	Sized + IntoIterator<Item = T>
+{
+	fn pipe_each<P: RsxPipeline<T, O> + Clone, O: RsxPipelineTarget>(
+		self,
+		pipeline: P,
+	) -> Vec<O> {
+		self.into_iter()
+			.map(|v| pipeline.clone().apply(v))
+			.collect()
+	}
+}
+impl<T: IntoIterator<Item = U>, U: RsxPipelineTarget> RsxPipelineTargetIter<U>
+	for T
+{
 }
 
 
@@ -75,6 +91,8 @@ impl<T1: RsxPipelineTarget, T2: RsxPipelineTarget> RsxPipelineTarget
 	for (T1, T2)
 {
 }
+
+
 
 impl RsxPipelineTarget for () {}
 impl RsxPipelineTarget for String {}

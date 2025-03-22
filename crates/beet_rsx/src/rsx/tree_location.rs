@@ -179,7 +179,16 @@ impl<Func> TreeLocationVisitor<Func> {
 		TreeLocation::new(self.tree_idx_incr, parent_idx, child_idx)
 	}
 
-	fn before_node(&mut self) { self.tree_idx_incr += 1; }
+	fn before_node(&mut self, node: &RsxNode) {
+		self.tree_idx_incr += 1;
+
+		// it is not allowed to perform tree location walk before
+		// resolving slot children
+		match node {
+			RsxNode::Component(comp) => comp.slot_children.assert_empty(),
+			_ => {}
+		}
+	}
 
 	fn after_node(&mut self, node: &RsxNode) {
 		if node.is_html_node() {
@@ -204,7 +213,7 @@ impl<Func: FnMut(TreeLocation, &RsxNode)> RsxVisitor
 	for TreeLocationVisitor<Func>
 {
 	fn visit_node(&mut self, node: &RsxNode) {
-		self.before_node();
+		self.before_node(node);
 		let loc = self.current_location();
 		(self.func)(loc, node);
 		self.after_node(node);
@@ -220,7 +229,7 @@ impl<Func: FnMut(TreeLocation, &mut RsxNode)> RsxVisitorMut
 	for TreeLocationVisitor<Func>
 {
 	fn visit_node(&mut self, node: &mut RsxNode) {
-		self.before_node();
+		self.before_node(node);
 		let loc = self.current_location();
 		(self.func)(loc, node);
 		self.after_node(node);
@@ -295,5 +304,19 @@ mod test {
 		expect(TreeLocation::new(4, 2, 3).to_token_stream().to_string()).to_be(
 			quote::quote! { TreeLocation::new(4u32, 2u32, 3u32) }.to_string(),
 		);
+	}
+
+
+	#[test]
+	#[should_panic]
+	fn has_slot_children() {
+		#[derive(Node)]
+		struct Comp;
+
+		fn comp(_: Comp) -> RsxRoot {
+			rsx! {<slot/>}
+		}
+
+		TreeLocationVisitor::visit(&rsx! {<Comp><div/></Comp>}.node, |_, _| {});
 	}
 }

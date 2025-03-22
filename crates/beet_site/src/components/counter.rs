@@ -15,7 +15,7 @@ fn counter(props: Counter) -> RsxRoot {
 
 	rsx! {
 		<div>
-			"val is"{get.clone()}"i think"
+			{get.clone()}
 			<button onclick=move |_|{set(get()+1)}>
 			Increment
 			</button>
