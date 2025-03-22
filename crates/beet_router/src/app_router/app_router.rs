@@ -49,6 +49,7 @@ impl AppRouter {
 
 	#[cfg(target_arch = "wasm32")]
 	fn run_inner(self) -> Result<()> {
+		console_error_panic_hook::set_once();
 		let args = AppRouterArgs::from_url_params()?;
 		self.on_run_wasm.into_iter().try_for_each(|f| f(&args))
 	}

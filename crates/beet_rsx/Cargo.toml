@@ -64,7 +64,6 @@ tokio.workspace = true
 #💡 wasm
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 sweet = { workspace = true, features = ["web"] }
-console_error_panic_hook.workspace = true
 console_log.workspace = true
 js-sys.workspace = true
 wasm-bindgen.workspace = true

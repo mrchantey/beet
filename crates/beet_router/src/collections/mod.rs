@@ -1,7 +1,5 @@
 #[cfg(all(feature = "server", not(target_arch = "wasm32")))]
 mod axum_router_collection;
-// TODO get beet_router working with wasm
-mod spa_route_collection;
 #[cfg(all(feature = "server", not(target_arch = "wasm32")))]
 pub use axum_router_collection::*;
 

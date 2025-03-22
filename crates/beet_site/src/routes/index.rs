@@ -1,5 +1,6 @@
 use crate::prelude::*;
 use beet::prelude::*;
+use beet::rsx::sigfault::signal;
 use serde::Deserialize;
 use serde::Serialize;
 
@@ -26,10 +27,15 @@ pub struct Counter {
 }
 
 fn counter(props: Counter) -> RsxRoot {
+	let (get, set) = signal(props.initial);
+
+
 	rsx! {
 		<div>
-			{props.initial}
-			<button>Increment</button>
+			{get.clone()}
+			<button onclick=move |_|{set(get()+1)}>
+			Increment
+			</button>
 		</div>
 	}
 }

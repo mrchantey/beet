@@ -74,3 +74,4 @@ beet_router = { path = "", features = ["parser", "bevy", "_test_site"] }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 web-sys.workspace = true
+console_error_panic_hook.workspace = true

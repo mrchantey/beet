@@ -29,7 +29,7 @@ pub struct CollectRoutes {
 	/// ❌ `src/routes/foo/routes/bar.rs` will be `routes/bar.rs`
 	#[arg(long, default_value = "src/routes")]
 	pub routes_dir: PathBuf,
-	
+
 	/// Specify the package name so codegen can `use crate as pkg_name`
 	#[arg(long)]
 	pub pkg_name: Option<String>,

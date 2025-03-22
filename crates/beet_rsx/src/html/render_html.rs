@@ -162,10 +162,9 @@ mod test {
 				</body>
 			</html>
 		}
-		.pipe(RsxToHtmlDocumentString {
-			render_html: RenderHtml::pretty(),
-			..Default::default()
-		})
+		.pipe(RsxToHtmlDocument::default())
+		.unwrap()
+		.pipe(RenderHtml::pretty())
 		.unwrap();
 		// println!("{}", doc.render_pretty());
 		expect(doc).to_be("<!DOCTYPE html>\n<html>\n\t<head>\n\t\t<title data-beet-rsx-idx=\"3\">\n\t\t\tTest \t\t\tfoo\t\t\tbar\n\t\t</title>\n\t</head>\n\t<body>\n\t\t<div foo=\"bar\" bazz>\n\t\t\t<p>\n\t\t\t\tTest\n\t\t\t</p>\n\t\t</div>\n\t</body>\n</html>");

@@ -4,9 +4,10 @@ use crate::prelude::*;
 pub struct RsxToHtml {
 	/// add attributes required for resumability
 	pub html_constants: HtmlConstants,
-	/// on elements that directly contain rust code (non recursive),
-	/// give them a `needs-id` attribute to be mapped by [RsxToResumableHtml]
-	pub no_beet_attributes: bool,
+	/// Do not check for wasm, which disables
+	/// applying the [`HtmlConstants::tree_idx_key`] on elements that directly contain rust code (non recursive)
+	/// 2. applying resumability to trees with `client:` directives.
+	pub no_wasm: bool,
 	/// text node content will be trimmed
 	pub trim: bool,
 	tree_idx_incr: TreeIdxIncr,
@@ -25,7 +26,7 @@ impl<T: RsxPipelineTarget + AsRef<RsxNode>> RsxPipeline<T, Vec<HtmlNode>>
 impl RsxToHtml {
 	pub fn as_resumable() -> Self {
 		Self {
-			no_beet_attributes: false,
+			no_wasm: false,
 			..Default::default()
 		}
 	}
@@ -75,7 +76,7 @@ impl RsxToHtml {
 			.flatten()
 			.collect::<Vec<_>>();
 
-		if !self.no_beet_attributes && el.contains_rust() {
+		if !self.no_wasm && el.contains_rust() {
 			html_attributes.push(HtmlAttribute {
 				key: self.html_constants.tree_idx_key.to_string(),
 				value: Some(idx.to_string()),
@@ -107,7 +108,7 @@ impl RsxToHtml {
 				}]
 			}
 			RsxAttribute::BlockValue { key, initial, .. } => {
-				if !self.no_beet_attributes && key.starts_with("on") {
+				if !self.no_wasm && key.starts_with("on") {
 					vec![HtmlAttribute {
 						key: key.clone(),
 						value: Some(format!(

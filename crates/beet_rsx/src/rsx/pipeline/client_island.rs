@@ -116,7 +116,7 @@ mod test {
 
 		expect(island.into_mount_tokens().to_string()).to_be(
 			quote::quote! {
-				beet::exports::ron::de::from_str::<MyComponent>((val:32))?
+				beet::exports::ron::de::from_str::<MyComponent>("(val:32)")?
 					.render()
 					.pipe(RegisterEffects::new(#location))?;
 			}

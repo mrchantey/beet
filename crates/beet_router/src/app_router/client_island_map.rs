@@ -1,6 +1,6 @@
 use crate::prelude::*;
 use anyhow::Result;
-use beet_rsx::rsx::ClientIsland;
+use beet_rsx::prelude::*;
 use rapidhash::RapidHashMap;
 use std::path::PathBuf;
 
@@ -52,12 +52,16 @@ impl ClientIslandMountFuncs {
 
 	#[cfg(target_arch = "wasm32")]
 	pub fn mount(&self) -> Result<()> {
+		DomTarget::set(BrowserDomTarget::default());
+
 		let path = web_sys::window().unwrap().location().pathname().unwrap();
 		if let Some(mount_fn) = self.map.get(path.as_str()) {
 			mount_fn()?;
 		} else {
 			anyhow::bail!("No mount function found for path: {}\n", path);
 		}
+
+		EventRegistry::initialize()?;
 		Ok(())
 	}
 }
@@ -103,8 +107,9 @@ mod test {
 		)
 		.to_be(
 			quote::quote! {
-				ClientIslandMoutFuncs::new(vec![("/", Box::new(|| {
-						beet::exports::ron::de::from_str::<Foo>(bar)?
+				ClientIslandMountFuncs::new(vec![("/", Box::new(|| {
+						beet::exports::ron::de::from_str::<Foo>("bar")?
+							.render()
 							.pipe(RegisterEffects::new(TreeLocation::new(0u32,0u32,0u32)))?;
 						Ok(())
 				}))])

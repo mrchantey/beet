@@ -21,7 +21,9 @@ impl RsxPipeline<RsxRoot, Result<RsxRoot>> for MountRsDom {
 
 impl RsDomTarget {
 	pub fn new(root: &RsxRoot) -> Result<Self> {
-		let doc = root.pipe(RsxToResumableHtml::default())?;
+		let doc = root
+			.pipe(RsxToHtml::default())
+			.pipe(HtmlToDocument::default())?;
 
 		let loc_map = TreeLocationMap::from_node(&root);
 		Ok(Self {

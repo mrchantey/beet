@@ -1,39 +1,6 @@
 use crate::prelude::*;
-use anyhow::Result;
 
-#[derive(Default)]
-pub struct RsxToResumableHtmlString {
-	pub rsx_to_resumable: RsxToResumableHtml,
-	pub render_html: RenderHtml,
-}
-
-impl RsxPipeline<RsxRoot, Result<String>> for RsxToResumableHtmlString {
-	#[rustfmt::skip]
-	fn apply(self, root: RsxRoot) -> Result<String> {
-		root.pipe(self.rsx_to_resumable)?
-			.pipe(self.render_html)
-	}
-}
-
-#[derive(Default)]
-pub struct RsxToResumableHtml {
-	pub rsx_to_html: RsxToHtml,
-	pub html_to_document: HtmlToDocument,
-	pub html_doc_to_resumable: HtmlDocToResumable,
-}
-
-impl<T: AsRef<RsxNode> + RsxPipelineTarget> RsxPipeline<T, Result<HtmlDocument>>
-	for RsxToResumableHtml
-{
-	fn apply(self, root: T) -> Result<HtmlDocument> {
-		root.as_ref()
-			.pipe(self.rsx_to_html)
-			.pipe(self.html_to_document)?
-			.pipe_with(root.as_ref(), self.html_doc_to_resumable)
-	}
-}
-
-
+/// insert tags and info required for client side resumability
 #[derive(Default)]
 pub struct HtmlDocToResumable {
 	pub html_constants: HtmlConstants,
@@ -108,29 +75,27 @@ mod test {
 	use crate::as_beet::*;
 	use sweet::prelude::*;
 
-
+	fn pipe(root: RsxRoot) -> String {
+		root.as_ref()
+			.pipe(RsxToHtml::default())
+			.pipe(HtmlToDocument::default())
+			.unwrap()
+			.pipe_with(root.as_ref(), HtmlDocToResumable::default())
+			.unwrap()
+			.pipe(RenderHtml::default())
+			.unwrap()
+	}
 
 
 	#[test]
-	fn plain() {
-		expect(
-			rsx! { <br /> }
-				.pipe(RsxToResumableHtmlString::default())
-				.unwrap(),
-		)
-		.to_contain("<br/>");
-	}
+	fn plain() { expect(pipe(rsx! { <br /> })).to_contain("<br/>"); }
 	#[test]
 	fn id() {
-		expect(
-			rsx! {
-				<main>
-					<article>{7}</article>
-				</main>
-			}
-			.pipe(RsxToResumableHtmlString::default())
-			.unwrap(),
-		)
+		expect(pipe(rsx! {
+			<main>
+				<article>{7}</article>
+			</main>
+		}))
 		.to_contain(
 			"<main><article data-beet-rsx-idx=\"1\">7</article></main>",
 		);
@@ -140,9 +105,7 @@ mod test {
 		let on_click = |_| {};
 
 		expect(
-			rsx! { <main onclick=on_click></main> }
-			.pipe(RsxToResumableHtmlString::default())
-			.unwrap(),
+			pipe(rsx! { <main onclick=on_click></main> })
 		)
 		.to_contain("<main onclick=\"_beet_event_handler(0, event)\" data-beet-rsx-idx=\"0\"></main>");
 	}

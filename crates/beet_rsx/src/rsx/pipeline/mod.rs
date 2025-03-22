@@ -114,17 +114,33 @@ pub struct RsxToHtmlDocument {
 	pub rsx_transforms: DefaultRsxTransforms,
 	pub rsx_to_html: RsxToHtml,
 	pub html_to_document: HtmlToDocument,
+	pub html_doc_to_resumable: HtmlDocToResumable,
 }
 
 impl RsxPipeline<RsxRoot, Result<HtmlDocument>> for RsxToHtmlDocument {
-	fn apply(self, root: RsxRoot) -> Result<HtmlDocument> {
-		root.pipe(self.rsx_transforms)?
+	fn apply(self, mut root: RsxRoot) -> Result<HtmlDocument> {
+		root = root.pipe(self.rsx_transforms)?;
+
+		let mut client_directives = false;
+		VisitRsxComponent::new(|c| {
+			if c.template_directives.iter().any(|d| d.prefix == "client") {
+				client_directives = true;
+			}
+		})
+		.walk_node(&root.node);
+
+		let mut doc = root
+			.as_ref()
 			.pipe(self.rsx_to_html)
-			.pipe(self.html_to_document)
+			.pipe(self.html_to_document)?;
+		if client_directives {
+			doc = doc.pipe_with(root.as_ref(), self.html_doc_to_resumable)?;
+		}
+		Ok(doc)
 	}
 }
 
-
+/// used for testing, directly transform rsx root then parse to html string
 #[derive(Default)]
 pub struct RsxToHtmlString {
 	pub rsx_transforms: DefaultRsxTransforms,
@@ -139,19 +155,31 @@ impl RsxPipeline<RsxRoot, Result<String>> for RsxToHtmlString {
 			.pipe(self.render_html)
 	}
 }
-#[derive(Default)]
-pub struct RsxToHtmlDocumentString {
-	pub rsx_transforms: DefaultRsxTransforms,
-	pub rsx_to_html: RsxToHtml,
-	pub html_to_document: HtmlToDocument,
-	pub render_html: RenderHtml,
-}
 
-impl RsxPipeline<RsxRoot, Result<String>> for RsxToHtmlDocumentString {
-	fn apply(self, root: RsxRoot) -> Result<String> {
-		root.pipe(self.rsx_transforms)?
-			.pipe(self.rsx_to_html)
-			.pipe(self.html_to_document)?
-			.pipe(self.render_html)
+
+
+#[cfg(test)]
+mod test {
+	use crate::as_beet::*;
+	use serde::Deserialize;
+	use serde::Serialize;
+	use sweet::prelude::*;
+
+	#[derive(Node, Serialize, Deserialize)]
+	struct MyComponent;
+	fn my_component(_: MyComponent) -> RsxRoot {
+		rsx! { <div /> }
+	}
+
+	#[test]
+	fn auto_resumable() {
+		let doc = rsx! { <MyComponent /> }
+			.pipe(RsxToHtmlDocument::default())
+			.unwrap();
+		expect(doc.body.len()).to_be(1);
+		let doc = rsx! { <MyComponent client:load /> }
+			.pipe(RsxToHtmlDocument::default())
+			.unwrap();
+		expect(doc.body.len()).to_be(4);
 	}
 }
