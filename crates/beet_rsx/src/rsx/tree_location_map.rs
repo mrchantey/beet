@@ -120,15 +120,13 @@ mod test {
 
 		fn my_component(_: MyComponent) -> RsxRoot {
 			let val = 4;
-			rsx! {
-				<div>{val}</div>
-			}
+			rsx! { <div>{val}</div> }
 		}
 
 
 		let root = rsx! {
-			<MyComponent/>
-			<MyComponent/>
+			<MyComponent />
+			<MyComponent />
 		}
 		.pipe(SlotsPipeline::default())
 		.unwrap();

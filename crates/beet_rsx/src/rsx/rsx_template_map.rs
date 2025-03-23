@@ -55,7 +55,7 @@ impl RsxTemplateMap {
 		}
 	}
 
-	// should live elsewhere, maybe RustyPart
+	// TODO pipeline
 	pub fn apply_template(&self, root: RsxRoot) -> TemplateResult<RsxRoot> {
 		if let Some(template_root) = self.templates.get(&root.location) {
 			let node = self.apply_template_for_node(
