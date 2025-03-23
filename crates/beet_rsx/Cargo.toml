@@ -14,7 +14,7 @@ keywords.workspace = true
 
 
 [features]
-default = ["macros", "fs"]
+default = ["macros", "fs", "serde"]
 fs = ["sweet/fs"]
 bevy = ["dep:bevy", "serde", "dep:flume"]
 # this is a hefty feature, pulls in bevy_render

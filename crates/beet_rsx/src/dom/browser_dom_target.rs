@@ -32,7 +32,13 @@ impl BrowserDomTarget {
 		let query = format!("[{}]", self.constants.loc_map_key);
 		if let Some(cx) = self.document.query_selector(&query).unwrap() {
 			let inner_text = cx.text_content().unwrap();
-			self.loc_map = Some(TreeLocationMap::from_csv(&inner_text)?);
+			let loc_map = ron::de::from_str(&inner_text).map_err(|e| {
+				ParseError::serde(format!(
+					"Could not parse TreeLocationMap: {}",
+					e
+				))
+			})?;
+			self.loc_map = Some(loc_map);
 			Ok(&self.loc_map.as_ref().unwrap())
 		} else {
 			Err(ParseError::serde(format!(

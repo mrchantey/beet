@@ -23,11 +23,13 @@ impl HtmlDocToResumable {
 	/// attempt to insert the rsx context map into the html body,
 	/// otherwise append it to the end of the html
 	fn insert_tree_location_map(&self, node: &RsxNode, doc: &mut HtmlDocument) {
-		let loc_map = TreeLocationMap::from_node(node).to_csv();
+		let loc_map = TreeLocationMap::from_node(node);
+		let loc_map =
+			ron::ser::to_string_pretty(&loc_map, Default::default()).unwrap();
 		let el = HtmlElementNode::inline_script(loc_map, vec![
 			HtmlAttribute {
 				key: "type".to_string(),
-				value: Some("beet-content".to_string()),
+				value: Some("beet/ron".to_string()),
 			},
 			HtmlAttribute {
 				key: self.html_constants.loc_map_key.to_string(),

@@ -3,7 +3,7 @@ use web_sys::Element;
 
 
 
-#[deprecated]
+#[deprecated = "we now use client directives exclusively"]
 pub struct BeetDom;
 
 

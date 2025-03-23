@@ -59,37 +59,6 @@ impl TreeLocation {
 			child_idx,
 		}
 	}
-
-	pub fn to_csv(&self) -> String {
-		// must keep in sync with from_csv
-		vec![
-			self.tree_idx.to_string(),
-			self.parent_idx.to_string(),
-			self.child_idx.to_string(),
-		]
-		.join(",")
-	}
-	pub fn from_csv(csv: &str) -> ParseResult<Self> {
-		let mut parts = csv.split(',');
-		let mut next = || -> Result<u32, ParseError> {
-			let next = parts
-				.next()
-				.ok_or_else(|| ParseError::serde("invalid rsx context csv"))?
-				.parse()?;
-			Ok(next)
-		};
-
-		// must keep in sync with to_csv
-		let tree_idx = next()?;
-		let parent_idx = next()?;
-		let child_idx = next()?;
-
-		Ok(Self {
-			tree_idx: TreeIdx::new(tree_idx),
-			parent_idx: TreeIdx::new(parent_idx),
-			child_idx,
-		})
-	}
 }
 
 
@@ -249,13 +218,6 @@ mod test {
 	use sweet::prelude::*;
 
 	#[test]
-	fn csv() {
-		let a = TreeLocation::new(4, 2, 3);
-		let csv = a.to_csv();
-		let b = TreeLocation::from_csv(&csv).unwrap();
-		expect(a).to_be(b);
-	}
-	#[test]
 	fn works() {
 		let bucket = mock_bucket();
 		let bucket2 = bucket.clone();
@@ -314,9 +276,17 @@ mod test {
 		struct Comp;
 
 		fn comp(_: Comp) -> RsxRoot {
-			rsx! {<slot/>}
+			rsx! { <slot /> }
 		}
 
-		TreeLocationVisitor::visit(&rsx! {<Comp><div/></Comp>}.node, |_, _| {});
+		TreeLocationVisitor::visit(
+			&rsx! {
+				<Comp>
+					<div />
+				</Comp>
+			}
+			.node,
+			|_, _| {},
+		);
 	}
 }
