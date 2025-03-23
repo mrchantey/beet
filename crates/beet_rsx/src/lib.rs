@@ -16,7 +16,6 @@ pub mod html;
 pub mod rsx;
 pub mod sigfault;
 pub mod string_rsx;
-pub mod tree;
 #[cfg(feature = "macros")]
 pub use beet_rsx_macros::*;
 #[cfg(feature = "parser")]
@@ -37,7 +36,6 @@ pub mod prelude {
 	pub use crate::dom::*;
 	pub use crate::error::*;
 	pub use crate::html::*;
-	pub use crate::tree::*;
 	pub use crate::rsx::*;
 	#[cfg(feature = "bevy")]
 	pub use crate::bevy::*;
