@@ -69,12 +69,14 @@ impl BeetServer {
 		let reload_handle = std::thread::spawn(move || -> Result<()> {
 			FsWatcher {
 				cwd: html_dir,
+				// no filter because any change in the html dir should trigger a reload
 				..Default::default()
 			}
 			.watch_blocking(move |e| {
-				if let Some(events) = e.mutated_pretty() {
+				if e.has_mutate() {
+					println!("html files changed, reloading wasm...");
 					reload.reload();
-					println!("{}", events);
+					// println!("{}", events);
 					// this2.print_start();
 				}
 				Ok(())

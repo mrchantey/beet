@@ -20,12 +20,12 @@ where
 				})
 			}));
 
-			// #[cfg(target_arch = "wasm32")]
-			// app.on_run_wasm.push(Box::new(move |_args| {
-			// 	BeetDom::hydrate(self);
-			// 	todo!("this should not use BeetDom and instead follow the same client islands workflow as file based routes");
-			// 	Ok(())
-			// }));
+			#[cfg(target_arch = "wasm32")]
+			app.on_run_wasm.push(Box::new(move |_args| {
+				todo!("this should not use BeetDom and instead follow the same client islands workflow as file based routes");
+				// BeetDom::hydrate(self);
+				// Ok(())
+			}));
 		}
 	}
 }

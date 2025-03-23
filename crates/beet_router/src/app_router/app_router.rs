@@ -92,6 +92,7 @@ impl AppRouter {
 				beet_server::prelude::BeetServer {
 					html_dir: args.html_dir.into(),
 					router: self.axum_router,
+
 					..Default::default()
 				}
 				.serve()
