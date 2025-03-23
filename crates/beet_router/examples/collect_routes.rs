@@ -1,5 +1,5 @@
 use beet_router::prelude::*;
-use sweet::prelude::FsExt;
+use sweet::prelude::*;
 
 
 /// Demonstration of how to collect all files in the 'routes' dir
