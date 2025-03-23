@@ -118,7 +118,7 @@ pub struct HtmlAttribute {
 pub struct HtmlConstants {
 	/// the attribute for element ids, used for encoding the [TreePosition],
 	pub tree_idx_key: &'static str,
-	/// used for describing the location of rust blocks in text nodes,
+	/// Attrubute tagging the [`TreeLocationMap`](crate::prelude::TreeLocationMap)
 	pub loc_map_key: &'static str,
 	/// the global event handler for all events
 	pub event_handler: &'static str,

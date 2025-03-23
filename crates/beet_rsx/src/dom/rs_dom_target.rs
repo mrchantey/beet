@@ -20,16 +20,17 @@ impl RsxPipeline<RsxRoot, Result<RsxRoot>> for MountRsDom {
 }
 
 impl RsDomTarget {
+	/// This does *not* apply any transformations
 	pub fn new(root: &RsxRoot) -> Result<Self> {
 		let doc = root
 			.pipe(RsxToHtml::default())
 			.pipe(HtmlToDocument::default())?;
 
-		let loc_map = TreeLocationMap::from_node(&root);
+		let loc_map = root.pipe(NodeToTreeLocationMap);
 		Ok(Self {
 			doc,
-			constants: Default::default(),
 			loc_map,
+			constants: Default::default(),
 		})
 	}
 }

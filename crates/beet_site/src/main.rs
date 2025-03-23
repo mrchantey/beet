@@ -1,6 +1,5 @@
 use beet::prelude::*;
 
-
 #[cfg(feature = "setup")]
 fn main() {
 	FileGroupConfig::new(app_cx!())

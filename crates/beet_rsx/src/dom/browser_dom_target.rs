@@ -29,22 +29,27 @@ impl Default for BrowserDomTarget {
 
 impl BrowserDomTarget {
 	fn get_tree_location_map(&mut self) -> ParseResult<&TreeLocationMap> {
-		let query = format!("[{}]", self.constants.loc_map_key);
-		if let Some(cx) = self.document.query_selector(&query).unwrap() {
-			let inner_text = cx.text_content().unwrap();
-			let loc_map = ron::de::from_str(&inner_text).map_err(|e| {
-				ParseError::serde(format!(
-					"Could not parse TreeLocationMap: {}",
-					e
-				))
-			})?;
-			self.loc_map = Some(loc_map);
-			Ok(&self.loc_map.as_ref().unwrap())
+		if self.loc_map.is_some() {
+			// for borrow checker
+			return Ok(self.loc_map.as_ref().unwrap());
 		} else {
-			Err(ParseError::serde(format!(
-				"Could not find context attribute: {}",
-				query
-			)))
+			let query = format!("[{}]", self.constants.loc_map_key);
+			if let Some(cx) = self.document.query_selector(&query).unwrap() {
+				let inner_text = cx.text_content().unwrap();
+				let loc_map = ron::de::from_str(&inner_text).map_err(|e| {
+					ParseError::serde(format!(
+						"Could not parse TreeLocationMap: {}",
+						e
+					))
+				})?;
+				self.loc_map = Some(loc_map);
+				Ok(&self.loc_map.as_ref().unwrap())
+			} else {
+				Err(ParseError::serde(format!(
+					"Could not find context attribute: {}",
+					query
+				)))
+			}
 		}
 	}
 

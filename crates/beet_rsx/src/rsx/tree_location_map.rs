@@ -1,26 +1,18 @@
+use crate::prelude::*;
+use anyhow::Result;
 use rapidhash::RapidHashMap;
 
-use crate::prelude::*;
 
-/// This map is updated every hot reload, the position
-/// of a rust block in the tree can change
-#[derive(Debug, Default, Clone, PartialEq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct TreeLocationMap {
-	// we could technically use a vec where the indices are 'block_idx',
-	// and track block_idx in the [TreeLocation]
-	// but at this stage of the project thats harder to reason about
-	// and this provides symmetry with [Self::collapsed_elements]
-	pub rusty_locations: RapidHashMap<TreeIdx, TreeLocation>,
-	pub collapsed_elements: RapidHashMap<TreeIdx, TextBlockEncoder>,
-}
 
-impl TreeLocationMap {
-	// TODO pipeline
-	pub fn from_node(node: &RsxNode) -> Self {
-		let mut map = Self::default();
+pub struct NodeToTreeLocationMap;
 
-		TreeLocationVisitor::visit(node, |loc, node| match node {
+impl<T: RsxPipelineTarget + AsRef<RsxNode>> RsxPipeline<T, TreeLocationMap>
+	for NodeToTreeLocationMap
+{
+	fn apply(self, node: T) -> TreeLocationMap {
+		let mut map = TreeLocationMap::default();
+
+		TreeLocationVisitor::visit(node.as_ref(), |loc, node| match node {
 			RsxNode::Block(_) => {
 				map.rusty_locations.insert(loc.tree_idx, loc);
 			}
@@ -37,6 +29,47 @@ impl TreeLocationMap {
 }
 
 
+
+/// This map is updated every hot reload, the position
+/// of a rust block in the tree can change
+#[derive(Debug, Default, Clone, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct TreeLocationMap {
+	// we could technically use a vec where the indices are 'block_idx',
+	// and track block_idx in the [TreeLocation]
+	// but at this stage of the project thats harder to reason about
+	// and this provides symmetry with [Self::collapsed_elements]
+	pub rusty_locations: RapidHashMap<TreeIdx, TreeLocation>,
+	pub collapsed_elements: RapidHashMap<TreeIdx, TextBlockEncoder>,
+}
+
+impl RsxPipelineTarget for TreeLocationMap {}
+
+
+impl TreeLocationMap {
+	/// a best-effort check for validity of a tree location map
+	pub fn check_valid(&self, node: &RsxNode) -> Result<()> {
+		let mut idx_incr = TreeIdxIncr::default();
+
+		let mut result = Ok(());
+
+		VisitRsxNode::walk(node, |node| {
+			let tree_idx = idx_incr.next();
+
+			if let Some(_) = self.collapsed_elements.get(&tree_idx) {
+				if let RsxNode::Element(_) = node {
+				} else {
+					result = Err(anyhow::anyhow!(
+						"parent element {tree_idx} does not exist for text block encoder"
+					));
+				}
+			}
+		});
+		Ok(())
+	}
+}
+
+
 #[cfg(test)]
 mod test {
 	use crate::as_beet::*;
@@ -49,8 +82,10 @@ mod test {
 		let action = "jumps over";
 
 		let root = rsx! { <div>"The "{desc}" and "{color}<b>fox</b>{action}the lazy " dog"</div> };
+		let map = (&root.node).pipe(NodeToTreeLocationMap);
 
-		let map = TreeLocationMap::from_node(&root);
+		map.check_valid(&root.node).unwrap();
+
 
 		expect(map.collapsed_elements).to_be(
 			vec![(1.into(), TextBlockEncoder {
@@ -69,5 +104,32 @@ mod test {
 		// {action}
 		expect(&map.rusty_locations[&11.into()])
 			.to_be(&TreeLocation::new(11, 1, 5));
+	}
+
+
+	#[test]
+	fn valid() {
+		use beet::prelude::*;
+
+		#[derive(Node)]
+		struct MyComponent;
+
+		fn my_component(_: MyComponent) -> RsxRoot {
+			rsx! {
+				<div><slot/></div>
+			}
+		}
+
+		let val = 4;
+
+		let root = rsx! {
+			<MyComponent>
+				<div>{val}</div>
+			</MyComponent>
+		}
+		.pipe(SlotsPipeline::default())
+		.unwrap();
+		let map = (&root.node).pipe(NodeToTreeLocationMap);
+		map.check_valid(&root.node).unwrap();
 	}
 }
