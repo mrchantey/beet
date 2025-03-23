@@ -93,10 +93,7 @@ impl IntoCollection<StaticRoute> for RouteTree<StaticRoute> {
 					Ok(())
 				})
 			}));
-			#[cfg(target_arch = "wasm32")]
-			{
-				todo!("use window.location to determine hydration route");
-			}
+			// wasm mounting is handled by ClientIslandMountFuncs
 		}
 	}
 }

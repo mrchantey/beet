@@ -6,7 +6,7 @@ pub fn get() -> RsxRoot {
 	rsx! {
 		<BeetPage>
 			{val + 8}
-			<span>hello world</span>
+			<span>hello pizza</span>
 			<Counter client:load initial=2/>
 			<style>
 				span{

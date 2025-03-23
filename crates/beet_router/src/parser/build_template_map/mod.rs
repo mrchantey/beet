@@ -223,7 +223,7 @@ mod test {
 		.unwrap()
 		.to_string();
 		let map: RsxTemplateMap = ron::de::from_str(&file).unwrap();
-		expect(map.root).to_be(src);
+		expect(map.root()).to_be(&src);
 		expect(map.templates.len()).to_be(4);
 		// println!("{:#?}", map);
 	}

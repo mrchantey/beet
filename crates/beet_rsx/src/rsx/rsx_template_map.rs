@@ -22,13 +22,15 @@ pub struct RsxTemplateMap {
 	/// The canonicalized root directory used to create the templates, templates
 	/// with a location outside of this root will not be expected to exists and
 	/// so will not produce an error.
-	pub root: PathBuf,
+	// canonicalized [here](crates/beet_router/src/parser/build_template_map/mod.rs#L110-L111)
+	root: PathBuf,
 	/// The templates themselves, keyed by their location.
 	pub templates: HashMap<RsxMacroLocation, RsxTemplateRoot>,
 }
 
-
 impl RsxTemplateMap {
+	pub fn root(&self) -> &PathBuf { &self.root }
+
 	/// Load the template map serialized by [beet_rsx_parser::RstmlToRsxTemplate]
 	#[cfg(all(feature = "serde", not(target_arch = "wasm32")))]
 	pub fn load(src: impl AsRef<std::path::Path>) -> Result<Self> {
@@ -66,6 +68,7 @@ impl RsxTemplateMap {
 		} else if root
 			.location
 			.file
+			.to_string()
 			.starts_with(&*self.root.to_string_lossy())
 		{
 			Err(TemplateError::NoTemplate {
@@ -77,6 +80,7 @@ impl RsxTemplateMap {
 				expected: root.location.clone(),
 			})
 		} else {
+			println!("ignoring root {:?}", root.location);
 			Ok(root)
 		}
 	}

@@ -50,6 +50,7 @@ impl RsxPipeline<Vec<(RouteInfo, RsxRoot)>, Result<Vec<(RouteInfo, RsxRoot)>>>
 				// TODO check if inside templates_root_dir.
 				// if so, error, otherwise do nothing
 				let root = template_map.apply_template(root)?;
+
 				Ok((route, root))
 			})
 			.collect()
