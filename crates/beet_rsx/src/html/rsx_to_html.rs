@@ -36,6 +36,7 @@ impl RsxToHtml {
 	/// If slot children have not been applied
 	pub fn map_node(&mut self, node: impl AsRef<RsxNode>) -> Vec<HtmlNode> {
 		let idx = self.tree_idx_incr.next();
+
 		match node.as_ref() {
 			RsxNode::Doctype { .. } => vec![HtmlNode::Doctype],
 			RsxNode::Comment { value, .. } => {
@@ -59,7 +60,11 @@ impl RsxToHtml {
 			}) => {
 				slot_children.assert_empty();
 				// use the location of the root
-				self.map_node(&root.node)
+				let node = self.map_node(&root.node);
+				// even though its empty we must visit to increment
+				// the idx incr, in the same order as [`RsxVisitor`] would
+				let _ = self.map_node(&slot_children);
+				node
 			}
 		}
 	}

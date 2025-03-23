@@ -44,6 +44,19 @@ impl Default for RsxNode {
 
 
 impl RsxNode {
+	pub fn idx(&self) -> RsxIdx {
+		match self {
+			RsxNode::Doctype { idx, .. }
+			| RsxNode::Comment { idx, .. }
+			| RsxNode::Text { idx, .. }
+			| RsxNode::Fragment { idx, .. }
+			| RsxNode::Element(RsxElement { idx, .. })
+			| RsxNode::Component(RsxComponent { idx, .. }) => *idx,
+			RsxNode::Block(RsxBlock { idx, .. }) => *idx,
+		}
+	}
+
+
 	/// Returns true if the node is an empty fragment,
 	/// or if it is recursively a fragment with only empty fragments
 	pub fn is_empty(&self) -> bool {

@@ -12,17 +12,21 @@ impl<T: RsxPipelineTarget + AsRef<RsxNode>> RsxPipeline<T, TreeLocationMap>
 	fn apply(self, node: T) -> TreeLocationMap {
 		let mut map = TreeLocationMap::default();
 
-		TreeLocationVisitor::visit(node.as_ref(), |loc, node| match node {
-			RsxNode::Block(_) => {
-				map.rusty_locations.insert(loc.tree_idx, loc);
-			}
-			RsxNode::Element(el) => {
-				if el.children.directly_contains_rust_node() {
-					let encoded = TextBlockEncoder::encode(loc.tree_idx, el);
-					map.collapsed_elements.insert(loc.tree_idx, encoded);
+		TreeLocationVisitor::visit(node.as_ref(), |loc, node| {
+			match node {
+				RsxNode::Block(_) => {
+					map.rusty_locations.insert(loc.tree_idx, loc);
 				}
+				RsxNode::Element(el) => {
+					// println!("el loc: {}", loc.tree_idx);
+					if el.children.directly_contains_rust_node() {
+						let encoded =
+							TextBlockEncoder::encode(loc.tree_idx, el);
+						map.collapsed_elements.insert(loc.tree_idx, encoded);
+					}
+				}
+				_ => {}
 			}
-			_ => {}
 		});
 		map
 	}
@@ -108,28 +112,37 @@ mod test {
 
 
 	#[test]
-	fn valid() {
+	fn consequtive_collapsed_nodes() {
 		use beet::prelude::*;
 
 		#[derive(Node)]
 		struct MyComponent;
 
 		fn my_component(_: MyComponent) -> RsxRoot {
+			let val = 4;
 			rsx! {
-				<div><slot/></div>
+				<div>{val}</div>
 			}
 		}
 
-		let val = 4;
 
 		let root = rsx! {
-			<MyComponent>
-				<div>{val}</div>
-			</MyComponent>
+			<MyComponent/>
+			<MyComponent/>
 		}
 		.pipe(SlotsPipeline::default())
 		.unwrap();
+
+		let html = (&root)
+			.pipe(RsxToHtml::default())
+			.pipe(RenderHtml::default())
+			.unwrap();
+		expect(html).to_be(
+			"<div data-beet-rsx-idx=\"3\">4</div><div data-beet-rsx-idx=\"8\">4</div>",
+		);
+
 		let map = (&root.node).pipe(NodeToTreeLocationMap);
-		map.check_valid(&root.node).unwrap();
+		expect(map.collapsed_elements.get(&TreeIdx::new(3))).to_be_some();
+		expect(map.collapsed_elements.get(&TreeIdx::new(8))).to_be_some();
 	}
 }
