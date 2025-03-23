@@ -2,7 +2,6 @@ use crate::prelude::*;
 use beet_rsx::prelude::*;
 
 
-
 pub struct SpaRouteCollection;
 
 impl<F> IntoCollection<SpaRouteCollection> for F
@@ -21,11 +20,12 @@ where
 				})
 			}));
 
-			#[cfg(target_arch = "wasm32")]
-			app.on_run_wasm.push(Box::new(move |_args| {
-				BeetDom::hydrate(self);
-				Ok(())
-			}));
+			// #[cfg(target_arch = "wasm32")]
+			// app.on_run_wasm.push(Box::new(move |_args| {
+			// 	BeetDom::hydrate(self);
+			// 	todo!("this should not use BeetDom and instead follow the same client islands workflow as file based routes");
+			// 	Ok(())
+			// }));
 		}
 	}
 }

@@ -10,6 +10,41 @@ mod parse_dir_routes;
 mod wasm_routes;
 pub use wasm_routes::*;
 
+
+/// Will scan a directory for all public http methods in files.
+/// Similar to a next-js or astro `pages` directory.
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
+pub struct TreeFileGroup {
+	/// The directory relative to the [`FileGroupConfig::root_dir`] where the files are located.
+	pub src_dir: PathBuf,
+}
+
+impl Default for TreeFileGroup {
+	fn default() -> Self {
+		Self {
+			src_dir: PathBuf::from("routes"),
+		}
+	}
+}
+
+impl TreeFileGroup {
+	pub fn new(dir: impl Into<PathBuf>) -> Self {
+		Self {
+			src_dir: dir.into(),
+		}
+	}
+
+	pub fn into_collect_routes(self, app_cx: &AppContext) -> CollectRoutes {
+		CollectRoutes {
+			routes_dir: app_cx.resolve_path(self.src_dir),
+			pkg_name: Some(app_cx.pkg_name.clone()),
+			..Default::default()
+		}
+	}
+}
+
+
+
 /// Parse a 'routes' dir, collecting all the routes,
 /// and create a `mod.rs` which contains
 /// a [ServerRoutes] struct with all the routes.

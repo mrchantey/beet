@@ -32,10 +32,17 @@ pub mod prelude {
 	#[rustfmt::skip]
 	pub fn setup_config() -> FileGroupConfig {
 		FileGroupConfig::new(app_cx!())
-			.add_group(GlobFileGroup::new(
-				".",
-				"mockups.rs",
+			.add_group(mockups())
+	}
+	/// Gets the [`GlobFileGroup`] for this crate
+	#[cfg(feature = "setup")]
+	#[rustfmt::skip]
+	pub fn mockups() -> GlobFileGroup {
+    use std::path::PathBuf;
+		GlobFileGroup::new(
+				PathBuf::from(file!()).parent().unwrap().to_path_buf(),
+				"mockup.rs",
 				GlobFilter::default(),
-		))
+		)
 	}
 }

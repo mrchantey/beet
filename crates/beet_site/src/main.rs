@@ -4,6 +4,8 @@ use beet::prelude::*;
 fn main() {
 	FileGroupConfig::new(app_cx!())
 		.add_group(TreeFileGroup::new("routes"))
+		// ensures design mockups are regenerated on reload
+		// .add_group(beet::design::prelude::mockups())
 		.export();
 }
 

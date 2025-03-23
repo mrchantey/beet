@@ -12,6 +12,7 @@ fn main() {
 	AppRouter::new(app_cx!())
 		.add_collection(app)
 		.run(); 
+	todo!("spa needs updating to islands architecture");
 }
 
 fn app() -> RsxRoot {

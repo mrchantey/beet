@@ -1,10 +1,13 @@
-use crate::prelude::AppContext;
+use crate::prelude::*;
 use std::path::PathBuf;
 use sweet::prelude::GlobFilter;
 
 /// File groups are collections of files that should be collected together,
 /// the most common example being a [`TreeFileGroup`] which creates routes
 /// for each file in a directory.
+///
+/// hese config files are simply passed to the cli which handles the parsing
+/// and code gen.
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct FileGroupConfig {
 	/// The directory from which all file paths are relative.
@@ -83,29 +86,6 @@ impl GlobFileGroup {
 	}
 }
 
-/// Will scan a directory for all public http methods in files.
-/// Similar to a next-js or astro `pages` directory.
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
-pub struct TreeFileGroup {
-	/// The directory relative to the [`FileGroupConfig::root_dir`] where the files are located.
-	pub src_dir: PathBuf,
-}
-
-impl Default for TreeFileGroup {
-	fn default() -> Self {
-		Self {
-			src_dir: PathBuf::from("routes"),
-		}
-	}
-}
-
-impl TreeFileGroup {
-	pub fn new(dir: impl Into<PathBuf>) -> Self {
-		Self {
-			src_dir: dir.into(),
-		}
-	}
-}
 
 
 #[cfg(test)]

@@ -84,12 +84,11 @@ impl RunSetup {
 			match item {
 				FileGroup::Child(_file_group_config) => todo!(),
 				FileGroup::Glob(_glob_file_group) => todo!(),
-				FileGroup::Tree(TreeFileGroup { src_dir }) => {
-					group.add(CollectRoutes {
-						routes_dir: setup_config.app_cx.resolve_path(src_dir),
-						pkg_name: Some(setup_config.app_cx.pkg_name.clone()),
-						..Default::default()
-					});
+				FileGroup::Tree(tree_file_group) => {
+					group.add(
+						tree_file_group
+							.into_collect_routes(&setup_config.app_cx),
+					);
 				}
 			}
 		}
