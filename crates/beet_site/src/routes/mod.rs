@@ -27,17 +27,24 @@ pub fn collect() -> RouteTree<beet::prelude::StaticRoute> {
 pub fn collect() -> ClientIslandMountFuncs {
     ClientIslandMountFuncs::new(
         vec![
-            ("/counter", Box::new(|| { beet::exports::ron::de::from_str:: <
-            beet_site::components::counter::Counter > ("(initial:7)") ? .render()
-            .pipe(RegisterEffects::new(TreeLocation::new(3u32, 1u32, 0u32))) ?;
+            ("/counter", Box::new(|| { #[allow(unused)] let tree_location_map =
+            DomTarget::with(| dom | dom.tree_location_map().clone());
             beet::exports::ron::de::from_str:: < beet_site::components::counter::Counter
-            > ("(initial:7)") ? .render()
-            .pipe(RegisterEffects::new(TreeLocation::new(11u32, 1u32, 1u32))) ?; Ok(())
-            })), ("/contributing", Box::new(|| { Ok(()) })), ("/helloworld", Box::new(||
-            { Ok(()) })), ("/", Box::new(|| { beet::exports::ron::de::from_str:: <
-            beet_site::components::counter::Counter > ("(initial:2)") ? .render()
-            .pipe(RegisterEffects::new(TreeLocation::new(75u32, 58u32, 4u32))) ?; Ok(())
-            }))
+            > ("(initial:7)") ? .render().pipe(RegisterEffects::new(tree_location_map
+            .rusty_locations[& RustyTracker::new(0u32, 16357251390072371795u64)])) ?;
+            beet::exports::ron::de::from_str:: < beet_site::components::counter::Counter
+            > ("(initial:7)") ? .render().pipe(RegisterEffects::new(tree_location_map
+            .rusty_locations[& RustyTracker::new(1u32, 16357251390072371795u64)])) ?;
+            Ok(()) })), ("/contributing", Box::new(|| { #[allow(unused)] let
+            tree_location_map = DomTarget::with(| dom | dom.tree_location_map().clone());
+            Ok(()) })), ("/helloworld", Box::new(|| { #[allow(unused)] let
+            tree_location_map = DomTarget::with(| dom | dom.tree_location_map().clone());
+            Ok(()) })), ("/", Box::new(|| { #[allow(unused)] let tree_location_map =
+            DomTarget::with(| dom | dom.tree_location_map().clone());
+            beet::exports::ron::de::from_str:: < beet_site::components::counter::Counter
+            > ("(initial:2)") ? .render().pipe(RegisterEffects::new(tree_location_map
+            .rusty_locations[& RustyTracker::new(2u32, 1934242216366192910u64)])) ?;
+            Ok(()) }))
         ],
     )
 }

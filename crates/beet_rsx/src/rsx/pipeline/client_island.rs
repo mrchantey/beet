@@ -5,9 +5,9 @@ use crate::prelude::*;
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone)]
 pub struct ClientIsland {
-	/// The location of the component, will be used as the starting point
+	/// The [`RsxComponent::tracker`], will be used as the starting point
 	/// with `register_effects`
-	pub location: TreeLocation,
+	pub tracker: RustyTracker,
 	/// The name of the component, retrieved via [`std::any::type_name`].
 	pub type_name: String,
 	/// The serialized component.
@@ -23,14 +23,20 @@ impl ClientIsland {
 	/// Panics if the type name or ron string are not valid tokens.
 	#[cfg(feature = "parser")]
 	pub fn into_mount_tokens(&self) -> proc_macro2::TokenStream {
-		let location = &self.location;
+		let tracker_index = &self.tracker.index;
+		let tracker_hash = &self.tracker.tokens_hash;
 		let type_name =
 			self.type_name.parse::<proc_macro2::TokenStream>().unwrap();
 		let ron = &self.ron;
 		quote::quote! {
+			// TODO resolve tracker to location
 			beet::exports::ron::de::from_str::<#type_name>(#ron)?
 				.render()
-				.pipe(RegisterEffects::new(#location))?;
+				.pipe(RegisterEffects::new(
+					tree_location_map.rusty_locations[
+						&RustyTracker::new(#tracker_index,#tracker_hash)]
+					)
+				)?;
 		}
 	}
 }
@@ -48,18 +54,24 @@ impl<T: RsxPipelineTarget + AsRef<RsxNode>> RsxPipeline<T, Vec<ClientIsland>>
 	fn apply(self, root: T) -> Vec<ClientIsland> {
 		let mut islands = Vec::new();
 
-		TreeLocationVisitor::visit(root.as_ref(), |loc, node| match node {
-			RsxNode::Component(RsxComponent { ron, type_name, .. }) => {
+		VisitRsxComponent::walk(
+			root.as_ref(),
+			|RsxComponent {
+			     ron,
+			     type_name,
+			     tracker,
+			     ..
+			 }| {
 				if let Some(ron) = ron {
 					islands.push(ClientIsland {
-						location: loc.clone(),
+						tracker: tracker.clone(),
 						type_name: type_name.clone(),
 						ron: ron.clone(),
 					});
 				}
-			}
-			_ => {}
-		});
+			},
+		);
+
 
 		islands
 	}
@@ -98,7 +110,8 @@ mod test {
 
 		expect(&island.type_name)
 			.to_be("beet_rsx::rsx::pipeline::client_island::test::MyComponent");
-		expect(&island.location).to_be(&TreeLocation::new(1, 0, 0));
+		expect(&island.tracker)
+			.to_be(&RustyTracker::new(0, 2208989915211983639));
 		expect(&island.ron).to_be("(val:32)");
 		expect(ron::de::from_str::<MyComponent>(&island.ron).unwrap())
 			.to_be(MyComponent { val: 32 });
@@ -108,17 +121,18 @@ mod test {
 	#[test]
 	fn to_tokens() {
 		let island = ClientIsland {
-			location: TreeLocation::new(1, 2, 3),
+			tracker: RustyTracker {
+				index: 0,
+				tokens_hash: 89,
+			},
 			type_name: "MyComponent".into(),
 			ron: "(val:32)".into(),
 		};
-		let location = &island.location;
-
 		expect(island.into_mount_tokens().to_string()).to_be(
 			quote::quote! {
 				beet::exports::ron::de::from_str::<MyComponent>("(val:32)")?
 					.render()
-					.pipe(RegisterEffects::new(#location))?;
+					.pipe(RegisterEffects::new(tree_location_map.rusty_locations[&RustyTracker::new(0u32,89u64)]))?;
 			}
 			.to_string(),
 		);

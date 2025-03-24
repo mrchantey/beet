@@ -14,8 +14,8 @@ impl<T: RsxPipelineTarget + AsRef<RsxNode>> RsxPipeline<T, TreeLocationMap>
 
 		TreeLocationVisitor::visit(node.as_ref(), |loc, node| {
 			match node {
-				RsxNode::Block(_) => {
-					map.rusty_locations.insert(loc.tree_idx, loc);
+				RsxNode::Block(RsxBlock { effect, .. }) => {
+					map.rusty_locations.insert(effect.tracker, loc);
 				}
 				RsxNode::Element(el) => {
 					// println!("el loc: {}", loc.tree_idx);
@@ -24,6 +24,9 @@ impl<T: RsxPipelineTarget + AsRef<RsxNode>> RsxPipeline<T, TreeLocationMap>
 							TextBlockEncoder::encode(loc.tree_idx, el);
 						map.collapsed_elements.insert(loc.tree_idx, encoded);
 					}
+				}
+				RsxNode::Component(comp) => {
+					map.rusty_locations.insert(comp.tracker, loc);
 				}
 				_ => {}
 			}
@@ -39,8 +42,8 @@ impl<T: RsxPipelineTarget + AsRef<RsxNode>> RsxPipeline<T, TreeLocationMap>
 #[derive(Debug, Default, Clone, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct TreeLocationMap {
-	/// Used to resolve the location of a rusty part by its
-	pub rusty_locations: RapidHashMap<TreeIdx, TreeLocation>,
+	/// Used to resolve the location of a rusty part by its tracker
+	pub rusty_locations: RapidHashMap<RustyTracker, TreeLocation>,
 	pub collapsed_elements: RapidHashMap<TreeIdx, TextBlockEncoder>,
 }
 
@@ -96,15 +99,14 @@ mod test {
 			.into_iter()
 			.collect::<HashMap<_, _>>(),
 		);
+		let mut locations = map.rusty_locations.iter().collect::<Vec<_>>();
+		locations.sort_by(|a, b| a.0.index.cmp(&b.0.index));
 		// {desc}
-		expect(&map.rusty_locations[&4.into()])
-			.to_be(&TreeLocation::new(4, 1, 1));
+		expect(locations[0].1).to_be(&TreeLocation::new(4, 1, 1));
 		// {color}
-		expect(&map.rusty_locations[&7.into()])
-			.to_be(&TreeLocation::new(7, 1, 3));
+		expect(locations[1].1).to_be(&TreeLocation::new(7, 1, 3));
 		// {action}
-		expect(&map.rusty_locations[&11.into()])
-			.to_be(&TreeLocation::new(11, 1, 5));
+		expect(locations[2].1).to_be(&TreeLocation::new(11, 1, 5));
 	}
 
 

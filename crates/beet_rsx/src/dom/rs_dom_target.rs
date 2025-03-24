@@ -48,24 +48,10 @@ impl DomTargetImpl for RsDomTarget {
 		rsx: RsxNode,
 		loc: TreeLocation,
 	) -> ParseResult<()> {
-		let parent_idx = self
-			.loc_map
-			.rusty_locations
-			.get(&loc.tree_idx)
-			.ok_or_else(|| {
-				ParseError::Hydration(format!(
-					"Could not find block parent for tree index: {}",
-					loc.tree_idx
-				))
-			})?
-			.parent_idx
-			.to_string();
-
 		for html in self.doc.iter_mut() {
-			// let parent_hash =
 			if let Some(parent_el) = html.query_selector_attr(
 				self.constants.tree_idx_key,
-				Some(&parent_idx),
+				Some(&loc.parent_idx.to_string()),
 			) {
 				return apply_rsx(parent_el, rsx, loc, &self.constants);
 			}
@@ -73,7 +59,7 @@ impl DomTargetImpl for RsDomTarget {
 
 		return Err(ParseError::Hydration(format!(
 			"Could not find node with id: {}",
-			parent_idx
+			loc.parent_idx
 		)));
 	}
 }

@@ -23,6 +23,8 @@ impl ClientIslandMap {
 				islands.iter().map(|island| island.into_mount_tokens());
 			let path_str = route.path.to_string_lossy();
 			quote::quote! { (#path_str, Box::new(||{
+				#[allow(unused)]
+				let tree_location_map = DomTarget::with(|dom| dom.tree_location_map().clone());
 				#( #islands )*
 				Ok(())
 			}))}
@@ -31,6 +33,9 @@ impl ClientIslandMap {
 			ClientIslandMountFuncs::new(vec![#( #items ),*])
 		}
 	}
+
+
+	// fn island_into_mount_tokens
 }
 
 pub struct ClientIslandMountFuncs {
@@ -99,18 +104,21 @@ mod test {
 	#[test]
 	fn to_tokens() {
 		use beet_rsx::rsx::ClientIsland;
-		use beet_rsx::rsx::TreeLocation;
+		use beet_rsx::rsx::RustyTracker;
+
+		let island = ClientIsland {
+			tracker: RustyTracker::new(0, 0),
+			type_name: "Foo".into(),
+			ron: "bar".into(),
+		};
+		let island_tokens = island.into_mount_tokens();
 
 		expect(
 			ClientIslandMap {
 				routes_mod_path: "foobar".into(),
-				map: vec![(RouteInfo::new("/", "get"), vec![ClientIsland {
-					location: TreeLocation::new(0, 0, 0),
-					type_name: "Foo".into(),
-					ron: "bar".into(),
-				}])]
-				.into_iter()
-				.collect(),
+				map: vec![(RouteInfo::new("/", "get"), vec![island.clone()])]
+					.into_iter()
+					.collect(),
 			}
 			.into_mount_tokens()
 			.to_string(),
@@ -118,10 +126,10 @@ mod test {
 		.to_be(
 			quote::quote! {
 				ClientIslandMountFuncs::new(vec![("/", Box::new(|| {
-						beet::exports::ron::de::from_str::<Foo>("bar")?
-							.render()
-							.pipe(RegisterEffects::new(TreeLocation::new(0u32,0u32,0u32)))?;
-						Ok(())
+					#[allow(unused)]
+					let tree_location_map = DomTarget::with(|dom| dom.tree_location_map().clone());
+					#island_tokens
+					Ok(())
 				}))])
 			}
 			.to_string(),

@@ -90,6 +90,7 @@ mod test {
 
 	use crate::prelude::*;
 	use http::Method;
+	use quote::ToTokens;
 	use sweet::prelude::*;
 
 	use syn::File;
@@ -119,14 +120,17 @@ mod test {
 		expect({
 			let mut file: File = syn::parse_quote! {};
 			CollectWasmRoutes::edit_file(&mut file, &island_map);
-			file
+			file.to_token_stream().to_string()
 		})
-		.to_be(syn::parse_quote! {
-			#[cfg(target_arch = "wasm32")]
-			pub fn collect() -> ClientIslandMountFuncs {
-				#island_map_tokens
+		.to_be(
+			quote::quote! {
+				#[cfg(target_arch = "wasm32")]
+				pub fn collect() -> ClientIslandMountFuncs {
+					#island_map_tokens
+				}
 			}
-		});
+			.to_string(),
+		);
 	}
 	#[test]
 	fn with_both() {
@@ -145,17 +149,20 @@ mod test {
 				}
 			};
 			CollectWasmRoutes::edit_file(&mut file, &island_map);
-			file
+			file.to_token_stream().to_string()
 		})
-		.to_be(syn::parse_quote! {
-			#[cfg(not(target_arch = "wasm32"))]
-			pub fn collect() -> Vec<Route> {
-				todo!()
+		.to_be(
+			quote::quote! {
+				#[cfg(not(target_arch = "wasm32"))]
+				pub fn collect() -> Vec<Route> {
+					todo!()
+				}
+				#[cfg(target_arch = "wasm32")]
+				pub fn collect() -> ClientIslandMountFuncs {
+					#island_map_tokens
+				}
 			}
-			#[cfg(target_arch = "wasm32")]
-			pub fn collect() -> ClientIslandMountFuncs {
-				#island_map_tokens
-			}
-		});
+			.to_string(),
+		);
 	}
 }
