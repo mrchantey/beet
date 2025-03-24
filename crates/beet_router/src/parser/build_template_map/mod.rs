@@ -113,11 +113,10 @@ impl BuildTemplateMap {
 			})
 			.collect::<Result<Vec<_>>>()?;
 
-		let root =
-			ron::ser::to_string(&self.templates_root_dir.canonicalize()?)?;
-		let root: TokenStream = root
-			.parse()
-			.map_err(|_| anyhow::anyhow!("Failed to parse root path"))?;
+		let root = WorkspacePathBuf::new_from_current_directory(
+			&self.templates_root_dir,
+		)?;
+		let root = root.to_string_lossy();
 
 		let map = quote! {
 			RsxTemplateMap(
@@ -223,11 +222,12 @@ mod test {
 	#[test]
 	#[cfg(not(target_arch = "wasm32"))]
 	fn works() {
-		let src =
-			FsExt::workspace_root().join("crates/beet_router/src/test_site");
+		let src = WorkspacePathBuf::new("crates/beet_router/src/test_site")
+			.into_canonical()
+			.unwrap();
 
 		let file = BuildTemplateMap {
-			templates_root_dir: src.clone(),
+			templates_root_dir: src.to_path_buf(),
 			templates_map_path: PathBuf::default(),
 			..Default::default()
 		}
@@ -236,7 +236,8 @@ mod test {
 		.to_string();
 
 		let map: RsxTemplateMap = ron::de::from_str(&file).unwrap();
-		expect(map.root()).to_be(&src);
+		expect(map.root())
+			.to_be(&WorkspacePathBuf::new_from_current_directory(src).unwrap());
 		expect(map.templates.len()).to_be(4);
 		// println!("{:#?}", map);
 	}

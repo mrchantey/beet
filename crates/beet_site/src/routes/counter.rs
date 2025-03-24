@@ -3,8 +3,10 @@ use beet::prelude::*;
 
 pub fn get() -> RsxRoot {
 	let rsx = rsx! {
+		<div>
 		<Counter  initial=7 client:load />
 		<Counter  initial=7 client:load />
+		</div>
 	};
 	rsx
 }

@@ -1,5 +1,3 @@
-use std::path::PathBuf;
-
 use crate::prelude::*;
 #[allow(unused)]
 use anyhow::Result;
@@ -30,7 +28,7 @@ pub struct RsxTemplateMap {
 }
 
 impl RsxTemplateMap {
-	pub fn root(&self) -> &PathBuf { &self.root }
+	pub fn root(&self) -> &WorkspacePathBuf { &self.root }
 
 	/// Load the template map serialized by [beet_rsx_parser::RstmlToRsxTemplate]
 	#[cfg(all(feature = "serde", not(target_arch = "wasm32")))]
@@ -44,6 +42,8 @@ impl RsxTemplateMap {
 	}
 
 	// TODO pipeline
+	/// ## Errors
+	/// If the root is inside the templates root directory and a template was not found.
 	pub fn apply_template(&self, root: RsxRoot) -> TemplateResult<RsxRoot> {
 		if let Some(template_root) = self.templates.get(&root.location) {
 			let node = self.apply_template_for_node(
@@ -61,7 +61,10 @@ impl RsxTemplateMap {
 				expected: root.location.clone(),
 			})
 		} else {
-			println!("ignoring root {:?}", root.location);
+			println!(
+				"rsx node is outside templates dir so no template will be applied:\n{:?}",
+				root.location
+			);
 			Ok(root)
 		}
 	}

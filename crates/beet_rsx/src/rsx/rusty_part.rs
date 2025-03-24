@@ -43,6 +43,8 @@ pub enum RustyPart {
 		root: RsxRoot,
 		/// Type names cannot be discovered statically
 		type_name: String,
+		/// for client islands, cannot be statically created
+		ron: Option<String>,
 	},
 	RustBlock {
 		initial: RsxRoot,
@@ -61,10 +63,15 @@ pub enum RustyPart {
 impl std::fmt::Debug for RustyPart {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		match self {
-			Self::Component { root, type_name } => f
+			Self::Component {
+				root,
+				type_name,
+				ron,
+			} => f
 				.debug_struct("Component")
 				.field("root", root)
 				.field("type_name", type_name)
+				.field("ron", ron)
 				.finish(),
 			Self::RustBlock { initial, register } => f
 				.debug_struct("RustBlock")
@@ -154,6 +161,7 @@ impl RsxVisitorMut for RustyPartVisitor {
 			.insert(component.tracker, RustyPart::Component {
 				root: std::mem::take(&mut component.root),
 				type_name: std::mem::take(&mut component.type_name),
+				ron: std::mem::take(&mut component.ron),
 			});
 	}
 }

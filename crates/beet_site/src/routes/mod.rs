@@ -23,3 +23,21 @@ pub fn collect() -> RouteTree<beet::prelude::StaticRoute> {
         .add_route((RouteInfo::new("/contributing", "get"), contributing::get))
         .add_route((RouteInfo::new("/", "get"), index::get))
 }
+#[cfg(target_arch = "wasm32")]
+pub fn collect() -> ClientIslandMountFuncs {
+    ClientIslandMountFuncs::new(
+        vec![
+            ("/counter", Box::new(|| { beet::exports::ron::de::from_str:: <
+            beet_site::components::counter::Counter > ("(initial:7)") ? .render()
+            .pipe(RegisterEffects::new(TreeLocation::new(2u32, 0u32, 0u32))) ?;
+            beet::exports::ron::de::from_str:: < beet_site::components::counter::Counter
+            > ("(initial:7)") ? .render()
+            .pipe(RegisterEffects::new(TreeLocation::new(10u32, 0u32, 1u32))) ?; Ok(())
+            })), ("/contributing", Box::new(|| { Ok(()) })), ("/helloworld", Box::new(||
+            { Ok(()) })), ("/", Box::new(|| { beet::exports::ron::de::from_str:: <
+            beet_site::components::counter::Counter > ("(initial:2)") ? .render()
+            .pipe(RegisterEffects::new(TreeLocation::new(75u32, 58u32, 4u32))) ?; Ok(())
+            }))
+        ],
+    )
+}

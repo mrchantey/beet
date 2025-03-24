@@ -41,8 +41,6 @@ pub enum RsxTemplateNode {
 		/// mapped from [RsxComponent::slot_children]
 		slot_children: Box<Self>,
 		template_directives: Vec<TemplateDirective>,
-		/// A serialized version of the component
-		ron: Option<String>,
 	},
 }
 
@@ -130,7 +128,8 @@ impl RsxTemplateNode {
 				root: _,
 				// type_name cannot be statically changed
 				type_name: _,
-				ron,
+				// ron cannot be statically generated
+				ron: _,
 				// not sure if we need to serialize these
 				template_directives,
 				slot_children,
@@ -142,7 +141,6 @@ impl RsxTemplateNode {
 				tracker: tracker.clone(),
 				tag: tag.clone(),
 				template_directives: template_directives.clone(),
-				ron: ron.clone(),
 			}),
 			RsxNode::Block(RsxBlock {
 				idx,
@@ -211,9 +209,8 @@ impl RsxTemplateNode {
 				slot_children,
 				template_directives,
 				idx,
-				ron,
 			} => {
-				let (root, type_name) =
+				let (root, type_name, ron) =
 					match rusty_map.remove(&tracker).ok_or_else(|| {
 						TemplateError::no_rusty_map(
 							&format!("Component: {}", tag),
@@ -221,9 +218,11 @@ impl RsxTemplateNode {
 							tracker,
 						)
 					})? {
-						RustyPart::Component { root, type_name } => {
-							Ok((root, type_name))
-						}
+						RustyPart::Component {
+							root,
+							type_name,
+							ron,
+						} => Ok((root, type_name, ron)),
 						other => TemplateResult::Err(
 							TemplateError::UnexpectedRusty {
 								expected: "Component",
@@ -506,7 +505,6 @@ mod test {
 								}),
 							}),
 							template_directives: vec![],
-							ron: None,
 						},
 					],
 				}),
