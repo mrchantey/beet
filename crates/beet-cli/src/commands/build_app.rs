@@ -118,6 +118,7 @@ impl BuildStep for BuildNative {
 	}
 }
 
+/// Run the native app with the `--static` flag, exporting client islands and html files
 pub struct ExportStatic {
 	exe_path: PathBuf,
 	watch_args: WatchArgs,

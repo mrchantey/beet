@@ -1,4 +1,4 @@
-use beet_rsx::prelude::*;
+use beet_rsx::as_beet::*;
 
 fn main() {
 	let template = rsx_template! {

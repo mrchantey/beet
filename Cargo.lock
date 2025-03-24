@@ -814,6 +814,7 @@ dependencies = [
  "proc-macro2-diagnostics",
  "quote",
  "rapidhash",
+ "ron",
  "rstml",
  "sweet",
  "syn 2.0.98",
@@ -5580,6 +5581,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "57c0d7b74b563b49d38dae00a0c37d4d6de9b432382b2892f0574ddcae73fd0a"
 
 [[package]]
+name = "path-clean"
+version = "1.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "17359afc20d7ab31fdb42bb844c8b3bb1dabd7dcf7e68428492da7f16966fcef"
+
+[[package]]
 name = "pathdiff"
 version = "0.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6863,7 +6870,6 @@ dependencies = [
  "ctrlc",
  "extend",
  "futures",
- "glob",
  "notify",
  "notify-debouncer-full",
  "serde",
@@ -6947,9 +6953,11 @@ dependencies = [
  "getrandom 0.3.1",
  "glob",
  "js-sys",
+ "path-clean",
  "rand 0.9.0",
  "rand_chacha 0.9.0",
  "serde",
+ "thiserror 2.0.11",
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "web-sys",

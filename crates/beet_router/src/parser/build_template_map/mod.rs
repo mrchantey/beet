@@ -9,6 +9,7 @@ use std::path::PathBuf;
 use sweet::prelude::FsExt;
 use sweet::prelude::ReadDir;
 use sweet::prelude::ReadFile;
+use sweet::prelude::WorkspacePathBuf;
 use syn::spanned::Spanned;
 use syn::visit::Visit;
 mod hash_file;
@@ -83,16 +84,21 @@ impl BuildTemplateMap {
 	pub fn build_ron(&self) -> Result<TokenStream> {
 		let items = ReadDir::files_recursive(&self.templates_root_dir)?
 			.into_iter()
-			.map(|path| self.file_templates(path))
+			.map(|path| {
+				let path = WorkspacePathBuf::new_from_current_directory(path)?;
+				let templates = self.file_templates(path)?;
+				Ok(templates)
+			})
 			.collect::<Result<Vec<_>>>()?
 			.into_iter()
 			.flatten()
 			.map(|(RsxMacroLocation { file, line, col }, tokens)| {
 				let line = Literal::usize_unsuffixed(line);
 				let col = Literal::usize_unsuffixed(col);
+				let file = file.to_string_lossy();
 				let kvp_tokens = quote! {
 					RsxMacroLocation(
-						file: #file,
+						file: (#file),
 						line: #line,
 						col: #col
 					):#tokens
@@ -115,7 +121,7 @@ impl BuildTemplateMap {
 
 		let map = quote! {
 			RsxTemplateMap(
-				root: #root,
+				root: (#root),
 				templates: {#(#items),*}
 			)
 		};
@@ -126,13 +132,14 @@ impl BuildTemplateMap {
 	/// If it doesnt have a rust extension an empty vec is returned
 	fn file_templates(
 		&self,
-		path: PathBuf,
+		path: WorkspacePathBuf,
 	) -> Result<Vec<(RsxMacroLocation, TokenStream)>> {
 		if path.extension().map_or(false, |ext| ext == "rs") {
-			let file = ReadFile::to_string(&path)?;
+			let canonical_path = path.into_canonical()?;
+			let file = ReadFile::to_string(&canonical_path)?;
 			let file = syn::parse_file(&file)?;
 			let mac = syn::parse_quote!(rsx);
-			let mut visitor = RsxSynVisitor::new(path.to_string_lossy(), mac);
+			let mut visitor = RsxSynVisitor::new(path, mac);
 
 			visitor.visit_file(&file);
 			Ok(visitor.templates)
@@ -164,14 +171,15 @@ fn ron_cx_err(e: ron::error::SpannedError, str: &str) -> anyhow::Error {
 
 #[derive(Debug)]
 struct RsxSynVisitor {
-	file: String,
+	/// Used for creating [`RsxMacroLocation`] in several places
+	file: WorkspacePathBuf,
 	templates: Vec<(RsxMacroLocation, TokenStream)>,
 	mac: syn::Ident,
 }
 impl RsxSynVisitor {
-	pub fn new(file: impl Into<String>, mac: syn::Ident) -> Self {
+	pub fn new(file: WorkspacePathBuf, mac: syn::Ident) -> Self {
 		Self {
-			file: file.into(),
+			file,
 			templates: Default::default(),
 			mac,
 		}
@@ -191,8 +199,11 @@ impl<'a> Visit<'a> for RsxSynVisitor {
 			// the rsx! macro
 			let span = mac.tokens.span();
 			let start = span.start();
-			let loc =
-				RsxMacroLocation::new(&self.file, start.line, start.column);
+			let loc = RsxMacroLocation::new(
+				self.file.clone(),
+				start.line,
+				start.column,
+			);
 			let tokens = RstmlToRsxTemplate::default()
 				.map_tokens(mac.tokens.clone(), &self.file);
 			self.templates.push((loc, tokens));
@@ -210,6 +221,7 @@ mod test {
 	use sweet::prelude::*;
 
 	#[test]
+	#[cfg(not(target_arch = "wasm32"))]
 	fn works() {
 		let src =
 			FsExt::workspace_root().join("crates/beet_router/src/test_site");
@@ -222,6 +234,7 @@ mod test {
 		.build_ron()
 		.unwrap()
 		.to_string();
+
 		let map: RsxTemplateMap = ron::de::from_str(&file).unwrap();
 		expect(map.root()).to_be(&src);
 		expect(map.templates.len()).to_be(4);

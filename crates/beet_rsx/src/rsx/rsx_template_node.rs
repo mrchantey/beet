@@ -41,6 +41,8 @@ pub enum RsxTemplateNode {
 		/// mapped from [RsxComponent::slot_children]
 		slot_children: Box<Self>,
 		template_directives: Vec<TemplateDirective>,
+		/// A serialized version of the component
+		ron: Option<String>,
 	},
 }
 
@@ -126,9 +128,9 @@ impl RsxTemplateNode {
 				tracker,
 				// ignore root, its a seperate tree
 				root: _,
+				// type_name cannot be statically changed
 				type_name: _,
-				// ron is not currently serialized
-				ron: _,
+				ron,
 				// not sure if we need to serialize these
 				template_directives,
 				slot_children,
@@ -140,6 +142,7 @@ impl RsxTemplateNode {
 				tracker: tracker.clone(),
 				tag: tag.clone(),
 				template_directives: template_directives.clone(),
+				ron: ron.clone(),
 			}),
 			RsxNode::Block(RsxBlock {
 				idx,
@@ -208,6 +211,7 @@ impl RsxTemplateNode {
 				slot_children,
 				template_directives,
 				idx,
+				ron,
 			} => {
 				let (root, type_name) =
 					match rusty_map.remove(&tracker).ok_or_else(|| {
@@ -234,7 +238,7 @@ impl RsxTemplateNode {
 					tag: tag.clone(),
 					tracker,
 					type_name,
-					ron: None,
+					ron,
 					root: Box::new(root),
 					slot_children: Box::new(
 						slot_children.into_rsx_node(template_map, rusty_map)?,
@@ -424,7 +428,7 @@ struct RsxTemplateNodeToHtml {
 
 #[cfg(test)]
 mod test {
-	use crate::prelude::*;
+	use crate::as_beet::*;
 	use sweet::prelude::*;
 
 	#[test]
@@ -502,6 +506,7 @@ mod test {
 								}),
 							}),
 							template_directives: vec![],
+							ron: None,
 						},
 					],
 				}),

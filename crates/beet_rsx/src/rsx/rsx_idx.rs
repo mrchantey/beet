@@ -95,9 +95,10 @@ mod test {
 		let hash = idx.into_hash();
 		expect(hash).not().to_be(0);
 		expect(idx.into_hash_str().len()).to_be(8);
+		// seemingly several reasons why the hash is different on wasm
 		#[cfg(target_arch = "wasm32")]
-		expect(idx.into_hash_str()).to_be("fBGrTQ9j");
+		expect(idx.into_hash_str()).to_be("8RYLj4SR");
 		#[cfg(not(target_arch = "wasm32"))]
-		expect(idx.into_hash_str()).to_be("6oeYu54e");
+		expect(idx.into_hash_str()).to_be("4mkGWc9C");
 	}
 }

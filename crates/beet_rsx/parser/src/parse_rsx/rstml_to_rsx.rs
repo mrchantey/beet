@@ -23,7 +23,7 @@ pub fn macro_location_tokens(tokens: impl Spanned) -> TokenStream {
 	let col = span.start().column;
 	quote! {
 		{
-			RsxMacroLocation::new(std::file!(), #line, #col)
+			RsxMacroLocation::new(beet::exports::WorkspacePathBuf::new(file!()), #line, #col)
 		}
 	}
 }

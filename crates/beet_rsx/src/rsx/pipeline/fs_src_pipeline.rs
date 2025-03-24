@@ -51,9 +51,12 @@ impl FsSrcPipeline {
 						return;
 					}
 
-					let file = Path::new(&root.location.file);
-					let workspace_path =
-						file.parent().unwrap_or(&Path::new("")).join(src);
+					let workspace_path = root
+						.location
+						.file
+						.parent()
+						.unwrap_or(&Path::new(""))
+						.join(src);
 					// we use the workspace root because location.file! is relative to the workspace
 					let path = FsExt::workspace_root().join(workspace_path);
 

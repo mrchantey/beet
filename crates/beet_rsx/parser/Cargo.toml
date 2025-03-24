@@ -12,8 +12,13 @@ repository.workspace = true
 categories.workspace = true
 keywords.workspace = true
 
+
+[features]
+fs = ["sweet/fs"]
+
 [dependencies]
 sweet.workspace = true
+ron.workspace = true
 anyhow.workspace = true
 
 syn = { workspace = true, features = ["visit"] }
