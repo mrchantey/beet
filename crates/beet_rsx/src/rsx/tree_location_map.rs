@@ -33,16 +33,13 @@ impl<T: RsxPipelineTarget + AsRef<RsxNode>> RsxPipeline<T, TreeLocationMap>
 }
 
 
-
+/// One of the essential components of resumability, allowing us to map
 /// This map is updated every hot reload, the position
 /// of a rust block in the tree can change
 #[derive(Debug, Default, Clone, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct TreeLocationMap {
-	// we could technically use a vec where the indices are 'block_idx',
-	// and track block_idx in the [TreeLocation]
-	// but at this stage of the project thats harder to reason about
-	// and this provides symmetry with [Self::collapsed_elements]
+	/// Used to resolve the location of a rusty part by its
 	pub rusty_locations: RapidHashMap<TreeIdx, TreeLocation>,
 	pub collapsed_elements: RapidHashMap<TreeIdx, TextBlockEncoder>,
 }

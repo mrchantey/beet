@@ -29,10 +29,10 @@ pub fn collect() -> ClientIslandMountFuncs {
         vec![
             ("/counter", Box::new(|| { beet::exports::ron::de::from_str:: <
             beet_site::components::counter::Counter > ("(initial:7)") ? .render()
-            .pipe(RegisterEffects::new(TreeLocation::new(2u32, 0u32, 0u32))) ?;
+            .pipe(RegisterEffects::new(TreeLocation::new(3u32, 1u32, 0u32))) ?;
             beet::exports::ron::de::from_str:: < beet_site::components::counter::Counter
             > ("(initial:7)") ? .render()
-            .pipe(RegisterEffects::new(TreeLocation::new(10u32, 0u32, 1u32))) ?; Ok(())
+            .pipe(RegisterEffects::new(TreeLocation::new(11u32, 1u32, 1u32))) ?; Ok(())
             })), ("/contributing", Box::new(|| { Ok(()) })), ("/helloworld", Box::new(||
             { Ok(()) })), ("/", Box::new(|| { beet::exports::ron::de::from_str:: <
             beet_site::components::counter::Counter > ("(initial:2)") ? .render()

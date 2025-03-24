@@ -13,6 +13,7 @@ pub struct BrowserDomTarget {
 	/// sparse set element array, cached for fast reference
 	/// TODO bench this
 	elements: Vec<Option<Element>>,
+	/// Will be None until lazy loaded
 	loc_map: Option<TreeLocationMap>,
 }
 
@@ -28,7 +29,9 @@ impl Default for BrowserDomTarget {
 }
 
 impl BrowserDomTarget {
-	fn get_tree_location_map(&mut self) -> ParseResult<&TreeLocationMap> {
+	fn get_or_load_tree_location_map(
+		&mut self,
+	) -> ParseResult<&TreeLocationMap> {
 		if self.loc_map.is_some() {
 			// for borrow checker
 			return Ok(self.loc_map.as_ref().unwrap());
@@ -96,7 +99,7 @@ impl BrowserDomTarget {
 		tree_idx: TreeIdx,
 	) -> ParseResult<()> {
 		let children = el.child_nodes();
-		let loc_map = self.get_tree_location_map()?;
+		let loc_map = self.get_or_load_tree_location_map()?;
 		let Some(el_cx) = loc_map.collapsed_elements.get(&tree_idx) else {
 			// here we assume this is because the element has no children
 			// so was not tracked
@@ -133,6 +136,9 @@ impl BrowserDomTarget {
 
 
 impl DomTargetImpl for BrowserDomTarget {
+	fn tree_location_map(&mut self) -> &TreeLocationMap {
+		self.get_or_load_tree_location_map().unwrap()
+	}
 	fn html_constants(&self) -> &HtmlConstants { &self.constants }
 
 	/// returns body inner html

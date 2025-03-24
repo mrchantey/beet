@@ -50,6 +50,8 @@ impl DomTarget {
 }
 
 pub trait DomTargetImpl {
+	/// Mutable in case the impl needs to load the tree location map
+	fn tree_location_map(&mut self) -> &TreeLocationMap;
 	fn html_constants(&self) -> &HtmlConstants;
 
 	// type Event;

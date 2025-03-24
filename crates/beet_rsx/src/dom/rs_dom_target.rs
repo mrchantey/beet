@@ -36,6 +36,7 @@ impl RsDomTarget {
 }
 
 impl DomTargetImpl for RsDomTarget {
+	fn tree_location_map(&mut self) -> &TreeLocationMap { &self.loc_map }
 	fn html_constants(&self) -> &HtmlConstants { &self.constants }
 
 	fn render(&self) -> String {
