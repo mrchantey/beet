@@ -34,15 +34,16 @@ pub mod prelude {
 		FileGroupConfig::new(app_cx!())
 			.add_group(mockups())
 	}
+
+
 	/// Gets the [`GlobFileGroup`] for this crate
 	#[cfg(feature = "setup")]
-	#[rustfmt::skip]
 	pub fn mockups() -> GlobFileGroup {
-    use std::path::PathBuf;
+		use sweet::prelude::WorkspacePathBuf;
 		GlobFileGroup::new(
-				PathBuf::from(file!()).parent().unwrap().to_path_buf(),
-				"mockup.rs",
-				GlobFilter::default(),
+			WorkspacePathBuf::new("crates/beet_design/src"),
+			WorkspacePathBuf::new("crates/beet_design/src/mockups.rs"),
+			GlobFilter::default(),
 		)
 	}
 }

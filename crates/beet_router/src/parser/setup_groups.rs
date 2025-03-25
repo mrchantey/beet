@@ -1,6 +1,6 @@
 use crate::prelude::*;
-use std::path::PathBuf;
 use sweet::prelude::GlobFilter;
+use sweet::prelude::WorkspacePathBuf;
 
 /// File groups are collections of files that should be collected together,
 /// the most common example being a [`TreeFileGroup`] which creates routes
@@ -65,21 +65,21 @@ impl Into<FileGroup> for TreeFileGroup {
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct GlobFileGroup {
 	/// The directory relative to the [`FileGroupConfig::root_dir`] where the files are located.
-	pub src_dir: PathBuf,
+	pub src_dir: WorkspacePathBuf,
 	/// The directory relative to the [`FileGroupConfig::root_dir`] to build the collected items.
-	pub dst_file: PathBuf,
+	pub dst_file: WorkspacePathBuf,
 	pub filter: GlobFilter,
 }
 
 impl GlobFileGroup {
 	pub fn new(
-		src_dir: impl Into<PathBuf>,
-		dst_file: impl Into<PathBuf>,
+		src_dir: WorkspacePathBuf,
+		dst_file: WorkspacePathBuf,
 		filter: GlobFilter,
 	) -> Self {
 		Self {
-			src_dir: src_dir.into(),
-			dst_file: dst_file.into(),
+			src_dir,
+			dst_file,
 			filter,
 		}
 	}
@@ -90,8 +90,8 @@ impl GlobFileGroup {
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use sweet::prelude::*;
 	use beet_rsx::as_beet::*;
+	use sweet::prelude::*;
 
 
 	#[test]
@@ -99,8 +99,8 @@ mod test {
 		let _builder = FileGroupConfig::new(app_cx!())
 			.add_group(FileGroupConfig::new(app_cx!()))
 			.add_group(GlobFileGroup::new(
-				".",
-				"my_group.rs",
+				WorkspacePathBuf::new("crates/beet_design/src"),
+				WorkspacePathBuf::new("crates/beet_design/src/mockups.rs"),
 				GlobFilter::default(),
 			))
 			.add_group(TreeFileGroup::new("routes"));

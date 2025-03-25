@@ -33,8 +33,8 @@ pub mod prelude {
 
 
 pub mod as_beet {
-	pub use crate::prelude;
-	pub use beet_rsx::exports::*;
+	pub use crate::prelude::*;
+	pub use beet_rsx::as_beet::*;
 }
 
 #[cfg(any(test, feature = "_test_site"))]

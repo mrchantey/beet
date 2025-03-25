@@ -10,7 +10,7 @@ use sweet::prelude::*;
 /// ## example
 ///
 /// ```rust
-/// # use beet_router::prelude::*;
+/// # use beet_router::as_beet::*;
 ///
 /// let app = AppRouter::new(app_cx!());
 ///
@@ -39,7 +39,7 @@ impl AppContext {
 /// ## Example
 ///
 /// ```rust
-/// # use beet_router::prelude::*;
+/// # use beet_router::as_beet::*;
 /// let app = AppRouter::new(app_cx!());
 #[macro_export]
 macro_rules! app_cx {
