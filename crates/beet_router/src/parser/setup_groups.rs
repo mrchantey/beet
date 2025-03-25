@@ -10,7 +10,6 @@ use sweet::prelude::GlobFilter;
 /// and code gen.
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct FileGroupConfig {
-	/// The directory from which all file paths are relative.
 	pub app_cx: AppContext,
 	pub groups: Vec<FileGroup>,
 }
@@ -92,7 +91,8 @@ impl GlobFileGroup {
 mod test {
 	use crate::prelude::*;
 	use sweet::prelude::*;
-	// use sweet::prelude::*;
+	use beet_rsx::as_beet::*;
+
 
 	#[test]
 	fn works() {

@@ -1,5 +1,6 @@
 use std::path::Path;
 use std::path::PathBuf;
+use sweet::prelude::*;
 
 /// Collection of cargo environment variables
 /// and file paths required to run a beet app.
@@ -17,7 +18,8 @@ use std::path::PathBuf;
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct AppContext {
-	pub file: PathBuf,
+	/// The entry file for the app.
+	pub file: WorkspacePathBuf,
 	pub manifest_path: PathBuf,
 	pub pkg_version: String,
 	pub pkg_name: String,
@@ -43,7 +45,7 @@ impl AppContext {
 macro_rules! app_cx {
 	() => {
 		AppContext {
-			file: file!().into(),
+			file: beet::exports::WorkspacePathBuf::new(file!()),
 			manifest_path: env!("CARGO_MANIFEST_PATH").into(),
 			pkg_version: env!("CARGO_PKG_VERSION").to_string(),
 			pkg_name: env!("CARGO_PKG_NAME").to_string(),
@@ -61,6 +63,7 @@ macro_rules! app_cx {
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
+	use beet_rsx::as_beet::*;
 	use sweet::prelude::*;
 
 	#[test]

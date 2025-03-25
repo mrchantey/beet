@@ -32,5 +32,10 @@ pub mod prelude {
 }
 
 
+pub mod as_beet {
+	pub use crate::prelude;
+	pub use beet_rsx::exports::*;
+}
+
 #[cfg(any(test, feature = "_test_site"))]
 pub mod test_site;

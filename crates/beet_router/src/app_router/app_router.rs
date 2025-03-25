@@ -107,6 +107,7 @@ impl AppRouter {
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
+	use beet_rsx::as_beet::*;
 
 	#[test]
 	fn works() { let _app = AppRouter::new(app_cx!()); }
