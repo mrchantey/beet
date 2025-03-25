@@ -103,7 +103,7 @@ mod test {
 				WorkspacePathBuf::new("crates/beet_design/src/mockups.rs"),
 				GlobFilter::default(),
 			))
-			.add_group(TreeFileGroup::new("routes"));
+			.add_group(TreeFileGroup::new(WorkspacePathBuf::new("src/routes")));
 		//.export();
 	}
 }

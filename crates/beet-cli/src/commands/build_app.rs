@@ -87,7 +87,7 @@ impl RunSetup {
 				FileGroup::Tree(tree_file_group) => {
 					group.add(
 						tree_file_group
-							.into_collect_routes(&setup_config.app_cx),
+							.into_collect_routes(&setup_config.app_cx)?,
 					);
 				}
 			}

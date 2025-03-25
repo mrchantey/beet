@@ -16,30 +16,29 @@ pub use wasm_routes::*;
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct TreeFileGroup {
 	/// The directory relative to the [`FileGroupConfig::root_dir`] where the files are located.
-	pub src_dir: PathBuf,
+	pub src_dir: WorkspacePathBuf,
 }
 
 impl Default for TreeFileGroup {
 	fn default() -> Self {
 		Self {
-			src_dir: PathBuf::from("routes"),
+			src_dir: WorkspacePathBuf::new("src/routes"),
 		}
 	}
 }
 
 impl TreeFileGroup {
-	pub fn new(dir: impl Into<PathBuf>) -> Self {
-		Self {
-			src_dir: dir.into(),
-		}
-	}
+	pub fn new(src_dir: WorkspacePathBuf) -> Self { Self { src_dir } }
 
-	pub fn into_collect_routes(self, app_cx: &AppContext) -> CollectRoutes {
-		CollectRoutes {
-			routes_dir: app_cx.resolve_path(self.src_dir),
+	pub fn into_collect_routes(
+		self,
+		app_cx: &AppContext,
+	) -> Result<CollectRoutes> {
+		Ok(CollectRoutes {
+			routes_dir: self.src_dir.into_canonical()?,
 			pkg_name: Some(app_cx.pkg_name.clone()),
 			..Default::default()
-		}
+		})
 	}
 }
 
@@ -62,8 +61,8 @@ pub struct CollectRoutes {
 	/// the last part will be taken so it should not occur in the path twice.
 	/// ✅ `src/routes/foo/bar.rs` will be `foo/bar.rs`
 	/// ❌ `src/routes/foo/routes/bar.rs` will be `routes/bar.rs`
-	#[arg(long, default_value = "src/routes")]
-	pub routes_dir: PathBuf,
+	#[arg(long, default_value = "./")]
+	pub routes_dir: CanonicalPathBuf,
 
 	/// Specify the package name so codegen can `use crate as pkg_name`
 	#[arg(long)]
@@ -122,10 +121,12 @@ mod test {
 
 	#[test]
 	fn works() {
-		let routes_dir = FsExt::workspace_root()
-			.join("crates/beet_router/src/test_site/routes");
 		let config = CollectRoutes {
-			routes_dir,
+			routes_dir: WorkspacePathBuf::new(
+				"crates/beet_router/src/test_site/routes",
+			)
+			.into_canonical()
+			.unwrap(),
 			..Default::default()
 		};
 

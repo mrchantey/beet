@@ -608,7 +608,7 @@ dependencies = [
 
 [[package]]
 name = "beet"
-version = "0.0.6-dev.1"
+version = "0.0.6-dev.2"
 dependencies = [
  "beet",
  "beet_design",
@@ -629,7 +629,7 @@ dependencies = [
 
 [[package]]
 name = "beet-cli"
-version = "0.0.6-dev.1"
+version = "0.0.6-dev.2"
 dependencies = [
  "anyhow",
  "beet",
@@ -642,7 +642,7 @@ dependencies = [
 
 [[package]]
 name = "beet_design"
-version = "0.0.6-dev.1"
+version = "0.0.6-dev.2"
 dependencies = [
  "beet_router",
  "beet_rsx",
@@ -651,7 +651,7 @@ dependencies = [
 
 [[package]]
 name = "beet_examples"
-version = "0.0.6-dev.1"
+version = "0.0.6-dev.2"
 dependencies = [
  "anyhow",
  "beet_flow",
@@ -671,7 +671,7 @@ dependencies = [
 
 [[package]]
 name = "beet_flow"
-version = "0.0.6-dev.1"
+version = "0.0.6-dev.2"
 dependencies = [
  "anyhow",
  "beet_flow",
@@ -686,7 +686,7 @@ dependencies = [
 
 [[package]]
 name = "beet_flow_macros"
-version = "0.0.6-dev.1"
+version = "0.0.6-dev.2"
 dependencies = [
  "anyhow",
  "extend",
@@ -699,7 +699,7 @@ dependencies = [
 
 [[package]]
 name = "beet_ml"
-version = "0.0.6-dev.1"
+version = "0.0.6-dev.2"
 dependencies = [
  "anyhow",
  "beet_flow",
@@ -732,7 +732,7 @@ dependencies = [
 
 [[package]]
 name = "beet_router"
-version = "0.0.6-dev.1"
+version = "0.0.6-dev.2"
 dependencies = [
  "anyhow",
  "beet_router",
@@ -759,7 +759,7 @@ dependencies = [
 
 [[package]]
 name = "beet_rsx"
-version = "0.0.6-dev.1"
+version = "0.0.6-dev.2"
 dependencies = [
  "anyhow",
  "beet_rsx",
@@ -792,7 +792,7 @@ dependencies = [
 
 [[package]]
 name = "beet_rsx_macros"
-version = "0.0.6-dev.1"
+version = "0.0.6-dev.2"
 dependencies = [
  "anyhow",
  "beet_rsx_parser",
@@ -806,7 +806,7 @@ dependencies = [
 
 [[package]]
 name = "beet_rsx_parser"
-version = "0.0.6-dev.1"
+version = "0.0.6-dev.2"
 dependencies = [
  "anyhow",
  "heck 0.4.1",
@@ -822,7 +822,7 @@ dependencies = [
 
 [[package]]
 name = "beet_server"
-version = "0.0.6-dev.1"
+version = "0.0.6-dev.2"
 dependencies = [
  "anyhow",
  "axum",
@@ -846,7 +846,7 @@ dependencies = [
 
 [[package]]
 name = "beet_sim"
-version = "0.0.6-dev.1"
+version = "0.0.6-dev.2"
 dependencies = [
  "anyhow",
  "beet_flow",
@@ -857,7 +857,7 @@ dependencies = [
 
 [[package]]
 name = "beet_site"
-version = "0.0.6-dev.1"
+version = "0.0.6-dev.2"
 dependencies = [
  "anyhow",
  "beet",
@@ -866,7 +866,7 @@ dependencies = [
 
 [[package]]
 name = "beet_spatial"
-version = "0.0.6-dev.1"
+version = "0.0.6-dev.2"
 dependencies = [
  "anyhow",
  "beet_flow",

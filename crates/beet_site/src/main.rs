@@ -2,8 +2,12 @@ use beet::prelude::*;
 
 #[cfg(feature = "setup")]
 fn main() {
+	use beet::exports::WorkspacePathBuf;
+
 	FileGroupConfig::new(app_cx!())
-		.add_group(TreeFileGroup::new("routes"))
+		.add_group(TreeFileGroup::new(WorkspacePathBuf::new(
+			"crates/beet_site/src/routes",
+		)))
 		// ensures design mockups are regenerated on reload
 		// .add_group(beet::design::prelude::mockups())
 		.export();
