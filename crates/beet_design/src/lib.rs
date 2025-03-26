@@ -27,23 +27,22 @@ pub mod prelude {
 	use beet_router::prelude::*;
 
 
-	/// Gets the [`FileGroupConfig`] for this crate
+	/// Gets the [`AppConfig`] for this crate
 	#[cfg(feature = "setup")]
 	#[rustfmt::skip]
-	pub fn setup_config() -> FileGroupConfig {
-		FileGroupConfig::new(app_cx!())
-			.add_group(mockups())
+	pub fn setup_config() -> AppConfig {
+		AppConfig::new()
+			.add_step(mockups())
 	}
 
 
 	/// Gets the [`GlobFileGroup`] for this crate
 	#[cfg(feature = "setup")]
-	pub fn mockups() -> GlobFileGroup {
+	pub fn mockups() -> BuildFileComponents {
 		use sweet::prelude::WorkspacePathBuf;
-		GlobFileGroup::new(
+		BuildFileComponents::new(
 			WorkspacePathBuf::new("crates/beet_design/src"),
 			WorkspacePathBuf::new("crates/beet_design/src/mockups.rs"),
-			GlobFilter::default(),
 		)
 	}
 }

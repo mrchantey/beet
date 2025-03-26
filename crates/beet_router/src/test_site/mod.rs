@@ -6,8 +6,8 @@ pub mod routes;
 
 use crate::as_beet::*;
 
-/// Gets the [`FileGroupConfig`] for this crate
-pub fn setup_config() -> FileGroupConfig {
-	FileGroupConfig::new(app_cx!())
+/// Gets the [`AppConfig`] for this crate
+pub fn config() -> AppConfig {
+	AppConfig::new()
 	// .add_group(mockups())
 }

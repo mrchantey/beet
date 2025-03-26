@@ -1,17 +1,12 @@
 use beet_router::prelude::*;
-use sweet::prelude::*;
-
 
 /// Demonstration of how to collect all files in the 'routes' dir
 /// and create a `routes.rs` file containing them all.
 pub fn main() {
-	let parser = CollectRoutes {
-		routes_dir: WorkspacePathBuf::new(
-			"crates/beet_router/src/test_site/routes",
-		)
-		.into_canonical()
-		.unwrap(),
+	let parser = BuildFileRoutes {
+		files: "crates/beet_router/src/test_site/routes".into(),
 		route_type: "crate::prelude::StaticRoute".into(),
+		pkg_name: Some("beet_router".into()),
 		file_router_tokens: Some(
 			r#"
 				use crate::prelude::*;

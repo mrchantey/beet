@@ -2,12 +2,14 @@ use beet::prelude::*;
 
 #[cfg(feature = "setup")]
 fn main() {
-	use beet::exports::WorkspacePathBuf;
+	let cx = app_cx!();
 
-	FileGroupConfig::new(app_cx!())
-		.add_group(TreeFileGroup::new(WorkspacePathBuf::new(
-			"crates/beet_site/src/routes",
-		)))
+	AppConfig::new()
+		.add_step(BuildFileRoutes {
+			files: "crates/beet_site/src/routes".into(),
+			pkg_name: Some(cx.pkg_name.clone()),
+			..Default::default()
+		})
 		// ensures design mockups are regenerated on reload
 		// .add_group(beet::design::prelude::mockups())
 		.export();

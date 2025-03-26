@@ -77,18 +77,16 @@ impl RunSetup {
 		let exe_path = build_cmd.exe_path();
 
 		let stdout = Command::new(&exe_path).output()?.stdout;
-		let setup_config: FileGroupConfig = ron::de::from_bytes(&stdout)?;
+		let setup_config: AppConfig = ron::de::from_bytes(&stdout)?;
 
 		let mut group = BuildStepGroup::default();
-		for item in setup_config.groups.into_iter() {
+		for item in setup_config.codegen_steps.into_iter() {
 			match item {
-				FileGroup::Child(_file_group_config) => todo!(),
-				FileGroup::Glob(_glob_file_group) => todo!(),
-				FileGroup::Tree(tree_file_group) => {
-					group.add(
-						tree_file_group
-							.into_collect_routes(&setup_config.app_cx)?,
-					);
+				CodegenStep::FileRoutes(build_file_routes) => {
+					group.add(build_file_routes);
+				}
+				CodegenStep::FileComponents(build_file_components) => {
+					group.add(build_file_components);
 				}
 			}
 		}

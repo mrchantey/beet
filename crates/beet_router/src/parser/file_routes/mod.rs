@@ -3,6 +3,8 @@ use beet_rsx::rsx::BuildStep;
 use clap::Parser;
 pub use file_route::*;
 pub use parse_dir_routes::*;
+use serde::Deserialize;
+use serde::Serialize;
 use std::path::PathBuf;
 use sweet::prelude::*;
 mod file_route;
@@ -13,42 +15,11 @@ pub use wasm_routes::*;
 
 /// Will scan a directory for all public http methods in files.
 /// Similar to a next-js or astro `pages` directory.
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
-pub struct TreeFileGroup {
-	/// The directory relative to the [`FileGroupConfig::root_dir`] where the files are located.
-	pub src_dir: WorkspacePathBuf,
-}
-
-impl Default for TreeFileGroup {
-	fn default() -> Self {
-		Self {
-			src_dir: WorkspacePathBuf::new("src/routes"),
-		}
-	}
-}
-
-impl TreeFileGroup {
-	pub fn new(src_dir: WorkspacePathBuf) -> Self { Self { src_dir } }
-
-	pub fn into_collect_routes(
-		self,
-		app_cx: &AppContext,
-	) -> Result<CollectRoutes> {
-		Ok(CollectRoutes {
-			routes_dir: self.src_dir.into_canonical()?,
-			pkg_name: Some(app_cx.pkg_name.clone()),
-			..Default::default()
-		})
-	}
-}
-
-
-
 /// Parse a 'routes' dir, collecting all the routes,
 /// and create a `mod.rs` which contains
 /// a [ServerRoutes] struct with all the routes.
-#[derive(Debug, Clone, Parser)]
-pub struct CollectRoutes {
+#[derive(Debug, Clone, Parser, Serialize, Deserialize)]
+pub struct BuildFileRoutes {
 	/// Optionally specify additional tokens to be added to the top of the file.
 	#[arg(long)]
 	pub file_router_tokens: Option<String>,
@@ -56,26 +27,29 @@ pub struct CollectRoutes {
 	/// [`IntoRoute<T>`] where T is this type.
 	#[arg(long, default_value = "beet::prelude::StaticRoute")]
 	pub route_type: String,
+	/// Specify a package name to support importing of local components.
+	/// This will be assigned automatically by the [`AppConfig`] if not provided.
+	#[arg(long)]
+	pub pkg_name: Option<String>,
 	/// location of the routes directory
 	/// This will be used to split the path and discover the route path,
 	/// the last part will be taken so it should not occur in the path twice.
 	/// ✅ `src/routes/foo/bar.rs` will be `foo/bar.rs`
 	/// ❌ `src/routes/foo/routes/bar.rs` will be `routes/bar.rs`
-	#[arg(long, default_value = "./")]
-	pub routes_dir: CanonicalPathBuf,
-
+	#[command(flatten)]
+	pub files: FileGroup,
 	/// Specify the package name so codegen can `use crate as pkg_name`
-	#[arg(long)]
-	pub pkg_name: Option<String>,
+	#[arg(long, default_value = "src/routes/mod.rs")]
+	pub codegen_file: WorkspacePathBuf,
 }
 
-impl Default for CollectRoutes {
+impl Default for BuildFileRoutes {
 	fn default() -> Self { clap::Parser::parse_from(&[""]) }
 }
 
 
 
-impl BuildStep for CollectRoutes {
+impl BuildStep for BuildFileRoutes {
 	fn run(&self) -> Result<()> {
 		self.build_and_write()?;
 		Ok(())
@@ -83,21 +57,22 @@ impl BuildStep for CollectRoutes {
 }
 
 
-impl CollectRoutes {
-	pub fn routes_mod_path(&self) -> PathBuf { self.routes_dir.join("mod.rs") }
-
-
+impl BuildFileRoutes {
 	pub fn build_strings(&self) -> Result<Vec<(PathBuf, String)>> {
+		let canonical_src = self.files.src.into_canonical()?;
+		let canonical_src_str = canonical_src.to_string_lossy();
+
 		let dir_routes = ReadDir {
 			dirs: true,
 			recursive: true,
 			root: true,
 			..Default::default()
 		}
-		.read(&self.routes_dir)?
+		.read(&canonical_src)?
 		.into_iter()
 		.map(|path| {
-			let str = ParseDirRoutes::build_string(self, &path)?;
+			let str =
+				ParseDirRoutes::build_string(self, &path, &canonical_src_str)?;
 			Ok((path, str))
 		})
 		.collect::<Result<Vec<_>>>()?;
@@ -121,12 +96,8 @@ mod test {
 
 	#[test]
 	fn works() {
-		let config = CollectRoutes {
-			routes_dir: WorkspacePathBuf::new(
-				"crates/beet_router/src/test_site/routes",
-			)
-			.into_canonical()
-			.unwrap(),
+		let config = BuildFileRoutes {
+			files: "crates/beet_router/src/test_site/routes".into(),
 			..Default::default()
 		};
 

@@ -17,15 +17,18 @@ impl ParseDirRoutes {
 	/// any routes in the file.
 	/// This will result in a `collect_routes` function
 	/// as well as static paths for any routes, ie INDEX.
-	pub fn build_string(config: &CollectRoutes, path: &Path) -> Result<String> {
-		let routes_dir_name = config.routes_dir.to_string_lossy();
+	pub fn build_string(
+		config: &BuildFileRoutes,
+		path: &Path,
+		canonical_src_str: &str,
+	) -> Result<String> {
 		let page_routes = ReadDir::files(path)?
 			.into_iter()
 			.filter(|path| {
 				path.extension().map_or(false, |ext| ext == "rs")
 					&& path.file_name().map_or(false, |f| f != "mod.rs")
 			})
-			.map(|path| FileRoute::new(&routes_dir_name, path))
+			.map(|path| FileRoute::new(&canonical_src_str, path))
 			.collect::<Result<Vec<_>>>()?;
 
 		let add_routes = page_routes.iter().map(|f| f.add_routes()).flatten();
