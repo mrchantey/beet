@@ -6,6 +6,8 @@ rustc-ice*
 crates/beet_flow_old
 .env
 .vscode/settings.json
-
+crates/*/src/codegen
+# this should be in codegen anyway
+crates/*/src/routes/mod.rs
 
 crates/beet_router/compilecheck_*

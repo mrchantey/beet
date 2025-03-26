@@ -9,6 +9,10 @@ pub mod context;
 pub mod interactive;
 /// Collection of layout components
 pub mod layout;
+/// Collection of mockups for all components
+#[cfg(not(feature = "setup"))]
+#[path = "codegen/mockups.rs"]
+pub mod mockups;
 
 // #[cfg(not(feature = "setup"))]
 // pub mod mockups;
@@ -26,6 +30,8 @@ pub mod prelude {
 	#[cfg(feature = "setup")]
 	use beet_router::prelude::*;
 
+	#[cfg(not(feature = "setup"))]
+	pub use crate::mockups::*;
 
 	/// Gets the [`AppConfig`] for this crate
 	#[cfg(feature = "setup")]
@@ -39,9 +45,6 @@ pub mod prelude {
 	/// Gets the [`GlobFileGroup`] for this crate
 	#[cfg(feature = "setup")]
 	pub fn mockups() -> BuildFileComponents {
-		BuildFileComponents::new(
-			"crates/beet_design/src",
-			"crates/beet_design/src/mockups.rs",
-		)
+		BuildFileComponents::mockups("crates/beet_design/src")
 	}
 }
