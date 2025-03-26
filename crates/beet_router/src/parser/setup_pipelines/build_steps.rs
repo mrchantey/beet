@@ -6,7 +6,7 @@ use serde::Serialize;
 use sweet::prelude::*;
 
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum SerdeBuildStep {
 	FileRoutes(BuildFileRoutes),
 	ComponentRoutes(BuildComponentRoutes),
@@ -42,7 +42,10 @@ pub struct BuildComponentRoutes {
 
 impl BuildComponentRoutes {
 	/// A common configuration of [`BuildComponentRoutes`] is to collect all mockup files in a directory.
-	pub fn mockups(src_dir: impl Into<WorkspacePathBuf>) -> Self {
+	pub fn mockups(
+		src_dir: impl Into<WorkspacePathBuf>,
+		pkg_name: &str,
+	) -> Self {
 		let src_dir = src_dir.into();
 		let output =
 			CanonicalPathBuf::new_unchecked(src_dir.join("codegen/mockups.rs"));
@@ -50,6 +53,7 @@ impl BuildComponentRoutes {
 		Self {
 			codegen_file: CodegenFile {
 				output,
+				pkg_name: Some(pkg_name.into()),
 				..Default::default()
 			},
 			file_group: FileGroup::new_workspace_rel(src_dir)
@@ -78,4 +82,58 @@ impl BuildStep for BuildComponentRoutes {
 	}
 }
 
-pub struct BuildFileRoutes2 {}
+
+
+const HTTP_METHODS: [&str; 9] = [
+	"get", "post", "put", "delete", "head", "options", "connect", "trace",
+	"patch",
+];
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BuildFileRoutes {
+	codegen_file: CodegenFile,
+	file_group: FileGroup,
+	group_to_funcs: FileGroupToFuncs,
+	funcs_to_codegen: FileFuncsToCodegen,
+}
+impl BuildFileRoutes {
+	pub fn new(src_dir: impl Into<WorkspacePathBuf>, pkg_name: &str) -> Self {
+		let src_dir = src_dir.into();
+		let output =
+			CanonicalPathBuf::new_unchecked(src_dir.join("codegen/routes.rs"));
+
+		Self {
+			codegen_file: CodegenFile {
+				output,
+				pkg_name: Some(pkg_name.into()),
+				..Default::default()
+			},
+			file_group: FileGroup::new_workspace_rel(src_dir)
+				.unwrap()
+				.with_filter(
+					GlobFilter::default()
+						.with_include("*.rs")
+						.with_exclude("*mod.rs"),
+				),
+			group_to_funcs: FileGroupToFuncs::default(),
+			funcs_to_codegen: FileFuncsToCodegen::default(),
+		}
+	}
+}
+
+impl BuildStep for BuildFileRoutes {
+	#[rustfmt::skip]
+	fn run(&self) -> Result<()> {
+		let Self {
+			codegen_file,
+			file_group,
+			group_to_funcs,
+			funcs_to_codegen,
+		} = self.clone();
+		file_group
+			.pipe(group_to_funcs)?
+			.pipe_with(codegen_file,funcs_to_codegen)?
+			.build_and_write()?;
+		Ok(())
+	}
+}

@@ -43,6 +43,7 @@ impl RsxPipelineTarget for RouteType {}
 
 impl RouteType {
 	pub fn from_file_funcs(file_funcs: FileFuncs) -> Self {
+		// use heck
 		Self {
 			func: syn::parse_quote!(
 				fn foobar() {}
