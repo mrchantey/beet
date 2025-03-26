@@ -11,7 +11,7 @@ fn main() {
 			..Default::default()
 		})
 		// ensures design mockups are regenerated on reload
-		// .add_group(beet::design::prelude::mockups())
+		.add_step(beet::design::prelude::mockups())
 		.export();
 }
 

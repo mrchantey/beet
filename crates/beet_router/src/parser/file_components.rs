@@ -33,10 +33,13 @@ impl Default for BuildFileComponents {
 }
 
 impl BuildFileComponents {
-	pub fn new(files: impl Into<FileGroup>, output: WorkspacePathBuf) -> Self {
+	pub fn new(
+		file_group: impl Into<FileGroup>,
+		output: impl Into<WorkspacePathBuf>,
+	) -> Self {
 		Self {
-			file_group: files.into(),
-			output,
+			file_group: file_group.into(),
+			output: output.into(),
 		}
 	}
 

@@ -39,10 +39,9 @@ pub mod prelude {
 	/// Gets the [`GlobFileGroup`] for this crate
 	#[cfg(feature = "setup")]
 	pub fn mockups() -> BuildFileComponents {
-		use sweet::prelude::WorkspacePathBuf;
 		BuildFileComponents::new(
-			WorkspacePathBuf::new("crates/beet_design/src"),
-			WorkspacePathBuf::new("crates/beet_design/src/mockups.rs"),
+			"crates/beet_design/src",
+			"crates/beet_design/src/mockups.rs",
 		)
 	}
 }
