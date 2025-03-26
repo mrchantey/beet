@@ -58,6 +58,17 @@ impl FileGroup {
 		.collect::<Vec<_>>();
 		Ok(items)
 	}
+
+	#[cfg(test)]
+	pub fn test_site_routes() -> Self {
+		Self::new_workspace_rel("crates/beet_router/src/test_site/routes")
+			.unwrap()
+			.with_filter(
+				GlobFilter::default()
+					.with_include("*.rs")
+					.with_exclude("*mod.rs"),
+			)
+	}
 }
 
 #[cfg(test)]

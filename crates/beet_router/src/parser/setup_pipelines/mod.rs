@@ -3,6 +3,8 @@ mod file_func;
 mod file_funcs_to_codegen;
 mod file_funcs_to_route_types;
 mod file_group_to_funcs;
+mod codegen_file;
+pub use codegen_file::*;
 pub use file_func::*;
 pub use file_funcs_to_codegen::*;
 pub use file_group_to_funcs::*;

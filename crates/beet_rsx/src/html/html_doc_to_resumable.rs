@@ -91,7 +91,6 @@ mod test {
 			.pipe(HtmlToDocument::default())
 			.unwrap()
 			.pipe_with(root.as_ref(), HtmlDocToResumable::default())
-			.unwrap()
 			.pipe(RenderHtml::default())
 			.unwrap()
 	}

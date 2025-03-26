@@ -62,7 +62,7 @@ impl RsxPipeline<FileGroup, Result<Vec<FileFuncs>>> for FileGroupToFuncs {
 	}
 }
 
-
+#[derive(Debug, Clone)]
 /// Collection of all public functions in a file
 pub struct FileFuncs {
 	/// Canonical path to the file
@@ -75,21 +75,12 @@ pub struct FileFuncs {
 	pub funcs: Vec<syn::Signature>,
 }
 
-impl FileFuncs {
-	pub fn route(&self) -> String {
-		let str = self.local_path.to_string_lossy();
-		let str = str.replace(".rs", "").replace("\\", "/");
-		if str.ends_with("index") {
-			str.replace("index", "")
-		} else {
-			str
-		}
-	}
-}
+impl FileFuncs {}
 
 impl RsxPipelineTarget for FileFuncs {}
 
 
+#[derive(Debug, Clone)]
 pub struct Route {
 	pub raw_str: String,
 }
@@ -107,6 +98,30 @@ impl Route {
 				raw_str.pop();
 			}
 		};
+		raw_str = format!("/{}", raw_str);
 		Ok(Self { raw_str })
+	}
+}
+
+
+#[cfg(test)]
+mod test {
+	use crate::prelude::*;
+	use beet_rsx::prelude::*;
+	use sweet::prelude::*;
+
+	#[test]
+	fn works() {
+		let funcs = FileGroup::test_site_routes()
+			.pipe(FileGroupToFuncs::default())
+			.unwrap();
+		expect(funcs.len()).to_be(3);
+		let docs = funcs.iter().find(|f| f.route.raw_str == "/docs").unwrap();
+		expect(docs.funcs.len()).to_be(1);
+		expect(&docs.local_path.to_string_lossy()).to_be("docs/index.rs");
+		expect(docs.canonical_path.to_string_lossy().ends_with(
+			"crates/beet_router/src/test_site/routes/docs/index.rs",
+		))
+		.to_be_true();
 	}
 }

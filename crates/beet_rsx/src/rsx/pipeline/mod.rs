@@ -52,11 +52,11 @@ pub trait RsxPipelineTarget: Sized {
 		self,
 		other: T2,
 		pipeline: P,
-	) -> Result<O>
+	) -> O
 	where
 		(Self, T2): RsxPipelineTarget,
 	{
-		Ok(pipeline.apply((self, other)))
+		pipeline.apply((self, other))
 	}
 }
 pub trait RsxPipelineTargetIter<T: RsxPipelineTarget>:
@@ -152,7 +152,7 @@ impl RsxPipeline<RsxRoot, Result<HtmlDocument>> for RsxToHtmlDocument {
 			.pipe(self.rsx_to_html)
 			.pipe(self.html_to_document)?;
 		if client_directives {
-			doc = doc.pipe_with(root.as_ref(), self.html_doc_to_resumable)?;
+			doc = doc.pipe_with(root.as_ref(), self.html_doc_to_resumable);
 		}
 		Ok(doc)
 	}
