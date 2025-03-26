@@ -1,37 +1,38 @@
 use anyhow::Result;
+use beet_rsx::rsx::RsxPipelineTarget;
 use clap::Parser;
+use serde::Deserialize;
+use serde::Serialize;
 use std::path::PathBuf;
 use sweet::prelude::*;
 
 /// Definition for a group of files that should be collected together.
 /// This is used as a field of types like [`ComponentFileGroup`] and [`RoutesFileGroup`].
-#[derive(
-	Debug, Default, Clone, Parser, serde::Serialize, serde::Deserialize,
-)]
+#[derive(Debug, Default, Clone, Parser, Serialize, Deserialize)]
 pub struct FileGroup {
 	/// The directory where the files are located.
 	#[arg(long, default_value = ".")]
-	pub src: WorkspacePathBuf,
+	pub src: CanonicalPathBuf,
 	/// Include and exclude filters for the files.
 	#[command(flatten)]
 	pub filter: GlobFilter,
 }
 
+impl RsxPipelineTarget for FileGroup {}
+
 impl FileGroup {
-	pub fn new(src: impl Into<WorkspacePathBuf>) -> Self {
+	pub fn new(src: CanonicalPathBuf) -> Self {
 		Self {
-			src: src.into(),
+			src,
 			filter: GlobFilter::default(),
 		}
 	}
-	pub fn new_with_filter(
-		src: impl Into<WorkspacePathBuf>,
-		filter: GlobFilter,
-	) -> Self {
-		Self {
-			src: src.into(),
-			filter,
-		}
+
+	pub fn new_workspace_rel(src: impl Into<WorkspacePathBuf>) -> Result<Self> {
+		Ok(Self {
+			src: src.into().into_canonical()?,
+			filter: GlobFilter::default(),
+		})
 	}
 
 	pub fn with_filter(mut self, filter: GlobFilter) -> Self {
@@ -45,7 +46,7 @@ impl FileGroup {
 			recursive: true,
 			..Default::default()
 		}
-		.read(self.src.into_canonical()?)?
+		.read(&self.src)?
 		.into_iter()
 		.filter_map(|path| {
 			if self.filter.passes(&path) {
@@ -59,23 +60,6 @@ impl FileGroup {
 	}
 }
 
-impl Into<FileGroup> for &str {
-	fn into(self) -> FileGroup {
-		FileGroup {
-			src: WorkspacePathBuf::new(self),
-			filter: GlobFilter::default(),
-		}
-	}
-}
-impl Into<FileGroup> for WorkspacePathBuf {
-	fn into(self) -> FileGroup {
-		FileGroup {
-			src: self,
-			filter: GlobFilter::default(),
-		}
-	}
-}
-
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
@@ -84,7 +68,8 @@ mod test {
 	#[test]
 	fn works() {
 		expect(
-			FileGroup::new("crates/beet_router/src/test_site")
+			FileGroup::new_workspace_rel("crates/beet_router/src/test_site")
+				.unwrap()
 				.with_filter(GlobFilter::default().with_include("*.mockup.rs"))
 				.collect_files()
 				.unwrap()

@@ -238,7 +238,7 @@ mod test {
 		let map: RsxTemplateMap = ron::de::from_str(&file).unwrap();
 		expect(map.root())
 			.to_be(&WorkspacePathBuf::new_from_current_directory(src).unwrap());
-		expect(map.templates.len()).to_be(4);
+		expect(map.templates.len()).to_be(6);
 		// println!("{:#?}", map);
 	}
 }

@@ -82,15 +82,8 @@ impl RunSetup {
 		let setup_config: AppConfig = ron::de::from_bytes(&stdout)?;
 
 		let mut group = BuildStepGroup::default();
-		for item in setup_config.codegen_steps.into_iter() {
-			match item {
-				CodegenStep::FileRoutes(build_file_routes) => {
-					group.add(build_file_routes);
-				}
-				CodegenStep::FileComponents(build_file_components) => {
-					group.add(build_file_components);
-				}
-			}
+		for item in setup_config.build_steps.into_iter() {
+			group.add(item);
 		}
 		Ok(group)
 	}

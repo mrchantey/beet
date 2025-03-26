@@ -178,11 +178,15 @@ mod test {
 
 	#[test]
 	fn test_preheat_cache() {
-		let src =
-			FsExt::workspace_root().join("crates/beet_router/src/test_site");
+		let src = WorkspacePathBuf::new("crates/beet_router/src/test_site")
+			.into_canonical()
+			.unwrap();
 		let cache = preheat_cache(&src).unwrap();
+
+		let num_files = ReadDir::files_recursive(&src).unwrap().len();
+
 		// flaky, depends on number of files in the test_site directory
-		expect(cache.len()).to_be(9);
+		expect(cache.len()).to_be(num_files);
 		// println!("{:#?}", cache);
 	}
 }

@@ -1,7 +1,7 @@
 #![feature(more_qualified_paths)]
 
 pub mod components;
-pub mod routes;
+// pub mod routes;
 
 pub mod prelude {
 	pub use super::*;

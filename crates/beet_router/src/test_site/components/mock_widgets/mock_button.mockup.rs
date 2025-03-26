@@ -1,4 +1,8 @@
-const A: u32 = 43;
+use beet_rsx::prelude::*;
 
 
-fn get() {}
+pub fn get() -> RsxRoot {
+	rsx! {
+		<div></div>
+	}
+}

@@ -44,7 +44,7 @@ pub mod prelude {
 
 	/// Gets the [`GlobFileGroup`] for this crate
 	#[cfg(feature = "setup")]
-	pub fn mockups() -> BuildFileComponents {
-		BuildFileComponents::mockups("crates/beet_design/src")
+	pub fn mockups() -> BuildComponentRoutes {
+		BuildComponentRoutes::mockups("crates/beet_design/src")
 	}
 }

@@ -4,7 +4,10 @@ use beet_router::prelude::*;
 /// and create a `routes.rs` file containing them all.
 pub fn main() {
 	let parser = BuildFileRoutes {
-		files: "crates/beet_router/src/test_site/routes".into(),
+		file_group: FileGroup::new_workspace_rel(
+			"crates/beet_router/src/test_site/routes",
+		)
+		.unwrap(),
 		route_type: "crate::prelude::StaticRoute".into(),
 		pkg_name: Some("beet_router".into()),
 		file_router_tokens: Some(

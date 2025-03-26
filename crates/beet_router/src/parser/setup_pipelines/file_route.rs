@@ -28,8 +28,6 @@ impl FileRoute {
 	/// reads a file and discovers all top level pub functions
 	/// that match a http method
 	pub fn new(routes_dir: &str, path: PathBuf) -> Result<Self> {
-		let file = ReadFile::to_string(&path)?;
-
 		// convert from ../routes/index.rs to index.rs
 		let file_path_str = path.to_string_lossy();
 		let file_relative_path =
@@ -44,6 +42,7 @@ impl FileRoute {
 			}
 		}
 
+		let file = ReadFile::to_string(&path)?;
 
 		let methods = syn::parse_file(&file)?
 			.items

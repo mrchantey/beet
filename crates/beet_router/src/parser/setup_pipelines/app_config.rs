@@ -7,7 +7,7 @@ use serde::Serialize;
 /// the name of the package and details for codegen.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct AppConfig {
-	pub codegen_steps: Vec<CodegenStep>,
+	pub build_steps: Vec<SerdeBuildStep>,
 }
 
 impl AppConfig {
@@ -16,12 +16,12 @@ impl AppConfig {
 	/// Panics if the current working directory cannot be determined.
 	pub fn new() -> Self {
 		Self {
-			codegen_steps: Vec::new(),
+			build_steps: Vec::new(),
 		}
 	}
 
-	pub fn add_step(mut self, group: impl Into<CodegenStep>) -> Self {
-		self.codegen_steps.push(group.into());
+	pub fn add_step(mut self, group: impl Into<SerdeBuildStep>) -> Self {
+		self.build_steps.push(group.into());
 		self
 	}
 
@@ -34,20 +34,4 @@ impl AppConfig {
 			.expect("failed to serialize");
 		println!("{}", ron);
 	}
-}
-
-
-#[derive(Debug, Serialize, Deserialize)]
-pub enum CodegenStep {
-	FileRoutes(BuildFileRoutes),
-	FileComponents(BuildFileComponents),
-}
-
-
-impl Into<CodegenStep> for BuildFileRoutes {
-	fn into(self) -> CodegenStep { CodegenStep::FileRoutes(self) }
-}
-
-impl Into<CodegenStep> for BuildFileComponents {
-	fn into(self) -> CodegenStep { CodegenStep::FileComponents(self) }
 }

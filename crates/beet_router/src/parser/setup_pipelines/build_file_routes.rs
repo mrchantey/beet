@@ -1,15 +1,11 @@
+use crate::prelude::*;
 use anyhow::Result;
 use beet_rsx::rsx::BuildStep;
-pub use file_route::*;
-pub use parse_dir_routes::*;
+use beet_rsx::rsx::RsxPipelineTarget;
 use serde::Deserialize;
 use serde::Serialize;
 use std::path::PathBuf;
 use sweet::prelude::*;
-mod file_route;
-mod parse_dir_routes;
-mod wasm_routes;
-pub use wasm_routes::*;
 
 
 /// Will scan a directory for all public http methods in files.
@@ -19,6 +15,10 @@ pub use wasm_routes::*;
 /// a [ServerRoutes] struct with all the routes.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BuildFileRoutes {
+	/// location of the routes directory
+	pub file_group: FileGroup,
+	pub group_to_funcs: FileGroupToFuncs,
+	pub funcs_to_routes: FileFuncsToRouteTypes,
 	/// Optionally specify additional tokens to be added to the top of the file.
 	pub file_router_tokens: Option<String>,
 	/// Identifier for the route type. Each route must implement
@@ -27,12 +27,6 @@ pub struct BuildFileRoutes {
 	/// Specify a package name to support importing of local components.
 	/// This will be assigned automatically by the [`AppConfig`] if not provided.
 	pub pkg_name: Option<String>,
-	/// location of the routes directory
-	/// This will be used to split the path and discover the route path,
-	/// the last part will be taken so it should not occur in the path twice.
-	/// ✅ `src/routes/foo/bar.rs` will be `foo/bar.rs`
-	/// ❌ `src/routes/foo/routes/bar.rs` will be `routes/bar.rs`
-	pub files: FileGroup,
 	/// Specify the package name so codegen can `use crate as pkg_name`
 	pub output: WorkspacePathBuf,
 }
@@ -40,10 +34,12 @@ pub struct BuildFileRoutes {
 impl Default for BuildFileRoutes {
 	fn default() -> Self {
 		Self {
+			file_group: FileGroup::default(),
+			group_to_funcs: Default::default(),
+			funcs_to_routes: Default::default(),
 			file_router_tokens: None,
 			route_type: "beet::prelude::StaticRoute".into(),
 			pkg_name: None,
-			files: "src/routes".into(),
 			output: "src/routes/mod.rs".into(),
 		}
 	}
@@ -53,6 +49,9 @@ impl Default for BuildFileRoutes {
 
 impl BuildStep for BuildFileRoutes {
 	fn run(&self) -> Result<()> {
+		self.file_group.clone().pipe(self.group_to_funcs.clone())?;
+
+
 		self.build_and_write()?;
 		Ok(())
 	}
@@ -61,7 +60,7 @@ impl BuildStep for BuildFileRoutes {
 
 impl BuildFileRoutes {
 	pub fn build_strings(&self) -> Result<Vec<(PathBuf, String)>> {
-		let canonical_src = self.files.src.into_canonical()?;
+		let canonical_src = &self.file_group.src;
 		let canonical_src_str = canonical_src.to_string_lossy();
 
 		let dir_routes = ReadDir {
@@ -99,7 +98,10 @@ mod test {
 	#[test]
 	fn works() {
 		let config = BuildFileRoutes {
-			files: "crates/beet_router/src/test_site/routes".into(),
+			file_group: FileGroup::new_workspace_rel(
+				"crates/beet_router/src/test_site/routes",
+			)
+			.unwrap(),
 			..Default::default()
 		};
 
