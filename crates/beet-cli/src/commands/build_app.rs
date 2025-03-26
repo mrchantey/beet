@@ -63,7 +63,9 @@ impl BuildApp {
 	}
 }
 
-
+/// This step *could* be done in the actual binary instead of passing
+/// the config to the cli, but allowing the cli to handle it means
+/// we dont need to recompile this step on live reload changes
 pub struct RunSetup;
 
 impl RunSetup {

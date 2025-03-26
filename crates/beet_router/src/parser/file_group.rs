@@ -1,10 +1,13 @@
+use anyhow::Result;
 use clap::Parser;
-use sweet::prelude::GlobFilter;
-use sweet::prelude::WorkspacePathBuf;
+use std::path::PathBuf;
+use sweet::prelude::*;
 
 /// Definition for a group of files that should be collected together.
 /// This is used as a field of types like [`ComponentFileGroup`] and [`RoutesFileGroup`].
-#[derive(Debug, Clone, Parser, serde::Serialize, serde::Deserialize)]
+#[derive(
+	Debug, Default, Clone, Parser, serde::Serialize, serde::Deserialize,
+)]
 pub struct FileGroup {
 	/// The directory where the files are located.
 	#[arg(long, default_value = ".")]
@@ -30,6 +33,30 @@ impl FileGroup {
 			filter,
 		}
 	}
+
+	pub fn with_filter(mut self, filter: GlobFilter) -> Self {
+		self.filter = filter;
+		self
+	}
+
+	pub fn collect_files(&self) -> Result<Vec<PathBuf>> {
+		let items = ReadDir {
+			files: true,
+			recursive: true,
+			..Default::default()
+		}
+		.read(self.src.into_canonical()?)?
+		.into_iter()
+		.filter_map(|path| {
+			if self.filter.passes(&path) {
+				Some(path)
+			} else {
+				None
+			}
+		})
+		.collect::<Vec<_>>();
+		Ok(items)
+	}
 }
 
 impl Into<FileGroup> for &str {
@@ -52,7 +79,17 @@ impl Into<FileGroup> for WorkspacePathBuf {
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
+	use sweet::prelude::*;
 
 	#[test]
-	fn works() { let _group: FileGroup = "foobar".into(); }
+	fn works() {
+		expect(
+			FileGroup::new("crates/beet_router/src/test_site")
+				.with_filter(GlobFilter::default().with_include("*.mockup.rs"))
+				.collect_files()
+				.unwrap()
+				.len(),
+		)
+		.to_be(2);
+	}
 }

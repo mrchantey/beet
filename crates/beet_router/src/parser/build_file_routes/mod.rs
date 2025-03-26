@@ -1,6 +1,5 @@
 use anyhow::Result;
 use beet_rsx::rsx::BuildStep;
-use clap::Parser;
 pub use file_route::*;
 pub use parse_dir_routes::*;
 use serde::Deserialize;
@@ -18,33 +17,36 @@ pub use wasm_routes::*;
 /// Parse a 'routes' dir, collecting all the routes,
 /// and create a `mod.rs` which contains
 /// a [ServerRoutes] struct with all the routes.
-#[derive(Debug, Clone, Parser, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BuildFileRoutes {
 	/// Optionally specify additional tokens to be added to the top of the file.
-	#[arg(long)]
 	pub file_router_tokens: Option<String>,
 	/// Identifier for the route type. Each route must implement
 	/// [`IntoRoute<T>`] where T is this type.
-	#[arg(long, default_value = "beet::prelude::StaticRoute")]
 	pub route_type: String,
 	/// Specify a package name to support importing of local components.
 	/// This will be assigned automatically by the [`AppConfig`] if not provided.
-	#[arg(long)]
 	pub pkg_name: Option<String>,
 	/// location of the routes directory
 	/// This will be used to split the path and discover the route path,
 	/// the last part will be taken so it should not occur in the path twice.
 	/// ✅ `src/routes/foo/bar.rs` will be `foo/bar.rs`
 	/// ❌ `src/routes/foo/routes/bar.rs` will be `routes/bar.rs`
-	#[command(flatten)]
 	pub files: FileGroup,
 	/// Specify the package name so codegen can `use crate as pkg_name`
-	#[arg(long, default_value = "src/routes/mod.rs")]
-	pub codegen_file: WorkspacePathBuf,
+	pub output: WorkspacePathBuf,
 }
 
 impl Default for BuildFileRoutes {
-	fn default() -> Self { clap::Parser::parse_from(&[""]) }
+	fn default() -> Self {
+		Self {
+			file_router_tokens: None,
+			route_type: "beet::prelude::StaticRoute".into(),
+			pkg_name: None,
+			files: "src/routes".into(),
+			output: "src/routes/mod.rs".into(),
+		}
+	}
 }
 
 

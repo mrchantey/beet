@@ -30,7 +30,6 @@ bevy = [
 	"dep:bevy",
 	"dep:flume",
 	"beet_rsx/bevy",
-	"beet_rsx/bevy_default", #why
 ]
 # for internal testing
 _test_site = []
