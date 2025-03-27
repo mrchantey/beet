@@ -43,6 +43,20 @@ impl Default for CodegenFile {
 impl RsxPipelineTarget for CodegenFile {}
 
 impl CodegenFile {
+	/// Create a new [`CodegenFile`] with the most common options.
+	pub fn new(
+		output: impl Into<WorkspacePathBuf>,
+		pkg_name: impl Into<String>,
+	) -> Self {
+		let output = output.into().into_canonical_unchecked();
+		Self {
+			output,
+			pkg_name: Some(pkg_name.into()),
+			..Default::default()
+		}
+	}
+
+
 	pub fn output_dir(&self) -> Result<&Path> {
 		self.output.parent().ok_or_else(|| {
 			anyhow::anyhow!("Output path must have a parent directory")

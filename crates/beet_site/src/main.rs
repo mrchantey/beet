@@ -5,20 +5,22 @@ fn main() {
 	let cx = app_cx!();
 
 	AppConfig {
-		native_build_step: BuildFileRouteTree::new(
-			cx.resolve_path("codegen/route_tree.rs"),
-			&cx.pkg_name,
-		)
+		native_build_step: BuildFileRouteTree::new(FileFuncsToRouteTree {
+			codgen_file: CodegenFile::new(
+				cx.resolve_path("codegen/route_tree.rs"),
+				&cx.pkg_name,
+			),
+		})
 		.with_step(BuildFileRoutes::new(
 			cx.resolve_path("routes"),
 			cx.resolve_path("codegen/routes.rs"),
 			&cx.pkg_name,
 		))
 		.with_step(beet::design::prelude::mockups_config()),
-		wasm_build_step: BuildWasmRoutes::new(
+		wasm_build_step: BuildWasmRoutes::new(CodegenFile::new(
 			cx.resolve_path("codegen/wasm.rs"),
 			&cx.pkg_name,
-		),
+		)),
 	}
 	.export();
 }

@@ -3,25 +3,19 @@ use anyhow::Result;
 use beet_rsx::prelude::*;
 use serde::Deserialize;
 use serde::Serialize;
-use sweet::prelude::*;
 
 
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BuildFileRouteTree {
-	pub codegen_file: CodegenFile,
+	pub to_route_tree: FileFuncsToRouteTree,
 	pub build_steps: Vec<BuildFileRoutes>,
 }
 
 impl BuildFileRouteTree {
-	pub fn new(out_file: impl Into<WorkspacePathBuf>, pkg_name: &str) -> Self {
-		let output = out_file.into().into_canonical_unchecked();
+	pub fn new(to_route_tree: FileFuncsToRouteTree) -> Self {
 		Self {
-			codegen_file: CodegenFile {
-				output,
-				pkg_name: Some(pkg_name.into()),
-				..Default::default()
-			},
+			to_route_tree,
 			build_steps: Vec::new(),
 		}
 	}
@@ -32,9 +26,11 @@ impl BuildFileRouteTree {
 }
 
 impl BuildStep for BuildFileRouteTree {
+	// this is one of the most awkward build steps,
+	// currently rsx piping really breaks down when it comes
+	// to splitting and joining
 	fn run(&self) -> Result<()> {
-		let files = self
-			.build_steps
+		self.build_steps
 			.iter()
 			.map(|step| {
 				let BuildFileRoutes {
@@ -53,14 +49,7 @@ impl BuildStep for BuildFileRouteTree {
 			.collect::<Result<Vec<_>>>()?
 			.into_iter()
 			.flatten()
-			.collect::<Vec<_>>();
-
-		let route_tree = RouteTree::new(files.iter()).into_paths_mod();
-
-		let mut codegen_file = self.codegen_file.clone();
-		codegen_file.add_item(route_tree);
-		codegen_file.build_and_write()?;
-
-		Ok(())
+			.collect::<Vec<_>>()
+			.pipe(self.to_route_tree.clone())
 	}
 }

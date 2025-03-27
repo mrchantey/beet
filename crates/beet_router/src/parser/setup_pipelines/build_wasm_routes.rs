@@ -15,29 +15,11 @@ pub struct BuildWasmRoutes {
 }
 
 impl BuildWasmRoutes {
-	pub fn new(out_file: impl Into<WorkspacePathBuf>, pkg_name: &str) -> Self {
-		Self::new_with_options(
-			out_file,
-			pkg_name,
-			RoutesToClientIslandMap::DEFAULT_ISLANDS_MAP_PATH.into(),
-		)
-	}
-
-
-	pub fn new_with_options(
-		out_file: impl Into<WorkspacePathBuf>,
-		pkg_name: &str,
-		islands_map_path: PathBuf,
-	) -> Self {
-		let output = out_file.into().into_canonical_unchecked();
-
+	pub fn new(codegen_file: CodegenFile) -> Self {
 		Self {
-			islands_map_path,
-			codegen_file: CodegenFile {
-				output,
-				pkg_name: Some(pkg_name.into()),
-				..Default::default()
-			},
+			codegen_file,
+			islands_map_path: RoutesToClientIslandMap::DEFAULT_ISLANDS_MAP_PATH
+				.into(),
 		}
 	}
 

@@ -52,8 +52,6 @@ impl FileFuncsToCodegen {
 		}
 		file.add_item(collect_func);
 
-		file.add_item(RouteTree::new(funcs.iter()).into_paths_mod());
-
 		Ok(())
 	}
 

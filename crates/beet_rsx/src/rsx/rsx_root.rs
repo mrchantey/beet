@@ -77,3 +77,17 @@ impl<T: FnOnce() -> U, U: IntoRsxRoot<M2>, M2> IntoRsxRoot<(M2, FuncIntoRsx)>
 {
 	fn into_root(self) -> RsxRoot { self().into_root() }
 }
+
+pub struct VecIntoRsx;
+impl<T: IntoRsxRoot<M2>, M2> IntoRsxRoot<(M2, VecIntoRsx)> for Vec<T> {
+	fn into_root(self) -> RsxRoot {
+		let node = RsxNode::Fragment {
+			idx: RsxIdx::default(),
+			nodes: self.into_iter().map(|item| item.into_root().node).collect(),
+		};
+		RsxRoot {
+			node,
+			..Default::default()
+		}
+	}
+}

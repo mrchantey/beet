@@ -88,6 +88,31 @@ impl quote::ToTokens for RouteInfo {
 }
 
 
+#[derive(Debug, Clone)]
+pub struct StaticRouteTree {
+	/// the name of this level of the tree, ie the directory.
+	/// for the root this is called 'root'
+	pub name: String,
+	/// all paths available at this level of the tree
+	pub paths: Vec<RoutePath>,
+	pub children: Vec<StaticRouteTree>,
+}
+
+impl StaticRouteTree {
+	pub fn flatten(&self) -> Vec<RoutePath> {
+		let mut paths = self.paths.clone();
+		for child in &self.children {
+			paths.extend(child.flatten());
+		}
+		paths
+	}
+}
+
+// pub struct StaticRouteTreeItem {
+// 	pub name: String,
+// 	pub path: RoutePath,
+// }
+
 
 #[cfg(feature = "serde")]
 fn serialize_method<S>(

@@ -1,5 +1,5 @@
+use crate::route_tree;
 use beet::prelude::*;
-
 
 
 #[derive(Node)]
@@ -15,13 +15,24 @@ fn beet_page(_: BeetPage) -> RsxRoot {
 
 	let brand = get_context::<Brand>();
 
+	let routes = route_tree::collect_static_route_tree();
+
+	let nav_items = move || {
+		routes
+			.flatten()
+			.iter()
+			.map(|route| {
+				let route_str = route.to_string_lossy().to_string();
+				rsx! {<a href={route_str.clone()}>{route_str}</a>}
+			})
+			.collect::<Vec<_>>()
+	};
+
 	rsx! {
 		<ContentLayout>
 		<h1>{brand.title}</h1>
 			<nav>
-				<a href="/">Home</a>
-				<a href="/contributing">Contributing</a>
-				<a href="/contributing">Foobarbsazz</a>
+				{nav_items}
 			</nav>
 				<slot/>
 				<style>
