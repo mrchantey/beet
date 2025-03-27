@@ -48,7 +48,7 @@ impl RouteType {
 			func: syn::parse_quote!(
 				fn foobar() {}
 			),
-			route: file_funcs.route,
+			route: file_funcs.route_path,
 		}
 	}
 }

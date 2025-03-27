@@ -108,7 +108,7 @@ impl FileFuncsToCodegen {
 	) -> Result<Vec<Expr>> {
 		let local_path_str = file.local_path.to_string_lossy();
 		let mod_ident = Self::index_to_mod_ident(index);
-		let route_path = file.route.to_string_lossy();
+		let route_path = file.route_path.to_string_lossy();
 
 		file.funcs
 			.iter()

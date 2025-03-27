@@ -2,6 +2,7 @@ use anyhow::Result;
 use beet_rsx::rsx::RsxPipelineTarget;
 use beet_rsx::rsx::RsxRoot;
 use http::Method;
+use std::path::Path;
 use std::path::PathBuf;
 use std::str::FromStr;
 
@@ -15,7 +16,7 @@ pub trait RoutesToRsx {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct RouteInfo {
 	/// the url path
-	pub path: PathBuf,
+	pub path: RoutePath,
 	/// the http method
 	#[cfg_attr(
 		feature = "serde",
@@ -26,6 +27,45 @@ pub struct RouteInfo {
 	)]
 	pub method: Method,
 }
+
+#[derive(Debug, Default, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct RoutePath(PathBuf);
+
+impl std::ops::Deref for RoutePath {
+	type Target = PathBuf;
+	fn deref(&self) -> &Self::Target { &self.0 }
+}
+
+impl Into<PathBuf> for RoutePath {
+	fn into(self) -> PathBuf { self.0 }
+}
+impl Into<RoutePath> for &str {
+	fn into(self) -> RoutePath { RoutePath::new(self) }
+}
+
+impl RoutePath {
+	pub fn new(path: impl Into<PathBuf>) -> Self { Self(path.into()) }
+	pub fn join(&self, path: &RoutePath) -> Self { Self(self.0.join(&path.0)) }
+	pub fn inner(&self) -> &Path { &self.0 }
+	pub fn parse_local_path(local_path: &Path) -> Result<Self> {
+		let mut raw_str = local_path
+			.to_string_lossy()
+			.replace(".rs", "")
+			.replace("\\", "/");
+		if raw_str.ends_with("index") {
+			raw_str = raw_str.replace("index", "");
+			// remove trailing `/` from non root paths
+			if raw_str.len() > 1 {
+				raw_str.pop();
+			}
+		};
+		raw_str = format!("/{}", raw_str);
+
+		Ok(Self(PathBuf::from(raw_str)))
+	}
+}
+
 
 #[cfg(feature = "parser")]
 impl quote::ToTokens for RouteInfo {
@@ -66,7 +106,7 @@ impl RouteInfo {
 	/// the method used by `beet_router`
 	pub fn new(path: impl Into<PathBuf>, method: &str) -> Self {
 		Self {
-			path: path.into(),
+			path: RoutePath::new(path),
 			method: Method::from_str(method).unwrap(),
 		}
 	}

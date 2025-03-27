@@ -66,7 +66,7 @@ impl RsxPipeline<Vec<(RouteInfo, HtmlDocument)>, Result<()>>
 
 		let dst = dst.canonicalize()?;
 		for (info, doc) in routes.into_iter() {
-			let mut path = info.path.clone();
+			let mut path = info.path.to_path_buf();
 			// map foo/index.rs to foo/index.html
 			if path.file_stem().map(|s| s == "index").unwrap_or(false) {
 				path.set_extension("html");
@@ -75,7 +75,7 @@ impl RsxPipeline<Vec<(RouteInfo, HtmlDocument)>, Result<()>>
 				path.set_extension("");
 				path.push("index.html");
 			}
-			path = path.strip_prefix("/").unwrap().to_path_buf();
+			let path = path.strip_prefix("/").unwrap();
 			let full_path = &dst.join(path);
 			// pretty rendering currently breaks text node logic
 			let str = doc.pipe(RenderHtml::default())?;

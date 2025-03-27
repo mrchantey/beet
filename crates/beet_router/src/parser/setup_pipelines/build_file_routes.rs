@@ -44,7 +44,6 @@ impl BuildFileRoutes {
 }
 
 impl BuildStep for BuildFileRoutes {
-	#[rustfmt::skip]
 	fn run(&self) -> Result<()> {
 		let Self {
 			codegen_file,
@@ -52,9 +51,9 @@ impl BuildStep for BuildFileRoutes {
 			group_to_funcs,
 			funcs_to_codegen,
 		} = self.clone();
-		file_group
-			.pipe(group_to_funcs)?
-			.pipe_with(codegen_file,funcs_to_codegen)?
+		let funcs = file_group.pipe(group_to_funcs)?;
+		funcs
+			.pipe_with(codegen_file, funcs_to_codegen)?
 			.build_and_write()?;
 		Ok(())
 	}

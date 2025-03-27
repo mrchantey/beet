@@ -86,6 +86,11 @@ impl<T: RsxPipelineTarget> RsxPipelineTarget
 	for Pin<Box<dyn Future<Output = T>>>
 {
 }
+impl<T: RsxPipelineTarget> RsxPipelineTarget
+	for Box<dyn Fn() -> Pin<Box<dyn Future<Output = T>>>>
+{
+}
+
 
 impl<T1: RsxPipelineTarget, T2: RsxPipelineTarget> RsxPipelineTarget
 	for (T1, T2)

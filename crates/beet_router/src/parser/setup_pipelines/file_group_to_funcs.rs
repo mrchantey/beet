@@ -1,10 +1,10 @@
 use crate::parser::FileGroup;
+use crate::parser::RoutePath;
 use anyhow::Result;
 use beet_rsx::rsx::RsxPipeline;
 use beet_rsx::rsx::RsxPipelineTarget;
 use serde::Deserialize;
 use serde::Serialize;
-use std::path::Path;
 use std::path::PathBuf;
 use sweet::prelude::CanonicalPathBuf;
 use sweet::prelude::ReadFile;
@@ -41,12 +41,12 @@ impl FileGroupToFuncs {
 
 		let canonical_path = CanonicalPathBuf::new(file)?;
 		let local_path = PathExt::create_relative(&group_src, &canonical_path)?;
-		let route = RoutePath::parse(&local_path)?;
+		let route_path = RoutePath::parse_local_path(&local_path)?;
 
 		Ok(FileFuncs {
 			canonical_path,
 			local_path,
-			route,
+			route_path,
 			funcs,
 		})
 	}
@@ -70,7 +70,7 @@ pub struct FileFuncs {
 	/// Path relative to the [`FileGroup::src`]
 	pub local_path: PathBuf,
 	/// Route for the file
-	pub route: RoutePath,
+	pub route_path: RoutePath,
 	/// Tokens for the functions visited
 	pub funcs: Vec<syn::Signature>,
 }
@@ -78,39 +78,6 @@ pub struct FileFuncs {
 impl FileFuncs {}
 
 impl RsxPipelineTarget for FileFuncs {}
-
-
-#[derive(Debug, Clone)]
-pub struct RoutePath(PathBuf);
-
-impl std::ops::Deref for RoutePath {
-	type Target = PathBuf;
-	fn deref(&self) -> &Self::Target { &self.0 }
-}
-
-impl Into<PathBuf> for RoutePath {
-	fn into(self) -> PathBuf { self.0 }
-}
-
-impl RoutePath {
-	pub fn new(path: impl Into<PathBuf>) -> Self { Self(path.into()) }
-	pub fn parse(local_path: &Path) -> Result<Self> {
-		let mut raw_str = local_path
-			.to_string_lossy()
-			.replace(".rs", "")
-			.replace("\\", "/");
-		if raw_str.ends_with("index") {
-			raw_str = raw_str.replace("index", "");
-			// remove trailing `/` from non root paths
-			if raw_str.len() > 1 {
-				raw_str.pop();
-			}
-		};
-		raw_str = format!("/{}", raw_str);
-
-		Ok(Self(PathBuf::from(raw_str)))
-	}
-}
 
 
 #[cfg(test)]
@@ -129,7 +96,7 @@ mod test {
 		expect(funcs.len()).to_be(3);
 		let docs = funcs
 			.iter()
-			.find(|f| &*f.route == Path::new("/docs"))
+			.find(|f| &*f.route_path == Path::new("/docs"))
 			.unwrap();
 		expect(docs.funcs.len()).to_be(1);
 		expect(&docs.local_path.to_string_lossy()).to_be("docs/index.rs");

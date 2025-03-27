@@ -1,14 +1,12 @@
+use crate::prelude::*;
 use anyhow::Result;
 use beet_rsx::prelude::*;
 use std::path::PathBuf;
 use std::pin::Pin;
 
-use crate::parser::RouteInfo;
-
-use super::RoutePath;
-
 pub type DefaultFileFunc =
 	Box<dyn Fn() -> Pin<Box<dyn Future<Output = Result<RsxRoot>>>>>;
+
 
 pub struct FileFunc<T> {
 	/// The path relative to its root, the [`FileGroup::src`] it was collected from.
