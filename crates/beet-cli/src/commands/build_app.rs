@@ -20,10 +20,9 @@ impl BuildApp {
 		// here we're compiling once
 		if !watch_args.only.is_empty() {
 			let mut group = BuildStepGroup::default();
-			let (setup, wasm) = RunSetup::new(&build_cmd)?;
 			for arg in watch_args.only.iter() {
 				match arg.as_str() {
-					"setup" => group.add(setup),
+					"setup" => group.add(RunSetup::new(&build_cmd)?.0),
 					"native" => {
 						group.add(BuildNative::new(&build_cmd, &watch_args))
 					}
@@ -33,7 +32,7 @@ impl BuildApp {
 					"static" => {
 						group.add(ExportStatic::new(watch_args, &exe_path))
 					}
-					"collect-wasm" => group.add(wasm),
+					"collect-wasm" => group.add(RunSetup::new(&build_cmd)?.1),
 					"build-wasm" => {
 						group.add(BuildWasm::new(&build_cmd, &watch_args)?)
 					}

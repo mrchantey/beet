@@ -10,7 +10,7 @@ pub mod interactive;
 /// Collection of layout components
 pub mod layout;
 /// Collection of mockups for all components
-#[cfg(not(feature = "setup"))]
+#[cfg(all(not(feature = "setup"), not(target_arch = "wasm32")))]
 #[path = "codegen/mockups.rs"]
 pub mod mockups;
 
@@ -30,7 +30,7 @@ pub mod prelude {
 	#[cfg(feature = "setup")]
 	use beet_router::prelude::*;
 
-	#[cfg(not(feature = "setup"))]
+	#[cfg(all(not(feature = "setup"), not(target_arch = "wasm32")))]
 	pub use crate::mockups::*;
 
 	/// Gets the [`AppConfig`] for this crate
@@ -45,6 +45,12 @@ pub mod prelude {
 	/// Gets the [`GlobFileGroup`] for this crate
 	#[cfg(feature = "setup")]
 	pub fn mockups() -> BuildComponentRoutes {
-		BuildComponentRoutes::mockups("crates/beet_design/src", "beet_design")
+		let mut mockups = BuildComponentRoutes::mockups(
+			"crates/beet_design/src",
+			"beet_design",
+		);
+		mockups.codegen_file.use_beet_tokens =
+			"use beet_router::as_beet::*;".into();
+		mockups
 	}
 }

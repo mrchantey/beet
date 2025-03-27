@@ -44,7 +44,8 @@ impl BuildWasmRoutes {
 	fn collect_fn(islands_map: &ClientIslandMap) -> ItemFn {
 		let tokens = islands_map.into_mount_tokens();
 		syn::parse_quote! {
-			#[cfg(target_arch = "wasm32")]
+			/// Collect all the island mount functions. The exact func used
+			/// will be determined by the `window.location`
 			pub fn collect() -> ClientIslandMountFuncs {
 				#tokens
 			}
@@ -100,7 +101,8 @@ mod test {
 		)
 		.to_be(
 			quote::quote! {
-				#[cfg(target_arch = "wasm32")]
+				/// Collect all the island mount functions. The exact func used
+				/// will be determined by the `window.location`
 				pub fn collect() -> ClientIslandMountFuncs {
 					#island_map_tokens
 				}

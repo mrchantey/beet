@@ -68,6 +68,7 @@ impl FileFuncsToCodegen {
 		let func_type: Type = syn::parse_str(&self.func_type)?;
 
 		Ok(syn::parse_quote! {
+			/// Collect all functions from their files as defined in the [`AppConfig`]
 			pub fn collect() -> Vec<FileFunc<#func_type>> {
 				vec![#(#files),*]
 			}

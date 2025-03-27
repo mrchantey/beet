@@ -36,16 +36,20 @@ impl Deploy {
 		self.build_template_map.build_and_write()?;
 		self.build_cmd.release = true;
 
+		let (setup, wasm) = RunSetup::new(&self.build_cmd)?;
+
 		BuildStepGroup::default()
-			.add(RunSetup::new(&self.build_cmd)?)
+			.add(setup)
 			.add(BuildNative::new(&self.build_cmd, &self.watch_args))
-			.add(BuildWasm::new(&self.build_cmd, &self.watch_args)?)
 			.add(ExportStatic::new(
 				&self.watch_args,
 				&self.build_cmd.exe_path(),
 			))
-			.add(self)
+			.add(wasm)
+			.add(BuildWasm::new(&self.build_cmd, &self.watch_args)?)
 			.run()?;
+		self.lambda_build()?;
+		self.lambda_deploy()?;
 
 		Ok(())
 	}
@@ -100,14 +104,6 @@ impl Deploy {
 
 		cmd.spawn()?.wait()?.exit_ok()?;
 
-		Ok(())
-	}
-}
-
-impl BuildStep for Deploy {
-	fn run(&self) -> Result<()> {
-		self.lambda_build()?;
-		self.lambda_deploy()?;
 		Ok(())
 	}
 }
