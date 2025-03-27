@@ -11,19 +11,25 @@ fn main() {
 			&cx.pkg_name,
 		))
 		// ensures design mockups are recollected on reload
-		.add_step(beet::design::prelude::mockups())
+		.add_step(beet::design::prelude::mockups_config())
 		.add_wasm_step(BuildWasmRoutes::new(
-			cx.resolve_path("codegen/routes_wasm.rs"),
+			cx.resolve_path("codegen/wasm.rs"),
 			&cx.pkg_name,
 		))
 		.export();
 }
 
 
-#[cfg(not(feature = "setup"))]
+#[cfg(all(not(feature = "setup"), not(target_arch = "wasm32")))]
+fn main() {
+	let mut routes = beet_site::routes::collect();
+	routes.extend(beet::design::mockups::collect().into_iter());
+	AppRouter::new(app_cx!()).add_collection(routes).run();
+}
+
+#[cfg(all(not(feature = "setup"), target_arch = "wasm32"))]
 fn main() {
 	AppRouter::new(app_cx!())
-		.add_collection(beet_site::routes::collect())
-		// .add_plugin(Router::new)
+		.add_collection(beet_site::wasm::collect())
 		.run();
 }

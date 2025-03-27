@@ -11,11 +11,9 @@ pub mod interactive;
 pub mod layout;
 /// Collection of mockups for all components
 #[cfg(all(not(feature = "setup"), not(target_arch = "wasm32")))]
-#[path = "./codegen/mockups.rs"]
+#[path = "codegen/mockups.rs"]
 pub mod mockups;
 
-// #[cfg(not(feature = "setup"))]
-// pub mod mockups;
 
 /// Commonly used components for beet_design
 pub mod prelude {
@@ -30,21 +28,18 @@ pub mod prelude {
 	#[cfg(feature = "setup")]
 	use beet_router::prelude::*;
 
-	#[cfg(all(not(feature = "setup"), not(target_arch = "wasm32")))]
-	pub use crate::mockups::*;
-
 	/// Gets the [`AppConfig`] for this crate
 	#[cfg(feature = "setup")]
 	#[rustfmt::skip]
 	pub fn setup_config() -> AppConfig {
 		AppConfig::new()
-			.add_step(mockups())
+			.add_step(mockups_config())
 	}
 
 
 	/// Gets the [`GlobFileGroup`] for this crate
 	#[cfg(feature = "setup")]
-	pub fn mockups() -> BuildComponentRoutes {
+	pub fn mockups_config() -> BuildComponentRoutes {
 		let mut mockups = BuildComponentRoutes::mockups(
 			"crates/beet_design/src",
 			"beet_design",

@@ -65,34 +65,30 @@ impl<'a> RouteTree<'a> {
 		self.into_paths_mod_inner("paths")
 	}
 	fn into_paths_mod_inner(&self, name: &str) -> ItemMod {
-		let mod_items =
-			self.files
-				.iter()
-				.map(|file| {
-					let ident = syn::Ident::new(
-						file.local_path
-							.file_stem()
-							.unwrap()
-							.to_string_lossy()
-							.as_ref(),
-						proc_macro2::Span::call_site(),
-					);
-					let route_path =
-						file.route_path.to_string_lossy().to_string();
-					// let func = file.into_collect_func();
-					let item: Item = syn::parse_quote!(
-						pub fn #ident()->&'static str{
-							#route_path
-						}
-					);
-					item
-				})
-				.chain(self.children.iter().map(|(name, child)| {
+		let mod_items = self
+			.files
+			.iter()
+			.map(|file| {
+				let ident =
+					syn::Ident::new(&file.name, proc_macro2::Span::call_site());
+				let route_path = file.route_path.to_string_lossy().to_string();
+				let item: Item = syn::parse_quote!(
+					/// Get the local route path
+					pub fn #ident()->&'static str{
+						#route_path
+					}
+				);
+				item
+			})
+			.chain(
+				self.children.iter().map(|(name, child)| {
 					child.into_paths_mod_inner(name).into()
-				}));
+				}),
+			);
 
 		let ident = syn::Ident::new(name, proc_macro2::Span::call_site());
 		syn::parse_quote!(
+			/// Nested local route paths
 			pub mod #ident {
 				#(#mod_items)*
 			}
@@ -104,6 +100,7 @@ impl<'a> RouteTree<'a> {
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
+	use quote::ToTokens;
 	use rapidhash::RapidHashMap;
 	use sweet::prelude::*;
 	use syn::ItemMod;
@@ -112,19 +109,22 @@ mod test {
 	fn files() -> Vec<FileFuncs> {
 		vec![
 			FileFuncs {
+				name: "index".into(),
 				local_path: "index.rs".into(),
 				route_path: "/".into(),
 				canonical_path: Default::default(),
 				funcs: Default::default(),
 			},
 			FileFuncs {
+				name: "index".into(),
 				local_path: "foo/bar/index.rs".into(),
 				route_path: "/foo/bar".into(),
 				canonical_path: Default::default(),
 				funcs: Default::default(),
 			},
 			FileFuncs {
-				local_path: "foo/bar/bazz.rs".into(),
+				name: "bazz".into(),
+				local_path: "foo/bar/bazz.booboo.rs".into(),
 				route_path: "/foo/bar/bazz".into(),
 				canonical_path: Default::default(),
 				funcs: Default::default(),
@@ -163,15 +163,21 @@ mod test {
 		let mod_item = tree.into_paths_mod();
 
 		let expected: ItemMod = syn::parse_quote! {
+			/// Nested local route paths
 			pub mod paths {
+				/// Get the local route path
 				pub fn index()->&'static str{
 					"/"
 				}
+				/// Nested local route paths
 				pub mod foo {
+					/// Nested local route paths
 					pub mod bar {
+						/// Get the local route path
 						pub fn index()->&'static str{
 							"/foo/bar"
 						}
+						/// Get the local route path
 						pub fn bazz()->&'static str{
 							"/foo/bar/bazz"
 						}
@@ -179,8 +185,7 @@ mod test {
 				}
 			}
 		};
-		expect(mod_item).to_be(expected);
-		// expect(mod_item.to_token_stream().to_string())
-		// .to_be(expected.to_token_stream().to_string());
+		expect(mod_item.to_token_stream().to_string())
+			.to_be(expected.to_token_stream().to_string());
 	}
 }

@@ -7,7 +7,7 @@ use std::path::PathBuf;
 use sweet::prelude::*;
 use syn::ItemFn;
 
-/// edit the routes/mod.rs to include a #[wasm] collect func
+/// Create a rust file that collects all the island mount functions
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BuildWasmRoutes {
 	islands_map_path: PathBuf,

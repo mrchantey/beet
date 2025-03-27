@@ -48,9 +48,24 @@ impl FileGroupToFuncs {
 		let canonical_path = CanonicalPathBuf::new(file)?;
 		let local_path = PathExt::create_relative(&group_src, &canonical_path)?;
 		let route_path = self.build_route_path(&local_path)?;
-		println!("{:?}", route_path);
+		let is_index = local_path
+			.file_stem()
+			.map(|s| s == "index")
+			.unwrap_or(false);
+		let name = if is_index {
+			"index".to_string()
+		} else {
+			route_path
+				.inner()
+				.file_stem()
+				.unwrap()
+				.to_string_lossy()
+				.to_string()
+		};
+
 
 		Ok(FileFuncs {
+			name,
 			canonical_path,
 			local_path,
 			route_path,
@@ -87,6 +102,11 @@ impl RsxPipeline<FileGroup, Result<Vec<FileFuncs>>> for FileGroupToFuncs {
 #[derive(Debug, Clone, PartialEq, Eq)]
 /// Collection of all public functions in a file
 pub struct FileFuncs {
+	/// The best name for this file. If it is an index file, it will be "index",
+	/// otherwise it will be the last segment of the `route_path`.
+	/// This is to respect any transformations done in the `FileGroupToFuncs`,
+	/// ie removing a `.mockup` suffix
+	pub name: String,
 	/// Canonical path to the file
 	pub canonical_path: CanonicalPathBuf,
 	/// Path relative to the [`FileGroup::src`]
