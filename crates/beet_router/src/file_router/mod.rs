@@ -28,9 +28,13 @@ pub struct RouteInfo {
 	pub method: Method,
 }
 
-#[derive(Debug, Default, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct RoutePath(PathBuf);
+
+impl Default for RoutePath {
+	fn default() -> Self { Self(PathBuf::from("/")) }
+}
 
 impl std::ops::Deref for RoutePath {
 	type Target = PathBuf;
@@ -46,7 +50,12 @@ impl Into<RoutePath> for &str {
 
 impl RoutePath {
 	pub fn new(path: impl Into<PathBuf>) -> Self { Self(path.into()) }
-	pub fn join(&self, path: &RoutePath) -> Self { Self(self.0.join(&path.0)) }
+	/// Creates a route join even if the other route path begins with `/`
+	pub fn join(&self, path: &RoutePath) -> Self {
+		let new_path =
+			path.0.strip_prefix("/").unwrap_or(&path.0).to_path_buf();
+		Self(self.0.join(&new_path))
+	}
 	pub fn inner(&self) -> &Path { &self.0 }
 	pub fn parse_local_path(local_path: &Path) -> Result<Self> {
 		let mut raw_str = local_path

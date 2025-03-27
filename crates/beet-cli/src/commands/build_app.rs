@@ -48,12 +48,12 @@ impl BuildApp {
 				.add(setup)
 				// 2. rebuild the native binary
 				.add(BuildNative::new(&build_cmd, &watch_args))
-				// 3. run the server as soon as we can
-				.add(RunServer::new(&watch_args, &exe_path))
 				// 4. export all static files from the app
 				//   - html files
 				//   - client island entries
 				.add(ExportStatic::new(watch_args, &exe_path))
+				// 3. run the server as soon as we can
+				.add(RunServer::new(&watch_args, &exe_path))
 				// 5. run the wasm steps after export static, before build wasm
 				.add(wasm)
 				// 5. build the wasm binary

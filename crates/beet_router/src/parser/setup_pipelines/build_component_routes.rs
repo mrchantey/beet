@@ -34,7 +34,14 @@ impl BuildComponentRoutes {
 			},
 			file_group: FileGroup::new(src_dir)
 				.with_filter(GlobFilter::default().with_include("*.mockup.rs")),
-			group_to_funcs: FileGroupToFuncs::default(),
+			group_to_funcs: FileGroupToFuncs {
+				route_path_prefix: Some("/mockups".into()),
+				route_path_replace: vec![(
+					".mockup".into(),
+					Default::default(),
+				)],
+				..Default::default()
+			},
 			funcs_to_codegen: FileFuncsToCodegen::default(),
 		}
 	}

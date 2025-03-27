@@ -5,6 +5,7 @@ use beet_rsx::rsx::RsxPipeline;
 use beet_rsx::rsx::RsxPipelineTarget;
 use serde::Deserialize;
 use serde::Serialize;
+use std::path::Path;
 use std::path::PathBuf;
 use sweet::prelude::CanonicalPathBuf;
 use sweet::prelude::ReadFile;
@@ -14,7 +15,12 @@ use syn::Visibility;
 
 /// For a given file group, collect all public functions.
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
-pub struct FileGroupToFuncs {}
+pub struct FileGroupToFuncs {
+	/// prepend the route path
+	pub route_path_prefix: Option<RoutePath>,
+	/// Replace parts of the route path with others
+	pub route_path_replace: Vec<(String, String)>,
+}
 
 impl FileGroupToFuncs {
 	fn build_file_funcs(
@@ -41,7 +47,8 @@ impl FileGroupToFuncs {
 
 		let canonical_path = CanonicalPathBuf::new(file)?;
 		let local_path = PathExt::create_relative(&group_src, &canonical_path)?;
-		let route_path = RoutePath::parse_local_path(&local_path)?;
+		let route_path = self.build_route_path(&local_path)?;
+		println!("{:?}", route_path);
 
 		Ok(FileFuncs {
 			canonical_path,
@@ -49,6 +56,21 @@ impl FileGroupToFuncs {
 			route_path,
 			funcs,
 		})
+	}
+
+	fn build_route_path(&self, local_path: &Path) -> Result<RoutePath> {
+		let path = RoutePath::parse_local_path(&local_path)?;
+		let mut path_str = path.to_string_lossy().to_string();
+
+		for (from, to) in self.route_path_replace.iter() {
+			path_str = path_str.replace(from.as_str(), to.as_str());
+		}
+		let mut path = RoutePath::new(path_str);
+		if let Some(prefix) = &self.route_path_prefix {
+			path = prefix.join(&path);
+		}
+
+		Ok(path)
 	}
 }
 
@@ -62,7 +84,7 @@ impl RsxPipeline<FileGroup, Result<Vec<FileFuncs>>> for FileGroupToFuncs {
 	}
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 /// Collection of all public functions in a file
 pub struct FileFuncs {
 	/// Canonical path to the file

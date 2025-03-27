@@ -16,7 +16,6 @@ pub struct FileFuncsToCodegen {
 	pub func_type: String,
 }
 
-
 impl Default for FileFuncsToCodegen {
 	fn default() -> Self {
 		Self {
@@ -45,17 +44,20 @@ impl FileFuncsToCodegen {
 		file: &mut CodegenFile,
 		funcs: Vec<FileFuncs>,
 	) -> Result<()> {
-		let collect_func = self.build_item_fn(&funcs)?;
+		let collect_func = self.collect_func(&funcs)?;
 		let mod_imports =
 			self.file_funcs_to_mod_imports(file.output_dir()?, &funcs)?;
 		for item in mod_imports.into_iter() {
 			file.add_item(item);
 		}
 		file.add_item(collect_func);
+
+		file.add_item(RouteTree::new(funcs.iter()).into_paths_mod());
+
 		Ok(())
 	}
 
-	fn build_item_fn(&self, funcs: &Vec<FileFuncs>) -> Result<syn::ItemFn> {
+	fn collect_func(&self, funcs: &Vec<FileFuncs>) -> Result<syn::ItemFn> {
 		let files = funcs
 			.iter()
 			.enumerate()
@@ -108,7 +110,7 @@ impl FileFuncsToCodegen {
 	) -> Result<Vec<Expr>> {
 		let local_path_str = file.local_path.to_string_lossy();
 		let mod_ident = Self::index_to_mod_ident(index);
-		let route_path = file.route_path.to_string_lossy();
+		let route_path = file.route_path.to_string_lossy().to_string();
 
 		file.funcs
 			.iter()
