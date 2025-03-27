@@ -4,19 +4,23 @@ use beet::prelude::*;
 fn main() {
 	let cx = app_cx!();
 
-	AppConfig::new()
-		.add_step(BuildFileRoutes::new(
+	AppConfig {
+		native_build_step: BuildFileRouteTree::new(
+			cx.resolve_path("codegen/route_tree.rs"),
+			&cx.pkg_name,
+		)
+		.with_step(BuildFileRoutes::new(
 			cx.resolve_path("routes"),
 			cx.resolve_path("codegen/routes.rs"),
 			&cx.pkg_name,
 		))
-		// ensures design mockups are recollected on reload
-		.add_step(beet::design::prelude::mockups_config())
-		.add_wasm_step(BuildWasmRoutes::new(
+		.with_step(beet::design::prelude::mockups_config()),
+		wasm_build_step: BuildWasmRoutes::new(
 			cx.resolve_path("codegen/wasm.rs"),
 			&cx.pkg_name,
-		))
-		.export();
+		),
+	}
+	.export();
 }
 
 

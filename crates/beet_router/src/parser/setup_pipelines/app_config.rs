@@ -7,33 +7,13 @@ use serde::Serialize;
 /// the name of the package and details for codegen.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct AppConfig {
-	pub build_steps: Vec<SerdeBuildStep>,
+	pub native_build_step: BuildFileRouteTree,
 	// temp, this will not scale
 	/// Steps that should be ran after ExportStatic but before BuildWasm
-	pub wasm_build_steps: Vec<SerdeBuildStep>,
+	pub wasm_build_step: BuildWasmRoutes,
 }
 
 impl AppConfig {
-	/// Create a new Collection Builder.
-	/// ## Panics
-	/// Panics if the current working directory cannot be determined.
-	pub fn new() -> Self {
-		Self {
-			build_steps: Vec::new(),
-			wasm_build_steps: Vec::new(),
-		}
-	}
-
-	pub fn add_step(mut self, group: impl Into<SerdeBuildStep>) -> Self {
-		self.build_steps.push(group.into());
-		self
-	}
-
-	pub fn add_wasm_step(mut self, group: impl Into<SerdeBuildStep>) -> Self {
-		self.wasm_build_steps.push(group.into());
-		self
-	}
-
 	/// Serializes self and writes to stdout, which is collected by the beet cli.
 	///
 	/// ## Panics

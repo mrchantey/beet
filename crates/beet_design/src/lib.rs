@@ -28,22 +28,11 @@ pub mod prelude {
 	#[cfg(feature = "setup")]
 	use beet_router::prelude::*;
 
-	/// Gets the [`AppConfig`] for this crate
-	#[cfg(feature = "setup")]
-	#[rustfmt::skip]
-	pub fn setup_config() -> AppConfig {
-		AppConfig::new()
-			.add_step(mockups_config())
-	}
-
-
 	/// Gets the [`GlobFileGroup`] for this crate
 	#[cfg(feature = "setup")]
-	pub fn mockups_config() -> BuildComponentRoutes {
-		let mut mockups = BuildComponentRoutes::mockups(
-			"crates/beet_design/src",
-			"beet_design",
-		);
+	pub fn mockups_config() -> BuildFileRoutes {
+		let mut mockups =
+			BuildFileRoutes::mockups("crates/beet_design/src", "beet_design");
 		mockups.codegen_file.use_beet_tokens =
 			"use beet_router::as_beet::*;".into();
 		mockups

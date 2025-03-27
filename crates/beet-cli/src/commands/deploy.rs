@@ -36,16 +36,16 @@ impl Deploy {
 		self.build_template_map.build_and_write()?;
 		self.build_cmd.release = true;
 
-		let (setup, wasm) = RunSetup::new(&self.build_cmd)?;
+		let app_config = LoadAppConfig::new(&self.build_cmd)?;
 
 		BuildStepGroup::default()
-			.add(setup)
+			.add(app_config.native_build_step)
 			.add(BuildNative::new(&self.build_cmd, &self.watch_args))
 			.add(ExportStatic::new(
 				&self.watch_args,
 				&self.build_cmd.exe_path(),
 			))
-			.add(wasm)
+			.add(app_config.wasm_build_step)
 			.add(BuildWasm::new(&self.build_cmd, &self.watch_args)?)
 			.run()?;
 		self.lambda_build()?;
