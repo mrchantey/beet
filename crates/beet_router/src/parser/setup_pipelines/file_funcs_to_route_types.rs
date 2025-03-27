@@ -36,7 +36,7 @@ impl RsxPipeline<Vec<FileFuncs>, Vec<RouteType>> for FileFuncsToRouteTypes {
 
 pub struct RouteType {
 	pub func: ItemFn,
-	pub route: Route,
+	pub route: RoutePath,
 }
 
 impl RsxPipelineTarget for RouteType {}

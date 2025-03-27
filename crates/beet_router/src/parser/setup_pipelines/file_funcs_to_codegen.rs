@@ -107,10 +107,17 @@ impl FileFuncsToCodegen {
 	) -> Result<Vec<Expr>> {
 		let local_path_str = file.local_path.to_string_lossy();
 		let mod_ident = Self::index_to_mod_ident(index);
+		let route_path = file.route.to_string_lossy();
+
 		file.funcs
 			.iter()
 			.map(|sig| {
-				self.file_func_to_collect(&mod_ident, &local_path_str, &sig)
+				self.file_func_to_collect(
+					&mod_ident,
+					&route_path,
+					&local_path_str,
+					&sig,
+				)
 			})
 			.collect()
 	}
@@ -118,6 +125,7 @@ impl FileFuncsToCodegen {
 	pub fn file_func_to_collect(
 		&self,
 		mod_ident: &Ident,
+		route_path: &str,
 		local_path: &str,
 		sig: &Signature,
 	) -> Result<syn::Expr> {
@@ -125,8 +133,9 @@ impl FileFuncsToCodegen {
 		let ident_str = ident.to_string();
 		let func = syn::parse_quote! {
 			FileFunc::new(
-				#local_path,
 				#ident_str,
+				#local_path,
+				#route_path,
 				#mod_ident::#ident
 			)
 		};

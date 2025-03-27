@@ -8,7 +8,8 @@ use std::path::Path;
 use sweet::prelude::*;
 use syn::Expr;
 
-
+/// Every codegen file is created via this struct. It contains
+/// several utilities and standards that make the whole thing nicer.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct CodegenFile {
 	/// The output codegen file location.

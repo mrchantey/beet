@@ -41,7 +41,7 @@ impl FileGroupToFuncs {
 
 		let canonical_path = CanonicalPathBuf::new(file)?;
 		let local_path = PathExt::create_relative(&group_src, &canonical_path)?;
-		let route = Route::parse(&local_path)?;
+		let route = RoutePath::parse(&local_path)?;
 
 		Ok(FileFuncs {
 			canonical_path,
@@ -70,7 +70,7 @@ pub struct FileFuncs {
 	/// Path relative to the [`FileGroup::src`]
 	pub local_path: PathBuf,
 	/// Route for the file
-	pub route: Route,
+	pub route: RoutePath,
 	/// Tokens for the functions visited
 	pub funcs: Vec<syn::Signature>,
 }
@@ -81,11 +81,19 @@ impl RsxPipelineTarget for FileFuncs {}
 
 
 #[derive(Debug, Clone)]
-pub struct Route {
-	pub raw_str: String,
+pub struct RoutePath(PathBuf);
+
+impl std::ops::Deref for RoutePath {
+	type Target = PathBuf;
+	fn deref(&self) -> &Self::Target { &self.0 }
 }
 
-impl Route {
+impl Into<PathBuf> for RoutePath {
+	fn into(self) -> PathBuf { self.0 }
+}
+
+impl RoutePath {
+	pub fn new(path: impl Into<PathBuf>) -> Self { Self(path.into()) }
 	pub fn parse(local_path: &Path) -> Result<Self> {
 		let mut raw_str = local_path
 			.to_string_lossy()
@@ -99,13 +107,16 @@ impl Route {
 			}
 		};
 		raw_str = format!("/{}", raw_str);
-		Ok(Self { raw_str })
+
+		Ok(Self(PathBuf::from(raw_str)))
 	}
 }
 
 
 #[cfg(test)]
 mod test {
+	use std::path::Path;
+
 	use crate::prelude::*;
 	use beet_rsx::prelude::*;
 	use sweet::prelude::*;
@@ -116,7 +127,10 @@ mod test {
 			.pipe(FileGroupToFuncs::default())
 			.unwrap();
 		expect(funcs.len()).to_be(3);
-		let docs = funcs.iter().find(|f| f.route.raw_str == "/docs").unwrap();
+		let docs = funcs
+			.iter()
+			.find(|f| &*f.route == Path::new("/docs"))
+			.unwrap();
 		expect(docs.funcs.len()).to_be(1);
 		expect(&docs.local_path.to_string_lossy()).to_be("docs/index.rs");
 		expect(docs.canonical_path.to_string_lossy().ends_with(

@@ -2,31 +2,29 @@ use crate::prelude::*;
 use anyhow::Result;
 use beet_rsx::prelude::*;
 use std::future::Future;
+use std::path::PathBuf;
 use std::pin::Pin;
 
-pub type StaticRoute =
-	Box<dyn Fn() -> Pin<Box<dyn Future<Output = Result<RsxRoot>>>>>;
 
 /// A simple static router
 #[derive(Default)]
-pub struct StaticRoutesToRsx;
-
-impl RsxPipelineTarget for RouteTree<StaticRoute> {}
+pub struct FileFuncsToRsx;
 
 impl
 	RsxPipeline<
-		RouteTree<StaticRoute>,
+		Vec<FileFunc<DefaultFileFunc>>,
 		Pin<Box<dyn Future<Output = Result<Vec<(RouteInfo, RsxRoot)>>>>>,
-	> for StaticRoutesToRsx
+	> for FileFuncsToRsx
 {
 	fn apply(
 		self,
-		routes: RouteTree<StaticRoute>,
+		routes: Vec<FileFunc<DefaultFileFunc>>,
 	) -> Pin<Box<dyn Future<Output = Result<Vec<(RouteInfo, RsxRoot)>>>>> {
 		Box::pin(async move {
-			futures::future::try_join_all(routes.flatten().into_iter().map(
-				async |(info, func)| {
-					let node = (func)().await?;
+			futures::future::try_join_all(routes.into_iter().map(
+				async |func| {
+					let node = (func.func)().await?;
+					let info = func.into_route_info();
 					Ok((info, node))
 				},
 			))
@@ -35,41 +33,18 @@ impl
 	}
 }
 
-impl<F: 'static + Clone + Fn() -> RsxRoot> IntoRoute<StaticRoute, ()> for F {
-	fn into_route(&self) -> StaticRoute {
-		let func = self.clone();
-		Box::new(move || {
-			let func = func.clone();
-			Box::pin(async move { Ok(func()) })
-		})
-	}
-}
-
-pub struct AsyncStaticRouteMarker;
-
-impl<F> IntoRoute<StaticRoute, AsyncStaticRouteMarker> for F
-where
-	F: 'static + Clone + AsyncFn() -> RsxRoot,
-{
-	fn into_route(&self) -> StaticRoute {
-		let func = self.clone();
-		Box::new(move || {
-			let func = func.clone();
-			Box::pin(async move { Ok(func().await) })
-		})
-	}
-}
-
-impl IntoCollection<StaticRoute> for RouteTree<StaticRoute> {
+/// allows directly adding a `FileFunc` to the `AppRouter`
+impl IntoCollection<Self> for Vec<FileFunc<DefaultFileFunc>> {
 	fn into_collection(self) -> impl Collection {
 		move |app: &mut AppRouter| {
 			#[cfg(not(target_arch = "wasm32"))]
 			app.on_run_static.push(Box::new(move |args| {
 				let html_dir = args.html_dir.clone();
 				Box::pin(async move {
-					let routes_mod_path = self.mod_path.clone();
+					// TODO we'll codegen to a seperate file
+					let routes_mod_path = PathBuf::default();
 					let routes = self
-						.pipe(StaticRoutesToRsx::default())
+						.pipe(FileFuncsToRsx::default())
 						.await?
 						.pipe(ApplyRouteTemplates::default())?
 						.into_iter()
@@ -109,17 +84,18 @@ mod test {
 	#[sweet::test]
 	async fn works() {
 		let html = crate::test_site::routes::collect()
-			.pipe(StaticRoutesToRsx::default())
+			.pipe(FileFuncsToRsx::default())
 			.await
 			.unwrap()
 			.pipe(RoutesToHtml::default())
 			.unwrap();
 
-		// expect(html.len()).to_be(2);
+		expect(html.len()).to_be(3);
 
-		// expect(&html[0].0.path.to_string_lossy()).to_be("/contributing");
-		// expect(&html[0].1.clone().pipe(RenderHtml::default()).unwrap()).to_be("<!DOCTYPE html><html><head></head><body><div><h1 data-beet-rsx-idx=\"5\">Test Site</h1>party time dude!</div></body></html>");
-		// expect(&html[1].0.path.to_string_lossy()).to_be("/");
-		// expect(&html[1].1.clone().pipe(RenderHtml::default()).unwrap()).to_be("<!DOCTYPE html><html><head></head><body><div><h1 data-beet-rsx-idx=\"5\">Test Site</h1>party time!</div></body></html>");
+		expect(&html[0].0.path.to_string_lossy()).to_be("/docs");
+		expect(&html[1].0.path.to_string_lossy()).to_be("/contributing");
+		expect(&html[2].0.path.to_string_lossy()).to_be("/");
+		expect(&html[0].1.clone().pipe(RenderHtml::default()).unwrap())
+			.to_contain("<!DOCTYPE html>");
 	}
 }

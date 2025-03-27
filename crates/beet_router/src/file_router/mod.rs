@@ -64,48 +64,15 @@ where
 
 impl RouteInfo {
 	/// the method used by `beet_router`
-	pub fn new(path: &str, method: &str) -> Self {
+	pub fn new(path: impl Into<PathBuf>, method: &str) -> Self {
 		Self {
-			path: PathBuf::from(path),
+			path: path.into(),
 			method: Method::from_str(method).unwrap(),
 		}
 	}
 }
 
-
 impl RsxPipelineTarget for RouteInfo {}
-
-pub struct RouteTree<T> {
-	/// The path to the auto generated mod file for this tree,
-	/// usually something like `src/routes/mod.rs`
-	pub mod_path: PathBuf,
-	pub routes: Vec<(RouteInfo, T)>,
-	pub children: Vec<RouteTree<T>>,
-}
-
-impl<T> RouteTree<T> {
-	pub fn add_route<M, R: IntoRoute<T, M>>(
-		mut self,
-		(info, route): (RouteInfo, R),
-	) -> Self {
-		self.routes.push((info, route.into_route()));
-		self
-	}
-	pub fn flatten(self) -> Vec<(RouteInfo, T)> {
-		let mut routes = self.routes;
-		for child in self.children {
-			routes.extend(child.flatten());
-		}
-		routes
-	}
-}
-
-/// Routes usually need a level of trait indirection to
-/// allow for multiple types of routes to be added to the same tree
-pub trait IntoRoute<T, M>: 'static {
-	fn into_route(&self) -> T;
-}
-
 
 #[cfg(test)]
 mod test {
