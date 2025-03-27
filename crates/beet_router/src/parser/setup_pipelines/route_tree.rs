@@ -9,14 +9,12 @@ use syn::ItemMod;
 ///
 /// ## Example
 /// This is an example output for the following input files
+///
+/// - `index.rs`
+/// - `foo/bar/index.rs`
+/// - `foo/bar/bazz.rs`
+///
 /// ```
-///
-/// let files = vec![
-/// 	FileFuncs::new("index.rs", "/"),
-/// 	FileFuncs::new("foo/bar/index.rs", "/foo/bar"),
-/// 	FileFuncs::new("foo/bar/bazz.rs", "/foo/bar/bazz"),
-/// ];
-///
 /// mod paths{
 /// 	pub fn index()->&'static str{
 /// 		"/"
@@ -25,7 +23,7 @@ use syn::ItemMod;
 /// 	mod foo{
 /// 	 	mod bar{
 ///  			pub fn index()->&'static str{
-/// 				"/foo/bar/index.rs"
+/// 				"/foo/bar"
 /// 			}
 /// 			pub fn bazz()->&'static str{
 /// 				"/foo/bar/bazz"
