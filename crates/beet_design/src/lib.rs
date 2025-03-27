@@ -11,7 +11,7 @@ pub mod interactive;
 pub mod layout;
 /// Collection of mockups for all components
 #[cfg(all(not(feature = "setup"), not(target_arch = "wasm32")))]
-#[path = "codegen/mockups.rs"]
+#[path = "./codegen/mockups.rs"]
 pub mod mockups;
 
 // #[cfg(not(feature = "setup"))]

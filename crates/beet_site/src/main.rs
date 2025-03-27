@@ -27,5 +27,3 @@ fn main() {
 		// .add_plugin(Router::new)
 		.run();
 }
-
-

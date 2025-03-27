@@ -5,7 +5,6 @@ use std::future::Future;
 use std::pin::Pin;
 
 
-/// A simple static router
 #[derive(Default)]
 pub struct FileFuncsToRsx;
 
@@ -56,8 +55,7 @@ impl IntoCollection<Self> for Vec<FileFunc<DefaultFileFunc>> {
 					// but before `DefaultTransformations` are applied.
 					// i dont think its nessecary because islands only register effect
 					// but if it turns out to be we can move some pipes around
-					(&routes)
-						.pipe(RoutesToClientIslandMap::default())?;
+					(&routes).pipe(RoutesToClientIslandMap::default())?;
 
 					routes
 						.pipe(RoutesToHtml::default())?

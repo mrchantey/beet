@@ -13,6 +13,7 @@ categories.workspace = true
 publish = true
 
 [features]
+# default = ["setup"]
 setup = []
 
 [dependencies]
