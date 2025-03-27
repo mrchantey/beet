@@ -8,24 +8,39 @@ use sweet::prelude::*;
 use syn::ItemFn;
 
 /// edit the routes/mod.rs to include a #[wasm] collect func
-#[derive(Debug, Serialize, Deserialize)]
-pub struct CollectWasmRoutes {
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BuildWasmRoutes {
 	islands_map_path: PathBuf,
 	codegen_file: CodegenFile,
 }
 
-impl Default for CollectWasmRoutes {
-	fn default() -> Self {
+impl BuildWasmRoutes {
+	pub fn new(out_file: impl Into<WorkspacePathBuf>, pkg_name: &str) -> Self {
+		Self::new_with_options(
+			out_file,
+			pkg_name,
+			RoutesToClientIslandMap::DEFAULT_ISLANDS_MAP_PATH.into(),
+		)
+	}
+
+
+	pub fn new_with_options(
+		out_file: impl Into<WorkspacePathBuf>,
+		pkg_name: &str,
+		islands_map_path: PathBuf,
+	) -> Self {
+		let output = out_file.into().into_canonical_unchecked();
+
 		Self {
-			islands_map_path: PathBuf::from(
-				RoutesToClientIslandMap::DEFAULT_ISLANDS_MAP_PATH,
-			),
-			codegen_file: CodegenFile::default(),
+			islands_map_path,
+			codegen_file: CodegenFile {
+				output,
+				pkg_name: Some(pkg_name.into()),
+				..Default::default()
+			},
 		}
 	}
-}
 
-impl CollectWasmRoutes {
 	fn collect_fn(islands_map: &ClientIslandMap) -> ItemFn {
 		let tokens = islands_map.into_mount_tokens();
 		syn::parse_quote! {
@@ -37,7 +52,7 @@ impl CollectWasmRoutes {
 	}
 }
 
-impl BuildStep for CollectWasmRoutes {
+impl BuildStep for BuildWasmRoutes {
 	fn run(&self) -> Result<()> {
 		let islands_map = ReadFile::to_bytes(&self.islands_map_path)?;
 		let islands_map = ron::de::from_bytes::<ClientIslandMap>(&islands_map)?;
@@ -53,7 +68,7 @@ impl BuildStep for CollectWasmRoutes {
 #[cfg(test)]
 mod test {
 
-	use super::CollectWasmRoutes;
+	use super::BuildWasmRoutes;
 	use crate::prelude::*;
 	use http::Method;
 	use quote::ToTokens;
@@ -79,7 +94,7 @@ mod test {
 		let island_map_tokens = island_map.into_mount_tokens();
 
 		expect(
-			CollectWasmRoutes::collect_fn(&island_map)
+			BuildWasmRoutes::collect_fn(&island_map)
 				.to_token_stream()
 				.to_string(),
 		)

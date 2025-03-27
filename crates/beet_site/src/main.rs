@@ -5,13 +5,17 @@ fn main() {
 	let cx = app_cx!();
 
 	AppConfig::new()
-		.add_step(BuildFileRoutes {
-			files: "crates/beet_site/src/routes".into(),
-			pkg_name: Some(cx.pkg_name.clone()),
-			..Default::default()
-		})
+		.add_step(BuildFileRoutes::new(
+			cx.resolve_path("routes"),
+			cx.resolve_path("codegen/routes.rs"),
+			&cx.pkg_name,
+		))
 		// ensures design mockups are recollected on reload
 		.add_step(beet::design::prelude::mockups())
+		.add_wasm_step(BuildWasmRoutes::new(
+			cx.resolve_path("codegen/routes_wasm.rs"),
+			&cx.pkg_name,
+		))
 		.export();
 }
 

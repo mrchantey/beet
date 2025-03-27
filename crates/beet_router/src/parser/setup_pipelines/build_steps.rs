@@ -10,6 +10,7 @@ use sweet::prelude::*;
 pub enum SerdeBuildStep {
 	FileRoutes(BuildFileRoutes),
 	ComponentRoutes(BuildComponentRoutes),
+	WasmRoutes(BuildWasmRoutes),
 }
 
 
@@ -21,11 +22,16 @@ impl Into<SerdeBuildStep> for BuildComponentRoutes {
 	fn into(self) -> SerdeBuildStep { SerdeBuildStep::ComponentRoutes(self) }
 }
 
+impl Into<SerdeBuildStep> for BuildWasmRoutes {
+	fn into(self) -> SerdeBuildStep { SerdeBuildStep::WasmRoutes(self) }
+}
+
 impl BuildStep for SerdeBuildStep {
 	fn run(&self) -> Result<()> {
 		match self {
 			SerdeBuildStep::FileRoutes(step) => step.run(),
 			SerdeBuildStep::ComponentRoutes(step) => step.run(),
+			SerdeBuildStep::WasmRoutes(step) => step.run(),
 		}
 	}
 }
