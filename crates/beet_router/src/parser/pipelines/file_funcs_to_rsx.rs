@@ -2,7 +2,6 @@ use crate::prelude::*;
 use anyhow::Result;
 use beet_rsx::prelude::*;
 use std::future::Future;
-use std::path::PathBuf;
 use std::pin::Pin;
 
 
@@ -41,8 +40,6 @@ impl IntoCollection<Self> for Vec<FileFunc<DefaultFileFunc>> {
 			app.on_run_static.push(Box::new(move |args| {
 				let html_dir = args.html_dir.clone();
 				Box::pin(async move {
-					// TODO we'll codegen to a seperate file
-					let routes_mod_path = PathBuf::default();
 					let routes = self
 						.pipe(FileFuncsToRsx::default())
 						.await?
@@ -60,7 +57,7 @@ impl IntoCollection<Self> for Vec<FileFunc<DefaultFileFunc>> {
 					// i dont think its nessecary because islands only register effect
 					// but if it turns out to be we can move some pipes around
 					(&routes)
-						.pipe(RoutesToClientIslandMap::new(routes_mod_path))?;
+						.pipe(RoutesToClientIslandMap::default())?;
 
 					routes
 						.pipe(RoutesToHtml::default())?

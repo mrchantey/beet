@@ -8,27 +8,21 @@ use sweet::prelude::*;
 #[derive(Debug)]
 pub struct RoutesToClientIslandMap {
 	pub islands_map_path: PathBuf,
-	/// The [`CodegenFile::output`] path for the routes module.
-	/// This will loaded, edited and saved again by the wasm routes codegen.
-	// TODO probs cleaner to just use a seperate file
-	pub codegen_output: PathBuf,
+}
+
+impl Default for RoutesToClientIslandMap {
+	fn default() -> Self {
+		Self {
+			islands_map_path: Self::DEFAULT_ISLANDS_MAP_PATH.into(),
+		}
+	}
 }
 
 
 impl RoutesToClientIslandMap {
-	pub fn new(routes_mod_path: impl Into<PathBuf>) -> Self {
+	pub fn new(island_map_path: impl Into<PathBuf>) -> Self {
 		Self {
-			codegen_output: routes_mod_path.into(),
-			islands_map_path: Self::DEFAULT_ISLANDS_MAP_PATH.into(),
-		}
-	}
-	pub fn new_with_islands_map_path(
-		routes_mod_path: impl Into<PathBuf>,
-		islands_map_path: impl Into<PathBuf>,
-	) -> Self {
-		Self {
-			codegen_output: routes_mod_path.into(),
-			islands_map_path: islands_map_path.into(),
+			islands_map_path: island_map_path.into(),
 		}
 	}
 }
@@ -52,10 +46,7 @@ impl RsxPipeline<&Vec<(RouteInfo, RsxRoot)>, Result<()>>
 
 
 		let ron = ron::ser::to_string_pretty(
-			&ClientIslandMap {
-				routes_mod_path: self.codegen_output,
-				map,
-			},
+			&ClientIslandMap { map },
 			Default::default(),
 		)?;
 		FsExt::write(&self.islands_map_path, &ron)?;

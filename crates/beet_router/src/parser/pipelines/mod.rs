@@ -8,3 +8,5 @@ mod spa_to_html_file;
 pub use spa_to_html_file::*;
 mod client_island_map;
 pub use client_island_map::*;
+mod file_funcs_to_rsx;
+pub use file_funcs_to_rsx::*;

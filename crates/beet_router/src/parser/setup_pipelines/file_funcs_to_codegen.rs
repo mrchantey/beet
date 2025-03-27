@@ -168,7 +168,7 @@ mod test {
 		// coarse test, it compiles and outputs something
 		expect(codegen_file.len()).to_be_greater_than(500);
 		// ensure no absolute paths
-		println!("{}", codegen_file);
+		// println!("{}", codegen_file);
 		expect(codegen_file).not().to_contain("/home/");
 	}
 }

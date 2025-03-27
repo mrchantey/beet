@@ -2,15 +2,10 @@ use crate::prelude::*;
 use anyhow::Result;
 use beet_rsx::prelude::*;
 use rapidhash::RapidHashMap;
-use std::path::PathBuf;
-
 
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone)]
 pub struct ClientIslandMap {
-	/// The path to the routes/mod.rs file at the root of these routes.
-	/// This is used for editing the routes file.
-	pub routes_mod_path: PathBuf,
 	pub map: RapidHashMap<RouteInfo, Vec<ClientIsland>>,
 }
 
@@ -115,7 +110,6 @@ mod test {
 
 		expect(
 			ClientIslandMap {
-				routes_mod_path: "foobar".into(),
 				map: vec![(RouteInfo::new("/", "get"), vec![island.clone()])]
 					.into_iter()
 					.collect(),
