@@ -32,10 +32,10 @@ impl BuildStep for SerdeBuildStep {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BuildComponentRoutes {
-	codegen_file: CodegenFile,
-	file_group: FileGroup,
-	group_to_funcs: FileGroupToFuncs,
-	funcs_to_codegen: FileFuncsToCodegen,
+	pub codegen_file: CodegenFile,
+	pub file_group: FileGroup,
+	pub group_to_funcs: FileGroupToFuncs,
+	pub funcs_to_codegen: FileFuncsToCodegen,
 }
 
 
@@ -84,23 +84,26 @@ impl BuildStep for BuildComponentRoutes {
 
 
 
-const HTTP_METHODS: [&str; 9] = [
-	"get", "post", "put", "delete", "head", "options", "connect", "trace",
-	"patch",
-];
+// const HTTP_METHODS: [&str; 9] = [
+// 	"get", "post", "put", "delete", "head", "options", "connect", "trace",
+// 	"patch",
+// ];
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BuildFileRoutes {
-	codegen_file: CodegenFile,
-	file_group: FileGroup,
-	group_to_funcs: FileGroupToFuncs,
-	funcs_to_codegen: FileFuncsToCodegen,
+	pub codegen_file: CodegenFile,
+	pub file_group: FileGroup,
+	pub group_to_funcs: FileGroupToFuncs,
+	pub funcs_to_codegen: FileFuncsToCodegen,
 }
 impl BuildFileRoutes {
-	pub fn new(src_dir: impl Into<WorkspacePathBuf>, pkg_name: &str) -> Self {
-		let src_dir = src_dir.into();
-		let output =
-			CanonicalPathBuf::new_unchecked(src_dir.join("codegen/routes.rs"));
+	pub fn new(
+		src_dir: impl Into<WorkspacePathBuf>,
+		out_file: impl Into<WorkspacePathBuf>,
+		pkg_name: &str,
+	) -> Self {
+		let src_dir = src_dir.into().into_canonical_unchecked();
+		let output = out_file.into().into_canonical_unchecked();
 
 		Self {
 			codegen_file: CodegenFile {
@@ -108,13 +111,11 @@ impl BuildFileRoutes {
 				pkg_name: Some(pkg_name.into()),
 				..Default::default()
 			},
-			file_group: FileGroup::new_workspace_rel(src_dir)
-				.unwrap()
-				.with_filter(
-					GlobFilter::default()
-						.with_include("*.rs")
-						.with_exclude("*mod.rs"),
-				),
+			file_group: FileGroup::new(src_dir).with_filter(
+				GlobFilter::default()
+					.with_include("*.rs")
+					.with_exclude("*mod.rs"),
+			),
 			group_to_funcs: FileGroupToFuncs::default(),
 			funcs_to_codegen: FileFuncsToCodegen::default(),
 		}

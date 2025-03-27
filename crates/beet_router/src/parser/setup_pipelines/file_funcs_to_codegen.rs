@@ -5,7 +5,9 @@ use serde::Deserialize;
 use serde::Serialize;
 use std::path::Path;
 use sweet::prelude::*;
-use syn::Block;
+use syn::Expr;
+use syn::Ident;
+use syn::ItemMod;
 use syn::Signature;
 use syn::Type;
 
@@ -43,19 +45,21 @@ impl FileFuncsToCodegen {
 		file: &mut CodegenFile,
 		funcs: Vec<FileFuncs>,
 	) -> Result<()> {
-		let collect_func = self.build_item_fn(file.output_dir()?, funcs)?;
+		let collect_func = self.build_item_fn(&funcs)?;
+		let mod_imports =
+			self.file_funcs_to_mod_imports(file.output_dir()?, &funcs)?;
+		for item in mod_imports.into_iter() {
+			file.add_item(item);
+		}
 		file.add_item(collect_func);
 		Ok(())
 	}
 
-	fn build_item_fn(
-		&self,
-		out_dir: &Path,
-		funcs: Vec<FileFuncs>,
-	) -> Result<syn::ItemFn> {
+	fn build_item_fn(&self, funcs: &Vec<FileFuncs>) -> Result<syn::ItemFn> {
 		let files = funcs
-			.into_iter()
-			.map(|file| self.file_funcs_to_blocks(&out_dir, file))
+			.iter()
+			.enumerate()
+			.map(|(index, file)| self.file_funcs_to_collect(index, file))
 			.collect::<Result<Vec<_>>>()?
 			.into_iter()
 			.flatten()
@@ -70,45 +74,66 @@ impl FileFuncsToCodegen {
 		})
 	}
 
-	pub fn file_funcs_to_blocks(
+	// this approach is cleaner than importing in each collect function,
+	// and also rust-analyzer has an easier time resolving file level imports
+	fn file_funcs_to_mod_imports(
 		&self,
 		canonical_out_dir: &Path,
-		file: FileFuncs,
-	) -> Result<Vec<Block>> {
-		let mod_path =
-			PathExt::create_relative(canonical_out_dir, &file.canonical_path)?;
-		let mod_path_str = mod_path.to_string_lossy();
-		let local_path_str = file.local_path.to_string_lossy();
-
-		let funcs = file
-			.funcs
-			.into_iter()
-			.map(|sig| {
-				self.file_func_to_block(&mod_path_str, &local_path_str, &sig)
+		funcs: &Vec<FileFuncs>,
+	) -> Result<Vec<ItemMod>> {
+		funcs
+			.iter()
+			.enumerate()
+			.map(|(index, file)| {
+				let mod_path = PathExt::create_relative(
+					canonical_out_dir,
+					&file.canonical_path,
+				)?;
+				let mod_path_str = mod_path.to_string_lossy();
+				let mod_ident = Self::index_to_mod_ident(index);
+				let mod_import = syn::parse_quote! {
+					#[path = #mod_path_str]
+					mod #mod_ident;
+				};
+				Ok(mod_import)
 			})
-			.collect::<Result<Vec<_>>>()?;
-
-		Ok(funcs)
+			.collect()
 	}
 
-	pub fn file_func_to_block(
+	pub fn file_funcs_to_collect(
 		&self,
-		mod_path: &str,
+		index: usize,
+		file: &FileFuncs,
+	) -> Result<Vec<Expr>> {
+		let local_path_str = file.local_path.to_string_lossy();
+		let mod_ident = Self::index_to_mod_ident(index);
+		file.funcs
+			.iter()
+			.map(|sig| {
+				self.file_func_to_collect(&mod_ident, &local_path_str, &sig)
+			})
+			.collect()
+	}
+
+	pub fn file_func_to_collect(
+		&self,
+		mod_ident: &Ident,
 		local_path: &str,
 		sig: &Signature,
-	) -> Result<syn::Block> {
+	) -> Result<syn::Expr> {
 		let ident = &sig.ident;
 		let ident_str = ident.to_string();
-		let func = syn::parse_quote! {{
-		#[path=#mod_path]
-			mod component;
+		let func = syn::parse_quote! {
 			FileFunc::new(
 				#local_path,
 				#ident_str,
-				component::#ident
+				#mod_ident::#ident
 			)
-		}};
+		};
 		Ok(func)
+	}
+	fn index_to_mod_ident(index: usize) -> Ident {
+		Ident::new(&format!("file{}", index), proc_macro2::Span::call_site())
 	}
 }
 
@@ -133,6 +158,8 @@ mod test {
 			.to_string();
 		// coarse test, it compiles and outputs something
 		expect(codegen_file.len()).to_be_greater_than(500);
-		// println!("{}", codegen_file);
+		// ensure no absolute paths
+		println!("{}", codegen_file);
+		expect(codegen_file).not().to_contain("/home/");
 	}
 }

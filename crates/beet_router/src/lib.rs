@@ -37,5 +37,6 @@ pub mod as_beet {
 	pub use beet_rsx::as_beet::*;
 }
 
-#[cfg(any(test, feature = "_test_site"))]
+// #[cfg(feature = "setup")]
+#[cfg(any(test, feature = "setup"))]
 pub mod test_site;

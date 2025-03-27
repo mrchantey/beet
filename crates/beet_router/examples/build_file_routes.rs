@@ -5,17 +5,17 @@ use sweet::prelude::ReadFile;
 /// Demonstration of how to collect all files in the 'routes' dir
 /// and create a `routes.rs` file containing them all.
 pub fn main() {
-	let parser =
-		BuildFileRoutes::new("crates/beet_router/src/test_site", "beet_router");
+	let out_file = "crates/beet_router/src/test_site/codegen/routes.rs";
+	let mut parser = BuildFileRoutes::new(
+		"crates/beet_router/src/test_site/routes",
+		out_file,
+		"beet_router",
+	);
+	parser.codegen_file.use_beet_tokens = "use beet_router::as_beet::*;".into();
 	parser.run().unwrap();
-	let file =
-		ReadFile::to_string("crates/beet_router/src/test_site/routes.rs")
-			.unwrap();
+	let file = ReadFile::to_string(out_file).unwrap();
 
 
 	// let routes = parser.build_strings().unwrap();
-	println!(
-		"wrote crates/beet_router/src/test_site/codegen/router.rs\n{:#?}",
-		file
-	);
+	println!("wrote {}\n{}", out_file, file);
 }
