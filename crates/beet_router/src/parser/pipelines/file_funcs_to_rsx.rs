@@ -10,13 +10,13 @@ pub struct FileFuncsToRsx;
 
 impl
 	RsxPipeline<
-		Vec<FileFunc<DefaultFileFunc>>,
+		Vec<RouteFunc<DefaultRouteFunc>>,
 		Pin<Box<dyn Future<Output = Result<Vec<(RouteInfo, RsxRoot)>>>>>,
 	> for FileFuncsToRsx
 {
 	fn apply(
 		self,
-		routes: Vec<FileFunc<DefaultFileFunc>>,
+		routes: Vec<RouteFunc<DefaultRouteFunc>>,
 	) -> Pin<Box<dyn Future<Output = Result<Vec<(RouteInfo, RsxRoot)>>>>> {
 		Box::pin(async move {
 			futures::future::try_join_all(routes.into_iter().map(
@@ -31,8 +31,8 @@ impl
 	}
 }
 
-/// allows directly adding a `FileFunc` to the `AppRouter`
-impl IntoCollection<Self> for Vec<FileFunc<DefaultFileFunc>> {
+/// allows directly adding a [`RouteFunc`] to the `AppRouter`
+impl IntoCollection<Self> for Vec<RouteFunc<DefaultRouteFunc>> {
 	fn into_collection(self) -> impl Collection {
 		move |app: &mut AppRouter| {
 			#[cfg(not(target_arch = "wasm32"))]

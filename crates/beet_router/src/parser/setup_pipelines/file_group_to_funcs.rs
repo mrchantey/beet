@@ -99,8 +99,8 @@ impl RsxPipeline<FileGroup, Result<Vec<FileFuncs>>> for FileGroupToFuncs {
 	}
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
 /// Collection of all public functions in a file
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FileFuncs {
 	/// The best name for this file. If it is an index file, it will be "index",
 	/// otherwise it will be the last segment of the `route_path`.

@@ -19,7 +19,7 @@ pub struct FileFuncsToCodegen {
 impl Default for FileFuncsToCodegen {
 	fn default() -> Self {
 		Self {
-			func_type: "DefaultFileFunc".into(),
+			func_type: "DefaultRouteFunc".into(),
 		}
 	}
 }
@@ -69,7 +69,7 @@ impl FileFuncsToCodegen {
 
 		Ok(syn::parse_quote! {
 			/// Collect all functions from their files as defined in the [`AppConfig`]
-			pub fn collect() -> Vec<FileFunc<#func_type>> {
+			pub fn collect() -> Vec<RouteFunc<#func_type>> {
 				vec![#(#files),*]
 			}
 		})
@@ -133,7 +133,7 @@ impl FileFuncsToCodegen {
 		let ident = &sig.ident;
 		let ident_str = ident.to_string();
 		let func = syn::parse_quote! {
-			FileFunc::new(
+			RouteFunc::new(
 				#ident_str,
 				#local_path,
 				#route_path,
