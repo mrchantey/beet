@@ -1,5 +1,5 @@
-mod cargo_cmd;
 mod build;
+mod cargo_cmd;
 pub use cargo_cmd::*;
 mod build_cmd;
 pub use build_cmd::*;
@@ -7,9 +7,9 @@ mod build_app;
 pub use build_app::*;
 mod deploy;
 mod watch;
+pub use build::*;
 pub use deploy::*;
 pub use watch::*;
-pub use build::*;
 
 use anyhow::Result;
 use clap::Subcommand;
