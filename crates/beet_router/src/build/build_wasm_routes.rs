@@ -1,16 +1,13 @@
 use crate::prelude::*;
 use anyhow::Result;
 use beet_rsx::rsx::BuildStep;
-use serde::Deserialize;
-use serde::Serialize;
-use std::path::PathBuf;
 use sweet::prelude::*;
 use syn::ItemFn;
 
 /// Create a rust file that collects all the island mount functions
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub struct BuildWasmRoutes {
-	islands_map_path: PathBuf,
+	islands_map_path: CanonicalPathBuf,
 	codegen_file: CodegenFile,
 }
 
@@ -18,8 +15,8 @@ impl BuildWasmRoutes {
 	pub fn new(codegen_file: CodegenFile) -> Self {
 		Self {
 			codegen_file,
-			islands_map_path: RoutesToClientIslandMap::DEFAULT_ISLANDS_MAP_PATH
-				.into(),
+			islands_map_path: RoutesToClientIslandMap::default_islands_map_path(
+			),
 		}
 	}
 

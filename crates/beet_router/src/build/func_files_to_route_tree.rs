@@ -10,7 +10,7 @@ use syn::ItemFn;
 use syn::ItemMod;
 
 
-/// Create a tree of routes from a list of [`FileFuncs`]`,
+/// Create a tree of routes from a list of [`FuncFile`]`,
 /// that can then be converted to an [`ItemMod`] to be used in the router.
 ///
 /// ## Example
@@ -39,12 +39,12 @@ use syn::ItemMod;
 /// }
 /// ```
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct FileFuncsToRouteTree {
+pub struct FuncFilesToRouteTree {
 	pub codgen_file: CodegenFile,
 }
 
-impl RsxPipeline<Vec<FileFuncs>, Result<()>> for FileFuncsToRouteTree {
-	fn apply(self, value: Vec<FileFuncs>) -> Result<()> {
+impl RsxPipeline<Vec<FuncFile>, Result<()>> for FuncFilesToRouteTree {
+	fn apply(self, value: Vec<FuncFile>) -> Result<()> {
 		let tree = RouteTreeBuilder::from_files(value.iter());
 		let mut codegen_file = self.codgen_file;
 		codegen_file.add_item(tree.into_paths_mod());
@@ -59,7 +59,7 @@ impl RsxPipeline<Vec<FileFuncs>, Result<()>> for FileFuncsToRouteTree {
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct RouteTreeBuilder<'a> {
 	name: String,
-	files: Vec<&'a FileFuncs>,
+	files: Vec<&'a FuncFile>,
 	children: RapidHashMap<String, RouteTreeBuilder<'a>>,
 }
 
@@ -72,7 +72,7 @@ impl<'a> RouteTreeBuilder<'a> {
 		}
 	}
 
-	pub fn from_files(files: impl Iterator<Item = &'a FileFuncs>) -> Self {
+	pub fn from_files(files: impl Iterator<Item = &'a FuncFile>) -> Self {
 		let mut tree = Self::new("root");
 		for file in files {
 			let parts = file.route_path.to_string_lossy().to_string();
@@ -182,16 +182,16 @@ mod test {
 	use super::RouteTreeBuilder;
 
 
-	fn files() -> Vec<FileFuncs> {
+	fn files() -> Vec<FuncFile> {
 		vec![
-			FileFuncs {
+			FuncFile {
 				name: "index".into(),
 				local_path: "index.rs".into(),
 				route_path: "/".into(),
 				canonical_path: Default::default(),
 				funcs: Default::default(),
 			},
-			FileFuncs {
+			FuncFile {
 				name: "index".into(),
 				local_path: "foo/bar/index.rs".into(),
 				route_path: "/foo/bar".into(),
@@ -199,7 +199,7 @@ mod test {
 				funcs: Default::default(),
 			},
 			// respects route path over local path
-			FileFuncs {
+			FuncFile {
 				name: "bazz".into(),
 				local_path: "bazz.booboo.rs".into(),
 				route_path: "/foo/bar/bazz".into(),

@@ -13,8 +13,8 @@ categories.workspace = true
 publish = true
 
 [features]
-# default = ["setup"]
-setup = []
+# default = ["build"]
+build = []
 
 [dependencies]
 sweet.workspace = true

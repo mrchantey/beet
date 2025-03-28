@@ -11,7 +11,7 @@ async fn main() -> Result<()> {
 	// 	.unwrap();"
 	// router.html_dir = "target/test_site".into();
 	beet_router::test_site::routes::collect()
-		.pipe(FileFuncsToRsx::default())
+		.pipe(FuncFilesToRsx::default())
 		.await
 		.unwrap()
 		.pipe(ApplyRouteTemplates::new(

@@ -15,7 +15,7 @@ pub struct BuildFileRoutes {
 	pub codegen_file: CodegenFile,
 	pub file_group: FileGroup,
 	pub group_to_funcs: FileGroupToFuncs,
-	pub funcs_to_codegen: FileFuncsToCodegen,
+	pub funcs_to_codegen: FuncFilesToCodegen,
 }
 impl BuildFileRoutes {
 	pub fn new(
@@ -38,7 +38,7 @@ impl BuildFileRoutes {
 					.with_exclude("*mod.rs"),
 			),
 			group_to_funcs: FileGroupToFuncs::default(),
-			funcs_to_codegen: FileFuncsToCodegen::default(),
+			funcs_to_codegen: FuncFilesToCodegen::default(),
 		}
 	}
 	/// A common configuration of [`BuildComponentRoutes`] is to collect all mockup files in a directory.
@@ -66,7 +66,7 @@ impl BuildFileRoutes {
 				)],
 				..Default::default()
 			},
-			funcs_to_codegen: FileFuncsToCodegen::default(),
+			funcs_to_codegen: FuncFilesToCodegen::default(),
 		}
 	}
 }

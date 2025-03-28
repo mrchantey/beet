@@ -2,34 +2,33 @@ use crate::prelude::*;
 use anyhow::Result;
 use beet_rsx::prelude::*;
 use rapidhash::RapidHashMap;
-use std::path::PathBuf;
 use sweet::prelude::*;
 
 #[derive(Debug)]
 pub struct RoutesToClientIslandMap {
-	pub islands_map_path: PathBuf,
+	pub islands_map_path: CanonicalPathBuf,
 }
 
 impl Default for RoutesToClientIslandMap {
 	fn default() -> Self {
 		Self {
-			islands_map_path: Self::DEFAULT_ISLANDS_MAP_PATH.into(),
+			islands_map_path: Self::default_islands_map_path(),
 		}
 	}
 }
 
 
 impl RoutesToClientIslandMap {
-	pub fn new(island_map_path: impl Into<PathBuf>) -> Self {
-		Self {
-			islands_map_path: island_map_path.into(),
-		}
+	pub fn new(islands_map_path: CanonicalPathBuf) -> Self {
+		Self { islands_map_path }
 	}
 }
 
 impl RoutesToClientIslandMap {
-	pub const DEFAULT_ISLANDS_MAP_PATH: &'static str =
-		"target/client-islands.ron";
+	pub fn default_islands_map_path() -> CanonicalPathBuf {
+		WorkspacePathBuf::new("target/client-islands.ron")
+			.into_canonical_unchecked()
+	}
 }
 
 impl RsxPipeline<&Vec<(RouteInfo, RsxRoot)>, Result<()>>

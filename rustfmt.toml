@@ -12,4 +12,4 @@ imports_layout = "Vertical"
 overflow_delimited_expr = true
 use_field_init_shorthand = true
 # .gitignore rules
-ignore = ["crates/beet_site/src/routes/**/mod.rs"]
+ignore = ["crates/*/src/codegen/**/*.rs"]

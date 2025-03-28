@@ -14,6 +14,8 @@ keywords.workspace = true
 
 [features]
 default = ["serde"]
+_test_site = []
+build = ["serde", "parser"]
 serde = ["dep:serde", "dep:ron", "beet_rsx/serde"]
 server = ["parser", "dep:beet_server"]
 parser = [
@@ -29,7 +31,6 @@ parser = [
 bevy = ["dep:bevy", "dep:flume", "beet_rsx/bevy"]
 # enables 'mod test_site' for internal testing,
 # the mod is also enabled by the 'test' flag
-setup = []
 
 [dependencies]
 anyhow.workspace = true
@@ -65,9 +66,8 @@ flume = { workspace = true, optional = true }
 sweet = { workspace = true, features = ["test"] }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
-beet_router = { path = "", features = ["parser", "bevy"] }
-# beet_router = { path = "", features = ["parser", "bevy", "setup"] }
-
+# beet_router = { path = "", features = ["parser", "bevy"] }
+beet_router = { path = "", features = ["parser", "bevy", "_test_site"] }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 web-sys.workspace = true

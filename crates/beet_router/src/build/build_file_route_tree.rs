@@ -8,12 +8,12 @@ use serde::Serialize;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BuildFileRouteTree {
-	pub to_route_tree: FileFuncsToRouteTree,
+	pub to_route_tree: FuncFilesToRouteTree,
 	pub build_steps: Vec<BuildFileRoutes>,
 }
 
 impl BuildFileRouteTree {
-	pub fn new(to_route_tree: FileFuncsToRouteTree) -> Self {
+	pub fn new(to_route_tree: FuncFilesToRouteTree) -> Self {
 		Self {
 			to_route_tree,
 			build_steps: Vec::new(),

@@ -12,6 +12,30 @@ use sweet::prelude::ReadFile;
 use sweet::prelude::*;
 use syn::Visibility;
 
+/// A definition of a file whose purpose is to expose functions
+/// for parsing.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FuncFile {
+	/// The best name for this file. If it is an index file, it will be "index",
+	/// otherwise it will be the last segment of the `route_path`.
+	/// This is to respect any transformations done in the `FileGroupToFuncs`,
+	/// ie removing a `.mockup` suffix
+	pub name: String,
+	/// Canonical path to the file
+	pub canonical_path: CanonicalPathBuf,
+	/// Path relative to the [`FileGroup::src`]
+	pub local_path: PathBuf,
+	/// Route for the file
+	pub route_path: RoutePath,
+	/// Tokens for the functions visited
+	pub funcs: Vec<syn::Signature>,
+}
+
+impl FuncFile {}
+
+impl RsxPipelineTarget for FuncFile {}
+
+
 
 /// For a given file group, collect all public functions.
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
@@ -27,7 +51,7 @@ impl FileGroupToFuncs {
 		&self,
 		group_src: &CanonicalPathBuf,
 		file: PathBuf,
-	) -> Result<FileFuncs> {
+	) -> Result<FuncFile> {
 		let file_str = ReadFile::to_string(&file)?;
 		let funcs = syn::parse_file(&file_str)?
 			.items
@@ -64,7 +88,7 @@ impl FileGroupToFuncs {
 		};
 
 
-		Ok(FileFuncs {
+		Ok(FuncFile {
 			name,
 			canonical_path,
 			local_path,
@@ -89,8 +113,8 @@ impl FileGroupToFuncs {
 	}
 }
 
-impl RsxPipeline<FileGroup, Result<Vec<FileFuncs>>> for FileGroupToFuncs {
-	fn apply(self, group: FileGroup) -> Result<Vec<FileFuncs>> {
+impl RsxPipeline<FileGroup, Result<Vec<FuncFile>>> for FileGroupToFuncs {
+	fn apply(self, group: FileGroup) -> Result<Vec<FuncFile>> {
 		group
 			.collect_files()?
 			.into_iter()
@@ -98,29 +122,6 @@ impl RsxPipeline<FileGroup, Result<Vec<FileFuncs>>> for FileGroupToFuncs {
 			.collect::<Result<Vec<_>>>()
 	}
 }
-
-/// Collection of all public functions in a file
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct FileFuncs {
-	/// The best name for this file. If it is an index file, it will be "index",
-	/// otherwise it will be the last segment of the `route_path`.
-	/// This is to respect any transformations done in the `FileGroupToFuncs`,
-	/// ie removing a `.mockup` suffix
-	pub name: String,
-	/// Canonical path to the file
-	pub canonical_path: CanonicalPathBuf,
-	/// Path relative to the [`FileGroup::src`]
-	pub local_path: PathBuf,
-	/// Route for the file
-	pub route_path: RoutePath,
-	/// Tokens for the functions visited
-	pub funcs: Vec<syn::Signature>,
-}
-
-impl FileFuncs {}
-
-impl RsxPipelineTarget for FileFuncs {}
-
 
 #[cfg(test)]
 mod test {

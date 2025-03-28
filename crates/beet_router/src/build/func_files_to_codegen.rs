@@ -12,11 +12,11 @@ use syn::Signature;
 use syn::Type;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct FileFuncsToCodegen {
+pub struct FuncFilesToCodegen {
 	pub func_type: String,
 }
 
-impl Default for FileFuncsToCodegen {
+impl Default for FuncFilesToCodegen {
 	fn default() -> Self {
 		Self {
 			func_type: "DefaultRouteFunc".into(),
@@ -25,12 +25,12 @@ impl Default for FileFuncsToCodegen {
 }
 
 
-impl RsxPipeline<(Vec<FileFuncs>, CodegenFile), Result<CodegenFile>>
-	for FileFuncsToCodegen
+impl RsxPipeline<(Vec<FuncFile>, CodegenFile), Result<CodegenFile>>
+	for FuncFilesToCodegen
 {
 	fn apply(
 		self,
-		(funcs, mut file): (Vec<FileFuncs>, CodegenFile),
+		(funcs, mut file): (Vec<FuncFile>, CodegenFile),
 	) -> Result<CodegenFile> {
 		self.append_collect_func(&mut file, funcs)?;
 		Ok(file)
@@ -38,11 +38,11 @@ impl RsxPipeline<(Vec<FileFuncs>, CodegenFile), Result<CodegenFile>>
 }
 
 
-impl FileFuncsToCodegen {
+impl FuncFilesToCodegen {
 	pub fn append_collect_func(
 		&self,
 		file: &mut CodegenFile,
-		funcs: Vec<FileFuncs>,
+		funcs: Vec<FuncFile>,
 	) -> Result<()> {
 		let collect_func = self.collect_func(&funcs)?;
 		let mod_imports =
@@ -55,7 +55,7 @@ impl FileFuncsToCodegen {
 		Ok(())
 	}
 
-	fn collect_func(&self, funcs: &Vec<FileFuncs>) -> Result<syn::ItemFn> {
+	fn collect_func(&self, funcs: &Vec<FuncFile>) -> Result<syn::ItemFn> {
 		let files = funcs
 			.iter()
 			.enumerate()
@@ -80,7 +80,7 @@ impl FileFuncsToCodegen {
 	fn file_funcs_to_mod_imports(
 		&self,
 		canonical_out_dir: &Path,
-		funcs: &Vec<FileFuncs>,
+		funcs: &Vec<FuncFile>,
 	) -> Result<Vec<ItemMod>> {
 		funcs
 			.iter()
@@ -104,7 +104,7 @@ impl FileFuncsToCodegen {
 	pub fn file_funcs_to_collect(
 		&self,
 		index: usize,
-		file: &FileFuncs,
+		file: &FuncFile,
 	) -> Result<Vec<Expr>> {
 		let local_path_str = file.local_path.to_string_lossy();
 		let mod_ident = Self::index_to_mod_ident(index);
@@ -160,7 +160,7 @@ mod test {
 		let codegen_file = FileGroup::test_site_routes()
 			.pipe(FileGroupToFuncs::default())
 			.unwrap()
-			.pipe_with(codegen_file, FileFuncsToCodegen::default())
+			.pipe_with(codegen_file, FuncFilesToCodegen::default())
 			.unwrap()
 			.build_output()
 			.unwrap()

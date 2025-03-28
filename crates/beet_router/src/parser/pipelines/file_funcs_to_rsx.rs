@@ -6,13 +6,13 @@ use std::pin::Pin;
 
 
 #[derive(Default)]
-pub struct FileFuncsToRsx;
+pub struct FuncFilesToRsx;
 
 impl
 	RsxPipeline<
 		Vec<RouteFunc<DefaultRouteFunc>>,
 		Pin<Box<dyn Future<Output = Result<Vec<(RouteInfo, RsxRoot)>>>>>,
-	> for FileFuncsToRsx
+	> for FuncFilesToRsx
 {
 	fn apply(
 		self,
@@ -40,7 +40,7 @@ impl IntoCollection<Self> for Vec<RouteFunc<DefaultRouteFunc>> {
 				let html_dir = args.html_dir.clone();
 				Box::pin(async move {
 					let routes = self
-						.pipe(FileFuncsToRsx::default())
+						.pipe(FuncFilesToRsx::default())
 						.await?
 						.pipe(ApplyRouteTemplates::default())?
 						.into_iter()
@@ -79,7 +79,7 @@ mod test {
 	#[sweet::test]
 	async fn works() {
 		let html = crate::test_site::routes::collect()
-			.pipe(FileFuncsToRsx::default())
+			.pipe(FuncFilesToRsx::default())
 			.await
 			.unwrap()
 			.pipe(RoutesToHtml::default())

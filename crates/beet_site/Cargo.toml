@@ -12,9 +12,6 @@ repository.workspace = true
 categories.workspace = true
 keywords.workspace = true
 
-[features]
-setup = ["beet/setup"]
-
 [dependencies]
 anyhow.workspace = true
 serde.workspace = true
@@ -24,3 +21,6 @@ beet = { workspace = true, features = ["router"] }
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 beet = { workspace = true, features = ["server"] }
 # tokio.workspace = true
+
+[build-dependencies]
+beet = { workspace = true, features = ["build", "router"] }
