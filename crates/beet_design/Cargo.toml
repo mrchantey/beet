@@ -23,3 +23,7 @@ beet_router.workspace = true
 
 [dev-dependencies]
 sweet = { workspace = true, features = ["test"] }
+
+[build-dependencies]
+anyhow.workspace = true
+beet_router = { workspace = true, features = ["build"] }

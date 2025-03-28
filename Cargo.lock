@@ -645,6 +645,7 @@ dependencies = [
 name = "beet_design"
 version = "0.0.6-dev.4"
 dependencies = [
+ "anyhow",
  "beet_router",
  "beet_rsx",
  "sweet",

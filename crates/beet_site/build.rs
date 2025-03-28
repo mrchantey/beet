@@ -2,12 +2,12 @@ use anyhow::Result;
 use beet::prelude::*;
 
 fn main() -> Result<()> {
-	// panic!("not even");
-	println!("building!");
-	// panic!("failed");
+	println!("cargo::rerun-if-changed=build.rs");
+	println!("cargo::rerun-if-changed=src/codegen");
+	println!("cargo::rerun-if-changed=../beet_design/src");
+	println!("cargo::warning={}", "\n🚀🚀running!\n");
 	let cx = app_cx!();
-	// println!("cargo::rerun-if-changed=build.rs");
-
+	
 	let is_wasm = std::env::var("TARGET").unwrap() == "wasm32-unknown-unknown";
 
 	if is_wasm {
@@ -37,21 +37,12 @@ fn main() -> Result<()> {
 					Ok(routes)
 				})?;
 
+		// should be identical to crates/beet_design/build.rs
 		let mockups = FileGroup::new_workspace_rel("crates/beet_design/src")?
 			.with_filter(GlobFilter::default().with_include("*.mockup.rs"))
 			.pipe(FileGroupToFuncFiles::default())?
 			.pipe(FuncFilesToRouteFuncs::mockups())?
-			.pipe(RouteFuncsToCodegen::new(
-				CodegenFile::new_workspace_rel(
-					"crates/beet_design/src/codegen/mockups.rs",
-					"beet_design",
-				)
-				.with_use_beet_tokens("use beet_router::as_beet::*;"),
-			))?
-			.map(|(_, routes, codegen)| -> Result<_> {
-				codegen.build_and_write()?;
-				Ok(routes)
-			})?;
+			.map(|(_, routes)| routes);
 
 		routes.extend(mockups);
 
