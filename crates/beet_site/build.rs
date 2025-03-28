@@ -1,6 +1,9 @@
 use anyhow::Result;
 use beet::prelude::*;
 
+
+// runtime env vars: https://doc.rust-lang.org/cargo/reference/environment-variables.html#environment-variables-cargo-sets-for-build-scripts
+// cargo:: output https://doc.rust-lang.org/cargo/reference/build-scripts.html#outputs-of-the-build-script
 fn main() -> Result<()> {
 	println!("cargo::rerun-if-changed=build.rs");
 	println!("cargo::rerun-if-changed=src/codegen");

@@ -72,7 +72,7 @@ impl BuildNative {
 
 impl BuildStep for BuildNative {
 	fn run(&self) -> Result<()> {
-		println!("🥁 Build Step 2: Native");
+		println!("🥁 Build Step 1: Native");
 		self.build_cmd.run()?;
 		Ok(())
 	}
@@ -157,7 +157,7 @@ impl BuildWasm {
 
 impl BuildStep for BuildWasm {
 	fn run(&self) -> Result<()> {
-		println!("🥁 Build Step 3: WASM");
+		println!("🥁 Build Step 2: WASM");
 		self.build_cmd.spawn()?;
 		self.wasm_bindgen()?;
 		Ok(())

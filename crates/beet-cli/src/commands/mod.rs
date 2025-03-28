@@ -1,4 +1,5 @@
 mod cargo_cmd;
+mod build;
 pub use cargo_cmd::*;
 mod build_cmd;
 pub use build_cmd::*;
@@ -8,6 +9,7 @@ mod deploy;
 mod watch;
 pub use deploy::*;
 pub use watch::*;
+pub use build::*;
 
 use anyhow::Result;
 use clap::Subcommand;
@@ -16,6 +18,7 @@ use clap::Subcommand;
 pub enum Commands {
 	Watch(Watch),
 	Deploy(Deploy),
+	Build(Build),
 }
 
 impl Commands {
@@ -23,6 +26,7 @@ impl Commands {
 		match self {
 			Commands::Watch(cmd) => cmd.run().await,
 			Commands::Deploy(cmd) => cmd.run(),
+			Commands::Build(cmd) => cmd.run(),
 		}
 	}
 }

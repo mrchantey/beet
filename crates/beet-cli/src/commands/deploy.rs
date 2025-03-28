@@ -1,29 +1,23 @@
 use crate::prelude::*;
 use anyhow::Result;
-use beet::prelude::*;
 use clap::Parser;
 use std::process::Command;
 
 /// Deploy to AWS Lambda in release mode.
 #[derive(Debug, Parser)]
 pub struct Deploy {
-	/// 🦀 the commands that will be used to build the binary 🦀
 	#[command(flatten)]
-	build_cmd: BuildCmd,
-	#[command(flatten)]
-	watch_args: WatchArgs,
-	#[command(flatten)]
-	build_template_map: BuildTemplateMap,
+	pub build: Build,
 	/// Specify the region to deploy the lambda function to
 	#[arg(long)]
-	region: Option<String>,
+	pub region: Option<String>,
 	/// use a specificed name for the lambda function,
 	/// defaults to the package name
 	#[arg(long)]
-	function_name: Option<String>,
+	pub function_name: Option<String>,
 	/// Specify the IAM role that the lambda function should use
 	#[arg(long)]
-	iam_role: Option<String>,
+	pub iam_role: Option<String>,
 }
 
 
@@ -33,18 +27,9 @@ impl Deploy {
 	/// - Build static files
 
 	pub fn run(mut self) -> Result<()> {
-		self.build_template_map.build_and_write()?;
-		self.build_cmd.release = true;
+		self.build.build_cmd.release = true;
+		self.build.run()?;
 
-
-		BuildStepGroup::default()
-			.add(BuildNative::new(&self.build_cmd, &self.watch_args))
-			.add(ExportStatic::new(
-				&self.watch_args,
-				&self.build_cmd.exe_path(),
-			))
-			.add(BuildWasm::new(&self.build_cmd, &self.watch_args)?)
-			.run()?;
 		self.lambda_build()?;
 		self.lambda_deploy()?;
 
@@ -59,7 +44,7 @@ impl Deploy {
 			.arg("beet/lambda")
 			.arg("--release");
 
-		if let Some(pkg) = &self.build_cmd.package {
+		if let Some(pkg) = &self.build.build_cmd.package {
 			cmd.arg("--package").arg(pkg);
 		}
 
@@ -70,9 +55,9 @@ impl Deploy {
 	fn lambda_deploy(&self) -> Result<()> {
 		let mut cmd = Command::new("cargo");
 
-		let binary_name = if let Some(bin) = &self.build_cmd.bin {
+		let binary_name = if let Some(bin) = &self.build.build_cmd.bin {
 			Some(bin)
-		} else if let Some(pkg) = &self.build_cmd.package {
+		} else if let Some(pkg) = &self.build.build_cmd.package {
 			Some(pkg)
 		} else {
 			None
@@ -82,7 +67,7 @@ impl Deploy {
 			.arg("deploy")
 			.arg("--enable-function-url")
 			.arg("--include")
-			.arg(&self.watch_args.html_dir);
+			.arg(&self.build.watch_args.html_dir);
 
 		if let Some(bin) = &binary_name {
 			cmd.arg("--binary-name").arg(&bin);

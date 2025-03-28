@@ -151,15 +151,12 @@ serve-web:
 
 # create codegen files
 codegen:
-	just clear-codegen
+	just clear-artifacts
 	cargo run -p beet_router --example test_site_codegen
-	cargo build -p beet_design
-	cargo build -p beet_site
-	cargo run -p beet_site -- --static
-	cargo build -p beet_site --target wasm32-unknown-unknown
+	just cli build -p beet_site
 
-
-clear-codegen:
+clear-artifacts:
+	rm -rf target
 	rm -rf crates/beet_design/src/codegen
 	rm -rf crates/beet_router/src/test_site/codegen
 	rm -rf crates/beet_site/src/codegen
