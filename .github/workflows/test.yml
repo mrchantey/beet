@@ -45,7 +45,8 @@ jobs:
     - name: 🔨 Add wasm target
       run: rustup target add wasm32-unknown-unknown
     - name: 🔨 Install cargo binstall
-      run: cargo install cargo-binstall || true
+      uses: cargo-bins/cargo-binstall@main
+      # run: cargo install cargo-binstall || true
     - name: 🔨 Install wasm bindgen cli
       run: cargo binstall wasm-bindgen-cli --version 0.2.100    || true
     - name: 🔨 Install sweet cli

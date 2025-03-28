@@ -22,6 +22,7 @@ init-repo:
 	just assets-pull
 	mkdir -p crates/beet_ml/assets/ml && cp ./assets/ml/default-bert.ron crates/beet_ml/assets/ml/default.bert.ron
 	mkdir -p crates/beet_rsx/assets/fonts && cp ./assets/fonts/* crates/beet_rsx/assets/fonts
+	just codegen
 # just test-site
 # just export-scenes
 
@@ -146,6 +147,19 @@ test-wasm-e2e crate test_name *args:
 
 serve-web:
 	just serve-wasm
+
+
+
+codegen:
+	just clear-codegen
+	cargo run -p beet_router --example test_site_codegen
+	cargo build -p beet_site
+
+
+clear-codegen:
+	rm -rf crates/beet_design/src/codegen
+	rm -rf crates/beet_router/src/test_site/codegen
+	rm -rf crates/beet_site/src/codegen
 
 # massive purge
 purge:
