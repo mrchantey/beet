@@ -59,6 +59,7 @@ impl IntoRsxRoot<()> for () {
 
 /// Strings are allowed to have an RsxMacroLocation::default(),
 /// as they will never be used for complex hydration etc
+// TODO its a code smell that we have to do this
 pub struct ToStringIntoRsx;
 impl<T: ToString> IntoRsxRoot<(T, ToStringIntoRsx)> for T {
 	fn into_root(self) -> RsxRoot {

@@ -1,7 +1,6 @@
 use crate::prelude::*;
 use anyhow::Result;
 use beet_rsx::prelude::*;
-use std::path::PathBuf;
 use std::pin::Pin;
 
 /// A function that has no parameters and returns a [`RsxRoot`].
@@ -10,13 +9,8 @@ pub type DefaultRouteFunc =
 
 
 pub struct RouteFunc<T> {
-	/// The path relative to its root, the [`FileGroup::src`] it was collected from.
-	/// This is useful for generating route paths.
-	pub local_path: PathBuf,
 	/// the route path
-	pub route_path: RoutePath,
-	/// The function name, ie `get`
-	pub name: String,
+	pub route_info: RouteInfo,
 	pub func: T,
 }
 
@@ -24,22 +18,19 @@ impl<T> RsxPipelineTarget for RouteFunc<T> {}
 
 impl<T> RouteFunc<T> {
 	pub fn new<M>(
-		name: &str,
-		local_path: &str,
+		method: &str,
 		route_path: &str,
 		func: impl IntoRouteFunc<T, M>,
 	) -> Self {
 		Self {
-			name: name.into(),
-			local_path: local_path.into(),
-			route_path: RoutePath::new(route_path),
+			route_info: RouteInfo::new(route_path, method),
 			func: func.into_route_func(),
 		}
 	}
 
-	pub fn into_route_info(&self) -> RouteInfo {
-		RouteInfo::new(self.route_path.clone(), &self.name)
-	}
+	// pub fn into_route_info(&self) -> RouteInfo {
+	// 	RouteInfo::new(self.route_path.clone(), &self.method)
+	// }
 }
 
 /// A mechanic that allows great flexibility in the kinds of

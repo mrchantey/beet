@@ -1,7 +1,8 @@
+use anyhow::Result;
 use beet::prelude::*;
 
-
-fn main() {
+fn main() -> Result<()> {
+	// panic!("not even");
 	println!("building!");
 	// panic!("failed");
 	let cx = app_cx!();
@@ -10,34 +11,56 @@ fn main() {
 	let is_wasm = std::env::var("TARGET").unwrap() == "wasm32-unknown-unknown";
 
 	if is_wasm {
-		BuildWasmRoutes::new(CodegenFile::new(
+		BuildWasmRoutes::new(CodegenFile::new_workspace_rel(
 			"crates/beet_site/src/codegen/wasm.rs",
 			&cx.pkg_name,
 		))
-		.run()
-		.unwrap();
+		.run()?;
 	} else {
-		BuildFileRouteTree::new(FuncFilesToRouteTree {
-			codgen_file: CodegenFile::new(
+		let mut routes =
+			FileGroup::new_workspace_rel("crates/beet_site/src/routes")?
+				.with_filter(
+					GlobFilter::default()
+						.with_include("*.rs")
+						.with_exclude("*mod.rs"),
+				)
+				.pipe(FileGroupToFuncFiles::default())?
+				.pipe(FuncFilesToRouteFuncs::http_routes())?
+				.pipe(RouteFuncsToCodegen::new(
+					CodegenFile::new_workspace_rel(
+						"crates/beet_site/src/codegen/routes.rs",
+						&cx.pkg_name,
+					),
+				))?
+				.map(|(_, routes, codegen)| -> Result<_> {
+					codegen.build_and_write()?;
+					Ok(routes)
+				})?;
+
+		let mockups = FileGroup::new_workspace_rel("crates/beet_design/src")?
+			.with_filter(GlobFilter::default().with_include("*.mockup.rs"))
+			.pipe(FileGroupToFuncFiles::default())?
+			.pipe(FuncFilesToRouteFuncs::mockups())?
+			.pipe(RouteFuncsToCodegen::new(
+				CodegenFile::new_workspace_rel(
+					"crates/beet_design/src/codegen/mockups.rs",
+					"beet_design",
+				)
+				.with_use_beet_tokens("use beet_router::as_beet::*;"),
+			))?
+			.map(|(_, routes, codegen)| -> Result<_> {
+				codegen.build_and_write()?;
+				Ok(routes)
+			})?;
+
+		routes.extend(mockups);
+
+		routes.pipe(RouteFuncsToTree {
+			codgen_file: CodegenFile::new_workspace_rel(
 				"crates/beet_site/src/codegen/route_tree.rs",
 				&cx.pkg_name,
 			),
-		})
-		.with_step(BuildFileRoutes::new(
-			"crates/beet_site/src/routes",
-			"crates/beet_site/src/codegen/routes.rs",
-			&cx.pkg_name,
-		))
-		.with_step({
-			let mut mockups = BuildFileRoutes::mockups(
-				"crates/beet_design/src",
-				"beet_design",
-			);
-			mockups.codegen_file.use_beet_tokens =
-				"use beet_router::as_beet::*;".into();
-			mockups
-		})
-		.run()
-		.unwrap();
+		})?;
 	}
+	Ok(())
 }

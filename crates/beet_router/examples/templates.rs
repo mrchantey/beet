@@ -22,7 +22,7 @@ async fn main() {
 	// println!("wrote to {}\n{:#?}", builder.dst.display(), map);
 	// println!("TEMPLATE_MAP::::{:#?}", map);
 
-	let rsx = beet_router::test_site::routes::index::get();
+	let rsx = beet_router::test_site::routes::collect()[0];
 	let root1 = map.templates.get(&rsx.location).unwrap();
 	let RsxTemplateNode::Component {
 		tracker: tracker1, ..

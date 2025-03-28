@@ -1,102 +1,143 @@
 use crate::prelude::*;
 use anyhow::Result;
 use beet_rsx::prelude::*;
-use serde::Deserialize;
-use serde::Serialize;
-use std::path::Path;
-use std::path::PathBuf;
-use sweet::prelude::*;
-use syn::Expr;
-use syn::Ident;
-use syn::ItemMod;
-use syn::Signature;
-use syn::Type;
 
+// const HTTP_METHODS: [&str; 9] = [
+// 	"get", "post", "put", "delete", "head", "options", "connect", "trace",
+// 	"patch",
+// ];
 
-/// The output of [`FuncFilesToRouteFuncs`], represents a mapping of a
-/// [`FileGroup`] to a [`Vec<RouteFunc`], we need to keep tracking each
-/// [`FuncFile`] for codgen to import the modules.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct RouteFuncGroup {
-	pub func_files: Vec<FuncFile>,
-	/// The created route functions
-	pub route_funcs: Vec<RouteFuncTokens>,
+pub trait MapFuncFileToRoutes {
+	fn file_to_routes(&self, file: &FuncFile) -> Result<Vec<RouteFuncTokens>>;
 }
 
 
-/// Intermediate representation for building a [`RouteFunc`]. This must be kept
-/// associated with the [`FuncFile`] that it was created from, as the [`RouteFuncTokens::block`]
-/// that has been created will depend on its import.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct RouteFuncTokens {
-	/// The best name for this file. If it is an index file, it will be "index",
-	/// otherwise it will be the last segment of the `route_path`.
-	/// This is to respect any transformations done in the `FileGroupToFuncs`,
-	/// ie removing a `.mockup` suffix
-	pub name: String,
-	/// Canonical path to the file
-	pub canonical_path: CanonicalPathBuf,
-	/// Path relative to the [`FileGroup::src`]
-	pub local_path: PathBuf,
-	/// Route for the file
-	pub route_path: RoutePath,
-	/// A block that will return a valid function, its exact signature depends
-	/// on [`FuncFilesToRouteFuncs::func_type`]. This block will contain references
-	/// to the corresponding [`FuncFile`] ident, by its index, ie `file0::get`, so
-	/// its imperative that this block is used in a codegen file with its corresponding
-	/// [`FuncFile`] mod import.
-	pub block: syn::Block,
+/// empty impl so we can create static methods
+impl MapFuncFileToRoutes for () {
+	fn file_to_routes(&self, _file: &FuncFile) -> Result<Vec<RouteFuncTokens>> {
+		Ok(vec![])
+	}
 }
 
-
-impl RsxPipelineTarget for RouteFuncGroup {}
-
+impl<F: Fn(&FuncFile) -> Result<Vec<RouteFuncTokens>>> MapFuncFileToRoutes
+	for F
+{
+	/// Map the [`FuncFile`] to a vec of [`RouteFuncTokens`].
+	/// The ident should be used in conjunction with the [`FuncFile::sigs`] to call
+	/// the function, ie `#file_ident::#sig_ident`
+	fn file_to_routes(&self, file: &FuncFile) -> Result<Vec<RouteFuncTokens>> {
+		self(file)
+	}
+}
 
 /// Convert a vec of [`FuncFile`] into a vec of [`RouteFuncTokens`].
 /// The number of functions is usally different, ie file based routes may
 /// have a `get` and `post` function, whereas mockups may merge all
 /// functions into one route.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct FuncFilesToRouteFuncs {}
+pub struct FuncFilesToRouteFuncs<F: MapFuncFileToRoutes> {
+	pub func: F,
+}
+impl FuncFilesToRouteFuncs<()> {
+	/// Simply map the [`FuncFile`] to a vec of [`RouteFuncTokens`] based on
+	/// the http methods of the functions in the file.
+	pub fn http_routes() -> FuncFilesToRouteFuncs<
+		for<'a> fn(&'a FuncFile) -> Result<Vec<RouteFuncTokens>>,
+	> {
+		fn map(file: &FuncFile) -> Result<Vec<RouteFuncTokens>> {
+			let route_path = file.default_route_path()?;
+			let ident = &file.ident;
+			let route_path_str = route_path.to_string_lossy();
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum FuncFilesToRouteFuncsStrategy {
-	/// Each function will be mapped to a corresponding http method
-	Http,
+			file.funcs
+				.iter()
+				.map(|sig| {
+					let sig_ident = &sig.ident;
+					let sig_ident_str = sig_ident.to_string();
+					let block = syn::parse_quote! {{
+					RouteFunc::new(
+						#sig_ident_str,
+						#route_path_str,
+						#ident::#sig_ident
+					)}};
+					RouteFuncTokens::build(
+						&file.local_path,
+						route_path.clone(),
+						block,
+					)
+				})
+				.collect()
+		}
+
+		FuncFilesToRouteFuncs::new(map)
+	}
+	pub fn mockups() -> FuncFilesToRouteFuncs<
+		for<'a> fn(&'a FuncFile) -> Result<Vec<RouteFuncTokens>>,
+	> {
+		pub fn map(file: &FuncFile) -> Result<Vec<RouteFuncTokens>> {
+			let route_path = RoutePath::new("/mockups")
+				.join(&file.default_route_path()?)
+				.to_string_lossy()
+				.to_string()
+				.replace(".mockup", "");
+			let route_path = RoutePath::new(route_path);
+
+			let ident = &file.ident;
+			let route_path_str = route_path.to_string_lossy();
+
+			let items = file.funcs.iter().map(|sig| {
+				let sig_ident = &sig.ident;
+				quote::quote! {#ident::#sig_ident().node}
+			});
+			Ok(vec![RouteFuncTokens::build(
+				&file.local_path,
+				route_path.clone(),
+				syn::parse_quote! {{
+					fn func()->RsxRoot{
+						let node = RsxNode::fragment(vec![
+							#(#items),*
+						]);
+						// TODO we should be able to just return the node,
+						// instead of fake location
+						RsxRoot{
+							node,
+							location: RsxMacroLocation::default(),
+						}
+					}
+					RouteFunc::new(
+						"get",
+						#route_path_str,
+						func
+					)
+				}},
+			)?])
+		}
+		FuncFilesToRouteFuncs::new(map)
+	}
 }
 
-impl Default for FuncFilesToRouteFuncs {
-	fn default() -> Self { Self {} }
+
+impl<F: MapFuncFileToRoutes> FuncFilesToRouteFuncs<F> {
+	pub fn new(func: F) -> Self { Self { func } }
 }
 
 
-impl RsxPipeline<Vec<FuncFile>, Result<RouteFuncGroup>>
-	for FuncFilesToRouteFuncs
+impl<T: RsxPipelineTarget + AsRef<Vec<FuncFile>>, F: MapFuncFileToRoutes>
+	RsxPipeline<T, Result<(T, Vec<RouteFuncTokens>)>>
+	for FuncFilesToRouteFuncs<F>
 {
-	fn apply(self, func_files: Vec<FuncFile>) -> Result<RouteFuncGroup> {
+	fn apply(self, func_files: T) -> Result<(T, Vec<RouteFuncTokens>)> {
 		let route_funcs = func_files
+			.as_ref()
 			.iter()
-			.map(|sigs| self.file_func_to_route_funcs(sigs))
+			.map(|func_file| self.func.file_to_routes(func_file))
 			.collect::<Result<Vec<_>>>()?
 			.into_iter()
 			.flatten()
 			.collect::<Vec<_>>();
-		Ok(RouteFuncGroup {
-			route_funcs,
-			func_files,
-		})
+		Ok((func_files, route_funcs))
 	}
 }
 
-
-impl FuncFilesToRouteFuncs {
-	pub fn file_func_to_route_funcs(
-		&self,
-		_func: &FuncFile,
-	) -> Result<Vec<RouteFuncTokens>> {
-		Ok(vec![])
-	}
-}
 
 #[cfg(test)]
 mod test {
@@ -108,9 +149,9 @@ mod test {
 	#[test]
 	fn works() {
 		let _route_funcs = FileGroup::test_site_routes()
-			.pipe(FileGroupToFuncs::default())
+			.pipe(FileGroupToFuncFiles::default())
 			.unwrap()
-			.pipe(FuncFilesToRouteFuncs::default())
+			.pipe(FuncFilesToRouteFuncs::http_routes())
 			.unwrap();
 	}
 }

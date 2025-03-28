@@ -56,6 +56,12 @@ impl RsxNode {
 		}
 	}
 
+	pub fn fragment(nodes: Vec<RsxNode>) -> Self {
+		Self::Fragment {
+			idx: RsxIdx::default(),
+			nodes,
+		}
+	}
 
 	/// Returns true if the node is an empty fragment,
 	/// or if it is recursively a fragment with only empty fragments

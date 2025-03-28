@@ -6,7 +6,7 @@ use sweet::prelude::ReadFile;
 /// and create a `routes.rs` file containing them all.
 pub fn main() {
 	let out_file = "crates/beet_router/src/test_site/codegen/routes.rs";
-	let mut parser = BuildFileRoutes::new(
+	let mut parser = BuildFileRoutes::http_routes(
 		"crates/beet_router/src/test_site/routes",
 		out_file,
 		"beet_router",

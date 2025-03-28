@@ -38,6 +38,8 @@ where
 }
 
 pub trait RsxPipelineTarget: Sized {
+	fn map<O>(self, func: impl FnOnce(Self) -> O) -> O { func(self) }
+
 	fn pipe<P: RsxPipeline<Self, O>, O: RsxPipelineTarget>(
 		self,
 		pipeline: P,
@@ -57,6 +59,21 @@ pub trait RsxPipelineTarget: Sized {
 		(Self, T2): RsxPipelineTarget,
 	{
 		pipeline.apply((self, other))
+	}
+	/// pipe_with but the other way round
+	fn pipe_with2<
+		P: RsxPipeline<(T2, Self), O>,
+		O: RsxPipelineTarget,
+		T2: RsxPipelineTarget,
+	>(
+		self,
+		other: T2,
+		pipeline: P,
+	) -> O
+	where
+		(Self, T2): RsxPipelineTarget,
+	{
+		pipeline.apply((other, self))
 	}
 }
 pub trait RsxPipelineTargetIter<T: RsxPipelineTarget>:
@@ -94,6 +111,11 @@ impl<T: RsxPipelineTarget> RsxPipelineTarget
 
 impl<T1: RsxPipelineTarget, T2: RsxPipelineTarget> RsxPipelineTarget
 	for (T1, T2)
+{
+}
+
+impl<T1: RsxPipelineTarget, T2: RsxPipelineTarget, T3: RsxPipelineTarget>
+	RsxPipelineTarget for (T1, T2, T3)
 {
 }
 

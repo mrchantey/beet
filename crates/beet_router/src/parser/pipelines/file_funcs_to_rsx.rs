@@ -22,7 +22,7 @@ impl
 			futures::future::try_join_all(routes.into_iter().map(
 				async |func| {
 					let node = (func.func)().await?;
-					let info = func.into_route_info();
+					let info = func.route_info;
 					Ok((info, node))
 				},
 			))
