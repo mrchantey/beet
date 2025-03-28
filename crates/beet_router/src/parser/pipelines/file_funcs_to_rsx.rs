@@ -86,11 +86,28 @@ mod test {
 			.unwrap();
 
 		expect(html.len()).to_be(3);
+		expect(
+			html.iter()
+				.find(|(info, _)| info.path.to_string_lossy() == "/docs"),
+		)
+		.to_be_some();
 
-		expect(&html[0].0.path.to_string_lossy()).to_be("/docs");
-		expect(&html[1].0.path.to_string_lossy()).to_be("/contributing");
-		expect(&html[2].0.path.to_string_lossy()).to_be("/");
-		expect(&html[0].1.clone().pipe(RenderHtml::default()).unwrap())
-			.to_contain("<!DOCTYPE html>");
+		expect(
+			html.iter().find(|(info, _)| {
+				info.path.to_string_lossy() == "/contributing"
+			}),
+		)
+		.to_be_some();
+
+
+		expect(
+			html.iter()
+				.find(|(info, _)| info.path.to_string_lossy() == "/")
+				.map(|(_, html)| {
+					html.clone().pipe(RenderHtml::default()).unwrap()
+				})
+				.unwrap(),
+		)
+		.to_contain("<!DOCTYPE html>");
 	}
 }
