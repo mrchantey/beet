@@ -23,6 +23,11 @@ pub struct RustyTracker {
 
 
 impl RustyTracker {
+	pub const PLACEHOLDER: Self = Self {
+		index: u32::MAX,
+		tokens_hash: u64::MAX,
+	};
+
 	pub fn new(index: u32, tokens_hash: u64) -> Self {
 		Self { index, tokens_hash }
 	}
@@ -36,6 +41,7 @@ impl RustyTracker {
 
 /// The parts of an rsx! macro that are not serializable are
 /// called Rusty Parts.
+#[derive(Debug)]
 pub enum RustyPart {
 	// we also collect components because they
 	// cannot be statically resolved
@@ -48,49 +54,18 @@ pub enum RustyPart {
 	},
 	RustBlock {
 		initial: RsxRoot,
-		register: RegisterEffect,
+		effect: Effect,
 	},
 	AttributeBlock {
 		initial: Vec<RsxAttribute>,
-		register: RegisterEffect,
+		effect: Effect,
 	},
 	AttributeValue {
 		initial: String,
-		register: RegisterEffect,
+		effect: Effect,
 	},
 }
 
-impl std::fmt::Debug for RustyPart {
-	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		match self {
-			Self::Component {
-				root,
-				type_name,
-				ron,
-			} => f
-				.debug_struct("Component")
-				.field("root", root)
-				.field("type_name", type_name)
-				.field("ron", ron)
-				.finish(),
-			Self::RustBlock { initial, register } => f
-				.debug_struct("RustBlock")
-				.field("initial", initial)
-				.field("register", &std::any::type_name_of_val(&register))
-				.finish(),
-			Self::AttributeBlock { initial, register } => f
-				.debug_struct("AttributeBlock")
-				.field("initial", initial)
-				.field("register", &std::any::type_name_of_val(&register))
-				.finish(),
-			Self::AttributeValue { initial, register } => f
-				.debug_struct("AttributeValue")
-				.field("initial", initial)
-				.field("register", &std::any::type_name_of_val(&register))
-				.finish(),
-		}
-	}
-}
 
 
 #[derive(Deref, DerefMut)]
@@ -120,11 +95,11 @@ impl RsxVisitorMut for RustyPartVisitor {
 	}
 
 	fn visit_block(&mut self, block: &mut RsxBlock) {
-		let effect = block.effect.take();
-		self.rusty_map.insert(effect.tracker, RustyPart::RustBlock {
-			initial: std::mem::take(&mut block.initial),
-			register: effect.register,
-		});
+		self.rusty_map
+			.insert(block.effect.tracker, RustyPart::RustBlock {
+				initial: std::mem::take(&mut block.initial),
+				effect: std::mem::take(&mut block.effect),
+			});
 		// }
 	}
 	fn visit_attribute(&mut self, attribute: &mut RsxAttribute) {
@@ -134,22 +109,20 @@ impl RsxVisitorMut for RustyPartVisitor {
 			RsxAttribute::BlockValue {
 				initial, effect, ..
 			} => {
-				let effect = effect.take();
 				self.rusty_map.insert(
 					effect.tracker,
 					RustyPart::AttributeValue {
 						initial: std::mem::take(initial),
-						register: effect.register,
+						effect: std::mem::take(effect),
 					},
 				);
 			}
 			RsxAttribute::Block { initial, effect } => {
-				let effect = effect.take();
 				self.rusty_map.insert(
 					effect.tracker,
 					RustyPart::AttributeBlock {
 						initial: std::mem::take(initial),
-						register: effect.register,
+						effect: std::mem::take(effect),
 					},
 				);
 			}

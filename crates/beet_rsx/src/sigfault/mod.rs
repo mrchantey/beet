@@ -33,8 +33,8 @@ impl Sigfault {
 					effect(move || {
 						let block = block.clone();
 						DomTarget::with(move |target| {
-							let node = block.clone().into_root();
-							target.update_rsx_node(node.node, loc).unwrap()
+							let root = block.clone().into_root();
+							target.update_rsx_node(root.node, loc).unwrap()
 						});
 					});
 					Ok(())

@@ -25,14 +25,9 @@ impl<T: RsxPipelineTarget + Into<RsxNode>> RsxPipeline<T, Result<()>>
 			&mut node,
 			self.root_location,
 			|loc, node| {
-				// println!(
-				// 	"registering effect at loc: {:?}:{:?}",
-				// 	loc,
-				// 	node.discriminant()
-				// );
 				match node {
 					RsxNode::Block(RsxBlock { effect, .. }) => {
-						if let Err(err) = effect.take().register(loc) {
+						if let Err(err) = std::mem::take(effect).register(loc) {
 							result = Err(err);
 						}
 					}
@@ -40,10 +35,10 @@ impl<T: RsxPipelineTarget + Into<RsxNode>> RsxPipeline<T, Result<()>>
 						for a in &mut e.attributes {
 							let res = match a {
 								RsxAttribute::Block { effect, .. } => {
-									effect.take().register(loc)
+									std::mem::take(effect).register(loc)
 								}
 								RsxAttribute::BlockValue { effect, .. } => {
-									effect.take().register(loc)
+									std::mem::take(effect).register(loc)
 								}
 								_ => Ok(()),
 							};

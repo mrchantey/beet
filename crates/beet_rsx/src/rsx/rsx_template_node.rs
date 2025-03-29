@@ -246,7 +246,7 @@ impl RsxTemplateNode {
 				}))
 			}
 			RsxTemplateNode::RustBlock { tracker, idx } => {
-				let (initial, register) =
+				let (initial, effect) =
 					match rusty_map.remove(&tracker).ok_or_else(|| {
 						TemplateError::no_rusty_map(
 							&format!("RustBlock"),
@@ -254,9 +254,10 @@ impl RsxTemplateNode {
 							tracker,
 						)
 					})? {
-						RustyPart::RustBlock { initial, register } => {
-							Ok((initial, register))
-						}
+						RustyPart::RustBlock {
+							initial,
+							effect: register,
+						} => Ok((initial, register)),
 						other => TemplateResult::Err(
 							TemplateError::UnexpectedRusty {
 								expected: "BlockNode",
@@ -267,7 +268,7 @@ impl RsxTemplateNode {
 				Ok(RsxNode::Block(RsxBlock {
 					idx,
 					initial: Box::new(initial),
-					effect: Effect::new(register, tracker),
+					effect,
 				}))
 			}
 			RsxTemplateNode::Element {
@@ -353,7 +354,7 @@ impl RsxTemplateAttribute {
 				Ok(RsxAttribute::KeyValue { key, value })
 			}
 			RsxTemplateAttribute::Block(tracker) => {
-				let (initial, register) =
+				let (initial, effect) =
 					match rusty_map.remove(&tracker).ok_or_else(|| {
 						TemplateError::no_rusty_map(
 							"AttributeBlock",
@@ -361,9 +362,10 @@ impl RsxTemplateAttribute {
 							tracker,
 						)
 					})? {
-						RustyPart::AttributeBlock { initial, register } => {
-							Ok((initial, register))
-						}
+						RustyPart::AttributeBlock {
+							initial,
+							effect: register,
+						} => Ok((initial, register)),
 						other => TemplateResult::Err(
 							TemplateError::UnexpectedRusty {
 								expected: "AttributeBlock",
@@ -372,13 +374,10 @@ impl RsxTemplateAttribute {
 						),
 					}?;
 
-				Ok(RsxAttribute::Block {
-					initial,
-					effect: Effect::new(register, tracker),
-				})
+				Ok(RsxAttribute::Block { initial, effect })
 			}
 			RsxTemplateAttribute::BlockValue { key, tracker } => {
-				let (initial, register) =
+				let (initial, effect) =
 					match rusty_map.remove(&tracker).ok_or_else(|| {
 						TemplateError::no_rusty_map(
 							"AttributeValue",
@@ -386,9 +385,10 @@ impl RsxTemplateAttribute {
 							tracker,
 						)
 					})? {
-						RustyPart::AttributeValue { initial, register } => {
-							Ok((initial, register))
-						}
+						RustyPart::AttributeValue {
+							initial,
+							effect: register,
+						} => Ok((initial, register)),
 						other => TemplateResult::Err(
 							TemplateError::UnexpectedRusty {
 								expected: "AttributeValue",
@@ -400,7 +400,7 @@ impl RsxTemplateAttribute {
 				Ok(RsxAttribute::BlockValue {
 					key,
 					initial,
-					effect: Effect::new(register, tracker),
+					effect,
 				})
 			}
 		}
