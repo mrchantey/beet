@@ -2,6 +2,7 @@ use crate::prelude::*;
 use anyhow::Result;
 use beet_rsx::prelude::*;
 use std::pin::Pin;
+use std::sync::Arc;
 
 /// A function that has no parameters and returns a [`RsxRoot`].
 pub type DefaultRouteFunc =
@@ -28,6 +29,16 @@ impl<T> RouteFunc<T> {
 		}
 	}
 
+	pub fn map_func<T2: IntoRouteFunc<T, M>, M>(
+		self,
+		func: impl FnOnce(T) -> T2,
+	) -> Self {
+		RouteFunc {
+			route_info: self.route_info,
+			func: func(self.func).into_route_func(),
+		}
+	}
+
 	// pub fn into_route_info(&self) -> RouteInfo {
 	// 	RouteInfo::new(self.route_path.clone(), &self.method)
 	// }
@@ -39,16 +50,17 @@ pub trait IntoRouteFunc<T, M>: 'static {
 	fn into_route_func(self) -> T;
 }
 
+pub struct SyncRouteFuncMarker;
 
 
-impl<F> IntoRouteFunc<DefaultRouteFunc, ()> for F
+impl<F> IntoRouteFunc<DefaultRouteFunc, SyncRouteFuncMarker> for F
 where
-	F: 'static + Clone + Fn() -> RsxRoot,
+	F: 'static + Fn() -> RsxRoot,
 {
 	fn into_route_func(self) -> DefaultRouteFunc {
+		let func = Arc::new(self);
 		Box::new(move || {
-			// why clone?
-			let func = self.clone();
+			let func = func.clone();
 			Box::pin(async move { Ok(func()) })
 		})
 	}
@@ -59,12 +71,108 @@ pub struct AsyncRouteFuncMarker;
 
 impl<F> IntoRouteFunc<DefaultRouteFunc, AsyncRouteFuncMarker> for F
 where
-	F: 'static + Clone + AsyncFn() -> RsxRoot,
+	F: 'static + AsyncFn() -> RsxRoot,
 {
 	fn into_route_func(self) -> DefaultRouteFunc {
+		let func = Arc::new(self);
 		Box::new(move || {
-			let func = self.clone();
+			let func = func.clone();
 			Box::pin(async move { Ok(func().await) })
 		})
+	}
+}
+
+pub struct ResultRouteFuncMarker;
+
+impl<F, E>
+	IntoRouteFunc<
+		DefaultRouteFunc,
+		(SyncRouteFuncMarker, ResultRouteFuncMarker),
+	> for F
+where
+	E: std::error::Error + 'static + Send + Sync,
+	F: 'static + Fn() -> Result<RsxRoot, E>,
+{
+	fn into_route_func(self) -> DefaultRouteFunc {
+		let func = Arc::new(self);
+		Box::new(move || {
+			let func = func.clone();
+			Box::pin(async move { Ok(func()?) })
+		})
+	}
+}
+impl<F, E>
+	IntoRouteFunc<
+		DefaultRouteFunc,
+		(AsyncRouteFuncMarker, ResultRouteFuncMarker),
+	> for F
+where
+	E: std::error::Error + 'static + Send + Sync,
+	F: 'static + AsyncFn() -> Result<RsxRoot, E>,
+{
+	fn into_route_func(self) -> DefaultRouteFunc {
+		let func = Arc::new(self);
+		Box::new(move || {
+			let func = func.clone();
+			Box::pin(async move { Ok(func().await?) })
+		})
+	}
+}
+
+pub struct AnyhowRouteFuncMarker;
+
+
+impl<F>
+	IntoRouteFunc<
+		DefaultRouteFunc,
+		(SyncRouteFuncMarker, AnyhowRouteFuncMarker),
+	> for F
+where
+	F: 'static + Fn() -> anyhow::Result<RsxRoot>,
+{
+	fn into_route_func(self) -> DefaultRouteFunc {
+		let func = Arc::new(self);
+		Box::new(move || {
+			let func = func.clone();
+			Box::pin(async move { func() })
+		})
+	}
+}
+impl<F>
+	IntoRouteFunc<
+		DefaultRouteFunc,
+		(AsyncRouteFuncMarker, AnyhowRouteFuncMarker),
+	> for F
+where
+	F: 'static + AsyncFn() -> anyhow::Result<RsxRoot>,
+{
+	fn into_route_func(self) -> DefaultRouteFunc {
+		let func = Arc::new(self);
+		Box::new(move || {
+			let func = func.clone();
+			Box::pin(async move { func().await })
+		})
+	}
+}
+
+
+
+#[cfg(test)]
+mod test {
+	use crate::as_beet::*;
+	use sweet::prelude::*;
+
+	#[test]
+	fn works() {
+		let _sync: DefaultRouteFunc = || -> RsxRoot {
+			rsx! {}
+		}
+		.into_route_func();
+		let _sync_result: DefaultRouteFunc =
+			|| -> Result<RsxRoot> { Ok(rsx! {}) }.into_route_func();
+		let _async_func: DefaultRouteFunc = async || -> RsxRoot {
+			rsx! {}
+		}
+		.into_route_func();
 	}
 }

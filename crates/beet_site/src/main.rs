@@ -1,9 +1,22 @@
+#![feature(more_qualified_paths)]
 use beet::prelude::*;
+use beet_site::prelude::*;
 
 #[cfg(not(target_arch = "wasm32"))]
 fn main() {
 	let mut routes = beet_site::routes::collect();
-	routes.extend(beet::design::mockups::collect().into_iter());
+	routes.extend(beet::design::mockups::collect().into_iter().map(|route| {
+		route.map_func(|func| {
+			async move || -> anyhow::Result<RsxRoot> {
+				let root = func().await?;
+				Ok(rsx! {
+					<BeetPage>
+						{root}
+					</BeetPage>
+				})
+			}
+		})
+	}));
 	AppRouter::new(app_cx!()).add_collection(routes).run();
 }
 

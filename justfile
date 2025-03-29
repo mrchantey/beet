@@ -100,7 +100,7 @@ run-test-site:
 	sweet serve target/test_site
 # --templates-root-dir crates \
 
-run-beet-site *args:
+run-site *args:
 	just cli watch -p beet_site {{args}}
 
 #💡 Test
