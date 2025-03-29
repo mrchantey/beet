@@ -71,7 +71,7 @@ beet_router = { path = "", features = [
 	"parser",
 	"bevy",
 	"build",
-	# "_test_site",
+	"_test_site",
 ] }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]

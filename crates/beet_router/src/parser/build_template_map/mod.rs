@@ -212,15 +212,13 @@ impl<'a> Visit<'a> for RsxSynVisitor {
 
 
 #[cfg(test)]
+#[cfg(not(target_arch = "wasm32"))]
 mod test {
+	use crate::as_beet::*;
 	use std::path::PathBuf;
-
-	use crate::prelude::*;
-	use beet_rsx::rsx::RsxTemplateMap;
 	use sweet::prelude::*;
 
 	#[test]
-	#[cfg(not(target_arch = "wasm32"))]
 	fn works() {
 		let src = WorkspacePathBuf::new("crates/beet_router/src/test_site")
 			.into_canonical()
@@ -240,5 +238,48 @@ mod test {
 			.to_be(&WorkspacePathBuf::new_from_current_directory(src).unwrap());
 		expect(map.templates.len()).to_be(6);
 		// println!("{:#?}", map);
+	}
+
+	/// it asserts that the process of loading tokens from macros
+	/// matches the process of loading tokens from the file system.
+	/// There are several ways this can go wrong:
+	/// - compile time hasher entropy differs from runtime
+	/// - macros discard whitespace but files do not
+	#[sweet::test]
+	async fn builds() {
+		use beet_rsx::rsx::RsxTemplateNode;
+
+		let src = WorkspacePathBuf::new("crates/beet_router/src/test_site")
+			.into_canonical()
+			.unwrap();
+		let builder = BuildTemplateMap::new(src.as_path());
+
+
+		// 2. build, parse and compare
+		let tokens = builder.build_ron().unwrap();
+		let map: RsxTemplateMap =
+			ron::de::from_str(&tokens.to_string()).unwrap();
+
+		// println!("wrote to {}\n{:#?}", builder.dst.display(), map);
+		// println!("TEMPLATE_MAP::::{:#?}", map);
+
+		let rsx = &crate::test_site::routes::collect()[0];
+		let root = (rsx.func)().await.unwrap();
+		let root1 = map.templates.get(&root.location).unwrap();
+		let RsxTemplateNode::Component {
+			tracker: tracker1, ..
+		} = &root1.node
+		else {
+			panic!();
+		};
+		let RsxNode::Component(RsxComponent {
+			tracker: tracker2, ..
+		}) = &root.node
+		else {
+			panic!();
+		};
+		expect(tracker1).to_be(tracker2);
+
+		// println!("RSX:::: {:#?}", rsx);}
 	}
 }

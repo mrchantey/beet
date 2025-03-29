@@ -86,3 +86,22 @@ impl RsxPipeline<Vec<(RouteInfo, HtmlDocument)>, Result<()>>
 		Ok(())
 	}
 }
+
+
+#[cfg(test)]
+mod test {
+
+	#[test]
+	fn works() {
+		// TODO non-disk version
+		// beet_router::test_site::routes::collect()
+		// .pipe(FuncFilesToRsx::default())
+		// .await
+		// .unwrap()
+		// .pipe(ApplyRouteTemplates::new(
+		// 	"target/test_site/rsx-templates.ron",
+		// ))?
+		// .pipe(RoutesToHtml::default())?
+		// .pipe(HtmlRoutesToDisk::new("target/test_site"))?;
+	}
+}

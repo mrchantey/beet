@@ -15,14 +15,14 @@ keywords.workspace = true
 
 [features]
 default = ["macros", "fs", "serde"]
+macros = ["dep:beet_rsx_macros"]
 fs = ["sweet/fs", "beet_rsx_parser/fs"]
+serde = ["dep:serde", "dep:ron"]
+
 bevy = ["dep:bevy", "serde", "dep:flume"]
-# this is a hefty feature, pulls in bevy_render
 bevy_default = ["bevy", "bevy/default"]
 css = ["dep:lightningcss", "dep:parcel_selectors"]
-macros = ["dep:beet_rsx_macros"]
 parser = ["dep:quote", "dep:proc-macro2", "dep:beet_rsx_parser"]
-serde = ["dep:serde", "dep:ron"]
 
 [dependencies]
 beet_rsx_parser = { workspace = true, optional = true }

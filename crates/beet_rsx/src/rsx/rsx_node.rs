@@ -52,18 +52,6 @@ impl AsMut<RsxNode> for &mut RsxNode {
 
 
 impl RsxNode {
-	pub fn idx(&self) -> RsxIdx {
-		match self {
-			RsxNode::Doctype { idx, .. }
-			| RsxNode::Comment { idx, .. }
-			| RsxNode::Text { idx, .. }
-			| RsxNode::Fragment { idx, .. }
-			| RsxNode::Element(RsxElement { idx, .. })
-			| RsxNode::Component(RsxComponent { idx, .. }) => *idx,
-			RsxNode::Block(RsxBlock { idx, .. }) => *idx,
-		}
-	}
-
 	pub fn fragment(nodes: Vec<RsxNode>) -> Self {
 		Self::Fragment {
 			idx: RsxIdx::default(),
