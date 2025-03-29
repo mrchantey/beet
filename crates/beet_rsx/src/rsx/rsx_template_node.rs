@@ -10,26 +10,18 @@ use thiserror::Error;
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum RsxTemplateNode {
-	Doctype {
-		idx: RsxIdx,
-	},
-	Comment {
-		idx: RsxIdx,
-		value: String,
-	},
-	Text {
-		idx: RsxIdx,
-		value: String,
-	},
-	Fragment {
-		idx: RsxIdx,
-		items: Vec<Self>,
-	},
+	/// Serializable [`RsxNode::Doctype`]
+	Doctype { idx: RsxIdx },
+	/// Serializable [`RsxNode::Comment`]
+	Comment { idx: RsxIdx, value: String },
+	/// Serializable [`RsxNode::Text`]
+	Text { idx: RsxIdx, value: String },
+	/// Serializable [`RsxNode::Fragment`]
+	Fragment { idx: RsxIdx, items: Vec<Self> },
+	/// Serializable [`RsxNode::Block`]
 	/// the initial value is the responsibility of the [RustyPart::RustBlock]
-	RustBlock {
-		idx: RsxIdx,
-		tracker: RustyTracker,
-	},
+	RustBlock { idx: RsxIdx, tracker: RustyTracker },
+	/// Serializable [`RsxNode::Element`]
 	Element {
 		idx: RsxIdx,
 		tag: String,
@@ -37,6 +29,7 @@ pub enum RsxTemplateNode {
 		attributes: Vec<RsxTemplateAttribute>,
 		children: Box<Self>,
 	},
+	/// Serializable [`RsxNode::Component`]
 	/// We dont know much about components, for example when parsing
 	/// a file we just get the name.
 	/// The [RsxMacroLocation] etc is is tracked by the [RustyPart::Component::root]
@@ -47,6 +40,7 @@ pub enum RsxTemplateNode {
 		tag: String,
 		/// mapped from [RsxComponent::slot_children]
 		slot_children: Box<Self>,
+		template_directives: Vec<TemplateDirective>,
 	},
 }
 
@@ -72,7 +66,7 @@ pub enum TemplateError {
 	)]
 	NoTemplate {
 		expected: RsxMacroLocation,
-		received: RsxTemplateMap,
+		received: Vec<RsxMacroLocation>,
 	},
 	#[error(
 		"Rusty Map is missing a tracker for {cx}\nExpected: {expected:#?}\nReceived: {received:#?}"
@@ -132,7 +126,12 @@ impl RsxTemplateNode {
 				tracker,
 				// ignore root, its a seperate tree
 				root: _,
-
+				// type_name cannot be statically changed
+				type_name: _,
+				// ron cannot be statically generated
+				ron: _,
+				// not sure if we need to serialize these
+				template_directives,
 				slot_children,
 			}) => Ok(Self::Component {
 				idx: *idx,
@@ -141,6 +140,7 @@ impl RsxTemplateNode {
 				slot_children: Box::new(Self::from_rsx_node(slot_children)?),
 				tracker: tracker.clone(),
 				tag: tag.clone(),
+				template_directives: template_directives.clone(),
 			}),
 			RsxNode::Block(RsxBlock {
 				idx,
@@ -207,9 +207,10 @@ impl RsxTemplateNode {
 				tracker,
 				tag,
 				slot_children,
+				template_directives,
 				idx,
 			} => {
-				let root =
+				let (root, type_name, ron) =
 					match rusty_map.remove(&tracker).ok_or_else(|| {
 						TemplateError::no_rusty_map(
 							&format!("Component: {}", tag),
@@ -217,7 +218,11 @@ impl RsxTemplateNode {
 							tracker,
 						)
 					})? {
-						RustyPart::Component { root } => Ok(root),
+						RustyPart::Component {
+							root,
+							type_name,
+							ron,
+						} => Ok((root, type_name, ron)),
 						other => TemplateResult::Err(
 							TemplateError::UnexpectedRusty {
 								expected: "Component",
@@ -225,16 +230,19 @@ impl RsxTemplateNode {
 							},
 						),
 					}?;
-				// here we need apply the template for the component
+				// very confusing to callback to the map like this
 				let root = template_map.apply_template(root)?;
 				Ok(RsxNode::Component(RsxComponent {
 					idx,
 					tag: tag.clone(),
 					tracker,
+					type_name,
+					ron,
 					root: Box::new(root),
 					slot_children: Box::new(
 						slot_children.into_rsx_node(template_map, rusty_map)?,
 					),
+					template_directives: template_directives.clone(),
 				}))
 			}
 			RsxTemplateNode::RustBlock { tracker, idx } => {
@@ -419,7 +427,7 @@ struct RsxTemplateNodeToHtml {
 
 #[cfg(test)]
 mod test {
-	use crate::prelude::*;
+	use crate::as_beet::*;
 	use sweet::prelude::*;
 
 	#[test]
@@ -496,6 +504,7 @@ mod test {
 									value: "some child".to_string(),
 								}),
 							}),
+							template_directives: vec![],
 						},
 					],
 				}),

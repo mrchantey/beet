@@ -44,14 +44,15 @@ jobs:
         components: rustfmt
     - name: 🔨 Add wasm target
       run: rustup target add wasm32-unknown-unknown
-    # - name: 🔨 Install cargo binstall
-    #   run: cargo install cargo-binstall || true
+    - name: 🔨 Install cargo binstall
+      uses: cargo-bins/cargo-binstall@main
+      # run: cargo install cargo-binstall || true
     - name: 🔨 Install wasm bindgen cli
-      run: cargo install wasm-bindgen-cli --version 0.2.100    || true
+      run: cargo binstall wasm-bindgen-cli --version 0.2.100    || true
     - name: 🔨 Install sweet cli
-      run: cargo install sweet-cli --version 0.3.0-rc.3        || true
+      run: cargo binstall sweet-cli --version 0.3.0-rc.3        || true
     - name: 🔨 Install leptosfmt
-      run: cargo install leptosfmt                             || true
+      run: cargo binstall leptosfmt                             || true
     - name: 🔨📋 Init repo
       run: just init-repo
     - name: 🔎 Test

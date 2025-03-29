@@ -45,7 +45,7 @@ impl VisitRsxOptions {
 			..Default::default()
 		}
 	}
-	/// - do not visit [RsxComponent::node]
+	/// - do not visit [RsxComponent::root]
 	/// - do not visit [RsxComponent::slot_children]
 	pub fn ignore_component() -> Self {
 		Self {
@@ -54,7 +54,7 @@ impl VisitRsxOptions {
 			..Default::default()
 		}
 	}
-	/// do not visit [RsxComponent::node]
+	/// do not visit [RsxComponent::root]
 	pub fn ignore_component_node() -> Self {
 		Self {
 			ignore_component_node: true,
@@ -240,18 +240,16 @@ mod test {
 	use crate::as_beet::*;
 	use sweet::prelude::*;
 
-
+	#[derive(Node)]
 	struct Child;
-	impl Component for Child {
-		fn render(self) -> RsxRoot {
-			rsx! {
-				<div>
-					<slot />
-				</div>
-			}
+
+	fn child(_: Child) -> RsxRoot {
+		rsx! {
+			<div>
+				<slot />
+			</div>
 		}
 	}
-
 
 	#[derive(Default)]
 	struct Counter {
@@ -294,7 +292,7 @@ mod test {
 		// let child_block = rsx! { <div> {"text"} </div> };
 
 		let mut counter = Counter::default();
-		let mut rsx = rsx! {
+		rsx! {
 			// doctype
 			<!DOCTYPE html>
 			// comment
@@ -315,9 +313,10 @@ mod test {
 					</Child>
 				</Child>
 			</div>
-		};
-		SlotsVisitor::apply(&mut rsx.node).unwrap();
-		rsx.walk(&mut counter);
+		}
+		.pipe(SlotsPipeline::default())
+		.unwrap()
+		.walk(&mut counter);
 		expect(counter.node).to_be(22);
 		expect(counter.doctype).to_be(1);
 		expect(counter.comment).to_be(1);

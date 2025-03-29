@@ -1,8 +1,10 @@
+mod html_doc_to_resumable;
 mod html_document;
 mod html_node;
-mod rsx_to_resumable_html;
+mod render_html;
 pub use html_document::*;
 pub use html_node::*;
+pub use render_html::*;
 mod rsx_to_html;
+pub use html_doc_to_resumable::*;
 pub use rsx_to_html::*;
-pub use rsx_to_resumable_html::*;

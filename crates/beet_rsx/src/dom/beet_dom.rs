@@ -3,18 +3,18 @@ use web_sys::Element;
 
 
 
+#[deprecated = "we now use client directives exclusively"]
 pub struct BeetDom;
 
 
-
+#[allow(deprecated)]
 impl BeetDom {
 	pub fn mount(app: impl 'static + Fn() -> RsxRoot) {
 		use sweet::prelude::wasm::set_timeout_ms;
 
-		console_error_panic_hook::set_once();
+		let doc = app().pipe(RsxToHtmlDocument::default()).unwrap();
 
 		// effects are called on render
-		let doc = RsxToResumableHtml::default().map_root(&app());
 		Self::mount_doc(&doc);
 		Self::normalize();
 		// give the dom a moment to mount
@@ -24,10 +24,9 @@ impl BeetDom {
 	}
 
 	pub fn hydrate<M>(app: impl IntoRsxRoot<M>) {
-		console_error_panic_hook::set_once();
 		DomTarget::set(BrowserDomTarget::default());
 		// effects called here too
-		app.into_root().register_effects();
+		app.into_root().pipe(RegisterEffects::default()).unwrap();
 		EventRegistry::initialize().unwrap();
 	}
 

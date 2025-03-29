@@ -44,22 +44,49 @@ impl Default for RsxNode {
 
 
 impl RsxNode {
-	/// Returns true if the node is an empty fragment,
-	/// or all children are empty fragments
-	pub fn assert_empty(&self) {
+	pub fn idx(&self) -> RsxIdx {
 		match self {
-			RsxNode::Fragment { nodes: items, .. } => {
-				for item in items {
-					item.assert_empty();
+			RsxNode::Doctype { idx, .. }
+			| RsxNode::Comment { idx, .. }
+			| RsxNode::Text { idx, .. }
+			| RsxNode::Fragment { idx, .. }
+			| RsxNode::Element(RsxElement { idx, .. })
+			| RsxNode::Component(RsxComponent { idx, .. }) => *idx,
+			RsxNode::Block(RsxBlock { idx, .. }) => *idx,
+		}
+	}
+
+	pub fn fragment(nodes: Vec<RsxNode>) -> Self {
+		Self::Fragment {
+			idx: RsxIdx::default(),
+			nodes,
+		}
+	}
+
+	/// Returns true if the node is an empty fragment,
+	/// or if it is recursively a fragment with only empty fragments
+	pub fn is_empty(&self) -> bool {
+		match self {
+			RsxNode::Fragment { nodes, .. } => {
+				for node in nodes {
+					if !node.is_empty() {
+						return false;
+					}
 				}
-				return;
+				true
 			}
-			_ => {}
-		};
-		panic!(
-			"Expected empty fragment. Slot children must be empty before mapping to html, please call HtmlSlotsVisitor::apply\nreceived: {:#?}",
-			self
-		);
+			_ => false,
+		}
+	}
+	/// ## Panics
+	/// If the node is not an empty fragment
+	pub fn assert_empty(&self) {
+		if !self.is_empty() {
+			panic!(
+				"Expected empty fragment. Slot children must be empty before mapping to html, please call HtmlSlotsVisitor::apply\nreceived: {:#?}",
+				self
+			);
+		}
 	}
 
 	pub fn discriminant(&self) -> RsxNodeDiscriminants { self.into() }
@@ -67,6 +94,26 @@ impl RsxNode {
 	pub fn walk(&self, visitor: &mut impl RsxVisitor) {
 		visitor.walk_node(self)
 	}
+
+	// this is too dangerous? so easy to expect the rsx idx to be unchanged?
+	//
+	// /// Add another node. If this node is a fragment it will be appended
+	// /// to the end, otherwise a new fragment will be created with the
+	// /// current node and the new node.
+	// pub fn push(&mut self, node: RsxNode) {
+	// 	match self {
+	// 		RsxNode::Fragment { nodes, .. } => nodes.push(node),
+	// 		_ => {
+	// 			// let idx = self
+	// 			let mut nodes = vec![std::mem::take(self)];
+	// 			nodes.push(node);
+	// 			*self = RsxNode::Fragment {
+	// 				idx: RsxIdx::default(),
+	// 				nodes,
+	// 			};
+	// 		}
+	// 	}
+	// }
 
 	/// Returns true if the node is an html node
 	pub fn is_html_node(&self) -> bool {
@@ -79,38 +126,6 @@ impl RsxNode {
 		}
 	}
 
-	/// takes all the register_effect functions
-	/// # Panics
-	/// If the register function fails
-	pub fn register_effects(&mut self) {
-		TreeLocationVisitor::visit_mut(self, |loc, node| {
-			// println!(
-			// 	"registering effect at loc: {:?}:{:?}",
-			// 	loc,
-			// 	node.discriminant()
-			// );
-
-			match node {
-				RsxNode::Block(RsxBlock { effect, .. }) => {
-					effect.take().register(loc).unwrap();
-				}
-				RsxNode::Element(e) => {
-					for a in &mut e.attributes {
-						match a {
-							RsxAttribute::Block { effect, .. } => {
-								effect.take().register(loc).unwrap();
-							}
-							RsxAttribute::BlockValue { effect, .. } => {
-								effect.take().register(loc).unwrap();
-							}
-							_ => {}
-						}
-					}
-				}
-				_ => {}
-			}
-		});
-	}
 
 	/// non-recursive check for blocks in self, accounting for fragments
 	pub fn directly_contains_rust_node(&self) -> bool {
@@ -162,20 +177,59 @@ pub struct RsxFragment(pub Vec<RsxNode>);
 /// with the [`Component::render`] method and any slot children.
 #[derive(Debug)]
 pub struct RsxComponent {
-	/// The index of this node in the local tree
+	/// The index of this node relative to its parent [`RsxRoot`]
 	pub idx: RsxIdx,
 	/// The name of the component, this must start with a capital letter
 	pub tag: String,
+	/// The type name extracted via [`std::any::type_name`]
+	pub type_name: String,
+	/// The serialized component, only `Some` if the component has a `client` directive
+	pub ron: Option<String>,
 	/// Tracks the <MyComponent ..> opening tag for this component
 	/// even key value attribute changes must be tracked
 	/// because components are structs not elements
 	pub tracker: RustyTracker,
 	/// the root returned by [Component::render]
 	pub root: Box<RsxRoot>,
-	// /// the children passed in by this component's parent:
-	// ///
-	// /// `rsx! { <MyComponent>slot_children</MyComponent> }`
+	/// the children passed in by this component's parent:
+	///
+	/// `rsx! { <MyComponent>slot_children</MyComponent> }`
 	pub slot_children: Box<RsxNode>,
+	/// Collected template directives
+	pub template_directives: Vec<TemplateDirective>,
+}
+
+/// Attributes with a colon `:` are considered special template directives,
+/// for example `client:load`
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct TemplateDirective {
+	/// The part before the colon
+	pub prefix: String,
+	/// The part after the colon
+	pub suffix: String,
+	/// The part after the equals sign, if any
+	pub value: Option<String>,
+}
+
+impl TemplateDirective {
+	/// Create a new template directive
+	/// ## Panics
+	/// If the key does not contain two parts split by a colon
+	pub fn new(key: &str, value: Option<&str>) -> Self {
+		let mut parts = key.split(':');
+		let prefix = parts
+			.next()
+			.expect("expected colon prefix in template directive");
+		let suffix = parts
+			.next()
+			.expect("expected colon suffix in template directive");
+		Self {
+			prefix: prefix.into(),
+			suffix: suffix.into(),
+			value: value.map(|v| v.into()),
+		}
+	}
 }
 
 /// Representation of an RsxElement
@@ -285,9 +339,29 @@ mod test {
 	fn root_location() {
 		let line = line!() + 1;
 		let RsxRoot { location, .. } = rsx! { <div>hello world</div> };
-		expect(location.file().replace("\\", "/"))
+		expect(&location.file().to_string_lossy())
 			.to_be("crates/beet_rsx/src/rsx/rsx_node.rs");
 		expect(location.line()).to_be(line as usize);
 		expect(location.col()).to_be(40);
+	}
+
+	#[derive(Node)]
+	struct MyComponent {
+		key: u32,
+	}
+	fn my_component(props: MyComponent) -> RsxRoot {
+		rsx! { <div>{props.key}</div> }
+	}
+
+
+	#[test]
+	fn block_attr() {
+		let my_comp = MyComponent { key: 3 };
+		expect(
+			rsx! { <MyComponent {my_comp} /> }
+				.pipe(RsxToHtmlString::default())
+				.unwrap(),
+		)
+		.to_be("<div data-beet-rsx-idx=\"2\">3</div>");
 	}
 }

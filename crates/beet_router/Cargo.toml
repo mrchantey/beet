@@ -7,38 +7,73 @@ authors.workspace = true
 readme.workspace = true
 description = "File based router for websites"
 documentation.workspace = true
+homepage.workspace = true
 repository.workspace = true
 categories.workspace = true
 keywords.workspace = true
 
 [features]
-parser = ["dep:beet_router_parser"]
-bevy = [
-	"dep:bevy",
-	"dep:tokio",
-	"dep:flume",
-	"beet_rsx/bevy",
-	"beet_rsx/bevy_default",
-]
-# for internal testing
+default = ["serde"]
 _test_site = []
+build = ["serde", "parser"]
+serde = ["dep:serde", "dep:ron", "beet_rsx/serde"]
+server = ["parser", "dep:beet_server"]
+parser = [
+	"serde",
+	"sweet/fs",
+	"beet_rsx/parser",
+	"dep:uuid",
+	"dep:quote",
+	"dep:proc-macro2",
+	"dep:prettyplease",
+	"dep:syn",
+]
+bevy = ["dep:bevy", "dep:flume", "beet_rsx/bevy"]
+# enables 'mod test_site' for internal testing,
+# the mod is also enabled by the 'test' flag
 
 [dependencies]
-beet_rsx = { workspace = true, features = ["serde"] }
-bevy = { workspace = true, optional = true }
 anyhow.workspace = true
-ron.workspace = true
+rapidhash.workspace = true
 http.workspace = true
 futures.workspace = true
+clap.workspace = true
+sweet.workspace = true
+
+
+beet_rsx = { workspace = true }
+bevy = { workspace = true, optional = true }
+
+#💡 serde
+serde = { workspace = true, optional = true }
+ron = { workspace = true, optional = true }
+
+#💡 parser
+uuid = { version = "1", features = ["v4"], optional = true }
+quote = { workspace = true, optional = true }
+proc-macro2 = { workspace = true, optional = true }
+prettyplease = { workspace = true, optional = true }
+syn = { workspace = true, optional = true }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-beet_router_parser = { workspace = true, optional = true }
-sweet = { workspace = true, features = ["fs"] }
-tokio = { workspace = true, optional = true }
+beet_server = { workspace = true, optional = true }
+
+tokio = { workspace = true }
 flume = { workspace = true, optional = true }
 
-[target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
-ron.workspace = true
-beet_router = { path = "", features = ["parser", "bevy", "_test_site"] }
+
+[dev-dependencies]
 sweet = { workspace = true, features = ["test"] }
-tokio.workspace = true
+
+[target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
+# beet_router = { path = "", features = ["parser", "bevy"] }
+beet_router = { path = "", features = [
+	"parser",
+	"bevy",
+	"build",
+	# "_test_site",
+] }
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+web-sys.workspace = true
+console_error_panic_hook.workspace = true

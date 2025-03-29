@@ -1,7 +1,14 @@
-use super::HtmlAttribute;
-use super::HtmlElementNode;
-use super::HtmlNode;
-use super::RenderHtml;
+use crate::prelude::*;
+use anyhow::Result;
+
+#[derive(Default)]
+pub struct HtmlToDocument;
+
+impl RsxPipeline<Vec<HtmlNode>, Result<HtmlDocument>> for HtmlToDocument {
+	fn apply(self, value: Vec<HtmlNode>) -> Result<HtmlDocument> {
+		Ok(HtmlDocument::from_nodes(value))
+	}
+}
 
 /// A valid html document has a particular structure, if the
 /// structure is missing it is usually inserterd by browsers, its
@@ -14,34 +21,6 @@ pub struct HtmlDocument {
 }
 
 impl HtmlDocument {
-	pub fn render_body(&self) -> String {
-		let mut html = String::new();
-		for node in &self.body {
-			node.render_inner(&mut html);
-		}
-		html
-	}
-
-	pub fn insert_wasm_script(&mut self) {
-		let script = r#"
-		import init from './wasm/bindgen.js'
-		init('./wasm/bindgen_bg.wasm')
-			.catch((error) => {
-				if (!error.message.startsWith("Using exceptions for control flow,"))
-					throw error
-			})
-"#;
-		self.body.push(HtmlNode::Element(HtmlElementNode {
-			tag: "script".to_string(),
-			self_closing: false,
-			attributes: vec![HtmlAttribute {
-				key: "type".to_string(),
-				value: Some("module".to_string()),
-			}],
-			children: vec![HtmlNode::Text(script.to_string())],
-		}));
-	}
-
 	/// Parses nodes, Appending them to the body unless they are one of
 	/// the following in these positions:
 	/// ```html
@@ -91,51 +70,33 @@ impl HtmlDocument {
 		}
 		Self { head, body }
 	}
-}
 
-pub trait IntoHtmlDocument {
-	fn into_document(self) -> HtmlDocument;
-}
-impl IntoHtmlDocument for Vec<HtmlNode> {
-	fn into_document(self) -> HtmlDocument { HtmlDocument::from_nodes(self) }
-}
-
-
-impl RenderHtml for HtmlDocument {
-	fn render_inner(&self, html: &mut String) {
-		html.push_str("<!DOCTYPE html><html><head>");
-		for node in &self.head {
-			node.render_inner(html);
-		}
-		html.push_str("</head><body>");
-		for node in &self.body {
-			node.render_inner(html);
-		}
-		html.push_str("</body></html>");
-	}
-	fn render_pretty_inner(&self, html: &mut String, indent: &mut usize) {
-		Self::push_pretty(html, indent, "<!DOCTYPE html>");
-		Self::push_pretty(html, indent, "<html>");
-		*indent += 1;
-		Self::push_pretty(html, indent, "<head>");
-		*indent += 1;
-		for node in &self.head {
-			node.render_pretty_inner(html, indent);
-		}
-		*indent -= 1;
-		Self::push_pretty(html, indent, "</head>");
-		Self::push_pretty(html, indent, "<body>");
-		*indent += 1;
-		for node in &self.body {
-			node.render_pretty_inner(html, indent);
-		}
-		*indent -= 1;
-		Self::push_pretty(html, indent, "</body>");
-		*indent -= 1;
-		Self::push_pretty(html, indent, "</html>");
+	/// Create a Vec<HtmlNode> that has a valid html document layout
+	pub fn into_nodes(self) -> Vec<HtmlNode> {
+		vec![
+			HtmlNode::Doctype,
+			HtmlNode::Element(HtmlElementNode {
+				tag: "html".to_string(),
+				self_closing: false,
+				attributes: vec![],
+				children: vec![
+					HtmlNode::Element(HtmlElementNode {
+						tag: "head".to_string(),
+						self_closing: false,
+						attributes: vec![],
+						children: self.head,
+					}),
+					HtmlNode::Element(HtmlElementNode {
+						tag: "body".to_string(),
+						self_closing: false,
+						attributes: vec![],
+						children: self.body,
+					}),
+				],
+			}),
+		]
 	}
 }
-
 
 use std::vec;
 

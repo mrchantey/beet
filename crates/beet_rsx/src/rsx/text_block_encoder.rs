@@ -14,6 +14,7 @@ use crate::prelude::*;
 /// <div> the quick brown {animal} <b> jumps </b> over the {color} dog </div>
 /// ```
 #[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct TextBlockEncoder {
 	pub parent_id: TreeIdx,
 	/// the index of the child text node that collapsed
@@ -71,58 +72,6 @@ impl TextBlockEncoder {
 
 		encoder
 	}
-
-	pub fn to_csv(&self) -> String {
-		format!(
-			"{},{}",
-			self.parent_id,
-			self.split_positions
-				.iter()
-				.map(|i| i
-					.iter()
-					.map(|i| i.to_string())
-					.collect::<Vec<String>>()
-					.join("-"))
-				.collect::<Vec<String>>()
-				.join(".")
-		)
-	}
-
-	pub fn to_csv_file(items: &Vec<Self>) -> String {
-		items
-			.iter()
-			.map(Self::to_csv)
-			.collect::<Vec<String>>()
-			.join("\n")
-	}
-
-	pub fn from_csv_file(file: &str) -> ParseResult<Vec<Self>> {
-		file.lines().map(Self::from_csv).collect()
-	}
-
-	pub fn from_csv(line: &str) -> ParseResult<Self> {
-		let mut items = line.split(",");
-		let parent_id = items
-			.next()
-			.ok_or_else(|| ParseError::Serde("missing parent id".into()))?
-			.parse()?;
-
-		let split_positions = items
-			.next()
-			.ok_or_else(|| ParseError::Serde("missing split positions".into()))?
-			.split(".")
-			.map(|i| {
-				i.split("-")
-					.map(|i| i.parse())
-					.collect::<Result<Vec<usize>, _>>()
-			})
-			.collect::<Result<Vec<Vec<usize>>, _>>()?;
-
-		Ok(Self {
-			parent_id,
-			split_positions,
-		})
-	}
 }
 
 
@@ -162,9 +111,13 @@ impl CollapsedNode {
 				out.extend(Self::from_node(root));
 			}
 			RsxNode::Block(RsxBlock { initial, .. }) => {
-				out.push(CollapsedNode::RustText(RsxToHtml::render_body(
-					initial,
-				)));
+				// let initial: &RsxNode = initial.as_ref();
+				let html = initial
+					.as_ref()
+					.pipe(RsxToHtml::default())
+					.pipe(RenderHtml::default())
+					.unwrap();
+				out.push(CollapsedNode::RustText(html));
 			}
 			RsxNode::Text { value, .. } => {
 				out.push(CollapsedNode::StaticText(value.clone()))
@@ -220,13 +173,13 @@ mod test {
 	use crate::as_beet::*;
 	use sweet::prelude::*;
 
+	#[derive(Node)]
 	struct Adjective;
-	impl Component for Adjective {
-		fn render(self) -> RsxRoot {
-			rsx! {
-				"lazy"
-				<slot />
-			}
+
+	fn adjective(_: Adjective) -> RsxRoot {
+		rsx! {
+			"lazy"
+			<slot />
 		}
 	}
 
@@ -261,12 +214,5 @@ mod test {
 			CollapsedNode::Break,
 			CollapsedNode::StaticText("dog\n\t\t\t".into()),
 		]);
-
-		let encoded = TextBlockEncoder::encode(0.into(), &el);
-		let csv = encoded.to_csv();
-		expect(&csv).to_be("0,4-5-5.10-5");
-
-		let decoded = TextBlockEncoder::from_csv(&csv).unwrap();
-		expect(decoded).to_be(encoded);
 	}
 }

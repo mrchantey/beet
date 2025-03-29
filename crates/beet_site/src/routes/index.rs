@@ -1,24 +1,18 @@
 use crate::prelude::*;
 use beet::prelude::*;
 
-
-
-pub fn get(_state: DefaultAppState) -> RsxRoot {
-	let val = 44;
+pub fn get() -> RsxRoot {
+	let val = 99;
 	rsx! {
-		<PageLayout title="fooba".into()>
-			<meta
-				slot="head"
-				name="description"
-				content="This is the main file"
-			/>
-			{val + 3}
-			<span>hello world</span>
+		<BeetPage>
+			{val + 8}
+			<span>hello pizza</span>
+			<Counter client:load initial=2/>
 			<style>
 				span{
-					color: red;
+					color: blue;
 				}
 			</style>
-		</PageLayout>
+		</BeetPage>
 	}
 }

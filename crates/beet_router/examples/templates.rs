@@ -10,7 +10,7 @@ use beet_rsx::prelude::*;
 #[tokio::main]
 async fn main() {
 	let src = "crates/beet_router/src/test_site";
-	let builder = BuildRsxTemplateMap::new(src);
+	let builder = BuildTemplateMap::new(src);
 
 	// 1. build
 	builder.build_and_write().unwrap();
@@ -22,9 +22,8 @@ async fn main() {
 	// println!("wrote to {}\n{:#?}", builder.dst.display(), map);
 	// println!("TEMPLATE_MAP::::{:#?}", map);
 
-	let rsx =
-		beet_router::test_site::routes::index::get(DefaultAppState::default());
-	let root1 = map.get(&rsx.location).unwrap();
+	let rsx = beet_router::test_site::routes::collect()[0];
+	let root1 = map.templates.get(&rsx.location).unwrap();
 	let RsxTemplateNode::Component {
 		tracker: tracker1, ..
 	} = &root1.node

@@ -1,53 +1,57 @@
 use crate::prelude::*;
-
+use anyhow::Result;
 /// An implementation of hydrator that simply updates a tree of
-/// html nodes.
+/// html nodes. This is conceptually similar to JSDom in that
+/// it mocks the dom.
 pub struct RsDomTarget {
-	pub html: HtmlDocument,
+	pub doc: HtmlDocument,
 	constants: HtmlConstants,
 	loc_map: TreeLocationMap,
 }
 
+
+pub struct MountRsDom;
+
+impl RsxPipeline<RsxRoot, Result<RsxRoot>> for MountRsDom {
+	fn apply(self, root: RsxRoot) -> Result<RsxRoot> {
+		DomTarget::set(RsDomTarget::new(&root)?);
+		Ok(root)
+	}
+}
+
 impl RsDomTarget {
-	pub fn new(root: &RsxRoot) -> Self {
-		let html = RsxToResumableHtml::default().map_root(root);
-		let loc_map = TreeLocationMap::from_node(root);
-		Self {
-			html,
-			constants: Default::default(),
+	/// This does *not* apply any transformations
+	pub fn new(root: &RsxRoot) -> Result<Self> {
+		let doc = root
+			.pipe(RsxToHtml::default())
+			.pipe(HtmlToDocument::default())?;
+
+		let loc_map = root.pipe(NodeToTreeLocationMap);
+		Ok(Self {
+			doc,
 			loc_map,
-		}
+			constants: Default::default(),
+		})
 	}
 }
 
 impl DomTargetImpl for RsDomTarget {
+	fn tree_location_map(&mut self) -> &TreeLocationMap { &self.loc_map }
 	fn html_constants(&self) -> &HtmlConstants { &self.constants }
 
-	fn render(&self) -> String { self.html.render() }
+	fn render(&self) -> String {
+		self.doc.clone().pipe(RenderHtml::default()).unwrap()
+	}
 
 	fn update_rsx_node(
 		&mut self,
 		rsx: RsxNode,
 		loc: TreeLocation,
 	) -> ParseResult<()> {
-		let parent_idx = self
-			.loc_map
-			.rusty_locations
-			.get(&loc.tree_idx)
-			.ok_or_else(|| {
-				ParseError::Hydration(format!(
-					"Could not find block parent for tree index: {}",
-					loc.tree_idx
-				))
-			})?
-			.parent_idx
-			.to_string();
-
-		for html in self.html.iter_mut() {
-			// let parent_hash =
+		for html in self.doc.iter_mut() {
 			if let Some(parent_el) = html.query_selector_attr(
 				self.constants.tree_idx_key,
-				Some(&parent_idx),
+				Some(&loc.parent_idx.to_string()),
 			) {
 				return apply_rsx(parent_el, rsx, loc, &self.constants);
 			}
@@ -55,7 +59,7 @@ impl DomTargetImpl for RsDomTarget {
 
 		return Err(ParseError::Hydration(format!(
 			"Could not find node with id: {}",
-			parent_idx
+			loc.parent_idx
 		)));
 	}
 }

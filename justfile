@@ -6,7 +6,9 @@
 # just test-ci
 # ```
 #
+
 #💡 Init
+
 set windows-shell := ["C:/tools/cygwin/bin/sh.exe","-c"]
 set dotenv-load
 crates := 'beet beet_spatial beet_flow'
@@ -20,6 +22,7 @@ init-repo:
 	just assets-pull
 	mkdir -p crates/beet_ml/assets/ml && cp ./assets/ml/default-bert.ron crates/beet_ml/assets/ml/default.bert.ron
 	mkdir -p crates/beet_rsx/assets/fonts && cp ./assets/fonts/* crates/beet_rsx/assets/fonts
+	just codegen
 # just test-site
 # just export-scenes
 
@@ -28,6 +31,10 @@ init-repo:
 # Run a cli command as if it was installed
 cli *args:
 	cargo run -p beet-cli -- {{args}}
+
+
+install-cli *args:
+	cargo install --path crates/beet-cli {{args}}
 
 # Run and watch a workspace example
 run example *args:
@@ -71,16 +78,17 @@ run-bevy-rsx:
 run-bevy-rsx-if-ok:
 	while cargo run --example bevy_rsx --features=bevy_default && [ $? -eq 0 ]; do :; done
 
+# rm -rf ./target
+# mkdir -p ./target/wasm-example
+# --html-dir 	target/wasm-example 							\
 
 run-dom-rsx:
-	rm -rf ./target
-	mkdir -p ./target/wasm-example
-	just cli serve-html 						\
-	--package beet 									\
-	--example dom_rsx 							\
-	--src examples/rsx/dom_rsx.rs 	\
-	--serve-dir target/wasm-example \
-	--wasm 													\
+	just cli watch 																\
+	--package beet 																\
+	--example dom_rsx 														\
+	--templates-root-dir examples/rsx/dom_rsx.rs 	\
+	--wasm 																				\
+	--static																			\
 
 # | just watch 'just build-wasm beet dom_rsx'
 # sweet serve ./target/wasm-example | \
@@ -90,47 +98,28 @@ run-test-site:
 	cargo run -p beet_router --example templates
 	cargo run -p beet_router --example html
 	sweet serve target/test_site
+# --templates-root-dir crates \
 
+run-beet-site *args:
+	just cli watch -p beet_site {{args}}
 
-run-beet-site:
-	just cli serve-html \
-	--mpa \
-	--src crates/beet_site/src \
-	-p beet_site \
-	--serve-dir target/client \	
+#💡 Test
 
-
-## common
-cmd *args:
-	cd /cygdrive/c/work/beet && {{args}}
-
-export-scenes *args:
-	cargo run --example export_scenes {{args}}
-
-app *args:
-	cargo run --example app {{args}}
-
-# blocked on #https://github.com/bevyengine/bevy/issues/14300
-hello-world:
-	just app \
-	./scenes/beet-debug.json \
-	../bevyhub/scenes/camera-2d.json \
-	../bevyhub/scenes/ui-terminal-input.json \
-	./scenes/hello-world.json
+min-stack := 'RUST_MIN_STACK=33554432'
 
 # Run tests for ci,
 # cargo test --workspace runs with 16MB stack and max 8 cores
 test-ci *args:
 	cargo fmt 				--check
 	just leptosfmt 		--check
-	RUST_MIN_STACK=16777216 cargo test --workspace --lib	--features=_doctest 			{{args}} -- --test-threads=8
-	RUST_MIN_STACK=16777216 cargo test --workspace --doc	--features=_doctest 			{{args}} -- --test-threads=8
+	{{min-stack}} cargo test --workspace --lib	--features=_doctest 			{{args}} -- --test-threads=8
+	{{min-stack}} cargo test --workspace --doc	--features=_doctest 			{{args}} -- --test-threads=8
 	cargo test --target wasm32-unknown-unknown 	--all-features	-p beet_flow 				{{args}} -- --test-threads=8
 
 # rebuilding bevy_render for wasm results in 'no space left on device'
 test-all *args:
 	just test-ci 																																			{{args}}
-	RUST_MIN_STACK=16777216 cargo test --workspace --lib 	--all-features							{{args}} -- --test-threads=8
+	{{min-stack}} cargo test --workspace --lib 	--all-features							{{args}} -- --test-threads=8
 	cargo test --lib --target wasm32-unknown-unknown --all-features -p beet_rsx 			{{args}}
 	cargo test --lib --target wasm32-unknown-unknown --all-features -p beet_spatial 	{{args}}
 
@@ -159,6 +148,19 @@ test-wasm-e2e crate test_name *args:
 serve-web:
 	just serve-wasm
 
+
+# create codegen files
+codegen:
+	just clear-artifacts
+	cargo run -p beet_router --example test_site_codegen
+	just cli build -p beet_site
+
+clear-artifacts:
+	rm -rf target
+	rm -rf crates/beet_design/src/codegen
+	rm -rf crates/beet_router/src/test_site/codegen
+	rm -rf crates/beet_site/src/codegen
+
 # massive purge
 purge:
 	cargo clean
@@ -172,22 +174,7 @@ pws *args:
 tree:
 	cargo tree --depth=2 -e=no-dev
 
-#### WEB EXAMPLES #####################################################
-
-
-# Build wasm files, pass --no-build to just update scenes and registries
-bevyhub-build *args:
-	just export-scenes
-	bevyhub build \
-	--example app \
-	--release \
-	--copy-local ../bevyhub-apps \
-	--copy-scenes scenes \
-	--copy-registries target/registries {{args}}
-	bevyhub build \
-	--example app_ml \
-	--release \
-	--copy-local ../bevyhub-apps {{args}}
+#💡 WEB EXAMPLES
 
 # Build a wasm example for the given crate and place the
 # generated files in target/wasm-example/wasm
@@ -200,7 +187,7 @@ build-wasm crate example *args:
 	--no-typescript \
 	~/.cargo_target/wasm32-unknown-unknown/debug/examples/{{example}}.wasm
 
-### MISC
+#💡 Misc
 
 expand crate example *args:
 	just watch 'cargo expand -p {{crate}} --example {{example}} {{args}}'
@@ -217,22 +204,22 @@ publish-all *args:
 	just publish beet_flow            {{args}} || true
 	just publish beet_spatial         {{args}} || true
 	just publish beet_ml              {{args}} || true
+	just publish beet_server       		{{args}} || true
 	just publish beet_sim          		{{args}} || true
 	just publish beet_rsx_parser      {{args}} || true
 	just publish beet_rsx_macros      {{args}} || true
 	just publish beet_rsx             {{args}} || true
-	just publish beet_router_parser   {{args}} || true
 	just publish beet_router          {{args}} || true
+	just publish beet_examples        {{args}} || true
 	just publish beet                 {{args}} || true
 	just publish beet-cli             {{args}} || true
 # just publish beet_examples        {{args}} || true
 
 watch *command:
-	forky watch \
-	-w '**/*.rs' \
-	-i '{.git,target,html}/**' \
-	-i '**/mod.rs' \
-	-- {{command}}
+	sweet watch \
+	--include '**/*.rs' \
+	--exclude '{.git,target,html}/**' \
+	--cmd "{{command}}"
 
 copy-web-assets:
 	mkdir -p target/wasm/assets || true
@@ -265,77 +252,6 @@ assets-pull:
 	tar -xzvf ./assets.tar.gz
 	rm ./assets.tar.gz
 
-
-
-### TEST SCENE LOADS
-
-test-fetch:
-	cargo run --example app_ml \
-	../bevyhub/scenes/ui-terminal-input.json \
-	../bevyhub/scenes/lighting-3d.json \
-	../bevyhub/scenes/ground-3d.json \
-	./scenes/beet-debug.json \
-	./scenes/fetch-scene.json \
-	./scenes/fetch-npc.json \
-
-
-test-flock:
-	cargo run --example app \
-	../bevyhub/scenes/camera-2d.json \
-	../bevyhub/scenes/space-scene.json \
-	./scenes/beet-debug.json \
-	./scenes/flock.json \
-
-test-seek:
-	cargo run --example app \
-	../bevyhub/scenes/camera-2d.json \
-	../bevyhub/scenes/space-scene.json \
-	./scenes/beet-debug.json \
-	./scenes/seek.json \
-
-test-frozen-lake-train:
-	cargo run --example app_ml \
-	../bevyhub/scenes/lighting-3d.json \
-	./scenes/frozen-lake-scene.json \
-	./scenes/frozen-lake-train.json \
-
-test-frozen-lake-run:
-	cargo run --example app_ml \
-	../bevyhub/scenes/lighting-3d.json \
-	./scenes/frozen-lake-scene.json \
-	./scenes/frozen-lake-run.json \
-
-test-hello-animation:
-	cargo run --example app \
-	../bevyhub/scenes/ui-terminal.json \
-	../bevyhub/scenes/lighting-3d.json \
-	../bevyhub/scenes/ground-3d.json \
-	./scenes/beet-debug.json \
-	./scenes/hello-animation.json \
-
-test-hello-ml:
-	cargo run --example app_ml \
-	../bevyhub/scenes/camera-2d.json \
-	../bevyhub/scenes/ui-terminal-input.json \
-	./scenes/beet-debug.json \
-	./scenes/hello-ml.json \
-
-test-hello-world:
-	cargo run --example app \
-	../bevyhub/scenes/camera-2d.json \
-	../bevyhub/scenes/ui-terminal.json \
-	./scenes/beet-debug.json \
-	./scenes/hello-world.json \
-
-test-seek-3d:
-	cargo run --example app \
-	../bevyhub/scenes/ui-terminal.json \
-	../bevyhub/scenes/lighting-3d.json \
-	../bevyhub/scenes/ground-3d.json \
-	./scenes/beet-debug.json \
-	./scenes/seek-3d.json \
-
-
 # https://gist.github.com/stephenhardy/5470814
 # 1. Remove the history
 # 2. recreate the repos from the current content only
@@ -356,3 +272,24 @@ very-scary-purge-commit-history:
 # Cargo search but returns one line
 search *args:
 	cargo search {{args}} | head -n 1
+
+
+#💡 Server
+
+lambda-watch:
+	cd crates/beet_server && cargo lambda watch --example lambda_axum
+
+
+lambda-deploy *args:
+	cargo lambda build 					\
+	--package beet_site					\
+	--features beet/lambda			\
+	--release
+	cargo lambda deploy			 		\
+	beet 												\
+	--binary-name beet_site			\
+	--region us-west-2 					\
+	--iam-role $AWS_IAM_ROLE 		\
+	--enable-function-url 			\
+	--include target/client 		\
+	{{args}}

@@ -11,6 +11,7 @@ use rstml::node::NodeAttribute;
 use rstml::node::NodeElement;
 use rstml::node::NodeFragment;
 use rstml::node::NodeName;
+use syn::Ident;
 use syn::spanned::Spanned;
 
 /// given a span, for example the inner block
@@ -22,7 +23,7 @@ pub fn macro_location_tokens(tokens: impl Spanned) -> TokenStream {
 	let col = span.start().column;
 	quote! {
 		{
-			RsxMacroLocation::new(std::file!(), #line, #col)
+			RsxMacroLocation::new(beet::exports::WorkspacePathBuf::new(file!()), #line, #col)
 		}
 	}
 }
@@ -71,6 +72,7 @@ impl RstmlToRsx {
 			}
 		}
 	}
+
 	/// the number of actual html nodes will likely be different
 	/// due to fragments, blocks etc
 	pub fn map_nodes<C>(&mut self, nodes: Vec<Node<C>>) -> TokenStream {
@@ -134,6 +136,7 @@ impl RstmlToRsx {
 			}
 			Node::Block(block) => {
 				let tracker = self.rusty_tracker.next_tracker(&block);
+
 				let ident = &self.idents.runtime.effect;
 				quote! {
 					#ident::parse_block_node(#idx, #tracker, #block)
@@ -249,36 +252,116 @@ impl RstmlToRsx {
 		children: Vec<Node<C>>,
 	) -> TokenStream {
 		let tracker = self.rusty_tracker.next_tracker(&open_tag);
-		let props = open_tag.attributes.into_iter().map(|attr| match attr {
-			NodeAttribute::Block(node_block) => {
-				quote! {#node_block}
-			}
-			NodeAttribute::Attribute(attr) => {
-				if let Some(value) = attr.value() {
-					let key = &attr.key;
-					// apply the value to the field
-					quote! {
-						#key: #value
+		let mut prop_assignments = Vec::new();
+		let mut prop_names = Vec::new();
+		let mut template_directives = Vec::new();
+		// currently unused
+		let mut block_attr = None;
+
+		let mut should_serialize = false;
+
+		for attr in open_tag.attributes.iter() {
+			match attr {
+				NodeAttribute::Block(node_block) => {
+					if block_attr.is_some() {
+						let diagnostic = Diagnostic::spanned(
+							node_block.span(),
+							Level::Error,
+							"Only one block attribute is allowed per component",
+						);
+						self.errors.push(diagnostic.emit_as_expr_tokens());
 					}
-				} else {
-					let key = &attr.key;
-					// for components a key is treated as a bool 'flag'
-					quote! {#key: true}
+					block_attr = Some(node_block);
+				}
+				NodeAttribute::Attribute(attr) => {
+					let attr_key = &attr.key;
+					let attr_key_str = attr_key.to_string();
+					match attr_key_str.contains(":") {
+						// its a client directive
+						true => {
+							if attr_key_str.starts_with("client:") {
+								should_serialize = true;
+							}
+							let value = match attr.value() {
+								Some(value) => quote! {Some(#value)},
+								None => quote! {None},
+							};
+							template_directives.push(
+								quote! {TemplateDirective::new(#attr_key_str, #value)},
+							);
+						}
+						// its a prop assignemnt
+						false => {
+							prop_names.push(attr_key);
+
+							let value = match attr.value() {
+								Some(value) => quote! {#value},
+								// for components no value means a bool flag
+								None => quote! {true},
+							};
+							prop_assignments.push(quote! {.#attr_key(#value)});
+						}
+					}
 				}
 			}
-		});
-		let ident = syn::Ident::new(&tag, tag.span());
+		}
+
+		let ident = syn::Ident::new(&tag, open_tag.span());
 		let slot_children = self.map_nodes(children);
-		quote!({
+
+
+		// ensures all required fields are set
+		let impl_required = quote::quote_spanned! {open_tag.span()=>
+					let _ = <#ident as Props>::Required{
+						#(#prop_names: Default::default()),*
+					};
+		};
+
+		let component = if let Some(node_block) = block_attr {
+			quote! {
+				#node_block
+			}
+		} else {
+			quote!({
+				#impl_required
+				<#ident as Props>::Builder::default()
+				#(#prop_assignments)*
+				.build()
+			})
+		};
+
+		let ron = if should_serialize {
+			quote! {{
+				#[cfg(target_arch = "wasm32")]
+				{None}
+				#[cfg(not(target_arch = "wasm32"))]
+				{Some(ron::ser::to_string(&component).unwrap())}
+			}}
+		} else {
+			quote! {None}
+		};
+
+		// attempt to get ide to show the correct type by using
+		// the component as the first spanned quote
+		let ide_helper = Ident::new(
+			&format!("{}Required", &ident.to_string()),
+			open_tag.span(),
+		);
+
+		quote::quote!({
+			let _ = #ide_helper::default();
+
+			let component = #component;
+
 			RsxNode::Component(RsxComponent{
 				idx: #idx,
 				tag: #tag.to_string(),
+				type_name: std::any::type_name::<#ident>().to_string(),
 				tracker: #tracker,
-				root: Box::new(#ident{
-					#(#props,)*
-				}
-				.render()),
-				slot_children: Box::new(#slot_children)
+				ron: #ron,
+				root: Box::new(component.render()),
+				slot_children: Box::new(#slot_children),
+				template_directives: vec![#(#template_directives),*]
 			})
 		})
 	}
@@ -323,4 +406,29 @@ impl RstmlToRsx {
 			true
 		});
 	}
+}
+
+#[cfg(test)]
+mod test {
+	use crate::prelude::*;
+	use proc_macro2::TokenStream;
+	use quote::quote;
+
+	fn map(tokens: TokenStream) -> TokenStream {
+		let (nodes, _) = tokens_to_rstml(tokens.clone());
+		RstmlToRsx::default().map_nodes(nodes)
+	}
+
+	#[test]
+	fn block() { let _block = map(quote! {{7}}); }
+	// #[test]
+	// fn style() { let _block = map(quote! {
+	// 	<style>
+	// 		main {
+	// 			/* min-height:100dvh; */
+	// 			min-height: var(--bm-main-height);
+	// 			padding: 1em var(--content-padding-width);
+	// 		}
+	// </style>
+	// }); }
 }

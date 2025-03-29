@@ -1,3 +1,4 @@
+#![feature(more_qualified_paths)]
 use beet::prelude::*;
 use bevy::prelude::*;
 
@@ -18,20 +19,19 @@ async fn main() {
 		.run();
 }
 
+#[derive(Node)]
 struct Counter {
 	initial: i32,
 }
 
-impl beet::prelude::Component for Counter {
-	fn render(self) -> RsxRoot {
-		let (get, set) = BevySignal::signal(self.initial);
-		let get2 = get.clone();
-		rsx! {
-			<entity runtime:bevy
-				Button
-				onclick=move |_|set(get.clone().get() + 1)>
-				"The value is "{get2}
-			</entity>
-		}
+fn counter(props: Counter) -> RsxRoot {
+	let (get, set) = BevySignal::signal(props.initial);
+	let get2 = get.clone();
+	rsx! {
+		<entity runtime:bevy
+			Button
+			onclick=move |_|set(get.clone().get() + 1)>
+			"The value is "{get2}
+		</entity>
 	}
 }

@@ -7,6 +7,7 @@ authors.workspace = true
 readme.workspace = true
 description = "CLI for beet authoring tools"
 documentation.workspace = true
+homepage.workspace = true
 repository.workspace = true
 categories.workspace = true
 keywords.workspace = true
@@ -16,8 +17,10 @@ name = "beet"
 path = "src/main.rs"
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-beet_router = { workspace = true, features = ["parser"] }
+beet = { workspace = true, features = ["router", "parser"] }
+# beet_router = { workspace = true, features = ["parser"] }
 anyhow.workspace = true
+ron.workspace = true
 sweet = { workspace = true, features = ["fs", "server"] }
 clap.workspace = true
 tokio.workspace = true

@@ -1,5 +1,4 @@
 use crate::prelude::*;
-use anyhow::Result;
 use std::borrow::Borrow;
 use std::borrow::BorrowMut;
 
@@ -19,32 +18,7 @@ pub struct RsxRoot {
 	pub location: RsxMacroLocation,
 }
 
-impl RsxRoot {
-	/// This is the method used by routers,
-	/// applies styles and slots, returning an HtmlDocument.
-	pub fn build_document(mut self) -> Result<HtmlDocument> {
-		#[cfg(feature = "css")]
-		ScopedStyle::default().apply(&mut self)?;
-		SlotsVisitor::apply(&mut self)?;
-		let html = RsxToHtml::default().map_node(&self);
-		let doc = html.into_document();
-		Ok(doc)
-	}
-	/// convenience method usually for testing:
-	/// - [ScopedStyle::apply]
-	/// - [SlotsVisitor::apply]
-	/// - [RsxToHtml::map_node]
-	/// - [HtmlNode::render]
-	///
-	/// ## Panics
-	/// If the slots cannot be applied.
-	pub fn apply_and_render(mut self) -> String {
-		#[cfg(feature = "css")]
-		ScopedStyle::default().apply(&mut self).unwrap();
-		SlotsVisitor::apply(&mut self).unwrap();
-		RsxToHtml::render_body(&self)
-	}
-}
+impl RsxRoot {}
 
 impl std::ops::Deref for RsxRoot {
 	type Target = RsxNode;
@@ -59,6 +33,10 @@ impl AsRef<RsxNode> for RsxRoot {
 }
 impl AsMut<RsxNode> for RsxRoot {
 	fn as_mut(&mut self) -> &mut RsxNode { &mut self.node }
+}
+
+impl Into<RsxNode> for RsxRoot {
+	fn into(self) -> RsxNode { self.node }
 }
 
 impl Borrow<RsxNode> for RsxRoot {
@@ -81,6 +59,7 @@ impl IntoRsxRoot<()> for () {
 
 /// Strings are allowed to have an RsxMacroLocation::default(),
 /// as they will never be used for complex hydration etc
+// TODO its a code smell that we have to do this
 pub struct ToStringIntoRsx;
 impl<T: ToString> IntoRsxRoot<(T, ToStringIntoRsx)> for T {
 	fn into_root(self) -> RsxRoot {
@@ -98,4 +77,18 @@ impl<T: FnOnce() -> U, U: IntoRsxRoot<M2>, M2> IntoRsxRoot<(M2, FuncIntoRsx)>
 	for T
 {
 	fn into_root(self) -> RsxRoot { self().into_root() }
+}
+
+pub struct VecIntoRsx;
+impl<T: IntoRsxRoot<M2>, M2> IntoRsxRoot<(M2, VecIntoRsx)> for Vec<T> {
+	fn into_root(self) -> RsxRoot {
+		let node = RsxNode::Fragment {
+			idx: RsxIdx::default(),
+			nodes: self.into_iter().map(|item| item.into_root().node).collect(),
+		};
+		RsxRoot {
+			node,
+			..Default::default()
+		}
+	}
 }

@@ -1,16 +1,23 @@
+use anyhow::Result;
 use beet_router::prelude::*;
+use beet_rsx::prelude::*;
 
 
 #[tokio::main]
-async fn main() {
-	let mut router = DefaultFileRouter::default();
+async fn main() -> Result<()> {
 	// usually its directly in src but test_site is a subdirectory
-	// router.dst_dir = PathBuf::from("crates/beet_router/target/client")
+	// router.html_dir = PathBuf::from("crates/beet_router/target/client")
 	// 	.canonicalize()
 	// 	.unwrap();"
-	// router.dst_dir = "target/test_site".into();
-	router.dst_dir = "target/test_site".into();
-	router.templates_src = "target/test_site/rsx-templates.ron".into();
-	beet_router::test_site::routes::collect_file_routes(&mut router);
-	router.routes_to_html_files().await.unwrap();
+	// router.html_dir = "target/test_site".into();
+	beet_router::test_site::routes::collect()
+		.pipe(FuncFilesToRsx::default())
+		.await
+		.unwrap()
+		.pipe(ApplyRouteTemplates::new(
+			"target/test_site/rsx-templates.ron",
+		))?
+		.pipe(RoutesToHtml::default())?
+		.pipe(HtmlRoutesToDisk::new("target/test_site"))?;
+	Ok(())
 }

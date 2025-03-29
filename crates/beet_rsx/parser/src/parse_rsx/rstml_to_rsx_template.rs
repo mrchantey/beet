@@ -11,6 +11,7 @@ use rstml::node::NodeComment;
 use rstml::node::NodeElement;
 use rstml::node::NodeFragment;
 use rstml::node::NodeText;
+use sweet::prelude::*;
 use syn::spanned::Spanned;
 
 /// Convert rstml nodes to a ron file.
@@ -26,15 +27,18 @@ impl RstmlToRsxTemplate {
 	/// for use with rsx_template! macro, which is usually just used for
 	/// tests, routers use [RstmlToRsxTemplate::map_tokens]
 	pub fn from_macro(&mut self, tokens: TokenStream) -> TokenStream {
+		// this will be overridden
+		let temp_file = WorkspacePathBuf::new("");
+
 		let str_tokens = self
-			.map_tokens(tokens, "unknown")
+			.map_tokens(tokens, &temp_file)
 			.to_string()
 			.to_token_stream();
 		// println!("generated ron:\n{}", str_tokens);
 		quote! {
 			{
 				let mut root = RsxTemplateRoot::from_ron(#str_tokens).unwrap();
-				root.location.file = std::file!().to_string();
+				root.location.file = beet::exports::WorkspacePathBuf::new(file!());
 				root
 			}
 		}
@@ -44,18 +48,20 @@ impl RstmlToRsxTemplate {
 	pub fn map_tokens(
 		&mut self,
 		tokens: TokenStream,
-		file: &str,
+		file: &WorkspacePathBuf,
 	) -> TokenStream {
 		let span = tokens.span();
 		let (nodes, _rstml_errors) = tokens_to_rstml(tokens);
 		let node = self.map_nodes(nodes);
 		let line = Literal::usize_unsuffixed(span.start().line);
 		let col = Literal::usize_unsuffixed(span.start().column);
+		// convert from WorkspacePathBuf at last moment
+		let file = file.to_string_lossy();
 
 		quote! {
 			RsxTemplateRoot (
 				location: RsxMacroLocation(
-					file: #file,
+					file: (#file),
 					line: #line,
 					col: #col
 				),
@@ -206,11 +212,46 @@ impl RstmlToRsxTemplate {
 		// we rely on the hydrated node to provide the attributes and children
 		let slot_children = self.map_nodes(children);
 
+		let template_directives = open_tag
+			.attributes
+			.into_iter()
+			.filter_map(|a| match a {
+				NodeAttribute::Attribute(attr) => {
+					let key = &attr.key.to_string();
+					if key.contains(":") {
+						let value = match attr.value() {
+							Some(expr) => {
+								quote! {Some(#expr)}
+							}
+							None => quote! {None},
+						};
+						let mut parts = key.split(':');
+						let prefix = parts.next().expect(
+							"expected colon prefix in template directive",
+						);
+						let suffix = parts.next().expect(
+							"expected colon suffix in template directive",
+						);
+
+						Some(quote! {TemplateDirective (
+							prefix: #prefix,
+							suffix: #suffix,
+							value: #value
+						)})
+					} else {
+						None
+					}
+				}
+				_ => None,
+			})
+			.collect::<Vec<_>>();
+
 		quote! { Component (
 			idx: #idx,
 			tracker: #tracker,
 			tag: #tag,
-			slot_children: #slot_children
+			slot_children: #slot_children,
+			template_directives: [#(#template_directives),*]
 		)}
 	}
 }

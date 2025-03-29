@@ -1,9 +1,7 @@
 #![cfg_attr(test, feature(test, custom_test_frameworks))]
 #![cfg_attr(test, test_runner(sweet::test_runner))]
-use anyhow::Result;
 use beet_cli::prelude::*;
 use clap::Parser;
-use clap::Subcommand;
 
 
 #[derive(Parser)]
@@ -13,15 +11,9 @@ struct Cli {
 	command: Commands,
 }
 
-#[derive(Subcommand)]
-enum Commands {
-	ServeHtml(ServeHtml),
-	WatchTemplates(WatchTemplates),
-}
 #[tokio::main]
-async fn main() -> Result<()> {
-	match Cli::parse().command {
-		Commands::ServeHtml(cmd) => cmd.run().await,
-		Commands::WatchTemplates(cmd) => cmd.run().await,
+async fn main() {
+	if let Err(err) = Cli::parse().command.run().await {
+		panic!("Error: {:?}", err);
 	}
 }

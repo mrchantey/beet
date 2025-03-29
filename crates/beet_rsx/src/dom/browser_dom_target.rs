@@ -13,6 +13,7 @@ pub struct BrowserDomTarget {
 	/// sparse set element array, cached for fast reference
 	/// TODO bench this
 	elements: Vec<Option<Element>>,
+	/// Will be None until lazy loaded
 	loc_map: Option<TreeLocationMap>,
 }
 
@@ -28,17 +29,30 @@ impl Default for BrowserDomTarget {
 }
 
 impl BrowserDomTarget {
-	fn get_tree_location_map(&mut self) -> ParseResult<&TreeLocationMap> {
-		let query = format!("[{}]", self.constants.loc_map_key);
-		if let Some(cx) = self.document.query_selector(&query).unwrap() {
-			let inner_text = cx.text_content().unwrap();
-			self.loc_map = Some(TreeLocationMap::from_csv(&inner_text)?);
-			Ok(&self.loc_map.as_ref().unwrap())
+	fn get_or_load_tree_location_map(
+		&mut self,
+	) -> ParseResult<&TreeLocationMap> {
+		if self.loc_map.is_some() {
+			// for borrow checker
+			return Ok(self.loc_map.as_ref().unwrap());
 		} else {
-			Err(ParseError::serde(format!(
-				"Could not find context attribute: {}",
-				query
-			)))
+			let query = format!("[{}]", self.constants.loc_map_key);
+			if let Some(cx) = self.document.query_selector(&query).unwrap() {
+				let inner_text = cx.text_content().unwrap();
+				let loc_map = ron::de::from_str(&inner_text).map_err(|e| {
+					ParseError::serde(format!(
+						"Could not parse TreeLocationMap: {}",
+						e
+					))
+				})?;
+				self.loc_map = Some(loc_map);
+				Ok(&self.loc_map.as_ref().unwrap())
+			} else {
+				Err(ParseError::serde(format!(
+					"Could not find context attribute: {}",
+					query
+				)))
+			}
 		}
 	}
 
@@ -72,7 +86,7 @@ impl BrowserDomTarget {
 			Ok(el)
 		} else {
 			Err(ParseError::Hydration(format!(
-				"Could not find parent for collapsed text node with rsx idx: {}",
+				"Could not text node parent with rsx idx: {}",
 				tree_idx
 			)))
 		}
@@ -85,7 +99,7 @@ impl BrowserDomTarget {
 		tree_idx: TreeIdx,
 	) -> ParseResult<()> {
 		let children = el.child_nodes();
-		let loc_map = self.get_tree_location_map()?;
+		let loc_map = self.get_or_load_tree_location_map()?;
 		let Some(el_cx) = loc_map.collapsed_elements.get(&tree_idx) else {
 			// here we assume this is because the element has no children
 			// so was not tracked
@@ -122,6 +136,9 @@ impl BrowserDomTarget {
 
 
 impl DomTargetImpl for BrowserDomTarget {
+	fn tree_location_map(&mut self) -> &TreeLocationMap {
+		self.get_or_load_tree_location_map().unwrap()
+	}
 	fn html_constants(&self) -> &HtmlConstants { &self.constants }
 
 	/// returns body inner html

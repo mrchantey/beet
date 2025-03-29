@@ -1,10 +1,15 @@
 use beet::prelude::*;
 
-/// The main entry point for a beet server
-#[tokio::main]
-async fn main() {
-	println!("rebuilding html files");
-	let mut router = DefaultFileRouter::default();
-	beet_site::routes::collect_file_routes(&mut router);
-	router.routes_to_html_files().await.unwrap();
+#[cfg(not(target_arch = "wasm32"))]
+fn main() {
+	let mut routes = beet_site::routes::collect();
+	routes.extend(beet::design::mockups::collect().into_iter());
+	AppRouter::new(app_cx!()).add_collection(routes).run();
+}
+
+#[cfg(target_arch = "wasm32")]
+fn main() {
+	AppRouter::new(app_cx!())
+		.add_collection(beet_site::wasm::collect())
+		.run();
 }

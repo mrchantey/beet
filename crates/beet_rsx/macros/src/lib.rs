@@ -1,5 +1,7 @@
 use beet_rsx_parser::prelude::*;
 use proc_macro::TokenStream;
+use syn::DeriveInput;
+use syn::parse_macro_input;
 mod derive_deref;
 
 /// Demonstrates how to select a different reactive runtime
@@ -19,7 +21,7 @@ fn feature_flag_idents() -> RsxIdents {
 
 
 
-/// This macro expands to an [RsxNode](beet_rsx::prelude::RsxNode).
+/// This macro expands to an [RsxRoot](beet_rsx::prelude::RsxRoot).
 ///
 /// The type of node is determied by the feature flags, current options are:
 /// - [`StringRsx`](beet_rsx::rsx::StringRsx)
@@ -59,4 +61,11 @@ pub fn derive_deref(input: TokenStream) -> TokenStream {
 #[proc_macro_derive(DerefMut)]
 pub fn derive_deref_mut(input: TokenStream) -> TokenStream {
 	derive_deref::derive_deref_mut(input)
+}
+
+
+#[proc_macro_derive(Node, attributes(node, field))]
+pub fn derive_node(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+	let input = parse_macro_input!(input as DeriveInput);
+	impl_derive_node(input).into()
 }

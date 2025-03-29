@@ -1,107 +1,75 @@
 use crate::prelude::*;
+use anyhow::Result;
+use rapidhash::RapidHashMap;
 
+
+
+pub struct NodeToTreeLocationMap;
+
+impl<T: RsxPipelineTarget + AsRef<RsxNode>> RsxPipeline<T, TreeLocationMap>
+	for NodeToTreeLocationMap
+{
+	fn apply(self, node: T) -> TreeLocationMap {
+		let mut map = TreeLocationMap::default();
+
+		TreeLocationVisitor::visit(node.as_ref(), |loc, node| {
+			match node {
+				RsxNode::Block(RsxBlock { effect, .. }) => {
+					map.rusty_locations.insert(effect.tracker, loc);
+				}
+				RsxNode::Element(el) => {
+					// println!("el loc: {}", loc.tree_idx);
+					if el.children.directly_contains_rust_node() {
+						let encoded =
+							TextBlockEncoder::encode(loc.tree_idx, el);
+						map.collapsed_elements.insert(loc.tree_idx, encoded);
+					}
+				}
+				RsxNode::Component(comp) => {
+					map.rusty_locations.insert(comp.tracker, loc);
+				}
+				_ => {}
+			}
+		});
+		map
+	}
+}
+
+
+/// One of the essential components of resumability, allowing us to map
 /// This map is updated every hot reload, the position
 /// of a rust block in the tree can change
 #[derive(Debug, Default, Clone, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct TreeLocationMap {
-	// we could technically use a vec where the indices are 'block_idx',
-	// and track block_idx in the [TreeLocation]
-	// but at this stage of the project thats harder to reason about
-	// and this provides symmetry with [Self::collapsed_elements]
-	pub rusty_locations: HashMap<TreeIdx, TreeLocation>,
-	pub collapsed_elements: HashMap<TreeIdx, TextBlockEncoder>,
+	/// Used to resolve the location of a rusty part by its tracker
+	pub rusty_locations: RapidHashMap<RustyTracker, TreeLocation>,
+	pub collapsed_elements: RapidHashMap<TreeIdx, TextBlockEncoder>,
 }
 
-///	Delimiter Reference:
-/// - `,` `-` `.` are used by [TreeLocation::to_csv] and [TextBlockEncoder::to_csv]
-/// - `*` seperates key value pairs
-/// - `;` seperates items in hash maps
-/// - `_` seperates [Self::rusty_locations] and [Self::collapsed_elements]
+impl RsxPipelineTarget for TreeLocationMap {}
+
+
 impl TreeLocationMap {
-	pub fn to_csv(&self) -> String {
-		let mut csv = String::new();
-		csv.push_str(
-			&self
-				.rusty_locations
-				.iter()
-				.map(|(k, v)| format!("{}*{}", k, v.to_csv()))
-				.collect::<Vec<_>>()
-				.join(";"),
-		);
-		csv.push_str("_");
-		csv.push_str(
-			&self
-				.collapsed_elements
-				.iter()
-				.map(|(k, v)| format!("{}*{}", k, v.to_csv()))
-				.collect::<Vec<_>>()
-				.join(";"),
-		);
-		csv
-	}
+	/// a best-effort check for validity of a tree location map
+	pub fn check_valid(&self, node: &RsxNode) -> Result<()> {
+		let mut idx_incr = TreeIdxIncr::default();
 
-	pub fn from_csv(csv: &str) -> ParseResult<Self> {
-		let mut parts = csv.split('_');
+		let mut result = Ok(());
 
+		VisitRsxNode::walk(node, |node| {
+			let tree_idx = idx_incr.next();
 
-		let rusty_locations = parts
-			.next()
-			.ok_or_else(|| ParseError::Serde("missing rusty locations".into()))?
-			.split(";")
-			.map(|s| {
-				let mut parts = s.split('*');
-				let key = parts
-					.next()
-					.ok_or_else(|| ParseError::Serde("missing key".into()))?
-					.parse()?;
-				let value = parts
-					.next()
-					.ok_or_else(|| ParseError::Serde("missing value".into()))?;
-
-				Ok((key, TreeLocation::from_csv(value)?))
-			})
-			.collect::<ParseResult<HashMap<_, _>>>()?;
-		let collapsed_elements = parts
-			.next()
-			.ok_or_else(|| ParseError::Serde("missing text encoders".into()))?
-			.split(";")
-			.map(|s| {
-				let mut parts = s.split('*');
-				let key = parts
-					.next()
-					.ok_or_else(|| ParseError::Serde("missing key".into()))?
-					.parse()?;
-				let value = parts
-					.next()
-					.ok_or_else(|| ParseError::Serde("missing value".into()))?;
-
-				Ok((key, TextBlockEncoder::from_csv(value)?))
-			})
-			.collect::<ParseResult<HashMap<_, _>>>()?;
-
-		Ok(Self {
-			rusty_locations,
-			collapsed_elements,
-		})
-	}
-
-
-	pub fn from_node(node: &RsxNode) -> Self {
-		let mut map = Self::default();
-
-		TreeLocationVisitor::visit(node, |loc, node| match node {
-			RsxNode::Block(_) => {
-				map.rusty_locations.insert(loc.tree_idx, loc);
-			}
-			RsxNode::Element(el) => {
-				if el.children.directly_contains_rust_node() {
-					let encoded = TextBlockEncoder::encode(loc.tree_idx, el);
-					map.collapsed_elements.insert(loc.tree_idx, encoded);
+			if let Some(_) = self.collapsed_elements.get(&tree_idx) {
+				if let RsxNode::Element(_) = node {
+				} else {
+					result = Err(anyhow::anyhow!(
+						"parent element {tree_idx} does not exist for text block encoder"
+					));
 				}
 			}
-			_ => {}
 		});
-		map
+		Ok(())
 	}
 }
 
@@ -117,36 +85,61 @@ mod test {
 		let color = "brown";
 		let action = "jumps over";
 
-		let root = rsx! {
-			<div>
-				"The "{desc}" and "{color}<b>fox</b>{action}" the lazy "andfatdog
-			</div>
-		};
+		let root = rsx! { <div>"The "{desc}" and "{color}<b>fox</b>{action}the lazy " dog"</div> };
+		let map = (&root.node).pipe(NodeToTreeLocationMap);
 
-		let map = TreeLocationMap::from_node(&root);
+		map.check_valid(&root.node).unwrap();
 
-		// test csv
-		let csv = map.to_csv();
-		let map2 = TreeLocationMap::from_csv(&csv).unwrap();
-		expect(&map2).to_be(&map);
-		// println!("{:#?}", map);
 
 		expect(map.collapsed_elements).to_be(
-			vec![(0.into(), TextBlockEncoder {
-				parent_id: 0.into(),
-				split_positions: vec![vec![4, 5, 5], vec![10]],
+			vec![(1.into(), TextBlockEncoder {
+				parent_id: 1.into(),
+				split_positions: vec![vec![4, 5, 5], vec![10, 9]],
 			})]
 			.into_iter()
 			.collect::<HashMap<_, _>>(),
 		);
+		let mut locations = map.rusty_locations.iter().collect::<Vec<_>>();
+		locations.sort_by(|a, b| a.0.index.cmp(&b.0.index));
 		// {desc}
-		expect(&map.rusty_locations[&3.into()])
-			.to_be(&TreeLocation::new(3, 0, 1));
+		expect(locations[0].1).to_be(&TreeLocation::new(4, 1, 1));
 		// {color}
-		expect(&map.rusty_locations[&6.into()])
-			.to_be(&TreeLocation::new(6, 0, 3));
+		expect(locations[1].1).to_be(&TreeLocation::new(7, 1, 3));
 		// {action}
-		expect(&map.rusty_locations[&10.into()])
-			.to_be(&TreeLocation::new(10, 0, 5));
+		expect(locations[2].1).to_be(&TreeLocation::new(11, 1, 5));
+	}
+
+
+	#[test]
+	fn consequtive_collapsed_nodes() {
+		use beet::prelude::*;
+
+		#[derive(Node)]
+		struct MyComponent;
+
+		fn my_component(_: MyComponent) -> RsxRoot {
+			let val = 4;
+			rsx! { <div>{val}</div> }
+		}
+
+
+		let root = rsx! {
+			<MyComponent />
+			<MyComponent />
+		}
+		.pipe(SlotsPipeline::default())
+		.unwrap();
+
+		let html = (&root)
+			.pipe(RsxToHtml::default())
+			.pipe(RenderHtml::default())
+			.unwrap();
+		expect(html).to_be(
+			"<div data-beet-rsx-idx=\"3\">4</div><div data-beet-rsx-idx=\"8\">4</div>",
+		);
+
+		let map = (&root.node).pipe(NodeToTreeLocationMap);
+		expect(map.collapsed_elements.get(&TreeIdx::new(3))).to_be_some();
+		expect(map.collapsed_elements.get(&TreeIdx::new(8))).to_be_some();
 	}
 }

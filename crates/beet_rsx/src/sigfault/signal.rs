@@ -1,64 +1,64 @@
-use std::cell::RefCell;
-use std::rc::Rc;
-
-thread_local! {
-	static EFFECT_CALLBACK: RefCell<Option<Rc<RefCell<dyn FnMut()>>>> = RefCell::new(None);
-}
+use std::sync::Arc;
+use std::sync::Mutex;
 
 /// an absolute minimal implementation of a signal
 /// for testing of the reactive abstraction and use as an example
 /// for integrations of fuller libraries
-// https://www.freecodecamp.org/news/learn-javascript-reactivity-build-signals-from-scratch/
 struct Signal<T> {
-	value: RefCell<T>,
-	subscribers: RefCell<Vec<Rc<RefCell<dyn FnMut()>>>>,
+	value: Mutex<T>,
+	subscribers: Mutex<Vec<Arc<Mutex<dyn FnMut() + Send>>>>,
 }
 
-impl<T: Clone> Signal<T> {
+impl<T: Clone + Send> Signal<T> {
 	fn new(value: T) -> Self {
 		Signal {
-			value: RefCell::new(value),
-			subscribers: RefCell::new(Vec::new()),
+			value: Mutex::new(value),
+			subscribers: Mutex::new(Vec::new()),
 		}
 	}
 
-	fn subscribe(&self, callback: Rc<RefCell<dyn FnMut()>>) {
-		self.subscribers.borrow_mut().push(callback);
+	fn subscribe(&self, callback: Arc<Mutex<dyn FnMut() + Send>>) {
+		self.subscribers.lock().unwrap().push(callback);
 	}
 
-	fn get_value(&self) -> T { self.value.borrow().clone() }
+	fn get_value(&self) -> T { self.value.lock().unwrap().clone() }
 
 	fn set_value(&self, new_val: T) {
-		*self.value.borrow_mut() = new_val;
-		for callback in self.subscribers.borrow().iter() {
-			callback.borrow_mut()();
+		*self.value.lock().unwrap() = new_val;
+		for callback in self.subscribers.lock().unwrap().iter() {
+			callback.lock().unwrap()();
 		}
 	}
 }
 
-
-pub fn effect<F>(callback: F)
-where
-	F: FnMut() + 'static,
-{
-	let callback = Rc::new(RefCell::new(callback));
-	EFFECT_CALLBACK
-		.with(|current| *current.borrow_mut() = Some(callback.clone()));
-	callback.borrow_mut()();
-	EFFECT_CALLBACK.with(|current| *current.borrow_mut() = None);
+thread_local! {
+	static EFFECT_CALLBACK: Mutex<Option<Arc<Mutex<dyn FnMut() + Send>>>> = Mutex::new(None);
 }
 
-pub fn signal<T: Clone + 'static>(
+/// Very simple implementation of effects used for testing and demos
+pub fn effect<F>(callback: F)
+where
+	F: FnMut() + Send + 'static,
+{
+	let callback = Arc::new(Mutex::new(callback));
+	EFFECT_CALLBACK
+		.with(|current| *current.lock().unwrap() = Some(callback.clone()));
+	callback.lock().unwrap()();
+	EFFECT_CALLBACK.with(|current| *current.lock().unwrap() = None);
+}
+
+/// Very simple implementation of signals used for testing and demos
+pub fn signal<T: Clone + Send + 'static>(
 	value: T,
 ) -> (impl Fn() -> T + Clone, impl Fn(T) + Clone) {
-	let signal = Rc::new(Signal::new(value));
+	let signal = Arc::new(Signal::new(value));
 	let signal_getter = signal.clone();
 	let signal_setter = signal.clone();
 
 	(
 		move || {
 			EFFECT_CALLBACK.with(|current| {
-				if let Some(callback) = current.borrow().clone() {
+				if let Some(callback) = current.lock().unwrap().clone() {
 					signal_getter.subscribe(callback);
 				}
 			});
@@ -76,24 +76,24 @@ mod tests {
 	#[test]
 	fn test_signals_and_effects() {
 		let (get_count, set_count) = signal(0);
-		let effect_called = Rc::new(RefCell::new(0));
+		let effect_called = Arc::new(Mutex::new(0));
 		let effect_called_clone = effect_called.clone();
 
 		let get_count2 = get_count.clone();
 		effect(move || {
 			get_count2(); // subscribe to changes
-			*effect_called_clone.borrow_mut() += 1;
+			*effect_called_clone.lock().unwrap() += 1;
 		});
 
 		expect(get_count()).to_be(0);
-		expect(*effect_called.borrow()).to_be(1);
+		expect(*effect_called.lock().unwrap()).to_be(1);
 
 		set_count(1);
 		expect(get_count()).to_be(1);
-		expect(*effect_called.borrow()).to_be(2);
+		expect(*effect_called.lock().unwrap()).to_be(2);
 
 		set_count(2);
 		expect(get_count()).to_be(2);
-		expect(*effect_called.borrow()).to_be(3);
+		expect(*effect_called.lock().unwrap()).to_be(3);
 	}
 }

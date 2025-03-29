@@ -1,6 +1,7 @@
 use crate::prelude::*;
 use anyhow::Result;
 
+// if this was clone RsxRoot could be too
 pub type RegisterEffect = Box<dyn FnOnce(TreeLocation) -> Result<()>>;
 
 
