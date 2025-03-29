@@ -48,7 +48,7 @@ mod test {
 			&Velocity::default(),
 			&mut Wander::default(),
 			MaxSpeed::default(),
-			&mut source,
+			&mut source.0,
 		);
 		expect(*impulse).to_be(Vec3::ZERO);
 	}

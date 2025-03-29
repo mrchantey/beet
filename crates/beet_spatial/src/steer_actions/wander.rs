@@ -83,7 +83,7 @@ pub(crate) fn wander(
 			&velocity,
 			&mut wander,
 			*max_speed,
-			&mut rng,
+			&mut rng.0,
 		);
 	}
 }
