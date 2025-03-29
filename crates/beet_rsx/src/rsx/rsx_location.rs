@@ -28,6 +28,12 @@ impl Default for RsxMacroLocation {
 	fn default() -> Self { Self::new(WorkspacePathBuf::new(file!()), 0, 0) }
 }
 
+impl std::fmt::Display for RsxMacroLocation {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		write!(f, "{}:{}:{}", self.file.display(), self.line, self.col)
+	}
+}
+
 impl RsxMacroLocation {
 	pub fn new(file: WorkspacePathBuf, line: usize, col: usize) -> Self {
 		Self { file, line, col }

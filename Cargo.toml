@@ -174,6 +174,7 @@ bevy = ["dep:bevy", "beet_rsx?/bevy", "beet_router?/bevy"]
 bevy_default = [
 	"bevy",
 	"bevy/default",
+	"beet_examples?/bevy_default",
 	"beet_flow?/bevy_default",
 	"beet_ml?/bevy_default",
 	"beet_rsx?/bevy_default",

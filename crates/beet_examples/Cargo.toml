@@ -10,10 +10,19 @@ license.workspace = true
 keywords.workspace = true
 categories.workspace = true
 
+[features]
+# this feature is always enabled by beet if this crate is included 
+# but we use it to ensure no bevy_default for workspace tests
+bevy_default = [
+	"beet_flow/bevy_default",
+	"beet_ml/bevy_default",
+	"beet_spatial/bevy_default",
+]
+
 [dependencies]
-beet_flow = { workspace = true, features = ["bevy_default", "reflect"] }
-beet_ml = { workspace = true, features = ["bevy_default", "candle", "spatial"] }
-beet_spatial = { workspace = true, features = ["bevy_default"] }
+beet_flow = { workspace = true, features = ["reflect"] }
+beet_ml = { workspace = true, features = ["candle", "spatial"] }
+beet_spatial = { workspace = true, features = [] }
 
 
 serde.workspace = true
