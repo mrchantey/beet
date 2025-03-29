@@ -8,7 +8,7 @@ fn main() -> Result<()> {
 	println!("cargo::rerun-if-changed=build.rs");
 	println!("cargo::rerun-if-changed=src/codegen");
 	println!("cargo::rerun-if-changed=../beet_design/src");
-	println!("cargo::warning={}", "\n🚀🚀running!\n");
+	println!("cargo::warning={}", "🚀🚀 building beet_site");
 	let cx = app_cx!();
 
 	let is_wasm = std::env::var("TARGET").unwrap() == "wasm32-unknown-unknown";

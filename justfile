@@ -106,22 +106,27 @@ run-beet-site *args:
 #💡 Test
 
 min-stack := 'RUST_MIN_STACK=33554432'
-
+test-threads:= '--test-threads=8'
 # Run tests for ci,
 # cargo test --workspace runs with 16MB stack and max 8 cores
 test-ci *args:
 	cargo fmt 				--check
 	just leptosfmt 		--check
-	{{min-stack}} cargo test --workspace --lib	--features=_doctest 			{{args}} -- --test-threads=8
-	{{min-stack}} cargo test --workspace --doc	--features=_doctest 			{{args}} -- --test-threads=8
-	cargo test --target wasm32-unknown-unknown 	--all-features	-p beet_flow 				{{args}} -- --test-threads=8
+	{{min-stack}} cargo test --workspace 			--lib	--features=_doctest	{{args}} -- {{test-threads}}
+	{{min-stack}} cargo test --workspace 			--doc	--features=_doctest	{{args}} -- {{test-threads}}
+	{{min-stack}} cargo test -p beet_flow 		--lib --features=reflect 	--target wasm32-unknown-unknown {{args}} -- {{test-threads}}
+	{{min-stack}} cargo test -p beet_spatial 	--lib 									 	--target wasm32-unknown-unknown {{args}} -- {{test-threads}}
+	{{min-stack}} cargo test -p beet_rsx 			--lib --features=bevy 		--target wasm32-unknown-unknown {{args}} -- {{test-threads}}
+	
 
 # rebuilding bevy_render for wasm results in 'no space left on device'
 test-all *args:
-	just test-ci 																																			{{args}}
-	{{min-stack}} cargo test --workspace --lib 	--all-features							{{args}} -- --test-threads=8
-	cargo test --lib --target wasm32-unknown-unknown --all-features -p beet_rsx 			{{args}}
-	cargo test --lib --target wasm32-unknown-unknown --all-features -p beet_spatial 	{{args}}
+	just test-ci {{args}}
+	{{min-stack}} cargo test --workspace 			--lib --all-features			{{args}} -- {{test-threads}}
+	{{min-stack}}	cargo test -p beet_flow 		--lib --target wasm32-unknown-unknown --all-features  {{args}} -- {{test-threads}}
+	{{min-stack}}	cargo test -p beet_spatial 	--lib --target wasm32-unknown-unknown --all-features  {{args}} -- {{test-threads}}
+	{{min-stack}}	cargo test -p beet_rsx 			--lib --target wasm32-unknown-unknown --all-features  {{args}} -- {{test-threads}}
+	
 
 #cargo test -p beet_spatial
 #cargo test -p beet_sim
@@ -129,11 +134,11 @@ test-all *args:
 # cargo test --workspace -- {{args}}
 # cargo test --workspace --all-features -- {{args}}
 
-test-doc crate *args:
-	just watch 'cargo test -p {{crate}} --doc 						{{args}}'
 # copied from sweet
 test crate *args:
 	just watch 'cargo test -p {{crate}} --lib -- --watch 	{{args}}'
+test-doc crate *args:
+	just watch 'cargo test -p {{crate}} --doc 						{{args}}'
 test-e2e crate test_name *args:
 	just watch 'cargo test -p {{crate}} --test {{test_name}} -- --watch {{args}}'
 test-feat crate *args:
@@ -219,6 +224,7 @@ watch *command:
 	sweet watch \
 	--include '**/*.rs' \
 	--exclude '{.git,target,html}/**' \
+	--exclude '*codegen*' \
 	--cmd "{{command}}"
 
 copy-web-assets:
@@ -231,13 +237,13 @@ copy-wasm-assets:
 	mkdir -p ./target/static/assets || true
 	
 serve-wasm *args:
-	cd ./target/static && forky serve {{args}}
+	cd ./target/static && sweet serve {{args}}
 
 watch-assets:
 	just watch-web 'just copy-wasm-assets'
 
 watch-web *command:
-	forky watch \
+	sweet watch \
 	-w '**/*/assets/**/*' \
 	-- {{command}}
 

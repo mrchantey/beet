@@ -20,9 +20,12 @@ build = []
 sweet.workspace = true
 beet_rsx.workspace = true
 beet_router.workspace = true
+material-colors = "0.4.2"
+
 
 [dev-dependencies]
 sweet = { workspace = true, features = ["test"] }
+lightningcss.workspace = true
 
 [build-dependencies]
 anyhow.workspace = true

@@ -609,7 +609,7 @@ dependencies = [
 
 [[package]]
 name = "beet"
-version = "0.0.6-dev.4"
+version = "0.0.6-dev.5"
 dependencies = [
  "beet",
  "beet_design",
@@ -630,7 +630,7 @@ dependencies = [
 
 [[package]]
 name = "beet-cli"
-version = "0.0.6-dev.4"
+version = "0.0.6-dev.5"
 dependencies = [
  "anyhow",
  "beet",
@@ -643,17 +643,19 @@ dependencies = [
 
 [[package]]
 name = "beet_design"
-version = "0.0.6-dev.4"
+version = "0.0.6-dev.5"
 dependencies = [
  "anyhow",
  "beet_router",
  "beet_rsx",
+ "lightningcss",
+ "material-colors",
  "sweet",
 ]
 
 [[package]]
 name = "beet_examples"
-version = "0.0.6-dev.4"
+version = "0.0.6-dev.5"
 dependencies = [
  "anyhow",
  "beet_flow",
@@ -673,7 +675,7 @@ dependencies = [
 
 [[package]]
 name = "beet_flow"
-version = "0.0.6-dev.4"
+version = "0.0.6-dev.5"
 dependencies = [
  "anyhow",
  "beet_flow",
@@ -688,7 +690,7 @@ dependencies = [
 
 [[package]]
 name = "beet_flow_macros"
-version = "0.0.6-dev.4"
+version = "0.0.6-dev.5"
 dependencies = [
  "anyhow",
  "extend",
@@ -701,7 +703,7 @@ dependencies = [
 
 [[package]]
 name = "beet_ml"
-version = "0.0.6-dev.4"
+version = "0.0.6-dev.5"
 dependencies = [
  "anyhow",
  "beet_flow",
@@ -734,7 +736,7 @@ dependencies = [
 
 [[package]]
 name = "beet_router"
-version = "0.0.6-dev.4"
+version = "0.0.6-dev.5"
 dependencies = [
  "anyhow",
  "beet_router",
@@ -761,7 +763,7 @@ dependencies = [
 
 [[package]]
 name = "beet_rsx"
-version = "0.0.6-dev.4"
+version = "0.0.6-dev.5"
 dependencies = [
  "anyhow",
  "beet_rsx",
@@ -794,7 +796,7 @@ dependencies = [
 
 [[package]]
 name = "beet_rsx_macros"
-version = "0.0.6-dev.4"
+version = "0.0.6-dev.5"
 dependencies = [
  "anyhow",
  "beet_rsx_parser",
@@ -808,7 +810,7 @@ dependencies = [
 
 [[package]]
 name = "beet_rsx_parser"
-version = "0.0.6-dev.4"
+version = "0.0.6-dev.5"
 dependencies = [
  "anyhow",
  "heck 0.4.1",
@@ -824,7 +826,7 @@ dependencies = [
 
 [[package]]
 name = "beet_server"
-version = "0.0.6-dev.4"
+version = "0.0.6-dev.5"
 dependencies = [
  "anyhow",
  "axum",
@@ -848,7 +850,7 @@ dependencies = [
 
 [[package]]
 name = "beet_sim"
-version = "0.0.6-dev.4"
+version = "0.0.6-dev.5"
 dependencies = [
  "anyhow",
  "beet_flow",
@@ -859,7 +861,7 @@ dependencies = [
 
 [[package]]
 name = "beet_site"
-version = "0.0.6-dev.4"
+version = "0.0.6-dev.5"
 dependencies = [
  "anyhow",
  "beet",
@@ -868,7 +870,7 @@ dependencies = [
 
 [[package]]
 name = "beet_spatial"
-version = "0.0.6-dev.4"
+version = "0.0.6-dev.5"
 dependencies = [
  "anyhow",
  "beet_flow",
@@ -4768,6 +4770,17 @@ name = "matchit"
 version = "0.8.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "47e1ffaa40ddd1f3ed91f717a33c8c0ee23fff369e3aa8772b9605cc1d22f4c3"
+
+[[package]]
+name = "material-colors"
+version = "0.4.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e226ffda362d5bc26bb8f730d637a0851eedfb05e35d92108c9d8b48d2e47941"
+dependencies = [
+ "ahash 0.8.11",
+ "indexmap",
+ "serde",
+]
 
 [[package]]
 name = "memchr"
