@@ -19,7 +19,7 @@ fn main() -> anyhow::Result<()> {
 		params,
 		initial_state,
 	);
-	trainer.train(&mut RandomSource::default());
+	trainer.train(&mut RandomSource::default().0);
 	let eval = trainer.evaluate();
 	assert_eq!(eval.mean, 1.);
 	assert_eq!(eval.std, 0.);
