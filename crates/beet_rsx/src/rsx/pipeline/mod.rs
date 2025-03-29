@@ -21,7 +21,10 @@ pub use scoped_style_pipeline::*;
 use crate::prelude::*;
 use anyhow::Result;
 
-
+// pub trait PipingHot: Sized {
+// 	fn pipe<O>(self, func: impl FnOnce(Self) -> O) -> O { func(self) }
+// }
+// impl<T: Sized> PipingHot for T {}
 
 /// Trait for pipelines that will mutate an [`RsxPluginTarget`]
 pub trait RsxPipeline<In: RsxPipelineTarget, Out: RsxPipelineTarget = In> {
@@ -123,6 +126,16 @@ impl<T1: RsxPipelineTarget, T2: RsxPipelineTarget, T3: RsxPipelineTarget>
 
 impl RsxPipelineTarget for () {}
 impl RsxPipelineTarget for String {}
+impl RsxPipelineTarget for i32 {}
+impl RsxPipelineTarget for u32 {}
+impl RsxPipelineTarget for i64 {}
+impl RsxPipelineTarget for u64 {}
+impl RsxPipelineTarget for f32 {}
+impl RsxPipelineTarget for f64 {}
+impl RsxPipelineTarget for bool {}
+impl RsxPipelineTarget for char {}
+impl RsxPipelineTarget for std::path::PathBuf {}
+
 impl RsxPipelineTarget for RsxRoot {}
 impl RsxPipelineTarget for RsxNode {}
 

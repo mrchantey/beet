@@ -1,6 +1,7 @@
 use beet_rsx::as_beet::*;
 use material_colors::color::Argb;
 // use material_colors::scheme::Scheme;
+use crate::prelude::*;
 use material_colors::theme::Theme;
 use material_colors::theme::ThemeBuilder;
 
@@ -15,7 +16,7 @@ pub struct ColorScheme {
 fn color_scheme(props: ColorScheme) -> RsxRoot {
 	// Theme
 
-	let _ = props.theme;
+	let _css = ThemeToCss::new("--bt-color").map(&props.theme);
 
 	rsx! {
 		<style>

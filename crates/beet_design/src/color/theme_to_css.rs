@@ -5,38 +5,48 @@ use material_colors::theme::Theme;
 
 
 pub struct ThemeToCss {
-	pub css: String,
+	pub prefix: String,
+}
+
+impl Default for ThemeToCss {
+	fn default() -> Self {
+		Self {
+			prefix: "--bt-color".to_string(),
+		}
+	}
 }
 
 
 impl ThemeToCss {
-	pub fn new(theme: &Theme) -> Self {
-		// theme.schemes.light.
-		let prefix = "--bt-color";
+	pub fn new(prefix: impl ToString) -> Self {
+		Self {
+			prefix: prefix.to_string(),
+		}
+	}
+	pub fn map(&self, theme: &Theme) -> String {
+		let prefix = &self.prefix;
 		let light =
 			Self::scheme_to_css("scheme-light", prefix, &theme.schemes.light);
 		let dark =
 			Self::scheme_to_css("scheme-dark", prefix, &theme.schemes.dark);
-		Self {
-			css: format!(
-				r#"
-{light}
-{dark}
-:root{{
-	{prefix}-opacity: 1;
-	{prefix}-opacity-hover: 0.7;
-	{prefix}-opacity-active: 0.5;
-	{prefix}-opacity-disabled: 0.5;
-
-	{prefix}-border: var({prefix}-outline);
-	{prefix}-text: var({prefix}-on-surface);
-	{prefix}-background: var({prefix}-surface);
-	{prefix}-border: var({prefix}-outline);
-	{prefix}-faint: var({prefix}-outline);
-}}
-"#
-			),
-		}
+		format!(
+			r#"
+		{light}
+		{dark}
+		:root{{
+		{prefix}-opacity: 1;
+		{prefix}-opacity-hover: 0.7;
+		{prefix}-opacity-active: 0.5;
+		{prefix}-opacity-disabled: 0.5;
+		
+		{prefix}-border: var({prefix}-outline);
+		{prefix}-text: var({prefix}-on-surface);
+		{prefix}-background: var({prefix}-surface);
+		{prefix}-border: var({prefix}-outline);
+		{prefix}-faint: var({prefix}-outline);
+		}}
+		"#
+		)
 	}
 
 	fn scheme_to_css(class: &str, var_prefix: &str, scheme: &Scheme) -> String {
@@ -161,10 +171,8 @@ mod test {
 
 	#[test]
 	fn works() {
-		let css = ThemeToCss::new(
-			&ThemeBuilder::with_source(Argb::new(255, 255, 0, 0)).build(),
-		)
-		.css;
+		let css = ThemeToCss::default()
+			.map(&ThemeBuilder::with_source(Argb::new(255, 255, 0, 0)).build());
 		expect(StyleSheet::parse(&css, ParserOptions::default())).to_be_ok();
 
 		// println!("{}", css);
