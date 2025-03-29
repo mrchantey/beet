@@ -52,16 +52,13 @@ impl RsxToBevy {
 			RsxNode::Comment { .. } => {
 				unimplemented!()
 			}
-			RsxNode::Text {
-				value,
-				idx: rsx_idx,
-			} => {
+			RsxNode::Text { value } => {
 				#[cfg(feature = "bevy_default")]
 				{
 					let entity = world
 						.spawn((
 							tree_idx,
-							GlobalRsxIdx::new(macro_location_hash, *rsx_idx),
+							GlobalRsxIdx::new(macro_location_hash, *tree_idx),
 							Text::new(value),
 						))
 						.id();
@@ -70,7 +67,7 @@ impl RsxToBevy {
 				#[cfg(not(feature = "bevy_default"))]
 				{
 					unimplemented!(
-						"cannot add {value} with {rsx_idx} ,add feature bevy_default to enable"
+						"cannot add {value}, add feature bevy_default to enable"
 					)
 				}
 			}
@@ -119,7 +116,7 @@ impl RsxToBevy {
 
 		let mut entity = world.spawn((
 			tree_idx,
-			GlobalRsxIdx::new(macro_location_hash, element.idx),
+			GlobalRsxIdx::new(macro_location_hash, *tree_idx),
 			BevyRsxElement {
 				tag: element.tag.clone(),
 			},
@@ -204,7 +201,7 @@ mod test {
 		expect(app.world_mut().entity(entity).get::<Transform>())
 			.to_be(Some(&Transform::default()));
 		expect(app.world_mut().entity(entity).get::<GlobalRsxIdx>())
-			.to_be(Some(&GlobalRsxIdx::new(root.location.into_hash(), 0)));
+			.to_be(Some(&GlobalRsxIdx::new(root.location.into_hash(), 1)));
 	}
 	#[test]
 	fn attribute_key_value() {
@@ -221,7 +218,7 @@ mod test {
 		expect(app.world_mut().entity(entity).get::<Transform>())
 			.to_be(Some(&Transform::from_xyz(0., 1., 2.)));
 		expect(app.world_mut().entity(entity).get::<GlobalRsxIdx>())
-			.to_be(Some(&GlobalRsxIdx::new(root.location.into_hash(), 0)));
+			.to_be(Some(&GlobalRsxIdx::new(root.location.into_hash(), 1)));
 	}
 	#[test]
 	fn attribute_block_value() {
@@ -250,6 +247,6 @@ mod test {
 		expect(app.world_mut().entity(entity).get::<Transform>())
 			.to_be(Some(&Transform::from_xyz(0., 1., 2.)));
 		expect(app.world_mut().entity(entity).get::<GlobalRsxIdx>())
-			.to_be(Some(&GlobalRsxIdx::new(root.location.into_hash(), 0)));
+			.to_be(Some(&GlobalRsxIdx::new(root.location.into_hash(), 1)));
 	}
 }

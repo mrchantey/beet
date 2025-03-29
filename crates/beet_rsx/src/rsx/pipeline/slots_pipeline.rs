@@ -201,10 +201,7 @@ impl RsxVisitorMut for SlotsVisitor {
 						// drains the default slots
 						std::mem::take(&mut self.default_slots)
 					};
-					*node = RsxNode::Fragment {
-						idx: element.idx,
-						nodes,
-					};
+					*node = RsxNode::Fragment { nodes };
 				}
 			}
 			_ => {}

@@ -6,17 +6,13 @@ use strum_macros::EnumDiscriminants;
 #[derive(Debug, Clone, AsRefStr, EnumDiscriminants)]
 pub enum RsxNode {
 	/// a html doctype node
-	Doctype {
-		idx: RsxIdx,
-	},
+	Doctype {},
 	/// a html comment node
 	Comment {
-		idx: RsxIdx,
 		value: String,
 	},
 	/// a html text node
 	Text {
-		idx: RsxIdx,
 		value: String,
 	},
 	/// a rust block that returns text
@@ -25,7 +21,6 @@ pub enum RsxNode {
 	/// This may be deprecated in the future if no patterns
 	/// require it. The RstmlToRsx could support it
 	Fragment {
-		idx: RsxIdx,
 		nodes: Vec<RsxNode>,
 	},
 	/// a html element
@@ -34,12 +29,7 @@ pub enum RsxNode {
 }
 
 impl Default for RsxNode {
-	fn default() -> Self {
-		Self::Fragment {
-			idx: RsxIdx::default(),
-			nodes: Vec::new(),
-		}
-	}
+	fn default() -> Self { Self::Fragment { nodes: Vec::new() } }
 }
 
 impl AsRef<RsxNode> for &RsxNode {
@@ -52,12 +42,7 @@ impl AsMut<RsxNode> for &mut RsxNode {
 
 
 impl RsxNode {
-	pub fn fragment(nodes: Vec<RsxNode>) -> Self {
-		Self::Fragment {
-			idx: RsxIdx::default(),
-			nodes,
-		}
-	}
+	pub fn fragment(nodes: Vec<RsxNode>) -> Self { Self::Fragment { nodes } }
 
 	/// Returns true if the node is an empty fragment,
 	/// or if it is recursively a fragment with only empty fragments
@@ -91,25 +76,19 @@ impl RsxNode {
 		visitor.walk_node(self)
 	}
 
-	// this is too dangerous? so easy to expect the rsx idx to be unchanged?
-	//
-	// /// Add another node. If this node is a fragment it will be appended
-	// /// to the end, otherwise a new fragment will be created with the
-	// /// current node and the new node.
-	// pub fn push(&mut self, node: RsxNode) {
-	// 	match self {
-	// 		RsxNode::Fragment { nodes, .. } => nodes.push(node),
-	// 		_ => {
-	// 			// let idx = self
-	// 			let mut nodes = vec![std::mem::take(self)];
-	// 			nodes.push(node);
-	// 			*self = RsxNode::Fragment {
-	// 				idx: RsxIdx::default(),
-	// 				nodes,
-	// 			};
-	// 		}
-	// 	}
-	// }
+	/// Add another node. If this node is a fragment it will be appended
+	/// to the end, otherwise a new fragment will be created with the
+	/// current node and the new node.
+	pub fn push(&mut self, node: RsxNode) {
+		match self {
+			RsxNode::Fragment { nodes, .. } => nodes.push(node),
+			_ => {
+				let mut nodes = vec![std::mem::take(self)];
+				nodes.push(node);
+				*self = RsxNode::Fragment { nodes };
+			}
+		}
+	}
 
 	/// Returns true if the node is an html node
 	pub fn is_html_node(&self) -> bool {
@@ -153,7 +132,6 @@ impl RsxNode {
 /// ```
 #[derive(Debug, Clone)]
 pub struct RsxBlock {
-	pub idx: RsxIdx,
 	/// The initial for an rsx block is considered a seperate tree,
 	pub initial: Box<RsxRoot>,
 	pub effect: Effect,
@@ -173,8 +151,6 @@ pub struct RsxFragment(pub Vec<RsxNode>);
 /// with the [`Component::render`] method and any slot children.
 #[derive(Debug, Clone)]
 pub struct RsxComponent {
-	/// The index of this node relative to its parent [`RsxRoot`]
-	pub idx: RsxIdx,
 	/// The name of the component, this must start with a capital letter
 	pub tag: String,
 	/// The type name extracted via [`std::any::type_name`]
@@ -236,8 +212,6 @@ impl TemplateDirective {
 /// ```
 #[derive(Debug, Clone)]
 pub struct RsxElement {
-	/// The index of this node in the local tree
-	pub idx: RsxIdx,
 	/// ie `div, span, input`
 	pub tag: String,
 	/// ie `class="my-class"`

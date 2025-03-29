@@ -70,10 +70,7 @@ impl FsSrcPipeline {
 					match ReadFile::to_string(&path) {
 						Ok(value) => {
 							el.self_closing = false;
-							el.children = Box::new(RsxNode::Text {
-								idx: rsx_idx_invalid(),
-								value,
-							})
+							el.children = Box::new(RsxNode::Text { value })
 						}
 						Err(err) => result = Err(err.into()),
 					}

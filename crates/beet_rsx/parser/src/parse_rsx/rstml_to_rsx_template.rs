@@ -19,7 +19,6 @@ use syn::spanned::Spanned;
 #[derive(Debug, Default)]
 pub struct RstmlToRsxTemplate {
 	rusty_tracker: RustyTrackerBuilder,
-	idx_incr: TokensRsxIdxIncr,
 }
 
 
@@ -75,13 +74,6 @@ impl RstmlToRsxTemplate {
 		&mut self,
 		nodes: Vec<Node<C>>,
 	) -> TokenStream {
-		// if we're creating a fragment it needs idx before children
-		let fragment_idx = if nodes.len() == 1 {
-			TokenStream::default()
-		} else {
-			self.idx_incr.next()
-		};
-
 		let mut nodes = nodes
 			.into_iter()
 			.map(|node| self.map_node(node))
@@ -90,7 +82,6 @@ impl RstmlToRsxTemplate {
 			nodes.pop().unwrap().to_token_stream()
 		} else {
 			quote! { Fragment (
-				idx: #fragment_idx,
 				items: [#(#nodes),*]
 			)}
 		}
@@ -98,43 +89,34 @@ impl RstmlToRsxTemplate {
 
 	/// returns an RsxTemplateNode
 	pub fn map_node<C: CustomNode>(&mut self, node: Node<C>) -> TokenStream {
-		let idx = self.idx_incr.next();
 		match node {
 			Node::Doctype(_) => quote! { Doctype (
-				idx: #idx
 			)},
 			Node::Comment(NodeComment { value, .. }) => {
 				quote! { Comment (
-					idx: #idx,
 					value: #value
 				)}
 			}
 			Node::Text(NodeText { value }) => {
 				quote! { Text (
-					idx: #idx,
 					value: #value
 				)}
 			}
 			Node::RawText(raw) => {
 				let value = raw.to_string_best();
 				quote! { Text (
-					idx: #idx,
 					value: #value
 				)}
 			}
-			// even if theres one child, fragments still map 1:1 from rstml
-			// to keep rsxidx consistent
 			Node::Fragment(NodeFragment { children, .. }) => {
 				let children = children.into_iter().map(|n| self.map_node(n));
 				quote! { Fragment (
-					idx: #idx,
 					items:[#(#children),*]
 				)}
 			}
 			Node::Block(block) => {
 				let tracker = self.rusty_tracker.next_tracker_ron(&block);
 				quote! { RustBlock (
-					idx: #idx,
 					tracker:#tracker
 				)}
 			}
@@ -146,7 +128,7 @@ impl RstmlToRsxTemplate {
 				let tag = open_tag.name.to_string();
 				let self_closing = close_tag.is_none();
 				if tag.starts_with(|c: char| c.is_uppercase()) {
-					self.map_component(idx, tag, open_tag, children)
+					self.map_component(tag, open_tag, children)
 				} else {
 					let attributes = open_tag
 						.attributes
@@ -155,7 +137,6 @@ impl RstmlToRsxTemplate {
 						.collect::<Vec<_>>();
 					let children = self.map_nodes(children);
 					quote! { Element (
-						idx: #idx,
 						tag: #tag,
 						self_closing: #self_closing,
 						attributes: [#(#attributes),*],
@@ -202,7 +183,6 @@ impl RstmlToRsxTemplate {
 	}
 	fn map_component<C: CustomNode>(
 		&mut self,
-		idx: TokenStream,
 		tag: String,
 		open_tag: OpenTag,
 		children: Vec<Node<C>>,
@@ -247,7 +227,6 @@ impl RstmlToRsxTemplate {
 			.collect::<Vec<_>>();
 
 		quote! { Component (
-			idx: #idx,
 			tracker: #tracker,
 			tag: #tag,
 			slot_children: #slot_children,

@@ -21,12 +21,10 @@ impl Sigfault {
 	/// let node = rsx!{<div>{block}</div>};
 	/// ```
 	pub fn parse_block_node<M>(
-		idx: RsxIdx,
 		tracker: RustyTracker,
 		block: impl 'static + Send + Sync + Clone + IntoRsxRoot<M>,
 	) -> RsxNode {
 		RsxNode::Block(RsxBlock {
-			idx,
 			initial: Box::new(block.clone().into_root()),
 			effect: Effect::new(
 				Box::new(move |loc: TreeLocation| {

@@ -41,7 +41,6 @@ pub struct RstmlToRsx {
 	pub collected_elements: Vec<NodeName>,
 	pub self_closing_elements: HashSet<&'static str>,
 	pub rusty_tracker: RustyTrackerBuilder,
-	pub idx_incr: TokensRsxIdxIncr,
 }
 
 impl RstmlToRsx {
@@ -76,13 +75,6 @@ impl RstmlToRsx {
 	/// the number of actual html nodes will likely be different
 	/// due to fragments, blocks etc
 	pub fn map_nodes<C>(&mut self, nodes: Vec<Node<C>>) -> TokenStream {
-		// if we're creating a fragment it needs idx before children
-		let fragment_idx = if nodes.len() == 1 {
-			TokenStream::default()
-		} else {
-			self.idx_incr.next()
-		};
-
 		let mut nodes = nodes
 			.into_iter()
 			.map(|node| self.map_node(node))
@@ -91,7 +83,6 @@ impl RstmlToRsx {
 			nodes.pop().unwrap().to_token_stream()
 		} else {
 			quote!( RsxNode::Fragment {
-				idx: #fragment_idx,
 				nodes: Vec::from([#(#nodes),*])
 			})
 		}
@@ -99,38 +90,29 @@ impl RstmlToRsx {
 
 	/// returns an RsxNode
 	fn map_node<C>(&mut self, node: Node<C>) -> TokenStream {
-		let idx = self.idx_incr.next();
 		match node {
-			Node::Doctype(_) => quote!(RsxNode::Doctype{
-				idx: #idx
-			}),
+			Node::Doctype(_) => quote!(RsxNode::Doctype {}),
 			Node::Comment(comment) => {
 				let comment = comment.value.value();
 				quote!(RsxNode::Comment{
-					idx: #idx,
 					value: #comment.to_string()
 				})
 			}
 			Node::Text(text) => {
 				let text = text.value_string();
 				quote!(RsxNode::Text {
-					idx: #idx,
 					value: #text.to_string()
 				})
 			}
 			Node::RawText(raw) => {
 				let text = raw.to_string_best();
 				quote!(RsxNode::Text {
-					idx: #idx,
 					value: #text.to_string()
 				})
 			}
-			// even if theres one child, fragments still map 1:1 from rstml
-			// to keep rsxidx consistent
 			Node::Fragment(NodeFragment { children, .. }) => {
 				let children = children.into_iter().map(|n| self.map_node(n));
 				quote! { RsxNode::Fragment{
-					idx: #idx,
 					nodes: vec![#(#children),*]
 				}}
 			}
@@ -139,7 +121,7 @@ impl RstmlToRsx {
 
 				let ident = &self.idents.runtime.effect;
 				quote! {
-					#ident::parse_block_node(#idx, #tracker, #block)
+					#ident::parse_block_node(#tracker, #block)
 				}
 			}
 			Node::Element(el) => {
@@ -160,7 +142,7 @@ impl RstmlToRsx {
 				let tag = open_tag.name.to_string();
 
 				if tag.starts_with(|c: char| c.is_uppercase()) {
-					self.map_component(idx, tag, open_tag, children)
+					self.map_component(tag, open_tag, children)
 				} else {
 					let attributes = open_tag
 						.attributes
@@ -169,7 +151,6 @@ impl RstmlToRsx {
 						.collect::<Vec<_>>();
 					let children = self.map_nodes(children);
 					quote!(RsxNode::Element(RsxElement {
-						idx: #idx,
 						tag: #tag.to_string(),
 						attributes: vec![#(#attributes),*],
 						children: Box::new(#children),
@@ -246,7 +227,6 @@ impl RstmlToRsx {
 	}
 	fn map_component<C>(
 		&mut self,
-		idx: TokenStream,
 		tag: String,
 		open_tag: OpenTag,
 		children: Vec<Node<C>>,
@@ -354,7 +334,6 @@ impl RstmlToRsx {
 			let component = #component;
 
 			RsxNode::Component(RsxComponent{
-				idx: #idx,
 				tag: #tag.to_string(),
 				type_name: std::any::type_name::<#ident>().to_string(),
 				tracker: #tracker,

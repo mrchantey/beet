@@ -75,6 +75,9 @@ fn handle_recv(
 	mut text_query: Query<(&GlobalRsxIdx, &mut Text)>,
 	mut other_query: Query<EntityMut, (Without<Text>, With<GlobalRsxIdx>)>,
 ) {
+	let rsx_idx = todo!(
+		"this needs to be rearchitected, templates cannot keep track of the rsx idx"
+	);
 	while let Ok(recv) = template_reload.recv.try_recv() {
 		match recv {
 			TemplateReloaderMessage::Reload => {
@@ -82,12 +85,9 @@ fn handle_recv(
 				for (loc, root) in map.templates.iter() {
 					let loc_hash = loc.into_hash();
 					root.node.visit(|template_node| {
-						let loc = GlobalRsxIdx::new(
-							loc_hash,
-							template_node.rsx_idx(),
-						);
+						let loc = GlobalRsxIdx::new(loc_hash, rsx_idx);
 						match template_node {
-							RsxTemplateNode::Text { idx, value } => {
+							RsxTemplateNode::Text { value } => {
 								for (_, mut text) in text_query
 									.iter_mut()
 									.filter(|entity| *entity.0 == loc)

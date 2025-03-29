@@ -1,10 +1,6 @@
 mod rstml_rust_to_hash;
 mod rstml_to_rsx_template;
 mod rusty_tracker_builder;
-// mod custom_nodes;
-// pub use custom_nodes::*;
-use proc_macro2::Literal;
-use quote::ToTokens;
 pub use rusty_tracker_builder::*;
 pub mod tokens_to_rstml;
 pub use self::rstml_rust_to_hash::*;
@@ -84,18 +80,6 @@ impl Default for RsxIdents {
 			mac: syn::parse_quote!(rsx),
 			runtime: RsxRuntime::default(),
 		}
-	}
-}
-/// An incrementer for assigning unique indexes to each node in a given rsx tree.
-#[derive(Debug, Default)]
-pub struct TokensRsxIdxIncr(usize);
-
-impl TokensRsxIdxIncr {
-	pub fn next(&mut self) -> TokenStream {
-		let idx = self.0;
-		self.0 += 1;
-		let idx = Literal::usize_unsuffixed(idx);
-		idx.to_token_stream()
 	}
 }
 #[derive(Debug, Clone)]

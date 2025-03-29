@@ -33,12 +33,10 @@ impl BevyRuntime {
 	/// let node = rsx!{<div>{block}</div>};
 	/// ```
 	pub fn parse_block_node<M1, M2>(
-		idx: RsxIdx,
 		tracker: RustyTracker,
 		block: impl Clone + IntoRsxRoot<M1> + SignalOrComponent<M2>,
 	) -> RsxNode {
 		RsxNode::Block(RsxBlock {
-			idx,
 			initial: Box::new(block.clone().into_root()),
 			effect: Effect::new(block.into_node_block_effect(), tracker),
 		})

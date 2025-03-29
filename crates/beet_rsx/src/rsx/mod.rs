@@ -1,11 +1,11 @@
+mod global_rsx_idx;
 mod pipeline;
 mod props;
-mod rsx_idx;
 pub use pipeline::*;
 pub use props::*;
 mod tree_location;
 mod tree_location_map;
-pub use rsx_idx::*;
+pub use global_rsx_idx::*;
 pub use tree_location::*;
 pub use tree_location_map::*;
 mod effect;

@@ -3,16 +3,6 @@ use bevy::prelude::*;
 use rapidhash::RapidHasher;
 use std::hash::Hasher;
 
-/// Unique identifier for every node in an rsx tree,
-/// and assigned to html elements that need it.
-/// The value is incremented every time an rsx node is encountered
-/// in a dfs pattern like [RsxVisitor].
-pub type RsxIdx = u32;
-
-/// Apply to an [`RsxNode`] that was created dynamically, outside of a formal
-/// macro structure.
-pub fn rsx_idx_invalid() -> RsxIdx { u32::MAX }
-
 /// An RsxIdx is unique only to the macro the node was created in,
 /// but for techniques like hot reloading we need to know not only
 /// the local index but enough to distinguish it from nodes
@@ -24,7 +14,7 @@ pub fn rsx_idx_invalid() -> RsxIdx { u32::MAX }
 )]
 #[cfg_attr(feature = "bevy", reflect(Component))]
 pub struct GlobalRsxIdx {
-	idx: RsxIdx,
+	idx: u32,
 	/// The actual [`RsxLocationHash`] is too expensive to store,
 	/// it can be found at every [RsxRoot] so propagate it from there if needed.
 	/// Rapidhash seed is consistent across macro and runtime hashing
@@ -33,9 +23,9 @@ pub struct GlobalRsxIdx {
 
 #[allow(deprecated)]
 impl GlobalRsxIdx {
-	pub fn idx(&self) -> RsxIdx { self.idx }
+	pub fn idx(&self) -> u32 { self.idx }
 	pub fn macro_location_hash(&self) -> u64 { self.macro_location_hash }
-	pub fn new(macro_location_hash: u64, idx: RsxIdx) -> Self {
+	pub fn new(macro_location_hash: u64, idx: u32) -> Self {
 		Self {
 			macro_location_hash,
 

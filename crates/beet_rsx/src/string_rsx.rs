@@ -16,12 +16,10 @@ impl StringRsx {
 	/// let node = rsx!{<div>{block}</div>};
 	/// ```
 	pub fn parse_block_node<M>(
-		idx: RsxIdx,
 		tracker: RustyTracker,
 		block: impl IntoRsxRoot<M>,
 	) -> RsxNode {
 		RsxNode::Block(RsxBlock {
-			idx,
 			initial: Box::new(block.into_root()),
 			effect: Effect::new(noop(), tracker),
 		})
