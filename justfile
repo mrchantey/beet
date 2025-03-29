@@ -112,7 +112,7 @@ test-threads:= '--test-threads=8'
 test-ci *args:
 	cargo fmt 				--check
 	just leptosfmt 		--check
-	{{min-stack}} cargo test --workspace 			--lib	--features=_doctest	{{args}} -- {{test-threads}}
+	{{min-stack}} cargo test --workspace 			--lib											{{args}} -- {{test-threads}}
 	{{min-stack}} cargo test --workspace 			--doc	--features=_doctest	{{args}} -- {{test-threads}}
 	{{min-stack}} cargo test -p beet_flow 		--lib --features=reflect 	--target wasm32-unknown-unknown {{args}} -- {{test-threads}}
 	{{min-stack}} cargo test -p beet_spatial 	--lib 									 	--target wasm32-unknown-unknown {{args}} -- {{test-threads}}

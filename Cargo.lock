@@ -3640,11 +3640,9 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "73fea8450eea4bac3940448fb7ae50d91f034f941199fcd9d909a5a07aa455f0"
 dependencies = [
  "cfg-if",
- "js-sys",
  "libc",
  "r-efi",
  "wasi 0.14.2+wasi-0.2.4",
- "wasm-bindgen",
 ]
 
 [[package]]
@@ -6905,7 +6903,7 @@ dependencies = [
 [[package]]
 name = "sweet"
 version = "0.3.0"
-source = "git+https://github.com/mrchantey/sweet#aeedbd3d3328323340e27edec88ad09d1b6f375d"
+source = "git+https://github.com/mrchantey/sweet#8ed947b1fc657b26ec94d028ea5583f8c5deac06"
 dependencies = [
  "sweet_bevy",
  "sweet_fs",
@@ -6918,15 +6916,15 @@ dependencies = [
 [[package]]
 name = "sweet_bevy"
 version = "0.3.0"
-source = "git+https://github.com/mrchantey/sweet#aeedbd3d3328323340e27edec88ad09d1b6f375d"
+source = "git+https://github.com/mrchantey/sweet#8ed947b1fc657b26ec94d028ea5583f8c5deac06"
 dependencies = [
  "anyhow",
  "bevy",
  "extend",
- "getrandom 0.3.2",
+ "getrandom 0.2.15",
  "js-sys",
- "rand 0.9.0",
- "rand_chacha 0.9.0",
+ "rand 0.8.5",
+ "rand_chacha 0.3.1",
  "sweet_utils",
  "sweet_web",
 ]
@@ -6934,7 +6932,7 @@ dependencies = [
 [[package]]
 name = "sweet_fs"
 version = "0.3.0"
-source = "git+https://github.com/mrchantey/sweet#aeedbd3d3328323340e27edec88ad09d1b6f375d"
+source = "git+https://github.com/mrchantey/sweet#8ed947b1fc657b26ec94d028ea5583f8c5deac06"
 dependencies = [
  "anyhow",
  "clap",
@@ -6953,7 +6951,7 @@ dependencies = [
 [[package]]
 name = "sweet_server"
 version = "0.3.0"
-source = "git+https://github.com/mrchantey/sweet#aeedbd3d3328323340e27edec88ad09d1b6f375d"
+source = "git+https://github.com/mrchantey/sweet#8ed947b1fc657b26ec94d028ea5583f8c5deac06"
 dependencies = [
  "anyhow",
  "axum",
@@ -6977,7 +6975,7 @@ dependencies = [
 [[package]]
 name = "sweet_test"
 version = "0.3.0"
-source = "git+https://github.com/mrchantey/sweet#aeedbd3d3328323340e27edec88ad09d1b6f375d"
+source = "git+https://github.com/mrchantey/sweet#8ed947b1fc657b26ec94d028ea5583f8c5deac06"
 dependencies = [
  "anyhow",
  "backtrace",
@@ -7009,7 +7007,7 @@ dependencies = [
 [[package]]
 name = "sweet_test_macros"
 version = "0.3.0"
-source = "git+https://github.com/mrchantey/sweet#aeedbd3d3328323340e27edec88ad09d1b6f375d"
+source = "git+https://github.com/mrchantey/sweet#8ed947b1fc657b26ec94d028ea5583f8c5deac06"
 dependencies = [
  "anyhow",
  "proc-macro2",
@@ -7020,19 +7018,19 @@ dependencies = [
 [[package]]
 name = "sweet_utils"
 version = "0.3.0"
-source = "git+https://github.com/mrchantey/sweet#aeedbd3d3328323340e27edec88ad09d1b6f375d"
+source = "git+https://github.com/mrchantey/sweet#8ed947b1fc657b26ec94d028ea5583f8c5deac06"
 dependencies = [
  "anyhow",
  "bevy",
  "clap",
  "extend",
- "getrandom 0.3.2",
+ "getrandom 0.2.15",
  "glob",
  "js-sys",
  "path-clean",
  "pathdiff",
- "rand 0.9.0",
- "rand_chacha 0.9.0",
+ "rand 0.8.5",
+ "rand_chacha 0.3.1",
  "serde",
  "thiserror 2.0.12",
  "wasm-bindgen",
@@ -7043,7 +7041,7 @@ dependencies = [
 [[package]]
 name = "sweet_web"
 version = "0.3.0"
-source = "git+https://github.com/mrchantey/sweet#aeedbd3d3328323340e27edec88ad09d1b6f375d"
+source = "git+https://github.com/mrchantey/sweet#8ed947b1fc657b26ec94d028ea5583f8c5deac06"
 dependencies = [
  "anyhow",
  "console_error_panic_hook",

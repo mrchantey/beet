@@ -46,7 +46,7 @@ impl BevyRuntime {
 	/// Used by [`RstmlToRsx`] when it encounters an attribute block:
 	/// ```
 	/// # use beet_rsx::as_beet::*;
-	/// let value = || vec![RsxAttribute::Key{key:"foo".to_string()}];
+	/// let value = vec![RsxAttribute::Key{key:"foo".to_string()}];
 	/// let node = rsx!{<el {value}/>};
 	/// ```
 	#[allow(unused)]

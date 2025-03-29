@@ -3,7 +3,7 @@ use strum_macros::AsRefStr;
 use strum_macros::EnumDiscriminants;
 
 
-#[derive(Debug, AsRefStr, EnumDiscriminants)]
+#[derive(Debug, Clone, AsRefStr, EnumDiscriminants)]
 pub enum RsxNode {
 	/// a html doctype node
 	Doctype {
@@ -40,6 +40,14 @@ impl Default for RsxNode {
 			nodes: Vec::new(),
 		}
 	}
+}
+
+impl AsRef<RsxNode> for &RsxNode {
+	fn as_ref(&self) -> &RsxNode { *self }
+}
+
+impl AsMut<RsxNode> for &mut RsxNode {
+	fn as_mut(&mut self) -> &mut RsxNode { *self }
 }
 
 
@@ -155,7 +163,7 @@ impl RsxNode {
 /// let my_block = 3;
 /// let el = rsx! { <div>{my_block}</div> };
 /// ```
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct RsxBlock {
 	pub idx: RsxIdx,
 	/// The initial for an rsx block is considered a seperate tree,
@@ -175,7 +183,7 @@ pub struct RsxFragment(pub Vec<RsxNode>);
 /// A component is a struct that implements the [Component] trait.
 /// When it is used in an `rsx!` macro it will be instantiated
 /// with the [`Component::render`] method and any slot children.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct RsxComponent {
 	/// The index of this node relative to its parent [`RsxRoot`]
 	pub idx: RsxIdx,
@@ -238,7 +246,7 @@ impl TemplateDirective {
 /// # use beet_rsx::as_beet::*;
 /// let el = rsx! { <div class="my-class">hello world</div> };
 /// ```
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct RsxElement {
 	/// The index of this node in the local tree
 	pub idx: RsxIdx,
@@ -301,7 +309,7 @@ impl RsxElement {
 
 // #[derive(Debug, Clone, PartialEq)]
 // #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum RsxAttribute {
 	Key {
 		key: String,
@@ -322,12 +330,17 @@ pub enum RsxAttribute {
 	},
 }
 
-impl AsRef<RsxNode> for &RsxNode {
-	fn as_ref(&self) -> &RsxNode { *self }
+pub trait IntoRsxAttributes<M> {
+	/// Convert this into a RsxAttribute
+	fn into_rsx_attributes(self) -> Vec<RsxAttribute>;
 }
 
-impl AsMut<RsxNode> for &mut RsxNode {
-	fn as_mut(&mut self) -> &mut RsxNode { *self }
+impl IntoRsxAttributes<Vec<RsxAttribute>> for Vec<RsxAttribute> {
+	fn into_rsx_attributes(self) -> Vec<RsxAttribute> { self }
+}
+
+impl<F: FnOnce() -> Vec<RsxAttribute>> IntoRsxAttributes<F> for F {
+	fn into_rsx_attributes(self) -> Vec<RsxAttribute> { self() }
 }
 
 #[cfg(test)]
@@ -355,7 +368,7 @@ mod test {
 
 
 	#[test]
-	fn block_attr() {
+	fn comp_attr() {
 		let my_comp = MyComponent { key: 3 };
 		expect(
 			rsx! { <MyComponent {my_comp} /> }
@@ -363,5 +376,12 @@ mod test {
 				.unwrap(),
 		)
 		.to_be("<div data-beet-rsx-idx=\"2\">3</div>");
+	}
+	#[test]
+	fn block_attr() {
+		let value = vec![RsxAttribute::Key {
+			key: "foo".to_string(),
+		}];
+		let _node = rsx! { <el {value} /> };
 	}
 }

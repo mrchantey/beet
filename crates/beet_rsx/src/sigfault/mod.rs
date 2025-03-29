@@ -23,7 +23,7 @@ impl Sigfault {
 	pub fn parse_block_node<M>(
 		idx: RsxIdx,
 		tracker: RustyTracker,
-		block: impl 'static + Send + Clone + IntoRsxRoot<M>,
+		block: impl 'static + Send + Sync + Clone + IntoRsxRoot<M>,
 	) -> RsxNode {
 		RsxNode::Block(RsxBlock {
 			idx,
@@ -50,12 +50,12 @@ impl Sigfault {
 	/// let value = || vec![RsxAttribute::Key{key:"foo".to_string()}];
 	/// let node = rsx!{<el {value}/>};
 	/// ```
-	pub fn parse_attribute_block(
+	pub fn parse_attribute_block<M>(
 		tracker: RustyTracker,
-		mut block: impl 'static + FnMut() -> Vec<RsxAttribute>,
+		block: impl IntoRsxAttributes<M>,
 	) -> RsxAttribute {
 		RsxAttribute::Block {
-			initial: block(),
+			initial: block.into_rsx_attributes(),
 			effect: Effect::new(
 				Box::new(|_loc| {
 					todo!();
@@ -74,7 +74,7 @@ impl Sigfault {
 	pub fn parse_attribute_value<M>(
 		key: &'static str,
 		tracker: RustyTracker,
-		block: impl 'static + Send + Clone + IntoSigfaultAttrVal<M>,
+		block: impl 'static + Send + Sync + Clone + IntoSigfaultAttrVal<M>,
 	) -> RsxAttribute {
 		RsxAttribute::BlockValue {
 			key: key.to_string(),

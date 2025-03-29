@@ -22,6 +22,7 @@ fn head(Head { fixed_scale }: Head) -> RsxRoot {
 		site_url,
 	} = get_context::<Brand>();
 
+
 	let scale = move || {
 		if fixed_scale {
 			rsx! {

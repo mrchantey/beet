@@ -3,12 +3,15 @@ use anyhow::Result;
 use std::sync::Arc;
 
 // if this was clone RsxRoot could be too
-pub type RegisterEffect = Box<dyn FnOnce(TreeLocation) -> Result<()>>;
+pub type RegisterEffect =
+	Box<dyn 'static + Send + Sync + FnOnce(TreeLocation) -> Result<()>>;
 
 #[derive(Clone)]
 pub struct Effect {
 	/// the function for registering the effect with
-	/// its reactive framework
+	/// its reactive framework.
+	/// If we get stuck we can mutex this too, the hope is nobody tries
+	/// to hold on to a reference and register at the same time.
 	pub(super) register: Arc<RegisterEffect>,
 	/// the location of the effect in the rsx macro,
 	/// this may or may not be populated depending
@@ -41,7 +44,7 @@ impl Effect {
 		match Arc::try_unwrap(self.register) {
 			Ok(register) => (register)(loc),
 			Err(_) => Err(anyhow::anyhow!(
-				"Failed to unwrap Arc: multiple references exist"
+				"Failed to unwrap Arc: multiple references exist, we dont mutex for perf but open an issue if you need this",
 			)),
 		}
 	}

@@ -81,9 +81,21 @@ pub enum TemplateError {
 		expected: &'static str,
 		received: String,
 	},
+	#[error("Location: {location:#?}\nError: {err}")]
+	WithLocation {
+		location: RsxMacroLocation,
+		err: Box<Self>,
+	},
 }
 
 impl TemplateError {
+	pub fn with_location(self, location: RsxMacroLocation) -> Self {
+		Self::WithLocation {
+			location,
+			err: Box::new(self),
+		}
+	}
+
 	pub fn no_rusty_map(
 		cx: &str,
 		received_map: &HashMap<RustyTracker, RustyPart>,
@@ -254,10 +266,9 @@ impl RsxTemplateNode {
 							tracker,
 						)
 					})? {
-						RustyPart::RustBlock {
-							initial,
-							effect: register,
-						} => Ok((initial, register)),
+						RustyPart::RustBlock { initial, effect } => {
+							Ok((initial, effect))
+						}
 						other => TemplateResult::Err(
 							TemplateError::UnexpectedRusty {
 								expected: "BlockNode",

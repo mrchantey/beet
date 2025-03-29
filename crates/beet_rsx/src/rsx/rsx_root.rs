@@ -10,7 +10,7 @@ use std::borrow::BorrowMut;
 /// anyway for Strings and ().
 ///
 /// The struct returned from an rsx! macro.
-#[derive(Debug, Default)]
+#[derive(Debug, Clone, Default)]
 pub struct RsxRoot {
 	/// the root node
 	pub node: RsxNode,
