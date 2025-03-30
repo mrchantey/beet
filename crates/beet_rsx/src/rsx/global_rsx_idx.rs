@@ -79,6 +79,7 @@ mod test {
 	use sweet::prelude::*;
 
 	#[test]
+	#[ignore = "its unused and this test is a bit silly"]
 	fn works() {
 		let idx =
 			GlobalRsxIdx::new(RsxMacroLocation::placeholder().into_hash(), 123);

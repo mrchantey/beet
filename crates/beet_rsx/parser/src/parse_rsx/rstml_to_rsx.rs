@@ -19,11 +19,11 @@ use syn::spanned::Spanned;
 /// return a [RsxMacroLocation] token stream
 pub fn macro_location_tokens(tokens: impl Spanned) -> TokenStream {
 	let span = tokens.span();
-	let line = span.start().line;
-	let col = span.start().column;
+	let line = span.start().line as u32;
+	let col = span.start().column as u32;
 	quote! {
 		{
-			Some(RsxMacroLocation::new(beet::exports::WorkspacePathBuf::new(file!()), #line, #col))
+			Some(RsxMacroLocation::new(file!(), #line, #col))
 		}
 	}
 }

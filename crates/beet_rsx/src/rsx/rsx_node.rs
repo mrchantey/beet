@@ -319,7 +319,7 @@ mod test {
 		};
 		expect(&location.file().to_string_lossy())
 			.to_be("crates/beet_rsx/src/rsx/rsx_node.rs");
-		expect(location.line()).to_be(line as usize);
+		expect(location.line()).to_be(line);
 		expect(location.col()).to_be(40);
 	}
 

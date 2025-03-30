@@ -93,8 +93,8 @@ impl BuildTemplateMap {
 			.into_iter()
 			.flatten()
 			.map(|(RsxMacroLocation { file, line, col }, tokens)| {
-				let line = Literal::usize_unsuffixed(line);
-				let col = Literal::usize_unsuffixed(col);
+				let line = Literal::u32_unsuffixed(line);
+				let col = Literal::u32_unsuffixed(col);
 				let file = file.to_string_lossy();
 				let kvp_tokens = quote! {
 					RsxMacroLocation(
@@ -200,8 +200,8 @@ impl<'a> Visit<'a> for RsxSynVisitor {
 			let start = span.start();
 			let loc = RsxMacroLocation::new(
 				self.file.clone(),
-				start.line,
-				start.column,
+				start.line as u32,
+				start.column as u32,
 			);
 			let tokens = RstmlToRsxTemplate::default()
 				.map_tokens(mac.tokens.clone(), Some(&self.file));
