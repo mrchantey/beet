@@ -100,7 +100,7 @@ impl FuncFilesToRouteFuncs<()> {
 						// instead of fake location
 						RsxRoot{
 							node,
-							location: RsxMacroLocation::default(),
+							location: None,
 						}
 					}
 					RouteFunc::new(

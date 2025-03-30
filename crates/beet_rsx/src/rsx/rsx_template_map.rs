@@ -42,32 +42,39 @@ impl RsxTemplateMap {
 	}
 
 	// TODO pipeline
+	/// Find a matching template for the given [`RsxRoot`] and apply it, returning the
+	/// updated root.
+	/// If the root has no location or the location is outside the templates root directory,
+	/// the root is returned unchanged.
+	///
 	/// ## Errors
 	/// If the root is inside the templates root directory and a template was not found.
 	pub fn apply_template(&self, root: RsxRoot) -> TemplateResult<RsxRoot> {
-		if let Some(template_root) = self.templates.get(&root.location) {
+		let Some(location) = &root.location else {
+			// if it doesnt have a location, we dont even try to apply a template
+			return Ok(root);
+		};
+
+
+		if let Some(template_root) = self.templates.get(&location) {
 			let node = self
 				.apply_template_for_node(
 					template_root.clone(),
 					&mut RustyPartMap::collect(root.node),
 				)
-				.map_err(|err| err.with_location(root.location.clone()))?;
+				.map_err(|err| err.with_location(location.clone()))?;
 			Ok(node)
-		} else if root.location.file.starts_with(&self.root) {
+		} else if location.file.starts_with(&self.root) {
 			Err(TemplateError::NoTemplate {
-				received: self
-					.templates
-					.values()
-					.map(|x| x.location.clone())
-					.collect(),
-				expected: root.location.clone(),
+				received: self.templates.keys().map(|x| x.clone()).collect(),
+				expected: location.clone(),
 			}
-			.with_location(root.location.clone()))
+			.with_location(location.clone()))
 		} else {
-			println!(
-				"rsx node is outside templates dir so no template will be applied:\n{:?}",
-				root.location
-			);
+			// println!(
+			// 	"rsx node is outside templates dir so no template will be applied:\n{:?}",
+			// 	location
+			// );
 			Ok(root)
 		}
 	}
@@ -108,7 +115,10 @@ mod test {
 			root: WorkspacePathBuf::new(file!()),
 			templates: templates
 				.into_iter()
-				.map(|root| (root.location.clone(), root))
+				.filter_map(|root| match &root.location {
+					Some(location) => Some((location.clone(), root)),
+					None => None,
+				})
 				.collect(),
 		}
 	}
@@ -218,7 +228,7 @@ mod test {
 		let should_exist = comp.clone();
 		let mut should_not_exist = comp;
 		should_not_exist.location =
-			RsxMacroLocation::new(WorkspacePathBuf::new("../"), 1, 1);
+			Some(RsxMacroLocation::new(WorkspacePathBuf::new("../"), 1, 1));
 
 		let map = test_template_map(vec![]);
 

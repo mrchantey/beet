@@ -14,8 +14,10 @@ use std::borrow::BorrowMut;
 pub struct RsxRoot {
 	/// the root node
 	pub node: RsxNode,
-	/// unique location with file, line, col
-	pub location: RsxMacroLocation,
+	/// Unique location with file, line, col.
+	/// The primary purpose is for applying templates,
+	/// so is usually only present when the macro is used
+	pub location: Option<RsxMacroLocation>,
 }
 
 impl RsxRoot {}
@@ -57,14 +59,11 @@ impl IntoRsxRoot<()> for () {
 	fn into_root(self) -> RsxRoot { RsxRoot::default() }
 }
 
-/// Strings are allowed to have an RsxMacroLocation::default(),
-/// as they will never be used for complex hydration etc
-// TODO its a code smell that we have to do this
 pub struct ToStringIntoRsx;
 impl<T: ToString> IntoRsxRoot<(T, ToStringIntoRsx)> for T {
 	fn into_root(self) -> RsxRoot {
 		RsxRoot {
-			location: RsxMacroLocation::default(),
+			location: None,
 			node: RsxNode::Text {
 				value: self.to_string(),
 			},

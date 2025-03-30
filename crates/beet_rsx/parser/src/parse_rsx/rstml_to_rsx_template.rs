@@ -26,20 +26,10 @@ impl RstmlToRsxTemplate {
 	/// for use with rsx_template! macro, which is usually just used for
 	/// tests, routers use [RstmlToRsxTemplate::map_tokens]
 	pub fn from_macro(&mut self, tokens: TokenStream) -> TokenStream {
-		// this will be overridden
-		let temp_file = WorkspacePathBuf::new("");
-
-		let str_tokens = self
-			.map_tokens(tokens, &temp_file)
-			.to_string()
-			.to_token_stream();
-		// println!("generated ron:\n{}", str_tokens);
+		let str_tokens =
+			self.map_tokens(tokens, None).to_string().to_token_stream();
 		quote! {
-			{
-				let mut root = RsxTemplateRoot::from_ron(#str_tokens).unwrap();
-				root.location.file = beet::exports::WorkspacePathBuf::new(file!());
-				root
-			}
+			RsxTemplateRoot::from_ron(#str_tokens).unwrap()
 		}
 	}
 	/// The entry point for parsing the content of an rsx! macro
@@ -47,23 +37,30 @@ impl RstmlToRsxTemplate {
 	pub fn map_tokens(
 		&mut self,
 		tokens: TokenStream,
-		file: &WorkspacePathBuf,
+		file: Option<&WorkspacePathBuf>,
 	) -> TokenStream {
 		let span = tokens.span();
 		let (nodes, _rstml_errors) = tokens_to_rstml(tokens);
 		let node = self.map_nodes(nodes);
 		let line = Literal::usize_unsuffixed(span.start().line);
 		let col = Literal::usize_unsuffixed(span.start().column);
-		// convert from WorkspacePathBuf at last moment
-		let file = file.to_string_lossy();
 
-		quote! {
-			RsxTemplateRoot (
-				location: RsxMacroLocation(
+		let location = file
+			.map(|file| {
+				let file = file.to_string_lossy();
+				quote! {Some(RsxMacroLocation(
 					file: (#file),
 					line: #line,
 					col: #col
-				),
+				))}
+			})
+			.unwrap_or(quote! {None});
+
+		// convert from WorkspacePathBuf at last moment
+
+		quote! {
+			RsxTemplateRoot (
+				location: #location,
 				node: #node
 			)
 		}

@@ -10,7 +10,7 @@ pub fn get() -> RsxRoot {
 			<Counter client:load initial=2/>
 			<style>
 				span{
-					color: blue;
+					color: red;
 				}
 			</style>
 		</BeetPage>

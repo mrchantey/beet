@@ -15,10 +15,12 @@ fn counter(props: Counter) -> RsxRoot {
 
 	rsx! {
 		<div>
-			{get.clone()}
-			<button onclick=move |_|{set(get()+1)}>
-			Increment
-			</button>
+		<div>pizza</div>
+		{get.clone()}
+		<button onclick=move |_|{set(get()+4)}>
+		Increment
+		</button>
+		<div>pizza</div>
 		</div>
 	}
 }

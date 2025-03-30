@@ -314,6 +314,9 @@ mod test {
 	fn root_location() {
 		let line = line!() + 1;
 		let RsxRoot { location, .. } = rsx! { <div>hello world</div> };
+		let Some(location) = location else {
+			panic!("expected location");
+		};
 		expect(&location.file().to_string_lossy())
 			.to_be("crates/beet_rsx/src/rsx/rsx_node.rs");
 		expect(location.line()).to_be(line as usize);

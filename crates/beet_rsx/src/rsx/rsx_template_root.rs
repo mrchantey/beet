@@ -7,7 +7,7 @@ use anyhow::Result;
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct RsxTemplateRoot {
 	pub node: RsxTemplateNode,
-	pub location: RsxMacroLocation,
+	pub location: Option<RsxMacroLocation>,
 }
 
 

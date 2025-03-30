@@ -204,7 +204,7 @@ impl<'a> Visit<'a> for RsxSynVisitor {
 				start.column,
 			);
 			let tokens = RstmlToRsxTemplate::default()
-				.map_tokens(mac.tokens.clone(), &self.file);
+				.map_tokens(mac.tokens.clone(), Some(&self.file));
 			self.templates.push((loc, tokens));
 		}
 	}
@@ -265,7 +265,7 @@ mod test {
 
 		let rsx = &crate::test_site::routes::collect()[0];
 		let root = (rsx.func)().await.unwrap();
-		let root1 = map.templates.get(&root.location).unwrap();
+		let root1 = map.templates.get(&root.location.unwrap()).unwrap();
 		let RsxTemplateNode::Component {
 			tracker: tracker1, ..
 		} = &root1.node

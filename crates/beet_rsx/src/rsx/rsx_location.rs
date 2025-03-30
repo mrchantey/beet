@@ -22,11 +22,6 @@ pub struct RsxMacroLocation {
 	pub line: usize,
 	pub col: usize,
 }
-// useful for example when converting strings to an RsxRoot,
-// where they can safely have an invalid file.
-impl Default for RsxMacroLocation {
-	fn default() -> Self { Self::new(WorkspacePathBuf::new(file!()), 0, 0) }
-}
 
 impl std::fmt::Display for RsxMacroLocation {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -35,6 +30,14 @@ impl std::fmt::Display for RsxMacroLocation {
 }
 
 impl RsxMacroLocation {
+	pub fn placeholder() -> Self {
+		Self {
+			file: WorkspacePathBuf::default(),
+			line: 0,
+			col: 0,
+		}
+	}
+
 	pub fn new(file: WorkspacePathBuf, line: usize, col: usize) -> Self {
 		Self { file, line, col }
 	}

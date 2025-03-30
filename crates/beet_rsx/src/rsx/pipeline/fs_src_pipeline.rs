@@ -51,8 +51,14 @@ impl FsSrcPipeline {
 						return;
 					}
 
-					let workspace_path = root
-						.location
+					let Some(location) = &root.location else {
+						result = Err(anyhow::anyhow!(
+							"elements with an fs src attribute must have a RootNode::location. This is set by default in rsx! macros"
+						));
+						return;
+					};
+
+					let workspace_path = location
 						.file
 						.parent()
 						.unwrap_or(&Path::new(""))
