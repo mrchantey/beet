@@ -22,6 +22,7 @@ pub struct ScopedStylePipeline {
 	/// defaults to "data-styleid"
 	attr: String,
 	/// an index used to track the current component being styled
+	/// TODO use treeidx
 	idx: usize,
 }
 
@@ -101,17 +102,29 @@ impl ScopedStylePipeline {
 				}
 				// currently only recurse top level style children, we could create another
 				// visitor to go deeper if we start supporting style body components
-				if let RsxNode::Text { value, .. } = &mut *el.children {
-					// this is a hack to allow for the css unit "em" to be used in the style tag
-					// we should put it somewhere else
-					*value = value.replace(".em", "em");
-					if let Err(err) = self.apply_styles(value, scope) {
-						parse_err = Err(err);
+				match &mut *el.children {
+					RsxNode::Text { value, .. } => {
+						// this is a hack to allow for the css unit "em" to be used in the style tag
+						// we should put it somewhere else
+						*value = value.replace(".em", "em");
+						if let Err(err) = self.apply_styles(value, scope) {
+							parse_err = Err(err);
+						}
 					}
-				} else {
-					parse_err = Err(ParseError::Serde(
-						"style tag must contain text".to_string(),
-					));
+					RsxNode::Fragment { nodes } => {
+						if !nodes.is_empty() {
+							parse_err = Err(ParseError::Serde(format!(
+								"ScopedStyle: Expected Text Node, received Fragment with {} nodes",
+								nodes.len()
+							)));
+						}
+					}
+					other => {
+						parse_err = Err(ParseError::Serde(format!(
+							"ScopedStyle: Expected Text Node, received {:#?}",
+							other
+						)));
+					}
 				}
 			}
 		});

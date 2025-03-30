@@ -13,7 +13,7 @@ pub struct ColorScheme {
 fn color_scheme(props: ColorScheme) -> RsxRoot {
 	// Theme
 
-	let css = ThemeToCss::new("--bt-color").map(&props.theme);
+	let css = ThemeToCss::default().map(&props.theme);
 
 	Style::new(css).with_global_scope().into_root()
 }

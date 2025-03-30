@@ -6,29 +6,37 @@ use material_colors::theme::Theme;
 
 pub struct ThemeToCss {
 	pub prefix: String,
+	/// The global class applied to the document in light mode
+	/// This must be kept in sync with initColorScheme.js
+	pub light_class: String,
+	/// The global class applied to the document in dark mode
+	/// This must be kept in sync with initColorScheme.js
+	pub dark_class: String,
 }
 
 impl Default for ThemeToCss {
 	fn default() -> Self {
 		Self {
 			prefix: "--bt-color".to_string(),
+			light_class: "scheme-light".to_string(),
+			dark_class: "scheme-dark".to_string(),
 		}
 	}
 }
 
 
 impl ThemeToCss {
-	pub fn new(prefix: impl ToString) -> Self {
-		Self {
-			prefix: prefix.to_string(),
-		}
-	}
 	pub fn map(&self, theme: &Theme) -> String {
-		let prefix = &self.prefix;
+		let Self {
+			prefix,
+			light_class: light_scheme,
+			dark_class: dark_scheme,
+		} = self;
+
 		let light =
-			Self::scheme_to_css("scheme-light", prefix, &theme.schemes.light);
+			Self::scheme_to_css(light_scheme, prefix, &theme.schemes.light);
 		let dark =
-			Self::scheme_to_css("scheme-dark", prefix, &theme.schemes.dark);
+			Self::scheme_to_css(dark_scheme, prefix, &theme.schemes.dark);
 		format!(
 			r#"
 		{light}

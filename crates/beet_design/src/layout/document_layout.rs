@@ -15,7 +15,7 @@ fn document_layout(_props: DocumentLayout) -> RsxRoot {
 			<slot name="head" />
 		</Head>
 		<body>
-			// <script is:inline src="/autoTheme.js"></script>
+			<script src="/js/initColorScheme.js" type="text/javascript"></script>
 			<slot/>
 		</body>
 	</html>

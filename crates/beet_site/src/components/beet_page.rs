@@ -32,7 +32,7 @@ fn beet_page(_: BeetPage) -> RsxRoot {
 
 	rsx! {
 		<ContentLayout>
-		<ColorScheme theme=theme/>		
+		<ColorScheme theme=theme/>
 		<h1>{brand.title}</h1>
 			<nav>
 				{nav_items}

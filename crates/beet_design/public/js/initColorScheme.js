@@ -1,7 +1,13 @@
 // a script to run before initial render to avoid FOUC.
 // the scheme from 
 
+const lightClass = 'scheme-light'
+const darkClass = 'scheme-dark'
 
+const schemes = [
+	lightClass,
+	darkClass
+]
 init()
 // document.addEventListener('astro:after-swap', () => 
 // 	init())
@@ -12,9 +18,9 @@ function init () {
 		.matchMedia('(prefers-color-scheme: dark)')
 	const setSchemeFromMql = () => {
 		if (mql.matches) 
-			setScheme('dark')
+			setScheme(darkClass)
 		else 
-			setScheme('light')	
+			setScheme(lightClass)	
 	}
 	
 	// event listeners should probably be in the application
@@ -25,43 +31,27 @@ function init () {
 	setSchemeFromMql()
 }
 
-
-/* eslint-disable no-undef */
-const materialSchemes = [
-	'light',
-	'light-medium-contrast',
-	'light-high-contrast',
-	'dark',
-	'dark-medium-contrast',
-	'dark-high-contrast'
-]
-
-function materialThemeToSimple(scheme) {
-	if (scheme === 'light' || scheme === 'light-medium-contrast' || scheme === 'light-high-contrast') {
-		return 'light'
-	} else {
-		return 'dark'
-	}
-}
-
 function setScheme(scheme) {
 
-	materialSchemes.forEach((t) => {
+	schemes.forEach((t) => {
 		document.documentElement.classList.remove(t)
 	})
 
 	document.documentElement.classList.add(scheme)
-	setScrollBar(materialThemeToSimple(scheme))
+	setScrollBar(scheme)
 }
 
 
-function setScrollBar(color) {
+function setScrollBar(scheme) {
+	const scollbarScheme = scheme === lightClass
+		? 'light'
+		: 'dark'
 
 	document.documentElement
 		.setAttribute('style', 'display: none')
 
 	document.documentElement
-		.setAttribute('data-color-scheme', color)
+		.setAttribute('data-color-scheme', scollbarScheme)
 
 	// Trigger reflow
 	document.body.clientWidth
