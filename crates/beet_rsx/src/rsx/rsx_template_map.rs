@@ -27,6 +27,24 @@ pub struct RsxTemplateMap {
 	pub templates: HashMap<RsxMacroLocation, RsxTemplateNode>,
 }
 
+
+
+// TODO use a visitor that doesnt exit early if a parent has no nodes.
+// has no location, it may have a child that does and so should be templated.
+/// Find a matching template for the given [`RsxNode`] and apply it, returning the
+/// updated root.
+/// If the root has no location or the location is outside the templates root directory,
+/// the root is returned unchanged.
+///
+/// ## Errors
+/// If the root is inside the templates root directory and a template was not found.
+impl RsxPipeline<RsxNode, TemplateResult<RsxNode>> for &RsxTemplateMap {
+	fn apply(self, value: RsxNode) -> TemplateResult<RsxNode> {
+		// RsxNode
+		self.apply_template(value)
+	}
+}
+
 impl RsxTemplateMap {
 	pub fn root(&self) -> &WorkspacePathBuf { &self.root }
 
@@ -41,17 +59,7 @@ impl RsxTemplateMap {
 		}
 	}
 
-	// TODO pipeline
-	// TODO use a visitor that doesnt exit early if a parent
-	// has no location, a child still might
-	/// Find a matching template for the given [`RsxNode`] and apply it, returning the
-	/// updated root.
-	/// If the root has no location or the location is outside the templates root directory,
-	/// the root is returned unchanged.
-	///
-	/// ## Errors
-	/// If the root is inside the templates root directory and a template was not found.
-	pub fn apply_template(&self, node: RsxNode) -> TemplateResult<RsxNode> {
+	fn apply_template(&self, node: RsxNode) -> TemplateResult<RsxNode> {
 		let Some(location) = node.location().cloned() else {
 			// if it doesnt have a location, we dont even try to apply a template
 			return Ok(node);

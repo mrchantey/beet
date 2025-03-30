@@ -57,13 +57,13 @@ impl RsxToHtml {
 				.collect(),
 			RsxNode::Block(rsx_block) => self.map_node(&rsx_block.initial),
 			RsxNode::Component(RsxComponent {
-				root,
+				node,
 				slot_children,
 				..
 			}) => {
 				slot_children.assert_empty();
 				// use the location of the root
-				let node = self.map_node(&root);
+				let node = self.map_node(&node);
 				// even though its empty we must visit to increment
 				// the idx incr, in the same order as [`RsxVisitor`] would
 				let _ = self.map_node(&slot_children);

@@ -26,8 +26,8 @@ impl RsxPipeline<RsxNode, Result<()>> for SpaToHtmlFile {
 		// we'll create the app even though its static parts are stale
 		// because we need the rusty parts to fill in the html template
 		// apply the template to the app
-		let html = template_map
-			.apply_template(app)?
+		let html = app
+			.bpipe(&template_map)?
 			.bpipe(RsxToHtmlDocument::default())?
 			.bpipe(RenderHtml::default())?;
 

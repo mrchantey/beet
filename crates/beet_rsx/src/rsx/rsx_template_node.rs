@@ -7,6 +7,11 @@ use thiserror::Error;
 /// An [RsxTemplateNode] is conceptually similar to a html template
 /// but instead of {{PLACEHOLDER}} there is a hash for a known
 /// location of the associated rust code.
+///
+/// Templates do not recurse into rusty parts,
+/// ie [`RsxBlock::initial`] or [`RsxComponent::node`] are not recursed into.
+/// For this reason its important that the [`RsxTemplateMap`] visits these
+/// children when applying the templates.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum RsxTemplateNode {
@@ -155,7 +160,7 @@ impl RsxTemplateNode {
 				tag,
 				tracker,
 				// ignore root, its a seperate tree
-				root: _,
+				node: _,
 				// type_name cannot be statically changed
 				type_name: _,
 				// ron cannot be statically generated
@@ -268,13 +273,13 @@ impl RsxTemplateNode {
 						),
 					}?;
 				// very confusing to callback to the map like this
-				let root = template_map.apply_template(root)?;
+				let root = root.bpipe(template_map)?;
 				RsxComponent {
 					tag,
 					tracker,
 					type_name,
 					ron,
-					root: Box::new(root),
+					node: Box::new(root),
 					slot_children: Box::new(
 						slot_children.into_rsx_node(template_map, rusty_map)?,
 					),

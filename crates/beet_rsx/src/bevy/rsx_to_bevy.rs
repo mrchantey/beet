@@ -80,12 +80,12 @@ impl RsxToBevy {
 				vec![self.spawn_element(world, element, tree_idx)?]
 			}
 			RsxNode::Component(RsxComponent {
-				root,
+				node,
 				slot_children,
 				..
 			}) => {
 				slot_children.assert_empty();
-				self.spawn_root(world, root)?
+				self.spawn_root(world, node)?
 			}
 		};
 		Ok(nodes)

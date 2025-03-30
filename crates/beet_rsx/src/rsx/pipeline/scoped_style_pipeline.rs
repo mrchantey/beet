@@ -72,7 +72,7 @@ impl RsxPipeline<RsxNode, Result<RsxNode>> for ScopedStylePipeline {
 		// visit all components
 		VisitRsxComponentMut::walk(&mut node, |component| {
 			// 2. apply to component node
-			if let Err(err) = self.apply_node(&mut component.root) {
+			if let Err(err) = self.apply_node(&mut component.node) {
 				parse_err = Err(err);
 			};
 			// 3. apply to component slot children

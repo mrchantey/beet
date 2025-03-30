@@ -25,7 +25,7 @@ impl RsxPipeline<RsxNode, Result<RsxNode>> for FsSrcPipeline {
 
 		//2. apply to the root of each component
 		VisitRsxComponentMut::walk(&mut root, |component| {
-			if let Err(err) = self.apply_root(&mut component.root) {
+			if let Err(err) = self.apply_root(&mut component.node) {
 				result = Err(err);
 			}
 		});

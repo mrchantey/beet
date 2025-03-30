@@ -132,7 +132,7 @@ impl RsxVisitorMut for RustyPartVisitor {
 		// note how we ignore slot_children, they are handled by RsxTemplateNode
 		self.rusty_map
 			.insert(component.tracker, RustyPart::Component {
-				root: std::mem::take(&mut component.root),
+				root: std::mem::take(&mut component.node),
 				type_name: std::mem::take(&mut component.type_name),
 				ron: std::mem::take(&mut component.ron),
 			});

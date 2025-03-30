@@ -291,8 +291,8 @@ pub struct RsxComponent {
 	/// even key value attribute changes must be tracked
 	/// because components are structs not elements
 	pub tracker: RustyTracker,
-	/// the root returned by [Component::render]
-	pub root: Box<RsxNode>,
+	/// the node returned by [Component::render]
+	pub node: Box<RsxNode>,
 	/// the children passed in by this component's parent:
 	///
 	/// `rsx! { <MyComponent>slot_children</MyComponent> }`

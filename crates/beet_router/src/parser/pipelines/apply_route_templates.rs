@@ -46,10 +46,7 @@ impl RsxPipeline<Vec<(RouteInfo, RsxNode)>, Result<Vec<(RouteInfo, RsxNode)>>>
 
 		routes
 			.into_iter()
-			.map(|(route, root)| {
-				let root = template_map.apply_template(root)?;
-				Ok((route, root))
-			})
+			.map(|(route, root)| Ok((route, root.bpipe(&template_map)?)))
 			.collect()
 	}
 }

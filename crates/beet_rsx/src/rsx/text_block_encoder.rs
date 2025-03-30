@@ -107,8 +107,8 @@ impl CollapsedNode {
 			RsxNode::Fragment(fragment) => {
 				out.extend(fragment.nodes.iter().flat_map(Self::from_node));
 			}
-			RsxNode::Component(RsxComponent { root, .. }) => {
-				out.extend(Self::from_node(root));
+			RsxNode::Component(RsxComponent { node, .. }) => {
+				out.extend(Self::from_node(node));
 			}
 			RsxNode::Block(RsxBlock { initial, .. }) => {
 				// let initial: &RsxNode = initial.as_ref();

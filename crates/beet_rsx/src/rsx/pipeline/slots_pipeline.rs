@@ -149,7 +149,7 @@ impl SlotsVisitor {
 			default_slots,
 			named_slots,
 		};
-		this.walk_node(&mut component.root);
+		this.walk_node(&mut component.node);
 		let mut unconsumed = this.named_slots.into_iter().collect::<Vec<_>>();
 
 		if !this.default_slots.is_empty() {
