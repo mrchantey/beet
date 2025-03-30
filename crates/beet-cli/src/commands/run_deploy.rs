@@ -6,9 +6,9 @@ use std::process::Command;
 
 /// Deploy to AWS Lambda in release mode.
 #[derive(Debug, Parser)]
-pub struct Deploy {
+pub struct RunDeploy {
 	#[command(flatten)]
-	pub build: Build,
+	pub build: RunBuild,
 	/// Specify the region to deploy the lambda function to
 	#[arg(long)]
 	pub region: Option<String>,
@@ -22,7 +22,7 @@ pub struct Deploy {
 }
 
 
-impl Deploy {
+impl RunDeploy {
 	/// Builds all required files and runs:
 	/// - Build template map used by the binary
 	/// - Build static files

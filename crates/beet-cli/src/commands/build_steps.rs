@@ -8,11 +8,11 @@ use std::process::Command;
 use sweet::prelude::GracefulChild;
 
 pub struct BuildNative {
-	build_cmd: BuildCmd,
+	build_cmd: CargoBuildCmd,
 }
 
 impl BuildNative {
-	pub fn new(build_cmd: &BuildCmd, watch_args: &WatchArgs) -> Self {
+	pub fn new(build_cmd: &CargoBuildCmd, watch_args: &WatchArgs) -> Self {
 		let mut build_cmd = build_cmd.clone();
 		if !watch_args.as_static {
 			build_cmd.cargo_args = Some("--features beet/server".to_string());
@@ -62,14 +62,14 @@ impl BuildStep for ExportStatic {
 
 
 pub struct BuildWasm {
-	build_cmd: BuildCmd,
+	build_cmd: CargoBuildCmd,
 	exe_path: PathBuf,
 	watch_args: WatchArgs,
 }
 
 impl BuildWasm {
 	pub fn new(
-		build_native: &BuildCmd,
+		build_native: &CargoBuildCmd,
 		watch_args: &WatchArgs,
 	) -> Result<Self> {
 		let mut build_cmd = build_native.clone();

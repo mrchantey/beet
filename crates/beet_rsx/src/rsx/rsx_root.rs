@@ -20,7 +20,14 @@ pub struct RsxRoot {
 	pub location: Option<RsxMacroLocation>,
 }
 
-impl RsxRoot {}
+impl RsxRoot {
+	pub fn location_str(&self) -> String {
+		match self.location {
+			Some(ref loc) => loc.to_string(),
+			None => "<unknown>".to_string(),
+		}
+	}
+}
 
 impl std::ops::Deref for RsxRoot {
 	type Target = RsxNode;

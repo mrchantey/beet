@@ -6,7 +6,7 @@ use std::process::Command;
 
 /// Verbatim clone of cargo run args
 #[derive(Debug, Clone, Parser)]
-pub struct BuildCmd {
+pub struct CargoBuildCmd {
 	/// Package with the target to run
 	#[arg(short = 'p', long = "package")]
 	pub package: Option<String>,
@@ -26,19 +26,19 @@ pub struct BuildCmd {
 	pub target: Option<String>,
 }
 
-impl Default for BuildCmd {
+impl Default for CargoBuildCmd {
 	fn default() -> Self { Self::parse_from(&[""]) }
 }
 
 
-impl BuildStep for BuildCmd {
+impl BuildStep for CargoBuildCmd {
 	fn run(&self) -> Result<()> {
 		self.spawn()?;
 		Ok(())
 	}
 }
 
-impl BuildCmd {
+impl CargoBuildCmd {
 	/// Best effort attempt to retrieve the path to the executable.
 	/// In the case of a wasm target, the path will have a `.wasm` extension.
 	pub fn exe_path(&self) -> PathBuf {
@@ -76,7 +76,7 @@ impl BuildCmd {
 
 	/// Blocking spawn of the cargo build command
 	pub fn spawn(&self) -> Result<()> {
-		let BuildCmd {
+		let CargoBuildCmd {
 			package,
 			bin,
 			example,

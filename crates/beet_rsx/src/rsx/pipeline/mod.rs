@@ -35,7 +35,7 @@ where
 }
 
 
-/// Blanket implementation for all types allowing for method-chaining.
+/// Utilities for method-chaining on any type.
 /// Very similar in its goals to [`tap`](https://crates.io/crates/tap)
 pub trait RsxPipelineTarget: Sized {
 	/// its like map but for any type
@@ -49,6 +49,8 @@ pub trait RsxPipelineTarget: Sized {
 	fn bpipe<P: RsxPipeline<Self, O>, O>(self, pipeline: P) -> O {
 		pipeline.apply(self)
 	}
+
+	fn bref(&self) -> &Self { self }
 }
 impl<T: Sized> RsxPipelineTarget for T {}
 

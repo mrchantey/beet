@@ -6,13 +6,13 @@ use std::pin::Pin;
 
 
 #[derive(Default)]
-pub struct FuncFilesToRsx;
+pub struct RouteFuncsToRsx;
 
 impl
 	RsxPipeline<
 		Vec<RouteFunc<DefaultRouteFunc>>,
 		Pin<Box<dyn Future<Output = Result<Vec<(RouteInfo, RsxRoot)>>>>>,
-	> for FuncFilesToRsx
+	> for RouteFuncsToRsx
 {
 	fn apply(
 		self,
@@ -40,22 +40,21 @@ impl IntoCollection<Self> for Vec<RouteFunc<DefaultRouteFunc>> {
 				let html_dir = args.html_dir.clone();
 				Box::pin(async move {
 					let routes = self
-						.bpipe(FuncFilesToRsx::default())
+						.bpipe(RouteFuncsToRsx::default())
 						.await?
-						.bpipe(ApplyRouteTemplates::default())?
+						.bpipe(ApplyRouteTemplates::default())?;
+
+					// export client islands after templates are applied,
+					// at this stage the only required transform is the slots pipeline
+					routes
+						.clone()
 						.into_iter()
-						// TODO this is a hack, we are also applying slots pipeline
-						// in RoutesToHtml
 						.map(|(info, root)| {
 							Ok((info, root.bpipe(SlotsPipeline::default())?))
 						})
-						.collect::<Result<Vec<_>>>()?;
-
-					// export client islands after templates are applied
-					// but before `DefaultTransformations` are applied.
-					// i dont think its nessecary because islands only register effect
-					// but if it turns out to be we can move some pipes around
-					(&routes).bpipe(RoutesToClientIslandMap::default())?;
+						.collect::<Result<Vec<_>>>()?
+						.bref()
+						.bpipe(RoutesToClientIslandMap::default())?;
 
 					routes
 						.bpipe(RoutesToHtml::default())?
@@ -79,7 +78,7 @@ mod test {
 	#[sweet::test]
 	async fn works() {
 		let html = crate::test_site::routes::collect()
-			.bpipe(FuncFilesToRsx::default())
+			.bpipe(RouteFuncsToRsx::default())
 			.await
 			.unwrap()
 			.bpipe(RoutesToHtml::default())

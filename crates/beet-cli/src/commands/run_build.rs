@@ -5,20 +5,21 @@ use clap::Parser;
 
 /// Build the project
 #[derive(Debug, Clone, Parser)]
-pub struct Build {
+pub struct RunBuild {
 	/// 🦀 the commands that will be used to build the binary 🦀
 	#[command(flatten)]
-	pub build_cmd: BuildCmd,
+	pub build_cmd: CargoBuildCmd,
 	#[command(flatten)]
 	pub watch_args: WatchArgs,
 	#[command(flatten)]
 	pub build_template_map: BuildTemplateMap,
 	/// for use by watch command, inserts server after native build
+	#[arg(long, default_value_t = false)]
 	pub server: bool,
 }
 
 
-impl Build {
+impl RunBuild {
 	pub fn run(self) -> Result<()> { self.into_group()?.run() }
 
 	pub fn into_group(self) -> Result<BuildStepGroup> {

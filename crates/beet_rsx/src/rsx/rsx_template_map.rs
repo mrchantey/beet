@@ -55,7 +55,6 @@ impl RsxTemplateMap {
 			return Ok(root);
 		};
 
-
 		if let Some(template_root) = self.templates.get(&location) {
 			let node = self
 				.apply_template_for_node(

@@ -8,21 +8,18 @@ use sweet::prelude::Server;
 
 /// Watch the beet project and rebuild on changes
 #[derive(Debug, Parser)]
-pub struct Watch {
+pub struct RunWatch {
 	#[command(flatten)]
 	watch_args: WatchArgs,
 	#[command(flatten)]
 	build_template_map: BuildTemplateMap,
 	#[command(flatten)]
-	build_cmd: BuildCmd,
+	build_cmd: CargoBuildCmd,
 }
 
 
 #[derive(Debug, Clone, Parser)]
 pub struct WatchArgs {
-	/// Do not build any binaries, just rebuild the templates
-	#[arg(long)]
-	pub no_build: bool,
 	/// Run a simple file server in this process instead of
 	/// spinning up the native binary with the --server feature
 	#[arg(long = "static")]
@@ -36,7 +33,7 @@ pub struct WatchArgs {
 	pub only: Vec<String>,
 }
 
-impl Watch {
+impl RunWatch {
 	pub async fn run(self) -> Result<()> {
 		if self.watch_args.as_static {
 			self.watch_and_serve().await
@@ -45,7 +42,7 @@ impl Watch {
 		}
 	}
 
-	/// Run in static mode, building the site and serving it
+	/// Run in static mode, building the site and serving it via cli
 	async fn watch_and_serve(self) -> Result<()> {
 		let watch_args = self.watch_args.clone();
 		let watch_handle = tokio::spawn(async move {
@@ -81,7 +78,7 @@ impl Watch {
 
 		let templates_root_dir = build_template_map.templates_root_dir.clone();
 
-		let recompile = Build {
+		let recompile = RunBuild {
 			build_cmd: build_cmd.clone(),
 			watch_args: watch_args.clone(),
 			build_template_map: build_template_map.clone(),

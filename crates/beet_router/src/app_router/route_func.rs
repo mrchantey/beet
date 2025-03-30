@@ -15,6 +15,15 @@ pub struct RouteFunc<T> {
 	pub func: T,
 }
 
+impl<T> std::fmt::Debug for RouteFunc<T> {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		f.debug_struct("RouteFunc")
+			.field("route_info", &self.route_info)
+			.field("func", &std::any::type_name::<T>())
+			.finish()
+	}
+}
+
 impl<T> RouteFunc<T> {
 	pub fn new<M>(
 		method: &str,
