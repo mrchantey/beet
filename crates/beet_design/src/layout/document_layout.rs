@@ -7,7 +7,7 @@ pub struct DocumentLayout {
 	// pub head: Head,
 }
 
-fn document_layout(_props: DocumentLayout) -> RsxRoot {
+fn document_layout(_props: DocumentLayout) -> RsxNode {
 	rsx! {
 	<!DOCTYPE html>
 	<html lang="en">

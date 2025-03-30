@@ -4,9 +4,9 @@ use beet_rsx::prelude::*;
 use std::pin::Pin;
 use std::sync::Arc;
 
-/// A function that has no parameters and returns a [`RsxRoot`].
+/// A function that has no parameters and returns a [`RsxNode`].
 pub type DefaultRouteFunc =
-	Box<dyn Fn() -> Pin<Box<dyn Future<Output = Result<RsxRoot>>>>>;
+	Box<dyn Fn() -> Pin<Box<dyn Future<Output = Result<RsxNode>>>>>;
 
 
 pub struct RouteFunc<T> {
@@ -62,7 +62,7 @@ pub struct SyncRouteFuncMarker;
 
 impl<F> IntoRouteFunc<DefaultRouteFunc, SyncRouteFuncMarker> for F
 where
-	F: 'static + Fn() -> RsxRoot,
+	F: 'static + Fn() -> RsxNode,
 {
 	fn into_route_func(self) -> DefaultRouteFunc {
 		let func = Arc::new(self);
@@ -78,7 +78,7 @@ pub struct AsyncRouteFuncMarker;
 
 impl<F> IntoRouteFunc<DefaultRouteFunc, AsyncRouteFuncMarker> for F
 where
-	F: 'static + AsyncFn() -> RsxRoot,
+	F: 'static + AsyncFn() -> RsxNode,
 {
 	fn into_route_func(self) -> DefaultRouteFunc {
 		let func = Arc::new(self);
@@ -98,7 +98,7 @@ impl<F, E>
 	> for F
 where
 	E: std::error::Error + 'static + Send + Sync,
-	F: 'static + Fn() -> Result<RsxRoot, E>,
+	F: 'static + Fn() -> Result<RsxNode, E>,
 {
 	fn into_route_func(self) -> DefaultRouteFunc {
 		let func = Arc::new(self);
@@ -115,7 +115,7 @@ impl<F, E>
 	> for F
 where
 	E: std::error::Error + 'static + Send + Sync,
-	F: 'static + AsyncFn() -> Result<RsxRoot, E>,
+	F: 'static + AsyncFn() -> Result<RsxNode, E>,
 {
 	fn into_route_func(self) -> DefaultRouteFunc {
 		let func = Arc::new(self);
@@ -135,7 +135,7 @@ impl<F>
 		(SyncRouteFuncMarker, AnyhowRouteFuncMarker),
 	> for F
 where
-	F: 'static + Fn() -> anyhow::Result<RsxRoot>,
+	F: 'static + Fn() -> anyhow::Result<RsxNode>,
 {
 	fn into_route_func(self) -> DefaultRouteFunc {
 		let func = Arc::new(self);
@@ -151,7 +151,7 @@ impl<F>
 		(AsyncRouteFuncMarker, AnyhowRouteFuncMarker),
 	> for F
 where
-	F: 'static + AsyncFn() -> anyhow::Result<RsxRoot>,
+	F: 'static + AsyncFn() -> anyhow::Result<RsxNode>,
 {
 	fn into_route_func(self) -> DefaultRouteFunc {
 		let func = Arc::new(self);
@@ -171,13 +171,13 @@ mod test {
 
 	#[test]
 	fn works() {
-		let _sync: DefaultRouteFunc = || -> RsxRoot {
+		let _sync: DefaultRouteFunc = || -> RsxNode {
 			rsx! {}
 		}
 		.into_route_func();
 		let _sync_result: DefaultRouteFunc =
-			|| -> Result<RsxRoot> { Ok(rsx! {}) }.into_route_func();
-		let _async_func: DefaultRouteFunc = async || -> RsxRoot {
+			|| -> Result<RsxNode> { Ok(rsx! {}) }.into_route_func();
+		let _async_func: DefaultRouteFunc = async || -> RsxNode {
 			rsx! {}
 		}
 		.into_route_func();

@@ -13,7 +13,7 @@ use sweet::prelude::WorkspacePathBuf;
 /// a compile step.
 ///
 ///
-/// When joining an [RsxTemplateRoot] with an [RustyPartMap],
+/// When joining an [RsxTemplateNode] with an [RustyPartMap],
 /// we need the entire [RsxTemplateMap] to resolve components.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -24,7 +24,7 @@ pub struct RsxTemplateMap {
 	// canonicalized [here](crates/beet_router/src/parser/build_template_map/mod.rs#L110-L111)
 	root: WorkspacePathBuf,
 	/// The templates themselves, keyed by their location.
-	pub templates: HashMap<RsxMacroLocation, RsxTemplateRoot>,
+	pub templates: HashMap<RsxMacroLocation, RsxTemplateNode>,
 }
 
 impl RsxTemplateMap {
@@ -44,24 +44,24 @@ impl RsxTemplateMap {
 	// TODO pipeline
 	// TODO use a visitor that doesnt exit early if a parent
 	// has no location, a child still might
-	/// Find a matching template for the given [`RsxRoot`] and apply it, returning the
+	/// Find a matching template for the given [`RsxNode`] and apply it, returning the
 	/// updated root.
 	/// If the root has no location or the location is outside the templates root directory,
 	/// the root is returned unchanged.
 	///
 	/// ## Errors
 	/// If the root is inside the templates root directory and a template was not found.
-	pub fn apply_template(&self, root: RsxRoot) -> TemplateResult<RsxRoot> {
-		let Some(location) = &root.location else {
+	pub fn apply_template(&self, node: RsxNode) -> TemplateResult<RsxNode> {
+		let Some(location) = node.location().cloned() else {
 			// if it doesnt have a location, we dont even try to apply a template
-			return Ok(root);
+			return Ok(node);
 		};
 
 		if let Some(template_root) = self.templates.get(&location) {
 			let node = self
 				.apply_template_for_node(
 					template_root.clone(),
-					&mut RustyPartMap::collect(root.node),
+					&mut RustyPartMap::collect(node),
 				)
 				.map_err(|err| err.with_location(location.clone()))?;
 			Ok(node)
@@ -76,7 +76,7 @@ impl RsxTemplateMap {
 			// 	"rsx node is outside templates dir so no template will be applied:\n{:?}",
 			// 	location
 			// );
-			Ok(root)
+			Ok(node)
 		}
 	}
 
@@ -85,18 +85,14 @@ impl RsxTemplateMap {
 	// }
 
 
-	/// Create an [`RsxRoot`] from a template and hydrated nodes.
+	/// Create an [`RsxNode`] from a template and hydrated nodes.
 	fn apply_template_for_node(
 		&self,
-		root: RsxTemplateRoot,
+		node: RsxTemplateNode,
 		rusty_map: &mut RustyPartMap,
-	) -> TemplateResult<RsxRoot> {
+	) -> TemplateResult<RsxNode> {
 		// i dont like passing self like this, kind of hides recursion
-		let node = root.node.into_rsx_node(self, rusty_map)?;
-		Ok(RsxRoot {
-			node,
-			location: root.location,
-		})
+		node.into_rsx_node(self, rusty_map)
 	}
 }
 
@@ -110,14 +106,14 @@ mod test {
 	/// used for testing, load directly from a collection of template roots.
 	#[cfg(test)]
 	pub fn test_template_map(
-		templates: Vec<RsxTemplateRoot>,
+		templates: Vec<RsxTemplateNode>,
 	) -> RsxTemplateMap {
 		RsxTemplateMap {
 			root: WorkspacePathBuf::new(file!()),
 			templates: templates
 				.into_iter()
-				.filter_map(|root| match &root.location {
-					Some(location) => Some((location.clone(), root)),
+				.filter_map(|node| match node.location() {
+					Some(location) => Some((location.clone(), node)),
 					None => None,
 				})
 				.collect(),
@@ -129,7 +125,7 @@ mod test {
 	struct MyComponent {
 		value: usize,
 	}
-	fn my_component(props: MyComponent) -> RsxRoot {
+	fn my_component(props: MyComponent) -> RsxNode {
 		rsx! { <div>the value is {props.value}<slot /></div> }
 	}
 
@@ -145,7 +141,7 @@ mod test {
 		};
 
 		let html1 = page.clone().bpipe(RsxToHtmlString::default()).unwrap();
-		let page_template = RsxTemplateRoot::from_rsx(&page).unwrap();
+		let page_template = RsxTemplateNode::from_rsx_node(&page).unwrap();
 		let map = test_template_map(vec![page_template]);
 		let node2 = map.apply_template(page).unwrap();
 		let html2 = node2.bpipe(RsxToHtmlString::default()).unwrap();
@@ -154,7 +150,7 @@ mod test {
 	#[test]
 	fn rsx_template_match_simple() {
 		let some_val = 3;
-		let node1 = rsx! {
+		let mut node1 = rsx! {
 			<div ident=some_val>
 				<div ident=some_val />
 			</div>
@@ -164,15 +160,19 @@ mod test {
 				<div ident=some_val />
 			</div>
 		};
-		let node1_template = RsxTemplateRoot::from_rsx(&node1).unwrap();
-		expect(&node1_template).not().to_be(&node2_template);
-		expect(&node1_template.node).to_be(&node2_template.node);
+		expect(&RsxTemplateNode::from_rsx_node(&node1).unwrap())
+			.not()
+			.to_be(&node2_template);
+
+		node1.remove_location();
+		expect(&RsxTemplateNode::from_rsx_node(&node1).unwrap())
+			.to_be(&node2_template);
 	}
 	#[test]
 	fn rsx_template_match_complex() {
 		let some_val = 3;
 
-		let node1 = rsx! {
+		let mut node1 = rsx! {
 			<div key str="value" num=32 ident=some_val onclick=|_| {}>
 				<p>
 					hello <MyComponent value=3 foo:bar bazz:boo="32">
@@ -190,9 +190,13 @@ mod test {
 				</p>
 			</div>
 		};
-		let node1_template = RsxTemplateRoot::from_rsx(&node1).unwrap();
-		expect(&node1_template).not().to_be(&node2_template);
-		expect(&node1_template.node).to_be(&node2_template.node);
+		expect(&RsxTemplateNode::from_rsx_node(&node1).unwrap())
+			.not()
+			.to_be(&node2_template);
+
+		node1.remove_location();
+		expect(&RsxTemplateNode::from_rsx_node(&node1).unwrap())
+			.to_be(&node2_template);
 	}
 
 	// test a roundtrip split/join,
@@ -209,12 +213,12 @@ mod test {
 
 
 		let html1 = page.clone().bpipe(RsxToHtmlString::default()).unwrap();
-		let page_template = RsxTemplateRoot::from_rsx(&page).unwrap();
+		let page_template = RsxTemplateNode::from_rsx_node(&page).unwrap();
 		// these templates are usually generated by statically looking at a file,
 		// here we create one from a default MyComponent, so the value: 4 will
 		// be ignored
 		let my_component_template =
-			RsxTemplateRoot::from_rsx(&MyComponent { value: 4 }.render())
+			RsxTemplateNode::from_rsx_node(&MyComponent { value: 4 }.render())
 				.unwrap();
 		let map = test_template_map(vec![page_template, my_component_template]);
 		let node2 = map.apply_template(page).unwrap();
@@ -227,9 +231,11 @@ mod test {
 	fn ignores_exterior_roots() {
 		let comp = rsx! { <div>foo</div> };
 		let should_exist = comp.clone();
-		let mut should_not_exist = comp;
-		should_not_exist.location =
-			Some(RsxMacroLocation::new(WorkspacePathBuf::new("../"), 1, 1));
+		let should_not_exist = comp.with_location(RsxMacroLocation::new(
+			WorkspacePathBuf::new("../"),
+			1,
+			1,
+		));
 
 		let map = test_template_map(vec![]);
 

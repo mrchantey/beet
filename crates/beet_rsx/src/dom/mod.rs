@@ -25,7 +25,7 @@ pub use browser_dom_target::*;
 thread_local! {
 	#[rustfmt::skip]
 	static DOM_TARGET: Arc<Mutex<Box<dyn DomTargetImpl>>> =
-		Arc::new(Mutex::new(Box::new(RsDomTarget::new(&().into_root()).unwrap())));
+		Arc::new(Mutex::new(Box::new(RsDomTarget::new(&().into_node()).unwrap())));
 }
 
 /// Mechanism for swapping out:

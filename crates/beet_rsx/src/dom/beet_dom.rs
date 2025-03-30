@@ -9,7 +9,7 @@ pub struct BeetDom;
 
 #[allow(deprecated)]
 impl BeetDom {
-	pub fn mount(app: impl 'static + Fn() -> RsxRoot) {
+	pub fn mount(app: impl 'static + Fn() -> RsxNode) {
 		use sweet::prelude::wasm::set_timeout_ms;
 
 		let doc = app().bpipe(RsxToHtmlDocument::default()).unwrap();
@@ -23,10 +23,10 @@ impl BeetDom {
 		});
 	}
 
-	pub fn hydrate<M>(app: impl IntoRsxRoot<M>) {
+	pub fn hydrate<M>(app: impl IntoRsxNode<M>) {
 		DomTarget::set(BrowserDomTarget::default());
 		// effects called here too
-		app.into_root().bpipe(RegisterEffects::default()).unwrap();
+		app.into_node().bpipe(RegisterEffects::default()).unwrap();
 		EventRegistry::initialize().unwrap();
 	}
 

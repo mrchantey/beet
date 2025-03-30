@@ -18,7 +18,7 @@ struct MyNode {
 	is_into: String,
 }
 
-fn my_node_other(props: MyNode) -> RsxRoot {
+fn my_node_other(props: MyNode) -> RsxNode {
 	rsx! {
 		<div>
 			<p>is_optional: {format!("{:?}", props.is_optional)}</p>

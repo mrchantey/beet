@@ -1,7 +1,7 @@
 use crate::prelude::*;
 use beet::prelude::*;
 
-pub fn get() -> RsxRoot {
+pub fn get() -> RsxNode {
 	let rsx = rsx! {
 		<div>
 		<span>Counter is cool</span>

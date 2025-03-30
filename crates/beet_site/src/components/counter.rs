@@ -9,7 +9,7 @@ pub struct Counter {
 	initial: i32,
 }
 
-fn counter(props: Counter) -> RsxRoot {
+fn counter(props: Counter) -> RsxNode {
 	let (get, set) = signal(props.initial);
 
 
@@ -17,7 +17,7 @@ fn counter(props: Counter) -> RsxRoot {
 		<div>
 		<div>pizza</div>
 		{get.clone()}
-		<button onclick=move |_|{set(get()+4)}>
+		<button onclick=move |_|{set(get()+2)}>
 		Increment
 		</button>
 		<div>pizza</div>

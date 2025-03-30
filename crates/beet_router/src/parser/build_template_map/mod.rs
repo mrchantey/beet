@@ -110,7 +110,7 @@ impl BuildTemplateMap {
 				if !self.skip_ron_check {
 					let str = tokens.to_string();
 					let str = str.trim();
-					let _parsed = ron::de::from_str::<RsxTemplateRoot>(&str)
+					let _parsed = ron::de::from_str::<RsxTemplateNode>(&str)
 						.map_err(|e| ron_cx_err(e, &str))?;
 				}
 				Ok(kvp_tokens)
@@ -207,8 +207,10 @@ impl<'a> Visit<'a> for RsxSynVisitor {
 				start.line as u32,
 				start.column as u32,
 			);
-			let tokens = RstmlToRsxTemplate::default()
-				.map_tokens(mac.tokens.clone(), Some(&self.file));
+			let tokens = RstmlToRsxTemplate::map_tokens(
+				mac.tokens.clone(),
+				Some(&self.file),
+			);
 			self.templates.push((loc, tokens));
 		}
 	}
@@ -268,17 +270,17 @@ mod test {
 		// println!("TEMPLATE_MAP::::{:#?}", map);
 
 		let rsx = &crate::test_site::routes::collect()[0];
-		let root = (rsx.func)().await.unwrap();
-		let root1 = map.templates.get(&root.location.unwrap()).unwrap();
+		let node = (rsx.func)().await.unwrap();
+		let node1 = map.templates.get(&node.location().unwrap()).unwrap();
 		let RsxTemplateNode::Component {
 			tracker: tracker1, ..
-		} = &root1.node
+		} = &node1
 		else {
 			panic!();
 		};
 		let RsxNode::Component(RsxComponent {
 			tracker: tracker2, ..
-		}) = &root.node
+		}) = &node
 		else {
 			panic!();
 		};

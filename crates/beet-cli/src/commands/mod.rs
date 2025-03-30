@@ -7,8 +7,8 @@ mod build_steps;
 pub use build_steps::*;
 mod run_deploy;
 mod run_watch;
-pub use run_deploy::*;
 pub use run_build::*;
+pub use run_deploy::*;
 pub use run_watch::*;
 
 use anyhow::Result;

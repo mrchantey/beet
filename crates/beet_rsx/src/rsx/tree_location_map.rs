@@ -84,10 +84,9 @@ mod test {
 		let action = "jumps over";
 
 		let root = rsx! { <div>"The "{desc}" and "{color}<b>fox</b>{action}the lazy " dog"</div> };
-		let map = (&root.node).bpipe(NodeToTreeLocationMap);
+		let map = (&root).bpipe(NodeToTreeLocationMap);
 
-		map.check_valid(&root.node).unwrap();
-
+		map.check_valid(&root).unwrap();
 
 		expect(map.collapsed_elements).to_be(
 			vec![(1.into(), TextBlockEncoder {
@@ -115,20 +114,21 @@ mod test {
 		#[derive(Node)]
 		struct MyComponent;
 
-		fn my_component(_: MyComponent) -> RsxRoot {
+		fn my_component(_: MyComponent) -> RsxNode {
 			let val = 4;
 			rsx! { <div>{val}</div> }
 		}
 
 
-		let root = rsx! {
+		let node = rsx! {
 			<MyComponent />
 			<MyComponent />
 		}
 		.bpipe(SlotsPipeline::default())
 		.unwrap();
 
-		let html = (&root)
+		let html = node
+			.bref()
 			.bpipe(RsxToHtml::default())
 			.bpipe(RenderHtml::default())
 			.unwrap();
@@ -136,7 +136,7 @@ mod test {
 			"<div data-beet-rsx-idx=\"3\">4</div><div data-beet-rsx-idx=\"8\">4</div>",
 		);
 
-		let map = (&root.node).bpipe(NodeToTreeLocationMap);
+		let map = node.bpipe(NodeToTreeLocationMap);
 		expect(map.collapsed_elements.get(&TreeIdx::new(3))).to_be_some();
 		expect(map.collapsed_elements.get(&TreeIdx::new(8))).to_be_some();
 	}

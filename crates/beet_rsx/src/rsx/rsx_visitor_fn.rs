@@ -112,8 +112,7 @@ mod test {
 	fn works() {
 		let mut count = 0;
 
-		VisitRsxNodeMut::new(|_| count += 1)
-			.walk_node(&mut rsx! { <div /> }.node);
+		VisitRsxNodeMut::new(|_| count += 1).walk_node(&mut rsx! { <div /> });
 		// includes empty children fragment
 		expect(count).to_be(2);
 	}

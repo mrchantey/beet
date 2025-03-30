@@ -6,7 +6,7 @@ pub struct PageLayout {
 	// pub document_layout: DocumentLayout,
 }
 
-fn page_layout(_props: PageLayout) -> RsxRoot {
+fn page_layout(_props: PageLayout) -> RsxNode {
 	rsx! {
 		<DocumentLayout>
 		<slot name="head" slot="head" />

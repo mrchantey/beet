@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use crate::rsx::IntoRsxRoot;
+use crate::rsx::IntoRsxNode;
 use crate::rsx::RsxAttribute;
 use crate::sigfault::IntoSigfaultAttrVal;
 
@@ -17,11 +17,12 @@ impl StringRsx {
 	/// ```
 	pub fn parse_block_node<M>(
 		tracker: RustyTracker,
-		block: impl IntoRsxRoot<M>,
+		block: impl IntoRsxNode<M>,
 	) -> RsxNode {
 		RsxNode::Block(RsxBlock {
-			initial: Box::new(block.into_root()),
+			initial: Box::new(block.into_node()),
 			effect: Effect::new(noop(), tracker),
+			location: None,
 		})
 	}
 

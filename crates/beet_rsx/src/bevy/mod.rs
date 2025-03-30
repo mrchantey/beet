@@ -18,11 +18,11 @@ use bevy::prelude::*;
 
 
 pub struct BevyRsxPlugin {
-	pub app: Box<dyn 'static + Send + Sync + Fn() -> RsxRoot>,
+	pub app: Box<dyn 'static + Send + Sync + Fn() -> RsxNode>,
 }
 
 impl BevyRsxPlugin {
-	pub fn new(app: impl 'static + Send + Sync + Fn() -> RsxRoot) -> Self {
+	pub fn new(app: impl 'static + Send + Sync + Fn() -> RsxNode) -> Self {
 		Self { app: Box::new(app) }
 	}
 }

@@ -1,4 +1,3 @@
-//! Module containing pipelines to be applied to an [`RsxRoot`]
 mod build_step;
 mod client_island;
 #[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
@@ -64,8 +63,8 @@ pub struct DefaultRsxTransforms {
 	slots: SlotsPipeline,
 }
 
-impl RsxPipeline<RsxRoot, Result<RsxRoot>> for DefaultRsxTransforms {
-	fn apply(self, root: RsxRoot) -> Result<RsxRoot> {
+impl RsxPipeline<RsxNode, Result<RsxNode>> for DefaultRsxTransforms {
+	fn apply(self, root: RsxNode) -> Result<RsxNode> {
 		#[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
 		let root = root.bpipe(self.fs_src)?;
 		#[cfg(feature = "css")]
@@ -83,9 +82,9 @@ pub struct RsxToHtmlDocument {
 	pub html_doc_to_resumable: HtmlDocToResumable,
 }
 
-impl RsxPipeline<RsxRoot, Result<HtmlDocument>> for RsxToHtmlDocument {
-	fn apply(self, mut root: RsxRoot) -> Result<HtmlDocument> {
-		root = root.bpipe(self.rsx_transforms)?;
+impl RsxPipeline<RsxNode, Result<HtmlDocument>> for RsxToHtmlDocument {
+	fn apply(self, mut node: RsxNode) -> Result<HtmlDocument> {
+		node = node.bpipe(self.rsx_transforms)?;
 
 		let mut client_directives = false;
 		VisitRsxComponent::new(|c| {
@@ -93,15 +92,16 @@ impl RsxPipeline<RsxRoot, Result<HtmlDocument>> for RsxToHtmlDocument {
 				client_directives = true;
 			}
 		})
-		.walk_node(&root.node);
+		.walk_node(&node);
 
-		let mut doc = root
-			.as_ref()
+
+		let mut doc = node
+			.bref()
 			.bpipe(self.rsx_to_html)
 			.bpipe(self.html_to_document)?;
 		if client_directives {
 			doc = doc
-				.bmap(|doc| (doc, root.as_ref()))
+				.bmap(|doc| (doc, node))
 				.bpipe(self.html_doc_to_resumable);
 		}
 		Ok(doc)
@@ -116,9 +116,10 @@ pub struct RsxToHtmlString {
 	pub render_html: RenderHtml,
 }
 
-impl RsxPipeline<RsxRoot, Result<String>> for RsxToHtmlString {
-	fn apply(self, root: RsxRoot) -> Result<String> {
+impl RsxPipeline<RsxNode, Result<String>> for RsxToHtmlString {
+	fn apply(self, root: RsxNode) -> Result<String> {
 		root.bpipe(self.rsx_transforms)?
+			.bref()
 			.bpipe(self.rsx_to_html)
 			.bpipe(self.render_html)
 	}
@@ -135,7 +136,7 @@ mod test {
 
 	#[derive(Node, Serialize, Deserialize)]
 	struct MyComponent;
-	fn my_component(_: MyComponent) -> RsxRoot {
+	fn my_component(_: MyComponent) -> RsxNode {
 		rsx! { <div /> }
 	}
 

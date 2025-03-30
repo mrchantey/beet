@@ -13,13 +13,11 @@ mod rsx_diff;
 mod rsx_location;
 mod rsx_template_map;
 mod rsx_template_node;
-mod rsx_template_root;
 mod rsx_visitor_fn;
 mod rusty_part;
 mod tree_idx;
 pub use rsx_template_map::*;
 pub use rsx_template_node::*;
-pub use rsx_template_root::*;
 pub use rsx_visitor_fn::*;
 pub use rusty_part::*;
 pub use tree_idx::*;
@@ -28,23 +26,17 @@ mod rsx_visitor;
 pub use rsx_node::*;
 pub use rsx_visitor::*;
 pub use text_block_encoder::*;
-mod rsx_root;
 mod text_block_encoder;
 pub use effect::*;
 pub use rsx_location::*;
-pub use rsx_root::*;
 
-
-
+// TODO deprecate for IntoRsxNode
 pub trait Rsx {
 	fn into_rsx(self) -> RsxNode;
 }
 
 impl Rsx for RsxNode {
 	fn into_rsx(self) -> RsxNode { self }
-}
-impl Rsx for RsxRoot {
-	fn into_rsx(self) -> RsxNode { self.node }
 }
 impl Rsx for () {
 	fn into_rsx(self) -> RsxNode { RsxNode::default() }
@@ -59,11 +51,11 @@ impl Rsx for () {
 // }
 
 pub trait Component {
-	fn render(self) -> RsxRoot;
+	fn render(self) -> RsxNode;
 }
 
-impl<T: FnOnce() -> RsxRoot> Component for T {
-	fn render(self) -> RsxRoot { self() }
+impl<T: FnOnce() -> RsxNode> Component for T {
+	fn render(self) -> RsxNode { self() }
 }
 
 impl<T: Component> Rsx for T {

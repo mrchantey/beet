@@ -15,7 +15,7 @@ fn main() {
 	todo!("spa needs updating to islands architecture");
 }
 
-fn app() -> RsxRoot {
+fn app() -> RsxNode {
 	let (value, set_value) = signal(0);
 
 	rsx! {

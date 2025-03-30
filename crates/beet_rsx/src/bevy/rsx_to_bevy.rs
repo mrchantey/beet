@@ -17,20 +17,20 @@ pub struct RsxToBevy {
 
 impl RsxToBevy {
 	/// Registers effects and spawns the node
-	pub fn spawn(root: RsxRoot) -> Result<Vec<Entity>> {
+	pub fn spawn(node: RsxNode) -> Result<Vec<Entity>> {
 		let entities = BevyRuntime::with_mut(|app| {
-			Self::default().spawn_root(app.world_mut(), &root)
+			Self::default().spawn_root(app.world_mut(), &node)
 		})?;
-		root.node.bpipe(RegisterEffects::default())?;
+		node.bpipe(RegisterEffects::default())?;
 		Ok(entities)
 	}
 
 	pub fn spawn_root(
 		&mut self,
 		world: &mut World,
-		root: &RsxRoot,
+		root: &RsxNode,
 	) -> Result<Vec<Entity>> {
-		let entities = self.spawn_node(world, &root.node)?;
+		let entities = self.spawn_node(world, &root)?;
 		// for entity in entities.iter() {
 		// 	world
 		// 		.entity_mut(*entity)
@@ -46,24 +46,27 @@ impl RsxToBevy {
 		let tree_idx = self.tree_idx_incr.next();
 		// println!("rsx_to_bevy found node: {:?}", node.as_ref().discriminant());
 		let nodes = match node.as_ref() {
-			RsxNode::Doctype { .. } => unimplemented!(),
-			RsxNode::Comment { .. } => {
+			RsxNode::Doctype(_) => unimplemented!(),
+			RsxNode::Comment(_) => {
 				unimplemented!()
 			}
-			RsxNode::Text { value } => {
+			RsxNode::Text(text) => {
 				#[cfg(feature = "bevy_default")]
 				{
-					let entity = world.spawn((tree_idx, Text::new(value))).id();
+					let entity =
+						world.spawn((tree_idx, Text::new(&text.value))).id();
 					vec![entity]
 				}
 				#[cfg(not(feature = "bevy_default"))]
 				{
 					unimplemented!(
-						"currently cannot add text node without bevy_default\nvalue: {value}"
+						"currently cannot add text node without bevy_default\nvalue: {}",
+						text.value
 					)
 				}
 			}
-			RsxNode::Fragment { nodes, .. } => nodes
+			RsxNode::Fragment(fragment) => fragment
+				.nodes
 				.iter()
 				.map(|n| self.spawn_node(world, n))
 				.collect::<Result<Vec<_>>>()?
@@ -104,7 +107,6 @@ impl RsxToBevy {
 		}));
 		entity.add_children(&children);
 
-		// println!("here");
 		for attr in element.attributes.iter() {
 			self.spawn_bevy_components(&registry, &mut entity, attr)?;
 		}

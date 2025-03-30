@@ -1,5 +1,5 @@
 use anyhow::Result;
-use beet_rsx::rsx::RsxRoot;
+use beet_rsx::rsx::RsxNode;
 use http::Method;
 use std::path::Path;
 use std::path::PathBuf;
@@ -7,7 +7,7 @@ use std::str::FromStr;
 
 
 pub trait RoutesToRsx {
-	async fn routes_to_rsx(&mut self) -> Result<Vec<(RouteInfo, RsxRoot)>>;
+	async fn routes_to_rsx(&mut self) -> Result<Vec<(RouteInfo, RsxNode)>>;
 }
 
 

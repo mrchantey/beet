@@ -9,7 +9,7 @@ fn main() {
 	routes.extend(beet::design::mockups::collect().into_iter().map(|route| {
 		// wrap the mockups in a beet page
 		route.map_func(|func| {
-			async move || -> anyhow::Result<RsxRoot> {
+			async move || -> anyhow::Result<RsxNode> {
 				let root = func().await?;
 				Ok(rsx! { <BeetPage>{root}</BeetPage> })
 			}

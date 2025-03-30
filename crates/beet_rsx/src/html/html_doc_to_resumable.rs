@@ -83,12 +83,12 @@ mod test {
 	use crate::as_beet::*;
 	use sweet::prelude::*;
 
-	fn pipe(root: RsxRoot) -> String {
-		root.as_ref()
+	fn pipe(root: RsxNode) -> String {
+		root.bref()
 			.bpipe(RsxToHtml::default())
 			.bpipe(HtmlToDocument::default())
 			.unwrap()
-			.bmap(|doc| (doc, root.as_ref()))
+			.bmap(|doc| (doc, root.bref()))
 			.bpipe(HtmlDocToResumable::default())
 			.bpipe(RenderHtml::default())
 			.unwrap()

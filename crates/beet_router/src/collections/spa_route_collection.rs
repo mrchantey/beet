@@ -6,7 +6,7 @@ pub struct SpaRouteCollection;
 
 impl<F> IntoCollection<SpaRouteCollection> for F
 where
-	F: 'static + Send + Sync + FnOnce() -> RsxRoot,
+	F: 'static + Send + Sync + FnOnce() -> RsxNode,
 {
 	fn into_collection(self) -> impl Collection {
 		#[allow(unused)]

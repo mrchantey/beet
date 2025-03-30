@@ -12,7 +12,7 @@ use std::borrow::Cow;
 /// # use beet_rsx::as_beet::*;
 /// # use beet_design::prelude::*;
 ///
-/// fn my_component()-> RsxRoot{
+/// fn my_component()-> RsxNode {
 /// 	set_context(Brand{
 /// 		title: "My Site".into(),
 /// 		description: "A site about stuff".into(),

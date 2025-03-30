@@ -11,13 +11,13 @@ pub struct RoutesToHtml;
 
 impl
 	RsxPipeline<
-		Vec<(RouteInfo, RsxRoot)>,
+		Vec<(RouteInfo, RsxNode)>,
 		Result<Vec<(RouteInfo, HtmlDocument)>>,
 	> for RoutesToHtml
 {
 	fn apply(
 		self,
-		routes: Vec<(RouteInfo, RsxRoot)>,
+		routes: Vec<(RouteInfo, RsxNode)>,
 	) -> Result<Vec<(RouteInfo, HtmlDocument)>> {
 		let html = routes
 			.into_iter()

@@ -83,7 +83,7 @@ fn handle_recv(
 			TemplateReloaderMessage::Reload => {
 				let map = RsxTemplateMap::load(&template_reload.dst).unwrap();
 				todo!(
-					"reload template just like html, we'll need to track the RsxRoot functions as entities"
+					"reload template just like html, we'll need to track the RsxNode functions as entities"
 				);
 			}
 			TemplateReloaderMessage::Recompile => {

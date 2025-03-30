@@ -86,22 +86,16 @@ impl FuncFilesToRouteFuncs<()> {
 
 			let items = file.funcs.iter().map(|sig| {
 				let sig_ident = &sig.ident;
-				quote::quote! {#ident::#sig_ident().node}
+				quote::quote! {#ident::#sig_ident()}
 			});
 			Ok(vec![RouteFuncTokens::build(
 				&file.local_path,
 				route_path.clone(),
 				syn::parse_quote! {{
-					fn func()->RsxRoot{
-						let node = RsxNode::fragment(vec![
+					fn func()->RsxNode {
+						vec![
 							#(#items),*
-						]);
-						// TODO we should be able to just return the node,
-						// instead of fake location
-						RsxRoot{
-							node,
-							location: Some(RsxMacroLocation::new(file!(), line!(), column!())),
-						}
+						].into_node()
 					}
 					RouteFunc::new(
 						"get",

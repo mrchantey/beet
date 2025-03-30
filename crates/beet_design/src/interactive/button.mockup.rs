@@ -1,10 +1,10 @@
 use crate::prelude::*;
 
 
-pub fn primary() -> RsxRoot {
+pub fn primary() -> RsxNode {
 	rsx! {<Button> click me </Button>}
 }
 
-pub fn secondary() -> RsxRoot {
+pub fn secondary() -> RsxNode {
 	rsx! {<Button> click me </Button>}
 }

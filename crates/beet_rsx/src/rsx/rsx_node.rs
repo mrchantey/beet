@@ -6,63 +6,183 @@ use strum_macros::EnumDiscriminants;
 #[derive(Debug, Clone, AsRefStr, EnumDiscriminants)]
 pub enum RsxNode {
 	/// a html doctype node
-	Doctype {},
+	Doctype(RsxDoctype),
 	/// a html comment node
-	Comment {
-		value: String,
-	},
+	Comment(RsxComment),
 	/// a html text node
-	Text {
-		value: String,
-	},
+	Text(RsxText),
 	/// a rust block that returns text
 	Block(RsxBlock),
 	/// A transparent node that simply contains children
 	/// This may be deprecated in the future if no patterns
 	/// require it. The RstmlToRsx could support it
-	Fragment {
-		nodes: Vec<RsxNode>,
-	},
+	Fragment(RsxFragment),
 	/// a html element
 	Element(RsxElement),
 	Component(RsxComponent),
 }
-
-impl Default for RsxNode {
-	fn default() -> Self { Self::Fragment { nodes: Vec::new() } }
+impl Into<RsxNode> for RsxDoctype {
+	fn into(self) -> RsxNode { RsxNode::Doctype(self) }
 }
-
-impl AsRef<RsxNode> for &RsxNode {
-	fn as_ref(&self) -> &RsxNode { *self }
+impl Into<RsxNode> for RsxComment {
+	fn into(self) -> RsxNode { RsxNode::Comment(self) }
 }
-
-impl AsMut<RsxNode> for &mut RsxNode {
-	fn as_mut(&mut self) -> &mut RsxNode { *self }
+impl Into<RsxNode> for RsxText {
+	fn into(self) -> RsxNode { RsxNode::Text(self) }
 }
-impl<T: ToString> From<T> for RsxNode {
-	fn from(value: T) -> Self {
-		RsxNode::Text {
-			value: value.to_string(),
-		}
-	}
+impl Into<RsxNode> for RsxBlock {
+	fn into(self) -> RsxNode { RsxNode::Block(self) }
 }
-
+impl Into<RsxNode> for RsxFragment {
+	fn into(self) -> RsxNode { RsxNode::Fragment(self) }
+}
 impl Into<RsxNode> for RsxElement {
 	fn into(self) -> RsxNode { RsxNode::Element(self) }
 }
+impl Into<RsxNode> for RsxComponent {
+	fn into(self) -> RsxNode { RsxNode::Component(self) }
+}
+
+
+#[derive(Debug, Clone)]
+pub struct RsxDoctype {
+	pub location: Option<RsxMacroLocation>,
+}
+
+
+#[derive(Debug, Clone)]
+pub struct RsxComment {
+	pub value: String,
+	pub location: Option<RsxMacroLocation>,
+}
+
+#[derive(Debug, Clone)]
+pub struct RsxText {
+	pub value: String,
+	pub location: Option<RsxMacroLocation>,
+}
+
+#[derive(Debug, Default, Clone)]
+pub struct RsxFragment {
+	pub nodes: Vec<RsxNode>,
+	pub location: Option<RsxMacroLocation>,
+}
+
+/// This is an RsxNode and a location, which is required for hydration.
+///
+/// It is allowed for the [`RsxRoot`] to be default(), which means that
+/// the macro location is a placeholder, this means that the the node
+/// will not be eligible for nested templating etc. which is the case
+/// anyway for Strings and ().
+///
+/// The struct returned from an rsx! macro.
+
+pub trait IntoRsxNode<M = ()> {
+	fn into_node(self) -> RsxNode;
+}
+
+pub struct IntoIntoRsx;
+impl<T: Into<RsxNode>> IntoRsxNode<IntoIntoRsx> for T {
+	fn into_node(self) -> RsxNode { self.into() }
+}
+
+impl IntoRsxNode<()> for () {
+	fn into_node(self) -> RsxNode { RsxNode::default() }
+}
+pub struct FuncIntoRsx;
+impl<T: FnOnce() -> U, U: IntoRsxNode<M2>, M2> IntoRsxNode<(M2, FuncIntoRsx)>
+	for T
+{
+	fn into_node(self) -> RsxNode { self().into_node() }
+}
+
+pub struct VecIntoRsx;
+impl<T: IntoRsxNode<M2>, M2> IntoRsxNode<(M2, VecIntoRsx)> for Vec<T> {
+	fn into_node(self) -> RsxNode {
+		RsxFragment {
+			nodes: self.into_iter().map(|item| item.into_node()).collect(),
+			location: None,
+		}
+		.into()
+	}
+}
 
 
 
+impl Default for RsxNode {
+	fn default() -> Self { Self::Fragment(RsxFragment::default()) }
+}
+
+impl AsRef<RsxNode> for RsxNode {
+	fn as_ref(&self) -> &RsxNode { self }
+}
+
+impl AsMut<RsxNode> for RsxNode {
+	fn as_mut(&mut self) -> &mut RsxNode { self }
+}
+
+impl<T: ToString> From<T> for RsxNode {
+	fn from(value: T) -> Self {
+		RsxNode::Text(RsxText {
+			value: value.to_string(),
+			location: None,
+		})
+	}
+}
 
 impl RsxNode {
-	pub fn fragment(nodes: Vec<RsxNode>) -> Self { Self::Fragment { nodes } }
+	#[rustfmt::skip]
+	pub fn location(&self) -> Option<&RsxMacroLocation> {
+		match self {
+			RsxNode::Doctype(RsxDoctype { location, .. }) => location.as_ref(),
+			RsxNode::Comment(RsxComment { location, .. }) => location.as_ref(),
+			RsxNode::Text(RsxText { location, .. }) => location.as_ref(),
+			RsxNode::Block(RsxBlock { location, .. }) => location.as_ref(),
+			RsxNode::Fragment(RsxFragment { location, .. }) => location.as_ref(),
+			RsxNode::Element(RsxElement { location, .. }) => location.as_ref(),
+			RsxNode::Component(RsxComponent { location, .. }) => location.as_ref(),
+		}
+	}
+	#[rustfmt::skip]
+	pub fn with_location(mut self, location: RsxMacroLocation) -> Self {
+		match &mut self {
+			RsxNode::Doctype(RsxDoctype { location: loc, .. }) => *loc = Some(location),
+			RsxNode::Comment(RsxComment { location: loc, .. }) => *loc = Some(location),
+			RsxNode::Text(RsxText { location: loc, .. }) => *loc = Some(location),
+			RsxNode::Block(RsxBlock { location: loc, .. }) => *loc = Some(location),
+			RsxNode::Fragment(RsxFragment { location: loc, .. }) => *loc = Some(location),
+			RsxNode::Element(RsxElement { location: loc, .. }) => *loc = Some(location),
+			RsxNode::Component(RsxComponent { location: loc, .. }) => *loc = Some(location),
+		}
+		self
+	}
+	#[rustfmt::skip]
+	pub fn remove_location(&mut self) -> &mut Self {
+		match self {
+			RsxNode::Doctype(RsxDoctype { location, .. }) => *location = None,
+			RsxNode::Comment(RsxComment { location, .. }) => *location = None,
+			RsxNode::Text(RsxText { location, .. }) => *location = None,
+			RsxNode::Block(RsxBlock { location, .. }) => *location = None,
+			RsxNode::Fragment(RsxFragment { location, .. }) => *location = None,
+			RsxNode::Element(RsxElement { location, .. }) => *location = None,
+			RsxNode::Component(RsxComponent { location, .. }) => *location = None,
+		}
+		self
+	}
+
+	pub fn location_str(&self) -> String {
+		match self.location() {
+			Some(loc) => loc.to_string(),
+			None => "<unknown>".to_string(),
+		}
+	}
 
 	/// Returns true if the node is an empty fragment,
 	/// or if it is recursively a fragment with only empty fragments
 	pub fn is_empty(&self) -> bool {
 		match self {
-			RsxNode::Fragment { nodes, .. } => {
-				for node in nodes {
+			RsxNode::Fragment(fragment) => {
+				for node in &fragment.nodes {
 					if !node.is_empty() {
 						return false;
 					}
@@ -94,11 +214,15 @@ impl RsxNode {
 	/// current node and the new node.
 	pub fn push(&mut self, node: RsxNode) {
 		match self {
-			RsxNode::Fragment { nodes, .. } => nodes.push(node),
+			RsxNode::Fragment(RsxFragment { nodes, .. }) => nodes.push(node),
 			_ => {
 				let mut nodes = vec![std::mem::take(self)];
 				nodes.push(node);
-				*self = RsxNode::Fragment { nodes };
+				*self = RsxFragment {
+					nodes,
+					..Default::default()
+				}
+				.into();
 			}
 		}
 	}
@@ -120,8 +244,8 @@ impl RsxNode {
 		fn walk(node: &RsxNode) -> bool {
 			match node {
 				RsxNode::Block(_) => true,
-				RsxNode::Fragment { nodes, .. } => {
-					for item in nodes {
+				RsxNode::Fragment(fragment) => {
+					for item in &fragment.nodes {
 						if walk(item) {
 							return true;
 						}
@@ -146,18 +270,11 @@ impl RsxNode {
 #[derive(Debug, Clone)]
 pub struct RsxBlock {
 	/// The initial for an rsx block is considered a seperate tree,
-	pub initial: Box<RsxRoot>,
+	pub initial: Box<RsxNode>,
 	pub effect: Effect,
+	/// The location of the block itsself, not that of its initial node
+	pub location: Option<RsxMacroLocation>,
 }
-/// Representation of a rusty node.
-///
-/// ```
-/// # use beet_rsx::as_beet::*;
-/// let my_block = 3;
-/// let el = rsx! { <div>{my_block}</div> };
-/// ```
-#[derive(Debug, Deref, DerefMut)]
-pub struct RsxFragment(pub Vec<RsxNode>);
 
 /// A component is a struct that implements the [Component] trait.
 /// When it is used in an `rsx!` macro it will be instantiated
@@ -175,13 +292,15 @@ pub struct RsxComponent {
 	/// because components are structs not elements
 	pub tracker: RustyTracker,
 	/// the root returned by [Component::render]
-	pub root: Box<RsxRoot>,
+	pub root: Box<RsxNode>,
 	/// the children passed in by this component's parent:
 	///
 	/// `rsx! { <MyComponent>slot_children</MyComponent> }`
 	pub slot_children: Box<RsxNode>,
 	/// Collected template directives
 	pub template_directives: Vec<TemplateDirective>,
+	/// The location of the node
+	pub location: Option<RsxMacroLocation>,
 }
 
 /// Attributes with a colon `:` are considered special template directives,
@@ -233,6 +352,8 @@ pub struct RsxElement {
 	pub children: Box<RsxNode>,
 	/// ie `<input/>`
 	pub self_closing: bool,
+	/// The location of the node
+	pub location: Option<RsxMacroLocation>,
 }
 
 impl RsxElement {
@@ -335,22 +456,23 @@ mod test {
 
 	#[test]
 	fn root_location() {
-		let line = line!() + 1;
-		let RsxRoot { location, .. } = rsx! { <div>hello world</div> };
-		let Some(location) = location else {
-			panic!("expected location");
-		};
+		let line = line!() + 2;
+		#[rustfmt::skip]
+		let location = rsx! { <div>hello world</div> }
+			.location()
+			.cloned()
+			.unwrap();
 		expect(&location.file().to_string_lossy())
 			.to_be("crates/beet_rsx/src/rsx/rsx_node.rs");
 		expect(location.line()).to_be(line);
-		expect(location.col()).to_be(40);
+		expect(location.col()).to_be(24);
 	}
 
 	#[derive(Node)]
 	struct MyComponent {
 		key: u32,
 	}
-	fn my_component(props: MyComponent) -> RsxRoot {
+	fn my_component(props: MyComponent) -> RsxNode {
 		rsx! { <div>{props.key}</div> }
 	}
 

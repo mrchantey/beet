@@ -7,7 +7,7 @@ pub struct ContentLayout {
 	// pub page_layout: PageLayout,
 }
 
-fn content_layout(_: ContentLayout) -> RsxRoot {
+fn content_layout(_: ContentLayout) -> RsxNode {
 	rsx! {
 			<PageLayout>
 			<slot name="head" slot="head" />

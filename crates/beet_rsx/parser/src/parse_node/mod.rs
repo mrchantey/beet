@@ -87,7 +87,7 @@ fn impl_component(input: &DeriveInput) -> Result<TokenStream> {
 	Ok(quote! {
 	impl #impl_generics beet::prelude::Component for #name #type_generics #where_clause {
 
-		fn render(self) -> RsxRoot {
+		fn render(self) -> RsxNode {
 			#into_rsx(self)
 		}
 	}
@@ -293,7 +293,7 @@ mod test {
 			use beet::prelude::*;
 
 			impl beet::prelude::Component for MyNode {
-				fn render (self) -> RsxRoot { my_node (self) }
+				fn render (self) -> RsxNode { my_node (self) }
 			}
 			impl Props for MyNode {
 				type Builder = MyNodeBuilder;

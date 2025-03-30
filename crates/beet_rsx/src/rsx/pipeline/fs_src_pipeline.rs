@@ -16,8 +16,8 @@ impl Default for FsSrcPipeline {
 	fn default() -> Self { Self {} }
 }
 
-impl RsxPipeline<RsxRoot, Result<RsxRoot>> for FsSrcPipeline {
-	fn apply(self, mut root: RsxRoot) -> Result<RsxRoot> {
+impl RsxPipeline<RsxNode, Result<RsxNode>> for FsSrcPipeline {
+	fn apply(self, mut root: RsxNode) -> Result<RsxNode> {
 		//1. apply to root
 		self.apply_root(&mut root)?;
 
@@ -36,11 +36,12 @@ impl RsxPipeline<RsxRoot, Result<RsxRoot>> for FsSrcPipeline {
 
 impl FsSrcPipeline {
 	/// apply to a root without recursing into components
-	fn apply_root(&self, root: &mut RsxRoot) -> Result<()> {
+	fn apply_root(&self, node: &mut RsxNode) -> Result<()> {
 		let mut result = Ok(());
+		let location = node.location().cloned();
 
 		VisitRsxElementMut::walk_with_opts(
-			&mut root.node,
+			node,
 			VisitRsxOptions::ignore_component_node(),
 			|el| {
 				if let Some(src) = el.get_key_value_attr("src") {
@@ -51,7 +52,7 @@ impl FsSrcPipeline {
 						return;
 					}
 
-					let Some(location) = &root.location else {
+					let Some(location) = &location else {
 						result = Err(anyhow::anyhow!(
 							"elements with an fs src attribute must have a RootNode::location. This is set by default in rsx! macros"
 						));
@@ -76,7 +77,7 @@ impl FsSrcPipeline {
 					match ReadFile::to_string(&path) {
 						Ok(value) => {
 							el.self_closing = false;
-							el.children = Box::new(RsxNode::Text { value })
+							el.children = Box::new(value.into_node());
 						}
 						Err(err) => result = Err(err.into()),
 					}
@@ -96,7 +97,7 @@ mod test {
 	#[derive(Node)]
 	struct Foo;
 
-	fn foo(_: Foo) -> RsxRoot {
+	fn foo(_: Foo) -> RsxNode {
 		rsx! {
 			<div>
 				<slot />
@@ -128,16 +129,16 @@ mod test {
 		)
 		.to_be_err();
 
-		let root = rsx! { <script src="test-fs-src.js" /> }
+		let node = rsx! { <script src="test-fs-src.js" /> }
 			.bpipe(FsSrcPipeline::default())
 			.unwrap();
 
-		let RsxNode::Element(el) = &root.node else {
+		let RsxNode::Element(el) = &node else {
 			panic!()
 		};
-		let RsxNode::Text { value, .. } = el.children.as_ref() else {
+		let RsxNode::Text(text) = el.children.as_ref() else {
 			panic!()
 		};
-		expect(value).to_be(include_str!("test-fs-src.js"));
+		expect(&text.value).to_be(include_str!("test-fs-src.js"));
 	}
 }

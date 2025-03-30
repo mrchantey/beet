@@ -14,9 +14,7 @@ pub struct RsxToHtml {
 }
 
 impl<T: AsRef<RsxNode>> RsxPipeline<T, Vec<HtmlNode>> for RsxToHtml {
-	fn apply(mut self, node: T) -> Vec<HtmlNode> {
-		self.map_node(node.as_ref())
-	}
+	fn apply(mut self, node: T) -> Vec<HtmlNode> { self.map_node(node) }
 }
 
 
@@ -36,21 +34,28 @@ impl RsxToHtml {
 		let idx = self.tree_idx_incr.next();
 
 		match node.as_ref() {
-			RsxNode::Doctype { .. } => vec![HtmlNode::Doctype],
-			RsxNode::Comment { value, .. } => {
-				vec![HtmlNode::Comment(value.clone())]
+			RsxNode::Doctype(_) => vec![HtmlNode::Doctype],
+			RsxNode::Comment(comment) => {
+				vec![HtmlNode::Comment(comment.value.clone())]
 			}
-			RsxNode::Text { value, .. } => {
-				let str = if self.trim { value.trim() } else { value };
+			RsxNode::Text(text) => {
+				let str = if self.trim {
+					text.value.trim()
+				} else {
+					&text.value
+				};
 				vec![HtmlNode::Text(str.into())]
 			}
 			RsxNode::Element(e) => {
 				vec![HtmlNode::Element(self.map_element(idx, e))]
 			}
-			RsxNode::Fragment { nodes, .. } => {
-				nodes.iter().map(|n| self.map_node(n)).flatten().collect()
-			}
-			RsxNode::Block(rsx_block) => self.map_node(&rsx_block.initial.node),
+			RsxNode::Fragment(frag) => frag
+				.nodes
+				.iter()
+				.map(|n| self.map_node(n))
+				.flatten()
+				.collect(),
+			RsxNode::Block(rsx_block) => self.map_node(&rsx_block.initial),
 			RsxNode::Component(RsxComponent {
 				root,
 				slot_children,
@@ -58,7 +63,7 @@ impl RsxToHtml {
 			}) => {
 				slot_children.assert_empty();
 				// use the location of the root
-				let node = self.map_node(&root.node);
+				let node = self.map_node(&root);
 				// even though its empty we must visit to increment
 				// the idx incr, in the same order as [`RsxVisitor`] would
 				let _ = self.map_node(&slot_children);
@@ -238,7 +243,7 @@ mod test {
 	fn component() {
 		#[derive(Node)]
 		struct Child;
-		fn child(_: Child) -> RsxRoot {
+		fn child(_: Child) -> RsxNode {
 			rsx! { <p>hello {1}</p> }
 		}
 		expect(
@@ -257,7 +262,7 @@ mod test {
 		struct Child {
 			value: usize,
 		}
-		fn child(props: Child) -> RsxRoot {
+		fn child(props: Child) -> RsxNode {
 			rsx! { <p>hello {props.value}</p> }
 		}
 
@@ -274,7 +279,7 @@ mod test {
 	fn component_children() {
 		#[derive(Node)]
 		struct Layout;
-		fn layout(_: Layout) -> RsxRoot {
+		fn layout(_: Layout) -> RsxNode {
 			rsx! {
 				<div>
 					<h1>welcome</h1>
@@ -299,7 +304,7 @@ mod test {
 	fn component_slots() {
 		#[derive(Node)]
 		struct Layout;
-		fn layout(_: Layout) -> RsxRoot {
+		fn layout(_: Layout) -> RsxNode {
 			rsx! {
 				<article>
 					<h1>welcome</h1>

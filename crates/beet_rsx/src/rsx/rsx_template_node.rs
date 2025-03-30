@@ -11,22 +11,35 @@ use thiserror::Error;
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum RsxTemplateNode {
 	/// Serializable [`RsxNode::Doctype`]
-	Doctype {},
+	Doctype { location: Option<RsxMacroLocation> },
 	/// Serializable [`RsxNode::Comment`]
-	Comment { value: String },
+	Comment {
+		value: String,
+		location: Option<RsxMacroLocation>,
+	},
 	/// Serializable [`RsxNode::Text`]
-	Text { value: String },
+	Text {
+		value: String,
+		location: Option<RsxMacroLocation>,
+	},
 	/// Serializable [`RsxNode::Fragment`]
-	Fragment { items: Vec<Self> },
+	Fragment {
+		items: Vec<Self>,
+		location: Option<RsxMacroLocation>,
+	},
 	/// Serializable [`RsxNode::Block`]
 	/// the initial value is the responsibility of the [RustyPart::RustBlock]
-	RustBlock { tracker: RustyTracker },
+	RustBlock {
+		tracker: RustyTracker,
+		location: Option<RsxMacroLocation>,
+	},
 	/// Serializable [`RsxNode::Element`]
 	Element {
 		tag: String,
 		self_closing: bool,
 		attributes: Vec<RsxTemplateAttribute>,
 		children: Box<Self>,
+		location: Option<RsxMacroLocation>,
 	},
 	/// Serializable [`RsxNode::Component`]
 	/// We dont know much about components, for example when parsing
@@ -39,13 +52,19 @@ pub enum RsxTemplateNode {
 		/// mapped from [RsxComponent::slot_children]
 		slot_children: Box<Self>,
 		template_directives: Vec<TemplateDirective>,
+		location: Option<RsxMacroLocation>,
 	},
 }
 
 pub type TemplateResult<T> = std::result::Result<T, TemplateError>;
 
 impl Default for RsxTemplateNode {
-	fn default() -> Self { Self::Fragment { items: vec![] } }
+	fn default() -> Self {
+		Self::Fragment {
+			items: Default::default(),
+			location: None,
+		}
+	}
 }
 
 #[derive(Debug, Error)]
@@ -103,14 +122,34 @@ impl TemplateError {
 }
 
 impl RsxTemplateNode {
+	#[cfg(feature = "serde")]
+	pub fn from_ron(ron: &str) -> anyhow::Result<Self> {
+		ron::de::from_str(ron).map_err(Into::into)
+	}
+
+	pub fn location(&self) -> Option<&RsxMacroLocation> {
+		match self {
+			RsxTemplateNode::Doctype { location }
+			| RsxTemplateNode::Comment { location, .. }
+			| RsxTemplateNode::Text { location, .. }
+			| RsxTemplateNode::Fragment { location, .. }
+			| RsxTemplateNode::RustBlock { location, .. }
+			| RsxTemplateNode::Element { location, .. }
+			| RsxTemplateNode::Component { location, .. } => location.as_ref(),
+		}
+	}
+
 	pub fn from_rsx_node(node: impl AsRef<RsxNode>) -> TemplateResult<Self> {
 		match node.as_ref() {
-			RsxNode::Fragment { nodes } => {
+			RsxNode::Fragment(RsxFragment { nodes, location }) => {
 				let items = nodes
 					.iter()
 					.map(|n| Self::from_rsx_node(n))
 					.collect::<TemplateResult<Vec<_>>>()?;
-				Ok(Self::Fragment { items })
+				Ok(Self::Fragment {
+					items,
+					location: location.clone(),
+				})
 			}
 			RsxNode::Component(RsxComponent {
 				tag,
@@ -124,6 +163,7 @@ impl RsxTemplateNode {
 				// not sure if we need to serialize these
 				template_directives,
 				slot_children,
+				location,
 			}) => Ok(Self::Component {
 				// location: node.location.clone(),
 				// node: Box::new(Self::from_rsx_node(node)?),
@@ -131,19 +171,23 @@ impl RsxTemplateNode {
 				tracker: tracker.clone(),
 				tag: tag.clone(),
 				template_directives: template_directives.clone(),
+				location: location.clone(),
 			}),
 			RsxNode::Block(RsxBlock {
 				effect,
 				// ignore initial, its a seperate tree
 				initial: _,
+				location,
 			}) => Ok(Self::RustBlock {
 				tracker: effect.tracker.clone(),
+				location: location.clone(),
 			}),
 			RsxNode::Element(RsxElement {
 				tag,
 				attributes,
 				children,
 				self_closing,
+				location,
 			}) => Ok(Self::Element {
 				tag: tag.clone(),
 				self_closing: *self_closing,
@@ -152,14 +196,21 @@ impl RsxTemplateNode {
 					.map(|attr| RsxTemplateAttribute::from_rsx_attribute(attr))
 					.collect::<TemplateResult<Vec<_>>>()?,
 				children: Box::new(Self::from_rsx_node(children)?),
+				location: location.clone(),
 			}),
-			RsxNode::Text { value } => Ok(Self::Text {
+			RsxNode::Text(RsxText { value, location }) => Ok(Self::Text {
 				value: value.clone(),
+				location: location.clone(),
 			}),
-			RsxNode::Comment { value } => Ok(Self::Comment {
-				value: value.clone(),
+			RsxNode::Comment(RsxComment { value, location }) => {
+				Ok(Self::Comment {
+					value: value.clone(),
+					location: location.clone(),
+				})
+			}
+			RsxNode::Doctype(RsxDoctype { location }) => Ok(Self::Doctype {
+				location: location.clone(),
 			}),
-			RsxNode::Doctype {} => Ok(Self::Doctype {}),
 		}
 	}
 
@@ -171,25 +222,30 @@ impl RsxTemplateNode {
 		template_map: &RsxTemplateMap,
 		rusty_map: &mut HashMap<RustyTracker, RustyPart>,
 	) -> TemplateResult<RsxNode> {
-		match self {
-			RsxTemplateNode::Doctype {} => Ok(RsxNode::Doctype {}),
-			RsxTemplateNode::Text { value } => Ok(RsxNode::Text { value }),
-			RsxTemplateNode::Comment { value } => {
-				Ok(RsxNode::Comment { value })
+		let node: RsxNode = match self {
+			RsxTemplateNode::Doctype { location } => {
+				RsxDoctype { location }.into()
+			}
+			RsxTemplateNode::Text { value, location } => {
+				RsxText { value, location }.into()
+			}
+			RsxTemplateNode::Comment { value, location } => {
+				RsxComment { value, location }.into()
 			}
 
-			RsxTemplateNode::Fragment { items } => {
+			RsxTemplateNode::Fragment { items, location } => {
 				let nodes = items
 					.into_iter()
 					.map(|node| node.into_rsx_node(template_map, rusty_map))
 					.collect::<TemplateResult<Vec<_>>>()?;
-				Ok(RsxNode::Fragment { nodes })
+				RsxFragment { nodes, location }.into()
 			}
 			RsxTemplateNode::Component {
 				tracker,
 				tag,
 				slot_children,
 				template_directives,
+				location,
 			} => {
 				let (root, type_name, ron) =
 					match rusty_map.remove(&tracker).ok_or_else(|| {
@@ -213,8 +269,8 @@ impl RsxTemplateNode {
 					}?;
 				// very confusing to callback to the map like this
 				let root = template_map.apply_template(root)?;
-				Ok(RsxNode::Component(RsxComponent {
-					tag: tag.clone(),
+				RsxComponent {
+					tag,
 					tracker,
 					type_name,
 					ron,
@@ -223,9 +279,11 @@ impl RsxTemplateNode {
 						slot_children.into_rsx_node(template_map, rusty_map)?,
 					),
 					template_directives: template_directives.clone(),
-				}))
+					location,
+				}
+				.into()
 			}
-			RsxTemplateNode::RustBlock { tracker } => {
+			RsxTemplateNode::RustBlock { tracker, location } => {
 				let (initial, effect) =
 					match rusty_map.remove(&tracker).ok_or_else(|| {
 						TemplateError::no_rusty_map(
@@ -244,17 +302,20 @@ impl RsxTemplateNode {
 							},
 						),
 					}?;
-				Ok(RsxNode::Block(RsxBlock {
+				RsxBlock {
 					initial: Box::new(initial),
 					effect,
-				}))
+					location,
+				}
+				.into()
 			}
 			RsxTemplateNode::Element {
 				tag,
 				self_closing,
 				attributes,
 				children,
-			} => Ok(RsxNode::Element(RsxElement {
+				location,
+			} => RsxElement {
 				tag,
 				self_closing,
 				attributes: attributes
@@ -264,8 +325,11 @@ impl RsxTemplateNode {
 				children: Box::new(
 					children.into_rsx_node(template_map, rusty_map)?,
 				),
-			})),
-		}
+				location,
+			}
+			.into(),
+		};
+		Ok(node)
 	}
 
 	/// A simple dfs visitor for an rsx template node
@@ -409,13 +473,17 @@ mod test {
 	#[test]
 	fn simple() {
 		let tracker = RustyTracker::new(0, 15046980652419922415);
-		let root = rsx_template! { <div>{value}</div> };
+		let node = rsx_template! { <div>{value}</div> };
 
-		expect(&root.node).to_be(&RsxTemplateNode::Element {
+		expect(&node).to_be(&RsxTemplateNode::Element {
 			tag: "div".to_string(),
 			self_closing: false,
 			attributes: vec![],
-			children: Box::new(RsxTemplateNode::RustBlock { tracker }),
+			location: None,
+			children: Box::new(RsxTemplateNode::RustBlock {
+				tracker,
+				location: None,
+			}),
 		});
 	}
 	#[test]
@@ -432,9 +500,10 @@ mod test {
 			</div>
 		};
 
-		expect(&template.node).to_be(&RsxTemplateNode::Element {
+		expect(&template).to_be(&RsxTemplateNode::Element {
 			tag: "div".to_string(),
 			self_closing: false,
+			location: None,
 			attributes: vec![
 				RsxTemplateAttribute::Key {
 					key: "key".to_string(),
@@ -456,20 +525,26 @@ mod test {
 				tag: "p".to_string(),
 				self_closing: false,
 				attributes: vec![],
+				location: None,
 				children: Box::new(RsxTemplateNode::Fragment {
+					location: None,
 					items: vec![
 						RsxTemplateNode::Text {
+							location: None,
 							value: "\n\t\t\t\t\thello ".to_string(),
 						},
 						RsxTemplateNode::Component {
+							location: None,
 							tracker: component_tracker,
 							tag: "MyComponent".to_string(),
 							slot_children: Box::new(RsxTemplateNode::Element {
 								tag: "div".to_string(),
 								self_closing: false,
 								attributes: vec![],
+								location: None,
 								children: Box::new(RsxTemplateNode::Text {
 									value: "some child".to_string(),
+									location: None,
 								}),
 							}),
 							template_directives: vec![],
@@ -482,6 +557,7 @@ mod test {
 
 	#[test]
 	fn ron() {
+		// whats this testing? its already ron
 		let template = rsx_template! {
 			<div key str="value" num=32 ident=some_val>
 				<p>
@@ -491,7 +567,7 @@ mod test {
 				</p>
 			</div>
 		};
-		let template_ron = rsx_template! {
+		let template2 = rsx_template! {
 			<div key str="value" num=32 ident=some_val>
 				<p>
 					hello <MyComponent>
@@ -500,6 +576,6 @@ mod test {
 				</p>
 			</div>
 		};
-		expect(template.node).to_be(template_ron.node);
+		expect(template).to_be(template2);
 	}
 }

@@ -12,8 +12,8 @@ pub struct RsDomTarget {
 
 pub struct MountRsDom;
 
-impl RsxPipeline<RsxRoot, Result<RsxRoot>> for MountRsDom {
-	fn apply(self, root: RsxRoot) -> Result<RsxRoot> {
+impl RsxPipeline<RsxNode, Result<RsxNode>> for MountRsDom {
+	fn apply(self, root: RsxNode) -> Result<RsxNode> {
 		DomTarget::set(RsDomTarget::new(&root)?);
 		Ok(root)
 	}
@@ -21,7 +21,7 @@ impl RsxPipeline<RsxRoot, Result<RsxRoot>> for MountRsDom {
 
 impl RsDomTarget {
 	/// This does *not* apply any transformations
-	pub fn new(root: &RsxRoot) -> Result<Self> {
+	pub fn new(root: &RsxNode) -> Result<Self> {
 		let doc = root
 			.bpipe(RsxToHtml::default())
 			.bpipe(HtmlToDocument::default())?;
@@ -74,11 +74,13 @@ fn apply_rsx(
 	constants: &HtmlConstants,
 ) -> ParseResult<()> {
 	match rsx {
-		RsxNode::Fragment { .. } => todo!(),
+		RsxNode::Doctype(_) => todo!(),
+		RsxNode::Comment(_) => todo!(),
+		RsxNode::Fragment(_) => todo!(),
 		RsxNode::Component(_) => todo!(),
-		RsxNode::Block(RsxBlock { .. }) => todo!(),
+		RsxNode::Block(_) => todo!(),
 		RsxNode::Element(rsx_element) => todo!(),
-		RsxNode::Text { value, .. } => {
+		RsxNode::Text(text) => {
 			let child =
 				parent_el.children.get_mut(loc.child_idx as usize).ok_or_else(|| {
 					ParseError::Hydration(format!(
@@ -86,10 +88,8 @@ fn apply_rsx(
 						loc.child_idx,
 					))
 				})?;
-			*child = HtmlNode::Text(value);
+			*child = HtmlNode::Text(text.value);
 		}
-		RsxNode::Comment { .. } => todo!(),
-		RsxNode::Doctype { .. } => todo!(),
 	}
 	Ok(())
 }

@@ -16,54 +16,60 @@ use syn::spanned::Spanned;
 
 /// Convert rstml nodes to a ron file.
 /// Rust block token streams will be hashed by [Span::start]
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct RstmlToRsxTemplate {
 	rusty_tracker: RustyTrackerBuilder,
+	/// this will be taken by the first node
+	location: Option<TokenStream>,
 }
 
 
 impl RstmlToRsxTemplate {
 	/// for use with rsx_template! macro, which is usually just used for
 	/// tests, routers use [RstmlToRsxTemplate::map_tokens]
-	pub fn from_macro(&mut self, tokens: TokenStream) -> TokenStream {
+	pub fn from_macro(tokens: TokenStream) -> TokenStream {
 		let str_tokens =
-			self.map_tokens(tokens, None).to_string().to_token_stream();
+			Self::map_tokens(tokens, None).to_string().to_token_stream();
 		quote! {
-			RsxTemplateRoot::from_ron(#str_tokens).unwrap()
+			RsxTemplateNode::from_ron(#str_tokens).unwrap()
 		}
 	}
 	/// The entry point for parsing the content of an rsx! macro
 	/// into a serializable RON format.
 	pub fn map_tokens(
-		&mut self,
 		tokens: TokenStream,
 		file: Option<&WorkspacePathBuf>,
 	) -> TokenStream {
-		let span = tokens.span();
-		let (nodes, _rstml_errors) = tokens_to_rstml(tokens);
-		let node = self.map_nodes(nodes);
-		let line = Literal::usize_unsuffixed(span.start().line);
-		let col = Literal::usize_unsuffixed(span.start().column);
+		let location_tokens = file.map(|file| {
+			let span = tokens.span();
+			let file = file.to_string_lossy();
+			let line = Literal::usize_unsuffixed(span.start().line);
+			let col = Literal::usize_unsuffixed(span.start().column);
 
-		let location = file
-			.map(|file| {
-				let file = file.to_string_lossy();
-				quote! {Some(RsxMacroLocation(
-					file: (#file),
-					line: #line,
-					col: #col
-				))}
-			})
-			.unwrap_or(quote! {None});
+			quote! {Some(RsxMacroLocation(
+				file: (#file),
+				line: #line,
+				col: #col
+			))}
+		});
 
-		// convert from WorkspacePathBuf at last moment
+		let mut this = Self {
+			rusty_tracker: RustyTrackerBuilder::default(),
+			location: location_tokens,
+		};
+		let (rstml_nodes, _rstml_errors) = tokens_to_rstml(tokens);
+		let nodes = this.map_nodes(rstml_nodes);
+		nodes
+		// quote! {
+		// 	RsxTemplateRoot (
+		// 		location: #location,
+		// 		node: #node
+		// 	)
+		// }
+	}
 
-		quote! {
-			RsxTemplateRoot (
-				location: #location,
-				node: #node
-			)
-		}
+	fn get_location(&mut self) -> TokenStream {
+		std::mem::take(&mut self.location).unwrap_or(quote! {None})
 	}
 
 	/// wraps in fragment if multiple nodes
@@ -71,6 +77,13 @@ impl RstmlToRsxTemplate {
 		&mut self,
 		nodes: Vec<Node<C>>,
 	) -> TokenStream {
+		// if itll be a fragment, we need to take the location before
+		// visiting
+		let location = if nodes.len() != 1 {
+			Some(self.get_location())
+		} else {
+			None
+		};
 		let mut nodes = nodes
 			.into_iter()
 			.map(|node| self.map_node(node))
@@ -78,43 +91,51 @@ impl RstmlToRsxTemplate {
 		if nodes.len() == 1 {
 			nodes.pop().unwrap().to_token_stream()
 		} else {
+			let location = location.unwrap_or_else(|| self.get_location());
 			quote! { Fragment (
-				items: [#(#nodes),*]
+				items: [#(#nodes),*],
+				location: #location
 			)}
 		}
 	}
 
 	/// returns an RsxTemplateNode
 	pub fn map_node<C: CustomNode>(&mut self, node: Node<C>) -> TokenStream {
+		let location = self.get_location();
 		match node {
 			Node::Doctype(_) => quote! { Doctype (
 			)},
 			Node::Comment(NodeComment { value, .. }) => {
 				quote! { Comment (
-					value: #value
+					value: #value,
+					location: #location
 				)}
 			}
 			Node::Text(NodeText { value }) => {
 				quote! { Text (
-					value: #value
+					value: #value,
+					location: #location
 				)}
 			}
 			Node::RawText(raw) => {
 				let value = raw.to_string_best();
 				quote! { Text (
-					value: #value
+					value: #value,
+					location: #location
 				)}
 			}
 			Node::Fragment(NodeFragment { children, .. }) => {
 				let children = children.into_iter().map(|n| self.map_node(n));
 				quote! { Fragment (
-					items:[#(#children),*]
+					items:[#(#children),*],
+					location: #location
 				)}
 			}
 			Node::Block(block) => {
 				let tracker = self.rusty_tracker.next_tracker_ron(&block);
 				quote! { RustBlock (
-					tracker:#tracker
+					tracker:#tracker,
+					location: #location
 				)}
 			}
 			Node::Element(NodeElement {
@@ -137,7 +158,8 @@ impl RstmlToRsxTemplate {
 						tag: #tag,
 						self_closing: #self_closing,
 						attributes: [#(#attributes),*],
-						children: #children
+						children: #children,
+						location: #location
 					)}
 				}
 			}
@@ -184,6 +206,8 @@ impl RstmlToRsxTemplate {
 		open_tag: OpenTag,
 		children: Vec<Node<C>>,
 	) -> TokenStream {
+		let location = self.get_location();
+
 		let tracker = self.rusty_tracker.next_tracker_ron(&open_tag);
 		// components disregard all the context and rely on the tracker
 		// we rely on the hydrated node to provide the attributes and children
@@ -227,7 +251,8 @@ impl RstmlToRsxTemplate {
 			tracker: #tracker,
 			tag: #tag,
 			slot_children: #slot_children,
-			template_directives: [#(#template_directives),*]
+			template_directives: [#(#template_directives),*],
+			location: #location
 		)}
 	}
 }

@@ -171,9 +171,9 @@ impl DomTargetImpl for BrowserDomTarget {
 				todo!()
 			}
 			RsxNode::Element(rsx_element) => todo!(),
-			RsxNode::Text { value, .. } => {
+			RsxNode::Text(text) => {
 				if let Some(child) = child.dyn_ref::<Text>() {
-					child.set_text_content(Some(&value));
+					child.set_text_content(Some(&text.value));
 				} else {
 					todo!(
 						"the structure containing reactivity changed, replace with text node?"

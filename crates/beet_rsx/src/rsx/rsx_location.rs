@@ -46,7 +46,7 @@ impl RsxMacroLocation {
 	/// ```rust
 	/// # use beet_rsx::as_beet::*;
 	/// let loc = RsxMacroLocation::new(file!(), line!(), column!());
-	/// let loc = rsx!{}.location.unwrap();
+	/// let loc = rsx!{}.location().unwrap();
 	pub fn new(
 		workspace_file_path: impl AsRef<Path>,
 		line: u32,

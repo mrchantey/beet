@@ -46,14 +46,14 @@ pub enum RustyPart {
 	// we also collect components because they
 	// cannot be statically resolved
 	Component {
-		root: RsxRoot,
+		root: RsxNode,
 		/// Type names cannot be discovered statically
 		type_name: String,
 		/// for client islands, cannot be statically created
 		ron: Option<String>,
 	},
 	RustBlock {
-		initial: RsxRoot,
+		initial: RsxNode,
 		effect: Effect,
 	},
 	AttributeBlock {

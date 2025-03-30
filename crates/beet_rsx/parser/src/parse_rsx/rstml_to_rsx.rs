@@ -23,7 +23,7 @@ pub fn macro_location_tokens(tokens: impl Spanned) -> TokenStream {
 	let col = span.start().column as u32;
 	quote! {
 		{
-			Some(RsxMacroLocation::new(file!(), #line, #col))
+			RsxMacroLocation::new(file!(), #line, #col)
 		}
 	}
 }
@@ -63,11 +63,7 @@ impl RstmlToRsx {
 				#(#rstml_to_rsx_errors;)*
 				use beet::prelude::*;
 				#[allow(unused_braces)]
-				RsxRoot{
-					location: #location,
-					node: #node
-				}
-
+				#node.with_location(#location)
 			}
 		}
 	}
@@ -82,39 +78,46 @@ impl RstmlToRsx {
 		if nodes.len() == 1 {
 			nodes.pop().unwrap().to_token_stream()
 		} else {
-			quote!( RsxNode::Fragment {
-				nodes: Vec::from([#(#nodes),*])
-			})
+			quote!( RsxFragment {
+				nodes: Vec::from([#(#nodes),*]),
+				location: None,
+			}.into_node())
 		}
 	}
 
 	/// returns an RsxNode
 	fn map_node<C>(&mut self, node: Node<C>) -> TokenStream {
 		match node {
-			Node::Doctype(_) => quote!(RsxNode::Doctype {}),
+			Node::Doctype(_) => {
+				quote!(RsxDoctype { location: None }.into_node())
+			}
 			Node::Comment(comment) => {
 				let comment = comment.value.value();
-				quote!(RsxNode::Comment{
-					value: #comment.to_string()
-				})
+				quote!(RsxComment {
+					value: #comment.to_string(),
+					location: None,
+				}.into_node())
 			}
 			Node::Text(text) => {
 				let text = text.value_string();
-				quote!(RsxNode::Text {
-					value: #text.to_string()
-				})
+				quote!(RsxText {
+					value: #text.to_string(),
+					location: None,
+				}.into_node())
 			}
 			Node::RawText(raw) => {
 				let text = raw.to_string_best();
-				quote!(RsxNode::Text {
-					value: #text.to_string()
-				})
+				quote!(RsxText {
+					value: #text.to_string(),
+					location: None,
+				}.into_node())
 			}
 			Node::Fragment(NodeFragment { children, .. }) => {
 				let children = children.into_iter().map(|n| self.map_node(n));
-				quote! { RsxNode::Fragment{
-					nodes: vec![#(#children),*]
-				}}
+				quote! { RsxFragment{
+					nodes: vec![#(#children),*],
+					location: None,
+				}.into_node()}
 			}
 			Node::Block(block) => {
 				let tracker = self.rusty_tracker.next_tracker(&block);
@@ -150,12 +153,13 @@ impl RstmlToRsx {
 						.map(|attr| self.map_attribute(attr))
 						.collect::<Vec<_>>();
 					let children = self.map_nodes(children);
-					quote!(RsxNode::Element(RsxElement {
+					quote!(RsxElement {
 						tag: #tag.to_string(),
 						attributes: vec![#(#attributes),*],
 						children: Box::new(#children),
 						self_closing: #self_closing,
-					}))
+						location: None,
+					}.into_node())
 				}
 			}
 			Node::Custom(_) => unimplemented!("Custom nodes not yet supported"),
@@ -333,15 +337,16 @@ impl RstmlToRsx {
 
 			let component = #component;
 
-			RsxNode::Component(RsxComponent{
+			RsxComponent{
 				tag: #tag.to_string(),
 				type_name: std::any::type_name::<#ident>().to_string(),
 				tracker: #tracker,
 				ron: #ron,
 				root: Box::new(component.render()),
 				slot_children: Box::new(#slot_children),
-				template_directives: vec![#(#template_directives),*]
-			})
+				template_directives: vec![#(#template_directives),*],
+				location: None,
+			}.into_node()
 		})
 	}
 

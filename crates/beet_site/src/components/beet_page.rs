@@ -7,7 +7,7 @@ use beet::prelude::*;
 pub struct BeetPage {}
 
 
-fn beet_page(_: BeetPage) -> RsxRoot {
+fn beet_page(_: BeetPage) -> RsxNode {
 	set_context(Brand {
 		title: "Beet".into(),
 		description: "A Rust web framework".into(),

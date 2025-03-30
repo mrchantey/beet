@@ -5,15 +5,16 @@ pub struct Style {
 	pub attrs: Vec<RsxAttribute>,
 }
 
-impl IntoRsxRoot for Style {
-	fn into_root(self) -> RsxRoot {
+impl IntoRsxNode for Style {
+	fn into_node(self) -> RsxNode {
 		RsxElement {
 			tag: "style".to_string(),
 			attributes: self.attrs,
 			self_closing: false,
-			children: Box::new(RsxNode::Text { value: self.css }),
+			children: Box::new(self.css.into_node()),
+			location: None,
 		}
-		.into_root()
+		.into_node()
 	}
 }
 

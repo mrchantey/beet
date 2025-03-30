@@ -137,8 +137,8 @@ test-ci *args:
 test-all *args:
 	cargo fmt 				--check
 	just leptosfmt 		--check
-	{{min-stack}} cargo test --workspace 			--doc 	--all-features																	{{args}} -- {{test-threads}}
 	{{min-stack}} cargo test --workspace 			--lib 	--all-features																	{{args}} -- {{test-threads}}
+	{{min-stack}} cargo test --workspace 			--doc 	--all-features																	{{args}} -- {{test-threads}}
 	{{min-stack}}	cargo test -p beet_flow 		--lib 	--target wasm32-unknown-unknown --all-features  {{args}} -- {{test-threads}}
 	{{min-stack}}	cargo test -p beet_spatial 	--lib 	--target wasm32-unknown-unknown --all-features  {{args}} -- {{test-threads}}
 	{{min-stack}}	cargo test -p beet_rsx 			--lib 	--target wasm32-unknown-unknown --all-features  {{args}} -- {{test-threads}}

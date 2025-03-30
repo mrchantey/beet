@@ -13,7 +13,7 @@ use thiserror::Error;
 /// struct MyComponent;
 ///
 ///
-/// fn my_component(_: MyComponent)->RsxRoot{
+/// fn my_component(_: MyComponent)->RsxNode {
 /// 	rsx!{
 /// 		<html>
 /// 			<slot name="header"/>
@@ -48,10 +48,10 @@ use thiserror::Error;
 #[derive(Debug, Default, Clone)]
 pub struct SlotsPipeline;
 
-impl RsxPipeline<RsxRoot, Result<RsxRoot>> for SlotsPipeline {
-	fn apply(self, mut root: RsxRoot) -> Result<RsxRoot> {
-		SlotsVisitor::apply(&mut root.node)
-			.map(|_| root)
+impl RsxPipeline<RsxNode, Result<RsxNode>> for SlotsPipeline {
+	fn apply(self, mut node: RsxNode) -> Result<RsxNode> {
+		SlotsVisitor::apply(&mut node)
+			.map(|_| node)
 			.map_err(|e| anyhow::anyhow!(e))
 	}
 }
@@ -201,7 +201,7 @@ impl RsxVisitorMut for SlotsVisitor {
 						// drains the default slots
 						std::mem::take(&mut self.default_slots)
 					};
-					*node = RsxNode::Fragment { nodes };
+					*node = nodes.into_node();
 				}
 			}
 			_ => {}
@@ -218,7 +218,7 @@ mod test {
 		#[derive(Node)]
 		struct MyComponent;
 
-		fn my_component(_: MyComponent) -> RsxRoot {
+		fn my_component(_: MyComponent) -> RsxNode {
 			rsx! {
 				<html>
 					<slot name="header" />
@@ -246,7 +246,7 @@ mod test {
 		#[derive(Node)]
 		struct MyComponent;
 
-		fn my_component(_: MyComponent) -> RsxRoot {
+		fn my_component(_: MyComponent) -> RsxNode {
 			rsx! {
 				<html>
 					<slot name="header" />

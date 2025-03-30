@@ -2,7 +2,6 @@ use crate::prelude::*;
 use anyhow::Result;
 use std::sync::Arc;
 
-// if this was clone RsxRoot could be too
 pub type RegisterEffect =
 	Box<dyn 'static + Send + Sync + FnOnce(TreeLocation) -> Result<()>>;
 

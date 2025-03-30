@@ -10,12 +10,12 @@ pub struct ColorScheme {
 	theme: Theme,
 }
 
-fn color_scheme(props: ColorScheme) -> RsxRoot {
+fn color_scheme(props: ColorScheme) -> RsxNode {
 	// Theme
 
 	let css = ThemeToCss::default().map(&props.theme);
 
-	Style::new(css).with_global_scope().into_root()
+	Style::new(css).with_global_scope().into_node()
 }
 
 impl ColorScheme {

@@ -21,7 +21,7 @@ fn feature_flag_idents() -> RsxIdents {
 
 
 
-/// This macro expands to an [RsxRoot](beet_rsx::prelude::RsxRoot).
+/// This macro expands to an [RsxNode](beet_rsx::prelude::RsxNode).
 ///
 /// The type of node is determied by the feature flags, current options are:
 /// - [`StringRsx`](beet_rsx::rsx::StringRsx)
@@ -45,9 +45,7 @@ pub fn rsx(tokens: TokenStream) -> TokenStream {
 /// things like hot reloading.
 #[proc_macro]
 pub fn rsx_template(tokens: TokenStream) -> TokenStream {
-	RstmlToRsxTemplate::default()
-		.from_macro(tokens.into())
-		.into()
+	RstmlToRsxTemplate::from_macro(tokens.into()).into()
 }
 
 

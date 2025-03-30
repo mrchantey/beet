@@ -5,7 +5,7 @@ use crate::prelude::*;
 #[derive(Node)]
 pub struct Button;
 
-fn button(_: Button) -> RsxRoot {
+fn button(_: Button) -> RsxNode {
 	rsx! {
 	<button>
 		<slot/>

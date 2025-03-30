@@ -275,7 +275,7 @@ mod test {
 		#[derive(Node)]
 		struct Comp;
 
-		fn comp(_: Comp) -> RsxRoot {
+		fn comp(_: Comp) -> RsxNode {
 			rsx! { <slot /> }
 		}
 
@@ -284,8 +284,7 @@ mod test {
 				<Comp>
 					<div />
 				</Comp>
-			}
-			.node,
+			},
 			|_, _| {},
 		);
 	}

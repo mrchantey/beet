@@ -11,13 +11,13 @@ pub struct RouteFuncsToRsx;
 impl
 	RsxPipeline<
 		Vec<RouteFunc<DefaultRouteFunc>>,
-		Pin<Box<dyn Future<Output = Result<Vec<(RouteInfo, RsxRoot)>>>>>,
+		Pin<Box<dyn Future<Output = Result<Vec<(RouteInfo, RsxNode)>>>>>,
 	> for RouteFuncsToRsx
 {
 	fn apply(
 		self,
 		routes: Vec<RouteFunc<DefaultRouteFunc>>,
-	) -> Pin<Box<dyn Future<Output = Result<Vec<(RouteInfo, RsxRoot)>>>>> {
+	) -> Pin<Box<dyn Future<Output = Result<Vec<(RouteInfo, RsxNode)>>>>> {
 		Box::pin(async move {
 			futures::future::try_join_all(routes.into_iter().map(
 				async |func| {

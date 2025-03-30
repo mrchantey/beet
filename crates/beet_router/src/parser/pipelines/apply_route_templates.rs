@@ -27,13 +27,13 @@ impl ApplyRouteTemplates {
 }
 
 
-impl RsxPipeline<Vec<(RouteInfo, RsxRoot)>, Result<Vec<(RouteInfo, RsxRoot)>>>
+impl RsxPipeline<Vec<(RouteInfo, RsxNode)>, Result<Vec<(RouteInfo, RsxNode)>>>
 	for ApplyRouteTemplates
 {
 	fn apply(
 		self,
-		routes: Vec<(RouteInfo, RsxRoot)>,
-	) -> Result<Vec<(RouteInfo, RsxRoot)>> {
+		routes: Vec<(RouteInfo, RsxNode)>,
+	) -> Result<Vec<(RouteInfo, RsxNode)>> {
 		let template_map = RsxTemplateMap::load(&self.templates_map_path)
 			.map_err(|err| {
 				// notify user that we are using routes

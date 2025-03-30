@@ -102,9 +102,9 @@ pub trait RsxVisitor {
 		self.options().ignore_component_slot_children
 	}
 	fn visit_node(&mut self, node: &RsxNode) {}
-	fn visit_doctype(&mut self) {}
-	fn visit_comment(&mut self, comment: &str) {}
-	fn visit_text(&mut self, text: &str) {}
+	fn visit_doctype(&mut self, doctype: &RsxDoctype) {}
+	fn visit_comment(&mut self, comment: &RsxComment) {}
+	fn visit_text(&mut self, text: &RsxText) {}
 	fn visit_block(&mut self, block: &RsxBlock) {}
 	fn visit_component(&mut self, component: &RsxComponent) {}
 	fn visit_element(&mut self, element: &RsxElement) {}
@@ -114,19 +114,19 @@ pub trait RsxVisitor {
 	fn walk_node(&mut self, node: &RsxNode) {
 		self.visit_node(node);
 		match node {
-			RsxNode::Doctype {} => {
-				self.visit_doctype();
+			RsxNode::Doctype(doctype) => {
+				self.visit_doctype(doctype);
 			}
-			RsxNode::Comment { value } => self.visit_comment(value),
-			RsxNode::Text { value } => self.visit_text(value),
+			RsxNode::Comment(comment) => self.visit_comment(comment),
+			RsxNode::Text(text) => self.visit_text(text),
 			RsxNode::Block(b) => {
 				self.visit_block(b);
 				if !self.ignore_block_node_initial() {
 					self.walk_node(&b.initial);
 				}
 			}
-			RsxNode::Fragment { nodes, .. } => {
-				for child in nodes {
+			RsxNode::Fragment(fragment) => {
+				for child in &fragment.nodes {
 					self.walk_node(child);
 				}
 			}
@@ -177,9 +177,9 @@ pub trait RsxVisitorMut {
 		self.options().ignore_component_slot_children
 	}
 	fn visit_node(&mut self, node: &mut RsxNode) {}
-	fn visit_doctype(&mut self) {}
-	fn visit_comment(&mut self, comment: &mut str) {}
-	fn visit_text(&mut self, text: &mut str) {}
+	fn visit_doctype(&mut self, doctype: &mut RsxDoctype) {}
+	fn visit_comment(&mut self, comment: &mut RsxComment) {}
+	fn visit_text(&mut self, text: &mut RsxText) {}
 	fn visit_block(&mut self, block: &mut RsxBlock) {}
 	fn visit_component(&mut self, component: &mut RsxComponent) {}
 	fn visit_element(&mut self, element: &mut RsxElement) {}
@@ -189,13 +189,13 @@ pub trait RsxVisitorMut {
 	fn walk_node(&mut self, node: &mut RsxNode) {
 		self.visit_node(node);
 		match node {
-			RsxNode::Doctype {} => {
-				self.visit_doctype();
+			RsxNode::Doctype(doctype) => {
+				self.visit_doctype(doctype);
 			}
-			RsxNode::Comment { value } => self.visit_comment(value),
-			RsxNode::Text { value } => self.visit_text(value),
-			RsxNode::Fragment { nodes, .. } => {
-				for child in nodes {
+			RsxNode::Comment(comment) => self.visit_comment(comment),
+			RsxNode::Text(text) => self.visit_text(text),
+			RsxNode::Fragment(fragment) => {
+				for child in &mut fragment.nodes {
 					self.walk_node(child);
 				}
 			}
@@ -243,7 +243,7 @@ mod test {
 	#[derive(Node)]
 	struct Child;
 
-	fn child(_: Child) -> RsxRoot {
+	fn child(_: Child) -> RsxNode {
 		rsx! {
 			<div>
 				<slot />
@@ -269,9 +269,9 @@ mod test {
 	impl RsxVisitor for Counter {
 		fn options(&self) -> &VisitRsxOptions { &self.options }
 		fn visit_node(&mut self, node: &RsxNode) { self.node += 1; }
-		fn visit_doctype(&mut self) { self.doctype += 1; }
-		fn visit_comment(&mut self, comment: &str) { self.comment += 1; }
-		fn visit_text(&mut self, text: &str) { self.text += 1; }
+		fn visit_doctype(&mut self, doctype: &RsxDoctype) { self.doctype += 1; }
+		fn visit_comment(&mut self, comment: &RsxComment) { self.comment += 1; }
+		fn visit_text(&mut self, text: &RsxText) { self.text += 1; }
 		fn visit_block(&mut self, block: &RsxBlock) { self.block += 1; }
 		fn visit_component(&mut self, component: &RsxComponent) {
 			self.component += 1;

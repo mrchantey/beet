@@ -104,8 +104,8 @@ impl CollapsedNode {
 	fn from_node(node: &RsxNode) -> Vec<CollapsedNode> {
 		let mut out = Vec::new();
 		match node {
-			RsxNode::Fragment { nodes, .. } => {
-				out.extend(nodes.into_iter().flat_map(Self::from_node));
+			RsxNode::Fragment(fragment) => {
+				out.extend(fragment.nodes.iter().flat_map(Self::from_node));
 			}
 			RsxNode::Component(RsxComponent { root, .. }) => {
 				out.extend(Self::from_node(root));
@@ -119,8 +119,8 @@ impl CollapsedNode {
 					.unwrap();
 				out.push(CollapsedNode::RustText(html));
 			}
-			RsxNode::Text { value, .. } => {
-				out.push(CollapsedNode::StaticText(value.clone()))
+			RsxNode::Text(text) => {
+				out.push(CollapsedNode::StaticText(text.value.clone()))
 			}
 			RsxNode::Doctype { .. } => out.push(CollapsedNode::Break),
 			RsxNode::Comment { .. } => out.push(CollapsedNode::Break),
@@ -176,7 +176,7 @@ mod test {
 	#[derive(Node)]
 	struct Adjective;
 
-	fn adjective(_: Adjective) -> RsxRoot {
+	fn adjective(_: Adjective) -> RsxNode {
 		rsx! {
 			"lazy"
 			<slot />
@@ -189,13 +189,13 @@ mod test {
 		let color = "brown";
 		let action = "jumps over";
 
-		let tree = rsx! {
+		let node = rsx! {
 			<div>
 				"The "{desc}" and "{color}<b>fox</b> {action}" the "
 				<Adjective>and fat</Adjective>dog
 			</div>
 		};
-		let RsxNode::Element(el) = &tree.node else {
+		let RsxNode::Element(el) = &node else {
 			panic!("expected element");
 		};
 

@@ -34,11 +34,12 @@ impl BevyRuntime {
 	/// ```
 	pub fn parse_block_node<M1, M2>(
 		tracker: RustyTracker,
-		block: impl Clone + IntoRsxRoot<M1> + SignalOrComponent<M2>,
+		block: impl Clone + IntoRsxNode<M1> + SignalOrComponent<M2>,
 	) -> RsxNode {
 		RsxNode::Block(RsxBlock {
-			initial: Box::new(block.clone().into_root()),
+			initial: Box::new(block.clone().into_node()),
 			effect: Effect::new(block.into_node_block_effect(), tracker),
+			location: None,
 		})
 	}
 	/// Used by [`RstmlToRsx`] when it encounters an attribute block:

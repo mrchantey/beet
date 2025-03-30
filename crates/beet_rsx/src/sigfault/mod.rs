@@ -22,23 +22,24 @@ impl Sigfault {
 	/// ```
 	pub fn parse_block_node<M>(
 		tracker: RustyTracker,
-		block: impl 'static + Send + Sync + Clone + IntoRsxRoot<M>,
+		block: impl 'static + Send + Sync + Clone + IntoRsxNode<M>,
 	) -> RsxNode {
 		RsxNode::Block(RsxBlock {
-			initial: Box::new(block.clone().into_root()),
+			initial: Box::new(block.clone().into_node()),
 			effect: Effect::new(
 				Box::new(move |loc: TreeLocation| {
 					effect(move || {
 						let block = block.clone();
 						DomTarget::with(move |target| {
-							let root = block.clone().into_root();
-							target.update_rsx_node(root.node, loc).unwrap()
+							let node = block.clone().into_node();
+							target.update_rsx_node(node, loc).unwrap()
 						});
 					});
 					Ok(())
 				}),
 				tracker,
 			),
+			location: None,
 		})
 	}
 

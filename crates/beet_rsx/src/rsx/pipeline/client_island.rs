@@ -89,7 +89,7 @@ mod test {
 	struct MyComponent {
 		val: usize,
 	}
-	fn my_component(props: MyComponent) -> RsxRoot {
+	fn my_component(props: MyComponent) -> RsxNode {
 		rsx! { <div>{props.val}</div> }
 	}
 

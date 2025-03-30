@@ -57,20 +57,20 @@ impl Scope {
 	}
 }
 
-impl RsxPipeline<RsxRoot, Result<RsxRoot>> for ScopedStylePipeline {
+impl RsxPipeline<RsxNode, Result<RsxNode>> for ScopedStylePipeline {
 	/// Applies scoped style to:
 	/// 1. root node
 	/// 2. all component nodes
 	/// 3. all component slot children
-	fn apply(mut self, mut root: RsxRoot) -> Result<RsxRoot> {
+	fn apply(mut self, mut node: RsxNode) -> Result<RsxNode> {
 		// 1. apply to the root node, if its a component nothing happens
 		//    in this step, it will be handled by the component visitor
-		self.apply_node(&mut root.node)?;
+		self.apply_node(&mut node)?;
 
 		let mut parse_err = Ok(());
 
 		// visit all components
-		VisitRsxComponentMut::walk(&mut root.node, |component| {
+		VisitRsxComponentMut::walk(&mut node, |component| {
 			// 2. apply to component node
 			if let Err(err) = self.apply_node(&mut component.root) {
 				parse_err = Err(err);
@@ -80,7 +80,7 @@ impl RsxPipeline<RsxRoot, Result<RsxRoot>> for ScopedStylePipeline {
 				parse_err = Err(err);
 			};
 		});
-		parse_err.map(|_| root).map_err(|e| anyhow::anyhow!(e))
+		parse_err.map(|_| node).map_err(|e| anyhow::anyhow!(e))
 	}
 }
 
@@ -103,19 +103,21 @@ impl ScopedStylePipeline {
 				// currently only recurse top level style children, we could create another
 				// visitor to go deeper if we start supporting style body components
 				match &mut *el.children {
-					RsxNode::Text { value, .. } => {
+					RsxNode::Text(text) => {
 						// this is a hack to allow for the css unit "em" to be used in the style tag
 						// we should put it somewhere else
-						*value = value.replace(".em", "em");
-						if let Err(err) = self.apply_styles(value, scope) {
+						text.value = text.value.replace(".em", "em");
+						if let Err(err) =
+							self.apply_styles(&mut text.value, scope)
+						{
 							parse_err = Err(err);
 						}
 					}
-					RsxNode::Fragment { nodes } => {
-						if !nodes.is_empty() {
+					RsxNode::Fragment(fragment) => {
+						if !fragment.nodes.is_empty() {
 							parse_err = Err(ParseError::Serde(format!(
 								"ScopedStyle: Expected Text Node, received Fragment with {} nodes",
-								nodes.len()
+								fragment.nodes.len()
 							)));
 						}
 					}
@@ -191,7 +193,7 @@ mod test {
 	#[derive(Node)]
 	struct Child;
 
-	fn child(_: Child) -> RsxRoot {
+	fn child(_: Child) -> RsxNode {
 		rsx! {
 			<div>
 				<style>span { color: blue; }</style>
