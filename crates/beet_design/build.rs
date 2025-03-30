@@ -10,16 +10,16 @@ fn main() -> Result<()> {
 
 	FileGroup::new_workspace_rel("crates/beet_design/src")?
 		.with_filter(GlobFilter::default().with_include("*.mockup.rs"))
-		.pipe(FileGroupToFuncFiles::default())?
-		.pipe(FuncFilesToRouteFuncs::mockups())?
-		.pipe(RouteFuncsToCodegen::new(
+		.bpipe(FileGroupToFuncFiles::default())?
+		.bpipe(FuncFilesToRouteFuncs::mockups())?
+		.bpipe(RouteFuncsToCodegen::new(
 			CodegenFile::new_workspace_rel(
 				"crates/beet_design/src/codegen/mockups.rs",
 				&cx.pkg_name,
 			)
 			.with_use_beet_tokens("use beet_router::as_beet::*;"),
 		))?
-		.map(|(_, _, codegen)| codegen)
+		.bmap(|(_, _, codegen)| codegen)
 		.build_and_write()?;
 
 	Ok(())

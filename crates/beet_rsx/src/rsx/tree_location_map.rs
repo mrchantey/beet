@@ -86,7 +86,7 @@ mod test {
 		let action = "jumps over";
 
 		let root = rsx! { <div>"The "{desc}" and "{color}<b>fox</b>{action}the lazy " dog"</div> };
-		let map = (&root.node).pipe(NodeToTreeLocationMap);
+		let map = (&root.node).bpipe(NodeToTreeLocationMap);
 
 		map.check_valid(&root.node).unwrap();
 
@@ -127,18 +127,18 @@ mod test {
 			<MyComponent />
 			<MyComponent />
 		}
-		.pipe(SlotsPipeline::default())
+		.bpipe(SlotsPipeline::default())
 		.unwrap();
 
 		let html = (&root)
-			.pipe(RsxToHtml::default())
-			.pipe(RenderHtml::default())
+			.bpipe(RsxToHtml::default())
+			.bpipe(RenderHtml::default())
 			.unwrap();
 		expect(html).to_be(
 			"<div data-beet-rsx-idx=\"3\">4</div><div data-beet-rsx-idx=\"8\">4</div>",
 		);
 
-		let map = (&root.node).pipe(NodeToTreeLocationMap);
+		let map = (&root.node).bpipe(NodeToTreeLocationMap);
 		expect(map.collapsed_elements.get(&TreeIdx::new(3))).to_be_some();
 		expect(map.collapsed_elements.get(&TreeIdx::new(8))).to_be_some();
 	}

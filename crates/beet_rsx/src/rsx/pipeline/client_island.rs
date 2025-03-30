@@ -32,7 +32,7 @@ impl ClientIsland {
 			// TODO resolve tracker to location
 			beet::exports::ron::de::from_str::<#type_name>(#ron)?
 				.render()
-				.pipe(RegisterEffects::new(
+				.bpipe(RegisterEffects::new(
 					tree_location_map.rusty_locations[
 						&RustyTracker::new(#tracker_index,#tracker_hash)]
 					)
@@ -100,13 +100,13 @@ mod test {
 	fn collect_islands() {
 		expect(
 			rsx! { <MyComponent val=32 /> }
-				.pipe(CollectClientIslands::default())
+				.bpipe(CollectClientIslands::default())
 				.len(),
 		)
 		.to_be(0);
 
 		let island = &rsx! { <MyComponent client:load val=32 /> }
-			.pipe(CollectClientIslands::default())[0];
+			.bpipe(CollectClientIslands::default())[0];
 
 		expect(&island.type_name)
 			.to_be("beet_rsx::rsx::pipeline::client_island::test::MyComponent");
@@ -132,7 +132,7 @@ mod test {
 			quote::quote! {
 				beet::exports::ron::de::from_str::<MyComponent>("(val:32)")?
 					.render()
-					.pipe(RegisterEffects::new(tree_location_map.rusty_locations[&RustyTracker::new(0u32,89u64)]))?;
+					.bpipe(RegisterEffects::new(tree_location_map.rusty_locations[&RustyTracker::new(0u32,89u64)]))?;
 			}
 			.to_string(),
 		);

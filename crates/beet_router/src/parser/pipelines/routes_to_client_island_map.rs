@@ -38,7 +38,7 @@ impl RsxPipeline<&Vec<(RouteInfo, RsxRoot)>, Result<()>>
 		let map: RapidHashMap<_, _> = routes
 			.into_iter()
 			.map(|(route, rsx)| {
-				let islands = rsx.pipe(CollectClientIslands::default());
+				let islands = rsx.bpipe(CollectClientIslands::default());
 				(route.clone(), islands)
 			})
 			.collect();

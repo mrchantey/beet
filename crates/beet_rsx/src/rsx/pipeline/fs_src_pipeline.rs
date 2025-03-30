@@ -109,12 +109,12 @@ mod test {
 	fn works() {
 		// relative ignored
 		expect(
-			rsx! { <script src="/missing" /> }.pipe(FsSrcPipeline::default()),
+			rsx! { <script src="/missing" /> }.bpipe(FsSrcPipeline::default()),
 		)
 		.to_be_ok();
 		// missing errors
 		expect(
-			rsx! { <script src="missing" /> }.pipe(FsSrcPipeline::default()),
+			rsx! { <script src="missing" /> }.bpipe(FsSrcPipeline::default()),
 		)
 		.to_be_err();
 		// slot children errors
@@ -124,12 +124,12 @@ mod test {
 					<script src="missing" />
 				</Foo>
 			}
-			.pipe(FsSrcPipeline::default()),
+			.bpipe(FsSrcPipeline::default()),
 		)
 		.to_be_err();
 
 		let root = rsx! { <script src="test-fs-src.js" /> }
-			.pipe(FsSrcPipeline::default())
+			.bpipe(FsSrcPipeline::default())
 			.unwrap();
 
 		let RsxNode::Element(el) = &root.node else {

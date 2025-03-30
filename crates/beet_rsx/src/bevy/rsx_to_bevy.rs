@@ -21,7 +21,7 @@ impl RsxToBevy {
 		let entities = BevyRuntime::with_mut(|app| {
 			Self::default().spawn_root(app.world_mut(), &root)
 		})?;
-		root.node.pipe(RegisterEffects::default())?;
+		root.node.bpipe(RegisterEffects::default())?;
 		Ok(entities)
 	}
 

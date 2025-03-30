@@ -68,9 +68,9 @@ mod test {
 		let (get, _) = signal(7);
 		expect(
 			rsx! { <div>value is {get}</div> }
-				.pipe(MountRsDom)
+				.bpipe(MountRsDom)
 				.unwrap()
-				.pipe(RegisterEffects::default()),
+				.bpipe(RegisterEffects::default()),
 		)
 		.to_be_ok();
 	}
@@ -84,9 +84,9 @@ mod test {
 	fn bad_location() {
 		let (get, _) = signal(7);
 		let _ = rsx! { <div>value is {get}</div> }
-			.pipe(MountRsDom)
+			.bpipe(MountRsDom)
 			.unwrap()
-			.pipe(RegisterEffects::new(TreeLocation::new(10, 10, 10)));
+			.bpipe(RegisterEffects::new(TreeLocation::new(10, 10, 10)));
 	}
 
 
@@ -95,9 +95,9 @@ mod test {
 		let (get, set) = signal(7);
 
 		rsx! { <div>value is {get}</div> }
-			.pipe(MountRsDom)
+			.bpipe(MountRsDom)
 			.unwrap()
-			.pipe(RegisterEffects::default())
+			.bpipe(RegisterEffects::default())
 			.unwrap();
 		expect(&DomTarget::with(|h| h.render()))
 			.to_contain("<div data-beet-rsx-idx=\"1\">value is 7</div>");

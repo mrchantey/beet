@@ -149,9 +149,9 @@ mod test {
 	#[test]
 	fn works() {
 		let _route_funcs = FileGroup::test_site_routes()
-			.pipe(FileGroupToFuncFiles::default())
+			.bpipe(FileGroupToFuncFiles::default())
 			.unwrap()
-			.pipe(FuncFilesToRouteFuncs::http_routes())
+			.bpipe(FuncFilesToRouteFuncs::http_routes())
 			.unwrap();
 	}
 }

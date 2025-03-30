@@ -196,7 +196,7 @@ mod test {
 					// <Child/>
 				</div>
 			}
-			.pipe(RsxToHtmlString::default()).unwrap(),
+			.bpipe(RsxToHtmlString::default()).unwrap(),
 		)
 		.to_be("<div data-styleid=\"0\"><style data-styleid=\"0\">span[data-styleid=\"0\"] {\n  color: red;\n}\n</style></div>");
 	}
@@ -210,7 +210,7 @@ mod test {
 					// <Child/>
 				</div>
 			}
-			.pipe(RsxToHtmlString::default())
+			.bpipe(RsxToHtmlString::default())
 			.unwrap(),
 		)
 		.to_be("<div><style>span {\n  color: red;\n}\n</style></div>");
@@ -224,7 +224,7 @@ mod test {
 					<style scope:global>span { color: red; }</style>
 				</div>
 			}
-			.pipe(RsxToHtmlString::default()).unwrap(),
+			.bpipe(RsxToHtmlString::default()).unwrap(),
 		)
 		.to_be("<div data-styleid=\"0\"><style data-styleid=\"0\">div[data-styleid=\"0\"] {\n  color: #00f;\n}\n</style><style data-styleid=\"0\">span {\n  color: red;\n}\n</style></div>");
 	}
@@ -232,7 +232,7 @@ mod test {
 
 	#[test]
 	fn applies_to_component_node() {
-		expect(rsx! { <Child /> }.pipe(RsxToHtmlString::default()).unwrap())
+		expect(rsx! { <Child /> }.bpipe(RsxToHtmlString::default()).unwrap())
 		.to_be("<div data-styleid=\"0\"><style data-styleid=\"0\">span[data-styleid=\"0\"] {\n  color: #00f;\n}\n</style></div>");
 	}
 	#[test]
@@ -241,7 +241,7 @@ mod test {
 			<Child>
 				<Child />
 			</Child>
-		}.pipe(RsxToHtmlString::default()).unwrap())
+		}.bpipe(RsxToHtmlString::default()).unwrap())
 			.to_be("<div data-styleid=\"0\"><style data-styleid=\"0\">span[data-styleid=\"0\"] {\n  color: #00f;\n}\n</style><div data-styleid=\"1\"><style data-styleid=\"1\">span[data-styleid=\"1\"] {\n  color: #00f;\n}\n</style></div></div>");
 	}
 	#[test]
@@ -251,7 +251,7 @@ mod test {
 				<br/>
 				<style>span { color: red; }</style>
 			</Child>
-		}.pipe(RsxToHtmlString::default()).unwrap())
+		}.bpipe(RsxToHtmlString::default()).unwrap())
 			.to_be("<div data-styleid=\"0\"><style data-styleid=\"0\">span[data-styleid=\"0\"] {\n  color: #00f;\n}\n</style><br data-styleid=\"1\"/><style data-styleid=\"1\">span[data-styleid=\"1\"] {\n  color: red;\n}\n</style></div>");
 	}
 
@@ -261,7 +261,7 @@ mod test {
 	fn inner_text() {
 		expect(rsx! {
 				<style>span { padding: 1.em; }</style>
-		}.pipe(RsxToHtmlString::default()).unwrap())
+		}.bpipe(RsxToHtmlString::default()).unwrap())
 			.to_be("<style data-styleid=\"0\">span[data-styleid=\"0\"] {\n  padding: 1em;\n}\n</style>");
 	}
 }

@@ -41,32 +41,15 @@ where
 }
 
 pub trait RsxPipelineTarget: Sized {
-	fn map<O>(self, func: impl FnOnce(Self) -> O) -> O { func(self) }
+	fn bmap<O>(self, func: impl FnOnce(Self) -> O) -> O { func(self) }
 
-	fn pipe<P: RsxPipeline<Self, O>, O: RsxPipelineTarget>(
+	fn bpipe<P: RsxPipeline<Self, O>, O: RsxPipelineTarget>(
 		self,
 		pipeline: P,
 	) -> O {
 		pipeline.apply(self)
 	}
 }
-pub trait RsxPipelineTargetIter<T: RsxPipelineTarget>:
-	Sized + IntoIterator<Item = T>
-{
-	fn pipe_each<P: RsxPipeline<T, O> + Clone, O: RsxPipelineTarget>(
-		self,
-		pipeline: P,
-	) -> Vec<O> {
-		self.into_iter()
-			.map(|v| pipeline.clone().apply(v))
-			.collect()
-	}
-}
-impl<T: IntoIterator<Item = U>, U: RsxPipelineTarget> RsxPipelineTargetIter<U>
-	for T
-{
-}
-
 
 impl<T: RsxPipelineTarget> RsxPipelineTarget for &T {}
 impl<T: RsxPipelineTarget> RsxPipelineTarget for Option<T> {}
@@ -130,10 +113,10 @@ pub struct DefaultRsxTransforms {
 impl RsxPipeline<RsxRoot, Result<RsxRoot>> for DefaultRsxTransforms {
 	fn apply(self, root: RsxRoot) -> Result<RsxRoot> {
 		#[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
-		let root = root.pipe(self.fs_src)?;
+		let root = root.bpipe(self.fs_src)?;
 		#[cfg(feature = "css")]
-		let root = root.pipe(self.scoped_style)?;
-		let root = root.pipe(self.slots)?;
+		let root = root.bpipe(self.scoped_style)?;
+		let root = root.bpipe(self.slots)?;
 		Ok(root)
 	}
 }
@@ -148,7 +131,7 @@ pub struct RsxToHtmlDocument {
 
 impl RsxPipeline<RsxRoot, Result<HtmlDocument>> for RsxToHtmlDocument {
 	fn apply(self, mut root: RsxRoot) -> Result<HtmlDocument> {
-		root = root.pipe(self.rsx_transforms)?;
+		root = root.bpipe(self.rsx_transforms)?;
 
 		let mut client_directives = false;
 		VisitRsxComponent::new(|c| {
@@ -160,12 +143,12 @@ impl RsxPipeline<RsxRoot, Result<HtmlDocument>> for RsxToHtmlDocument {
 
 		let mut doc = root
 			.as_ref()
-			.pipe(self.rsx_to_html)
-			.pipe(self.html_to_document)?;
+			.bpipe(self.rsx_to_html)
+			.bpipe(self.html_to_document)?;
 		if client_directives {
 			doc = doc
-				.map(|doc| (doc, root.as_ref()))
-				.pipe(self.html_doc_to_resumable);
+				.bmap(|doc| (doc, root.as_ref()))
+				.bpipe(self.html_doc_to_resumable);
 		}
 		Ok(doc)
 	}
@@ -181,9 +164,9 @@ pub struct RsxToHtmlString {
 
 impl RsxPipeline<RsxRoot, Result<String>> for RsxToHtmlString {
 	fn apply(self, root: RsxRoot) -> Result<String> {
-		root.pipe(self.rsx_transforms)?
-			.pipe(self.rsx_to_html)
-			.pipe(self.render_html)
+		root.bpipe(self.rsx_transforms)?
+			.bpipe(self.rsx_to_html)
+			.bpipe(self.render_html)
 	}
 }
 
@@ -205,11 +188,11 @@ mod test {
 	#[test]
 	fn auto_resumable() {
 		let doc = rsx! { <MyComponent /> }
-			.pipe(RsxToHtmlDocument::default())
+			.bpipe(RsxToHtmlDocument::default())
 			.unwrap();
 		expect(doc.body.len()).to_be(1);
 		let doc = rsx! { <MyComponent client:load /> }
-			.pipe(RsxToHtmlDocument::default())
+			.bpipe(RsxToHtmlDocument::default())
 			.unwrap();
 		expect(doc.body.len()).to_be(4);
 	}

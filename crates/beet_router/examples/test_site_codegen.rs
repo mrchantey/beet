@@ -16,16 +16,16 @@ pub fn main() -> Result<()> {
 				.with_include("*.rs")
 				.with_exclude("*mod.rs"),
 		)
-		.pipe(FileGroupToFuncFiles::default())?
-		.pipe(FuncFilesToRouteFuncs::http_routes())?
-		.pipe(RouteFuncsToCodegen::new(
+		.bpipe(FileGroupToFuncFiles::default())?
+		.bpipe(FuncFilesToRouteFuncs::http_routes())?
+		.bpipe(RouteFuncsToCodegen::new(
 			CodegenFile::new_workspace_rel(
 				"crates/beet_router/src/test_site/codegen/routes.rs",
 				"beet_router",
 			)
 			.with_use_beet_tokens("use beet_router::as_beet::*;"),
 		))?
-		.map(|(_, routes, codegen)| -> Result<_> {
+		.bmap(|(_, routes, codegen)| -> Result<_> {
 			codegen.build_and_write()?;
 			Ok(routes)
 		})?;

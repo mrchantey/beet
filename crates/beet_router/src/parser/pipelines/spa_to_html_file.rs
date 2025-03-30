@@ -28,8 +28,8 @@ impl RsxPipeline<RsxRoot, Result<()>> for SpaToHtmlFile {
 		// apply the template to the app
 		let html = template_map
 			.apply_template(app)?
-			.pipe(RsxToHtmlDocument::default())?
-			.pipe(RenderHtml::default())?;
+			.bpipe(RsxToHtmlDocument::default())?
+			.bpipe(RenderHtml::default())?;
 
 		// build the doc and save it, the web server will detect a change
 		// and reload the page.

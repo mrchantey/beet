@@ -23,10 +23,10 @@ impl RsDomTarget {
 	/// This does *not* apply any transformations
 	pub fn new(root: &RsxRoot) -> Result<Self> {
 		let doc = root
-			.pipe(RsxToHtml::default())
-			.pipe(HtmlToDocument::default())?;
+			.bpipe(RsxToHtml::default())
+			.bpipe(HtmlToDocument::default())?;
 
-		let loc_map = root.pipe(NodeToTreeLocationMap);
+		let loc_map = root.bpipe(NodeToTreeLocationMap);
 		Ok(Self {
 			doc,
 			loc_map,
@@ -40,7 +40,7 @@ impl DomTargetImpl for RsDomTarget {
 	fn html_constants(&self) -> &HtmlConstants { &self.constants }
 
 	fn render(&self) -> String {
-		self.doc.clone().pipe(RenderHtml::default()).unwrap()
+		self.doc.clone().bpipe(RenderHtml::default()).unwrap()
 	}
 
 	fn update_rsx_node(

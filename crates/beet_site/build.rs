@@ -27,15 +27,15 @@ fn main() -> Result<()> {
 						.with_include("*.rs")
 						.with_exclude("*mod.rs"),
 				)
-				.pipe(FileGroupToFuncFiles::default())?
-				.pipe(FuncFilesToRouteFuncs::http_routes())?
-				.pipe(RouteFuncsToCodegen::new(
+				.bpipe(FileGroupToFuncFiles::default())?
+				.bpipe(FuncFilesToRouteFuncs::http_routes())?
+				.bpipe(RouteFuncsToCodegen::new(
 					CodegenFile::new_workspace_rel(
 						"crates/beet_site/src/codegen/routes.rs",
 						&cx.pkg_name,
 					),
 				))?
-				.map(|(_, routes, codegen)| -> Result<_> {
+				.bmap(|(_, routes, codegen)| -> Result<_> {
 					codegen.build_and_write()?;
 					Ok(routes)
 				})?;
@@ -43,13 +43,13 @@ fn main() -> Result<()> {
 		// should be identical to crates/beet_design/build.rs
 		let mockups = FileGroup::new_workspace_rel("crates/beet_design/src")?
 			.with_filter(GlobFilter::default().with_include("*.mockup.rs"))
-			.pipe(FileGroupToFuncFiles::default())?
-			.pipe(FuncFilesToRouteFuncs::mockups())?
-			.map(|(_, routes)| routes);
+			.bpipe(FileGroupToFuncFiles::default())?
+			.bpipe(FuncFilesToRouteFuncs::mockups())?
+			.bmap(|(_, routes)| routes);
 
 		routes.extend(mockups);
 
-		routes.pipe(RouteFuncsToTree {
+		routes.bpipe(RouteFuncsToTree {
 			codgen_file: CodegenFile::new_workspace_rel(
 				"crates/beet_site/src/codegen/route_tree.rs",
 				&cx.pkg_name,

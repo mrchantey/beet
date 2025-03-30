@@ -34,7 +34,7 @@ fn my_node_other(props: MyNode) -> RsxRoot {
 
 fn main() {
 	let str = rsx! { <MyNode is_required=38 is_into="foobar" /> }
-		.pipe(RsxToHtmlString::default())
+		.bpipe(RsxToHtmlString::default())
 		.unwrap();
 	assert_eq!(
 		str,

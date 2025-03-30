@@ -24,7 +24,7 @@ impl
 			.map(|(route, root)| {
 				// only hydrate if we have templates
 				// we already warned otherwise
-				let doc = root.pipe(RsxToHtmlDocument::default())?;
+				let doc = root.bpipe(RsxToHtmlDocument::default())?;
 				Ok((route.clone(), doc))
 			})
 			.collect::<Result<Vec<_>>>()?;
@@ -78,7 +78,7 @@ impl RsxPipeline<Vec<(RouteInfo, HtmlDocument)>, Result<()>>
 			let path = path.strip_prefix("/").unwrap();
 			let full_path = &dst.join(path);
 			// pretty rendering currently breaks text node logic
-			let str = doc.pipe(RenderHtml::default())?;
+			let str = doc.bpipe(RenderHtml::default())?;
 			FsExt::write(&full_path, &str)?;
 		}
 
@@ -95,13 +95,13 @@ mod test {
 	fn works() {
 		// TODO non-disk version
 		// beet_router::test_site::routes::collect()
-		// .pipe(FuncFilesToRsx::default())
+		// .bpipe(FuncFilesToRsx::default())
 		// .await
 		// .unwrap()
-		// .pipe(ApplyRouteTemplates::new(
+		// .bpipe(ApplyRouteTemplates::new(
 		// 	"target/test_site/rsx-templates.ron",
 		// ))?
-		// .pipe(RoutesToHtml::default())?
-		// .pipe(HtmlRoutesToDisk::new("target/test_site"))?;
+		// .bpipe(RoutesToHtml::default())?
+		// .bpipe(HtmlRoutesToDisk::new("target/test_site"))?;
 	}
 }

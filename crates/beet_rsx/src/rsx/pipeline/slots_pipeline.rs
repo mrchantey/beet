@@ -27,7 +27,7 @@ use thiserror::Error;
 ///  		<div slot="header">Header</div>
 /// 		<div>Default</div>
 ///  	</MyComponent>
-/// }.pipe(RsxToHtmlString::default()).unwrap(),
+/// }.bpipe(RsxToHtmlString::default()).unwrap(),
 /// "<html><div>Header</div><div>Default</div></html>");
 ///
 /// ```
@@ -236,7 +236,7 @@ mod test {
 					<div>Default</div>
 				</MyComponent>
 			}
-			.pipe(RsxToHtmlString::default())
+			.bpipe(RsxToHtmlString::default())
 			.unwrap(),
 		)
 		.to_be("<html><div>Header</div><div>Default</div></html>");
@@ -265,7 +265,7 @@ mod test {
 					</MyComponent>
 				</MyComponent>
 			}
-			.pipe(RsxToHtmlString::default())
+			.bpipe(RsxToHtmlString::default())
 			.unwrap(),
 		)
 		.to_be("<html><html><div>Header</div><div>Default</div></html></html>");

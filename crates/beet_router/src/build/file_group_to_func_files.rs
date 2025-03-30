@@ -74,7 +74,7 @@ mod test {
 	#[test]
 	fn works() {
 		let funcs = FileGroup::test_site_routes()
-			.pipe(FileGroupToFuncFiles::default())
+			.bpipe(FileGroupToFuncFiles::default())
 			.unwrap();
 		expect(funcs.len()).to_be(3);
 		let file = funcs

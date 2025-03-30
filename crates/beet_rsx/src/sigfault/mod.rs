@@ -123,9 +123,9 @@ mod test {
 		let (get, set) = signal(7);
 
 		rsx! { <div>value is {get}</div> }
-			.pipe(MountRsDom)
+			.bpipe(MountRsDom)
 			.unwrap()
-			.pipe(RegisterEffects::default())
+			.bpipe(RegisterEffects::default())
 			.unwrap();
 		expect(&DomTarget::with(|h| h.render()))
 			.to_contain("<div data-beet-rsx-idx=\"1\">value is 7</div>");
@@ -141,9 +141,9 @@ mod test {
 		let (get, set) = signal(7);
 
 		rsx! { <div>value is {get}</div> }
-			.pipe(MountRsDom)
+			.bpipe(MountRsDom)
 			.unwrap()
-			.pipe(RegisterEffects::default())
+			.bpipe(RegisterEffects::default())
 			.unwrap();
 		expect(&DomTarget::with(|h| h.render()))
 			.to_contain("<div data-beet-rsx-idx=\"1\">value is 7</div>");
