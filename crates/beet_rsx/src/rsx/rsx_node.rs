@@ -39,6 +39,19 @@ impl AsRef<RsxNode> for &RsxNode {
 impl AsMut<RsxNode> for &mut RsxNode {
 	fn as_mut(&mut self) -> &mut RsxNode { *self }
 }
+impl<T: ToString> From<T> for RsxNode {
+	fn from(value: T) -> Self {
+		RsxNode::Text {
+			value: value.to_string(),
+		}
+	}
+}
+
+impl Into<RsxNode> for RsxElement {
+	fn into(self) -> RsxNode { RsxNode::Element(self) }
+}
+
+
 
 
 impl RsxNode {
@@ -222,7 +235,6 @@ pub struct RsxElement {
 	pub self_closing: bool,
 }
 
-
 impl RsxElement {
 	/// Whether any children or attributes are blocks,
 	/// used to determine whether the node requires an id
@@ -290,6 +302,17 @@ pub enum RsxAttribute {
 		initial: Vec<RsxAttribute>,
 		effect: Effect,
 	},
+}
+
+pub struct AsStrIntoRsxAttributeMarker;
+impl<T: Into<String>> IntoRsxAttribute<AsStrIntoRsxAttributeMarker> for T {
+	fn into_rsx_attribute(self) -> RsxAttribute {
+		RsxAttribute::Key { key: self.into() }
+	}
+}
+pub trait IntoRsxAttribute<M> {
+	/// Convert this into a RsxAttribute
+	fn into_rsx_attribute(self) -> RsxAttribute;
 }
 
 pub trait IntoRsxAttributes<M> {

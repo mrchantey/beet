@@ -36,7 +36,7 @@ impl AsRef<RsxNode> for RsxRoot {
 impl AsMut<RsxNode> for RsxRoot {
 	fn as_mut(&mut self) -> &mut RsxNode { &mut self.node }
 }
-
+// This also means RsxRoot: impl IntoRsxRoot
 impl Into<RsxNode> for RsxRoot {
 	fn into(self) -> RsxNode { self.node }
 }
@@ -48,25 +48,20 @@ impl BorrowMut<RsxNode> for RsxRoot {
 	fn borrow_mut(&mut self) -> &mut RsxNode { &mut self.node }
 }
 
-pub trait IntoRsxRoot<M> {
+pub trait IntoRsxRoot<M = ()> {
 	fn into_root(self) -> RsxRoot;
-}
-impl IntoRsxRoot<RsxRoot> for RsxRoot {
-	fn into_root(self) -> RsxRoot { self }
 }
 
 impl IntoRsxRoot<()> for () {
 	fn into_root(self) -> RsxRoot { RsxRoot::default() }
 }
 
-pub struct ToStringIntoRsx;
-impl<T: ToString> IntoRsxRoot<(T, ToStringIntoRsx)> for T {
+pub struct NodeToRoot;
+impl<T: Into<RsxNode>> IntoRsxRoot<(T, NodeToRoot)> for T {
 	fn into_root(self) -> RsxRoot {
 		RsxRoot {
 			location: None,
-			node: RsxNode::Text {
-				value: self.to_string(),
-			},
+			node: self.into(),
 		}
 	}
 }

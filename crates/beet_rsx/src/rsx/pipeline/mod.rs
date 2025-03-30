@@ -20,12 +20,8 @@ pub use scoped_style_pipeline::*;
 use crate::prelude::*;
 use anyhow::Result;
 
-// pub trait PipingHot: Sized {
-// 	fn pipe<O>(self, func: impl FnOnce(Self) -> O) -> O { func(self) }
-// }
-// impl<T: Sized> PipingHot for T {}
 
-/// Trait for pipelines that will mutate an [`RsxPluginTarget`]
+/// Basically a `FnOnce` trait, but not nightly and a little less awkward to implement.
 pub trait RsxPipeline<In, Out = In> {
 	/// Consume self and apply to the target
 	fn apply(self, value: In) -> Out;
@@ -42,8 +38,14 @@ where
 /// Blanket implementation for all types allowing for method-chaining.
 /// Very similar in its goals to [`tap`](https://crates.io/crates/tap)
 pub trait RsxPipelineTarget: Sized {
+	/// its like map but for any type
 	fn bmap<O>(self, func: impl FnOnce(Self) -> O) -> O { func(self) }
-
+	/// its like inpsect but for any type
+	fn btap(mut self, func: impl FnOnce(&mut Self)) -> Self {
+		func(&mut self);
+		self
+	}
+	/// its like map but for our pipeline trait
 	fn bpipe<P: RsxPipeline<Self, O>, O>(self, pipeline: P) -> O {
 		pipeline.apply(self)
 	}

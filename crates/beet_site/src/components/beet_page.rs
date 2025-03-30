@@ -1,4 +1,5 @@
 use crate::route_tree;
+use beet::design::exports::*;
 use beet::prelude::*;
 
 
@@ -27,9 +28,11 @@ fn beet_page(_: BeetPage) -> RsxRoot {
 			})
 			.collect::<Vec<_>>()
 	};
+	let theme = ThemeBuilder::with_source(Argb::new(255, 0, 255, 127)).build();
 
 	rsx! {
 		<ContentLayout>
+		<ColorScheme theme=theme/>
 		<h1>{brand.title}</h1>
 			<nav>
 				{nav_items}

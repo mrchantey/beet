@@ -1,11 +1,8 @@
-use beet_rsx::as_beet::*;
-use material_colors::color::Argb;
-// use material_colors::scheme::Scheme;
 use crate::prelude::*;
+use beet_rsx::prelude::*;
+use material_colors::color::Argb;
 use material_colors::theme::Theme;
 use material_colors::theme::ThemeBuilder;
-
-
 
 
 #[derive(Debug, Node)]
@@ -16,14 +13,9 @@ pub struct ColorScheme {
 fn color_scheme(props: ColorScheme) -> RsxRoot {
 	// Theme
 
-	let _css = ThemeToCss::new("--bt-color").map(&props.theme);
+	let css = ThemeToCss::new("--bt-color").map(&props.theme);
 
-	rsx! {
-		<style>
-
-
-		</style>
-	}
+	Style::new(css).with_global_scope().into_root()
 }
 
 impl ColorScheme {
