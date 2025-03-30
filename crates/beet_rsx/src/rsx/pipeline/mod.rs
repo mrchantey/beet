@@ -49,35 +49,6 @@ pub trait RsxPipelineTarget: Sized {
 	) -> O {
 		pipeline.apply(self)
 	}
-	fn pipe_with<
-		P: RsxPipeline<(Self, T2), O>,
-		O: RsxPipelineTarget,
-		T2: RsxPipelineTarget,
-	>(
-		self,
-		other: T2,
-		pipeline: P,
-	) -> O
-	where
-		(Self, T2): RsxPipelineTarget,
-	{
-		pipeline.apply((self, other))
-	}
-	/// pipe_with but the other way round
-	fn pipe_with2<
-		P: RsxPipeline<(T2, Self), O>,
-		O: RsxPipelineTarget,
-		T2: RsxPipelineTarget,
-	>(
-		self,
-		other: T2,
-		pipeline: P,
-	) -> O
-	where
-		(Self, T2): RsxPipelineTarget,
-	{
-		pipeline.apply((other, self))
-	}
 }
 pub trait RsxPipelineTargetIter<T: RsxPipelineTarget>:
 	Sized + IntoIterator<Item = T>
@@ -192,7 +163,9 @@ impl RsxPipeline<RsxRoot, Result<HtmlDocument>> for RsxToHtmlDocument {
 			.pipe(self.rsx_to_html)
 			.pipe(self.html_to_document)?;
 		if client_directives {
-			doc = doc.pipe_with(root.as_ref(), self.html_doc_to_resumable);
+			doc = doc
+				.map(|doc| (doc, root.as_ref()))
+				.pipe(self.html_doc_to_resumable);
 		}
 		Ok(doc)
 	}

@@ -12,6 +12,7 @@ use syn::Visibility;
 #[derive(Debug, Default, Clone)]
 pub struct FileGroupToFuncFiles;
 
+
 impl RsxPipeline<FileGroup, Result<Vec<FuncFile>>> for FileGroupToFuncFiles {
 	fn apply(self, group: FileGroup) -> Result<Vec<FuncFile>> {
 		group
@@ -22,7 +23,6 @@ impl RsxPipeline<FileGroup, Result<Vec<FuncFile>>> for FileGroupToFuncFiles {
 			.collect::<Result<Vec<_>>>()
 	}
 }
-
 
 impl FileGroupToFuncFiles {
 	fn build_func_file(

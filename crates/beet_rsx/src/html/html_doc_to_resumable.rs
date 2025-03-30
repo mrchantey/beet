@@ -90,7 +90,8 @@ mod test {
 			.pipe(RsxToHtml::default())
 			.pipe(HtmlToDocument::default())
 			.unwrap()
-			.pipe_with(root.as_ref(), HtmlDocToResumable::default())
+			.map(|doc| (doc, root.as_ref()))
+			.pipe(HtmlDocToResumable::default())
 			.pipe(RenderHtml::default())
 			.unwrap()
 	}

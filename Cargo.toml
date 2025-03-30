@@ -71,12 +71,17 @@ beet_server = { path = "crates/beet_server", version = "0.0.6-dev.8" }
 beet_sim = { path = "crates/beet_sim", version = "0.0.6-dev.8" }
 
 #💡 local
-# bevyhub = { git = "https://github.com/mrchantey/bevyhub", default-features = false }
 # sweet = { version = "0.3.0" }
 # sweet = { path = "../sweet", features = ["rand"] }
 sweet = { git = "https://github.com/mrchantey/sweet", features = ["rand"] }
-
 bevy = { version = "0.15", default-features = false, features = ["bevy_color"] }
+
+#💡 utility
+anyhow = "1"
+thiserror = "1"
+heck = "0.4"
+once_cell = "1"
+rapidhash = "1.3.0"
 
 #💡 logging
 log = "0.4"
@@ -85,12 +90,6 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 pretty_env_logger = "0.4"
 console_log = { version = "1", features = ["color"] }
 
-#💡 utility
-anyhow = "1"
-thiserror = "1"
-heck = "0.4"
-once_cell = "1"
-rapidhash = "1.3.0"
 
 #💡 async
 futures = "0.3"
