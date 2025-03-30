@@ -36,6 +36,7 @@ cli *args:
 install-cli *args:
 	cargo install --path crates/beet-cli {{args}}
 
+
 # Run and watch a workspace example
 run example *args:
 	just watch just run-ci {{example}} {{args}}
@@ -102,6 +103,10 @@ run-test-site:
 
 run-site *args:
 	just cli watch -p beet_site {{args}}
+
+build-site *args:
+	just cli build -p beet_site {{args}}
+
 
 #💡 Test
 

@@ -11,18 +11,14 @@ use sweet::prelude::*;
 /// changed in a file, or if it was just the html template.
 ///
 /// The reload step is as follows:
-/// 1. rebuild templates
-/// 2. call reload
+/// 1. call reload
 ///
 /// The recompile step is as follows:
 /// 1. call recompile
-/// 2. rebuild templates
-/// 3. call reload
+/// 2. call reload
 ///
 pub struct TemplateWatcher<Reload, Recompile> {
-	// we will be swapping out the `run` and `build` methods of this command,
-	// depending on the diff
-	build_templates: BuildTemplateMap,
+	templates_root_dir: PathBuf,
 	reload_func: Reload,
 	recompile_func: Recompile,
 	/// A hash of the *code parts* of each file being watched.
@@ -34,13 +30,13 @@ impl<Reload: FnMut() -> Result<()>, Recompile: FnMut() -> Result<()>>
 	TemplateWatcher<Reload, Recompile>
 {
 	pub fn new(
-		build_templates: BuildTemplateMap,
+		templates_root_dir: impl AsRef<Path>,
 		reload_func: Reload,
 		recompile_func: Recompile,
 	) -> Result<Self> {
-		let file_cache = preheat_cache(&build_templates.templates_root_dir)?;
+		let file_cache = preheat_cache(&templates_root_dir)?;
 		Ok(Self {
-			build_templates,
+			templates_root_dir: templates_root_dir.as_ref().to_path_buf(),
 			file_cache,
 			reload_func,
 			recompile_func,
@@ -54,7 +50,7 @@ impl<Reload: FnMut() -> Result<()>, Recompile: FnMut() -> Result<()>>
 
 	pub async fn watch(mut self) -> Result<()> {
 		FsWatcher {
-			cwd: self.build_templates.templates_root_dir.clone(),
+			cwd: self.templates_root_dir.clone(),
 			filter: GlobFilter::default()
 				.with_exclude("*.git*")
 				.with_exclude("*target*"),
@@ -133,9 +129,6 @@ impl<Reload: FnMut() -> Result<()>, Recompile: FnMut() -> Result<()>>
 		// terminal::clear()?;
 		println!("Watcher::Recompile: {}", reason);
 		let start = Instant::now();
-		// recompile depends on a templates file existing
-		// and build_templates doesnt depend on recompile so safe to do first
-		self.build_templates.build_and_write()?;
 		(self.recompile_func)()?;
 		(self.reload_func)()?;
 		println!("Watcher::Recompile Duration: {:?}", start.elapsed());
@@ -145,8 +138,6 @@ impl<Reload: FnMut() -> Result<()>, Recompile: FnMut() -> Result<()>>
 	fn reload(&mut self, reason: &str) -> Result<()> {
 		println!("Watcher::Reload: {}", reason);
 		let start = Instant::now();
-		// first rebuild templates
-		self.build_templates.build_and_write()?;
 		(self.reload_func)()?;
 		println!("Watcher::Reload Duration: {:?}", start.elapsed());
 		Ok(())
@@ -155,7 +146,7 @@ impl<Reload: FnMut() -> Result<()>, Recompile: FnMut() -> Result<()>>
 
 
 /// Create a file cache with every file in the src directory
-fn preheat_cache(src: &Path) -> Result<HashMap<PathBuf, u64>> {
+fn preheat_cache(src: impl AsRef<Path>) -> Result<HashMap<PathBuf, u64>> {
 	// let now = Instant::now();
 	// TODO rayon par_iter
 	let cache: HashMap<PathBuf, u64> = ReadDir::files_recursive(src)?

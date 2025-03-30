@@ -25,3 +25,4 @@ beet = { workspace = true, features = ["server"] }
 [build-dependencies]
 anyhow.workspace = true
 beet = { workspace = true, features = ["build", "router"] }
+sweet = { workspace = true, features = ["fs"] }

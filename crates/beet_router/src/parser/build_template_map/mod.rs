@@ -18,7 +18,7 @@ pub use hash_file::*;
 pub use template_watcher::*;
 
 /// Build an [`RsxTemplateMap`] and write it to a file
-#[derive(Debug, Parser)]
+#[derive(Debug, Clone, Parser)]
 pub struct BuildTemplateMap {
 	/// File or directory to watch and create templates for
 	//  TODO this might be better as an include pattern
@@ -42,6 +42,10 @@ pub struct BuildTemplateMap {
 
 impl Default for BuildTemplateMap {
 	fn default() -> Self { clap::Parser::parse_from(&[""]) }
+}
+
+impl BuildStep for BuildTemplateMap {
+	fn run(&self) -> Result<()> { self.build_and_write() }
 }
 
 impl BuildTemplateMap {

@@ -33,15 +33,18 @@ impl Plugin for BevyTemplateReloader {
 			send2.send(TemplateReloaderMessage::Reload)?;
 			Ok(())
 		};
+		let builder = BuildTemplateMap::new(&src);
+		let templates_root_dir = builder.templates_root_dir.clone();
+		let dst = builder.templates_map_path.clone();
+
 		let recompile = move || {
+			builder.build_and_write()?;
 			send.send(TemplateReloaderMessage::Recompile)?;
 			Ok(())
 		};
-		let builder = BuildTemplateMap::new(&src);
-		let dst = builder.templates_map_path.clone();
 
 		let _handle = tokio::spawn(async move {
-			TemplateWatcher::new(builder, reload, recompile)?
+			TemplateWatcher::new(templates_root_dir, reload, recompile)?
 				.watch()
 				.await
 		});

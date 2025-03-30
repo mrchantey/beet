@@ -72,15 +72,31 @@ impl Watch {
 	/// 2. recompile on code changes
 	/// 3. run the process
 	async fn watch(self) -> Result<()> {
-		let build_app = BuildApp::new(&self.build_cmd, &self.watch_args)?;
+		let Self {
+			watch_args,
+			build_template_map,
+			build_cmd,
+		} = self;
 
-		let build_templates =
-			ExportStatic::new(&self.watch_args, &self.build_cmd.exe_path());
+
+		let templates_root_dir = build_template_map.templates_root_dir.clone();
+
+		let recompile = Build {
+			build_cmd: build_cmd.clone(),
+			watch_args: watch_args.clone(),
+			build_template_map: build_template_map.clone(),
+			server: true,
+		}
+		.into_group()?;
+
+		let reload = BuildStepGroup::default()
+			.with(build_template_map.clone())
+			.with(ExportStatic::new(&watch_args, &build_cmd.exe_path()));
 
 		TemplateWatcher::new(
-			self.build_template_map,
-			|| build_templates.run(),
-			|| build_app.run(),
+			templates_root_dir,
+			|| reload.run(),
+			|| recompile.run(),
 		)?
 		.run_once_and_watch()
 		.await

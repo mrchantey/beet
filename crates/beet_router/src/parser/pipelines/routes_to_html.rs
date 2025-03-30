@@ -59,10 +59,6 @@ impl RsxPipeline<Vec<(RouteInfo, HtmlDocument)>, Result<()>>
 {
 	fn apply(self, routes: Vec<(RouteInfo, HtmlDocument)>) -> Result<()> {
 		let dst = &self.html_dir;
-		// in debug mode removing a watched dir breaks FsWatcher
-		#[cfg(not(debug_assertions))]
-		FsExt::remove(&dst).ok();
-		std::fs::create_dir_all(&dst)?;
 
 		let dst = dst.canonicalize()?;
 		for (info, doc) in routes.into_iter() {

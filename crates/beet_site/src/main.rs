@@ -1,5 +1,6 @@
 #![feature(more_qualified_paths)]
 use beet::prelude::*;
+#[allow(unused)]
 use beet_site::prelude::*;
 
 #[cfg(not(target_arch = "wasm32"))]

@@ -1,5 +1,6 @@
 use crate::prelude::*;
 use anyhow::Result;
+use beet::prelude::*;
 use clap::Parser;
 use std::process::Command;
 
@@ -28,7 +29,7 @@ impl Deploy {
 
 	pub fn run(mut self) -> Result<()> {
 		self.build.build_cmd.release = true;
-		self.build.run()?;
+		self.build.clone().into_group()?.run()?;
 
 		self.lambda_build()?;
 		self.lambda_deploy()?;
