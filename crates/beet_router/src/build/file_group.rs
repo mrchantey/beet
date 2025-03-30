@@ -1,5 +1,4 @@
 use anyhow::Result;
-use beet_rsx::rsx::RsxPipelineTarget;
 use clap::Parser;
 use serde::Deserialize;
 use serde::Serialize;
@@ -17,8 +16,6 @@ pub struct FileGroup {
 	#[command(flatten)]
 	pub filter: GlobFilter,
 }
-
-impl RsxPipelineTarget for FileGroup {}
 
 impl FileGroup {
 	pub fn new(src: CanonicalPathBuf) -> Self {

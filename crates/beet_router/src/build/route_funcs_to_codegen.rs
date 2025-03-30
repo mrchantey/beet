@@ -21,10 +21,8 @@ impl Default for RouteFuncsToCodegen {
 }
 
 
-impl<
-	T1: RsxPipelineTarget + AsRef<Vec<FuncFile>>,
-	T2: RsxPipelineTarget + AsRef<Vec<RouteFuncTokens>>,
-> RsxPipeline<(T1, T2), Result<(T1, T2, CodegenFile)>> for RouteFuncsToCodegen
+impl<T1: AsRef<Vec<FuncFile>>, T2: AsRef<Vec<RouteFuncTokens>>>
+	RsxPipeline<(T1, T2), Result<(T1, T2, CodegenFile)>> for RouteFuncsToCodegen
 {
 	fn apply(
 		self,

@@ -1,6 +1,5 @@
 use crate::prelude::*;
 use anyhow::Result;
-use beet_rsx::prelude::*;
 use std::path::Path;
 use syn::Block;
 
@@ -53,6 +52,3 @@ impl RouteFuncTokens {
 		})
 	}
 }
-
-
-impl RsxPipelineTarget for RouteFuncTokens {}

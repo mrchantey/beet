@@ -13,9 +13,7 @@ pub struct RsxToHtml {
 	tree_idx_incr: TreeIdxIncr,
 }
 
-impl<T: RsxPipelineTarget + AsRef<RsxNode>> RsxPipeline<T, Vec<HtmlNode>>
-	for RsxToHtml
-{
+impl<T: AsRef<RsxNode>> RsxPipeline<T, Vec<HtmlNode>> for RsxToHtml {
 	fn apply(mut self, node: T) -> Vec<HtmlNode> {
 		self.map_node(node.as_ref())
 	}

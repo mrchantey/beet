@@ -14,9 +14,7 @@ impl RegisterEffects {
 	pub fn new(root_location: TreeLocation) -> Self { Self { root_location } }
 }
 
-impl<T: RsxPipelineTarget + Into<RsxNode>> RsxPipeline<T, Result<()>>
-	for RegisterEffects
-{
+impl<T: Into<RsxNode>> RsxPipeline<T, Result<()>> for RegisterEffects {
 	fn apply(self, node: T) -> Result<()> {
 		let mut node: RsxNode = node.into();
 		let mut result = Ok(());

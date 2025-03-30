@@ -27,9 +27,7 @@ impl RenderHtml {
 	}
 }
 
-impl<T: RsxPipelineTarget + AsRef<Vec<HtmlNode>>> RsxPipeline<T, Result<String>>
-	for RenderHtml
-{
+impl<T: AsRef<Vec<HtmlNode>>> RsxPipeline<T, Result<String>> for RenderHtml {
 	fn apply(self, target: T) -> Result<String> {
 		Ok(self.render(target.as_ref())?)
 	}

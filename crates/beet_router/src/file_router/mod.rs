@@ -1,5 +1,4 @@
 use anyhow::Result;
-use beet_rsx::rsx::RsxPipelineTarget;
 use beet_rsx::rsx::RsxRoot;
 use http::Method;
 use std::path::Path;
@@ -145,8 +144,6 @@ impl RouteInfo {
 		}
 	}
 }
-
-impl RsxPipelineTarget for RouteInfo {}
 
 #[cfg(test)]
 mod test {

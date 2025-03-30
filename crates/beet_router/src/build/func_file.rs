@@ -1,6 +1,5 @@
 use crate::prelude::*;
 use anyhow::Result;
-use beet_rsx::rsx::RsxPipelineTarget;
 use std::path::PathBuf;
 use sweet::prelude::CanonicalPathBuf;
 use syn::Ident;
@@ -28,5 +27,3 @@ impl FuncFile {
 		RoutePath::parse_local_path(&self.local_path)
 	}
 }
-
-impl RsxPipelineTarget for FuncFile {}

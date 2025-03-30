@@ -15,8 +15,6 @@ pub struct RouteFunc<T> {
 	pub func: T,
 }
 
-impl<T> RsxPipelineTarget for RouteFunc<T> {}
-
 impl<T> RouteFunc<T> {
 	pub fn new<M>(
 		method: &str,

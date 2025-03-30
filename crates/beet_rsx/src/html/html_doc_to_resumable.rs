@@ -6,10 +6,8 @@ pub struct HtmlDocToResumable {
 	pub html_constants: HtmlConstants,
 }
 
-impl<T: AsRef<RsxNode> + RsxPipelineTarget>
-	RsxPipeline<(HtmlDocument, T), HtmlDocument> for HtmlDocToResumable
-where
-	(HtmlDocument, T): RsxPipelineTarget,
+impl<T: AsRef<RsxNode>> RsxPipeline<(HtmlDocument, T), HtmlDocument>
+	for HtmlDocToResumable
 {
 	fn apply(self, (mut doc, node): (HtmlDocument, T)) -> HtmlDocument {
 		self.insert_tree_location_map(node.as_ref(), &mut doc);

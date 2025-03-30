@@ -121,7 +121,7 @@ impl<F: MapFuncFileToRoutes> FuncFilesToRouteFuncs<F> {
 }
 
 
-impl<T: RsxPipelineTarget + AsRef<Vec<FuncFile>>, F: MapFuncFileToRoutes>
+impl<T: AsRef<Vec<FuncFile>>, F: MapFuncFileToRoutes>
 	RsxPipeline<T, Result<(T, Vec<RouteFuncTokens>)>>
 	for FuncFilesToRouteFuncs<F>
 {

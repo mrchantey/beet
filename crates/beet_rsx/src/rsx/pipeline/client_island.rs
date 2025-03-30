@@ -46,9 +46,7 @@ impl ClientIsland {
 #[derive(Default)]
 pub struct CollectClientIslands;
 
-impl RsxPipelineTarget for Vec<ClientIsland> {}
-
-impl<T: RsxPipelineTarget + AsRef<RsxNode>> RsxPipeline<T, Vec<ClientIsland>>
+impl<T: AsRef<RsxNode>> RsxPipeline<T, Vec<ClientIsland>>
 	for CollectClientIslands
 {
 	fn apply(self, root: T) -> Vec<ClientIsland> {

@@ -6,7 +6,6 @@ mod fs_src_pipeline;
 mod register_effects;
 mod slots_pipeline;
 pub use register_effects::*;
-use std::pin::Pin;
 
 pub use build_step::*;
 pub use client_island::*;
@@ -27,78 +26,29 @@ use anyhow::Result;
 // impl<T: Sized> PipingHot for T {}
 
 /// Trait for pipelines that will mutate an [`RsxPluginTarget`]
-pub trait RsxPipeline<In: RsxPipelineTarget, Out: RsxPipelineTarget = In> {
+pub trait RsxPipeline<In, Out = In> {
 	/// Consume self and apply to the target
 	fn apply(self, value: In) -> Out;
 }
 
-impl<F, In: RsxPipelineTarget, Out: RsxPipelineTarget> RsxPipeline<In, Out>
-	for F
+impl<F, In, Out> RsxPipeline<In, Out> for F
 where
 	F: FnOnce(In) -> Out,
 {
 	fn apply(self, value: In) -> Out { self(value) }
 }
 
+
+/// Blanket implementation for all types allowing for method-chaining.
+/// Very similar in its goals to [`tap`](https://crates.io/crates/tap)
 pub trait RsxPipelineTarget: Sized {
 	fn bmap<O>(self, func: impl FnOnce(Self) -> O) -> O { func(self) }
 
-	fn bpipe<P: RsxPipeline<Self, O>, O: RsxPipelineTarget>(
-		self,
-		pipeline: P,
-	) -> O {
+	fn bpipe<P: RsxPipeline<Self, O>, O>(self, pipeline: P) -> O {
 		pipeline.apply(self)
 	}
 }
-
-impl<T: RsxPipelineTarget> RsxPipelineTarget for &T {}
-impl<T: RsxPipelineTarget> RsxPipelineTarget for Option<T> {}
-impl<T: RsxPipelineTarget> RsxPipelineTarget for Result<T> {}
-impl<T: RsxPipelineTarget> RsxPipelineTarget for Vec<T> {}
-impl<T: RsxPipelineTarget> RsxPipelineTarget for Box<T> {}
-impl<T: RsxPipelineTarget> RsxPipelineTarget
-	for Pin<Box<dyn Future<Output = T>>>
-{
-}
-impl<T: RsxPipelineTarget> RsxPipelineTarget
-	for Box<dyn Fn() -> Pin<Box<dyn Future<Output = T>>>>
-{
-}
-
-
-impl<T1: RsxPipelineTarget, T2: RsxPipelineTarget> RsxPipelineTarget
-	for (T1, T2)
-{
-}
-
-impl<T1: RsxPipelineTarget, T2: RsxPipelineTarget, T3: RsxPipelineTarget>
-	RsxPipelineTarget for (T1, T2, T3)
-{
-}
-
-
-
-impl RsxPipelineTarget for () {}
-impl RsxPipelineTarget for String {}
-impl RsxPipelineTarget for i32 {}
-impl RsxPipelineTarget for u32 {}
-impl RsxPipelineTarget for i64 {}
-impl RsxPipelineTarget for u64 {}
-impl RsxPipelineTarget for f32 {}
-impl RsxPipelineTarget for f64 {}
-impl RsxPipelineTarget for bool {}
-impl RsxPipelineTarget for char {}
-impl RsxPipelineTarget for std::path::PathBuf {}
-
-impl RsxPipelineTarget for RsxRoot {}
-impl RsxPipelineTarget for RsxNode {}
-
-impl RsxPipelineTarget for RsxElement {}
-impl RsxPipelineTarget for RsxBlock {}
-impl RsxPipelineTarget for RsxComponent {}
-
-impl RsxPipelineTarget for HtmlNode {}
-impl RsxPipelineTarget for HtmlDocument {}
+impl<T: Sized> RsxPipelineTarget for T {}
 
 
 #[derive(Default)]

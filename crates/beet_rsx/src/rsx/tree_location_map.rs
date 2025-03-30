@@ -6,7 +6,7 @@ use rapidhash::RapidHashMap;
 
 pub struct NodeToTreeLocationMap;
 
-impl<T: RsxPipelineTarget + AsRef<RsxNode>> RsxPipeline<T, TreeLocationMap>
+impl<T: AsRef<RsxNode>> RsxPipeline<T, TreeLocationMap>
 	for NodeToTreeLocationMap
 {
 	fn apply(self, node: T) -> TreeLocationMap {
@@ -46,8 +46,6 @@ pub struct TreeLocationMap {
 	pub rusty_locations: RapidHashMap<RustyTracker, TreeLocation>,
 	pub collapsed_elements: RapidHashMap<TreeIdx, TextBlockEncoder>,
 }
-
-impl RsxPipelineTarget for TreeLocationMap {}
 
 
 impl TreeLocationMap {

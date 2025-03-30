@@ -1,5 +1,4 @@
 use anyhow::Result;
-use beet_rsx::rsx::RsxPipelineTarget;
 use proc_macro2::TokenStream;
 use std::path::Path;
 use sweet::prelude::*;
@@ -36,9 +35,6 @@ impl Default for CodegenFile {
 		}
 	}
 }
-
-
-impl RsxPipelineTarget for CodegenFile {}
 
 impl CodegenFile {
 	/// Create a new [`CodegenFile`] with the most common options.
