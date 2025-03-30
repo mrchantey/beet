@@ -42,6 +42,8 @@ impl RsxTemplateMap {
 	}
 
 	// TODO pipeline
+	// TODO use a visitor that doesnt exit early if a parent
+	// has no location, a child still might
 	/// Find a matching template for the given [`RsxRoot`] and apply it, returning the
 	/// updated root.
 	/// If the root has no location or the location is outside the templates root directory,
