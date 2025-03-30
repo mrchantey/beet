@@ -21,7 +21,7 @@ pub fn light() -> RsxNode {
 pub fn dark() -> RsxNode {
 	rsx! {
 		<div class="primary">
-		hello worlddssd
+		hello worlddssdsdsds
 		</div>
 		<style>
 		</style>

@@ -12,7 +12,7 @@ pub struct BuildNative {
 }
 
 impl BuildNative {
-	pub fn new(build_cmd: &CargoBuildCmd, watch_args: &WatchArgs) -> Self {
+	pub fn new(build_cmd: &CargoBuildCmd, watch_args: &BuildArgs) -> Self {
 		let mut build_cmd = build_cmd.clone();
 		if !watch_args.as_static {
 			build_cmd.cargo_args = Some("--features beet/server".to_string());
@@ -32,13 +32,13 @@ impl BuildStep for BuildNative {
 /// Run the native app with the `--static` flag, exporting client islands and html files
 pub struct ExportStatic {
 	exe_path: PathBuf,
-	watch_args: WatchArgs,
+	build_args: BuildArgs,
 }
 
 impl ExportStatic {
-	pub fn new(watch_args: &WatchArgs, exe_path: &Path) -> Self {
+	pub fn new(build_args: &BuildArgs, exe_path: &Path) -> Self {
 		Self {
-			watch_args: watch_args.clone(),
+			build_args: build_args.clone(),
 			exe_path: exe_path.to_path_buf(),
 		}
 	}
@@ -52,7 +52,7 @@ impl BuildStep for ExportStatic {
 		println!("🥁 Build Step 2: HTML");
 		Command::new(&self.exe_path)
 			.arg("--html-dir")
-			.arg(&self.watch_args.html_dir)
+			.arg(&self.build_args.html_dir)
 			.arg("--static")
 			.status()?
 			.exit_ok()?;
@@ -64,13 +64,13 @@ impl BuildStep for ExportStatic {
 pub struct BuildWasm {
 	build_cmd: CargoBuildCmd,
 	exe_path: PathBuf,
-	watch_args: WatchArgs,
+	build_args: BuildArgs,
 }
 
 impl BuildWasm {
 	pub fn new(
 		build_native: &CargoBuildCmd,
-		watch_args: &WatchArgs,
+		build_args: &BuildArgs,
 	) -> Result<Self> {
 		let mut build_cmd = build_native.clone();
 		build_cmd.target = Some("wasm32-unknown-unknown".to_string());
@@ -78,7 +78,7 @@ impl BuildWasm {
 		let this = Self {
 			build_cmd,
 			exe_path,
-			watch_args: watch_args.clone(),
+			build_args: build_args.clone(),
 		};
 		Ok(this)
 	}
@@ -88,7 +88,7 @@ impl BuildWasm {
 	fn wasm_bindgen(&self) -> Result<()> {
 		Command::new("wasm-bindgen")
 			.arg("--out-dir")
-			.arg(self.watch_args.html_dir.join("wasm"))
+			.arg(self.build_args.html_dir.join("wasm"))
 			.arg("--out-name")
 			.arg("bindgen")
 			.arg("--target")
@@ -116,14 +116,14 @@ impl BuildStep for BuildWasm {
 
 pub struct RunServer {
 	exe_path: PathBuf,
-	watch_args: WatchArgs,
+	build_args: BuildArgs,
 	child_process: GracefulChild,
 }
 
 impl RunServer {
-	pub fn new(watch_args: &WatchArgs, exe_path: &Path) -> Self {
+	pub fn new(build_args: &BuildArgs, exe_path: &Path) -> Self {
 		Self {
-			watch_args: watch_args.clone(),
+			build_args: build_args.clone(),
 			exe_path: exe_path.to_path_buf(),
 			child_process: GracefulChild::default().as_only_ctrlc_handler(),
 		}
@@ -134,7 +134,7 @@ impl BuildStep for RunServer {
 	/// run the built binary with the `--static` flag, instructing
 	/// it to not spin up a server, and instead just build the static files
 	fn run(&self) -> Result<()> {
-		if self.watch_args.as_static {
+		if self.build_args.as_static {
 			return Ok(());
 		}
 
@@ -142,7 +142,7 @@ impl BuildStep for RunServer {
 
 		let child = Command::new(&self.exe_path)
 			.arg("--html-dir")
-			.arg(&self.watch_args.html_dir)
+			.arg(&self.build_args.html_dir)
 			// kill child when parent is killed
 			.process_group(0)
 			.spawn()?;

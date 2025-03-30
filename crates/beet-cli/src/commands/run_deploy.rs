@@ -68,7 +68,7 @@ impl RunDeploy {
 			.arg("deploy")
 			.arg("--enable-function-url")
 			.arg("--include")
-			.arg(&self.build.watch_args.html_dir);
+			.arg(&self.build.build_args.html_dir);
 
 		if let Some(bin) = &binary_name {
 			cmd.arg("--binary-name").arg(&bin);

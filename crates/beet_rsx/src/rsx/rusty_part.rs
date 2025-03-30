@@ -72,10 +72,9 @@ pub enum RustyPart {
 pub struct RustyPartMap(pub HashMap<RustyTracker, RustyPart>);
 
 impl RustyPartMap {
-	pub fn collect(node: impl Rsx) -> Self {
+	pub fn collect(node: &mut RsxNode) -> Self {
 		let mut visitor = RustyPartVisitor::default();
-		let mut node = node.into_rsx();
-		visitor.walk_node(&mut node);
+		visitor.walk_node(node);
 		Self(visitor.rusty_map)
 	}
 }
@@ -148,8 +147,10 @@ mod test {
 	#[test]
 	fn works() {
 		let bar = 2;
-		expect(RustyPartMap::collect(rsx! { <div /> }).len()).to_be(0);
-		expect(RustyPartMap::collect(rsx! { <div foo=bar /> }).len()).to_be(1);
-		expect(RustyPartMap::collect(rsx! { <div>{bar}</div> }).len()).to_be(1);
+		expect(RustyPartMap::collect(&mut rsx! { <div /> }).len()).to_be(0);
+		expect(RustyPartMap::collect(&mut rsx! { <div foo=bar /> }).len())
+			.to_be(1);
+		expect(RustyPartMap::collect(&mut rsx! { <div>{bar}</div> }).len())
+			.to_be(1);
 	}
 }

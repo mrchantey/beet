@@ -2,40 +2,22 @@ use crate::prelude::*;
 use anyhow::Result;
 use beet::prelude::*;
 use clap::Parser;
-use std::path::PathBuf;
 use sweet::prelude::Server;
-
 
 /// Watch the beet project and rebuild on changes
 #[derive(Debug, Parser)]
 pub struct RunWatch {
 	#[command(flatten)]
-	watch_args: WatchArgs,
+	build_args: BuildArgs,
 	#[command(flatten)]
 	build_template_map: BuildTemplateMap,
 	#[command(flatten)]
 	build_cmd: CargoBuildCmd,
 }
 
-
-#[derive(Debug, Clone, Parser)]
-pub struct WatchArgs {
-	/// Run a simple file server in this process instead of
-	/// spinning up the native binary with the --server feature
-	#[arg(long = "static")]
-	pub as_static: bool,
-	/// root for the emitted html files
-	#[arg(long, default_value = "target/client")]
-	pub html_dir: PathBuf,
-	/// Only execute the provided build steps,
-	/// options are `setup`, `native`, `server`, `static`, `collect-wasm` `build-wasm`
-	#[arg(long, value_delimiter = ',')]
-	pub only: Vec<String>,
-}
-
 impl RunWatch {
 	pub async fn run(self) -> Result<()> {
-		if self.watch_args.as_static {
+		if self.build_args.as_static {
 			self.watch_and_serve().await
 		} else {
 			self.watch().await
@@ -44,7 +26,7 @@ impl RunWatch {
 
 	/// Run in static mode, building the site and serving it via cli
 	async fn watch_and_serve(self) -> Result<()> {
-		let watch_args = self.watch_args.clone();
+		let watch_args = self.build_args.clone();
 		let watch_handle = tokio::spawn(async move {
 			self.watch().await.map_err(|e| {
 				// watcher errors are fatal, print the error and exit
@@ -70,7 +52,7 @@ impl RunWatch {
 	/// 3. run the process
 	async fn watch(self) -> Result<()> {
 		let Self {
-			watch_args,
+			build_args: watch_args,
 			build_template_map,
 			build_cmd,
 		} = self;
@@ -80,7 +62,7 @@ impl RunWatch {
 
 		let recompile = RunBuild {
 			build_cmd: build_cmd.clone(),
-			watch_args: watch_args.clone(),
+			build_args: watch_args.clone(),
 			build_template_map: build_template_map.clone(),
 			server: true,
 		}

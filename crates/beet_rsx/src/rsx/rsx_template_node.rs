@@ -219,12 +219,10 @@ impl RsxTemplateNode {
 		}
 	}
 
-	/// drain the effect map into an RsxNode
-	/// We need the [`RsxTemplateMap`] to apply the template
-	/// for nested components
+	/// drain the effect map into an RsxNode. This does not recurse into
+	/// [`RsxBlock::initial`] or [`RsxComponent::node`].
 	pub fn into_rsx_node(
 		self,
-		template_map: &RsxTemplateMap,
 		rusty_map: &mut HashMap<RustyTracker, RustyPart>,
 	) -> TemplateResult<RsxNode> {
 		let node: RsxNode = match self {
@@ -241,7 +239,7 @@ impl RsxTemplateNode {
 			RsxTemplateNode::Fragment { items, location } => {
 				let nodes = items
 					.into_iter()
-					.map(|node| node.into_rsx_node(template_map, rusty_map))
+					.map(|node| node.into_rsx_node(rusty_map))
 					.collect::<TemplateResult<Vec<_>>>()?;
 				RsxFragment { nodes, location }.into()
 			}
@@ -252,7 +250,7 @@ impl RsxTemplateNode {
 				template_directives,
 				location,
 			} => {
-				let (root, type_name, ron) =
+				let (node, type_name, ron) =
 					match rusty_map.remove(&tracker).ok_or_else(|| {
 						TemplateError::no_rusty_map(
 							&format!("Component: {}", tag),
@@ -273,15 +271,17 @@ impl RsxTemplateNode {
 						),
 					}?;
 				// very confusing to callback to the map like this
-				let root = root.bpipe(template_map)?;
+				// let root = node.bpipe(template_map)?;
 				RsxComponent {
 					tag,
 					tracker,
 					type_name,
 					ron,
-					node: Box::new(root),
+					// the node has no template applied yet, that is the
+					// responsibility of the [`RsxTemplateMap`]
+					node: Box::new(node),
 					slot_children: Box::new(
-						slot_children.into_rsx_node(template_map, rusty_map)?,
+						slot_children.into_rsx_node(rusty_map)?,
 					),
 					template_directives: template_directives.clone(),
 					location,
@@ -308,6 +308,8 @@ impl RsxTemplateNode {
 						),
 					}?;
 				RsxBlock {
+					// the node has no template applied yet, that is the
+					// responsibility of the [`RsxTemplateMap`]
 					initial: Box::new(initial),
 					effect,
 					location,
@@ -327,9 +329,7 @@ impl RsxTemplateNode {
 					.into_iter()
 					.map(|attr| attr.into_rsx_node(rusty_map))
 					.collect::<TemplateResult<Vec<_>>>()?,
-				children: Box::new(
-					children.into_rsx_node(template_map, rusty_map)?,
-				),
+				children: Box::new(children.into_rsx_node(rusty_map)?),
 				location,
 			}
 			.into(),
