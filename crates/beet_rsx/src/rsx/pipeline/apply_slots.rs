@@ -67,7 +67,7 @@ impl ApplySlots {
 	fn map_node(
 		node: &mut RsxNode,
 		// only for the apply step, passing up any bubble slots
-		parent_bubble_slot_map: &mut HashMap<String, Vec<RsxNode>>,
+		parent_slot_map: &mut HashMap<String, Vec<RsxNode>>,
 	) -> Result<(), SlotsError> {
 		// this is the 'parent_slot_map' for this nodes descendents
 		// it is used to collect any bubbling slots
@@ -92,29 +92,38 @@ impl ApplySlots {
 				Self::map_node(&mut el.children, &mut slot_map)?;
 			}
 			RsxNode::Component(component) => {
+				println!("processing component: {}", component.tag);
 				Self::map_node(&mut component.node, &mut slot_map)?;
 				// this feels weird, slot children are a special case in ApplySlot
 				// but we're treating them like normal, but its all working atm i guess
 				Self::map_node(&mut component.slot_children, &mut slot_map)?;
 
-				// println!("processing component: {}", component.tag);
-				slot_map.extend(
-					Self::collect_slot_children(&mut component.slot_children)
-						.into_iter(),
+				// First collect all available slots from this component's slot_children
+				let component_slots =
+					Self::collect_slot_children(&mut component.slot_children);
+				println!(
+					"component slots: {:?}",
+					slot_map_debug(&component_slots)
 				);
-				// println!("slot_map: {:?}", slot_map_debug(&slot_map));
+				slot_map.extend(component_slots);
+
+				
+				println!("full slot_map: {:?}", slot_map_debug(&slot_map));
+				
+				
+
 				Self::apply_to_node(
 					&mut component.node,
 					slot_map,
-					parent_bubble_slot_map,
+					parent_slot_map,
 				)?;
 			}
 		}
-		// println!(
-		// 	"visiting node end:   {:?} - {}",
-		// 	node.discriminant(),
-		// 	node.location_str()
-		// );
+		println!(
+			"visiting node end:   {:?} - {}",
+			node.discriminant(),
+			node.location_str()
+		);
 
 
 		Ok(())
@@ -208,7 +217,9 @@ impl ApplySlots {
 								// so add the children to the parent slot map and replace
 								// with default
 								parent_slot_map
-									.insert(bubbling_name.to_string(), nodes);
+									.entry(bubbling_name.to_string())
+									.or_default()
+									.extend(nodes);
 								*node = RsxNode::default();
 							} else {
 								*node = nodes.into_node();
@@ -223,17 +234,17 @@ impl ApplySlots {
 	}
 }
 
-// fn slot_map_debug(map: &HashMap<String, Vec<RsxNode>>) -> String {
-// 	let mut s = String::new();
-// 	for (name, nodes) in map {
-// 		s.push_str(&format!(
-// 			"{}: {:?}\n",
-// 			name,
-// 			nodes.iter().map(|n| n.discriminant()).collect::<Vec<_>>()
-// 		));
-// 	}
-// 	s
-// }
+fn slot_map_debug(map: &HashMap<String, Vec<RsxNode>>) -> String {
+	let mut s = String::new();
+	for (name, nodes) in map {
+		s.push_str(&format!(
+			"{}: {:?}\n",
+			name,
+			nodes.iter().map(|n| n.discriminant()).collect::<Vec<_>>()
+		));
+	}
+	s
+}
 
 /// if the hashmap is empty, return Ok(()), otherwise return an error
 fn slot_map_to_result(
@@ -333,26 +344,26 @@ mod test {
 	}
 
 
-	#[derive(Node)]
-	struct Parent;
-
-	fn parent(_: Parent) -> RsxNode {
-		rsx! {
-			<slot name="header" />
-			<slot/>
-		}
-	}
-	#[derive(Node)]
-	struct Child;
-
-	fn child(_: Child) -> RsxNode {
-		rsx! {
-				<slot name="header" slot="header" />
-		}
-	}
 
 	#[test]
 	fn bubbles() {
+		#[derive(Node)]
+		struct Parent;
+
+		fn parent(_: Parent) -> RsxNode {
+			rsx! {
+				<slot name="header" />
+				<slot/>
+			}
+		}
+		#[derive(Node)]
+		struct Child;
+
+		fn child(_: Child) -> RsxNode {
+			rsx! {
+					<slot name="header" slot="header" />
+			}
+		}
 		expect(
 			rsx! {
 				<Parent>
@@ -370,35 +381,37 @@ mod test {
 	#[test]
 	fn complex_bubbles() {
 		#[derive(Node)]
-		struct Parent;
+		struct Layout;
 
-		fn parent(_: Parent) -> RsxNode {
-			rsx! {
-				<header>
-					<slot name="header" />
-					<slot />
-				</header>
-			}
-		}
-		#[derive(Node)]
-		struct Child;
-
-		fn child(_: Child) -> RsxNode {
+		fn layout(_: Layout) -> RsxNode {
 			rsx! {
 				<p>
-					<slot name="header" slot="header" />
+					<Header>
+						<slot name="header" />
+					</Header>
 					<slot/>
 				</p>
 			}
 		}
+
+		#[derive(Node)]
+		struct Header;
+
+		fn header(_: Header) -> RsxNode {
+			rsx! {
+				<header>
+					<slot/>
+				</header>
+			}
+		}
+
+
 		expect(
 			rsx! {
-				<Parent>
-					<Child>
-						<div slot="header">My App</div>
-						<div>Content</div>
-					</Child>
-				</Parent>
+				<Layout>
+					<div slot="header">My App</div>
+					<div>Content</div>
+				</Layout>
 			}
 			.bpipe(RsxToHtmlString::default())
 			.unwrap(),

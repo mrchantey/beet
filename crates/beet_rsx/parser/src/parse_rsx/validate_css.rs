@@ -38,7 +38,8 @@ pub fn validate_style_node<'a, C: CustomNode>(
 
 
 pub fn validate_css<'a>(val: &'a str, source: impl ToTokens) -> Result {
-	StyleSheet::parse(val, ParserOptions::default())
+	let val = val.replace(".em", "em");
+	StyleSheet::parse(&val, ParserOptions::default())
 		.map(|_| ())
 		.map_err(|err| {
 			let span = source.to_token_stream().span();

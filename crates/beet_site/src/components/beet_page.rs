@@ -33,7 +33,7 @@ fn beet_page(_: BeetPage) -> RsxNode {
 	rsx! {
 		<ContentLayout>
 		<DesignSystem theme=theme/>
-		<span slot="head">its not too bad</span>
+		// <span slot="head">its not too bad</span>
 		<h1>{brand.title}</h1>
 			<nav>
 				{nav_items}
