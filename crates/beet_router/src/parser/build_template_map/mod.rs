@@ -253,7 +253,7 @@ mod test {
 	/// - macros discard whitespace but files do not
 	#[sweet::test]
 	async fn builds() {
-		use beet_rsx::rsx::RsxTemplateNode;
+		use beet_rsx::prelude::*;
 
 		let src = WorkspacePathBuf::new("crates/beet_router/src/test_site")
 			.into_canonical()

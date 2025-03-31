@@ -37,8 +37,7 @@ mod test {
 	#[cfg(feature = "parser")]
 	#[test]
 	fn to_tokens() {
-		use beet_rsx::rsx::ClientIsland;
-		use beet_rsx::rsx::RustyTracker;
+		use beet_rsx::prelude::*;
 
 		let island = ClientIsland {
 			tracker: RustyTracker::new(0, 0),
