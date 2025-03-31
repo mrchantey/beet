@@ -17,15 +17,19 @@ pub struct ThemeToCss {
 impl Default for ThemeToCss {
 	fn default() -> Self {
 		Self {
-			prefix: "--bt-color".to_string(),
-			light_class: "scheme-light".to_string(),
-			dark_class: "scheme-dark".to_string(),
+			prefix: Self::DEFAULT_PREFIX.to_string(),
+			light_class: Self::DEFAULT_LIGHT_CLASS.to_string(),
+			dark_class: Self::DEFAULT_DARK_CLASS.to_string(),
 		}
 	}
 }
 
 
 impl ThemeToCss {
+	pub const DEFAULT_PREFIX: &'static str = "--bt-color";
+	pub const DEFAULT_LIGHT_CLASS: &'static str = "scheme-light";
+	pub const DEFAULT_DARK_CLASS: &'static str = "scheme-dark";
+
 	pub fn map(&self, theme: &Theme) -> String {
 		let Self {
 			prefix,
