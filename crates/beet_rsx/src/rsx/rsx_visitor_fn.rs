@@ -91,6 +91,7 @@ impl_visitor!(VisitRsxNode, RsxNode, visit_node);
 // impl_visitor!(VisitRsxText, str, visit_text);
 impl_visitor!(VisitRsxBlock, RsxBlock, visit_block);
 impl_visitor!(VisitRsxElement, RsxElement, visit_element);
+impl_visitor!(VisitRsxAttribute, RsxAttribute, visit_attribute);
 impl_visitor!(VisitRsxComponent, RsxComponent, visit_component);
 
 impl_visitor_mut!(VisitRsxNodeMut, RsxNode, visit_node);
@@ -98,6 +99,7 @@ impl_visitor_mut!(VisitRsxNodeMut, RsxNode, visit_node);
 // impl_visitor_mut!(VisitRsxTextMut, str, visit_text);
 impl_visitor_mut!(VisitRsxBlockMut, RsxBlock, visit_block);
 impl_visitor_mut!(VisitRsxElementMut, RsxElement, visit_element);
+impl_visitor_mut!(VisitRsxAttributeMut, RsxAttribute, visit_attribute);
 impl_visitor_mut!(VisitRsxComponentMut, RsxComponent, visit_component);
 
 

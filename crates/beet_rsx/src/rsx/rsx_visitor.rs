@@ -11,6 +11,13 @@ pub struct VisitRsxOptions {
 	pub ignore_component_node: bool,
 	/// do not visit [RsxComponent::slot_children]
 	pub ignore_component_slot_children: bool,
+	/// Visit all children before parents, this includes
+	/// - fragment children
+	/// - element children
+	/// - component slot children
+	/// - component node
+	/// - block node initial
+	pub bottom_up: bool,
 }
 
 pub const DEFAULT_VISIT_RSX_OPTIONS: VisitRsxOptions = VisitRsxOptions {
@@ -18,6 +25,7 @@ pub const DEFAULT_VISIT_RSX_OPTIONS: VisitRsxOptions = VisitRsxOptions {
 	ignore_element_children: false,
 	ignore_component_node: false,
 	ignore_component_slot_children: false,
+	bottom_up: false,
 };
 
 impl VisitRsxOptions {
@@ -28,6 +36,7 @@ impl VisitRsxOptions {
 			ignore_element_children: true,
 			ignore_component_node: true,
 			ignore_component_slot_children: true,
+			..Default::default()
 		}
 	}
 
@@ -85,33 +94,19 @@ impl VisitRsxOptions {
 pub trait RsxVisitor {
 	/// get the options
 	fn options(&self) -> &VisitRsxOptions { &DEFAULT_VISIT_RSX_OPTIONS }
-	/// override the options
-	fn ignore_block_node_initial(&self) -> bool {
-		self.options().ignore_block_node_initial
-	}
-	/// override the options
-	fn ignore_element_children(&self) -> bool {
-		self.options().ignore_element_children
-	}
-	/// override the options
-	fn ignore_component_node(&self) -> bool {
-		self.options().ignore_component_node
-	}
-	/// override the options
-	fn ignore_component_slot_children(&self) -> bool {
-		self.options().ignore_component_slot_children
-	}
 	fn visit_node(&mut self, node: &RsxNode) {}
 	fn visit_doctype(&mut self, doctype: &RsxDoctype) {}
 	fn visit_comment(&mut self, comment: &RsxComment) {}
 	fn visit_text(&mut self, text: &RsxText) {}
 	fn visit_block(&mut self, block: &RsxBlock) {}
 	fn visit_component(&mut self, component: &RsxComponent) {}
+	fn visit_fragment(&mut self, fragment: &RsxFragment) {}
 	fn visit_element(&mut self, element: &RsxElement) {}
 	fn visit_attribute(&mut self, attribute: &RsxAttribute) {}
 	fn before_element_children(&mut self, element: &RsxElement) {}
 	fn after_element_children(&mut self, element: &RsxElement) {}
-	fn walk_node(&mut self, node: &RsxNode) {
+	/// call the visit methods without walking any inners
+	fn call_visit(&mut self, node: &RsxNode) {
 		self.visit_node(node);
 		match node {
 			RsxNode::Doctype(doctype) => {
@@ -119,43 +114,62 @@ pub trait RsxVisitor {
 			}
 			RsxNode::Comment(comment) => self.visit_comment(comment),
 			RsxNode::Text(text) => self.visit_text(text),
-			RsxNode::Block(b) => {
-				self.visit_block(b);
-				if !self.ignore_block_node_initial() {
-					self.walk_node(&b.initial);
+			RsxNode::Block(block) => {
+				self.visit_block(block);
+			}
+			RsxNode::Fragment(fragment) => {
+				self.visit_fragment(fragment);
+			}
+			RsxNode::Element(element) => {
+				self.visit_element(element);
+				for attr in &element.attributes {
+					self.visit_attribute(attr);
 				}
 			}
+			RsxNode::Component(component) => {
+				self.visit_component(component);
+			}
+		}
+	}
+
+	/// walk the node tree, visiting each node
+	/// either top down or bottom up
+	fn walk_node(&mut self, node: &RsxNode) {
+		// if top down, visit before walk
+		if self.options().bottom_up == false {
+			self.call_visit(node);
+		}
+		match node {
 			RsxNode::Fragment(fragment) => {
 				for child in &fragment.nodes {
 					self.walk_node(child);
 				}
 			}
-			RsxNode::Element(e) => {
-				self.walk_element(e);
+			RsxNode::Block(b) => {
+				if !self.options().ignore_block_node_initial {
+					self.walk_node(&b.initial);
+				}
 			}
-			RsxNode::Component(c) => {
-				self.walk_component(c);
+			RsxNode::Element(element) => {
+				if !self.options().ignore_element_children {
+					self.before_element_children(element);
+					self.walk_node(&element.children);
+					self.after_element_children(element);
+				}
 			}
+			RsxNode::Component(component) => {
+				if !self.options().ignore_component_node {
+					self.walk_node(&component.node);
+				}
+				if !self.options().ignore_component_slot_children {
+					self.walk_node(&component.slot_children);
+				}
+			}
+			_ => {}
 		}
-	}
-	fn walk_element(&mut self, element: &RsxElement) {
-		self.visit_element(element);
-		for attr in &element.attributes {
-			self.visit_attribute(attr);
-		}
-		if !self.ignore_element_children() {
-			self.before_element_children(element);
-			self.walk_node(&element.children);
-			self.after_element_children(element);
-		}
-	}
-	fn walk_component(&mut self, component: &RsxComponent) {
-		self.visit_component(component);
-		if !self.ignore_component_node() {
-			self.walk_node(&component.node);
-		}
-		if !self.ignore_component_slot_children() {
-			self.walk_node(&component.slot_children);
+		// if bottom up, visit after walk
+		if self.options().bottom_up == true {
+			self.call_visit(node);
 		}
 	}
 }
@@ -164,29 +178,19 @@ pub trait RsxVisitor {
 #[allow(unused_variables)]
 pub trait RsxVisitorMut {
 	fn options(&self) -> &VisitRsxOptions { &DEFAULT_VISIT_RSX_OPTIONS }
-	fn ignore_block_node_initial(&self) -> bool {
-		self.options().ignore_block_node_initial
-	}
-	fn ignore_element_children(&self) -> bool {
-		self.options().ignore_element_children
-	}
-	fn ignore_component_node(&self) -> bool {
-		self.options().ignore_component_node
-	}
-	fn ignore_component_slot_children(&self) -> bool {
-		self.options().ignore_component_slot_children
-	}
 	fn visit_node(&mut self, node: &mut RsxNode) {}
 	fn visit_doctype(&mut self, doctype: &mut RsxDoctype) {}
 	fn visit_comment(&mut self, comment: &mut RsxComment) {}
 	fn visit_text(&mut self, text: &mut RsxText) {}
 	fn visit_block(&mut self, block: &mut RsxBlock) {}
 	fn visit_component(&mut self, component: &mut RsxComponent) {}
+	fn visit_fragment(&mut self, fragment: &mut RsxFragment) {}
 	fn visit_element(&mut self, element: &mut RsxElement) {}
 	fn visit_attribute(&mut self, attribute: &mut RsxAttribute) {}
 	fn before_element_children(&mut self, element: &mut RsxElement) {}
 	fn after_element_children(&mut self, element: &mut RsxElement) {}
-	fn walk_node(&mut self, node: &mut RsxNode) {
+	/// call the visit methods without walking any inners
+	fn call_visit(&mut self, node: &mut RsxNode) {
 		self.visit_node(node);
 		match node {
 			RsxNode::Doctype(doctype) => {
@@ -194,43 +198,61 @@ pub trait RsxVisitorMut {
 			}
 			RsxNode::Comment(comment) => self.visit_comment(comment),
 			RsxNode::Text(text) => self.visit_text(text),
+			RsxNode::Block(block) => {
+				self.visit_block(block);
+			}
+			RsxNode::Fragment(fragment) => {
+				self.visit_fragment(fragment);
+			}
+			RsxNode::Element(element) => {
+				self.visit_element(element);
+				for attr in &mut element.attributes {
+					self.visit_attribute(attr);
+				}
+			}
+			RsxNode::Component(component) => {
+				self.visit_component(component);
+			}
+		}
+	}
+	/// walk the node tree, visiting each node
+	/// either top down or bottom up
+	fn walk_node(&mut self, node: &mut RsxNode) {
+		// if top down, visit before walk
+		if self.options().bottom_up == false {
+			self.call_visit(node);
+		}
+		match node {
 			RsxNode::Fragment(fragment) => {
 				for child in &mut fragment.nodes {
 					self.walk_node(child);
 				}
 			}
 			RsxNode::Block(b) => {
-				self.visit_block(b);
-				if !self.ignore_block_node_initial() {
+				if !self.options().ignore_block_node_initial {
 					self.walk_node(&mut b.initial);
 				}
 			}
-			RsxNode::Element(e) => {
-				self.walk_element(e);
+			RsxNode::Element(element) => {
+				if !self.options().ignore_element_children {
+					self.before_element_children(element);
+					self.walk_node(&mut element.children);
+					self.after_element_children(element);
+				}
 			}
-			RsxNode::Component(c) => {
-				self.walk_component(c);
+			RsxNode::Component(component) => {
+				if !self.options().ignore_component_node {
+					self.walk_node(&mut component.node);
+				}
+				if !self.options().ignore_component_slot_children {
+					self.walk_node(&mut component.slot_children);
+				}
 			}
+			_ => {}
 		}
-	}
-	fn walk_element(&mut self, element: &mut RsxElement) {
-		self.visit_element(element);
-		for attr in &mut element.attributes {
-			self.visit_attribute(attr);
-		}
-		if !self.ignore_element_children() {
-			self.before_element_children(element);
-			self.walk_node(&mut element.children);
-			self.after_element_children(element);
-		}
-	}
-	fn walk_component(&mut self, component: &mut RsxComponent) {
-		self.visit_component(component);
-		if !self.ignore_component_node() {
-			self.walk_node(&mut component.node);
-		}
-		if !self.ignore_component_slot_children() {
-			self.walk_node(&mut component.slot_children);
+		// if bottom up, visit after walk
+		if self.options().bottom_up == true {
+			self.call_visit(node);
 		}
 	}
 }
@@ -360,5 +382,53 @@ mod test {
 
 		expect(counter.component).to_be(1); // Child component
 		expect(counter.element).to_be(2); // just div and span, Child's div not visited
+	}
+
+	#[test]
+	fn top_down() {
+		let node = rsx! {
+			<div val="1">
+				<div val="2"/>
+			</div>
+		};
+
+		let mut counts = Vec::new();
+		VisitRsxAttribute::walk_with_opts(
+			&node,
+			VisitRsxOptions {
+				..Default::default()
+			},
+			|attr| {
+				let RsxAttribute::KeyValue { value, .. } = attr else {
+					return;
+				};
+				counts.push(value.parse::<u32>().unwrap());
+			},
+		);
+		expect(counts).to_be(vec![1, 2]);
+	}
+	#[test]
+	fn bottom_up() {
+		let node = rsx! {
+			<div val="1">
+				<div val="2"/>
+			</div>
+		};
+
+		let mut counts = Vec::new();
+		VisitRsxAttribute::walk_with_opts(
+			&node,
+			VisitRsxOptions {
+				bottom_up: true,
+				..Default::default()
+			},
+			|attr| {
+				let RsxAttribute::KeyValue { value, .. } = attr else {
+					return;
+				};
+				counts.push(value.parse::<u32>().unwrap());
+			},
+		);
+		expect(counts).to_be(vec![2, 1]);
 	}
 }
