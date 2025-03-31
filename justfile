@@ -151,21 +151,21 @@ test-all *args:
 # cargo test --workspace --all-features -- {{args}}
 
 test crate *args:
-	just watch 'cargo test -p {{crate}} --lib -- 																								--watch {{args}}'
+	just watch cargo test -p {{crate}} --lib -- 																								--watch {{args}}
 test-doc crate *args:
-	just watch 'cargo test -p {{crate}} --doc 																													{{args}}'
+	just watch cargo test -p {{crate}} --doc 																														{{args}}
 test-e2e crate test_name *args:
-	just watch 'cargo test -p {{crate}} --test {{test_name}} -- 																--watch {{args}}'
+	just watch cargo test -p {{crate}} --test {{test_name}} -- 																	--watch {{args}}
 test-feat crate *args:
-	just watch 'cargo test -p {{crate}} --lib --all-features -- 																				{{args}}'
+	just watch cargo test -p {{crate}} --lib --all-features -- 																					{{args}}
 test-wasm crate *args:
-	just watch 'cargo test -p {{crate}} --lib --target wasm32-unknown-unknown -- 								--watch {{args}}'
+	just watch cargo test -p {{crate}} --lib --target wasm32-unknown-unknown -- 								--watch {{args}}
 test-wasm-feat crate *args:
-	just watch 'cargo test -p {{crate}} --lib --target wasm32-unknown-unknown --all-features -- 				{{args}}'
+	just watch cargo test -p {{crate}} --lib --target wasm32-unknown-unknown --all-features -- 					{{args}}
 test-wasm-e2e crate test_name *args:
-	just watch 'cargo test -p {{crate}} --test {{test_name}} --target wasm32-unknown-unknown -- --watch {{args}}'
+	just watch cargo test -p {{crate}} --test {{test_name}} --target wasm32-unknown-unknown -- 	--watch {{args}}
 test-rsx-macro *args:
-	just watch 'cargo test -p beet_rsx --test rsx_macro --features=css -- 											--watch {{args}}'
+	just watch cargo test -p beet_rsx --test rsx_macro --features=css -- 												--watch {{args}}
 
 # create codegen files
 codegen:

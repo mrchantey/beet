@@ -49,35 +49,82 @@ use thiserror::Error;
 pub struct ApplySlots;
 
 impl RsxPipeline<RsxNode, Result<RsxNode, SlotsError>> for ApplySlots {
-	/// apply slots to all top level components,
 	fn apply(self, mut node: RsxNode) -> Result<RsxNode, SlotsError> {
-		let mut err = Ok(());
-
-		// let mut slots_passed_up_by_children =
-		// visit all children
-
-		// let mut comp_id: u32 = 0;
-
-		VisitRsxComponentMut::walk_with_opts(
-			&mut node,
-			VisitRsxOptions::bottom_up(),
-			|component| {
-				let slot_map = Self::collect_slot_map(component);
-				match Self::apply_to_node(&mut component.node, slot_map) {
-					Ok(_slots_for_parent) => {}
-					Err(e) => err = Err(e),
-				}
-			},
-		);
-		err.map(|_| node)
+		let mut root_slot_map = HashMap::default();
+		Self::map_node(&mut node, &mut root_slot_map)?;
+		// the root slot map should never be filled
+		slot_map_to_result(root_slot_map).map(|_| node)
 	}
 }
 
 impl ApplySlots {
+	/// visit a node tree from the bottom up, collecting all slots and applying them to the node.
+	/// any slots for the parent are returned.
+	/// # Errors
+	/// - If [`ApplySlots::apply_to_node`] returns an error, in which case
+	/// a non-bubbling slot was not consumed.
+	/// - If [`ApplySlots::collect_slot_map`]
+	fn map_node(
+		node: &mut RsxNode,
+		// only for the apply step, passing up any bubble slots
+		parent_bubble_slot_map: &mut HashMap<String, Vec<RsxNode>>,
+	) -> Result<(), SlotsError> {
+		// this is the 'parent_slot_map' for this nodes descendents
+		// it is used to collect any bubbling slots
+		let mut slot_map = HashMap::default();
+		// println!(
+		// 	"visiting node start: {:?} - {}",
+		// 	node.discriminant(),
+		// 	node.location_str()
+		// );
+
+		match node {
+			RsxNode::Doctype(_) | RsxNode::Comment(_) | RsxNode::Text(_) => {}
+			RsxNode::Block(rsx_block) => {
+				Self::map_node(&mut rsx_block.initial, &mut slot_map)?;
+			}
+			RsxNode::Fragment(rsx_fragment) => {
+				for child in &mut rsx_fragment.nodes {
+					Self::map_node(child, &mut slot_map)?;
+				}
+			}
+			RsxNode::Element(el) => {
+				Self::map_node(&mut el.children, &mut slot_map)?;
+			}
+			RsxNode::Component(component) => {
+				Self::map_node(&mut component.node, &mut slot_map)?;
+				// this feels weird, slot children are a special case in ApplySlot
+				// but we're treating them like normal, but its all working atm i guess
+				Self::map_node(&mut component.slot_children, &mut slot_map)?;
+
+				// println!("processing component: {}", component.tag);
+				slot_map.extend(
+					Self::collect_slot_children(&mut component.slot_children)
+						.into_iter(),
+				);
+				// println!("slot_map: {:?}", slot_map_debug(&slot_map));
+				Self::apply_to_node(
+					&mut component.node,
+					slot_map,
+					parent_bubble_slot_map,
+				)?;
+			}
+		}
+		// println!(
+		// 	"visiting node end:   {:?} - {}",
+		// 	node.discriminant(),
+		// 	node.location_str()
+		// );
+
+
+		Ok(())
+	}
+
+
 	/// collect any child elements with a slot attribute into a hashmap
-	/// ie <div slot="foo">
-	fn collect_slot_map(
-		component: &mut RsxComponent,
+	/// of that name, ie <div slot="foo">, and remove the slot attribute
+	fn collect_slot_children(
+		children: &mut RsxNode,
 	) -> HashMap<String, Vec<RsxNode>> {
 		let mut slot_map = HashMap::default();
 		let mut insert = |name: &str, node: &mut RsxNode| {
@@ -88,8 +135,10 @@ impl ApplySlots {
 				.push(std::mem::take(node));
 		};
 
+		// apply all slot children either to the default slot or its named slot
+		// using a visitor handles the case of nested fragments
 		VisitRsxNodeMut::walk_with_opts(
-			&mut component.slot_children,
+			children,
 			// top level only
 			VisitRsxOptions::ignore_all(),
 			|node| match node {
@@ -112,7 +161,7 @@ impl ApplySlots {
 					insert(&slot_name, node);
 				}
 				RsxNode::Component(_) => {
-					// TODO component slot, ie RsxComponent {slot:Option<String>,...}
+					// TODO component slot field, ie RsxComponent {slot:Option<String>,...}
 					insert("default", node);
 				}
 			},
@@ -131,12 +180,15 @@ impl ApplySlots {
 	fn apply_to_node(
 		node: &mut RsxNode,
 		mut slot_map: HashMap<String, Vec<RsxNode>>,
-	) -> Result<HashMap<String, Vec<RsxNode>>, SlotsError> {
-		let mut slots_for_parent = HashMap::default();
+		// the slot map for the parent component, to be filled up with
+		// any bubbling slots
+		parent_slot_map: &mut HashMap<String, Vec<RsxNode>>,
+	) -> Result<(), SlotsError> {
 		VisitRsxNodeMut::walk_with_opts(
 			node,
 			// avoid 'slot stealing' by not visiting any child component nodes
-			// we still need to visit element children because we still need to find and remove default <slot/>
+			// using a visitor handles element children (just to remove the <slot>)
+			// and fragments
 			VisitRsxOptions::ignore_component_node(),
 			|node| {
 				match node {
@@ -149,13 +201,14 @@ impl ApplySlots {
 							// TODO fallback to using the slots children https://docs.astro.build/en/basics/astro-components/#fallback-content-for-slots
 							let nodes =
 								slot_map.remove(name).unwrap_or_default();
-							// handle bubbling
-							if let Some(_slot_name) =
+							if let Some(bubbling_name) =
 								element.get_key_value_attr("slot")
 							{
-								slots_for_parent
-									.insert(name.to_string(), nodes);
-								// unimplemented!("bubbling");
+								// its a <slot slot="foo"> ie a bubbling slot,
+								// so add the children to the parent slot map and replace
+								// with default
+								parent_slot_map
+									.insert(bubbling_name.to_string(), nodes);
 								*node = RsxNode::default();
 							} else {
 								*node = nodes.into_node();
@@ -166,16 +219,33 @@ impl ApplySlots {
 				}
 			},
 		);
-		let unconsumed = slot_map.into_iter().collect::<Vec<_>>();
-		if unconsumed.is_empty() {
-			Ok(slots_for_parent)
-		} else {
-			Err(SlotsError::new(unconsumed))
-		}
+		slot_map_to_result(slot_map)
 	}
 }
 
+// fn slot_map_debug(map: &HashMap<String, Vec<RsxNode>>) -> String {
+// 	let mut s = String::new();
+// 	for (name, nodes) in map {
+// 		s.push_str(&format!(
+// 			"{}: {:?}\n",
+// 			name,
+// 			nodes.iter().map(|n| n.discriminant()).collect::<Vec<_>>()
+// 		));
+// 	}
+// 	s
+// }
 
+/// if the hashmap is empty, return Ok(()), otherwise return an error
+fn slot_map_to_result(
+	map: HashMap<String, Vec<RsxNode>>,
+) -> Result<(), SlotsError> {
+	let unconsumed = map.into_iter().collect::<Vec<_>>();
+	if unconsumed.is_empty() {
+		Ok(())
+	} else {
+		Err(SlotsError::new(unconsumed))
+	}
+}
 
 #[derive(Debug, Error)]
 #[error("some slots were not consumed: {unconsumed:?}")]
@@ -263,13 +333,46 @@ mod test {
 	}
 
 
-	#[test]
-	#[ignore = "maybe we need bevy"]
-	fn bubbles() {
-		#[derive(Node)]
-		struct Comp1;
+	#[derive(Node)]
+	struct Parent;
 
-		fn comp1(_: Comp1) -> RsxNode {
+	fn parent(_: Parent) -> RsxNode {
+		rsx! {
+			<slot name="header" />
+			<slot/>
+		}
+	}
+	#[derive(Node)]
+	struct Child;
+
+	fn child(_: Child) -> RsxNode {
+		rsx! {
+				<slot name="header" slot="header" />
+		}
+	}
+
+	#[test]
+	fn bubbles() {
+		expect(
+			rsx! {
+				<Parent>
+					<Child>
+						<div slot="header">My App</div>
+					</Child>
+				</Parent>
+			}
+			.bpipe(RsxToHtmlString::default())
+			.unwrap(),
+		)
+		.to_be("<div>My App</div>");
+	}
+
+	#[test]
+	fn complex_bubbles() {
+		#[derive(Node)]
+		struct Parent;
+
+		fn parent(_: Parent) -> RsxNode {
 			rsx! {
 				<header>
 					<slot name="header" />
@@ -278,27 +381,28 @@ mod test {
 			}
 		}
 		#[derive(Node)]
-		struct Comp2;
+		struct Child;
 
-		fn comp2(_: Comp2) -> RsxNode {
+		fn child(_: Child) -> RsxNode {
 			rsx! {
-				<header>
+				<p>
 					<slot name="header" slot="header" />
-				</header>
+					<slot/>
+				</p>
 			}
 		}
-
 		expect(
 			rsx! {
-				<Comp1>
-					<Comp2>
+				<Parent>
+					<Child>
 						<div slot="header">My App</div>
-					</Comp2>
-				</Comp1>
+						<div>Content</div>
+					</Child>
+				</Parent>
 			}
 			.bpipe(RsxToHtmlString::default())
 			.unwrap(),
 		)
-		.to_be("<html><div>Header</div><html><div>Default</div></html></html>");
+		.to_be("<header><div>My App</div><p><div>Content</div></p></header>");
 	}
 }

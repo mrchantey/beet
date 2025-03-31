@@ -44,15 +44,14 @@ pub fn validate_css<'a>(val: &'a str, source: impl ToTokens) -> Result {
 			let span = source.to_token_stream().span();
 
 			let mut linecol = source.to_token_stream().span().start();
+			// attempt to find error location probs wrong but best we can do i guess
+			// remember proc_macro lines are 1 based, lightningcss is 0 based
 			if let Some(err_loc) = err.loc {
 				linecol.line += err_loc.line as usize;
-				// probs wrong but best we can do i guess
-				// remember proc_macro lines are 1 based, lightningcss is 0 based
 				if err_loc.line == 0 {
 					linecol.column += err_loc.column as usize;
 				}
 			}
-			// span.
 			let msg = format!(
 				"CSS Error at approx ({}:{}): {}",
 				linecol.line,
