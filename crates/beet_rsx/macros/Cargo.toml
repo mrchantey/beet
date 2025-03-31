@@ -15,6 +15,7 @@ keywords.workspace = true
 [features]
 default = ["sigfault"]
 sigfault = []
+css = ["beet_rsx_parser/css"]
 # bevy = []
 
 [lib]

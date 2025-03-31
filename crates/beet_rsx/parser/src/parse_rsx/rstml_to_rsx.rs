@@ -6,6 +6,7 @@ use quote::ToTokens;
 use quote::quote;
 use rapidhash::RapidHashSet as HashSet;
 use rstml::atoms::OpenTag;
+use rstml::node::CustomNode;
 use rstml::node::Node;
 use rstml::node::NodeAttribute;
 use rstml::node::NodeElement;
@@ -70,7 +71,10 @@ impl RstmlToRsx {
 
 	/// the number of actual html nodes will likely be different
 	/// due to fragments, blocks etc
-	pub fn map_nodes<C>(&mut self, nodes: Vec<Node<C>>) -> TokenStream {
+	pub fn map_nodes<C: CustomNode>(
+		&mut self,
+		nodes: Vec<Node<C>>,
+	) -> TokenStream {
 		let mut nodes = nodes
 			.into_iter()
 			.map(|node| self.map_node(node))
@@ -86,7 +90,7 @@ impl RstmlToRsx {
 	}
 
 	/// returns an RsxNode
-	fn map_node<C>(&mut self, node: Node<C>) -> TokenStream {
+	fn map_node<C: CustomNode>(&mut self, node: Node<C>) -> TokenStream {
 		match node {
 			Node::Doctype(_) => {
 				quote!(RsxDoctype { location: None }.into_node())
@@ -147,6 +151,19 @@ impl RstmlToRsx {
 				if tag.starts_with(|c: char| c.is_uppercase()) {
 					self.map_component(tag, open_tag, children)
 				} else {
+					// panic!();
+					// println!("its a style tag");
+					#[cfg(feature = "css")]
+					if tag == "style" {
+						if let Err(err) = validate_style_node(&children) {
+							self.errors.push(
+								Diagnostic::spanned(err.0, Level::Error, err.1)
+									.emit_as_expr_tokens(),
+							);
+						}
+					}
+
+
 					let attributes = open_tag
 						.attributes
 						.into_iter()
@@ -229,7 +246,7 @@ impl RstmlToRsx {
 			}
 		}
 	}
-	fn map_component<C>(
+	fn map_component<C: CustomNode>(
 		&mut self,
 		tag: String,
 		open_tag: OpenTag,

@@ -1,7 +1,11 @@
 mod rstml_rust_to_hash;
 mod rstml_to_rsx_template;
 mod rusty_tracker_builder;
+#[cfg(feature = "css")]
+mod validate_css;
 pub use rusty_tracker_builder::*;
+#[cfg(feature = "css")]
+pub use validate_css::*;
 pub mod tokens_to_rstml;
 pub use self::rstml_rust_to_hash::*;
 #[allow(unused_imports)]
