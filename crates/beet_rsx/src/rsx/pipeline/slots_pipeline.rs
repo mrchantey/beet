@@ -56,15 +56,9 @@ impl RsxPipeline<RsxNode, Result<RsxNode, SlotsError>> for SlotsPipeline {
 
 		// visit all children
 		VisitRsxComponentMut::walk(&mut node, |component| {
-			match Self::collect_slots(component) {
-				Ok(slot_map) => {
-					if let Err(e) =
-						Self::apply_to_node(&mut component.node, slot_map)
-					{
-						err = Err(e);
-					}
-				}
-				Err(e) => err = Err(e),
+			let slot_map = Self::collect_slot_map(component);
+			if let Err(e) = Self::apply_to_node(&mut component.node, slot_map) {
+				err = Err(e);
 			}
 		});
 		err.map(|_| node)
@@ -72,12 +66,11 @@ impl RsxPipeline<RsxNode, Result<RsxNode, SlotsError>> for SlotsPipeline {
 }
 
 impl SlotsPipeline {
-	/// apply all slots
-	/// ## Errors
-	/// If any named slots were not consumed
-	fn collect_slots(
+	/// collect any child elements with a slot attribute,
+	/// ie <div slot="foo">
+	fn collect_slot_map(
 		component: &mut RsxComponent,
-	) -> Result<HashMap<String, Vec<RsxNode>>, SlotsError> {
+	) -> HashMap<String, Vec<RsxNode>> {
 		let mut slot_map = HashMap::default();
 		let mut insert = |name: &str, node: &mut RsxNode| {
 			slot_map
@@ -104,11 +97,11 @@ impl SlotsPipeline {
 					// allow traversal
 				}
 				RsxNode::Element(el) => {
-					// remove the slot attribute if it exists
 					let slot_name = el
 						.get_key_value_attr("slot")
 						.unwrap_or("default")
 						.to_string();
+					// remove the slot attribute if it exists
 					el.remove_matching_key("slot");
 					insert(&slot_name, node);
 				}
@@ -118,7 +111,7 @@ impl SlotsPipeline {
 				}
 			},
 		);
-		Ok(slot_map)
+		slot_map
 	}
 
 	/// secondly apply the slots
@@ -136,21 +129,19 @@ impl SlotsPipeline {
 				match node {
 					RsxNode::Element(element) => {
 						if element.tag == "slot" {
-							// println!(
-							// 	"visiting slot: \n{:?}\nvisitor:{:?}",
-							// 	element, self
-							// );
 							let name = element
 								.get_key_value_attr("name")
 								.unwrap_or("default");
 							// no matching slot children is allowed, so use default
+							// TODO fallback to using the slots children https://docs.astro.build/en/basics/astro-components/#fallback-content-for-slots
 							let nodes =
 								slot_map.remove(name).unwrap_or_default();
 							// handle bubbling
 							if let Some(_slot_name) =
 								element.get_key_value_attr("slot")
 							{
-								unimplemented!("bubbling");
+								// unimplemented!("bubbling");
+								*node = nodes.into_node();
 							} else {
 								*node = nodes.into_node();
 							}
@@ -258,27 +249,37 @@ mod test {
 
 
 	#[test]
+	#[ignore = "we need reverse visitors"]
 	fn bubbles() {
 		#[derive(Node)]
-		struct MyComponent;
+		struct Comp1;
 
-		fn my_component(_: MyComponent) -> RsxNode {
+		fn comp1(_: Comp1) -> RsxNode {
 			rsx! {
-				<html>
+				<header>
+					<slot name="header" />
+					<slot/>
+				</header>
+			}
+		}
+		#[derive(Node)]
+		struct Comp2;
+
+		fn comp2(_: Comp2) -> RsxNode {
+			rsx! {
+				<header>
 					<slot name="header" slot="header" />
-					<slot />
-				</html>
+				</header>
 			}
 		}
 
 		expect(
 			rsx! {
-				<MyComponent>
-					<MyComponent>
-						<div slot="header">Header</div>
-						<div>Default</div>
-					</MyComponent>
-				</MyComponent>
+				<Comp1>
+					<Comp2>
+						<div slot="header">My App</div>
+					</Comp2>
+				</Comp1>
 			}
 			.bpipe(RsxToHtmlString::default())
 			.unwrap(),

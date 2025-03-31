@@ -17,10 +17,10 @@ impl RsxPipeline<(RsxNode, RsxTemplateNode), TemplateResult<RsxNode>>
 {
 	fn apply(
 		self,
-		(mut node, template): (RsxNode, RsxTemplateNode),
+		(node, template): (RsxNode, RsxTemplateNode),
 	) -> TemplateResult<RsxNode> {
 		// println!("found template for node: {}\n{:?}", location, template);
-		self.apply_to_node(template, &mut RustyPartMap::collect(&mut node))
+		self.apply_to_node(template, &mut node.bpipe(NodeToRustyPartMap))
 	}
 }
 

@@ -67,77 +67,72 @@ pub enum RustyPart {
 }
 
 
-
 #[derive(Deref, DerefMut)]
 pub struct RustyPartMap(pub HashMap<RustyTracker, RustyPart>);
 
-impl RustyPartMap {
-	pub fn collect(node: &mut RsxNode) -> Self {
-		let mut visitor = RustyPartVisitor::default();
-		visitor.walk_node(node);
-		Self(visitor.rusty_map)
+pub struct NodeToRustyPartMap;
+
+impl RsxPipeline<RsxNode, RustyPartMap> for NodeToRustyPartMap {
+	fn apply(self, mut node: RsxNode) -> RustyPartMap {
+		let mut rusty_map = HashMap::default();
+		VisitRsxNodeMut::walk_with_opts(
+			&mut node,
+			// we dont want to recurse into initial?
+			VisitRsxOptions::ignore_block_node_initial(),
+			|node| match node {
+				RsxNode::Block(block) => {
+					rusty_map.insert(
+						block.effect.tracker,
+						RustyPart::RustBlock {
+							initial: std::mem::take(&mut block.initial),
+							effect: std::mem::take(&mut block.effect),
+						},
+					);
+				}
+				RsxNode::Element(el) => {
+					for attr in el.attributes.iter_mut() {
+						match attr {
+							RsxAttribute::Key { .. } => {}
+							RsxAttribute::KeyValue { .. } => {}
+							RsxAttribute::BlockValue {
+								initial,
+								effect,
+								..
+							} => {
+								rusty_map.insert(
+									effect.tracker,
+									RustyPart::AttributeValue {
+										initial: std::mem::take(initial),
+										effect: std::mem::take(effect),
+									},
+								);
+							}
+							RsxAttribute::Block { initial, effect } => {
+								rusty_map.insert(
+									effect.tracker,
+									RustyPart::AttributeBlock {
+										initial: std::mem::take(initial),
+										effect: std::mem::take(effect),
+									},
+								);
+							}
+						}
+					}
+				}
+				RsxNode::Component(component) => {
+					// note how we ignore slot_children, they are handled by RsxTemplateNode
+					rusty_map.insert(component.tracker, RustyPart::Component {
+						root: std::mem::take(&mut component.node),
+						type_name: std::mem::take(&mut component.type_name),
+						ron: std::mem::take(&mut component.ron),
+					});
+				}
+				_ => {}
+			},
+		);
+		RustyPartMap(rusty_map)
 	}
 }
-
-/// take the effects from a node recursively
-#[derive(Default)]
-struct RustyPartVisitor {
-	rusty_map: HashMap<RustyTracker, RustyPart>,
-}
-
-impl RustyPartVisitor {}
-
-impl RsxVisitorMut for RustyPartVisitor {
-	fn ignore_block_node_initial(&self) -> bool {
-		// we dont want to recurse into initial?
-		true
-	}
-
-	fn visit_block(&mut self, block: &mut RsxBlock) {
-		self.rusty_map
-			.insert(block.effect.tracker, RustyPart::RustBlock {
-				initial: std::mem::take(&mut block.initial),
-				effect: std::mem::take(&mut block.effect),
-			});
-		// }
-	}
-	fn visit_attribute(&mut self, attribute: &mut RsxAttribute) {
-		match attribute {
-			RsxAttribute::Key { .. } => {}
-			RsxAttribute::KeyValue { .. } => {}
-			RsxAttribute::BlockValue {
-				initial, effect, ..
-			} => {
-				self.rusty_map.insert(
-					effect.tracker,
-					RustyPart::AttributeValue {
-						initial: std::mem::take(initial),
-						effect: std::mem::take(effect),
-					},
-				);
-			}
-			RsxAttribute::Block { initial, effect } => {
-				self.rusty_map.insert(
-					effect.tracker,
-					RustyPart::AttributeBlock {
-						initial: std::mem::take(initial),
-						effect: std::mem::take(effect),
-					},
-				);
-			}
-		}
-	}
-	fn visit_component(&mut self, component: &mut RsxComponent) {
-		// note how we ignore slot_children, they are handled by RsxTemplateNode
-		self.rusty_map
-			.insert(component.tracker, RustyPart::Component {
-				root: std::mem::take(&mut component.node),
-				type_name: std::mem::take(&mut component.type_name),
-				ron: std::mem::take(&mut component.ron),
-			});
-	}
-}
-
 
 #[cfg(test)]
 mod test {
@@ -147,10 +142,10 @@ mod test {
 	#[test]
 	fn works() {
 		let bar = 2;
-		expect(RustyPartMap::collect(&mut rsx! { <div /> }).len()).to_be(0);
-		expect(RustyPartMap::collect(&mut rsx! { <div foo=bar /> }).len())
+		expect(rsx! { <div /> }.bpipe(NodeToRustyPartMap).len()).to_be(0);
+		expect(rsx! { <div foo=bar /> }.bpipe(NodeToRustyPartMap).len())
 			.to_be(1);
-		expect(RustyPartMap::collect(&mut rsx! { <div>{bar}</div> }).len())
+		expect(rsx! { <div>{bar}</div> }.bpipe(NodeToRustyPartMap).len())
 			.to_be(1);
 	}
 }
