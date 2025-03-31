@@ -119,6 +119,13 @@ pub struct RsxToHtmlString {
 	pub render_html: RenderHtml,
 }
 
+impl RsxToHtmlString {
+	pub fn no_slot_check(mut self) -> Self {
+		self.rsx_to_html.no_slot_check = true;
+		self
+	}
+}
+
 impl RsxPipeline<RsxNode, Result<String>> for RsxToHtmlString {
 	fn apply(self, root: RsxNode) -> Result<String> {
 		root.bpipe(self.rsx_transforms)?

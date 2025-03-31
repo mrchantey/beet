@@ -2,6 +2,10 @@ use crate::prelude::*;
 
 #[derive(Debug, Default)]
 pub struct RsxToHtml {
+	/// Slot children are not rendered so by default this will
+	/// panic if they still exist, enable this option to ignore
+	/// slot children, pretty much only used for testing
+	pub no_slot_check: bool,
 	/// add attributes required for resumability
 	pub html_constants: HtmlConstants,
 	/// Do not check for wasm, which disables
@@ -20,11 +24,9 @@ impl<T: AsRef<RsxNode>> RsxPipeline<T, Vec<HtmlNode>> for RsxToHtml {
 
 
 impl RsxToHtml {
-	pub fn as_resumable() -> Self {
-		Self {
-			no_wasm: false,
-			..Default::default()
-		}
+	pub fn no_slot_check(mut self) -> Self {
+		self.no_slot_check = true;
+		self
 	}
 
 	/// recursively map rsx nodes to html nodes
@@ -61,7 +63,9 @@ impl RsxToHtml {
 				slot_children,
 				..
 			}) => {
-				slot_children.assert_empty();
+				if self.no_slot_check == false {
+					slot_children.assert_empty();
+				}
 				// use the location of the root
 				let node = self.map_node(&node);
 				// even though its empty we must visit to increment
