@@ -1,14 +1,14 @@
+#[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
+mod apply_fs_src;
 mod apply_slots;
 mod build_step;
 mod client_island;
-#[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
-mod apply_fs_src;
 mod register_effects;
+#[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
+pub use apply_fs_src::*;
 pub use apply_slots::*;
 pub use build_step::*;
 pub use client_island::*;
-#[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
-pub use apply_fs_src::*;
 pub use register_effects::*;
 #[cfg(feature = "css")]
 mod apply_scoped_style;

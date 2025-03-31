@@ -29,6 +29,14 @@ pub const DEFAULT_VISIT_RSX_OPTIONS: VisitRsxOptions = VisitRsxOptions {
 };
 
 impl VisitRsxOptions {
+	/// visit all children before parents, see `[VisitRsxOptions::bottom_up]`
+	pub fn bottom_up() -> Self {
+		Self {
+			bottom_up: true,
+			..Default::default()
+		}
+	}
+
 	/// do not visit any nodes aside from direct child and fragments
 	pub fn ignore_all() -> Self {
 		Self {
@@ -388,7 +396,7 @@ mod test {
 	fn top_down() {
 		let node = rsx! {
 			<div val="1">
-				<div val="2"/>
+				<div val="2" />
 			</div>
 		};
 
@@ -411,7 +419,7 @@ mod test {
 	fn bottom_up() {
 		let node = rsx! {
 			<div val="1">
-				<div val="2"/>
+				<div val="2" />
 			</div>
 		};
 

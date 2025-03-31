@@ -1,6 +1,5 @@
 use crate::prelude::*;
 use anyhow::Result;
-use rapidhash::RapidHashMap;
 use thiserror::Error;
 
 /// Slotting is the process of traversing the [RsxComponent::slot_children]
@@ -54,19 +53,28 @@ impl RsxPipeline<RsxNode, Result<RsxNode, SlotsError>> for ApplySlots {
 	fn apply(self, mut node: RsxNode) -> Result<RsxNode, SlotsError> {
 		let mut err = Ok(());
 
+		// let mut slots_passed_up_by_children =
 		// visit all children
-		VisitRsxComponentMut::walk(&mut node, |component| {
-			let slot_map = Self::collect_slot_map(component);
-			if let Err(e) = Self::apply_to_node(&mut component.node, slot_map) {
-				err = Err(e);
-			}
-		});
+
+		// let mut comp_id: u32 = 0;
+
+		VisitRsxComponentMut::walk_with_opts(
+			&mut node,
+			VisitRsxOptions::bottom_up(),
+			|component| {
+				let slot_map = Self::collect_slot_map(component);
+				match Self::apply_to_node(&mut component.node, slot_map) {
+					Ok(_slots_for_parent) => {}
+					Err(e) => err = Err(e),
+				}
+			},
+		);
 		err.map(|_| node)
 	}
 }
 
 impl ApplySlots {
-	/// collect any child elements with a slot attribute,
+	/// collect any child elements with a slot attribute into a hashmap
 	/// ie <div slot="foo">
 	fn collect_slot_map(
 		component: &mut RsxComponent,
@@ -80,12 +88,10 @@ impl ApplySlots {
 				.push(std::mem::take(node));
 		};
 
-		// firstly sort slot children
-		VisitRsxNodeMut::walk(
+		VisitRsxNodeMut::walk_with_opts(
 			&mut component.slot_children,
 			// top level only
-			// VisitRsxOptions::default(),
-			// VisitRsxOptions::ignore_all(),
+			VisitRsxOptions::ignore_all(),
 			|node| match node {
 				RsxNode::Doctype { .. }
 				| RsxNode::Comment { .. }
@@ -114,12 +120,19 @@ impl ApplySlots {
 		slot_map
 	}
 
-	/// secondly apply the slots
-	/// visit node so we can replace slot with fragment
+	/// Apply the slots to the node.
+	/// ## Bubbling up
+	/// The returned hashmap contains the children of
+	/// any <slot slot="foo"> where the key is "foo" and the value is
+	/// the *resolved* children of the slot.
+	/// ## Errors
+	///
+	/// If there are any unconsumed slots, an error is returned
 	fn apply_to_node(
 		node: &mut RsxNode,
-		mut slot_map: RapidHashMap<String, Vec<RsxNode>>,
-	) -> Result<(), SlotsError> {
+		mut slot_map: HashMap<String, Vec<RsxNode>>,
+	) -> Result<HashMap<String, Vec<RsxNode>>, SlotsError> {
+		let mut slots_for_parent = HashMap::default();
 		VisitRsxNodeMut::walk_with_opts(
 			node,
 			// avoid 'slot stealing' by not visiting any child component nodes
@@ -140,8 +153,10 @@ impl ApplySlots {
 							if let Some(_slot_name) =
 								element.get_key_value_attr("slot")
 							{
+								slots_for_parent
+									.insert(name.to_string(), nodes);
 								// unimplemented!("bubbling");
-								*node = nodes.into_node();
+								*node = RsxNode::default();
 							} else {
 								*node = nodes.into_node();
 							}
@@ -153,7 +168,7 @@ impl ApplySlots {
 		);
 		let unconsumed = slot_map.into_iter().collect::<Vec<_>>();
 		if unconsumed.is_empty() {
-			Ok(())
+			Ok(slots_for_parent)
 		} else {
 			Err(SlotsError::new(unconsumed))
 		}
@@ -224,7 +239,7 @@ mod test {
 			rsx! {
 				<html>
 					<slot name="header" />
-					<br/>
+					<br />
 					<slot />
 				</html>
 			}
@@ -249,7 +264,7 @@ mod test {
 
 
 	#[test]
-	#[ignore = "we need reverse visitors"]
+	#[ignore = "maybe we need bevy"]
 	fn bubbles() {
 		#[derive(Node)]
 		struct Comp1;
@@ -258,7 +273,7 @@ mod test {
 			rsx! {
 				<header>
 					<slot name="header" />
-					<slot/>
+					<slot />
 				</header>
 			}
 		}
