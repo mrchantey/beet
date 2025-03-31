@@ -33,13 +33,9 @@ fn my_node_other(props: MyNode) -> RsxNode {
 
 
 fn main() {
-	let str = rsx! { <MyNode
-	is_required=38
-	is_into="foobar"
-	is_optional=3
-	/> }
-	.bpipe(RsxToHtmlString::default())
-	.unwrap();
+	let str = rsx! { <MyNode is_required=38 is_into="foobar" is_optional=3 /> }
+		.bpipe(RsxToHtmlString::default())
+		.unwrap();
 	assert_eq!(
 		str,
 		"<div><p data-beet-rsx-idx=\"3\">is_optional: None</p><p data-beet-rsx-idx=\"8\">is_required: 38</p><p data-beet-rsx-idx=\"13\">is_default: 7</p><p data-beet-rsx-idx=\"18\">is_generic_default: Foo(PhantomData<u32>)</p><p data-beet-rsx-idx=\"23\">is_into: \"foobar\"</p></div>"

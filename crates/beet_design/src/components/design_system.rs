@@ -32,16 +32,16 @@ fn layout_style() -> RsxNode {
 		/* border */
 		--bm-border-radius: 0.5rem;
 		--bm-border-radius-sm: 0.25rem;
-		--bm-border: var(--bm-border-width) solid var(--bm-color-border);	
+		--bm-border: var(--bm-border-width) solid var(--bm-color-border);
 		--bm-border-width: 0.0625rem;
 		--bm-border-width-xs: calc(var(--bm-border-width) * 0.5);
 		--bm-border-width-sm: calc(var(--bm-border-width) * 0.75);
 		--bm-border-width-lg: calc(var(--bm-border-width) * 2);
 		--bm-border-width-xl: calc(var(--bm-border-width) * 4);
-	
+
 		/* animation */
 		--bm-transition: .2s ease-in-out;
-		
+
 		/* layout */
 		--md-primary-tab-container-height: 32px;
 		--header-height: 48px;

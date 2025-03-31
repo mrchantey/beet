@@ -44,6 +44,10 @@ pub trait RsxPipelineTarget: Sized {
 		func(&mut self);
 		self
 	}
+	fn btap_mut(&mut self, func: impl FnOnce(&mut Self)) -> &mut Self {
+		func(self);
+		self
+	}
 	/// its like map but for our pipeline trait
 	fn bpipe<P: RsxPipeline<Self, O>, O>(self, pipeline: P) -> O {
 		pipeline.apply(self)

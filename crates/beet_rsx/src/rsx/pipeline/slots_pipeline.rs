@@ -1,5 +1,6 @@
 use crate::prelude::*;
 use anyhow::Result;
+use rapidhash::RapidHashMap;
 use thiserror::Error;
 
 /// Slotting is the process of traversing the [RsxComponent::slot_children]
@@ -48,22 +49,131 @@ use thiserror::Error;
 #[derive(Debug, Default, Clone)]
 pub struct SlotsPipeline;
 
-impl RsxPipeline<RsxNode, Result<RsxNode>> for SlotsPipeline {
-	fn apply(self, mut node: RsxNode) -> Result<RsxNode> {
-		SlotsVisitor::apply(&mut node)
-			.map(|_| node)
-			.map_err(|e| anyhow::anyhow!(e))
+impl RsxPipeline<RsxNode, Result<RsxNode, SlotsError>> for SlotsPipeline {
+	/// apply slots to all top level components,
+	fn apply(self, mut node: RsxNode) -> Result<RsxNode, SlotsError> {
+		let mut err = Ok(());
+
+		// visit all children
+		VisitRsxComponentMut::walk(&mut node, |component| {
+			match Self::collect_slots(component) {
+				Ok(slot_map) => {
+					if let Err(e) =
+						Self::apply_to_node(&mut component.node, slot_map)
+					{
+						err = Err(e);
+					}
+				}
+				Err(e) => err = Err(e),
+			}
+		});
+		err.map(|_| node)
 	}
 }
-#[derive(Debug)]
-struct SlotsVisitor {
-	default_slots: Vec<RsxNode>,
-	named_slots: HashMap<String, Vec<RsxNode>>,
+
+impl SlotsPipeline {
+	/// apply all slots
+	/// ## Errors
+	/// If any named slots were not consumed
+	fn collect_slots(
+		component: &mut RsxComponent,
+	) -> Result<HashMap<String, Vec<RsxNode>>, SlotsError> {
+		let mut slot_map = HashMap::default();
+		let mut insert = |name: &str, node: &mut RsxNode| {
+			slot_map
+				.entry(name.to_string())
+				.or_insert_with(Vec::new)
+				// taking a mutable node results in its children not being visited
+				.push(std::mem::take(node));
+		};
+
+		// firstly sort slot children
+		VisitRsxNodeMut::walk(
+			&mut component.slot_children,
+			// top level only
+			// VisitRsxOptions::default(),
+			// VisitRsxOptions::ignore_all(),
+			|node| match node {
+				RsxNode::Doctype { .. }
+				| RsxNode::Comment { .. }
+				| RsxNode::Text { .. }
+				| RsxNode::Block(_) => {
+					insert("default", node);
+				}
+				RsxNode::Fragment { .. } => {
+					// allow traversal
+				}
+				RsxNode::Element(el) => {
+					// remove the slot attribute if it exists
+					let slot_name = el
+						.get_key_value_attr("slot")
+						.unwrap_or("default")
+						.to_string();
+					el.remove_matching_key("slot");
+					insert(&slot_name, node);
+				}
+				RsxNode::Component(_) => {
+					// TODO component slot, ie RsxComponent {slot:Option<String>,...}
+					insert("default", node);
+				}
+			},
+		);
+		Ok(slot_map)
+	}
+
+	/// secondly apply the slots
+	/// visit node so we can replace slot with fragment
+	fn apply_to_node(
+		node: &mut RsxNode,
+		mut slot_map: RapidHashMap<String, Vec<RsxNode>>,
+	) -> Result<(), SlotsError> {
+		VisitRsxNodeMut::walk_with_opts(
+			node,
+			// avoid 'slot stealing' by not visiting any child component nodes
+			// we still need to visit element children because we still need to find and remove default <slot/>
+			VisitRsxOptions::ignore_component_node(),
+			|node| {
+				match node {
+					RsxNode::Element(element) => {
+						if element.tag == "slot" {
+							// println!(
+							// 	"visiting slot: \n{:?}\nvisitor:{:?}",
+							// 	element, self
+							// );
+							let name = element
+								.get_key_value_attr("name")
+								.unwrap_or("default");
+							// no matching slot children is allowed, so use default
+							let nodes =
+								slot_map.remove(name).unwrap_or_default();
+							// handle bubbling
+							if let Some(_slot_name) =
+								element.get_key_value_attr("slot")
+							{
+								unimplemented!("bubbling");
+							} else {
+								*node = nodes.into_node();
+							}
+						}
+					}
+					_ => {}
+				}
+			},
+		);
+		let unconsumed = slot_map.into_iter().collect::<Vec<_>>();
+		if unconsumed.is_empty() {
+			Ok(())
+		} else {
+			Err(SlotsError::new(unconsumed))
+		}
+	}
 }
+
+
 
 #[derive(Debug, Error)]
 #[error("some slots were not consumed: {unconsumed:?}")]
-struct SlotsError {
+pub struct SlotsError {
 	unconsumed: Vec<(String, Vec<RsxNodeDiscriminants>)>,
 }
 impl SlotsError {
@@ -78,133 +188,6 @@ impl SlotsError {
 					)
 				})
 				.collect(),
-		}
-	}
-}
-
-impl SlotsVisitor {
-	/// apply slots to all top level components,
-	/// TODO apply recursively to child components?
-	pub fn apply(node: &mut RsxNode) -> Result<(), SlotsError> {
-		let mut err = None;
-
-		// visit all children
-		VisitRsxComponentMut::walk(node, |component| {
-			if let Err(e) = Self::apply_to_component(component) {
-				err = Some(e);
-			}
-		});
-		if let Some(err) = err {
-			Err(err)
-		} else {
-			Ok(())
-		}
-	}
-
-
-	/// apply all slots
-	/// ## Errors
-	/// If any named slots were not consumed
-	fn apply_to_component(
-		component: &mut RsxComponent,
-	) -> Result<(), SlotsError> {
-		let mut default_slots = vec![];
-		let mut named_slots = HashMap::default();
-		// firstly sort slot children
-		VisitRsxNodeMut::walk(
-			&mut component.slot_children,
-			|node| match node {
-				RsxNode::Doctype { .. }
-				| RsxNode::Comment { .. }
-				| RsxNode::Text { .. }
-				| RsxNode::Block(_) => {
-					// taking a mutable node results in its children not being visited
-					default_slots.push(std::mem::take(node));
-				}
-				RsxNode::Fragment { .. } => {
-					// println!("fragment");
-					// allow traversal
-				}
-				RsxNode::Element(el) => {
-					if let Some(slot_name) = el.get_key_value_attr("slot") {
-						let slot_name = slot_name.to_string();
-						// remove the slot attribute
-						el.remove_matching_key("slot");
-						named_slots
-							.entry(slot_name)
-							.or_insert_with(Vec::new)
-							.push(std::mem::take(node));
-					} else {
-						default_slots.push(std::mem::take(node));
-					}
-				}
-				RsxNode::Component(_) => {
-					// TODO component slot, ie RsxComponent {slot:Option<String>,...}
-					default_slots.push(std::mem::take(node));
-				}
-			},
-		);
-		// secondly apply the slots
-		let mut this = Self {
-			default_slots,
-			named_slots,
-		};
-		this.walk_node(&mut component.node);
-		let mut unconsumed = this.named_slots.into_iter().collect::<Vec<_>>();
-
-		if !this.default_slots.is_empty() {
-			unconsumed.push(("default".to_string(), this.default_slots));
-		}
-		if unconsumed.is_empty() {
-			Ok(())
-		} else {
-			Err(SlotsError::new(unconsumed))
-		}
-	}
-}
-
-
-
-
-
-
-
-impl RsxVisitorMut for SlotsVisitor {
-	fn ignore_component_node(&self) -> bool {
-		// avoid 'slot stealing'
-		true
-	}
-	// we cant exit early because we still need to find and remove default <slot/>
-	fn ignore_element_children(&self) -> bool { false }
-
-	/// visit node so we can replace slot with fragment
-	fn visit_node(&mut self, node: &mut RsxNode) {
-		// println!("visiting node: {:?}", node);
-
-		match node {
-			RsxNode::Element(element) => {
-				if element.tag == "slot" {
-					// println!(
-					// 	"visiting slot: \n{:?}\nvisitor:{:?}",
-					// 	element, self
-					// );
-					let nodes = if let Some(name) =
-						element.get_key_value_attr("name")
-					{
-						if let Some(nodes) = self.named_slots.remove(name) {
-							nodes
-						} else {
-							Vec::new()
-						}
-						// no matching slot children, thats allowed
-					} else {
-						// drains the default slots
-						std::mem::take(&mut self.default_slots)
-					};
-					*node = nodes.into_node();
-				}
-			}
-			_ => {}
 		}
 	}
 }
@@ -250,7 +233,7 @@ mod test {
 			rsx! {
 				<html>
 					<slot name="header" />
-					// default
+					<br/>
 					<slot />
 				</html>
 			}
@@ -268,6 +251,38 @@ mod test {
 			.bpipe(RsxToHtmlString::default())
 			.unwrap(),
 		)
-		.to_be("<html><html><div>Header</div><div>Default</div></html></html>");
+		.to_be(
+			"<html><br/><html><div>Header</div><br/><div>Default</div></html></html>",
+		);
+	}
+
+
+	#[test]
+	fn bubbles() {
+		#[derive(Node)]
+		struct MyComponent;
+
+		fn my_component(_: MyComponent) -> RsxNode {
+			rsx! {
+				<html>
+					<slot name="header" slot="header" />
+					<slot />
+				</html>
+			}
+		}
+
+		expect(
+			rsx! {
+				<MyComponent>
+					<MyComponent>
+						<div slot="header">Header</div>
+						<div>Default</div>
+					</MyComponent>
+				</MyComponent>
+			}
+			.bpipe(RsxToHtmlString::default())
+			.unwrap(),
+		)
+		.to_be("<html><div>Header</div><html><div>Default</div></html></html>");
 	}
 }
