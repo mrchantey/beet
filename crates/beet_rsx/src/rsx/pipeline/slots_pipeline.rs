@@ -177,7 +177,7 @@ impl RsxVisitorMut for SlotsVisitor {
 	// we cant exit early because we still need to find and remove default <slot/>
 	fn ignore_element_children(&self) -> bool { false }
 
-	/// visit node so we can replace slot with fragment of same idx
+	/// visit node so we can replace slot with fragment
 	fn visit_node(&mut self, node: &mut RsxNode) {
 		// println!("visiting node: {:?}", node);
 

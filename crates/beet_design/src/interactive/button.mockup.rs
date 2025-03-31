@@ -6,5 +6,5 @@ pub fn primary() -> RsxNode {
 }
 
 pub fn secondary() -> RsxNode {
-	rsx! {<Button> click me </Button>}
+	rsx! {<Button variant=ButtonVariant::Secondary> click me </Button>}
 }

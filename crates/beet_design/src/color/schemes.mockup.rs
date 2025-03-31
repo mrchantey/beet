@@ -116,7 +116,7 @@ fn scheme() -> RsxNode {
 			.color-box {
 				display: flex;
 				align-items: center;
-				padding:0.3em;
+				padding:0.3.em;
 				height:3.em;
 				width:10.em;
 			}

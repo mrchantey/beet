@@ -295,11 +295,13 @@ impl RstmlToRsx {
 
 
 		// ensures all required fields are set
-		let impl_required = quote::quote_spanned! {open_tag.span()=>
-					let _ = <#ident as Props>::Required{
-						#(#prop_names: Default::default()),*
-					};
-		};
+		// doesnt work because we cant tell whether its an optional or default
+		// just by its name
+		// let impl_required = quote::quote_spanned! {open_tag.span()=>
+		// 			let _ = <#ident as Props>::Required{
+		// 				#(#prop_names: Default::default()),*
+		// 			};
+		// };
 
 		let component = if let Some(node_block) = block_attr {
 			quote! {
@@ -307,7 +309,7 @@ impl RstmlToRsx {
 			}
 		} else {
 			quote!({
-				#impl_required
+				// #impl_required
 				<#ident as Props>::Builder::default()
 				#(#prop_assignments)*
 				.build()

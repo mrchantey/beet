@@ -46,6 +46,7 @@ impl ThemeToCss {
 		{light}
 		{dark}
 		:root{{
+		/* a default that can be overridden, ie by a button state */
 		{prefix}-opacity: 1;
 		{prefix}-opacity-hover: 0.7;
 		{prefix}-opacity-active: 0.5;

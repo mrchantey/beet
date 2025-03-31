@@ -24,7 +24,7 @@ impl<'a> PropsField<'a> {
 
 	/// Returns true if the field is required.
 	pub fn is_required(&self) -> bool {
-		!self.is_optional() && self.attributes.get("default").is_none()
+		self.is_optional() == false && self.default_attr().is_none()
 	}
 
 	pub fn default_attr(&self) -> Option<&AttributeItem> {
