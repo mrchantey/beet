@@ -50,7 +50,7 @@ impl IntoCollection<Self> for Vec<RouteFunc<DefaultRouteFunc>> {
 						.clone()
 						.into_iter()
 						.map(|(info, root)| {
-							Ok((info, root.bpipe(SlotsPipeline::default())?))
+							Ok((info, root.bpipe(ApplySlots::default())?))
 						})
 						.collect::<Result<Vec<_>>>()?
 						.bref()

@@ -47,9 +47,9 @@ use thiserror::Error;
 /// 	slot children.
 /// - All slot="foo" attributes are removed.
 #[derive(Debug, Default, Clone)]
-pub struct SlotsPipeline;
+pub struct ApplySlots;
 
-impl RsxPipeline<RsxNode, Result<RsxNode, SlotsError>> for SlotsPipeline {
+impl RsxPipeline<RsxNode, Result<RsxNode, SlotsError>> for ApplySlots {
 	/// apply slots to all top level components,
 	fn apply(self, mut node: RsxNode) -> Result<RsxNode, SlotsError> {
 		let mut err = Ok(());
@@ -65,7 +65,7 @@ impl RsxPipeline<RsxNode, Result<RsxNode, SlotsError>> for SlotsPipeline {
 	}
 }
 
-impl SlotsPipeline {
+impl ApplySlots {
 	/// collect any child elements with a slot attribute,
 	/// ie <div slot="foo">
 	fn collect_slot_map(

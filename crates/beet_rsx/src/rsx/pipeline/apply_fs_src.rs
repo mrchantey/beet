@@ -8,15 +8,15 @@ use sweet::prelude::*;
 
 
 /// Resolve the src attribute to a file if it does not start with any [IGNORED_PREFIX]:
-pub struct FsSrcPipeline {}
+pub struct ApplyFsSrc;
 
 const IGNORED_PREFIX: [&str; 3] = ["/", "http://", "https://"];
 
-impl Default for FsSrcPipeline {
+impl Default for ApplyFsSrc {
 	fn default() -> Self { Self {} }
 }
 
-impl RsxPipeline<RsxNode, Result<RsxNode>> for FsSrcPipeline {
+impl RsxPipeline<RsxNode, Result<RsxNode>> for ApplyFsSrc {
 	fn apply(self, mut root: RsxNode) -> Result<RsxNode> {
 		//1. apply to root
 		self.apply_root(&mut root)?;
@@ -34,7 +34,7 @@ impl RsxPipeline<RsxNode, Result<RsxNode>> for FsSrcPipeline {
 	}
 }
 
-impl FsSrcPipeline {
+impl ApplyFsSrc {
 	/// apply to a root without recursing into components
 	fn apply_root(&self, node: &mut RsxNode) -> Result<()> {
 		let mut result = Ok(());
@@ -109,15 +109,11 @@ mod test {
 	#[test]
 	fn works() {
 		// relative ignored
-		expect(
-			rsx! { <script src="/missing" /> }.bpipe(FsSrcPipeline::default()),
-		)
-		.to_be_ok();
+		expect(rsx! { <script src="/missing" /> }.bpipe(ApplyFsSrc::default()))
+			.to_be_ok();
 		// missing errors
-		expect(
-			rsx! { <script src="missing" /> }.bpipe(FsSrcPipeline::default()),
-		)
-		.to_be_err();
+		expect(rsx! { <script src="missing" /> }.bpipe(ApplyFsSrc::default()))
+			.to_be_err();
 		// slot children errors
 		expect(
 			rsx! {
@@ -125,12 +121,12 @@ mod test {
 					<script src="missing" />
 				</Foo>
 			}
-			.bpipe(FsSrcPipeline::default()),
+			.bpipe(ApplyFsSrc::default()),
 		)
 		.to_be_err();
 
 		let node = rsx! { <script src="test-fs-src.js" /> }
-			.bpipe(FsSrcPipeline::default())
+			.bpipe(ApplyFsSrc::default())
 			.unwrap();
 
 		let RsxNode::Element(el) = &node else {

@@ -124,7 +124,7 @@ mod test {
 			<MyComponent />
 			<MyComponent />
 		}
-		.bpipe(SlotsPipeline::default())
+		.bpipe(ApplySlots::default())
 		.unwrap();
 
 		let html = node

@@ -1,20 +1,19 @@
+mod apply_slots;
 mod build_step;
 mod client_island;
 #[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
-mod fs_src_pipeline;
+mod apply_fs_src;
 mod register_effects;
-mod slots_pipeline;
-pub use register_effects::*;
-
+pub use apply_slots::*;
 pub use build_step::*;
 pub use client_island::*;
 #[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
-pub use fs_src_pipeline::*;
-pub use slots_pipeline::*;
+pub use apply_fs_src::*;
+pub use register_effects::*;
 #[cfg(feature = "css")]
-mod scoped_style_pipeline;
+mod apply_scoped_style;
 #[cfg(feature = "css")]
-pub use scoped_style_pipeline::*;
+pub use apply_scoped_style::*;
 
 use crate::prelude::*;
 use anyhow::Result;
@@ -61,10 +60,10 @@ impl<T: Sized> RsxPipelineTarget for T {}
 #[derive(Default)]
 pub struct DefaultRsxTransforms {
 	#[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
-	fs_src: FsSrcPipeline,
+	fs_src: ApplyFsSrc,
 	#[cfg(feature = "css")]
-	scoped_style: ScopedStylePipeline,
-	slots: SlotsPipeline,
+	scoped_style: ApplyScopedStyle,
+	slots: ApplySlots,
 }
 
 impl RsxPipeline<RsxNode, Result<RsxNode>> for DefaultRsxTransforms {
