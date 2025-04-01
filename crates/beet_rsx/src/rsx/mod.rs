@@ -4,9 +4,9 @@ mod pipeline;
 mod props;
 mod rsx_location;
 mod rsx_node;
-pub use rsx_visitor_fn::*;
 mod rsx_visitor;
 mod rsx_visitor_fn;
+mod template_directive;
 mod tree_idx;
 pub use effect::*;
 pub use global_rsx_idx::*;
@@ -15,6 +15,8 @@ pub use props::*;
 pub use rsx_location::*;
 pub use rsx_node::*;
 pub use rsx_visitor::*;
+pub use rsx_visitor_fn::*;
+pub use template_directive::*;
 pub use tree_idx::*;
 
 // TODO deprecate for IntoRsxNode

@@ -364,7 +364,7 @@ mod test {
 		}
 		#[derive(Node)]
 		struct Header;
-		
+
 		fn header(_: Header) -> RsxNode {
 			rsx! {
 				<header>

@@ -9,7 +9,5 @@ use beet::prelude::*;
 pub struct BeetHeaderLinks;
 
 fn beet_header_links(_: BeetHeaderLinks) -> RsxNode {
-	rsx! {
-		<div>over here!</div>
-	}
+	rsx! { <div>over here!</div> }
 }

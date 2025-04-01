@@ -192,9 +192,7 @@ mod test {
 	struct JustSlot;
 
 	fn just_slot(_: JustSlot) -> RsxNode {
-		rsx! {
-				<slot />
-		}
+		rsx! { <slot /> }
 	}
 	#[derive(Node)]
 	struct Child;

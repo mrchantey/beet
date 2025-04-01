@@ -37,10 +37,8 @@ impl ThemeToCss {
 			dark_class: dark_scheme,
 		} = self;
 
-		let light =
-			Self::scheme_to_css(light_scheme, &theme.schemes.light);
-		let dark =
-			Self::scheme_to_css(dark_scheme, &theme.schemes.dark);
+		let light = Self::scheme_to_css(light_scheme, &theme.schemes.light);
+		let dark = Self::scheme_to_css(dark_scheme, &theme.schemes.dark);
 		format!(
 			r#"
 		{light}
