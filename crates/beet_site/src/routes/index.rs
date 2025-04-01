@@ -6,7 +6,7 @@ pub fn get() -> RsxNode {
 	rsx! {
 		<BeetPage>
 			{val + 8}
-			<span>hello pizzadoodie</span>
+			<span>hello pizzad</span>
 			<Counter client:load initial=2/>
 			<style>
 				span{

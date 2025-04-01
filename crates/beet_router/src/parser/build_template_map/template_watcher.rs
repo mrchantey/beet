@@ -83,29 +83,21 @@ impl<Reload: FnMut() -> Result<()>, Recompile: FnMut() -> Result<()>>
 				EventKind::Create(CreateKind::File)
 				| EventKind::Modify(ModifyKind::Data(_))
 				| EventKind::Modify(ModifyKind::Name(_)) => {
-					if ev
-						.path
-						.extension()
-						.map(|x| x == "rs")
-						.unwrap_or_default()
-					{
-						let new_hash =
-							HashFile::default().file_to_hash(&ev.path)?;
-						if let Some(curr_hash) = self.file_cache.get(&ev.path) {
-							if curr_hash == &new_hash {
-								hotreload_reason = Some(ev.display());
-								continue;
-							}
-							// println!(
-							// 	"the hash changed\nprev: {}\nnew: {}",
-							// 	curr_hash, new_hash
-							// );
+					let new_hash =
+						HashFile::default().file_to_hash(&ev.path)?;
+					if let Some(curr_hash) = self.file_cache.get(&ev.path) {
+						if curr_hash == &new_hash {
+							// no code changed, just reload
+							hotreload_reason = Some(ev.display());
+							continue;
 						}
-						self.file_cache.insert(ev.path.clone(), new_hash);
-						return self.recompile_then_reload(&ev.display());
-					} else {
-						return self.recompile_then_reload(&ev.display());
+						// println!(
+						// 	"the hash changed\nprev: {}\nnew: {}",
+						// 	curr_hash, new_hash
+						// );
 					}
+					self.file_cache.insert(ev.path.clone(), new_hash);
+					return self.recompile_then_reload(&ev.display());
 				}
 				EventKind::Remove(RemoveKind::File)
 				| EventKind::Remove(RemoveKind::Folder) => {

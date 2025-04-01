@@ -6,7 +6,7 @@ fn main() -> Result<()> {
 	println!("cargo::rerun-if-changed=build.rs");
 	// mockups can be generated from anywhere in src,
 	// so rebuild if any change
-	println!("cargo::rerun-if-changed=src");
+	println!("cargo::rerun-if-changed=src/**/*.mockup.rs");
 
 	FileGroup::new_workspace_rel("crates/beet_design/src")?
 		.with_filter(GlobFilter::default().with_include("*.mockup.rs"))

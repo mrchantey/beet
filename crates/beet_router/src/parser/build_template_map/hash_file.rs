@@ -21,6 +21,7 @@ pub struct HashFile {
 
 impl HashFile {
 	/// hash only the code parts of a rust file.
+	/// Non-rust files will always return 0, ie no recompile
 	pub fn file_to_hash(&self, path: &Path) -> Result<u64> {
 		if path.extension().map_or(false, |ext| ext == "rs") {
 			let file = ReadFile::to_string(path)?;

@@ -11,7 +11,7 @@ fn page_layout(_props: PageLayout) -> RsxNode {
 		<DocumentLayout>
 		<slot name="head" slot="head" />
 		<div class="page">
-			// <Header/>
+			<Header/>
 			<slot/>
 			// <Footer/>
 		</div>
