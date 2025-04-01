@@ -12,7 +12,8 @@ pub struct PropsField<'a> {
 
 impl<'a> PropsField<'a> {
 	pub fn parse(inner: &'a Field) -> Result<Self> {
-		let attributes = AttributeGroup::parse(&inner.attrs, "field")?;
+		let attributes = AttributeGroup::parse(&inner.attrs, "field")?
+			.validate_allowed_keys(&["default", "required", "into"])?;
 		Ok(Self { inner, attributes })
 	}
 

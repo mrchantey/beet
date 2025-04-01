@@ -59,7 +59,8 @@ fn parse(input: DeriveInput) -> Result<TokenStream> {
 }
 
 fn impl_component(input: &DeriveInput) -> Result<TokenStream> {
-	let attributes = AttributeGroup::parse(&input.attrs, "node")?;
+	let attributes = AttributeGroup::parse(&input.attrs, "node")?
+		.validate_allowed_keys(&["into_rsx", "no_component"])?;
 	if attributes.get("no_component").is_some() {
 		return Ok(Default::default());
 	}

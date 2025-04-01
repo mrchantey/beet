@@ -16,8 +16,8 @@ struct MyNode {
 	is_generic_default: Foo<u32>,
 	#[field(into)]
 	is_into: String,
-	#[field(foo)]
-	is_bad_macro: String,
+	// #[field(foo)]
+	// is_bad_macro: String,
 }
 
 fn my_node_other(props: MyNode) -> RsxNode {

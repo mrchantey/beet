@@ -3,7 +3,7 @@ use crate::prelude::*;
 
 #[derive(Node)]
 pub struct Header {
-	#[field(into, defaut = "./".to_string())]
+	#[field(into, default = "./".to_string())]
 	home_route: String,
 }
 
