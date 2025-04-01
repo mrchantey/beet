@@ -4,6 +4,8 @@ mod footer;
 mod head;
 mod header;
 mod page_layout;
+mod sidebar;
+pub use sidebar::*;
 pub use content_layout::*;
 pub use document_layout::*;
 pub use footer::*;

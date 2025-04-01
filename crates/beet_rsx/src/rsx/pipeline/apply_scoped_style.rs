@@ -75,10 +75,6 @@ impl RsxPipeline<RsxNode, Result<RsxNode>> for ApplyScopedStyle {
 			if let Err(err) = self.apply_node(&mut component.node) {
 				parse_err = Err(err);
 			};
-			// 3. apply to component slot children
-			if let Err(err) = self.apply_node(&mut component.slot_children) {
-				parse_err = Err(err);
-			};
 		});
 		parse_err.map(|_| node).map_err(|e| anyhow::anyhow!(e))
 	}
@@ -90,7 +86,9 @@ impl ApplyScopedStyle {
 	fn apply_node(&mut self, node: &mut RsxNode) -> ParseResult<()> {
 		let mut parse_err = Ok(());
 
-		let opts = VisitRsxOptions::ignore_component();
+		// the boundary for scoped style is to apply to every descendent
+		// with the exception of component nodes
+		let opts = VisitRsxOptions::ignore_component_node();
 		let mut component_scope_found = false;
 
 		// 1. apply to style bodies
@@ -191,6 +189,14 @@ mod test {
 	use sweet::prelude::*;
 
 	#[derive(Node)]
+	struct JustSlot;
+
+	fn just_slot(_: JustSlot) -> RsxNode {
+		rsx! {
+				<slot />
+		}
+	}
+	#[derive(Node)]
 	struct Child;
 
 	fn child(_: Child) -> RsxNode {
@@ -262,12 +268,12 @@ mod test {
 	#[test]
 	fn applies_to_slot_children() {
 		expect(rsx! {
-			<Child>
+			<JustSlot>
 				<br/>
-				<style>span { color: red; }</style>
-			</Child>
+			</JustSlot>
+			<style>br { color: red; }</style>
 		}.bpipe(RsxToHtmlString::default()).unwrap())
-			.to_be("<div data-styleid=\"0\"><style data-styleid=\"0\">span[data-styleid=\"0\"] {\n  color: #00f;\n}\n</style><br data-styleid=\"1\"/><style data-styleid=\"1\">span[data-styleid=\"1\"] {\n  color: red;\n}\n</style></div>");
+			.to_be("<br data-styleid=\"0\"/><style data-styleid=\"0\">br[data-styleid=\"0\"] {\n  color: red;\n}\n</style>");
 	}
 
 

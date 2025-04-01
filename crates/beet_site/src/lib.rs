@@ -13,4 +13,5 @@ pub mod wasm;
 pub mod prelude {
 	pub use super::*;
 	pub use crate::components::*;
+	pub use crate::route_tree::paths;
 }

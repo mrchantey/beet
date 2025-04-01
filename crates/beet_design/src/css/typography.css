@@ -51,8 +51,8 @@ body {
 	font-family: var(--bt-font);
 	/* line-height: var(--bt-line-height); */
 	-webkit-font-smoothing: antialiased;
-	color: var(--sl-color-text);
-	background-color: var(--sl-color-bg);
+	color: var(--bt-color-text);
+	background-color: var(--bt-color-background);
 }
 
 input,

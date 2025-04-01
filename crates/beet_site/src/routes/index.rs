@@ -2,17 +2,13 @@ use crate::prelude::*;
 use beet::prelude::*;
 
 pub fn get() -> RsxNode {
-	let val = 99;
 	rsx! {
-		<BeetPage>
-			{val + 8}
-			<span>hello pizzad</span>
+		<BeetContext>
+		<ContentLayout>
+			<h1>Beet</h1>
+			<a href={paths::docs()}>Get Started</a>
 			<Counter client:load initial=2/>
-			<style>
-				span{
-					color: blue;
-				}
-			</style>
-		</BeetPage>
+			</ContentLayout>
+		</BeetContext>
 	}
 }

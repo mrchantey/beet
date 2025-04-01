@@ -11,7 +11,7 @@ fn main() {
 		route.map_func(|func| {
 			async move || -> anyhow::Result<RsxNode> {
 				let root = func().await?;
-				Ok(rsx! { <BeetPage>{root}</BeetPage> })
+				Ok(rsx! { <BeetSidebarLayout>{root}</BeetSidebarLayout> })
 			}
 		})
 	}));

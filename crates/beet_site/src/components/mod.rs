@@ -1,4 +1,6 @@
-mod beet_page;
+mod beet_sidebar_layout;
 pub mod counter;
-pub use beet_page::*;
+mod beet_context;
+pub use beet_sidebar_layout::*;
+pub use beet_context::*;
 pub use counter::*;
