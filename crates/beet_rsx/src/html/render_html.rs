@@ -2,6 +2,7 @@ use crate::prelude::*;
 use anyhow::Result;
 
 /// Convert [`HtmlNode`] structures into a string of html
+/// - Panics if an element is self closing and has children
 #[derive(Default)]
 pub struct RenderHtml {
 	pub pretty: bool,
@@ -72,6 +73,7 @@ fn render_node_pretty(node: &HtmlNode, html: &mut String, indent: &mut usize) {
 
 
 fn render_element(el: &HtmlElementNode, html: &mut String) {
+	el.assert_self_closing_no_children();
 	html.push_str(&format!("<{}", el.tag));
 	for attr in &el.attributes {
 		render_attribute(attr, html);
@@ -93,6 +95,7 @@ fn render_element_pretty(
 	html: &mut String,
 	indent: &mut usize,
 ) {
+	el.assert_self_closing_no_children();
 	let mut open_tag = format!("<{}", el.tag);
 	for attr in &el.attributes {
 		render_attribute(attr, &mut open_tag);

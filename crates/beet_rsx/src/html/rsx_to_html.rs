@@ -1,5 +1,12 @@
 use crate::prelude::*;
 
+
+
+/// Convert [`RsxNode`] structures into a string of [`HtmlNode`]
+///
+/// ## Panics
+/// - Panics if `no_slot_check` is false and there are still slot children
+/// - Panics if an element is self closing and has children
 #[derive(Debug, Default)]
 pub struct RsxToHtml {
 	/// Slot children are not rendered so by default this will
@@ -95,12 +102,14 @@ impl RsxToHtml {
 			});
 		}
 
-		HtmlElementNode {
+		let el = HtmlElementNode {
 			tag: el.tag.clone(),
 			self_closing: el.self_closing,
 			attributes: html_attributes,
 			children: self.map_node(&el.children),
-		}
+		};
+		el.assert_self_closing_no_children();
+		el
 	}
 
 	pub fn map_attribute(
