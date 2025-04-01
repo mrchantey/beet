@@ -5,7 +5,7 @@ use material_colors::theme::Theme;
 
 
 pub struct ThemeToCss {
-	pub prefix: String,
+	// pub prefix: String,
 	/// The global class applied to the document in light mode
 	/// This must be kept in sync with initColorScheme.js
 	pub light_class: String,
@@ -17,7 +17,7 @@ pub struct ThemeToCss {
 impl Default for ThemeToCss {
 	fn default() -> Self {
 		Self {
-			prefix: Self::DEFAULT_PREFIX.to_string(),
+			// prefix: Self::DEFAULT_PREFIX.to_string(),
 			light_class: Self::DEFAULT_LIGHT_CLASS.to_string(),
 			dark_class: Self::DEFAULT_DARK_CLASS.to_string(),
 		}
@@ -26,43 +26,43 @@ impl Default for ThemeToCss {
 
 
 impl ThemeToCss {
-	pub const DEFAULT_PREFIX: &'static str = "--bt-color";
+	// pub const DEFAULT_PREFIX: &'static str = "--bt-color";
 	pub const DEFAULT_LIGHT_CLASS: &'static str = "scheme-light";
 	pub const DEFAULT_DARK_CLASS: &'static str = "scheme-dark";
 
 	pub fn map(&self, theme: &Theme) -> String {
 		let Self {
-			prefix,
+			// prefix,
 			light_class: light_scheme,
 			dark_class: dark_scheme,
 		} = self;
 
 		let light =
-			Self::scheme_to_css(light_scheme, prefix, &theme.schemes.light);
+			Self::scheme_to_css(light_scheme, &theme.schemes.light);
 		let dark =
-			Self::scheme_to_css(dark_scheme, prefix, &theme.schemes.dark);
+			Self::scheme_to_css(dark_scheme, &theme.schemes.dark);
 		format!(
 			r#"
 		{light}
 		{dark}
 		:root{{
 		/* a default that can be overridden, ie by a button state */
-		{prefix}-opacity: 1;
-		{prefix}-opacity-hover: 0.7;
-		{prefix}-opacity-active: 0.5;
-		{prefix}-opacity-disabled: 0.5;
+		--bt-color-opacity: 1;
+		--bt-color-opacity-hover: 0.7;
+		--bt-color-opacity-active: 0.5;
+		--bt-color-opacity-disabled: 0.5;
 		
-		{prefix}-border: var({prefix}-outline);
-		{prefix}-text: var({prefix}-on-surface);
-		{prefix}-background: var({prefix}-surface);
-		{prefix}-border: var({prefix}-outline);
-		{prefix}-faint: var({prefix}-outline);
+		--bt-color-border: var(--bt-color-outline);
+		--bt-color-text: var(--bt-color-on-surface);
+		--bt-color-background: var(--bt-color-surface-container-lowest);
+		--bt-color-border: var(--bt-color-outline);
+		--bt-color-faint: var(--bt-color-outline);
 		}}
 		"#
 		)
 	}
 
-	fn scheme_to_css(class: &str, var_prefix: &str, scheme: &Scheme) -> String {
+	fn scheme_to_css(class: &str, scheme: &Scheme) -> String {
 		let Scheme {
 			primary,
 			on_primary,
@@ -118,55 +118,55 @@ impl ThemeToCss {
 		format!(
 			r#"
 .{class} {{
-	{var_prefix}-primary: {primary};
-	{var_prefix}-on-primary: {on_primary};
-	{var_prefix}-primary-container: {primary_container};
-	{var_prefix}-on-primary-container: {on_primary_container};
-	{var_prefix}-inverse-primary: {inverse_primary};
-	{var_prefix}-primary-fixed: {primary_fixed};
-	{var_prefix}-primary-fixed-dim: {primary_fixed_dim};
-	{var_prefix}-on-primary-fixed: {on_primary_fixed};
-	{var_prefix}-on-primary-fixed-variant: {on_primary_fixed_variant};
-	{var_prefix}-secondary: {secondary};
-	{var_prefix}-on-secondary: {on_secondary};
-	{var_prefix}-secondary-container: {secondary_container};
-	{var_prefix}-on-secondary-container: {on_secondary_container};
-	{var_prefix}-secondary-fixed: {secondary_fixed};
-	{var_prefix}-secondary-fixed-dim: {secondary_fixed_dim};
-	{var_prefix}-on-secondary-fixed: {on_secondary_fixed};
-	{var_prefix}-on-secondary-fixed-variant: {on_secondary_fixed_variant};
-	{var_prefix}-tertiary: {tertiary};
-	{var_prefix}-on-tertiary: {on_tertiary};
-	{var_prefix}-tertiary-container: {tertiary_container};
-	{var_prefix}-on-tertiary-container: {on_tertiary_container};
-	{var_prefix}-tertiary-fixed: {tertiary_fixed};
-	{var_prefix}-tertiary-fixed-dim: {tertiary_fixed_dim};
-	{var_prefix}-on-tertiary-fixed: {on_tertiary_fixed};
-	{var_prefix}-on-tertiary-fixed-variant: {on_tertiary_fixed_variant};
-	{var_prefix}-error: {error};
-	{var_prefix}-on-error: {on_error};
-	{var_prefix}-error-container: {error_container};
-	{var_prefix}-on-error-container: {on_error_container};
-	{var_prefix}-surface-dim: {surface_dim};
-	{var_prefix}-surface: {surface};
-	{var_prefix}-surface-tint: {surface_tint};
-	{var_prefix}-surface-bright: {surface_bright};
-	{var_prefix}-surface-container-lowest: {surface_container_lowest};
-	{var_prefix}-surface-container-low: {surface_container_low};
-	{var_prefix}-surface-container: {surface_container};
-	{var_prefix}-surface-container-high: {surface_container_high};
-	{var_prefix}-surface-container-highest: {surface_container_highest};
-	{var_prefix}-on-surface: {on_surface};
-	{var_prefix}-on-surface-variant: {on_surface_variant};
-	{var_prefix}-outline: {outline};
-	{var_prefix}-outline-variant: {outline_variant};
-	{var_prefix}-inverse-surface: {inverse_surface};
-	{var_prefix}-inverse-on-surface: {inverse_on_surface};
-	{var_prefix}-surface-variant: {surface_variant};
-	{var_prefix}-background: {background};
-	{var_prefix}-on-background: {on_background};
-	{var_prefix}-shadow: {shadow};
-	{var_prefix}-scrim: {scrim};
+	--bt-color-primary: {primary};
+	--bt-color-on-primary: {on_primary};
+	--bt-color-primary-container: {primary_container};
+	--bt-color-on-primary-container: {on_primary_container};
+	--bt-color-inverse-primary: {inverse_primary};
+	--bt-color-primary-fixed: {primary_fixed};
+	--bt-color-primary-fixed-dim: {primary_fixed_dim};
+	--bt-color-on-primary-fixed: {on_primary_fixed};
+	--bt-color-on-primary-fixed-variant: {on_primary_fixed_variant};
+	--bt-color-secondary: {secondary};
+	--bt-color-on-secondary: {on_secondary};
+	--bt-color-secondary-container: {secondary_container};
+	--bt-color-on-secondary-container: {on_secondary_container};
+	--bt-color-secondary-fixed: {secondary_fixed};
+	--bt-color-secondary-fixed-dim: {secondary_fixed_dim};
+	--bt-color-on-secondary-fixed: {on_secondary_fixed};
+	--bt-color-on-secondary-fixed-variant: {on_secondary_fixed_variant};
+	--bt-color-tertiary: {tertiary};
+	--bt-color-on-tertiary: {on_tertiary};
+	--bt-color-tertiary-container: {tertiary_container};
+	--bt-color-on-tertiary-container: {on_tertiary_container};
+	--bt-color-tertiary-fixed: {tertiary_fixed};
+	--bt-color-tertiary-fixed-dim: {tertiary_fixed_dim};
+	--bt-color-on-tertiary-fixed: {on_tertiary_fixed};
+	--bt-color-on-tertiary-fixed-variant: {on_tertiary_fixed_variant};
+	--bt-color-error: {error};
+	--bt-color-on-error: {on_error};
+	--bt-color-error-container: {error_container};
+	--bt-color-on-error-container: {on_error_container};
+	--bt-color-surface-dim: {surface_dim};
+	--bt-color-surface: {surface};
+	--bt-color-surface-tint: {surface_tint};
+	--bt-color-surface-bright: {surface_bright};
+	--bt-color-surface-container-lowest: {surface_container_lowest};
+	--bt-color-surface-container-low: {surface_container_low};
+	--bt-color-surface-container: {surface_container};
+	--bt-color-surface-container-high: {surface_container_high};
+	--bt-color-surface-container-highest: {surface_container_highest};
+	--bt-color-on-surface: {on_surface};
+	--bt-color-on-surface-variant: {on_surface_variant};
+	--bt-color-outline: {outline};
+	--bt-color-outline-variant: {outline_variant};
+	--bt-color-inverse-surface: {inverse_surface};
+	--bt-color-inverse-on-surface: {inverse_on_surface};
+	--bt-color-surface-variant: {surface_variant};
+	--bt-color-background: {background};
+	--bt-color-on-background: {on_background};
+	--bt-color-shadow: {shadow};
+	--bt-color-scrim: {scrim};
 }}"#
 		)
 	}
