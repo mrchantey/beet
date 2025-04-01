@@ -12,6 +12,7 @@ fn beet_page(_: BeetPage) -> RsxNode {
 		title: "Beet".into(),
 		description: "A Rust web framework".into(),
 		site_url: "https://beetrsx.dev".into(),
+		version: env!("CARGO_PKG_VERSION").into(),
 	});
 
 	let brand = get_context::<Brand>();
@@ -24,7 +25,7 @@ fn beet_page(_: BeetPage) -> RsxNode {
 			.iter()
 			.map(|route| {
 				let route_str = route.to_string_lossy().to_string();
-				rsx! {<a href={route_str.clone()}>{route_str}</a>}
+				rsx! { <a href=route_str.clone()>{route_str}</a> }
 			})
 			.collect::<Vec<_>>()
 	};
@@ -32,6 +33,7 @@ fn beet_page(_: BeetPage) -> RsxNode {
 
 	rsx! {
 		<ContentLayout>
+		<a class="bt-u-button-like" href="/" slot="header-nav">click me</a>
 		<DesignSystem theme=theme/>
 		// <meta slot="head" name="foo" content="bar"/>
 		<h1>{brand.title}</h1>

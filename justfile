@@ -59,15 +59,21 @@ doc crate *args:
 fmt *args:
 	cargo fmt {{args}} && just leptosfmt {{args}}
 
+# soo bad
 leptosfmt *args:
 	leptosfmt -q											\
 	crates/beet_rsx/**/*.rs 					\
 	crates/beet_rsx/**/**/*.rs 				\
 	crates/beet_rsx/**/**/**/*.rs 		\
+	crates/beet_design/**/*.rs 				\
+	crates/beet_design/**/**/*.rs 		\
+	crates/beet_design/**/**/**/*.rs 	\
 	crates/beet_router/**/*.rs 				\
 	crates/beet_router/**/**/*.rs 		\
 	crates/beet_router/**/**/**/*.rs 	\
 	crates/beet_site/**/*.rs 					\
+	crates/beet_site/**/**/*.rs 			\
+	crates/beet_site/**/**/**/*.rs 		\
 	{{args}}
 
 #💡 e2e examples

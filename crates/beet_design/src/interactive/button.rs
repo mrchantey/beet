@@ -19,8 +19,8 @@ pub struct Button {
 
 fn button(_: Button) -> RsxNode {
 	rsx! {
-	<button>
-		<slot/>
-	</button>
+		<button>
+			<slot />
+		</button>
 	}
 }

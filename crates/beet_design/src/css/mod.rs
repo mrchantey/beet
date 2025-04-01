@@ -13,5 +13,6 @@ fn css(_: Css) -> RsxNode {
 		<style scope:global src="form.css" />
 		<style scope:global src="layout.css" />
 		<style scope:global src="reset.css" />
+		<style scope:global src="utility.css" />
 	}
 }

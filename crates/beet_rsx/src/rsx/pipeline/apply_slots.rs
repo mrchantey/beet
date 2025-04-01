@@ -325,8 +325,8 @@ mod test {
 
 		fn child(_: Child) -> RsxNode {
 			rsx! {
-				<slot name="header" slot="header"/>
-				<slot/>
+				<slot name="header" slot="header" />
+				<slot />
 			}
 		}
 		expect(
@@ -358,7 +358,7 @@ mod test {
 		fn layout(_: Layout) -> RsxNode {
 			rsx! {
 				<Header>
-					<slot name="header"/>
+					<slot name="header" />
 				</Header>
 			}
 		}
@@ -368,7 +368,7 @@ mod test {
 		fn header(_: Header) -> RsxNode {
 			rsx! {
 				<header>
-					<slot/>
+					<slot />
 				</header>
 			}
 		}
@@ -393,10 +393,10 @@ mod test {
 			rsx! {
 				<body>
 					<Header>
-						<slot name="header" slot="default"/>
+						<slot name="header" slot="default" />
 					</Header>
 					<main>
-					<slot/>
+						<slot />
 					</main>
 				</body>
 			}
@@ -408,7 +408,7 @@ mod test {
 		fn header(_: Header) -> RsxNode {
 			rsx! {
 				<header>
-					<slot/>
+					<slot />
 				</header>
 			}
 		}

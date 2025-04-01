@@ -3,7 +3,7 @@ use crate::prelude::*;
 
 #[derive(Node)]
 pub struct Header {
-	#[field(into, default = "./".to_string())]
+	#[field(into, default = "/".to_string())]
 	home_route: String,
 }
 
@@ -29,14 +29,14 @@ fn header(Header { home_route }: Header) -> RsxNode {
 			display: flex;
 			align-items: center;
 			justify-content: space-between;
-			background-color: var(--bt-md-sys-color-surface-container-high);
-			border-bottom: 1px solid var(--md-sys-color-outline-variant);
+			background-color: var(--bt-color-surface-container-high);
+			border-bottom: 1px solid var(--color-outline-variant);
 		}
 
 		.app-bar-title {
 			font-size: 2rem;
 			font-weight: 900;
-			background-image: linear-gradient(90deg, var(--bm-color-primary) 45%, var(--bm-color-secondary) 65%);
+			background-image: linear-gradient(90deg, var(--bt-color-primary) 45%, var(--bt-color-secondary) 65%);
 			color: transparent !important;
 			background-clip: text;
 			display: flex;

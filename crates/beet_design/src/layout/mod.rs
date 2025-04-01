@@ -1,10 +1,12 @@
 mod content_layout;
 mod document_layout;
+mod footer;
 mod head;
-mod page_layout;
 mod header;
+mod page_layout;
 pub use content_layout::*;
 pub use document_layout::*;
+pub use footer::*;
 pub use head::*;
 pub use header::*;
 pub use page_layout::*;

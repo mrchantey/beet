@@ -7,7 +7,7 @@ utility classes
 
 
 /* make an anchor more like a 'text' button */
-a.button-like {
+a.bt-u-button-like {
 	color: inherit;
 	text-decoration: inherit;
 	padding: 0 0.5rem;

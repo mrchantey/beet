@@ -36,4 +36,7 @@ pub struct Brand {
 	/// The canonical url of the production site,
 	/// ie `https://myapp.com`
 	pub site_url: Cow<'static, str>,
+	/// The site version, usually set via
+	/// `std::env!("CARGO_PKG_VERSION")`
+	pub version: Cow<'static, str>,
 }

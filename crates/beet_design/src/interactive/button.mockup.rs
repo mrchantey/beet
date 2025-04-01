@@ -2,9 +2,9 @@ use crate::prelude::*;
 
 
 pub fn primary() -> RsxNode {
-	rsx! {<Button> click me </Button>}
+	rsx! { <Button>click me</Button> }
 }
 
 pub fn secondary() -> RsxNode {
-	rsx! {<Button variant=ButtonVariant::Secondary> click me </Button>}
+	rsx! { <Button variant=ButtonVariant::Secondary>click me</Button> }
 }

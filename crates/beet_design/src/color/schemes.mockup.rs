@@ -7,9 +7,7 @@ use beet_rsx::as_beet::*;
 pub fn light() -> RsxNode {
 	rsx! {
 		<h2>Color Scheme - Light</h2>
-		<div class={ThemeToCss::DEFAULT_LIGHT_CLASS}>
-		{scheme()}
-		</div>
+		<div class=ThemeToCss::DEFAULT_LIGHT_CLASS>{scheme()}</div>
 	}
 }
 
@@ -18,9 +16,7 @@ pub fn light() -> RsxNode {
 pub fn dark() -> RsxNode {
 	rsx! {
 		<h2>Color Scheme - Dark</h2>
-		<div class={ThemeToCss::DEFAULT_DARK_CLASS}>
-		{scheme()}
-		</div>
+		<div class=ThemeToCss::DEFAULT_DARK_CLASS>{scheme()}</div>
 	}
 }
 

@@ -11,6 +11,9 @@ fn content_layout(_: ContentLayout) -> RsxNode {
 	rsx! {
 			<PageLayout>
 			<slot name="head" slot="head" />
+			<slot name="header" slot="header" />
+			<slot name="header-nav" slot="header-nav" />
+			<slot name="footer" slot="footer" />
 			<main>
 				<slot />
 			</main>
@@ -18,8 +21,8 @@ fn content_layout(_: ContentLayout) -> RsxNode {
 			<style>
 				main {
 					/* min-height:100dvh; */
-					min-height: var(--bm-main-height);
-					padding: 1.em var(--content-padding-width);
+					min-height: var(--bt-main-height);
+					padding: 1.em var(--bt-content-padding-width);
 				}
 				main img {
 					max-width: 100%;

@@ -20,18 +20,21 @@ fn head(Head { fixed_scale }: Head) -> RsxNode {
 		title,
 		description,
 		site_url,
+		version,
+		..
 	} = get_context::<Brand>();
 
 
 	let scale = {
 		if fixed_scale {
 			rsx! {
-					<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
+				<meta
+					name="viewport"
+					content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"
+				/>
 			}
 		} else {
-			rsx! {
-				<meta name="viewport" content="width=device-width, initial-scale=1" />
-			}
+			rsx! { <meta name="viewport" content="width=device-width, initial-scale=1" /> }
 		}
 	};
 
@@ -41,6 +44,7 @@ fn head(Head { fixed_scale }: Head) -> RsxNode {
 		<link rel="canonical" href={site_url.clone()}>
 		{scale}
 		<meta name="description" content={description.clone()}>
+		<meta name="version" content={version.clone()}>
 		// <link rel="alternate" type="application/rss+xml" title="Bevyhub Blog" href={Routes.rss} />
 		// <link rel="sitemap" href="/sitemap-index.xml" />
 

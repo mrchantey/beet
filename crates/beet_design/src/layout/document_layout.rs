@@ -9,15 +9,15 @@ pub struct DocumentLayout {
 
 fn document_layout(_props: DocumentLayout) -> RsxNode {
 	rsx! {
-	<!DOCTYPE html>
-	<html lang="en">
-		<Head>
-			<slot name="head" />
-		</Head>
-		<body>
-			<script src="/js/initColorScheme.js" type="text/javascript"></script>
-			<slot/>
-		</body>
-	</html>
+		<!DOCTYPE html>
+		<html lang="en">
+			<Head>
+				<slot name="head" />
+			</Head>
+			<body>
+				<script src="/js/initColorScheme.js" type="text/javascript"></script>
+				<slot />
+			</body>
+		</html>
 	}
 }
