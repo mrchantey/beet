@@ -17,6 +17,7 @@ use std::borrow::Cow;
 /// 		title: "My Site".into(),
 /// 		description: "A site about stuff".into(),
 ///			site_url: "https://myapp.com".into(),
+/// 		version: std::env!("CARGO_PKG_VERSION").into(),
 /// 	});
 ///
 /// 	rsx!{
