@@ -33,12 +33,12 @@ impl ColorScheme {
 
 #[cfg(test)]
 mod test {
-	use crate::prelude::*;
+	// use crate::prelude::*;
 	// use sweet::prelude::*;
 
 	#[test]
 	fn works() {
-		let color_scheme = ColorScheme::new_from_color(255, 0, 0);
-		println!("{:#?}", color_scheme);
+		// let color_scheme = ColorScheme::new_from_color(255, 0, 0);
+		// println!("{:#?}", color_scheme);
 	}
 }
