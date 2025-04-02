@@ -655,6 +655,7 @@ dependencies = [
  "beet_router",
  "beet_rsx",
  "chrono",
+ "heck 0.4.1",
  "lightningcss",
  "material-colors",
  "sweet",

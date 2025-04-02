@@ -1,4 +1,6 @@
 mod signal;
+use std::path::Path;
+
 // use crate::rsx::RsxAttribute;
 // use crate::rsx::RsxNode;
 // use crate::rsx::RsxRust;
@@ -105,11 +107,17 @@ pub struct ToStringIntoSigfaultAttrVal;
 impl<T: ToString> IntoSigfaultAttrVal<(T, ToStringIntoSigfaultAttrVal)> for T {
 	fn into_sigfault_val(self) -> String { self.to_string() }
 }
+
 pub struct FuncIntoSigfaultAttrVal;
 impl<T: FnOnce() -> U, U: IntoSigfaultAttrVal<M2>, M2>
 	IntoSigfaultAttrVal<(M2, FuncIntoSigfaultAttrVal)> for T
 {
 	fn into_sigfault_val(self) -> String { self().into_sigfault_val() }
+}
+
+pub struct PathIntoSigfaultAttrVal;
+impl IntoSigfaultAttrVal<PathIntoSigfaultAttrVal> for &Path {
+	fn into_sigfault_val(self) -> String { self.to_string_lossy().to_string() }
 }
 
 

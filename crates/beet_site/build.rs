@@ -7,8 +7,8 @@ use sweet::prelude::*;
 fn main() -> Result<()> {
 	println!("cargo::rerun-if-changed=build.rs");
 	// println!("cargo::rerun-if-changed=src/codegen");
-	// println!("cargo::rerun-if-changed=../beet_design/src/**/*.rs");
-	// println!("cargo::rerun-if-changed=../beet_design/public");
+	println!("cargo::rerun-if-changed=../beet_design/src/**/*.mockup.rs");
+	println!("cargo::rerun-if-changed=../beet_design/public");
 
 	// println!("cargo::warning={}", "🚀🚀 building beet_site");
 	let cx = app_cx!();

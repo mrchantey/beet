@@ -40,6 +40,10 @@ impl std::ops::Deref for RoutePath {
 	fn deref(&self) -> &Self::Target { &self.0 }
 }
 
+impl AsRef<Path> for RoutePath {
+	fn as_ref(&self) -> &Path { self.0.as_path() }
+}
+
 impl Into<PathBuf> for RoutePath {
 	fn into(self) -> PathBuf { self.0 }
 }

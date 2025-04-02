@@ -7,7 +7,8 @@ pub struct BeetSidebarLayout {}
 
 
 fn beet_sidebar_layout(_: BeetSidebarLayout) -> RsxNode {
-	let routes = route_tree::collect_static_route_tree();
+	let sidebar_nodes = route_tree::collect_static_route_tree()
+		.bpipe(StaticRouteTreeToSidebarTree::default());
 	rsx! {
 		<BeetContext>
 		<PageLayout>
@@ -17,7 +18,7 @@ fn beet_sidebar_layout(_: BeetSidebarLayout) -> RsxNode {
 		// <slot name="footer" slot="footer" />
 		<BeetHeaderLinks slot="header-nav"/>
 		<div class="container">
-			<Sidebar routes={routes} />
+			<Sidebar nodes={sidebar_nodes} />
 			<main>
 				<slot/>
 			</main>

@@ -144,7 +144,7 @@ impl<T: FnOnce() -> U, U: IntoRsxNode<M2>, M2> IntoRsxNode<(M2, FuncIntoRsx)>
 }
 
 pub struct IterIntoRsx;
-impl<I, T, M2> IntoRsxNode<(M2, IterIntoRsx)> for I 
+impl<I, T, M2> IntoRsxNode<(M2, IterIntoRsx)> for I
 where
 	I: IntoIterator<Item = T>,
 	T: IntoRsxNode<M2>,
@@ -180,6 +180,16 @@ impl<T: ToString> From<T> for RsxNode {
 		})
 	}
 }
+
+// pub struct PathIntoRsx;
+// impl IntoRsxNode<PathIntoRsx> for &Path {
+// 	fn into_node(self) -> RsxNode {
+// 		RsxNode::Text(RsxText {
+// 			value: self.to_string_lossy().to_string(),
+// 			meta: RsxNodeMeta::default(),
+// 		})
+// 	}
+// }
 
 
 

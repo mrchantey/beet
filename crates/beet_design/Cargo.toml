@@ -20,8 +20,10 @@ build = []
 sweet.workspace = true
 beet_rsx.workspace = true
 beet_router.workspace = true
-material-colors = "0.4.2"
 chrono.workspace = true
+heck.workspace = true
+
+material-colors = "0.4.2"
 
 [dev-dependencies]
 sweet = { workspace = true, features = ["test"] }
