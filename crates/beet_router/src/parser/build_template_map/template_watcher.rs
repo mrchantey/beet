@@ -54,6 +54,7 @@ impl<Reload: FnMut() -> Result<()>, Recompile: FnMut() -> Result<()>>
 			cwd: self.templates_root_dir.clone(),
 			filter: GlobFilter::default()
 				.with_exclude("*.git*")
+				.with_exclude("*codegen*") // temp until we get fine grained codegen control
 				.with_exclude("*target*"),
 			// avoid short burst refreshing
 			debounce: Duration::from_millis(100),

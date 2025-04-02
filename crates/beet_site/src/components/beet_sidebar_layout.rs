@@ -27,8 +27,6 @@ fn beet_sidebar_layout(_: BeetSidebarLayout) -> RsxNode {
 		</BeetContext>
 		<style>
 		.container{
-
-			--sidebar-width:20rem;
 			/* --sidebar-content-padding-width: calc(var(--content-padding-width) + 10rem); */
 			min-height:var(--bt-main-height);
 			display:flex;

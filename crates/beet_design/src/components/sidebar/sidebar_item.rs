@@ -12,7 +12,7 @@ fn sidebar_item(SidebarItem { node, root }: SidebarItem) -> RsxNode {
 	// let items = tree.
 	let class = if root { "root" } else { "" };
 
-	match node {
+	let inner = match node {
 		SidebarNode::Group {
 			display_name,
 			path,
@@ -30,7 +30,6 @@ fn sidebar_item(SidebarItem { node, root }: SidebarItem) -> RsxNode {
 			};
 
 			rsx! {
-				<li>
 					// {group}
 					<details
 					class="bm-c-sidebar__sublist"
@@ -48,14 +47,11 @@ fn sidebar_item(SidebarItem { node, root }: SidebarItem) -> RsxNode {
 					</ul>
 					// <Astro.self entries={entry.items}/>
 				</details>
-				</li>
-				<style src="./sidebar_group.css"/>
 			}
 		}
 
 		SidebarNode::Route { display_name, path } => {
 			rsx! {
-				<li>
 				<a
 				class="bm-c-sidebar__link"
 				href={path.to_string_lossy().to_string()}
@@ -67,8 +63,14 @@ fn sidebar_item(SidebarItem { node, root }: SidebarItem) -> RsxNode {
 			>
 			{display_name}
 				</a>
-			</li>
 			 }
 		}
+	};
+
+	rsx! {
+		<li>
+		{inner}
+		</li>
+		<style src="./sidebar_item.css"/>
 	}
 }
