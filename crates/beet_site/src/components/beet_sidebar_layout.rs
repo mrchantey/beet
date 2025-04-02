@@ -11,10 +11,10 @@ fn beet_sidebar_layout(_: BeetSidebarLayout) -> RsxNode {
 	rsx! {
 		<BeetContext>
 		<PageLayout>
-		<slot name="head" slot="head" />
-		<slot name="header" slot="header" />
-		<slot name="header-nav" slot="header-nav" />
-		<slot name="footer" slot="footer" />
+		// <slot name="head" slot="head" />
+		// <slot name="header" slot="header" />
+		// <slot name="header-nav" slot="header-nav" />
+		// <slot name="footer" slot="footer" />
 		<BeetHeaderLinks slot="header-nav"/>
 		<div class="container">
 			<Sidebar routes={routes} />

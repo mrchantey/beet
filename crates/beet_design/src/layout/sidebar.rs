@@ -8,7 +8,6 @@ pub struct Sidebar {
 }
 
 fn sidebar(Sidebar { routes }: Sidebar) -> RsxNode {
-
 	rsx! {
 		<nav>
 		<SidebarGroup tree={routes} root/>

@@ -56,7 +56,7 @@ fn sidebar_group(SidebarGroup { tree, root }: SidebarGroup) -> RsxNode {
 
 	rsx! {
 		<ul class={class}>
-			// {child_groups}
+			{child_groups}
 			{child_links}
 		</ul>
 		<style src="./sidebar_group.css"/>

@@ -10,8 +10,6 @@ use sweet::prelude::*;
 /// Resolve the src attribute to a file if it does not start with any [IGNORED_PREFIX]:
 pub struct ApplyFsSrc;
 
-const IGNORED_PREFIX: [&str; 3] = ["/", "http://", "https://"];
-
 impl Default for ApplyFsSrc {
 	fn default() -> Self { Self {} }
 }
@@ -44,15 +42,7 @@ impl ApplyFsSrc {
 			node,
 			VisitRsxOptions::ignore_component_node(),
 			|el| {
-				if let Some(src) = el.get_key_value_attr("src") {
-					if IGNORED_PREFIX
-						.iter()
-						.any(|prefix| src.starts_with(prefix))
-					{
-						return;
-					}
-
-					let Some(location) = &location else {
+				if let Some(src) = el.src_directive() {					let Some(location) = &location else {
 						result = Err(anyhow::anyhow!(
 							"elements with an fs src attribute must have a RootNode::location. This is set by default in rsx! macros"
 						));
@@ -112,20 +102,20 @@ mod test {
 		expect(rsx! { <script src="/missing" /> }.bpipe(ApplyFsSrc::default()))
 			.to_be_ok();
 		// missing errors
-		expect(rsx! { <script src="missing" /> }.bpipe(ApplyFsSrc::default()))
+		expect(rsx! { <script src="./missing" /> }.bpipe(ApplyFsSrc::default()))
 			.to_be_err();
 		// slot children errors
 		expect(
 			rsx! {
 				<Foo>
-					<script src="missing" />
+					<script src="./missing" />
 				</Foo>
 			}
 			.bpipe(ApplyFsSrc::default()),
 		)
 		.to_be_err();
 
-		let node = rsx! { <script src="test-fs-src.js" /> }
+		let node = rsx! { <script src="./test-fs-src.js" /> }
 			.bpipe(ApplyFsSrc::default())
 			.unwrap();
 
@@ -135,6 +125,6 @@ mod test {
 		let RsxNode::Text(text) = el.children.as_ref() else {
 			panic!()
 		};
-		expect(&text.value).to_be(include_str!("test-fs-src.js"));
+		expect(&text.value).to_be(include_str!("./test-fs-src.js"));
 	}
 }

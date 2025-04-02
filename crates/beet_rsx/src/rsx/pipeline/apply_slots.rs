@@ -143,14 +143,8 @@ impl ApplySlots {
 		// visit node so we can set it
 		VisitRsxNodeMut::walk_with_opts(
 			node,
-			// only visit element and fragment children
-			VisitRsxOptions {
-				ignore_element_children: false,
-				ignore_block_node_initial: true,
-				ignore_component_node: true,
-				ignore_component_slot_children: false,
-				bottom_up: false,
-			},
+			// avoid 'slot stealing' by not visiting descendent component nodes
+			VisitRsxOptions::ignore_component_node(),
 			|node| {
 				let RsxNode::Element(element) = node else {
 					return;

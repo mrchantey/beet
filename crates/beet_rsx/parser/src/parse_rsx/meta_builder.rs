@@ -54,6 +54,10 @@ impl ParsedTemplateDirective {
 			}
 			"src" => {
 				if let Some(val) = str_lit_val(keyed_attr) {
+					// alternatively we could use an ignore approach
+					// if ["/", "http://", "https://"]
+					// .iter()
+					// .all(|p| val.starts_with(p) == false)
 					if val.starts_with('.') {
 						return Some(ParsedTemplateDirective::FsSrc(val));
 					}

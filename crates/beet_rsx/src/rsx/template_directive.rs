@@ -97,6 +97,13 @@ pub trait TemplateDirectiveExt {
 		})
 	}
 
+	fn src_directive(&self) -> Option<&String> {
+		self.find_map_directive(|d| match d {
+			TemplateDirective::FsSrc(src) => Some(src),
+			_ => None,
+		})
+	}
+
 	fn any_directive(&self, func: impl Fn(&TemplateDirective) -> bool) -> bool {
 		self.find_directive(func).is_some()
 	}
