@@ -33,29 +33,26 @@ impl ApplyTemplateToNode {
 		rusty_map: &mut HashMap<RustyTracker, RustyPart>,
 	) -> TemplateResult<RsxNode> {
 		let node: RsxNode = match template {
-			RsxTemplateNode::Doctype { location } => {
-				RsxDoctype { location }.into()
+			RsxTemplateNode::Doctype { meta } => RsxDoctype { meta }.into(),
+			RsxTemplateNode::Text { value, meta } => {
+				RsxText { value, meta }.into()
 			}
-			RsxTemplateNode::Text { value, location } => {
-				RsxText { value, location }.into()
-			}
-			RsxTemplateNode::Comment { value, location } => {
-				RsxComment { value, location }.into()
+			RsxTemplateNode::Comment { value, meta } => {
+				RsxComment { value, meta }.into()
 			}
 
-			RsxTemplateNode::Fragment { items, location } => {
+			RsxTemplateNode::Fragment { items, meta } => {
 				let nodes = items
 					.into_iter()
 					.map(|template| self.apply_to_node(template, rusty_map))
 					.collect::<TemplateResult<Vec<_>>>()?;
-				RsxFragment { nodes, location }.into()
+				RsxFragment { nodes, meta }.into()
 			}
 			RsxTemplateNode::Component {
 				tracker,
 				tag,
 				slot_children,
-				template_directives,
-				location,
+				meta,
 			} => {
 				let (node, type_name, ron) =
 					match rusty_map.remove(&tracker).ok_or_else(|| {
@@ -90,12 +87,11 @@ impl ApplyTemplateToNode {
 					slot_children: Box::new(
 						self.apply_to_node(*slot_children, rusty_map)?,
 					),
-					template_directives: template_directives.clone(),
-					location,
+					meta,
 				}
 				.into()
 			}
-			RsxTemplateNode::RustBlock { tracker, location } => {
+			RsxTemplateNode::RustBlock { tracker, meta } => {
 				let (initial, effect) =
 					match rusty_map.remove(&tracker).ok_or_else(|| {
 						TemplateError::no_rusty_map(
@@ -119,7 +115,7 @@ impl ApplyTemplateToNode {
 					// responsibility of the [`RsxTemplateMap`]
 					initial: Box::new(initial),
 					effect,
-					location,
+					meta,
 				}
 				.into()
 			}
@@ -128,7 +124,7 @@ impl ApplyTemplateToNode {
 				self_closing,
 				attributes,
 				children,
-				location,
+				meta,
 			} => RsxElement {
 				tag,
 				self_closing,
@@ -137,7 +133,7 @@ impl ApplyTemplateToNode {
 					.map(|attr| template_to_attr(attr, rusty_map))
 					.collect::<TemplateResult<Vec<_>>>()?,
 				children: Box::new(self.apply_to_node(*children, rusty_map)?),
-				location,
+				meta,
 			}
 			.into(),
 		};

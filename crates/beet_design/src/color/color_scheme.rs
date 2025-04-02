@@ -15,7 +15,9 @@ fn color_scheme(props: ColorScheme) -> RsxNode {
 
 	let css = ThemeToCss::default().map(&props.theme);
 
-	Style::new(css).with_global_scope().into_node()
+	Style::new(css)
+		.with_directive(TemplateDirective::ScopeGlobal)
+		.into_node()
 }
 
 impl ColorScheme {

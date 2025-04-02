@@ -42,30 +42,77 @@ impl Into<RsxNode> for RsxElement {
 impl Into<RsxNode> for RsxComponent {
 	fn into(self) -> RsxNode { RsxNode::Component(self) }
 }
+impl NodeMeta for RsxNode {
+	fn meta(&self) -> &RsxNodeMeta {
+		match self {
+			RsxNode::Doctype(node) => node.meta(),
+			RsxNode::Comment(node) => node.meta(),
+			RsxNode::Text(node) => node.meta(),
+			RsxNode::Block(node) => node.meta(),
+			RsxNode::Fragment(node) => node.meta(),
+			RsxNode::Element(node) => node.meta(),
+			RsxNode::Component(node) => node.meta(),
+		}
+	}
 
+	fn meta_mut(&mut self) -> &mut RsxNodeMeta {
+		match self {
+			RsxNode::Doctype(node) => node.meta_mut(),
+			RsxNode::Comment(node) => node.meta_mut(),
+			RsxNode::Text(node) => node.meta_mut(),
+			RsxNode::Block(node) => node.meta_mut(),
+			RsxNode::Fragment(node) => node.meta_mut(),
+			RsxNode::Element(node) => node.meta_mut(),
+			RsxNode::Component(node) => node.meta_mut(),
+		}
+	}
+}
 
 #[derive(Debug, Clone)]
 pub struct RsxDoctype {
-	pub location: Option<RsxMacroLocation>,
+	/// Metadata for this node
+	pub meta: RsxNodeMeta,
 }
 
+impl NodeMeta for RsxDoctype {
+	fn meta(&self) -> &RsxNodeMeta { &self.meta }
+	fn meta_mut(&mut self) -> &mut RsxNodeMeta { &mut self.meta }
+}
 
 #[derive(Debug, Clone)]
 pub struct RsxComment {
 	pub value: String,
-	pub location: Option<RsxMacroLocation>,
+	/// Metadata for this node
+	pub meta: RsxNodeMeta,
+}
+
+impl NodeMeta for RsxComment {
+	fn meta(&self) -> &RsxNodeMeta { &self.meta }
+	fn meta_mut(&mut self) -> &mut RsxNodeMeta { &mut self.meta }
 }
 
 #[derive(Debug, Clone)]
 pub struct RsxText {
 	pub value: String,
-	pub location: Option<RsxMacroLocation>,
+	/// Metadata for this node
+	pub meta: RsxNodeMeta,
+}
+
+impl NodeMeta for RsxText {
+	fn meta(&self) -> &RsxNodeMeta { &self.meta }
+	fn meta_mut(&mut self) -> &mut RsxNodeMeta { &mut self.meta }
 }
 
 #[derive(Debug, Default, Clone)]
 pub struct RsxFragment {
 	pub nodes: Vec<RsxNode>,
-	pub location: Option<RsxMacroLocation>,
+	/// Metadata for this node
+	pub meta: RsxNodeMeta,
+}
+
+impl NodeMeta for RsxFragment {
+	fn meta(&self) -> &RsxNodeMeta { &self.meta }
+	fn meta_mut(&mut self) -> &mut RsxNodeMeta { &mut self.meta }
 }
 
 /// This is an RsxNode and a location, which is required for hydration.
@@ -101,7 +148,7 @@ impl<T: IntoRsxNode<M2>, M2> IntoRsxNode<(M2, VecIntoRsx)> for Vec<T> {
 	fn into_node(self) -> RsxNode {
 		RsxFragment {
 			nodes: self.into_iter().map(|item| item.into_node()).collect(),
-			location: None,
+			meta: RsxNodeMeta::default(),
 		}
 		.into()
 	}
@@ -125,58 +172,14 @@ impl<T: ToString> From<T> for RsxNode {
 	fn from(value: T) -> Self {
 		RsxNode::Text(RsxText {
 			value: value.to_string(),
-			location: None,
+			meta: RsxNodeMeta::default(),
 		})
 	}
 }
 
+
+
 impl RsxNode {
-	#[rustfmt::skip]
-	pub fn location(&self) -> Option<&RsxMacroLocation> {
-		match self {
-			RsxNode::Doctype(RsxDoctype { location, .. }) => location.as_ref(),
-			RsxNode::Comment(RsxComment { location, .. }) => location.as_ref(),
-			RsxNode::Text(RsxText { location, .. }) => location.as_ref(),
-			RsxNode::Block(RsxBlock { location, .. }) => location.as_ref(),
-			RsxNode::Fragment(RsxFragment { location, .. }) => location.as_ref(),
-			RsxNode::Element(RsxElement { location, .. }) => location.as_ref(),
-			RsxNode::Component(RsxComponent { location, .. }) => location.as_ref(),
-		}
-	}
-	#[rustfmt::skip]
-	pub fn with_location(mut self, location: RsxMacroLocation) -> Self {
-		match &mut self {
-			RsxNode::Doctype(RsxDoctype { location: loc, .. }) => *loc = Some(location),
-			RsxNode::Comment(RsxComment { location: loc, .. }) => *loc = Some(location),
-			RsxNode::Text(RsxText { location: loc, .. }) => *loc = Some(location),
-			RsxNode::Block(RsxBlock { location: loc, .. }) => *loc = Some(location),
-			RsxNode::Fragment(RsxFragment { location: loc, .. }) => *loc = Some(location),
-			RsxNode::Element(RsxElement { location: loc, .. }) => *loc = Some(location),
-			RsxNode::Component(RsxComponent { location: loc, .. }) => *loc = Some(location),
-		}
-		self
-	}
-	#[rustfmt::skip]
-	pub fn remove_location(&mut self) -> &mut Self {
-		match self {
-			RsxNode::Doctype(RsxDoctype { location, .. }) => *location = None,
-			RsxNode::Comment(RsxComment { location, .. }) => *location = None,
-			RsxNode::Text(RsxText { location, .. }) => *location = None,
-			RsxNode::Block(RsxBlock { location, .. }) => *location = None,
-			RsxNode::Fragment(RsxFragment { location, .. }) => *location = None,
-			RsxNode::Element(RsxElement { location, .. }) => *location = None,
-			RsxNode::Component(RsxComponent { location, .. }) => *location = None,
-		}
-		self
-	}
-
-	pub fn location_str(&self) -> String {
-		match self.location() {
-			Some(loc) => loc.to_string(),
-			None => "<unknown>".to_string(),
-		}
-	}
-
 	/// Returns true if the node is an empty fragment,
 	/// or if it is recursively a fragment with only empty fragments
 	pub fn is_empty(&self) -> bool {
@@ -272,8 +275,13 @@ pub struct RsxBlock {
 	/// The initial for an rsx block is considered a seperate tree,
 	pub initial: Box<RsxNode>,
 	pub effect: Effect,
-	/// The location of the block itsself, not that of its initial node
-	pub location: Option<RsxMacroLocation>,
+	/// Metadata for this node
+	pub meta: RsxNodeMeta,
+}
+
+impl NodeMeta for RsxBlock {
+	fn meta(&self) -> &RsxNodeMeta { &self.meta }
+	fn meta_mut(&mut self) -> &mut RsxNodeMeta { &mut self.meta }
 }
 
 /// A component is a struct that implements the [Component] trait.
@@ -297,10 +305,13 @@ pub struct RsxComponent {
 	///
 	/// `rsx! { <MyComponent>slot_children</MyComponent> }`
 	pub slot_children: Box<RsxNode>,
-	/// Collected template directives
-	pub template_directives: Vec<TemplateDirective>,
-	/// The location of the node
-	pub location: Option<RsxMacroLocation>,
+	/// Metadata for this node
+	pub meta: RsxNodeMeta,
+}
+
+impl NodeMeta for RsxComponent {
+	fn meta(&self) -> &RsxNodeMeta { &self.meta }
+	fn meta_mut(&mut self) -> &mut RsxNodeMeta { &mut self.meta }
 }
 
 /// Representation of an RsxElement
@@ -320,7 +331,12 @@ pub struct RsxElement {
 	/// ie `<input/>`
 	pub self_closing: bool,
 	/// The location of the node
-	pub location: Option<RsxMacroLocation>,
+	pub meta: RsxNodeMeta,
+}
+
+impl NodeMeta for RsxElement {
+	fn meta(&self) -> &RsxNodeMeta { &self.meta }
+	fn meta_mut(&mut self) -> &mut RsxNodeMeta { &mut self.meta }
 }
 
 impl RsxElement {

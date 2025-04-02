@@ -8,14 +8,14 @@ impl<T: AsRef<RsxNode>> RsxPipeline<T, TemplateResult<RsxTemplateNode>>
 {
 	fn apply(self, node: T) -> TemplateResult<RsxTemplateNode> {
 		match node.as_ref() {
-			RsxNode::Fragment(RsxFragment { nodes, location }) => {
+			RsxNode::Fragment(RsxFragment { nodes, meta }) => {
 				let items = nodes
 					.iter()
 					.map(|n| n.bpipe(NodeToTemplate))
 					.collect::<TemplateResult<Vec<_>>>()?;
 				Ok(RsxTemplateNode::Fragment {
 					items,
-					location: location.clone(),
+					meta: meta.clone(),
 				})
 			}
 			RsxNode::Component(RsxComponent {
@@ -27,32 +27,29 @@ impl<T: AsRef<RsxNode>> RsxPipeline<T, TemplateResult<RsxTemplateNode>>
 				type_name: _,
 				// ron cannot be statically generated
 				ron: _,
-				// not sure if we need to serialize these
-				template_directives,
 				slot_children,
-				location,
+				meta,
 			}) => Ok(RsxTemplateNode::Component {
 				slot_children: Box::new(slot_children.bpipe(NodeToTemplate)?),
 				tracker: tracker.clone(),
 				tag: tag.clone(),
-				template_directives: template_directives.clone(),
-				location: location.clone(),
+				meta: meta.clone(),
 			}),
 			RsxNode::Block(RsxBlock {
 				effect,
 				// ignore initial, its a seperate tree
 				initial: _,
-				location,
+				meta,
 			}) => Ok(RsxTemplateNode::RustBlock {
 				tracker: effect.tracker.clone(),
-				location: location.clone(),
+				meta: meta.clone(),
 			}),
 			RsxNode::Element(RsxElement {
 				tag,
 				attributes,
 				children,
 				self_closing,
-				location,
+				meta,
 			}) => Ok(RsxTemplateNode::Element {
 				tag: tag.clone(),
 				self_closing: *self_closing,
@@ -61,24 +58,22 @@ impl<T: AsRef<RsxNode>> RsxPipeline<T, TemplateResult<RsxTemplateNode>>
 					.map(|attr| attr_to_template(attr))
 					.collect::<TemplateResult<Vec<_>>>()?,
 				children: Box::new(children.bpipe(NodeToTemplate)?),
-				location: location.clone(),
+				meta: meta.clone(),
 			}),
-			RsxNode::Text(RsxText { value, location }) => {
+			RsxNode::Text(RsxText { value, meta }) => {
 				Ok(RsxTemplateNode::Text {
 					value: value.clone(),
-					location: location.clone(),
+					meta: meta.clone(),
 				})
 			}
-			RsxNode::Comment(RsxComment { value, location }) => {
+			RsxNode::Comment(RsxComment { value, meta }) => {
 				Ok(RsxTemplateNode::Comment {
 					value: value.clone(),
-					location: location.clone(),
+					meta: meta.clone(),
 				})
 			}
-			RsxNode::Doctype(RsxDoctype { location }) => {
-				Ok(RsxTemplateNode::Doctype {
-					location: location.clone(),
-				})
+			RsxNode::Doctype(RsxDoctype { meta }) => {
+				Ok(RsxTemplateNode::Doctype { meta: meta.clone() })
 			}
 		}
 	}

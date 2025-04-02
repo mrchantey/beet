@@ -137,7 +137,11 @@ test-ci *args:
 	{{min-stack}} cargo test -p beet_flow 		--lib --features=reflect 	--target wasm32-unknown-unknown {{args}} -- {{test-threads}}
 	{{min-stack}} cargo test -p beet_spatial 	--lib 									 	--target wasm32-unknown-unknown {{args}} -- {{test-threads}}
 	{{min-stack}} cargo test -p beet_rsx 			--lib --features=bevy 		--target wasm32-unknown-unknown {{args}} -- {{test-threads}}
-	
+
+test-web:
+
+
+
 
 # rebuilding bevy_render for wasm results in 'no space left on device'
 test-all *args:

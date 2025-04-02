@@ -1,3 +1,4 @@
+mod meta_builder;
 mod rstml_rust_to_hash;
 mod rstml_to_rsx_template;
 mod rusty_tracker_builder;

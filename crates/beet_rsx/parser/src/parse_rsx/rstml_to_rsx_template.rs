@@ -3,7 +3,6 @@ use proc_macro2::Literal;
 use proc_macro2::TokenStream;
 use quote::ToTokens;
 use quote::quote;
-use rstml::atoms::OpenTag;
 use rstml::node::CustomNode;
 use rstml::node::Node;
 use rstml::node::NodeAttribute;
@@ -14,13 +13,15 @@ use rstml::node::NodeText;
 use sweet::prelude::*;
 use syn::spanned::Spanned;
 
+use super::meta_builder::MetaBuilder;
+
 /// Convert rstml nodes to a ron file.
 /// Rust block token streams will be hashed by [Span::start]
 #[derive(Debug)]
 pub struct RstmlToRsxTemplate {
 	rusty_tracker: RustyTrackerBuilder,
-	/// this will be taken by the first node
-	location: Option<TokenStream>,
+	/// root location of the macro, this will be taken by the first node
+	root_location: Option<TokenStream>,
 }
 
 
@@ -40,13 +41,13 @@ impl RstmlToRsxTemplate {
 		tokens: TokenStream,
 		file: Option<&WorkspacePathBuf>,
 	) -> TokenStream {
-		let location_tokens = file.map(|file| {
+		let root_location = file.map(|file| {
 			let span = tokens.span();
 			let file = file.to_string_lossy();
 			let line = Literal::usize_unsuffixed(span.start().line);
 			let col = Literal::usize_unsuffixed(span.start().column);
 
-			quote! {Some(RsxMacroLocation(
+			quote! { Some(RsxMacroLocation(
 				file: (#file),
 				line: #line,
 				col: #col
@@ -55,21 +56,22 @@ impl RstmlToRsxTemplate {
 
 		let mut this = Self {
 			rusty_tracker: RustyTrackerBuilder::default(),
-			location: location_tokens,
+			root_location,
 		};
 		let (rstml_nodes, _rstml_errors) = tokens_to_rstml(tokens);
-		let nodes = this.map_nodes(rstml_nodes);
-		nodes
-		// quote! {
-		// 	RsxTemplateRoot (
-		// 		location: #location,
-		// 		node: #node
-		// 	)
-		// }
+		this.map_nodes(rstml_nodes)
 	}
 
-	fn get_location(&mut self) -> TokenStream {
-		std::mem::take(&mut self.location).unwrap_or(quote! {None})
+
+	/// the first to call this gets the real location, this mirrors
+	/// `RstmlToRsx` behavior, only root has location.
+	fn location(&mut self) -> TokenStream {
+		std::mem::take(&mut self.root_location).unwrap_or(quote! {None})
+	}
+
+	/// meta without template directives
+	fn basic_meta(&mut self) -> TokenStream {
+		MetaBuilder::build_ron(self.location())
 	}
 
 	/// wraps in fragment if multiple nodes
@@ -79,8 +81,8 @@ impl RstmlToRsxTemplate {
 	) -> TokenStream {
 		// if itll be a fragment, we need to take the location before
 		// visiting
-		let location = if nodes.len() != 1 {
-			Some(self.get_location())
+		let root_fragment_meta = if nodes.len() != 1 {
+			Some(self.basic_meta())
 		} else {
 			None
 		};
@@ -91,51 +93,59 @@ impl RstmlToRsxTemplate {
 		if nodes.len() == 1 {
 			nodes.pop().unwrap().to_token_stream()
 		} else {
-			let location = location.unwrap_or_else(|| self.get_location());
+			let meta = root_fragment_meta.unwrap_or_else(|| self.basic_meta());
 			quote! { Fragment (
 				items: [#(#nodes),*],
-				location: #location
+				meta: #meta
 			)}
 		}
 	}
 
 	/// returns an RsxTemplateNode
 	pub fn map_node<C: CustomNode>(&mut self, node: Node<C>) -> TokenStream {
-		let location = self.get_location();
 		match node {
-			Node::Doctype(_) => quote! { Doctype (
-			)},
+			Node::Doctype(_) => {
+				let meta = self.basic_meta();
+				quote! { Doctype (
+					meta: #meta
+				)}
+			}
 			Node::Comment(NodeComment { value, .. }) => {
+				let meta = self.basic_meta();
 				quote! { Comment (
 					value: #value,
-					location: #location
+					meta: #meta
 				)}
 			}
 			Node::Text(NodeText { value }) => {
+				let meta = self.basic_meta();
 				quote! { Text (
 					value: #value,
-					location: #location
+					meta: #meta
 				)}
 			}
 			Node::RawText(raw) => {
+				let meta = self.basic_meta();
 				let value = raw.to_string_best();
 				quote! { Text (
 					value: #value,
-					location: #location
+					meta: #meta
 				)}
 			}
 			Node::Fragment(NodeFragment { children, .. }) => {
+				let meta = self.basic_meta();
 				let children = children.into_iter().map(|n| self.map_node(n));
 				quote! { Fragment (
 					items:[#(#children),*],
-					location: #location
+					meta: #meta
 				)}
 			}
 			Node::Block(block) => {
+				let meta = self.basic_meta();
 				let tracker = self.rusty_tracker.next_tracker_ron(&block);
 				quote! { RustBlock (
 					tracker:#tracker,
-					location: #location
+					meta: #meta
 				)}
 			}
 			Node::Element(NodeElement {
@@ -143,13 +153,33 @@ impl RstmlToRsxTemplate {
 				children,
 				close_tag,
 			}) => {
+				let location = self.location();
+				let (directives, attributes) =
+					MetaBuilder::parse_attributes(&open_tag.attributes);
+
+
+				let meta = MetaBuilder::build_ron_with_directives(
+					location,
+					&directives,
+				);
+
 				let tag = open_tag.name.to_string();
 				let self_closing = close_tag.is_none();
 				if tag.starts_with(|c: char| c.is_uppercase()) {
-					self.map_component(tag, open_tag, children)
+					let tracker =
+						self.rusty_tracker.next_tracker_ron(&open_tag);
+					// components disregard all the context and rely on the tracker
+					// we rely on the hydrated node to provide the attributes and children
+					let slot_children = self.map_nodes(children);
+
+					quote! { Component (
+						tracker: #tracker,
+						tag: #tag,
+						slot_children: #slot_children,
+						meta: #meta
+					)}
 				} else {
-					let attributes = open_tag
-						.attributes
+					let attributes = attributes
 						.into_iter()
 						.map(|a| self.map_attribute(a))
 						.collect::<Vec<_>>();
@@ -159,7 +189,7 @@ impl RstmlToRsxTemplate {
 						self_closing: #self_closing,
 						attributes: [#(#attributes),*],
 						children: #children,
-						location: #location
+						meta: #meta
 					)}
 				}
 			}
@@ -167,7 +197,7 @@ impl RstmlToRsxTemplate {
 		}
 	}
 
-	fn map_attribute(&mut self, attr: NodeAttribute) -> TokenStream {
+	fn map_attribute(&mut self, attr: &NodeAttribute) -> TokenStream {
 		match attr {
 			NodeAttribute::Block(block) => {
 				let tracker = self.rusty_tracker.next_tracker_ron(&block);
@@ -199,61 +229,6 @@ impl RstmlToRsxTemplate {
 				}
 			}
 		}
-	}
-	fn map_component<C: CustomNode>(
-		&mut self,
-		tag: String,
-		open_tag: OpenTag,
-		children: Vec<Node<C>>,
-	) -> TokenStream {
-		let location = self.get_location();
-
-		let tracker = self.rusty_tracker.next_tracker_ron(&open_tag);
-		// components disregard all the context and rely on the tracker
-		// we rely on the hydrated node to provide the attributes and children
-		let slot_children = self.map_nodes(children);
-
-		let template_directives = open_tag
-			.attributes
-			.into_iter()
-			.filter_map(|a| match a {
-				NodeAttribute::Attribute(attr) => {
-					let key = &attr.key.to_string();
-					if key.contains(":") {
-						let value = match attr.value() {
-							Some(expr) => {
-								quote! {Some(#expr)}
-							}
-							None => quote! {None},
-						};
-						let mut parts = key.split(':');
-						let prefix = parts.next().expect(
-							"expected colon prefix in template directive",
-						);
-						let suffix = parts.next().expect(
-							"expected colon suffix in template directive",
-						);
-
-						Some(quote! {TemplateDirective (
-							prefix: #prefix,
-							suffix: #suffix,
-							value: #value
-						)})
-					} else {
-						None
-					}
-				}
-				_ => None,
-			})
-			.collect::<Vec<_>>();
-
-		quote! { Component (
-			tracker: #tracker,
-			tag: #tag,
-			slot_children: #slot_children,
-			template_directives: [#(#template_directives),*],
-			location: #location
-		)}
 	}
 }
 pub fn lit_to_string(lit: &syn::Lit) -> String {

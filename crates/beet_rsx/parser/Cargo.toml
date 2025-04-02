@@ -21,6 +21,7 @@ css = ["dep:lightningcss"]
 sweet.workspace = true
 ron.workspace = true
 anyhow.workspace = true
+itertools.workspace = true
 
 syn = { workspace = true, features = ["visit"] }
 quote.workspace = true

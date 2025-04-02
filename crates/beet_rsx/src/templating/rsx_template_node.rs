@@ -16,27 +16,18 @@ use thiserror::Error;
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum RsxTemplateNode {
 	/// Serializable [`RsxNode::Doctype`]
-	Doctype { location: Option<RsxMacroLocation> },
+	Doctype { meta: RsxNodeMeta },
 	/// Serializable [`RsxNode::Comment`]
-	Comment {
-		value: String,
-		location: Option<RsxMacroLocation>,
-	},
+	Comment { value: String, meta: RsxNodeMeta },
 	/// Serializable [`RsxNode::Text`]
-	Text {
-		value: String,
-		location: Option<RsxMacroLocation>,
-	},
+	Text { value: String, meta: RsxNodeMeta },
 	/// Serializable [`RsxNode::Fragment`]
-	Fragment {
-		items: Vec<Self>,
-		location: Option<RsxMacroLocation>,
-	},
+	Fragment { items: Vec<Self>, meta: RsxNodeMeta },
 	/// Serializable [`RsxNode::Block`]
 	/// the initial value is the responsibility of the [RustyPart::RustBlock]
 	RustBlock {
 		tracker: RustyTracker,
-		location: Option<RsxMacroLocation>,
+		meta: RsxNodeMeta,
 	},
 	/// Serializable [`RsxNode::Element`]
 	Element {
@@ -44,7 +35,7 @@ pub enum RsxTemplateNode {
 		self_closing: bool,
 		attributes: Vec<RsxTemplateAttribute>,
 		children: Box<Self>,
-		location: Option<RsxMacroLocation>,
+		meta: RsxNodeMeta,
 	},
 	/// Serializable [`RsxNode::Component`]
 	/// We dont know much about components, for example when parsing
@@ -56,8 +47,7 @@ pub enum RsxTemplateNode {
 		tag: String,
 		/// mapped from [RsxComponent::slot_children]
 		slot_children: Box<Self>,
-		template_directives: Vec<TemplateDirective>,
-		location: Option<RsxMacroLocation>,
+		meta: RsxNodeMeta,
 	},
 }
 
@@ -67,7 +57,7 @@ impl Default for RsxTemplateNode {
 	fn default() -> Self {
 		Self::Fragment {
 			items: Default::default(),
-			location: None,
+			meta: Default::default(),
 		}
 	}
 }
@@ -126,25 +116,37 @@ impl TemplateError {
 	}
 }
 
+impl NodeMeta for RsxTemplateNode {
+	fn meta(&self) -> &RsxNodeMeta {
+		match self {
+			RsxTemplateNode::Doctype { meta }
+			| RsxTemplateNode::Comment { meta, .. }
+			| RsxTemplateNode::Text { meta, .. }
+			| RsxTemplateNode::Fragment { meta, .. }
+			| RsxTemplateNode::RustBlock { meta, .. }
+			| RsxTemplateNode::Element { meta, .. }
+			| RsxTemplateNode::Component { meta, .. } => meta,
+		}
+	}
+
+	fn meta_mut(&mut self) -> &mut RsxNodeMeta {
+		match self {
+			RsxTemplateNode::Doctype { meta }
+			| RsxTemplateNode::Comment { meta, .. }
+			| RsxTemplateNode::Text { meta, .. }
+			| RsxTemplateNode::Fragment { meta, .. }
+			| RsxTemplateNode::RustBlock { meta, .. }
+			| RsxTemplateNode::Element { meta, .. }
+			| RsxTemplateNode::Component { meta, .. } => meta,
+		}
+	}
+}
+
 impl RsxTemplateNode {
 	#[cfg(feature = "serde")]
 	pub fn from_ron(ron: &str) -> anyhow::Result<Self> {
 		ron::de::from_str(ron).map_err(Into::into)
 	}
-
-	pub fn location(&self) -> Option<&RsxMacroLocation> {
-		match self {
-			RsxTemplateNode::Doctype { location }
-			| RsxTemplateNode::Comment { location, .. }
-			| RsxTemplateNode::Text { location, .. }
-			| RsxTemplateNode::Fragment { location, .. }
-			| RsxTemplateNode::RustBlock { location, .. }
-			| RsxTemplateNode::Element { location, .. }
-			| RsxTemplateNode::Component { location, .. } => location.as_ref(),
-		}
-	}
-
-
 
 	/// A simple dfs visitor for an rsx template node
 	pub fn visit(&self, mut func: impl FnMut(&Self)) {
@@ -210,10 +212,10 @@ mod test {
 			tag: "div".to_string(),
 			self_closing: false,
 			attributes: vec![],
-			location: None,
+			meta: RsxNodeMeta::default(),
 			children: Box::new(RsxTemplateNode::RustBlock {
 				tracker,
-				location: None,
+				meta: RsxNodeMeta::default(),
 			}),
 		});
 	}
@@ -234,7 +236,8 @@ mod test {
 		expect(&template).to_be(&RsxTemplateNode::Element {
 			tag: "div".to_string(),
 			self_closing: false,
-			location: None,
+			meta: RsxNodeMeta::default(),
+
 			attributes: vec![
 				RsxTemplateAttribute::Key {
 					key: "key".to_string(),
@@ -256,29 +259,33 @@ mod test {
 				tag: "p".to_string(),
 				self_closing: false,
 				attributes: vec![],
-				location: None,
+				meta: RsxNodeMeta::default(),
+
 				children: Box::new(RsxTemplateNode::Fragment {
-					location: None,
+					meta: RsxNodeMeta::default(),
+
 					items: vec![
 						RsxTemplateNode::Text {
-							location: None,
+							meta: RsxNodeMeta::default(),
+
 							value: "\n\t\t\t\t\thello ".to_string(),
 						},
 						RsxTemplateNode::Component {
-							location: None,
+							meta: RsxNodeMeta::default(),
+
 							tracker: component_tracker,
 							tag: "MyComponent".to_string(),
 							slot_children: Box::new(RsxTemplateNode::Element {
 								tag: "div".to_string(),
 								self_closing: false,
 								attributes: vec![],
-								location: None,
+								meta: RsxNodeMeta::default(),
+
 								children: Box::new(RsxTemplateNode::Text {
 									value: "some child".to_string(),
-									location: None,
+									meta: RsxNodeMeta::default(),
 								}),
 							}),
-							template_directives: vec![],
 						},
 					],
 				}),

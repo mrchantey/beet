@@ -1,4 +1,7 @@
+use crate::parse_rsx::meta_builder::MetaBuilder;
+use crate::parse_rsx::meta_builder::ParsedTemplateDirective;
 use crate::prelude::*;
+use proc_macro2::Span;
 use proc_macro2::TokenStream;
 use proc_macro2_diagnostics::Diagnostic;
 use proc_macro2_diagnostics::Level;
@@ -58,6 +61,10 @@ impl RstmlToRsx {
 
 		let location = macro_location_tokens(tokens);
 		let rstml_to_rsx_errors = &self.errors;
+
+		// we intentionally only set the location on the root node,
+		// havent yet found a usecase that makes it worth setting on
+		// every node
 		quote! {
 			{
 				#(#rstml_errors;)*
@@ -84,7 +91,7 @@ impl RstmlToRsx {
 		} else {
 			quote!( RsxFragment {
 				nodes: Vec::from([#(#nodes),*]),
-				location: None,
+				meta: RsxNodeMeta::default(),
 			}.into_node())
 		}
 	}
@@ -93,34 +100,39 @@ impl RstmlToRsx {
 	fn map_node<C: CustomNode>(&mut self, node: Node<C>) -> TokenStream {
 		match node {
 			Node::Doctype(_) => {
-				quote!(RsxDoctype { location: None }.into_node())
+				quote!(
+					RsxDoctype {
+						meta: RsxNodeMeta::default()
+					}
+					.into_node()
+				)
 			}
 			Node::Comment(comment) => {
 				let comment = comment.value.value();
 				quote!(RsxComment {
 					value: #comment.to_string(),
-					location: None,
+					meta: RsxNodeMeta::default(),
 				}.into_node())
 			}
 			Node::Text(text) => {
 				let text = text.value_string();
 				quote!(RsxText {
 					value: #text.to_string(),
-					location: None,
+					meta: RsxNodeMeta::default(),
 				}.into_node())
 			}
 			Node::RawText(raw) => {
 				let text = raw.to_string_best();
 				quote!(RsxText {
 					value: #text.to_string(),
-					location: None,
+					meta: RsxNodeMeta::default(),
 				}.into_node())
 			}
 			Node::Fragment(NodeFragment { children, .. }) => {
 				let children = children.into_iter().map(|n| self.map_node(n));
 				quote! { RsxFragment{
 					nodes: vec![#(#children),*],
-					location: None,
+					meta: RsxNodeMeta::default(),
 				}.into_node()}
 			}
 			Node::Block(block) => {
@@ -133,13 +145,19 @@ impl RstmlToRsx {
 			}
 			Node::Element(el) => {
 				self.check_self_closing_children(&el);
+
 				let NodeElement {
-					mut open_tag,
+					open_tag,
 					children,
 					close_tag,
 				} = el;
+
+
+				let (directives, attributes) =
+					MetaBuilder::parse_attributes(&open_tag.attributes);
+
 				// we must parse runtime attr before anything else
-				self.parse_runtime_attribute(&mut open_tag.attributes);
+				self.parse_runtime_directive(&directives);
 
 				self.collected_elements.push(open_tag.name.clone());
 				let self_closing = close_tag.is_none();
@@ -149,7 +167,13 @@ impl RstmlToRsx {
 				let tag = open_tag.name.to_string();
 
 				if tag.starts_with(|c: char| c.is_uppercase()) {
-					self.map_component(tag, open_tag, children)
+					self.map_component(
+						tag,
+						&open_tag,
+						&attributes,
+						&directives,
+						children,
+					)
 				} else {
 					// panic!();
 					// println!("its a style tag");
@@ -163,19 +187,21 @@ impl RstmlToRsx {
 						}
 					}
 
-
-					let attributes = open_tag
-						.attributes
-						.into_iter()
+					let attributes = attributes
+						.iter()
 						.map(|attr| self.map_attribute(attr))
 						.collect::<Vec<_>>();
+
+
+					let meta = MetaBuilder::build_with_directives(&directives);
+
 					let children = self.map_nodes(children);
 					quote!(RsxElement {
 						tag: #tag.to_string(),
 						attributes: vec![#(#attributes),*],
 						children: Box::new(#children),
 						self_closing: #self_closing,
-						location: None,
+						meta: #meta,
 					}.into_node())
 				}
 			}
@@ -183,7 +209,7 @@ impl RstmlToRsx {
 		}
 	}
 
-	fn map_attribute(&mut self, attr: NodeAttribute) -> TokenStream {
+	fn map_attribute(&mut self, attr: &NodeAttribute) -> TokenStream {
 		let ident = &self.idents.runtime.effect;
 		match attr {
 			NodeAttribute::Block(block) => {
@@ -249,19 +275,19 @@ impl RstmlToRsx {
 	fn map_component<C: CustomNode>(
 		&mut self,
 		tag: String,
-		open_tag: OpenTag,
+		open_tag: &OpenTag,
+		attributes: &[&NodeAttribute],
+		directives: &[ParsedTemplateDirective],
 		children: Vec<Node<C>>,
 	) -> TokenStream {
 		let tracker = self.rusty_tracker.next_tracker(&open_tag);
 		let mut prop_assignments = Vec::new();
 		let mut prop_names = Vec::new();
-		let mut template_directives = Vec::new();
-		// currently unused
+		// currently unused but we could allow setting component directly,
+		// like <Component {component} />
 		let mut block_attr = None;
 
-		let mut should_serialize = false;
-
-		for attr in open_tag.attributes.iter() {
+		for attr in attributes.iter() {
 			match attr {
 				NodeAttribute::Block(node_block) => {
 					if block_attr.is_some() {
@@ -276,36 +302,18 @@ impl RstmlToRsx {
 				}
 				NodeAttribute::Attribute(attr) => {
 					let attr_key = &attr.key;
-					let attr_key_str = attr_key.to_string();
-					match attr_key_str.contains(":") {
-						// its a client directive
-						true => {
-							if attr_key_str.starts_with("client:") {
-								should_serialize = true;
-							}
-							let value = match attr.value() {
-								Some(value) => quote! {Some(#value)},
-								None => quote! {None},
-							};
-							template_directives.push(
-								quote! {TemplateDirective::new(#attr_key_str, #value)},
-							);
-						}
-						// its a prop assignemnt
-						false => {
-							prop_names.push(attr_key);
-
-							let value = match attr.value() {
-								Some(value) => quote! {#value},
-								// for components no value means a bool flag
-								None => quote! {true},
-							};
-							prop_assignments.push(quote! {.#attr_key(#value)});
-						}
-					}
+					prop_names.push(attr_key);
+					let value = match attr.value() {
+						Some(value) => quote! {#value},
+						// for components no value means a bool flag
+						None => quote! {true},
+					};
+					prop_assignments.push(quote! {.#attr_key(#value)});
 				}
 			}
 		}
+
+		let meta = MetaBuilder::build_with_directives(&directives);
 
 		let ident = syn::Ident::new(&tag, open_tag.span());
 		let slot_children = self.map_nodes(children);
@@ -333,7 +341,7 @@ impl RstmlToRsx {
 			})
 		};
 
-		let ron = if should_serialize {
+		let ron = if directives.iter().any(|d| d.is_client_reactive()) {
 			quote! {{
 				#[cfg(target_arch = "wasm32")]
 				{None}
@@ -352,20 +360,19 @@ impl RstmlToRsx {
 		);
 
 		quote::quote!({
-			let _ = #ide_helper::default();
+				let _ = #ide_helper::default();
 
-			let component = #component;
+				let component = #component;
 
-			RsxComponent{
-				tag: #tag.to_string(),
-				type_name: std::any::type_name::<#ident>().to_string(),
-				tracker: #tracker,
-				ron: #ron,
-				node: Box::new(component.render()),
-				slot_children: Box::new(#slot_children),
-				template_directives: vec![#(#template_directives),*],
-				location: None,
-			}.into_node()
+				RsxComponent{
+					tag: #tag.to_string(),
+					type_name: std::any::type_name::<#ident>().to_string(),
+					tracker: #tracker,
+					ron: #ron,
+					node: Box::new(component.render()),
+					slot_children: Box::new(#slot_children),
+					meta: #meta
+				}.into_node()
 		})
 	}
 
@@ -389,25 +396,22 @@ impl RstmlToRsx {
 
 	/// Update [`Self::idents`] with the specified runtime and removes it from
 	/// the list of attributes. See [`RsxIdents::set_runtime`] for more information.
-	fn parse_runtime_attribute(&mut self, attrs: &mut Vec<NodeAttribute>) {
-		attrs.retain(|attr| {
-			if let NodeAttribute::Attribute(attr) = attr {
-				let key = attr.key.to_string();
-				if key.starts_with("runtime:") {
-					let runtime = key.replace("runtime:", "");
-					if let Err(err) = self.idents.runtime.set(&runtime) {
-						let diagnostic = Diagnostic::spanned(
-							attr.span(),
-							Level::Error,
-							err.to_string(),
-						);
-						self.errors.push(diagnostic.emit_as_expr_tokens());
-					}
-					return false;
+	fn parse_runtime_directive(
+		&mut self,
+		directives: &[ParsedTemplateDirective],
+	) {
+		for directive in directives.iter() {
+			if let ParsedTemplateDirective::Runtime(runtime) = directive {
+				if let Err(err) = self.idents.runtime.set(runtime) {
+					let diagnostic = Diagnostic::spanned(
+						Span::call_site(),
+						Level::Error,
+						err.to_string(),
+					);
+					self.errors.push(diagnostic.emit_as_expr_tokens());
 				}
 			}
-			true
-		});
+		}
 	}
 }
 

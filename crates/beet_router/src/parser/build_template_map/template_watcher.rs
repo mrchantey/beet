@@ -3,6 +3,7 @@ use anyhow::Result;
 use rapidhash::RapidHashMap as HashMap;
 use std::path::Path;
 use std::path::PathBuf;
+use std::time::Duration;
 use std::time::Instant;
 use sweet::prelude::*;
 
@@ -54,6 +55,8 @@ impl<Reload: FnMut() -> Result<()>, Recompile: FnMut() -> Result<()>>
 			filter: GlobFilter::default()
 				.with_exclude("*.git*")
 				.with_exclude("*target*"),
+			// avoid short burst refreshing
+			debounce: Duration::from_millis(100),
 			..Default::default()
 		}
 		.watch_async(move |ev| {

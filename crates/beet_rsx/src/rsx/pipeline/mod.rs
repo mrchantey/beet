@@ -89,10 +89,10 @@ impl RsxPipeline<RsxNode, Result<HtmlDocument>> for RsxToHtmlDocument {
 	fn apply(self, mut node: RsxNode) -> Result<HtmlDocument> {
 		node = node.bpipe(self.rsx_transforms)?;
 
-		let mut client_directives = false;
+		let mut client_reactive = false;
 		VisitRsxComponent::new(|c| {
-			if c.template_directives.iter().any(|d| d.prefix == "client") {
-				client_directives = true;
+			if c.is_client_reactive() {
+				client_reactive = true;
 			}
 		})
 		.walk_node(&node);
@@ -102,7 +102,7 @@ impl RsxPipeline<RsxNode, Result<HtmlDocument>> for RsxToHtmlDocument {
 			.bref()
 			.bpipe(self.rsx_to_html)
 			.bpipe(self.html_to_document)?;
-		if client_directives {
+		if client_reactive {
 			doc = doc
 				.bmap(|doc| (doc, node))
 				.bpipe(self.html_doc_to_resumable);

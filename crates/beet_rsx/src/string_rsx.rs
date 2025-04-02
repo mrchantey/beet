@@ -22,7 +22,7 @@ impl StringRsx {
 		RsxNode::Block(RsxBlock {
 			initial: Box::new(block.into_node()),
 			effect: Effect::new(noop(), tracker),
-			location: None,
+			meta: RsxNodeMeta::default(),
 		})
 	}
 

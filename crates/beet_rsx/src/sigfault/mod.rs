@@ -39,7 +39,7 @@ impl Sigfault {
 				}),
 				tracker,
 			),
-			location: None,
+			meta: RsxNodeMeta::default(),
 		})
 	}
 

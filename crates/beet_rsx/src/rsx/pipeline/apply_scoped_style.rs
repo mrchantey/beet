@@ -42,20 +42,6 @@ enum Scope {
 	Global,
 	// Cascade (eargerly apply slots?)
 }
-impl Scope {
-	pub fn from_element(el: &mut RsxElement) -> Self {
-		if el.contains_attr_key("scope:global") {
-			el.attributes.retain(|attr| match attr {
-				RsxAttribute::Key { key } => key != "scope:global",
-				_ => true,
-			});
-
-			Scope::Global
-		} else {
-			Scope::Component
-		}
-	}
-}
 
 impl RsxPipeline<RsxNode, Result<RsxNode>> for ApplyScopedStyle {
 	/// Applies scoped style to:
@@ -94,7 +80,10 @@ impl ApplyScopedStyle {
 		// 1. apply to style bodies
 		VisitRsxElementMut::walk_with_opts(node, opts.clone(), |el| {
 			if el.tag == "style" {
-				let scope = Scope::from_element(el);
+				let scope = match el.is_global_scope() {
+					true => Scope::Global,
+					false => Scope::Component,
+				};
 				if scope == Scope::Component {
 					component_scope_found = true;
 				}

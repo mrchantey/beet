@@ -39,7 +39,7 @@ impl BevyRuntime {
 		RsxNode::Block(RsxBlock {
 			initial: Box::new(block.clone().into_node()),
 			effect: Effect::new(block.into_node_block_effect(), tracker),
-			location: None,
+			meta: RsxNodeMeta::default(),
 		})
 	}
 	/// Used by [`RstmlToRsx`] when it encounters an attribute block:
