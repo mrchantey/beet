@@ -15,8 +15,7 @@ fn beet_sidebar_layout(_: BeetSidebarLayout) -> RsxNode {
 		<slot name="header" slot="header" />
 		<slot name="header-nav" slot="header-nav" />
 		<slot name="footer" slot="footer" />
-		<BeetHeaderLinks/>
-		<a class="bt-u-button-like" href="/" slot="header-nav">click me</a>
+		<BeetHeaderLinks slot="header-nav"/>
 		<div class="container">
 			<Sidebar routes={routes} />
 			<main>

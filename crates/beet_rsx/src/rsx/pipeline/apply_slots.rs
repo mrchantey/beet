@@ -250,7 +250,9 @@ mod test {
 
 	fn span(_: Span) -> RsxNode {
 		rsx! {
-			<span><slot /></span>
+			<span>
+				<slot />
+			</span>
 		}
 	}
 
@@ -261,7 +263,7 @@ mod test {
 		rsx! {
 			<html>
 				<slot name="header">Fallback Title</slot>
-				<br/>
+				<br />
 				// default
 				<slot />
 			</html>
@@ -303,15 +305,13 @@ mod test {
 	#[test]
 	fn fallback() {
 		expect(
-			rsx! {<MyComponent/>}
+			rsx! { <MyComponent /> }
 				.bpipe(RsxToHtmlString::default())
 				.unwrap(),
 		)
-		.to_be(
-			"<html>Fallback Title<br/></html>",
-		);
+		.to_be("<html>Fallback Title<br/></html>");
 	}
-	
+
 	#[test]
 	fn recursive() {
 		expect(
@@ -339,7 +339,7 @@ mod test {
 		fn layout(_: Layout) -> RsxNode {
 			rsx! {
 				<Header>
-					<slot name="header" slot="default"/>
+					<slot name="header" slot="default" />
 				</Header>
 			}
 		}

@@ -8,10 +8,11 @@ fn main() -> Result<()> {
 	// so rebuild if any change
 	println!("cargo::rerun-if-changed=src/**/*.mockup.rs");
 
+	// ⚠️ changes here should be duplicated in crates/beet_site/build.rs
 	FileGroup::new_workspace_rel("crates/beet_design/src")?
 		.with_filter(GlobFilter::default().with_include("*.mockup.rs"))
 		.bpipe(FileGroupToFuncFiles::default())?
-		.bpipe(FuncFilesToRouteFuncs::mockups())?
+		.bpipe(MockupFuncFilesToRouteFuncs::new("/design"))?
 		.bpipe(RouteFuncsToCodegen::new(
 			CodegenFile::new_workspace_rel(
 				"crates/beet_design/src/codegen/mockups.rs",

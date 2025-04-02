@@ -103,7 +103,7 @@ mod test {
 		let codegen_file = FileGroup::test_site_routes()
 			.bpipe(FileGroupToFuncFiles::default())
 			.unwrap()
-			.bpipe(FuncFilesToRouteFuncs::http_routes())
+			.bpipe(HttpFuncFilesToRouteFuncs::default())
 			.unwrap()
 			.bpipe(RouteFuncsToCodegen::default())
 			.unwrap()

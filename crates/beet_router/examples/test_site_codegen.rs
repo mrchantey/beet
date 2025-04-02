@@ -17,7 +17,7 @@ pub fn main() -> Result<()> {
 				.with_exclude("*mod.rs"),
 		)
 		.bpipe(FileGroupToFuncFiles::default())?
-		.bpipe(FuncFilesToRouteFuncs::http_routes())?
+		.bpipe(HttpFuncFilesToRouteFuncs::default())?
 		.bpipe(RouteFuncsToCodegen::new(
 			CodegenFile::new_workspace_rel(
 				"crates/beet_router/src/test_site/codegen/routes.rs",

@@ -1,4 +1,4 @@
-// use crate::prelude::*;
+use crate::prelude::*;
 use beet::prelude::*;
 
 
@@ -9,5 +9,10 @@ use beet::prelude::*;
 pub struct BeetHeaderLinks;
 
 fn beet_header_links(_: BeetHeaderLinks) -> RsxNode {
-	rsx! { <div>over here!</div> }
+	rsx! {
+
+	   <a class="bt-u-button-like" href={paths::docs()}>Docs</a>
+	   <a class="bt-u-button-like" href={paths::index()}>Design</a>
+
+	}
 }
