@@ -1,4 +1,5 @@
 #![feature(more_qualified_paths)]
+#[allow(unused)]
 use beet::prelude::*;
 #[allow(unused)]
 use beet_site::prelude::*;
@@ -19,8 +20,4 @@ fn main() {
 }
 
 #[cfg(target_arch = "wasm32")]
-fn main() {
-	AppRouter::new(app_cx!())
-		.add_collection(beet_site::wasm::collect())
-		.run();
-}
+fn main() -> anyhow::Result<()> { beet_site::wasm::collect().mount() }

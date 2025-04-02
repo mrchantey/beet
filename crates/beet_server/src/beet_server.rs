@@ -1,9 +1,10 @@
-use std::path::PathBuf;
-
 use crate::prelude::*;
 use anyhow::Result;
 use axum::Router;
-
+use std::path::PathBuf;
+// use tower::Layer;
+// use tower_http::normalize_path::NormalizePath;
+// use tower_http::normalize_path::NormalizePathLayer;
 
 
 /// The main server struct for Beet.
@@ -17,7 +18,7 @@ impl Default for BeetServer {
 	fn default() -> Self {
 		Self {
 			html_dir: "target".into(),
-			router: Router::new().merge(state_utils_routes()),
+			router: Router::default(),
 		}
 	}
 }
@@ -34,7 +35,13 @@ impl BeetServer {
 	pub async fn serve(mut self) -> Result<()> {
 		self.router = self
 			.router
-			.fallback_service(file_and_error_handler(&self.html_dir));
+			.fallback_service(file_and_error_handler(&self.html_dir))
+			.merge(state_utils_routes());
+		// .layer(NormalizePathLayer::trim_trailing_slash());
+
+		// self.router =
+		// 	NormalizePathLayer::trim_trailing_slash().layer(self.router);
+
 
 		#[cfg(all(debug_assertions, feature = "reload"))]
 		let reload_handle = {

@@ -1,4 +1,3 @@
-use crate::prelude::*;
 use anyhow::Result;
 #[allow(unused)]
 use beet_rsx::prelude::*;
@@ -53,16 +52,5 @@ impl ClientIslandMountFuncs {
 
 		EventRegistry::initialize()?;
 		Ok(())
-	}
-}
-
-
-impl IntoCollection<ClientIslandMountFuncs> for ClientIslandMountFuncs {
-	fn into_collection(self) -> impl Collection {
-		#[allow(unused)]
-		move |app: &mut AppRouter| {
-			#[cfg(target_arch = "wasm32")]
-			app.on_run_wasm.push(Box::new(move |_| self.mount()));
-		}
 	}
 }
