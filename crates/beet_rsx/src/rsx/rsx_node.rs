@@ -143,8 +143,12 @@ impl<T: FnOnce() -> U, U: IntoRsxNode<M2>, M2> IntoRsxNode<(M2, FuncIntoRsx)>
 	fn into_node(self) -> RsxNode { self().into_node() }
 }
 
-pub struct VecIntoRsx;
-impl<T: IntoRsxNode<M2>, M2> IntoRsxNode<(M2, VecIntoRsx)> for Vec<T> {
+pub struct IterIntoRsx;
+impl<I, T, M2> IntoRsxNode<(M2, IterIntoRsx)> for I 
+where
+	I: IntoIterator<Item = T>,
+	T: IntoRsxNode<M2>,
+{
 	fn into_node(self) -> RsxNode {
 		RsxFragment {
 			nodes: self.into_iter().map(|item| item.into_node()).collect(),

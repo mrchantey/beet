@@ -86,9 +86,9 @@ fn impl_component(input: &DeriveInput) -> Result<TokenStream> {
 	let name = &input.ident;
 
 	Ok(quote! {
-	impl #impl_generics beet::prelude::Component for #name #type_generics #where_clause {
+	impl #impl_generics IntoRsxNode for #name #type_generics #where_clause {
 
-		fn render(self) -> RsxNode {
+		fn into_node(self) -> RsxNode {
 			#into_rsx(self)
 		}
 	}

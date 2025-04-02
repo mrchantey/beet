@@ -222,7 +222,7 @@ mod test {
 		// here we create one from a default MyComponent, so the value: 4 will
 		// be ignored
 		let my_component_template = MyComponent { value: 4 }
-			.render()
+			.into_node()
 			.bref()
 			.bpipe(NodeToTemplate)
 			.unwrap();

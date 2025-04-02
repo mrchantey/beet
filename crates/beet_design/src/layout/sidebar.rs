@@ -1,5 +1,6 @@
 use beet_router::prelude::*;
 use beet_rsx::as_beet::*;
+use crate::prelude::*;
 
 #[derive(Node)]
 pub struct Sidebar {
@@ -7,17 +8,11 @@ pub struct Sidebar {
 }
 
 fn sidebar(Sidebar { routes }: Sidebar) -> RsxNode {
-	let nav_items = routes
-		.flatten()
-		.iter()
-		.map(|route| {
-			let route_str = route.to_string_lossy().to_string();
-			rsx! { <a href=route_str.clone()>{route_str}</a> }
-		})
-		.collect::<Vec<_>>();
 
 	rsx! {
-		<nav>{nav_items}</nav>
+		<nav>
+		<SidebarGroup tree={routes} root/>
+		</nav>
 		<style>
 			nav{
 				display: flex;

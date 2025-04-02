@@ -31,7 +31,7 @@ impl ClientIsland {
 		quote::quote! {
 			// TODO resolve tracker to location
 			beet::exports::ron::de::from_str::<#type_name>(#ron)?
-				.render()
+				.into_node()
 				.bpipe(RegisterEffects::new(
 					tree_location_map.rusty_locations[
 						&RustyTracker::new(#tracker_index,#tracker_hash)]
@@ -129,7 +129,7 @@ mod test {
 		expect(island.into_mount_tokens().to_string()).to_be(
 			quote::quote! {
 				beet::exports::ron::de::from_str::<MyComponent>("(val:32)")?
-					.render()
+					.into_node()
 					.bpipe(RegisterEffects::new(tree_location_map.rusty_locations[&RustyTracker::new(0u32,89u64)]))?;
 			}
 			.to_string(),

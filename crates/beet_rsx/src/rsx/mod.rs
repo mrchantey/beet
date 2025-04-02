@@ -20,13 +20,3 @@ pub use rsx_visitor::*;
 pub use rsx_visitor_fn::*;
 pub use template_directive::*;
 pub use tree_idx::*;
-
-
-// probs deprecate for IntoRsx which has a default T
-pub trait Component {
-	fn render(self) -> RsxNode;
-}
-
-impl<T: FnOnce() -> RsxNode> Component for T {
-	fn render(self) -> RsxNode { self() }
-}

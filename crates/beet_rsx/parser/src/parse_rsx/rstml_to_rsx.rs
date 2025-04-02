@@ -369,7 +369,7 @@ impl RstmlToRsx {
 					type_name: std::any::type_name::<#ident>().to_string(),
 					tracker: #tracker,
 					ron: #ron,
-					node: Box::new(component.render()),
+					node: Box::new(component.into_node()),
 					slot_children: Box::new(#slot_children),
 					meta: #meta
 				}.into_node()

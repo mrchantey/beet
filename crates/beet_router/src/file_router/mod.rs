@@ -94,6 +94,7 @@ pub struct StaticRouteTree {
 	pub name: String,
 	/// all paths available at this level of the tree
 	pub paths: Vec<RoutePath>,
+	/// All child directories
 	pub children: Vec<StaticRouteTree>,
 }
 
