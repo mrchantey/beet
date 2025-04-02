@@ -39,8 +39,8 @@ use thiserror::Error;
 /// - Only top level slots, fragments aside, are supported
 /// - Any unconsumed slot children will be returned in an error
 /// - For unnamed slots `<div/>`, they will be inserted in the components unnamed
-/// 	<slot> tag.
-/// - Components are not recursively searched because they would steal the slot
+/// 	<sag.
+/// - Comnot recursively searched because they would steal the slot
 /// 	from following internal siblings.
 /// - All <slot> elements are replaced with a <fragment> element containing the
 /// 	slot children.
@@ -55,13 +55,23 @@ impl RsxPipeline<RsxNode, Result<RsxNode, SlotsError>> for ApplySlots {
 }
 
 impl ApplySlots {
+	/// Apply slots for a given node, if it isnt an [`RsxComponent`] this is a noop.
+	/// 1. Collect all [`RsxComponent::slot_children`] into a hashmap, any direct
+	/// 	 children without a slot directive are added to the "default" slot.
 	fn map_node(node: &mut RsxNode) -> Result<(), SlotsError> {
 		let mut res = Ok(());
 		VisitRsxNodeMut::walk_with_opts(
 			node,
 			VisitRsxOptions::default(),
 			|node| {
-				if let Err(err) = Self::apply_for_node(node) {
+				let RsxNode::Component(component) = node else {
+					return;
+				};
+				let slot_map =
+					Self::collect_slot_children(&mut component.slot_children);
+				if let Err(err) =
+					Self::insert_slot_children(&mut *component.node, slot_map)
+				{
 					res = Err(err);
 				}
 			},
@@ -69,24 +79,8 @@ impl ApplySlots {
 		Ok(())
 	}
 
-	/// Apply slots for a given node, if it isnt an [`RsxComponent`] this is a noop.
-	/// 1. Collect all [`RsxComponent::slot_children`] into a hashmap, any direct
-	/// 	 children without a slot attribute are added to the "default" slot.
-	fn apply_for_node(node: &mut RsxNode) -> Result<(), SlotsError> {
-		let RsxNode::Component(component) = node else {
-			return Ok(());
-		};
-		let slot_map =
-			Self::collect_slot_children(&mut component.slot_children);
-		// println!("applying slots for component: {}", component.tag);
-		// println!("slot children: {:?}", slot_map_debug(&slot_map));
-
-		Self::insert_slot_children(&mut *component.node, slot_map)?;
-
-		Ok(())
-	}
-	/// collect any *direct descendent* child elements with a slot attribute into a hashmap
-	/// of that name, ie <div slot="foo">, and remove the slot attribute
+	/// collect any *direct descendent* child elements with a slot directive into a hashmap
+	/// of that name, ie <div slot="foo">, and remove the slot directive
 	///
 	/// # Panics
 	///
@@ -110,35 +104,27 @@ impl ApplySlots {
 			children,
 			// top level only
 			VisitRsxOptions::ignore_all(),
-			|node| match node {
-				RsxNode::Doctype { .. }
-				| RsxNode::Comment { .. }
-				| RsxNode::Text { .. }
-				| RsxNode::Block(_) => {
-					insert("default", node);
-				}
-				RsxNode::Fragment { .. } => {
-					// allow traversal
-				}
-				RsxNode::Element(el) => {
-					let slot_name = el
-						.get_key_value_attr("slot")
-						.unwrap_or("default")
-						.to_string();
-					// remove the slot attribute if it exists
-					el.remove_matching_key("slot");
-					// its a tranfer slot, just remove the slot and insert the children
-					// TODO this should probably be a fragment
-					if el.tag == "slot" {
-						insert(&slot_name, &mut *el.children);
-						*node = RsxNode::default();
-					} else {
+			|node| {
+				match node {
+					RsxNode::Doctype(_)
+					| RsxNode::Comment(_)
+					| RsxNode::Text(_)
+					| RsxNode::Block(_)
+					| RsxNode::Component(_)
+					| RsxNode::Element(_) => {
+						let slot_name = node
+							.slot_directive()
+							.map(|d| d.to_string())
+							.unwrap_or_else(|| "default".to_string());
 						insert(&slot_name, node);
 					}
-				}
-				RsxNode::Component(_) => {
-					// TODO component slot field, ie RsxComponent {slot:Option<String>,...}
-					insert("default", node);
+					RsxNode::Fragment(fragment) => {
+						// only apply to fragment if it has a slot directive
+						// otherwise allow traversal
+						if let Some(slot_name) = fragment.slot_directive() {
+							insert(&slot_name.to_string(), node);
+						}
+					}
 				}
 			},
 		);
@@ -174,28 +160,32 @@ impl ApplySlots {
 				}
 				let slot_name =
 					element.get_key_value_attr("name").unwrap_or("default");
+				// println!("inserting slot children\nslot name: {}", slot_name);
+				// println!("slot map: {:#?}", slot_map);
 				let slot_children = slot_map
 					.remove(slot_name)
 					.map(|vec| vec.into_node())
 					// <slot>foo</slot> fallback pattern https://docs.astro.build/en/basics/astro-components/#fallback-content-for-slots
 					.unwrap_or(std::mem::take(&mut *element.children));
 				element.remove_matching_key("name");
-				// println!("slot children: {:?}", slot_children);
+				// println!("slot children: {:#?}", slot_children);
 
 				// <slot slot="foo"> transfer pattern https://docs.astro.build/en/basics/astro-components/#transferring-slots
-				// in this case we leave the slot as is, just replacing its children
+				// in this case we simply convert to a fragment
 				// it will be collected in the [`Self::collect_slot_children`] of the child
-				if let Some(_transfer_name) = element.get_key_value_attr("slot")
-				{
-					element.self_closing = false;
-					element.children = Box::new(slot_children);
-					// println!("element: {:?}", element);
-					// println!(
-					// 	"after: {:}",
-					// 	node.bpipe(RsxToHtml::default())
-					// 		.bpipe(RenderHtml::default())
-					// 		.unwrap()
-					// );
+				if element.slot_directive().is_some() {
+					*node = RsxFragment {
+						nodes: vec![slot_children],
+						meta: element.meta().clone(),
+					}
+					.into_node();
+				// println!("node: {:?}", node);
+				// println!(
+				// 	"after: {:}",
+				// 	node.bpipe(RsxToHtml::default())
+				// 		.bpipe(RenderHtml::default())
+				// 		.unwrap()
+				// );
 				} else {
 					*node = slot_children;
 				}
@@ -255,100 +245,91 @@ mod test {
 	use crate::as_beet::*;
 	use sweet::prelude::*;
 
+	#[derive(Node)]
+	struct Span;
+
+	fn span(_: Span) -> RsxNode {
+		rsx! {
+			<span><slot /></span>
+		}
+	}
+
+	#[derive(Node)]
+	struct MyComponent;
+
+	fn my_component(_: MyComponent) -> RsxNode {
+		rsx! {
+			<html>
+				<slot name="header">Fallback Title</slot>
+				<br/>
+				// default
+				<slot />
+			</html>
+		}
+	}
+
 	#[test]
 	fn works() {
-		#[derive(Node)]
-		struct MyComponent;
-
-		fn my_component(_: MyComponent) -> RsxNode {
-			rsx! {
-				<html>
-					<slot name="header" />
-					// default
-					<slot />
-				</html>
-			}
-		}
-
-		// println!("{:?}", slot_example);
 		expect(
 			rsx! {
 				<MyComponent>
-					<div slot="header">Header</div>
 					<div>Default</div>
+					<div slot="header">Title</div>
 				</MyComponent>
 			}
 			.bpipe(RsxToHtmlString::default())
 			.unwrap(),
 		)
-		.to_be("<html><div>Header</div><div>Default</div></html>");
+		.to_be("<html><div>Title</div><br/><div>Default</div></html>");
 	}
+
 	#[test]
-	fn recursive() {
-		#[derive(Node)]
-		struct MyComponent;
-
-		fn my_component(_: MyComponent) -> RsxNode {
-			rsx! {
-				<html>
-					<slot name="header" />
-					<br />
-					<slot />
-				</html>
-			}
-		}
-
+	fn component_slots() {
 		expect(
 			rsx! {
 				<MyComponent>
-					<MyComponent>
-						<div slot="header">Header</div>
-						<div>Default</div>
-					</MyComponent>
+					<div>Default</div>
+					<Span slot="header">Title</Span>
 				</MyComponent>
+			}
+			.bpipe(RsxToHtmlString::default())
+			.unwrap(),
+		)
+		.to_be("<html><span>Title</span><br/><div>Default</div></html>");
+	}
+
+
+
+	#[test]
+	fn fallback() {
+		expect(
+			rsx! {<MyComponent/>}
+				.bpipe(RsxToHtmlString::default())
+				.unwrap(),
+		)
+		.to_be(
+			"<html>Fallback Title<br/></html>",
+		);
+	}
+	
+	#[test]
+	fn recursive() {
+		expect(
+			rsx! {
+				<Span>
+					<MyComponent>
+						<div>Default</div>
+						<div slot="header">Title</div>
+					</MyComponent>
+				</Span>
 			}
 			.bpipe(RsxToHtmlString::default())
 			.unwrap(),
 		)
 		.to_be(
-			"<html><br/><html><div>Header</div><br/><div>Default</div></html></html>",
+			"<span><html><div>Title</div><br/><div>Default</div></html></span>",
 		);
 	}
-
-
-
-
-	#[test]
-	fn apply_for_node() {
-		#[derive(Node)]
-		struct Child;
-
-		fn child(_: Child) -> RsxNode {
-			rsx! {
-				<slot name="header" slot="header" />
-				<slot />
-			}
-		}
-		expect(
-			rsx! {
-				<Child>
-					// <div>"Content"</div>
-					<div slot="header">"Title"</div>
-				</Child>
-			}
-			.bmap(|mut node| {
-				// only apply, no recursion
-				ApplySlots::apply_for_node(&mut node).unwrap();
-				node.bpipe(RsxToHtml::default().no_slot_check())
-					.bpipe(RenderHtml::default())
-					.unwrap()
-			}),
-		)
-		.to_be("<slot slot=\"header\"><div>Title</div></slot>");
-	}
-
-
-
 
 	#[test]
 	fn transfer_simple() {
@@ -358,7 +339,7 @@ mod test {
 		fn layout(_: Layout) -> RsxNode {
 			rsx! {
 				<Header>
-					<slot name="header" />
+					<slot name="header" slot="default"/>
 				</Header>
 			}
 		}

@@ -62,21 +62,16 @@ pub trait NodeMeta {
 
 
 impl<T: NodeMeta> TemplateDirectiveExt for T {
-	fn is_client_reactive(&self) -> bool {
-		self.template_directives()
-			.iter()
-			.any(|d| d.is_client_reactive())
+	fn find_directive(
+		&self,
+		mut func: impl FnMut(&TemplateDirective) -> bool,
+	) -> Option<&TemplateDirective> {
+		self.template_directives().iter().find(|d| func(d))
 	}
-
-	fn is_local_scope(&self) -> bool {
-		self.template_directives()
-			.iter()
-			.any(|d| d.is_local_scope())
-	}
-
-	fn is_global_scope(&self) -> bool {
-		self.template_directives()
-			.iter()
-			.any(|d| d.is_global_scope())
+	fn find_map_directive<U>(
+		&self,
+		mut func: impl FnMut(&TemplateDirective) -> Option<&U>,
+	) -> Option<&U> {
+		self.template_directives().iter().find_map(|d| func(d))
 	}
 }

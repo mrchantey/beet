@@ -1,6 +1,7 @@
 use itertools::Itertools;
 use proc_macro2::TokenStream;
 use quote::quote;
+use rstml::node::KeyedAttribute;
 use rstml::node::NodeAttribute;
 use syn::Expr;
 
@@ -9,6 +10,8 @@ pub(crate) enum ParsedTemplateDirective {
 	ClientLoad,
 	ScopeLocal,
 	ScopeGlobal,
+	FsSrc(String),
+	Slot(String),
 	Runtime(String),
 	Custom {
 		/// The part before the colon
@@ -21,6 +24,18 @@ pub(crate) enum ParsedTemplateDirective {
 }
 
 
+fn str_lit_val(attr: &KeyedAttribute) -> Option<String> {
+	if let Some(Expr::Lit(exp)) = attr.value() {
+		match exp.lit {
+			syn::Lit::Str(ref lit) => {
+				return Some(lit.value());
+			}
+			_ => {}
+		}
+	}
+	None
+}
+
 impl ParsedTemplateDirective {
 	pub fn from_attr(attr: &NodeAttribute) -> Option<ParsedTemplateDirective> {
 		let NodeAttribute::Attribute(keyed_attr) = attr else {
@@ -31,6 +46,20 @@ impl ParsedTemplateDirective {
 			"client:load" => Some(ParsedTemplateDirective::ClientLoad),
 			"scope:local" => Some(ParsedTemplateDirective::ScopeLocal),
 			"scope:global" => Some(ParsedTemplateDirective::ScopeGlobal),
+			"slot" => {
+				if let Some(val) = str_lit_val(keyed_attr) {
+					return Some(ParsedTemplateDirective::Slot(val));
+				}
+				None
+			}
+			"src" => {
+				if let Some(val) = str_lit_val(keyed_attr) {
+					if val.starts_with('.') {
+						return Some(ParsedTemplateDirective::FsSrc(val));
+					}
+				}
+				None
+			}
 			other => {
 				match other.contains(":") {
 					// its a client directive
@@ -112,6 +141,12 @@ impl MetaBuilder {
 				ParsedTemplateDirective::ScopeGlobal => {
 					quote! {TemplateDirective::ScopeGlobal}
 				}
+				ParsedTemplateDirective::FsSrc(src) => {
+					quote! {TemplateDirective::FsSrc(#src.into())}
+				}
+				ParsedTemplateDirective::Slot(slot) => {
+					quote! {TemplateDirective::Slot(#slot.into())}
+				}
 				ParsedTemplateDirective::Runtime(runtime) => {
 					quote! {TemplateDirective::Runtime(#runtime.into())}
 				}
@@ -163,6 +198,12 @@ impl MetaBuilder {
 				}
 				ParsedTemplateDirective::ScopeGlobal => {
 					quote! {ScopeGlobal}
+				}
+				ParsedTemplateDirective::FsSrc(src) => {
+					quote! {FsSrc(#src)}
+				}
+				ParsedTemplateDirective::Slot(slot) => {
+					quote! {Slot(#slot)}
 				}
 				ParsedTemplateDirective::Runtime(runtime) => {
 					quote! {Runtime(#runtime)}
