@@ -38,6 +38,19 @@ fn parse(input: DeriveInput) -> Result<TokenStream> {
 		input.generics.split_for_impl();
 	let vis = &input.vis;
 
+	let as_mut = fields.iter()
+		.filter(|field|field.attributes.contains("flatten"))
+		.map(|field| {
+			let field_name = &field.inner.ident;
+			let field_type = &field.inner.ty;
+			Some(quote! {
+			   impl #impl_generics AsMut<#field_type> for #target_name #type_generics #where_clause {
+				   fn as_mut(&mut self) -> &mut #field_type { &mut self.#field_name }
+			   }
+			})
+		}
+	);
+
 
 	let mut blanket_impl_generics = input.generics.params.clone();
 	blanket_impl_generics.push(syn::parse_quote! { T });
@@ -50,6 +63,12 @@ fn parse(input: DeriveInput) -> Result<TokenStream> {
 
 		impl <#blanket_impl_generics> #trait_buildable_name for T where T: AsMut<#target_name #type_generics> #where_clause {
 		}
+
+		impl #impl_generics AsMut<Self> for #target_name #type_generics #where_clause {
+			fn as_mut(&mut self) -> &mut Self { self }
+		}
+
+		#(#as_mut)*
 
 	})
 }

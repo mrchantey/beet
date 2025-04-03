@@ -17,7 +17,12 @@ fn parse(input: DeriveInput) -> Result<TokenStream> {
 		.map(|field| {
 			let ident = &field.inner.ident;
 			let ident_str = ident.to_token_stream().to_string();
-			if field.is_optional() {
+
+			if field.attributes.contains("flatten") {
+				quote! {
+					attributes.extend(Into::<Vec<RsxAttribute>>::into(self.#ident));
+				}
+			} else if field.is_optional() {
 				quote! {
 					if let Some(#ident) = self.#ident {
 						attributes.push(RsxAttribute::KeyValue{
@@ -48,7 +53,7 @@ fn parse(input: DeriveInput) -> Result<TokenStream> {
 
 		impl #impl_generics Into<Vec<RsxAttribute>> for #target_name #type_generics #where_clause {
 			fn into(self) -> Vec<RsxAttribute> {
-				let mut attributes = vec![];
+				let mut attributes:Vec<RsxAttribute> = Default::default();
 				#(#push_fields)*
 				attributes
 			}
