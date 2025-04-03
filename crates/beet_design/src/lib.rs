@@ -9,6 +9,7 @@ pub mod components;
 /// Structs for use as context in components
 pub mod context;
 pub mod css;
+pub mod html_elements;
 /// Collection of interactive components
 pub mod interactive;
 /// Collection of layout components
@@ -25,6 +26,7 @@ pub mod prelude {
 	pub use crate::components::*;
 	pub use crate::context::*;
 	pub use crate::css::*;
+	pub use crate::html_elements::*;
 	pub use crate::interactive::*;
 	pub use crate::layout::*;
 	// #[cfg(not(feature = "build"))]

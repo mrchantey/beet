@@ -13,7 +13,9 @@ pub struct PropsField<'a> {
 impl<'a> PropsField<'a> {
 	pub fn parse(inner: &'a Field) -> Result<Self> {
 		let attributes = AttributeGroup::parse(&inner.attrs, "field")?
-			.validate_allowed_keys(&["default", "required", "into"])?;
+			.validate_allowed_keys(&[
+				"default", "required", "into", "flatten",
+			])?;
 		Ok(Self { inner, attributes })
 	}
 
@@ -21,6 +23,11 @@ impl<'a> PropsField<'a> {
 		matches!(self.inner.ty, syn::Type::Path(ref p) if p.path.segments.last()
 				.map(|s| s.ident == "Option")
 				.unwrap_or(false))
+	}
+
+	pub fn is_default_or_flatten(&self) -> bool {
+		self.attributes.contains("default")
+			|| self.attributes.contains("flatten")
 	}
 
 	/// Returns true if the field is required.

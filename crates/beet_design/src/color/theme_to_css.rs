@@ -45,10 +45,10 @@ impl ThemeToCss {
 		{dark}
 		:root{{
 		/* a default that can be overridden, ie by a button state */
-		--bt-color-opacity: 1;
-		--bt-color-opacity-hover: 0.7;
-		--bt-color-opacity-active: 0.5;
-		--bt-color-opacity-disabled: 0.5;
+		--bt-opacity: 1;
+		--bt-opacity-hover: 0.7;
+		--bt-opacity-active: 0.5;
+		--bt-opacity-disabled: 0.5;
 		
 		--bt-color-border: var(--bt-color-outline);
 		--bt-color-text: var(--bt-color-on-surface);

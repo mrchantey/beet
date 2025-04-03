@@ -1,0 +1,82 @@
+.bt-c-button {
+	/* see bt-form.css for base definition */
+	opacity: var(--bt-opacity);
+	align-items: center;
+	justify-content: center;
+	cursor: pointer;
+	--bt-prev-transition: opacity var(--bt-transition);
+	transition: opacity var(--bt-transition), transform var(--bt-transition);
+}
+
+a.bt-c-button {
+	text-decoration: none;
+}
+
+.bt-c-button .bt-c-icon {
+	font-size: 1.8em;
+	/* margin: 0 0.5em; */
+}
+
+.bt-c-button:hover {
+	--bt-opacity: var(--bt-opacity-hover);
+}
+
+.bt-c-button:active {
+	--bt-opacity: var(--bt-opacity-active);
+}
+
+.bt-c-button:disabled {
+	cursor: inherit;
+	--bt-opacity: var(--bt-opacity-disabled);
+}
+
+
+.bt-c-button--primary {
+	--bt-color-text: var(--bt-color-on-primary-container);
+	--bt-color-background: var(--bt-color-primary-container);
+}
+
+.bt-c-button--secondary {
+	--bt-color-text: var(--bt-color-on-secondary);
+	--bt-color-background: var(--bt-color-secondary);
+}
+.bt-c-button--tertiary {
+	--bt-color-text: var(--bt-color-on-tertiary);
+	--bt-color-background: var(--bt-color-tertiary);
+}
+
+.bt-c-button--outlined {
+	border: var(--bt-border-width) solid var(--bt-color-text);
+	--bt-color-background: transparent;
+}
+
+.bt-c-button--text {
+	--bt-color-background: transparent;
+}
+
+.bt-c-button--icon {
+	width: 3em;
+	position: relative;
+}
+
+.bt-c-button--icon>* {
+	position: absolute;
+	top: 50%;
+	left: 50%;
+	transform: translate(-50%, -50%);
+	font-size: 2.5em;
+}
+
+.bt-c-button svg {
+	margin-right: 0.2em;
+}
+
+/* undo typography defaults */
+.bt-c-button * {
+	margin-top: inherit;
+	margin-bottom: inherit;
+	color: inherit;
+	font-style: inherit;
+	font-weight: inherit;
+
+}

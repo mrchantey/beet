@@ -52,6 +52,8 @@ impl AttributeGroup {
 		})
 	}
 
+	pub fn contains(&self, name: &str) -> bool { self.get(name).is_some() }
+
 	/// Returns the value if the attribute is present and has a value.
 	#[allow(unused)]
 	pub fn get_value(&self, name: &str) -> Option<&Expr> {

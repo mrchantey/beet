@@ -123,7 +123,7 @@ fn impl_builder(
 	let builder_fields = fields.iter().map(|field| {
 		let name = &field.inner.ident;
 		let ty = get_inner_type(&field.inner.ty);
-		if field.default_attr().is_some() {
+		if field.is_default_or_flatten() {
 			quote! { #name: #ty }
 		} else {
 			quote! { #name: Option<#ty> }
@@ -138,7 +138,7 @@ fn impl_builder(
 			let val = attr.value.as_ref().unwrap_or(&default_fallback);
 			quote! { #name: #val }
 		} else {
-			quote! { #name: None }
+			quote! { #name: Default::default() }
 		}
 	});
 
@@ -159,7 +159,7 @@ fn impl_builder(
 			ty.to_token_stream()
 		};
 
-		let rhs = if field.default_attr().is_some() {
+		let rhs = if field.is_default_or_flatten() {
 			quote! { #value }
 		} else {
 			quote! { Some(#value) }
@@ -175,7 +175,7 @@ fn impl_builder(
 	let unwrap_fields = fields.iter().map(|field| {
 		let name = &field.inner.ident;
 
-		let rhs = if field.default_attr().is_some() {
+		let rhs = if field.is_default_or_flatten() {
 			quote! { self.#name }
 		} else if field.is_optional() {
 			quote! { self.#name }
@@ -185,11 +185,28 @@ fn impl_builder(
 		quote! {#name: #rhs}
 	});
 
+
+
+
 	let node_name = &input.ident;
 	let impl_builder_name = format_ident!("{}Builder", &input.ident);
 	let (impl_generics, type_generics, where_clause) =
 		input.generics.split_for_impl();
 	let vis = &input.vis;
+
+	let as_mut = fields.iter().filter_map(|field| {
+		if field.attributes.contains("flatten") {
+			let field_name = &field.inner.ident;
+			let field_type = &field.inner.ty;
+			Some(quote! {
+			   impl #impl_generics AsMut<#field_type> for #impl_builder_name #type_generics #where_clause {
+				   fn as_mut(&mut self) -> &mut #field_type { &mut self.#field_name }
+			   }
+			})
+		} else {
+			None
+		}
+	});
 
 	Ok(quote! {
 		#[allow(missing_docs)]
@@ -208,6 +225,8 @@ fn impl_builder(
 				}
 			}
 		}
+
+		#(#as_mut)*
 
 		impl #impl_generics PropsBuilder for #impl_builder_name #type_generics #where_clause {
 			type Component = #node_name #type_generics;
