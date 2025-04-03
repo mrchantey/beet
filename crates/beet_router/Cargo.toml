@@ -16,6 +16,7 @@ keywords.workspace = true
 default = ["serde"]
 _test_site = []
 build = ["serde", "parser"]
+markdown = ["parser", "dep:pulldown-cmark"]
 serde = ["dep:serde", "dep:ron", "beet_rsx/serde"]
 server = ["parser", "dep:beet_server"]
 parser = [
@@ -60,7 +61,7 @@ beet_server = { workspace = true, optional = true }
 
 tokio = { workspace = true }
 flume = { workspace = true, optional = true }
-
+pulldown-cmark = { version = "0.13", optional = true }
 
 [dev-dependencies]
 sweet = { workspace = true, features = ["test"] }

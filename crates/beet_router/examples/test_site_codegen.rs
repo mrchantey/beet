@@ -15,11 +15,11 @@ pub fn main() -> Result<()> {
 			GlobFilter::default()
 				.with_include("*.rs")
 				.with_exclude("*mod.rs"),
-		)
-		.bpipe(FileGroupToFuncFiles::default())?
-		.bpipe(HttpFuncFilesToRouteFuncs::default())?
-		.bpipe(RouteFuncsToCodegen::new(
-			CodegenFile::new_workspace_rel(
+			)
+			.bpipe(FileGroupToFuncFiles::default())?
+			.bpipe(HttpFuncFilesToRouteFuncs::default())?
+			.bpipe(RouteFuncsToCodegen::new(
+				CodegenFile::new_workspace_rel(
 				"crates/beet_router/src/test_site/codegen/routes.rs",
 				"beet_router",
 			)
