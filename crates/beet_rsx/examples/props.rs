@@ -27,13 +27,14 @@ fn main() {
 			is_no_into="foobar".into()
 			is_optional=3
 			class="kablamo"
+			id="bar"
 		/>
 	}
 	.bpipe(RsxToHtmlString::default())
 	.unwrap();
 	assert_eq!(
 		str,
-		"<div><p data-beet-rsx-idx=\"4\">is_optional: Some(3)</p><p data-beet-rsx-idx=\"9\">is_required: 38</p><p data-beet-rsx-idx=\"14\">is_default: 7</p><p data-beet-rsx-idx=\"19\">is_generic_default: Foo(PhantomData<u32>)</p><p data-beet-rsx-idx=\"24\">is_into: \"foobar\"</p><p class=\"kablamo\" data-beet-rsx-idx=\"29\">is_flatten: SomeHtmlAttrs { class: \"kablamo\" }</p></div>"
+		"<div><p data-beet-rsx-idx=\"4\">is_optional: Some(3)</p><p data-beet-rsx-idx=\"9\">is_required: 38</p><p data-beet-rsx-idx=\"14\">is_default: 7</p><p data-beet-rsx-idx=\"19\">is_generic_default: Foo(PhantomData<u32>)</p><p data-beet-rsx-idx=\"24\">is_into: \"foobar\"</p><p class=\"kablamo\" id=\"bar\" data-beet-rsx-idx=\"29\">is_flatten: SomeHtmlAttrs { class: \"kablamo\", id: Some(\"bar\") }</p></div>"
 	);
 	sweet::log!("success!");
 }
@@ -46,6 +47,7 @@ struct Foo<T>(PhantomData<T>);
 #[derive(Node)]
 #[node(into_rsx=my_node_other)]
 struct MyNode {
+	/// This is a required field
 	is_required: u32,
 	is_optional: Option<u32>,
 	#[field(default = 7)]
@@ -63,5 +65,8 @@ struct MyNode {
 
 #[derive(Debug, Default, Clone, Buildable, IntoRsxAttributes)]
 struct SomeHtmlAttrs {
+	/// the class that will be set
 	class: String,
+	/// this is what identifies it
+	id: Option<String>,
 }

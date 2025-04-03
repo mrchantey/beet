@@ -5,12 +5,15 @@ use syn::DeriveInput;
 use syn::Expr;
 use syn::Field;
 use syn::Fields;
+use syn::Meta;
 use syn::Result;
 use syn::Type;
 
 #[derive(Debug)]
 pub struct PropsField<'a> {
 	pub inner: &'a Field,
+	/// The inner type of the field, unwrapping Option<T> to T.
+	pub unwrapped: &'a Type,
 	pub attributes: AttributeGroup,
 }
 
@@ -45,7 +48,14 @@ impl<'a> PropsField<'a> {
 			.validate_allowed_keys(&[
 				"default", "required", "into", "no_into", "flatten",
 			])?;
-		Ok(Self { inner, attributes })
+
+
+
+		Ok(Self {
+			unwrapped: Self::unwrap_type(inner),
+			inner,
+			attributes,
+		})
 	}
 
 	pub fn is_optional(&self) -> bool {
@@ -70,8 +80,8 @@ impl<'a> PropsField<'a> {
 		self.attributes.get("default")
 	}
 	/// Returns the inner type of a type, unwrapping Option<T> to T.
-	pub fn unwrap_type(&self) -> &Type {
-		if let Type::Path(p) = &self.inner.ty {
+	pub fn unwrap_type(field: &Field) -> &Type {
+		if let Type::Path(p) = &field.ty {
 			if let Some(segment) = p.path.segments.last() {
 				if segment.ident == "Option" {
 					if let syn::PathArguments::AngleBracketed(args) =
@@ -86,7 +96,7 @@ impl<'a> PropsField<'a> {
 				}
 			}
 		}
-		&self.inner.ty
+		&field.ty
 	}
 
 	pub fn is_into(&self) -> bool {
@@ -94,7 +104,7 @@ impl<'a> PropsField<'a> {
 			return true;
 		} else if self.attributes.contains("no_into") {
 			return false;
-		} else if self.inner.ty == syn::parse_quote! { String } {
+		} else if self.unwrapped == &syn::parse_quote! { String } {
 			return true;
 		} else {
 			return false;
@@ -107,7 +117,7 @@ impl<'a> PropsField<'a> {
 	/// - `(impl Into<SomeVal>, value.into())`
 	pub fn assign_tokens(&self) -> (Type, Expr) {
 		let is_into = self.is_into();
-		let inner_ty = self.unwrap_type();
+		let inner_ty = self.unwrapped;
 		match is_into {
 			true => (
 				syn::parse_quote! { impl Into<#inner_ty> },
@@ -117,5 +127,21 @@ impl<'a> PropsField<'a> {
 				(syn::parse_quote! { #inner_ty }, syn::parse_quote! { value })
 			}
 		}
+	}
+
+	/// Create a new [`Documentation`] from a type's attributes.
+	///
+	/// This will collect all `#[doc = "..."]` attributes, including the ones generated via `///` and `//!`.
+	pub fn docs(&self) -> Vec<&syn::Attribute> {
+		self.inner
+			.attrs
+			.iter()
+			.filter_map(|attr| match &attr.meta {
+				Meta::NameValue(pair) if pair.path.is_ident("doc") => {
+					Some(attr)
+				}
+				_ => None,
+			})
+			.collect()
 	}
 }

@@ -14,9 +14,16 @@ fn parse(input: DeriveInput) -> Result<TokenStream> {
 	let set_val_methods = fields.iter().map(|field| {
 		let name = &field.inner.ident;
 		let (ty, expr) = field.assign_tokens();
+		let docs = field.docs();
+
+		let expr = if field.is_optional() {
+			quote! {Some(#expr)}
+		} else {
+			quote! {#expr}
+		};
 
 		quote! {
-			#[allow(missing_docs)]
+			#(#docs)*
 			fn #name(mut self, value: #ty) -> Self {
 				self.as_mut().#name = #expr;
 				self
@@ -38,7 +45,7 @@ fn parse(input: DeriveInput) -> Result<TokenStream> {
 	Ok(quote! {
 		#[allow(missing_docs)]
 		#vis trait #trait_buildable_name #impl_generics: Sized + AsMut<#target_name #type_generics> #where_clause {
-			#(#set_val_methods),*
+			#(#set_val_methods)*
 		}
 
 		impl <#blanket_impl_generics> #trait_buildable_name for T where T: AsMut<#target_name #type_generics> #where_clause {

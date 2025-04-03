@@ -1,6 +1,6 @@
 use beet_rsx::as_beet::*;
 
-#[derive(Default)]
+#[derive(Default, Buildable, IntoRsxAttributes)]
 pub struct BaseHtmlAttributes {
 	pub class: Option<String>,
 }

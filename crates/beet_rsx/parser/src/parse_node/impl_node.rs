@@ -93,7 +93,7 @@ fn impl_builder(
 ) -> Result<TokenStream> {
 	let builder_fields = fields.iter().map(|field| {
 		let name = &field.inner.ident;
-		let ty = field.unwrap_type();
+		let ty = field.unwrapped;
 		if field.is_default() {
 			quote! { #name: #ty }
 		} else {
@@ -122,9 +122,10 @@ fn impl_builder(
 		} else {
 			quote! { Some(#expr) }
 		};
+		let docs = field.docs();
 
 		quote! {
-			#[allow(missing_docs)]
+			#(#docs)*
 			pub fn #name(mut self, value: #ty) -> Self {
 				self.#name = #expr;
 				self
