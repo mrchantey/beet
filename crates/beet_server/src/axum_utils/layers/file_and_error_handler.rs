@@ -24,8 +24,27 @@ pub fn file_and_error_handler(
 		(StatusCode::NOT_FOUND, "File Not found")
 	}
 
-	let serve_dir =
-		ServeDir::new(file_dir).not_found_service(handle_404.into_service());
+	let serve_dir = ServeDir::new(file_dir)
+		// .append_index_html_on_directories(false)
+		.not_found_service(handle_404.into_service());
 
-	serve_dir
+
+	// ServeDir will append a trailing slash which screws up our
+	// route matching, so we assume any route without a file extension
+	// is a directory and append index.html
+	tower::ServiceBuilder::new()
+		.layer_fn(|mut svc: ServeDir<_>| {
+			tower::service_fn(move |req: Request| {
+				let mut req = req;
+				let uri = req.uri().to_string();
+
+				if !uri.contains('.') && !uri.ends_with('/') {
+					let new_uri = format!("{}/index.html", uri);
+					*req.uri_mut() = new_uri.parse().unwrap();
+				}
+
+				svc.call(req)
+			})
+		})
+		.service(serve_dir)
 }
