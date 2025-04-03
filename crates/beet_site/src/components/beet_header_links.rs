@@ -10,9 +10,11 @@ pub struct BeetHeaderLinks;
 
 fn beet_header_links(_: BeetHeaderLinks) -> RsxNode {
 	rsx! {
-
-	   <a class="bt-u-button-like" href={paths::docs()}>Docs</a>
-	   <a class="bt-u-button-like" href={paths::index()}>Design</a>
-
+		<a class="bt-u-button-like" href=paths::docs()>
+			Docs
+		</a>
+		<a class="bt-u-button-like" href=paths::index()>
+			Design
+		</a>
 	}
 }

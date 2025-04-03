@@ -62,8 +62,30 @@ pub fn derive_deref_mut(input: TokenStream) -> TokenStream {
 }
 
 
+
+/// Adds a builder pattern to a struct enabling construction as an
+/// rsx component
 #[proc_macro_derive(Node, attributes(node, field))]
 pub fn derive_node(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 	let input = parse_macro_input!(input as DeriveInput);
-	impl_derive_node(input).into()
+	impl_node(input).into()
+}
+
+/// Allow a struct to be included as a `#[field(flatten)]` of another struct
+#[proc_macro_derive(Buildable, attributes(field))]
+pub fn derive_buildable(
+	input: proc_macro::TokenStream,
+) -> proc_macro::TokenStream {
+	let input = parse_macro_input!(input as DeriveInput);
+	impl_buildable(input).into()
+}
+/// Implements Into<Vec<RsxAttribute>> for a struct.
+/// Optional fields will checked and only added if they are Some.
+/// All fields must implement Into<String>.
+#[proc_macro_derive(IntoRsxAttributes, attributes(field))]
+pub fn derive_into_rsx_attributes(
+	input: proc_macro::TokenStream,
+) -> proc_macro::TokenStream {
+	let input = parse_macro_input!(input as DeriveInput);
+	impl_into_rsx_attributes(input).into()
 }

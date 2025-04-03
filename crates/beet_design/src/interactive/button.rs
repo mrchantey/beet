@@ -28,13 +28,13 @@ impl ButtonVariant {
 /// A styled button
 #[derive(Node)]
 pub struct Button {
-	#[field(default=ButtonVariant::default())]
+	#[field(default)]
 	pub variant: ButtonVariant,
 }
 
 fn button(Button { variant }: Button) -> RsxNode {
 	let class = format!("bt-c-button bt-c-button--{}", variant.class_suffix());
-	
+
 	rsx! {
 		<button class=class>
 			<slot />

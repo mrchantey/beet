@@ -32,7 +32,7 @@ fn sidebar(Sidebar { nodes }: Sidebar) -> RsxNode {
 			nav[aria-hidden="true"]{
 				display:none;
 			}
-			
+
 		</style>
 	}
 }

@@ -42,7 +42,8 @@ impl ApplyFsSrc {
 			node,
 			VisitRsxOptions::ignore_component_node(),
 			|el| {
-				if let Some(src) = el.src_directive() {					let Some(location) = &location else {
+				if let Some(src) = el.src_directive() {
+					let Some(location) = &location else {
 						result = Err(anyhow::anyhow!(
 							"elements with an fs src attribute must have a RootNode::location. This is set by default in rsx! macros"
 						));
@@ -102,8 +103,10 @@ mod test {
 		expect(rsx! { <script src="/missing" /> }.bpipe(ApplyFsSrc::default()))
 			.to_be_ok();
 		// missing errors
-		expect(rsx! { <script src="./missing" /> }.bpipe(ApplyFsSrc::default()))
-			.to_be_err();
+		expect(
+			rsx! { <script src="./missing" /> }.bpipe(ApplyFsSrc::default()),
+		)
+		.to_be_err();
 		// slot children errors
 		expect(
 			rsx! {

@@ -24,53 +24,45 @@ fn sidebar_item(SidebarItem { node, root }: SidebarItem) -> RsxNode {
 				.map(|node| SidebarItem { node, root: false });
 
 			let item = if let Some(path) = path {
-				rsx! {<a class="large" href={path.to_string_lossy().to_string()}>{display_name}</a>}
+				rsx! {
+					<a class="large" href=path.to_string_lossy().to_string()>
+						{display_name}
+					</a>
+				}
 			} else {
-				rsx! {<span class="large">{display_name}</span>}
+				rsx! { <span class="large">{display_name}</span> }
 			};
 
 			rsx! {
-					// {group}
-					<details
-					class="bm-c-sidebar__sublist"
-					data-always-expand={expanded}
+				// {group}
+				<details class="bm-c-sidebar__sublist" data-always-expand=expanded>
 					// open={
-					// 	// handled in js but this avoids FOUC
-					// 	entry.expanded || Sidebar.flatten(entry.items).some(item => item.isCurrent)}
-				>
-					<summary>
-						{item}
-						// <IconChevronRight class="caret"/>
-					</summary>
-					<ul class={class}>
-					{children}
-					</ul>
-					// <Astro.self entries={entry.items}/>
+					// // handled in js but this avoids FOUC
+					// entry.expanded || Sidebar.flatten(entry.items).some(item => item.isCurrent)}
+					// <IconChevronRight class="caret"/>
+					<summary>{item}</summary>
+					<ul class=class>{children}</ul>
+				// <Astro.self entries={entry.items}/>
 				</details>
 			}
 		}
 
 		SidebarNode::Route { display_name, path } => {
 			rsx! {
-				<a
-				class="bm-c-sidebar__link"
-				href={path.to_string_lossy().to_string()}
-				// aria-current={
-				// 	// handled in js but this avoids FOUC
-				// 	entry.isCurrent && 'page'
-				// }
-				// class:list={[{ large: root }]}
-			>
-			{display_name}
+				<a class="bm-c-sidebar__link" href=path.to_string_lossy().to_string()>
+					// aria-current={
+					// // handled in js but this avoids FOUC
+					// entry.isCurrent && 'page'
+					// }
+					// class:list={[{ large: root }]}
+					{display_name}
 				</a>
-			 }
+			}
 		}
 	};
 
 	rsx! {
-		<li>
-		{inner}
-		</li>
-		<style src="./sidebar_item.css"/>
+		<li>{inner}</li>
+		<style src="./sidebar_item.css" />
 	}
 }

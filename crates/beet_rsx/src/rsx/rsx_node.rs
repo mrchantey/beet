@@ -438,8 +438,11 @@ pub trait IntoRsxAttributes<M> {
 	fn into_rsx_attributes(self) -> Vec<RsxAttribute>;
 }
 
-impl IntoRsxAttributes<Vec<RsxAttribute>> for Vec<RsxAttribute> {
-	fn into_rsx_attributes(self) -> Vec<RsxAttribute> { self }
+pub struct IntoVecIntoRsxAttributeMarker;
+impl<T: Into<Vec<RsxAttribute>>>
+	IntoRsxAttributes<IntoVecIntoRsxAttributeMarker> for T
+{
+	fn into_rsx_attributes(self) -> Vec<RsxAttribute> { self.into() }
 }
 
 impl<F: FnOnce() -> Vec<RsxAttribute>> IntoRsxAttributes<F> for F {
