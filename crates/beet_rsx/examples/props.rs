@@ -69,4 +69,5 @@ struct SomeHtmlAttrs {
 	class: String,
 	/// this is what identifies it
 	id: Option<String>,
+	disabled: Option<bool>,
 }

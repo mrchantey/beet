@@ -14,6 +14,7 @@ pub mod html_elements;
 pub mod interactive;
 /// Collection of layout components
 pub mod layout;
+pub mod macros;
 /// Collection of mockups for all components
 #[cfg(not(target_arch = "wasm32"))]
 #[path = "codegen/mockups.rs"]
@@ -26,9 +27,11 @@ pub mod prelude {
 	pub use crate::components::*;
 	pub use crate::context::*;
 	pub use crate::css::*;
+	pub use crate::csx;
 	pub use crate::html_elements::*;
 	pub use crate::interactive::*;
 	pub use crate::layout::*;
+	pub use crate::macros::*;
 	// #[cfg(not(feature = "build"))]
 	// pub use crate::mockups::*;
 

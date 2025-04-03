@@ -18,26 +18,38 @@ fn parse(input: DeriveInput) -> Result<TokenStream> {
 			let ident = &field.inner.ident;
 			let ident_str = ident.to_token_stream().to_string();
 
+
+			let attr =
+				match field.unwrapped.to_token_stream().to_string().as_ref() {
+					"bool" => quote! { RsxAttribute::Key{
+						key: #ident_str.into()
+					} },
+					_ => {
+						quote! {RsxAttribute::KeyValue{
+							key: #ident_str.into(),
+							value: #ident.into()
+						}}
+					}
+				};
+
+
 			if field.attributes.contains("flatten") {
 				quote! {
 					attributes.extend(Into::<Vec<RsxAttribute>>::into(self.#ident));
 				}
 			} else if field.is_optional() {
 				quote! {
+					#[allow(unused_variables)]
 					if let Some(#ident) = self.#ident {
-						attributes.push(RsxAttribute::KeyValue{
-							key: #ident_str.into(),
-							value: #ident.into()
-						});
+						attributes.push(#attr);
 					}
 				}
 			} else {
-				quote! {
-					attributes.push(RsxAttribute::KeyValue{
-						key: #ident_str.into(),
-						value: self.#ident.into()
-					});
-				}
+				quote! {{
+					#[allow(unused_variables)]
+					let #ident = self.#ident;
+					attributes.push(#attr);
+				}}
 			}
 		})
 		.collect::<Vec<_>>();

@@ -11,9 +11,10 @@ pub fn impl_buildable(input: DeriveInput) -> TokenStream {
 
 fn parse(input: DeriveInput) -> Result<TokenStream> {
 	let fields = PropsField::parse_all(&input)?;
-	let set_val_methods = fields.iter().map(|field| {
-		let name = &field.inner.ident;
-		let (ty, expr) = field.assign_tokens();
+	let field_methods = fields.iter().map(|field| {
+		let name = &field.ident;
+		let actual_ty = &field.inner.ty;
+		let (builder_ty, expr) = field.assign_tokens();
 		let docs = field.docs();
 
 		let expr = if field.is_optional() {
@@ -22,9 +23,21 @@ fn parse(input: DeriveInput) -> Result<TokenStream> {
 			quote! {#expr}
 		};
 
+		let set_name = format_ident!("set_{}", name);
+		let get_name = format_ident!("get_{}", name);
+
 		quote! {
 			#(#docs)*
-			fn #name(mut self, value: #ty) -> Self {
+			fn #name(mut self, value: #builder_ty) -> Self {
+				self.as_mut().#name = #expr;
+				self
+			}
+			#(#docs)*
+			fn #get_name(&mut self) -> &mut #actual_ty {
+				&mut self.as_mut().#name
+			}
+			#(#docs)*
+			fn #set_name(&mut self, value: #builder_ty) -> &mut Self {
 				self.as_mut().#name = #expr;
 				self
 			}
@@ -58,7 +71,7 @@ fn parse(input: DeriveInput) -> Result<TokenStream> {
 	Ok(quote! {
 		#[allow(missing_docs)]
 		#vis trait #trait_buildable_name #impl_generics: Sized + AsMut<#target_name #type_generics> #where_clause {
-			#(#set_val_methods)*
+			#(#field_methods)*
 		}
 
 		impl <#blanket_impl_generics> #trait_buildable_name for T where T: AsMut<#target_name #type_generics> #where_clause {

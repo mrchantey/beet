@@ -9,6 +9,7 @@ pub struct BaseHtmlAttributes {
 pub struct ButtonHtmlAttributes {
 	#[field(flatten)]
 	pub base_attrs: BaseHtmlAttributes,
+	pub disabled: Option<bool>,
 }
 #[derive(Default, Buildable, IntoRsxAttributes)]
 pub struct AnchorHtmlAttributes {
@@ -19,6 +20,18 @@ pub struct AnchorHtmlAttributes {
 }
 
 
+pub trait BaseHtmlAttributesExt: BaseHtmlAttributesBuildable {
+	fn push_class(&mut self, class: impl AsRef<str>) {
+		if let Some(existing) = self.get_class() {
+			existing.push(' ');
+			existing.push_str(class.as_ref());
+		} else {
+			self.class(class.as_ref());
+		}
+	}
+}
+
+impl<T: BaseHtmlAttributesBuildable> BaseHtmlAttributesExt for T {}
 
 
 #[cfg(test)]

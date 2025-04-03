@@ -5,6 +5,7 @@ use syn::DeriveInput;
 use syn::Expr;
 use syn::Field;
 use syn::Fields;
+use syn::Ident;
 use syn::Meta;
 use syn::Result;
 use syn::Type;
@@ -14,6 +15,8 @@ pub struct PropsField<'a> {
 	pub inner: &'a Field,
 	/// The inner type of the field, unwrapping Option<T> to T.
 	pub unwrapped: &'a Type,
+	/// Only named fields are supported so we unwrap it
+	pub ident: &'a Ident,
 	pub attributes: AttributeGroup,
 }
 
@@ -49,10 +52,14 @@ impl<'a> PropsField<'a> {
 				"default", "required", "into", "no_into", "flatten",
 			])?;
 
-
+		let ident = inner.ident.as_ref().ok_or_else(|| {
+			syn::Error::new_spanned(inner, "Only named fields are supported")
+		})?;
 
 		Ok(Self {
 			unwrapped: Self::unwrap_type(inner),
+			ident,
+			// ident: &inner.ident,
 			inner,
 			attributes,
 		})
