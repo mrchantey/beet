@@ -1,8 +1,5 @@
-use std::path::PathBuf;
-
 use crate::prelude::*;
 use anyhow::Result;
-use beet_rsx::rsx::RsxPipeline;
 use http::Method;
 use proc_macro2::TokenStream;
 use pulldown_cmark::CowStr;
@@ -11,31 +8,14 @@ use pulldown_cmark::Options;
 use pulldown_cmark::Parser;
 use pulldown_cmark::Tag;
 use pulldown_cmark::TagEnd;
+use std::path::PathBuf;
 use sweet::prelude::*;
 
-pub struct MarkdownToFuncTokens<'a> {
-	/// The [`src`](FileGroup::src) of the [`FileGroup`] this file belongs to.
-	group_src: &'a CanonicalPathBuf,
-}
-
-
-impl<'a> MarkdownToFuncTokens<'a> {
-	pub fn new(group_src: &'a CanonicalPathBuf) -> Self { Self { group_src } }
-}
-
-impl RsxPipeline<CanonicalPathBuf, Result<FuncTokens>>
-	for MarkdownToFuncTokens<'_>
-{
-	fn apply(self, path: CanonicalPathBuf) -> Result<FuncTokens> {
-		let file_str = ReadFile::to_string(&path)?;
-		let local_path = PathExt::create_relative(self.group_src, &path)?;
-		Self::from_markdown(&file_str, local_path, path)
-	}
-}
+pub struct MarkdownToFuncTokens;
 
 // impl MarkdownToFuncTokens
 
-impl MarkdownToFuncTokens<'_> {
+impl MarkdownToFuncTokens {
 	fn options() -> Options {
 		Options::ENABLE_TABLES
 				| Options::ENABLE_FOOTNOTES
@@ -118,10 +98,10 @@ impl MarkdownToFuncTokens<'_> {
 	// 	Ok(Some(format!("({})", lines)))
 	// }
 
-	pub fn from_markdown(
+	pub fn parse(
 		markdown: &str,
-		local_path: PathBuf,
 		canonical_path: CanonicalPathBuf,
+		local_path: PathBuf,
 	) -> Result<FuncTokens> {
 		let frontmatter = match Self::markdown_to_frontmatter(markdown) {
 			Some(frontmatter) => {
@@ -141,8 +121,9 @@ impl MarkdownToFuncTokens<'_> {
 		});
 
 		Ok(FuncTokens {
+			mod_ident: None,
 			frontmatter,
-			block,
+			func: block,
 			route_info: RouteInfo {
 				path: RoutePath::parse_local_path(&local_path)?,
 				method: Method::GET,

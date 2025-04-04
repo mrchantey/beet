@@ -15,20 +15,16 @@ pub fn main() -> Result<()> {
 			GlobFilter::default()
 				.with_include("*.rs")
 				.with_exclude("*mod.rs"),
-			)
-			.bpipe(FileGroupToFuncFiles::default())?
-			.bpipe(HttpFuncFilesToRouteFuncs::default())?
-			.bpipe(RouteFuncsToCodegen::new(
-				CodegenFile::new_workspace_rel(
+		)
+		.bpipe(FileGroupToFuncTokens::default())?
+		.bpipe(FuncTokensToCodegen::new(
+			CodegenFile::new_workspace_rel(
 				"crates/beet_router/src/test_site/codegen/routes.rs",
 				"beet_router",
 			)
 			.with_use_beet_tokens("use beet_router::as_beet::*;"),
 		))?
-		.bmap(|(_, routes, codegen)| -> Result<_> {
-			codegen.build_and_write()?;
-			Ok(routes)
-		})?;
+		.bmap(|(_, codegen)| -> Result<_> { codegen.build_and_write() })?;
 
 	let file =
 		ReadFile::to_string(out_file.into_canonical_unchecked()).unwrap();

@@ -53,6 +53,12 @@ pub trait RsxPipelineTarget: Sized {
 	}
 
 	fn bref(&self) -> &Self { self }
+	fn bok<E>(self) -> Result<Self, E>
+	where
+		Self: Sized,
+	{
+		Ok(self)
+	}
 }
 impl<T: Sized> RsxPipelineTarget for T {}
 

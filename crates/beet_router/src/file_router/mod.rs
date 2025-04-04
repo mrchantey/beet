@@ -60,8 +60,11 @@ impl RoutePath {
 		Self(self.0.join(&new_path))
 	}
 	pub fn inner(&self) -> &Path { &self.0 }
-	pub fn parse_local_path(local_path: &Path) -> Result<Self> {
+	/// given a local path, return a new [`RoutePath`] with
+	/// any extension removed and the path normalized and 'index' removed
+	pub fn parse_local_path(local_path: impl AsRef<Path>) -> Result<Self> {
 		let mut raw_str = local_path
+			.as_ref()
 			.to_string_lossy()
 			.replace(".rs", "")
 			.replace("\\", "/");

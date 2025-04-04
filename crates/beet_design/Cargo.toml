@@ -12,17 +12,22 @@ keywords.workspace = true
 categories.workspace = true
 publish = true
 
+# [[bin]]
+# name = "run-build"
+# path = "build.rs"
+# required-features = ["build"]
+
 [features]
 # default = ["build"]
-build = []
+build = ["beet_router/build"]
 
 [dependencies]
+anyhow.workspace = true
 sweet.workspace = true
 beet_rsx.workspace = true
 beet_router.workspace = true
 chrono.workspace = true
 heck.workspace = true
-
 material-colors = "0.4.2"
 
 [dev-dependencies]

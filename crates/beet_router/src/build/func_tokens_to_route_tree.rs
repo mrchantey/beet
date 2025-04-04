@@ -2,13 +2,14 @@ use crate::prelude::*;
 use anyhow::Result;
 use beet_rsx::rsx::RsxPipeline;
 use rapidhash::RapidHashMap;
+use rapidhash::RapidHashSet;
 use syn::Expr;
 use syn::Item;
 use syn::ItemFn;
 use syn::ItemMod;
 
 
-/// Create a tree of routes from a list of [`RouteFuncTokens`]`,
+/// Create a tree of routes from a list of [`FuncTokens`]`,
 /// that can then be converted to an [`ItemMod`] to be used in the router.
 ///
 /// ## Example
@@ -41,8 +42,8 @@ pub struct RouteFuncsToTree {
 	pub codgen_file: CodegenFile,
 }
 
-impl RsxPipeline<Vec<RouteFuncTokens>, Result<()>> for RouteFuncsToTree {
-	fn apply(self, value: Vec<RouteFuncTokens>) -> Result<()> {
+impl RsxPipeline<Vec<FuncTokens>, Result<()>> for RouteFuncsToTree {
+	fn apply(self, value: Vec<FuncTokens>) -> Result<()> {
 		let tree = RouteTreeBuilder::from_routes(value.iter());
 		let mut codegen_file = self.codgen_file;
 		codegen_file.add_item(tree.into_paths_mod());
@@ -54,10 +55,10 @@ impl RsxPipeline<Vec<RouteFuncTokens>, Result<()>> for RouteFuncsToTree {
 
 
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone)]
 struct RouteTreeBuilder<'a> {
 	name: String,
-	routes: Vec<&'a RouteFuncTokens>,
+	routes: Vec<&'a FuncTokens>,
 	children: RapidHashMap<String, RouteTreeBuilder<'a>>,
 }
 
@@ -70,17 +71,15 @@ impl<'a> RouteTreeBuilder<'a> {
 		}
 	}
 
-	pub fn from_routes(
-		routes: impl Iterator<Item = &'a RouteFuncTokens>,
-	) -> Self {
+	pub fn from_routes(routes: impl Iterator<Item = &'a FuncTokens>) -> Self {
 		let mut tree = Self::new("root");
 		for route in routes {
-			let parts = route.route_path.to_string_lossy().to_string();
+			let parts = route.route_info.path.to_string_lossy().to_string();
 			let parts = parts
 				.split('/')
 				.filter(|p| !p.is_empty())
 				.collect::<Vec<_>>();
-			let num_to_remove = if route.is_index { 0 } else { 1 };
+			let num_to_remove = if route.is_index() { 0 } else { 1 };
 
 			let mut current = &mut tree;
 			// For each part of the path except the last one, create nodes
@@ -107,11 +106,11 @@ impl<'a> RouteTreeBuilder<'a> {
 				.iter()
 				.map(|route| {
 					let ident = syn::Ident::new(
-						&route.name,
+						&route.name(),
 						proc_macro2::Span::call_site(),
 					);
 					let route_path =
-						route.route_path.to_string_lossy().to_string();
+						route.route_info.path.to_string_lossy().to_string();
 					let item: Item = syn::parse_quote!(
 						/// Get the local route path
 						pub fn #ident()->&'static str{
@@ -150,11 +149,19 @@ impl<'a> RouteTreeBuilder<'a> {
 			.map(|child| child.into_static_route_tree())
 			.collect::<Vec<_>>();
 
-		let paths = self.routes.iter().map(|file| {
-			let path = file.route_path.to_string_lossy().to_string();
-			let path: Expr = syn::parse_quote!(RoutePath::new(#path));
-			path
-		});
+		let paths = self
+			.routes
+			.iter()
+			.map(|func| {
+				let path = func.route_info.path.to_string_lossy().to_string();
+				let path: Expr = syn::parse_quote!(RoutePath::new(#path));
+				path
+			})
+			.collect::<Vec<_>>()
+			.into_iter()
+			.collect::<RapidHashSet<_>>()
+			.into_iter();
+
 		let name = &self.name;
 
 		syn::parse_quote!(StaticRouteTree {
@@ -169,36 +176,34 @@ impl<'a> RouteTreeBuilder<'a> {
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
+	use http::Method;
 	use quote::ToTokens;
-	use rapidhash::RapidHashMap;
+	use quote::quote;
 	use sweet::prelude::*;
 	use syn::ItemFn;
 	use syn::ItemMod;
 
 	use super::RouteTreeBuilder;
 
+	fn route(local_path: &str) -> FuncTokens {
+		FuncTokens {
+			mod_ident: None,
+			frontmatter: syn::parse_quote!({}),
+			func: syn::parse_quote!({}),
+			canonical_path: CanonicalPathBuf::new_unchecked(local_path),
+			route_info: RouteInfo {
+				path: RoutePath::parse_local_path(local_path).unwrap(),
+				method: Method::GET,
+			},
+			local_path: local_path.into(),
+		}
+	}
 
-	fn routes() -> Vec<RouteFuncTokens> {
+	fn routes() -> Vec<FuncTokens> {
 		vec![
-			RouteFuncTokens {
-				name: "index".into(),
-				is_index: true,
-				route_path: "/".into(),
-				block: syn::parse_quote!({}),
-			},
-			RouteFuncTokens {
-				name: "index".into(),
-				is_index: true,
-				route_path: "/foo/bar".into(),
-				block: syn::parse_quote!({}),
-			},
-			// respects route path over local path
-			RouteFuncTokens {
-				name: "bazz".into(),
-				is_index: false,
-				route_path: "/foo/bar/bazz".into(),
-				block: syn::parse_quote!({}),
-			},
+			route("index.rs"),
+			route("foo/bar/index.rs"),
+			route("foo/bar/bazz.rs"),
 		]
 	}
 
@@ -208,31 +213,38 @@ mod test {
 		let tree = RouteTreeBuilder::from_routes(files.iter());
 
 		// #[rustfmt::skip]
-		expect(tree).to_be(RouteTreeBuilder {
-			name: "root".to_string(),
-			children: RapidHashMap::from_iter(vec![(
-				"foo".to_string(),
-				RouteTreeBuilder {
-					name: "foo".to_string(),
-					children: RapidHashMap::from_iter(vec![(
-						"bar".to_string(),
-						RouteTreeBuilder {
-							name: "bar".to_string(),
-							children: RapidHashMap::from_iter(vec![]),
-							routes: vec![&files[1], &files[2]],
-						},
-					)]),
-					routes: vec![],
-				},
-			)]),
-			routes: vec![&files[0]],
-		});
+		expect(tree.into_static_route_tree().to_token_stream().to_string())
+			.to_be(
+				quote! {
+					StaticRouteTree {
+						name: "root".into(),
+						paths: vec![RoutePath::new("/")],
+						children: vec![
+							StaticRouteTree {
+								name: "foo".into(),
+								paths: vec![],
+								children: vec![
+									StaticRouteTree {
+										name: "bar".into(),
+										paths: vec![
+											RoutePath::new("/foo/bar/bazz"),
+											RoutePath::new("/foo/bar")
+										],
+										children: vec![],
+									}
+								],
+							}
+						],
+					}
+				}
+				.to_string(),
+			);
 	}
 
 	#[test]
 	fn creates_mod() {
-		let files = routes();
-		let tree = RouteTreeBuilder::from_routes(files.iter());
+		let routes = routes();
+		let tree = RouteTreeBuilder::from_routes(routes.iter());
 		let mod_item = tree.into_paths_mod();
 
 		let expected: ItemMod = syn::parse_quote! {
@@ -283,8 +295,8 @@ mod test {
 								StaticRouteTree {
 									name: "bar".into(),
 									paths: vec![
-										RoutePath::new("/foo/bar"),
-										RoutePath::new("/foo/bar/bazz")
+										RoutePath::new("/foo/bar/bazz"),
+										RoutePath::new("/foo/bar")
 									],
 									children: vec![],
 								}

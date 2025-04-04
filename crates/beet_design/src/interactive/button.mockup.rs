@@ -1,7 +1,7 @@
 use crate::prelude::*;
 
 
-pub fn primary() -> RsxNode {
+pub fn get() -> RsxNode {
 	rsx! {
 			<h2>Variants</h2>
 			<div>

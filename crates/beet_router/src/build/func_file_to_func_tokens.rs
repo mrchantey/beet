@@ -1,47 +1,47 @@
 use crate::prelude::*;
 use anyhow::Result;
-use beet_rsx::rsx::RsxPipeline;
-use sweet::prelude::CanonicalPathBuf;
-use sweet::prelude::ReadFile;
+use beet_rsx::rsx::RsxPipelineTarget;
+use http::Method;
+use quote::quote;
+use std::path::PathBuf;
+use std::str::FromStr;
 use sweet::prelude::*;
 use syn::Ident;
 use syn::Visibility;
 
 /// For a given file group, collect all public functions of rust files.
-#[derive(Debug, Default, Clone)]
-pub struct FileGroupToFuncFiles;
+#[derive(Debug, Clone)]
+pub struct FuncFileToFuncTokens;
 
+const HTTP_METHODS: [&str; 9] = [
+	"get", "post", "put", "delete", "head", "options", "connect", "trace",
+	"patch",
+];
 
-impl RsxPipeline<FileGroup, Result<Vec<FuncFile>>> for FileGroupToFuncFiles {
-	fn apply(self, group: FileGroup) -> Result<Vec<FuncFile>> {
-		group
-			.collect_files()?
-			.into_iter()
-			.enumerate()
-			.filter(|(_, file)| {
-				file.extension().map(|ext| ext == "rs").unwrap_or(false)
-			})
-			.map(|(i, p)| self.build_func_file(i, &group.src, p))
-			.collect::<Result<Vec<_>>>()
-	}
-}
-
-impl FileGroupToFuncFiles {
-	fn build_func_file(
-		&self,
+impl FuncFileToFuncTokens {
+	pub fn parse(
 		index: usize,
-		group_src: &CanonicalPathBuf,
+		file_str: &str,
 		canonical_path: CanonicalPathBuf,
-	) -> Result<FuncFile> {
-		let file_str = ReadFile::to_string(&canonical_path)?;
-		let funcs = syn::parse_file(&file_str)?
+		local_path: PathBuf,
+	) -> Result<Vec<FuncTokens>> {
+
+		let mod_ident = Ident::new(
+			&format!("file{}", index),
+			proc_macro2::Span::call_site(),
+		);
+
+		let route_path = RoutePath::parse_local_path(&local_path)?;
+
+		let func_idents = syn::parse_file(&file_str)?
 			.items
 			.into_iter()
 			.filter_map(|item| {
 				if let syn::Item::Fn(f) = item {
 					match &f.vis {
 						Visibility::Public(_) => {
-							return Some(f.sig);
+							let sig_str = f.sig.ident.to_string();
+							return Some((sig_str, f.sig.ident));
 						}
 						_ => {}
 					}
@@ -50,18 +50,40 @@ impl FileGroupToFuncFiles {
 			})
 			.collect::<Vec<_>>();
 
-		let local_path = PathExt::create_relative(&group_src, &canonical_path)?;
-		let ident = Ident::new(
-			&format!("file{}", index),
-			proc_macro2::Span::call_site(),
-		);
 
-		Ok(FuncFile {
-			ident,
-			canonical_path,
-			local_path,
-			funcs,
-		})
+		func_idents
+			.iter()
+			.filter_map(|(ident_str, ident)| {
+				if HTTP_METHODS.iter().all(|m| m != &ident_str) {
+					return None;
+				}
+				let frontmatter_ident = format!("{ident_str}_frontmatter");
+				let frontmatter = match func_idents.iter().find(|(s, _)| {
+					s == "frontmatter" || s == &frontmatter_ident
+				}) {
+					Some((_, frontmatter_ident)) => {
+						syn::parse_quote!({
+							#mod_ident::#frontmatter_ident()
+						})
+					}
+					None => syn::parse_quote!({ Default::default() }),
+				};
+
+				Some(FuncTokens {
+					mod_ident: Some(mod_ident.clone()),
+					canonical_path: canonical_path.clone(),
+					local_path: local_path.clone(),
+					route_info: RouteInfo {
+						path: route_path.clone(),
+						// we just checked its a valid method
+						method: Method::from_str(&ident_str).unwrap(),
+					},
+					frontmatter,
+					func: quote! {#mod_ident::#ident},
+				})
+			})
+			.collect::<Vec<_>>()
+			.bok()
 	}
 }
 
@@ -75,14 +97,13 @@ mod test {
 	#[test]
 	fn works() {
 		let funcs = FileGroup::test_site_routes()
-			.bpipe(FileGroupToFuncFiles::default())
+			.bpipe(FileGroupToFuncTokens::default())
 			.unwrap();
 		expect(funcs.len()).to_be(3);
 		let file = funcs
 			.iter()
 			.find(|f| f.local_path.ends_with("docs/index.rs"))
 			.unwrap();
-		expect(file.funcs.len()).to_be(1);
 		expect(&file.local_path.to_string_lossy()).to_be("docs/index.rs");
 		expect(file.canonical_path.to_string_lossy().ends_with(
 			"crates/beet_router/src/test_site/routes/docs/index.rs",

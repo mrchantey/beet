@@ -51,6 +51,9 @@ run-ci example *args:
 # Run and watch a crate example
 run-p crate example *args:
 	just watch cargo run -p {{crate}} --example {{example}} {{args}}
+# Run and watch a crate build step
+run-b crate *args:
+	just watch cargo run -p {{crate}} --bin run-build --features=build {{args}}
 
 
 doc crate *args:
