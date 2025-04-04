@@ -52,6 +52,18 @@ fn main() -> Result<()> {
 					Ok(funcs)
 				})?;
 
+		let docs = FileGroup::new_workspace_rel("crates/beet_site/src/docs")?
+			.bpipe(FileGroupToFuncTokens::default())?
+			.bpipe(MapFuncTokensRoute::default().base_route("/docs"))
+			.bpipe(FuncTokensToCodegen::new(CodegenFile::new_workspace_rel(
+				"crates/beet_site/src/codegen/docs.rs",
+				&cx.pkg_name,
+			)))?
+			.bmap(|(funcs, codegen)| -> Result<_> {
+				codegen.build_and_write()?;
+				Ok(funcs)
+			})?;
+
 		// ⚠️ this is a downstream copy of crates/beet_design/build.rs
 		let mockups = FileGroup::new_workspace_rel("crates/beet_design/src")?
 			.with_filter(GlobFilter::default().with_include("*.mockup.rs"))
@@ -59,6 +71,7 @@ fn main() -> Result<()> {
 			.bpipe(MapFuncTokensRoute::new("/design", [(".mockup", "")]));
 
 		funcs.extend(mockups);
+		funcs.extend(docs);
 
 		funcs.bpipe(RouteFuncsToTree {
 			codgen_file: CodegenFile::new_workspace_rel(

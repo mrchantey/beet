@@ -26,10 +26,7 @@ impl MapFuncTokensRoute {
 				.collect(),
 		}
 	}
-	pub fn base_route<S: ToString>(
-		mut self,
-		base_route: impl Into<PathBuf>,
-	) -> Self {
+	pub fn base_route(mut self, base_route: impl Into<PathBuf>) -> Self {
 		self.base_route = Some(RoutePath::new(base_route));
 		self
 	}

@@ -19,12 +19,11 @@ impl RsxPipeline<FileGroup, Result<Vec<FuncTokens>>> for FileGroupToFuncTokens {
 			.into_iter()
 			.enumerate()
 			.map(|(index, file)| self.map_file(index, &group.src, file))
-			.collect::<Result<Vec<_>>>()
+			.collect::<Result<Vec<_>>>()?
 			.into_iter()
 			.flatten()
-			.flatten()
 			.collect::<Vec<_>>();
-		
+
 		Ok(items)
 	}
 }
@@ -61,6 +60,7 @@ impl FileGroupToFuncTokens {
 mod test {
 	use crate::prelude::*;
 	use beet_rsx::prelude::*;
+	use quote::ToTokens;
 	use sweet::prelude::*;
 
 	#[test]
@@ -81,5 +81,22 @@ mod test {
 			),
 		)
 		.to_be_true();
+	}
+	#[test]
+	fn beet_site() {
+		let docs = FileGroup::new_workspace_rel("crates/beet_site/src/docs")
+			.unwrap()
+			.bpipe(FileGroupToFuncTokens::default())
+			.unwrap()
+			.bpipe(MapFuncTokensRoute::default().base_route("/docs"))
+			.bpipe(FuncTokensToCodegen::new(CodegenFile::new_workspace_rel(
+				"crates/beet_site/src/codegen/docs.rs",
+				"beet_site",
+			)))
+			.unwrap();
+		println!(
+			"{}",
+			docs.1.build_output().unwrap().to_token_stream().to_string()
+		);
 	}
 }
