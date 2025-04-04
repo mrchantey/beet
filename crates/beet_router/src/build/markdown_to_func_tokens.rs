@@ -1,0 +1,220 @@
+use std::path::PathBuf;
+
+use crate::prelude::*;
+use anyhow::Result;
+use beet_rsx::rsx::RsxPipeline;
+use proc_macro2::TokenStream;
+use pulldown_cmark::CowStr;
+use pulldown_cmark::Event;
+use pulldown_cmark::Options;
+use pulldown_cmark::Parser;
+use pulldown_cmark::Tag;
+use pulldown_cmark::TagEnd;
+use sweet::prelude::*;
+
+pub struct MarkdownToFuncTokens<'a> {
+	/// The [`src`](FileGroup::src) of the [`FileGroup`] this file belongs to.
+	group_src: &'a CanonicalPathBuf,
+}
+
+
+impl<'a> MarkdownToFuncTokens<'a> {
+	pub fn new(group_src: &'a CanonicalPathBuf) -> Self { Self { group_src } }
+}
+
+impl RsxPipeline<CanonicalPathBuf, Result<FuncTokens>>
+	for MarkdownToFuncTokens<'_>
+{
+	fn apply(self, path: CanonicalPathBuf) -> Result<FuncTokens> {
+		let file_str = ReadFile::to_string(&path)?;
+		let local_path = PathExt::create_relative(self.group_src, &path)?;
+		Self::from_markdown(&file_str, local_path, path)
+	}
+}
+
+// impl MarkdownToFuncTokens
+
+impl MarkdownToFuncTokens<'_> {
+	fn options() -> Options {
+		Options::ENABLE_TABLES
+				| Options::ENABLE_FOOTNOTES
+				| Options::ENABLE_STRIKETHROUGH
+				| Options::ENABLE_TASKLISTS
+				| Options::ENABLE_SMART_PUNCTUATION
+				| Options::ENABLE_HEADING_ATTRIBUTES
+				| Options::ENABLE_YAML_STYLE_METADATA_BLOCKS
+				// | Options::ENABLE_PLUSES_DELIMITED_METADATA_BLOCKS
+				// | Options::ENABLE_OLD_FOOTNOTES
+				| Options::ENABLE_MATH
+				| Options::ENABLE_GFM
+				| Options::ENABLE_DEFINITION_LIST
+				| Options::ENABLE_SUPERSCRIPT
+				| Options::ENABLE_SUBSCRIPT
+				| Options::ENABLE_WIKILINKS
+	}
+
+	fn markdown_to_html(markdown: &str) -> String {
+		let parser = Parser::new_ext(&markdown, Self::options());
+
+		let approx_out_len = markdown.len() * 3 / 2;
+		let mut html_output = String::with_capacity(approx_out_len);
+		pulldown_cmark::html::push_html(&mut html_output, parser);
+		html_output
+	}
+
+
+	/// returns the content of the first frontmatter block discovered,
+	/// wrapped in parentheses as a requirement of the `ron` parser
+	fn markdown_to_frontmatter<'a>(markdown: &'a str) -> Option<CowStr<'a>> {
+		let parser = Parser::new_ext(&markdown, Self::options());
+		let mut frontmatter = None;
+		let mut in_frontmatter = false;
+		for ev in parser {
+			match ev {
+				Event::Start(Tag::MetadataBlock(_)) => {
+					in_frontmatter = true;
+				}
+				Event::Text(txt) => {
+					if in_frontmatter {
+						frontmatter = Some(txt);
+						break;
+					}
+				}
+				Event::End(TagEnd::MetadataBlock(_)) => {
+					in_frontmatter = false;
+				}
+				_ => {}
+			}
+		}
+		frontmatter
+	}
+
+	// fn markdown_to_frontmatter_ron(markdown: &str) -> Result<Option<String>> {
+	// 	let Some(frontmatter) = Self::markdown_to_frontmatter(markdown) else {
+	// 		return Ok(None);
+	// 	};
+
+	// 	let lines = frontmatter
+	// 		.lines()
+	// 		.map(|line| -> Result<String> {
+	// 			let mut split = line.splitn(2, ':');
+	// 			let key = split
+	// 				.next()
+	// 				.ok_or_else(|| {
+	// 					anyhow::anyhow!("frontmatter line has no key: {line}")
+	// 				})?
+	// 				.trim();
+	// 			let value = split
+	// 				.next()
+	// 				.ok_or_else(|| {
+	// 					anyhow::anyhow!("frontmatter line has no value: {line}")
+	// 				})?
+	// 				.trim();
+	// 			Ok(format!("{}: {}", key, value))
+	// 		})
+	// 		.collect::<Result<Vec<_>, _>>()?
+	// 		.join(",\n");
+	// 	Ok(Some(format!("({})", lines)))
+	// }
+
+	pub fn from_markdown(
+		markdown: &str,
+		local_path: PathBuf,
+		canonical_path: CanonicalPathBuf,
+	) -> Result<FuncTokens> {
+		let frontmatter = match Self::markdown_to_frontmatter(markdown) {
+			Some(frontmatter) => {
+				let frontmatter = frontmatter.to_string();
+				syn::parse_quote!({
+					beet::exports::toml::from_str(#frontmatter)
+				})
+			}
+			None => {
+				syn::parse_quote!({ Default::default() })
+			}
+		};
+		let html_str = Self::markdown_to_html(markdown);
+		let html = syn::parse_str::<TokenStream>(&html_str)?;
+		let block = syn::parse_quote!({
+			rsx! {#html}
+		});
+
+		Ok(FuncTokens {
+			frontmatter,
+			block,
+			local_path,
+			canonical_path,
+		})
+	}
+}
+
+
+#[cfg(test)]
+mod test {
+	use crate::prelude::*;
+	use serde::Deserialize;
+	use serde::Serialize;
+	use sweet::prelude::*;
+
+
+	const MARKDOWN: &str = r#"
+---
+val_bool		=	true
+val_int			= 83
+val_float		= 3.14
+val_string	=	"bar=bazz"
+[val_enum]
+Bar 				= 42
+[val_nested]
+val_string	= "foo"
+---
+# hello world
+"#;
+
+
+	#[derive(Debug, PartialEq, Serialize, Deserialize)]
+	enum MyEnum {
+		Foo,
+		Bar(u32),
+	}
+	#[derive(Debug, PartialEq, Serialize, Deserialize)]
+	struct Frontmatter {
+		val_bool: bool,
+		val_int: u32,
+		val_float: f32,
+		val_string: String,
+		val_enum: MyEnum,
+		val_nested: Nested,
+	}
+
+	#[derive(Debug, PartialEq, Serialize, Deserialize)]
+	struct Nested {
+		val_string: String,
+	}
+
+
+
+	#[test]
+	fn html() {
+		expect(MarkdownToFuncTokens::markdown_to_html(MARKDOWN))
+			.to_be("<h1>hello world</h1>\n");
+	}
+
+	#[test]
+	fn frontmatter() {
+		let frontmatter_str =
+			MarkdownToFuncTokens::markdown_to_frontmatter(MARKDOWN).unwrap();
+		let frontmatter: Frontmatter =
+			toml::from_str(&frontmatter_str).unwrap();
+		expect(frontmatter).to_be(Frontmatter {
+			val_bool: true,
+			val_int: 83,
+			val_float: 3.14,
+			val_string: "bar=bazz".into(),
+			val_enum: MyEnum::Bar(42),
+			val_nested: Nested {
+				val_string: "foo".into(),
+			},
+		});
+	}
+}

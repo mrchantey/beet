@@ -1,14 +1,13 @@
 use crate::prelude::*;
 use anyhow::Result;
 use beet_rsx::rsx::RsxPipeline;
-use std::path::PathBuf;
 use sweet::prelude::CanonicalPathBuf;
 use sweet::prelude::ReadFile;
 use sweet::prelude::*;
 use syn::Ident;
 use syn::Visibility;
 
-/// For a given file group, collect all public functions.
+/// For a given file group, collect all public functions of rust files.
 #[derive(Debug, Default, Clone)]
 pub struct FileGroupToFuncFiles;
 
@@ -19,6 +18,9 @@ impl RsxPipeline<FileGroup, Result<Vec<FuncFile>>> for FileGroupToFuncFiles {
 			.collect_files()?
 			.into_iter()
 			.enumerate()
+			.filter(|(_, file)| {
+				file.extension().map(|ext| ext == "rs").unwrap_or(false)
+			})
 			.map(|(i, p)| self.build_func_file(i, &group.src, p))
 			.collect::<Result<Vec<_>>>()
 	}
@@ -29,9 +31,9 @@ impl FileGroupToFuncFiles {
 		&self,
 		index: usize,
 		group_src: &CanonicalPathBuf,
-		file: PathBuf,
+		canonical_path: CanonicalPathBuf,
 	) -> Result<FuncFile> {
-		let file_str = ReadFile::to_string(&file)?;
+		let file_str = ReadFile::to_string(&canonical_path)?;
 		let funcs = syn::parse_file(&file_str)?
 			.items
 			.into_iter()
@@ -48,7 +50,6 @@ impl FileGroupToFuncFiles {
 			})
 			.collect::<Vec<_>>();
 
-		let canonical_path = CanonicalPathBuf::new(file)?;
 		let local_path = PathExt::create_relative(&group_src, &canonical_path)?;
 		let ident = Ident::new(
 			&format!("file{}", index),

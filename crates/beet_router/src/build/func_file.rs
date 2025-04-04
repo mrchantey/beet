@@ -14,7 +14,7 @@ pub struct FuncFile {
 	pub ident: Ident,
 	/// Canonical path to the file
 	pub canonical_path: CanonicalPathBuf,
-	/// Path relative to the [`FileGroup::src`]
+	/// Path relative to the [`src`](FileGroup::src) of the [`FileGroup`] 
 	pub local_path: PathBuf,
 	/// Tokens for the functions visited
 	pub funcs: Vec<syn::Signature>,
@@ -22,7 +22,7 @@ pub struct FuncFile {
 
 impl FuncFile {
 	/// Create a simple route path for this file, based on
-	/// its [`FuncFile::local_path`].
+	/// its [`local_path`](Self::local_path).
 	pub fn default_route_path(&self) -> Result<RoutePath> {
 		RoutePath::parse_local_path(&self.local_path)
 	}

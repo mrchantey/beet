@@ -766,6 +766,7 @@ dependencies = [
  "sweet",
  "syn 2.0.100",
  "tokio",
+ "toml",
  "uuid",
  "web-sys",
 ]

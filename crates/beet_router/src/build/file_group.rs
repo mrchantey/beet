@@ -2,7 +2,6 @@ use anyhow::Result;
 use clap::Parser;
 use serde::Deserialize;
 use serde::Serialize;
-use std::path::PathBuf;
 use sweet::prelude::*;
 
 /// Definition for a group of files that should be collected together.
@@ -37,7 +36,9 @@ impl FileGroup {
 		self
 	}
 
-	pub fn collect_files(&self) -> Result<Vec<PathBuf>> {
+	/// Perform a [`ReadDir`], returning all files in the directory
+	/// relative this src
+	pub fn collect_files(&self) -> Result<Vec<CanonicalPathBuf>> {
 		let items = ReadDir {
 			files: true,
 			recursive: true,
@@ -47,12 +48,13 @@ impl FileGroup {
 		.into_iter()
 		.filter_map(|path| {
 			if self.filter.passes(&path) {
-				Some(path)
+				// should be path+self.src?
+				Some(CanonicalPathBuf::new(path))
 			} else {
 				None
 			}
 		})
-		.collect::<Vec<_>>();
+		.collect::<Result<Vec<_>, FsError>>()?;
 		Ok(items)
 	}
 
@@ -65,6 +67,12 @@ impl FileGroup {
 					.with_include("*.rs")
 					.with_exclude("*mod.rs"),
 			)
+	}
+	#[cfg(test)]
+	pub fn test_site_markdown() -> Self {
+		Self::new_workspace_rel("crates/beet_router/src/test_site/test_docs")
+			.unwrap()
+			.with_filter(GlobFilter::default().with_include("*.md"))
 	}
 }
 
