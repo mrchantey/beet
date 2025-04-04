@@ -50,7 +50,7 @@ impl<T: AsRef<Vec<FuncFile>>> RsxPipeline<T, Result<(T, Vec<RouteFuncTokens>)>>
 {
 	fn apply(self, func_files: T) -> Result<(T, Vec<RouteFuncTokens>)> {
 		FuncFilesToRouteFuncs::map_func_files(func_files, |file| {
-			let route_path = file.default_route_path()?;
+			let route_path = RoutePath::parse_local_path(&file.local_path)?;
 			let ident = &file.ident;
 			let route_path_str = route_path.to_string_lossy();
 			file.funcs
@@ -103,12 +103,12 @@ impl<T: AsRef<Vec<FuncFile>>> RsxPipeline<T, Result<(T, Vec<RouteFuncTokens>)>>
 		FuncFilesToRouteFuncs::map_func_files(func_files, |file| {
 			let route_path = self
 				.base_route
-				.join(&file.default_route_path()?)
+				.join(&RoutePath::parse_local_path(&file.local_path)?)
 				.to_string_lossy()
 				.to_string()
 				.replace(".mockup", "");
 			let route_path = RoutePath::new(route_path);
-			println!("route_path: {:?}", route_path);
+			// println!("route_path: {:?}", route_path);
 
 			let ident = &file.ident;
 			let route_path_str = route_path.to_string_lossy();

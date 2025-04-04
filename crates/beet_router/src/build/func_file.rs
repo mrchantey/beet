@@ -1,5 +1,3 @@
-use crate::prelude::*;
-use anyhow::Result;
 use std::path::PathBuf;
 use sweet::prelude::CanonicalPathBuf;
 use syn::Ident;
@@ -18,12 +16,4 @@ pub struct FuncFile {
 	pub local_path: PathBuf,
 	/// Tokens for the functions visited
 	pub funcs: Vec<syn::Signature>,
-}
-
-impl FuncFile {
-	/// Create a simple route path for this file, based on
-	/// its [`local_path`](Self::local_path).
-	pub fn default_route_path(&self) -> Result<RoutePath> {
-		RoutePath::parse_local_path(&self.local_path)
-	}
 }

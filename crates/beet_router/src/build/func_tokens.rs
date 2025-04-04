@@ -16,8 +16,8 @@ pub struct FuncTokens {
 	pub canonical_path: CanonicalPathBuf,
 	/// Path relative to the [`src`](FileGroup::src) of the [`FileGroup`]
 	pub local_path: PathBuf,
+	/// A reasonable route path generated from this file's local path,
+	/// and a method matching either the functions signature, or
+	/// `get` in the case of markdown.
+	pub route_info: RouteInfo,
 }
-
-
-
-impl FuncTokens {}

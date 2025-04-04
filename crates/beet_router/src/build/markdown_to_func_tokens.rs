@@ -3,6 +3,7 @@ use std::path::PathBuf;
 use crate::prelude::*;
 use anyhow::Result;
 use beet_rsx::rsx::RsxPipeline;
+use http::Method;
 use proc_macro2::TokenStream;
 use pulldown_cmark::CowStr;
 use pulldown_cmark::Event;
@@ -142,6 +143,10 @@ impl MarkdownToFuncTokens<'_> {
 		Ok(FuncTokens {
 			frontmatter,
 			block,
+			route_info: RouteInfo {
+				path: RoutePath::parse_local_path(&local_path)?,
+				method: Method::GET,
+			},
 			local_path,
 			canonical_path,
 		})
@@ -181,7 +186,7 @@ val_string	= "foo"
 	struct Frontmatter {
 		val_bool: bool,
 		val_int: u32,
-		val_float: f32,
+		val_float: Option<f32>,
 		val_string: String,
 		val_enum: MyEnum,
 		val_nested: Nested,
@@ -209,7 +214,7 @@ val_string	= "foo"
 		expect(frontmatter).to_be(Frontmatter {
 			val_bool: true,
 			val_int: 83,
-			val_float: 3.14,
+			val_float: Some(3.14),
 			val_string: "bar=bazz".into(),
 			val_enum: MyEnum::Bar(42),
 			val_nested: Nested {
