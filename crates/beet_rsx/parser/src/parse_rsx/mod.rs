@@ -1,9 +1,13 @@
+#[cfg(feature = "html")]
+mod html_to_rsx_template;
 mod meta_builder;
 mod rstml_rust_to_hash;
 mod rstml_to_rsx_template;
 mod rusty_tracker_builder;
 #[cfg(feature = "css")]
 mod validate_css;
+#[cfg(feature = "html")]
+pub use html_to_rsx_template::*;
 pub use rusty_tracker_builder::*;
 #[cfg(feature = "css")]
 pub use validate_css::*;

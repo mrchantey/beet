@@ -116,7 +116,7 @@ impl MarkdownToFuncTokens {
 		};
 		let html_str = Self::markdown_to_html(markdown);
 		let html = syn::parse_str::<TokenStream>(&html_str)?;
-		todo!()
+		todo!();
 		let block = syn::parse_quote!({
 			rsx! {#html}
 		});
