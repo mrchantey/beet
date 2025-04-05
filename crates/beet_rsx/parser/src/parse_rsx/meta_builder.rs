@@ -1,10 +1,8 @@
-use std::convert::Infallible;
-
 use crate::prelude::*;
 use anyhow::Result;
 use proc_macro2::TokenStream;
 use quote::quote;
-use rstml::node::KeyedAttribute;
+use std::convert::Infallible;
 use sweet::prelude::Pipeline;
 use syn::Expr;
 
@@ -52,42 +50,22 @@ pub enum TemplateDirectiveTokens {
 }
 
 
-/// TODO this is how we should do it
-fn str_lit_val(attr: &KeyedAttribute) -> Option<String> {
-	if let Some(Expr::Lit(exp)) = attr.value() {
-		match exp.lit {
-			syn::Lit::Str(ref lit) => {
-				return Some(lit.value());
-			}
-			_ => {}
-		}
-	}
-	None
-}
-
 impl TemplateDirectiveTokens {
 	pub fn from_attr(
 		attr: &RsxAttributeTokens,
 	) -> Option<TemplateDirectiveTokens> {
 		println!("attr: {:?}", attr);
 		match attr {
-			RsxAttributeTokens::Key { key }
-				if let Some(key) = key.try_lit_str() =>
-			{
-				match key.as_str() {
-					"client:load" => Some(TemplateDirectiveTokens::ClientLoad),
-					"scope:local" => Some(TemplateDirectiveTokens::ScopeLocal),
-					"scope:global" => {
-						Some(TemplateDirectiveTokens::ScopeGlobal)
-					}
-					_other => None,
-				}
-			}
+			RsxAttributeTokens::Key { key } => match key.to_string().as_str() {
+				"client:load" => Some(TemplateDirectiveTokens::ClientLoad),
+				"scope:local" => Some(TemplateDirectiveTokens::ScopeLocal),
+				"scope:global" => Some(TemplateDirectiveTokens::ScopeGlobal),
+				_other => None,
+			},
 			RsxAttributeTokens::KeyValue { key, value }
-				if let Some(key) = key.try_lit_str()
-					&& let Some(value) = value.try_lit_str() =>
+				if let Some(value) = value.try_lit_str() =>
 			{
-				match key.as_str() {
+				match key.to_string().as_str() {
 					"slot" => Some(TemplateDirectiveTokens::Slot(value)),
 					"src" if value.starts_with('.') => {
 						Some(TemplateDirectiveTokens::FsSrc(value))

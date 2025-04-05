@@ -64,6 +64,7 @@ mod test {
 				.xpipe(RsxMacroPipeline::no_errors())
 				.to_string(),
 		)
+		//yes we now have client directives again!
 		.to_be(quote! {}.to_string());
 	}
 }

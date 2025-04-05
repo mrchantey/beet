@@ -18,6 +18,8 @@ use syn::spanned::Spanned;
 
 
 /// Convert rstml nodes to a Vec<RsxNode> token stream
+/// ## Pipeline
+/// [`Pipeline<Vec<Node<C>>, (HtmlTokens, Vec<TokenStream>)>`]
 #[derive(Debug, Default)]
 pub struct RstmlToHtmlTokens<C = rstml::Infallible> {
 	// Additional error and warning messages.
@@ -28,7 +30,7 @@ pub struct RstmlToHtmlTokens<C = rstml::Infallible> {
 	// because we need to mark each of them.
 	pub collected_elements: Vec<NodeName>,
 	// rstml requires std hashset :(
-	pub self_closing_elements: HashSet<&'static str>,
+	self_closing_elements: HashSet<&'static str>,
 	phantom: std::marker::PhantomData<C>,
 }
 
@@ -80,10 +82,7 @@ impl<C: CustomNode> RstmlToHtmlTokens<C> {
 				value: node.value.into(),
 			},
 			Node::RawText(node) => HtmlTokens::Text {
-				value: Spanner::new_custom_spanned(
-					node.to_string_best(),
-					&node,
-				),
+				value: LitStr::new(&node.to_string_best(), node.span()).into(),
 			},
 			Node::Fragment(NodeFragment { children, .. }) => {
 				HtmlTokens::Fragment {
@@ -132,7 +131,7 @@ impl<C: CustomNode> RstmlToHtmlTokens<C> {
 				HtmlTokens::Element {
 					self_closing,
 					component: RsxNodeTokens {
-						tag: open_tag.name.clone().into(),
+						tag: self.map_node_name(open_tag.name.clone()),
 						tokens: open_tag.to_token_stream(),
 						attributes,
 						directives: Vec::default(),
@@ -179,18 +178,41 @@ impl<C: CustomNode> RstmlToHtmlTokens<C> {
 				let value = attr.value().cloned();
 				match (attr.key, value) {
 					(key, Some(value)) => Some(RsxAttributeTokens::KeyValue {
-						key: key.into(),
+						key: self.map_node_name(key),
 						value: value.into(),
 					}),
-					(key, None) => {
-						Some(RsxAttributeTokens::Key { key: key.into() })
-					}
+					(key, None) => Some(RsxAttributeTokens::Key {
+						key: self.map_node_name(key),
+					}),
 				}
 			}
 		}
 	}
+	/// Simplifies the [`NodeName::Punctuated`],ie client:load to a string literal
+	fn map_node_name(&mut self, name: NodeName) -> NameExpr {
+		let name_str = name.to_string();
+		match name {
+			NodeName::Path(path) => NameExpr::ExprPath(path.into()),
+			NodeName::Punctuated(punctuated) => {
+				let str = LitStr::new(&name_str, punctuated.span());
+				NameExpr::LitStr(str.into())
+			}
+			NodeName::Block(block) => {
+				self.errors.push(
+					Diagnostic::spanned(
+						block.span(),
+						Level::Error,
+						"Block names are not supported",
+					)
+					.emit_as_expr_tokens(),
+				);
+				NameExpr::LitStr(LitStr::new("error", block.span()).into())
+			}
+		}
+	}
 
-	/// Ensure that self-closing elements do not have children.
+	/// Ensure that self-closing elements do not have children,
+	/// ie <br>foo</br>
 	fn check_self_closing_children(&mut self, element: &NodeElement<C>) {
 		if element.children.is_empty()
 			|| !self
@@ -207,23 +229,6 @@ impl<C: CustomNode> RstmlToHtmlTokens<C> {
 		self.errors.push(warning.emit_as_expr_tokens());
 	}
 }
-/// Simplifies the [`NodeName::Punctuated`] to a string literal
-impl From<NodeName> for NameExpr {
-	fn from(value: NodeName) -> Self {
-		match value {
-			NodeName::Path(expr_path) => NameExpr::ExprPath(expr_path.into()),
-			NodeName::Punctuated(punctuated) => {
-				let str: LitStr = LitStr::new(
-					&punctuated.to_token_stream().to_string(),
-					punctuated.span(),
-				);
-				NameExpr::String(str.into())
-			}
-			NodeName::Block(block) => NameExpr::Block(block.into()),
-		}
-	}
-}
-
 
 
 #[cfg(test)]

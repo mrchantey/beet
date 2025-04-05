@@ -10,9 +10,8 @@ use std::collections::HashSet;
 use sweet::prelude::Pipeline;
 use syn::spanned::Spanned;
 
-/// # Pipeline
-/// In: [`TokenStream`]
-/// Out: [`(Vec<Node<C>>, Vec<TokenStream>)`]
+/// Converts token stream to [`rstml`] nodes and errors.
+/// Pipeline: [`Pipeline<TokenStream, (Vec<Node<C>>, Vec<TokenStream>)>`]
 pub struct TokensToRstml<C = rstml::Infallible> {
 	self_closing_elements: HashSet<&'static str>,
 	phantom: std::marker::PhantomData<C>,
@@ -69,7 +68,7 @@ pub fn self_closing_elements() -> HashSet<&'static str> {
 	.collect()
 }
 
-pub fn _generate_tags_docs(
+fn _generate_tags_docs(
 	elements: &[NodeName],
 ) -> Vec<proc_macro2::TokenStream> {
 	// Mark some of elements as type,

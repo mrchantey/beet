@@ -15,11 +15,10 @@ impl Pipeline<HtmlTokens, Result<HtmlTokens>> for ValidateStyleNode {
 				component,
 				children,
 				..
-			} if let Some(str) = component.tag.try_lit_str()
-				&& str == "style"
+			} if component.tag.to_string() == "style"
 				&& let HtmlTokens::Text { value } = &**children =>
 			{
-				validate_css(&value.to_string(), &value)
+				validate_css(&value.value.value(), &value)
 			}
 			_ => Ok(()),
 		})?;
@@ -65,7 +64,7 @@ mod test {
 	fn works() {
 		expect(validate_css(
 			"body { color: red; }",
-			&Spanner::<LitStr>::new_spanned(syn::parse_quote!("foo")),
+			&Spanner::<LitStr>::new(syn::parse_quote!("foo")),
 		))
 		.to_be_ok();
 		// expect(validate_css("//dsds", TokenStream::default()))

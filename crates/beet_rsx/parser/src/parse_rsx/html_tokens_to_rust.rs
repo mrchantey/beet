@@ -125,7 +125,7 @@ impl HtmlTokensToRust {
 
 				// we must parse runtime attr before anything else
 				self.parse_runtime_directive(&directives);
-				let tag_str = tag.try_lit_str().expect("this sucks");
+				let tag_str = tag.to_string();
 				if tag_str.starts_with(|c: char| c.is_uppercase()) {
 					self.map_component(component, *children)
 				} else {
@@ -149,6 +149,7 @@ impl HtmlTokensToRust {
 	fn map_attribute(&mut self, attr: &RsxAttributeTokens) -> TokenStream {
 		let ident = &self.idents.runtime.effect;
 		match attr {
+			// The attribute is a block
 			RsxAttributeTokens::Block { block } => {
 				let tracker = self.rusty_tracker.next_tracker(&block);
 				quote! {
@@ -158,46 +159,48 @@ impl HtmlTokensToRust {
 					)
 				}
 			}
+			// The attribute is a key
 			RsxAttributeTokens::Key { key } => {
-				let key = key.try_lit_str().unwrap();
-
+				let key_str = key.to_string();
 				quote!(RsxAttribute::Key {
-					key: #key.to_string()
+					key: #key_str.to_string()
 				})
 			}
+			// the attribute is a key value where
+			// the value is a string literal
 			RsxAttributeTokens::KeyValue { key, value }
-				if let Spanner::Spanned { value } = value
-					&& let Expr::Lit(_) = value =>
+				if let Some(val_str) = value.try_lit_str() =>
 			{
-				let key = key.try_lit_str().unwrap();
+				let key_str = key.to_string();
 
 				quote! {
 					RsxAttribute::KeyValue {
-						key: #key.to_string(),
-						value: #value.to_string()
+						key: #key_str.to_string(),
+						value: #val_str.to_string()
 					}
 				}
 			}
+			// the attribute is a key value where
+			// the value is a block
 			RsxAttributeTokens::KeyValue { key, value }
-				if let Some(key) = key.try_lit_str()
-					&& let Spanner::Spanned { value } = value
-					&& let Expr::Block(block) = value =>
+				if let Expr::Block(block) = &value.value =>
 			{
-				let tracker = self.rusty_tracker.next_tracker(&block);
+				let key_str = key.to_string();
+				let tracker = self.rusty_tracker.next_tracker(block);
 				// we need to handle events at the tokens level for inferred
 				// event types and intellisense.
-				if key.starts_with("on") {
+				if key_str.starts_with("on") {
 					let register_func = syn::Ident::new(
-						&format!("register_{key}"),
+						&format!("register_{key_str}"),
 						block.span(),
 					);
 					let event_registry = &self.idents.runtime.event;
 					quote! {
 						RsxAttribute::BlockValue {
-							key: #key.to_string(),
+							key: #key_str.to_string(),
 							initial: "event-placeholder".to_string(),
 							effect: Effect::new(Box::new(move |cx| {
-								#event_registry::#register_func(#key,cx,#block);
+								#event_registry::#register_func(#key_str,cx,#block);
 								Ok(())
 							}), #tracker)
 						}
@@ -205,7 +208,7 @@ impl HtmlTokensToRust {
 				} else {
 					quote! {
 						#ident::parse_attribute_value(
-							#key,
+							#key_str,
 							#tracker,
 							#block
 						)
@@ -240,9 +243,7 @@ impl HtmlTokensToRust {
 		}: RsxNodeTokens,
 		children: HtmlTokens,
 	) -> TokenStream {
-		let tag_str = tag
-			.try_lit_str()
-			.expect("we already checked if starts with uppercase");
+		let tag_str = tag.to_string();
 
 		let tracker = self.rusty_tracker.next_tracker(&tokens);
 		let mut prop_assignments = Vec::new();

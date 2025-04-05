@@ -10,7 +10,8 @@ pub enum HtmlTokens {
 		nodes: Vec<HtmlTokens>,
 	},
 	Doctype {
-		value: Spanner<Lt, ()>,
+		/// the opening bracket
+		value: Spanner<Lt>,
 	},
 	Comment {
 		value: Spanner<LitStr>,

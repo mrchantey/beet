@@ -1,11 +1,11 @@
 use crate::prelude::*;
 use anyhow::Result;
 use proc_macro2::LineColumn;
+use proc_macro2::Span;
 use proc_macro2::TokenStream;
 use quote::ToTokens;
 use syn::Block;
 use syn::Expr;
-use syn::ExprBlock;
 use syn::ExprPath;
 use syn::LitStr;
 use syn::spanned::Spanned;
@@ -108,130 +108,74 @@ impl RsxAttributeTokens {
 /// A value whose location can be retrieved either
 /// from the token stream or from a string
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Spanner<Spannable, Custom = String> {
-	Spanned {
-		value: Spannable,
-	},
-	Custom {
-		value: Custom,
-		start: LineColumn,
-		end: LineColumn,
-	},
+pub struct Spanner<Spannable> {
+	pub value: Spannable,
+	/// If the value was created from a token stream
+	/// this will be None
+	pub loc: Option<SpanLike>,
 }
 
-
-impl<S: ToTokens, C: ToString> Spanner<S, C> {
-	/// if the value is a token stream, convert it to a string
-	/// otherwise, convert it to a string
-	pub fn to_tokens_or_string(&self) -> String {
-		match self {
-			Spanner::Spanned { value } => value.to_token_stream().to_string(),
-			Spanner::Custom { value, .. } => value.to_string(),
-		}
-	}
-}
-impl<C: ToString> Spanner<Expr, C> {
-	/// if the value is a token stream, convert it to a string
-	/// otherwise, convert it to a string
-	pub fn try_lit_str(&self) -> Option<String> {
-		match self {
-			Spanner::Spanned { value } => {
-				if let Expr::Lit(expr_lit) = value {
-					if let syn::Lit::Str(ref lit) = expr_lit.lit {
-						return Some(lit.value());
-					}
-				}
-				None
-			}
-			Spanner::Custom { value, .. } => Some(value.to_string()),
-		}
-	}
-}
-impl<C: ToString> Spanner<LitStr, C> {
-	/// if the value is a token stream, convert it to a string
-	/// otherwise, convert it to a string
-	pub fn to_string(&self) -> String {
-		match self {
-			Spanner::Spanned { value } => value.value(),
-			Spanner::Custom { value, .. } => value.to_string(),
-		}
-	}
-}
-
-impl<S: ToString, C: ToString> ToString for Spanner<S, C> {
-	fn to_string(&self) -> String {
-		match self {
-			Spanner::Spanned { value } => value.to_string(),
-			Spanner::Custom { value, .. } => value.to_string(),
-		}
-	}
-}
-
-
-impl<S: ToTokens, C: ToTokens> ToTokens for Spanner<S, C> {
+impl<S: ToTokens> ToTokens for Spanner<S> {
 	fn to_tokens(&self, tokens: &mut TokenStream) {
-		match self {
-			Spanner::Spanned { value } => value.to_tokens(tokens),
-			Spanner::Custom { value, .. } => value.to_tokens(tokens),
+		self.value.to_tokens(tokens);
+	}
+}
+
+/// For non rust tokens that still need a location, ie markdown
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SpanLike {
+	pub start: LineColumn,
+	pub end: LineColumn,
+}
+
+impl<S> Spanner<S> {
+	pub fn new(value: S) -> Self { Self { value, loc: None } }
+}
+impl Spanner<LitStr> {
+	pub fn new_lit_str(value: impl Into<String>, loc: SpanLike) -> Self {
+		Self {
+			value: LitStr::new(&value.into(), Span::call_site()),
+			loc: Some(loc),
 		}
+	}
+}
+
+impl Spanner<Expr> {
+	/// if the value is a string literal return its value
+	pub fn try_lit_str(&self) -> Option<String> {
+		if let Expr::Lit(expr_lit) = &self.value {
+			if let syn::Lit::Str(lit) = &expr_lit.lit {
+				return Some(lit.value());
+			}
+		}
+		None
 	}
 }
 
 impl<Spannable: Spanned> Spanner<Spannable> {
+	/// Prefers the location of the value
+	/// because if thats set the span will be Callsite
 	pub fn start(&self) -> LineColumn {
-		match self {
-			Spanner::Spanned { value } => value.span().start(),
-			Spanner::Custom { start, .. } => start.clone(),
+		if let Some(loc) = &self.loc {
+			loc.start.clone()
+		} else {
+			self.value.span().start()
 		}
 	}
+	/// Prefers the location of the value
+	/// because if thats set the span will be Callsite
 	pub fn end(&self) -> LineColumn {
-		match self {
-			Spanner::Spanned { value } => value.span().end(),
-			Spanner::Custom { end, .. } => end.clone(),
+		if let Some(loc) = &self.loc {
+			loc.end.clone()
+		} else {
+			self.value.span().end()
 		}
 	}
 }
 
-
-impl<S, C> From<S> for Spanner<S, C> {
-	fn from(value: S) -> Self { Spanner::Spanned { value } }
+impl<S> From<S> for Spanner<S> {
+	fn from(value: S) -> Self { Self::new(value) }
 }
-impl<C> From<LitStr> for Spanner<Expr, C> {
-	fn from(value: LitStr) -> Self {
-		Spanner::Spanned {
-			value: Expr::Lit(syn::ExprLit {
-				lit: value.into(),
-				attrs: Vec::new(),
-			}),
-		}
-	}
-}
-impl<C> From<Block> for Spanner<Expr, C> {
-	fn from(value: Block) -> Self {
-		Spanner::Spanned {
-			value: Expr::Block(ExprBlock {
-				block: value,
-				label: None,
-				attrs: Vec::new(),
-			}),
-		}
-	}
-}
-
-impl<C> From<&str> for Spanner<Expr, C> {
-	fn from(value: &str) -> Self {
-		Spanner::Spanned {
-			value: Expr::Lit(syn::ExprLit {
-				lit: syn::Lit::Str(syn::LitStr::new(
-					value,
-					proc_macro2::Span::call_site(),
-				)),
-				attrs: Vec::new(),
-			}),
-		}
-	}
-}
-
 
 
 
@@ -243,63 +187,32 @@ impl<C> From<&str> for Spanner<Expr, C> {
 // }
 
 
-impl<S, C> Spanner<S, C> {
-	pub fn new_spanned(value: S) -> Self { Spanner::Spanned { value } }
-	pub fn new_custom_spanned(
-		value: impl Into<C>,
-		span: &impl Spanned,
-	) -> Self {
-		Self::Custom {
-			value: value.into(),
-			start: span.span().start(),
-			end: span.span().end(),
-		}
-	}
-	pub fn new_custom(value: C, start: LineColumn, end: LineColumn) -> Self {
-		Spanner::Custom { value, start, end }
-	}
-}
-
 /// A restricted subtype of [`Expr`], often created by [`rstml::node::NodeName`]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum NameExpr {
-	String(Spanner<LitStr>),
-	/// A valid path expression
+	/// A name that must be a string because its not a valid path expression,
+	/// like <foo-bar/>
+	LitStr(Spanner<LitStr>),
+	/// A valid path expression like `my_component::MyComponent`
 	ExprPath(Spanner<ExprPath>),
-	Block(Spanner<Block>),
 }
-
-impl NameExpr {
-	pub fn string_spanned(
-		value: impl Into<String>,
-		span: &impl Spanned,
-	) -> Self {
-		NameExpr::String(Spanner::new_custom_spanned(value, span))
-	}
-
-	/// If the variant would be fairly represented as a string,
-	/// return the string value, otherwise return None.
-	/// [`ExprPath`] and [`String`] are valid, but [`Block`] is not.
-	pub fn try_lit_str(&self) -> Option<String> {
+/// force expr into string literal
+impl ToString for NameExpr {
+	fn to_string(&self) -> String {
 		match self {
-			NameExpr::String(value) => Some(value.to_tokens_or_string()),
-			NameExpr::ExprPath(value) => Some(value.to_tokens_or_string()),
-			NameExpr::Block(_) => None,
+			NameExpr::LitStr(value) => value.value.value(),
+			NameExpr::ExprPath(value) => {
+				value.value.to_token_stream().to_string()
+			}
 		}
 	}
 }
-
-impl Into<NameExpr> for &str {
-	fn into(self) -> NameExpr { NameExpr::string_spanned(self, &self) }
-}
-
 
 impl ToTokens for NameExpr {
 	fn to_tokens(&self, tokens: &mut TokenStream) {
 		match self {
 			NameExpr::ExprPath(expr) => expr.to_tokens(tokens),
-			NameExpr::Block(block) => block.to_tokens(tokens),
-			NameExpr::String(string) => string.to_tokens(tokens),
+			NameExpr::LitStr(string) => string.to_tokens(tokens),
 		}
 	}
 }
