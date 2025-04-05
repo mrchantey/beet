@@ -10,7 +10,9 @@ use std::collections::HashSet;
 use sweet::prelude::Pipeline;
 use syn::spanned::Spanned;
 
-
+/// # Pipeline
+/// In: [`TokenStream`]
+/// Out: [`(Vec<Node<C>>, Vec<TokenStream>)`]
 pub struct TokensToRstml<C = rstml::Infallible> {
 	self_closing_elements: HashSet<&'static str>,
 	phantom: std::marker::PhantomData<C>,

@@ -3,21 +3,8 @@ use proc_macro::TokenStream;
 use syn::DeriveInput;
 use syn::parse_macro_input;
 mod derive_deref;
+use sweet::prelude::*;
 
-/// Demonstrates how to select a different reactive runtime
-#[allow(unused_mut)]
-fn feature_flag_idents() -> RsxIdents {
-	let mut idents = RsxIdents::default();
-	#[cfg(feature = "sigfault")]
-	{
-		idents.runtime = RsxRuntime::sigfault();
-	}
-	// #[cfg(feature = "bevy")]
-	// {
-	// 	idents.runtime = RsxRuntime::bevy();
-	// }
-	idents
-}
 
 
 
@@ -31,13 +18,14 @@ fn feature_flag_idents() -> RsxIdents {
 ///
 #[proc_macro]
 pub fn rsx(tokens: TokenStream) -> TokenStream {
-	RstmlToRsx {
-		// perhaps we can feature gate this if it proves expensive
-		idents: feature_flag_idents(),
-		..Default::default()
-	}
-	.map_tokens(tokens.into())
-	.into()
+	// RstmlToRsx {
+	// 	// perhaps we can feature gate this if it proves expensive
+	// 	idents: feature_flag_idents(),
+	// 	..Default::default()
+	// }
+	// .map_tokens(tokens.into())
+	// .into()
+	tokens.xpipe(RsxMacroPipeline::default()).into()
 }
 
 /// Mostly used for testing,

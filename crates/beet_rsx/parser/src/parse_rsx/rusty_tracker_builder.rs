@@ -17,29 +17,19 @@ pub struct RustyTrackerBuilder {
 }
 
 impl RustyTrackerBuilder {
-	pub fn next_index_hash(&mut self, tokens: TokenStream) -> (u32, u64) {
-		// the rsx! macro splits whitespace in the tokens
-		// but visiting tokens via runtime  file loading does not,
-		// so we remove whitespace to ensure the hash is the same
-		let tokens_hash =
-			rapidhash(tokens.to_string().replace(" ", "").as_bytes());
-		let index = self.current_index;
-		self.current_index += 1;
-		// println!("index: {}, hash: {}", index, tokens_hash);
-		(index, tokens_hash)
-	}
-
-
-	/// tokens for the next next `RustyTracker` to build
+	/// Provided stringified token stream,
+	/// returns the tokens for the next next `RustyTracker` to build
 	pub fn next_tracker(&mut self, val: impl ToTokens) -> TokenStream {
-		let (index, tokens_hash) = self.next_index_hash(val.to_token_stream());
+		let (index, tokens_hash) = self.next_index_hash(val);
 		quote! {RustyTracker::new(#index, #tokens_hash)}
 	}
 
-	/// [`Self::Next`] but outputs to ron syntax
+	/// Provided stringified token stream,
+	/// returns the tokens for the next next `RustyTracker` to build
+	/// in ron format
 	// #[deprecated = "these should be options on the builder"]
 	pub fn next_tracker_ron(&mut self, val: impl ToTokens) -> TokenStream {
-		let (index, tokens_hash) = self.next_index_hash(val.to_token_stream());
+		let (index, tokens_hash) = self.next_index_hash(val);
 		let index = Literal::u32_unsuffixed(index);
 		let tokens_hash = Literal::u64_unsuffixed(tokens_hash);
 
@@ -49,5 +39,23 @@ impl RustyTrackerBuilder {
 				tokens_hash: #tokens_hash
 			)
 		}
+	}
+
+	/// provided a stringified token stream, returns the next index and hash
+	fn next_index_hash(&mut self, tokens: impl ToTokens) -> (u32, u64) {
+		// the rsx! macro splits whitespace in the tokens
+		// but visiting tokens via runtime  file loading does not,
+		// so we remove whitespace to ensure the hash is the same
+		let tokens_hash = rapidhash(
+			tokens
+				.to_token_stream()
+				.to_string()
+				.replace(" ", "")
+				.as_bytes(),
+		);
+		let index = self.current_index;
+		self.current_index += 1;
+		// println!("index: {}, hash: {}", index, tokens_hash);
+		(index, tokens_hash)
 	}
 }

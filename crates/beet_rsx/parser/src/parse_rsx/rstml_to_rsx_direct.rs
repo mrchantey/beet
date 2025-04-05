@@ -153,9 +153,9 @@ impl RstmlToRsx {
 					close_tag,
 				} = el;
 
-				// unnsesecary clone but we gonna replace it anyway
-				let (directives, attributes) =
-					MetaBuilder::parse_attributes(open_tag.attributes.clone());
+				// hack, we deleted parse_attributes
+				let attributes = open_tag.attributes.clone();
+				let directives: Vec<TemplateDirectiveTokens> = Vec::default();
 
 				// we must parse runtime attr before anything else
 				self.parse_runtime_directive(&directives);
@@ -176,18 +176,6 @@ impl RstmlToRsx {
 						children,
 					)
 				} else {
-					// panic!();
-					// println!("its a style tag");
-					#[cfg(feature = "css")]
-					if tag == "style" {
-						if let Err(err) = validate_style_node(&children) {
-							self.errors.push(
-								Diagnostic::spanned(err.0, Level::Error, err.1)
-									.emit_as_expr_tokens(),
-							);
-						}
-					}
-
 					let attributes = attributes
 						.iter()
 						.map(|attr| self.map_attribute(attr))

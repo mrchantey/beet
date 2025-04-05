@@ -1,10 +1,43 @@
+use std::convert::Infallible;
+
 use crate::prelude::*;
-use itertools::Itertools;
+use anyhow::Result;
 use proc_macro2::TokenStream;
 use quote::quote;
 use rstml::node::KeyedAttribute;
-use rstml::node::NodeAttribute;
+use sweet::prelude::Pipeline;
 use syn::Expr;
+
+#[derive(Default)]
+pub struct ApplyDefaultTemplateDirectives;
+
+
+impl<T: RsxNodeTokensVisitor<Infallible>> Pipeline<T, T>
+	for ApplyDefaultTemplateDirectives
+{
+	fn apply(self, mut node: T) -> T {
+		node.walk_rsx_tokens(parse_node).ok();
+		node
+	}
+}
+
+fn parse_node(
+	RsxNodeTokens {
+		attributes,
+		directives,
+		..
+	}: &mut RsxNodeTokens,
+) -> Result<(), Infallible> {
+	attributes.retain(|attr| {
+		if let Some(directive) = TemplateDirectiveTokens::from_attr(attr) {
+			directives.push(directive);
+			return false;
+		}
+		true
+	});
+	Ok(())
+}
+
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TemplateDirectiveTokens {
@@ -19,6 +52,7 @@ pub enum TemplateDirectiveTokens {
 }
 
 
+/// TODO this is how we should do it
 fn str_lit_val(attr: &KeyedAttribute) -> Option<String> {
 	if let Some(Expr::Lit(exp)) = attr.value() {
 		match exp.lit {
@@ -32,55 +66,64 @@ fn str_lit_val(attr: &KeyedAttribute) -> Option<String> {
 }
 
 impl TemplateDirectiveTokens {
-	pub fn from_attr(attr: &NodeAttribute) -> Option<TemplateDirectiveTokens> {
-		let NodeAttribute::Attribute(keyed_attr) = attr else {
-			return None;
-		};
-		let attr_key_str = keyed_attr.key.to_string();
-		match attr_key_str.as_str() {
-			"client:load" => Some(TemplateDirectiveTokens::ClientLoad),
-			"scope:local" => Some(TemplateDirectiveTokens::ScopeLocal),
-			"scope:global" => Some(TemplateDirectiveTokens::ScopeGlobal),
-			"slot" => {
-				if let Some(val) = str_lit_val(keyed_attr) {
-					return Some(TemplateDirectiveTokens::Slot(val));
-				}
-				None
-			}
-			"src" => {
-				if let Some(val) = str_lit_val(keyed_attr) {
-					// alternatively we could use an ignore approach
-					// if ["/", "http://", "https://"]
-					// .iter()
-					// .all(|p| val.starts_with(p) == false)
-					if val.starts_with('.') {
-						return Some(TemplateDirectiveTokens::FsSrc(val));
+	pub fn from_attr(
+		attr: &RsxAttributeTokens,
+	) -> Option<TemplateDirectiveTokens> {
+		println!("attr: {:?}", attr);
+		match attr {
+			RsxAttributeTokens::Key { key }
+				if let Some(key) = key.try_lit_str() =>
+			{
+				match key.as_str() {
+					"client:load" => Some(TemplateDirectiveTokens::ClientLoad),
+					"scope:local" => Some(TemplateDirectiveTokens::ScopeLocal),
+					"scope:global" => {
+						Some(TemplateDirectiveTokens::ScopeGlobal)
 					}
+					_other => None,
 				}
-				None
 			}
-			other => {
-				match other.contains(":") {
-					// its a client directive
-					true => {
-						let prefix =
-							other.split(':').next().unwrap().to_string();
-
-						let suffix =
-							other.split(':').nth(1).unwrap().to_string();
-
-						if prefix == "runtime" {
-							return Some(TemplateDirectiveTokens::Runtime(
-								suffix,
-							));
-						}
-						None
+			RsxAttributeTokens::KeyValue { key, value }
+				if let Some(key) = key.try_lit_str()
+					&& let Some(value) = value.try_lit_str() =>
+			{
+				match key.as_str() {
+					"slot" => Some(TemplateDirectiveTokens::Slot(value)),
+					"src" if value.starts_with('.') => {
+						Some(TemplateDirectiveTokens::FsSrc(value))
+						// alternatively we could use an ignore approach
+						// if ["/", "http://", "https://"]
+						// .iter()
+						// .all(|p| val.starts_with(p) == false)
 					}
-					// its a prop assignemnt
-					false => None,
+					_ => None,
 				}
 			}
+			_ => None,
 		}
+		// match attr_key_str.as_str() {
+		// 	other => {
+		// 		match other.contains(":") {
+		// 			// its a client directive
+		// 			true => {
+		// 				let prefix =
+		// 					other.split(':').next().unwrap().to_string();
+
+		// 				let suffix =
+		// 					other.split(':').nth(1).unwrap().to_string();
+
+		// 				if prefix == "runtime" {
+		// 					return Some(TemplateDirectiveTokens::Runtime(
+		// 						suffix,
+		// 					));
+		// 				}
+		// 				None
+		// 			}
+		// 			// its a prop assignemnt
+		// 			false => None,
+		// 		}
+		// 	}
+		// }
 	}
 
 	/// Check if this is a client directive that means the
@@ -106,18 +149,6 @@ pub struct MetaBuilder;
 
 
 impl MetaBuilder {
-	pub fn parse_attributes(
-		attributes: Vec<NodeAttribute>,
-	) -> (Vec<TemplateDirectiveTokens>, Vec<NodeAttribute>) {
-		attributes.into_iter().partition_map(|attr| {
-			match TemplateDirectiveTokens::from_attr(&attr) {
-				Some(directive) => itertools::Either::Left(directive),
-				None => itertools::Either::Right(attr),
-			}
-		})
-	}
-
-
 	pub fn build_with_directives(
 		template_directives: &[TemplateDirectiveTokens],
 	) -> TokenStream {

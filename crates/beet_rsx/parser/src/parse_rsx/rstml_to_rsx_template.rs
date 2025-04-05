@@ -154,9 +154,10 @@ impl RstmlToRsxTemplate {
 				close_tag,
 			}) => {
 				let location = self.location();
-				// unnsesecary clone but we gonna replace it anyway
-				let (directives, attributes) =
-					MetaBuilder::parse_attributes(open_tag.attributes.clone());
+
+				// hack, we deleted parse_attributes
+				let attributes = open_tag.attributes.clone();
+				let directives: Vec<TemplateDirectiveTokens> = Vec::default();
 
 
 				let meta = MetaBuilder::build_ron_with_directives(
