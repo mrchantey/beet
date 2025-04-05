@@ -6,9 +6,7 @@ use rapidhash::RapidHashMap;
 
 pub struct NodeToTreeLocationMap;
 
-impl<T: AsRef<RsxNode>> RsxPipeline<T, TreeLocationMap>
-	for NodeToTreeLocationMap
-{
+impl<T: AsRef<RsxNode>> Pipeline<T, TreeLocationMap> for NodeToTreeLocationMap {
 	fn apply(self, node: T) -> TreeLocationMap {
 		let mut map = TreeLocationMap::default();
 
@@ -84,7 +82,7 @@ mod test {
 		let action = "jumps over";
 
 		let root = rsx! { <div>"The "{desc}" and "{color}<b>fox</b>{action}the lazy " dog"</div> };
-		let map = (&root).bpipe(NodeToTreeLocationMap);
+		let map = (&root).xpipe(NodeToTreeLocationMap);
 
 		map.check_valid(&root).unwrap();
 
@@ -124,19 +122,19 @@ mod test {
 			<MyComponent />
 			<MyComponent />
 		}
-		.bpipe(ApplySlots::default())
+		.xpipe(ApplySlots::default())
 		.unwrap();
 
 		let html = node
-			.bref()
-			.bpipe(RsxToHtml::default())
-			.bpipe(RenderHtml::default())
+			.xref()
+			.xpipe(RsxToHtml::default())
+			.xpipe(RenderHtml::default())
 			.unwrap();
 		expect(html).to_be(
 			"<div data-beet-rsx-idx=\"3\">4</div><div data-beet-rsx-idx=\"8\">4</div>",
 		);
 
-		let map = node.bpipe(NodeToTreeLocationMap);
+		let map = node.xpipe(NodeToTreeLocationMap);
 		expect(map.collapsed_elements.get(&TreeIdx::new(3))).to_be_some();
 		expect(map.collapsed_elements.get(&TreeIdx::new(8))).to_be_some();
 	}

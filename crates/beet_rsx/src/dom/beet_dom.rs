@@ -12,7 +12,7 @@ impl BeetDom {
 	pub fn mount(app: impl 'static + Fn() -> RsxNode) {
 		use sweet::prelude::wasm::set_timeout_ms;
 
-		let doc = app().bpipe(RsxToHtmlDocument::default()).unwrap();
+		let doc = app().xpipe(RsxToHtmlDocument::default()).unwrap();
 
 		// effects are called on render
 		Self::mount_doc(&doc);
@@ -26,7 +26,7 @@ impl BeetDom {
 	pub fn hydrate<M>(app: impl IntoRsxNode<M>) {
 		DomTarget::set(BrowserDomTarget::default());
 		// effects called here too
-		app.into_node().bpipe(RegisterEffects::default()).unwrap();
+		app.into_node().xpipe(RegisterEffects::default()).unwrap();
 		EventRegistry::initialize().unwrap();
 	}
 

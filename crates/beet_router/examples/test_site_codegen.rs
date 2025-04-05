@@ -16,15 +16,15 @@ pub fn main() -> Result<()> {
 				.with_include("*.rs")
 				.with_exclude("*mod.rs"),
 		)
-		.bpipe(FileGroupToFuncTokens::default())?
-		.bpipe(FuncTokensToCodegen::new(
+		.xpipe(FileGroupToFuncTokens::default())?
+		.xpipe(FuncTokensToCodegen::new(
 			CodegenFile::new_workspace_rel(
 				"crates/beet_router/src/test_site/codegen/routes.rs",
 				"beet_router",
 			)
 			.with_use_beet_tokens("use beet_router::as_beet::*;"),
 		))?
-		.bmap(|(_, codegen)| -> Result<_> { codegen.build_and_write() })?;
+		.xmap(|(_, codegen)| -> Result<_> { codegen.build_and_write() })?;
 
 	let file =
 		ReadFile::to_string(out_file.into_canonical_unchecked()).unwrap();

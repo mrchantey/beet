@@ -14,7 +14,7 @@ impl Default for ApplyFsSrc {
 	fn default() -> Self { Self {} }
 }
 
-impl RsxPipeline<RsxNode, Result<RsxNode>> for ApplyFsSrc {
+impl Pipeline<RsxNode, Result<RsxNode>> for ApplyFsSrc {
 	fn apply(self, mut root: RsxNode) -> Result<RsxNode> {
 		//1. apply to root
 		self.apply_root(&mut root)?;
@@ -100,11 +100,11 @@ mod test {
 	#[test]
 	fn works() {
 		// relative ignored
-		expect(rsx! { <script src="/missing" /> }.bpipe(ApplyFsSrc::default()))
+		expect(rsx! { <script src="/missing" /> }.xpipe(ApplyFsSrc::default()))
 			.to_be_ok();
 		// missing errors
 		expect(
-			rsx! { <script src="./missing" /> }.bpipe(ApplyFsSrc::default()),
+			rsx! { <script src="./missing" /> }.xpipe(ApplyFsSrc::default()),
 		)
 		.to_be_err();
 		// slot children errors
@@ -114,12 +114,12 @@ mod test {
 					<script src="./missing" />
 				</Foo>
 			}
-			.bpipe(ApplyFsSrc::default()),
+			.xpipe(ApplyFsSrc::default()),
 		)
 		.to_be_err();
 
 		let node = rsx! { <script src="./test-fs-src.js" /> }
-			.bpipe(ApplyFsSrc::default())
+			.xpipe(ApplyFsSrc::default())
 			.unwrap();
 
 		let RsxNode::Element(el) = &node else {

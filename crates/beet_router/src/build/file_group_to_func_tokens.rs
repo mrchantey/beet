@@ -1,6 +1,6 @@
 use crate::prelude::*;
 use anyhow::Result;
-use beet_rsx::rsx::RsxPipeline;
+use beet_rsx::prelude::*;
 use sweet::prelude::*;
 // use syn::Type;
 
@@ -12,7 +12,7 @@ pub struct FileGroupToFuncTokens {
 
 
 
-impl RsxPipeline<FileGroup, Result<Vec<FuncTokens>>> for FileGroupToFuncTokens {
+impl Pipeline<FileGroup, Result<Vec<FuncTokens>>> for FileGroupToFuncTokens {
 	fn apply(self, group: FileGroup) -> Result<Vec<FuncTokens>> {
 		let items = group
 			.collect_files()?
@@ -44,13 +44,14 @@ impl FileGroupToFuncTokens {
 				canonical_path,
 				local_path,
 			),
-			#[cfg(feature = "markdown")]
-			Some(ex) if ex == "md" => MarkdownToFuncTokens::parse(
-				&file_str,
-				canonical_path,
-				local_path,
-			)
-			.map(|func| vec![func]),
+			// TODO html parsing
+			// #[cfg(feature = "markdown")]
+			// Some(ex) if ex == "md" => MarkdownToFuncTokens::parse(
+			// 	&file_str,
+			// 	canonical_path,
+			// 	local_path,
+			// )
+			// .map(|func| vec![func]),
 			_ => Ok(Vec::default()),
 		}
 	}
@@ -64,9 +65,10 @@ mod test {
 	use sweet::prelude::*;
 
 	#[test]
-	fn works() {
+	#[ignore = "todo html parsing"]
+	fn markdown() {
 		let funcs = FileGroup::test_site_markdown()
-			.bpipe(FileGroupToFuncTokens::default())
+			.xpipe(FileGroupToFuncTokens::default())
 			.unwrap();
 		expect(funcs.len()).to_be(1);
 		let func_tokens = funcs
@@ -86,10 +88,10 @@ mod test {
 	fn beet_site() {
 		let docs = FileGroup::new_workspace_rel("crates/beet_site/src/docs")
 			.unwrap()
-			.bpipe(FileGroupToFuncTokens::default())
+			.xpipe(FileGroupToFuncTokens::default())
 			.unwrap()
-			.bpipe(MapFuncTokensRoute::default().base_route("/docs"))
-			.bpipe(FuncTokensToCodegen::new(CodegenFile::new_workspace_rel(
+			.xpipe(MapFuncTokensRoute::default().base_route("/docs"))
+			.xpipe(FuncTokensToCodegen::new(CodegenFile::new_workspace_rel(
 				"crates/beet_site/src/codegen/docs.rs",
 				"beet_site",
 			)))

@@ -1,6 +1,6 @@
 use crate::prelude::*;
 use anyhow::Result;
-use beet_rsx::rsx::RsxPipelineTarget;
+use beet_rsx::prelude::*;
 use http::Method;
 use quote::quote;
 use std::path::PathBuf;
@@ -25,7 +25,6 @@ impl FuncFileToFuncTokens {
 		canonical_path: CanonicalPathBuf,
 		local_path: PathBuf,
 	) -> Result<Vec<FuncTokens>> {
-
 		let mod_ident = Ident::new(
 			&format!("file{}", index),
 			proc_macro2::Span::call_site(),
@@ -83,7 +82,7 @@ impl FuncFileToFuncTokens {
 				})
 			})
 			.collect::<Vec<_>>()
-			.bok()
+			.xok()
 	}
 }
 
@@ -97,7 +96,7 @@ mod test {
 	#[test]
 	fn works() {
 		let funcs = FileGroup::test_site_routes()
-			.bpipe(FileGroupToFuncTokens::default())
+			.xpipe(FileGroupToFuncTokens::default())
 			.unwrap();
 		expect(funcs.len()).to_be(3);
 		let file = funcs

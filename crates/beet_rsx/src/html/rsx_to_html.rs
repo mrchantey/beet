@@ -24,7 +24,7 @@ pub struct RsxToHtml {
 	tree_idx_incr: TreeIdxIncr,
 }
 
-impl<T: AsRef<RsxNode>> RsxPipeline<T, Vec<HtmlNode>> for RsxToHtml {
+impl<T: AsRef<RsxNode>> Pipeline<T, Vec<HtmlNode>> for RsxToHtml {
 	fn apply(mut self, node: T) -> Vec<HtmlNode> { self.map_node(node) }
 }
 
@@ -166,7 +166,7 @@ mod test {
 	fn doctype() {
 		expect(
 			rsx! { <!DOCTYPE html> }
-				.bpipe(RsxToHtmlString::default())
+				.xpipe(RsxToHtmlString::default())
 				.unwrap(),
 		)
 		.to_be("<!DOCTYPE html>");
@@ -176,7 +176,7 @@ mod test {
 	fn comment() {
 		expect(
 			rsx! { <!-- "hello" --> }
-				.bpipe(RsxToHtmlString::default())
+				.xpipe(RsxToHtmlString::default())
 				.unwrap(),
 		)
 		.to_be("<!-- hello -->");
@@ -184,7 +184,7 @@ mod test {
 
 	#[test]
 	fn text() {
-		expect(rsx! { "hello" }.bpipe(RsxToHtmlString::default()).unwrap())
+		expect(rsx! { "hello" }.xpipe(RsxToHtmlString::default()).unwrap())
 			.to_be("hello");
 	}
 
@@ -201,19 +201,19 @@ mod test {
 				// {key_value}
 				favorite_food=food
 			></div>
-		}.bpipe(RsxToHtmlString::default()).unwrap())
+		}.xpipe(RsxToHtmlString::default()).unwrap())
 		.to_be("<div name=\"pete\" age=\"9\" favorite_food=\"pizza\" data-beet-rsx-idx=\"1\"></div>");
 	}
 	#[test]
 	fn element_self_closing() {
-		expect(rsx! { <br /> }.bpipe(RsxToHtmlString::default()).unwrap())
+		expect(rsx! { <br /> }.xpipe(RsxToHtmlString::default()).unwrap())
 			.to_be("<br/>");
 	}
 	#[test]
 	fn element_children() {
 		expect(
 			rsx! { <div>hello</div> }
-				.bpipe(RsxToHtmlString::default())
+				.xpipe(RsxToHtmlString::default())
 				.unwrap(),
 		)
 		.to_be("<div>hello</div>");
@@ -222,7 +222,7 @@ mod test {
 	#[test]
 	fn rsx_text() {
 		let value = "hello";
-		expect(rsx! { {value} }.bpipe(RsxToHtmlString::default()).unwrap())
+		expect(rsx! { {value} }.xpipe(RsxToHtmlString::default()).unwrap())
 			.to_be("hello");
 	}
 
@@ -235,7 +235,7 @@ mod test {
 					<p>hello {world}</p>
 				</div>
 			}
-			.bpipe(RsxToHtmlString::default())
+			.xpipe(RsxToHtmlString::default())
 			.unwrap(),
 		)
 		.to_be("<div><p data-beet-rsx-idx=\"2\">hello mars</p></div>");
@@ -248,7 +248,7 @@ mod test {
 			<div onclick=onclick>
 				<p>hello {world}</p>
 			</div>
-		}.bpipe(RsxToHtmlString::default()).unwrap())
+		}.xpipe(RsxToHtmlString::default()).unwrap())
 		.to_be("<div onclick=\"_beet_event_handler(1, event)\" data-beet-rsx-idx=\"1\"><p data-beet-rsx-idx=\"2\">hello mars</p></div>");
 	}
 
@@ -261,7 +261,7 @@ mod test {
 		}
 		expect(
 			rsx! { <Child /> }
-				.bpipe(RsxToHtmlString::default())
+				.xpipe(RsxToHtmlString::default())
 				.unwrap(),
 		)
 		.to_be(
@@ -281,7 +281,7 @@ mod test {
 
 		expect(
 			rsx! { <div>the child is <Child value=38 />!</div> }
-				.bpipe(RsxToHtmlString::default())
+				.xpipe(RsxToHtmlString::default())
 				.unwrap(),
 		)
 		.to_be(
@@ -308,7 +308,7 @@ mod test {
 					<b>foo</b>
 				</Layout>
 			}
-			.bpipe(RsxToHtmlString::default())
+			.xpipe(RsxToHtmlString::default())
 			.unwrap(),
 		)
 		.to_be("<div><h1>welcome</h1><p><b>foo</b></p></div>");
@@ -336,7 +336,7 @@ mod test {
 				<b slot="tagline">what a cool article</b>
 				<div>direct child</div>
 			</Layout>
-		}.bpipe(RsxToHtmlString::default()).unwrap())
+		}.xpipe(RsxToHtmlString::default()).unwrap())
 			.to_be("<article><h1>welcome</h1><p><b>what a cool article</b></p><main><div>direct child</div></main></article>");
 	}
 
@@ -345,7 +345,7 @@ mod test {
 	fn trims() {
 		expect(
 			rsx! { "  hello  " }
-				.bpipe(RsxToHtmlString {
+				.xpipe(RsxToHtmlString {
 					rsx_to_html: RsxToHtml {
 						trim: true,
 						..Default::default()

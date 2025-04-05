@@ -72,7 +72,7 @@ pub struct RustyPartMap(pub HashMap<RustyTracker, RustyPart>);
 
 pub struct NodeToRustyPartMap;
 
-impl RsxPipeline<RsxNode, RustyPartMap> for NodeToRustyPartMap {
+impl Pipeline<RsxNode, RustyPartMap> for NodeToRustyPartMap {
 	fn apply(self, mut node: RsxNode) -> RustyPartMap {
 		let mut rusty_map = HashMap::default();
 		VisitRsxNodeMut::walk_with_opts(
@@ -142,10 +142,10 @@ mod test {
 	#[test]
 	fn works() {
 		let bar = 2;
-		expect(rsx! { <div /> }.bpipe(NodeToRustyPartMap).len()).to_be(0);
-		expect(rsx! { <div foo=bar /> }.bpipe(NodeToRustyPartMap).len())
+		expect(rsx! { <div /> }.xpipe(NodeToRustyPartMap).len()).to_be(0);
+		expect(rsx! { <div foo=bar /> }.xpipe(NodeToRustyPartMap).len())
 			.to_be(1);
-		expect(rsx! { <div>{bar}</div> }.bpipe(NodeToRustyPartMap).len())
+		expect(rsx! { <div>{bar}</div> }.xpipe(NodeToRustyPartMap).len())
 			.to_be(1);
 	}
 }

@@ -11,16 +11,16 @@ fn main() -> Result<()> {
 	// ⚠️ changes here should be duplicated in crates/beet_site/build.rs
 	FileGroup::new_workspace_rel("crates/beet_design/src")?
 		.with_filter(GlobFilter::default().with_include("*.mockup.rs"))
-		.bpipe(FileGroupToFuncTokens::default())?
-		.bpipe(MapFuncTokensRoute::new("/design", [(".mockup", "")]))
-		.bpipe(FuncTokensToCodegen::new(
+		.xpipe(FileGroupToFuncTokens::default())?
+		.xpipe(MapFuncTokensRoute::new("/design", [(".mockup", "")]))
+		.xpipe(FuncTokensToCodegen::new(
 			CodegenFile::new_workspace_rel(
 				"crates/beet_design/src/codegen/mockups.rs",
 				&cx.pkg_name,
 			)
 			.with_use_beet_tokens("use beet_router::as_beet::*;"),
 		))?
-		.bmap(|(_, codegen)| codegen)
+		.xmap(|(_, codegen)| codegen)
 		.build_and_write()?;
 
 	Ok(())

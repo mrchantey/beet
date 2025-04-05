@@ -43,7 +43,7 @@ enum Scope {
 	// Cascade (eargerly apply slots?)
 }
 
-impl RsxPipeline<RsxNode, Result<RsxNode>> for ApplyScopedStyle {
+impl Pipeline<RsxNode, Result<RsxNode>> for ApplyScopedStyle {
 	/// Applies scoped style to:
 	/// 1. root node
 	/// 2. all component nodes
@@ -204,7 +204,7 @@ mod test {
 					// <Child/>
 				</div>
 			}
-			.bpipe(RsxToHtmlString::default()).unwrap(),
+			.xpipe(RsxToHtmlString::default()).unwrap(),
 		)
 		.to_be("<div data-styleid=\"0\"><style data-styleid=\"0\">span[data-styleid=\"0\"] {\n  color: red;\n}\n</style></div>");
 	}
@@ -218,7 +218,7 @@ mod test {
 					// <Child/>
 				</div>
 			}
-			.bpipe(RsxToHtmlString::default())
+			.xpipe(RsxToHtmlString::default())
 			.unwrap(),
 		)
 		.to_be("<div><style>span {\n  color: red;\n}\n</style></div>");
@@ -232,7 +232,7 @@ mod test {
 					<style scope:global>span { color: red; }</style>
 				</div>
 			}
-			.bpipe(RsxToHtmlString::default()).unwrap(),
+			.xpipe(RsxToHtmlString::default()).unwrap(),
 		)
 		.to_be("<div data-styleid=\"0\"><style data-styleid=\"0\">div[data-styleid=\"0\"] {\n  color: #00f;\n}\n</style><style data-styleid=\"0\">span {\n  color: red;\n}\n</style></div>");
 	}
@@ -240,7 +240,7 @@ mod test {
 
 	#[test]
 	fn applies_to_component_node() {
-		expect(rsx! { <Child /> }.bpipe(RsxToHtmlString::default()).unwrap())
+		expect(rsx! { <Child /> }.xpipe(RsxToHtmlString::default()).unwrap())
 		.to_be("<div data-styleid=\"0\"><style data-styleid=\"0\">span[data-styleid=\"0\"] {\n  color: #00f;\n}\n</style></div>");
 	}
 	#[test]
@@ -249,7 +249,7 @@ mod test {
 			<Child>
 				<Child />
 			</Child>
-		}.bpipe(RsxToHtmlString::default()).unwrap())
+		}.xpipe(RsxToHtmlString::default()).unwrap())
 			.to_be("<div data-styleid=\"0\"><style data-styleid=\"0\">span[data-styleid=\"0\"] {\n  color: #00f;\n}\n</style><div data-styleid=\"1\"><style data-styleid=\"1\">span[data-styleid=\"1\"] {\n  color: #00f;\n}\n</style></div></div>");
 	}
 	#[test]
@@ -259,7 +259,7 @@ mod test {
 				<br/>
 			</JustSlot>
 			<style>br { color: red; }</style>
-		}.bpipe(RsxToHtmlString::default()).unwrap())
+		}.xpipe(RsxToHtmlString::default()).unwrap())
 			.to_be("<br data-styleid=\"0\"/><style data-styleid=\"0\">br[data-styleid=\"0\"] {\n  color: red;\n}\n</style>");
 	}
 
@@ -269,7 +269,7 @@ mod test {
 	fn inner_text() {
 		expect(rsx! {
 				<style>span { padding: 1.em; }</style>
-		}.bpipe(RsxToHtmlString::default()).unwrap())
+		}.xpipe(RsxToHtmlString::default()).unwrap())
 			.to_be("<style data-styleid=\"0\">span[data-styleid=\"0\"] {\n  padding: 1em;\n}\n</style>");
 	}
 }

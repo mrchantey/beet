@@ -9,11 +9,8 @@ use sweet::prelude::*;
 pub struct RoutesToHtml;
 
 
-impl
-	RsxPipeline<
-		Vec<(RouteInfo, RsxNode)>,
-		Result<Vec<(RouteInfo, HtmlDocument)>>,
-	> for RoutesToHtml
+impl Pipeline<Vec<(RouteInfo, RsxNode)>, Result<Vec<(RouteInfo, HtmlDocument)>>>
+	for RoutesToHtml
 {
 	fn apply(
 		self,
@@ -24,7 +21,7 @@ impl
 			.map(|(route, root)| {
 				// only hydrate if we have templates
 				// we already warned otherwise
-				let doc = root.bpipe(RsxToHtmlDocument::default())?;
+				let doc = root.xpipe(RsxToHtmlDocument::default())?;
 				Ok((route.clone(), doc))
 			})
 			.collect::<Result<Vec<_>>>()?;
@@ -54,9 +51,7 @@ impl Default for HtmlRoutesToDisk {
 }
 
 
-impl RsxPipeline<Vec<(RouteInfo, HtmlDocument)>, Result<()>>
-	for HtmlRoutesToDisk
-{
+impl Pipeline<Vec<(RouteInfo, HtmlDocument)>, Result<()>> for HtmlRoutesToDisk {
 	fn apply(self, routes: Vec<(RouteInfo, HtmlDocument)>) -> Result<()> {
 		let dst = &self.html_dir;
 
@@ -74,7 +69,7 @@ impl RsxPipeline<Vec<(RouteInfo, HtmlDocument)>, Result<()>>
 			let path = path.strip_prefix("/").unwrap();
 			let full_path = &dst.join(path);
 			// pretty rendering currently breaks text node logic
-			let str = doc.bpipe(RenderHtml::default())?;
+			let str = doc.xpipe(RenderHtml::default())?;
 			FsExt::write(&full_path, &str)?;
 		}
 
@@ -91,13 +86,13 @@ mod test {
 	fn works() {
 		// TODO non-disk version
 		// beet_router::test_site::routes::collect()
-		// .bpipe(FuncFilesToRsx::default())
+		// .xpipe(FuncFilesToRsx::default())
 		// .await
 		// .unwrap()
-		// .bpipe(ApplyRouteTemplates::new(
+		// .xpipe(ApplyRouteTemplates::new(
 		// 	"target/test_site/rsx-templates.ron",
 		// ))?
-		// .bpipe(RoutesToHtml::default())?
-		// .bpipe(HtmlRoutesToDisk::new("target/test_site"))?;
+		// .xpipe(RoutesToHtml::default())?
+		// .xpipe(HtmlRoutesToDisk::new("target/test_site"))?;
 	}
 }

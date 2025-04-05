@@ -15,7 +15,7 @@ fn main() {
 			<MyNode />
 		</div>
 	}
-	.bpipe(RsxToHtmlString::default())
+	.xpipe(RsxToHtmlString::default())
 	.unwrap();
 	assert_eq!(
 		str,

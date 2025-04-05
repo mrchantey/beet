@@ -12,7 +12,7 @@ pub struct ApplyTemplateToNode;
 
 
 
-impl RsxPipeline<(RsxNode, RsxTemplateNode), TemplateResult<RsxNode>>
+impl Pipeline<(RsxNode, RsxTemplateNode), TemplateResult<RsxNode>>
 	for ApplyTemplateToNode
 {
 	fn apply(
@@ -20,7 +20,7 @@ impl RsxPipeline<(RsxNode, RsxTemplateNode), TemplateResult<RsxNode>>
 		(node, template): (RsxNode, RsxTemplateNode),
 	) -> TemplateResult<RsxNode> {
 		// println!("found template for node: {}\n{:?}", location, template);
-		self.apply_to_node(template, &mut node.bpipe(NodeToRustyPartMap))
+		self.apply_to_node(template, &mut node.xpipe(NodeToRustyPartMap))
 	}
 }
 
@@ -75,7 +75,7 @@ impl ApplyTemplateToNode {
 						),
 					}?;
 				// very confusing to callback to the map like this
-				// let root = node.bpipe(template_map)?;
+				// let root = node.xpipe(template_map)?;
 				RsxComponent {
 					tag,
 					tracker,

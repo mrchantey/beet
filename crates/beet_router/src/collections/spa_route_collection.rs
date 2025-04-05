@@ -25,7 +25,7 @@ where
 			app.on_run_static.push(Box::new(move |args| {
 				let path = args.html_dir.join("index.html");
 				Box::pin(async move {
-					self().bpipe(SpaToHtmlFile::new(path)).unwrap();
+					self().xpipe(SpaToHtmlFile::new(path)).unwrap();
 					Ok(())
 				})
 			}));

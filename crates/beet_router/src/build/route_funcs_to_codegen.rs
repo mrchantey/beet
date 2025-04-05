@@ -21,7 +21,7 @@ impl Default for FuncTokensToCodegen {
 }
 
 
-impl<T: AsRef<Vec<FuncTokens>>> RsxPipeline<T, Result<(T, CodegenFile)>>
+impl<T: AsRef<Vec<FuncTokens>>> Pipeline<T, Result<(T, CodegenFile)>>
 	for FuncTokensToCodegen
 {
 	fn apply(self, func_tokens: T) -> Result<(T, CodegenFile)> {
@@ -101,11 +101,11 @@ mod test {
 	#[test]
 	fn works() {
 		let codegen_file = FileGroup::test_site_routes()
-			.bpipe(FileGroupToFuncTokens::default())
+			.xpipe(FileGroupToFuncTokens::default())
 			.unwrap()
-			.bpipe(FuncTokensToCodegen::default())
+			.xpipe(FuncTokensToCodegen::default())
 			.unwrap()
-			.bmap(|(_, codegen_file)| codegen_file.build_output())
+			.xmap(|(_, codegen_file)| codegen_file.build_output())
 			.unwrap()
 			.to_token_stream()
 			.to_string();

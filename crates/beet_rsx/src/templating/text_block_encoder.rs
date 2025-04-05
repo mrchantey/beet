@@ -114,8 +114,8 @@ impl CollapsedNode {
 				// let initial: &RsxNode = initial.as_ref();
 				let html = initial
 					.as_ref()
-					.bpipe(RsxToHtml::default())
-					.bpipe(RenderHtml::default())
+					.xpipe(RsxToHtml::default())
+					.xpipe(RenderHtml::default())
 					.unwrap();
 				out.push(CollapsedNode::RustText(html));
 			}

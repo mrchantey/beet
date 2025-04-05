@@ -31,14 +31,14 @@ impl RoutesToClientIslandMap {
 	}
 }
 
-impl RsxPipeline<&Vec<(RouteInfo, RsxNode)>, Result<()>>
+impl Pipeline<&Vec<(RouteInfo, RsxNode)>, Result<()>>
 	for RoutesToClientIslandMap
 {
 	fn apply(self, routes: &Vec<(RouteInfo, RsxNode)>) -> Result<()> {
 		let map: RapidHashMap<_, _> = routes
 			.into_iter()
 			.map(|(route, rsx)| {
-				let islands = rsx.bpipe(CollectClientIslands::default());
+				let islands = rsx.xpipe(CollectClientIslands::default());
 				(route.clone(), islands)
 			})
 			.collect();

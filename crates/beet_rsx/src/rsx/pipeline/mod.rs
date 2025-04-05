@@ -18,51 +18,6 @@ pub use apply_scoped_style::*;
 use crate::prelude::*;
 use anyhow::Result;
 
-
-/// Basically a `FnOnce` trait, but not nightly and a little less awkward to implement.
-pub trait RsxPipeline<In, Out = In> {
-	/// Consume self and apply to the target
-	fn apply(self, value: In) -> Out;
-}
-
-impl<F, In, Out> RsxPipeline<In, Out> for F
-where
-	F: FnOnce(In) -> Out,
-{
-	fn apply(self, value: In) -> Out { self(value) }
-}
-
-
-/// Utilities for method-chaining on any type.
-/// Very similar in its goals to [`tap`](https://crates.io/crates/tap)
-pub trait RsxPipelineTarget: Sized {
-	/// its like map but for any type
-	fn bmap<O>(self, func: impl FnOnce(Self) -> O) -> O { func(self) }
-	/// its like inpsect but for any type
-	fn btap(mut self, func: impl FnOnce(&mut Self)) -> Self {
-		func(&mut self);
-		self
-	}
-	fn btap_mut(&mut self, func: impl FnOnce(&mut Self)) -> &mut Self {
-		func(self);
-		self
-	}
-	/// its like map but for our pipeline trait
-	fn bpipe<P: RsxPipeline<Self, O>, O>(self, pipeline: P) -> O {
-		pipeline.apply(self)
-	}
-
-	fn bref(&self) -> &Self { self }
-	fn bok<E>(self) -> Result<Self, E>
-	where
-		Self: Sized,
-	{
-		Ok(self)
-	}
-}
-impl<T: Sized> RsxPipelineTarget for T {}
-
-
 #[derive(Default)]
 pub struct DefaultRsxTransforms {
 	#[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
@@ -72,13 +27,13 @@ pub struct DefaultRsxTransforms {
 	slots: ApplySlots,
 }
 
-impl RsxPipeline<RsxNode, Result<RsxNode>> for DefaultRsxTransforms {
+impl Pipeline<RsxNode, Result<RsxNode>> for DefaultRsxTransforms {
 	fn apply(self, root: RsxNode) -> Result<RsxNode> {
 		#[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
-		let root = root.bpipe(self.fs_src)?;
+		let root = root.xpipe(self.fs_src)?;
 		#[cfg(feature = "css")]
-		let root = root.bpipe(self.scoped_style)?;
-		let root = root.bpipe(self.slots)?;
+		let root = root.xpipe(self.scoped_style)?;
+		let root = root.xpipe(self.slots)?;
 		Ok(root)
 	}
 }
@@ -91,9 +46,9 @@ pub struct RsxToHtmlDocument {
 	pub html_doc_to_resumable: HtmlDocToResumable,
 }
 
-impl RsxPipeline<RsxNode, Result<HtmlDocument>> for RsxToHtmlDocument {
+impl Pipeline<RsxNode, Result<HtmlDocument>> for RsxToHtmlDocument {
 	fn apply(self, mut node: RsxNode) -> Result<HtmlDocument> {
-		node = node.bpipe(self.rsx_transforms)?;
+		node = node.xpipe(self.rsx_transforms)?;
 
 		let mut client_reactive = false;
 		VisitRsxComponent::new(|c| {
@@ -105,13 +60,13 @@ impl RsxPipeline<RsxNode, Result<HtmlDocument>> for RsxToHtmlDocument {
 
 
 		let mut doc = node
-			.bref()
-			.bpipe(self.rsx_to_html)
-			.bpipe(self.html_to_document)?;
+			.xref()
+			.xpipe(self.rsx_to_html)
+			.xpipe(self.html_to_document)?;
 		if client_reactive {
 			doc = doc
-				.bmap(|doc| (doc, node))
-				.bpipe(self.html_doc_to_resumable);
+				.xmap(|doc| (doc, node))
+				.xpipe(self.html_doc_to_resumable);
 		}
 		Ok(doc)
 	}
@@ -132,12 +87,12 @@ impl RsxToHtmlString {
 	}
 }
 
-impl RsxPipeline<RsxNode, Result<String>> for RsxToHtmlString {
+impl Pipeline<RsxNode, Result<String>> for RsxToHtmlString {
 	fn apply(self, root: RsxNode) -> Result<String> {
-		root.bpipe(self.rsx_transforms)?
-			.bref()
-			.bpipe(self.rsx_to_html)
-			.bpipe(self.render_html)
+		root.xpipe(self.rsx_transforms)?
+			.xref()
+			.xpipe(self.rsx_to_html)
+			.xpipe(self.render_html)
 	}
 }
 
@@ -159,11 +114,11 @@ mod test {
 	#[test]
 	fn auto_resumable() {
 		let doc = rsx! { <MyComponent /> }
-			.bpipe(RsxToHtmlDocument::default())
+			.xpipe(RsxToHtmlDocument::default())
 			.unwrap();
 		expect(doc.body.len()).to_be(1);
 		let doc = rsx! { <MyComponent client:load /> }
-			.bpipe(RsxToHtmlDocument::default())
+			.xpipe(RsxToHtmlDocument::default())
 			.unwrap();
 		expect(doc.body.len()).to_be(4);
 	}

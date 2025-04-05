@@ -43,7 +43,7 @@ impl MapFuncTokensRoute {
 }
 
 
-impl RsxPipeline<Vec<FuncTokens>> for MapFuncTokensRoute {
+impl Pipeline<Vec<FuncTokens>> for MapFuncTokensRoute {
 	fn apply(self, funcs: Vec<FuncTokens>) -> Vec<FuncTokens> {
 		funcs
 			.into_iter()
@@ -77,8 +77,8 @@ mod test {
 	#[test]
 	fn works() {
 		// let _route_funcs = FileGroup::test_site_routes()
-		// 	.bpipe(FileGroupToFuncTokens::default())
+		// 	.xpipe(FileGroupToFuncTokens::default())
 		// 	.unwrap()
-		// 	.bpipe(FuncTokensToRoutes::default());
+		// 	.xpipe(FuncTokensToRoutes::default());
 	}
 }

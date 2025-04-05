@@ -482,7 +482,7 @@ mod test {
 		let my_comp = MyComponent { key: 3 };
 		expect(
 			rsx! { <MyComponent {my_comp} /> }
-				.bpipe(RsxToHtmlString::default())
+				.xpipe(RsxToHtmlString::default())
 				.unwrap(),
 		)
 		.to_be("<div data-beet-rsx-idx=\"2\">3</div>");

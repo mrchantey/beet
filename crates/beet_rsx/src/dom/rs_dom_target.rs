@@ -12,7 +12,7 @@ pub struct RsDomTarget {
 
 pub struct MountRsDom;
 
-impl RsxPipeline<RsxNode, Result<RsxNode>> for MountRsDom {
+impl Pipeline<RsxNode, Result<RsxNode>> for MountRsDom {
 	fn apply(self, root: RsxNode) -> Result<RsxNode> {
 		DomTarget::set(RsDomTarget::new(&root)?);
 		Ok(root)
@@ -23,10 +23,10 @@ impl RsDomTarget {
 	/// This does *not* apply any transformations
 	pub fn new(root: &RsxNode) -> Result<Self> {
 		let doc = root
-			.bpipe(RsxToHtml::default())
-			.bpipe(HtmlToDocument::default())?;
+			.xpipe(RsxToHtml::default())
+			.xpipe(HtmlToDocument::default())?;
 
-		let loc_map = root.bpipe(NodeToTreeLocationMap);
+		let loc_map = root.xpipe(NodeToTreeLocationMap);
 		Ok(Self {
 			doc,
 			loc_map,
@@ -40,7 +40,7 @@ impl DomTargetImpl for RsDomTarget {
 	fn html_constants(&self) -> &HtmlConstants { &self.constants }
 
 	fn render(&self) -> String {
-		self.doc.clone().bpipe(RenderHtml::default()).unwrap()
+		self.doc.clone().xpipe(RenderHtml::default()).unwrap()
 	}
 
 	fn update_rsx_node(

@@ -62,7 +62,7 @@ impl StaticRouteTreeToSidebarTree {
 	}
 }
 
-impl RsxPipeline<StaticRouteTree, Vec<SidebarNode>>
+impl Pipeline<StaticRouteTree, Vec<SidebarNode>>
 	for StaticRouteTreeToSidebarTree
 {
 	fn apply(self, value: StaticRouteTree) -> Vec<SidebarNode> {

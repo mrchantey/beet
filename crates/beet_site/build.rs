@@ -40,40 +40,41 @@ fn main() -> Result<()> {
 						.with_include("*.rs")
 						.with_exclude("*mod.rs"),
 				)
-				.bpipe(FileGroupToFuncTokens::default())?
-				.bpipe(FuncTokensToCodegen::new(
+				.xpipe(FileGroupToFuncTokens::default())?
+				.xpipe(FuncTokensToCodegen::new(
 					CodegenFile::new_workspace_rel(
 						"crates/beet_site/src/codegen/routes.rs",
 						&cx.pkg_name,
 					),
 				))?
-				.bmap(|(funcs, codegen)| -> Result<_> {
+				.xmap(|(funcs, codegen)| -> Result<_> {
 					codegen.build_and_write()?;
 					Ok(funcs)
 				})?;
 
-		let docs = FileGroup::new_workspace_rel("crates/beet_site/src/docs")?
-			.bpipe(FileGroupToFuncTokens::default())?
-			.bpipe(MapFuncTokensRoute::default().base_route("/docs"))
-			.bpipe(FuncTokensToCodegen::new(CodegenFile::new_workspace_rel(
-				"crates/beet_site/src/codegen/docs.rs",
-				&cx.pkg_name,
-			)))?
-			.bmap(|(funcs, codegen)| -> Result<_> {
-				codegen.build_and_write()?;
-				Ok(funcs)
-			})?;
+		// TODO html string parsing
+		// let docs = FileGroup::new_workspace_rel("crates/beet_site/src/docs")?
+		// 	.xpipe(FileGroupToFuncTokens::default())?
+		// 	.xpipe(MapFuncTokensRoute::default().base_route("/docs"))
+		// 	.xpipe(FuncTokensToCodegen::new(CodegenFile::new_workspace_rel(
+		// 		"crates/beet_site/src/codegen/docs.rs",
+		// 		&cx.pkg_name,
+		// 	)))?
+		// 	.xmap(|(funcs, codegen)| -> Result<_> {
+		// 		codegen.build_and_write()?;
+		// 		Ok(funcs)
+		// 	})?;
 
 		// ⚠️ this is a downstream copy of crates/beet_design/build.rs
 		let mockups = FileGroup::new_workspace_rel("crates/beet_design/src")?
 			.with_filter(GlobFilter::default().with_include("*.mockup.rs"))
-			.bpipe(FileGroupToFuncTokens::default())?
-			.bpipe(MapFuncTokensRoute::new("/design", [(".mockup", "")]));
+			.xpipe(FileGroupToFuncTokens::default())?
+			.xpipe(MapFuncTokensRoute::new("/design", [(".mockup", "")]));
 
 		funcs.extend(mockups);
-		funcs.extend(docs);
+		// funcs.extend(docs);
 
-		funcs.bpipe(RouteFuncsToTree {
+		funcs.xpipe(RouteFuncsToTree {
 			codgen_file: CodegenFile::new_workspace_rel(
 				"crates/beet_site/src/codegen/route_tree.rs",
 				&cx.pkg_name,

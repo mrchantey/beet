@@ -1,6 +1,6 @@
 use crate::prelude::*;
 use anyhow::Result;
-use beet_rsx::rsx::RsxPipeline;
+use beet_rsx::prelude::*;
 use rapidhash::RapidHashMap;
 use rapidhash::RapidHashSet;
 use syn::Expr;
@@ -42,7 +42,7 @@ pub struct RouteFuncsToTree {
 	pub codgen_file: CodegenFile,
 }
 
-impl RsxPipeline<Vec<FuncTokens>, Result<()>> for RouteFuncsToTree {
+impl Pipeline<Vec<FuncTokens>, Result<()>> for RouteFuncsToTree {
 	fn apply(self, value: Vec<FuncTokens>) -> Result<()> {
 		let tree = RouteTreeBuilder::from_routes(value.iter());
 		let mut codegen_file = self.codgen_file;

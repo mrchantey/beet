@@ -5,6 +5,10 @@ use std::path::Path;
 use std::path::PathBuf;
 use std::time::Duration;
 use std::time::Instant;
+use sweet::fs::exports::notify::EventKind;
+use sweet::fs::exports::notify::event::CreateKind;
+use sweet::fs::exports::notify::event::ModifyKind;
+use sweet::fs::exports::notify::event::RemoveKind;
 use sweet::prelude::*;
 
 

@@ -81,7 +81,7 @@ anyhow = "1"
 thiserror = "1"
 heck = "0.4"
 once_cell = "1"
-rapidhash = "1.3.0"
+rapidhash = "1"
 chrono = "0.4"
 itertools = "0"
 

@@ -342,7 +342,7 @@ mod test {
 				</Child>
 			</div>
 		}
-		.bpipe(ApplySlots::default())
+		.xpipe(ApplySlots::default())
 		.unwrap()
 		.walk(&mut counter);
 		expect(counter.node).to_be(22);

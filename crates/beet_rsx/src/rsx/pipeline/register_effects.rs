@@ -14,7 +14,7 @@ impl RegisterEffects {
 	pub fn new(root_location: TreeLocation) -> Self { Self { root_location } }
 }
 
-impl<T: Into<RsxNode>> RsxPipeline<T, Result<()>> for RegisterEffects {
+impl<T: Into<RsxNode>> Pipeline<T, Result<()>> for RegisterEffects {
 	fn apply(self, node: T) -> Result<()> {
 		let mut node: RsxNode = node.into();
 		let mut result = Ok(());
@@ -66,9 +66,9 @@ mod test {
 		let (get, _) = signal(7);
 		expect(
 			rsx! { <div>value is {get}</div> }
-				.bpipe(MountRsDom)
+				.xpipe(MountRsDom)
 				.unwrap()
-				.bpipe(RegisterEffects::default()),
+				.xpipe(RegisterEffects::default()),
 		)
 		.to_be_ok();
 	}
@@ -82,9 +82,9 @@ mod test {
 	fn bad_location() {
 		let (get, _) = signal(7);
 		let _ = rsx! { <div>value is {get}</div> }
-			.bpipe(MountRsDom)
+			.xpipe(MountRsDom)
 			.unwrap()
-			.bpipe(RegisterEffects::new(TreeLocation::new(10, 10, 10)));
+			.xpipe(RegisterEffects::new(TreeLocation::new(10, 10, 10)));
 	}
 
 
@@ -93,9 +93,9 @@ mod test {
 		let (get, set) = signal(7);
 
 		rsx! { <div>value is {get}</div> }
-			.bpipe(MountRsDom)
+			.xpipe(MountRsDom)
 			.unwrap()
-			.bpipe(RegisterEffects::default())
+			.xpipe(RegisterEffects::default())
 			.unwrap();
 		expect(&DomTarget::with(|h| h.render()))
 			.to_contain("<div data-beet-rsx-idx=\"1\">value is 7</div>");

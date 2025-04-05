@@ -30,7 +30,7 @@ fn main() {
 			id="bar"
 		/>
 	}
-	.bpipe(RsxToHtmlString::default())
+	.xpipe(RsxToHtmlString::default())
 	.unwrap();
 	assert_eq!(
 		str,

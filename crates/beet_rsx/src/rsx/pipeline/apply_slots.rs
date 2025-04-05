@@ -27,7 +27,7 @@ use thiserror::Error;
 ///  		<div slot="header">Header</div>
 /// 		<div>Default</div>
 ///  	</MyComponent>
-/// }.bpipe(RsxToHtmlString::default()).unwrap(),
+/// }.xpipe(RsxToHtmlString::default()).unwrap(),
 /// "<html><div>Header</div><div>Default</div></html>");
 ///
 /// ```
@@ -48,7 +48,7 @@ use thiserror::Error;
 #[derive(Debug, Default, Clone)]
 pub struct ApplySlots;
 
-impl RsxPipeline<RsxNode, Result<RsxNode, SlotsError>> for ApplySlots {
+impl Pipeline<RsxNode, Result<RsxNode, SlotsError>> for ApplySlots {
 	fn apply(self, mut node: RsxNode) -> Result<RsxNode, SlotsError> {
 		Self::map_node(&mut node).map(|_| node)
 	}
@@ -176,8 +176,8 @@ impl ApplySlots {
 				// println!("node: {:?}", node);
 				// println!(
 				// 	"after: {:}",
-				// 	node.bpipe(RsxToHtml::default())
-				// 		.bpipe(RenderHtml::default())
+				// 	node.xpipe(RsxToHtml::default())
+				// 		.xpipe(RenderHtml::default())
 				// 		.unwrap()
 				// );
 				} else {
@@ -273,7 +273,7 @@ mod test {
 					<div slot="header">Title</div>
 				</MyComponent>
 			}
-			.bpipe(RsxToHtmlString::default())
+			.xpipe(RsxToHtmlString::default())
 			.unwrap(),
 		)
 		.to_be("<html><div>Title</div><br/><div>Default</div></html>");
@@ -288,7 +288,7 @@ mod test {
 					<Span slot="header">Title</Span>
 				</MyComponent>
 			}
-			.bpipe(RsxToHtmlString::default())
+			.xpipe(RsxToHtmlString::default())
 			.unwrap(),
 		)
 		.to_be("<html><span>Title</span><br/><div>Default</div></html>");
@@ -300,7 +300,7 @@ mod test {
 	fn fallback() {
 		expect(
 			rsx! { <MyComponent /> }
-				.bpipe(RsxToHtmlString::default())
+				.xpipe(RsxToHtmlString::default())
 				.unwrap(),
 		)
 		.to_be("<html>Fallback Title<br/></html>");
@@ -317,7 +317,7 @@ mod test {
 					</MyComponent>
 				</Span>
 			}
-			.bpipe(RsxToHtmlString::default())
+			.xpipe(RsxToHtmlString::default())
 			.unwrap(),
 		)
 		.to_be(
@@ -353,7 +353,7 @@ mod test {
 					<h1 slot="header">"Title"</h1>
 				</Layout>
 			}
-			.bpipe(RsxToHtmlString::default())
+			.xpipe(RsxToHtmlString::default())
 			.unwrap(),
 		)
 		.to_be("<header><h1>Title</h1></header>");
@@ -396,7 +396,7 @@ mod test {
 					<h1 slot="header">"Title"</h1>
 				</Layout>
 			}
-			.bpipe(RsxToHtmlString::default())
+			.xpipe(RsxToHtmlString::default())
 			.unwrap(),
 		)
 		.to_be("<body><header><h1>Title</h1></header><main><div>Content</div></main></body>");

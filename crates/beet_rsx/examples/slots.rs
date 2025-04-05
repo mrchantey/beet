@@ -19,7 +19,7 @@ fn main() {
 			</p>
 		</div>
 	}
-	.bpipe(RsxToHtmlString::default())
+	.xpipe(RsxToHtmlString::default())
 	.unwrap();
 
 	assert_eq!(

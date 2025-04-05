@@ -287,10 +287,6 @@ mod test {
 	use quote::quote;
 
 	fn map(tokens: TokenStream) -> TokenStream {
-
-
-
-		
 		let (nodes, _) = tokens_to_rstml::<rstml::Infallible>(tokens.clone());
 		RstmlToRsx::default().map_nodes(nodes)
 	}

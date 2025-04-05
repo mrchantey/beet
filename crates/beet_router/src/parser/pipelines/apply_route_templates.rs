@@ -27,7 +27,7 @@ impl ApplyRouteTemplates {
 }
 
 
-impl RsxPipeline<Vec<(RouteInfo, RsxNode)>, Result<Vec<(RouteInfo, RsxNode)>>>
+impl Pipeline<Vec<(RouteInfo, RsxNode)>, Result<Vec<(RouteInfo, RsxNode)>>>
 	for ApplyRouteTemplates
 {
 	fn apply(
@@ -46,7 +46,7 @@ impl RsxPipeline<Vec<(RouteInfo, RsxNode)>, Result<Vec<(RouteInfo, RsxNode)>>>
 
 		routes
 			.into_iter()
-			.map(|(route, root)| Ok((route, root.bpipe(&template_map)?)))
+			.map(|(route, root)| Ok((route, root.xpipe(&template_map)?)))
 			.collect()
 	}
 }

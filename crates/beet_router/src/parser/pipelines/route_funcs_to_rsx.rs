@@ -9,7 +9,7 @@ use std::pin::Pin;
 pub struct RouteFuncsToRsx;
 
 impl
-	RsxPipeline<
+	Pipeline<
 		Vec<RouteFunc<DefaultRouteFunc>>,
 		Pin<Box<dyn Future<Output = Result<Vec<(RouteInfo, RsxNode)>>>>>,
 	> for RouteFuncsToRsx
@@ -40,9 +40,9 @@ impl IntoCollection<Self> for Vec<RouteFunc<DefaultRouteFunc>> {
 				let html_dir = args.html_dir.clone();
 				Box::pin(async move {
 					let routes = self
-						.bpipe(RouteFuncsToRsx::default())
+						.xpipe(RouteFuncsToRsx::default())
 						.await?
-						.bpipe(ApplyRouteTemplates::default())?;
+						.xpipe(ApplyRouteTemplates::default())?;
 
 					// export client islands after templates are applied,
 					// at this stage the only required transform is the slots pipeline
@@ -50,15 +50,15 @@ impl IntoCollection<Self> for Vec<RouteFunc<DefaultRouteFunc>> {
 						.clone()
 						.into_iter()
 						.map(|(info, root)| {
-							Ok((info, root.bpipe(ApplySlots::default())?))
+							Ok((info, root.xpipe(ApplySlots::default())?))
 						})
 						.collect::<Result<Vec<_>>>()?
-						.bref()
-						.bpipe(RoutesToClientIslandMap::default())?;
+						.xref()
+						.xpipe(RoutesToClientIslandMap::default())?;
 
 					routes
-						.bpipe(RoutesToHtml::default())?
-						.bpipe(HtmlRoutesToDisk::new(html_dir))?;
+						.xpipe(RoutesToHtml::default())?
+						.xpipe(HtmlRoutesToDisk::new(html_dir))?;
 					Ok(())
 				})
 			}));
@@ -78,10 +78,10 @@ mod test {
 	#[sweet::test]
 	async fn works() {
 		let html = crate::test_site::routes::collect()
-			.bpipe(RouteFuncsToRsx::default())
+			.xpipe(RouteFuncsToRsx::default())
 			.await
 			.unwrap()
-			.bpipe(RoutesToHtml::default())
+			.xpipe(RoutesToHtml::default())
 			.unwrap();
 
 		expect(html.len()).to_be(3);
@@ -103,7 +103,7 @@ mod test {
 			html.iter()
 				.find(|(info, _)| info.path.to_string_lossy() == "/")
 				.map(|(_, html)| {
-					html.clone().bpipe(RenderHtml::default()).unwrap()
+					html.clone().xpipe(RenderHtml::default()).unwrap()
 				})
 				.unwrap(),
 		)

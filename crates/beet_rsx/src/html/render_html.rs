@@ -28,13 +28,13 @@ impl RenderHtml {
 	}
 }
 
-impl<T: AsRef<Vec<HtmlNode>>> RsxPipeline<T, Result<String>> for RenderHtml {
+impl<T: AsRef<Vec<HtmlNode>>> Pipeline<T, Result<String>> for RenderHtml {
 	fn apply(self, target: T) -> Result<String> {
 		Ok(self.render(target.as_ref())?)
 	}
 }
 
-impl RsxPipeline<HtmlDocument, Result<String>> for RenderHtml {
+impl Pipeline<HtmlDocument, Result<String>> for RenderHtml {
 	fn apply(self, target: HtmlDocument) -> Result<String> {
 		Ok(self.render(&target.into_nodes())?)
 	}
@@ -163,9 +163,9 @@ mod test {
 				</body>
 			</html>
 		}
-		.bpipe(RsxToHtmlDocument::default())
+		.xpipe(RsxToHtmlDocument::default())
 		.unwrap()
-		.bpipe(RenderHtml::pretty())
+		.xpipe(RenderHtml::pretty())
 		.unwrap();
 		// println!("{}", doc.render_pretty());
 		expect(doc).to_be("<!DOCTYPE html>\n<html>\n\t<head>\n\t\t<title data-beet-rsx-idx=\"4\">\n\t\t\tTest \t\t\tfoo\t\t\tbar\n\t\t</title>\n\t</head>\n\t<body>\n\t\t<div foo=\"bar\" bazz>\n\t\t\t<p>\n\t\t\t\tTest\n\t\t\t</p>\n\t\t</div>\n\t</body>\n</html>");

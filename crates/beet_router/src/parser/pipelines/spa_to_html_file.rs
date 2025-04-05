@@ -17,7 +17,7 @@ impl SpaToHtmlFile {
 	pub fn new(dst: impl Into<PathBuf>) -> Self { Self { dst: dst.into() } }
 }
 
-impl RsxPipeline<RsxNode, Result<()>> for SpaToHtmlFile {
+impl Pipeline<RsxNode, Result<()>> for SpaToHtmlFile {
 	fn apply(self, app: RsxNode) -> Result<()> {
 		// the cli built the template map by looking at this file
 		let template_map =
@@ -27,9 +27,9 @@ impl RsxPipeline<RsxNode, Result<()>> for SpaToHtmlFile {
 		// because we need the rusty parts to fill in the html template
 		// apply the template to the app
 		let html = app
-			.bpipe(&template_map)?
-			.bpipe(RsxToHtmlDocument::default())?
-			.bpipe(RenderHtml::default())?;
+			.xpipe(&template_map)?
+			.xpipe(RsxToHtmlDocument::default())?
+			.xpipe(RenderHtml::default())?;
 
 		// build the doc and save it, the web server will detect a change
 		// and reload the page.

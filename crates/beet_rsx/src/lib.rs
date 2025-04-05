@@ -42,7 +42,8 @@ pub mod prelude {
 	#[cfg(feature = "bevy")]
 	pub use crate::bevy::*;
 
-
+	pub use sweet::prelude::Pipeline;
+	pub use sweet::prelude::PipelineTarget;
 	pub type HashMap<K,V> = rapidhash::RapidHashMap<K,V>;
 	pub type HashSet<K> = rapidhash::RapidHashSet<K>;
 	

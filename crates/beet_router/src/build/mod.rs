@@ -5,8 +5,8 @@ mod file_group;
 mod file_group_to_func_tokens;
 mod func_file_to_func_tokens;
 mod func_tokens;
-mod map_func_tokens_route;
 mod func_tokens_to_route_tree;
+mod map_func_tokens_route;
 #[cfg(feature = "markdown")]
 mod markdown_to_func_tokens;
 mod route_funcs_to_codegen;
@@ -16,8 +16,8 @@ pub use file_group::*;
 pub use file_group_to_func_tokens::*;
 pub use func_file_to_func_tokens::*;
 pub use func_tokens::*;
-pub use map_func_tokens_route::*;
 pub use func_tokens_to_route_tree::*;
+pub use map_func_tokens_route::*;
 #[cfg(feature = "markdown")]
 pub use markdown_to_func_tokens::*;
 pub use route_funcs_to_codegen::*;

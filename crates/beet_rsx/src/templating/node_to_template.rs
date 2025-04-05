@@ -3,7 +3,7 @@ use crate::prelude::*;
 
 pub struct NodeToTemplate;
 
-impl<T: AsRef<RsxNode>> RsxPipeline<T, TemplateResult<RsxTemplateNode>>
+impl<T: AsRef<RsxNode>> Pipeline<T, TemplateResult<RsxTemplateNode>>
 	for NodeToTemplate
 {
 	fn apply(self, node: T) -> TemplateResult<RsxTemplateNode> {
@@ -11,7 +11,7 @@ impl<T: AsRef<RsxNode>> RsxPipeline<T, TemplateResult<RsxTemplateNode>>
 			RsxNode::Fragment(RsxFragment { nodes, meta }) => {
 				let items = nodes
 					.iter()
-					.map(|n| n.bpipe(NodeToTemplate))
+					.map(|n| n.xpipe(NodeToTemplate))
 					.collect::<TemplateResult<Vec<_>>>()?;
 				Ok(RsxTemplateNode::Fragment {
 					items,
@@ -30,7 +30,7 @@ impl<T: AsRef<RsxNode>> RsxPipeline<T, TemplateResult<RsxTemplateNode>>
 				slot_children,
 				meta,
 			}) => Ok(RsxTemplateNode::Component {
-				slot_children: Box::new(slot_children.bpipe(NodeToTemplate)?),
+				slot_children: Box::new(slot_children.xpipe(NodeToTemplate)?),
 				tracker: tracker.clone(),
 				tag: tag.clone(),
 				meta: meta.clone(),
@@ -57,7 +57,7 @@ impl<T: AsRef<RsxNode>> RsxPipeline<T, TemplateResult<RsxTemplateNode>>
 					.iter()
 					.map(|attr| attr_to_template(attr))
 					.collect::<TemplateResult<Vec<_>>>()?,
-				children: Box::new(children.bpipe(NodeToTemplate)?),
+				children: Box::new(children.xpipe(NodeToTemplate)?),
 				meta: meta.clone(),
 			}),
 			RsxNode::Text(RsxText { value, meta }) => {
