@@ -1,5 +1,5 @@
-mod rstml_to_node_tokens;
-pub use rstml_to_node_tokens::*;
+mod rstml_to_rsx_tokens;
+pub use rstml_to_rsx_tokens::*;
 #[cfg(feature = "html")]
 mod html_to_rsx_template;
 mod meta_builder;
@@ -22,9 +22,9 @@ pub use self::tokens_to_rstml::*;
 pub mod rsx_file_visitor;
 #[allow(unused_imports)]
 pub use self::rsx_file_visitor::*;
-pub mod rstml_to_rsx;
+pub mod rstml_to_rsx_direct;
 #[allow(unused_imports)]
-pub use self::rstml_to_rsx::*;
+pub use self::rstml_to_rsx_direct::*;
 use proc_macro2::TokenStream;
 use syn::Expr;
 use syn::File;

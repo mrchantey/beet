@@ -10,12 +10,12 @@ use syn::spanned::Spanned;
 
 
 /// Intermediate representation of an RSX Node.
-#[derive(Debug, Clone)]
-pub enum NodeTokens<C> {
+#[derive(Debug, Clone, PartialEq)]
+pub enum RsxNodeTokens {
 	/// A fragment node, containing more fragments.
 	/// ie `rsx!(<>"foo"</>)`
 	Fragment {
-		nodes: Vec<NodeTokens<C>>,
+		nodes: Vec<RsxNodeTokens>,
 		directives: Vec<TemplateDirectiveTokens>,
 	},
 	/// A text node, containing a string.
@@ -39,23 +39,46 @@ pub enum NodeTokens<C> {
 		/// special directives, ie <MyComponent client:load/>
 		directives: Vec<TemplateDirectiveTokens>,
 		/// the children of the component, ie <MyComponent>foo</MyComponent>
-		children: Box<NodeTokens<C>>,
+		children: Box<RsxNodeTokens>,
 	},
-	Custom(C),
 }
 
 /// used when a recoverable error is emitted
-impl<C> Default for NodeTokens<C> {
+impl Default for RsxNodeTokens {
 	fn default() -> Self {
-		NodeTokens::Fragment {
+		RsxNodeTokens::Fragment {
 			nodes: Vec::new(),
 			directives: Vec::new(),
 		}
 	}
 }
+
+impl RsxNodeTokens {
+	pub fn component(tag: impl Into<NameExpr>) -> Self {
+		RsxNodeTokens::Component {
+			tag: tag.into(),
+			attributes: Vec::new(),
+			directives: Vec::new(),
+			children: Default::default(),
+		}
+	}
+}
+
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum RsxAttributeTokens {
+	/// A block attribute
+	Block { block: Spanner<Block> },
+	/// A key attribute created by [`TokenStream`]
+	Key { key: NameExpr },
+	/// A key value attribute created by [`TokenStream`]
+	KeyValue { key: NameExpr, value: Spanner<Expr> },
+}
+
+
 /// A value whose location can be retrieved either
 /// from the token stream or from a string
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Spanner<Spannable, Custom = String> {
 	Spanned {
 		value: Spannable,
@@ -114,37 +137,37 @@ impl<S, C> Spanner<S, C> {
 }
 
 
-impl<C: AsRef<Vec<TemplateDirectiveTokens>>> AsRef<Vec<TemplateDirectiveTokens>>
-	for NodeTokens<C>
-{
+impl AsRef<Vec<TemplateDirectiveTokens>> for RsxNodeTokens {
 	fn as_ref(&self) -> &Vec<TemplateDirectiveTokens> {
 		match self {
-			NodeTokens::Fragment { directives, .. }
-			| NodeTokens::Text { directives, .. }
-			| NodeTokens::Block { directives, .. }
-			| NodeTokens::Component { directives, .. } => directives,
-			NodeTokens::Custom(c) => c.as_ref(),
+			RsxNodeTokens::Fragment { directives, .. }
+			| RsxNodeTokens::Text { directives, .. }
+			| RsxNodeTokens::Block { directives, .. }
+			| RsxNodeTokens::Component { directives, .. } => directives,
 		}
 	}
 }
 
-#[derive(Debug, Clone)]
-pub enum RsxAttributeTokens {
-	/// A block attribute
-	Block { block: Spanner<Block> },
-	/// A key attribute created by [`TokenStream`]
-	Key { key: NameExpr },
-	/// A key value attribute created by [`TokenStream`]
-	KeyValue { key: NameExpr, value: Spanner<Expr> },
-}
-
 /// A restricted subtype of [`Expr`], often created by [`rstml::node::NodeName`]
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum NameExpr {
 	/// A valid path expression
 	ExprPath(Spanner<ExprPath>),
 	Block(Spanner<Block>),
 	String(Spanner<LitStr>),
+}
+
+impl NameExpr {
+	pub fn string_spanned(
+		value: impl Into<String>,
+		span: &impl Spanned,
+	) -> Self {
+		NameExpr::String(Spanner::new_custom_spanned(value, span))
+	}
+}
+
+impl Into<NameExpr> for &str {
+	fn into(self) -> NameExpr { NameExpr::string_spanned(self, &self) }
 }
 
 

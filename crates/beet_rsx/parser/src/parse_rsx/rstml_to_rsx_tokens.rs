@@ -1,9 +1,8 @@
 use crate::prelude::*;
-use proc_macro2::Span;
 use proc_macro2::TokenStream;
 use proc_macro2_diagnostics::Diagnostic;
 use proc_macro2_diagnostics::Level;
-use quote::quote;
+use rstml::node::CustomNode;
 use rstml::node::Node;
 use rstml::node::NodeAttribute;
 use rstml::node::NodeBlock;
@@ -11,17 +10,14 @@ use rstml::node::NodeElement;
 use rstml::node::NodeFragment;
 use rstml::node::NodeName;
 use std::collections::HashSet;
-use std::ops::ControlFlow;
-use sweet::prelude::PipelineTarget;
+use sweet::prelude::Pipeline;
 use syn::spanned::Spanned;
 
 
 
 /// Convert rstml nodes to a Vec<RsxNode> token stream
 #[derive(Debug, Default)]
-pub struct RstmlToNodeTokens<C: CustomNodeTokens = ()> {
-	custom_parser: C::RstmlParser,
-	pub idents: RsxIdents,
+pub struct RstmlToRsxTokens<C = rstml::Infallible> {
 	// Additional error and warning messages.
 	pub errors: Vec<TokenStream>,
 	// Collect elements to provide semantic highlight based on element tag.
@@ -31,47 +27,37 @@ pub struct RstmlToNodeTokens<C: CustomNodeTokens = ()> {
 	pub collected_elements: Vec<NodeName>,
 	// rstml requires std hashset :(
 	pub self_closing_elements: HashSet<&'static str>,
+	phantom: std::marker::PhantomData<C>,
 }
 
-impl<C: CustomNodeTokens> RstmlToNodeTokens<C>
-where
-	C::RstmlParser: std::default::Default,
-{
-	pub fn new(idents: RsxIdents) -> Self {
+impl RstmlToRsxTokens {
+	pub fn new() -> Self {
 		Self {
-			idents,
-			custom_parser: Default::default(),
-			errors: Default::default(),
-			collected_elements: Default::default(),
+			errors: Vec::new(),
+			collected_elements: Vec::new(),
 			self_closing_elements: self_closing_elements(),
+			phantom: std::marker::PhantomData,
 		}
 	}
 }
-impl<C: CustomNodeTokens> RstmlToNodeTokens<C> {
-	/// Parse rstml tokens to a [`NodeTokens`] and any compile errors
-	pub fn parse(
-		&mut self,
-		tokens: TokenStream,
-	) -> (NodeTokens<C>, TokenStream) {
-		let (nodes, rstml_errors) =
-			tokens.xpipe(TokensToRstml::<C::CustomRstmlNode>::default());
+
+/// Parse rstml nodes to a [`NodeTokens`] and any compile errors
+impl<C: CustomNode> Pipeline<Vec<Node<C>>, (RsxNodeTokens, Vec<TokenStream>)>
+	for RstmlToRsxTokens<C>
+{
+	fn apply(
+		mut self,
+		nodes: Vec<Node<C>>,
+	) -> (RsxNodeTokens, Vec<TokenStream>) {
 		let node = self.map_nodes(nodes);
-
-		let rstml_to_rsx_errors = &self.errors;
-		(node, quote! {
-			{
-				#(#rstml_errors;)*
-				#(#rstml_to_rsx_errors;)*
-			}
-		})
+		(node, self.errors)
 	}
+}
 
+impl<C: CustomNode> RstmlToRsxTokens<C> {
 	/// the number of actual html nodes will likely be different
 	/// due to fragments, blocks etc
-	pub fn map_nodes(
-		&mut self,
-		nodes: Vec<Node<C::CustomRstmlNode>>,
-	) -> NodeTokens<C> {
+	pub fn map_nodes(&mut self, nodes: Vec<Node<C>>) -> RsxNodeTokens {
 		let mut nodes = nodes
 			.into_iter()
 			.map(|node| self.map_node(node))
@@ -79,7 +65,7 @@ impl<C: CustomNodeTokens> RstmlToNodeTokens<C> {
 		if nodes.len() == 1 {
 			nodes.pop().unwrap()
 		} else {
-			NodeTokens::Fragment {
+			RsxNodeTokens::Fragment {
 				nodes,
 				directives: Default::default(),
 			}
@@ -87,25 +73,33 @@ impl<C: CustomNodeTokens> RstmlToNodeTokens<C> {
 	}
 
 	/// returns an RsxNode
-	fn map_node(&mut self, node: Node<C::CustomRstmlNode>) -> NodeTokens<C> {
-		let node = match self.custom_parser.map_node(node) {
-			ControlFlow::Continue(rstml_node) => rstml_node,
-			ControlFlow::Break(rsx_node) => {
-				return rsx_node;
-			}
-		};
-
+	fn map_node(&mut self, node: Node<C>) -> RsxNodeTokens {
 		match node {
-			Node::Text(text) => NodeTokens::Text {
+			Node::Doctype(node) => RsxNodeTokens::Component {
+				tag: NameExpr::string_spanned("doctype", &node),
+				attributes: Default::default(),
+				directives: Default::default(),
+				children: Default::default(),
+			},
+			Node::Comment(node) => RsxNodeTokens::Component {
+				tag: NameExpr::string_spanned("comment", &node),
+				attributes: Default::default(),
+				directives: Default::default(),
+				children: Box::new(RsxNodeTokens::Text {
+					text: node.value.value(),
+					directives: Default::default(),
+				}),
+			},
+			Node::Text(text) => RsxNodeTokens::Text {
 				text: text.value_string(),
 				directives: Default::default(),
 			},
-			Node::RawText(raw) => NodeTokens::Text {
+			Node::RawText(raw) => RsxNodeTokens::Text {
 				text: raw.to_string_best(),
 				directives: Default::default(),
 			},
 			Node::Fragment(NodeFragment { children, .. }) => {
-				NodeTokens::Fragment {
+				RsxNodeTokens::Fragment {
 					nodes: children
 						.into_iter()
 						.map(|n| self.map_node(n))
@@ -114,7 +108,7 @@ impl<C: CustomNodeTokens> RstmlToNodeTokens<C> {
 					directives: Default::default(),
 				}
 			}
-			Node::Block(NodeBlock::ValidBlock(block)) => NodeTokens::Block {
+			Node::Block(NodeBlock::ValidBlock(block)) => RsxNodeTokens::Block {
 				block: Spanner::new_spanned(block),
 				directives: Default::default(),
 			},
@@ -171,7 +165,7 @@ impl<C: CustomNodeTokens> RstmlToNodeTokens<C> {
 					.filter_map(|attr| self.map_attribute(attr))
 					.collect::<Vec<_>>();
 
-				NodeTokens::Component {
+				RsxNodeTokens::Component {
 					tag: open_tag.name.into(),
 					attributes,
 					directives,
@@ -184,17 +178,6 @@ impl<C: CustomNodeTokens> RstmlToNodeTokens<C> {
 						node.span(),
 						Level::Error,
 						"Unhandled custom node",
-					)
-					.emit_as_expr_tokens(),
-				);
-				Default::default()
-			}
-			_ => {
-				self.errors.push(
-					Diagnostic::spanned(
-						node.span(),
-						Level::Error,
-						"Unhandled node",
 					)
 					.emit_as_expr_tokens(),
 				);
@@ -240,10 +223,7 @@ impl<C: CustomNodeTokens> RstmlToNodeTokens<C> {
 	}
 
 	/// Ensure that self-closing elements do not have children.
-	fn check_self_closing_children(
-		&mut self,
-		element: &NodeElement<C::CustomRstmlNode>,
-	) {
+	fn check_self_closing_children(&mut self, element: &NodeElement<C>) {
 		if element.children.is_empty()
 			|| !self
 				.self_closing_elements
@@ -258,41 +238,27 @@ impl<C: CustomNodeTokens> RstmlToNodeTokens<C> {
 		);
 		self.errors.push(warning.emit_as_expr_tokens());
 	}
-
-
-	/// Update [`Self::idents`] with the specified runtime and removes it from
-	/// the list of attributes. See [`RsxIdents::set_runtime`] for more information.
-	#[allow(unused)]
-	fn parse_runtime_directive(
-		&mut self,
-		directives: &[TemplateDirectiveTokens],
-	) {
-		for directive in directives.iter() {
-			if let TemplateDirectiveTokens::Runtime(runtime) = directive {
-				if let Err(err) = self.idents.runtime.set(runtime) {
-					let diagnostic = Diagnostic::spanned(
-						Span::call_site(),
-						Level::Error,
-						err.to_string(),
-					);
-					self.errors.push(diagnostic.emit_as_expr_tokens());
-				}
-			}
-		}
-	}
 }
 
 #[cfg(test)]
 mod test {
+	use crate::prelude::*;
+	use quote::quote;
+	use sweet::prelude::*;
 
-	// #[test]
-	// fn style() { let _block = map(quote! {
-	// 	<style>
-	// 		main {
-	// 			/* min-height:100dvh; */
-	// 			min-height: var(--bm-main-height);
-	// 			padding: 1em var(--content-padding-width);
-	// 		}
-	// </style>
-	// }); }
+	#[test]
+	fn works() {
+		expect(
+			quote! {
+				<div/>
+			}
+			.xpipe(TokensToRstml::new())
+			.0
+			.xpipe(RstmlToRsxTokens::new())
+			.0,
+		)
+		.to_be(RsxNodeTokens::component(NameExpr::ExprPath(
+			Spanner::new_spanned(syn::parse_quote!(div)),
+		)));
+	}
 }

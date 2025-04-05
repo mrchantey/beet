@@ -6,7 +6,7 @@ use rstml::node::KeyedAttribute;
 use rstml::node::NodeAttribute;
 use syn::Expr;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TemplateDirectiveTokens {
 	ClientLoad,
 	ScopeLocal,
