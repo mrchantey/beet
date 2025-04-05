@@ -2,9 +2,6 @@ use anyhow::Result;
 use ego_tree::NodeRef;
 use scraper::Html;
 use scraper::Node;
-use std::io;
-use std::io::Write;
-
 
 pub struct HtmlToRsxTemplate;
 
@@ -33,16 +30,13 @@ impl HtmlToRsxTemplate {
 					Self::parse_node(child, buffer)?;
 				}
 			}
-			Node::Doctype(_) => {
-				
-				
-			},
-			Node::Comment(comment) => todo!(),
-			Node::Text(text) => todo!(),
-			Node::Element(element) => todo!(),
-			Node::ProcessingInstruction(processing_instruction) => {
-				todo!()
-			}
+			Node::Doctype(_) => {}
+			_ => {} // Node::Comment(comment) => todo!(),
+			        // Node::Text(text) => todo!(),
+			        // Node::Element(element) => todo!(),
+			        // Node::ProcessingInstruction(processing_instruction) => {
+			        // 	todo!()
+			        // }
 		}
 
 
@@ -54,9 +48,9 @@ impl HtmlToRsxTemplate {
 
 #[cfg(test)]
 mod test {
-	use crate::prelude::*;
-	use sweet::prelude::*;
+	// use crate::prelude::*;
+	// use sweet::prelude::*;
 
-	#[test]
-	fn works() { expect(true).to_be_false(); }
+	// #[test]
+	// fn works() { expect(true).to_be_false(); }
 }

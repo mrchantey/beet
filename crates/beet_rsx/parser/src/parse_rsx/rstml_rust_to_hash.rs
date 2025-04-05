@@ -18,7 +18,8 @@ pub struct RstmlRustToHash<'a> {
 impl<'a> RstmlRustToHash<'a> {
 	/// visit and hash without validating the rsx
 	pub fn visit_and_hash(hasher: &'a mut RapidHasher, tokens: TokenStream) {
-		let (mut nodes, _) = tokens_to_rstml(tokens.clone());
+		let (mut nodes, _) =
+			tokens_to_rstml::<rstml::Infallible>(tokens.clone());
 		let this = Self { hasher };
 		visit_nodes(&mut nodes, this);
 	}

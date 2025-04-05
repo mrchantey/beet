@@ -3,6 +3,7 @@ use quote::quote;
 use quote::quote_spanned;
 use rstml::Parser;
 use rstml::ParserConfig;
+use rstml::node::CustomNode;
 use rstml::node::Node;
 use rstml::node::NodeName;
 use std::collections::HashSet;
@@ -19,7 +20,9 @@ pub fn self_closing_elements() -> HashSet<&'static str> {
 }
 
 
-pub fn tokens_to_rstml(tokens: TokenStream) -> (Vec<Node>, Vec<TokenStream>) {
+pub fn tokens_to_rstml<C: CustomNode + std::fmt::Debug>(
+	tokens: TokenStream,
+) -> (Vec<Node<C>>, Vec<TokenStream>) {
 	let empty_elements = self_closing_elements();
 	let config = ParserConfig::new()
 		.recover_block(true)
@@ -27,7 +30,8 @@ pub fn tokens_to_rstml(tokens: TokenStream) -> (Vec<Node>, Vec<TokenStream>) {
 		.raw_text_elements(["script", "style"].into_iter().collect())
 		// here we define the rsx! as the constant thats used
 		// to resolve raw text blocks more correctly
-		.macro_call_pattern(quote!(rsx! {%%}));
+		.macro_call_pattern(quote!(rsx! {%%}))
+		.custom_node::<C>();
 
 	let parser = Parser::new(config);
 	let (nodes, errors) = parser.parse_recoverable(tokens).split_vec();

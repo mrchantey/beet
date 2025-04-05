@@ -1,5 +1,5 @@
 use crate::parse_rsx::meta_builder::MetaBuilder;
-use crate::parse_rsx::meta_builder::ParsedTemplateDirective;
+use crate::parse_rsx::meta_builder::TemplateDirectiveTokens;
 use crate::prelude::*;
 use proc_macro2::Span;
 use proc_macro2::TokenStream;
@@ -56,7 +56,8 @@ impl RstmlToRsx {
 	}
 
 	pub fn map_tokens(&mut self, tokens: TokenStream) -> TokenStream {
-		let (nodes, rstml_errors) = tokens_to_rstml(tokens.clone());
+		let (nodes, rstml_errors) =
+			tokens_to_rstml::<rstml::Infallible>(tokens.clone());
 		let node = self.map_nodes(nodes);
 
 		let location = macro_location_tokens(tokens);
@@ -152,9 +153,9 @@ impl RstmlToRsx {
 					close_tag,
 				} = el;
 
-
+				// unnsesecary clone but we gonna replace it anyway
 				let (directives, attributes) =
-					MetaBuilder::parse_attributes(&open_tag.attributes);
+					MetaBuilder::parse_attributes(open_tag.attributes.clone());
 
 				// we must parse runtime attr before anything else
 				self.parse_runtime_directive(&directives);
@@ -276,8 +277,8 @@ impl RstmlToRsx {
 		&mut self,
 		tag: String,
 		open_tag: &OpenTag,
-		attributes: &[&NodeAttribute],
-		directives: &[ParsedTemplateDirective],
+		attributes: &[NodeAttribute],
+		directives: &[TemplateDirectiveTokens],
 		children: Vec<Node<C>>,
 	) -> TokenStream {
 		let tracker = self.rusty_tracker.next_tracker(&open_tag);
@@ -398,10 +399,10 @@ impl RstmlToRsx {
 	/// the list of attributes. See [`RsxIdents::set_runtime`] for more information.
 	fn parse_runtime_directive(
 		&mut self,
-		directives: &[ParsedTemplateDirective],
+		directives: &[TemplateDirectiveTokens],
 	) {
 		for directive in directives.iter() {
-			if let ParsedTemplateDirective::Runtime(runtime) = directive {
+			if let TemplateDirectiveTokens::Runtime(runtime) = directive {
 				if let Err(err) = self.idents.runtime.set(runtime) {
 					let diagnostic = Diagnostic::spanned(
 						Span::call_site(),
@@ -422,7 +423,7 @@ mod test {
 	use quote::quote;
 
 	fn map(tokens: TokenStream) -> TokenStream {
-		let (nodes, _) = tokens_to_rstml(tokens.clone());
+		let (nodes, _) = tokens_to_rstml::<rstml::Infallible>(tokens.clone());
 		RstmlToRsx::default().map_nodes(nodes)
 	}
 

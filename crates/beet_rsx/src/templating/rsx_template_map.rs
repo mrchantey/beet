@@ -183,7 +183,7 @@ mod test {
 		let mut node1 = rsx! {
 			<div key str="value" num=32 ident=some_val onclick=|_| {}>
 				<p>
-					hello <MyComponent value=3 foo:bar bazz:boo="32">
+					hello <MyComponent value=3>
 						<div>some child</div>
 					</MyComponent>
 				</p>
@@ -192,7 +192,7 @@ mod test {
 		let node2_template = rsx_template! {
 			<div key str="value" num=32 ident=some_val onclick=|_| {}>
 				<p>
-					hello <MyComponent value=3 foo:bar bazz:boo="32">
+					hello <MyComponent value=3>
 						<div>some child</div>
 					</MyComponent>
 				</p>

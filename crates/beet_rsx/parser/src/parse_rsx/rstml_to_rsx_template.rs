@@ -58,7 +58,8 @@ impl RstmlToRsxTemplate {
 			rusty_tracker: RustyTrackerBuilder::default(),
 			root_location,
 		};
-		let (rstml_nodes, _rstml_errors) = tokens_to_rstml(tokens);
+		let (rstml_nodes, _rstml_errors) =
+			tokens_to_rstml::<rstml::Infallible>(tokens);
 		this.map_nodes(rstml_nodes)
 	}
 
@@ -154,8 +155,9 @@ impl RstmlToRsxTemplate {
 				close_tag,
 			}) => {
 				let location = self.location();
+				// unnsesecary clone but we gonna replace it anyway
 				let (directives, attributes) =
-					MetaBuilder::parse_attributes(&open_tag.attributes);
+					MetaBuilder::parse_attributes(open_tag.attributes.clone());
 
 
 				let meta = MetaBuilder::build_ron_with_directives(
@@ -181,7 +183,7 @@ impl RstmlToRsxTemplate {
 				} else {
 					let attributes = attributes
 						.into_iter()
-						.map(|a| self.map_attribute(a))
+						.map(|a| self.map_attribute(&a))
 						.collect::<Vec<_>>();
 					let children = self.map_nodes(children);
 					quote! { Element (

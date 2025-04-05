@@ -1,3 +1,4 @@
+use crate::prelude::*;
 use itertools::Itertools;
 use proc_macro2::TokenStream;
 use quote::quote;
@@ -5,22 +6,16 @@ use rstml::node::KeyedAttribute;
 use rstml::node::NodeAttribute;
 use syn::Expr;
 
-
-pub(crate) enum ParsedTemplateDirective {
+#[derive(Debug, Clone)]
+pub enum TemplateDirectiveTokens {
 	ClientLoad,
 	ScopeLocal,
 	ScopeGlobal,
 	FsSrc(String),
 	Slot(String),
 	Runtime(String),
-	Custom {
-		/// The part before the colon
-		prefix: String,
-		/// The part after the colon
-		suffix: String,
-		/// The part after the equals sign, if any
-		value: Option<Expr>,
-	},
+	CustomKey(NameExpr),
+	CustomKeyValue { key: NameExpr, value: Expr },
 }
 
 
@@ -36,19 +31,19 @@ fn str_lit_val(attr: &KeyedAttribute) -> Option<String> {
 	None
 }
 
-impl ParsedTemplateDirective {
-	pub fn from_attr(attr: &NodeAttribute) -> Option<ParsedTemplateDirective> {
+impl TemplateDirectiveTokens {
+	pub fn from_attr(attr: &NodeAttribute) -> Option<TemplateDirectiveTokens> {
 		let NodeAttribute::Attribute(keyed_attr) = attr else {
 			return None;
 		};
 		let attr_key_str = keyed_attr.key.to_string();
 		match attr_key_str.as_str() {
-			"client:load" => Some(ParsedTemplateDirective::ClientLoad),
-			"scope:local" => Some(ParsedTemplateDirective::ScopeLocal),
-			"scope:global" => Some(ParsedTemplateDirective::ScopeGlobal),
+			"client:load" => Some(TemplateDirectiveTokens::ClientLoad),
+			"scope:local" => Some(TemplateDirectiveTokens::ScopeLocal),
+			"scope:global" => Some(TemplateDirectiveTokens::ScopeGlobal),
 			"slot" => {
 				if let Some(val) = str_lit_val(keyed_attr) {
-					return Some(ParsedTemplateDirective::Slot(val));
+					return Some(TemplateDirectiveTokens::Slot(val));
 				}
 				None
 			}
@@ -59,7 +54,7 @@ impl ParsedTemplateDirective {
 					// .iter()
 					// .all(|p| val.starts_with(p) == false)
 					if val.starts_with('.') {
-						return Some(ParsedTemplateDirective::FsSrc(val));
+						return Some(TemplateDirectiveTokens::FsSrc(val));
 					}
 				}
 				None
@@ -75,18 +70,11 @@ impl ParsedTemplateDirective {
 							other.split(':').nth(1).unwrap().to_string();
 
 						if prefix == "runtime" {
-							return Some(ParsedTemplateDirective::Runtime(
+							return Some(TemplateDirectiveTokens::Runtime(
 								suffix,
 							));
 						}
-
-
-						let value = keyed_attr.value();
-						Some(ParsedTemplateDirective::Custom {
-							prefix,
-							suffix,
-							value: value.map(|v| v.clone()),
-						})
+						None
 					}
 					// its a prop assignemnt
 					false => None,
@@ -100,10 +88,10 @@ impl ParsedTemplateDirective {
 	/// This must match TemplateDirective::is_client_reactive
 	pub fn is_client_reactive(&self) -> bool {
 		match self {
-			ParsedTemplateDirective::ClientLoad => true,
-			ParsedTemplateDirective::Custom { prefix, .. } => {
-				prefix == "client"
-			}
+			TemplateDirectiveTokens::ClientLoad => true,
+			// TemplateDirectiveTokens::Custom { prefix, .. } => {
+			// 	prefix == "client"
+			// }
 			_ => false,
 		}
 	}
@@ -119,10 +107,10 @@ pub struct MetaBuilder;
 
 impl MetaBuilder {
 	pub fn parse_attributes(
-		attributes: &[NodeAttribute],
-	) -> (Vec<ParsedTemplateDirective>, Vec<&NodeAttribute>) {
-		attributes.iter().partition_map(|attr| {
-			match ParsedTemplateDirective::from_attr(attr) {
+		attributes: Vec<NodeAttribute>,
+	) -> (Vec<TemplateDirectiveTokens>, Vec<NodeAttribute>) {
+		attributes.into_iter().partition_map(|attr| {
+			match TemplateDirectiveTokens::from_attr(&attr) {
 				Some(directive) => itertools::Either::Left(directive),
 				None => itertools::Either::Right(attr),
 			}
@@ -131,45 +119,53 @@ impl MetaBuilder {
 
 
 	pub fn build_with_directives(
-		template_directives: &[ParsedTemplateDirective],
+		template_directives: &[TemplateDirectiveTokens],
 	) -> TokenStream {
 		let template_directives = template_directives
 			.iter()
 			.map(|directive| match directive {
-				ParsedTemplateDirective::ClientLoad => {
+				TemplateDirectiveTokens::ClientLoad => {
 					quote! {TemplateDirective::ClientLoad}
 				}
-				ParsedTemplateDirective::ScopeLocal => {
+				TemplateDirectiveTokens::ScopeLocal => {
 					quote! {TemplateDirective::ScopeLocal}
 				}
-				ParsedTemplateDirective::ScopeGlobal => {
+				TemplateDirectiveTokens::ScopeGlobal => {
 					quote! {TemplateDirective::ScopeGlobal}
 				}
-				ParsedTemplateDirective::FsSrc(src) => {
+				TemplateDirectiveTokens::FsSrc(src) => {
 					quote! {TemplateDirective::FsSrc(#src.into())}
 				}
-				ParsedTemplateDirective::Slot(slot) => {
+				TemplateDirectiveTokens::Slot(slot) => {
 					quote! {TemplateDirective::Slot(#slot.into())}
 				}
-				ParsedTemplateDirective::Runtime(runtime) => {
+				TemplateDirectiveTokens::Runtime(runtime) => {
 					quote! {TemplateDirective::Runtime(#runtime.into())}
 				}
-				ParsedTemplateDirective::Custom {
-					prefix,
-					suffix,
-					value,
-				} => {
-					let value = match value {
-						Some(value) => quote! {Some(#value.into())},
-						None => quote! {None},
-					};
-					quote! {TemplateDirective::Custom{
-						prefix: #prefix.into(),
-						suffix: #suffix.into(),
-						value: #value
-					}
-					}
+				TemplateDirectiveTokens::CustomKey(key) => {
+					quote! {TemplateDirective::CustomKey(#key.into())}
 				}
+				TemplateDirectiveTokens::CustomKeyValue { key, value } => {
+					quote! {TemplateDirective::CustomKeyValue{
+						key: #key.into(),
+						value: #value.into()
+					}}
+				} // TemplateDirectiveTokens::Custom {
+				  // 	prefix,
+				  // 	suffix,
+				  // 	value,
+				  // } => {
+				  // 	let value = match value {
+				  // 		Some(value) => quote! {Some(#value.into())},
+				  // 		None => quote! {None},
+				  // 	};
+				  // 	quote! {TemplateDirective::Custom{
+				  // 		prefix: #prefix.into(),
+				  // 		suffix: #suffix.into(),
+				  // 		value: #value
+				  // 	}
+				  // 	}
+				  // }
 			})
 			.collect::<Vec<_>>();
 		quote! {
@@ -189,41 +185,35 @@ impl MetaBuilder {
 
 	pub fn build_ron_with_directives(
 		location: TokenStream,
-		directives: &[ParsedTemplateDirective],
+		directives: &[TemplateDirectiveTokens],
 	) -> TokenStream {
 		let template_directives = directives
 			.iter()
 			.map(|directive| match directive {
-				ParsedTemplateDirective::ClientLoad => {
+				TemplateDirectiveTokens::ClientLoad => {
 					quote! {ClientLoad}
 				}
-				ParsedTemplateDirective::ScopeLocal => {
+				TemplateDirectiveTokens::ScopeLocal => {
 					quote! {ScopeLocal}
 				}
-				ParsedTemplateDirective::ScopeGlobal => {
+				TemplateDirectiveTokens::ScopeGlobal => {
 					quote! {ScopeGlobal}
 				}
-				ParsedTemplateDirective::FsSrc(src) => {
+				TemplateDirectiveTokens::FsSrc(src) => {
 					quote! {FsSrc(#src)}
 				}
-				ParsedTemplateDirective::Slot(slot) => {
+				TemplateDirectiveTokens::Slot(slot) => {
 					quote! {Slot(#slot)}
 				}
-				ParsedTemplateDirective::Runtime(runtime) => {
+				TemplateDirectiveTokens::Runtime(runtime) => {
 					quote! {Runtime(#runtime)}
 				}
-				ParsedTemplateDirective::Custom {
-					prefix,
-					suffix,
-					value,
-				} => {
-					let value = match value {
-						Some(value) => quote! {Some(#value)},
-						None => quote! {None},
-					};
-					quote! {Custom(
-						prefix: #prefix,
-						suffix: #suffix,
+				TemplateDirectiveTokens::CustomKey(key) => {
+					quote! {CustomKey(#key)}
+				}
+				TemplateDirectiveTokens::CustomKeyValue { key, value } => {
+					quote! {CustomKeyValue(
+						key: #key,
 						value: #value
 					)
 					}
