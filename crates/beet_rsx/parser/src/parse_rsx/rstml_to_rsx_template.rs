@@ -58,8 +58,7 @@ impl RstmlToRsxTemplate {
 			rusty_tracker: RustyTrackerBuilder::default(),
 			root_location,
 		};
-		let (rstml_nodes, _rstml_errors) =
-			tokens_to_rstml::<rstml::Infallible>(tokens);
+		let (rstml_nodes, _rstml_errors) = tokens.xpipe(TokensToRstml::new());
 		this.map_nodes(rstml_nodes)
 	}
 

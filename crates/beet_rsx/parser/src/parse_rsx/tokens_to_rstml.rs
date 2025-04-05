@@ -7,7 +7,55 @@ use rstml::node::CustomNode;
 use rstml::node::Node;
 use rstml::node::NodeName;
 use std::collections::HashSet;
+use sweet::prelude::Pipeline;
 use syn::spanned::Spanned;
+
+
+pub struct TokensToRstml<C = rstml::Infallible> {
+	self_closing_elements: HashSet<&'static str>,
+	phantom: std::marker::PhantomData<C>,
+}
+
+impl<C> Default for TokensToRstml<C> {
+	fn default() -> Self {
+		Self {
+			self_closing_elements: self_closing_elements(),
+			phantom: std::marker::PhantomData,
+		}
+	}
+}
+
+impl TokensToRstml<rstml::Infallible> {
+	/// convenience without specifying the type
+	pub fn new() -> Self { Self::default() }
+}
+
+
+impl<C: CustomNode + std::fmt::Debug>
+	Pipeline<TokenStream, (Vec<Node<C>>, Vec<TokenStream>)> for TokensToRstml<C>
+{
+	fn apply(self, tokens: TokenStream) -> (Vec<Node<C>>, Vec<TokenStream>) {
+		let config = ParserConfig::new()
+			.recover_block(true)
+			.always_self_closed_elements(self.self_closing_elements)
+			.raw_text_elements(["script", "style"].into_iter().collect())
+			// here we define the rsx! as the constant thats used
+			// to resolve raw text blocks more correctly
+			.macro_call_pattern(quote!(rsx! {%%}))
+			.custom_node::<C>();
+
+		let parser = Parser::new(config);
+		let (nodes, errors) = parser.parse_recoverable(tokens).split_vec();
+
+		let errors = errors
+			.into_iter()
+			.map(|e| e.emit_as_expr_tokens())
+			.collect();
+
+		(nodes, errors)
+	}
+}
+
 
 /// elements that are self-closing
 pub fn self_closing_elements() -> HashSet<&'static str> {
@@ -17,31 +65,6 @@ pub fn self_closing_elements() -> HashSet<&'static str> {
 	]
 	.into_iter()
 	.collect()
-}
-
-
-pub fn tokens_to_rstml<C: CustomNode + std::fmt::Debug>(
-	tokens: TokenStream,
-) -> (Vec<Node<C>>, Vec<TokenStream>) {
-	let empty_elements = self_closing_elements();
-	let config = ParserConfig::new()
-		.recover_block(true)
-		.always_self_closed_elements(empty_elements)
-		.raw_text_elements(["script", "style"].into_iter().collect())
-		// here we define the rsx! as the constant thats used
-		// to resolve raw text blocks more correctly
-		.macro_call_pattern(quote!(rsx! {%%}))
-		.custom_node::<C>();
-
-	let parser = Parser::new(config);
-	let (nodes, errors) = parser.parse_recoverable(tokens).split_vec();
-
-	let errors = errors
-		.into_iter()
-		.map(|e| e.emit_as_expr_tokens())
-		.collect();
-
-	(nodes, errors)
 }
 
 pub fn _generate_tags_docs(

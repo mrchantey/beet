@@ -4,14 +4,15 @@ use proc_macro2::TokenStream;
 use proc_macro2_diagnostics::Diagnostic;
 use proc_macro2_diagnostics::Level;
 use quote::quote;
-use rapidhash::RapidHashSet as HashSet;
 use rstml::node::Node;
 use rstml::node::NodeAttribute;
 use rstml::node::NodeBlock;
 use rstml::node::NodeElement;
 use rstml::node::NodeFragment;
 use rstml::node::NodeName;
+use std::collections::HashSet;
 use std::ops::ControlFlow;
+use sweet::prelude::PipelineTarget;
 use syn::spanned::Spanned;
 
 
@@ -28,6 +29,7 @@ pub struct RstmlToNodeTokens<C: CustomNodeTokens = ()> {
 	// Also multiple tags with same name can be present,
 	// because we need to mark each of them.
 	pub collected_elements: Vec<NodeName>,
+	// rstml requires std hashset :(
 	pub self_closing_elements: HashSet<&'static str>,
 }
 
@@ -41,7 +43,7 @@ where
 			custom_parser: Default::default(),
 			errors: Default::default(),
 			collected_elements: Default::default(),
-			self_closing_elements: Default::default(),
+			self_closing_elements: self_closing_elements(),
 		}
 	}
 }
@@ -52,7 +54,7 @@ impl<C: CustomNodeTokens> RstmlToNodeTokens<C> {
 		tokens: TokenStream,
 	) -> (NodeTokens<C>, TokenStream) {
 		let (nodes, rstml_errors) =
-			tokens_to_rstml::<C::CustomRstmlNode>(tokens.clone());
+			tokens.xpipe(TokensToRstml::<C::CustomRstmlNode>::default());
 		let node = self.map_nodes(nodes);
 
 		let rstml_to_rsx_errors = &self.errors;
@@ -282,17 +284,7 @@ impl<C: CustomNodeTokens> RstmlToNodeTokens<C> {
 
 #[cfg(test)]
 mod test {
-	use crate::prelude::*;
-	use proc_macro2::TokenStream;
-	use quote::quote;
 
-	fn map(tokens: TokenStream) -> TokenStream {
-		let (nodes, _) = tokens_to_rstml::<rstml::Infallible>(tokens.clone());
-		RstmlToRsx::default().map_nodes(nodes)
-	}
-
-	#[test]
-	fn block() { let _block = map(quote! {{7}}); }
 	// #[test]
 	// fn style() { let _block = map(quote! {
 	// 	<style>

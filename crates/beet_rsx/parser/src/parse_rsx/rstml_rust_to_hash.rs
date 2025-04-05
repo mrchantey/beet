@@ -1,28 +1,22 @@
-use super::tokens_to_rstml;
+use super::TokensToRstml;
 use proc_macro2::TokenStream;
 use quote::ToTokens;
 use rapidhash::RapidHasher;
+use rstml::node::CustomNode;
 use rstml::node::NodeAttribute;
-use rstml::visitor::Visitor;
 use rstml::visitor::visit_nodes;
 use std::hash::Hash;
+use sweet::prelude::PipelineTarget;
 
 
 /// Hash all the 'rusty' parts of the rsx macro
-pub struct RstmlRustToHash<'a> {
+pub struct RstmlRustToHash<'a, C = rstml::Infallible> {
 	hasher: &'a mut RapidHasher,
+	phantom: std::marker::PhantomData<C>,
 }
 
 
-
-impl<'a> RstmlRustToHash<'a> {
-	/// visit and hash without validating the rsx
-	pub fn visit_and_hash(hasher: &'a mut RapidHasher, tokens: TokenStream) {
-		let (mut nodes, _) =
-			tokens_to_rstml::<rstml::Infallible>(tokens.clone());
-		let this = Self { hasher };
-		visit_nodes(&mut nodes, this);
-	}
+impl<'a, C> RstmlRustToHash<'a, C> {
 	fn hash(&mut self, tokens: impl ToTokens) {
 		tokens
 			.to_token_stream()
@@ -31,13 +25,27 @@ impl<'a> RstmlRustToHash<'a> {
 			.hash(self.hasher);
 	}
 }
-impl<'a> syn::visit_mut::VisitMut for RstmlRustToHash<'a> {}
+
+impl<'a, C: 'static + CustomNode + std::fmt::Debug + Hash>
+	RstmlRustToHash<'a, C>
+{
+	/// visit and hash without validating the rsx
+	pub fn visit_and_hash(hasher: &'a mut RapidHasher, tokens: TokenStream) {
+		let (mut nodes, _) = tokens.xpipe(TokensToRstml::<C>::default());
+		let this = Self {
+			hasher,
+			phantom: std::marker::PhantomData,
+		};
+		visit_nodes(&mut nodes, this);
+	}
+}
+impl<'a, C> syn::visit_mut::VisitMut for RstmlRustToHash<'a, C> {}
 
 /// we could visit_rust_block but this feels more explicit
 /// and easier to understand
-impl<'a, C> Visitor<C> for RstmlRustToHash<'a>
+impl<'a, C> rstml::visitor::Visitor<C> for RstmlRustToHash<'a, C>
 where
-	C: rstml::node::CustomNode + 'static,
+	C: rstml::node::CustomNode,
 {
 	fn visit_block(&mut self, block: &mut rstml::node::NodeBlock) -> bool {
 		// println!("visiting block: {}", block.into_token_stream().to_string());

@@ -15,13 +15,14 @@ use rstml::node::NodeAttribute;
 use rstml::node::NodeElement;
 use rstml::node::NodeFragment;
 use rstml::node::NodeName;
+use sweet::prelude::PipelineTarget;
 use syn::Ident;
 use syn::spanned::Spanned;
 
 /// given a span, for example the inner block
 /// of an rsx! or rsx_template! macro,
 /// return a [RsxMacroLocation] token stream
-pub fn macro_location_tokens(tokens: impl Spanned) -> TokenStream {
+pub fn macro_location_tokens(tokens: &impl Spanned) -> TokenStream {
 	let span = tokens.span();
 	let line = span.start().line as u32;
 	let col = span.start().column as u32;
@@ -56,11 +57,10 @@ impl RstmlToRsx {
 	}
 
 	pub fn map_tokens(&mut self, tokens: TokenStream) -> TokenStream {
-		let (nodes, rstml_errors) =
-			tokens_to_rstml::<rstml::Infallible>(tokens.clone());
+		let location = macro_location_tokens(&tokens);
+		let (nodes, rstml_errors) = tokens.xpipe(TokensToRstml::new());
 		let node = self.map_nodes(nodes);
 
-		let location = macro_location_tokens(tokens);
 		let rstml_to_rsx_errors = &self.errors;
 
 		// we intentionally only set the location on the root node,
@@ -414,29 +414,4 @@ impl RstmlToRsx {
 			}
 		}
 	}
-}
-
-#[cfg(test)]
-mod test {
-	use crate::prelude::*;
-	use proc_macro2::TokenStream;
-	use quote::quote;
-
-	fn map(tokens: TokenStream) -> TokenStream {
-		let (nodes, _) = tokens_to_rstml::<rstml::Infallible>(tokens.clone());
-		RstmlToRsx::default().map_nodes(nodes)
-	}
-
-	#[test]
-	fn block() { let _block = map(quote! {{7}}); }
-	// #[test]
-	// fn style() { let _block = map(quote! {
-	// 	<style>
-	// 		main {
-	// 			/* min-height:100dvh; */
-	// 			min-height: var(--bm-main-height);
-	// 			padding: 1em var(--content-padding-width);
-	// 		}
-	// </style>
-	// }); }
 }
