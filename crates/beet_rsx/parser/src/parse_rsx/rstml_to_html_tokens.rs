@@ -233,12 +233,26 @@ impl<C: CustomNode> RstmlToHtmlTokens<C> {
 
 #[cfg(test)]
 mod test {
+	// use proc_macro2::TokenStream;
+	// use sweet::prelude::*;
 	// use crate::prelude::*;
 	// use quote::quote;
-	// use sweet::prelude::*;
+	// use super::RstmlToHtmlTokens;
+	//
+	// fn map(tokens: TokenStream) -> HtmlTokens {
+	// 	tokens
+	// 		.xpipe(TokensToRstml::new())
+	// 		.0
+	// 		.xpipe(RstmlToHtmlTokens::new())
+	// 		.0
+	// }
 
 	#[test]
-	fn div() {
+	fn works() {
+		// expect(map(quote!())).to_be(HtmlTokens::Text {
+		// 	value: syn::parse_quote!("foobar").into(),
+		// })
+
 		// expect(
 		// 	quote! {
 		// 		<div/>

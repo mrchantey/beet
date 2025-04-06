@@ -52,7 +52,6 @@ impl Pipeline<RsxNode, Result<RsxNode>> for ApplyScopedStyle {
 		// 1. apply to the root node, if its a component nothing happens
 		//    in this step, it will be handled by the component visitor
 		self.apply_node(&mut node)?;
-
 		let mut parse_err = Ok(());
 
 		// visit all components

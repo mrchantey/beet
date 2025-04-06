@@ -35,7 +35,7 @@ impl<T: Into<TokenStream>> Pipeline<T, TokenStream> for RsxMacroPipeline {
 			quote::quote! {{
 				#(#rstml_errors;)*
 				#(#html_errors;)*
-				tokens
+				#tokens
 			}}
 		}
 	}
@@ -65,6 +65,29 @@ mod test {
 				.to_string(),
 		)
 		//yes we now have client directives again!
-		.to_be(quote! {}.to_string());
+		.to_be(
+			quote! {{
+					use beet::prelude::*;
+					#[allow(unused_braces)]
+					RsxElement {
+				tag: "div".to_string(),
+				attributes: vec![],
+				children: Box::new(
+						RsxFragment {
+					nodes: vec![],
+					meta: RsxNodeMeta::default(),
+						}.into_node()
+				),
+				self_closing: true,
+				meta: RsxNodeMeta {
+						template_directives: vec![TemplateDirective::ClientLoad],
+						location: None
+				},
+					}
+					.into_node()
+					.with_location(RsxMacroLocation::new(file!(), 1u32, 0u32))
+			}}
+			.to_string(),
+		);
 	}
 }

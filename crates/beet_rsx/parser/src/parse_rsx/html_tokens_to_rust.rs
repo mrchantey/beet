@@ -67,7 +67,7 @@ impl HtmlTokensToRust {
 			idents,
 			location,
 			errors: Vec::new(),
-			rusty_tracker: RustyTrackerBuilder::default(),
+			rusty_tracker: Default::default(),
 			exclude_errors: false,
 		}
 	}
@@ -130,9 +130,11 @@ impl HtmlTokensToRust {
 					self.map_component(component, *children)
 				} else {
 					let meta = MetaBuilder::build_with_directives(&directives);
+					let attributes = attributes
+						.iter()
+						.map(|attr| self.map_attribute(attr))
+						.collect::<Vec<_>>();
 					let children = self.map_node(*children);
-					let attributes =
-						attributes.iter().map(|attr| self.map_attribute(attr));
 
 					quote!(RsxElement {
 						tag: #tag_str.to_string(),
@@ -169,30 +171,28 @@ impl HtmlTokensToRust {
 			// the attribute is a key value where
 			// the value is a string literal
 			RsxAttributeTokens::KeyValue { key, value }
-				if let Some(val_str) = value.try_lit_str() =>
+				if let Expr::Lit(lit) = &value.value =>
 			{
 				let key_str = key.to_string();
 
 				quote! {
 					RsxAttribute::KeyValue {
 						key: #key_str.to_string(),
-						value: #val_str.to_string()
+						value: #lit.to_string()
 					}
 				}
 			}
-			// the attribute is a key value where
-			// the value is a block
-			RsxAttributeTokens::KeyValue { key, value }
-				if let Expr::Block(block) = &value.value =>
-			{
+			// the attribute is a key value where the value
+			// is not an [`Expr::Lit`]
+			RsxAttributeTokens::KeyValue { key, value } => {
 				let key_str = key.to_string();
-				let tracker = self.rusty_tracker.next_tracker(block);
+				let tracker = self.rusty_tracker.next_tracker(value);
 				// we need to handle events at the tokens level for inferred
 				// event types and intellisense.
 				if key_str.starts_with("on") {
 					let register_func = syn::Ident::new(
 						&format!("register_{key_str}"),
-						block.span(),
+						value.span(),
 					);
 					let event_registry = &self.idents.runtime.event;
 					quote! {
@@ -200,7 +200,7 @@ impl HtmlTokensToRust {
 							key: #key_str.to_string(),
 							initial: "event-placeholder".to_string(),
 							effect: Effect::new(Box::new(move |cx| {
-								#event_registry::#register_func(#key_str,cx,#block);
+								#event_registry::#register_func(#key_str,cx,#value);
 								Ok(())
 							}), #tracker)
 						}
@@ -210,24 +210,8 @@ impl HtmlTokensToRust {
 						#ident::parse_attribute_value(
 							#key_str,
 							#tracker,
-							#block
+							#value
 						)
-					}
-				}
-			}
-			RsxAttributeTokens::KeyValue { key, value: _ } => {
-				self.errors.push(
-					Diagnostic::spanned(
-						key.span(),
-						Level::Error,
-						"Unsupported attribute type",
-					)
-					.emit_as_expr_tokens(),
-				);
-				quote! {
-					RsxAttribute::KeyValue {
-						key: "error".to_string(),
-						value: "error".to_string()
 					}
 				}
 			}
@@ -359,3 +343,7 @@ impl HtmlTokensToRust {
 		}
 	}
 }
+
+
+#[cfg(test)]
+mod test {}

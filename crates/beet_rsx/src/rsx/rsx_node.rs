@@ -410,6 +410,9 @@ pub enum RsxAttribute {
 		key: String,
 		value: String,
 	},
+	/// An attribute where the value is a 'block', could be represented
+	/// as an identifier for a variable or a block:
+	/// `key=value` or `key={value}` are both considered blocks.
 	BlockValue {
 		key: String,
 		initial: String,

@@ -222,9 +222,9 @@ mod test {
 			.register_type::<Vec3>()
 			.register_type::<Transform>();
 
-		let root = rsx! { <entity runtime:bevy Transform.translation=val /> };
+		let node = rsx! { <entity runtime:bevy Transform.translation=val /> };
 		let entity = RsxToBevy::default()
-			.spawn_node(app.world_mut(), &root)
+			.spawn_node(app.world_mut(), &node)
 			.unwrap()[0];
 
 		expect(app.world_mut().entity(entity).get::<Transform>())

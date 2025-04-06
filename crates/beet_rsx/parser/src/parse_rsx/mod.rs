@@ -20,7 +20,6 @@ pub use meta_builder::*;
 pub use rusty_tracker_builder::*;
 #[cfg(feature = "html")]
 pub use string_to_html_tokens::*;
-use sweet::prelude::Pipeline;
 #[cfg(feature = "css")]
 pub use validate_css::*;
 pub mod tokens_to_rstml;

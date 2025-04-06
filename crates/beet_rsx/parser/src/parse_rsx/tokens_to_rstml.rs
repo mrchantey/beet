@@ -68,9 +68,7 @@ pub fn self_closing_elements() -> HashSet<&'static str> {
 	.collect()
 }
 
-fn _generate_tags_docs(
-	elements: &[NodeName],
-) -> Vec<proc_macro2::TokenStream> {
+fn _generate_tags_docs(elements: &[NodeName]) -> Vec<proc_macro2::TokenStream> {
 	// Mark some of elements as type,
 	// and other as elements as fn in crate::docs,
 	// to give an example how to link tag with docs.

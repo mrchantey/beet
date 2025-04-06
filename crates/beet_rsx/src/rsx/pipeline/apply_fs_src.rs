@@ -17,13 +17,13 @@ impl Default for ApplyFsSrc {
 impl Pipeline<RsxNode, Result<RsxNode>> for ApplyFsSrc {
 	fn apply(self, mut root: RsxNode) -> Result<RsxNode> {
 		//1. apply to root
-		self.apply_root(&mut root)?;
+		self.apply_to_node(&mut root)?;
 
 		let mut result = Ok(());
 
 		//2. apply to the root of each component
 		VisitRsxComponentMut::walk(&mut root, |component| {
-			if let Err(err) = self.apply_root(&mut component.node) {
+			if let Err(err) = self.apply_to_node(&mut component.node) {
 				result = Err(err);
 			}
 		});
@@ -34,10 +34,9 @@ impl Pipeline<RsxNode, Result<RsxNode>> for ApplyFsSrc {
 
 impl ApplyFsSrc {
 	/// apply to a root without recursing into components
-	fn apply_root(&self, node: &mut RsxNode) -> Result<()> {
+	fn apply_to_node(&self, node: &mut RsxNode) -> Result<()> {
 		let mut result = Ok(());
 		let location = node.location().cloned();
-
 		VisitRsxElementMut::walk_with_opts(
 			node,
 			VisitRsxOptions::ignore_component_node(),

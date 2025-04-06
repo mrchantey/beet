@@ -54,12 +54,19 @@ impl TemplateDirectiveTokens {
 	pub fn from_attr(
 		attr: &RsxAttributeTokens,
 	) -> Option<TemplateDirectiveTokens> {
-		println!("attr: {:?}", attr);
 		match attr {
 			RsxAttributeTokens::Key { key } => match key.to_string().as_str() {
 				"client:load" => Some(TemplateDirectiveTokens::ClientLoad),
 				"scope:local" => Some(TemplateDirectiveTokens::ScopeLocal),
 				"scope:global" => Some(TemplateDirectiveTokens::ScopeGlobal),
+				runtime if runtime.starts_with("runtime:") => {
+					let Some(suffix) = runtime.split(':').nth(1) else {
+						return None;
+					};
+					return Some(TemplateDirectiveTokens::Runtime(
+						suffix.to_string(),
+					));
+				}
 				_other => None,
 			},
 			RsxAttributeTokens::KeyValue { key, value }
@@ -79,6 +86,17 @@ impl TemplateDirectiveTokens {
 			}
 			_ => None,
 		}
+		// TODO custom directives
+		// RsxAttributeTokens::Key { key }
+		// 	if let NameExpr::LitStr(key) = key =>
+		// {
+		// 	None
+		// }
+		// RsxAttributeTokens::KeyValue { key, value }
+		// 	if let NameExpr::LitStr(key) = key =>
+		// {
+		// 	None
+		// }
 		// match attr_key_str.as_str() {
 		// 	other => {
 		// 		match other.contains(":") {

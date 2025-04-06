@@ -121,6 +121,7 @@ impl<S: ToTokens> ToTokens for Spanner<S> {
 	}
 }
 
+
 /// For non rust tokens that still need a location, ie markdown
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SpanLike {
