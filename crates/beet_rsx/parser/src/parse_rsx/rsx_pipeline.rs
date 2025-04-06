@@ -3,14 +3,6 @@ use proc_macro2::TokenStream;
 use sweet::prelude::*;
 use syn::spanned::Spanned;
 
-pub struct ToProcMacro2;
-impl<T: Into<TokenStream>> Pipeline<T, TokenStream> for ToProcMacro2 {
-	fn apply(self, tokens: T) -> TokenStream { tokens.into() }
-}
-pub struct FromProcMacro2;
-impl<T: From<TokenStream>> Pipeline<TokenStream, T> for FromProcMacro2 {
-	fn apply(self, tokens: TokenStream) -> T { tokens.into() }
-}
 #[derive(Default)]
 pub struct RsxMacroPipeline {
 	pub no_errors: bool,
@@ -40,6 +32,51 @@ impl<T: Into<TokenStream>> Pipeline<T, TokenStream> for RsxMacroPipeline {
 		}
 	}
 }
+
+#[derive(Default)]
+pub struct RsxTemplateMacroPipeline;
+
+
+impl<T: Into<TokenStream>> Pipeline<T, TokenStream>
+	for RsxTemplateMacroPipeline
+{
+	fn apply(self, value: T) -> TokenStream {
+		value.xpipe(RsxRonPipeline::default()).xmap(|tokens| {
+			let str_tokens = tokens.to_string();
+			//TODO here we should embed errors like the rsx macro
+			quote::quote! {RsxTemplateNode::from_ron(#str_tokens).unwrap()}
+		})
+	}
+}
+
+#[derive(Default)]
+pub struct RsxRonPipeline<'a> {
+	pub file: Option<&'a WorkspacePathBuf>,
+}
+
+impl<'a> RsxRonPipeline<'a> {
+	pub fn new(file: &'a WorkspacePathBuf) -> Self { Self { file: Some(file) } }
+}
+
+
+impl<'a, T: Into<TokenStream>> Pipeline<T, TokenStream> for RsxRonPipeline<'a> {
+	fn apply(self, tokens: T) -> TokenStream {
+		let tokens = tokens.into();
+		let span = tokens.span();
+		tokens
+			.xpipe(TokensToRstml::default())
+			.0
+			.xpipe(RstmlToHtmlTokens::new())
+			.0
+			.xpipe(ApplyDefaultTemplateDirectives::default())
+			.xpipe(HtmlTokensToRon::new_from_tokens(&span, self.file))
+	}
+}
+
+
+
+
+
 // /// Demonstrates how to select a different reactive runtime
 // #[allow(unused_mut)]
 // fn feature_flag_idents() -> RsxIdents {

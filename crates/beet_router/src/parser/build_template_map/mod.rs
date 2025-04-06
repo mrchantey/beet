@@ -207,10 +207,8 @@ impl<'a> Visit<'a> for RsxSynVisitor {
 				start.line as u32,
 				start.column as u32,
 			);
-			let tokens = RstmlToRsxTemplate::map_tokens(
-				mac.tokens.clone(),
-				Some(&self.file),
-			);
+			let tokens =
+				mac.tokens.clone().xpipe(RsxRonPipeline::new(&self.file));
 			self.templates.push((loc, tokens));
 		}
 	}

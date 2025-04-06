@@ -206,6 +206,7 @@ mod test {
 	#[test]
 	fn simple() {
 		let tracker = RustyTracker::new(0, 15046980652419922415);
+		// Element (tag : \"div\" , self_closing : true , attributes : [] , children : Fragment (items : [] , meta : RsxNodeMeta (template_directives : [] , location : None)) , meta : RsxNodeMeta (template_directives : [] , location : None))
 		let node = rsx_template! { <div>{value}</div> };
 
 		expect(&node).to_be(&RsxTemplateNode::Element {

@@ -130,6 +130,8 @@ impl HtmlTokensToRust {
 					self.map_component(component, *children)
 				} else {
 					let meta = MetaBuilder::build_with_directives(&directives);
+					// this attributes-children order is important for rusty tracker indices
+					// to be consistend with HtmlTokensToRon
 					let attributes = attributes
 						.iter()
 						.map(|attr| self.map_attribute(attr))

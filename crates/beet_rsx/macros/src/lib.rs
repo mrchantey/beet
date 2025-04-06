@@ -18,13 +18,6 @@ use sweet::prelude::*;
 ///
 #[proc_macro]
 pub fn rsx(tokens: TokenStream) -> TokenStream {
-	// RstmlToRsx {
-	// 	// perhaps we can feature gate this if it proves expensive
-	// 	idents: feature_flag_idents(),
-	// 	..Default::default()
-	// }
-	// .map_tokens(tokens.into())
-	// .into()
 	tokens.xpipe(RsxMacroPipeline::default()).into()
 }
 
@@ -33,7 +26,9 @@ pub fn rsx(tokens: TokenStream) -> TokenStream {
 /// things like hot reloading.
 #[proc_macro]
 pub fn rsx_template(tokens: TokenStream) -> TokenStream {
-	RstmlToRsxTemplate::from_macro(tokens.into()).into()
+	tokens
+		.xpipe(RsxTemplateMacroPipeline::default())
+		.into()
 }
 
 
