@@ -6,6 +6,7 @@ use sweet::prelude::*;
 // cargo:: output https://doc.rust-lang.org/cargo/reference/build-scripts.html#outputs-of-the-build-script
 fn main() -> Result<()> {
 	println!("cargo::rerun-if-changed=build.rs");
+
 	// println!("cargo::rerun-if-changed=src/codegen");
 	println!("cargo::rerun-if-changed=../beet_design/src/**/*.mockup.rs");
 	println!("cargo::rerun-if-changed=../beet_design/public");
@@ -52,18 +53,17 @@ fn main() -> Result<()> {
 					Ok(funcs)
 				})?;
 
-		// TODO html string parsing
-		// let docs = FileGroup::new_workspace_rel("crates/beet_site/src/docs")?
-		// 	.xpipe(FileGroupToFuncTokens::default())?
-		// 	.xpipe(MapFuncTokensRoute::default().base_route("/docs"))
-		// 	.xpipe(FuncTokensToCodegen::new(CodegenFile::new_workspace_rel(
-		// 		"crates/beet_site/src/codegen/docs.rs",
-		// 		&cx.pkg_name,
-		// 	)))?
-		// 	.xmap(|(funcs, codegen)| -> Result<_> {
-		// 		codegen.build_and_write()?;
-		// 		Ok(funcs)
-		// 	})?;
+		let docs = FileGroup::new_workspace_rel("crates/beet_site/src/docs")?
+			.xpipe(FileGroupToFuncTokens::default())?
+			.xpipe(MapFuncTokensRoute::default().base_route("/docs"))
+			.xpipe(FuncTokensToCodegen::new(CodegenFile::new_workspace_rel(
+				"crates/beet_site/src/codegen/docs.rs",
+				&cx.pkg_name,
+			)))?
+			.xmap(|(funcs, codegen)| -> Result<_> {
+				codegen.build_and_write()?;
+				Ok(funcs)
+			})?;
 
 		// ⚠️ this is a downstream copy of crates/beet_design/build.rs
 		let mockups = FileGroup::new_workspace_rel("crates/beet_design/src")?
@@ -72,7 +72,7 @@ fn main() -> Result<()> {
 			.xpipe(MapFuncTokensRoute::new("/design", [(".mockup", "")]));
 
 		funcs.extend(mockups);
-		// funcs.extend(docs);
+		funcs.extend(docs);
 
 		funcs.xpipe(RouteFuncsToTree {
 			codgen_file: CodegenFile::new_workspace_rel(

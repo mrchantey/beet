@@ -44,14 +44,13 @@ impl FileGroupToFuncTokens {
 				canonical_path,
 				local_path,
 			),
-			// TODO html parsing
-			// #[cfg(feature = "markdown")]
-			// Some(ex) if ex == "md" => MarkdownToFuncTokens::parse(
-			// 	&file_str,
-			// 	canonical_path,
-			// 	local_path,
-			// )
-			// .map(|func| vec![func]),
+			#[cfg(feature = "markdown")]
+			Some(ex) if ex == "md" => MarkdownToFuncTokens::parse(
+				&file_str,
+				canonical_path,
+				local_path,
+			)
+			.map(|func| vec![func]),
 			_ => Ok(Vec::default()),
 		}
 	}

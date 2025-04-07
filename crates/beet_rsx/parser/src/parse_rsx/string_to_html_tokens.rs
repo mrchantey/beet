@@ -1,4 +1,5 @@
 use crate::prelude::*;
+use anyhow::Result;
 use nom::IResult;
 use nom::branch::alt;
 use nom::bytes::complete::tag;
@@ -18,12 +19,33 @@ use nom::sequence::tuple;
 use proc_macro2::Span;
 use proc_macro2::TokenStream;
 use std::fmt::Formatter;
+use sweet::prelude::*;
 use syn::Expr;
 use syn::LitStr;
 
+#[derive(Debug, Default)]
+pub struct StringToHtmlTokens;
+
+impl Pipeline<String, Result<HtmlTokens>> for StringToHtmlTokens {
+	fn apply(self, input: String) -> Result<HtmlTokens> {
+		let (remaining, node) = parse_html(&input).map_err(|e| {
+			anyhow::anyhow!("Failed to parse HTML: {}", e.to_string())
+		})?;
+		if !remaining.is_empty() {
+			return Err(anyhow::anyhow!(
+				"Unparsed input remaining: {}",
+				remaining
+			));
+		}
+		Ok(node.into())
+	}
+}
+
+
+
 /// absolute bare bones html parsing
 #[derive(Debug, PartialEq)]
-pub enum HtmlNode {
+enum HtmlNode {
 	Element {
 		name: String,
 		attributes: Vec<HtmlAttribute>,
@@ -95,7 +117,7 @@ impl std::fmt::Display for HtmlNode {
 
 
 #[derive(Debug, PartialEq)]
-pub enum HtmlAttribute {
+enum HtmlAttribute {
 	Key { key: String },
 	KeyValue { key: String, value: String },
 }
@@ -248,14 +270,15 @@ fn element(input: &str) -> IResult<&str, HtmlNode> {
 }
 
 // Parse an HTML document
-pub fn parse_html(input: &str) -> IResult<&str, HtmlNode> {
+fn parse_html(input: &str) -> IResult<&str, HtmlNode> {
 	delimited(multispace0, element, multispace0)(input)
 }
 
 #[cfg(test)]
 mod test {
-	use crate::prelude::*;
-	use sweet::prelude::*;
+	// use crate::prelude::*;
+	use super::*;
+	// use sweet::prelude::*;
 
 	#[test]
 	fn works() {
