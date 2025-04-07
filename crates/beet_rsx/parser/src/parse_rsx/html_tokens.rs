@@ -60,6 +60,14 @@ impl HtmlTokens {
 		}
 		Ok(())
 	}
+	/// Collapse a vector of `HtmlTokens` into a single `HtmlTokens`.
+	pub fn collapse(nodes: Vec<HtmlTokens>) -> HtmlTokens {
+		if nodes.len() == 1 {
+			nodes.into_iter().next().unwrap()
+		} else {
+			HtmlTokens::Fragment { nodes }
+		}
+	}
 }
 
 

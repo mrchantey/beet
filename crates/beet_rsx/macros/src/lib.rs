@@ -26,9 +26,7 @@ pub fn rsx(tokens: TokenStream) -> TokenStream {
 /// things like hot reloading.
 #[proc_macro]
 pub fn rsx_template(tokens: TokenStream) -> TokenStream {
-	tokens
-		.xpipe(RsxTemplateMacroPipeline::default())
-		.into()
+	tokens.xpipe(RsxTemplateMacroPipeline::default()).into()
 }
 
 

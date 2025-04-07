@@ -107,7 +107,7 @@ impl RsxAttributeTokens {
 
 /// A value whose location can be retrieved either
 /// from the token stream or from a string
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct Spanner<Spannable> {
 	pub value: Spannable,
 	/// If the value was created from a token stream

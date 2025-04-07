@@ -55,7 +55,11 @@ impl Pipeline<HtmlTokens, TokenStream> for HtmlTokensToRust {
 		}
 	}
 }
-
+impl Default for HtmlTokensToRust {
+	fn default() -> Self {
+		Self::new(RsxIdents::default(), LineColumn { line: 0, column: 0 })
+	}
+}
 
 
 impl HtmlTokensToRust {

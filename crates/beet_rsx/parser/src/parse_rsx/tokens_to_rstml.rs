@@ -58,7 +58,7 @@ impl<C: CustomNode + std::fmt::Debug>
 }
 
 
-/// elements that are self-closing
+/// elements that are self-closing, rstml requires hashset
 pub fn self_closing_elements() -> HashSet<&'static str> {
 	[
 		"area", "base", "br", "col", "embed", "hr", "img", "input", "link",
