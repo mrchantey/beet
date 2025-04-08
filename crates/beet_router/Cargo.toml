@@ -49,6 +49,7 @@ bevy = { workspace = true, optional = true }
 serde = { workspace = true, optional = true }
 ron = { workspace = true, optional = true }
 toml = { workspace = true, optional = true }
+heck.workspace = true
 
 #💡 parser
 uuid = { version = "1", features = ["v4"], optional = true }

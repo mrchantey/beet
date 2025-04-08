@@ -10,7 +10,6 @@ use syn::ExprPath;
 use syn::LitStr;
 use syn::spanned::Spanned;
 
-
 /// Visit all [`RsxNodeTokens`] in a tree, the nodes
 /// should be visited before children are walked in DFS preorder.
 pub trait RsxNodeTokensVisitor<E = anyhow::Error> {
@@ -215,5 +214,12 @@ impl ToTokens for NameExpr {
 			NameExpr::ExprPath(expr) => expr.to_tokens(tokens),
 			NameExpr::LitStr(string) => string.to_tokens(tokens),
 		}
+	}
+}
+
+
+impl Into<NameExpr> for String {
+	fn into(self) -> NameExpr {
+		NameExpr::LitStr(Spanner::new(LitStr::new(&self, Span::call_site())))
 	}
 }

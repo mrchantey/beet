@@ -1,6 +1,9 @@
 #![feature(more_qualified_paths)]
 
 pub mod components;
+#[cfg(not(target_arch = "wasm32"))]
+#[path = "codegen/docs.rs"]
+pub mod docs;
 #[path = "codegen/route_tree.rs"]
 pub mod route_tree;
 #[cfg(not(target_arch = "wasm32"))]

@@ -26,7 +26,6 @@ pub use validate_css::*;
 pub mod tokens_to_rstml;
 pub use self::rstml_rust_to_hash::*;
 pub use self::tokens_to_rstml::*;
-
 #[derive(Debug, Clone)]
 pub struct RsxIdents {
 	pub mac: syn::Ident,

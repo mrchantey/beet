@@ -16,6 +16,7 @@ fn main() {
 			}
 		})
 	}));
+	routes.extend(beet_site::docs::collect());
 	AppRouter::new(app_cx!()).add_collection(routes).run();
 }
 

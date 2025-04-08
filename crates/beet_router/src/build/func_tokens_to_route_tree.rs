@@ -1,6 +1,7 @@
 use crate::prelude::*;
 use anyhow::Result;
 use beet_rsx::prelude::*;
+use heck::ToSnakeCase;
 use rapidhash::RapidHashMap;
 use rapidhash::RapidHashSet;
 use syn::Expr;
@@ -105,8 +106,10 @@ impl<'a> RouteTreeBuilder<'a> {
 			self.routes
 				.iter()
 				.map(|route| {
+					let route_ident = route.name().to_snake_case();
+
 					let ident = syn::Ident::new(
-						&route.name(),
+						&route_ident,
 						proc_macro2::Span::call_site(),
 					);
 					let route_path =

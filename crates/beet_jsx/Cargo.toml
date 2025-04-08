@@ -1,0 +1,21 @@
+[package]
+name = "beet_jsx"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+readme.workspace = true
+description = "JSX-like parser combinator for Rust"
+documentation.workspace = true
+homepage.workspace = true
+repository.workspace = true
+categories.workspace = true
+keywords.workspace = true
+
+
+[dependencies]
+# rsx-parser = { git = "https://github.com/mrchantey/rsx-parser" }
+rsx-parser = { path = "../../../rsx-parser" }
+# chumsky = "0.10"
+# ariadne = "0.2"
+# nom = { version = "7" }

@@ -53,7 +53,7 @@ fn main() -> Result<()> {
 					Ok(funcs)
 				})?;
 
-		let docs = FileGroup::new_workspace_rel("crates/beet_site/src/docs")?
+		let docs = FileGroup::new_workspace_rel("crates/beet_site/src/guides")?
 			.xpipe(FileGroupToFuncTokens::default())?
 			.xpipe(MapFuncTokensRoute::default().base_route("/docs"))
 			.xpipe(FuncTokensToCodegen::new(CodegenFile::new_workspace_rel(
