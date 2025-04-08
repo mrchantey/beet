@@ -240,30 +240,30 @@ val_string	= "foo"
 		.unwrap();
 		expect(func_tokens.func.to_string()).to_be(
 			quote! {
-				rsx! {
-					{
-						use beet::prelude::*;
-						#[allow(unused_braces)]
-						RsxElement {
-							tag: "h1".to_string(),
-							attributes: vec![],
-							children: Box::new(
-								RsxText {
-									value: "hello world".to_string(),
-									meta: RsxNodeMeta::default(),
-								}.into_node()
-							),
-							self_closing: false,
-							meta: RsxNodeMeta {
-								template_directives: vec![],
-								location: None
-							},
+			||				rsx! {
+								{
+									use beet::prelude::*;
+									#[allow(unused_braces)]
+									RsxElement {
+										tag: "h1".to_string(),
+										attributes: vec![],
+										children: Box::new(
+											RsxText {
+												value: "hello world".to_string(),
+												meta: RsxNodeMeta::default(),
+											}.into_node()
+										),
+										self_closing: false,
+										meta: RsxNodeMeta {
+											template_directives: vec![],
+											location: None
+										},
+									}
+									.into_node()
+									.with_location(RsxMacroLocation::new(file!(), 0u32, 0u32))
+								}
+							}
 						}
-						.into_node()
-						.with_location(RsxMacroLocation::new(file!(), 0u32, 0u32))
-					}
-				}
-			}
 			.to_string(),
 		);
 	}

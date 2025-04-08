@@ -174,7 +174,7 @@ server = ["parser", "dep:beet_server", "beet_router?/server"]
 lambda = ["server", "beet_server/lambda"]
 spatial = ["flow", "dep:beet_spatial", "beet_ml?/spatial"]
 sim = ["flow", "dep:beet_sim"]
-build = ["beet_design?/build", "beet_router?/build"]
+build = ["router", "beet_design?/build", "beet_router?/build"]
 bevy = ["dep:bevy", "beet_rsx?/bevy", "beet_router?/bevy"]
 bevy_default = [
 	"bevy",
@@ -202,7 +202,6 @@ beet_flow = { workspace = true, optional = true }
 beet_ml = { workspace = true, optional = true }
 beet_router = { workspace = true, optional = true }
 beet_rsx = { workspace = true, optional = true }
-beet_server = { workspace = true, optional = true }
 beet_sim = { workspace = true, optional = true }
 beet_spatial = { workspace = true, optional = true }
 bevy = { workspace = true, optional = true }
@@ -217,6 +216,7 @@ sweet = { workspace = true, features = ["test", "bevy", "rand"] }
 beet = { path = "", features = ["parser"] }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+beet_server = { workspace = true, optional = true }
 tokio.workspace = true
 
 [target.'cfg(target_arch = "wasm32")'.dev-dependencies]

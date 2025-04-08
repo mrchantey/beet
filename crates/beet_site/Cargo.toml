@@ -16,13 +16,9 @@ keywords.workspace = true
 anyhow.workspace = true
 serde.workspace = true
 
-beet = { workspace = true, features = ["router", "design"] }
-
-[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-beet = { workspace = true, features = ["server"] }
-# tokio.workspace = true
+beet = { workspace = true, features = ["router", "design", "server"] }
 
 [build-dependencies]
 anyhow.workspace = true
-beet = { workspace = true, features = ["build", "router"] }
+beet = { workspace = true, features = ["build"] }
 sweet = { workspace = true, features = ["fs"] }
