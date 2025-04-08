@@ -125,37 +125,45 @@ test-threads:= '--test-threads=8'
 # cargo test --workspace runs with 16MB stack and max 8 cores
 # {{min-stack}} cargo test --workspace 			--lib											{{args}} -- {{test-threads}}
 # {{min-stack}} cargo test --workspace 			--doc	--features=_doctest	{{args}} -- {{test-threads}}
-test-ci *args:
+
+test-fmt:
 	cargo fmt 				--check
 	just leptosfmt 		--check
+
+test-ci *args:
+	just test-fmt
+	just test-web
+	just test-flow
+
+test-web *args:
 	{{min-stack}} cargo test -p beet_design 	 	 																												{{args}} -- {{test-threads}}
-	{{min-stack}} cargo test -p beet_flow 		--features=_doctest,reflect 															{{args}} -- {{test-threads}}
 	{{min-stack}} cargo test -p beet_router 	--features=_test_site,build,serde,server,parser,bevy 			{{args}} -- {{test-threads}}
 	{{min-stack}} cargo test -p beet_rsx 			--features=bevy,css,parser 																{{args}} -- {{test-threads}}
 	{{min-stack}} cargo test -p beet_server 																														{{args}} -- {{test-threads}}
-	{{min-stack}} cargo test -p beet_sim		 	--lib																											{{args}} -- {{test-threads}}
-	{{min-stack}} cargo test -p beet_spatial	--features=_doctest																				{{args}} -- {{test-threads}}
 	{{min-stack}} cargo test -p beet_site																																{{args}} -- {{test-threads}}
 	{{min-stack}} cargo test -p beet-cli																																{{args}} -- {{test-threads}}
+	{{min-stack}} cargo test -p beet_rsx 			--lib --features=bevy 		--target wasm32-unknown-unknown {{args}} -- {{test-threads}}
+	
+test-flow *args:
+	{{min-stack}} cargo test -p beet_flow 		--features=_doctest,reflect 															{{args}} -- {{test-threads}}
+	{{min-stack}} cargo test -p beet_sim		 	--lib																											{{args}} -- {{test-threads}}
+	{{min-stack}} cargo test -p beet_spatial	--features=_doctest																				{{args}} -- {{test-threads}}
 	{{min-stack}} cargo test -p beet_flow 		--lib --features=reflect 	--target wasm32-unknown-unknown {{args}} -- {{test-threads}}
 	{{min-stack}} cargo test -p beet_spatial 	--lib 									 	--target wasm32-unknown-unknown {{args}} -- {{test-threads}}
-	{{min-stack}} cargo test -p beet_rsx 			--lib --features=bevy 		--target wasm32-unknown-unknown {{args}} -- {{test-threads}}
 
-test-web:
-
-
-
+test-all-lib *args:
+	{{min-stack}} cargo test --workspace 			--lib 	--all-features																	{{args}} -- {{test-threads}}
+test-all-doc *args:
+	{{min-stack}} cargo test --workspace 			--doc 	--all-features																	{{args}} -- {{test-threads}}
 
 # rebuilding bevy_render for wasm results in 'no space left on device'
 test-all *args:
-	cargo fmt 				--check
-	just leptosfmt 		--check
-	{{min-stack}} cargo test --workspace 			--lib 	--all-features																	{{args}} -- {{test-threads}}
-	{{min-stack}} cargo test --workspace 			--doc 	--all-features																	{{args}} -- {{test-threads}}
+	just test-ci
+	just test-all-lib 																																								{{args}}
+	just test-all-doc 																																								{{args}}
+	{{min-stack}}	cargo test -p beet_rsx 			--lib 	--target wasm32-unknown-unknown --all-features  {{args}} -- {{test-threads}}
 	{{min-stack}}	cargo test -p beet_flow 		--lib 	--target wasm32-unknown-unknown --all-features  {{args}} -- {{test-threads}}
 	{{min-stack}}	cargo test -p beet_spatial 	--lib 	--target wasm32-unknown-unknown --all-features  {{args}} -- {{test-threads}}
-	{{min-stack}}	cargo test -p beet_rsx 			--lib 	--target wasm32-unknown-unknown --all-features  {{args}} -- {{test-threads}}
-	
 
 #cargo test -p beet_spatial
 #cargo test -p beet_sim

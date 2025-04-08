@@ -195,7 +195,7 @@ mod test {
 			func: syn::parse_quote!({}),
 			canonical_path: CanonicalPathBuf::new_unchecked(local_path),
 			route_info: RouteInfo {
-				path: RoutePath::parse_local_path(local_path).unwrap(),
+				path: RoutePath::from_file_path(local_path).unwrap(),
 				method: Method::GET,
 			},
 			local_path: local_path.into(),

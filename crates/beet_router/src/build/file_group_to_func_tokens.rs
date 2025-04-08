@@ -60,7 +60,6 @@ impl FileGroupToFuncTokens {
 mod test {
 	use crate::prelude::*;
 	use beet_rsx::prelude::*;
-	use quote::ToTokens;
 	use sweet::prelude::*;
 
 	#[test]
@@ -85,7 +84,7 @@ mod test {
 	}
 	#[test]
 	fn beet_site() {
-		let docs = FileGroup::new_workspace_rel("crates/beet_site/src/docs")
+		let _docs = FileGroup::new_workspace_rel("crates/beet_site/src/docs")
 			.unwrap()
 			.xpipe(FileGroupToFuncTokens::default())
 			.unwrap()
@@ -95,9 +94,9 @@ mod test {
 				"beet_site",
 			)))
 			.unwrap();
-		println!(
-			"{}",
-			docs.1.build_output().unwrap().to_token_stream().to_string()
-		);
+		// println!(
+		// 	"{}",
+		// 	docs.1.build_output().unwrap().to_token_stream().to_string()
+		// );
 	}
 }

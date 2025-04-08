@@ -30,7 +30,7 @@ impl FuncFileToFuncTokens {
 			proc_macro2::Span::call_site(),
 		);
 
-		let route_path = RoutePath::parse_local_path(&local_path)?;
+		let route_path = RoutePath::from_file_path(&local_path)?;
 
 		let func_idents = syn::parse_file(&file_str)?
 			.items

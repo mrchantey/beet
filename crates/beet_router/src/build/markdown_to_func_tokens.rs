@@ -152,7 +152,7 @@ impl MarkdownToFuncTokens {
 			frontmatter,
 			func: quote! {|| rsx! {#rust_tokens}},
 			route_info: RouteInfo {
-				path: RoutePath::parse_local_path(&local_path)?,
+				path: RoutePath::from_file_path(&local_path)?,
 				method: Method::GET,
 			},
 			local_path,

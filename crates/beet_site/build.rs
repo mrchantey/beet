@@ -6,22 +6,17 @@ use sweet::prelude::*;
 // cargo:: output https://doc.rust-lang.org/cargo/reference/build-scripts.html#outputs-of-the-build-script
 fn main() -> Result<()> {
 	println!("cargo::rerun-if-changed=build.rs");
-
-	// println!("cargo::rerun-if-changed=src/codegen");
 	println!("cargo::rerun-if-changed=../beet_design/src/**/*.mockup.rs");
 	println!("cargo::rerun-if-changed=../beet_design/public");
-
 	// println!("cargo::warning={}", "🚀🚀 building beet_site");
 	let cx = app_cx!();
+	let codegen_wasm = "crates/beet_site/src/codegen/wasm.rs";
 
 	let is_wasm = std::env::var("TARGET").unwrap() == "wasm32-unknown-unknown";
 
 	if is_wasm {
-		BuildWasmRoutes::new(CodegenFile::new_workspace_rel(
-			"crates/beet_site/src/codegen/wasm.rs",
-			&cx.pkg_name,
-		))
-		.run()?;
+		CodegenFile::new_workspace_rel(codegen_wasm, &cx.pkg_name)
+			.xpipe(BuildWasmRoutes::default())?
 	} else {
 		let html_dir =
 			WorkspacePathBuf::new("target/client").into_canonical_unchecked();

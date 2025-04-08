@@ -35,6 +35,14 @@ impl Default for RoutePath {
 	fn default() -> Self { Self(PathBuf::from("/")) }
 }
 
+/// routes shouldnt have os specific paths
+/// so we allow to_string
+impl std::fmt::Display for RoutePath {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		write!(f, "{}", self.0.display())
+	}
+}
+
 impl std::ops::Deref for RoutePath {
 	type Target = PathBuf;
 	fn deref(&self) -> &Self::Target { &self.0 }
@@ -54,28 +62,35 @@ impl Into<RoutePath> for &str {
 impl RoutePath {
 	pub fn new(path: impl Into<PathBuf>) -> Self { Self(path.into()) }
 	/// Creates a route join even if the other route path begins with `/`
-	pub fn join(&self, path: &RoutePath) -> Self {
-		let new_path =
-			path.0.strip_prefix("/").unwrap_or(&path.0).to_path_buf();
+	pub fn join(&self, new_path: &RoutePath) -> Self {
+		let new_path = new_path.0.strip_prefix("/").unwrap_or(&new_path.0);
 		Self(self.0.join(&new_path))
 	}
 	pub fn inner(&self) -> &Path { &self.0 }
-	/// given a local path, return a new [`RoutePath`] with
-	/// any extension removed and the path normalized and 'index' removed
-	pub fn parse_local_path(local_path: impl AsRef<Path>) -> Result<Self> {
-		let mut raw_str = local_path
-			.as_ref()
-			.to_string_lossy()
-			.replace(".rs", "")
-			.replace("\\", "/");
-		if raw_str.ends_with("index") {
-			raw_str = raw_str.replace("index", "");
-			// remove trailing `/` from non root paths
-			if raw_str.len() > 1 {
-				raw_str.pop();
-			}
-		};
-		raw_str = format!("/{}", raw_str);
+	/// given a local path, return a new [`RoutePath`] with:
+	/// - any extension removed
+	/// - 'index' file stems removed
+	/// - leading `/` added if not present
+	///
+	/// Backslashes are not transformed
+	pub fn from_file_path(file_path: impl AsRef<Path>) -> Result<Self> {
+		let mut path = file_path.as_ref().to_path_buf();
+		path.set_extension("");
+		if path
+			.file_stem()
+			.map(|stem| stem.to_str().map(|stem| stem == "index"))
+			.flatten()
+			.unwrap_or_default()
+		{
+			path.pop();
+		}
+		let mut raw_str = path.to_string_lossy().to_string();
+		if raw_str.len() > 1 && raw_str.ends_with('/') {
+			raw_str.pop();
+		}
+		if !raw_str.starts_with('/') {
+			raw_str = format!("/{}", raw_str);
+		}
 
 		Ok(Self(PathBuf::from(raw_str)))
 	}
@@ -169,5 +184,27 @@ mod test {
 			}
 			.to_string(),
 		);
+	}
+
+
+	#[test]
+	fn route_path() {
+		expect(RoutePath::new("hello").to_string()).to_be("hello");
+
+		for (value, expected) in [
+			("hello", "/hello"),
+			("hello.rs", "/hello"),
+			("hello/index.rs", "/hello"),
+			("/hello/index/", "/hello"),
+			("/hello/index.rs/", "/hello"),
+			("/hello/index.rs", "/hello"),
+			("/index.rs", "/"),
+			("/index.rs/", "/"),
+			("/index/hi", "/index/hi"),
+			("/index/hi/", "/index/hi"),
+		] {
+			expect(RoutePath::from_file_path(value).unwrap().to_string())
+				.to_be(expected);
+		}
 	}
 }
