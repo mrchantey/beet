@@ -7,7 +7,7 @@ pub fn get() -> RsxNode {
 			<ContentLayout>
 				<BeetHeaderLinks slot="header-nav" />
 				<h1>Beet</h1>
-				<a href=paths::docs()>Get Started</a>
+				<a href=paths::docs::index()>Get Started</a>
 				<Counter client:load initial=2 />
 			</ContentLayout>
 		</BeetContext>

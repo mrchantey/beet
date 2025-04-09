@@ -2,7 +2,7 @@
 #![cfg_attr(test, feature(test, custom_test_frameworks))]
 #![cfg_attr(test, test_runner(sweet::test_runner))]
 #![allow(async_fn_in_trait)]
-#![feature(more_qualified_paths)]
+#![feature(more_qualified_paths, if_let_guard)]
 
 pub mod app_router;
 #[cfg(feature = "bevy")]

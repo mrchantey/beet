@@ -115,17 +115,23 @@ pub struct StaticRouteTree {
 	/// for the root this is called 'root'
 	pub name: String,
 	/// all paths available at this level of the tree
-	pub paths: Vec<RoutePath>,
+	pub path: Option<RoutePath>,
 	/// All child directories
 	pub children: Vec<StaticRouteTree>,
 }
 
 impl StaticRouteTree {
 	pub fn flatten(&self) -> Vec<RoutePath> {
-		let mut paths = self.paths.clone();
-		for child in &self.children {
-			paths.extend(child.flatten());
+		let mut paths = Vec::new();
+		fn inner(paths: &mut Vec<RoutePath>, node: &StaticRouteTree) {
+			if let Some(path) = &node.path {
+				paths.push(path.clone());
+			}
+			for child in node.children.iter() {
+				inner(paths, child);
+			}
 		}
+		inner(&mut paths, &self);
 		paths
 	}
 }

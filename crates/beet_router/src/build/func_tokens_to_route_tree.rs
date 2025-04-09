@@ -2,12 +2,11 @@ use crate::prelude::*;
 use anyhow::Result;
 use beet_rsx::prelude::*;
 use heck::ToSnakeCase;
-use rapidhash::RapidHashMap;
-use rapidhash::RapidHashSet;
+use quote::ToTokens;
+use sweet::prelude::*;
 use syn::Expr;
 use syn::Item;
 use syn::ItemFn;
-use syn::ItemMod;
 
 
 /// Create a tree of routes from a list of [`FuncTokens`]`,
@@ -58,81 +57,114 @@ impl Pipeline<Vec<FuncTokens>, Result<()>> for RouteFuncsToTree {
 
 #[derive(Debug, Clone)]
 struct RouteTreeBuilder<'a> {
+	/// The route path for this part of the tree. It may be
+	/// a parent or leaf node.
 	name: String,
-	routes: Vec<&'a FuncTokens>,
-	children: RapidHashMap<String, RouteTreeBuilder<'a>>,
+	value: Option<&'a FuncTokens>,
+	/// Children mapped by their [`RouteTreeBuilder::name`].
+	/// If this is empty then the route is a leaf node.
+	children: Vec<RouteTreeBuilder<'a>>,
 }
 
 impl<'a> RouteTreeBuilder<'a> {
 	pub fn new(name: impl Into<String>) -> Self {
 		Self {
 			name: name.into(),
-			routes: Default::default(),
-			children: Default::default(),
+			value: None,
+			children: Vec::new(),
 		}
 	}
 
 	pub fn from_routes(routes: impl Iterator<Item = &'a FuncTokens>) -> Self {
-		let mut tree = Self::new("root");
+		let mut this = Self::new("root");
 		for route in routes {
-			let parts = route.route_info.path.to_string_lossy().to_string();
-			let parts = parts
-				.split('/')
-				.filter(|p| !p.is_empty())
-				.collect::<Vec<_>>();
-			let num_to_remove = if route.is_index() { 0 } else { 1 };
-
-			let mut current = &mut tree;
-			// For each part of the path except the last one, create nodes
-			for part in
-				parts.iter().take(parts.len().saturating_sub(num_to_remove))
-			{
-				current = current
-					.children
-					.entry(part.to_string())
-					.or_insert_with(|| RouteTreeBuilder::new(*part));
+			// 	// should be ancestors
+			// 	// let parts = ;
+			let mut current = &mut this;
+			for component in route.route_info.path.components() {
+				match component {
+					std::path::Component::Normal(os_str)
+						if let Some(str) = os_str.to_str() =>
+					{
+						current = VecExt::entry_or_insert_with(
+							&mut current.children,
+							|child| child.name == str,
+							|| RouteTreeBuilder::new(str),
+						);
+					}
+					_ => {} // std::path::Component::Prefix(prefix_component) => todo!(),
+					        // std::path::Component::RootDir => todo!(),
+					        // std::path::Component::CurDir => todo!(),
+					        // std::path::Component::ParentDir => todo!(),
+				}
 			}
-			// Add the file to the final node
-			current.routes.push(route);
+			current.value = Some(route);
 		}
-		tree
+		this
 	}
 
-	pub fn into_paths_mod(&self) -> ItemMod {
-		self.into_paths_mod_inner("paths")
+	/// usually for debugging, just output all paths
+	/// and the route names
+	#[allow(dead_code)]
+	fn into_path_tree(&self) -> Tree<String> {
+		let mut children = self
+			.children
+			.iter()
+			.map(|child| child.into_path_tree())
+			.collect::<Vec<_>>();
+
+		children.sort_by(|a, b| a.value.cmp(&b.value));
+		Tree {
+			value: self.name.clone(),
+			children,
+		}
 	}
-	fn into_paths_mod_inner(&self, name: &str) -> ItemMod {
-		let mod_items =
-			self.routes
-				.iter()
-				.map(|route| {
-					let route_ident = route.name().to_snake_case();
 
-					let ident = syn::Ident::new(
-						&route_ident,
-						proc_macro2::Span::call_site(),
-					);
-					let route_path =
-						route.route_info.path.to_string_lossy().to_string();
-					let item: Item = syn::parse_quote!(
-						/// Get the local route path
-						pub fn #ident()->&'static str{
-							#route_path
-						}
-					);
-					item
-				})
-				.chain(self.children.iter().map(|(name, child)| {
-					child.into_paths_mod_inner(name).into()
-				}));
-
-		let ident = syn::Ident::new(name, proc_macro2::Span::call_site());
-		syn::parse_quote!(
-			/// Nested local route paths
-			pub mod #ident {
-				#(#mod_items)*
+	fn into_path_func(&self) -> Option<ItemFn> {
+		let Some(route) = &self.value else {
+			return None;
+		};
+		let route_ident = if self.children.is_empty() {
+			syn::Ident::new(
+				&route.name().to_snake_case(),
+				proc_macro2::Span::call_site(),
+			)
+		} else {
+			syn::Ident::new("index", proc_macro2::Span::call_site())
+		};
+		let route_path = route.route_info.path.to_string_lossy().to_string();
+		Some(syn::parse_quote!(
+			/// Get the local route path
+			pub fn #route_ident()->&'static str{
+				#route_path
 			}
-		)
+		))
+	}
+
+	pub fn into_paths_mod(&self) -> Item {
+		if self.children.is_empty() {
+			self.into_path_func()
+				.expect(
+					"RouteTreeBuilders with no path and no children is not allowed",
+				)
+				.into()
+		} else {
+			let children =
+				self.children.iter().map(|child| child.into_paths_mod());
+			let ident =
+				syn::Ident::new(&self.name, proc_macro2::Span::call_site());
+			let path = self
+				.into_path_func()
+				.map(|p| p.to_token_stream())
+				.unwrap_or_default();
+			syn::parse_quote!(
+				/// Nested local route paths
+				pub mod #ident {
+					#path
+					#(#children)*
+				}
+			)
+		}
 	}
 
 	pub fn into_collect_static_route_tree(&self) -> ItemFn {
@@ -148,28 +180,26 @@ impl<'a> RouteTreeBuilder<'a> {
 	fn into_static_route_tree(&self) -> Expr {
 		let children = self
 			.children
-			.values()
+			.iter()
 			.map(|child| child.into_static_route_tree())
 			.collect::<Vec<_>>();
 
-		let paths = self
-			.routes
-			.iter()
-			.map(|func| {
-				let path = func.route_info.path.to_string_lossy().to_string();
-				let path: Expr = syn::parse_quote!(RoutePath::new(#path));
+		let path = match &self.value {
+			Some(value) => {
+				let path = value.route_info.path.to_string_lossy().to_string();
+				let path: Expr = syn::parse_quote!(Some(RoutePath::new(#path)));
 				path
-			})
-			.collect::<Vec<_>>()
-			.into_iter()
-			.collect::<RapidHashSet<_>>()
-			.into_iter();
+			}
+			None => {
+				syn::parse_quote!(None)
+			}
+		};
 
 		let name = &self.name;
 
 		syn::parse_quote!(StaticRouteTree {
 			name: #name.into(),
-			paths: vec![#(#paths),*],
+			path: #path,
 			children: vec![#(#children),*],
 		})
 	}
@@ -181,7 +211,6 @@ mod test {
 	use crate::prelude::*;
 	use http::Method;
 	use quote::ToTokens;
-	use quote::quote;
 	use sweet::prelude::*;
 	use syn::ItemFn;
 	use syn::ItemMod;
@@ -205,45 +234,28 @@ mod test {
 	fn routes() -> Vec<FuncTokens> {
 		vec![
 			route("index.rs"),
-			route("foo/bar/index.rs"),
-			route("foo/bar/bazz.rs"),
+			route("foo/bar.rs"),
+			route("foo/bazz/index.rs"),
+			route("foo/bazz/boo.rs"),
 		]
 	}
 
 	#[test]
-	fn creates_nodes() {
-		let files = routes();
-		let tree = RouteTreeBuilder::from_routes(files.iter());
-
-		// #[rustfmt::skip]
-		expect(tree.into_static_route_tree().to_token_stream().to_string())
-			.to_be(
-				quote! {
-					StaticRouteTree {
-						name: "root".into(),
-						paths: vec![RoutePath::new("/")],
-						children: vec![
-							StaticRouteTree {
-								name: "foo".into(),
-								paths: vec![],
-								children: vec![
-									StaticRouteTree {
-										name: "bar".into(),
-										paths: vec![
-											RoutePath::new("/foo/bar/bazz"),
-											RoutePath::new("/foo/bar")
-										],
-										children: vec![],
-									}
-								],
-							}
-						],
-					}
-				}
-				.to_string(),
-			);
+	fn correct_tree_structure() {
+		expect(
+			RouteTreeBuilder::from_routes(routes().iter())
+				.into_path_tree()
+				.to_string_indented(),
+		)
+		.to_be(
+			r#"root
+  foo
+    bar
+    bazz
+      boo
+"#,
+		);
 	}
-
 	#[test]
 	fn creates_mod() {
 		let routes = routes();
@@ -251,28 +263,33 @@ mod test {
 		let mod_item = tree.into_paths_mod();
 
 		let expected: ItemMod = syn::parse_quote! {
-			/// Nested local route paths
-			pub mod paths {
-				/// Get the local route path
-				pub fn index()->&'static str{
+		/// Nested local route paths
+		pub mod root {
+			/// Get the local route path
+			pub fn index() -> &'static str {
 					"/"
-				}
-				/// Nested local route paths
-				pub mod foo {
-					/// Nested local route paths
-					pub mod bar {
-						/// Get the local route path
-						pub fn index()->&'static str{
-							"/foo/bar"
-						}
-						/// Get the local route path
-						pub fn bazz()->&'static str{
-							"/foo/bar/bazz"
-						}
-					}
-				}
 			}
-		};
+			/// Nested local route paths
+			pub mod foo {
+					/// Get the local route path
+					pub fn bar() -> &'static str {
+							"/foo/bar"
+					}
+					/// Nested local route paths
+					pub mod bazz {
+							/// Get the local route path
+							pub fn index() -> &'static str {
+									"/foo/bazz"
+							}
+
+							/// Get the local route path
+							pub fn boo() -> &'static str {
+									"/foo/bazz/boo"
+							}
+					}
+			}
+		}
+				};
 		expect(mod_item.to_token_stream().to_string())
 			.to_be(expected.to_token_stream().to_string());
 	}
@@ -286,28 +303,34 @@ mod test {
 			/// Collect the static route tree
 			pub fn collect_static_route_tree() -> StaticRouteTree {
 				StaticRouteTree {
-					name: "root".into(),
-					paths: vec![
-						RoutePath::new("/")
-						],
-					children: vec![
-							StaticRouteTree {
-							name: "foo".into(),
-							paths: vec![],
-							children: vec![
+						name: "root".into(),
+						path: Some(RoutePath::new("/")),
+						children: vec![
 								StaticRouteTree {
-									name: "bar".into(),
-									paths: vec![
-										RoutePath::new("/foo/bar/bazz"),
-										RoutePath::new("/foo/bar")
-									],
-									children: vec![],
+										name: "foo".into(),
+										path: None,
+										children: vec![
+												StaticRouteTree {
+														name: "bar".into(),
+														path: Some(RoutePath::new("/foo/bar")),
+														children: vec![],
+												},
+												StaticRouteTree {
+														name: "bazz".into(),
+														path: Some(RoutePath::new("/foo/bazz")),
+														children: vec![
+																StaticRouteTree {
+																		name: "boo".into(),
+																		path: Some(RoutePath::new("/foo/bazz/boo")),
+																		children: vec![],
+																}
+														],
+												}
+										],
 								}
-							],
-						}
-					],
+						],
 				}
-			}
+		}
 		};
 		expect(func.to_token_stream().to_string())
 			.to_be(expected.to_token_stream().to_string());
