@@ -29,7 +29,7 @@ impl Pipeline<RsxNode, Result<()>> for SpaToHtmlFile {
 		let html = app
 			.xpipe(&template_map)?
 			.xpipe(RsxToHtmlDocument::default())?
-			.xpipe(RenderHtml::default())?;
+			.xpipe(RenderHtmlEscaped::default());
 
 		// build the doc and save it, the web server will detect a change
 		// and reload the page.

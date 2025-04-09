@@ -24,7 +24,7 @@ impl MarkdownToFuncTokens {
 				| Options::ENABLE_FOOTNOTES
 				| Options::ENABLE_STRIKETHROUGH
 				| Options::ENABLE_TASKLISTS
-				| Options::ENABLE_SMART_PUNCTUATION
+				// | Options::ENABLE_SMART_PUNCTUATION
 				| Options::ENABLE_HEADING_ATTRIBUTES
 				| Options::ENABLE_YAML_STYLE_METADATA_BLOCKS
 				| Options::ENABLE_PLUSES_DELIMITED_METADATA_BLOCKS
@@ -165,7 +165,6 @@ impl MarkdownToFuncTokens {
 mod test {
 	use crate::prelude::*;
 	use quote::ToTokens;
-	use quote::quote;
 	use serde::Deserialize;
 	use serde::Serialize;
 	use sweet::prelude::*;
@@ -238,33 +237,34 @@ val_string	= "foo"
 			"bar".into(),
 		)
 		.unwrap();
-		expect(func_tokens.func.to_token_stream().to_string()).to_be(
-			quote! {
-			||				rsx! {
-								{
-									use beet::prelude::*;
-									#[allow(unused_braces)]
-									RsxElement {
-										tag: "h1".to_string(),
-										attributes: vec![],
-										children: Box::new(
-											RsxText {
-												value: "hello world".to_string(),
-												meta: RsxNodeMeta::default(),
-											}.into_node()
-										),
-										self_closing: false,
-										meta: RsxNodeMeta {
-											template_directives: vec![],
-											location: None
-										},
-									}
-									.into_node()
-									.with_location(RsxMacroLocation::new(file!(), 0u32, 0u32))
+
+		let expected: syn::Expr = syn::parse_quote! {
+		||				rsx! {
+							{
+								use beet::prelude::*;
+								#[allow(unused_braces)]
+								RsxElement {
+									tag: "h1".to_string(),
+									attributes: vec![],
+									children: Box::new(
+										RsxText {
+											value: "hello world".to_string(),
+											meta: RsxNodeMeta::default(),
+										}.into_node()
+									),
+									self_closing: false,
+									meta: RsxNodeMeta {
+										template_directives: vec![],
+										location: None
+									},
 								}
+								.into_node()
+								.with_location(RsxMacroLocation::new(file!(), 0u32, 0u32))
 							}
 						}
-			.to_string(),
-		);
+					};
+
+		expect(func_tokens.func.to_token_stream().to_string())
+			.to_be(expected.to_token_stream().to_string());
 	}
 }

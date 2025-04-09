@@ -128,8 +128,7 @@ mod test {
 		let html = node
 			.xref()
 			.xpipe(RsxToHtml::default())
-			.xpipe(RenderHtml::default())
-			.unwrap();
+			.xpipe(RenderHtml::default());
 		expect(html).to_be(
 			"<div data-beet-rsx-idx=\"3\">4</div><div data-beet-rsx-idx=\"8\">4</div>",
 		);

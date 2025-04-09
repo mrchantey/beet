@@ -91,7 +91,6 @@ mod test {
 			.xmap(|doc| (doc, root.xref()))
 			.xpipe(HtmlDocToResumable::default())
 			.xpipe(RenderHtml::default())
-			.unwrap()
 	}
 
 

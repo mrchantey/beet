@@ -69,7 +69,7 @@ impl Pipeline<Vec<(RouteInfo, HtmlDocument)>, Result<()>> for HtmlRoutesToDisk {
 			let path = path.strip_prefix("/").unwrap();
 			let full_path = &dst.join(path);
 			// pretty rendering currently breaks text node logic
-			let str = doc.xpipe(RenderHtml::default())?;
+			let str = doc.xpipe(RenderHtmlEscaped::default());
 			FsExt::write(&full_path, &str)?;
 		}
 

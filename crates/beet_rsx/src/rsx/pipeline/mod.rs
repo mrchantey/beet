@@ -77,7 +77,7 @@ impl Pipeline<RsxNode, Result<HtmlDocument>> for RsxToHtmlDocument {
 pub struct RsxToHtmlString {
 	pub rsx_transforms: DefaultRsxTransforms,
 	pub rsx_to_html: RsxToHtml,
-	pub render_html: RenderHtml,
+	pub render_html: RenderHtmlEscaped,
 }
 
 impl RsxToHtmlString {
@@ -93,6 +93,7 @@ impl Pipeline<RsxNode, Result<String>> for RsxToHtmlString {
 			.xref()
 			.xpipe(self.rsx_to_html)
 			.xpipe(self.render_html)
+			.xok()
 	}
 }
 

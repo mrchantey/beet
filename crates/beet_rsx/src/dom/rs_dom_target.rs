@@ -40,7 +40,7 @@ impl DomTargetImpl for RsDomTarget {
 	fn html_constants(&self) -> &HtmlConstants { &self.constants }
 
 	fn render(&self) -> String {
-		self.doc.clone().xpipe(RenderHtml::default()).unwrap()
+		self.doc.clone().xpipe(RenderHtmlEscaped::default())
 	}
 
 	fn update_rsx_node(

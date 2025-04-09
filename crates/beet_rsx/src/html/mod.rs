@@ -1,3 +1,7 @@
+mod escape_html;
+pub use escape_html::*;
+mod render_html_pretty;
+pub use render_html_pretty::*;
 mod html_doc_to_resumable;
 mod html_document;
 mod html_node;
