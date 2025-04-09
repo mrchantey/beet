@@ -2,7 +2,6 @@ use crate::prelude::*;
 use anyhow::Result;
 use beet_rsx::prelude::*;
 use http::Method;
-use quote::quote;
 use std::path::PathBuf;
 use std::str::FromStr;
 use sweet::prelude::*;
@@ -78,7 +77,7 @@ impl FuncFileToFuncTokens {
 						method: Method::from_str(&ident_str).unwrap(),
 					},
 					frontmatter,
-					func: quote! {#mod_ident::#ident},
+					func: syn::parse_quote! {#mod_ident::#ident},
 				})
 			})
 			.collect::<Vec<_>>()

@@ -10,7 +10,6 @@ use pulldown_cmark::Options;
 use pulldown_cmark::Parser;
 use pulldown_cmark::Tag;
 use pulldown_cmark::TagEnd;
-use quote::quote;
 use std::path::PathBuf;
 use sweet::prelude::*;
 use syn::Block;
@@ -150,7 +149,7 @@ impl MarkdownToFuncTokens {
 		Ok(FuncTokens {
 			mod_ident: None,
 			frontmatter,
-			func: quote! {|| rsx! {#rust_tokens}},
+			func: syn::parse_quote! {|| rsx! {#rust_tokens}},
 			route_info: RouteInfo {
 				path: RoutePath::from_file_path(&local_path)?,
 				method: Method::GET,
@@ -165,6 +164,7 @@ impl MarkdownToFuncTokens {
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
+	use quote::ToTokens;
 	use quote::quote;
 	use serde::Deserialize;
 	use serde::Serialize;
@@ -238,7 +238,7 @@ val_string	= "foo"
 			"bar".into(),
 		)
 		.unwrap();
-		expect(func_tokens.func.to_string()).to_be(
+		expect(func_tokens.func.to_token_stream().to_string()).to_be(
 			quote! {
 			||				rsx! {
 								{

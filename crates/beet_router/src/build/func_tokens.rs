@@ -1,6 +1,5 @@
 #[allow(unused_imports)]
 use crate::prelude::*;
-use proc_macro2::TokenStream;
 use std::path::PathBuf;
 use sweet::prelude::*;
 use syn::Block;
@@ -8,7 +7,7 @@ use syn::Ident;
 
 
 /// Tokens for a function that may be used as a route.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FuncTokens {
 	/// A unique identifier for this file based on its index in
 	/// the [`FileGroup`], ie `file1`. It is used for importing the file
@@ -20,7 +19,7 @@ pub struct FuncTokens {
 	/// Tokens that will return a valid [`RouteFunc::func`], its exact signature depends
 	/// on [`FuncTokensToCodegen::func_type`]. This may depend on [`mod_ident`](Self::mod_ident),
 	/// to be imported and in scope.
-	pub func: TokenStream,
+	pub func: syn::Expr,
 	/// Canonical path to the file
 	pub canonical_path: CanonicalPathBuf,
 	/// Path relative to the [`src`](FileGroup::src) of the [`FileGroup`]

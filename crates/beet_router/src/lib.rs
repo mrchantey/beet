@@ -32,6 +32,8 @@ pub mod prelude {
 	#[cfg(feature = "parser")]
 	pub use ron;
 	pub use sweet::prelude::GlobFilter;
+	#[cfg(feature = "build")]
+	pub use syn;
 }
 
 

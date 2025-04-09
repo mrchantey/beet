@@ -29,7 +29,7 @@ fn main() -> Result<()> {
 		FsExt::copy_recursive(design_public_dir, html_dir)?;
 
 
-		let mut funcs =
+		let mut routes =
 			FileGroup::new_workspace_rel("crates/beet_site/src/routes")?
 				.with_filter(
 					GlobFilter::default()
@@ -50,7 +50,18 @@ fn main() -> Result<()> {
 
 		let docs = FileGroup::new_workspace_rel("crates/beet_site/src/docs")?
 			.xpipe(FileGroupToFuncTokens::default())?
-			.xpipe(MapFuncTokensRoute::default().base_route("/docs"))
+			.xpipe(MapFuncTokens::default().base_route("/docs").wrap_func(
+				|func| {
+					syn::parse_quote!(|| {
+						use crate::prelude::*;
+						rsx! {
+							<BeetSidebarLayout>
+								{(#func)()}
+							</BeetSidebarLayout>
+						}
+					})
+				},
+			))
 			.xpipe(FuncTokensToCodegen::new(CodegenFile::new_workspace_rel(
 				"crates/beet_site/src/codegen/docs.rs",
 				&cx.pkg_name,
@@ -63,13 +74,12 @@ fn main() -> Result<()> {
 		// ⚠️ this is a downstream copy of crates/beet_design/build.rs
 		let mockups = FileGroup::new_workspace_rel("crates/beet_design/src")?
 			.with_filter(GlobFilter::default().with_include("*.mockup.rs"))
-			.xpipe(FileGroupToFuncTokens::default())?
-			.xpipe(MapFuncTokensRoute::new("/design", [(".mockup", "")]));
+			.xpipe(FileGroupToFuncTokens::default())?;
 
-		funcs.extend(mockups);
-		funcs.extend(docs);
+		routes.extend(mockups);
+		routes.extend(docs);
 
-		funcs.xpipe(RouteFuncsToTree {
+		routes.xpipe(RouteFuncsToTree {
 			codgen_file: CodegenFile::new_workspace_rel(
 				"crates/beet_site/src/codegen/route_tree.rs",
 				&cx.pkg_name,

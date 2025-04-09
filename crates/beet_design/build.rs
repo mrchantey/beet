@@ -12,7 +12,11 @@ fn main() -> Result<()> {
 	FileGroup::new_workspace_rel("crates/beet_design/src")?
 		.with_filter(GlobFilter::default().with_include("*.mockup.rs"))
 		.xpipe(FileGroupToFuncTokens::default())?
-		.xpipe(MapFuncTokensRoute::new("/design", [(".mockup", "")]))
+		.xpipe(
+			MapFuncTokens::default()
+				.base_route("/design")
+				.replace_route([(".mockup", "")]),
+		)
 		.xpipe(FuncTokensToCodegen::new(
 			CodegenFile::new_workspace_rel(
 				"crates/beet_design/src/codegen/mockups.rs",

@@ -88,7 +88,7 @@ mod test {
 			.unwrap()
 			.xpipe(FileGroupToFuncTokens::default())
 			.unwrap()
-			.xpipe(MapFuncTokensRoute::default().base_route("/docs"))
+			.xpipe(MapFuncTokens::default().base_route("/docs"))
 			.xpipe(FuncTokensToCodegen::new(CodegenFile::new_workspace_rel(
 				"crates/beet_site/src/codegen/docs.rs",
 				"beet_site",

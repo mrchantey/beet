@@ -36,6 +36,8 @@ impl<T> RouteFunc<T> {
 		}
 	}
 
+	/// Map this route func into another route func,
+	/// maintaining the same route info.
 	pub fn map_func<T2: IntoRouteFunc<T, M>, M>(
 		self,
 		func: impl FnOnce(T) -> T2,
