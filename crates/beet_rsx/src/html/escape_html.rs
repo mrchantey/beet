@@ -2,7 +2,7 @@ use crate::prelude::*;
 
 pub struct EscapeHtml {
 	/// Element tags, the children of which will not be escaped.
-	/// Default: `["script", "style"]`
+	/// Default: `["script", "style","code"]`
 	pub ignored_tags: Vec<String>,
 }
 
