@@ -135,7 +135,8 @@ impl MarkdownToFuncTokens {
 		let frontmatter = Self::markdown_to_frontmatter_tokens(markdown)?;
 		let html_str = Self::markdown_to_html(markdown);
 		let rust_tokens = html_str
-			.clone()
+			.trim() // pulldown-cmark inserts a \n
+			.to_string()
 			.xpipe(StringToHtmlTokens::default())
 			.map_err(|e| {
 				anyhow::anyhow!(
@@ -180,8 +181,7 @@ Bar 				= 42
 [val_nested]
 val_string	= "foo"
 +++
-# hello world
-"#;
+# hello world"#;
 
 
 	#[derive(Debug, PartialEq, Serialize, Deserialize)]

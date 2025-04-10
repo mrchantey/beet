@@ -1,6 +1,6 @@
 use crate::prelude::*;
 use anyhow::Result;
-use beet_jsx::prelude::*;
+use beet_rsx_combinator::prelude::*;
 use proc_macro2::Span;
 use proc_macro2::TokenStream;
 use sweet::prelude::*;
@@ -27,35 +27,44 @@ impl Pipeline<String, Result<HtmlTokens>> for StringToHtmlTokens {
 }
 
 impl Into<HtmlTokens> for RsxParsedExpression {
+	// TODO this is a hack, we need to be able to handle this
+	// expression element placeholder technique all the way
+	// through the pipeline.
+	// currently its either expression or fragment
 	fn into(self) -> HtmlTokens {
-		// TODO this is a hack, we need to be able to handle this
-		// expression element placeholder technique all the way
-		// through the pipeline.
-		// currently its either expression or fragment
-		if self.elements.is_empty() {
-			// panic!("Expression: {}", self.tokens);
-			let block: Block = syn::parse_str(&format!("{{{}}}", &self.tokens))
-				.map_err(|e| {
-					anyhow::anyhow!(
-						"Failed to parse block:\nblock:{}\nerror:{}",
-						self.tokens,
-						e.to_string()
-					)
-				})
-				.unwrap();
-			HtmlTokens::Block {
-				value: block.into(),
-			}
-		} else if self.elements.len() == 1 {
-			self.elements.into_iter().next().unwrap().1.into()
+		if self.len() == 1 {
+			self.inner().into_iter().next().unwrap().into()
 		} else {
 			HtmlTokens::Fragment {
-				nodes: self
-					.elements
-					.into_iter()
-					.map(|(_, e)| e.into())
-					.collect(),
+				nodes: self.inner().into_iter().map(|e| e.into()).collect(),
 			}
+		}
+	}
+}
+
+impl Into<HtmlTokens> for RsxTokensOrElement {
+	fn into(self) -> HtmlTokens {
+		match self {
+			RsxTokensOrElement::Tokens(tokens) => {
+				// TODO this is incorrect, what we need is a new type,
+				// like a PartialBlock or something that allows for interspersed
+				// tokens and elements
+				let block: Block = syn::parse_str(&format!("{{{}}}", &tokens))
+					.map_err(|e| {
+						anyhow::anyhow!(
+							"\nWarning: This parser is a wip, \
+								this issue may be a me not you problem \
+								Failed to parse block:\nblock:{}\nerror:{}",
+							tokens,
+							e.to_string()
+						)
+					})
+					.unwrap();
+				HtmlTokens::Block {
+					value: block.into(),
+				}
+			}
+			RsxTokensOrElement::Element(el) => el.into(),
 		}
 	}
 }

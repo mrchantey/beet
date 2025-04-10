@@ -18,11 +18,11 @@ default = ["html"]
 fs = ["sweet/fs"]
 css = ["dep:lightningcss"]
 # html = ["dep:nom"]
-html = ["dep:beet_jsx"]
+html = ["dep:beet_rsx_combinator"]
 
 [dependencies]
 sweet.workspace = true
-beet_jsx = { workspace = true, optional = true }
+beet_rsx_combinator = { workspace = true, optional = true }
 ron.workspace = true
 anyhow.workspace = true
 itertools.workspace = true

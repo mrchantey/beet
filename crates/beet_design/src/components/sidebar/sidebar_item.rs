@@ -27,11 +27,11 @@ fn sidebar_item(
 	{
 		rsx! {
 			<a class="bm-c-sidebar__link" href=path.to_string()>
-			// aria-current={
-			// // handled in js but this avoids FOUC
-			// entry.isCurrent && 'page'
-			// }
-			// class:list={[{ large: root }]}
+				// aria-current={
+				// // handled in js but this avoids FOUC
+				// entry.isCurrent && 'page'
+				// }
+				// class:list={[{ large: root }]}
 				{display_name}
 			</a>
 		}
@@ -42,9 +42,10 @@ fn sidebar_item(
 
 		let item = if let Some(path) = path {
 			rsx! {
-			<a class="bm-c-sidebar__link" href=path.to_string()>
-				{display_name}
-			</a>}
+				<a class="bm-c-sidebar__link" href=path.to_string()>
+					{display_name}
+				</a>
+			}
 		} else {
 			rsx! { <span class="large">{display_name}</span> }
 		};

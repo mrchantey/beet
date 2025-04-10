@@ -3,7 +3,7 @@ use beet::prelude::*;
 
 pub fn get() -> RsxNode {
 	let counter = if cfg!(debug_assertions) {
-		rsx! {<Counter client:load initial=2 />}
+		rsx! { <Counter client:load initial=2 /> }
 		// this is a hack to get the counter to work in dev mode
 		// it should be removed when we have a better way to do this
 		// "client:load"

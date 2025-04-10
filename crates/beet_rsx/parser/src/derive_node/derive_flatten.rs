@@ -1,7 +1,7 @@
 use crate::prelude::*;
 use proc_macro2::TokenStream;
-use quote::quote;
 use quote::ToTokens;
+use quote::quote;
 use syn::DeriveInput;
 use syn::Expr;
 use syn::ExprLit;
@@ -11,7 +11,7 @@ use syn::Result;
 
 
 /// Impl AsRef<T> and AsMut<T> for all fields that are marked with #[field(flatten)]
-/// Also impl AsRef<Type> and AsMut<Type> for all fields that are marked with 
+/// Also impl AsRef<Type> and AsMut<Type> for all fields that are marked with
 /// #[field(flatten=Type)] or #[field(flatten("Type<usize>"))]
 /// ## `target_ident`
 /// For `derive(Node)` this is NodeBuilder,
@@ -30,7 +30,7 @@ pub fn impl_flatten(
 				let field_ident = &field.ident;
 				let field_type = &field.inner.ty;
 				let second_order_as_mut = second_order_impl(target_ident,input, field)?;
-				
+
 				Ok(quote! {
 					 impl #impl_generics AsRef<#field_type> for #target_ident #type_generics #where_clause {
 						 fn as_ref(&self) -> &#field_type { &self.#field_ident }
@@ -39,7 +39,6 @@ pub fn impl_flatten(
 							fn as_mut(&mut self) -> &mut #field_type { &mut self.#field_ident }
 						}
 						#(#second_order_as_mut)*
-						
 						// impl #impl_generics #field_buildable #marker_type_generics for #target_ident #type_generics #where_clause {
 							// 	fn get(&self) -> &#field_type { &self.#field_name }
 							// 	fn get_mut(&mut self) -> &mut #field_type { &mut self.#field_name }				
@@ -60,11 +59,11 @@ fn second_order_impl(
 	let (impl_generics, type_generics, where_clause) =
 		input.generics.split_for_impl();
 	let field_ident = &field.ident;
-	
+
 	let flatten_attrs = field.attributes.get_many("flatten");
 
 	flatten_attrs.iter().filter_map(|attr|{
-		attr.value.as_ref()		
+		attr.value.as_ref()
 	}).map(|expr|{
 		let ty: TokenStream = if let Expr::Lit(ExprLit{lit,..}) = expr && let Lit::Str(lit) = &lit{
 			syn::parse_str(&lit.value())?

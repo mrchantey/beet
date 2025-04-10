@@ -1,9 +1,9 @@
 [package]
-name = "beet_jsx"
+name = "beet_rsx_combinator"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-authors.workspace = true
+authors = ["Victor Porof <victor.porof@gmail.com>", "Peter Hayman"]
 readme.workspace = true
 description = "JSX-like parser combinator for Rust"
 documentation.workspace = true
@@ -14,8 +14,11 @@ keywords.workspace = true
 
 
 [dependencies]
-# rsx-parser = { git = "https://github.com/mrchantey/rsx-parser" }
-rsx-parser = { path = "../../../rsx-parser" }
-# chumsky = "0.10"
-# ariadne = "0.2"
-# nom = { version = "7" }
+# tough one to upgrade
+combine = "2.5"
+itertools = "0.14"
+sweet.workspace = true
+
+
+[dev-dependencies]
+sweet = { workspace = true, features = ["test"] }
