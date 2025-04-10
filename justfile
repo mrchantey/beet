@@ -139,6 +139,8 @@ test-web *args:
 	{{min-stack}} cargo test -p beet_design 	 	 																												{{args}} -- {{test-threads}}
 	{{min-stack}} cargo test -p beet_router 	--features=_test_site,build,serde,server,parser,bevy 			{{args}} -- {{test-threads}}
 	{{min-stack}} cargo test -p beet_rsx 			--features=bevy,css,parser 																{{args}} -- {{test-threads}}
+	{{min-stack}} cargo test -p beet_rsx_parser 																												{{args}} -- {{test-threads}}
+	{{min-stack}} cargo test -p beet_rsx_combinator 																										{{args}} -- {{test-threads}}
 	{{min-stack}} cargo test -p beet_server 																														{{args}} -- {{test-threads}}
 	{{min-stack}} cargo test -p beet_site																																{{args}} -- {{test-threads}}
 	{{min-stack}} cargo test -p beet-cli																																{{args}} -- {{test-threads}}
