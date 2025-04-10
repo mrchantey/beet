@@ -1,5 +1,6 @@
 {
 	//💡💡💡 EXAMPLE SETTINGS 💡💡💡
+	"rust-analyzer.cargo.buildScripts.rebuildOnSave": false,
 	"rust-analyzer.cargo.target": "wasm32-unknown-unknown",
 	"rust-analyzer.cargo.features": [
 		"beet/bevy_default",

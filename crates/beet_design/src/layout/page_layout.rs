@@ -2,18 +2,21 @@ use crate::prelude::*;
 
 /// Layout for any html page, superset of [`DocumentLayout`].
 #[derive(Node)]
-pub struct PageLayout {
-	// pub document_layout: DocumentLayout,
-}
+pub struct PageLayout;
 
-fn page_layout(_props: PageLayout) -> RsxRoot {
+fn page_layout(_props: PageLayout) -> RsxNode {
 	rsx! {
 		<DocumentLayout>
 		<slot name="head" slot="head" />
 		<div class="page">
-			// <Header/>
+			<Header>
+				<slot name="header" slot="default" />
+				<slot name="header-nav" slot="nav" />
+			</Header>
 			<slot/>
-			// <Footer/>
+			<Footer>
+				<slot name="footer" slot="default" />
+			</Footer>
 		</div>
 		</DocumentLayout>
 		<style>

@@ -47,7 +47,6 @@ impl<T: SignalPayload> SignalChannel<T> {
 /// where things get more interesting, see [`SignalGetter`]
 #[derive(Event, Clone)]
 pub struct BevySignal<T> {
-	// pub idx: RsxIdx,
 	pub value: T,
 }
 

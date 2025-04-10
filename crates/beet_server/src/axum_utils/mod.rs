@@ -1,19 +1,14 @@
 mod axum_ext;
-pub use axum_ext::*;
 mod layers;
+pub use axum_ext::*;
 pub use layers::*;
 mod state;
 pub use state::*;
-
-use anyhow::Result;
-use axum::Router;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 
-/// Sets up tracing and runs the axum server.
-/// If the router contains an app state ensure it is initialized
-/// using `.with_state()` before passing it to this function.
-pub async fn run_axum(router: Router) -> Result<()> {
+/// tracing for local development, lambda has its own thing
+pub fn init_axum_tracing() {
 	tracing_subscriber::registry()
 		.with(
 			tracing_subscriber::EnvFilter::try_from_default_env()
@@ -29,9 +24,4 @@ pub async fn run_axum(router: Router) -> Result<()> {
 		)
 		.with(tracing_subscriber::fmt::layer())
 		.init();
-	let listener = tokio::net::TcpListener::bind("127.0.0.1:3000").await?;
-	tracing::info!("listening on http://{}", listener.local_addr()?);
-
-	axum::serve(listener, router).await?;
-	Ok(())
 }

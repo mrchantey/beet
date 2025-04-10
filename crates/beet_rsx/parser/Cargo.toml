@@ -14,12 +14,18 @@ keywords.workspace = true
 
 
 [features]
+default = ["html"]
 fs = ["sweet/fs"]
+css = ["dep:lightningcss"]
+# html = ["dep:nom"]
+html = ["dep:beet_rsx_combinator"]
 
 [dependencies]
 sweet.workspace = true
+beet_rsx_combinator = { workspace = true, optional = true }
 ron.workspace = true
 anyhow.workspace = true
+itertools.workspace = true
 
 syn = { workspace = true, features = ["visit"] }
 quote.workspace = true
@@ -28,6 +34,7 @@ proc-macro2.workspace = true
 rapidhash.workspace = true
 rstml = { version = "0.12", features = ["rawtext-stable-hack"] }
 proc-macro2-diagnostics = "0.10"
+lightningcss = { workspace = true, optional = true }
 
 [dev-dependencies]
 sweet = { workspace = true, features = ["test"] }

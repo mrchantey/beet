@@ -14,9 +14,7 @@ impl RegisterEffects {
 	pub fn new(root_location: TreeLocation) -> Self { Self { root_location } }
 }
 
-impl<T: RsxPipelineTarget + Into<RsxNode>> RsxPipeline<T, Result<()>>
-	for RegisterEffects
-{
+impl<T: Into<RsxNode>> Pipeline<T, Result<()>> for RegisterEffects {
 	fn apply(self, node: T) -> Result<()> {
 		let mut node: RsxNode = node.into();
 		let mut result = Ok(());
@@ -25,14 +23,9 @@ impl<T: RsxPipelineTarget + Into<RsxNode>> RsxPipeline<T, Result<()>>
 			&mut node,
 			self.root_location,
 			|loc, node| {
-				// println!(
-				// 	"registering effect at loc: {:?}:{:?}",
-				// 	loc,
-				// 	node.discriminant()
-				// );
 				match node {
 					RsxNode::Block(RsxBlock { effect, .. }) => {
-						if let Err(err) = effect.take().register(loc) {
+						if let Err(err) = std::mem::take(effect).register(loc) {
 							result = Err(err);
 						}
 					}
@@ -40,10 +33,10 @@ impl<T: RsxPipelineTarget + Into<RsxNode>> RsxPipeline<T, Result<()>>
 						for a in &mut e.attributes {
 							let res = match a {
 								RsxAttribute::Block { effect, .. } => {
-									effect.take().register(loc)
+									std::mem::take(effect).register(loc)
 								}
 								RsxAttribute::BlockValue { effect, .. } => {
-									effect.take().register(loc)
+									std::mem::take(effect).register(loc)
 								}
 								_ => Ok(()),
 							};
@@ -73,9 +66,9 @@ mod test {
 		let (get, _) = signal(7);
 		expect(
 			rsx! { <div>value is {get}</div> }
-				.pipe(MountRsDom)
+				.xpipe(MountRsDom)
 				.unwrap()
-				.pipe(RegisterEffects::default()),
+				.xpipe(RegisterEffects::default()),
 		)
 		.to_be_ok();
 	}
@@ -89,9 +82,9 @@ mod test {
 	fn bad_location() {
 		let (get, _) = signal(7);
 		let _ = rsx! { <div>value is {get}</div> }
-			.pipe(MountRsDom)
+			.xpipe(MountRsDom)
 			.unwrap()
-			.pipe(RegisterEffects::new(TreeLocation::new(10, 10, 10)));
+			.xpipe(RegisterEffects::new(TreeLocation::new(10, 10, 10)));
 	}
 
 
@@ -100,9 +93,9 @@ mod test {
 		let (get, set) = signal(7);
 
 		rsx! { <div>value is {get}</div> }
-			.pipe(MountRsDom)
+			.xpipe(MountRsDom)
 			.unwrap()
-			.pipe(RegisterEffects::default())
+			.xpipe(RegisterEffects::default())
 			.unwrap();
 		expect(&DomTarget::with(|h| h.render()))
 			.to_contain("<div data-beet-rsx-idx=\"1\">value is 7</div>");

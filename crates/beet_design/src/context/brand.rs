@@ -12,11 +12,12 @@ use std::borrow::Cow;
 /// # use beet_rsx::as_beet::*;
 /// # use beet_design::prelude::*;
 ///
-/// fn my_component()-> RsxRoot{
+/// fn my_component()-> RsxNode {
 /// 	set_context(Brand{
 /// 		title: "My Site".into(),
 /// 		description: "A site about stuff".into(),
 ///			site_url: "https://myapp.com".into(),
+/// 		version: std::env!("CARGO_PKG_VERSION").into(),
 /// 	});
 ///
 /// 	rsx!{
@@ -36,4 +37,7 @@ pub struct Brand {
 	/// The canonical url of the production site,
 	/// ie `https://myapp.com`
 	pub site_url: Cow<'static, str>,
+	/// The site version, usually set via
+	/// `std::env!("CARGO_PKG_VERSION")`
+	pub version: Cow<'static, str>,
 }

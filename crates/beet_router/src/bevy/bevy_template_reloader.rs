@@ -33,15 +33,18 @@ impl Plugin for BevyTemplateReloader {
 			send2.send(TemplateReloaderMessage::Reload)?;
 			Ok(())
 		};
+		let builder = BuildTemplateMap::new(&src);
+		let templates_root_dir = builder.templates_root_dir.clone();
+		let dst = builder.templates_map_path.clone();
+
 		let recompile = move || {
+			builder.build_and_write()?;
 			send.send(TemplateReloaderMessage::Recompile)?;
 			Ok(())
 		};
-		let builder = BuildTemplateMap::new(&src);
-		let dst = builder.templates_map_path.clone();
 
 		let _handle = tokio::spawn(async move {
-			TemplateWatcher::new(builder, reload, recompile)?
+			TemplateWatcher::new(templates_root_dir, reload, recompile)?
 				.watch()
 				.await
 		});
@@ -65,51 +68,23 @@ struct TemplateReload {
 }
 
 
-/// Here we don't care at all about [`TreeIdx`] because any
-/// matching [`GlobalRsxIdx`] will be updated.
 #[allow(unused)]
 fn handle_recv(
 	template_reload: Res<TemplateReload>,
 	mut commands: Commands,
 	mut app_exit: EventWriter<AppExit>,
-	mut text_query: Query<(&GlobalRsxIdx, &mut Text)>,
-	mut other_query: Query<EntityMut, (Without<Text>, With<GlobalRsxIdx>)>,
+	to_remove: Query<Entity, With<TreeIdx>>,
 ) {
+	let rsx_idx = todo!(
+		"this needs to be rearchitected, templates cannot keep track of the rsx idx"
+	);
 	while let Ok(recv) = template_reload.recv.try_recv() {
 		match recv {
 			TemplateReloaderMessage::Reload => {
 				let map = RsxTemplateMap::load(&template_reload.dst).unwrap();
-				for (loc, root) in map.templates.iter() {
-					let loc_hash = loc.into_hash();
-					root.node.visit(|template_node| {
-						let loc = GlobalRsxIdx::new(
-							loc_hash,
-							template_node.rsx_idx(),
-						);
-						match template_node {
-							RsxTemplateNode::Text { idx, value } => {
-								for (_, mut text) in text_query
-									.iter_mut()
-									.filter(|entity| *entity.0 == loc)
-								{
-									text.0 = value.clone();
-								}
-							}
-							_ => {
-								for entity in
-									other_query.iter_mut().filter(|entity| {
-										entity.get::<GlobalRsxIdx>()
-											== Some(&loc)
-									}) {
-									// println!(
-									// 	"gonna change this entity: {:?}\n{:#?}",
-									// 	entity, template_node
-									// );
-								}
-							}
-						}
-					});
-				}
+				todo!(
+					"reload template just like html, we'll need to track the RsxNode functions as entities"
+				);
 			}
 			TemplateReloaderMessage::Recompile => {
 				println!("recompilation required, exiting..");

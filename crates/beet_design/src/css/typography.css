@@ -1,0 +1,67 @@
+/* 
+[`starlight css`](https://github.com/withastro/starlight/blob/main/packages/starlight/style/props.css) 
+*/
+
+:root,
+::backdrop {
+/* Text size and line height */
+	--bt-text-2xs: 0.75rem; /* 12px */
+	--bt-text-xs: 0.8125rem; /* 13px */
+	--bt-text-sm: 0.875rem; /* 14px */
+	--bt-text-base: 1rem; /* 16px */
+	--bt-text-lg: 1.125rem; /* 18px */
+	--bt-text-xl: 1.25rem; /* 20px */
+	--bt-text-2xl: 1.5rem; /* 24px */
+	--bt-text-3xl: 1.8125rem; /* 29px */
+	--bt-text-4xl: 2.1875rem; /* 35px */
+	--bt-text-5xl: 2.625rem; /* 42px */
+	--bt-text-6xl: 4rem; /* 64px */
+
+	--bt-text-body: var(--bt-text-base);
+	--bt-text-body-sm: var(--bt-text-xs);
+	--bt-text-code: var(--bt-text-sm);
+	--bt-text-code-sm: var(--bt-text-xs);
+	--bt-text-h1: var(--bt-text-4xl);
+	--bt-text-h2: var(--bt-text-3xl);
+	--bt-text-h3: var(--bt-text-2xl);
+	--bt-text-h4: var(--bt-text-xl);
+	--bt-text-h5: var(--bt-text-lg);
+
+	--bt-line-height: 1.75;
+	--bt-line-height-headings: 1.2;
+
+	--bt-font: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
+		'Helvetica Neue', Arial, 'Noto Sans', sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
+		'Segoe UI Symbol', 'Noto Color Emoji';
+	--bt-font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono',
+		'Courier New', monospace;
+}
+/* big headings for big screens */
+@media (min-width: 50em) {
+	:root {
+		--bt-text-h1: var(--bt-text-5xl);
+		--bt-text-h2: var(--bt-text-4xl);
+		--bt-text-h3: var(--bt-text-3xl);
+		--bt-text-h4: var(--bt-text-2xl);
+	}
+}
+
+
+body {
+	font-family: var(--bt-font);
+	/* line-height: var(--bt-line-height); */
+	-webkit-font-smoothing: antialiased;
+	color: var(--bt-color-text);
+	background-color: var(--bt-color-background);
+}
+
+input,
+button,
+textarea,
+select {
+	font: inherit;
+}
+
+code {
+	font-family: var(--bt-font-mono);
+}

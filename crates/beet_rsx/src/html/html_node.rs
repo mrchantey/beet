@@ -73,6 +73,12 @@ impl Into<HtmlNode> for HtmlElementNode {
 }
 
 impl HtmlElementNode {
+	pub fn assert_self_closing_no_children(&self) {
+		if self.self_closing && !self.children.is_empty() {
+			panic!("Self closing elements cannot have children");
+		}
+	}
+
 	pub fn inline_script(
 		script: String,
 		attributes: Vec<HtmlAttribute>,

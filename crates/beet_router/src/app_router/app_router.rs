@@ -22,9 +22,6 @@ pub struct AppRouter {
 	/// A set of functions to execute when running in static
 	/// mode.
 	pub on_run_static: Vec<OnRun>,
-	#[cfg(target_arch = "wasm32")]
-	pub on_run_wasm:
-		Vec<Box<dyn Send + Sync + FnOnce(&AppRouterArgs) -> Result<()>>>,
 }
 
 impl AppRouter {
@@ -34,8 +31,6 @@ impl AppRouter {
 			#[cfg(all(feature = "server", not(target_arch = "wasm32")))]
 			axum_router: Default::default(),
 			on_run_static: Default::default(),
-			#[cfg(target_arch = "wasm32")]
-			on_run_wasm: Default::default(),
 		}
 	}
 
@@ -43,17 +38,6 @@ impl AppRouter {
 		col.into_collection().register(&mut self);
 		self
 	}
-
-	#[cfg(target_arch = "wasm32")]
-	pub fn run(self) { self.run_inner().unwrap(); }
-
-	#[cfg(target_arch = "wasm32")]
-	fn run_inner(self) -> Result<()> {
-		console_error_panic_hook::set_once();
-		let args = AppRouterArgs::from_url_params()?;
-		self.on_run_wasm.into_iter().try_for_each(|f| f(&args))
-	}
-
 
 	#[cfg(not(target_arch = "wasm32"))]
 	pub fn run(self) {

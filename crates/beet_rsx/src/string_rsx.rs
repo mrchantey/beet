@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use crate::rsx::IntoRsxRoot;
+use crate::rsx::IntoRsxNode;
 use crate::rsx::RsxAttribute;
 use crate::sigfault::IntoSigfaultAttrVal;
 
@@ -16,29 +16,28 @@ impl StringRsx {
 	/// let node = rsx!{<div>{block}</div>};
 	/// ```
 	pub fn parse_block_node<M>(
-		idx: RsxIdx,
 		tracker: RustyTracker,
-		block: impl 'static + Clone + IntoRsxRoot<M>,
+		block: impl IntoRsxNode<M>,
 	) -> RsxNode {
 		RsxNode::Block(RsxBlock {
-			idx,
-			initial: Box::new(block.clone().into_root()),
+			initial: Box::new(block.into_node()),
 			effect: Effect::new(noop(), tracker),
+			meta: RsxNodeMeta::default(),
 		})
 	}
 
 	/// Used by [`RstmlToRsx`] when it encounters an attribute block:
 	/// ```
 	/// # use beet_rsx::as_beet::*;
-	/// let value = || vec![RsxAttribute::Key{key:"foo".to_string()}];
+	/// let value = vec![RsxAttribute::Key{key:"foo".to_string()}];
 	/// let node = rsx!{<el {value}/>};
 	/// ```
-	pub fn parse_attribute_block(
+	pub fn parse_attribute_block<M>(
 		tracker: RustyTracker,
-		mut block: impl 'static + FnMut() -> Vec<RsxAttribute>,
+		block: impl IntoRsxAttributes<M>,
 	) -> RsxAttribute {
 		RsxAttribute::Block {
-			initial: block(),
+			initial: block.into_rsx_attributes(),
 			effect: Effect::new(noop(), tracker),
 		}
 	}

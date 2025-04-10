@@ -20,6 +20,13 @@ pub struct BuildStepGroup {
 }
 
 impl BuildStepGroup {
+	pub fn with(
+		mut self,
+		item: impl BuildStep + 'static + Send + Sync,
+	) -> Self {
+		self.items.push(Box::new(item));
+		self
+	}
 	pub fn add(
 		&mut self,
 		item: impl BuildStep + 'static + Send + Sync,

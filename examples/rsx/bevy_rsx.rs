@@ -24,7 +24,7 @@ struct Counter {
 	initial: i32,
 }
 
-fn counter(props: Counter) -> RsxRoot {
+fn counter(props: Counter) -> RsxNode {
 	let (get, set) = BevySignal::signal(props.initial);
 	let get2 = get.clone();
 	rsx! {

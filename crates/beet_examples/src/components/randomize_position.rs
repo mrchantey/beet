@@ -26,7 +26,7 @@ pub fn randomize_position(
 	>,
 ) {
 	for (entity, mut transform, pos) in query.iter_mut() {
-		let mut position = Vec3::random_in_cube(&mut rand);
+		let mut position = Vec3::random_in_cube(&mut rand.0);
 		position.x *= pos.scale.x;
 		position.y *= pos.scale.y;
 		position.z *= pos.scale.z;

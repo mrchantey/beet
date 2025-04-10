@@ -4,9 +4,19 @@ use beet_rsx::prelude::*;
 
 pub struct SpaRouteCollection;
 
+
+impl SpaRouteCollection {
+	pub fn mount() -> Self {
+		todo!(
+			"this should not use BeetDom and instead follow the same client islands workflow as file based routes"
+		);
+	}
+}
+
+
 impl<F> IntoCollection<SpaRouteCollection> for F
 where
-	F: 'static + Send + Sync + FnOnce() -> RsxRoot,
+	F: 'static + Send + Sync + FnOnce() -> RsxNode,
 {
 	fn into_collection(self) -> impl Collection {
 		#[allow(unused)]
@@ -15,16 +25,9 @@ where
 			app.on_run_static.push(Box::new(move |args| {
 				let path = args.html_dir.join("index.html");
 				Box::pin(async move {
-					self.into_root().pipe(SpaToHtmlFile::new(path)).unwrap();
+					self().xpipe(SpaToHtmlFile::new(path)).unwrap();
 					Ok(())
 				})
-			}));
-
-			#[cfg(target_arch = "wasm32")]
-			app.on_run_wasm.push(Box::new(move |_args| {
-				todo!("this should not use BeetDom and instead follow the same client islands workflow as file based routes");
-				// BeetDom::hydrate(self);
-				// Ok(())
 			}));
 		}
 	}

@@ -97,14 +97,14 @@ mod test {
 
 			let mut env = env.clone();
 			let mut action =
-				source.epsilon_greedy_policy(&state, epsilon, &mut rng).0;
+				source.epsilon_greedy_policy(&state, epsilon, &mut rng.0).0;
 
 			for _step in 0..params.max_steps {
 				let outcome = env.step(&state, &action);
 				// Must step even if outcome is done, to remember reward
 				action = source.step(
 					&params,
-					&mut rng,
+					&mut rng.0,
 					epsilon,
 					&action,
 					&state,

@@ -5,7 +5,7 @@ edition.workspace = true
 license.workspace = true
 authors.workspace = true
 readme.workspace = true
-description = "Cross domain authoring tools"
+description.workspace = true
 documentation.workspace = true
 homepage.workspace = true
 repository.workspace = true
@@ -15,14 +15,18 @@ keywords.workspace = true
 
 [features]
 default = ["macros", "fs", "serde"]
-fs = ["sweet/fs", "beet_rsx_parser/fs"]
-bevy = ["dep:bevy", "serde", "dep:flume"]
-# this is a hefty feature, pulls in bevy_render
-bevy_default = ["bevy", "bevy/default"]
-css = ["dep:lightningcss", "dep:parcel_selectors"]
 macros = ["dep:beet_rsx_macros"]
 parser = ["dep:quote", "dep:proc-macro2", "dep:beet_rsx_parser"]
+fs = ["sweet/fs", "beet_rsx_parser/fs"]
 serde = ["dep:serde", "dep:ron"]
+bevy = ["dep:bevy", "serde", "dep:flume"]
+bevy_default = ["bevy", "bevy/default"]
+css = [
+	"dep:lightningcss",
+	"dep:parcel_selectors",
+	"beet_rsx_parser?/css",
+	"beet_rsx_macros?/css",
+]
 
 [dependencies]
 beet_rsx_parser = { workspace = true, optional = true }
@@ -30,8 +34,8 @@ beet_rsx_macros = { workspace = true, optional = true }
 sweet.workspace = true
 
 #💡 utils
-thiserror.workspace = true
 anyhow.workspace = true
+thiserror.workspace = true
 extend.workspace = true
 strum.workspace = true
 rapidhash.workspace = true
@@ -49,8 +53,9 @@ quote = { workspace = true, optional = true }
 proc-macro2 = { workspace = true, optional = true }
 
 #💡 style
-parcel_selectors = { version = "0.28", optional = true }
-lightningcss = { version = "1.0.0-alpha.63", optional = true }
+parcel_selectors = { workspace = true, optional = true }
+lightningcss = { workspace = true, optional = true }
+
 
 #💡 bevy
 bevy = { workspace = true, optional = true }

@@ -11,8 +11,6 @@ use std::str::FromStr;
 ///
 /// The value is **1 indexed** as 0 represents the 'parent' of the root node.
 ///
-/// This is different from an [`RsxIdx`] which is unique only to its macro.
-///
 /// This technique is also the reason there can only be a single entrypoint for
 /// a document, app etc, the tree idx is incremented as items are rendered.
 #[derive(

@@ -9,22 +9,19 @@ use sweet::prelude::*;
 pub struct RoutesToHtml;
 
 
-impl
-	RsxPipeline<
-		Vec<(RouteInfo, RsxRoot)>,
-		Result<Vec<(RouteInfo, HtmlDocument)>>,
-	> for RoutesToHtml
+impl Pipeline<Vec<(RouteInfo, RsxNode)>, Result<Vec<(RouteInfo, HtmlDocument)>>>
+	for RoutesToHtml
 {
 	fn apply(
 		self,
-		routes: Vec<(RouteInfo, RsxRoot)>,
+		routes: Vec<(RouteInfo, RsxNode)>,
 	) -> Result<Vec<(RouteInfo, HtmlDocument)>> {
 		let html = routes
 			.into_iter()
 			.map(|(route, root)| {
 				// only hydrate if we have templates
 				// we already warned otherwise
-				let doc = root.pipe(RsxToHtmlDocument::default())?;
+				let doc = root.xpipe(RsxToHtmlDocument::default())?;
 				Ok((route.clone(), doc))
 			})
 			.collect::<Result<Vec<_>>>()?;
@@ -54,15 +51,9 @@ impl Default for HtmlRoutesToDisk {
 }
 
 
-impl RsxPipeline<Vec<(RouteInfo, HtmlDocument)>, Result<()>>
-	for HtmlRoutesToDisk
-{
+impl Pipeline<Vec<(RouteInfo, HtmlDocument)>, Result<()>> for HtmlRoutesToDisk {
 	fn apply(self, routes: Vec<(RouteInfo, HtmlDocument)>) -> Result<()> {
 		let dst = &self.html_dir;
-		// in debug mode removing a watched dir breaks FsWatcher
-		#[cfg(not(debug_assertions))]
-		FsExt::remove(&dst).ok();
-		std::fs::create_dir_all(&dst)?;
 
 		let dst = dst.canonicalize()?;
 		for (info, doc) in routes.into_iter() {
@@ -78,11 +69,30 @@ impl RsxPipeline<Vec<(RouteInfo, HtmlDocument)>, Result<()>>
 			let path = path.strip_prefix("/").unwrap();
 			let full_path = &dst.join(path);
 			// pretty rendering currently breaks text node logic
-			let str = doc.pipe(RenderHtml::default())?;
+			let str = doc.xpipe(RenderHtmlEscaped::default());
 			FsExt::write(&full_path, &str)?;
 		}
 
 
 		Ok(())
+	}
+}
+
+
+#[cfg(test)]
+mod test {
+
+	#[test]
+	fn works() {
+		// TODO non-disk version
+		// beet_router::test_site::routes::collect()
+		// .xpipe(FuncFilesToRsx::default())
+		// .await
+		// .unwrap()
+		// .xpipe(ApplyRouteTemplates::new(
+		// 	"target/test_site/rsx-templates.ron",
+		// ))?
+		// .xpipe(RoutesToHtml::default())?
+		// .xpipe(HtmlRoutesToDisk::new("target/test_site"))?;
 	}
 }

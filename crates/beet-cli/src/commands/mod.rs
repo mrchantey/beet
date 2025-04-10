@@ -1,24 +1,24 @@
-mod build;
 mod cargo_cmd;
+mod run_build;
 pub use cargo_cmd::*;
-mod build_cmd;
-pub use build_cmd::*;
-mod build_app;
-pub use build_app::*;
-mod deploy;
-mod watch;
-pub use build::*;
-pub use deploy::*;
-pub use watch::*;
+mod cargo_build_cmd;
+pub use cargo_build_cmd::*;
+mod build_steps;
+pub use build_steps::*;
+mod run_deploy;
+mod run_watch;
+pub use run_build::*;
+pub use run_deploy::*;
+pub use run_watch::*;
 
 use anyhow::Result;
 use clap::Subcommand;
 
 #[derive(Subcommand)]
 pub enum Commands {
-	Watch(Watch),
-	Deploy(Deploy),
-	Build(Build),
+	Watch(RunWatch),
+	Deploy(RunDeploy),
+	Build(RunBuild),
 }
 
 impl Commands {

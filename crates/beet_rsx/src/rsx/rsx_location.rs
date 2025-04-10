@@ -2,10 +2,11 @@ use rapidhash::RapidHasher;
 use rapidhash::rapidhash;
 use std::hash::Hash;
 use std::hash::Hasher;
+use std::path::Path;
 use sweet::prelude::*;
 
 /// File location of the first symbol inside an rsx macro, used by [RsxTemplate]
-/// to reconcile rsx nodes with html partials
+/// to reconcile rsx nodes with templates
 ///
 /// ```rust ignore
 /// # use beet_rsx_macros::rsx;
@@ -19,28 +20,53 @@ pub struct RsxMacroLocation {
 	/// as this struct is created in several places from all kinds concatenations,
 	/// and we need PartialEq & Hash to be identical.
 	pub file: WorkspacePathBuf,
-	pub line: usize,
-	pub col: usize,
+	pub line: u32,
+	pub col: u32,
 }
-// useful for example when converting strings to an RsxRoot,
-// where they can safely have an invalid file.
-impl Default for RsxMacroLocation {
-	fn default() -> Self { Self::new(WorkspacePathBuf::new(file!()), 0, 0) }
+
+impl std::fmt::Display for RsxMacroLocation {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		write!(f, "{}:{}:{}", self.file.display(), self.line, self.col)
+	}
 }
 
 impl RsxMacroLocation {
-	pub fn new(file: WorkspacePathBuf, line: usize, col: usize) -> Self {
-		Self { file, line, col }
+	pub fn placeholder() -> Self {
+		Self {
+			file: WorkspacePathBuf::default(),
+			line: 0,
+			col: 0,
+		}
+	}
+
+	/// Create a new [RsxMacroLocation] from a file path, line and column,
+	/// most commonly used by the `rsx!` macro.
+	/// ## Example
+	///
+	/// ```rust
+	/// # use beet_rsx::as_beet::*;
+	/// let loc = RsxMacroLocation::new(file!(), line!(), column!());
+	/// let loc = rsx!{}.location().unwrap();
+	pub fn new(
+		workspace_file_path: impl AsRef<Path>,
+		line: u32,
+		col: u32,
+	) -> Self {
+		Self {
+			file: WorkspacePathBuf::new(workspace_file_path),
+			line,
+			col,
+		}
 	}
 	pub fn file(&self) -> &WorkspacePathBuf { &self.file }
-	pub fn line(&self) -> usize { self.line }
-	pub fn col(&self) -> usize { self.col }
+	pub fn line(&self) -> u32 { self.line }
+	pub fn col(&self) -> u32 { self.col }
 
 	pub fn into_hash(&self) -> u64 {
 		let mut hasher = RapidHasher::default_const();
 		self.file.hash(&mut hasher);
-		hasher.write_usize(self.line);
-		hasher.write_usize(self.col);
+		hasher.write_u32(self.line);
+		hasher.write_u32(self.col);
 		hasher.finish()
 	}
 

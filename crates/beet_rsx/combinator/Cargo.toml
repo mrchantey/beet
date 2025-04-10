@@ -1,0 +1,24 @@
+[package]
+name = "beet_rsx_combinator"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors = ["Victor Porof <victor.porof@gmail.com>", "Peter Hayman"]
+readme.workspace = true
+description = "JSX-like parser combinator for Rust"
+documentation.workspace = true
+homepage.workspace = true
+repository.workspace = true
+categories.workspace = true
+keywords.workspace = true
+
+
+[dependencies]
+# tough one to upgrade
+combine = "2.5"
+itertools = "0.14"
+sweet.workspace = true
+
+
+[dev-dependencies]
+sweet = { workspace = true, features = ["test"] }

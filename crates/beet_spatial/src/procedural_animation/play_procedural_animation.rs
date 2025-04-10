@@ -103,7 +103,6 @@ mod test {
 			.id();
 
 		app.update();
-		println!("here");
 
 		expect(
 			app.world()

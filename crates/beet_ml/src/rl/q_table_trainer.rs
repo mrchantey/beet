@@ -144,7 +144,7 @@ mod test {
 			initial_state,
 		);
 		let now = Instant::now();
-		trainer.train(&mut policy_rng);
+		trainer.train(&mut policy_rng.0);
 		// My PC: 10ms
 		// Github Actions: 50ms
 		let elapsed = now.elapsed();

@@ -5,7 +5,7 @@ use crate::test_site::*;
 // use beet_rsx::prelude::*;
 
 
-pub fn get() -> RsxRoot {
+pub fn get() -> RsxNode {
 	// rsx! { <div>{"party time!"}</div> }
 	rsx! { <PageLayout title="foobar">party time!</PageLayout> }
 }

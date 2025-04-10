@@ -53,7 +53,7 @@ pub fn spawn_frozen_lake_episode(
 				grid_to_world.clone(),
 				RlAgentBundle {
 					state: map.agent_position(),
-					action: GridDirection::sample(&mut rng),
+					action: GridDirection::sample(&mut rng.0),
 					env: QTableEnv::new(map.transition_outcomes()),
 					params: event.params.learn_params.clone(),
 					session: SessionEntity(event.session),

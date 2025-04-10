@@ -92,7 +92,8 @@ impl Into<Vec3> for GridDirection {
 
 impl GridDirection {
 	pub fn as_slippery(&self, rng: &mut impl Rng) -> Self {
-		match rng.random_range(0..3) {
+		match rng.gen_range(0..3) {
+			// match rng.random_range(0..3) {
 			0 => self.clone(),
 			1 => self.rotate_left(),
 			2 => self.rotate_right(),
@@ -120,7 +121,8 @@ impl GridDirection {
 
 impl ActionSpace for GridDirection {
 	fn sample(rng: &mut impl Rng) -> Self {
-		match rng.random_range(0..4) {
+		match rng.gen_range(0..4) {
+			// match rng.random_range(0..4) {
 			0 => Self::Up,
 			1 => Self::Right,
 			2 => Self::Down,

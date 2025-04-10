@@ -10,28 +10,27 @@ use bevy::reflect::TypeRegistry;
 /// nodes.
 #[derive(Debug, Default)]
 pub struct RsxToBevy {
+	// we should probably use a tree visitor instead
 	tree_idx_incr: TreeIdxIncr,
 }
 
 
 impl RsxToBevy {
 	/// Registers effects and spawns the node
-	pub fn spawn(root: RsxRoot) -> Result<Vec<Entity>> {
+	pub fn spawn(node: RsxNode) -> Result<Vec<Entity>> {
 		let entities = BevyRuntime::with_mut(|app| {
-			Self::default().spawn_root(app.world_mut(), &root)
+			Self::default().spawn_root(app.world_mut(), &node)
 		})?;
-		root.node.pipe(RegisterEffects::default())?;
+		node.xpipe(RegisterEffects::default())?;
 		Ok(entities)
 	}
 
 	pub fn spawn_root(
 		&mut self,
 		world: &mut World,
-		root: &RsxRoot,
+		root: &RsxNode,
 	) -> Result<Vec<Entity>> {
-		let macro_location_hash = root.location.into_hash();
-		let entities =
-			self.spawn_node(world, &root.node, macro_location_hash)?;
+		let entities = self.spawn_node(world, &root)?;
 		// for entity in entities.iter() {
 		// 	world
 		// 		.entity_mut(*entity)
@@ -43,40 +42,33 @@ impl RsxToBevy {
 		&mut self,
 		world: &mut World,
 		node: impl AsRef<RsxNode>,
-		macro_location_hash: u64,
 	) -> Result<Vec<Entity>> {
 		let tree_idx = self.tree_idx_incr.next();
 		// println!("rsx_to_bevy found node: {:?}", node.as_ref().discriminant());
 		let nodes = match node.as_ref() {
-			RsxNode::Doctype { .. } => unimplemented!(),
-			RsxNode::Comment { .. } => {
+			RsxNode::Doctype(_) => unimplemented!(),
+			RsxNode::Comment(_) => {
 				unimplemented!()
 			}
-			RsxNode::Text {
-				value,
-				idx: rsx_idx,
-			} => {
+			RsxNode::Text(text) => {
 				#[cfg(feature = "bevy_default")]
 				{
-					let entity = world
-						.spawn((
-							tree_idx,
-							GlobalRsxIdx::new(macro_location_hash, *rsx_idx),
-							Text::new(value),
-						))
-						.id();
+					let entity =
+						world.spawn((tree_idx, Text::new(&text.value))).id();
 					vec![entity]
 				}
 				#[cfg(not(feature = "bevy_default"))]
 				{
 					unimplemented!(
-						"cannot add {value} with {rsx_idx} ,add feature bevy_default to enable"
+						"currently cannot add text node without bevy_default\nvalue: {}",
+						text.value
 					)
 				}
 			}
-			RsxNode::Fragment { nodes, .. } => nodes
+			RsxNode::Fragment(fragment) => fragment
+				.nodes
 				.iter()
-				.map(|n| self.spawn_node(world, n, macro_location_hash))
+				.map(|n| self.spawn_node(world, n))
 				.collect::<Result<Vec<_>>>()?
 				.into_iter()
 				.flatten()
@@ -85,20 +77,15 @@ impl RsxToBevy {
 				self.spawn_root(world, &rsx_block.initial)?
 			}
 			RsxNode::Element(element) => {
-				vec![self.spawn_element(
-					world,
-					element,
-					tree_idx,
-					macro_location_hash,
-				)?]
+				vec![self.spawn_element(world, element, tree_idx)?]
 			}
 			RsxNode::Component(RsxComponent {
-				root,
+				node,
 				slot_children,
 				..
 			}) => {
 				slot_children.assert_empty();
-				self.spawn_root(world, root)?
+				self.spawn_root(world, node)?
 			}
 		};
 		Ok(nodes)
@@ -108,25 +95,18 @@ impl RsxToBevy {
 		world: &mut World,
 		element: &RsxElement,
 		tree_idx: TreeIdx,
-		macro_location_hash: u64,
 	) -> Result<Entity> {
 		// Arc::clone
 		let registry = world.resource::<AppTypeRegistry>().clone();
 		let registry = registry.read();
 
-		let children =
-			self.spawn_node(world, &element.children, macro_location_hash)?;
+		let children = self.spawn_node(world, &element.children)?;
 
-		let mut entity = world.spawn((
-			tree_idx,
-			GlobalRsxIdx::new(macro_location_hash, element.idx),
-			BevyRsxElement {
-				tag: element.tag.clone(),
-			},
-		));
+		let mut entity = world.spawn((tree_idx, BevyRsxElement {
+			tag: element.tag.clone(),
+		}));
 		entity.add_children(&children);
 
-		// println!("here");
 		for attr in element.attributes.iter() {
 			self.spawn_bevy_components(&registry, &mut entity, attr)?;
 		}
@@ -203,8 +183,8 @@ mod test {
 
 		expect(app.world_mut().entity(entity).get::<Transform>())
 			.to_be(Some(&Transform::default()));
-		expect(app.world_mut().entity(entity).get::<GlobalRsxIdx>())
-			.to_be(Some(&GlobalRsxIdx::new(root.location.into_hash(), 0)));
+		expect(app.world_mut().entity(entity).get::<TreeIdx>())
+			.to_be(Some(&TreeIdx::new(1)));
 	}
 	#[test]
 	fn attribute_key_value() {
@@ -215,13 +195,13 @@ mod test {
 
 		let root = rsx! { <entity Transform.translation="(0.,1.,2.)" /> };
 		let entity = RsxToBevy::default()
-			.spawn_node(app.world_mut(), &root, root.location.into_hash())
+			.spawn_node(app.world_mut(), &root)
 			.unwrap()[0];
 
 		expect(app.world_mut().entity(entity).get::<Transform>())
 			.to_be(Some(&Transform::from_xyz(0., 1., 2.)));
-		expect(app.world_mut().entity(entity).get::<GlobalRsxIdx>())
-			.to_be(Some(&GlobalRsxIdx::new(root.location.into_hash(), 0)));
+		expect(app.world_mut().entity(entity).get::<TreeIdx>())
+			.to_be(Some(&TreeIdx::new(1)));
 	}
 	#[test]
 	fn attribute_block_value() {
@@ -242,14 +222,14 @@ mod test {
 			.register_type::<Vec3>()
 			.register_type::<Transform>();
 
-		let root = rsx! { <entity runtime:bevy Transform.translation=val /> };
+		let node = rsx! { <entity runtime:bevy Transform.translation=val /> };
 		let entity = RsxToBevy::default()
-			.spawn_node(app.world_mut(), &root, root.location.into_hash())
+			.spawn_node(app.world_mut(), &node)
 			.unwrap()[0];
 
 		expect(app.world_mut().entity(entity).get::<Transform>())
 			.to_be(Some(&Transform::from_xyz(0., 1., 2.)));
-		expect(app.world_mut().entity(entity).get::<GlobalRsxIdx>())
-			.to_be(Some(&GlobalRsxIdx::new(root.location.into_hash(), 0)));
+		expect(app.world_mut().entity(entity).get::<TreeIdx>())
+			.to_be(Some(&TreeIdx::new(1)));
 	}
 }

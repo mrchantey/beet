@@ -6,12 +6,12 @@ use sweet::prelude::*;
 use syn::Item;
 
 #[derive(Debug, Clone)]
-pub struct RouteFuncsToCodegen {
+pub struct FuncTokensToCodegen {
 	pub func_type: syn::Type,
 	pub codegen_file: CodegenFile,
 }
 
-impl Default for RouteFuncsToCodegen {
+impl Default for FuncTokensToCodegen {
 	fn default() -> Self {
 		Self {
 			func_type: syn::parse_quote!(DefaultRouteFunc),
@@ -21,30 +21,25 @@ impl Default for RouteFuncsToCodegen {
 }
 
 
-impl<
-	T1: RsxPipelineTarget + AsRef<Vec<FuncFile>>,
-	T2: RsxPipelineTarget + AsRef<Vec<RouteFuncTokens>>,
-> RsxPipeline<(T1, T2), Result<(T1, T2, CodegenFile)>> for RouteFuncsToCodegen
+impl<T: AsRef<Vec<FuncTokens>>> Pipeline<T, Result<(T, CodegenFile)>>
+	for FuncTokensToCodegen
 {
-	fn apply(
-		self,
-		(func_files, route_funcs): (T1, T2),
-	) -> Result<(T1, T2, CodegenFile)> {
+	fn apply(self, func_tokens: T) -> Result<(T, CodegenFile)> {
 		let out_dir = self.codegen_file.output_dir()?;
 		let collect_routes =
-			self.routes_to_collect_func(route_funcs.as_ref())?;
+			self.routes_to_collect_func(func_tokens.as_ref())?;
 		let mod_imports =
-			self.func_files_to_mod_imports(out_dir, func_files.as_ref())?;
+			self.func_files_to_mod_imports(out_dir, func_tokens.as_ref())?;
 		let mut codegen_file = self.codegen_file;
 		codegen_file.items.extend(mod_imports);
 		codegen_file.items.push(collect_routes.into());
 
-		Ok((func_files, route_funcs, codegen_file))
+		Ok((func_tokens, codegen_file))
 	}
 }
 
 
-impl RouteFuncsToCodegen {
+impl FuncTokensToCodegen {
 	pub fn new(codegen_file: CodegenFile) -> Self {
 		Self {
 			codegen_file,
@@ -54,9 +49,9 @@ impl RouteFuncsToCodegen {
 
 	fn routes_to_collect_func(
 		&self,
-		route_funcs: &Vec<RouteFuncTokens>,
+		funcs: &Vec<FuncTokens>,
 	) -> Result<syn::ItemFn> {
-		let blocks = route_funcs.iter().map(|func| &func.block);
+		let blocks = funcs.iter().map(|func| func.to_route_func_tokens());
 		let func_type = &self.func_type;
 
 		Ok(syn::parse_quote! {
@@ -67,22 +62,25 @@ impl RouteFuncsToCodegen {
 		})
 	}
 
-	// this approach is cleaner than importing in each collect function,
+	// this approach is cleaner than importing in each function,
 	// and also rust-analyzer has an easier time resolving file level imports
 	fn func_files_to_mod_imports(
 		&self,
 		canonical_out_dir: &Path,
-		funcs: &Vec<FuncFile>,
+		funcs: &Vec<FuncTokens>,
 	) -> Result<Vec<Item>> {
 		funcs
 			.iter()
-			.map(|file| {
+			.filter_map(|func| match &func.mod_ident {
+				Some(mod_ident) => Some((mod_ident, func)),
+				None => None,
+			})
+			.map(|(mod_ident, func)| {
 				let mod_path = PathExt::create_relative(
 					canonical_out_dir,
-					&file.canonical_path,
+					&func.canonical_path,
 				)?;
 				let mod_path_str = mod_path.to_string_lossy();
-				let mod_ident = &file.ident;
 				let mod_import = syn::parse_quote! {
 					#[path = #mod_path_str]
 					mod #mod_ident;
@@ -103,13 +101,11 @@ mod test {
 	#[test]
 	fn works() {
 		let codegen_file = FileGroup::test_site_routes()
-			.pipe(FileGroupToFuncFiles::default())
+			.xpipe(FileGroupToFuncTokens::default())
 			.unwrap()
-			.pipe(FuncFilesToRouteFuncs::http_routes())
+			.xpipe(FuncTokensToCodegen::default())
 			.unwrap()
-			.pipe(RouteFuncsToCodegen::default())
-			.unwrap()
-			.map(|(_, _, codegen_file)| codegen_file.build_output())
+			.xmap(|(_, codegen_file)| codegen_file.build_output())
 			.unwrap()
 			.to_token_stream()
 			.to_string();

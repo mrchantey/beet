@@ -1,5 +1,5 @@
 # Beet uses the Just command runner
-#
+# 
 # ```rust 
 # cargo binstall just
 # just --list
@@ -36,6 +36,7 @@ cli *args:
 install-cli *args:
 	cargo install --path crates/beet-cli {{args}}
 
+
 # Run and watch a workspace example
 run example *args:
 	just watch just run-ci {{example}} {{args}}
@@ -50,6 +51,9 @@ run-ci example *args:
 # Run and watch a crate example
 run-p crate example *args:
 	just watch cargo run -p {{crate}} --example {{example}} {{args}}
+# Run and watch a crate build step
+run-b crate *args:
+	just watch cargo run -p {{crate}} --bin run-build --features=build {{args}}
 
 
 doc crate *args:
@@ -58,15 +62,21 @@ doc crate *args:
 fmt *args:
 	cargo fmt {{args}} && just leptosfmt {{args}}
 
+# soo bad
 leptosfmt *args:
 	leptosfmt -q											\
 	crates/beet_rsx/**/*.rs 					\
 	crates/beet_rsx/**/**/*.rs 				\
 	crates/beet_rsx/**/**/**/*.rs 		\
+	crates/beet_design/**/*.rs 				\
+	crates/beet_design/**/**/*.rs 		\
+	crates/beet_design/**/**/**/*.rs 	\
 	crates/beet_router/**/*.rs 				\
 	crates/beet_router/**/**/*.rs 		\
 	crates/beet_router/**/**/**/*.rs 	\
 	crates/beet_site/**/*.rs 					\
+	crates/beet_site/**/**/*.rs 			\
+	crates/beet_site/**/**/**/*.rs 		\
 	{{args}}
 
 #💡 e2e examples
@@ -100,28 +110,62 @@ run-test-site:
 	sweet serve target/test_site
 # --templates-root-dir crates \
 
-run-beet-site *args:
+run-site *args:
 	just cli watch -p beet_site {{args}}
+
+build-site *args:
+	just cli build -p beet_site {{args}}
+
 
 #💡 Test
 
 min-stack := 'RUST_MIN_STACK=33554432'
-
-# Run tests for ci,
+test-threads:= '--test-threads=8'
+# Run tests for ci, not using workspace cos somehow bevy_default still getting pulled in
 # cargo test --workspace runs with 16MB stack and max 8 cores
-test-ci *args:
+# {{min-stack}} cargo test --workspace 			--lib											{{args}} -- {{test-threads}}
+# {{min-stack}} cargo test --workspace 			--doc	--features=_doctest	{{args}} -- {{test-threads}}
+
+test-fmt:
 	cargo fmt 				--check
 	just leptosfmt 		--check
-	{{min-stack}} cargo test --workspace --lib	--features=_doctest 			{{args}} -- --test-threads=8
-	{{min-stack}} cargo test --workspace --doc	--features=_doctest 			{{args}} -- --test-threads=8
-	cargo test --target wasm32-unknown-unknown 	--all-features	-p beet_flow 				{{args}} -- --test-threads=8
+
+test-ci *args:
+	just test-fmt
+	just test-web
+	just test-flow
+
+test-web *args:
+	{{min-stack}} cargo test -p beet_design 	 	 																												{{args}} -- {{test-threads}}
+	{{min-stack}} cargo test -p beet_router 	--features=_test_site,build,serde,server,parser,bevy 			{{args}} -- {{test-threads}}
+	{{min-stack}} cargo test -p beet_rsx 			--features=bevy,css,parser 																{{args}} -- {{test-threads}}
+	{{min-stack}} cargo test -p beet_rsx_parser 																												{{args}} -- {{test-threads}}
+	{{min-stack}} cargo test -p beet_rsx_combinator 																										{{args}} -- {{test-threads}}
+	{{min-stack}} cargo test -p beet_server 																														{{args}} -- {{test-threads}}
+	{{min-stack}} cargo test -p beet_site																																{{args}} -- {{test-threads}}
+	{{min-stack}} cargo test -p beet-cli																																{{args}} -- {{test-threads}}
+	{{min-stack}} cargo test -p beet_rsx 			--lib --features=bevy 		--target wasm32-unknown-unknown {{args}} -- {{test-threads}}
+	
+test-flow *args:
+	{{min-stack}} cargo test -p beet_flow 		--features=_doctest,reflect 															{{args}} -- {{test-threads}}
+	{{min-stack}} cargo test -p beet_sim		 	--lib																											{{args}} -- {{test-threads}}
+	{{min-stack}} cargo test -p beet_spatial	--features=_doctest																				{{args}} -- {{test-threads}}
+	{{min-stack}} cargo test -p beet_flow 		--lib --features=reflect 	--target wasm32-unknown-unknown {{args}} -- {{test-threads}}
+	{{min-stack}} cargo test -p beet_spatial 	--lib 									 	--target wasm32-unknown-unknown {{args}} -- {{test-threads}}
+
+test-all-lib *args:
+	{{min-stack}} cargo test --workspace 			--lib 	--all-features																	{{args}} -- {{test-threads}}
+test-all-doc *args:
+	{{min-stack}} cargo test --workspace 			--doc 	--all-features																	{{args}} -- {{test-threads}}
 
 # rebuilding bevy_render for wasm results in 'no space left on device'
 test-all *args:
-	just test-ci 																																			{{args}}
-	{{min-stack}} cargo test --workspace --lib 	--all-features							{{args}} -- --test-threads=8
-	cargo test --lib --target wasm32-unknown-unknown --all-features -p beet_rsx 			{{args}}
-	cargo test --lib --target wasm32-unknown-unknown --all-features -p beet_spatial 	{{args}}
+	just test-ci
+	just test-all-lib 																																								{{args}}
+	just test-all-doc 																																								{{args}}
+	{{min-stack}}	cargo test -p beet_rsx 			--lib 	--target wasm32-unknown-unknown --all-features  {{args}} -- {{test-threads}}
+	{{min-stack}}	cargo test -p beet_flow 		--lib 	--target wasm32-unknown-unknown --all-features  {{args}} -- {{test-threads}}
+	{{min-stack}}	cargo test -p beet_spatial 	--lib 	--target wasm32-unknown-unknown --all-features  {{args}} -- {{test-threads}}
 
 #cargo test -p beet_spatial
 #cargo test -p beet_sim
@@ -129,25 +173,22 @@ test-all *args:
 # cargo test --workspace -- {{args}}
 # cargo test --workspace --all-features -- {{args}}
 
-test-doc crate *args:
-	just watch 'cargo test -p {{crate}} --doc 						{{args}}'
-# copied from sweet
 test crate *args:
-	just watch 'cargo test -p {{crate}} --lib -- --watch 	{{args}}'
+	just watch cargo test -p {{crate}} --lib -- 																								--watch {{args}}
+test-doc crate *args:
+	just watch cargo test -p {{crate}} --doc 																														{{args}}
 test-e2e crate test_name *args:
-	just watch 'cargo test -p {{crate}} --test {{test_name}} -- --watch {{args}}'
+	just watch cargo test -p {{crate}} --test {{test_name}} -- 																	--watch {{args}}
 test-feat crate *args:
-	just watch 'cargo test -p {{crate}} --lib --all-features -- {{args}}'
+	just watch cargo test -p {{crate}} --lib --all-features -- 																					{{args}}
 test-wasm crate *args:
-	just watch 'cargo test -p {{crate}} --lib --target wasm32-unknown-unknown -- --watch {{args}}'
+	just watch cargo test -p {{crate}} --lib --target wasm32-unknown-unknown -- 								--watch {{args}}
 test-wasm-feat crate *args:
-	just watch 'cargo test -p {{crate}} --lib --target wasm32-unknown-unknown --all-features -- {{args}}'
+	just watch cargo test -p {{crate}} --lib --target wasm32-unknown-unknown --all-features -- 					{{args}}
 test-wasm-e2e crate test_name *args:
-	just watch 'cargo test -p {{crate}} --test {{test_name}} --target wasm32-unknown-unknown -- --watch {{args}}'
-
-serve-web:
-	just serve-wasm
-
+	just watch cargo test -p {{crate}} --test {{test_name}} --target wasm32-unknown-unknown -- 	--watch {{args}}
+test-rsx-macro *args:
+	just watch cargo test -p beet_rsx --test rsx_macro --features=css -- 												--watch {{args}}
 
 # create codegen files
 codegen:
@@ -163,6 +204,7 @@ clear-artifacts:
 
 # massive purge
 purge:
+	just clear-artifacts
 	cargo clean
 	rm -rf ./target
 	rm -rf $CARGO_TARGET_DIR/rust-analyzer
@@ -173,19 +215,6 @@ pws *args:
 
 tree:
 	cargo tree --depth=2 -e=no-dev
-
-#💡 WEB EXAMPLES
-
-# Build a wasm example for the given crate and place the
-# generated files in target/wasm-example/wasm
-build-wasm crate example *args:
-	cargo build -p {{crate}} --example {{example}} --target wasm32-unknown-unknown {{args}}
-	wasm-bindgen \
-	--out-dir ./target/wasm-example/wasm \
-	--out-name bindgen \
-	--target web \
-	--no-typescript \
-	~/.cargo_target/wasm32-unknown-unknown/debug/examples/{{example}}.wasm
 
 #💡 Misc
 
@@ -219,27 +248,8 @@ watch *command:
 	sweet watch \
 	--include '**/*.rs' \
 	--exclude '{.git,target,html}/**' \
+	--exclude '*codegen*' \
 	--cmd "{{command}}"
-
-copy-web-assets:
-	mkdir -p target/wasm/assets || true
-	cp -r ./assets/* target/wasm/assets
-
-
-copy-wasm-assets:
-	rm -rf ./target/static/assets
-	mkdir -p ./target/static/assets || true
-	
-serve-wasm *args:
-	cd ./target/static && forky serve {{args}}
-
-watch-assets:
-	just watch-web 'just copy-wasm-assets'
-
-watch-web *command:
-	forky watch \
-	-w '**/*/assets/**/*' \
-	-- {{command}}
 
 assets-push:
 	aws s3 sync ./assets s3://bevyhub-public/assets --delete
@@ -252,44 +262,8 @@ assets-pull:
 	tar -xzvf ./assets.tar.gz
 	rm ./assets.tar.gz
 
-# https://gist.github.com/stephenhardy/5470814
-# 1. Remove the history
-# 2. recreate the repos from the current content only
-# 3. push to the github remote repos ensuring you overwrite history
-very-scary-purge-commit-history:
-	rm -rf .git
-
-	git init
-	git add .
-	git commit -m "Initial commit"
-
-	git remote add origin git@github.com:mrchantey/beet.git
-	git push -u --force origin main
-
-
 #💡 Misc
 
 # Cargo search but returns one line
 search *args:
 	cargo search {{args}} | head -n 1
-
-
-#💡 Server
-
-lambda-watch:
-	cd crates/beet_server && cargo lambda watch --example lambda_axum
-
-
-lambda-deploy *args:
-	cargo lambda build 					\
-	--package beet_site					\
-	--features beet/lambda			\
-	--release
-	cargo lambda deploy			 		\
-	beet 												\
-	--binary-name beet_site			\
-	--region us-west-2 					\
-	--iam-role $AWS_IAM_ROLE 		\
-	--enable-function-url 			\
-	--include target/client 		\
-	{{args}}

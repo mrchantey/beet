@@ -13,10 +13,11 @@ categories.workspace = true
 keywords.workspace = true
 
 [features]
-default = ["serde"]
+default = ["serde", "markdown"]
 _test_site = []
 build = ["serde", "parser"]
-serde = ["dep:serde", "dep:ron", "beet_rsx/serde"]
+markdown = ["parser", "dep:pulldown-cmark"]
+serde = ["dep:serde", "dep:ron", "dep:toml", "beet_rsx/serde"]
 server = ["parser", "dep:beet_server"]
 parser = [
 	"serde",
@@ -47,6 +48,8 @@ bevy = { workspace = true, optional = true }
 #💡 serde
 serde = { workspace = true, optional = true }
 ron = { workspace = true, optional = true }
+toml = { workspace = true, optional = true }
+heck.workspace = true
 
 #💡 parser
 uuid = { version = "1", features = ["v4"], optional = true }
@@ -60,7 +63,7 @@ beet_server = { workspace = true, optional = true }
 
 tokio = { workspace = true }
 flume = { workspace = true, optional = true }
-
+pulldown-cmark = { version = "0.13", optional = true }
 
 [dev-dependencies]
 sweet = { workspace = true, features = ["test"] }

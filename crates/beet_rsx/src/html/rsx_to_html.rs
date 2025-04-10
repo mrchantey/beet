@@ -1,7 +1,18 @@
 use crate::prelude::*;
 
+
+
+/// Convert [`RsxNode`] structures into a string of [`HtmlNode`]
+///
+/// ## Panics
+/// - Panics if `no_slot_check` is false and there are still slot children
+/// - Panics if an element is self closing and has children
 #[derive(Debug, Default)]
 pub struct RsxToHtml {
+	/// Slot children are not rendered so by default this will
+	/// panic if they still exist, enable this option to ignore
+	/// slot children, pretty much only used for testing
+	pub no_slot_check: bool,
 	/// add attributes required for resumability
 	pub html_constants: HtmlConstants,
 	/// Do not check for wasm, which disables
@@ -13,22 +24,16 @@ pub struct RsxToHtml {
 	tree_idx_incr: TreeIdxIncr,
 }
 
-impl<T: RsxPipelineTarget + AsRef<RsxNode>> RsxPipeline<T, Vec<HtmlNode>>
-	for RsxToHtml
-{
-	fn apply(mut self, node: T) -> Vec<HtmlNode> {
-		self.map_node(node.as_ref())
-	}
+impl<T: AsRef<RsxNode>> Pipeline<T, Vec<HtmlNode>> for RsxToHtml {
+	fn apply(mut self, node: T) -> Vec<HtmlNode> { self.map_node(node) }
 }
 
 
 
 impl RsxToHtml {
-	pub fn as_resumable() -> Self {
-		Self {
-			no_wasm: false,
-			..Default::default()
-		}
+	pub fn no_slot_check(mut self) -> Self {
+		self.no_slot_check = true;
+		self
 	}
 
 	/// recursively map rsx nodes to html nodes
@@ -38,29 +43,38 @@ impl RsxToHtml {
 		let idx = self.tree_idx_incr.next();
 
 		match node.as_ref() {
-			RsxNode::Doctype { .. } => vec![HtmlNode::Doctype],
-			RsxNode::Comment { value, .. } => {
-				vec![HtmlNode::Comment(value.clone())]
+			RsxNode::Doctype(_) => vec![HtmlNode::Doctype],
+			RsxNode::Comment(comment) => {
+				vec![HtmlNode::Comment(comment.value.clone())]
 			}
-			RsxNode::Text { value, .. } => {
-				let str = if self.trim { value.trim() } else { value };
+			RsxNode::Text(text) => {
+				let str = if self.trim {
+					text.value.trim()
+				} else {
+					&text.value
+				};
 				vec![HtmlNode::Text(str.into())]
 			}
 			RsxNode::Element(e) => {
 				vec![HtmlNode::Element(self.map_element(idx, e))]
 			}
-			RsxNode::Fragment { nodes, .. } => {
-				nodes.iter().map(|n| self.map_node(n)).flatten().collect()
-			}
-			RsxNode::Block(rsx_block) => self.map_node(&rsx_block.initial.node),
+			RsxNode::Fragment(frag) => frag
+				.nodes
+				.iter()
+				.map(|n| self.map_node(n))
+				.flatten()
+				.collect(),
+			RsxNode::Block(rsx_block) => self.map_node(&rsx_block.initial),
 			RsxNode::Component(RsxComponent {
-				root,
+				node,
 				slot_children,
 				..
 			}) => {
-				slot_children.assert_empty();
+				if self.no_slot_check == false {
+					slot_children.assert_empty();
+				}
 				// use the location of the root
-				let node = self.map_node(&root.node);
+				let node = self.map_node(&node);
 				// even though its empty we must visit to increment
 				// the idx incr, in the same order as [`RsxVisitor`] would
 				let _ = self.map_node(&slot_children);
@@ -88,12 +102,14 @@ impl RsxToHtml {
 			});
 		}
 
-		HtmlElementNode {
+		let el = HtmlElementNode {
 			tag: el.tag.clone(),
 			self_closing: el.self_closing,
 			attributes: html_attributes,
 			children: self.map_node(&el.children),
-		}
+		};
+		el.assert_self_closing_no_children();
+		el
 	}
 
 	pub fn map_attribute(
@@ -150,7 +166,7 @@ mod test {
 	fn doctype() {
 		expect(
 			rsx! { <!DOCTYPE html> }
-				.pipe(RsxToHtmlString::default())
+				.xpipe(RsxToHtmlString::default())
 				.unwrap(),
 		)
 		.to_be("<!DOCTYPE html>");
@@ -160,7 +176,7 @@ mod test {
 	fn comment() {
 		expect(
 			rsx! { <!-- "hello" --> }
-				.pipe(RsxToHtmlString::default())
+				.xpipe(RsxToHtmlString::default())
 				.unwrap(),
 		)
 		.to_be("<!-- hello -->");
@@ -168,7 +184,7 @@ mod test {
 
 	#[test]
 	fn text() {
-		expect(rsx! { "hello" }.pipe(RsxToHtmlString::default()).unwrap())
+		expect(rsx! { "hello" }.xpipe(RsxToHtmlString::default()).unwrap())
 			.to_be("hello");
 	}
 
@@ -185,19 +201,19 @@ mod test {
 				// {key_value}
 				favorite_food=food
 			></div>
-		}.pipe(RsxToHtmlString::default()).unwrap())
+		}.xpipe(RsxToHtmlString::default()).unwrap())
 		.to_be("<div name=\"pete\" age=\"9\" favorite_food=\"pizza\" data-beet-rsx-idx=\"1\"></div>");
 	}
 	#[test]
 	fn element_self_closing() {
-		expect(rsx! { <br /> }.pipe(RsxToHtmlString::default()).unwrap())
+		expect(rsx! { <br /> }.xpipe(RsxToHtmlString::default()).unwrap())
 			.to_be("<br/>");
 	}
 	#[test]
 	fn element_children() {
 		expect(
 			rsx! { <div>hello</div> }
-				.pipe(RsxToHtmlString::default())
+				.xpipe(RsxToHtmlString::default())
 				.unwrap(),
 		)
 		.to_be("<div>hello</div>");
@@ -206,7 +222,7 @@ mod test {
 	#[test]
 	fn rsx_text() {
 		let value = "hello";
-		expect(rsx! { {value} }.pipe(RsxToHtmlString::default()).unwrap())
+		expect(rsx! { {value} }.xpipe(RsxToHtmlString::default()).unwrap())
 			.to_be("hello");
 	}
 
@@ -219,7 +235,7 @@ mod test {
 					<p>hello {world}</p>
 				</div>
 			}
-			.pipe(RsxToHtmlString::default())
+			.xpipe(RsxToHtmlString::default())
 			.unwrap(),
 		)
 		.to_be("<div><p data-beet-rsx-idx=\"2\">hello mars</p></div>");
@@ -232,7 +248,7 @@ mod test {
 			<div onclick=onclick>
 				<p>hello {world}</p>
 			</div>
-		}.pipe(RsxToHtmlString::default()).unwrap())
+		}.xpipe(RsxToHtmlString::default()).unwrap())
 		.to_be("<div onclick=\"_beet_event_handler(1, event)\" data-beet-rsx-idx=\"1\"><p data-beet-rsx-idx=\"2\">hello mars</p></div>");
 	}
 
@@ -240,14 +256,18 @@ mod test {
 	fn component() {
 		#[derive(Node)]
 		struct Child;
-		fn child(_: Child) -> RsxRoot {
+		fn child(_: Child) -> RsxNode {
 			rsx! { <p>hello {1}</p> }
 		}
-		expect(rsx! { <Child /> }.pipe(RsxToHtmlString::default()).unwrap())
-			.to_be(
-				// the component itsself is rsx-idx-0
-				"<p data-beet-rsx-idx=\"2\">hello 1</p>",
-			);
+		expect(
+			rsx! { <Child /> }
+				.xpipe(RsxToHtmlString::default())
+				.unwrap(),
+		)
+		.to_be(
+			// the component itsself is rsx-idx-0
+			"<p data-beet-rsx-idx=\"2\">hello 1</p>",
+		);
 	}
 	#[test]
 	fn component_props() {
@@ -255,13 +275,13 @@ mod test {
 		struct Child {
 			value: usize,
 		}
-		fn child(props: Child) -> RsxRoot {
+		fn child(props: Child) -> RsxNode {
 			rsx! { <p>hello {props.value}</p> }
 		}
 
 		expect(
 			rsx! { <div>the child is <Child value=38 />!</div> }
-				.pipe(RsxToHtmlString::default())
+				.xpipe(RsxToHtmlString::default())
 				.unwrap(),
 		)
 		.to_be(
@@ -272,7 +292,7 @@ mod test {
 	fn component_children() {
 		#[derive(Node)]
 		struct Layout;
-		fn layout(_: Layout) -> RsxRoot {
+		fn layout(_: Layout) -> RsxNode {
 			rsx! {
 				<div>
 					<h1>welcome</h1>
@@ -288,7 +308,7 @@ mod test {
 					<b>foo</b>
 				</Layout>
 			}
-			.pipe(RsxToHtmlString::default())
+			.xpipe(RsxToHtmlString::default())
 			.unwrap(),
 		)
 		.to_be("<div><h1>welcome</h1><p><b>foo</b></p></div>");
@@ -297,7 +317,7 @@ mod test {
 	fn component_slots() {
 		#[derive(Node)]
 		struct Layout;
-		fn layout(_: Layout) -> RsxRoot {
+		fn layout(_: Layout) -> RsxNode {
 			rsx! {
 				<article>
 					<h1>welcome</h1>
@@ -316,7 +336,7 @@ mod test {
 				<b slot="tagline">what a cool article</b>
 				<div>direct child</div>
 			</Layout>
-		}.pipe(RsxToHtmlString::default()).unwrap())
+		}.xpipe(RsxToHtmlString::default()).unwrap())
 			.to_be("<article><h1>welcome</h1><p><b>what a cool article</b></p><main><div>direct child</div></main></article>");
 	}
 
@@ -325,7 +345,7 @@ mod test {
 	fn trims() {
 		expect(
 			rsx! { "  hello  " }
-				.pipe(RsxToHtmlString {
+				.xpipe(RsxToHtmlString {
 					rsx_to_html: RsxToHtml {
 						trim: true,
 						..Default::default()

@@ -1,6 +1,5 @@
 use crate::prelude::*;
 use anyhow::Result;
-use beet_rsx::rsx::BuildStep;
 use sweet::prelude::*;
 use syn::ItemFn;
 
@@ -8,18 +7,17 @@ use syn::ItemFn;
 #[derive(Debug, Clone)]
 pub struct BuildWasmRoutes {
 	islands_map_path: CanonicalPathBuf,
-	codegen_file: CodegenFile,
 }
-
-impl BuildWasmRoutes {
-	pub fn new(codegen_file: CodegenFile) -> Self {
+impl Default for BuildWasmRoutes {
+	fn default() -> Self {
 		Self {
-			codegen_file,
 			islands_map_path: RoutesToClientIslandMap::default_islands_map_path(
 			),
 		}
 	}
+}
 
+impl BuildWasmRoutes {
 	fn collect_fn(islands_map: &ClientIslandMap) -> ItemFn {
 		let tokens = islands_map.into_mount_tokens();
 		syn::parse_quote! {
@@ -32,18 +30,15 @@ impl BuildWasmRoutes {
 	}
 }
 
-impl BuildStep for BuildWasmRoutes {
-	fn run(&self) -> Result<()> {
+impl Pipeline<CodegenFile, Result<()>> for BuildWasmRoutes {
+	fn apply(self, mut codegen_file: CodegenFile) -> Result<()> {
 		let islands_map = ReadFile::to_bytes(&self.islands_map_path)?;
 		let islands_map = ron::de::from_bytes::<ClientIslandMap>(&islands_map)?;
-
-		let mut file = self.codegen_file.clone();
-		file.add_item(Self::collect_fn(&islands_map));
-		file.build_and_write()?;
+		codegen_file.add_item(Self::collect_fn(&islands_map));
+		codegen_file.build_and_write()?;
 		Ok(())
 	}
 }
-
 
 #[cfg(test)]
 mod test {

@@ -33,20 +33,19 @@ impl BevyRuntime {
 	/// let node = rsx!{<div>{block}</div>};
 	/// ```
 	pub fn parse_block_node<M1, M2>(
-		idx: RsxIdx,
 		tracker: RustyTracker,
-		block: impl Clone + IntoRsxRoot<M1> + SignalOrComponent<M2>,
+		block: impl Clone + IntoRsxNode<M1> + SignalOrComponent<M2>,
 	) -> RsxNode {
 		RsxNode::Block(RsxBlock {
-			idx,
-			initial: Box::new(block.clone().into_root()),
+			initial: Box::new(block.clone().into_node()),
 			effect: Effect::new(block.into_node_block_effect(), tracker),
+			meta: RsxNodeMeta::default(),
 		})
 	}
 	/// Used by [`RstmlToRsx`] when it encounters an attribute block:
 	/// ```
 	/// # use beet_rsx::as_beet::*;
-	/// let value = || vec![RsxAttribute::Key{key:"foo".to_string()}];
+	/// let value = vec![RsxAttribute::Key{key:"foo".to_string()}];
 	/// let node = rsx!{<el {value}/>};
 	/// ```
 	#[allow(unused)]

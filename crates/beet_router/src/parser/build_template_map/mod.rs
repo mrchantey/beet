@@ -18,7 +18,7 @@ pub use hash_file::*;
 pub use template_watcher::*;
 
 /// Build an [`RsxTemplateMap`] and write it to a file
-#[derive(Debug, Parser)]
+#[derive(Debug, Clone, Parser)]
 pub struct BuildTemplateMap {
 	/// File or directory to watch and create templates for
 	//  TODO this might be better as an include pattern
@@ -42,6 +42,10 @@ pub struct BuildTemplateMap {
 
 impl Default for BuildTemplateMap {
 	fn default() -> Self { clap::Parser::parse_from(&[""]) }
+}
+
+impl BuildStep for BuildTemplateMap {
+	fn run(&self) -> Result<()> { self.build_and_write() }
 }
 
 impl BuildTemplateMap {
@@ -93,8 +97,8 @@ impl BuildTemplateMap {
 			.into_iter()
 			.flatten()
 			.map(|(RsxMacroLocation { file, line, col }, tokens)| {
-				let line = Literal::usize_unsuffixed(line);
-				let col = Literal::usize_unsuffixed(col);
+				let line = Literal::u32_unsuffixed(line);
+				let col = Literal::u32_unsuffixed(col);
 				let file = file.to_string_lossy();
 				let kvp_tokens = quote! {
 					RsxMacroLocation(
@@ -106,7 +110,7 @@ impl BuildTemplateMap {
 				if !self.skip_ron_check {
 					let str = tokens.to_string();
 					let str = str.trim();
-					let _parsed = ron::de::from_str::<RsxTemplateRoot>(&str)
+					let _parsed = ron::de::from_str::<RsxTemplateNode>(&str)
 						.map_err(|e| ron_cx_err(e, &str))?;
 				}
 				Ok(kvp_tokens)
@@ -200,11 +204,11 @@ impl<'a> Visit<'a> for RsxSynVisitor {
 			let start = span.start();
 			let loc = RsxMacroLocation::new(
 				self.file.clone(),
-				start.line,
-				start.column,
+				start.line as u32,
+				start.column as u32,
 			);
-			let tokens = RstmlToRsxTemplate::default()
-				.map_tokens(mac.tokens.clone(), &self.file);
+			let tokens =
+				mac.tokens.clone().xpipe(RsxRonPipeline::new(&self.file));
 			self.templates.push((loc, tokens));
 		}
 	}
@@ -212,15 +216,13 @@ impl<'a> Visit<'a> for RsxSynVisitor {
 
 
 #[cfg(test)]
+#[cfg(not(target_arch = "wasm32"))]
 mod test {
+	use crate::as_beet::*;
 	use std::path::PathBuf;
-
-	use crate::prelude::*;
-	use beet_rsx::rsx::RsxTemplateMap;
 	use sweet::prelude::*;
 
 	#[test]
-	#[cfg(not(target_arch = "wasm32"))]
 	fn works() {
 		let src = WorkspacePathBuf::new("crates/beet_router/src/test_site")
 			.into_canonical()
@@ -240,5 +242,48 @@ mod test {
 			.to_be(&WorkspacePathBuf::new_from_current_directory(src).unwrap());
 		expect(map.templates.len()).to_be(6);
 		// println!("{:#?}", map);
+	}
+
+	/// it asserts that the process of loading tokens from macros
+	/// matches the process of loading tokens from the file system.
+	/// There are several ways this can go wrong:
+	/// - compile time hasher entropy differs from runtime
+	/// - macros discard whitespace but files do not
+	#[sweet::test]
+	async fn builds() {
+		use beet_rsx::prelude::*;
+
+		let src = WorkspacePathBuf::new("crates/beet_router/src/test_site")
+			.into_canonical()
+			.unwrap();
+		let builder = BuildTemplateMap::new(src.as_path());
+
+
+		// 2. build, parse and compare
+		let tokens = builder.build_ron().unwrap();
+		let map: RsxTemplateMap =
+			ron::de::from_str(&tokens.to_string()).unwrap();
+
+		// println!("wrote to {}\n{:#?}", builder.dst.display(), map);
+		// println!("TEMPLATE_MAP::::{:#?}", map);
+
+		let rsx = &crate::test_site::routes::collect()[0];
+		let node = (rsx.func)().await.unwrap();
+		let node1 = map.templates.get(&node.location().unwrap()).unwrap();
+		let RsxTemplateNode::Component {
+			tracker: tracker1, ..
+		} = &node1
+		else {
+			panic!();
+		};
+		let RsxNode::Component(RsxComponent {
+			tracker: tracker2, ..
+		}) = &node
+		else {
+			panic!();
+		};
+		expect(tracker1).to_be(tracker2);
+
+		// println!("RSX:::: {:#?}", rsx);}
 	}
 }

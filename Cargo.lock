@@ -166,6 +166,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fc7eb209b1518d6bb87b283c20095f5228ecda460da70b44f0802523dea6da04"
 
 [[package]]
+name = "android-tzdata"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e999941b234f3131b00bc13c22d06e8c5ff726d1b6318ac7eb276997bbb4fef0"
+
+[[package]]
 name = "android_log-sys"
 version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -277,6 +283,12 @@ name = "as-raw-xcb-connection"
 version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "175571dd1d178ced59193a6fc02dde1b972eb0bc56c892cde9beeceac5bf0f6b"
+
+[[package]]
+name = "ascii"
+version = "0.7.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3ae7d751998c189c1d4468cf0a39bb2eae052a9c58d50ebb3b9591ee3813ad50"
 
 [[package]]
 name = "ash"
@@ -609,7 +621,7 @@ dependencies = [
 
 [[package]]
 name = "beet"
-version = "0.0.6-dev.4"
+version = "0.0.6-dev.10"
 dependencies = [
  "beet",
  "beet_design",
@@ -630,7 +642,7 @@ dependencies = [
 
 [[package]]
 name = "beet-cli"
-version = "0.0.6-dev.4"
+version = "0.0.6-dev.10"
 dependencies = [
  "anyhow",
  "beet",
@@ -643,17 +655,21 @@ dependencies = [
 
 [[package]]
 name = "beet_design"
-version = "0.0.6-dev.4"
+version = "0.0.6-dev.10"
 dependencies = [
  "anyhow",
  "beet_router",
  "beet_rsx",
+ "chrono",
+ "heck 0.4.1",
+ "lightningcss",
+ "material-colors",
  "sweet",
 ]
 
 [[package]]
 name = "beet_examples"
-version = "0.0.6-dev.4"
+version = "0.0.6-dev.10"
 dependencies = [
  "anyhow",
  "beet_flow",
@@ -673,7 +689,7 @@ dependencies = [
 
 [[package]]
 name = "beet_flow"
-version = "0.0.6-dev.4"
+version = "0.0.6-dev.10"
 dependencies = [
  "anyhow",
  "beet_flow",
@@ -688,7 +704,7 @@ dependencies = [
 
 [[package]]
 name = "beet_flow_macros"
-version = "0.0.6-dev.4"
+version = "0.0.6-dev.10"
 dependencies = [
  "anyhow",
  "extend",
@@ -701,7 +717,7 @@ dependencies = [
 
 [[package]]
 name = "beet_ml"
-version = "0.0.6-dev.4"
+version = "0.0.6-dev.10"
 dependencies = [
  "anyhow",
  "beet_flow",
@@ -734,7 +750,7 @@ dependencies = [
 
 [[package]]
 name = "beet_router"
-version = "0.0.6-dev.4"
+version = "0.0.6-dev.10"
 dependencies = [
  "anyhow",
  "beet_router",
@@ -745,9 +761,11 @@ dependencies = [
  "console_error_panic_hook",
  "flume",
  "futures",
+ "heck 0.4.1",
  "http",
  "prettyplease",
  "proc-macro2",
+ "pulldown-cmark",
  "quote",
  "rapidhash",
  "ron",
@@ -755,13 +773,14 @@ dependencies = [
  "sweet",
  "syn 2.0.100",
  "tokio",
+ "toml",
  "uuid",
  "web-sys",
 ]
 
 [[package]]
 name = "beet_rsx"
-version = "0.0.6-dev.4"
+version = "0.0.6-dev.10"
 dependencies = [
  "anyhow",
  "beet_rsx",
@@ -793,8 +812,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "beet_rsx_combinator"
+version = "0.0.6-dev.10"
+dependencies = [
+ "combine 2.5.2",
+ "itertools 0.14.0",
+ "sweet",
+]
+
+[[package]]
 name = "beet_rsx_macros"
-version = "0.0.6-dev.4"
+version = "0.0.6-dev.10"
 dependencies = [
  "anyhow",
  "beet_rsx_parser",
@@ -808,10 +836,13 @@ dependencies = [
 
 [[package]]
 name = "beet_rsx_parser"
-version = "0.0.6-dev.4"
+version = "0.0.6-dev.10"
 dependencies = [
  "anyhow",
+ "beet_rsx_combinator",
  "heck 0.4.1",
+ "itertools 0.10.5",
+ "lightningcss",
  "proc-macro2",
  "proc-macro2-diagnostics",
  "quote",
@@ -824,7 +855,7 @@ dependencies = [
 
 [[package]]
 name = "beet_server"
-version = "0.0.6-dev.4"
+version = "0.0.6-dev.10"
 dependencies = [
  "anyhow",
  "axum",
@@ -848,7 +879,7 @@ dependencies = [
 
 [[package]]
 name = "beet_sim"
-version = "0.0.6-dev.4"
+version = "0.0.6-dev.10"
 dependencies = [
  "anyhow",
  "beet_flow",
@@ -859,16 +890,17 @@ dependencies = [
 
 [[package]]
 name = "beet_site"
-version = "0.0.6-dev.4"
+version = "0.0.6-dev.10"
 dependencies = [
  "anyhow",
  "beet",
  "serde",
+ "sweet",
 ]
 
 [[package]]
 name = "beet_spatial"
-version = "0.0.6-dev.4"
+version = "0.0.6-dev.10"
 dependencies = [
  "anyhow",
  "beet_flow",
@@ -2184,6 +2216,20 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "613afe47fcd5fac7ccf1db93babcb082c5994d996f20b8b159f2ad1658eb5724"
 
 [[package]]
+name = "chrono"
+version = "0.4.40"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1a7964611d71df112cb1730f2ee67324fcf4d0fc6606acbbe9bfe06df124637c"
+dependencies = [
+ "android-tzdata",
+ "iana-time-zone",
+ "js-sys",
+ "num-traits",
+ "wasm-bindgen",
+ "windows-link",
+]
+
+[[package]]
 name = "clang-sys"
 version = "1.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2264,6 +2310,16 @@ name = "colorize"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dc17e449bc7854c50b943d113a98bc0e01dc6585d2c66eaa09ca645ebd8a7e62"
+
+[[package]]
+name = "combine"
+version = "2.5.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1645a65a99c7c8d345761f4b75a6ffe5be3b3b27a93ee731fccc5050ba6be97c"
+dependencies = [
+ "ascii",
+ "byteorder",
+]
 
 [[package]]
 name = "combine"
@@ -3619,6 +3675,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "getopts"
+version = "0.2.21"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "14dbbfd5c71d70241ecf9e6f13737f7b5ce823821063188d7e46c41d371eebd5"
+dependencies = [
+ "unicode-width 0.1.14",
+]
+
+[[package]]
 name = "getrandom"
 version = "0.2.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3638,11 +3703,9 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "73fea8450eea4bac3940448fb7ae50d91f034f941199fcd9d909a5a07aa455f0"
 dependencies = [
  "cfg-if",
- "js-sys",
  "libc",
  "r-efi",
  "wasi 0.14.2+wasi-0.2.4",
- "wasm-bindgen",
 ]
 
 [[package]]
@@ -4127,6 +4190,30 @@ dependencies = [
 ]
 
 [[package]]
+name = "iana-time-zone"
+version = "0.1.63"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b0c919e5debc312ad217002b8048a17b7d83f80703865bbfcfebb0458b0b27d8"
+dependencies = [
+ "android_system_properties",
+ "core-foundation-sys",
+ "iana-time-zone-haiku",
+ "js-sys",
+ "log",
+ "wasm-bindgen",
+ "windows-core 0.60.1",
+]
+
+[[package]]
+name = "iana-time-zone-haiku"
+version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f31827a206f56af32e590ba56d5d2d085f558508192593743f16b2306495269f"
+dependencies = [
+ "cc",
+]
+
+[[package]]
 name = "icu_collections"
 version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4401,6 +4488,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "itertools"
+version = "0.14.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2b192c782037fadd9cfa75548310488aabdbf3d2da73885b31bd0abd03351285"
+dependencies = [
+ "either",
+]
+
+[[package]]
 name = "itoa"
 version = "1.0.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4414,7 +4510,7 @@ checksum = "1a87aa2bb7d2af34197c04845522473242e1aa17c12f4935d5856491a7fb8c97"
 dependencies = [
  "cesu8",
  "cfg-if",
- "combine",
+ "combine 4.6.7",
  "jni-sys",
  "log",
  "thiserror 1.0.69",
@@ -4768,6 +4864,17 @@ name = "matchit"
 version = "0.8.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "47e1ffaa40ddd1f3ed91f717a33c8c0ee23fff369e3aa8772b9605cc1d22f4c3"
+
+[[package]]
+name = "material-colors"
+version = "0.4.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e226ffda362d5bc26bb8f730d637a0851eedfb05e35d92108c9d8b48d2e47941"
+dependencies = [
+ "ahash 0.8.11",
+ "indexmap",
+ "serde",
+]
 
 [[package]]
 name = "memchr"
@@ -5902,6 +6009,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "pulldown-cmark"
+version = "0.13.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1e8bbe1a966bd2f362681a44f6edce3c2310ac21e4d5067a6e7ec396297a6ea0"
+dependencies = [
+ "bitflags 2.9.0",
+ "getopts",
+ "memchr",
+ "pulldown-cmark-escape",
+ "unicase",
+]
+
+[[package]]
+name = "pulldown-cmark-escape"
+version = "0.11.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "007d8adb5ddab6f8e3f491ac63566a7d5002cc7ed73901f72057943fa71ae1ae"
+
+[[package]]
 name = "pulp"
 version = "0.18.22"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6892,7 +7018,7 @@ dependencies = [
 [[package]]
 name = "sweet"
 version = "0.3.0"
-source = "git+https://github.com/mrchantey/sweet#aeedbd3d3328323340e27edec88ad09d1b6f375d"
+source = "git+https://github.com/mrchantey/sweet#9425f3623d422a5305cbf245d2e02369130e0175"
 dependencies = [
  "sweet_bevy",
  "sweet_fs",
@@ -6905,15 +7031,15 @@ dependencies = [
 [[package]]
 name = "sweet_bevy"
 version = "0.3.0"
-source = "git+https://github.com/mrchantey/sweet#aeedbd3d3328323340e27edec88ad09d1b6f375d"
+source = "git+https://github.com/mrchantey/sweet#9425f3623d422a5305cbf245d2e02369130e0175"
 dependencies = [
  "anyhow",
  "bevy",
  "extend",
- "getrandom 0.3.2",
+ "getrandom 0.2.15",
  "js-sys",
- "rand 0.9.0",
- "rand_chacha 0.9.0",
+ "rand 0.8.5",
+ "rand_chacha 0.3.1",
  "sweet_utils",
  "sweet_web",
 ]
@@ -6921,7 +7047,7 @@ dependencies = [
 [[package]]
 name = "sweet_fs"
 version = "0.3.0"
-source = "git+https://github.com/mrchantey/sweet#aeedbd3d3328323340e27edec88ad09d1b6f375d"
+source = "git+https://github.com/mrchantey/sweet#9425f3623d422a5305cbf245d2e02369130e0175"
 dependencies = [
  "anyhow",
  "clap",
@@ -6940,7 +7066,7 @@ dependencies = [
 [[package]]
 name = "sweet_server"
 version = "0.3.0"
-source = "git+https://github.com/mrchantey/sweet#aeedbd3d3328323340e27edec88ad09d1b6f375d"
+source = "git+https://github.com/mrchantey/sweet#9425f3623d422a5305cbf245d2e02369130e0175"
 dependencies = [
  "anyhow",
  "axum",
@@ -6964,7 +7090,7 @@ dependencies = [
 [[package]]
 name = "sweet_test"
 version = "0.3.0"
-source = "git+https://github.com/mrchantey/sweet#aeedbd3d3328323340e27edec88ad09d1b6f375d"
+source = "git+https://github.com/mrchantey/sweet#9425f3623d422a5305cbf245d2e02369130e0175"
 dependencies = [
  "anyhow",
  "backtrace",
@@ -6996,7 +7122,7 @@ dependencies = [
 [[package]]
 name = "sweet_test_macros"
 version = "0.3.0"
-source = "git+https://github.com/mrchantey/sweet#aeedbd3d3328323340e27edec88ad09d1b6f375d"
+source = "git+https://github.com/mrchantey/sweet#9425f3623d422a5305cbf245d2e02369130e0175"
 dependencies = [
  "anyhow",
  "proc-macro2",
@@ -7007,19 +7133,20 @@ dependencies = [
 [[package]]
 name = "sweet_utils"
 version = "0.3.0"
-source = "git+https://github.com/mrchantey/sweet#aeedbd3d3328323340e27edec88ad09d1b6f375d"
+source = "git+https://github.com/mrchantey/sweet#9425f3623d422a5305cbf245d2e02369130e0175"
 dependencies = [
  "anyhow",
  "bevy",
  "clap",
  "extend",
- "getrandom 0.3.2",
+ "getrandom 0.2.15",
  "glob",
  "js-sys",
  "path-clean",
  "pathdiff",
- "rand 0.9.0",
- "rand_chacha 0.9.0",
+ "rand 0.8.5",
+ "rand_chacha 0.3.1",
+ "rapidhash",
  "serde",
  "thiserror 2.0.12",
  "wasm-bindgen",
@@ -7030,7 +7157,7 @@ dependencies = [
 [[package]]
 name = "sweet_web"
 version = "0.3.0"
-source = "git+https://github.com/mrchantey/sweet#aeedbd3d3328323340e27edec88ad09d1b6f375d"
+source = "git+https://github.com/mrchantey/sweet#9425f3623d422a5305cbf245d2e02369130e0175"
 dependencies = [
  "anyhow",
  "console_error_panic_hook",

@@ -31,8 +31,8 @@ impl ClientIsland {
 		quote::quote! {
 			// TODO resolve tracker to location
 			beet::exports::ron::de::from_str::<#type_name>(#ron)?
-				.render()
-				.pipe(RegisterEffects::new(
+				.into_node()
+				.xpipe(RegisterEffects::new(
 					tree_location_map.rusty_locations[
 						&RustyTracker::new(#tracker_index,#tracker_hash)]
 					)
@@ -46,9 +46,7 @@ impl ClientIsland {
 #[derive(Default)]
 pub struct CollectClientIslands;
 
-impl RsxPipelineTarget for Vec<ClientIsland> {}
-
-impl<T: RsxPipelineTarget + AsRef<RsxNode>> RsxPipeline<T, Vec<ClientIsland>>
+impl<T: AsRef<RsxNode>> Pipeline<T, Vec<ClientIsland>>
 	for CollectClientIslands
 {
 	fn apply(self, root: T) -> Vec<ClientIsland> {
@@ -91,7 +89,7 @@ mod test {
 	struct MyComponent {
 		val: usize,
 	}
-	fn my_component(props: MyComponent) -> RsxRoot {
+	fn my_component(props: MyComponent) -> RsxNode {
 		rsx! { <div>{props.val}</div> }
 	}
 
@@ -100,13 +98,13 @@ mod test {
 	fn collect_islands() {
 		expect(
 			rsx! { <MyComponent val=32 /> }
-				.pipe(CollectClientIslands::default())
+				.xpipe(CollectClientIslands::default())
 				.len(),
 		)
 		.to_be(0);
 
 		let island = &rsx! { <MyComponent client:load val=32 /> }
-			.pipe(CollectClientIslands::default())[0];
+			.xpipe(CollectClientIslands::default())[0];
 
 		expect(&island.type_name)
 			.to_be("beet_rsx::rsx::pipeline::client_island::test::MyComponent");
@@ -131,8 +129,8 @@ mod test {
 		expect(island.into_mount_tokens().to_string()).to_be(
 			quote::quote! {
 				beet::exports::ron::de::from_str::<MyComponent>("(val:32)")?
-					.render()
-					.pipe(RegisterEffects::new(tree_location_map.rusty_locations[&RustyTracker::new(0u32,89u64)]))?;
+					.into_node()
+					.xpipe(RegisterEffects::new(tree_location_map.rusty_locations[&RustyTracker::new(0u32,89u64)]))?;
 			}
 			.to_string(),
 		);

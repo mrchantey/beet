@@ -1,4 +1,6 @@
 mod signal;
+use std::path::Path;
+
 // use crate::rsx::RsxAttribute;
 // use crate::rsx::RsxNode;
 // use crate::rsx::RsxRust;
@@ -21,26 +23,25 @@ impl Sigfault {
 	/// let node = rsx!{<div>{block}</div>};
 	/// ```
 	pub fn parse_block_node<M>(
-		idx: RsxIdx,
 		tracker: RustyTracker,
-		block: impl 'static + Send + Clone + IntoRsxRoot<M>,
+		block: impl 'static + Send + Sync + Clone + IntoRsxNode<M>,
 	) -> RsxNode {
 		RsxNode::Block(RsxBlock {
-			idx,
-			initial: Box::new(block.clone().into_root()),
+			initial: Box::new(block.clone().into_node()),
 			effect: Effect::new(
 				Box::new(move |loc: TreeLocation| {
 					effect(move || {
 						let block = block.clone();
 						DomTarget::with(move |target| {
-							let node = block.clone().into_root();
-							target.update_rsx_node(node.node, loc).unwrap()
+							let node = block.clone().into_node();
+							target.update_rsx_node(node, loc).unwrap()
 						});
 					});
 					Ok(())
 				}),
 				tracker,
 			),
+			meta: RsxNodeMeta::default(),
 		})
 	}
 
@@ -50,12 +51,12 @@ impl Sigfault {
 	/// let value = || vec![RsxAttribute::Key{key:"foo".to_string()}];
 	/// let node = rsx!{<el {value}/>};
 	/// ```
-	pub fn parse_attribute_block(
+	pub fn parse_attribute_block<M>(
 		tracker: RustyTracker,
-		mut block: impl 'static + FnMut() -> Vec<RsxAttribute>,
+		block: impl IntoRsxAttributes<M>,
 	) -> RsxAttribute {
 		RsxAttribute::Block {
-			initial: block(),
+			initial: block.into_rsx_attributes(),
 			effect: Effect::new(
 				Box::new(|_loc| {
 					todo!();
@@ -74,7 +75,7 @@ impl Sigfault {
 	pub fn parse_attribute_value<M>(
 		key: &'static str,
 		tracker: RustyTracker,
-		block: impl 'static + Send + Clone + IntoSigfaultAttrVal<M>,
+		block: impl 'static + Send + Sync + Clone + IntoSigfaultAttrVal<M>,
 	) -> RsxAttribute {
 		RsxAttribute::BlockValue {
 			key: key.to_string(),
@@ -106,11 +107,17 @@ pub struct ToStringIntoSigfaultAttrVal;
 impl<T: ToString> IntoSigfaultAttrVal<(T, ToStringIntoSigfaultAttrVal)> for T {
 	fn into_sigfault_val(self) -> String { self.to_string() }
 }
+
 pub struct FuncIntoSigfaultAttrVal;
 impl<T: FnOnce() -> U, U: IntoSigfaultAttrVal<M2>, M2>
 	IntoSigfaultAttrVal<(M2, FuncIntoSigfaultAttrVal)> for T
 {
 	fn into_sigfault_val(self) -> String { self().into_sigfault_val() }
+}
+
+pub struct PathIntoSigfaultAttrVal;
+impl IntoSigfaultAttrVal<PathIntoSigfaultAttrVal> for &Path {
+	fn into_sigfault_val(self) -> String { self.to_string_lossy().to_string() }
 }
 
 
@@ -125,9 +132,9 @@ mod test {
 		let (get, set) = signal(7);
 
 		rsx! { <div>value is {get}</div> }
-			.pipe(MountRsDom)
+			.xpipe(MountRsDom)
 			.unwrap()
-			.pipe(RegisterEffects::default())
+			.xpipe(RegisterEffects::default())
 			.unwrap();
 		expect(&DomTarget::with(|h| h.render()))
 			.to_contain("<div data-beet-rsx-idx=\"1\">value is 7</div>");
@@ -143,9 +150,9 @@ mod test {
 		let (get, set) = signal(7);
 
 		rsx! { <div>value is {get}</div> }
-			.pipe(MountRsDom)
+			.xpipe(MountRsDom)
 			.unwrap()
-			.pipe(RegisterEffects::default())
+			.xpipe(RegisterEffects::default())
 			.unwrap();
 		expect(&DomTarget::with(|h| h.render()))
 			.to_contain("<div data-beet-rsx-idx=\"1\">value is 7</div>");

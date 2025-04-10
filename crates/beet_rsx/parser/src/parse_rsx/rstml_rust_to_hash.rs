@@ -1,11 +1,14 @@
-use super::tokens_to_rstml;
+use super::TokensToRstml;
 use proc_macro2::TokenStream;
 use quote::ToTokens;
 use rapidhash::RapidHasher;
+use rstml::Infallible;
 use rstml::node::NodeAttribute;
-use rstml::visitor::Visitor;
+use rstml::node::NodeBlock;
+use rstml::node::NodeElement;
 use rstml::visitor::visit_nodes;
 use std::hash::Hash;
+use sweet::prelude::PipelineTarget;
 
 
 /// Hash all the 'rusty' parts of the rsx macro
@@ -14,14 +17,7 @@ pub struct RstmlRustToHash<'a> {
 }
 
 
-
 impl<'a> RstmlRustToHash<'a> {
-	/// visit and hash without validating the rsx
-	pub fn visit_and_hash(hasher: &'a mut RapidHasher, tokens: TokenStream) {
-		let (mut nodes, _) = tokens_to_rstml(tokens.clone());
-		let this = Self { hasher };
-		visit_nodes(&mut nodes, this);
-	}
 	fn hash(&mut self, tokens: impl ToTokens) {
 		tokens
 			.to_token_stream()
@@ -30,23 +26,26 @@ impl<'a> RstmlRustToHash<'a> {
 			.hash(self.hasher);
 	}
 }
+
+impl<'a> RstmlRustToHash<'a> {
+	/// visit and hash without validating the rsx
+	pub fn visit_and_hash(hasher: &'a mut RapidHasher, tokens: TokenStream) {
+		let (mut nodes, _) = tokens.xpipe(TokensToRstml::new());
+		let this = Self { hasher };
+		visit_nodes(&mut nodes, this);
+	}
+}
 impl<'a> syn::visit_mut::VisitMut for RstmlRustToHash<'a> {}
 
 /// we could visit_rust_block but this feels more explicit
 /// and easier to understand
-impl<'a, C> Visitor<C> for RstmlRustToHash<'a>
-where
-	C: rstml::node::CustomNode + 'static,
-{
-	fn visit_block(&mut self, block: &mut rstml::node::NodeBlock) -> bool {
+impl<'a> rstml::visitor::Visitor<Infallible> for RstmlRustToHash<'a> {
+	fn visit_block(&mut self, block: &mut NodeBlock) -> bool {
 		// println!("visiting block: {}", block.into_token_stream().to_string());
 		self.hash(block);
 		true
 	}
-	fn visit_element(
-		&mut self,
-		element: &mut rstml::node::NodeElement<C>,
-	) -> bool {
+	fn visit_element(&mut self, element: &mut NodeElement<Infallible>) -> bool {
 		// we must hash component open tags because if the keys change
 		// thats also a recompile.
 		if element

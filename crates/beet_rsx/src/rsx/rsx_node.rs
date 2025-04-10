@@ -3,72 +3,203 @@ use strum_macros::AsRefStr;
 use strum_macros::EnumDiscriminants;
 
 
-#[derive(Debug, AsRefStr, EnumDiscriminants)]
+#[derive(Debug, Clone, AsRefStr, EnumDiscriminants)]
 pub enum RsxNode {
 	/// a html doctype node
-	Doctype {
-		idx: RsxIdx,
-	},
+	Doctype(RsxDoctype),
 	/// a html comment node
-	Comment {
-		idx: RsxIdx,
-		value: String,
-	},
+	Comment(RsxComment),
 	/// a html text node
-	Text {
-		idx: RsxIdx,
-		value: String,
-	},
+	Text(RsxText),
 	/// a rust block that returns text
 	Block(RsxBlock),
 	/// A transparent node that simply contains children
 	/// This may be deprecated in the future if no patterns
 	/// require it. The RstmlToRsx could support it
-	Fragment {
-		idx: RsxIdx,
-		nodes: Vec<RsxNode>,
-	},
+	Fragment(RsxFragment),
 	/// a html element
 	Element(RsxElement),
 	Component(RsxComponent),
 }
+impl Into<RsxNode> for RsxDoctype {
+	fn into(self) -> RsxNode { RsxNode::Doctype(self) }
+}
+impl Into<RsxNode> for RsxComment {
+	fn into(self) -> RsxNode { RsxNode::Comment(self) }
+}
+impl Into<RsxNode> for RsxText {
+	fn into(self) -> RsxNode { RsxNode::Text(self) }
+}
+impl Into<RsxNode> for RsxBlock {
+	fn into(self) -> RsxNode { RsxNode::Block(self) }
+}
+impl Into<RsxNode> for RsxFragment {
+	fn into(self) -> RsxNode { RsxNode::Fragment(self) }
+}
+impl Into<RsxNode> for RsxElement {
+	fn into(self) -> RsxNode { RsxNode::Element(self) }
+}
+impl Into<RsxNode> for RsxComponent {
+	fn into(self) -> RsxNode { RsxNode::Component(self) }
+}
+impl NodeMeta for RsxNode {
+	fn meta(&self) -> &RsxNodeMeta {
+		match self {
+			RsxNode::Doctype(node) => node.meta(),
+			RsxNode::Comment(node) => node.meta(),
+			RsxNode::Text(node) => node.meta(),
+			RsxNode::Block(node) => node.meta(),
+			RsxNode::Fragment(node) => node.meta(),
+			RsxNode::Element(node) => node.meta(),
+			RsxNode::Component(node) => node.meta(),
+		}
+	}
 
-impl Default for RsxNode {
-	fn default() -> Self {
-		Self::Fragment {
-			idx: RsxIdx::default(),
-			nodes: Vec::new(),
+	fn meta_mut(&mut self) -> &mut RsxNodeMeta {
+		match self {
+			RsxNode::Doctype(node) => node.meta_mut(),
+			RsxNode::Comment(node) => node.meta_mut(),
+			RsxNode::Text(node) => node.meta_mut(),
+			RsxNode::Block(node) => node.meta_mut(),
+			RsxNode::Fragment(node) => node.meta_mut(),
+			RsxNode::Element(node) => node.meta_mut(),
+			RsxNode::Component(node) => node.meta_mut(),
 		}
 	}
 }
 
+#[derive(Debug, Clone)]
+pub struct RsxDoctype {
+	/// Metadata for this node
+	pub meta: RsxNodeMeta,
+}
+
+impl NodeMeta for RsxDoctype {
+	fn meta(&self) -> &RsxNodeMeta { &self.meta }
+	fn meta_mut(&mut self) -> &mut RsxNodeMeta { &mut self.meta }
+}
+
+#[derive(Debug, Clone)]
+pub struct RsxComment {
+	pub value: String,
+	/// Metadata for this node
+	pub meta: RsxNodeMeta,
+}
+
+impl NodeMeta for RsxComment {
+	fn meta(&self) -> &RsxNodeMeta { &self.meta }
+	fn meta_mut(&mut self) -> &mut RsxNodeMeta { &mut self.meta }
+}
+
+#[derive(Debug, Clone)]
+pub struct RsxText {
+	pub value: String,
+	/// Metadata for this node
+	pub meta: RsxNodeMeta,
+}
+
+impl NodeMeta for RsxText {
+	fn meta(&self) -> &RsxNodeMeta { &self.meta }
+	fn meta_mut(&mut self) -> &mut RsxNodeMeta { &mut self.meta }
+}
+
+#[derive(Debug, Default, Clone)]
+pub struct RsxFragment {
+	pub nodes: Vec<RsxNode>,
+	/// Metadata for this node
+	pub meta: RsxNodeMeta,
+}
+
+impl NodeMeta for RsxFragment {
+	fn meta(&self) -> &RsxNodeMeta { &self.meta }
+	fn meta_mut(&mut self) -> &mut RsxNodeMeta { &mut self.meta }
+}
+
+/// This is an RsxNode and a location, which is required for hydration.
+///
+/// It is allowed for the [`RsxRoot`] to be default(), which means that
+/// the macro location is a placeholder, this means that the the node
+/// will not be eligible for nested templating etc. which is the case
+/// anyway for Strings and ().
+///
+/// The struct returned from an rsx! macro.
+
+pub trait IntoRsxNode<M = ()> {
+	fn into_node(self) -> RsxNode;
+}
+
+pub struct IntoIntoRsx;
+impl<T: Into<RsxNode>> IntoRsxNode<IntoIntoRsx> for T {
+	fn into_node(self) -> RsxNode { self.into() }
+}
+
+impl IntoRsxNode<()> for () {
+	fn into_node(self) -> RsxNode { RsxNode::default() }
+}
+pub struct FuncIntoRsx;
+impl<T: FnOnce() -> U, U: IntoRsxNode<M2>, M2> IntoRsxNode<(M2, FuncIntoRsx)>
+	for T
+{
+	fn into_node(self) -> RsxNode { self().into_node() }
+}
+
+pub struct IterIntoRsx;
+impl<I, T, M2> IntoRsxNode<(M2, IterIntoRsx)> for I
+where
+	I: IntoIterator<Item = T>,
+	T: IntoRsxNode<M2>,
+{
+	fn into_node(self) -> RsxNode {
+		RsxFragment {
+			nodes: self.into_iter().map(|item| item.into_node()).collect(),
+			meta: RsxNodeMeta::default(),
+		}
+		.into()
+	}
+}
+
+
+
+impl Default for RsxNode {
+	fn default() -> Self { Self::Fragment(RsxFragment::default()) }
+}
+
+impl AsRef<RsxNode> for RsxNode {
+	fn as_ref(&self) -> &RsxNode { self }
+}
+
+impl AsMut<RsxNode> for RsxNode {
+	fn as_mut(&mut self) -> &mut RsxNode { self }
+}
+
+impl<T: ToString> From<T> for RsxNode {
+	fn from(value: T) -> Self {
+		RsxNode::Text(RsxText {
+			value: value.to_string(),
+			meta: RsxNodeMeta::default(),
+		})
+	}
+}
+
+// pub struct PathIntoRsx;
+// impl IntoRsxNode<PathIntoRsx> for &Path {
+// 	fn into_node(self) -> RsxNode {
+// 		RsxNode::Text(RsxText {
+// 			value: self.to_string_lossy().to_string(),
+// 			meta: RsxNodeMeta::default(),
+// 		})
+// 	}
+// }
+
+
 
 impl RsxNode {
-	pub fn idx(&self) -> RsxIdx {
-		match self {
-			RsxNode::Doctype { idx, .. }
-			| RsxNode::Comment { idx, .. }
-			| RsxNode::Text { idx, .. }
-			| RsxNode::Fragment { idx, .. }
-			| RsxNode::Element(RsxElement { idx, .. })
-			| RsxNode::Component(RsxComponent { idx, .. }) => *idx,
-			RsxNode::Block(RsxBlock { idx, .. }) => *idx,
-		}
-	}
-
-	pub fn fragment(nodes: Vec<RsxNode>) -> Self {
-		Self::Fragment {
-			idx: RsxIdx::default(),
-			nodes,
-		}
-	}
-
 	/// Returns true if the node is an empty fragment,
 	/// or if it is recursively a fragment with only empty fragments
 	pub fn is_empty(&self) -> bool {
 		match self {
-			RsxNode::Fragment { nodes, .. } => {
-				for node in nodes {
+			RsxNode::Fragment(fragment) => {
+				for node in &fragment.nodes {
 					if !node.is_empty() {
 						return false;
 					}
@@ -95,25 +226,23 @@ impl RsxNode {
 		visitor.walk_node(self)
 	}
 
-	// this is too dangerous? so easy to expect the rsx idx to be unchanged?
-	//
-	// /// Add another node. If this node is a fragment it will be appended
-	// /// to the end, otherwise a new fragment will be created with the
-	// /// current node and the new node.
-	// pub fn push(&mut self, node: RsxNode) {
-	// 	match self {
-	// 		RsxNode::Fragment { nodes, .. } => nodes.push(node),
-	// 		_ => {
-	// 			// let idx = self
-	// 			let mut nodes = vec![std::mem::take(self)];
-	// 			nodes.push(node);
-	// 			*self = RsxNode::Fragment {
-	// 				idx: RsxIdx::default(),
-	// 				nodes,
-	// 			};
-	// 		}
-	// 	}
-	// }
+	/// Add another node. If this node is a fragment it will be appended
+	/// to the end, otherwise a new fragment will be created with the
+	/// current node and the new node.
+	pub fn push(&mut self, node: RsxNode) {
+		match self {
+			RsxNode::Fragment(RsxFragment { nodes, .. }) => nodes.push(node),
+			_ => {
+				let mut nodes = vec![std::mem::take(self)];
+				nodes.push(node);
+				*self = RsxFragment {
+					nodes,
+					..Default::default()
+				}
+				.into();
+			}
+		}
+	}
 
 	/// Returns true if the node is an html node
 	pub fn is_html_node(&self) -> bool {
@@ -132,8 +261,8 @@ impl RsxNode {
 		fn walk(node: &RsxNode) -> bool {
 			match node {
 				RsxNode::Block(_) => true,
-				RsxNode::Fragment { nodes, .. } => {
-					for item in nodes {
+				RsxNode::Fragment(fragment) => {
+					for item in &fragment.nodes {
 						if walk(item) {
 							return true;
 						}
@@ -155,30 +284,25 @@ impl RsxNode {
 /// let my_block = 3;
 /// let el = rsx! { <div>{my_block}</div> };
 /// ```
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct RsxBlock {
-	pub idx: RsxIdx,
 	/// The initial for an rsx block is considered a seperate tree,
-	pub initial: Box<RsxRoot>,
+	pub initial: Box<RsxNode>,
 	pub effect: Effect,
+	/// Metadata for this node
+	pub meta: RsxNodeMeta,
 }
-/// Representation of a rusty node.
-///
-/// ```
-/// # use beet_rsx::as_beet::*;
-/// let my_block = 3;
-/// let el = rsx! { <div>{my_block}</div> };
-/// ```
-#[derive(Debug, Deref, DerefMut)]
-pub struct RsxFragment(pub Vec<RsxNode>);
+
+impl NodeMeta for RsxBlock {
+	fn meta(&self) -> &RsxNodeMeta { &self.meta }
+	fn meta_mut(&mut self) -> &mut RsxNodeMeta { &mut self.meta }
+}
 
 /// A component is a struct that implements the [Component] trait.
 /// When it is used in an `rsx!` macro it will be instantiated
 /// with the [`Component::render`] method and any slot children.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct RsxComponent {
-	/// The index of this node relative to its parent [`RsxRoot`]
-	pub idx: RsxIdx,
 	/// The name of the component, this must start with a capital letter
 	pub tag: String,
 	/// The type name extracted via [`std::any::type_name`]
@@ -189,47 +313,19 @@ pub struct RsxComponent {
 	/// even key value attribute changes must be tracked
 	/// because components are structs not elements
 	pub tracker: RustyTracker,
-	/// the root returned by [Component::render]
-	pub root: Box<RsxRoot>,
+	/// the node returned by [Component::render]
+	pub node: Box<RsxNode>,
 	/// the children passed in by this component's parent:
 	///
 	/// `rsx! { <MyComponent>slot_children</MyComponent> }`
 	pub slot_children: Box<RsxNode>,
-	/// Collected template directives
-	pub template_directives: Vec<TemplateDirective>,
+	/// Metadata for this node
+	pub meta: RsxNodeMeta,
 }
 
-/// Attributes with a colon `:` are considered special template directives,
-/// for example `client:load`
-#[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct TemplateDirective {
-	/// The part before the colon
-	pub prefix: String,
-	/// The part after the colon
-	pub suffix: String,
-	/// The part after the equals sign, if any
-	pub value: Option<String>,
-}
-
-impl TemplateDirective {
-	/// Create a new template directive
-	/// ## Panics
-	/// If the key does not contain two parts split by a colon
-	pub fn new(key: &str, value: Option<&str>) -> Self {
-		let mut parts = key.split(':');
-		let prefix = parts
-			.next()
-			.expect("expected colon prefix in template directive");
-		let suffix = parts
-			.next()
-			.expect("expected colon suffix in template directive");
-		Self {
-			prefix: prefix.into(),
-			suffix: suffix.into(),
-			value: value.map(|v| v.into()),
-		}
-	}
+impl NodeMeta for RsxComponent {
+	fn meta(&self) -> &RsxNodeMeta { &self.meta }
+	fn meta_mut(&mut self) -> &mut RsxNodeMeta { &mut self.meta }
 }
 
 /// Representation of an RsxElement
@@ -238,10 +334,8 @@ impl TemplateDirective {
 /// # use beet_rsx::as_beet::*;
 /// let el = rsx! { <div class="my-class">hello world</div> };
 /// ```
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct RsxElement {
-	/// The index of this node in the local tree
-	pub idx: RsxIdx,
 	/// ie `div, span, input`
 	pub tag: String,
 	/// ie `class="my-class"`
@@ -250,8 +344,14 @@ pub struct RsxElement {
 	pub children: Box<RsxNode>,
 	/// ie `<input/>`
 	pub self_closing: bool,
+	/// The location of the node
+	pub meta: RsxNodeMeta,
 }
 
+impl NodeMeta for RsxElement {
+	fn meta(&self) -> &RsxNodeMeta { &self.meta }
+	fn meta_mut(&mut self) -> &mut RsxNodeMeta { &mut self.meta }
+}
 
 impl RsxElement {
 	/// Whether any children or attributes are blocks,
@@ -301,7 +401,7 @@ impl RsxElement {
 
 // #[derive(Debug, Clone, PartialEq)]
 // #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum RsxAttribute {
 	Key {
 		key: String,
@@ -310,6 +410,9 @@ pub enum RsxAttribute {
 		key: String,
 		value: String,
 	},
+	/// An attribute where the value is a 'block', could be represented
+	/// as an identifier for a variable or a block:
+	/// `key=value` or `key={value}` are both considered blocks.
 	BlockValue {
 		key: String,
 		initial: String,
@@ -322,12 +425,31 @@ pub enum RsxAttribute {
 	},
 }
 
-impl AsRef<RsxNode> for &RsxNode {
-	fn as_ref(&self) -> &RsxNode { *self }
+pub struct AsStrIntoRsxAttributeMarker;
+impl<T: Into<String>> IntoRsxAttribute<AsStrIntoRsxAttributeMarker> for T {
+	fn into_rsx_attribute(self) -> RsxAttribute {
+		RsxAttribute::Key { key: self.into() }
+	}
+}
+pub trait IntoRsxAttribute<M> {
+	/// Convert this into a RsxAttribute
+	fn into_rsx_attribute(self) -> RsxAttribute;
 }
 
-impl AsMut<RsxNode> for &mut RsxNode {
-	fn as_mut(&mut self) -> &mut RsxNode { *self }
+pub trait IntoRsxAttributes<M> {
+	/// Convert this into a RsxAttribute
+	fn into_rsx_attributes(self) -> Vec<RsxAttribute>;
+}
+
+pub struct IntoVecIntoRsxAttributeMarker;
+impl<T: Into<Vec<RsxAttribute>>>
+	IntoRsxAttributes<IntoVecIntoRsxAttributeMarker> for T
+{
+	fn into_rsx_attributes(self) -> Vec<RsxAttribute> { self.into() }
+}
+
+impl<F: FnOnce() -> Vec<RsxAttribute>> IntoRsxAttributes<F> for F {
+	fn into_rsx_attributes(self) -> Vec<RsxAttribute> { self() }
 }
 
 #[cfg(test)]
@@ -337,31 +459,42 @@ mod test {
 
 	#[test]
 	fn root_location() {
-		let line = line!() + 1;
-		let RsxRoot { location, .. } = rsx! { <div>hello world</div> };
+		let line = line!() + 2;
+		#[rustfmt::skip]
+		let location = rsx! { <div>hello world</div> }
+			.location()
+			.cloned()
+			.unwrap();
 		expect(&location.file().to_string_lossy())
 			.to_be("crates/beet_rsx/src/rsx/rsx_node.rs");
-		expect(location.line()).to_be(line as usize);
-		expect(location.col()).to_be(40);
+		expect(location.line()).to_be(line);
+		expect(location.col()).to_be(24);
 	}
 
 	#[derive(Node)]
 	struct MyComponent {
 		key: u32,
 	}
-	fn my_component(props: MyComponent) -> RsxRoot {
+	fn my_component(props: MyComponent) -> RsxNode {
 		rsx! { <div>{props.key}</div> }
 	}
 
 
 	#[test]
-	fn block_attr() {
+	fn comp_attr() {
 		let my_comp = MyComponent { key: 3 };
 		expect(
 			rsx! { <MyComponent {my_comp} /> }
-				.pipe(RsxToHtmlString::default())
+				.xpipe(RsxToHtmlString::default())
 				.unwrap(),
 		)
 		.to_be("<div data-beet-rsx-idx=\"2\">3</div>");
+	}
+	#[test]
+	fn block_attr() {
+		let value = vec![RsxAttribute::Key {
+			key: "foo".to_string(),
+		}];
+		let _node = rsx! { <el {value} /> };
 	}
 }

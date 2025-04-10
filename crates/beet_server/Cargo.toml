@@ -35,12 +35,12 @@ tokio.workspace = true
 axum = { version = "0.8", features = ["macros"] }
 tower = "0.5"
 tower-livereload = { version = "0.9", optional = true }
-tower-http = { version = "0.6", features = ["trace", "fs"] }
+tower-http = { version = "0.6", features = ["trace", "fs", "normalize-path"] }
 lambda_http = { version = "0.14", optional = true }
 
 # i think we can use compile time constants instead
 semver = { version = "1", optional = true }
-toml = { version = "0.8", optional = true }
+toml = { workspace = true, optional = true }
 cargo-manifest = { version = "0.19", optional = true }
 
 [dev-dependencies]

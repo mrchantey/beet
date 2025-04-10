@@ -25,6 +25,25 @@ impl AttributeGroup {
 			.collect();
 		Ok(Self { attributes })
 	}
+	/// ## Errors
+	/// if any of the attributes does not match a provided key
+	pub fn validate_allowed_keys(self, keys: &[&str]) -> Result<Self> {
+		for attr in &self.attributes {
+			if let Some(name) = attr.name() {
+				if !keys.contains(&name.to_string().as_str()) {
+					return Err(syn::Error::new(
+						name.span(),
+						format!(
+							"Invalid Attribute key `{}`. Allowed attributes are: {}",
+							name,
+							keys.join(", ")
+						),
+					));
+				}
+			}
+		}
+		Ok(self)
+	}
 
 	/// Returns the attribute if it is present.
 	pub fn get(&self, name: &str) -> Option<&AttributeItem> {
@@ -32,6 +51,17 @@ impl AttributeGroup {
 			attr.name().map(|n| n.to_string() == name).unwrap_or(false)
 		})
 	}
+
+	pub fn get_many(&self, name: &str) -> Vec<&AttributeItem> {
+		self.attributes
+			.iter()
+			.filter(|attr| {
+				attr.name().map(|n| n.to_string() == name).unwrap_or(false)
+			})
+			.collect()
+	}
+
+	pub fn contains(&self, name: &str) -> bool { self.get(name).is_some() }
 
 	/// Returns the value if the attribute is present and has a value.
 	#[allow(unused)]

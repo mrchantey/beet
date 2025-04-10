@@ -3,25 +3,12 @@ use proc_macro::TokenStream;
 use syn::DeriveInput;
 use syn::parse_macro_input;
 mod derive_deref;
-
-/// Demonstrates how to select a different reactive runtime
-#[allow(unused_mut)]
-fn feature_flag_idents() -> RsxIdents {
-	let mut idents = RsxIdents::default();
-	#[cfg(feature = "sigfault")]
-	{
-		idents.runtime = RsxRuntime::sigfault();
-	}
-	// #[cfg(feature = "bevy")]
-	// {
-	// 	idents.runtime = RsxRuntime::bevy();
-	// }
-	idents
-}
+use sweet::prelude::*;
 
 
 
-/// This macro expands to an [RsxRoot](beet_rsx::prelude::RsxRoot).
+
+/// This macro expands to an [RsxNode](beet_rsx::prelude::RsxNode).
 ///
 /// The type of node is determied by the feature flags, current options are:
 /// - [`StringRsx`](beet_rsx::rsx::StringRsx)
@@ -31,13 +18,7 @@ fn feature_flag_idents() -> RsxIdents {
 ///
 #[proc_macro]
 pub fn rsx(tokens: TokenStream) -> TokenStream {
-	RstmlToRsx {
-		// perhaps we can feature gate this if it proves expensive
-		idents: feature_flag_idents(),
-		..Default::default()
-	}
-	.map_tokens(tokens.into())
-	.into()
+	tokens.xpipe(RsxMacroPipeline::default()).into()
 }
 
 /// Mostly used for testing,
@@ -45,9 +26,7 @@ pub fn rsx(tokens: TokenStream) -> TokenStream {
 /// things like hot reloading.
 #[proc_macro]
 pub fn rsx_template(tokens: TokenStream) -> TokenStream {
-	RstmlToRsxTemplate::default()
-		.from_macro(tokens.into())
-		.into()
+	tokens.xpipe(RsxTemplateMacroPipeline::default()).into()
 }
 
 
@@ -64,8 +43,30 @@ pub fn derive_deref_mut(input: TokenStream) -> TokenStream {
 }
 
 
+
+/// Adds a builder pattern to a struct enabling construction as an
+/// rsx component
 #[proc_macro_derive(Node, attributes(node, field))]
 pub fn derive_node(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 	let input = parse_macro_input!(input as DeriveInput);
-	impl_derive_node(input).into()
+	parse_derive_node(input).into()
+}
+
+/// Allow a struct to be included as a `#[field(flatten)]` of another struct
+#[proc_macro_derive(Buildable, attributes(field))]
+pub fn derive_buildable(
+	input: proc_macro::TokenStream,
+) -> proc_macro::TokenStream {
+	let input = parse_macro_input!(input as DeriveInput);
+	parse_derive_buildable(input).into()
+}
+/// Implements Into<Vec<RsxAttribute>> for a struct.
+/// Optional fields will checked and only added if they are Some.
+/// All fields must implement Into<String>.
+#[proc_macro_derive(IntoRsxAttributes, attributes(field))]
+pub fn derive_into_rsx_attributes(
+	input: proc_macro::TokenStream,
+) -> proc_macro::TokenStream {
+	let input = parse_macro_input!(input as DeriveInput);
+	impl_into_rsx_attributes(input).into()
 }

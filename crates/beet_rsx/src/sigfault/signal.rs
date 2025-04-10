@@ -38,7 +38,7 @@ thread_local! {
 /// Very simple implementation of effects used for testing and demos
 pub fn effect<F>(callback: F)
 where
-	F: FnMut() + Send + 'static,
+	F: 'static + Send + Sync + FnMut(),
 {
 	let callback = Arc::new(Mutex::new(callback));
 	EFFECT_CALLBACK

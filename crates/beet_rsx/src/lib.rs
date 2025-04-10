@@ -1,6 +1,6 @@
 #![cfg_attr(test, feature(test, custom_test_frameworks))]
 #![cfg_attr(test, test_runner(sweet::test_runner))]
-#![cfg_attr(feature = "bevy", feature(unboxed_closures, fn_traits))]
+#![cfg_attr(feature = "bevy", feature(fn_traits, unboxed_closures))]
 #![feature(more_qualified_paths)]
 // #![deny(missing_docs)]
 //!
@@ -16,6 +16,7 @@ pub mod html;
 pub mod rsx;
 pub mod sigfault;
 pub mod string_rsx;
+pub mod templating;
 #[cfg(feature = "macros")]
 pub use beet_rsx_macros::*;
 #[cfg(feature = "parser")]
@@ -33,6 +34,7 @@ pub mod prelude {
 	#[cfg(feature = "parser")]
 	pub use beet_rsx_parser::prelude::*;
 	pub use crate::context::*;
+	pub use crate::templating::*;
 	pub use crate::dom::*;
 	pub use crate::error::*;
 	pub use crate::html::*;
@@ -40,7 +42,8 @@ pub mod prelude {
 	#[cfg(feature = "bevy")]
 	pub use crate::bevy::*;
 
-
+	pub use sweet::prelude::Pipeline;
+	pub use sweet::prelude::PipelineTarget;
 	pub type HashMap<K,V> = rapidhash::RapidHashMap<K,V>;
 	pub type HashSet<K> = rapidhash::RapidHashSet<K>;
 	
