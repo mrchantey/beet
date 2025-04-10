@@ -48,6 +48,7 @@ impl<'a> PropsField<'a> {
 
 	pub fn parse(inner: &'a Field) -> Result<Self> {
 		let attributes = AttributeGroup::parse(&inner.attrs, "field")?
+			// TODO we've outgrown this, each derive should validate seperately
 			.validate_allowed_keys(&[
 				"default", "required", "into", "no_into", "flatten",
 			])?;

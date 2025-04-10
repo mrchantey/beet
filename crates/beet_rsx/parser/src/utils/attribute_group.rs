@@ -52,6 +52,15 @@ impl AttributeGroup {
 		})
 	}
 
+	pub fn get_many(&self, name: &str) -> Vec<&AttributeItem> {
+		self.attributes
+			.iter()
+			.filter(|attr| {
+				attr.name().map(|n| n.to_string() == name).unwrap_or(false)
+			})
+			.collect()
+	}
+
 	pub fn contains(&self, name: &str) -> bool { self.get(name).is_some() }
 
 	/// Returns the value if the attribute is present and has a value.

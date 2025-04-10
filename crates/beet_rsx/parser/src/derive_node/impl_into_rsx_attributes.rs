@@ -15,7 +15,7 @@ fn parse(input: DeriveInput) -> Result<TokenStream> {
 	let push_fields = fields
 		.iter()
 		.map(|field| {
-			let ident = &field.inner.ident;
+			let ident = &field.ident;
 			let ident_str = ident.to_token_stream().to_string();
 
 

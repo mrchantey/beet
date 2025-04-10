@@ -31,6 +31,8 @@ impl ClientIslandMountFuncs {
 
 	#[cfg(target_arch = "wasm32")]
 	pub fn mount(&self) -> Result<()> {
+		console_error_panic_hook::set_once();
+
 		DomTarget::set(BrowserDomTarget::default());
 
 		let mut path =

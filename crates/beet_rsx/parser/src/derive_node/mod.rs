@@ -1,8 +1,10 @@
-mod impl_buildable;
+mod derive_buildable;
+mod derive_flatten;
 mod impl_into_rsx_attributes;
-mod impl_node;
+mod derive_node;
 mod props_field;
-pub use impl_buildable::*;
+pub use derive_buildable::*;
+pub use derive_flatten::*;
 pub use impl_into_rsx_attributes::*;
-pub use impl_node::*;
+pub use derive_node::*;
 pub use props_field::*;

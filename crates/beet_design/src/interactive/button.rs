@@ -36,7 +36,6 @@ pub struct Button {
 
 fn button(Button { variant, mut attrs }: Button) -> RsxNode {
 	let class = format!(" bt-c-button--{}", variant.class_suffix());
-
 	attrs.push_class(csx!("bt-c-button", class));
 
 	rsx! {
@@ -75,14 +74,19 @@ fn icon_button(IconButton { variant }: IconButton) -> RsxNode {
 /// An anchor tag styled as a button
 #[derive(Node)]
 pub struct Link {
+	#[field(default)]
 	pub variant: ButtonVariant,
+	#[field(flatten)]
+	#[field(flatten=BaseHtmlAttributes)]
+	pub attrs: AnchorHtmlAttributes,
 }
 
 
-pub fn link(Link { variant }: Link) -> RsxNode {
-	let class = format!("bt-c-button bt-c-button--{}", variant.class_suffix());
+pub fn link(Link { variant, mut attrs }: Link) -> RsxNode {
+	let class = format!(" bt-c-button--{}", variant.class_suffix());
+	attrs.push_class(csx!("bt-c-button", class));
 	rsx! {
-		<a class=class>
+		<a {attrs}>
 			<slot />
 		</a>
 		<style src="./button.css" />

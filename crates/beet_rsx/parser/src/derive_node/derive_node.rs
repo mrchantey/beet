@@ -8,7 +8,7 @@ use syn::Expr;
 use syn::Ident;
 use syn::Result;
 
-pub fn impl_node(input: DeriveInput) -> TokenStream {
+pub fn parse_derive_node(input: DeriveInput) -> TokenStream {
 	parse(input).unwrap_or_else(|err| err.into_compile_error())
 }
 
@@ -18,6 +18,11 @@ fn parse(input: DeriveInput) -> Result<TokenStream> {
 	let impl_props = impl_props(&input)?;
 	let impl_builder = impl_builder(&input, &fields)?;
 	let impl_required = impl_required(&input, &fields)?;
+	let impl_flatten = impl_flatten(
+		&name_lookup::builder_ident(&input.ident),
+		&input,
+		&fields,
+	)?;
 
 	Ok(quote! {
 		use beet::prelude::*;
@@ -26,6 +31,7 @@ fn parse(input: DeriveInput) -> Result<TokenStream> {
 		#impl_props
 		#impl_builder
 		#impl_required
+		#impl_flatten
 	})
 }
 
@@ -69,16 +75,16 @@ fn impl_component(input: &DeriveInput) -> Result<TokenStream> {
 
 fn impl_props(input: &DeriveInput) -> Result<TokenStream> {
 	let name = &input.ident;
-	let impl_builder_name = format_ident!("{}Builder", &input.ident);
-	let impl_required_name = format_ident!("{}Required", &input.ident);
+	let builder_ident = name_lookup::builder_ident(&input.ident);
+	let required_ident = name_lookup::required_ident(&input.ident);
 
 	let (impl_generics, type_generics, where_clause) =
 		input.generics.split_for_impl();
 
 	Ok(quote! {
 		impl #impl_generics Props for #name #type_generics #where_clause {
-			type Builder = #impl_builder_name #type_generics;
-			type Required = #impl_required_name;
+			type Builder = #builder_ident #type_generics;
+			type Required = #required_ident;
 		}
 
 
@@ -92,7 +98,7 @@ fn impl_builder(
 	fields: &[PropsField],
 ) -> Result<TokenStream> {
 	let builder_fields = fields.iter().map(|field| {
-		let name = &field.inner.ident;
+		let name = &field.ident;
 		let ty = field.unwrapped;
 		if field.is_default() {
 			quote! { #name: #ty }
@@ -104,7 +110,7 @@ fn impl_builder(
 	let default_fallback = syn::parse_quote! { Default::default() };
 
 	let builder_defaults = fields.iter().map(|field| {
-		let name = &field.inner.ident;
+		let name = &field.ident;
 		if let Some(attr) = field.default_attr() {
 			let val = attr.value.as_ref().unwrap_or(&default_fallback);
 			quote! { #name: #val }
@@ -115,7 +121,7 @@ fn impl_builder(
 
 
 	let set_val_methods = fields.iter().map(|field| {
-		let name = &field.inner.ident;
+		let name = &field.ident;
 		let (ty, expr) = field.assign_tokens();
 		let expr = if field.is_default() {
 			quote! { #expr }
@@ -134,49 +140,40 @@ fn impl_builder(
 	});
 
 	let unwrap_fields = fields.iter().map(|field| {
-		let name = &field.inner.ident;
+		let name = &field.ident;
 
 		let rhs = if field.is_default() {
 			quote! { self.#name }
 		} else if field.is_optional() {
 			quote! { self.#name }
 		} else {
-			quote! { self.#name.unwrap() }
+			let err_msg = format!(
+				"Missing required field `{}::{}`",
+				input.ident, field.ident
+			);
+			quote! { self.#name.expect(#err_msg) }
 		};
 		quote! {#name: #rhs}
 	});
 
 
 	let node_name = &input.ident;
-	let impl_builder_name = format_ident!("{}Builder", &input.ident);
+	let builder_ident = name_lookup::builder_ident(&input.ident);
 	let (impl_generics, type_generics, where_clause) =
 		input.generics.split_for_impl();
 	let vis = &input.vis;
 
-	let as_mut = fields.iter()
-		.filter(|field|field.attributes.contains("flatten"))
-		.map(|field| {
-			let field_name = &field.inner.ident;
-			let field_type = &field.inner.ty;
-			Some(quote! {
-			   impl #impl_generics AsMut<#field_type> for #impl_builder_name #type_generics #where_clause {
-				   fn as_mut(&mut self) -> &mut #field_type { &mut self.#field_name }
-			   }
-			})
-		}
-	);
-
 	Ok(quote! {
 		#[allow(missing_docs)]
-		#vis struct #impl_builder_name #impl_generics {
+		#vis struct #builder_ident #impl_generics {
 			#(#builder_fields),*
 		}
 
-		impl #impl_generics #impl_builder_name #type_generics #where_clause {
+		impl #impl_generics #builder_ident #type_generics #where_clause {
 			#(#set_val_methods)*
 		}
 
-		impl #impl_generics Default for #impl_builder_name #type_generics #where_clause {
+		impl #impl_generics Default for #builder_ident #type_generics #where_clause {
 			fn default() -> Self {
 				Self {
 					#(#builder_defaults),*
@@ -184,9 +181,7 @@ fn impl_builder(
 			}
 		}
 
-		#(#as_mut)*
-
-		impl #impl_generics PropsBuilder for #impl_builder_name #type_generics #where_clause {
+		impl #impl_generics PropsBuilder for #builder_ident #type_generics #where_clause {
 			type Component = #node_name #type_generics;
 
 			fn build(self) -> Self::Component {
@@ -204,7 +199,7 @@ fn impl_required(
 ) -> Result<TokenStream> {
 	let required_field_names = fields.iter().filter_map(|field| {
 		if field.is_required() {
-			Some(&field.inner.ident)
+			Some(&field.ident)
 		} else {
 			None
 		}
@@ -321,7 +316,7 @@ mod test {
 			}
 		};
 
-		let actual = impl_node(input);
+		let actual = parse_derive_node(input);
 		expect(actual.to_string()).to_be(expected.to_string());
 	}
 }

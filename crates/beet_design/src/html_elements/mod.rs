@@ -22,11 +22,11 @@ pub struct AnchorHtmlAttributes {
 
 pub trait BaseHtmlAttributesExt: BaseHtmlAttributesBuildable {
 	fn push_class(&mut self, class: impl AsRef<str>) {
-		if let Some(existing) = self.get_class() {
+		if let Some(existing) = self.get_class_mut() {
 			existing.push(' ');
 			existing.push_str(class.as_ref());
 		} else {
-			self.class(class.as_ref());
+			self.set_class(class.as_ref());
 		}
 	}
 }
@@ -39,10 +39,25 @@ mod test {
 	use crate::prelude::*;
 	use sweet::prelude::*;
 
+
+
 	#[test]
 	fn works() {
 		let a = AnchorHtmlAttributes::default().class("foo").href("bar");
 		expect(a.base_attrs.class).to_be(Some("foo".to_string()));
 		expect(a.href).to_be(Some("bar".to_string()));
+	}
+
+
+	#[test]
+	fn third_order() {
+		#[derive(Default, Buildable, IntoRsxAttributes)]
+		struct Button {
+			#[field(flatten)]
+			#[field(flatten = BaseHtmlAttributes)]
+			pub button_attrs: ButtonHtmlAttributes,
+		}
+
+		let _a = Button::default().class("foo").disabled(true);
 	}
 }
