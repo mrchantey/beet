@@ -74,7 +74,12 @@ fn main() -> Result<()> {
 		// ⚠️ this is a downstream copy of crates/beet_design/build.rs
 		let mockups = FileGroup::new_workspace_rel("crates/beet_design/src")?
 			.with_filter(GlobFilter::default().with_include("*.mockup.rs"))
-			.xpipe(FileGroupToFuncTokens::default())?;
+			.xpipe(FileGroupToFuncTokens::default())?
+			.xpipe(
+				MapFuncTokens::default()
+					.base_route("/design")
+					.replace_route([(".mockup", "")]),
+			);
 
 		routes.extend(mockups);
 		routes.extend(docs);

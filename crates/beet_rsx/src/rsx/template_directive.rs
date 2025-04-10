@@ -9,6 +9,8 @@ pub enum TemplateDirective {
 	ScopeLocal,
 	/// A node with a global scope directive: <div scope:global />
 	ScopeGlobal,
+	/// A node with a cascade scope directive: <div scope:cascade />
+	ScopeCascade,
 	/// A node with a slot directive: <div slot="foo" />
 	Slot(String),
 	/// A node with a runtime directive: <div runtime:bevy />
@@ -59,6 +61,9 @@ impl TemplateDirectiveExt for TemplateDirective {
 	fn is_global_scope(&self) -> bool {
 		matches!(self, TemplateDirective::ScopeGlobal)
 	}
+	fn is_cascade_scope(&self) -> bool {
+		matches!(self, TemplateDirective::ScopeCascade)
+	}
 	fn find_directive(
 		&self,
 		func: impl Fn(&TemplateDirective) -> bool,
@@ -88,6 +93,10 @@ pub trait TemplateDirectiveExt {
 	/// Check if the template directive is a global scope directive
 	fn is_global_scope(&self) -> bool {
 		self.any_directive(|d| d.is_global_scope())
+	}
+	/// Check if the template directive is a cascade scope directive
+	fn is_cascade_scope(&self) -> bool {
+		self.any_directive(|d| d.is_cascade_scope())
 	}
 
 	fn slot_directive(&self) -> Option<&String> {

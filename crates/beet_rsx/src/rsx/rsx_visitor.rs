@@ -1,7 +1,8 @@
 use crate::prelude::*;
 
 
-#[derive(Debug, Default, Clone)]
+
+#[derive(Default, Clone)]
 pub struct VisitRsxOptions {
 	/// do not visit [RsxBlock::initial]
 	pub ignore_block_node_initial: bool,
@@ -18,6 +19,11 @@ pub struct VisitRsxOptions {
 	/// - component node
 	/// - block node initial
 	pub bottom_up: bool,
+	/// A predicate function to visit nodes
+	pub should_visit_node: Option<fn(&RsxNode) -> bool>,
+	/// A predicate function to visit the node of a component.
+	/// This does not effect the slot children.
+	pub should_visit_component_node: Option<fn(&RsxComponent) -> bool>,
 }
 
 pub const DEFAULT_VISIT_RSX_OPTIONS: VisitRsxOptions = VisitRsxOptions {
@@ -26,6 +32,8 @@ pub const DEFAULT_VISIT_RSX_OPTIONS: VisitRsxOptions = VisitRsxOptions {
 	ignore_component_node: false,
 	ignore_component_slot_children: false,
 	bottom_up: false,
+	should_visit_node: None,
+	should_visit_component_node: None,
 };
 
 impl VisitRsxOptions {
@@ -85,6 +93,35 @@ impl VisitRsxOptions {
 			..Default::default()
 		}
 	}
+	pub fn should_visit_node(predicate: fn(&RsxNode) -> bool) -> Self {
+		Self {
+			should_visit_node: Some(predicate),
+			..Default::default()
+		}
+	}
+	pub fn should_visit_component_node(
+		predicate: fn(&RsxComponent) -> bool,
+	) -> Self {
+		Self {
+			should_visit_component_node: Some(predicate),
+			..Default::default()
+		}
+	}
+	/// Returns true if there is no predicate,
+	/// otherwise returns the result of the predicate function
+	pub fn passes_visit_node(&self, node: &RsxNode) -> bool {
+		self.should_visit_node
+			.map(|predicate| predicate(node))
+			.unwrap_or(true)
+	}
+	/// Checks both `ignore_component_node` and `should_visit_component_node`
+	pub fn passes_visit_component_node(&self, node: &RsxComponent) -> bool {
+		!self.ignore_component_node
+			&& self
+				.should_visit_component_node
+				.map(|predicate| predicate(node))
+				.unwrap_or(true)
+	}
 }
 
 ///
@@ -143,6 +180,10 @@ pub trait RsxVisitor {
 	/// walk the node tree, visiting each node
 	/// either top down or bottom up
 	fn walk_node(&mut self, node: &RsxNode) {
+		if !self.options().passes_visit_node(node) {
+			return;
+		}
+
 		// if top down, visit before walk
 		if self.options().bottom_up == false {
 			self.call_visit(node);
@@ -166,7 +207,7 @@ pub trait RsxVisitor {
 				}
 			}
 			RsxNode::Component(component) => {
-				if !self.options().ignore_component_node {
+				if self.options().passes_visit_component_node(component) {
 					self.walk_node(&component.node);
 				}
 				if !self.options().ignore_component_slot_children {
@@ -226,6 +267,10 @@ pub trait RsxVisitorMut {
 	/// walk the node tree, visiting each node
 	/// either top down or bottom up
 	fn walk_node(&mut self, node: &mut RsxNode) {
+		if !self.options().passes_visit_node(node) {
+			return;
+		}
+
 		// if top down, visit before walk
 		if self.options().bottom_up == false {
 			self.call_visit(node);
@@ -249,7 +294,7 @@ pub trait RsxVisitorMut {
 				}
 			}
 			RsxNode::Component(component) => {
-				if !self.options().ignore_component_node {
+				if self.options().passes_visit_component_node(component) {
 					self.walk_node(&mut component.node);
 				}
 				if !self.options().ignore_component_slot_children {

@@ -42,6 +42,7 @@ pub enum TemplateDirectiveTokens {
 	ClientLoad,
 	ScopeLocal,
 	ScopeGlobal,
+	ScopeCascade,
 	FsSrc(String),
 	Slot(String),
 	Runtime(String),
@@ -59,6 +60,7 @@ impl TemplateDirectiveTokens {
 				"client:load" => Some(TemplateDirectiveTokens::ClientLoad),
 				"scope:local" => Some(TemplateDirectiveTokens::ScopeLocal),
 				"scope:global" => Some(TemplateDirectiveTokens::ScopeGlobal),
+				"scope:cascade" => Some(TemplateDirectiveTokens::ScopeCascade),
 				runtime if runtime.starts_with("runtime:") => {
 					let Some(suffix) = runtime.split(':').nth(1) else {
 						return None;
@@ -160,6 +162,9 @@ impl MetaBuilder {
 				TemplateDirectiveTokens::ScopeGlobal => {
 					quote! {TemplateDirective::ScopeGlobal}
 				}
+				TemplateDirectiveTokens::ScopeCascade => {
+					quote! {TemplateDirective::ScopeCascade}
+				}
 				TemplateDirectiveTokens::FsSrc(src) => {
 					quote! {TemplateDirective::FsSrc(#src.into())}
 				}
@@ -225,6 +230,9 @@ impl MetaBuilder {
 				}
 				TemplateDirectiveTokens::ScopeGlobal => {
 					quote! {ScopeGlobal}
+				}
+				TemplateDirectiveTokens::ScopeCascade => {
+					quote! {ScopeCascade}
 				}
 				TemplateDirectiveTokens::FsSrc(src) => {
 					quote! {FsSrc(#src)}

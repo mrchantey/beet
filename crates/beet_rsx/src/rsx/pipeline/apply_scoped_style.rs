@@ -3,8 +3,6 @@ use anyhow::Result;
 use lightningcss::printer::PrinterOptions;
 use lightningcss::stylesheet::ParserOptions;
 use lightningcss::stylesheet::StyleSheet;
-use parcel_selectors::attr::AttrSelectorOperator;
-use parcel_selectors::attr::ParsedCaseSensitivity;
 
 /// ScopedStyle is a utility for applying scoped styles to components.
 /// The approach is inspired by astro https://docs.astro.build/en/guides/styling/
@@ -66,6 +64,11 @@ impl Pipeline<RsxNode, Result<RsxNode>> for ApplyScopedStyle {
 }
 
 impl ApplyScopedStyle {
+	/// a class name in the format `data-styleid-0`,
+	/// this allows for multiple classes on a single element,
+	/// which is required for scope:cascade
+	fn class_name(&self) -> String { format!("{}-{}", self.attr, self.idx) }
+
 	/// 1. apply the idx to all style bodies
 	/// 2. if contains style, apply tag to all elements in the component
 	fn apply_node(&mut self, node: &mut RsxNode) -> ParseResult<()> {
@@ -75,6 +78,7 @@ impl ApplyScopedStyle {
 		// with the exception of component nodes
 		let opts = VisitRsxOptions::ignore_component_node();
 		let mut component_scope_found = false;
+		let class_name = self.class_name();
 
 		// 1. apply to style bodies
 		VisitRsxElementMut::walk_with_opts(node, opts.clone(), |el| {
@@ -116,14 +120,21 @@ impl ApplyScopedStyle {
 				}
 			}
 		});
-		// 2. tag elements if *any* component scoped styles were found
+		// 2. tag elements if *any* component scoped styles were found.
+		// elements in child components tagged as cascade will also be tagged
 		if component_scope_found {
-			VisitRsxElementMut::walk_with_opts(node, opts.clone(), |el| {
-				el.attributes.push(RsxAttribute::KeyValue {
-					key: self.attr.to_string(),
-					value: self.idx.to_string(),
-				});
-			});
+			VisitRsxElementMut::walk_with_opts(
+				node,
+				// opts.clone(),
+				VisitRsxOptions::should_visit_component_node(|c| {
+					c.is_cascade_scope()
+				}),
+				|el| {
+					el.attributes.push(RsxAttribute::Key {
+						key: class_name.clone(),
+					});
+				},
+			);
 			self.idx += 1;
 		}
 		parse_err
@@ -134,19 +145,16 @@ impl ApplyScopedStyle {
 			.map_err(|e| ParseError::Serde(e.to_string()))?;
 
 		if scope == Scope::Component {
+			let class_name = self.class_name();
 			stylesheet.rules.0.iter_mut().for_each(|rule| {
 				// we only care about style rules
 				if let lightningcss::rules::CssRule::Style(style_rule) = rule {
 					style_rule.selectors.0.iter_mut().for_each(|selector| {
 						selector.append(
-						lightningcss::selector::Component::AttributeInNoNamespace {
-							local_name: self.attr.clone().into(),
-							operator: AttrSelectorOperator::Equal,
-							value: self.idx.to_string().into(),
-							case_sensitivity:
-								ParsedCaseSensitivity::CaseSensitive,
-							never_matches: false,
-						},
+						lightningcss::selector::Component::AttributeInNoNamespaceExists {
+							local_name: class_name.clone().into(),
+							local_name_lower: class_name.clone().into(),
+						}
 					);
 					});
 				}
@@ -205,7 +213,7 @@ mod test {
 			}
 			.xpipe(RsxToHtmlString::default()).unwrap(),
 		)
-		.to_be("<div data-styleid=\"0\"><style data-styleid=\"0\">span[data-styleid=\"0\"] {\n  color: red;\n}\n</style></div>");
+		.to_be("<div data-styleid-0><style data-styleid-0>span[data-styleid-0] {\n  color: red;\n}\n</style></div>");
 	}
 
 	#[test]
@@ -233,15 +241,16 @@ mod test {
 			}
 			.xpipe(RsxToHtmlString::default()).unwrap(),
 		)
-		.to_be("<div data-styleid=\"0\"><style data-styleid=\"0\">div[data-styleid=\"0\"] {\n  color: #00f;\n}\n</style><style data-styleid=\"0\">span {\n  color: red;\n}\n</style></div>");
+		.to_be("<div data-styleid-0><style data-styleid-0>div[data-styleid-0] {\n  color: #00f;\n}\n</style><style data-styleid-0>span {\n  color: red;\n}\n</style></div>");
 	}
 
 
 	#[test]
 	fn applies_to_component_node() {
 		expect(rsx! { <Child /> }.xpipe(RsxToHtmlString::default()).unwrap())
-		.to_be("<div data-styleid=\"0\"><style data-styleid=\"0\">span[data-styleid=\"0\"] {\n  color: #00f;\n}\n</style></div>");
+		.to_be("<div data-styleid-0><style data-styleid-0>span[data-styleid-0] {\n  color: #00f;\n}\n</style></div>");
 	}
+
 	#[test]
 	fn applies_to_nested_component() {
 		expect(rsx! {
@@ -249,8 +258,9 @@ mod test {
 				<Child />
 			</Child>
 		}.xpipe(RsxToHtmlString::default()).unwrap())
-			.to_be("<div data-styleid=\"0\"><style data-styleid=\"0\">span[data-styleid=\"0\"] {\n  color: #00f;\n}\n</style><div data-styleid=\"1\"><style data-styleid=\"1\">span[data-styleid=\"1\"] {\n  color: #00f;\n}\n</style></div></div>");
+			.to_be("<div data-styleid-0><style data-styleid-0>span[data-styleid-0] {\n  color: #00f;\n}\n</style><div data-styleid-1><style data-styleid-1>span[data-styleid-1] {\n  color: #00f;\n}\n</style></div></div>");
 	}
+
 	#[test]
 	fn applies_to_slot_children() {
 		expect(rsx! {
@@ -259,16 +269,30 @@ mod test {
 			</JustSlot>
 			<style>br { color: red; }</style>
 		}.xpipe(RsxToHtmlString::default()).unwrap())
-			.to_be("<br data-styleid=\"0\"/><style data-styleid=\"0\">br[data-styleid=\"0\"] {\n  color: red;\n}\n</style>");
+			.to_be("<br data-styleid-0/><style data-styleid-0>br[data-styleid-0] {\n  color: red;\n}\n</style>");
+	}
+	#[test]
+	fn scope_cascade() {
+		expect(rsx! {
+			<Child scope:cascade/>
+			<style>span { padding: 1px; }</style>
+		}.xpipe(RsxToHtmlString::default()).unwrap())
+			.to_be("<div data-styleid-0 data-styleid-1><style data-styleid-0 data-styleid-1>span[data-styleid-1] {\n  color: #00f;\n}\n</style></div><style data-styleid-0>span[data-styleid-0] {\n  padding: 1px;\n}\n</style>");
 	}
 
 
 	// this is invalid css, wrapping in "1em", we need to unwrap somehow
 	#[test]
 	fn inner_text() {
-		expect(rsx! {
-				<style>span { padding: 1.em; }</style>
-		}.xpipe(RsxToHtmlString::default()).unwrap())
-			.to_be("<style data-styleid=\"0\">span[data-styleid=\"0\"] {\n  padding: 1em;\n}\n</style>");
+		expect(
+			rsx! {
+					<style>span { padding: 1.em; }</style>
+			}
+			.xpipe(RsxToHtmlString::default())
+			.unwrap(),
+		)
+		.to_be(
+			"<style data-styleid-0>span[data-styleid-0] {\n  padding: 1em;\n}\n</style>",
+		);
 	}
 }
