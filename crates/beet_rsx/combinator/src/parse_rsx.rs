@@ -74,161 +74,148 @@ mod tests {
 	</ul>
 	<void/>
 </root>
-								"#
+								"#,
 				)
-				.unwrap()).to_be(
-			(
-				RsxElement::Normal(RsxNormalElement(
-					RsxElementName::Name("root".into()),
-					RsxAttributes::from(vec![
-						RsxAttribute::Named(
-							RsxAttributeName::Name("first".into()),
-							RsxAttributeValue::Default
-						),
-						RsxAttribute::Named(
-							RsxAttributeName::Name("second".into()),
-							RsxAttributeValue::Boolean(true.into())
-						),
-						RsxAttribute::Named(
-							RsxAttributeName::Name("third".into()),
-							RsxAttributeValue::Boolean(false.into())
-						),
-						RsxAttribute::Named(
-							RsxAttributeName::Name("fourth".into()),
-							RsxAttributeValue::Number(1f64.into())
-						),
-						RsxAttribute::Named(
-							RsxAttributeName::Name("fifth".into()),
-							RsxAttributeValue::Str(("2", '"').into())
-						),
-						RsxAttribute::Named(
-							RsxAttributeName::Name("sixth".into()),
-							RsxAttributeValue::Str(("3", '\'').into())
-						),
-						RsxAttribute::Named(
-							RsxAttributeName::Name("seventh".into()),
-							RsxAttributeValue::Str(("4", '"').into())
-						),
-						RsxAttribute::Named(
-							RsxAttributeName::Name("eighth".into()),
-							RsxAttributeValue::Str(("5", '\'').into())
-						),
-						RsxAttribute::Named(
-							RsxAttributeName::Name("ninth".into()),
-							RsxAttributeValue::CodeBlock(RsxParsedExpression(
-								vec!["6 + 7 - 8 * 9 / 10".into()]
-							))
-						),
-						RsxAttribute::Named(
-							RsxAttributeName::Name("tenth".into()),
-							RsxAttributeValue::CodeBlock(RsxParsedExpression(
-								vec![
-									"|e: Event| { println!(\"{:?}\", e); }"
-										.into()
-								]
-							))
-						),
-					]),
-					RsxChildren::from(vec![
-						RsxChild::Element(RsxElement::Normal(
-							RsxNormalElement(
-								RsxElementName::Name("div".into()),
-								RsxAttributes::from(vec![]),
-								RsxChildren::from(vec![RsxChild::Text(
-									RsxText("hello".into())
-								)])
-							)
+				.unwrap(),
+		)
+		.to_be((
+			RsxElement::Normal(RsxNormalElement(
+				RsxElementName::Name("root".into()),
+				RsxAttributes::from(vec![
+					RsxAttribute::Named(
+						RsxAttributeName::Name("first".into()),
+						RsxAttributeValue::Default,
+					),
+					RsxAttribute::Named(
+						RsxAttributeName::Name("second".into()),
+						RsxAttributeValue::Boolean(true.into()),
+					),
+					RsxAttribute::Named(
+						RsxAttributeName::Name("third".into()),
+						RsxAttributeValue::Boolean(false.into()),
+					),
+					RsxAttribute::Named(
+						RsxAttributeName::Name("fourth".into()),
+						RsxAttributeValue::Number(1f64.into()),
+					),
+					RsxAttribute::Named(
+						RsxAttributeName::Name("fifth".into()),
+						RsxAttributeValue::Str(("2", '"').into()),
+					),
+					RsxAttribute::Named(
+						RsxAttributeName::Name("sixth".into()),
+						RsxAttributeValue::Str(("3", '\'').into()),
+					),
+					RsxAttribute::Named(
+						RsxAttributeName::Name("seventh".into()),
+						RsxAttributeValue::Str(("4", '"').into()),
+					),
+					RsxAttribute::Named(
+						RsxAttributeName::Name("eighth".into()),
+						RsxAttributeValue::Str(("5", '\'').into()),
+					),
+					RsxAttribute::Named(
+						RsxAttributeName::Name("ninth".into()),
+						RsxAttributeValue::CodeBlock(RsxParsedExpression(
+							vec!["6 + 7 - 8 * 9 / 10".into()],
 						)),
-						RsxChild::Element(RsxElement::Normal(
-							RsxNormalElement(
-								RsxElementName::Name("span".into()),
-								RsxAttributes::from(vec![]),
-								RsxChildren::from(vec![RsxChild::Text(
-									RsxText("world".into())
-								)])
-							)
+					),
+					RsxAttribute::Named(
+						RsxAttributeName::Name("tenth".into()),
+						RsxAttributeValue::CodeBlock(RsxParsedExpression(
+							vec![
+								"|e: Event| { println!(\"{:?}\", e); }".into(),
+							],
 						)),
-						RsxChild::CodeBlock(RsxParsedExpression(vec![
-							"\n\t\tif foo {\n\t\t\t\t".into(),
-							RsxElement::Normal(RsxNormalElement(
-								RsxElementName::Name("first".into()),
-								RsxAttributes::from(vec![]),
-								RsxChildren::from(vec![
-									RsxChild::Text(RsxText("lorem".into())),
-									RsxChild::CodeBlock(RsxParsedExpression(
-										vec![" 1 + 2 ".into()]
-									)),
-									RsxChild::Text(RsxText("ipsum".into())),
-								])
-							))
-							.into(),
-							"\n\t\t} else {\n\t\t\t\t".into(),
-							RsxElement::Normal(RsxNormalElement(
-								RsxElementName::Name("second".into()),
-								RsxAttributes::from(vec![]),
-								RsxChildren::from(vec![
-									RsxChild::Text(RsxText("dolor".into())),
-									RsxChild::CodeBlock(RsxParsedExpression(
-										vec![" 3 + 4 ".into()]
-									)),
-									RsxChild::Text(RsxText("sit".into())),
-								])
-							))
-							.into(),
-							"\n\t\t}\n\t".into(),
-						])),
-						RsxChild::Element(RsxElement::Normal(
-							RsxNormalElement(
-								RsxElementName::Name("ul".into()),
-								RsxAttributes::from(vec![]),
-								RsxChildren::from(vec![
-									RsxChild::Element(RsxElement::Normal(
-										RsxNormalElement(
-											RsxElementName::Name("li".into()),
-											RsxAttributes::from(vec![]),
-											RsxChildren::from(vec![
-												RsxChild::Text(RsxText(
-													"First".into()
-												)),
-											])
-										)
-									)),
-									RsxChild::Element(RsxElement::Normal(
-										RsxNormalElement(
-											RsxElementName::Name("li".into()),
-											RsxAttributes::from(vec![]),
-											RsxChildren::from(vec![
-												RsxChild::Text(RsxText(
-													"Second".into()
-												)),
-											])
-										)
-									)),
-									RsxChild::Element(RsxElement::Normal(
-										RsxNormalElement(
-											RsxElementName::Name("li".into()),
-											RsxAttributes::from(vec![]),
-											RsxChildren::from(vec![
-												RsxChild::Text(RsxText(
-													"Third".into()
-												)),
-											])
-										)
-									)),
-								])
-							)
-						)),
-						RsxChild::Element(RsxElement::SelfClosing(
-							RsxSelfClosingElement(
-								RsxElementName::Name("void".into()),
-								RsxAttributes::from(vec![])
-							)
-						)),
-					])
-				)),
-				""
-			)
-		);
+					),
+				]),
+				RsxChildren::from(vec![
+					RsxChild::Element(RsxElement::Normal(RsxNormalElement(
+						RsxElementName::Name("div".into()),
+						RsxAttributes::from(vec![]),
+						RsxChildren::from(vec![RsxChild::Text(RsxText(
+							"hello".into(),
+						))]),
+					))),
+					RsxChild::Element(RsxElement::Normal(RsxNormalElement(
+						RsxElementName::Name("span".into()),
+						RsxAttributes::from(vec![]),
+						RsxChildren::from(vec![RsxChild::Text(RsxText(
+							"world".into(),
+						))]),
+					))),
+					RsxChild::CodeBlock(RsxParsedExpression(vec![
+						"\n\t\tif foo {\n\t\t\t\t".into(),
+						RsxElement::Normal(RsxNormalElement(
+							RsxElementName::Name("first".into()),
+							RsxAttributes::from(vec![]),
+							RsxChildren::from(vec![
+								RsxChild::Text(RsxText("lorem".into())),
+								RsxChild::CodeBlock(RsxParsedExpression(vec![
+									" 1 + 2 ".into(),
+								])),
+								RsxChild::Text(RsxText("ipsum".into())),
+							]),
+						))
+						.into(),
+						"\n\t\t} else {\n\t\t\t\t".into(),
+						RsxElement::Normal(RsxNormalElement(
+							RsxElementName::Name("second".into()),
+							RsxAttributes::from(vec![]),
+							RsxChildren::from(vec![
+								RsxChild::Text(RsxText("dolor".into())),
+								RsxChild::CodeBlock(RsxParsedExpression(vec![
+									" 3 + 4 ".into(),
+								])),
+								RsxChild::Text(RsxText("sit".into())),
+							]),
+						))
+						.into(),
+						"\n\t\t}\n\t".into(),
+					])),
+					RsxChild::Element(RsxElement::Normal(RsxNormalElement(
+						RsxElementName::Name("ul".into()),
+						RsxAttributes::from(vec![]),
+						RsxChildren::from(vec![
+							RsxChild::Element(RsxElement::Normal(
+								RsxNormalElement(
+									RsxElementName::Name("li".into()),
+									RsxAttributes::from(vec![]),
+									RsxChildren::from(vec![RsxChild::Text(
+										RsxText("First".into()),
+									)]),
+								),
+							)),
+							RsxChild::Element(RsxElement::Normal(
+								RsxNormalElement(
+									RsxElementName::Name("li".into()),
+									RsxAttributes::from(vec![]),
+									RsxChildren::from(vec![RsxChild::Text(
+										RsxText("Second".into()),
+									)]),
+								),
+							)),
+							RsxChild::Element(RsxElement::Normal(
+								RsxNormalElement(
+									RsxElementName::Name("li".into()),
+									RsxAttributes::from(vec![]),
+									RsxChildren::from(vec![RsxChild::Text(
+										RsxText("Third".into()),
+									)]),
+								),
+							)),
+						]),
+					))),
+					RsxChild::Element(RsxElement::SelfClosing(
+						RsxSelfClosingElement(
+							RsxElementName::Name("void".into()),
+							RsxAttributes::from(vec![]),
+						),
+					)),
+				]),
+			)),
+			"",
+		));
 	}
 
 	#[test]

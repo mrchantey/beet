@@ -9,7 +9,8 @@ use combine::optional;
 
 
 
-/// Parse a string of code containing rsx
+/// Parse a string of code containing rsx, the output will be
+/// an expression enclosed in `{`block quotes`}`
 pub fn parse(s: &str) -> Result<(RsxParsedExpression, &str), ParseError<&str>> {
 	let (items, remainder) = parser(rsx_code_ignoring_ws).parse(s)?;
 	Ok((items.into_iter().collect(), remainder))

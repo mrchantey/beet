@@ -3,13 +3,13 @@ use combine::Parser;
 use combine::Stream;
 use combine::char::digit;
 use combine::char::spaces;
+use combine::choice;
 use combine::combinator::many1;
 use combine::combinator::one_of;
 use combine::combinator::optional;
 use combine::combinator::parser;
 use combine::combinator::token;
 use combine::combinator::value;
-use combine::choice;
 
 pub fn open_tag<I>(input: I) -> ParseResult<(), I>
 where

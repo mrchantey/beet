@@ -7,13 +7,13 @@ use sweet::prelude::*;
 pub fn top_level_expression() {
 	let source = "let a = <br/>; a";
 	let (ast, _remaining) = parse(source).unwrap();
-	expect(ast.to_html()).to_be("let a = <br/>; a");
+	expect(ast.to_html()).to_be("{let a = <br/>; a}");
 }
 #[test]
 pub fn style_tags() {
 	let source = "<style>body {padding: 1em}</style>";
 	let (ast, _remaining) = parse(source).unwrap();
-	expect(ast.to_html()).to_be("<style>body{padding: 1em}</style>");
+	expect(ast.to_html()).to_be("{<style>body{padding: 1em}</style>}");
 }
 
 #[test]
@@ -21,7 +21,7 @@ pub fn test_to_html_1() {
 	let source = "<foo>Hello world!</foo>";
 	let (ast, _) = parse(source).unwrap();
 
-	assert_eq!(ast.to_html(), "<foo>Hello world!</foo>");
+	expect(ast.to_html()).to_be("{<foo>Hello world!</foo>}");
 }
 
 #[test]
@@ -29,9 +29,8 @@ pub fn test_to_html_2() {
 	let source =
 		"<div hidden style={stylesheet.get(\".foo\")}>Hello world!</div>";
 	let (ast, _) = parse(source).unwrap();
-	assert_eq!(
-		ast.to_html(),
-		"<div hidden style={stylesheet.get(\".foo\")}>Hello world!</div>"
+	expect(ast.to_html()).to_be(
+		"{<div hidden style={stylesheet.get(\".foo\")}>Hello world!</div>}",
 	);
 }
 
@@ -39,5 +38,5 @@ pub fn test_to_html_2() {
 pub fn test_to_html_3() {
 	let source = "<x-foo-bar>Hello world!</x-foo-bar>";
 	let (ast, _) = parse(source).unwrap();
-	assert_eq!(ast.to_html(), "<x-foo-bar>Hello world!</x-foo-bar>");
+	expect(ast.to_html()).to_be("{<x-foo-bar>Hello world!</x-foo-bar>}");
 }
