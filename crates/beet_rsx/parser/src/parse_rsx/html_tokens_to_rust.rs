@@ -80,9 +80,9 @@ impl HtmlTokensToRust {
 	fn map_node(&mut self, node: HtmlTokens) -> TokenStream {
 		match node {
 			HtmlTokens::Fragment { nodes } => {
-				let children = nodes.into_iter().map(|n| self.map_node(n));
+				let nodes = nodes.into_iter().map(|n| self.map_node(n));
 				quote! { RsxFragment{
-					nodes: vec![#(#children),*],
+					nodes: vec![#(#nodes),*],
 					meta: RsxNodeMeta::default(),
 				}.into_node()}
 			}
@@ -108,7 +108,6 @@ impl HtmlTokensToRust {
 			}
 			HtmlTokens::Block { value } => {
 				let tracker = self.rusty_tracker.next_tracker(&value);
-
 				let ident = &self.idents.runtime.effect;
 				quote! {
 					#ident::parse_block_node(#tracker, #value)
@@ -135,7 +134,7 @@ impl HtmlTokensToRust {
 				} else {
 					let meta = MetaBuilder::build_with_directives(&directives);
 					// this attributes-children order is important for rusty tracker indices
-					// to be consistend with HtmlTokensToRon
+					// to be consistent with HtmlTokensToRon
 					let attributes = attributes
 						.iter()
 						.map(|attr| self.map_attribute(attr))
@@ -223,6 +222,7 @@ impl HtmlTokensToRust {
 			}
 		}
 	}
+
 	fn map_component(
 		&mut self,
 		RsxNodeTokens {
@@ -234,8 +234,11 @@ impl HtmlTokensToRust {
 		children: HtmlTokens,
 	) -> TokenStream {
 		let tag_str = tag.to_string();
-
 		let tracker = self.rusty_tracker.next_tracker(&tokens);
+		// visiting slot children is safe here, we aren't pulling any more trackers
+		let slot_children = self.map_node(children);
+		let meta = MetaBuilder::build_with_directives(&directives);
+
 		let mut prop_assignments = Vec::new();
 		let mut prop_names = Vec::new();
 		// currently unused but we could allow setting component directly,
@@ -267,10 +270,8 @@ impl HtmlTokensToRust {
 			}
 		}
 
-		let meta = MetaBuilder::build_with_directives(&directives);
 
 		let ident = syn::Ident::new(&tag_str, tokens.span());
-		let slot_children = self.map_node(children);
 
 		// ensures all required fields are set
 		// doesnt work because we cant tell whether its an optional or default
@@ -281,6 +282,8 @@ impl HtmlTokensToRust {
 		// 			};
 		// };
 
+		// TODO spread, ie allow the block component to be turned
+		// into a builder and apply props
 		let component = if let Some(node_block) = block_attr {
 			quote! {
 				#node_block

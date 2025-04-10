@@ -44,13 +44,15 @@ impl RustyTrackerBuilder {
 	/// provided a stringified token stream, returns the next index and hash
 	fn next_index_hash(&mut self, tokens: impl ToTokens) -> (u32, u64) {
 		// the rsx! macro splits whitespace in the tokens
-		// but visiting tokens via runtime  file loading does not,
+		// but parsing a syn::file doesn't (and it also inserts a wacky /n here and there)
 		// so we remove whitespace to ensure the hash is the same
 		let tokens_hash = rapidhash(
 			tokens
 				.to_token_stream()
 				.to_string()
-				.replace(" ", "")
+				.chars()
+				.filter(|c| !c.is_whitespace())
+				.collect::<String>()
 				.as_bytes(),
 		);
 		let index = self.current_index;

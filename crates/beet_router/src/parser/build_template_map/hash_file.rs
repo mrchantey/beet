@@ -11,7 +11,8 @@ use sweet::prelude::ReadFile;
 
 
 /// determine if a compilation is required due to rust code changes
-/// by hashing an entire file.
+/// by hashing an entire file. This is not related to [`RustyTracker`] system,
+/// it is purely for diffing by the [`TemplateWatcher`]
 /// Non-rust files can also be handled
 #[derive(Default)]
 pub struct HashFile {

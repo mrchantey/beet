@@ -30,7 +30,7 @@ impl ApplyTemplateToNode {
 	pub fn apply_to_node(
 		&self,
 		template: RsxTemplateNode,
-		rusty_map: &mut HashMap<RustyTracker, RustyPart>,
+		rusty_map: &mut RustyPartMap,
 	) -> TemplateResult<RsxNode> {
 		let node: RsxNode = match template {
 			RsxTemplateNode::Doctype { meta } => RsxDoctype { meta }.into(),
@@ -144,7 +144,7 @@ impl ApplyTemplateToNode {
 /// drain the rusty map into the template
 fn template_to_attr(
 	template_attr: RsxTemplateAttribute,
-	rusty_map: &mut HashMap<RustyTracker, RustyPart>,
+	rusty_map: &mut RustyPartMap,
 ) -> TemplateResult<RsxAttribute> {
 	let rsx_attr = match template_attr {
 		RsxTemplateAttribute::Key { key } => RsxAttribute::Key { key },

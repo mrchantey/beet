@@ -7,5 +7,5 @@ use crate::test_site::*;
 
 pub fn get() -> RsxNode {
 	// rsx! { <div>{"party time!"}</div> }
-	rsx! { <PageLayout title="foobar">party time!</PageLayout> }
+	rsx! { <PageLayout scope:cascade title="foobar">party time!</PageLayout> }
 }

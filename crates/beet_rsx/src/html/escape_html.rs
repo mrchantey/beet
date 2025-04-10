@@ -4,6 +4,7 @@ pub struct EscapeHtml {
 	/// Element tags, the children of which will not be escaped.
 	/// Default: `["script", "style","code"]`
 	pub ignored_tags: Vec<String>,
+	pub escape_attributes: bool,
 }
 
 
@@ -14,6 +15,7 @@ impl Default for EscapeHtml {
 				.iter()
 				.map(|s| s.to_string())
 				.collect(),
+			escape_attributes: false,
 		}
 	}
 }
@@ -34,8 +36,10 @@ impl EscapeHtml {
 				HtmlNode::Comment(inner) => *inner = escape(inner),
 				HtmlNode::Text(text) => *text = escape(text),
 				HtmlNode::Element(el) => {
-					for attr in &mut el.attributes {
-						self.escape_attribute(attr);
+					if self.escape_attributes {
+						for attr in &mut el.attributes {
+							self.escape_attribute(attr);
+						}
 					}
 					if !self.ignored_tags.contains(&el.tag) {
 						self.escape_nodes(&mut el.children);
