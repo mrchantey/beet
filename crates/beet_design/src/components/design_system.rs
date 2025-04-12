@@ -10,7 +10,6 @@ use material_colors::theme::Theme;
 /// - Color: Material Design
 /// 	- [`material-colors` crate](https://crates.io/crates/material-colors)
 /// - Typography: Starlight
-/// 	-
 /// - Layout: PicoCSS
 #[derive(Node)]
 pub struct DesignSystem {

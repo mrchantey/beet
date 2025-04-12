@@ -2,20 +2,36 @@
 *::before,
 *::after {
 	box-sizing: border-box;
+	background-repeat: no-repeat;
+
+}
+
+::before,
+::after {
+  text-decoration: inherit;
+  vertical-align: inherit;
 }
 
 * {
 	margin: 0;
 }
 
+body {
+  width: 100%;
+  margin: 0;
+}
 
-p,
-h1,
-h2,
-h3,
-h4,
-h5,
-h6,
-code {
-	overflow-wrap: anywhere;
+main {
+  display: block;
+}
+
+
+body > header,
+body > main,
+body > footer {
+  padding-block: var(--bt-block-spacing-vertical);
+}
+
+section {
+  margin-bottom: var(--bt-block-spacing-vertical);
 }

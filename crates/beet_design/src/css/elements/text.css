@@ -1,0 +1,125 @@
+
+small {
+  --bt-font-size: 0.875em;
+}
+
+
+a {
+  color: var(--bt-color-primary);
+  --bt-text-decoration: underline;
+}
+
+b,
+strong {
+  font-weight: bolder;
+}
+
+sub,
+sup {
+  position: relative;
+  font-size: 0.75em;
+  line-height: 0;
+  vertical-align: baseline;
+}
+
+sub {
+  bottom: -0.25em;
+}
+
+sup {
+  top: -0.5em;
+}
+
+
+
+:where(article, address, blockquote, dl, figure, form, ol, p, pre, table, ul) ~ :is(h1, h2, h3, h4, h5, h6) {
+  margin-top: var(--bt-typography-spacing-top);
+}
+
+p {
+  margin-bottom: var(--bt-typography-spacing-vertical);
+}
+
+hgroup {
+  margin-bottom: var(--bt-typography-spacing-vertical);
+}
+hgroup > * {
+  margin-top: 0;
+  margin-bottom: 0;
+}
+hgroup > *:not(:first-child):last-child {
+  --bt-text-color: var(--bt-color-on-surface-variant);
+  --bt-font-weight: unset;
+  font-size: 1rem;
+}
+
+hr {
+  height: 0;
+  margin: var(--bt-typography-spacing-vertical) 0;
+  border: 0;
+  border-top: 1px solid var(--bt-muted-border-color);
+  color: inherit;
+}
+
+[hidden],
+template {
+  display: none !important;
+}
+
+:where(ol, ul) li {
+  margin-bottom: calc(var(--bt-typography-spacing-vertical) * 0.25);
+}
+
+:where(dl, ol, ul) :where(dl, ol, ul) {
+  margin: 0;
+  margin-top: calc(var(--bt-typography-spacing-vertical) * 0.25);
+}
+
+ul li {
+  list-style: square;
+}
+
+mark {
+  padding: 0.125rem 0.25rem;
+  background-color: var(--bt-mark-background-color);
+  color: var(--bt-mark-color);
+  vertical-align: baseline;
+}
+
+blockquote {
+  display: block;
+  margin: var(--bt-typography-spacing-vertical) 0;
+  padding: var(--bt-spacing);
+  border-right: none;
+  border-left: 0.25rem solid var(--bt-blockquote-border-color);
+  border-inline-start: 0.25rem solid var(--bt-blockquote-border-color);
+  border-inline-end: none;
+}
+blockquote footer {
+  margin-top: calc(var(--bt-typography-spacing-vertical) * 0.5);
+  color: var(--bt-blockquote-footer-color);
+}
+
+abbr[title] {
+  border-bottom: 1px dotted;
+  text-decoration: none;
+  cursor: help;
+}
+
+ins {
+  color: var(--bt-ins-color);
+  text-decoration: none;
+}
+
+del {
+  color: var(--bt-del-color);
+}
+
+::-moz-selection {
+  background-color: var(--bt-text-selection-color);
+}
+
+::selection {
+  background-color: var(--bt-text-selection-color);
+}
+
