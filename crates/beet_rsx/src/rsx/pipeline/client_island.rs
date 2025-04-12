@@ -132,6 +132,7 @@ mod test {
 			quote::quote! {
 				beet::exports::ron::de::from_str::<MyComponent>("(val:32)")?
 					.into_node()
+					.xpipe(ApplySlots::default())?
 					.xpipe(RegisterEffects::new(tree_location_map.rusty_locations[&RustyTracker::new(0u32,89u64)]))?;
 			}
 			.to_string(),

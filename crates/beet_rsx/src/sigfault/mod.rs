@@ -55,7 +55,7 @@ impl Sigfault {
 		tracker: RustyTracker,
 		block: impl IntoRsxAttributes<M>,
 	) -> RsxAttribute {
-		let initial = block.into_rsx_attributes();
+		let initial = block.into_initial_attributes();
 		RsxAttribute::Block {
 			initial: initial.clone(),
 			effect: Effect::new(

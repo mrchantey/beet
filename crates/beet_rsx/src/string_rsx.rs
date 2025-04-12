@@ -37,7 +37,7 @@ impl StringRsx {
 		block: impl IntoRsxAttributes<M>,
 	) -> RsxAttribute {
 		RsxAttribute::Block {
-			initial: block.into_rsx_attributes(),
+			initial: block.into_initial_attributes(),
 			effect: Effect::new(noop(), tracker),
 		}
 	}

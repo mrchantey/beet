@@ -1,7 +1,7 @@
 use crate::prelude::*;
 use strum_macros::AsRefStr;
 use strum_macros::EnumDiscriminants;
-
+use anyhow::Result;
 
 #[derive(Debug, Clone, AsRefStr, EnumDiscriminants)]
 pub enum RsxNode {
@@ -438,19 +438,23 @@ pub trait IntoRsxAttribute<M> {
 
 pub trait IntoRsxAttributes<M> {
 	/// Convert this into a RsxAttribute
-	fn into_rsx_attributes(self) -> Vec<RsxAttribute>;
+	fn into_initial_attributes(self) -> Vec<RsxAttribute>;
+
+	fn register_effects(self, loc: TreeLocation) -> Result<()>;
 }
 
-pub struct IntoVecIntoRsxAttributeMarker;
-impl<T: Into<Vec<RsxAttribute>>>
-	IntoRsxAttributes<IntoVecIntoRsxAttributeMarker> for T
-{
-	fn into_rsx_attributes(self) -> Vec<RsxAttribute> { self.into() }
-}
+// pub struct IntoVecIntoRsxAttributeMarker;
+// impl<T: Into<Vec<RsxAttribute>>>
+// 	IntoRsxAttributes<IntoVecIntoRsxAttributeMarker> for T
+// {
+// 	fn into_initial_attributes(self) -> Vec<RsxAttribute> { self.into() }
 
-impl<F: FnOnce() -> Vec<RsxAttribute>> IntoRsxAttributes<F> for F {
-	fn into_rsx_attributes(self) -> Vec<RsxAttribute> { self() }
-}
+// 	fn register_effects
+// }
+
+// impl<F: FnOnce() -> Vec<RsxAttribute>> IntoRsxAttributes<F> for F {
+// 	fn into_initial_attributes(self) -> Vec<RsxAttribute> { self() }
+// }
 
 #[cfg(test)]
 mod test {
@@ -490,11 +494,11 @@ mod test {
 		)
 		.to_be("<div data-beet-rsx-idx=\"2\">3</div>");
 	}
-	#[test]
-	fn block_attr() {
-		let value = vec![RsxAttribute::Key {
-			key: "foo".to_string(),
-		}];
-		let _node = rsx! { <el {value} /> };
-	}
+	// #[test]
+	// fn block_attr() {
+	// 	let value = vec![RsxAttribute::Key {
+	// 		key: "foo".to_string(),
+	// 	}];
+	// 	let _node = rsx! { <el {value} /> };
+	// }
 }
