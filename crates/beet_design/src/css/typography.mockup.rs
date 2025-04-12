@@ -6,11 +6,18 @@ use beet_rsx::as_beet::*;
 pub fn get() -> RsxNode {
 	rsx! {
 		<h1>This is a H1 Heading</h1>
+		<p>Here is some text under the heading</p>
 		<h2>This is a H2 Heading</h2>
+		<p>Here is some text under the heading</p>
 		<h3>This is a H3 Heading</h3>
+		<p>Here is some text under the heading</p>
 		<h4>This is a H4 Heading</h4>
+		<p>Here is some text under the heading</p>
 		<h5>This is a H5 Heading</h5>
+		<p>Here is some text under the heading</p>
 		<h6>This is a H6 Heading</h6>
+		<p>Here is some text under the heading</p>
+		<h2>Paragraphs</h2>
 		<p>This is a paragraph</p>
 		<p>This is a paragraph with <a href="https://example.com">a link</a></p>
 		<p>This is a paragraph with <strong>strong text</strong></p>// aka bold

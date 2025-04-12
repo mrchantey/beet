@@ -67,7 +67,7 @@ fn sidebar_item(
 	};
 
 	rsx! {
-		<li>{inner}</li>
+		<li class=class>{inner}</li>
 		<style src="./sidebar_item.css" />
 	}
 }

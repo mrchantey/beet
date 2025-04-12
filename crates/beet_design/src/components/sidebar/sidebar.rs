@@ -18,19 +18,13 @@ fn sidebar(Sidebar { nodes }: Sidebar) -> RsxNode {
 		<style>
 			nav{
 				--sidebar-width:20rem;
-				--bt-depth-padding: 0.5rem;
+				--sidebar-indent: 0.5rem;
 				background-color:var(--bt-color-surface-container-highest);
 				padding: 0 0.5.em 0 0;
 				width: var(--sidebar-width);
 				min-width: var(--sidebar-width);
 				max-width: var(--sidebar-width);
 				/* overflow-y:scroll; */
-			}
-			nav[aria-hidden="false"]{
-				display:block;
-			}
-			nav[aria-hidden="true"]{
-				display:none;
 			}
 
 		</style>

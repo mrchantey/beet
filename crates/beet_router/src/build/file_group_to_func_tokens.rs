@@ -45,7 +45,7 @@ impl FileGroupToFuncTokens {
 				local_path,
 			),
 			#[cfg(feature = "markdown")]
-			Some(ex) if ex == "md" => MarkdownToFuncTokens::parse(
+			Some(ex) if ex == "md" || ex == "mdx" => MarkdownToFuncTokens::parse(
 				&file_str,
 				canonical_path,
 				local_path,

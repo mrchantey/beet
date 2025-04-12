@@ -1,3 +1,11 @@
+[aria-hidden=false]{
+  display:block;
+}
+[aria-hidden=true]{
+  display:none;
+}
+
+
 [aria-controls] {
   cursor: pointer;
 }

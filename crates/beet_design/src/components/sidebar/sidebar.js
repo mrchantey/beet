@@ -30,7 +30,7 @@ function handleCurrentPage() {
 	const links = document.querySelectorAll('a.bm-c-sidebar__link')
 	const sublists = document.querySelectorAll('details.bm-c-sidebar__sublist')
 
-	console.log('location', globalThis.location.href)
+	// console.log('location', globalThis.location.href)
 	
 	// handle show selected
 	links.forEach(link => {

@@ -3,6 +3,19 @@
 
 :root,
 :host {
+  /* aliases */
+  --bt-text-2xs: 0.75rem; /* 12px */
+  --bt-text-xs: 0.8125rem; /* 13px */
+  --bt-text-sm: 0.875rem; /* 14px */
+  --bt-text-base: 1rem; /* 16px */
+  --bt-text-lg: 1.125rem; /* 18px */
+  --bt-text-xl: 1.25rem; /* 20px */
+  --bt-text-2xl: 1.5rem; /* 24px */
+  --bt-text-3xl: 1.8125rem; /* 29px */
+  --bt-text-4xl: 2.1875rem; /* 35px */
+  --bt-text-5xl: 2.625rem; /* 42px */
+  --bt-text-6xl: 4rem; /* 64px */
+
   --bt-font-family-emoji: "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
   --bt-font-family-sans-serif: system-ui, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, Helvetica, Arial, "Helvetica Neue", sans-serif, var(--bt-font-family-emoji);
   --bt-font-family-monospace: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace, var(--bt-font-family-emoji);
