@@ -25,7 +25,6 @@ fn sidebar_item(
 	let inner = if children.is_empty()
 		&& let Some(path) = path
 	{
-		
 		rsx! {
 			<a class="leaf bm-c-sidebar__link" href=path.to_string()>
 				// aria-current={

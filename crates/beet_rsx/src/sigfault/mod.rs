@@ -59,7 +59,10 @@ impl Sigfault {
 			initial: block.into_rsx_attributes(),
 			effect: Effect::new(
 				Box::new(|_loc| {
-					todo!();
+					sweet::log!(
+						"todo mounting attribute blocks <div {{foo}}/>"
+					);
+					Ok(())
 				}),
 				tracker,
 			),

@@ -30,11 +30,15 @@ impl ButtonVariant {
 pub struct Button {
 	#[field(default)]
 	pub variant: ButtonVariant,
-	#[field(flatten)]
+	#[field(flatten=BaseHtmlAttributes)]
 	pub attrs: ButtonHtmlAttributes,
 }
 
-fn button(Button { variant, mut attrs }: Button) -> RsxNode {
+fn button(
+	Button {
+		variant, mut attrs, ..
+	}: Button,
+) -> RsxNode {
 	let class = format!(" bt-c-button--{}", variant.class_suffix());
 	attrs.push_class(csx!("bt-c-button", class));
 

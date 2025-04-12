@@ -32,6 +32,9 @@ impl ClientIsland {
 			// TODO resolve tracker to location
 			beet::exports::ron::de::from_str::<#type_name>(#ron)?
 				.into_node()
+				// applying slots is a requirement of walking tree locations
+				// consistently, it panics otherwise
+				.xpipe(ApplySlots::default())?
 				.xpipe(RegisterEffects::new(
 					tree_location_map.rusty_locations[
 						&RustyTracker::new(#tracker_index,#tracker_hash)]

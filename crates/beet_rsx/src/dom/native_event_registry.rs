@@ -2,6 +2,12 @@ use crate::prelude::*;
 pub struct EventRegistry;
 
 
+pub mod event {
+	use super::*;
+	pub type MouseEvent = MockEvent;
+}
+
+
 
 pub struct MockEvent {
 	pub target: MockTarget,

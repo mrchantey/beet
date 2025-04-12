@@ -10,9 +10,7 @@ fn main() -> Result<()> {
 
 	// ⚠️ changes here should be duplicated in crates/beet_site/build.rs
 	FileGroup::new_workspace_rel("crates/beet_design/src")?
-		.with_filter(
-			GlobFilter::default().with_include("*.mockup.*"),
-		)
+		.with_filter(GlobFilter::default().with_include("*.mockup.*"))
 		.xpipe(FileGroupToFuncTokens::default())?
 		.xpipe(
 			MapFuncTokens::default()

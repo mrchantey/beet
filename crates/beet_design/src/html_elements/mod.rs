@@ -1,9 +1,12 @@
 use beet_rsx::as_beet::*;
 
+
+
 #[derive(Default, Buildable, IntoRsxAttributes)]
 pub struct BaseHtmlAttributes {
 	pub id: Option<String>,
 	pub class: Option<String>,
+	pub onclick: Option<Box<dyn Fn(event::MouseEvent)>>,
 }
 #[derive(Default, Buildable, IntoRsxAttributes)]
 pub struct ButtonHtmlAttributes {
@@ -13,6 +16,7 @@ pub struct ButtonHtmlAttributes {
 }
 #[derive(Default, Buildable, IntoRsxAttributes)]
 pub struct AnchorHtmlAttributes {
+	// #[field(flatten=BaseHtmlAttributes)]
 	#[field(flatten)]
 	pub base_attrs: BaseHtmlAttributes,
 	/// the download thing
@@ -59,5 +63,17 @@ mod test {
 		}
 
 		let _a = Button::default().class("foo").disabled(true);
+	}
+
+	#[test]
+	fn events_omitted() {
+		#[derive(Node)]
+		struct Button {
+			#[field(flatten = BaseHtmlAttributes)]
+			_button_attrs: ButtonHtmlAttributes,
+		}
+		fn button(_props: Button) -> RsxNode { Default::default() }
+		// onclick was ommitted from the into_rsx_attributes
+		let _foo = rsx! { <Button onclick=|_| {} /> };
 	}
 }

@@ -12,11 +12,20 @@ pub struct Counter {
 fn counter(props: Counter) -> RsxNode {
 	let (get, set) = signal(props.initial);
 
-
+	let get2 = get.clone();
 	rsx! {
 		<div>
-			{get.clone()}
-			<button onclick=move |_| { set(get() + 1) }><Link>Increment</Link></button>
+			<Button
+				variant=ButtonVariant::Secondary
+				onclick=move |_| set(get2() + 1)>
+				Number of cookies: {get.clone()}
+			</Button>
 		</div>
+		<style>
+			div{
+				display: flex;
+				gap: 2rem;
+			}
+		</style>
 	}
 }

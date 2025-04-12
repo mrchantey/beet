@@ -73,10 +73,7 @@ fn main() -> Result<()> {
 
 		// ⚠️ this is a downstream copy of crates/beet_design/build.rs
 		let mockups = FileGroup::new_workspace_rel("crates/beet_design/src")?
-			.with_filter(
-				GlobFilter::default()
-					.with_include("*.mockup.*"),
-			)
+			.with_filter(GlobFilter::default().with_include("*.mockup.*"))
 			.xpipe(FileGroupToFuncTokens::default())?
 			.xpipe(
 				MapFuncTokens::default()

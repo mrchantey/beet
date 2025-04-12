@@ -10,6 +10,12 @@ use web_sys::window;
 
 pub struct EventRegistry;
 
+/// Events types used
+pub mod event {
+	pub type MouseEvent = web_sys::MouseEvent;
+}
+
+
 thread_local! {
 	static REGISTERED_EVENTS: RefCell<HashMap<(TreeIdx,String),Box<dyn Fn(JsValue)>>> = Default::default();
 }
