@@ -47,12 +47,11 @@ fn nested(_props: Nested) -> RsxNode {
 	let get2 = get.clone();
 	rsx! {
 		<div>
-		{4}
-	<Button
-		variant=ButtonVariant::Secondary
-		onclick={move |_| set(get2() + 1)}>
-		Num cookies: {get.clone()}
-	</Button>
-			</div>
+			{4}
+			<Button variant=ButtonVariant::Secondary onclick=move |_| set(get2() + 1)>
+				Num cookies:
+				{get.clone()}
+			</Button>
+		</div>
 	}
 }

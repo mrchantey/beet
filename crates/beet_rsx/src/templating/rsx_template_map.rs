@@ -208,12 +208,11 @@ mod test {
 	/// TODO this doesnt test trackers generated via syn::parse which generates whitespace etc differently
 	#[test]
 	fn trackers_match() {
-		let node1 =
-			rsx! {
-				<MyComponent scope:cascade value=3>
-					Hello
-				</MyComponent>
-			};
+		let node1 = rsx! {
+			<MyComponent scope:cascade value=3>
+				Hello
+			</MyComponent>
+		};
 		let node2_template = rsx_template! {
 			<MyComponent scope:cascade value=3>
 				Hello

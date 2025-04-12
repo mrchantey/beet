@@ -13,6 +13,7 @@ pub fn impl_into_rsx_attributes(input: DeriveInput) -> TokenStream {
 fn parse(input: DeriveInput) -> Result<TokenStream> {
 	let fields = PropsField::parse_all(&input)?;
 	let into_initial = impl_into_initial(&fields)?;
+	let register_effects = impl_register_effects(&fields)?;
 
 	let target_name = &input.ident;
 	let (impl_generics, type_generics, where_clause) =
@@ -30,7 +31,10 @@ fn parse(input: DeriveInput) -> Result<TokenStream> {
 				attributes
 			}
 
-			fn register_effects(self, loc: TreeLocation) -> Result<()>;
+			fn register_effects(self, _loc: TreeLocation) -> beet::exports::anyhow::Result<()>{
+				#(#register_effects)*
+				todo!()
+			}
 
 		}
 	})
@@ -89,7 +93,7 @@ fn impl_register_effects(fields: &[PropsField]) -> Result<Vec<TokenStream>> {
 		.iter()
 		.filter(|field| field.ident.to_string().starts_with("on"))
 		.map(|field| {
-			let ident = &field.ident;
+			// let ident = &field.ident;
 			// let ident_str = ident.to_token_stream().to_string();
 			// let attr =
 			// 	match field.unwrapped.to_token_stream().to_string().as_ref() {
@@ -103,23 +107,23 @@ fn impl_register_effects(fields: &[PropsField]) -> Result<Vec<TokenStream>> {
 			// 			}}
 			// 		}
 			// 	};
-
-			if field.attributes.contains("flatten") {
-				quote! {
-					self.#ident.register_effects(loc);
-				}
-			} else if field.is_optional() {
-				quote! {
-					if let Some(#ident) = &self.#ident {
-						self.#ident.register_effects(loc);
-					}
-				}
-			} else {
-				quote! {{
-					let #ident = &self.#ident;
-					self.#ident.register_effects(loc);
-				}}
-			}
+			// if field.attributes.contains("flatten") {
+			// 	quote! {
+			// 		self.#ident.register_effects(loc);
+			// 	}
+			// } else if field.is_optional() {
+			// 	quote! {
+			// 		if let Some(#ident) = &self.#ident {
+			// 			self.#ident.register_effects(loc);
+			// 		}
+			// 	}
+			// } else {
+			// 	quote! {{
+			// 		let #ident = &self.#ident;
+			// 		self.#ident.register_effects(loc);
+			// 	}}
+			// }
+			Default::default()
 		})
 		.collect::<Vec<_>>()
 		.xok()
