@@ -9,6 +9,7 @@ use syn::Ident;
 use syn::Meta;
 use syn::Result;
 use syn::Type;
+use syn::TypeTraitObject;
 
 #[derive(Debug)]
 pub struct PropsField<'a> {
@@ -107,6 +108,8 @@ impl<'a> PropsField<'a> {
 		&field.ty
 	}
 
+	/// 1. First checks for a specified attribute
+	/// By default strings are converted to `impl Into<String>`.
 	pub fn is_into(&self) -> bool {
 		if self.attributes.contains("into") {
 			return true;
@@ -119,11 +122,43 @@ impl<'a> PropsField<'a> {
 		}
 	}
 
+	/// If this field is a `Box<dyn Trait>` type return the inner trait
+	pub fn boxed_trait(&self) -> Option<TypeTraitObject> {
+		if let Type::Path(p) = self.unwrapped {
+			if let Some(segment) = p.path.segments.last() {
+				if segment.ident == "Box" {
+					if let syn::PathArguments::AngleBracketed(args) =
+						&segment.arguments
+					{
+						if let Some(syn::GenericArgument::Type(
+							Type::TraitObject(obj),
+						)) = args.args.first()
+						{
+							return Some(obj.clone());
+						}
+					}
+				}
+			}
+		}
+		None
+	}
+
 	/// In Builder pattern these are the tokens for assignment, depending
-	/// on attributes it may be one fof the following:
-	/// - `(SomeVal, value)`
-	/// - `(impl Into<SomeVal>, value.into())`
+	/// on attributes it will be checked in the following order:
+	/// - is_boxed:		`(impl SomeType`, Box::new(value))`
+	/// - is_into: 		`(impl Into<SomeType>, value.into())`
+	/// - verbatim: 	`(SomeType, value)`
 	pub fn assign_tokens(&self) -> (Type, Expr) {
+		// 1. box
+		if let Some(box_trait) = self.boxed_trait() {
+			let mut trait_bounds = box_trait.bounds;
+			trait_bounds.push(syn::parse_quote! { 'static });
+			return (
+				syn::parse_quote! { impl #trait_bounds },
+				syn::parse_quote! { Box::new(value) },
+			);
+		}
+		// 2. into
 		let is_into = self.is_into();
 		let inner_ty = self.unwrapped;
 		match is_into {
@@ -131,6 +166,7 @@ impl<'a> PropsField<'a> {
 				syn::parse_quote! { impl Into<#inner_ty> },
 				syn::parse_quote! { value.into() },
 			),
+			// 3. verbatim
 			false => {
 				(syn::parse_quote! { #inner_ty }, syn::parse_quote! { value })
 			}
