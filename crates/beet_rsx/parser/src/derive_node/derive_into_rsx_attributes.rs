@@ -24,7 +24,7 @@ fn parse(input: DeriveInput) -> Result<TokenStream> {
 		use beet::prelude::*;
 
 
-		impl #impl_generics IntoRsxAttributes<Self> for #target_name #type_generics #where_clause {
+		impl #impl_generics IntoBlockAttribute<Self> for #target_name #type_generics #where_clause {
 			fn into_initial_attributes(self) -> Vec<RsxAttribute>{
 				let mut attributes:Vec<RsxAttribute> = Default::default();
 				#(#into_initial)*

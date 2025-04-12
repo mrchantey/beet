@@ -34,7 +34,7 @@ impl StringRsx {
 	/// ```
 	pub fn parse_attribute_block<M>(
 		tracker: RustyTracker,
-		block: impl IntoRsxAttributes<M>,
+		block: impl IntoBlockAttribute<M>,
 	) -> RsxAttribute {
 		RsxAttribute::Block {
 			initial: block.into_initial_attributes(),

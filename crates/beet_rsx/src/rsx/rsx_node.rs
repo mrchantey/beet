@@ -436,7 +436,8 @@ pub trait IntoRsxAttribute<M> {
 	fn into_rsx_attribute(self) -> RsxAttribute;
 }
 
-pub trait IntoRsxAttributes<M> {
+/// A trait for types that can be converted into a [`RsxAttribute::Block`]
+pub trait IntoBlockAttribute<M> {
 	/// Convert this into a RsxAttribute
 	fn into_initial_attributes(self) -> Vec<RsxAttribute>;
 
@@ -445,14 +446,14 @@ pub trait IntoRsxAttributes<M> {
 
 // pub struct IntoVecIntoRsxAttributeMarker;
 // impl<T: Into<Vec<RsxAttribute>>>
-// 	IntoRsxAttributes<IntoVecIntoRsxAttributeMarker> for T
+// 	IntoBlockAttribute<IntoVecIntoRsxAttributeMarker> for T
 // {
 // 	fn into_initial_attributes(self) -> Vec<RsxAttribute> { self.into() }
 
 // 	fn register_effects
 // }
 
-// impl<F: FnOnce() -> Vec<RsxAttribute>> IntoRsxAttributes<F> for F {
+// impl<F: FnOnce() -> Vec<RsxAttribute>> IntoBlockAttribute<F> for F {
 // 	fn into_initial_attributes(self) -> Vec<RsxAttribute> { self() }
 // }
 

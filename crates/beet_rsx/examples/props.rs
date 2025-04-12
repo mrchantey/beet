@@ -47,7 +47,7 @@ fn main() {
 #[derive(Debug, Default)]
 struct Foo<T>(PhantomData<T>);
 
-#[derive(Debug, Default, Clone, Buildable, IntoRsxAttributes)]
+#[derive(Debug, Default, Clone, Buildable, IntoBlockAttribute)]
 struct MyFlattenedNode {
 	/// the class that will be set
 	class: String,

@@ -2,19 +2,19 @@ use beet_rsx::as_beet::*;
 
 
 
-#[derive(Default, Buildable, IntoRsxAttributes)]
+#[derive(Default, Buildable, IntoBlockAttribute)]
 pub struct BaseHtmlAttributes {
 	pub id: Option<String>,
 	pub class: Option<String>,
 	pub onclick: Option<Box<dyn Fn(event::MouseEvent)>>,
 }
-#[derive(Default, Buildable, IntoRsxAttributes)]
+#[derive(Default, Buildable, IntoBlockAttribute)]
 pub struct ButtonHtmlAttributes {
 	#[field(flatten)]
 	pub base_attrs: BaseHtmlAttributes,
 	pub disabled: Option<bool>,
 }
-#[derive(Default, Buildable, IntoRsxAttributes)]
+#[derive(Default, Buildable, IntoBlockAttribute)]
 pub struct AnchorHtmlAttributes {
 	// #[field(flatten=BaseHtmlAttributes)]
 	#[field(flatten)]
@@ -55,7 +55,7 @@ mod test {
 
 	#[test]
 	fn third_order() {
-		#[derive(Default, Buildable, IntoRsxAttributes)]
+		#[derive(Default, Buildable, IntoBlockAttribute)]
 		struct Button {
 			#[field(flatten)]
 			#[field(flatten = BaseHtmlAttributes)]

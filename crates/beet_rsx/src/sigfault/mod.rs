@@ -53,7 +53,7 @@ impl Sigfault {
 	/// ```
 	pub fn parse_attribute_block<M>(
 		tracker: RustyTracker,
-		block: impl IntoRsxAttributes<M>,
+		block: impl IntoBlockAttribute<M>,
 	) -> RsxAttribute {
 		let initial = block.into_initial_attributes();
 		RsxAttribute::Block {
