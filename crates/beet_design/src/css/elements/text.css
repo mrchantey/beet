@@ -7,6 +7,7 @@ small {
 a {
   color: var(--bt-color-primary);
   --bt-text-decoration: underline;
+  margin: 0 0.25em;
 }
 
 b,

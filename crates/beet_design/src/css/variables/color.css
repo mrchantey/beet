@@ -64,3 +64,15 @@
 	--bt-color-border: var(--bt-color-outline);
 	--bt-color-faint: var(--bt-color-outline);
 }
+
+/* 
+setting data-color-scheme on the document element also sets the scrollbar colors,
+see initColorScheme.js
+*/
+[data-color-scheme="dark"] {
+	color-scheme: dark;
+}
+
+[data-color-scheme="light"] {
+	color-scheme: light;
+}

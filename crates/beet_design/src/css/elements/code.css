@@ -31,10 +31,10 @@ pre {
 pre,
 code,
 kbd,
-samp {
+samp,kbd {
   border-radius: var(--bt-border-radius);
-  background: var(--bt-code-background-color);
-  color: var(--bt-code-color);
+  background: var(--bt-color-surface-container);
+  color: var(--bt-color-on-surface-variant);
   font-weight: var(--bt-font-weight);
   line-height: initial;
 }
@@ -43,7 +43,8 @@ code,
 kbd,
 samp {
   display: inline-block;
-  padding: 0.375rem;
+  padding: 0.3rem;
+  margin: 0.2rem 0.2rem;
 }
 
 pre {
@@ -60,7 +61,5 @@ pre > samp {
 }
 
 kbd {
-  background-color: var(--bt-code-kbd-background-color);
-  color: var(--bt-code-kbd-color);
   vertical-align: baseline;
 }

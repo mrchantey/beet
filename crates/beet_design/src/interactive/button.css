@@ -32,8 +32,8 @@ a.bt-c-button {
 
 
 .bt-c-button--primary {
-	--bt-color-text: var(--bt-color-on-primary-container);
-	--bt-color-background: var(--bt-color-primary-container);
+	--bt-color-text: var(--bt-color-on-primary);
+	--bt-color-background: var(--bt-color-primary);
 }
 
 .bt-c-button--secondary {
