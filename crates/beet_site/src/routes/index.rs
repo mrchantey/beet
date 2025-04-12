@@ -25,7 +25,7 @@ pub fn get() -> RsxNode {
 					href=paths::docs::index()
 					scope:cascade
 					>Get Started</Link>
-				<Counter client:load initial=2 />
+				<Counter client:load initial=1 />
 				</div>
 			</ContentLayout>
 		</BeetContext>

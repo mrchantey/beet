@@ -74,8 +74,8 @@ beet_sim = { path = "crates/beet_sim", version = "0.0.6-dev.1" }
 
 #💡 local
 # sweet = { version = "0.3.0" }
-# sweet = { path = "../sweet", features = ["rand"] }
-sweet = { git = "https://github.com/mrchantey/sweet", features = ["rand"] }
+sweet = { path = "../sweet", features = ["rand"] }
+# sweet = { git = "https://github.com/mrchantey/sweet", features = ["rand"] }
 bevy = { version = "0.15", default-features = false, features = ["bevy_color"] }
 
 #💡 utility

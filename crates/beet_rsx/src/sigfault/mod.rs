@@ -55,12 +55,13 @@ impl Sigfault {
 		tracker: RustyTracker,
 		block: impl IntoRsxAttributes<M>,
 	) -> RsxAttribute {
+		let initial = block.into_rsx_attributes();
 		RsxAttribute::Block {
-			initial: block.into_rsx_attributes(),
+			initial: initial.clone(),
 			effect: Effect::new(
-				Box::new(|_loc| {
+				Box::new(move |_loc| {
 					sweet::log!(
-						"todo mounting attribute blocks <div {{foo}}/>"
+						"todo mounting attribute blocks <div {{foo}}/> {initial:?}",
 					);
 					Ok(())
 				}),

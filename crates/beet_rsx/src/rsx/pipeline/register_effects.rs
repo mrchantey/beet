@@ -18,7 +18,6 @@ impl<T: Into<RsxNode>> Pipeline<T, Result<()>> for RegisterEffects {
 	fn apply(self, node: T) -> Result<()> {
 		let mut node: RsxNode = node.into();
 		let mut result = Ok(());
-
 		TreeLocationVisitor::visit_with_location_mut(
 			&mut node,
 			self.root_location,

@@ -54,6 +54,7 @@ impl EventRegistry {
 		loc: TreeLocation,
 		value: impl 'static + Fn(Event),
 	) {
+		// sweet::log!("onclick registered at location {:?}", loc);
 		Self::register(key, loc, value);
 	}
 

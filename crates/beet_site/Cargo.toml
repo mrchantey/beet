@@ -16,6 +16,7 @@ keywords.workspace = true
 anyhow.workspace = true
 serde.workspace = true
 
+sweet.workspace = true
 beet = { workspace = true, features = ["router", "design", "server"] }
 
 [build-dependencies]

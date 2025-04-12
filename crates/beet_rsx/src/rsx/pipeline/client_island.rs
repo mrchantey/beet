@@ -1,5 +1,38 @@
 use crate::prelude::*;
 
+/// Collects all components with a `client:load` directive.
+#[derive(Default)]
+pub struct CollectClientIslands;
+
+impl<T: AsRef<RsxNode>> Pipeline<T, Vec<ClientIsland>>
+	for CollectClientIslands
+{
+	fn apply(self, root: T) -> Vec<ClientIsland> {
+		let mut islands = Vec::new();
+
+		VisitRsxComponent::walk(
+			root.as_ref(),
+			|RsxComponent {
+			     ron,
+			     type_name,
+			     tracker,
+			     ..
+			 }| {
+				if let Some(ron) = ron {
+					islands.push(ClientIsland {
+						tracker: tracker.clone(),
+						type_name: type_name.clone(),
+						ron: ron.clone(),
+					});
+				}
+			},
+		);
+
+
+		islands
+	}
+}
+
 /// Representation of a component in an Rsx tree that was marked as an
 /// island by a `client`.
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -41,40 +74,6 @@ impl ClientIsland {
 					)
 				)?;
 		}
-	}
-}
-
-
-/// Collects all components with a `client:load` directive.
-#[derive(Default)]
-pub struct CollectClientIslands;
-
-impl<T: AsRef<RsxNode>> Pipeline<T, Vec<ClientIsland>>
-	for CollectClientIslands
-{
-	fn apply(self, root: T) -> Vec<ClientIsland> {
-		let mut islands = Vec::new();
-
-		VisitRsxComponent::walk(
-			root.as_ref(),
-			|RsxComponent {
-			     ron,
-			     type_name,
-			     tracker,
-			     ..
-			 }| {
-				if let Some(ron) = ron {
-					islands.push(ClientIsland {
-						tracker: tracker.clone(),
-						type_name: type_name.clone(),
-						ron: ron.clone(),
-					});
-				}
-			},
-		);
-
-
-		islands
 	}
 }
 
