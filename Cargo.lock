@@ -621,7 +621,7 @@ dependencies = [
 
 [[package]]
 name = "beet"
-version = "0.0.6-dev.10"
+version = "0.0.6-dev.1"
 dependencies = [
  "beet",
  "beet_design",
@@ -642,7 +642,7 @@ dependencies = [
 
 [[package]]
 name = "beet-cli"
-version = "0.0.6-dev.10"
+version = "0.0.6-dev.1"
 dependencies = [
  "anyhow",
  "beet",
@@ -655,7 +655,7 @@ dependencies = [
 
 [[package]]
 name = "beet_design"
-version = "0.0.6-dev.10"
+version = "0.0.6-dev.1"
 dependencies = [
  "anyhow",
  "beet_router",
@@ -669,7 +669,7 @@ dependencies = [
 
 [[package]]
 name = "beet_examples"
-version = "0.0.6-dev.10"
+version = "0.0.6-dev.1"
 dependencies = [
  "anyhow",
  "beet_flow",
@@ -689,7 +689,7 @@ dependencies = [
 
 [[package]]
 name = "beet_flow"
-version = "0.0.6-dev.10"
+version = "0.0.6-dev.1"
 dependencies = [
  "anyhow",
  "beet_flow",
@@ -704,7 +704,7 @@ dependencies = [
 
 [[package]]
 name = "beet_flow_macros"
-version = "0.0.6-dev.10"
+version = "0.0.6-dev.1"
 dependencies = [
  "anyhow",
  "extend",
@@ -717,7 +717,7 @@ dependencies = [
 
 [[package]]
 name = "beet_ml"
-version = "0.0.6-dev.10"
+version = "0.0.6-dev.1"
 dependencies = [
  "anyhow",
  "beet_flow",
@@ -750,7 +750,7 @@ dependencies = [
 
 [[package]]
 name = "beet_router"
-version = "0.0.6-dev.10"
+version = "0.0.6-dev.1"
 dependencies = [
  "anyhow",
  "beet_router",
@@ -780,7 +780,7 @@ dependencies = [
 
 [[package]]
 name = "beet_rsx"
-version = "0.0.6-dev.10"
+version = "0.0.6-dev.1"
 dependencies = [
  "anyhow",
  "beet_rsx",
@@ -790,6 +790,7 @@ dependencies = [
  "console_log",
  "extend",
  "flume",
+ "html-escape",
  "http",
  "js-sys",
  "lightningcss",
@@ -813,7 +814,7 @@ dependencies = [
 
 [[package]]
 name = "beet_rsx_combinator"
-version = "0.0.6-dev.10"
+version = "0.0.6-dev.1"
 dependencies = [
  "combine 2.5.2",
  "itertools 0.14.0",
@@ -822,7 +823,7 @@ dependencies = [
 
 [[package]]
 name = "beet_rsx_macros"
-version = "0.0.6-dev.10"
+version = "0.0.6-dev.1"
 dependencies = [
  "anyhow",
  "beet_rsx_parser",
@@ -836,7 +837,7 @@ dependencies = [
 
 [[package]]
 name = "beet_rsx_parser"
-version = "0.0.6-dev.10"
+version = "0.0.6-dev.1"
 dependencies = [
  "anyhow",
  "beet_rsx_combinator",
@@ -855,7 +856,7 @@ dependencies = [
 
 [[package]]
 name = "beet_server"
-version = "0.0.6-dev.10"
+version = "0.0.6-dev.1"
 dependencies = [
  "anyhow",
  "axum",
@@ -879,7 +880,7 @@ dependencies = [
 
 [[package]]
 name = "beet_sim"
-version = "0.0.6-dev.10"
+version = "0.0.6-dev.1"
 dependencies = [
  "anyhow",
  "beet_flow",
@@ -890,7 +891,7 @@ dependencies = [
 
 [[package]]
 name = "beet_site"
-version = "0.0.6-dev.10"
+version = "0.0.6-dev.1"
 dependencies = [
  "anyhow",
  "beet",
@@ -900,7 +901,7 @@ dependencies = [
 
 [[package]]
 name = "beet_spatial"
-version = "0.0.6-dev.10"
+version = "0.0.6-dev.1"
 dependencies = [
  "anyhow",
  "beet_flow",
@@ -4043,6 +4044,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "589533453244b0995c858700322199b2becb13b627df2851f64a2775d024abcf"
 dependencies = [
  "windows-sys 0.59.0",
+]
+
+[[package]]
+name = "html-escape"
+version = "0.2.13"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6d1ad449764d627e22bfd7cd5e8868264fc9236e07c752972b4080cd351cb476"
+dependencies = [
+ "utf8-width",
 ]
 
 [[package]]
@@ -7936,6 +7946,12 @@ name = "utf16_iter"
 version = "1.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c8232dd3cdaed5356e0f716d285e4b40b932ac434100fe9b7e0e8e935b9e6246"
+
+[[package]]
+name = "utf8-width"
+version = "0.1.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "86bd8d4e895da8537e5315b8254664e6b769c4ff3db18321b297a1e7004392e3"
 
 [[package]]
 name = "utf8_iter"

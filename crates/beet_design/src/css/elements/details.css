@@ -1,3 +1,6 @@
+/* something like a picocss details */
+
+
 details {
   display: block;
   margin-bottom: var(--bt-spacing);

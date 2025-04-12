@@ -46,7 +46,6 @@ impl MarkdownToFuncTokens {
 		html_output
 	}
 
-
 	/// returns the content of the first frontmatter block discovered,
 	/// wrapped in parentheses as a requirement of the `ron` parser
 	fn markdown_to_frontmatter_tokens<'a>(markdown: &'a str) -> Result<Block> {
@@ -204,12 +203,20 @@ val_string	= "foo"
 		val_string: String,
 	}
 
-
-
 	#[test]
 	fn html() {
 		expect(MarkdownToFuncTokens::markdown_to_html(MARKDOWN))
 			.to_be("<h1>hello world</h1>\n");
+	}
+
+	#[test]
+	#[ignore = "todo"]
+	// currently text nodes of html tags are not parsed
+	fn inside_tags() {
+		expect(MarkdownToFuncTokens::markdown_to_html(
+			r#"<div>## Subheading</div>"#,
+		))
+		.to_be("<div><h2>Subheading</h2></div>\n");
 	}
 
 	#[test]

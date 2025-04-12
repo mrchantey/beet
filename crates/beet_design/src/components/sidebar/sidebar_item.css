@@ -58,14 +58,25 @@ summary::-webkit-details-marker {
 	transform: rotateZ(90deg);
 }
 
+/* 
+anchor is used for leaf nodes and parents with a page
+otherwise span
+*/
+a,span{
+	padding: 0.3em;
+}
+
+/* account for the arrow */
+a.leaf{
+	width:calc(100% + 3px - 1rem - var(--bt-spacing));
+}
+
 a {
 	display: block;
 	width: 100%;
-	max-width:calc(100% - 1rem);
 	border-radius: var(--bt-border-radius-sm);
 	text-decoration: none;
 	color: var(--bt-color-on-surface-variant);
-	padding: 0.3em var(--sidebar-indent);
 	line-height: var(--bt-line-height);
 }
 

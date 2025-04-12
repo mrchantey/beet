@@ -35,7 +35,7 @@ For cloud watch and s3 access we will need to set up a custom role. At first IAM
 		- AWSLambdaBasicExecutionRole - cloud watch
 	- name: example-lambda
 	- description: IAM Role for the Example axum server.
-	- restrict s3 to bevyhub-dev & bevyhub-prod
+	- (optional) restrict s3 resources to example
 2. Save the arn, we'll need it later
 
 ### Deploy the Server

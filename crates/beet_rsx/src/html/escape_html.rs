@@ -1,5 +1,7 @@
 use crate::prelude::*;
 
+/// TODO this is incorrect, we need to escape RsxNode rust code
+/// only.
 pub struct EscapeHtml {
 	/// Element tags, the children of which will not be escaped.
 	/// Default: `["script", "style","code"]`
@@ -41,6 +43,7 @@ impl EscapeHtml {
 							self.escape_attribute(attr);
 						}
 					}
+					// TODO use html_escape::encode_attribute etc
 					if !self.ignored_tags.contains(&el.tag) {
 						self.escape_nodes(&mut el.children);
 					}
@@ -54,20 +57,13 @@ impl EscapeHtml {
 }
 
 
-
-/// escape html characters unless `no_escape` is set
-fn escape(str: &str) -> String {
-	str.replace("&", "&amp;")
-		.replace("<", "&lt;")
-		.replace(">", "&gt;")
-		.replace("\"", "&quot;")
-		.replace("'", "&apos;")
-}
+fn escape(str: &str) -> String { html_escape::encode_safe(str).to_string() }
 
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
 	use sweet::prelude::*;
+
 
 	#[test]
 	fn works() {
@@ -75,6 +71,6 @@ mod test {
 			&vec![HtmlNode::Text("there's a snake in my boot".into())]
 				.xpipe(RenderHtmlEscaped::default()),
 		)
-		.to_be("there&apos;s a snake in my boot");
+		.to_be("there&#x27;s a snake in my boot");
 	}
 }

@@ -25,8 +25,9 @@ fn sidebar_item(
 	let inner = if children.is_empty()
 		&& let Some(path) = path
 	{
+		
 		rsx! {
-			<a class="bm-c-sidebar__link" href=path.to_string()>
+			<a class="leaf bm-c-sidebar__link" href=path.to_string()>
 				// aria-current={
 				// // handled in js but this avoids FOUC
 				// entry.isCurrent && 'page'
@@ -42,7 +43,7 @@ fn sidebar_item(
 
 		let item = if let Some(path) = path {
 			rsx! {
-				<a class="bm-c-sidebar__link" href=path.to_string()>
+				<a class="large bm-c-sidebar__link" href=path.to_string()>
 					{display_name}
 				</a>
 			}

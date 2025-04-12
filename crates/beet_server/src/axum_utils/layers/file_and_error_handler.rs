@@ -1,11 +1,14 @@
 use axum::extract::Request;
 use axum::handler::HandlerWithoutStateExt;
 use axum::response::IntoResponse;
+use http::HeaderValue;
 use http::StatusCode;
+use http::header::CONTENT_TYPE;
 use std::convert::Infallible;
 use std::path::Path;
 use tower::Service;
 use tower_http::services::ServeDir;
+use tower_http::set_header::SetResponseHeaderLayer;
 
 /// Serve files as a fallback, if none are found return 404.
 /// TODO its bad practice to serve files from lambda,
