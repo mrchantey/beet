@@ -16,7 +16,7 @@ fn counter(props: Counter) -> RsxNode {
 	rsx! {
 		<div>
 			{get.clone()}
-			<button onclick=move |_| { set(get() + 2) }>Increment</button>
+			<button onclick=move |_| { set(get() + 1) }><Link>Increment</Link></button>
 		</div>
 	}
 }

@@ -17,6 +17,7 @@ pub fn get() -> RsxNode {
 		<BeetContext>
 			<ContentLayout>
 				<BeetHeaderLinks slot="header-nav" />
+				<div class="container">
 				<h1>Beet</h1>
 				<p>Its a framework</p>
 				<Link
@@ -24,13 +25,22 @@ pub fn get() -> RsxNode {
 					href=paths::docs::index()
 					scope:cascade
 					>Get Started</Link>
-		{counter}
+					{counter}
+				</div>
 			</ContentLayout>
 		</BeetContext>
 		<style>
+		.container{
+			display: flex;
+			flex-direction: column;
+			align-items: center;
+			padding-top: 3.em;
+			gap:1. em;
+		}
+
+
 		.primary-action{
 			max-width:20.em;
-
 		}
 
 		</style>

@@ -57,7 +57,8 @@ impl EscapeHtml {
 }
 
 
-fn escape(str: &str) -> String { html_escape::encode_safe(str).to_string() }
+// fn escape(str: &str) -> String { html_escape::encode_safe(str).to_string() }
+fn escape(str: &str) -> String { str.to_string() }
 
 #[cfg(test)]
 mod test {
