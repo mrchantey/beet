@@ -17,6 +17,10 @@ pub fn get() -> RsxNode {
 		<p>Here is some text under the heading</p>
 		<h6>This is a H6 Heading</h6>
 		<p>Here is some text under the heading</p>
+		<details>
+			<summary role="button">This is a details panel</summary>
+			<p>Yep its pretty simple! If you want something more styled use Accordian</p>
+			</details>
 		<h2>Paragraphs</h2>
 		<p>This is a paragraph</p>
 		<p>This is a paragraph with <a href="https://example.com">a link</a></p>

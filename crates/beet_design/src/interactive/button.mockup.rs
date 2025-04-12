@@ -18,6 +18,14 @@ pub fn get() -> RsxNode {
 				<Button disabled variant=ButtonVariant::Outlined>Beet is rad</Button>
 				<Button disabled variant=ButtonVariant::Text>Beet is rad</Button>
 			</div>
+			<h2>Links</h2>
+			<div>
+				<Link>Beet is rad</Link>
+				<Link variant=ButtonVariant::Secondary>Beet is rad</Link>
+				<Link variant=ButtonVariant::Tertiary>Beet is rad</Link>
+				<Link variant=ButtonVariant::Outlined>Beet is rad</Link>
+				<Link variant=ButtonVariant::Text>Beet is rad</Link>
+			</div>
 			<style>
 			div{
 				padding:1.em;
