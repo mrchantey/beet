@@ -83,7 +83,7 @@ impl FuncTokensToCodegen {
 				let mod_path_str = mod_path.to_string_lossy();
 				let mod_import = syn::parse_quote! {
 					#[path = #mod_path_str]
-					mod #mod_ident;
+					pub mod #mod_ident;
 				};
 				Ok(mod_import)
 			})

@@ -70,7 +70,7 @@ impl CodegenFile {
 	}
 
 	pub fn build_output(&self) -> Result<syn::File> {
-		let use_beet: syn::Item = syn::parse_str(&self.use_beet_tokens)?;
+		let use_beet: TokenStream = syn::parse_str(&self.use_beet_tokens)?;
 		let crate_alias = self.crate_alias()?;
 
 		let items = &self.items;

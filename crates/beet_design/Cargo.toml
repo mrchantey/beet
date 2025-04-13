@@ -30,6 +30,8 @@ chrono.workspace = true
 heck.workspace = true
 material-colors = "0.4.2"
 
+serde.workspace = true
+
 [dev-dependencies]
 sweet = { workspace = true, features = ["test"] }
 lightningcss.workspace = true

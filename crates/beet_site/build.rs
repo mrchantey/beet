@@ -16,6 +16,9 @@ fn main() -> Result<()> {
 
 	if is_wasm {
 		CodegenFile::new_workspace_rel(codegen_wasm, &cx.pkg_name)
+			.with_use_beet_tokens(
+				"use beet::prelude::*;use beet::design as beet_design;",
+			)
 			.xpipe(BuildWasmRoutes::default())?
 	} else {
 		let html_dir =

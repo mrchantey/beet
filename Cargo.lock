@@ -664,6 +664,7 @@ dependencies = [
  "heck 0.4.1",
  "lightningcss",
  "material-colors",
+ "serde",
  "sweet",
 ]
 

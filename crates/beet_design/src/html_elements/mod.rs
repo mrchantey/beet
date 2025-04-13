@@ -1,5 +1,6 @@
 use beet_rsx::as_beet::*;
-
+mod maybe_signal;
+use maybe_signal::*;
 
 
 #[derive(Default, Buildable, IntoBlockAttribute)]
@@ -32,8 +33,8 @@ pub struct InputHtmlAttributes {
 	pub r#type: Option<String>,
 	pub disabled: Option<bool>,
 	pub required: Option<bool>,
-	#[field(into)]
-	pub value: Option<String>,
+	// #[field(into)]
+	// pub value: Option<MaybeSignal<String>>,
 }
 
 

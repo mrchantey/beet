@@ -145,7 +145,7 @@ impl<'a> PropsField<'a> {
 
 	/// In Builder pattern these are the tokens for assignment, depending
 	/// on attributes it will be checked in the following order:
-	/// - is_boxed:		`(impl SomeType`, Box::new(value))`
+	/// - is_boxed:		`(impl SomeType, Box::new(value))`
 	/// - is_into: 		`(impl Into<SomeType>, value.into())`
 	/// - verbatim: 	`(SomeType, value)`
 	pub fn assign_tokens(&self) -> (Type, Expr) {

@@ -10,6 +10,8 @@
 .bt-c-input,
 .bt-c-select {
 
+	outline:none;
+
 	pointer-events: auto;
 
 	height: var(--bt-form-element-height);
