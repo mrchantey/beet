@@ -8,7 +8,7 @@ h6 {
   --bt-font-weight: 700;
 	margin-top: 0;
   margin-bottom: var(--bt-typography-spacing-vertical);
-  color: var(--bt-color);
+  color: var(--bt-color-text);
   font-weight: var(--bt-font-weight);
   font-size: var(--bt-font-size);
   line-height: var(--bt-line-height);

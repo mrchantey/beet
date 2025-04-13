@@ -14,6 +14,9 @@ a.bt-c-button {
 	margin-left:unset;
 	margin-right:unset;
 }
+a.bt-c-button:visited {
+	color:var(--bt-color-text);
+}
 
 .bt-c-button .bt-c-icon {
 	font-size: 1.8em;

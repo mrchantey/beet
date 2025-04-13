@@ -6,6 +6,7 @@ use beet_rsx::as_beet::*;
 pub struct BaseHtmlAttributes {
 	pub id: Option<String>,
 	pub class: Option<String>,
+	pub onchange: Option<Box<dyn EventHandler<Event>>>,
 	pub onclick: Option<Box<dyn EventHandler<MouseEvent>>>,
 }
 #[derive(Default, Buildable, IntoBlockAttribute)]
@@ -23,6 +24,16 @@ pub struct AnchorHtmlAttributes {
 	pub base_attrs: BaseHtmlAttributes,
 	/// the download thing
 	pub href: Option<String>,
+}
+#[derive(Default, Buildable, IntoBlockAttribute)]
+pub struct InputHtmlAttributes {
+	#[field(flatten)]
+	pub base_attrs: BaseHtmlAttributes,
+	pub r#type: Option<String>,
+	pub disabled: Option<bool>,
+	pub required: Option<bool>,
+	#[field(into)]
+	pub value: Option<String>,
 }
 
 

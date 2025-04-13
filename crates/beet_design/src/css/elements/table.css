@@ -16,9 +16,9 @@ tfoot td {
 th,
 td {
   padding: calc(var(--bt-spacing) / 2) var(--bt-spacing);
-  border-bottom: var(--bt-border-width) solid var(--bt-table-border-color);
-  background-color: var(--bt-background-color);
-  color: var(--bt-color);
+  border-bottom: var(--bt-border-width) solid var(--bt-color-border-faint);
+  background-color: var(--bt-color-background);
+  color: var(--bt-color-text);
   font-weight: var(--bt-font-weight);
   text-align: left;
   text-align: start;
@@ -26,11 +26,11 @@ td {
 
 tfoot th,
 tfoot td {
-  border-top: var(--bt-border-width) solid var(--bt-table-border-color);
+  border-top: var(--bt-border-width) solid var(--bt-color-border-faint);
   border-bottom: 0;
 }
 
 table.striped tbody tr:nth-child(odd) th,
 table.striped tbody tr:nth-child(odd) td {
-  background-color: var(--bt-table-row-stripped-background-color);
+  background-color: var(--bt-color-surface-container-low);
 }

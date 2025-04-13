@@ -59,6 +59,7 @@
 	--bt-opacity-disabled: 0.5;
 	
 	--bt-color-border: var(--bt-color-outline);
+	--bt-color-border-faint: var(--bt-color-outline-variant);
 	--bt-color-text: var(--bt-color-on-surface);
 	--bt-color-background: var(--bt-color-surface-container-lowest);
 	--bt-color-border: var(--bt-color-outline);

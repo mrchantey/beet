@@ -34,13 +34,11 @@ pub struct Button {
 	pub attrs: ButtonHtmlAttributes,
 }
 
-fn button(
-	Button {
-		variant, mut attrs, ..
-	}: Button,
-) -> RsxNode {
-	let class = format!(" bt-c-button--{}", variant.class_suffix());
-	attrs.push_class(csx!("bt-c-button", class));
+fn button(Button { variant, mut attrs }: Button) -> RsxNode {
+	attrs.push_class(format!(
+		"bt-c-button bt-c-button--{}",
+		variant.class_suffix()
+	));
 
 	rsx! {
 		<button {attrs}>
