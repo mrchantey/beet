@@ -1,6 +1,3 @@
-mod maybe_signal;
-pub use maybe_signal::*;
-
 use beet_rsx::as_beet::*;
 
 #[derive(Default, Buildable, IntoBlockAttribute)]

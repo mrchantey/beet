@@ -131,7 +131,7 @@ impl<'a> PropsField<'a> {
 	}
 
 	/// If this field is a `Box<dyn Trait>` type return the inner trait
-	pub fn boxed_trait(&self) -> Option<TypeTraitObject> {
+	fn boxed_trait(&self) -> Option<&TypeTraitObject> {
 		if let Type::Path(p) = self.inner_ty {
 			if let Some(segment) = p.path.segments.last() {
 				if segment.ident == "Box" {
@@ -142,7 +142,26 @@ impl<'a> PropsField<'a> {
 							Type::TraitObject(obj),
 						)) = args.args.first()
 						{
-							return Some(obj.clone());
+							return Some(obj);
+						}
+					}
+				}
+			}
+		}
+		None
+	}
+	/// If this field is a `Box<dyn Trait>` type return the inner trait
+	fn maybe_signal(&self) -> Option<&Type> {
+		if let Type::Path(p) = self.inner_ty {
+			if let Some(segment) = p.path.segments.last() {
+				if segment.ident == "MaybeSignal" {
+					if let syn::PathArguments::AngleBracketed(args) =
+						&segment.arguments
+					{
+						if let Some(syn::GenericArgument::Type(ty)) =
+							args.args.first()
+						{
+							return Some(ty);
 						}
 					}
 				}
@@ -153,20 +172,27 @@ impl<'a> PropsField<'a> {
 
 	/// In Builder pattern these are the tokens for assignment, depending
 	/// on attributes it will be checked in the following order:
-	/// - is_boxed:				`(Default, impl SomeType, 			Box::new(value))`
-	/// - is_into=Foo<M>:	`(<M>,		 impl Foo<M>, 				value.foo())`
-	/// - is_into: 				`(Default, impl Into<SomeType>, value.into())`
-	/// - verbatim: 			`(Default, SomeType, 						value)`
+	/// - MaybeSignal<T>:	`(<M>, 						impl IntoMaybeSignal,		value.into_maybe_signal())`
+	/// - is_boxed:				`(Default, 				impl SomeType, 					Box::new(value))`
+	/// - into_type:			`(into_generics,	into_type, into_func							)`
+	/// - is_into: 				`(Default, 				impl Into<SomeType>, 		value.into())		`
+	/// - verbatim: 			`(Default, 				SomeType, 							value)					`
 	pub fn assign_tokens(&self) -> Result<(TokenStream, Type, Expr)> {
 		// 1. box
-		if let Some(box_trait) = self.boxed_trait() {
-			let mut trait_bounds = box_trait.bounds;
+		if let Some(ty) = self.maybe_signal() {
+			Ok((
+				syn::parse_quote! {<M>},
+				syn::parse_quote! { impl beet::prelude::IntoMaybeSignal<#ty,M> },
+				syn::parse_quote! { value.into_maybe_signal() },
+			))
+		} else if let Some(box_trait) = self.boxed_trait() {
+			let mut trait_bounds = box_trait.bounds.clone();
 			trait_bounds.push(syn::parse_quote! { 'static });
-			return Ok((
+			Ok((
 				TokenStream::new(),
 				syn::parse_quote! { impl #trait_bounds },
 				syn::parse_quote! { Box::new(value) },
-			));
+			))
 		} else if let Some(ty) =
 			self.attributes.get_value_parsed::<Type>("into_type")?
 		{
@@ -187,22 +213,23 @@ impl<'a> PropsField<'a> {
 
 			// this is wrong
 			return Ok((generics, ty, func));
-		}
-		// 2. into
-		let is_into = self.is_into();
-		let inner_ty = self.inner_ty;
-		match is_into {
-			true => Ok((
-				TokenStream::new(),
-				syn::parse_quote! { impl Into<#inner_ty> },
-				syn::parse_quote! { value.into() },
-			)),
-			// 3. verbatim
-			false => Ok((
-				TokenStream::new(),
-				syn::parse_quote! { #inner_ty },
-				syn::parse_quote! { value },
-			)),
+		} else {
+			// 2. into
+			let is_into = self.is_into();
+			let inner_ty = self.inner_ty;
+			match is_into {
+				true => Ok((
+					TokenStream::new(),
+					syn::parse_quote! { impl Into<#inner_ty> },
+					syn::parse_quote! { value.into() },
+				)),
+				// 3. verbatim
+				false => Ok((
+					TokenStream::new(),
+					syn::parse_quote! { #inner_ty },
+					syn::parse_quote! { value },
+				)),
+			}
 		}
 	}
 

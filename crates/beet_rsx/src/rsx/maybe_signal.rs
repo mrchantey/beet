@@ -1,7 +1,27 @@
 /// A type that can be either a constant value or a function that returns a value.
+
+
 pub enum MaybeSignal<T> {
 	Const(T),
 	Func(Box<dyn 'static + Send + Sync + Fn() -> T>),
+}
+
+impl<T: Clone> MaybeSignal<T> {
+	pub fn value(&self) -> T {
+		match self {
+			MaybeSignal::Const(v) => v.clone(),
+			MaybeSignal::Func(f) => f(),
+		}
+	}
+}
+
+impl<T: std::fmt::Debug> std::fmt::Debug for MaybeSignal<T> {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		match self {
+			MaybeSignal::Const(v) => write!(f, "Const({:?})", v),
+			MaybeSignal::Func(v) => write!(f, "Func({:?})", v()),
+		}
+	}
 }
 
 impl<T: ToString> ToString for MaybeSignal<T> {
