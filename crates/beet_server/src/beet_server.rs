@@ -27,6 +27,7 @@ impl BeetServer {
 	/// Server the provided router, adding
 	/// a fallback file server with live reload.
 	pub async fn serve(self) -> Result<()> {
+		#[allow(unused_mut)]
 		let mut router = self
 			.router
 			.fallback_service(file_and_error_handler(&self.html_dir))

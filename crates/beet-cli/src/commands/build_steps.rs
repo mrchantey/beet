@@ -49,7 +49,10 @@ impl BuildStep for ExportStatic {
 	/// it to not spin up a server, and instead just build the static files,
 	/// saving them to the `html_dir`
 	fn run(&self) -> Result<()> {
-		println!("🥁 Build Step 2: HTML");
+		println!(
+			"🥁 Build Step 2: HTML \nExecuting {}",
+			self.exe_path.display()
+		);
 		Command::new(&self.exe_path)
 			.arg("--html-dir")
 			.arg(&self.build_args.html_dir)

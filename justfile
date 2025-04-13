@@ -32,9 +32,16 @@ init-repo:
 cli *args:
 	cargo run -p beet-cli -- {{args}}
 
-
 install-cli *args:
 	cargo install --path crates/beet-cli {{args}}
+
+deploy *args:
+	just cli deploy 								\
+	--package 				beet_site 		\
+	--function-name 	beet 					\
+	--region 					us-west-2 		\
+	--iam-role 				$AWS_IAM_ROLE \
+	{{args}}
 
 
 # Run and watch a workspace example
