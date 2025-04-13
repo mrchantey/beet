@@ -271,7 +271,9 @@ mod test {
 
 		let world = "mars";
 		expect(rsx! {
-			<div {Foo{onclick:Box::new(move|_|{})}}>
+			<div {Foo {
+				onclick: Box::new(move |_| {}),
+			}}>
 				<p>hello {world}</p>
 			</div>
 		}.xpipe(RsxToHtmlString::default()).unwrap())

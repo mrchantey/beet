@@ -48,43 +48,46 @@ fn impl_buildable(
 	input: &DeriveInput,
 	fields: &Vec<PropsField>,
 ) -> Result<TokenStream> {
-	let field_methods = fields.iter().map(|field| {
-		let name = &field.ident;
-		let actual_ty = &field.inner.ty;
-		let (generics, builder_ty, expr) = field.assign_tokens()?;
-		let docs = field.docs();
+	let field_methods = fields
+		.iter()
+		.map(|field| {
+			let name = &field.ident;
+			let actual_ty = &field.inner.ty;
+			let (generics, builder_ty, expr) = field.assign_tokens()?;
+			let docs = field.docs();
 
-		let expr = if field.is_optional() {
-			quote! {Some(#expr)}
-		} else {
-			quote! {#expr}
-		};
+			let expr = if field.is_optional() {
+				quote! {Some(#expr)}
+			} else {
+				quote! {#expr}
+			};
 
-		let get = format_ident!("get_{}", name);
-		let get_mut = format_ident!("get_{}_mut", name);
-		let set = format_ident!("set_{}", name);
+			let get = format_ident!("get_{}", name);
+			let get_mut = format_ident!("get_{}_mut", name);
+			let set = format_ident!("set_{}", name);
 
-		Ok(quote! {
-			#(#docs)*
-			fn #name #generics(mut self, value: #builder_ty) -> Self {
-				self.get_mut().#name = #expr;
-				self
-			}
-			#(#docs)*
-			fn #get(&self) -> & #actual_ty {
-				&self.get().#name
-			}
-			#(#docs)*
-			fn #get_mut(&mut self) -> &mut #actual_ty {
-				&mut self.get_mut().#name
-			}
-			#(#docs)*
-			fn #set #generics(&mut self, value: #builder_ty) -> &mut Self {
-				self.get_mut().#name = #expr;
-				self
-			}
+			Ok(quote! {
+				#(#docs)*
+				fn #name #generics(mut self, value: #builder_ty) -> Self {
+					self.get_mut().#name = #expr;
+					self
+				}
+				#(#docs)*
+				fn #get(&self) -> & #actual_ty {
+					&self.get().#name
+				}
+				#(#docs)*
+				fn #get_mut(&mut self) -> &mut #actual_ty {
+					&mut self.get_mut().#name
+				}
+				#(#docs)*
+				fn #set #generics(&mut self, value: #builder_ty) -> &mut Self {
+					self.get_mut().#name = #expr;
+					self
+				}
+			})
 		})
-	}).collect::<Result<Vec<_>>>()?;
+		.collect::<Result<Vec<_>>>()?;
 
 	let target_ident = &input.ident;
 

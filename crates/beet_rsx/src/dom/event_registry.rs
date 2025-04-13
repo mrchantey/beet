@@ -9,7 +9,7 @@ impl<T, F> EventHandler<T> for F where F: 'static + Send + Sync + Fn(T) {}
 pub use event_types_native::*;
 #[cfg(not(target_arch = "wasm32"))]
 mod event_types_native {
-	use super::EventExt;
+	use super::*;
 
 	pub struct MockEvent {
 		pub target: MockTarget,
@@ -29,17 +29,19 @@ mod event_types_native {
 pub use event_types_wasm::*;
 #[cfg(target_arch = "wasm32")]
 mod event_types_wasm {
-	// use super::*;
+	use wasm_bindgen::JsCast;
+
+	use super::*;
 	pub type Event = web_sys::MouseEvent;
 	pub type MouseEvent = web_sys::MouseEvent;
-	// impl EventExt for MouseEvent {
-	// 	fn value(&self) -> String {
-	// 		self.current_target()
-	// 			.into::<web_sys::HtmlInputElement>()
-	// 			.unwrap()
-	// 			.value()
-	// 	}
-	// }
+	impl EventExt for MouseEvent {
+		fn value(&self) -> String {
+			self.current_target()
+				.unwrap()
+				.unchecked_into::<web_sys::HtmlInputElement>()
+				.value()
+		}
+	}
 }
 
 
@@ -105,9 +107,5 @@ mod test {
 
 	#[test]
 	// #[cfg(target_arch = "wasm32")]
-	fn works() {
-		
-
-
-	}
+	fn works() {}
 }

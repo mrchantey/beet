@@ -60,8 +60,7 @@ impl FileGroup {
 
 	#[cfg(test)]
 	pub fn test_site() -> Self {
-		Self::new_workspace_rel("crates/beet_router/src/test_site")
-			.unwrap()
+		Self::new_workspace_rel("crates/beet_router/src/test_site").unwrap()
 	}
 	#[cfg(test)]
 	pub fn test_site_routes() -> Self {

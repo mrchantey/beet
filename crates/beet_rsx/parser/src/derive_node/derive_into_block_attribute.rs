@@ -112,6 +112,7 @@ fn fn_register_effects(fields: &[PropsField]) -> TokenStream {
 				}})
 			}
 		} else {
+			// todo!("here we need to register BlockValue attributes same way as in tokens?");
 			None
 		}
 	});

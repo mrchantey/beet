@@ -1,9 +1,10 @@
 use crate::prelude::*;
+use beet_rsx::sigfault::effect;
 use beet_rsx::sigfault::signal;
 
 
 pub fn get() -> RsxNode {
-	rsx! {<Inner client:load />}
+	rsx! { <Inner client:load /> }
 }
 
 // temp until global client:load
@@ -12,6 +13,11 @@ pub struct Inner;
 
 fn inner(_: Inner) -> RsxNode {
 	let (value, set_value) = signal("Hello world".to_string());
+
+	let val2 = value.clone();
+	effect(move || {
+		sweet::log!("value: {}", val2());
+	});
 
 	let set_value1 = set_value.clone();
 	let set_value2 = set_value.clone();
