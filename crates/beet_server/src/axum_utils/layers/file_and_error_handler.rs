@@ -36,11 +36,20 @@ pub fn file_and_error_handler(
 		.layer_fn(|mut svc: ServeDir<_>| {
 			tower::service_fn(move |req: Request| {
 				let mut req = req;
-				let uri = req.uri().to_string();
-
-				if !uri.contains('.') && !uri.ends_with('/') {
-					let new_uri = format!("{}/index.html", uri);
-					*req.uri_mut() = new_uri.parse().unwrap();
+				let mut uri = req.uri().to_string();
+				// Extract the last path component
+				// Check if the last component has a file extension
+				if !uri
+					.split('/')
+					.last()
+					.map(|p| p.contains('.'))
+					.unwrap_or(false)
+				{
+					if uri.ends_with('/') {
+						uri.pop();
+					}
+					uri.push_str("/index.html");
+					*req.uri_mut() = uri.parse().unwrap();
 				}
 
 				svc.call(req)

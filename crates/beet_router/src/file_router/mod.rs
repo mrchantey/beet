@@ -64,7 +64,11 @@ impl RoutePath {
 	/// Creates a route join even if the other route path begins with `/`
 	pub fn join(&self, new_path: &RoutePath) -> Self {
 		let new_path = new_path.0.strip_prefix("/").unwrap_or(&new_path.0);
-		Self(self.0.join(&new_path))
+		if new_path == Path::new("") {
+			self.clone()
+		} else {
+			Self(self.0.join(&new_path))
+		}
 	}
 	pub fn inner(&self) -> &Path { &self.0 }
 	/// given a local path, return a new [`RoutePath`] with:
@@ -212,5 +216,15 @@ mod test {
 			expect(RoutePath::from_file_path(value).unwrap().to_string())
 				.to_be(expected);
 		}
+	}
+
+	#[test]
+	fn join() {
+		expect(
+			&RoutePath::new("/foo")
+				.join(&RoutePath::new("/"))
+				.to_string(),
+		)
+		.to_be("/foo");
 	}
 }

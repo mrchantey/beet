@@ -85,16 +85,29 @@ impl<F: Fn(Expr) -> Expr> Pipeline<Vec<FuncTokens>> for MapFuncTokens<F> {
 
 #[cfg(test)]
 mod test {
-	// use crate::prelude::*;
-	// use beet_rsx::prelude::*;
+	use crate::prelude::*;
+	use beet_rsx::prelude::*;
 	// use quote::ToTokens;
-	// use sweet::prelude::*;
+	use sweet::prelude::*;
 
 	#[test]
 	fn works() {
-		// let _route_funcs = FileGroup::test_site_routes()
-		// 	.xpipe(FileGroupToFuncTokens::default())
-		// 	.unwrap()
-		// 	.xpipe(FuncTokensToRoutes::default());
+		expect(
+			FileGroup::test_site()
+				.with_filter(GlobFilter::default().with_include("*.mockup.*"))
+				.xpipe(FileGroupToFuncTokens::default())
+				.unwrap()
+				.xpipe(
+					MapFuncTokens::default()
+						.base_route("/design")
+						.replace_route([(".mockup", "")]),
+				)
+				.xmap_each(|func| func.route_info.path.to_string()),
+		)
+		.to_be(vec![
+			"/design/components/mock_widgets/mock_button",
+			"/design/components/test_layout",
+			"/design",
+		])
 	}
 }
