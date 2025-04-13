@@ -195,17 +195,16 @@ impl HtmlTokensToRust {
 				// we need to handle events at the tokens level for inferred
 				// event types and intellisense.
 				if key_str.starts_with("on") {
-					let register_func = syn::Ident::new(
-						&format!("register_{key_str}"),
-						value.span(),
-					);
-					let event_registry = &self.idents.runtime.event;
+					let register_event = self
+						.idents
+						.runtime
+						.register_event_tokens(&key_str, value);
 					quote! {
 						RsxAttribute::BlockValue {
 							key: #key_str.to_string(),
 							initial: "event-placeholder".to_string(),
 							effect: Effect::new(Box::new(move |loc| {
-								#event_registry::#register_func(#key_str,loc,#value);
+								#register_event
 								Ok(())
 							}), #tracker)
 						}

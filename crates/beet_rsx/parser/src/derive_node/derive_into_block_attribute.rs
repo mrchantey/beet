@@ -10,9 +10,12 @@ pub fn impl_into_block_attribute(input: DeriveInput) -> TokenStream {
 }
 
 fn parse(input: DeriveInput) -> Result<TokenStream> {
+	// TODO this should be customizable via a derive macro attribute
+	let runtime = RsxRuntime::default();
+
 	let fields = PropsField::parse_all(&input)?;
 	let fn_initial_attributes = fn_initial_attributes(&fields);
-	let fn_register_effects = fn_register_effects(&fields);
+	let fn_register_effects = fn_register_effects(&runtime, &fields);
 
 	let target_name = &input.ident;
 	let (impl_generics, type_generics, where_clause) =
@@ -82,7 +85,10 @@ fn fn_initial_attributes(fields: &[PropsField]) -> TokenStream {
 }
 
 
-fn fn_register_effects(fields: &[PropsField]) -> TokenStream {
+fn fn_register_effects(
+	runtime: &RsxRuntime,
+	fields: &[PropsField],
+) -> TokenStream {
 	let fields = fields.iter().filter_map(|field| {
 		let ident = &field.ident;
 		let ident_str = ident.to_string();
@@ -91,24 +97,18 @@ fn fn_register_effects(fields: &[PropsField]) -> TokenStream {
 				self.#ident.register_effects(loc)?;
 			})
 		} else if ident_str.starts_with("on") {
-			// TODO this should be customizable via a derive macro attribute
-			let event_registry = quote! {beet::prelude::EventRegistry};
-			let register_func =
-				syn::Ident::new(&format!("register_{ident_str}"), ident.span());
-			let inner = quote! {
-				#event_registry::#register_func(#ident_str, loc ,#ident);
-			};
-
+			let register_event =
+				runtime.register_event_tokens(&ident_str, ident);
 			if field.is_optional() {
 				Some(quote! {
 					if let Some(#ident) = self.#ident {
-						#inner
+						#register_event
 					}
 				})
 			} else {
 				Some(quote! {{
 					let #ident = self.#ident;
-					#inner
+					#register_event
 				}})
 			}
 		} else {

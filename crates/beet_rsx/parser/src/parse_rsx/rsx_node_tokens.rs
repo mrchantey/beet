@@ -114,6 +114,10 @@ pub struct Spanner<Spannable> {
 	pub loc: Option<SpanLike>,
 }
 
+impl<S> AsRef<S> for Spanner<S> {
+	fn as_ref(&self) -> &S { &self.value }
+}
+
 impl<S: ToTokens> ToTokens for Spanner<S> {
 	fn to_tokens(&self, tokens: &mut TokenStream) {
 		self.value.to_tokens(tokens);
