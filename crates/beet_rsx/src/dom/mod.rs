@@ -3,21 +3,16 @@ use crate::prelude::*;
 mod beet_dom;
 #[cfg(target_arch = "wasm32")]
 mod dom_event_registry;
+mod event_registry;
 #[cfg(target_arch = "wasm32")]
 pub use beet_dom::*;
 #[cfg(target_arch = "wasm32")]
 pub use dom_event_registry::*;
-#[cfg(not(target_arch = "wasm32"))]
-mod native_event_registry;
+pub use event_registry::*;
 mod rs_dom_target;
-#[cfg(not(target_arch = "wasm32"))]
-pub use native_event_registry::*;
 pub use rs_dom_target::*;
 use std::sync::Arc;
 use std::sync::Mutex;
-
-pub trait EventHandler<T>: 'static + Send + Sync + Fn(T) {}
-impl<T, F> EventHandler<T> for F where F: 'static + Send + Sync + Fn(T) {}
 
 #[cfg(target_arch = "wasm32")]
 mod browser_dom_target;

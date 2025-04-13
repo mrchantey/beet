@@ -8,19 +8,26 @@ use wasm_bindgen::prelude::Closure;
 use web_sys::Event;
 use web_sys::window;
 
-pub struct EventRegistry;
+pub struct DomEventRegistry;
 
 /// Events types used
-pub mod event {
-	pub type MouseEvent = web_sys::MouseEvent;
-}
+pub mod event {}
 
 
 thread_local! {
 	static REGISTERED_EVENTS: RefCell<HashMap<(TreeIdx,String),Box<dyn Fn(JsValue)>>> = Default::default();
 }
 
-impl EventRegistry {
+impl DomEventRegistry {
+	pub fn initialize() -> ParseResult<()> {
+		let constants = DomTarget::with(|h| h.html_constants().clone());
+		hook_up_event_listeners(&constants)?;
+		// TODO now the sweet loader is.. is what?
+		playback_prehydrate_events(&constants)?;
+		Ok(())
+	}
+
+
 	fn trigger(key: &str, tree_idx: TreeIdx, value: JsValue) {
 		REGISTERED_EVENTS.with(|current| {
 			if let Some(func) =
@@ -31,7 +38,7 @@ impl EventRegistry {
 		});
 	}
 
-	fn register<T: 'static + JsCast>(
+	pub fn register<T: 'static + JsCast>(
 		key: &str,
 		loc: TreeLocation,
 		func: impl EventHandler<T>,
@@ -44,28 +51,6 @@ impl EventRegistry {
 				}),
 			);
 		});
-	}
-	// TODO this now has the same signature as native event registry
-	// thanks to the `event` module, they should be merged
-	/// A simple example of how to register an event listener.
-	/// Here the [`Event`] should be swapped out for the type
-	/// specific to that event. This is what allows for inferred
-	/// types and intellisence inside rsx macros.
-	pub fn register_onclick(
-		key: &str,
-		loc: TreeLocation,
-		value: impl EventHandler<event::MouseEvent>,
-	) {
-		// sweet::log!("onclick registered at location {:?}", loc);
-		Self::register(key, loc, value);
-	}
-
-	pub fn initialize() -> ParseResult<()> {
-		let constants = DomTarget::with(|h| h.html_constants().clone());
-		hook_up_event_listeners(&constants)?;
-		// TODO now the sweet loader is
-		playback_prehydrate_events(&constants)?;
-		Ok(())
 	}
 }
 
@@ -90,7 +75,7 @@ fn playback_prehydrate_events(constants: &HtmlConstants) -> ParseResult<()> {
 					event_arr.get(0).as_f64().expect("bad event id") as u32;
 				let event: Event = event_arr.get(1).unchecked_into();
 				let event_type = format!("on{}", event.type_());
-				EventRegistry::trigger(
+				DomEventRegistry::trigger(
 					&event_type,
 					tree_idx.into(),
 					event.unchecked_into(),

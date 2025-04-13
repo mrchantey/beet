@@ -266,7 +266,7 @@ mod test {
 	fn block_events() {
 		#[derive(IntoBlockAttribute)]
 		struct Foo {
-			onclick: Box<dyn EventHandler<event::MouseEvent>>,
+			onclick: Box<dyn EventHandler<MouseEvent>>,
 		}
 
 		let world = "mars";

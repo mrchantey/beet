@@ -54,7 +54,7 @@ struct MyFlattenedNode {
 	/// this is what identifies it
 	id: Option<String>,
 	disabled: Option<bool>,
-	onclick: Option<Box<dyn EventHandler<event::MouseEvent>>>,
+	onclick: Option<Box<dyn EventHandler<MouseEvent>>>,
 }
 
 #[derive(Node)]
