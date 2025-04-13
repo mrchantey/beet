@@ -17,6 +17,7 @@ fn some_custom_name(props: MyNode) -> RsxNode {
 			<p>is_flatten.class: {format!("{:?}", props.is_flatten.class)}</p>
 			<p>is_flatten.id: {format!("{:?}", props.is_flatten.id)}</p>
 			<p>is_flatten.disabled: {format!("{:?}", props.is_flatten.disabled)}</p>
+			<p>is_marker_into: {format!("{:?}", props.is_marker_into)}</p>
 		</div>
 	}
 }
@@ -30,6 +31,7 @@ fn main() {
 			is_boxed=|| 3
 			is_no_into="foobar".into()
 			is_optional=3
+			is_marker_into=3
 			class="kablamo"
 			id="bar"
 		/>
@@ -38,9 +40,16 @@ fn main() {
 	.unwrap();
 	assert_eq!(
 		str,
-		"<div><p data-beet-rsx-idx=\"4\">is_optional: Some(3)</p><p data-beet-rsx-idx=\"9\">is_required: 38</p><p data-beet-rsx-idx=\"14\">is_default: 7</p><p data-beet-rsx-idx=\"19\">is_generic_default: Foo(PhantomData<u32>)</p><p data-beet-rsx-idx=\"24\">is_into: \"foobar\"</p><p data-beet-rsx-idx=\"29\">is_boxed: 3</p><p data-beet-rsx-idx=\"34\">is_flatten.class: \"kablamo\"</p><p data-beet-rsx-idx=\"39\">is_flatten.id: Some(\"bar\")</p><p data-beet-rsx-idx=\"44\">is_flatten.disabled: None</p></div>"
+		"<div><p data-beet-rsx-idx=\"4\">is_optional: Some(3)</p><p data-beet-rsx-idx=\"9\">is_required: 38</p><p data-beet-rsx-idx=\"14\">is_default: 7</p><p data-beet-rsx-idx=\"19\">is_generic_default: Foo(PhantomData<u32>)</p><p data-beet-rsx-idx=\"24\">is_into: \"foobar\"</p><p data-beet-rsx-idx=\"29\">is_boxed: 3</p><p data-beet-rsx-idx=\"34\">is_flatten.class: \"kablamo\"</p><p data-beet-rsx-idx=\"39\">is_flatten.id: Some(\"bar\")</p><p data-beet-rsx-idx=\"44\">is_flatten.disabled: None</p><p data-beet-rsx-idx=\"49\">is_marker_into: \"3\"</p></div>"
 	);
 	sweet::log!("success!");
+}
+
+trait MarkerIntoString<M> {
+	fn marker_into_string(self) -> String;
+}
+impl MarkerIntoString<()> for u32 {
+	fn marker_into_string(self) -> String { self.to_string() }
 }
 
 
@@ -72,6 +81,11 @@ struct MyNode {
 	is_no_into: String,
 	#[field(flatten)]
 	is_flatten: MyFlattenedNode,
+
+	#[field(into_type = "impl MarkerIntoString<M>")]
+	#[field(into_generics = "<M>")]
+	#[field(into_func=marker_into_string)]
+	is_marker_into: String,
 	// #[field(foo)]
 	// is_bad_macro: String,
 }

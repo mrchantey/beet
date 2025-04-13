@@ -1,9 +1,13 @@
 //! inspired by [bevy-inspector-egui](https://github.com/jakobhellermann/bevy-inspector-egui/blob/main/crates/bevy-inspector-egui-derive/src/attributes.rs)
+use quote::ToTokens;
 use syn::Expr;
+use syn::ExprLit;
 use syn::Ident;
+use syn::Lit;
 use syn::Member;
 use syn::Result;
 use syn::Token;
+use syn::parse::Parse;
 use syn::parse::ParseStream;
 
 #[derive(Debug)]
@@ -64,9 +68,16 @@ impl AttributeGroup {
 	pub fn contains(&self, name: &str) -> bool { self.get(name).is_some() }
 
 	/// Returns the value if the attribute is present and has a value.
-	#[allow(unused)]
 	pub fn get_value(&self, name: &str) -> Option<&Expr> {
 		self.get(name).map(|attr| attr.value.as_ref()).flatten()
+	}
+
+	pub fn get_value_parsed<T: Parse>(&self, name: &str) -> Result<Option<T>> {
+		if let Some(attr) = self.get(name) {
+			attr.value_parsed()
+		} else {
+			Ok(None)
+		}
 	}
 }
 
@@ -95,6 +106,24 @@ impl AttributeItem {
 		match &self.key {
 			Member::Named(ident) => Some(ident),
 			_ => None,
+		}
+	}
+
+
+	/// Handle `#[foo(bar="baz")]` and `#[foo(bar=bazz)]`, useful
+	/// for when generics are required that arent valid tokens
+	pub fn value_parsed<T: Parse>(&self) -> Result<Option<T>> {
+		if let Some(expr) = &self.value {
+			let val = if let Expr::Lit(ExprLit { lit, .. }) = expr
+				&& let Lit::Str(lit) = &lit
+			{
+				syn::parse_str(&lit.value())?
+			} else {
+				syn::parse2(expr.to_token_stream())?
+			};
+			Ok(Some(val))
+		} else {
+			Ok(None)
 		}
 	}
 }

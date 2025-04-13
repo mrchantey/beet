@@ -120,24 +120,27 @@ fn impl_builder(
 	});
 
 
-	let set_val_methods = fields.iter().map(|field| {
-		let name = &field.ident;
-		let (ty, expr) = field.assign_tokens();
-		let expr = if field.is_default() {
-			quote! { #expr }
-		} else {
-			quote! { Some(#expr) }
-		};
-		let docs = field.docs();
+	let set_val_methods = fields
+		.iter()
+		.map(|field| {
+			let name = &field.ident;
+			let (generics, ty, expr) = field.assign_tokens()?;
+			let expr = if field.is_default() {
+				quote! { #expr }
+			} else {
+				quote! { Some(#expr) }
+			};
+			let docs = field.docs();
 
-		quote! {
-			#(#docs)*
-			pub fn #name(mut self, value: #ty) -> Self {
-				self.#name = #expr;
-				self
-			}
-		}
-	});
+			Ok(quote! {
+				#(#docs)*
+				pub fn #name #generics(mut self, value: #ty) -> Self {
+					self.#name = #expr;
+					self
+				}
+			})
+		})
+		.collect::<Result<Vec<_>>>()?;
 
 	let unwrap_fields = fields.iter().map(|field| {
 		let name = &field.ident;

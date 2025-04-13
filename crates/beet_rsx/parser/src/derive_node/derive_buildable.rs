@@ -11,7 +11,7 @@ pub fn parse_derive_buildable(input: DeriveInput) -> TokenStream {
 
 fn parse(input: DeriveInput) -> Result<TokenStream> {
 	let fields = PropsField::parse_all(&input)?;
-	let impl_buildable = impl_buildable(&input, &fields);
+	let impl_buildable = impl_buildable(&input, &fields)?;
 	let impl_flatten = impl_flatten(&input.ident, &input, &fields)?;
 	let impl_self_as_ref_mut = impl_self_as_ref_mut(&input);
 	// let impl_buildable_blanket = impl_buildable_blanket(&input);
@@ -47,11 +47,11 @@ fn impl_self_as_ref_mut(input: &DeriveInput) -> TokenStream {
 fn impl_buildable(
 	input: &DeriveInput,
 	fields: &Vec<PropsField>,
-) -> TokenStream {
+) -> Result<TokenStream> {
 	let field_methods = fields.iter().map(|field| {
 		let name = &field.ident;
 		let actual_ty = &field.inner.ty;
-		let (builder_ty, expr) = field.assign_tokens();
+		let (generics, builder_ty, expr) = field.assign_tokens()?;
 		let docs = field.docs();
 
 		let expr = if field.is_optional() {
@@ -64,9 +64,9 @@ fn impl_buildable(
 		let get_mut = format_ident!("get_{}_mut", name);
 		let set = format_ident!("set_{}", name);
 
-		quote! {
+		Ok(quote! {
 			#(#docs)*
-			fn #name(mut self, value: #builder_ty) -> Self {
+			fn #name #generics(mut self, value: #builder_ty) -> Self {
 				self.get_mut().#name = #expr;
 				self
 			}
@@ -79,12 +79,12 @@ fn impl_buildable(
 				&mut self.get_mut().#name
 			}
 			#(#docs)*
-			fn #set(&mut self, value: #builder_ty) -> &mut Self {
+			fn #set #generics(&mut self, value: #builder_ty) -> &mut Self {
 				self.get_mut().#name = #expr;
 				self
 			}
-		}
-	});
+		})
+	}).collect::<Result<Vec<_>>>()?;
 
 	let target_ident = &input.ident;
 
@@ -109,7 +109,7 @@ fn impl_buildable(
 			BeetT: AsRef<#target_ident #type_generics> + AsMut<#target_ident #type_generics>
 		),
 	);
-	quote! {
+	Ok(quote! {
 
 		#[doc = #builder_docs]
 		#vis trait #buildable_ident #impl_generics: Sized + #where_clause {
@@ -123,7 +123,7 @@ fn impl_buildable(
 			fn get(&self) -> &#target_ident #type_generics { self.as_ref() }
 			fn get_mut(&mut self) -> &mut #target_ident #type_generics { self.as_mut() }
 		}
-	}
+	})
 }
 
 #[allow(dead_code)]

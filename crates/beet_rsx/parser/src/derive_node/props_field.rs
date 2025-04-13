@@ -1,5 +1,6 @@
 //! copied from [bevy-inspector-egui](https://github.com/jakobhellermann/bevy-inspector-egui/blob/main/crates/bevy-inspector-egui-derive/src/attributes.rs)
 use crate::prelude::*;
+use proc_macro2::TokenStream;
 use syn::Data;
 use syn::DeriveInput;
 use syn::Expr;
@@ -51,7 +52,14 @@ impl<'a> PropsField<'a> {
 		let attributes = AttributeGroup::parse(&inner.attrs, "field")?
 			// TODO we've outgrown this, each derive should validate seperately
 			.validate_allowed_keys(&[
-				"default", "required", "into", "no_into", "flatten",
+				"default",
+				"required",
+				"into",
+				"no_into",
+				"into_generics",
+				"into_func",
+				"into_type",
+				"flatten",
 			])?;
 
 		let ident = inner.ident.as_ref().ok_or_else(|| {
@@ -145,31 +153,56 @@ impl<'a> PropsField<'a> {
 
 	/// In Builder pattern these are the tokens for assignment, depending
 	/// on attributes it will be checked in the following order:
-	/// - is_boxed:		`(impl SomeType, Box::new(value))`
-	/// - is_into: 		`(impl Into<SomeType>, value.into())`
-	/// - verbatim: 	`(SomeType, value)`
-	pub fn assign_tokens(&self) -> (Type, Expr) {
+	/// - is_boxed:				`(Default, impl SomeType, 			Box::new(value))`
+	/// - is_into=Foo<M>:	`(<M>,		 impl Foo<M>, 				value.foo())`
+	/// - is_into: 				`(Default, impl Into<SomeType>, value.into())`
+	/// - verbatim: 			`(Default, SomeType, 						value)`
+	pub fn assign_tokens(&self) -> Result<(TokenStream, Type, Expr)> {
 		// 1. box
 		if let Some(box_trait) = self.boxed_trait() {
 			let mut trait_bounds = box_trait.bounds;
 			trait_bounds.push(syn::parse_quote! { 'static });
-			return (
+			return Ok((
+				TokenStream::new(),
 				syn::parse_quote! { impl #trait_bounds },
 				syn::parse_quote! { Box::new(value) },
-			);
+			));
+		} else if let Some(ty) =
+			self.attributes.get_value_parsed::<Type>("into_type")?
+		{
+			let generics = self
+				.attributes
+				.get_value_parsed::<TokenStream>("into_generics")?
+				.unwrap_or_default();
+
+			let func = self
+				.attributes
+				.get_value_parsed::<Expr>("into_func")?
+				.map(|func| {
+					syn::parse_quote! { value.#func() }
+				})
+				.unwrap_or_else(|| {
+					syn::parse_quote! { value.into() }
+				});
+
+			// this is wrong
+			return Ok((generics, ty, func));
 		}
 		// 2. into
 		let is_into = self.is_into();
 		let inner_ty = self.inner_ty;
 		match is_into {
-			true => (
+			true => Ok((
+				TokenStream::new(),
 				syn::parse_quote! { impl Into<#inner_ty> },
 				syn::parse_quote! { value.into() },
-			),
+			)),
 			// 3. verbatim
-			false => {
-				(syn::parse_quote! { #inner_ty }, syn::parse_quote! { value })
-			}
+			false => Ok((
+				TokenStream::new(),
+				syn::parse_quote! { #inner_ty },
+				syn::parse_quote! { value },
+			)),
 		}
 	}
 

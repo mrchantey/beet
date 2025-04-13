@@ -1,7 +1,7 @@
-use beet_rsx::as_beet::*;
 mod maybe_signal;
-use maybe_signal::*;
+pub use maybe_signal::*;
 
+use beet_rsx::as_beet::*;
 
 #[derive(Default, Buildable, IntoBlockAttribute)]
 pub struct BaseHtmlAttributes {

@@ -13,26 +13,17 @@ impl<T: ToString> ToString for MaybeSignal<T> {
 	}
 }
 
+
 pub trait IntoMaybeSignal<T, M> {
 	fn into_maybe_signal(self) -> MaybeSignal<T>;
 }
+pub struct IntoIntoMaybeSignalMarker;
 
-// impl<T, M, V> From<V> for MaybeSignal<T>
-// where
-// 	V: IntoMaybeSignal<T, M>,
-// {
-// 	fn from(value: V) -> Self {
-// 		value.into_maybe_signal()
-// 	}
-// }
-
-// pub struct IntoIntoMaybeSignalMarker;
-
-// impl<T, V: Into<T>> IntoMaybeSignal<T, IntoIntoMaybeSignalMarker> for V {
-// 	fn into_maybe_signal(self) -> MaybeSignal<T> {
-// 		MaybeSignal::Const(self.into())
-// 	}
-// }
+impl<T, V: Into<T>> IntoMaybeSignal<T, IntoIntoMaybeSignalMarker> for V {
+	fn into_maybe_signal(self) -> MaybeSignal<T> {
+		MaybeSignal::Const(self.into())
+	}
+}
 
 pub struct FuncIntoMaybeSignalMarker;
 impl<F, T, T2> IntoMaybeSignal<T, FuncIntoMaybeSignalMarker> for F
