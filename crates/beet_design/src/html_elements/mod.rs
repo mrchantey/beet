@@ -30,8 +30,7 @@ pub struct InputHtmlAttributes {
 	pub r#type: Option<String>,
 	pub disabled: Option<bool>,
 	pub required: Option<bool>,
-	// #[field(into)]
-	// pub value: Option<MaybeSignal<String>>,
+	pub value: Option<MaybeSignal<String>>,
 }
 
 

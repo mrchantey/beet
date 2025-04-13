@@ -11,20 +11,42 @@ pub fn get() -> RsxNode {
 pub struct Inner;
 
 fn inner(_: Inner) -> RsxNode {
-	let (value,set_value) = signal("Hello world".to_string());
+	let (value, set_value) = signal("Hello world".to_string());
+
+	let set_value1 = set_value.clone();
+	let set_value2 = set_value.clone();
+	let set_value3 = set_value.clone();
+
 	rsx! {
 			<h2>Variants</h2>
 			<div>
-			// <TextField 
-			// 	variant=TextFieldVariant::Outlined value=value>	Outlined 	</TextField>
-			// <TextField variant=TextFieldVariant::Filled 	value=value>	Filled 		</TextField>
-			// <TextField variant=TextFieldVariant::Text 		value=value>	Text 			</TextField>
-			// </div>
-			// <h2>Disabled</h2>
-			// <div>
-			// <TextField disabled variant=TextFieldVariant::Outlined 	value=value>	Outlined 	</TextField>
-			// <TextField disabled variant=TextFieldVariant::Filled 		value=value>	Filled 		</TextField>
-			// <TextField disabled variant=TextFieldVariant::Text 			value=value>	Text 			</TextField>
+			<TextField
+				onchange=move |e|set_value1(e.value())
+				variant=TextFieldVariant::Outlined
+				value=value.clone()>	Outlined 	</TextField>
+				<TextField
+				onchange=move |e|set_value2(e.value())
+				variant=TextFieldVariant::Filled
+				value=value.clone()>	Filled 		</TextField>
+				<TextField
+				onchange=move |e|set_value3(e.value())
+				variant=TextFieldVariant::Text
+				value=value.clone()>	Text 			</TextField>
+			</div>
+			<h2>Disabled</h2>
+			<div>
+			<TextField
+				disabled
+				variant=TextFieldVariant::Outlined
+				value=value.clone()>	Outlined 	</TextField>
+			<TextField
+				disabled
+				variant=TextFieldVariant::Filled
+				value=value.clone()>	Filled 		</TextField>
+			<TextField
+				disabled
+				variant=TextFieldVariant::Text
+				value=value.clone()>	Text 			</TextField>
 			</div>
 			<style>
 			div{

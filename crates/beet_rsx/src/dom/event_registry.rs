@@ -9,6 +9,8 @@ impl<T, F> EventHandler<T> for F where F: 'static + Send + Sync + Fn(T) {}
 pub use event_types_native::*;
 #[cfg(not(target_arch = "wasm32"))]
 mod event_types_native {
+	use super::EventExt;
+
 	pub struct MockEvent {
 		pub target: MockTarget,
 	}
@@ -17,6 +19,10 @@ mod event_types_native {
 	}
 	pub type MouseEvent = MockEvent;
 	pub type Event = MockEvent;
+
+	impl EventExt for MockEvent {
+		fn value(&self) -> String { self.target.value.clone() }
+	}
 }
 
 #[cfg(target_arch = "wasm32")]
@@ -98,6 +104,10 @@ mod test {
 	// use sweet::prelude::*;
 
 	#[test]
-	#[cfg(target_arch = "wasm32")]
-	fn works() {}
+	// #[cfg(target_arch = "wasm32")]
+	fn works() {
+		
+
+
+	}
 }
