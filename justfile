@@ -119,7 +119,9 @@ build-site *args:
 
 #💡 Test
 
-min-stack := 'RUST_MIN_STACK=33554432'
+# it keeps asking for bigger stacks?
+min-stack := 'RUST_MIN_STACK=67108864'
+# min-stack := 'RUST_MIN_STACK=33554432'
 test-threads:= '--test-threads=8'
 # Run tests for ci, not using workspace cos somehow bevy_default still getting pulled in
 # cargo test --workspace runs with 16MB stack and max 8 cores

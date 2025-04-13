@@ -68,5 +68,5 @@ pub fn derive_into_block_attribute(
 	input: proc_macro::TokenStream,
 ) -> proc_macro::TokenStream {
 	let input = parse_macro_input!(input as DeriveInput);
-	impl_into_rsx_attributes(input).into()
+	impl_into_block_attribute(input).into()
 }

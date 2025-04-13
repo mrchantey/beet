@@ -7,8 +7,6 @@ pub mod event {
 	pub type MouseEvent = MockEvent;
 }
 
-
-
 pub struct MockEvent {
 	pub target: MockTarget,
 }
@@ -22,7 +20,7 @@ impl EventRegistry {
 	pub fn register_onclick(
 		key: &str,
 		loc: TreeLocation,
-		value: impl Fn(MockEvent) -> (),
+		value: impl EventHandler<event::MouseEvent>,
 	) {
 		todo!()
 	}

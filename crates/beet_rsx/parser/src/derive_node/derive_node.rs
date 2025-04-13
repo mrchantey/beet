@@ -99,7 +99,7 @@ fn impl_builder(
 ) -> Result<TokenStream> {
 	let builder_fields = fields.iter().map(|field| {
 		let name = &field.ident;
-		let ty = field.unwrapped;
+		let ty = field.inner_ty;
 		if field.is_default() {
 			quote! { #name: #ty }
 		} else {

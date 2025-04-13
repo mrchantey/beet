@@ -16,6 +16,8 @@ pub use rs_dom_target::*;
 use std::sync::Arc;
 use std::sync::Mutex;
 
+pub trait EventHandler<T>: 'static + Send + Sync + Fn(T) {}
+impl<T, F> EventHandler<T> for F where F: 'static + Send + Sync + Fn(T) {}
 
 #[cfg(target_arch = "wasm32")]
 mod browser_dom_target;

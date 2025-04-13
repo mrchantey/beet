@@ -204,8 +204,8 @@ impl HtmlTokensToRust {
 						RsxAttribute::BlockValue {
 							key: #key_str.to_string(),
 							initial: "event-placeholder".to_string(),
-							effect: Effect::new(Box::new(move |cx| {
-								#event_registry::#register_func(#key_str,cx,#value);
+							effect: Effect::new(Box::new(move |loc| {
+								#event_registry::#register_func(#key_str,loc,#value);
 								Ok(())
 							}), #tracker)
 						}

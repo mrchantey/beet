@@ -154,8 +154,16 @@ impl RsxToBevy {
 				}
 			}
 			RsxAttribute::Block { initial, effect: _ } => {
-				for attr in initial.iter() {
-					self.spawn_bevy_components(registry, entity, attr)?;
+				for (key, initial) in initial.iter() {
+					// events are registered by RegisterEffects
+					// TODO handle key only attributes, ie bool?
+					if !key.starts_with("on")
+						&& let Some(initial) = initial
+					{
+						ReflectUtils::apply_or_insert_at_path(
+							registry, entity, key, initial,
+						)?;
+					}
 				}
 			}
 		}

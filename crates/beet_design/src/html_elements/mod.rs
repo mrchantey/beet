@@ -6,7 +6,7 @@ use beet_rsx::as_beet::*;
 pub struct BaseHtmlAttributes {
 	pub id: Option<String>,
 	pub class: Option<String>,
-	pub onclick: Option<Box<dyn Fn(event::MouseEvent)>>,
+	pub onclick: Option<Box<dyn EventHandler<event::MouseEvent>>>,
 }
 #[derive(Default, Buildable, IntoBlockAttribute)]
 pub struct ButtonHtmlAttributes {

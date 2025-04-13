@@ -34,7 +34,7 @@ impl EventRegistry {
 	fn register<T: 'static + JsCast>(
 		key: &str,
 		loc: TreeLocation,
-		func: impl 'static + Fn(T),
+		func: impl EventHandler<T>,
 	) {
 		REGISTERED_EVENTS.with(|current| {
 			current.borrow_mut().insert(
@@ -45,6 +45,8 @@ impl EventRegistry {
 			);
 		});
 	}
+	// TODO this now has the same signature as native event registry
+	// thanks to the `event` module, they should be merged
 	/// A simple example of how to register an event listener.
 	/// Here the [`Event`] should be swapped out for the type
 	/// specific to that event. This is what allows for inferred
@@ -52,7 +54,7 @@ impl EventRegistry {
 	pub fn register_onclick(
 		key: &str,
 		loc: TreeLocation,
-		value: impl 'static + Fn(Event),
+		value: impl EventHandler<event::MouseEvent>,
 	) {
 		// sweet::log!("onclick registered at location {:?}", loc);
 		Self::register(key, loc, value);

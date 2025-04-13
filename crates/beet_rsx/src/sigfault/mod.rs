@@ -48,23 +48,18 @@ impl Sigfault {
 	/// Used by [`RstmlToRsx`] when it encounters an attribute block:
 	/// ```
 	/// # use beet_rsx::as_beet::*;
-	/// let value = || vec![RsxAttribute::Key{key:"foo".to_string()}];
-	/// let node = rsx!{<el {value}/>};
+	/// #[derive(IntoBlockAttribute)]
+	/// struct Foo;
+	/// let node = rsx!{<el {Foo}/>};
 	/// ```
 	pub fn parse_attribute_block<M>(
 		tracker: RustyTracker,
 		block: impl IntoBlockAttribute<M>,
 	) -> RsxAttribute {
-		let initial = block.into_initial_attributes();
 		RsxAttribute::Block {
-			initial: initial.clone(),
+			initial: block.initial_attributes(),
 			effect: Effect::new(
-				Box::new(move |_loc| {
-					sweet::log!(
-						"todo mounting attribute blocks <div {{foo}}/> {initial:?}",
-					);
-					Ok(())
-				}),
+				Box::new(move |loc| block.register_effects(loc)),
 				tracker,
 			),
 		}

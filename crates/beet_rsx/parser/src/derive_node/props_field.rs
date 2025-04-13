@@ -15,7 +15,7 @@ use syn::TypeTraitObject;
 pub struct PropsField<'a> {
 	pub inner: &'a Field,
 	/// The inner type of the field, unwrapping Option<T> to T.
-	pub unwrapped: &'a Type,
+	pub inner_ty: &'a Type,
 	/// Only named fields are supported so we unwrap it
 	pub ident: &'a Ident,
 	pub attributes: AttributeGroup,
@@ -59,7 +59,7 @@ impl<'a> PropsField<'a> {
 		})?;
 
 		Ok(Self {
-			unwrapped: Self::unwrap_type(inner),
+			inner_ty: Self::unwrap_type(inner),
 			ident,
 			// ident: &inner.ident,
 			inner,
@@ -115,7 +115,7 @@ impl<'a> PropsField<'a> {
 			return true;
 		} else if self.attributes.contains("no_into") {
 			return false;
-		} else if self.unwrapped == &syn::parse_quote! { String } {
+		} else if self.inner_ty == &syn::parse_quote! { String } {
 			return true;
 		} else {
 			return false;
@@ -124,7 +124,7 @@ impl<'a> PropsField<'a> {
 
 	/// If this field is a `Box<dyn Trait>` type return the inner trait
 	pub fn boxed_trait(&self) -> Option<TypeTraitObject> {
-		if let Type::Path(p) = self.unwrapped {
+		if let Type::Path(p) = self.inner_ty {
 			if let Some(segment) = p.path.segments.last() {
 				if segment.ident == "Box" {
 					if let syn::PathArguments::AngleBracketed(args) =
@@ -160,7 +160,7 @@ impl<'a> PropsField<'a> {
 		}
 		// 2. into
 		let is_into = self.is_into();
-		let inner_ty = self.unwrapped;
+		let inner_ty = self.inner_ty;
 		match is_into {
 			true => (
 				syn::parse_quote! { impl Into<#inner_ty> },
