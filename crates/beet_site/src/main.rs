@@ -21,7 +21,7 @@ async fn main() -> Result<()> {
 		}))
 		.xtend(beet_site::docs::collect());
 
-	let args = AppRouterArgs::parse().validate()?;
+	let args = AppRouterArgs::parse();
 
 	if args.is_static {
 		routes.xpipe(RouteFuncsToHtml::new(args.html_dir)).await?;

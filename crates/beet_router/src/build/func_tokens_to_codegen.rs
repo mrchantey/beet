@@ -15,10 +15,10 @@ pub struct FuncTokensToCodegen {
 
 
 pub trait FuncTokensMapper {
-		/// The return type of the `collect` function, this must
+	/// The return type of the `collect` function, this must
 	/// match the output of the [`MapFuncTokens::map_tokens`]
 	fn func_type(&self) -> syn::Type;
-		/// Map the func tokens, this must return the [`FuncTokensToCodegen::func_type`]
+	/// Map the func tokens, this must return the [`FuncTokensToCodegen::func_type`]
 	fn map_tokens(&mut self, func_tokens: &FuncTokens) -> Result<Block>;
 }
 
