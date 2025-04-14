@@ -10,9 +10,9 @@ pub struct RsDomTarget {
 }
 
 
-pub struct MountRsDom;
+pub struct MountToRsDom;
 
-impl Pipeline<RsxNode, Result<RsxNode>> for MountRsDom {
+impl Pipeline<RsxNode, Result<RsxNode>> for MountToRsDom {
 	fn apply(self, root: RsxNode) -> Result<RsxNode> {
 		DomTarget::set(RsDomTarget::new(&root)?);
 		Ok(root)
@@ -45,8 +45,8 @@ impl DomTargetImpl for RsDomTarget {
 
 	fn update_rsx_node(
 		&mut self,
-		rsx: RsxNode,
 		loc: TreeLocation,
+		rsx: RsxNode,
 	) -> ParseResult<()> {
 		for html in self.doc.iter_mut() {
 			if let Some(parent_el) = html.query_selector_attr(
@@ -56,22 +56,41 @@ impl DomTargetImpl for RsDomTarget {
 				return apply_rsx(parent_el, rsx, loc, &self.constants);
 			}
 		}
-
 		return Err(ParseError::Hydration(format!(
 			"Could not find node with id: {}",
 			loc.parent_idx
+		)));
+	}
+
+	fn update_rsx_attribute(
+		&mut self,
+		loc: TreeLocation,
+		key: &str,
+		value: &str,
+	) -> ParseResult<()> {
+		for html in self.doc.iter_mut() {
+			if let Some(el) = html.query_selector_attr(
+				self.constants.tree_idx_key,
+				Some(&loc.tree_idx.to_string()),
+			) {
+				el.set_attribute(key, value);
+				return Ok(());
+			}
+		}
+		return Err(ParseError::Hydration(format!(
+			"Could not find node with id: {}",
+			loc.tree_idx
 		)));
 	}
 }
 
 
 /// we've found a html node with a matching id
-#[allow(unused)]
 fn apply_rsx(
 	parent_el: &mut HtmlElementNode,
 	rsx: RsxNode,
 	loc: TreeLocation,
-	constants: &HtmlConstants,
+	_constants: &HtmlConstants,
 ) -> ParseResult<()> {
 	match rsx {
 		RsxNode::Doctype(_) => todo!(),
@@ -79,7 +98,7 @@ fn apply_rsx(
 		RsxNode::Fragment(_) => todo!(),
 		RsxNode::Component(_) => todo!(),
 		RsxNode::Block(_) => todo!(),
-		RsxNode::Element(rsx_element) => todo!(),
+		RsxNode::Element(_) => todo!(),
 		RsxNode::Text(text) => {
 			let child =
 				parent_el.children.get_mut(loc.child_idx as usize).ok_or_else(|| {
@@ -92,4 +111,31 @@ fn apply_rsx(
 		}
 	}
 	Ok(())
+}
+
+
+#[cfg(test)]
+mod test {
+	use crate::as_beet::*;
+	use sweet::prelude::*;
+
+	#[test]
+	fn works() {
+		rsx! { <div data-beet-rsx-idx="0">value</div> }
+			.xpipe(MountToRsDom)
+			.unwrap();
+
+		// a text node will use the parent idx
+		DomTarget::update_rsx_node(TreeLocation::new(1, 0, 0), rsx! {bar})
+			.unwrap();
+		expect(DomTarget::render()).to_be("<!DOCTYPE html><html><head></head><body><div data-beet-rsx-idx=\"0\">bar</div></body></html>");
+
+		DomTarget::update_rsx_attribute(
+			TreeLocation::new(0, 0, 0),
+			"wheres-the",
+			"any-key",
+		)
+		.unwrap();
+		expect(DomTarget::render()).to_be("<!DOCTYPE html><html><head></head><body><div data-beet-rsx-idx=\"0\" wheres-the=\"any-key\">bar</div></body></html>");
+	}
 }

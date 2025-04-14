@@ -154,8 +154,8 @@ impl DomTargetImpl for BrowserDomTarget {
 
 	fn update_rsx_node(
 		&mut self,
-		rsx: RsxNode,
 		loc: TreeLocation,
+		rsx: RsxNode,
 	) -> ParseResult<()> {
 		let parent = self.get_or_find_element(loc.parent_idx)?;
 		let child =

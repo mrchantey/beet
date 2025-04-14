@@ -44,7 +44,35 @@ impl DomTarget {
 			*current.lock().unwrap_or_else(|e| e.into_inner()) = Box::new(item);
 		});
 	}
+
+	pub fn render() -> String {
+		DOM_TARGET.with(|current| {
+			let current = current.lock().unwrap();
+			current.render()
+		})
+	}
+
+	pub fn update_rsx_node(
+		loc: TreeLocation,
+		node: RsxNode,
+	) -> ParseResult<()> {
+		DOM_TARGET.with(|current| {
+			let mut current = current.lock().unwrap();
+			current.update_rsx_node(loc, node)
+		})
+	}
+	pub fn update_rsx_attribute(
+		loc: TreeLocation,
+		key: &str,
+		value: &str,
+	) -> ParseResult<()> {
+		DOM_TARGET.with(|current| {
+			let mut current = current.lock().unwrap();
+			current.update_rsx_attribute(loc, key, value)
+		})
+	}
 }
+
 
 pub trait DomTargetImpl {
 	/// Mutable in case the impl needs to load the tree location map
@@ -54,9 +82,18 @@ pub trait DomTargetImpl {
 	// type Event;
 	fn update_rsx_node(
 		&mut self,
-		node: RsxNode,
 		loc: TreeLocation,
+		node: RsxNode,
 	) -> ParseResult<()>;
+
+	fn update_rsx_attribute(
+		&mut self,
+		loc: TreeLocation,
+		key: &str,
+		value: &str,
+	) -> ParseResult<()> {
+		todo!("implement for rsdom and browser")
+	}
 
 	// TODO update attriute block, update block value
 

@@ -92,7 +92,6 @@ fn fn_register_effects(
 	let fields = fields.iter().map(|field| {
 		let ident = &field.ident;
 		let ident_str = ident.to_string();
-		println!("register_effects: {}", ident_str);
 		let inner = if field.attributes.contains("flatten") {
 			quote! {
 				#ident.register_effects(loc)?;

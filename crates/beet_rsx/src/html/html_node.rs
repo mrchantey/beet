@@ -112,6 +112,21 @@ impl HtmlElementNode {
 		}
 		None
 	}
+
+	/// Sets an attribute, updating it if it already exists,
+	/// otherwise adding it to the list.
+	pub fn set_attribute(&mut self, key: &str, value: &str) {
+		for attr in &mut self.attributes {
+			if attr.key == key {
+				attr.value = Some(value.to_string());
+				return;
+			}
+		}
+		self.attributes.push(HtmlAttribute {
+			key: key.to_string(),
+			value: Some(value.to_string()),
+		});
+	}
 }
 
 #[derive(Debug, Clone)]

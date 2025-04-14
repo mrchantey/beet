@@ -98,6 +98,7 @@ pub struct RsxText {
 	pub meta: RsxNodeMeta,
 }
 
+
 impl NodeMeta for RsxText {
 	fn meta(&self) -> &RsxNodeMeta { &self.meta }
 	fn meta_mut(&mut self) -> &mut RsxNodeMeta { &mut self.meta }
