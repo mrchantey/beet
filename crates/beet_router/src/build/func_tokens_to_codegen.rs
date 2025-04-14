@@ -47,17 +47,16 @@ fn func_tokens_to_route_funcs(func_tokens: &FuncTokens) -> Block {
 impl<T: AsRef<Vec<FuncTokens>>> Pipeline<T, Result<(T, CodegenFile)>>
 	for FuncTokensToCodegen
 {
-	fn apply(self, func_tokens: T) -> Result<(T, CodegenFile)> {
+	fn apply(mut self, func_tokens: T) -> Result<(T, CodegenFile)> {
 		let out_dir = self.codegen_file.output_dir()?;
 		let collect_routes =
 			self.routes_to_collect_func(func_tokens.as_ref())?;
 		let mod_imports =
 			self.func_files_to_mod_imports(out_dir, func_tokens.as_ref())?;
-		let mut codegen_file = self.codegen_file;
-		codegen_file.items.extend(mod_imports);
-		codegen_file.items.push(collect_routes.into());
+		self.codegen_file.items.extend(mod_imports);
+		self.codegen_file.items.push(collect_routes.into());
 
-		Ok((func_tokens, codegen_file))
+		Ok((func_tokens, self.codegen_file))
 	}
 }
 
