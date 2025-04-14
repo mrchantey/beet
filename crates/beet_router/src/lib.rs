@@ -10,7 +10,6 @@ pub mod bevy;
 #[cfg(feature = "build")]
 pub mod build;
 pub mod collections;
-pub mod file_router;
 #[cfg(all(feature = "parser", not(target_arch = "wasm32")))]
 pub mod parser;
 
@@ -23,7 +22,6 @@ pub mod prelude {
 	#[cfg(feature = "build")]
 	pub use crate::build::*;
 	pub use crate::collections::*;
-	pub use crate::file_router::*;
 	#[cfg(all(feature = "parser", not(target_arch = "wasm32")))]
 	pub use crate::parser::*;
 

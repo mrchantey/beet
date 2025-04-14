@@ -33,6 +33,7 @@ bevy = ["dep:bevy", "dep:flume", "beet_rsx/bevy"]
 # enables 'mod test_site' for internal testing,
 # the mod is also enabled by the 'test' flag
 
+
 [dependencies]
 anyhow.workspace = true
 rapidhash.workspace = true

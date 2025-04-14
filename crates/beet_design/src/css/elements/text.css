@@ -11,7 +11,7 @@ a {
 }
 
 a:visited {
-  color: var(--bt-color-secondary);
+  color: var(--bt-color-tertiary);
 }
 
 b,

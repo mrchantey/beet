@@ -267,7 +267,7 @@ mod test {
 		// println!("wrote to {}\n{:#?}", builder.dst.display(), map);
 		// println!("TEMPLATE_MAP::::{:#?}", map);
 
-		let rsx = &crate::test_site::routes::collect()[0];
+		let rsx = &crate::test_site::pages::collect()[0];
 		let node = (rsx.func)().await.unwrap();
 		let node1 = map.templates.get(&node.location().unwrap()).unwrap();
 		let RsxTemplateNode::Component {

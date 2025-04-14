@@ -94,7 +94,7 @@ mod test {
 
 	#[test]
 	fn works() {
-		let funcs = FileGroup::test_site_routes()
+		let funcs = FileGroup::test_site_pages()
 			.xpipe(FileGroupToFuncTokens::default())
 			.unwrap();
 		expect(funcs.len()).to_be(3);
@@ -103,9 +103,11 @@ mod test {
 			.find(|f| f.local_path.ends_with("docs/index.rs"))
 			.unwrap();
 		expect(&file.local_path.to_string_lossy()).to_be("docs/index.rs");
-		expect(file.canonical_path.to_string_lossy().ends_with(
-			"crates/beet_router/src/test_site/routes/docs/index.rs",
-		))
+		expect(
+			file.canonical_path.to_string_lossy().ends_with(
+				"crates/beet_router/src/test_site/pages/docs/index.rs",
+			),
+		)
 		.to_be_true();
 	}
 }

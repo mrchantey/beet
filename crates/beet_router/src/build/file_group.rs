@@ -63,8 +63,8 @@ impl FileGroup {
 		Self::new_workspace_rel("crates/beet_router/src/test_site").unwrap()
 	}
 	#[cfg(test)]
-	pub fn test_site_routes() -> Self {
-		Self::new_workspace_rel("crates/beet_router/src/test_site/routes")
+	pub fn test_site_pages() -> Self {
+		Self::new_workspace_rel("crates/beet_router/src/test_site/pages")
 			.unwrap()
 			.with_filter(
 				GlobFilter::default()

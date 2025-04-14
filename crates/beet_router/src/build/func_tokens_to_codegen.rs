@@ -135,7 +135,7 @@ mod test {
 
 	#[test]
 	fn works() {
-		let codegen_file = FileGroup::test_site_routes()
+		let codegen_file = FileGroup::test_site_pages()
 			.xpipe(FileGroupToFuncTokens::default())
 			.unwrap()
 			.xpipe(FuncTokensToCodegen::default())

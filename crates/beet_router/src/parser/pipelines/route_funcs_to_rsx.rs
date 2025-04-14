@@ -77,7 +77,7 @@ mod test {
 
 	#[sweet::test]
 	async fn works() {
-		let html = crate::test_site::routes::collect()
+		let html = crate::test_site::pages::collect()
 			.xpipe(RouteFuncsToRsx::default())
 			.await
 			.unwrap()

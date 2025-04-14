@@ -32,24 +32,21 @@ fn main() -> Result<()> {
 		FsExt::copy_recursive(design_public_dir, html_dir)?;
 
 
-		let mut routes =
-			FileGroup::new_workspace_rel("crates/beet_site/src/routes")?
-				.with_filter(
-					GlobFilter::default()
-						.with_include("*.rs")
-						.with_exclude("*mod.rs"),
-				)
-				.xpipe(FileGroupToFuncTokens::default())?
-				.xpipe(FuncTokensToCodegen::new(
-					CodegenFile::new_workspace_rel(
-						"crates/beet_site/src/codegen/routes.rs",
-						&cx.pkg_name,
-					),
-				))?
-				.xmap(|(funcs, codegen)| -> Result<_> {
-					codegen.build_and_write()?;
-					Ok(funcs)
-				})?;
+		let pages = FileGroup::new_workspace_rel("crates/beet_site/src/pages")?
+			.with_filter(
+				GlobFilter::default()
+					.with_include("*.rs")
+					.with_exclude("*mod.rs"),
+			)
+			.xpipe(FileGroupToFuncTokens::default())?
+			.xpipe(FuncTokensToCodegen::new(CodegenFile::new_workspace_rel(
+				"crates/beet_site/src/codegen/pages.rs",
+				&cx.pkg_name,
+			)))?
+			.xmap(|(funcs, codegen)| -> Result<_> {
+				codegen.build_and_write()?;
+				Ok(funcs)
+			})?;
 
 		let docs = FileGroup::new_workspace_rel("crates/beet_site/src/docs")?
 			.xpipe(FileGroupToFuncTokens::default())?
@@ -84,10 +81,7 @@ fn main() -> Result<()> {
 					.replace_route([(".mockup", "")]),
 			);
 
-		routes.extend(mockups);
-		routes.extend(docs);
-
-		routes.xpipe(RouteFuncsToTree {
+		pages.xtend(mockups).xtend(docs).xpipe(RouteFuncsToTree {
 			codgen_file: CodegenFile::new_workspace_rel(
 				"crates/beet_site/src/codegen/route_tree.rs",
 				&cx.pkg_name,
