@@ -39,6 +39,9 @@ textarea:focus-visible,
 summary:focus-visible{
 	/* outline: none; */
 	outline: var(--bt-border-width-lg) solid var(--bt-color-border) !important;
+}
+
+summary{
 	border-radius: var(--bt-border-radius-sm);
 }
 
