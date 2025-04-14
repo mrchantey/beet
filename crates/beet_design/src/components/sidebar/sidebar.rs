@@ -17,7 +17,7 @@ fn sidebar(Sidebar { nodes }: Sidebar) -> RsxNode {
 		<script src="./sidebar.js"/>
 		<style>
 			nav{
-				--sidebar-width:20rem;
+				--sidebar-width:15rem;
 				--sidebar-indent: 0.5rem;
 				background-color:var(--bt-color-surface-container-highest);
 				padding: 0 0.5.em 0 0;

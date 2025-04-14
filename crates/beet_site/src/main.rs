@@ -1,12 +1,12 @@
 #![feature(more_qualified_paths)]
-#[allow(unused)]
-use beet::prelude::*;
-#[allow(unused)]
-use beet_site::prelude::*;
-use sweet::prelude::*;
+use anyhow::Result;
 
 #[cfg(not(target_arch = "wasm32"))]
-fn main() {
+#[tokio::main]
+async fn main() -> Result<()> {
+	use beet::prelude::*;
+	use beet_site::prelude::*;
+	use sweet::prelude::*;
 	// we must collect all or islands break?
 
 	let routes = beet_site::pages::collect()
@@ -20,8 +20,23 @@ fn main() {
 			})
 		}))
 		.xtend(beet_site::docs::collect());
-	AppRouter::new(app_cx!()).add_collection(routes).run();
+
+	let args = AppRouterArgs::parse().validate()?;
+
+	if args.is_static {
+		routes.xpipe(RouteFuncsToHtml::new(args.html_dir)).await?;
+	} else {
+		BeetServer {
+			html_dir: args.html_dir.into(),
+			// router: ,
+			..Default::default()
+		}
+		.serve()
+		.await?;
+	}
+
+	Ok(())
 }
 
 #[cfg(target_arch = "wasm32")]
-fn main() -> anyhow::Result<()> { beet_site::wasm::collect().mount() }
+fn main() -> Result<()> { beet_site::wasm::collect().mount() }

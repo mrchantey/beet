@@ -18,11 +18,15 @@ pub struct AppRouterArgs {
 
 
 impl AppRouterArgs {
+	/// reexport of [`clap::Parser::parse`]
+	pub fn parse() -> Self { Parser::parse() }
+
+
 	/// Check the arguments parsed in match the compiled feature set
 	pub fn validate(self) -> Result<Self> {
 		#[cfg(not(feature = "server"))]
 		if !self.is_static {
-			anyhow::bail!("Server feature is required to run a server")
+			anyhow::bail!("beet/server feature is required to run a server")
 		}
 		Ok(self)
 	}

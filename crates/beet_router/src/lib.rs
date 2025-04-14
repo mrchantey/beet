@@ -9,7 +9,6 @@ pub mod app_router;
 pub mod bevy;
 #[cfg(feature = "build")]
 pub mod build;
-pub mod collections;
 #[cfg(all(feature = "parser", not(target_arch = "wasm32")))]
 pub mod parser;
 
@@ -21,7 +20,6 @@ pub mod prelude {
 	pub use crate::bevy::*;
 	#[cfg(feature = "build")]
 	pub use crate::build::*;
-	pub use crate::collections::*;
 	#[cfg(all(feature = "parser", not(target_arch = "wasm32")))]
 	pub use crate::parser::*;
 

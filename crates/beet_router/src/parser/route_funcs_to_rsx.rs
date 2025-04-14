@@ -2,11 +2,64 @@ use crate::prelude::*;
 use anyhow::Result;
 use beet_rsx::prelude::*;
 use std::future::Future;
+use std::path::PathBuf;
 use std::pin::Pin;
 
 
+
+pub struct RouteFuncsToHtml {
+	pub html_dir: PathBuf,
+}
+
+impl RouteFuncsToHtml {
+	/// Create a new instance of `RouteFuncsToHtml` with a custom `html_dir`
+	pub fn new(html_dir: impl Into<PathBuf>) -> Self {
+		Self {
+			html_dir: html_dir.into(),
+		}
+	}
+}
+
+impl
+	Pipeline<
+		Vec<RouteFunc<DefaultRouteFunc>>,
+		Pin<Box<dyn Future<Output = Result<()>>>>,
+	> for RouteFuncsToHtml
+{
+	fn apply(
+		self,
+		routes: Vec<RouteFunc<DefaultRouteFunc>>,
+	) -> Pin<Box<dyn Future<Output = Result<()>>>> {
+		let html_dir = self.html_dir;
+		Box::pin(async move {
+			let routes = routes
+				.xpipe(RouteFuncsToRsx::default())
+				.await?
+				.xpipe(ApplyRouteTemplates::default())?;
+
+			// export client islands after templates are applied,
+			// at this stage the only required transform is the slots pipeline
+			routes
+				.clone()
+				.into_iter()
+				.map(|(info, root)| {
+					Ok((info, root.xpipe(ApplySlots::default())?))
+				})
+				.collect::<Result<Vec<_>>>()?
+				.xref()
+				.xpipe(RoutesToClientIslandMap::default())?;
+
+			routes
+				.xpipe(RoutesToHtml::default())?
+				.xpipe(HtmlRoutesToDisk::new(html_dir))?;
+			Ok(())
+		})
+	}
+}
+
+
 #[derive(Default)]
-pub struct RouteFuncsToRsx;
+struct RouteFuncsToRsx;
 
 impl
 	Pipeline<
@@ -31,46 +84,9 @@ impl
 	}
 }
 
-/// allows directly adding a [`RouteFunc`] to the `AppRouter`
-impl IntoCollection<Self> for Vec<RouteFunc<DefaultRouteFunc>> {
-	fn into_collection(self) -> impl Collection {
-		move |app: &mut AppRouter| {
-			#[cfg(not(target_arch = "wasm32"))]
-			app.on_run_static.push(Box::new(move |args| {
-				let html_dir = args.html_dir.clone();
-				Box::pin(async move {
-					let routes = self
-						.xpipe(RouteFuncsToRsx::default())
-						.await?
-						.xpipe(ApplyRouteTemplates::default())?;
-
-					// export client islands after templates are applied,
-					// at this stage the only required transform is the slots pipeline
-					routes
-						.clone()
-						.into_iter()
-						.map(|(info, root)| {
-							Ok((info, root.xpipe(ApplySlots::default())?))
-						})
-						.collect::<Result<Vec<_>>>()?
-						.xref()
-						.xpipe(RoutesToClientIslandMap::default())?;
-
-					routes
-						.xpipe(RoutesToHtml::default())?
-						.xpipe(HtmlRoutesToDisk::new(html_dir))?;
-					Ok(())
-				})
-			}));
-			// wasm mounting is handled by ClientIslandMountFuncs
-		}
-	}
-}
-
-
-
 #[cfg(test)]
 mod test {
+	use super::RouteFuncsToRsx;
 	use crate::prelude::*;
 	use beet_rsx::prelude::*;
 	use sweet::prelude::*;
