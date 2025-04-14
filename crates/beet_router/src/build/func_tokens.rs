@@ -26,13 +26,27 @@ pub struct FuncTokens {
 	pub local_path: PathBuf,
 	/// A reasonable route path generated from this file's local path,
 	/// and a method matching either the functions signature, or
-	/// `get` in the case of markdown.
+	/// `get` in the case of single file routes like markdown.
 	pub route_info: RouteInfo,
 }
 
 
 
 impl FuncTokens {
+	#[cfg(test)]
+	/// create a simple `FuncTokens` for testing
+	pub fn simple(path: impl AsRef<std::path::Path>, func: syn::Expr) -> Self {
+		let path = path.as_ref();
+		Self {
+			mod_ident: None,
+			frontmatter: syn::parse_quote! {{}},
+			func,
+			canonical_path: CanonicalPathBuf::new_unchecked(path),
+			local_path: path.to_path_buf(),
+			route_info: RouteInfo::new(path, "get"),
+		}
+	}
+
 	/// Whether this route was created from a file called `index.rs`, used by the
 	/// [`RouteTreeBuilder`] to determine if it should be a child
 	pub fn is_index(&self) -> bool {

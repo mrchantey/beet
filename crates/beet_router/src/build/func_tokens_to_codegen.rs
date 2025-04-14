@@ -133,6 +133,7 @@ mod test {
 	use quote::ToTokens;
 	use sweet::prelude::*;
 
+
 	#[test]
 	fn works() {
 		let codegen_file = FileGroup::test_site_routes()
@@ -149,5 +150,28 @@ mod test {
 		// ensure no absolute paths
 		// println!("{}", codegen_file);
 		expect(codegen_file).not().to_contain("/home/");
+	}
+
+	#[test]
+	fn custom() {
+		let codegen_file = vec![FuncTokens::simple(
+			"docs/index.rs",
+			syn::parse_quote! {|| rsx! { "hello world" }},
+		)]
+		.xpipe(FuncTokensToCodegen::default().with_map_tokens(
+			syn::parse_quote!(String),
+			|func| {
+				let block = &func.func;
+				syn::parse_quote! {{
+					#block.to_string()
+				}}
+			},
+		))
+		.unwrap()
+		.xmap(|(_, codegen_file)| codegen_file.build_output())
+		.unwrap()
+		.to_token_stream()
+		.to_string();
+		expect(&codegen_file).to_contain("pub fn collect () -> Vec < String > { vec ! [{ | | rsx ! { \"hello world\" } . to_string () }] }");
 	}
 }
