@@ -48,31 +48,18 @@ where
 }
 
 /// Possible rejection types for the `JsonQuery` extractor
-#[derive(Debug)]
+#[derive(Debug, thiserror::Error)]
 pub enum JsonQueryRejection {
 	/// Failed to extract query parameters
+	#[error("Failed to extract query parameters: {0}")]
 	QueryExtractionError(axum::extract::rejection::QueryRejection),
 	/// The 'data' query parameter is missing
+	#[error("Missing 'data' query parameter")]
 	MissingDataParam,
 	/// Failed to parse the JSON in the 'data' parameter
+	#[error("Failed to parse JSON: {0}")]
 	JsonParseError(JsonError),
 }
-
-impl std::fmt::Display for JsonQueryRejection {
-	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		match self {
-			Self::QueryExtractionError(e) => {
-				write!(f, "Failed to extract query parameters: {}", e)
-			}
-			Self::MissingDataParam => {
-				write!(f, "Missing 'data' query parameter")
-			}
-			Self::JsonParseError(e) => write!(f, "Failed to parse JSON: {}", e),
-		}
-	}
-}
-
-impl std::error::Error for JsonQueryRejection {}
 
 // If you want to integrate with axum's error handling
 impl axum::response::IntoResponse for JsonQueryRejection {
