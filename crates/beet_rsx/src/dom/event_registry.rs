@@ -82,8 +82,16 @@ impl EventRegistry {
 	) {
 		Self::register(key, loc, value);
 	}
-	/// Typed handler for `onclick` events.
+	/// Typed handler for `onchange` events.
 	pub fn register_onchange(
+		key: &str,
+		loc: TreeLocation,
+		value: impl EventHandler<Event>,
+	) {
+		Self::register(key, loc, value);
+	}
+	/// Typed handler for `oninput` events.
+	pub fn register_oninput(
 		key: &str,
 		loc: TreeLocation,
 		value: impl EventHandler<Event>,

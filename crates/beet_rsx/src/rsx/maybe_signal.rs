@@ -2,16 +2,16 @@
 
 
 pub trait Getter<T>: 'static + Send + Sync + Fn() -> T {
-	fn clone_self(&self) -> Box<dyn Getter<T>>;
+	fn clone_box(&self) -> Box<dyn Getter<T>>;
 }
 impl<T, F> Getter<T> for F
 where
 	F: 'static + Send + Sync + Clone + Fn() -> T,
 {
-	fn clone_self(&self) -> Box<dyn Getter<T>> { Box::new(self.clone()) }
+	fn clone_box(&self) -> Box<dyn Getter<T>> { Box::new(self.clone()) }
 }
 impl<T: 'static> Clone for Box<dyn Getter<T>> {
-	fn clone(&self) -> Self { self.clone_self() }
+	fn clone(&self) -> Self { (**self).clone_box() }
 }
 
 #[derive(Clone)]
@@ -20,7 +20,14 @@ pub enum MaybeSignal<T: 'static> {
 	Func(Box<dyn Getter<T>>),
 }
 
-
+// impl<T: 'static + Clone> Clone for MaybeSignal<T> {
+// 	fn clone(&self) -> Self {
+// 		match self {
+// 			MaybeSignal::Const(v) => MaybeSignal::Const(v.clone()),
+// 			MaybeSignal::Func(f) => MaybeSignal::Func(f.clone()),
+// 		}
+// 	}
+// }
 
 impl<T: Clone> MaybeSignal<T> {
 	pub fn value(&self) -> T {
@@ -69,5 +76,17 @@ where
 {
 	fn into_maybe_signal(self) -> MaybeSignal<T> {
 		MaybeSignal::Func(Box::new(move || self().into()))
+	}
+}
+
+
+#[cfg(test)]
+mod test {
+	use crate::prelude::*;
+
+	#[test]
+	fn clones_without_recursion() {
+		let val: Box<dyn Getter<usize>> = Box::new(|| 5);
+		let _val2 = val.clone();
 	}
 }

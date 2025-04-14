@@ -91,11 +91,7 @@ pub trait DomTargetImpl {
 		loc: TreeLocation,
 		key: &str,
 		value: &str,
-	) -> ParseResult<()> {
-		todo!("implement for rsdom and browser")
-	}
-
-	// TODO update attriute block, update block value
+	) -> ParseResult<()>;
 
 
 	/// just used for testing atm

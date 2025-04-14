@@ -5,6 +5,7 @@ pub struct BaseHtmlAttributes {
 	pub id: Option<String>,
 	pub class: Option<String>,
 	pub onchange: Option<Box<dyn EventHandler<Event>>>,
+	pub oninput: Option<Box<dyn EventHandler<Event>>>,
 	pub onclick: Option<Box<dyn EventHandler<MouseEvent>>>,
 }
 #[derive(Default, Buildable, IntoBlockAttribute)]

@@ -27,15 +27,15 @@ fn inner(_: Inner) -> RsxNode {
 			<h2>Variants</h2>
 			<div>
 			<TextField
-				onchange=move |e|set_value1(e.value())
+				oninput=move |e|set_value1(e.value())
 				variant=TextFieldVariant::Outlined
 				value=value.clone()>	Outlined 	</TextField>
 				<TextField
-				onchange=move |e|set_value2(e.value())
+				oninput=move |e|set_value2(e.value())
 				variant=TextFieldVariant::Filled
 				value=value.clone()>	Filled 		</TextField>
 				<TextField
-				onchange=move |e|set_value3(e.value())
+				oninput=move |e|set_value3(e.value())
 				variant=TextFieldVariant::Text
 				value=value.clone()>	Text 			</TextField>
 			</div>
