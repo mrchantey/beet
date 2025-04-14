@@ -15,9 +15,10 @@ use syn::TypeTraitObject;
 #[derive(Debug)]
 pub struct PropsField<'a> {
 	pub inner: &'a Field,
-	/// The inner type of the field, unwrapping Option<T> to T.
+	/// The `Bar` in `foo: Bar` or `foo: Option<Bar>` 
 	pub inner_ty: &'a Type,
-	/// Only named fields are supported so we unwrap it
+	/// The `foo` in `foo: Bar`
+	/// Only named fields are supported as PropsFields
 	pub ident: &'a Ident,
 	pub attributes: AttributeGroup,
 }

@@ -89,31 +89,40 @@ fn fn_register_effects(
 	runtime: &RsxRuntime,
 	fields: &[PropsField],
 ) -> TokenStream {
-	let fields = fields.iter().filter_map(|field| {
+	let fields = fields.iter().map(|field| {
 		let ident = &field.ident;
 		let ident_str = ident.to_string();
-		if field.attributes.contains("flatten") {
-			Some(quote! {
-				self.#ident.register_effects(loc)?;
-			})
+		println!("register_effects: {}", ident_str);
+		let inner = if field.attributes.contains("flatten") {
+			quote! {
+				#ident.register_effects(loc)?;
+			}
 		} else if ident_str.starts_with("on") {
-			let register_event =
-				runtime.register_event_tokens(&ident_str, ident);
-			if field.is_optional() {
-				Some(quote! {
-					if let Some(#ident) = self.#ident {
-						#register_event
-					}
-				})
-			} else {
-				Some(quote! {{
-					let #ident = self.#ident;
-					#register_event
-				}})
+			runtime.register_event_tokens(&ident_str, ident)
+		} else {
+			// here we need to register effects for *all* fields, even static ones
+			// because we dont know if they are reactive.
+			let runtime_effect_registry = &runtime.effect;
+			quote! {
+				#runtime_effect_registry::register_attribute_effect(
+					loc,
+					#ident_str,
+					#ident
+				)
+			}
+		};
+		// handle optional fields
+		if field.is_optional() {
+			quote! {
+				if let Some(#ident) = self.#ident {
+					#inner
+				}
 			}
 		} else {
-			// todo!("here we need to register BlockValue attributes same way as in tokens?");
-			None
+			quote! {{
+				let #ident = self.#ident;
+				#inner
+			}}
 		}
 	});
 

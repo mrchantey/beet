@@ -81,19 +81,32 @@ impl Sigfault {
 			initial: block.clone().into_sigfault_val(),
 			effect: Effect::new(
 				Box::new(move |loc| {
-					effect(move || {
-						let value = block.clone().into_sigfault_val();
-						println!(
-							"would update attribute for {}\n{key}: {value}",
-							loc.tree_idx
-						);
-						todo!();
-					});
+					Self::register_attribute_effect(loc, key, block);
 					Ok(())
 				}),
 				tracker,
 			),
 		}
+	}
+
+	/// Called by both `parse_attribute_value` and the implementation of
+	/// `parse_attribute_block` where the block contains non-event fields.
+	/// Note that in the case of an attribute block `<foo {bar}/>` all 
+	/// attributes are registered, even the static ones.
+	pub fn register_attribute_effect<M>(
+		loc: TreeLocation,
+		key: &'static str,
+		block: impl 'static + Send + Sync + Clone + IntoSigfaultAttrVal<M>,
+	) {
+		effect(move || {
+			sweet::log!("registering attribute effect for {}", key);
+			let value = block.clone().into_sigfault_val();
+			sweet::log!(
+				"would update attribute for {}\n{key}: {value}",
+				loc.tree_idx
+			);
+			todo!();
+		});
 	}
 }
 
