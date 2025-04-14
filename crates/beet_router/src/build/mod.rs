@@ -1,4 +1,8 @@
 //! Module for the codegen build step of the router.
+mod func_tokens_to_rsx_routes;
+pub use func_tokens_to_rsx_routes::*;
+mod func_tokens_group;
+pub use func_tokens_group::*;
 mod build_wasm_routes;
 mod codegen_file;
 mod file_group;

@@ -18,8 +18,7 @@ pub struct CodegenFile {
 	/// crate to match any internal types, setting this option will add `use crate as pkg_name`
 	/// to the top of the file.
 	pub pkg_name: Option<String>,
-	// it'd be nice to use syn::Item but that isnt thread safe and
-	// involves custom serde
+	// List of all items to be included in the file.
 	pub items: Vec<Item>,
 }
 

@@ -22,13 +22,13 @@ impl RouteFuncsToHtml {
 
 impl
 	Pipeline<
-		Vec<RouteFunc<DefaultRouteFunc>>,
+		Vec<RouteFunc<RsxRouteFunc>>,
 		Pin<Box<dyn Future<Output = Result<()>>>>,
 	> for RouteFuncsToHtml
 {
 	fn apply(
 		self,
-		routes: Vec<RouteFunc<DefaultRouteFunc>>,
+		routes: Vec<RouteFunc<RsxRouteFunc>>,
 	) -> Pin<Box<dyn Future<Output = Result<()>>>> {
 		let html_dir = self.html_dir;
 		Box::pin(async move {
@@ -63,13 +63,13 @@ struct RouteFuncsToRsx;
 
 impl
 	Pipeline<
-		Vec<RouteFunc<DefaultRouteFunc>>,
+		Vec<RouteFunc<RsxRouteFunc>>,
 		Pin<Box<dyn Future<Output = Result<Vec<(RouteInfo, RsxNode)>>>>>,
 	> for RouteFuncsToRsx
 {
 	fn apply(
 		self,
-		routes: Vec<RouteFunc<DefaultRouteFunc>>,
+		routes: Vec<RouteFunc<RsxRouteFunc>>,
 	) -> Pin<Box<dyn Future<Output = Result<Vec<(RouteInfo, RsxNode)>>>>> {
 		Box::pin(async move {
 			futures::future::try_join_all(routes.into_iter().map(

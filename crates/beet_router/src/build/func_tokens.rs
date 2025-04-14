@@ -6,15 +6,17 @@ use syn::Block;
 use syn::Ident;
 
 
-/// Tokens for a function that may be used as a route.
+/// Tokens for a function that may be used as a route. This may
+/// be considered the `Tokens` version of a [`RouteFunc`].
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FuncTokens {
 	/// A unique identifier for this file based on its index in
 	/// the [`FileGroup`], ie `file1`. It is used for importing the file
 	/// as a module by its path. We need this awkwardness because rust analyzer
-	/// cannot detect path imports nested inside a block.
+	/// struggles to detect path imports nested inside a block.
 	pub mod_ident: Option<Ident>,
-	/// A block that returns the frontmatter of this function.
+	/// A block that returns the frontmatter of this function, this may be a unit type
+	/// or [`None`] if the eventual type allows for it.
 	pub frontmatter: Block,
 	/// Tokens that will return a valid [`RouteFunc::func`], its exact signature depends
 	/// on [`FuncTokensToCodegen::func_type`]. This may depend on [`mod_ident`](Self::mod_ident),

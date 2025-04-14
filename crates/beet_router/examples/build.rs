@@ -16,7 +16,8 @@ pub fn main() -> Result<()> {
 				.with_exclude("*mod.rs"),
 		)
 		.xpipe(FileGroupToFuncTokens::default())?
-		.xpipe(FuncTokensToCodegen::new(
+		.xpipe(FuncTokensToRsxRoutesGroup::default())
+		.xpipe(FuncTokensGroupToCodegen::new(
 			CodegenFile::new_workspace_rel(
 				"crates/beet_router/src/test_site/codegen/pages.rs",
 				"beet_router",

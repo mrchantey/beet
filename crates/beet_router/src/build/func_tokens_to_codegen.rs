@@ -3,71 +3,35 @@ use anyhow::Result;
 use beet_rsx::prelude::*;
 use std::path::Path;
 use sweet::prelude::*;
-use syn::Block;
 use syn::Item;
 
-// #[derive(Clone)]
-pub struct FuncTokensToCodegen {
-	pub func_type: syn::Type,
+
+/// For a given [`FuncTokensGroup`], add the
+/// `collect` function to the [`CodegenFile`] using its types
+/// and importing required modules as directed.
+#[derive(Debug, Default, Clone)]
+pub struct FuncTokensGroupToCodegen {
 	pub codegen_file: CodegenFile,
-	pub map_func_tokens: Box<dyn Fn(&FuncTokens) -> Block>,
 }
 
 
-pub trait FuncTokensMapper {
-	/// The return type of the `collect` function, this must
-	/// match the output of the [`MapFuncTokens::map_tokens`]
-	fn func_type(&self) -> syn::Type;
-	/// Map the func tokens, this must return the [`FuncTokensToCodegen::func_type`]
-	fn map_tokens(&mut self, func_tokens: &FuncTokens) -> Result<Block>;
-}
-
-impl Default for FuncTokensToCodegen {
-	fn default() -> Self {
-		Self {
-			func_type: syn::parse_quote!(RouteFunc<DefaultRouteFunc>),
-			codegen_file: CodegenFile::default(),
-			map_func_tokens: Box::new(func_tokens_to_route_funcs),
-		}
-	}
-}
-
-/// Create the tokens for a [`RouteFunc`], usually the final
-/// transformation before codegen.
-/// We need to do this at a late stage to allow transformations
-/// to be applied.
-fn func_tokens_to_route_funcs(func_tokens: &FuncTokens) -> Block {
-	let method = func_tokens.route_info.method.to_string();
-	let route_path = func_tokens.route_info.path.to_string_lossy();
-	let block = &func_tokens.func;
-	// TODO frontmatter
-	syn::parse_quote! {{
-	RouteFunc::new(
-		#method,
-		#route_path,
-		#block
-	)}}
-}
-
-
-impl<T: AsRef<Vec<FuncTokens>>> Pipeline<T, Result<(T, CodegenFile)>>
-	for FuncTokensToCodegen
+impl<T: AsRef<FuncTokensGroup>> Pipeline<T, Result<(T, CodegenFile)>>
+	for FuncTokensGroupToCodegen
 {
-	fn apply(mut self, func_tokens: T) -> Result<(T, CodegenFile)> {
+	fn apply(mut self, group: T) -> Result<(T, CodegenFile)> {
 		let out_dir = self.codegen_file.output_dir()?;
-		let collect_routes =
-			self.routes_to_collect_func(func_tokens.as_ref())?;
+		let collect_routes = self.routes_to_collect_func(group.as_ref())?;
 		let mod_imports =
-			self.func_files_to_mod_imports(out_dir, func_tokens.as_ref())?;
+			self.func_files_to_mod_imports(out_dir, &group.as_ref().funcs)?;
 		self.codegen_file.items.extend(mod_imports);
 		self.codegen_file.items.push(collect_routes.into());
 
-		Ok((func_tokens, self.codegen_file))
+		Ok((group, self.codegen_file))
 	}
 }
 
 
-impl FuncTokensToCodegen {
+impl FuncTokensGroupToCodegen {
 	pub fn new(codegen_file: CodegenFile) -> Self {
 		Self {
 			codegen_file,
@@ -75,29 +39,17 @@ impl FuncTokensToCodegen {
 		}
 	}
 
-	pub fn with_map_tokens(
-		self,
-		func_type: syn::Type,
-		map_func_tokens: impl Fn(&FuncTokens) -> Block + 'static,
-	) -> Self {
-		Self {
-			func_type,
-			map_func_tokens: Box::new(map_func_tokens),
-			..self
-		}
-	}
-
 	fn routes_to_collect_func(
 		&self,
-		funcs: &Vec<FuncTokens>,
+		group: &FuncTokensGroup,
 	) -> Result<syn::ItemFn> {
-		let blocks = funcs.iter().map(|func| (self.map_func_tokens)(func));
-		let func_type = &self.func_type;
+		let funcs = group.funcs.iter().map(|func| &func.func);
+		let func_type = &group.func_type;
 
 		Ok(syn::parse_quote! {
 			/// Collect all functions from their files as defined in the [`AppConfig`]
 			pub fn collect() -> Vec<#func_type> {
-				vec![#(#blocks),*]
+				vec![#(#funcs),*]
 			}
 		})
 	}
@@ -144,7 +96,8 @@ mod test {
 		let codegen_file = FileGroup::test_site_pages()
 			.xpipe(FileGroupToFuncTokens::default())
 			.unwrap()
-			.xpipe(FuncTokensToCodegen::default())
+			.xpipe(FuncTokensToRsxRoutesGroup::default())
+			.xpipe(FuncTokensGroupToCodegen::default())
 			.unwrap()
 			.xmap(|(_, codegen_file)| codegen_file.build_output())
 			.unwrap()
@@ -157,26 +110,26 @@ mod test {
 		expect(codegen_file).not().to_contain("/home/");
 	}
 
-	#[test]
-	fn custom() {
-		let codegen_file = vec![FuncTokens::simple(
-			"docs/index.rs",
-			syn::parse_quote! {|| rsx! { "hello world" }},
-		)]
-		.xpipe(FuncTokensToCodegen::default().with_map_tokens(
-			syn::parse_quote!(String),
-			|func| {
-				let block = &func.func;
-				syn::parse_quote! {{
-					#block.to_string()
-				}}
-			},
-		))
-		.unwrap()
-		.xmap(|(_, codegen_file)| codegen_file.build_output())
-		.unwrap()
-		.to_token_stream()
-		.to_string();
-		expect(&codegen_file).to_contain("pub fn collect () -> Vec < String > { vec ! [{ | | rsx ! { \"hello world\" } . to_string () }] }");
-	}
+	// #[test]
+	// fn custom() {
+	// 	let codegen_file = vec![FuncTokens::simple(
+	// 		"docs/index.rs",
+	// 		syn::parse_quote! {|| rsx! { "hello world" }},
+	// 	)]
+	// 	.xpipe(FuncTokensGroupToCodegen::default().with_map_tokens(
+	// 		syn::parse_quote!(String),
+	// 		|func| {
+	// 			let block = &func.func;
+	// 			syn::parse_quote! {{
+	// 				#block.to_string()
+	// 			}}
+	// 		},
+	// 	))
+	// 	.unwrap()
+	// 	.xmap(|(_, codegen_file)| codegen_file.build_output())
+	// 	.unwrap()
+	// 	.to_token_stream()
+	// 	.to_string();
+	// 	expect(&codegen_file).to_contain("pub fn collect () -> Vec < String > { vec ! [{ | | rsx ! { \"hello world\" } . to_string () }] }");
+	// }
 }

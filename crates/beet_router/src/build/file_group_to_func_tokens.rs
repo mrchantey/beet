@@ -89,10 +89,13 @@ mod test {
 			.xpipe(FileGroupToFuncTokens::default())
 			.unwrap()
 			.xpipe(MapFuncTokens::default().base_route("/docs"))
-			.xpipe(FuncTokensToCodegen::new(CodegenFile::new_workspace_rel(
-				"crates/beet_site/src/codegen/docs.rs",
-				"beet_site",
-			)))
+			.xpipe(FuncTokensToRsxRoutesGroup::default())
+			.xpipe(FuncTokensGroupToCodegen::new(
+				CodegenFile::new_workspace_rel(
+					"crates/beet_site/src/codegen/docs.rs",
+					"beet_site",
+				),
+			))
 			.unwrap();
 		// println!(
 		// 	"{}",

@@ -17,7 +17,8 @@ fn main() -> Result<()> {
 				.base_route("/design")
 				.replace_route([(".mockup", "")]),
 		)
-		.xpipe(FuncTokensToCodegen::new(
+		.xpipe(FuncTokensToRsxRoutesGroup::default())
+		.xpipe(FuncTokensGroupToCodegen::new(
 			CodegenFile::new_workspace_rel(
 				"crates/beet_design/src/codegen/mockups.rs",
 				&cx.pkg_name,

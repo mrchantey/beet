@@ -5,7 +5,7 @@ use std::pin::Pin;
 use std::sync::Arc;
 
 /// A function that has no parameters and returns a [`RsxNode`].
-pub type DefaultRouteFunc =
+pub type RsxRouteFunc =
 	Box<dyn Fn() -> Pin<Box<dyn Future<Output = Result<RsxNode>>>>>;
 
 
@@ -62,11 +62,11 @@ pub trait IntoRouteFunc<T, M>: 'static {
 pub struct SyncRouteFuncMarker;
 
 
-impl<F> IntoRouteFunc<DefaultRouteFunc, SyncRouteFuncMarker> for F
+impl<F> IntoRouteFunc<RsxRouteFunc, SyncRouteFuncMarker> for F
 where
 	F: 'static + Fn() -> RsxNode,
 {
-	fn into_route_func(self) -> DefaultRouteFunc {
+	fn into_route_func(self) -> RsxRouteFunc {
 		let func = Arc::new(self);
 		Box::new(move || {
 			let func = func.clone();
@@ -78,11 +78,11 @@ where
 
 pub struct AsyncRouteFuncMarker;
 
-impl<F> IntoRouteFunc<DefaultRouteFunc, AsyncRouteFuncMarker> for F
+impl<F> IntoRouteFunc<RsxRouteFunc, AsyncRouteFuncMarker> for F
 where
 	F: 'static + AsyncFn() -> RsxNode,
 {
-	fn into_route_func(self) -> DefaultRouteFunc {
+	fn into_route_func(self) -> RsxRouteFunc {
 		let func = Arc::new(self);
 		Box::new(move || {
 			let func = func.clone();
@@ -94,15 +94,12 @@ where
 pub struct ResultRouteFuncMarker;
 
 impl<F, E>
-	IntoRouteFunc<
-		DefaultRouteFunc,
-		(SyncRouteFuncMarker, ResultRouteFuncMarker),
-	> for F
+	IntoRouteFunc<RsxRouteFunc, (SyncRouteFuncMarker, ResultRouteFuncMarker)> for F
 where
 	E: std::error::Error + 'static + Send + Sync,
 	F: 'static + Fn() -> Result<RsxNode, E>,
 {
-	fn into_route_func(self) -> DefaultRouteFunc {
+	fn into_route_func(self) -> RsxRouteFunc {
 		let func = Arc::new(self);
 		Box::new(move || {
 			let func = func.clone();
@@ -111,15 +108,13 @@ where
 	}
 }
 impl<F, E>
-	IntoRouteFunc<
-		DefaultRouteFunc,
-		(AsyncRouteFuncMarker, ResultRouteFuncMarker),
-	> for F
+	IntoRouteFunc<RsxRouteFunc, (AsyncRouteFuncMarker, ResultRouteFuncMarker)>
+	for F
 where
 	E: std::error::Error + 'static + Send + Sync,
 	F: 'static + AsyncFn() -> Result<RsxNode, E>,
 {
-	fn into_route_func(self) -> DefaultRouteFunc {
+	fn into_route_func(self) -> RsxRouteFunc {
 		let func = Arc::new(self);
 		Box::new(move || {
 			let func = func.clone();
@@ -132,14 +127,11 @@ pub struct AnyhowRouteFuncMarker;
 
 
 impl<F>
-	IntoRouteFunc<
-		DefaultRouteFunc,
-		(SyncRouteFuncMarker, AnyhowRouteFuncMarker),
-	> for F
+	IntoRouteFunc<RsxRouteFunc, (SyncRouteFuncMarker, AnyhowRouteFuncMarker)> for F
 where
 	F: 'static + Fn() -> anyhow::Result<RsxNode>,
 {
-	fn into_route_func(self) -> DefaultRouteFunc {
+	fn into_route_func(self) -> RsxRouteFunc {
 		let func = Arc::new(self);
 		Box::new(move || {
 			let func = func.clone();
@@ -148,14 +140,12 @@ where
 	}
 }
 impl<F>
-	IntoRouteFunc<
-		DefaultRouteFunc,
-		(AsyncRouteFuncMarker, AnyhowRouteFuncMarker),
-	> for F
+	IntoRouteFunc<RsxRouteFunc, (AsyncRouteFuncMarker, AnyhowRouteFuncMarker)>
+	for F
 where
 	F: 'static + AsyncFn() -> anyhow::Result<RsxNode>,
 {
-	fn into_route_func(self) -> DefaultRouteFunc {
+	fn into_route_func(self) -> RsxRouteFunc {
 		let func = Arc::new(self);
 		Box::new(move || {
 			let func = func.clone();
@@ -173,13 +163,13 @@ mod test {
 
 	#[test]
 	fn works() {
-		let _sync: DefaultRouteFunc = || -> RsxNode {
+		let _sync: RsxRouteFunc = || -> RsxNode {
 			rsx! {}
 		}
 		.into_route_func();
-		let _sync_result: DefaultRouteFunc =
+		let _sync_result: RsxRouteFunc =
 			|| -> Result<RsxNode> { Ok(rsx! {}) }.into_route_func();
-		let _async_func: DefaultRouteFunc = async || -> RsxNode {
+		let _async_func: RsxRouteFunc = async || -> RsxNode {
 			rsx! {}
 		}
 		.into_route_func();

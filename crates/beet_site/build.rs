@@ -39,10 +39,13 @@ fn main() -> Result<()> {
 					.with_exclude("*mod.rs"),
 			)
 			.xpipe(FileGroupToFuncTokens::default())?
-			.xpipe(FuncTokensToCodegen::new(CodegenFile::new_workspace_rel(
-				"crates/beet_site/src/codegen/pages.rs",
-				&cx.pkg_name,
-			)))?
+			.xpipe(FuncTokensToRsxRoutesGroup::default())
+			.xpipe(FuncTokensGroupToCodegen::new(
+				CodegenFile::new_workspace_rel(
+					"crates/beet_site/src/codegen/pages.rs",
+					&cx.pkg_name,
+				),
+			))?
 			.xmap(|(funcs, codegen)| -> Result<_> {
 				codegen.build_and_write()?;
 				Ok(funcs)
@@ -62,10 +65,13 @@ fn main() -> Result<()> {
 					})
 				},
 			))
-			.xpipe(FuncTokensToCodegen::new(CodegenFile::new_workspace_rel(
-				"crates/beet_site/src/codegen/docs.rs",
-				&cx.pkg_name,
-			)))?
+			.xpipe(FuncTokensToRsxRoutesGroup::default())
+			.xpipe(FuncTokensGroupToCodegen::new(
+				CodegenFile::new_workspace_rel(
+					"crates/beet_site/src/codegen/docs.rs",
+					&cx.pkg_name,
+				),
+			))?
 			.xmap(|(funcs, codegen)| -> Result<_> {
 				codegen.build_and_write()?;
 				Ok(funcs)
@@ -81,12 +87,14 @@ fn main() -> Result<()> {
 					.replace_route([(".mockup", "")]),
 			);
 
-		pages.xtend(mockups).xtend(docs).xpipe(RouteFuncsToTree {
-			codgen_file: CodegenFile::new_workspace_rel(
-				"crates/beet_site/src/codegen/route_tree.rs",
-				&cx.pkg_name,
-			),
-		})?;
+		pages.funcs.xtend(mockups).xtend(docs.funcs).xpipe(
+			RouteFuncsToTree {
+				codgen_file: CodegenFile::new_workspace_rel(
+					"crates/beet_site/src/codegen/route_tree.rs",
+					&cx.pkg_name,
+				),
+			},
+		)?;
 	}
 	Ok(())
 }
