@@ -3,21 +3,44 @@ use anyhow::Result;
 use beet_rsx::prelude::*;
 use std::path::Path;
 use sweet::prelude::*;
+use syn::Block;
 use syn::Item;
 
-#[derive(Debug, Clone)]
+// #[derive(Clone)]
 pub struct FuncTokensToCodegen {
+	/// The return type of the `collect` function, this must
+	/// match the output of the [`FuncTokensToCodegen::map_func_tokens`]
 	pub func_type: syn::Type,
 	pub codegen_file: CodegenFile,
+	/// Map the func tokens, this must return the [`FuncTokensToCodegen::func_type`]
+	pub map_func_tokens: Box<dyn Fn(&FuncTokens) -> Block>,
 }
 
 impl Default for FuncTokensToCodegen {
 	fn default() -> Self {
 		Self {
-			func_type: syn::parse_quote!(DefaultRouteFunc),
+			func_type: syn::parse_quote!(RouteFunc<DefaultRouteFunc>),
 			codegen_file: CodegenFile::default(),
+			map_func_tokens: Box::new(func_tokens_to_route_funcs),
 		}
 	}
+}
+
+/// Create the tokens for a [`RouteFunc`], usually the final
+/// transformation before codegen.
+/// We need to do this at a late stage to allow transformations
+/// to be applied.
+fn func_tokens_to_route_funcs(func_tokens: &FuncTokens) -> Block {
+	let method = func_tokens.route_info.method.to_string();
+	let route_path = func_tokens.route_info.path.to_string_lossy();
+	let block = &func_tokens.func;
+	// TODO frontmatter
+	syn::parse_quote! {{
+	RouteFunc::new(
+		#method,
+		#route_path,
+		#block
+	)}}
 }
 
 
@@ -47,16 +70,28 @@ impl FuncTokensToCodegen {
 		}
 	}
 
+	pub fn with_map_tokens(
+		self,
+		func_type: syn::Type,
+		map_func_tokens: impl Fn(&FuncTokens) -> Block + 'static,
+	) -> Self {
+		Self {
+			func_type,
+			map_func_tokens: Box::new(map_func_tokens),
+			..self
+		}
+	}
+
 	fn routes_to_collect_func(
 		&self,
 		funcs: &Vec<FuncTokens>,
 	) -> Result<syn::ItemFn> {
-		let blocks = funcs.iter().map(|func| func.to_route_func_tokens());
+		let blocks = funcs.iter().map(|func| (self.map_func_tokens)(func));
 		let func_type = &self.func_type;
 
 		Ok(syn::parse_quote! {
 			/// Collect all functions from their files as defined in the [`AppConfig`]
-			pub fn collect() -> Vec<RouteFunc<#func_type>> {
+			pub fn collect() -> Vec<#func_type> {
 				vec![#(#blocks),*]
 			}
 		})

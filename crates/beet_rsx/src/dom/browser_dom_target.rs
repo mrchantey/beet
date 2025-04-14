@@ -194,21 +194,25 @@ impl DomTargetImpl for BrowserDomTarget {
 		let el = self.get_or_find_element(loc.tree_idx)?;
 		// Try to set as a JS property first (for properties like 'value')
 		let js_val = wasm_bindgen::JsValue::from_str(value);
-		let result = js_sys::Reflect::set(&el, &wasm_bindgen::JsValue::from_str(key), &js_val);
-		
+		let result = js_sys::Reflect::set(
+			&el,
+			&wasm_bindgen::JsValue::from_str(key),
+			&js_val,
+		);
+
 		if let Ok(false) = result {
-				// Fall back to attribute if property setting failed
-				el.set_attribute(key, value).map_err(|e| {
-			ParseError::Hydration(format!(
+			// Fall back to attribute if property setting failed
+			el.set_attribute(key, value).map_err(|e| {
+				ParseError::Hydration(format!(
 					"Could not set attribute {} on element {}: {:?}",
 					key, loc.tree_idx, e
-			))
-				})?;
+				))
+			})?;
 		} else if let Err(e) = result {
-				return Err(ParseError::Hydration(format!(
-			"Could not set property {} on element {}: {:?}",
-			key, loc.tree_idx, e
-				)));
+			return Err(ParseError::Hydration(format!(
+				"Could not set property {} on element {}: {:?}",
+				key, loc.tree_idx, e
+			)));
 		}
 		Ok(())
 	}

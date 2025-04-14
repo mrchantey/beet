@@ -1,7 +1,7 @@
 mod html_tokens_to_ron;
 mod rsx_runtime;
-pub use rsx_runtime::*;
 pub use html_tokens_to_ron::*;
+pub use rsx_runtime::*;
 mod rsx_pipeline;
 pub use rsx_pipeline::*;
 mod html_tokens;

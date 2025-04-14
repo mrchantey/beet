@@ -65,8 +65,10 @@ fn text_area(TextArea { variant, mut attrs }: TextArea) -> RsxNode {
 
 	rsx! {
 		<div class="bt-c-input__container">
-			<slot/>
-			<textarea {attrs}><slot name="textarea"/></textarea>
+			<slot />
+			<textarea {attrs}>
+				<slot name="textarea" />
+			</textarea>
 		</div>
 		<style src="./input.css" />
 	}

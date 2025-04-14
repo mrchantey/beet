@@ -126,7 +126,7 @@ mod test {
 			.unwrap();
 
 		// a text node will use the parent idx
-		DomTarget::update_rsx_node(TreeLocation::new(1, 0, 0), rsx! {bar})
+		DomTarget::update_rsx_node(TreeLocation::new(1, 0, 0), rsx! { bar })
 			.unwrap();
 		expect(DomTarget::render()).to_be("<!DOCTYPE html><html><head></head><body><div data-beet-rsx-idx=\"0\">bar</div></body></html>");
 

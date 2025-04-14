@@ -57,21 +57,4 @@ impl FuncTokens {
 				.to_string()
 		}
 	}
-
-	/// Create the tokens for a [`RouteFunc`], usually the final
-	/// transformation before codegen.
-	/// We need to do this at a late stage to allow transformations
-	/// to be applied.
-	pub fn to_route_func_tokens(&self) -> Block {
-		let method = self.route_info.method.to_string();
-		let route_path = self.route_info.path.to_string_lossy();
-		let block = &self.func;
-		// TODO frontmatter
-		syn::parse_quote! {{
-		RouteFunc::new(
-			#method,
-			#route_path,
-			#block
-		)}}
-	}
 }
