@@ -34,8 +34,6 @@
   --bt-block-spacing-horizontal: var(--bt-spacing);
   --bt-grid-column-gap: var(--bt-spacing);
   --bt-grid-row-gap: var(--bt-spacing);
-  --bt-form-element-spacing-vertical: 0.75rem;
-  --bt-form-element-spacing-horizontal: 1rem;
   --bt-group-box-shadow: 0 0 0 rgba(0, 0, 0, 0);
   --bt-group-box-shadow-focus-with-button: 0 0 0 var(--bt-outline-width) var(--bt-primary-focus);
   --bt-group-box-shadow-focus-with-input: 0 0 0 0.0625rem var(--bt-form-element-border-color);

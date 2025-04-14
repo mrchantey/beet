@@ -34,6 +34,14 @@ pub struct InputHtmlAttributes {
 	pub value: Option<MaybeSignal<String>>,
 }
 
+#[derive(Default, Buildable, IntoBlockAttribute)]
+pub struct TextAreaHtmlAttributes {
+	#[field(flatten=BaseHtmlAttributes)]
+	pub input_attrs: InputHtmlAttributes,
+	pub rows: Option<u32>,
+	pub cols: Option<u32>,
+}
+
 
 pub trait BaseHtmlAttributesExt: BaseHtmlAttributesBuildable {
 	fn push_class(&mut self, class: impl AsRef<str>) {

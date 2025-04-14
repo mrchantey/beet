@@ -34,6 +34,7 @@ details{
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
+	border-radius: var(--bt-border-radius-sm);
 	padding-top: 0.2em inherit;
 	/* padding-bottom: 0.2em var(--sidebar-indent); */
 	line-height: var(--bt-line-height);

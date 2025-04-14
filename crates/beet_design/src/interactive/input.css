@@ -26,16 +26,24 @@
 }
 
 .bt-c-input--outlined {
-		border: var(--bt-border-width) solid var(--bt-color-on-surface-variant);
+		border: var(--bt-border-width-lg) solid var(--bt-color-border-faint);
 		--bt-color-background: transparent;
 }
 
 .bt-c-input__container {
+	width:100%;
 	display: flex;
 	flex-direction: column;
 	/* align-items: center; */
 	gap: var(--bt-spacing-xs);
 	justify-content: space-between;
+}
+
+/* ERRORS */
+textarea.bt-c-input{
+	overflow:auto;
+	resize:none;
+	height:unset;
 }
 
 

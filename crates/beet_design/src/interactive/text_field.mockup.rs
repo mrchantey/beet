@@ -22,6 +22,7 @@ fn inner(_: Inner) -> RsxNode {
 	let set_value1 = set_value.clone();
 	let set_value2 = set_value.clone();
 	let set_value3 = set_value.clone();
+	let set_value4 = set_value.clone();
 
 	rsx! {
 			<h2>Variants</h2>
@@ -53,6 +54,14 @@ fn inner(_: Inner) -> RsxNode {
 				disabled
 				variant=TextFieldVariant::Text
 				value=value.clone()>	Text 			</TextField>
+			</div>
+			<h2>Text Area</h2>
+			<div>
+			<TextArea
+			oninput=move |e|set_value4(e.value())
+			variant=TextFieldVariant::Filled
+			rows=10
+			value=value.clone()>	Text Area 		</TextArea>
 			</div>
 			<style>
 			div{
