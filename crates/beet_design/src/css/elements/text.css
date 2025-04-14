@@ -119,12 +119,8 @@ ins {
 del {
   color: var(--bt-color-text);
 }
-
+::selection,
 ::-moz-selection {
+  color: var(--bt-color-on-secondary);
   background-color: var(--bt-color-secondary);
 }
-
-::selection {
-  background-color: var(--bt-color-secondary);
-}
-

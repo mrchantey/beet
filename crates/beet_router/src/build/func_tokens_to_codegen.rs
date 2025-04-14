@@ -8,12 +8,18 @@ use syn::Item;
 
 // #[derive(Clone)]
 pub struct FuncTokensToCodegen {
-	/// The return type of the `collect` function, this must
-	/// match the output of the [`FuncTokensToCodegen::map_func_tokens`]
 	pub func_type: syn::Type,
 	pub codegen_file: CodegenFile,
-	/// Map the func tokens, this must return the [`FuncTokensToCodegen::func_type`]
 	pub map_func_tokens: Box<dyn Fn(&FuncTokens) -> Block>,
+}
+
+
+pub trait FuncTokensMapper {
+		/// The return type of the `collect` function, this must
+	/// match the output of the [`MapFuncTokens::map_tokens`]
+	fn func_type(&self) -> syn::Type;
+		/// Map the func tokens, this must return the [`FuncTokensToCodegen::func_type`]
+	fn map_tokens(&mut self, func_tokens: &FuncTokens) -> Result<Block>;
 }
 
 impl Default for FuncTokensToCodegen {
