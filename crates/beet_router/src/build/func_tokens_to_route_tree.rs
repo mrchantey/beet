@@ -8,6 +8,7 @@ use syn::Expr;
 use syn::Item;
 use syn::ItemFn;
 
+// TODO this should be RouteInfo not FuncTokens, we dont need the func body
 
 /// Create a tree of routes from a list of [`FuncTokens`]`,
 /// that can then be converted to an [`ItemMod`] to be used in the router.

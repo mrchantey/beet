@@ -4,6 +4,8 @@ use sweet::prelude::*;
 use syn::ItemFn;
 
 /// Create a rust file that collects all the island mount functions
+/// This  step depends on the native step, we need to actually build
+/// the rsx tree to find the client islands and create the IslandMap
 #[derive(Debug, Clone)]
 pub struct BuildWasmRoutes {
 	islands_map_path: CanonicalPathBuf,

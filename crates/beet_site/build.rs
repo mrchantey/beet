@@ -24,7 +24,7 @@ fn main() -> Result<()> {
 		let html_dir =
 			WorkspacePathBuf::new("target/client").into_canonical_unchecked();
 
-		// removing dir makes live reload very hard
+		// removing dir breaks the FsWatcher in live reload
 		// FsExt::remove(&html_dir).ok();
 		let design_public_dir =
 			WorkspacePathBuf::new("crates/beet_design/public")
@@ -53,18 +53,7 @@ fn main() -> Result<()> {
 
 		let docs = FileGroup::new_workspace_rel("crates/beet_site/src/docs")?
 			.xpipe(FileGroupToFuncTokens::default())?
-			.xpipe(MapFuncTokens::default().base_route("/docs").wrap_func(
-				|func| {
-					syn::parse_quote!(|| {
-						use crate::prelude::*;
-						rsx! {
-							<BeetSidebarLayout>
-								{(#func)()}
-							</BeetSidebarLayout>
-						}
-					})
-				},
-			))
+			.xpipe(MapFuncTokens::default().base_route("/docs"))
 			.xpipe(FuncTokensToRsxRoutesGroup::default())
 			.xpipe(FuncTokensGroupToCodegen::new(
 				CodegenFile::new_workspace_rel(
@@ -78,6 +67,8 @@ fn main() -> Result<()> {
 			})?;
 
 		// ⚠️ this is a downstream copy of crates/beet_design/build.rs
+		// we're actually only using the route paths, maybe we should generate
+		// those in design
 		let mockups = FileGroup::new_workspace_rel("crates/beet_design/src")?
 			.with_filter(GlobFilter::default().with_include("*.mockup.*"))
 			.xpipe(FileGroupToFuncTokens::default())?

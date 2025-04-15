@@ -45,6 +45,8 @@ pub mod prelude {
 pub mod exports {
 	#[cfg(feature = "rsx")]
 	pub use beet_rsx::exports::*;
+	#[cfg(all(feature = "server", not(target_arch = "wasm32")))]
+	pub use beet_server::exports::*;
 	// #[cfg(feature = "examples")]
 	// pub use beet_examples::exports::*;
 	// #[cfg(feature = "flow")]

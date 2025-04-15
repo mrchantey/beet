@@ -1,25 +1,28 @@
 #![feature(more_qualified_paths)]
 use anyhow::Result;
 
+
+
 #[cfg(not(target_arch = "wasm32"))]
 #[tokio::main]
 async fn main() -> Result<()> {
 	use beet::prelude::*;
 	use beet_site::prelude::*;
 	use sweet::prelude::*;
-	// we must collect all or islands break?
+
+
+	fn with_sidebar(route: RouteFunc<RsxRouteFunc>) -> RouteFunc<RsxRouteFunc> {
+		route.map_func(|func| {
+			async move || -> anyhow::Result<RsxNode> {
+				let root = func().await?;
+				Ok(rsx! { <BeetSidebarLayout>{root}</BeetSidebarLayout> })
+			}
+		})
+	}
 
 	let routes = beet_site::pages::collect()
-		.xtend(beet::design::mockups::collect().xmap_each(|route| {
-			// wrap the mockups in a beet page
-			route.map_func(|func| {
-				async move || -> anyhow::Result<RsxNode> {
-					let root = func().await?;
-					Ok(rsx! { <BeetSidebarLayout>{root}</BeetSidebarLayout> })
-				}
-			})
-		}))
-		.xtend(beet_site::docs::collect());
+		.xtend(beet::design::mockups::collect().xmap_each(with_sidebar))
+		.xtend(beet_site::docs::collect().xmap_each(with_sidebar));
 
 	let args = AppRouterArgs::parse();
 

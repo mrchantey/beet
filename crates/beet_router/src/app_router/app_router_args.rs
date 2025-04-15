@@ -20,7 +20,7 @@ impl AppRouterArgs {
 	pub fn parse() -> Self { Parser::parse() }
 
 	#[cfg(target_arch = "wasm32")]
-	pub fn from_url_params() -> Result<Self> {
+	pub fn from_url_params() -> anyhow::Result<Self> {
 		// TODO actually parse from search params
 		Ok(Self {
 			is_static: false,
