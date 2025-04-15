@@ -6,6 +6,7 @@ use axum::routing::get;
 use axum::routing::post;
 use beet_router::prelude::*;
 use beet_server::prelude::*;
+use http::Method;
 use sweet::prelude::*;
 use tokio::net::TcpListener;
 use tokio::spawn;
@@ -42,7 +43,7 @@ async fn test_server_action_calls() {
 
 	// Test GET request
 	expect(
-		CallServerAction::request::<_, i32>("get", "/add", (5, 3))
+		CallServerAction::request::<_, i32>(Method::GET, "/add", (5, 3))
 			.await
 			.unwrap(),
 	)
@@ -50,7 +51,7 @@ async fn test_server_action_calls() {
 
 	// Test POST request
 	expect(
-		CallServerAction::request::<_, i32>("post", "/add", (10, 7))
+		CallServerAction::request::<_, i32>(Method::POST, "/add", (10, 7))
 			.await
 			.unwrap(),
 	)

@@ -15,6 +15,18 @@ pub struct CallServerAction;
 static CLIENT: Lazy<Client> = Lazy::new(|| Client::new());
 
 impl CallServerAction {
+	pub fn is_bodyless(method: &Method) -> bool {
+		matches!(
+			method,
+			&Method::GET
+				| &Method::HEAD
+				| &Method::DELETE
+				| &Method::OPTIONS
+				| &Method::CONNECT
+				| &Method::TRACE
+		)
+	}
+
 	pub fn get_server_url() -> RoutePath { SERVER_URL.lock().unwrap().clone() }
 	pub fn set_server_url(url: RoutePath) { *SERVER_URL.lock().unwrap() = url; }
 
@@ -23,40 +35,11 @@ impl CallServerAction {
 	/// - Bodyless methods (GET, HEAD, DELETE, OPTIONS, CONNECT, TRACE) send data as query parameters
 	/// - Methods with body (POST, PUT, PATCH) send data in the request body
 	pub async fn request<T: Serialize, O: DeserializeOwned>(
-		method: &str,
+		method: Method,
 		path: impl Into<RoutePath>,
 		value: T,
 	) -> Result<O, CallServerActionError> {
-		// Convert method string to reqwest Method
-		let method = match method.to_uppercase().as_str() {
-			"GET" => Method::GET,
-			"POST" => Method::POST,
-			"PUT" => Method::PUT,
-			"DELETE" => Method::DELETE,
-			"HEAD" => Method::HEAD,
-			"OPTIONS" => Method::OPTIONS,
-			"CONNECT" => Method::CONNECT,
-			"PATCH" => Method::PATCH,
-			"TRACE" => Method::TRACE,
-			_ => {
-				return Err(CallServerActionError::InvalidMethod(
-					method.to_string(),
-				));
-			}
-		};
-
-		// Determine if this is a bodyless method
-		let is_bodyless = matches!(
-			method,
-			Method::GET
-				| Method::HEAD
-				| Method::DELETE
-				| Method::OPTIONS
-				| Method::CONNECT
-				| Method::TRACE
-		);
-
-		if is_bodyless {
+		if Self::is_bodyless(&method) {
 			Self::request_with_query(method, path, value).await
 		} else {
 			Self::request_with_body(method, path, value).await

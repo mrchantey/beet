@@ -1,8 +1,10 @@
+use crate::prelude::*;
+use http::Method;
 use quote::format_ident;
 use quote::quote;
+use std::str::FromStr;
 use syn::Block;
 use syn::FnArg;
-use syn::Ident;
 use syn::ItemFn;
 use syn::Pat;
 use syn::ReturnType;
@@ -26,13 +28,11 @@ impl ServerActionBuilder {
 		let fn_name = &self.item_fn.sig.ident;
 		let return_type = &self.item_fn.sig.output;
 		let is_async = self.item_fn.sig.asyncness.is_some();
-		let method_name = fn_name.to_string().to_lowercase();
+		let method = Method::from_str(&fn_name.to_string().to_uppercase())
+			.unwrap_or(Method::POST);
 
 		// Determine if this is a bodyless method
-		let is_bodyless = matches!(
-			method_name.as_str(),
-			"get" | "head" | "options" | "connect" | "trace" | "delete"
-		);
+		let is_bodyless = CallServerAction::is_bodyless(&method);
 
 		// Extract the function body
 		let function_body = &self.item_fn.block;
@@ -44,7 +44,7 @@ impl ServerActionBuilder {
 		// Build client version using method name directly
 		let client_out = self.build_client_version(
 			fn_name,
-			&method_name,
+			method,
 			&client_params,
 			return_type,
 		);
@@ -151,7 +151,7 @@ impl ServerActionBuilder {
 	fn build_client_version(
 		&self,
 		fn_name: &syn::Ident,
-		method_name: &str,
+		method: Method,
 		client_params: &[syn::FnArg],
 		return_type: &ReturnType,
 	) -> syn::ItemFn {
@@ -168,14 +168,12 @@ impl ServerActionBuilder {
 			.map(|(i, _)| format_ident!("args{}", i))
 			.collect();
 
-		// Use a string literal for the method name
-		let method_str =
-			syn::LitStr::new(method_name, proc_macro2::Span::call_site());
+		let method = format_ident!("{}", method.as_str());
 
 		parse_quote! {
 			#[cfg(feature="client")]
 			async fn #fn_name(#(#client_params),*) -> Result<#return_inner_type, ServerActionError> {
-				CallServerAction::request(#method_str, #route_path, (#(#param_names),*)).await
+				CallServerAction::request(beet::exports::http::method::#method, #route_path, (#(#param_names),*)).await
 			}
 		}
 	}
@@ -307,9 +305,13 @@ mod tests {
 		// Check client function has post method
 		let client_str = quote!(#client_fn).to_token_stream().to_string();
 		expect(client_str).to_contain(
-			&quote!(CallServerAction::request("post", "/add", (args0, args1)))
-				.to_token_stream()
-				.to_string(),
+			&quote!(CallServerAction::request(
+				beet::exports::http::method::POST,
+				"/add",
+				(args0, args1)
+			))
+			.to_token_stream()
+			.to_string(),
 		);
 
 		// Check server function uses Json extractor instead of JsonQuery
@@ -469,9 +471,13 @@ mod tests {
 		// Client function should have zero parameters since there's no args tuple
 		let client_str = quote!(#client_fn).to_token_stream().to_string();
 		expect(client_str).to_contain(
-			&quote!(CallServerAction::request("get", "/greet", ()))
-				.to_token_stream()
-				.to_string(),
+			&quote!(CallServerAction::request(
+				beet::exports::http::method::GET,
+				"/greet",
+				()
+			))
+			.to_token_stream()
+			.to_string(),
 		);
 
 		// Server function should preserve the extractors
@@ -530,9 +536,13 @@ mod tests {
 		// Verify call has empty tuple
 		let client_str = quote!(#client_fn).to_token_stream().to_string();
 		expect(client_str).to_contain(
-			&quote!(CallServerAction::request("get", "/hello", ()))
-				.to_token_stream()
-				.to_string(),
+			&quote!(CallServerAction::request(
+				beet::exports::http::method::GET,
+				"/hello",
+				()
+			))
+			.to_token_stream()
+			.to_string(),
 		);
 
 		// Server function should have JsonQuery with empty tuple
@@ -608,7 +618,7 @@ mod tests {
 		let client_str = quote!(#client_fn).to_token_stream().to_string();
 		expect(client_str).to_contain(
 			&quote!(CallServerAction::request(
-				"put",
+				beet::exports::http::method::PUT,
 				"/update",
 				(args0, args1)
 			))
@@ -642,7 +652,7 @@ mod tests {
 		let client_str = quote!(#client_fn).to_token_stream().to_string();
 		expect(client_str).to_contain(
 			&quote!(CallServerAction::request(
-				"delete",
+				beet::exports::http::method::DELETE,
 				"/delete",
 				(args0, args1)
 			))
@@ -673,7 +683,7 @@ mod tests {
 		let client_str = quote!(#client_fn).to_token_stream().to_string();
 		expect(client_str).to_contain(
 			&quote!(CallServerAction::request(
-				"patch",
+				beet::exports::http::method::PATCH,
 				"/patch",
 				(args0, args1)
 			))
@@ -706,9 +716,13 @@ mod tests {
 		// Check client function has OPTIONS method
 		let client_str = quote!(#client_fn).to_token_stream().to_string();
 		expect(client_str).to_contain(
-			&quote!(CallServerAction::request("options", "/options", ()))
-				.to_token_stream()
-				.to_string(),
+			&quote!(CallServerAction::request(
+				beet::exports::http::method::OPTIONS,
+				"/options",
+				()
+			))
+			.to_token_stream()
+			.to_string(),
 		);
 
 		// Check server function uses JsonQuery extractor for OPTIONS (bodyless)
@@ -733,9 +747,13 @@ mod tests {
 		// Check client function has HEAD method
 		let client_str = quote!(#client_fn).to_token_stream().to_string();
 		expect(client_str).to_contain(
-			&quote!(CallServerAction::request("head", "/head", (args0, args1)))
-				.to_token_stream()
-				.to_string(),
+			&quote!(CallServerAction::request(
+				beet::exports::http::method::HEAD,
+				"/head",
+				(args0, args1)
+			))
+			.to_token_stream()
+			.to_string(),
 		);
 
 		// Check server function uses JsonQuery extractor for HEAD (bodyless)
