@@ -78,14 +78,17 @@ fn main() -> Result<()> {
 					.replace_route([(".mockup", "")]),
 			);
 
-		pages.funcs.xtend(mockups).xtend(docs.funcs).xpipe(
-			RouteFuncsToTree {
-				codgen_file: CodegenFile::new_workspace_rel(
+		pages
+			.funcs
+			.xtend(mockups)
+			.xtend(docs.funcs)
+			.xpipe(FuncTokensToTree::default())
+			.xpipe(FuncTokensTreeToRouteTree {
+				codegen_file: CodegenFile::new_workspace_rel(
 					"crates/beet_site/src/codegen/route_tree.rs",
 					&cx.pkg_name,
 				),
-			},
-		)?;
+			})?;
 	}
 	Ok(())
 }

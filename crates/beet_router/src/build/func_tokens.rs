@@ -1,5 +1,6 @@
 #[allow(unused_imports)]
 use crate::prelude::*;
+use http::Method;
 use std::path::PathBuf;
 use sweet::prelude::*;
 use syn::Block;
@@ -36,15 +37,21 @@ pub struct FuncTokens {
 
 impl FuncTokens {
 	/// create a simple `FuncTokens` for testing
-	pub fn simple(path: impl AsRef<std::path::Path>, func: syn::Expr) -> Self {
-		let path = path.as_ref();
+	pub fn simple(
+		local_path: impl AsRef<std::path::Path>,
+		func: syn::Expr,
+	) -> Self {
+		let path = local_path.as_ref();
 		Self {
 			mod_ident: None,
 			frontmatter: syn::parse_quote! {{}},
 			func,
 			canonical_path: CanonicalPathBuf::new_unchecked(path),
 			local_path: path.to_path_buf(),
-			route_info: RouteInfo::new(path, "get"),
+			route_info: RouteInfo {
+				path: RoutePath::from_file_path(path).unwrap(),
+				method: Method::GET,
+			},
 		}
 	}
 
