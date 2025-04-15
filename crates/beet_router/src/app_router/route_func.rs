@@ -59,6 +59,11 @@ pub trait IntoRouteFunc<T, M>: 'static {
 	fn into_route_func(self) -> T;
 }
 
+// self
+impl<T: 'static> IntoRouteFunc<T, Self> for T {
+	fn into_route_func(self) -> T { self }
+}
+
 pub struct SyncRouteFuncMarker;
 
 

@@ -44,6 +44,9 @@ deploy *args:
 	{{args}}
 
 
+mod *args:
+	sweet mod --exclude *codegen* {{args}}
+
 # Run and watch a workspace example
 run example *args:
 	just watch just run-ci {{example}} {{args}}

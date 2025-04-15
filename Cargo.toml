@@ -174,7 +174,12 @@ server = ["parser", "dep:beet_server"]
 lambda = ["server", "beet_server/lambda"]
 spatial = ["flow", "dep:beet_spatial", "beet_ml?/spatial"]
 sim = ["flow", "dep:beet_sim"]
-build = ["router", "beet_design?/build", "beet_router?/build"]
+build = [
+	"router",
+	"beet_design?/build",
+	"beet_router?/build",
+	"beet_server?/build",
+]
 bevy = ["dep:bevy", "beet_rsx?/bevy", "beet_router?/bevy"]
 bevy_default = [
 	"bevy",

@@ -6,7 +6,7 @@ use sweet::prelude::*;
 
 
 /// Maps the [`FuncTokens::func`] blocks so that it returns a
-/// [`RouteFunc`] 
+/// [`RouteFunc<RsxRouteFunc>`]
 #[derive(Default)]
 pub struct FuncTokensToRsxRoutesGroup;
 

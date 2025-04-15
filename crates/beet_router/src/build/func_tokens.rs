@@ -35,7 +35,6 @@ pub struct FuncTokens {
 
 
 impl FuncTokens {
-	#[cfg(test)]
 	/// create a simple `FuncTokens` for testing
 	pub fn simple(path: impl AsRef<std::path::Path>, func: syn::Expr) -> Self {
 		let path = path.as_ref();

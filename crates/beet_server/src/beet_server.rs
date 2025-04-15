@@ -1,7 +1,15 @@
 use crate::prelude::*;
 use anyhow::Result;
 use axum::Router;
+#[cfg(not(feature = "lambda"))]
+use axum::ServiceExt;
+#[cfg(not(feature = "lambda"))]
+use axum::body::Body;
+use beet_router::parser::RouteFunc;
+#[cfg(feature = "lambda")]
+use lambda_http::Body;
 use std::path::PathBuf;
+use tower::Service;
 // use tower::Layer;
 // use tower_http::normalize_path::NormalizePath;
 // use tower_http::normalize_path::NormalizePathLayer;
@@ -9,12 +17,12 @@ use std::path::PathBuf;
 
 /// The main server struct for Beet.
 /// By default a file server will be used as a fallback.
-pub struct BeetServer {
+pub struct BeetServer<S> {
 	pub html_dir: PathBuf,
-	pub router: Router,
+	pub router: Router<S>,
 }
 
-impl Default for BeetServer {
+impl Default for BeetServer<()> {
 	fn default() -> Self {
 		Self {
 			html_dir: "target".into(),
@@ -23,10 +31,29 @@ impl Default for BeetServer {
 	}
 }
 
-impl BeetServer {
+impl<S> BeetServer<S> {
+	pub fn register(
+		mut self,
+		funcs: Vec<RouteFunc<RegisterAxumRoute<S>>>,
+	) -> Self {
+		for func in funcs.into_iter() {
+			self.router = (func.func)(self.router);
+		}
+		self
+	}
+
 	/// Server the provided router, adding
 	/// a fallback file server with live reload.
-	pub async fn serve(self) -> Result<()> {
+	pub async fn serve(self) -> Result<()>
+	where
+		S: Clone + Send + Sync + 'static,
+		Router<S>: Service<
+				http::Request<Body>,
+				Response = axum::response::Response,
+				Error = std::convert::Infallible,
+			> + Clone,
+		<Router<S> as Service<http::Request<Body>>>::Future: Send,
+	{
 		#[allow(unused_mut)]
 		let mut router = self
 			.router
@@ -54,7 +81,7 @@ impl BeetServer {
 			let listener =
 				tokio::net::TcpListener::bind("127.0.0.1:3000").await?;
 			tracing::info!("\nlistening on http://{}", listener.local_addr()?);
-			axum::serve(listener, router).await?;
+			axum::serve(listener, router.into_make_service()).await?;
 		}
 
 		#[cfg(all(debug_assertions, feature = "reload"))]
