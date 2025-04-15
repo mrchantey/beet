@@ -1,4 +1,6 @@
 //! Module for the codegen build step of the router.
+mod server_action;
+pub use server_action::*;
 mod func_tokens_to_rsx_routes;
 pub use func_tokens_to_rsx_routes::*;
 mod func_tokens_group;

@@ -19,6 +19,7 @@ mod browser_dom_target;
 #[cfg(target_arch = "wasm32")]
 pub use browser_dom_target::*;
 
+// TODO probably shouldnt be a thread local, use once_cell::sync::Lazy
 thread_local! {
 	#[rustfmt::skip]
 	static DOM_TARGET: Arc<Mutex<Box<dyn DomTargetImpl>>> =
