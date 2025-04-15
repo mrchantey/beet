@@ -17,9 +17,10 @@ impl CallServerAction {
 	pub fn get_server_url() -> RoutePath { SERVER_URL.lock().unwrap().clone() }
 	pub fn set_server_url(url: RoutePath) { *SERVER_URL.lock().unwrap() = url; }
 
-	/// Call a server action with a GET request.
-	/// The `value` is serialized to JSON and sent as a query parameter called `data`.
-	pub async fn get<T: Serialize, O: DeserializeOwned>(
+	/// Internal function to make a request with data in the query parameters.
+	/// Used by GET, HEAD, DELETE, OPTIONS, CONNECT, TRACE methods.
+	async fn request_with_query<T: Serialize, O: DeserializeOwned>(
+		method: reqwest::Method,
 		path: impl Into<RoutePath>,
 		value: T,
 	) -> Result<O, CallServerActionError> {
@@ -28,7 +29,7 @@ impl CallServerAction {
 
 		let url = SERVER_URL.lock().unwrap().join(&path.into());
 		let bytes = CLIENT
-			.get(url.to_string())
+			.request(method, url.to_string())
 			.query(&[("data", value)])
 			.send()
 			.await
@@ -41,6 +42,43 @@ impl CallServerAction {
 
 		serde_json::from_slice(&bytes)
 			.map_err(|e| CallServerActionError::Deserialize(e))
+	}
+
+	/// Internal function to make a request with data in the request body.
+	/// Used by POST, PUT, PATCH methods.
+	async fn request_with_body<T: Serialize, O: DeserializeOwned>(
+		method: reqwest::Method,
+		path: impl Into<RoutePath>,
+		value: T,
+	) -> Result<O, CallServerActionError> {
+		let value = serde_json::to_string(&value)
+			.map_err(|e| CallServerActionError::Serialize(e))?;
+
+		let url = SERVER_URL.lock().unwrap().join(&path.into());
+		let bytes = CLIENT
+				.request(method, url.to_string())
+				.header("Content-Type", "application/json")
+				.body(value)
+				.send()
+				.await
+				.map_err(|e| e.into())?
+				.error_for_status()
+				.map_err(|e| CallServerActionError::Response(e.to_string()))?
+				.bytes()
+				.await
+				.map_err(|e| e.into())?;
+
+		serde_json::from_slice(&bytes)
+			.map_err(|e| CallServerActionError::Deserialize(e))
+	}
+
+	/// Call a server action with a GET request.
+	/// The `value` is serialized to JSON and sent as a query parameter called `data`.
+	pub async fn get<T: Serialize, O: DeserializeOwned>(
+		path: impl Into<RoutePath>,
+		value: T,
+	) -> Result<O, CallServerActionError> {
+		Self::request_with_query(reqwest::Method::GET, path, value).await
 	}
 
 	/// Call a server action with a HEAD request.
@@ -50,24 +88,7 @@ impl CallServerAction {
 		path: impl Into<RoutePath>,
 		value: T,
 	) -> Result<O, CallServerActionError> {
-		let value = serde_json::to_string(&value)
-			.map_err(|e| CallServerActionError::Serialize(e))?;
-
-		let url = SERVER_URL.lock().unwrap().join(&path.into());
-		let bytes = CLIENT
-			.head(url.to_string())
-			.query(&[("data", value)])
-			.send()
-			.await
-			.map_err(|e| e.into())?
-			.error_for_status()
-			.map_err(|e| CallServerActionError::Response(e.to_string()))?
-			.bytes()
-			.await
-			.map_err(|e| e.into())?;
-
-		serde_json::from_slice(&bytes)
-			.map_err(|e| CallServerActionError::Deserialize(e))
+		Self::request_with_query(reqwest::Method::HEAD, path, value).await
 	}
 
 	/// Call a server action with a POST request.
@@ -76,25 +97,7 @@ impl CallServerAction {
 		path: impl Into<RoutePath>,
 		value: T,
 	) -> Result<O, CallServerActionError> {
-		let value = serde_json::to_string(&value)
-			.map_err(|e| CallServerActionError::Serialize(e))?;
-
-		let url = SERVER_URL.lock().unwrap().join(&path.into());
-		let bytes = CLIENT
-			.post(url.to_string())
-			.header("Content-Type", "application/json")
-			.body(value)
-			.send()
-			.await
-			.map_err(|e| e.into())?
-			.error_for_status()
-			.map_err(|e| CallServerActionError::Response(e.to_string()))?
-			.bytes()
-			.await
-			.map_err(|e| e.into())?;
-
-		serde_json::from_slice(&bytes)
-			.map_err(|e| CallServerActionError::Deserialize(e))
+		Self::request_with_body(reqwest::Method::POST, path, value).await
 	}
 
 	/// Call a server action with a PUT request.
@@ -103,25 +106,7 @@ impl CallServerAction {
 		path: impl Into<RoutePath>,
 		value: T,
 	) -> Result<O, CallServerActionError> {
-		let value = serde_json::to_string(&value)
-			.map_err(|e| CallServerActionError::Serialize(e))?;
-
-		let url = SERVER_URL.lock().unwrap().join(&path.into());
-		let bytes = CLIENT
-			.put(url.to_string())
-			.header("Content-Type", "application/json")
-			.body(value)
-			.send()
-			.await
-			.map_err(|e| e.into())?
-			.error_for_status()
-			.map_err(|e| CallServerActionError::Response(e.to_string()))?
-			.bytes()
-			.await
-			.map_err(|e| e.into())?;
-
-		serde_json::from_slice(&bytes)
-			.map_err(|e| CallServerActionError::Deserialize(e))
+		Self::request_with_body(reqwest::Method::PUT, path, value).await
 	}
 
 	/// Call a server action with a DELETE request.
@@ -131,24 +116,7 @@ impl CallServerAction {
 		path: impl Into<RoutePath>,
 		value: T,
 	) -> Result<O, CallServerActionError> {
-		let value = serde_json::to_string(&value)
-			.map_err(|e| CallServerActionError::Serialize(e))?;
-
-		let url = SERVER_URL.lock().unwrap().join(&path.into());
-		let bytes = CLIENT
-			.delete(url.to_string())
-			.query(&[("data", value)])
-			.send()
-			.await
-			.map_err(|e| e.into())?
-			.error_for_status()
-			.map_err(|e| CallServerActionError::Response(e.to_string()))?
-			.bytes()
-			.await
-			.map_err(|e| e.into())?;
-
-		serde_json::from_slice(&bytes)
-			.map_err(|e| CallServerActionError::Deserialize(e))
+		Self::request_with_query(reqwest::Method::DELETE, path, value).await
 	}
 
 	/// Call a server action with a PATCH request.
@@ -157,25 +125,7 @@ impl CallServerAction {
 		path: impl Into<RoutePath>,
 		value: T,
 	) -> Result<O, CallServerActionError> {
-		let value = serde_json::to_string(&value)
-			.map_err(|e| CallServerActionError::Serialize(e))?;
-
-		let url = SERVER_URL.lock().unwrap().join(&path.into());
-		let bytes = CLIENT
-			.patch(url.to_string())
-			.header("Content-Type", "application/json")
-			.body(value)
-			.send()
-			.await
-			.map_err(|e| e.into())?
-			.error_for_status()
-			.map_err(|e| CallServerActionError::Response(e.to_string()))?
-			.bytes()
-			.await
-			.map_err(|e| e.into())?;
-
-		serde_json::from_slice(&bytes)
-			.map_err(|e| CallServerActionError::Deserialize(e))
+		Self::request_with_body(reqwest::Method::PATCH, path, value).await
 	}
 
 	/// Call a server action with an OPTIONS request.
@@ -184,24 +134,7 @@ impl CallServerAction {
 		path: impl Into<RoutePath>,
 		value: T,
 	) -> Result<O, CallServerActionError> {
-		let value = serde_json::to_string(&value)
-			.map_err(|e| CallServerActionError::Serialize(e))?;
-
-		let url = SERVER_URL.lock().unwrap().join(&path.into());
-		let bytes = CLIENT
-			.request(reqwest::Method::OPTIONS, url.to_string())
-			.query(&[("data", value)])
-			.send()
-			.await
-			.map_err(|e| e.into())?
-			.error_for_status()
-			.map_err(|e| CallServerActionError::Response(e.to_string()))?
-			.bytes()
-			.await
-			.map_err(|e| e.into())?;
-
-		serde_json::from_slice(&bytes)
-			.map_err(|e| CallServerActionError::Deserialize(e))
+		Self::request_with_query(reqwest::Method::OPTIONS, path, value).await
 	}
 
 	/// Call a server action with a CONNECT request.
@@ -210,24 +143,7 @@ impl CallServerAction {
 		path: impl Into<RoutePath>,
 		value: T,
 	) -> Result<O, CallServerActionError> {
-		let value = serde_json::to_string(&value)
-			.map_err(|e| CallServerActionError::Serialize(e))?;
-
-		let url = SERVER_URL.lock().unwrap().join(&path.into());
-		let bytes = CLIENT
-			.request(reqwest::Method::CONNECT, url.to_string())
-			.query(&[("data", value)])
-			.send()
-			.await
-			.map_err(|e| e.into())?
-			.error_for_status()
-			.map_err(|e| CallServerActionError::Response(e.to_string()))?
-			.bytes()
-			.await
-			.map_err(|e| e.into())?;
-
-		serde_json::from_slice(&bytes)
-			.map_err(|e| CallServerActionError::Deserialize(e))
+		Self::request_with_query(reqwest::Method::CONNECT, path, value).await
 	}
 
 	/// Call a server action with a TRACE request.
@@ -236,24 +152,7 @@ impl CallServerAction {
 		path: impl Into<RoutePath>,
 		value: T,
 	) -> Result<O, CallServerActionError> {
-		let value = serde_json::to_string(&value)
-			.map_err(|e| CallServerActionError::Serialize(e))?;
-
-		let url = SERVER_URL.lock().unwrap().join(&path.into());
-		let bytes = CLIENT
-			.request(reqwest::Method::TRACE, url.to_string())
-			.query(&[("data", value)])
-			.send()
-			.await
-			.map_err(|e| e.into())?
-			.error_for_status()
-			.map_err(|e| CallServerActionError::Response(e.to_string()))?
-			.bytes()
-			.await
-			.map_err(|e| e.into())?;
-
-		serde_json::from_slice(&bytes)
-			.map_err(|e| CallServerActionError::Deserialize(e))
+		Self::request_with_query(reqwest::Method::TRACE, path, value).await
 	}
 }
 

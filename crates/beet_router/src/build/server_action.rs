@@ -63,7 +63,7 @@ impl ServerActionBuilder {
 			return_type,
 		);
 
-		// Build server version - use is_bodyless instead of is_get
+		// Build server version using is_bodyless to determine extractor type
 		let server_out = self.build_server_version(
 			fn_name,
 			is_async,
