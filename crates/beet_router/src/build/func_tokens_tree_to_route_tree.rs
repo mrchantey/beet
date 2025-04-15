@@ -1,11 +1,13 @@
 use crate::prelude::*;
 use anyhow::Result;
 use beet_rsx::prelude::*;
+use heck::ToSnakeCase;
+use proc_macro2::TokenStream;
 use syn::Expr;
+use syn::Item;
 use syn::ItemFn;
 
 
-// TODO this should be RouteInfo not FuncTokens, we dont need the func body
 
 /// Create a tree of routes from a list of [`FuncTokens`]`,
 /// that can then be converted to an [`ItemMod`] to be used in the router.
@@ -40,10 +42,11 @@ pub struct FuncTokensTreeToRouteTree {
 	pub codegen_file: CodegenFile,
 }
 
+// TODO this should be RouteInfo not FuncTokens? we dont need the func body
 impl Pipeline<FuncTokensTree, Result<()>> for FuncTokensTreeToRouteTree {
 	fn apply(mut self, tree: FuncTokensTree) -> Result<()> {
-		let paths_mod = tree.into_paths_mod();
-		let collect_func = self.into_collect_route_tree(&tree);
+		let paths_mod = self.routes_mod_tree(&tree);
+		let collect_func = self.collect_func(&tree);
 		self.codegen_file.add_item(paths_mod);
 		self.codegen_file.add_item(collect_func);
 		self.codegen_file.build_and_write()?;
@@ -53,21 +56,50 @@ impl Pipeline<FuncTokensTree, Result<()>> for FuncTokensTreeToRouteTree {
 
 
 impl FuncTokensTreeToRouteTree {
-	fn into_collect_route_tree(&self, tree: &FuncTokensTree) -> ItemFn {
-		let route_tree = self.tokens_to_tree(tree);
+	fn into_path_func(tree: &FuncTokensTree) -> Option<ItemFn> {
+		let Some(route) = &tree.value else {
+			return None;
+		};
+		let route_ident = if tree.children.is_empty() {
+			syn::Ident::new(
+				&route.name().to_snake_case(),
+				proc_macro2::Span::call_site(),
+			)
+		} else {
+			syn::Ident::new("index", proc_macro2::Span::call_site())
+		};
+		let route_path = route.route_info.path.to_string_lossy().to_string();
+		Some(syn::parse_quote!(
+			/// Get the local route path
+			pub fn #route_ident()->&'static str{
+				#route_path
+			}
+		))
+	}
+
+	fn routes_mod_tree(&self, tree: &FuncTokensTree) -> Item {
+		tree.mod_tree(|node| {
+			Self::into_path_func(node)
+				.map(|n| n.into())
+				.unwrap_or(Item::Verbatim(TokenStream::default()))
+		})
+	}
+
+	fn collect_func(&self, tree: &FuncTokensTree) -> ItemFn {
+		let route_tree = self.collect_route_node(tree);
 		syn::parse_quote!(
 			/// Collect the static route tree
-			pub fn collect_static_route_tree() -> StaticRouteTree {
+			pub fn collect() -> StaticRouteTree {
 				#route_tree
 			}
 		)
 	}
 
-	fn tokens_to_tree(&self, tree: &FuncTokensTree) -> Expr {
+	fn collect_route_node(&self, tree: &FuncTokensTree) -> Expr {
 		let children = tree
 			.children
 			.iter()
-			.map(|child| self.tokens_to_tree(child))
+			.map(|child| self.collect_route_node(child))
 			.collect::<Vec<_>>();
 
 		let path = match &tree.value {
@@ -129,22 +161,22 @@ mod test {
 	fn creates_mod() {
 		let routes = routes();
 		let tree = routes.xpipe(FuncTokensToTree);
-		let mod_item = tree.into_paths_mod();
+		let mod_item = FuncTokensTreeToRouteTree::default().routes_mod_tree(&tree);
 
 		let expected: ItemMod = syn::parse_quote! {
-		/// Nested local route paths
+		#[allow(missing_docs)]
 		pub mod root {
 			/// Get the local route path
 			pub fn index() -> &'static str {
 					"/"
 			}
-			/// Nested local route paths
+			#[allow(missing_docs)]
 			pub mod foo {
 					/// Get the local route path
 					pub fn bar() -> &'static str {
 							"/foo/bar"
 					}
-					/// Nested local route paths
+					#[allow(missing_docs)]
 					pub mod bazz {
 							/// Get the local route path
 							pub fn index() -> &'static str {
@@ -165,12 +197,11 @@ mod test {
 	#[test]
 	fn creates_collect_tree() {
 		let tree = routes().xpipe(FuncTokensToTree);
-		let func =
-			FuncTokensTreeToRouteTree::default().into_collect_route_tree(&tree);
+		let func = FuncTokensTreeToRouteTree::default().collect_func(&tree);
 
 		let expected: ItemFn = syn::parse_quote! {
 			/// Collect the static route tree
-			pub fn collect_static_route_tree() -> StaticRouteTree {
+			pub fn collect() -> StaticRouteTree {
 				StaticRouteTree {
 						name: "root".into(),
 						path: Some(RoutePath::new("/")),

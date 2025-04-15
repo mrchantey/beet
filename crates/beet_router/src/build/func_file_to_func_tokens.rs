@@ -35,11 +35,11 @@ impl FuncFileToFuncTokens {
 			.items
 			.into_iter()
 			.filter_map(|item| {
-				if let syn::Item::Fn(f) = item {
-					match &f.vis {
+				if let syn::Item::Fn(func) = item {
+					match &func.vis {
 						Visibility::Public(_) => {
-							let sig_str = f.sig.ident.to_string();
-							return Some((sig_str, f.sig.ident));
+							let sig_str = func.sig.ident.to_string();
+							return Some((sig_str, func.sig.ident));
 						}
 						_ => {}
 					}

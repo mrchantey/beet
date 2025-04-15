@@ -1,4 +1,6 @@
 //! Module for the codegen build step of the router.
+mod func_tokens_tree_to_server_actions;
+pub use func_tokens_tree_to_server_actions::*;
 mod func_tokens_to_tree;
 pub use func_tokens_to_tree::*;
 mod server_action;

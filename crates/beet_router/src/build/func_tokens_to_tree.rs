@@ -1,9 +1,6 @@
 use crate::prelude::*;
-use heck::ToSnakeCase;
-use quote::ToTokens;
 use sweet::prelude::*;
 use syn::Item;
-use syn::ItemFn;
 
 
 #[derive(Debug, Default, Clone)]
@@ -80,56 +77,28 @@ impl FuncTokensTree {
 		}
 	}
 
-	fn into_path_func(&self) -> Option<ItemFn> {
-		let Some(route) = &self.value else {
-			return None;
-		};
-		let route_ident = if self.children.is_empty() {
-			syn::Ident::new(
-				&route.name().to_snake_case(),
-				proc_macro2::Span::call_site(),
-			)
-		} else {
-			syn::Ident::new("index", proc_macro2::Span::call_site())
-		};
-		let route_path = route.route_info.path.to_string_lossy().to_string();
-		Some(syn::parse_quote!(
-			/// Get the local route path
-			pub fn #route_ident()->&'static str{
-				#route_path
-			}
-		))
-	}
 
-	pub fn into_paths_mod(&self) -> Item {
+	/// Create a tree of `mod` items, mapping each leaf node.
+	pub fn mod_tree(&self, map_item: impl Fn(&Self) -> Item + Clone) -> Item {
 		if self.children.is_empty() {
-			self.into_path_func()
-				.expect(
-					"RouteTreeBuilders with no path and no children is not allowed",
-				)
-				.into()
+			map_item(self)
 		} else {
-			let children =
-				self.children.iter().map(|child| child.into_paths_mod());
+			let children = self
+				.children
+				.iter()
+				.map(|child| child.mod_tree(map_item.clone()));
 			let ident =
 				syn::Ident::new(&self.name, proc_macro2::Span::call_site());
-			let path = self
-				.into_path_func()
-				.map(|p| p.to_token_stream())
-				.unwrap_or_default();
+			let item = map_item(self);
 			syn::parse_quote!(
-				/// Nested local route paths
+				#[allow(missing_docs)]
 				pub mod #ident {
-					#path
+					#item
 					#(#children)*
 				}
 			)
 		}
 	}
-
-
-
-	
 }
 
 
