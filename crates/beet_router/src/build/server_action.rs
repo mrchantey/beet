@@ -28,25 +28,11 @@ impl ServerActionBuilder {
 		let is_async = self.item_fn.sig.asyncness.is_some();
 		let method_name = fn_name.to_string().to_lowercase();
 
-		// Determine the HTTP method based on function name
-		// Classify methods into bodyless and methods with body
+		// Determine if this is a bodyless method
 		let is_bodyless = matches!(
 			method_name.as_str(),
 			"get" | "head" | "options" | "connect" | "trace" | "delete"
 		);
-
-		let http_method: Ident = match method_name.as_str() {
-			"get" => parse_quote!(get),
-			"post" => parse_quote!(post),
-			"put" => parse_quote!(put),
-			"delete" => parse_quote!(delete),
-			"patch" => parse_quote!(patch),
-			"head" => parse_quote!(head),
-			"options" => parse_quote!(options),
-			"connect" => parse_quote!(connect),
-			"trace" => parse_quote!(trace),
-			_ => parse_quote!(post), // Default fallback to POST for unknown methods
-		};
 
 		// Extract the function body
 		let function_body = &self.item_fn.block;
@@ -55,10 +41,10 @@ impl ServerActionBuilder {
 		let (args_tuple_pat, args_type, client_params, server_extractors) =
 			self.extract_parameters();
 
-		// Build client version
+		// Build client version using method name directly
 		let client_out = self.build_client_version(
 			fn_name,
-			&http_method,
+			&method_name,
 			&client_params,
 			return_type,
 		);
@@ -165,7 +151,7 @@ impl ServerActionBuilder {
 	fn build_client_version(
 		&self,
 		fn_name: &syn::Ident,
-		http_method: &syn::Ident,
+		method_name: &str,
 		client_params: &[syn::FnArg],
 		return_type: &ReturnType,
 	) -> syn::ItemFn {
@@ -182,10 +168,14 @@ impl ServerActionBuilder {
 			.map(|(i, _)| format_ident!("args{}", i))
 			.collect();
 
+		// Use a string literal for the method name
+		let method_str =
+			syn::LitStr::new(method_name, proc_macro2::Span::call_site());
+
 		parse_quote! {
 			#[cfg(feature="client")]
 			async fn #fn_name(#(#client_params),*) -> Result<#return_inner_type, ServerActionError> {
-				CallServerAction::#http_method(#route_path, (#(#param_names),*)).await
+				CallServerAction::request(#method_str, #route_path, (#(#param_names),*)).await
 			}
 		}
 	}
@@ -317,7 +307,9 @@ mod tests {
 		// Check client function has post method
 		let client_str = quote!(#client_fn).to_token_stream().to_string();
 		expect(client_str).to_contain(
-			&quote!(CallServerAction::post).to_token_stream().to_string(),
+			&quote!(CallServerAction::request("post", "/add", (args0, args1)))
+				.to_token_stream()
+				.to_string(),
 		);
 
 		// Check server function uses Json extractor instead of JsonQuery
@@ -477,7 +469,7 @@ mod tests {
 		// Client function should have zero parameters since there's no args tuple
 		let client_str = quote!(#client_fn).to_token_stream().to_string();
 		expect(client_str).to_contain(
-			&quote!(CallServerAction::get("/greet", ()))
+			&quote!(CallServerAction::request("get", "/greet", ()))
 				.to_token_stream()
 				.to_string(),
 		);
@@ -538,7 +530,7 @@ mod tests {
 		// Verify call has empty tuple
 		let client_str = quote!(#client_fn).to_token_stream().to_string();
 		expect(client_str).to_contain(
-			&quote!(CallServerAction::get("/hello", ()))
+			&quote!(CallServerAction::request("get", "/hello", ()))
 				.to_token_stream()
 				.to_string(),
 		);
@@ -615,7 +607,13 @@ mod tests {
 		// Check client function has PUT method
 		let client_str = quote!(#client_fn).to_token_stream().to_string();
 		expect(client_str).to_contain(
-			&quote!(CallServerAction::put).to_token_stream().to_string(),
+			&quote!(CallServerAction::request(
+				"put",
+				"/update",
+				(args0, args1)
+			))
+			.to_token_stream()
+			.to_string(),
 		);
 
 		// Check server function uses Json extractor for PUT (has body)
@@ -643,9 +641,13 @@ mod tests {
 		// Check client function has DELETE method
 		let client_str = quote!(#client_fn).to_token_stream().to_string();
 		expect(client_str).to_contain(
-			&quote!(CallServerAction::delete)
-				.to_token_stream()
-				.to_string(),
+			&quote!(CallServerAction::request(
+				"delete",
+				"/delete",
+				(args0, args1)
+			))
+			.to_token_stream()
+			.to_string(),
 		);
 
 		// DELETE currently treated as a bodyless method
@@ -670,9 +672,13 @@ mod tests {
 		// Check client function has PATCH method
 		let client_str = quote!(#client_fn).to_token_stream().to_string();
 		expect(client_str).to_contain(
-			&quote!(CallServerAction::patch)
-				.to_token_stream()
-				.to_string(),
+			&quote!(CallServerAction::request(
+				"patch",
+				"/patch",
+				(args0, args1)
+			))
+			.to_token_stream()
+			.to_string(),
 		);
 
 		// Check server function uses Json extractor for PATCH (has body)
@@ -700,7 +706,7 @@ mod tests {
 		// Check client function has OPTIONS method
 		let client_str = quote!(#client_fn).to_token_stream().to_string();
 		expect(client_str).to_contain(
-			&quote!(CallServerAction::options)
+			&quote!(CallServerAction::request("options", "/options", ()))
 				.to_token_stream()
 				.to_string(),
 		);
@@ -727,7 +733,9 @@ mod tests {
 		// Check client function has HEAD method
 		let client_str = quote!(#client_fn).to_token_stream().to_string();
 		expect(client_str).to_contain(
-			&quote!(CallServerAction::head).to_token_stream().to_string(),
+			&quote!(CallServerAction::request("head", "/head", (args0, args1)))
+				.to_token_stream()
+				.to_string(),
 		);
 
 		// Check server function uses JsonQuery extractor for HEAD (bodyless)

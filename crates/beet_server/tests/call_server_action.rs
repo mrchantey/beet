@@ -42,7 +42,7 @@ async fn test_server_action_calls() {
 
 	// Test GET request
 	expect(
-		CallServerAction::get::<_, i32>("/add", (5, 3))
+		CallServerAction::request::<_, i32>("get", "/add", (5, 3))
 			.await
 			.unwrap(),
 	)
@@ -50,7 +50,7 @@ async fn test_server_action_calls() {
 
 	// Test POST request
 	expect(
-		CallServerAction::post::<_, i32>("/add", (10, 7))
+		CallServerAction::request::<_, i32>("post", "/add", (10, 7))
 			.await
 			.unwrap(),
 	)
