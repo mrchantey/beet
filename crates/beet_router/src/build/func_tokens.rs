@@ -19,10 +19,13 @@ pub struct FuncTokens {
 	/// A block that returns the frontmatter of this function, this may be a unit type
 	/// or [`None`] if the eventual type allows for it.
 	pub frontmatter: Block,
-	/// Tokens that will return a valid [`RouteFunc::func`], its exact signature depends
-	/// on [`FuncTokensToCodegen::func_type`]. This may depend on [`mod_ident`](Self::mod_ident),
-	/// to be imported and in scope.
+	/// Tokens that will return the corresponding [`FuncTokensGroup::func_type`]. 
+	/// This may depend on [`mod_ident`](Self::mod_ident), to be imported and in scope,
+	/// which is created via [`FuncTokensGroup::func_files_to_mod_imports`].
 	pub func: syn::Expr,
+	/// Optionally capture the actual function that was used to create this route.
+	/// For sources like markdown this will be `None`.
+	pub item_fn: Option<syn::ItemFn>,
 	/// Canonical path to the file
 	pub canonical_path: CanonicalPathBuf,
 	/// Path relative to the [`src`](FileGroup::src) of the [`FileGroup`]
@@ -46,6 +49,7 @@ impl FuncTokens {
 			mod_ident: None,
 			frontmatter: syn::parse_quote! {{}},
 			func,
+			item_fn: None,
 			canonical_path: CanonicalPathBuf::new_unchecked(path),
 			local_path: path.to_path_buf(),
 			route_info: RouteInfo {

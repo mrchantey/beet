@@ -31,7 +31,7 @@ impl FuncFileToFuncTokens {
 
 		let route_path = RoutePath::from_file_path(&local_path)?;
 
-		let func_idents = syn::parse_file(&file_str)?
+		let pub_funcs = syn::parse_file(&file_str)?
 			.items
 			.into_iter()
 			.filter_map(|item| {
@@ -39,7 +39,7 @@ impl FuncFileToFuncTokens {
 					match &func.vis {
 						Visibility::Public(_) => {
 							let sig_str = func.sig.ident.to_string();
-							return Some((sig_str, func.sig.ident));
+							return Some((sig_str, func));
 						}
 						_ => {}
 					}
@@ -49,14 +49,14 @@ impl FuncFileToFuncTokens {
 			.collect::<Vec<_>>();
 
 
-		func_idents
+		pub_funcs
 			.iter()
-			.filter_map(|(ident_str, ident)| {
+			.filter_map(|(ident_str, func)| {
 				if HTTP_METHODS.iter().all(|m| m != &ident_str) {
 					return None;
 				}
 				let frontmatter_ident = format!("{ident_str}_frontmatter");
-				let frontmatter = match func_idents.iter().find(|(s, _)| {
+				let frontmatter = match pub_funcs.iter().find(|(s, _)| {
 					s == "frontmatter" || s == &frontmatter_ident
 				}) {
 					Some((_, frontmatter_ident)) => {
@@ -67,6 +67,7 @@ impl FuncFileToFuncTokens {
 					None => syn::parse_quote!({ Default::default() }),
 				};
 
+				let ident = &func.sig.ident;
 				Some(FuncTokens {
 					mod_ident: Some(mod_ident.clone()),
 					canonical_path: canonical_path.clone(),
@@ -78,6 +79,7 @@ impl FuncFileToFuncTokens {
 					},
 					frontmatter,
 					func: syn::parse_quote! {#mod_ident::#ident},
+					item_fn: Some(func.clone()),
 				})
 			})
 			.collect::<Vec<_>>()

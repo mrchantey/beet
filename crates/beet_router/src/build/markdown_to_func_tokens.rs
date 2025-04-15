@@ -149,6 +149,7 @@ impl MarkdownToFuncTokens {
 		Ok(FuncTokens {
 			mod_ident: None,
 			frontmatter,
+			item_fn: None,
 			func: syn::parse_quote! {|| rsx! {#rust_tokens}},
 			route_info: RouteInfo {
 				path: RoutePath::from_file_path(&local_path)?,
