@@ -1,5 +1,6 @@
 use crate::prelude::*;
 use anyhow::Result;
+use beet_router::prelude::*;
 use beet_rsx::prelude::*;
 use proc_macro2::TokenStream;
 use syn::Item;

@@ -1,4 +1,4 @@
-use crate::prelude::*;
+use beet_router::prelude::*;
 use quote::format_ident;
 use quote::quote;
 use sweet::prelude::*;
@@ -216,6 +216,7 @@ impl FuncTokensToServerActions {
 #[cfg(test)]
 mod tests {
 	use crate::prelude::*;
+	use beet_router::prelude::*;
 	use quote::ToTokens;
 	use quote::quote;
 	use sweet::prelude::*;

@@ -865,6 +865,7 @@ dependencies = [
  "anyhow",
  "axum",
  "beet_router",
+ "beet_rsx",
  "bytes",
  "cargo-manifest",
  "http",
