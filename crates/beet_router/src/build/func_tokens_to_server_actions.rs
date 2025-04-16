@@ -1,8 +1,7 @@
 use crate::prelude::*;
-use http::Method;
 use quote::format_ident;
 use quote::quote;
-use std::str::FromStr;
+use sweet::prelude::*;
 use syn::Block;
 use syn::FnArg;
 use syn::ItemFn;
@@ -10,55 +9,53 @@ use syn::Pat;
 use syn::ReturnType;
 use syn::Type;
 use syn::parse_quote;
+use syn::punctuated::Punctuated;
 
-
+/// Maps the [`FuncTokens::item_fn`] to a pair of
+/// [`ItemFn`]s, one for the client and one for the server.
 pub struct FuncTokensToServerActions;
 
-
-
-pub struct ServerActionBuilder {
-	item_fn: ItemFn,
-	route_path: String,
+impl Pipeline<FuncTokens, Option<(ItemFn, ItemFn)>>
+	for FuncTokensToServerActions
+{
+	fn apply(self, func_tokens: FuncTokens) -> Option<(ItemFn, ItemFn)> {
+		let Some(item_fn) = func_tokens.item_fn else {
+			return None;
+		};
+		Some(self.build(&func_tokens.route_info, &item_fn))
+	}
 }
 
-impl ServerActionBuilder {
-	pub fn new(item_fn: ItemFn, route_path: String) -> Self {
-		Self {
-			item_fn,
-			route_path,
-		}
-	}
-
-	pub fn build(&self) -> (syn::ItemFn, syn::ItemFn) {
-		let fn_name = &self.item_fn.sig.ident;
-		let return_type = &self.item_fn.sig.output;
-		let is_async = self.item_fn.sig.asyncness.is_some();
-		let method = Method::from_str(&fn_name.to_string().to_uppercase())
-			.unwrap_or(Method::POST);
-
-		// Determine if this is a bodyless method
-		let is_bodyless = CallServerAction::is_bodyless(&method);
+impl FuncTokensToServerActions {
+	pub fn build(
+		&self,
+		route_info: &RouteInfo,
+		item_fn: &ItemFn,
+	) -> (syn::ItemFn, syn::ItemFn) {
+		let fn_name = &item_fn.sig.ident;
+		let return_type = &item_fn.sig.output;
+		let is_async = item_fn.sig.asyncness.is_some();
 
 		// Extract the function body
-		let function_body = &self.item_fn.block;
+		let function_body = &item_fn.block;
 
 		// Extract parameters
 		let (args_tuple_pat, args_type, client_params, server_extractors) =
-			self.extract_parameters();
+			self.extract_parameters(&item_fn.sig.inputs);
 
 		// Build client version using method name directly
 		let client_out = self.build_client_version(
+			route_info,
 			fn_name,
-			method,
 			&client_params,
 			return_type,
 		);
 
 		// Build server version using is_bodyless to determine extractor type
 		let server_out = self.build_server_version(
+			route_info,
 			fn_name,
 			is_async,
-			is_bodyless,
 			args_tuple_pat,
 			args_type,
 			function_body,
@@ -71,13 +68,14 @@ impl ServerActionBuilder {
 
 	fn extract_parameters(
 		&self,
-	) -> (Option<Pat>, Option<Type>, Vec<syn::FnArg>, Vec<syn::FnArg>) {
+		inputs: &Punctuated<FnArg, syn::token::Comma>,
+	) -> (Option<Pat>, Option<Type>, Vec<FnArg>, Vec<FnArg>) {
 		let mut args_tuple_pat = None;
 		let mut args_type = None;
 		let mut client_params = Vec::new();
 		let mut server_extractors = Vec::new();
 
-		for param in &self.item_fn.sig.inputs {
+		for param in inputs {
 			match param {
 				FnArg::Receiver(_) => {
 					// Skip self parameters
@@ -155,12 +153,11 @@ impl ServerActionBuilder {
 
 	fn build_client_version(
 		&self,
+		route_info: &RouteInfo,
 		fn_name: &syn::Ident,
-		method: Method,
-		client_params: &[syn::FnArg],
+		client_params: &[FnArg],
 		return_type: &ReturnType,
 	) -> syn::ItemFn {
-		let route_path = &self.route_path;
 		let return_inner_type = match return_type {
 			ReturnType::Type(_, ty) => ty.clone(),
 			_ => parse_quote!(()),
@@ -173,31 +170,33 @@ impl ServerActionBuilder {
 			.map(|(i, _)| format_ident!("args{}", i))
 			.collect();
 
-		let method = format_ident!("{}", method.as_str());
-
 		parse_quote! {
 			#[cfg(feature="client")]
 			async fn #fn_name(#(#client_params),*) -> Result<#return_inner_type, ServerActionError> {
-				CallServerAction::request(beet::exports::http::method::#method, #route_path, (#(#param_names),*)).await
+				CallServerAction::request(#route_info, (#(#param_names),*)).await
 			}
 		}
 	}
 
 	fn build_server_version(
 		&self,
+		route_info: &RouteInfo,
 		fn_name: &syn::Ident,
 		is_async: bool,
-		is_bodyless: bool,
 		args_tuple_pat: Option<Pat>,
 		args_type: Option<Type>,
 		function_body: &Block,
-		server_extractors: &[syn::FnArg],
+		server_extractors: &[FnArg],
 		return_type: &ReturnType,
 	) -> syn::ItemFn {
-		let extractor_type: syn::TypePath = if is_bodyless {
-			parse_quote!(JsonQuery)
-		} else {
+		let method_has_body = route_info.method_has_body();
+		println!("Function name: {:?}", fn_name);
+		println!("Route info: {:?}", route_info);
+		println!("Method has body: {}", method_has_body);
+		let extractor_type: syn::TypePath = if method_has_body {
 			parse_quote!(Json)
+		} else {
+			parse_quote!(JsonQuery)
 		};
 
 		let return_inner_type = match return_type {
@@ -205,18 +204,19 @@ impl ServerActionBuilder {
 			_ => parse_quote!(()),
 		};
 
-		let args_param: syn::FnArg = if let Some(ty) = args_type {
+		let args_param: FnArg = if let Some(ty) = args_type {
 			if let Some(pat) = args_tuple_pat {
 				parse_quote! { #extractor_type(#pat): #ty }
 			} else {
 				parse_quote! { #extractor_type(args): #ty }
 			}
 		} else {
-			if is_bodyless {
+			if method_has_body {
+				// is this valid?
+				parse_quote! { #extractor_type(args): () }
+			} else {
 				// For bodyless requests with no parameters, use JsonQuery<()>
 				parse_quote! { #extractor_type(args): #extractor_type < () > }
-			} else {
-				parse_quote! { #extractor_type(args): () }
 			}
 		};
 
@@ -245,11 +245,22 @@ impl ServerActionBuilder {
 
 #[cfg(test)]
 mod tests {
+	use std::str::FromStr;
+
 	use crate::prelude::*;
+	use http::Method;
 	use quote::ToTokens;
 	use quote::quote;
 	use sweet::prelude::*;
 	use syn::parse_quote;
+
+	fn build(func: syn::ItemFn, path: &str) -> (syn::ItemFn, syn::ItemFn) {
+		let mut func_tokens = FuncTokens::simple(path, syn::parse_quote!({}));
+		func_tokens.route_info.method =
+			Method::from_str(&func.sig.ident.to_string()).unwrap();
+		func_tokens.item_fn = Some(func);
+		func_tokens.xpipe(FuncTokensToServerActions).unwrap()
+	}
 
 	#[test]
 	fn test_basic_get_function() {
@@ -260,8 +271,7 @@ mod tests {
 			}
 		};
 
-		let builder = ServerActionBuilder::new(item_fn, "/add".to_string());
-		let (client_fn, server_fn) = builder.build();
+		let (client_fn, server_fn) = build(item_fn, "/add");
 
 		// Check client function
 		expect(client_fn.sig.ident.to_string()).to_be("get");
@@ -304,15 +314,13 @@ mod tests {
 			}
 		};
 
-		let builder = ServerActionBuilder::new(item_fn, "/add".to_string());
-		let (client_fn, server_fn) = builder.build();
+		let (client_fn, server_fn) = build(item_fn, "/add");
 
 		// Check client function has post method
 		let client_str = quote!(#client_fn).to_token_stream().to_string();
 		expect(client_str).to_contain(
 			&quote!(CallServerAction::request(
-				beet::exports::http::method::POST,
-				"/add",
+				RouteInfo::new("/add", beet::exports::http::Method::POST),
 				(args0, args1)
 			))
 			.to_token_stream()
@@ -338,8 +346,7 @@ mod tests {
 			}
 		};
 
-		let builder = ServerActionBuilder::new(item_fn, "/add".to_string());
-		let (client_fn, _) = builder.build();
+		let (client_fn, _) = build(item_fn, "/add");
 
 		// Verify client function parameters are named correctly
 		let params_str = quote!(#client_fn).to_token_stream().to_string();
@@ -358,8 +365,7 @@ mod tests {
 			}
 		};
 
-		let builder = ServerActionBuilder::new(item_fn, "/add".to_string());
-		let (client_fn, _) = builder.build();
+		let (client_fn, _) = build(item_fn, "/add");
 
 		// Verify client function parameters use generic args names
 		let params_str = quote!(#client_fn).to_token_stream().to_string();
@@ -378,8 +384,7 @@ mod tests {
 			}
 		};
 
-		let builder = ServerActionBuilder::new(item_fn, "/add".to_string());
-		let (_, server_fn) = builder.build();
+		let (_, server_fn) = build(item_fn, "/add");
 
 		// Verify server function properly awaits the body
 		let server_str = quote!(#server_fn).to_token_stream().to_string();
@@ -396,8 +401,7 @@ mod tests {
 			}
 		};
 
-		let builder = ServerActionBuilder::new(item_fn, "/add".to_string());
-		let (_, server_fn) = builder.build();
+		let (_, server_fn) = build(item_fn, "/add");
 
 		// Verify server function doesn't await the body
 		let server_str = quote!(#server_fn).to_token_stream().to_string();
@@ -419,8 +423,7 @@ mod tests {
 			}
 		};
 
-		let builder = ServerActionBuilder::new(item_fn, "/complex".to_string());
-		let (client_fn, server_fn) = builder.build();
+		let (client_fn, server_fn) = build(item_fn, "/complex");
 
 		// Check client return type
 		let client_str = quote!(#client_fn).to_token_stream().to_string();
@@ -446,8 +449,7 @@ mod tests {
 			}
 		};
 
-		let builder = ServerActionBuilder::new(item_fn, "/add".to_string());
-		let (_, server_fn) = builder.build();
+		let (_, server_fn) = build(item_fn, "/add");
 
 		// Check that all extractors are preserved in server function
 		let server_str = quote!(#server_fn).to_token_stream().to_string();
@@ -470,15 +472,13 @@ mod tests {
 			}
 		};
 
-		let builder = ServerActionBuilder::new(item_fn, "/greet".to_string());
-		let (client_fn, server_fn) = builder.build();
+		let (client_fn, server_fn) = build(item_fn, "/greet");
 
 		// Client function should have zero parameters since there's no args tuple
 		let client_str = quote!(#client_fn).to_token_stream().to_string();
 		expect(client_str).to_contain(
 			&quote!(CallServerAction::request(
-				beet::exports::http::method::GET,
-				"/greet",
+				RouteInfo::new("/greet", beet::exports::http::Method::GET),
 				()
 			))
 			.to_token_stream()
@@ -510,8 +510,7 @@ mod tests {
 			}
 		};
 
-		let builder = ServerActionBuilder::new(item_fn, "/add".to_string());
-		let (client_fn, server_fn) = builder.build();
+		let (client_fn, server_fn) = build(item_fn, "/add");
 
 		// Check that method name case is preserved but HTTP method is correct
 		expect(client_fn.sig.ident.to_string()).to_be("GET");
@@ -531,8 +530,7 @@ mod tests {
 				}
 		};
 
-		let builder = ServerActionBuilder::new(item_fn, "/hello".to_string());
-		let (client_fn, server_fn) = builder.build();
+		let (client_fn, server_fn) = build(item_fn, "/hello");
 
 		// Client function should have no parameters
 		let client_params = client_fn.sig.inputs.len();
@@ -542,8 +540,7 @@ mod tests {
 		let client_str = quote!(#client_fn).to_token_stream().to_string();
 		expect(client_str).to_contain(
 			&quote!(CallServerAction::request(
-				beet::exports::http::method::GET,
-				"/hello",
+				RouteInfo::new("/hello", beet::exports::http::Method::GET),
 				()
 			))
 			.to_token_stream()
@@ -568,8 +565,7 @@ mod tests {
 				}
 		};
 
-		let builder = ServerActionBuilder::new(item_fn, "/log".to_string());
-		let (client_fn, server_fn) = builder.build();
+		let (client_fn, server_fn) = build(item_fn, "/log");
 
 		// Check return types
 		let client_str = quote!(#client_fn).to_token_stream().to_string();
@@ -593,8 +589,7 @@ mod tests {
 				}
 		};
 
-		let builder = ServerActionBuilder::new(item_fn, "/add".to_string());
-		let (client_fn, server_fn) = builder.build();
+		let (client_fn, server_fn) = build(item_fn, "/add");
 
 		// Verify self parameter is removed from client function
 		let client_params = client_fn.sig.inputs.len();
@@ -616,15 +611,13 @@ mod tests {
 			}
 		};
 
-		let builder = ServerActionBuilder::new(item_fn, "/update".to_string());
-		let (client_fn, server_fn) = builder.build();
+		let (client_fn, server_fn) = build(item_fn, "/update");
 
 		// Check client function has PUT method
 		let client_str = quote!(#client_fn).to_token_stream().to_string();
 		expect(client_str).to_contain(
 			&quote!(CallServerAction::request(
-				beet::exports::http::method::PUT,
-				"/update",
+				RouteInfo::new("/update", beet::exports::http::Method::PUT),
 				(args0, args1)
 			))
 			.to_token_stream()
@@ -650,15 +643,13 @@ mod tests {
 			}
 		};
 
-		let builder = ServerActionBuilder::new(item_fn, "/delete".to_string());
-		let (client_fn, server_fn) = builder.build();
+		let (client_fn, server_fn) = build(item_fn, "/delete");
 
 		// Check client function has DELETE method
 		let client_str = quote!(#client_fn).to_token_stream().to_string();
 		expect(client_str).to_contain(
 			&quote!(CallServerAction::request(
-				beet::exports::http::method::DELETE,
-				"/delete",
+				RouteInfo::new("/delete", beet::exports::http::Method::DELETE),
 				(args0, args1)
 			))
 			.to_token_stream()
@@ -681,15 +672,13 @@ mod tests {
 			}
 		};
 
-		let builder = ServerActionBuilder::new(item_fn, "/patch".to_string());
-		let (client_fn, server_fn) = builder.build();
+		let (client_fn, server_fn) = build(item_fn, "/patch");
 
 		// Check client function has PATCH method
 		let client_str = quote!(#client_fn).to_token_stream().to_string();
 		expect(client_str).to_contain(
 			&quote!(CallServerAction::request(
-				beet::exports::http::method::PATCH,
-				"/patch",
+				RouteInfo::new("/patch", beet::exports::http::Method::PATCH),
 				(args0, args1)
 			))
 			.to_token_stream()
@@ -715,15 +704,16 @@ mod tests {
 			}
 		};
 
-		let builder = ServerActionBuilder::new(item_fn, "/options".to_string());
-		let (client_fn, server_fn) = builder.build();
+		let (client_fn, server_fn) = build(item_fn, "/options");
 
 		// Check client function has OPTIONS method
 		let client_str = quote!(#client_fn).to_token_stream().to_string();
 		expect(client_str).to_contain(
 			&quote!(CallServerAction::request(
-				beet::exports::http::method::OPTIONS,
-				"/options",
+				RouteInfo::new(
+					"/options",
+					beet::exports::http::Method::OPTIONS
+				),
 				()
 			))
 			.to_token_stream()
@@ -746,15 +736,13 @@ mod tests {
 			}
 		};
 
-		let builder = ServerActionBuilder::new(item_fn, "/head".to_string());
-		let (client_fn, server_fn) = builder.build();
+		let (client_fn, server_fn) = build(item_fn, "/head");
 
 		// Check client function has HEAD method
 		let client_str = quote!(#client_fn).to_token_stream().to_string();
 		expect(client_str).to_contain(
 			&quote!(CallServerAction::request(
-				beet::exports::http::method::HEAD,
-				"/head",
+				RouteInfo::new("/head", beet::exports::http::Method::HEAD),
 				(args0, args1)
 			))
 			.to_token_stream()

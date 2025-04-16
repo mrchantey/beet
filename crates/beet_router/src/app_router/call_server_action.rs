@@ -1,7 +1,6 @@
 use crate::prelude::*;
 use once_cell::sync::Lazy;
 use reqwest::Client;
-use reqwest::Method;
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 use std::sync::Mutex;
@@ -15,18 +14,6 @@ pub struct CallServerAction;
 static CLIENT: Lazy<Client> = Lazy::new(|| Client::new());
 
 impl CallServerAction {
-	pub fn is_bodyless(method: &Method) -> bool {
-		matches!(
-			method,
-			&Method::GET
-				| &Method::HEAD
-				| &Method::DELETE
-				| &Method::OPTIONS
-				| &Method::CONNECT
-				| &Method::TRACE
-		)
-	}
-
 	pub fn get_server_url() -> RoutePath { SERVER_URL.lock().unwrap().clone() }
 	pub fn set_server_url(url: RoutePath) { *SERVER_URL.lock().unwrap() = url; }
 
@@ -35,30 +22,28 @@ impl CallServerAction {
 	/// - Bodyless methods (GET, HEAD, DELETE, OPTIONS, CONNECT, TRACE) send data as query parameters
 	/// - Methods with body (POST, PUT, PATCH) send data in the request body
 	pub async fn request<T: Serialize, O: DeserializeOwned>(
-		method: Method,
-		path: impl Into<RoutePath>,
+		route_info: RouteInfo,
 		value: T,
 	) -> Result<O, CallServerActionError> {
-		if Self::is_bodyless(&method) {
-			Self::request_with_query(method, path, value).await
+		if route_info.method_has_body() {
+			Self::request_with_body(route_info, value).await
 		} else {
-			Self::request_with_body(method, path, value).await
+			Self::request_with_query(route_info, value).await
 		}
 	}
 
 	/// Internal function to make a request with data in the query parameters.
 	/// Used by GET, HEAD, DELETE, OPTIONS, CONNECT, TRACE methods.
 	async fn request_with_query<T: Serialize, O: DeserializeOwned>(
-		method: Method,
-		path: impl Into<RoutePath>,
+		route_info: RouteInfo,
 		value: T,
 	) -> Result<O, CallServerActionError> {
 		let value = serde_json::to_string(&value)
 			.map_err(|e| CallServerActionError::Serialize(e))?;
 
-		let url = SERVER_URL.lock().unwrap().join(&path.into());
+		let url = SERVER_URL.lock().unwrap().join(&route_info.path);
 		let bytes = CLIENT
-			.request(method, url.to_string())
+			.request(route_info.method, url.to_string())
 			.query(&[("data", value)])
 			.send()
 			.await
@@ -76,16 +61,15 @@ impl CallServerAction {
 	/// Internal function to make a request with data in the request body.
 	/// Used by POST, PUT, PATCH methods.
 	async fn request_with_body<T: Serialize, O: DeserializeOwned>(
-		method: Method,
-		path: impl Into<RoutePath>,
+		route_info: RouteInfo,
 		value: T,
 	) -> Result<O, CallServerActionError> {
 		let value = serde_json::to_string(&value)
 			.map_err(|e| CallServerActionError::Serialize(e))?;
 
-		let url = SERVER_URL.lock().unwrap().join(&path.into());
+		let url = SERVER_URL.lock().unwrap().join(&route_info.path);
 		let bytes = CLIENT
-			.request(method, url.to_string())
+			.request(route_info.method, url.to_string())
 			.header("Content-Type", "application/json")
 			.body(value)
 			.send()

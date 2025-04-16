@@ -39,6 +39,7 @@ pub struct FuncTokens {
 
 
 impl FuncTokens {
+
 	/// create a simple `FuncTokens` for testing
 	pub fn simple(
 		local_path: impl AsRef<std::path::Path>,

@@ -26,6 +26,16 @@ pub struct RouteInfo {
 	pub method: Method,
 }
 
+impl RouteInfo {
+	/// Whether the [`Method`] is of the type that
+	/// expects a body
+	pub fn method_has_body(&self) -> bool {
+		self.method == Method::POST
+			|| self.method == Method::PUT
+			|| self.method == Method::PATCH
+	}
+}
+
 #[cfg(feature = "parser")]
 impl quote::ToTokens for RouteInfo {
 	fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {

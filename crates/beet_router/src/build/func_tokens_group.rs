@@ -2,7 +2,7 @@ use crate::prelude::*;
 use std::path::Path;
 use sweet::prelude::*;
 use syn::Item;
-
+use anyhow::Result;
 
 
 /// A group of [`FuncTokens`] for which a type has been
