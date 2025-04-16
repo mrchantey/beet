@@ -38,4 +38,5 @@ lightningcss.workspace = true
 
 [build-dependencies]
 anyhow.workspace = true
+sweet.workspace = true
 beet_router = { workspace = true, features = ["build"] }

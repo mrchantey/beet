@@ -17,12 +17,10 @@ impl Pipeline<Vec<FuncTokens>, FuncTokensGroup> for FuncTokensToRsxRoutesGroup {
 			func_type: syn::parse_quote!(RouteFunc<RsxRouteFunc>),
 			funcs: funcs.xmap_each(|mut func| {
 				let block = &func.func;
-				let method = func.route_info.method.to_string();
-				let route_path = func.route_info.path.to_string_lossy();
+				let route_info = &func.route_info;
 				func.func = syn::parse_quote! {{
 					RouteFunc::new(
-						#method,
-						#route_path,
+						#route_info,
 						#block
 					)
 				}};

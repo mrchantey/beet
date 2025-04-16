@@ -72,6 +72,7 @@ pub mod as_beet {
 	// expose macro for single import in docs
 	pub use beet_rsx_macros::rsx;
 	pub mod beet {
+		// expose prelude and exports
 		pub use crate::*;
 		// in beet the beet_rsx crate is aliased to rsx
 		pub mod rsx {

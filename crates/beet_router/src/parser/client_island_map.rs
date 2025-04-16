@@ -38,6 +38,7 @@ mod test {
 	#[test]
 	fn to_tokens() {
 		use beet_rsx::prelude::*;
+		use http::Method;
 
 		let island = ClientIsland {
 			tracker: RustyTracker::new(0, 0),
@@ -48,7 +49,7 @@ mod test {
 
 		expect(
 			ClientIslandMap {
-				map: vec![(RouteInfo::new("/", "get"), vec![island.clone()])]
+				map: vec![(RouteInfo::new("/", Method::GET), vec![island.clone()])]
 					.into_iter()
 					.collect(),
 			}

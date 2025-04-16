@@ -11,6 +11,11 @@ use syn::ReturnType;
 use syn::Type;
 use syn::parse_quote;
 
+
+pub struct FuncTokensToServerActions;
+
+
+
 pub struct ServerActionBuilder {
 	item_fn: ItemFn,
 	route_path: String,

@@ -4,4 +4,3 @@ pub use components::*;
 // mod foo;
 #[path = "codegen/pages.rs"]
 pub mod pages;
-use crate::as_beet::*;

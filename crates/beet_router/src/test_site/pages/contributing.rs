@@ -1,7 +1,6 @@
 #![allow(unused)]
+use crate::as_beet::*;
 use crate::test_site::*;
-use beet_rsx::as_beet::*;
-use beet_rsx::prelude::*;
 
 pub fn get() -> RsxNode {
 	// rsx! { <div>party time dude!</div> }

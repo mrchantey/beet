@@ -89,7 +89,7 @@ impl FuncTokensTreeToRouteTree {
 		let route_tree = self.collect_route_node(tree);
 		syn::parse_quote!(
 			/// Collect the static route tree
-			pub fn collect() -> StaticRouteTree {
+			pub fn collect() -> RoutePathTree {
 				#route_tree
 			}
 		)
@@ -115,7 +115,7 @@ impl FuncTokensTreeToRouteTree {
 
 		let name = &tree.name;
 
-		syn::parse_quote!(StaticRouteTree {
+		syn::parse_quote!(RoutePathTree {
 			name: #name.into(),
 			path: #path,
 			children: vec![#(#children),*],
@@ -161,7 +161,8 @@ mod test {
 	fn creates_mod() {
 		let routes = routes();
 		let tree = routes.xpipe(FuncTokensToTree);
-		let mod_item = FuncTokensTreeToRouteTree::default().routes_mod_tree(&tree);
+		let mod_item =
+			FuncTokensTreeToRouteTree::default().routes_mod_tree(&tree);
 
 		let expected: ItemMod = syn::parse_quote! {
 		#[allow(missing_docs)]
@@ -201,25 +202,25 @@ mod test {
 
 		let expected: ItemFn = syn::parse_quote! {
 			/// Collect the static route tree
-			pub fn collect() -> StaticRouteTree {
-				StaticRouteTree {
+			pub fn collect() -> RoutePathTree {
+				RoutePathTree {
 						name: "root".into(),
 						path: Some(RoutePath::new("/")),
 						children: vec![
-								StaticRouteTree {
+								RoutePathTree {
 										name: "foo".into(),
 										path: None,
 										children: vec![
-												StaticRouteTree {
+												RoutePathTree {
 														name: "bar".into(),
 														path: Some(RoutePath::new("/foo/bar")),
 														children: vec![],
 												},
-												StaticRouteTree {
+												RoutePathTree {
 														name: "bazz".into(),
 														path: Some(RoutePath::new("/foo/bazz")),
 														children: vec![
-																StaticRouteTree {
+																RoutePathTree {
 																		name: "boo".into(),
 																		path: Some(RoutePath::new("/foo/bazz/boo")),
 																		children: vec![],

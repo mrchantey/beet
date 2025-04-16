@@ -1,3 +1,5 @@
+mod route_path;
+pub use route_path::*;
 mod call_server_action;
 pub use call_server_action::*;
 mod app_context;

@@ -26,12 +26,11 @@ impl<T> std::fmt::Debug for RouteFunc<T> {
 
 impl<T> RouteFunc<T> {
 	pub fn new<M>(
-		method: &str,
-		route_path: &str,
+		route_info: RouteInfo,
 		func: impl IntoRouteFunc<T, M>,
 	) -> Self {
 		Self {
-			route_info: RouteInfo::new(route_path, method),
+			route_info,
 			func: func.into_route_func(),
 		}
 	}

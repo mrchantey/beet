@@ -43,6 +43,8 @@ pub mod prelude {
 
 
 pub mod exports {
+	#[cfg(feature = "router")]
+	pub use beet_router::exports::*;
 	#[cfg(feature = "rsx")]
 	pub use beet_rsx::exports::*;
 	#[cfg(all(feature = "server", not(target_arch = "wasm32")))]

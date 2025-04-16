@@ -1,22 +1,23 @@
 mod sidebar;
 mod sidebar_item;
+use beet_rsx::prelude::*;
 use beet_router::prelude::*;
-use beet_rsx::as_beet::*;
 use heck::ToTitleCase;
 pub use sidebar::*;
 pub use sidebar_item::*;
+use sweet::prelude::GlobFilter;
 
 
 #[derive(Debug, Default, Clone)]
-pub struct StaticRouteTreeToSidebarTree {
+pub struct RoutePathTreeToSidebarTree {
 	/// All groups that match this filter will be expanded
 	pub expanded_filter: GlobFilter,
 	/// By default the root is unwrapped, enable this to return the root node
 	pub keep_root: bool,
 }
 
-impl StaticRouteTreeToSidebarTree {
-	fn map_node(&self, tree: StaticRouteTree) -> SidebarNode {
+impl RoutePathTreeToSidebarTree {
+	fn map_node(&self, tree: RoutePathTree) -> SidebarNode {
 		SidebarNode {
 			display_name: tree.name.as_str().to_title_case(),
 			expanded: tree
@@ -33,10 +34,8 @@ impl StaticRouteTreeToSidebarTree {
 	}
 }
 
-impl Pipeline<StaticRouteTree, Vec<SidebarNode>>
-	for StaticRouteTreeToSidebarTree
-{
-	fn apply(self, value: StaticRouteTree) -> Vec<SidebarNode> {
+impl Pipeline<RoutePathTree, Vec<SidebarNode>> for RoutePathTreeToSidebarTree {
+	fn apply(self, value: RoutePathTree) -> Vec<SidebarNode> {
 		let root_node = self.map_node(value);
 		if self.keep_root {
 			vec![root_node]

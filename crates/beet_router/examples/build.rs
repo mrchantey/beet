@@ -1,10 +1,10 @@
 //! Build script for the test site,
 //! this cant be a real build script because it depends
 //! on the crate it builds for, `beet_router`
-
 use anyhow::Result;
 use beet_router::prelude::*;
 use beet_rsx::prelude::*;
+use sweet::prelude::*;
 
 /// Demonstration of how to collect all files in the 'routes' dir
 /// and create a `routes.rs` file containing them all.
@@ -22,8 +22,9 @@ pub fn main() -> Result<()> {
 				"crates/beet_router/src/test_site/codegen/pages.rs",
 				"beet_router",
 			)
-			.with_use_beet_tokens("use beet_router::as_beet::*;"),
+			.with_use_beet_tokens("use crate::as_beet::*;"),
 		))?
 		.xmap(|(_, codegen)| -> Result<_> { codegen.build_and_write() })?;
+	println!("success");
 	Ok(())
 }

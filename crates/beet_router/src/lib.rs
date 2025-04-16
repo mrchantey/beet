@@ -22,8 +22,10 @@ pub mod prelude {
 	pub use crate::build::*;
 	#[cfg(all(feature = "parser", not(target_arch = "wasm32")))]
 	pub use crate::parser::*;
+}
 
-	// re-exports
+
+pub mod exports {
 	pub use http;
 	#[cfg(feature = "parser")]
 	pub use ron;
@@ -32,11 +34,21 @@ pub mod prelude {
 	pub use syn;
 }
 
-
-
+/// expose prelude and as beet for macros
 pub mod as_beet {
-	pub use crate::prelude::*;
-	pub use beet_rsx::as_beet::*;
+	pub use beet::prelude::*;
+	pub mod beet {
+		pub use crate as router;
+		pub use beet_rsx as rsx;
+		pub mod prelude {
+			pub use crate::prelude::*;
+			pub use beet_rsx::prelude::*;
+		}
+		pub mod exports {
+			pub use crate::exports::*;
+			pub use beet_rsx::exports::*;
+		}
+	}
 }
 
 #[cfg(any(test, feature = "_test_site"))]

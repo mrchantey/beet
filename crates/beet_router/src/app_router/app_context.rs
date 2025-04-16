@@ -62,8 +62,7 @@ macro_rules! app_cx {
 
 #[cfg(test)]
 mod test {
-	use crate::prelude::*;
-	use beet_rsx::as_beet::*;
+	use crate::as_beet::*;
 	use sweet::prelude::*;
 
 	#[test]

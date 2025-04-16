@@ -1,8 +1,9 @@
 use anyhow::Result;
-use beet_router::as_beet::*;
+use beet_router::exports::*;
+use beet_router::prelude::*;
+use sweet::prelude::*;
 
 fn main() -> Result<()> {
-	let cx = app_cx!();
 	println!("cargo::rerun-if-changed=build.rs");
 	// mockups can be generated from anywhere in src,
 	// so rebuild if any change
@@ -21,7 +22,7 @@ fn main() -> Result<()> {
 		.xpipe(FuncTokensGroupToCodegen::new(
 			CodegenFile::new_workspace_rel(
 				"crates/beet_design/src/codegen/mockups.rs",
-				&cx.pkg_name,
+				env!("CARGO_PKG_NAME").to_string(),
 			)
 			.with_use_beet_tokens("use beet_router::as_beet::*;"),
 		))?
