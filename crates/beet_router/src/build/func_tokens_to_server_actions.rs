@@ -202,19 +202,15 @@ impl FuncTokensToServerActions {
 				parse_quote! { #extractor_type(args): #extractor_type < () > }
 			}
 		};
-		let function_body = &item_fn.block;
+		let function_body = &func_tokens.func;
 
 		let function_execution = if item_fn.sig.asyncness.is_some() {
 			quote! {
-				Json({
-					#function_body.await
-				})
+				Json(#function_body.await)
 			}
 		} else {
 			quote! {
-				Json({
-					#function_body
-				})
+				Json(#function_body)
 			}
 		};
 

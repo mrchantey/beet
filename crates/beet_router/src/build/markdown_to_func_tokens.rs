@@ -126,6 +126,7 @@ impl MarkdownToFuncTokens {
 	}
 
 	pub fn parse(
+		index: usize,
 		markdown: &str,
 		canonical_path: CanonicalPathBuf,
 		local_path: PathBuf,
@@ -239,6 +240,7 @@ val_string	= "foo"
 	#[test]
 	fn parse() {
 		let func_tokens = MarkdownToFuncTokens::parse(
+			0,
 			MARKDOWN,
 			CanonicalPathBuf::new_unchecked("foo"),
 			"bar".into(),

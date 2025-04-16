@@ -7,7 +7,7 @@ fn main() -> Result<()> {
 	println!("cargo::rerun-if-changed=build.rs");
 	// mockups can be generated from anywhere in src,
 	// so rebuild if any change
-	println!("cargo::rerun-if-changed=src/**/*.mockup.rs");
+	// println!("cargo::rerun-if-changed=src/**/*.mockup.rs");
 
 	// ⚠️ changes here should be duplicated in crates/beet_site/build.rs
 	FileGroup::new_workspace_rel("crates/beet_design/src")?
