@@ -40,9 +40,10 @@ impl MapFuncTokens {
 }
 
 
-impl Pipeline<Vec<FuncTokens>> for MapFuncTokens {
-	fn apply(self, funcs: Vec<FuncTokens>) -> Vec<FuncTokens> {
-		funcs
+impl Pipeline<FuncTokensGroup> for MapFuncTokens {
+	fn apply(self, group: FuncTokensGroup) -> FuncTokensGroup {
+		group
+			.funcs
 			.into_iter()
 			.map(|mut func| {
 				let mut route_path = if let Some(base_route) = &self.base_route
@@ -60,7 +61,8 @@ impl Pipeline<Vec<FuncTokens>> for MapFuncTokens {
 				func.route_info.path = RoutePath::new(route_path);
 				func
 			})
-			.collect()
+			.collect::<Vec<_>>()
+			.into()
 	}
 }
 

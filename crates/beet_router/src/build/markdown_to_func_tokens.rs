@@ -12,6 +12,8 @@ use pulldown_cmark::TagEnd;
 use std::path::PathBuf;
 use sweet::prelude::*;
 use syn::Block;
+use syn::Ident;
+use syn::ItemFn;
 
 pub struct MarkdownToFuncTokens;
 
@@ -126,7 +128,7 @@ impl MarkdownToFuncTokens {
 	}
 
 	pub fn parse(
-		index: usize,
+		mod_ident: Ident,
 		markdown: &str,
 		canonical_path: CanonicalPathBuf,
 		local_path: PathBuf,
@@ -146,11 +148,17 @@ impl MarkdownToFuncTokens {
 			})?
 			.xpipe(HtmlTokensToRust::default());
 
+		let item_fn: ItemFn = syn::parse_quote! {
+			pub fn get() -> RsxNode
+				#rust_tokens
+
+		};
+
 		Ok(FuncTokens {
-			mod_ident: None,
+			mod_ident: mod_ident.clone(),
+			mod_import: ModImport::Inline,
 			frontmatter,
-			item_fn: None,
-			func: syn::parse_quote! {|| rsx! {#rust_tokens}},
+			item_fn,
 			route_info: RouteInfo {
 				path: RoutePath::from_file_path(&local_path)?,
 				method: HttpMethod::Get,
@@ -169,6 +177,7 @@ mod test {
 	use serde::Deserialize;
 	use serde::Serialize;
 	use sweet::prelude::*;
+	use syn::ItemFn;
 
 	const MARKDOWN: &str = r#"
 +++
@@ -240,40 +249,38 @@ val_string	= "foo"
 	#[test]
 	fn parse() {
 		let func_tokens = MarkdownToFuncTokens::parse(
-			0,
+			syn::parse_quote!(foo),
 			MARKDOWN,
 			CanonicalPathBuf::new_unchecked("foo"),
 			"bar".into(),
 		)
 		.unwrap();
 
-		let expected: syn::Expr = syn::parse_quote! {
-		||				rsx! {
-							{
-								use beet::prelude::*;
-								#[allow(unused_braces)]
-								RsxElement {
-									tag: "h1".to_string(),
-									attributes: vec![],
-									children: Box::new(
-										RsxText {
-											value: "hello world".to_string(),
-											meta: RsxNodeMeta::default(),
-										}.into_node()
-									),
-									self_closing: false,
-									meta: RsxNodeMeta {
-										template_directives: vec![],
-										location: None
-									},
-								}
-								.into_node()
-								.with_location(RsxMacroLocation::new(file!(), 0u32, 0u32))
-							}
-						}
-					};
+		let expected: ItemFn = syn::parse_quote! {
+		pub fn get() -> RsxNode {
+			use beet::prelude::*;
+			#[allow(unused_braces)]
+			RsxElement {
+				tag: "h1".to_string(),
+				attributes: vec![],
+				children: Box::new(
+					RsxText {
+						value: "hello world".to_string(),
+						meta: RsxNodeMeta::default(),
+					}.into_node()
+				),
+				self_closing: false,
+				meta: RsxNodeMeta {
+					template_directives: vec![],
+					location: None
+				},
+			}
+			.into_node()
+			.with_location(RsxMacroLocation::new(file!(), 0u32, 0u32))
+		}
+		};
 
-		expect(func_tokens.func.to_token_stream().to_string())
+		expect(func_tokens.item_fn.to_token_stream().to_string())
 			.to_be(expected.to_token_stream().to_string());
 	}
 }

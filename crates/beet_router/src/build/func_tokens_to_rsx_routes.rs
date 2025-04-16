@@ -1,31 +1,79 @@
 use crate::prelude::*;
 use sweet::prelude::*;
+use anyhow::Result;
 
 
 
 
-
-/// Maps the [`FuncTokens::func`] blocks so that it returns a
-/// [`RouteFunc<RsxRouteFunc>`]
 #[derive(Default)]
-pub struct FuncTokensToRsxRoutesGroup;
+pub struct FuncTokensToRsxRoutes {
+	pub codegen_file: CodegenFile,
+}
 
 
-impl Pipeline<Vec<FuncTokens>, FuncTokensGroup> for FuncTokensToRsxRoutesGroup {
-	fn apply(self, funcs: Vec<FuncTokens>) -> FuncTokensGroup {
-		FuncTokensGroup {
-			func_type: syn::parse_quote!(RouteFunc<RsxRouteFunc>),
-			funcs: funcs.xmap_each(|mut func| {
-				let block = &func.func;
+impl Pipeline<FuncTokensGroup, Result<(FuncTokensGroup, CodegenFile)>>
+	for FuncTokensToRsxRoutes
+{
+	fn apply(
+		mut self,
+		group: FuncTokensGroup,
+	) -> Result<(FuncTokensGroup, CodegenFile)> {
+		let mod_imports = group.as_ref().item_mods(&self.codegen_file)?;
+
+		let collect_routes = group.collect_func(
+			&syn::parse_quote!(RouteFunc<RsxRouteFunc>),
+			|func| {
+				let func_path = &func.func_path();
 				let route_info = &func.route_info;
-				func.func = syn::parse_quote! {{
+				syn::parse_quote! {
 					RouteFunc::new(
 						#route_info,
-						#block
+						#func_path
 					)
-				}};
-				func
-			}),
+				}
+			},
+		);
+
+		self.codegen_file.items.extend(mod_imports);
+		self.codegen_file.items.push(collect_routes.into());
+
+		Ok((group, self.codegen_file))
+	}
+}
+
+
+impl FuncTokensToRsxRoutes {
+	pub fn new(codegen_file: CodegenFile) -> Self {
+		Self {
+			codegen_file,
+			..Default::default()
 		}
+	}
+}
+
+#[cfg(test)]
+mod test {
+	use crate::prelude::*;
+	use beet_rsx::prelude::*;
+	use quote::ToTokens;
+	use sweet::prelude::*;
+
+
+	#[test]
+	fn works() {
+		let codegen_file = FileGroup::test_site_pages()
+			.xpipe(FileGroupToFuncTokens::default())
+			.unwrap()
+			.xpipe(FuncTokensToRsxRoutes::default())
+			.unwrap()
+			.xmap(|(_, codegen_file)| codegen_file.build_output())
+			.unwrap()
+			.to_token_stream()
+			.to_string();
+		// coarse test, it compiles and outputs something
+		expect(codegen_file.len()).to_be_greater_than(500);
+		// ensure no absolute paths
+		// println!("{}", codegen_file);
+		expect(codegen_file).not().to_contain("/home/");
 	}
 }

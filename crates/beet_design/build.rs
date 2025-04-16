@@ -18,13 +18,14 @@ fn main() -> Result<()> {
 				.base_route("/design")
 				.replace_route([(".mockup", "")]),
 		)
-		.xpipe(FuncTokensToRsxRoutesGroup::default())
-		.xpipe(FuncTokensGroupToCodegen::new(
+		.xpipe(FuncTokensToRsxRoutes::new(
 			CodegenFile::new_workspace_rel(
 				"crates/beet_design/src/codegen/mockups.rs",
 				env!("CARGO_PKG_NAME").to_string(),
 			)
-			.with_use_beet_tokens("use beet_router::as_beet::*;"),
+			.with_import(syn::parse_quote!(
+				use beet_router::as_beet::*;
+			)),
 		))?
 		.xmap(|(_, codegen)| codegen)
 		.build_and_write()?;

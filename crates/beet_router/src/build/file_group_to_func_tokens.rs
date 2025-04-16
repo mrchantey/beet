@@ -2,6 +2,7 @@ use crate::prelude::*;
 use anyhow::Result;
 use beet_rsx::prelude::*;
 use sweet::prelude::*;
+use syn::Ident;
 // use syn::Type;
 
 
@@ -12,8 +13,8 @@ pub struct FileGroupToFuncTokens {
 
 
 
-impl Pipeline<FileGroup, Result<Vec<FuncTokens>>> for FileGroupToFuncTokens {
-	fn apply(self, group: FileGroup) -> Result<Vec<FuncTokens>> {
+impl Pipeline<FileGroup, Result<FuncTokensGroup>> for FileGroupToFuncTokens {
+	fn apply(self, group: FileGroup) -> Result<FuncTokensGroup> {
 		let items = group
 			.collect_files()?
 			.into_iter()
@@ -24,7 +25,7 @@ impl Pipeline<FileGroup, Result<Vec<FuncTokens>>> for FileGroupToFuncTokens {
 			.flatten()
 			.collect::<Vec<_>>();
 
-		Ok(items)
+		Ok(items.into())
 	}
 }
 
@@ -37,16 +38,21 @@ impl FileGroupToFuncTokens {
 	) -> Result<Vec<FuncTokens>> {
 		let file_str = ReadFile::to_string(&canonical_path)?;
 		let local_path = PathExt::create_relative(&group_src, &canonical_path)?;
+		let mod_ident = Ident::new(
+			&format!("file{}", index),
+			proc_macro2::Span::call_site(),
+		);
+
 		match canonical_path.extension() {
 			Some(ex) if ex == "rs" => FuncFileToFuncTokens::parse(
-				index,
+				mod_ident,
 				&file_str,
 				canonical_path,
 				local_path,
 			),
 			#[cfg(feature = "markdown")]
 			Some(ex) if ex == "md" || ex == "mdx" => MarkdownToFuncTokens::parse(
-				index,
+				mod_ident,
 				&file_str,
 				canonical_path,
 				local_path,
@@ -66,11 +72,11 @@ mod test {
 	#[test]
 	#[ignore = "todo html parsing"]
 	fn markdown() {
-		let funcs = FileGroup::test_site_markdown()
+		let group = FileGroup::test_site_markdown()
 			.xpipe(FileGroupToFuncTokens::default())
 			.unwrap();
-		expect(funcs.len()).to_be(1);
-		let func_tokens = funcs
+		expect(group.len()).to_be(1);
+		let func_tokens = group
 			.iter()
 			.find(|f| f.local_path.ends_with("hello.md"))
 			.unwrap();
@@ -90,13 +96,10 @@ mod test {
 			.xpipe(FileGroupToFuncTokens::default())
 			.unwrap()
 			.xpipe(MapFuncTokens::default().base_route("/docs"))
-			.xpipe(FuncTokensToRsxRoutesGroup::default())
-			.xpipe(FuncTokensGroupToCodegen::new(
-				CodegenFile::new_workspace_rel(
-					"crates/beet_site/src/codegen/docs.rs",
-					"beet_site",
-				),
-			))
+			.xpipe(FuncTokensToRsxRoutes::new(CodegenFile::new_workspace_rel(
+				"crates/beet_site/src/codegen/docs.rs",
+				"beet_site",
+			)))
 			.unwrap();
 		// println!(
 		// 	"{}",

@@ -18,16 +18,11 @@ const HTTP_METHODS: [&str; 9] = [
 
 impl FuncFileToFuncTokens {
 	pub fn parse(
-		index: usize,
+		mod_ident: Ident,
 		file_str: &str,
 		canonical_path: CanonicalPathBuf,
 		local_path: PathBuf,
 	) -> Result<Vec<FuncTokens>> {
-		let mod_ident = Ident::new(
-			&format!("file{}", index),
-			proc_macro2::Span::call_site(),
-		);
-
 		let route_path = RoutePath::from_file_path(&local_path)?;
 
 		let pub_funcs = syn::parse_file(&file_str)?
@@ -50,7 +45,7 @@ impl FuncFileToFuncTokens {
 
 		pub_funcs
 			.iter()
-			.filter_map(|(ident_str, func)| {
+			.filter_map(|(ident_str, item_fn)| {
 				if HTTP_METHODS.iter().all(|m| m != &ident_str) {
 					return None;
 				}
@@ -66,9 +61,9 @@ impl FuncFileToFuncTokens {
 					None => syn::parse_quote!({ Default::default() }),
 				};
 
-				let ident = &func.sig.ident;
 				Some(FuncTokens {
-					mod_ident: Some(mod_ident.clone()),
+					mod_ident: mod_ident.clone(),
+					mod_import: ModImport::Path,
 					canonical_path: canonical_path.clone(),
 					local_path: local_path.clone(),
 					route_info: RouteInfo {
@@ -77,8 +72,7 @@ impl FuncFileToFuncTokens {
 						method: HttpMethod::from_str(&ident_str).unwrap(),
 					},
 					frontmatter,
-					func: syn::parse_quote! {#mod_ident::#ident},
-					item_fn: Some(func.clone()),
+					item_fn: item_fn.clone(),
 				})
 			})
 			.collect::<Vec<_>>()

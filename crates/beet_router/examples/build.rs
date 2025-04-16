@@ -16,13 +16,14 @@ pub fn main() -> Result<()> {
 				.with_exclude("*mod.rs"),
 		)
 		.xpipe(FileGroupToFuncTokens::default())?
-		.xpipe(FuncTokensToRsxRoutesGroup::default())
-		.xpipe(FuncTokensGroupToCodegen::new(
+		.xpipe(FuncTokensToRsxRoutes::new(
 			CodegenFile::new_workspace_rel(
 				"crates/beet_router/src/test_site/codegen/pages.rs",
 				"beet_router",
 			)
-			.with_use_beet_tokens("use crate::as_beet::*;"),
+			.with_import(syn::parse_quote!(
+				use crate::as_beet::*;
+			)),
 		))?
 		.xmap(|(_, codegen)| -> Result<_> { codegen.build_and_write() })?;
 	println!("success");

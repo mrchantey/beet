@@ -131,24 +131,19 @@ mod test {
 	use syn::ItemFn;
 	use syn::ItemMod;
 
-	fn routes() -> Vec<FuncTokens> {
+	fn tree() -> FuncTokensTree {
 		vec![
-			FuncTokens::simple("index.rs", syn::parse_quote!({})),
-			FuncTokens::simple("foo/bar.rs", syn::parse_quote!({})),
-			FuncTokens::simple("foo/bazz/index.rs", syn::parse_quote!({})),
-			FuncTokens::simple("foo/bazz/boo.rs", syn::parse_quote!({})),
+			FuncTokens::simple("index.rs"),
+			FuncTokens::simple("foo/bar.rs"),
+			FuncTokens::simple("foo/bazz/index.rs"),
+			FuncTokens::simple("foo/bazz/boo.rs"),
 		]
+		.into()
 	}
 
 	#[test]
 	fn correct_tree_structure() {
-		expect(
-			routes()
-				.xpipe(FuncTokensToTree)
-				.into_path_tree()
-				.to_string_indented(),
-		)
-		.to_be(
+		expect(tree().into_path_tree().to_string_indented()).to_be(
 			r#"root
   foo
     bar
@@ -159,8 +154,7 @@ mod test {
 	}
 	#[test]
 	fn creates_mod() {
-		let routes = routes();
-		let tree = routes.xpipe(FuncTokensToTree);
+		let tree = tree();
 		let mod_item =
 			FuncTokensTreeToRouteTree::default().routes_mod_tree(&tree);
 
@@ -197,7 +191,7 @@ mod test {
 	}
 	#[test]
 	fn creates_collect_tree() {
-		let tree = routes().xpipe(FuncTokensToTree);
+		let tree = tree();
 		let func = FuncTokensTreeToRouteTree::default().collect_func(&tree);
 
 		let expected: ItemFn = syn::parse_quote! {

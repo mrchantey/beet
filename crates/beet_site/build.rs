@@ -1,4 +1,5 @@
 use anyhow::Result;
+use beet::exports::syn;
 use beet::prelude::*;
 use sweet::prelude::*;
 
@@ -16,9 +17,9 @@ fn main() -> Result<()> {
 
 	if is_wasm {
 		CodegenFile::new_workspace_rel(codegen_wasm, &cx.pkg_name)
-			.with_use_beet_tokens(
-				"use beet::prelude::*;use beet::design as beet_design;",
-			)
+			.with_import(syn::parse_quote!(
+				use beet::design as beet_design;
+			))
 			.xpipe(BuildWasmRoutes::default())?
 	} else {
 		let html_dir =
@@ -39,13 +40,10 @@ fn main() -> Result<()> {
 					.with_exclude("*mod.rs"),
 			)
 			.xpipe(FileGroupToFuncTokens::default())?
-			.xpipe(FuncTokensToRsxRoutesGroup::default())
-			.xpipe(FuncTokensGroupToCodegen::new(
-				CodegenFile::new_workspace_rel(
-					"crates/beet_site/src/codegen/pages.rs",
-					&cx.pkg_name,
-				),
-			))?
+			.xpipe(FuncTokensToRsxRoutes::new(CodegenFile::new_workspace_rel(
+				"crates/beet_site/src/codegen/pages.rs",
+				&cx.pkg_name,
+			)))?
 			.xmap(|(funcs, codegen)| -> Result<_> {
 				codegen.build_and_write()?;
 				Ok(funcs)
@@ -54,13 +52,10 @@ fn main() -> Result<()> {
 		let docs = FileGroup::new_workspace_rel("crates/beet_site/src/docs")?
 			.xpipe(FileGroupToFuncTokens::default())?
 			.xpipe(MapFuncTokens::default().base_route("/docs"))
-			.xpipe(FuncTokensToRsxRoutesGroup::default())
-			.xpipe(FuncTokensGroupToCodegen::new(
-				CodegenFile::new_workspace_rel(
-					"crates/beet_site/src/codegen/docs.rs",
-					&cx.pkg_name,
-				),
-			))?
+			.xpipe(FuncTokensToRsxRoutes::new(CodegenFile::new_workspace_rel(
+				"crates/beet_site/src/codegen/docs.rs",
+				&cx.pkg_name,
+			)))?
 			.xmap(|(funcs, codegen)| -> Result<_> {
 				codegen.build_and_write()?;
 				Ok(funcs)
@@ -80,9 +75,9 @@ fn main() -> Result<()> {
 
 		pages
 			.funcs
-			.xtend(mockups)
+			.xtend(mockups.funcs)
 			.xtend(docs.funcs)
-			.xpipe(FuncTokensToTree::default())
+			.xinto::<FuncTokensTree>()
 			.xpipe(FuncTokensTreeToRouteTree {
 				codegen_file: CodegenFile::new_workspace_rel(
 					"crates/beet_site/src/codegen/route_tree.rs",

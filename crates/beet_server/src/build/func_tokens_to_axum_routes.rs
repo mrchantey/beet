@@ -1,39 +1,58 @@
-// use crate::prelude::*;
+use anyhow::Result;
 use beet_router::prelude::*;
 use sweet::prelude::*;
 
 /// Maps the [`FuncTokens::func`] blocks so that it returns a
 /// [`RouteFunc<RegisterAxumRoute>`]
-pub struct FuncTokensToAxumRoutesGroup {
+pub struct FuncTokensToAxumRoutes {
 	pub state_type: syn::Type,
+	pub codegen_file: CodegenFile,
 }
-impl Default for FuncTokensToAxumRoutesGroup {
+impl Default for FuncTokensToAxumRoutes {
 	fn default() -> Self {
-		FuncTokensToAxumRoutesGroup {
+		FuncTokensToAxumRoutes {
 			state_type: syn::parse_quote!(()),
+			codegen_file: CodegenFile::default(),
 		}
 	}
 }
 
-impl Pipeline<Vec<FuncTokens>, FuncTokensGroup>
-	for FuncTokensToAxumRoutesGroup
+impl FuncTokensToAxumRoutes {
+	pub fn new(state_type: syn::Type) -> Self {
+		FuncTokensToAxumRoutes {
+			state_type,
+			..Default::default()
+		}
+	}
+}
+
+impl Pipeline<FuncTokensGroup, Result<(FuncTokensGroup, CodegenFile)>>
+	for FuncTokensToAxumRoutes
 {
-	fn apply(self, funcs: Vec<FuncTokens>) -> FuncTokensGroup {
+	fn apply(
+		mut self,
+		group: FuncTokensGroup,
+	) -> Result<(FuncTokensGroup, CodegenFile)> {
+		let mod_imports = group.as_ref().item_mods(&self.codegen_file)?;
 		let state_type = self.state_type;
-		FuncTokensGroup {
-			func_type: syn::parse_quote!(RouteFunc<RegisterAxumRoute<#state_type>>),
-			funcs: funcs.xmap_each(|mut func| {
-				let block = &func.func;
+		let collect_routes = group.collect_func(
+			&syn::parse_quote!(RouteFunc<RegisterAxumRoute<#state_type>>),
+			|func| {
+				let func_path = &func.func_path();
 				let route_info = &func.route_info;
-				func.func = syn::parse_quote! {{
+				syn::parse_quote! {
 					RouteFunc::new(
 						#route_info,
-						#block.into_register_axum_route()
+						#func_path.into_register_axum_route()
 					)
-				}};
-				func
-			}),
-		}
+				}
+			},
+		);
+
+		self.codegen_file.items.extend(mod_imports);
+		self.codegen_file.items.push(collect_routes.into());
+
+		Ok((group, self.codegen_file))
 	}
 }
 
@@ -42,16 +61,21 @@ impl Pipeline<Vec<FuncTokens>, FuncTokensGroup>
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use beet_router::build::FuncTokens;
+	use beet_router::prelude::*;
 	use quote::ToTokens;
 	use sweet::prelude::*;
 
 	#[test]
 	fn works() {
-		let tokens =
-			vec![FuncTokens::simple("/foo", syn::parse_quote! {|| Ok(())})]
-				.xpipe(FuncTokensToAxumRoutesGroup::default());
-		expect(tokens.funcs[0].func.to_token_stream().to_string())
+		FuncTokens::simple("/foo")
+			.xinto::<FuncTokensGroup>()
+			.xpipe(FuncTokensToAxumRoutes::default())
+			.unwrap()
+			.1
+			.build_output()
+			.unwrap()
+			.xmap(|f| f.to_token_stream().to_string())
+			.xmap(expect)
 			.to_contain(". into_register_axum_route ()");
 	}
 }

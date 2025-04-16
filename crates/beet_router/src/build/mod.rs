@@ -1,8 +1,8 @@
 //! Module for the codegen build step of the router.
 mod func_tokens_tree_to_server_actions;
 pub use func_tokens_tree_to_server_actions::*;
-mod func_tokens_to_tree;
-pub use func_tokens_to_tree::*;
+mod func_tokens_tree;
+pub use func_tokens_tree::*;
 mod func_tokens_to_server_actions;
 pub use func_tokens_to_server_actions::*;
 mod func_tokens_to_rsx_routes;
@@ -15,7 +15,6 @@ mod file_group;
 mod file_group_to_func_tokens;
 mod func_file_to_func_tokens;
 mod func_tokens;
-mod func_tokens_group_to_codegen;
 mod func_tokens_tree_to_route_tree;
 mod map_func_tokens;
 #[cfg(feature = "markdown")]
@@ -26,7 +25,6 @@ pub use file_group::*;
 pub use file_group_to_func_tokens::*;
 pub use func_file_to_func_tokens::*;
 pub use func_tokens::*;
-pub use func_tokens_group_to_codegen::*;
 pub use func_tokens_tree_to_route_tree::*;
 pub use map_func_tokens::*;
 #[cfg(feature = "markdown")]

@@ -1,11 +1,13 @@
 #[allow(unused_imports)]
 use crate::prelude::*;
-use std::path::Path;
+use anyhow::Result;
 use std::path::PathBuf;
+use std::str::FromStr;
 use sweet::prelude::*;
 use syn::Block;
 use syn::Ident;
-
+use syn::ItemFn;
+use syn::ItemMod;
 
 /// Tokens for a function that may be used as a route. This may
 /// be considered the `Tokens` version of a [`RouteFunc`].
@@ -15,17 +17,16 @@ pub struct FuncTokens {
 	/// the [`FileGroup`], ie `file1`. It is used for importing the file
 	/// as a module by its path. We need this awkwardness because rust analyzer
 	/// struggles to detect path imports nested inside a block.
-	pub mod_ident: Option<Ident>,
+	pub mod_ident: Ident,
+	/// The strategy for the mod import, whether its linking to a file
+	/// or defining the function inline.
+	pub mod_import: ModImport,
 	/// A block that returns the frontmatter of this function, this may be a unit type
 	/// or [`None`] if the eventual type allows for it.
 	pub frontmatter: Block,
-	/// Tokens that will return the corresponding [`FuncTokensGroup::func_type`].
-	/// This may depend on [`mod_ident`](Self::mod_ident), to be imported and in scope,
-	/// which is created via [`FuncTokensGroup::func_files_to_mod_imports`].
-	pub func: syn::Expr,
-	/// Optionally capture the actual function that was used to create this route.
-	/// For sources like markdown this will be `None`.
-	pub item_fn: Option<syn::ItemFn>,
+	/// The function defined in the [`mod_ident`](Self::mod_ident) module.
+	/// Its return type is the [`FuncTokensGroup::func_type`].
+	pub item_fn: ItemFn,
 	/// Canonical path to the file
 	pub canonical_path: CanonicalPathBuf,
 	/// Path relative to the [`src`](FileGroup::src) of the [`FileGroup`]
@@ -39,23 +40,34 @@ impl AsRef<FuncTokens> for FuncTokens {
 	fn as_ref(&self) -> &FuncTokens { self }
 }
 
+
 impl FuncTokens {
+	pub fn simple(local_path: impl AsRef<std::path::Path>) -> Self {
+		Self::simple_with_func(local_path, syn::parse_quote! {
+			fn get()->RsxNode{
+				Default::default()
+			}
+		})
+	}
+
 	/// create a simple `FuncTokens` for testing
-	pub fn simple(
+	pub fn simple_with_func(
 		local_path: impl AsRef<std::path::Path>,
-		func: syn::Expr,
+		item_fn: ItemFn,
 	) -> Self {
 		let path = local_path.as_ref();
+		let method =
+			HttpMethod::from_str(&item_fn.sig.ident.to_string()).unwrap();
 		Self {
-			mod_ident: None,
+			mod_ident: syn::parse_quote! {file0},
+			mod_import: ModImport::Inline,
 			frontmatter: syn::parse_quote! {{}},
-			func,
-			item_fn: None,
+			item_fn,
 			canonical_path: CanonicalPathBuf::new_unchecked(path),
 			local_path: path.to_path_buf(),
 			route_info: RouteInfo {
 				path: RoutePath::from_file_path(path).unwrap(),
-				method: HttpMethod::Get,
+				method,
 			},
 		}
 	}
@@ -85,27 +97,55 @@ impl FuncTokens {
 		}
 	}
 
+	/// Returns a path to the function, assuming its [`ModImport`] is in
+	/// scope.
+	pub fn func_path(&self) -> syn::Path {
+		let mod_ident = &self.mod_ident;
+		let fn_ident = &self.item_fn.sig.ident;
+		syn::parse_quote! {
+			#mod_ident::#fn_ident
+		}
+	}
+
 	/// Return a `mod` import for each [`FuncTokens::func`]
-	/// that requires a module import.
+	/// that requires a module import. The modules are public because
+	/// client islands may need to call them.
 	// this approach is cleaner than importing in each function,
 	// and also rust-analyzer has an easier time resolving file level imports
-	pub fn mod_import(
-		&self,
-		canonical_out_dir: &Path,
-	) -> Result<Option<syn::Item>> {
-		self.mod_ident
-			.as_ref()
-			.map(|mod_ident| {
-				let mod_path = PathExt::create_relative(
-					canonical_out_dir,
-					&self.canonical_path,
-				)?;
+	pub fn item_mod(&self, codegen_file: &CodegenFile) -> Result<ItemMod> {
+		let mod_ident = &self.mod_ident;
+		match self.mod_import {
+			ModImport::Inline => {
+				let item = &self.item_fn;
+				let imports = &codegen_file.imports;
+				Ok(syn::parse_quote! {
+					pub mod #mod_ident {
+						#(#imports)*
+						#item
+					}
+				})
+			}
+			ModImport::Path => {
+				let out_dir = codegen_file.output_dir()?;
+				let mod_path =
+					PathExt::create_relative(out_dir, &self.canonical_path)?;
 				let mod_path_str = mod_path.to_string_lossy();
 				Ok(syn::parse_quote! {
 					#[path = #mod_path_str]
 					pub mod #mod_ident;
 				})
-			})
-			.transpose()
+			}
+		}
 	}
+}
+
+/// The strategy to use for importing the module.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ModImport {
+	/// The func doesnt actually exist yet (ie it was generated via markdown)
+	/// so when defining the module include it as an item.
+	Inline,
+	/// The mod is imported from a rust file and its path will be
+	/// resolved on codegen.
+	Path,
 }

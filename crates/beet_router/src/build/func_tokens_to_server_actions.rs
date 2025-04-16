@@ -15,15 +15,12 @@ use syn::punctuated::Punctuated;
 #[derive(Default)]
 pub struct FuncTokensToServerActions;
 
-impl<T: AsRef<FuncTokens>> Pipeline<T, Option<(ItemFn, ItemFn)>>
+impl<T: AsRef<FuncTokens>> Pipeline<T, (ItemFn, ItemFn)>
 	for FuncTokensToServerActions
 {
-	fn apply(self, func_tokens: T) -> Option<(ItemFn, ItemFn)> {
+	fn apply(self, func_tokens: T) -> (ItemFn, ItemFn) {
 		let func_tokens = func_tokens.as_ref();
-		let Some(item_fn) = &func_tokens.item_fn else {
-			return None;
-		};
-		Some(self.build(&func_tokens, item_fn))
+		self.build(&func_tokens)
 	}
 }
 
@@ -31,20 +28,17 @@ impl FuncTokensToServerActions {
 	pub fn build(
 		&self,
 		func_tokens: &FuncTokens,
-		item_fn: &ItemFn,
 	) -> (syn::ItemFn, syn::ItemFn) {
 		// Extract parameters
 		let (args_tuple_pat, args_type, client_params, server_extractors) =
-			self.extract_parameters(&item_fn.sig.inputs);
+			self.extract_parameters(&func_tokens.item_fn.sig.inputs);
 
 		// Build client version using method name directly
-		let client_func =
-			self.client_func(func_tokens, item_fn, &client_params);
+		let client_func = self.client_func(func_tokens, &client_params);
 
 		// Build server version using is_bodyless to determine extractor type
 		let server_func = self.server_func(
 			func_tokens,
-			item_fn,
 			args_tuple_pat,
 			args_type,
 			&server_extractors,
@@ -141,10 +135,9 @@ impl FuncTokensToServerActions {
 	fn client_func(
 		&self,
 		func_tokens: &FuncTokens,
-		item_fn: &ItemFn,
 		client_params: &[FnArg],
 	) -> syn::ItemFn {
-		let return_inner_type = match &item_fn.sig.output {
+		let return_inner_type = match &func_tokens.item_fn.sig.output {
 			ReturnType::Type(_, ty) => ty.clone(),
 			_ => parse_quote!(()),
 		};
@@ -156,7 +149,7 @@ impl FuncTokensToServerActions {
 			.map(|(i, _)| format_ident!("args{}", i))
 			.collect();
 
-		let fn_ident = &item_fn.sig.ident;
+		let fn_ident = &func_tokens.item_fn.sig.ident;
 		let route_info = &func_tokens.route_info;
 
 		parse_quote! {
@@ -170,7 +163,6 @@ impl FuncTokensToServerActions {
 	fn server_func(
 		&self,
 		func_tokens: &FuncTokens,
-		item_fn: &ItemFn,
 		args_tuple_pat: Option<Pat>,
 		args_type: Option<Type>,
 		server_extractors: &[FnArg],
@@ -182,7 +174,7 @@ impl FuncTokensToServerActions {
 			parse_quote!(JsonQuery)
 		};
 
-		let return_inner_type = match &item_fn.sig.output {
+		let return_inner_type = match &func_tokens.item_fn.sig.output {
 			ReturnType::Type(_, ty) => ty.clone(),
 			_ => parse_quote!(()),
 		};
@@ -202,19 +194,20 @@ impl FuncTokensToServerActions {
 				parse_quote! { #extractor_type(args): #extractor_type < () > }
 			}
 		};
-		let function_body = &func_tokens.func;
+		let call_func = &func_tokens.func_path();
 
-		let function_execution = if item_fn.sig.asyncness.is_some() {
+		let function_execution = if func_tokens.item_fn.sig.asyncness.is_some()
+		{
 			quote! {
-				Json(#function_body.await)
+				Json(#call_func.await)
 			}
 		} else {
 			quote! {
-				Json(#function_body)
+				Json(#call_func)
 			}
 		};
 
-		let fn_ident = &item_fn.sig.ident;
+		let fn_ident = &func_tokens.item_fn.sig.ident;
 
 		parse_quote! {
 			#[cfg(not(feature="client"))]
@@ -227,8 +220,6 @@ impl FuncTokensToServerActions {
 
 #[cfg(test)]
 mod tests {
-	use std::str::FromStr;
-
 	use crate::prelude::*;
 	use quote::ToTokens;
 	use quote::quote;
@@ -236,11 +227,8 @@ mod tests {
 	use syn::parse_quote;
 
 	fn build(func: syn::ItemFn, path: &str) -> (syn::ItemFn, syn::ItemFn) {
-		let mut func_tokens = FuncTokens::simple(path, syn::parse_quote!({}));
-		func_tokens.route_info.method =
-			HttpMethod::from_str(&func.sig.ident.to_string()).unwrap();
-		func_tokens.item_fn = Some(func);
-		func_tokens.xpipe(FuncTokensToServerActions).unwrap()
+		FuncTokens::simple_with_func(path, func)
+			.xpipe(FuncTokensToServerActions)
 	}
 
 	#[test]

@@ -8,6 +8,7 @@ use proc_macro2_diagnostics::Diagnostic;
 use proc_macro2_diagnostics::Level;
 use quote::quote;
 use sweet::prelude::Pipeline;
+use syn::Block;
 use syn::Expr;
 use syn::Ident;
 use syn::spanned::Spanned;
@@ -32,8 +33,8 @@ pub struct HtmlTokensToRust {
 	pub exclude_errors: bool,
 }
 
-impl Pipeline<HtmlTokens, TokenStream> for HtmlTokensToRust {
-	fn apply(mut self, node: HtmlTokens) -> TokenStream {
+impl Pipeline<HtmlTokens, Block> for HtmlTokensToRust {
+	fn apply(mut self, node: HtmlTokens) -> Block {
 		let node = self.map_node(node);
 
 		let errors = if self.exclude_errors {
@@ -45,7 +46,7 @@ impl Pipeline<HtmlTokens, TokenStream> for HtmlTokensToRust {
 		let line = self.location.line as u32;
 		let col = self.location.column as u32;
 
-		quote! {
+		syn::parse_quote! {
 			{
 				#(#errors;)*
 				use beet::prelude::*;

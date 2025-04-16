@@ -1,5 +1,6 @@
 use crate::prelude::*;
 use proc_macro2::TokenStream;
+use quote::ToTokens;
 use sweet::prelude::*;
 use syn::spanned::Spanned;
 
@@ -17,17 +18,17 @@ impl<T: Into<TokenStream>> Pipeline<T, TokenStream> for RsxMacroPipeline {
 		let span = tokens.span();
 		let (rstml, rstml_errors) = tokens.xpipe(TokensToRstml::default());
 		let (html, html_errors) = rstml.xpipe(RstmlToHtmlTokens::new());
-		let tokens = html
+		let block = html
 			.xpipe(ApplyDefaultTemplateDirectives::default())
 			.xpipe(HtmlTokensToRust::new_spanned(RsxIdents::default(), &span));
 
 		if self.no_errors {
-			tokens
+			block.to_token_stream()
 		} else {
 			quote::quote! {{
 				#(#rstml_errors;)*
 				#(#html_errors;)*
-				#tokens
+				#block
 			}}
 		}
 	}

@@ -2,44 +2,6 @@ use crate::prelude::*;
 use sweet::prelude::*;
 use syn::Item;
 
-
-#[derive(Debug, Default, Clone)]
-pub struct FuncTokensToTree;
-
-
-
-impl Pipeline<Vec<FuncTokens>, FuncTokensTree> for FuncTokensToTree {
-	fn apply(self, routes: Vec<FuncTokens>) -> FuncTokensTree {
-		let mut this = FuncTokensTree::new("root");
-		for route in routes {
-			// 	// should be ancestors
-			// 	// let parts = ;
-			let mut current = &mut this;
-			for component in route.route_info.path.components() {
-				match component {
-					std::path::Component::Normal(os_str)
-						if let Some(str) = os_str.to_str() =>
-					{
-						current = VecExt::entry_or_insert_with(
-							&mut current.children,
-							|child| child.name == str,
-							|| FuncTokensTree::new(str),
-						);
-					}
-					_ => {} // std::path::Component::Prefix(prefix_component) => todo!(),
-					        // std::path::Component::RootDir => todo!(),
-					        // std::path::Component::CurDir => todo!(),
-					        // std::path::Component::ParentDir => todo!(),
-				}
-			}
-			current.value = Some(route);
-		}
-		this
-	}
-}
-
-
-
 #[derive(Debug, Clone)]
 pub struct FuncTokensTree {
 	/// The route path for this part of the tree. It may be
@@ -100,19 +62,28 @@ impl FuncTokensTree {
 		}
 	}
 
-	pub fn flatten(&self) -> Vec<&FuncTokens> {
+	/// Flattens the tree into a [`FuncTokensGroup`].
+	pub fn into_group(self) -> FuncTokensGroup { self.into() }
+}
+
+impl Into<FuncTokensGroup> for FuncTokensTree {
+	fn into(self) -> FuncTokensGroup {
 		let mut out = Vec::new();
-		if let Some(value) = &self.value {
+		if let Some(value) = self.value {
 			out.push(value);
 		}
-		for child in &self.children {
-			out.extend(child.flatten());
+		for child in self.children.into_iter() {
+			out.extend(child.into_group().funcs);
 		}
-		out
+		FuncTokensGroup::new(out)
 	}
 }
 
-
+impl From<Vec<FuncTokens>> for FuncTokensTree {
+	fn from(value: Vec<FuncTokens>) -> Self {
+		FuncTokensGroup::new(value).into()
+	}
+}
 
 
 #[cfg(test)]
@@ -120,20 +91,21 @@ mod test {
 	use crate::prelude::*;
 	use sweet::prelude::*;
 
-	fn routes() -> Vec<FuncTokens> {
+	fn tree() -> FuncTokensTree {
 		vec![
-			FuncTokens::simple("index.rs", syn::parse_quote!({})),
-			FuncTokens::simple("foo/bar.rs", syn::parse_quote!({})),
-			FuncTokens::simple("foo/bazz/index.rs", syn::parse_quote!({})),
-			FuncTokens::simple("foo/bazz/boo.rs", syn::parse_quote!({})),
+			FuncTokens::simple("index.rs"),
+			FuncTokens::simple("foo/bar.rs"),
+			FuncTokens::simple("foo/bazz/index.rs"),
+			FuncTokens::simple("foo/bazz/boo.rs"),
 		]
+		.into()
 	}
 
 	#[test]
 	fn correct_tree_structure() {
 		expect(
-			routes()
-				.xpipe(FuncTokensToTree)
+			tree()
+				.xinto::<FuncTokensTree>()
 				.into_path_tree()
 				.to_string_indented(),
 		)
