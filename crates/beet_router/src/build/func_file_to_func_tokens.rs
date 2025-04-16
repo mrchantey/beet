@@ -1,7 +1,6 @@
 use crate::prelude::*;
 use anyhow::Result;
 use beet_rsx::prelude::*;
-use http::Method;
 use std::path::PathBuf;
 use std::str::FromStr;
 use sweet::prelude::*;
@@ -75,7 +74,7 @@ impl FuncFileToFuncTokens {
 					route_info: RouteInfo {
 						path: route_path.clone(),
 						// we just checked its a valid method
-						method: Method::from_str(&ident_str).unwrap(),
+						method: HttpMethod::from_str(&ident_str).unwrap(),
 					},
 					frontmatter,
 					func: syn::parse_quote! {#mod_ident::#ident},

@@ -2,7 +2,6 @@ use crate::prelude::*;
 use anyhow::Result;
 use beet_rsx::prelude::HtmlTokensToRust;
 use beet_rsx::prelude::StringToHtmlTokens;
-use http::Method;
 use pulldown_cmark::CowStr;
 use pulldown_cmark::Event;
 use pulldown_cmark::MetadataBlockKind;
@@ -153,7 +152,7 @@ impl MarkdownToFuncTokens {
 			func: syn::parse_quote! {|| rsx! {#rust_tokens}},
 			route_info: RouteInfo {
 				path: RoutePath::from_file_path(&local_path)?,
-				method: Method::GET,
+				method: HttpMethod::Get,
 			},
 			local_path,
 			canonical_path,

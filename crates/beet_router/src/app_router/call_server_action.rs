@@ -25,7 +25,7 @@ impl CallServerAction {
 		route_info: RouteInfo,
 		value: T,
 	) -> Result<O, CallServerActionError> {
-		if route_info.method_has_body() {
+		if route_info.method.has_body() {
 			Self::request_with_body(route_info, value).await
 		} else {
 			Self::request_with_query(route_info, value).await
@@ -43,7 +43,7 @@ impl CallServerAction {
 
 		let url = SERVER_URL.lock().unwrap().join(&route_info.path);
 		let bytes = CLIENT
-			.request(route_info.method, url.to_string())
+			.request(route_info.method.into(), url.to_string())
 			.query(&[("data", value)])
 			.send()
 			.await
@@ -69,7 +69,7 @@ impl CallServerAction {
 
 		let url = SERVER_URL.lock().unwrap().join(&route_info.path);
 		let bytes = CLIENT
-			.request(route_info.method, url.to_string())
+			.request(route_info.method.into(), url.to_string())
 			.header("Content-Type", "application/json")
 			.body(value)
 			.send()

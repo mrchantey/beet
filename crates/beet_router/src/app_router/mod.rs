@@ -1,3 +1,5 @@
+mod http_method;
+pub use http_method::*;
 mod route_path;
 pub use route_path::*;
 mod call_server_action;

@@ -2,8 +2,6 @@ use axum::Router;
 use axum::handler::Handler;
 use axum::routing;
 use beet_router::prelude::*;
-use http::Method;
-
 
 pub type RegisterAxumRoute<S> =
 	Box<dyn FnOnce(Router<S>) -> Router<S> + Send + Sync>;
@@ -29,18 +27,16 @@ where
 		self,
 		route_info: &RouteInfo,
 	) -> RegisterAxumRoute<S> {
-		let func = if route_info.method == Method::GET {
-			routing::get
-		} else if route_info.method == Method::POST {
-			routing::post
-		} else if route_info.method == Method::PUT {
-			routing::put
-		} else if route_info.method == Method::DELETE {
-			routing::delete
-		} else if route_info.method == Method::PATCH {
-			routing::patch
-		} else {
-			panic!("Unsupported method: {}", route_info.method)
+		let func = match route_info.method {
+			HttpMethod::Get => routing::get,
+			HttpMethod::Post => routing::post,
+			HttpMethod::Put => routing::put,
+			HttpMethod::Patch => routing::patch,
+			HttpMethod::Delete => routing::delete,
+			HttpMethod::Options => routing::options,
+			HttpMethod::Head => routing::head,
+			HttpMethod::Trace => routing::trace,
+			HttpMethod::Connect => routing::connect,
 		};
 		let path = route_info.path.to_string();
 		Box::new(move |router: Router<S>| router.route(&path, func(self)))

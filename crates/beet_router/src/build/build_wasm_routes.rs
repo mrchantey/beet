@@ -47,7 +47,6 @@ mod test {
 
 	use super::BuildWasmRoutes;
 	use crate::prelude::*;
-	use http::Method;
 	use quote::ToTokens;
 	use sweet::prelude::*;
 
@@ -56,7 +55,7 @@ mod test {
 			map: vec![(
 				RouteInfo {
 					path: "/".into(),
-					method: Method::GET,
+					method: HttpMethod::Get,
 				},
 				vec![],
 			)]

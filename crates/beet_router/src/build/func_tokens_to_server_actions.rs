@@ -189,10 +189,7 @@ impl FuncTokensToServerActions {
 		server_extractors: &[FnArg],
 		return_type: &ReturnType,
 	) -> syn::ItemFn {
-		let method_has_body = route_info.method_has_body();
-		println!("Function name: {:?}", fn_name);
-		println!("Route info: {:?}", route_info);
-		println!("Method has body: {}", method_has_body);
+		let method_has_body = route_info.method.has_body();
 		let extractor_type: syn::TypePath = if method_has_body {
 			parse_quote!(Json)
 		} else {
@@ -248,7 +245,6 @@ mod tests {
 	use std::str::FromStr;
 
 	use crate::prelude::*;
-	use http::Method;
 	use quote::ToTokens;
 	use quote::quote;
 	use sweet::prelude::*;
@@ -257,7 +253,7 @@ mod tests {
 	fn build(func: syn::ItemFn, path: &str) -> (syn::ItemFn, syn::ItemFn) {
 		let mut func_tokens = FuncTokens::simple(path, syn::parse_quote!({}));
 		func_tokens.route_info.method =
-			Method::from_str(&func.sig.ident.to_string()).unwrap();
+			HttpMethod::from_str(&func.sig.ident.to_string()).unwrap();
 		func_tokens.item_fn = Some(func);
 		func_tokens.xpipe(FuncTokensToServerActions).unwrap()
 	}
@@ -320,7 +316,7 @@ mod tests {
 		let client_str = quote!(#client_fn).to_token_stream().to_string();
 		expect(client_str).to_contain(
 			&quote!(CallServerAction::request(
-				RouteInfo::new("/add", beet::exports::http::Method::POST),
+				RouteInfo::new("/add", HttpMethod::Post),
 				(args0, args1)
 			))
 			.to_token_stream()
@@ -478,7 +474,7 @@ mod tests {
 		let client_str = quote!(#client_fn).to_token_stream().to_string();
 		expect(client_str).to_contain(
 			&quote!(CallServerAction::request(
-				RouteInfo::new("/greet", beet::exports::http::Method::GET),
+				RouteInfo::new("/greet", HttpMethod::Get),
 				()
 			))
 			.to_token_stream()
@@ -540,7 +536,7 @@ mod tests {
 		let client_str = quote!(#client_fn).to_token_stream().to_string();
 		expect(client_str).to_contain(
 			&quote!(CallServerAction::request(
-				RouteInfo::new("/hello", beet::exports::http::Method::GET),
+				RouteInfo::new("/hello", HttpMethod::Get),
 				()
 			))
 			.to_token_stream()
@@ -617,7 +613,7 @@ mod tests {
 		let client_str = quote!(#client_fn).to_token_stream().to_string();
 		expect(client_str).to_contain(
 			&quote!(CallServerAction::request(
-				RouteInfo::new("/update", beet::exports::http::Method::PUT),
+				RouteInfo::new("/update", HttpMethod::Put),
 				(args0, args1)
 			))
 			.to_token_stream()
@@ -649,7 +645,7 @@ mod tests {
 		let client_str = quote!(#client_fn).to_token_stream().to_string();
 		expect(client_str).to_contain(
 			&quote!(CallServerAction::request(
-				RouteInfo::new("/delete", beet::exports::http::Method::DELETE),
+				RouteInfo::new("/delete", HttpMethod::Delete),
 				(args0, args1)
 			))
 			.to_token_stream()
@@ -678,7 +674,7 @@ mod tests {
 		let client_str = quote!(#client_fn).to_token_stream().to_string();
 		expect(client_str).to_contain(
 			&quote!(CallServerAction::request(
-				RouteInfo::new("/patch", beet::exports::http::Method::PATCH),
+				RouteInfo::new("/patch", HttpMethod::Patch),
 				(args0, args1)
 			))
 			.to_token_stream()
@@ -710,10 +706,7 @@ mod tests {
 		let client_str = quote!(#client_fn).to_token_stream().to_string();
 		expect(client_str).to_contain(
 			&quote!(CallServerAction::request(
-				RouteInfo::new(
-					"/options",
-					beet::exports::http::Method::OPTIONS
-				),
+				RouteInfo::new("/options", HttpMethod::Options),
 				()
 			))
 			.to_token_stream()
@@ -742,7 +735,7 @@ mod tests {
 		let client_str = quote!(#client_fn).to_token_stream().to_string();
 		expect(client_str).to_contain(
 			&quote!(CallServerAction::request(
-				RouteInfo::new("/head", beet::exports::http::Method::HEAD),
+				RouteInfo::new("/head", HttpMethod::Head),
 				(args0, args1)
 			))
 			.to_token_stream()
