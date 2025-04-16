@@ -1,6 +1,8 @@
 use crate::prelude::*;
 use anyhow::Result;
 use beet_rsx::prelude::*;
+use proc_macro2::TokenStream;
+use sweet::prelude::PipelineTargetIter;
 use syn::Item;
 
 #[derive(Debug, Default, Clone)]
@@ -13,7 +15,11 @@ pub struct FuncTokensTreeToServerActions {
 impl Pipeline<FuncTokensTree, Result<()>> for FuncTokensTreeToServerActions {
 	fn apply(mut self, tree: FuncTokensTree) -> Result<()> {
 		let mod_tree = self.mod_tree(&tree);
-		// let collect_func = self.collect_func(&tree);
+		let out_dir = self.codegen_file.output_dir()?;
+		let mod_imports = tree
+			.flatten()
+			.xtry_filter_map(|item| item.mod_import(out_dir))?;
+		self.codegen_file.items.extend(mod_imports);
 		self.codegen_file.add_item(mod_tree);
 		self.codegen_file.build_and_write()?;
 		Ok(())
@@ -23,6 +29,21 @@ impl Pipeline<FuncTokensTree, Result<()>> for FuncTokensTreeToServerActions {
 
 impl FuncTokensTreeToServerActions {
 	fn mod_tree(&self, tree: &FuncTokensTree) -> Item {
-		tree.mod_tree(|node| todo!())
+		tree.mod_tree(|node| {
+			node.value
+				.as_ref()
+				.map(|tokens| {
+					tokens.xpipe(FuncTokensToServerActions::default()).map(
+						|(client, server)| {
+							Item::Verbatim(quote::quote! {
+								#client
+								#server
+							})
+						},
+					)
+				})
+				.flatten()
+				.unwrap_or(Item::Verbatim(TokenStream::new()))
+		})
 	}
 }

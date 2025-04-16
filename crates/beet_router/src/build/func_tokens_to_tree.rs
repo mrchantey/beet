@@ -99,7 +99,20 @@ impl FuncTokensTree {
 			)
 		}
 	}
+
+	pub fn flatten(&self) -> Vec<&FuncTokens> {
+		let mut out = Vec::new();
+		if let Some(value) = &self.value {
+			out.push(value);
+		}
+		for child in &self.children {
+			out.extend(child.flatten());
+		}
+		out
+	}
 }
+
+
 
 
 #[cfg(test)]

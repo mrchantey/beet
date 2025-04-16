@@ -1,5 +1,6 @@
 #[allow(unused_imports)]
 use crate::prelude::*;
+use std::path::Path;
 use std::path::PathBuf;
 use sweet::prelude::*;
 use syn::Block;
@@ -34,8 +35,9 @@ pub struct FuncTokens {
 	/// `get` in the case of single file routes like markdown.
 	pub route_info: RouteInfo,
 }
-
-
+impl AsRef<FuncTokens> for FuncTokens {
+	fn as_ref(&self) -> &FuncTokens { self }
+}
 
 impl FuncTokens {
 	/// create a simple `FuncTokens` for testing
@@ -81,5 +83,29 @@ impl FuncTokens {
 				.to_string_lossy()
 				.to_string()
 		}
+	}
+
+	/// Return a `mod` import for each [`FuncTokens::func`]
+	/// that requires a module import.
+	// this approach is cleaner than importing in each function,
+	// and also rust-analyzer has an easier time resolving file level imports
+	pub fn mod_import(
+		&self,
+		canonical_out_dir: &Path,
+	) -> Result<Option<syn::Item>> {
+		self.mod_ident
+			.as_ref()
+			.map(|mod_ident| {
+				let mod_path = PathExt::create_relative(
+					canonical_out_dir,
+					&self.canonical_path,
+				)?;
+				let mod_path_str = mod_path.to_string_lossy();
+				Ok(syn::parse_quote! {
+					#[path = #mod_path_str]
+					pub mod #mod_ident;
+				})
+			})
+			.transpose()
 	}
 }

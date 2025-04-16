@@ -2,7 +2,6 @@ use crate::prelude::*;
 use quote::format_ident;
 use quote::quote;
 use sweet::prelude::*;
-use syn::Block;
 use syn::FnArg;
 use syn::ItemFn;
 use syn::Pat;
@@ -13,57 +12,45 @@ use syn::punctuated::Punctuated;
 
 /// Maps the [`FuncTokens::item_fn`] to a pair of
 /// [`ItemFn`]s, one for the client and one for the server.
+#[derive(Default)]
 pub struct FuncTokensToServerActions;
 
-impl Pipeline<FuncTokens, Option<(ItemFn, ItemFn)>>
+impl<T: AsRef<FuncTokens>> Pipeline<T, Option<(ItemFn, ItemFn)>>
 	for FuncTokensToServerActions
 {
-	fn apply(self, func_tokens: FuncTokens) -> Option<(ItemFn, ItemFn)> {
-		let Some(item_fn) = func_tokens.item_fn else {
+	fn apply(self, func_tokens: T) -> Option<(ItemFn, ItemFn)> {
+		let func_tokens = func_tokens.as_ref();
+		let Some(item_fn) = &func_tokens.item_fn else {
 			return None;
 		};
-		Some(self.build(&func_tokens.route_info, &item_fn))
+		Some(self.build(&func_tokens, item_fn))
 	}
 }
 
 impl FuncTokensToServerActions {
 	pub fn build(
 		&self,
-		route_info: &RouteInfo,
+		func_tokens: &FuncTokens,
 		item_fn: &ItemFn,
 	) -> (syn::ItemFn, syn::ItemFn) {
-		let fn_name = &item_fn.sig.ident;
-		let return_type = &item_fn.sig.output;
-		let is_async = item_fn.sig.asyncness.is_some();
-
-		// Extract the function body
-		let function_body = &item_fn.block;
-
 		// Extract parameters
 		let (args_tuple_pat, args_type, client_params, server_extractors) =
 			self.extract_parameters(&item_fn.sig.inputs);
 
 		// Build client version using method name directly
-		let client_out = self.build_client_version(
-			route_info,
-			fn_name,
-			&client_params,
-			return_type,
-		);
+		let client_func =
+			self.client_func(func_tokens, item_fn, &client_params);
 
 		// Build server version using is_bodyless to determine extractor type
-		let server_out = self.build_server_version(
-			route_info,
-			fn_name,
-			is_async,
+		let server_func = self.server_func(
+			func_tokens,
+			item_fn,
 			args_tuple_pat,
 			args_type,
-			function_body,
 			&server_extractors,
-			return_type,
 		);
 
-		(client_out, server_out)
+		(client_func, server_func)
 	}
 
 	fn extract_parameters(
@@ -151,14 +138,13 @@ impl FuncTokensToServerActions {
 		parse_quote! { () } // Fallback
 	}
 
-	fn build_client_version(
+	fn client_func(
 		&self,
-		route_info: &RouteInfo,
-		fn_name: &syn::Ident,
+		func_tokens: &FuncTokens,
+		item_fn: &ItemFn,
 		client_params: &[FnArg],
-		return_type: &ReturnType,
 	) -> syn::ItemFn {
-		let return_inner_type = match return_type {
+		let return_inner_type = match &item_fn.sig.output {
 			ReturnType::Type(_, ty) => ty.clone(),
 			_ => parse_quote!(()),
 		};
@@ -170,33 +156,33 @@ impl FuncTokensToServerActions {
 			.map(|(i, _)| format_ident!("args{}", i))
 			.collect();
 
+		let fn_ident = &item_fn.sig.ident;
+		let route_info = &func_tokens.route_info;
+
 		parse_quote! {
 			#[cfg(feature="client")]
-			async fn #fn_name(#(#client_params),*) -> Result<#return_inner_type, ServerActionError> {
+			async fn #fn_ident(#(#client_params),*) -> Result<#return_inner_type, ServerActionError> {
 				CallServerAction::request(#route_info, (#(#param_names),*)).await
 			}
 		}
 	}
 
-	fn build_server_version(
+	fn server_func(
 		&self,
-		route_info: &RouteInfo,
-		fn_name: &syn::Ident,
-		is_async: bool,
+		func_tokens: &FuncTokens,
+		item_fn: &ItemFn,
 		args_tuple_pat: Option<Pat>,
 		args_type: Option<Type>,
-		function_body: &Block,
 		server_extractors: &[FnArg],
-		return_type: &ReturnType,
 	) -> syn::ItemFn {
-		let method_has_body = route_info.method.has_body();
+		let method_has_body = func_tokens.route_info.method.has_body();
 		let extractor_type: syn::TypePath = if method_has_body {
 			parse_quote!(Json)
 		} else {
 			parse_quote!(JsonQuery)
 		};
 
-		let return_inner_type = match return_type {
+		let return_inner_type = match &item_fn.sig.output {
 			ReturnType::Type(_, ty) => ty.clone(),
 			_ => parse_quote!(()),
 		};
@@ -216,8 +202,9 @@ impl FuncTokensToServerActions {
 				parse_quote! { #extractor_type(args): #extractor_type < () > }
 			}
 		};
+		let function_body = &item_fn.block;
 
-		let function_execution = if is_async {
+		let function_execution = if item_fn.sig.asyncness.is_some() {
 			quote! {
 				Json({
 					#function_body.await
@@ -231,9 +218,11 @@ impl FuncTokensToServerActions {
 			}
 		};
 
+		let fn_ident = &item_fn.sig.ident;
+
 		parse_quote! {
 			#[cfg(not(feature="client"))]
-			async fn #fn_name(#args_param, #(#server_extractors),*) -> Json<#return_inner_type> {
+			async fn #fn_ident(#args_param, #(#server_extractors),*) -> Json<#return_inner_type> {
 				#function_execution
 			}
 		}

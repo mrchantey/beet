@@ -1,8 +1,8 @@
 use crate::prelude::*;
+use anyhow::Result;
 use std::path::Path;
 use sweet::prelude::*;
 use syn::Item;
-use anyhow::Result;
 
 
 /// A group of [`FuncTokens`] for which a type has been
@@ -22,32 +22,10 @@ impl AsRef<FuncTokensGroup> for FuncTokensGroup {
 
 
 impl FuncTokensGroup {
-	// this approach is cleaner than importing in each function,
-	// and also rust-analyzer has an easier time resolving file level imports
-	/// Return a list of `mod` imports for each [`FuncTokens::func`]
-	/// that requires a module import.
 	pub fn func_files_to_mod_imports(
 		&self,
 		canonical_out_dir: &Path,
 	) -> Result<Vec<Item>> {
-		self.funcs
-			.iter()
-			.filter_map(|func| match &func.mod_ident {
-				Some(mod_ident) => Some((mod_ident, func)),
-				None => None,
-			})
-			.map(|(mod_ident, func)| {
-				let mod_path = PathExt::create_relative(
-					canonical_out_dir,
-					&func.canonical_path,
-				)?;
-				let mod_path_str = mod_path.to_string_lossy();
-				let mod_import = syn::parse_quote! {
-					#[path = #mod_path_str]
-					pub mod #mod_ident;
-				};
-				Ok(mod_import)
-			})
-			.collect()
+		(&self.funcs).xtry_filter_map(|func| func.mod_import(canonical_out_dir))
 	}
 }
