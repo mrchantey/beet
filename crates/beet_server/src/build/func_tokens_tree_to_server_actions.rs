@@ -62,6 +62,8 @@ impl FuncTokensTreeToServerActions {
 		syn::parse_quote! {
 			#[allow(missing_docs)]
 			pub mod #ident {
+				#[allow(unused_imports)]
+				use super::*;
 				#(#items)*
 				#(#children)*
 			}
@@ -74,11 +76,10 @@ impl FuncTokensTreeToServerActions {
 	/// so that the function replaces the mod and its name becomes the mod name
 	fn collapse_item(&self, item: Item) -> Item {
 		if let Item::Mod(mut item_mod) = item {
-			println!("visiting mod {}", item_mod.ident);
 			if let Some((_, ref mut items)) = item_mod.content {
-				if items.len() == 1 {
-					if let Item::Fn(mut func) = items[0].clone() {
-						println!("collapsing, items: {}", func.sig.ident);
+				// the first is `use super::*;`
+				if items.len() == 2 {
+					if let Item::Fn(mut func) = items[1].clone() {
 						func.sig.ident = item_mod.ident;
 						return Item::Fn(func);
 					}
@@ -106,7 +107,6 @@ mod test {
 	use sweet::prelude::*;
 
 	#[test]
-	#[ignore]
 	fn simple() {
 		FuncTokensTreeToServerActions::default()
 			.mod_tree(&vec![FuncTokens::simple_get("bazz.rs")].into())
@@ -115,6 +115,8 @@ mod test {
 			.to_be(quote! {
 				#[allow (missing_docs)]
 				pub mod root {
+					#[allow(unused_imports)]
+					use super::*;	
 					pub async fn bazz() -> Result<(), ServerActionError> {
 						CallServerAction::request_no_data(RouteInfo::new("/bazz", HttpMethod::Get)).await
 					}
@@ -138,33 +140,41 @@ mod test {
 			.to_be(quote! {
 				#[allow(missing_docs)]
 				pub mod root {
-
+					#[allow(unused_imports)]
+					use super::*;
+	
 						pub async fn bazz() -> Result<(), ServerActionError> {
 								CallServerAction::request_no_data(RouteInfo::new("/bazz", HttpMethod::Get)).await
 						}
 
 						#[allow(missing_docs)]
 						pub mod foo {
-		
+							#[allow(unused_imports)]
+							use super::*;
+					
 								pub async fn bar() -> Result<(), ServerActionError> {
 										CallServerAction::request_no_data(RouteInfo::new("/foo/bar", HttpMethod::Get)).await
 								}
 
 								#[allow(missing_docs)]
 								pub mod boo {
-				
-										pub async fn get() -> Result<(), ServerActionError> {
-												CallServerAction::request_no_data(RouteInfo::new("/foo/boo", HttpMethod::Get)).await
-										}
+									#[allow(unused_imports)]
+									use super::*;
+									
+									pub async fn get() -> Result<(), ServerActionError> {
+										CallServerAction::request_no_data(RouteInfo::new("/foo/boo", HttpMethod::Get)).await
+									}
 
-										pub async fn post() -> Result<(), ServerActionError> {
-												CallServerAction::request_no_data(RouteInfo::new("/foo/boo", HttpMethod::Post)).await
-										}
+									pub async fn post() -> Result<(), ServerActionError> {
+										CallServerAction::request_no_data(RouteInfo::new("/foo/boo", HttpMethod::Post)).await
+									}
 								}
 								#[allow(missing_docs)]
 								pub mod bing {			
-										pub async fn bong() -> Result<(), ServerActionError> {
-												CallServerAction::request_no_data(RouteInfo::new("/foo/bing/bong", HttpMethod::Post)).await
+									#[allow(unused_imports)]
+									use super::*;
+									pub async fn bong() -> Result<(), ServerActionError> {
+											CallServerAction::request_no_data(RouteInfo::new("/foo/bing/bong", HttpMethod::Post)).await
 									}
 								}
 						}

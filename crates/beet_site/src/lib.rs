@@ -12,9 +12,9 @@ pub mod route_tree;
 #[cfg(target_arch = "wasm32")]
 #[path = "codegen/wasm.rs"]
 pub mod wasm;
-// #[cfg(target_arch = "wasm32")]
-// #[path = "codegen/actions.rs"]
-// pub mod actions;
+#[cfg(target_arch = "wasm32")]
+#[path = "codegen/actions.rs"]
+pub mod actions;
 
 pub mod prelude {
 	pub use super::*;

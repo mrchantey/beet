@@ -55,6 +55,8 @@ impl FuncTokensTree {
 			syn::parse_quote!(
 				#[allow(missing_docs)]
 				pub mod #ident {
+					#[allow(unused_imports)]
+					use super::*;	
 					#item
 					#(#children)*
 				}

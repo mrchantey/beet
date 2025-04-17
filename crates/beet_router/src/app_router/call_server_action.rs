@@ -25,7 +25,7 @@ impl CallServerAction {
 	pub async fn request<T: Serialize, O: DeserializeOwned>(
 		route_info: RouteInfo,
 		value: T,
-	) -> Result<O, CallServerActionError> {
+	) -> Result<O, ServerActionError> {
 		if route_info.method.has_body() {
 			Self::request_with_body(route_info, value).await
 		} else {
@@ -35,7 +35,7 @@ impl CallServerAction {
 	//// Makes a HTTP request to a server action without any data.
 	pub async fn request_no_data<O: DeserializeOwned>(
 		route_info: RouteInfo,
-	) -> Result<O, CallServerActionError> {
+	) -> Result<O, ServerActionError> {
 		let url = SERVER_URL.lock().unwrap().join(&route_info.path);
 		Self::send(CLIENT.request(route_info.method.into(), url.to_string()))
 			.await
@@ -46,9 +46,9 @@ impl CallServerAction {
 	async fn request_with_query<T: Serialize, O: DeserializeOwned>(
 		route_info: RouteInfo,
 		value: T,
-	) -> Result<O, CallServerActionError> {
+	) -> Result<O, ServerActionError> {
 		let value = serde_json::to_string(&value)
-			.map_err(|e| CallServerActionError::Serialize(e))?;
+			.map_err(|e| ServerActionError::Serialize(e))?;
 
 		let url = SERVER_URL.lock().unwrap().join(&route_info.path);
 		Self::send(
@@ -64,9 +64,9 @@ impl CallServerAction {
 	async fn request_with_body<T: Serialize, O: DeserializeOwned>(
 		route_info: RouteInfo,
 		value: T,
-	) -> Result<O, CallServerActionError> {
+	) -> Result<O, ServerActionError> {
 		let value = serde_json::to_string(&value)
-			.map_err(|e| CallServerActionError::Serialize(e))?;
+			.map_err(|e| ServerActionError::Serialize(e))?;
 
 		let url = SERVER_URL.lock().unwrap().join(&route_info.path);
 		Self::send(
@@ -81,24 +81,24 @@ impl CallServerAction {
 
 	async fn send<O: DeserializeOwned>(
 		request: RequestBuilder,
-	) -> Result<O, CallServerActionError> {
+	) -> Result<O, ServerActionError> {
 		let bytes = request
 			.send()
 			.await
 			.map_err(|e| e.into())?
 			.error_for_status()
-			.map_err(|e| CallServerActionError::Response(e.to_string()))?
+			.map_err(|e| ServerActionError::Response(e.to_string()))?
 			.bytes()
 			.await
 			.map_err(|e| e.into())?;
 
 		serde_json::from_slice(&bytes)
-			.map_err(|e| CallServerActionError::Deserialize(e))
+			.map_err(|e| ServerActionError::Deserialize(e))
 	}
 }
 
 #[derive(Debug, thiserror::Error)]
-pub enum CallServerActionError {
+pub enum ServerActionError {
 	#[error("Error making request: {0}")]
 	Request(reqwest::Error),
 	#[error("Response returned a non-200 error: {0}")]
@@ -111,9 +111,9 @@ pub enum CallServerActionError {
 	InvalidMethod(String),
 }
 
-impl Into<CallServerActionError> for reqwest::Error {
-	fn into(self) -> CallServerActionError {
-		CallServerActionError::Request(self)
+impl Into<ServerActionError> for reqwest::Error {
+	fn into(self) -> ServerActionError {
+		ServerActionError::Request(self)
 	}
 }
 

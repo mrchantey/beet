@@ -124,10 +124,10 @@ impl FuncTokens {
 		match self.mod_import {
 			ModImport::Inline => {
 				let item = &self.item_fn;
-				let imports = &codegen_file.imports;
 				Ok(syn::parse_quote! {
 					pub mod #mod_ident {
-						#(#imports)*
+						#[allow(unused_imports)]
+						use super::*;
 						#item
 					}
 				})
