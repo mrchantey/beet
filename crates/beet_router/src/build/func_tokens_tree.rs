@@ -62,6 +62,11 @@ impl FuncTokensTree {
 		}
 	}
 
+	/// Returns true if all children of this node have no children
+	pub fn all_children_are_leaf_nodes(&self) -> bool {
+		self.children.iter().all(|child| child.children.is_empty())
+	}
+
 	/// Flattens the tree into a [`FuncTokensGroup`].
 	pub fn into_group(self) -> FuncTokensGroup { self.into() }
 }
@@ -94,6 +99,7 @@ mod test {
 	fn tree() -> FuncTokensTree {
 		vec![
 			FuncTokens::simple("index.rs"),
+			FuncTokens::simple("bazz.rs"),
 			FuncTokens::simple("foo/bar.rs"),
 			FuncTokens::simple("foo/bazz/index.rs"),
 			FuncTokens::simple("foo/bazz/boo.rs"),
@@ -103,14 +109,9 @@ mod test {
 
 	#[test]
 	fn correct_tree_structure() {
-		expect(
-			tree()
-				.xinto::<FuncTokensTree>()
-				.into_path_tree()
-				.to_string_indented(),
-		)
-		.to_be(
+		expect(tree().into_path_tree().to_string_indented()).to_be(
 			r#"root
+  bazz
   foo
     bar
     bazz
