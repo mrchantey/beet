@@ -57,7 +57,8 @@ impl Pipeline<FuncTokensTree, Result<()>> for FuncTokensTreeToRouteTree {
 
 impl FuncTokensTreeToRouteTree {
 	fn into_path_func(tree: &FuncTokensTree) -> Option<ItemFn> {
-		let Some(route) = &tree.value else {
+		// just use the next one, each func should have the same route path
+		let Some(route) = &tree.funcs.iter().next() else {
 			return None;
 		};
 		let route_ident = if tree.children.is_empty() {
@@ -102,7 +103,7 @@ impl FuncTokensTreeToRouteTree {
 			.map(|child| self.collect_route_node(child))
 			.collect::<Vec<_>>();
 
-		let path = match &tree.value {
+		let path = match &tree.funcs.iter().next() {
 			Some(value) => {
 				let path = value.route_info.path.to_string_lossy().to_string();
 				let path: Expr = syn::parse_quote!(Some(RoutePath::new(#path)));
@@ -137,6 +138,8 @@ mod test {
 			FuncTokens::simple_get("foo/bar.rs"),
 			FuncTokens::simple_get("foo/bazz/index.rs"),
 			FuncTokens::simple_get("foo/bazz/boo.rs"),
+			// duplicates with same path are ignored
+			FuncTokens::simple_post("foo/bazz/boo.rs"),
 		]
 		.into()
 	}

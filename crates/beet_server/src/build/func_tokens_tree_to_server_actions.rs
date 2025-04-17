@@ -43,26 +43,26 @@ impl FuncTokensTreeToServerActions {
 	/// Create a tree of server actions
 	fn mod_tree(&self, tree: &FuncTokensTree) -> Item {
 		let item = self.mod_tree_inner(tree);
-		// if self.collapse_nodes {
-		// 	self.collapse_item(item)
-		// }else{
+		if self.collapse_nodes {
+			self.collapse_item(item)
+		}else{
 		item
-		// }
+		}
 	}
 	fn mod_tree_inner(&self, tree: &FuncTokensTree) -> Item {
 		let ident = syn::Ident::new(&tree.name, proc_macro2::Span::call_site());
 		let children =
 			tree.children.iter().map(|child| self.mod_tree_inner(child));
 
-		let item = tree
-			.value
-			.as_ref()
+		let items = tree
+			.funcs
+			.iter()
 			.map(|tokens| tokens.xpipe(FuncTokensToServerActions::default()));
 
 		syn::parse_quote! {
 			#[allow(missing_docs)]
 			pub mod #ident {
-				#item
+				#(#items)*
 				#(#children)*
 			}
 		}
@@ -123,7 +123,6 @@ mod test {
 	}
 
 	#[test]
-	#[ignore]
 	fn correct_tree_structure() {
 		FuncTokensTreeToServerActions::default()
 			.mod_tree(&vec![
@@ -137,9 +136,8 @@ mod test {
 			.xmap(|item| item.to_token_stream().to_string())
 			.xmap(expect)
 			.to_be(quote! {
-				#![allow(missing_docs)]
+				#[allow(missing_docs)]
 				pub mod root {
-						use super::*;
 
 						pub async fn bazz() -> Result<(), ServerActionError> {
 								CallServerAction::request_no_data(RouteInfo::new("/bazz", HttpMethod::Get)).await
@@ -147,35 +145,26 @@ mod test {
 
 						#[allow(missing_docs)]
 						pub mod foo {
-								use super::*;
-
+		
 								pub async fn bar() -> Result<(), ServerActionError> {
 										CallServerAction::request_no_data(RouteInfo::new("/foo/bar", HttpMethod::Get)).await
 								}
 
 								#[allow(missing_docs)]
 								pub mod boo {
-										use super::*;
-
+				
 										pub async fn get() -> Result<(), ServerActionError> {
-												CallServerAction::request_no_data(RouteInfo::new("/foo/bazz.boo", HttpMethod::Get)).await
+												CallServerAction::request_no_data(RouteInfo::new("/foo/boo", HttpMethod::Get)).await
 										}
 
 										pub async fn post() -> Result<(), ServerActionError> {
-												CallServerAction::request_no_data(RouteInfo::new("/foo/bazz/boo", HttpMethod::Post)).await
+												CallServerAction::request_no_data(RouteInfo::new("/foo/boo", HttpMethod::Post)).await
 										}
 								}
 								#[allow(missing_docs)]
-								pub mod bing {
-									use super::*;
-
-									#[allow(missing_docs)]
-									pub mod bong {
-										use super::*;
-
-										pub async fn post() -> Result<(), ServerActionError> {
-												CallServerAction::request_no_data(RouteInfo::new("/foo/bazz/bing/bong", HttpMethod::Post)).await
-										}
+								pub mod bing {			
+										pub async fn bong() -> Result<(), ServerActionError> {
+												CallServerAction::request_no_data(RouteInfo::new("/foo/bing/bong", HttpMethod::Post)).await
 									}
 								}
 						}

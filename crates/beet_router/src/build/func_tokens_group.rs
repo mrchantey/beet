@@ -90,7 +90,7 @@ impl Into<FuncTokensTree> for FuncTokensGroup {
 					        // std::path::Component::ParentDir => todo!(),
 				}
 			}
-			current.value = Some(func);
+			current.funcs.push(func);
 		}
 		this
 	}

@@ -7,7 +7,7 @@ pub struct FuncTokensTree {
 	/// The route path for this part of the tree. It may be
 	/// a parent or leaf node.
 	pub name: String,
-	pub value: Option<FuncTokens>,
+	pub funcs: Vec<FuncTokens>,
 	/// Children mapped by their [`RouteTreeBuilder::name`].
 	/// If this is empty then the route is a leaf node.
 	pub children: Vec<FuncTokensTree>,
@@ -17,7 +17,7 @@ impl FuncTokensTree {
 	pub fn new(name: impl Into<String>) -> Self {
 		Self {
 			name: name.into(),
-			value: None,
+			funcs: Vec::new(),
 			children: Vec::new(),
 		}
 	}
@@ -69,9 +69,7 @@ impl FuncTokensTree {
 
 	pub fn flatten(self) -> Vec<FuncTokens> {
 		let mut out = Vec::new();
-		if let Some(value) = self.value {
-			out.push(value);
-		}
+		out.extend(self.funcs.into_iter());
 		for child in self.children.into_iter() {
 			out.extend(child.flatten());
 		}
@@ -118,7 +116,6 @@ mod test {
   foo
     bar
     bazz
-      boo
       boo
 "#,
 		);
