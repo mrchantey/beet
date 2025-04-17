@@ -25,5 +25,5 @@ tokio.workspace = true
 
 [build-dependencies]
 anyhow.workspace = true
-beet = { workspace = true, features = ["build"] }
+beet = { workspace = true, features = ["build", "server"] }
 sweet = { workspace = true, features = ["fs"] }

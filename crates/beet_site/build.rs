@@ -32,6 +32,17 @@ fn main() -> Result<()> {
 				.into_canonical_unchecked();
 		FsExt::copy_recursive(design_public_dir, html_dir)?;
 
+		let _actions =
+			FileGroup::new_workspace_rel("crates/beet_site/src/actions")?
+				.xpipe(FileGroupToFuncTokens::default())?
+				.xmap(|g| g.into_tree())
+				.xpipe(FuncTokensTreeToServerActions::new(
+					CodegenFile::new_workspace_rel(
+						"crates/beet_site/src/codegen/actions.rs",
+						&cx.pkg_name,
+					),
+				))?;
+
 
 		let pages = FileGroup::new_workspace_rel("crates/beet_site/src/pages")?
 			.with_filter(

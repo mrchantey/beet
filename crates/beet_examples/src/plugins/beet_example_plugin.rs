@@ -105,7 +105,7 @@ fn assert_local_assets() {
 	if !std::path::Path::new("assets/README.md").exists() {
 		panic!(
 			r#"
-🥁🥁🥁
+🌱🌱🌱
 	
 Welcome! This Beet example uses large assets that are stored remotely.
 Until bevy supports http asset sources these must be downloaded manually:
@@ -121,7 +121,7 @@ Windows:
 1. Download https://bevyhub-public.s3.us-west-2.amazonaws.com/assets.tar.gz
 2. Unzip into `./assets`
 
-🥁🥁🥁
+🌱🌱🌱
 "#
 		);
 	}

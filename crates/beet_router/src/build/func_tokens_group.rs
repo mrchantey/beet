@@ -62,8 +62,9 @@ impl FuncTokensGroup {
 			}
 		}
 	}
-}
 
+	pub fn into_tree(self) -> FuncTokensTree { self.into() }
+}
 
 impl Into<FuncTokensTree> for FuncTokensGroup {
 	fn into(self) -> FuncTokensTree {

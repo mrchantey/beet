@@ -25,6 +25,8 @@ impl Pipeline<FuncTokensTree, Result<()>> for FuncTokensTreeToServerActions {
 
 
 impl FuncTokensTreeToServerActions {
+	pub fn new(codegen_file: CodegenFile) -> Self { Self { codegen_file } }
+
 	fn mod_tree(&self, tree: &FuncTokensTree) -> Item {
 		tree.mod_tree(|node| {
 			node.value
