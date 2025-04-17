@@ -42,9 +42,16 @@ impl AsRef<FuncTokens> for FuncTokens {
 
 
 impl FuncTokens {
-	pub fn simple(local_path: impl AsRef<std::path::Path>) -> Self {
+	pub fn simple_get(local_path: impl AsRef<std::path::Path>) -> Self {
 		Self::simple_with_func(local_path, syn::parse_quote! {
 			fn get()->RsxNode{
+				Default::default()
+			}
+		})
+	}
+	pub fn simple_post(local_path: impl AsRef<std::path::Path>) -> Self {
+		Self::simple_with_func(local_path, syn::parse_quote! {
+			fn post()->RsxNode{
 				Default::default()
 			}
 		})

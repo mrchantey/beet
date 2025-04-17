@@ -67,7 +67,7 @@ mod test {
 
 	#[test]
 	fn works() {
-		FuncTokens::simple("/foo")
+		FuncTokens::simple_get("/foo")
 			.xinto::<FuncTokensGroup>()
 			.xpipe(FuncTokensToAxumRoutes::default())
 			.unwrap()

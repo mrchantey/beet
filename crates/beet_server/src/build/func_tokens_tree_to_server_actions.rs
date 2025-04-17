@@ -109,7 +109,7 @@ mod test {
 	#[ignore]
 	fn simple() {
 		FuncTokensTreeToServerActions::default()
-			.mod_tree(&vec![FuncTokens::simple("bazz.rs")].into())
+			.mod_tree(&vec![FuncTokens::simple_get("bazz.rs")].into())
 			.xmap(|item| item.to_token_stream().to_string())
 			.xmap(expect)
 			.to_be(quote! {

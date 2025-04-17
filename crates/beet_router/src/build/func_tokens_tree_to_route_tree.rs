@@ -133,10 +133,10 @@ mod test {
 
 	fn tree() -> FuncTokensTree {
 		vec![
-			FuncTokens::simple("index.rs"),
-			FuncTokens::simple("foo/bar.rs"),
-			FuncTokens::simple("foo/bazz/index.rs"),
-			FuncTokens::simple("foo/bazz/boo.rs"),
+			FuncTokens::simple_get("index.rs"),
+			FuncTokens::simple_get("foo/bar.rs"),
+			FuncTokens::simple_get("foo/bazz/index.rs"),
+			FuncTokens::simple_get("foo/bazz/boo.rs"),
 		]
 		.into()
 	}

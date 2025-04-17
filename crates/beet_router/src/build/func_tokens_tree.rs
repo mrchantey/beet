@@ -67,21 +67,23 @@ impl FuncTokensTree {
 		self.children.iter().all(|child| child.children.is_empty())
 	}
 
-	/// Flattens the tree into a [`FuncTokensGroup`].
-	pub fn into_group(self) -> FuncTokensGroup { self.into() }
-}
-
-impl Into<FuncTokensGroup> for FuncTokensTree {
-	fn into(self) -> FuncTokensGroup {
+	pub fn flatten(self) -> Vec<FuncTokens> {
 		let mut out = Vec::new();
 		if let Some(value) = self.value {
 			out.push(value);
 		}
 		for child in self.children.into_iter() {
-			out.extend(child.into_group().funcs);
+			out.extend(child.flatten());
 		}
-		FuncTokensGroup::new(out)
+		out
 	}
+
+	/// Flattens the tree into a [`FuncTokensGroup`].
+	pub fn into_group(self) -> FuncTokensGroup { self.into() }
+}
+
+impl Into<FuncTokensGroup> for FuncTokensTree {
+	fn into(self) -> FuncTokensGroup { FuncTokensGroup::new(self.flatten()) }
 }
 
 impl From<Vec<FuncTokens>> for FuncTokensTree {
@@ -98,11 +100,12 @@ mod test {
 
 	fn tree() -> FuncTokensTree {
 		vec![
-			FuncTokens::simple("index.rs"),
-			FuncTokens::simple("bazz.rs"),
-			FuncTokens::simple("foo/bar.rs"),
-			FuncTokens::simple("foo/bazz/index.rs"),
-			FuncTokens::simple("foo/bazz/boo.rs"),
+			FuncTokens::simple_get("index.rs"),
+			FuncTokens::simple_get("bazz.rs"),
+			FuncTokens::simple_get("foo/bar.rs"),
+			FuncTokens::simple_get("foo/bazz/index.rs"),
+			FuncTokens::simple_get("foo/bazz/boo.rs"),
+			FuncTokens::simple_post("foo/bazz/boo.rs"),
 		]
 		.into()
 	}
@@ -115,6 +118,7 @@ mod test {
   foo
     bar
     bazz
+      boo
       boo
 "#,
 		);
