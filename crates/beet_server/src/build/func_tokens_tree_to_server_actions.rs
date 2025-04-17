@@ -30,14 +30,7 @@ impl FuncTokensTreeToServerActions {
 			node.value
 				.as_ref()
 				.map(|tokens| {
-					tokens.xpipe(FuncTokensToServerActions::default()).xmap(
-						|(client, server)| {
-							Item::Verbatim(quote::quote! {
-								#client
-								#server
-							})
-						},
-					)
+					tokens.xpipe(FuncTokensToServerActions::default()).into()
 				})
 				.unwrap_or(Item::Verbatim(TokenStream::new()))
 		})

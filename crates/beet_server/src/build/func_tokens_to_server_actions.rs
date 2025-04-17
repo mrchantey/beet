@@ -1,44 +1,39 @@
 use beet_router::prelude::*;
-use quote::format_ident;
-use quote::quote;
 use sweet::prelude::*;
-use syn::Expr;
 use syn::FnArg;
 use syn::Ident;
 use syn::ItemFn;
-use syn::Member;
 use syn::Pat;
-use syn::PatType;
+use syn::PatIdent;
+use syn::PatTupleStruct;
 use syn::Token;
 use syn::Type;
+use syn::TypePath;
 use syn::parse_quote;
 use syn::punctuated::Punctuated;
 
-/// Maps the [`FuncTokens::item_fn`] to a pair of
-/// [`ItemFn`]s, one for the client and one for the server.
+/// For a given [`FuncTokens::item_fn`] which is a valid [`axum::handler::Handler`],
+/// create an equivelent client side function to call it.
+///
+///
+/// ## Syntax Sugar
+///
+/// Destructuring any valid
+///
 #[derive(Default)]
 pub struct FuncTokensToServerActions;
 
-impl<T: AsRef<FuncTokens>> Pipeline<T, (ItemFn, ItemFn)>
-	for FuncTokensToServerActions
-{
-	fn apply(self, func_tokens: T) -> (ItemFn, ItemFn) {
+impl<T: AsRef<FuncTokens>> Pipeline<T, ItemFn> for FuncTokensToServerActions {
+	fn apply(self, func_tokens: T) -> ItemFn {
 		let func_tokens = func_tokens.as_ref();
-		self.build(&func_tokens)
+		self.client_func(&func_tokens)
 	}
 }
 
 impl FuncTokensToServerActions {
-	pub fn build(&self, func_tokens: &FuncTokens) -> (ItemFn, ItemFn) {
-		let client_func = self.client_func(func_tokens);
-		let server_func = self.server_func(func_tokens);
-
-		(client_func, server_func)
-	}
-
 	fn client_func(&self, func_tokens: &FuncTokens) -> ItemFn {
-		let (inputs, param_names) = self.destructure_client_inputs(func_tokens);
-		let output = &func_tokens.item_fn.sig.output;
+		let parsed_inputs = Self::parse_inputs(func_tokens);
+		let return_type = Self::parse_output(func_tokens);
 
 		let fn_ident = &func_tokens.item_fn.sig.ident;
 		let route_info = &func_tokens.route_info;
@@ -51,165 +46,265 @@ impl FuncTokensToServerActions {
 			}
 		});
 
-		let return_type = match output {
-			syn::ReturnType::Default => quote! { () },
-			syn::ReturnType::Type(_, ty) => quote! { #ty },
-		};
-
-		parse_quote! {
-			#(#docs)*
-			# [cfg(feature="client")]
-			pub async fn #fn_ident(#inputs) -> Result<#return_type, ServerActionError> {
-				CallServerAction::request(#route_info, #param_names).await
-			}
-		}
-	}
-
-
-	/// Map the original function inputs into a tuple of
-	/// its first arg (destructured if tuple), and the param names for that arg.
-	fn destructure_client_inputs(
-		&self,
-		func_tokens: &FuncTokens,
-	) -> (Punctuated<FnArg, Token![,]>, Option<Expr>) {
-		let pat_type = func_tokens
-			.item_fn
-			.sig
-			.inputs
-			.iter()
-			.next()
-			.map(|arg| match arg {
-				FnArg::Typed(pat_type) => Some(pat_type),
-				_ => None,
-			})
-			.flatten();
-
-		match pat_type {
-			Some(pat_ty) if let Type::Tuple(tuple) = &*pat_ty.ty => {
-				let param_names = match &*pat_ty.pat {
-					Pat::Tuple(pat_tuple) => pat_tuple
-						.elems
-						.iter()
-						.map(|elem| match elem {
-							Pat::Ident(ident) => ident.ident.clone(),
-							_ => format_ident!("arg{}", 0u32),
-						})
-						.collect::<Vec<_>>(),
-					_ => vec![],
-				};
-				let tuple_types = tuple.elems.iter().collect::<Vec<_>>();
-				if param_names.len() == tuple_types.len() {
-					let inputs = tuple_types
-						.iter()
-						.zip(param_names.iter())
-						.map(|(ty, name)| -> FnArg {
-							parse_quote! { #name: #ty }
-						})
-						.collect();
-					(inputs, Some(parse_quote! { (#(#param_names),*) }))
-				} else {
-					let pat = pat_ty.pat.clone();
-					(parse_quote!(#pat_ty), Some(parse_quote!(#pat)))
+		match parsed_inputs {
+			Some((fn_args, param_names)) => parse_quote! {
+				#(#docs)*
+				pub async fn #fn_ident(#fn_args) -> Result<#return_type, ServerActionError> {
+					CallServerAction::request(#route_info, #param_names).await
 				}
-			}
-			Some(pat_ty) => {
-				let pat = &pat_ty.pat;
-				(parse_quote!(#pat_ty), Some(parse_quote!(#pat)))
-			}
-			None => {
-				// No parameters
-				(Punctuated::new(), None)
-			}
-		}
-	}
-
-
-	fn server_func(&self, func_tokens: &FuncTokens) -> ItemFn {
-		let func_path = &func_tokens.func_path();
-		let (inputs, param_names) = self.destructure_server_inputs(func_tokens);
-		let maybe_await = if func_tokens.item_fn.sig.asyncness.is_some() {
-			quote! { .await }
-		} else {
-			quote! {}
-		};
-
-		let fn_ident = &func_tokens.item_fn.sig.ident;
-		// TODO handle if output is a result
-		let output = &func_tokens.item_fn.sig.output;
-		let return_type = match output {
-			syn::ReturnType::Default => quote! { () },
-			syn::ReturnType::Type(_, ty) => quote! { #ty },
-		};
-
-
-		parse_quote! {
-			#[cfg(not(feature="client"))]
-			async fn #fn_ident(#inputs) -> Json<#return_type> {
-				Json(#func_path(#(#param_names),*) #maybe_await)
-			}
-		}
-	}
-
-	fn destructure_server_inputs(
-		&self,
-		func_tokens: &FuncTokens,
-	) -> (Punctuated<FnArg, Token![,]>, Vec<Ident>) {
-		let mut inputs = func_tokens.item_fn.sig.inputs.clone();
-		// wrap the first arg in an extractor and destructure it
-		if let Some(first_arg) = inputs.first_mut() {
-			if let FnArg::Typed(pat_ty) = first_arg {
-				let pat = &*pat_ty.pat;
-				let ty = &*pat_ty.ty;
-				if func_tokens.route_info.method.has_body() {
-					*pat_ty.pat = parse_quote!(Json(#pat));
-					*pat_ty.ty = parse_quote!(Json<#ty>)
-				} else {
-					*pat_ty.pat = parse_quote!(JsonQuery(#pat));
-					*pat_ty.ty = parse_quote!(JsonQuery<#ty>)
+			},
+			None => parse_quote! {
+				#(#docs)*
+				pub async fn #fn_ident() -> Result<#return_type, ServerActionError> {
+					CallServerAction::request_no_data(#route_info).await
 				}
-			}
+			},
 		}
+	}
 
-		/// recursively extracts the inner identifier from a `PatType`
-		/// in the context of being used as a FnArg. Includes handling
-		/// destructred tuples and structs.
-		fn pat_ty_inner_idents(pat_ty: &PatType) -> Vec<&Ident> {
-			match &*pat_ty.pat {
-				Pat::Ident(pat_ident) => vec![&pat_ident.ident],
-				Pat::Tuple(pat_tuple) => pat_tuple
-					.elems
-					.iter()
-					.filter_map(|elem| {
-						if let Pat::Ident(pat_ident) = elem {
-							Some(&pat_ident.ident)
-						} else {
-							None
+	/// Extractors that can be mapped to client side.
+	/// This will be an extractor that either works with the url or the body,
+	/// depending on the method.
+	fn input_extractors(method: HttpMethod) -> Vec<Ident> {
+		match method.has_body() {
+			true => vec![parse_quote! { Json }],
+			false => vec![parse_quote! { JsonQuery }],
+		}
+	}
+	/// For given function inputs, return the inputs for the client function
+	/// as well as the 'restructured' version to be pased to the server.
+	/// If there are no inputs to be passed, this will be [`None`].
+	///
+	/// ## Examples:
+	/// |Input 																	| Output 														|
+	/// |---																		|	---																|
+	/// |`fn foo()` 														| `None`														|
+	/// |`fn foo(some_extractor: SomeExtractor)`| `None`														|
+	/// |`fn foo(a: Json<i32>)` 								| `Some([a: i32], a)`								|
+	/// |`fn foo(Json(a): Json<i32>)` 					| `Some([a: i32], a)`								|
+	/// |`fn foo(args: Json<(i32,i32)>)` 				| `Some([args: (i32, i32)], args])`	|
+	/// |`fn foo(Json((a,b)): Json<(i32,i32)>)` | `Some([a: i32, b: i32], (a, b))`	|
+	fn parse_inputs(
+		func: &FuncTokens,
+	) -> Option<(Punctuated<FnArg, Token![,]>, Pat)> {
+		// Find the first input that matches an extractor
+		let Some(extractor_arg) =
+			func.item_fn.sig.inputs.iter().find_map(|arg| {
+				if let FnArg::Typed(pat_type) = arg {
+					if let Type::Path(type_path) = &*pat_type.ty {
+						if let Some(last) = type_path.path.segments.last() {
+							if Self::input_extractors(func.route_info.method)
+								.iter()
+								.any(|extractor| last.ident == *extractor)
+							{
+								return Some(pat_type);
+							}
 						}
-					})
-					.collect(),
-				Pat::Struct(pat_struct) => pat_struct
-					.fields
-					.iter()
-					.filter_map(|field| match &field.member {
-						Member::Named(ident) => Some(ident),
-						Member::Unnamed(_) => None,
-					})
-					.collect(),
-				_ => vec![],
+					}
+				}
+				None
+			})
+		else {
+			return None;
+		};
+
+		// Extract the pattern and the inner type
+		match &*extractor_arg.pat {
+			// ie a: Json<i32>
+			Pat::Ident(PatIdent { ident, .. }) => {
+				// Type is Json<T>
+				if let Type::Path(TypePath { path, .. }) = &*extractor_arg.ty {
+					if let Some(seg) = path.segments.last() {
+						if let syn::PathArguments::AngleBracketed(args) =
+							&seg.arguments
+						{
+							if let Some(syn::GenericArgument::Type(inner_ty)) =
+								args.args.first()
+							{
+								// Pattern is just the ident
+								return Some((
+									{
+										let mut punct = Punctuated::new();
+										punct.push(
+											syn::parse_quote! { #ident: #inner_ty },
+										);
+										punct
+									},
+									syn::parse_quote! { #ident },
+								));
+							}
+						}
+					}
+				}
+				return None;
+			}
+			// ie Json(a): Json<i32>
+			// or Json((a,b)): Json<(i32,i32)>
+			Pat::TupleStruct(PatTupleStruct { elems, .. }) => {
+				// Pattern is Json(a) or Json((a, b))
+				if let Type::Path(TypePath { path, .. }) = &*extractor_arg.ty {
+					if let Some(seg) = path.segments.last() {
+						if let syn::PathArguments::AngleBracketed(args) =
+							&seg.arguments
+						{
+							if let Some(syn::GenericArgument::Type(inner_ty)) =
+								args.args.first()
+							{
+								if let Type::Tuple(tuple) = inner_ty {
+									// Handle Json((a, b)): Json<(u32, u32)>
+									if elems.len() == 1 {
+										if let Pat::Tuple(inner_tuple) =
+											&elems[0]
+										{
+											let mut fn_args = Punctuated::new();
+											let mut pat_idents = Vec::new();
+											for (pat_elem, ty_elem) in
+												inner_tuple
+													.elems
+													.iter()
+													.zip(tuple.elems.iter())
+											{
+												if let Pat::Ident(PatIdent {
+													ident,
+													..
+												}) = pat_elem
+												{
+													fn_args.push(
+														syn::parse_quote! { #ident: #ty_elem },
+													);
+													pat_idents
+														.push(ident.clone());
+												}
+											}
+											let tuple_pat = syn::parse_quote! { (#(#pat_idents),*) };
+											return Some((fn_args, tuple_pat));
+										}
+									}
+									// Fallback: e.g. Json(a, b): Json<(u32, u32)> (not typical, but for completeness)
+									let mut fn_args = Punctuated::new();
+									let mut pat_idents = Vec::new();
+									for (pat_elem, ty_elem) in
+										elems.iter().zip(tuple.elems.iter())
+									{
+										if let Pat::Ident(PatIdent {
+											ident,
+											..
+										}) = pat_elem
+										{
+											fn_args.push(
+												syn::parse_quote! { #ident: #ty_elem },
+											);
+											pat_idents.push(ident.clone());
+										}
+									}
+									let tuple_pat = syn::parse_quote! { (#(#pat_idents),*) };
+									return Some((fn_args, tuple_pat));
+								} else {
+									// e.g. Json(a): Json<i32>
+									if let Some(Pat::Ident(PatIdent {
+										ident,
+										..
+									})) = elems.first()
+									{
+										let mut fn_args = Punctuated::new();
+										fn_args.push(
+											syn::parse_quote! { #ident: #inner_ty },
+										);
+										return Some((
+											fn_args,
+											syn::parse_quote! { #ident },
+										));
+									}
+								}
+							}
+						}
+					}
+				}
+				return None;
+			}
+			_ => return None,
+		};
+	}
+
+	/// For given function output, return the output for the client function, uwrapping
+	/// whatever was inside the extractor, if any.
+	///
+	/// ## Examples:
+	/// |Input 																				| Output 														|
+	/// |---																					|	---																|
+	/// |`fn foo()` 																	| `()`															|
+	/// |`fn foo() -> Bar`														| `()`															|
+	/// |`fn foo() -> Result<Foo, Bar>`	 							| `()`															|
+	/// |`fn foo() -> Json<u32>`											| `u32`															|
+	/// |`fn foo() -> Result<Json<u32>>`							| `u32`															|
+	/// |`fn foo() -> Result<Json<u32>, Bar>`					| `u32`															|
+	/// |`fn foo() -> Json<Result<u32,u32>>`					| `Result<u32, u32>`								|
+	/// |`fn foo() -> Result<Json<Result<u32,u32>>>`	| `Result<u32, u32>`								|
+	fn parse_output(func: &FuncTokens) -> Type {
+		/// Return type that can be mapped to client side.
+		fn output_extractors() -> Vec<Ident> { vec![parse_quote! { Json }] }
+
+		// Helper to check if a type is an output extractor (e.g., Json),
+		// and if so return the first generic argument
+		fn output_extractor_inner(ty: &Type) -> Option<&Type> {
+			if let Type::Path(type_path) = ty {
+				if let Some(seg) = type_path.path.segments.last() {
+					if output_extractors()
+						.iter()
+						.any(|extractor| seg.ident == *extractor)
+					{
+						// Extract the inner type: Json<T>
+						if let syn::PathArguments::AngleBracketed(args) =
+							&seg.arguments
+						{
+							if let Some(syn::GenericArgument::Type(inner_ty)) =
+								args.args.first()
+							{
+								return Some(inner_ty);
+							}
+						}
+					}
+				}
+			}
+			None
+		}
+
+		// If the type is a Result<T,..> return T
+		fn result_inner(ty: &Type) -> Option<&Type> {
+			if let Type::Path(type_path) = ty {
+				if let Some(seg) = type_path.path.segments.last() {
+					if seg.ident == "Result" {
+						if let syn::PathArguments::AngleBracketed(args) =
+							&seg.arguments
+						{
+							if let Some(syn::GenericArgument::Type(inner_ty)) =
+								args.args.first()
+							{
+								return Some(inner_ty);
+							}
+						}
+					}
+				}
+			}
+			None
+		}
+
+		// Recursively unwrap output extractors and Results
+		fn unwrap_type(ty: &Type) -> Type {
+			// Json<T>
+			if let Some(inner) = output_extractor_inner(ty) {
+				return inner.clone();
+			} else if let Some(inner) = result_inner(ty) {
+				return unwrap_type(inner);
+			} else {
+				parse_quote! { () }
 			}
 		}
 
-		let param_names = inputs
-			.iter()
-			.map(|arg| match arg {
-				FnArg::Typed(pat_ty) => pat_ty_inner_idents(pat_ty),
-				_ => vec![],
-			})
-			.flatten()
-			.map(|ident| ident.clone())
-			.collect::<Vec<_>>();
-
-		(inputs, param_names)
+		match &func.item_fn.sig.output {
+			syn::ReturnType::Default => parse_quote! { () },
+			syn::ReturnType::Type(_, ty) => unwrap_type(ty),
+		}
 	}
 }
 
@@ -217,64 +312,107 @@ impl FuncTokensToServerActions {
 mod tests {
 	use crate::prelude::*;
 	use beet_router::prelude::*;
+	use proc_macro2::TokenStream;
 	use quote::ToTokens;
-	use quote::quote;
 	use sweet::prelude::*;
 	use syn::parse_quote;
 
-	fn build(func: syn::ItemFn) -> String {
-		FuncTokens::simple_with_func("/add", func)
-			.xpipe(FuncTokensToServerActions)
-			.xmap(|(client, server)| {
-				quote! {
-					#client
-					#server
-				}
+	#[test]
+	fn parse_inputs() {
+		fn assert(inputs: &str, expected: Option<(&str, &str)>) {
+			let inputs: TokenStream = syn::parse_str(&inputs).unwrap();
+			FuncTokensToServerActions::parse_inputs(
+				&FuncTokens::simple_with_func("/add", syn::parse_quote! {
+					fn post(#inputs){}
+				}),
+			)
+			.xmap(|idents| {
+				idents.map(|(a, b)| {
+					(
+						a.to_token_stream().to_string(),
+						b.to_token_stream().to_string(),
+					)
+				})
 			})
-			.to_token_stream()
-			.to_string()
+			.xmap(expect)
+			.to_be(expected.map(|(a, b)| (a.to_string(), b.to_string())));
+		}
+		assert("", None);
+		assert("foo: Bar", None);
+		assert("foo: Json<u32>", Some(("foo : u32", "foo")));
+		assert("Json(foo): Json<u32>", Some(("foo : u32", "foo")));
+		assert("foo: Json<(u32)>", Some(("foo : (u32)", "foo")));
+		assert("foo: Json<(u32,u32)>", Some(("foo : (u32 , u32)", "foo")));
+		assert(
+			"Json((foo,bar)): Json<(u32,u32)>",
+			Some(("foo : u32 , bar : u32", "(foo , bar)")),
+		);
+	}
+	#[test]
+	fn parse_output() {
+		fn assert(output: &str, expected: &str) {
+			let output: TokenStream = syn::parse_str(output).unwrap();
+			let func_tokens =
+				FuncTokens::simple_with_func("/add", parse_quote! {
+					fn post() -> #output {}
+				});
+			let ty = FuncTokensToServerActions::parse_output(&func_tokens);
+			expect(ty.to_token_stream().to_string())
+				.to_be(expected.to_string());
+		}
+		// No output
+		let func_tokens = FuncTokens::simple_with_func("/foo", parse_quote! {
+			fn post() {}
+		});
+		let ty = FuncTokensToServerActions::parse_output(&func_tokens);
+		expect(ty.to_token_stream().to_string()).to_be("()");
+
+		assert("Bar", "()");
+		assert("Result<Foo, Bar>", "()");
+		assert("Json<u32>", "u32");
+		assert("Result<Json<u64>>", "u64");
+		assert("Result<Json<i32>, Bar>", "i32");
+		assert("Json<Result<u32 , i32>>", "Result < u32 , i32 >");
+		assert("Result<Json<Result<u32 , u32>>>", "Result < u32 , u32 >");
 	}
 
+
+
+
 	#[test]
-	fn get_no_args() {
-		expect(build(parse_quote! {
+	fn get() {
+		fn assert(
+			func: syn::ItemFn,
+			expected: syn::ItemFn,
+		) -> (String, String) {
+			let received = FuncTokens::simple_with_func("/add", func)
+				.xpipe(FuncTokensToServerActions)
+				.to_token_stream()
+				.to_string();
+			(received, expected.to_token_stream().to_string())
+		}
+		assert(parse_quote! {
 			fn get() {
 				1 + 1
 			}
-		}))
-		.to_be(
-			quote! {
-				#[cfg(feature = "client")]
-				pub async fn get() -> Result<i32, ServerActionError> {
-					CallServerAction::request(RouteInfo::new("/add", HttpMethod::Get), ).await
-				}
-				#[cfg(not(feature = "client"))]
-				async fn get() -> Json<i32> {
-					Json(file0::get())
-				}
+		},parse_quote! {
+			pub async fn get() -> Result<(), ServerActionError> {
+				CallServerAction::request_no_data(RouteInfo::new("/add", HttpMethod::Get)).await
 			}
-			.to_string(),
-		);
+		}).xmap(|(received, expected)| {
+			expect(received).to_be(expected);
+		});
+
+		assert(parse_quote! {
+			fn get(JsonQuery((a,b)):JsonQuery<(i32,i64)>)->Result<Json<Result<u32>>> {
+				1 + 1
+			}
+		},parse_quote! {
+			pub async fn get(a:i32,b:i64) -> Result<Result<u32>, ServerActionError> {
+				CallServerAction::request(RouteInfo::new("/add", HttpMethod::Get),(a,b)).await
+			}
+		}).xmap(|(received, expected)| {
+			expect(received).to_be(expected);
+		});
 	}
-	// #[test]
-	// fn one_arg() {
-	// 	expect(build(parse_quote! {
-	// 		fn get(val:u32) -> i32 {
-	// 			val + 1
-	// 		}
-	// 	}))
-	// 	.to_be(
-	// 		quote! {
-	// 			#[cfg(feature = "client")]
-	// 			pub async fn get(val:u32) -> Result<i32, ServerActionError> {
-	// 				CallServerAction::request(RouteInfo::new("/add", HttpMethod::Get), ).await
-	// 			}
-	// 			#[cfg(not(feature = "client"))]
-	// 			async fn get(Json(val):Json<i32>) -> Json<i32> {
-	// 				Json(file0::get())
-	// 			}
-	// 		}
-	// 		.to_string(),
-	// 	);
-	// }
 }

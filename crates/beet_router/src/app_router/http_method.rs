@@ -92,7 +92,7 @@ impl fmt::Display for HttpMethod {
 }
 
 impl std::str::FromStr for HttpMethod {
-	type Err = ();
+	type Err = anyhow::Error;
 	fn from_str(s: &str) -> Result<Self, Self::Err> {
 		Ok(match s.to_ascii_uppercase().as_str() {
 			"GET" => HttpMethod::Get,
@@ -104,7 +104,7 @@ impl std::str::FromStr for HttpMethod {
 			"HEAD" => HttpMethod::Head,
 			"TRACE" => HttpMethod::Trace,
 			"CONNECT" => HttpMethod::Connect,
-			_ => return Err(()),
+			_ => anyhow::bail!("Unknown HTTP method: {}", s),
 		})
 	}
 }

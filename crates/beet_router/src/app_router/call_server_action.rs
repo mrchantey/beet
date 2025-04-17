@@ -1,6 +1,7 @@
 use crate::prelude::*;
 use once_cell::sync::Lazy;
 use reqwest::Client;
+use reqwest::RequestBuilder;
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 use std::sync::Mutex;
@@ -31,6 +32,14 @@ impl CallServerAction {
 			Self::request_with_query(route_info, value).await
 		}
 	}
+	//// Makes a HTTP request to a server action without any data.
+	pub async fn request_no_data<O: DeserializeOwned>(
+		route_info: RouteInfo,
+	) -> Result<O, CallServerActionError> {
+		let url = SERVER_URL.lock().unwrap().join(&route_info.path);
+		Self::send(CLIENT.request(route_info.method.into(), url.to_string()))
+			.await
+	}
 
 	/// Internal function to make a request with data in the query parameters.
 	/// Used by GET, HEAD, DELETE, OPTIONS, CONNECT, TRACE methods.
@@ -42,20 +51,12 @@ impl CallServerAction {
 			.map_err(|e| CallServerActionError::Serialize(e))?;
 
 		let url = SERVER_URL.lock().unwrap().join(&route_info.path);
-		let bytes = CLIENT
-			.request(route_info.method.into(), url.to_string())
-			.query(&[("data", value)])
-			.send()
-			.await
-			.map_err(|e| e.into())?
-			.error_for_status()
-			.map_err(|e| CallServerActionError::Response(e.to_string()))?
-			.bytes()
-			.await
-			.map_err(|e| e.into())?;
-
-		serde_json::from_slice(&bytes)
-			.map_err(|e| CallServerActionError::Deserialize(e))
+		Self::send(
+			CLIENT
+				.request(route_info.method.into(), url.to_string())
+				.query(&[("data", value)]),
+		)
+		.await
 	}
 
 	/// Internal function to make a request with data in the request body.
@@ -68,10 +69,20 @@ impl CallServerAction {
 			.map_err(|e| CallServerActionError::Serialize(e))?;
 
 		let url = SERVER_URL.lock().unwrap().join(&route_info.path);
-		let bytes = CLIENT
-			.request(route_info.method.into(), url.to_string())
-			.header("Content-Type", "application/json")
-			.body(value)
+		Self::send(
+			CLIENT
+				.request(route_info.method.into(), url.to_string())
+				.header("Content-Type", "application/json")
+				.body(value),
+		)
+		.await
+	}
+
+
+	async fn send<O: DeserializeOwned>(
+		request: RequestBuilder,
+	) -> Result<O, CallServerActionError> {
+		let bytes = request
 			.send()
 			.await
 			.map_err(|e| e.into())?
