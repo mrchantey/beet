@@ -19,7 +19,7 @@ pub fn get() -> RsxNode {
 				<BeetHeaderLinks slot="header-nav" />
 				<div class="container">
 				<h1>Beet</h1>
-				<p>Its a framework framework</p>
+				<p>The framework that grows with you</p>
 				<Link
 					class="primary-action"
 					href=paths::docs::index()

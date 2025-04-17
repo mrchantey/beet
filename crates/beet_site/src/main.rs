@@ -48,4 +48,11 @@ async fn main() -> Result<()> {
 }
 
 #[cfg(target_arch = "wasm32")]
-fn main() -> Result<()> { beet_site::wasm::collect().mount() }
+fn main() -> Result<()> {
+	#[cfg(not(debug_assertions))]
+	{
+		use beet::prelude::*;
+		CallServerAction::set_server_url(RoutePath::new("https://beetrsx.dev"));
+	}
+	beet_site::wasm::collect().mount()
+}

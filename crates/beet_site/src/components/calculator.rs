@@ -23,9 +23,8 @@ fn calculator(props: Calculator) -> RsxNode {
 		{
 			let val = get();
 			beet::exports::wasm_bindgen_futures::spawn_local(async move {
-				sweet::log!("sending {}", val);
-				let result = crate::prelude::actions::add(val, 1).await.unwrap();
-				sweet::log!("done {}", result);
+				let result =
+					crate::prelude::actions::add(val, 1).await.unwrap();
 				set(result);
 			});
 		}
@@ -36,7 +35,7 @@ fn calculator(props: Calculator) -> RsxNode {
 		<Button
 			variant=ButtonVariant::Outlined
 			onclick=onclick>
-			Cookie Count: {get.clone()}
+			Server Cookie Count: {get.clone()}
 		</Button>
 	</div>
 	<style>
