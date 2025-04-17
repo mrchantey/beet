@@ -60,6 +60,13 @@ pub mod exports {
 	#[cfg(feature = "serde")]
 	pub use serde;
 	pub use sweet::prelude::WorkspacePathBuf;
+
+	#[cfg(target_arch = "wasm32")]
+	pub use wasm_bindgen;
+	#[cfg(target_arch = "wasm32")]
+	pub use wasm_bindgen_futures;
+	#[cfg(target_arch = "wasm32")]
+	pub use web_sys;
 }
 
 // rsx macros expect 'beet'

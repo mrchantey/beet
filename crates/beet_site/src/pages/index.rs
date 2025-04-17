@@ -26,6 +26,7 @@ pub fn get() -> RsxNode {
 					scope:cascade
 					>Get Started</Link>
 				<Counter client:load initial=1 />
+				<Calculator client:load initial=1 />
 				</div>
 			</ContentLayout>
 		</BeetContext>

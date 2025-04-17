@@ -6,6 +6,7 @@ use anyhow::Result;
 #[cfg(not(target_arch = "wasm32"))]
 #[tokio::main]
 async fn main() -> Result<()> {
+	use beet::exports::axum::Router;
 	use beet::prelude::*;
 	use beet_site::prelude::*;
 	use sweet::prelude::*;
@@ -29,9 +30,14 @@ async fn main() -> Result<()> {
 	if args.is_static {
 		routes.xpipe(RouteFuncsToHtml::new(args.html_dir)).await?;
 	} else {
+		let mut router = Router::new();
+		for action in server_actions::collect() {
+			router = (action.func)(router);
+		}
+
 		BeetServer {
 			html_dir: args.html_dir.into(),
-			// router: ,
+			router,
 			..Default::default()
 		}
 		.serve()

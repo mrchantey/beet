@@ -8,7 +8,7 @@ use std::sync::Mutex;
 
 
 static SERVER_URL: Lazy<Mutex<RoutePath>> =
-	Lazy::new(|| Mutex::new("/".into()));
+	Lazy::new(|| Mutex::new("http://localhost:3000".into()));
 
 pub struct CallServerAction;
 
@@ -112,9 +112,7 @@ pub enum ServerActionError {
 }
 
 impl Into<ServerActionError> for reqwest::Error {
-	fn into(self) -> ServerActionError {
-		ServerActionError::Request(self)
-	}
+	fn into(self) -> ServerActionError { ServerActionError::Request(self) }
 }
 
 

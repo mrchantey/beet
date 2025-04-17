@@ -43,7 +43,7 @@ impl Pipeline<FuncTokensGroup, Result<(FuncTokensGroup, CodegenFile)>>
 				syn::parse_quote! {
 					RouteFunc::new(
 						#route_info,
-						#func_path.into_register_axum_route()
+						#func_path.into_register_axum_route(&#route_info)
 					)
 				}
 			},

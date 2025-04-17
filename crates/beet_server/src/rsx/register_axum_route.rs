@@ -56,3 +56,13 @@ where
 
 
 // impl<F:RsxR
+
+
+// #[cfg(test)]
+// mod test {
+// 	use crate::prelude::*;
+// 	use sweet::prelude::*;
+
+// 	#[test]
+// 	fn works() { let a = (async { || {} }).into_register_axum_route(); }
+// }
