@@ -51,6 +51,7 @@ pub mod prelude {
 
 pub mod exports {
 	pub use anyhow;
+	pub use sweet;
 	#[cfg(feature = "parser")]
 	pub use proc_macro2;
 	#[cfg(feature = "parser")]

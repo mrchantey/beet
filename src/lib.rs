@@ -20,6 +20,9 @@ pub use beet_sim as sim;
 #[cfg(feature = "spatial")]
 pub use beet_spatial as spatial;
 
+#[cfg(all(feature = "build", feature = "router"))]
+mod default_builder;
+
 pub mod prelude {
 	#[cfg(feature = "design")]
 	pub use crate::design::prelude::*;
@@ -39,6 +42,10 @@ pub mod prelude {
 	pub use crate::sim::prelude::*;
 	#[cfg(feature = "spatial")]
 	pub use crate::spatial::prelude::*;
+
+
+	#[cfg(all(feature = "build", feature = "router"))]
+	pub use crate::default_builder::*;
 }
 
 
