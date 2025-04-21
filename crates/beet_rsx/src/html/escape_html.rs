@@ -1,12 +1,12 @@
 use crate::prelude::*;
 
-/// TODO this is incorrect, we need to escape RsxNode rust code
-/// only.
+/// Escapes HTML content to prevent XSS attacks. This does not escape
+/// ignored tags, which are `script`, `style`, and `code` by default,
+/// so do not include any user input in these tags.
 pub struct EscapeHtml {
 	/// Element tags, the children of which will not be escaped.
 	/// Default: `["script", "style","code"]`
 	pub ignored_tags: Vec<String>,
-	pub escape_attributes: bool,
 }
 
 
@@ -17,7 +17,6 @@ impl Default for EscapeHtml {
 				.iter()
 				.map(|s| s.to_string())
 				.collect(),
-			escape_attributes: false,
 		}
 	}
 }
@@ -35,15 +34,22 @@ impl EscapeHtml {
 		for node in nodes {
 			match node {
 				HtmlNode::Doctype => {}
-				HtmlNode::Comment(inner) => *inner = escape(inner),
-				HtmlNode::Text(text) => *text = escape(text),
+				HtmlNode::Comment(inner) => {
+					*inner = html_escape::encode_text(inner).to_string()
+				}
+				HtmlNode::Text(text) => {
+					*text = html_escape::encode_text(text).to_string()
+				}
 				HtmlNode::Element(el) => {
-					if self.escape_attributes {
-						for attr in &mut el.attributes {
-							self.escape_attribute(attr);
-						}
+					for value in &mut el
+						.attributes
+						.iter_mut()
+						.filter_map(|a| a.value.as_mut())
+					{
+						*value =
+							html_escape::encode_double_quoted_attribute(value)
+								.to_string();
 					}
-					// TODO use html_escape::encode_attribute etc
 					if !self.ignored_tags.contains(&el.tag) {
 						self.escape_nodes(&mut el.children);
 					}
@@ -51,14 +57,7 @@ impl EscapeHtml {
 			}
 		}
 	}
-	fn escape_attribute(&self, attr: &mut HtmlAttribute) {
-		attr.value = attr.value.as_ref().map(|v| escape(&v));
-	}
 }
-
-
-// fn escape(str: &str) -> String { html_escape::encode_safe(str).to_string() }
-fn escape(str: &str) -> String { str.to_string() }
 
 #[cfg(test)]
 mod test {
@@ -67,12 +66,11 @@ mod test {
 
 
 	#[test]
-	#[ignore = "todo proper escape"]
 	fn works() {
 		expect(
-			&vec![HtmlNode::Text("there's a snake in my boot".into())]
+			&vec![HtmlNode::Text("<script>alert(\"xss\")</script>".into())]
 				.xpipe(RenderHtmlEscaped::default()),
 		)
-		.to_be("there&#x27;s a snake in my boot");
+		.to_be("&lt;script&gt;alert(\"xss\")&lt;/script&gt;");
 	}
 }

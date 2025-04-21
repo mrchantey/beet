@@ -8,7 +8,7 @@ use std::sync::Mutex;
 
 
 static SERVER_URL: Lazy<Mutex<RoutePath>> =
-	Lazy::new(|| Mutex::new("http://localhost:3000".into()));
+	Lazy::new(|| Mutex::new("http://127.0.0.1:3000".into()));
 
 pub struct CallServerAction;
 

@@ -1,4 +1,6 @@
 //! Module for the codegen build step of the router.
+mod default_builder;
+pub use default_builder::*;
 mod func_tokens_tree;
 pub use func_tokens_tree::*;
 mod func_tokens_to_rsx_routes;
