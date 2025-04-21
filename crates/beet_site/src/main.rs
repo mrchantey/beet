@@ -4,13 +4,10 @@ use anyhow::Result;
 
 
 #[cfg(not(target_arch = "wasm32"))]
-#[tokio::main]
-async fn main() -> Result<()> {
-	use beet::exports::axum::Router;
+fn main() -> Result<()> {
 	use beet::prelude::*;
 	use beet_site::prelude::*;
 	use sweet::prelude::*;
-
 
 	fn with_sidebar(route: RouteFunc<RsxRouteFunc>) -> RouteFunc<RsxRouteFunc> {
 		route.map_func(|func| {
@@ -21,38 +18,19 @@ async fn main() -> Result<()> {
 		})
 	}
 
-	let routes = beet_site::pages::collect()
-		.xtend(beet::design::mockups::collect().xmap_each(with_sidebar))
-		.xtend(beet_site::docs::collect().xmap_each(with_sidebar));
-
-	let args = AppRouterArgs::parse();
-
-	if args.is_static {
-		routes.xpipe(RouteFuncsToHtml::new(args.html_dir)).await?;
-	} else {
-		let mut router = Router::new();
-		for action in server_actions::collect() {
-			router = (action.func)(router);
-		}
-
-		BeetServer {
-			html_dir: args.html_dir.into(),
-			router,
-			..Default::default()
-		}
-		.serve()
-		.await?;
+	DefaultRunner {
+		server_actions: beet_site::server_actions::collect(),
+		routes: beet_site::pages::collect()
+			.xtend(beet::design::mockups::collect().xmap_each(with_sidebar))
+			.xtend(beet_site::docs::collect().xmap_each(with_sidebar)),
 	}
+	.run()?;
+
 
 	Ok(())
 }
 
 #[cfg(target_arch = "wasm32")]
 fn main() -> Result<()> {
-	#[cfg(not(debug_assertions))]
-	{
-		use beet::prelude::*;
-		CallServerAction::set_server_url(RoutePath::new("https://beetrsx.dev"));
-	}
-	beet_site::wasm::collect().mount()
+	beet_site::wasm::collect().mount_with_server_url("https://beetrsx.dev")
 }

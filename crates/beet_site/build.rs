@@ -38,7 +38,7 @@ fn main() -> Result<()> {
 				use beet::prelude::*;
 			),
 		],
-		funcs: mockups.funcs,
+		routes: mockups.funcs,
 		..Default::default()
 	}
 	.build()?;

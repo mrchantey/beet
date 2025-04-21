@@ -3,13 +3,30 @@ use beet_router::exports::syn::Item;
 use beet_rsx::exports::anyhow::Result;
 use beet_rsx::exports::sweet::prelude::*;
 
+
+
+
+/// The default codegen builder for a beet site.
+///
+/// This will perform the following tasks:
+///
+/// - If a `src/actions` dir exists, generate server actions
+/// - If a `src/pages` dir exists, generate pages codegen and add to the route tree
+/// - If a `src/docs` dir exists, generate docs codegen and add to the route tree
+///
 pub struct DefaultBuilder {
 	/// The name of the package being built.
 	/// By default this is set by `std::env::var("CARGO_PKG_NAME")`
 	pub pkg_name: String,
+	/// These imports will be added to the head of the wasm imports file.
+	/// This will be required for any components with a client island directive.
 	pub wasm_imports: Vec<Item>,
 	/// Additional funcs to be added to the route tree
-	pub funcs: Vec<FuncTokens>,
+	pub routes: Vec<FuncTokens>,
+	/// Optionally set the path for the docs route.
+	/// By default this is set to `/docs` but if your entire site is a docs
+	/// site it may be more idiomatic to set this to `None`.
+	pub docs_route: Option<String>,
 }
 
 
@@ -19,7 +36,8 @@ impl Default for DefaultBuilder {
 			pkg_name: std::env::var("CARGO_PKG_NAME")
 				.expect("DefaultBuilder: CARGO_PKG_NAME not set"),
 			wasm_imports: Vec::new(),
-			funcs: Vec::new(),
+			routes: Vec::new(),
+			docs_route: Some("/docs".to_string()),
 		}
 	}
 }
@@ -48,58 +66,64 @@ impl DefaultBuilder {
 			#[cfg(feature = "server")]
 			self.build_server_actions()?;
 
-			let pages =
-				FileGroup::new(AbsPathBuf::new_manifest_rel("src/pages")?)
-					.with_filter(
-						GlobFilter::default()
-							.with_include("*.rs")
-							.with_exclude("*mod.rs"),
-					)
-					.xpipe(FileGroupToFuncTokens::default())?
-					.xpipe(FuncTokensToRsxRoutes::new(
-						CodegenFile::new(
-							AbsPathBuf::new_manifest_rel_unchecked(
-								"src/codegen/pages.rs",
-							),
+			let mut routes = self.routes;
+
+			if let Ok(pages_dir) = AbsPathBuf::new_manifest_rel("src/pages") {
+				routes.extend(
+					FileGroup::new(pages_dir)
+						.with_filter(
+							GlobFilter::default()
+								.with_include("*.rs")
+								.with_exclude("*mod.rs"),
 						)
-						.with_pkg_name(&self.pkg_name),
-					))?
-					.xmap(|(funcs, codegen)| -> Result<_> {
-						codegen.build_and_write()?;
-						Ok(funcs)
-					})?;
+						.xpipe(FileGroupToFuncTokens::default())?
+						.xpipe(FuncTokensToRsxRoutes::new(
+							CodegenFile::new(
+								AbsPathBuf::new_manifest_rel_unchecked(
+									"src/codegen/pages.rs",
+								),
+							)
+							.with_pkg_name(&self.pkg_name),
+						))?
+						.xmap(|(group, codegen)| -> Result<_> {
+							codegen.build_and_write()?;
+							Ok(group.funcs)
+						})?,
+				);
+			}
 
-			let docs =
-				FileGroup::new(AbsPathBuf::new_manifest_rel("src/docs")?)
-					.xpipe(FileGroupToFuncTokens::default())?
-					.xpipe(MapFuncTokens::default().base_route("/docs"))
-					.xpipe(FuncTokensToRsxRoutes::new(
-						CodegenFile::new(
-							AbsPathBuf::new_manifest_rel_unchecked(
-								"src/codegen/docs.rs",
-							),
-						)
-						.with_pkg_name(&self.pkg_name),
-					))?
-					.xmap(|(funcs, codegen)| -> Result<_> {
-						codegen.build_and_write()?;
-						Ok(funcs)
-					})?;
+			if let Ok(docs_dir) = AbsPathBuf::new_manifest_rel("src/docs") {
+				routes.extend(
+					FileGroup::new(docs_dir)
+						.xpipe(FileGroupToFuncTokens::default())?
+						.xpipe(MapFuncTokens::default().base_route(
+							self.docs_route.unwrap_or_else(|| "/".to_string()),
+						))
+						.xpipe(FuncTokensToRsxRoutes::new(
+							CodegenFile::new(
+								AbsPathBuf::new_manifest_rel_unchecked(
+									"src/codegen/docs.rs",
+								),
+							)
+							.with_pkg_name(&self.pkg_name),
+						))?
+						.xmap(|(group, codegen)| -> Result<_> {
+							codegen.build_and_write()?;
+							Ok(group.funcs)
+						})?,
+				);
+			}
 
-
-			pages
-				.funcs
-				.xtend(docs.funcs)
-				.xtend(self.funcs)
-				.xinto::<FuncTokensTree>()
-				.xpipe(FuncTokensTreeToRouteTree {
+			routes.xinto::<FuncTokensTree>().xpipe(
+				FuncTokensTreeToRouteTree {
 					codegen_file: CodegenFile::new(
 						AbsPathBuf::new_manifest_rel_unchecked(
 							"src/codegen/route_tree.rs",
 						),
 					)
 					.with_pkg_name(&self.pkg_name),
-				})?;
+				},
+			)?;
 		}
 
 		Ok(())
@@ -107,32 +131,37 @@ impl DefaultBuilder {
 
 	#[cfg(feature = "server")]
 	fn build_server_actions(&self) -> Result<()> {
-		let _client_actions =
-			FileGroup::new(AbsPathBuf::new_manifest_rel("src/actions")?)
-				.xpipe(FileGroupToFuncTokens::default())?
-				.xmap(|g| g.into_tree())
-				.xpipe(FuncTokensTreeToServerActions::new(
-					CodegenFile::new(AbsPathBuf::new_manifest_rel_unchecked(
-						"src/codegen/client_actions.rs",
-					))
-					.with_pkg_name(&self.pkg_name),
-				))?;
-		let _server_actions =
-			FileGroup::new(AbsPathBuf::new_manifest_rel("src/actions")?)
-				.xpipe(FileGroupToFuncTokens::default())?
-				.xpipe(FuncTokensToAxumRoutes {
-					codegen_file: CodegenFile::new(
-						AbsPathBuf::new_manifest_rel_unchecked(
-							"src/codegen/server_actions.rs",
-						),
-					)
-					.with_pkg_name(&self.pkg_name),
-					..Default::default()
-				})?
-				.xmap(|(funcs, codegen)| -> Result<_> {
-					codegen.build_and_write()?;
-					Ok(funcs)
-				})?;
+		let Ok(actions_dir) = AbsPathBuf::new_manifest_rel("src/actions")
+		else {
+			return Ok(());
+		};
+
+
+
+		let _client_actions = FileGroup::new(actions_dir.clone())
+			.xpipe(FileGroupToFuncTokens::default())?
+			.xmap(|g| g.into_tree())
+			.xpipe(FuncTokensTreeToServerActions::new(
+				CodegenFile::new(AbsPathBuf::new_manifest_rel_unchecked(
+					"src/codegen/client_actions.rs",
+				))
+				.with_pkg_name(&self.pkg_name),
+			))?;
+		let _server_actions = FileGroup::new(actions_dir)
+			.xpipe(FileGroupToFuncTokens::default())?
+			.xpipe(FuncTokensToAxumRoutes {
+				codegen_file: CodegenFile::new(
+					AbsPathBuf::new_manifest_rel_unchecked(
+						"src/codegen/server_actions.rs",
+					),
+				)
+				.with_pkg_name(&self.pkg_name),
+				..Default::default()
+			})?
+			.xmap(|(funcs, codegen)| -> Result<_> {
+				codegen.build_and_write()?;
+				Ok(funcs)
+			})?;
 		Ok(())
 	}
 }
