@@ -21,7 +21,24 @@ impl Pipeline<Vec<(RouteInfo, RsxNode)>, Result<Vec<(RouteInfo, HtmlDocument)>>>
 			.map(|(route, root)| {
 				// only hydrate if we have templates
 				// we already warned otherwise
-				let doc = root.xpipe(RsxToHtmlDocument::default())?;
+
+				// TODO proper error handling
+				let path = if let Some(loc) = root.location() {
+					loc.file.as_path()
+				} else {
+					route.path.as_path()
+				}
+				.display()
+				.to_string();
+
+				let doc =
+					root.xpipe(RsxToHtmlDocument::default()).map_err(|e| {
+						anyhow::anyhow!(
+							"Failed to convert route to html\npath: {}\nerror: {}",
+							path,
+							e
+						)
+					})?;
 				Ok((route.clone(), doc))
 			})
 			.collect::<Result<Vec<_>>>()?;

@@ -10,11 +10,6 @@ fn main() -> Result<()> {
 	println!("cargo::rerun-if-changed=../beet_design/public");
 	// println!("cargo::warning={}", "🚀🚀 building beet_site");
 
-	FsExt::copy_recursive(
-		AbsPathBuf::new_manifest_rel("../beet_design/public")?,
-		AbsPathBuf::new_workspace_rel_unchecked("target/client"),
-	)?;
-
 	// ⚠️ this is a downstream copy of crates/beet_design/build.rs
 	// we're actually only using the route paths, maybe we should generate
 	// those in design

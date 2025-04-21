@@ -1,5 +1,5 @@
 // a script to run before initial render to avoid FOUC.
-// the scheme from 
+// this will be included by the Head component
 
 const lightClass = 'scheme-light'
 const darkClass = 'scheme-dark'
