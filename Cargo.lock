@@ -908,7 +908,6 @@ dependencies = [
  "beet",
  "serde",
  "sweet",
- "tokio",
 ]
 
 [[package]]
