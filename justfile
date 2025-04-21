@@ -17,12 +17,14 @@ crates := 'beet beet_spatial beet_flow'
 default:
 	just --list --unsorted
 
-# Initialize the repository, pulling assets into their respective crates
+# Initialize the repository, pulling assets into their respective crates.
+# Also we need to build the test_site codegen, which cant use a build script
+# due to cyclic dependencies
 init-repo:
 	just assets-pull
 	mkdir -p crates/beet_ml/assets/ml && cp ./assets/ml/default-bert.ron crates/beet_ml/assets/ml/default.bert.ron
 	mkdir -p crates/beet_rsx/assets/fonts && cp ./assets/fonts/* crates/beet_rsx/assets/fonts
-	just codegen
+	cargo run -p beet_router --example build
 # just test-site
 # just export-scenes
 

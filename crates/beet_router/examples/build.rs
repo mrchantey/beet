@@ -21,9 +21,9 @@ pub fn main() -> Result<()> {
 		)
 		.xpipe(FileGroupToFuncTokens::default())?
 		.xpipe(FuncTokensToRsxRoutes::new(
-			CodegenFile::new(AbsPathBuf::new_manifest_rel(
+			CodegenFile::new(AbsPathBuf::new_manifest_rel_unchecked(
 				"src/test_site/codegen/pages.rs",
-			)?)
+			))
 			.with_pkg_name("beet_router")
 			.with_import(syn::parse_quote!(
 				use crate::as_beet::*;
