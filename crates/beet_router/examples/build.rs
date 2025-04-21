@@ -13,7 +13,7 @@ use sweet::prelude::*;
 /// Demonstration of how to collect all files in the 'routes' dir
 /// and create a `routes.rs` file containing them all.
 pub fn main() -> Result<()> {
-	FileGroup::new_workspace_rel("crates/beet_router/src/test_site/pages")?
+	FileGroup::new(AbsPathBuf::new_manifest_rel("src/test_site/pages")?)
 		.with_filter(
 			GlobFilter::default()
 				.with_include("*.rs")
@@ -21,10 +21,10 @@ pub fn main() -> Result<()> {
 		)
 		.xpipe(FileGroupToFuncTokens::default())?
 		.xpipe(FuncTokensToRsxRoutes::new(
-			CodegenFile::new_workspace_rel(
-				"crates/beet_router/src/test_site/codegen/pages.rs",
-				"beet_router",
-			)
+			CodegenFile::new(AbsPathBuf::new_manifest_rel(
+				"src/test_site/codegen/pages.rs",
+			)?)
+			.with_pkg_name("beet_router")
 			.with_import(syn::parse_quote!(
 				use crate::as_beet::*;
 			)),

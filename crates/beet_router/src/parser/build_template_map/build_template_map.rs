@@ -5,6 +5,7 @@ use clap::Parser;
 use proc_macro2::Literal;
 use proc_macro2::TokenStream;
 use quote::quote;
+use std::path::Path;
 use std::path::PathBuf;
 use sweet::prelude::FsExt;
 use sweet::prelude::ReadDir;
@@ -85,8 +86,7 @@ impl BuildTemplateMap {
 		let items = ReadDir::files_recursive(&self.templates_root_dir)?
 			.into_iter()
 			.map(|path| {
-				let path = WorkspacePathBuf::new_from_current_directory(path)?;
-				let templates = self.file_templates(path)?;
+				let templates = self.file_templates(&path)?;
 				Ok(templates)
 			})
 			.collect::<Result<Vec<_>>>()?
@@ -131,13 +131,13 @@ impl BuildTemplateMap {
 	/// If it doesnt have a rust extension an empty vec is returned
 	fn file_templates(
 		&self,
-		path: WorkspacePathBuf,
+		path: &Path,
 	) -> Result<Vec<(RsxMacroLocation, TokenStream)>> {
 		if path.extension().map_or(false, |ext| ext == "rs") {
-			let canonical_path = path.into_canonical()?;
-			let file = ReadFile::to_string(&canonical_path)?;
+			let file = ReadFile::to_string(path)?;
 			let file = syn::parse_file(&file)?;
 			let mac = syn::parse_quote!(rsx);
+			let path = WorkspacePathBuf::new_from_current_directory(path)?;
 			let mut visitor = RsxSynVisitor::new(path, mac);
 
 			visitor.visit_file(&file);
@@ -170,7 +170,9 @@ fn ron_cx_err(e: ron::error::SpannedError, str: &str) -> anyhow::Error {
 
 #[derive(Debug)]
 struct RsxSynVisitor {
-	/// Used for creating [`RsxMacroLocation`] in several places
+	/// Used for creating [`RsxMacroLocation`] in several places.
+	/// We must use workspace relative paths because locations are created
+	/// via the `file!()` macro.
 	file: WorkspacePathBuf,
 	templates: Vec<(RsxMacroLocation, TokenStream)>,
 	mac: syn::Ident,
@@ -221,7 +223,7 @@ mod test {
 	#[test]
 	fn works() {
 		let src = WorkspacePathBuf::new("crates/beet_router/src/test_site")
-			.into_canonical()
+			.into_abs()
 			.unwrap();
 
 		let file = BuildTemplateMap {
@@ -250,7 +252,7 @@ mod test {
 		use beet_rsx::prelude::*;
 
 		let src = WorkspacePathBuf::new("crates/beet_router/src/test_site")
-			.into_canonical()
+			.into_abs()
 			.unwrap();
 		let builder = BuildTemplateMap::new(src.as_path());
 

@@ -24,13 +24,6 @@ impl FileGroup {
 		}
 	}
 
-	pub fn new_workspace_rel(src: impl Into<WorkspacePathBuf>) -> Result<Self> {
-		Ok(Self {
-			src: src.into().into_canonical()?,
-			filter: GlobFilter::default(),
-		})
-	}
-
 	pub fn with_filter(mut self, filter: GlobFilter) -> Self {
 		self.filter = filter;
 		self
@@ -60,12 +53,11 @@ impl FileGroup {
 
 	#[cfg(test)]
 	pub fn test_site() -> Self {
-		Self::new_workspace_rel("crates/beet_router/src/test_site").unwrap()
+		Self::new(AbsPathBuf::new_manifest_rel("src/test_site").unwrap())
 	}
 	#[cfg(test)]
 	pub fn test_site_pages() -> Self {
-		Self::new_workspace_rel("crates/beet_router/src/test_site/pages")
-			.unwrap()
+		Self::new(AbsPathBuf::new_manifest_rel("src/test_site/pages").unwrap())
 			.with_filter(
 				GlobFilter::default()
 					.with_include("*.rs")
@@ -74,9 +66,10 @@ impl FileGroup {
 	}
 	#[cfg(test)]
 	pub fn test_site_markdown() -> Self {
-		Self::new_workspace_rel("crates/beet_router/src/test_site/test_docs")
-			.unwrap()
-			.with_filter(GlobFilter::default().with_include("*.md"))
+		Self::new(
+			AbsPathBuf::new_manifest_rel("src/test_site/test_docs").unwrap(),
+		)
+		.with_filter(GlobFilter::default().with_include("*.md"))
 	}
 }
 
@@ -88,12 +81,13 @@ mod test {
 	#[test]
 	fn works() {
 		expect(
-			FileGroup::new_workspace_rel("crates/beet_router/src/test_site")
-				.unwrap()
-				.with_filter(GlobFilter::default().with_include("*.mockup.rs"))
-				.collect_files()
-				.unwrap()
-				.len(),
+			FileGroup::new(
+				AbsPathBuf::new_manifest_rel("src/test_site").unwrap(),
+			)
+			.with_filter(GlobFilter::default().with_include("*.mockup.rs"))
+			.collect_files()
+			.unwrap()
+			.len(),
 		)
 		.to_be(2);
 	}

@@ -170,7 +170,7 @@ mod test {
 	#[test]
 	fn test_preheat_cache() {
 		let src = WorkspacePathBuf::new("crates/beet_router/src/test_site")
-			.into_canonical()
+			.into_abs()
 			.unwrap();
 		let cache = preheat_cache(&src).unwrap();
 

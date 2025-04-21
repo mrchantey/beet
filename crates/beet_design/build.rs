@@ -10,7 +10,7 @@ fn main() -> Result<()> {
 	// println!("cargo::rerun-if-changed=src/**/*.mockup.rs");
 
 	// ⚠️ changes here should be duplicated in crates/beet_site/build.rs
-	FileGroup::new_workspace_rel("crates/beet_design/src")?
+	FileGroup::new(AbsPathBuf::new_manifest_rel("src")?)
 		.with_filter(GlobFilter::default().with_include("*.mockup.*"))
 		.xpipe(FileGroupToFuncTokens::default())?
 		.xpipe(
@@ -19,10 +19,10 @@ fn main() -> Result<()> {
 				.replace_route([(".mockup", "")]),
 		)
 		.xpipe(FuncTokensToRsxRoutes::new(
-			CodegenFile::new_workspace_rel(
-				"crates/beet_design/src/codegen/mockups.rs",
-				env!("CARGO_PKG_NAME").to_string(),
-			)
+			CodegenFile::new(AbsPathBuf::new_manifest_rel(
+				"src/codegen/mockups.rs",
+			)?)
+			.with_pkg_name(env!("CARGO_PKG_NAME"))
 			.with_import(syn::parse_quote!(
 				use beet_router::as_beet::*;
 			)),

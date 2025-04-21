@@ -31,7 +31,7 @@ impl Default for CodegenFile {
 				use beet::prelude::*;
 			)],
 			output: WorkspacePathBuf::new("src/codegen/mod.rs")
-				.into_canonical_unchecked(),
+				.into_abs_unchecked(),
 			pkg_name: None,
 			items: Default::default(),
 		}
@@ -40,16 +40,16 @@ impl Default for CodegenFile {
 
 impl CodegenFile {
 	/// Create a new [`CodegenFile`] with the most common options.
-	pub fn new_workspace_rel(
-		output: impl Into<WorkspacePathBuf>,
-		pkg_name: impl Into<String>,
-	) -> Self {
-		let output = output.into().into_canonical_unchecked();
+	pub fn new(output: AbsPathBuf) -> Self {
 		Self {
 			output,
-			pkg_name: Some(pkg_name.into()),
 			..Default::default()
 		}
+	}
+
+	pub fn with_pkg_name(mut self, pkg_name: impl Into<String>) -> Self {
+		self.pkg_name = Some(pkg_name.into());
+		self
 	}
 
 	pub fn with_import(mut self, item: Item) -> Self {

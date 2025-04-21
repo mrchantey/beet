@@ -91,16 +91,22 @@ mod test {
 	}
 	#[test]
 	fn beet_site() {
-		let _docs = FileGroup::new_workspace_rel("crates/beet_site/src/docs")
-			.unwrap()
-			.xpipe(FileGroupToFuncTokens::default())
-			.unwrap()
-			.xpipe(MapFuncTokens::default().base_route("/docs"))
-			.xpipe(FuncTokensToRsxRoutes::new(CodegenFile::new_workspace_rel(
-				"crates/beet_site/src/codegen/docs.rs",
-				"beet_site",
-			)))
-			.unwrap();
+		let _docs = FileGroup::new(
+			AbsPathBuf::new_workspace_rel("crates/beet_site/src/docs").unwrap(),
+		)
+		.xpipe(FileGroupToFuncTokens::default())
+		.unwrap()
+		.xpipe(MapFuncTokens::default().base_route("/docs"))
+		.xpipe(FuncTokensToRsxRoutes::new(
+			CodegenFile::new(
+				AbsPathBuf::new_workspace_rel(
+					"crates/beet_site/src/codegen/docs.rs",
+				)
+				.unwrap(),
+			)
+			.with_pkg_name("beet_site"),
+		))
+		.unwrap();
 		// println!(
 		// 	"{}",
 		// 	docs.1.build_output().unwrap().to_token_stream().to_string()
