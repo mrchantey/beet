@@ -51,7 +51,6 @@ pub mod prelude {
 
 pub mod exports {
 	pub use anyhow;
-	pub use sweet;
 	#[cfg(feature = "parser")]
 	pub use proc_macro2;
 	#[cfg(feature = "parser")]
@@ -60,6 +59,7 @@ pub mod exports {
 	pub use ron;
 	#[cfg(feature = "serde")]
 	pub use serde;
+	pub use sweet;
 	pub use sweet::prelude::WorkspacePathBuf;
 
 	#[cfg(target_arch = "wasm32")]

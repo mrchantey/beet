@@ -15,7 +15,7 @@ fn document_layout(_props: DocumentLayout) -> RsxNode {
 				<slot name="head" />
 			</Head>
 			<body>
-				<script src="../css/initColorScheme.js"/>
+				<script src="../css/initColorScheme.js" />
 				<slot />
 			</body>
 		</html>
