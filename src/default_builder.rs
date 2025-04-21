@@ -1,8 +1,15 @@
 use crate::prelude::*;
 use beet_router::exports::syn::Item;
+use beet_router::exports::syn::{
+	self,
+};
 use beet_rsx::exports::anyhow::Result;
 use beet_rsx::exports::sweet::prelude::*;
 
+
+// build.rs Reference
+// runtime env vars: https://doc.rust-lang.org/cargo/reference/environment-variables.html#environment-variables-cargo-sets-for-build-scripts
+// cargo:: output https://doc.rust-lang.org/cargo/reference/build-scripts.html#outputs-of-the-build-script
 
 
 
@@ -20,6 +27,7 @@ pub struct DefaultBuilder {
 	pub pkg_name: String,
 	/// These imports will be added to the head of the wasm imports file.
 	/// This will be required for any components with a client island directive.
+	/// By default this will include `use beet::prelude::*;`
 	pub wasm_imports: Vec<Item>,
 	/// Additional funcs to be added to the route tree
 	pub routes: Vec<FuncTokens>,
@@ -35,7 +43,9 @@ impl Default for DefaultBuilder {
 		Self {
 			pkg_name: std::env::var("CARGO_PKG_NAME")
 				.expect("DefaultBuilder: CARGO_PKG_NAME not set"),
-			wasm_imports: Vec::new(),
+			wasm_imports: vec![syn::parse_quote!(
+				use beet::prelude::*;
+			)],
 			routes: Vec::new(),
 			docs_route: Some("/docs".to_string()),
 		}
@@ -46,6 +56,9 @@ impl Default for DefaultBuilder {
 impl DefaultBuilder {
 	pub fn build(self) -> Result<()> {
 		println!("cargo::rerun-if-changed=build.rs");
+		println!("cargo::rerun-if-changed=src/pages/**");
+		println!("cargo::rerun-if-changed=src/actions/**");
+		println!("cargo::rerun-if-changed=src/docs/**");
 
 		let is_wasm =
 			std::env::var("TARGET").unwrap() == "wasm32-unknown-unknown";
