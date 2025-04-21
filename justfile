@@ -130,7 +130,8 @@ build-site *args:
 #💡 Test
 
 # it keeps asking for bigger stacks?
-min-stack := 'RUST_MIN_STACK=67108864'
+min-stack := 'RUST_MIN_STACK=134217728'
+# min-stack := 'RUST_MIN_STACK=67108864'
 # min-stack := 'RUST_MIN_STACK=33554432'
 test-threads:= '--test-threads=8'
 # Run tests for ci, not using workspace cos somehow bevy_default still getting pulled in
@@ -202,16 +203,10 @@ test-wasm-e2e crate test_name *args:
 test-rsx-macro *args:
 	just watch cargo test -p beet_rsx --test rsx_macro --features=css -- 												--watch {{args}}
 
-# create codegen files
-codegen:
-	just clear-artifacts
-	cargo run -p beet_router --example test_site_codegen
-	just cli build -p beet_site
-
 clear-artifacts:
 	rm -rf target
 	rm -rf crates/beet_design/src/codegen
-	rm -rf crates/beet_router/src/test_site/codegen
+	rm -rf crates/test_site/src/codegen
 	rm -rf crates/beet_site/src/codegen
 
 # massive purge

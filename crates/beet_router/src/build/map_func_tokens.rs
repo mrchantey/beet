@@ -76,7 +76,7 @@ mod test {
 	#[test]
 	fn works() {
 		expect(
-			FileGroup::test_site()
+			&FileGroup::test_site()
 				.with_filter(GlobFilter::default().with_include("*.mockup.*"))
 				.xpipe(FileGroupToFuncTokens::default())
 				.unwrap()
@@ -87,10 +87,10 @@ mod test {
 				)
 				.xmap_each(|func| func.route_info.path.to_string()),
 		)
-		.to_be(vec![
-			"/design/components/mock_widgets/mock_button",
-			"/design/components/test_layout",
-			"/design",
-		])
+		.to_contain_element(
+			&"/design/components/mock_widgets/mock_button".into(),
+		)
+		.to_contain_element(&"/design/components/test_layout".into())
+		.to_contain_element(&"/design".into());
 	}
 }

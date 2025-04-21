@@ -161,10 +161,10 @@ mod test {
 		let mod_item =
 			FuncTokensTreeToRouteTree::default().routes_mod_tree(&tree);
 
-		let expected: ItemMod = syn::parse_quote! {			
+		let expected: ItemMod = syn::parse_quote! {
 		#[allow(missing_docs)]
 		pub mod root {
-			#[allow (unused_imports)] 
+			#[allow (unused_imports)]
 			use super::*;
 			/// Get the local route path
 			pub fn index() -> &'static str {
@@ -172,7 +172,7 @@ mod test {
 			}
 			#[allow(missing_docs)]
 			pub mod foo {
-					#[allow (unused_imports)] 
+					#[allow (unused_imports)]
 					use super::*;
 					/// Get the local route path
 					pub fn bar() -> &'static str {
@@ -180,7 +180,7 @@ mod test {
 					}
 					#[allow(missing_docs)]
 					pub mod bazz {
-							#[allow (unused_imports)] 
+							#[allow (unused_imports)]
 							use super::*;
 							/// Get the local route path
 							pub fn index() -> &'static str {

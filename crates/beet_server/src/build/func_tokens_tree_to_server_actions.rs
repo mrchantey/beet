@@ -45,8 +45,8 @@ impl FuncTokensTreeToServerActions {
 		let item = self.mod_tree_inner(tree);
 		if self.collapse_nodes {
 			self.collapse_item(item)
-		}else{
-		item
+		} else {
+			item
 		}
 	}
 	fn mod_tree_inner(&self, tree: &FuncTokensTree) -> Item {
@@ -116,7 +116,7 @@ mod test {
 				#[allow (missing_docs)]
 				pub mod root {
 					#[allow(unused_imports)]
-					use super::*;	
+					use super::*;
 					pub async fn bazz() -> Result<(), ServerActionError> {
 						CallServerAction::request_no_data(RouteInfo::new("/bazz", HttpMethod::Get)).await
 					}
@@ -142,7 +142,7 @@ mod test {
 				pub mod root {
 					#[allow(unused_imports)]
 					use super::*;
-	
+
 						pub async fn bazz() -> Result<(), ServerActionError> {
 								CallServerAction::request_no_data(RouteInfo::new("/bazz", HttpMethod::Get)).await
 						}
@@ -151,7 +151,7 @@ mod test {
 						pub mod foo {
 							#[allow(unused_imports)]
 							use super::*;
-					
+
 								pub async fn bar() -> Result<(), ServerActionError> {
 										CallServerAction::request_no_data(RouteInfo::new("/foo/bar", HttpMethod::Get)).await
 								}
@@ -160,7 +160,7 @@ mod test {
 								pub mod boo {
 									#[allow(unused_imports)]
 									use super::*;
-									
+
 									pub async fn get() -> Result<(), ServerActionError> {
 										CallServerAction::request_no_data(RouteInfo::new("/foo/boo", HttpMethod::Get)).await
 									}
@@ -170,7 +170,7 @@ mod test {
 									}
 								}
 								#[allow(missing_docs)]
-								pub mod bing {			
+								pub mod bing {
 									#[allow(unused_imports)]
 									use super::*;
 									pub async fn bong() -> Result<(), ServerActionError> {

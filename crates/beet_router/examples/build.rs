@@ -1,9 +1,13 @@
-//! Build script for the test site,
-//! this cant be a real build script because it depends
-//! on the crate it builds for, `beet_router`
+//! Build script for the test site, this cant be a real build script
+//! because:
+//! this --> beet_router
+//! beet_router/test --> test_site
+//! test_site --> this
+//!
+//! It can still compile because test_site dep is behind a feature flag
 use anyhow::Result;
+use beet_router::exports::*;
 use beet_router::prelude::*;
-use beet_rsx::prelude::*;
 use sweet::prelude::*;
 
 /// Demonstration of how to collect all files in the 'routes' dir

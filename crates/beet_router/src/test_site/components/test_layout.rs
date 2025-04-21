@@ -1,4 +1,4 @@
-use crate::as_beet::*;
+use beet_rsx::as_beet::*;
 
 #[derive(Node)]
 pub struct PageLayout {

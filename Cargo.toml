@@ -130,7 +130,9 @@ bytes = "1"
 #💡 http
 http = "1"
 http-body-util = "0.1"
-reqwest = "0.12"
+reqwest = { version = "0.12", default-features = false, features = [
+	"rustls-tls",
+] }
 
 #💡 web
 js-sys = "0.3"
@@ -161,6 +163,10 @@ include = ["CHANGELOG.md", "README.md", "/src", "/examples", "/scenes"]
 
 [features]
 default = ["flow"]
+# helper features
+web-server = ["server", "router", "design"]
+
+# fine-grained
 examples = ["bevy_default", "dep:beet_examples"]
 flow = ["dep:beet_flow"]
 css = ["beet_rsx?/css"]

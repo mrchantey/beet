@@ -56,7 +56,7 @@ impl FuncTokensTree {
 				#[allow(missing_docs)]
 				pub mod #ident {
 					#[allow(unused_imports)]
-					use super::*;	
+					use super::*;
 					#item
 					#(#children)*
 				}

@@ -14,7 +14,6 @@ keywords.workspace = true
 
 [features]
 default = ["serde", "markdown", "actions"]
-_test_site = []
 build = ["serde", "parser"]
 actions = ["serde", "dep:reqwest", "dep:once_cell"]
 markdown = ["parser", "dep:pulldown-cmark"]
@@ -30,11 +29,13 @@ parser = [
 	"dep:syn",
 ]
 bevy = ["beet_rsx/bevy", "dep:bevy", "dep:flume", "dep:tokio"]
-# enables 'mod test_site' for internal testing,
-# the mod is also enabled by the 'test' flag
+# adds the test_site mod for internal testing
+_test_site = []
 
 
 [dependencies]
+beet_rsx = { workspace = true }
+
 anyhow.workspace = true
 thiserror.workspace = true
 rapidhash.workspace = true
@@ -43,8 +44,6 @@ futures.workspace = true
 clap.workspace = true
 sweet.workspace = true
 
-
-beet_rsx = { workspace = true }
 
 reqwest = { workspace = true, optional = true }
 once_cell = { workspace = true, optional = true }

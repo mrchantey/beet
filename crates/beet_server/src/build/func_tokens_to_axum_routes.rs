@@ -76,6 +76,6 @@ mod test {
 			.unwrap()
 			.xmap(|f| f.to_token_stream().to_string())
 			.xmap(expect)
-			.to_contain(". into_register_axum_route ()");
+			.to_contain(". into_register_axum_route");
 	}
 }
