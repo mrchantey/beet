@@ -8,7 +8,7 @@ use syn::ItemFn;
 /// the rsx tree to find the client islands and create the IslandMap
 #[derive(Debug, Clone)]
 pub struct BuildWasmRoutes {
-	islands_map_path: CanonicalPathBuf,
+	islands_map_path: AbsPathBuf,
 }
 impl Default for BuildWasmRoutes {
 	fn default() -> Self {

@@ -130,7 +130,7 @@ impl MarkdownToFuncTokens {
 	pub fn parse(
 		mod_ident: Ident,
 		markdown: &str,
-		canonical_path: CanonicalPathBuf,
+		canonical_path: AbsPathBuf,
 		local_path: PathBuf,
 	) -> Result<FuncTokens> {
 		let frontmatter = Self::markdown_to_frontmatter_tokens(markdown)?;
@@ -251,7 +251,7 @@ val_string	= "foo"
 		let func_tokens = MarkdownToFuncTokens::parse(
 			syn::parse_quote!(foo),
 			MARKDOWN,
-			CanonicalPathBuf::new_unchecked("foo"),
+			AbsPathBuf::new_unchecked("foo"),
 			"bar".into(),
 		)
 		.unwrap();

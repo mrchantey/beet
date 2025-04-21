@@ -6,7 +6,7 @@ use sweet::prelude::*;
 
 #[derive(Debug)]
 pub struct RoutesToClientIslandMap {
-	pub islands_map_path: CanonicalPathBuf,
+	pub islands_map_path: AbsPathBuf,
 }
 
 impl Default for RoutesToClientIslandMap {
@@ -19,13 +19,13 @@ impl Default for RoutesToClientIslandMap {
 
 
 impl RoutesToClientIslandMap {
-	pub fn new(islands_map_path: CanonicalPathBuf) -> Self {
+	pub fn new(islands_map_path: AbsPathBuf) -> Self {
 		Self { islands_map_path }
 	}
 }
 
 impl RoutesToClientIslandMap {
-	pub fn default_islands_map_path() -> CanonicalPathBuf {
+	pub fn default_islands_map_path() -> AbsPathBuf {
 		WorkspacePathBuf::new("target/client-islands.ron")
 			.into_canonical_unchecked()
 	}

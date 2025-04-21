@@ -10,14 +10,14 @@ use sweet::prelude::*;
 pub struct FileGroup {
 	/// The directory where the files are located.
 	#[arg(long, default_value = ".")]
-	pub src: CanonicalPathBuf,
+	pub src: AbsPathBuf,
 	/// Include and exclude filters for the files.
 	#[command(flatten)]
 	pub filter: GlobFilter,
 }
 
 impl FileGroup {
-	pub fn new(src: CanonicalPathBuf) -> Self {
+	pub fn new(src: AbsPathBuf) -> Self {
 		Self {
 			src,
 			filter: GlobFilter::default(),
@@ -38,7 +38,7 @@ impl FileGroup {
 
 	/// Perform a [`ReadDir`], returning all files in the directory
 	/// relative this src
-	pub fn collect_files(&self) -> Result<Vec<CanonicalPathBuf>> {
+	pub fn collect_files(&self) -> Result<Vec<AbsPathBuf>> {
 		let items = ReadDir {
 			files: true,
 			recursive: true,
@@ -49,7 +49,7 @@ impl FileGroup {
 		.filter_map(|path| {
 			if self.filter.passes(&path) {
 				// should be path+self.src?
-				Some(CanonicalPathBuf::new(path))
+				Some(AbsPathBuf::new(path))
 			} else {
 				None
 			}

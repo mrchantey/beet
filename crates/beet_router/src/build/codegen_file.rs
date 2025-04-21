@@ -10,7 +10,7 @@ use syn::Item;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CodegenFile {
 	/// The output codegen file location.
-	pub output: CanonicalPathBuf,
+	pub output: AbsPathBuf,
 	/// All of the imports that must be included both globally and inside each
 	/// inline module.
 	pub imports: Vec<Item>,

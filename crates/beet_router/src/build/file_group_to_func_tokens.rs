@@ -33,8 +33,8 @@ impl FileGroupToFuncTokens {
 	fn map_file(
 		&self,
 		index: usize,
-		group_src: &CanonicalPathBuf,
-		canonical_path: CanonicalPathBuf,
+		group_src: &AbsPathBuf,
+		canonical_path: AbsPathBuf,
 	) -> Result<Vec<FuncTokens>> {
 		let file_str = ReadFile::to_string(&canonical_path)?;
 		let local_path = PathExt::create_relative(&group_src, &canonical_path)?;

@@ -20,7 +20,7 @@ impl FuncFileToFuncTokens {
 	pub fn parse(
 		mod_ident: Ident,
 		file_str: &str,
-		canonical_path: CanonicalPathBuf,
+		canonical_path: AbsPathBuf,
 		local_path: PathBuf,
 	) -> Result<Vec<FuncTokens>> {
 		let route_path = RoutePath::from_file_path(&local_path)?;

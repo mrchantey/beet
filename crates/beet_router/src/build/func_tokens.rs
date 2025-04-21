@@ -28,7 +28,7 @@ pub struct FuncTokens {
 	/// Its return type is the [`FuncTokensGroup::func_type`].
 	pub item_fn: ItemFn,
 	/// Canonical path to the file
-	pub canonical_path: CanonicalPathBuf,
+	pub canonical_path: AbsPathBuf,
 	/// Path relative to the [`src`](FileGroup::src) of the [`FileGroup`]
 	pub local_path: PathBuf,
 	/// A reasonable route path generated from this file's local path,
@@ -70,7 +70,7 @@ impl FuncTokens {
 			mod_import: ModImport::Inline,
 			frontmatter: syn::parse_quote! {{}},
 			item_fn,
-			canonical_path: CanonicalPathBuf::new_unchecked(path),
+			canonical_path: AbsPathBuf::new_unchecked(path),
 			local_path: path.to_path_buf(),
 			route_info: RouteInfo {
 				path: RoutePath::from_file_path(path).unwrap(),
