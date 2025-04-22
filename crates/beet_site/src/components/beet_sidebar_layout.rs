@@ -7,8 +7,8 @@ pub struct BeetSidebarLayout {}
 
 
 fn beet_sidebar_layout(_: BeetSidebarLayout) -> RsxNode {
-	let sidebar_nodes = route_tree::collect_static_route_tree()
-		.xpipe(StaticRouteTreeToSidebarTree::default());
+	let sidebar_nodes =
+		route_tree::collect().xpipe(RoutePathTreeToSidebarTree::default());
 	rsx! {
 		<BeetContext>
 		<PageLayout>
@@ -34,7 +34,7 @@ fn beet_sidebar_layout(_: BeetSidebarLayout) -> RsxNode {
 		}
 		main{
 			width:100%;
-			padding: 0 calc(max((100% - 100rem) * 0.5, 1.em));
+			padding: 1.em calc(max((100% - 100rem) * 0.5, 1.em));
 			/* padding: 0 10em 0 2em; */
 			/* padding: 0 calc(var(--content-padding-width) - var(--sidebar-width)) 0 0; */
 		}

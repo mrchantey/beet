@@ -56,12 +56,14 @@ pub enum RustyPart {
 		initial: RsxNode,
 		effect: Effect,
 	},
-	AttributeBlock {
-		initial: Vec<RsxAttribute>,
+	AttributeValue {
+		/// The initial valu cannot be statically created
+		initial: String,
 		effect: Effect,
 	},
-	AttributeValue {
-		initial: String,
+	AttributeBlock {
+		/// The initial valu cannot be statically created
+		initial: Vec<(String, Option<String>)>,
 		effect: Effect,
 	},
 }

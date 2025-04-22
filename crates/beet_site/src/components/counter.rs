@@ -5,18 +5,28 @@ use serde::Serialize;
 
 #[derive(Node, Serialize, Deserialize)]
 pub struct Counter {
-	// #[field(default = 0)]
+	#[field(default = 0)]
 	initial: i32,
 }
 
 fn counter(props: Counter) -> RsxNode {
 	let (get, set) = signal(props.initial);
 
-
+	let get2 = get.clone();
 	rsx! {
-		<div>
-			{get.clone()}
-			<button onclick=move |_| { set(get() + 2) }>Increment</button>
-		</div>
+	<div>
+		<Button
+			variant=ButtonVariant::Outlined
+			onclick=move |_| set(get2() + 1)>
+			Cookie Count: {get.clone()}
+		</Button>
+	</div>
+	<style>
+		div {
+			display: flex;
+			align-items: center;
+			gap: 1.em;
+		}
+	</style>
 	}
 }

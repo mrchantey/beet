@@ -11,7 +11,9 @@ use std::hash::Hash;
 use sweet::prelude::PipelineTarget;
 
 
-/// Hash all the 'rusty' parts of the rsx macro
+/// Hash all the 'rusty' parts of the rsx macro.
+/// This is not related to [`RustyTracker`] system,
+/// it is purely for diffing by the [`TemplateWatcher`]
 pub struct RstmlRustToHash<'a> {
 	hasher: &'a mut RapidHasher,
 }

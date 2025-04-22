@@ -1,0 +1,36 @@
+thead th,
+thead td,
+tfoot th,
+tfoot td {
+  --bt-font-weight: 600;
+  --bt-border-width: 0.1875rem;
+}
+
+:where(table) {
+  width: 100%;
+  border-collapse: collapse;
+  border-spacing: 0;
+  text-indent: 0;
+}
+
+th,
+td {
+  padding: calc(var(--bt-spacing) / 2) var(--bt-spacing);
+  border-bottom: var(--bt-border-width) solid var(--bt-color-border-faint);
+  background-color: var(--bt-color-background);
+  color: var(--bt-color-text);
+  font-weight: var(--bt-font-weight);
+  text-align: left;
+  text-align: start;
+}
+
+tfoot th,
+tfoot td {
+  border-top: var(--bt-border-width) solid var(--bt-color-border-faint);
+  border-bottom: 0;
+}
+
+table.striped tbody tr:nth-child(odd) th,
+table.striped tbody tr:nth-child(odd) td {
+  background-color: var(--bt-color-surface-container-low);
+}

@@ -45,23 +45,16 @@ impl BevyRuntime {
 	/// Used by [`RstmlToRsx`] when it encounters an attribute block:
 	/// ```
 	/// # use beet_rsx::as_beet::*;
-	/// let value = vec![RsxAttribute::Key{key:"foo".to_string()}];
-	/// let node = rsx!{<el {value}/>};
+	/// #[derive(IntoBlockAttribute)]
+	/// struct Foo;
+	/// let node = rsx!{<el {Foo}/>};
 	/// ```
 	#[allow(unused)]
 	pub fn parse_attribute_block<M, T: SignalOrRon<M>>(
 		tracker: RustyTracker,
 		mut block: T,
 	) -> RsxAttribute {
-		RsxAttribute::Block {
-			initial: todo!(),
-			effect: Effect::new(
-				Box::new(|_loc| {
-					todo!();
-				}),
-				tracker,
-			),
-		}
+		todo!()
 	}
 
 

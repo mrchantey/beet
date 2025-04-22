@@ -1,7 +1,7 @@
 use crate::prelude::*;
+use anyhow::Result;
 use strum_macros::AsRefStr;
 use strum_macros::EnumDiscriminants;
-
 
 #[derive(Debug, Clone, AsRefStr, EnumDiscriminants)]
 pub enum RsxNode {
@@ -97,6 +97,7 @@ pub struct RsxText {
 	/// Metadata for this node
 	pub meta: RsxNodeMeta,
 }
+
 
 impl NodeMeta for RsxText {
 	fn meta(&self) -> &RsxNodeMeta { &self.meta }
@@ -418,9 +419,18 @@ pub enum RsxAttribute {
 		initial: String,
 		effect: Effect,
 	},
-	// kind of like a fragment, but for attributes
+	/// Block attributes are a bit like fragments, but for attributes.
+	/// A common use-case is prop flattening where a `Button` component
+	/// has a  `ButtonHtmlAttributes` struct to directly apply to its
+	/// element.
 	Block {
-		initial: Vec<RsxAttribute>,
+		/// The initial key or key-value attributes
+		/// for this block.
+		/// Events will be a key that starts with `on`,
+		/// and will have no value
+		initial: Vec<(String, Option<String>)>,
+		/// This effect will register all required
+		/// dynamic parts of this block
 		effect: Effect,
 	},
 }
@@ -436,21 +446,29 @@ pub trait IntoRsxAttribute<M> {
 	fn into_rsx_attribute(self) -> RsxAttribute;
 }
 
-pub trait IntoRsxAttributes<M> {
-	/// Convert this into a RsxAttribute
-	fn into_rsx_attributes(self) -> Vec<RsxAttribute>;
+/// A trait for types that can be converted into an [`RsxAttribute::Block`],
+/// Unlike [`IntoRsxAttribute`] the creation must be split into parts
+/// to allow for prop flattening.
+pub trait IntoBlockAttribute<M>: 'static + Send + Sync {
+	/// Sets the [`RsxAttribute::Block::initial`] value
+	fn initial_attributes(&self) -> Vec<(String, Option<String>)>;
+	/// Called by the [`RsxAttribute::Block::effect`], can also
+	/// be called recursively on children to handle prop flattening
+	fn register_effects(self, loc: TreeLocation) -> Result<()>;
 }
 
-pub struct IntoVecIntoRsxAttributeMarker;
-impl<T: Into<Vec<RsxAttribute>>>
-	IntoRsxAttributes<IntoVecIntoRsxAttributeMarker> for T
-{
-	fn into_rsx_attributes(self) -> Vec<RsxAttribute> { self.into() }
-}
+// pub struct IntoVecIntoRsxAttributeMarker;
+// impl<T: Into<Vec<RsxAttribute>>>
+// 	IntoBlockAttribute<IntoVecIntoRsxAttributeMarker> for T
+// {
+// 	fn into_initial_attributes(self) -> Vec<RsxAttribute> { self.into() }
 
-impl<F: FnOnce() -> Vec<RsxAttribute>> IntoRsxAttributes<F> for F {
-	fn into_rsx_attributes(self) -> Vec<RsxAttribute> { self() }
-}
+// 	fn register_effects
+// }
+
+// impl<F: FnOnce() -> Vec<RsxAttribute>> IntoBlockAttribute<F> for F {
+// 	fn into_initial_attributes(self) -> Vec<RsxAttribute> { self() }
+// }
 
 #[cfg(test)]
 mod test {
@@ -490,11 +508,11 @@ mod test {
 		)
 		.to_be("<div data-beet-rsx-idx=\"2\">3</div>");
 	}
-	#[test]
-	fn block_attr() {
-		let value = vec![RsxAttribute::Key {
-			key: "foo".to_string(),
-		}];
-		let _node = rsx! { <el {value} /> };
-	}
+	// #[test]
+	// fn block_attr() {
+	// 	let value = vec![RsxAttribute::Key {
+	// 		key: "foo".to_string(),
+	// 	}];
+	// 	let _node = rsx! { <el {value} /> };
+	// }
 }

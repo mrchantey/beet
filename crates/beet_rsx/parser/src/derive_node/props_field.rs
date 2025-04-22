@@ -1,5 +1,6 @@
 //! copied from [bevy-inspector-egui](https://github.com/jakobhellermann/bevy-inspector-egui/blob/main/crates/bevy-inspector-egui-derive/src/attributes.rs)
 use crate::prelude::*;
+use proc_macro2::TokenStream;
 use syn::Data;
 use syn::DeriveInput;
 use syn::Expr;
@@ -9,13 +10,15 @@ use syn::Ident;
 use syn::Meta;
 use syn::Result;
 use syn::Type;
+use syn::TypeTraitObject;
 
 #[derive(Debug)]
 pub struct PropsField<'a> {
 	pub inner: &'a Field,
-	/// The inner type of the field, unwrapping Option<T> to T.
-	pub unwrapped: &'a Type,
-	/// Only named fields are supported so we unwrap it
+	/// The `Bar` in `foo: Bar` or `foo: Option<Bar>`
+	pub inner_ty: &'a Type,
+	/// The `foo` in `foo: Bar`
+	/// Only named fields are supported as PropsFields
 	pub ident: &'a Ident,
 	pub attributes: AttributeGroup,
 }
@@ -50,7 +53,14 @@ impl<'a> PropsField<'a> {
 		let attributes = AttributeGroup::parse(&inner.attrs, "field")?
 			// TODO we've outgrown this, each derive should validate seperately
 			.validate_allowed_keys(&[
-				"default", "required", "into", "no_into", "flatten",
+				"default",
+				"required",
+				"into",
+				"no_into",
+				"into_generics",
+				"into_func",
+				"into_type",
+				"flatten",
 			])?;
 
 		let ident = inner.ident.as_ref().ok_or_else(|| {
@@ -58,7 +68,7 @@ impl<'a> PropsField<'a> {
 		})?;
 
 		Ok(Self {
-			unwrapped: Self::unwrap_type(inner),
+			inner_ty: Self::unwrap_type(inner),
 			ident,
 			// ident: &inner.ident,
 			inner,
@@ -107,32 +117,119 @@ impl<'a> PropsField<'a> {
 		&field.ty
 	}
 
+	/// 1. First checks for a specified attribute
+	/// By default strings are converted to `impl Into<String>`.
 	pub fn is_into(&self) -> bool {
 		if self.attributes.contains("into") {
 			return true;
 		} else if self.attributes.contains("no_into") {
 			return false;
-		} else if self.unwrapped == &syn::parse_quote! { String } {
+		} else if self.inner_ty == &syn::parse_quote! { String } {
 			return true;
 		} else {
 			return false;
 		}
 	}
 
+	/// If this field is a `Box<dyn Trait>` type return the inner trait
+	fn boxed_trait(&self) -> Option<&TypeTraitObject> {
+		if let Type::Path(p) = self.inner_ty {
+			if let Some(segment) = p.path.segments.last() {
+				if segment.ident == "Box" {
+					if let syn::PathArguments::AngleBracketed(args) =
+						&segment.arguments
+					{
+						if let Some(syn::GenericArgument::Type(
+							Type::TraitObject(obj),
+						)) = args.args.first()
+						{
+							return Some(obj);
+						}
+					}
+				}
+			}
+		}
+		None
+	}
+	/// If this field is a `Box<dyn Trait>` type return the inner trait
+	fn maybe_signal(&self) -> Option<&Type> {
+		if let Type::Path(p) = self.inner_ty {
+			if let Some(segment) = p.path.segments.last() {
+				if segment.ident == "MaybeSignal" {
+					if let syn::PathArguments::AngleBracketed(args) =
+						&segment.arguments
+					{
+						if let Some(syn::GenericArgument::Type(ty)) =
+							args.args.first()
+						{
+							return Some(ty);
+						}
+					}
+				}
+			}
+		}
+		None
+	}
+
 	/// In Builder pattern these are the tokens for assignment, depending
-	/// on attributes it may be one fof the following:
-	/// - `(SomeVal, value)`
-	/// - `(impl Into<SomeVal>, value.into())`
-	pub fn assign_tokens(&self) -> (Type, Expr) {
-		let is_into = self.is_into();
-		let inner_ty = self.unwrapped;
-		match is_into {
-			true => (
-				syn::parse_quote! { impl Into<#inner_ty> },
-				syn::parse_quote! { value.into() },
-			),
-			false => {
-				(syn::parse_quote! { #inner_ty }, syn::parse_quote! { value })
+	/// on attributes it will be checked in the following order:
+	/// - MaybeSignal<T>:	`(<M>, 						impl IntoMaybeSignal,		value.into_maybe_signal())`
+	/// - is_boxed:				`(Default, 				impl SomeType, 					Box::new(value))`
+	/// - into_type:			`(into_generics,	into_type, into_func							)`
+	/// - is_into: 				`(Default, 				impl Into<SomeType>, 		value.into())		`
+	/// - verbatim: 			`(Default, 				SomeType, 							value)					`
+	pub fn assign_tokens(&self) -> Result<(TokenStream, Type, Expr)> {
+		// 1. box
+		if let Some(ty) = self.maybe_signal() {
+			Ok((
+				syn::parse_quote! {<M>},
+				syn::parse_quote! { impl beet::prelude::IntoMaybeSignal<#ty,M> },
+				syn::parse_quote! { value.into_maybe_signal() },
+			))
+		} else if let Some(box_trait) = self.boxed_trait() {
+			let mut trait_bounds = box_trait.bounds.clone();
+			trait_bounds.push(syn::parse_quote! { 'static });
+			Ok((
+				TokenStream::new(),
+				syn::parse_quote! { impl #trait_bounds },
+				syn::parse_quote! { Box::new(value) },
+			))
+		} else if let Some(ty) =
+			self.attributes.get_value_parsed::<Type>("into_type")?
+		{
+			let generics = self
+				.attributes
+				.get_value_parsed::<TokenStream>("into_generics")?
+				.unwrap_or_default();
+
+			let func = self
+				.attributes
+				.get_value_parsed::<Expr>("into_func")?
+				.map(|func| {
+					syn::parse_quote! { value.#func() }
+				})
+				.unwrap_or_else(|| {
+					syn::parse_quote! { value.into() }
+				});
+
+			// this is wrong
+			return Ok((generics, ty, func));
+		} else {
+			// 2. into
+			let is_into = self.is_into();
+			let inner_ty = self.inner_ty;
+			match is_into {
+				true => Ok((
+					TokenStream::new(),
+					syn::parse_quote! { impl Into<#inner_ty> },
+					syn::parse_quote! { value.into() },
+				)),
+				// 3. verbatim
+				false => Ok((
+					TokenStream::new(),
+					syn::parse_quote! { #inner_ty },
+					syn::parse_quote! { value },
+				)),
 			}
 		}
 	}

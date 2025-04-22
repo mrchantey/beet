@@ -4,6 +4,8 @@
 	--bt-form-element-font-size: 0.8.em;
 	--bt-form-element-border-radius-percent: 0.5;
 	--bt-form-element-border-radius: calc(var(--bt-form-element-height) * var(--bt-form-element-border-radius-percent) * 0.5);
+  --bt-form-element-spacing-vertical: 0.75rem;
+  --bt-form-element-spacing-horizontal: 1rem;
 }
 
 .bt-c-button,
@@ -24,6 +26,30 @@
 	display: flex;
 	color: var(--bt-color-text);
 	background-color: var(--bt-color-background);
+}
 
+:focus {
+  outline: none;
+}
 
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+summary:focus-visible{
+	/* outline: none; */
+	outline: var(--bt-border-width-lg) solid var(--bt-color-border) !important;
+}
+
+summary{
+	border-radius: var(--bt-border-radius-sm);
+}
+
+input:not([type=checkbox], [type=radio], [type=range], [type=file]),
+select,
+textarea {
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  padding: var(--bt-form-element-spacing-vertical) var(--bt-form-element-spacing-horizontal);
 }

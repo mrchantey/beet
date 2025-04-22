@@ -10,6 +10,12 @@
 
 a.bt-c-button {
 	text-decoration: none;
+	/* undo the margin applied by default to anchor tags */
+	margin-left:unset;
+	margin-right:unset;
+}
+a.bt-c-button:visited {
+	color:var(--bt-color-text);
 }
 
 .bt-c-button .bt-c-icon {
@@ -32,8 +38,8 @@ a.bt-c-button {
 
 
 .bt-c-button--primary {
-	--bt-color-text: var(--bt-color-on-primary-container);
-	--bt-color-background: var(--bt-color-primary-container);
+	--bt-color-text: var(--bt-color-on-primary);
+	--bt-color-background: var(--bt-color-primary);
 }
 
 .bt-c-button--secondary {

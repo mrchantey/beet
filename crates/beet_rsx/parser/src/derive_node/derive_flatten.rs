@@ -8,6 +8,7 @@ use syn::ExprLit;
 use syn::Ident;
 use syn::Lit;
 use syn::Result;
+use syn::Type;
 
 
 /// Impl AsRef<T> and AsMut<T> for all fields that are marked with #[field(flatten)]
@@ -65,11 +66,15 @@ fn second_order_impl(
 	flatten_attrs.iter().filter_map(|attr|{
 		attr.value.as_ref()
 	}).map(|expr|{
-		let ty: TokenStream = if let Expr::Lit(ExprLit{lit,..}) = expr && let Lit::Str(lit) = &lit{
+		let ty: Type = if let Expr::Lit(ExprLit{lit,..}) = expr && let Lit::Str(lit) = &lit{
 			syn::parse_str(&lit.value())?
 		}else{
-			expr.to_token_stream()
+			syn::parse2(expr.to_token_stream())?
 		};
+		if ty == field.inner.ty {
+			// its already implemented, should we warn unnecessary attr value?
+			return Ok(TokenStream::default());
+		}
 
 		Ok(quote!{
 			impl #impl_generics AsRef<#ty> for #target_ident #type_generics #where_clause {

@@ -17,12 +17,15 @@ crates := 'beet beet_spatial beet_flow'
 default:
 	just --list --unsorted
 
-# Initialize the repository, pulling assets into their respective crates
+# Initialize the repository, pulling assets into their respective crates.
+# Also we need to build the test_site codegen, which cant use a build script
+# due to cyclic dependencies
 init-repo:
 	just assets-pull
 	mkdir -p crates/beet_ml/assets/ml && cp ./assets/ml/default-bert.ron crates/beet_ml/assets/ml/default.bert.ron
 	mkdir -p crates/beet_rsx/assets/fonts && cp ./assets/fonts/* crates/beet_rsx/assets/fonts
-	just codegen
+	cargo run -p beet_router --example build
+	just cli build -p beet_site
 # just test-site
 # just export-scenes
 
@@ -32,10 +35,20 @@ init-repo:
 cli *args:
 	cargo run -p beet-cli -- {{args}}
 
-
 install-cli *args:
 	cargo install --path crates/beet-cli {{args}}
 
+deploy *args:
+	just cli deploy 								\
+	--package 				beet_site 		\
+	--function-name 	beet 					\
+	--region 					us-west-2 		\
+	--iam-role 				$AWS_IAM_ROLE \
+	{{args}}
+
+
+mod *args:
+	sweet mod --exclude *codegen* {{args}}
 
 # Run and watch a workspace example
 run example *args:
@@ -119,7 +132,10 @@ build-site *args:
 
 #💡 Test
 
-min-stack := 'RUST_MIN_STACK=33554432'
+# it keeps asking for bigger stacks?
+min-stack := 'RUST_MIN_STACK=134217728'
+# min-stack := 'RUST_MIN_STACK=67108864'
+# min-stack := 'RUST_MIN_STACK=33554432'
 test-threads:= '--test-threads=8'
 # Run tests for ci, not using workspace cos somehow bevy_default still getting pulled in
 # cargo test --workspace runs with 16MB stack and max 8 cores
@@ -133,11 +149,12 @@ test-fmt:
 test-ci *args:
 	just test-fmt
 	just test-web
-	just test-flow
+
+# just test-flow runs out of space
 
 test-web *args:
 	{{min-stack}} cargo test -p beet_design 	 	 																												{{args}} -- {{test-threads}}
-	{{min-stack}} cargo test -p beet_router 	--features=_test_site,build,serde,server,parser,bevy 			{{args}} -- {{test-threads}}
+	{{min-stack}} cargo test -p beet_router 	--features=_test_site,build,serde,parser,bevy 						{{args}} -- {{test-threads}}
 	{{min-stack}} cargo test -p beet_rsx 			--features=bevy,css,parser 																{{args}} -- {{test-threads}}
 	{{min-stack}} cargo test -p beet_rsx_parser 																												{{args}} -- {{test-threads}}
 	{{min-stack}} cargo test -p beet_rsx_combinator 																										{{args}} -- {{test-threads}}
@@ -190,16 +207,10 @@ test-wasm-e2e crate test_name *args:
 test-rsx-macro *args:
 	just watch cargo test -p beet_rsx --test rsx_macro --features=css -- 												--watch {{args}}
 
-# create codegen files
-codegen:
-	just clear-artifacts
-	cargo run -p beet_router --example test_site_codegen
-	just cli build -p beet_site
-
 clear-artifacts:
 	rm -rf target
-	rm -rf crates/beet_design/src/codegen
 	rm -rf crates/beet_router/src/test_site/codegen
+	rm -rf crates/beet_design/src/codegen
 	rm -rf crates/beet_site/src/codegen
 
 # massive purge

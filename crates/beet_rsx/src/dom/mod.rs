@@ -3,25 +3,23 @@ use crate::prelude::*;
 mod beet_dom;
 #[cfg(target_arch = "wasm32")]
 mod dom_event_registry;
+mod event_registry;
 #[cfg(target_arch = "wasm32")]
 pub use beet_dom::*;
 #[cfg(target_arch = "wasm32")]
-pub use dom_event_registry::EventRegistry;
-#[cfg(not(target_arch = "wasm32"))]
-mod native_event_registry;
+pub use dom_event_registry::*;
+pub use event_registry::*;
 mod rs_dom_target;
-#[cfg(not(target_arch = "wasm32"))]
-pub use native_event_registry::EventRegistry;
 pub use rs_dom_target::*;
 use std::sync::Arc;
 use std::sync::Mutex;
-
 
 #[cfg(target_arch = "wasm32")]
 mod browser_dom_target;
 #[cfg(target_arch = "wasm32")]
 pub use browser_dom_target::*;
 
+// TODO probably shouldnt be a thread local, use once_cell::sync::Lazy
 thread_local! {
 	#[rustfmt::skip]
 	static DOM_TARGET: Arc<Mutex<Box<dyn DomTargetImpl>>> =
@@ -47,7 +45,35 @@ impl DomTarget {
 			*current.lock().unwrap_or_else(|e| e.into_inner()) = Box::new(item);
 		});
 	}
+
+	pub fn render() -> String {
+		DOM_TARGET.with(|current| {
+			let current = current.lock().unwrap();
+			current.render()
+		})
+	}
+
+	pub fn update_rsx_node(
+		loc: TreeLocation,
+		node: RsxNode,
+	) -> ParseResult<()> {
+		DOM_TARGET.with(|current| {
+			let mut current = current.lock().unwrap();
+			current.update_rsx_node(loc, node)
+		})
+	}
+	pub fn update_rsx_attribute(
+		loc: TreeLocation,
+		key: &str,
+		value: &str,
+	) -> ParseResult<()> {
+		DOM_TARGET.with(|current| {
+			let mut current = current.lock().unwrap();
+			current.update_rsx_attribute(loc, key, value)
+		})
+	}
 }
+
 
 pub trait DomTargetImpl {
 	/// Mutable in case the impl needs to load the tree location map
@@ -57,11 +83,16 @@ pub trait DomTargetImpl {
 	// type Event;
 	fn update_rsx_node(
 		&mut self,
-		node: RsxNode,
 		loc: TreeLocation,
+		node: RsxNode,
 	) -> ParseResult<()>;
 
-	// TODO update attriute block, update block value
+	fn update_rsx_attribute(
+		&mut self,
+		loc: TreeLocation,
+		key: &str,
+		value: &str,
+	) -> ParseResult<()>;
 
 
 	/// just used for testing atm

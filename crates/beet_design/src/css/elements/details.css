@@ -1,0 +1,63 @@
+/* Very simple version of pico details,
+we use an Accordian component for more styled versions
+*/
+
+/* layout */
+
+details {
+  display: block;
+  margin-bottom: var(--bt-spacing);
+}
+details summary {
+  line-height: 1rem;
+  list-style-type: none;
+  cursor: pointer;
+}
+
+/* marker */
+
+details summary::-webkit-details-marker {
+  display: none;
+}
+details summary::marker {
+  display: none;
+}
+details summary::-moz-list-bullet {
+  list-style-type: none;
+}
+
+details summary::after {
+  display: block;
+  width: 1rem;
+  height: 1rem;
+  margin-inline-start: calc(var(--bt-spacing, 1rem) * 0.5);
+  float: right;
+  transform: rotate(-90deg);
+  background-image: var(--bt-icon-chevron);
+  background-position: right center;
+  background-size: 1rem auto;
+  background-repeat: no-repeat;
+  content: "";
+  transition: transform var(--bt-transition);
+}
+
+/* on open */
+
+details[open] > summary {
+  margin-bottom: var(--bt-spacing);
+}
+
+details[open] > summary::after {
+  transform: rotate(0);
+}
+
+/* rtl */
+
+[dir=rtl] details summary {
+  text-align: right;
+}
+
+[dir=rtl] details summary::after {
+  float: left;
+  background-position: left center;
+}

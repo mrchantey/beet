@@ -18,7 +18,6 @@ impl<T: Into<RsxNode>> Pipeline<T, Result<()>> for RegisterEffects {
 	fn apply(self, node: T) -> Result<()> {
 		let mut node: RsxNode = node.into();
 		let mut result = Ok(());
-
 		TreeLocationVisitor::visit_with_location_mut(
 			&mut node,
 			self.root_location,
@@ -66,7 +65,7 @@ mod test {
 		let (get, _) = signal(7);
 		expect(
 			rsx! { <div>value is {get}</div> }
-				.xpipe(MountRsDom)
+				.xpipe(MountToRsDom)
 				.unwrap()
 				.xpipe(RegisterEffects::default()),
 		)
@@ -82,7 +81,7 @@ mod test {
 	fn bad_location() {
 		let (get, _) = signal(7);
 		let _ = rsx! { <div>value is {get}</div> }
-			.xpipe(MountRsDom)
+			.xpipe(MountToRsDom)
 			.unwrap()
 			.xpipe(RegisterEffects::new(TreeLocation::new(10, 10, 10)));
 	}
@@ -93,7 +92,7 @@ mod test {
 		let (get, set) = signal(7);
 
 		rsx! { <div>value is {get}</div> }
-			.xpipe(MountRsDom)
+			.xpipe(MountToRsDom)
 			.unwrap()
 			.xpipe(RegisterEffects::default())
 			.unwrap();

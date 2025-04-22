@@ -1,7 +1,7 @@
 #![cfg_attr(test, feature(test, custom_test_frameworks))]
 #![cfg_attr(test, test_runner(sweet::test_runner))]
 #![cfg_attr(feature = "bevy", feature(fn_traits, unboxed_closures))]
-#![feature(more_qualified_paths)]
+#![feature(more_qualified_paths, let_chains)]
 // #![deny(missing_docs)]
 //!
 //! All about rsx trees, html, hydrating patterns, signals.
@@ -50,6 +50,7 @@ pub mod prelude {
 }
 
 pub mod exports {
+	pub use anyhow;
 	#[cfg(feature = "parser")]
 	pub use proc_macro2;
 	#[cfg(feature = "parser")]
@@ -58,7 +59,15 @@ pub mod exports {
 	pub use ron;
 	#[cfg(feature = "serde")]
 	pub use serde;
+	pub use sweet;
 	pub use sweet::prelude::WorkspacePathBuf;
+
+	#[cfg(target_arch = "wasm32")]
+	pub use wasm_bindgen;
+	#[cfg(target_arch = "wasm32")]
+	pub use wasm_bindgen_futures;
+	#[cfg(target_arch = "wasm32")]
+	pub use web_sys;
 }
 
 // rsx macros expect 'beet'
@@ -71,6 +80,7 @@ pub mod as_beet {
 	// expose macro for single import in docs
 	pub use beet_rsx_macros::rsx;
 	pub mod beet {
+		// expose prelude and exports
 		pub use crate::*;
 		// in beet the beet_rsx crate is aliased to rsx
 		pub mod rsx {

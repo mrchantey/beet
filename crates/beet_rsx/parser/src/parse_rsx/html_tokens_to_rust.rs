@@ -8,6 +8,7 @@ use proc_macro2_diagnostics::Diagnostic;
 use proc_macro2_diagnostics::Level;
 use quote::quote;
 use sweet::prelude::Pipeline;
+use syn::Block;
 use syn::Expr;
 use syn::Ident;
 use syn::spanned::Spanned;
@@ -32,8 +33,8 @@ pub struct HtmlTokensToRust {
 	pub exclude_errors: bool,
 }
 
-impl Pipeline<HtmlTokens, TokenStream> for HtmlTokensToRust {
-	fn apply(mut self, node: HtmlTokens) -> TokenStream {
+impl Pipeline<HtmlTokens, Block> for HtmlTokensToRust {
+	fn apply(mut self, node: HtmlTokens) -> Block {
 		let node = self.map_node(node);
 
 		let errors = if self.exclude_errors {
@@ -45,7 +46,7 @@ impl Pipeline<HtmlTokens, TokenStream> for HtmlTokensToRust {
 		let line = self.location.line as u32;
 		let col = self.location.column as u32;
 
-		quote! {
+		syn::parse_quote! {
 			{
 				#(#errors;)*
 				use beet::prelude::*;
@@ -80,9 +81,9 @@ impl HtmlTokensToRust {
 	fn map_node(&mut self, node: HtmlTokens) -> TokenStream {
 		match node {
 			HtmlTokens::Fragment { nodes } => {
-				let children = nodes.into_iter().map(|n| self.map_node(n));
+				let nodes = nodes.into_iter().map(|n| self.map_node(n));
 				quote! { RsxFragment{
-					nodes: vec![#(#children),*],
+					nodes: vec![#(#nodes),*],
 					meta: RsxNodeMeta::default(),
 				}.into_node()}
 			}
@@ -108,7 +109,6 @@ impl HtmlTokensToRust {
 			}
 			HtmlTokens::Block { value } => {
 				let tracker = self.rusty_tracker.next_tracker(&value);
-
 				let ident = &self.idents.runtime.effect;
 				quote! {
 					#ident::parse_block_node(#tracker, #value)
@@ -135,7 +135,7 @@ impl HtmlTokensToRust {
 				} else {
 					let meta = MetaBuilder::build_with_directives(&directives);
 					// this attributes-children order is important for rusty tracker indices
-					// to be consistend with HtmlTokensToRon
+					// to be consistent with HtmlTokensToRon
 					let attributes = attributes
 						.iter()
 						.map(|attr| self.map_attribute(attr))
@@ -196,17 +196,16 @@ impl HtmlTokensToRust {
 				// we need to handle events at the tokens level for inferred
 				// event types and intellisense.
 				if key_str.starts_with("on") {
-					let register_func = syn::Ident::new(
-						&format!("register_{key_str}"),
-						value.span(),
-					);
-					let event_registry = &self.idents.runtime.event;
+					let register_event = self
+						.idents
+						.runtime
+						.register_event_tokens(&key_str, value);
 					quote! {
 						RsxAttribute::BlockValue {
 							key: #key_str.to_string(),
 							initial: "event-placeholder".to_string(),
-							effect: Effect::new(Box::new(move |cx| {
-								#event_registry::#register_func(#key_str,cx,#value);
+							effect: Effect::new(Box::new(move |loc| {
+								#register_event
 								Ok(())
 							}), #tracker)
 						}
@@ -223,6 +222,7 @@ impl HtmlTokensToRust {
 			}
 		}
 	}
+
 	fn map_component(
 		&mut self,
 		RsxNodeTokens {
@@ -234,8 +234,11 @@ impl HtmlTokensToRust {
 		children: HtmlTokens,
 	) -> TokenStream {
 		let tag_str = tag.to_string();
-
 		let tracker = self.rusty_tracker.next_tracker(&tokens);
+		// visiting slot children is safe here, we aren't pulling any more trackers
+		let slot_children = self.map_node(children);
+		let meta = MetaBuilder::build_with_directives(&directives);
+
 		let mut prop_assignments = Vec::new();
 		let mut prop_names = Vec::new();
 		// currently unused but we could allow setting component directly,
@@ -267,10 +270,8 @@ impl HtmlTokensToRust {
 			}
 		}
 
-		let meta = MetaBuilder::build_with_directives(&directives);
 
 		let ident = syn::Ident::new(&tag_str, tokens.span());
-		let slot_children = self.map_node(children);
 
 		// ensures all required fields are set
 		// doesnt work because we cant tell whether its an optional or default
@@ -281,6 +282,8 @@ impl HtmlTokensToRust {
 		// 			};
 		// };
 
+		// TODO spread, ie allow the block component to be turned
+		// into a builder and apply props
 		let component = if let Some(node_block) = block_attr {
 			quote! {
 				#node_block
@@ -299,7 +302,7 @@ impl HtmlTokensToRust {
 				#[cfg(target_arch = "wasm32")]
 				{None}
 				#[cfg(not(target_arch = "wasm32"))]
-				{Some(ron::ser::to_string(&component).unwrap())}
+				{Some(beet::exports::ron::ser::to_string(&component).unwrap())}
 			}}
 		} else {
 			quote! {None}

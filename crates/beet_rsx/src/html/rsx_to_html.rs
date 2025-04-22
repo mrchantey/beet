@@ -112,6 +112,8 @@ impl RsxToHtml {
 		el
 	}
 
+	/// Returns a vec to handle the case of [`RsxAttribute::Block`]
+	/// which can contain multiple attributes
 	pub fn map_attribute(
 		&self,
 		idx: TreeIdx,
@@ -129,27 +131,36 @@ impl RsxToHtml {
 				}]
 			}
 			RsxAttribute::BlockValue { key, initial, .. } => {
-				if !self.no_wasm && key.starts_with("on") {
-					vec![HtmlAttribute {
-						key: key.clone(),
-						value: Some(format!(
-							"{}({}, event)",
-							self.html_constants.event_handler,
-							idx.to_string(),
-						)),
-					}]
-				} else {
-					vec![HtmlAttribute {
-						key: key.clone(),
-						value: Some(initial.clone()),
-					}]
-				}
+				vec![self.map_maybe_event_attribute(idx, key, Some(initial))]
 			}
 			RsxAttribute::Block { initial, .. } => initial
-				.iter()
-				.map(|a| self.map_attribute(idx, a))
-				.flatten()
+				.iter() // test this when implementing
+				.map(|(key, value)| {
+					self.map_maybe_event_attribute(idx, key, value.as_deref())
+				})
 				.collect(),
+		}
+	}
+
+	fn map_maybe_event_attribute(
+		&self,
+		idx: TreeIdx,
+		key: &str,
+		value: Option<&str>,
+	) -> HtmlAttribute {
+		if !self.no_wasm && key.starts_with("on") {
+			HtmlAttribute {
+				key: key.to_string(),
+				value: Some(format!(
+					"{}({idx}, event)",
+					self.html_constants.event_handler,
+				)),
+			}
+		} else {
+			HtmlAttribute {
+				key: key.to_string(),
+				value: value.map(|v| v.to_string()),
+			}
 		}
 	}
 }
@@ -241,11 +252,28 @@ mod test {
 		.to_be("<div><p data-beet-rsx-idx=\"2\">hello mars</p></div>");
 	}
 	#[test]
-	fn events() {
+	fn block_value_events() {
 		let onclick = move |_| {};
 		let world = "mars";
 		expect(rsx! {
 			<div onclick=onclick>
+				<p>hello {world}</p>
+			</div>
+		}.xpipe(RsxToHtmlString::default()).unwrap())
+		.to_be("<div onclick=\"_beet_event_handler(1, event)\" data-beet-rsx-idx=\"1\"><p data-beet-rsx-idx=\"2\">hello mars</p></div>");
+	}
+	#[test]
+	fn block_events() {
+		#[derive(IntoBlockAttribute)]
+		struct Foo {
+			onclick: Box<dyn EventHandler<MouseEvent>>,
+		}
+
+		let world = "mars";
+		expect(rsx! {
+			<div {Foo {
+				onclick: Box::new(move |_| {}),
+			}}>
 				<p>hello {world}</p>
 			</div>
 		}.xpipe(RsxToHtmlString::default()).unwrap())

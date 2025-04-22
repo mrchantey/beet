@@ -48,7 +48,7 @@ impl BevyEventRegistry {
 		loc: TreeLocation,
 		observer: impl IntoObserverSystem<E, B, M>,
 	) where
-		E: Event,
+		E: bevy::prelude::Event,
 		B: Bundle,
 	{
 		BevyRuntime::with_mut(move |app| {

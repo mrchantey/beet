@@ -1,5 +1,38 @@
 use crate::prelude::*;
 
+/// Collects all components with a `client:load` directive.
+#[derive(Default)]
+pub struct CollectClientIslands;
+
+impl<T: AsRef<RsxNode>> Pipeline<T, Vec<ClientIsland>>
+	for CollectClientIslands
+{
+	fn apply(self, root: T) -> Vec<ClientIsland> {
+		let mut islands = Vec::new();
+
+		VisitRsxComponent::walk(
+			root.as_ref(),
+			|RsxComponent {
+			     ron,
+			     type_name,
+			     tracker,
+			     ..
+			 }| {
+				if let Some(ron) = ron {
+					islands.push(ClientIsland {
+						tracker: tracker.clone(),
+						type_name: type_name.clone(),
+						ron: ron.clone(),
+					});
+				}
+			},
+		);
+
+
+		islands
+	}
+}
+
 /// Representation of a component in an Rsx tree that was marked as an
 /// island by a `client`.
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -32,46 +65,15 @@ impl ClientIsland {
 			// TODO resolve tracker to location
 			beet::exports::ron::de::from_str::<#type_name>(#ron)?
 				.into_node()
+				// applying slots is a requirement of walking tree locations
+				// consistently, it panics otherwise
+				.xpipe(ApplySlots::default())?
 				.xpipe(RegisterEffects::new(
 					tree_location_map.rusty_locations[
 						&RustyTracker::new(#tracker_index,#tracker_hash)]
 					)
 				)?;
 		}
-	}
-}
-
-
-/// Collects all components with a `client:load` directive.
-#[derive(Default)]
-pub struct CollectClientIslands;
-
-impl<T: AsRef<RsxNode>> Pipeline<T, Vec<ClientIsland>>
-	for CollectClientIslands
-{
-	fn apply(self, root: T) -> Vec<ClientIsland> {
-		let mut islands = Vec::new();
-
-		VisitRsxComponent::walk(
-			root.as_ref(),
-			|RsxComponent {
-			     ron,
-			     type_name,
-			     tracker,
-			     ..
-			 }| {
-				if let Some(ron) = ron {
-					islands.push(ClientIsland {
-						tracker: tracker.clone(),
-						type_name: type_name.clone(),
-						ron: ron.clone(),
-					});
-				}
-			},
-		);
-
-
-		islands
 	}
 }
 
@@ -130,6 +132,7 @@ mod test {
 			quote::quote! {
 				beet::exports::ron::de::from_str::<MyComponent>("(val:32)")?
 					.into_node()
+					.xpipe(ApplySlots::default())?
 					.xpipe(RegisterEffects::new(tree_location_map.rusty_locations[&RustyTracker::new(0u32,89u64)]))?;
 			}
 			.to_string(),

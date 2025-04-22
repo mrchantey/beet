@@ -40,6 +40,7 @@ fn head(Head { fixed_scale }: Head) -> RsxNode {
 
 	rsx! {
 		<head>
+		<meta charset="UTF-8">
 		<title>{title.clone()}</title>
 		<link rel="canonical" href={site_url.clone()}>
 		{scale}

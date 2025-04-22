@@ -60,13 +60,13 @@ pub fn derive_buildable(
 	let input = parse_macro_input!(input as DeriveInput);
 	parse_derive_buildable(input).into()
 }
-/// Implements Into<Vec<RsxAttribute>> for a struct.
+/// Implements [`IntoBlockAttribute`] for a struct.
 /// Optional fields will checked and only added if they are Some.
 /// All fields must implement Into<String>.
-#[proc_macro_derive(IntoRsxAttributes, attributes(field))]
-pub fn derive_into_rsx_attributes(
+#[proc_macro_derive(IntoBlockAttribute, attributes(field))]
+pub fn derive_into_block_attribute(
 	input: proc_macro::TokenStream,
 ) -> proc_macro::TokenStream {
 	let input = parse_macro_input!(input as DeriveInput);
-	impl_into_rsx_attributes(input).into()
+	impl_into_block_attribute(input).into()
 }

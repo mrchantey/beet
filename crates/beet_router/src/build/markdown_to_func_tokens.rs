@@ -2,7 +2,6 @@ use crate::prelude::*;
 use anyhow::Result;
 use beet_rsx::prelude::HtmlTokensToRust;
 use beet_rsx::prelude::StringToHtmlTokens;
-use http::Method;
 use pulldown_cmark::CowStr;
 use pulldown_cmark::Event;
 use pulldown_cmark::MetadataBlockKind;
@@ -13,6 +12,8 @@ use pulldown_cmark::TagEnd;
 use std::path::PathBuf;
 use sweet::prelude::*;
 use syn::Block;
+use syn::Ident;
+use syn::ItemFn;
 
 pub struct MarkdownToFuncTokens;
 
@@ -45,7 +46,6 @@ impl MarkdownToFuncTokens {
 		pulldown_cmark::html::push_html(&mut html_output, parser);
 		html_output
 	}
-
 
 	/// returns the content of the first frontmatter block discovered,
 	/// wrapped in parentheses as a requirement of the `ron` parser
@@ -128,8 +128,9 @@ impl MarkdownToFuncTokens {
 	}
 
 	pub fn parse(
+		mod_ident: Ident,
 		markdown: &str,
-		canonical_path: CanonicalPathBuf,
+		canonical_path: AbsPathBuf,
 		local_path: PathBuf,
 	) -> Result<FuncTokens> {
 		let frontmatter = Self::markdown_to_frontmatter_tokens(markdown)?;
@@ -147,13 +148,20 @@ impl MarkdownToFuncTokens {
 			})?
 			.xpipe(HtmlTokensToRust::default());
 
+		let item_fn: ItemFn = syn::parse_quote! {
+			pub fn get() -> RsxNode
+				#rust_tokens
+
+		};
+
 		Ok(FuncTokens {
-			mod_ident: None,
+			mod_ident: mod_ident.clone(),
+			mod_import: ModImport::Inline,
 			frontmatter,
-			func: syn::parse_quote! {|| rsx! {#rust_tokens}},
+			item_fn,
 			route_info: RouteInfo {
 				path: RoutePath::from_file_path(&local_path)?,
-				method: Method::GET,
+				method: HttpMethod::Get,
 			},
 			local_path,
 			canonical_path,
@@ -169,6 +177,7 @@ mod test {
 	use serde::Deserialize;
 	use serde::Serialize;
 	use sweet::prelude::*;
+	use syn::ItemFn;
 
 	const MARKDOWN: &str = r#"
 +++
@@ -204,12 +213,20 @@ val_string	= "foo"
 		val_string: String,
 	}
 
-
-
 	#[test]
 	fn html() {
 		expect(MarkdownToFuncTokens::markdown_to_html(MARKDOWN))
 			.to_be("<h1>hello world</h1>\n");
+	}
+
+	#[test]
+	#[ignore = "todo"]
+	// currently text nodes of html tags are not parsed
+	fn inside_tags() {
+		expect(MarkdownToFuncTokens::markdown_to_html(
+			r#"<div>## Subheading</div>"#,
+		))
+		.to_be("<div><h2>Subheading</h2></div>\n");
 	}
 
 	#[test]
@@ -232,39 +249,38 @@ val_string	= "foo"
 	#[test]
 	fn parse() {
 		let func_tokens = MarkdownToFuncTokens::parse(
+			syn::parse_quote!(foo),
 			MARKDOWN,
-			CanonicalPathBuf::new_unchecked("foo"),
+			AbsPathBuf::new_unchecked("foo"),
 			"bar".into(),
 		)
 		.unwrap();
 
-		let expected: syn::Expr = syn::parse_quote! {
-		||				rsx! {
-							{
-								use beet::prelude::*;
-								#[allow(unused_braces)]
-								RsxElement {
-									tag: "h1".to_string(),
-									attributes: vec![],
-									children: Box::new(
-										RsxText {
-											value: "hello world".to_string(),
-											meta: RsxNodeMeta::default(),
-										}.into_node()
-									),
-									self_closing: false,
-									meta: RsxNodeMeta {
-										template_directives: vec![],
-										location: None
-									},
-								}
-								.into_node()
-								.with_location(RsxMacroLocation::new(file!(), 0u32, 0u32))
-							}
-						}
-					};
+		let expected: ItemFn = syn::parse_quote! {
+		pub fn get() -> RsxNode {
+			use beet::prelude::*;
+			#[allow(unused_braces)]
+			RsxElement {
+				tag: "h1".to_string(),
+				attributes: vec![],
+				children: Box::new(
+					RsxText {
+						value: "hello world".to_string(),
+						meta: RsxNodeMeta::default(),
+					}.into_node()
+				),
+				self_closing: false,
+				meta: RsxNodeMeta {
+					template_directives: vec![],
+					location: None
+				},
+			}
+			.into_node()
+			.with_location(RsxMacroLocation::new(file!(), 0u32, 0u32))
+		}
+		};
 
-		expect(func_tokens.func.to_token_stream().to_string())
+		expect(func_tokens.item_fn.to_token_stream().to_string())
 			.to_be(expected.to_token_stream().to_string());
 	}
 }

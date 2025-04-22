@@ -1,22 +1,45 @@
 use beet_rsx::as_beet::*;
 
-#[derive(Default, Buildable, IntoRsxAttributes)]
+#[derive(Default, Buildable, IntoBlockAttribute)]
 pub struct BaseHtmlAttributes {
 	pub id: Option<String>,
 	pub class: Option<String>,
+	pub onchange: Option<Box<dyn EventHandler<Event>>>,
+	pub oninput: Option<Box<dyn EventHandler<Event>>>,
+	pub onclick: Option<Box<dyn EventHandler<MouseEvent>>>,
 }
-#[derive(Default, Buildable, IntoRsxAttributes)]
+#[derive(Default, Buildable, IntoBlockAttribute)]
 pub struct ButtonHtmlAttributes {
 	#[field(flatten)]
 	pub base_attrs: BaseHtmlAttributes,
 	pub disabled: Option<bool>,
 }
-#[derive(Default, Buildable, IntoRsxAttributes)]
+
+
+#[derive(Default, Buildable, IntoBlockAttribute)]
 pub struct AnchorHtmlAttributes {
+	// #[field(flatten=BaseHtmlAttributes)]
 	#[field(flatten)]
 	pub base_attrs: BaseHtmlAttributes,
 	/// the download thing
 	pub href: Option<String>,
+}
+#[derive(Default, Buildable, IntoBlockAttribute)]
+pub struct InputHtmlAttributes {
+	#[field(flatten)]
+	pub base_attrs: BaseHtmlAttributes,
+	pub r#type: Option<String>,
+	pub disabled: Option<bool>,
+	pub required: Option<bool>,
+	pub value: Option<MaybeSignal<String>>,
+}
+
+#[derive(Default, Buildable, IntoBlockAttribute)]
+pub struct TextAreaHtmlAttributes {
+	#[field(flatten=BaseHtmlAttributes)]
+	pub input_attrs: InputHtmlAttributes,
+	pub rows: Option<u32>,
+	pub cols: Option<u32>,
 }
 
 
@@ -51,7 +74,7 @@ mod test {
 
 	#[test]
 	fn third_order() {
-		#[derive(Default, Buildable, IntoRsxAttributes)]
+		#[derive(Default, Buildable, IntoBlockAttribute)]
 		struct Button {
 			#[field(flatten)]
 			#[field(flatten = BaseHtmlAttributes)]
@@ -59,5 +82,17 @@ mod test {
 		}
 
 		let _a = Button::default().class("foo").disabled(true);
+	}
+
+	#[test]
+	fn events_omitted() {
+		#[derive(Node)]
+		struct Button {
+			#[field(flatten = BaseHtmlAttributes)]
+			_button_attrs: ButtonHtmlAttributes,
+		}
+		fn button(_props: Button) -> RsxNode { Default::default() }
+		// onclick was ommitted from the into_rsx_attributes
+		let _foo = rsx! { <Button onclick=|_| {} /> };
 	}
 }

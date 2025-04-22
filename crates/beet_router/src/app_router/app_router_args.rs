@@ -1,7 +1,5 @@
-use std::path::PathBuf;
-
-use anyhow::Result;
 use clap::Parser;
+use std::path::PathBuf;
 
 
 /// Cli args parser when running an [`AppRouter`].
@@ -18,17 +16,11 @@ pub struct AppRouterArgs {
 
 
 impl AppRouterArgs {
-	/// Check the arguments parsed in match the compiled feature set
-	pub fn validate(self) -> Result<Self> {
-		#[cfg(not(feature = "server"))]
-		if !self.is_static {
-			anyhow::bail!("Server feature is required to run a server")
-		}
-		Ok(self)
-	}
+	/// reexport of [`clap::Parser::parse`]
+	pub fn parse() -> Self { Parser::parse() }
 
 	#[cfg(target_arch = "wasm32")]
-	pub fn from_url_params() -> Result<Self> {
+	pub fn from_url_params() -> anyhow::Result<Self> {
 		// TODO actually parse from search params
 		Ok(Self {
 			is_static: false,

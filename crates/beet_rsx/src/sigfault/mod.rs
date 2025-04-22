@@ -34,7 +34,7 @@ impl Sigfault {
 						let block = block.clone();
 						DomTarget::with(move |target| {
 							let node = block.clone().into_node();
-							target.update_rsx_node(node, loc).unwrap()
+							target.update_rsx_node(loc, node).unwrap()
 						});
 					});
 					Ok(())
@@ -48,19 +48,18 @@ impl Sigfault {
 	/// Used by [`RstmlToRsx`] when it encounters an attribute block:
 	/// ```
 	/// # use beet_rsx::as_beet::*;
-	/// let value = || vec![RsxAttribute::Key{key:"foo".to_string()}];
-	/// let node = rsx!{<el {value}/>};
+	/// #[derive(IntoBlockAttribute)]
+	/// struct Foo;
+	/// let node = rsx!{<el {Foo}/>};
 	/// ```
 	pub fn parse_attribute_block<M>(
 		tracker: RustyTracker,
-		block: impl IntoRsxAttributes<M>,
+		block: impl IntoBlockAttribute<M>,
 	) -> RsxAttribute {
 		RsxAttribute::Block {
-			initial: block.into_rsx_attributes(),
+			initial: block.initial_attributes(),
 			effect: Effect::new(
-				Box::new(|_loc| {
-					todo!();
-				}),
+				Box::new(move |loc| block.register_effects(loc)),
 				tracker,
 			),
 		}
@@ -82,19 +81,29 @@ impl Sigfault {
 			initial: block.clone().into_sigfault_val(),
 			effect: Effect::new(
 				Box::new(move |loc| {
-					effect(move || {
-						let value = block.clone().into_sigfault_val();
-						println!(
-							"would update attribute for {}\n{key}: {value}",
-							loc.tree_idx
-						);
-						todo!();
-					});
+					Self::register_attribute_effect(loc, key, block);
 					Ok(())
 				}),
 				tracker,
 			),
 		}
+	}
+
+	/// Called by both `parse_attribute_value` and the implementation of
+	/// `parse_attribute_block` where the block contains non-event fields.
+	/// Note that in the case of an attribute block `<foo {bar}/>` all
+	/// attributes are registered, even the static ones.
+	pub fn register_attribute_effect<M>(
+		loc: TreeLocation,
+		key: &'static str,
+		block: impl 'static + Send + Sync + Clone + IntoSigfaultAttrVal<M>,
+	) {
+		effect(move || {
+			let value = block.clone().into_sigfault_val();
+			DomTarget::with(move |target| {
+				target.update_rsx_attribute(loc, key, &value).unwrap()
+			});
+		});
 	}
 }
 
@@ -132,7 +141,7 @@ mod test {
 		let (get, set) = signal(7);
 
 		rsx! { <div>value is {get}</div> }
-			.xpipe(MountRsDom)
+			.xpipe(MountToRsDom)
 			.unwrap()
 			.xpipe(RegisterEffects::default())
 			.unwrap();
@@ -150,7 +159,7 @@ mod test {
 		let (get, set) = signal(7);
 
 		rsx! { <div>value is {get}</div> }
-			.xpipe(MountRsDom)
+			.xpipe(MountToRsDom)
 			.unwrap()
 			.xpipe(RegisterEffects::default())
 			.unwrap();

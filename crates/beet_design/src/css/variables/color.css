@@ -1,0 +1,79 @@
+/* these are mostly aliases for Material Colors
+
+--bt-color-primary
+--bt-color-on-primary
+--bt-color-primary-container
+--bt-color-on-primary-container
+--bt-color-inverse-primary
+--bt-color-primary-fixed
+--bt-color-primary-fixed-dim
+--bt-color-on-primary-fixed
+--bt-color-on-primary-fixed-variant
+--bt-color-secondary
+--bt-color-on-secondary
+--bt-color-secondary-container
+--bt-color-on-secondary-container
+--bt-color-secondary-fixed
+--bt-color-secondary-fixed-dim
+--bt-color-on-secondary-fixed
+--bt-color-on-secondary-fixed-variant
+--bt-color-tertiary
+--bt-color-on-tertiary
+--bt-color-tertiary-container
+--bt-color-on-tertiary-container
+--bt-color-tertiary-fixed
+--bt-color-tertiary-fixed-dim
+--bt-color-on-tertiary-fixed
+--bt-color-on-tertiary-fixed-variant
+--bt-color-error
+--bt-color-on-error
+--bt-color-error-container
+--bt-color-on-error-container
+--bt-color-surface-dim
+--bt-color-surface
+--bt-color-surface-tint
+--bt-color-surface-bright
+--bt-color-surface-container-lowest
+--bt-color-surface-container-low
+--bt-color-surface-container
+--bt-color-surface-container-high
+--bt-color-surface-container-highest
+--bt-color-on-surface
+--bt-color-on-surface-variant
+--bt-color-outline
+--bt-color-outline-variant
+--bt-color-inverse-surface
+--bt-color-inverse-on-surface
+--bt-color-surface-variant
+--bt-color-background
+--bt-color-on-background
+--bt-color-shadow
+--bt-color-scrim
+*/
+
+:root{
+	/* a default that can be overridden, ie by a button state */
+	--bt-opacity: 1;
+	--bt-opacity-hover: 0.7;
+	--bt-opacity-active: 0.5;
+	--bt-opacity-disabled: 0.5;
+	
+	--bt-color-border: var(--bt-color-outline);
+	--bt-color-border-faint: var(--bt-color-outline-variant);
+	--bt-color-text: var(--bt-color-on-surface);
+	--bt-color-background: var(--bt-color-surface-container-lowest);
+	--bt-color-border: var(--bt-color-outline);
+	--bt-color-faint: var(--bt-color-outline);
+}
+
+/* 
+setting data-color-scheme on the document element also sets the scrollbar colors,
+see initColorScheme.js
+*/
+[data-color-scheme="dark"] {
+	color-scheme: dark;
+}
+
+[data-color-scheme="light"] {
+	color-scheme: light;
+}

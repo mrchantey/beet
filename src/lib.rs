@@ -20,6 +20,11 @@ pub use beet_sim as sim;
 #[cfg(feature = "spatial")]
 pub use beet_spatial as spatial;
 
+#[cfg(all(feature = "build", feature = "router"))]
+mod default_builder;
+#[cfg(all(feature = "router", not(target_arch = "wasm32")))]
+mod default_runner;
+
 pub mod prelude {
 	#[cfg(feature = "design")]
 	pub use crate::design::prelude::*;
@@ -39,12 +44,22 @@ pub mod prelude {
 	pub use crate::sim::prelude::*;
 	#[cfg(feature = "spatial")]
 	pub use crate::spatial::prelude::*;
+
+
+	#[cfg(all(feature = "build", feature = "router"))]
+	pub use crate::default_builder::*;
+	#[cfg(all(feature = "router", not(target_arch = "wasm32")))]
+	pub use crate::default_runner::*;
 }
 
 
 pub mod exports {
+	#[cfg(feature = "router")]
+	pub use beet_router::exports::*;
 	#[cfg(feature = "rsx")]
 	pub use beet_rsx::exports::*;
+	#[cfg(all(feature = "server", not(target_arch = "wasm32")))]
+	pub use beet_server::exports::*;
 	// #[cfg(feature = "examples")]
 	// pub use beet_examples::exports::*;
 	// #[cfg(feature = "flow")]

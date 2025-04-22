@@ -1,39 +1,44 @@
 .root > li + li {
 	/* little gap between top level entries */
-	margin-top: 0.75rem;
-}
-a > *:not(:last-child),
-.group-label > *:not(:last-child) {
-	margin-inline-end: 0.25em;
+	/* margin-top: 0.75rem; */
 }
 
 ul {
 	list-style: none;
 	padding: 0;
+	margin-bottom: 0;
 }
 
-li {
+li{
 	overflow-wrap: anywhere;
 	list-style-type: none;
+	margin-bottom: 0;
 }
 
-ul ul li {
-	margin-inline-start: var(--bt-depth-padding);
+li:not(.root) {
+	margin-inline-start: var(--sidebar-indent);
 	border-inline-start: 1px solid var(--bt-color-outline-variant);
-	padding-inline-start: var(--bt-depth-padding);
-}
-.large {
-	font-size: var(--sl-text-lg);
-	font-weight: var(--bt-form-element-font-weight);
-	/* color: var(--sl-color-white); */
+	padding-inline-start: var(--sidebar-indent);
 }
 
-summary {
+.large {
+	/* font-size: var(--bt-text-base); */
+	font-weight: var(--bt-form-element-font-weight);
+}
+
+details{
+	margin-bottom: 0;
+}
+
+.bm-c-sidebar__sublist summary {
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
-	padding: 0.2em var(--bt-depth-padding);
+	border-radius: var(--bt-border-radius);
+	padding-top: 0.2em inherit;
+	/* padding-bottom: 0.2em var(--sidebar-indent); */
 	line-height: var(--bt-line-height);
+	margin-bottom:0;
 	cursor: pointer;
 	user-select: none;
 }
@@ -54,12 +59,25 @@ summary::-webkit-details-marker {
 	transform: rotateZ(90deg);
 }
 
+/* 
+anchor is used for leaf nodes and parents with a page
+otherwise span
+*/
+a,span{
+	padding: 0.3em;
+}
+
+/* account for the arrow */
+a.leaf{
+	width:calc(100% + 3px - 1rem - var(--bt-spacing));
+}
+
 a {
 	display: block;
-	border-radius: var(--bt-border-radius-sm);
+	width: 100%;
+	border-radius: var(--bt-border-radius);
 	text-decoration: none;
 	color: var(--bt-color-on-surface-variant);
-	padding: 0.3em var(--bt-depth-padding);
 	line-height: var(--bt-line-height);
 }
 
@@ -67,7 +85,13 @@ a:hover,
 a:focus {
 	color: var(--bt-color-on-surface);
 }
-[aria-current='page'],
+
+a > *:not(:last-child),
+.group-label > *:not(:last-child) {
+	margin-inline-end: 0.25em;
+}
+
+a[aria-current='page'],
 	[aria-current='page']:hover,
 	[aria-current='page']:focus {
 		font-weight: var(--bt-form-element-font-weight);

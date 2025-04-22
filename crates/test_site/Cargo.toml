@@ -1,0 +1,21 @@
+[package]
+name = "test_site"
+publish = false
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+readme.workspace = true
+description = "File based router for websites"
+documentation.workspace = true
+homepage.workspace = true
+repository.workspace = true
+categories.workspace = true
+keywords.workspace = true
+
+[features]
+
+[dependencies]
+# test_site is used by beet_router so can only
+# include crates upstream from beet_router
+beet_rsx = { workspace = true }

@@ -75,8 +75,39 @@ pub enum TemplateError {
 		expected: RsxMacroLocation,
 		received: Vec<RsxMacroLocation>,
 	},
-	#[error(
-		"Rusty Map is missing a tracker for {cx}\nExpected: {expected:#?}\nReceived: {received:#?}"
+	#[error(r#"
+`RustyPartMap` is missing a tracker for {cx}
+Expected: {expected:#?}
+Received: {received:#?}
+
+---
+
+Congratulations you've reached a hydration error! 🚀
+
+Its likely that you can see a corresponding index but a different hash in the error.
+This may be caused by one of several reasons:
+	1. The generated templates are out of sync with the compiled rust code.
+	2. A new discrepancy between how the rsx! macro creates a TokenStream and parsing
+		a syn::File does it. For example they handle whitespace differently.
+
+Please try a full rebuild and file a reproducible issue if that doesn't work.
+
+## Debugging (for contributors)
+
+The two entrypoints for the tracker generation are
+			- `BuildTemplateMap` which creates an `RsxTemplateMap` via the `RsxRonPipeline`
+			- The `rsx!` macro which creates rusty trackers via the `RsxMacroPipeline`
+			
+A good place to start with println! are in the RustyTrackerBuilder which
+handles *all* hash generation for both macros and file loading.
+have a good look at the tokens being passed in and check they match
+
+Also remember that using the rsx_template! macro likely wont help because that uses the 
+same process as the rsx! macro. It would be better to use syn::parse or something closer to
+the syn::parse_file 
+---
+
+"#
 	)]
 	NoRustyMap {
 		cx: String,
@@ -105,7 +136,7 @@ impl TemplateError {
 
 	pub fn no_rusty_map(
 		cx: &str,
-		received_map: &HashMap<RustyTracker, RustyPart>,
+		received_map: &RustyPartMap,
 		expected: RustyTracker,
 	) -> Self {
 		Self::NoRustyMap {

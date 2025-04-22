@@ -16,7 +16,7 @@ pub mod interactive;
 pub mod layout;
 pub mod macros;
 /// Collection of mockups for all components
-#[cfg(not(target_arch = "wasm32"))]
+// #[cfg(not(target_arch = "wasm32"))]
 #[path = "codegen/mockups.rs"]
 pub mod mockups;
 

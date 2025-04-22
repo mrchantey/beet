@@ -14,6 +14,7 @@ publish = true
 
 [features]
 default = ["reload"]
+build = ["beet_router/build", "dep:quote", "dep:proc-macro2", "dep:syn"]
 reload = ["tower-livereload"]
 lambda = ["dep:lambda_http"]
 toml = ["dep:cargo-manifest", "dep:toml", "dep:semver"]
@@ -21,7 +22,10 @@ toml = ["dep:cargo-manifest", "dep:toml", "dep:semver"]
 
 [dependencies]
 sweet = { workspace = true, features = ["fs"] }
+beet_rsx.workspace = true
+beet_router.workspace = true
 
+thiserror.workspace = true
 tracing.workspace = true
 tracing-subscriber.workspace = true
 anyhow.workspace = true
@@ -31,12 +35,25 @@ http.workspace = true
 http-body-util.workspace = true
 bytes.workspace = true
 
+#💡 server
 tokio.workspace = true
 axum = { version = "0.8", features = ["macros"] }
 tower = "0.5"
 tower-livereload = { version = "0.9", optional = true }
-tower-http = { version = "0.6", features = ["trace", "fs", "normalize-path"] }
+tower-http = { version = "0.6", features = [
+	"trace",
+	"fs",
+	"normalize-path",
+	"set-header",
+] }
 lambda_http = { version = "0.14", optional = true }
+
+#💡 build
+quote = { workspace = true, optional = true }
+proc-macro2 = { workspace = true, optional = true }
+prettyplease = { workspace = true, optional = true }
+syn = { workspace = true, optional = true }
+
 
 # i think we can use compile time constants instead
 semver = { version = "1", optional = true }

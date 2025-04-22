@@ -29,6 +29,19 @@ impl ClientIslandMountFuncs {
 		self
 	}
 
+	#[allow(unused)]
+	pub fn mount_with_server_url(&self, url: &str) -> Result<()> {
+		#[cfg(not(debug_assertions))]
+		{
+			use beet::prelude::*;
+			CallServerAction::set_server_url(RoutePath::new(url));
+		}
+		#[cfg(target_arch = "wasm32")]
+		self.mount()?;
+		Ok(())
+	}
+
+
 	#[cfg(target_arch = "wasm32")]
 	pub fn mount(&self) -> Result<()> {
 		console_error_panic_hook::set_once();

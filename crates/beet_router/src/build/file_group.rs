@@ -10,25 +10,18 @@ use sweet::prelude::*;
 pub struct FileGroup {
 	/// The directory where the files are located.
 	#[arg(long, default_value = ".")]
-	pub src: CanonicalPathBuf,
+	pub src: AbsPathBuf,
 	/// Include and exclude filters for the files.
 	#[command(flatten)]
 	pub filter: GlobFilter,
 }
 
 impl FileGroup {
-	pub fn new(src: CanonicalPathBuf) -> Self {
+	pub fn new(src: AbsPathBuf) -> Self {
 		Self {
 			src,
 			filter: GlobFilter::default(),
 		}
-	}
-
-	pub fn new_workspace_rel(src: impl Into<WorkspacePathBuf>) -> Result<Self> {
-		Ok(Self {
-			src: src.into().into_canonical()?,
-			filter: GlobFilter::default(),
-		})
 	}
 
 	pub fn with_filter(mut self, filter: GlobFilter) -> Self {
@@ -38,7 +31,7 @@ impl FileGroup {
 
 	/// Perform a [`ReadDir`], returning all files in the directory
 	/// relative this src
-	pub fn collect_files(&self) -> Result<Vec<CanonicalPathBuf>> {
+	pub fn collect_files(&self) -> Result<Vec<AbsPathBuf>> {
 		let items = ReadDir {
 			files: true,
 			recursive: true,
@@ -49,7 +42,7 @@ impl FileGroup {
 		.filter_map(|path| {
 			if self.filter.passes(&path) {
 				// should be path+self.src?
-				Some(CanonicalPathBuf::new(path))
+				Some(AbsPathBuf::new(path))
 			} else {
 				None
 			}
@@ -59,9 +52,12 @@ impl FileGroup {
 	}
 
 	#[cfg(test)]
-	pub fn test_site_routes() -> Self {
-		Self::new_workspace_rel("crates/beet_router/src/test_site/routes")
-			.unwrap()
+	pub fn test_site() -> Self {
+		Self::new(AbsPathBuf::new_manifest_rel("src/test_site").unwrap())
+	}
+	#[cfg(test)]
+	pub fn test_site_pages() -> Self {
+		Self::new(AbsPathBuf::new_manifest_rel("src/test_site/pages").unwrap())
 			.with_filter(
 				GlobFilter::default()
 					.with_include("*.rs")
@@ -70,9 +66,10 @@ impl FileGroup {
 	}
 	#[cfg(test)]
 	pub fn test_site_markdown() -> Self {
-		Self::new_workspace_rel("crates/beet_router/src/test_site/test_docs")
-			.unwrap()
-			.with_filter(GlobFilter::default().with_include("*.md"))
+		Self::new(
+			AbsPathBuf::new_manifest_rel("src/test_site/test_docs").unwrap(),
+		)
+		.with_filter(GlobFilter::default().with_include("*.md"))
 	}
 }
 
@@ -84,12 +81,13 @@ mod test {
 	#[test]
 	fn works() {
 		expect(
-			FileGroup::new_workspace_rel("crates/beet_router/src/test_site")
-				.unwrap()
-				.with_filter(GlobFilter::default().with_include("*.mockup.rs"))
-				.collect_files()
-				.unwrap()
-				.len(),
+			FileGroup::new(
+				AbsPathBuf::new_manifest_rel("src/test_site").unwrap(),
+			)
+			.with_filter(GlobFilter::default().with_include("*.mockup.rs"))
+			.collect_files()
+			.unwrap()
+			.len(),
 		)
 		.to_be(2);
 	}

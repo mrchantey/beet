@@ -9,12 +9,13 @@ use beet::rsx::sigfault::signal;
 
 #[rustfmt::skip]
 fn main() { 
-	AppRouter::new(app_cx!())
-		.add_collection(app)
-		.run(); 
+	// AppRouter::new(app_cx!())
+	// 	.add_collection(app)
+	// 	.run(); 
 	todo!("spa needs updating to islands architecture");
 }
 
+#[allow(unused)]
 fn app() -> RsxNode {
 	let (value, set_value) = signal(0);
 

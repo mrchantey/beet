@@ -19,6 +19,9 @@ pub struct RunDeploy {
 	/// Specify the IAM role that the lambda function should use
 	#[arg(long)]
 	pub iam_role: Option<String>,
+	/// Build but do not deploy
+	#[arg(long)]
+	pub dry_run: bool,
 }
 
 
@@ -32,8 +35,9 @@ impl RunDeploy {
 		self.build.clone().into_group()?.run()?;
 
 		self.lambda_build()?;
-		self.lambda_deploy()?;
-
+		if !self.dry_run {
+			self.lambda_deploy()?;
+		}
 		Ok(())
 	}
 
@@ -53,6 +57,8 @@ impl RunDeploy {
 		Ok(())
 	}
 
+
+	/// Deploy to lambda, using best effort to determine the binary name
 	fn lambda_deploy(&self) -> Result<()> {
 		let mut cmd = Command::new("cargo");
 

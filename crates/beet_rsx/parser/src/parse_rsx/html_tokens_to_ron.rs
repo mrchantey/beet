@@ -119,9 +119,9 @@ impl HtmlTokensToRon {
 
 				let tag_str = tag.to_string();
 				if tag_str.starts_with(|c: char| c.is_uppercase()) {
-					let tracker = self.rusty_tracker.next_tracker_ron(&tokens);
 					// components disregard all the context and rely on the tracker
 					// we rely on the hydrated node to provide the attributes and children
+					let tracker = self.rusty_tracker.next_tracker_ron(&tokens);
 					let slot_children = self.map_node(*children);
 
 					quote! { Component (
@@ -132,7 +132,7 @@ impl HtmlTokensToRon {
 					)}
 				} else {
 					// this attributes-children order is important for rusty tracker indices
-					// to be consistend with HtmlTokensToRust
+					// to be consistent with HtmlTokensToRust
 					let attributes = attributes
 						.into_iter()
 						.map(|a| self.map_attribute(&a))

@@ -1,0 +1,66 @@
+.bt-c-input {
+	/* see bm-form.css for base definition */
+	width: 100%;
+}
+
+.bt-c-input[type='color'] {
+	padding: calc(var(--bt-spacing) * 0.5);
+}
+
+.bt-c-input:disabled {
+	opacity: var(--bt-opacity-disabled);
+}
+
+.bt-c-input::placeholder {
+	color: var(--bt-color-on-surface-variant);
+}
+
+.bt-c-input--filled {
+	--bt-color-text: var(--bt-color-on-surface-container);
+	--bt-color-background: var(--bt-color-surface-container-high);
+}
+
+.bt-c-input--text {
+	--bt-color-text: var(--bt-color-on-surface-container);
+	--bt-color-background: transparent;
+}
+
+.bt-c-input--outlined {
+		border: var(--bt-border-width-lg) solid var(--bt-color-border-faint);
+		--bt-color-background: transparent;
+}
+
+.bt-c-input__container {
+	width:100%;
+	display: flex;
+	flex-direction: column;
+	/* align-items: center; */
+	gap: var(--bt-spacing-xs);
+	justify-content: space-between;
+}
+
+/* ERRORS */
+textarea.bt-c-input{
+	overflow:auto;
+	resize:none;
+	height:unset;
+}
+
+
+/* ERRORS */
+.bt-c-input[aria-invalid='true']:focus {
+	outline: none;
+	border-width: var(--bt-border-width-lg);
+}
+
+.bt-c-input[aria-invalid='true'] {
+	border: var(--bt-border-width) solid var(--bt-color-error);
+}
+
+.bt-c-input__error {
+	color: var(--bt-color-error);
+	/* font-size:2em; */
+	font-size: var(--bt-font-size-xs);
+	
+	/* margin-top: var(--bt-spacing-xs); */
+}

@@ -14,7 +14,7 @@ use axum::response::Html;
 use axum::routing::get;
 use http::StatusCode;
 
-pub fn state_utils_routes() -> Router {
+pub fn state_utils_routes<S: 'static + Send + Sync + Clone>() -> Router<S> {
 	Router::new()
 		.route("/app-info", get(app_info))
 		.route("/health-check", get(health_check))

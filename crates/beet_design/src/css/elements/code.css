@@ -1,0 +1,65 @@
+
+pre,
+code,
+kbd,
+samp {
+  --bt-font-family: var(--bt-font-family-monospace);
+}
+
+kbd {
+  --bt-font-weight: bolder;
+}
+pre,
+code,
+kbd,
+samp {
+  font-size: 0.875em;
+  font-family: var(--bt-font-family);
+}
+
+pre code,
+pre samp {
+  font-size: inherit;
+  font-family: inherit;
+}
+
+pre {
+  -ms-overflow-style: scrollbar;
+  overflow: auto;
+}
+
+pre,
+code,
+kbd,
+samp,kbd {
+  border-radius: var(--bt-border-radius);
+  background: var(--bt-color-surface-container);
+  color: var(--bt-color-on-surface-variant);
+  font-weight: var(--bt-font-weight);
+  line-height: initial;
+}
+
+code,
+kbd,
+samp {
+  display: inline-block;
+  padding: 0.3rem;
+  margin: 0.2rem 0.2rem;
+}
+
+pre {
+  display: block;
+  margin-bottom: var(--bt-spacing);
+  overflow-x: auto;
+}
+pre > code,
+pre > samp {
+  display: block;
+  padding: var(--bt-spacing);
+  background: none;
+  line-height: var(--bt-line-height);
+}
+
+kbd {
+  vertical-align: baseline;
+}

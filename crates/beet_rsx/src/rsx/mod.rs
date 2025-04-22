@@ -20,3 +20,5 @@ pub use rsx_visitor::*;
 pub use rsx_visitor_fn::*;
 pub use template_directive::*;
 pub use tree_idx::*;
+mod maybe_signal;
+pub use maybe_signal::*;

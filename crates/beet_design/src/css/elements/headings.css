@@ -1,0 +1,52 @@
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  --bt-font-weight: 700;
+	margin-top: 0;
+  margin-bottom: var(--bt-typography-spacing-vertical);
+  color: var(--bt-color-text);
+  font-weight: var(--bt-font-weight);
+  font-size: var(--bt-font-size);
+  line-height: var(--bt-line-height);
+  font-family: var(--bt-font-family);
+}
+
+h1 {
+  --bt-font-size: 2rem;
+  --bt-line-height: 1.125;
+  --bt-typography-spacing-top: 3rem;
+}
+
+h2 {
+  --bt-font-size: 1.75rem;
+  --bt-line-height: 1.15;
+  --bt-typography-spacing-top: 2.625rem;
+}
+
+h3 {
+  --bt-font-size: 1.5rem;
+  --bt-line-height: 1.175;
+  --bt-typography-spacing-top: 2.25rem;
+}
+
+h4 {
+  --bt-font-size: 1.25rem;
+  --bt-line-height: 1.2;
+  --bt-typography-spacing-top: 1.874rem;
+}
+
+h5 {
+  --bt-font-size: 1.125rem;
+  --bt-line-height: 1.225;
+  --bt-typography-spacing-top: 1.6875rem;
+}
+
+h6 {
+  --bt-font-size: 1rem;
+  --bt-line-height: 1.25;
+  --bt-typography-spacing-top: 1.5rem;
+}

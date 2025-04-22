@@ -24,7 +24,11 @@ impl Pipeline<HtmlDocument, String> for RenderHtmlEscaped {
 
 
 
-/// Convert [`HtmlNode`] structures into a string of html
+/// Convert [`HtmlNode`] structures into a string of html.
+///
+/// ## WARNING
+/// This does not escape the html, only use this if you *really really*
+/// know what you're doing.
 #[derive(Default)]
 pub struct RenderHtml;
 

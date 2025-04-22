@@ -23,7 +23,7 @@ impl BuildNative {
 
 impl BuildStep for BuildNative {
 	fn run(&self) -> Result<()> {
-		println!("🥁 Build Step 1: Native");
+		println!("🌱 Build Step 1: Native");
 		self.build_cmd.run()?;
 		Ok(())
 	}
@@ -49,7 +49,10 @@ impl BuildStep for ExportStatic {
 	/// it to not spin up a server, and instead just build the static files,
 	/// saving them to the `html_dir`
 	fn run(&self) -> Result<()> {
-		println!("🥁 Build Step 2: HTML");
+		println!(
+			"🌱 Build Step 2: HTML \nExecuting {}",
+			self.exe_path.display()
+		);
 		Command::new(&self.exe_path)
 			.arg("--html-dir")
 			.arg(&self.build_args.html_dir)
@@ -106,7 +109,7 @@ impl BuildWasm {
 
 impl BuildStep for BuildWasm {
 	fn run(&self) -> Result<()> {
-		println!("🥁 Build Step 3: WASM");
+		println!("🌱 Build Step 3: WASM");
 		self.build_cmd.spawn()?;
 		self.wasm_bindgen()?;
 		Ok(())
