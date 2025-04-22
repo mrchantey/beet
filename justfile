@@ -27,6 +27,7 @@ init-repo:
 	cargo run -p beet_router --example build
 	cargo build -p beet_design
 	cargo build -p beet_site
+	cargo build -p beet_site --target wasm32-unknown-unknown
 # just test-site
 # just export-scenes
 
