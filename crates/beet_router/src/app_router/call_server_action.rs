@@ -1,18 +1,16 @@
 use crate::prelude::*;
 use once_cell::sync::Lazy;
-use reqwest::Client;
-use reqwest::RequestBuilder;
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 use std::sync::Mutex;
-
+use sweet::net::exports::reqwest;
+use sweet::net::exports::reqwest::RequestBuilder;
+use sweet::prelude::*;
 
 static SERVER_URL: Lazy<Mutex<RoutePath>> =
 	Lazy::new(|| Mutex::new("http://127.0.0.1:3000".into()));
 
 pub struct CallServerAction;
-
-static CLIENT: Lazy<Client> = Lazy::new(|| Client::new());
 
 impl CallServerAction {
 	pub fn get_server_url() -> RoutePath { SERVER_URL.lock().unwrap().clone() }
@@ -37,8 +35,11 @@ impl CallServerAction {
 		route_info: RouteInfo,
 	) -> Result<O, ServerActionError> {
 		let url = SERVER_URL.lock().unwrap().join(&route_info.path);
-		Self::send(CLIENT.request(route_info.method.into(), url.to_string()))
-			.await
+		Self::send(
+			ReqwestClient::client()
+				.request(route_info.method.into(), url.to_string()),
+		)
+		.await
 	}
 
 	/// Internal function to make a request with data in the query parameters.
@@ -52,7 +53,7 @@ impl CallServerAction {
 
 		let url = SERVER_URL.lock().unwrap().join(&route_info.path);
 		Self::send(
-			CLIENT
+			ReqwestClient::client()
 				.request(route_info.method.into(), url.to_string())
 				.query(&[("data", value)]),
 		)
@@ -70,7 +71,7 @@ impl CallServerAction {
 
 		let url = SERVER_URL.lock().unwrap().join(&route_info.path);
 		Self::send(
-			CLIENT
+			ReqwestClient::client()
 				.request(route_info.method.into(), url.to_string())
 				.header("Content-Type", "application/json")
 				.body(value),

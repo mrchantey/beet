@@ -15,7 +15,7 @@ keywords.workspace = true
 [features]
 default = ["serde", "markdown", "actions"]
 build = ["serde", "parser"]
-actions = ["serde", "dep:reqwest", "dep:once_cell"]
+actions = ["serde", "sweet/net", "dep:once_cell"]
 markdown = ["parser", "dep:pulldown-cmark"]
 serde = ["dep:serde", "dep:serde_json", "dep:ron", "dep:toml", "beet_rsx/serde"]
 parser = [
@@ -44,8 +44,6 @@ futures.workspace = true
 clap.workspace = true
 sweet.workspace = true
 
-
-reqwest = { workspace = true, optional = true }
 once_cell = { workspace = true, optional = true }
 
 #💡 serde

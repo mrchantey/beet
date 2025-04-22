@@ -30,7 +30,7 @@ async fn test_server_action_calls() {
 	let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
 	let addr = listener.local_addr().unwrap();
 
-	// Start the server in a separate task
+	// Start the server in a separate task, dropped on exit
 	let _server = spawn(async move {
 		axum::serve(listener, app).await.unwrap();
 	});
@@ -61,7 +61,4 @@ async fn test_server_action_calls() {
 		.unwrap(),
 	)
 	.to_be(17);
-
-	// We don't need to explicitly shut down the server as it will be dropped
-	// when the test completes
 }
