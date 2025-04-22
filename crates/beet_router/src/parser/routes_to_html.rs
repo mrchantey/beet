@@ -70,9 +70,6 @@ impl Default for HtmlRoutesToDisk {
 
 impl Pipeline<Vec<(RouteInfo, HtmlDocument)>, Result<()>> for HtmlRoutesToDisk {
 	fn apply(self, routes: Vec<(RouteInfo, HtmlDocument)>) -> Result<()> {
-		let dst = &self.html_dir;
-
-		let dst = dst.canonicalize()?;
 		for (info, doc) in routes.into_iter() {
 			let mut path = info.path.to_path_buf();
 			// map foo/index.rs to foo/index.html
@@ -84,7 +81,7 @@ impl Pipeline<Vec<(RouteInfo, HtmlDocument)>, Result<()>> for HtmlRoutesToDisk {
 				path.push("index.html");
 			}
 			let path = path.strip_prefix("/").unwrap();
-			let full_path = &dst.join(path);
+			let full_path = self.html_dir.join(path);
 			// pretty rendering currently breaks text node logic
 			let str = doc.xpipe(RenderHtmlEscaped::default());
 			FsExt::write(&full_path, &str)?;

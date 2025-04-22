@@ -208,8 +208,8 @@ test-rsx-macro *args:
 
 clear-artifacts:
 	rm -rf target
+	rm -rf crates/beet_router/src/test_site/codegen
 	rm -rf crates/beet_design/src/codegen
-	rm -rf crates/test_site/src/codegen
 	rm -rf crates/beet_site/src/codegen
 
 # massive purge
