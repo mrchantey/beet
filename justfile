@@ -26,7 +26,7 @@ init-repo:
 	mkdir -p crates/beet_rsx/assets/fonts && cp ./assets/fonts/* crates/beet_rsx/assets/fonts
 	cargo run -p beet_router --example build
 	cargo build -p beet_design
-	cargo build -p beet_router
+	cargo build -p beet_site
 # just test-site
 # just export-scenes
 
