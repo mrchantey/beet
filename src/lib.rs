@@ -1,6 +1,8 @@
 #![cfg_attr(test, feature(test, custom_test_frameworks))]
 #![cfg_attr(test, test_runner(sweet::test_runner))]
 #![doc = include_str!("../README.md")]
+#[cfg(feature = "connect")]
+pub use beet_connect as connect;
 #[cfg(feature = "design")]
 pub use beet_design as design;
 #[cfg(feature = "examples")]
@@ -26,6 +28,8 @@ mod default_builder;
 mod default_runner;
 
 pub mod prelude {
+	#[cfg(feature = "connect")]
+	pub use crate::connect::prelude::*;
 	#[cfg(feature = "design")]
 	pub use crate::design::prelude::*;
 	#[cfg(feature = "examples")]
@@ -74,4 +78,11 @@ pub mod exports {
 	// pub use beet_sim::exports::*;
 	// #[cfg(feature = "spatial")]
 	// pub use beet_spatial::exports::*;
+}
+
+
+#[cfg(test)]
+mod test {
+	#[test]
+	fn compiles() {}
 }
