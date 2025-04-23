@@ -43,6 +43,12 @@ impl RouteInfo {
 	}
 }
 
+impl std::fmt::Display for RouteInfo {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		write!(f, "{} {}", self.method, self.path)
+	}
+}
+
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;

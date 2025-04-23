@@ -770,6 +770,7 @@ name = "beet_router"
 version = "0.0.6-dev.3"
 dependencies = [
  "anyhow",
+ "axum",
  "beet_router",
  "beet_rsx",
  "bevy",
@@ -779,6 +780,7 @@ dependencies = [
  "futures",
  "heck 0.4.1",
  "http",
+ "http-body-util",
  "once_cell",
  "prettyplease",
  "proc-macro2",
@@ -793,6 +795,7 @@ dependencies = [
  "thiserror 1.0.69",
  "tokio",
  "toml",
+ "tower 0.5.2",
  "uuid",
  "web-sys",
 ]
@@ -882,21 +885,18 @@ dependencies = [
  "beet_router",
  "beet_rsx",
  "bytes",
- "cargo-manifest",
  "http",
  "http-body-util",
  "lambda_http",
  "prettyplease",
  "proc-macro2",
  "quote",
- "semver",
  "serde",
  "serde_json",
  "sweet",
  "syn 2.0.100",
  "thiserror 1.0.69",
  "tokio",
- "toml",
  "tower 0.5.2",
  "tower-http",
  "tower-livereload",
@@ -2185,17 +2185,6 @@ dependencies = [
  "serde_json",
  "serde_plain",
  "tracing",
-]
-
-[[package]]
-name = "cargo-manifest"
-version = "0.19.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a1d8af896b707212cd0e99c112a78c9497dd32994192a463ed2f7419d29bd8c6"
-dependencies = [
- "serde",
- "thiserror 2.0.12",
- "toml",
 ]
 
 [[package]]
@@ -6825,12 +6814,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2fdfc24bc566f839a2da4c4295b82db7d25a24253867d5c64355abb5799bdbe"
 
 [[package]]
-name = "semver"
-version = "1.0.26"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "56e6fa9c48d24d85fb3de5ad847117517440f6beceb7798af16b4a87d616b8d0"
-
-[[package]]
 name = "send_wrapper"
 version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7729,7 +7712,6 @@ version = "0.8.20"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cd87a5cdd6ffab733b2f74bc4fd7ee5fff6634124999ac278c35fc78c6120148"
 dependencies = [
- "indexmap 2.8.0",
  "serde",
  "serde_spanned",
  "toml_datetime",

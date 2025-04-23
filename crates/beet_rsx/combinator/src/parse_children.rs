@@ -52,7 +52,7 @@ where
 }
 
 #[cfg(test)]
-mod tests {
+mod test {
 	use super::*;
 	use crate::to_html::ToHtml;
 

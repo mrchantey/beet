@@ -17,6 +17,7 @@ default = ["serde", "markdown", "actions"]
 build = ["serde", "parser"]
 actions = ["serde", "sweet/net", "dep:once_cell"]
 markdown = ["parser", "dep:pulldown-cmark"]
+axum = ["dep:axum", "dep:tower", "dep:http-body-util"]
 serde = ["dep:serde", "dep:serde_json", "dep:ron", "dep:toml", "beet_rsx/serde"]
 parser = [
 	"serde",
@@ -66,7 +67,9 @@ bevy = { workspace = true, optional = true }
 flume = { workspace = true, optional = true }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-
+axum = { workspace = true, optional = true }
+tower = { workspace = true, optional = true }
+http-body-util = { workspace = true, optional = true }
 tokio = { workspace = true, optional = true }
 
 [dev-dependencies]
@@ -75,6 +78,7 @@ sweet = { workspace = true, features = ["test"] }
 [target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
 # beet_router = { path = "", features = ["parser", "bevy"] }
 beet_router = { path = "", features = [
+	"axum",
 	"parser",
 	"bevy",
 	"build",

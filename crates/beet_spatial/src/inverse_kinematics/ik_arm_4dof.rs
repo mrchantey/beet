@@ -133,7 +133,7 @@ impl IkArm4Dof {
 
 
 #[cfg(test)]
-mod tests {
+mod test {
 	use crate::prelude::*;
 	use bevy::prelude::*;
 	use std::f32::consts::PI;

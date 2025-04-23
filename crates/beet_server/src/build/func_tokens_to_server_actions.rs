@@ -309,7 +309,7 @@ impl FuncTokensToServerActions {
 }
 
 #[cfg(test)]
-mod tests {
+mod test {
 	use crate::prelude::*;
 	use beet_router::prelude::*;
 	use proc_macro2::TokenStream;

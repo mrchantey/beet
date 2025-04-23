@@ -158,7 +158,7 @@ where
 }
 
 #[cfg(test)]
-mod tests {
+mod test {
 	use super::parser as p;
 	use super::*;
 
