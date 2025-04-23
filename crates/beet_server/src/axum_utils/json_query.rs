@@ -7,8 +7,14 @@ use std::collections::HashMap;
 
 /// An extractor that extracts JSON data from the `data` query parameter.
 ///
-/// Similar to `axum::extract::Json`, but works on GET requests by pulling
+/// Similar to `axum::extract::Json`, but works on bodyless requests like GET by pulling
 /// data from a query parameter instead of the request body.
+///
+/// ## Example
+/// ```sh
+/// curl -X GET "http://localhost:3000/?data={\"key\":\"value\"}"
+///
+/// ```
 pub struct JsonQuery<T>(pub T);
 
 impl<T> JsonQuery<T> {

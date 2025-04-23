@@ -4,24 +4,28 @@
 #![allow(async_fn_in_trait)]
 #![feature(more_qualified_paths, if_let_guard)]
 
-pub mod app_router;
+pub mod server_actions;
 #[cfg(feature = "bevy")]
 pub mod bevy;
 #[cfg(feature = "build")]
 pub mod build;
+pub mod client_islands;
 #[cfg(all(feature = "parser", not(target_arch = "wasm32")))]
 pub mod parser;
+pub mod types;
 
 pub mod prelude {
 	pub use crate::app_cx;
-	pub use crate::app_router::*;
+	pub use crate::server_actions::*;
 	#[cfg(feature = "bevy")]
 	#[allow(unused_imports)]
 	pub use crate::bevy::*;
 	#[cfg(feature = "build")]
 	pub use crate::build::*;
+	pub use crate::client_islands::*;
 	#[cfg(all(feature = "parser", not(target_arch = "wasm32")))]
 	pub use crate::parser::*;
+	pub use crate::types::*;
 }
 
 
