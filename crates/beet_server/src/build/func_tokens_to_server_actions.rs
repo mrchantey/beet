@@ -442,7 +442,7 @@ assert("ActionError<Json<Bar>>", ("()", "Bar"));
 				1 + 1
 			}
 		},parse_quote! {
-			pub async fn get(a:i32,b:i64) -> ServerActionResult<Result<u32>, ()> {
+			pub async fn get(a:i32,b:i64) -> ServerActionResult<Result<u32>, String> {
 				CallServerAction::request(RouteInfo::new("/add", HttpMethod::Get),(a,b)).await
 			}
 		}).xmap(|(received, expected)| {

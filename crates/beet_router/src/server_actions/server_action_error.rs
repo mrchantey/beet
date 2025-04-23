@@ -27,6 +27,7 @@ impl<E: std::error::Error> From<E> for ActionError<String> {
 	}
 }
 
+
 impl<E: ToString> std::fmt::Display for ActionError<E> {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		write!(
@@ -38,14 +39,27 @@ impl<E: ToString> std::fmt::Display for ActionError<E> {
 	}
 }
 
-#[extend::ext(name=AnyhowToActionResult)]
-pub impl<T, E: From<String>> anyhow::Result<T> {
-	/// A helper method, shorthand for
-	/// `.map_err(|err| ActionError::new(400, err.to_string().into()))`.
-	fn into_action_result(self) -> ActionResult<T, E> {
-		self.map_err(|err| err.into_action_error())
+pub trait IntoActionResult<T, E, M> {
+	fn into_action_result(self) -> ActionResult<T, E>;
+}
+impl<T, E> IntoActionResult<T, E, Self> for Result<T, ActionError<E>> {
+	fn into_action_result(self) -> ActionResult<T, E> { self }
+}
+
+impl<T> IntoActionResult<T, String, Self> for Result<T, anyhow::Error> {
+	fn into_action_result(self) -> ActionResult<T, String> {
+		self.map_err(|err| ActionError::new(400, err.to_string()))
 	}
 }
+
+impl<T, E: ToString> IntoActionResult<T, String, Self> for (StatusCode, E) {
+	fn into_action_result(self) -> ActionResult<T, String> {
+		let (status, error) = self;
+		Err(ActionError::new(status.as_u16(), error.to_string()))
+	}
+}
+
+
 #[extend::ext(name=AnyhowToActionError)]
 pub impl<E: From<String>> anyhow::Error {
 	/// A helper method, shorthand for ActionError::new(400,self.to_string().into())`.
@@ -55,7 +69,7 @@ pub impl<E: From<String>> anyhow::Error {
 }
 
 
-pub type ServerActionResult<T, E> = Result<T, ServerActionError<E>>;
+pub type ServerActionResult<T, E = String> = Result<T, ServerActionError<E>>;
 
 /// Client side errors returend by [`CallServerAction`]. The
 /// [ClientError](ServerActionError::ClientError) variant is used

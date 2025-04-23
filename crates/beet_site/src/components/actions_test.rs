@@ -28,7 +28,7 @@ fn action_test(_props: ActionTest) -> RsxNode {
 pub struct RejectsNeg {}
 fn rejects_neg(_props: RejectsNeg) -> RsxNode {
 	let (val, _set_val) = signal(0);
-	let (get, set) = signal::<String>("Ready".into());
+	let (get, set) = signal("Ready".to_string());
 
 	let onclick = move |_| {
 		let val = val.clone();

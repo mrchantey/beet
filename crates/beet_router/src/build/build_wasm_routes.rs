@@ -25,6 +25,7 @@ impl BuildWasmRoutes {
 		syn::parse_quote! {
 			/// Collect all the island mount functions. The exact func used
 			/// will be determined by the `window.location`
+			#[allow(dead_code)]
 			pub fn collect() -> ClientIslandMountFuncs {
 				#tokens
 			}
@@ -78,6 +79,7 @@ mod test {
 			quote::quote! {
 				/// Collect all the island mount functions. The exact func used
 				/// will be determined by the `window.location`
+				#[allow(dead_code)]
 				pub fn collect() -> ClientIslandMountFuncs {
 					#island_map_tokens
 				}

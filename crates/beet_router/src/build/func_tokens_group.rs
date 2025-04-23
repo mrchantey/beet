@@ -57,6 +57,7 @@ impl FuncTokensGroup {
 
 		syn::parse_quote! {
 			/// Collect all functions from their files as defined in the [`AppConfig`]
+			#[allow(dead_code)]
 			pub fn collect() -> Vec<#output> {
 				vec![#(#funcs),*]
 			}
