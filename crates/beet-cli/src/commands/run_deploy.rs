@@ -36,6 +36,7 @@ impl RunDeploy {
 
 		self.lambda_build()?;
 		if !self.dry_run {
+			self.sst_deploy()?;
 			self.lambda_deploy()?;
 		}
 		Ok(())
@@ -48,17 +49,33 @@ impl RunDeploy {
 			.arg("--features")
 			.arg("beet/lambda")
 			.arg("--release");
+		// this is where sst expects the boostrap to be located
+		// .arg("--lambda-dir")
+		// .arg("target/lambda/crates");
 
 		if let Some(pkg) = &self.build.build_cmd.package {
 			cmd.arg("--package").arg(pkg);
 		}
-
+		println!("🌱 Compiling lambda binary");
 		cmd.spawn()?.wait()?.exit_ok()?;
 		Ok(())
 	}
-
+	fn sst_deploy(&self) -> Result<()> {
+		Command::new("npx")
+			.arg("sst")
+			.arg("deploy")
+			.arg("--stage")
+			.arg("production")
+			.arg("--config")
+			.arg("infra/sst.config.ts")
+			.spawn()?
+			.wait()?
+			.exit_ok()?
+			.xok()
+	}
 
 	/// Deploy to lambda, using best effort to determine the binary name
+	#[allow(unused)]
 	fn lambda_deploy(&self) -> Result<()> {
 		let mut cmd = Command::new("cargo");
 

@@ -38,14 +38,17 @@ cli *args:
 install-cli *args:
 	cargo install --path crates/beet-cli {{args}}
 
+deploy-sst:
+	npx sst deploy --stage production --config sst/sst.config.ts
+
 deploy *args:
-	just cli deploy 								\
-	--package 				beet_site 		\
-	--function-name 	beet 					\
-	--region 					us-west-2 		\
-	--iam-role 				$AWS_IAM_ROLE \
+	just cli deploy 									\
+	--package 				beet_site 			\
+	--function-name 	BeetSiteLambda	\
 	{{args}}
 
+# --region 					us-west-2 			\
+# --iam-role 				$AWS_IAM_ROLE 	\
 
 mod *args:
 	sweet mod --exclude *codegen* {{args}}
