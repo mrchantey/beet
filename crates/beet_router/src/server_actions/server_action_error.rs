@@ -77,7 +77,7 @@ pub enum ServerActionError<E = String> {
 	/// A 400 error from the server with a valid body of type `E`. If the
 	/// error is not of type `E`, a 400 [`Deserialize`] error will be returned.
 	#[error("Response returned an action error: {0}")]
-	ActionError(ActionError<E>),
+	ActionError(E),
 	/// This is a catch-all but should be a 4xx or 5xx error.
 	#[error(
 		"Response returned an unparsed error:\nStatus Code: {0}\nError: {1}"
@@ -87,7 +87,7 @@ pub enum ServerActionError<E = String> {
 
 impl<E> Into<ServerActionError<E>> for ActionError<E> {
 	fn into(self) -> ServerActionError<E> {
-		ServerActionError::ActionError(self)
+		ServerActionError::ActionError(self.error)
 	}
 }
 

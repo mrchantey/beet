@@ -33,7 +33,7 @@ impl<T: AsRef<FuncTokens>> Pipeline<T, ItemFn> for FuncTokensToServerActions {
 impl FuncTokensToServerActions {
 	fn client_func(&self, func_tokens: &FuncTokens) -> ItemFn {
 		let parsed_inputs = Self::parse_inputs(func_tokens);
-		let return_type = Self::parse_output(func_tokens);
+		let (return_type, error_type) = Self::parse_output(func_tokens);
 
 		let fn_ident = &func_tokens.item_fn.sig.ident;
 		let route_info = &func_tokens.route_info;
@@ -49,13 +49,13 @@ impl FuncTokensToServerActions {
 		match parsed_inputs {
 			Some((fn_args, param_names)) => parse_quote! {
 				#(#docs)*
-				pub async fn #fn_ident(#fn_args) -> Result<#return_type, ServerActionError> {
+				pub async fn #fn_ident(#fn_args) -> ServerActionResult<#return_type, #error_type> {
 					CallServerAction::request(#route_info, #param_names).await
 				}
 			},
 			None => parse_quote! {
 				#(#docs)*
-				pub async fn #fn_ident() -> Result<#return_type, ServerActionError> {
+				pub async fn #fn_ident() -> ServerActionResult<#return_type, #error_type> {
 					CallServerAction::request_no_data(#route_info).await
 				}
 			},
@@ -226,84 +226,102 @@ impl FuncTokensToServerActions {
 		};
 	}
 
-	/// For given function output, return the output for the client function, uwrapping
+	/// For given function output, return the output and error types for the client function, unwrapping
 	/// whatever was inside the extractor, if any.
 	///
 	/// ## Examples:
-	/// |Input 																				| Output 														|
-	/// |---																					|	---																|
-	/// |`fn foo()` 																	| `()`															|
-	/// |`fn foo() -> Bar`														| `()`															|
-	/// |`fn foo() -> Result<Foo, Bar>`	 							| `()`															|
-	/// |`fn foo() -> Json<u32>`											| `u32`															|
-	/// |`fn foo() -> Result<Json<u32>>`							| `u32`															|
-	/// |`fn foo() -> Result<Json<u32>, Bar>`					| `u32`															|
-	/// |`fn foo() -> Json<Result<u32,u32>>`					| `Result<u32, u32>`								|
-	/// |`fn foo() -> Result<Json<Result<u32,u32>>>`	| `Result<u32, u32>`								|
-	fn parse_output(func: &FuncTokens) -> Type {
-		/// Return type that can be mapped to client side.
-		fn output_extractors() -> Vec<Ident> { vec![parse_quote! { Json }] }
+	/// |Input                                                                                  | Output                                 |
+	/// |---                                                                                    | ---                                    |
+	/// |`fn foo()`                                                                            | `((), ())`                             |
+	/// |`fn foo() -> Bar`                                                                     | `(Bar, ())`                            |
+	/// |`fn foo() -> ActionResult<Foo, Bar>`                                                  | `(Foo, Bar)`                           |
+	/// |`fn foo() -> ActionResult<Json<Foo>, Json<Bar>>`                                      | `(Foo, Bar)`                           |
+	/// |`fn foo() -> ActionResult<Json<Result<u32, u32>>, Json<ActionError<u32>>>`            | `(Result<u32, u32>, ActionError<u32>)` |
+	/// |`fn foo() -> ActionError<Bar>`                                                        | `((), Bar)`                            |
+	/// |`fn foo() -> ActionError<Json<Bar>>`                                                  | `((), Bar)`                            |
+	/// |`fn foo() -> Json<u32>`                                                               | `(u32, ())`                            |
+	/// |`fn foo() -> Result<Json<u64>>`                                                       | `(u64, ())`                            |
+	/// |`fn foo() -> Result<Json<i32>, Bar>`                                                  | `(i32, Bar)`                           |
+	/// |`fn foo() -> Result<Json<Result<u32, u32>>>`                                          | `(Result<u32, u32>, ())`               |
+	fn parse_output(func: &FuncTokens) -> (Type, Type) {
+		// recursively unwraps the extractor type,
+		// ie Json<ActionError<Json<u32>>> becomes u32
+		fn is_action_error(ty: &Type) -> bool {
+			if let Type::Path(TypePath { path, .. }) = ty {
+				if let Some(seg) = path.segments.last() {
+					if seg.ident == "ActionError" {
+						return true;
+					}
+				}
+			}
+			false
+		}
 
-		// Helper to check if a type is an output extractor (e.g., Json),
-		// and if so return the first generic argument
-		fn output_extractor_inner(ty: &Type) -> Option<&Type> {
-			if let Type::Path(type_path) = ty {
-				if let Some(seg) = type_path.path.segments.last() {
-					if output_extractors()
-						.iter()
-						.any(|extractor| seg.ident == *extractor)
-					{
-						// Extract the inner type: Json<T>
+
+		fn unwrap_extractors(ty: &Type) -> &Type {
+			if let Type::Path(TypePath { path, .. }) = ty {
+				if let Some(seg) = path.segments.last() {
+					if seg.ident == "Json" || seg.ident == "ActionError" {
 						if let syn::PathArguments::AngleBracketed(args) =
 							&seg.arguments
 						{
 							if let Some(syn::GenericArgument::Type(inner_ty)) =
 								args.args.first()
 							{
-								return Some(inner_ty);
+								return unwrap_extractors(inner_ty);
 							}
 						}
 					}
 				}
 			}
-			None
+			ty
 		}
 
-		// If the type is a Result<T,..> return T
-		fn result_inner(ty: &Type) -> Option<&Type> {
-			if let Type::Path(type_path) = ty {
-				if let Some(seg) = type_path.path.segments.last() {
-					if seg.ident == "Result" {
+		/// Unwraps a `Result<T,E>` or `ActionResult<T,E>`
+		fn unwrap_result_like(ty: &Type) -> Option<(Type, Type)> {
+			if let Type::Path(TypePath { path, .. }) = ty {
+				if let Some(seg) = path.segments.last() {
+					if seg.ident == "Result" || seg.ident == "ActionResult" {
 						if let syn::PathArguments::AngleBracketed(args) =
 							&seg.arguments
 						{
-							if let Some(syn::GenericArgument::Type(inner_ty)) =
-								args.args.first()
-							{
-								return Some(inner_ty);
-							}
+							let mut args_iter =
+								args.args.iter().filter_map(|a| match a {
+									syn::GenericArgument::Type(t) => Some(t),
+									_ => None,
+								});
+							let t = args_iter
+								.next()
+								.map(unwrap_extractors)
+								.cloned()
+								.unwrap_or_else(|| parse_quote! { () });
+							let e = args_iter
+								.next()
+								.map(unwrap_extractors)
+								.cloned()
+								// the default E type of ActionResult is String
+								.unwrap_or_else(|| parse_quote! { String });
+							return Some((t, e));
 						}
 					}
 				}
 			}
 			None
-		}
-
-		// Recursively unwrap output extractors and Results
-		fn unwrap_type(ty: &Type) -> Type {
-			// Json<T>
-			if let Some(inner) = output_extractor_inner(ty) {
-				return inner.clone();
-			} else if let Some(inner) = result_inner(ty) {
-				return unwrap_type(inner);
-			} else {
-				parse_quote! { () }
-			}
 		}
 
 		match &func.item_fn.sig.output {
-			syn::ReturnType::Default => parse_quote! { () },
-			syn::ReturnType::Type(_, ty) => unwrap_type(ty),
+			syn::ReturnType::Default => {
+				(parse_quote! { () }, parse_quote! { () })
+			}
+			syn::ReturnType::Type(_, ty) => {
+				if let Some((t, e)) = unwrap_result_like(ty) {
+					(t, e)
+				} else if is_action_error(ty) {
+					(parse_quote! { () }, unwrap_extractors(ty).clone())
+				} else {
+					(unwrap_extractors(ty).clone(), parse_quote! { () })
+				}
+			}
 		}
 	}
 }
@@ -337,43 +355,59 @@ mod test {
 			.xmap(expect)
 			.to_be(expected.map(|(a, b)| (a.to_string(), b.to_string())));
 		}
-		assert("", None);
-		assert("foo: Bar", None);
-		assert("foo: Json<u32>", Some(("foo : u32", "foo")));
-		assert("Json(foo): Json<u32>", Some(("foo : u32", "foo")));
-		assert("foo: Json<(u32)>", Some(("foo : (u32)", "foo")));
-		assert("foo: Json<(u32,u32)>", Some(("foo : (u32 , u32)", "foo")));
-		assert(
-			"Json((foo,bar)): Json<(u32,u32)>",
-			Some(("foo : u32 , bar : u32", "(foo , bar)")),
-		);
+		#[rustfmt::skip]
+{
+assert("", None);
+assert("foo: Bar", None);
+assert("foo: Json<u32>", Some(("foo : u32", "foo")));
+assert("Json(foo): Json<u32>", Some(("foo : u32", "foo")));
+assert("foo: Json<(u32)>", Some(("foo : (u32)", "foo")));
+assert("foo: Json<(u32,u32)>", Some(("foo : (u32 , u32)", "foo")));
+assert("Json((foo,bar)): Json<(u32,u32)>",Some(("foo : u32 , bar : u32", "(foo , bar)")));
+}
 	}
 	#[test]
 	fn parse_output() {
-		fn assert(output: &str, expected: &str) {
+		fn assert(output: &str, expected: (&str, &str)) {
 			let output: TokenStream = syn::parse_str(output).unwrap();
 			let func_tokens =
 				FuncTokens::simple_with_func("/add", parse_quote! {
 					fn post() -> #output {}
 				});
-			let ty = FuncTokensToServerActions::parse_output(&func_tokens);
-			expect(ty.to_token_stream().to_string())
-				.to_be(expected.to_string());
+			let (ty, err) =
+				FuncTokensToServerActions::parse_output(&func_tokens);
+			expect((
+				ty.to_token_stream().to_string(),
+				err.to_token_stream().to_string(),
+			))
+			.to_be((expected.0.to_string(), expected.1.to_string()));
 		}
 		// No output
 		let func_tokens = FuncTokens::simple_with_func("/foo", parse_quote! {
 			fn post() {}
 		});
-		let ty = FuncTokensToServerActions::parse_output(&func_tokens);
-		expect(ty.to_token_stream().to_string()).to_be("()");
+		let (ty, err) = FuncTokensToServerActions::parse_output(&func_tokens);
+		expect((
+			ty.to_token_stream().to_string(),
+			err.to_token_stream().to_string(),
+		))
+		.to_be(("()".to_string(), "()".to_string()));
 
-		assert("Bar", "()");
-		assert("Result<Foo, Bar>", "()");
-		assert("Json<u32>", "u32");
-		assert("Result<Json<u64>>", "u64");
-		assert("Result<Json<i32>, Bar>", "i32");
-		assert("Json<Result<u32 , i32>>", "Result < u32 , i32 >");
-		assert("Result<Json<Result<u32 , u32>>>", "Result < u32 , u32 >");
+		#[rustfmt::skip]
+		{
+assert("Bar", ("Bar", "()"));
+assert("Json<u32>", ("u32", "()"));
+assert("Json<Result<u32 , i32>>", ("Result < u32 , i32 >", "()"));
+assert("Result<Foo, Bar>", ("Foo", "Bar"));
+assert("Result<Json<u64>>", ("u64", "String"));
+assert("Result<Json<i32>, Bar>", ("i32", "Bar"));
+assert("Result<Json<Result<u32 , u32>>>",("Result < u32 , u32 >", "String"));
+assert("ActionResult<i32,i64>",("i32", "i64"));
+assert("ActionResult<i32>",("i32", "String"));
+assert("Result<Bar, ActionError<Bar>>", ("Bar", "Bar"));
+assert("ActionResult<Json<Result<u32 , u32>>, Json<ActionError<u32>>>",("Result < u32 , u32 >", "u32"));
+assert("ActionError<Json<Bar>>", ("()", "Bar"));
+		}
 	}
 
 
@@ -396,7 +430,7 @@ mod test {
 				1 + 1
 			}
 		},parse_quote! {
-			pub async fn get() -> Result<(), ServerActionError> {
+			pub async fn get() -> ServerActionResult<(), ()> {
 				CallServerAction::request_no_data(RouteInfo::new("/add", HttpMethod::Get)).await
 			}
 		}).xmap(|(received, expected)| {
@@ -408,7 +442,7 @@ mod test {
 				1 + 1
 			}
 		},parse_quote! {
-			pub async fn get(a:i32,b:i64) -> Result<Result<u32>, ServerActionError> {
+			pub async fn get(a:i32,b:i64) -> ServerActionResult<Result<u32>, ()> {
 				CallServerAction::request(RouteInfo::new("/add", HttpMethod::Get),(a,b)).await
 			}
 		}).xmap(|(received, expected)| {

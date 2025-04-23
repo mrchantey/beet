@@ -1,6 +1,8 @@
-mod beet_context;
-mod beet_header_links;
-mod beet_sidebar_layout;
+pub mod actions_test;
+pub use actions_test::*;
+pub mod beet_context;
+pub mod beet_header_links;
+pub mod beet_sidebar_layout;
 pub mod calculator;
 pub mod counter;
 pub use beet_context::*;

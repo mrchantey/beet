@@ -120,7 +120,8 @@ impl CallServerAction {
 			serde_json::from_slice(&body_bytes)
 				.map_err(|e| ServerActionError::Deserialize(e))
 		} else if let Ok(err) = serde_json::from_slice(&body_bytes) {
-			Err(ActionError::new(status.as_u16(), err).into())
+			Err(ServerActionError::ActionError(err))
+			// Err(ActionError::new(status.as_u16(), err).into())
 		} else {
 			Err(ServerActionError::UnparsedError(status, body_str()))
 		}
