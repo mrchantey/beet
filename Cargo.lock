@@ -776,6 +776,7 @@ dependencies = [
  "bevy",
  "clap",
  "console_error_panic_hook",
+ "extend",
  "flume",
  "futures",
  "heck 0.4.1",

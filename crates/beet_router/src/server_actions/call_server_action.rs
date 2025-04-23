@@ -19,10 +19,14 @@ impl CallServerAction {
 	/// Automatically uses the correct request style based on the HTTP method:
 	/// - Bodyless methods (GET, HEAD, DELETE, OPTIONS, CONNECT, TRACE) send data as query parameters
 	/// - Methods with body (POST, PUT, PATCH) send data in the request body
-	pub async fn request<T: Serialize, O: DeserializeOwned>(
+	pub async fn request<
+		T: Serialize,
+		O: DeserializeOwned,
+		E: DeserializeOwned,
+	>(
 		route_info: RouteInfo,
 		value: T,
-	) -> Result<O, ServerActionError> {
+	) -> ServerActionResult<O, E> {
 		if route_info.method.has_body() {
 			Self::request_with_body(route_info, value).await
 		} else {
@@ -30,9 +34,9 @@ impl CallServerAction {
 		}
 	}
 	//// Makes a HTTP request to a server action without any data.
-	pub async fn request_no_data<O: DeserializeOwned>(
+	pub async fn request_no_data<O: DeserializeOwned, E: DeserializeOwned>(
 		route_info: RouteInfo,
-	) -> Result<O, ServerActionError> {
+	) -> ServerActionResult<O, E> {
 		let url = SERVER_URL.lock().unwrap().join(&route_info.path);
 		let method = route_info.method.into();
 		Self::send(
@@ -45,12 +49,16 @@ impl CallServerAction {
 	/// Internal function to make a request with data in the query parameters,
 	/// for deserilization by [`JsonQuery`].
 	/// Used by GET, HEAD, DELETE, OPTIONS, CONNECT, TRACE methods.
-	async fn request_with_query<T: Serialize, O: DeserializeOwned>(
+	async fn request_with_query<
+		T: Serialize,
+		O: DeserializeOwned,
+		E: DeserializeOwned,
+	>(
 		route_info: RouteInfo,
 		value: T,
-	) -> Result<O, ServerActionError> {
+	) -> ServerActionResult<O, E> {
 		let value = serde_json::to_string(&value)
-			.map_err(|e| ServerActionError::Serialize(route_info.clone(), e))?;
+			.map_err(|e| ServerActionError::Serialize(e))?;
 
 		let url = SERVER_URL.lock().unwrap().join(&route_info.path);
 		let method = route_info.method.into();
@@ -65,12 +73,16 @@ impl CallServerAction {
 
 	/// Internal function to make a request with data in the request body.
 	/// Used by POST, PUT, PATCH methods.
-	async fn request_with_body<T: Serialize, O: DeserializeOwned>(
+	async fn request_with_body<
+		T: Serialize,
+		O: DeserializeOwned,
+		E: DeserializeOwned,
+	>(
 		route_info: RouteInfo,
 		value: T,
-	) -> Result<O, ServerActionError> {
+	) -> ServerActionResult<O, E> {
 		let value = serde_json::to_string(&value)
-			.map_err(|e| ServerActionError::Serialize(route_info.clone(), e))?;
+			.map_err(|e| ServerActionError::Serialize(e))?;
 
 		let url = SERVER_URL.lock().unwrap().join(&route_info.path);
 		let method = route_info.method.into();
@@ -85,33 +97,32 @@ impl CallServerAction {
 	}
 
 
-	async fn send<O: DeserializeOwned>(
-		route_info: RouteInfo,
+	async fn send<O: DeserializeOwned, E: DeserializeOwned>(
+		_route_info: RouteInfo,
 		req: RequestBuilder,
-	) -> Result<O, ServerActionError> {
+	) -> ServerActionResult<O, E> {
 		let res = req
 			.send()
 			.await
-			.map_err(|e| ServerActionError::Request(route_info.clone(), e))?;
+			.map_err(|e| ServerActionError::Request(e))?;
 		let status = res.status();
 
-		// this will always either be of type O or E
-		let bytes = res.bytes().await.map_err(|e| {
-			ServerActionError::ResponseBody(route_info.clone(), e)
-		})?;
+		// bytes being rejected is usually a network error,
+		// an empty body should return empty bytes
+		let body_bytes = res
+			.bytes()
+			.await
+			.map_err(|e| ServerActionError::ResponseBody(e))?;
+
+		let body_str = || String::from_utf8_lossy(&body_bytes).to_string();
 
 		if status.is_success() {
-			serde_json::from_slice(&bytes)
-				.map_err(|e| ServerActionError::Deserialize(route_info, e))
-		} else if status.is_client_error() {
-			println!("Error: {status} {bytes:?}");
-			Err(ServerActionError::ClientError(
-				route_info,
-				status,
-				String::from_utf8_lossy(&bytes).to_string(),
-			))
+			serde_json::from_slice(&body_bytes)
+				.map_err(|e| ServerActionError::Deserialize(e))
+		} else if let Ok(err) = serde_json::from_slice(&body_bytes) {
+			Err(ActionError::new(status.as_u16(), err).into())
 		} else {
-			Err(ServerActionError::ServerError(route_info, status))
+			Err(ServerActionError::UnparsedError(status, body_str()))
 		}
 	}
 }
@@ -129,14 +140,26 @@ mod test {
 	use tokio::spawn;
 	use tokio::task::JoinHandle;
 
-	async fn add_handler_get(
+	async fn add_via_get(
 		JsonQuery(params): JsonQuery<(i32, i32)>,
 	) -> Json<i32> {
 		Json(params.0 + params.1)
 	}
 
-	async fn add_handler_post(Json(params): Json<(i32, i32)>) -> Json<i32> {
+	async fn add_via_post(Json(params): Json<(i32, i32)>) -> Json<i32> {
 		Json(params.0 + params.1)
+	}
+
+	fn check(val: i32) -> anyhow::Result<()> {
+		if val > 0 {
+			Ok(())
+		} else {
+			anyhow::bail!("expected positive number, received {val}")
+		}
+	}
+
+	async fn reject_neg(Json(params): Json<i32>) -> Result<(), ActionError> {
+		check(params).into_action_result()
 	}
 
 	#[must_use]
@@ -160,8 +183,9 @@ mod test {
 	async fn works() {
 		let _server = serve(
 			Router::new()
-				.route("/add", get(add_handler_get))
-				.route("/add", post(add_handler_post)),
+				.route("/add", get(add_via_get))
+				.route("/add", post(add_via_post))
+				.route("/reject_neg", post(reject_neg)),
 		)
 		.await;
 		test_get().await;
@@ -170,7 +194,7 @@ mod test {
 	}
 	async fn test_get() {
 		expect(
-			CallServerAction::request::<_, i32>(
+			CallServerAction::request::<_, i32, ()>(
 				RouteInfo::new("/add", HttpMethod::Get),
 				(5, 3),
 			)
@@ -181,7 +205,7 @@ mod test {
 	}
 	async fn test_post() {
 		expect(
-			CallServerAction::request::<_, i32>(
+			CallServerAction::request::<_, i32, ()>(
 				RouteInfo::new("/add", HttpMethod::Post),
 				(10, 7),
 			)
@@ -192,14 +216,14 @@ mod test {
 	}
 	async fn rejects() {
 		expect(
-			CallServerAction::request::<_, i32>(
-				RouteInfo::new("/add", HttpMethod::Post),
-				7,
+			CallServerAction::request::<_, i32, String>(
+				RouteInfo::new("/reject_neg", HttpMethod::Post),
+				-7,
 			)
 			.await
 			.unwrap_err()
 			.to_string(),
 		)
-		.to_be("fooar");
+		.to_contain("expected positive number, received -7");
 	}
 }

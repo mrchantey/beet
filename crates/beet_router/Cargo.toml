@@ -44,6 +44,7 @@ http.workspace = true
 futures.workspace = true
 clap.workspace = true
 sweet.workspace = true
+extend.workspace = true
 
 once_cell = { workspace = true, optional = true }
 
