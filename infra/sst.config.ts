@@ -43,7 +43,6 @@ Cloudflare DNS requires two environment variables:
     });
 
     let func = new sst.aws.Function(`${appName}Lambda`, {
-      link: [gateway],
       // this name *must* match beet deploy --function-name ...
       name: `${appName}Lambda`,
       // the rust runtime is not ready, we deploy ourselves
