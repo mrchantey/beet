@@ -1,8 +1,21 @@
 use crate::prelude::*;
-
+use beet_rsx::sigfault::signal;
 
 pub fn get() -> RsxNode {
+	rsx! { <Inner client:load /> }
+}
+
+// temp until global client:load
+#[derive(Node, serde::Serialize, serde::Deserialize)]
+pub struct Inner;
+
+fn inner(_: Inner) -> RsxNode {
+	let (value, set_value) = signal(0);
+	let val2 = value.clone();
 	rsx! {
+			<h2>Interactivity</h2>
+			<p id="interactive-text">value: {value}</p>
+			<Button id="interactive-button" onclick=move|_|set_value(val2() + 1)>Increment</Button>
 			<h2>Variants</h2>
 			<div>
 				<Button variant=ButtonVariant::Primary>		Primary 	</Button>

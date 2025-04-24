@@ -100,3 +100,31 @@ pub trait DomTargetImpl {
 
 	// fn register_event(&self, event: Box<dyn Fn() -> ()>);
 }
+
+
+
+
+
+#[cfg(test)]
+#[cfg(feature = "e2e")]
+mod test {
+	use sweet::prelude::*;
+
+
+	// we immediately click the button, 
+	// should be before the wasm had a chance to load
+	#[sweet::test]
+	#[ignore]
+	async fn playback_prehydrated() {
+		let page =
+			visit("http://127.0.0.1:3000/design/interactive/button").await;
+		let el = page.find_id("interactive-text").await;
+		page.find_id("interactive-button")
+			.await
+			.click()
+			.await
+			.unwrap();
+		el.as_ref().xpect().to_have_text("value: 0").await;
+		expect(&el).to_have_text("value: 1").await;
+	}
+}

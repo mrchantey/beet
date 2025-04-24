@@ -10,11 +10,10 @@ use beet_router::parser::RouteFunc;
 use lambda_http::Body;
 use std::path::PathBuf;
 use tower::Service;
-use tower_http::trace::TraceLayer;
-use tower_http::trace::{
-	self,
-};
-use tracing::Level;
+// use tower_http::trace::TraceLayer;
+// use tower_http::trace;
+// use tracing::Level;
+
 // use tower::Layer;
 // use tower_http::normalize_path::NormalizePath;
 // use tower_http::normalize_path::NormalizePathLayer;
@@ -78,15 +77,15 @@ impl<S> BeetServer<S> {
 		// );
 
 		// get debug info for each request and response
-		router = router.layer(
-			TraceLayer::new_for_http()
-				.make_span_with(
-					trace::DefaultMakeSpan::new().level(Level::INFO),
-				)
-				.on_response(
-					trace::DefaultOnResponse::new().level(Level::INFO),
-				),
-		);
+		// router = router.layer(
+		// 	TraceLayer::new_for_http()
+		// 		.make_span_with(
+		// 			trace::DefaultMakeSpan::new().level(Level::INFO),
+		// 		)
+		// 		.on_response(
+		// 			trace::DefaultOnResponse::new().level(Level::INFO),
+		// 		),
+		// );
 
 
 		#[cfg(feature = "lambda")]

@@ -28,6 +28,7 @@ fs = ["sweet/fs", "beet_rsx_parser/fs"]
 serde = ["dep:serde", "dep:ron"]
 bevy = ["dep:bevy", "serde", "dep:flume"]
 bevy_default = ["bevy", "bevy/default"]
+e2e = ["sweet/e2e"]
 
 [dependencies]
 beet_rsx_parser = { workspace = true, optional = true }

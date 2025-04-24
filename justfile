@@ -202,9 +202,11 @@ test-all *args:
 
 test crate *args:
 	just watch cargo test -p {{crate}} --lib -- 																								--watch {{args}}
+test-e2e crate *args:
+	just watch cargo test -p {{crate}} --lib --features=e2e -- 														--e2e	--watch {{args}}
 test-doc crate *args:
 	just watch cargo test -p {{crate}} --doc 																														{{args}}
-test-e2e crate test_name *args:
+test-integration crate test_name *args:
 	just watch cargo test -p {{crate}} --test {{test_name}} -- 																	--watch {{args}}
 test-feat crate *args:
 	just watch cargo test -p {{crate}} --lib --all-features -- 																					{{args}}
