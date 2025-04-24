@@ -26,6 +26,10 @@ init-repo:
 	mkdir -p crates/beet_rsx/assets/fonts && cp ./assets/fonts/* crates/beet_rsx/assets/fonts
 	cargo run -p beet_router --example build
 	just cli build -p beet_site
+	cd infra && npm ci
+	mkdir -p target/lambda/crates/beet_site || true
+	echo 'dummy file so sst deploys' > target/lambda/crates/beet_site/bootstrap
+
 # just test-site
 # just export-scenes
 
@@ -38,13 +42,16 @@ cli *args:
 install-cli *args:
 	cargo install --path crates/beet-cli {{args}}
 
-deploy-sst:
-	npx sst deploy --stage production --config sst/sst.config.ts
+sst-deploy:
+	npx sst deploy --stage production --config infra/sst.config.ts
+
+sst-remove:
+	npx sst remove --stage production --config infra/sst.config.ts
 
 deploy *args:
-	just cli deploy 									\
-	--package 				beet_site 			\
-	--function-name 	BeetSiteLambda	\
+	just cli deploy 										\
+	--package 				beet_site 				\
+	--function-name 	BeetServerLambda	\
 	{{args}}
 
 # --region 					us-west-2 			\

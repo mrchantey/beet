@@ -22,6 +22,10 @@ pub struct RunDeploy {
 	/// Build but do not deploy
 	#[arg(long)]
 	pub dry_run: bool,
+	/// Also deploy sst infrastructure using a config file
+	/// located at `infra/sst.config.ts`
+	#[arg(long)]
+	pub sst: bool,
 }
 
 
@@ -36,7 +40,9 @@ impl RunDeploy {
 
 		self.lambda_build()?;
 		if !self.dry_run {
-			self.sst_deploy()?;
+			if self.sst {
+				self.sst_deploy()?;
+			}
 			self.lambda_deploy()?;
 		}
 		Ok(())

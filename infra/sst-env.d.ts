@@ -5,7 +5,11 @@
 
 declare module "sst" {
   export interface Resource {
-    "BeetSiteLambda": {
+    "BeetServerGateway": {
+      "type": "sst.aws.ApiGatewayV2"
+      "url": string
+    }
+    "BeetServerLambda": {
       "name": string
       "type": "sst.aws.Function"
       "url": string
