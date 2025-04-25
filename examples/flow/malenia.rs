@@ -151,7 +151,7 @@ fn health_handler(
 				"👩\tMalenia says: 'I am Malenia. Blade of Miquella'\n❌\tYou lose"
 			);
 		}
-		exit.send(AppExit::Success);
+		exit.write(AppExit::Success);
 	}
 }
 

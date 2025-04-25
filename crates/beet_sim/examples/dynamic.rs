@@ -1,3 +1,6 @@
+use bevy::ecs::component::ComponentCloneBehavior;
+use bevy::ecs::component::ComponentDescriptor;
+use bevy::ecs::component::StorageType;
 use bevy::ecs::world::FilteredEntityMut;
 use bevy::prelude::*;
 use std::alloc::Layout;
@@ -5,17 +8,16 @@ use std::alloc::Layout;
 fn main() {
 	let mut world = World::new();
 
-
-
-
 	// 1. Register a dynamic component
 	// SAFETY: Using u64 which is Send + Sync
 	let descriptor = unsafe {
-		bevy::ecs::component::ComponentDescriptor::new_with_layout(
+		ComponentDescriptor::new_with_layout(
 			"DynamicComp".to_string(),
-			bevy::ecs::component::StorageType::Table,
+			StorageType::Table,
 			Layout::array::<u64>(2).unwrap(),
 			None,
+			true,
+			ComponentCloneBehavior::Default,
 		)
 	};
 	let comp_id = world.register_component_with_descriptor(descriptor);

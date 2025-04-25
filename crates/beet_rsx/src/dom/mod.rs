@@ -106,7 +106,7 @@ pub trait DomTargetImpl {
 
 
 #[cfg(test)]
-#[cfg(feature = "e2e")]
+#[cfg(all(not(target_arch = "wasm32"), feature = "e2e"))]
 mod test {
 	use sweet::prelude::*;
 

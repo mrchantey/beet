@@ -27,12 +27,12 @@ pub impl<'w, T: ActionEvent> Trigger<'w, T> {
 	/// If this trigger was called globally and the action entity is [Entity::PLACEHOLDER]
 	fn resolve_action(&self) -> Entity {
 		if self.action() == Entity::PLACEHOLDER {
-			if self.entity() == Entity::PLACEHOLDER {
+			if self.target() == Entity::PLACEHOLDER {
 				panic!(
 					"OnRunAction must either specify an action or be triggered on an action entity"
 				);
 			} else {
-				self.entity()
+				self.target()
 			}
 		} else {
 			self.action()

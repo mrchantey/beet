@@ -123,12 +123,11 @@ mod test {
 	// use sweet::prelude::*;
 
 	#[test]
-	#[should_panic]
-	// #[cfg(target_arch = "wasm32")]
+	#[cfg_attr(not(target_arch = "wasm32"), should_panic)]
 	fn works() {
 		let func: Box<dyn EventHandler<_>> = Box::new(|_| {});
 		EventRegistry::register_onclick(
-			"onClick",
+			"onclick",
 			TreeLocation::default(),
 			func,
 		);

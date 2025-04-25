@@ -1,7 +1,6 @@
 use crate::prelude::*;
+use bevy::platform::collections::HashMap;
 use bevy::prelude::*;
-use bevy::utils::HashMap;
-
 
 
 #[derive(Debug, Default, Clone, PartialEq, Resource)]

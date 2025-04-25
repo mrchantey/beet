@@ -26,7 +26,7 @@ impl AutoSpawn {
 
 
 // pub fn auto_spawn(
-// 	time: Res<Time>,
+// 	time: When<Time>,
 // 	mut query: Query<&mut AutoSpawn>,
 // 	send: Res<BeetMessageSend>,
 // ) {

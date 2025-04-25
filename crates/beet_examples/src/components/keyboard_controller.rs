@@ -1,4 +1,5 @@
 use bevy::prelude::*;
+use sweet::prelude::When;
 
 #[derive(Component, Reflect)]
 #[reflect(Default, Component)]
@@ -11,8 +12,8 @@ impl Default for KeyboardController {
 }
 
 pub fn keyboard_controller(
-	time: Res<Time>,
-	keys: Res<ButtonInput<KeyCode>>,
+	time: When<Time>,
+	keys: When<ButtonInput<KeyCode>>,
 	mut query: Populated<(&mut Transform, &KeyboardController)>,
 ) {
 	for (mut transform, controller) in query.iter_mut() {

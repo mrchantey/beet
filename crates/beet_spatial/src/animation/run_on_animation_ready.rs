@@ -37,7 +37,7 @@ impl Default for RunOnAnimationReady<()> {
 pub fn run_on_animation_ready<P: RunPayload>(
 	mut commands: Commands,
 	scene_roots: Query<Entity, With<SceneRoot>>,
-	parents: Query<&Parent>,
+	parents: Query<&ChildOf>,
 	children: Query<&Children>,
 	actions: Query<&RunOnAnimationReady<P>>,
 	players: Populated<Entity, Added<AnimationPlayer>>,

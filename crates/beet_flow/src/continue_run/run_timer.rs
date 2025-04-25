@@ -2,6 +2,7 @@ use crate::prelude::*;
 use bevy::prelude::*;
 use bevy::time::Stopwatch;
 use std::fmt::Debug;
+use sweet::prelude::When;
 
 /// Tracks the last time a node was run.
 /// This action is required by [`ContinueRun`] so is rarely added manually.
@@ -23,7 +24,7 @@ pub(crate) fn reset_run_time_started(
 ) {
 	// println!("reset_run_time_started");
 	query
-		.get_mut(ev.entity())
+		.get_mut(ev.target())
 		.map(|mut timer| timer.last_started.reset())
 		.ok();
 }
@@ -33,15 +34,14 @@ pub(crate) fn reset_run_timer_stopped(
 ) {
 	// println!("reset_run_time_stopped");
 	query
-		.get_mut(ev.entity())
+		.get_mut(ev.target())
 		.map(|mut timer| timer.last_stopped.reset())
 		.ok();
 }
 
 /// Ticks all [`RunTimer`] timers in the [`PreTickSet`].
 pub(crate) fn tick_run_timers(
-	// TODO run_if
-	time: Res<Time>,
+	time: When<Time>,
 	mut timers: Populated<&mut RunTimer>,
 ) {
 	for mut timer in timers.iter_mut() {

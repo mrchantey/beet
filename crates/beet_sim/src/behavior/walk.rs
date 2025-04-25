@@ -10,7 +10,7 @@ pub fn walk_plugin(app: &mut App) {
 	app.register_type::<Walk>()
 		.world_mut()
 		.register_component_hooks::<Walk>()
-		.on_add(|mut world, entity, _| {
+		.on_add(|mut world, cx| {
 
 			// world
 			// 	.commands()

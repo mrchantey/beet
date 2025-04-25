@@ -56,7 +56,7 @@ pub fn pickup_collectable(
 				&children,
 				&mut stats,
 			);
-			commands.entity(collectable_entity).try_despawn_recursive();
+			commands.entity(collectable_entity).try_despawn();
 		}
 	}
 }

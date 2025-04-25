@@ -101,11 +101,11 @@ pub fn start_session<T: EpisodeParams>(
 	sessions: Query<(Entity, &mut RlSession<T>), Added<RlSession<T>>>,
 ) {
 	for (entity, session) in sessions.iter() {
-		start_session.send(StartSession {
+		start_session.write(StartSession {
 			session: entity,
 			params: session.params.clone(),
 		});
-		start_episode.send(StartEpisode {
+		start_episode.write(StartEpisode {
 			session: entity,
 			episode: session.episode,
 			params: session.params.clone(),
@@ -135,13 +135,13 @@ pub fn handle_episode_end<T: EpisodeParams>(
 			for (e_despawn, parent_session) in despawn_on_episode_end.iter_mut()
 			{
 				if **parent_session == session_entity {
-					commands.entity(e_despawn).despawn_recursive();
+					commands.entity(e_despawn).despawn();
 				}
 			}
 			session.episode += 1;
 			if session.episode < session.params.num_episodes() {
 				log::info!("Starting episode {}", session.episode);
-				start_ep.send(StartEpisode {
+				start_ep.write(StartEpisode {
 					session: session_entity,
 					episode: session.episode,
 					params: session.params.clone(),
@@ -149,7 +149,7 @@ pub fn handle_episode_end<T: EpisodeParams>(
 			} else {
 				log::info!("Ending session");
 				// complete!
-				end_session.send(EndSession {
+				end_session.write(EndSession {
 					session: session_entity,
 					params: session.params.clone(),
 				});
@@ -158,7 +158,7 @@ pub fn handle_episode_end<T: EpisodeParams>(
 					despawn_on_session_end.iter_mut()
 				{
 					if **parent_session == session_entity {
-						commands.entity(e_despawn).despawn_recursive();
+						commands.entity(e_despawn).despawn();
 					}
 				}
 			}
@@ -187,7 +187,7 @@ mod test {
 		query: Query<&SessionEntity, Added<SessionEntity>>,
 	) {
 		for trainer in query.iter() {
-			events.send(EndEpisode::new(**trainer));
+			events.write(EndEpisode::new(**trainer));
 		}
 	}
 

@@ -32,10 +32,7 @@ pub(crate) fn control_flow_plugin(app: &mut App) {
 		.configure_sets(Update, PreTickSet)
 		.configure_sets(Update, TickSet.after(PreTickSet))
 		.configure_sets(Update, PostTickSet.after(TickSet))
-		.add_systems(
-			Update,
-			run_on_spawn.never_param_warn().in_set(PreTickSet),
-		);
+		.add_systems(Update, run_on_spawn.in_set(PreTickSet));
 }
 /// Any [RunTimer] will be ticked, runs before [`TickSet`]
 #[derive(Debug, Clone, PartialEq, Eq, Hash, SystemSet)]

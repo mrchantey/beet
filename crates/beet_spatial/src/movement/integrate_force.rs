@@ -1,12 +1,13 @@
 use crate::prelude::*;
 use bevy::prelude::*;
+use sweet::prelude::When;
 
 
 /// Implementation of position, velocity, force integration
 /// as described by Daniel Shiffman
 /// https://natureofcode.com/vectors/#acceleration
 pub fn integrate_force(
-	time: Res<Time>,
+	time: When<Time>,
 	mut query: Populated<(
 		&mut Transform,
 		&mut Velocity,

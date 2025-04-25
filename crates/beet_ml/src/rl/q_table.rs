@@ -1,6 +1,6 @@
 use crate::prelude::*;
+use bevy::platform::collections::HashMap;
 use bevy::prelude::*;
-use bevy::utils::HashMap;
 use serde::Deserialize;
 use serde::Serialize;
 pub type QValue = f32;

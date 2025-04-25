@@ -1,7 +1,5 @@
 
-# Unreleased (0.0.5)
-
-
+# 0.0.5
 
 ## `beet_flow`
 

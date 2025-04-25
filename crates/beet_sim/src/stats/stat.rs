@@ -47,7 +47,7 @@ impl StatValue {
 			return None;
 		};
 		for child in children.iter() {
-			if let Ok((stat_id, value)) = stats.get(*child) {
+			if let Ok((stat_id, value)) = stats.get(child) {
 				if *stat_id == id {
 					return Some(*value);
 				}
@@ -71,10 +71,10 @@ pub fn stat_plugin(app: &mut App) {
 	app.register_type::<StatValue>()
 		.world_mut()
 		.register_component_hooks::<StatValue>()
-		.on_add(|mut world, entity, _| {
+		.on_add(|mut world, cx| {
 			let map = world.resource::<StatMap>();
 			let stat_id = world
-				.get::<StatId>(entity)
+				.get::<StatId>(cx.entity)
 				.expect("StatValue requires StatId");
 
 			let hexcode = map

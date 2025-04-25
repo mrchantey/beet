@@ -10,7 +10,7 @@ struct LogOnRun(pub String);
 fn log_on_run(ev: Trigger<OnRun>, query: Query<&LogOnRun>) {
 	let name = query
 		// ensure that we use ev.action, wich is the 'action entity'
-		// ev.entity() is the 'action observer'
+		// ev.target() is the 'action observer'
 		.get(ev.action)
 		// common pattern for getting an action,
 		// it should never be missing

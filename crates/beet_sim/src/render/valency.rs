@@ -20,7 +20,7 @@ pub fn render_valency(
 		// 1. remove existing valency renders
 		for child in children.iter_descendants(entity) {
 			if existing.get(child).is_ok() {
-				commands.entity(child).despawn_recursive();
+				commands.entity(child).despawn();
 			}
 		}
 		let emoji = match value.is_sign_positive() {

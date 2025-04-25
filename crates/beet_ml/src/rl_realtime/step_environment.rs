@@ -89,7 +89,7 @@ fn step_environment<S: RlSessionTypes>(
 	step.step += 1;
 
 	if outcome.done || step.step >= params.max_steps {
-		end_episode_events.send(EndEpisode::new(**session_entity));
+		end_episode_events.write(EndEpisode::new(**session_entity));
 	}
 }
 

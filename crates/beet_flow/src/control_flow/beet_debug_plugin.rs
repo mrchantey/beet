@@ -3,6 +3,7 @@ use crate::prelude::*;
 use bevy::color::palettes::tailwind;
 use bevy::prelude::*;
 use std::borrow::Cow;
+use sweet::prelude::When;
 
 
 
@@ -90,8 +91,8 @@ impl Plugin for BeetDebugPlugin {
 		app
 			// maybe log_user_message belongs elsewhere
 			.add_observer(log_user_message)
-			.add_observer(log_on_run.never_param_warn())
-			.add_observer(log_on_run_result.never_param_warn())
+			.add_observer(log_on_run)
+			.add_observer(log_on_run_result)
 			.add_event::<OnLogMessage>()
 			.add_systems(
 				Update,
@@ -206,7 +207,7 @@ fn log_user_message(
 	if stdout.is_some() {
 		println!("{}", msg.msg);
 	}
-	out.send(msg);
+	out.write(msg);
 }
 
 
@@ -237,7 +238,7 @@ pub struct DebugToStdOut;
 fn log_on_run(
 	ev: Trigger<OnRunAction>,
 	query: Query<&Name>,
-	_m: Res<DebugOnRun>,
+	_m: When<DebugOnRun>,
 	mut out: EventWriter<OnLogMessage>,
 	stdout: Option<Res<DebugToStdOut>>,
 ) {
@@ -250,7 +251,7 @@ fn log_on_run(
 	if stdout.is_some() {
 		msg.log();
 	}
-	out.send(msg);
+	out.write(msg);
 }
 
 
@@ -258,7 +259,7 @@ fn log_on_run_result(
 	ev: Trigger<OnResultAction>,
 	query: Query<&Name>,
 	mut out: EventWriter<OnLogMessage>,
-	_m: Res<DebugOnResult>,
+	_m: When<DebugOnResult>,
 	stdout: Option<Res<DebugToStdOut>>,
 ) {
 	let msg = OnLogMessage::new_with_query(
@@ -270,7 +271,7 @@ fn log_on_run_result(
 	if stdout.is_some() {
 		msg.log();
 	}
-	out.send(msg);
+	out.write(msg);
 }
 
 fn log_running(
@@ -289,6 +290,6 @@ fn log_running(
 		if stdout.is_some() {
 			msg.log();
 		}
-		out.send(msg);
+		out.write(msg);
 	}
 }

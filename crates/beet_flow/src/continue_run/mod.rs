@@ -21,9 +21,9 @@ pub fn continue_run_plugin(app: &mut App) {
 	app.add_systems(
 		Update,
 		(
-			tick_run_timers.never_param_warn(),
+			tick_run_timers,
 			// return_in_duration must be after tick_run_timers
-			return_in_duration::<RunResult>.never_param_warn(),
+			return_in_duration::<RunResult>,
 		)
 			.chain()
 			.in_set(TickSet),

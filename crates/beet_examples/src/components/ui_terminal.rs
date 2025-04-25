@@ -6,6 +6,7 @@ use bevy::prelude::Node;
 use bevy::prelude::*;
 use bevy::ui::UiSystem;
 use bevy::window::WindowResized;
+use sweet::prelude::When;
 
 /// A plugin for rendering a terminal-like UI
 #[derive(Clone)]
@@ -15,7 +16,7 @@ impl Plugin for UiTerminalPlugin {
 	fn build(&self, app: &mut App) {
 		app
 
-			.add_systems(Update, (parse_text_input,log_on_message.never_param_warn()))
+			.add_systems(Update, (parse_text_input,log_on_message))
 			.add_systems(
 				PostUpdate,
 				(init_output,resize_output,remove_excessive_lines)
@@ -79,7 +80,7 @@ fn remove_excessive_lines(
 		let num_over_max = children.len().saturating_sub(MAX_LINES);
 		// removes the first n children
 		for child in children.iter().take(num_over_max) {
-			commands.entity(*child).despawn_recursive();
+			commands.entity(child).despawn();
 		}
 	}
 }
@@ -159,7 +160,7 @@ pub fn spawn_ui_terminal(mut commands: Commands, user_input: bool) {
 fn parse_text_input(
 	mut commands: Commands,
 	mut evr_char: EventReader<KeyboardInput>,
-	keys: Res<ButtonInput<KeyCode>>,
+	keys: When<ButtonInput<KeyCode>>,
 	mut query: Query<&mut TextSpan, With<InputContainer>>,
 ) {
 	if keys.any_pressed([KeyCode::ControlRight, KeyCode::ControlLeft]) {

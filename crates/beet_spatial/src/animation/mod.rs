@@ -31,7 +31,7 @@ impl Plugin for AnimationPlugin {
 			Update,
 			(
 				// play_animation_on_load,
-				return_on_animation_end::<RunResult>.never_param_warn(),
+				return_on_animation_end::<RunResult>,
 			)
 				.in_set(TickSet),
 		);

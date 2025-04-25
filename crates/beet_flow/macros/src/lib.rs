@@ -7,6 +7,7 @@ use action::*;
 ///
 /// This may be deprecated once we get many-many relations
 #[proc_macro_derive(Action, attributes(observers, category, storage))]
+#[deprecated]
 pub fn derive_action(
 	input: proc_macro::TokenStream,
 ) -> proc_macro::TokenStream {

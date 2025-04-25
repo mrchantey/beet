@@ -49,10 +49,9 @@ fn parse(attr: TokenStream, mut item: DeriveInput) -> syn::Result<TokenStream> {
 		#[allow(non_snake_case)]
 		fn #on_add_ident #impl_generics(
 			mut world: bevy::ecs::world::DeferredWorld,
-			action: bevy::ecs::entity::Entity,
-			cid: bevy::ecs::component::ComponentId
+			cx: bevy::ecs::component::HookContext,
 		) #where_clause {
-		  #beet_flow_path::prelude::ActionObservers::on_add(&mut world, action, cid,
+		  #beet_flow_path::prelude::ActionObservers::on_add(&mut world, cx,
 			  |world, observer_entity| {
 					let mut commands = world.commands();
 				  let mut cmd = commands.entity(observer_entity);
