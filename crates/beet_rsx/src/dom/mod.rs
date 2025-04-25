@@ -111,7 +111,7 @@ mod test {
 	use sweet::prelude::*;
 
 
-	// we immediately click the button, 
+	// we immediately click the button,
 	// should be before the wasm had a chance to load
 	#[sweet::test]
 	#[ignore]

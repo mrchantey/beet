@@ -5,7 +5,7 @@ use beet::prelude::*;
 pub fn get() -> RsxNode {
 	rsx! {
 		<BeetSidebarLayout>
-			<ActionTest client:load/>
+			<ActionTest client:load />
 		</BeetSidebarLayout>
 	}
 }
