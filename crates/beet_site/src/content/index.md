@@ -5,13 +5,14 @@
 Our `beet_infra` SST template deploys an entire stack including a cargo lambda, sqlite database, custom domain and s3 bucket. SST is very accessible infra as code, enabling stack deployment in minutes while maintaining 100% control.
 
 ```sh
-# if aws credentials are configured this will deploy an app
 cargo binstall beet cargo-generate
-cargo generate beet_todo 
+cargo generate beet_todo
 cd beet_todo
+# if aws credentials are configured this will deploy an app
 beet deploy --sst
-# ... lambda url ..
+# ..aaand we're live!
 beet remove --sst
+# all resources cleaned up :)
 ```
 
 ### ORM Integration
