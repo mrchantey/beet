@@ -641,8 +641,10 @@ dependencies = [
  "beet_spatial",
  "bevy",
  "console_error_panic_hook",
+ "getrandom 0.3.2",
  "sweet",
  "tokio",
+ "uuid",
  "web-sys",
 ]
 
@@ -8314,7 +8316,17 @@ dependencies = [
  "getrandom 0.3.2",
  "js-sys",
  "serde",
+ "uuid-rng-internal",
  "wasm-bindgen",
+]
+
+[[package]]
+name = "uuid-rng-internal"
+version = "1.16.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9376f53b15ed85851c10175b5e45f0af556b4853ff3fe335080b337e3828981e"
+dependencies = [
+ "getrandom 0.3.2",
 ]
 
 [[package]]

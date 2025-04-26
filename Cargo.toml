@@ -89,6 +89,7 @@ rapidhash = "1"
 chrono = "0.4"
 itertools = "0"
 
+
 #💡 logging
 log = "0.4"
 tracing = "0.1"
@@ -230,6 +231,11 @@ beet_rsx = { workspace = true, optional = true }
 beet_sim = { workspace = true, optional = true }
 beet_spatial = { workspace = true, optional = true }
 bevy = { workspace = true, optional = true }
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+# required for rand 0.9 to compile on wasm targets
+uuid = { version = "1", features = ["rng-getrandom"] }
+getrandom = { version = "0.3", features = ["wasm_js"] }
 
 [dev-dependencies]
 beet = { path = "", features = ["router", "bevy"] }
