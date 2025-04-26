@@ -1,6 +1,6 @@
+use crate::table_field::TableField;
 use beet_build::prelude::*;
 use heck::ToSnakeCase;
-use heck::ToTitleCase;
 use proc_macro2;
 use proc_macro2::TokenStream;
 use quote::ToTokens;
@@ -10,181 +10,275 @@ use syn;
 use syn::DeriveInput;
 use syn::Ident;
 use syn::Result;
-use syn::Type;
-use syn::spanned::Spanned;
 
 pub fn parse_derive_table(input: DeriveInput) -> TokenStream {
-	parse(input).unwrap_or_else(|err| err.into_compile_error())
+	DeriveTable::new(&input)
+		.and_then(|table| table.parse())
+		.unwrap_or_else(|err| err.into_compile_error())
 }
 
-fn parse(input: DeriveInput) -> Result<TokenStream> {
-	let attributes = AttributeGroup::parse(&input.attrs, "table")?;
-	attributes.validate_allowed_keys(&["name"])?;
-	let fields = NamedField::parse_all(&input)?;
-	let impl_table = impl_table(&input, &attributes)?;
-	let columns_struct = columns_struct(&input, &fields)?;
-	let impl_columns = impl_columns(&input, &fields)?;
-
-
-	quote! {
-		use beet::prelude::*;
-		#impl_table
-		#columns_struct
-		#impl_columns
-	}
-	.xok()
+struct DeriveTable<'a> {
+	input: &'a DeriveInput,
+	/// the name of the table
+	table_name: TokenStream,
+	/// the attributes of the table
+	/// ie `#[table(name = "foo", if_not_exists)]`
+	table_attributes: AttributeGroup,
+	/// the fields of the table
+	/// ```no_run
+	/// #[field(name = "foo", value_type = ValueType::Text)]`
+	/// foo: Bar
+	/// ```
+	fields: Vec<TableField<'a>>,
+	/// This will be `MyTableColumns`
+	columns_ident: Ident,
+	/// This will be `InsertMyTable`
+	insert_ident: Ident,
 }
 
+impl<'a> DeriveTable<'a> {
+	fn new(input: &'a DeriveInput) -> Result<Self> {
+		let attributes = AttributeGroup::parse(&input.attrs, "table")?;
+		attributes.validate_allowed_keys(&["name", "if_not_exists"])?;
+		let fields = NamedField::parse_all(&input)?
+			.into_iter()
+			.map(|f| f.xmap(|f| TableField::new(f)))
+			.collect::<Vec<_>>();
 
-fn impl_table(
-	input: &DeriveInput,
-	attributes: &AttributeGroup,
-) -> Result<TokenStream> {
-	let name = attributes
-		.get_value("name")
-		.map(ToTokens::to_token_stream)
-		.unwrap_or_else(|| {
-			input.ident.to_string().to_snake_case().to_token_stream()
-		});
-
-	let ident = &input.ident;
-	let columns_ident = columns_ident(input);
-	quote! {
-
-		impl Table for #ident {
-			type Columns = #columns_ident;
-			fn name() -> &'static str {
-				#name
-			}
-		}
-
-	}
-	.xok()
-}
-
-
-fn columns_ident(input: &DeriveInput) -> Ident {
-	Ident::new(&format!("{}Columns", &input.ident), input.ident.span())
-}
-
-fn columns_struct(
-	input: &DeriveInput,
-	fields: &[NamedField],
-) -> Result<TokenStream> {
-	let variants = fields
-		.iter()
-		.map(|field| {
-			let ident = field.ident.to_string().to_title_case();
-			let ident = Ident::new(&ident, field.ident.span());
-			quote! {
-				#ident
-			}
-			.xok()
-		})
-		.collect::<Result<Vec<_>>>()?;
-
-	let columns_ident = columns_ident(input);
-	quote! {
-		pub enum #columns_ident {
-			#(#variants),*
-		}
-	}
-	.xok()
-}
-
-fn impl_columns(
-	input: &DeriveInput,
-	fields: &[NamedField],
-) -> Result<TokenStream> {
-	let match_names = fields
-		.iter()
-		.map(|field| {
-			let name = field
-				.attributes
+		Self {
+			input,
+			table_name: attributes
 				.get_value("name")
 				.map(ToTokens::to_token_stream)
-				.unwrap_or_else(|| field.ident.to_string().to_token_stream());
-			let ident = field.ident.to_string().to_title_case();
-			let ident = Ident::new(&ident, field.ident.span());
-			quote! {
-				Self::#ident: #name
-			}
-			.xok()
-		})
-		.collect::<Result<Vec<_>>>()?;
-	let match_sql_types = fields
-		.iter()
-		.map(|field| {
-			let type_val = field
-				.attributes
-				.get_value("sql_type")
-				.map(|v| v.to_token_stream().xok())
 				.unwrap_or_else(|| {
-					parse_sql_ty(field).map(|v| v.to_token_stream())
-				})?;
-			let ident = field.ident.to_string().to_title_case();
-			let ident = Ident::new(&ident, field.ident.span());
-			quote! {
-				Self::#ident: #type_val
-			}
-			.xok()
-		})
-		.collect::<Result<Vec<_>>>()?;
+					input.ident.to_string().to_snake_case().to_token_stream()
+				}),
+			columns_ident: Ident::new(
+				&format!("{}Columns", &input.ident),
+				input.ident.span(),
+			),
+			insert_ident: Ident::new(
+				&format!("Insert{}", &input.ident),
+				input.ident.span(),
+			),
+			table_attributes: attributes,
+			fields,
+		}
+		.xok()
+	}
+	fn parse(&self) -> Result<TokenStream> {
+		let impl_table = self.impl_table()?;
+		let columns_struct = self.columns_struct()?;
+		let impl_columns = self.impl_into_column()?;
+		let insert_struct = self.insert_struct()?;
+		let impl_insert_table_view = self.impl_insert_table_view()?;
 
-	let columns_ident = columns_ident(input);
-	quote! {
-		impl Columns for #columns_ident {
+		quote! {
+			use beet::prelude::*;
+			#impl_table
 
-			fn name(&self) -> &'static str {
-				match self {
-					#(#match_names),*
+			#columns_struct
+			#impl_columns
+
+			#insert_struct
+			#impl_insert_table_view
+		}
+		.xok()
+	}
+
+	fn impl_table(&self) -> Result<TokenStream> {
+		let if_not_exists =
+			self.table_attributes.get_value("if_not_exists").map(|v| {
+				quote! {
+					fn if_not_exists() -> bool {
+						#v
+					}
 				}
+			});
+		let columns_ident = &self.columns_ident;
+		let ident = &self.input.ident;
+		let table_name = &self.table_name;
+		quote! {
+
+			impl Table for #ident {
+				type Columns = #columns_ident;
+				fn name() -> String {
+					#table_name.into()
+				}
+				#if_not_exists
 			}
-			fn sql_type(&self) -> beet::sql::SqlType {
-				match self {
-					#(#match_sql_types),*
+
+		}
+		.xok()
+	}
+	fn columns_struct(&self) -> Result<TokenStream> {
+		let variants = self.fields.iter().map(|field| &field.variant_ident);
+
+		let vis = &self.input.vis;
+
+		let columns_ident = &self.columns_ident;
+		quote! {
+			#vis enum #columns_ident {
+				#(#variants),*
+			}
+		}
+		.xok()
+	}
+	fn impl_into_column(&self) -> Result<TokenStream> {
+		let match_column = self
+			.fields
+			.iter()
+			.map(parse_column)
+			.collect::<Result<Vec<_>>>()?;
+
+		let variants = self
+			.fields
+			.iter()
+			.map(|field| {
+				let ident = &field.variant_ident;
+				quote! {
+					Self::#ident
+				}
+				.xok()
+			})
+			.collect::<Result<Vec<_>>>()?;
+
+		let table_ident = &self.input.ident;
+		let columns_ident = &self.columns_ident;
+		quote! {
+			impl Columns for #columns_ident {
+				type Table = #table_ident;
+
+				fn all() -> Vec<Column> {
+					vec![#(#variants.into_column()),*]
+				}
+
+				fn into_column(&self) -> Column {
+					match self {
+						#(#match_column),*
+					}
 				}
 			}
 		}
+		.xok()
 	}
-	.xok()
+
+	fn insert_struct(&self) -> Result<TokenStream> {
+		let fields = self.fields.iter().map(|field| {
+			let ident = &field.ident;
+			let inner_ty = &field.inner_ty;
+			if field.insert_required() {
+				quote! {
+					#ident: #inner_ty
+				}
+			} else {
+				quote! {
+					#ident: Option<#inner_ty>
+				}
+			}
+		});
+		let vis = &self.input.vis;
+		let insert_ident = &self.insert_ident;
+		quote! {
+			#vis struct #insert_ident {
+				#(#fields),*
+			}
+		}
+		.xok()
+	}
+
+	fn impl_insert_table_view(&self) -> Result<TokenStream> {
+		let insert_ident = &self.insert_ident;
+		let columns_ident = &self.columns_ident;
+
+		let columns = self.fields.iter().filter_map(|field| {
+			let variant_ident = &field.variant_ident;
+			// if field.insert_required() {
+			Some(quote! {#columns_ident::#variant_ident})
+			// } else {
+			// 	None
+			// }
+		});
+
+		let push_values = self.fields.iter().map(|field| {
+			let ident = &field.ident;
+			if field.insert_required() {
+				quote! {
+					values.push(self.#ident.try_into_value()?);
+				}
+			} else {
+				quote! {
+					if let Some(v) = self.#ident {
+						values.push(v.try_into_value()?);
+					} else {
+						values.push(Value::Null);
+					}
+				}
+			}
+		});
+
+		let table_ident = &self.input.ident;
+
+		quote! {
+			impl TableView for #insert_ident{
+				type Table = #table_ident;
+				fn columns() -> Vec<#columns_ident> {
+					vec![#(#columns),*]
+				}
+				fn into_values(self) -> ParseValueResult<Vec<Value>> {
+					let mut values = vec![];
+					#(#push_values)*
+					Ok(values)
+				}
+
+			}
+		}
+		.xok()
+	}
 }
 
 
-fn parse_sql_ty(field: &NamedField) -> Result<&'static str> {
-	let Type::Path(type_path) = &field.inner.ty else {
-		return Err(syn::Error::new(
-			field.inner.ty.span(),
-			"Only path types are supported",
-		));
+
+
+
+
+
+fn parse_column(field: &TableField) -> Result<TokenStream> {
+	let name = field
+		.attributes
+		.get_value("name")
+		.map(ToTokens::to_token_stream)
+		.unwrap_or_else(|| field.ident.to_string().to_token_stream());
+	let value_type = field.value_type()?;
+
+	let optional = field.is_optional();
+
+
+	let default_value = match field.attributes.get_value("default") {
+		Some(value) => quote! {
+			Some(#value.into())
+		},
+		None => quote! {None},
 	};
-	let ident = type_path
-		.path
-		.segments
-		.last()
-		.ok_or_else(|| {
-			syn::Error::new(type_path.path.span(), "No segments found")
-		})?
-		.ident
-		.to_string();
 
-	#[rustfmt::skip]
-	match ident.as_str() {
-		"String" | "str" => "TEXT",
-		"u8" | "u16" | "u32" | "u64" | "i8" | "i16" | "i32" | "i64" => "INTEGER",
-		"f32" | "f64" => "REAL",
-		"bool" => "BOOLEAN",
-		"chrono::NaiveDateTime" | "chrono::DateTime" => "DATETIME",
-		// "Vec" => "BLOB" ,
-		_ => {
-			return Err(syn::Error::new(
-				field.inner.ty.span(),
-				format!("Unsupported type: {}", ident),
-			));
+	let ident = &field.variant_ident;
+	let primary_key = &field.primary_key;
+	let auto_increment = &field.auto_increment;
+	let unique = &field.unique;
+	quote! {
+		Self::#ident => Column{
+			name: #name.into(),
+			value_type: #value_type,
+			optional: #optional,
+			default_value: #default_value,
+			primary_key: #primary_key,
+			auto_increment: #auto_increment,
+			unique: #unique,
 		}
 	}
 	.xok()
 }
+
 
 #[cfg(test)]
 mod test {
@@ -209,23 +303,44 @@ mod test {
 				use beet::prelude::*;
 				impl Table for MyTable {
 					type Columns = MyTableColumns;
-					fn name() -> &'static str {
-						"my_table"
+					fn name() -> String {
+						"my_table".into()
 					}
 				}
-				pub enum MyTableColumns{
+				enum MyTableColumns{
 					Test
 				}
 				impl Columns for MyTableColumns {
-					fn name(&self) -> &'static str {
+					type Table = MyTable;
+					fn all() -> Vec<Column> {
+						vec![Self::Test.into_column()]
+					}
+					fn into_column(&self) -> Column {
 						match self {
-							Self::Test: "test"
+							Self::Test => Column {
+								name: "test".into(),
+								value_type: ValueType::Integer,
+								optional: false,
+								default_value: None,
+								primary_key: false,
+								auto_increment: false,
+								unique: false,
+							}
 						}
 					}
-					fn sql_type(&self) -> beet::sql::SqlType {
-						match self {
-							Self::Test: "INTEGER"
-						}
+				 }
+				struct InsertMyTable {
+					test: u32
+				}
+				impl TableView for InsertMyTable {
+					type Table = MyTable;
+					fn columns() -> Vec<MyTableColumns> {
+						vec![MyTableColumns::Test]
+					}
+					fn into_values(self) -> ParseValueResult<Vec<Value>> {
+						let mut values = vec![];
+						values.push(self.test.try_into_value()?);
+						Ok(values)
 					}
 				}
 			}
@@ -237,9 +352,17 @@ mod test {
 		expect(
 			parse_derive_table(parse_quote! {
 				#[derive(Table)]
-				#[table(name = "foobar")]
-				struct MyTable {
-					#[field(name = "FooBazz", sql_type = "TEXT")]
+				#[table(name = "foobar",if_not_exists = false)]
+				pub struct MyTable {
+					#[field(not_primary_key,default=9)]
+					id: Option<u32>,
+					#[field(
+						name = "FooBazz",
+						value_type = ValueType::Text,
+						primary_key,
+						auto_increment,
+						unique
+					)]
 					test: u32,
 				}
 			})
@@ -251,23 +374,67 @@ mod test {
 
 				impl Table for MyTable {
 					type Columns = MyTableColumns;
-					fn name() -> &'static str {
-						"foobar"
+					fn name() -> String {
+						"foobar".into()
+					}
+					fn if_not_exists() -> bool {
+						false
 					}
 				}
 				pub enum MyTableColumns{
+					Id,
 					Test
 				}
 				impl Columns for MyTableColumns {
-					fn name(&self) -> &'static str {
+					type Table = MyTable;
+					fn all() -> Vec<Column> {
+						vec![Self::Id.into_column(), Self::Test.into_column()]
+					}
+					fn into_column(&self) -> Column {
 						match self {
-							Self::Test: "FooBazz"
+							Self::Id => Column{
+								name: "id".into(),
+								value_type: ValueType::Integer,
+								optional: true,
+								default_value: Some(9.into()),
+								primary_key: false,
+								auto_increment: false,
+								unique: false,
+							},
+							Self::Test=> Column{
+								name: "FooBazz".into(),
+								value_type: ValueType::Text,
+								optional: false,
+								default_value: None,
+								primary_key: true,
+								auto_increment: true,
+								unique: true,
+							}
 						}
 					}
-					fn sql_type(&self) -> beet::sql::SqlType {
-						match self {
-							Self::Test: "TEXT"
+				 }
+				pub struct InsertMyTable {
+					id: Option<u32>,
+					test: Option<u32>
+				}
+				impl TableView for InsertMyTable {
+					type Table = MyTable;
+					fn columns() -> Vec<MyTableColumns> {
+						vec![MyTableColumns::Id, MyTableColumns::Test]
+					}
+					fn into_values(self) -> ParseValueResult<Vec<Value>> {
+						let mut values = vec![];
+						if let Some(v) = self.id {
+							values.push(v.try_into_value()?);
+						} else {
+							values.push(Value::Null);
 						}
+						if let Some(v) = self.test {
+							values.push(v.try_into_value()?);
+						} else {
+							values.push(Value::Null);
+						}
+						Ok(values)
 					}
 				}
 			}

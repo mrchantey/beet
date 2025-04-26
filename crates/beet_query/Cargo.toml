@@ -21,9 +21,11 @@ libsql = ["dep:libsql"]
 [dependencies]
 anyhow.workspace = true
 thiserror.workspace = true
+beet_query_macros.workspace = true
 
 sweet = { workspace = true, features = ["net"] }
 
+base64 = { version = "0" }
 libsql = { version = "0.9", optional = true }
 limbo = { version = "0.0.19", optional = true }
 

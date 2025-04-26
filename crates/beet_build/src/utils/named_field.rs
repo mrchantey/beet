@@ -72,6 +72,7 @@ impl<'a> NamedField<'a> {
 		})
 	}
 
+	/// Returs whether this field is of type `Option<T>`.
 	pub fn is_optional(&self) -> bool {
 		matches!(self.inner.ty, Type::Path(ref p) if p.path.segments.last()
 				.map(|s| s.ident == "Option")
@@ -88,10 +89,6 @@ impl<'a> NamedField<'a> {
 	pub fn is_required(&self) -> bool {
 		self.is_optional() == false
 			&& self.attributes.contains("default") == false
-	}
-
-	pub fn default_attr(&self) -> Option<&AttributeItem> {
-		self.attributes.get("default")
 	}
 
 	/// 1. First checks for a specified attribute

@@ -863,6 +863,8 @@ name = "beet_query"
 version = "0.0.6-rc.1"
 dependencies = [
  "anyhow",
+ "base64 0.13.1",
+ "beet_query_macros",
  "libsql",
  "limbo",
  "sweet",
