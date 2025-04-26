@@ -1,0 +1,29 @@
+[package]
+name = "beet_query"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+readme.workspace = true
+description = "Extend beet server actions with database queries"
+documentation.workspace = true
+homepage.workspace = true
+repository.workspace = true
+categories.workspace = true
+keywords.workspace = true
+
+[features]
+
+[dependencies]
+anyhow.workspace = true
+thiserror.workspace = true
+
+diesel = { version = "2", features = ["sqlite", "returning_clauses_for_sqlite_3_35"] }
+sweet = { workspace = true, features = ["net"] }
+
+[dev-dependencies]
+tokio.workspace = true
+sweet = { workspace = true, features = ["test"] }
+
+[build-dependencies]
+anyhow.workspace = true

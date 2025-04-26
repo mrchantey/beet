@@ -6,9 +6,8 @@ use sweet::prelude::*;
 // runtime env vars: https://doc.rust-lang.org/cargo/reference/environment-variables.html#environment-variables-cargo-sets-for-build-scripts
 // cargo:: output https://doc.rust-lang.org/cargo/reference/build-scripts.html#outputs-of-the-build-script
 fn main() -> Result<()> {
-	println!("cargo::rerun-if-changed=src/actions/**/*.rs");
-	println!("cargo::rerun-if-changed=../beet_design/src/**/*.mockup.rs");
-	println!("cargo::rerun-if-changed=../beet_design/public");
+	BuildUtils::rerun_if_changed("../beet_design/src/**/*.mockup.rs");
+	BuildUtils::rerun_if_changed("../beet_design/public");
 	// println!("cargo::warning={}", "🚀🚀 building beet_site");
 
 	// ⚠️ this is a downstream copy of crates/beet_design/build.rs
