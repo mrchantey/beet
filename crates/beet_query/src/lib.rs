@@ -4,9 +4,10 @@
 
 // #[cfg(test)]
 // pub mod testdb;
-
+pub mod types;
 
 pub mod prelude {
 	// #[cfg(test)]
 	// pub use crate::testdb::*;
+	pub use crate::types::*;
 }
