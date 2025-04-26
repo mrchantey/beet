@@ -15,13 +15,17 @@ categories.workspace = true
 # but we use it to ensure no bevy_default for workspace tests
 bevy_default = [
 	"beet_flow/bevy_default",
-	"beet_ml/bevy_default",
+	"beet_ml?/bevy_default",
 	"beet_spatial/bevy_default",
 ]
+ml = ["dep:beet_ml"]
 
 [dependencies]
 beet_flow = { workspace = true, features = ["reflect"] }
-beet_ml = { workspace = true, features = ["candle", "spatial"] }
+beet_ml = { workspace = true, features = [
+	"candle",
+	"spatial",
+], optional = true }
 beet_spatial = { workspace = true, features = [] }
 
 

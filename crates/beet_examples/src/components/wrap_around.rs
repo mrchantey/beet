@@ -1,4 +1,5 @@
 use bevy::prelude::*;
+use sweet::prelude::When;
 
 pub const DEFAULT_WRAPAROUND_HALF_EXTENTS: f32 = 1.;
 
@@ -31,7 +32,7 @@ impl WrapAround {
 }
 
 pub fn wrap_around(
-	wrap: Res<WrapAround>,
+	wrap: When<Res<WrapAround>>,
 	mut query: Populated<&mut Transform, Changed<Transform>>,
 ) {
 	for mut transform in query.iter_mut() {
@@ -61,7 +62,7 @@ pub fn wrap_around(
 
 
 pub fn update_wrap_around(
-	mut wrap_around: ResMut<WrapAround>,
+	mut wrap_around: When<ResMut<WrapAround>>,
 	windows: Populated<&Window, Changed<Window>>,
 ) {
 	for window in windows.iter() {

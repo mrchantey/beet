@@ -159,8 +159,8 @@ pub fn spawn_ui_terminal(mut commands: Commands, user_input: bool) {
 
 fn parse_text_input(
 	mut commands: Commands,
-	mut evr_char: EventReader<KeyboardInput>,
-	keys: When<ButtonInput<KeyCode>>,
+	mut evr_char: When<EventReader<KeyboardInput>>,
+	keys: When<Res<ButtonInput<KeyCode>>>,
 	mut query: Query<&mut TextSpan, With<InputContainer>>,
 ) {
 	if keys.any_pressed([KeyCode::ControlRight, KeyCode::ControlLeft]) {

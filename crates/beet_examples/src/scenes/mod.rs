@@ -1,3 +1,4 @@
+#[cfg(feature = "ml")]
 pub mod ml;
 use crate::beet::prelude::*;
 use crate::prelude::*;

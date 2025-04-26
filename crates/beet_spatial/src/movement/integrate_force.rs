@@ -7,7 +7,7 @@ use sweet::prelude::When;
 /// as described by Daniel Shiffman
 /// https://natureofcode.com/vectors/#acceleration
 pub fn integrate_force(
-	time: When<Time>,
+	time: When<Res<Time>>,
 	mut query: Populated<(
 		&mut Transform,
 		&mut Velocity,

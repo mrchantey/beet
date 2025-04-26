@@ -45,10 +45,10 @@ fn setup(
 			Transform::from_translation(agent_pos).with_scale(object_scale),
 			grid_to_world.clone(),
 			agent_grid_pos,
-			GridDirection::sample(&mut rng),
+			GridDirection::sample(&mut rng.0),
 		))
 		.with_children(|parent| {
-			let origin = parent.parent_entity();
+			let origin = parent.target_entity();
 
 			parent
 				.spawn((

@@ -12,7 +12,7 @@ pub struct Collectable;
 const TURNS_PER_SECOND: f32 = 0.5;
 
 pub fn rotate_collectables(
-	time: When<Time>,
+	time: When<Res<Time>>,
 	mut query: Populated<&mut Transform, With<Collectable>>,
 ) {
 	for mut transform in query.iter_mut() {

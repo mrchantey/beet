@@ -57,6 +57,7 @@ pub fn beet_example_plugin(app: &mut App) {
 	.register_type::<Collectable>();
 }
 
+#[cfg(feature = "ml")]
 pub fn plugin_ml(app: &mut App) {
 	app.add_plugins((
 		FrozenLakePlugin,

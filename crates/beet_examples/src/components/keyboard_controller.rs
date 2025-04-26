@@ -12,8 +12,8 @@ impl Default for KeyboardController {
 }
 
 pub fn keyboard_controller(
-	time: When<Time>,
-	keys: When<ButtonInput<KeyCode>>,
+	time: When<Res<Time>>,
+	keys: When<Res<ButtonInput<KeyCode>>>,
 	mut query: Populated<(&mut Transform, &KeyboardController)>,
 ) {
 	for (mut transform, controller) in query.iter_mut() {

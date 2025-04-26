@@ -49,7 +49,7 @@ pub(crate) fn return_on_animation_end<P: ResultPayload>(
 	mut commands: Commands,
 	animators: Query<&AnimationPlayer>,
 	children: Query<&Children>,
-	clips: When<Assets<AnimationClip>>,
+	clips: When<Res<Assets<AnimationClip>>>,
 	mut query: Populated<(Entity, &Running, &ReturnOnAnimationEnd<P>)>,
 ) {
 	for (action, running, return_on_end) in query.iter_mut() {

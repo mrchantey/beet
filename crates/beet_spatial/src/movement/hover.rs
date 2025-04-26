@@ -47,7 +47,7 @@ impl Hover {
 
 pub(crate) fn hover(
 	mut _commands: Commands,
-	time: When<Time>,
+	time: When<Res<Time>>,
 	actions: Populated<(&Running, &Hover)>,
 	mut transforms: Query<&mut Transform>,
 ) {

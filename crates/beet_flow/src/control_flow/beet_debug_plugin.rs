@@ -238,7 +238,7 @@ pub struct DebugToStdOut;
 fn log_on_run(
 	ev: Trigger<OnRunAction>,
 	query: Query<&Name>,
-	_m: When<DebugOnRun>,
+	_m: When<Res<DebugOnRun>>,
 	mut out: EventWriter<OnLogMessage>,
 	stdout: Option<Res<DebugToStdOut>>,
 ) {
@@ -259,7 +259,7 @@ fn log_on_run_result(
 	ev: Trigger<OnResultAction>,
 	query: Query<&Name>,
 	mut out: EventWriter<OnLogMessage>,
-	_m: When<DebugOnResult>,
+	_m: When<Res<DebugOnResult>>,
 	stdout: Option<Res<DebugToStdOut>>,
 ) {
 	let msg = OnLogMessage::new_with_query(

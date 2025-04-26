@@ -33,7 +33,7 @@ impl Default for RotateToVelocity3d {
 }
 
 pub(crate) fn rotate_to_velocity_3d(
-	time: When<Time>,
+	time: When<Res<Time>>,
 	mut query: Query<(&mut Transform, &Velocity, &RotateToVelocity3d)>,
 ) {
 	for (mut transform, velocity, rotate) in query.iter_mut() {

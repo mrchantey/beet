@@ -41,7 +41,7 @@ pub(crate) fn reset_run_timer_stopped(
 
 /// Ticks all [`RunTimer`] timers in the [`PreTickSet`].
 pub(crate) fn tick_run_timers(
-	time: When<Time>,
+	time: When<Res<Time>>,
 	mut timers: Populated<&mut RunTimer>,
 ) {
 	for mut timer in timers.iter_mut() {

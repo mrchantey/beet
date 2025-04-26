@@ -32,7 +32,7 @@ impl Translate {
 	pub fn new(translation: Vec3) -> Self { Self { translation } }
 }
 pub(crate) fn translate(
-	time: When<Time>,
+	time: When<Res<Time>>,
 	action: Populated<(&Running, &Translate)>,
 	mut transforms: Query<&mut Transform>,
 ) {
