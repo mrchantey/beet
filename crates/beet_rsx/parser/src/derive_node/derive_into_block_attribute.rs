@@ -13,7 +13,7 @@ fn parse(input: DeriveInput) -> Result<TokenStream> {
 	// TODO this should be customizable via a derive macro attribute
 	let runtime = RsxRuntime::default();
 
-	let fields = PropsField::parse_all(&input)?;
+	let fields = NodeField::parse_all(&input)?;
 	let fn_initial_attributes = fn_initial_attributes(&fields);
 	let fn_register_effects = fn_register_effects(&runtime, &fields);
 
@@ -34,7 +34,7 @@ fn parse(input: DeriveInput) -> Result<TokenStream> {
 	})
 }
 
-fn fn_initial_attributes(fields: &[PropsField]) -> TokenStream {
+fn fn_initial_attributes(fields: &[NodeField]) -> TokenStream {
 	let fields = fields.iter().map(|field| {
 		let ident = &field.ident;
 		let ident_str = ident.to_string();
@@ -87,7 +87,7 @@ fn fn_initial_attributes(fields: &[PropsField]) -> TokenStream {
 
 fn fn_register_effects(
 	runtime: &RsxRuntime,
-	fields: &[PropsField],
+	fields: &[NodeField],
 ) -> TokenStream {
 	let fields = fields.iter().map(|field| {
 		let ident = &field.ident;

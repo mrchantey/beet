@@ -1,4 +1,5 @@
 use crate::prelude::*;
+use beet_build::prelude::*;
 use proc_macro2::TokenStream;
 use quote::ToTokens;
 use quote::quote;
@@ -20,7 +21,7 @@ use syn::Type;
 pub fn impl_flatten(
 	target_ident: &Ident,
 	input: &DeriveInput,
-	fields: &Vec<PropsField>,
+	fields: &Vec<NodeField>,
 ) -> Result<TokenStream> {
 	let (impl_generics, type_generics, where_clause) =
 		input.generics.split_for_impl();
@@ -55,7 +56,7 @@ pub fn impl_flatten(
 fn second_order_impl(
 	target_ident: &Ident,
 	input: &DeriveInput,
-	field: &PropsField,
+	field: &NamedField,
 ) -> Result<Vec<TokenStream>> {
 	let (impl_generics, type_generics, where_clause) =
 		input.generics.split_for_impl();

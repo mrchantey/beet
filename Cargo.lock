@@ -736,6 +736,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "beet_build"
+version = "0.0.6-rc.1"
+dependencies = [
+ "anyhow",
+ "proc-macro2",
+ "proc-macro2-diagnostics",
+ "quote",
+ "sweet",
+ "syn 2.0.100",
+]
+
+[[package]]
 name = "beet_connect"
 version = "0.0.6-rc.1"
 dependencies = [
@@ -967,6 +979,7 @@ name = "beet_rsx_parser"
 version = "0.0.6-rc.1"
 dependencies = [
  "anyhow",
+ "beet_build",
  "beet_rsx_combinator",
  "heck 0.4.1",
  "itertools 0.14.0",

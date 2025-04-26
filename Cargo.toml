@@ -36,6 +36,7 @@ publish = false
 # default resolver
 resolver = "2"
 members = [
+	"crates/beet_build",
 	"crates/beet_connect",
 	"crates/beet_design",
 	"crates/beet_examples",
@@ -61,6 +62,7 @@ members = [
 [workspace.dependencies]
 ## internal
 beet = { path = "", version = "0.0.6-rc.1", default-features = false }
+beet_build = { path = "crates/beet_build", version = "0.0.6-rc.1", default-features = false }
 beet_connect = { path = "crates/beet_connect", version = "0.0.6-rc.1", default-features = false }
 beet_design = { path = "crates/beet_design", version = "0.0.6-rc.1", default-features = false }
 beet_examples = { path = "crates/beet_examples", version = "0.0.6-rc.1" }

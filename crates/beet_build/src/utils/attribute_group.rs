@@ -10,6 +10,8 @@ use syn::Token;
 use syn::parse::Parse;
 use syn::parse::ParseStream;
 
+/// [`AttributeItem`] collection parsed from Syn attributes.
+/// These cannot be ref types because they are parsed.
 #[derive(Debug)]
 pub struct AttributeGroup {
 	pub attributes: Vec<AttributeItem>,
@@ -31,7 +33,7 @@ impl AttributeGroup {
 	}
 	/// ## Errors
 	/// if any of the attributes does not match a provided key
-	pub fn validate_allowed_keys(self, keys: &[&str]) -> Result<Self> {
+	pub fn validate_allowed_keys(&self, keys: &[&str]) -> Result<&Self> {
 		for attr in &self.attributes {
 			if let Some(name) = attr.name() {
 				if !keys.contains(&name.to_string().as_str()) {
@@ -46,7 +48,7 @@ impl AttributeGroup {
 				}
 			}
 		}
-		Ok(self)
+		Ok(&self)
 	}
 
 	/// Returns the attribute if it is present.

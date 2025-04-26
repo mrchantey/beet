@@ -16,6 +16,4 @@ fn parse(input: DeriveInput) -> Result<TokenStream> {
 	
 	quote! {}.xok() 
 
-
-
 }
