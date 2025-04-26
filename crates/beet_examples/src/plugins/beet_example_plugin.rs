@@ -32,7 +32,7 @@ pub fn running_beet_example_plugin(app: &mut App) {
 			.build(),
 		beet_example_plugin,
 	))
-	.add_systems(Update, (close_on_esc, toggle_fullscreen.never_param_warn()));
+	.add_systems(Update, (close_on_esc, toggle_fullscreen));
 }
 
 /// Simple default plugins
@@ -57,6 +57,7 @@ pub fn beet_example_plugin(app: &mut App) {
 	.register_type::<Collectable>();
 }
 
+#[cfg(feature = "ml")]
 pub fn plugin_ml(app: &mut App) {
 	app.add_plugins((
 		FrozenLakePlugin,
@@ -74,7 +75,7 @@ fn plugin_2d(app: &mut App) {
 		.add_systems(Update, randomize_position.in_set(PreTickSet))
 		.add_systems(
 			Update,
-			(update_wrap_around.never_param_warn(), wrap_around.never_param_warn())
+			(update_wrap_around, wrap_around)
 			.chain()
 			.in_set(PostTickSet),
 		)

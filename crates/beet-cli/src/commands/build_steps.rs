@@ -23,7 +23,7 @@ impl BuildNative {
 
 impl BuildStep for BuildNative {
 	fn run(&self) -> Result<()> {
-		println!("🌱 Build Step 1: Native");
+		println!("🌱 Compiling native binary");
 		self.build_cmd.run()?;
 		Ok(())
 	}
@@ -50,7 +50,7 @@ impl BuildStep for ExportStatic {
 	/// saving them to the `html_dir`
 	fn run(&self) -> Result<()> {
 		println!(
-			"🌱 Build Step 2: HTML \nExecuting {}",
+			"🌱 Running native binary to generate static files \nExecuting {}",
 			self.exe_path.display()
 		);
 		Command::new(&self.exe_path)
@@ -96,12 +96,39 @@ impl BuildWasm {
 			.arg("bindgen")
 			.arg("--target")
 			.arg("web")
+			// alternatively es modules target: experimental-nodejs-module
 			.arg("--no-typescript")
 			.arg(&self.exe_path)
 			.status()?
+			.exit_ok()?
+			.xok()
+	}
+
+	// TODO wasm opt
+	fn wasm_opt(&self) -> Result<()> {
+		println!("🌱 Optimizing wasm binary");
+		let out_file = self
+			.build_args
+			.html_dir
+			.join("wasm")
+			.join("bindgen_bg.wasm");
+
+		let size_before = std::fs::metadata(&out_file)?.len();
+
+		Command::new("wasm-opt")
+			.arg("-Oz")
+			.arg("--output")
+			.arg(&out_file)
+			.arg(&out_file)
+			.status()?
 			.exit_ok()?;
 
-		// TODO wasm-opt in release
+		let size_after = std::fs::metadata(&out_file)?.len();
+		println!(
+			"🌱 Reduced wasm binary from {} to {}",
+			format!("{} KB", size_before as usize / 1024),
+			format!("{} KB", size_after as usize / 1024)
+		);
 
 		Ok(())
 	}
@@ -109,9 +136,12 @@ impl BuildWasm {
 
 impl BuildStep for BuildWasm {
 	fn run(&self) -> Result<()> {
-		println!("🌱 Build Step 3: WASM");
+		println!("🌱 Compiling wasm binary");
 		self.build_cmd.spawn()?;
 		self.wasm_bindgen()?;
+		if self.build_cmd.release {
+			self.wasm_opt()?;
+		}
 		Ok(())
 	}
 }

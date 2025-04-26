@@ -184,7 +184,7 @@ where
 }
 
 #[cfg(test)]
-mod tests {
+mod test {
 	use super::env_parser as env_p;
 	use super::parser as p;
 	use super::*;

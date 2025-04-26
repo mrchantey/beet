@@ -55,7 +55,7 @@ impl Default for Repeat {
 
 fn repeat(
 	ev: Trigger<OnResult>,
-	parents: Query<&Parent>,
+	parents: Query<&ChildOf>,
 	action_observers: Query<&ActionObservers>,
 	query: Query<&Repeat>,
 	mut commands: Commands,

@@ -1,3 +1,4 @@
+use bevy::ecs::component::Mutable;
 use bevy::prelude::*;
 use std::fmt::Debug;
 use std::hash::Hash;
@@ -39,7 +40,7 @@ pub trait DiscreteSpace:
 	+ Clone
 	+ PartialEq
 	+ Eq
-	+ Component
+	+ Component<Mutability = Mutable>
 	+ TypePath
 {
 	// type Value;
@@ -57,7 +58,7 @@ impl<
 		+ Clone
 		+ PartialEq
 		+ Eq
-		+ Component
+		+ Component<Mutability = Mutable>
 		+ TypePath,
 > DiscreteSpace for T
 {

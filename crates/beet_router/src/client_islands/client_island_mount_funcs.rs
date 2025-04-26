@@ -33,7 +33,7 @@ impl ClientIslandMountFuncs {
 	pub fn mount_with_server_url(&self, url: &str) -> Result<()> {
 		#[cfg(not(debug_assertions))]
 		{
-			use beet::prelude::*;
+			use crate::prelude::*;
 			CallServerAction::set_server_url(RoutePath::new(url));
 		}
 		#[cfg(target_arch = "wasm32")]

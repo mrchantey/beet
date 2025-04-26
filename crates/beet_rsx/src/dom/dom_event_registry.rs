@@ -21,9 +21,10 @@ thread_local! {
 impl DomEventRegistry {
 	pub fn initialize() -> ParseResult<()> {
 		let constants = DomTarget::with(|h| h.html_constants().clone());
-		hook_up_event_listeners(&constants)?;
-		// TODO now the sweet loader is.. is what?
+		// hooking up event listeners drains registered events
+		// so playback_prehydrate_events must be called first
 		playback_prehydrate_events(&constants)?;
+		hook_up_event_listeners(&constants)?;
 		Ok(())
 	}
 
@@ -52,6 +53,35 @@ impl DomEventRegistry {
 			);
 		});
 	}
+}
+
+/// Drains the registered events into the corresponding dom events
+fn hook_up_event_listeners(constants: &HtmlConstants) -> ParseResult<()> {
+	REGISTERED_EVENTS.with(|current| -> ParseResult<()> {
+		let document = window().unwrap().document().unwrap();
+		for ((tree_idx, key), func) in current.borrow_mut().drain() {
+			let query = format!("[{}='{}']", constants.tree_idx_key, tree_idx);
+			let el =
+				document.query_selector(&query).ok().flatten().ok_or_else(
+					|| {
+						ParseError::Hydration(format!(
+							"could not find element with dom idx: {}",
+							query
+						))
+					},
+				)?;
+			el.remove_attribute(&key).unwrap();
+
+			let closure = Closure::wrap(func);
+			el.add_event_listener_with_callback(
+				&key.replace("on", ""),
+				closure.as_ref().unchecked_ref(),
+			)
+			.unwrap();
+			closure.forget();
+		}
+		Ok(())
+	})
 }
 
 
@@ -95,37 +125,6 @@ fn playback_prehydrate_events(constants: &HtmlConstants) -> ParseResult<()> {
 		)
 		.unwrap();
 
-		Ok(())
-	})
-}
-
-fn hook_up_event_listeners(constants: &HtmlConstants) -> ParseResult<()> {
-	REGISTERED_EVENTS.with(|current| -> ParseResult<()> {
-		let mut current = current.borrow_mut();
-		let document = window().unwrap().document().unwrap();
-		for ((tree_idx, key), func) in current.drain() {
-			let query = format!("[{}='{}']", constants.tree_idx_key, tree_idx);
-
-			let el =
-				document.query_selector(&query).ok().flatten().ok_or_else(
-					|| {
-						ParseError::Hydration(format!(
-							"could not find element with dom idx: {}",
-							query
-						))
-					},
-				)?;
-			el.remove_attribute(&key).unwrap();
-			let closure = Closure::wrap(Box::new(move |e: JsValue| {
-				func(e);
-			}) as Box<dyn Fn(JsValue)>);
-			el.add_event_listener_with_callback(
-				&key.replace("on", ""),
-				closure.as_ref().unchecked_ref(),
-			)
-			.unwrap();
-			closure.forget();
-		}
 		Ok(())
 	})
 }

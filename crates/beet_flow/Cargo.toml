@@ -27,6 +27,7 @@ extend.workspace = true
 anyhow.workspace = true
 thiserror.workspace = true
 serde = { workspace = true, optional = true }
+sweet = { workspace = true, features = ["bevy"] }
 
 [dev-dependencies]
 beet_flow = { path = "", features = ["_doctest"] }

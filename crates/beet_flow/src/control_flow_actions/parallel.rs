@@ -1,6 +1,6 @@
 use crate::prelude::*;
+use bevy::platform::collections::HashSet;
 use bevy::prelude::*;
-use bevy::utils::HashSet;
 
 /// An action that runs all of its children in parallel.
 /// ## Tags

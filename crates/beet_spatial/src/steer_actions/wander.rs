@@ -115,7 +115,7 @@ mod test {
 			))
 			.with_children(|parent| {
 				parent.spawn((
-					Running::new(parent.parent_entity()),
+					Running::new(parent.target_entity()),
 					Wander::default(),
 				));
 			})

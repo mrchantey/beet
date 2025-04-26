@@ -1,7 +1,8 @@
 use bevy::ecs::component::ComponentId;
+use bevy::ecs::component::HookContext;
 use bevy::ecs::world::DeferredWorld;
+use bevy::platform::collections::HashMap;
 use bevy::prelude::*;
-use bevy::utils::HashMap;
 
 /// An Action Entity is any node on a control flow graph,
 /// containing the action components.
@@ -52,17 +53,19 @@ impl ActionObservers {
 	/// Do not call this directly, it is called by the `#[action]` macro component hooks.
 	pub fn on_add(
 		world: &mut DeferredWorld,
-		action: Entity,
-		cid: ComponentId,
+		cx: HookContext,
 		on_spawn_observer: impl FnMut(&mut DeferredWorld, Entity),
 	) {
-		let observer_entity =
-			ActionObserverMap::get_or_spawn(world, cid, on_spawn_observer);
+		let observer_entity = ActionObserverMap::get_or_spawn(
+			world,
+			cx.component_id,
+			on_spawn_observer,
+		);
 
 
 		world
 			.commands()
-			.entity(action)
+			.entity(cx.entity)
 			.entry::<ActionObservers>()
 			// should always exist because macro adds
 			// #[require(ActionObservers)]
@@ -71,13 +74,9 @@ impl ActionObservers {
 	}
 	/// Called whenever an action is removed from an [`ActionEntity`].
 	/// Do not call this directly, it is called by the `#[action]` macro component hooks.
-	pub fn on_remove(
-		mut world: DeferredWorld,
-		action: Entity,
-		_cid: ComponentId,
-	) {
-		if let Some(mut actions) = world.get_mut::<ActionObservers>(action) {
-			actions.retain(|&e| e != action);
+	pub fn on_remove(mut world: DeferredWorld, cx: HookContext) {
+		if let Some(mut actions) = world.get_mut::<ActionObservers>(cx.entity) {
+			actions.retain(|&e| e != cx.entity);
 		}
 	}
 }

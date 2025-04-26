@@ -54,7 +54,7 @@ fn agent(mut commands: Commands, stat_map: Res<StatMap>) {
 		.with_children(|parent| {
 			let total_children = 4;
 
-			let _agent = parent.parent_entity();
+			let _agent = parent.target_entity();
 			let _stress = parent
 				.spawn((
 					Name::new(STRESS),

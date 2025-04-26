@@ -14,10 +14,10 @@ pub struct IkSpawner;
 pub fn ik_spawner_plugin(app: &mut App) {
 	app.world_mut()
 		.register_component_hooks::<IkSpawner>()
-		.on_add(|mut world, entity, _| {
+		.on_add(|mut world, cx| {
 			world
 				.commands()
-				.entity(entity)
+				.entity(cx.entity)
 				.remove::<IkSpawner>()
 				.observe(ik_spawner);
 		});
@@ -32,7 +32,7 @@ fn ik_spawner(
 	query: Populated<(Entity, &Transform, &Children, &TargetEntity)>,
 ) {
 	let Ok((scene_root_entity, transform, scene_root_children, target_entity)) =
-		query.get(trigger.entity())
+		query.get(trigger.target())
 	else {
 		return;
 	};
@@ -43,9 +43,10 @@ fn ik_spawner(
 		return;
 	};
 
-	let Some(arm_root) = children.iter().find_map(|entity| {
-		find_by_name(&child_nodes_query, *entity, "ArmRoot")
-	}) else {
+	let Some(arm_root) = children
+		.iter()
+		.find_map(|entity| find_by_name(&child_nodes_query, entity, "ArmRoot"))
+	else {
 		return;
 	};
 
@@ -109,7 +110,7 @@ fn map_names_to_query_entries<'a>(
 		.map(|name| {
 			let Some(entry) = children
 				.iter()
-				.find_map(|child| find_by_name(query, *child, name))
+				.find_map(|child| find_by_name(query, child, name))
 			else {
 				return None;
 			};

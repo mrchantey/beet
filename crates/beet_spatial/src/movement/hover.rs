@@ -1,6 +1,7 @@
 use beet_flow::prelude::*;
 use bevy::prelude::*;
 use std::f32::consts::TAU;
+use sweet::prelude::When;
 
 
 /// Translates the agent up and down in a sine wave.
@@ -46,7 +47,7 @@ impl Hover {
 
 pub(crate) fn hover(
 	mut _commands: Commands,
-	time: Res<Time>,
+	time: When<Res<Time>>,
 	actions: Populated<(&Running, &Hover)>,
 	mut transforms: Query<&mut Transform>,
 ) {

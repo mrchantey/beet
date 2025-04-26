@@ -90,11 +90,11 @@ impl IkArm4DofTransforms {
 
 impl MapEntities for IkArm4DofTransforms {
 	fn map_entities<M: EntityMapper>(&mut self, entity_mapper: &mut M) {
-		self.target = entity_mapper.map_entity(self.target);
-		self.base = entity_mapper.map_entity(self.base);
-		self.segment1 = entity_mapper.map_entity(self.segment1);
-		self.segment2 = entity_mapper.map_entity(self.segment2);
-		self.segment3 = entity_mapper.map_entity(self.segment3);
+		self.target = entity_mapper.get_mapped(self.target);
+		self.base = entity_mapper.get_mapped(self.base);
+		self.segment1 = entity_mapper.get_mapped(self.segment1);
+		self.segment2 = entity_mapper.get_mapped(self.segment2);
+		self.segment3 = entity_mapper.get_mapped(self.segment3);
 	}
 }
 

@@ -1,7 +1,7 @@
 use std::fmt;
 
 
-/// The [`http::Method`] is a low level representation of HTTP methods
+/// Alternative to the [`http::Method`] which is a low level representation of HTTP methods
 /// and quite error prone in this high level context. For example
 /// `http::method::from_str("get") != http::Method::GET` due to
 /// case sensitivity.

@@ -22,7 +22,7 @@ fn find_steer_target(
 	ev: Trigger<OnRun>,
 	mut commands: Commands,
 	transforms: Query<&Transform>,
-	targets: Query<(&StatId, &StatValue, &Parent), With<StatProvider>>,
+	targets: Query<(&StatId, &StatValue, &ChildOf), With<StatProvider>>,
 	query: Populated<(&FindStatSteerTarget, &StatId, &StatValueGoal)>,
 ) {
 	let (_action, goal_id, value_goal) = query
@@ -41,7 +41,7 @@ fn find_steer_target(
 			continue;
 		}
 		let pickup_transform = transforms
-			.get(**pickup_parent)
+			.get(pickup_parent.parent())
 			.expect(&expect_action::to_have_other(pickup_parent));
 
 		let new_dist = Vec3::distance(
@@ -61,7 +61,7 @@ fn find_steer_target(
 
 		if new_score < best_score {
 			best_score = new_score;
-			closest_target = Some(**pickup_parent);
+			closest_target = Some(pickup_parent.parent());
 		}
 	}
 

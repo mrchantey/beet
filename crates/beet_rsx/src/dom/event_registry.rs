@@ -1,8 +1,17 @@
 use crate::prelude::*;
 
-pub trait EventHandler<T>: 'static + Send + Sync + Fn(T) {}
-impl<T, F> EventHandler<T> for F where F: 'static + Send + Sync + Fn(T) {}
 
+pub trait EventHandler<T>: 'static + Send + Sync + Fn(T) {
+	// fn box_clone(&self) -> Box<dyn EventHandler<T>>;
+	// fn call(&self, val: T);
+}
+impl<T, F> EventHandler<T> for F
+where
+	F: 'static + Send + Sync + Fn(T),
+{
+	// fn box_clone(&self) -> Box<dyn EventHandler<T>> { Box::new(self.clone()) }
+	// fn call(&self, val: T) { self(val); }
+}
 
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -110,10 +119,17 @@ pub trait EventExt {
 
 #[cfg(test)]
 mod test {
-	// use crate::prelude::*;
+	use crate::prelude::*;
 	// use sweet::prelude::*;
 
 	#[test]
-	// #[cfg(target_arch = "wasm32")]
-	fn works() {}
+	#[cfg_attr(not(target_arch = "wasm32"), should_panic)]
+	fn works() {
+		let func: Box<dyn EventHandler<_>> = Box::new(|_| {});
+		EventRegistry::register_onclick(
+			"onclick",
+			TreeLocation::default(),
+			func,
+		);
+	}
 }

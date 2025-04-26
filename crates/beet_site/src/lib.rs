@@ -1,7 +1,7 @@
 #![feature(more_qualified_paths)]
 
 #[path = "codegen/client_actions.rs"]
-pub mod actions;
+pub mod client_actions;
 pub mod components;
 #[cfg(not(target_arch = "wasm32"))]
 #[path = "codegen/docs.rs"]
@@ -20,7 +20,7 @@ pub mod wasm;
 
 pub mod prelude {
 	pub use super::*;
-	pub use crate::actions::root as actions;
+	pub use crate::client_actions::root as actions;
 	pub use crate::components::*;
 	pub use crate::route_tree::root as paths;
 }

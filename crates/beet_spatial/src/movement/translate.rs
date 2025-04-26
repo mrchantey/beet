@@ -1,5 +1,6 @@
 use beet_flow::prelude::*;
 use bevy::prelude::*;
+use sweet::prelude::When;
 
 /// Applies constant translation to [`Running::origin`],
 /// multiplied by [`Time::delta_secs`]
@@ -31,7 +32,7 @@ impl Translate {
 	pub fn new(translation: Vec3) -> Self { Self { translation } }
 }
 pub(crate) fn translate(
-	time: Res<Time>,
+	time: When<Res<Time>>,
 	action: Populated<(&Running, &Translate)>,
 	mut transforms: Query<&mut Transform>,
 ) {

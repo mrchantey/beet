@@ -69,7 +69,7 @@ pub fn signal<T: Clone + Send + 'static>(
 }
 
 #[cfg(test)]
-mod tests {
+mod test {
 	use super::*;
 	use sweet::prelude::*;
 

@@ -117,7 +117,7 @@ mod test {
 				pub mod root {
 					#[allow(unused_imports)]
 					use super::*;
-					pub async fn bazz() -> Result<(), ServerActionError> {
+					pub async fn bazz() -> ServerActionResult<RsxNode,()> {
 						CallServerAction::request_no_data(RouteInfo::new("/bazz", HttpMethod::Get)).await
 					}
 				}
@@ -143,7 +143,7 @@ mod test {
 					#[allow(unused_imports)]
 					use super::*;
 
-						pub async fn bazz() -> Result<(), ServerActionError> {
+						pub async fn bazz() -> ServerActionResult<(),()> {
 								CallServerAction::request_no_data(RouteInfo::new("/bazz", HttpMethod::Get)).await
 						}
 
@@ -152,7 +152,7 @@ mod test {
 							#[allow(unused_imports)]
 							use super::*;
 
-								pub async fn bar() -> Result<(), ServerActionError> {
+								pub async fn bar() -> ServerActionResult<(),()> {
 										CallServerAction::request_no_data(RouteInfo::new("/foo/bar", HttpMethod::Get)).await
 								}
 
@@ -161,11 +161,11 @@ mod test {
 									#[allow(unused_imports)]
 									use super::*;
 
-									pub async fn get() -> Result<(), ServerActionError> {
+									pub async fn get() -> ServerActionResult<(),()> {
 										CallServerAction::request_no_data(RouteInfo::new("/foo/boo", HttpMethod::Get)).await
 									}
 
-									pub async fn post() -> Result<(), ServerActionError> {
+									pub async fn post() -> ServerActionResult<(),()> {
 										CallServerAction::request_no_data(RouteInfo::new("/foo/boo", HttpMethod::Post)).await
 									}
 								}
@@ -173,7 +173,7 @@ mod test {
 								pub mod bing {
 									#[allow(unused_imports)]
 									use super::*;
-									pub async fn bong() -> Result<(), ServerActionError> {
+									pub async fn bong() -> ServerActionResult<(),()> {
 											CallServerAction::request_no_data(RouteInfo::new("/foo/bing/bong", HttpMethod::Post)).await
 									}
 								}

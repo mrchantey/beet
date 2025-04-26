@@ -4,7 +4,6 @@ use proc_macro2::TokenStream;
 use quote::quote;
 use syn::DeriveInput;
 
-
 pub fn impl_derive_action(
 	input: proc_macro::TokenStream,
 ) -> proc_macro::TokenStream {
@@ -47,6 +46,7 @@ fn impl_component(
 	quote! {
 		impl #impl_generics bevy::prelude::Component for #ident #type_generics #where_clause {
 			const STORAGE_TYPE: bevy::ecs::component::StorageType = #storage;
+			// wrong as of 0.16
 			fn register_component_hooks(
 				hooks: &mut bevy::ecs::component::ComponentHooks,
 			) {

@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use bevy::ecs::component::ComponentId;
+use bevy::ecs::component::HookContext;
 use bevy::ecs::world::DeferredWorld;
 use bevy::prelude::*;
 
@@ -57,10 +57,10 @@ pub struct Running {
 }
 
 /// if Running was added with a placeholder origin, set it to the entity it was added to.
-fn on_add_running(mut world: DeferredWorld, entity: Entity, _cid: ComponentId) {
-	let mut running = world.get_mut::<Running>(entity).unwrap();
+fn on_add_running(mut world: DeferredWorld, cx: HookContext) {
+	let mut running = world.get_mut::<Running>(cx.entity).unwrap();
 	if running.origin == Entity::PLACEHOLDER {
-		running.origin = entity;
+		running.origin = cx.entity;
 	}
 }
 

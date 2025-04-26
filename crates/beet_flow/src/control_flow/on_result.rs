@@ -96,7 +96,7 @@ pub struct OnResult<T = RunResult> {
 	_sealed: (),
 }
 
-/// Called on the [Parent] of an [ActionEntity] to propagate the result,
+/// Called on the [ChildOf] of an [ActionEntity] to propagate the result,
 /// See [HighestScore] for an example usage.
 /// It is not allowed to trigger this directly because that would
 /// break the routing model of beet, instead see [OnResultAction].
@@ -122,14 +122,14 @@ impl<T: ResultPayload> OnChildResult<T> {
 	/// on the action entity.
 	pub fn try_trigger(
 		mut commands: Commands,
-		parents: Query<&Parent>,
+		parent_query: Query<&ChildOf>,
 		action_observers: Query<&ActionObservers>,
 		action: Entity,
 		origin: Entity,
 		payload: T,
 	) {
-		if let Ok(parent) = parents.get(action) {
-			let parent = parent.get();
+		if let Ok(parent) = parent_query.get(action) {
+			let parent = parent.parent();
 			if let Ok(action_observers) = action_observers.get(parent) {
 				let res = OnChildResult {
 					payload,
@@ -197,13 +197,13 @@ pub struct NoBubble;
 
 
 /// Propagate the [`OnResultAction`] event to all [`ActionObservers`],
-/// and call [`OnChildResult`] on the [`Parent`] if it exists.
+/// and call [`OnChildResult`] on the [`ChildOf`] if it exists.
 pub(super) fn propagate_on_result<T: ResultPayload>(
 	ev: Trigger<OnResultAction<T>>,
 	mut commands: Commands,
 	action_observers: Query<&ActionObservers>,
 	should_bubble: Query<(), Without<NoBubble>>,
-	parents: Query<&Parent>,
+	parents: Query<&ChildOf>,
 ) {
 	let action = ev.resolve_action();
 	let origin = ev.resolve_origin();

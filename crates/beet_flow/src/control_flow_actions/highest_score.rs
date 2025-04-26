@@ -1,6 +1,6 @@
 use crate::prelude::*;
+use bevy::platform::collections::HashMap;
 use bevy::prelude::*;
-use bevy::utils::HashMap;
 use std::cmp::Ordering;
 
 /// Wrapper for an f32, representing a score. This should be between 0 and 1.
@@ -96,7 +96,7 @@ fn on_start(
 	action.clear();
 
 	for child in children.iter() {
-		commands.trigger(OnRunAction::new(*child, ev.origin, RequestScore));
+		commands.trigger(OnRunAction::new(child, ev.origin, RequestScore));
 	}
 }
 

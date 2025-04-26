@@ -44,7 +44,7 @@ impl SteerTarget {
 impl MapEntities for SteerTarget {
 	fn map_entities<M: EntityMapper>(&mut self, entity_mapper: &mut M) {
 		match self {
-			Self::Entity(entity) => *entity = entity_mapper.map_entity(*entity),
+			Self::Entity(entity) => *entity = entity_mapper.get_mapped(*entity),
 			_ => {}
 		}
 	}

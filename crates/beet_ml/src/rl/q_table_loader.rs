@@ -2,7 +2,7 @@ use crate::prelude::*;
 use bevy::asset::AssetLoader;
 use bevy::asset::LoadContext;
 use bevy::asset::io::Reader;
-use bevy::utils::ConditionalSendFuture;
+use bevy::tasks::ConditionalSendFuture;
 use serde::de::DeserializeOwned;
 use std::marker::PhantomData;
 

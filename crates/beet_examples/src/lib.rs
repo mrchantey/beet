@@ -24,6 +24,7 @@ pub(crate) mod beet {
 
 	pub mod prelude {
 		pub use beet_flow::prelude::*;
+		#[cfg(feature = "ml")]
 		pub use beet_ml::prelude::*;
 		pub use beet_spatial::prelude::*;
 	}

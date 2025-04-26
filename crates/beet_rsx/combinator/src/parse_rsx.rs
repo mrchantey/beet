@@ -15,7 +15,7 @@ where
 }
 
 #[cfg(test)]
-mod tests {
+mod test {
 	use crate::prelude::*;
 	use combine::Parser;
 	use combine::combinator::parser;

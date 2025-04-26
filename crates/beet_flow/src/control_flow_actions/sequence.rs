@@ -32,7 +32,7 @@ fn on_start(
 		.get(ev.action)
 		.expect(&expect_action::to_have_children(&ev));
 	if let Some(first_child) = children.iter().next() {
-		ev.trigger_next(&mut commands, *first_child);
+		ev.trigger_next(&mut commands, first_child);
 	} else {
 		ev.trigger_result(&mut commands, RunResult::Success);
 	}
@@ -52,7 +52,7 @@ fn on_next(
 		.expect(&expect_action::to_have_children(&ev));
 	let index = children
 		.iter()
-		.position(|&x| x == ev.child)
+		.position(|x| x == ev.child)
 		.expect(&expect_action::to_have_child(&ev, ev.child));
 	if index == children.len() - 1 {
 		ev.trigger_bubble(commands);

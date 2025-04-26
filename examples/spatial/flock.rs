@@ -29,7 +29,8 @@ fn setup(
 	let ship = asset_server.load("spaceship_pack/ship_2.png");
 
 	for _ in 0..NUM_AGENTS {
-		let position = Vec3::random_in_sphere(&mut rand).with_z(0.) * 500.;
+		let position =
+			Vec3::random_in_sphere(&mut rand.as_mut().0).with_z(0.) * 500.;
 		commands.spawn((
 			Name::new("Spaceship"),
 			Sprite {

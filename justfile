@@ -26,6 +26,10 @@ init-repo:
 	mkdir -p crates/beet_rsx/assets/fonts && cp ./assets/fonts/* crates/beet_rsx/assets/fonts
 	cargo run -p beet_router --example build
 	just cli build -p beet_site
+	cd infra && npm ci
+	mkdir -p target/lambda/crates/beet_site || true
+	echo 'dummy file so sst deploys' > target/lambda/crates/beet_site/bootstrap
+
 # just test-site
 # just export-scenes
 
@@ -38,14 +42,20 @@ cli *args:
 install-cli *args:
 	cargo install --path crates/beet-cli {{args}}
 
+sst-deploy:
+	npx sst deploy --stage production --config infra/sst.config.ts
+
+sst-remove:
+	npx sst remove --stage production --config infra/sst.config.ts
+
 deploy *args:
-	just cli deploy 								\
-	--package 				beet_site 		\
-	--function-name 	beet 					\
-	--region 					us-west-2 		\
-	--iam-role 				$AWS_IAM_ROLE \
+	just cli deploy 										\
+	--package 				beet_site 				\
+	--function-name 	BeetServerLambda	\
 	{{args}}
 
+# --region 					us-west-2 			\
+# --iam-role 				$AWS_IAM_ROLE 	\
 
 mod *args:
 	sweet mod --exclude *codegen* {{args}}
@@ -192,9 +202,11 @@ test-all *args:
 
 test crate *args:
 	just watch cargo test -p {{crate}} --lib -- 																								--watch {{args}}
+test-e2e crate *args:
+	just watch cargo test -p {{crate}} --lib --features=e2e -- 														--e2e	--watch {{args}}
 test-doc crate *args:
 	just watch cargo test -p {{crate}} --doc 																														{{args}}
-test-e2e crate test_name *args:
+test-integration crate test_name *args:
 	just watch cargo test -p {{crate}} --test {{test_name}} -- 																	--watch {{args}}
 test-feat crate *args:
 	just watch cargo test -p {{crate}} --lib --all-features -- 																					{{args}}
@@ -244,13 +256,16 @@ publish-all *args:
 	just publish beet_flow            {{args}} || true
 	just publish beet_spatial         {{args}} || true
 	just publish beet_ml              {{args}} || true
-	just publish beet_server       		{{args}} || true
 	just publish beet_sim          		{{args}} || true
+	just publish beet_examples        {{args}} || true
+	just publish beet_rsx_combinator  {{args}} || true
 	just publish beet_rsx_parser      {{args}} || true
 	just publish beet_rsx_macros      {{args}} || true
 	just publish beet_rsx             {{args}} || true
 	just publish beet_router          {{args}} || true
-	just publish beet_examples        {{args}} || true
+	just publish beet_server       		{{args}} || true
+	just publish beet_connect      		{{args}} || true
+	just publish beet_design 					{{args}} || true
 	just publish beet                 {{args}} || true
 	just publish beet-cli             {{args}} || true
 # just publish beet_examples        {{args}} || true

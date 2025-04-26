@@ -12,13 +12,13 @@ pub fn emoji_plugin(app: &mut App) {
 	app.register_type::<Emoji>()
 		.world_mut()
 		.register_component_hooks::<Emoji>()
-		.on_add(|mut world, entity, _| {
+		.on_add(|mut world, cx| {
 			let hexcode =
-				world.get::<Emoji>(entity).unwrap().hexcode().to_string();
+				world.get::<Emoji>(cx.entity).unwrap().hexcode().to_string();
 
 			world
 				.commands()
-				.entity(entity)
+				.entity(cx.entity)
 				.insert(Emoji::bundle(&hexcode));
 		});
 }

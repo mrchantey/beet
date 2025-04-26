@@ -23,5 +23,5 @@ fn main() {
 }
 
 fn increment(trigger: Trigger<OnRun>, mut query: Query<&mut TriggerCount>) {
-	query.get_mut(trigger.entity()).unwrap().as_mut().0 += 1;
+	query.get_mut(trigger.target()).unwrap().as_mut().0 += 1;
 }

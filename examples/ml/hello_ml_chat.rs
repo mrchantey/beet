@@ -29,7 +29,7 @@ fn setup(
 	asset_server: Res<AssetServer>,
 	mut ev: EventWriter<OnLogMessage>,
 ) {
-	ev.send(
+	ev.write(
 		OnLogMessage::new("Agent: I can heal or attack, what should i do?",
 		OnLogMessage::GAME_COLOR)
 		.and_log()

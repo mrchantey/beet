@@ -88,8 +88,7 @@ fn handle_recv(
 			}
 			TemplateReloaderMessage::Recompile => {
 				println!("recompilation required, exiting..");
-				// seems it doesnt actu
-				app_exit.send(AppExit::Success);
+				app_exit.write(AppExit::Success);
 				std::process::exit(0);
 			}
 		}

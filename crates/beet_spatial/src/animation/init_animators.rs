@@ -8,7 +8,7 @@ use sweet::prelude::*;
 /// that need [`AnimationTransitions`] to trigger animations.
 pub(crate) fn init_animators(
 	mut commands: Commands,
-	parents: Query<&Parent>,
+	parents: Query<&ChildOf>,
 	graphs: Query<&AnimationGraphHandle>,
 	players: Populated<Entity, Added<AnimationPlayer>>,
 ) {

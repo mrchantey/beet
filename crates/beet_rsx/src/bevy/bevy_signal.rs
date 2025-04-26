@@ -1,4 +1,5 @@
 use crate::prelude::*;
+use bevy::ecs::component::Mutable;
 use bevy::prelude::*;
 use bevy::reflect::Reflectable;
 use flume::Receiver;
@@ -45,7 +46,7 @@ impl<T: SignalPayload> SignalChannel<T> {
 /// An example implementation of bevy signals. The machinery is quite straightforward,
 /// its just an observer, but the way that the scene gets updated by changes is
 /// where things get more interesting, see [`SignalGetter`]
-#[derive(Event, Clone)]
+#[derive(Event, Component, Clone)]
 pub struct BevySignal<T> {
 	pub value: T,
 }
@@ -67,10 +68,10 @@ impl<T: SignalPayload> BevySignal<T> {
 					 mut commands: Commands,
 					 mut query: Query<&mut BevySignal<T>>| {
 						let new_val = ev.event().clone();
-						if let Ok(mut val) = query.get_mut(ev.entity()) {
+						if let Ok(mut val) = query.get_mut(ev.target()) {
 							*val = new_val;
 						} else {
-							commands.entity(ev.entity()).insert(new_val);
+							commands.entity(ev.target()).insert(new_val);
 						}
 					},
 				)
@@ -143,7 +144,7 @@ impl<T: SignalPayload> FnMut<()> for SignalGetter<T> {
 /// Trait for signals, literals and blocks that can be converted to
 /// bevy entities
 pub trait SignalOrComponent<M>: 'static + Send + Sync + Clone {
-	type Component: bevy::prelude::Component + Reflectable;
+	type Component: bevy::prelude::Component<Mutability = Mutable> + Reflectable;
 	/// Serialize using ron
 	fn into_component(self) -> Self::Component;
 
