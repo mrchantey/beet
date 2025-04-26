@@ -44,6 +44,7 @@ members = [
 	"crates/beet_ml",
 	# "crates/beet_rig",
 	"crates/beet_query",
+	"crates/beet_query/macros",
 	"crates/beet_router",
 	"crates/beet_rsx",
 	"crates/beet_rsx/macros",
@@ -67,6 +68,7 @@ beet_flow = { path = "crates/beet_flow", version = "0.0.6-rc.1" }
 beet_flow_macros = { path = "crates/beet_flow/macros", version = "0.0.6-rc.1" }
 beet_ml = { path = "crates/beet_ml", version = "0.0.6-rc.1" }
 beet_query = { path = "crates/beet_query", version = "0.0.6-rc.1" }
+beet_query_macros = { path = "crates/beet_query/macros", version = "0.0.6-rc.1" }
 beet_router = { path = "crates/beet_router", version = "0.0.6-rc.1" }
 beet_rsx = { path = "crates/beet_rsx", version = "0.0.6-rc.1" }
 beet_rsx_macros = { path = "crates/beet_rsx/macros", version = "0.0.6-rc.1" }
@@ -117,6 +119,7 @@ tokio = { version = "1", features = [
 syn = "2"
 quote = "1"
 proc-macro2 = "1"
+proc-macro2-diagnostics = "0.10"
 prettyplease = "0.2"
 
 #💡 attributes

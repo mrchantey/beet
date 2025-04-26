@@ -29,21 +29,6 @@ init-repo:
 	cd infra && npm ci
 	mkdir -p target/lambda/crates/beet_site || true
 	echo 'dummy file so sst deploys' > target/lambda/crates/beet_site/bootstrap
-
-
-testdb-init:
-	diesel setup 																				\
-	--config-file=crates/beet_query/test_diesel.toml		\
-	--database-url=crates/beet_query/test.db 						\
-	--migration-dir=crates/beet_query/test_migrations 	\
-
-
-testdb-migrate:
-	diesel migration generate --diff-schema	create_tables	\																			\
-	--config-file=crates/beet_query/test_diesel.toml			\
-	--database-url=crates/beet_query/test.db 							\
-	--migration-dir=crates/beet_query/test_migrations 		\
-
 	
 # just test-site
 # just export-scenes

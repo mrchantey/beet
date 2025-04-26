@@ -33,7 +33,7 @@ heck.workspace = true
 proc-macro2.workspace = true
 rapidhash.workspace = true
 rstml = { version = "0.12", features = ["rawtext-stable-hack"] }
-proc-macro2-diagnostics = "0.10"
+proc-macro2-diagnostics.workspace = true
 lightningcss = { workspace = true, optional = true }
 
 [dev-dependencies]

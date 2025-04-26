@@ -13,13 +13,19 @@ categories.workspace = true
 keywords.workspace = true
 
 [features]
+default = ["limbo"]
+limbo = ["dep:limbo"]
+libsql = ["dep:libsql"]
+
 
 [dependencies]
 anyhow.workspace = true
 thiserror.workspace = true
 
-diesel = { version = "2", features = ["sqlite", "returning_clauses_for_sqlite_3_35"] }
 sweet = { workspace = true, features = ["net"] }
+
+libsql = { version = "0.9", optional = true }
+limbo = { version = "0.0.19", optional = true }
 
 [dev-dependencies]
 tokio.workspace = true
@@ -27,3 +33,8 @@ sweet = { workspace = true, features = ["test"] }
 
 [build-dependencies]
 anyhow.workspace = true
+
+
+[[example]]
+name = "libsql"
+required-features = ["libsql"]
