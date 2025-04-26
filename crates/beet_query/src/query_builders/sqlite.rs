@@ -56,6 +56,9 @@ impl QueryBuilder for SqliteQueryBuilder {
 		Ok(sql)
 	}
 
+	/// Create a prepared insert statement with parameter placeholders.
+	/// This can be used in comjunction with `view.into_values()` to
+	/// get a list of values to insert.
 	fn prepare_insert<T: TableView>() -> Result<String> {
 		let mut sql = String::new();
 		sql.push_str("INSERT INTO ");
@@ -84,7 +87,9 @@ impl QueryBuilder for SqliteQueryBuilder {
 		Ok(sql)
 	}
 
-	fn execute_insert<T: TableView>(view: T) -> Result<String> {
+	/// Create an execute insert statement with values. This is vunerable
+	/// to sql injection, so use with caution.
+	fn execute_insert_unsanitized<T: TableView>(view: T) -> Result<String> {
 		let mut sql = String::new();
 		sql.push_str("INSERT INTO ");
 		sql.push_str(&T::Table::name());
@@ -195,8 +200,9 @@ mod test {
 			name: "John".to_string(),
 			age: Some(30),
 		};
-		expect(&SqliteQueryBuilder::execute_insert(view).unwrap()).to_be(
-			"INSERT INTO my_table (id, name, age) VALUES (?, 'John', 30);",
-		);
+		expect(&SqliteQueryBuilder::execute_insert_unsanitized(view).unwrap())
+			.to_be(
+				"INSERT INTO my_table (id, name, age) VALUES (?, 'John', 30);",
+			);
 	}
 }

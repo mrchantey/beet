@@ -8,5 +8,5 @@ pub trait QueryBuilder {
 	fn init<T: Table>() -> Result<String>;
 	fn drop<T: Table>() -> Result<String>;
 	fn prepare_insert<T: TableView>() -> Result<String>;
-	fn execute_insert<T: TableView>(view: T) -> Result<String>;
+	fn execute_insert_unsanitized<T: TableView>(view: T) -> Result<String>;
 }
