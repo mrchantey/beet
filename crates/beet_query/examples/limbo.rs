@@ -29,6 +29,9 @@ async fn main() {
 	// 3. Read Row
 	let rows = User::stmt_select()
 		.and_where(Expr::col(UserCols::Email).eq("foo@example.com"))
+		.xtap(|stmt| {
+			println!("{:?}", stmt.build(sea_query::SqliteQueryBuilder))
+		})
 		.to_owned()
 		.query(&conn)
 		.await
@@ -42,17 +45,22 @@ async fn main() {
 		id: 1,
 		email: "bar@example.com".into(),
 	}
-	.update_self(&conn)
+	// .update_self(&conn)
+	.stmt_update()
+	.unwrap()
+	.xtap(|stmt| println!("{:?}", stmt.build(sea_query::SqliteQueryBuilder)))
+	.execute(&conn)
+	// 	.
 	.await
 	.unwrap();
 
 	let rows = User::stmt_select()
 		// .and_where(Expr::col(UserCols::Id).eq(1))
 		// .limit(2)
-		// .and_where(Expr::col(UserCols::Email).eq("bar@example.com"))
-		// .and_where(Expr::col(UserCols::Email).eq("bar@example.com"))
+		.and_where(Expr::col(UserCols::Email).eq("bar@example.com"))
+		.and_where(Expr::col(UserCols::Email).eq("bar@example.com"))
 		.xtap(|stmt| {
-			println!("{:?}", stmt.build(sea_query::SqliteQueryBuilder))
+			println!("{:?}", stmt.to_string(sea_query::SqliteQueryBuilder))
 		})
 		.to_owned()
 		.query(&conn)
