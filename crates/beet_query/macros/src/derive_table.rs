@@ -9,6 +9,7 @@ use sweet::prelude::*;
 use syn;
 use syn::DeriveInput;
 use syn::Ident;
+use syn::LitBool;
 use syn::Result;
 
 pub fn parse_derive_table(input: DeriveInput) -> TokenStream {
@@ -31,7 +32,7 @@ struct DeriveTable<'a> {
 	/// ```
 	fields: Vec<TableField<'a>>,
 	/// This will be `MyTableColumns`
-	columns_ident: Ident,
+	cols_ident: Ident,
 	/// This will be `InsertMyTable`
 	insert_ident: Ident,
 }
@@ -53,8 +54,8 @@ impl<'a> DeriveTable<'a> {
 				.unwrap_or_else(|| {
 					input.ident.to_string().to_snake_case().to_token_stream()
 				}),
-			columns_ident: Ident::new(
-				&format!("{}Columns", &input.ident),
+			cols_ident: Ident::new(
+				&format!("{}Cols", &input.ident),
 				input.ident.span(),
 			),
 			insert_ident: Ident::new(
@@ -68,56 +69,90 @@ impl<'a> DeriveTable<'a> {
 	}
 	fn parse(&self) -> Result<TokenStream> {
 		let impl_table = self.impl_table()?;
-		let columns_struct = self.columns_struct()?;
+		let columns_enum = self.columns_enum()?;
 		let impl_columns = self.impl_into_column()?;
-		let insert_struct = self.insert_struct()?;
-		let impl_insert_table_view = self.impl_insert_table_view()?;
+		// let insert_struct = self.insert_struct()?;
+		// let impl_insert_table_view = self.impl_insert_table_view()?;
 
 		quote! {
 			use beet::prelude::*;
+			use beet::exports::sea_query;
 			#impl_table
 
-			#columns_struct
+			#columns_enum
 			#impl_columns
 
-			#insert_struct
-			#impl_insert_table_view
+			// #insert_struct
+			// #impl_insert_table_view
 		}
 		.xok()
 	}
 
 	fn impl_table(&self) -> Result<TokenStream> {
-		let if_not_exists =
-			self.table_attributes.get_value("if_not_exists").map(|v| {
-				quote! {
-					fn if_not_exists() -> bool {
-						#v
-					}
+		let if_not_exists = self
+			.table_attributes
+			.get_value_parsed::<LitBool>("if_not_exists")?
+			.map(|v| v.value())
+			.unwrap_or(true)
+			.xmap(|v| {
+				if v {
+					Some(quote! {.if_not_exists()})
+				} else {
+					None
 				}
 			});
-		let columns_ident = &self.columns_ident;
+		let cols_ident = &self.cols_ident;
+
+		let cols = self.fields.iter().map(|field| {
+			let variant_ident = &field.variant_ident;
+			// TODO foreign key
+			quote! {
+				.col(#cols_ident::#variant_ident)
+			}
+		});
+
+		let columns_ident = &self.cols_ident;
 		let ident = &self.input.ident;
 		let table_name = &self.table_name;
 		quote! {
 
 			impl Table for #ident {
 				type Columns = #columns_ident;
-				fn name() -> String {
+				fn name() -> std::borrow::Cow<'static, str> {
 					#table_name.into()
 				}
-				#if_not_exists
+				fn stmt_create_table() -> sea_query::TableCreateStatement{
+				sea_query::Table::create()
+					.table(CowIden::new(#table_name))
+					#if_not_exists
+					#(#cols)*
+					.to_owned()
+				}
 			}
-
 		}
 		.xok()
 	}
-	fn columns_struct(&self) -> Result<TokenStream> {
-		let variants = self.fields.iter().map(|field| &field.variant_ident);
+	fn columns_enum(&self) -> Result<TokenStream> {
+		let variants = self.fields.iter().map(|field| {
+			let iden_attrs = field
+				.inner
+				.inner
+				.attrs
+				.iter()
+				.filter(|attr| attr.path().is_ident("iden"));
+
+			let variant_ident = &field.variant_ident;
+			quote! {
+				#(#iden_attrs)*
+				#variant_ident
+			}
+		});
 
 		let vis = &self.input.vis;
 
-		let columns_ident = &self.columns_ident;
+		let columns_ident = &self.cols_ident;
 		quote! {
+			#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash , sea_query::Iden)]
 			#vis enum #columns_ident {
 				#(#variants),*
 			}
@@ -125,10 +160,10 @@ impl<'a> DeriveTable<'a> {
 		.xok()
 	}
 	fn impl_into_column(&self) -> Result<TokenStream> {
-		let match_column = self
+		let col_defs = self
 			.fields
 			.iter()
-			.map(parse_column)
+			.map(parse_col_def)
 			.collect::<Result<Vec<_>>>()?;
 
 		let variants = self
@@ -144,18 +179,19 @@ impl<'a> DeriveTable<'a> {
 			.collect::<Result<Vec<_>>>()?;
 
 		let table_ident = &self.input.ident;
-		let columns_ident = &self.columns_ident;
+		let columns_ident = &self.cols_ident;
 		quote! {
 			impl Columns for #columns_ident {
 				type Table = #table_ident;
 
-				fn all() -> Vec<Column> {
-					vec![#(#variants.into_column()),*]
+				fn all() -> Vec<sea_query::ColumnDef> {
+					vec![#(#variants.into_column_def()),*]
 				}
-
-				fn into_column(&self) -> Column {
+			}
+			impl sea_query::IntoColumnDef for #columns_ident {
+				fn into_column_def(self) -> sea_query::ColumnDef {
 					match self {
-						#(#match_column),*
+						#(#col_defs),*
 					}
 				}
 			}
@@ -189,7 +225,7 @@ impl<'a> DeriveTable<'a> {
 
 	fn impl_insert_table_view(&self) -> Result<TokenStream> {
 		let insert_ident = &self.insert_ident;
-		let columns_ident = &self.columns_ident;
+		let columns_ident = &self.cols_ident;
 
 		let columns = self.fields.iter().filter_map(|field| {
 			let variant_ident = &field.variant_ident;
@@ -237,44 +273,53 @@ impl<'a> DeriveTable<'a> {
 	}
 }
 
+fn parse_col_def(field: &TableField) -> Result<TokenStream> {
+	// we now use derive Iden with #[iden="foo"] instead
+	// let name = field
+	// 	.attributes
+	// 	.get_value("name")
+	// 	.map(ToTokens::to_token_stream)
+	// 	.unwrap_or_else(|| field.ident.to_string().to_token_stream());
+	let value_type = field.column_type()?;
 
+	let not_null = if field.is_optional() {
+		None
+	} else {
+		Some(quote! {.not_null()})
+	};
 
+	let primary_key = if field.primary_key {
+		Some(quote! {.primary_key()})
+	} else {
+		None
+	};
 
-
-
-
-fn parse_column(field: &TableField) -> Result<TokenStream> {
-	let name = field
-		.attributes
-		.get_value("name")
-		.map(ToTokens::to_token_stream)
-		.unwrap_or_else(|| field.ident.to_string().to_token_stream());
-	let value_type = field.value_type()?;
-
-	let optional = field.is_optional();
-
+	let auto_increment = if field.auto_increment {
+		Some(quote! {.auto_increment()})
+	} else {
+		None
+	};
 
 	let default_value = match field.attributes.get_value("default") {
-		Some(value) => quote! {
-			Some(#value.into())
-		},
-		None => quote! {None},
+		Some(value) => Some(quote! {.default(#value)}),
+		None => None,
+	};
+	let unique = if field.unique {
+		Some(quote! {.unique()})
+	} else {
+		None
 	};
 
 	let ident = &field.variant_ident;
-	let primary_key = &field.primary_key;
-	let auto_increment = &field.auto_increment;
-	let unique = &field.unique;
 	quote! {
-		Self::#ident => Column{
-			name: #name.into(),
-			value_type: #value_type,
-			optional: #optional,
-			default_value: #default_value,
-			primary_key: #primary_key,
-			auto_increment: #auto_increment,
-			unique: #unique,
-		}
+		Self::#ident =>
+			sea_query::ColumnDef::new_with_type(self,#value_type)
+			#primary_key
+			#auto_increment
+			#unique
+			#default_value
+			#not_null
+			.to_owned()
 	}
 	.xok()
 }

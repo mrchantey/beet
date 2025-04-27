@@ -1,6 +1,7 @@
 use super::QueryBuilder;
 use crate::prelude::*;
 use anyhow::Result;
+use base64::prelude::*;
 
 pub struct SqliteQueryBuilder;
 
@@ -138,7 +139,7 @@ impl SqliteQueryBuilder {
 			}
 			Value::Blob(b) => {
 				sql.push('\'');
-				sql.push_str(&base64::encode(b));
+				sql.push_str(&base64::prelude::BASE64_STANDARD.encode(b));
 				sql.push('\'');
 			}
 			Value::Null => sql.push('?'),

@@ -64,19 +64,21 @@ impl<'a> TableField<'a> {
 			&& self.attributes.contains("default") == false
 	}
 
-	pub fn value_type(&self) -> Result<TokenStream> {
+
+	/// This is the ident of the type builder portion of a ColumnDef:
+	pub fn column_type(&self) -> Result<TokenStream> {
 		self.attributes
-			.get_value("value_type")
+			.get_value("type")
 			.map(|v| v.to_token_stream().xok())
 			.unwrap_or_else(|| {
-				parse_value_type(self).map(|v| v.to_token_stream())
+				parse_column_type(self).map(|v| v.to_token_stream())
 			})
 	}
 }
 
 
-
-fn parse_value_type(field: &NamedField) -> Result<Expr> {
+/// This is the [sea_query::ColumnType] passed into [`sea_query::ColumnDef::new_with_type`]
+fn parse_column_type(field: &NamedField) -> Result<Expr> {
 	let Type::Path(type_path) = &field.inner_ty else {
 		return Err(syn::Error::new(
 			field.inner.ty.span(),
@@ -93,15 +95,32 @@ fn parse_value_type(field: &NamedField) -> Result<Expr> {
 		.ident
 		.to_string();
 
+	// untested but a good start
 	#[rustfmt::skip]
 	let expr:Expr = match ident.as_str() {
-		"String" | "str" => parse_quote!(ValueType::Text),
-		"u8" | "u16" | "u32" | "u64" | "i8" | "i16" | "i32" | "i64" => parse_quote!(ValueType::Integer),
-		"f32" | "f64" => parse_quote!(ValueType::Real),
-		"bool" => parse_quote!(ValueType::Integer), // SQLite stores booleans as integers
-		"chrono::NaiveDateTime" | "chrono::DateTime" => parse_quote!(ValueType::Text), // Dates as text
-		"Vec" => parse_quote!(ValueType::Blob),
-		"()" => parse_quote!(ValueType::Null),
+    "String" | "str" => parse_quote!(sea_query::ColumnType::Text),
+    "i8" => parse_quote!(sea_query::ColumnType::TinyInteger),
+    "i16" => parse_quote!(sea_query::ColumnType::SmallInteger),
+    "i32" | "isize" => parse_quote!(sea_query::ColumnType::Integer),
+    "i64" => parse_quote!(sea_query::ColumnType::BigInteger),
+    "u8" => parse_quote!(sea_query::ColumnType::TinyUnsigned),
+    "u16" => parse_quote!(sea_query::ColumnType::SmallUnsigned),
+    "u32" | "usize" => parse_quote!(sea_query::ColumnType::Unsigned),
+    "u64" => parse_quote!(sea_query::ColumnType::BigUnsigned),
+    "f32" => parse_quote!(sea_query::ColumnType::Float),
+    "f64" => parse_quote!(sea_query::ColumnType::Double),
+    "bool" => parse_quote!(sea_query::ColumnType::Boolean),
+    "char" => parse_quote!(sea_query::ColumnType::Char(Some(1))),
+    "Vec<u8>" | "[u8]" => parse_quote!(sea_query::ColumnType::Blob),
+    "Uuid" => parse_quote!(sea_query::ColumnType::Uuid),
+    "NaiveDateTime" => parse_quote!(sea_query::ColumnType::DateTime),
+    "DateTime<Utc>" | "DateTime<FixedOffset>" => parse_quote!(sea_query::ColumnType::TimestampWithTimeZone),
+    "NaiveDate" => parse_quote!(sea_query::ColumnType::Date),
+    "NaiveTime" => parse_quote!(sea_query::ColumnType::Time),
+    "Json" | "Value" => parse_quote!(sea_query::ColumnType::Json),
+    "Decimal" => parse_quote!(sea_query::ColumnType::Decimal(None)),
+    "IpAddr" | "Ipv4Addr" | "Ipv6Addr" => parse_quote!(sea_query::ColumnType::Inet),
+    "MacAddr" => parse_quote!(sea_query::ColumnType::MacAddr),
 		_ => {
 			return Err(syn::Error::new(
 				field.inner.ty.span(),

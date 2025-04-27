@@ -17,14 +17,15 @@ default = ["limbo"]
 limbo = ["dep:limbo"]
 libsql = ["dep:libsql"]
 
-
 [dependencies]
 anyhow.workspace = true
 thiserror.workspace = true
 beet_query_macros.workspace = true
+extend.workspace = true
 
 sweet = { workspace = true, features = ["net"] }
 
+sea-query = { version = "0.32" }
 base64 = { version = "0" }
 libsql = { version = "0.9", optional = true }
 limbo = { version = "0.0.19", optional = true }

@@ -1,20 +1,27 @@
 #![cfg_attr(test, feature(test, custom_test_frameworks))]
 #![cfg_attr(test, test_runner(sweet::test_runner))]
+#![allow(async_fn_in_trait)]
 
 
 // #[cfg(test)]
 // pub mod testdb;
+// pub mod query_builders;
 pub mod types;
-pub mod query_builders;
-
+pub mod utils;
 // pub use beet_query_macros::*;
 
 pub mod prelude {
 	pub use beet_query_macros::*;
 	// #[cfg(test)]
 	// pub use crate::testdb::*;
+	// pub use crate::query_builders::*;
 	pub use crate::types::*;
-	pub use crate::query_builders::*;
+	pub use crate::utils::*;
+	pub use sea_query::IntoColumnDef;
+}
+
+pub mod exports {
+	pub use sea_query;
 }
 
 
@@ -22,7 +29,9 @@ pub mod prelude {
 pub mod as_beet {
 	pub use crate::prelude::*;
 
+
 	pub mod beet {
+		pub use crate::exports;
 		pub use crate::prelude;
 	}
 }

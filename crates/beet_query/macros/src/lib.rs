@@ -16,7 +16,7 @@ use syn::parse_macro_input;
 ///
 /// }
 /// ```
-#[proc_macro_derive(Table, attributes(table, field))]
+#[proc_macro_derive(Table, attributes(table, field, iden))]
 pub fn table(input: TokenStream) -> TokenStream {
 	let input = parse_macro_input!(input as DeriveInput);
 	derive_table::parse_derive_table(input).into()

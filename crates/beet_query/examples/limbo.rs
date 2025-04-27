@@ -18,24 +18,23 @@ async fn main() {
 
 	// conn.query("select 1; select 1;", ()).await.unwrap();
 
-	conn.execute(&SqliteQueryBuilder::init::<User>().unwrap(), ())
-		.await
-		.unwrap();
 
-	let mut stmt = conn
-		.prepare(&SqliteQueryBuilder::prepare_insert::<InsertUser>().unwrap())
-		.await
-		.unwrap();
+	User::create_table(&conn).await.unwrap();
 
-	stmt.execute(
-		InsertUser {
-			email: "bar@example.com".into(),
-		}
-		.into_values()
-		.unwrap(),
-	)
-	.await
-	.unwrap();
+	// let mut stmt = conn
+	// 	.prepare(&SqliteQueryBuilder::prepare_insert::<InsertUser>().unwrap())
+	// 	.await
+	// 	.unwrap();
+
+	// stmt.execute(
+	// 	InsertUser {
+	// 		email: "bar@example.com".into(),
+	// 	}
+	// 	.into_values()
+	// 	.unwrap(),
+	// )
+	// .await
+	// .unwrap();
 
 	let mut stmt = conn
 		.prepare("SELECT * FROM users WHERE email = ?1")
