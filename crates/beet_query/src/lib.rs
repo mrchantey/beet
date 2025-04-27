@@ -1,16 +1,21 @@
 #![cfg_attr(test, feature(test, custom_test_frameworks))]
 #![cfg_attr(test, test_runner(sweet::test_runner))]
 #![allow(async_fn_in_trait)]
+#![feature(let_chains)]
 
 
 // #[cfg(test)]
 // pub mod testdb;
 // pub mod query_builders;
+#[cfg(feature = "limbo")]
+pub mod limbo;
 pub mod types;
 pub mod utils;
 // pub use beet_query_macros::*;
 
 pub mod prelude {
+	#[cfg(feature = "limbo")]
+	pub use crate::limbo::*;
 	pub use beet_query_macros::*;
 	// #[cfg(test)]
 	// pub use crate::testdb::*;

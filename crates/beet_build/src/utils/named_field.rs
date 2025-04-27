@@ -17,7 +17,7 @@ use syn::parse_quote;
 /// A wrapper around [`syn::Field`] that provides additional functionality
 #[derive(Debug)]
 pub struct NamedField<'a> {
-	pub inner: &'a Field,
+	pub syn_field: &'a Field,
 	/// The `Bar` in `foo: Bar` or `foo: Option<Bar>`
 	pub inner_ty: &'a Type,
 	/// The `(Bar,Bazz)` in `foo: Bar<Bazz>` or `foo: Option<Bar<Bazz>>`
@@ -67,14 +67,14 @@ impl<'a> NamedField<'a> {
 			inner_ty,
 			ident,
 			// ident: &inner.ident,
-			inner,
+			syn_field: inner,
 			attributes,
 		})
 	}
 
 	/// Returs whether this field is of type `Option<T>`.
 	pub fn is_optional(&self) -> bool {
-		matches!(self.inner.ty, Type::Path(ref p) if p.path.segments.last()
+		matches!(self.syn_field.ty, Type::Path(ref p) if p.path.segments.last()
 				.map(|s| s.ident == "Option")
 				.unwrap_or(false))
 	}
@@ -146,7 +146,7 @@ impl<'a> NamedField<'a> {
 	///
 	/// This will collect all `#[doc = "..."]` attributes, including the ones generated via `///` and `//!`.
 	pub fn docs(&self) -> Vec<&Attribute> {
-		self.inner
+		self.syn_field
 			.attrs
 			.iter()
 			.filter_map(|attr| match &attr.meta {

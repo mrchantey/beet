@@ -14,7 +14,7 @@ use syn::spanned::Spanned;
 
 pub struct TableField<'a> {
 	/// The original field
-	pub inner: NamedField<'a>,
+	pub named_field: NamedField<'a>,
 	/// The TitleCase `Foo` for a field `foo`
 	pub variant_ident: Ident,
 	/// The `PRIMARY KEY` attribute
@@ -27,7 +27,7 @@ pub struct TableField<'a> {
 
 impl<'a> std::ops::Deref for TableField<'a> {
 	type Target = NamedField<'a>;
-	fn deref(&self) -> &Self::Target { &self.inner }
+	fn deref(&self) -> &Self::Target { &self.named_field }
 }
 
 
@@ -48,22 +48,13 @@ impl<'a> TableField<'a> {
 		let unique = inner.attributes.contains("unique");
 
 		Self {
-			inner,
+			named_field: inner,
 			variant_ident,
 			primary_key,
 			auto_increment,
 			unique,
 		}
 	}
-
-	/// When constructing the default Insert type, this field
-	/// will be marked non-optional.
-	pub fn insert_required(&self) -> bool {
-		self.is_optional() == false
-			&& self.primary_key == false
-			&& self.attributes.contains("default") == false
-	}
-
 
 	/// This is the ident of the type builder portion of a ColumnDef:
 	pub fn column_type(&self) -> Result<TokenStream> {
@@ -74,14 +65,23 @@ impl<'a> TableField<'a> {
 				parse_column_type(self).map(|v| v.to_token_stream())
 			})
 	}
+	/// returns false if the field is either:
+	/// - a primary key without partial_include
+	/// - a non-primary key with partial_exclude
+	#[rustfmt::skip]
+	pub fn partial_exclude(&self) -> bool {
+		 (self.primary_key && !self.attributes.contains("partial_include"))
+		 || self.attributes.contains("partial_exclude") 
+	}
 }
+
 
 
 /// This is the [sea_query::ColumnType] passed into [`sea_query::ColumnDef::new_with_type`]
 fn parse_column_type(field: &NamedField) -> Result<Expr> {
 	let Type::Path(type_path) = &field.inner_ty else {
 		return Err(syn::Error::new(
-			field.inner.ty.span(),
+			field.syn_field.ty.span(),
 			"Only path types are supported",
 		));
 	};
@@ -123,7 +123,7 @@ fn parse_column_type(field: &NamedField) -> Result<Expr> {
     "MacAddr" => parse_quote!(sea_query::ColumnType::MacAddr),
 		_ => {
 			return Err(syn::Error::new(
-				field.inner.ty.span(),
+				field.syn_field.ty.span(),
 				format!("Unsupported type: {}", ident),
 			));
 		}

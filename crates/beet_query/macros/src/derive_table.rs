@@ -12,15 +12,15 @@ use syn::Ident;
 use syn::LitBool;
 use syn::Result;
 
-pub fn parse_derive_table(input: DeriveInput) -> TokenStream {
-	DeriveTable::new(&input)
-		.and_then(|table| table.parse())
-		.unwrap_or_else(|err| err.into_compile_error())
-}
 
-struct DeriveTable<'a> {
+
+pub(crate) struct DeriveTable<'a> {
 	input: &'a DeriveInput,
-	/// the name of the table
+	/// The ident used by `TableView`, for a #[derive(Table)]
+	/// this is Self, but for a #[derive(TableView)] this is
+	/// #[table_view(table=User)]
+	table_ident: Ident,
+	/// the name of the table, ie "users"
 	table_name: TokenStream,
 	/// the attributes of the table
 	/// ie `#[table(name = "foo", if_not_exists)]`
@@ -33,8 +33,8 @@ struct DeriveTable<'a> {
 	fields: Vec<TableField<'a>>,
 	/// This will be `MyTableColumns`
 	cols_ident: Ident,
-	/// This will be `InsertMyTable`
-	insert_ident: Ident,
+	/// This will be `MyTablePartial`
+	partial_ident: Ident,
 }
 
 impl<'a> DeriveTable<'a> {
@@ -46,46 +46,71 @@ impl<'a> DeriveTable<'a> {
 			.map(|f| f.xmap(|f| TableField::new(f)))
 			.collect::<Vec<_>>();
 
+		let table_view_attributes =
+			AttributeGroup::parse(&input.attrs, "table_view")?;
+		table_view_attributes.validate_allowed_keys(&["table"])?;
+		let table_ident = table_view_attributes
+			.get_value_parsed::<Ident>("table")?
+			.unwrap_or_else(|| input.ident.clone());
+
 		Self {
 			input,
 			table_name: attributes
-				.get_value("name")
+			.get_value("name")
 				.map(ToTokens::to_token_stream)
 				.unwrap_or_else(|| {
-					input.ident.to_string().to_snake_case().to_token_stream()
+					table_ident.to_string().to_snake_case().to_token_stream()
 				}),
-			cols_ident: Ident::new(
-				&format!("{}Cols", &input.ident),
-				input.ident.span(),
-			),
-			insert_ident: Ident::new(
-				&format!("Insert{}", &input.ident),
-				input.ident.span(),
+				cols_ident: Ident::new(
+					&format!("{}Cols", &table_ident),
+					table_ident.span(),
+				),
+			partial_ident: Ident::new(
+				&format!("{}Partial", &table_ident),
+				table_ident.span(),
 			),
 			table_attributes: attributes,
+			table_ident,
 			fields,
 		}
 		.xok()
 	}
-	fn parse(&self) -> Result<TokenStream> {
+	pub fn parse_derive_table(input: DeriveInput) -> TokenStream {
+		DeriveTable::new(&input)
+			.and_then(|table| table.parse_derive_table_inner())
+			.unwrap_or_else(|err| err.into_compile_error())
+	}
+	pub fn parse_derive_table_view(input: DeriveInput) -> TokenStream {
+		DeriveTable::new(&input)
+			.and_then(|table| table.parse_derive_table_view_inner())
+			.unwrap_or_else(|err| err.into_compile_error())
+	}
+
+	fn parse_derive_table_inner(&self) -> Result<TokenStream> {
 		let impl_table = self.impl_table()?;
 		let columns_enum = self.columns_enum()?;
-		let impl_columns = self.impl_into_column()?;
-		// let insert_struct = self.insert_struct()?;
-		let impl_full_table_view = self.impl_full_table_view()?;
-		// let impl_partial_table_view = self.impl_partial_table_view()?;
+		let impl_columns = self.impl_columns()?;
+		let partial_table = self.partial_table()?;
+		let impl_table_view = self.impl_table_view()?;
 
 
 		quote! {
 			use beet::prelude::*;
-			use beet::exports::sea_query;
 			#impl_table
+			#impl_table_view
 
 			#columns_enum
 			#impl_columns
 
-			// #insert_struct
-			#impl_full_table_view
+			#partial_table
+		}
+		.xok()
+	}
+	fn parse_derive_table_view_inner(&self) -> Result<TokenStream> {
+		let impl_table_view = self.impl_table_view()?;
+		quote! {
+			use beet::prelude::*;
+			#impl_table_view
 		}
 		.xok()
 	}
@@ -123,8 +148,8 @@ impl<'a> DeriveTable<'a> {
 				fn name() -> std::borrow::Cow<'static, str> {
 					#table_name.into()
 				}
-				fn stmt_create_table() -> sea_query::TableCreateStatement{
-				sea_query::Table::create()
+				fn stmt_create_table() -> beet::exports::sea_query::TableCreateStatement{
+					beet::exports::sea_query::Table::create()
 					.table(CowIden::new(#table_name))
 					#if_not_exists
 					#(#cols)*
@@ -137,8 +162,8 @@ impl<'a> DeriveTable<'a> {
 	fn columns_enum(&self) -> Result<TokenStream> {
 		let variants = self.fields.iter().map(|field| {
 			let iden_attrs = field
-				.inner
-				.inner
+				.named_field
+				.syn_field
 				.attrs
 				.iter()
 				.filter(|attr| attr.path().is_ident("iden"));
@@ -154,14 +179,14 @@ impl<'a> DeriveTable<'a> {
 
 		let columns_ident = &self.cols_ident;
 		quote! {
-			#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash , sea_query::Iden)]
+			#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash , beet::exports::sea_query::Iden)]
 			#vis enum #columns_ident {
 				#(#variants),*
 			}
 		}
 		.xok()
 	}
-	fn impl_into_column(&self) -> Result<TokenStream> {
+	fn impl_columns(&self) -> Result<TokenStream> {
 		let col_defs = self
 			.fields
 			.iter()
@@ -170,21 +195,33 @@ impl<'a> DeriveTable<'a> {
 
 		let variants = self.fields.iter().map(|field| &field.variant_ident);
 
+		let primary_key = self
+			.fields
+			.iter()
+			.find(|field| field.primary_key)
+			.map(|field| {
+				let variant = &field.variant_ident;
+				quote! {
+					fn primary_key() -> Option<Self> {
+						Some(Self::#variant)
+					}
+				}
+			});
+
 		let table_ident = &self.input.ident;
 		let columns_ident = &self.cols_ident;
 		quote! {
 			impl Columns for #columns_ident {
 				type Table = #table_ident;
 
+				#primary_key
+
 				fn variants() -> Vec<Self> {
 					vec![#(Self::#variants),*]
 				}
-				// fn all() -> Vec<sea_query::ColumnDef> {
-				// 	vec![#(#variants.into_column_def()),*]
-				// }
 			}
-			impl sea_query::IntoColumnDef for #columns_ident {
-				fn into_column_def(self) -> sea_query::ColumnDef {
+			impl beet::exports::sea_query::IntoColumnDef for #columns_ident {
+				fn into_column_def(self) -> beet::exports::sea_query::ColumnDef {
 					match self {
 						#(#col_defs),*
 					}
@@ -194,32 +231,39 @@ impl<'a> DeriveTable<'a> {
 		.xok()
 	}
 
-	fn insert_struct(&self) -> Result<TokenStream> {
-		let fields = self.fields.iter().map(|field| {
-			let ident = &field.ident;
-			let inner_ty = &field.inner_ty;
-			if field.insert_required() {
-				quote! {
-					#ident: #inner_ty
-				}
+
+	/// Build a partial version of the table, ie `UserPartial` without
+	/// primary keys and fields marked with `partial_exclude`
+	fn partial_table(&self) -> Result<TokenStream> {
+		let fields = self.fields.iter().filter_map(|field| {
+			if field.partial_exclude() {
+				None
 			} else {
-				quote! {
-					#ident: Option<#inner_ty>
-				}
+				let ident = &field.ident;
+				let ty = &field.named_field.syn_field.ty;
+				Some(quote! {
+					#ident: #ty
+				})
 			}
 		});
 		let vis = &self.input.vis;
-		let insert_ident = &self.insert_ident;
+		let partial_ident = &self.partial_ident;
+
+		let table_ident = &self.input.ident;
 		quote! {
-			#vis struct #insert_ident {
+			#[derive(TableView)]
+			#[table_view(table = #table_ident)]
+			#vis struct #partial_ident {
 				#(#fields),*
 			}
 		}
 		.xok()
 	}
 
-	/// Implements `TableView` for the table, ie `Users`
-	fn impl_full_table_view(&self) -> Result<TokenStream> {
+	/// Implements `TableView` for the table
+	fn impl_table_view(&self) -> Result<TokenStream> {
+		let col_variants = self.fields.iter().map(|field| &field.variant_ident);
+
 		let push_values = self.fields.iter().map(|field| {
 			let ident = &field.ident;
 			if field.is_optional() {
@@ -237,68 +281,35 @@ impl<'a> DeriveTable<'a> {
 			}
 		});
 
+		let primary_value = self
+			.fields
+			.iter()
+			.find(|field| field.primary_key)
+			.map(|field| {
+				let ident = &field.ident;
+				quote! {
+					fn primary_value(&self) -> Option<beet::exports::sea_query::Value> {
+						Some(self.#ident.into())
+					}
+				}
+			});
+
 		let ident = &self.input.ident;
+		let table_ident = &self.table_ident;
 		let cols_ident = &self.cols_ident;
 
 		quote! {
-				impl TableView for #ident{
-					type Table = Self;
-					fn columns() -> Vec<#cols_ident> {
-						#cols_ident::variants()
-					}
-					fn into_values(self) -> sea_query::Values {
-						let mut values = vec![];
-						#(#push_values)*
-						sea_query::Values(values)
-					}
-			}
-		}
-		.xok()
-	}
-
-	/// Implements `TableView` for the table, ie `UsersPartial`
-	fn impl_partial_table_view(&self) -> Result<TokenStream> {
-		let insert_ident = &self.insert_ident;
-		let columns_ident = &self.cols_ident;
-
-		let columns = self.fields.iter().filter_map(|field| {
-			let variant_ident = &field.variant_ident;
-			// if field.insert_required() {
-			Some(quote! {#columns_ident::#variant_ident})
-			// } else {
-			// 	None
-			// }
-		});
-
-		let push_values = self.fields.iter().map(|field| {
-			let ident = &field.ident;
-			if field.insert_required() {
-				quote! {
-					values.push(self.#ident.try_into_value()?);
-				}
-			} else {
-				quote! {
-					if let Some(v) = self.#ident {
-						values.push(v.try_into_value()?);
-					} else {
-						values.push(Value::Null);
-					}
-				}
-			}
-		});
-
-		let table_ident = &self.input.ident;
-
-		quote! {
-			impl TableView for #insert_ident{
+			impl TableView for #ident{
 				type Table = #table_ident;
-				fn columns() -> Vec<#columns_ident> {
-					vec![#(#columns),*]
+				#primary_value
+
+				fn columns() -> Vec<#cols_ident> {
+					vec![#(#cols_ident::#col_variants),*]
 				}
-				fn into_values(self) -> ParseValueResult<Vec<Value>> {
+				fn into_values(self) -> beet::exports::sea_query::Values {
 					let mut values = vec![];
 					#(#push_values)*
-					Ok(values)
+					beet::exports::sea_query::Values(values)
 				}
 
 			}
@@ -347,7 +358,7 @@ fn parse_col_def(field: &TableField) -> Result<TokenStream> {
 	let ident = &field.variant_ident;
 	quote! {
 		Self::#ident =>
-			sea_query::ColumnDef::new_with_type(self,#value_type)
+			beet::exports::sea_query::ColumnDef::new_with_type(self,#value_type)
 			#primary_key
 			#auto_increment
 			#unique
@@ -361,15 +372,16 @@ fn parse_col_def(field: &TableField) -> Result<TokenStream> {
 
 #[cfg(test)]
 mod test {
-	use super::parse_derive_table;
 	use quote::quote;
 	use sweet::prelude::*;
 	use syn::parse_quote;
 
+	use super::DeriveTable;
+
 	#[test]
 	fn default() {
 		expect(
-			parse_derive_table(parse_quote! {
+			DeriveTable::parse_derive_table(parse_quote! {
 				#[derive(Table)]
 				struct MyTable {
 					test: u32,
@@ -429,7 +441,7 @@ mod test {
 	#[test]
 	fn with_attributes() {
 		expect(
-			parse_derive_table(parse_quote! {
+			DeriveTable::parse_derive_table(parse_quote! {
 				#[derive(Table)]
 				#[table(name = "foobar",if_not_exists = false)]
 				pub struct MyTable {

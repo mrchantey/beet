@@ -868,6 +868,8 @@ dependencies = [
  "extend",
  "libsql",
  "limbo",
+ "once_cell",
+ "rapidhash",
  "sea-query",
  "sweet",
  "thiserror 1.0.69",
@@ -5542,8 +5544,6 @@ dependencies = [
 [[package]]
 name = "limbo"
 version = "0.0.19"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f40b741793e16e49b35922ad495433444b5b763084cdb74175956b71b0b8b3bb"
 dependencies = [
  "limbo_core",
  "thiserror 2.0.12",
@@ -5552,8 +5552,6 @@ dependencies = [
 [[package]]
 name = "limbo_core"
 version = "0.0.19"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3ea40cfa0f5f4321b40d44cafce938dcc52afd31e20cffc4ea7a2bea53716e25"
 dependencies = [
  "built",
  "cfg_block",
@@ -5589,8 +5587,6 @@ dependencies = [
 [[package]]
 name = "limbo_ext"
 version = "0.0.19"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bdd995bc2389a08959548f8cabef9d7ba8d208576aa2ecf645599d46a88c9a7b"
 dependencies = [
  "chrono",
  "getrandom 0.3.2",
@@ -5600,8 +5596,6 @@ dependencies = [
 [[package]]
 name = "limbo_macros"
 version = "0.0.19"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d4f2161c85c3d14175c0b12434abf26a68f6e485aba7f4e0fc15669097c19432"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -5611,8 +5605,6 @@ dependencies = [
 [[package]]
 name = "limbo_sqlite3_parser"
 version = "0.0.19"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7090eafe03ee47481bb5dc78272c9bec8e454afaa727432defb47aa7e4592ebb"
 dependencies = [
  "bitflags 2.9.0",
  "cc",
@@ -5632,8 +5624,6 @@ dependencies = [
 [[package]]
 name = "limbo_time"
 version = "0.0.19"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "654c51ae1460cab6f26a98bf663f15f5a5f597dffcb693d19a21310c681f6fc9"
 dependencies = [
  "chrono",
  "limbo_ext",
@@ -5646,8 +5636,6 @@ dependencies = [
 [[package]]
 name = "limbo_uuid"
 version = "0.0.19"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "971b9aae768c6ececd51b69419887e00f24de44493b7d9566b01bd4b48cd6541"
 dependencies = [
  "limbo_ext",
  "mimalloc",

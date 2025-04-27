@@ -16,7 +16,14 @@ fn main() {
 #[table(name = "users")]
 // #[allow(unused)]
 struct User {
+	id: i32,
 	#[iden = "contact"]
 	#[field(default = "foobar")]
+	email: String,
+}
+
+#[derive(Default, TableView)]
+#[table_view(table = User)]
+struct UserEmail {
 	email: String,
 }

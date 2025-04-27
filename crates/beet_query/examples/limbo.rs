@@ -1,62 +1,63 @@
 //! https://github.com/tursodatabase/limbo/blob/main/bindings/rust/examples/example.rs
 use beet_query::as_beet::*;
-use limbo::Builder;
+use sea_query::Expr;
+use sweet::prelude::PipelineTarget;
 
 #[derive(Table)]
-#[table(name = "users")]
-#[allow(unused)]
 struct User {
+	id: u32,
 	email: String,
 }
 
 
 #[tokio::main]
 async fn main() {
-	let db = Builder::new_local(":memory:").build().await.unwrap();
-	let conn = db.connect().unwrap();
+	let conn = LimboUtils::memory_db().await.unwrap();
+
+	// 1. Initialize Schema
 	User::create_table(&conn).await.unwrap();
 
-	// insert uncached
-	User {
-		email: "bar@example.com".into(),
+	// 2. Create Row
+	UserPartial {
+		email: "foo@example.com".into(),
 	}
 	.insert(&conn)
 	.await
 	.unwrap();
-	// User {
-	// 	email: "bar@example.com".into(),
-	// }
-	// .prepare(&conn)
-	// .await
-	// .unwrap();
 
 
-	// let mut stmt = conn
-	// 	.prepare(&SqliteQueryBuilder::prepare_insert::<InsertUser>().unwrap())
-	// 	.await
-	// 	.unwrap();
-
-	// stmt.execute(
-	// 	InsertUser {
-	// 		email: "bar@example.com".into(),
-	// 	}
-	// 	.into_values()
-	// 	.unwrap(),
-	// )
-	// .await
-	// .unwrap();
-
-	let mut stmt = conn
-		.prepare("SELECT * FROM users WHERE email = ?1")
+	// 3. Read Row
+	let rows = User::stmt_select()
+		.and_where(Expr::col(UserCols::Email).eq("foo@example.com"))
+		.to_owned()
+		.query(&conn)
 		.await
 		.unwrap();
+	assert!(rows.len() == 1);
 
-	let mut rows = stmt.query(["bar@example.com"]).await.unwrap();
+	println!("Rows: {:?}", rows);
 
-	let row = rows.next().await.unwrap().unwrap();
+	// 4. Update Row
+	User {
+		id: 1,
+		email: "bar@example.com".into(),
+	}
+	.update_self(&conn)
+	.await
+	.unwrap();
 
-	let value = row.get_value(0).unwrap();
-
-
-	println!("Row: {:?}", value);
+	let rows = User::stmt_select()
+		// .and_where(Expr::col(UserCols::Id).eq(1))
+		// .limit(2)
+		// .and_where(Expr::col(UserCols::Email).eq("bar@example.com"))
+		// .and_where(Expr::col(UserCols::Email).eq("bar@example.com"))
+		.xtap(|stmt| {
+			println!("{:?}", stmt.build(sea_query::SqliteQueryBuilder))
+		})
+		.to_owned()
+		.query(&conn)
+		.await
+		.unwrap();
+	println!("Rows: {:?}", rows);
+	assert!(rows.len() == 1);
 }

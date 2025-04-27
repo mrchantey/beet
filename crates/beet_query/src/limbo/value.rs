@@ -1,4 +1,4 @@
-#[extend::ext(name=SeaQueryValuesExt)]
+#[extend::ext(name=SeaQueryValuesToLimbo)]
 pub impl sea_query::Values {
 	fn into_limbo_values(self) -> Vec<limbo::Value> {
 		self.0
@@ -10,7 +10,7 @@ pub impl sea_query::Values {
 
 
 
-#[extend::ext(name=SeaQueryValueExt)]
+#[extend::ext(name=SeaQueryValueToLimbo)]
 pub impl sea_query::Value {
 	/// Converts a [`sea_query::Value`] into a [`limbo::Value`].
 	/// Limbo values are sqlite values:
@@ -65,6 +65,22 @@ pub impl sea_query::Value {
 			sea_query::Value::Bytes(Some(items)) => limbo::Value::Blob(*items),
 			// for all None option types
 			_ => limbo::Value::Null,
+		}
+	}
+}
+
+
+#[extend::ext(name=LimboValueToSeaQuery)]
+pub impl limbo::Value {
+	#[rustfmt::skip]
+	fn into_sea_query_value(self) -> sea_query::Value {
+		match self {
+			// no null, i guess int is fine?
+			Self::Null => sea_query::Value::Int(None),
+			Self::Integer(i) => sea_query::Value::BigInt(Some(i)),
+			Self::Real(f) => sea_query::Value::Double(Some(f)),
+			Self::Text(text) => sea_query::Value::String(Some(Box::new(text))),
+			Self::Blob(items) => sea_query::Value::Bytes(Some(Box::new(items))),
 		}
 	}
 }

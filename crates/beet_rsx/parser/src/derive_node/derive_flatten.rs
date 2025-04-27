@@ -30,7 +30,7 @@ pub fn impl_flatten(
 			.filter(|field|field.attributes.contains("flatten"))
 			.map(|field| {
 				let field_ident = &field.ident;
-				let field_type = &field.inner.ty;
+				let field_type = &field.syn_field.ty;
 				let second_order_as_mut = second_order_impl(target_ident,input, field)?;
 
 				Ok(quote! {
@@ -72,7 +72,7 @@ fn second_order_impl(
 		}else{
 			syn::parse2(expr.to_token_stream())?
 		};
-		if ty == field.inner.ty {
+		if ty == field.syn_field.ty {
 			// its already implemented, should we warn unnecessary attr value?
 			return Ok(TokenStream::default());
 		}

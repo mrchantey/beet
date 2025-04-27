@@ -52,7 +52,7 @@ fn impl_buildable(
 		.iter()
 		.map(|field| {
 			let name = &field.ident;
-			let actual_ty = &field.inner.ty;
+			let actual_ty = &field.syn_field.ty;
 			let (generics, builder_ty, expr) = NodeField::assign_tokens(field)?;
 			let docs = field.docs();
 
