@@ -72,7 +72,9 @@ impl<'a> DeriveTable<'a> {
 		let columns_enum = self.columns_enum()?;
 		let impl_columns = self.impl_into_column()?;
 		// let insert_struct = self.insert_struct()?;
-		// let impl_insert_table_view = self.impl_insert_table_view()?;
+		let impl_full_table_view = self.impl_full_table_view()?;
+		// let impl_partial_table_view = self.impl_partial_table_view()?;
+
 
 		quote! {
 			use beet::prelude::*;
@@ -83,7 +85,7 @@ impl<'a> DeriveTable<'a> {
 			#impl_columns
 
 			// #insert_struct
-			// #impl_insert_table_view
+			#impl_full_table_view
 		}
 		.xok()
 	}
@@ -166,17 +168,7 @@ impl<'a> DeriveTable<'a> {
 			.map(parse_col_def)
 			.collect::<Result<Vec<_>>>()?;
 
-		let variants = self
-			.fields
-			.iter()
-			.map(|field| {
-				let ident = &field.variant_ident;
-				quote! {
-					Self::#ident
-				}
-				.xok()
-			})
-			.collect::<Result<Vec<_>>>()?;
+		let variants = self.fields.iter().map(|field| &field.variant_ident);
 
 		let table_ident = &self.input.ident;
 		let columns_ident = &self.cols_ident;
@@ -184,9 +176,12 @@ impl<'a> DeriveTable<'a> {
 			impl Columns for #columns_ident {
 				type Table = #table_ident;
 
-				fn all() -> Vec<sea_query::ColumnDef> {
-					vec![#(#variants.into_column_def()),*]
+				fn variants() -> Vec<Self> {
+					vec![#(Self::#variants),*]
 				}
+				// fn all() -> Vec<sea_query::ColumnDef> {
+				// 	vec![#(#variants.into_column_def()),*]
+				// }
 			}
 			impl sea_query::IntoColumnDef for #columns_ident {
 				fn into_column_def(self) -> sea_query::ColumnDef {
@@ -223,7 +218,46 @@ impl<'a> DeriveTable<'a> {
 		.xok()
 	}
 
-	fn impl_insert_table_view(&self) -> Result<TokenStream> {
+	/// Implements `TableView` for the table, ie `Users`
+	fn impl_full_table_view(&self) -> Result<TokenStream> {
+		let push_values = self.fields.iter().map(|field| {
+			let ident = &field.ident;
+			if field.is_optional() {
+				quote! {
+					if let Some(v) = self.#ident {
+						values.push(v.into());
+					} else {
+						values.push(Value::Null);
+					}
+				}
+			} else {
+				quote! {
+					values.push(self.#ident.into());
+				}
+			}
+		});
+
+		let ident = &self.input.ident;
+		let cols_ident = &self.cols_ident;
+
+		quote! {
+				impl TableView for #ident{
+					type Table = Self;
+					fn columns() -> Vec<#cols_ident> {
+						#cols_ident::variants()
+					}
+					fn into_values(self) -> sea_query::Values {
+						let mut values = vec![];
+						#(#push_values)*
+						sea_query::Values(values)
+					}
+			}
+		}
+		.xok()
+	}
+
+	/// Implements `TableView` for the table, ie `UsersPartial`
+	fn impl_partial_table_view(&self) -> Result<TokenStream> {
 		let insert_ident = &self.insert_ident;
 		let columns_ident = &self.cols_ident;
 

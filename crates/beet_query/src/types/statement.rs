@@ -26,3 +26,28 @@ impl<T: QueryStatementBuilder> Statement<QueryStatementBuilderMarker> for T {
 		self.build_any(&schema_builder)
 	}
 }
+
+
+pub struct CachedStatement {}
+
+
+
+#[cfg(test)]
+mod test {
+	use crate::as_beet::*;
+	use sea_query::SqliteQueryBuilder;
+
+	#[derive(Table)]
+	struct Foo {
+		bar: u32,
+	}
+
+
+	#[test]
+	fn works() {
+		let stmt2 = Foo { bar: 3 }.stmt_insert().unwrap();
+		let (placeholder2, values2) = stmt2.build_any(&SqliteQueryBuilder);
+		println!("SQL: {}", placeholder2);
+		println!("Values: {:?}", values2);
+	}
+}

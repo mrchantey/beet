@@ -13,13 +13,23 @@ struct User {
 #[tokio::main]
 async fn main() {
 	let db = Builder::new_local(":memory:").build().await.unwrap();
-
 	let conn = db.connect().unwrap();
-
-	// conn.query("select 1; select 1;", ()).await.unwrap();
-
-
 	User::create_table(&conn).await.unwrap();
+
+	// insert uncached
+	User {
+		email: "bar@example.com".into(),
+	}
+	.insert(&conn)
+	.await
+	.unwrap();
+	// User {
+	// 	email: "bar@example.com".into(),
+	// }
+	// .prepare(&conn)
+	// .await
+	// .unwrap();
+
 
 	// let mut stmt = conn
 	// 	.prepare(&SqliteQueryBuilder::prepare_insert::<InsertUser>().unwrap())

@@ -5,6 +5,10 @@ use sea_query::SqliteQueryBuilder;
 
 pub trait Connection {
 	async fn execute<M>(&self, stmt: impl Statement<M>) -> Result<()>;
+	// async fn prepare<M>(
+	// 	&self,
+	// 	stmt: impl Statement<M>,
+	// ) -> Result<CachedStatement>;
 }
 
 
@@ -15,4 +19,12 @@ impl Connection for limbo::Connection {
 		self.execute(&sql, values.into_limbo_values()).await?;
 		Ok(())
 	}
+
+	// async fn prepare<M>(
+	// 	&self,
+	// 	stmt: impl Statement<M>,
+	// ) -> Result<(CachedStatement)> {
+	// 	let (sql, values) = stmt.build(SqliteQueryBuilder);
+	// 	self.prepare(&sql, values.into_limbo_values()).await
+	// }
 }
