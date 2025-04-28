@@ -3,14 +3,18 @@ use anyhow::Result;
 use sea_query::QueryStatementBuilder;
 use sea_query::SchemaBuilder;
 use sea_query::SchemaStatementBuilder;
-use sea_query::Values;
+use sweet::prelude::*;
 
 pub trait Statement<M>: Sized {
-	fn build<T: SchemaBuilder>(&self, schema_builder: T) -> (String, Values);
-	async fn execute(self, conn: &impl Connection) -> Result<()> {
+	/// Build a [`SeaQuery`] statement into [`beet::Rows`](Rows)
+	fn build<T: SchemaBuilder>(
+		&self,
+		schema_builder: T,
+	) -> ConvertValueResult<(String, Row)>;
+	async fn execute(self, conn: &impl ConnectionInner) -> Result<()> {
 		conn.execute(self).await
 	}
-	async fn query(self, conn: &impl Connection) -> Result<SeaQueryRows> {
+	async fn query(self, conn: &impl ConnectionInner) -> Result<Rows> {
 		conn.query(self).await
 	}
 }
@@ -18,16 +22,23 @@ pub trait Statement<M>: Sized {
 pub struct SchemaStatementBuilderMarker;
 
 impl<T: SchemaStatementBuilder> Statement<SchemaStatementBuilderMarker> for T {
-	fn build<U: SchemaBuilder>(&self, schema_builder: U) -> (String, Values) {
-		(T::build(self, schema_builder), Values(Vec::new()))
+	fn build<U: SchemaBuilder>(
+		&self,
+		schema_builder: U,
+	) -> ConvertValueResult<(String, Row)> {
+		(T::build(self, schema_builder), Row::default()).xok()
 	}
 }
 
 pub struct QueryStatementBuilderMarker;
 
 impl<T: QueryStatementBuilder> Statement<QueryStatementBuilderMarker> for T {
-	fn build<U: SchemaBuilder>(&self, schema_builder: U) -> (String, Values) {
+	fn build<U: SchemaBuilder>(
+		&self,
+		schema_builder: U,
+	) -> ConvertValueResult<(String, Row)> {
 		T::build_any(self, &schema_builder)
+			.xmap(|(sql, values)| (sql, values.into_row()?).xok())
 	}
 }
 

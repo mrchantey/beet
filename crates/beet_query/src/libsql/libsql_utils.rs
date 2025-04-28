@@ -1,13 +1,15 @@
 use crate::prelude::*;
 use anyhow::Result;
-use libsql::*;
 use sweet::prelude::*;
 
 pub struct LibsqlUtils;
 
 impl LibsqlUtils {
 	pub async fn memory_db() -> Result<libsql::Connection, libsql::Error> {
-		Builder::new_local(":memory:").build().await?.connect()
+		libsql::Builder::new_local(":memory:")
+			.build()
+			.await?
+			.connect()
 	}
 	pub async fn remote_db() -> Result<libsql::Connection> {
 		let url = std::env::var("LIBSQL_URL")?;
@@ -15,7 +17,7 @@ impl LibsqlUtils {
 			println!("LIBSQL_TOKEN not set, using empty token...");
 			"".to_string()
 		});
-		Builder::new_remote(url, token)
+		libsql::Builder::new_remote(url, token)
 			.build()
 			.await?
 			.connect()?
@@ -33,17 +35,17 @@ impl LibsqlUtils {
 		}
 	}
 
-	pub async fn collect_rows(mut rows: libsql::Rows) -> Result<SeaQueryRows> {
-		let mut result = Vec::new();
-		while let Some(row) = rows.next().await? {
-			let mut cells = Vec::new();
-			for i in 0..row.column_count() {
-				let value = row.get_value(i)?;
-				cells.push(value.into_sea_query_value());
+	pub async fn collect_rows(mut rows_in: libsql::Rows) -> Result<Rows> {
+		let mut rows_out = Rows::default();
+		while let Some(row_in) = rows_in.next().await? {
+			let mut row_out = Row::default();
+			for i in 0..row_in.column_count() {
+				let value = row_in.get_value(i)?;
+				row_out.push(value.into_value()?);
 			}
-			result.push(cells);
+			rows_out.push(row_out);
 		}
-		Ok(result)
+		Ok(rows_out)
 	}
 }
 

@@ -1,6 +1,5 @@
 use crate::prelude::*;
 use anyhow::Result;
-use sea_query::Values;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::sync::Mutex;
@@ -31,29 +30,35 @@ impl CachedStatementInner for LibsqlStatementWrapper {
 
 	fn execute<'a>(
 		&'a mut self,
-		values: Values,
+		row: Row,
 	) -> Pin<Box<dyn Future<Output = Result<()>> + 'a>> {
 		Box::pin(async move {
 			let mut stmt = self.statement.lock().unwrap();
-			libsql::Statement::execute(&mut *stmt, values.into_libsql_values())
-				.await?
-				.xmap(LibsqlUtils::parse_step_result)
-				.xmap(|_| {})
-				.xok()
+			libsql::Statement::execute(
+				&mut *stmt,
+				row.into_other::<libsql::Value>()?,
+			)
+			.await?
+			.xmap(LibsqlUtils::parse_step_result)
+			.xmap(|_| {})
+			.xok()
 		})
 	}
 
 	fn query<'a>(
 		&'a mut self,
-		values: Values,
-	) -> Pin<Box<dyn Future<Output = Result<SeaQueryRows>> + 'a>> {
+		row: Row,
+	) -> Pin<Box<dyn Future<Output = Result<Rows>> + 'a>> {
 		Box::pin(async move {
 			let mut stmt = self.statement.lock().unwrap();
-			libsql::Statement::query(&mut *stmt, values.into_libsql_values())
-				.await?
-				.xmap(LibsqlUtils::collect_rows)
-				.await?
-				.xok()
+			libsql::Statement::query(
+				&mut *stmt,
+				row.into_other::<libsql::Value>()?,
+			)
+			.await?
+			.xmap(LibsqlUtils::collect_rows)
+			.await?
+			.xok()
 		})
 	}
 }

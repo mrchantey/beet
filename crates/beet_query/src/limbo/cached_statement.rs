@@ -1,6 +1,5 @@
 use crate::prelude::*;
 use anyhow::Result;
-use sea_query::Values;
 use std::pin::Pin;
 use sweet::prelude::*;
 
@@ -19,10 +18,10 @@ impl CachedStatementInner for limbo::Statement {
 	#[allow(unused)]
 	fn execute<'a>(
 		&'a mut self,
-		values: Values,
+		row: Row,
 	) -> Pin<Box<dyn Future<Output = Result<()>> + 'a>> {
 		Box::pin(async move {
-			limbo::Statement::execute(self, values.into_limbo_values())
+			limbo::Statement::execute(self, row.into_other::<limbo::Value>()?)
 				.await?
 				.xmap(LimboUtils::step_result_err)?
 				.xok()
@@ -30,10 +29,10 @@ impl CachedStatementInner for limbo::Statement {
 	}
 	fn query<'a>(
 		&'a mut self,
-		values: Values,
-	) -> Pin<Box<dyn Future<Output = Result<SeaQueryRows>> + 'a>> {
+		row: Row,
+	) -> Pin<Box<dyn Future<Output = Result<Rows>> + 'a>> {
 		Box::pin(async move {
-			limbo::Statement::query(self, values.into_limbo_values())
+			limbo::Statement::query(self, row.into_other::<limbo::Value>()?)
 				.await?
 				.xmap(LimboUtils::collect_rows)
 				.await?

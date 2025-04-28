@@ -21,7 +21,7 @@ pub mod prelude {
 	pub use crate::limbo::*;
 	#[cfg(feature = "libsql")]
 	pub use crate::libsql::*;
-	// pub use crate::sea_query::*;
+	pub use crate::sea_query::*;
 	pub use beet_query_macros::*;
 	// #[cfg(test)]
 	// pub use crate::testdb::*;

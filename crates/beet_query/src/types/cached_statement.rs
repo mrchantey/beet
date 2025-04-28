@@ -1,8 +1,7 @@
+use crate::prelude::*;
 use anyhow::Result;
 use once_cell::sync::Lazy;
 use rapidhash::RapidHashMap;
-use sea_query::Value;
-use sea_query::Values;
 use std::pin::Pin;
 
 #[cfg(not(all(feature = "tokio", not(target_arch = "wasm32"))))]
@@ -66,20 +65,15 @@ impl CachedStatement {
 
 impl CachedStatement {
 	pub fn new(inner: Box<dyn CachedStatementInner>) -> Self { Self { inner } }
-	pub async fn execute<'a>(&'a mut self, values: Values) -> Result<()> {
+	pub async fn execute<'a>(&'a mut self, row: Row) -> Result<()> {
 		self.inner.reset();
-		self.inner.execute(values).await
+		self.inner.execute(row).await
 	}
-	pub async fn query<'a>(
-		&'a mut self,
-		values: Values,
-	) -> Result<SeaQueryRows> {
+	pub async fn query<'a>(&'a mut self, row: Row) -> Result<Rows> {
 		self.inner.reset();
-		self.inner.query(values).await
+		self.inner.query(row).await
 	}
 }
-
-pub type SeaQueryRows = Vec<Vec<Value>>;
 
 /// All the annoying clone and pin stuff wrapping execute and query calls
 pub trait CachedStatementInner: 'static + Send + Sync {
@@ -90,13 +84,13 @@ pub trait CachedStatementInner: 'static + Send + Sync {
 
 	fn execute<'a>(
 		&'a mut self,
-		values: Values,
+		row: Row,
 	) -> Pin<Box<dyn Future<Output = Result<()>> + 'a>>;
 
 	fn query<'a>(
 		&'a mut self,
-		values: Values,
-	) -> Pin<Box<dyn Future<Output = Result<SeaQueryRows>> + 'a>>;
+		row: Row,
+	) -> Pin<Box<dyn Future<Output = Result<Rows>> + 'a>>;
 }
 
 

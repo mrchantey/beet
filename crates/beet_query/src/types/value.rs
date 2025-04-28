@@ -1,7 +1,4 @@
-use std::str::FromStr;
-
-// pub type Row = Vec<Value>;
-// pub type Rows = Vec<Row>;
+use crate::prelude::*;
 
 pub type ConvertValueResult<T> = Result<T, ConvertValueError>;
 
@@ -32,7 +29,7 @@ impl ConvertValueError {
 }
 
 /// Sqlite types are the lowest common denominator of all sql types
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq, PartialOrd)]
 pub enum Value {
 	Null,
 	Integer(i64),
@@ -41,15 +38,30 @@ pub enum Value {
 	Blob(Vec<u8>),
 }
 
-impl Value {
-	// pub fn into_other<T, M>(self) -> ConvertValueResult<T>
-	// where
-	// 	T: ConvertValue<T, M>,
-	// {
-	// 	T::from_value(self)
-	// }
+impl std::fmt::Display for Value {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		match self {
+			Value::Null => write!(f, "NULL"),
+			Value::Integer(val) => write!(f, "{}", val),
+			Value::Real(val) => write!(f, "{}", val),
+			Value::Text(val) => write!(f, "'{}'", val),
+			Value::Blob(val) => {
+				write!(
+					f,
+					"[{}]",
+					val.iter()
+						.map(|v| v.to_string())
+						.collect::<Vec<_>>()
+						.join(", ")
+				)
+			}
+		}
+	}
 }
 
+impl Value {}
+/// Convert a [`Value`] into another type by specifying the type
+/// but not the marker.
 pub trait ValueIntoOther<M> {
 	/// Convert a [`Value`] into another type that implements [`ConvertValue`],
 	/// for example [`sea_query::Value`] or [`libsql::Value`]
@@ -66,72 +78,8 @@ impl<M> ValueIntoOther<M> for Value {
 		T::from_value(self)
 	}
 }
-
-/// Sqlite types are the lowest common denominator of all the types
-#[derive(Debug, Copy, Clone, PartialEq)]
-pub enum ValueType {
-	/// Starting from 1 to match sqlite
-	Integer = 1,
-	Real,
-	Text,
-	Blob,
-	Null,
-}
-
-pub trait TypeIntoValueType: Sized {
-	fn into_value_type() -> ValueType;
-}
-pub trait ValueIntoValueType: Sized {
-	fn into_value_type(&self) -> ValueType;
-}
-
-
-macro_rules! impl_into_value_type {
-	($($t:ty => $value_type:expr),* $(,)?) => {
-		$(
-			impl TypeIntoValueType for $t {
-				fn into_value_type() -> ValueType { $value_type }
-			}
-		)*
-	};
-}
-
-impl_into_value_type! {
-	u8 => ValueType::Integer,
-	u16 => ValueType::Integer,
-	u32 => ValueType::Integer,
-	u64 => ValueType::Integer,
-	i8 => ValueType::Integer,
-	i16 => ValueType::Integer,
-	i32 => ValueType::Integer,
-	i64 => ValueType::Integer,
-	usize => ValueType::Integer,
-	isize => ValueType::Integer,
-	f32 => ValueType::Real,
-	f64 => ValueType::Real,
-	String => ValueType::Text,
-	Vec<u8> => ValueType::Blob,
-	// str=> ValueType::Text,
-}
-
-
-impl FromStr for ValueType {
-	type Err = anyhow::Error;
-
-	fn from_str(s: &str) -> std::result::Result<ValueType, Self::Err> {
-		match s {
-			"TEXT" => Ok(ValueType::Text),
-			"INTEGER" => Ok(ValueType::Integer),
-			"BLOB" => Ok(ValueType::Blob),
-			"NULL" => Ok(ValueType::Null),
-			"REAL" => Ok(ValueType::Real),
-			_ => anyhow::bail!("Invalid ValueType: {}", s),
-		}
-	}
-}
-
-impl Value {
-	pub fn value_type(&self) -> ValueType {
+impl ValueIntoValueType for Value {
+	fn value_type(&self) -> ValueType {
 		match self {
 			Value::Null => ValueType::Null,
 			Value::Integer(_) => ValueType::Integer,

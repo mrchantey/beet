@@ -16,7 +16,7 @@ pub trait Table {
 	fn stmt_create_table() -> TableCreateStatement;
 
 	/// Execute a `CREATE TABLE` statement with this table's [`stmt_create_table`](Table::stmt_create_table)
-	async fn create_table(conn: &impl Connection) -> Result<()> {
+	async fn create_table(conn: &impl ConnectionInner) -> Result<()> {
 		conn.execute_uncached(Self::stmt_create_table()).await
 	}
 }
@@ -42,7 +42,7 @@ pub trait Columns: Sized + IntoColumnDef + ValueIntoValueType {
 	/// Returns the type of the primary key column, or `ValueType::Null` if there is no primary key
 	fn primary_key_value_type() -> ValueType {
 		Self::primary_key()
-			.map(|col| col.into_value_type())
+			.map(|col| col.value_type())
 			.unwrap_or(ValueType::Null)
 	}
 }

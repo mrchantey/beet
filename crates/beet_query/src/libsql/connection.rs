@@ -5,10 +5,11 @@ use sea_query::SqliteQueryBuilder;
 use sweet::prelude::PipelineTarget;
 
 #[cfg(feature = "libsql")]
-impl Connection for libsql::Connection {
+impl ConnectionInner for libsql::Connection {
 	async fn execute_uncached<M>(&self, stmt: impl Statement<M>) -> Result<()> {
-		let (sql, values) = stmt.build(SqliteQueryBuilder);
-		self.execute(&sql, values.into_libsql_values()).await?;
+		let (sql, row) = stmt.build(SqliteQueryBuilder)?;
+		self.execute(&sql, row.into_other::<libsql::Value>()?)
+			.await?;
 		Ok(())
 	}
 

@@ -4,10 +4,11 @@ use sea_query::SqliteQueryBuilder;
 use sweet::prelude::PipelineTarget;
 
 #[cfg(feature = "limbo")]
-impl Connection for limbo::Connection {
+impl ConnectionInner for limbo::Connection {
 	async fn execute_uncached<M>(&self, stmt: impl Statement<M>) -> Result<()> {
-		let (sql, values) = stmt.build(SqliteQueryBuilder);
-		self.execute(&sql, values.into_limbo_values()).await?;
+		let (sql, row) = stmt.build(SqliteQueryBuilder)?;
+		self.execute(&sql, row.into_other::<limbo::Value>()?)
+			.await?;
 		Ok(())
 	}
 

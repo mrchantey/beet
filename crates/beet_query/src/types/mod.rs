@@ -1,3 +1,5 @@
+mod value_type;
+pub use value_type::*;
 mod row;
 pub use row::*;
 mod table_view;

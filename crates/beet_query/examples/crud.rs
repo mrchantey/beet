@@ -57,6 +57,5 @@ async fn main() {
 		.unwrap();
 	assert!(rows.len() == 1);
 	assert_eq!(rows[0][1].to_string(), "'bar@example.com'");
-	// println!("Rows: {:?}", rows);
-	println!("success!");
+	println!("{}", rows);
 }

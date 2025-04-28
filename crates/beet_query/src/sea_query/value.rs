@@ -62,3 +62,16 @@ impl ValueType {
 		}
 	}
 }
+
+
+#[extend::ext(name=SeaQueryValuesExt)]
+pub impl sea_query::Values {
+	fn into_row(self) -> ConvertValueResult<Row> {
+		Row::new(
+			self.into_iter()
+				.map(|v| v.into_value())
+				.collect::<ConvertValueResult<Vec<_>>>()?,
+		)
+		.xok()
+	}
+}

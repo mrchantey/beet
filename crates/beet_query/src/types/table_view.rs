@@ -95,15 +95,15 @@ pub trait TableView: Sized {
 			.xok()
 	}
 
-	async fn insert(self, conn: &impl Connection) -> Result<()> {
+	async fn insert(self, conn: &impl ConnectionInner) -> Result<()> {
 		conn.execute(self.stmt_insert()?).await
 	}
-	async fn insert_uncached(self, conn: &impl Connection) -> Result<()> {
+	async fn insert_uncached(self, conn: &impl ConnectionInner) -> Result<()> {
 		conn.execute_uncached(self.stmt_insert()?).await
 	}
 
 
-	async fn update_self(self, conn: &impl Connection) -> Result<()> {
+	async fn update_self(self, conn: &impl ConnectionInner) -> Result<()> {
 		let kvp = self.primary_kvp()?;
 		let mut stmt = self.stmt_update()?;
 		stmt.and_where(
@@ -114,7 +114,7 @@ pub trait TableView: Sized {
 	}
 
 	async fn select_by_primary<M>(
-		conn: &impl Connection,
+		conn: &impl ConnectionInner,
 		value: Self::PrimaryKey,
 	) -> Result<Self>
 	where
@@ -135,8 +135,12 @@ pub trait TableView: Sized {
 			Expr::col(primary_key)
 				.eq(value.into_other::<sea_query::SimpleExpr>()?),
 		);
-		todo!()
-		// conn.query(stmt).await?
+
+		conn.query(stmt)
+			.await?
+			.exactly_one()?
+			.xmap(Self::from_row)?
+			.xok()
 	}
 }
 

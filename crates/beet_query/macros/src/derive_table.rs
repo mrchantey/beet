@@ -216,7 +216,7 @@ impl<'a> DeriveTable<'a> {
 				.unwrap_or_else(|| field.inner_ty.to_token_stream());
 			let variant_ident = &field.variant_ident;
 			quote! {
-				Self::#variant_ident => #value_type::into_value_type()
+				Self::#variant_ident => #value_type::value_type()
 			}
 		});
 
@@ -240,7 +240,7 @@ impl<'a> DeriveTable<'a> {
 				}
 			}
 			impl ValueIntoValueType for #columns_ident {
-				fn into_value_type(&self) -> ValueType {
+				fn value_type(&self) -> ValueType {
 					match self {
 						#(#value_types),*
 					}
@@ -400,7 +400,7 @@ fn parse_col_def(field: &TableField) -> Result<TokenStream> {
 	let ident = &field.variant_ident;
 	quote! {
 		Self::#ident =>{
-			let column_type = self.into_value_type().into_column_type();
+			let column_type = self.value_type().into_column_type();
 			beet::exports::sea_query::ColumnDef::new_with_type(self,column_type)
 			#primary_key
 			#auto_increment
