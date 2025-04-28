@@ -14,7 +14,7 @@ pub impl sea_query::Values {
 pub impl sea_query::Value {
 	/// Converts a [`sea_query::Value`] into a [`libsql::Value`].
 	/// Libsql values are sqlite values:
-	/// ```no_run
+	/// ```ignore
 	/// Null,
 	/// Integer(i64),
 	/// Real(f64),
