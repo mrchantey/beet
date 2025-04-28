@@ -1,5 +1,4 @@
 use crate::prelude::*;
-use anyhow::Result;
 use sea_query::ColumnDef;
 use sea_query::Iden;
 use sea_query::TableCreateStatement;
@@ -15,10 +14,6 @@ pub trait Table {
 	/// usually with options defined in `#[derive(Table)]`
 	fn stmt_create_table() -> TableCreateStatement;
 
-	/// Execute a `CREATE TABLE` statement with this table's [`stmt_create_table`](Table::stmt_create_table)
-	async fn create_table(conn: &Connection) -> Result<()> {
-		conn.execute(Self::stmt_create_table()).await
-	}
 }
 
 /// A trait for a list of columns in a table

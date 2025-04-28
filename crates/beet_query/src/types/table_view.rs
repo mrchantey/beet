@@ -95,22 +95,19 @@ pub trait TableView: Sized {
 			.xok()
 	}
 
-	async fn insert(self, conn: &Connection) -> Result<()> {
-		conn.execute(self.stmt_insert()?).await
-	}
-
-	async fn update_self(self, conn: &Connection) -> Result<()> {
+	async fn update_self(self, db: &Database) -> Result<()> {
 		let kvp = self.primary_kvp()?;
-		let mut stmt = self.stmt_update()?;
-		stmt.and_where(
-			Expr::col(kvp.0).eq(kvp.1.into_other::<sea_query::SimpleExpr>()?),
-		);
-		// println!("{:?}", stmt.build(sea_query::SqliteQueryBuilder));
-		conn.execute(stmt).await
+		self.stmt_update()?
+			.and_where(
+				Expr::col(kvp.0)
+					.eq(kvp.1.into_other::<sea_query::SimpleExpr>()?),
+			)
+			.execute(db)
+			.await
 	}
 
 	async fn select_by_primary<M>(
-		conn: &Connection,
+		db: &Database,
 		value: Self::PrimaryKey,
 	) -> Result<Self>
 	where
@@ -130,13 +127,12 @@ pub trait TableView: Sized {
 		stmt.and_where(
 			Expr::col(primary_key)
 				.eq(value.into_other::<sea_query::SimpleExpr>()?),
-		);
-
-		conn.query(stmt)
-			.await?
-			.exactly_one()?
-			.xmap(Self::from_row)?
-			.xok()
+		)
+		.query(&db)
+		.await?
+		.exactly_one()?
+		.xmap(Self::from_row)?
+		.xok()
 	}
 }
 

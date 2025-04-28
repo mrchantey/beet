@@ -116,14 +116,14 @@ mod test {
 	async fn works() {
 		use sea_query::SqliteQueryBuilder;
 
-		let conn = Connection::new().await.unwrap();
-		MyTable::create_table(&conn).await.unwrap();
+		let db = Database::new().await.unwrap();
+		db.create_table::<MyTable>().await.unwrap();
 		let row = MyTable { name: "foo".into() };
 		let stmt = row.clone().stmt_insert().unwrap();
-		row.insert(&conn).await.unwrap();
-		expect(conn.cached_statements.read().await.len()).to_be(1);
+		db.insert(row).await.unwrap();
+		expect(db.statement_cache.read().await.len()).to_be(1);
 		expect(
-			conn.cached_statements
+			db.statement_cache
 				.read()
 				.await
 				.get(&rapidhash::rapidhash(

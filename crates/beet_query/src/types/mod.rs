@@ -1,4 +1,6 @@
 mod value_type;
+mod database;
+pub use database::*;
 pub use value_type::*;
 mod row;
 pub use row::*;

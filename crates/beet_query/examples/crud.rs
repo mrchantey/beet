@@ -12,28 +12,28 @@ struct User {
 #[tokio::main]
 async fn main() {
 	// #[cfg(feature = "libsql")]
-	let conn = Connection::new().await.unwrap();
+	let db = Database::new().await.unwrap();
 	// #[cfg(not(feature = "libsql"))]
 	// let conn = LimboUtils::memory_db().await.unwrap();
 
 	// 1. Initialize Schema
-	User::create_table(&conn).await.unwrap();
+	db.create_table::<User>().await.unwrap();
 
 	// 2. Create Row
-	UserPartial {
+	db.insert(UserPartial {
 		email: "foo@example.com".into(),
-	}
-	.insert(&conn)
+	})
 	.await
 	.ok()
 	.unwrap();
 
 
 	// 3. Read Row
-	let rows = User::stmt_select()
-		.and_where(Expr::col(UserCols::Email).eq("foo@example.com"))
-		.to_owned()
-		.query(&conn)
+	let rows = db
+		.query(
+			User::stmt_select()
+				.and_where(Expr::col(UserCols::Email).eq("foo@example.com")),
+		)
 		.await
 		.unwrap();
 	assert!(rows.len() == 1);
@@ -44,7 +44,7 @@ async fn main() {
 		id: 1,
 		email: "bar@example.com".into(),
 	}
-	.update_self(&conn)
+	.update_self(&db)
 	.await
 	.unwrap();
 
@@ -52,7 +52,7 @@ async fn main() {
 	let rows = User::stmt_select()
 		.and_where(Expr::col(UserCols::Email).eq("bar@example.com"))
 		.to_owned()
-		.query(&conn)
+		.query(&db)
 		.await
 		.unwrap();
 	assert!(rows.len() == 1);

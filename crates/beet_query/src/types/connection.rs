@@ -1,59 +1,6 @@
 use crate::prelude::*;
 use anyhow::Result;
 
-#[derive(Clone)]
-pub struct Connection {
-	pub variant: ConnectionVariant,
-	pub cached_statements: CachedStatementMap,
-}
-
-
-
-impl Connection {
-	pub async fn new() -> Result<Self> {
-		let variant = ConnectionVariant::new().await?;
-		let cached_statements = Default::default();
-		Ok(Self {
-			variant,
-			cached_statements,
-		})
-	}
-
-	async fn get_or_prepare(&self, sql: &str) -> Result<CachedStatement> {
-		self.cached_statements
-			.get_or_prepare(sql, || Box::pin(self.variant.prepare(sql)))
-			.await
-	}
-
-	/// Execute a statement:
-	///
-	/// ## Caching
-	/// The caching strategy is automatically determined based on
-	/// the statement type:
-	/// - [`Schema`](sea_query::SchemaStatementBuilder) statements like
-	///  creating tables or indexes are executed without caching
-	/// - [`Query`](sea_query::QueryStatementBuilder) statements like
-	/// `SELECT`, `INSERT`, `UPDATE` and `DELETE are cached
-	pub async fn execute<M>(&self, stmt: impl Statement<M>) -> Result<()> {
-		if stmt.statement_type() == StatementType::Schema {
-			self.variant.execute_uncached(stmt).await
-		} else {
-			self.execute_cached(stmt).await
-		}
-	}
-	pub async fn query<M>(&self, stmt: impl Statement<M>) -> Result<Rows> {
-		let (sql, values) = stmt.build(&*self.variant.statement_builder())?;
-		self.get_or_prepare(&sql).await?.query(values).await
-	}
-
-	/// Execute a statement and automatically cache it for next call. This
-	/// is usually used by [`Query`](sea_query::QueryStatementBuilder) statements
-	/// like `SELECT`, `INSERT`, `UPDATE` and `DELETE`.
-	async fn execute_cached<M>(&self, stmt: impl Statement<M>) -> Result<()> {
-		let (sql, values) = stmt.build(&*self.variant.statement_builder())?;
-		self.get_or_prepare(&sql).await?.execute(values).await
-	}
-}
 
 
 /// Unified connection type for all supported backends.
@@ -63,16 +10,16 @@ impl Connection {
 /// - `libsql`
 /// - `limbo`
 #[derive(Clone)]
-pub enum ConnectionVariant {
+pub enum Connection {
 	#[cfg(feature = "libsql")]
 	Libsql(libsql::Connection),
 	#[cfg(feature = "limbo")]
 	Limbo(limbo::Connection),
 }
 
-impl ConnectionVariant {}
+impl Connection {}
 
-impl ConnectionInner for ConnectionVariant {
+impl ConnectionInner for Connection {
 	fn statement_builder(&self) -> Box<dyn StatementBuilder> {
 		match self {
 			#[cfg(feature = "libsql")]
@@ -89,7 +36,10 @@ impl ConnectionInner for ConnectionVariant {
 		#[allow(unused)]
 		return Ok(Self::Limbo(limbo::Connection::new().await?));
 	}
-	async fn execute_uncached<M>(&self, stmt: impl Statement<M>) -> Result<()> {
+	async fn execute_uncached<M>(
+		&self,
+		stmt: &impl Statement<M>,
+	) -> Result<()> {
 		match self {
 			#[cfg(feature = "libsql")]
 			Self::Libsql(conn) => ConnectionInner::execute_uncached(conn, stmt).await,
@@ -120,7 +70,8 @@ pub trait ConnectionInner: Sized {
 	/// Execute a statement without caching it. This is usually used
 	/// by [`Schema`](sea_query::SchemaStatementBuilder) statements like
 	/// creating tables or indexes.
-	async fn execute_uncached<M>(&self, stmt: impl Statement<M>) -> Result<()>;
+	async fn execute_uncached<M>(&self, stmt: &impl Statement<M>)
+	-> Result<()>;
 	/// Prepare a statement for execution.
 	async fn prepare(&self, sql: &str) -> Result<CachedStatement>;
 }

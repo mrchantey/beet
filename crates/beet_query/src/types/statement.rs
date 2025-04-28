@@ -6,7 +6,7 @@ use sea_query::SchemaBuilder;
 use sea_query::SchemaStatementBuilder;
 use sweet::prelude::*;
 
-pub trait StatementBuilder:SchemaBuilder+ QueryBuilder{}
+pub trait StatementBuilder: SchemaBuilder + QueryBuilder {}
 impl<T: SchemaBuilder + QueryBuilder> StatementBuilder for T {}
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
@@ -29,11 +29,11 @@ pub trait Statement<M>: Sized {
 		&self,
 		schema_builder: &dyn StatementBuilder,
 	) -> ConvertValueResult<(String, Row)>;
-	async fn execute(self, conn: &Connection) -> Result<()> {
-		conn.execute(self).await
+	async fn execute(&self, db: &Database) -> Result<()> {
+		db.execute(self).await
 	}
-	async fn query(self, conn: &Connection) -> Result<Rows> {
-		conn.query(self).await
+	async fn query(&self, db: &Database) -> Result<Rows> {
+		db.query(self).await
 	}
 }
 
