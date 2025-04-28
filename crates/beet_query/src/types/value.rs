@@ -1,11 +1,17 @@
 use std::str::FromStr;
 
+// pub type Row = Vec<Value>;
+// pub type Rows = Vec<Row>;
+
+pub type ConvertValueResult<T> = Result<T, ConvertValueError>;
 
 #[rustfmt::skip]
 #[derive(Debug, Clone, thiserror::Error, PartialEq)]
 pub enum ConvertValueError {
 	#[error("ConvertValue Failed: {error}")]
 	ConversionFailed { error: String },
+	#[error("Expected: {expected}\n Received: {received}")]
+	TypeMismatch { expected: String,received: String },
 }
 
 impl ConvertValueError {
@@ -14,9 +20,17 @@ impl ConvertValueError {
 			error: error.to_string(),
 		}
 	}
+	pub fn type_mismatch(
+		expected: impl ToString,
+		received: impl std::fmt::Debug,
+	) -> Self {
+		Self::TypeMismatch {
+			expected: expected.to_string(),
+			received: format!("{:?}", received),
+		}
+	}
 }
 
-pub type ConvertValueResult<T> = Result<T, ConvertValueError>;
 
 
 /// Sqlite types are the lowest common denominator of all sql types
@@ -27,6 +41,33 @@ pub enum Value {
 	Real(f64),
 	Text(String),
 	Blob(Vec<u8>),
+}
+
+impl Value {
+	// pub fn into_other<T, M>(self) -> ConvertValueResult<T>
+	// where
+	// 	T: ConvertValue<T, M>,
+	// {
+	// 	T::from_value(self)
+	// }
+}
+
+pub trait ValueIntoOther<M> {
+	/// Convert a [`Value`] into another type that implements [`ConvertValue`],
+	/// for example [`sea_query::Value`] or [`libsql::Value`]
+	fn into_other<T>(self) -> ConvertValueResult<T>
+	where
+		T: ConvertValue<T, M>;
+}
+
+
+impl<M> ValueIntoOther<M> for Value {
+	fn into_other<T>(self) -> ConvertValueResult<T>
+	where
+		T: ConvertValue<T, M>,
+	{
+		T::from_value(self)
+	}
 }
 
 /// Sqlite types are the lowest common denominator of all the types
@@ -70,6 +111,19 @@ pub trait ConvertValue<T, M> {
 	fn into_value(self) -> ConvertValueResult<Value>;
 	fn from_value(value: Value) -> ConvertValueResult<T>;
 }
+impl ConvertValue<(), ()> for () {
+	fn into_value(self) -> ConvertValueResult<Value> { Ok(Value::Null) }
+	fn from_value(value: Value) -> ConvertValueResult<()> {
+		match value {
+			Value::Null => Ok(()),
+			_ => Err(ConvertValueError::conversion_failed(format!(
+				"Expected Value::Null, found {:?}",
+				value
+			))),
+		}
+	}
+}
+
 impl ConvertValue<String, String> for String {
 	fn into_value(self) -> ConvertValueResult<Value> { Ok(Value::Text(self)) }
 	fn from_value(value: Value) -> ConvertValueResult<String> {
@@ -83,6 +137,23 @@ impl ConvertValue<String, String> for String {
 		}
 	}
 }
+
+impl ConvertValue<bool, bool> for bool {
+	fn into_value(self) -> ConvertValueResult<Value> {
+		Ok(Value::Integer(if self { 1 } else { 0 }))
+	}
+
+	fn from_value(value: Value) -> ConvertValueResult<bool> {
+		match value {
+			Value::Integer(val) => Ok(val != 0),
+			_ => Err(ConvertValueError::conversion_failed(format!(
+				"Expected Value::Integer, found {:?}",
+				value
+			))),
+		}
+	}
+}
+
 impl ConvertValue<Vec<u8>, Vec<u8>> for Vec<u8> {
 	fn into_value(self) -> ConvertValueResult<Value> { Ok(Value::Blob(self)) }
 	fn from_value(value: Value) -> ConvertValueResult<Vec<u8>> {
@@ -184,6 +255,71 @@ impl ConvertValue<f64, f64> for f64 {
 		}
 	}
 }
+
+// impl Into<Value> for i8 {
+// 	fn into(self) -> Value { Value::Integer(self.into()) }
+// }
+// impl Into<Value> for i16 {
+// 	fn into(self) -> Value { Value::Integer(self.into()) }
+// }
+// impl Into<Value> for i32 {
+// 	fn into(self) -> Value { Value::Integer(self.into()) }
+// }
+// impl Into<Value> for i64 {
+// 	fn into(self) -> Value { Value::Integer(self) }
+// }
+// impl Into<Value> for u8 {
+// 	fn into(self) -> Value { Value::Integer(self.into()) }
+// }
+// impl Into<Value> for u16 {
+// 	fn into(self) -> Value { Value::Integer(self.into()) }
+// }
+// impl Into<Value> for u32 {
+// 	fn into(self) -> Value { Value::Integer(self.into()) }
+// }
+// impl Into<Value> for u64 {
+// 	fn into(self) -> Value {
+// 		if self > i64::MAX as u64 {
+// 			panic!("Value exceeds i64::MAX");
+// 		}
+// 		Value::Integer(self as i64)
+// 	}
+// }
+// impl Into<Value> for usize {
+// 	fn into(self) -> Value {
+// 		if self > i64::MAX as usize {
+// 			panic!("Value exceeds i64::MAX");
+// 		}
+// 		Value::Integer(self as i64)
+// 	}
+// }
+// impl Into<Value> for isize {
+// 	fn into(self) -> Value { Value::Integer(self as i64) }
+// }
+// impl Into<Value> for bool {
+// 	fn into(self) -> Value { Value::Integer(if self { 1 } else { 0 }) }
+// }
+// impl Into<Value> for () {
+// 	fn into(self) -> Value { Value::Null }
+// }
+// impl Into<Value> for String {
+// 	fn into(self) -> Value { Value::Text(self) }
+// }
+// impl Into<Value> for &str {
+// 	fn into(self) -> Value { Value::Text(self.to_string()) }
+// }
+// impl Into<Value> for Vec<u8> {
+// 	fn into(self) -> Value { Value::Blob(self) }
+// }
+// impl Into<Value> for &[u8] {
+// 	fn into(self) -> Value { Value::Blob(self.to_vec()) }
+// }
+// impl Into<Value> for f32 {
+// 	fn into(self) -> Value { Value::Real(self as f64) }
+// }
+// impl Into<Value> for f64 {
+// 	fn into(self) -> Value { Value::Real(self) }
+// }
 
 
 #[cfg(test)]
@@ -364,6 +500,7 @@ mod test {
 			ConvertValueError::ConversionFailed { error } => {
 				expect(error).to_be("test error".to_string());
 			}
+			_ => panic!("Expected ConversionFailed error"),
 		}
 
 		// Test error message format

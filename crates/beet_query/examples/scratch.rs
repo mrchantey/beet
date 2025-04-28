@@ -1,8 +1,3 @@
-#![allow(unused)]
-use beet_query::as_beet::*;
+use beet_query::prelude::*;
 
 fn main() {}
-struct User {
-	// #[iden = "contact"]
-	email: String,
-}

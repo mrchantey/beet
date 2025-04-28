@@ -1,3 +1,5 @@
+mod row;
+pub use row::*;
 mod table_view;
 pub use table_view::*;
 mod cached_statement;

@@ -50,6 +50,6 @@ mod test {
 		let stmt = Foo { bar: 3 }.stmt_insert().unwrap();
 		let (placeholder, values) = stmt.build_any(&SqliteQueryBuilder);
 		expect(placeholder).to_be("INSERT INTO \"foo\" (\"bar\") VALUES (?)");
-		expect(values.0).to_be(vec![3u32.into()]);
+		expect(values.0).to_be(vec![3i64.into()]);
 	}
 }

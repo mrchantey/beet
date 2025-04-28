@@ -269,17 +269,18 @@ impl<'a> DeriveTable<'a> {
 			if field.is_optional() {
 				quote! {
 					if let Some(v) = self.#ident {
-						values.push(v.into());
+						values.push(v.into_value()?);
 					} else {
 						values.push(Value::Null);
 					}
 				}
 			} else {
 				quote! {
-					values.push(self.#ident.into());
+					values.push(self.#ident.into_value()?);
 				}
 			}
 		});
+		let field_idents = self.fields.iter().map(|field| &field.ident);
 
 		let primary_value = self
 			.fields
@@ -288,8 +289,8 @@ impl<'a> DeriveTable<'a> {
 			.map(|field| {
 				let ident = &field.ident;
 				quote! {
-					fn primary_value(&self) -> Option<beet::exports::sea_query::Value> {
-						Some(self.#ident.into())
+					fn primary_value(&self) -> ConvertValueResult<Option<Value>> {
+						Ok(Some(self.#ident.into_value()?))
 					}
 				}
 			});
@@ -297,6 +298,7 @@ impl<'a> DeriveTable<'a> {
 		let ident = &self.input.ident;
 		let table_ident = &self.table_ident;
 		let cols_ident = &self.cols_ident;
+		let num_fields = self.fields.len();
 
 		quote! {
 			impl TableView for #ident{
@@ -306,23 +308,24 @@ impl<'a> DeriveTable<'a> {
 				fn columns() -> Vec<#cols_ident> {
 					vec![#(#cols_ident::#col_variants),*]
 				}
-				fn into_values(self) -> beet::exports::sea_query::Values {
+				fn into_row(self) -> ConvertValueResult<Row> {
 					let mut values = vec![];
 					#(#push_values)*
-					beet::exports::sea_query::Values(values)
+					Ok(Row::new(values))
 				}
 
-				fn from_values(values: Vec<beet::exports::sea_query::Value>) -> Result<Self,DeserializeError> {
-					todo!()
-					// if values.len() != Self::columns().len() {
-					// 	return Err(DeserializeError::RowLengthMismatch {
-					// 		expected: Self::columns().len(),
-					// 		actual: values.len(),
-					// 	})
-					// }
-					// let mut values = values.into_iter();
-
-
+				fn from_row(row: Row) -> Result<Self,DeserializeError> {
+					let values = row.inner();
+					if values.len() != #num_fields {
+						return Err(DeserializeError::RowLengthMismatch {
+							expected: #num_fields,
+							received: values.len(),
+						})
+					}
+					let mut values = values.into_iter();
+					Ok(Self {
+						#(#field_idents: values.next().unwrap().into_other()?,)*
+					})
 				}
 			}
 		}

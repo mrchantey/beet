@@ -3,8 +3,6 @@ use anyhow::Result;
 use sea_query::Expr;
 use sea_query::InsertStatement;
 use sea_query::Query;
-use sea_query::Value;
-use sea_query::Values;
 use sweet::prelude::*;
 
 #[derive(Debug, Clone, thiserror::Error)]
@@ -13,6 +11,8 @@ pub enum DeserializeError {
 	RowLengthMismatch { expected: usize, received: usize },
 	#[error("Type Mismatch: expected: {expected}, received: {received}")]
 	TypeMismatch { expected: String, received: String },
+	#[error("{0}")]
+	ConvertValueError(#[from] ConvertValueError),
 }
 
 /// A trait for a partial view of a table,
@@ -28,13 +28,13 @@ pub trait TableView: Sized {
 	/// Like [`serde::Serialize`], converts the view into a [`Values`]
 	/// for an insert or update statement.
 	/// This must be the same length and order as [`Self::columns`](TableView::columns)
-	fn into_values(self) -> Values;
+	fn into_row(self) -> ConvertValueResult<Row>;
 
 	/// Like [`serde::Deserialize`], converts a row of values into this view.
-	fn from_values(values: Vec<Value>) -> Result<Self, DeserializeError>;
+	fn from_row(row: Row) -> Result<Self, DeserializeError>;
 	/// Returns the value of the primary key for this table, its type
 	/// should match [`Self::Table::Columns::primary_key`](Columns::primary_key)
-	fn primary_value(&self) -> Option<Value> { None }
+	fn primary_value(&self) -> ConvertValueResult<Option<Value>> { Ok(None) }
 
 	/// Returns the primary key and value for this table if both exist
 	fn primary_kvp(&self) -> Result<(<Self::Table as Table>::Columns, Value)> {
@@ -47,7 +47,7 @@ pub trait TableView: Sized {
 			},
 		)?;
 
-		let value = self.primary_value().ok_or_else(|| {
+		let value = self.primary_value()?.ok_or_else(|| {
 			anyhow::anyhow!(
 				"No primary key value provided for {}",
 				std::any::type_name::<Self>(),
@@ -64,7 +64,7 @@ pub trait TableView: Sized {
 		Query::insert()
 			.into_table(CowIden(Self::Table::name()))
 			.columns(Self::columns())
-			.values(self.into_values().0.into_iter().map(|v| v.into()))?
+			.values(self.into_row()?.into_other()?)?
 			.to_owned()
 			.xok()
 	}
@@ -87,7 +87,7 @@ pub trait TableView: Sized {
 			.values(
 				Self::columns()
 					.into_iter()
-					.zip(self.into_values().0.into_iter().map(|v| v.into())),
+					.zip(self.into_row()?.into_other()?),
 			)
 			.to_owned()
 			.xok()
@@ -104,7 +104,9 @@ pub trait TableView: Sized {
 	async fn update_self(self, conn: &impl Connection) -> Result<()> {
 		let kvp = self.primary_kvp()?;
 		let mut stmt = self.stmt_update()?;
-		stmt.and_where(Expr::col(kvp.0).eq(kvp.1));
+		stmt.and_where(
+			Expr::col(kvp.0).eq(kvp.1.into_other::<sea_query::SimpleExpr>()?),
+		);
 		// println!("{:?}", stmt.build(sea_query::SqliteQueryBuilder));
 		conn.execute(stmt).await
 	}
