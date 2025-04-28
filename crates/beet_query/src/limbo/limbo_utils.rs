@@ -3,12 +3,7 @@ use anyhow::Result;
 pub struct LimboUtils;
 
 impl LimboUtils {
-	pub async fn memory_db() -> limbo::Result<limbo::Connection> {
-		limbo::Builder::new_local(":memory:")
-			.build()
-			.await?
-			.connect()
-	}
+
 
 	pub async fn collect_rows(mut rows_in: limbo::Rows) -> Result<Rows> {
 		let mut rows_out = Rows::default();

@@ -114,7 +114,7 @@ mod test {
 
 		use super::CACHE_LOOKUP;
 
-		let conn = LibsqlUtils::memory_db().await.unwrap();
+		let conn = Connection::new().await.unwrap();
 		MyTable::create_table(&conn).await.unwrap();
 		let row = MyTable { name: "foo".into() };
 		let stmt = row.clone().stmt_insert().unwrap();

@@ -1,28 +1,10 @@
 use crate::prelude::*;
 use anyhow::Result;
-use sweet::prelude::*;
 
 pub struct LibsqlUtils;
 
 impl LibsqlUtils {
-	pub async fn memory_db() -> Result<libsql::Connection, libsql::Error> {
-		libsql::Builder::new_local(":memory:")
-			.build()
-			.await?
-			.connect()
-	}
-	pub async fn remote_db() -> Result<libsql::Connection> {
-		let url = std::env::var("LIBSQL_URL")?;
-		let token = std::env::var("LIBSQL_AUTH_TOKEN").unwrap_or_else(|_| {
-			println!("LIBSQL_TOKEN not set, using empty token...");
-			"".to_string()
-		});
-		libsql::Builder::new_remote(url, token)
-			.build()
-			.await?
-			.connect()?
-			.xok()
-	}
+
 
 	pub fn parse_step_result(result: usize) -> LibsqlStepResult {
 		match result {

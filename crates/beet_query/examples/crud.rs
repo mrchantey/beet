@@ -12,7 +12,7 @@ struct User {
 #[tokio::main]
 async fn main() {
 	// #[cfg(feature = "libsql")]
-	let conn = LibsqlUtils::memory_db().await.unwrap();
+	let conn = Connection::new().await.unwrap();
 	// #[cfg(not(feature = "libsql"))]
 	// let conn = LimboUtils::memory_db().await.unwrap();
 
