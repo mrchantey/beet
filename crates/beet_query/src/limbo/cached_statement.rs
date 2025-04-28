@@ -10,42 +10,34 @@ impl CachedStatementInner for limbo::Statement {
 	fn box_clone(&self) -> Box<dyn CachedStatementInner> {
 		Box::new(self.clone())
 	}
+
+	fn reset(&mut self) {
+		// limbo::Statement::reset(self);
+		unimplemented!("reset not implemented for limbo::Statement");
+	}
+
+	#[allow(unused)]
 	fn execute<'a>(
 		&'a mut self,
 		values: Values,
 	) -> Pin<Box<dyn Future<Output = Result<()>> + 'a>> {
 		Box::pin(async move {
-			let step_result =
-				limbo::Statement::execute(self, values.into_limbo_values())
-					.await?;
-			step_result_err(step_result)?;
-			Ok(())
+			limbo::Statement::execute(self, values.into_limbo_values())
+				.await?
+				.xmap(LimboUtils::step_result_err)?
+				.xok()
 		})
 	}
 	fn query<'a>(
 		&'a mut self,
 		values: Values,
-	) -> Pin<Box<dyn Future<Output = Result<Rows>> + 'a>> {
+	) -> Pin<Box<dyn Future<Output = Result<SeaQueryRows>> + 'a>> {
 		Box::pin(async move {
 			limbo::Statement::query(self, values.into_limbo_values())
 				.await?
-				.collect()?
-				.into_iter()
-				.map(|row| {
-					row.into_inner()
-						.into_iter()
-						.map(|v| {
-							v.to_owned()
-								// we nee an intermediaray type because
-								// limbo_core::OwnedValue != limbo::Value
-								.xinto::<limbo::Value>()
-								.into_sea_query_value()
-						})
-						.collect::<Vec<_>>()
-				})
-				.collect::<Vec<_>>()
+				.xmap(LimboUtils::collect_rows)
+				.await?
 				.xok()
 		})
 	}
 }
-

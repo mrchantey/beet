@@ -15,7 +15,7 @@ pub trait Connection {
 		Ok(())
 	}
 
-	async fn query<M>(&self, stmt: impl Statement<M>) -> Result<Rows> {
+	async fn query<M>(&self, stmt: impl Statement<M>) -> Result<SeaQueryRows> {
 		let (sql, values) = stmt.build(SqliteQueryBuilder);
 		CachedStatement::get_or_prepare(&sql, || {
 			Box::pin(Connection::prepare(self, &sql))

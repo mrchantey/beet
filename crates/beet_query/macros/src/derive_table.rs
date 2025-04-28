@@ -56,15 +56,15 @@ impl<'a> DeriveTable<'a> {
 		Self {
 			input,
 			table_name: attributes
-			.get_value("name")
+				.get_value("name")
 				.map(ToTokens::to_token_stream)
 				.unwrap_or_else(|| {
 					table_ident.to_string().to_snake_case().to_token_stream()
 				}),
-				cols_ident: Ident::new(
-					&format!("{}Cols", &table_ident),
-					table_ident.span(),
-				),
+			cols_ident: Ident::new(
+				&format!("{}Cols", &table_ident),
+				table_ident.span(),
+			),
 			partial_ident: Ident::new(
 				&format!("{}Partial", &table_ident),
 				table_ident.span(),
@@ -312,6 +312,18 @@ impl<'a> DeriveTable<'a> {
 					beet::exports::sea_query::Values(values)
 				}
 
+				fn from_values(values: Vec<beet::exports::sea_query::Value>) -> Result<Self,DeserializeError> {
+					todo!()
+					// if values.len() != Self::columns().len() {
+					// 	return Err(DeserializeError::RowLengthMismatch {
+					// 		expected: Self::columns().len(),
+					// 		actual: values.len(),
+					// 	})
+					// }
+					// let mut values = values.into_iter();
+
+
+				}
 			}
 		}
 		.xok()

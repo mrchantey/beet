@@ -67,17 +67,26 @@ impl CachedStatement {
 impl CachedStatement {
 	pub fn new(inner: Box<dyn CachedStatementInner>) -> Self { Self { inner } }
 	pub async fn execute<'a>(&'a mut self, values: Values) -> Result<()> {
+		self.inner.reset();
 		self.inner.execute(values).await
 	}
-	pub async fn query<'a>(&'a mut self, values: Values) -> Result<Rows> {
+	pub async fn query<'a>(
+		&'a mut self,
+		values: Values,
+	) -> Result<SeaQueryRows> {
+		self.inner.reset();
 		self.inner.query(values).await
 	}
 }
-pub type Rows = Vec<Vec<Value>>;
+
+pub type SeaQueryRows = Vec<Vec<Value>>;
 
 /// All the annoying clone and pin stuff wrapping execute and query calls
 pub trait CachedStatementInner: 'static + Send + Sync {
 	fn box_clone(&self) -> Box<dyn CachedStatementInner>;
+
+	/// Called before executing or querying
+	fn reset(&mut self);
 
 	fn execute<'a>(
 		&'a mut self,
@@ -87,14 +96,14 @@ pub trait CachedStatementInner: 'static + Send + Sync {
 	fn query<'a>(
 		&'a mut self,
 		values: Values,
-	) -> Pin<Box<dyn Future<Output = Result<Rows>> + 'a>>;
+	) -> Pin<Box<dyn Future<Output = Result<SeaQueryRows>> + 'a>>;
 }
 
 
 
 
 #[cfg(test)]
-#[cfg(all(feature = "limbo", not(target_arch = "wasm32")))]
+#[cfg(all(feature = "libsql", not(target_arch = "wasm32")))]
 mod test {
 	use crate::as_beet::*;
 	use sweet::prelude::*;
@@ -111,7 +120,7 @@ mod test {
 
 		use super::CACHE_LOOKUP;
 
-		let conn = LimboUtils::memory_db().await.unwrap();
+		let conn = LibsqlUtils::memory_db().await.unwrap();
 		MyTable::create_table(&conn).await.unwrap();
 		let row = MyTable { name: "foo".into() };
 		let stmt = row.clone().stmt_insert().unwrap();

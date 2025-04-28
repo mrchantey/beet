@@ -10,7 +10,7 @@ pub trait Statement<M>: Sized {
 	async fn execute(self, conn: &impl Connection) -> Result<()> {
 		conn.execute(self).await
 	}
-	async fn query(self, conn: &impl Connection) -> Result<Rows> {
+	async fn query(self, conn: &impl Connection) -> Result<SeaQueryRows> {
 		conn.query(self).await
 	}
 }
