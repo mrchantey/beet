@@ -1,15 +1,7 @@
 use beet_build::prelude::*;
 use heck::ToTitleCase;
-use proc_macro2::TokenStream;
-use quote::ToTokens;
-use sweet::prelude::*;
 use syn;
-use syn::Expr;
 use syn::Ident;
-use syn::Result;
-use syn::Type;
-use syn::parse_quote;
-use syn::spanned::Spanned;
 
 
 pub struct TableField<'a> {
@@ -56,15 +48,6 @@ impl<'a> TableField<'a> {
 		}
 	}
 
-	/// This is the ident of the type builder portion of a ColumnDef:
-	pub fn column_type(&self) -> Result<TokenStream> {
-		self.attributes
-			.get_value("type")
-			.map(|v| v.to_token_stream().xok())
-			.unwrap_or_else(|| {
-				parse_column_type(self).map(|v| v.to_token_stream())
-			})
-	}
 	/// returns false if the field is either:
 	/// - a primary key without partial_include
 	/// - a non-primary key with partial_exclude
@@ -73,60 +56,4 @@ impl<'a> TableField<'a> {
 		 (self.primary_key && !self.attributes.contains("partial_include"))
 		 || self.attributes.contains("partial_exclude") 
 	}
-}
-
-
-
-/// This is the [sea_query::ColumnType] passed into [`sea_query::ColumnDef::new_with_type`]
-fn parse_column_type(field: &NamedField) -> Result<Expr> {
-	let Type::Path(type_path) = &field.inner_ty else {
-		return Err(syn::Error::new(
-			field.syn_field.ty.span(),
-			"Only path types are supported",
-		));
-	};
-	let ident = type_path
-		.path
-		.segments
-		.last()
-		.ok_or_else(|| {
-			syn::Error::new(type_path.path.span(), "No segments found")
-		})?
-		.ident
-		.to_string();
-
-	// untested but a good start
-	#[rustfmt::skip]
-	let expr:Expr = match ident.as_str() {
-    "String" | "str" => parse_quote!(sea_query::ColumnType::Text),
-    "i8" => parse_quote!(sea_query::ColumnType::TinyInteger),
-    "i16" => parse_quote!(sea_query::ColumnType::SmallInteger),
-    "i32" | "isize" => parse_quote!(sea_query::ColumnType::Integer),
-    "i64" => parse_quote!(sea_query::ColumnType::BigInteger),
-    "u8" => parse_quote!(sea_query::ColumnType::TinyUnsigned),
-    "u16" => parse_quote!(sea_query::ColumnType::SmallUnsigned),
-    "u32" | "usize" => parse_quote!(sea_query::ColumnType::Unsigned),
-    "u64" => parse_quote!(sea_query::ColumnType::BigUnsigned),
-    "f32" => parse_quote!(sea_query::ColumnType::Float),
-    "f64" => parse_quote!(sea_query::ColumnType::Double),
-    "bool" => parse_quote!(sea_query::ColumnType::Boolean),
-    "char" => parse_quote!(sea_query::ColumnType::Char(Some(1))),
-    "Vec<u8>" | "[u8]" => parse_quote!(sea_query::ColumnType::Blob),
-    "Uuid" => parse_quote!(sea_query::ColumnType::Uuid),
-    "NaiveDateTime" => parse_quote!(sea_query::ColumnType::DateTime),
-    "DateTime<Utc>" | "DateTime<FixedOffset>" => parse_quote!(sea_query::ColumnType::TimestampWithTimeZone),
-    "NaiveDate" => parse_quote!(sea_query::ColumnType::Date),
-    "NaiveTime" => parse_quote!(sea_query::ColumnType::Time),
-    "Json" | "Value" => parse_quote!(sea_query::ColumnType::Json),
-    "Decimal" => parse_quote!(sea_query::ColumnType::Decimal(None)),
-    "IpAddr" | "Ipv4Addr" | "Ipv6Addr" => parse_quote!(sea_query::ColumnType::Inet),
-    "MacAddr" => parse_quote!(sea_query::ColumnType::MacAddr),
-		_ => {
-			return Err(syn::Error::new(
-				field.syn_field.ty.span(),
-				format!("Unsupported type: {}", ident),
-			));
-		}
-	};
-	expr.xok()
 }

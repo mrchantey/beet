@@ -31,8 +31,6 @@ impl ConvertValueError {
 	}
 }
 
-
-
 /// Sqlite types are the lowest common denominator of all sql types
 #[derive(Clone, Debug, PartialEq)]
 pub enum Value {
@@ -57,14 +55,13 @@ pub trait ValueIntoOther<M> {
 	/// for example [`sea_query::Value`] or [`libsql::Value`]
 	fn into_other<T>(self) -> ConvertValueResult<T>
 	where
-		T: ConvertValue<T, M>;
+		T: ConvertValue<M>;
 }
-
 
 impl<M> ValueIntoOther<M> for Value {
 	fn into_other<T>(self) -> ConvertValueResult<T>
 	where
-		T: ConvertValue<T, M>,
+		T: ConvertValue<M>,
 	{
 		T::from_value(self)
 	}
@@ -73,12 +70,45 @@ impl<M> ValueIntoOther<M> for Value {
 /// Sqlite types are the lowest common denominator of all the types
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum ValueType {
+	/// Starting from 1 to match sqlite
 	Integer = 1,
 	Real,
 	Text,
 	Blob,
 	Null,
 }
+
+pub trait IntoValueType<M>: Sized {
+	fn into_value_type() -> ValueType;
+}
+macro_rules! impl_into_value_type {
+	($($t:ty => $value_type:expr),* $(,)?) => {
+		$(
+			impl IntoValueType<Self> for $t {
+				fn into_value_type() -> ValueType { $value_type }
+			}
+		)*
+	};
+}
+
+impl_into_value_type! {
+	u8 => ValueType::Integer,
+	u16 => ValueType::Integer,
+	u32 => ValueType::Integer,
+	u64 => ValueType::Integer,
+	i8 => ValueType::Integer,
+	i16 => ValueType::Integer,
+	i32 => ValueType::Integer,
+	i64 => ValueType::Integer,
+	usize => ValueType::Integer,
+	isize => ValueType::Integer,
+	f32 => ValueType::Real,
+	f64 => ValueType::Real,
+	String => ValueType::Text,
+	Vec<u8> => ValueType::Blob,
+	// str=> ValueType::Text,
+}
+
 
 impl FromStr for ValueType {
 	type Err = anyhow::Error;
@@ -107,13 +137,13 @@ impl Value {
 	}
 }
 
-pub trait ConvertValue<T, M> {
+pub trait ConvertValue<M>: Sized {
 	fn into_value(self) -> ConvertValueResult<Value>;
-	fn from_value(value: Value) -> ConvertValueResult<T>;
+	fn from_value(value: Value) -> ConvertValueResult<Self>;
 }
-impl ConvertValue<(), ()> for () {
+impl ConvertValue<()> for () {
 	fn into_value(self) -> ConvertValueResult<Value> { Ok(Value::Null) }
-	fn from_value(value: Value) -> ConvertValueResult<()> {
+	fn from_value(value: Value) -> ConvertValueResult<Self> {
 		match value {
 			Value::Null => Ok(()),
 			_ => Err(ConvertValueError::conversion_failed(format!(
@@ -124,9 +154,9 @@ impl ConvertValue<(), ()> for () {
 	}
 }
 
-impl ConvertValue<String, String> for String {
+impl ConvertValue<String> for String {
 	fn into_value(self) -> ConvertValueResult<Value> { Ok(Value::Text(self)) }
-	fn from_value(value: Value) -> ConvertValueResult<String> {
+	fn from_value(value: Value) -> ConvertValueResult<Self> {
 		match value {
 			Value::Text(val) => Ok(val),
 			Value::Blob(val) => Ok(String::from_utf8_lossy(&val).to_string()),
@@ -138,12 +168,12 @@ impl ConvertValue<String, String> for String {
 	}
 }
 
-impl ConvertValue<bool, bool> for bool {
+impl ConvertValue<bool> for bool {
 	fn into_value(self) -> ConvertValueResult<Value> {
 		Ok(Value::Integer(if self { 1 } else { 0 }))
 	}
 
-	fn from_value(value: Value) -> ConvertValueResult<bool> {
+	fn from_value(value: Value) -> ConvertValueResult<Self> {
 		match value {
 			Value::Integer(val) => Ok(val != 0),
 			_ => Err(ConvertValueError::conversion_failed(format!(
@@ -154,9 +184,9 @@ impl ConvertValue<bool, bool> for bool {
 	}
 }
 
-impl ConvertValue<Vec<u8>, Vec<u8>> for Vec<u8> {
+impl ConvertValue<Vec<u8>> for Vec<u8> {
 	fn into_value(self) -> ConvertValueResult<Value> { Ok(Value::Blob(self)) }
-	fn from_value(value: Value) -> ConvertValueResult<Vec<u8>> {
+	fn from_value(value: Value) -> ConvertValueResult<Self> {
 		match value {
 			Value::Blob(val) => Ok(val),
 			Value::Text(val) => Ok(val.into_bytes()),
@@ -168,11 +198,10 @@ impl ConvertValue<Vec<u8>, Vec<u8>> for Vec<u8> {
 	}
 }
 
-
 pub struct OptionMarker;
-impl<T, M> ConvertValue<Option<T>, (Option<T>, (M, OptionMarker))> for Option<T>
+impl<T, M> ConvertValue<(M, OptionMarker)> for Option<T>
 where
-	T: ConvertValue<T, M>,
+	T: ConvertValue<M>,
 {
 	fn into_value(self) -> ConvertValueResult<Value> {
 		match self {
@@ -181,7 +210,7 @@ where
 		}
 	}
 
-	fn from_value(value: Value) -> ConvertValueResult<Option<T>> {
+	fn from_value(value: Value) -> ConvertValueResult<Self> {
 		if value == Value::Null {
 			Ok(None)
 		} else {
@@ -191,8 +220,7 @@ where
 }
 
 pub struct TryIntoI64Marker;
-impl<T: TryInto<i64> + TryFrom<i64>> ConvertValue<T, (T, TryIntoI64Marker)>
-	for T
+impl<T: TryInto<i64> + TryFrom<i64>> ConvertValue<(T, TryIntoI64Marker)> for T
 where
 	<T as TryInto<i64>>::Error: std::fmt::Debug,
 	<T as TryFrom<i64>>::Error: std::fmt::Debug,
@@ -208,7 +236,7 @@ where
 		}
 	}
 
-	fn from_value(value: Value) -> ConvertValueResult<T> {
+	fn from_value(value: Value) -> ConvertValueResult<Self> {
 		match value {
 			Value::Integer(val) => match T::try_from(val) {
 				Ok(value) => Ok(value),
@@ -226,12 +254,12 @@ where
 	}
 }
 
-impl ConvertValue<f32, f32> for f32 {
+impl ConvertValue<f32> for f32 {
 	fn into_value(self) -> ConvertValueResult<Value> {
 		Ok(Value::Real(self as f64))
 	}
 
-	fn from_value(value: Value) -> ConvertValueResult<f32> {
+	fn from_value(value: Value) -> ConvertValueResult<Self> {
 		match value {
 			Value::Real(val) => Ok(val as f32),
 			_ => Err(ConvertValueError::conversion_failed(format!(
@@ -242,10 +270,10 @@ impl ConvertValue<f32, f32> for f32 {
 	}
 }
 
-impl ConvertValue<f64, f64> for f64 {
+impl ConvertValue<f64> for f64 {
 	fn into_value(self) -> ConvertValueResult<Value> { Ok(Value::Real(self)) }
 
-	fn from_value(value: Value) -> ConvertValueResult<f64> {
+	fn from_value(value: Value) -> ConvertValueResult<Self> {
 		match value {
 			Value::Real(val) => Ok(val),
 			_ => Err(ConvertValueError::conversion_failed(format!(
@@ -255,72 +283,6 @@ impl ConvertValue<f64, f64> for f64 {
 		}
 	}
 }
-
-// impl Into<Value> for i8 {
-// 	fn into(self) -> Value { Value::Integer(self.into()) }
-// }
-// impl Into<Value> for i16 {
-// 	fn into(self) -> Value { Value::Integer(self.into()) }
-// }
-// impl Into<Value> for i32 {
-// 	fn into(self) -> Value { Value::Integer(self.into()) }
-// }
-// impl Into<Value> for i64 {
-// 	fn into(self) -> Value { Value::Integer(self) }
-// }
-// impl Into<Value> for u8 {
-// 	fn into(self) -> Value { Value::Integer(self.into()) }
-// }
-// impl Into<Value> for u16 {
-// 	fn into(self) -> Value { Value::Integer(self.into()) }
-// }
-// impl Into<Value> for u32 {
-// 	fn into(self) -> Value { Value::Integer(self.into()) }
-// }
-// impl Into<Value> for u64 {
-// 	fn into(self) -> Value {
-// 		if self > i64::MAX as u64 {
-// 			panic!("Value exceeds i64::MAX");
-// 		}
-// 		Value::Integer(self as i64)
-// 	}
-// }
-// impl Into<Value> for usize {
-// 	fn into(self) -> Value {
-// 		if self > i64::MAX as usize {
-// 			panic!("Value exceeds i64::MAX");
-// 		}
-// 		Value::Integer(self as i64)
-// 	}
-// }
-// impl Into<Value> for isize {
-// 	fn into(self) -> Value { Value::Integer(self as i64) }
-// }
-// impl Into<Value> for bool {
-// 	fn into(self) -> Value { Value::Integer(if self { 1 } else { 0 }) }
-// }
-// impl Into<Value> for () {
-// 	fn into(self) -> Value { Value::Null }
-// }
-// impl Into<Value> for String {
-// 	fn into(self) -> Value { Value::Text(self) }
-// }
-// impl Into<Value> for &str {
-// 	fn into(self) -> Value { Value::Text(self.to_string()) }
-// }
-// impl Into<Value> for Vec<u8> {
-// 	fn into(self) -> Value { Value::Blob(self) }
-// }
-// impl Into<Value> for &[u8] {
-// 	fn into(self) -> Value { Value::Blob(self.to_vec()) }
-// }
-// impl Into<Value> for f32 {
-// 	fn into(self) -> Value { Value::Real(self as f64) }
-// }
-// impl Into<Value> for f64 {
-// 	fn into(self) -> Value { Value::Real(self) }
-// }
-
 
 #[cfg(test)]
 mod test {

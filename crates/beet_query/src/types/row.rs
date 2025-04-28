@@ -20,7 +20,7 @@ impl Row {
 	pub fn inner(self) -> Vec<Value> { self.0 }
 	pub fn into_other<T, M>(self) -> ConvertValueResult<Vec<T>>
 	where
-		T: ConvertValue<T, M>,
+		T: ConvertValue<M>,
 	{
 		self.0.into_iter().map(|v| v.into_other::<T>()).collect()
 	}

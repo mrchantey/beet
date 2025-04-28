@@ -340,7 +340,11 @@ fn parse_col_def(field: &TableField) -> Result<TokenStream> {
 	// 	.get_value("name")
 	// 	.map(ToTokens::to_token_stream)
 	// 	.unwrap_or_else(|| field.ident.to_string().to_token_stream());
-	let value_type = field.column_type()?;
+	let value_type = field
+		.attributes
+		.get_value("type")
+		.map(|v| v.to_token_stream())
+		.unwrap_or_else(|| field.inner_ty.to_token_stream());
 
 	let not_null = if field.is_optional() {
 		None
@@ -373,7 +377,7 @@ fn parse_col_def(field: &TableField) -> Result<TokenStream> {
 	let ident = &field.variant_ident;
 	quote! {
 		Self::#ident =>
-			beet::exports::sea_query::ColumnDef::new_with_type(self,#value_type)
+			beet::exports::sea_query::ColumnDef::new_with_type(self,#value_type::into_value_type().into_column_type())
 			#primary_key
 			#auto_increment
 			#unique

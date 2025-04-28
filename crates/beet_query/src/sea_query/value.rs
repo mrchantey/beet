@@ -2,7 +2,7 @@ use crate::prelude::*;
 use sweet::prelude::*;
 
 
-impl ConvertValue<sea_query::Value, sea_query::Value> for sea_query::Value {
+impl ConvertValue<sea_query::Value> for sea_query::Value {
 	fn into_value(self) -> ConvertValueResult<Value> {
 		match self {
 			sea_query::Value::Bool(Some(val)) => val.into_value(),
@@ -22,7 +22,7 @@ impl ConvertValue<sea_query::Value, sea_query::Value> for sea_query::Value {
 			_ => ().into_value(),
 		}
 	}
-	fn from_value(value: Value) -> ConvertValueResult<sea_query::Value> {
+	fn from_value(value: Value) -> ConvertValueResult<Self> {
 		match value {
 			Value::Null => Ok(sea_query::Value::Int(None)),
 			Value::Integer(val) => Ok(sea_query::Value::BigInt(Some(val))),
@@ -34,9 +34,7 @@ impl ConvertValue<sea_query::Value, sea_query::Value> for sea_query::Value {
 }
 
 
-impl ConvertValue<sea_query::SimpleExpr, sea_query::Value>
-	for sea_query::SimpleExpr
-{
+impl ConvertValue<sea_query::Value> for sea_query::SimpleExpr {
 	fn into_value(self) -> ConvertValueResult<Value> {
 		match self {
 			sea_query::SimpleExpr::Value(val) => val.into_value(),
@@ -46,7 +44,21 @@ impl ConvertValue<sea_query::SimpleExpr, sea_query::Value>
 			)),
 		}
 	}
-	fn from_value(value: Value) -> ConvertValueResult<sea_query::SimpleExpr> {
+	fn from_value(value: Value) -> ConvertValueResult<Self> {
 		sea_query::SimpleExpr::Value(value.into_other()?).xok()
+	}
+}
+
+
+impl ValueType {
+	/// Converts a [`ValueType`] to a [`sea_query::ColumnType`].
+	pub fn into_column_type(self) -> sea_query::ColumnType {
+		match self {
+			ValueType::Integer => sea_query::ColumnType::BigInteger,
+			ValueType::Real => sea_query::ColumnType::Double,
+			ValueType::Text => sea_query::ColumnType::Text,
+			ValueType::Blob => sea_query::ColumnType::Blob,
+			ValueType::Null => sea_query::ColumnType::BigInteger,
+		}
 	}
 }
