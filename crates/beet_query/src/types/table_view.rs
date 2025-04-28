@@ -3,6 +3,7 @@ use anyhow::Result;
 use sea_query::Expr;
 use sea_query::InsertStatement;
 use sea_query::Query;
+use sea_query::SimpleExpr;
 use sweet::prelude::*;
 
 #[derive(Debug, Clone, thiserror::Error)]
@@ -37,6 +38,30 @@ pub trait TableView: Sized {
 	/// Returns the value of the primary key for this table, its type
 	/// should match [`Self::Table::Columns::primary_key`](Columns::primary_key)
 	fn primary_value(&self) -> ConvertValueResult<Option<Value>> { Ok(None) }
+
+	/// Create a [`sea_query::SimpleExpr`] stating that the field with
+	/// its name is equal to the value provided
+	fn expr_primary_key_eq<M>(
+		key_val: Self::PrimaryKey,
+	) -> Result<SimpleExpr>
+	where
+		Self::PrimaryKey: ConvertValue<M>,
+	{
+		let Some(key_name) = <Self::Table as Table>::Columns::primary_key()
+		else {
+			return Err(anyhow::anyhow!(
+				"No primary key defined for table {}",
+				Self::Table::name()
+			)
+			.into());
+		};
+
+		Expr::col(key_name)
+			.eq(key_val
+				.into_value()?
+				.into_other::<sea_query::SimpleExpr>()?)
+			.xok()
+	}
 
 	/// Returns the primary key and value for this table if both exist
 	fn primary_kvp(&self) -> Result<(<Self::Table as Table>::Columns, Value)> {
@@ -83,8 +108,7 @@ pub trait TableView: Sized {
 	/// Create an update statement for this table
 	/// with all columns and values in this view
 	fn stmt_update(self) -> Result<sea_query::UpdateStatement> {
-		let mut query = Query::update();
-		query
+		Query::update()
 			.table(CowIden(Self::Table::name()))
 			.values(
 				Self::columns()
@@ -95,44 +119,11 @@ pub trait TableView: Sized {
 			.xok()
 	}
 
-	async fn update_self(self, db: &Database) -> Result<()> {
-		let kvp = self.primary_kvp()?;
-		self.stmt_update()?
-			.and_where(
-				Expr::col(kvp.0)
-					.eq(kvp.1.into_other::<sea_query::SimpleExpr>()?),
-			)
-			.execute(db)
-			.await
-	}
-
-	async fn select_by_primary<M>(
-		db: &Database,
-		value: Self::PrimaryKey,
-	) -> Result<Self>
-	where
-		Self::PrimaryKey: ConvertValue<M>,
-	{
-		let mut stmt = Self::stmt_select();
-		let Some(primary_key) = <Self::Table as Table>::Columns::primary_key()
-		else {
-			return Err(anyhow::anyhow!(
-				"No primary key defined for table {}",
-				Self::Table::name()
-			)
-			.into());
-		};
-
-		let value = value.into_value()?;
-		stmt.and_where(
-			Expr::col(primary_key)
-				.eq(value.into_other::<sea_query::SimpleExpr>()?),
-		)
-		.query(&db)
-		.await?
-		.exactly_one()?
-		.xmap(Self::from_row)?
-		.xok()
+	/// Create a delete statement for this table
+	fn stmt_delete() -> sea_query::DeleteStatement {
+		Query::delete()
+			.from_table(CowIden(Self::Table::name()))
+			.to_owned()
 	}
 }
 

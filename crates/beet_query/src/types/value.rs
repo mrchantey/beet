@@ -90,6 +90,7 @@ impl ValueIntoValueType for Value {
 	}
 }
 
+
 pub trait ConvertValue<M>: Sized {
 	fn into_value(self) -> ConvertValueResult<Value>;
 	fn from_value(value: Value) -> ConvertValueResult<Self>;

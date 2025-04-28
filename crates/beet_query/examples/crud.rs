@@ -40,11 +40,10 @@ async fn main() {
 	assert_eq!(rows[0][1].to_string(), "'foo@example.com'");
 
 	// 4. Update Row
-	User {
+	db.update(User {
 		id: 1,
 		email: "bar@example.com".into(),
-	}
-	.update_self(&db)
+	})
 	.await
 	.unwrap();
 
