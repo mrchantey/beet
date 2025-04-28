@@ -1,7 +1,7 @@
 use crate::prelude::*;
 
 
-impl ConvertValue<Self> for limbo::Value {
+impl ConvertValue for limbo::Value {
 	fn into_value(self) -> ConvertValueResult<Value> {
 		match self {
 			limbo::Value::Null => Ok(Value::Null),

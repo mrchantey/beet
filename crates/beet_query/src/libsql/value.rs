@@ -1,7 +1,7 @@
 use crate::prelude::*;
 
 
-impl ConvertValue<Self> for libsql::Value {
+impl ConvertValue for libsql::Value {
 	fn into_value(self) -> ConvertValueResult<Value> {
 		match self {
 			libsql::Value::Null => Ok(Value::Null),

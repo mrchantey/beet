@@ -15,7 +15,7 @@ impl std::fmt::Display for Rows {
 		if self.0.is_empty() {
 			return write!(f, "[]");
 		}
-		
+
 		writeln!(f, "[")?;
 		for (i, row) in self.0.iter().enumerate() {
 			write!(f, "  {}", row)?;
@@ -56,16 +56,16 @@ impl Rows {
 }
 /// Convert a [`Rows`] into another type by specifying the type
 /// but not the marker.
-pub trait RowsIntoOther<M> {
+pub trait RowsIntoOther {
 	fn into_other<T>(self) -> ConvertValueResult<Vec<Vec<T>>>
 	where
-		T: ConvertValue<M>;
+		T: ConvertValue;
 }
 
-impl<M> RowsIntoOther<M> for Rows {
+impl RowsIntoOther for Rows {
 	fn into_other<T>(self) -> ConvertValueResult<Vec<Vec<T>>>
 	where
-		T: ConvertValue<M>,
+		T: ConvertValue,
 	{
 		self.0.into_iter().map(|v| v.into_other::<T>()).collect()
 	}
@@ -106,16 +106,16 @@ impl Row {
 
 /// Convert a [`Row`] into another type by specifying the type
 /// but not the marker.
-pub trait RowIntoOther<M> {
+pub trait RowIntoOther {
 	fn into_other<T>(self) -> ConvertValueResult<Vec<T>>
 	where
-		T: ConvertValue<M>;
+		T: ConvertValue;
 }
 
-impl<M> RowIntoOther<M> for Row {
+impl RowIntoOther for Row {
 	fn into_other<T>(self) -> ConvertValueResult<Vec<T>>
 	where
-		T: ConvertValue<M>,
+		T: ConvertValue,
 	{
 		self.0.into_iter().map(|v| v.into_other::<T>()).collect()
 	}

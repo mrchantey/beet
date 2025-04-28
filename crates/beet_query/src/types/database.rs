@@ -37,14 +37,14 @@ impl Database {
 	///  creating tables or indexes are executed without caching
 	/// - [`Query`](sea_query::QueryStatementBuilder) statements like
 	/// `SELECT`, `INSERT`, `UPDATE` and `DELETE are cached
-	pub async fn execute<M>(&self, stmt: &impl Statement<M>) -> Result<()> {
+	pub async fn execute(&self, stmt: &impl Statement) -> Result<()> {
 		if stmt.statement_type() == StatementType::Schema {
 			self.connection.execute_uncached(stmt).await
 		} else {
 			self.execute_cached(stmt).await
 		}
 	}
-	pub async fn query<M>(&self, stmt: &impl Statement<M>) -> Result<Rows> {
+	pub async fn query(&self, stmt: &impl Statement) -> Result<Rows> {
 		let (sql, values) =
 			stmt.build(&*self.connection.statement_builder())?;
 		self.get_or_prepare(&sql).await?.query(values).await
@@ -53,7 +53,7 @@ impl Database {
 	/// Execute a statement and automatically cache it for next call. This
 	/// is usually used by [`Query`](sea_query::QueryStatementBuilder) statements
 	/// like `SELECT`, `INSERT`, `UPDATE` and `DELETE`.
-	async fn execute_cached<M>(&self, stmt: &impl Statement<M>) -> Result<()> {
+	async fn execute_cached(&self, stmt: &impl Statement) -> Result<()> {
 		let (sql, values) =
 			stmt.build(&*self.connection.statement_builder())?;
 		self.get_or_prepare(&sql).await?.execute(values).await
@@ -71,15 +71,12 @@ impl Database {
 	}
 
 	/// Find a row by its primary key
-	pub async fn find<T: TableView, M>(
-		&self,
-		key_val: T::PrimaryKey,
-	) -> Result<T>
+	pub async fn find<T: TableView>(&self, key_val: T::PrimaryKey) -> Result<T>
 	where
-		T::PrimaryKey: ConvertValue<M>,
+		T::PrimaryKey: ConvertValue,
 	{
 		T::stmt_select()
-			.and_where(T::expr_primary_key_eq::<M>(key_val)?)
+			.and_where(T::expr_primary_key_eq(key_val)?)
 			.query(&self)
 			.await?
 			.exactly_one()?
@@ -99,15 +96,15 @@ impl Database {
 			.execute(self)
 			.await
 	}
-	pub async fn delete<T: TableView, M>(
+	pub async fn delete<T: TableView>(
 		&self,
 		key_val: T::PrimaryKey,
 	) -> Result<()>
 	where
-		T::PrimaryKey: ConvertValue<M>,
+		T::PrimaryKey: ConvertValue,
 	{
 		T::stmt_delete()
-			.and_where(T::expr_primary_key_eq::<M>(key_val)?)
+			.and_where(T::expr_primary_key_eq(key_val)?)
 			.execute(self)
 			.await
 	}
@@ -143,8 +140,8 @@ mod test {
 		db.insert(user.clone()).await.unwrap();
 
 		// 2. READ
-		db.find::<User, _>(1).await.unwrap().xpect().to_be(user);
-		
+		db.find::<User>(1).await.unwrap().xpect().to_be(user);
+
 		// 3. UPDATE
 		db.update(User {
 			id: 1,
@@ -154,7 +151,7 @@ mod test {
 		.await
 		.unwrap();
 
-		db.find::<User, _>(1)
+		db.find::<User>(1)
 			.await
 			.unwrap()
 			.xmap(|u| u.name)
@@ -162,7 +159,7 @@ mod test {
 			.to_be("WonderWoman".to_string());
 
 		// 4. DELETE
-		db.delete::<User, _>(1).await.unwrap();
-		db.find::<User, _>(1).await.xpect().to_be_err();
+		db.delete::<User>(1).await.unwrap();
+		db.find::<User>(1).await.xpect().to_be_err();
 	}
 }

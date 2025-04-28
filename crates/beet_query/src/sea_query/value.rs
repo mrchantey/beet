@@ -2,7 +2,7 @@ use crate::prelude::*;
 use sweet::prelude::*;
 
 
-impl ConvertValue<sea_query::Value> for sea_query::Value {
+impl ConvertValue for sea_query::Value {
 	fn into_value(self) -> ConvertValueResult<Value> {
 		match self {
 			sea_query::Value::Bool(Some(val)) => val.into_value(),
@@ -34,7 +34,7 @@ impl ConvertValue<sea_query::Value> for sea_query::Value {
 }
 
 
-impl ConvertValue<sea_query::Value> for sea_query::SimpleExpr {
+impl ConvertValue for sea_query::SimpleExpr {
 	fn into_value(self) -> ConvertValueResult<Value> {
 		match self {
 			sea_query::SimpleExpr::Value(val) => val.into_value(),

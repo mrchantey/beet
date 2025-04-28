@@ -1,9 +1,22 @@
 use crate::prelude::*;
 use anyhow::Result;
+use sea_query::DeleteStatement;
+use sea_query::ForeignKeyCreateStatement;
+use sea_query::ForeignKeyDropStatement;
+use sea_query::IndexCreateStatement;
+use sea_query::IndexDropStatement;
+use sea_query::InsertStatement;
 use sea_query::QueryBuilder;
 use sea_query::QueryStatementBuilder;
 use sea_query::SchemaBuilder;
-use sea_query::SchemaStatementBuilder;
+use sea_query::SelectStatement;
+use sea_query::TableAlterStatement;
+use sea_query::TableCreateStatement;
+use sea_query::TableDropStatement;
+use sea_query::TableRenameStatement;
+use sea_query::TableTruncateStatement;
+use sea_query::UpdateStatement;
+use sea_query::WithQuery;
 use sweet::prelude::*;
 
 pub trait StatementBuilder: SchemaBuilder + QueryBuilder {}
@@ -19,7 +32,7 @@ pub enum StatementType {
 	Query,
 }
 
-pub trait Statement<M>: Sized {
+pub trait Statement: Sized {
 	/// Define the type of statement this is, which can be used
 	/// to determine a caching strategy.
 	fn statement_type(&self) -> StatementType;
@@ -39,31 +52,60 @@ pub trait Statement<M>: Sized {
 
 pub struct SchemaStatementBuilderMarker;
 
-impl<T: SchemaStatementBuilder> Statement<SchemaStatementBuilderMarker> for T {
-	fn statement_type(&self) -> StatementType { StatementType::Schema }
+macro_rules! impl_schema_statement {
+	($($type:ty),* $(,)?) => {
+		$(
+			impl Statement for $type {
+				fn statement_type(&self) -> StatementType { StatementType::Schema }
 
-	fn build(
-		&self,
-		schema_builder: &dyn StatementBuilder,
-	) -> ConvertValueResult<(String, Row)> {
-		(T::build_any(self, schema_builder), Row::default()).xok()
+				fn build(
+					&self,
+					schema_builder: &dyn StatementBuilder,
+				) -> ConvertValueResult<(String, Row)> {
+					(Self::build_any(self, schema_builder), Row::default()).xok()
+				}
+			}
+		)*
 	}
 }
 
-pub struct QueryStatementBuilderMarker;
+impl_schema_statement! {
+	TableCreateStatement,
+	TableAlterStatement,
+	TableDropStatement,
+	TableRenameStatement,
+	TableTruncateStatement,
+	IndexCreateStatement,
+	IndexDropStatement,
+	ForeignKeyCreateStatement,
+	ForeignKeyDropStatement,
+}
 
-impl<T: QueryStatementBuilder> Statement<QueryStatementBuilderMarker> for T {
-	fn statement_type(&self) -> StatementType { StatementType::Query }
+macro_rules! impl_query_statement {
+	($($type:ty),* $(,)?) => {
+		$(
+			impl Statement for $type {
+				fn statement_type(&self) -> StatementType { StatementType::Query }
 
-	fn build(
-		&self,
-		schema_builder: &dyn StatementBuilder,
-	) -> ConvertValueResult<(String, Row)> {
-		T::build_any(self, schema_builder)
-			.xmap(|(sql, values)| (sql, values.into_row()?).xok())
+				fn build(
+					&self,
+					schema_builder: &dyn StatementBuilder,
+				) -> ConvertValueResult<(String, Row)> {
+					Self::build_any(self, schema_builder)
+					.xmap(|(sql, values)| (sql, values.into_row()?).xok())
+				}
+			}
+		)*
 	}
 }
 
+impl_query_statement! {
+	SelectStatement,
+	InsertStatement,
+	UpdateStatement,
+	DeleteStatement,
+	WithQuery
+}
 
 
 #[cfg(test)]

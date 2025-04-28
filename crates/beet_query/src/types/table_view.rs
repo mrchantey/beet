@@ -41,11 +41,9 @@ pub trait TableView: Sized {
 
 	/// Create a [`sea_query::SimpleExpr`] stating that the field with
 	/// its name is equal to the value provided
-	fn expr_primary_key_eq<M>(
-		key_val: Self::PrimaryKey,
-	) -> Result<SimpleExpr>
+	fn expr_primary_key_eq(key_val: Self::PrimaryKey) -> Result<SimpleExpr>
 	where
-		Self::PrimaryKey: ConvertValue<M>,
+		Self::PrimaryKey: ConvertValue,
 	{
 		let Some(key_name) = <Self::Table as Table>::Columns::primary_key()
 		else {

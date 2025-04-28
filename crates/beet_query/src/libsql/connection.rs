@@ -27,9 +27,7 @@ impl ConnectionInner for libsql::Connection {
 		}
 	}
 
-
-
-	async fn execute_uncached<M>(&self, stmt: &impl Statement<M>) -> Result<()> {
+	async fn execute_uncached(&self, stmt: &impl Statement) -> Result<()> {
 		let (sql, row) = stmt.build(&*self.statement_builder())?;
 		self.execute(&sql, row.into_other::<libsql::Value>()?)
 			.await?;

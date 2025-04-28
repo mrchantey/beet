@@ -1,8 +1,6 @@
 use crate::prelude::*;
 use anyhow::Result;
 
-
-
 /// Unified connection type for all supported backends.
 /// Calling `Connection::new()` will create a new connection
 /// to the database, selecting backends in the following order based
@@ -36,10 +34,7 @@ impl ConnectionInner for Connection {
 		#[allow(unused)]
 		return Ok(Self::Limbo(limbo::Connection::new().await?));
 	}
-	async fn execute_uncached<M>(
-		&self,
-		stmt: &impl Statement<M>,
-	) -> Result<()> {
+	async fn execute_uncached(&self, stmt: &impl Statement) -> Result<()> {
 		match self {
 			#[cfg(feature = "libsql")]
 			Self::Libsql(conn) => ConnectionInner::execute_uncached(conn, stmt).await,
@@ -70,8 +65,7 @@ pub trait ConnectionInner: Sized {
 	/// Execute a statement without caching it. This is usually used
 	/// by [`Schema`](sea_query::SchemaStatementBuilder) statements like
 	/// creating tables or indexes.
-	async fn execute_uncached<M>(&self, stmt: &impl Statement<M>)
-	-> Result<()>;
+	async fn execute_uncached(&self, stmt: &impl Statement) -> Result<()>;
 	/// Prepare a statement for execution.
 	async fn prepare(&self, sql: &str) -> Result<CachedStatement>;
 }

@@ -60,20 +60,19 @@ impl std::fmt::Display for Value {
 }
 
 impl Value {}
-/// Convert a [`Value`] into another type by specifying the type
-/// but not the marker.
-pub trait ValueIntoOther<M> {
+/// Convert a [`Value`] into another type by specifying the type.
+pub trait ValueIntoOther {
 	/// Convert a [`Value`] into another type that implements [`ConvertValue`],
 	/// for example [`sea_query::Value`] or [`libsql::Value`]
 	fn into_other<T>(self) -> ConvertValueResult<T>
 	where
-		T: ConvertValue<M>;
+		T: ConvertValue;
 }
 
-impl<M> ValueIntoOther<M> for Value {
+impl ValueIntoOther for Value {
 	fn into_other<T>(self) -> ConvertValueResult<T>
 	where
-		T: ConvertValue<M>,
+		T: ConvertValue,
 	{
 		T::from_value(self)
 	}
@@ -90,12 +89,11 @@ impl ValueIntoValueType for Value {
 	}
 }
 
-
-pub trait ConvertValue<M>: Sized {
+pub trait ConvertValue: Sized {
 	fn into_value(self) -> ConvertValueResult<Value>;
 	fn from_value(value: Value) -> ConvertValueResult<Self>;
 }
-impl ConvertValue<()> for () {
+impl ConvertValue for () {
 	fn into_value(self) -> ConvertValueResult<Value> { Ok(Value::Null) }
 	fn from_value(value: Value) -> ConvertValueResult<Self> {
 		match value {
@@ -108,7 +106,7 @@ impl ConvertValue<()> for () {
 	}
 }
 
-impl ConvertValue<String> for String {
+impl ConvertValue for String {
 	fn into_value(self) -> ConvertValueResult<Value> { Ok(Value::Text(self)) }
 	fn from_value(value: Value) -> ConvertValueResult<Self> {
 		match value {
@@ -122,7 +120,7 @@ impl ConvertValue<String> for String {
 	}
 }
 
-impl ConvertValue<bool> for bool {
+impl ConvertValue for bool {
 	fn into_value(self) -> ConvertValueResult<Value> {
 		Ok(Value::Integer(if self { 1 } else { 0 }))
 	}
@@ -138,7 +136,7 @@ impl ConvertValue<bool> for bool {
 	}
 }
 
-impl ConvertValue<Vec<u8>> for Vec<u8> {
+impl ConvertValue for Vec<u8> {
 	fn into_value(self) -> ConvertValueResult<Value> { Ok(Value::Blob(self)) }
 	fn from_value(value: Value) -> ConvertValueResult<Self> {
 		match value {
@@ -152,18 +150,14 @@ impl ConvertValue<Vec<u8>> for Vec<u8> {
 	}
 }
 
-pub struct OptionMarker;
-impl<T, M> ConvertValue<(M, OptionMarker)> for Option<T>
-where
-	T: ConvertValue<M>,
-{
+// Generic Option<T> ConvertValue implementation
+impl<T: ConvertValue> ConvertValue for Option<T> {
 	fn into_value(self) -> ConvertValueResult<Value> {
 		match self {
 			Some(value) => value.into_value(),
 			None => Ok(Value::Null),
 		}
 	}
-
 	fn from_value(value: Value) -> ConvertValueResult<Self> {
 		if value == Value::Null {
 			Ok(None)
@@ -173,42 +167,47 @@ where
 	}
 }
 
-pub struct TryIntoI64Marker;
-impl<T: TryInto<i64> + TryFrom<i64>> ConvertValue<(T, TryIntoI64Marker)> for T
-where
-	<T as TryInto<i64>>::Error: std::fmt::Debug,
-	<T as TryFrom<i64>>::Error: std::fmt::Debug,
-{
-	fn into_value(self) -> ConvertValueResult<Value> {
-		match self.try_into() {
-			Ok(value) => Ok(Value::Integer(value)),
-			Err(err) => Err(ConvertValueError::conversion_failed(format!(
-				"Failed to convert {} to i64: {:?}",
-				std::any::type_name::<T>(),
-				err,
-			))),
-		}
-	}
-
-	fn from_value(value: Value) -> ConvertValueResult<Self> {
-		match value {
-			Value::Integer(val) => match T::try_from(val) {
-				Ok(value) => Ok(value),
-				Err(err) => Err(ConvertValueError::conversion_failed(format!(
-					"Failed to convert i64 to {}: {:?}",
-					std::any::type_name::<T>(),
-					err,
-				))),
-			},
-			_ => Err(ConvertValueError::conversion_failed(format!(
-				"Expected Value::Integer, found {:?}",
-				value
-			))),
-		}
-	}
+// TryInto<i64> ConvertValue implementation using macro_rules!
+macro_rules! impl_convert_value_try_into_i64 {
+    ($($t:ty),*) => {
+        $(
+            impl ConvertValue for $t {
+                fn into_value(self) -> ConvertValueResult<Value> {
+                    match self.try_into() {
+                        Ok(value) => Ok(Value::Integer(value)),
+                        Err(err) => Err(ConvertValueError::conversion_failed(format!(
+                            "Failed to convert {} to i64: {:?}",
+                            std::any::type_name::<$t>(),
+                            err,
+                        ))),
+                    }
+                }
+                fn from_value(value: Value) -> ConvertValueResult<Self> {
+                    match value {
+                        Value::Integer(val) => match <$t>::try_from(val) {
+                            Ok(value) => Ok(value),
+                            Err(err) => Err(ConvertValueError::conversion_failed(format!(
+                                "Failed to convert i64 to {}: {:?}",
+                                std::any::type_name::<$t>(),
+                                err,
+                            ))),
+                        },
+                        _ => Err(ConvertValueError::conversion_failed(format!(
+                            "Expected Value::Integer, found {:?}",
+                            value
+                        ))),
+                    }
+                }
+            }
+        )*
+    };
 }
 
-impl ConvertValue<f32> for f32 {
+impl_convert_value_try_into_i64!(
+	u8, i8, u16, i16, u32, i32, u64, i64, usize, isize
+);
+
+impl ConvertValue for f32 {
 	fn into_value(self) -> ConvertValueResult<Value> {
 		Ok(Value::Real(self as f64))
 	}
@@ -224,7 +223,7 @@ impl ConvertValue<f32> for f32 {
 	}
 }
 
-impl ConvertValue<f64> for f64 {
+impl ConvertValue for f64 {
 	fn into_value(self) -> ConvertValueResult<Value> { Ok(Value::Real(self)) }
 
 	fn from_value(value: Value) -> ConvertValueResult<Self> {
