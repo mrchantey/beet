@@ -11,6 +11,7 @@ imports_granularity = "Item"
 imports_layout = "Vertical"
 overflow_delimited_expr = true
 use_field_init_shorthand = true
+match_arm_leading_pipes = "Preserve"
 # .gitignore rules
 ignore = [
 	"crates/*/src/codegen/**/*.rs",

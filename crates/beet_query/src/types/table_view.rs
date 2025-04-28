@@ -115,7 +115,6 @@ pub trait TableView: Sized {
 mod test {
 	use crate::as_beet::*;
 	use sea_query::SqliteQueryBuilder;
-	use sea_query::ValueType;
 	use sweet::prelude::*;
 
 	#[derive(Default, Table)]
@@ -126,7 +125,7 @@ mod test {
 
 	#[test]
 	fn value() {
-		let val = sea_query::Value::from(3u32);
+		// let val = sea_query::Value::from(3u32);
 		// ValueType::type_name(val.clone()).unwrap();
 		// let val: u32 = sea_query::ValueType::try_from(val.clone()).unwrap();
 

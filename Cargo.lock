@@ -883,6 +883,7 @@ dependencies = [
  "extend",
  "libsql",
  "limbo",
+ "num-traits",
  "once_cell",
  "rapidhash",
  "sea-query",
@@ -7948,7 +7949,6 @@ checksum = "d99447c24da0cded00089e2021e1624af90878c65f7534319448d01da3df869d"
 dependencies = [
  "inherent",
  "sea-query-derive",
- "serde_json",
 ]
 
 [[package]]
