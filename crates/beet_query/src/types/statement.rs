@@ -1,20 +1,38 @@
 use crate::prelude::*;
 use anyhow::Result;
+use sea_query::QueryBuilder;
 use sea_query::QueryStatementBuilder;
 use sea_query::SchemaBuilder;
 use sea_query::SchemaStatementBuilder;
 use sweet::prelude::*;
 
+pub trait StatementBuilder:SchemaBuilder+ QueryBuilder{}
+impl<T: SchemaBuilder + QueryBuilder> StatementBuilder for T {}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub enum StatementType {
+	/// A statement that is used to create or modify the database schema
+	/// e.g. create table, alter table, create index, create foreign key.
+	Schema,
+	/// A statement that is used to query the database,
+	/// e.g. select, insert, update, delete.
+	Query,
+}
+
 pub trait Statement<M>: Sized {
+	/// Define the type of statement this is, which can be used
+	/// to determine a caching strategy.
+	fn statement_type(&self) -> StatementType;
+
 	/// Build a [`SeaQuery`] statement into [`beet::Rows`](Rows)
-	fn build<T: SchemaBuilder>(
+	fn build(
 		&self,
-		schema_builder: T,
+		schema_builder: &dyn StatementBuilder,
 	) -> ConvertValueResult<(String, Row)>;
-	async fn execute(self, conn: &impl ConnectionInner) -> Result<()> {
+	async fn execute(self, conn: &Connection) -> Result<()> {
 		conn.execute(self).await
 	}
-	async fn query(self, conn: &impl ConnectionInner) -> Result<Rows> {
+	async fn query(self, conn: &Connection) -> Result<Rows> {
 		conn.query(self).await
 	}
 }
@@ -22,22 +40,26 @@ pub trait Statement<M>: Sized {
 pub struct SchemaStatementBuilderMarker;
 
 impl<T: SchemaStatementBuilder> Statement<SchemaStatementBuilderMarker> for T {
-	fn build<U: SchemaBuilder>(
+	fn statement_type(&self) -> StatementType { StatementType::Schema }
+
+	fn build(
 		&self,
-		schema_builder: U,
+		schema_builder: &dyn StatementBuilder,
 	) -> ConvertValueResult<(String, Row)> {
-		(T::build(self, schema_builder), Row::default()).xok()
+		(T::build_any(self, schema_builder), Row::default()).xok()
 	}
 }
 
 pub struct QueryStatementBuilderMarker;
 
 impl<T: QueryStatementBuilder> Statement<QueryStatementBuilderMarker> for T {
-	fn build<U: SchemaBuilder>(
+	fn statement_type(&self) -> StatementType { StatementType::Query }
+
+	fn build(
 		&self,
-		schema_builder: U,
+		schema_builder: &dyn StatementBuilder,
 	) -> ConvertValueResult<(String, Row)> {
-		T::build_any(self, &schema_builder)
+		T::build_any(self, schema_builder)
 			.xmap(|(sql, values)| (sql, values.into_row()?).xok())
 	}
 }

@@ -6,6 +6,10 @@ use sweet::prelude::PipelineTarget;
 
 #[cfg(feature = "limbo")]
 impl ConnectionInner for limbo::Connection {
+	fn statement_builder(&self) -> Box<dyn StatementBuilder> {
+		Box::new(SqliteQueryBuilder)
+	}
+
 	async fn new() -> Result<Self> {
 		if let Ok(_url) = std::env::var("LIMBO_URL") {
 			unimplemented!()
@@ -25,7 +29,7 @@ impl ConnectionInner for limbo::Connection {
 	}
 
 	async fn execute_uncached<M>(&self, stmt: impl Statement<M>) -> Result<()> {
-		let (sql, row) = stmt.build(SqliteQueryBuilder)?;
+		let (sql, row) = stmt.build(&*self.statement_builder())?;
 		self.execute(&sql, row.into_other::<limbo::Value>()?)
 			.await?;
 		Ok(())

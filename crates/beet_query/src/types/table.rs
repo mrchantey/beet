@@ -16,8 +16,8 @@ pub trait Table {
 	fn stmt_create_table() -> TableCreateStatement;
 
 	/// Execute a `CREATE TABLE` statement with this table's [`stmt_create_table`](Table::stmt_create_table)
-	async fn create_table(conn: &impl ConnectionInner) -> Result<()> {
-		conn.execute_uncached(Self::stmt_create_table()).await
+	async fn create_table(conn: &Connection) -> Result<()> {
+		conn.execute(Self::stmt_create_table()).await
 	}
 }
 

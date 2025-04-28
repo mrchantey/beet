@@ -95,15 +95,11 @@ pub trait TableView: Sized {
 			.xok()
 	}
 
-	async fn insert(self, conn: &impl ConnectionInner) -> Result<()> {
+	async fn insert(self, conn: &Connection) -> Result<()> {
 		conn.execute(self.stmt_insert()?).await
 	}
-	async fn insert_uncached(self, conn: &impl ConnectionInner) -> Result<()> {
-		conn.execute_uncached(self.stmt_insert()?).await
-	}
 
-
-	async fn update_self(self, conn: &impl ConnectionInner) -> Result<()> {
+	async fn update_self(self, conn: &Connection) -> Result<()> {
 		let kvp = self.primary_kvp()?;
 		let mut stmt = self.stmt_update()?;
 		stmt.and_where(
@@ -114,7 +110,7 @@ pub trait TableView: Sized {
 	}
 
 	async fn select_by_primary<M>(
-		conn: &impl ConnectionInner,
+		conn: &Connection,
 		value: Self::PrimaryKey,
 	) -> Result<Self>
 	where

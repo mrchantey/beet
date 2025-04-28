@@ -6,6 +6,10 @@ use sweet::prelude::PipelineTarget;
 
 #[cfg(feature = "libsql")]
 impl ConnectionInner for libsql::Connection {
+	fn statement_builder(&self) -> Box<dyn StatementBuilder> {
+		Box::new(SqliteQueryBuilder)
+	}
+
 	async fn new() -> Result<libsql::Connection> {
 		if let Ok(url) = std::env::var("LIBSQL_URL") {
 			let token = std::env::var("LIBSQL_AUTH_TOKEN")?;
@@ -26,7 +30,7 @@ impl ConnectionInner for libsql::Connection {
 
 
 	async fn execute_uncached<M>(&self, stmt: impl Statement<M>) -> Result<()> {
-		let (sql, row) = stmt.build(SqliteQueryBuilder)?;
+		let (sql, row) = stmt.build(&*self.statement_builder())?;
 		self.execute(&sql, row.into_other::<libsql::Value>()?)
 			.await?;
 		Ok(())
