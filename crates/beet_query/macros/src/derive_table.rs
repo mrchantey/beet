@@ -208,6 +208,18 @@ impl<'a> DeriveTable<'a> {
 				}
 			});
 
+		let value_types = self.fields.iter().map(|field| {
+			let value_type = field
+				.attributes
+				.get_value("type")
+				.map(|v| v.to_token_stream())
+				.unwrap_or_else(|| field.inner_ty.to_token_stream());
+			let variant_ident = &field.variant_ident;
+			quote! {
+				Self::#variant_ident => #value_type::into_value_type()
+			}
+		});
+
 		let table_ident = &self.input.ident;
 		let columns_ident = &self.cols_ident;
 		quote! {
@@ -224,6 +236,13 @@ impl<'a> DeriveTable<'a> {
 				fn into_column_def(self) -> beet::exports::sea_query::ColumnDef {
 					match self {
 						#(#col_defs),*
+					}
+				}
+			}
+			impl ValueIntoValueType for #columns_ident {
+				fn into_value_type(&self) -> ValueType {
+					match self {
+						#(#value_types),*
 					}
 				}
 			}
@@ -295,6 +314,13 @@ impl<'a> DeriveTable<'a> {
 				}
 			});
 
+		let primary_key_type = self
+			.fields
+			.iter()
+			.find(|field| field.primary_key)
+			.map(|field| field.named_field.syn_field.ty.to_token_stream())
+			.unwrap_or_else(|| quote! { () });
+
 		let ident = &self.input.ident;
 		let table_ident = &self.table_ident;
 		let cols_ident = &self.cols_ident;
@@ -303,6 +329,8 @@ impl<'a> DeriveTable<'a> {
 		quote! {
 			impl TableView for #ident{
 				type Table = #table_ident;
+				type PrimaryKey = #primary_key_type;
+
 				#primary_value
 
 				fn columns() -> Vec<#cols_ident> {
@@ -340,11 +368,6 @@ fn parse_col_def(field: &TableField) -> Result<TokenStream> {
 	// 	.get_value("name")
 	// 	.map(ToTokens::to_token_stream)
 	// 	.unwrap_or_else(|| field.ident.to_string().to_token_stream());
-	let value_type = field
-		.attributes
-		.get_value("type")
-		.map(|v| v.to_token_stream())
-		.unwrap_or_else(|| field.inner_ty.to_token_stream());
 
 	let not_null = if field.is_optional() {
 		None
@@ -376,14 +399,16 @@ fn parse_col_def(field: &TableField) -> Result<TokenStream> {
 
 	let ident = &field.variant_ident;
 	quote! {
-		Self::#ident =>
-			beet::exports::sea_query::ColumnDef::new_with_type(self,#value_type::into_value_type().into_column_type())
+		Self::#ident =>{
+			let column_type = self.into_value_type().into_column_type();
+			beet::exports::sea_query::ColumnDef::new_with_type(self,column_type)
 			#primary_key
 			#auto_increment
 			#unique
 			#default_value
 			#not_null
 			.to_owned()
+		}
 	}
 	.xok()
 }

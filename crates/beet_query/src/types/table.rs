@@ -22,7 +22,7 @@ pub trait Table {
 }
 
 /// A trait for a list of columns in a table
-pub trait Columns: Sized + IntoColumnDef {
+pub trait Columns: Sized + IntoColumnDef + ValueIntoValueType {
 	/// The table these columns are for
 	type Table: Table;
 	/// Returns a list of all columns in the table
@@ -37,6 +37,13 @@ pub trait Columns: Sized + IntoColumnDef {
 			.into_iter()
 			.map(|col| col.into_column_def())
 			.collect()
+	}
+
+	/// Returns the type of the primary key column, or `ValueType::Null` if there is no primary key
+	fn primary_key_value_type() -> ValueType {
+		Self::primary_key()
+			.map(|col| col.into_value_type())
+			.unwrap_or(ValueType::Null)
 	}
 }
 

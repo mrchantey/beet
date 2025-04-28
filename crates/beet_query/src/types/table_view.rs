@@ -19,6 +19,8 @@ pub enum DeserializeError {
 /// used for insert, update and query statements
 /// TODO all [sea_query::QueryStatement]
 pub trait TableView: Sized {
+	type PrimaryKey;
+
 	/// The table this view is for
 	type Table: Table;
 	/// All columns for this insert view. This includes Optional columns,
@@ -109,6 +111,32 @@ pub trait TableView: Sized {
 		);
 		// println!("{:?}", stmt.build(sea_query::SqliteQueryBuilder));
 		conn.execute(stmt).await
+	}
+
+	async fn select_by_primary<M>(
+		conn: &impl Connection,
+		value: Self::PrimaryKey,
+	) -> Result<Self>
+	where
+		Self::PrimaryKey: ConvertValue<M>,
+	{
+		let mut stmt = Self::stmt_select();
+		let Some(primary_key) = <Self::Table as Table>::Columns::primary_key()
+		else {
+			return Err(anyhow::anyhow!(
+				"No primary key defined for table {}",
+				Self::Table::name()
+			)
+			.into());
+		};
+
+		let value = value.into_value()?;
+		stmt.and_where(
+			Expr::col(primary_key)
+				.eq(value.into_other::<sea_query::SimpleExpr>()?),
+		);
+		todo!()
+		// conn.query(stmt).await?
 	}
 }
 

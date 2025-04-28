@@ -78,13 +78,18 @@ pub enum ValueType {
 	Null,
 }
 
-pub trait IntoValueType<M>: Sized {
+pub trait TypeIntoValueType: Sized {
 	fn into_value_type() -> ValueType;
 }
+pub trait ValueIntoValueType: Sized {
+	fn into_value_type(&self) -> ValueType;
+}
+
+
 macro_rules! impl_into_value_type {
 	($($t:ty => $value_type:expr),* $(,)?) => {
 		$(
-			impl IntoValueType<Self> for $t {
+			impl TypeIntoValueType for $t {
 				fn into_value_type() -> ValueType { $value_type }
 			}
 		)*
