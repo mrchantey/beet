@@ -50,7 +50,6 @@ async fn main() {
 	// 5. Read Changes
 	let rows = User::stmt_select()
 		.and_where(Expr::col(UserCols::Email).eq("bar@example.com"))
-		.to_owned()
 		.query(&db)
 		.await
 		.unwrap();
