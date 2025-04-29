@@ -1,4 +1,7 @@
+#[cfg(feature = "reactive_graph")]
 mod reactive_graph_runtime;
+#[cfg(feature = "reactive_graph")]
+pub use reactive_graph_runtime::*;
 pub mod sigfault;
 mod sigfault_runtime;
 mod string_runtime;
@@ -8,6 +11,9 @@ use std::path::Path;
 pub use string_runtime::*;
 // pub use reactive_graph_runtime::*;
 
+
+/// An rsx Runtime handles creation of reactive rsx nodes,
+/// often by  
 pub trait Runtime {
 	/// A type which all attribute values must be able to be converted to,
 	/// see [`IntoAttrVal`].

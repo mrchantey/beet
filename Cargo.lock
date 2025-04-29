@@ -252,6 +252,17 @@ dependencies = [
 
 [[package]]
 name = "any_spawner"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "41058deaa38c9d9dd933d6d238d825227cffa668e2839b52879f6619c63eee3b"
+dependencies = [
+ "futures",
+ "thiserror 2.0.12",
+ "tokio",
+]
+
+[[package]]
+name = "any_spawner"
 version = "0.3.0-rc3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a13cbc743e8026cbe749d81d093e42afdd9178ef969374a8c7e6eff0bf130386"
@@ -942,6 +953,7 @@ dependencies = [
 name = "beet_rsx"
 version = "0.0.6-rc.1"
 dependencies = [
+ "any_spawner 0.2.0",
  "anyhow",
  "beet_rsx",
  "beet_rsx_macros",
@@ -3754,6 +3766,7 @@ dependencies = [
  "futures-core",
  "futures-task",
  "futures-util",
+ "num_cpus",
 ]
 
 [[package]]
@@ -7305,7 +7318,7 @@ version = "0.2.0-rc3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f60623422c1ddd5af4e37c4e63fe82de84d143359660bff1a7b4fb8909a8cb20"
 dependencies = [
- "any_spawner",
+ "any_spawner 0.3.0-rc3",
  "async-lock",
  "futures",
  "guardian",
