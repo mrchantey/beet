@@ -11,8 +11,6 @@
 pub mod libsql;
 #[cfg(feature = "limbo")]
 pub mod limbo;
-#[cfg(feature = "sqlx")]
-pub mod sqlx;
 pub mod sea_query;
 pub mod types;
 pub mod utils;
@@ -23,8 +21,6 @@ pub mod prelude {
 	pub use crate::libsql::*;
 	#[cfg(feature = "limbo")]
 	pub use crate::limbo::*;
-	#[cfg(feature = "sqlx")]
-	pub use crate::sqlx::*;
 	pub use crate::sea_query::*;
 	pub use beet_query_macros::*;
 	// #[cfg(test)]
