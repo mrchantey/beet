@@ -13,11 +13,14 @@ categories.workspace = true
 keywords.workspace = true
 
 [features]
-default = ["limbo", "tokio", "libsql"]
+default = ["tokio", "libsql", "sqlite"]
 limbo = ["dep:limbo"]
 libsql = ["dep:libsql"]
 tokio = ["dep:tokio"]
 sqlx = ["dep:sqlx"]
+sqlite = ["sqlx", "sqlx/sqlite"]
+postgres = ["sqlx", "sqlx/postgres"]
+mysql = ["sqlx", "sqlx/mysql"]
 
 [dependencies]
 anyhow.workspace = true
@@ -33,7 +36,10 @@ sea-query = { version = "0.32" }
 base64 = { version = "0" }
 num-traits = { version = "0.2" }
 libsql = { version = "0.9", optional = true }
-sqlx = { version = "0.8", optional = true }
+sqlx = { version = "0.8", optional = true, features = [
+	"runtime-tokio",
+	"tls-native-tls",
+] }
 limbo = { version = "0.0.19", path = "../../../../me-ref/limbo/bindings/rust", optional = true }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
