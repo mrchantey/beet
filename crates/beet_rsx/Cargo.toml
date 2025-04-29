@@ -69,6 +69,7 @@ reactive_graph = { version = "0.2.0-rc3", optional = true, features = [
 ] }
 any_spawner = { version = "0", optional = true, features = [
 	"futures-executor",
+	"wasm-bindgen",
 	"tokio",
 ] }
 

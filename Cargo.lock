@@ -259,6 +259,7 @@ dependencies = [
  "futures",
  "thiserror 2.0.12",
  "tokio",
+ "wasm-bindgen-futures",
 ]
 
 [[package]]

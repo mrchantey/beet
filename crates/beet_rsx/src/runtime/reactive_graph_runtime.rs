@@ -5,31 +5,38 @@ pub struct ReactiveGraphRuntime;
 #[cfg(test)]
 mod test {
 	use any_spawner::Executor;
-	use reactive_graph::effect::RenderEffect;
 	use reactive_graph::owner::Owner;
 	use reactive_graph::signal::signal;
-	use std::sync::Arc;
-	use std::sync::Mutex;
-	use sweet::prelude::*;
 
 	#[sweet::test]
-	#[ignore = "how to reactive graph?"]
 	async fn works() {
+		use reactive_graph::effect::Effect;
+
+
+		#[cfg(not(target_arch = "wasm32"))]
 		Executor::init_tokio().unwrap();
+
+		#[cfg(target_arch = "wasm32")]
+		Executor::init_wasm_bindgen().unwrap();
+
 		let owner = Owner::new();
 		owner.set();
 
-		reactive_graph::spawn(async {
-			let (get, set) = signal(7);
+		let (get1, set1) = signal(0);
+		let (get2, set2) = signal(0);
 
-			let val = Arc::new(Mutex::new(0));
-			let val2 = val.clone();
-			let _effect = RenderEffect::new(Box::new(move |_| {
-				*val2.lock().unwrap() = get();
-			}));
+		let _effect = Effect::new(Box::new(move |_| {
+			set2(get1() + 1);
+		}));
 
-			set(4);
-			expect(&*val.lock().unwrap()).to_be(&4);
-		});
+		set1(4);
+
+		assert_eq!(get1(), 4);
+
+		Executor::tick().await;
+
+		assert_eq!(get2(), 5);
+
+		println!("done");
 	}
 }

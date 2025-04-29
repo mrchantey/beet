@@ -25,7 +25,9 @@ impl MarkdownToFuncTokens {
 				| Options::ENABLE_FOOTNOTES
 				| Options::ENABLE_STRIKETHROUGH
 				| Options::ENABLE_TASKLISTS
-				// | Options::ENABLE_SMART_PUNCTUATION
+				// replaces ' with ’ etc, if users want this they should do a find and 
+				// replace at a higher level
+				// | Options::ENABLE_SMART_PUNCTUATION 
 				| Options::ENABLE_HEADING_ATTRIBUTES
 				| Options::ENABLE_YAML_STYLE_METADATA_BLOCKS
 				| Options::ENABLE_PLUSES_DELIMITED_METADATA_BLOCKS
