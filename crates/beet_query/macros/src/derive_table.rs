@@ -437,51 +437,82 @@ mod test {
 			quote! {
 				use beet::prelude::*;
 				impl Table for MyTable {
-					type Columns = MyTableColumns;
-					fn name() -> String {
+					type Columns = MyTableCols;
+					fn name() -> std::borrow::Cow<'static, str> {
 						"my_table".into()
 					}
+					fn stmt_create_table() -> beet::exports::sea_query::TableCreateStatement {
+						beet::exports::sea_query::Table::create()
+							.table(CowIden::new("my_table"))
+							.if_not_exists()
+							.col(MyTableCols::Test)
+							.to_owned()
+					}
 				}
-				enum MyTableColumns{
+				impl TableView for MyTable {
+					type Table = MyTable;
+					type PrimaryKey = ();
+					fn columns() -> Vec<MyTableCols> {
+						vec![MyTableCols::Test]
+					}
+					fn into_row(self) -> ConvertValueResult<Row> {
+						let mut values = vec![];
+						values.push(self.test.into_value()?);
+						Ok(Row::new(values))
+					}
+					fn from_row(row: Row) -> Result<Self,DeserializeError> {
+						let values = row.inner();
+						if values.len() != 1usize {
+							return Err(DeserializeError::RowLengthMismatch {
+								expected: 1usize,
+								received: values.len(),
+							})
+						}
+						let mut values = values.into_iter();
+						Ok(Self {
+							test: values.next().unwrap().into_other()?,
+						})
+					}
+				}
+				#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, beet::exports::sea_query::Iden)]
+				enum MyTableCols {
 					Test
 				}
-				impl Columns for MyTableColumns {
+				impl Columns for MyTableCols {
 					type Table = MyTable;
-					fn all() -> Vec<Column> {
-						vec![Self::Test.into_column()]
+					fn variants() -> Vec<Self> {
+						vec![Self::Test]
 					}
-					fn into_column(&self) -> Column {
+				}
+				impl beet::exports::sea_query::IntoColumnDef for MyTableCols {
+					fn into_column_def(self) -> beet::exports::sea_query::ColumnDef {
 						match self {
-							Self::Test => Column {
-								name: "test".into(),
-								value_type: ValueType::Integer,
-								optional: false,
-								default_value: None,
-								primary_key: false,
-								auto_increment: false,
-								unique: false,
+							Self::Test => {
+								let column_type = self.value_type().into_column_type();
+								beet::exports::sea_query::ColumnDef::new_with_type(self,column_type)
+									.not_null()
+									.to_owned()
 							}
 						}
 					}
-				 }
-				struct InsertMyTable {
-					test: u32
 				}
-				impl TableView for InsertMyTable {
-					type Table = MyTable;
-					fn columns() -> Vec<MyTableColumns> {
-						vec![MyTableColumns::Test]
+				impl ValueIntoValueType for MyTableCols {
+					fn value_type(&self) -> ValueType {
+						match self {
+							Self::Test => u32::value_type()
+						}
 					}
-					fn into_values(self) -> ParseValueResult<Vec<Value>> {
-						let mut values = vec![];
-						values.push(self.test.try_into_value()?);
-						Ok(values)
-					}
+				}
+				#[derive(TableView)]
+				#[table_view(table = MyTable)]
+				struct MyTablePartial {
+					test: u32
 				}
 			}
 			.to_string(),
 		);
 	}
+
 	#[test]
 	fn with_attributes() {
 		expect(
@@ -506,71 +537,100 @@ mod test {
 		.to_be(
 			quote! {
 				use beet::prelude::*;
-
 				impl Table for MyTable {
-					type Columns = MyTableColumns;
-					fn name() -> String {
+					type Columns = MyTableCols;
+					fn name() -> std::borrow::Cow<'static, str> {
 						"foobar".into()
 					}
-					fn if_not_exists() -> bool {
-						false
+					fn stmt_create_table() -> beet::exports::sea_query::TableCreateStatement {
+						beet::exports::sea_query::Table::create()
+							.table(CowIden::new("foobar"))
+							.col(MyTableCols::Id)
+							.col(MyTableCols::Test)
+							.to_owned()
 					}
 				}
-				pub enum MyTableColumns{
+				impl TableView for MyTable {
+					type Table = MyTable;
+					type PrimaryKey = u32;
+					fn primary_value(&self) -> ConvertValueResult<Option<Value>> {
+						Ok(Some(self.test.into_value()?))
+					}
+					fn columns() -> Vec<MyTableCols> {
+						vec![MyTableCols::Id, MyTableCols::Test]
+					}
+					fn into_row(self) -> ConvertValueResult<Row> {
+						let mut values = vec![];
+						if let Some(v) = self.id {
+							values.push(v.into_value()?);
+						} else {
+							values.push(Value::Null);
+						}
+						values.push(self.test.into_value()?);
+						Ok(Row::new(values))
+					}
+					fn from_row(row: Row) -> Result<Self,DeserializeError> {
+						let values = row.inner();
+						if values.len() != 2usize {
+							return Err(DeserializeError::RowLengthMismatch {
+								expected: 2usize,
+								received: values.len(),
+							})
+						}
+						let mut values = values.into_iter();
+						Ok(Self {
+							id: values.next().unwrap().into_other()?,
+							test: values.next().unwrap().into_other()?,
+						})
+					}
+				}
+				#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, beet::exports::sea_query::Iden)]
+				pub enum MyTableCols {
 					Id,
 					Test
 				}
-				impl Columns for MyTableColumns {
+				impl Columns for MyTableCols {
 					type Table = MyTable;
-					fn all() -> Vec<Column> {
-						vec![Self::Id.into_column(), Self::Test.into_column()]
+					fn primary_key() -> Option<Self> {
+						Some(Self::Test)
 					}
-					fn into_column(&self) -> Column {
+					fn variants() -> Vec<Self> {
+						vec![Self::Id, Self::Test]
+					}
+				}
+				impl beet::exports::sea_query::IntoColumnDef for MyTableCols {
+					fn into_column_def(self) -> beet::exports::sea_query::ColumnDef {
 						match self {
-							Self::Id => Column{
-								name: "id".into(),
-								value_type: ValueType::Integer,
-								optional: true,
-								default_value: Some(9.into()),
-								primary_key: false,
-								auto_increment: false,
-								unique: false,
+							Self::Id => {
+								let column_type = self.value_type().into_column_type();
+								beet::exports::sea_query::ColumnDef::new_with_type(self,column_type)
+									.default(9)
+									.to_owned()
 							},
-							Self::Test=> Column{
-								name: "FooBazz".into(),
-								value_type: ValueType::Text,
-								optional: false,
-								default_value: None,
-								primary_key: true,
-								auto_increment: true,
-								unique: true,
+							Self::Test => {
+								let column_type = self.value_type().into_column_type();
+								beet::exports::sea_query::ColumnDef::new_with_type(self,column_type)
+									.primary_key()
+									.auto_increment()
+									.unique()
+									.not_null()
+									.to_owned()
 							}
 						}
 					}
-				 }
-				pub struct InsertMyTable {
-					id: Option<u32>,
-					test: Option<u32>
 				}
-				impl TableView for InsertMyTable {
-					type Table = MyTable;
-					fn columns() -> Vec<MyTableColumns> {
-						vec![MyTableColumns::Id, MyTableColumns::Test]
-					}
-					fn into_values(self) -> ParseValueResult<Vec<Value>> {
-						let mut values = vec![];
-						if let Some(v) = self.id {
-							values.push(v.try_into_value()?);
-						} else {
-							values.push(Value::Null);
+				impl ValueIntoValueType for MyTableCols {
+					fn value_type(&self) -> ValueType {
+						match self {
+							Self::Id => u32::value_type(),
+							Self::Test => u32::value_type()
 						}
-						if let Some(v) = self.test {
-							values.push(v.try_into_value()?);
-						} else {
-							values.push(Value::Null);
-						}
-						Ok(values)
 					}
+				}
+				#[derive(TableView)]
+				#[table_view(table = MyTable)]
+				pub struct MyTablePartial {
+					id: Option<u32>
 				}
 			}
 			.to_string(),
