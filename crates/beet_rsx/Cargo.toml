@@ -14,13 +14,14 @@ keywords.workspace = true
 
 
 [features]
-default = ["macros", "fs", "serde", "html"]
+default = ["macros", "fs", "serde", "html", "reactive_graph"]
 css = [
 	"dep:lightningcss",
 	"dep:parcel_selectors",
 	"beet_rsx_parser?/css",
 	"beet_rsx_macros?/css",
 ]
+reactive_graph = ["dep:reactive_graph"]
 html = ["dep:html-escape"]
 macros = ["dep:beet_rsx_macros"]
 parser = ["dep:quote", "dep:proc-macro2", "dep:beet_rsx_parser"]
@@ -61,6 +62,10 @@ proc-macro2 = { workspace = true, optional = true }
 parcel_selectors = { workspace = true, optional = true }
 lightningcss = { workspace = true, optional = true }
 
+#💡 reactivity
+reactive_graph = { version = "0.2.0-rc3", optional = true, features = [
+	"effects",
+] }
 
 #💡 bevy
 bevy = { workspace = true, optional = true }

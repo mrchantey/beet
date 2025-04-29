@@ -33,3 +33,7 @@ sweet = { workspace = true, features = ["test"] }
 name = "sim_test"
 path = "examples/sim_test.rs"
 required-features = ["bevy_default"]
+[[example]]
+name = "dynamic"
+path = "examples/dynamic.rs"
+required-features = ["bevy_default"]

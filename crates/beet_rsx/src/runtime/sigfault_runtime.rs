@@ -1,28 +1,16 @@
-mod signal;
-use std::path::Path;
-
-// use crate::rsx::RsxAttribute;
-// use crate::rsx::RsxNode;
-// use crate::rsx::RsxRust;
+use super::sigfault::*;
 use crate::prelude::*;
-pub use signal::*;
-
-
 
 /// a woefully basic implementation of signals, intended
 /// only for testing and as an example implementation for
 /// authors of actual reactivity libraries.
 /// It aint a segfault, but it's not great.
-pub struct Sigfault;
+pub struct SigfaultRuntime;
 
-impl Sigfault {
-	/// Used by [`RstmlToRsx`] when it encounters a block node:
-	/// ```
-	/// # use beet_rsx::as_beet::*;
-	/// let block = "hello";
-	/// let node = rsx!{<div>{block}</div>};
-	/// ```
-	pub fn parse_block_node<M>(
+impl Runtime for SigfaultRuntime {
+	type AttributeValue = String;
+
+	fn parse_block_node<M>(
 		tracker: RustyTracker,
 		block: impl 'static + Send + Sync + Clone + IntoRsxNode<M>,
 	) -> RsxNode {
@@ -45,14 +33,7 @@ impl Sigfault {
 		})
 	}
 
-	/// Used by [`RstmlToRsx`] when it encounters an attribute block:
-	/// ```
-	/// # use beet_rsx::as_beet::*;
-	/// #[derive(IntoBlockAttribute)]
-	/// struct Foo;
-	/// let node = rsx!{<el {Foo}/>};
-	/// ```
-	pub fn parse_attribute_block<M>(
+	fn parse_attribute_block<M>(
 		tracker: RustyTracker,
 		block: impl IntoBlockAttribute<M>,
 	) -> RsxAttribute {
@@ -71,14 +52,18 @@ impl Sigfault {
 	/// let value = 3;
 	/// let node = rsx!{<el key={value}/>};
 	/// ```
-	pub fn parse_attribute_value<M>(
+	fn parse_attribute_value<M>(
 		key: &'static str,
 		tracker: RustyTracker,
-		block: impl 'static + Send + Sync + Clone + IntoSigfaultAttrVal<M>,
+		block: impl 'static
+		+ Send
+		+ Sync
+		+ Clone
+		+ IntoAttrVal<Self::AttributeValue, M>,
 	) -> RsxAttribute {
 		RsxAttribute::BlockValue {
 			key: key.to_string(),
-			initial: block.clone().into_sigfault_val(),
+			initial: block.clone().into_val(),
 			effect: Effect::new(
 				Box::new(move |loc| {
 					Self::register_attribute_effect(loc, key, block);
@@ -89,44 +74,22 @@ impl Sigfault {
 		}
 	}
 
-	/// Called by both `parse_attribute_value` and the implementation of
-	/// `parse_attribute_block` where the block contains non-event fields.
-	/// Note that in the case of an attribute block `<foo {bar}/>` all
-	/// attributes are registered, even the static ones.
-	pub fn register_attribute_effect<M>(
+	fn register_attribute_effect<M>(
 		loc: TreeLocation,
 		key: &'static str,
-		block: impl 'static + Send + Sync + Clone + IntoSigfaultAttrVal<M>,
+		block: impl 'static
+		+ Send
+		+ Sync
+		+ Clone
+		+ IntoAttrVal<Self::AttributeValue, M>,
 	) {
 		effect(move || {
-			let value = block.clone().into_sigfault_val();
+			let value = block.clone().into_val();
 			DomTarget::with(move |target| {
 				target.update_rsx_attribute(loc, key, &value).unwrap()
 			});
 		});
 	}
-}
-
-
-pub trait IntoSigfaultAttrVal<M> {
-	fn into_sigfault_val(self) -> String;
-}
-
-pub struct ToStringIntoSigfaultAttrVal;
-impl<T: ToString> IntoSigfaultAttrVal<(T, ToStringIntoSigfaultAttrVal)> for T {
-	fn into_sigfault_val(self) -> String { self.to_string() }
-}
-
-pub struct FuncIntoSigfaultAttrVal;
-impl<T: FnOnce() -> U, U: IntoSigfaultAttrVal<M2>, M2>
-	IntoSigfaultAttrVal<(M2, FuncIntoSigfaultAttrVal)> for T
-{
-	fn into_sigfault_val(self) -> String { self().into_sigfault_val() }
-}
-
-pub struct PathIntoSigfaultAttrVal;
-impl IntoSigfaultAttrVal<PathIntoSigfaultAttrVal> for &Path {
-	fn into_sigfault_val(self) -> String { self.to_string_lossy().to_string() }
 }
 
 

@@ -40,6 +40,41 @@ Beet is a set of tools for building reactive structures. Your mileage may vary d
 
 | `bevy` | `beet` |
 | ------ | ------ |
+| 0.16   | 0.0.6  |
 | 0.15   | 0.0.4  |
 | 0.14   | 0.0.2  |
 | 0.12   | 0.0.1  |
+
+
+## Wishlist
+
+Most of these are quite complex but if you'd like to have a go open an issue and I'll help where i can.
+
+### `beet_rsx`
+- [ ] escape html 
+- [ ] reactive graph
+- [ ] minify style
+
+
+### `beet_router`
+- [ ] markdown live reload
+- [ ] markdown rsx
+- [ ] markdown recursive parsing
+
+### `sweet`
+- [ ] native cli
+
+### `beet_build`
+- [ ] css parser / style tag location
+- [ ] markdown parser
+- [ ] file hashing
+
+### `beet_query`
+- [ ] sqlx
+
+
+### `beet_server`
+- [ ] sever signals
+
+### `infra`
+- [ ] static files on s3

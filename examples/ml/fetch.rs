@@ -97,7 +97,7 @@ pub fn fetch_npc(
 			},
 		)
 		.with_children(|parent| {
-			let origin = parent.parent_entity();
+			let origin = parent.target_entity();
 			parent
 				.spawn((
 					Name::new("Fetch Behavior"),
@@ -112,7 +112,7 @@ pub fn fetch_npc(
 					parent.spawn((
 						Name::new("Apply Sentence Steer Target"),
 						SentenceSteerTarget::<Collectable>::new(
-							TargetEntity::Other(parent.parent_entity()),
+							TargetEntity::Other(parent.target_entity()),
 						),
 						HandleWrapper(bert),
 						ReturnWith(RunResult::Success),

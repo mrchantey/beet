@@ -74,3 +74,8 @@ tokio.workspace = true
 name = "hello_rl_basic"
 path = "examples/hello_rl_basic.rs"
 required-features = ["candle", "bevy_default"]
+
+[[example]]
+name = "hello_ml_basic"
+path = "examples/hello_ml_basic.rs"
+required-features = ["candle"]

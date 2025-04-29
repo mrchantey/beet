@@ -14,8 +14,8 @@ pub mod dom;
 pub mod error;
 pub mod html;
 pub mod rsx;
-pub mod sigfault;
-pub mod string_rsx;
+pub mod runtime;
+pub use runtime::sigfault;
 pub mod templating;
 #[cfg(feature = "macros")]
 pub use beet_rsx_macros::*;
@@ -36,6 +36,7 @@ pub mod prelude {
 	pub use crate::context::*;
 	pub use crate::templating::*;
 	pub use crate::dom::*;
+	pub use crate::runtime::*;
 	pub use crate::error::*;
 	pub use crate::html::*;
 	pub use crate::rsx::*;
