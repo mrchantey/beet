@@ -26,6 +26,8 @@ pub mod prelude {
 	pub use crate::parser::*;
 	pub use crate::server_actions::*;
 	pub use crate::types::*;
+
+	pub use sweet::prelude::HttpMethod;
 }
 
 

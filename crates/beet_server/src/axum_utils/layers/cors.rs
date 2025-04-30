@@ -112,6 +112,7 @@ mod test {
 	use axum::middleware;
 	use axum::response::IntoResponse;
 	use axum::routing::get;
+	use http::Request;
 	use http::*;
 	use sweet::prelude::*;
 	use tower::util::ServiceExt;
