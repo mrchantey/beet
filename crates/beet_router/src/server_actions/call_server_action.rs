@@ -61,8 +61,9 @@ impl CallServerAction {
 		Self::send(route_info, req).await
 	}
 
-	/// Internal function to make a request with data in the query parameters,
-	/// for deserilization by [`JsonQuery`].
+	/// Internal function to make a request with data in the query parameters.
+	/// This will be first serialized as json and then encoded as a query parameter
+	/// for deserilaization by [`JsonQuery`].
 	/// Used by GET, HEAD, DELETE, OPTIONS, CONNECT, TRACE methods.
 	async fn request_with_query<
 		T: Serialize,
@@ -72,7 +73,7 @@ impl CallServerAction {
 		route_info: RouteInfo,
 		value: T,
 	) -> ServerActionResult<O, E> {
-		let payload = serde_json::to_value(value)
+		let payload = serde_json::to_string(&value)
 			.map_err(|err| cross_fetch::Error::serialization(err))?;
 
 		let req = Request::new(Self::create_url(&route_info))

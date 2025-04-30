@@ -944,7 +944,6 @@ dependencies = [
  "tokio",
  "toml",
  "tower 0.5.2",
- "uuid",
  "web-sys",
 ]
 
