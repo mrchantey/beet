@@ -95,6 +95,6 @@ a[aria-current='page'],
 	[aria-current='page']:hover,
 	[aria-current='page']:focus {
 		font-weight: var(--bt-form-element-font-weight);
-		color: var(--bt-color-on-primary);
-		background-color: var(--bt-color-primary);
+		color: var(--bt-color-primary);
+		background-color: var(--bt-color-surface-container-highest);
 	}
