@@ -3,17 +3,36 @@ use once_cell::sync::Lazy;
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 use std::sync::Mutex;
-use sweet::net::exports::reqwest::RequestBuilder;
+use sweet::net::cross_fetch;
 use sweet::prelude::*;
 
+/// the url for the server.
+/// On native builds this defaults to `http://127.0.0.1:3000`.
+/// On wasm builds this is set to the current origin.
+#[cfg(not(target_arch = "wasm32"))]
 static SERVER_URL: Lazy<Mutex<RoutePath>> =
 	Lazy::new(|| Mutex::new("http://127.0.0.1:3000".into()));
+
+#[cfg(target_arch = "wasm32")]
+static SERVER_URL: Lazy<Mutex<RoutePath>> = Lazy::new(|| {
+	Mutex::new(
+		web_sys::window()
+			.and_then(|w| w.location().origin().ok())
+			.unwrap()
+			.into(),
+	)
+});
 
 pub struct CallServerAction;
 
 impl CallServerAction {
 	pub fn get_server_url() -> RoutePath { SERVER_URL.lock().unwrap().clone() }
 	pub fn set_server_url(url: RoutePath) { *SERVER_URL.lock().unwrap() = url; }
+	/// on wasm we assume the same domain and dont prefix SERVER_URL.
+	fn create_url(route_info: &RouteInfo) -> String {
+		format!("{}{}", Self::get_server_url(), route_info.path)
+	}
+
 
 	/// Makes a HTTP request to a server action.
 	/// Automatically uses the correct request style based on the HTTP method:
@@ -37,13 +56,9 @@ impl CallServerAction {
 	pub async fn request_no_data<O: DeserializeOwned, E: DeserializeOwned>(
 		route_info: RouteInfo,
 	) -> ServerActionResult<O, E> {
-		let url = SERVER_URL.lock().unwrap().join(&route_info.path);
-		let method = route_info.method.into();
-		Self::send(
-			route_info,
-			ReqwestClient::client().request(method, url.to_string()),
-		)
-		.await
+		let req = Request::new(Self::create_url(&route_info))
+			.method(route_info.method);
+		Self::send(route_info, req).await
 	}
 
 	/// Internal function to make a request with data in the query parameters,
@@ -57,18 +72,13 @@ impl CallServerAction {
 		route_info: RouteInfo,
 		value: T,
 	) -> ServerActionResult<O, E> {
-		let value = serde_json::to_string(&value)
-			.map_err(|e| ServerActionError::Serialize(e))?;
+		let payload = serde_json::to_value(value)
+			.map_err(|err| cross_fetch::Error::serialization(err))?;
 
-		let url = SERVER_URL.lock().unwrap().join(&route_info.path);
-		let method = route_info.method.into();
-		Self::send(
-			route_info,
-			ReqwestClient::client()
-				.request(method, url.to_string())
-				.query(&[("data", value)]),
-		)
-		.await
+		let req = Request::new(Self::create_url(&route_info))
+			.method(route_info.method)
+			.query(&[("data", payload)])?;
+		Self::send(route_info, req).await
 	}
 
 	/// Internal function to make a request with data in the request body.
@@ -81,49 +91,31 @@ impl CallServerAction {
 		route_info: RouteInfo,
 		value: T,
 	) -> ServerActionResult<O, E> {
-		let value = serde_json::to_string(&value)
-			.map_err(|e| ServerActionError::Serialize(e))?;
-
-		let url = SERVER_URL.lock().unwrap().join(&route_info.path);
-		let method = route_info.method.into();
-		Self::send(
-			route_info,
-			ReqwestClient::client()
-				.request(method, url.to_string())
-				.header("Content-Type", "application/json")
-				.body(value),
-		)
-		.await
+		let req = Request::new(Self::create_url(&route_info))
+			.method(route_info.method)
+			.body(value)?;
+		Self::send(route_info, req).await
 	}
 
 
 	async fn send<O: DeserializeOwned, E: DeserializeOwned>(
 		_route_info: RouteInfo,
-		req: RequestBuilder,
+		req: Request,
 	) -> ServerActionResult<O, E> {
-		let res = req
-			.send()
-			.await
-			.map_err(|e| ServerActionError::Request(e))?;
-		let status = res.status();
+		let res = req.send().await?;
+		let status = res.status_code();
 
-		// bytes being rejected is usually a network error,
-		// an empty body should return empty bytes
-		let body_bytes = res
-			.bytes()
-			.await
-			.map_err(|e| ServerActionError::ResponseBody(e))?;
-
-		let body_str = || String::from_utf8_lossy(&body_bytes).to_string();
+		let body_bytes = res.bytes().await?;
 
 		if status.is_success() {
-			serde_json::from_slice(&body_bytes)
-				.map_err(|e| ServerActionError::Deserialize(e))
+			serde_json::from_slice::<O>(&body_bytes)
+				.map_err(|err| cross_fetch::Error::serialization(err))?
+				.xok()
 		} else if let Ok(err) = serde_json::from_slice(&body_bytes) {
 			Err(ServerActionError::ActionError(err))
-			// Err(ActionError::new(status.as_u16(), err).into())
 		} else {
-			Err(ServerActionError::UnparsedError(status, body_str()))
+			let str = String::from_utf8_lossy(&body_bytes).to_string();
+			Err(ServerActionError::UnparsedError(status, str))
 		}
 	}
 }

@@ -11,23 +11,15 @@ impl RealtimeApi {
 	pub async fn create(
 		req: RealtimeSessionCreateRequest,
 	) -> OpenAiResult<RealtimeSessionCreateResponse> {
-		ReqwestClient::client()
-			.post("https://api.openai.com/v1/realtime/sessions")
-			.header("Authorization", format!("Bearer {}", OpenAiKey::get()?))
-			.header("Content-Type", "application/json")
-			.body(
-				serde_json::to_string(&req)
-					.map_err(|e| OpenAiError::SerializationFailed(e))?,
-			)
+		Request::new("https://api.openai.com/v1/realtime/sessions")
+			.method(HttpMethod::Post)
+			.auth_bearer(&OpenAiKey::get()?)
+			.body(req)?
 			.send()
 			.await?
-			.error_for_status()?
-			.text()
+			.into_result()?
+			.body::<RealtimeSessionCreateResponse>()
 			.await?
-			.xmap(|s| {
-				serde_json::from_str::<RealtimeSessionCreateResponse>(&s)
-					.map_err(|e| OpenAiError::DeserializationFailed(e))
-			})?
 			.xok()
 	}
 }

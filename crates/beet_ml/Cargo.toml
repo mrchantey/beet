@@ -49,7 +49,6 @@ tokenizers = { version = "0.19.1", optional = true, default-features = false, fe
 	"unstable_wasm",
 ] }
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-reqwest.workspace = true
 hf-hub = "0.4"
 
 #💡 web

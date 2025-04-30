@@ -140,9 +140,6 @@ bytes = "1"
 #💡 http
 http = "1"
 http-body-util = "0.1"
-reqwest = { version = "0.12", default-features = false, features = [
-	"rustls-tls",
-] }
 
 #💡 server
 axum = { version = "0.8", features = ["macros"] }
