@@ -5577,6 +5577,7 @@ dependencies = [
 [[package]]
 name = "limbo"
 version = "0.0.19"
+source = "git+https://github.com/mrchantey/limbo#56f0d25bb037e45c1e294ae4c848f2cf78ff9f09"
 dependencies = [
  "limbo_core",
  "thiserror 2.0.12",
@@ -5585,6 +5586,7 @@ dependencies = [
 [[package]]
 name = "limbo_core"
 version = "0.0.19"
+source = "git+https://github.com/mrchantey/limbo#56f0d25bb037e45c1e294ae4c848f2cf78ff9f09"
 dependencies = [
  "built",
  "cfg_block",
@@ -5620,6 +5622,7 @@ dependencies = [
 [[package]]
 name = "limbo_ext"
 version = "0.0.19"
+source = "git+https://github.com/mrchantey/limbo#56f0d25bb037e45c1e294ae4c848f2cf78ff9f09"
 dependencies = [
  "chrono",
  "getrandom 0.3.2",
@@ -5629,6 +5632,7 @@ dependencies = [
 [[package]]
 name = "limbo_macros"
 version = "0.0.19"
+source = "git+https://github.com/mrchantey/limbo#56f0d25bb037e45c1e294ae4c848f2cf78ff9f09"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -5638,6 +5642,7 @@ dependencies = [
 [[package]]
 name = "limbo_sqlite3_parser"
 version = "0.0.19"
+source = "git+https://github.com/mrchantey/limbo#56f0d25bb037e45c1e294ae4c848f2cf78ff9f09"
 dependencies = [
  "bitflags 2.9.0",
  "cc",
@@ -5657,6 +5662,7 @@ dependencies = [
 [[package]]
 name = "limbo_time"
 version = "0.0.19"
+source = "git+https://github.com/mrchantey/limbo#56f0d25bb037e45c1e294ae4c848f2cf78ff9f09"
 dependencies = [
  "chrono",
  "limbo_ext",
@@ -5669,6 +5675,7 @@ dependencies = [
 [[package]]
 name = "limbo_uuid"
 version = "0.0.19"
+source = "git+https://github.com/mrchantey/limbo#56f0d25bb037e45c1e294ae4c848f2cf78ff9f09"
 dependencies = [
  "limbo_ext",
  "mimalloc",

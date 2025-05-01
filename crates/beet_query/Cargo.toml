@@ -32,7 +32,8 @@ sea-query = { version = "0.32" }
 base64 = { version = "0" }
 num-traits = { version = "0.2" }
 libsql = { version = "0.9", optional = true }
-limbo = { version = "0.0.19", path = "../../../../me-ref/limbo/bindings/rust", optional = true }
+# limbo = { version = "0.0.19", path = "../../../../me-ref/limbo/bindings/rust", optional = true }
+limbo = { version = "0.0.19", git = "https://github.com/mrchantey/limbo", optional = true }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 tokio = { workspace = true, optional = true }
