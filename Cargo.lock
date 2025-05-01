@@ -8238,6 +8238,7 @@ dependencies = [
 [[package]]
 name = "sweet"
 version = "0.4.1"
+source = "git+https://github.com/mrchantey/sweet#bc513011305692baf20a5dc81b73e611ca243868"
 dependencies = [
  "sweet_bevy",
  "sweet_fs",
@@ -8251,6 +8252,7 @@ dependencies = [
 [[package]]
 name = "sweet_bevy"
 version = "0.4.1"
+source = "git+https://github.com/mrchantey/sweet#bc513011305692baf20a5dc81b73e611ca243868"
 dependencies = [
  "anyhow",
  "bevy",
@@ -8266,6 +8268,7 @@ dependencies = [
 [[package]]
 name = "sweet_fs"
 version = "0.4.1"
+source = "git+https://github.com/mrchantey/sweet#bc513011305692baf20a5dc81b73e611ca243868"
 dependencies = [
  "anyhow",
  "clap",
@@ -8284,6 +8287,7 @@ dependencies = [
 [[package]]
 name = "sweet_net"
 version = "0.4.1"
+source = "git+https://github.com/mrchantey/sweet#bc513011305692baf20a5dc81b73e611ca243868"
 dependencies = [
  "anyhow",
  "http 1.3.1",
@@ -8305,6 +8309,7 @@ dependencies = [
 [[package]]
 name = "sweet_server"
 version = "0.4.1"
+source = "git+https://github.com/mrchantey/sweet#bc513011305692baf20a5dc81b73e611ca243868"
 dependencies = [
  "anyhow",
  "axum 0.8.3",
@@ -8328,6 +8333,7 @@ dependencies = [
 [[package]]
 name = "sweet_test"
 version = "0.4.1"
+source = "git+https://github.com/mrchantey/sweet#bc513011305692baf20a5dc81b73e611ca243868"
 dependencies = [
  "anyhow",
  "backtrace",
@@ -8361,6 +8367,7 @@ dependencies = [
 [[package]]
 name = "sweet_test_macros"
 version = "0.4.1"
+source = "git+https://github.com/mrchantey/sweet#bc513011305692baf20a5dc81b73e611ca243868"
 dependencies = [
  "anyhow",
  "proc-macro2",
@@ -8371,6 +8378,7 @@ dependencies = [
 [[package]]
 name = "sweet_utils"
 version = "0.4.1"
+source = "git+https://github.com/mrchantey/sweet#bc513011305692baf20a5dc81b73e611ca243868"
 dependencies = [
  "anyhow",
  "bevy",
@@ -8395,6 +8403,7 @@ dependencies = [
 [[package]]
 name = "sweet_web"
 version = "0.4.1"
+source = "git+https://github.com/mrchantey/sweet#bc513011305692baf20a5dc81b73e611ca243868"
 dependencies = [
  "anyhow",
  "console_error_panic_hook",
