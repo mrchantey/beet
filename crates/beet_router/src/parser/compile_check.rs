@@ -2,7 +2,8 @@ use anyhow::Result;
 use std::fs;
 use std::path::Path;
 use std::process::Command;
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::atomic::AtomicUsize;
+use std::sync::atomic::Ordering;
 
 // currently unused, not nessecary?
 pub struct CompileCheck;

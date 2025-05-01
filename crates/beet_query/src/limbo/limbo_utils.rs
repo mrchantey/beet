@@ -3,8 +3,6 @@ use anyhow::Result;
 pub struct LimboUtils;
 
 impl LimboUtils {
-
-
 	pub async fn collect_rows(mut rows_in: limbo::Rows) -> Result<Rows> {
 		let mut rows_out = Rows::default();
 		while let Some(row_in) = rows_in.next().await? {

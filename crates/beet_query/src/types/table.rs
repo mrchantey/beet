@@ -13,7 +13,6 @@ pub trait Table {
 	/// Generate a create statement for the table,
 	/// usually with options defined in `#[derive(Table)]`
 	fn stmt_create_table() -> TableCreateStatement;
-
 }
 
 /// A trait for a list of columns in a table

@@ -4,8 +4,6 @@ use anyhow::Result;
 pub struct LibsqlUtils;
 
 impl LibsqlUtils {
-
-
 	pub fn parse_step_result(result: usize) -> LibsqlStepResult {
 		match result {
 			0 => LibsqlStepResult::Done,
