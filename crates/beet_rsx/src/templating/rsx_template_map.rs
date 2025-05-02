@@ -18,7 +18,7 @@ use sweet::prelude::WorkspacePathBuf;
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct RsxTemplateMap {
-	/// The canonicalized root directory used to create the templates, templates
+	/// The root directory used to create the templates, templates
 	/// with a location outside of this root will not be expected to exists and
 	/// so will not produce an error.
 	// canonicalized [here](crates/beet_router/src/parser/build_template_map/mod.rs#L110-L111)

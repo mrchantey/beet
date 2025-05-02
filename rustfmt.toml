@@ -13,7 +13,4 @@ overflow_delimited_expr = true
 use_field_init_shorthand = true
 match_arm_leading_pipes = "Preserve"
 # .gitignore rules
-ignore = [
-	"crates/*/src/codegen/**/*.rs",
-	"crates/beet_router/src/test_site/codegen/**/*.rs",
-]
+ignore = ["**/codegen/**/*.rs"]
