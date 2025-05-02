@@ -1,17 +1,23 @@
-# Copied from https://github.com/mrchantey/bevyhub/blob/main/.github/workflows/test.yml
-name: 🔎 Test Crates
+name: 🔎 Test - Flow
 on:
-  merge_group:
   pull_request:
+    paths:
+      - 'Cargo.lock'
+      - '.github/workflows/**'
+      - 'crates_rsx/**'
   push:
     branches:
       - main
       - release-*
+    paths:
+      - 'Cargo.lock'
+      - '.github/workflows/**'
+      - 'crates_flow/**'
 env:
   CARGO_TERM_COLOR: always
 jobs:
   build_and_test:
-    name: Build and Test
+    name: Test
     runs-on: ubuntu-latest
     steps:
     - name: 📂 Checkout
@@ -41,19 +47,15 @@ jobs:
         toolchain: nightly
         override: true
         default: true
-        components: rustfmt
     - name: 🔨 Add wasm target
       run: rustup target add wasm32-unknown-unknown
     - name: 🔨 Install cargo binstall
       uses: cargo-bins/cargo-binstall@main
-      # run: cargo install cargo-binstall || true
     - name: 🔨 Install wasm bindgen cli
       run: cargo binstall wasm-bindgen-cli --version 0.2.100    || true
     - name: 🔨 Install sweet cli
       run: cargo binstall sweet-cli --version 0.3.0-rc.3        || true
-    - name: 🔨 Install leptosfmt
-      run: cargo binstall leptosfmt                             || true
-    - name: 🔨📋 Init repo
-      run: just init-repo
+    - name: 📋 Init repo
+      run: just init-flow
     - name: 🔎 Test
-      run: just test-ci
+      run: just test-flow

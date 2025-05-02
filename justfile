@@ -21,15 +21,23 @@ default:
 # Also we need to build the test_site codegen, which cant use a build script
 # due to cyclic dependencies
 init-repo:
+	just init-flow
+	just init-rsx
+
+init-flow:
 	just assets-pull
 	mkdir -p crates/beet_ml/assets/ml && cp ./assets/ml/default-bert.ron crates/beet_ml/assets/ml/default.bert.ron
 	mkdir -p crates/beet_rsx/assets/fonts && cp ./assets/fonts/* crates/beet_rsx/assets/fonts
+
+init-rsx:
 	cargo run -p beet_router --example build
 	just cli build -p beet_site
 	cd infra && npm ci
 	mkdir -p target/lambda/crates/beet_site || true
 	echo 'dummy file so sst deploys' > target/lambda/crates/beet_site/bootstrap
-	
+
+
+
 # just test-site
 # just export-scenes
 
@@ -158,11 +166,11 @@ test-fmt:
 
 test-ci *args:
 	just test-fmt
-	just test-web
+	just test-rsx
 
 # just test-flow runs out of space
 
-test-web *args:
+test-rsx *args:
 	{{min-stack}} cargo test -p beet_design 	 	 																												{{args}} -- {{test-threads}}
 	{{min-stack}} cargo test -p beet_router 	--features=_test_site,build,serde,parser,bevy 						{{args}} -- {{test-threads}}
 	{{min-stack}} cargo test -p beet_rsx 			--features=bevy,css,parser 																{{args}} -- {{test-threads}}

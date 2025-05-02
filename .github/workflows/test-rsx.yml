@@ -1,0 +1,58 @@
+name: 🔎 Test - RSX
+on:
+  pull_request:
+    paths:
+      - 'Cargo.lock'
+      - '.github/workflows/test-rsx.yml'
+      - 'crates_rsx/**'
+  push:
+    branches:
+      - main
+      - release-*
+    paths:
+      - 'Cargo.lock'
+      - '.github/workflows/test-rsx.yml'
+      - 'crates_rsx/**'
+env:
+  CARGO_TERM_COLOR: always
+jobs:
+  build_and_test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+    - name: 📂 Checkout
+      uses: actions/checkout@v4
+    - name: 📂 Cache
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cargo/bin/
+          ~/.cargo/registry/index/
+          ~/.cargo/registry/cache/
+          ~/.cargo/git/db/
+          target/
+        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}-v0
+    - name: 🔨📋 Install Just
+      uses: extractions/setup-just@v1
+    - name: 🔨 Install Deno
+      uses: denoland/setup-deno@v2
+      with:
+        deno-version: v2.x  
+    - name: 🔨 Install Rust
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: nightly
+        override: true
+        default: true
+    - name: 🔨 Add wasm target
+      run: rustup target add wasm32-unknown-unknown
+    - name: 🔨 Install cargo binstall
+      uses: cargo-bins/cargo-binstall@main
+    - name: 🔨 Install wasm bindgen cli
+      run: cargo binstall wasm-bindgen-cli --version 0.2.100    || true
+    - name: 🔨 Install sweet cli
+      run: cargo binstall sweet-cli --version 0.3.0-rc.3        || true
+    - name: 📋 Init repo
+      run: just init-rsx
+    - name: 🔎 Test
+      run: just test-rsx

@@ -1,0 +1,57 @@
+name: 🔎 Test - Format
+on:
+  pull_request:
+    paths:
+      - 'Cargo.lock'
+      - '.github/workflows/test-fmt.yml'
+      - '**/*.rs'
+      - '**/*.md'
+  push:
+    branches:
+      - main
+      - release-*
+    paths:
+      - 'Cargo.lock'
+      - '.github/workflows/test-fmt.yml'
+      - '**/*.rs'
+      - '**/*.md'
+env:
+  CARGO_TERM_COLOR: always
+jobs:
+  build_and_test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+    - name: 📂 Checkout
+      uses: actions/checkout@v4
+    - name: 📂 Cache
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cargo/bin/
+          ~/.cargo/registry/index/
+          ~/.cargo/registry/cache/
+          ~/.cargo/git/db/
+          target/
+        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}-v0
+    - name: 🔨📋 Install Just
+      uses: extractions/setup-just@v1
+    - name: 🔨 Install Deno
+      uses: denoland/setup-deno@v2
+      with:
+        deno-version: v2.x  
+    - name: 🔨 Install Rust
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: nightly
+        override: true
+        default: true
+        components: rustfmt
+    - name: 🔨 Install cargo binstall
+      uses: cargo-bins/cargo-binstall@main
+    - name: 🔨 Install leptosfmt
+      run: cargo binstall leptosfmt         || true
+    # - name: 🔨📋 Init repo
+    #   run: just init-repo
+    - name: 🔎 Test
+      run: just test-fmt
