@@ -16,7 +16,6 @@ keywords.workspace = true
 anyhow.workspace = true
 serde.workspace = true
 
-
 sweet = { workspace = true, features = ["web"] }
 beet = { workspace = true, features = ["web-server"] }
 

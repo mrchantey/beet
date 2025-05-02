@@ -29,7 +29,7 @@ init-repo:
 	cd infra && npm ci
 	mkdir -p target/lambda/crates/beet_site || true
 	echo 'dummy file so sst deploys' > target/lambda/crates/beet_site/bootstrap
-
+	
 # just test-site
 # just export-scenes
 

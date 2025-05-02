@@ -1,7 +1,7 @@
 use http::StatusCode;
 use serde::Deserialize;
 use serde::Serialize;
-use sweet::net::exports::reqwest;
+use sweet::net::cross_fetch;
 
 pub type ActionResult<T, E = String> = Result<T, ActionError<E>>;
 
@@ -76,18 +76,8 @@ pub type ServerActionResult<T, E = String> = Result<T, ServerActionError<E>>;
 /// for returning serialized errors from the server.
 #[derive(Debug, thiserror::Error)]
 pub enum ServerActionError<E = String> {
-	/// The request body could not be serialized, ie `req.json()`
-	#[error("Failed to serialize request:\nError: {0}")]
-	Serialize(serde_json::Error),
-	/// The request failed, often due to connection error
-	#[error("Error making request:\nError: {0}")]
-	Request(reqwest::Error),
-	/// The response body could not be read, ie `res.bytes()`
-	#[error("Error getting response body:\nError: {0}")]
-	ResponseBody(reqwest::Error),
-	/// The response was successful but the body could not be deserialized.
-	#[error("Failed to deserialize response:\nError: {0}")]
-	Deserialize(serde_json::Error),
+	#[error("{0}")]
+	FetchError(#[from] cross_fetch::Error),
 	/// A 400 error from the server with a valid body of type `E`. If the
 	/// error is not of type `E`, a 400 [`Deserialize`] error will be returned.
 	#[error("Response returned an action error: {0}")]

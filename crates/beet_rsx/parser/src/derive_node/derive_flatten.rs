@@ -1,4 +1,5 @@
 use crate::prelude::*;
+use beet_build::prelude::*;
 use proc_macro2::TokenStream;
 use quote::ToTokens;
 use quote::quote;
@@ -20,7 +21,7 @@ use syn::Type;
 pub fn impl_flatten(
 	target_ident: &Ident,
 	input: &DeriveInput,
-	fields: &Vec<PropsField>,
+	fields: &Vec<NodeField>,
 ) -> Result<TokenStream> {
 	let (impl_generics, type_generics, where_clause) =
 		input.generics.split_for_impl();
@@ -29,7 +30,7 @@ pub fn impl_flatten(
 			.filter(|field|field.attributes.contains("flatten"))
 			.map(|field| {
 				let field_ident = &field.ident;
-				let field_type = &field.inner.ty;
+				let field_type = &field.syn_field.ty;
 				let second_order_as_mut = second_order_impl(target_ident,input, field)?;
 
 				Ok(quote! {
@@ -55,7 +56,7 @@ pub fn impl_flatten(
 fn second_order_impl(
 	target_ident: &Ident,
 	input: &DeriveInput,
-	field: &PropsField,
+	field: &NamedField,
 ) -> Result<Vec<TokenStream>> {
 	let (impl_generics, type_generics, where_clause) =
 		input.generics.split_for_impl();
@@ -71,7 +72,7 @@ fn second_order_impl(
 		}else{
 			syn::parse2(expr.to_token_stream())?
 		};
-		if ty == field.inner.ty {
+		if ty == field.syn_field.ty {
 			// its already implemented, should we warn unnecessary attr value?
 			return Ok(TokenStream::default());
 		}

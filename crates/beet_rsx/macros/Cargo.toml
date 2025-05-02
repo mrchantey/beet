@@ -27,10 +27,8 @@ sweet.workspace = true
 syn.workspace = true
 quote.workspace = true
 proc-macro2.workspace = true
+proc-macro2-diagnostics.workspace = true
 anyhow.workspace = true
-
-rstml = { version = "0.12", features = ["rawtext-stable-hack"] }
-proc-macro2-diagnostics = "0.10"
 
 
 [dev-dependencies]

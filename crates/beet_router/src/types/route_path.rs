@@ -18,6 +18,17 @@ impl std::fmt::Display for RoutePath {
 	}
 }
 
+impl From<String> for RoutePath {
+	fn from(value: String) -> Self { Self(PathBuf::from(value)) }
+}
+impl From<&str> for RoutePath {
+	fn from(value: &str) -> Self { Self(PathBuf::from(value)) }
+}
+
+impl Into<PathBuf> for RoutePath {
+	fn into(self) -> PathBuf { self.0 }
+}
+
 impl std::ops::Deref for RoutePath {
 	type Target = PathBuf;
 	fn deref(&self) -> &Self::Target { &self.0 }
@@ -25,13 +36,6 @@ impl std::ops::Deref for RoutePath {
 
 impl AsRef<Path> for RoutePath {
 	fn as_ref(&self) -> &Path { self.0.as_path() }
-}
-
-impl Into<PathBuf> for RoutePath {
-	fn into(self) -> PathBuf { self.0 }
-}
-impl Into<RoutePath> for &str {
-	fn into(self) -> RoutePath { RoutePath::new(self) }
 }
 
 impl RoutePath {

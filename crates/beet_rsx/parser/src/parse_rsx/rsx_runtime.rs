@@ -16,7 +16,7 @@ impl Default for RsxRuntime {
 impl RsxRuntime {
 	pub fn sigfault() -> Self {
 		Self {
-			effect: syn::parse_quote!(beet::rsx::sigfault::Sigfault),
+			effect: syn::parse_quote!(beet::prelude::SigfaultRuntime),
 			event: syn::parse_quote!(beet::prelude::EventRegistry),
 		}
 	}
@@ -28,7 +28,7 @@ impl RsxRuntime {
 	}
 	/// Updates [`Self::effect`] to the given runtime. Built-in runtimes
 	/// have a shorthand:
-	/// - `sigfault` -> `beet::rsx::sigfault::Sigfault`
+	/// - `sigfault` -> `beet::rsx::sigfault::SigfaultRuntime`
 	/// - `bevy` -> `beet::rsx::bevy::BevyRuntime`
 	pub fn set(&mut self, runtime: &str) -> syn::Result<()> {
 		*self = match runtime {

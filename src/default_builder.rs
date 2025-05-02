@@ -55,15 +55,12 @@ impl Default for DefaultBuilder {
 
 impl DefaultBuilder {
 	pub fn build(self) -> Result<()> {
-		println!("cargo::rerun-if-changed=build.rs");
-		println!("cargo::rerun-if-changed=src/pages/**");
-		println!("cargo::rerun-if-changed=src/actions/**");
-		println!("cargo::rerun-if-changed=src/docs/**");
+		BuildUtils::rerun_if_changed("build.rs");
+		BuildUtils::rerun_if_changed("src/pages/**");
+		BuildUtils::rerun_if_changed("src/actions/**");
+		BuildUtils::rerun_if_changed("src/docs/**");
 
-		let is_wasm =
-			std::env::var("TARGET").unwrap() == "wasm32-unknown-unknown";
-
-		if is_wasm {
+		if BuildUtils::is_wasm() {
 			CodegenFile {
 				output: AbsPathBuf::new_manifest_rel_unchecked(
 					"src/codegen/wasm.rs",

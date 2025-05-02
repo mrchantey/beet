@@ -2,17 +2,21 @@ use anyhow::Result;
 use std::fs;
 use std::path::Path;
 use std::process::Command;
-use uuid::Uuid;
+use std::sync::atomic::AtomicUsize;
+use std::sync::atomic::Ordering;
 
 // currently unused, not nessecary?
 pub struct CompileCheck;
 
+// Static counter for generating unique file names
+static COUNTER: AtomicUsize = AtomicUsize::new(0);
 
 impl CompileCheck {
 	pub fn string(code: &str) -> Result<()> {
-		// Create temporary file with unique name
+		// Create temporary file with unique name using atomic counter
 		let temp_dir = std::env::temp_dir();
-		let file_name = format!("compilecheck_{}.rs", Uuid::new_v4());
+		let counter = COUNTER.fetch_add(1, Ordering::SeqCst);
+		let file_name = format!("compilecheck_{}.rs", counter);
 		let file_path = temp_dir.join(&file_name);
 
 		// Write code to temp file
@@ -35,19 +39,5 @@ impl CompileCheck {
 		} else {
 			anyhow::bail!("{}", String::from_utf8_lossy(&output.stderr))
 		}
-	}
-}
-
-
-#[cfg(test)]
-mod test {
-	use crate::prelude::*;
-	use sweet::prelude::*;
-
-	#[test]
-	#[ignore = "need to suppress output files"]
-	fn works() {
-		expect(CompileCheck::string("fn main(){}")).to_be_ok();
-		expect(CompileCheck::string("dsajk923")).to_be_err();
 	}
 }

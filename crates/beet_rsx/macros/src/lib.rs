@@ -9,11 +9,8 @@ use sweet::prelude::*;
 
 
 /// This macro expands to an [RsxNode](beet_rsx::prelude::RsxNode).
-///
-/// The type of node is determied by the feature flags, current options are:
-/// - [`StringRsx`](beet_rsx::rsx::StringRsx)
 /// ```ignore
-/// let tree = rsx! {<div> the value is {3}</div>};
+/// let node = rsx! {<div> the value is {3}</div>};
 /// ```
 ///
 #[proc_macro]

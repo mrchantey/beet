@@ -64,7 +64,7 @@ anchor is used for leaf nodes and parents with a page
 otherwise span
 */
 a,span{
-	padding: 0.3em;
+	padding: 0.2em  0.1em 0.2em 0.5em;
 }
 
 /* account for the arrow */
@@ -95,6 +95,6 @@ a[aria-current='page'],
 	[aria-current='page']:hover,
 	[aria-current='page']:focus {
 		font-weight: var(--bt-form-element-font-weight);
-		color: var(--bt-color-on-primary);
-		background-color: var(--bt-color-primary);
+		color: var(--bt-color-primary);
+		background-color: var(--bt-color-surface-container-high);
 	}

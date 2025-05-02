@@ -36,6 +36,7 @@ publish = false
 # default resolver
 resolver = "2"
 members = [
+	"crates/beet_build",
 	"crates/beet_connect",
 	"crates/beet_design",
 	"crates/beet_examples",
@@ -43,6 +44,8 @@ members = [
 	"crates/beet_flow/macros",
 	"crates/beet_ml",
 	# "crates/beet_rig",
+	"crates/beet_query",
+	"crates/beet_query/macros",
 	"crates/beet_router",
 	"crates/beet_rsx",
 	"crates/beet_rsx/macros",
@@ -59,25 +62,28 @@ members = [
 [workspace.dependencies]
 ## internal
 beet = { path = "", version = "0.0.6-rc.1", default-features = false }
+beet_build = { path = "crates/beet_build", version = "0.0.6-rc.1", default-features = false }
 beet_connect = { path = "crates/beet_connect", version = "0.0.6-rc.1", default-features = false }
 beet_design = { path = "crates/beet_design", version = "0.0.6-rc.1", default-features = false }
-beet_spatial = { path = "crates/beet_spatial", version = "0.0.6-rc.1", default-features = false }
 beet_examples = { path = "crates/beet_examples", version = "0.0.6-rc.1" }
 beet_flow = { path = "crates/beet_flow", version = "0.0.6-rc.1" }
 beet_flow_macros = { path = "crates/beet_flow/macros", version = "0.0.6-rc.1" }
 beet_ml = { path = "crates/beet_ml", version = "0.0.6-rc.1" }
+beet_query = { path = "crates/beet_query", version = "0.0.6-rc.1" }
+beet_query_macros = { path = "crates/beet_query/macros", version = "0.0.6-rc.1" }
 beet_router = { path = "crates/beet_router", version = "0.0.6-rc.1" }
 beet_rsx = { path = "crates/beet_rsx", version = "0.0.6-rc.1" }
 beet_rsx_macros = { path = "crates/beet_rsx/macros", version = "0.0.6-rc.1" }
 beet_rsx_parser = { path = "crates/beet_rsx/parser", version = "0.0.6-rc.1" }
 beet_rsx_combinator = { path = "crates/beet_rsx/combinator", version = "0.0.6-rc.1" }
 beet_server = { path = "crates/beet_server", version = "0.0.6-rc.1" }
+beet_spatial = { path = "crates/beet_spatial", version = "0.0.6-rc.1", default-features = false }
 beet_sim = { path = "crates/beet_sim", version = "0.0.6-rc.1" }
 
 #💡 local
-sweet = { version = "0.4.1" }
+# sweet = { version = "0.4.1" }
 # sweet = { path = "../sweet", features = ["rand"] }
-# sweet = { git = "https://github.com/mrchantey/sweet", features = ["rand"] }
+sweet = { git = "https://github.com/mrchantey/sweet", features = ["rand"] }
 bevy = { version = "0.16", default-features = false, features = ["bevy_color"] }
 
 #💡 utility
@@ -115,6 +121,7 @@ tokio = { version = "1", features = [
 syn = "2"
 quote = "1"
 proc-macro2 = "1"
+proc-macro2-diagnostics = "0.10"
 prettyplease = "0.2"
 
 #💡 attributes
@@ -133,9 +140,6 @@ bytes = "1"
 #💡 http
 http = "1"
 http-body-util = "0.1"
-reqwest = { version = "0.12", default-features = false, features = [
-	"rustls-tls",
-] }
 
 #💡 server
 axum = { version = "0.8", features = ["macros"] }
@@ -186,6 +190,7 @@ flow = ["dep:beet_flow"]
 css = ["beet_rsx?/css"]
 design = ["rsx", "css", "dep:beet_design"]
 router = ["rsx", "dep:beet_router"]
+query = ["dep:beet_query"]
 parser = ["beet_rsx?/parser", "beet_router?/parser"]
 rsx = ["dep:beet_rsx"]
 fs = ["beet_rsx?/fs"]
@@ -226,6 +231,7 @@ beet_design = { workspace = true, optional = true }
 beet_examples = { workspace = true, optional = true }
 beet_flow = { workspace = true, optional = true }
 beet_ml = { workspace = true, optional = true }
+beet_query = { workspace = true, optional = true }
 beet_router = { workspace = true, optional = true }
 beet_rsx = { workspace = true, optional = true }
 beet_sim = { workspace = true, optional = true }

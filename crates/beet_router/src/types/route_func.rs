@@ -163,7 +163,8 @@ where
 #[cfg(test)]
 mod test {
 	use crate::as_beet::*;
-	use sweet::prelude::*;
+	use anyhow::Result;
+	// use sweet::prelude::*;
 
 	#[test]
 	fn works() {

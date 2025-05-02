@@ -9,3 +9,5 @@ crates/beet_flow_old
 .vscode/settings.json
 crates/beet_router/src/test_site/codegen
 crates/*/src/codegen
+
+crates/beet_query/test.db

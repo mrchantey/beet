@@ -1,0 +1,51 @@
+[package]
+name = "beet_query"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+readme.workspace = true
+description = "Extend beet server actions with database queries"
+documentation.workspace = true
+homepage.workspace = true
+repository.workspace = true
+categories.workspace = true
+keywords.workspace = true
+
+[features]
+default = ["tokio", "libsql"]
+limbo = ["dep:limbo"]
+libsql = ["dep:libsql"]
+tokio = ["dep:tokio"]
+
+[dependencies]
+anyhow.workspace = true
+thiserror.workspace = true
+beet_query_macros.workspace = true
+extend.workspace = true
+rapidhash.workspace = true
+once_cell.workspace = true
+serde_json.workspace = true
+
+sweet = { workspace = true, features = ["net"] }
+sea-query = { version = "0.32" }
+base64 = { version = "0" }
+num-traits = { version = "0.2" }
+libsql = { version = "0.9", optional = true }
+# limbo = { version = "0.0.19", path = "../../../../me-ref/limbo/bindings/rust", optional = true }
+limbo = { version = "0.0.19", git = "https://github.com/mrchantey/limbo", optional = true }
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+tokio = { workspace = true, optional = true }
+
+[dev-dependencies]
+tokio.workspace = true
+sweet = { workspace = true, features = ["test"] }
+
+[build-dependencies]
+anyhow.workspace = true
+
+
+[[example]]
+name = "libsql"
+required-features = ["libsql"]

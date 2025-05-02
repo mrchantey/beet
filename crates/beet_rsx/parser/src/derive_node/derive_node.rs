@@ -1,4 +1,5 @@
 use crate::prelude::*;
+use beet_build::prelude::*;
 use proc_macro2::TokenStream;
 use quote::ToTokens;
 use quote::format_ident;
@@ -13,7 +14,7 @@ pub fn parse_derive_node(input: DeriveInput) -> TokenStream {
 }
 
 fn parse(input: DeriveInput) -> Result<TokenStream> {
-	let fields = PropsField::parse_all(&input)?;
+	let fields = NodeField::parse_all(&input)?;
 	let impl_component = impl_component(&input)?;
 	let impl_props = impl_props(&input)?;
 	let impl_builder = impl_builder(&input, &fields)?;
@@ -36,8 +37,8 @@ fn parse(input: DeriveInput) -> Result<TokenStream> {
 }
 
 fn impl_component(input: &DeriveInput) -> Result<TokenStream> {
-	let attributes = AttributeGroup::parse(&input.attrs, "node")?
-		.validate_allowed_keys(&["into_rsx", "no_component"])?;
+	let attributes = AttributeGroup::parse(&input.attrs, "node")?;
+	attributes.validate_allowed_keys(&["into_rsx", "no_component"])?;
 	if attributes.get("no_component").is_some() {
 		return Ok(Default::default());
 	}
@@ -95,7 +96,7 @@ fn impl_props(input: &DeriveInput) -> Result<TokenStream> {
 
 fn impl_builder(
 	input: &DeriveInput,
-	fields: &[PropsField],
+	fields: &[NodeField],
 ) -> Result<TokenStream> {
 	let builder_fields = fields.iter().map(|field| {
 		let name = &field.ident;
@@ -111,7 +112,7 @@ fn impl_builder(
 
 	let builder_defaults = fields.iter().map(|field| {
 		let name = &field.ident;
-		if let Some(attr) = field.default_attr() {
+		if let Some(attr) = field.attributes.get("default") {
 			let val = attr.value.as_ref().unwrap_or(&default_fallback);
 			quote! { #name: #val }
 		} else {
@@ -124,7 +125,7 @@ fn impl_builder(
 		.iter()
 		.map(|field| {
 			let name = &field.ident;
-			let (generics, ty, expr) = field.assign_tokens()?;
+			let (generics, ty, expr) = NodeField::assign_tokens(field)?;
 			let expr = if field.is_default() {
 				quote! { #expr }
 			} else {
@@ -198,7 +199,7 @@ fn impl_builder(
 
 fn impl_required(
 	input: &DeriveInput,
-	fields: &[PropsField],
+	fields: &[NodeField],
 ) -> Result<TokenStream> {
 	let required_field_names = fields.iter().filter_map(|field| {
 		if field.is_required() {

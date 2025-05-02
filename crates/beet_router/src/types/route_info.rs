@@ -2,6 +2,7 @@ use crate::prelude::*;
 use anyhow::Result;
 use beet_rsx::rsx::RsxNode;
 use std::path::PathBuf;
+use sweet::prelude::*;
 
 pub trait RoutesToRsx {
 	async fn routes_to_rsx(&mut self) -> Result<Vec<(RouteInfo, RsxNode)>>;
@@ -26,13 +27,21 @@ impl RouteInfo {
 impl quote::ToTokens for RouteInfo {
 	fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
 		let path = &self.path.to_string_lossy();
-		let method = &self.method;
+		let method = http_method_to_tokens(&self.method);
 		tokens.extend(quote::quote! {
 					RouteInfo::new(#path, #method)
 		});
 	}
 }
 
+fn http_method_to_tokens(method: &HttpMethod) -> proc_macro2::TokenStream {
+	use proc_macro2::Span;
+	use syn::Ident;
+	let method = Ident::new(&method.to_string(), Span::call_site());
+	quote::quote! {
+		HttpMethod::#method
+	}
+}
 impl RouteInfo {
 	/// the method used by `beet_router`
 	pub fn new(path: impl Into<PathBuf>, method: HttpMethod) -> Self {

@@ -14,9 +14,11 @@ categories.workspace = true
 # this feature is always enabled by beet if this crate is included 
 # but we use it to ensure no bevy_default for workspace tests
 bevy_default = [
+	"bevy/default",
 	"beet_flow/bevy_default",
 	"beet_ml?/bevy_default",
 	"beet_spatial/bevy_default",
+	"sweet/bevy_default",
 ]
 ml = ["dep:beet_ml"]
 
@@ -32,12 +34,12 @@ beet_spatial = { workspace = true, features = [] }
 serde.workspace = true
 serde_json.workspace = true
 # beet = { workspace = true, features = ["reflect"] }
-bevy = { workspace = true, default-features = true }
+bevy = { workspace = true }
 # bevy-inspector-egui = "0.25.0"
 log.workspace = true
 pretty_env_logger.workspace = true
 anyhow.workspace = true
-sweet = { workspace = true, features = ["bevy_default", "rand"] }
+sweet = { workspace = true, features = ["rand"] }
 
 [dev-dependencies]
 sweet = { workspace = true, features = ["test"] }

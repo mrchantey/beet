@@ -1,0 +1,33 @@
+[package]
+name = "beet_query_macros"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+readme.workspace = true
+description.workspace = true
+documentation.workspace = true
+homepage.workspace = true
+repository.workspace = true
+categories.workspace = true
+keywords.workspace = true
+
+[features]
+
+[lib]
+proc-macro = true
+
+[dependencies]
+sweet.workspace = true
+
+
+heck.workspace = true
+beet_build.workspace = true
+syn.workspace = true
+quote.workspace = true
+proc-macro2.workspace = true
+proc-macro2-diagnostics.workspace = true
+anyhow.workspace = true
+
+[dev-dependencies]
+sweet = { workspace = true, features = ["test"] }

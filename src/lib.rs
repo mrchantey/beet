@@ -11,6 +11,8 @@ pub use beet_examples as examples;
 pub use beet_flow as flow;
 #[cfg(feature = "ml")]
 pub use beet_ml as ml;
+#[cfg(feature = "query")]
+pub use beet_query as query;
 #[cfg(feature = "router")]
 pub use beet_router as router;
 #[cfg(feature = "rsx")]
@@ -38,6 +40,8 @@ pub mod prelude {
 	pub use crate::flow::prelude::*;
 	#[cfg(feature = "ml")]
 	pub use crate::ml::prelude::*;
+	#[cfg(feature = "query")]
+	pub use crate::query::prelude::*;
 	#[cfg(feature = "router")]
 	pub use crate::router::prelude::*;
 	#[cfg(feature = "rsx")]
