@@ -84,7 +84,10 @@ impl PanicStore {
 		if !CURRENT_LISTENER.is_set() {
 			// nobody is listening, must be a real one
 			let payload = payload_to_string(info.payload());
-			sweet_utils::log!("Sweet Runner Panic:\nThis is an internal sweet panic, please file an issue\n{}\nend payload", payload);
+			sweet_utils::log!(
+				"Sweet Runner Panic:\nThis is an internal sweet panic, please file an issue\n{}\nend payload",
+				payload
+			);
 			return;
 		} else {
 			CURRENT_LISTENER.with(|last_panic| {

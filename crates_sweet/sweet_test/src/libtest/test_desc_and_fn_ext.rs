@@ -32,7 +32,7 @@ impl TestDescAndFnExt {
 
 
 	// pub fn run(test: &TestDescAndFn) -> Result<(), String> {
-		
+
 
 	// 	// match test.testfn {
 	// 	// 	TestFn::StaticTestFn(func) => func(),

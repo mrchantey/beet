@@ -1,10 +1,10 @@
 use crate::ClosureFnMutT1T2Ext;
 use js_sys::Function;
 use js_sys::Reflect;
-use wasm_bindgen::convert::FromWasmAbi;
-use wasm_bindgen::prelude::Closure;
 use wasm_bindgen::JsCast;
 use wasm_bindgen::JsValue;
+use wasm_bindgen::convert::FromWasmAbi;
+use wasm_bindgen::prelude::Closure;
 
 #[derive(Debug, Clone)]
 pub struct ReplaceFunc {

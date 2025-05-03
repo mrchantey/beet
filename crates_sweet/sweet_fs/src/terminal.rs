@@ -1,7 +1,7 @@
 use anyhow::Result;
 use crossterm::*;
-use std::io::stdout;
 use std::io::Write;
+use std::io::stdout;
 
 pub fn show_cursor() {
 	let mut stdout = stdout();

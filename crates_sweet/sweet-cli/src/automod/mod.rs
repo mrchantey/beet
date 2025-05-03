@@ -389,7 +389,8 @@ mod test {
 		expect(&insert_lib).to_contain("pub mod foo;");
 		expect(&insert_lib).to_contain("pub use crate::foo::*;");
 
-		let insert_mod = insert("crates_sweet/sweet-cli/src/bench/foo.rs").unwrap();
+		let insert_mod =
+			insert("crates_sweet/sweet-cli/src/bench/foo.rs").unwrap();
 		expect(&insert_mod).to_contain("mod foo;");
 		expect(&insert_mod).to_contain("pub use foo::*;");
 	}

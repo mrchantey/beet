@@ -39,7 +39,7 @@ impl<T> Tree<T> {
 				return &mut self.children[i];
 			}
 		}
-		
+
 		// If no child matches, create and add a new one
 		self.children.push(Tree::new(T::default()));
 		self.children.last_mut().unwrap()

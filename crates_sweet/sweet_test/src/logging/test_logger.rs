@@ -1,9 +1,9 @@
 use crate::prelude::*;
+use anyhow::Result;
 use colorize::*;
 use std::path::Path;
 use std::sync::Arc;
 use test::TestDescAndFn;
-use anyhow::Result;
 
 
 pub enum CaseLoggerEnum {

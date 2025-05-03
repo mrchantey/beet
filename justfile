@@ -192,7 +192,7 @@ test-flow *args:
 
 
 test-sweet *args:
-	{{min-stack}} cargo test -p sweet_bevy 							--all-features 													 	{{args}} -- {{test-threads}}
+	{{min-stack}} cargo test -p sweet_bevy 							--features=rand 												 	{{args}} -- {{test-threads}}
 	{{min-stack}} cargo test -p sweet_fs 								--all-features 													 	{{args}} -- {{test-threads}}
 	{{min-stack}} cargo test -p sweet_net 							--all-features 													 	{{args}} -- {{test-threads}}
 	{{min-stack}} cargo test -p sweet_server 						--all-features 													 	{{args}} -- {{test-threads}}

@@ -6,8 +6,8 @@ use std::rc::Rc;
 use std::time::Duration;
 use wasm_bindgen::JsValue;
 use wasm_bindgen_futures::JsFuture;
-use web_sys::window;
 use web_sys::EventTarget;
+use web_sys::window;
 
 
 pub struct HtmlEventWaiterInstance {

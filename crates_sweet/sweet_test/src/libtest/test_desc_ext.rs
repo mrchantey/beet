@@ -15,7 +15,9 @@ impl TestDescExt {
 		match result {
 			Ok(_) => {}
 			Err(_) => {
-				panic!("test returned an Err(). Use `unwrap()` instead to see the contents of the error");
+				panic!(
+					"test returned an Err(). Use `unwrap()` instead to see the contents of the error"
+				);
 			}
 		}
 	}

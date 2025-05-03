@@ -1,10 +1,10 @@
 use crate::prelude::*;
+use anyhow::Result;
 use colorize::*;
 use std::sync::Arc;
 use std::time::Duration;
 use test::TestDescAndFn;
 use web_time::Instant;
-use anyhow::Result;
 
 pub struct RunnerLogger {
 	start_time: Instant,

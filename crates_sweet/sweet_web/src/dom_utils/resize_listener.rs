@@ -1,6 +1,6 @@
 use js_sys::Array;
-use wasm_bindgen::prelude::Closure;
 use wasm_bindgen::JsCast;
+use wasm_bindgen::prelude::Closure;
 use web_sys::Element;
 use web_sys::HtmlCanvasElement;
 use web_sys::ResizeObserver;

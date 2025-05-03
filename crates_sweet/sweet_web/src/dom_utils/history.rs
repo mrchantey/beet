@@ -1,6 +1,6 @@
 use wasm_bindgen::JsValue;
-use web_sys::window;
 use web_sys::Url;
+use web_sys::window;
 
 pub struct History;
 

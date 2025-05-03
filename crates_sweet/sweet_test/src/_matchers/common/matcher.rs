@@ -32,10 +32,6 @@ impl<T> Matcher<T> {
 
 	/// Return a boolean as-is if not negated, otherwise flip it.
 	pub fn is_true_with_negated(&self, received: bool) -> bool {
-		if self.negated {
-			!received
-		} else {
-			received
-		}
+		if self.negated { !received } else { received }
 	}
 }

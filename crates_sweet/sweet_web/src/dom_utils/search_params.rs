@@ -1,11 +1,10 @@
 use crate::*;
-use web_sys::window;
 use web_sys::UrlSearchParams;
+use web_sys::window;
 
 pub struct SearchParams;
 
 impl SearchParams {
-
 	pub fn has(key: &str) -> bool {
 		let search = window().unwrap().location().search().unwrap();
 		let params = UrlSearchParams::new_with_str(search.as_str()).unwrap();
@@ -66,4 +65,3 @@ impl SearchParams {
 pub fn path_name() -> String {
 	window().unwrap().location().pathname().unwrap()
 }
-

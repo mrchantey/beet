@@ -4,14 +4,14 @@ use js_sys::Promise;
 use std::cell::RefCell;
 use std::rc::Rc;
 use sweet_utils::prelude::*;
-use wasm_bindgen::convert::FromWasmAbi;
-use wasm_bindgen::prelude::Closure;
 use wasm_bindgen::JsCast;
 use wasm_bindgen::JsValue;
+use wasm_bindgen::convert::FromWasmAbi;
+use wasm_bindgen::prelude::Closure;
 use wasm_bindgen_futures::JsFuture;
-use web_sys::window;
 use web_sys::Event;
 use web_sys::EventTarget;
+use web_sys::window;
 
 pub struct HtmlEventListenerInner<T> {
 	closure: Closure<dyn FnMut(T)>,

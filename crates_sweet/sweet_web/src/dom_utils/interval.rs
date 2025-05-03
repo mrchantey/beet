@@ -1,9 +1,9 @@
 use crate::ClosureFnMutT2Ext;
 use js_sys::Function;
-use wasm_bindgen::closure::Closure;
 use wasm_bindgen::JsCast;
-use web_sys::window;
+use wasm_bindgen::closure::Closure;
 use web_sys::Window;
+use web_sys::window;
 
 pub struct Interval {
 	_func: Function,

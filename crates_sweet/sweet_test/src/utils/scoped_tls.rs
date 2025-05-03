@@ -74,9 +74,9 @@ impl<T> ScopedKey<T> {
 	{
 		let val = self.inner.0.get();
 		assert!(
-            !val.is_null(),
-            "cannot access a scoped thread local variable without calling `set` first"
-        );
+			!val.is_null(),
+			"cannot access a scoped thread local variable without calling `set` first"
+		);
 		unsafe { f(&*(val as *const T)) }
 	}
 

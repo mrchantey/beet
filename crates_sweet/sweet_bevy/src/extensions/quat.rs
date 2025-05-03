@@ -50,8 +50,8 @@ pub impl Quat {
 
 #[cfg(test)]
 mod test {
-	use bevy::prelude::*;
 	use crate::prelude::*;
+	use bevy::prelude::*;
 	use sweet_test::prelude::*;
 
 	#[test]

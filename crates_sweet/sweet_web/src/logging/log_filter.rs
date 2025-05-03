@@ -31,13 +31,13 @@ impl LogFilter {
 	pub fn default_log() -> Self {
 		let ignores = vec![
 			"[tower-livereload] connected...",
-			"WebXR emulator extension overrides native WebXR API with polyfill."
+			"WebXR emulator extension overrides native WebXR API with polyfill.",
 		];
 		LogFilter::new("log", ignores)
 	}
 	pub fn default_warn() -> Self {
 		let ignores = vec![
-	"Error with Permissions-Policy header: Origin trial controlled feature not enabled: 'browsing-topics'."
+			"Error with Permissions-Policy header: Origin trial controlled feature not enabled: 'browsing-topics'.",
 		];
 		LogFilter::new("warn", ignores)
 	}

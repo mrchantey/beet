@@ -13,7 +13,9 @@ pub impl HtmlIFrameElement {
 		self.set_src(&url);
 		self.x_wait_for_load().await;
 		if self.content_document().is_none() {
-			panic!("tried to load url: {url}\niframe content document is null, if you can see the page this is likely a cors issue");
+			panic!(
+				"tried to load url: {url}\niframe content document is null, if you can see the page this is likely a cors issue"
+			);
 		}
 	}
 

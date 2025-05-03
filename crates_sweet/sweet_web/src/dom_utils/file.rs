@@ -1,5 +1,5 @@
-use crate::prelude::*;
 use crate::DocumentExt;
+use crate::prelude::*;
 use js_sys::Array;
 use js_sys::Uint8Array;
 use wasm_bindgen::JsCast;

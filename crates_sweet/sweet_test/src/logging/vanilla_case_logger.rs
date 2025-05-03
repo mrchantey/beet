@@ -18,7 +18,11 @@ impl CaseLogger for VanillaCaseLogger {
 			TestResult::Ignore(None) => "ignored".yellow(),
 			TestResult::Ignore(Some(msg)) => format!("ignored, {msg}").yellow(),
 		};
-		sweet_utils::log!("test {} ... {}", result.desc.name.to_string(), status,);
+		sweet_utils::log!(
+			"test {} ... {}",
+			result.desc.name.to_string(),
+			status,
+		);
 
 		Ok(())
 	}

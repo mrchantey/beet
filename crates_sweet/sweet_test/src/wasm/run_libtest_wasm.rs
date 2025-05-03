@@ -1,8 +1,8 @@
 use crate::prelude::*;
 use anyhow::Result;
 use std::sync::Arc;
-use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::JsValue;
+use wasm_bindgen::prelude::wasm_bindgen;
 
 pub fn run_libtest_wasm(tests: &[&test::TestDescAndFn]) -> Result<()> {
 	let config = TestRunnerConfig::from_deno_args().unwrap();

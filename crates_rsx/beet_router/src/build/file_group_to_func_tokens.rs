@@ -82,11 +82,9 @@ mod test {
 			.unwrap();
 		// expect(func_tokens.funcs.len()).to_be(1);
 		expect(&func_tokens.local_path.to_string_lossy()).to_be("hello.md");
-		expect(
-			func_tokens.canonical_path.to_string_lossy().ends_with(
-				"crates_rsx/beet_router/src/test_site/test_docs/hello.md",
-			),
-		)
+		expect(func_tokens.canonical_path.to_string_lossy().ends_with(
+			"crates_rsx/beet_router/src/test_site/test_docs/hello.md",
+		))
 		.to_be_true();
 	}
 	#[test]

@@ -51,7 +51,7 @@ impl FileResult {
 		if self.results.len() != self.total {
 			return;
 		}
-		
+
 		// its finished so log if not skipped
 		let status = self.status();
 		if let TestResult::Ignore(_) = status {

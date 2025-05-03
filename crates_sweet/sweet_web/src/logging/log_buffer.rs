@@ -2,9 +2,9 @@ use js_sys::Function;
 use js_sys::Reflect;
 use std::cell::RefCell;
 use std::rc::Rc;
-use wasm_bindgen::prelude::Closure;
 use wasm_bindgen::JsCast;
 use wasm_bindgen::JsValue;
+use wasm_bindgen::prelude::Closure;
 
 pub struct LogBuffer {
 	name: &'static str,

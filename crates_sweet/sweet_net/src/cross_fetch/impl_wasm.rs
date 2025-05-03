@@ -8,15 +8,16 @@ use wasm_bindgen::JsCast;
 
 impl super::Request {
 	pub async fn send(self) -> Result<Response> {
-		let request = web_sys::Request::new_with_str_and_init(self.url.as_str(), &{
-			let init = web_sys::RequestInit::new();
-			init.set_method(&self.method.to_string());
-			if let Some(body) = &self.body {
-				init.set_body(&js_sys::Uint8Array::from(body.as_slice()));
-			}
-			init
-		})
-		.map_err(Error::network)?;
+		let request =
+			web_sys::Request::new_with_str_and_init(self.url.as_str(), &{
+				let init = web_sys::RequestInit::new();
+				init.set_method(&self.method.to_string());
+				if let Some(body) = &self.body {
+					init.set_body(&js_sys::Uint8Array::from(body.as_slice()));
+				}
+				init
+			})
+			.map_err(Error::network)?;
 
 		for (name, value) in &self.headers {
 			request
