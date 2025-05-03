@@ -9,7 +9,7 @@ A counter is a great way to demonstrate core concepts, for a deeper dive read [h
 
 <details>
 <summary>Show final code</summary>
-</details
+</details>
 
 Assuming rust nightly is installed, the following will get a new project up and running in four steps.
 
@@ -103,8 +103,3 @@ fn rsx(self) -> Rsx {
   }
 }
 ```
-
-<!-- ## Next steps
-
-- If you want to ensure your counter doesn't go haywire check out this [testing guide]. 
-- Beautify your counter with scoped styles or the built-in component library -->

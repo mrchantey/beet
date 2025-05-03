@@ -123,7 +123,6 @@ rand = "0.8.5"
 rand_chacha = "0.3.1"
 # # wasm_js ignored in native
 getrandom = { version = "0.2.15", features = ["js"] }
-# getrandom = { version = "0.3", features = ["wasm_js"] }
 
 
 #💡 logging

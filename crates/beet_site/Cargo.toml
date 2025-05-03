@@ -18,6 +18,7 @@ serde.workspace = true
 
 sweet = { workspace = true, features = ["web"] }
 beet = { workspace = true, features = ["web-server"] }
+getrandom = { version = "0.3", features = ["wasm_js"] }
 
 [build-dependencies]
 anyhow.workspace = true

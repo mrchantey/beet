@@ -108,6 +108,14 @@ impl MarkdownToFuncTokens {
 	fn yaml_frontmatter_to_ron(yaml: &str) -> Result<String> {
 		let lines = yaml
 			.lines()
+			.filter_map(|line| {
+				let line = line.trim();
+				if line.is_empty() || line.starts_with('#') {
+					None
+				} else {
+					Some(line)
+				}
+			})
 			.map(|line| -> Result<String> {
 				let mut split = line.splitn(2, ':');
 				let key = split
