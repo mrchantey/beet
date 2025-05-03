@@ -1,20 +1,21 @@
 name: 🔎 Test - Format
 on:
-  pull_request:
-    paths:
-      - 'Cargo.lock'
-      - '.github/workflows/test-fmt.yml'
-      - '**/*.rs'
-      - '**/*.md'
-  push:
-    branches:
-      - main
-      - release-*
-    paths:
-      - 'Cargo.lock'
-      - '.github/workflows/test-fmt.yml'
-      - '**/*.rs'
-      - '**/*.md'
+  workflow_dispatch:
+  # pull_request:
+  #   paths:
+  #     - 'Cargo.lock'
+  #     - '.github/workflows/test-fmt.yml'
+  #     - '**/*.rs'
+  #     - '**/*.md'
+  # push:
+  #   branches:
+  #     - main
+  #     - release-*
+  #   paths:
+  #     - 'Cargo.lock'
+  #     - '.github/workflows/test-fmt.yml'
+  #     - '**/*.rs'
+  #     - '**/*.md'
 env:
   CARGO_TERM_COLOR: always
 jobs:
