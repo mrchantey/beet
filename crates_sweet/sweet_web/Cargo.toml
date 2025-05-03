@@ -1,0 +1,100 @@
+[package]
+name = "sweet_web"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+documentation.workspace = true
+license.workspace = true
+readme.workspace = true
+description.workspace = true
+repository.workspace = true
+
+[features]
+default = []
+
+[dependencies]
+sweet_utils.workspace = true
+anyhow.workspace = true
+extend.workspace = true
+
+js-sys.workspace = true
+wasm-bindgen.workspace = true
+wasm-bindgen-futures.workspace = true
+console_error_panic_hook.workspace = true
+
+
+[dev-dependencies]
+sweet_test.workspace = true
+
+#https://rustwasm.github.io/wasm-bindgen/api/web_sys/
+#https://github.com/rustwasm/wasm-bindgen/blob/main/crates/web-sys/Cargo.toml
+[dependencies.web-sys]
+workspace = true
+features = [
+	"Text",
+	"Comment",
+	"Node",
+	"NodeList",
+	# File
+	"File",
+	"FileList",
+	# Blob
+	'Blob',
+	'BlobEvent',
+	'BlobEventInit',
+	'BlobPropertyBag',
+	# HTML
+	'Headers',
+	'Document',
+	'Element',
+	'Window',
+	'HtmlAnchorElement',
+	'HtmlButtonElement',
+	'HtmlCanvasElement',
+	'HtmlDivElement',
+	'HtmlHeadElement',
+	"HtmlInputElement",
+	'HtmlIFrameElement',
+	'HtmlLinkElement',
+	'HtmlParagraphElement',
+	'HtmlScriptElement',
+	# Style
+	'MediaQueryList',
+	# Events
+	'MouseEvent',
+	'KeyboardEvent',
+	# JS
+	'console',
+	'Navigator',
+	'Performance',
+	# Fetch
+	'Request',
+	'RequestInit',
+	'RequestMode',
+	'Response',
+	# Blob
+	'Blob',
+	'BlobEvent',
+	'BlobEventInit',
+	'BlobPropertyBag',
+	# Url
+	'Url',
+	'History',
+	'Location',
+	'UrlSearchParams',
+	# Sockets
+	'BinaryType',
+	'FileReader',
+	'ErrorEvent',
+	'MessageEvent',
+	'ProgressEvent',
+	'WebSocket',
+	# Resize Observer
+	'ResizeObserver',
+	'ResizeObserverBoxOptions',
+	'ResizeObserverEntry',
+	'ResizeObserverOptions',
+	'ResizeObserverSize',
+	'DomRect',
+	'DomRectReadOnly',
+]

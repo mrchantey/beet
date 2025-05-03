@@ -1,0 +1,66 @@
+[package]
+name = "sweet_test"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+readme = "README.md"
+description = "A pretty cross platform test runner"
+documentation.workspace = true
+repository.workspace = true
+categories.workspace = true
+keywords.workspace = true
+
+[features]
+# allow for fn_traits, ie mock_fn(3);
+nightly = []
+bevy = ["dep:bevy"]
+e2e = ["dep:fantoccini", "dep:serde_json", "sweet_utils/tokio"]
+
+[dependencies]
+#💡 internal 
+sweet_utils.workspace = true
+# sweet_web.workspace = true
+sweet_test_macros.workspace = true
+#💡 misc 
+anyhow.workspace = true
+extend.workspace = true
+web-time = "1"
+
+
+#💡 logging
+log.workspace = true
+pretty_env_logger.workspace = true
+colorize.workspace = true
+backtrace = "0.3"
+
+#💡 parse 
+glob.workspace = true
+clap.workspace = true
+
+#💡 async
+flume.workspace = true
+rayon.workspace = true
+futures.workspace = true
+thread_local = "1.1.8"
+
+#💡 bevy 
+bevy = { workspace = true, optional = true }
+
+
+#💡 native
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+tokio.workspace = true
+sweet_fs.workspace = true
+pin-project-lite = "0.2.15"
+fantoccini = { version = "0.21.5", optional = true, features = ["rustls-tls"] }
+serde_json = { workspace = true, optional = true }
+
+#💡 wasm
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+console_log.workspace = true
+js-sys.workspace = true
+web-sys = { workspace = true, features = ["HtmlElement"] }
+wasm-bindgen.workspace = true
+wasm-bindgen-futures.workspace = true
+console_error_panic_hook.workspace = true

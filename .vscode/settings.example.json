@@ -3,6 +3,9 @@
 	"rust-analyzer.cargo.buildScripts.rebuildOnSave": false,
 	"rust-analyzer.cargo.target": "wasm32-unknown-unknown",
 	"rust-analyzer.cargo.features": [
+		"sweet_test/e2e",
+		"sweet_test/nightly", 
+		"sweet_test/bevy",
 		"beet/bevy_default",
 		"beet/examples",
 		"beet/ml"

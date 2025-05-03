@@ -29,6 +29,7 @@ init-flow:
 	just assets-pull
 	mkdir -p crates_flow/beet_ml/assets/ml && cp ./assets/ml/default-bert.ron crates_flow/beet_ml/assets/ml/default.bert.ron
 
+# once beet-cli is binstallable we shouldnt need to compile in order to codegen
 init-rsx:
 	cargo run -p beet_router --example build
 	just cli build -p beet_site
@@ -36,7 +37,8 @@ init-rsx:
 	mkdir -p target/lambda/crates/beet_site || true
 	@echo 'dummy file so sst deploys' > target/lambda/crates/beet_site/bootstrap
 
-
+init-sweet:
+	just install-chromedriver
 
 # just test-site
 # just export-scenes
@@ -188,6 +190,19 @@ test-flow *args:
 	{{min-stack}} cargo test -p beet_flow 		--lib --features=reflect 	--target wasm32-unknown-unknown {{args}} -- {{test-threads}}
 	{{min-stack}} cargo test -p beet_spatial 	--lib 									 	--target wasm32-unknown-unknown {{args}} -- {{test-threads}}
 
+
+test-sweet *args:
+	{{min-stack}} cargo test -p sweet_bevy 							--all-features 													 	{{args}} -- {{test-threads}}
+	{{min-stack}} cargo test -p sweet_fs 								--all-features 													 	{{args}} -- {{test-threads}}
+	{{min-stack}} cargo test -p sweet_net 							--all-features 													 	{{args}} -- {{test-threads}}
+	{{min-stack}} cargo test -p sweet_server 						--all-features 													 	{{args}} -- {{test-threads}}
+	{{min-stack}} cargo test -p sweet_test 			--lib 	--all-features  										 			{{args}} -- {{test-threads}} --e2e
+	{{min-stack}} cargo test -p sweet_utils 						--all-features 													 	{{args}} -- {{test-threads}}
+	{{min-stack}} cargo test -p sweet-cli 							--all-features 													 	{{args}} -- {{test-threads}}
+	{{min-stack}} cargo test --lib --target wasm32-unknown-unknown --all-features -p sweet_bevy   {{args}} -- {{test-threads}}
+	{{min-stack}} cargo test --lib --target wasm32-unknown-unknown --all-features -p sweet_test   {{args}} -- {{test-threads}}
+	{{min-stack}} cargo test --lib --target wasm32-unknown-unknown --all-features -p sweet_web   	{{args}} -- {{test-threads}}
+
 test-all-lib *args:
 	{{min-stack}} cargo test --workspace 			--lib 	--all-features																	{{args}} -- {{test-threads}}
 test-all-doc *args:
@@ -260,12 +275,25 @@ publish crate *args:
 	sleep 2
 
 publish-all *args:
+	@echo 'Publishing Sweet Crates'
+	just publish sweet_utils				{{args}} | true
+	just publish sweet_fs						{{args}} | true
+	just publish sweet_test_macros	{{args}} | true
+	just publish sweet_test					{{args}} | true
+	just publish sweet_server				{{args}} | true
+	just publish sweet_web					{{args}} | true
+	just publish sweet_bevy					{{args}} | true
+	just publish sweet_net					{{args}} | true
+	just publish sweet 							{{args}} | true
+	just publish sweet-cli					{{args}} | true
+	@echo 'Publishing Flow Crates'
 	just publish beet_flow_macros     {{args}} || true
 	just publish beet_flow            {{args}} || true
 	just publish beet_spatial         {{args}} || true
 	just publish beet_ml              {{args}} || true
 	just publish beet_sim          		{{args}} || true
 	just publish beet_examples        {{args}} || true
+	@echo 'Publishing Rsx Crates'
 	just publish beet_rsx_combinator  {{args}} || true
 	just publish beet_rsx_parser      {{args}} || true
 	just publish beet_rsx_macros      {{args}} || true
@@ -274,8 +302,12 @@ publish-all *args:
 	just publish beet_server       		{{args}} || true
 	just publish beet_connect      		{{args}} || true
 	just publish beet_design 					{{args}} || true
+	@echo 'Publishing Misc Crates'
 	just publish beet                 {{args}} || true
 	just publish beet-cli             {{args}} || true
+
+
+
 # just publish beet_examples        {{args}} || true
 
 watch *command:
@@ -301,3 +333,28 @@ assets-pull:
 # Cargo search but returns one line
 search *args:
 	cargo search {{args}} | head -n 1
+
+# Run a command with the sweet cli without installing it
+sweet *args:
+	cargo run -p sweet-cli -- {{args}}
+
+# Install the sweet cli
+install-sweet-cli *args:
+	cargo install --path crates/sweet-cli {{args}}
+
+
+# creates a directory ~/chrome-for-testing and installs chrome and chromedriver there.
+# The latest version can be found at https://googlechromelabs.github.io/chrome-for-testing/
+# Previous versions can be found at
+install-chromedriver:
+	wget https://storage.googleapis.com/chrome-for-testing-public/135.0.7049.114/linux64/chrome-linux64.zip -P ~/chrome-for-testing
+	wget https://storage.googleapis.com/chrome-for-testing-public/135.0.7049.114/linux64/chromedriver-linux64.zip -P ~/chrome-for-testing
+	mkdir -p ~/chrome-for-testing
+	unzip ~/chrome-for-testing/chrome-linux64.zip -d ~/chrome-for-testing
+	unzip ~/chrome-for-testing/chromedriver-linux64.zip -d ~/chrome-for-testing
+	chmod +x ~/chrome-for-testing/chromedriver-linux64/chromedriver
+	export PATH="$PATH:$HOME/chrome-for-testing/chromedriver-linux64"
+	echo "Chrome installed at: $HOME/chrome-for-testing/chrome-linux64/chrome"
+	echo "ChromeDriver installed at: $HOME/chrome-for-testing/chromedriver-linux64/chromedriver"
+	echo "ChromeDriver version:"
+	~/chrome-for-testing/chromedriver-linux64/chromedriver --version

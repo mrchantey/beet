@@ -1,6 +1,6 @@
 [build]
 # recommended for cargo test --workspace
-jobs = 8
+# jobs = 8
 
 [target.wasm32-unknown-unknown]
 runner = 'sweet test-wasm'

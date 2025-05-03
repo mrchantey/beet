@@ -33,7 +33,8 @@ jobs:
           ~/.cargo/registry/cache/
           ~/.cargo/git/db/
           target/
-        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}-v0
+        # TODO - once the beet cli is binstallable we should be able to share cache between workflows because setup will be cheap
+        key: ${{ runner.os }}-cargo-${{ github.workflow }}-${{ hashFiles('**/Cargo.lock') }}-v0
     - name: 🔨📋 Install Just
       uses: extractions/setup-just@v1
     - name: 🔨 Install Deno
@@ -51,7 +52,7 @@ jobs:
       uses: cargo-bins/cargo-binstall@main
     - name: 🔨 Install leptosfmt
       run: cargo binstall leptosfmt         || true
-    # - name: 🔨📋 Init repo
-    #   run: just init-repo
+    - name: 🔨📋 Init repo
+      run: just init-rsx
     - name: 🔎 Test
       run: just test-fmt

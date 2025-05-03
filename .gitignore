@@ -1,11 +1,14 @@
+rustc-ice*
 assets
 target
-docs/book
-out.txt
-rustc-ice*
 .rustc_info.json
 .env
 .vscode/settings.json
+
+
+tests/assert.rs
+tests/expect.rs
+
 **/codegen
 
 crates_rsx/beet_query/test.db

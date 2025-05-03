@@ -2,7 +2,7 @@
 
 <div align="center">
   <p>
-    <strong>The anything framework</strong>
+    <strong>🦄 The anything framework 🦄</strong>
   </p>
   <p>
     <a href="https://crates.io/crates/beet"><img src="https://img.shields.io/crates/v/beet.svg?style=flat-square" alt="Crates.io version" /></a>
@@ -24,35 +24,47 @@ Beet is a collection of tools for building web pages, realtime applications and 
 - 🐣 docs and tests are incomplete
 - 🐉 highly experimental, here be dragons
 
-## `beet_flow`
+## `crates_flow`
 
-Control flow crates built upon the ecs engine that powers Bevy. They are decoupled from rendering, for instance they can be run on small microcontrollers like the ESP32.
+Control flow crates built upon the [ecs engine](https://crates.io/crates/bevy_ecs) that powers Bevy. These can be used for a growing variety of behavior paradigms including Behavior Trees, LLMs and Reinforcement Learning. They are also decoupled from rendering, for instance they can be run on small microcontrollers like the ESP32.
 
-| Crate                                                   | Status | Description                                                       |
-| ------------------------------------------------------- | ------ | ----------------------------------------------------------------- |
+| Crate                                                 | Status | Description                                                       |
+| ----------------------------------------------------- | ------ | ----------------------------------------------------------------- |
 | [`beet_flow`](crates_flow/beet_flow/Cargo.toml)       | 🦢      | Scenes-as-control-flow bevy library for behavior trees etc        |
 | [`beet_spatial`](crates_flow/beet_spatial/Cargo.toml) | 🐣      | Extend `beet_flow` with spatial behaviors like steering           |
 | [`beet_ml`](crates_flow/beet_ml/Cargo.toml)           | 🐉      | Extend `beet_flow` with machine learning using `candle`           |
 | [`beet_sim`](crates_flow/beet_sim/Cargo.toml)         | 🐉      | Extend `beet_flow` with generalized simulation tooling like stats |
 
 
-## `beet_rsx`
+## `crates_rsx`
 
 An exploration of a rusty `JSX`, and the tools required to maximize developer productivity and performance. 
 
-| Crate                                                   | Status | Description                                                       |
-| ------------------------------------------------------- | ------ | ----------------------------------------------------------------- |
-| [`beet_rsx`](crates_rsx/beet_rsx/Cargo.toml)         | 🐉      | Cross domain authoring tools                                      |
-| [`beet_router`](crates_rsx/beet_router/Cargo.toml)   | 🐉      | File based router for websites                                    |
+| Crate                                              | Status | Description                    |
+| -------------------------------------------------- | ------ | ------------------------------ |
+| [`beet_rsx`](crates_rsx/beet_rsx/Cargo.toml)       | 🐉      | Cross domain authoring tools   |
+| [`beet_router`](crates_rsx/beet_router/Cargo.toml) | 🐉      | File based router for websites |
+
+## `crates_sweet`
+
+General utilities including a test runner, file watcher etc.
+
+| Crate                                                   | Status | Description                            |
+| ------------------------------------------------------- | ------ | -------------------------------------- |
+| [`sweet_bevy`](https://crates.io/crates/sweet_bevy)     | 🐉      | Bevy utilities                         |
+| [`sweet_fs`](https://crates.io/crates/sweet_fs)         | 🐉      | FS utilities                           |
+| [`sweet_server`](https://crates.io/crates/sweet_server) | 🐉      | Simple file server with live reload    |
+| [`sweet_test`](https://crates.io/crates/sweet_test)     | 🐣      | A pretty cross platform test runner    |
+| [`sweet-cli`](https://crates.io/crates/sweet-cli)       | 🐣      | Cross-platform utilities and dev tools |
 
 
-## `beet_build`
+## `crates`
 
-Crates for building beet applications by working on the level of parsers & tokenizers.
+Top level crates that depend on several of the above.
 
-| Crate                                                   | Status | Description                                                       |
-| ------------------------------------------------------- | ------ | ----------------------------------------------------------------- |
-| [`beet-cli`](https://crates.io/crates/beet-cli)         | 🐉      | CLI for beet authoring tools                                      |
+| Crate                                           | Status | Description                  |
+| ----------------------------------------------- | ------ | ---------------------------- |
+| [`beet-cli`](https://crates.io/crates/beet-cli) | 🐉      | CLI for beet authoring tools |
 
 
 ## Bevy Versions
@@ -96,4 +108,4 @@ Most of these are quite complex but if you'd like to have a go open an issue and
 - [ ] sever signals
 
 ### `infra`
-- [ ] static files on s3
+- [ ] serve static files on s3 instead of bundled in the lambda
