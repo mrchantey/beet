@@ -171,13 +171,15 @@ test-ci *args:
 	just test-rsx
 
 # just test-flow runs out of space
+test-build *args:
+	{{min-stack}} cargo test -p beet_tokens 																														{{args}} -- {{test-threads}}
+	{{min-stack}} cargo test -p beet_rsx_combinator 																										{{args}} -- {{test-threads}}
+	{{min-stack}} cargo test -p beet_rsx_parser 																												{{args}} -- {{test-threads}}
 
 test-rsx *args:
 	{{min-stack}} cargo test -p beet_design 	 	 																												{{args}} -- {{test-threads}}
 	{{min-stack}} cargo test -p beet_router 	--features=_test_site,build,serde,parser,bevy 						{{args}} -- {{test-threads}}
 	{{min-stack}} cargo test -p beet_rsx 			--features=bevy,css,parser 																{{args}} -- {{test-threads}}
-	{{min-stack}} cargo test -p beet_rsx_parser 																												{{args}} -- {{test-threads}}
-	{{min-stack}} cargo test -p beet_rsx_combinator 																										{{args}} -- {{test-threads}}
 	{{min-stack}} cargo test -p beet_server 																														{{args}} -- {{test-threads}}
 	{{min-stack}} cargo test -p beet_site																																{{args}} -- {{test-threads}}
 	{{min-stack}} cargo test -p beet-cli																																{{args}} -- {{test-threads}}
@@ -275,6 +277,7 @@ publish crate *args:
 	sleep 2
 
 publish-all *args:
+	just publish beet_rsx_combinator  {{args}} || true
 	@echo 'Publishing Sweet Crates'
 	just publish sweet_utils				{{args}} | true
 	just publish sweet_fs						{{args}} | true
@@ -293,15 +296,17 @@ publish-all *args:
 	just publish beet_ml              {{args}} || true
 	just publish beet_sim          		{{args}} || true
 	just publish beet_examples        {{args}} || true
-	@echo 'Publishing Rsx Crates'
-	just publish beet_rsx_combinator  {{args}} || true
+	@echo 'Publishing Rsx Build Crates'
+	just publish beet_tokens      		{{args}} || true
 	just publish beet_rsx_parser      {{args}} || true
 	just publish beet_rsx_macros      {{args}} || true
+	@echo 'Publishing Rsx Crates'
 	just publish beet_rsx             {{args}} || true
 	just publish beet_router          {{args}} || true
 	just publish beet_server       		{{args}} || true
 	just publish beet_connect      		{{args}} || true
 	just publish beet_design 					{{args}} || true
+	@echo 'Publishing Build Crates'
 	@echo 'Publishing Misc Crates'
 	just publish beet                 {{args}} || true
 	just publish beet-cli             {{args}} || true

@@ -40,6 +40,8 @@ members = [
 	"crates/beet-cli",
 
 	"crates_build/beet_tokens",
+	"crates_build/beet_rsx_combinator",
+	"crates_rsx/beet_rsx/parser",
 
 	"crates_flow/beet_examples",
 	"crates_flow/beet_flow",
@@ -55,8 +57,6 @@ members = [
 	"crates_rsx/beet_router",
 	"crates_rsx/beet_rsx",
 	"crates_rsx/beet_rsx/macros",
-	"crates_rsx/beet_rsx/parser",
-	"crates_rsx/beet_rsx/combinator",
 	"crates_rsx/beet_server",
 
 	"crates_sweet/sweet",
@@ -78,6 +78,8 @@ members = [
 beet = { path = "", version = "0.4.2-dev.2", default-features = false }
 
 beet_tokens = { path = "crates_build/beet_tokens", version = "0.4.2-dev.2", default-features = false }
+beet_rsx_combinator = { path = "crates_build/beet_rsx_combinator", version = "0.4.2-dev.2" }
+beet_rsx_parser = { path = "crates_rsx/beet_rsx/parser", version = "0.4.2-dev.2" }
 
 beet_examples = { path = "crates_flow/beet_examples", version = "0.4.2-dev.2" }
 beet_flow = { path = "crates_flow/beet_flow", version = "0.4.2-dev.2" }
@@ -93,8 +95,6 @@ beet_query_macros = { path = "crates_rsx/beet_query/macros", version = "0.4.2-de
 beet_router = { path = "crates_rsx/beet_router", version = "0.4.2-dev.2" }
 beet_rsx = { path = "crates_rsx/beet_rsx", version = "0.4.2-dev.2" }
 beet_rsx_macros = { path = "crates_rsx/beet_rsx/macros", version = "0.4.2-dev.2" }
-beet_rsx_parser = { path = "crates_rsx/beet_rsx/parser", version = "0.4.2-dev.2" }
-beet_rsx_combinator = { path = "crates_rsx/beet_rsx/combinator", version = "0.4.2-dev.2" }
 beet_server = { path = "crates_rsx/beet_server", version = "0.4.2-dev.2" }
 
 sweet = { path = "crates_sweet/sweet", version = "0.4.2-dev.2" }
