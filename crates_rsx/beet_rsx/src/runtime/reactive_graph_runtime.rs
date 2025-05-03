@@ -5,38 +5,52 @@ pub struct ReactiveGraphRuntime;
 #[cfg(test)]
 mod test {
 	use any_spawner::Executor;
+	use reactive_graph::effect::Effect;
 	use reactive_graph::owner::Owner;
-	use reactive_graph::signal::signal;
+	use reactive_graph::signal::RwSignal;
+	use sweet::prelude::*;
 
 	#[sweet::test]
 	async fn works() {
-		use reactive_graph::effect::Effect;
-
-
-		#[cfg(not(target_arch = "wasm32"))]
-		Executor::init_tokio().unwrap();
+		use std::sync::Arc;
+		use std::sync::RwLock;
 
 		#[cfg(target_arch = "wasm32")]
-		Executor::init_wasm_bindgen().unwrap();
+		let _ex = Executor::init_wasm_bindgen();
+		#[cfg(not(target_arch = "wasm32"))]
+		let _ex = Executor::init_tokio();
 
 		let owner = Owner::new();
 		owner.set();
 
-		let (get1, set1) = signal(0);
-		let (get2, set2) = signal(0);
+		let block = async {
+			let a = RwSignal::new(-1);
 
-		let _effect = Effect::new(Box::new(move |_| {
-			set2(get1() + 1);
-		}));
+			// simulate an arbitrary side effect
+			let b = Arc::new(RwLock::new(String::new()));
 
-		set1(4);
+			// we forget it so it continues running
+			// if it's dropped, it will stop listening
+			Effect::new({
+				let b = b.clone();
+				move |_| {
+					let formatted = format!("Value is {}", a());
+					*b.write().unwrap() = formatted;
+				}
+			});
 
-		assert_eq!(get1(), 4);
+			Executor::tick().await;
+			b.read().unwrap().as_str().xpect().to_be("Value is -1");
 
-		Executor::tick().await;
+			a(1);
 
-		assert_eq!(get2(), 5);
+			Executor::tick().await;
+			b.read().unwrap().as_str().xpect().to_be("Value is 1");
+		};
+		#[cfg(not(target_arch = "wasm32"))]
+		tokio::task::LocalSet::new().run_until(block).await;
 
-		println!("done");
+		#[cfg(target_arch = "wasm32")]
+		block.await;
 	}
 }

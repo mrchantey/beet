@@ -37,4 +37,6 @@ pub mod prelude {
 
 pub mod exports {
 	pub use sweet_utils::exports::*;
+	#[cfg(feature = "test")]
+	pub use sweet_test::exports::*;
 }

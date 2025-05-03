@@ -51,6 +51,6 @@ mod test {
 	#[test]
 	fn env_vars() {
 		expect(env!("CARGO_PKG_NAME")).to_be("beet_server");
-		expect(env!("CARGO_PKG_VERSION")).to_start_with("0.0.");
+		expect(env!("CARGO_PKG_VERSION")).to_start_with("0.");
 	}
 }
