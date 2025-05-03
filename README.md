@@ -2,7 +2,7 @@
 
 <div align="center">
   <p>
-    <strong>Tools for building reactive structures</strong>
+    <strong>The anything framework</strong>
   </p>
   <p>
     <a href="https://crates.io/crates/beet"><img src="https://img.shields.io/crates/v/beet.svg?style=flat-square" alt="Crates.io version" /></a>
@@ -18,22 +18,41 @@
   </h3>
 </div>
 
-Beet is a set of tools for building reactive structures. Your mileage may vary depending on the crate of interest:
-
-
-| Crate                                                   | Status | Description                                                       |
-| ------------------------------------------------------- | ------ | ----------------------------------------------------------------- |
-| [`beet_flow`](https://crates.io/crates/beet_flow)       | 🦢      | Scenes-as-control-flow bevy library for behavior trees etc        |
-| [`beet_spatial`](https://crates.io/crates/beet_spatial) | 🐣      | Extend `beet_flow` with spatial behaviors like steering           |
-| [`beet_ml`](https://crates.io/crates/beet_ml)           | 🐉      | Extend `beet_flow` with machine learning using `candle`           |
-| [`beet_sim`](https://crates.io/crates/beet_sim)         | 🐉      | Extend `beet_flow` with generalized simulation tooling like stats |
-| [`beet_rsx`](https://crates.io/crates/beet_rsx)         | 🐉      | Cross domain authoring tools                                      |
-| [`beet_router`](https://crates.io/crates/beet_router)   | 🐉      | File based router for websites                                    |
-| [`beet-cli`](https://crates.io/crates/beet-cli)         | 🐉      | CLI for beet authoring tools                                      |
+Beet is a collection of tools for building web pages, realtime applications and behaviors. Its early days so your mileage may vary depending on the crate of interest:
 
 - 🦢 documented and tested
 - 🐣 docs and tests are incomplete
 - 🐉 highly experimental, here be dragons
+
+## `beet_flow`
+
+Control flow crates built upon the ecs engine that powers Bevy. They are decoupled from rendering, for instance they can be run on small microcontrollers like the ESP32.
+
+| Crate                                                   | Status | Description                                                       |
+| ------------------------------------------------------- | ------ | ----------------------------------------------------------------- |
+| [`beet_flow`](crates_flow/beet_flow/Cargo.toml)       | 🦢      | Scenes-as-control-flow bevy library for behavior trees etc        |
+| [`beet_spatial`](crates_flow/beet_spatial/Cargo.toml) | 🐣      | Extend `beet_flow` with spatial behaviors like steering           |
+| [`beet_ml`](crates_flow/beet_ml/Cargo.toml)           | 🐉      | Extend `beet_flow` with machine learning using `candle`           |
+| [`beet_sim`](crates_flow/beet_sim/Cargo.toml)         | 🐉      | Extend `beet_flow` with generalized simulation tooling like stats |
+
+
+## `beet_rsx`
+
+An exploration of a rusty `JSX`, and the tools required to maximize developer productivity and performance. 
+
+| Crate                                                   | Status | Description                                                       |
+| ------------------------------------------------------- | ------ | ----------------------------------------------------------------- |
+| [`beet_rsx`](crates_rsx/beet_rsx/Cargo.toml)         | 🐉      | Cross domain authoring tools                                      |
+| [`beet_router`](crates_rsx/beet_router/Cargo.toml)   | 🐉      | File based router for websites                                    |
+
+
+## `beet_build`
+
+Crates for building beet applications by working on the level of parsers & tokenizers.
+
+| Crate                                                   | Status | Description                                                       |
+| ------------------------------------------------------- | ------ | ----------------------------------------------------------------- |
+| [`beet-cli`](https://crates.io/crates/beet-cli)         | 🐉      | CLI for beet authoring tools                                      |
 
 
 ## Bevy Versions

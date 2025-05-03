@@ -21,7 +21,7 @@ pub struct RsxTemplateMap {
 	/// The root directory used to create the templates, templates
 	/// with a location outside of this root will not be expected to exists and
 	/// so will not produce an error.
-	// canonicalized [here](crates/beet_router/src/parser/build_template_map/mod.rs#L110-L111)
+	// canonicalized [here](crates_rsx/beet_router/src/parser/build_template_map/mod.rs#L110-L111)
 	root: WorkspacePathBuf,
 	/// The templates themselves, keyed by their location.
 	pub templates: HashMap<RsxMacroLocation, RsxTemplateNode>,

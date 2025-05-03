@@ -6,15 +6,15 @@ use sweet::prelude::*;
 // runtime env vars: https://doc.rust-lang.org/cargo/reference/environment-variables.html#environment-variables-cargo-sets-for-build-scripts
 // cargo:: output https://doc.rust-lang.org/cargo/reference/build-scripts.html#outputs-of-the-build-script
 fn main() -> Result<()> {
-	BuildUtils::rerun_if_changed("../beet_design/src/**/*.mockup.rs");
-	BuildUtils::rerun_if_changed("../beet_design/public");
+	BuildUtils::rerun_if_changed("../../crates_rsx/beet_design/src/**/*.mockup.rs");
+	BuildUtils::rerun_if_changed("../../crates_rsx/beet_design/public");
 	// println!("cargo::warning={}", "🚀🚀 building beet_site");
 
-	// ⚠️ this is a downstream copy of crates/beet_design/build.rs
+	// ⚠️ this is a downstream copy of crates_rsx/beet_design/build.rs
 	// we're actually only using the route paths, maybe we should generate
 	// those in design
 	let mockups =
-		FileGroup::new(AbsPathBuf::new_manifest_rel("../beet_design/src")?)
+		FileGroup::new(AbsPathBuf::new_manifest_rel("../../crates_rsx/beet_design/src")?)
 			.with_filter(GlobFilter::default().with_include("*.mockup.*"))
 			.xpipe(FileGroupToFuncTokens::default())?
 			.xpipe(

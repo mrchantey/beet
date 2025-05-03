@@ -36,49 +36,53 @@ publish = false
 # default resolver
 resolver = "2"
 members = [
-	"crates/beet_build",
-	"crates/beet_connect",
-	"crates/beet_design",
-	"crates/beet_examples",
-	"crates/beet_flow",
-	"crates/beet_flow/macros",
-	"crates/beet_ml",
-	# "crates/beet_rig",
-	"crates/beet_query",
-	"crates/beet_query/macros",
-	"crates/beet_router",
-	"crates/beet_rsx",
-	"crates/beet_rsx/macros",
-	"crates/beet_rsx/parser",
-	"crates/beet_rsx/combinator",
-	"crates/beet_server",
-	"crates/beet_sim",
-	"crates/beet_spatial",
 	"crates/beet_site",
 	"crates/beet-cli",
+
+	"crates_flow/beet_examples",
+	"crates_flow/beet_flow",
+	"crates_flow/beet_flow/macros",
+	"crates_flow/beet_ml",
+	"crates_flow/beet_sim",
+	"crates_flow/beet_spatial",
+
+	"crates_rsx/beet_build",
+	"crates_rsx/beet_connect",
+	"crates_rsx/beet_design",
+	"crates_rsx/beet_query",
+	"crates_rsx/beet_query/macros",
+	"crates_rsx/beet_router",
+	"crates_rsx/beet_rsx",
+	"crates_rsx/beet_rsx/macros",
+	"crates_rsx/beet_rsx/parser",
+	"crates_rsx/beet_rsx/combinator",
+	"crates_rsx/beet_server",
+
 	# "crates/emby",
 ]
 
 [workspace.dependencies]
 ## internal
 beet = { path = "", version = "0.0.6-rc.1", default-features = false }
-beet_build = { path = "crates/beet_build", version = "0.0.6-rc.1", default-features = false }
-beet_connect = { path = "crates/beet_connect", version = "0.0.6-rc.1", default-features = false }
-beet_design = { path = "crates/beet_design", version = "0.0.6-rc.1", default-features = false }
-beet_examples = { path = "crates/beet_examples", version = "0.0.6-rc.1" }
-beet_flow = { path = "crates/beet_flow", version = "0.0.6-rc.1" }
-beet_flow_macros = { path = "crates/beet_flow/macros", version = "0.0.6-rc.1" }
-beet_ml = { path = "crates/beet_ml", version = "0.0.6-rc.1" }
-beet_query = { path = "crates/beet_query", version = "0.0.6-rc.1" }
-beet_query_macros = { path = "crates/beet_query/macros", version = "0.0.6-rc.1" }
-beet_router = { path = "crates/beet_router", version = "0.0.6-rc.1" }
-beet_rsx = { path = "crates/beet_rsx", version = "0.0.6-rc.1" }
-beet_rsx_macros = { path = "crates/beet_rsx/macros", version = "0.0.6-rc.1" }
-beet_rsx_parser = { path = "crates/beet_rsx/parser", version = "0.0.6-rc.1" }
-beet_rsx_combinator = { path = "crates/beet_rsx/combinator", version = "0.0.6-rc.1" }
-beet_server = { path = "crates/beet_server", version = "0.0.6-rc.1" }
-beet_spatial = { path = "crates/beet_spatial", version = "0.0.6-rc.1", default-features = false }
-beet_sim = { path = "crates/beet_sim", version = "0.0.6-rc.1" }
+
+beet_examples = { path = "crates_flow/beet_examples", version = "0.0.6-rc.1" }
+beet_flow = { path = "crates_flow/beet_flow", version = "0.0.6-rc.1" }
+beet_flow_macros = { path = "crates_flow/beet_flow/macros", version = "0.0.6-rc.1" }
+beet_ml = { path = "crates_flow/beet_ml", version = "0.0.6-rc.1" }
+beet_spatial = { path = "crates_flow/beet_spatial", version = "0.0.6-rc.1", default-features = false }
+beet_sim = { path = "crates_flow/beet_sim", version = "0.0.6-rc.1" }
+
+beet_build = { path = "crates_rsx/beet_build", version = "0.0.6-rc.1", default-features = false }
+beet_connect = { path = "crates_rsx/beet_connect", version = "0.0.6-rc.1", default-features = false }
+beet_design = { path = "crates_rsx/beet_design", version = "0.0.6-rc.1", default-features = false }
+beet_query = { path = "crates_rsx/beet_query", version = "0.0.6-rc.1" }
+beet_query_macros = { path = "crates_rsx/beet_query/macros", version = "0.0.6-rc.1" }
+beet_router = { path = "crates_rsx/beet_router", version = "0.0.6-rc.1" }
+beet_rsx = { path = "crates_rsx/beet_rsx", version = "0.0.6-rc.1" }
+beet_rsx_macros = { path = "crates_rsx/beet_rsx/macros", version = "0.0.6-rc.1" }
+beet_rsx_parser = { path = "crates_rsx/beet_rsx/parser", version = "0.0.6-rc.1" }
+beet_rsx_combinator = { path = "crates_rsx/beet_rsx/combinator", version = "0.0.6-rc.1" }
+beet_server = { path = "crates_rsx/beet_server", version = "0.0.6-rc.1" }
 
 #💡 local
 # sweet = { version = "0.4.1" }

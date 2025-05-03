@@ -100,7 +100,7 @@ mod test {
 		expect(&file.local_path.to_string_lossy()).to_be("docs/index.rs");
 		expect(
 			file.canonical_path.to_string_lossy().ends_with(
-				"crates/beet_router/src/test_site/pages/docs/index.rs",
+				"crates_rsx/beet_router/src/test_site/pages/docs/index.rs",
 			),
 		)
 		.to_be_true();

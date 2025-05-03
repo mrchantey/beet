@@ -4,10 +4,8 @@ docs/book
 out.txt
 rustc-ice*
 .rustc_info.json
-crates/beet_flow_old
 .env
 .vscode/settings.json
-crates/beet_router/src/test_site/codegen
-crates/*/src/codegen
+**/codegen
 
-crates/beet_query/test.db
+crates_rsx/beet_query/test.db

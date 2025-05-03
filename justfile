@@ -24,17 +24,17 @@ init-repo:
 	just init-flow
 	just init-rsx
 
+# mkdir -p crates_flow/beet_rsx/assets/fonts && cp ./assets/fonts/* crates_rsx/beet_rsx/assets/fonts
 init-flow:
 	just assets-pull
-	mkdir -p crates/beet_ml/assets/ml && cp ./assets/ml/default-bert.ron crates/beet_ml/assets/ml/default.bert.ron
-	mkdir -p crates/beet_rsx/assets/fonts && cp ./assets/fonts/* crates/beet_rsx/assets/fonts
+	mkdir -p crates_flow/beet_ml/assets/ml && cp ./assets/ml/default-bert.ron crates_flow/beet_ml/assets/ml/default.bert.ron
 
 init-rsx:
 	cargo run -p beet_router --example build
 	just cli build -p beet_site
 	cd infra && npm ci
 	mkdir -p target/lambda/crates/beet_site || true
-	echo 'dummy file so sst deploys' > target/lambda/crates/beet_site/bootstrap
+	@echo 'dummy file so sst deploys' > target/lambda/crates/beet_site/bootstrap
 
 
 
@@ -96,15 +96,15 @@ fmt *args:
 # soo bad
 leptosfmt *args:
 	leptosfmt -q											\
-	crates/beet_rsx/**/*.rs 					\
-	crates/beet_rsx/**/**/*.rs 				\
-	crates/beet_rsx/**/**/**/*.rs 		\
-	crates/beet_design/**/*.rs 				\
-	crates/beet_design/**/**/*.rs 		\
-	crates/beet_design/**/**/**/*.rs 	\
-	crates/beet_router/**/*.rs 				\
-	crates/beet_router/**/**/*.rs 		\
-	crates/beet_router/**/**/**/*.rs 	\
+	crates_rsx/beet_rsx/**/*.rs 					\
+	crates_rsx/beet_rsx/**/**/*.rs 				\
+	crates_rsx/beet_rsx/**/**/**/*.rs 		\
+	crates_rsx/beet_design/**/*.rs 				\
+	crates_rsx/beet_design/**/**/*.rs 		\
+	crates_rsx/beet_design/**/**/**/*.rs 	\
+	crates_rsx/beet_router/**/*.rs 				\
+	crates_rsx/beet_router/**/**/*.rs 		\
+	crates_rsx/beet_router/**/**/**/*.rs 	\
 	crates/beet_site/**/*.rs 					\
 	crates/beet_site/**/**/*.rs 			\
 	crates/beet_site/**/**/**/*.rs 		\
@@ -229,8 +229,8 @@ test-rsx-macro *args:
 
 clear-artifacts:
 	rm -rf target
-	rm -rf crates/beet_router/src/test_site/codegen
-	rm -rf crates/beet_design/src/codegen
+	rm -rf crates_rsx/beet_router/src/test_site/codegen
+	rm -rf crates_rsx/beet_design/src/codegen
 	rm -rf crates/beet_site/src/codegen
 
 # massive purge
