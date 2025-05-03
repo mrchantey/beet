@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use beet_build::prelude::*;
+use beet_tokens::prelude::*;
 use proc_macro2::TokenStream;
 use quote::ToTokens;
 use quote::quote;

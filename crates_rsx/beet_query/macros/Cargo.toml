@@ -22,7 +22,7 @@ sweet.workspace = true
 
 
 heck.workspace = true
-beet_build.workspace = true
+beet_tokens.workspace = true
 syn.workspace = true
 quote.workspace = true
 proc-macro2.workspace = true

@@ -39,6 +39,8 @@ members = [
 	"crates/beet_site",
 	"crates/beet-cli",
 
+	"crates_build/beet_tokens",
+
 	"crates_flow/beet_examples",
 	"crates_flow/beet_flow",
 	"crates_flow/beet_flow/macros",
@@ -46,7 +48,6 @@ members = [
 	"crates_flow/beet_sim",
 	"crates_flow/beet_spatial",
 
-	"crates_rsx/beet_build",
 	"crates_rsx/beet_connect",
 	"crates_rsx/beet_design",
 	"crates_rsx/beet_query",
@@ -76,6 +77,8 @@ members = [
 ## internal
 beet = { path = "", version = "0.4.2-dev.2", default-features = false }
 
+beet_tokens = { path = "crates_build/beet_tokens", version = "0.4.2-dev.2", default-features = false }
+
 beet_examples = { path = "crates_flow/beet_examples", version = "0.4.2-dev.2" }
 beet_flow = { path = "crates_flow/beet_flow", version = "0.4.2-dev.2" }
 beet_flow_macros = { path = "crates_flow/beet_flow/macros", version = "0.4.2-dev.2" }
@@ -83,7 +86,6 @@ beet_ml = { path = "crates_flow/beet_ml", version = "0.4.2-dev.2" }
 beet_spatial = { path = "crates_flow/beet_spatial", version = "0.4.2-dev.2", default-features = false }
 beet_sim = { path = "crates_flow/beet_sim", version = "0.4.2-dev.2" }
 
-beet_build = { path = "crates_rsx/beet_build", version = "0.4.2-dev.2", default-features = false }
 beet_connect = { path = "crates_rsx/beet_connect", version = "0.4.2-dev.2", default-features = false }
 beet_design = { path = "crates_rsx/beet_design", version = "0.4.2-dev.2", default-features = false }
 beet_query = { path = "crates_rsx/beet_query", version = "0.4.2-dev.2" }

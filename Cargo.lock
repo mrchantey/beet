@@ -749,18 +749,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "beet_build"
-version = "0.4.2-dev.2"
-dependencies = [
- "anyhow",
- "proc-macro2",
- "proc-macro2-diagnostics",
- "quote",
- "sweet",
- "syn 2.0.101",
-]
-
-[[package]]
 name = "beet_connect"
 version = "0.4.2-dev.2"
 dependencies = [
@@ -894,7 +882,7 @@ name = "beet_query_macros"
 version = "0.4.2-dev.2"
 dependencies = [
  "anyhow",
- "beet_build",
+ "beet_tokens",
  "heck 0.4.1",
  "proc-macro2",
  "proc-macro2-diagnostics",
@@ -1001,8 +989,8 @@ name = "beet_rsx_parser"
 version = "0.4.2-dev.2"
 dependencies = [
  "anyhow",
- "beet_build",
  "beet_rsx_combinator",
+ "beet_tokens",
  "heck 0.4.1",
  "itertools 0.10.5",
  "lightningcss",
@@ -1082,6 +1070,18 @@ dependencies = [
  "strum_macros",
  "sweet",
  "web-sys",
+]
+
+[[package]]
+name = "beet_tokens"
+version = "0.4.2-dev.2"
+dependencies = [
+ "anyhow",
+ "proc-macro2",
+ "proc-macro2-diagnostics",
+ "quote",
+ "sweet",
+ "syn 2.0.101",
 ]
 
 [[package]]

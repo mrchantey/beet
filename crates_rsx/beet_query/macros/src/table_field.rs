@@ -1,4 +1,4 @@
-use beet_build::prelude::*;
+use beet_tokens::prelude::*;
 use heck::ToTitleCase;
 use syn;
 use syn::Ident;
