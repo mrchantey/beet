@@ -1,3 +1,6 @@
+mod syn_serde;
+pub use syn_serde::syn_item_serde;
+pub use syn_serde::syn_item_vec_serde;
 mod client_island_tokens;
 pub use client_island_tokens::*;
 mod compile_check;

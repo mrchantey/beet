@@ -10,9 +10,11 @@ use sweet::prelude::*;
 pub struct FileGroup {
 	/// The directory where the files are located.
 	#[arg(long, default_value = ".")]
+	#[serde(rename = "path")]
 	pub src: AbsPathBuf,
 	/// Include and exclude filters for the files.
 	#[command(flatten)]
+	#[serde(flatten)]
 	pub filter: GlobFilter,
 }
 

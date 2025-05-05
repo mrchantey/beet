@@ -1,4 +1,6 @@
 //! Module for the codegen build step of the router.
+mod beet_config;
+pub use beet_config::*;
 mod func_tokens_tree;
 pub use func_tokens_tree::*;
 mod func_tokens_to_rsx_routes;

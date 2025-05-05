@@ -770,6 +770,7 @@ dependencies = [
  "rapidhash",
  "ron",
  "serde",
+ "serde_json",
  "sweet",
  "syn 2.0.101",
  "tokio",

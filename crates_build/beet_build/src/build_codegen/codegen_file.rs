@@ -1,24 +1,32 @@
+use crate::prelude::syn_item_vec_serde;
 use anyhow::Result;
-use proc_macro2::TokenStream;
+use serde::Deserialize;
+use serde::Serialize;
 use std::path::Path;
 use sweet::prelude::*;
 use syn::Expr;
 use syn::Item;
 
+
+
 /// Every codegen file is created via this struct. It contains
 /// several utilities and standards that make the whole thing nicer.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CodegenFile {
 	/// The output codegen file location.
 	pub output: AbsPathBuf,
 	/// All of the imports that must be included both globally and inside each
 	/// inline module.
+	#[serde(default, rename = "import_tokens", with = "syn_item_vec_serde")]
 	pub imports: Vec<Item>,
 	/// As `std::any::typename` resolves to a named crate, we need to alias the current
 	/// crate to match any internal types, setting this option will add `use crate as pkg_name`
 	/// to the top of the file.
+	#[serde(rename = "package_name")]
 	pub pkg_name: Option<String>,
 	// List of all root level items to be included in the file.
+	// These are usually appended to as this struct is passed around.
+	#[serde(default, with = "syn_item_vec_serde")]
 	pub items: Vec<Item>,
 }
 
@@ -90,17 +98,16 @@ impl CodegenFile {
 		FsExt::write(&self.output, &output_str)?;
 		Ok(())
 	}
-	fn crate_alias(&self) -> Result<syn::Item> {
-		let alias = if let Some(pkg_name) = &self.pkg_name {
+	fn crate_alias(&self) -> Result<Option<syn::Item>> {
+		if let Some(pkg_name) = &self.pkg_name {
 			let pkg_name: Expr = syn::parse_str(pkg_name)?;
-			syn::parse_quote! {
+			Ok(Some(syn::parse_quote! {
 				#[allow(unused_imports)]
 				use crate as #pkg_name;
-			}
+			}))
 		} else {
-			syn::Item::Verbatim(TokenStream::default())
-		};
-		Ok(alias)
+			Ok(None)
+		}
 	}
 }
 
