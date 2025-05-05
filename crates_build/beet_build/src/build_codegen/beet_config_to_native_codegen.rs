@@ -8,6 +8,7 @@ pub struct BeetConfigToNativeCodegen;
 
 impl Pipeline<BeetConfig, Result<()>> for BeetConfigToNativeCodegen {
 	fn apply(self, config: BeetConfig) -> Result<()> {
+		config.default_site_config.build_native(config.routes()?)?;
 		config
 			.file_groups
 			.into_iter()
@@ -22,9 +23,7 @@ impl Pipeline<BeetConfig, Result<()>> for BeetConfigToNativeCodegen {
 impl BeetConfigToNativeCodegen {
 	fn apply_for_file_group(value: FileGroupConfig) -> Result<CodegenFile> {
 		value
-			.file_group
-			.xpipe(FileGroupToFuncTokens::default())?
-			.xpipe(value.map_tokens)
+			.to_func_tokens()?
 			.xpipe(FuncTokensToRsxRoutes::new(value.codegen))?
 			.xmap(|(_, codegen)| codegen)
 			.xok()
@@ -33,6 +32,7 @@ impl BeetConfigToNativeCodegen {
 		Self::apply_for_file_group(value)?.build_and_write()
 	}
 }
+
 
 
 #[cfg(test)]

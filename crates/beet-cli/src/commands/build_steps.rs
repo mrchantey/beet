@@ -23,6 +23,7 @@ impl BuildCodegenNative {
 impl BuildStep for BuildCodegenNative {
 	fn run(&self) -> Result<()> {
 		println!("🌱 Running native codegen");
+		// FsExt::remove(&html_dir).ok();
 		BeetConfig::from_file(&self.build_args.config)?
 			.xpipe(BeetConfigToNativeCodegen)?;
 		Ok(())
@@ -85,6 +86,29 @@ impl BuildStep for ExportStatic {
 		Ok(())
 	}
 }
+
+
+pub struct BuildCodegenWasm {
+	build_args: BuildArgs,
+}
+
+impl BuildCodegenWasm {
+	pub fn new(build_args: &BuildArgs) -> Self {
+		Self {
+			build_args: build_args.clone(),
+		}
+	}
+}
+
+impl BuildStep for BuildCodegenWasm {
+	fn run(&self) -> Result<()> {
+		println!("🌱 Running wasm codegen");
+		BeetConfig::from_file(&self.build_args.config)?
+			.xpipe(BeetConfigToWasmCodegen)?;
+		Ok(())
+	}
+}
+
 
 
 pub struct BuildWasm {

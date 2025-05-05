@@ -39,45 +39,6 @@ macro_rules! abs_file {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct AbsPathBuf(PathBuf);
 
-#[cfg(feature = "serde")]
-impl serde::Serialize for AbsPathBuf {
-	fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-	where
-		S: serde::Serializer,
-	{
-		// Get workspace root
-		let workspace_root = FsExt::workspace_root();
-
-		// Make path relative to workspace root
-		let rel_path = pathdiff::diff_paths(&self.0, &workspace_root)
-			.ok_or_else(|| {
-				serde::ser::Error::custom(
-					"Failed to make path relative to workspace root",
-				)
-			})?;
-
-		// Serialize the relative path
-		rel_path.serialize(serializer)
-	}
-}
-
-#[cfg(feature = "serde")]
-impl<'de> serde::Deserialize<'de> for AbsPathBuf {
-	fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-	where
-		D: serde::Deserializer<'de>,
-	{
-		// Deserialize to a PathBuf
-		let rel_path = PathBuf::deserialize(deserializer)?;
-
-		// Join with workspace root
-		let abs_path = FsExt::workspace_root().join(rel_path);
-
-		// Return as AbsPathBuf
-		Ok(AbsPathBuf::new_unchecked(abs_path))
-	}
-}
-
 impl Default for AbsPathBuf {
 	fn default() -> Self {
 		Self::new(std::env::current_dir().unwrap()).unwrap()
@@ -114,6 +75,13 @@ impl AbsPathBuf {
 		{
 			Ok(Self(PathExt::canonicalize(path)?))
 		}
+	}
+
+	/// Add a path to the current [`AbsPathBuf`], which will also naturally
+	/// be a canonical path.
+	pub fn join(&self, path: impl AsRef<Path>) -> Self {
+		let path = self.0.join(path);
+		Self::new_unchecked(path)
 	}
 	/// Create a new [`AbsPathBuf`] from a path relative to the workspace root,
 	/// ie from using the `file!()` macro.
@@ -191,6 +159,45 @@ impl std::ops::Deref for AbsPathBuf {
 
 	fn deref(&self) -> &Self::Target { &self.0 }
 }
+#[cfg(feature = "serde")]
+impl serde::Serialize for AbsPathBuf {
+	fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+	where
+		S: serde::Serializer,
+	{
+		// Get workspace root
+		let workspace_root = FsExt::workspace_root();
+
+		// Make path relative to workspace root
+		let rel_path = pathdiff::diff_paths(&self.0, &workspace_root)
+			.ok_or_else(|| {
+				serde::ser::Error::custom(
+					"Failed to make path relative to workspace root",
+				)
+			})?;
+
+		// Serialize the relative path
+		rel_path.serialize(serializer)
+	}
+}
+
+#[cfg(feature = "serde")]
+impl<'de> serde::Deserialize<'de> for AbsPathBuf {
+	fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+	where
+		D: serde::Deserializer<'de>,
+	{
+		// Deserialize to a PathBuf
+		let rel_path = PathBuf::deserialize(deserializer)?;
+
+		// Join with workspace root
+		let abs_path = FsExt::workspace_root().join(rel_path);
+
+		// Return as AbsPathBuf
+		Ok(AbsPathBuf::new_unchecked(abs_path))
+	}
+}
+
 
 
 #[cfg(test)]

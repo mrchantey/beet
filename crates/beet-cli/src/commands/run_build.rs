@@ -61,15 +61,18 @@ impl RunBuild {
 		for arg in build_args.only.iter() {
 			match arg.as_str() {
 				"templates" => group.add(build_template_map.clone()),
-				"native-codegen" => group.add(BuildCodegenNative::new(&build_args)),
-				"native" => {
+				"native-codegen" => {
+					group.add(BuildCodegenNative::new(&build_args))
+				}
+				"native-compile" => {
 					group.add(BuildNative::new(&build_cmd, &build_args))
 				}
 				"server" => group.add(RunServer::new(&build_args, &exe_path)),
 				"static" => {
 					group.add(ExportStatic::new(&build_args, &exe_path))
 				}
-				"wasm" => group.add(BuildWasm::new(&build_cmd, &build_args)?),
+				"wasm-codegen" => group.add(BuildCodegenWasm::new(&build_args)),
+				"wasm-compile" => group.add(BuildWasm::new(&build_cmd, &build_args)?),
 				_ => anyhow::bail!("unknown build step: {}", arg),
 			};
 		}

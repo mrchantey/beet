@@ -52,10 +52,6 @@ impl Default for DefaultBuilder {
 
 impl DefaultBuilder {
 	pub fn build(self) -> Result<()> {
-		BuildUtils::rerun_if_changed("build.rs");
-		BuildUtils::rerun_if_changed("src/pages/**");
-		BuildUtils::rerun_if_changed("src/actions/**");
-		BuildUtils::rerun_if_changed("src/docs/**");
 
 		if BuildUtils::is_wasm() {
 			CodegenFile {
