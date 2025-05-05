@@ -1,7 +1,8 @@
+use crate::prelude::*;
+use anyhow::Result;
 use serde::Deserialize;
 use serde::Serialize;
-
-use crate::prelude::*;
+use sweet::prelude::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BeetConfig {
@@ -9,7 +10,22 @@ pub struct BeetConfig {
 }
 
 
-impl BeetConfig {}
+impl BeetConfig {
+	pub fn apply_codegen(self) -> Result<Vec<CodegenFile>> {
+		self.file_group
+			.into_iter()
+			.map(|file_group| file_group.apply_codegen())
+			.collect()
+	}
+	/// Build and write all codegen files
+	pub fn build_and_write(self) -> Result<()> {
+		let codegens = self.apply_codegen()?;
+		for codegen in codegens {
+			codegen.build_and_write()?;
+		}
+		Ok(())
+	}
+}
 
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -18,6 +34,16 @@ pub struct FileGroupConfig {
 	pub file_group: FileGroup,
 	#[serde(flatten)]
 	pub codegen: CodegenFile,
+}
+
+impl FileGroupConfig {
+	pub fn apply_codegen(self) -> Result<CodegenFile> {
+		self.file_group
+			.xpipe(FileGroupToFuncTokens::default())?
+			.xpipe(FuncTokensToRsxRoutes::new(self.codegen.clone()))?
+			.xmap(|(_, codegen)| codegen)
+			.xok()
+	}
 }
 
 #[cfg(test)]
@@ -40,5 +66,20 @@ import_tokens = ["use crate::as_beet::*;"]
 	fn works() {
 		let config: BeetConfig = toml::de::from_str(CONFIG).unwrap();
 		expect(config.file_group.len()).to_be(1);
+	}
+
+	#[test]
+	fn apply_codegen() {
+		let config: BeetConfig = toml::de::from_str(CONFIG).unwrap();
+		let file_group = config.file_group[0].clone();
+		let codegen = file_group.apply_codegen().unwrap();
+		let str = codegen
+			.build_output()
+			.unwrap()
+			.xmap(|file| prettyplease::unparse(&file));
+		// println!("{}", str);
+		expect(str).to_contain(
+			"RouteFunc::new(RouteInfo::new(\"/docs\", HttpMethod::Get), file0::get)",
+		);
 	}
 }

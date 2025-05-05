@@ -29,9 +29,54 @@ macro_rules! abs_file {
 /// 1. the path is canonical
 /// 2. on windows backslashes are replaced by forward slashes
 /// 3. The hash is cross-platform as it uses encoded bytes
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+/// ## Serialization
+/// Naturally serializing absolute paths is problematic for several reasons:
+/// - moving the serialized path between machines will break
+/// - often an `AbsPathBuf` is used for workspace config files, and workspace
+/// 	paths are more intuitive in that context.  
+/// For these reasons the path is serialized and deserialized relative to the workspace root,
+/// using [`FsExt::workspace_root`].
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct AbsPathBuf(PathBuf);
+
+#[cfg(feature = "serde")]
+impl serde::Serialize for AbsPathBuf {
+	fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+	where
+		S: serde::Serializer,
+	{
+		// Get workspace root
+		let workspace_root = FsExt::workspace_root();
+
+		// Make path relative to workspace root
+		let rel_path = pathdiff::diff_paths(&self.0, &workspace_root)
+			.ok_or_else(|| {
+				serde::ser::Error::custom(
+					"Failed to make path relative to workspace root",
+				)
+			})?;
+
+		// Serialize the relative path
+		rel_path.serialize(serializer)
+	}
+}
+
+#[cfg(feature = "serde")]
+impl<'de> serde::Deserialize<'de> for AbsPathBuf {
+	fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+	where
+		D: serde::Deserializer<'de>,
+	{
+		// Deserialize to a PathBuf
+		let rel_path = PathBuf::deserialize(deserializer)?;
+
+		// Join with workspace root
+		let abs_path = FsExt::workspace_root().join(rel_path);
+
+		// Return as AbsPathBuf
+		Ok(AbsPathBuf::new_unchecked(abs_path))
+	}
+}
 
 impl Default for AbsPathBuf {
 	fn default() -> Self {
@@ -172,5 +217,21 @@ mod test {
 			AbsPathBuf::new_manifest_rel("src/path_utils/abs_path_buf.rs")
 				.unwrap();
 		assert_eq!(buf, abs_file!());
+	}
+
+	#[test]
+	fn serde_roundtrip() {
+		// Create an AbsPathBuf instance
+		let original = abs_file!();
+
+		// Serialize to JSON
+		let serialized = serde_json::to_string(&original).unwrap();
+
+		// Deserialize back to AbsPathBuf
+		let deserialized: AbsPathBuf =
+			serde_json::from_str(&serialized).unwrap();
+
+		// Check if the roundtrip preserved the path
+		assert_eq!(original, deserialized);
 	}
 }

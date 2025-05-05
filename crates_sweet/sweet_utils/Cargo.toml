@@ -45,3 +45,4 @@ js-sys.workspace = true
 
 [dev-dependencies]
 sweet_utils = { path = "", features = ["tokio", "serde"] }
+serde_json.workspace = true

@@ -170,6 +170,14 @@ test-ci *args:
 	just test-fmt
 	just test-rsx
 
+# upstream from sweet_test
+test-fs *args:
+	just watch 'cargo test -p sweet_fs --lib {{args}}'
+# upstream from sweet_test
+test-utils *args:
+	just watch 'cargo test -p sweet_utils --lib --features=serde {{args}}'
+
+
 # just test-flow runs out of space
 test-build *args:
 	{{min-stack}} cargo test -p beet_tokens 																														{{args}} -- {{test-threads}}
