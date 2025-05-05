@@ -72,7 +72,9 @@ impl RunBuild {
 					group.add(ExportStatic::new(&build_args, &exe_path))
 				}
 				"wasm-codegen" => group.add(BuildCodegenWasm::new(&build_args)),
-				"wasm-compile" => group.add(BuildWasm::new(&build_cmd, &build_args)?),
+				"wasm-compile" => {
+					group.add(BuildWasm::new(&build_cmd, &build_args)?)
+				}
 				_ => anyhow::bail!("unknown build step: {}", arg),
 			};
 		}
@@ -96,16 +98,18 @@ impl RunBuild {
 			.with(build_template_map)
 			// 2. build native codegen
 			.with(BuildCodegenNative::new(&build_args))
-			// 2. build the native binary
+			// 3. build the native binary
 			.with(BuildNative::new(&build_cmd, &build_args))
-			// 3. export all static files from the app
+			// 4. export all static files from the app
 			//   	- html files
 			//   	- client island entries
-			.with(ExportStatic::new(&build_args, &exe_path));
+			.with(ExportStatic::new(&build_args, &exe_path))
+			// 5. build the wasm codegen
+			.with(BuildCodegenWasm::new(&build_args));
 		if server {
 			group.add(RunServer::new(&build_args, &exe_path));
 		}
-		// 4. build the wasm binary
+		// 6. build the wasm binary
 		group.add(BuildWasm::new(&build_cmd, &build_args)?);
 		Ok(group)
 	}

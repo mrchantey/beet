@@ -3,8 +3,12 @@
 #
 # It contains some custom parts to handle the internal nature
 # of the beet site, an external project will be significantly simpler.
-[config]
+
 package_name = "beet_site"
+src_path = "crates/beet_site/src"
+docs_route = "/docs"
+wasm_imports = ["use beet::design as beet_design;", "use beet::prelude::*;"]
+file_group_routes = ["beet_design_mockups"]
 
 [[file_group]]
 name = "test_site_pages"
@@ -16,6 +20,11 @@ package_name = "beet_router"
 import_tokens = ["use crate::as_beet::*;"]
 
 
+
+
+
+
+
 [[file_group]]
 name = "beet_design_mockups"
 # preset = "mockup"
@@ -25,7 +34,10 @@ output = "crates_rsx/beet_design/src/codegen/mockups.rs"
 include = ["*.mockup.*"]
 base_route = "/design"
 replace_route = [{ from = ".mockup", to = "" }]
-import_tokens = ["use beet::prelude::*;", "use beet_router::as_beet::*;"]
+import_tokens = [
+	"#[allow(unused_imports)]use beet::prelude::*;",
+	"use beet_router::as_beet::*;",
+]
 
 
 # [wasm]
