@@ -131,23 +131,28 @@ impl BuildTemplateMap {
 		&self,
 		path: &Path,
 	) -> Result<Vec<(RsxMacroLocation, TokenStream)>> {
-		if path.extension().map_or(false, |ext| ext == "rs") {
-			let file = ReadFile::to_string(path)?;
-			let file = syn::parse_file(&file)?;
-			let mac = syn::parse_quote!(rsx);
-			let path = WorkspacePathBuf::new_from_current_directory(path)?;
-			let mut visitor = RsxSynVisitor::new(path, mac);
+		match path.extension() {
+			Some(ex) if ex == "rs" => {
+				let file = ReadFile::to_string(path)?;
+				let file = syn::parse_file(&file)?;
+				let mac = syn::parse_quote!(rsx);
+				let path = WorkspacePathBuf::new_from_current_directory(path)?;
+				let mut visitor = RsxSynVisitor::new(path, mac);
 
-			visitor.visit_file(&file);
-			Ok(visitor.templates)
-		} else {
-			Ok(Default::default())
+				visitor.visit_file(&file);
+				Ok(visitor.templates)
+			}
+			Some(ex) if ex == "md" || ex == "mdx" => {
+				todo!()
+			}
+			_ => Ok(Default::default()),
 		}
 	}
 }
 
-/// A ron deserialization error with the context of the file and line
+/// how many leading and trailing characters to show in the context of the error
 const CX_SIZE: usize = 8;
+/// A ron deserialization error with the context of the file and line
 fn ron_cx_err(e: ron::error::SpannedError, str: &str) -> anyhow::Error {
 	let start = e.position.col.saturating_sub(CX_SIZE);
 	let end = e.position.col.saturating_add(CX_SIZE);
@@ -166,6 +171,9 @@ fn ron_cx_err(e: ron::error::SpannedError, str: &str) -> anyhow::Error {
 	);
 }
 
+
+/// Visit a file, extracting an [`RsxMacroLocation`] and [`RsxTemplateNode`] for each
+/// `rsx!` macro in the file.
 #[derive(Debug)]
 struct RsxSynVisitor {
 	/// Used for creating [`RsxMacroLocation`] in several places.
@@ -184,7 +192,6 @@ impl RsxSynVisitor {
 		}
 	}
 }
-
 
 impl<'a> Visit<'a> for RsxSynVisitor {
 	fn visit_macro(&mut self, mac: &syn::Macro) {

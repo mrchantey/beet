@@ -5,13 +5,12 @@ use sweet::prelude::WorkspacePathBuf;
 
 
 
-/// A cli router will visit all files in a crate and collect each
-/// rsx! macro into a ron structure of this type using
-/// [beet_rsx_parser::RstmlToRsxTemplate]. Because it operates on the level
-/// of *tokens* and *ron format*, it is actually unaware of this type directly.
+/// The beet cli will visit all files in a crate and collect each
+/// rsx! macro into a ron structure of this type. Because it operates on the level
+/// of *tokens* it is actually unaware of this type directly and instead
+/// generates it in a [`ron`] format via [beet_rsx_parser::RstmlToRsxTemplate].
 /// The advantage of this approach is we can build templates statically without
 /// a compile step.
-///
 ///
 /// When joining an [RsxTemplateNode] with an [RustyPartMap],
 /// we need the entire [RsxTemplateMap] to resolve components.
