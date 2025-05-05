@@ -22,6 +22,9 @@ pub struct RunBuild {
 // TODO probably integrate with RunBuild, and just nest
 #[derive(Debug, Clone, Parser)]
 pub struct BuildArgs {
+	/// Location of the beet.toml config file
+	#[arg(long, default_value = "beet.toml")]
+	pub config: PathBuf,
 	/// Run a simple file server in this process instead of
 	/// spinning up the native binary with the --server feature
 	#[arg(long = "static")]
@@ -51,21 +54,22 @@ impl RunBuild {
 		let exe_path = self.build_cmd.exe_path();
 		let Self {
 			build_cmd,
-			build_args: watch_args,
+			build_args,
 			build_template_map,
 			server: _,
 		} = self;
-		for arg in watch_args.only.iter() {
+		for arg in build_args.only.iter() {
 			match arg.as_str() {
 				"templates" => group.add(build_template_map.clone()),
+				"native-codegen" => group.add(BuildCodegenNative::new(&build_args)),
 				"native" => {
-					group.add(BuildNative::new(&build_cmd, &watch_args))
+					group.add(BuildNative::new(&build_cmd, &build_args))
 				}
-				"server" => group.add(RunServer::new(&watch_args, &exe_path)),
+				"server" => group.add(RunServer::new(&build_args, &exe_path)),
 				"static" => {
-					group.add(ExportStatic::new(&watch_args, &exe_path))
+					group.add(ExportStatic::new(&build_args, &exe_path))
 				}
-				"wasm" => group.add(BuildWasm::new(&build_cmd, &watch_args)?),
+				"wasm" => group.add(BuildWasm::new(&build_cmd, &build_args)?),
 				_ => anyhow::bail!("unknown build step: {}", arg),
 			};
 		}
@@ -74,7 +78,7 @@ impl RunBuild {
 	fn into_group_default(self) -> Result<BuildStepGroup> {
 		let Self {
 			build_cmd,
-			build_args: watch_args,
+			build_args,
 			build_template_map,
 			server,
 		} = self;
@@ -87,17 +91,19 @@ impl RunBuild {
 			// 		recompile depends on a templates file existing
 			// 		and build_templates doesnt depend on recompile so safe to do first
 			.with(build_template_map)
+			// 2. build native codegen
+			.with(BuildCodegenNative::new(&build_args))
 			// 2. build the native binary
-			.with(BuildNative::new(&build_cmd, &watch_args))
+			.with(BuildNative::new(&build_cmd, &build_args))
 			// 3. export all static files from the app
 			//   	- html files
 			//   	- client island entries
-			.with(ExportStatic::new(&watch_args, &exe_path));
+			.with(ExportStatic::new(&build_args, &exe_path));
 		if server {
-			group.add(RunServer::new(&watch_args, &exe_path));
+			group.add(RunServer::new(&build_args, &exe_path));
 		}
 		// 4. build the wasm binary
-		group.add(BuildWasm::new(&build_cmd, &watch_args)?);
+		group.add(BuildWasm::new(&build_cmd, &build_args)?);
 		Ok(group)
 	}
 }

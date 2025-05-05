@@ -6,7 +6,7 @@ use sweet::prelude::*;
 
 /// Definition for a group of files that should be collected together.
 /// This is used as a field of types like [`ComponentFileGroup`] and [`RoutesFileGroup`].
-#[derive(Debug, Default, Clone, Parser, Serialize, Deserialize)]
+#[derive(Debug, Default, PartialEq, Clone, Parser, Serialize, Deserialize)]
 pub struct FileGroup {
 	/// The directory where the files are located.
 	#[arg(long, default_value = ".")]

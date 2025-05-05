@@ -7,6 +7,29 @@ use std::path::PathBuf;
 use std::process::Command;
 use sweet::prelude::GracefulChild;
 
+
+pub struct BuildCodegenNative {
+	build_args: BuildArgs,
+}
+
+impl BuildCodegenNative {
+	pub fn new(build_args: &BuildArgs) -> Self {
+		Self {
+			build_args: build_args.clone(),
+		}
+	}
+}
+
+impl BuildStep for BuildCodegenNative {
+	fn run(&self) -> Result<()> {
+		println!("🌱 Running native codegen");
+		BeetConfig::from_file(&self.build_args.config)?
+			.xpipe(BeetConfigToNativeCodegen)?;
+		Ok(())
+	}
+}
+
+
 pub struct BuildNative {
 	build_cmd: CargoBuildCmd,
 }
