@@ -24,10 +24,10 @@ init-repo:
 	just init-flow
 	just init-rsx
 
-# mkdir -p crates_flow/beet_rsx/assets/fonts && cp ./assets/fonts/* crates_rsx/beet_rsx/assets/fonts
+# mkdir -p ws_flow/beet_rsx/assets/fonts && cp ./assets/fonts/* ws_rsx/beet_rsx/assets/fonts
 init-flow:
 	just assets-pull
-	mkdir -p crates_flow/beet_ml/assets/ml && cp ./assets/ml/default-bert.ron crates_flow/beet_ml/assets/ml/default.bert.ron
+	mkdir -p ws_flow/beet_ml/assets/ml && cp ./assets/ml/default-bert.ron ws_flow/beet_ml/assets/ml/default.bert.ron
 
 # once beet-cli is binstallable we shouldnt need to compile in order to codegen
 init-rsx:
@@ -98,15 +98,15 @@ fmt *args:
 # soo bad
 leptosfmt *args:
 	leptosfmt -q											\
-	crates_rsx/beet_rsx/**/*.rs 					\
-	crates_rsx/beet_rsx/**/**/*.rs 				\
-	crates_rsx/beet_rsx/**/**/**/*.rs 		\
-	crates_rsx/beet_design/**/*.rs 				\
-	crates_rsx/beet_design/**/**/*.rs 		\
-	crates_rsx/beet_design/**/**/**/*.rs 	\
-	crates_rsx/beet_router/**/*.rs 				\
-	crates_rsx/beet_router/**/**/*.rs 		\
-	crates_rsx/beet_router/**/**/**/*.rs 	\
+	ws_rsx/beet_rsx/**/*.rs 					\
+	ws_rsx/beet_rsx/**/**/*.rs 				\
+	ws_rsx/beet_rsx/**/**/**/*.rs 		\
+	ws_rsx/beet_design/**/*.rs 				\
+	ws_rsx/beet_design/**/**/*.rs 		\
+	ws_rsx/beet_design/**/**/**/*.rs 	\
+	ws_rsx/beet_router/**/*.rs 				\
+	ws_rsx/beet_router/**/**/*.rs 		\
+	ws_rsx/beet_router/**/**/**/*.rs 	\
 	crates/beet_site/**/*.rs 					\
 	crates/beet_site/**/**/*.rs 			\
 	crates/beet_site/**/**/**/*.rs 		\
@@ -255,8 +255,8 @@ test-rsx-macro *args:
 
 clear-artifacts:
 	rm -rf target
-	rm -rf crates_rsx/beet_router/src/test_site/codegen
-	rm -rf crates_rsx/beet_design/src/codegen
+	rm -rf ws_rsx/beet_router/src/test_site/codegen
+	rm -rf ws_rsx/beet_design/src/codegen
 	rm -rf crates/beet_site/src/codegen
 
 # massive purge
