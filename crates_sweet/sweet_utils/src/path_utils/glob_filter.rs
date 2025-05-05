@@ -12,6 +12,7 @@ pub struct GlobFilter {
 	#[cfg_attr(
 		feature = "serde",
 		serde(
+			default,
 			serialize_with = "serialize_patterns",
 			deserialize_with = "deserialize_patterns"
 		)
@@ -22,6 +23,7 @@ pub struct GlobFilter {
 	#[cfg_attr(
 		feature = "serde",
 		serde(
+			default,
 			serialize_with = "serialize_patterns",
 			deserialize_with = "deserialize_patterns"
 		)

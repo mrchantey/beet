@@ -24,7 +24,8 @@ impl BeetConfigToNativeCodegen {
 		value
 			.file_group
 			.xpipe(FileGroupToFuncTokens::default())?
-			.xpipe(FuncTokensToRsxRoutes::new(value.codegen.clone()))?
+			.xpipe(value.map_tokens)
+			.xpipe(FuncTokensToRsxRoutes::new(value.codegen))?
 			.xmap(|(_, codegen)| codegen)
 			.xok()
 	}
@@ -43,7 +44,9 @@ mod test {
 	fn works() {
 		let config = BeetConfig::test_config();
 		let file_group = config.file_groups[0].clone();
-		let codegen = file_group.apply_codegen().unwrap();
+		let codegen =
+			BeetConfigToNativeCodegen::apply_for_file_group(file_group)
+				.unwrap();
 		let str = codegen
 			.build_output()
 			.unwrap()

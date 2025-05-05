@@ -1,17 +1,27 @@
 use crate::prelude::*;
 use beet_router::prelude::*;
 use beet_rsx::prelude::*;
+use serde::Deserialize;
+use serde::Serialize;
 use std::path::PathBuf;
 
 /// Helper for common route mapping
-#[derive(Clone)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct MapFuncTokens {
 	/// A base path to prepend to the route path
 	base_route: Option<RoutePath>,
 	/// List of strings to replace in the route path
-	replace_route: Vec<(String, String)>,
+	#[serde(default)]
+	replace_route: Vec<ReplaceRoute>,
 }
-
+/// Replace some part of the route path with another string
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ReplaceRoute {
+	/// The string to replace
+	from: String,
+	/// The string to replace with
+	to: String,
+}
 
 impl Default for MapFuncTokens {
 	fn default() -> Self {
@@ -34,7 +44,10 @@ impl MapFuncTokens {
 	) -> Self {
 		self.replace_route = replace
 			.into_iter()
-			.map(|(a, b)| (a.to_string(), b.to_string()))
+			.map(|(a, b)| ReplaceRoute {
+				from: a.to_string(),
+				to: b.to_string(),
+			})
 			.collect();
 		self
 	}
@@ -56,8 +69,8 @@ impl Pipeline<FuncTokensGroup> for MapFuncTokens {
 				} else {
 					func.route_info.path.to_string_lossy().to_string()
 				};
-				for (needle, replacement) in &self.replace_route {
-					route_path = route_path.replace(needle, replacement);
+				for ReplaceRoute { from, to } in &self.replace_route {
+					route_path = route_path.replace(from, to);
 				}
 				func.route_info.path = RoutePath::new(route_path);
 				func

@@ -16,16 +16,16 @@ package_name = "beet_router"
 import_tokens = ["use crate::as_beet::*;"]
 
 
-# [[file_group]]
-# name = "beet_design_mockups"
+[[file_group]]
+name = "beet_design_mockups"
 # preset = "mockup"
-# package_name = "beet_design"
-# path = "crates_rsx/beet_design/src"
-# codegen_file = "crates_rsx/beet_design/src/codegen/mockups.rs"
-# include = ["*.mockup.*"]
-# base_route = "/design"
-# replace_route = [{ from = ".mockup", to = "" }]
-# import_tokens = ["use beet_router::as_beet::*;"]
+package_name = "beet_design"
+path = "crates_rsx/beet_design/src"
+output = "crates_rsx/beet_design/src/codegen/mockups.rs"
+include = ["*.mockup.*"]
+base_route = "/design"
+replace_route = [{ from = ".mockup", to = "" }]
+import_tokens = ["use beet::prelude::*;", "use beet_router::as_beet::*;"]
 
 
 # [wasm]

@@ -42,16 +42,8 @@ pub struct FileGroupConfig {
 	pub file_group: FileGroup,
 	#[serde(flatten)]
 	pub codegen: CodegenFile,
-}
-
-impl FileGroupConfig {
-	pub fn apply_codegen(self) -> Result<CodegenFile> {
-		self.file_group
-			.xpipe(FileGroupToFuncTokens::default())?
-			.xpipe(FuncTokensToRsxRoutes::new(self.codegen.clone()))?
-			.xmap(|(_, codegen)| codegen)
-			.xok()
-	}
+	#[serde(flatten)]
+	pub map_tokens: MapFuncTokens,
 }
 
 #[cfg(test)]
