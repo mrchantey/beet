@@ -14,7 +14,6 @@ publish = true
 
 [features]
 default = ["reload"]
-build = ["beet_router/build", "dep:quote", "dep:proc-macro2", "dep:syn"]
 reload = ["tower-livereload"]
 lambda = ["dep:lambda_http"]
 
@@ -40,12 +39,6 @@ tower.workspace = true
 tower-livereload = { workspace = true, optional = true }
 tower-http.workspace = true
 lambda_http = { version = "0.14", optional = true }
-
-#💡 build
-quote = { workspace = true, optional = true }
-proc-macro2 = { workspace = true, optional = true }
-prettyplease = { workspace = true, optional = true }
-syn = { workspace = true, optional = true }
 
 [dev-dependencies]
 sweet = { workspace = true, features = ["test"] }

@@ -1,6 +1,8 @@
 #![cfg_attr(test, feature(test, custom_test_frameworks))]
 #![cfg_attr(test, test_runner(sweet::test_runner))]
 #![doc = include_str!("../README.md")]
+#[cfg(feature = "build")]
+pub use beet_build as build;
 #[cfg(feature = "connect")]
 pub use beet_connect as connect;
 #[cfg(feature = "design")]
@@ -30,6 +32,8 @@ mod default_builder;
 mod default_runner;
 
 pub mod prelude {
+	#[cfg(feature = "build")]
+	pub use crate::build::prelude::*;
 	#[cfg(feature = "connect")]
 	pub use crate::connect::prelude::*;
 	#[cfg(feature = "design")]
@@ -62,6 +66,8 @@ pub mod prelude {
 
 
 pub mod exports {
+	#[cfg(feature = "build")]
+	pub use beet_build::exports::*;
 	#[cfg(feature = "router")]
 	pub use beet_router::exports::*;
 	#[cfg(feature = "rsx")]

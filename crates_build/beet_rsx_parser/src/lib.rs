@@ -1,3 +1,4 @@
+//! This crate is upstream of `beet_rsx` unlike `beet_build`
 #![cfg_attr(test, feature(test, custom_test_frameworks))]
 #![cfg_attr(test, test_runner(sweet::test_runner))]
 #![feature(associated_type_defaults, if_let_guard, let_chains)]

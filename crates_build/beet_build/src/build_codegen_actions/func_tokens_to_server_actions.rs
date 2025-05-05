@@ -1,3 +1,4 @@
+use crate::prelude::*;
 use beet_router::prelude::*;
 use sweet::prelude::*;
 use syn::FnArg;
@@ -36,7 +37,7 @@ impl FuncTokensToServerActions {
 		let (return_type, error_type) = Self::parse_output(func_tokens);
 
 		let fn_ident = &func_tokens.item_fn.sig.ident;
-		let route_info = &func_tokens.route_info;
+		let route_info = route_info_to_tokens(&func_tokens.route_info);
 
 		let docs = func_tokens.item_fn.attrs.iter().filter_map(|attr| {
 			if attr.path().is_ident("doc") {
@@ -329,7 +330,6 @@ impl FuncTokensToServerActions {
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use beet_router::prelude::*;
 	use proc_macro2::TokenStream;
 	use quote::ToTokens;
 	use sweet::prelude::*;

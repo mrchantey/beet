@@ -39,9 +39,10 @@ members = [
 	"crates/beet_site",
 	"crates/beet-cli",
 
-	"crates_build/beet_tokens",
+	"crates_build/beet_build",
 	"crates_build/beet_rsx_combinator",
-	"crates_rsx/beet_rsx/parser",
+	"crates_build/beet_rsx_parser",
+	"crates_build/beet_tokens",
 
 	"crates_flow/beet_examples",
 	"crates_flow/beet_flow",
@@ -77,9 +78,10 @@ members = [
 ## internal
 beet = { path = "", version = "0.4.2-dev.2", default-features = false }
 
+beet_build = { path = "crates_build/beet_build", version = "0.4.2-dev.2", default-features = false }
 beet_tokens = { path = "crates_build/beet_tokens", version = "0.4.2-dev.2", default-features = false }
 beet_rsx_combinator = { path = "crates_build/beet_rsx_combinator", version = "0.4.2-dev.2" }
-beet_rsx_parser = { path = "crates_rsx/beet_rsx/parser", version = "0.4.2-dev.2" }
+beet_rsx_parser = { path = "crates_build/beet_rsx_parser", version = "0.4.2-dev.2" }
 
 beet_examples = { path = "crates_flow/beet_examples", version = "0.4.2-dev.2" }
 beet_flow = { path = "crates_flow/beet_flow", version = "0.4.2-dev.2" }
@@ -212,9 +214,9 @@ include = ["CHANGELOG.md", "README.md", "/src", "/examples", "/scenes"]
 
 [features]
 default = ["flow"]
-# helper features
+#💡 helper features
 web-server = ["server", "router", "design"]
-# fine-grained
+#💡 fine-grained
 connect = ["dep:beet_connect"]
 examples = ["bevy_default", "dep:beet_examples"]
 flow = ["dep:beet_flow"]
@@ -222,21 +224,16 @@ css = ["beet_rsx?/css"]
 design = ["rsx", "css", "dep:beet_design"]
 router = ["rsx", "dep:beet_router"]
 query = ["dep:beet_query"]
-parser = ["beet_rsx?/parser", "beet_router?/parser"]
+# parser = ["beet_rsx?/parser", "beet_router?/parser"]
 rsx = ["dep:beet_rsx"]
 fs = ["beet_rsx?/fs"]
 ml = ["flow", "dep:beet_ml", "beet_examples?/ml"]
-server = ["parser", "dep:beet_server"]
+server = ["dep:beet_server"]
 lambda = ["server", "beet_server/lambda"]
 spatial = ["flow", "dep:beet_spatial", "beet_ml?/spatial"]
 sim = ["flow", "dep:beet_sim"]
-build = [
-	"router",
-	"beet_design?/build",
-	"beet_router?/build",
-	"beet_server?/build",
-]
-bevy = ["dep:bevy", "beet_rsx?/bevy", "beet_router?/bevy"]
+build = ["dep:beet_build"]
+bevy = ["dep:bevy", "beet_rsx?/bevy", "beet_build?/bevy"]
 bevy_default = [
 	"bevy",
 	"bevy/default",
@@ -257,6 +254,7 @@ bevy_default = [
 # dynamic_linking = ["bevy/dynamic_linking"]
 
 [dependencies]
+beet_build = { workspace = true, optional = true }
 beet_connect = { workspace = true, optional = true }
 beet_design = { workspace = true, optional = true }
 beet_examples = { workspace = true, optional = true }
@@ -281,7 +279,7 @@ beet = { path = "", features = ["router", "bevy"] }
 sweet = { workspace = true, features = ["test", "bevy", "rand"] }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
-beet = { path = "", features = ["parser"] }
+beet = { path = "", features = ["build"] }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 beet_server = { workspace = true, optional = true }

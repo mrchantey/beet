@@ -1,8 +1,8 @@
 use crate::prelude::*;
 use anyhow::Result;
-use beet_router::prelude::*;
 use beet_rsx::prelude::*;
 use syn::Item;
+
 
 #[derive(Debug, Clone)]
 pub struct FuncTokensTreeToServerActions {
@@ -101,7 +101,6 @@ impl FuncTokensTreeToServerActions {
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use beet_router::prelude::*;
 	use quote::ToTokens;
 	use quote::quote;
 	use sweet::prelude::*;
@@ -179,6 +178,6 @@ mod test {
 								}
 						}
 				}
-			}.to_string())
+			}.to_string());
 	}
 }

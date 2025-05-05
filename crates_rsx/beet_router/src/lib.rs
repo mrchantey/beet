@@ -4,26 +4,17 @@
 #![allow(async_fn_in_trait)]
 #![feature(more_qualified_paths, if_let_guard)]
 
-#[cfg(feature = "bevy")]
-pub mod bevy;
-#[cfg(feature = "build")]
-pub mod build;
+#[cfg(not(target_arch = "wasm32"))]
+pub mod build_ssg;
 pub mod client_islands;
-#[cfg(all(feature = "parser", not(target_arch = "wasm32")))]
-pub mod parser;
 pub mod server_actions;
 pub mod types;
 
 pub mod prelude {
 	pub use crate::app_cx;
-	#[cfg(feature = "bevy")]
-	#[allow(unused_imports)]
-	pub use crate::bevy::*;
-	#[cfg(feature = "build")]
-	pub use crate::build::*;
+	#[cfg(not(target_arch = "wasm32"))]
+	pub use crate::build_ssg::*;
 	pub use crate::client_islands::*;
-	#[cfg(all(feature = "parser", not(target_arch = "wasm32")))]
-	pub use crate::parser::*;
 	pub use crate::server_actions::*;
 	pub use crate::types::*;
 
@@ -33,11 +24,7 @@ pub mod prelude {
 
 pub mod exports {
 	pub use http;
-	#[cfg(feature = "parser")]
-	pub use ron;
 	pub use sweet::prelude::GlobFilter;
-	#[cfg(feature = "build")]
-	pub use syn;
 }
 
 /// expose prelude and as beet for macros

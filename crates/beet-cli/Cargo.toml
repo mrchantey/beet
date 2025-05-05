@@ -17,7 +17,7 @@ name = "beet"
 path = "src/main.rs"
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-beet = { workspace = true, features = ["router", "parser"] }
+beet = { workspace = true, features = ["router", "build"] }
 # beet_router = { workspace = true, features = ["parser"] }
 anyhow.workspace = true
 ron.workspace = true

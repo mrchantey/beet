@@ -1,6 +1,7 @@
-pub use crate::prelude::*;
 use anyhow::Result;
+use beet_router::prelude::*;
 use beet_rsx::prelude::*;
+use beet_rsx_parser::prelude::*;
 use clap::Parser;
 use proc_macro2::Literal;
 use proc_macro2::TokenStream;
@@ -22,7 +23,7 @@ pub struct BuildTemplateMap {
 	#[arg(long, default_value = "./")]
 	pub templates_root_dir: PathBuf,
 	/// Location of the `rsx-templates.ron` file
-	#[arg(long, default_value = Self::DEFAULT_TEMPLATES_MAP_PATH)]
+	#[arg(long, default_value = default_paths::RSX_TEMPLATES)]
 	pub templates_map_path: PathBuf,
 	/// Output the contents of the `rsx-templates.ron` file to stdout
 	/// on change
@@ -46,11 +47,8 @@ impl BuildStep for BuildTemplateMap {
 }
 
 impl BuildTemplateMap {
-	pub const DEFAULT_TEMPLATES_MAP_PATH: &'static str =
-		"target/rsx-templates.ron";
-
 	pub fn new(src: impl Into<PathBuf>) -> Self {
-		Self::new_with_dst(src, Self::DEFAULT_TEMPLATES_MAP_PATH)
+		Self::new_with_dst(src, default_paths::RSX_TEMPLATES)
 	}
 	pub fn new_with_dst(
 		src: impl Into<PathBuf>,
@@ -216,7 +214,8 @@ impl<'a> Visit<'a> for RsxSynVisitor {
 #[cfg(test)]
 #[cfg(not(target_arch = "wasm32"))]
 mod test {
-	use crate::as_beet::*;
+	use crate::prelude::*;
+	use beet_rsx::prelude::*;
 	use std::path::PathBuf;
 	use sweet::prelude::*;
 
@@ -265,7 +264,7 @@ mod test {
 		// println!("wrote to {}\n{:#?}", builder.dst.display(), map);
 		// println!("TEMPLATE_MAP::::{:#?}", map);
 
-		let rsx = &crate::test_site::pages::collect()[0];
+		let rsx = &beet_router::test_site::pages::collect()[0];
 		let node = (rsx.func)().await.unwrap();
 		let node1 = map.templates.get(&node.location().unwrap()).unwrap();
 		let RsxTemplateNode::Component {

@@ -6,7 +6,6 @@ use std::path::PathBuf;
 use std::pin::Pin;
 
 
-
 pub struct RouteFuncsToHtml {
 	pub html_dir: PathBuf,
 }

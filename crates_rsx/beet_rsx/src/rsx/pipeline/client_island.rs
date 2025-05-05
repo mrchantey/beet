@@ -47,37 +47,6 @@ pub struct ClientIsland {
 	pub ron: String,
 }
 
-impl ClientIsland {
-	/// Convert the island into a token stream that can be used to mount the
-	/// island.
-	///
-	/// ## Panics
-	///
-	/// Panics if the type name or ron string are not valid tokens.
-	#[cfg(feature = "parser")]
-	pub fn into_mount_tokens(&self) -> proc_macro2::TokenStream {
-		let tracker_index = &self.tracker.index;
-		let tracker_hash = &self.tracker.tokens_hash;
-		let type_name =
-			self.type_name.parse::<proc_macro2::TokenStream>().unwrap();
-		let ron = &self.ron;
-		quote::quote! {
-			// TODO resolve tracker to location
-			beet::exports::ron::de::from_str::<#type_name>(#ron)?
-				.into_node()
-				// applying slots is a requirement of walking tree locations
-				// consistently, it panics otherwise
-				.xpipe(ApplySlots::default())?
-				.xpipe(RegisterEffects::new(
-					tree_location_map.rusty_locations[
-						&RustyTracker::new(#tracker_index,#tracker_hash)]
-					)
-				)?;
-		}
-	}
-}
-
-
 
 #[cfg(test)]
 mod test {
@@ -115,27 +84,5 @@ mod test {
 		expect(&island.ron).to_be("(val:32)");
 		expect(ron::de::from_str::<MyComponent>(&island.ron).unwrap())
 			.to_be(MyComponent { val: 32 });
-	}
-
-	#[cfg(feature = "parser")]
-	#[test]
-	fn to_tokens() {
-		let island = ClientIsland {
-			tracker: RustyTracker {
-				index: 0,
-				tokens_hash: 89,
-			},
-			type_name: "MyComponent".into(),
-			ron: "(val:32)".into(),
-		};
-		expect(island.into_mount_tokens().to_string()).to_be(
-			quote::quote! {
-				beet::exports::ron::de::from_str::<MyComponent>("(val:32)")?
-					.into_node()
-					.xpipe(ApplySlots::default())?
-					.xpipe(RegisterEffects::new(tree_location_map.rusty_locations[&RustyTracker::new(0u32,89u64)]))?;
-			}
-			.to_string(),
-		);
 	}
 }

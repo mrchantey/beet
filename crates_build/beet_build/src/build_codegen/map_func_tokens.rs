@@ -1,4 +1,5 @@
 use crate::prelude::*;
+use beet_router::prelude::*;
 use beet_rsx::prelude::*;
 use std::path::PathBuf;
 

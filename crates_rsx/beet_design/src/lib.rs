@@ -32,9 +32,6 @@ pub mod prelude {
 	pub use crate::interactive::*;
 	pub use crate::layout::*;
 	pub use crate::macros::*;
-	// #[cfg(not(feature = "build"))]
-	// pub use crate::mockups::*;
-
 	pub(crate) use beet_rsx::as_beet::*;
 }
 

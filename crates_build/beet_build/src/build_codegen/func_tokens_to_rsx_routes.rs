@@ -25,6 +25,7 @@ impl Pipeline<FuncTokensGroup, Result<(FuncTokensGroup, CodegenFile)>>
 			|func| {
 				let func_path = &func.func_path();
 				let route_info = &func.route_info;
+				let route_info = route_info_to_tokens(route_info);
 				syn::parse_quote! {
 					RouteFunc::new(
 						#route_info,

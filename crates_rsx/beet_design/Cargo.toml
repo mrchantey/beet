@@ -18,8 +18,6 @@ publish = true
 # required-features = ["build"]
 
 [features]
-# default = ["build"]
-build = ["beet_router/build"]
 
 [dependencies]
 anyhow.workspace = true
@@ -39,4 +37,3 @@ lightningcss.workspace = true
 [build-dependencies]
 anyhow.workspace = true
 sweet.workspace = true
-beet_router = { workspace = true, features = ["build"] }

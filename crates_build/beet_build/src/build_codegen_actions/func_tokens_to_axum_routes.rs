@@ -1,5 +1,5 @@
+use crate::prelude::*;
 use anyhow::Result;
-use beet_router::prelude::*;
 use sweet::prelude::*;
 
 /// Maps the [`FuncTokens::func`] blocks so that it returns a
@@ -39,7 +39,7 @@ impl Pipeline<FuncTokensGroup, Result<(FuncTokensGroup, CodegenFile)>>
 			&syn::parse_quote!(RouteFunc<RegisterAxumRoute<#state_type>>),
 			|func| {
 				let func_path = &func.func_path();
-				let route_info = &func.route_info;
+				let route_info = route_info_to_tokens(&func.route_info);
 				syn::parse_quote! {
 					RouteFunc::new(
 						#route_info,
@@ -61,7 +61,6 @@ impl Pipeline<FuncTokensGroup, Result<(FuncTokensGroup, CodegenFile)>>
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use beet_router::prelude::*;
 	use quote::ToTokens;
 	use sweet::prelude::*;
 

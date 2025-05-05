@@ -13,23 +13,11 @@ categories.workspace = true
 keywords.workspace = true
 
 [features]
-default = ["serde", "markdown", "actions"]
-build = ["serde", "parser"]
+default = ["serde", "actions"]
 actions = ["serde", "sweet/net", "dep:once_cell"]
-markdown = ["parser", "dep:pulldown-cmark"]
 axum = ["dep:axum", "dep:tower", "dep:http-body-util"]
 serde = ["dep:serde", "dep:serde_json", "dep:ron", "dep:toml", "beet_rsx/serde"]
-parser = [
-	"serde",
-	"sweet/fs",
-	"beet_rsx/parser",
-	# "dep:uuid",
-	"dep:quote",
-	"dep:proc-macro2",
-	"dep:prettyplease",
-	"dep:syn",
-]
-bevy = ["beet_rsx/bevy", "dep:bevy", "dep:flume", "dep:tokio"]
+
 # adds the test_site mod for internal testing
 _test_site = []
 
@@ -55,18 +43,6 @@ ron = { workspace = true, optional = true }
 toml = { workspace = true, optional = true }
 heck.workspace = true
 
-#💡 parser
-# uuid = { workspace=true, optional = true }
-quote = { workspace = true, optional = true }
-proc-macro2 = { workspace = true, optional = true }
-prettyplease = { workspace = true, optional = true }
-syn = { workspace = true, optional = true }
-pulldown-cmark = { version = "0.13", optional = true }
-
-#💡 bevy
-bevy = { workspace = true, optional = true }
-flume = { workspace = true, optional = true }
-
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 axum = { workspace = true, optional = true }
 tower = { workspace = true, optional = true }
@@ -77,12 +53,9 @@ tokio = { workspace = true, optional = true }
 sweet = { workspace = true, features = ["test"] }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
-# beet_router = { path = "", features = ["parser", "bevy"] }
+tokio.workspace = true
 beet_router = { path = "", features = [
 	"axum",
-	"parser",
-	"bevy",
-	"build",
 	# "_test_site",
 ] }
 

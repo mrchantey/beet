@@ -1,5 +1,5 @@
 use anyhow::Result;
-use beet_rsx::prelude::RstmlRustToHash;
+use beet_rsx_parser::prelude::RstmlRustToHash;
 use proc_macro2::TokenStream;
 use proc_macro2::TokenTree;
 use quote::ToTokens;

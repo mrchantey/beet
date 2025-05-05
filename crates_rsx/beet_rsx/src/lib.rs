@@ -19,8 +19,6 @@ pub use runtime::sigfault;
 pub mod templating;
 #[cfg(feature = "macros")]
 pub use beet_rsx_macros::*;
-#[cfg(feature = "parser")]
-pub use beet_rsx_parser;
 #[cfg(feature = "bevy")]
 pub mod bevy;
 #[cfg(feature = "bevy")]
@@ -31,8 +29,6 @@ pub use crate::bevy as bevy2;
 pub mod prelude {
 	#[cfg(feature = "macros")]
 	pub use beet_rsx_macros::*;
-	#[cfg(feature = "parser")]
-	pub use beet_rsx_parser::prelude::*;
 	pub use crate::context::*;
 	pub use crate::templating::*;
 	pub use crate::dom::*;

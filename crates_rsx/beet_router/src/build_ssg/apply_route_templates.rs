@@ -12,8 +12,7 @@ pub struct ApplyRouteTemplates {
 impl Default for ApplyRouteTemplates {
 	fn default() -> Self {
 		Self {
-			templates_map_path: BuildTemplateMap::DEFAULT_TEMPLATES_MAP_PATH
-				.into(),
+			templates_map_path: default_paths::RSX_TEMPLATES.into(),
 		}
 	}
 }

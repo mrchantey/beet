@@ -1,8 +1,5 @@
+use crate::exports::syn;
 use crate::prelude::*;
-use beet_router::exports::syn::Item;
-use beet_router::exports::syn::{
-	self,
-};
 use beet_rsx::exports::anyhow::Result;
 use beet_rsx::exports::sweet::prelude::*;
 
@@ -28,7 +25,7 @@ pub struct DefaultBuilder {
 	/// These imports will be added to the head of the wasm imports file.
 	/// This will be required for any components with a client island directive.
 	/// By default this will include `use beet::prelude::*;`
-	pub wasm_imports: Vec<Item>,
+	pub wasm_imports: Vec<syn::Item>,
 	/// Additional funcs to be added to the route tree
 	pub routes: Vec<FuncTokens>,
 	/// Optionally set the path for the docs route.

@@ -22,7 +22,7 @@ pub fn get() -> RsxNode {
 				<p>The framework that grows with you</p>
 				<Link
 					class="primary-action"
-					href=paths::docs::index()
+					// href=paths::docs::index()
 					scope:cascade
 					>Get Started</Link>
 				<Counter client:load initial=1 />

@@ -1,6 +1,7 @@
 #[allow(unused_imports)]
 use crate::prelude::*;
 use anyhow::Result;
+use beet_router::prelude::*;
 use std::path::PathBuf;
 use std::str::FromStr;
 use sweet::prelude::*;
