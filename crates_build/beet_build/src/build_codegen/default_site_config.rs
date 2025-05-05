@@ -4,16 +4,29 @@ use serde::Deserialize;
 use serde::Serialize;
 use sweet::prelude::*;
 
+/// The default codegen builder for a beet site.
+///
+/// This will perform the following tasks:
+///
+/// - If a `src/actions` dir exists, generate server actions
+/// - If a `src/pages` dir exists, generate pages codegen and add to the route tree
+/// - If a `src/docs` dir exists, generate docs codegen and add to the route tree
+///
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct DefaultSiteConfig {
+	/// The name of the package being built, used for imports in codegen.
 	#[serde(rename = "package_name")]
 	pub pkg_name: String,
 	#[serde(default = "default_src_path")]
 	pub src_path: AbsPathBuf,
-	/// The route to the documentation pages
+	/// Optionally set the path for the docs route.
+	/// By default this is set to `/docs` but if your entire site is a docs
+	/// site it may be more idiomatic to set this to `None`.
 	#[serde(default = "default_docs_route")]
 	pub docs_route: String,
-	/// Imports added to the generated wasm file.
+	/// These imports will be added to the head of the wasm imports file.
+	/// This will be required for any components with a client island directive.
+	/// By default this will include `use beet::prelude::*;`
 	#[serde(default = "default_wasm_imports", with = "syn_item_vec_serde")]
 	pub wasm_imports: Vec<syn::Item>,
 }
@@ -40,14 +53,15 @@ impl DefaultSiteConfig {
 		.xok()
 	}
 
-	/// the default setup for most beet projects
+	/// the default setup for most beet projects.
+	/// The [routes] param is for additional funcs to be added to the route tree
 	// TODO expose various options
 	pub fn build_native(&self, mut routes: Vec<FuncTokens>) -> Result<()> {
 		// removing dir breaks the FsWatcher in live reload
 		self.build_server_actions()?;
 
 
-		if let Ok(pages_dir) = AbsPathBuf::new_manifest_rel("src/pages") {
+		if let Ok(pages_dir) = self.src_path.join_checked("pages") {
 			routes.extend(
 				FileGroup::new(pages_dir)
 					.with_filter(
@@ -58,9 +72,7 @@ impl DefaultSiteConfig {
 					.xpipe(FileGroupToFuncTokens::default())?
 					.xpipe(FuncTokensToRsxRoutes::new(
 						CodegenFile::new(
-							AbsPathBuf::new_manifest_rel_unchecked(
-								"src/codegen/pages.rs",
-							),
+							self.src_path.join("codegen/pages.rs"),
 						)
 						.with_pkg_name(&self.pkg_name),
 					))?
@@ -71,7 +83,7 @@ impl DefaultSiteConfig {
 			);
 		}
 
-		if let Ok(docs_dir) = AbsPathBuf::new_manifest_rel("src/docs") {
+		if let Ok(docs_dir) = self.src_path.join_checked("docs") {
 			routes.extend(
 				FileGroup::new(docs_dir)
 					.xpipe(FileGroupToFuncTokens::default())?
@@ -79,12 +91,8 @@ impl DefaultSiteConfig {
 						MapFuncTokens::default().base_route(&self.docs_route),
 					)
 					.xpipe(FuncTokensToRsxRoutes::new(
-						CodegenFile::new(
-							AbsPathBuf::new_manifest_rel_unchecked(
-								"src/codegen/docs.rs",
-							),
-						)
-						.with_pkg_name(&self.pkg_name),
+						CodegenFile::new(self.src_path.join("codegen/docs.rs"))
+							.with_pkg_name(&self.pkg_name),
 					))?
 					.xmap(|(group, codegen)| -> Result<_> {
 						codegen.build_and_write()?;
@@ -97,9 +105,7 @@ impl DefaultSiteConfig {
 			.xinto::<FuncTokensTree>()
 			.xpipe(FuncTokensTreeToRouteTree {
 				codegen_file: CodegenFile::new(
-					AbsPathBuf::new_manifest_rel_unchecked(
-						"src/codegen/route_tree.rs",
-					),
+					self.src_path.join("codegen/route_tree.rs"),
 				)
 				.with_pkg_name(&self.pkg_name),
 			})?;
@@ -109,8 +115,7 @@ impl DefaultSiteConfig {
 	}
 
 	fn build_server_actions(&self) -> Result<()> {
-		let Ok(actions_dir) = AbsPathBuf::new_manifest_rel("src/actions")
-		else {
+		let Ok(actions_dir) = self.src_path.join_checked("actions") else {
 			return Ok(());
 		};
 
@@ -118,18 +123,16 @@ impl DefaultSiteConfig {
 			.xpipe(FileGroupToFuncTokens::default())?
 			.xmap(|g| g.into_tree())
 			.xpipe(FuncTokensTreeToServerActions::new(
-				CodegenFile::new(AbsPathBuf::new_manifest_rel_unchecked(
-					"src/codegen/client_actions.rs",
-				))
+				CodegenFile::new(
+					self.src_path.join("codegen/client_actions.rs"),
+				)
 				.with_pkg_name(&self.pkg_name),
 			))?;
 		let _server_actions = FileGroup::new(actions_dir)
 			.xpipe(FileGroupToFuncTokens::default())?
 			.xpipe(FuncTokensToAxumRoutes {
 				codegen_file: CodegenFile::new(
-					AbsPathBuf::new_manifest_rel_unchecked(
-						"src/codegen/server_actions.rs",
-					),
+					self.src_path.join("codegen/server_actions.rs"),
 				)
 				.with_pkg_name(&self.pkg_name),
 				..Default::default()

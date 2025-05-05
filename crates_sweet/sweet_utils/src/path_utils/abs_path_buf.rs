@@ -83,6 +83,12 @@ impl AbsPathBuf {
 		let path = self.0.join(path);
 		Self::new_unchecked(path)
 	}
+	/// Add a path to the current [`AbsPathBuf`], which will also naturally
+	/// be a canonical path. This will error if the path cannot be canonicalized.
+	pub fn join_checked(&self, path: impl AsRef<Path>) -> FsResult<Self> {
+		let path = self.0.join(path);
+		Self::new(path)
+	}
 	/// Create a new [`AbsPathBuf`] from a path relative to the workspace root,
 	/// ie from using the `file!()` macro.
 	/// ## Errors
