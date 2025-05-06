@@ -30,6 +30,7 @@ anyhow.workspace = true
 rapidhash.workspace = true
 futures.workspace = true
 heck.workspace = true
+rayon.workspace = true
 
 #💡 Tokens
 syn.workspace = true

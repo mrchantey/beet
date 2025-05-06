@@ -769,6 +769,7 @@ dependencies = [
  "pulldown-cmark",
  "quote",
  "rapidhash",
+ "rayon",
  "ron",
  "serde",
  "serde_json",

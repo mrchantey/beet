@@ -4,9 +4,8 @@ use anyhow::Result;
 use beet_router::prelude::*;
 use beet_rsx::prelude::*;
 use clap::Parser;
-use proc_macro2::Literal;
-use proc_macro2::TokenStream;
-use quote::quote;
+use rapidhash::RapidHashMap;
+use rayon::iter::*;
 use std::path::PathBuf;
 use sweet::prelude::*;
 
@@ -28,9 +27,6 @@ pub struct BuildTemplateMap {
 	/// instead of parsing via [ron::ser::to_string_pretty]
 	#[arg(long)]
 	pub minify_templates: bool,
-	/// dont check if the ron file is valid
-	#[arg(long)]
-	pub skip_ron_check: bool,
 }
 
 fn default_filter() -> GlobFilter {
@@ -60,19 +56,17 @@ impl BuildTemplateMap {
 			templates_root_dir: src.into(),
 			templates_map_path: dst.into(),
 			templates_map_stdout: false,
-			skip_ron_check: false,
 		}
 	}
 
 	pub fn build_and_write(&self) -> Result<()> {
-		let map_tokens = self.build_ron()?;
-		let mut map_str = map_tokens.to_string();
+		let map = self.build_template_map()?;
 		// its already minified, so we prettify if false
-		if self.minify_templates == false {
-			let map = ron::de::from_str::<RsxTemplateMap>(&map_str)
-				.map_err(|e| ron_cx_err(e, &map_str))?;
-			map_str = ron::ser::to_string_pretty(&map, Default::default())?;
-		}
+		let map_str = if self.minify_templates {
+			ron::ser::to_string(&map)
+		} else {
+			ron::ser::to_string_pretty(&map, Default::default())
+		}?;
 		if self.templates_map_stdout {
 			println!("{}", map_str);
 		}
@@ -81,10 +75,10 @@ impl BuildTemplateMap {
 	}
 
 
-	pub fn build_ron(&self) -> Result<TokenStream> {
+	pub fn build_template_map(&self) -> Result<RsxTemplateMap> {
 		let filter = default_filter();
 		let items = ReadDir::files_recursive(&self.templates_root_dir)?
-			.into_iter()
+			.into_par_iter()
 			.filter(|path| filter.passes(path))
 			.map(|path| {
 				WorkspacePathBuf::new_from_canonicalizable(path)?
@@ -96,66 +90,21 @@ impl BuildTemplateMap {
 			.map(
 				|FileTemplates {
 				     location,
-				     rsx_ron,
-				     style_ron: _,
-				 }| {
-					let line = Literal::u32_unsuffixed(location.line);
-					let col = Literal::u32_unsuffixed(location.col);
-					let file = location.file.to_string_lossy();
-					// validate the rsx ron
-					if !self.skip_ron_check {
-						let str = rsx_ron.to_string();
-						let str = str.trim();
-						let _parsed =
-							ron::de::from_str::<RsxTemplateNode>(&str)
-								.map_err(|e| ron_cx_err(e, &str))?;
-					}
-					quote! {
-						RsxMacroLocation(
-							file: (#file),
-							line: #line,
-							col: #col
-						):#rsx_ron
-					}
-					.xok()
-				},
+				     template_node,
+				 }| { (location, template_node) },
 			)
-			.collect::<Result<Vec<_>>>()?;
+			.collect::<RapidHashMap<_, _>>();
 
 		let root = WorkspacePathBuf::new_from_canonicalizable(
 			&self.templates_root_dir,
 		)?;
-		let root = root.to_string_lossy();
 
-		quote! {
-			RsxTemplateMap(
-				root: (#root),
-				templates: {#(#items),*}
-			)
+		RsxTemplateMap {
+			root,
+			templates: items,
 		}
 		.xok()
 	}
-}
-
-/// how many leading and trailing characters to show in the context of the error
-const CX_SIZE: usize = 8;
-/// A ron deserialization error with the context of the file and line
-fn ron_cx_err(e: ron::error::SpannedError, str: &str) -> anyhow::Error {
-	let start = e.position.col.saturating_sub(CX_SIZE);
-	let end = e.position.col.saturating_add(CX_SIZE);
-	let cx = if e.position.line == 1 {
-		str[start..end].to_string()
-	} else {
-		let lines = str.lines().collect::<Vec<_>>();
-		let str = lines.get(e.position.line - 1).unwrap_or(&"");
-		str[start..end].to_string()
-	};
-	return anyhow::anyhow!(
-		"Failed to parse RsxTemplate from string\nError: {}\nContext: {}\nFull: {}",
-		e.code,
-		cx,
-		str
-	);
 }
 
 
@@ -163,7 +112,6 @@ fn ron_cx_err(e: ron::error::SpannedError, str: &str) -> anyhow::Error {
 #[cfg(not(target_arch = "wasm32"))]
 mod test {
 	use crate::prelude::*;
-	use beet_rsx::prelude::*;
 	use std::path::PathBuf;
 	use sweet::prelude::*;
 
@@ -173,16 +121,14 @@ mod test {
 			.into_abs()
 			.unwrap();
 
-		let file = BuildTemplateMap {
+		let map = BuildTemplateMap {
 			templates_root_dir: src.to_path_buf(),
 			templates_map_path: PathBuf::default(),
 			..Default::default()
 		}
-		.build_ron()
-		.unwrap()
-		.to_string();
+		.build_template_map()
+		.unwrap();
 
-		let map: RsxTemplateMap = ron::de::from_str(&file).unwrap();
 		expect(map.root())
 			.to_be(&WorkspacePathBuf::new_from_canonicalizable(src).unwrap());
 		expect(map.templates.len()).to_be_greater_or_equal_to(8);
@@ -205,9 +151,7 @@ mod test {
 
 
 		// 2. build, parse and compare
-		let tokens = builder.build_ron().unwrap();
-		let map: RsxTemplateMap =
-			ron::de::from_str(&tokens.to_string()).unwrap();
+		let map = builder.build_template_map().unwrap();
 
 		// println!("wrote to {}\n{:#?}", builder.dst.display(), map);
 		// println!("TEMPLATE_MAP::::{:#?}", map);
