@@ -129,17 +129,19 @@ mod test {
 				children: Box::new(
 						RsxFragment {
 					nodes: vec![],
-					meta: NodeMeta::default(),
+					meta: NodeMeta {
+						template_directives: Vec::new(),
+						location: None
+				},
 						}.into_node()
 				),
 				self_closing: true,
 				meta: NodeMeta {
 						template_directives: vec![TemplateDirective::ClientLoad],
-						location: None
+						location: Some(RsxMacroLocation::new(file!(), 1u32, 0u32))
 				},
 					}
 					.into_node()
-					.with_location(RsxMacroLocation::new(file!(), 1u32, 0u32))
 			}}
 			.to_string(),
 		);

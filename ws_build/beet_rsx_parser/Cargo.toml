@@ -26,7 +26,6 @@ beet_tokens.workspace = true
 beet_rsx_combinator = { workspace = true, optional = true }
 ron.workspace = true
 anyhow.workspace = true
-itertools.workspace = true
 
 syn = { workspace = true, features = ["visit"] }
 quote.workspace = true

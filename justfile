@@ -183,6 +183,7 @@ test-build *args:
 	{{min-stack}} cargo test -p beet_tokens 																														{{args}} -- {{test-threads}}
 	{{min-stack}} cargo test -p beet_rsx_combinator 																										{{args}} -- {{test-threads}}
 	{{min-stack}} cargo test -p beet_rsx_parser 																												{{args}} -- {{test-threads}}
+	{{min-stack}} cargo test -p beet_build 																															{{args}} -- {{test-threads}}
 
 test-rsx *args:
 	{{min-stack}} cargo test -p beet_build 	 	--features=bevy,style																			{{args}} -- {{test-threads}}

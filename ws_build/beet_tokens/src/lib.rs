@@ -1,3 +1,5 @@
+#![cfg_attr(test, feature(test, custom_test_frameworks))]
+#![cfg_attr(test, test_runner(sweet::test_runner))]
 //! This crate enables various forms of code generation for beet crates,
 //! and can also be used as a standalone library.
 //! It includes very large parsers but all are gated by feature flags.
