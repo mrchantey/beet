@@ -27,10 +27,6 @@ pub trait RsxNodeTokensVisitor<E = anyhow::Error> {
 
 
 /// Intermediate representation of an RSX Node.
-///
-/// The tag is used to identify the node,
-/// parsers may use it to extend the node types, ie
-/// `tag: "fragment"`, tag: "doctype" etc.
 #[derive(Debug, Clone)]
 pub struct RsxNodeTokens {
 	/// the name of the component, ie <MyComponent/>

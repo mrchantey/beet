@@ -6,16 +6,19 @@ use std::convert::Infallible;
 use sweet::prelude::Pipeline;
 use syn::Expr;
 
+
+/// For each [`RsxNodeTokens`], read its [`attributes`](RsxNodeTokens::attributes) and extract them
+/// into the [`directives`](RsxNodeTokens::directives) field.
 #[derive(Default)]
 pub struct ApplyDefaultTemplateDirectives;
 
 
-impl<T: RsxNodeTokensVisitor<Infallible>> Pipeline<T, T>
+impl<T: RsxNodeTokensVisitor<Infallible>> Pipeline<T, Result<T>>
 	for ApplyDefaultTemplateDirectives
 {
-	fn apply(self, mut node: T) -> T {
-		node.walk_rsx_tokens(parse_node).ok();
-		node
+	fn apply(self, mut node: T) -> Result<T> {
+		node.walk_rsx_tokens(parse_node)?;
+		Ok(node)
 	}
 }
 

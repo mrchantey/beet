@@ -30,6 +30,7 @@ pub enum HtmlTokens {
 	Block {
 		value: Spanner<Block>,
 	},
+	/// An element `<div>` or a component `<MyComponent>`
 	Element {
 		component: RsxNodeTokens,
 		children: Box<HtmlTokens>,

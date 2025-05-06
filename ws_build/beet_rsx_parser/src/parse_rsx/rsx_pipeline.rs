@@ -18,10 +18,18 @@ impl<T: Into<TokenStream>> Pipeline<T, TokenStream> for RsxMacroPipeline {
 		let span = tokens.span();
 		let (rstml, rstml_errors) = tokens.xpipe(TokensToRstml::default());
 		let (html, html_errors) = rstml.xpipe(RstmlToHtmlTokens::new());
-		let block = html
-			.xpipe(ApplyDefaultTemplateDirectives::default())
-			.xpipe(HtmlTokensToRust::new_spanned(RsxIdents::default(), &span));
-
+		let block = match html.xpipe(ParseHtmlTokens::default()) {
+			Ok(val) => val.xpipe(HtmlTokensToRust::new_spanned(
+				RsxIdents::default(),
+				&span,
+			)),
+			Err(err) => {
+				let err_str = err.to_string();
+				return quote::quote! {
+					compile_error!(#err_str);
+				};
+			}
+		};
 		if self.no_errors {
 			block.to_token_stream()
 		} else {
@@ -69,8 +77,16 @@ impl<'a, T: Into<TokenStream>> Pipeline<T, TokenStream> for RsxRonPipeline<'a> {
 			.0
 			.xpipe(RstmlToHtmlTokens::new())
 			.0
-			.xpipe(ApplyDefaultTemplateDirectives::default())
-			.xpipe(HtmlTokensToRon::new_from_tokens(&span, self.file))
+			.xpipe(ParseHtmlTokens::default())
+			.map(|html| {
+				html.xpipe(HtmlTokensToRon::new_from_tokens(&span, self.file))
+			})
+			.unwrap_or_else(|err| {
+				let err_str = err.to_string();
+				quote::quote! {
+					compile_error!(#err_str);
+				}
+			})
 	}
 }
 

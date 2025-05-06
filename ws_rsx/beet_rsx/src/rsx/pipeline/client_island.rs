@@ -53,6 +53,7 @@ mod test {
 	use crate::as_beet::*;
 	use serde::Deserialize;
 	use serde::Serialize;
+	#[allow(unused)]
 	use sweet::prelude::*;
 
 	#[allow(unused)]

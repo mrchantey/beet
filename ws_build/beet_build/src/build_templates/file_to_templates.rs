@@ -25,21 +25,23 @@ impl Pipeline<WorkspacePathBuf, Result<Vec<FileTemplates>>>
 			_ => Ok(Default::default()),
 		}?
 		.xmap_each(|(location, html_tokens)| {
-			let rsx_ron = html_tokens
-				.xpipe(ApplyDefaultTemplateDirectives::default())
-				.xpipe(HtmlTokensToRon::new(
+			let rsx_ron = html_tokens.xpipe(ParseHtmlTokens::default())?.xpipe(
+				HtmlTokensToRon::new(
 					&location.file,
 					location.line,
 					location.col,
-				));
+				),
+			);
 
 			FileTemplates {
 				location,
 				rsx_ron,
 				style_ron: Default::default(),
 			}
+			.xok()
 		})
-		.xok()
+		.into_iter()
+		.collect::<Result<Vec<_>>>()
 	}
 }
 
