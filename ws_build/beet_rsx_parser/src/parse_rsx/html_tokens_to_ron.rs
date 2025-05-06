@@ -136,6 +136,7 @@ impl HtmlTokensToRon {
 					tokens,
 					..
 				} = &component;
+				// take location before visiting children
 				let location = self.location();
 
 				let meta = MetaBuilder::build_ron_with_directives(

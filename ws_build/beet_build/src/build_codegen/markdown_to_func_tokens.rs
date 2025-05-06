@@ -126,11 +126,10 @@ val_string	= "foo"
 				self_closing: false,
 				meta: RsxNodeMeta {
 					template_directives: vec![],
-					location: None
+					location: Some(RsxMacroLocation::new(file!(), 1u32, 0u32))
 				},
 			}
 			.into_node()
-			.with_location(RsxMacroLocation::new(file!(), 1u32, 0u32))
 		}
 		};
 

@@ -147,7 +147,16 @@ pub struct MetaBuilder;
 
 
 impl MetaBuilder {
+	pub fn build(location: TokenStream) -> TokenStream {
+		quote! {RsxNodeMeta {
+			template_directives: Vec::new(),
+			location: #location
+		}}
+	}
+
+
 	pub fn build_with_directives(
+		location: TokenStream,
 		template_directives: &[TemplateDirectiveTokens],
 	) -> TokenStream {
 		let template_directives = template_directives
@@ -203,7 +212,7 @@ impl MetaBuilder {
 		quote! {
 			RsxNodeMeta {
 				template_directives: vec![#(#template_directives),*],
-				location: None
+				location: #location
 			}
 		}
 	}

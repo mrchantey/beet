@@ -19,8 +19,8 @@ use syn::spanned::Spanned;
 /// every node
 #[derive(Debug)]
 pub struct HtmlTokensToRust {
-	/// The entrypoint of the macro,
-	pub location: LineColumn,
+	/// The location of the root node
+	root_location: Option<TokenStream>,
 	pub idents: RsxIdents,
 	// Additional error and warning messages.
 	pub errors: Vec<TokenStream>,
@@ -43,15 +43,13 @@ impl Pipeline<HtmlTokens, Block> for HtmlTokensToRust {
 			self.errors
 		};
 
-		let line = self.location.line as u32;
-		let col = self.location.column as u32;
 
 		syn::parse_quote! {
 			{
 				#(#errors;)*
 				use beet::prelude::*;
 				#[allow(unused_braces)]
-				#node.with_location(RsxMacroLocation::new(file!(), #line, #col))
+				#node
 			}
 		}
 	}
@@ -59,50 +57,74 @@ impl Pipeline<HtmlTokens, Block> for HtmlTokensToRust {
 
 impl HtmlTokensToRust {
 	pub fn new_file_start_location() -> Self {
-		Self::new(RsxIdents::default(), LineColumn { line: 1, column: 0 })
+		Self::new_for_this_file(RsxIdents::default(), LineColumn {
+			line: 1,
+			column: 0,
+		})
 	}
 
 	pub fn new_spanned(idents: RsxIdents, entry: &impl Spanned) -> Self {
-		Self::new(idents, entry.span().start())
+		Self::new_for_this_file(idents, entry.span().start())
 	}
-	pub fn new(idents: RsxIdents, location: LineColumn) -> Self {
+	/// use the line and column with the `file!()` macro to resolve location
+	pub fn new_for_this_file(idents: RsxIdents, location: LineColumn) -> Self {
+		let line = location.line as u32;
+		let col = location.column as u32;
+		let location = quote! {
+			Some(RsxMacroLocation::new(file!(), #line, #col))
+		};
+
 		Self {
 			idents,
-			location,
+			root_location: Some(location),
 			errors: Vec::new(),
 			rusty_tracker: Default::default(),
 			exclude_errors: false,
 		}
 	}
 
+	fn location(&mut self) -> TokenStream {
+		std::mem::take(&mut self.root_location).unwrap_or(quote! {None})
+	}
+
+	fn basic_meta(&mut self) -> TokenStream {
+		let location = self.location();
+		MetaBuilder::build(location)
+	}
+
 	/// returns an RsxNode
 	fn map_node(&mut self, node: HtmlTokens) -> TokenStream {
 		match node {
 			HtmlTokens::Fragment { nodes } => {
+				let meta = self.basic_meta();
 				let nodes = nodes.into_iter().map(|n| self.map_node(n));
 				quote! { RsxFragment{
 					nodes: vec![#(#nodes),*],
-					meta: RsxNodeMeta::default(),
+					meta: #meta,
 				}.into_node()}
 			}
 			HtmlTokens::Doctype { value: _ } => {
+				let meta = self.basic_meta();
 				quote!(
 					RsxDoctype {
-						meta: RsxNodeMeta::default()
+						meta: #meta
 					}
 					.into_node()
 				)
 			}
 			HtmlTokens::Comment { value } => {
+				let meta = self.basic_meta();
 				quote!(RsxComment {
 					value: #value.to_string(),
-					meta: RsxNodeMeta::default(),
+					meta: #meta,
 				}.into_node())
 			}
 			HtmlTokens::Text { value } => {
+				let meta = self.basic_meta();
+
 				quote!(RsxText {
 					value: #value.to_string(),
-					meta: RsxNodeMeta::default(),
+					meta: #meta,
 				}.into_node())
 			}
 			HtmlTokens::Block { value } => {
@@ -123,15 +145,20 @@ impl HtmlTokensToRust {
 					directives,
 					..
 				} = &component;
+				// take root location before visiting children
+				let location = self.location();
 
 
 				// we must parse runtime attr before anything else
 				self.parse_runtime_directive(&directives);
 				let tag_str = tag.to_string();
 				if tag_str.starts_with(|c: char| c.is_uppercase()) {
-					self.map_component(component, *children)
+					self.map_component(location, component, *children)
 				} else {
-					let meta = MetaBuilder::build_with_directives(&directives);
+					let meta = MetaBuilder::build_with_directives(
+						location,
+						&directives,
+					);
 					// this attributes-children order is important for rusty tracker indices
 					// to be consistent with HtmlTokensToRon
 					let attributes = attributes
@@ -223,6 +250,7 @@ impl HtmlTokensToRust {
 
 	fn map_component(
 		&mut self,
+		location: TokenStream,
 		RsxNodeTokens {
 			tag,
 			tokens,
@@ -235,7 +263,7 @@ impl HtmlTokensToRust {
 		let tracker = self.rusty_tracker.next_tracker(&tokens);
 		// visiting slot children is safe here, we aren't pulling any more trackers
 		let slot_children = self.map_node(children);
-		let meta = MetaBuilder::build_with_directives(&directives);
+		let meta = MetaBuilder::build_with_directives(location, &directives);
 
 		let mut prop_assignments = Vec::new();
 		let mut prop_names = Vec::new();
