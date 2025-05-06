@@ -1,3 +1,5 @@
+mod parse_markdown;
+pub use parse_markdown::*;
 mod syn_serde;
 pub use syn_serde::syn_item_serde;
 pub use syn_serde::syn_item_vec_serde;

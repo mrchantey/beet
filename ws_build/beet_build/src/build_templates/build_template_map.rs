@@ -1,19 +1,16 @@
+use super::FileTemplates;
+use super::FileToTemplates;
 use anyhow::Result;
 use beet_router::prelude::*;
 use beet_rsx::prelude::*;
-use beet_rsx_parser::prelude::*;
 use clap::Parser;
 use proc_macro2::Literal;
 use proc_macro2::TokenStream;
 use quote::quote;
-use std::path::Path;
 use std::path::PathBuf;
 use sweet::prelude::FsExt;
 use sweet::prelude::ReadDir;
-use sweet::prelude::ReadFile;
 use sweet::prelude::WorkspacePathBuf;
-use syn::spanned::Spanned;
-use syn::visit::Visit;
 
 /// Build an [`RsxTemplateMap`] and write it to a file
 #[derive(Debug, Clone, Parser)]
@@ -84,34 +81,42 @@ impl BuildTemplateMap {
 		let items = ReadDir::files_recursive(&self.templates_root_dir)?
 			.into_iter()
 			.map(|path| {
-				let templates = self.file_templates(&path)?;
-				Ok(templates)
+				WorkspacePathBuf::new_from_canonicalizable(path)?
+					.xpipe(FileToTemplates)
 			})
 			.collect::<Result<Vec<_>>>()?
 			.into_iter()
 			.flatten()
-			.map(|(RsxMacroLocation { file, line, col }, tokens)| {
-				let line = Literal::u32_unsuffixed(line);
-				let col = Literal::u32_unsuffixed(col);
-				let file = file.to_string_lossy();
-				let kvp_tokens = quote! {
-					RsxMacroLocation(
-						file: (#file),
-						line: #line,
-						col: #col
-					):#tokens
-				};
-				if !self.skip_ron_check {
-					let str = tokens.to_string();
-					let str = str.trim();
-					let _parsed = ron::de::from_str::<RsxTemplateNode>(&str)
-						.map_err(|e| ron_cx_err(e, &str))?;
-				}
-				Ok(kvp_tokens)
-			})
+			.map(
+				|FileTemplates {
+				     location,
+				     rsx_ron,
+				     style_ron: _,
+				 }| {
+					let line = Literal::u32_unsuffixed(location.line);
+					let col = Literal::u32_unsuffixed(location.col);
+					let file = location.file.to_string_lossy();
+					let kvp_tokens = quote! {
+						RsxMacroLocation(
+							file: (#file),
+							line: #line,
+							col: #col
+						):#rsx_ron
+					};
+					// validate the rsx ron
+					if !self.skip_ron_check {
+						let str = rsx_ron.to_string();
+						let str = str.trim();
+						let _parsed =
+							ron::de::from_str::<RsxTemplateNode>(&str)
+								.map_err(|e| ron_cx_err(e, &str))?;
+					}
+					Ok(kvp_tokens)
+				},
+			)
 			.collect::<Result<Vec<_>>>()?;
 
-		let root = WorkspacePathBuf::new_from_current_directory(
+		let root = WorkspacePathBuf::new_from_canonicalizable(
 			&self.templates_root_dir,
 		)?;
 		let root = root.to_string_lossy();
@@ -123,30 +128,6 @@ impl BuildTemplateMap {
 			)
 		};
 		Ok(map)
-	}
-
-	/// get all the rsx macros in this file.
-	/// If it doesnt have a rust extension an empty vec is returned
-	fn file_templates(
-		&self,
-		path: &Path,
-	) -> Result<Vec<(RsxMacroLocation, TokenStream)>> {
-		match path.extension() {
-			Some(ex) if ex == "rs" => {
-				let file = ReadFile::to_string(path)?;
-				let file = syn::parse_file(&file)?;
-				let mac = syn::parse_quote!(rsx);
-				let path = WorkspacePathBuf::new_from_current_directory(path)?;
-				let mut visitor = RsxSynVisitor::new(path, mac);
-
-				visitor.visit_file(&file);
-				Ok(visitor.templates)
-			}
-			Some(ex) if ex == "md" || ex == "mdx" => {
-				todo!()
-			}
-			_ => Ok(Default::default()),
-		}
 	}
 }
 
@@ -169,52 +150,6 @@ fn ron_cx_err(e: ron::error::SpannedError, str: &str) -> anyhow::Error {
 		cx,
 		str
 	);
-}
-
-
-/// Visit a file, extracting an [`RsxMacroLocation`] and [`RsxTemplateNode`] for each
-/// `rsx!` macro in the file.
-#[derive(Debug)]
-struct RsxSynVisitor {
-	/// Used for creating [`RsxMacroLocation`] in several places.
-	/// We must use workspace relative paths because locations are created
-	/// via the `file!()` macro.
-	file: WorkspacePathBuf,
-	templates: Vec<(RsxMacroLocation, TokenStream)>,
-	mac: syn::Ident,
-}
-impl RsxSynVisitor {
-	pub fn new(file: WorkspacePathBuf, mac: syn::Ident) -> Self {
-		Self {
-			file,
-			templates: Default::default(),
-			mac,
-		}
-	}
-}
-
-impl<'a> Visit<'a> for RsxSynVisitor {
-	fn visit_macro(&mut self, mac: &syn::Macro) {
-		if mac
-			.path
-			.segments
-			.last()
-			.map_or(false, |seg| seg.ident == self.mac)
-		{
-			// use the span of the inner tokens to match the behavior of
-			// the rsx! macro
-			let span = mac.tokens.span();
-			let start = span.start();
-			let loc = RsxMacroLocation::new(
-				self.file.clone(),
-				start.line as u32,
-				start.column as u32,
-			);
-			let tokens =
-				mac.tokens.clone().xpipe(RsxRonPipeline::new(&self.file));
-			self.templates.push((loc, tokens));
-		}
-	}
 }
 
 
@@ -243,8 +178,8 @@ mod test {
 
 		let map: RsxTemplateMap = ron::de::from_str(&file).unwrap();
 		expect(map.root())
-			.to_be(&WorkspacePathBuf::new_from_current_directory(src).unwrap());
-		expect(map.templates.len()).to_be(6);
+			.to_be(&WorkspacePathBuf::new_from_canonicalizable(src).unwrap());
+		expect(map.templates.len()).to_be_greater_or_equal_to(8);
 		// println!("{:#?}", map);
 	}
 

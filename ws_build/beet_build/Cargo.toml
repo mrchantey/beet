@@ -16,7 +16,7 @@ keywords.workspace = true
 default = ["markdown"]
 bevy = ["dep:bevy", "dep:flume", "beet_rsx/bevy"]
 markdown = ["dep:pulldown-cmark"]
-style = []
+style = ["dep:lightningcss"]
 
 [dependencies]
 #💡 Internal
@@ -46,6 +46,9 @@ serde_json.workspace = true
 #💡 Parsing
 prettyplease.workspace = true
 pulldown-cmark = { version = "0.13", optional = true }
+# TODO direct dep, not workspace. this should be the only place
+# we dep on lightning
+lightningcss = { workspace = true, optional = true }
 clap.workspace = true
 
 #💡 Bevy

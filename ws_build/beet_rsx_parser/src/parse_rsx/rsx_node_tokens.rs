@@ -78,7 +78,7 @@ impl RsxNodeTokens {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RsxAttributeTokens {
-	/// A block attribute
+	/// A block attribute, in jsx this is known as a spread attribute
 	Block { block: Spanner<Block> },
 	/// A key attribute created by [`TokenStream`]
 	Key { key: NameExpr },

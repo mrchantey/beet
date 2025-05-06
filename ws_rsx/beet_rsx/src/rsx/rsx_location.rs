@@ -20,7 +20,9 @@ pub struct RsxMacroLocation {
 	/// as this struct is created in several places from all kinds concatenations,
 	/// and we need PartialEq & Hash to be identical.
 	pub file: WorkspacePathBuf,
+	/// The 1 indexed line in the source file, reflecting the behavior of `line!()`
 	pub line: u32,
+	/// The 0 indexed column in the source file, reflecting the behavior of `column!()`
 	pub col: u32,
 }
 
@@ -35,6 +37,15 @@ impl RsxMacroLocation {
 		Self {
 			file: WorkspacePathBuf::default(),
 			line: 0,
+			col: 0,
+		}
+	}
+	/// Create a new [RsxMacroLocation] from a file path where it should represent
+	/// the entire file, the line and column are set to 1 and 0 respectively.
+	pub fn new_for_file(file: impl AsRef<Path>) -> Self {
+		Self {
+			file: WorkspacePathBuf::new(file),
+			line: 1,
 			col: 0,
 		}
 	}

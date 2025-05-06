@@ -22,6 +22,32 @@ impl Pipeline<HtmlTokens, TokenStream> for HtmlTokensToRon {
 }
 
 impl HtmlTokensToRon {
+	pub fn new_no_location() -> Self {
+		Self {
+			rusty_tracker: Default::default(),
+			root_location: None,
+		}
+	}
+
+	/// Create a new [`HtmlTokensToRon`] instance, specifying the location,
+	/// usually from an [`RsxMacroLocation`], we dont accept that type because
+	/// this crate is upstream from [`beet_rsx`].
+	pub fn new(file: &WorkspacePathBuf, line: u32, col: u32) -> Self {
+		let file = file.to_string_lossy();
+		let line = Literal::u32_unsuffixed(line);
+		let col = Literal::u32_unsuffixed(col);
+
+		Self {
+			rusty_tracker: Default::default(),
+			root_location: Some(quote! { Some(RsxMacroLocation(
+				file: (#file),
+				line: #line,
+				col: #col
+			))}),
+		}
+	}
+
+
 	/// The entry point for parsing the content of an rsx! macro
 	/// into a serializable RON format.
 	pub fn new_from_tokens(

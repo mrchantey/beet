@@ -52,7 +52,7 @@ impl WorkspacePathBuf {
 	///
 	/// Panics if [`FsExt::workspace_root`] fails.
 	#[cfg(not(target_arch = "wasm32"))]
-	pub fn new_from_current_directory(
+	pub fn new_from_canonicalizable(
 		path: impl AsRef<Path>,
 	) -> anyhow::Result<Self> {
 		use crate::prelude::PathExt;

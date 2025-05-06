@@ -4,6 +4,14 @@ use anyhow::Result;
 use syn::Block;
 use syn::LitStr;
 use syn::token::Lt;
+
+/// IR between some rsx input output, probs needs a better name
+/// ## Example inputs:
+/// - rsx! macros
+/// - mdx files
+/// ## Example outputs:
+/// - RsxNode TokenStream
+/// - RsxTemplateNode TokenStream (ron)
 #[derive(Debug, Clone)]
 pub enum HtmlTokens {
 	Fragment {

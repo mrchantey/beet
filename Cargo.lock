@@ -762,6 +762,7 @@ dependencies = [
  "flume",
  "futures",
  "heck 0.4.1",
+ "lightningcss",
  "prettyplease",
  "proc-macro2",
  "proc-macro2-diagnostics",
