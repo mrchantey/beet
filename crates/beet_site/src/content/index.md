@@ -20,7 +20,7 @@ beet remove --sst
 Make seamless database calls by combining the Diesel ORM with server actions.
 
 <div server:defer>{Foo::num_entries().rx()}</div>
-<Button onclick={|_|Foo::add_default()}</Button>
+<Button onclick={|_|Foo::add_default()}></Button>
 
 ### Rusty Markdown
 
@@ -28,7 +28,7 @@ Take your docs to the next level with rust and rsx components in your markdown d
 
 <Tabs>
 <TabItem>
-*This paragraph was written in markdown, inside a `<Tabs>` component.*
+*This paragraph was written in markdown, inside a  component.*
 </TabItem>
 <TabItem>
 *So was this one!*

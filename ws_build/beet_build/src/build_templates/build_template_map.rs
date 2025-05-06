@@ -8,9 +8,7 @@ use proc_macro2::Literal;
 use proc_macro2::TokenStream;
 use quote::quote;
 use std::path::PathBuf;
-use sweet::prelude::FsExt;
-use sweet::prelude::ReadDir;
-use sweet::prelude::WorkspacePathBuf;
+use sweet::prelude::*;
 
 /// Build an [`RsxTemplateMap`] and write it to a file
 #[derive(Debug, Clone, Parser)]
@@ -33,6 +31,12 @@ pub struct BuildTemplateMap {
 	/// dont check if the ron file is valid
 	#[arg(long)]
 	pub skip_ron_check: bool,
+}
+
+fn default_filter() -> GlobFilter {
+	GlobFilter::default()
+		.with_exclude("*/target/*")
+		.with_exclude("*/node_modules/*")
 }
 
 impl Default for BuildTemplateMap {
@@ -78,8 +82,10 @@ impl BuildTemplateMap {
 
 
 	pub fn build_ron(&self) -> Result<TokenStream> {
+		let filter = default_filter();
 		let items = ReadDir::files_recursive(&self.templates_root_dir)?
 			.into_iter()
+			.filter(|path| filter.passes(path))
 			.map(|path| {
 				WorkspacePathBuf::new_from_canonicalizable(path)?
 					.xpipe(FileToTemplates)

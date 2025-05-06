@@ -28,6 +28,7 @@ where
 	token('}').with(value(())).parse_stream(input)
 }
 
+/// A code block including the curly braces `{}`.
 pub fn rsx_code_block<I>(input: I) -> ParseResult<RsxParsedExpression, I>
 where
 	I: Stream<Item = char>,
@@ -55,6 +56,7 @@ where
 	.parse_stream(input)
 }
 
+/// The inside of a code block, without the curly braces `{}`.
 pub fn rsx_code_block_fragment<I>(
 	input: I,
 ) -> ParseResult<RsxRawCodeFragment, I>

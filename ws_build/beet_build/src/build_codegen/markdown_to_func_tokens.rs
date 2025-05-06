@@ -33,7 +33,7 @@ impl MarkdownToFuncTokens {
 					e.to_string()
 				)
 			})?
-			.xpipe(HtmlTokensToRust::default());
+			.xpipe(HtmlTokensToRust::new_file_start_location());
 
 		let item_fn: ItemFn = syn::parse_quote! {
 			pub fn get() -> RsxNode
@@ -130,7 +130,7 @@ val_string	= "foo"
 				},
 			}
 			.into_node()
-			.with_location(RsxMacroLocation::new(file!(), 0u32, 0u32))
+			.with_location(RsxMacroLocation::new(file!(), 1u32, 0u32))
 		}
 		};
 

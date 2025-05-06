@@ -56,14 +56,12 @@ impl Pipeline<HtmlTokens, Block> for HtmlTokensToRust {
 		}
 	}
 }
-impl Default for HtmlTokensToRust {
-	fn default() -> Self {
-		Self::new(RsxIdents::default(), LineColumn { line: 0, column: 0 })
-	}
-}
-
 
 impl HtmlTokensToRust {
+	pub fn new_file_start_location() -> Self {
+		Self::new(RsxIdents::default(), LineColumn { line: 1, column: 0 })
+	}
+
 	pub fn new_spanned(idents: RsxIdents, entry: &impl Spanned) -> Self {
 		Self::new(idents, entry.span().start())
 	}

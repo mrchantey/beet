@@ -426,6 +426,13 @@ mod test {
 			.unwrap()
 			.0;
 		assert_eq!(value.to_html(), "foo-a:bar-b=\"baz\"");
+
+		// Closures
+		let value = parser(rsx_attributes)
+			.parse("onclick={|e| e.preventDefault()}")
+			.unwrap()
+			.0;
+		assert_eq!(value.to_html(), "onclick={|e| e.preventDefault()}");
 	}
 
 	#[test]
