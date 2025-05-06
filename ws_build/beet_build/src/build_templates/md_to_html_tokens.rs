@@ -23,7 +23,6 @@ impl Pipeline<WorkspacePathBuf, Result<(RsxMacroLocation, HtmlTokens)>>
 		let location = RsxMacroLocation::new_for_file(&path);
 		let file = ReadFile::to_string(path.into_abs_unchecked())?;
 		let html_tokens = ParseMarkdown::markdown_to_rsx_str(&file)
-			.xtap(|val| println!("Parsed Markdown: {}", val))
 			.xpipe(StringToHtmlTokens::default())
 			.map_err(|e| {
 				anyhow::anyhow!(

@@ -38,7 +38,7 @@ where
 	.map(RSString)
 	.parse_stream(input)
 }
-
+/// an rs comment or doc comment are discarded equally
 pub fn rs_comment<I>(input: I) -> ParseResult<(), I>
 where
 	I: Stream<Item = char>,

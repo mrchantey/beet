@@ -64,6 +64,7 @@ where
 	choice!(
 		r#try(parser(rsx_code_block).map(RsxRawCodeFragment::ParsedExpression)),
 		r#try(parser(rsx_element).map(RsxRawCodeFragment::Element)),
+		r#try(parser(html_comment).map(|_| RsxRawCodeFragment::Empty)),
 		r#try(parser(rs_comment).map(|_| RsxRawCodeFragment::Empty)),
 		r#try(
 			parser(rs_char)
@@ -77,6 +78,7 @@ where
 	)
 	.parse_stream(input)
 }
+
 
 #[cfg(test)]
 mod test {
@@ -145,6 +147,27 @@ mod test {
                     }/>
                 }"#;
 		assert_eq!(value.to_html(), expected);
+	}
+	#[test]
+	pub fn test_comments() {
+		assert_eq!(
+			parser(rsx_code_block_fragment)
+				.parse("<!-- a comment-> -->")
+				.unwrap(),
+			(RsxRawCodeFragment::Empty, "")
+		);
+		assert_eq!(
+			parser(rsx_code_block_fragment)
+				.parse("/// a comment\n")
+				.unwrap(),
+			(RsxRawCodeFragment::Empty, "")
+		);
+		assert_eq!(
+			parser(rsx_code_block_fragment)
+				.parse("/* a comment*/")
+				.unwrap(),
+			(RsxRawCodeFragment::Empty, "")
+		);
 	}
 	#[test]
 	pub fn test_rsx_code_block() {

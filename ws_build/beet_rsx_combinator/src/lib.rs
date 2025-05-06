@@ -10,6 +10,7 @@ mod parse_elements;
 mod parse_elements_types;
 mod parse_external;
 mod parse_external_types;
+mod parse_html;
 mod parse_js;
 mod parse_js_types;
 mod parse_misc;
@@ -36,6 +37,7 @@ pub mod prelude {
 	pub use crate::parse_children::*;
 	pub use crate::parse_elements::*;
 	pub use crate::parse_external::*;
+	pub use crate::parse_html::*;
 	pub use crate::parse_js::*;
 	pub use crate::parse_misc::*;
 	pub use crate::parse_rsx::*;

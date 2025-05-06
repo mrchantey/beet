@@ -26,6 +26,8 @@ where
 	choice!(
 		r#try(parser(rsx_code_block).map(RsxChild::CodeBlock)),
 		r#try(parser(rsx_element).map(RsxChild::Element)),
+		// not ideal, preferably return None instead of empty string
+		r#try(parser(html_comment).map(|_| RsxChild::Text(RsxText("".into())))),
 		parser(rsx_text).map(RsxChild::Text)
 	)
 	.parse_stream(input)
