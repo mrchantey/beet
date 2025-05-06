@@ -34,7 +34,7 @@ pub struct Button {
 	pub attrs: ButtonHtmlAttributes,
 }
 
-fn button(Button { variant, mut attrs }: Button) -> RsxNode {
+fn button(Button { variant, mut attrs }: Button) -> WebNode {
 	attrs.push_class(format!(
 		"bt-c-button bt-c-button--{}",
 		variant.class_suffix()
@@ -59,7 +59,7 @@ pub struct IconButton {
 }
 
 
-fn icon_button(IconButton { variant }: IconButton) -> RsxNode {
+fn icon_button(IconButton { variant }: IconButton) -> WebNode {
 	let class = format!(
 		"bt-c-button bt-c-button--icon bt-c-button--{}",
 		variant.class_suffix()
@@ -84,7 +84,7 @@ pub struct Link {
 }
 
 
-pub fn link(Link { variant, mut attrs }: Link) -> RsxNode {
+pub fn link(Link { variant, mut attrs }: Link) -> WebNode {
 	let class = format!(" bt-c-button--{}", variant.class_suffix());
 	attrs.push_class(csx!("bt-c-button", class));
 	rsx! {

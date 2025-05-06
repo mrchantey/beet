@@ -10,22 +10,6 @@ use syn::ExprPath;
 use syn::LitStr;
 use syn::spanned::Spanned;
 
-/// Visit all [`ElementTokens`] in a tree, the nodes
-/// should be visited before children, ie walked in DFS preorder.
-pub trait ElementTokensVisitor<E = anyhow::Error> {
-	fn walk_rsx_tokens(
-		&mut self,
-		mut visit: impl FnMut(&mut ElementTokens) -> Result<(), E>,
-	) -> Result<(), E> {
-		self.walk_rsx_tokens_inner(&mut visit)
-	}
-	fn walk_rsx_tokens_inner(
-		&mut self,
-		visit: &mut impl FnMut(&mut ElementTokens) -> Result<(), E>,
-	) -> Result<(), E>;
-}
-
-
 /// Intermediate representation of an 'element' in an rsx tree.
 /// Despite the web terminology, this is also used to represent
 /// other types like Bevy entities.
@@ -36,7 +20,7 @@ pub struct ElementTokens {
 	/// fields of the component, ie <MyComponent foo=bar bazz/>
 	pub attributes: Vec<RsxAttributeTokens>,
 	/// special directives for use by both
-	/// parser and RsxNode pipelines, ie <MyComponent client:load/>
+	/// parser and WebNode pipelines, ie <MyComponent client:load/>
 	pub directives: Vec<TemplateDirectiveTokens>,
 }
 
@@ -67,6 +51,22 @@ impl ElementTokens {
 	// 	self
 	// }
 }
+
+/// Visit all [`ElementTokens`] in a tree, the nodes
+/// should be visited before children, ie walked in DFS preorder.
+pub trait ElementTokensVisitor<E = anyhow::Error> {
+	fn walk_rsx_tokens(
+		&mut self,
+		mut visit: impl FnMut(&mut ElementTokens) -> Result<(), E>,
+	) -> Result<(), E> {
+		self.walk_rsx_tokens_inner(&mut visit)
+	}
+	fn walk_rsx_tokens_inner(
+		&mut self,
+		visit: &mut impl FnMut(&mut ElementTokens) -> Result<(), E>,
+	) -> Result<(), E>;
+}
+
 
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]

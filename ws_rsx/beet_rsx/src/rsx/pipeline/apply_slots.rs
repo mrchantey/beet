@@ -13,7 +13,7 @@ use thiserror::Error;
 /// struct MyComponent;
 ///
 ///
-/// fn my_component(_: MyComponent)->RsxNode {
+/// fn my_component(_: MyComponent)->WebNode {
 /// 	rsx!{
 /// 		<html>
 /// 			<slot name="header"/>
@@ -48,8 +48,8 @@ use thiserror::Error;
 #[derive(Debug, Default, Clone)]
 pub struct ApplySlots;
 
-impl Pipeline<RsxNode, Result<RsxNode, SlotsError>> for ApplySlots {
-	fn apply(self, mut node: RsxNode) -> Result<RsxNode, SlotsError> {
+impl Pipeline<WebNode, Result<WebNode, SlotsError>> for ApplySlots {
+	fn apply(self, mut node: WebNode) -> Result<WebNode, SlotsError> {
 		Self::map_node(&mut node).map(|_| node)
 	}
 }
@@ -58,13 +58,13 @@ impl ApplySlots {
 	/// Apply slots for a given node, if it isnt an [`RsxComponent`] this is a noop.
 	/// 1. Collect all [`RsxComponent::slot_children`] into a hashmap, any direct
 	/// 	 children without a slot directive are added to the "default" slot.
-	fn map_node(node: &mut RsxNode) -> Result<(), SlotsError> {
+	fn map_node(node: &mut WebNode) -> Result<(), SlotsError> {
 		let mut res = Ok(());
-		VisitRsxNodeMut::walk_with_opts(
+		VisitWebNodeMut::walk_with_opts(
 			node,
 			VisitRsxOptions::default(),
 			|node| {
-				let RsxNode::Component(component) = node else {
+				let WebNode::Component(component) = node else {
 					return;
 				};
 				let slot_map =
@@ -87,10 +87,10 @@ impl ApplySlots {
 	/// If the slot children are still not empty after the visit. this is
 	/// an internal error, file a bug report
 	fn collect_slot_children(
-		children: &mut RsxNode,
-	) -> HashMap<String, Vec<RsxNode>> {
+		children: &mut WebNode,
+	) -> HashMap<String, Vec<WebNode>> {
 		let mut slot_map = HashMap::default();
-		let mut insert = |name: &str, node: &mut RsxNode| {
+		let mut insert = |name: &str, node: &mut WebNode| {
 			slot_map
 				.entry(name.to_string())
 				.or_insert_with(Vec::new)
@@ -100,25 +100,25 @@ impl ApplySlots {
 
 		// apply all slot children either to the default slot or its named slot
 		// using a visitor handles the case of nested fragments
-		VisitRsxNodeMut::walk_with_opts(
+		VisitWebNodeMut::walk_with_opts(
 			children,
 			// top level only
 			VisitRsxOptions::ignore_all(),
 			|node| {
 				match node {
-					RsxNode::Doctype(_)
-					| RsxNode::Comment(_)
-					| RsxNode::Text(_)
-					| RsxNode::Block(_)
-					| RsxNode::Component(_)
-					| RsxNode::Element(_) => {
+					WebNode::Doctype(_)
+					| WebNode::Comment(_)
+					| WebNode::Text(_)
+					| WebNode::Block(_)
+					| WebNode::Component(_)
+					| WebNode::Element(_) => {
 						let slot_name = node
 							.slot_directive()
 							.map(|d| d.to_string())
 							.unwrap_or_else(|| "default".to_string());
 						insert(&slot_name, node);
 					}
-					RsxNode::Fragment(fragment) => {
+					WebNode::Fragment(fragment) => {
 						// only apply to fragment if it has a slot directive
 						// otherwise allow traversal
 						if let Some(slot_name) = fragment.slot_directive() {
@@ -137,16 +137,16 @@ impl ApplySlots {
 	/// - fragment children (recursive)
 	/// - child component slot children (recursive)
 	fn insert_slot_children(
-		node: &mut RsxNode,
-		mut slot_map: HashMap<String, Vec<RsxNode>>,
+		node: &mut WebNode,
+		mut slot_map: HashMap<String, Vec<WebNode>>,
 	) -> Result<(), SlotsError> {
 		// visit node so we can set it
-		VisitRsxNodeMut::walk_with_opts(
+		VisitWebNodeMut::walk_with_opts(
 			node,
 			// avoid 'slot stealing' by not visiting descendent component nodes
 			VisitRsxOptions::ignore_component_node(),
 			|node| {
-				let RsxNode::Element(element) = node else {
+				let WebNode::Element(element) = node else {
 					return;
 				};
 				if element.tag != "slot" {
@@ -190,7 +190,7 @@ impl ApplySlots {
 }
 
 #[allow(unused)]
-fn slot_map_debug(map: &HashMap<String, Vec<RsxNode>>) -> String {
+fn slot_map_debug(map: &HashMap<String, Vec<WebNode>>) -> String {
 	let mut s = String::new();
 	for (name, nodes) in map {
 		s.push_str(&format!(
@@ -204,7 +204,7 @@ fn slot_map_debug(map: &HashMap<String, Vec<RsxNode>>) -> String {
 
 /// if the hashmap is empty, return Ok(()), otherwise return an error
 fn slot_map_to_result(
-	map: HashMap<String, Vec<RsxNode>>,
+	map: HashMap<String, Vec<WebNode>>,
 ) -> Result<(), SlotsError> {
 	let unconsumed = map.into_iter().collect::<Vec<_>>();
 	if unconsumed.is_empty() {
@@ -217,10 +217,10 @@ fn slot_map_to_result(
 #[derive(Debug, Error)]
 #[error("some slots were not consumed: {unconsumed:?}")]
 pub struct SlotsError {
-	unconsumed: Vec<(String, Vec<RsxNodeDiscriminants>)>,
+	unconsumed: Vec<(String, Vec<WebNodeDiscriminants>)>,
 }
 impl SlotsError {
-	pub fn new(unconsumed: Vec<(String, Vec<RsxNode>)>) -> Self {
+	pub fn new(unconsumed: Vec<(String, Vec<WebNode>)>) -> Self {
 		Self {
 			unconsumed: unconsumed
 				.into_iter()
@@ -242,7 +242,7 @@ mod test {
 	#[derive(Node)]
 	struct Span;
 
-	fn span(_: Span) -> RsxNode {
+	fn span(_: Span) -> WebNode {
 		rsx! {
 			<span>
 				<slot />
@@ -253,7 +253,7 @@ mod test {
 	#[derive(Node)]
 	struct MyComponent;
 
-	fn my_component(_: MyComponent) -> RsxNode {
+	fn my_component(_: MyComponent) -> WebNode {
 		rsx! {
 			<html>
 				<slot name="header">Fallback Title</slot>
@@ -330,7 +330,7 @@ mod test {
 		#[derive(Node)]
 		struct Layout;
 
-		fn layout(_: Layout) -> RsxNode {
+		fn layout(_: Layout) -> WebNode {
 			rsx! {
 				<Header>
 					<slot name="header" slot="default" />
@@ -340,7 +340,7 @@ mod test {
 		#[derive(Node)]
 		struct Header;
 
-		fn header(_: Header) -> RsxNode {
+		fn header(_: Header) -> WebNode {
 			rsx! {
 				<header>
 					<slot />
@@ -364,7 +364,7 @@ mod test {
 		#[derive(Node)]
 		struct Layout;
 
-		fn layout(_: Layout) -> RsxNode {
+		fn layout(_: Layout) -> WebNode {
 			rsx! {
 				<body>
 					<Header>
@@ -380,7 +380,7 @@ mod test {
 		#[derive(Node)]
 		struct Header;
 
-		fn header(_: Header) -> RsxNode {
+		fn header(_: Header) -> WebNode {
 			rsx! {
 				<header>
 					<slot />

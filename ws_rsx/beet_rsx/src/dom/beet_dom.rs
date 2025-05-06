@@ -9,7 +9,7 @@ pub struct BeetDom;
 
 #[allow(deprecated)]
 impl BeetDom {
-	pub fn mount(app: impl 'static + Fn() -> RsxNode) {
+	pub fn mount(app: impl 'static + Fn() -> WebNode) {
 		use sweet::prelude::wasm::set_timeout_ms;
 
 		let doc = app().xpipe(RsxToHtmlDocument::default()).unwrap();
@@ -23,7 +23,7 @@ impl BeetDom {
 		});
 	}
 
-	pub fn hydrate<M>(app: impl IntoRsxNode<M>) {
+	pub fn hydrate<M>(app: impl IntoWebNode<M>) {
 		DomTarget::set(BrowserDomTarget::default());
 		// effects called here too
 		app.into_node().xpipe(RegisterEffects::default()).unwrap();

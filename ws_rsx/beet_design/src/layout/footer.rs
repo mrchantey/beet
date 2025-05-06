@@ -5,7 +5,7 @@ use chrono::Datelike;
 #[derive(Node)]
 pub struct Footer;
 
-fn footer(_props: Footer) -> RsxNode {
+fn footer(_props: Footer) -> WebNode {
 	let Brand { title, version, .. } = get_context::<Brand>();
 	let current_year = chrono::Utc::now().year();
 	let footer_text = format!("&copy; {title} {current_year}");

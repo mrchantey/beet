@@ -16,7 +16,7 @@ use syn::spanned::Spanned;
 
 
 
-/// Convert rstml nodes to a Vec<RsxNode> token stream
+/// Convert rstml nodes to a Vec<WebNode> token stream
 /// ## Pipeline
 /// [`Pipeline<Vec<Node<C>>, (WebTokens, Vec<TokenStream>)>`]
 #[derive(Debug, Default)]

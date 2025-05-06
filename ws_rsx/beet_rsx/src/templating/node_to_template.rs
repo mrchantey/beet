@@ -3,12 +3,12 @@ use crate::prelude::*;
 
 pub struct NodeToTemplate;
 
-impl<T: AsRef<RsxNode>> Pipeline<T, TemplateResult<RsxTemplateNode>>
+impl<T: AsRef<WebNode>> Pipeline<T, TemplateResult<RsxTemplateNode>>
 	for NodeToTemplate
 {
 	fn apply(self, node: T) -> TemplateResult<RsxTemplateNode> {
 		match node.as_ref() {
-			RsxNode::Fragment(RsxFragment { nodes, meta }) => {
+			WebNode::Fragment(RsxFragment { nodes, meta }) => {
 				let items = nodes
 					.iter()
 					.map(|n| n.xpipe(NodeToTemplate))
@@ -18,7 +18,7 @@ impl<T: AsRef<RsxNode>> Pipeline<T, TemplateResult<RsxTemplateNode>>
 					meta: meta.clone(),
 				})
 			}
-			RsxNode::Component(RsxComponent {
+			WebNode::Component(RsxComponent {
 				tag,
 				tracker,
 				// ignore root, its a seperate tree
@@ -35,7 +35,7 @@ impl<T: AsRef<RsxNode>> Pipeline<T, TemplateResult<RsxTemplateNode>>
 				tag: tag.clone(),
 				meta: meta.clone(),
 			}),
-			RsxNode::Block(RsxBlock {
+			WebNode::Block(RsxBlock {
 				effect,
 				// ignore initial, its a seperate tree
 				initial: _,
@@ -44,7 +44,7 @@ impl<T: AsRef<RsxNode>> Pipeline<T, TemplateResult<RsxTemplateNode>>
 				tracker: effect.tracker.clone(),
 				meta: meta.clone(),
 			}),
-			RsxNode::Element(RsxElement {
+			WebNode::Element(RsxElement {
 				tag,
 				attributes,
 				children,
@@ -60,19 +60,19 @@ impl<T: AsRef<RsxNode>> Pipeline<T, TemplateResult<RsxTemplateNode>>
 				children: Box::new(children.xpipe(NodeToTemplate)?),
 				meta: meta.clone(),
 			}),
-			RsxNode::Text(RsxText { value, meta }) => {
+			WebNode::Text(RsxText { value, meta }) => {
 				Ok(RsxTemplateNode::Text {
 					value: value.clone(),
 					meta: meta.clone(),
 				})
 			}
-			RsxNode::Comment(RsxComment { value, meta }) => {
+			WebNode::Comment(RsxComment { value, meta }) => {
 				Ok(RsxTemplateNode::Comment {
 					value: value.clone(),
 					meta: meta.clone(),
 				})
 			}
-			RsxNode::Doctype(RsxDoctype { meta }) => {
+			WebNode::Doctype(RsxDoctype { meta }) => {
 				Ok(RsxTemplateNode::Doctype { meta: meta.clone() })
 			}
 		}

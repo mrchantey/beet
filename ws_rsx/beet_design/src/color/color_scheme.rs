@@ -10,7 +10,7 @@ pub struct ColorScheme {
 	theme: Theme,
 }
 
-fn color_scheme(props: ColorScheme) -> RsxNode {
+fn color_scheme(props: ColorScheme) -> WebNode {
 	// Theme
 
 	let css = ThemeToCss::default().map(&props.theme);

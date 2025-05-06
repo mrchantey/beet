@@ -14,8 +14,8 @@ impl Default for ApplyFsSrc {
 	fn default() -> Self { Self {} }
 }
 
-impl Pipeline<RsxNode, Result<RsxNode>> for ApplyFsSrc {
-	fn apply(self, mut root: RsxNode) -> Result<RsxNode> {
+impl Pipeline<WebNode, Result<WebNode>> for ApplyFsSrc {
+	fn apply(self, mut root: WebNode) -> Result<WebNode> {
 		//1. apply to root
 		self.apply_to_node(&mut root)?;
 
@@ -34,7 +34,7 @@ impl Pipeline<RsxNode, Result<RsxNode>> for ApplyFsSrc {
 
 impl ApplyFsSrc {
 	/// apply to a root without recursing into components
-	fn apply_to_node(&self, node: &mut RsxNode) -> Result<()> {
+	fn apply_to_node(&self, node: &mut WebNode) -> Result<()> {
 		let mut result = Ok(());
 		let location = node.location().cloned();
 		VisitRsxElementMut::walk_with_opts(
@@ -87,7 +87,7 @@ mod test {
 	#[derive(Node)]
 	struct Foo;
 
-	fn foo(_: Foo) -> RsxNode {
+	fn foo(_: Foo) -> WebNode {
 		rsx! {
 			<div>
 				<slot />
@@ -121,10 +121,10 @@ mod test {
 			.xpipe(ApplyFsSrc::default())
 			.unwrap();
 
-		let RsxNode::Element(el) = &node else {
+		let WebNode::Element(el) = &node else {
 			panic!()
 		};
-		let RsxNode::Text(text) = el.children.as_ref() else {
+		let WebNode::Text(text) = el.children.as_ref() else {
 			panic!()
 		};
 		expect(&text.value).to_be(include_str!("./test-fs-src.js"));

@@ -2,7 +2,7 @@ use crate::prelude::*;
 
 
 
-/// Convert [`RsxNode`] structures into a string of [`HtmlNode`]
+/// Convert [`WebNode`] structures into a string of [`HtmlNode`]
 ///
 /// ## Panics
 /// - Panics if `no_slot_check` is false and there are still slot children
@@ -24,7 +24,7 @@ pub struct RsxToHtml {
 	tree_idx_incr: TreeIdxIncr,
 }
 
-impl<T: AsRef<RsxNode>> Pipeline<T, Vec<HtmlNode>> for RsxToHtml {
+impl<T: AsRef<WebNode>> Pipeline<T, Vec<HtmlNode>> for RsxToHtml {
 	fn apply(mut self, node: T) -> Vec<HtmlNode> { self.map_node(node) }
 }
 
@@ -36,18 +36,18 @@ impl RsxToHtml {
 		self
 	}
 
-	/// recursively map rsx nodes to html nodes
+	/// recursively map web nodes to html nodes
 	/// ## Panics
 	/// If slot children have not been applied
-	pub fn map_node(&mut self, node: impl AsRef<RsxNode>) -> Vec<HtmlNode> {
+	pub fn map_node(&mut self, node: impl AsRef<WebNode>) -> Vec<HtmlNode> {
 		let idx = self.tree_idx_incr.next();
 
 		match node.as_ref() {
-			RsxNode::Doctype(_) => vec![HtmlNode::Doctype],
-			RsxNode::Comment(comment) => {
+			WebNode::Doctype(_) => vec![HtmlNode::Doctype],
+			WebNode::Comment(comment) => {
 				vec![HtmlNode::Comment(comment.value.clone())]
 			}
-			RsxNode::Text(text) => {
+			WebNode::Text(text) => {
 				let str = if self.trim {
 					text.value.trim()
 				} else {
@@ -55,17 +55,17 @@ impl RsxToHtml {
 				};
 				vec![HtmlNode::Text(str.into())]
 			}
-			RsxNode::Element(e) => {
+			WebNode::Element(e) => {
 				vec![HtmlNode::Element(self.map_element(idx, e))]
 			}
-			RsxNode::Fragment(frag) => frag
+			WebNode::Fragment(frag) => frag
 				.nodes
 				.iter()
 				.map(|n| self.map_node(n))
 				.flatten()
 				.collect(),
-			RsxNode::Block(rsx_block) => self.map_node(&rsx_block.initial),
-			RsxNode::Component(RsxComponent {
+			WebNode::Block(rsx_block) => self.map_node(&rsx_block.initial),
+			WebNode::Component(RsxComponent {
 				node,
 				slot_children,
 				..
@@ -284,7 +284,7 @@ mod test {
 	fn component() {
 		#[derive(Node)]
 		struct Child;
-		fn child(_: Child) -> RsxNode {
+		fn child(_: Child) -> WebNode {
 			rsx! { <p>hello {1}</p> }
 		}
 		expect(
@@ -303,7 +303,7 @@ mod test {
 		struct Child {
 			value: usize,
 		}
-		fn child(props: Child) -> RsxNode {
+		fn child(props: Child) -> WebNode {
 			rsx! { <p>hello {props.value}</p> }
 		}
 
@@ -320,7 +320,7 @@ mod test {
 	fn component_children() {
 		#[derive(Node)]
 		struct Layout;
-		fn layout(_: Layout) -> RsxNode {
+		fn layout(_: Layout) -> WebNode {
 			rsx! {
 				<div>
 					<h1>welcome</h1>
@@ -345,7 +345,7 @@ mod test {
 	fn component_slots() {
 		#[derive(Node)]
 		struct Layout;
-		fn layout(_: Layout) -> RsxNode {
+		fn layout(_: Layout) -> WebNode {
 			rsx! {
 				<article>
 					<h1>welcome</h1>

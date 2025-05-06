@@ -5,7 +5,7 @@ pub struct PageLayout {
 	pub title: String,
 }
 
-fn page_layout(props: PageLayout) -> RsxNode {
+fn page_layout(props: PageLayout) -> WebNode {
 	rsx! {
 		<html>
 			<div>

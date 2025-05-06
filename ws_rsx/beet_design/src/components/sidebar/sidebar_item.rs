@@ -18,7 +18,7 @@ fn sidebar_item(
 			},
 		root,
 	}: SidebarItem,
-) -> RsxNode {
+) -> WebNode {
 	// let items = tree.
 	let class = if root { "root" } else { "" };
 

@@ -17,7 +17,7 @@ pub struct RsxToBevy {
 
 impl RsxToBevy {
 	/// Registers effects and spawns the node
-	pub fn spawn(node: RsxNode) -> Result<Vec<Entity>> {
+	pub fn spawn(node: WebNode) -> Result<Vec<Entity>> {
 		let entities = BevyRuntime::with_mut(|app| {
 			Self::default().spawn_root(app.world_mut(), &node)
 		})?;
@@ -28,7 +28,7 @@ impl RsxToBevy {
 	pub fn spawn_root(
 		&mut self,
 		world: &mut World,
-		root: &RsxNode,
+		root: &WebNode,
 	) -> Result<Vec<Entity>> {
 		let entities = self.spawn_node(world, &root)?;
 		// for entity in entities.iter() {
@@ -41,16 +41,16 @@ impl RsxToBevy {
 	pub fn spawn_node(
 		&mut self,
 		world: &mut World,
-		node: impl AsRef<RsxNode>,
+		node: impl AsRef<WebNode>,
 	) -> Result<Vec<Entity>> {
 		let tree_idx = self.tree_idx_incr.next();
 		// println!("rsx_to_bevy found node: {:?}", node.as_ref().discriminant());
 		let nodes = match node.as_ref() {
-			RsxNode::Doctype(_) => unimplemented!(),
-			RsxNode::Comment(_) => {
+			WebNode::Doctype(_) => unimplemented!(),
+			WebNode::Comment(_) => {
 				unimplemented!()
 			}
-			RsxNode::Text(text) => {
+			WebNode::Text(text) => {
 				#[cfg(feature = "bevy_default")]
 				{
 					let entity =
@@ -65,7 +65,7 @@ impl RsxToBevy {
 					)
 				}
 			}
-			RsxNode::Fragment(fragment) => fragment
+			WebNode::Fragment(fragment) => fragment
 				.nodes
 				.iter()
 				.map(|n| self.spawn_node(world, n))
@@ -73,13 +73,13 @@ impl RsxToBevy {
 				.into_iter()
 				.flatten()
 				.collect(),
-			RsxNode::Block(rsx_block) => {
+			WebNode::Block(rsx_block) => {
 				self.spawn_root(world, &rsx_block.initial)?
 			}
-			RsxNode::Element(element) => {
+			WebNode::Element(element) => {
 				vec![self.spawn_element(world, element, tree_idx)?]
 			}
-			RsxNode::Component(RsxComponent {
+			WebNode::Component(RsxComponent {
 				node,
 				slot_children,
 				..

@@ -116,7 +116,7 @@ mod test {
 				pub mod root {
 					#[allow(unused_imports)]
 					use super::*;
-					pub async fn bazz() -> ServerActionResult<RsxNode,()> {
+					pub async fn bazz() -> ServerActionResult<WebNode,()> {
 						CallServerAction::request_no_data(RouteInfo::new("/bazz", HttpMethod::Get)).await
 					}
 				}

@@ -16,7 +16,7 @@ use std::hash::Hasher;
 pub struct GlobalRsxIdx {
 	idx: u32,
 	/// The actual [`RsxLocationHash`] is too expensive to store,
-	/// it can be found at every [RsxNode] so propagate it from there if needed.
+	/// it can be found at every [WebNode] so propagate it from there if needed.
 	/// Rapidhash seed is consistent across macro and runtime hashing
 	macro_location_hash: u64,
 }

@@ -15,7 +15,7 @@ pub struct Head {
 	pub fixed_scale: bool,
 }
 
-fn head(Head { fixed_scale }: Head) -> RsxNode {
+fn head(Head { fixed_scale }: Head) -> WebNode {
 	let Brand {
 		title,
 		description,

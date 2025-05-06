@@ -1,11 +1,11 @@
 use crate::prelude::*;
 use anyhow::Result;
-use beet_rsx::rsx::RsxNode;
+use beet_rsx::rsx::WebNode;
 use std::path::PathBuf;
 use sweet::prelude::*;
 
 pub trait RoutesToRsx {
-	async fn routes_to_rsx(&mut self) -> Result<Vec<(RouteInfo, RsxNode)>>;
+	async fn routes_to_rsx(&mut self) -> Result<Vec<(RouteInfo, WebNode)>>;
 }
 
 

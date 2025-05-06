@@ -30,22 +30,22 @@ pub struct RsxTemplateMap {
 
 // TODO use a visitor that doesnt exit early if a parent has no nodes.
 // has no location, it may have a child that does and so should be templated.
-/// Find a matching template for the given [`RsxNode`] and apply it, returning the
+/// Find a matching template for the given [`WebNode`] and apply it, returning the
 /// updated root.
 /// If the root has no location or the location is outside the templates root directory,
 /// the root is returned unchanged.
 ///
 /// ## Errors
 /// If the root is inside the templates root directory and a template was not found.
-impl Pipeline<RsxNode, TemplateResult<RsxNode>> for &RsxTemplateMap {
-	fn apply(self, mut node: RsxNode) -> TemplateResult<RsxNode> {
+impl Pipeline<WebNode, TemplateResult<WebNode>> for &RsxTemplateMap {
+	fn apply(self, mut node: WebNode) -> TemplateResult<WebNode> {
 		let mut result = Ok(());
 		// templates cannot track block initials and component nodes,
 		// so we certainly must visit them
 		// even though they can track element and slot children, we still need to visit
 		// because the parent may not have a location/template, in most of these cases
 		// the child will not have a location so itll be a noop.
-		VisitRsxNodeMut::walk(&mut node, |node| {
+		VisitWebNodeMut::walk(&mut node, |node| {
 			// this will atually mutate the node, effecting which children get visited next.
 			if let Err(err) = self.apply_template(node) {
 				result = Err(err);
@@ -69,7 +69,7 @@ impl RsxTemplateMap {
 		}
 	}
 
-	fn apply_template(&self, node: &mut RsxNode) -> TemplateResult<()> {
+	fn apply_template(&self, node: &mut WebNode) -> TemplateResult<()> {
 		let Some(location) = node.location().cloned() else {
 			// if the node doesnt have a location we dont even try to apply a template
 			return Ok(());
@@ -90,7 +90,7 @@ impl RsxTemplateMap {
 			.with_location(location.clone()))
 		} else {
 			// println!(
-			// 	"rsx node is outside templates dir so no template will be applied:\n{:?}",
+			// 	"web node is outside templates dir so no template will be applied:\n{:?}",
 			// 	location
 			// );
 			// if the node location is outside the templates root directory,
@@ -128,7 +128,7 @@ mod test {
 	struct MyComponent {
 		value: usize,
 	}
-	fn my_component(props: MyComponent) -> RsxNode {
+	fn my_component(props: MyComponent) -> WebNode {
 		rsx! { <div>the value is {props.value}<slot /></div> }
 	}
 
@@ -217,7 +217,7 @@ mod test {
 				Hello
 			</MyComponent>
 		};
-		let RsxNode::Component(RsxComponent {
+		let WebNode::Component(RsxComponent {
 			tracker: tracker1, ..
 		}) = node1
 		else {

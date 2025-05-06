@@ -34,9 +34,9 @@ impl BevyRuntime {
 	/// ```
 	pub fn parse_block_node<M1, M2>(
 		tracker: RustyTracker,
-		block: impl Clone + IntoRsxNode<M1> + SignalOrComponent<M2>,
-	) -> RsxNode {
-		RsxNode::Block(RsxBlock {
+		block: impl Clone + IntoWebNode<M1> + SignalOrComponent<M2>,
+	) -> WebNode {
+		WebNode::Block(RsxBlock {
 			initial: Box::new(block.clone().into_node()),
 			effect: Effect::new(block.into_node_block_effect(), tracker),
 			meta: NodeMeta::default(),

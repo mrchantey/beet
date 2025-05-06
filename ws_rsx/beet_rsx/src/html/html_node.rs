@@ -1,4 +1,4 @@
-/// Unlike RsxNode, this struct contains only real html nodes
+/// Unlike WebNode, this struct contains only real html nodes
 #[derive(Debug, Clone)]
 pub enum HtmlNode {
 	Doctype,

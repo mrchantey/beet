@@ -5,8 +5,8 @@ pub struct Style {
 	pub directives: Vec<TemplateDirective>,
 }
 
-impl IntoRsxNode for Style {
-	fn into_node(self) -> RsxNode {
+impl IntoWebNode for Style {
+	fn into_node(self) -> WebNode {
 		RsxElement {
 			tag: "style".to_string(),
 			attributes: Default::default(),

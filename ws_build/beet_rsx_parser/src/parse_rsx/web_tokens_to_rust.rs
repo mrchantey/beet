@@ -15,10 +15,11 @@ use syn::Expr;
 use syn::Ident;
 use syn::spanned::Spanned;
 
-/// Convert rsx nodes to an RsxNode token stream
+/// Convert web nodes to a [`WebNode`] token stream
 /// we intentionally only set the location on the root node,
 /// havent yet found a usecase that makes it worth setting on
-/// every node
+/// every node, and we would need to pass locations of non-proc_macro
+/// tokens too.
 #[derive(Debug)]
 pub struct WebTokensToRust {
 	/// The location of the root node
@@ -106,7 +107,7 @@ impl WebTokensToRust {
 		MetaBuilder::build(location)
 	}
 
-	/// returns an RsxNode
+	/// returns an WebNode
 	fn map_node(&mut self, node: WebTokens) -> TokenStream {
 		match node {
 			WebTokens::Fragment { nodes } => {

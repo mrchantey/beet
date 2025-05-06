@@ -4,9 +4,9 @@ use beet_rsx::prelude::*;
 use std::pin::Pin;
 use std::sync::Arc;
 
-/// A function that has no parameters and returns a [`RsxNode`].
+/// A function that has no parameters and returns a [`WebNode`].
 pub type RsxRouteFunc =
-	Box<dyn Fn() -> Pin<Box<dyn Future<Output = Result<RsxNode>>>>>;
+	Box<dyn Fn() -> Pin<Box<dyn Future<Output = Result<WebNode>>>>>;
 
 
 pub struct RouteFunc<T> {
@@ -68,7 +68,7 @@ pub struct SyncRouteFuncMarker;
 
 impl<F> IntoRouteFunc<RsxRouteFunc, SyncRouteFuncMarker> for F
 where
-	F: 'static + Fn() -> RsxNode,
+	F: 'static + Fn() -> WebNode,
 {
 	fn into_route_func(self) -> RsxRouteFunc {
 		let func = Arc::new(self);
@@ -84,7 +84,7 @@ pub struct AsyncRouteFuncMarker;
 
 impl<F> IntoRouteFunc<RsxRouteFunc, AsyncRouteFuncMarker> for F
 where
-	F: 'static + AsyncFn() -> RsxNode,
+	F: 'static + AsyncFn() -> WebNode,
 {
 	fn into_route_func(self) -> RsxRouteFunc {
 		let func = Arc::new(self);
@@ -101,7 +101,7 @@ impl<F, E>
 	IntoRouteFunc<RsxRouteFunc, (SyncRouteFuncMarker, ResultRouteFuncMarker)> for F
 where
 	E: std::error::Error + 'static + Send + Sync,
-	F: 'static + Fn() -> Result<RsxNode, E>,
+	F: 'static + Fn() -> Result<WebNode, E>,
 {
 	fn into_route_func(self) -> RsxRouteFunc {
 		let func = Arc::new(self);
@@ -116,7 +116,7 @@ impl<F, E>
 	for F
 where
 	E: std::error::Error + 'static + Send + Sync,
-	F: 'static + AsyncFn() -> Result<RsxNode, E>,
+	F: 'static + AsyncFn() -> Result<WebNode, E>,
 {
 	fn into_route_func(self) -> RsxRouteFunc {
 		let func = Arc::new(self);
@@ -133,7 +133,7 @@ pub struct AnyhowRouteFuncMarker;
 impl<F>
 	IntoRouteFunc<RsxRouteFunc, (SyncRouteFuncMarker, AnyhowRouteFuncMarker)> for F
 where
-	F: 'static + Fn() -> anyhow::Result<RsxNode>,
+	F: 'static + Fn() -> anyhow::Result<WebNode>,
 {
 	fn into_route_func(self) -> RsxRouteFunc {
 		let func = Arc::new(self);
@@ -147,7 +147,7 @@ impl<F>
 	IntoRouteFunc<RsxRouteFunc, (AsyncRouteFuncMarker, AnyhowRouteFuncMarker)>
 	for F
 where
-	F: 'static + AsyncFn() -> anyhow::Result<RsxNode>,
+	F: 'static + AsyncFn() -> anyhow::Result<WebNode>,
 {
 	fn into_route_func(self) -> RsxRouteFunc {
 		let func = Arc::new(self);
@@ -168,13 +168,13 @@ mod test {
 
 	#[test]
 	fn works() {
-		let _sync: RsxRouteFunc = || -> RsxNode {
+		let _sync: RsxRouteFunc = || -> WebNode {
 			rsx! {}
 		}
 		.into_route_func();
 		let _sync_result: RsxRouteFunc =
-			|| -> Result<RsxNode> { Ok(rsx! {}) }.into_route_func();
-		let _async_func: RsxRouteFunc = async || -> RsxNode {
+			|| -> Result<WebNode> { Ok(rsx! {}) }.into_route_func();
+		let _async_func: RsxRouteFunc = async || -> WebNode {
 			rsx! {}
 		}
 		.into_route_func();

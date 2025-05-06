@@ -17,8 +17,8 @@ impl SpaToHtmlFile {
 	pub fn new(dst: impl Into<PathBuf>) -> Self { Self { dst: dst.into() } }
 }
 
-impl Pipeline<RsxNode, Result<()>> for SpaToHtmlFile {
-	fn apply(self, app: RsxNode) -> Result<()> {
+impl Pipeline<WebNode, Result<()>> for SpaToHtmlFile {
+	fn apply(self, app: WebNode) -> Result<()> {
 		// the cli built the template map by looking at this file
 		let template_map =
 			RsxTemplateMap::load(default_paths::RSX_TEMPLATES)?;

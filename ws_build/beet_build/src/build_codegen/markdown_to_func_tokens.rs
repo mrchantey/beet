@@ -38,7 +38,7 @@ impl MarkdownToFuncTokens {
 			.xpipe(WebTokensToRust::new_for_file(workspace_path));
 
 		let item_fn: ItemFn = syn::parse_quote! {
-			pub fn get() -> RsxNode
+			pub fn get() -> WebNode
 				#rust_tokens
 
 		};
@@ -113,7 +113,7 @@ val_string	= "foo"
 		.unwrap();
 
 		let expected: ItemFn = syn::parse_quote! {
-		pub fn get() -> RsxNode {
+		pub fn get() -> WebNode {
 			use beet::prelude::*;
 			#[allow(unused_braces)]
 			RsxElement {

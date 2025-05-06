@@ -6,16 +6,16 @@ use rapidhash::RapidHashMap;
 
 pub struct NodeToTreeLocationMap;
 
-impl<T: AsRef<RsxNode>> Pipeline<T, TreeLocationMap> for NodeToTreeLocationMap {
+impl<T: AsRef<WebNode>> Pipeline<T, TreeLocationMap> for NodeToTreeLocationMap {
 	fn apply(self, node: T) -> TreeLocationMap {
 		let mut map = TreeLocationMap::default();
 
 		TreeLocationVisitor::visit(node.as_ref(), |loc, node| {
 			match node {
-				RsxNode::Block(RsxBlock { effect, .. }) => {
+				WebNode::Block(RsxBlock { effect, .. }) => {
 					map.rusty_locations.insert(effect.tracker, loc);
 				}
-				RsxNode::Element(el) => {
+				WebNode::Element(el) => {
 					// println!("el loc: {}", loc.tree_idx);
 					if el.children.directly_contains_rust_node() {
 						let encoded =
@@ -23,7 +23,7 @@ impl<T: AsRef<RsxNode>> Pipeline<T, TreeLocationMap> for NodeToTreeLocationMap {
 						map.collapsed_elements.insert(loc.tree_idx, encoded);
 					}
 				}
-				RsxNode::Component(comp) => {
+				WebNode::Component(comp) => {
 					map.rusty_locations.insert(comp.tracker, loc);
 				}
 				_ => {}
@@ -48,16 +48,16 @@ pub struct TreeLocationMap {
 
 impl TreeLocationMap {
 	/// a best-effort check for validity of a tree location map
-	pub fn check_valid(&self, node: &RsxNode) -> Result<()> {
+	pub fn check_valid(&self, node: &WebNode) -> Result<()> {
 		let mut idx_incr = TreeIdxIncr::default();
 
 		let mut result = Ok(());
 
-		VisitRsxNode::walk(node, |node| {
+		VisitWebNode::walk(node, |node| {
 			let tree_idx = idx_incr.next();
 
 			if let Some(_) = self.collapsed_elements.get(&tree_idx) {
-				if let RsxNode::Element(_) = node {
+				if let WebNode::Element(_) = node {
 				} else {
 					result = Err(anyhow::anyhow!(
 						"parent element {tree_idx} does not exist for text block encoder"
@@ -112,7 +112,7 @@ mod test {
 		#[derive(Node)]
 		struct MyComponent;
 
-		fn my_component(_: MyComponent) -> RsxNode {
+		fn my_component(_: MyComponent) -> WebNode {
 			let val = 4;
 			rsx! { <div>{val}</div> }
 		}

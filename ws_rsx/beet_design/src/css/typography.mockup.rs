@@ -3,7 +3,7 @@ use beet_rsx::as_beet::*;
 
 
 
-pub fn get() -> RsxNode {
+pub fn get() -> WebNode {
 	rsx! {
 		<h1>This is a H1 Heading</h1>
 		<p>Here is some text under the heading</p>

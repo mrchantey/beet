@@ -10,11 +10,11 @@ macro_rules! impl_visitor {
 
 		impl<F: FnMut(&$node_type)> $visitor_name<F> {
 			/// Walk the node with the default [`VisitRsxOptions`]
-			pub fn walk(node: &RsxNode, func: F) {
+			pub fn walk(node: &WebNode, func: F) {
 				$visitor_name::new(func).walk_node(node);
 			}
 			pub fn walk_with_opts(
-				node: &RsxNode,
+				node: &WebNode,
 				options: VisitRsxOptions,
 				func: F,
 			) {
@@ -58,11 +58,11 @@ macro_rules! impl_visitor_mut {
 					options: Default::default(),
 				}
 			}
-			pub fn walk(node: &mut RsxNode, func: F) {
+			pub fn walk(node: &mut WebNode, func: F) {
 				$visitor_name::new(func).walk_node(node);
 			}
 			pub fn walk_with_opts(
-				node: &mut RsxNode,
+				node: &mut WebNode,
 				options: VisitRsxOptions,
 				func: F,
 			) {
@@ -86,7 +86,7 @@ macro_rules! impl_visitor_mut {
 
 
 
-impl_visitor!(VisitRsxNode, RsxNode, visit_node);
+impl_visitor!(VisitWebNode, WebNode, visit_node);
 // impl_visitor!(VisitRsxComment, str, visit_comment);
 // impl_visitor!(VisitRsxText, str, visit_text);
 impl_visitor!(VisitRsxBlock, RsxBlock, visit_block);
@@ -94,7 +94,7 @@ impl_visitor!(VisitRsxElement, RsxElement, visit_element);
 impl_visitor!(VisitRsxAttribute, RsxAttribute, visit_attribute);
 impl_visitor!(VisitRsxComponent, RsxComponent, visit_component);
 
-impl_visitor_mut!(VisitRsxNodeMut, RsxNode, visit_node);
+impl_visitor_mut!(VisitWebNodeMut, WebNode, visit_node);
 // impl_visitor_mut!(VisitRsxCommentMut, str, visit_comment);
 // impl_visitor_mut!(VisitRsxTextMut, str, visit_text);
 impl_visitor_mut!(VisitRsxBlockMut, RsxBlock, visit_block);
@@ -114,7 +114,7 @@ mod test {
 	fn works() {
 		let mut count = 0;
 
-		VisitRsxNodeMut::new(|_| count += 1).walk_node(&mut rsx! { <div /> });
+		VisitWebNodeMut::new(|_| count += 1).walk_node(&mut rsx! { <div /> });
 		// includes empty children fragment
 		expect(count).to_be(2);
 	}

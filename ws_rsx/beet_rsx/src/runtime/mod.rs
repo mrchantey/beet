@@ -12,7 +12,7 @@ pub use string_runtime::*;
 // pub use reactive_graph_runtime::*;
 
 
-/// An rsx Runtime handles creation of reactive rsx nodes,
+/// An rsx Runtime handles creation of reactive web nodes,
 /// often by  
 pub trait Runtime {
 	/// A type which all attribute values must be able to be converted to,
@@ -27,8 +27,8 @@ pub trait Runtime {
 	/// ```
 	fn parse_block_node<M>(
 		tracker: RustyTracker,
-		block: impl 'static + Send + Sync + Clone + IntoRsxNode<M>,
-	) -> RsxNode;
+		block: impl 'static + Send + Sync + Clone + IntoWebNode<M>,
+	) -> WebNode;
 	/// Used by [`RstmlToRsx`] when it encounters an attribute block:
 	/// ```
 	/// # use beet_rsx::as_beet::*;

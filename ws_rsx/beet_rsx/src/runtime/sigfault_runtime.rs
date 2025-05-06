@@ -12,9 +12,9 @@ impl Runtime for SigfaultRuntime {
 
 	fn parse_block_node<M>(
 		tracker: RustyTracker,
-		block: impl 'static + Send + Sync + Clone + IntoRsxNode<M>,
-	) -> RsxNode {
-		RsxNode::Block(RsxBlock {
+		block: impl 'static + Send + Sync + Clone + IntoWebNode<M>,
+	) -> WebNode {
+		WebNode::Block(RsxBlock {
 			initial: Box::new(block.clone().into_node()),
 			effect: Effect::new(
 				Box::new(move |loc: TreeLocation| {
@@ -22,7 +22,7 @@ impl Runtime for SigfaultRuntime {
 						let block = block.clone();
 						DomTarget::with(move |target| {
 							let node = block.clone().into_node();
-							target.update_rsx_node(loc, node).unwrap()
+							target.update_web_node(loc, node).unwrap()
 						});
 					});
 					Ok(())

@@ -6,7 +6,7 @@ pub struct Sidebar {
 	pub nodes: Vec<SidebarNode>,
 }
 
-fn sidebar(Sidebar { nodes }: Sidebar) -> RsxNode {
+fn sidebar(Sidebar { nodes }: Sidebar) -> WebNode {
 	rsx! {
 		<nav id="sidebar" aria-hidden="false">
 		{nodes.into_iter().map(|node|{

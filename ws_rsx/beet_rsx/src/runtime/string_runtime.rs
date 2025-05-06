@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use crate::rsx::IntoRsxNode;
+use crate::rsx::IntoWebNode;
 use crate::rsx::RsxAttribute;
 
 /// A simple non-reactive rsx runtime
@@ -11,9 +11,9 @@ impl Runtime for StringRuntime {
 	type AttributeValue = String;
 	fn parse_block_node<M>(
 		tracker: RustyTracker,
-		block: impl IntoRsxNode<M>,
-	) -> RsxNode {
-		RsxNode::Block(RsxBlock {
+		block: impl IntoWebNode<M>,
+	) -> WebNode {
+		WebNode::Block(RsxBlock {
 			initial: Box::new(block.into_node()),
 			effect: Effect::new(noop(), tracker),
 			meta: NodeMeta::default(),

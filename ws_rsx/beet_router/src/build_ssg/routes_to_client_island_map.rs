@@ -31,10 +31,10 @@ impl RoutesToClientIslandMap {
 	}
 }
 
-impl Pipeline<&Vec<(RouteInfo, RsxNode)>, Result<()>>
+impl Pipeline<&Vec<(RouteInfo, WebNode)>, Result<()>>
 	for RoutesToClientIslandMap
 {
-	fn apply(self, routes: &Vec<(RouteInfo, RsxNode)>) -> Result<()> {
+	fn apply(self, routes: &Vec<(RouteInfo, WebNode)>) -> Result<()> {
 		let map: RapidHashMap<_, _> = routes
 			.into_iter()
 			.map(|(route, rsx)| {

@@ -4,7 +4,7 @@ use crate::prelude::*;
 #[derive(Default)]
 pub struct CollectClientIslands;
 
-impl<T: AsRef<RsxNode>> Pipeline<T, Vec<ClientIsland>>
+impl<T: AsRef<WebNode>> Pipeline<T, Vec<ClientIsland>>
 	for CollectClientIslands
 {
 	fn apply(self, root: T) -> Vec<ClientIsland> {
@@ -61,7 +61,7 @@ mod test {
 	struct MyComponent {
 		val: usize,
 	}
-	fn my_component(props: MyComponent) -> RsxNode {
+	fn my_component(props: MyComponent) -> WebNode {
 		rsx! { <div>{props.val}</div> }
 	}
 

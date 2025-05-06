@@ -17,7 +17,7 @@ pub struct DesignSystem {
 }
 
 
-fn design_system(props: DesignSystem) -> RsxNode {
+fn design_system(props: DesignSystem) -> WebNode {
 	rsx! {
 		<ColorScheme theme=props.theme />
 		<Css />

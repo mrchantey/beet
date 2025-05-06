@@ -8,7 +8,7 @@ struct MyNode<T: 'static + Send + Sync + Clone + ToString> {
 }
 fn my_node<T: 'static + Send + Sync + Clone + ToString>(
 	props: MyNode<T>,
-) -> RsxNode {
+) -> WebNode {
 	rsx! { {props.value} }
 }
 

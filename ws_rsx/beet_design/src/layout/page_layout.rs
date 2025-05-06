@@ -4,7 +4,7 @@ use crate::prelude::*;
 #[derive(Node)]
 pub struct PageLayout;
 
-fn page_layout(_props: PageLayout) -> RsxNode {
+fn page_layout(_props: PageLayout) -> WebNode {
 	rsx! {
 		<DocumentLayout>
 		<slot name="head" slot="head" />

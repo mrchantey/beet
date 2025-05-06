@@ -1,7 +1,7 @@
 use crate::prelude::*;
 use beet::prelude::*;
 
-pub fn get() -> RsxNode {
+pub fn get() -> WebNode {
 	// let counter = if cfg!(debug_assertions) {
 	// 	rsx! {}
 	// 	// this is a hack to get the counter to work in dev mode

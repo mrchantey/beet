@@ -64,9 +64,9 @@ fn impl_component(input: &DeriveInput) -> Result<TokenStream> {
 	let name = &input.ident;
 
 	Ok(quote! {
-	impl #impl_generics IntoRsxNode for #name #type_generics #where_clause {
+	impl #impl_generics IntoWebNode for #name #type_generics #where_clause {
 
-		fn into_node(self) -> RsxNode {
+		fn into_node(self) -> WebNode {
 			#into_rsx(self)
 		}
 	}
@@ -250,7 +250,7 @@ mod test {
 			use beet::prelude::*;
 
 			impl beet::prelude::Component for MyNode {
-				fn render (self) -> RsxNode { my_node (self) }
+				fn render (self) -> WebNode { my_node (self) }
 			}
 			impl Props for MyNode {
 				type Builder = MyNodeBuilder;

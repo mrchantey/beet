@@ -5,7 +5,7 @@ use beet_rsx::as_beet::*;
 use std::marker::PhantomData;
 
 
-fn some_custom_name(props: MyNode) -> RsxNode {
+fn some_custom_name(props: MyNode) -> WebNode {
 	rsx! {
 		<div>
 			<p>is_optional: {format!("{:?}", props.is_optional)}</p>

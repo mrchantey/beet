@@ -9,12 +9,12 @@ use sweet::prelude::*;
 pub struct RoutesToHtml;
 
 
-impl Pipeline<Vec<(RouteInfo, RsxNode)>, Result<Vec<(RouteInfo, HtmlDocument)>>>
+impl Pipeline<Vec<(RouteInfo, WebNode)>, Result<Vec<(RouteInfo, HtmlDocument)>>>
 	for RoutesToHtml
 {
 	fn apply(
 		self,
-		routes: Vec<(RouteInfo, RsxNode)>,
+		routes: Vec<(RouteInfo, WebNode)>,
 	) -> Result<Vec<(RouteInfo, HtmlDocument)>> {
 		let html = routes
 			.into_iter()

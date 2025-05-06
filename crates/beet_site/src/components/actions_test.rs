@@ -8,7 +8,7 @@ use sweet::prelude::*;
 #[derive(Node, Serialize, Deserialize)]
 pub struct ActionTest;
 
-fn action_test(_props: ActionTest) -> RsxNode {
+fn action_test(_props: ActionTest) -> WebNode {
 	rsx! {
 	<div>
 		<RejectsNeg/>
@@ -26,7 +26,7 @@ fn action_test(_props: ActionTest) -> RsxNode {
 
 #[derive(Node)]
 pub struct RejectsNeg {}
-fn rejects_neg(_props: RejectsNeg) -> RsxNode {
+fn rejects_neg(_props: RejectsNeg) -> WebNode {
 	let (val, _set_val) = signal(0);
 	let (get, set) = signal("Ready".to_string());
 

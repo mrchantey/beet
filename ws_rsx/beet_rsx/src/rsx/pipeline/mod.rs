@@ -27,8 +27,8 @@ pub struct DefaultRsxTransforms {
 	slots: ApplySlots,
 }
 
-impl Pipeline<RsxNode, Result<RsxNode>> for DefaultRsxTransforms {
-	fn apply(self, root: RsxNode) -> Result<RsxNode> {
+impl Pipeline<WebNode, Result<WebNode>> for DefaultRsxTransforms {
+	fn apply(self, root: WebNode) -> Result<WebNode> {
 		#[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
 		let root = root.xpipe(self.fs_src)?;
 		#[cfg(feature = "css")]
@@ -46,8 +46,8 @@ pub struct RsxToHtmlDocument {
 	pub html_doc_to_resumable: HtmlDocToResumable,
 }
 
-impl Pipeline<RsxNode, Result<HtmlDocument>> for RsxToHtmlDocument {
-	fn apply(self, mut node: RsxNode) -> Result<HtmlDocument> {
+impl Pipeline<WebNode, Result<HtmlDocument>> for RsxToHtmlDocument {
+	fn apply(self, mut node: WebNode) -> Result<HtmlDocument> {
 		node = node.xpipe(self.rsx_transforms)?;
 
 		let mut client_reactive = false;
@@ -87,8 +87,8 @@ impl RsxToHtmlString {
 	}
 }
 
-impl Pipeline<RsxNode, Result<String>> for RsxToHtmlString {
-	fn apply(self, root: RsxNode) -> Result<String> {
+impl Pipeline<WebNode, Result<String>> for RsxToHtmlString {
+	fn apply(self, root: WebNode) -> Result<String> {
 		root.xpipe(self.rsx_transforms)?
 			.xref()
 			.xpipe(self.rsx_to_html)
@@ -108,7 +108,7 @@ mod test {
 
 	#[derive(Node, Serialize, Deserialize)]
 	struct MyComponent;
-	fn my_component(_: MyComponent) -> RsxNode {
+	fn my_component(_: MyComponent) -> WebNode {
 		rsx! { <div /> }
 	}
 

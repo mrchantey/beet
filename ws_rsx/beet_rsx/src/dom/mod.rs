@@ -53,13 +53,13 @@ impl DomTarget {
 		})
 	}
 
-	pub fn update_rsx_node(
+	pub fn update_web_node(
 		loc: TreeLocation,
-		node: RsxNode,
+		node: WebNode,
 	) -> ParseResult<()> {
 		DOM_TARGET.with(|current| {
 			let mut current = current.lock().unwrap();
-			current.update_rsx_node(loc, node)
+			current.update_web_node(loc, node)
 		})
 	}
 	pub fn update_rsx_attribute(
@@ -81,10 +81,10 @@ pub trait DomTargetImpl {
 	fn html_constants(&self) -> &HtmlConstants;
 
 	// type Event;
-	fn update_rsx_node(
+	fn update_web_node(
 		&mut self,
 		loc: TreeLocation,
-		node: RsxNode,
+		node: WebNode,
 	) -> ParseResult<()>;
 
 	fn update_rsx_attribute(

@@ -31,7 +31,7 @@ pub struct TextField {
 	pub attrs: InputHtmlAttributes,
 }
 
-fn text_field(TextField { variant, mut attrs }: TextField) -> RsxNode {
+fn text_field(TextField { variant, mut attrs }: TextField) -> WebNode {
 	attrs.push_class(format!(
 		"bt-c-input bt-c-input--{}",
 		variant.class_suffix()
@@ -57,7 +57,7 @@ pub struct TextArea {
 	pub attrs: TextAreaHtmlAttributes,
 }
 
-fn text_area(TextArea { variant, mut attrs }: TextArea) -> RsxNode {
+fn text_area(TextArea { variant, mut attrs }: TextArea) -> WebNode {
 	attrs.push_class(format!(
 		"bt-c-input bt-c-input--{}",
 		variant.class_suffix()

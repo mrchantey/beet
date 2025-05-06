@@ -15,7 +15,7 @@ use syn::token::Lt;
 /// - rsx! macros
 /// - mdx files
 /// ## Example outputs:
-/// - RsxNode TokenStream
+/// - WebNode TokenStream
 /// - RsxTemplateNode TokenStream (ron)
 #[derive(Debug, Clone)]
 pub enum WebTokens {

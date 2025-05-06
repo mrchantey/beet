@@ -5,7 +5,7 @@ use beet::prelude::*;
 #[derive(Node)]
 pub struct BeetContext {}
 
-fn beet_context(_: BeetContext) -> RsxNode {
+fn beet_context(_: BeetContext) -> WebNode {
 	set_context(Brand {
 		title: "Beet".into(),
 		description: "A Rust web framework".into(),

@@ -41,12 +41,12 @@ enum Scope {
 	// Cascade (eargerly apply slots?)
 }
 
-impl Pipeline<RsxNode, Result<RsxNode>> for ApplyScopedStyle {
+impl Pipeline<WebNode, Result<WebNode>> for ApplyScopedStyle {
 	/// Applies scoped style to:
 	/// 1. root node
 	/// 2. all component nodes
 	/// 3. all component slot children
-	fn apply(mut self, mut node: RsxNode) -> Result<RsxNode> {
+	fn apply(mut self, mut node: WebNode) -> Result<WebNode> {
 		// 1. apply to the root node, if its a component nothing happens
 		//    in this step, it will be handled by the component visitor
 		self.apply_node(&mut node)?;
@@ -71,7 +71,7 @@ impl ApplyScopedStyle {
 
 	/// 1. apply the idx to all style bodies
 	/// 2. if contains style, apply tag to all elements in the component
-	fn apply_node(&mut self, node: &mut RsxNode) -> ParseResult<()> {
+	fn apply_node(&mut self, node: &mut WebNode) -> ParseResult<()> {
 		let mut parse_err = Ok(());
 
 		// the boundary for scoped style is to apply to every descendent
@@ -93,7 +93,7 @@ impl ApplyScopedStyle {
 				// currently only recurse top level style children, we could create another
 				// visitor to go deeper if we start supporting style body components
 				match &mut *el.children {
-					RsxNode::Text(text) => {
+					WebNode::Text(text) => {
 						// this is a hack to allow for the css unit "em" to be used in the style tag
 						// we should put it somewhere else
 						text.value = text.value.replace(".em", "em");
@@ -103,7 +103,7 @@ impl ApplyScopedStyle {
 							parse_err = Err(err);
 						}
 					}
-					RsxNode::Fragment(fragment) => {
+					WebNode::Fragment(fragment) => {
 						if !fragment.nodes.is_empty() {
 							parse_err = Err(ParseError::Serde(format!(
 								"ScopedStyle: Expected Text Node, received Fragment with {} nodes",
@@ -192,13 +192,13 @@ mod test {
 	#[derive(Node)]
 	struct JustSlot;
 
-	fn just_slot(_: JustSlot) -> RsxNode {
+	fn just_slot(_: JustSlot) -> WebNode {
 		rsx! { <slot /> }
 	}
 	#[derive(Node)]
 	struct Child;
 
-	fn child(_: Child) -> RsxNode {
+	fn child(_: Child) -> WebNode {
 		rsx! {
 			<div>
 				<style>span { color: blue; }</style>

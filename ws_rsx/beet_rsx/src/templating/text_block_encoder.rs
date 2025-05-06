@@ -101,29 +101,29 @@ impl CollapsedNode {
 	fn from_element(el: &RsxElement) -> Vec<CollapsedNode> {
 		Self::from_node(&el.children)
 	}
-	fn from_node(node: &RsxNode) -> Vec<CollapsedNode> {
+	fn from_node(node: &WebNode) -> Vec<CollapsedNode> {
 		let mut out = Vec::new();
 		match node {
-			RsxNode::Fragment(fragment) => {
+			WebNode::Fragment(fragment) => {
 				out.extend(fragment.nodes.iter().flat_map(Self::from_node));
 			}
-			RsxNode::Component(RsxComponent { node, .. }) => {
+			WebNode::Component(RsxComponent { node, .. }) => {
 				out.extend(Self::from_node(node));
 			}
-			RsxNode::Block(RsxBlock { initial, .. }) => {
-				// let initial: &RsxNode = initial.as_ref();
+			WebNode::Block(RsxBlock { initial, .. }) => {
+				// let initial: &WebNode = initial.as_ref();
 				let html = initial
 					.as_ref()
 					.xpipe(RsxToHtml::default())
 					.xpipe(RenderHtmlEscaped::default());
 				out.push(CollapsedNode::RustText(html));
 			}
-			RsxNode::Text(text) => {
+			WebNode::Text(text) => {
 				out.push(CollapsedNode::StaticText(text.value.clone()))
 			}
-			RsxNode::Doctype { .. } => out.push(CollapsedNode::Break),
-			RsxNode::Comment { .. } => out.push(CollapsedNode::Break),
-			RsxNode::Element(_) => out.push(CollapsedNode::Break),
+			WebNode::Doctype { .. } => out.push(CollapsedNode::Break),
+			WebNode::Comment { .. } => out.push(CollapsedNode::Break),
+			WebNode::Element(_) => out.push(CollapsedNode::Break),
 		}
 		return out;
 	}
@@ -175,7 +175,7 @@ mod test {
 	#[derive(Node)]
 	struct Adjective;
 
-	fn adjective(_: Adjective) -> RsxNode {
+	fn adjective(_: Adjective) -> WebNode {
 		rsx! {
 			"lazy"
 			<slot />
@@ -194,7 +194,7 @@ mod test {
 				<Adjective>and fat</Adjective>dog
 			</div>
 		};
-		let RsxNode::Element(el) = &node else {
+		let WebNode::Element(el) = &node else {
 			panic!("expected element");
 		};
 

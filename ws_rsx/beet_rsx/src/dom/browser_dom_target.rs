@@ -61,7 +61,7 @@ impl BrowserDomTarget {
 	fn apply_rsx(
 		&self,
 		el: Element,
-		rsx: RsxNode,
+		rsx: WebNode,
 		loc: TreeLocation,
 	) -> ParseResult<()> {
 		Ok(())
@@ -152,10 +152,10 @@ impl DomTargetImpl for BrowserDomTarget {
 			.inner_html()
 	}
 
-	fn update_rsx_node(
+	fn update_web_node(
 		&mut self,
 		loc: TreeLocation,
-		rsx: RsxNode,
+		rsx: WebNode,
 	) -> ParseResult<()> {
 		let parent = self.get_or_find_element(loc.parent_idx)?;
 		let child =
@@ -165,13 +165,13 @@ impl DomTargetImpl for BrowserDomTarget {
 
 		#[allow(unused)]
 		match rsx {
-			RsxNode::Fragment { .. } => todo!(),
-			RsxNode::Component(_) => todo!(),
-			RsxNode::Block(RsxBlock { .. }) => {
+			WebNode::Fragment { .. } => todo!(),
+			WebNode::Component(_) => todo!(),
+			WebNode::Block(RsxBlock { .. }) => {
 				todo!()
 			}
-			RsxNode::Element(rsx_element) => todo!(),
-			RsxNode::Text(text) => {
+			WebNode::Element(rsx_element) => todo!(),
+			WebNode::Text(text) => {
 				if let Some(child) = child.dyn_ref::<Text>() {
 					child.set_text_content(Some(&text.value));
 				} else {
@@ -180,8 +180,8 @@ impl DomTargetImpl for BrowserDomTarget {
 					);
 				}
 			}
-			RsxNode::Comment { .. } => todo!(),
-			RsxNode::Doctype { .. } => todo!(),
+			WebNode::Comment { .. } => todo!(),
+			WebNode::Doctype { .. } => todo!(),
 		}
 		Ok(())
 	}

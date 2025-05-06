@@ -3,7 +3,7 @@ use beet_rsx::sigfault::effect;
 use beet_rsx::sigfault::signal;
 
 
-pub fn get() -> RsxNode {
+pub fn get() -> WebNode {
 	rsx! { <Inner client:load /> }
 }
 
@@ -11,7 +11,7 @@ pub fn get() -> RsxNode {
 #[derive(Node, serde::Serialize, serde::Deserialize)]
 pub struct Inner;
 
-fn inner(_: Inner) -> RsxNode {
+fn inner(_: Inner) -> WebNode {
 	let (value, set_value) = signal("Hello world".to_string());
 
 	let val2 = value.clone();

@@ -8,7 +8,7 @@ use sweet::prelude::*;
 
 
 
-/// This macro expands to an [RsxNode](beet_rsx::prelude::RsxNode).
+/// This macro expands to an [WebNode](beet_rsx::prelude::WebNode).
 /// ```ignore
 /// let node = rsx! {<div> the value is {3}</div>};
 /// ```

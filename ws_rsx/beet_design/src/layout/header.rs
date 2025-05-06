@@ -8,7 +8,7 @@ pub struct Header {
 }
 
 
-fn header(Header { home_route }: Header) -> RsxNode {
+fn header(Header { home_route }: Header) -> WebNode {
 	let Brand { title, .. } = get_context::<Brand>();
 
 	rsx! {

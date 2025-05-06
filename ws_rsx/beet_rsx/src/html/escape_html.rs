@@ -31,7 +31,7 @@ impl<T: AsMut<Vec<HtmlNode>>> Pipeline<T> for EscapeHtml {
 
 impl EscapeHtml {
 	fn escape_nodes(&self, _nodes: &mut Vec<HtmlNode>) {
-		// TODO rsx node escaping, only of mutable content
+		// TODO web node escaping, only of mutable content
 
 		// for node in nodes {
 		// 	match node {

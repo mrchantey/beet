@@ -47,7 +47,7 @@ struct ButtonB {
 	pub button_attrs: StructD,
 	pub field_button_b: u32,
 }
-fn button_b(button: ButtonB) -> RsxNode { RsxNode::default() }
+fn button_b(button: ButtonB) -> WebNode { WebNode::default() }
 
 
 

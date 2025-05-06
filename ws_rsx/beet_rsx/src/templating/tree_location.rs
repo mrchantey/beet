@@ -2,7 +2,7 @@ use crate::prelude::*;
 
 pub type RustyIdx = u32;
 
-///	This struct is the binding between a [RsxNode] and an [HtmlNode].
+///	This struct is the binding between a [WebNode] and an [HtmlNode].
 ///
 /// Hydrating elements is relatively simple, we can just slap an id on them,
 /// but text nodes don't have ids, and to make things even more exciting adjacent
@@ -17,9 +17,9 @@ pub type RustyIdx = u32;
 #[derive(Debug, Default, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct TreeLocation {
-	/// Incremented every time an rsx node is encountered,
+	/// Incremented every time an web node is encountered,
 	/// used for reconciliation with the [TreeLocationMap::rusty_locations].
-	/// It is required because not all rsx nodes are html nodes.
+	/// It is required because not all web nodes are html nodes.
 	pub tree_idx: TreeIdx,
 	/// the [`TreeIdx`] of this node's parent *element*. This is used by
 	/// text nodes to determine their location in the dom.
@@ -101,34 +101,34 @@ impl<Func> TreeLocationVisitor<Func> {
 
 
 	/// Visit a node and return the total number of elements visited
-	pub fn visit(node: &RsxNode, func: Func)
+	pub fn visit(node: &WebNode, func: Func)
 	where
-		Func: FnMut(TreeLocation, &RsxNode),
+		Func: FnMut(TreeLocation, &WebNode),
 	{
 		Self::new(func).walk_node(node);
 	}
 
 	pub fn visit_with_location(
-		node: &RsxNode,
+		node: &WebNode,
 		location: TreeLocation,
 		func: Func,
 	) where
-		Func: FnMut(TreeLocation, &RsxNode),
+		Func: FnMut(TreeLocation, &WebNode),
 	{
 		Self::new_with_location(func, location).walk_node(node);
 	}
-	pub fn visit_mut(node: &mut RsxNode, func: Func)
+	pub fn visit_mut(node: &mut WebNode, func: Func)
 	where
-		Func: FnMut(TreeLocation, &mut RsxNode),
+		Func: FnMut(TreeLocation, &mut WebNode),
 	{
 		Self::new(func).walk_node(node);
 	}
 	pub fn visit_with_location_mut(
-		node: &mut RsxNode,
+		node: &mut WebNode,
 		location: TreeLocation,
 		func: Func,
 	) where
-		Func: FnMut(TreeLocation, &mut RsxNode),
+		Func: FnMut(TreeLocation, &mut WebNode),
 	{
 		Self::new_with_location(func, location).walk_node(node);
 	}
@@ -148,18 +148,18 @@ impl<Func> TreeLocationVisitor<Func> {
 		TreeLocation::new(self.tree_idx_incr, parent_idx, child_idx)
 	}
 
-	fn before_node(&mut self, node: &RsxNode) {
+	fn before_node(&mut self, node: &WebNode) {
 		self.tree_idx_incr += 1;
 
 		// it is not allowed to perform tree location walk before
 		// resolving slot children
 		match node {
-			RsxNode::Component(comp) => comp.slot_children.assert_empty(),
+			WebNode::Component(comp) => comp.slot_children.assert_empty(),
 			_ => {}
 		}
 	}
 
-	fn after_node(&mut self, node: &RsxNode) {
+	fn after_node(&mut self, node: &WebNode) {
 		if node.is_html_node() {
 			if let Some(child_idx) = self.child_idxs.last_mut() {
 				*child_idx += 1;
@@ -178,10 +178,10 @@ impl<Func> TreeLocationVisitor<Func> {
 }
 
 
-impl<Func: FnMut(TreeLocation, &RsxNode)> RsxVisitor
+impl<Func: FnMut(TreeLocation, &WebNode)> RsxVisitor
 	for TreeLocationVisitor<Func>
 {
-	fn visit_node(&mut self, node: &RsxNode) {
+	fn visit_node(&mut self, node: &WebNode) {
 		self.before_node(node);
 		let loc = self.current_location();
 		(self.func)(loc, node);
@@ -194,10 +194,10 @@ impl<Func: FnMut(TreeLocation, &RsxNode)> RsxVisitor
 		self.after_children();
 	}
 }
-impl<Func: FnMut(TreeLocation, &mut RsxNode)> RsxVisitorMut
+impl<Func: FnMut(TreeLocation, &mut WebNode)> RsxVisitorMut
 	for TreeLocationVisitor<Func>
 {
-	fn visit_node(&mut self, node: &mut RsxNode) {
+	fn visit_node(&mut self, node: &mut WebNode) {
 		self.before_node(node);
 		let loc = self.current_location();
 		(self.func)(loc, node);
@@ -236,7 +236,7 @@ mod test {
 			</div>
 		};
 		TreeLocationVisitor::visit(&rsx, move |loc, node| {
-			if let RsxNode::Element(_) = node {
+			if let WebNode::Element(_) = node {
 				bucket2.call(loc);
 			}
 		});
@@ -275,7 +275,7 @@ mod test {
 		#[derive(Node)]
 		struct Comp;
 
-		fn comp(_: Comp) -> RsxNode {
+		fn comp(_: Comp) -> WebNode {
 			rsx! { <slot /> }
 		}
 

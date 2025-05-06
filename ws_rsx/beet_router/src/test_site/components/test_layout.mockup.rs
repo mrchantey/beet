@@ -1,5 +1,5 @@
 use beet_rsx::prelude::*;
 
-pub fn get() -> RsxNode {
+pub fn get() -> WebNode {
 	rsx! { <div></div> }
 }

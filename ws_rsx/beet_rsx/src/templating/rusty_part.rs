@@ -46,14 +46,14 @@ pub enum RustyPart {
 	// we also collect components because they
 	// cannot be statically resolved
 	Component {
-		root: RsxNode,
+		root: WebNode,
 		/// Type names cannot be discovered statically
 		type_name: String,
 		/// for client islands, cannot be statically created
 		ron: Option<String>,
 	},
 	RustBlock {
-		initial: RsxNode,
+		initial: WebNode,
 		effect: Effect,
 	},
 	AttributeValue {
@@ -74,15 +74,15 @@ pub struct RustyPartMap(pub HashMap<RustyTracker, RustyPart>);
 
 pub struct NodeToRustyPartMap;
 
-impl Pipeline<RsxNode, RustyPartMap> for NodeToRustyPartMap {
-	fn apply(self, mut node: RsxNode) -> RustyPartMap {
+impl Pipeline<WebNode, RustyPartMap> for NodeToRustyPartMap {
+	fn apply(self, mut node: WebNode) -> RustyPartMap {
 		let mut rusty_map = HashMap::default();
-		VisitRsxNodeMut::walk_with_opts(
+		VisitWebNodeMut::walk_with_opts(
 			&mut node,
 			// we dont want to recurse into initial?
 			VisitRsxOptions::ignore_block_node_initial(),
 			|node| match node {
-				RsxNode::Block(block) => {
+				WebNode::Block(block) => {
 					rusty_map.insert(
 						block.effect.tracker,
 						RustyPart::RustBlock {
@@ -91,7 +91,7 @@ impl Pipeline<RsxNode, RustyPartMap> for NodeToRustyPartMap {
 						},
 					);
 				}
-				RsxNode::Element(el) => {
+				WebNode::Element(el) => {
 					for attr in el.attributes.iter_mut() {
 						match attr {
 							RsxAttribute::Key { .. } => {}
@@ -121,7 +121,7 @@ impl Pipeline<RsxNode, RustyPartMap> for NodeToRustyPartMap {
 						}
 					}
 				}
-				RsxNode::Component(component) => {
+				WebNode::Component(component) => {
 					// note how we ignore slot_children, they are handled by RsxTemplateNode
 					rusty_map.insert(component.tracker, RustyPart::Component {
 						root: std::mem::take(&mut component.node),

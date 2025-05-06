@@ -11,7 +11,7 @@ Rusty tools for developing reative structures.
 Sweet builds upon Astro's principle of creating interoperability between various reactive libraries, and extends that capability with support for multiple renderers and authoring flavours.
 
 # Planned Authoring Flavours
-- Vanilla Rust `RsxNode`
+- Vanilla Rust `WebNode`
 - Reactive html `rsx!`
 - Reactive bevy scenes `bsn!`
 

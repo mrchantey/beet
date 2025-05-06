@@ -4,7 +4,7 @@ use beet_rsx::as_beet::*;
 #[derive(Node)]
 struct MyNode;
 
-fn my_node(_props: MyNode) -> RsxNode { Default::default() }
+fn my_node(_props: MyNode) -> WebNode { Default::default() }
 
 
 

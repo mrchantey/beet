@@ -14,21 +14,21 @@ impl RegisterEffects {
 	pub fn new(root_location: TreeLocation) -> Self { Self { root_location } }
 }
 
-impl<T: Into<RsxNode>> Pipeline<T, Result<()>> for RegisterEffects {
+impl<T: Into<WebNode>> Pipeline<T, Result<()>> for RegisterEffects {
 	fn apply(self, node: T) -> Result<()> {
-		let mut node: RsxNode = node.into();
+		let mut node: WebNode = node.into();
 		let mut result = Ok(());
 		TreeLocationVisitor::visit_with_location_mut(
 			&mut node,
 			self.root_location,
 			|loc, node| {
 				match node {
-					RsxNode::Block(RsxBlock { effect, .. }) => {
+					WebNode::Block(RsxBlock { effect, .. }) => {
 						if let Err(err) = std::mem::take(effect).register(loc) {
 							result = Err(err);
 						}
 					}
-					RsxNode::Element(e) => {
+					WebNode::Element(e) => {
 						for a in &mut e.attributes {
 							let res = match a {
 								RsxAttribute::Block { effect, .. } => {

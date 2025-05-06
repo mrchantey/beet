@@ -165,7 +165,7 @@ mod test {
 		else {
 			panic!();
 		};
-		let RsxNode::Component(RsxComponent {
+		let WebNode::Component(RsxComponent {
 			tracker: tracker2, ..
 		}) = &node
 		else {

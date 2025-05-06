@@ -7,7 +7,7 @@ pub struct Css;
 
 
 
-fn css(_: Css) -> RsxNode {
+fn css(_: Css) -> WebNode {
 	rsx! {
 		<style scope:global src="./elements/code.css" />
 		<style scope:global src="./elements/details.css" />

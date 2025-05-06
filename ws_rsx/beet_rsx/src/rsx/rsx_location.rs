@@ -6,7 +6,7 @@ use std::path::Path;
 use sweet::prelude::*;
 
 /// File location of the first symbol inside an rsx macro, used by [RsxTemplate]
-/// to reconcile rsx nodes with templates
+/// to reconcile web nodes with templates
 ///
 /// ```rust ignore
 /// # use beet_rsx_macros::rsx;

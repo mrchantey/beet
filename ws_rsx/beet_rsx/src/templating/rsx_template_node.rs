@@ -2,7 +2,7 @@ use crate::prelude::*;
 use thiserror::Error;
 
 
-/// Serializable version of an rsx node that can be rehydrated.
+/// Serializable version of an web node that can be rehydrated.
 ///
 /// An [RsxTemplateNode] is conceptually similar to a html template
 /// but instead of {{PLACEHOLDER}} there is a hash for a known
@@ -15,21 +15,21 @@ use thiserror::Error;
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum RsxTemplateNode {
-	/// Serializable [`RsxNode::Doctype`]
+	/// Serializable [`WebNode::Doctype`]
 	Doctype { meta: NodeMeta },
-	/// Serializable [`RsxNode::Comment`]
+	/// Serializable [`WebNode::Comment`]
 	Comment { value: String, meta: NodeMeta },
-	/// Serializable [`RsxNode::Text`]
+	/// Serializable [`WebNode::Text`]
 	Text { value: String, meta: NodeMeta },
-	/// Serializable [`RsxNode::Fragment`]
+	/// Serializable [`WebNode::Fragment`]
 	Fragment { items: Vec<Self>, meta: NodeMeta },
-	/// Serializable [`RsxNode::Block`]
+	/// Serializable [`WebNode::Block`]
 	/// the initial value is the responsibility of the [RustyPart::RustBlock]
 	RustBlock {
 		tracker: RustyTracker,
 		meta: NodeMeta,
 	},
-	/// Serializable [`RsxNode::Element`]
+	/// Serializable [`WebNode::Element`]
 	Element {
 		tag: String,
 		self_closing: bool,
@@ -37,7 +37,7 @@ pub enum RsxTemplateNode {
 		children: Box<Self>,
 		meta: NodeMeta,
 	},
-	/// Serializable [`RsxNode::Component`]
+	/// Serializable [`WebNode::Component`]
 	/// We dont know much about components, for example when parsing
 	/// a file we just get the name.
 	/// The [RsxMacroLocation] etc is is tracked by the [RustyPart::Component::root]
@@ -65,7 +65,7 @@ impl Default for RsxTemplateNode {
 #[derive(Debug, Error)]
 pub enum TemplateError {
 	#[error(
-		"RsxNode has no tracker for {0}, ensure they are included in RstmlToRsx settings"
+		"WebNode has no tracker for {0}, ensure they are included in RstmlToRsx settings"
 	)]
 	DehydrationFailed(String),
 	#[error(

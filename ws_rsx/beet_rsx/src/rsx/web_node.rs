@@ -4,7 +4,7 @@ use strum_macros::AsRefStr;
 use strum_macros::EnumDiscriminants;
 
 #[derive(Debug, Clone, AsRefStr, EnumDiscriminants)]
-pub enum RsxNode {
+pub enum WebNode {
 	/// a html doctype node
 	Doctype(RsxDoctype),
 	/// a html comment node
@@ -21,49 +21,49 @@ pub enum RsxNode {
 	Element(RsxElement),
 	Component(RsxComponent),
 }
-impl Into<RsxNode> for RsxDoctype {
-	fn into(self) -> RsxNode { RsxNode::Doctype(self) }
+impl Into<WebNode> for RsxDoctype {
+	fn into(self) -> WebNode { WebNode::Doctype(self) }
 }
-impl Into<RsxNode> for RsxComment {
-	fn into(self) -> RsxNode { RsxNode::Comment(self) }
+impl Into<WebNode> for RsxComment {
+	fn into(self) -> WebNode { WebNode::Comment(self) }
 }
-impl Into<RsxNode> for RsxText {
-	fn into(self) -> RsxNode { RsxNode::Text(self) }
+impl Into<WebNode> for RsxText {
+	fn into(self) -> WebNode { WebNode::Text(self) }
 }
-impl Into<RsxNode> for RsxBlock {
-	fn into(self) -> RsxNode { RsxNode::Block(self) }
+impl Into<WebNode> for RsxBlock {
+	fn into(self) -> WebNode { WebNode::Block(self) }
 }
-impl Into<RsxNode> for RsxFragment {
-	fn into(self) -> RsxNode { RsxNode::Fragment(self) }
+impl Into<WebNode> for RsxFragment {
+	fn into(self) -> WebNode { WebNode::Fragment(self) }
 }
-impl Into<RsxNode> for RsxElement {
-	fn into(self) -> RsxNode { RsxNode::Element(self) }
+impl Into<WebNode> for RsxElement {
+	fn into(self) -> WebNode { WebNode::Element(self) }
 }
-impl Into<RsxNode> for RsxComponent {
-	fn into(self) -> RsxNode { RsxNode::Component(self) }
+impl Into<WebNode> for RsxComponent {
+	fn into(self) -> WebNode { WebNode::Component(self) }
 }
-impl GetNodeMeta for RsxNode {
+impl GetNodeMeta for WebNode {
 	fn meta(&self) -> &NodeMeta {
 		match self {
-			RsxNode::Doctype(node) => node.meta(),
-			RsxNode::Comment(node) => node.meta(),
-			RsxNode::Text(node) => node.meta(),
-			RsxNode::Block(node) => node.meta(),
-			RsxNode::Fragment(node) => node.meta(),
-			RsxNode::Element(node) => node.meta(),
-			RsxNode::Component(node) => node.meta(),
+			WebNode::Doctype(node) => node.meta(),
+			WebNode::Comment(node) => node.meta(),
+			WebNode::Text(node) => node.meta(),
+			WebNode::Block(node) => node.meta(),
+			WebNode::Fragment(node) => node.meta(),
+			WebNode::Element(node) => node.meta(),
+			WebNode::Component(node) => node.meta(),
 		}
 	}
 
 	fn meta_mut(&mut self) -> &mut NodeMeta {
 		match self {
-			RsxNode::Doctype(node) => node.meta_mut(),
-			RsxNode::Comment(node) => node.meta_mut(),
-			RsxNode::Text(node) => node.meta_mut(),
-			RsxNode::Block(node) => node.meta_mut(),
-			RsxNode::Fragment(node) => node.meta_mut(),
-			RsxNode::Element(node) => node.meta_mut(),
-			RsxNode::Component(node) => node.meta_mut(),
+			WebNode::Doctype(node) => node.meta_mut(),
+			WebNode::Comment(node) => node.meta_mut(),
+			WebNode::Text(node) => node.meta_mut(),
+			WebNode::Block(node) => node.meta_mut(),
+			WebNode::Fragment(node) => node.meta_mut(),
+			WebNode::Element(node) => node.meta_mut(),
+			WebNode::Component(node) => node.meta_mut(),
 		}
 	}
 }
@@ -106,7 +106,7 @@ impl GetNodeMeta for RsxText {
 
 #[derive(Debug, Default, Clone)]
 pub struct RsxFragment {
-	pub nodes: Vec<RsxNode>,
+	pub nodes: Vec<WebNode>,
 	/// Metadata for this node
 	pub meta: NodeMeta,
 }
@@ -116,7 +116,7 @@ impl GetNodeMeta for RsxFragment {
 	fn meta_mut(&mut self) -> &mut NodeMeta { &mut self.meta }
 }
 
-/// This is an RsxNode and a location, which is required for hydration.
+/// This is an WebNode and a location, which is required for hydration.
 ///
 /// It is allowed for the [`RsxRoot`] to be default(), which means that
 /// the macro location is a placeholder, this means that the the node
@@ -125,32 +125,32 @@ impl GetNodeMeta for RsxFragment {
 ///
 /// The struct returned from an rsx! macro.
 
-pub trait IntoRsxNode<M = ()> {
-	fn into_node(self) -> RsxNode;
+pub trait IntoWebNode<M = ()> {
+	fn into_node(self) -> WebNode;
 }
 
 pub struct IntoIntoRsx;
-impl<T: Into<RsxNode>> IntoRsxNode<IntoIntoRsx> for T {
-	fn into_node(self) -> RsxNode { self.into() }
+impl<T: Into<WebNode>> IntoWebNode<IntoIntoRsx> for T {
+	fn into_node(self) -> WebNode { self.into() }
 }
 
-impl IntoRsxNode<()> for () {
-	fn into_node(self) -> RsxNode { RsxNode::default() }
+impl IntoWebNode<()> for () {
+	fn into_node(self) -> WebNode { WebNode::default() }
 }
 pub struct FuncIntoRsx;
-impl<T: FnOnce() -> U, U: IntoRsxNode<M2>, M2> IntoRsxNode<(M2, FuncIntoRsx)>
+impl<T: FnOnce() -> U, U: IntoWebNode<M2>, M2> IntoWebNode<(M2, FuncIntoRsx)>
 	for T
 {
-	fn into_node(self) -> RsxNode { self().into_node() }
+	fn into_node(self) -> WebNode { self().into_node() }
 }
 
 pub struct IterIntoRsx;
-impl<I, T, M2> IntoRsxNode<(M2, IterIntoRsx)> for I
+impl<I, T, M2> IntoWebNode<(M2, IterIntoRsx)> for I
 where
 	I: IntoIterator<Item = T>,
-	T: IntoRsxNode<M2>,
+	T: IntoWebNode<M2>,
 {
-	fn into_node(self) -> RsxNode {
+	fn into_node(self) -> WebNode {
 		RsxFragment {
 			nodes: self.into_iter().map(|item| item.into_node()).collect(),
 			meta: NodeMeta::default(),
@@ -161,33 +161,33 @@ where
 
 
 
-impl Default for RsxNode {
+impl Default for WebNode {
 	fn default() -> Self { Self::Fragment(RsxFragment::default()) }
 }
 
-impl AsRef<RsxNode> for RsxNode {
-	fn as_ref(&self) -> &RsxNode { self }
+impl AsRef<WebNode> for WebNode {
+	fn as_ref(&self) -> &WebNode { self }
 }
 
-impl AsMut<RsxNode> for RsxNode {
-	fn as_mut(&mut self) -> &mut RsxNode { self }
+impl AsMut<WebNode> for WebNode {
+	fn as_mut(&mut self) -> &mut WebNode { self }
 }
 
-impl<T: ToString> From<T> for RsxNode {
+impl<T: ToString> From<T> for WebNode {
 	fn from(value: T) -> Self {
-		RsxNode::Text(RsxText {
+		WebNode::Text(RsxText {
 			value: value.to_string(),
 			meta: NodeMeta::default(),
 		})
 	}
 }
 
-impl RsxNode {
+impl WebNode {
 	/// Returns true if the node is an empty fragment,
 	/// or if it is recursively a fragment with only empty fragments
 	pub fn is_empty(&self) -> bool {
 		match self {
-			RsxNode::Fragment(fragment) => {
+			WebNode::Fragment(fragment) => {
 				for node in &fragment.nodes {
 					if !node.is_empty() {
 						return false;
@@ -209,7 +209,7 @@ impl RsxNode {
 		}
 	}
 
-	pub fn discriminant(&self) -> RsxNodeDiscriminants { self.into() }
+	pub fn discriminant(&self) -> WebNodeDiscriminants { self.into() }
 	/// helper method to kick off a visitor
 	pub fn walk(&self, visitor: &mut impl RsxVisitor) {
 		visitor.walk_node(self)
@@ -218,9 +218,9 @@ impl RsxNode {
 	/// Add another node. If this node is a fragment it will be appended
 	/// to the end, otherwise a new fragment will be created with the
 	/// current node and the new node.
-	pub fn push(&mut self, node: RsxNode) {
+	pub fn push(&mut self, node: WebNode) {
 		match self {
-			RsxNode::Fragment(RsxFragment { nodes, .. }) => nodes.push(node),
+			WebNode::Fragment(RsxFragment { nodes, .. }) => nodes.push(node),
 			_ => {
 				let mut nodes = vec![std::mem::take(self)];
 				nodes.push(node);
@@ -236,10 +236,10 @@ impl RsxNode {
 	/// Returns true if the node is an html node
 	pub fn is_html_node(&self) -> bool {
 		match self {
-			RsxNode::Doctype { .. }
-			| RsxNode::Comment { .. }
-			| RsxNode::Text { .. }
-			| RsxNode::Element(_) => true,
+			WebNode::Doctype { .. }
+			| WebNode::Comment { .. }
+			| WebNode::Text { .. }
+			| WebNode::Element(_) => true,
 			_ => false,
 		}
 	}
@@ -247,10 +247,10 @@ impl RsxNode {
 
 	/// non-recursive check for blocks in self, accounting for fragments
 	pub fn directly_contains_rust_node(&self) -> bool {
-		fn walk(node: &RsxNode) -> bool {
+		fn walk(node: &WebNode) -> bool {
 			match node {
-				RsxNode::Block(_) => true,
-				RsxNode::Fragment(fragment) => {
+				WebNode::Block(_) => true,
+				WebNode::Fragment(fragment) => {
 					for item in &fragment.nodes {
 						if walk(item) {
 							return true;
@@ -276,7 +276,7 @@ impl RsxNode {
 #[derive(Debug, Clone)]
 pub struct RsxBlock {
 	/// The initial for an rsx block is considered a seperate tree,
-	pub initial: Box<RsxNode>,
+	pub initial: Box<WebNode>,
 	pub effect: Effect,
 	/// Metadata for this node
 	pub meta: NodeMeta,
@@ -303,11 +303,11 @@ pub struct RsxComponent {
 	/// because components are structs not elements
 	pub tracker: RustyTracker,
 	/// the node returned by [Component::render]
-	pub node: Box<RsxNode>,
+	pub node: Box<WebNode>,
 	/// the children passed in by this component's parent:
 	///
 	/// `rsx! { <MyComponent>slot_children</MyComponent> }`
-	pub slot_children: Box<RsxNode>,
+	pub slot_children: Box<WebNode>,
 	/// Metadata for this node
 	pub meta: NodeMeta,
 }
@@ -330,7 +330,7 @@ pub struct RsxElement {
 	/// ie `class="my-class"`
 	pub attributes: Vec<RsxAttribute>,
 	/// ie `<div>childtext<childel/>{childblock}</div>`
-	pub children: Box<RsxNode>,
+	pub children: Box<WebNode>,
 	/// ie `<input/>`
 	pub self_closing: bool,
 	/// The location of the node
@@ -472,7 +472,7 @@ mod test {
 			.cloned()
 			.unwrap();
 		expect(&location.file().to_string_lossy())
-			.to_be("ws_rsx/beet_rsx/src/rsx/rsx_node.rs");
+			.to_be("ws_rsx/beet_rsx/src/rsx/web_node.rs");
 		expect(location.line()).to_be(line);
 		expect(location.col()).to_be(24);
 	}
@@ -481,7 +481,7 @@ mod test {
 	struct MyComponent {
 		key: u32,
 	}
-	fn my_component(props: MyComponent) -> RsxNode {
+	fn my_component(props: MyComponent) -> WebNode {
 		rsx! { <div>{props.key}</div> }
 	}
 

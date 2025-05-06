@@ -6,7 +6,7 @@ pub struct HtmlDocToResumable {
 	pub html_constants: HtmlConstants,
 }
 
-impl<T: AsRef<RsxNode>> Pipeline<(HtmlDocument, T), HtmlDocument>
+impl<T: AsRef<WebNode>> Pipeline<(HtmlDocument, T), HtmlDocument>
 	for HtmlDocToResumable
 {
 	fn apply(self, (mut doc, node): (HtmlDocument, T)) -> HtmlDocument {
@@ -20,7 +20,7 @@ impl<T: AsRef<RsxNode>> Pipeline<(HtmlDocument, T), HtmlDocument>
 impl HtmlDocToResumable {
 	/// attempt to insert the rsx context map into the html body,
 	/// otherwise append it to the end of the html
-	fn insert_tree_location_map(&self, node: &RsxNode, doc: &mut HtmlDocument) {
+	fn insert_tree_location_map(&self, node: &WebNode, doc: &mut HtmlDocument) {
 		let loc_map = node.xpipe(NodeToTreeLocationMap);
 		let loc_map =
 			ron::ser::to_string_pretty(&loc_map, Default::default()).unwrap();
@@ -83,7 +83,7 @@ mod test {
 	use crate::as_beet::*;
 	use sweet::prelude::*;
 
-	fn pipe(root: RsxNode) -> String {
+	fn pipe(root: WebNode) -> String {
 		root.xref()
 			.xpipe(RsxToHtml::default())
 			.xpipe(HtmlToDocument::default())

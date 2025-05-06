@@ -1,7 +1,7 @@
 use crate::prelude::*;
 
 
-/// Apply the template for the given [`RsxNode`] if it has a location and
+/// Apply the template for the given [`WebNode`] if it has a location and
 /// the location is inside the templates root directory, otherwise return Ok(()).
 ///
 /// # Errors
@@ -12,27 +12,27 @@ pub struct ApplyTemplateToNode;
 
 
 
-impl Pipeline<(RsxNode, RsxTemplateNode), TemplateResult<RsxNode>>
+impl Pipeline<(WebNode, RsxTemplateNode), TemplateResult<WebNode>>
 	for ApplyTemplateToNode
 {
 	fn apply(
 		self,
-		(node, template): (RsxNode, RsxTemplateNode),
-	) -> TemplateResult<RsxNode> {
+		(node, template): (WebNode, RsxTemplateNode),
+	) -> TemplateResult<WebNode> {
 		// println!("found template for node: {}\n{:?}", location, template);
 		self.apply_to_node(template, &mut node.xpipe(NodeToRustyPartMap))
 	}
 }
 
 impl ApplyTemplateToNode {
-	/// drain the effect map into an RsxNode. This does not recurse into
+	/// drain the effect map into an WebNode. This does not recurse into
 	/// [`RsxBlock::initial`] or [`RsxComponent::node`].
 	pub fn apply_to_node(
 		&self,
 		template: RsxTemplateNode,
 		rusty_map: &mut RustyPartMap,
-	) -> TemplateResult<RsxNode> {
-		let node: RsxNode = match template {
+	) -> TemplateResult<WebNode> {
+		let node: WebNode = match template {
 			RsxTemplateNode::Doctype { meta } => RsxDoctype { meta }.into(),
 			RsxTemplateNode::Text { value, meta } => {
 				RsxText { value, meta }.into()

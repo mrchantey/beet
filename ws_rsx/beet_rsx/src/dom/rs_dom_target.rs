@@ -12,8 +12,8 @@ pub struct RsDomTarget {
 
 pub struct MountToRsDom;
 
-impl Pipeline<RsxNode, Result<RsxNode>> for MountToRsDom {
-	fn apply(self, root: RsxNode) -> Result<RsxNode> {
+impl Pipeline<WebNode, Result<WebNode>> for MountToRsDom {
+	fn apply(self, root: WebNode) -> Result<WebNode> {
 		DomTarget::set(RsDomTarget::new(&root)?);
 		Ok(root)
 	}
@@ -21,7 +21,7 @@ impl Pipeline<RsxNode, Result<RsxNode>> for MountToRsDom {
 
 impl RsDomTarget {
 	/// This does *not* apply any transformations
-	pub fn new(root: &RsxNode) -> Result<Self> {
+	pub fn new(root: &WebNode) -> Result<Self> {
 		let doc = root
 			.xpipe(RsxToHtml::default())
 			.xpipe(HtmlToDocument::default())?;
@@ -43,10 +43,10 @@ impl DomTargetImpl for RsDomTarget {
 		self.doc.clone().xpipe(RenderHtmlEscaped::default())
 	}
 
-	fn update_rsx_node(
+	fn update_web_node(
 		&mut self,
 		loc: TreeLocation,
-		rsx: RsxNode,
+		rsx: WebNode,
 	) -> ParseResult<()> {
 		for html in self.doc.iter_mut() {
 			if let Some(parent_el) = html.query_selector_attr(
@@ -88,18 +88,18 @@ impl DomTargetImpl for RsDomTarget {
 /// we've found a html node with a matching id
 fn apply_rsx(
 	parent_el: &mut HtmlElementNode,
-	rsx: RsxNode,
+	rsx: WebNode,
 	loc: TreeLocation,
 	_constants: &HtmlConstants,
 ) -> ParseResult<()> {
 	match rsx {
-		RsxNode::Doctype(_) => todo!(),
-		RsxNode::Comment(_) => todo!(),
-		RsxNode::Fragment(_) => todo!(),
-		RsxNode::Component(_) => todo!(),
-		RsxNode::Block(_) => todo!(),
-		RsxNode::Element(_) => todo!(),
-		RsxNode::Text(text) => {
+		WebNode::Doctype(_) => todo!(),
+		WebNode::Comment(_) => todo!(),
+		WebNode::Fragment(_) => todo!(),
+		WebNode::Component(_) => todo!(),
+		WebNode::Block(_) => todo!(),
+		WebNode::Element(_) => todo!(),
+		WebNode::Text(text) => {
 			let child =
 				parent_el.children.get_mut(loc.child_idx as usize).ok_or_else(|| {
 					ParseError::Hydration(format!(
@@ -126,7 +126,7 @@ mod test {
 			.unwrap();
 
 		// a text node will use the parent idx
-		DomTarget::update_rsx_node(TreeLocation::new(1, 0, 0), rsx! { bar })
+		DomTarget::update_web_node(TreeLocation::new(1, 0, 0), rsx! { bar })
 			.unwrap();
 		expect(DomTarget::render()).to_be("<!DOCTYPE html><html><head></head><body><div data-beet-rsx-idx=\"0\">bar</div></body></html>");
 

@@ -5,7 +5,7 @@ use std::num::ParseIntError;
 use std::str::FromStr;
 
 
-/// A value guaranteed to be unique for every [`RsxNode`] *instance* in an
+/// A value guaranteed to be unique for every [`WebNode`] *instance* in an
 /// application before interactivity. This is what allows for reconciliation
 /// in hydration and template reloading.
 ///
@@ -41,11 +41,11 @@ impl TreeIdx {
 
 /// An id incrementer for mappers, similar to the [TreeLocation] visitor pattern.
 /// This pattern only works if implemented consistently between mappers.
-/// The #1 rule is that [`Self::next`] must be called for *every single* [`RsxNode`].
+/// The #1 rule is that [`Self::next`] must be called for *every single* [`WebNode`].
 /// Even if you don't use the value, it must still be visited to keep
 /// the rsx id consistency.
-/// - [`RsxNode::Fragment`]
-/// - [`RsxNode::Block`]
+/// - [`WebNode::Fragment`]
+/// - [`WebNode::Block`]
 /// - [`RsxBlock::initial`]
 /// - [`RsxComponent::root`]
 #[derive(Debug, Default)]
