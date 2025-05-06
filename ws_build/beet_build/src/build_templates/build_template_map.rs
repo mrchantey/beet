@@ -102,13 +102,6 @@ impl BuildTemplateMap {
 					let line = Literal::u32_unsuffixed(location.line);
 					let col = Literal::u32_unsuffixed(location.col);
 					let file = location.file.to_string_lossy();
-					let kvp_tokens = quote! {
-						RsxMacroLocation(
-							file: (#file),
-							line: #line,
-							col: #col
-						):#rsx_ron
-					};
 					// validate the rsx ron
 					if !self.skip_ron_check {
 						let str = rsx_ron.to_string();
@@ -117,7 +110,14 @@ impl BuildTemplateMap {
 							ron::de::from_str::<RsxTemplateNode>(&str)
 								.map_err(|e| ron_cx_err(e, &str))?;
 					}
-					Ok(kvp_tokens)
+					quote! {
+						RsxMacroLocation(
+							file: (#file),
+							line: #line,
+							col: #col
+						):#rsx_ron
+					}
+					.xok()
 				},
 			)
 			.collect::<Result<Vec<_>>>()?;
@@ -127,13 +127,13 @@ impl BuildTemplateMap {
 		)?;
 		let root = root.to_string_lossy();
 
-		let map = quote! {
+		quote! {
 			RsxTemplateMap(
 				root: (#root),
 				templates: {#(#items),*}
 			)
-		};
-		Ok(map)
+		}
+		.xok()
 	}
 }
 

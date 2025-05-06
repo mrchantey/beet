@@ -58,11 +58,14 @@ impl Pipeline<HtmlTokens, Block> for HtmlTokensToRust {
 }
 
 impl HtmlTokensToRust {
-	pub fn new_file_start_location() -> Self {
-		Self::new(RsxIdents::default(), quote! {file!()}, LineColumn {
-			line: 1,
-			column: 0,
-		})
+	pub fn new_no_location() -> Self {
+		Self {
+			idents: Default::default(),
+			root_location: None,
+			errors: Vec::new(),
+			rusty_tracker: Default::default(),
+			exclude_errors: false,
+		}
 	}
 
 	pub fn new_for_file(file: WorkspacePathBuf) -> Self {

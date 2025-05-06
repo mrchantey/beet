@@ -205,7 +205,7 @@ impl IntoRsxAttributeTokens for RsxAttribute {
 			RsxAttribute::Spread(value) => {
 				let block = value
 					.into_html_tokens()?
-					.xpipe(HtmlTokensToRust::new_file_start_location());
+					.xpipe(HtmlTokensToRust::new_no_location());
 				RsxAttributeTokens::Block {
 					block: block.into(),
 				}
@@ -239,13 +239,13 @@ impl TryInto<Spanner<Expr>> for RsxAttributeValue {
 			RsxAttributeValue::Element(value) => {
 				let block = value
 					.into_html_tokens()?
-					.xpipe(HtmlTokensToRust::new_file_start_location());
+					.xpipe(HtmlTokensToRust::new_no_location());
 				syn::parse_quote!(#block)
 			}
 			RsxAttributeValue::CodeBlock(value) => {
 				let block = value
 					.into_html_tokens()?
-					.xpipe(HtmlTokensToRust::new_file_start_location());
+					.xpipe(HtmlTokensToRust::new_no_location());
 				syn::parse_quote!(#block)
 			}
 		};

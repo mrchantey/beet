@@ -8,7 +8,7 @@ use syn::spanned::Spanned;
 
 use super::meta_builder::MetaBuilder;
 
-/// Convert rstml nodes to a ron file.
+/// Convert [`HtmlTokens`] to a ron format.
 /// Rust block token streams will be hashed by [Span::start]
 #[derive(Debug)]
 pub struct HtmlTokensToRon {

@@ -147,16 +147,21 @@ impl ApplyScopedStyle {
 		if scope == Scope::Component {
 			let class_name = self.class_name();
 			stylesheet.rules.0.iter_mut().for_each(|rule| {
-				// we only care about style rules
-				if let lightningcss::rules::CssRule::Style(style_rule) = rule {
-					style_rule.selectors.0.iter_mut().for_each(|selector| {
-						selector.append(
-						lightningcss::selector::Component::AttributeInNoNamespaceExists {
-							local_name: class_name.clone().into(),
-							local_name_lower: class_name.clone().into(),
-						}
-					);
-					});
+				match rule {
+					// currently only style rules are supported
+					lightningcss::rules::CssRule::Style(style_rule) => {
+						style_rule.selectors.0.iter_mut().for_each(
+							|selector| {
+								selector.append(
+								lightningcss::selector::Component::AttributeInNoNamespaceExists {
+									local_name: class_name.clone().into(),
+									local_name_lower: class_name.clone().into(),
+								}
+							);
+							},
+						);
+					}
+					_ => {}
 				}
 			});
 		}
