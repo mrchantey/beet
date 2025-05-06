@@ -16,18 +16,18 @@ use thiserror::Error;
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum RsxTemplateNode {
 	/// Serializable [`RsxNode::Doctype`]
-	Doctype { meta: RsxNodeMeta },
+	Doctype { meta: NodeMeta },
 	/// Serializable [`RsxNode::Comment`]
-	Comment { value: String, meta: RsxNodeMeta },
+	Comment { value: String, meta: NodeMeta },
 	/// Serializable [`RsxNode::Text`]
-	Text { value: String, meta: RsxNodeMeta },
+	Text { value: String, meta: NodeMeta },
 	/// Serializable [`RsxNode::Fragment`]
-	Fragment { items: Vec<Self>, meta: RsxNodeMeta },
+	Fragment { items: Vec<Self>, meta: NodeMeta },
 	/// Serializable [`RsxNode::Block`]
 	/// the initial value is the responsibility of the [RustyPart::RustBlock]
 	RustBlock {
 		tracker: RustyTracker,
-		meta: RsxNodeMeta,
+		meta: NodeMeta,
 	},
 	/// Serializable [`RsxNode::Element`]
 	Element {
@@ -35,7 +35,7 @@ pub enum RsxTemplateNode {
 		self_closing: bool,
 		attributes: Vec<RsxTemplateAttribute>,
 		children: Box<Self>,
-		meta: RsxNodeMeta,
+		meta: NodeMeta,
 	},
 	/// Serializable [`RsxNode::Component`]
 	/// We dont know much about components, for example when parsing
@@ -47,7 +47,7 @@ pub enum RsxTemplateNode {
 		tag: String,
 		/// mapped from [RsxComponent::slot_children]
 		slot_children: Box<Self>,
-		meta: RsxNodeMeta,
+		meta: NodeMeta,
 	},
 }
 
@@ -147,8 +147,8 @@ impl TemplateError {
 	}
 }
 
-impl NodeMeta for RsxTemplateNode {
-	fn meta(&self) -> &RsxNodeMeta {
+impl GetNodeMeta for RsxTemplateNode {
+	fn meta(&self) -> &NodeMeta {
 		match self {
 			RsxTemplateNode::Doctype { meta }
 			| RsxTemplateNode::Comment { meta, .. }
@@ -160,7 +160,7 @@ impl NodeMeta for RsxTemplateNode {
 		}
 	}
 
-	fn meta_mut(&mut self) -> &mut RsxNodeMeta {
+	fn meta_mut(&mut self) -> &mut NodeMeta {
 		match self {
 			RsxTemplateNode::Doctype { meta }
 			| RsxTemplateNode::Comment { meta, .. }
@@ -237,17 +237,16 @@ mod test {
 	#[test]
 	fn simple() {
 		let tracker = RustyTracker::new(0, 14909846839018434065);
-		// Element (tag : \"div\" , self_closing : true , attributes : [] , children : Fragment (items : [] , meta : RsxNodeMeta (template_directives : [] , location : None)) , meta : RsxNodeMeta (template_directives : [] , location : None))
 		let node = rsx_template! { <div>{value}</div> };
 
 		expect(&node).to_be(&RsxTemplateNode::Element {
 			tag: "div".to_string(),
 			self_closing: false,
 			attributes: vec![],
-			meta: RsxNodeMeta::default(),
+			meta: NodeMeta::default(),
 			children: Box::new(RsxTemplateNode::RustBlock {
 				tracker,
-				meta: RsxNodeMeta::default(),
+				meta: NodeMeta::default(),
 			}),
 		});
 	}
@@ -268,7 +267,7 @@ mod test {
 		expect(&template).to_be(&RsxTemplateNode::Element {
 			tag: "div".to_string(),
 			self_closing: false,
-			meta: RsxNodeMeta::default(),
+			meta: NodeMeta::default(),
 
 			attributes: vec![
 				RsxTemplateAttribute::Key {
@@ -291,19 +290,19 @@ mod test {
 				tag: "p".to_string(),
 				self_closing: false,
 				attributes: vec![],
-				meta: RsxNodeMeta::default(),
+				meta: NodeMeta::default(),
 
 				children: Box::new(RsxTemplateNode::Fragment {
-					meta: RsxNodeMeta::default(),
+					meta: NodeMeta::default(),
 
 					items: vec![
 						RsxTemplateNode::Text {
-							meta: RsxNodeMeta::default(),
+							meta: NodeMeta::default(),
 
 							value: "\n\t\t\t\t\thello ".to_string(),
 						},
 						RsxTemplateNode::Component {
-							meta: RsxNodeMeta::default(),
+							meta: NodeMeta::default(),
 
 							tracker: component_tracker,
 							tag: "MyComponent".to_string(),
@@ -311,11 +310,11 @@ mod test {
 								tag: "div".to_string(),
 								self_closing: false,
 								attributes: vec![],
-								meta: RsxNodeMeta::default(),
+								meta: NodeMeta::default(),
 
 								children: Box::new(RsxTemplateNode::Text {
 									value: "some child".to_string(),
-									meta: RsxNodeMeta::default(),
+									meta: NodeMeta::default(),
 								}),
 							}),
 						},

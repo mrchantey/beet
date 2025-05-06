@@ -16,7 +16,7 @@ impl Runtime for StringRuntime {
 		RsxNode::Block(RsxBlock {
 			initial: Box::new(block.into_node()),
 			effect: Effect::new(noop(), tracker),
-			meta: RsxNodeMeta::default(),
+			meta: NodeMeta::default(),
 		})
 	}
 

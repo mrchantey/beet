@@ -4,19 +4,19 @@ use crate::prelude::*;
 
 #[derive(Debug, Default, Clone, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct RsxNodeMeta {
+pub struct NodeMeta {
 	pub template_directives: Vec<TemplateDirective>,
 	pub location: Option<RsxMacroLocation>,
 }
 
-impl NodeMeta for RsxNodeMeta {
-	fn meta(&self) -> &RsxNodeMeta { self }
-	fn meta_mut(&mut self) -> &mut RsxNodeMeta { self }
+impl GetNodeMeta for NodeMeta {
+	fn meta(&self) -> &NodeMeta { self }
+	fn meta_mut(&mut self) -> &mut NodeMeta { self }
 }
 
-pub trait NodeMeta {
-	fn meta(&self) -> &RsxNodeMeta;
-	fn meta_mut(&mut self) -> &mut RsxNodeMeta;
+pub trait GetNodeMeta {
+	fn meta(&self) -> &NodeMeta;
+	fn meta_mut(&mut self) -> &mut NodeMeta;
 	fn location(&self) -> Option<&RsxMacroLocation> {
 		self.meta().location.as_ref()
 	}
@@ -61,7 +61,7 @@ pub trait NodeMeta {
 }
 
 
-impl<T: NodeMeta> TemplateDirectiveExt for T {
+impl<T: GetNodeMeta> TemplateDirectiveExt for T {
 	fn find_directive(
 		&self,
 		mut func: impl FnMut(&TemplateDirective) -> bool,

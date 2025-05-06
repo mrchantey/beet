@@ -29,7 +29,7 @@ impl Runtime for SigfaultRuntime {
 				}),
 				tracker,
 			),
-			meta: RsxNodeMeta::default(),
+			meta: NodeMeta::default(),
 		})
 	}
 

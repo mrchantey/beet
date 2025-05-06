@@ -129,11 +129,11 @@ mod test {
 				children: Box::new(
 						RsxFragment {
 					nodes: vec![],
-					meta: RsxNodeMeta::default(),
+					meta: NodeMeta::default(),
 						}.into_node()
 				),
 				self_closing: true,
-				meta: RsxNodeMeta {
+				meta: NodeMeta {
 						template_directives: vec![TemplateDirective::ClientLoad],
 						location: None
 				},

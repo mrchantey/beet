@@ -12,7 +12,7 @@ impl IntoRsxNode for Style {
 			attributes: Default::default(),
 			self_closing: false,
 			children: Box::new(self.css.into_node()),
-			meta: RsxNodeMeta {
+			meta: NodeMeta {
 				template_directives: self.directives,
 				location: Default::default(),
 			},

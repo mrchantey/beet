@@ -122,14 +122,14 @@ val_string	= "foo"
 				children: Box::new(
 					RsxText {
 						value: "hello world".to_string(),
-						meta: RsxNodeMeta {
+						meta: NodeMeta {
 							template_directives: Vec::new(),
 							location: None
 						},
 					}.into_node()
 				),
 				self_closing: false,
-				meta: RsxNodeMeta {
+				meta: NodeMeta {
 					template_directives: vec![],
 					location: Some(RsxMacroLocation::new("ws_build/beet_build/src/build_codegen/markdown_to_func_tokens.rs", 1u32, 0u32))
 				},

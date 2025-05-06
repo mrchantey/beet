@@ -42,8 +42,8 @@ impl Into<RsxNode> for RsxElement {
 impl Into<RsxNode> for RsxComponent {
 	fn into(self) -> RsxNode { RsxNode::Component(self) }
 }
-impl NodeMeta for RsxNode {
-	fn meta(&self) -> &RsxNodeMeta {
+impl GetNodeMeta for RsxNode {
+	fn meta(&self) -> &NodeMeta {
 		match self {
 			RsxNode::Doctype(node) => node.meta(),
 			RsxNode::Comment(node) => node.meta(),
@@ -55,7 +55,7 @@ impl NodeMeta for RsxNode {
 		}
 	}
 
-	fn meta_mut(&mut self) -> &mut RsxNodeMeta {
+	fn meta_mut(&mut self) -> &mut NodeMeta {
 		match self {
 			RsxNode::Doctype(node) => node.meta_mut(),
 			RsxNode::Comment(node) => node.meta_mut(),
@@ -71,49 +71,49 @@ impl NodeMeta for RsxNode {
 #[derive(Debug, Clone)]
 pub struct RsxDoctype {
 	/// Metadata for this node
-	pub meta: RsxNodeMeta,
+	pub meta: NodeMeta,
 }
 
-impl NodeMeta for RsxDoctype {
-	fn meta(&self) -> &RsxNodeMeta { &self.meta }
-	fn meta_mut(&mut self) -> &mut RsxNodeMeta { &mut self.meta }
+impl GetNodeMeta for RsxDoctype {
+	fn meta(&self) -> &NodeMeta { &self.meta }
+	fn meta_mut(&mut self) -> &mut NodeMeta { &mut self.meta }
 }
 
 #[derive(Debug, Clone)]
 pub struct RsxComment {
 	pub value: String,
 	/// Metadata for this node
-	pub meta: RsxNodeMeta,
+	pub meta: NodeMeta,
 }
 
-impl NodeMeta for RsxComment {
-	fn meta(&self) -> &RsxNodeMeta { &self.meta }
-	fn meta_mut(&mut self) -> &mut RsxNodeMeta { &mut self.meta }
+impl GetNodeMeta for RsxComment {
+	fn meta(&self) -> &NodeMeta { &self.meta }
+	fn meta_mut(&mut self) -> &mut NodeMeta { &mut self.meta }
 }
 
 #[derive(Debug, Clone)]
 pub struct RsxText {
 	pub value: String,
 	/// Metadata for this node
-	pub meta: RsxNodeMeta,
+	pub meta: NodeMeta,
 }
 
 
-impl NodeMeta for RsxText {
-	fn meta(&self) -> &RsxNodeMeta { &self.meta }
-	fn meta_mut(&mut self) -> &mut RsxNodeMeta { &mut self.meta }
+impl GetNodeMeta for RsxText {
+	fn meta(&self) -> &NodeMeta { &self.meta }
+	fn meta_mut(&mut self) -> &mut NodeMeta { &mut self.meta }
 }
 
 #[derive(Debug, Default, Clone)]
 pub struct RsxFragment {
 	pub nodes: Vec<RsxNode>,
 	/// Metadata for this node
-	pub meta: RsxNodeMeta,
+	pub meta: NodeMeta,
 }
 
-impl NodeMeta for RsxFragment {
-	fn meta(&self) -> &RsxNodeMeta { &self.meta }
-	fn meta_mut(&mut self) -> &mut RsxNodeMeta { &mut self.meta }
+impl GetNodeMeta for RsxFragment {
+	fn meta(&self) -> &NodeMeta { &self.meta }
+	fn meta_mut(&mut self) -> &mut NodeMeta { &mut self.meta }
 }
 
 /// This is an RsxNode and a location, which is required for hydration.
@@ -153,7 +153,7 @@ where
 	fn into_node(self) -> RsxNode {
 		RsxFragment {
 			nodes: self.into_iter().map(|item| item.into_node()).collect(),
-			meta: RsxNodeMeta::default(),
+			meta: NodeMeta::default(),
 		}
 		.into()
 	}
@@ -177,22 +177,10 @@ impl<T: ToString> From<T> for RsxNode {
 	fn from(value: T) -> Self {
 		RsxNode::Text(RsxText {
 			value: value.to_string(),
-			meta: RsxNodeMeta::default(),
+			meta: NodeMeta::default(),
 		})
 	}
 }
-
-// pub struct PathIntoRsx;
-// impl IntoRsxNode<PathIntoRsx> for &Path {
-// 	fn into_node(self) -> RsxNode {
-// 		RsxNode::Text(RsxText {
-// 			value: self.to_string_lossy().to_string(),
-// 			meta: RsxNodeMeta::default(),
-// 		})
-// 	}
-// }
-
-
 
 impl RsxNode {
 	/// Returns true if the node is an empty fragment,
@@ -291,12 +279,12 @@ pub struct RsxBlock {
 	pub initial: Box<RsxNode>,
 	pub effect: Effect,
 	/// Metadata for this node
-	pub meta: RsxNodeMeta,
+	pub meta: NodeMeta,
 }
 
-impl NodeMeta for RsxBlock {
-	fn meta(&self) -> &RsxNodeMeta { &self.meta }
-	fn meta_mut(&mut self) -> &mut RsxNodeMeta { &mut self.meta }
+impl GetNodeMeta for RsxBlock {
+	fn meta(&self) -> &NodeMeta { &self.meta }
+	fn meta_mut(&mut self) -> &mut NodeMeta { &mut self.meta }
 }
 
 /// A component is a struct that implements the [Component] trait.
@@ -321,12 +309,12 @@ pub struct RsxComponent {
 	/// `rsx! { <MyComponent>slot_children</MyComponent> }`
 	pub slot_children: Box<RsxNode>,
 	/// Metadata for this node
-	pub meta: RsxNodeMeta,
+	pub meta: NodeMeta,
 }
 
-impl NodeMeta for RsxComponent {
-	fn meta(&self) -> &RsxNodeMeta { &self.meta }
-	fn meta_mut(&mut self) -> &mut RsxNodeMeta { &mut self.meta }
+impl GetNodeMeta for RsxComponent {
+	fn meta(&self) -> &NodeMeta { &self.meta }
+	fn meta_mut(&mut self) -> &mut NodeMeta { &mut self.meta }
 }
 
 /// Representation of an RsxElement
@@ -346,12 +334,12 @@ pub struct RsxElement {
 	/// ie `<input/>`
 	pub self_closing: bool,
 	/// The location of the node
-	pub meta: RsxNodeMeta,
+	pub meta: NodeMeta,
 }
 
-impl NodeMeta for RsxElement {
-	fn meta(&self) -> &RsxNodeMeta { &self.meta }
-	fn meta_mut(&mut self) -> &mut RsxNodeMeta { &mut self.meta }
+impl GetNodeMeta for RsxElement {
+	fn meta(&self) -> &NodeMeta { &self.meta }
+	fn meta_mut(&mut self) -> &mut NodeMeta { &mut self.meta }
 }
 
 impl RsxElement {

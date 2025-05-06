@@ -151,7 +151,7 @@ pub struct MetaBuilder;
 
 impl MetaBuilder {
 	pub fn build(location: TokenStream) -> TokenStream {
-		quote! {RsxNodeMeta {
+		quote! {NodeMeta {
 			template_directives: Vec::new(),
 			location: #location
 		}}
@@ -213,7 +213,7 @@ impl MetaBuilder {
 			})
 			.collect::<Vec<_>>();
 		quote! {
-			RsxNodeMeta {
+			NodeMeta {
 				template_directives: vec![#(#template_directives),*],
 				location: #location
 			}
@@ -221,7 +221,7 @@ impl MetaBuilder {
 	}
 
 	pub fn build_ron(location: TokenStream) -> TokenStream {
-		quote! {RsxNodeMeta(
+		quote! {NodeMeta(
 			template_directives: [],
 			location: #location
 		)}
@@ -267,7 +267,7 @@ impl MetaBuilder {
 				}
 			})
 			.collect::<Vec<_>>();
-		quote! {RsxNodeMeta(
+		quote! {NodeMeta(
 			template_directives: [#(#template_directives),*],
 			location: #location
 		)}
