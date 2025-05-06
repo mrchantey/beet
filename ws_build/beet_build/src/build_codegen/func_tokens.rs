@@ -29,7 +29,7 @@ pub struct FuncTokens {
 	/// Its return type is the [`FuncTokensGroup::func_type`].
 	pub item_fn: ItemFn,
 	/// Canonical path to the file
-	pub canonical_path: AbsPathBuf,
+	pub abs_path: AbsPathBuf,
 	/// Path relative to the [`src`](FileGroup::src) of the [`FileGroup`]
 	pub local_path: PathBuf,
 	/// A reasonable route path generated from this file's local path,
@@ -71,7 +71,7 @@ impl FuncTokens {
 			mod_import: ModImport::Inline,
 			frontmatter: syn::parse_quote! {{}},
 			item_fn,
-			canonical_path: AbsPathBuf::new_unchecked(path),
+			abs_path: AbsPathBuf::new_unchecked(path),
 			local_path: path.to_path_buf(),
 			route_info: RouteInfo {
 				path: RoutePath::from_file_path(path).unwrap(),
@@ -83,7 +83,7 @@ impl FuncTokens {
 	/// Whether this route was created from a file called `index.rs`, used by the
 	/// [`RouteTreeBuilder`] to determine if it should be a child
 	pub fn is_index(&self) -> bool {
-		self.canonical_path
+		self.abs_path
 			.file_stem()
 			.map(|s| s == "index")
 			.unwrap_or(false)
@@ -136,7 +136,7 @@ impl FuncTokens {
 			ModImport::Path => {
 				let out_dir = codegen_file.output_dir()?;
 				let mod_path =
-					PathExt::create_relative(out_dir, &self.canonical_path)?;
+					PathExt::create_relative(out_dir, &self.abs_path)?;
 				let mod_path_str = mod_path.to_string_lossy();
 				Ok(syn::parse_quote! {
 					#[path = #mod_path_str]

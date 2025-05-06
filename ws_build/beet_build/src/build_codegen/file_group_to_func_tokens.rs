@@ -34,27 +34,27 @@ impl FileGroupToFuncTokens {
 		&self,
 		index: usize,
 		group_src: &AbsPathBuf,
-		canonical_path: AbsPathBuf,
+		abs_path: AbsPathBuf,
 	) -> Result<Vec<FuncTokens>> {
-		let file_str = ReadFile::to_string(&canonical_path)?;
-		let local_path = PathExt::create_relative(&group_src, &canonical_path)?;
+		let file_str = ReadFile::to_string(&abs_path)?;
+		let local_path = PathExt::create_relative(&group_src, &abs_path)?;
 		let mod_ident = Ident::new(
 			&format!("file{}", index),
 			proc_macro2::Span::call_site(),
 		);
 
-		match canonical_path.extension() {
+		match abs_path.extension() {
 			Some(ex) if ex == "rs" => FuncFileToFuncTokens::parse(
 				mod_ident,
 				&file_str,
-				canonical_path,
+				abs_path,
 				local_path,
 			),
 			#[cfg(feature = "markdown")]
 			Some(ex) if ex == "md" || ex == "mdx" => MarkdownToFuncTokens::parse(
 				mod_ident,
 				&file_str,
-				canonical_path,
+				abs_path,
 				local_path,
 			)
 			.map(|func| vec![func]),
@@ -83,7 +83,7 @@ mod test {
 		// expect(func_tokens.funcs.len()).to_be(1);
 		expect(&func_tokens.local_path.to_string_lossy()).to_be("hello.md");
 		expect(
-			func_tokens.canonical_path.to_string_lossy().ends_with(
+			func_tokens.abs_path.to_string_lossy().ends_with(
 				"ws_rsx/beet_router/src/test_site/test_docs/hello.md",
 			),
 		)

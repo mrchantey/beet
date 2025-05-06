@@ -38,7 +38,7 @@ impl FuncTokensGroup {
 	/// required for calling the [`FuncTokens::item_fn`]
 	/// ## Errors
 	///
-	/// Errors if a relative path between the [`FuncTokens::canonical_path`]
+	/// Errors if a relative path between the [`FuncTokens::abs_path`]
 	/// and the `out_dir` cannot be created.
 	pub fn item_mods(&self, codegen_file: &CodegenFile) -> Result<Vec<Item>> {
 		self.funcs

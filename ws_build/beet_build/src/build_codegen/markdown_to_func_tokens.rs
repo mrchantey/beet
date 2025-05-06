@@ -16,9 +16,11 @@ impl MarkdownToFuncTokens {
 	pub fn parse(
 		mod_ident: Ident,
 		markdown: &str,
-		canonical_path: AbsPathBuf,
+		abs_path: AbsPathBuf,
 		local_path: PathBuf,
 	) -> Result<FuncTokens> {
+		let workspace_path =
+			WorkspacePathBuf::new_from_canonicalizable(&abs_path)?;
 		let frontmatter =
 			ParseMarkdown::markdown_to_frontmatter_tokens(markdown)?;
 		let rsx_str = ParseMarkdown::markdown_to_rsx_str(markdown);
@@ -28,12 +30,12 @@ impl MarkdownToFuncTokens {
 			.map_err(|e| {
 				anyhow::anyhow!(
 					"Failed to parse Markdown HTML\nPath: {}\nInput: {}\nError: {}",
-					canonical_path.display(),
+					abs_path.display(),
 					rsx_str,
 					e.to_string()
 				)
 			})?
-			.xpipe(HtmlTokensToRust::new_file_start_location());
+			.xpipe(HtmlTokensToRust::new_for_file(workspace_path));
 
 		let item_fn: ItemFn = syn::parse_quote! {
 			pub fn get() -> RsxNode
@@ -51,7 +53,7 @@ impl MarkdownToFuncTokens {
 				method: HttpMethod::Get,
 			},
 			local_path,
-			canonical_path,
+			abs_path,
 		})
 	}
 }
@@ -105,7 +107,7 @@ val_string	= "foo"
 		let func_tokens = MarkdownToFuncTokens::parse(
 			syn::parse_quote!(foo),
 			MARKDOWN,
-			AbsPathBuf::new_unchecked("foo"),
+			AbsPathBuf::new_workspace_rel_unchecked(file!()),
 			"bar".into(),
 		)
 		.unwrap();
@@ -120,13 +122,16 @@ val_string	= "foo"
 				children: Box::new(
 					RsxText {
 						value: "hello world".to_string(),
-						meta: RsxNodeMeta::default(),
+						meta: RsxNodeMeta { 
+							template_directives: Vec::new(),
+							location: None 
+						},
 					}.into_node()
 				),
 				self_closing: false,
 				meta: RsxNodeMeta {
 					template_directives: vec![],
-					location: Some(RsxMacroLocation::new(file!(), 1u32, 0u32))
+					location: Some(RsxMacroLocation::new("ws_build/beet_build/src/build_codegen/markdown_to_func_tokens.rs", 1u32, 0u32))
 				},
 			}
 			.into_node()

@@ -99,6 +99,12 @@ impl AbsPathBuf {
 	}
 	/// Create a new unchecked [`AbsPathBuf`] from a path relative to the workspace root,
 	/// ie from using the `file!()` macro.
+	/// ## Example
+	///
+	/// ```
+	/// # use sweet_utils::prelude::*;
+	/// let path = AbsPathBuf::new_workspace_rel(file!());
+	/// ```
 	pub fn new_workspace_rel_unchecked(path: impl AsRef<Path>) -> Self {
 		let path = FsExt::workspace_root().join(path);
 		Self::new_unchecked(path)

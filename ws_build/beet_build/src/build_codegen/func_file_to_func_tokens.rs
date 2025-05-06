@@ -21,7 +21,7 @@ impl FuncFileToFuncTokens {
 	pub fn parse(
 		mod_ident: Ident,
 		file_str: &str,
-		canonical_path: AbsPathBuf,
+		abs_path: AbsPathBuf,
 		local_path: PathBuf,
 	) -> Result<Vec<FuncTokens>> {
 		let route_path = RoutePath::from_file_path(&local_path)?;
@@ -65,7 +65,7 @@ impl FuncFileToFuncTokens {
 				Some(FuncTokens {
 					mod_ident: mod_ident.clone(),
 					mod_import: ModImport::Path,
-					canonical_path: canonical_path.clone(),
+					abs_path: abs_path.clone(),
 					local_path: local_path.clone(),
 					route_info: RouteInfo {
 						path: route_path.clone(),
@@ -100,7 +100,7 @@ mod test {
 			.unwrap();
 		expect(&file.local_path.to_string_lossy()).to_be("docs/index.rs");
 		expect(
-			file.canonical_path.to_string_lossy().ends_with(
+			file.abs_path.to_string_lossy().ends_with(
 				"ws_rsx/beet_router/src/test_site/pages/docs/index.rs",
 			),
 		)

@@ -6,8 +6,10 @@ use proc_macro2::Span;
 use proc_macro2::TokenStream;
 use proc_macro2_diagnostics::Diagnostic;
 use proc_macro2_diagnostics::Level;
+use quote::ToTokens;
 use quote::quote;
 use sweet::prelude::Pipeline;
+use sweet::prelude::WorkspacePathBuf;
 use syn::Block;
 use syn::Expr;
 use syn::Ident;
@@ -57,21 +59,30 @@ impl Pipeline<HtmlTokens, Block> for HtmlTokensToRust {
 
 impl HtmlTokensToRust {
 	pub fn new_file_start_location() -> Self {
-		Self::new_for_this_file(RsxIdents::default(), LineColumn {
+		Self::new(RsxIdents::default(), quote! {file!()}, LineColumn {
 			line: 1,
 			column: 0,
 		})
 	}
 
-	pub fn new_spanned(idents: RsxIdents, entry: &impl Spanned) -> Self {
-		Self::new_for_this_file(idents, entry.span().start())
+	pub fn new_for_file(file: WorkspacePathBuf) -> Self {
+		Self::new(
+			RsxIdents::default(),
+			file.to_string_lossy().to_token_stream(),
+			LineColumn { line: 1, column: 0 },
+		)
 	}
+
+	pub fn new_spanned(idents: RsxIdents, entry: &impl Spanned) -> Self {
+		Self::new(idents, quote! {file!()}, entry.span().start())
+	}
+
 	/// use the line and column with the `file!()` macro to resolve location
-	pub fn new_for_this_file(idents: RsxIdents, location: LineColumn) -> Self {
-		let line = location.line as u32;
-		let col = location.column as u32;
+	fn new(idents: RsxIdents, file: TokenStream, linecol: LineColumn) -> Self {
+		let line = linecol.line as u32;
+		let col = linecol.column as u32;
 		let location = quote! {
-			Some(RsxMacroLocation::new(file!(), #line, #col))
+			Some(RsxMacroLocation::new(#file, #line, #col))
 		};
 
 		Self {
