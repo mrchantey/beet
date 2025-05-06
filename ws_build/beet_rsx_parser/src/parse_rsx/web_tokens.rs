@@ -5,11 +5,12 @@ use syn::Block;
 use syn::LitStr;
 use syn::token::Lt;
 
-/// [`WebTokens`] is a superset of [`RsxNodeTokens`] 
-/// 
-/// 
-/// 
-/// 
+/// [`WebTokens`] is a superset of [`RsxNodeTokens`], and
+/// includes several types of information including html, css,
+/// wasm code and various template directives related to web rendering
+/// like islands.
+///
+///
 /// ## Example inputs:
 /// - rsx! macros
 /// - mdx files
