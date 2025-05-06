@@ -17,9 +17,9 @@ impl<T: Into<TokenStream>> Pipeline<T, TokenStream> for RsxMacroPipeline {
 		let tokens = tokens.into();
 		let span = tokens.span();
 		let (rstml, rstml_errors) = tokens.xpipe(TokensToRstml::default());
-		let (html, html_errors) = rstml.xpipe(RstmlToHtmlTokens::new());
-		let block = match html.xpipe(ParseHtmlTokens::default()) {
-			Ok(val) => val.xpipe(HtmlTokensToRust::new_spanned(
+		let (html, html_errors) = rstml.xpipe(RstmlToWebTokens::new());
+		let block = match html.xpipe(ParseWebTokens::default()) {
+			Ok(val) => val.xpipe(WebTokensToRust::new_spanned(
 				RsxIdents::default(),
 				&span,
 			)),
@@ -75,11 +75,11 @@ impl<'a, T: Into<TokenStream>> Pipeline<T, TokenStream> for RsxRonPipeline<'a> {
 		tokens
 			.xpipe(TokensToRstml::default())
 			.0
-			.xpipe(RstmlToHtmlTokens::new())
+			.xpipe(RstmlToWebTokens::new())
 			.0
-			.xpipe(ParseHtmlTokens::default())
+			.xpipe(ParseWebTokens::default())
 			.map(|html| {
-				html.xpipe(HtmlTokensToRon::new_from_tokens(&span, self.file))
+				html.xpipe(WebTokensToRon::new_from_tokens(&span, self.file))
 			})
 			.unwrap_or_else(|err| {
 				let err_str = err.to_string();

@@ -17,16 +17,18 @@ impl Pipeline<WorkspacePathBuf, Result<Vec<FileTemplates>>>
 {
 	fn apply(self, path: WorkspacePathBuf) -> Result<Vec<FileTemplates>> {
 		match path.extension() {
-			Some(ex) if ex == "rs" => path.xpipe(RsToHtmlTokens),
+			Some(ex) if ex == "rs" => path.xpipe(RsToWebTokens),
 			Some(ex) if ex == "md" || ex == "mdx" => {
-				path.xpipe(MdToHtmlTokens).map(|v| vec![v])
+				path.xpipe(MdToWebTokens).map(|v| vec![v])
 			}
 			_ => Ok(Default::default()),
 		}?
-		.xmap_each(|(location, html_tokens)| {
-			let rsx_ron = html_tokens
-				.xpipe(ParseHtmlTokens::default())?
-				.xpipe(HtmlTokensToRon::new(
+		.xmap_each(|(location, web_tokens)| {
+			// todo!("here we should extract the styles");
+
+			let rsx_ron = web_tokens
+				.xpipe(ParseWebTokens::default())?
+				.xpipe(WebTokensToRon::new(
 					&location.file,
 					location.line,
 					location.col,

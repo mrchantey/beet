@@ -38,7 +38,7 @@ impl ParseMarkdown {
 	}
 
 	/// Parse a given string of markdown into an rsx string,
-	/// often parsed by [`StringToHtmlTokens`]
+	/// often parsed by [`StringToWebTokens`]
 	pub fn markdown_to_rsx_str(markdown: &str) -> String {
 		let parser = Parser::new_ext(&markdown, Self::options());
 

@@ -20,7 +20,7 @@ use syn::spanned::Spanned;
 /// havent yet found a usecase that makes it worth setting on
 /// every node
 #[derive(Debug)]
-pub struct HtmlTokensToRust {
+pub struct WebTokensToRust {
 	/// The location of the root node
 	root_location: Option<TokenStream>,
 	pub idents: RsxIdents,
@@ -35,8 +35,8 @@ pub struct HtmlTokensToRust {
 	pub exclude_errors: bool,
 }
 
-impl Pipeline<HtmlTokens, Block> for HtmlTokensToRust {
-	fn apply(mut self, node: HtmlTokens) -> Block {
+impl Pipeline<WebTokens, Block> for WebTokensToRust {
+	fn apply(mut self, node: WebTokens) -> Block {
 		let node = self.map_node(node);
 
 		let errors = if self.exclude_errors {
@@ -57,7 +57,7 @@ impl Pipeline<HtmlTokens, Block> for HtmlTokensToRust {
 	}
 }
 
-impl HtmlTokensToRust {
+impl WebTokensToRust {
 	pub fn new_no_location() -> Self {
 		Self {
 			idents: Default::default(),
@@ -107,9 +107,9 @@ impl HtmlTokensToRust {
 	}
 
 	/// returns an RsxNode
-	fn map_node(&mut self, node: HtmlTokens) -> TokenStream {
+	fn map_node(&mut self, node: WebTokens) -> TokenStream {
 		match node {
-			HtmlTokens::Fragment { nodes } => {
+			WebTokens::Fragment { nodes } => {
 				let meta = self.basic_meta();
 				let nodes = nodes.into_iter().map(|n| self.map_node(n));
 				quote! { RsxFragment{
@@ -117,7 +117,7 @@ impl HtmlTokensToRust {
 					meta: #meta,
 				}.into_node()}
 			}
-			HtmlTokens::Doctype { value: _ } => {
+			WebTokens::Doctype { value: _ } => {
 				let meta = self.basic_meta();
 				quote!(
 					RsxDoctype {
@@ -126,14 +126,14 @@ impl HtmlTokensToRust {
 					.into_node()
 				)
 			}
-			HtmlTokens::Comment { value } => {
+			WebTokens::Comment { value } => {
 				let meta = self.basic_meta();
 				quote!(RsxComment {
 					value: #value.to_string(),
 					meta: #meta,
 				}.into_node())
 			}
-			HtmlTokens::Text { value } => {
+			WebTokens::Text { value } => {
 				let meta = self.basic_meta();
 
 				quote!(RsxText {
@@ -141,14 +141,14 @@ impl HtmlTokensToRust {
 					meta: #meta,
 				}.into_node())
 			}
-			HtmlTokens::Block { value } => {
+			WebTokens::Block { value } => {
 				let tracker = self.rusty_tracker.next_tracker(&value);
 				let ident = &self.idents.runtime.effect;
 				quote! {
 					#ident::parse_block_node(#tracker, #value)
 				}
 			}
-			HtmlTokens::Element {
+			WebTokens::Element {
 				component,
 				children,
 				self_closing,
@@ -174,7 +174,7 @@ impl HtmlTokensToRust {
 						&directives,
 					);
 					// this attributes-children order is important for rusty tracker indices
-					// to be consistent with HtmlTokensToRon
+					// to be consistent with [`WebTokensToRon`]
 					let attributes = attributes
 						.iter()
 						.map(|attr| self.map_attribute(attr))
@@ -266,7 +266,7 @@ impl HtmlTokensToRust {
 		&mut self,
 		location: TokenStream,
 		component: RsxNodeTokens,
-		children: HtmlTokens,
+		children: WebTokens,
 	) -> TokenStream {
 		let tracker = self.rusty_tracker.next_tracker(&component);
 		let RsxNodeTokens {

@@ -10,10 +10,10 @@ use syn::LitStr;
 
 /// For a given string of rsx, use [`beet_rsx_combinator`] to parse.
 #[derive(Debug, Default)]
-pub struct StringToHtmlTokens;
+pub struct StringToWebTokens;
 
-impl<T: AsRef<str>> Pipeline<T, Result<HtmlTokens>> for StringToHtmlTokens {
-	fn apply(self, input: T) -> Result<HtmlTokens> {
+impl<T: AsRef<str>> Pipeline<T, Result<WebTokens>> for StringToWebTokens {
+	fn apply(self, input: T) -> Result<WebTokens> {
 		let (expr, remaining) = parse(input.as_ref()).map_err(|e| {
 			anyhow::anyhow!("Failed to parse HTML: {}", e.to_string())
 		})?;
@@ -23,24 +23,24 @@ impl<T: AsRef<str>> Pipeline<T, Result<HtmlTokens>> for StringToHtmlTokens {
 				remaining
 			));
 		}
-		expr.into_html_tokens()
+		expr.into_web_tokens()
 	}
 }
 
-trait IntoHtmlTokens {
-	fn into_html_tokens(self) -> Result<HtmlTokens>;
+trait IntoWebTokens {
+	fn into_web_tokens(self) -> Result<WebTokens>;
 }
 
-impl IntoHtmlTokens for RsxParsedExpression {
-	fn into_html_tokens(self) -> Result<HtmlTokens> {
+impl IntoWebTokens for RsxParsedExpression {
+	fn into_web_tokens(self) -> Result<WebTokens> {
 		if self.len() == 1 {
-			self.inner().into_iter().next().unwrap().into_html_tokens()
+			self.inner().into_iter().next().unwrap().into_web_tokens()
 		} else {
-			HtmlTokens::Fragment {
+			WebTokens::Fragment {
 				nodes: self
 					.inner()
 					.into_iter()
-					.map(IntoHtmlTokens::into_html_tokens)
+					.map(IntoWebTokens::into_web_tokens)
 					.collect::<Result<Vec<_>>>()?,
 			}
 			.xok()
@@ -48,8 +48,8 @@ impl IntoHtmlTokens for RsxParsedExpression {
 	}
 }
 
-impl IntoHtmlTokens for RsxTokensOrElement {
-	fn into_html_tokens(self) -> Result<HtmlTokens> {
+impl IntoWebTokens for RsxTokensOrElement {
+	fn into_web_tokens(self) -> Result<WebTokens> {
 		match self {
 			RsxTokensOrElement::Tokens(tokens) => {
 				// TODO this is incorrect, what we need is a new type,
@@ -64,26 +64,26 @@ impl IntoHtmlTokens for RsxTokensOrElement {
 							e.to_string()
 						)
 					})?;
-				Ok(HtmlTokens::Block {
+				Ok(WebTokens::Block {
 					value: block.into(),
 				})
 			}
-			RsxTokensOrElement::Element(el) => el.into_html_tokens(),
+			RsxTokensOrElement::Element(el) => el.into_web_tokens(),
 		}
 	}
 }
-impl IntoHtmlTokens for RsxElement {
-	fn into_html_tokens(self) -> Result<HtmlTokens> {
+impl IntoWebTokens for RsxElement {
+	fn into_web_tokens(self) -> Result<WebTokens> {
 		match self {
-			RsxElement::SelfClosing(el) => el.into_html_tokens(),
-			RsxElement::Normal(el) => el.into_html_tokens(),
+			RsxElement::SelfClosing(el) => el.into_web_tokens(),
+			RsxElement::Normal(el) => el.into_web_tokens(),
 		}
 	}
 }
 
-impl IntoHtmlTokens for RsxSelfClosingElement {
-	fn into_html_tokens(self) -> Result<HtmlTokens> {
-		HtmlTokens::Element {
+impl IntoWebTokens for RsxSelfClosingElement {
+	fn into_web_tokens(self) -> Result<WebTokens> {
+		WebTokens::Element {
 			component: RsxNodeTokens {
 				tag: NameExpr::LitStr(
 					LitStr::new(&self.0.to_string(), Span::call_site()).into(),
@@ -103,19 +103,19 @@ impl IntoHtmlTokens for RsxSelfClosingElement {
 	}
 }
 
-impl IntoHtmlTokens for RsxNormalElement {
-	fn into_html_tokens(self) -> Result<HtmlTokens> {
+impl IntoWebTokens for RsxNormalElement {
+	fn into_web_tokens(self) -> Result<WebTokens> {
 		const STRING_TAGS: [&str; 3] = ["script", "style", "code"];
 
 		let children = if STRING_TAGS.contains(&self.0.to_string().as_str()) {
-			HtmlTokens::Text {
+			WebTokens::Text {
 				value: LitStr::new(&self.2.to_html(), Span::call_site()).into(),
 			}
 		} else {
-			self.2.into_html_tokens()?
+			self.2.into_web_tokens()?
 		};
 
-		HtmlTokens::Element {
+		WebTokens::Element {
 			component: RsxNodeTokens {
 				tag: NameExpr::LitStr(
 					LitStr::new(&self.0.to_string(), Span::call_site()).into(),
@@ -137,20 +137,20 @@ impl IntoHtmlTokens for RsxNormalElement {
 	}
 }
 
-impl IntoHtmlTokens for RsxChildren {
-	fn into_html_tokens(self) -> Result<HtmlTokens> {
+impl IntoWebTokens for RsxChildren {
+	fn into_web_tokens(self) -> Result<WebTokens> {
 		if self.0.len() == 1 {
 			self.0
 				.into_iter()
 				.next()
 				.unwrap()
-				.xmap(IntoHtmlTokens::into_html_tokens)
+				.xmap(IntoWebTokens::into_web_tokens)
 		} else {
-			HtmlTokens::Fragment {
+			WebTokens::Fragment {
 				nodes: self
 					.0
 					.into_iter()
-					.map(IntoHtmlTokens::into_html_tokens)
+					.map(IntoWebTokens::into_web_tokens)
 					.collect::<Result<_>>()?,
 			}
 			.xok()
@@ -158,20 +158,20 @@ impl IntoHtmlTokens for RsxChildren {
 	}
 }
 
-impl IntoHtmlTokens for RsxChild {
-	fn into_html_tokens(self) -> Result<HtmlTokens> {
+impl IntoWebTokens for RsxChild {
+	fn into_web_tokens(self) -> Result<WebTokens> {
 		match self {
-			RsxChild::Element(val) => val.into_html_tokens(),
-			RsxChild::Text(val) => val.into_html_tokens(),
-			RsxChild::CodeBlock(val) => val.into_html_tokens(),
+			RsxChild::Element(val) => val.into_web_tokens(),
+			RsxChild::Text(val) => val.into_web_tokens(),
+			RsxChild::CodeBlock(val) => val.into_web_tokens(),
 		}
 	}
 }
 
 
-impl IntoHtmlTokens for RsxText {
-	fn into_html_tokens(self) -> Result<HtmlTokens> {
-		HtmlTokens::Text {
+impl IntoWebTokens for RsxText {
+	fn into_web_tokens(self) -> Result<WebTokens> {
+		WebTokens::Text {
 			value: LitStr::new(&self.0, Span::call_site()).into(),
 		}
 		.xok()
@@ -201,8 +201,8 @@ impl IntoRsxAttributeTokens for RsxAttribute {
 			.xok(),
 			RsxAttribute::Spread(value) => {
 				let block = value
-					.into_html_tokens()?
-					.xpipe(HtmlTokensToRust::new_no_location());
+					.into_web_tokens()?
+					.xpipe(WebTokensToRust::new_no_location());
 				RsxAttributeTokens::Block {
 					block: block.into(),
 				}
@@ -235,14 +235,14 @@ impl TryInto<Spanner<Expr>> for RsxAttributeValue {
 			}
 			RsxAttributeValue::Element(value) => {
 				let block = value
-					.into_html_tokens()?
-					.xpipe(HtmlTokensToRust::new_no_location());
+					.into_web_tokens()?
+					.xpipe(WebTokensToRust::new_no_location());
 				syn::parse_quote!(#block)
 			}
 			RsxAttributeValue::CodeBlock(value) => {
 				let block = value
-					.into_html_tokens()?
-					.xpipe(HtmlTokensToRust::new_no_location());
+					.into_web_tokens()?
+					.xpipe(WebTokensToRust::new_no_location());
 				syn::parse_quote!(#block)
 			}
 		};
@@ -254,23 +254,26 @@ impl TryInto<Spanner<Expr>> for RsxAttributeValue {
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
+	use quote::ToTokens;
 	use sweet::prelude::*;
 
 	fn str_to_ron_matcher(str: &str) -> Matcher<String> {
-		str.xpipe(StringToHtmlTokens)
+		str.xpipe(StringToWebTokens)
 			.unwrap()
-			.xpipe(HtmlTokensToRon::new_no_location())
+			.xpipe(WebTokensToRon::new_no_location())
 			.to_string()
 			.xpect()
 	}
-	// fn str_to_rust_matcher(str: &str) -> Matcher<String> {
-	// 	str.xpipe(StringToHtmlTokens)
-	// 		.unwrap()
-	// 		.xpipe(HtmlTokensToRust::default())
-	// 		.to_token_stream()
-	// 		.to_string()
-	// 		.xpect()
-	// }
+
+	#[allow(unused)]
+	fn str_to_rust_matcher(str: &str) -> Matcher<String> {
+		str.xpipe(StringToWebTokens)
+			.unwrap()
+			.xpipe(WebTokensToRust::new_no_location())
+			.to_token_stream()
+			.to_string()
+			.xpect()
+	}
 
 	#[test]
 	fn element() {

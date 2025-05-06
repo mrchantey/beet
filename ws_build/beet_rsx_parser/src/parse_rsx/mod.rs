@@ -1,30 +1,30 @@
-mod parse_html_tokens;
-pub use parse_html_tokens::*;
-mod html_tokens_to_ron;
+mod parse_web_tokens;
+pub use parse_web_tokens::*;
+mod web_tokens_to_ron;
 mod rsx_runtime;
-pub use html_tokens_to_ron::*;
+pub use web_tokens_to_ron::*;
 pub use rsx_runtime::*;
 mod rsx_pipeline;
 pub use rsx_pipeline::*;
-mod html_tokens;
-pub use html_tokens::*;
-mod html_tokens_to_rust;
-pub use html_tokens_to_rust::*;
+mod web_tokens;
+pub use web_tokens::*;
+mod web_tokens_to_rust;
+pub use web_tokens_to_rust::*;
 mod rsx_node_tokens;
 pub use rsx_node_tokens::*;
-mod rstml_to_html_tokens;
-pub use rstml_to_html_tokens::*;
+mod rstml_to_web_tokens;
+pub use rstml_to_web_tokens::*;
 mod meta_builder;
 mod rstml_rust_to_hash;
 mod rusty_tracker_builder;
 #[cfg(feature = "html")]
-mod string_to_html_tokens;
+mod string_to_web_tokens;
 #[cfg(feature = "css")]
 mod validate_css;
 pub use meta_builder::*;
 pub use rusty_tracker_builder::*;
 #[cfg(feature = "html")]
-pub use string_to_html_tokens::*;
+pub use string_to_web_tokens::*;
 #[cfg(feature = "css")]
 pub use validate_css::*;
 pub mod tokens_to_rstml;

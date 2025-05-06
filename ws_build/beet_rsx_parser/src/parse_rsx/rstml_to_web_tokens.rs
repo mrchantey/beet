@@ -18,9 +18,9 @@ use syn::spanned::Spanned;
 
 /// Convert rstml nodes to a Vec<RsxNode> token stream
 /// ## Pipeline
-/// [`Pipeline<Vec<Node<C>>, (HtmlTokens, Vec<TokenStream>)>`]
+/// [`Pipeline<Vec<Node<C>>, (WebTokens, Vec<TokenStream>)>`]
 #[derive(Debug, Default)]
-pub struct RstmlToHtmlTokens<C = rstml::Infallible> {
+pub struct RstmlToWebTokens<C = rstml::Infallible> {
 	// Additional error and warning messages.
 	pub errors: Vec<TokenStream>,
 	// Collect elements to provide semantic highlight based on element tag.
@@ -33,7 +33,7 @@ pub struct RstmlToHtmlTokens<C = rstml::Infallible> {
 	phantom: std::marker::PhantomData<C>,
 }
 
-impl RstmlToHtmlTokens {
+impl RstmlToWebTokens {
 	pub fn new() -> Self {
 		Self {
 			errors: Vec::new(),
@@ -45,19 +45,19 @@ impl RstmlToHtmlTokens {
 }
 
 /// Parse rstml nodes to a [`NodeTokens`] and any compile errors
-impl<C: CustomNode> Pipeline<Vec<Node<C>>, (HtmlTokens, Vec<TokenStream>)>
-	for RstmlToHtmlTokens<C>
+impl<C: CustomNode> Pipeline<Vec<Node<C>>, (WebTokens, Vec<TokenStream>)>
+	for RstmlToWebTokens<C>
 {
-	fn apply(mut self, nodes: Vec<Node<C>>) -> (HtmlTokens, Vec<TokenStream>) {
+	fn apply(mut self, nodes: Vec<Node<C>>) -> (WebTokens, Vec<TokenStream>) {
 		let node = self.map_nodes(nodes);
 		(node, self.errors)
 	}
 }
 
-impl<C: CustomNode> RstmlToHtmlTokens<C> {
+impl<C: CustomNode> RstmlToWebTokens<C> {
 	/// the number of actual html nodes will likely be different
 	/// due to fragments, blocks etc
-	pub fn map_nodes(&mut self, nodes: Vec<Node<C>>) -> HtmlTokens {
+	pub fn map_nodes(&mut self, nodes: Vec<Node<C>>) -> WebTokens {
 		let mut nodes = nodes
 			.into_iter()
 			.map(|node| self.map_node(node))
@@ -65,26 +65,26 @@ impl<C: CustomNode> RstmlToHtmlTokens<C> {
 		if nodes.len() == 1 {
 			nodes.pop().unwrap()
 		} else {
-			HtmlTokens::Fragment { nodes }
+			WebTokens::Fragment { nodes }
 		}
 	}
 
-	fn map_node(&mut self, node: Node<C>) -> HtmlTokens {
+	fn map_node(&mut self, node: Node<C>) -> WebTokens {
 		match node {
-			Node::Doctype(node) => HtmlTokens::Doctype {
+			Node::Doctype(node) => WebTokens::Doctype {
 				value: node.token_start.token_lt.into(),
 			},
-			Node::Comment(node) => HtmlTokens::Comment {
+			Node::Comment(node) => WebTokens::Comment {
 				value: node.value.into(),
 			},
-			Node::Text(node) => HtmlTokens::Text {
+			Node::Text(node) => WebTokens::Text {
 				value: node.value.into(),
 			},
-			Node::RawText(node) => HtmlTokens::Text {
+			Node::RawText(node) => WebTokens::Text {
 				value: LitStr::new(&node.to_string_best(), node.span()).into(),
 			},
 			Node::Fragment(NodeFragment { children, .. }) => {
-				HtmlTokens::Fragment {
+				WebTokens::Fragment {
 					nodes: children
 						.into_iter()
 						.map(|n| self.map_node(n))
@@ -92,7 +92,7 @@ impl<C: CustomNode> RstmlToHtmlTokens<C> {
 				}
 			}
 			Node::Block(NodeBlock::ValidBlock(node)) => {
-				HtmlTokens::Block { value: node.into() }
+				WebTokens::Block { value: node.into() }
 			}
 			Node::Block(NodeBlock::Invalid(invalid)) => {
 				self.errors.push(
@@ -127,7 +127,7 @@ impl<C: CustomNode> RstmlToHtmlTokens<C> {
 					.filter_map(|attr| self.map_attribute(attr))
 					.collect::<Vec<_>>();
 
-				HtmlTokens::Element {
+				WebTokens::Element {
 					self_closing,
 					component: RsxNodeTokens {
 						tag: self.map_node_name(open_tag.name.clone()),

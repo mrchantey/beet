@@ -8,20 +8,22 @@ use syn::spanned::Spanned;
 
 use super::meta_builder::MetaBuilder;
 
-/// Convert [`HtmlTokens`] to a ron format.
+/// Convert [`WebTokens`] to a ron format.
 /// Rust block token streams will be hashed by [Span::start]
 #[derive(Debug)]
-pub struct HtmlTokensToRon {
+pub struct WebTokensToRon {
 	rusty_tracker: RustyTrackerBuilder,
 	/// root location of the macro, this will be taken by the first node
 	root_location: Option<TokenStream>,
 }
 
-impl Pipeline<HtmlTokens, TokenStream> for HtmlTokensToRon {
-	fn apply(mut self, node: HtmlTokens) -> TokenStream { self.map_node(node) }
+impl Pipeline<WebTokens, TokenStream> for WebTokensToRon {
+	fn apply(mut self, node: WebTokens) -> TokenStream {
+		self.map_node(node)
+	}
 }
 
-impl HtmlTokensToRon {
+impl WebTokensToRon {
 	pub fn new_no_location() -> Self {
 		Self {
 			rusty_tracker: Default::default(),
@@ -29,7 +31,7 @@ impl HtmlTokensToRon {
 		}
 	}
 
-	/// Create a new [`HtmlTokensToRon`] instance, specifying the location,
+	/// Create a new [`WebTokensToRon`] instance, specifying the location,
 	/// usually from an [`RsxMacroLocation`], we dont accept that type because
 	/// this crate is upstream from [`beet_rsx`].
 	// TODO this should accept a [`RsxMacroLocation`] but cyclic deps we cant get it yet
@@ -87,9 +89,9 @@ impl HtmlTokensToRon {
 	}
 
 	/// returns an RsxTemplateNode
-	pub fn map_node(&mut self, node: HtmlTokens) -> TokenStream {
+	pub fn map_node(&mut self, node: WebTokens) -> TokenStream {
 		match node {
-			HtmlTokens::Fragment { nodes } => {
+			WebTokens::Fragment { nodes } => {
 				let meta = self.basic_meta();
 				let nodes = nodes.into_iter().map(|n| self.map_node(n));
 				quote! { Fragment (
@@ -97,27 +99,27 @@ impl HtmlTokensToRon {
 					meta: #meta
 				)}
 			}
-			HtmlTokens::Doctype { value: _ } => {
+			WebTokens::Doctype { value: _ } => {
 				let meta = self.basic_meta();
 				quote! { Doctype (
 					meta: #meta
 				)}
 			}
-			HtmlTokens::Comment { value } => {
+			WebTokens::Comment { value } => {
 				let meta = self.basic_meta();
 				quote! { Comment (
 					value: #value,
 					meta: #meta
 				)}
 			}
-			HtmlTokens::Text { value } => {
+			WebTokens::Text { value } => {
 				let meta = self.basic_meta();
 				quote! { Text (
 					value: #value,
 					meta: #meta
 				)}
 			}
-			HtmlTokens::Block { value } => {
+			WebTokens::Block { value } => {
 				let meta = self.basic_meta();
 				let tracker = self.rusty_tracker.next_tracker_ron(&value);
 				quote! { RustBlock (
@@ -125,7 +127,7 @@ impl HtmlTokensToRon {
 					meta: #meta
 				)}
 			}
-			HtmlTokens::Element {
+			WebTokens::Element {
 				component,
 				children,
 				self_closing,
@@ -148,7 +150,8 @@ impl HtmlTokensToRon {
 				if tag_str.starts_with(|c: char| c.is_uppercase()) {
 					// components disregard all the context and rely on the tracker
 					// we rely on the hydrated node to provide the attributes and children
-					let tracker = self.rusty_tracker.next_tracker_ron(&component);
+					let tracker =
+						self.rusty_tracker.next_tracker_ron(&component);
 					let slot_children = self.map_node(*children);
 
 					quote! { Component (
@@ -159,7 +162,7 @@ impl HtmlTokensToRon {
 					)}
 				} else {
 					// this attributes-children order is important for rusty tracker indices
-					// to be consistent with HtmlTokensToRust
+					// to be consistent with WebTokensToRust
 					let attributes = attributes
 						.into_iter()
 						.map(|a| self.map_attribute(&a))

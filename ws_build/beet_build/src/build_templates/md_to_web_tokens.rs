@@ -9,21 +9,21 @@ use crate::utils::ParseMarkdown;
 
 
 /// For a given markdown file, parse into a
-/// [`RsxMacroLocation`] and [`HtmlTokens`] pairs.
-pub struct MdToHtmlTokens;
+/// [`RsxMacroLocation`] and [`WebTokens`] pairs.
+pub struct MdToWebTokens;
 
 
-impl Pipeline<WorkspacePathBuf, Result<(RsxMacroLocation, HtmlTokens)>>
-	for MdToHtmlTokens
+impl Pipeline<WorkspacePathBuf, Result<(RsxMacroLocation, WebTokens)>>
+	for MdToWebTokens
 {
 	fn apply(
 		self,
 		path: WorkspacePathBuf,
-	) -> Result<(RsxMacroLocation, HtmlTokens)> {
+	) -> Result<(RsxMacroLocation, WebTokens)> {
 		let location = RsxMacroLocation::new_for_file(&path);
 		let file = ReadFile::to_string(path.into_abs_unchecked())?;
-		let html_tokens = ParseMarkdown::markdown_to_rsx_str(&file)
-			.xpipe(StringToHtmlTokens::default())
+		let web_tokens = ParseMarkdown::markdown_to_rsx_str(&file)
+			.xpipe(StringToWebTokens::default())
 			.map_err(|e| {
 				anyhow::anyhow!(
 					"Failed to parse Markdown HTML\nPath: {}\nError: {}",
@@ -31,7 +31,7 @@ impl Pipeline<WorkspacePathBuf, Result<(RsxMacroLocation, HtmlTokens)>>
 					e
 				)
 			})?;
-		Ok((location, html_tokens))
+		Ok((location, web_tokens))
 	}
 }
 
@@ -45,7 +45,7 @@ mod test {
 	#[test]
 	fn works() {
 		WorkspacePathBuf::new("README.md")
-			.xpipe(MdToHtmlTokens)
+			.xpipe(MdToWebTokens)
 			.unwrap();
 	}
 }

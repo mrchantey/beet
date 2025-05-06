@@ -1,5 +1,5 @@
-use super::HtmlTokens;
 use super::Spanner;
+use super::WebTokens;
 use anyhow::Result;
 use lightningcss::stylesheet::ParserOptions;
 use lightningcss::stylesheet::StyleSheet;
@@ -7,16 +7,16 @@ use sweet::prelude::Pipeline;
 use syn::spanned::Spanned;
 pub struct ValidateStyleNode;
 
-impl Pipeline<HtmlTokens, Result<HtmlTokens>> for ValidateStyleNode {
-	fn apply(self, mut node: HtmlTokens) -> Result<HtmlTokens> {
+impl Pipeline<WebTokens, Result<WebTokens>> for ValidateStyleNode {
+	fn apply(self, mut node: WebTokens) -> Result<WebTokens> {
 		// doesnt need to be mut but no ref visitor
-		node.walk_html_tokens(|html| match html {
-			HtmlTokens::Element {
+		node.walk_web_tokens(|html| match html {
+			WebTokens::Element {
 				component,
 				children,
 				..
 			} if component.tag.to_string() == "style"
-				&& let HtmlTokens::Text { value } = &**children =>
+				&& let WebTokens::Text { value } = &**children =>
 			{
 				validate_css(&value.value.value(), &value)
 			}

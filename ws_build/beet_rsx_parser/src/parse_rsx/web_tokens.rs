@@ -5,7 +5,11 @@ use syn::Block;
 use syn::LitStr;
 use syn::token::Lt;
 
-/// IR between some rsx input output, probs needs a better name
+/// [`WebTokens`] is a superset of [`RsxNodeTokens`] 
+/// 
+/// 
+/// 
+/// 
 /// ## Example inputs:
 /// - rsx! macros
 /// - mdx files
@@ -13,9 +17,9 @@ use syn::token::Lt;
 /// - RsxNode TokenStream
 /// - RsxTemplateNode TokenStream (ron)
 #[derive(Debug, Clone)]
-pub enum HtmlTokens {
+pub enum WebTokens {
 	Fragment {
-		nodes: Vec<HtmlTokens>,
+		nodes: Vec<WebTokens>,
 	},
 	Doctype {
 		/// the opening bracket
@@ -33,65 +37,65 @@ pub enum HtmlTokens {
 	/// An element `<div>` or a component `<MyComponent>`
 	Element {
 		component: RsxNodeTokens,
-		children: Box<HtmlTokens>,
+		children: Box<WebTokens>,
 		self_closing: bool,
 	},
 }
 
 
-impl Default for HtmlTokens {
+impl Default for WebTokens {
 	fn default() -> Self { Self::Fragment { nodes: Vec::new() } }
 }
 
 
-impl HtmlTokens {
-	pub fn walk_html_tokens<E>(
+impl WebTokens {
+	pub fn walk_web_tokens<E>(
 		&mut self,
-		mut visit: impl FnMut(&mut HtmlTokens) -> Result<E>,
+		mut visit: impl FnMut(&mut WebTokens) -> Result<E>,
 	) -> Result<()> {
-		self.walk_html_tokens_inner(&mut visit)
+		self.walk_web_tokens_inner(&mut visit)
 	}
-	fn walk_html_tokens_inner<E>(
+	fn walk_web_tokens_inner<E>(
 		&mut self,
-		visit: &mut impl FnMut(&mut HtmlTokens) -> Result<E>,
+		visit: &mut impl FnMut(&mut WebTokens) -> Result<E>,
 	) -> Result<()> {
 		visit(self)?;
 		match self {
-			HtmlTokens::Fragment { nodes } => {
+			WebTokens::Fragment { nodes } => {
 				for child in nodes.iter_mut() {
-					child.walk_html_tokens_inner(visit)?;
+					child.walk_web_tokens_inner(visit)?;
 				}
 			}
-			HtmlTokens::Element { children, .. } => {
-				children.walk_html_tokens_inner(visit)?;
+			WebTokens::Element { children, .. } => {
+				children.walk_web_tokens_inner(visit)?;
 			}
 			_ => {}
 		}
 		Ok(())
 	}
-	/// Collapse a vector of `HtmlTokens` into a single `HtmlTokens`.
-	pub fn collapse(nodes: Vec<HtmlTokens>) -> HtmlTokens {
+	/// Collapse a vector of `WebTokens` into a single `WebTokens`.
+	pub fn collapse(nodes: Vec<WebTokens>) -> WebTokens {
 		if nodes.len() == 1 {
 			nodes.into_iter().next().unwrap()
 		} else {
-			HtmlTokens::Fragment { nodes }
+			WebTokens::Fragment { nodes }
 		}
 	}
 }
 
 
-impl<E> RsxNodeTokensVisitor<E> for HtmlTokens {
+impl<E> RsxNodeTokensVisitor<E> for WebTokens {
 	fn walk_rsx_tokens_inner(
 		&mut self,
 		visit: &mut impl FnMut(&mut RsxNodeTokens) -> Result<(), E>,
 	) -> anyhow::Result<(), E> {
 		match self {
-			HtmlTokens::Fragment { nodes } => {
+			WebTokens::Fragment { nodes } => {
 				for child in nodes.iter_mut() {
 					child.walk_rsx_tokens_inner(visit)?;
 				}
 			}
-			HtmlTokens::Element {
+			WebTokens::Element {
 				children,
 				component,
 				..

@@ -26,7 +26,7 @@ impl MarkdownToFuncTokens {
 		let rsx_str = ParseMarkdown::markdown_to_rsx_str(markdown);
 		let rust_tokens = rsx_str
 			.xref()
-			.xpipe(StringToHtmlTokens::default())
+			.xpipe(StringToWebTokens::default())
 			.map_err(|e| {
 				anyhow::anyhow!(
 					"Failed to parse Markdown HTML\nPath: {}\nInput: {}\nError: {}",
@@ -35,7 +35,7 @@ impl MarkdownToFuncTokens {
 					e.to_string()
 				)
 			})?
-			.xpipe(HtmlTokensToRust::new_for_file(workspace_path));
+			.xpipe(WebTokensToRust::new_for_file(workspace_path));
 
 		let item_fn: ItemFn = syn::parse_quote! {
 			pub fn get() -> RsxNode
@@ -122,9 +122,9 @@ val_string	= "foo"
 				children: Box::new(
 					RsxText {
 						value: "hello world".to_string(),
-						meta: RsxNodeMeta { 
+						meta: RsxNodeMeta {
 							template_directives: Vec::new(),
-							location: None 
+							location: None
 						},
 					}.into_node()
 				),

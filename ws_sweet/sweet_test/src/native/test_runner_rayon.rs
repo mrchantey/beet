@@ -52,7 +52,10 @@ impl TestRunner for TestRunnerRayon {
 						eprintln!("failed to register panic: {}", err);
 					}
 				} else {
-					eprintln!("malformed thread local test description");
+					eprintln!(
+						"malformed thread local test description. This can happen if a test spawns a thread that panics, \
+						we might need to make the description send"
+					);
 				}
 			} else {
 				default_hook(info);
