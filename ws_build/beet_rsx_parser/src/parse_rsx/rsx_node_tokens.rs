@@ -27,15 +27,10 @@ pub trait RsxNodeTokensVisitor<E = anyhow::Error> {
 
 
 /// Intermediate representation of an RSX Node.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct RsxNodeTokens {
 	/// the name of the component, ie <MyComponent/>
 	pub tag: NameExpr,
-	/// All tokens involved in the definition of the component,
-	/// but not its children or closing tags.
-	/// In Rstml this is the `OpenTag`
-	/// Maybe this should be a string or just a hash, so we get Eq back
-	pub tokens: TokenStream,
 	/// fields of the component, ie <MyComponent foo=bar bazz/>
 	pub attributes: Vec<RsxAttributeTokens>,
 	/// special directives for use by both
@@ -72,7 +67,7 @@ impl RsxNodeTokens {
 }
 
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum RsxAttributeTokens {
 	/// A block attribute, in jsx this is known as a spread attribute
 	Block { block: Spanner<Block> },
@@ -102,7 +97,7 @@ impl RsxAttributeTokens {
 
 /// A value whose location can be retrieved either
 /// from the token stream or from a string
-#[derive(Debug, Default, Clone, PartialEq, Eq)]
+#[derive(Debug, Default, Clone, PartialEq, Eq, Hash)]
 pub struct Spanner<Spannable> {
 	pub value: Spannable,
 	/// If the value was created from a token stream
@@ -122,7 +117,7 @@ impl<S: ToTokens> ToTokens for Spanner<S> {
 
 
 /// For non rust tokens that still need a location, ie markdown
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct SpanLike {
 	pub start: LineColumn,
 	pub end: LineColumn,
@@ -188,7 +183,7 @@ impl<S> From<S> for Spanner<S> {
 
 
 /// A restricted subtype of [`Expr`], often created by [`rstml::node::NodeName`]
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum NameExpr {
 	/// A name that must be a string because its not a valid path expression,
 	/// like <foo-bar/>
@@ -196,6 +191,19 @@ pub enum NameExpr {
 	/// A valid path expression like `my_component::MyComponent`
 	ExprPath(Spanner<ExprPath>),
 }
+
+impl NameExpr {
+	/// Returns the inner span, this will be [`Span::call_site`] if the value was
+	/// created from strings not tokens, ie a markdown file
+	pub fn span(&self) -> Span {
+		match self {
+			NameExpr::LitStr(value) => value.value.span(),
+			NameExpr::ExprPath(value) => value.value.span(),
+		}
+	}
+}
+
+
 /// force expr into string literal
 impl ToString for NameExpr {
 	fn to_string(&self) -> String {

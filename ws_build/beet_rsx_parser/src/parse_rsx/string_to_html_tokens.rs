@@ -2,7 +2,6 @@ use crate::prelude::*;
 use anyhow::Result;
 use beet_rsx_combinator::prelude::*;
 use proc_macro2::Span;
-use proc_macro2::TokenStream;
 use sweet::prelude::*;
 use syn::Block;
 use syn::Expr;
@@ -89,7 +88,6 @@ impl IntoHtmlTokens for RsxSelfClosingElement {
 				tag: NameExpr::LitStr(
 					LitStr::new(&self.0.to_string(), Span::call_site()).into(),
 				),
-				tokens: TokenStream::new(),
 				attributes: self
 					.1
 					.0
@@ -122,7 +120,6 @@ impl IntoHtmlTokens for RsxNormalElement {
 				tag: NameExpr::LitStr(
 					LitStr::new(&self.0.to_string(), Span::call_site()).into(),
 				),
-				tokens: TokenStream::new(),
 				attributes: self
 					.1
 					.0

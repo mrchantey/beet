@@ -2,7 +2,6 @@ use crate::prelude::*;
 use proc_macro2::TokenStream;
 use proc_macro2_diagnostics::Diagnostic;
 use proc_macro2_diagnostics::Level;
-use quote::ToTokens;
 use rstml::node::CustomNode;
 use rstml::node::Node;
 use rstml::node::NodeAttribute;
@@ -132,7 +131,6 @@ impl<C: CustomNode> RstmlToHtmlTokens<C> {
 					self_closing,
 					component: RsxNodeTokens {
 						tag: self.map_node_name(open_tag.name.clone()),
-						tokens: open_tag.to_token_stream(),
 						attributes,
 						directives: Vec::default(),
 					},

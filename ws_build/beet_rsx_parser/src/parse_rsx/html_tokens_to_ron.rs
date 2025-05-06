@@ -133,7 +133,6 @@ impl HtmlTokensToRon {
 					tag,
 					attributes,
 					directives,
-					tokens,
 					..
 				} = &component;
 				// take location before visiting children
@@ -148,7 +147,7 @@ impl HtmlTokensToRon {
 				if tag_str.starts_with(|c: char| c.is_uppercase()) {
 					// components disregard all the context and rely on the tracker
 					// we rely on the hydrated node to provide the attributes and children
-					let tracker = self.rusty_tracker.next_tracker_ron(&tokens);
+					let tracker = self.rusty_tracker.next_tracker_ron(&component);
 					let slot_children = self.map_node(*children);
 
 					quote! { Component (

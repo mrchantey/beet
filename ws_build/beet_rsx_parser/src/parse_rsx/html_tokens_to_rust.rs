@@ -265,16 +265,16 @@ impl HtmlTokensToRust {
 	fn map_component(
 		&mut self,
 		location: TokenStream,
-		RsxNodeTokens {
-			tag,
-			tokens,
-			attributes,
-			directives,
-		}: RsxNodeTokens,
+		component: RsxNodeTokens,
 		children: HtmlTokens,
 	) -> TokenStream {
+		let tracker = self.rusty_tracker.next_tracker(&component);
+		let RsxNodeTokens {
+			tag,
+			attributes,
+			directives,
+		} = component;
 		let tag_str = tag.to_string();
-		let tracker = self.rusty_tracker.next_tracker(&tokens);
 		// visiting slot children is safe here, we aren't pulling any more trackers
 		let slot_children = self.map_node(children);
 		let meta = MetaBuilder::build_with_directives(location, &directives);
@@ -311,7 +311,7 @@ impl HtmlTokensToRust {
 		}
 
 
-		let ident = syn::Ident::new(&tag_str, tokens.span());
+		let ident = syn::Ident::new(&tag_str, tag.span());
 
 		// ensures all required fields are set
 		// doesnt work because we cant tell whether its an optional or default
@@ -350,10 +350,8 @@ impl HtmlTokensToRust {
 
 		// attempt to get ide to show the correct type by using
 		// the component as the first spanned quote
-		let ide_helper = Ident::new(
-			&format!("{}Required", &ident.to_string()),
-			tokens.span(),
-		);
+		let ide_helper =
+			Ident::new(&format!("{}Required", &ident.to_string()), tag.span());
 
 		quote::quote!({
 				let _ = #ide_helper::default();

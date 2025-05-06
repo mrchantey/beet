@@ -236,7 +236,7 @@ mod test {
 
 	#[test]
 	fn simple() {
-		let tracker = RustyTracker::new(0, 15046980652419922415);
+		let tracker = RustyTracker::new(0, 14909846839018434065);
 		// Element (tag : \"div\" , self_closing : true , attributes : [] , children : Fragment (items : [] , meta : RsxNodeMeta (template_directives : [] , location : None)) , meta : RsxNodeMeta (template_directives : [] , location : None))
 		let node = rsx_template! { <div>{value}</div> };
 
@@ -253,8 +253,8 @@ mod test {
 	}
 	#[test]
 	fn complex() {
-		let ident_tracker = RustyTracker::new(0, 3802233634778759949);
-		let component_tracker = RustyTracker::new(1, 3429327963174273294);
+		let ident_tracker = RustyTracker::new(0, 6068255516074130633);
+		let component_tracker = RustyTracker::new(1, 4498377743695909661);
 		let template = rsx_template! {
 			<div key str="value" num=32 ident=some_val>
 				<p>
