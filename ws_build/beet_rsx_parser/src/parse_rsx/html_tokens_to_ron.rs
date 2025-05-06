@@ -32,6 +32,7 @@ impl HtmlTokensToRon {
 	/// Create a new [`HtmlTokensToRon`] instance, specifying the location,
 	/// usually from an [`RsxMacroLocation`], we dont accept that type because
 	/// this crate is upstream from [`beet_rsx`].
+	// TODO this should accept a [`RsxMacroLocation`] but cyclic deps we cant get it yet
 	pub fn new(file: &WorkspacePathBuf, line: u32, col: u32) -> Self {
 		let file = file.to_string_lossy();
 		let line = Literal::u32_unsuffixed(line);

@@ -15,13 +15,14 @@ where
 /// Utilities for method-chaining on any type.
 /// Very similar in its goals to [`tap`](https://crates.io/crates/tap)
 pub trait PipelineTarget: Sized {
-	/// its like map but for any type
+	/// Similar to [`Iterator::map`] but for any type, not just iterators.
 	fn xmap<O>(self, func: impl FnOnce(Self) -> O) -> O { func(self) }
-	/// its like inpsect but for any type
+	/// Similar to [`Iterator::inspect`] but for any type, not just iterators.
 	fn xtap(mut self, func: impl FnOnce(&mut Self)) -> Self {
 		func(&mut self);
 		self
 	}
+	/// just print the value and return it
 	fn xdebug(self) -> Self
 	where
 		Self: std::fmt::Debug,
@@ -29,6 +30,7 @@ pub trait PipelineTarget: Sized {
 		println!("{:?}", self);
 		self
 	}
+	/// just print the value and return it
 	fn xdisplay(self) -> Self
 	where
 		Self: std::fmt::Display,
@@ -36,19 +38,43 @@ pub trait PipelineTarget: Sized {
 		println!("{}", self);
 		self
 	}
+	/// Similar to [`Iterator::inspect`] but for any type, not just iterators, and mutable.
 	fn xtap_mut(&mut self, func: impl FnOnce(&mut Self)) -> &mut Self {
 		func(self);
 		self
 	}
-	/// its like map but for our pipeline trait
+	/// Similar to [`Iterator::map`] but for any type, not just iterators,
+	/// using a custom [`Pipeline`] trait which behaves similarly to a `FnOnce` trait,
+	/// but available on stable rust.
 	fn xpipe<P: Pipeline<Self, O>, O>(self, pipeline: P) -> O {
 		pipeline.apply(self)
 	}
 
+	/// Convenience wrapper for `&self` in method chaining contexts.
 	fn xref(&self) -> &Self { self }
+	/// Wraps the value in a [`Result::Ok`]
+	///
+	/// ## Example
+	///
+	/// ```rust
+	/// # use sweet_utils::prelude::*;
+	/// assert_eq!("foo".xok::<()>(), Ok("foo"));
+	/// ```
 	fn xok<E>(self) -> Result<Self, E> { Ok(self) }
+	/// Wraps the value in an [`Option::Some`]
+	/// ## Example
+	///
+	/// ```rust
+	/// # use sweet_utils::prelude::*;
+	/// assert_eq!("foo".xsome(), Some("foo"));
+	/// ```
 	fn xsome(self) -> Option<Self> { Some(self) }
 
+	/// Convenience wrapper for [`Into::into`].
+	/// ```rust
+	/// # use sweet_utils::prelude::*;
+	/// assert_eq!(7_u32.xinto::<u64>(), 7);
+	/// ```
 	fn xinto<T: From<Self>>(self) -> T { T::from(self) }
 }
 impl<T: Sized> PipelineTarget for T {}
@@ -57,11 +83,11 @@ impl<T: Sized> PipelineTarget for T {}
 /// Utilities for method-chaining on any type.
 /// Very similar in its goals to [`tap`](https://crates.io/crates/tap)
 pub trait PipelineTargetIter<T>: Sized + IntoIterator<Item = T> {
-	/// its [`IntoIterator::into_iter().map(func).collect()`]
+	/// Similar to [`IntoIterator::into_iter().map(func).collect()`]
 	fn xmap_each<O>(self, func: impl FnMut(T) -> O) -> Vec<O> {
 		self.into_iter().map(func).collect()
 	}
-	/// its [`IntoIterator::into_iter().filter_map(func).collect()`]
+	/// Similar to [`IntoIterator::into_iter().filter_map(func).collect()`]
 	/// but flattens the results.
 	fn xtry_filter_map<O, E>(
 		self,
@@ -82,7 +108,7 @@ pub trait PipelineTargetIter<T>: Sized + IntoIterator<Item = T> {
 impl<T: Sized, I: IntoIterator<Item = T>> PipelineTargetIter<T> for I {}
 
 pub trait PipelineTargetVec<T> {
-	/// its [`Vec::extend`] but returns [`Self`]
+	/// Similar to [`Vec::extend`] but returns [`Self`]
 	fn xtend<I: IntoIterator<Item = T>>(self, iter: I) -> Self;
 }
 
@@ -97,7 +123,7 @@ where
 }
 
 pub trait PipelineTargetString {
-	/// its [`String::push_str`] but returns [`Self`]
+	/// Similar to [`String::push_str`] but returns [`Self`]
 	fn xtend(self, item: impl AsRef<str>) -> Self;
 }
 
