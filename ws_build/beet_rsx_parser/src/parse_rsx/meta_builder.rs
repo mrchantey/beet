@@ -7,13 +7,13 @@ use sweet::prelude::Pipeline;
 use syn::Expr;
 
 
-/// For each [`RsxNodeTokens`], read its [`attributes`](RsxNodeTokens::attributes) and extract them
-/// into the [`directives`](RsxNodeTokens::directives) field.
+/// For each [`ElementTokens`], read its [`attributes`](ElementTokens::attributes) and extract them
+/// into the [`directives`](ElementTokens::directives) field.
 #[derive(Default)]
 pub struct ApplyDefaultTemplateDirectives;
 
 
-impl<T: RsxNodeTokensVisitor<Infallible>> Pipeline<T, Result<T>>
+impl<T: ElementTokensVisitor<Infallible>> Pipeline<T, Result<T>>
 	for ApplyDefaultTemplateDirectives
 {
 	fn apply(self, mut node: T) -> Result<T> {
@@ -23,11 +23,11 @@ impl<T: RsxNodeTokensVisitor<Infallible>> Pipeline<T, Result<T>>
 }
 
 fn parse_node(
-	RsxNodeTokens {
+	ElementTokens {
 		attributes,
 		directives,
 		..
-	}: &mut RsxNodeTokens,
+	}: &mut ElementTokens,
 ) -> Result<(), Infallible> {
 	attributes.retain(|attr| {
 		if let Some(directive) = TemplateDirectiveTokens::from_attr(attr) {

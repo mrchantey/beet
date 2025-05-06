@@ -153,7 +153,7 @@ impl WebTokensToRust {
 				children,
 				self_closing,
 			} => {
-				let RsxNodeTokens {
+				let ElementTokens {
 					tag,
 					attributes,
 					directives,
@@ -265,11 +265,11 @@ impl WebTokensToRust {
 	fn map_component(
 		&mut self,
 		location: TokenStream,
-		component: RsxNodeTokens,
+		component: ElementTokens,
 		children: WebTokens,
 	) -> TokenStream {
 		let tracker = self.rusty_tracker.next_tracker(&component);
-		let RsxNodeTokens {
+		let ElementTokens {
 			tag,
 			attributes,
 			directives,

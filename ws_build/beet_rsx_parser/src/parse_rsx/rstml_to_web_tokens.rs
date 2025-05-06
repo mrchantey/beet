@@ -129,7 +129,7 @@ impl<C: CustomNode> RstmlToWebTokens<C> {
 
 				WebTokens::Element {
 					self_closing,
-					component: RsxNodeTokens {
+					component: ElementTokens {
 						tag: self.map_node_name(open_tag.name.clone()),
 						attributes,
 						directives: Vec::default(),
@@ -260,7 +260,7 @@ mod test {
 		// 	.xpipe(RstmlToRsxTokens::new())
 		// 	.0,
 		// )
-		// .to_be(RsxNodeTokens::new(NameExpr::ExprPath(
+		// .to_be(ElementTokens::new(NameExpr::ExprPath(
 		// 	Spanner::new_spanned(syn::parse_quote!(div)),
 		// )));
 	}

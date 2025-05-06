@@ -84,7 +84,7 @@ impl IntoWebTokens for RsxElement {
 impl IntoWebTokens for RsxSelfClosingElement {
 	fn into_web_tokens(self) -> Result<WebTokens> {
 		WebTokens::Element {
-			component: RsxNodeTokens {
+			component: ElementTokens {
 				tag: NameExpr::LitStr(
 					LitStr::new(&self.0.to_string(), Span::call_site()).into(),
 				),
@@ -116,7 +116,7 @@ impl IntoWebTokens for RsxNormalElement {
 		};
 
 		WebTokens::Element {
-			component: RsxNodeTokens {
+			component: ElementTokens {
 				tag: NameExpr::LitStr(
 					LitStr::new(&self.0.to_string(), Span::call_site()).into(),
 				),

@@ -18,9 +18,7 @@ pub struct WebTokensToRon {
 }
 
 impl Pipeline<WebTokens, TokenStream> for WebTokensToRon {
-	fn apply(mut self, node: WebTokens) -> TokenStream {
-		self.map_node(node)
-	}
+	fn apply(mut self, node: WebTokens) -> TokenStream { self.map_node(node) }
 }
 
 impl WebTokensToRon {
@@ -132,7 +130,7 @@ impl WebTokensToRon {
 				children,
 				self_closing,
 			} => {
-				let RsxNodeTokens {
+				let ElementTokens {
 					tag,
 					attributes,
 					directives,

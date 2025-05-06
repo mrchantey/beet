@@ -1,11 +1,11 @@
-use super::RsxNodeTokens;
+use super::ElementTokens;
 use crate::prelude::*;
 use anyhow::Result;
 use syn::Block;
 use syn::LitStr;
 use syn::token::Lt;
 
-/// [`WebTokens`] is a superset of [`RsxNodeTokens`], and
+/// [`WebTokens`] is a superset of [`ElementTokens`], and
 /// includes several types of information including html, css,
 /// wasm code and various template directives related to web rendering
 /// like islands.
@@ -37,7 +37,7 @@ pub enum WebTokens {
 	},
 	/// An element `<div>` or a component `<MyComponent>`
 	Element {
-		component: RsxNodeTokens,
+		component: ElementTokens,
 		children: Box<WebTokens>,
 		self_closing: bool,
 	},
@@ -85,10 +85,10 @@ impl WebTokens {
 }
 
 
-impl<E> RsxNodeTokensVisitor<E> for WebTokens {
+impl<E> ElementTokensVisitor<E> for WebTokens {
 	fn walk_rsx_tokens_inner(
 		&mut self,
-		visit: &mut impl FnMut(&mut RsxNodeTokens) -> Result<(), E>,
+		visit: &mut impl FnMut(&mut ElementTokens) -> Result<(), E>,
 	) -> anyhow::Result<(), E> {
 		match self {
 			WebTokens::Fragment { nodes } => {

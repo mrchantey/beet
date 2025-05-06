@@ -10,25 +10,27 @@ use syn::ExprPath;
 use syn::LitStr;
 use syn::spanned::Spanned;
 
-/// Visit all [`RsxNodeTokens`] in a tree, the nodes
-/// should be visited before children are walked in DFS preorder.
-pub trait RsxNodeTokensVisitor<E = anyhow::Error> {
+/// Visit all [`ElementTokens`] in a tree, the nodes
+/// should be visited before children, ie walked in DFS preorder.
+pub trait ElementTokensVisitor<E = anyhow::Error> {
 	fn walk_rsx_tokens(
 		&mut self,
-		mut visit: impl FnMut(&mut RsxNodeTokens) -> Result<(), E>,
+		mut visit: impl FnMut(&mut ElementTokens) -> Result<(), E>,
 	) -> Result<(), E> {
 		self.walk_rsx_tokens_inner(&mut visit)
 	}
 	fn walk_rsx_tokens_inner(
 		&mut self,
-		visit: &mut impl FnMut(&mut RsxNodeTokens) -> Result<(), E>,
+		visit: &mut impl FnMut(&mut ElementTokens) -> Result<(), E>,
 	) -> Result<(), E>;
 }
 
 
-/// Intermediate representation of an RSX Node.
+/// Intermediate representation of an 'element' in an rsx tree.
+/// Despite the web terminology, this is also used to represent
+/// other types like Bevy entities.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct RsxNodeTokens {
+pub struct ElementTokens {
 	/// the name of the component, ie <MyComponent/>
 	pub tag: NameExpr,
 	/// fields of the component, ie <MyComponent foo=bar bazz/>
@@ -39,11 +41,11 @@ pub struct RsxNodeTokens {
 }
 
 // used when a recoverable error is emitted
-// impl Default for RsxNodeTokens {
+// impl Default for ElementTokens {
 // 	fn default() -> Self { Self::fragment(Default::default()) }
 // }
 
-impl RsxNodeTokens {
+impl ElementTokens {
 	// pub fn new(tag: impl Into<NameExpr>) -> Self {
 	// 	Self {
 	// 		tag: tag.into(),
