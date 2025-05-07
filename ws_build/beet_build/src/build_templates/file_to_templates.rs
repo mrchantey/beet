@@ -7,6 +7,22 @@ use sweet::prelude::WorkspacePathBuf;
 use sweet::prelude::*;
 
 
+/// When parsing a file, it may contain multiple rsx templates and style templates:
+/// ## Rsx Templates
+/// For rust files, each rsx template is defined by an `rsx!` macro, whereas for mdx files
+/// the entire file is a single rsx template.
+/// ## Style Templates
+/// When visiting an rsx template, any style tag without the `scope:verbatim` directive
+/// is considered a style template and will be extracted, replaced by a
+/// [`TemplateDirective::StylePlaceholder`] directive.
+#[derive(Debug, Default)]
+pub struct FileTemplates {
+	/// A [`TokenStream`] representing a [`ron`] representation of a [`RsxTemplateNode`].
+	pub rsx_templates: Vec<(NodeSpan, RsxTemplateNode)>,
+	// /// A [`TokenStream`] representing styles extracted from the file.
+	pub style_templates: Vec<StyleTemplate>,
+}
+
 
 
 pub struct FileToTemplates;
@@ -25,9 +41,9 @@ impl Pipeline<WorkspacePathBuf, Result<FileTemplates>> for FileToTemplates {
 			_ => Ok(Default::default()),
 		}?
 		.xmap_each(|(location, web_tokens)| {
-			// templates
-			// 	.style_templates
-			// 	.extend(web_tokens.xref().xpipe(WebTokensToStyleTemplates)?);
+			templates
+				.style_templates
+				.extend(web_tokens.xref().xpipe(WebTokensToStyleTemplates)?);
 
 			let web_tokens = web_tokens.xpipe(ParseWebTokens::default())?;
 
@@ -65,13 +81,4 @@ fn ron_cx_err(e: ron::error::SpannedError, str: &str) -> anyhow::Error {
 		cx,
 		str
 	);
-}
-
-
-#[derive(Debug, Default)]
-pub struct FileTemplates {
-	/// A [`TokenStream`] representing a [`ron`] representation of a [`RsxTemplateNode`].
-	pub rsx_templates: Vec<(NodeSpan, RsxTemplateNode)>,
-	// /// A [`TokenStream`] representing styles extracted from the file.
-	pub style_templates: Vec<StyleTemplate>,
 }

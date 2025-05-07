@@ -39,12 +39,12 @@ pub enum TemplateDirective {
 	/// have the attribute applied.
 	/// ## Example
 	/// ```rust ignore
-	/// <MyComponent scope:cascade>
+	/// <MyComponent style:cascade>
 	/// <style>
 	/// 	/* this css will also be applied to children of MyComponent */
 	/// </style>
 	/// ```
-	ScopeCascade,
+	StyleCascade,
 	/// This directive is applied to style tags that have had their content removed.
 	/// The `content_hash` is used to retrieve the styleid when resolving scoped styles.
 	/// ## Example
@@ -128,8 +128,8 @@ impl TemplateDirectiveExt for TemplateDirective {
 	fn is_global_scope(&self) -> bool {
 		matches!(self, TemplateDirective::ScopeGlobal)
 	}
-	fn is_cascade_scope(&self) -> bool {
-		matches!(self, TemplateDirective::ScopeCascade)
+	fn is_cascade_style(&self) -> bool {
+		matches!(self, TemplateDirective::StyleCascade)
 	}
 	fn find_directive(
 		&self,
@@ -163,9 +163,9 @@ pub trait TemplateDirectiveExt {
 	fn is_global_scope(&self) -> bool {
 		self.any_directive(|d| d.is_global_scope())
 	}
-	/// Check if the template directive is a cascade scope directive
-	fn is_cascade_scope(&self) -> bool {
-		self.any_directive(|d| d.is_cascade_scope())
+	/// Check if the template directive is a cascade style directive
+	fn is_cascade_style(&self) -> bool {
+		self.any_directive(|d| d.is_cascade_style())
 	}
 
 	fn slot_directive(&self) -> Option<&String> {
@@ -221,8 +221,8 @@ impl crate::prelude::SerdeTokens for TemplateDirective {
 			TemplateDirective::ScopeGlobal => {
 				quote! {TemplateDirective::ScopeGlobal}
 			}
-			TemplateDirective::ScopeCascade => {
-				quote! {TemplateDirective::ScopeCascade}
+			TemplateDirective::StyleCascade => {
+				quote! {TemplateDirective::StyleCascade}
 			}
 			TemplateDirective::StylePlaceholder { content_hash } => {
 				quote! {TemplateDirective::StylePlaceholder{content_hash: #content_hash}}
@@ -276,8 +276,8 @@ impl crate::prelude::SerdeTokens for TemplateDirective {
 			TemplateDirective::ScopeGlobal => {
 				quote! {ScopeGlobal}
 			}
-			TemplateDirective::ScopeCascade => {
-				quote! {ScopeCascade}
+			TemplateDirective::StyleCascade => {
+				quote! {StyleCascade}
 			}
 			TemplateDirective::StylePlaceholder { content_hash } => {
 				let content_hash =
@@ -328,7 +328,7 @@ mod test {
 			TemplateDirective::ClientLoad,
 			TemplateDirective::ScopeLocal,
 			TemplateDirective::ScopeGlobal,
-			TemplateDirective::ScopeCascade,
+			TemplateDirective::StyleCascade,
 			TemplateDirective::StylePlaceholder { content_hash: 1 },
 			TemplateDirective::FsSrc("foo".into()),
 			TemplateDirective::Slot("bar".into()),

@@ -23,7 +23,7 @@ pub fn get() -> WebNode {
 				<Link
 					class="primary-action"
 					href=paths::docs::index()
-					scope:cascade
+					style:cascade
 					>Get Started</Link>
 				<Counter client:load initial=1 />
 				<Calculator client:load initial=1 />

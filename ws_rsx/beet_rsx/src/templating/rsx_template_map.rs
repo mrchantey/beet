@@ -183,7 +183,7 @@ mod test {
 		let mut node1 = rsx! {
 			<div key str="value" num=32 ident=some_val onclick=|_| {}>
 				<p>
-					hello <MyComponent scope:cascade value=3>
+					hello <MyComponent style:cascade value=3>
 						<div>some child</div>
 					</MyComponent>
 				</p>
@@ -192,7 +192,7 @@ mod test {
 		let node2_template = rsx_template! {
 			<div key str="value" num=32 ident=some_val onclick=|_| {}>
 				<p>
-					hello <MyComponent scope:cascade value=3>
+					hello <MyComponent style:cascade value=3>
 						<div>some child</div>
 					</MyComponent>
 				</p>
@@ -210,12 +210,12 @@ mod test {
 	#[test]
 	fn trackers_match() {
 		let node1 = rsx! {
-			<MyComponent scope:cascade value=3>
+			<MyComponent style:cascade value=3>
 				Hello
 			</MyComponent>
 		};
 		let node2_template = rsx_template! {
-			<MyComponent scope:cascade value=3>
+			<MyComponent style:cascade value=3>
 				Hello
 			</MyComponent>
 		};

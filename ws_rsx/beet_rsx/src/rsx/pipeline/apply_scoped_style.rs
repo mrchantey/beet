@@ -1,9 +1,9 @@
 use crate::prelude::*;
 use anyhow::Result;
+use beet_common::prelude::*;
 use lightningcss::printer::PrinterOptions;
 use lightningcss::stylesheet::ParserOptions;
 use lightningcss::stylesheet::StyleSheet;
-use beet_common::prelude::*;
 
 /// ScopedStyle is a utility for applying scoped styles to components.
 /// The approach is inspired by astro https://docs.astro.build/en/guides/styling/
@@ -67,7 +67,7 @@ impl Pipeline<WebNode, Result<WebNode>> for ApplyScopedStyle {
 impl ApplyScopedStyle {
 	/// a class name in the format `data-styleid-0`,
 	/// this allows for multiple classes on a single element,
-	/// which is required for scope:cascade
+	/// which is required for style:cascade
 	fn class_name(&self) -> String { format!("{}-{}", self.attr, self.idx) }
 
 	/// 1. apply the idx to all style bodies
@@ -128,7 +128,7 @@ impl ApplyScopedStyle {
 				node,
 				// opts.clone(),
 				VisitRsxOptions::should_visit_component_node(|c| {
-					c.is_cascade_scope()
+					c.is_cascade_style()
 				}),
 				|el| {
 					el.attributes.push(RsxAttribute::Key {
@@ -278,9 +278,9 @@ mod test {
 			.to_be("<br data-styleid-0/><style data-styleid-0>br[data-styleid-0] {\n  color: red;\n}\n</style>");
 	}
 	#[test]
-	fn scope_cascade() {
+	fn style_cascade() {
 		expect(rsx! {
-			<Child scope:cascade/>
+			<Child style:cascade/>
 			<style>span { padding: 1px; }</style>
 		}.xpipe(RsxToHtmlString::default()).unwrap())
 			.to_be("<div data-styleid-0 data-styleid-1><style data-styleid-0 data-styleid-1>span[data-styleid-1] {\n  color: #00f;\n}\n</style></div><style data-styleid-0>span[data-styleid-0] {\n  padding: 1px;\n}\n</style>");

@@ -44,7 +44,7 @@ fn attr_to_template_directive(
 			"client:load" => Some(TemplateDirective::ClientLoad),
 			"scope:local" => Some(TemplateDirective::ScopeLocal),
 			"scope:global" => Some(TemplateDirective::ScopeGlobal),
-			"scope:cascade" => Some(TemplateDirective::ScopeCascade),
+			"style:cascade" => Some(TemplateDirective::StyleCascade),
 			runtime_key if runtime_key.starts_with("runtime:") => {
 				let Some(suffix) = runtime_key.split(':').nth(1) else {
 					return None;
