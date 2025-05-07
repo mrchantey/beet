@@ -18,6 +18,7 @@ default = []
 # default = ["serde", "tokens"]
 serde = ["dep:serde", "dep:ron"]
 tokens = [
+	"serde",
 	"dep:syn",
 	"dep:quote",
 	"dep:proc-macro2",

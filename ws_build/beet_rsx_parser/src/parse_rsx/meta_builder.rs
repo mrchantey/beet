@@ -10,11 +10,10 @@ use sweet::prelude::Pipeline;
 /// For each [`ElementTokens`], read its [`attributes`](ElementTokens::attributes) and extract them
 /// into the [`directives`](ElementTokens::directives) field.
 #[derive(Default)]
-pub struct ApplyDefaultTemplateDirectives;
-
+pub struct ExtractTemplateDirectives;
 
 impl<T: ElementTokensVisitor<Infallible>> Pipeline<T, Result<T>>
-	for ApplyDefaultTemplateDirectives
+	for ExtractTemplateDirectives
 {
 	fn apply(self, mut node: T) -> Result<T> {
 		node.walk_rsx_tokens(parse_node)?;
@@ -50,65 +49,53 @@ fn attr_to_template_directive(
 			"scope:local" => Some(TemplateDirective::ScopeLocal),
 			"scope:global" => Some(TemplateDirective::ScopeGlobal),
 			"scope:cascade" => Some(TemplateDirective::ScopeCascade),
-			runtime if runtime.starts_with("runtime:") => {
-				let Some(suffix) = runtime.split(':').nth(1) else {
+			runtime_key if runtime_key.starts_with("runtime:") => {
+				let Some(suffix) = runtime_key.split(':').nth(1) else {
 					return None;
 				};
 				return Some(TemplateDirective::Runtime(suffix.to_string()));
 			}
-			_other => None,
+			custom_key if custom_key.contains(':') => {
+				let mut parts = custom_key.split(':');
+				let prefix = parts.next().unwrap_or_default().to_string();
+				let suffix = parts.next().unwrap_or_default().to_string();
+				Some(TemplateDirective::Custom {
+					prefix,
+					suffix,
+					value: None,
+				})
+			}
+			_attr => None,
 		},
+		// only key value pairs where the value is a string are valid
+		// templates
 		RsxAttributeTokens::KeyValue { key, value }
 			if let Some(value) = value.try_lit_str() =>
 		{
 			match key.to_string().as_str() {
 				"slot" => Some(TemplateDirective::Slot(value)),
 				"src" if value.starts_with('.') => {
-					Some(TemplateDirective::FsSrc(value))
 					// alternatively we could use an ignore approach
 					// if ["/", "http://", "https://"]
 					// .iter()
 					// .all(|p| val.starts_with(p) == false)
+					Some(TemplateDirective::FsSrc(value))
 				}
-				_ => None,
+				custom_key if custom_key.contains(':') => {
+					let mut parts = custom_key.split(':');
+					let prefix = parts.next().unwrap_or_default().to_string();
+					let suffix = parts.next().unwrap_or_default().to_string();
+					Some(TemplateDirective::Custom {
+						prefix,
+						suffix,
+						value: Some(value),
+					})
+				}
+				_attr => None,
 			}
 		}
 		_ => None,
 	}
-	// TODO custom directives
-	// RsxAttributeTokens::Key { key }
-	// 	if let NameExpr::LitStr(key) = key =>
-	// {
-	// 	None
-	// }
-	// RsxAttributeTokens::KeyValue { key, value }
-	// 	if let NameExpr::LitStr(key) = key =>
-	// {
-	// 	None
-	// }
-	// match attr_key_str.as_str() {
-	// 	other => {
-	// 		match other.contains(":") {
-	// 			// its a client directive
-	// 			true => {
-	// 				let prefix =
-	// 					other.split(':').next().unwrap().to_string();
-
-	// 				let suffix =
-	// 					other.split(':').nth(1).unwrap().to_string();
-
-	// 				if prefix == "runtime" {
-	// 					return Some(TemplateDirective::Runtime(
-	// 						suffix,
-	// 					));
-	// 				}
-	// 				None
-	// 			}
-	// 			// its a prop assignemnt
-	// 			false => None,
-	// 		}
-	// 	}
-	// }
 }
 /// Builds a [`NodeMeta`] struct in rust or ron syntax
 pub struct MetaBuilder;
@@ -121,7 +108,6 @@ impl MetaBuilder {
 			location: #location
 		}}
 	}
-
 
 	pub fn build_with_directives(
 		location: TokenStream,

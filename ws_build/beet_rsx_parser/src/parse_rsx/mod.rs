@@ -1,3 +1,5 @@
+mod remove_style_tags;
+pub use remove_style_tags::*;
 mod parse_web_tokens;
 pub use parse_web_tokens::*;
 mod web_tokens_to_ron;

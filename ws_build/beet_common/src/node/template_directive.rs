@@ -19,7 +19,7 @@ pub enum TemplateDirective {
 	/// ## Example
 	/// ```rust ignore
 	/// <style scope:local>
-	/// 	/* css */
+	/// 	div { color: blue; }
 	/// </style>
 	/// ```
 	ScopeLocal,
@@ -28,7 +28,7 @@ pub enum TemplateDirective {
 	/// ## Example
 	/// ```rust ignore
 	/// <style scope:global>
-	/// 	/* css */
+	/// 	div { color: blue; }
 	/// </style>
 	/// ```
 	ScopeGlobal,
@@ -45,6 +45,21 @@ pub enum TemplateDirective {
 	/// </style>
 	/// ```
 	ScopeCascade,
+	/// This directive is applied to style tags that have had their content removed.
+	/// The `content_hash` is used to retrieve the styleid when resolving scoped styles.
+	/// ## Example
+	/// ```rust ignore
+	/// // before
+	/// <style>
+	/// 	div { color: blue; }
+	/// </style>
+	/// // after, this wont be rendered but conceptually this is what happens
+	/// <style style:content-hash="1234567890" />
+	/// ```
+	StylePlaceholder {
+		/// A rapidhash of the inner text of the style tag.
+		content_hash: u64,
+	},
 	/// Indicates this node should be rendered in a named slot instead of
 	/// the default slot.
 	/// ## Example
@@ -200,6 +215,9 @@ impl crate::prelude::SerdeTokens for TemplateDirective {
 			TemplateDirective::ScopeCascade => {
 				quote! {TemplateDirective::ScopeCascade}
 			}
+			TemplateDirective::StylePlaceholder { content_hash } => {
+				quote! {TemplateDirective::StylePlaceholder{content_hash: #content_hash}}
+			}
 			TemplateDirective::FsSrc(src) => {
 				quote! {TemplateDirective::FsSrc(#src.into())}
 			}
@@ -252,6 +270,13 @@ impl crate::prelude::SerdeTokens for TemplateDirective {
 			TemplateDirective::ScopeCascade => {
 				quote! {ScopeCascade}
 			}
+			TemplateDirective::StylePlaceholder { content_hash } => {
+				let content_hash =
+					proc_macro2::Literal::u64_unsuffixed(*content_hash);
+				quote! {StylePlaceholder(
+					content_hash: #content_hash
+				)}
+			}
 			TemplateDirective::FsSrc(src) => {
 				quote! {FsSrc(#src)}
 			}
@@ -266,7 +291,11 @@ impl crate::prelude::SerdeTokens for TemplateDirective {
 				suffix,
 				value,
 			} => {
-				quote! {CustomKeyValue(
+				let value = match value {
+					Some(value) => quote! {Some(#value)},
+					None => quote! {None},
+				};
+				quote! {Custom(
 					prefix: #prefix,
 					suffix: #suffix,
 					value: #value
@@ -274,5 +303,46 @@ impl crate::prelude::SerdeTokens for TemplateDirective {
 				}
 			}
 		}
+	}
+}
+
+
+#[cfg(test)]
+mod test {
+	use crate::prelude::*;
+	use sweet::prelude::*;
+
+	#[test]
+	#[cfg(feature = "tokens")]
+	fn ron_serde() {
+		let directives = vec![
+			TemplateDirective::ClientLoad,
+			TemplateDirective::ScopeLocal,
+			TemplateDirective::ScopeGlobal,
+			TemplateDirective::ScopeCascade,
+			TemplateDirective::StylePlaceholder { content_hash: 1 },
+			TemplateDirective::FsSrc("foo".into()),
+			TemplateDirective::Slot("bar".into()),
+			TemplateDirective::Runtime("baz".into()),
+			TemplateDirective::Custom {
+				prefix: "foo".into(),
+				suffix: "".into(),
+				value: None,
+			},
+			TemplateDirective::Custom {
+				prefix: "foo".into(),
+				suffix: "bar".into(),
+				value: Some("baz".into()),
+			},
+		];
+		let tokens = directives
+			.iter()
+			.map(|d| d.into_ron_tokens().to_string())
+			.collect::<Vec<_>>()
+			.join(", ");
+		let directives2 =
+			ron::de::from_str::<Vec<TemplateDirective>>(&format!("[{tokens}]"))
+				.unwrap();
+		expect(directives2).to_be(directives);
 	}
 }

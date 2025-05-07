@@ -17,7 +17,7 @@ use syn::token::Lt;
 /// ## Example outputs:
 /// - WebNode TokenStream
 /// - RsxTemplateNode TokenStream (ron)
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Hash)]
 pub enum WebTokens {
 	Fragment {
 		nodes: Vec<WebTokens>,
@@ -52,14 +52,14 @@ impl Default for WebTokens {
 impl WebTokens {
 	pub fn walk_web_tokens<E>(
 		&mut self,
-		mut visit: impl FnMut(&mut WebTokens) -> Result<E>,
-	) -> Result<()> {
+		mut visit: impl FnMut(&mut WebTokens) -> Result<(), E>,
+	) -> Result<(), E> {
 		self.walk_web_tokens_inner(&mut visit)
 	}
 	fn walk_web_tokens_inner<E>(
 		&mut self,
-		visit: &mut impl FnMut(&mut WebTokens) -> Result<E>,
-	) -> Result<()> {
+		visit: &mut impl FnMut(&mut WebTokens) -> Result<(), E>,
+	) -> Result<(), E> {
 		visit(self)?;
 		match self {
 			WebTokens::Fragment { nodes } => {
