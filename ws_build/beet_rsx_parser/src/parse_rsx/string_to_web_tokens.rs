@@ -1,5 +1,6 @@
 use crate::prelude::*;
 use anyhow::Result;
+use beet_common::prelude::*;
 use beet_rsx_combinator::prelude::*;
 use proc_macro2::Span;
 use sweet::prelude::*;
@@ -10,7 +11,13 @@ use syn::LitStr;
 
 /// For a given string of rsx, use [`beet_rsx_combinator`] to parse.
 #[derive(Debug, Default)]
-pub struct StringToWebTokens;
+pub struct StringToWebTokens {
+	node_span: Option<NodeSpan>,
+}
+
+impl StringToWebTokens {
+	pub fn new(node_span: Option<NodeSpan>) -> Self { Self { node_span } }
+}
 
 impl<T: AsRef<str>> Pipeline<T, Result<WebTokens>> for StringToWebTokens {
 	fn apply(self, input: T) -> Result<WebTokens> {
@@ -23,7 +30,11 @@ impl<T: AsRef<str>> Pipeline<T, Result<WebTokens>> for StringToWebTokens {
 				remaining
 			));
 		}
-		expr.into_web_tokens()
+		let mut tokens = expr.into_web_tokens()?;
+		if let Some(node_span) = self.node_span {
+			tokens.meta_mut().location = Some(node_span);
+		}
+		Ok(tokens)
 	}
 }
 
@@ -42,6 +53,7 @@ impl IntoWebTokens for RsxParsedExpression {
 					.into_iter()
 					.map(IntoWebTokens::into_web_tokens)
 					.collect::<Result<Vec<_>>>()?,
+				meta: Default::default(),
 			}
 			.xok()
 		}
@@ -66,6 +78,7 @@ impl IntoWebTokens for RsxTokensOrElement {
 					})?;
 				Ok(WebTokens::Block {
 					value: block.into(),
+					meta: Default::default(),
 				})
 			}
 			RsxTokensOrElement::Element(el) => el.into_web_tokens(),
@@ -94,7 +107,7 @@ impl IntoWebTokens for RsxSelfClosingElement {
 					.into_iter()
 					.map(|v| v.into_rsx_attribute_tokens())
 					.collect::<Result<Vec<_>>>()?,
-				directives: Vec::new(),
+				meta: Default::default(),
 			},
 			children: Default::default(),
 			self_closing: true,
@@ -110,6 +123,7 @@ impl IntoWebTokens for RsxNormalElement {
 		let children = if STRING_TAGS.contains(&self.0.to_string().as_str()) {
 			WebTokens::Text {
 				value: LitStr::new(&self.2.to_html(), Span::call_site()).into(),
+				meta: Default::default(),
 			}
 		} else {
 			self.2.into_web_tokens()?
@@ -126,7 +140,7 @@ impl IntoWebTokens for RsxNormalElement {
 					.into_iter()
 					.map(|v| v.into_rsx_attribute_tokens())
 					.collect::<Result<Vec<_>>>()?,
-				directives: Vec::new(),
+				meta: Default::default(),
 			},
 			// here we must descide whether to go straight into html, ie for
 			// script, style and code elements
@@ -152,6 +166,7 @@ impl IntoWebTokens for RsxChildren {
 					.into_iter()
 					.map(IntoWebTokens::into_web_tokens)
 					.collect::<Result<_>>()?,
+				meta: Default::default(),
 			}
 			.xok()
 		}
@@ -173,6 +188,7 @@ impl IntoWebTokens for RsxText {
 	fn into_web_tokens(self) -> Result<WebTokens> {
 		WebTokens::Text {
 			value: LitStr::new(&self.0, Span::call_site()).into(),
+			meta: Default::default(),
 		}
 		.xok()
 	}
@@ -200,9 +216,8 @@ impl IntoRsxAttributeTokens for RsxAttribute {
 			}
 			.xok(),
 			RsxAttribute::Spread(value) => {
-				let block = value
-					.into_web_tokens()?
-					.xpipe(WebTokensToRust::new_no_location());
+				let block =
+					value.into_web_tokens()?.xpipe(WebTokensToRust::default());
 				RsxAttributeTokens::Block {
 					block: block.into(),
 				}
@@ -234,15 +249,13 @@ impl TryInto<Spanner<Expr>> for RsxAttributeValue {
 				syn::parse_quote!(#val)
 			}
 			RsxAttributeValue::Element(value) => {
-				let block = value
-					.into_web_tokens()?
-					.xpipe(WebTokensToRust::new_no_location());
+				let block =
+					value.into_web_tokens()?.xpipe(WebTokensToRust::default());
 				syn::parse_quote!(#block)
 			}
 			RsxAttributeValue::CodeBlock(value) => {
-				let block = value
-					.into_web_tokens()?
-					.xpipe(WebTokensToRust::new_no_location());
+				let block =
+					value.into_web_tokens()?.xpipe(WebTokensToRust::default());
 				syn::parse_quote!(#block)
 			}
 		};
@@ -258,18 +271,18 @@ mod test {
 	use sweet::prelude::*;
 
 	fn str_to_ron_matcher(str: &str) -> Matcher<String> {
-		str.xpipe(StringToWebTokens)
+		str.xpipe(StringToWebTokens::default())
 			.unwrap()
-			.xpipe(WebTokensToRon::new_no_location())
+			.xpipe(WebTokensToRon::default())
 			.to_string()
 			.xpect()
 	}
 
 	#[allow(unused)]
 	fn str_to_rust_matcher(str: &str) -> Matcher<String> {
-		str.xpipe(StringToWebTokens)
+		str.xpipe(StringToWebTokens::default())
 			.unwrap()
-			.xpipe(WebTokensToRust::new_no_location())
+			.xpipe(WebTokensToRust::default())
 			.to_token_stream()
 			.to_string()
 			.xpect()

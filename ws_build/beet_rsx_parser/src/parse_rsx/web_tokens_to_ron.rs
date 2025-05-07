@@ -1,20 +1,15 @@
 use crate::prelude::*;
-use beet_common::node::NodeSpan;
 use beet_common::prelude::SerdeTokens;
 use proc_macro2::TokenStream;
 use quote::quote;
 use sweet::prelude::*;
 use syn::Expr;
 
-use super::meta_builder::MetaBuilder;
-
 /// Convert [`WebTokens`] to a ron format.
 /// Rust block token streams will be hashed by [Span::start]
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct WebTokensToRon {
 	rusty_tracker: RustyTrackerBuilder,
-	/// root location of the macro, this will be taken by the first node
-	root_location: Option<TokenStream>,
 }
 
 impl Pipeline<WebTokens, TokenStream> for WebTokensToRon {
@@ -22,68 +17,39 @@ impl Pipeline<WebTokens, TokenStream> for WebTokensToRon {
 }
 
 impl WebTokensToRon {
-	pub fn new_no_location() -> Self {
-		Self {
-			rusty_tracker: Default::default(),
-			root_location: None,
-		}
-	}
-
-	/// Create a new [`WebTokensToRon`] instance, specifying the location,
-	/// usually from an [`NodeSpan`], we dont accept that type because
-	/// this crate is upstream from [`beet_rsx`].
-	pub fn new(node_span: &NodeSpan) -> Self {
-		let node_span = node_span.into_ron_tokens();
-		Self {
-			rusty_tracker: Default::default(),
-			root_location: Some(quote! { Some(#node_span)}),
-		}
-	}
-
-	/// the first to call this gets the real location, this mirrors
-	/// `RstmlToRsx` behavior, only root has location.
-	fn location(&mut self) -> TokenStream {
-		std::mem::take(&mut self.root_location).unwrap_or(quote! {None})
-	}
-
-	/// meta without template directives
-	fn basic_meta(&mut self) -> TokenStream {
-		MetaBuilder::build_ron(self.location())
-	}
-
 	/// returns an RsxTemplateNode
 	pub fn map_node(&mut self, node: WebTokens) -> TokenStream {
 		match node {
-			WebTokens::Fragment { nodes } => {
-				let meta = self.basic_meta();
+			WebTokens::Fragment { nodes, meta } => {
+				let meta = meta.into_ron_tokens();
 				let nodes = nodes.into_iter().map(|n| self.map_node(n));
 				quote! { Fragment (
 					items:[#(#nodes),*],
 					meta: #meta
 				)}
 			}
-			WebTokens::Doctype { value: _ } => {
-				let meta = self.basic_meta();
+			WebTokens::Doctype { value: _, meta } => {
+				let meta = meta.into_ron_tokens();
 				quote! { Doctype (
 					meta: #meta
 				)}
 			}
-			WebTokens::Comment { value } => {
-				let meta = self.basic_meta();
+			WebTokens::Comment { value, meta } => {
+				let meta = meta.into_ron_tokens();
 				quote! { Comment (
 					value: #value,
 					meta: #meta
 				)}
 			}
-			WebTokens::Text { value } => {
-				let meta = self.basic_meta();
+			WebTokens::Text { value, meta } => {
+				let meta = meta.into_ron_tokens();
 				quote! { Text (
 					value: #value,
 					meta: #meta
 				)}
 			}
-			WebTokens::Block { value } => {
-				let meta = self.basic_meta();
+			WebTokens::Block { value, meta } => {
+				let meta = meta.into_ron_tokens();
 				let tracker = self.rusty_tracker.next_tracker_ron(&value);
 				quote! { RustBlock (
 					tracker:#tracker,
@@ -98,16 +64,10 @@ impl WebTokensToRon {
 				let ElementTokens {
 					tag,
 					attributes,
-					directives,
+					meta,
 					..
 				} = &component;
-				// take location before visiting children
-				let location = self.location();
-
-				let meta = MetaBuilder::build_ron_with_directives(
-					location,
-					&directives,
-				);
+				let meta = meta.into_ron_tokens();
 
 				let tag_str = tag.to_string();
 				if tag_str.starts_with(|c: char| c.is_uppercase()) {

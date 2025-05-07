@@ -1,8 +1,6 @@
 use crate::prelude::*;
 use anyhow::Result;
 use beet_common::prelude::*;
-use proc_macro2::TokenStream;
-use quote::quote;
 use std::convert::Infallible;
 use sweet::prelude::Pipeline;
 
@@ -25,14 +23,12 @@ impl<T: ElementTokensVisitor<Infallible>> Pipeline<T, Result<T>>
 /// and add them to the directives field
 fn parse_node(
 	ElementTokens {
-		attributes,
-		directives,
-		..
+		attributes, meta, ..
 	}: &mut ElementTokens,
 ) -> Result<(), Infallible> {
 	attributes.retain(|attr| {
 		if let Some(directive) = attr_to_template_directive(attr) {
-			directives.push(directive);
+			meta.template_directives.push(directive);
 			return false;
 		}
 		true
@@ -95,52 +91,5 @@ fn attr_to_template_directive(
 			}
 		}
 		_ => None,
-	}
-}
-/// Builds a [`NodeMeta`] struct in rust or ron syntax
-pub struct MetaBuilder;
-
-
-impl MetaBuilder {
-	pub fn build(location: TokenStream) -> TokenStream {
-		quote! {NodeMeta {
-			template_directives: Vec::new(),
-			location: #location
-		}}
-	}
-
-	pub fn build_with_directives(
-		location: TokenStream,
-		template_directives: &[TemplateDirective],
-	) -> TokenStream {
-		let template_directives = template_directives
-			.iter()
-			.map(|directive| directive.into_rust_tokens());
-		quote! {
-			NodeMeta {
-				template_directives: vec![#(#template_directives),*],
-				location: #location
-			}
-		}
-	}
-
-	pub fn build_ron(location: TokenStream) -> TokenStream {
-		quote! {NodeMeta(
-			template_directives: [],
-			location: #location
-		)}
-	}
-
-	pub fn build_ron_with_directives(
-		location: TokenStream,
-		directives: &[TemplateDirective],
-	) -> TokenStream {
-		let template_directives = directives
-			.iter()
-			.map(|directive| directive.into_ron_tokens());
-		quote! {NodeMeta(
-			template_directives: [#(#template_directives),*],
-			location: #location
-		)}
 	}
 }

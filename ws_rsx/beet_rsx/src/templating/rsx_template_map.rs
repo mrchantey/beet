@@ -1,9 +1,8 @@
 use crate::prelude::*;
 #[allow(unused)]
 use anyhow::Result;
-use sweet::prelude::WorkspacePathBuf;
 use beet_common::prelude::*;
-
+use sweet::prelude::WorkspacePathBuf;
 
 /// The beet cli will visit all files in a crate and collect each
 /// rsx! macro into a ron structure of this type. Because it operates on the level
@@ -26,8 +25,6 @@ pub struct RsxTemplateMap {
 	pub templates: HashMap<NodeSpan, RsxTemplateNode>,
 }
 
-
-
 // TODO use a visitor that doesnt exit early if a parent has no nodes.
 // has no location, it may have a child that does and so should be templated.
 /// Find a matching template for the given [`WebNode`] and apply it, returning the
@@ -46,11 +43,15 @@ impl Pipeline<WebNode, TemplateResult<WebNode>> for &RsxTemplateMap {
 		// because the parent may not have a location/template, in most of these cases
 		// the child will not have a location so itll be a noop.
 		VisitWebNodeMut::walk(&mut node, |node| {
-			// this will atually mutate the node, effecting which children get visited next.
+			// this will actually mutate the node, effecting which children get visited next.
+			// this makes it vunerable to a stack overflow, for instance if the location
+			// was set on a child instead of the root, the child would be replaced
+			// with the root and its child would be visited again.
 			if let Err(err) = self.apply_template(node) {
 				result = Err(err);
 			}
 		});
+
 		result.map(|_| node)
 	}
 }
@@ -74,6 +75,8 @@ impl RsxTemplateMap {
 			// if the node doesnt have a location we dont even try to apply a template
 			return Ok(());
 		};
+
+
 		// println!("applying template to node: {}", node.location_str());
 
 		if let Some(template) = self.templates.get(&location) {
@@ -81,6 +84,7 @@ impl RsxTemplateMap {
 			*node = (std::mem::take(node), template.clone())
 				.xpipe(ApplyTemplateToNode)
 				.map_err(|err| err.with_location(location.clone()))?;
+
 			Ok(())
 		} else if location.file.starts_with(&self.root) {
 			Err(TemplateError::NoTemplate {
@@ -100,12 +104,10 @@ impl RsxTemplateMap {
 	}
 }
 
-
 #[cfg(test)]
 mod test {
 	use crate::as_beet::*;
 	use sweet::prelude::*;
-
 
 	/// used for testing, load directly from a collection of template roots.
 	#[cfg(test)]
@@ -229,9 +231,9 @@ mod test {
 		else {
 			panic!();
 		};
-		expect(tracker1).to_be(tracker2);
+		expect(tracker1.tokens_hash).to_be(3999007107847791261);
+		expect(tracker2.tokens_hash).to_be(1827591748735135928);
 	}
-
 
 	#[test]
 	fn nested_templates() {

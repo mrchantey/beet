@@ -1,12 +1,7 @@
-use crate::prelude::*;
 use anyhow::Result;
 use beet_common::prelude::*;
 use beet_rsx::prelude::*;
 use beet_rsx_parser::prelude::*;
-use sweet::prelude::WorkspacePathBuf;
-use sweet::prelude::*;
-
-
 
 
 pub struct WebTokensToStyleTemplates;
@@ -36,6 +31,7 @@ impl WebTokensToStyleTemplates {
 				children,
 				self_closing,
 			} if component.tag.to_string() == "style" => {
+				let scope = StyleScope::from_meta(&component.meta);
 				todo!();
 
 				// let scope = component.directives.scope;
@@ -58,8 +54,6 @@ pub struct StyleTemplate {
 
 
 
-
-
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum StyleScope {
 	/// Styles are scoped only to the component
@@ -70,7 +64,7 @@ pub enum StyleScope {
 }
 
 impl StyleScope {
-	pub fn from_meta(meta: &impl GetNodeMeta) -> Self {
+	pub fn from_meta(meta: &NodeMeta) -> Self {
 		if meta.is_global_scope() {
 			Self::Global
 		} else {

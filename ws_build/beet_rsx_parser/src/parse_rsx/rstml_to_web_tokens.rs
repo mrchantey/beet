@@ -1,4 +1,5 @@
 use crate::prelude::*;
+use beet_common::prelude::*;
 use proc_macro2::TokenStream;
 use proc_macro2_diagnostics::Diagnostic;
 use proc_macro2_diagnostics::Level;
@@ -19,7 +20,7 @@ use syn::spanned::Spanned;
 /// Convert rstml nodes to a Vec<WebNode> token stream
 /// ## Pipeline
 /// [`Pipeline<Vec<Node<C>>, (WebTokens, Vec<TokenStream>)>`]
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct RstmlToWebTokens<C = rstml::Infallible> {
 	// Additional error and warning messages.
 	pub errors: Vec<TokenStream>,
@@ -31,15 +32,19 @@ pub struct RstmlToWebTokens<C = rstml::Infallible> {
 	// rstml requires std hashset :(
 	self_closing_elements: HashSet<&'static str>,
 	phantom: std::marker::PhantomData<C>,
+	/// The span of the entry node, this will be taken
+	/// by the first node visited.
+	node_span: Option<NodeSpan>,
 }
 
 impl RstmlToWebTokens {
-	pub fn new() -> Self {
+	pub fn new(node_span: Option<NodeSpan>) -> Self {
 		Self {
 			errors: Vec::new(),
 			collected_elements: Vec::new(),
 			self_closing_elements: self_closing_elements(),
 			phantom: std::marker::PhantomData,
+			node_span,
 		}
 	}
 }
@@ -49,7 +54,10 @@ impl<C: CustomNode> Pipeline<Vec<Node<C>>, (WebTokens, Vec<TokenStream>)>
 	for RstmlToWebTokens<C>
 {
 	fn apply(mut self, nodes: Vec<Node<C>>) -> (WebTokens, Vec<TokenStream>) {
-		let node = self.map_nodes(nodes);
+		let mut node = self.map_nodes(nodes);
+		if let Some(node_span) = self.node_span {
+			node.meta_mut().location = Some(node_span);
+		}
 		(node, self.errors)
 	}
 }
@@ -65,7 +73,10 @@ impl<C: CustomNode> RstmlToWebTokens<C> {
 		if nodes.len() == 1 {
 			nodes.pop().unwrap()
 		} else {
-			WebTokens::Fragment { nodes }
+			WebTokens::Fragment {
+				nodes,
+				meta: NodeMeta::default(),
+			}
 		}
 	}
 
@@ -73,15 +84,19 @@ impl<C: CustomNode> RstmlToWebTokens<C> {
 		match node {
 			Node::Doctype(node) => WebTokens::Doctype {
 				value: node.token_start.token_lt.into(),
+				meta: NodeMeta::default(),
 			},
 			Node::Comment(node) => WebTokens::Comment {
 				value: node.value.into(),
+				meta: NodeMeta::default(),
 			},
 			Node::Text(node) => WebTokens::Text {
 				value: node.value.into(),
+				meta: NodeMeta::default(),
 			},
 			Node::RawText(node) => WebTokens::Text {
 				value: LitStr::new(&node.to_string_best(), node.span()).into(),
+				meta: NodeMeta::default(),
 			},
 			Node::Fragment(NodeFragment { children, .. }) => {
 				WebTokens::Fragment {
@@ -89,11 +104,13 @@ impl<C: CustomNode> RstmlToWebTokens<C> {
 						.into_iter()
 						.map(|n| self.map_node(n))
 						.collect(),
+					meta: NodeMeta::default(),
 				}
 			}
-			Node::Block(NodeBlock::ValidBlock(node)) => {
-				WebTokens::Block { value: node.into() }
-			}
+			Node::Block(NodeBlock::ValidBlock(node)) => WebTokens::Block {
+				value: node.into(),
+				meta: NodeMeta::default(),
+			},
 			Node::Block(NodeBlock::Invalid(invalid)) => {
 				self.errors.push(
 					Diagnostic::spanned(
@@ -132,7 +149,7 @@ impl<C: CustomNode> RstmlToWebTokens<C> {
 					component: ElementTokens {
 						tag: self.map_node_name(open_tag.name.clone()),
 						attributes,
-						directives: Vec::default(),
+						meta: NodeMeta::default(),
 					},
 					children: Box::new(self.map_nodes(children)),
 				}

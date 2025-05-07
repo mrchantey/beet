@@ -66,18 +66,13 @@ impl<'a> Visit<'a> for RsxSynVisitor {
 			// use the span of the inner tokens to match the behavior of
 			// the rsx! macro
 			let span = mac.tokens.span();
-			let start = span.start();
-			let loc = NodeSpan::new(
-				self.file.clone(),
-				start.line as u32,
-				start.column as u32,
-			);
+			let loc = NodeSpan::new_from_spanned(self.file.clone(), &span);
 			let web_tokens = mac
 				.tokens
 				.clone()
 				.xpipe(TokensToRstml::default())
 				.0
-				.xpipe(RstmlToWebTokens::new())
+				.xpipe(RstmlToWebTokens::new(Some(loc.clone())))
 				.0;
 
 			self.templates.push((loc, web_tokens));

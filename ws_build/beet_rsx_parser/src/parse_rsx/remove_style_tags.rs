@@ -26,7 +26,7 @@ impl Pipeline<WebTokens, WebTokens> for RemoveStyleTags {
 						std::mem::take(children);
 
 						*self_closing = true;
-						component.directives.push(
+						component.meta.template_directives.push(
 							TemplateDirective::StylePlaceholder {
 								content_hash,
 							},

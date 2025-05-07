@@ -81,7 +81,7 @@ mod test {
 		expect(&island.type_name)
 			.to_be("beet_rsx::rsx::pipeline::client_island::test::MyComponent");
 		expect(&island.tracker)
-			.to_be(&RustyTracker::new(0, 17560417869480573103));
+			.to_be(&RustyTracker::new(0, 1166527498685859621));
 		expect(&island.ron).to_be("(val:32)");
 		expect(ron::de::from_str::<MyComponent>(&island.ron).unwrap())
 			.to_be(MyComponent { val: 32 });

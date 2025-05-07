@@ -22,6 +22,7 @@ css = ["beet_rsx_parser/css"]
 proc-macro = true
 
 [dependencies]
+beet_common = { workspace = true, features = ["tokens"] }
 beet_rsx_parser.workspace = true
 sweet.workspace = true
 syn.workspace = true

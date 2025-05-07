@@ -1,15 +1,11 @@
-use crate::parse_rsx::meta_builder::MetaBuilder;
 use crate::prelude::*;
 use beet_common::prelude::*;
-use proc_macro2::LineColumn;
 use proc_macro2::Span;
 use proc_macro2::TokenStream;
 use proc_macro2_diagnostics::Diagnostic;
 use proc_macro2_diagnostics::Level;
-use quote::ToTokens;
 use quote::quote;
 use sweet::prelude::Pipeline;
-use sweet::prelude::WorkspacePathBuf;
 use syn::Block;
 use syn::Expr;
 use syn::Ident;
@@ -20,10 +16,8 @@ use syn::spanned::Spanned;
 /// havent yet found a usecase that makes it worth setting on
 /// every node, and we would need to pass locations of non-proc_macro
 /// tokens too.
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct WebTokensToRust {
-	/// The location of the root node
-	root_location: Option<TokenStream>,
 	pub idents: RsxIdents,
 	// Additional error and warning messages.
 	pub errors: Vec<TokenStream>,
@@ -59,67 +53,23 @@ impl Pipeline<WebTokens, Block> for WebTokensToRust {
 }
 
 impl WebTokensToRust {
-	pub fn new_no_location() -> Self {
-		Self {
-			idents: Default::default(),
-			root_location: None,
-			errors: Vec::new(),
-			rusty_tracker: Default::default(),
-			exclude_errors: false,
-		}
-	}
-
-	pub fn new_for_file(file: WorkspacePathBuf) -> Self {
-		Self::new(
-			RsxIdents::default(),
-			file.to_string_lossy().to_token_stream(),
-			LineColumn { line: 1, column: 0 },
-		)
-	}
-
-	pub fn new_spanned(idents: RsxIdents, entry: &impl Spanned) -> Self {
-		Self::new(idents, quote! {file!()}, entry.span().start())
-	}
-
-	/// use the line and column with the `file!()` macro to resolve location
-	fn new(idents: RsxIdents, file: TokenStream, linecol: LineColumn) -> Self {
-		let line = linecol.line as u32;
-		let col = linecol.column as u32;
-		let location = quote! {
-			Some(NodeSpan::new(#file, #line, #col))
-		};
-
-		Self {
-			idents,
-			root_location: Some(location),
-			errors: Vec::new(),
-			rusty_tracker: Default::default(),
-			exclude_errors: false,
-		}
-	}
-
-	fn location(&mut self) -> TokenStream {
-		std::mem::take(&mut self.root_location).unwrap_or(quote! {None})
-	}
-
-	fn basic_meta(&mut self) -> TokenStream {
-		let location = self.location();
-		MetaBuilder::build(location)
+	pub fn with_idents(self, idents: RsxIdents) -> Self {
+		Self { idents, ..self }
 	}
 
 	/// returns an WebNode
 	fn map_node(&mut self, node: WebTokens) -> TokenStream {
 		match node {
-			WebTokens::Fragment { nodes } => {
-				let meta = self.basic_meta();
+			WebTokens::Fragment { nodes, meta } => {
+				let meta = meta.into_rust_tokens();
 				let nodes = nodes.into_iter().map(|n| self.map_node(n));
 				quote! { RsxFragment{
 					nodes: vec![#(#nodes),*],
 					meta: #meta,
 				}.into_node()}
 			}
-			WebTokens::Doctype { value: _ } => {
-				let meta = self.basic_meta();
+			WebTokens::Doctype { value: _, meta } => {
+				let meta = meta.into_rust_tokens();
 				quote!(
 					RsxDoctype {
 						meta: #meta
@@ -127,22 +77,26 @@ impl WebTokensToRust {
 					.into_node()
 				)
 			}
-			WebTokens::Comment { value } => {
-				let meta = self.basic_meta();
+			WebTokens::Comment { value, meta } => {
+				let meta = meta.into_rust_tokens();
 				quote!(RsxComment {
 					value: #value.to_string(),
 					meta: #meta,
 				}.into_node())
 			}
-			WebTokens::Text { value } => {
-				let meta = self.basic_meta();
-
+			WebTokens::Text { value, meta } => {
+				let meta = meta.into_rust_tokens();
 				quote!(RsxText {
 					value: #value.to_string(),
 					meta: #meta,
 				}.into_node())
 			}
-			WebTokens::Block { value } => {
+			WebTokens::Block {
+				value,
+				// Block meta is not used in WebTokensToRust,
+				// but it is used in WebTokensToRon
+				meta: _,
+			} => {
 				let tracker = self.rusty_tracker.next_tracker(&value);
 				let ident = &self.idents.runtime.effect;
 				quote! {
@@ -157,23 +111,16 @@ impl WebTokensToRust {
 				let ElementTokens {
 					tag,
 					attributes,
-					directives,
+					meta,
 					..
 				} = &component;
-				// take root location before visiting children
-				let location = self.location();
-
 
 				// we must parse runtime attr before anything else
-				self.parse_runtime_directive(&directives);
+				self.parse_runtime_directive(&meta);
 				let tag_str = tag.to_string();
 				if tag_str.starts_with(|c: char| c.is_uppercase()) {
-					self.map_component(location, component, *children)
+					self.map_component(component, *children)
 				} else {
-					let meta = MetaBuilder::build_with_directives(
-						location,
-						&directives,
-					);
 					// this attributes-children order is important for rusty tracker indices
 					// to be consistent with [`WebTokensToRon`]
 					let attributes = attributes
@@ -181,7 +128,7 @@ impl WebTokensToRust {
 						.map(|attr| self.map_attribute(attr))
 						.collect::<Vec<_>>();
 					let children = self.map_node(*children);
-
+					let meta = meta.into_rust_tokens();
 					quote!(RsxElement {
 						tag: #tag_str.to_string(),
 						attributes: vec![#(#attributes),*],
@@ -265,7 +212,6 @@ impl WebTokensToRust {
 
 	fn map_component(
 		&mut self,
-		location: TokenStream,
 		component: ElementTokens,
 		children: WebTokens,
 	) -> TokenStream {
@@ -273,12 +219,11 @@ impl WebTokensToRust {
 		let ElementTokens {
 			tag,
 			attributes,
-			directives,
+			meta,
 		} = component;
 		let tag_str = tag.to_string();
 		// visiting slot children is safe here, we aren't pulling any more trackers
 		let slot_children = self.map_node(children);
-		let meta = MetaBuilder::build_with_directives(location, &directives);
 
 		let mut prop_assignments = Vec::new();
 		let mut prop_names = Vec::new();
@@ -338,7 +283,7 @@ impl WebTokensToRust {
 			})
 		};
 
-		let ron = if directives.iter().any(|d| d.is_client_reactive()) {
+		let ron = if meta.is_client_reactive() {
 			quote! {{
 				#[cfg(target_arch = "wasm32")]
 				{None}
@@ -354,6 +299,7 @@ impl WebTokensToRust {
 		let ide_helper =
 			Ident::new(&format!("{}Required", &ident.to_string()), tag.span());
 
+		let meta = meta.into_rust_tokens();
 		quote::quote!({
 				let _ = #ide_helper::default();
 
@@ -373,17 +319,15 @@ impl WebTokensToRust {
 
 	/// Update [`Self::idents`] with the specified runtime and removes it from
 	/// the list of attributes. See [`RsxIdents::set_runtime`] for more information.
-	fn parse_runtime_directive(&mut self, directives: &[TemplateDirective]) {
-		for directive in directives.iter() {
-			if let TemplateDirective::Runtime(runtime) = directive {
-				if let Err(err) = self.idents.runtime.set(runtime) {
-					let diagnostic = Diagnostic::spanned(
-						Span::call_site(),
-						Level::Error,
-						err.to_string(),
-					);
-					self.errors.push(diagnostic.emit_as_expr_tokens());
-				}
+	fn parse_runtime_directive(&mut self, meta: &NodeMeta) {
+		if let Some(runtime) = meta.runtime() {
+			if let Err(err) = self.idents.runtime.set(runtime) {
+				let diagnostic = Diagnostic::spanned(
+					Span::call_site(),
+					Level::Error,
+					err.to_string(),
+				);
+				self.errors.push(diagnostic.emit_as_expr_tokens());
 			}
 		}
 	}

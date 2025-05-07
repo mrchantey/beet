@@ -29,6 +29,14 @@ impl std::fmt::Display for NodeSpan {
 }
 
 impl NodeSpan {
+	pub fn new_from_file(file: WorkspacePathBuf) -> Self {
+		Self {
+			file,
+			line: 1,
+			col: 0,
+		}
+	}
+
 	#[cfg(feature = "tokens")]
 	pub fn new_from_spanned(
 		file: WorkspacePathBuf,
@@ -75,7 +83,8 @@ impl NodeSpan {
 		line: u32,
 		col: u32,
 	) -> Self {
-		assert_ne!(line, 0, "Line number must be greater than 0");
+		// id like to assert this but it seems rust-analyzer uses 0 based line numbers?
+		// assert_ne!(line, 0, "Line number must be greater than 0");
 		Self {
 			file: WorkspacePathBuf::new(workspace_file_path),
 			line,

@@ -26,7 +26,6 @@ fn main() -> Result<()> {
 	}
 	.run()?;
 
-
 	Ok(())
 }
 

@@ -16,7 +16,7 @@ impl Pipeline<WebTokens, Result<WebTokens>> for ValidateStyleNode {
 				children,
 				..
 			} if component.tag.to_string() == "style"
-				&& let WebTokens::Text { value } = &**children =>
+				&& let WebTokens::Text { value, .. } = &**children =>
 			{
 				validate_css(&value.value.value(), &value)
 			}

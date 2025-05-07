@@ -1,6 +1,7 @@
 use super::ElementTokens;
 use crate::prelude::*;
 use anyhow::Result;
+use beet_common::prelude::*;
 use syn::Block;
 use syn::LitStr;
 use syn::token::Lt;
@@ -21,19 +22,24 @@ use syn::token::Lt;
 pub enum WebTokens {
 	Fragment {
 		nodes: Vec<WebTokens>,
+		meta: NodeMeta,
 	},
 	Doctype {
 		/// the opening bracket
 		value: Spanner<Lt>,
+		meta: NodeMeta,
 	},
 	Comment {
 		value: Spanner<LitStr>,
+		meta: NodeMeta,
 	},
 	Text {
 		value: Spanner<LitStr>,
+		meta: NodeMeta,
 	},
 	Block {
 		value: Spanner<Block>,
+		meta: NodeMeta,
 	},
 	/// An element `<div>` or a component `<MyComponent>`
 	Element {
@@ -45,7 +51,34 @@ pub enum WebTokens {
 
 
 impl Default for WebTokens {
-	fn default() -> Self { Self::Fragment { nodes: Vec::new() } }
+	fn default() -> Self {
+		Self::Fragment {
+			nodes: Vec::new(),
+			meta: NodeMeta::default(),
+		}
+	}
+}
+impl GetNodeMeta for WebTokens {
+	fn meta(&self) -> &NodeMeta {
+		match self {
+			WebTokens::Fragment { meta, .. } => meta,
+			WebTokens::Doctype { meta, .. } => meta,
+			WebTokens::Comment { meta, .. } => meta,
+			WebTokens::Text { meta, .. } => meta,
+			WebTokens::Block { meta, .. } => meta,
+			WebTokens::Element { component, .. } => &component.meta,
+		}
+	}
+	fn meta_mut(&mut self) -> &mut NodeMeta {
+		match self {
+			WebTokens::Fragment { meta, .. } => meta,
+			WebTokens::Doctype { meta, .. } => meta,
+			WebTokens::Comment { meta, .. } => meta,
+			WebTokens::Text { meta, .. } => meta,
+			WebTokens::Block { meta, .. } => meta,
+			WebTokens::Element { component, .. } => &mut component.meta,
+		}
+	}
 }
 
 
@@ -67,7 +100,7 @@ impl WebTokens {
 	) -> Result<(), E> {
 		visit(self)?;
 		match self {
-			WebTokens::Fragment { nodes } => {
+			WebTokens::Fragment { nodes, .. } => {
 				for child in nodes.iter() {
 					child.walk_web_tokens_inner(visit)?;
 				}
@@ -92,7 +125,7 @@ impl WebTokens {
 	) -> Result<(), E> {
 		visit(self)?;
 		match self {
-			WebTokens::Fragment { nodes } => {
+			WebTokens::Fragment { nodes, .. } => {
 				for child in nodes.iter_mut() {
 					child.walk_web_tokens_mut_inner(visit)?;
 				}
@@ -104,14 +137,14 @@ impl WebTokens {
 		}
 		Ok(())
 	}
-	/// Collapse a vector of `WebTokens` into a single `WebTokens`.
-	pub fn collapse(nodes: Vec<WebTokens>) -> WebTokens {
-		if nodes.len() == 1 {
-			nodes.into_iter().next().unwrap()
-		} else {
-			WebTokens::Fragment { nodes }
-		}
-	}
+	// /// Collapse a vector of `WebTokens` into a single `WebTokens`.
+	// pub fn collapse(nodes: Vec<WebTokens>) -> WebTokens {
+	// 	if nodes.len() == 1 {
+	// 		nodes.into_iter().next().unwrap()
+	// 	} else {
+	// 		WebTokens::Fragment { nodes }
+	// 	}
+	// }
 }
 
 
@@ -121,7 +154,7 @@ impl<E> ElementTokensVisitor<E> for WebTokens {
 		visit: &mut impl FnMut(&mut ElementTokens) -> Result<(), E>,
 	) -> anyhow::Result<(), E> {
 		match self {
-			WebTokens::Fragment { nodes } => {
+			WebTokens::Fragment { nodes, .. } => {
 				for child in nodes.iter_mut() {
 					child.walk_rsx_tokens_inner(visit)?;
 				}

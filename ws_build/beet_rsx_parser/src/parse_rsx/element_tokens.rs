@@ -21,7 +21,12 @@ pub struct ElementTokens {
 	pub attributes: Vec<RsxAttributeTokens>,
 	/// special directives for use by both
 	/// parser and WebNode pipelines, ie <MyComponent client:load/>
-	pub directives: Vec<TemplateDirective>,
+	pub meta: NodeMeta,
+}
+
+impl GetNodeMeta for ElementTokens {
+	fn meta(&self) -> &NodeMeta { &self.meta }
+	fn meta_mut(&mut self) -> &mut NodeMeta { &mut self.meta }
 }
 
 // used when a recoverable error is emitted

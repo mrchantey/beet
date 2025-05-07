@@ -251,7 +251,7 @@ mod test {
 	#[test]
 	fn complex() {
 		let ident_tracker = RustyTracker::new(0, 6068255516074130633);
-		let component_tracker = RustyTracker::new(1, 4498377743695909661);
+		let component_tracker = RustyTracker::new(1, 10397102694472040927);
 		let template = rsx_template! {
 			<div key str="value" num=32 ident=some_val>
 				<p>

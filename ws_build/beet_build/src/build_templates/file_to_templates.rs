@@ -25,14 +25,14 @@ impl Pipeline<WorkspacePathBuf, Result<FileTemplates>> for FileToTemplates {
 			_ => Ok(Default::default()),
 		}?
 		.xmap_each(|(location, web_tokens)| {
-			templates
-				.style_templates
-				.extend(web_tokens.xref().xpipe(WebTokensToStyleTemplates)?);
+			// templates
+			// 	.style_templates
+			// 	.extend(web_tokens.xref().xpipe(WebTokensToStyleTemplates)?);
 
 			let web_tokens = web_tokens.xpipe(ParseWebTokens::default())?;
 
 			let rsx_ron =
-				web_tokens.xpipe(WebTokensToRon::new(&location)).to_string();
+				web_tokens.xpipe(WebTokensToRon::default()).to_string();
 			let template_node =
 				ron::de::from_str::<RsxTemplateNode>(rsx_ron.trim())
 					.map_err(|e| ron_cx_err(e, &rsx_ron))?;

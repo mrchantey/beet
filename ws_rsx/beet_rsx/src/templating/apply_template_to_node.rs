@@ -19,6 +19,7 @@ impl Pipeline<(WebNode, RsxTemplateNode), TemplateResult<WebNode>>
 		self,
 		(node, template): (WebNode, RsxTemplateNode),
 	) -> TemplateResult<WebNode> {
+
 		// println!("found template for node: {}\n{:?}", location, template);
 		self.apply_to_node(template, &mut node.xpipe(NodeToRustyPartMap))
 	}
@@ -27,7 +28,7 @@ impl Pipeline<(WebNode, RsxTemplateNode), TemplateResult<WebNode>>
 impl ApplyTemplateToNode {
 	/// drain the effect map into an WebNode. This does not recurse into
 	/// [`RsxBlock::initial`] or [`RsxComponent::node`].
-	pub fn apply_to_node(
+	fn apply_to_node(
 		&self,
 		template: RsxTemplateNode,
 		rusty_map: &mut RustyPartMap,
@@ -44,7 +45,7 @@ impl ApplyTemplateToNode {
 			RsxTemplateNode::Fragment { items, meta } => {
 				let nodes = items
 					.into_iter()
-					.map(|template| self.apply_to_node(template, rusty_map))
+					.map(|item| self.apply_to_node(item, rusty_map))
 					.collect::<TemplateResult<Vec<_>>>()?;
 				RsxFragment { nodes, meta }.into()
 			}
@@ -137,6 +138,7 @@ impl ApplyTemplateToNode {
 			}
 			.into(),
 		};
+
 		Ok(node)
 	}
 }

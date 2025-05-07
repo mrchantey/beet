@@ -182,6 +182,15 @@ pub trait TemplateDirectiveExt {
 		})
 	}
 
+
+	fn runtime(&self) -> Option<&String> {
+		self.find_map_directive(|d| match d {
+			TemplateDirective::Runtime(runtime) => Some(runtime),
+			_ => None,
+		})
+	}
+
+
 	fn any_directive(&self, func: impl Fn(&TemplateDirective) -> bool) -> bool {
 		self.find_directive(func).is_some()
 	}

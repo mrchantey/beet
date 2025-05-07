@@ -18,18 +18,18 @@ impl Pipeline<WorkspacePathBuf, Result<(NodeSpan, WebTokens)>>
 	for MdToWebTokens
 {
 	fn apply(self, path: WorkspacePathBuf) -> Result<(NodeSpan, WebTokens)> {
-		let location = NodeSpan::new_for_file(&path);
+		let node_span = NodeSpan::new_for_file(&path);
 		let file = ReadFile::to_string(path.into_abs_unchecked())?;
 		let web_tokens = ParseMarkdown::markdown_to_rsx_str(&file)
-			.xpipe(StringToWebTokens::default())
+			.xpipe(StringToWebTokens::new(Some(node_span.clone())))
 			.map_err(|e| {
 				anyhow::anyhow!(
 					"Failed to parse Markdown HTML\nPath: {}\nError: {}",
-					location.file.display(),
+					node_span.file.display(),
 					e
 				)
 			})?;
-		Ok((location, web_tokens))
+		Ok((node_span, web_tokens))
 	}
 }
 

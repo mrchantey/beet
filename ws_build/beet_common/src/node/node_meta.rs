@@ -9,6 +9,15 @@ pub struct NodeMeta {
 	pub location: Option<NodeSpan>,
 }
 
+impl NodeMeta {
+	pub fn new(location: Option<NodeSpan>) -> Self {
+		Self {
+			template_directives: Vec::new(),
+			location,
+		}
+	}
+}
+
 impl GetNodeMeta for NodeMeta {
 	fn meta(&self) -> &NodeMeta { self }
 	fn meta_mut(&mut self) -> &mut NodeMeta { self }
@@ -38,7 +47,6 @@ pub trait GetNodeMeta {
 			None => "<unknown>".to_string(),
 		}
 	}
-
 
 	fn template_directives(&self) -> &Vec<TemplateDirective> {
 		self.meta().template_directives.as_ref()
@@ -71,5 +79,50 @@ impl<T: GetNodeMeta> TemplateDirectiveExt for T {
 		mut func: impl FnMut(&TemplateDirective) -> Option<&U>,
 	) -> Option<&U> {
 		self.template_directives().iter().find_map(|d| func(d))
+	}
+}
+
+
+#[cfg(feature = "tokens")]
+impl crate::prelude::SerdeTokens for NodeMeta {
+	fn into_rust_tokens(&self) -> proc_macro2::TokenStream {
+		let location = match self.location() {
+			Some(loc) => {
+				let loc = loc.into_rust_tokens();
+				quote::quote! {Some(#loc)}
+			}
+			None => quote::quote! {None},
+		};
+
+		let template_directives = self
+			.template_directives()
+			.iter()
+			.map(|d| d.into_rust_tokens());
+		quote::quote! {
+			NodeMeta {
+				template_directives: vec![#(#template_directives),*],
+				location: #location
+			}
+		}
+	}
+
+	fn into_ron_tokens(&self) -> proc_macro2::TokenStream {
+		let location = match self.location() {
+			Some(loc) => {
+				let loc = loc.into_ron_tokens();
+				quote::quote! {Some(#loc)}
+			}
+			None => quote::quote! {None},
+		};
+		let template_directives = self
+			.template_directives()
+			.iter()
+			.map(|d| d.into_ron_tokens());
+		quote::quote! {
+			NodeMeta(
+				template_directives: [#(#template_directives),*],
+				location: #location,
+			)
+		}
 	}
 }
