@@ -1,6 +1,6 @@
 use crate::parse_rsx::meta_builder::MetaBuilder;
-use crate::parse_rsx::meta_builder::TemplateDirectiveTokens;
 use crate::prelude::*;
+use beet_common::prelude::*;
 use proc_macro2::LineColumn;
 use proc_macro2::Span;
 use proc_macro2::TokenStream;
@@ -373,12 +373,9 @@ impl WebTokensToRust {
 
 	/// Update [`Self::idents`] with the specified runtime and removes it from
 	/// the list of attributes. See [`RsxIdents::set_runtime`] for more information.
-	fn parse_runtime_directive(
-		&mut self,
-		directives: &[TemplateDirectiveTokens],
-	) {
+	fn parse_runtime_directive(&mut self, directives: &[TemplateDirective]) {
 		for directive in directives.iter() {
-			if let TemplateDirectiveTokens::Runtime(runtime) = directive {
+			if let TemplateDirective::Runtime(runtime) = directive {
 				if let Err(err) = self.idents.runtime.set(runtime) {
 					let diagnostic = Diagnostic::spanned(
 						Span::call_site(),

@@ -1,24 +1,76 @@
-/// Attributes with a colon `:` are considered special template directives,
-/// for example `client:load`
+/// Template directives contain instructions for various stages of a beet
+/// pipeline. Some the syntax of a colon, ie `<div client:load />`, and
+/// some are more nuanced, for example a script with a src attribute that
+/// starts with a `.` is a file source directive.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum TemplateDirective {
-	/// A node with a client directive: <div client:load />
+	/// Indicates that a component should be rendered in html, and also
+	/// hydrated on the client. This is the `client islands architecture` used
+	/// by frameworks like astro.
+	/// ## Example
+	/// ```rust ignore
+	/// <div client:load />
+	/// ```
 	ClientLoad,
-	/// A node with a local scope directive: <div scope:local />
+	/// The default scope for a style tag, its styles will only be applied to
+	/// elements within the component, each selector will be preprended with
+	/// an attribute selector for the component, eg `[data-styleid-1]`.
+	/// ## Example
+	/// ```rust ignore
+	/// <style scope:local>
+	/// 	/* css */
+	/// </style>
+	/// ```
 	ScopeLocal,
-	/// A node with a global scope directive: <div scope:global />
+	/// Global scope for a style tag, its styles will not have an attribute
+	/// selector prepended to them, so will apply to all elements in the document.
+	/// ## Example
+	/// ```rust ignore
+	/// <style scope:global>
+	/// 	/* css */
+	/// </style>
+	/// ```
 	ScopeGlobal,
-	/// A node with a cascade scope directive: <div scope:cascade />
+	/// Mark a *component* as allowing styles to cascasde into it. This means that
+	/// it will have the `data-styleid` attribute applied for each style tag in
+	/// its parent.
+	/// This behavior is *recursive*, meaning that its children will also
+	/// have the attribute applied.
+	/// ## Example
+	/// ```rust ignore
+	/// <MyComponent scope:cascade>
+	/// <style>
+	/// 	/* this css will also be applied to children of MyComponent */
+	/// </style>
+	/// ```
 	ScopeCascade,
-	/// A node with a slot directive: <div slot="foo" />
+	/// Indicates this node should be rendered in a named slot instead of
+	/// the default slot.
+	/// ## Example
+	/// ```rust ignore
+	/// <div slot="header" />
+	/// ````
 	Slot(String),
-	/// A node with a runtime directive: <div runtime:bevy />
+	/// Sets the runtime for the parser.
+	/// ## Example
+	/// ```rust ignore
+	/// <div runtime:bevy />
+	/// ````
 	Runtime(String),
 	// A node with an fs source directive: <div src="foo" />
 	// By default this is any src attribute starting wth a `.`
+	/// ## Example
+	/// ```rust ignore
+	/// <style src="./style.css" />
+	/// <script src="./my-script.js" />
+	/// ```
 	FsSrc(String),
-	/// A node with a custom directive: <div custom:foo="bar" />
+	/// A custom directive used by a pipeline defined by the user.
+	/// ## Example
+	/// ```rust ignore
+	/// <div custom:foo="bar" />
+	/// ```
 	Custom {
 		/// The part before the colon
 		prefix: String,
@@ -82,6 +134,8 @@ impl TemplateDirectiveExt for TemplateDirective {
 /// like in [`NodeMeta`]
 pub trait TemplateDirectiveExt {
 	/// Check if the template directive is a client directive
+	/// which means the RsxComponent should be serialized, ie `ClientLoad`
+	/// This must match TemplateDirective::is_client_reactive
 	fn is_client_reactive(&self) -> bool {
 		// Check if the template directive is a client directive
 		self.any_directive(|d| d.is_client_reactive())
@@ -125,4 +179,100 @@ pub trait TemplateDirectiveExt {
 		&self,
 		func: impl Fn(&TemplateDirective) -> Option<&T>,
 	) -> Option<&T>;
+}
+
+#[cfg(feature = "tokens")]
+use quote::quote;
+
+#[cfg(feature = "tokens")]
+impl crate::prelude::SerdeTokens for TemplateDirective {
+	fn into_rust_tokens(&self) -> proc_macro2::TokenStream {
+		match self {
+			TemplateDirective::ClientLoad => {
+				quote! {TemplateDirective::ClientLoad}
+			}
+			TemplateDirective::ScopeLocal => {
+				quote! {TemplateDirective::ScopeLocal}
+			}
+			TemplateDirective::ScopeGlobal => {
+				quote! {TemplateDirective::ScopeGlobal}
+			}
+			TemplateDirective::ScopeCascade => {
+				quote! {TemplateDirective::ScopeCascade}
+			}
+			TemplateDirective::FsSrc(src) => {
+				quote! {TemplateDirective::FsSrc(#src.into())}
+			}
+			TemplateDirective::Slot(slot) => {
+				quote! {TemplateDirective::Slot(#slot.into())}
+			}
+			TemplateDirective::Runtime(runtime) => {
+				quote! {TemplateDirective::Runtime(#runtime.into())}
+			}
+			TemplateDirective::Custom {
+				prefix,
+				suffix,
+				value,
+			} => {
+				quote! {TemplateDirective::Custom{
+					prefix: #prefix.into(),
+					suffix: #suffix.into(),
+					value: #value.into()
+				}}
+			} // TemplateDirective::Custom {
+			  // 	prefix,
+			  // 	suffix,
+			  // 	value,
+			  // } => {
+			  // 	let value = match value {
+			  // 		Some(value) => quote! {Some(#value.into())},
+			  // 		None => quote! {None},
+			  // 	};
+			  // 	quote! {TemplateDirective::Custom{
+			  // 		prefix: #prefix.into(),
+			  // 		suffix: #suffix.into(),
+			  // 		value: #value
+			  // 	}
+			  // 	}
+			  // }
+		}
+	}
+
+	fn into_ron_tokens(&self) -> proc_macro2::TokenStream {
+		match self {
+			TemplateDirective::ClientLoad => {
+				quote! {ClientLoad}
+			}
+			TemplateDirective::ScopeLocal => {
+				quote! {ScopeLocal}
+			}
+			TemplateDirective::ScopeGlobal => {
+				quote! {ScopeGlobal}
+			}
+			TemplateDirective::ScopeCascade => {
+				quote! {ScopeCascade}
+			}
+			TemplateDirective::FsSrc(src) => {
+				quote! {FsSrc(#src)}
+			}
+			TemplateDirective::Slot(slot) => {
+				quote! {Slot(#slot)}
+			}
+			TemplateDirective::Runtime(runtime) => {
+				quote! {Runtime(#runtime)}
+			}
+			TemplateDirective::Custom {
+				prefix,
+				suffix,
+				value,
+			} => {
+				quote! {CustomKeyValue(
+					prefix: #prefix,
+					suffix: #suffix,
+					value: #value
+				)
+				}
+			}
+		}
+	}
 }

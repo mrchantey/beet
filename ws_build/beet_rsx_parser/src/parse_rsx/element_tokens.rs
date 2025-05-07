@@ -1,5 +1,5 @@
-use crate::prelude::*;
 use anyhow::Result;
+use beet_common::prelude::*;
 use proc_macro2::LineColumn;
 use proc_macro2::Span;
 use proc_macro2::TokenStream;
@@ -21,7 +21,7 @@ pub struct ElementTokens {
 	pub attributes: Vec<RsxAttributeTokens>,
 	/// special directives for use by both
 	/// parser and WebNode pipelines, ie <MyComponent client:load/>
-	pub directives: Vec<TemplateDirectiveTokens>,
+	pub directives: Vec<TemplateDirective>,
 }
 
 // used when a recoverable error is emitted
