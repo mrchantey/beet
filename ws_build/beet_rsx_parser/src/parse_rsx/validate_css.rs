@@ -8,7 +8,7 @@ use syn::spanned::Spanned;
 pub struct ValidateStyleNode;
 
 impl Pipeline<WebTokens, Result<WebTokens>> for ValidateStyleNode {
-	fn apply(self, mut node: WebTokens) -> Result<WebTokens> {
+	fn apply(self, node: WebTokens) -> Result<WebTokens> {
 		// doesnt need to be mut but no ref visitor
 		node.walk_web_tokens(|html| match html {
 			WebTokens::Element {

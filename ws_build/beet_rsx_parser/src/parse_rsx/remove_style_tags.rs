@@ -13,14 +13,13 @@ pub struct RemoveStyleTags;
 impl Pipeline<WebTokens, WebTokens> for RemoveStyleTags {
 	fn apply(self, mut tokens: WebTokens) -> WebTokens {
 		tokens
-			.walk_web_tokens::<Infallible>(|tokens| {
+			.walk_web_tokens_mut::<Infallible>(|tokens| {
 				match tokens {
 					WebTokens::Element {
 						component,
 						children,
 						self_closing,
 					} if component.tag.to_string() == "style" => {
-
 						let mut hasher = RapidHasher::default_const();
 						children.hash(&mut hasher);
 						let content_hash = hasher.finish();

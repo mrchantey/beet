@@ -13,10 +13,10 @@ pub struct FileToTemplates;
 
 
 
-impl Pipeline<WorkspacePathBuf, Result<Vec<FileTemplates>>>
-	for FileToTemplates
-{
-	fn apply(self, path: WorkspacePathBuf) -> Result<Vec<FileTemplates>> {
+impl Pipeline<WorkspacePathBuf, Result<FileTemplates>> for FileToTemplates {
+	fn apply(self, path: WorkspacePathBuf) -> Result<FileTemplates> {
+		let mut templates = FileTemplates::default();
+
 		match path.extension() {
 			Some(ex) if ex == "rs" => path.xpipe(RsToWebTokens),
 			Some(ex) if ex == "md" || ex == "mdx" => {
@@ -25,25 +25,23 @@ impl Pipeline<WorkspacePathBuf, Result<Vec<FileTemplates>>>
 			_ => Ok(Default::default()),
 		}?
 		.xmap_each(|(location, web_tokens)| {
-			// todo!("here we should extract the styles");
+			templates
+				.style_templates
+				.extend(web_tokens.xref().xpipe(WebTokensToStyleTemplates)?);
 
-			let rsx_ron = web_tokens
-				.xpipe(ParseWebTokens::default())?
-				.xpipe(WebTokensToRon::new(&location))
-				.to_string();
+			let web_tokens = web_tokens.xpipe(ParseWebTokens::default())?;
+
+			let rsx_ron =
+				web_tokens.xpipe(WebTokensToRon::new(&location)).to_string();
 			let template_node =
 				ron::de::from_str::<RsxTemplateNode>(rsx_ron.trim())
 					.map_err(|e| ron_cx_err(e, &rsx_ron))?;
-
-			FileTemplates {
-				location,
-				template_node,
-				// style_ron: Default::default(),
-			}
-			.xok()
+			templates.rsx_templates.push((location, template_node));
+			Ok(())
 		})
 		.into_iter()
-		.collect::<Result<Vec<_>>>()
+		.collect::<Result<()>>()?;
+		Ok(templates)
 	}
 }
 
@@ -70,12 +68,10 @@ fn ron_cx_err(e: ron::error::SpannedError, str: &str) -> anyhow::Error {
 }
 
 
-
+#[derive(Debug, Default)]
 pub struct FileTemplates {
-	/// The location of the rsx
-	pub location: NodeSpan,
 	/// A [`TokenStream`] representing a [`ron`] representation of a [`RsxTemplateNode`].
-	pub template_node: RsxTemplateNode,
+	pub rsx_templates: Vec<(NodeSpan, RsxTemplateNode)>,
 	// /// A [`TokenStream`] representing styles extracted from the file.
-	// pub style_ron: TokenStream,
+	pub style_templates: Vec<StyleTemplate>,
 }

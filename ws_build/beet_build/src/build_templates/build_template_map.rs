@@ -1,5 +1,4 @@
-use super::FileTemplates;
-use super::FileToTemplates;
+use crate::prelude::*;
 use anyhow::Result;
 use beet_router::prelude::*;
 use beet_rsx::prelude::*;
@@ -86,14 +85,12 @@ impl BuildTemplateMap {
 			})
 			.collect::<Result<Vec<_>>>()?
 			.into_iter()
-			.flatten()
-			.map(
-				|FileTemplates {
-				     location,
-				     template_node,
-				 }| { (location, template_node) },
-			)
-			.collect::<RapidHashMap<_, _>>();
+			.fold(RapidHashMap::default(), |mut acc, file| {
+				for (location, template) in file.rsx_templates {
+					acc.insert(location, template);
+				}
+				acc
+			});
 
 		let root = WorkspacePathBuf::new_from_canonicalizable(
 			&self.templates_root_dir,

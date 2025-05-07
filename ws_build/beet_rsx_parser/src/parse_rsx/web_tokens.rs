@@ -49,14 +49,44 @@ impl Default for WebTokens {
 }
 
 
+impl AsRef<WebTokens> for WebTokens {
+	fn as_ref(&self) -> &WebTokens { self }
+}
+
 impl WebTokens {
+	/// Visit each [`WebTokens`] node in the tree.
 	pub fn walk_web_tokens<E>(
-		&mut self,
-		mut visit: impl FnMut(&mut WebTokens) -> Result<(), E>,
+		&self,
+		mut visit: impl FnMut(&WebTokens) -> Result<(), E>,
 	) -> Result<(), E> {
 		self.walk_web_tokens_inner(&mut visit)
 	}
 	fn walk_web_tokens_inner<E>(
+		&self,
+		visit: &mut impl FnMut(&WebTokens) -> Result<(), E>,
+	) -> Result<(), E> {
+		visit(self)?;
+		match self {
+			WebTokens::Fragment { nodes } => {
+				for child in nodes.iter() {
+					child.walk_web_tokens_inner(visit)?;
+				}
+			}
+			WebTokens::Element { children, .. } => {
+				children.walk_web_tokens_inner(visit)?;
+			}
+			_ => {}
+		}
+		Ok(())
+	}
+	/// Mutably visit each [`WebTokens`] node in the tree.
+	pub fn walk_web_tokens_mut<E>(
+		&mut self,
+		mut visit: impl FnMut(&mut WebTokens) -> Result<(), E>,
+	) -> Result<(), E> {
+		self.walk_web_tokens_mut_inner(&mut visit)
+	}
+	fn walk_web_tokens_mut_inner<E>(
 		&mut self,
 		visit: &mut impl FnMut(&mut WebTokens) -> Result<(), E>,
 	) -> Result<(), E> {
@@ -64,11 +94,11 @@ impl WebTokens {
 		match self {
 			WebTokens::Fragment { nodes } => {
 				for child in nodes.iter_mut() {
-					child.walk_web_tokens_inner(visit)?;
+					child.walk_web_tokens_mut_inner(visit)?;
 				}
 			}
 			WebTokens::Element { children, .. } => {
-				children.walk_web_tokens_inner(visit)?;
+				children.walk_web_tokens_mut_inner(visit)?;
 			}
 			_ => {}
 		}
