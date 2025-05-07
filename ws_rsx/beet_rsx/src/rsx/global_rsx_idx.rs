@@ -28,7 +28,6 @@ impl GlobalRsxIdx {
 	pub fn new(macro_location_hash: u64, idx: u32) -> Self {
 		Self {
 			macro_location_hash,
-
 			idx,
 		}
 	}
@@ -75,14 +74,13 @@ fn hash_to_alphanumeric(hash: u64, length: usize) -> String {
 
 #[cfg(test)]
 mod test {
-	use crate::prelude::*;
+	use crate::as_beet::*;
 	use sweet::prelude::*;
 
 	#[test]
 	#[ignore = "its unused and this test is a bit silly"]
 	fn works() {
-		let idx =
-			GlobalRsxIdx::new(RsxMacroLocation::placeholder().into_hash(), 123);
+		let idx = GlobalRsxIdx::new(0, 123);
 		let hash = idx.into_hash();
 		expect(hash).not().to_be(0);
 		expect(idx.into_hash_str().len()).to_be(8);

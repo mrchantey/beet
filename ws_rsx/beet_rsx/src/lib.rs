@@ -73,15 +73,15 @@ pub mod exports {
 // only for internal examples
 // #[cfg(debug_assertions)]
 pub mod as_beet {
-	pub use crate::prelude::*;
-	// expose macro for single import in docs
-	pub use beet_rsx_macros::rsx;
+	pub use beet::prelude::*;
 	pub mod beet {
-		// expose prelude and exports
-		pub use crate::*;
-		// in beet the beet_rsx crate is aliased to rsx
-		pub mod rsx {
-			pub use crate::*;
+		pub use crate as rsx;
+		pub mod prelude {
+			pub use crate::prelude::*;
+			pub use beet_common::prelude::*;
+		}
+		pub mod exports {
+			pub use crate::exports::*;
 		}
 	}
 }

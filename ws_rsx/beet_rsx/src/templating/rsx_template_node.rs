@@ -1,5 +1,6 @@
 use crate::prelude::*;
 use thiserror::Error;
+use beet_common::prelude::*;
 
 
 /// Serializable version of an web node that can be rehydrated.
@@ -40,7 +41,7 @@ pub enum RsxTemplateNode {
 	/// Serializable [`WebNode::Component`]
 	/// We dont know much about components, for example when parsing
 	/// a file we just get the name.
-	/// The [RsxMacroLocation] etc is is tracked by the [RustyPart::Component::root]
+	/// The [NodeSpan] etc is is tracked by the [RustyPart::Component::root]
 	Component {
 		/// the hydrated part has the juicy details
 		tracker: RustyTracker,
@@ -72,8 +73,8 @@ pub enum TemplateError {
 		"No template found\nExpected: {expected:#?}\nReceived: {received:#?}"
 	)]
 	NoTemplate {
-		expected: RsxMacroLocation,
-		received: Vec<RsxMacroLocation>,
+		expected: NodeSpan,
+		received: Vec<NodeSpan>,
 	},
 	#[error(r#"
 `RustyPartMap` is missing a tracker for {cx}
@@ -120,14 +121,11 @@ the syn::parse_file
 		received: String,
 	},
 	#[error("Location: {location:#?}\nError: {err}")]
-	WithLocation {
-		location: RsxMacroLocation,
-		err: Box<Self>,
-	},
+	WithLocation { location: NodeSpan, err: Box<Self> },
 }
 
 impl TemplateError {
-	pub fn with_location(self, location: RsxMacroLocation) -> Self {
+	pub fn with_location(self, location: NodeSpan) -> Self {
 		Self::WithLocation {
 			location,
 			err: Box::new(self),

@@ -23,6 +23,7 @@ publish = true
 anyhow.workspace = true
 sweet.workspace = true
 beet_rsx.workspace = true
+beet_common.workspace = true
 beet_router.workspace = true
 chrono.workspace = true
 heck.workspace = true

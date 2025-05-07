@@ -1,4 +1,5 @@
 use crate::prelude::*;
+use beet_common::node::NodeSpan;
 use proc_macro2::TokenStream;
 use quote::ToTokens;
 use sweet::prelude::*;
@@ -79,7 +80,17 @@ impl<'a, T: Into<TokenStream>> Pipeline<T, TokenStream> for RsxRonPipeline<'a> {
 			.0
 			.xpipe(ParseWebTokens::default())
 			.map(|html| {
-				html.xpipe(WebTokensToRon::new_from_tokens(&span, self.file))
+				let web_tokens_to_ron = if let Some(file) = self.file {
+					WebTokensToRon::new(&NodeSpan::new_from_spanned(
+						file.clone(),
+						&span,
+					))
+				} else {
+					WebTokensToRon::new_no_location()
+				};
+
+
+				html.xpipe(web_tokens_to_ron)
 			})
 			.unwrap_or_else(|err| {
 				let err_str = err.to_string();
@@ -138,7 +149,7 @@ mod test {
 				self_closing: true,
 				meta: NodeMeta {
 						template_directives: vec![TemplateDirective::ClientLoad],
-						location: Some(RsxMacroLocation::new(file!(), 1u32, 0u32))
+						location: Some(NodeSpan::new(file!(), 1u32, 0u32))
 				},
 					}
 					.into_node()

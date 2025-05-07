@@ -1,3 +1,4 @@
+use beet_common::prelude::*;
 use beet_rsx::prelude::*;
 
 pub struct Style {

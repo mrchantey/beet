@@ -1,5 +1,6 @@
 use crate::prelude::*;
 use anyhow::Result;
+use beet_common::prelude::*;
 use beet_rsx::prelude::*;
 use std::path::PathBuf;
 use sweet::prelude::*;

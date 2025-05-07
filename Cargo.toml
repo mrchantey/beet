@@ -152,7 +152,7 @@ tokio = { version = "1", features = [
 #💡 macros
 syn = { version = "2", features = ["extra-traits", "visit"] }
 quote = "1"
-proc-macro2 = "1"
+proc-macro2 = { version = "1", features = ["span-locations"] }
 proc-macro2-diagnostics = "0.10"
 prettyplease = "0.2"
 
@@ -253,6 +253,7 @@ bevy_default = [
 # dynamic_linking = ["bevy/dynamic_linking"]
 
 [dependencies]
+beet_common = { workspace = true }
 beet_build = { workspace = true, optional = true }
 beet_connect = { workspace = true, optional = true }
 beet_design = { workspace = true, optional = true }

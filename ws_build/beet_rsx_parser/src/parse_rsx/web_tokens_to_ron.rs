@@ -1,10 +1,10 @@
 use crate::prelude::*;
-use proc_macro2::Literal;
+use beet_common::node::NodeSpan;
+use beet_common::prelude::SerdeTokens;
 use proc_macro2::TokenStream;
 use quote::quote;
 use sweet::prelude::*;
 use syn::Expr;
-use syn::spanned::Spanned;
 
 use super::meta_builder::MetaBuilder;
 
@@ -30,50 +30,15 @@ impl WebTokensToRon {
 	}
 
 	/// Create a new [`WebTokensToRon`] instance, specifying the location,
-	/// usually from an [`RsxMacroLocation`], we dont accept that type because
+	/// usually from an [`NodeSpan`], we dont accept that type because
 	/// this crate is upstream from [`beet_rsx`].
-	// TODO this should accept a [`RsxMacroLocation`] but cyclic deps we cant get it yet
-	pub fn new(file: &WorkspacePathBuf, line: u32, col: u32) -> Self {
-		let file = file.to_string_lossy();
-		let line = Literal::u32_unsuffixed(line);
-		let col = Literal::u32_unsuffixed(col);
-
+	pub fn new(node_span: &NodeSpan) -> Self {
+		let node_span = node_span.into_ron_tokens();
 		Self {
 			rusty_tracker: Default::default(),
-			root_location: Some(quote! { Some(RsxMacroLocation(
-				file: (#file),
-				line: #line,
-				col: #col
-			))}),
+			root_location: Some(quote! { Some(#node_span)}),
 		}
 	}
-
-
-	/// The entry point for parsing the content of an rsx! macro
-	/// into a serializable RON format.
-	pub fn new_from_tokens(
-		tokens: &impl Spanned,
-		file: Option<&WorkspacePathBuf>,
-	) -> Self {
-		let root_location = file.map(|file| {
-			let span = tokens.span();
-			let file = file.to_string_lossy();
-			let line = Literal::usize_unsuffixed(span.start().line);
-			let col = Literal::usize_unsuffixed(span.start().column);
-
-			quote! { Some(RsxMacroLocation(
-				file: (#file),
-				line: #line,
-				col: #col
-			))}
-		});
-
-		Self {
-			rusty_tracker: Default::default(),
-			root_location,
-		}
-	}
-
 
 	/// the first to call this gets the real location, this mirrors
 	/// `RstmlToRsx` behavior, only root has location.

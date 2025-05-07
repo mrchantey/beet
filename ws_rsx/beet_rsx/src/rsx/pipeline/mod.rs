@@ -15,6 +15,8 @@ mod apply_scoped_style;
 #[cfg(feature = "css")]
 pub use apply_scoped_style::*;
 
+
+use beet_common::prelude::*;
 use crate::prelude::*;
 use anyhow::Result;
 

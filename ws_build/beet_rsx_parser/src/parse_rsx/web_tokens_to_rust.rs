@@ -86,7 +86,7 @@ impl WebTokensToRust {
 		let line = linecol.line as u32;
 		let col = linecol.column as u32;
 		let location = quote! {
-			Some(RsxMacroLocation::new(#file, #line, #col))
+			Some(NodeSpan::new(#file, #line, #col))
 		};
 
 		Self {

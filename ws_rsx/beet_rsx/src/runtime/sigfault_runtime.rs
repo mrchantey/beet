@@ -1,5 +1,6 @@
 use super::sigfault::*;
 use crate::prelude::*;
+use beet_common::prelude::*;
 
 /// a woefully basic implementation of signals, intended
 /// only for testing and as an example implementation for

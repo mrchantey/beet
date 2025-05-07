@@ -14,7 +14,9 @@ keywords.workspace = true
 
 
 [features]
-default = ["tokens"]
+default = []
+# default = ["serde", "tokens"]
+serde = ["dep:serde", "dep:ron"]
 tokens = [
 	"dep:syn",
 	"dep:quote",
@@ -24,7 +26,13 @@ tokens = [
 
 [dependencies]
 sweet.workspace = true
+rapidhash.workspace = true
 anyhow.workspace = true
+
+#💡 serde
+serde = { workspace = true, optional = true }
+ron = { workspace = true, optional = true }
+
 
 #💡 Tokens
 syn = { workspace = true, optional = true }

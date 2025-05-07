@@ -1,6 +1,7 @@
 use crate::prelude::*;
 use crate::rsx::IntoWebNode;
 use crate::rsx::RsxAttribute;
+use beet_common::prelude::*;
 
 /// A simple non-reactive rsx runtime
 #[derive(Debug)]

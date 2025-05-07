@@ -3,6 +3,7 @@
 #![doc = include_str!("../README.md")]
 #[cfg(feature = "build")]
 pub use beet_build as build;
+pub use beet_common as common;
 #[cfg(feature = "connect")]
 pub use beet_connect as connect;
 #[cfg(feature = "design")]
@@ -32,6 +33,7 @@ mod default_runner;
 pub mod prelude {
 	#[cfg(feature = "build")]
 	pub use crate::build::prelude::*;
+	pub use crate::common::prelude::*;
 	#[cfg(feature = "connect")]
 	pub use crate::connect::prelude::*;
 	#[cfg(feature = "design")]

@@ -1,11 +1,8 @@
 use std::path::Path;
-
+use beet_common::prelude::*;
 use crate::prelude::*;
 use anyhow::Result;
 use sweet::prelude::*;
-
-
-
 
 /// Resolve the src attribute to a file if it does not start with any [IGNORED_PREFIX]:
 pub struct ApplyFsSrc;

@@ -3,6 +3,7 @@ use anyhow::Result;
 use lightningcss::printer::PrinterOptions;
 use lightningcss::stylesheet::ParserOptions;
 use lightningcss::stylesheet::StyleSheet;
+use beet_common::prelude::*;
 
 /// ScopedStyle is a utility for applying scoped styles to components.
 /// The approach is inspired by astro https://docs.astro.build/en/guides/styling/

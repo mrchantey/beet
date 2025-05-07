@@ -716,6 +716,7 @@ version = "0.0.6-rc.3"
 dependencies = [
  "beet",
  "beet_build",
+ "beet_common",
  "beet_connect",
  "beet_design",
  "beet_examples",
@@ -754,6 +755,7 @@ name = "beet_build"
 version = "0.0.6-rc.3"
 dependencies = [
  "anyhow",
+ "beet_common",
  "beet_router",
  "beet_rsx",
  "beet_rsx_parser",
@@ -787,6 +789,9 @@ dependencies = [
  "proc-macro2",
  "proc-macro2-diagnostics",
  "quote",
+ "rapidhash",
+ "ron",
+ "serde",
  "sweet",
  "syn 2.0.101",
 ]
@@ -810,6 +815,7 @@ name = "beet_design"
 version = "0.0.6-rc.3"
 dependencies = [
  "anyhow",
+ "beet_common",
  "beet_router",
  "beet_rsx",
  "chrono",
@@ -940,6 +946,7 @@ version = "0.0.6-rc.3"
 dependencies = [
  "anyhow",
  "axum 0.8.4",
+ "beet_common",
  "beet_router",
  "beet_rsx",
  "clap",
@@ -968,6 +975,7 @@ version = "0.0.6-rc.3"
 dependencies = [
  "any_spawner",
  "anyhow",
+ "beet_common",
  "beet_rsx",
  "beet_rsx_macros",
  "bevy",

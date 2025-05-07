@@ -1,6 +1,7 @@
 use crate::prelude::*;
 use anyhow::Result;
 use thiserror::Error;
+use beet_common::prelude::*;
 
 /// Slotting is the process of traversing the [RsxComponent::slot_children]
 /// and applying them to the [RsxComponent::node] in the corresponding slots.

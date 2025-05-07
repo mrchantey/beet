@@ -6,7 +6,7 @@ use crate::prelude::*;
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct NodeMeta {
 	pub template_directives: Vec<TemplateDirective>,
-	pub location: Option<RsxMacroLocation>,
+	pub location: Option<NodeSpan>,
 }
 
 impl GetNodeMeta for NodeMeta {
@@ -17,10 +17,8 @@ impl GetNodeMeta for NodeMeta {
 pub trait GetNodeMeta {
 	fn meta(&self) -> &NodeMeta;
 	fn meta_mut(&mut self) -> &mut NodeMeta;
-	fn location(&self) -> Option<&RsxMacroLocation> {
-		self.meta().location.as_ref()
-	}
-	fn with_location(mut self, location: RsxMacroLocation) -> Self
+	fn location(&self) -> Option<&NodeSpan> { self.meta().location.as_ref() }
+	fn with_location(mut self, location: NodeSpan) -> Self
 	where
 		Self: Sized,
 	{
@@ -31,7 +29,7 @@ pub trait GetNodeMeta {
 	fn remove_location(&mut self) { self.meta_mut().location = None; }
 
 
-	fn set_location(&mut self, location: RsxMacroLocation) {
+	fn set_location(&mut self, location: NodeSpan) {
 		self.meta_mut().location = Some(location);
 	}
 	fn location_str(&self) -> String {

@@ -1,4 +1,5 @@
 use anyhow::Result;
+use beet_common::prelude::*;
 use beet_rsx::prelude::*;
 use beet_rsx_parser::prelude::*;
 use sweet::prelude::ReadFile;
@@ -7,19 +8,18 @@ use syn::spanned::Spanned;
 use syn::visit::Visit;
 
 
-
 /// For a given rust file, extract all `rsx!` macros and return a vector of
-/// [`RsxMacroLocation`] and [`WebTokens`] pairs.
+/// [`NodeSpan`] and [`WebTokens`] pairs.
 pub struct RsToWebTokens;
 
 
-impl Pipeline<WorkspacePathBuf, Result<Vec<(RsxMacroLocation, WebTokens)>>>
+impl Pipeline<WorkspacePathBuf, Result<Vec<(NodeSpan, WebTokens)>>>
 	for RsToWebTokens
 {
 	fn apply(
 		self,
 		path: WorkspacePathBuf,
-	) -> Result<Vec<(RsxMacroLocation, WebTokens)>> {
+	) -> Result<Vec<(NodeSpan, WebTokens)>> {
 		let file = ReadFile::to_string(path.into_abs_unchecked())?;
 		let file = syn::parse_file(&file)?;
 		let mac = syn::parse_quote!(rsx);
@@ -34,15 +34,15 @@ impl Pipeline<WorkspacePathBuf, Result<Vec<(RsxMacroLocation, WebTokens)>>>
 
 
 
-/// Visit a file, extracting an [`RsxMacroLocation`] and [`RsxTemplateNode`] for each
+/// Visit a file, extracting an [`NodeSpan`] and [`RsxTemplateNode`] for each
 /// `rsx!` macro in the file.
 #[derive(Debug)]
 struct RsxSynVisitor {
-	/// Used for creating [`RsxMacroLocation`] in several places.
+	/// Used for creating [`NodeSpan`] in several places.
 	/// We must use workspace relative paths because locations are created
 	/// via the `file!()` macro.
 	file: WorkspacePathBuf,
-	templates: Vec<(RsxMacroLocation, WebTokens)>,
+	templates: Vec<(NodeSpan, WebTokens)>,
 	mac: syn::Ident,
 }
 impl RsxSynVisitor {
@@ -67,7 +67,7 @@ impl<'a> Visit<'a> for RsxSynVisitor {
 			// the rsx! macro
 			let span = mac.tokens.span();
 			let start = span.start();
-			let loc = RsxMacroLocation::new(
+			let loc = NodeSpan::new(
 				self.file.clone(),
 				start.line as u32,
 				start.column as u32,

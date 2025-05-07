@@ -1,5 +1,6 @@
 use crate::prelude::*;
 use anyhow::Result;
+use beet_common::prelude::*;
 use beet_rsx::prelude::*;
 use beet_rsx_parser::prelude::*;
 use sweet::prelude::WorkspacePathBuf;
@@ -28,11 +29,7 @@ impl Pipeline<WorkspacePathBuf, Result<Vec<FileTemplates>>>
 
 			let rsx_ron = web_tokens
 				.xpipe(ParseWebTokens::default())?
-				.xpipe(WebTokensToRon::new(
-					&location.file,
-					location.line,
-					location.col,
-				))
+				.xpipe(WebTokensToRon::new(&location))
 				.to_string();
 			let template_node =
 				ron::de::from_str::<RsxTemplateNode>(rsx_ron.trim())
@@ -76,7 +73,7 @@ fn ron_cx_err(e: ron::error::SpannedError, str: &str) -> anyhow::Error {
 
 pub struct FileTemplates {
 	/// The location of the rsx
-	pub location: RsxMacroLocation,
+	pub location: NodeSpan,
 	/// A [`TokenStream`] representing a [`ron`] representation of a [`RsxTemplateNode`].
 	pub template_node: RsxTemplateNode,
 	// /// A [`TokenStream`] representing styles extracted from the file.

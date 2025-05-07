@@ -20,6 +20,7 @@ style = ["dep:lightningcss"]
 
 [dependencies]
 #💡 Internal
+beet_common.workspace = true
 beet_rsx.workspace = true
 beet_router.workspace = true
 beet_rsx_parser.workspace = true

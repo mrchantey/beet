@@ -112,6 +112,7 @@ impl BuildTemplateMap {
 #[cfg(not(target_arch = "wasm32"))]
 mod test {
 	use crate::prelude::*;
+	use beet_common::prelude::*;
 	use std::path::PathBuf;
 	use sweet::prelude::*;
 

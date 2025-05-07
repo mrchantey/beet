@@ -16,7 +16,14 @@ keywords.workspace = true
 default = ["serde", "actions"]
 actions = ["serde", "sweet/net", "dep:once_cell"]
 axum = ["dep:axum", "dep:tower", "dep:http-body-util"]
-serde = ["dep:serde", "dep:serde_json", "dep:ron", "dep:toml", "beet_rsx/serde"]
+serde = [
+	"beet_rsx/serde",
+	"beet_common/serde",
+	"dep:serde",
+	"dep:serde_json",
+	"dep:ron",
+	"dep:toml",
+]
 
 # adds the test_site mod for internal testing
 _test_site = []
@@ -24,6 +31,7 @@ _test_site = []
 
 [dependencies]
 beet_rsx = { workspace = true }
+beet_common = { workspace = true }
 
 anyhow.workspace = true
 thiserror.workspace = true

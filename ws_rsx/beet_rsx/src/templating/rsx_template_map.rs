@@ -2,7 +2,7 @@ use crate::prelude::*;
 #[allow(unused)]
 use anyhow::Result;
 use sweet::prelude::WorkspacePathBuf;
-
+use beet_common::prelude::*;
 
 
 /// The beet cli will visit all files in a crate and collect each
@@ -23,7 +23,7 @@ pub struct RsxTemplateMap {
 	// canonicalized [here](ws_rsx/beet_router/src/parser/build_template_map/mod.rs#L110-L111)
 	pub root: WorkspacePathBuf,
 	/// The templates themselves, keyed by their location.
-	pub templates: HashMap<RsxMacroLocation, RsxTemplateNode>,
+	pub templates: HashMap<NodeSpan, RsxTemplateNode>,
 }
 
 
@@ -276,7 +276,7 @@ mod test {
 		expect(comp.clone().xpipe(&map)).to_be_err();
 		// exterior root, ok
 		expect(
-			comp.with_location(RsxMacroLocation::new(
+			comp.with_location(NodeSpan::new(
 				WorkspacePathBuf::new("../"),
 				1,
 				1,
