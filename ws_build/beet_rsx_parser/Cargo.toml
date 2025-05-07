@@ -22,15 +22,15 @@ html = ["dep:beet_rsx_combinator"]
 
 [dependencies]
 sweet.workspace = true
-beet_tokens.workspace = true
+beet_common = { workspace = true, features = ["tokens"] }
 beet_rsx_combinator = { workspace = true, optional = true }
 ron.workspace = true
 anyhow.workspace = true
 
-syn = { workspace = true, features = ["visit"] }
+syn.workspace = true
 quote.workspace = true
-heck.workspace = true
 proc-macro2.workspace = true
+heck.workspace = true
 rapidhash.workspace = true
 rstml = { version = "0.12", features = ["rawtext-stable-hack"] }
 proc-macro2-diagnostics.workspace = true

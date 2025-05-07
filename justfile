@@ -180,10 +180,10 @@ test-utils *args:
 
 # just test-flow runs out of space
 test-build *args:
-	{{min-stack}} cargo test -p beet_tokens 																														{{args}} -- {{test-threads}}
-	{{min-stack}} cargo test -p beet_rsx_combinator 																										{{args}} -- {{test-threads}}
-	{{min-stack}} cargo test -p beet_rsx_parser 																												{{args}} -- {{test-threads}}
-	{{min-stack}} cargo test -p beet_build 																															{{args}} -- {{test-threads}}
+	{{min-stack}} cargo test -p beet_common 					--all-features																		{{args}} -- {{test-threads}}
+	{{min-stack}} cargo test -p beet_rsx_combinator 	--all-features																		{{args}} -- {{test-threads}}
+	{{min-stack}} cargo test -p beet_rsx_parser 			--all-features																		{{args}} -- {{test-threads}}
+	{{min-stack}} cargo test -p beet_build 						--all-features																		{{args}} -- {{test-threads}}
 
 test-rsx *args:
 	{{min-stack}} cargo test -p beet_build 	 	--features=bevy,style																			{{args}} -- {{test-threads}}
@@ -307,7 +307,7 @@ publish-all *args:
 	just publish beet_sim          		{{args}} || true
 	just publish beet_examples        {{args}} || true
 	@echo 'Publishing Rsx Build Crates'
-	just publish beet_tokens      		{{args}} || true
+	just publish beet_common      		{{args}} || true
 	just publish beet_rsx_parser      {{args}} || true
 	just publish beet_rsx_macros      {{args}} || true
 	@echo 'Publishing Rsx Crates'

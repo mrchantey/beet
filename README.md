@@ -95,7 +95,7 @@ Most of these are quite complex but if you'd like to have a go open an issue and
 ### `sweet`
 - [ ] native cli
 
-### `beet_tokens`
+### `beet_common`
 - [ ] css parser / style tag location
 - [ ] markdown parser
 - [ ] file hashing
