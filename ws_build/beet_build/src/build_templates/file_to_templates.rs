@@ -41,11 +41,11 @@ impl Pipeline<WorkspacePathBuf, Result<FileTemplates>> for FileToTemplates {
 			_ => Ok(Default::default()),
 		}?
 		.xmap_each(|(location, web_tokens)| {
+			let web_tokens = web_tokens.xpipe(ParseWebTokens::default())?;
 			templates
 				.style_templates
 				.extend(web_tokens.xref().xpipe(WebTokensToStyleTemplates)?);
 
-			let web_tokens = web_tokens.xpipe(ParseWebTokens::default())?;
 
 			let rsx_ron =
 				web_tokens.xpipe(WebTokensToRon::default()).to_string();
@@ -62,10 +62,18 @@ impl Pipeline<WorkspacePathBuf, Result<FileTemplates>> for FileToTemplates {
 }
 
 
-/// how many leading and trailing characters to show in the context of the error
-const CX_SIZE: usize = 8;
+impl FileToTemplates {
+
+
+	// fn extract_
+
+}
+
 /// A ron deserialization error with the context of the file and line
 fn ron_cx_err(e: ron::error::SpannedError, str: &str) -> anyhow::Error {
+	/// how many leading and trailing characters to show in the context of the error
+	const CX_SIZE: usize = 8;
+	
 	let start = e.position.col.saturating_sub(CX_SIZE);
 	let end = e.position.col.saturating_add(CX_SIZE);
 	let cx = if e.position.line == 1 {

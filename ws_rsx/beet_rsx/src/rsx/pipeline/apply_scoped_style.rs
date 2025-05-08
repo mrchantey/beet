@@ -34,14 +34,6 @@ impl Default for ApplyScopedStyle {
 	}
 }
 
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
-enum Scope {
-	#[default]
-	Component,
-	Global,
-	// Cascade (eargerly apply slots?)
-}
-
 impl Pipeline<WebNode, Result<WebNode>> for ApplyScopedStyle {
 	/// Applies scoped style to:
 	/// 1. root node
@@ -84,11 +76,9 @@ impl ApplyScopedStyle {
 		// 1. apply to style bodies
 		VisitRsxElementMut::walk_with_opts(node, opts.clone(), |el| {
 			if el.tag == "style" {
-				let scope = match el.is_global_scope() {
-					true => Scope::Global,
-					false => Scope::Component,
-				};
-				if scope == Scope::Component {
+				let scope = el.style_scope().unwrap_or_default();
+
+				if matches!(scope, StyleScope::Local) {
 					component_scope_found = true;
 				}
 				// currently only recurse top level style children, we could create another
@@ -140,12 +130,16 @@ impl ApplyScopedStyle {
 		}
 		parse_err
 	}
-	fn apply_styles(&self, css: &mut String, scope: Scope) -> ParseResult<()> {
+	fn apply_styles(
+		&self,
+		css: &mut String,
+		scope: StyleScope,
+	) -> ParseResult<()> {
 		// Parse the stylesheet
 		let mut stylesheet = StyleSheet::parse(css, ParserOptions::default())
 			.map_err(|e| ParseError::Serde(e.to_string()))?;
 
-		if scope == Scope::Component {
+		if scope == StyleScope::Local {
 			let class_name = self.class_name();
 			stylesheet.rules.0.iter_mut().for_each(|rule| {
 				match rule {

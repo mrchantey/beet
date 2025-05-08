@@ -1,3 +1,5 @@
+use super::StyleScope;
+
 /// Template directives contain instructions for various stages of a beet
 /// pipeline. Some the syntax of a colon, ie `<div client:load />`, and
 /// some are more nuanced, for example a script with a src attribute that
@@ -13,25 +15,14 @@ pub enum TemplateDirective {
 	/// <div client:load />
 	/// ```
 	ClientLoad,
-	/// The default scope for a style tag, its styles will only be applied to
-	/// elements within the component, each selector will be preprended with
-	/// an attribute selector for the component, eg `[data-styleid-1]`.
-	/// ## Example
-	/// ```rust ignore
-	/// <style scope:local>
-	/// 	div { color: blue; }
-	/// </style>
-	/// ```
-	ScopeLocal,
-	/// Global scope for a style tag, its styles will not have an attribute
-	/// selector prepended to them, so will apply to all elements in the document.
+	/// The scope of a style tag, see [`StyleScope`] for more details.
 	/// ## Example
 	/// ```rust ignore
 	/// <style scope:global>
 	/// 	div { color: blue; }
 	/// </style>
 	/// ```
-	ScopeGlobal,
+	StyleScope(StyleScope),
 	/// Mark a *component* as allowing styles to cascasde into it. This means that
 	/// it will have the `data-styleid` attribute applied for each style tag in
 	/// its parent.
@@ -117,20 +108,6 @@ impl TemplateDirective {
 }
 
 impl TemplateDirectiveExt for TemplateDirective {
-	fn is_client_reactive(&self) -> bool {
-		matches!(self, TemplateDirective::ClientLoad)
-	}
-
-	fn is_local_scope(&self) -> bool {
-		matches!(self, TemplateDirective::ScopeLocal)
-	}
-
-	fn is_global_scope(&self) -> bool {
-		matches!(self, TemplateDirective::ScopeGlobal)
-	}
-	fn is_cascade_style(&self) -> bool {
-		matches!(self, TemplateDirective::StyleCascade)
-	}
 	fn find_directive(
 		&self,
 		func: impl Fn(&TemplateDirective) -> bool,
@@ -148,24 +125,33 @@ impl TemplateDirectiveExt for TemplateDirective {
 /// Trait that also allows calling the methods on a vector of template directives
 /// like in [`NodeMeta`]
 pub trait TemplateDirectiveExt {
+	fn find_directive(
+		&self,
+		func: impl Fn(&TemplateDirective) -> bool,
+	) -> Option<&TemplateDirective>;
+	fn find_map_directive<T>(
+		&self,
+		func: impl Fn(&TemplateDirective) -> Option<&T>,
+	) -> Option<&T>;
+
 	/// Check if the template directive is a client directive
 	/// which means the RsxComponent should be serialized, ie `ClientLoad`
 	/// This must match TemplateDirective::is_client_reactive
 	fn is_client_reactive(&self) -> bool {
 		// Check if the template directive is a client directive
-		self.any_directive(|d| d.is_client_reactive())
+		self.any_directive(|d| matches!(d, TemplateDirective::ClientLoad))
 	}
 	/// Check if the template directive is a local scope directive
-	fn is_local_scope(&self) -> bool {
-		self.any_directive(|d| d.is_local_scope())
-	}
-	/// Check if the template directive is a global scope directive
-	fn is_global_scope(&self) -> bool {
-		self.any_directive(|d| d.is_global_scope())
+	fn style_scope(&self) -> Option<StyleScope> {
+		self.find_map_directive(|d| match d {
+			TemplateDirective::StyleScope(scope) => Some(scope),
+			_ => None,
+		})
+		.copied()
 	}
 	/// Check if the template directive is a cascade style directive
 	fn is_cascade_style(&self) -> bool {
-		self.any_directive(|d| d.is_cascade_style())
+		self.any_directive(|d| matches!(d, TemplateDirective::StyleCascade))
 	}
 
 	fn slot_directive(&self) -> Option<&String> {
@@ -190,23 +176,14 @@ pub trait TemplateDirectiveExt {
 		})
 	}
 
-
 	fn any_directive(&self, func: impl Fn(&TemplateDirective) -> bool) -> bool {
 		self.find_directive(func).is_some()
 	}
-
-	fn find_directive(
-		&self,
-		func: impl Fn(&TemplateDirective) -> bool,
-	) -> Option<&TemplateDirective>;
-	fn find_map_directive<T>(
-		&self,
-		func: impl Fn(&TemplateDirective) -> Option<&T>,
-	) -> Option<&T>;
 }
 
 #[cfg(feature = "tokens")]
 use quote::quote;
+
 
 #[cfg(feature = "tokens")]
 impl crate::prelude::SerdeTokens for TemplateDirective {
@@ -215,11 +192,9 @@ impl crate::prelude::SerdeTokens for TemplateDirective {
 			TemplateDirective::ClientLoad => {
 				quote! {TemplateDirective::ClientLoad}
 			}
-			TemplateDirective::ScopeLocal => {
-				quote! {TemplateDirective::ScopeLocal}
-			}
-			TemplateDirective::ScopeGlobal => {
-				quote! {TemplateDirective::ScopeGlobal}
+			TemplateDirective::StyleScope(scope) => {
+				let scope = scope.into_rust_tokens();
+				quote! {TemplateDirective::StyleScope(#scope)}
 			}
 			TemplateDirective::StyleCascade => {
 				quote! {TemplateDirective::StyleCascade}
@@ -246,22 +221,7 @@ impl crate::prelude::SerdeTokens for TemplateDirective {
 					suffix: #suffix.into(),
 					value: #value.into()
 				}}
-			} // TemplateDirective::Custom {
-			  // 	prefix,
-			  // 	suffix,
-			  // 	value,
-			  // } => {
-			  // 	let value = match value {
-			  // 		Some(value) => quote! {Some(#value.into())},
-			  // 		None => quote! {None},
-			  // 	};
-			  // 	quote! {TemplateDirective::Custom{
-			  // 		prefix: #prefix.into(),
-			  // 		suffix: #suffix.into(),
-			  // 		value: #value
-			  // 	}
-			  // 	}
-			  // }
+			}
 		}
 	}
 
@@ -270,11 +230,9 @@ impl crate::prelude::SerdeTokens for TemplateDirective {
 			TemplateDirective::ClientLoad => {
 				quote! {ClientLoad}
 			}
-			TemplateDirective::ScopeLocal => {
-				quote! {ScopeLocal}
-			}
-			TemplateDirective::ScopeGlobal => {
-				quote! {ScopeGlobal}
+			TemplateDirective::StyleScope(scope) => {
+				let scope = scope.into_ron_tokens();
+				quote! {StyleScope(#scope)}
 			}
 			TemplateDirective::StyleCascade => {
 				quote! {StyleCascade}
@@ -326,8 +284,9 @@ mod test {
 	fn ron_serde() {
 		let directives = vec![
 			TemplateDirective::ClientLoad,
-			TemplateDirective::ScopeLocal,
-			TemplateDirective::ScopeGlobal,
+			TemplateDirective::StyleScope(StyleScope::Local),
+			TemplateDirective::StyleScope(StyleScope::Global),
+			TemplateDirective::StyleScope(StyleScope::Verbatim),
 			TemplateDirective::StyleCascade,
 			TemplateDirective::StylePlaceholder { content_hash: 1 },
 			TemplateDirective::FsSrc("foo".into()),

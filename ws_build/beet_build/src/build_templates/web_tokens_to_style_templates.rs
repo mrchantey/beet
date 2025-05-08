@@ -31,7 +31,7 @@ impl WebTokensToStyleTemplates {
 				children,
 				self_closing,
 			} if component.tag.to_string() == "style" => {
-				let scope = StyleScope::from_meta(&component.meta);
+				let scope = component.meta.style_scope().unwrap_or_default();
 				todo!();
 
 				// let scope = component.directives.scope;
@@ -49,26 +49,4 @@ pub struct StyleTemplate {
 	pub scope: StyleScope,
 	/// the style template
 	pub style: String,
-}
-
-
-
-
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum StyleScope {
-	/// Styles are scoped only to the component
-	#[default]
-	Local,
-	/// Styles are scoped to the global scope
-	Global,
-}
-
-impl StyleScope {
-	pub fn from_meta(meta: &NodeMeta) -> Self {
-		if meta.is_global_scope() {
-			Self::Global
-		} else {
-			Self::Local
-		}
-	}
 }

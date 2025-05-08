@@ -231,8 +231,8 @@ mod test {
 		else {
 			panic!();
 		};
-		expect(tracker1.tokens_hash).to_be(3999007107847791261);
-		expect(tracker2.tokens_hash).to_be(1827591748735135928);
+		expect(tracker1.tokens_hash).to_be(4683591200171505408);
+		expect(tracker2.tokens_hash).to_be(12045063164022816694);
 	}
 
 	#[test]

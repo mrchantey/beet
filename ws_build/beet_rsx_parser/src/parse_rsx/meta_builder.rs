@@ -42,8 +42,15 @@ fn attr_to_template_directive(
 	match attr {
 		RsxAttributeTokens::Key { key } => match key.to_string().as_str() {
 			"client:load" => Some(TemplateDirective::ClientLoad),
-			"scope:local" => Some(TemplateDirective::ScopeLocal),
-			"scope:global" => Some(TemplateDirective::ScopeGlobal),
+			"scope:local" => {
+				Some(TemplateDirective::StyleScope(StyleScope::Local))
+			}
+			"scope:global" => {
+				Some(TemplateDirective::StyleScope(StyleScope::Global))
+			}
+			"scope:verbatim" => {
+				Some(TemplateDirective::StyleScope(StyleScope::Verbatim))
+			}
 			"style:cascade" => Some(TemplateDirective::StyleCascade),
 			runtime_key if runtime_key.starts_with("runtime:") => {
 				let Some(suffix) = runtime_key.split(':').nth(1) else {

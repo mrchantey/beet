@@ -1,3 +1,5 @@
+mod style_scope;
+pub use style_scope::*;
 mod template_directive;
 pub use template_directive::*;
 mod node_span;

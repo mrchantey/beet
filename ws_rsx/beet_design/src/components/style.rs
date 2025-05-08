@@ -1,6 +1,8 @@
 use beet_common::prelude::*;
 use beet_rsx::prelude::*;
 
+// what does this do? i think it can be removed since we have
+// scope:verbatim now?
 pub struct Style {
 	pub css: String,
 	pub directives: Vec<TemplateDirective>,
