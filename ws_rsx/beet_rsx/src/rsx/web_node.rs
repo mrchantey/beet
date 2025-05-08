@@ -1,8 +1,8 @@
 use crate::prelude::*;
 use anyhow::Result;
+use beet_common::prelude::*;
 use strum_macros::AsRefStr;
 use strum_macros::EnumDiscriminants;
-use beet_common::prelude::*;
 
 #[derive(Debug, Clone, AsRefStr, EnumDiscriminants)]
 pub enum WebNode {
@@ -474,8 +474,8 @@ mod test {
 			.unwrap();
 		expect(&location.file().to_string_lossy())
 			.to_be("ws_rsx/beet_rsx/src/rsx/web_node.rs");
-		expect(location.line()).to_be(line);
-		expect(location.col()).to_be(24);
+		expect(location.start_line()).to_be(line);
+		expect(location.start_col()).to_be(24);
 	}
 
 	#[derive(Node)]

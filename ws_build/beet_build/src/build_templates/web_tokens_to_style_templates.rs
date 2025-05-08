@@ -28,11 +28,11 @@ impl WebTokensToStyleTemplates {
 		match node {
 			WebTokens::Element {
 				component,
-				children,
-				self_closing,
+				children: _,
+				self_closing: _,
 			} if component.tag.to_string() == "style" => {
-				let scope = component.meta.style_scope().unwrap_or_default();
-				todo!();
+				let _scope = component.meta.style_scope().unwrap_or_default();
+				// todo!();
 
 				// let scope = component.directives.scope;
 

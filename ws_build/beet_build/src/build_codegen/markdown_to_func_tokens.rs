@@ -136,8 +136,8 @@ val_string	= "foo"
 					template_directives: vec![],
 					location: Some(
 						NodeSpan::new("ws_build/beet_build/src/build_codegen/markdown_to_func_tokens.rs",
-						1u32,
-						0u32
+						1,
+						0
 					))
 				},
 			}

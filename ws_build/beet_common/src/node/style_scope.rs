@@ -6,6 +6,7 @@ pub enum StyleScope {
 	/// elements within the component, each selector will be preprended with
 	/// an attribute selector for the component, eg `[data-styleid-1]`.
 	/// ## Example
+	/// Remember `scope:local` is the default so this directive can be ommitted.
 	/// ```rust ignore
 	/// <style scope:local>
 	/// 	div { color: blue; }
@@ -15,6 +16,7 @@ pub enum StyleScope {
 	Local,
 	/// Global scope for a style tag, its styles will not have an attribute
 	/// selector prepended to them, so will apply to all elements in the document.
+	/// The style tag will still be extracted and deduplicated.
 	/// ## Example
 	/// ```rust ignore
 	/// <style scope:global>
@@ -23,7 +25,15 @@ pub enum StyleScope {
 	/// ```
 	Global,
 	/// This style tag should not be extracted at all, beet
-	/// will leave it as is.
+	/// will leave it as is. 
+	/// Bear in mind that if the component appears multiple times in a tree it
+	/// will be duplicated.
+	/// ## Example
+	/// ```rust ignore
+	/// <style scope:verbatim>
+	/// 	div { color: blue; }
+	/// </style>
+	/// ```
 	Verbatim,
 }
 

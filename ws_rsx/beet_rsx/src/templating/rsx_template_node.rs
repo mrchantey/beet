@@ -96,8 +96,8 @@ Please try a full rebuild and file a reproducible issue if that doesn't work.
 ## Debugging (for contributors)
 
 The two entrypoints for the tracker generation are
-			- `BuildTemplateMap` which creates an `RsxTemplateMap` via the `RsxRonPipeline`
-			- The `rsx!` macro which creates rusty trackers via the `RsxMacroPipeline`
+			- `BuildTemplateMap` which creates an `RsxTemplateMap` via `FileToTemplates`
+			- The `rsx!` macro which creates rusty trackers via `RsxMacroPipeline`
 			
 A good place to start with println! are in the RustyTrackerBuilder which
 handles *all* hash generation for both macros and file loading.
@@ -105,7 +105,7 @@ have a good look at the tokens being passed in and check they match
 
 Also remember that using the rsx_template! macro likely wont help because that uses the 
 same process as the rsx! macro. It would be better to use syn::parse or something closer to
-the syn::parse_file 
+the syn::parse_file workflow.
 ---
 
 "#

@@ -155,8 +155,8 @@ mod test {
 							location: Some (
 								NodeSpan::new(
 									"ws_build/beet_rsx_parser/src/parse_rsx/rsx_pipeline.rs",
-									1u32,
-									0u32
+									1,
+									0
 								)
 							)
 						},

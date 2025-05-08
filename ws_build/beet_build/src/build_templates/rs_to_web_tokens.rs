@@ -66,7 +66,7 @@ impl<'a> Visit<'a> for RsxSynVisitor {
 			// use the span of the inner tokens to match the behavior of
 			// the rsx! macro
 			let span = mac.tokens.span();
-			let loc = NodeSpan::new_from_spanned(self.file.clone(), &span);
+			let loc = NodeSpan::new_from_span_start(self.file.clone(), &span);
 			let web_tokens = mac
 				.tokens
 				.clone()
