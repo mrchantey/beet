@@ -4,7 +4,7 @@ use beet_common::prelude::*;
 use std::path::Path;
 use sweet::prelude::*;
 
-/// Resolve the src attribute to a file if it does not start with any [IGNORED_PREFIX]:
+/// Resolve the src attribute to a file if it starts with a dot
 pub struct ApplyFsSrc;
 
 impl Default for ApplyFsSrc {

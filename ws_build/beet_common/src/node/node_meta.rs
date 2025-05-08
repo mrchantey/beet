@@ -31,16 +31,12 @@ pub trait GetNodeMeta {
 	where
 		Self: Sized,
 	{
-		self.set_location(location);
+		self.meta_mut().location = Some(location);
 		self
 	}
 
 	fn remove_location(&mut self) { self.meta_mut().location = None; }
 
-
-	fn set_location(&mut self, location: FileSpan) {
-		self.meta_mut().location = Some(location);
-	}
 	fn location_str(&self) -> String {
 		match self.location() {
 			Some(loc) => loc.to_string(),

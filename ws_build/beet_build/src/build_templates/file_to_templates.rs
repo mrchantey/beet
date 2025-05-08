@@ -61,8 +61,9 @@ impl FileToTemplates {
 		&self,
 		web_tokens: WebTokens,
 	) -> Result<(RsxTemplateNode, Vec<StyleTemplate>)> {
-		let (web_tokens, styles) =
-			web_tokens.xpipe(ExtractStyleTemplates::default())?;
+		let styles = vec![];
+		// let (web_tokens, styles) =
+		// 	web_tokens.xpipe(ExtractStyleTemplates::default())?;
 		let rsx_ron = web_tokens.xpipe(WebTokensToRon::default()).to_string();
 		let template_node =
 			ron::de::from_str::<RsxTemplateNode>(rsx_ron.trim())

@@ -16,8 +16,6 @@ pub struct FileSpan {
 	/// Workspace relative path to the file, its essential to use consistent paths
 	/// as this struct is created in several places from all kinds concatenations,
 	/// and we need PartialEq & Hash to be identical.
-	///
-	/// This may be empty.
 	file: WorkspacePathBuf,
 	/// The position of the first token in this span
 	start: LineCol,
