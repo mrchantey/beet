@@ -8,7 +8,7 @@ use sweet::prelude::*;
 
 
 
-/// This macro expands to an [WebNode](beet_rsx::prelude::WebNode).
+/// This macro expands to a [WebNode](beet_rsx::prelude::WebNode).
 /// ```ignore
 /// let node = rsx! {<div> the value is {3}</div>};
 /// ```
@@ -19,14 +19,20 @@ pub fn rsx(tokens: TokenStream) -> TokenStream {
 	tokens.xpipe(RsxMacroPipeline::new(source_file)).into()
 }
 
-/// Mostly used for testing,
-/// this macro expands to an RsxTemplateNode, it is used for
-/// things like hot reloading.
+/// Mostly used for testing, this macro expands to an [`RsxTemplateNode`]
 #[proc_macro]
 pub fn rsx_template(tokens: TokenStream) -> TokenStream {
 	let source_file = source_file(&tokens);
 	tokens
 		.xpipe(RsxTemplateMacroPipeline::new(source_file))
+		.into()
+}
+/// Mostly used for testing, this macro expands to [`WebTokens`]
+#[proc_macro]
+pub fn parsed_web_tokens(tokens: TokenStream) -> TokenStream {
+	let source_file = source_file(&tokens);
+	tokens
+		.xpipe(ParsedWebTokensPipeline::new(source_file))
 		.into()
 }
 
@@ -74,6 +80,8 @@ pub fn derive_into_block_attribute(
 
 
 /// For a token stream create the [`FileSpan`] using its location.
+/// we'll get this from proc_macro2::Span::source_file, when this issue resolves:
+/// https://github.com/dtolnay/proc-macro2/issues/499
 fn source_file(tokens: &proc_macro::TokenStream) -> Option<WorkspacePathBuf> {
 	// cloning is cheap, its an immutable arc
 	tokens

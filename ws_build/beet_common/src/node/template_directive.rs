@@ -186,7 +186,7 @@ use quote::quote;
 
 
 #[cfg(feature = "tokens")]
-impl crate::prelude::SerdeTokens for TemplateDirective {
+impl crate::prelude::RustTokens for TemplateDirective {
 	fn into_rust_tokens(&self) -> proc_macro2::TokenStream {
 		match self {
 			TemplateDirective::ClientLoad => {
@@ -224,7 +224,10 @@ impl crate::prelude::SerdeTokens for TemplateDirective {
 			}
 		}
 	}
+}
 
+#[cfg(feature = "tokens")]
+impl crate::prelude::RonTokens for TemplateDirective {
 	fn into_ron_tokens(&self) -> proc_macro2::TokenStream {
 		match self {
 			TemplateDirective::ClientLoad => {

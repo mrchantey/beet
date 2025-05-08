@@ -84,7 +84,7 @@ impl<T: GetNodeMeta> TemplateDirectiveExt for T {
 
 
 #[cfg(feature = "tokens")]
-impl crate::prelude::SerdeTokens for NodeMeta {
+impl crate::prelude::RustTokens for NodeMeta {
 	fn into_rust_tokens(&self) -> proc_macro2::TokenStream {
 		let location = match self.location() {
 			Some(loc) => {
@@ -105,7 +105,10 @@ impl crate::prelude::SerdeTokens for NodeMeta {
 			}
 		}
 	}
+}
 
+#[cfg(feature = "tokens")]
+impl crate::prelude::RonTokens for NodeMeta {
 	fn into_ron_tokens(&self) -> proc_macro2::TokenStream {
 		let location = match self.location() {
 			Some(loc) => {

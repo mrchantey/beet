@@ -25,7 +25,7 @@ pub enum StyleScope {
 	/// ```
 	Global,
 	/// This style tag should not be extracted at all, beet
-	/// will leave it as is. 
+	/// will leave it as is.
 	/// Bear in mind that if the component appears multiple times in a tree it
 	/// will be duplicated.
 	/// ## Example
@@ -40,7 +40,7 @@ pub enum StyleScope {
 
 impl StyleScope {}
 #[cfg(feature = "tokens")]
-impl crate::prelude::SerdeTokens for StyleScope {
+impl crate::prelude::RustTokens for StyleScope {
 	fn into_rust_tokens(&self) -> proc_macro2::TokenStream {
 		match self {
 			Self::Local => quote::quote! { StyleScope::Local },
@@ -48,7 +48,9 @@ impl crate::prelude::SerdeTokens for StyleScope {
 			Self::Verbatim => quote::quote! { StyleScope::Verbatim },
 		}
 	}
-
+}
+#[cfg(feature = "tokens")]
+impl crate::prelude::RonTokens for StyleScope {
 	fn into_ron_tokens(&self) -> proc_macro2::TokenStream {
 		match self {
 			Self::Local => quote::quote! { Local },

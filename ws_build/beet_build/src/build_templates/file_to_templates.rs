@@ -24,7 +24,7 @@ pub struct FileTemplates {
 }
 
 
-
+#[derive(Debug, Default)]
 pub struct FileToTemplates;
 
 
@@ -42,17 +42,11 @@ impl Pipeline<WorkspacePathBuf, Result<FileTemplates>> for FileToTemplates {
 		}?
 		.xmap_each(|(location, web_tokens)| {
 			let web_tokens = web_tokens.xpipe(ParseWebTokens::default())?;
-			templates
-				.style_templates
-				.extend(web_tokens.xref().xpipe(WebTokensToStyleTemplates)?);
 
+			let (template_node, styles) = self.extract_templates(web_tokens)?;
 
-			let rsx_ron =
-				web_tokens.xpipe(WebTokensToRon::default()).to_string();
-			let template_node =
-				ron::de::from_str::<RsxTemplateNode>(rsx_ron.trim())
-					.map_err(|e| ron_cx_err(e, &rsx_ron))?;
 			templates.rsx_templates.push((location, template_node));
+			templates.style_templates.extend(styles);
 			Ok(())
 		})
 		.into_iter()
@@ -63,7 +57,16 @@ impl Pipeline<WorkspacePathBuf, Result<FileTemplates>> for FileToTemplates {
 
 
 impl FileToTemplates {
-	// fn extract_
+	fn extract_templates(
+		&self,
+		web_tokens: WebTokens,
+	) -> Result<(RsxTemplateNode, Vec<StyleTemplate>)> {
+		let rsx_ron = web_tokens.xpipe(WebTokensToRon::default()).to_string();
+		let template_node =
+			ron::de::from_str::<RsxTemplateNode>(rsx_ron.trim())
+				.map_err(|e| ron_cx_err(e, &rsx_ron))?;
+		Ok((template_node, vec![]))
+	}
 }
 
 /// A ron deserialization error with the context of the file and line
@@ -86,4 +89,21 @@ fn ron_cx_err(e: ron::error::SpannedError, str: &str) -> anyhow::Error {
 		cx,
 		str
 	);
+}
+
+
+#[cfg(test)]
+mod test {
+	use crate::as_beet::*;
+	use sweet::prelude::*;
+
+	#[test]
+	fn works() {
+		let tokens = parsed_web_tokens! {<div client:load/>};
+
+		let templates = FileToTemplates::default()
+			.extract_templates(tokens)
+			.unwrap();
+		println!("{:?}", templates);
+	}
 }

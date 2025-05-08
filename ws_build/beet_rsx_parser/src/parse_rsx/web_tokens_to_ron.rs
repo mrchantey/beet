@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use beet_common::prelude::SerdeTokens;
+use beet_common::prelude::*;
 use proc_macro2::TokenStream;
 use quote::quote;
 use sweet::prelude::*;

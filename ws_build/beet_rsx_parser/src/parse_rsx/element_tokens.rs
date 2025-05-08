@@ -1,6 +1,8 @@
 use anyhow::Result;
 use beet_common::prelude::*;
+use proc_macro2::TokenStream;
 use quote::ToTokens;
+use quote::quote;
 use syn::Block;
 use syn::Expr;
 use syn::Ident;
@@ -30,7 +32,21 @@ impl GetNodeMeta for ElementTokens {
 // 	fn default() -> Self { Self::fragment(Default::default()) }
 // }
 
-impl ElementTokens {}
+impl RustTokens for ElementTokens {
+	fn into_rust_tokens(&self) -> TokenStream {
+		let tag = self.tag.into_rust_tokens();
+		let attributes =
+			self.attributes.iter().map(|attr| attr.into_rust_tokens());
+		let meta = &self.meta.into_rust_tokens();
+		quote! {
+			ElementTokens {
+				tag: #tag,
+				attributes: vec![#(#attributes),*],
+				meta: #meta,
+			}
+		}
+	}
+}
 
 /// Visit all [`ElementTokens`] in a tree, the nodes
 /// should be visited before children, ie walked in DFS preorder.
@@ -68,7 +84,28 @@ impl RsxAttributeTokens {
 		None
 	}
 }
-
+impl RustTokens for RsxAttributeTokens {
+	fn into_rust_tokens(&self) -> TokenStream {
+		match self {
+			RsxAttributeTokens::Block { block } => {
+				quote! { RsxAttributeTokens::Block{ block: #block} }
+			}
+			RsxAttributeTokens::Key { key } => {
+				let key = key.into_rust_tokens();
+				quote! { RsxAttributeTokens::Key{ key: #key } }
+			}
+			RsxAttributeTokens::KeyValue { key, value } => {
+				let key = key.into_rust_tokens();
+				quote! {
+					RsxAttributeTokens::KeyValue {
+						key: #key,
+						value: #value,
+					}
+				}
+			}
+		}
+	}
+}
 
 
 /// A value that may have been created
@@ -130,5 +167,11 @@ impl Into<Spanner<String>> for String {
 impl ToTokens for Spanner<String> {
 	fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
 		self.into_lit_str().to_tokens(tokens);
+	}
+}
+
+impl RustTokens for Spanner<String> {
+	fn into_rust_tokens(&self) -> TokenStream {
+		quote! { Spanner::new(#self.to_string()) }
 	}
 }

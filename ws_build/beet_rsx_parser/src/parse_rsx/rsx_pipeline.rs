@@ -2,13 +2,11 @@ use crate::prelude::*;
 use beet_common::prelude::*;
 use proc_macro2::TokenStream;
 use quote::ToTokens;
+use quote::quote;
 use sweet::prelude::*;
-
 
 #[derive(Default)]
 pub struct RsxMacroPipeline {
-	/// ideally we'd get this from proc_macro2::Span::source_file
-	/// but thats not yet supported
 	pub source_file: Option<WorkspacePathBuf>,
 	pub no_errors: bool,
 }
@@ -37,7 +35,7 @@ impl<T: Into<TokenStream>> Pipeline<T, TokenStream> for RsxMacroPipeline {
 			Ok(val) => val.xpipe(WebTokensToRust::default()),
 			Err(err) => {
 				let err_str = err.to_string();
-				return quote::quote! {
+				return quote! {
 					compile_error!(#err_str);
 				};
 			}
@@ -56,8 +54,6 @@ impl<T: Into<TokenStream>> Pipeline<T, TokenStream> for RsxMacroPipeline {
 
 #[derive(Default)]
 pub struct RsxTemplateMacroPipeline {
-	/// ideally we'd get this from proc_macro2::Span::source_file
-	/// but thats not yet supported
 	pub source_file: Option<WorkspacePathBuf>,
 }
 impl RsxTemplateMacroPipeline {
@@ -75,45 +71,71 @@ impl<T: Into<TokenStream>> Pipeline<T, TokenStream>
 			.source_file
 			.map(|file| FileSpan::new_from_span(file, &tokens));
 
-		tokens.xpipe(RsxRonPipeline::new(span)).xmap(|tokens| {
-			let str_tokens = tokens.to_string();
-			//TODO here we should embed errors like the rsx macro
-			quote::quote! {RsxTemplateNode::from_ron(#str_tokens).unwrap()}
-		})
-	}
-}
-
-#[derive(Default)]
-pub struct RsxRonPipeline {
-	pub span: Option<FileSpan>,
-}
-
-impl RsxRonPipeline {
-	pub fn new(span: Option<FileSpan>) -> Self { Self { span } }
-}
-
-
-impl<T: Into<TokenStream>> Pipeline<T, TokenStream> for RsxRonPipeline {
-	fn apply(self, tokens: T) -> TokenStream {
-		let tokens = tokens.into();
 		tokens
+			// .xpipe(RsxRonPipeline::new(span))
 			.xpipe(TokensToRstml::default())
 			.0
-			.xpipe(RstmlToWebTokens::new(self.span))
+			.xpipe(RstmlToWebTokens::new(span))
 			.0
 			.xpipe(ParseWebTokens::default())
-			.map(|html| html.xpipe(WebTokensToRon::default()))
+			.map(|tokens| tokens.xpipe(WebTokensToRon::default()))
 			.unwrap_or_else(|err| {
 				let err_str = err.to_string();
-				quote::quote! {
+				quote! {
 					compile_error!(#err_str);
 				}
+			})
+			.xmap(|tokens| {
+				let str_tokens = tokens.to_string();
+				//TODO here we should embed errors like the rsx macro
+				quote! {RsxTemplateNode::from_ron(#str_tokens).unwrap()}
 			})
 	}
 }
 
 
+#[derive(Default)]
+pub struct ParsedWebTokensPipeline {
+	/// ideally we'd get this from proc_macro2::Span::source_file
+	/// but thats not yet supported
+	pub source_file: Option<WorkspacePathBuf>,
+}
+impl ParsedWebTokensPipeline {
+	pub fn new(source_file: Option<WorkspacePathBuf>) -> Self {
+		Self { source_file }
+	}
+}
 
+impl<T: Into<TokenStream>> Pipeline<T, TokenStream>
+	for ParsedWebTokensPipeline
+{
+	fn apply(self, value: T) -> TokenStream {
+		let tokens: TokenStream = value.into();
+		let span = self
+			.source_file
+			.map(|file| FileSpan::new_from_span(file, &tokens));
+
+		tokens
+			.xpipe(TokensToRstml::default())
+			.0
+			.xpipe(RstmlToWebTokens::new(span))
+			.0
+			.xpipe(ParseWebTokens::default())
+			.map(|tokens| {
+				let tokens = tokens.into_rust_tokens();
+				quote! {{	
+					use beet::prelude::*;
+					#tokens
+				}}
+			})
+			.unwrap_or_else(|err| {
+				let err_str = err.to_string();
+				quote! {
+					compile_error!(#err_str);
+				}
+			})
+	}
+}
 
 
 // /// Demonstrates how to select a different reactive runtime

@@ -106,7 +106,7 @@ impl FileSpan {
 }
 
 #[cfg(feature = "tokens")]
-impl SerdeTokens for FileSpan {
+impl RustTokens for FileSpan {
 	fn into_rust_tokens(&self) -> proc_macro2::TokenStream {
 		let file = self.file.to_string_lossy();
 		let start = self.start.into_rust_tokens();
@@ -115,7 +115,9 @@ impl SerdeTokens for FileSpan {
 			FileSpan::new(#file, #start, #end)
 		}
 	}
-	
+}
+#[cfg(feature = "tokens")]
+impl RonTokens for FileSpan {
 	fn into_ron_tokens(&self) -> proc_macro2::TokenStream {
 		let file = self.file.to_string_lossy();
 		let start = self.start.into_ron_tokens();

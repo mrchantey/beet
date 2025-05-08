@@ -2,6 +2,8 @@ use super::ElementTokens;
 use crate::prelude::*;
 use anyhow::Result;
 use beet_common::prelude::*;
+use proc_macro2::TokenStream;
+use quote::quote;
 use syn::Block;
 use syn::LitStr;
 use syn::Token;
@@ -170,5 +172,74 @@ impl<E> ElementTokensVisitor<E> for WebTokens {
 			_ => {}
 		}
 		Ok(())
+	}
+}
+
+
+impl RustTokens for WebTokens {
+	fn into_rust_tokens(&self) -> TokenStream {
+		match self {
+			WebTokens::Fragment { nodes, meta } => {
+				let nodes = nodes.iter().map(|node| node.into_rust_tokens());
+				let meta = meta.into_rust_tokens();
+				quote! {
+					WebTokens::Fragment {
+						nodes: vec![#(#nodes),*],
+						meta: #meta,
+					}
+				}
+			}
+			WebTokens::Doctype { value, meta } => {
+				let meta = meta.into_rust_tokens();
+				quote! {
+					WebTokens::Doctype {
+						value: #value,
+						meta: #meta,
+					}
+				}
+			}
+			WebTokens::Comment { value, meta } => {
+				let meta = meta.into_rust_tokens();
+				quote! {
+					WebTokens::Comment {
+						value: #value,
+						meta: #meta,
+					}
+				}
+			}
+			WebTokens::Text { value, meta } => {
+				let meta = meta.into_rust_tokens();
+				quote! {
+					WebTokens::Text {
+						value: #value,
+						meta: #meta,
+					}
+				}
+			}
+			WebTokens::Block { value, meta } => {
+				let meta = meta.into_rust_tokens();
+				quote! {
+					WebTokens::Block {
+						value: #value,
+						meta: #meta,
+					}
+				}
+			}
+			WebTokens::Element {
+				component,
+				children,
+				self_closing,
+			} => {
+				let component = component.into_rust_tokens();
+				let children = children.into_rust_tokens();
+				quote! {
+					WebTokens::Element {
+						component: #component,
+						children: Box::new(#children),
+						self_closing: #self_closing,
+					}
+				}
+			}
+		}
 	}
 }
