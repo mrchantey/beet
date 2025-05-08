@@ -1,13 +1,10 @@
 use anyhow::Result;
 use beet_common::prelude::*;
-use proc_macro2::Span;
-use proc_macro2::TokenStream;
 use quote::ToTokens;
 use syn::Block;
 use syn::Expr;
-use syn::ExprPath;
+use syn::Ident;
 use syn::LitStr;
-use syn::spanned::Spanned;
 
 /// Intermediate representation of an 'element' in an rsx tree.
 /// Despite the web terminology, this is also used to represent
@@ -15,7 +12,7 @@ use syn::spanned::Spanned;
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ElementTokens {
 	/// the name of the component, ie <MyComponent/>
-	pub tag: NameExpr,
+	pub tag: Spanner<String>,
 	/// fields of the component, ie <MyComponent foo=bar bazz/>
 	pub attributes: Vec<RsxAttributeTokens>,
 	/// special directives for use by both
@@ -33,28 +30,7 @@ impl GetNodeMeta for ElementTokens {
 // 	fn default() -> Self { Self::fragment(Default::default()) }
 // }
 
-impl ElementTokens {
-	// pub fn new(tag: impl Into<NameExpr>) -> Self {
-	// 	Self {
-	// 		tag: tag.into(),
-	// 		attributes: Vec::new(),
-	// 		directives: Vec::new(),
-	// 	}
-	// }
-	// pub fn string_spanned(
-	// 	name: impl Into<String>,
-	// 	span: &impl Spanned,
-	// ) -> Self {
-	// 	Self::new(NameExpr::string_spanned(name, span))
-	// }
-	// pub fn with_attribute(
-	// 	mut self,
-	// 	attribute: impl Into<RsxAttributeTokens>,
-	// ) -> Self {
-	// 	self.attributes.push(attribute.into());
-	// 	self
-	// }
-}
+impl ElementTokens {}
 
 /// Visit all [`ElementTokens`] in a tree, the nodes
 /// should be visited before children, ie walked in DFS preorder.
@@ -76,132 +52,83 @@ pub trait ElementTokensVisitor<E = anyhow::Error> {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum RsxAttributeTokens {
 	/// A block attribute, in jsx this is known as a spread attribute
-	Block { block: Spanner<Block> },
+	Block { block: Block },
 	/// A key attribute created by [`TokenStream`]
-	Key { key: NameExpr },
+	Key { key: Spanner<String> },
 	/// A key value attribute created by [`TokenStream`]
-	KeyValue { key: NameExpr, value: Spanner<Expr> },
+	KeyValue { key: Spanner<String>, value: Expr },
 }
-
 impl RsxAttributeTokens {
-	pub fn key_value(
-		key: impl Into<NameExpr>,
-		value: impl Into<Spanner<Expr>>,
-	) -> Self {
-		Self::KeyValue {
-			key: key.into(),
-			value: value.into(),
-		}
-	}
-}
-
-// #[derive(Debug, Clone)]
-// pub enum SpanOrLoc {
-// 	Span(Span),
-// 	Location { start: LineColumn, end: LineColumn },
-// }
-
-/// A value whose location can be retrieved either
-/// from the token stream or from a string
-#[derive(Debug, Default, Clone, PartialEq, Eq, Hash)]
-pub struct Spanner<Spannable> {
-	pub value: Spannable,
-	/// If the value was created from a token stream
-	/// this will be None
-	pub span: FileSpan,
-}
-
-impl<S> AsRef<S> for Spanner<S> {
-	fn as_ref(&self) -> &S { &self.value }
-}
-
-impl<S: ToTokens> ToTokens for Spanner<S> {
-	fn to_tokens(&self, tokens: &mut TokenStream) {
-		self.value.to_tokens(tokens);
-	}
-}
-
-impl<S: syn::spanned::Spanned> Spanner<S> {
-	pub fn new(value: S) -> Self {
-		Self {
-			span: FileSpan::new_from_span(Default::default(), &value),
-			value,
-		}
-	}
-}
-
-impl Spanner<Expr> {
-	/// if the value is a string literal return its value
-	pub fn try_lit_str(&self) -> Option<String> {
-		if let Expr::Lit(expr_lit) = &self.value {
-			if let syn::Lit::Str(lit) = &expr_lit.lit {
-				return Some(lit.value());
+	pub fn try_lit_str(expr: &Expr) -> Option<String> {
+		if let Expr::Lit(expr_lit) = expr {
+			if let syn::Lit::Str(lit_str) = &expr_lit.lit {
+				return Some(lit_str.value());
 			}
 		}
 		None
 	}
 }
 
-impl<S: syn::spanned::Spanned> From<S> for Spanner<S> {
-	fn from(value: S) -> Self { Self::new(value) }
+
+
+/// A value that may have been created
+#[derive(Debug, Clone)]
+pub struct Spanner<T> {
+	/// The span, if any, of the original value.
+	/// This will be Span::call_site() if the value
+	tokens_span: proc_macro2::Span,
+	// file_span: FileSpan,
+	value: T,
 }
 
 
-
-// impl<T, S, C> From<T> for Spanner<S, C>
-// where
-// 	T: Into<S>,
-// {
-// 	fn from(value: S) -> Self { Spanner::Spanned { value } }
-// }
-
-
-/// A restricted subtype of [`Expr`], often created by [`rstml::node::NodeName`]
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum NameExpr {
-	/// A name that must be a string because its not a valid path expression,
-	/// like <foo-bar/>
-	LitStr(Spanner<LitStr>),
-	/// A valid path expression like `my_component::MyComponent`
-	ExprPath(Spanner<ExprPath>),
-}
-
-impl NameExpr {
-	/// Returns the inner span, this will be [`Span::call_site`] if the value was
-	/// created from strings not tokens, ie a markdown file
-	pub fn span(&self) -> Span {
-		match self {
-			NameExpr::LitStr(value) => value.value.span(),
-			NameExpr::ExprPath(value) => value.value.span(),
+impl<T> Spanner<T> {
+	pub fn new(value: T) -> Self {
+		Self {
+			value,
+			tokens_span: proc_macro2::Span::call_site(),
 		}
+	}
+
+	pub fn new_with_span(value: T, tokens_span: proc_macro2::Span) -> Self {
+		Self { value, tokens_span }
+	}
+	pub fn tokens_span(&self) -> proc_macro2::Span { self.tokens_span }
+	pub fn value(&self) -> &T { &self.value }
+	pub fn into_value(self) -> T { self.value }
+}
+
+impl<T: std::hash::Hash> std::hash::Hash for Spanner<T> {
+	fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+		self.value.hash(state);
 	}
 }
 
+impl<T: PartialEq> PartialEq for Spanner<T> {
+	fn eq(&self, other: &Self) -> bool { self.value == other.value }
+}
+impl<T: Eq> Eq for Spanner<T> {}
 
-/// force expr into string literal
-impl ToString for NameExpr {
-	fn to_string(&self) -> String {
-		match self {
-			NameExpr::LitStr(value) => value.value.value(),
-			NameExpr::ExprPath(value) => {
-				value.value.to_token_stream().to_string()
-			}
-		}
+impl<T: AsRef<str>> Spanner<T> {
+	pub fn as_str(&self) -> &str { self.value.as_ref() }
+	pub fn into_lit_str(&self) -> LitStr {
+		LitStr::new(self.value.as_ref(), self.tokens_span)
+	}
+	pub fn into_ident(&self) -> Ident {
+		Ident::new(self.value.as_ref(), self.tokens_span)
 	}
 }
 
-impl ToTokens for NameExpr {
-	fn to_tokens(&self, tokens: &mut TokenStream) {
-		match self {
-			NameExpr::ExprPath(expr) => expr.to_tokens(tokens),
-			NameExpr::LitStr(string) => string.to_tokens(tokens),
-		}
+impl Into<Spanner<String>> for LitStr {
+	fn into(self) -> Spanner<String> {
+		Spanner::new_with_span(self.value(), self.span())
 	}
 }
-
-
-impl Into<NameExpr> for String {
-	fn into(self) -> NameExpr {
-		NameExpr::LitStr(Spanner::new(LitStr::new(&self, Span::call_site())))
+impl Into<Spanner<String>> for String {
+	fn into(self) -> Spanner<String> { Spanner::new(self) }
+}
+impl ToTokens for Spanner<String> {
+	fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
+		self.into_lit_str().to_tokens(tokens);
 	}
 }

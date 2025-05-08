@@ -143,11 +143,10 @@ impl<C: CustomNode> RstmlToWebTokens<C> {
 					.into_iter()
 					.filter_map(|attr| self.map_attribute(attr))
 					.collect::<Vec<_>>();
-
 				WebTokens::Element {
 					self_closing,
 					component: ElementTokens {
-						tag: self.map_node_name(open_tag.name.clone()),
+						tag: self.map_node_name(&open_tag.name),
 						attributes,
 						meta: NodeMeta::default(),
 					},
@@ -191,39 +190,33 @@ impl<C: CustomNode> RstmlToWebTokens<C> {
 			}
 			NodeAttribute::Attribute(attr) => {
 				let value = attr.value().cloned();
-				match (attr.key, value) {
-					(key, Some(value)) => Some(RsxAttributeTokens::KeyValue {
-						key: self.map_node_name(key),
+				let key = self.map_node_name(&attr.key);
+				match value {
+					Some(value) => Some(RsxAttributeTokens::KeyValue {
+						key,
 						value: value.into(),
 					}),
-					(key, None) => Some(RsxAttributeTokens::Key {
-						key: self.map_node_name(key),
-					}),
+					None => Some(RsxAttributeTokens::Key { key }),
 				}
 			}
 		}
 	}
 	/// Simplifies the [`NodeName::Punctuated`],ie client:load to a string literal
-	fn map_node_name(&mut self, name: NodeName) -> NameExpr {
-		let name_str = name.to_string();
+	fn map_node_name(&mut self, name: &NodeName) -> Spanner<String> {
 		match name {
-			NodeName::Path(path) => NameExpr::ExprPath(path.into()),
-			NodeName::Punctuated(punctuated) => {
-				let str = LitStr::new(&name_str, punctuated.span());
-				NameExpr::LitStr(str.into())
-			}
 			NodeName::Block(block) => {
 				self.errors.push(
 					Diagnostic::spanned(
 						block.span(),
 						Level::Error,
-						"Block names are not supported",
+						"Block tag names are not supported",
 					)
 					.emit_as_expr_tokens(),
 				);
-				NameExpr::LitStr(LitStr::new("error", block.span()).into())
 			}
+			_ => {}
 		}
+		Spanner::new_with_span(name.to_string(), name.span())
 	}
 
 	/// Ensure that self-closing elements do not have children,
@@ -263,22 +256,5 @@ mod test {
 	// }
 
 	#[test]
-	fn works() {
-		// expect(map(quote!())).to_be(HtmlTokens::Text {
-		// 	value: syn::parse_quote!("foobar").into(),
-		// })
-
-		// expect(
-		// 	quote! {
-		// 		<div/>
-		// 	}
-		// 	.xpipe(TokensToRstml::new())
-		// 	.0
-		// 	.xpipe(RstmlToRsxTokens::new())
-		// 	.0,
-		// )
-		// .to_be(ElementTokens::new(NameExpr::ExprPath(
-		// 	Spanner::new_spanned(syn::parse_quote!(div)),
-		// )));
-	}
+	fn works() {}
 }

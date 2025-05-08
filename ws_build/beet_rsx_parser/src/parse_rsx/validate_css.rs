@@ -14,7 +14,7 @@ impl Pipeline<WebTokens, Result<WebTokens>> for ValidateStyleNode {
 				component,
 				children,
 				..
-			} if component.tag.to_string() == "style"
+			} if component.tag.value() == "style"
 				&& let WebTokens::Text { value, .. } = &**children =>
 			{
 				let span = component

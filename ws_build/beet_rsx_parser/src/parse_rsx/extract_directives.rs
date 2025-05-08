@@ -40,7 +40,7 @@ fn attr_to_template_directive(
 	attr: &RsxAttributeTokens,
 ) -> Option<TemplateDirective> {
 	match attr {
-		RsxAttributeTokens::Key { key } => match key.to_string().as_str() {
+		RsxAttributeTokens::Key { key } => match key.as_str() {
 			"client:load" => Some(TemplateDirective::ClientLoad),
 			"scope:local" => {
 				Some(TemplateDirective::StyleScope(StyleScope::Local))
@@ -73,9 +73,9 @@ fn attr_to_template_directive(
 		// only key value pairs where the value is a string are valid
 		// templates
 		RsxAttributeTokens::KeyValue { key, value }
-			if let Some(value) = value.try_lit_str() =>
+			if let Some(value) = RsxAttributeTokens::try_lit_str(value) =>
 		{
-			match key.to_string().as_str() {
+			match key.as_str() {
 				"slot" => Some(TemplateDirective::Slot(value)),
 				"src" if value.starts_with('.') => {
 					// alternatively we could use an ignore approach

@@ -115,7 +115,7 @@ impl SerdeTokens for FileSpan {
 			FileSpan::new(#file, #start, #end)
 		}
 	}
-
+	
 	fn into_ron_tokens(&self) -> proc_macro2::TokenStream {
 		let file = self.file.to_string_lossy();
 		let start = self.start.into_ron_tokens();

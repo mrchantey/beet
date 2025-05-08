@@ -19,7 +19,7 @@ impl Pipeline<WebTokens, WebTokens> for RemoveStyleTags {
 						component,
 						children,
 						self_closing,
-					} if component.tag.to_string() == "style" => {
+					} if component.tag.value() == "style" => {
 						let mut hasher = RapidHasher::default_const();
 						children.hash(&mut hasher);
 						let content_hash = hasher.finish();

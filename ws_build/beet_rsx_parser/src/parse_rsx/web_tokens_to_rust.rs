@@ -117,8 +117,7 @@ impl WebTokensToRust {
 
 				// we must parse runtime attr before anything else
 				self.parse_runtime_directive(&meta);
-				let tag_str = tag.to_string();
-				if tag_str.starts_with(|c: char| c.is_uppercase()) {
+				if tag.as_str().starts_with(|c: char| c.is_uppercase()) {
 					self.map_component(component, *children)
 				} else {
 					// this attributes-children order is important for rusty tracker indices
@@ -130,7 +129,7 @@ impl WebTokensToRust {
 					let children = self.map_node(*children);
 					let meta = meta.into_rust_tokens();
 					quote!(RsxElement {
-						tag: #tag_str.to_string(),
+						tag: #tag.to_string(),
 						attributes: vec![#(#attributes),*],
 						children: Box::new(#children),
 						self_closing: #self_closing,
@@ -146,7 +145,7 @@ impl WebTokensToRust {
 		match attr {
 			// The attribute is a block
 			RsxAttributeTokens::Block { block } => {
-				let tracker = self.rusty_tracker.next_tracker(&block.value);
+				let tracker = self.rusty_tracker.next_tracker(&block);
 				quote! {
 					#ident::parse_attribute_block(
 						#tracker,
@@ -156,21 +155,18 @@ impl WebTokensToRust {
 			}
 			// The attribute is a key
 			RsxAttributeTokens::Key { key } => {
-				let key_str = key.to_string();
 				quote!(RsxAttribute::Key {
-					key: #key_str.to_string()
+					key: #key.to_string()
 				})
 			}
 			// the attribute is a key value where
 			// the value is a string literal
 			RsxAttributeTokens::KeyValue { key, value }
-				if let Expr::Lit(lit) = &value.value =>
+				if let Expr::Lit(lit) = &value =>
 			{
-				let key_str = key.to_string();
-
 				quote! {
 					RsxAttribute::KeyValue {
-						key: #key_str.to_string(),
+						key: #key.to_string(),
 						value: #lit.to_string()
 					}
 				}
@@ -178,18 +174,17 @@ impl WebTokensToRust {
 			// the attribute is a key value where the value
 			// is not an [`Expr::Lit`]
 			RsxAttributeTokens::KeyValue { key, value } => {
-				let key_str = key.to_string();
-				let tracker = self.rusty_tracker.next_tracker(&value.value);
+				let tracker = self.rusty_tracker.next_tracker(&value);
 				// we need to handle events at the tokens level for inferred
 				// event types and intellisense.
-				if key_str.starts_with("on") {
+				if key.as_str().starts_with("on") {
 					let register_event = self
 						.idents
 						.runtime
-						.register_event_tokens(&key_str, value);
+						.register_event_tokens(&key.as_str(), value);
 					quote! {
 						RsxAttribute::BlockValue {
-							key: #key_str.to_string(),
+							key: #key.to_string(),
 							initial: "event-placeholder".to_string(),
 							effect: Effect::new(Box::new(move |loc| {
 								#register_event
@@ -200,7 +195,7 @@ impl WebTokensToRust {
 				} else {
 					quote! {
 						#ident::parse_attribute_value(
-							#key_str,
+							#key,
 							#tracker,
 							#value
 						)
@@ -221,7 +216,6 @@ impl WebTokensToRust {
 			attributes,
 			meta,
 		} = component;
-		let tag_str = tag.to_string();
 		// visiting slot children is safe here, we aren't pulling any more trackers
 		let slot_children = self.map_node(children);
 
@@ -246,18 +240,20 @@ impl WebTokensToRust {
 				}
 				RsxAttributeTokens::Key { key } => {
 					prop_names.push(key);
+					let key = key.into_ident();
 					// for components no value means a bool flag
 					prop_assignments.push(quote! {.#key(true)});
 				}
 				RsxAttributeTokens::KeyValue { key, value } => {
 					prop_names.push(key);
+					let key = key.into_ident();
 					prop_assignments.push(quote! {.#key(#value)});
 				}
 			}
 		}
 
 
-		let ident = syn::Ident::new(&tag_str, tag.span());
+		let ident = Ident::new(tag.as_str(), tag.tokens_span());
 
 		// ensures all required fields are set
 		// doesnt work because we cant tell whether its an optional or default
@@ -297,7 +293,7 @@ impl WebTokensToRust {
 		// attempt to get ide to show the correct type by using
 		// the component as the first spanned quote
 		let ide_helper =
-			Ident::new(&format!("{}Required", &ident.to_string()), tag.span());
+			Ident::new(&format!("{}Required", tag.as_str()), tag.tokens_span());
 
 		let meta = meta.into_rust_tokens();
 		quote::quote!({
@@ -306,7 +302,7 @@ impl WebTokensToRust {
 				let component = #component;
 
 				RsxComponent{
-					tag: #tag_str.to_string(),
+					tag: #tag.to_string(),
 					type_name: std::any::type_name::<#ident>().to_string(),
 					tracker: #tracker,
 					ron: #ron,

@@ -4,7 +4,7 @@ use anyhow::Result;
 use beet_common::prelude::*;
 use syn::Block;
 use syn::LitStr;
-use syn::token::Lt;
+use syn::Token;
 
 /// [`WebTokens`] is a superset of [`ElementTokens`], and
 /// includes several types of information including html, css,
@@ -25,8 +25,8 @@ pub enum WebTokens {
 		meta: NodeMeta,
 	},
 	Doctype {
-		/// the opening bracket
-		value: Lt,
+		/// the opening angle bracket in <!DOCTYPE html>
+		value: Token![<],
 		meta: NodeMeta,
 	},
 	Comment {

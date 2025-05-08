@@ -69,17 +69,15 @@ impl WebTokensToRon {
 				} = &component;
 				let meta = meta.into_ron_tokens();
 
-				let tag_str = tag.to_string();
-				if tag_str.starts_with(|c: char| c.is_uppercase()) {
+				if tag.as_str().starts_with(|c: char| c.is_uppercase()) {
 					// components disregard all the context and rely on the tracker
 					// we rely on the hydrated node to provide the attributes and children
 					let tracker =
 						self.rusty_tracker.next_tracker_ron(&component);
 					let slot_children = self.map_node(*children);
-
 					quote! { Component (
 						tracker: #tracker,
-						tag: #tag_str,
+						tag: #tag,
 						slot_children: #slot_children,
 						meta: #meta
 					)}
@@ -92,7 +90,7 @@ impl WebTokensToRon {
 						.collect::<Vec<_>>();
 					let children = self.map_node(*children);
 					quote! { Element (
-						tag: #tag_str,
+						tag: #tag,
 						self_closing: #self_closing,
 						attributes: [#(#attributes),*],
 						children: #children,
@@ -106,22 +104,20 @@ impl WebTokensToRon {
 	fn map_attribute(&mut self, attr: &RsxAttributeTokens) -> TokenStream {
 		match attr {
 			RsxAttributeTokens::Block { block } => {
-				let tracker = self.rusty_tracker.next_tracker_ron(&block.value);
+				let tracker = self.rusty_tracker.next_tracker_ron(&block);
 				quote! { Block (#tracker)}
 			}
 			RsxAttributeTokens::Key { key } => {
-				let key_str = key.to_string();
-				quote! {Key ( key: #key_str )}
+				quote! {Key ( key: #key )}
 			}
 			RsxAttributeTokens::KeyValue { key, value }
-				if let Expr::Lit(value) = &value.value =>
+				if let Expr::Lit(value) = &value =>
 			{
-				let key_str = key.to_string();
 				// ron stringifies all lit values?
 				// tbh not sure why we need to do this but it complains need string
 				let value = lit_to_string(&value.lit);
 				quote! { KeyValue (
-						key: #key_str,
+						key: #key,
 						value: #value
 						)
 				}
@@ -129,12 +125,11 @@ impl WebTokensToRon {
 			// the attribute is a key value where the value
 			// is not an [`Expr::Lit`]
 			RsxAttributeTokens::KeyValue { key, value } => {
-				let tracker = self.rusty_tracker.next_tracker_ron(&value.value);
-				let key_str = key.to_string();
+				let tracker = self.rusty_tracker.next_tracker_ron(&value);
 				// we dont need to handle events for serialization,
 				// thats an rstml_to_rsx concern so having the tracker is enough
 				quote! { BlockValue (
-					key: #key_str,
+					key: #key,
 					tracker: #tracker
 				)}
 			}

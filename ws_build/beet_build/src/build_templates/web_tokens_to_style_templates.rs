@@ -30,7 +30,7 @@ impl WebTokensToStyleTemplates {
 				component,
 				children: _,
 				self_closing: _,
-			} if component.tag.to_string() == "style" => {
+			} if component.tag.as_str() == "style" => {
 				let _scope = component.meta.style_scope().unwrap_or_default();
 				// todo!();
 

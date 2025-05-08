@@ -98,9 +98,7 @@ impl IntoWebTokens for RsxSelfClosingElement {
 	fn into_web_tokens(self) -> Result<WebTokens> {
 		WebTokens::Element {
 			component: ElementTokens {
-				tag: NameExpr::LitStr(
-					LitStr::new(&self.0.to_string(), Span::call_site()).into(),
-				),
+				tag: self.0.to_string().into(),
 				attributes: self
 					.1
 					.0
@@ -131,9 +129,7 @@ impl IntoWebTokens for RsxNormalElement {
 
 		WebTokens::Element {
 			component: ElementTokens {
-				tag: NameExpr::LitStr(
-					LitStr::new(&self.0.to_string(), Span::call_site()).into(),
-				),
+				tag: self.0.to_string().into(),
 				attributes: self
 					.1
 					.0
@@ -212,7 +208,7 @@ impl IntoRsxAttributeTokens for RsxAttribute {
 			}
 			RsxAttribute::Named(name, value) => RsxAttributeTokens::KeyValue {
 				key: name.to_string().into(),
-				value: value.try_into()?,
+				value: attribute_value_to_expr(value)?,
 			}
 			.xok(),
 			RsxAttribute::Spread(value) => {
@@ -227,41 +223,39 @@ impl IntoRsxAttributeTokens for RsxAttribute {
 	}
 }
 
-impl TryInto<Spanner<Expr>> for RsxAttributeValue {
-	type Error = anyhow::Error;
-	fn try_into(self) -> Result<Spanner<Expr>, Self::Error> {
-		let expr: Expr = match self {
-			RsxAttributeValue::Default => {
-				unreachable!(
-					"We checked for this in RsxAttribute::into_rsx_attribute_tokens"
-				)
-			}
-			RsxAttributeValue::Boolean(val) => {
-				let val = val.0;
-				syn::parse_quote!(#val)
-			}
-			RsxAttributeValue::Number(val) => {
-				let val = val.0;
-				syn::parse_quote!(#val)
-			}
-			RsxAttributeValue::Str(val) => {
-				let val = val.to_string();
-				syn::parse_quote!(#val)
-			}
-			RsxAttributeValue::Element(value) => {
-				let block =
-					value.into_web_tokens()?.xpipe(WebTokensToRust::default());
-				syn::parse_quote!(#block)
-			}
-			RsxAttributeValue::CodeBlock(value) => {
-				let block =
-					value.into_web_tokens()?.xpipe(WebTokensToRust::default());
-				syn::parse_quote!(#block)
-			}
-		};
-		expr.xinto::<Spanner<Expr>>().xok()
-	}
+fn attribute_value_to_expr(value: RsxAttributeValue) -> Result<Expr> {
+	let expr: Expr = match value {
+		RsxAttributeValue::Default => {
+			unreachable!(
+				"We checked for this in RsxAttribute::into_rsx_attribute_tokens"
+			)
+		}
+		RsxAttributeValue::Boolean(val) => {
+			let val = val.0;
+			syn::parse_quote!(#val)
+		}
+		RsxAttributeValue::Number(val) => {
+			let val = val.0;
+			syn::parse_quote!(#val)
+		}
+		RsxAttributeValue::Str(val) => {
+			let val = val.to_string();
+			syn::parse_quote!(#val)
+		}
+		RsxAttributeValue::Element(value) => {
+			let block =
+				value.into_web_tokens()?.xpipe(WebTokensToRust::default());
+			syn::parse_quote!(#block)
+		}
+		RsxAttributeValue::CodeBlock(value) => {
+			let block =
+				value.into_web_tokens()?.xpipe(WebTokensToRust::default());
+			syn::parse_quote!(#block)
+		}
+	};
+	expr.xok()
 }
+
 
 
 #[cfg(test)]

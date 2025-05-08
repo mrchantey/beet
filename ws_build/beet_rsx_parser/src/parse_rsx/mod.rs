@@ -16,14 +16,14 @@ mod element_tokens;
 pub use element_tokens::*;
 mod rstml_to_web_tokens;
 pub use rstml_to_web_tokens::*;
-mod meta_builder;
+mod extract_directives;
 mod rstml_rust_to_hash;
 mod rusty_tracker_builder;
 #[cfg(feature = "html")]
 mod string_to_web_tokens;
 #[cfg(feature = "css")]
 mod validate_css;
-pub use meta_builder::*;
+pub use extract_directives::*;
 pub use rusty_tracker_builder::*;
 #[cfg(feature = "html")]
 pub use string_to_web_tokens::*;
