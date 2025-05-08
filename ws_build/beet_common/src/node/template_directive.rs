@@ -48,9 +48,21 @@ pub enum TemplateDirective {
 	/// <style style:content-hash="1234567890" />
 	/// ```
 	StylePlaceholder {
-		/// A rapidhash of the inner text of the style tag.
+		/// A rapidhash of a [`StyleTemplate`], including:
+		/// - the inner text of the style tag.
+		/// - its [`StyleScope`] directive.
+		/// The hash is used to resolve the style id when rendering.
 		content_hash: u64,
 	},
+	/// This script or style tag should be rendered inline, and not
+	/// deduplicated or be used for component scoped styles.
+	/// ## Example
+	/// ```rust ignore
+	/// <style is:inline>
+	/// 	div { color: blue; }
+	/// </style>
+	/// ```
+	Inline,
 	/// Indicates this node should be rendered in a named slot instead of
 	/// the default slot.
 	/// ## Example
@@ -153,6 +165,9 @@ pub trait TemplateDirectiveExt {
 	fn is_cascade_style(&self) -> bool {
 		self.any_directive(|d| matches!(d, TemplateDirective::StyleCascade))
 	}
+	fn is_inline(&self) -> bool {
+		self.any_directive(|d| matches!(d, TemplateDirective::Inline))
+	}
 
 	fn slot_directive(&self) -> Option<&String> {
 		self.find_map_directive(|d| match d {
@@ -166,6 +181,15 @@ pub trait TemplateDirectiveExt {
 			TemplateDirective::FsSrc(src) => Some(src),
 			_ => None,
 		})
+	}
+	fn style_placeholder(&self) -> Option<u64> {
+		self.find_map_directive(|d| match d {
+			TemplateDirective::StylePlaceholder { content_hash } => {
+				Some(content_hash)
+			}
+			_ => None,
+		})
+		.copied()
 	}
 
 
@@ -202,6 +226,9 @@ impl crate::prelude::RustTokens for TemplateDirective {
 			TemplateDirective::StylePlaceholder { content_hash } => {
 				quote! {TemplateDirective::StylePlaceholder{content_hash: #content_hash}}
 			}
+			TemplateDirective::Inline => {
+				quote! {TemplateDirective::Inline}
+			}
 			TemplateDirective::FsSrc(src) => {
 				quote! {TemplateDirective::FsSrc(#src.into())}
 			}
@@ -216,10 +243,14 @@ impl crate::prelude::RustTokens for TemplateDirective {
 				suffix,
 				value,
 			} => {
+				let value = match value {
+					Some(value) => quote! {Some(#value.into())},
+					None => quote! {None},
+				};
 				quote! {TemplateDirective::Custom{
 					prefix: #prefix.into(),
 					suffix: #suffix.into(),
-					value: #value.into()
+					value: #value
 				}}
 			}
 		}
@@ -239,6 +270,9 @@ impl crate::prelude::RonTokens for TemplateDirective {
 			}
 			TemplateDirective::StyleCascade => {
 				quote! {StyleCascade}
+			}
+			TemplateDirective::Inline => {
+				quote! {Inline}
 			}
 			TemplateDirective::StylePlaceholder { content_hash } => {
 				let content_hash =
@@ -289,7 +323,7 @@ mod test {
 			TemplateDirective::ClientLoad,
 			TemplateDirective::StyleScope(StyleScope::Local),
 			TemplateDirective::StyleScope(StyleScope::Global),
-			TemplateDirective::StyleScope(StyleScope::Verbatim),
+			TemplateDirective::Inline,
 			TemplateDirective::StyleCascade,
 			TemplateDirective::StylePlaceholder { content_hash: 1 },
 			TemplateDirective::FsSrc("foo".into()),

@@ -29,7 +29,7 @@ pub fn rsx_template(tokens: TokenStream) -> TokenStream {
 }
 /// Mostly used for testing, this macro expands to [`WebTokens`]
 #[proc_macro]
-pub fn parsed_web_tokens(tokens: TokenStream) -> TokenStream {
+pub fn web_tokens(tokens: TokenStream) -> TokenStream {
 	let source_file = source_file(&tokens);
 	tokens
 		.xpipe(ParsedWebTokensPipeline::new(source_file))

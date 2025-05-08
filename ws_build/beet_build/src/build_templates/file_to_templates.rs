@@ -12,7 +12,7 @@ use sweet::prelude::*;
 /// For rust files, each rsx template is defined by an `rsx!` macro, whereas for mdx files
 /// the entire file is a single rsx template.
 /// ## Style Templates
-/// When visiting an rsx template, any style tag without the `scope:verbatim` directive
+/// When visiting an rsx template, any style tag without the `is:inline` directive
 /// is considered a style template and will be extracted, replaced by a
 /// [`TemplateDirective::StylePlaceholder`] directive.
 #[derive(Debug, Default)]
@@ -61,11 +61,13 @@ impl FileToTemplates {
 		&self,
 		web_tokens: WebTokens,
 	) -> Result<(RsxTemplateNode, Vec<StyleTemplate>)> {
+		let (web_tokens, styles) =
+			web_tokens.xpipe(ExtractStyleTemplates::default())?;
 		let rsx_ron = web_tokens.xpipe(WebTokensToRon::default()).to_string();
 		let template_node =
 			ron::de::from_str::<RsxTemplateNode>(rsx_ron.trim())
 				.map_err(|e| ron_cx_err(e, &rsx_ron))?;
-		Ok((template_node, vec![]))
+		Ok((template_node, styles))
 	}
 }
 
@@ -99,11 +101,16 @@ mod test {
 
 	#[test]
 	fn works() {
-		let tokens = parsed_web_tokens! {<div client:load/>};
+		let tokens = web_tokens! {
+			<div client:load/>
+			<style scope:local>
+				div { color: blue; }
+			</style>
+		};
 
-		let templates = FileToTemplates::default()
+		let (_templates, styles) = FileToTemplates::default()
 			.extract_templates(tokens)
 			.unwrap();
-		println!("{:?}", templates);
+		expect(styles.len()).to_be(1);
 	}
 }

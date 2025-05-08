@@ -5,7 +5,6 @@ use beet_common::prelude::*;
 use proc_macro2::TokenStream;
 use quote::quote;
 use syn::Block;
-use syn::LitStr;
 use syn::Token;
 
 /// [`WebTokens`] is a superset of [`ElementTokens`], and
@@ -32,11 +31,11 @@ pub enum WebTokens {
 		meta: NodeMeta,
 	},
 	Comment {
-		value: LitStr,
+		value: Spanner<String>,
 		meta: NodeMeta,
 	},
 	Text {
-		value: LitStr,
+		value: Spanner<String>,
 		meta: NodeMeta,
 	},
 	Block {
@@ -89,6 +88,20 @@ impl AsRef<WebTokens> for WebTokens {
 }
 
 impl WebTokens {
+	/// check if this is made up of only [`WebTokens::Fragment`] nodes
+	pub fn is_empty(&self) -> bool {
+		match self {
+			WebTokens::Fragment { nodes, .. } => {
+				for node in nodes {
+					if !node.is_empty() {
+						return false;
+					}
+				}
+				true
+			}
+			_ => false,
+		}
+	}
 	/// Visit each [`WebTokens`] node in the tree.
 	pub fn walk_web_tokens<E>(
 		&self,
@@ -200,6 +213,7 @@ impl RustTokens for WebTokens {
 			}
 			WebTokens::Comment { value, meta } => {
 				let meta = meta.into_rust_tokens();
+				let value = value.into_rust_tokens();
 				quote! {
 					WebTokens::Comment {
 						value: #value,
@@ -208,6 +222,7 @@ impl RustTokens for WebTokens {
 				}
 			}
 			WebTokens::Text { value, meta } => {
+				let value = value.into_rust_tokens();
 				let meta = meta.into_rust_tokens();
 				quote! {
 					WebTokens::Text {

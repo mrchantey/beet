@@ -24,17 +24,6 @@ pub enum StyleScope {
 	/// </style>
 	/// ```
 	Global,
-	/// This style tag should not be extracted at all, beet
-	/// will leave it as is.
-	/// Bear in mind that if the component appears multiple times in a tree it
-	/// will be duplicated.
-	/// ## Example
-	/// ```rust ignore
-	/// <style scope:verbatim>
-	/// 	div { color: blue; }
-	/// </style>
-	/// ```
-	Verbatim,
 }
 
 
@@ -45,7 +34,6 @@ impl crate::prelude::RustTokens for StyleScope {
 		match self {
 			Self::Local => quote::quote! { StyleScope::Local },
 			Self::Global => quote::quote! { StyleScope::Global },
-			Self::Verbatim => quote::quote! { StyleScope::Verbatim },
 		}
 	}
 }
@@ -55,7 +43,6 @@ impl crate::prelude::RonTokens for StyleScope {
 		match self {
 			Self::Local => quote::quote! { Local },
 			Self::Global => quote::quote! { Global },
-			Self::Verbatim => quote::quote! { Verbatim },
 		}
 	}
 }

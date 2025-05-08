@@ -48,9 +48,7 @@ fn attr_to_template_directive(
 			"scope:global" => {
 				Some(TemplateDirective::StyleScope(StyleScope::Global))
 			}
-			"scope:verbatim" => {
-				Some(TemplateDirective::StyleScope(StyleScope::Verbatim))
-			}
+			"is:inline" => Some(TemplateDirective::Inline),
 			"style:cascade" => Some(TemplateDirective::StyleCascade),
 			runtime_key if runtime_key.starts_with("runtime:") => {
 				let Some(suffix) = runtime_key.split(':').nth(1) else {

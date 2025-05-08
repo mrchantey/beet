@@ -175,3 +175,9 @@ impl RustTokens for Spanner<String> {
 		quote! { Spanner::new(#self.to_string()) }
 	}
 }
+
+impl std::fmt::Display for Spanner<String> {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		write!(f, "{}", self.value)
+	}
+}
