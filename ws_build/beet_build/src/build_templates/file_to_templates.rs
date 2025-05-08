@@ -18,7 +18,7 @@ use sweet::prelude::*;
 #[derive(Debug, Default)]
 pub struct FileTemplates {
 	/// A [`TokenStream`] representing a [`ron`] representation of a [`RsxTemplateNode`].
-	pub rsx_templates: Vec<(NodeSpan, RsxTemplateNode)>,
+	pub rsx_templates: Vec<(FileSpan, RsxTemplateNode)>,
 	// /// A [`TokenStream`] representing styles extracted from the file.
 	pub style_templates: Vec<StyleTemplate>,
 }
@@ -63,17 +63,14 @@ impl Pipeline<WorkspacePathBuf, Result<FileTemplates>> for FileToTemplates {
 
 
 impl FileToTemplates {
-
-
 	// fn extract_
-
 }
 
 /// A ron deserialization error with the context of the file and line
 fn ron_cx_err(e: ron::error::SpannedError, str: &str) -> anyhow::Error {
 	/// how many leading and trailing characters to show in the context of the error
 	const CX_SIZE: usize = 8;
-	
+
 	let start = e.position.col.saturating_sub(CX_SIZE);
 	let end = e.position.col.saturating_add(CX_SIZE);
 	let cx = if e.position.line == 1 {

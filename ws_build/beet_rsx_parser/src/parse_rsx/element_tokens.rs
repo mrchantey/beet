@@ -1,6 +1,5 @@
 use anyhow::Result;
 use beet_common::prelude::*;
-use proc_macro2::LineColumn;
 use proc_macro2::Span;
 use proc_macro2::TokenStream;
 use quote::ToTokens;
@@ -109,7 +108,7 @@ pub struct Spanner<Spannable> {
 	pub value: Spannable,
 	/// If the value was created from a token stream
 	/// this will be None
-	pub loc: Option<SpanLike>,
+	pub span: FileSpan,
 }
 
 impl<S> AsRef<S> for Spanner<S> {
@@ -122,22 +121,11 @@ impl<S: ToTokens> ToTokens for Spanner<S> {
 	}
 }
 
-
-/// For non rust tokens that still need a location, ie markdown
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct SpanLike {
-	pub start: LineColumn,
-	pub end: LineColumn,
-}
-
-impl<S> Spanner<S> {
-	pub fn new(value: S) -> Self { Self { value, loc: None } }
-}
-impl Spanner<LitStr> {
-	pub fn new_lit_str(value: impl Into<String>, loc: SpanLike) -> Self {
+impl<S: syn::spanned::Spanned> Spanner<S> {
+	pub fn new(value: S) -> Self {
 		Self {
-			value: LitStr::new(&value.into(), Span::call_site()),
-			loc: Some(loc),
+			span: FileSpan::new_from_span(Default::default(), &value),
+			value,
 		}
 	}
 }
@@ -154,28 +142,7 @@ impl Spanner<Expr> {
 	}
 }
 
-impl<Spannable: Spanned> Spanner<Spannable> {
-	/// Prefers the location of the value
-	/// because if thats set the span will be Callsite
-	pub fn start(&self) -> LineColumn {
-		if let Some(loc) = &self.loc {
-			loc.start.clone()
-		} else {
-			self.value.span().start()
-		}
-	}
-	/// Prefers the location of the value
-	/// because if thats set the span will be Callsite
-	pub fn end(&self) -> LineColumn {
-		if let Some(loc) = &self.loc {
-			loc.end.clone()
-		} else {
-			self.value.span().end()
-		}
-	}
-}
-
-impl<S> From<S> for Spanner<S> {
+impl<S: syn::spanned::Spanned> From<S> for Spanner<S> {
 	fn from(value: S) -> Self { Self::new(value) }
 }
 

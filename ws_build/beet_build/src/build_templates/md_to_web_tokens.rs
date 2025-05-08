@@ -10,26 +10,26 @@ use crate::utils::ParseMarkdown;
 
 
 /// For a given markdown file, parse into a
-/// [`NodeSpan`] and [`WebTokens`] pairs.
+/// [`FileSpan`] and [`WebTokens`] pairs.
 pub struct MdToWebTokens;
 
 
-impl Pipeline<WorkspacePathBuf, Result<(NodeSpan, WebTokens)>>
+impl Pipeline<WorkspacePathBuf, Result<(FileSpan, WebTokens)>>
 	for MdToWebTokens
 {
-	fn apply(self, path: WorkspacePathBuf) -> Result<(NodeSpan, WebTokens)> {
-		let node_span = NodeSpan::new_for_file(&path);
+	fn apply(self, path: WorkspacePathBuf) -> Result<(FileSpan, WebTokens)> {
+		let span = FileSpan::new_for_file(&path);
 		let file = ReadFile::to_string(path.into_abs_unchecked())?;
 		let web_tokens = ParseMarkdown::markdown_to_rsx_str(&file)
-			.xpipe(StringToWebTokens::new(Some(node_span.clone())))
+			.xpipe(StringToWebTokens::new(Some(span.clone())))
 			.map_err(|e| {
 				anyhow::anyhow!(
 					"Failed to parse Markdown HTML\nPath: {}\nError: {}",
-					node_span.file.display(),
+					span.file().display(),
 					e
 				)
 			})?;
-		Ok((node_span, web_tokens))
+		Ok((span, web_tokens))
 	}
 }
 

@@ -1,7 +1,7 @@
-use std::path::Path;
-use beet_common::prelude::*;
 use crate::prelude::*;
 use anyhow::Result;
+use beet_common::prelude::*;
+use std::path::Path;
 use sweet::prelude::*;
 
 /// Resolve the src attribute to a file if it does not start with any [IGNORED_PREFIX]:
@@ -47,7 +47,7 @@ impl ApplyFsSrc {
 					};
 
 					let workspace_path = location
-						.file
+						.file()
 						.parent()
 						.unwrap_or(&Path::new(""))
 						.join(src);

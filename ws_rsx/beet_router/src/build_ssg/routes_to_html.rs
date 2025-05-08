@@ -25,7 +25,7 @@ impl Pipeline<Vec<(RouteInfo, WebNode)>, Result<Vec<(RouteInfo, HtmlDocument)>>>
 
 				// TODO proper error handling
 				let path = if let Some(loc) = root.location() {
-					loc.file.as_path()
+					loc.file().as_path()
 				} else {
 					route.path.as_path()
 				}

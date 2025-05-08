@@ -26,19 +26,19 @@ pub enum WebTokens {
 	},
 	Doctype {
 		/// the opening bracket
-		value: Spanner<Lt>,
+		value: Lt,
 		meta: NodeMeta,
 	},
 	Comment {
-		value: Spanner<LitStr>,
+		value: LitStr,
 		meta: NodeMeta,
 	},
 	Text {
-		value: Spanner<LitStr>,
+		value: LitStr,
 		meta: NodeMeta,
 	},
 	Block {
-		value: Spanner<Block>,
+		value: Block,
 		meta: NodeMeta,
 	},
 	/// An element `<div>` or a component `<MyComponent>`

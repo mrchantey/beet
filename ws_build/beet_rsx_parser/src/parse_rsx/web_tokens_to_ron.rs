@@ -106,7 +106,7 @@ impl WebTokensToRon {
 	fn map_attribute(&mut self, attr: &RsxAttributeTokens) -> TokenStream {
 		match attr {
 			RsxAttributeTokens::Block { block } => {
-				let tracker = self.rusty_tracker.next_tracker_ron(&block);
+				let tracker = self.rusty_tracker.next_tracker_ron(&block.value);
 				quote! { Block (#tracker)}
 			}
 			RsxAttributeTokens::Key { key } => {
@@ -129,7 +129,7 @@ impl WebTokensToRon {
 			// the attribute is a key value where the value
 			// is not an [`Expr::Lit`]
 			RsxAttributeTokens::KeyValue { key, value } => {
-				let tracker = self.rusty_tracker.next_tracker_ron(&value);
+				let tracker = self.rusty_tracker.next_tracker_ron(&value.value);
 				let key_str = key.to_string();
 				// we dont need to handle events for serialization,
 				// thats an rstml_to_rsx concern so having the tracker is enough

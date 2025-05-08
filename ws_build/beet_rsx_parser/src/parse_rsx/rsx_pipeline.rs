@@ -7,13 +7,15 @@ use sweet::prelude::*;
 
 #[derive(Default)]
 pub struct RsxMacroPipeline {
-	pub node_span: Option<NodeSpan>,
+	/// ideally we'd get this from proc_macro2::Span::source_file
+	/// but thats not yet supported
+	pub source_file: Option<WorkspacePathBuf>,
 	pub no_errors: bool,
 }
 impl RsxMacroPipeline {
-	pub fn new(node_span: Option<NodeSpan>) -> Self {
+	pub fn new(source_file: Option<WorkspacePathBuf>) -> Self {
 		Self {
-			node_span,
+			source_file,
 			no_errors: false,
 		}
 	}
@@ -25,10 +27,12 @@ impl RsxMacroPipeline {
 
 impl<T: Into<TokenStream>> Pipeline<T, TokenStream> for RsxMacroPipeline {
 	fn apply(self, tokens: T) -> TokenStream {
-		let tokens = tokens.into();
+		let tokens: TokenStream = tokens.into();
+		let span = self
+			.source_file
+			.map(|file| FileSpan::new_from_span(file, &tokens));
 		let (rstml, rstml_errors) = tokens.xpipe(TokensToRstml::default());
-		let (html, html_errors) =
-			rstml.xpipe(RstmlToWebTokens::new(self.node_span));
+		let (html, html_errors) = rstml.xpipe(RstmlToWebTokens::new(span));
 		let block = match html.xpipe(ParseWebTokens::default()) {
 			Ok(val) => val.xpipe(WebTokensToRust::default()),
 			Err(err) => {
@@ -52,17 +56,26 @@ impl<T: Into<TokenStream>> Pipeline<T, TokenStream> for RsxMacroPipeline {
 
 #[derive(Default)]
 pub struct RsxTemplateMacroPipeline {
-	pub node_span: Option<NodeSpan>,
+	/// ideally we'd get this from proc_macro2::Span::source_file
+	/// but thats not yet supported
+	pub source_file: Option<WorkspacePathBuf>,
 }
 impl RsxTemplateMacroPipeline {
-	pub fn new(node_span: Option<NodeSpan>) -> Self { Self { node_span } }
+	pub fn new(source_file: Option<WorkspacePathBuf>) -> Self {
+		Self { source_file }
+	}
 }
 
 impl<T: Into<TokenStream>> Pipeline<T, TokenStream>
 	for RsxTemplateMacroPipeline
 {
 	fn apply(self, value: T) -> TokenStream {
-		value.xpipe(RsxRonPipeline::default()).xmap(|tokens| {
+		let tokens: TokenStream = value.into();
+		let span = self
+			.source_file
+			.map(|file| FileSpan::new_from_span(file, &tokens));
+
+		tokens.xpipe(RsxRonPipeline::new(span)).xmap(|tokens| {
 			let str_tokens = tokens.to_string();
 			//TODO here we should embed errors like the rsx macro
 			quote::quote! {RsxTemplateNode::from_ron(#str_tokens).unwrap()}
@@ -72,11 +85,11 @@ impl<T: Into<TokenStream>> Pipeline<T, TokenStream>
 
 #[derive(Default)]
 pub struct RsxRonPipeline {
-	pub node_span: Option<NodeSpan>,
+	pub span: Option<FileSpan>,
 }
 
 impl RsxRonPipeline {
-	pub fn new(node_span: Option<NodeSpan>) -> Self { Self { node_span } }
+	pub fn new(span: Option<FileSpan>) -> Self { Self { span } }
 }
 
 
@@ -86,7 +99,7 @@ impl<T: Into<TokenStream>> Pipeline<T, TokenStream> for RsxRonPipeline {
 		tokens
 			.xpipe(TokensToRstml::default())
 			.0
-			.xpipe(RstmlToWebTokens::new(self.node_span))
+			.xpipe(RstmlToWebTokens::new(self.span))
 			.0
 			.xpipe(ParseWebTokens::default())
 			.map(|html| html.xpipe(WebTokensToRon::default()))
@@ -118,7 +131,6 @@ impl<T: Into<TokenStream>> Pipeline<T, TokenStream> for RsxRonPipeline {
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use beet_common::node::NodeSpan;
 	use quote::quote;
 	use sweet::prelude::*;
 	#[test]
@@ -126,10 +138,8 @@ mod test {
 		expect(
 			quote! {<div client:load/>}
 				.xpipe(
-					RsxMacroPipeline::new(Some(NodeSpan::new_from_file(
-						WorkspacePathBuf::new(file!()),
-					)))
-					.no_errors(),
+					RsxMacroPipeline::new(Some(WorkspacePathBuf::new(file!())))
+						.no_errors(),
 				)
 				.to_string(),
 		)
@@ -153,10 +163,10 @@ mod test {
 					meta: NodeMeta {
 							template_directives: vec![TemplateDirective::ClientLoad],
 							location: Some (
-								NodeSpan::new(
+								FileSpan::new(
 									"ws_build/beet_rsx_parser/src/parse_rsx/rsx_pipeline.rs",
-									1,
-									0
+									LineCol::new(1, 0),
+									LineCol::new(1, 0)
 								)
 							)
 						},

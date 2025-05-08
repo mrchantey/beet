@@ -1,6 +1,6 @@
 use crate::prelude::*;
-use thiserror::Error;
 use beet_common::prelude::*;
+use thiserror::Error;
 
 
 /// Serializable version of an web node that can be rehydrated.
@@ -41,7 +41,7 @@ pub enum RsxTemplateNode {
 	/// Serializable [`WebNode::Component`]
 	/// We dont know much about components, for example when parsing
 	/// a file we just get the name.
-	/// The [NodeSpan] etc is is tracked by the [RustyPart::Component::root]
+	/// The [FileSpan] etc is is tracked by the [RustyPart::Component::root]
 	Component {
 		/// the hydrated part has the juicy details
 		tracker: RustyTracker,
@@ -51,6 +51,7 @@ pub enum RsxTemplateNode {
 		meta: NodeMeta,
 	},
 }
+
 
 pub type TemplateResult<T> = std::result::Result<T, TemplateError>;
 
@@ -73,8 +74,8 @@ pub enum TemplateError {
 		"No template found\nExpected: {expected:#?}\nReceived: {received:#?}"
 	)]
 	NoTemplate {
-		expected: NodeSpan,
-		received: Vec<NodeSpan>,
+		expected: FileSpan,
+		received: Vec<FileSpan>,
 	},
 	#[error(r#"
 `RustyPartMap` is missing a tracker for {cx}
@@ -121,11 +122,11 @@ the syn::parse_file workflow.
 		received: String,
 	},
 	#[error("Location: {location:#?}\nError: {err}")]
-	WithLocation { location: NodeSpan, err: Box<Self> },
+	WithLocation { location: FileSpan, err: Box<Self> },
 }
 
 impl TemplateError {
-	pub fn with_location(self, location: NodeSpan) -> Self {
+	pub fn with_location(self, location: FileSpan) -> Self {
 		Self::WithLocation {
 			location,
 			err: Box::new(self),
@@ -198,6 +199,53 @@ impl RsxTemplateNode {
 			_ => {}
 		}
 	}
+	pub fn visit_mut(&mut self, mut func: impl FnMut(&mut Self)) {
+		self.visit_inner_mut(&mut func);
+	}
+	fn visit_inner_mut(&mut self, func: &mut impl FnMut(&mut Self)) {
+		func(self);
+		match self {
+			RsxTemplateNode::Fragment { items, .. } => {
+				for item in items.iter_mut() {
+					item.visit_inner_mut(func);
+				}
+			}
+			RsxTemplateNode::Component { slot_children, .. } => {
+				slot_children.visit_inner_mut(func);
+			}
+			RsxTemplateNode::Element { children, .. } => {
+				children.visit_inner_mut(func);
+			}
+			_ => {}
+		}
+	}
+	#[cfg(test)]
+	/// When testing for equality sometimes we dont want to
+	/// compare locations and trackers.
+	pub fn without_location_and_trackers(mut self) -> Self {
+		self.remove_location();
+		self.visit_mut(|node| match node {
+			RsxTemplateNode::RustBlock { tracker, .. } => {
+				*tracker = RustyTracker::PLACEHOLDER;
+			}
+			RsxTemplateNode::Component { tracker, .. } => {
+				*tracker = RustyTracker::PLACEHOLDER;
+			}
+			RsxTemplateNode::Element { attributes, .. } => {
+				attributes.iter_mut().for_each(|attr| match attr {
+					RsxTemplateAttribute::Block(tracker) => {
+						*tracker = RustyTracker::PLACEHOLDER
+					}
+					RsxTemplateAttribute::BlockValue { tracker, .. } => {
+						*tracker = RustyTracker::PLACEHOLDER
+					}
+					_ => {}
+				})
+			}
+			_ => {}
+		});
+		self
+	}
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -234,24 +282,25 @@ mod test {
 
 	#[test]
 	fn simple() {
-		let tracker = RustyTracker::new(0, 14909846839018434065);
-		let node = rsx_template! { <div>{value}</div> };
-
-		expect(&node).to_be(&RsxTemplateNode::Element {
-			tag: "div".to_string(),
-			self_closing: false,
-			attributes: vec![],
-			meta: NodeMeta::default(),
-			children: Box::new(RsxTemplateNode::RustBlock {
-				tracker,
-				meta: NodeMeta::default(),
-			}),
-		});
+		rsx_template! { <div>{value}</div> }
+			.without_location_and_trackers()
+			.xpect()
+			.to_be(RsxTemplateNode::Element {
+				tag: "div".to_string(),
+				self_closing: false,
+				attributes: vec![],
+				meta: NodeMeta {
+					template_directives: vec![],
+					location: None,
+				},
+				children: Box::new(RsxTemplateNode::RustBlock {
+					tracker: RustyTracker::PLACEHOLDER,
+					meta: NodeMeta::default(),
+				}),
+			});
 	}
 	#[test]
 	fn complex() {
-		let ident_tracker = RustyTracker::new(0, 6068255516074130633);
-		let component_tracker = RustyTracker::new(1, 10397102694472040927);
 		let template = rsx_template! {
 			<div key str="value" num=32 ident=some_val>
 				<p>
@@ -260,13 +309,16 @@ mod test {
 					</MyComponent>
 				</p>
 			</div>
-		};
+		}
+		.without_location_and_trackers();
 
 		expect(&template).to_be(&RsxTemplateNode::Element {
 			tag: "div".to_string(),
 			self_closing: false,
-			meta: NodeMeta::default(),
-
+			meta: NodeMeta {
+				template_directives: vec![],
+				location: None,
+			},
 			attributes: vec![
 				RsxTemplateAttribute::Key {
 					key: "key".to_string(),
@@ -281,7 +333,7 @@ mod test {
 				},
 				RsxTemplateAttribute::BlockValue {
 					key: "ident".to_string(),
-					tracker: ident_tracker,
+					tracker: RustyTracker::PLACEHOLDER,
 				},
 			],
 			children: Box::new(RsxTemplateNode::Element {
@@ -289,27 +341,22 @@ mod test {
 				self_closing: false,
 				attributes: vec![],
 				meta: NodeMeta::default(),
-
 				children: Box::new(RsxTemplateNode::Fragment {
 					meta: NodeMeta::default(),
-
 					items: vec![
 						RsxTemplateNode::Text {
 							meta: NodeMeta::default(),
-
 							value: "\n\t\t\t\t\thello ".to_string(),
 						},
 						RsxTemplateNode::Component {
 							meta: NodeMeta::default(),
-
-							tracker: component_tracker,
+							tracker: RustyTracker::PLACEHOLDER,
 							tag: "MyComponent".to_string(),
 							slot_children: Box::new(RsxTemplateNode::Element {
 								tag: "div".to_string(),
 								self_closing: false,
 								attributes: vec![],
 								meta: NodeMeta::default(),
-
 								children: Box::new(RsxTemplateNode::Text {
 									value: "some child".to_string(),
 									meta: NodeMeta::default(),
@@ -324,7 +371,6 @@ mod test {
 
 	#[test]
 	fn ron() {
-		// whats this testing? its already ron
 		let template = rsx_template! {
 			<div key str="value" num=32 ident=some_val>
 				<p>
@@ -333,7 +379,8 @@ mod test {
 					</MyComponent>
 				</p>
 			</div>
-		};
+		}
+		.without_location_and_trackers();
 		let template2 = rsx_template! {
 			<div key str="value" num=32 ident=some_val>
 				<p>
@@ -342,7 +389,8 @@ mod test {
 					</MyComponent>
 				</p>
 			</div>
-		};
+		}
+		.without_location_and_trackers();
 		expect(template).to_be(template2);
 	}
 }

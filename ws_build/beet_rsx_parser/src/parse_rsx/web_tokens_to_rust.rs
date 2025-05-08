@@ -146,7 +146,7 @@ impl WebTokensToRust {
 		match attr {
 			// The attribute is a block
 			RsxAttributeTokens::Block { block } => {
-				let tracker = self.rusty_tracker.next_tracker(&block);
+				let tracker = self.rusty_tracker.next_tracker(&block.value);
 				quote! {
 					#ident::parse_attribute_block(
 						#tracker,
@@ -179,7 +179,7 @@ impl WebTokensToRust {
 			// is not an [`Expr::Lit`]
 			RsxAttributeTokens::KeyValue { key, value } => {
 				let key_str = key.to_string();
-				let tracker = self.rusty_tracker.next_tracker(value);
+				let tracker = self.rusty_tracker.next_tracker(&value.value);
 				// we need to handle events at the tokens level for inferred
 				// event types and intellisense.
 				if key_str.starts_with("on") {

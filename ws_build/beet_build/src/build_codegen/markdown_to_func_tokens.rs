@@ -1,6 +1,6 @@
 use crate::prelude::*;
 use anyhow::Result;
-use beet_common::node::NodeSpan;
+use beet_common::node::FileSpan;
 use beet_router::prelude::*;
 use beet_rsx::prelude::*;
 use beet_rsx_parser::prelude::*;
@@ -27,7 +27,7 @@ impl MarkdownToFuncTokens {
 		let rsx_str = ParseMarkdown::markdown_to_rsx_str(markdown);
 		let rust_tokens = rsx_str
 			.xref()
-			.xpipe(StringToWebTokens::new(Some(NodeSpan::new_from_file(
+			.xpipe(StringToWebTokens::new(Some(FileSpan::new_from_file(
 				workspace_path,
 			))))
 			.map_err(|e| {
@@ -135,9 +135,9 @@ val_string	= "foo"
 				meta: NodeMeta {
 					template_directives: vec![],
 					location: Some(
-						NodeSpan::new("ws_build/beet_build/src/build_codegen/markdown_to_func_tokens.rs",
-						1,
-						0
+						FileSpan::new("ws_build/beet_build/src/build_codegen/markdown_to_func_tokens.rs",
+							LineCol::new(1, 0),
+							LineCol::new(1, 0)
 					))
 				},
 			}

@@ -22,7 +22,7 @@ pub struct RsxTemplateMap {
 	// canonicalized [here](ws_rsx/beet_router/src/parser/build_template_map/mod.rs#L110-L111)
 	pub root: WorkspacePathBuf,
 	/// The templates themselves, keyed by their location.
-	pub templates: HashMap<NodeSpan, RsxTemplateNode>,
+	pub templates: HashMap<FileSpan, RsxTemplateNode>,
 }
 
 // TODO use a visitor that doesnt exit early if a parent has no nodes.
@@ -86,7 +86,7 @@ impl RsxTemplateMap {
 				.map_err(|err| err.with_location(location.clone()))?;
 
 			Ok(())
-		} else if location.file.starts_with(&self.root) {
+		} else if location.file().starts_with(&self.root) {
 			Err(TemplateError::NoTemplate {
 				received: self.templates.keys().map(|x| x.clone()).collect(),
 				expected: location.clone(),
@@ -158,7 +158,7 @@ mod test {
 	#[test]
 	fn rsx_template_match_simple() {
 		let some_val = 3;
-		let mut node1 = rsx! {
+		let node1 = rsx! {
 			<div ident=some_val>
 				<div ident=some_val />
 			</div>
@@ -167,20 +167,26 @@ mod test {
 			<div ident=some_val>
 				<div ident=some_val />
 			</div>
-		};
+		}
+		.without_location_and_trackers();
 		expect(&node1.xref().xpipe(NodeToTemplate).unwrap())
 			.not()
 			.to_be(&node2_template);
 
-		node1.remove_location();
-		expect(&node1.xref().xpipe(NodeToTemplate).unwrap())
-			.to_be(&node2_template);
+		expect(
+			&node1
+				.xref()
+				.xpipe(NodeToTemplate)
+				.unwrap()
+				.without_location_and_trackers(),
+		)
+		.to_be(&node2_template);
 	}
 	#[test]
 	fn rsx_template_match_complex() {
 		let some_val = 3;
 
-		let mut node1 = rsx! {
+		let node1 = rsx! {
 			<div key str="value" num=32 ident=some_val onclick=|_| {}>
 				<p>
 					hello <MyComponent style:cascade value=3>
@@ -197,16 +203,20 @@ mod test {
 					</MyComponent>
 				</p>
 			</div>
-		};
+		}
+		.without_location_and_trackers();
 		expect(&node1.xref().xpipe(NodeToTemplate).unwrap())
 			.not()
 			.to_be(&node2_template);
 
-		node1.remove_location();
-		expect(&node1.xref().xpipe(NodeToTemplate).unwrap())
-			.to_be(&node2_template);
+		node1
+			.xref()
+			.xpipe(NodeToTemplate)
+			.unwrap()
+			.without_location_and_trackers()
+			.xpect()
+			.to_be(node2_template);
 	}
-	/// TODO this doesnt test trackers generated via syn::parse which generates whitespace etc differently
 	#[test]
 	fn trackers_match() {
 		let node1 = rsx! {
@@ -231,8 +241,8 @@ mod test {
 		else {
 			panic!();
 		};
-		expect(tracker1.tokens_hash).to_be(4683591200171505408);
-		expect(tracker2.tokens_hash).to_be(12045063164022816694);
+		expect(tracker1.tokens_hash).to_be(18257056885909532015);
+		expect(tracker2.tokens_hash).to_be(13935702536628378751);
 	}
 
 	#[test]
@@ -278,7 +288,7 @@ mod test {
 		expect(comp.clone().xpipe(&map)).to_be_err();
 		// exterior root, ok
 		expect(
-			comp.with_location(NodeSpan::new(
+			comp.with_location(FileSpan::new_with_start(
 				WorkspacePathBuf::new("../"),
 				1,
 				1,

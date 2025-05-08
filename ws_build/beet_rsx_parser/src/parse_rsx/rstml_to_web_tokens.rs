@@ -34,17 +34,17 @@ pub struct RstmlToWebTokens<C = rstml::Infallible> {
 	phantom: std::marker::PhantomData<C>,
 	/// The span of the entry node, this will be taken
 	/// by the first node visited.
-	node_span: Option<NodeSpan>,
+	span: Option<FileSpan>,
 }
 
 impl RstmlToWebTokens {
-	pub fn new(node_span: Option<NodeSpan>) -> Self {
+	pub fn new(span: Option<FileSpan>) -> Self {
 		Self {
 			errors: Vec::new(),
 			collected_elements: Vec::new(),
 			self_closing_elements: self_closing_elements(),
 			phantom: std::marker::PhantomData,
-			node_span,
+			span,
 		}
 	}
 }
@@ -55,8 +55,8 @@ impl<C: CustomNode> Pipeline<Vec<Node<C>>, (WebTokens, Vec<TokenStream>)>
 {
 	fn apply(mut self, nodes: Vec<Node<C>>) -> (WebTokens, Vec<TokenStream>) {
 		let mut node = self.map_nodes(nodes);
-		if let Some(node_span) = self.node_span {
-			node.meta_mut().location = Some(node_span);
+		if let Some(span) = self.span {
+			node.meta_mut().location = Some(span);
 		}
 		(node, self.errors)
 	}

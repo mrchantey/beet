@@ -9,17 +9,17 @@ use syn::visit::Visit;
 
 
 /// For a given rust file, extract all `rsx!` macros and return a vector of
-/// [`NodeSpan`] and [`WebTokens`] pairs.
+/// [`FileSpan`] and [`WebTokens`] pairs.
 pub struct RsToWebTokens;
 
 
-impl Pipeline<WorkspacePathBuf, Result<Vec<(NodeSpan, WebTokens)>>>
+impl Pipeline<WorkspacePathBuf, Result<Vec<(FileSpan, WebTokens)>>>
 	for RsToWebTokens
 {
 	fn apply(
 		self,
 		path: WorkspacePathBuf,
-	) -> Result<Vec<(NodeSpan, WebTokens)>> {
+	) -> Result<Vec<(FileSpan, WebTokens)>> {
 		let file = ReadFile::to_string(path.into_abs_unchecked())?;
 		let file = syn::parse_file(&file)?;
 		let mac = syn::parse_quote!(rsx);
@@ -34,15 +34,15 @@ impl Pipeline<WorkspacePathBuf, Result<Vec<(NodeSpan, WebTokens)>>>
 
 
 
-/// Visit a file, extracting an [`NodeSpan`] and [`RsxTemplateNode`] for each
+/// Visit a file, extracting an [`FileSpan`] and [`RsxTemplateNode`] for each
 /// `rsx!` macro in the file.
 #[derive(Debug)]
 struct RsxSynVisitor {
-	/// Used for creating [`NodeSpan`] in several places.
+	/// Used for creating [`FileSpan`] in several places.
 	/// We must use workspace relative paths because locations are created
 	/// via the `file!()` macro.
 	file: WorkspacePathBuf,
-	templates: Vec<(NodeSpan, WebTokens)>,
+	templates: Vec<(FileSpan, WebTokens)>,
 	mac: syn::Ident,
 }
 impl RsxSynVisitor {
@@ -66,7 +66,7 @@ impl<'a> Visit<'a> for RsxSynVisitor {
 			// use the span of the inner tokens to match the behavior of
 			// the rsx! macro
 			let span = mac.tokens.span();
-			let loc = NodeSpan::new_from_span_start(self.file.clone(), &span);
+			let loc = FileSpan::new_from_span(self.file.clone(), &span);
 			let web_tokens = mac
 				.tokens
 				.clone()

@@ -1,10 +1,9 @@
-use super::Spanner;
 use super::WebTokens;
 use anyhow::Result;
+use beet_common::node::FileSpan;
 use lightningcss::stylesheet::ParserOptions;
 use lightningcss::stylesheet::StyleSheet;
 use sweet::prelude::Pipeline;
-use syn::spanned::Spanned;
 pub struct ValidateStyleNode;
 
 impl Pipeline<WebTokens, Result<WebTokens>> for ValidateStyleNode {
@@ -18,7 +17,12 @@ impl Pipeline<WebTokens, Result<WebTokens>> for ValidateStyleNode {
 			} if component.tag.to_string() == "style"
 				&& let WebTokens::Text { value, .. } = &**children =>
 			{
-				validate_css(&value.value.value(), &value)
+				let span = component
+					.meta
+					.location
+					.as_ref()
+					.expect("todo all components have spans");
+				validate_css(&value.value(), span)
 			}
 			_ => Ok(()),
 		})?;
@@ -26,27 +30,25 @@ impl Pipeline<WebTokens, Result<WebTokens>> for ValidateStyleNode {
 	}
 }
 
-pub fn validate_css<'a, T: Spanned>(
-	val: &'a str,
-	source: &Spanner<T>,
-) -> Result<()> {
+pub fn validate_css(val: &str, span: &FileSpan) -> Result<()> {
 	let val = val.replace(".em", "em");
 	StyleSheet::parse(&val, ParserOptions::default())
 		.map(|_| ())
 		.map_err(|err| {
-			let mut linecol = source.start();
+			let mut line = span.start_line();
+			let mut column = span.start_col();
 			// attempt to find error location probs wrong but best we can do i guess
 			// remember proc_macro lines are 1 based, lightningcss is 0 based
 			if let Some(err_loc) = err.loc {
-				linecol.line += err_loc.line as usize;
+				line += err_loc.line;
 				if err_loc.line == 0 {
-					linecol.column += err_loc.column as usize;
+					column += err_loc.column;
 				}
 			}
 			anyhow::anyhow!(
 				"CSS Error at approx ({}:{}): {}",
-				linecol.line,
-				linecol.column,
+				line,
+				column,
 				err.kind.to_string()
 			)
 		})
@@ -57,16 +59,13 @@ pub fn validate_css<'a, T: Spanned>(
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
+	use beet_common::node::FileSpan;
 	use sweet::prelude::*;
-	use syn::LitStr;
 
 	#[test]
 	fn works() {
-		expect(validate_css(
-			"body { color: red; }",
-			&Spanner::<LitStr>::new(syn::parse_quote!("foo")),
-		))
-		.to_be_ok();
+		expect(validate_css("body { color: red; }", &FileSpan::default()))
+			.to_be_ok();
 		// expect(validate_css("//dsds", TokenStream::default()))
 		// 	.to_be_ok();
 		// expect(

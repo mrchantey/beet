@@ -12,11 +12,11 @@ use syn::LitStr;
 /// For a given string of rsx, use [`beet_rsx_combinator`] to parse.
 #[derive(Debug, Default)]
 pub struct StringToWebTokens {
-	node_span: Option<NodeSpan>,
+	span: Option<FileSpan>,
 }
 
 impl StringToWebTokens {
-	pub fn new(node_span: Option<NodeSpan>) -> Self { Self { node_span } }
+	pub fn new(span: Option<FileSpan>) -> Self { Self { span } }
 }
 
 impl<T: AsRef<str>> Pipeline<T, Result<WebTokens>> for StringToWebTokens {
@@ -31,8 +31,8 @@ impl<T: AsRef<str>> Pipeline<T, Result<WebTokens>> for StringToWebTokens {
 			));
 		}
 		let mut tokens = expr.into_web_tokens()?;
-		if let Some(node_span) = self.node_span {
-			tokens.meta_mut().location = Some(node_span);
+		if let Some(span) = self.span {
+			tokens.meta_mut().location = Some(span);
 		}
 		Ok(tokens)
 	}

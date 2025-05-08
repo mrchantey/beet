@@ -152,10 +152,11 @@ mod test {
 		let map = builder.build_template_map().unwrap();
 
 		// println!("wrote to {}\n{:#?}", builder.dst.display(), map);
-		// println!("TEMPLATE_MAP::::{:#?}", map);
 
 		let rsx = &beet_router::test_site::pages::collect()[0];
 		let node = (rsx.func)().await.unwrap();
+		// println!("Template Map: {:#?}", map);
+		// println!("location: {:#?}", node.location());
 		let node1 = map.templates.get(&node.location().unwrap()).unwrap();
 		let RsxTemplateNode::Component {
 			tracker: tracker1, ..

@@ -1,5 +1,4 @@
 #![feature(proc_macro_span)]
-use beet_common::node::NodeSpan;
 use beet_rsx_parser::prelude::*;
 use proc_macro::TokenStream;
 use syn::DeriveInput;
@@ -16,8 +15,8 @@ use sweet::prelude::*;
 ///
 #[proc_macro]
 pub fn rsx(tokens: TokenStream) -> TokenStream {
-	let node_span = tokens_node_span(&tokens);
-	tokens.xpipe(RsxMacroPipeline::new(node_span)).into()
+	let source_file = source_file(&tokens);
+	tokens.xpipe(RsxMacroPipeline::new(source_file)).into()
 }
 
 /// Mostly used for testing,
@@ -25,9 +24,9 @@ pub fn rsx(tokens: TokenStream) -> TokenStream {
 /// things like hot reloading.
 #[proc_macro]
 pub fn rsx_template(tokens: TokenStream) -> TokenStream {
-	let node_span = tokens_node_span(&tokens);
+	let source_file = source_file(&tokens);
 	tokens
-		.xpipe(RsxTemplateMacroPipeline::new(node_span))
+		.xpipe(RsxTemplateMacroPipeline::new(source_file))
 		.into()
 }
 
@@ -74,17 +73,12 @@ pub fn derive_into_block_attribute(
 }
 
 
-/// For a token stream create the [`NodeSpan`] using its location.
-fn tokens_node_span(tokens: &proc_macro::TokenStream) -> Option<NodeSpan> {
+/// For a token stream create the [`FileSpan`] using its location.
+fn source_file(tokens: &proc_macro::TokenStream) -> Option<WorkspacePathBuf> {
 	// cloning is cheap, its an immutable arc
-	tokens.clone().into_iter().next().map(|token| {
-		let span = token.span();
-		let start = span.start();
-		let line = start.line();
-		// proc_macro::column is 1 indexed whereas
-		// proc_macro2::column is 0 indexed
-		let col = start.column().saturating_sub(1);
-		let file = span.source_file().path();
-		NodeSpan::new(file, line as u32, col as u32)
-	})
+	tokens
+		.clone()
+		.into_iter()
+		.next()
+		.map(|token| WorkspacePathBuf::new(token.span().source_file().path()))
 }
