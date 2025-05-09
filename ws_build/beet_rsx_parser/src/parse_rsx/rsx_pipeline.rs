@@ -7,11 +7,11 @@ use sweet::prelude::*;
 
 #[derive(Default)]
 pub struct RsxMacroPipeline {
-	pub source_file: Option<WorkspacePathBuf>,
+	pub source_file: WorkspacePathBuf,
 	pub no_errors: bool,
 }
 impl RsxMacroPipeline {
-	pub fn new(source_file: Option<WorkspacePathBuf>) -> Self {
+	pub fn new(source_file: WorkspacePathBuf) -> Self {
 		Self {
 			source_file,
 			no_errors: false,
@@ -26,11 +26,9 @@ impl RsxMacroPipeline {
 impl<T: Into<TokenStream>> Pipeline<T, TokenStream> for RsxMacroPipeline {
 	fn apply(self, tokens: T) -> TokenStream {
 		let tokens: TokenStream = tokens.into();
-		let span = self
-			.source_file
-			.map(|file| FileSpan::new_from_span(file, &tokens));
 		let (rstml, rstml_errors) = tokens.xpipe(TokensToRstml::default());
-		let (html, html_errors) = rstml.xpipe(RstmlToWebTokens::new(span));
+		let (html, html_errors) =
+			rstml.xpipe(RstmlToWebTokens::new(self.source_file));
 		let block = match html.xpipe(ParseWebTokens::default()) {
 			Ok(val) => val.xpipe(WebTokensToRust::default()),
 			Err(err) => {
@@ -54,12 +52,10 @@ impl<T: Into<TokenStream>> Pipeline<T, TokenStream> for RsxMacroPipeline {
 
 #[derive(Default)]
 pub struct RsxTemplateMacroPipeline {
-	pub source_file: Option<WorkspacePathBuf>,
+	pub source_file: WorkspacePathBuf,
 }
 impl RsxTemplateMacroPipeline {
-	pub fn new(source_file: Option<WorkspacePathBuf>) -> Self {
-		Self { source_file }
-	}
+	pub fn new(source_file: WorkspacePathBuf) -> Self { Self { source_file } }
 }
 
 impl<T: Into<TokenStream>> Pipeline<T, TokenStream>
@@ -67,15 +63,12 @@ impl<T: Into<TokenStream>> Pipeline<T, TokenStream>
 {
 	fn apply(self, value: T) -> TokenStream {
 		let tokens: TokenStream = value.into();
-		let span = self
-			.source_file
-			.map(|file| FileSpan::new_from_span(file, &tokens));
 
 		tokens
 			// .xpipe(RsxRonPipeline::new(span))
 			.xpipe(TokensToRstml::default())
 			.0
-			.xpipe(RstmlToWebTokens::new(span))
+			.xpipe(RstmlToWebTokens::new(self.source_file))
 			.0
 			.xpipe(ParseWebTokens::default())
 			.map(|tokens| tokens.xpipe(WebTokensToRon::default()))
@@ -98,12 +91,10 @@ impl<T: Into<TokenStream>> Pipeline<T, TokenStream>
 pub struct ParsedWebTokensPipeline {
 	/// ideally we'd get this from proc_macro2::Span::source_file
 	/// but thats not yet supported
-	pub source_file: Option<WorkspacePathBuf>,
+	pub source_file: WorkspacePathBuf,
 }
 impl ParsedWebTokensPipeline {
-	pub fn new(source_file: Option<WorkspacePathBuf>) -> Self {
-		Self { source_file }
-	}
+	pub fn new(source_file: WorkspacePathBuf) -> Self { Self { source_file } }
 }
 
 impl<T: Into<TokenStream>> Pipeline<T, TokenStream>
@@ -111,19 +102,16 @@ impl<T: Into<TokenStream>> Pipeline<T, TokenStream>
 {
 	fn apply(self, value: T) -> TokenStream {
 		let tokens: TokenStream = value.into();
-		let span = self
-			.source_file
-			.map(|file| FileSpan::new_from_span(file, &tokens));
 
 		tokens
 			.xpipe(TokensToRstml::default())
 			.0
-			.xpipe(RstmlToWebTokens::new(span))
+			.xpipe(RstmlToWebTokens::new(self.source_file))
 			.0
 			.xpipe(ParseWebTokens::default())
 			.map(|tokens| {
 				let tokens = tokens.into_rust_tokens();
-				quote! {{	
+				quote! {{
 					use beet::prelude::*;
 					#tokens
 				}}
@@ -160,7 +148,7 @@ mod test {
 		expect(
 			quote! {<div client:load/>}
 				.xpipe(
-					RsxMacroPipeline::new(Some(WorkspacePathBuf::new(file!())))
+					RsxMacroPipeline::new(WorkspacePathBuf::new(file!()))
 						.no_errors(),
 				)
 				.to_string(),
@@ -175,23 +163,24 @@ mod test {
 					children: Box::new(
 							RsxFragment {
 						nodes: vec![],
-						meta: NodeMeta {
-							template_directives: vec![],
-							location: None
-					},
+						meta: NodeMeta::new(
+							FileSpan::new("ws_build/beet_rsx_parser/src/parse_rsx/rsx_pipeline.rs",
+								LineCol::new(1, 0), 
+								LineCol::new(1, 0))
+								, vec![]
+							),
 							}.into_node()
 					),
 					self_closing: true,
-					meta: NodeMeta {
-							template_directives: vec![TemplateDirective::ClientLoad],
-							location: Some (
-								FileSpan::new(
-									"ws_build/beet_rsx_parser/src/parse_rsx/rsx_pipeline.rs",
-									LineCol::new(1, 0),
-									LineCol::new(1, 0)
-								)
-							)
-						},
+					meta: NodeMeta::new(
+						FileSpan::new("ws_build/beet_rsx_parser/src/parse_rsx/rsx_pipeline.rs",
+							LineCol::new(1, 0), 
+							LineCol::new(1, 0))
+							, vec![
+								TemplateDirective::RsxTemplate, 
+								TemplateDirective::ClientLoad
+							]
+						),
 					}
 					.into_node()
 			}}

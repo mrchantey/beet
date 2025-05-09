@@ -210,7 +210,12 @@ impl WebTokensToRust {
 		component: ElementTokens,
 		children: WebTokens,
 	) -> TokenStream {
-		let tracker = self.rusty_tracker.next_tracker(&component);
+		// dont hash the span
+		let tracker = self.rusty_tracker.next_tracker((
+			&component.attributes,
+			// dont hash the span
+			component.meta.directives(),
+		));
 		let ElementTokens {
 			tag,
 			attributes,

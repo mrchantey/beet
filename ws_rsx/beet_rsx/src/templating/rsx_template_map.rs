@@ -71,27 +71,25 @@ impl RsxTemplateMap {
 	}
 
 	fn apply_template(&self, node: &mut WebNode) -> TemplateResult<()> {
-		let Some(location) = node.location().cloned() else {
-			// if the node doesnt have a location we dont even try to apply a template
+		if !node.is_template() {
 			return Ok(());
-		};
-
-
+		}
+		let span = node.span().clone();
 		// println!("applying template to node: {}", node.location_str());
 
-		if let Some(template) = self.templates.get(&location) {
+		if let Some(template) = self.templates.get(&span) {
 			// clone because multiple nodes may have the same location
 			*node = (std::mem::take(node), template.clone())
 				.xpipe(ApplyTemplateToNode)
-				.map_err(|err| err.with_location(location.clone()))?;
+				.map_err(|err| err.with_location(span.clone()))?;
 
 			Ok(())
-		} else if location.file().starts_with(&self.root) {
+		} else if span.file().starts_with(&self.root) {
 			Err(TemplateError::NoTemplate {
 				received: self.templates.keys().map(|x| x.clone()).collect(),
-				expected: location.clone(),
+				expected: span.clone(),
 			}
-			.with_location(location.clone()))
+			.with_location(span.clone()))
 		} else {
 			// println!(
 			// 	"web node is outside templates dir so no template will be applied:\n{:?}",
@@ -118,9 +116,9 @@ mod test {
 			root: WorkspacePathBuf::new(file!()),
 			templates: templates
 				.into_iter()
-				.filter_map(|node| match node.location() {
-					Some(location) => Some((location.clone(), node)),
-					None => None,
+				.filter_map(|node| match node.is_template() {
+					true => Some((node.span().clone(), node)),
+					false => None,
 				})
 				.collect(),
 		}
@@ -168,7 +166,7 @@ mod test {
 				<div ident=some_val />
 			</div>
 		}
-		.without_location_and_trackers();
+		.reset_meta_and_trackers();
 		expect(&node1.xref().xpipe(NodeToTemplate).unwrap())
 			.not()
 			.to_be(&node2_template);
@@ -178,7 +176,7 @@ mod test {
 				.xref()
 				.xpipe(NodeToTemplate)
 				.unwrap()
-				.without_location_and_trackers(),
+				.reset_meta_and_trackers(),
 		)
 		.to_be(&node2_template);
 	}
@@ -204,7 +202,7 @@ mod test {
 				</p>
 			</div>
 		}
-		.without_location_and_trackers();
+		.reset_meta_and_trackers();
 		expect(&node1.xref().xpipe(NodeToTemplate).unwrap())
 			.not()
 			.to_be(&node2_template);
@@ -213,7 +211,7 @@ mod test {
 			.xref()
 			.xpipe(NodeToTemplate)
 			.unwrap()
-			.without_location_and_trackers()
+			.reset_meta_and_trackers()
 			.xpect()
 			.to_be(node2_template);
 	}
@@ -289,7 +287,7 @@ mod test {
 		expect(comp.clone().xpipe(&map)).to_be_err();
 		// exterior root, ok
 		expect(
-			comp.with_location(FileSpan::new_with_start(
+			comp.with_span(FileSpan::new_with_start(
 				WorkspacePathBuf::new("../"),
 				1,
 				1,

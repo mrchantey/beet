@@ -1,5 +1,6 @@
 use crate::prelude::*;
 use beet_common::prelude::*;
+use proc_macro2::Span;
 use proc_macro2::TokenStream;
 use proc_macro2_diagnostics::Diagnostic;
 use proc_macro2_diagnostics::Level;
@@ -12,6 +13,7 @@ use rstml::node::NodeFragment;
 use rstml::node::NodeName;
 use std::collections::HashSet;
 use sweet::prelude::Pipeline;
+use sweet::prelude::WorkspacePathBuf;
 use syn::LitStr;
 use syn::spanned::Spanned;
 
@@ -34,17 +36,17 @@ pub struct RstmlToWebTokens<C = rstml::Infallible> {
 	phantom: std::marker::PhantomData<C>,
 	/// The span of the entry node, this will be taken
 	/// by the first node visited.
-	span: Option<FileSpan>,
+	file: WorkspacePathBuf,
 }
 
 impl RstmlToWebTokens {
-	pub fn new(span: Option<FileSpan>) -> Self {
+	pub fn new(file: WorkspacePathBuf) -> Self {
 		Self {
 			errors: Vec::new(),
 			collected_elements: Vec::new(),
 			self_closing_elements: self_closing_elements(),
 			phantom: std::marker::PhantomData,
-			span,
+			file,
 		}
 	}
 }
@@ -55,9 +57,7 @@ impl<C: CustomNode> Pipeline<Vec<Node<C>>, (WebTokens, Vec<TokenStream>)>
 {
 	fn apply(mut self, nodes: Vec<Node<C>>) -> (WebTokens, Vec<TokenStream>) {
 		let mut node = self.map_nodes(nodes);
-		if let Some(span) = self.span {
-			node.meta_mut().location = Some(span);
-		}
+		node.push_directive(TemplateDirective::RsxTemplate);
 		(node, self.errors)
 	}
 }
@@ -73,9 +73,11 @@ impl<C: CustomNode> RstmlToWebTokens<C> {
 		if nodes.len() == 1 {
 			nodes.pop().unwrap()
 		} else {
+			let (start, end) = LineCol::iter_to_spans(&nodes);
+
 			WebTokens::Fragment {
 				nodes,
-				meta: NodeMeta::default(),
+				meta: FileSpan::new(self.file.clone(), start, end).into(),
 			}
 		}
 	}
@@ -83,33 +85,34 @@ impl<C: CustomNode> RstmlToWebTokens<C> {
 	fn map_node(&mut self, node: Node<C>) -> WebTokens {
 		match node {
 			Node::Doctype(node) => WebTokens::Doctype {
+				meta: FileSpan::new_from_span(self.file.clone(), &node).into(),
 				value: node.token_start.token_lt.into(),
-				meta: NodeMeta::default(),
 			},
 			Node::Comment(node) => WebTokens::Comment {
+				meta: FileSpan::new_from_span(self.file.clone(), &node).into(),
 				value: node.value.into(),
-				meta: NodeMeta::default(),
 			},
 			Node::Text(node) => WebTokens::Text {
+				meta: FileSpan::new_from_span(self.file.clone(), &node).into(),
 				value: node.value.into(),
-				meta: NodeMeta::default(),
 			},
 			Node::RawText(node) => WebTokens::Text {
+				meta: FileSpan::new_from_span(self.file.clone(), &node).into(),
 				value: LitStr::new(&node.to_string_best(), node.span()).into(),
-				meta: NodeMeta::default(),
 			},
 			Node::Fragment(NodeFragment { children, .. }) => {
+				let (start, end) = LineCol::syn_iter_to_spans(&children);
 				WebTokens::Fragment {
 					nodes: children
 						.into_iter()
 						.map(|n| self.map_node(n))
 						.collect(),
-					meta: NodeMeta::default(),
+					meta: FileSpan::new(self.file.clone(), start, end).into(),
 				}
 			}
 			Node::Block(NodeBlock::ValidBlock(node)) => WebTokens::Block {
+				meta: FileSpan::new_from_span(self.file.clone(), &node).into(),
 				value: node.into(),
-				meta: NodeMeta::default(),
 			},
 			Node::Block(NodeBlock::Invalid(invalid)) => {
 				self.errors.push(
@@ -130,6 +133,13 @@ impl<C: CustomNode> RstmlToWebTokens<C> {
 					children,
 					close_tag,
 				} = el;
+				let (start, end) = LineCol::syn_iter_to_spans(&[
+					open_tag.span(),
+					close_tag
+						.as_ref()
+						.map(|t| t.span())
+						.unwrap_or(Span::call_site()),
+				]);
 
 				self.collected_elements.push(open_tag.name.clone());
 				let self_closing = close_tag.is_none();
@@ -148,7 +158,8 @@ impl<C: CustomNode> RstmlToWebTokens<C> {
 					component: ElementTokens {
 						tag: self.map_node_name(&open_tag.name),
 						attributes,
-						meta: NodeMeta::default(),
+						meta: FileSpan::new(self.file.clone(), start, end)
+							.into(),
 					},
 					children: Box::new(self.map_nodes(children)),
 				}

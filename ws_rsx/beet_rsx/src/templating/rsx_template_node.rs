@@ -121,7 +121,7 @@ the syn::parse_file workflow.
 		expected: &'static str,
 		received: String,
 	},
-	#[error("Location: {location:#?}\nError: {err}")]
+	#[error("Location: {location}\nError: {err}")]
 	WithLocation { location: FileSpan, err: Box<Self> },
 }
 
@@ -222,27 +222,29 @@ impl RsxTemplateNode {
 	#[cfg(test)]
 	/// When testing for equality sometimes we dont want to
 	/// compare locations and trackers.
-	pub fn without_location_and_trackers(mut self) -> Self {
-		self.remove_location();
-		self.visit_mut(|node| match node {
-			RsxTemplateNode::RustBlock { tracker, .. } => {
-				*tracker = RustyTracker::PLACEHOLDER;
+	pub fn reset_meta_and_trackers(mut self) -> Self {
+		self.visit_mut(|node| {
+			*node.meta_mut() = NodeMeta::default();
+			match node {
+				RsxTemplateNode::RustBlock { tracker, .. } => {
+					*tracker = RustyTracker::PLACEHOLDER;
+				}
+				RsxTemplateNode::Component { tracker, .. } => {
+					*tracker = RustyTracker::PLACEHOLDER;
+				}
+				RsxTemplateNode::Element { attributes, .. } => {
+					attributes.iter_mut().for_each(|attr| match attr {
+						RsxTemplateAttribute::Block(tracker) => {
+							*tracker = RustyTracker::PLACEHOLDER
+						}
+						RsxTemplateAttribute::BlockValue {
+							tracker, ..
+						} => *tracker = RustyTracker::PLACEHOLDER,
+						_ => {}
+					})
+				}
+				_ => {}
 			}
-			RsxTemplateNode::Component { tracker, .. } => {
-				*tracker = RustyTracker::PLACEHOLDER;
-			}
-			RsxTemplateNode::Element { attributes, .. } => {
-				attributes.iter_mut().for_each(|attr| match attr {
-					RsxTemplateAttribute::Block(tracker) => {
-						*tracker = RustyTracker::PLACEHOLDER
-					}
-					RsxTemplateAttribute::BlockValue { tracker, .. } => {
-						*tracker = RustyTracker::PLACEHOLDER
-					}
-					_ => {}
-				})
-			}
-			_ => {}
 		});
 		self
 	}
@@ -283,16 +285,13 @@ mod test {
 	#[test]
 	fn simple() {
 		rsx_template! { <div>{value}</div> }
-			.without_location_and_trackers()
+			.reset_meta_and_trackers()
 			.xpect()
 			.to_be(RsxTemplateNode::Element {
 				tag: "div".to_string(),
 				self_closing: false,
 				attributes: vec![],
-				meta: NodeMeta {
-					template_directives: vec![],
-					location: None,
-				},
+				meta: NodeMeta::default(),
 				children: Box::new(RsxTemplateNode::RustBlock {
 					tracker: RustyTracker::PLACEHOLDER,
 					meta: NodeMeta::default(),
@@ -310,15 +309,12 @@ mod test {
 				</p>
 			</div>
 		}
-		.without_location_and_trackers();
+		.reset_meta_and_trackers();
 
 		expect(&template).to_be(&RsxTemplateNode::Element {
 			tag: "div".to_string(),
 			self_closing: false,
-			meta: NodeMeta {
-				template_directives: vec![],
-				location: None,
-			},
+			meta: NodeMeta::default(),
 			attributes: vec![
 				RsxTemplateAttribute::Key {
 					key: "key".to_string(),
@@ -380,7 +376,7 @@ mod test {
 				</p>
 			</div>
 		}
-		.without_location_and_trackers();
+		.reset_meta_and_trackers();
 		let template2 = rsx_template! {
 			<div key str="value" num=32 ident=some_val>
 				<p>
@@ -390,7 +386,7 @@ mod test {
 				</p>
 			</div>
 		}
-		.without_location_and_trackers();
+		.reset_meta_and_trackers();
 		expect(template).to_be(template2);
 	}
 }

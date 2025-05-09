@@ -72,8 +72,11 @@ impl WebTokensToRon {
 				if tag.as_str().starts_with(|c: char| c.is_uppercase()) {
 					// components disregard all the context and rely on the tracker
 					// we rely on the hydrated node to provide the attributes and children
-					let tracker =
-						self.rusty_tracker.next_tracker_ron(&component);
+					let tracker = self.rusty_tracker.next_tracker_ron((
+						&component.attributes,
+						// dont hash the span
+						component.meta.directives(),
+					));
 					let slot_children = self.map_node(*children);
 					quote! { Component (
 						tracker: #tracker,

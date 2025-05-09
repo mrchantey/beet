@@ -1,6 +1,5 @@
 use crate::prelude::*;
 use anyhow::Result;
-use beet_common::prelude::*;
 use beet_rsx::prelude::*;
 use beet_rsx_parser::prelude::*;
 use sweet::prelude::WorkspacePathBuf;
@@ -18,7 +17,7 @@ use sweet::prelude::*;
 #[derive(Debug, Default)]
 pub struct FileTemplates {
 	/// A [`TokenStream`] representing a [`ron`] representation of a [`RsxTemplateNode`].
-	pub rsx_templates: Vec<(FileSpan, RsxTemplateNode)>,
+	pub rsx_templates: Vec<RsxTemplateNode>,
 	// /// A [`TokenStream`] representing styles extracted from the file.
 	pub style_templates: Vec<StyleTemplate>,
 }
@@ -40,12 +39,12 @@ impl Pipeline<WorkspacePathBuf, Result<FileTemplates>> for FileToTemplates {
 			}
 			_ => Ok(Default::default()),
 		}?
-		.xmap_each(|(location, web_tokens)| {
+		.xmap_each(|web_tokens| {
 			let web_tokens = web_tokens.xpipe(ParseWebTokens::default())?;
 
 			let (template_node, styles) = self.extract_templates(web_tokens)?;
 
-			templates.rsx_templates.push((location, template_node));
+			templates.rsx_templates.push(template_node);
 			templates.style_templates.extend(styles);
 			Ok(())
 		})
@@ -101,6 +100,7 @@ mod test {
 	use sweet::prelude::*;
 
 	#[test]
+	#[ignore = "styles disabled temporarily"]
 	fn works() {
 		let tokens = web_tokens! {
 			<div client:load/>

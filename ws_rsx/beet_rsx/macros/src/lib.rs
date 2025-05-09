@@ -82,11 +82,12 @@ pub fn derive_into_block_attribute(
 /// For a token stream create the [`FileSpan`] using its location.
 /// we'll get this from proc_macro2::Span::source_file, when this issue resolves:
 /// https://github.com/dtolnay/proc-macro2/issues/499
-fn source_file(tokens: &proc_macro::TokenStream) -> Option<WorkspacePathBuf> {
+fn source_file(tokens: &proc_macro::TokenStream) -> WorkspacePathBuf {
 	// cloning is cheap, its an immutable arc
 	tokens
 		.clone()
 		.into_iter()
 		.next()
 		.map(|token| WorkspacePathBuf::new(token.span().source_file().path()))
+		.unwrap_or_default()
 }

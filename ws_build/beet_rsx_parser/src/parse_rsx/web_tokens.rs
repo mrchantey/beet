@@ -59,6 +59,7 @@ impl Default for WebTokens {
 		}
 	}
 }
+
 impl GetNodeMeta for WebTokens {
 	fn meta(&self) -> &NodeMeta {
 		match self {

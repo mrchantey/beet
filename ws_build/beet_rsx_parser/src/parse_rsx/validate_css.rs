@@ -1,6 +1,6 @@
 use super::WebTokens;
 use anyhow::Result;
-use beet_common::node::FileSpan;
+use beet_common::prelude::*;
 use lightningcss::stylesheet::ParserOptions;
 use lightningcss::stylesheet::StyleSheet;
 use sweet::prelude::Pipeline;
@@ -17,11 +17,7 @@ impl Pipeline<WebTokens, Result<WebTokens>> for ValidateStyleNode {
 			} if component.tag.value() == "style"
 				&& let WebTokens::Text { value, .. } = &**children =>
 			{
-				let span = component
-					.meta
-					.location
-					.as_ref()
-					.expect("todo all components have spans");
+				let span = component.span();
 				validate_css(&value.value(), span)
 			}
 			_ => Ok(()),

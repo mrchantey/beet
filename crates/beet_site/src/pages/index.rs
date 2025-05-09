@@ -24,7 +24,7 @@ pub fn get() -> WebNode {
 					class="primary-action"
 					href=paths::docs::index()
 					style:cascade
-					>Get Started</Link>
+					>Get Started woot</Link>
 				<Counter client:load initial=1 />
 				<Calculator client:load initial=1 />
 				</div>

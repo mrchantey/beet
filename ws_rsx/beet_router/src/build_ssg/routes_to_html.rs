@@ -24,13 +24,7 @@ impl Pipeline<Vec<(RouteInfo, WebNode)>, Result<Vec<(RouteInfo, HtmlDocument)>>>
 				// we already warned otherwise
 
 				// TODO proper error handling
-				let path = if let Some(loc) = root.location() {
-					loc.file().as_path()
-				} else {
-					route.path.as_path()
-				}
-				.display()
-				.to_string();
+				let path = root.span().to_string();
 
 				let doc =
 					root.xpipe(RsxToHtmlDocument::default()).map_err(|e| {

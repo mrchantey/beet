@@ -15,10 +15,7 @@ impl IntoWebNode for Style {
 			attributes: Default::default(),
 			self_closing: false,
 			children: Box::new(self.css.into_node()),
-			meta: NodeMeta {
-				template_directives: self.directives,
-				location: Default::default(),
-			},
+			meta: NodeMeta::new(FileSpan::default(), self.directives),
 		}
 		.into_node()
 	}

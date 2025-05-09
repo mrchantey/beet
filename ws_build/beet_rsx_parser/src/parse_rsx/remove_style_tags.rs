@@ -8,6 +8,7 @@ use sweet::prelude::*;
 
 /// Remove the contents of `<style>` tags and replace them with a
 /// [`TemplateDirective::StylePlaceholder`].
+// deprecated this, it happens in extractor now
 pub struct RemoveStyleTags;
 
 impl Pipeline<WebTokens, WebTokens> for RemoveStyleTags {
@@ -26,7 +27,7 @@ impl Pipeline<WebTokens, WebTokens> for RemoveStyleTags {
 						std::mem::take(children);
 
 						*self_closing = true;
-						component.meta.template_directives.push(
+						component.meta.push_directive(
 							TemplateDirective::StylePlaceholder {
 								content_hash,
 							},

@@ -1,5 +1,4 @@
 use anyhow::Result;
-use beet_common::prelude::*;
 use beet_rsx::prelude::*;
 use beet_rsx_parser::prelude::*;
 use sweet::prelude::ReadFile;
@@ -14,22 +13,19 @@ use crate::utils::ParseMarkdown;
 pub struct MdToWebTokens;
 
 
-impl Pipeline<WorkspacePathBuf, Result<(FileSpan, WebTokens)>>
-	for MdToWebTokens
-{
-	fn apply(self, path: WorkspacePathBuf) -> Result<(FileSpan, WebTokens)> {
-		let span = FileSpan::new_for_file(&path);
+impl Pipeline<WorkspacePathBuf, Result<WebTokens>> for MdToWebTokens {
+	fn apply(self, path: WorkspacePathBuf) -> Result<WebTokens> {
 		let file = ReadFile::to_string(path.into_abs_unchecked())?;
 		let web_tokens = ParseMarkdown::markdown_to_rsx_str(&file)
-			.xpipe(StringToWebTokens::new(Some(span.clone())))
+			.xpipe(StringToWebTokens::new(path.clone()))
 			.map_err(|e| {
 				anyhow::anyhow!(
 					"Failed to parse Markdown HTML\nPath: {}\nError: {}",
-					span.file().display(),
+					path.display(),
 					e
 				)
 			})?;
-		Ok((span, web_tokens))
+		Ok(web_tokens)
 	}
 }
 

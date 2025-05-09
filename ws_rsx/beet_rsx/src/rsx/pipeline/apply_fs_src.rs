@@ -33,20 +33,13 @@ impl ApplyFsSrc {
 	/// apply to a root without recursing into components
 	fn apply_to_node(&self, node: &mut WebNode) -> Result<()> {
 		let mut result = Ok(());
-		let location = node.location().cloned();
 		VisitRsxElementMut::walk_with_opts(
 			node,
 			VisitRsxOptions::ignore_component_node(),
 			|el| {
 				if let Some(src) = el.src_directive() {
-					let Some(location) = &location else {
-						result = Err(anyhow::anyhow!(
-							"elements with an fs src attribute must have a RootNode::location. This is set by default in rsx! macros"
-						));
-						return;
-					};
-
-					let workspace_path = location
+					let workspace_path = el
+						.span()
 						.file()
 						.parent()
 						.unwrap_or(&Path::new(""))

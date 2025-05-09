@@ -1,5 +1,6 @@
 use crate::prelude::*;
 use anyhow::Result;
+use beet_common::prelude::*;
 use beet_router::prelude::*;
 use beet_rsx::prelude::*;
 use clap::Parser;
@@ -86,8 +87,8 @@ impl BuildTemplateMap {
 			.collect::<Result<Vec<_>>>()?
 			.into_iter()
 			.fold(RapidHashMap::default(), |mut acc, file| {
-				for (location, template) in file.rsx_templates {
-					acc.insert(location, template);
+				for template in file.rsx_templates {
+					acc.insert(template.span().clone(), template);
 				}
 				acc
 			});
@@ -157,7 +158,7 @@ mod test {
 		let node = (rsx.func)().await.unwrap();
 		// println!("Template Map: {:#?}", map);
 		// println!("location: {:#?}", node.location());
-		let node1 = map.templates.get(&node.location().unwrap()).unwrap();
+		let node1 = map.templates.get(&node.span()).unwrap();
 		let RsxTemplateNode::Component {
 			tracker: tracker1, ..
 		} = &node1

@@ -7,6 +7,13 @@ use super::StyleScope;
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum TemplateDirective {
+	/// The entry point for an rsx template. This is set by default on all
+	/// root nodes.
+	/// ## Example
+	/// ```rust ignore
+	/// <div is:template />
+	/// ```
+	RsxTemplate,
 	/// Indicates that a component should be rendered in html, and also
 	/// hydrated on the client. This is the `client islands architecture` used
 	/// by frameworks like astro.
@@ -161,6 +168,10 @@ pub trait TemplateDirectiveExt {
 		})
 		.copied()
 	}
+	fn is_template(&self) -> bool {
+		self.any_directive(|d| matches!(d, TemplateDirective::RsxTemplate))
+	}
+
 	/// Check if the template directive is a cascade style directive
 	fn is_cascade_style(&self) -> bool {
 		self.any_directive(|d| matches!(d, TemplateDirective::StyleCascade))
@@ -213,6 +224,9 @@ use quote::quote;
 impl crate::prelude::RustTokens for TemplateDirective {
 	fn into_rust_tokens(&self) -> proc_macro2::TokenStream {
 		match self {
+			TemplateDirective::RsxTemplate => {
+				quote! {TemplateDirective::RsxTemplate}
+			}
 			TemplateDirective::ClientLoad => {
 				quote! {TemplateDirective::ClientLoad}
 			}
@@ -261,6 +275,9 @@ impl crate::prelude::RustTokens for TemplateDirective {
 impl crate::prelude::RonTokens for TemplateDirective {
 	fn into_ron_tokens(&self) -> proc_macro2::TokenStream {
 		match self {
+			TemplateDirective::RsxTemplate => {
+				quote! {RsxTemplate}
+			}
 			TemplateDirective::ClientLoad => {
 				quote! {ClientLoad}
 			}

@@ -43,6 +43,7 @@ impl Into<WebNode> for RsxElement {
 impl Into<WebNode> for RsxComponent {
 	fn into(self) -> WebNode { WebNode::Component(self) }
 }
+
 impl GetNodeMeta for WebNode {
 	fn meta(&self) -> &NodeMeta {
 		match self {
@@ -468,14 +469,12 @@ mod test {
 	fn root_location() {
 		let line = line!() + 2;
 		#[rustfmt::skip]
-		let location = rsx! { <div>hello world</div> }
-			.location()
-			.cloned()
-			.unwrap();
-		expect(&location.file().to_string_lossy())
+		let span = rsx! { <div>hello world</div> }
+			.span().clone();
+		expect(&span.file().to_string_lossy())
 			.to_be("ws_rsx/beet_rsx/src/rsx/web_node.rs");
-		expect(location.start_line()).to_be(line);
-		expect(location.start_col()).to_be(24);
+		expect(span.start_line()).to_be(line);
+		expect(span.start_col()).to_be(20);
 	}
 
 	#[derive(Node)]

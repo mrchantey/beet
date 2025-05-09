@@ -28,7 +28,7 @@ fn parse_node(
 ) -> Result<(), Infallible> {
 	attributes.retain(|attr| {
 		if let Some(directive) = attr_to_template_directive(attr) {
-			meta.template_directives.push(directive);
+			meta.push_directive(directive);
 			return false;
 		}
 		true
@@ -41,6 +41,7 @@ fn attr_to_template_directive(
 ) -> Option<TemplateDirective> {
 	match attr {
 		RsxAttributeTokens::Key { key } => match key.as_str() {
+			"is:template" => Some(TemplateDirective::RsxTemplate),
 			"client:load" => Some(TemplateDirective::ClientLoad),
 			"scope:local" => {
 				Some(TemplateDirective::StyleScope(StyleScope::Local))

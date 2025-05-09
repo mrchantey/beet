@@ -5,16 +5,13 @@ use crate::prelude::*;
 #[derive(Debug, Default, Clone, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct NodeMeta {
-	pub template_directives: Vec<TemplateDirective>,
-	pub location: Option<FileSpan>,
+	directives: Vec<TemplateDirective>,
+	span: FileSpan,
 }
 
 impl NodeMeta {
-	pub fn new(location: Option<FileSpan>) -> Self {
-		Self {
-			template_directives: Vec::new(),
-			location,
-		}
+	pub fn new(span: FileSpan, directives: Vec<TemplateDirective>) -> Self {
+		Self { span, directives }
 	}
 }
 
@@ -23,32 +20,30 @@ impl GetNodeMeta for NodeMeta {
 	fn meta_mut(&mut self) -> &mut NodeMeta { self }
 }
 
+impl<T: GetNodeMeta> GetSpan for T {
+	fn span(&self) -> &FileSpan { &self.meta().span }
+	fn span_mut(&mut self) -> &mut FileSpan { &mut self.meta_mut().span }
+}
+
 pub trait GetNodeMeta {
 	fn meta(&self) -> &NodeMeta;
 	fn meta_mut(&mut self) -> &mut NodeMeta;
-	fn location(&self) -> Option<&FileSpan> { self.meta().location.as_ref() }
-	fn with_location(mut self, location: FileSpan) -> Self
+	fn with_span(mut self, span: FileSpan) -> Self
 	where
 		Self: Sized,
 	{
-		self.meta_mut().location = Some(location);
+		self.meta_mut().span = span;
 		self
 	}
-
-	fn remove_location(&mut self) { self.meta_mut().location = None; }
-
-	fn location_str(&self) -> String {
-		match self.location() {
-			Some(loc) => loc.to_string(),
-			None => "<unknown>".to_string(),
-		}
+	fn directives(&self) -> &[TemplateDirective] {
+		&self.meta().directives
+	}
+	fn push_directive(&mut self, directive: TemplateDirective) {
+		self.meta_mut().directives.push(directive);
 	}
 
-	fn template_directives(&self) -> &Vec<TemplateDirective> {
-		self.meta().template_directives.as_ref()
-	}
 	fn set_template_directives(&mut self, directives: Vec<TemplateDirective>) {
-		self.meta_mut().template_directives = directives;
+		self.meta_mut().directives = directives;
 	}
 	fn with_template_directives(
 		mut self,
@@ -62,19 +57,23 @@ pub trait GetNodeMeta {
 	}
 }
 
+impl From<FileSpan> for NodeMeta {
+	fn from(span: FileSpan) -> Self { Self::new(span, Vec::new()) }
+}
+
 
 impl<T: GetNodeMeta> TemplateDirectiveExt for T {
 	fn find_directive(
 		&self,
 		mut func: impl FnMut(&TemplateDirective) -> bool,
 	) -> Option<&TemplateDirective> {
-		self.template_directives().iter().find(|d| func(d))
+		self.meta().directives.iter().find(|d| func(d))
 	}
 	fn find_map_directive<U>(
 		&self,
 		mut func: impl FnMut(&TemplateDirective) -> Option<&U>,
 	) -> Option<&U> {
-		self.template_directives().iter().find_map(|d| func(d))
+		self.meta().directives.iter().find_map(|d| func(d))
 	}
 }
 
@@ -82,23 +81,10 @@ impl<T: GetNodeMeta> TemplateDirectiveExt for T {
 #[cfg(feature = "tokens")]
 impl crate::prelude::RustTokens for NodeMeta {
 	fn into_rust_tokens(&self) -> proc_macro2::TokenStream {
-		let location = match self.location() {
-			Some(loc) => {
-				let loc = loc.into_rust_tokens();
-				quote::quote! {Some(#loc)}
-			}
-			None => quote::quote! {None},
-		};
-
-		let template_directives = self
-			.template_directives()
-			.iter()
-			.map(|d| d.into_rust_tokens());
+		let span = self.span.into_rust_tokens();
+		let directives = self.directives.iter().map(|d| d.into_rust_tokens());
 		quote::quote! {
-			NodeMeta {
-				template_directives: vec![#(#template_directives),*],
-				location: #location
-			}
+			NodeMeta::new(#span,vec![#(#directives),*])
 		}
 	}
 }
@@ -106,22 +92,31 @@ impl crate::prelude::RustTokens for NodeMeta {
 #[cfg(feature = "tokens")]
 impl crate::prelude::RonTokens for NodeMeta {
 	fn into_ron_tokens(&self) -> proc_macro2::TokenStream {
-		let location = match self.location() {
-			Some(loc) => {
-				let loc = loc.into_ron_tokens();
-				quote::quote! {Some(#loc)}
-			}
-			None => quote::quote! {None},
-		};
-		let template_directives = self
-			.template_directives()
-			.iter()
-			.map(|d| d.into_ron_tokens());
+		let span = self.span.into_ron_tokens();
+		let directives = self.directives.iter().map(|d| d.into_ron_tokens());
 		quote::quote! {
 			NodeMeta(
-				template_directives: [#(#template_directives),*],
-				location: #location,
+				directives: [#(#directives),*],
+				span: #span,
 			)
 		}
+	}
+}
+
+
+#[cfg(test)]
+mod test {
+	use crate::prelude::*;
+	use sweet::prelude::*;
+
+	#[test]
+	fn ron() {
+		let meta =
+			NodeMeta::new(FileSpan::new_with_start("foo", 0, 0), Vec::new());
+		expect(
+			ron::de::from_str::<NodeMeta>(&meta.into_ron_tokens().to_string())
+				.unwrap(),
+		)
+		.to_be(meta);
 	}
 }

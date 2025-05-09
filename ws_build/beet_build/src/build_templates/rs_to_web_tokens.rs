@@ -1,10 +1,8 @@
 use anyhow::Result;
-use beet_common::prelude::*;
 use beet_rsx::prelude::*;
 use beet_rsx_parser::prelude::*;
 use sweet::prelude::ReadFile;
 use sweet::prelude::WorkspacePathBuf;
-use syn::spanned::Spanned;
 use syn::visit::Visit;
 
 
@@ -13,13 +11,8 @@ use syn::visit::Visit;
 pub struct RsToWebTokens;
 
 
-impl Pipeline<WorkspacePathBuf, Result<Vec<(FileSpan, WebTokens)>>>
-	for RsToWebTokens
-{
-	fn apply(
-		self,
-		path: WorkspacePathBuf,
-	) -> Result<Vec<(FileSpan, WebTokens)>> {
+impl Pipeline<WorkspacePathBuf, Result<Vec<WebTokens>>> for RsToWebTokens {
+	fn apply(self, path: WorkspacePathBuf) -> Result<Vec<WebTokens>> {
 		let file = ReadFile::to_string(path.into_abs_unchecked())?;
 		let file = syn::parse_file(&file)?;
 		let mac = syn::parse_quote!(rsx);
@@ -42,7 +35,7 @@ struct RsxSynVisitor {
 	/// We must use workspace relative paths because locations are created
 	/// via the `file!()` macro.
 	file: WorkspacePathBuf,
-	templates: Vec<(FileSpan, WebTokens)>,
+	templates: Vec<WebTokens>,
 	mac: syn::Ident,
 }
 impl RsxSynVisitor {
@@ -65,17 +58,17 @@ impl<'a> Visit<'a> for RsxSynVisitor {
 		{
 			// use the span of the inner tokens to match the behavior of
 			// the rsx! macro
-			let span = mac.tokens.span();
-			let loc = FileSpan::new_from_span(self.file.clone(), &span);
+			// let span = mac.tokens.span();
+			// let loc = FileSpan::new_from_span(self.file.clone(), &span);
+
 			let web_tokens = mac
 				.tokens
 				.clone()
 				.xpipe(TokensToRstml::default())
 				.0
-				.xpipe(RstmlToWebTokens::new(Some(loc.clone())))
+				.xpipe(RstmlToWebTokens::new(self.file.clone()))
 				.0;
-
-			self.templates.push((loc, web_tokens));
+			self.templates.push(web_tokens);
 		}
 	}
 }

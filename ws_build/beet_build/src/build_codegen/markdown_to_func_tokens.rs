@@ -1,6 +1,5 @@
 use crate::prelude::*;
 use anyhow::Result;
-use beet_common::node::FileSpan;
 use beet_router::prelude::*;
 use beet_rsx::prelude::*;
 use beet_rsx_parser::prelude::*;
@@ -27,9 +26,7 @@ impl MarkdownToFuncTokens {
 		let rsx_str = ParseMarkdown::markdown_to_rsx_str(markdown);
 		let rust_tokens = rsx_str
 			.xref()
-			.xpipe(StringToWebTokens::new(Some(FileSpan::new_from_file(
-				workspace_path,
-			))))
+			.xpipe(StringToWebTokens::new(workspace_path))
 			.map_err(|e| {
 				anyhow::anyhow!(
 					"Failed to parse Markdown HTML\nPath: {}\nInput: {}\nError: {}",
@@ -125,23 +122,22 @@ val_string	= "foo"
 				children: Box::new(
 					RsxText {
 						value: "hello world".to_string(),
-						meta: NodeMeta {
-							template_directives: vec![],
-							location: None
-						},
+						meta: NodeMeta::new(
+							FileSpan::new("ws_build/beet_build/src/build_codegen/markdown_to_func_tokens.rs",
+								LineCol::new(1, 0), 
+								LineCol::new(1, 0))
+								, vec![]
+							),
 					}.into_node()
 				),
 				self_closing: false,
-				meta: NodeMeta {
-					template_directives: vec![],
-					location: Some(
-						FileSpan::new("ws_build/beet_build/src/build_codegen/markdown_to_func_tokens.rs",
-							LineCol::new(1, 0),
-							LineCol::new(1, 0)
-					))
-				},
-			}
-			.into_node()
+				meta: NodeMeta::new(
+					FileSpan::new("ws_build/beet_build/src/build_codegen/markdown_to_func_tokens.rs",
+						LineCol::new(1, 0), 
+						LineCol::new(1, 0))
+						, vec![TemplateDirective::RsxTemplate]
+					),
+		}.into_node()
 		}
 		};
 

@@ -131,6 +131,17 @@ impl RonTokens for FileSpan {
 }
 
 
+pub trait GetSpan {
+	fn span(&self) -> &FileSpan;
+	// probs an anti-pattern but need it until proper spans in rsx combinator
+	fn span_mut(&mut self) -> &mut FileSpan;
+}
+
+impl GetSpan for FileSpan {
+	fn span(&self) -> &FileSpan { self }
+	fn span_mut(&mut self) -> &mut FileSpan { self }
+}
+
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;

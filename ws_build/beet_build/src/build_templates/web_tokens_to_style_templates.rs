@@ -66,9 +66,9 @@ impl ExtractStyleTemplates {
 				style.hash(&mut hasher);
 				let hash = hasher.finish();
 
-				component.meta.template_directives.push(
-					TemplateDirective::StylePlaceholder { content_hash: hash },
-				);
+				component.push_directive(TemplateDirective::StylePlaceholder {
+					content_hash: hash,
+				});
 
 				Ok(Some(style))
 			}
