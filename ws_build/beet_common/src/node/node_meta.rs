@@ -88,35 +88,3 @@ impl crate::prelude::RustTokens for NodeMeta {
 		}
 	}
 }
-
-#[cfg(feature = "tokens")]
-impl crate::prelude::RonTokens for NodeMeta {
-	fn into_ron_tokens(&self) -> proc_macro2::TokenStream {
-		let span = self.span.into_ron_tokens();
-		let directives = self.directives.iter().map(|d| d.into_ron_tokens());
-		quote::quote! {
-			NodeMeta(
-				directives: [#(#directives),*],
-				span: #span,
-			)
-		}
-	}
-}
-
-
-#[cfg(test)]
-mod test {
-	use crate::prelude::*;
-	use sweet::prelude::*;
-
-	#[test]
-	fn ron() {
-		let meta =
-			NodeMeta::new(FileSpan::new_with_start("foo", 0, 0), Vec::new());
-		expect(
-			ron::de::from_str::<NodeMeta>(&meta.into_ron_tokens().to_string())
-				.unwrap(),
-		)
-		.to_be(meta);
-	}
-}

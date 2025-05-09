@@ -268,8 +268,8 @@ mod test {
 	fn str_to_ron_matcher(str: &str) -> Matcher<String> {
 		str.xpipe(StringToWebTokens::default())
 			.unwrap()
-			.xpipe(WebTokensToRon::default())
-			.to_string()
+			.xpipe(WebTokensToTemplate::default())
+			.xmap(|template| ron::ser::to_string(&template).unwrap())
 			.xpect()
 	}
 
@@ -287,47 +287,47 @@ mod test {
 	fn element() {
 		"<br/>"
 			.xmap(str_to_ron_matcher)
-			.to_contain("Element (tag : \"br\"");
+			.to_contain("Element(tag:\"br\"");
 	}
 	#[test]
 	#[ignore]
 	fn unclosed() {
 		"<div align=\"center\" />"
 			.xmap(str_to_ron_matcher)
-			.to_contain("Element (tag : \"br\"");
+			.to_contain("Element(tag:\"br\"");
 	}
 
 	#[test]
 	fn text() {
 		"<div>hello</div>"
 			.xmap(str_to_ron_matcher)
-			.to_contain("Text (value : \"hello\"");
+			.to_contain("Text(value:\"hello\"");
 	}
 	#[test]
 	fn attributes() {
 		// default
 		"<br foo />"
 			.xmap(str_to_ron_matcher)
-			.to_contain("Key (key : \"foo\")");
+			.to_contain("Key(key:\"foo\")");
 		// string
 		"<br foo=\"bar\"/>"
 			.xmap(str_to_ron_matcher)
-			.to_contain("KeyValue (key : \"foo\" , value : \"bar\")");
+			.to_contain("KeyValue(key:\"foo\",value:\"bar\")");
 		// bool
 		"<br foo=true />"
 			.xmap(str_to_ron_matcher)
-			.to_contain("KeyValue (key : \"foo\" , value : \"true\")");
+			.to_contain("KeyValue(key:\"foo\",value:\"true\")");
 		// number
 		"<br foo=20 />"
 			.xmap(str_to_ron_matcher)
-			.to_contain("KeyValue (key : \"foo\" , value : \"20\")");
+			.to_contain("KeyValue(key:\"foo\",value:\"20\")");
 		// ident
 		"<br foo={bar} />"
 			.xmap(str_to_ron_matcher)
-			.to_contain("BlockValue (key : \"foo\" , tracker : RustyTracker");
+			.to_contain("BlockValue(key:\"foo\",tracker:(index:1,");
 		// element
 		"<br foo={<br/>} />"
 			.xmap(str_to_ron_matcher)
-			.to_contain("BlockValue (key : \"foo\" , tracker : RustyTracker");
+			.to_contain("BlockValue(key:\"foo\",tracker:(index:0,");
 	}
 }

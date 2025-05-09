@@ -13,7 +13,7 @@ opt-level = 0
 opt-level = 0
 
 [workspace.package]
-version = "0.0.6-dev.0"
+version = "0.0.6-dev.1"
 authors = ["Pete Hayman"]
 edition = "2024"
 description = "Tools for building reactive structures"
@@ -76,38 +76,38 @@ members = [
 
 [workspace.dependencies]
 ## internal
-beet = { path = "", version = "0.0.6-dev.0" }
+beet = { path = "", version = "0.0.6-dev.1" }
 
-beet_build = { path = "ws_build/beet_build", version = "0.0.6-dev.0" }
-beet_common = { path = "ws_build/beet_common", version = "0.0.6-dev.0" }
-beet_rsx_combinator = { path = "ws_build/beet_rsx_combinator", version = "0.0.6-dev.0" }
-beet_rsx_parser = { path = "ws_build/beet_rsx_parser", version = "0.0.6-dev.0" }
+beet_build = { path = "ws_build/beet_build", version = "0.0.6-dev.1" }
+beet_common = { path = "ws_build/beet_common", version = "0.0.6-dev.1" }
+beet_rsx_combinator = { path = "ws_build/beet_rsx_combinator", version = "0.0.6-dev.1" }
+beet_rsx_parser = { path = "ws_build/beet_rsx_parser", version = "0.0.6-dev.1" }
 
-beet_examples = { path = "ws_flow/beet_examples", version = "0.0.6-dev.0" }
-beet_flow = { path = "ws_flow/beet_flow", version = "0.0.6-dev.0" }
-beet_flow_macros = { path = "ws_flow/beet_flow/macros", version = "0.0.6-dev.0" }
-beet_ml = { path = "ws_flow/beet_ml", version = "0.0.6-dev.0" }
-beet_spatial = { path = "ws_flow/beet_spatial", version = "0.0.6-dev.0" }
-beet_sim = { path = "ws_flow/beet_sim", version = "0.0.6-dev.0" }
+beet_examples = { path = "ws_flow/beet_examples", version = "0.0.6-dev.1" }
+beet_flow = { path = "ws_flow/beet_flow", version = "0.0.6-dev.1" }
+beet_flow_macros = { path = "ws_flow/beet_flow/macros", version = "0.0.6-dev.1" }
+beet_ml = { path = "ws_flow/beet_ml", version = "0.0.6-dev.1" }
+beet_spatial = { path = "ws_flow/beet_spatial", version = "0.0.6-dev.1" }
+beet_sim = { path = "ws_flow/beet_sim", version = "0.0.6-dev.1" }
 
-beet_connect = { path = "ws_rsx/beet_connect", version = "0.0.6-dev.0" }
-beet_design = { path = "ws_rsx/beet_design", version = "0.0.6-dev.0" }
-beet_query = { path = "ws_rsx/beet_query", version = "0.0.6-dev.0" }
-beet_query_macros = { path = "ws_rsx/beet_query/macros", version = "0.0.6-dev.0" }
-beet_router = { path = "ws_rsx/beet_router", version = "0.0.6-dev.0" }
-beet_rsx = { path = "ws_rsx/beet_rsx", version = "0.0.6-dev.0" }
-beet_rsx_macros = { path = "ws_rsx/beet_rsx/macros", version = "0.0.6-dev.0" }
-beet_server = { path = "ws_rsx/beet_server", version = "0.0.6-dev.0" }
+beet_connect = { path = "ws_rsx/beet_connect", version = "0.0.6-dev.1" }
+beet_design = { path = "ws_rsx/beet_design", version = "0.0.6-dev.1" }
+beet_query = { path = "ws_rsx/beet_query", version = "0.0.6-dev.1" }
+beet_query_macros = { path = "ws_rsx/beet_query/macros", version = "0.0.6-dev.1" }
+beet_router = { path = "ws_rsx/beet_router", version = "0.0.6-dev.1" }
+beet_rsx = { path = "ws_rsx/beet_rsx", version = "0.0.6-dev.1" }
+beet_rsx_macros = { path = "ws_rsx/beet_rsx/macros", version = "0.0.6-dev.1" }
+beet_server = { path = "ws_rsx/beet_server", version = "0.0.6-dev.1" }
 
-sweet = { path = "ws_sweet/sweet", version = "0.0.6-dev.0" }
-sweet_bevy = { path = "ws_sweet/sweet_bevy", version = "0.0.6-dev.0" }
-sweet_fs = { path = "ws_sweet/sweet_fs", version = "0.0.6-dev.0" }
-sweet_net = { path = "ws_sweet/sweet_net", version = "0.0.6-dev.0" }
-sweet_server = { path = "ws_sweet/sweet_server", version = "0.0.6-dev.0" }
-sweet_test = { path = "ws_sweet/sweet_test", version = "0.0.6-dev.0" }
-sweet_test_macros = { path = "ws_sweet/sweet_test/macros", version = "0.0.6-dev.0" }
-sweet_web = { path = "ws_sweet/sweet_web", version = "0.0.6-dev.0" }
-sweet_utils = { path = "ws_sweet/sweet_utils", version = "0.0.6-dev.0" }
+sweet = { path = "ws_sweet/sweet", version = "0.0.6-dev.1" }
+sweet_bevy = { path = "ws_sweet/sweet_bevy", version = "0.0.6-dev.1" }
+sweet_fs = { path = "ws_sweet/sweet_fs", version = "0.0.6-dev.1" }
+sweet_net = { path = "ws_sweet/sweet_net", version = "0.0.6-dev.1" }
+sweet_server = { path = "ws_sweet/sweet_server", version = "0.0.6-dev.1" }
+sweet_test = { path = "ws_sweet/sweet_test", version = "0.0.6-dev.1" }
+sweet_test_macros = { path = "ws_sweet/sweet_test/macros", version = "0.0.6-dev.1" }
+sweet_web = { path = "ws_sweet/sweet_web", version = "0.0.6-dev.1" }
+sweet_utils = { path = "ws_sweet/sweet_utils", version = "0.0.6-dev.1" }
 
 #💡 local
 bevy = { version = "0.16", default-features = false, features = ["bevy_color"] }

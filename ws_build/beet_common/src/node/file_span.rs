@@ -114,22 +114,6 @@ impl RustTokens for FileSpan {
 		}
 	}
 }
-#[cfg(feature = "tokens")]
-impl RonTokens for FileSpan {
-	fn into_ron_tokens(&self) -> proc_macro2::TokenStream {
-		let file = self.file.to_string_lossy();
-		let start = self.start.into_ron_tokens();
-		let end = self.end.into_ron_tokens();
-		quote::quote! {
-			FileSpan(
-				file: (#file),
-				start: #start,
-				end: #end
-			)
-		}
-	}
-}
-
 
 pub trait GetSpan {
 	fn span(&self) -> &FileSpan;
@@ -159,13 +143,5 @@ mod test {
 			}
 			.to_string(),
 		);
-	}
-	#[cfg(feature = "tokens")]
-	#[test]
-	fn to_ron_tokens() {
-		let span = FileSpan::new_with_start("foo", 1, 2);
-		let tokens = span.into_ron_tokens();
-		let span2 = ron::de::from_str::<FileSpan>(&tokens.to_string()).unwrap();
-		expect(span2).to_be(span);
 	}
 }

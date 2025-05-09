@@ -71,17 +71,25 @@ impl<T: Into<TokenStream>> Pipeline<T, TokenStream>
 			.xpipe(RstmlToWebTokens::new(self.source_file))
 			.0
 			.xpipe(ParseWebTokens::default())
-			.map(|tokens| tokens.xpipe(WebTokensToRon::default()))
-			.unwrap_or_else(|err| {
-				let err_str = err.to_string();
-				quote! {
-					compile_error!(#err_str);
-				}
+			.map(|tokens| {
+				tokens
+					.xpipe(WebTokensToTemplate::default())
+					.xmap(|template| {
+						let str_tokens = ron::ser::to_string(&template)?;
+						//TODO here we should embed errors like the rsx macro
+						quote! {WebNodeTemplate::from_ron(#str_tokens).unwrap()}
+							.xok()
+					})
 			})
-			.xmap(|tokens| {
-				let str_tokens = tokens.to_string();
-				//TODO here we should embed errors like the rsx macro
-				quote! {WebNodeTemplate::from_ron(#str_tokens).unwrap()}
+			.flatten()
+			.xmap(|result| match result {
+				Ok(tokens) => tokens,
+				Err(err) => {
+					let err_str = err.to_string();
+					quote! {
+						compile_error!(#err_str);
+					}
+				}
 			})
 	}
 }

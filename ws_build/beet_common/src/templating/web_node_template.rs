@@ -259,22 +259,13 @@ pub enum RsxTemplateAttribute {
 	BlockValue { key: String, tracker: RustyTracker },
 }
 
+#[cfg(feature = "tokens")]
+use std::str::FromStr;
 
-/// TODO this may be used for resumability
-#[allow(dead_code)]
-struct WebNodeTemplateToHtml {
-	/// The attribute to identify the block,
-	/// ie `<div>{rust_code}</div>`
-	/// will become `<div><rsx-block hash="1234"/></div>`
-	rust_block_tag: String,
-	/// An attribute to identify a rust block attribute,
-	/// ie `<div {rust_code}/>`
-	/// will become `<div rsx-attr-block="1234"/>`
-	attribute_block_key: String,
-	/// An attribute to identify a rust block attribute value,
-	/// ie `<div key={rust_code}/>`
-	/// will become `<div key="rsx-attr-value-1234"/>`
-	attribute_value_prefix: String,
+#[cfg(feature = "tokens")]
+impl RustTokens for WebNodeTemplate {
+	fn into_rust_tokens(&self) -> proc_macro2::TokenStream {
+		let ron = ron::ser::to_string(self).unwrap();
+		proc_macro2::TokenStream::from_str(&ron).unwrap()
+	}
 }
-
-// tests in beet_rsx

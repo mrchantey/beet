@@ -37,12 +37,3 @@ impl crate::prelude::RustTokens for StyleScope {
 		}
 	}
 }
-#[cfg(feature = "tokens")]
-impl crate::prelude::RonTokens for StyleScope {
-	fn into_ron_tokens(&self) -> proc_macro2::TokenStream {
-		match self {
-			Self::Local => quote::quote! { Local },
-			Self::Global => quote::quote! { Global },
-		}
-	}
-}

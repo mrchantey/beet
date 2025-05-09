@@ -63,15 +63,13 @@ impl FileToTemplates {
 		let styles = vec![];
 		// let (web_tokens, styles) =
 		// 	web_tokens.xpipe(ExtractStyleTemplates::default())?;
-		let rsx_ron = web_tokens.xpipe(WebTokensToRon::default()).to_string();
-		let template_node =
-			ron::de::from_str::<WebNodeTemplate>(rsx_ron.trim())
-				.map_err(|e| ron_cx_err(e, &rsx_ron))?;
-		Ok((template_node, styles))
+		let template = web_tokens.xpipe(WebTokensToTemplate::default());
+		Ok((template, styles))
 	}
 }
 
 /// A ron deserialization error with the context of the file and line
+#[allow(unused)]
 fn ron_cx_err(e: ron::error::SpannedError, str: &str) -> anyhow::Error {
 	/// how many leading and trailing characters to show in the context of the error
 	const CX_SIZE: usize = 8;
