@@ -55,6 +55,7 @@ fn island_into_mount_tokens(island: &ClientIsland) -> TokenStream {
 #[cfg(test)]
 mod test {
 	use super::*;
+	use beet_common::prelude::RustyTracker;
 	use beet_router::types::RouteInfo;
 	use sweet::prelude::*;
 

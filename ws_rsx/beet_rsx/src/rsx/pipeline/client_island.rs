@@ -1,4 +1,5 @@
 use crate::prelude::*;
+use beet_common::prelude::*;
 
 /// Collects all components with a `client:load` directive.
 #[derive(Default)]

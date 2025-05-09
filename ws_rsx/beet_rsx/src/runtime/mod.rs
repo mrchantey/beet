@@ -11,6 +11,7 @@ use std::path::Path;
 pub use string_runtime::*;
 // pub use reactive_graph_runtime::*;
 
+use beet_common::prelude::*;
 
 /// An rsx Runtime handles creation of reactive web nodes,
 /// often by  
