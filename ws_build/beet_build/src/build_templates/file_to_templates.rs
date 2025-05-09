@@ -19,7 +19,7 @@ pub struct FileTemplates {
 	/// A [`TokenStream`] representing a [`ron`] representation of a [`WebNodeTemplate`].
 	pub rsx_templates: Vec<WebNodeTemplate>,
 	// /// A [`TokenStream`] representing styles extracted from the file.
-	pub style_templates: Vec<StyleTemplate>,
+	pub lang_templates: Vec<LangTemplate>,
 }
 
 
@@ -45,7 +45,7 @@ impl Pipeline<WorkspacePathBuf, Result<FileTemplates>> for FileToTemplates {
 			let (template_node, styles) = self.extract_templates(web_tokens)?;
 
 			templates.rsx_templates.push(template_node);
-			templates.style_templates.extend(styles);
+			templates.lang_templates.extend(styles);
 			Ok(())
 		})
 		.into_iter()
@@ -59,7 +59,7 @@ impl FileToTemplates {
 	fn extract_templates(
 		&self,
 		web_tokens: WebTokens,
-	) -> Result<(WebNodeTemplate, Vec<StyleTemplate>)> {
+	) -> Result<(WebNodeTemplate, Vec<LangTemplate>)> {
 		let styles = vec![];
 		// let (web_tokens, styles) =
 		// 	web_tokens.xpipe(ExtractStyleTemplates::default())?;

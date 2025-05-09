@@ -43,18 +43,19 @@ pub enum TemplateDirective {
 	/// </style>
 	/// ```
 	StyleCascade,
-	/// This directive is applied to style tags that have had their content removed.
+	/// This directive is applied to script and style tags that have had their content removed.
 	/// The `content_hash` is used to retrieve the styleid when resolving scoped styles.
 	/// ## Example
 	/// ```rust ignore
 	/// // before
+	///
 	/// <style>
 	/// 	div { color: blue; }
 	/// </style>
 	/// // after, this wont be rendered but conceptually this is what happens
-	/// <style style:content-hash="1234567890" />
+	/// <style is:placeholder="1234567890" />
 	/// ```
-	StylePlaceholder {
+	LangTemplate {
 		/// A rapidhash of a [`StyleTemplate`], including:
 		/// - the inner text of the style tag.
 		/// - its [`StyleScope`] directive.
@@ -193,9 +194,9 @@ pub trait TemplateDirectiveExt {
 			_ => None,
 		})
 	}
-	fn style_placeholder(&self) -> Option<u64> {
+	fn lang_template(&self) -> Option<u64> {
 		self.find_map_directive(|d| match d {
-			TemplateDirective::StylePlaceholder { content_hash } => {
+			TemplateDirective::LangTemplate { content_hash } => {
 				Some(content_hash)
 			}
 			_ => None,
@@ -237,8 +238,11 @@ impl crate::prelude::RustTokens for TemplateDirective {
 			TemplateDirective::StyleCascade => {
 				quote! {TemplateDirective::StyleCascade}
 			}
-			TemplateDirective::StylePlaceholder { content_hash } => {
-				quote! {TemplateDirective::StylePlaceholder{content_hash: #content_hash}}
+			TemplateDirective::LangTemplate { content_hash } => {
+				quote! {TemplateDirective::ContentPlaceholder{
+						content_hash: #content_hash
+					}
+				}
 			}
 			TemplateDirective::Inline => {
 				quote! {TemplateDirective::Inline}
@@ -270,4 +274,3 @@ impl crate::prelude::RustTokens for TemplateDirective {
 		}
 	}
 }
-

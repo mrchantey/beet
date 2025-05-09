@@ -28,9 +28,7 @@ impl Pipeline<WebTokens, WebTokens> for RemoveStyleTags {
 
 						*self_closing = true;
 						component.meta.push_directive(
-							TemplateDirective::StylePlaceholder {
-								content_hash,
-							},
+							TemplateDirective::LangTemplate { content_hash },
 						);
 					}
 					_ => {}

@@ -63,6 +63,13 @@ impl WorkspacePathBuf {
 		Ok(Self::new(path))
 	}
 
+	/// Create a new [`WorkspacePathBuf`] from joining this one with
+	/// another [`Path`]
+	pub fn join(&self, path: impl AsRef<Path>) -> Self {
+		let path = self.0.join(path);
+		Self::new(path)
+	}
+
 	#[cfg(not(target_arch = "wasm32"))]
 	/// Convert to a [`AbsPathBuf`]. This should be used instead of
 	/// canonicalize because canonicalize expects cwd relative paths.

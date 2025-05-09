@@ -1,7 +1,9 @@
 //! Building templates is the cheapest step of the beet build process,
 //! it depends entirely on static analysis of source files so requires no compilation.
-mod web_tokens_to_style_templates;
-pub use web_tokens_to_style_templates::*;
+mod lang_template_map;
+pub use lang_template_map::*;
+mod lang_template;
+pub use lang_template::*;
 mod file_to_templates;
 pub use file_to_templates::*;
 mod md_to_web_tokens;
