@@ -14,6 +14,7 @@ use rstml::node::NodeName;
 use std::collections::HashSet;
 use sweet::prelude::Pipeline;
 use sweet::prelude::WorkspacePathBuf;
+use syn::Expr;
 use syn::LitStr;
 use syn::spanned::Spanned;
 
@@ -37,16 +38,31 @@ pub struct RstmlToWebTokens<C = rstml::Infallible> {
 	/// The span of the entry node, this will be taken
 	/// by the first node visited.
 	file: WorkspacePathBuf,
+	// Collect elements to provide semantic highlight based on element tag.
+	// No differences between open tag and closed tag.
+	// Also multiple tags with same name can be present,
+	// because we need to mark each of them.
+	pub rusty_tracker: RustyTrackerBuilder,
 }
 
-impl RstmlToWebTokens {
-	pub fn new(file: WorkspacePathBuf) -> Self {
+impl Default for RstmlToWebTokens<rstml::Infallible> {
+	fn default() -> Self {
 		Self {
+			file: WorkspacePathBuf::default(),
 			errors: Vec::new(),
 			collected_elements: Vec::new(),
 			self_closing_elements: self_closing_elements(),
 			phantom: std::marker::PhantomData,
+			rusty_tracker: RustyTrackerBuilder::default(),
+		}
+	}
+}
+
+impl RstmlToWebTokens<rstml::Infallible> {
+	pub fn new(file: WorkspacePathBuf) -> Self {
+		Self {
 			file,
+			..Default::default()
 		}
 	}
 }
@@ -111,6 +127,7 @@ impl<C: CustomNode> RstmlToWebTokens<C> {
 				}
 			}
 			Node::Block(NodeBlock::ValidBlock(node)) => WebTokens::Block {
+				tracker: self.rusty_tracker.next_tracker(&node),
 				meta: FileSpan::new_from_span(self.file.clone(), &node).into(),
 				value: node.into(),
 			},
@@ -146,22 +163,42 @@ impl<C: CustomNode> RstmlToWebTokens<C> {
 				if let Some(close_tag) = close_tag {
 					self.collected_elements.push(close_tag.name.clone());
 				}
-
+				let tag = self.map_node_name(&open_tag.name);
 				let attributes = open_tag
 					.attributes
 					.clone()
 					.into_iter()
 					.filter_map(|attr| self.map_attribute(attr))
 					.collect::<Vec<_>>();
-				WebTokens::Element {
-					self_closing,
-					component: ElementTokens {
-						tag: self.map_node_name(&open_tag.name),
-						attributes,
-						meta: FileSpan::new(self.file.clone(), start, end)
-							.into(),
-					},
-					children: Box::new(self.map_nodes(children)),
+
+				let children = Box::new(self.map_nodes(children));
+				let meta = FileSpan::new(self.file.clone(), start, end).into();
+
+				if tag.as_str().starts_with(|c: char| c.is_uppercase()) {
+					// dont hash the span
+					// at this stage directives are still attributes, which
+					// is good because we want to hash those too
+					let tracker = self.rusty_tracker.next_tracker(&attributes);
+
+					WebTokens::Component {
+						component: ElementTokens {
+							tag,
+							attributes,
+							meta,
+						},
+						children,
+						tracker,
+					}
+				} else {
+					WebTokens::Element {
+						self_closing,
+						component: ElementTokens {
+							tag,
+							attributes,
+							meta,
+						},
+						children,
+					}
 				}
 			}
 			Node::Custom(_) => {
@@ -185,6 +222,7 @@ impl<C: CustomNode> RstmlToWebTokens<C> {
 		match attr {
 			NodeAttribute::Block(NodeBlock::ValidBlock(block)) => {
 				Some(RsxAttributeTokens::Block {
+					tracker: self.rusty_tracker.next_tracker(&block),
 					block: block.into(),
 				})
 			}
@@ -200,12 +238,19 @@ impl<C: CustomNode> RstmlToWebTokens<C> {
 				None
 			}
 			NodeAttribute::Attribute(attr) => {
-				let value = attr.value().cloned();
+				// let value = attr.value().cloned();
 				let key = self.map_node_name(&attr.key);
-				match value {
-					Some(value) => Some(RsxAttributeTokens::KeyValue {
+				match attr.value() {
+					Some(value) if let Expr::Lit(value) = value => {
+						Some(RsxAttributeTokens::KeyValueLit {
+							key,
+							value: value.lit.clone(),
+						})
+					}
+					Some(value) => Some(RsxAttributeTokens::KeyValueExpr {
+						tracker: self.rusty_tracker.next_tracker(&value),
 						key,
-						value: value.into(),
+						value: value.clone().into(),
 					}),
 					None => Some(RsxAttributeTokens::Key { key }),
 				}
@@ -252,20 +297,42 @@ impl<C: CustomNode> RstmlToWebTokens<C> {
 
 #[cfg(test)]
 mod test {
-	// use proc_macro2::TokenStream;
-	// use sweet::prelude::*;
-	// use crate::prelude::*;
-	// use quote::quote;
-	// use super::RstmlToHtmlTokens;
-	//
-	// fn map(tokens: TokenStream) -> HtmlTokens {
-	// 	tokens
-	// 		.xpipe(TokensToRstml::new())
-	// 		.0
-	// 		.xpipe(RstmlToHtmlTokens::new())
-	// 		.0
-	// }
+	use crate::prelude::*;
+	use anyhow::Result;
+	use beet_common::prelude::*;
+	use proc_macro2::TokenStream;
+	use quote::quote;
+	use sweet::prelude::*;
+
+	fn map(tokens: TokenStream) -> Result<WebTokens> {
+		tokens
+			.xpipe(TokensToRstml::default())
+			.0
+			.xpipe(RstmlToWebTokens::default())
+			.0
+			.xpipe(ParseWebTokens::default())
+	}
 
 	#[test]
-	fn works() {}
+	fn works() {
+		quote! {
+			<MyComponent client:load />
+		}
+		.xmap(map)
+		.unwrap()
+		.reset_spans_and_trackers()
+		.xpect()
+		.to_be(WebTokens::Component {
+			component: ElementTokens {
+				tag: "MyComponent".into(),
+				attributes: Vec::new(),
+				meta: NodeMeta::default().with_template_directives(vec![
+					TemplateDirective::RsxTemplate,
+					TemplateDirective::ClientLoad,
+				]),
+			},
+			children: Default::default(),
+			tracker: RustyTracker::PLACEHOLDER,
+		});
+	}
 }

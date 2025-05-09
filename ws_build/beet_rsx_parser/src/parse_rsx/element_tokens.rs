@@ -6,6 +6,7 @@ use quote::quote;
 use syn::Block;
 use syn::Expr;
 use syn::Ident;
+use syn::Lit;
 use syn::LitStr;
 
 /// Intermediate representation of an 'element' in an rsx tree.
@@ -68,38 +69,99 @@ pub trait ElementTokensVisitor<E = anyhow::Error> {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum RsxAttributeTokens {
 	/// A block attribute, in jsx this is known as a spread attribute
-	Block { block: Block },
+	Block { block: Block, tracker: RustyTracker },
 	/// A key attribute created by [`TokenStream`]
 	Key { key: Spanner<String> },
-	/// A key value attribute created by [`TokenStream`]
-	KeyValue { key: Spanner<String>, value: Expr },
+	/// A key value attribute where the value is a literal like
+	/// a string, number, or boolean
+	KeyValueLit { key: Spanner<String>, value: Lit },
+	/// A key value attribute where the value is a rust expression
+	KeyValueExpr {
+		key: Spanner<String>,
+		value: Expr,
+		tracker: RustyTracker,
+	},
 }
 impl RsxAttributeTokens {
-	pub fn try_lit_str(expr: &Expr) -> Option<String> {
-		if let Expr::Lit(expr_lit) = expr {
-			if let syn::Lit::Str(lit_str) = &expr_lit.lit {
-				return Some(lit_str.value());
+	// pub fn try_lit_str(expr: &Expr) -> Option<String> {
+	// 	if let Expr::Lit(expr_lit) = expr {
+	// 		if let syn::Lit::Str(lit_str) = &expr_lit.lit {
+	// 			return Some(lit_str.value());
+	// 		}
+	// 	}
+	// 	None
+	// }
+	pub fn lit_to_string(lit: &syn::Lit) -> String {
+		match lit {
+			syn::Lit::Int(lit_int) => lit_int.base10_digits().to_string(),
+			syn::Lit::Float(lit_float) => lit_float.base10_digits().to_string(),
+			syn::Lit::Bool(lit_bool) => lit_bool.value.to_string(),
+			syn::Lit::Str(lit_str) => lit_str.value(),
+			syn::Lit::ByteStr(lit_byte_str) => {
+				String::from_utf8_lossy(&lit_byte_str.value()).into_owned()
+			}
+			syn::Lit::Byte(lit_byte) => lit_byte.value().to_string(),
+			syn::Lit::Char(lit_char) => lit_char.value().to_string(),
+			syn::Lit::Verbatim(lit_verbatim) => lit_verbatim.to_string(),
+			syn::Lit::CStr(_) => unimplemented!(),
+			_ => unimplemented!(),
+		}
+	}
+
+	#[cfg(test)]
+	pub fn reset_spans_and_trackers(&mut self) {
+		match self {
+			RsxAttributeTokens::Block { tracker, .. } => {
+				*tracker = RustyTracker::PLACEHOLDER
+			}
+			RsxAttributeTokens::Key { key, .. } => {
+				key.tokens_span = proc_macro2::Span::call_site();
+			}
+			RsxAttributeTokens::KeyValueExpr { key, tracker, .. } => {
+				key.tokens_span = proc_macro2::Span::call_site();
+				*tracker = RustyTracker::PLACEHOLDER
+			}
+			RsxAttributeTokens::KeyValueLit { key, .. } => {
+				key.tokens_span = proc_macro2::Span::call_site();
 			}
 		}
-		None
 	}
 }
 impl RustTokens for RsxAttributeTokens {
 	fn into_rust_tokens(&self) -> TokenStream {
 		match self {
-			RsxAttributeTokens::Block { block } => {
-				quote! { RsxAttributeTokens::Block{ block: #block} }
+			RsxAttributeTokens::Block { block, tracker } => {
+				let tracker = tracker.into_rust_tokens();
+				quote! { RsxAttributeTokens::Block{
+					block: #block,
+					tracker: #tracker,
+				} }
 			}
 			RsxAttributeTokens::Key { key } => {
 				let key = key.into_rust_tokens();
 				quote! { RsxAttributeTokens::Key{ key: #key } }
 			}
-			RsxAttributeTokens::KeyValue { key, value } => {
+			RsxAttributeTokens::KeyValueLit { key, value } => {
 				let key = key.into_rust_tokens();
 				quote! {
-					RsxAttributeTokens::KeyValue {
+					RsxAttributeTokens::KeyValueLit {
 						key: #key,
 						value: #value,
+					}
+				}
+			}
+			RsxAttributeTokens::KeyValueExpr {
+				key,
+				value,
+				tracker,
+			} => {
+				let key = key.into_rust_tokens();
+				let tracker = tracker.into_rust_tokens();
+				quote! {
+					RsxAttributeTokens::KeyValueExpr {
+						key: #key,
+						value: #value,
+						tracker: #tracker,
 					}
 				}
 			}
@@ -113,7 +175,7 @@ impl RustTokens for RsxAttributeTokens {
 pub struct Spanner<T> {
 	/// The span, if any, of the original value.
 	/// This will be Span::call_site() if the value
-	tokens_span: proc_macro2::Span,
+	pub(crate) tokens_span: proc_macro2::Span,
 	// file_span: FileSpan,
 	value: T,
 }
@@ -163,6 +225,9 @@ impl Into<Spanner<String>> for LitStr {
 }
 impl Into<Spanner<String>> for String {
 	fn into(self) -> Spanner<String> { Spanner::new(self) }
+}
+impl<'a> Into<Spanner<String>> for &'a str {
+	fn into(self) -> Spanner<String> { Spanner::new(self.to_string()) }
 }
 impl ToTokens for Spanner<String> {
 	fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {

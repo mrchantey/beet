@@ -12,14 +12,20 @@ use syn::LitStr;
 #[derive(Debug, Default)]
 pub struct StringToWebTokens {
 	source_file: WorkspacePathBuf,
+	rusty_tracker: RustyTrackerBuilder,
 }
 
 impl StringToWebTokens {
-	pub fn new(source_file: WorkspacePathBuf) -> Self { Self { source_file } }
+	pub fn new(source_file: WorkspacePathBuf) -> Self {
+		Self {
+			source_file,
+			rusty_tracker: RustyTrackerBuilder::default(),
+		}
+	}
 }
 
 impl<T: AsRef<str>> Pipeline<T, Result<WebTokens>> for StringToWebTokens {
-	fn apply(self, input: T) -> Result<WebTokens> {
+	fn apply(mut self, input: T) -> Result<WebTokens> {
 		let (expr, remaining) = parse(input.as_ref()).map_err(|e| {
 			anyhow::anyhow!("Failed to parse HTML: {}", e.to_string())
 		})?;
@@ -29,54 +35,37 @@ impl<T: AsRef<str>> Pipeline<T, Result<WebTokens>> for StringToWebTokens {
 				remaining
 			));
 		}
-		let mut tokens = expr.into_web_tokens(&self.source_file)?;
+		let mut tokens = self.rsx_parsed_expression(expr)?;
 		tokens.push_directive(TemplateDirective::RsxTemplate);
 		Ok(tokens)
 	}
 }
-
-trait IntoWebTokens {
-	fn into_web_tokens(
-		self,
-		source_file: &WorkspacePathBuf,
-	) -> Result<WebTokens>;
-}
-
-impl IntoWebTokens for RsxParsedExpression {
-	fn into_web_tokens(
-		self,
-		source_file: &WorkspacePathBuf,
+impl StringToWebTokens {
+	fn rsx_parsed_expression(
+		&mut self,
+		expr: RsxParsedExpression,
 	) -> Result<WebTokens> {
-		if self.len() == 1 {
-			self.inner()
-				.into_iter()
-				.next()
-				.unwrap()
-				.into_web_tokens(source_file)
+		if expr.len() == 1 {
+			self.rsx_tokens_or_element(expr.inner().into_iter().next().unwrap())
 		} else {
 			WebTokens::Fragment {
-				nodes: self
+				nodes: expr
 					.inner()
 					.into_iter()
-					.map(|item| item.into_web_tokens(source_file))
+					.map(|item| self.rsx_tokens_or_element(item))
 					.collect::<Result<Vec<_>>>()?,
-				meta: FileSpan::new_for_file(source_file).into(),
+				meta: FileSpan::new_for_file(&self.source_file).into(),
 			}
 			.xok()
 		}
 	}
-}
 
-impl IntoWebTokens for RsxTokensOrElement {
-	fn into_web_tokens(
-		self,
-		source_file: &WorkspacePathBuf,
+	fn rsx_tokens_or_element(
+		&mut self,
+		tokens: RsxTokensOrElement,
 	) -> Result<WebTokens> {
-		match self {
+		match tokens {
 			RsxTokensOrElement::Tokens(tokens) => {
-				// TODO this is incorrect, what we need is a new type,
-				// like a PartialBlock or something that allows for interspersed
-				// tokens and elements
 				// TODO this is incorrect, what we need is a new type,
 				// like a PartialBlock or something that allows for interspersed
 				// tokens and elements
@@ -89,77 +78,69 @@ impl IntoWebTokens for RsxTokensOrElement {
 							e.to_string()
 						)
 					})?;
-				Ok(WebTokens::Block {
+				WebTokens::Block {
+					tracker: self.rusty_tracker.next_tracker(&block),
 					value: block.into(),
-					meta: FileSpan::new_for_file(source_file).into(),
-				})
+					meta: FileSpan::new_for_file(&self.source_file).into(),
+				}
+				.xok()
 			}
-			RsxTokensOrElement::Element(el) => el.into_web_tokens(source_file),
+			RsxTokensOrElement::Element(el) => self.rsx_element(el),
 		}
 	}
-}
 
-impl IntoWebTokens for RsxElement {
-	fn into_web_tokens(
-		self,
-		source_file: &WorkspacePathBuf,
-	) -> Result<WebTokens> {
-		match self {
-			RsxElement::SelfClosing(el) => el.into_web_tokens(source_file),
-			RsxElement::Normal(el) => el.into_web_tokens(source_file),
+	fn rsx_element(&mut self, element: RsxElement) -> Result<WebTokens> {
+		match element {
+			RsxElement::SelfClosing(el) => self.rsx_self_closing_element(el),
+			RsxElement::Normal(el) => self.rsx_normal_element(el),
 		}
 	}
-}
-
-impl IntoWebTokens for RsxSelfClosingElement {
-	fn into_web_tokens(
-		self,
-		source_file: &WorkspacePathBuf,
+	fn rsx_self_closing_element(
+		&mut self,
+		el: RsxSelfClosingElement,
 	) -> Result<WebTokens> {
 		WebTokens::Element {
 			component: ElementTokens {
-				tag: self.0.to_string().into(),
-				attributes: self
+				tag: el.0.to_string().into(),
+				attributes: el
 					.1
 					.0
 					.into_iter()
-					.map(|v| v.into_rsx_attribute_tokens(source_file))
+					.map(|attr| self.rsx_attribute(attr))
 					.collect::<Result<Vec<_>>>()?,
-				meta: FileSpan::new_for_file(source_file).into(),
+				meta: FileSpan::new_for_file(&self.source_file).into(),
 			},
 			children: Default::default(),
 			self_closing: true,
 		}
 		.xok()
 	}
-}
 
-impl IntoWebTokens for RsxNormalElement {
-	fn into_web_tokens(
-		self,
-		source_file: &WorkspacePathBuf,
+	fn rsx_normal_element(
+		&mut self,
+		el: RsxNormalElement,
 	) -> Result<WebTokens> {
 		const STRING_TAGS: [&str; 3] = ["script", "style", "code"];
 
-		let children = if STRING_TAGS.contains(&self.0.to_string().as_str()) {
+		let children = if STRING_TAGS.contains(&el.0.to_string().as_str()) {
 			WebTokens::Text {
-				value: LitStr::new(&self.2.to_html(), Span::call_site()).into(),
-				meta: FileSpan::new_for_file(source_file).into(),
+				value: LitStr::new(&el.2.to_html(), Span::call_site()).into(),
+				meta: FileSpan::new_for_file(&self.source_file).into(),
 			}
 		} else {
-			self.2.into_web_tokens(source_file)?
+			self.rsx_children(el.2)?
 		};
 
 		WebTokens::Element {
 			component: ElementTokens {
-				tag: self.0.to_string().into(),
-				attributes: self
+				tag: el.0.to_string().into(),
+				attributes: el
 					.1
 					.0
 					.into_iter()
-					.map(|v| v.into_rsx_attribute_tokens(source_file))
+					.map(|attr| self.rsx_attribute(attr))
 					.collect::<Result<Vec<_>>>()?,
-				meta: FileSpan::new_for_file(source_file).into(),
+				meta: FileSpan::new_for_file(&self.source_file).into(),
 			},
 			// here we must descide whether to go straight into html, ie for
 			// script, style and code elements
@@ -168,135 +149,115 @@ impl IntoWebTokens for RsxNormalElement {
 		}
 		.xok()
 	}
-}
 
-impl IntoWebTokens for RsxChildren {
-	fn into_web_tokens(
-		self,
-		source_file: &WorkspacePathBuf,
-	) -> Result<WebTokens> {
-		if self.0.len() == 1 {
-			self.0
-				.into_iter()
-				.next()
-				.unwrap()
-				.into_web_tokens(source_file)
+	fn rsx_children(&mut self, children: RsxChildren) -> Result<WebTokens> {
+		if children.0.len() == 1 {
+			self.rsx_child(children.0.into_iter().next().unwrap())
 		} else {
 			WebTokens::Fragment {
-				nodes: self
+				nodes: children
 					.0
 					.into_iter()
-					.map(|item| item.into_web_tokens(source_file))
-					.collect::<Result<_>>()?,
-				meta: FileSpan::new_for_file(source_file).into(),
+					.map(|child| self.rsx_child(child))
+					.collect::<Result<Vec<_>>>()?,
+				meta: FileSpan::new_for_file(&self.source_file).into(),
 			}
 			.xok()
 		}
 	}
-}
-
-impl IntoWebTokens for RsxChild {
-	fn into_web_tokens(
-		self,
-		source_file: &WorkspacePathBuf,
-	) -> Result<WebTokens> {
-		match self {
-			RsxChild::Element(val) => val.into_web_tokens(source_file),
-			RsxChild::Text(val) => val.into_web_tokens(source_file),
-			RsxChild::CodeBlock(val) => val.into_web_tokens(source_file),
+	fn rsx_child(&mut self, child: RsxChild) -> Result<WebTokens> {
+		match child {
+			RsxChild::Element(el) => self.rsx_element(el),
+			RsxChild::Text(text) => self.rsx_text(text),
+			RsxChild::CodeBlock(code_block) => {
+				self.rsx_parsed_expression(code_block)
+			}
 		}
 	}
-}
 
-impl IntoWebTokens for RsxText {
-	fn into_web_tokens(
-		self,
-		source_file: &WorkspacePathBuf,
-	) -> Result<WebTokens> {
+	fn rsx_text(&self, text: RsxText) -> Result<WebTokens> {
 		WebTokens::Text {
-			value: LitStr::new(&self.0, Span::call_site()).into(),
-			meta: FileSpan::new_for_file(source_file).into(),
+			value: LitStr::new(&text.0, Span::call_site()).into(),
+			meta: FileSpan::new_for_file(&self.source_file).into(),
 		}
 		.xok()
 	}
-}
 
-trait IntoRsxAttributeTokens {
-	fn into_rsx_attribute_tokens(
-		self,
-		source_file: &WorkspacePathBuf,
-	) -> Result<RsxAttributeTokens>;
-}
-
-impl IntoRsxAttributeTokens for RsxAttribute {
-	fn into_rsx_attribute_tokens(
-		self,
-		source_file: &WorkspacePathBuf,
+	fn rsx_attribute(
+		&mut self,
+		attribute: RsxAttribute,
 	) -> Result<RsxAttributeTokens> {
-		match self {
+		match attribute {
 			RsxAttribute::Named(name, value)
 				if let RsxAttributeValue::Default = value =>
 			{
 				RsxAttributeTokens::Key {
 					key: name.to_string().into(),
 				}
-				.xok()
 			}
-			RsxAttribute::Named(name, value) => RsxAttributeTokens::KeyValue {
-				key: name.to_string().into(),
-				value: attribute_value_to_expr(value, source_file)?,
+			RsxAttribute::Named(name, value) => {
+				match self.rsx_attribute_value(value)? {
+					Expr::Lit(value) => RsxAttributeTokens::KeyValueLit {
+						key: name.to_string().into(),
+						value: value.lit,
+					},
+					value => RsxAttributeTokens::KeyValueExpr {
+						tracker: self.rusty_tracker.next_tracker(&value),
+						key: name.to_string().into(),
+						value,
+					},
+				}
 			}
-			.xok(),
 			RsxAttribute::Spread(value) => {
-				let block = value
-					.into_web_tokens(source_file)?
+				let block = self
+					.rsx_parsed_expression(value)?
 					.xpipe(WebTokensToRust::default());
 				RsxAttributeTokens::Block {
+					tracker: self.rusty_tracker.next_tracker(&block),
 					block: block.into(),
 				}
-				.xok()
 			}
 		}
+		.xok()
+	}
+	fn rsx_attribute_value(
+		&mut self,
+		value: RsxAttributeValue,
+	) -> Result<Expr> {
+		let expr: Expr = match value {
+			RsxAttributeValue::Default => {
+				unreachable!(
+					"We checked for this in StringToWebTokens::rsx_attribute"
+				)
+			}
+			RsxAttributeValue::Boolean(val) => {
+				let val = val.0;
+				syn::parse_quote!(#val)
+			}
+			RsxAttributeValue::Number(val) => {
+				let val = val.0;
+				syn::parse_quote!(#val)
+			}
+			RsxAttributeValue::Str(val) => {
+				let val = val.to_string();
+				syn::parse_quote!(#val)
+			}
+			RsxAttributeValue::Element(value) => {
+				let block =
+					self.rsx_element(value)?.xpipe(WebTokensToRust::default());
+				syn::parse_quote!(#block)
+			}
+			RsxAttributeValue::CodeBlock(value) => {
+				let block = self
+					.rsx_parsed_expression(value)?
+					.xpipe(WebTokensToRust::default());
+				syn::parse_quote!(#block)
+			}
+		};
+		expr.xok()
 	}
 }
 
-fn attribute_value_to_expr(
-	value: RsxAttributeValue,
-	source_file: &WorkspacePathBuf,
-) -> Result<Expr> {
-	let expr: Expr = match value {
-		RsxAttributeValue::Default => {
-			unreachable!(
-				"We checked for this in RsxAttribute::into_rsx_attribute_tokens"
-			)
-		}
-		RsxAttributeValue::Boolean(val) => {
-			let val = val.0;
-			syn::parse_quote!(#val)
-		}
-		RsxAttributeValue::Number(val) => {
-			let val = val.0;
-			syn::parse_quote!(#val)
-		}
-		RsxAttributeValue::Str(val) => {
-			let val = val.to_string();
-			syn::parse_quote!(#val)
-		}
-		RsxAttributeValue::Element(value) => {
-			let block = value
-				.into_web_tokens(source_file)?
-				.xpipe(WebTokensToRust::default());
-			syn::parse_quote!(#block)
-		}
-		RsxAttributeValue::CodeBlock(value) => {
-			let block = value
-				.into_web_tokens(source_file)?
-				.xpipe(WebTokensToRust::default());
-			syn::parse_quote!(#block)
-		}
-	};
-	expr.xok()
-}
 
 #[cfg(test)]
 mod test {

@@ -31,9 +31,7 @@ pub fn rsx_template(tokens: TokenStream) -> TokenStream {
 #[proc_macro]
 pub fn web_tokens(tokens: TokenStream) -> TokenStream {
 	let source_file = source_file(&tokens);
-	tokens
-		.xpipe(ParsedWebTokensPipeline::new(source_file))
-		.into()
+	tokens.xpipe(WebTokensPipeline::new(source_file)).into()
 }
 
 

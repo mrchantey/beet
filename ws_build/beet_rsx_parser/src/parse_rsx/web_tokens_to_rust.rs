@@ -7,7 +7,6 @@ use proc_macro2_diagnostics::Level;
 use quote::quote;
 use sweet::prelude::Pipeline;
 use syn::Block;
-use syn::Expr;
 use syn::Ident;
 use syn::spanned::Spanned;
 
@@ -21,11 +20,6 @@ pub struct WebTokensToRust {
 	pub idents: RsxIdents,
 	// Additional error and warning messages.
 	pub errors: Vec<TokenStream>,
-	// Collect elements to provide semantic highlight based on element tag.
-	// No differences between open tag and closed tag.
-	// Also multiple tags with same name can be present,
-	// because we need to mark each of them.
-	pub rusty_tracker: RustyTrackerBuilder,
 	/// do not insert compile errors into the output
 	pub exclude_errors: bool,
 }
@@ -96,8 +90,9 @@ impl WebTokensToRust {
 				// Block meta is not used in WebTokensToRust,
 				// but it is used in WebTokensToRon
 				meta: _,
+				tracker,
 			} => {
-				let tracker = self.rusty_tracker.next_tracker(&value);
+				let tracker = tracker.into_rust_tokens();
 				let ident = &self.idents.runtime.effect;
 				quote! {
 					#ident::parse_block_node(#tracker, #value)
@@ -117,26 +112,27 @@ impl WebTokensToRust {
 
 				// we must parse runtime attr before anything else
 				self.parse_runtime_directive(&meta);
-				if tag.as_str().starts_with(|c: char| c.is_uppercase()) {
-					self.map_component(component, *children)
-				} else {
-					// this attributes-children order is important for rusty tracker indices
-					// to be consistent with [`WebTokensToRon`]
-					let attributes = attributes
-						.iter()
-						.map(|attr| self.map_attribute(attr))
-						.collect::<Vec<_>>();
-					let children = self.map_node(*children);
-					let meta = meta.into_rust_tokens();
-					quote!(RsxElement {
+				// this attributes-children order is important for rusty tracker indices
+				// to be consistent with [`WebTokensToRon`]
+				let attributes = attributes
+					.iter()
+					.map(|attr| self.map_attribute(attr))
+					.collect::<Vec<_>>();
+				let children = self.map_node(*children);
+				let meta = meta.into_rust_tokens();
+				quote!(RsxElement {
 						tag: #tag.to_string(),
 						attributes: vec![#(#attributes),*],
 						children: Box::new(#children),
 						self_closing: #self_closing,
 						meta: #meta,
 					}.into_node())
-				}
 			}
+			WebTokens::Component {
+				component,
+				children,
+				tracker,
+			} => self.map_component(component, *children, tracker),
 		}
 	}
 
@@ -144,8 +140,8 @@ impl WebTokensToRust {
 		let ident = &self.idents.runtime.effect;
 		match attr {
 			// The attribute is a block
-			RsxAttributeTokens::Block { block } => {
-				let tracker = self.rusty_tracker.next_tracker(&block);
+			RsxAttributeTokens::Block { block, tracker } => {
+				let tracker = tracker.into_rust_tokens();
 				quote! {
 					#ident::parse_attribute_block(
 						#tracker,
@@ -161,20 +157,22 @@ impl WebTokensToRust {
 			}
 			// the attribute is a key value where
 			// the value is a string literal
-			RsxAttributeTokens::KeyValue { key, value }
-				if let Expr::Lit(lit) = &value =>
-			{
+			RsxAttributeTokens::KeyValueLit { key, value } => {
 				quote! {
 					RsxAttribute::KeyValue {
 						key: #key.to_string(),
-						value: #lit.to_string()
+						value: #value.to_string()
 					}
 				}
 			}
 			// the attribute is a key value where the value
 			// is not an [`Expr::Lit`]
-			RsxAttributeTokens::KeyValue { key, value } => {
-				let tracker = self.rusty_tracker.next_tracker(&value);
+			RsxAttributeTokens::KeyValueExpr {
+				key,
+				value,
+				tracker,
+			} => {
+				let tracker = tracker.into_rust_tokens();
 				// we need to handle events at the tokens level for inferred
 				// event types and intellisense.
 				if key.as_str().starts_with("on") {
@@ -209,13 +207,8 @@ impl WebTokensToRust {
 		&mut self,
 		component: ElementTokens,
 		children: WebTokens,
+		tracker: RustyTracker,
 	) -> TokenStream {
-		// dont hash the span
-		let tracker = self.rusty_tracker.next_tracker((
-			&component.attributes,
-			// dont hash the span
-			component.meta.directives(),
-		));
 		let ElementTokens {
 			tag,
 			attributes,
@@ -232,7 +225,7 @@ impl WebTokensToRust {
 
 		for attr in attributes.iter() {
 			match attr {
-				RsxAttributeTokens::Block { block } => {
+				RsxAttributeTokens::Block { block, tracker: _ } => {
 					if block_attr.is_some() {
 						let diagnostic = Diagnostic::spanned(
 							block.span(),
@@ -249,7 +242,12 @@ impl WebTokensToRust {
 					// for components no value means a bool flag
 					prop_assignments.push(quote! {.#key(true)});
 				}
-				RsxAttributeTokens::KeyValue { key, value } => {
+				RsxAttributeTokens::KeyValueLit { key, value } => {
+					prop_names.push(key);
+					let key = key.into_ident();
+					prop_assignments.push(quote! {.#key(#value)});
+				}
+				RsxAttributeTokens::KeyValueExpr { key, value, .. } => {
 					prop_names.push(key);
 					let key = key.into_ident();
 					prop_assignments.push(quote! {.#key(#value)});
@@ -301,6 +299,7 @@ impl WebTokensToRust {
 			Ident::new(&format!("{}Required", tag.as_str()), tag.tokens_span());
 
 		let meta = meta.into_rust_tokens();
+		let tracker = tracker.into_rust_tokens();
 		quote::quote!({
 				let _ = #ide_helper::default();
 

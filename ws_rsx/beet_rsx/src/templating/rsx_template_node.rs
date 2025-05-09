@@ -220,11 +220,10 @@ impl RsxTemplateNode {
 		}
 	}
 	#[cfg(test)]
-	/// When testing for equality sometimes we dont want to
-	/// compare locations and trackers.
-	pub fn reset_meta_and_trackers(mut self) -> Self {
+	/// When testing for equality sometimes we dont want to compare spans and trackers.
+	pub fn reset_spans_and_trackers(mut self) -> Self {
 		self.visit_mut(|node| {
-			*node.meta_mut() = NodeMeta::default();
+			*node.meta_mut().span_mut() = FileSpan::default();
 			match node {
 				RsxTemplateNode::RustBlock { tracker, .. } => {
 					*tracker = RustyTracker::PLACEHOLDER;
@@ -285,13 +284,15 @@ mod test {
 	#[test]
 	fn simple() {
 		rsx_template! { <div>{value}</div> }
-			.reset_meta_and_trackers()
+			.reset_spans_and_trackers()
 			.xpect()
 			.to_be(RsxTemplateNode::Element {
 				tag: "div".to_string(),
 				self_closing: false,
 				attributes: vec![],
-				meta: NodeMeta::default(),
+				meta: NodeMeta::new(FileSpan::default(), vec![
+					TemplateDirective::RsxTemplate,
+				]),
 				children: Box::new(RsxTemplateNode::RustBlock {
 					tracker: RustyTracker::PLACEHOLDER,
 					meta: NodeMeta::default(),
@@ -309,12 +310,14 @@ mod test {
 				</p>
 			</div>
 		}
-		.reset_meta_and_trackers();
+		.reset_spans_and_trackers();
 
 		expect(&template).to_be(&RsxTemplateNode::Element {
 			tag: "div".to_string(),
 			self_closing: false,
-			meta: NodeMeta::default(),
+			meta: NodeMeta::new(FileSpan::default(), vec![
+				TemplateDirective::RsxTemplate,
+			]),
 			attributes: vec![
 				RsxTemplateAttribute::Key {
 					key: "key".to_string(),
@@ -376,7 +379,7 @@ mod test {
 				</p>
 			</div>
 		}
-		.reset_meta_and_trackers();
+		.reset_spans_and_trackers();
 		let template2 = rsx_template! {
 			<div key str="value" num=32 ident=some_val>
 				<p>
@@ -386,7 +389,7 @@ mod test {
 				</p>
 			</div>
 		}
-		.reset_meta_and_trackers();
+		.reset_spans_and_trackers();
 		expect(template).to_be(template2);
 	}
 }

@@ -71,9 +71,8 @@ fn attr_to_template_directive(
 		},
 		// only key value pairs where the value is a string are valid
 		// templates
-		RsxAttributeTokens::KeyValue { key, value }
-			if let Some(value) = RsxAttributeTokens::try_lit_str(value) =>
-		{
+		RsxAttributeTokens::KeyValueLit { key, value } => {
+			let value = RsxAttributeTokens::lit_to_string(&value);
 			match key.as_str() {
 				"slot" => Some(TemplateDirective::Slot(value)),
 				"src" if value.starts_with('.') => {

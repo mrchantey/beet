@@ -37,7 +37,15 @@ impl RustyTracker {
 		self.index = 0;
 		self.tokens_hash = 0;
 	}
-
+	/// Used by [RustyTrackerBuilder] to assign a rusty tracker
+	///  
+	/// # Footguns
+	/// - Users must be identical in their call ordering for indices to match
+	///	- Don't use TokenStream::to_string() and then hash the string.
+	/// 	the rsx! macro splits whitespace in the tokens
+	/// 	but parsing a syn::file doesn't (and it also inserts a wacky /n here and there).
+	///   Its possible to do a `.chars().filter(|c| !c.is_whitespace()).collect::<String>()`
+	///   but thats just extra work.
 	pub fn new_hashed(index: u32, hashable: impl std::hash::Hash) -> Self {
 		let mut hasher = RapidHasher::default_const();
 		hashable.hash(&mut hasher);

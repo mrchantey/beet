@@ -166,7 +166,7 @@ mod test {
 				<div ident=some_val />
 			</div>
 		}
-		.reset_meta_and_trackers();
+		.reset_spans_and_trackers();
 		expect(&node1.xref().xpipe(NodeToTemplate).unwrap())
 			.not()
 			.to_be(&node2_template);
@@ -176,7 +176,7 @@ mod test {
 				.xref()
 				.xpipe(NodeToTemplate)
 				.unwrap()
-				.reset_meta_and_trackers(),
+				.reset_spans_and_trackers(),
 		)
 		.to_be(&node2_template);
 	}
@@ -202,7 +202,7 @@ mod test {
 				</p>
 			</div>
 		}
-		.reset_meta_and_trackers();
+		.reset_spans_and_trackers();
 		expect(&node1.xref().xpipe(NodeToTemplate).unwrap())
 			.not()
 			.to_be(&node2_template);
@@ -211,7 +211,7 @@ mod test {
 			.xref()
 			.xpipe(NodeToTemplate)
 			.unwrap()
-			.reset_meta_and_trackers()
+			.reset_spans_and_trackers()
 			.xpect()
 			.to_be(node2_template);
 	}

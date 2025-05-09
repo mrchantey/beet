@@ -19,7 +19,7 @@ use syn::Token;
 /// ## Example outputs:
 /// - WebNode TokenStream
 /// - RsxTemplateNode TokenStream (ron)
-#[derive(Debug, Clone, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum WebTokens {
 	Fragment {
 		nodes: Vec<WebTokens>,
@@ -41,12 +41,19 @@ pub enum WebTokens {
 	Block {
 		value: Block,
 		meta: NodeMeta,
+		tracker: RustyTracker,
 	},
-	/// An element `<div>` or a component `<MyComponent>`
+	/// An element `<div>`
 	Element {
 		component: ElementTokens,
 		children: Box<WebTokens>,
 		self_closing: bool,
+	},
+	/// A component `<MyComponent>`
+	Component {
+		component: ElementTokens,
+		children: Box<WebTokens>,
+		tracker: RustyTracker,
 	},
 }
 
@@ -69,6 +76,7 @@ impl GetNodeMeta for WebTokens {
 			WebTokens::Text { meta, .. } => meta,
 			WebTokens::Block { meta, .. } => meta,
 			WebTokens::Element { component, .. } => &component.meta,
+			WebTokens::Component { component, .. } => &component.meta,
 		}
 	}
 	fn meta_mut(&mut self) -> &mut NodeMeta {
@@ -79,6 +87,7 @@ impl GetNodeMeta for WebTokens {
 			WebTokens::Text { meta, .. } => meta,
 			WebTokens::Block { meta, .. } => meta,
 			WebTokens::Element { component, .. } => &mut component.meta,
+			WebTokens::Component { component, .. } => &mut component.meta,
 		}
 	}
 }
@@ -124,6 +133,9 @@ impl WebTokens {
 			WebTokens::Element { children, .. } => {
 				children.walk_web_tokens_inner(visit)?;
 			}
+			WebTokens::Component { children, .. } => {
+				children.walk_web_tokens_inner(visit)?;
+			}
 			_ => {}
 		}
 		Ok(())
@@ -149,6 +161,9 @@ impl WebTokens {
 			WebTokens::Element { children, .. } => {
 				children.walk_web_tokens_mut_inner(visit)?;
 			}
+			WebTokens::Component { children, .. } => {
+				children.walk_web_tokens_mut_inner(visit)?;
+			}
 			_ => {}
 		}
 		Ok(())
@@ -161,6 +176,41 @@ impl WebTokens {
 	// 		WebTokens::Fragment { nodes }
 	// 	}
 	// }
+	#[cfg(test)]
+	/// When testing for equality sometimes we dont want to compare spans and trackers.
+	pub fn reset_spans_and_trackers(mut self) -> Self {
+		use std::convert::Infallible;
+
+		self.walk_web_tokens_mut::<Infallible>(|node| {
+			*node.meta_mut().span_mut() = FileSpan::default();
+			match node {
+				WebTokens::Block { tracker, .. } => {
+					*tracker = RustyTracker::PLACEHOLDER;
+				}
+				WebTokens::Element { component, .. } => {
+					Self::reset_component(component);
+				}
+				WebTokens::Component {
+					tracker, component, ..
+				} => {
+					*tracker = RustyTracker::PLACEHOLDER;
+					Self::reset_component(component);
+				}
+				_ => {}
+			}
+			Ok(())
+		})
+		.ok();
+		self
+	}
+	#[cfg(test)]
+	fn reset_component(component: &mut ElementTokens) {
+		component.tag.tokens_span = proc_macro2::Span::call_site();
+		*component.meta_mut().span_mut() = FileSpan::default();
+		component.attributes.iter_mut().for_each(|attr| {
+			attr.reset_spans_and_trackers();
+		});
+	}
 }
 
 
@@ -169,23 +219,18 @@ impl<E> ElementTokensVisitor<E> for WebTokens {
 		&mut self,
 		visit: &mut impl FnMut(&mut ElementTokens) -> Result<(), E>,
 	) -> anyhow::Result<(), E> {
-		match self {
-			WebTokens::Fragment { nodes, .. } => {
-				for child in nodes.iter_mut() {
-					child.walk_rsx_tokens_inner(visit)?;
+		self.walk_web_tokens_mut(|node| {
+			match node {
+				WebTokens::Element { component, .. } => {
+					visit(component)?;
 				}
+				WebTokens::Component { component, .. } => {
+					visit(component)?;
+				}
+				_ => {}
 			}
-			WebTokens::Element {
-				children,
-				component,
-				..
-			} => {
-				visit(component)?;
-				children.walk_rsx_tokens_inner(visit)?;
-			}
-			_ => {}
-		}
-		Ok(())
+			Ok(())
+		})
 	}
 }
 
@@ -232,12 +277,18 @@ impl RustTokens for WebTokens {
 					}
 				}
 			}
-			WebTokens::Block { value, meta } => {
+			WebTokens::Block {
+				value,
+				meta,
+				tracker,
+			} => {
 				let meta = meta.into_rust_tokens();
+				let tracker = tracker.into_rust_tokens();
 				quote! {
 					WebTokens::Block {
 						value: #value,
 						meta: #meta,
+						tracker: #tracker,
 					}
 				}
 			}
@@ -253,6 +304,22 @@ impl RustTokens for WebTokens {
 						component: #component,
 						children: Box::new(#children),
 						self_closing: #self_closing,
+					}
+				}
+			}
+			WebTokens::Component {
+				component,
+				children,
+				tracker,
+			} => {
+				let component = component.into_rust_tokens();
+				let children = children.into_rust_tokens();
+				let tracker = tracker.into_rust_tokens();
+				quote! {
+					WebTokens::Component {
+						component: #component,
+						children: Box::new(#children),
+						tracker: #tracker,
 					}
 				}
 			}

@@ -88,18 +88,16 @@ impl<T: Into<TokenStream>> Pipeline<T, TokenStream>
 
 
 #[derive(Default)]
-pub struct ParsedWebTokensPipeline {
+pub struct WebTokensPipeline {
 	/// ideally we'd get this from proc_macro2::Span::source_file
 	/// but thats not yet supported
 	pub source_file: WorkspacePathBuf,
 }
-impl ParsedWebTokensPipeline {
+impl WebTokensPipeline {
 	pub fn new(source_file: WorkspacePathBuf) -> Self { Self { source_file } }
 }
 
-impl<T: Into<TokenStream>> Pipeline<T, TokenStream>
-	for ParsedWebTokensPipeline
-{
+impl<T: Into<TokenStream>> Pipeline<T, TokenStream> for WebTokensPipeline {
 	fn apply(self, value: T) -> TokenStream {
 		let tokens: TokenStream = value.into();
 
@@ -165,7 +163,7 @@ mod test {
 						nodes: vec![],
 						meta: NodeMeta::new(
 							FileSpan::new("ws_build/beet_rsx_parser/src/parse_rsx/rsx_pipeline.rs",
-								LineCol::new(1, 0), 
+								LineCol::new(1, 0),
 								LineCol::new(1, 0))
 								, vec![]
 							),
@@ -174,10 +172,10 @@ mod test {
 					self_closing: true,
 					meta: NodeMeta::new(
 						FileSpan::new("ws_build/beet_rsx_parser/src/parse_rsx/rsx_pipeline.rs",
-							LineCol::new(1, 0), 
+							LineCol::new(1, 0),
 							LineCol::new(1, 0))
 							, vec![
-								TemplateDirective::RsxTemplate, 
+								TemplateDirective::RsxTemplate,
 								TemplateDirective::ClientLoad
 							]
 						),
