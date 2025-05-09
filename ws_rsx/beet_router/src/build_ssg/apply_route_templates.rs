@@ -3,7 +3,7 @@ use anyhow::Result;
 use beet_rsx::prelude::*;
 use std::path::PathBuf;
 
-/// Load an [`RsxTemplateMap`] and apply the templates to each route
+/// Load an [`NodeTemplateMap`] and apply the templates to each route
 pub struct ApplyRouteTemplates {
 	/// Location of the `rsx-templates.ron` file
 	pub templates_map_path: PathBuf,
@@ -12,7 +12,7 @@ pub struct ApplyRouteTemplates {
 impl Default for ApplyRouteTemplates {
 	fn default() -> Self {
 		Self {
-			templates_map_path: default_paths::RSX_TEMPLATES.into(),
+			templates_map_path: default_paths::NODE_TEMPLATE_MAP.into(),
 		}
 	}
 }
@@ -33,7 +33,7 @@ impl Pipeline<Vec<(RouteInfo, WebNode)>, Result<Vec<(RouteInfo, WebNode)>>>
 		self,
 		routes: Vec<(RouteInfo, WebNode)>,
 	) -> Result<Vec<(RouteInfo, WebNode)>> {
-		let template_map = RsxTemplateMap::load(&self.templates_map_path)
+		let template_map = NodeTemplateMap::load(&self.templates_map_path)
 			.map_err(|err| {
 				// notify user that we are using routes
 				anyhow::anyhow!(

@@ -183,7 +183,7 @@ mod test {
 							LineCol::new(1, 0),
 							LineCol::new(1, 0))
 							, vec![
-								TemplateDirective::RsxTemplate,
+								TemplateDirective::NodeTemplate,
 								TemplateDirective::ClientLoad
 							]
 						),

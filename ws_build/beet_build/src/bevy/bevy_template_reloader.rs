@@ -33,9 +33,9 @@ impl Plugin for BevyTemplateReloader {
 			send2.send(TemplateReloaderMessage::Reload)?;
 			Ok(())
 		};
-		let builder = BuildTemplateMap::new(&src);
+		let builder = BuildTemplateMaps::new(&src);
 		let templates_root_dir = builder.templates_root_dir.clone();
-		let dst = builder.templates_map_path.clone();
+		let dst = builder.template_map_path.clone();
 
 		let recompile = move || {
 			builder.build_and_write()?;
@@ -81,7 +81,7 @@ fn handle_recv(
 	while let Ok(recv) = template_reload.recv.try_recv() {
 		match recv {
 			TemplateReloaderMessage::Reload => {
-				let map = RsxTemplateMap::load(&template_reload.dst).unwrap();
+				let map = NodeTemplateMap::load(&template_reload.dst).unwrap();
 				todo!(
 					"reload template just like html, we'll need to track the WebNode functions as entities"
 				);

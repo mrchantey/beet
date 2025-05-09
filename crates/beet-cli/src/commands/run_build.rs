@@ -13,7 +13,7 @@ pub struct RunBuild {
 	#[command(flatten)]
 	pub build_args: BuildArgs,
 	#[command(flatten)]
-	pub build_template_map: BuildTemplateMap,
+	pub build_template_maps: BuildTemplateMaps,
 	/// used by watch command only, inserts server step after native build
 	#[arg(long, default_value_t = false)]
 	pub server: bool,
@@ -55,12 +55,12 @@ impl RunBuild {
 		let Self {
 			build_cmd,
 			build_args,
-			build_template_map,
+			build_template_maps,
 			server: _,
 		} = self;
 		for arg in build_args.only.iter() {
 			match arg.as_str() {
-				"templates" => group.add(build_template_map.clone()),
+				"templates" => group.add(build_template_maps.clone()),
 				"native-codegen" => {
 					group.add(BuildCodegenNative::new(&build_args))
 				}
@@ -84,7 +84,7 @@ impl RunBuild {
 		let Self {
 			build_cmd,
 			build_args,
-			build_template_map,
+			build_template_maps,
 			server,
 		} = self;
 
@@ -95,7 +95,7 @@ impl RunBuild {
 			// 1. export the templates by statically viewing the files
 			// 		recompile depends on a templates file existing
 			// 		and build_templates doesnt depend on recompile so safe to do first
-			.with(build_template_map)
+			.with(build_template_maps)
 			// 2. build native codegen
 			.with(BuildCodegenNative::new(&build_args))
 			// 3. build the native binary

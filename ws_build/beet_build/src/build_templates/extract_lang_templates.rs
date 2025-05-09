@@ -2,25 +2,13 @@ use anyhow::Result;
 use beet_common::prelude::*;
 use beet_rsx::prelude::*;
 use beet_rsx_parser::prelude::*;
-use rapidhash::RapidHasher;
-use serde::Deserialize;
-use serde::Serialize;
-use std::hash::Hash;
-use std::hash::Hasher;
-use sweet::prelude::WorkspacePathBuf;
-// use std::sync::atomic::AtomicUsize;
-// use std::sync::atomic::Ordering;
-
-// static ID_COUNTER: AtomicUsize = AtomicUsize::new(0);
-
-// fn next_id() -> usize { ID_COUNTER.fetch_add(1, Ordering::Relaxed) }
 
 /// Visit web tokens and replace style templates with a [`TemplateDirective::StylePlaceholder`]
 #[derive(Default)]
-pub struct ExtractStyleTemplates;
+pub struct ExtractLangTemplates;
 
 impl Pipeline<WebTokens, Result<(WebTokens, Vec<(FileSpan, LangTemplate)>)>>
-	for ExtractStyleTemplates
+	for ExtractLangTemplates
 {
 	fn apply(
 		self,
@@ -38,7 +26,7 @@ impl Pipeline<WebTokens, Result<(WebTokens, Vec<(FileSpan, LangTemplate)>)>>
 	}
 }
 
-impl ExtractStyleTemplates {
+impl ExtractLangTemplates {
 	fn try_extract_style(
 		node: &mut WebTokens,
 	) -> Result<Option<(FileSpan, LangTemplate)>> {
@@ -59,10 +47,8 @@ impl ExtractStyleTemplates {
 					return Ok(None);
 				}
 
-				let Some(content) = LangContent::from_element(
-					&component.meta,
-					std::mem::take(children),
-				)?
+				let Some(content) =
+					lang_content(&component.meta, std::mem::take(children))?
 				else {
 					// empty element
 					return Ok(None);
@@ -83,80 +69,37 @@ impl ExtractStyleTemplates {
 	}
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct LangTemplate {
-	/// the scope of the style
-	pub directives: Vec<TemplateDirective>,
-	/// the child text of the element, may be empty
-	/// for src templates
-	pub content: LangContent,
-}
 
-impl LangTemplate {
-	/// Hash the content of the template
-	pub fn hash_self(&self) -> u64 {
-		let mut hasher = RapidHasher::default_const();
-		self.hash(&mut hasher);
-		hasher.finish()
-	}
-}
 
-/// The content of a style template, either inline or a file path
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub enum LangContent {
-	/// Inner text of an elment: `<script>alert("hello")</script>`
-	Inline(String),
-	/// A path to a file: `<script src="./foo.js" />`
-	File(WorkspacePathBuf),
-}
-
-impl LangContent {
-	fn from_element(
-		meta: &NodeMeta,
-		children: WebTokens,
-	) -> Result<Option<Self>> {
-		match (children.is_empty(), meta.src_directive(), children) {
-			(true, None, _) => {
-				// empty
-				Ok(None)
-			}
-			(true, Some(src), _) => {
-				// src directive
-				Ok(Some(Self::File(meta.span().file().join(src))))
-			}
-			(false, None, WebTokens::Text { value, .. }) => {
-				// inline text
-				Ok(Some(Self::Inline(value.to_string())))
-			}
-			(false, Some(_), _) => {
-				// inline directive
-				anyhow::bail!("elements with src directive must be empty");
-			}
-			(false, None, _) => {
-				// inline directive
-				anyhow::bail!(
-					"script and style elements must only have one text child"
-				);
-			}
+fn lang_content(
+	meta: &NodeMeta,
+	children: WebTokens,
+) -> Result<Option<LangContent>> {
+	match (children.is_empty(), meta.src_directive(), children) {
+		(true, None, _) => {
+			// empty
+			Ok(None)
+		}
+		(true, Some(src), _) => {
+			// src directive
+			Ok(Some(LangContent::File(meta.span().file().join(src))))
+		}
+		(false, None, WebTokens::Text { value, .. }) => {
+			// inline text
+			Ok(Some(LangContent::Inline(value.to_string())))
+		}
+		(false, Some(_), _) => {
+			// inline directive
+			anyhow::bail!("elements with src directive must be empty");
+		}
+		(false, None, _) => {
+			// inline directive
+			anyhow::bail!(
+				"script and style elements must only have one text child"
+			);
 		}
 	}
 }
-
-
-impl LangTemplate {
-	pub fn new(
-		directives: Vec<TemplateDirective>,
-		content: LangContent,
-	) -> Self {
-		Self {
-			directives,
-			content,
-		}
-	}
-}
-
-
-
 
 
 #[cfg(test)]
@@ -167,25 +110,25 @@ mod test {
 	#[test]
 	fn ignores() {
 		web_tokens! {<div>foobar</div>}
-			.xpipe(ExtractStyleTemplates)
+			.xpipe(ExtractLangTemplates)
 			.unwrap()
 			.1
 			.xpect()
 			.to_be(vec![]);
 		web_tokens! {<style is:inline>div{}</style>}
-			.xpipe(ExtractStyleTemplates)
+			.xpipe(ExtractLangTemplates)
 			.unwrap()
 			.1
 			.xpect()
 			.to_be(vec![]);
 		web_tokens! {<style/>}
-			.xpipe(ExtractStyleTemplates)
+			.xpipe(ExtractLangTemplates)
 			.unwrap()
 			.1
 			.xpect()
 			.to_be(vec![]);
 		web_tokens! {<style></style>}
-			.xpipe(ExtractStyleTemplates)
+			.xpipe(ExtractLangTemplates)
 			.unwrap()
 			.1
 			.xpect()
@@ -194,12 +137,28 @@ mod test {
 
 
 	#[test]
+	fn errors() {
+		// empty is ignored
+		web_tokens! {<style></style>
+		}
+		.xpipe(ExtractLangTemplates)
+		.xpect()
+		.to_be_ok();
+		// source and inner text
+		web_tokens! {<style src="./foo">foo{}</style>
+		}
+		.xpipe(ExtractLangTemplates)
+		.xpect()
+		.to_be_err();
+	}
+
+	#[test]
 	#[ignore = "multiple children wont error because \
 	rstml treats style tag inner as a single text node"]
 	fn multi_children() {
 		web_tokens! {<style><div/><br/></style>
 		}
-		.xpipe(ExtractStyleTemplates)
+		.xpipe(ExtractLangTemplates)
 		.xpect()
 		.to_be_err();
 	}
@@ -214,7 +173,7 @@ mod test {
 				}
 			</style>
 		}
-		.xpipe(ExtractStyleTemplates)
+		.xpipe(ExtractLangTemplates)
 		.unwrap();
 		expect(styles.len()).to_be(1);
 		expect(tokens.meta().lang_template()).to_be_some();

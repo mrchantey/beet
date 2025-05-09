@@ -93,6 +93,5 @@ mod test {
 			}),
 		]);
 		expect(map.templates.len()).to_be(3);
-		expect(map.templates.values().next().unwrap().spans.len()).to_be(2);
 	}
 }

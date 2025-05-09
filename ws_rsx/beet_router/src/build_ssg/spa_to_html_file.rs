@@ -21,7 +21,7 @@ impl Pipeline<WebNode, Result<()>> for SpaToHtmlFile {
 	fn apply(self, app: WebNode) -> Result<()> {
 		// the cli built the template map by looking at this file
 		let template_map =
-			RsxTemplateMap::load(default_paths::RSX_TEMPLATES)?;
+			NodeTemplateMap::load(default_paths::NODE_TEMPLATE_MAP)?;
 
 		// we'll create the app even though its static parts are stale
 		// because we need the rusty parts to fill in the html template

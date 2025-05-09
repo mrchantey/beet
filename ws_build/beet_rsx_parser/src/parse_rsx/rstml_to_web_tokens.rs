@@ -73,7 +73,7 @@ impl<C: CustomNode> Pipeline<Vec<Node<C>>, (WebTokens, Vec<TokenStream>)>
 {
 	fn apply(mut self, nodes: Vec<Node<C>>) -> (WebTokens, Vec<TokenStream>) {
 		let mut node = self.map_nodes(nodes);
-		node.push_directive(TemplateDirective::RsxTemplate);
+		node.push_directive(TemplateDirective::NodeTemplate);
 		(node, self.errors)
 	}
 }
@@ -327,7 +327,7 @@ mod test {
 				tag: "MyComponent".into(),
 				attributes: Vec::new(),
 				meta: NodeMeta::default().with_template_directives(vec![
-					TemplateDirective::RsxTemplate,
+					TemplateDirective::NodeTemplate,
 					TemplateDirective::ClientLoad,
 				]),
 			},

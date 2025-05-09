@@ -16,10 +16,10 @@ use sweet::prelude::*;
 /// [`TemplateDirective::StylePlaceholder`] directive.
 #[derive(Debug, Default)]
 pub struct FileTemplates {
-	/// A [`TokenStream`] representing a [`ron`] representation of a [`WebNodeTemplate`].
-	pub rsx_templates: Vec<WebNodeTemplate>,
-	// /// A [`TokenStream`] representing styles extracted from the file.
-	pub lang_templates: Vec<LangTemplate>,
+	/// All collected rsx node templates
+	pub node_templates: Vec<WebNodeTemplate>,
+	/// All collected style templates
+	pub lang_templates: Vec<(FileSpan, LangTemplate)>,
 }
 
 
@@ -42,29 +42,20 @@ impl Pipeline<WorkspacePathBuf, Result<FileTemplates>> for FileToTemplates {
 		.xmap_each(|web_tokens| {
 			let web_tokens = web_tokens.xpipe(ParseWebTokens::default())?;
 
-			let (template_node, styles) = self.extract_templates(web_tokens)?;
+			// this will replace the style templates with a placeholder
+			let (web_tokens, styles) =
+				web_tokens.xpipe(ExtractLangTemplates::default())?;
+			let template_node =
+				web_tokens.xpipe(WebTokensToTemplate::default());
 
-			templates.rsx_templates.push(template_node);
+
+			templates.node_templates.push(template_node);
 			templates.lang_templates.extend(styles);
 			Ok(())
 		})
 		.into_iter()
 		.collect::<Result<()>>()?;
 		Ok(templates)
-	}
-}
-
-
-impl FileToTemplates {
-	fn extract_templates(
-		&self,
-		web_tokens: WebTokens,
-	) -> Result<(WebNodeTemplate, Vec<LangTemplate>)> {
-		let styles = vec![];
-		// let (web_tokens, styles) =
-		// 	web_tokens.xpipe(ExtractStyleTemplates::default())?;
-		let template = web_tokens.xpipe(WebTokensToTemplate::default());
-		Ok((template, styles))
 	}
 }
 
@@ -89,27 +80,4 @@ fn ron_cx_err(e: ron::error::SpannedError, str: &str) -> anyhow::Error {
 		cx,
 		str
 	);
-}
-
-
-#[cfg(test)]
-mod test {
-	use crate::as_beet::*;
-	use sweet::prelude::*;
-
-	#[test]
-	#[ignore = "styles disabled temporarily"]
-	fn works() {
-		let tokens = web_tokens! {
-			<div client:load/>
-			<style scope:local>
-				div { color: blue; }
-			</style>
-		};
-
-		let (_templates, styles) = FileToTemplates::default()
-			.extract_templates(tokens)
-			.unwrap();
-		expect(styles.len()).to_be(1);
-	}
 }

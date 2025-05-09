@@ -2,6 +2,7 @@ use crate::prelude::*;
 #[allow(unused)]
 use anyhow::Result;
 use beet_common::prelude::*;
+use rapidhash::RapidHashMap;
 use sweet::prelude::WorkspacePathBuf;
 
 /// The beet cli will visit all files in a crate and collect each
@@ -12,17 +13,32 @@ use sweet::prelude::WorkspacePathBuf;
 /// a compile step.
 ///
 /// When joining an [WebNodeTemplate] with an [RustyPartMap],
-/// we need the entire [RsxTemplateMap] to resolve components.
+/// we need the entire [NodeTemplateMap] to resolve components.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct RsxTemplateMap {
+pub struct NodeTemplateMap {
 	/// The root directory used to create the templates, templates
 	/// with a location outside of this root will not be expected to exists and
 	/// so will not produce an error.
 	// canonicalized [here](ws_rsx/beet_router/src/parser/build_template_map/mod.rs#L110-L111)
 	pub root: WorkspacePathBuf,
-	/// The templates themselves, keyed by their location.
-	pub templates: HashMap<FileSpan, WebNodeTemplate>,
+	/// Template for each node with a [`TemplateDirective::NodeTemplate`], keyed by their span.
+	pub node_templates: RapidHashMap<FileSpan, WebNodeTemplate>,
+}
+
+impl NodeTemplateMap {
+	pub fn new(
+		root: WorkspacePathBuf,
+		templates: Vec<WebNodeTemplate>,
+	) -> Self {
+		Self {
+			root,
+			node_templates: templates
+				.into_iter()
+				.map(|template| (template.span().clone(), template))
+				.collect(),
+		}
+	}
 }
 
 // TODO use a visitor that doesnt exit early if a parent has no nodes.
@@ -34,7 +50,7 @@ pub struct RsxTemplateMap {
 ///
 /// ## Errors
 /// If the root is inside the templates root directory and a template was not found.
-impl Pipeline<WebNode, TemplateResult<WebNode>> for &RsxTemplateMap {
+impl Pipeline<WebNode, TemplateResult<WebNode>> for &NodeTemplateMap {
 	fn apply(self, mut node: WebNode) -> TemplateResult<WebNode> {
 		let mut result = Ok(());
 		// templates cannot track block initials and component nodes,
@@ -56,7 +72,7 @@ impl Pipeline<WebNode, TemplateResult<WebNode>> for &RsxTemplateMap {
 	}
 }
 
-impl RsxTemplateMap {
+impl NodeTemplateMap {
 	pub fn root(&self) -> &WorkspacePathBuf { &self.root }
 
 	/// Load the template map serialized by [beet_rsx_parser::RstmlToRsxTemplate]
@@ -77,7 +93,7 @@ impl RsxTemplateMap {
 		let span = node.span().clone();
 		// println!("applying template to node: {}", node.location_str());
 
-		if let Some(template) = self.templates.get(&span) {
+		if let Some(template) = self.node_templates.get(&span) {
 			// clone because multiple nodes may have the same location
 			*node = (std::mem::take(node), template.clone())
 				.xpipe(ApplyTemplateToNode)
@@ -86,7 +102,11 @@ impl RsxTemplateMap {
 			Ok(())
 		} else if span.file().starts_with(&self.root) {
 			Err(TemplateError::NoTemplate {
-				received: self.templates.keys().map(|x| x.clone()).collect(),
+				received: self
+					.node_templates
+					.keys()
+					.map(|x| x.clone())
+					.collect(),
 				expected: span.clone(),
 			}
 			.with_location(span.clone()))
@@ -111,10 +131,10 @@ mod test {
 	#[cfg(test)]
 	pub fn test_template_map(
 		templates: Vec<WebNodeTemplate>,
-	) -> RsxTemplateMap {
-		RsxTemplateMap {
+	) -> NodeTemplateMap {
+		NodeTemplateMap {
 			root: WorkspacePathBuf::new(file!()),
-			templates: templates
+			node_templates: templates
 				.into_iter()
 				.filter_map(|node| match node.is_template() {
 					true => Some((node.span().clone(), node)),

@@ -135,7 +135,7 @@ val_string	= "foo"
 					FileSpan::new("ws_build/beet_build/src/build_codegen/markdown_to_func_tokens.rs",
 						LineCol::new(1, 0), 
 						LineCol::new(1, 0))
-						, vec![TemplateDirective::RsxTemplate]
+						, vec![TemplateDirective::NodeTemplate]
 					),
 		}.into_node()
 		}

@@ -36,7 +36,7 @@ impl<T: AsRef<str>> Pipeline<T, Result<WebTokens>> for StringToWebTokens {
 			));
 		}
 		let mut tokens = self.rsx_parsed_expression(expr)?;
-		tokens.push_directive(TemplateDirective::RsxTemplate);
+		tokens.push_directive(TemplateDirective::NodeTemplate);
 		Ok(tokens)
 	}
 }

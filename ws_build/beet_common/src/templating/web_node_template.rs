@@ -10,7 +10,7 @@ use thiserror::Error;
 ///
 /// Templates do not recurse into rusty parts,
 /// ie [`RsxBlock::initial`] or [`RsxComponent::node`] are not recursed into.
-/// For this reason its important that the [`RsxTemplateMap`] visits these
+/// For this reason its important that the [`NodeTemplateMap`] visits these
 /// children when applying the templates.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -96,7 +96,7 @@ Please try a full rebuild and file a reproducible issue if that doesn't work.
 ## Debugging (for contributors)
 
 The two entrypoints for the tracker generation are
-			- `BuildTemplateMap` which creates an `RsxTemplateMap` via `FileToTemplates`
+			- `BuildTemplateMaps` which creates an `NodeTemplateMap` via `FileToTemplates`
 			- The `rsx!` macro which creates rusty trackers via `RsxMacroPipeline`
 			
 A good place to start with println! are in the RustyTrackerBuilder which

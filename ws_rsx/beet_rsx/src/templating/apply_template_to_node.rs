@@ -83,7 +83,7 @@ impl ApplyTemplateToNode {
 					type_name,
 					ron,
 					// the node has no template applied yet, that is the
-					// responsibility of the [`RsxTemplateMap`]
+					// responsibility of the [`NodeTemplateMap`]
 					node: Box::new(node),
 					slot_children: Box::new(
 						self.apply_to_node(*slot_children, rusty_map)?,
@@ -113,7 +113,7 @@ impl ApplyTemplateToNode {
 					}?;
 				RsxBlock {
 					// the node has no template applied yet, that is the
-					// responsibility of the [`RsxTemplateMap`]
+					// responsibility of the [`NodeTemplateMap`]
 					initial: Box::new(initial),
 					effect,
 					meta,

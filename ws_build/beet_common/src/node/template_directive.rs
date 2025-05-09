@@ -7,13 +7,32 @@ use super::StyleScope;
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum TemplateDirective {
-	/// The entry point for an rsx template. This is set by default on all
-	/// root nodes.
+	/// A node which should have a template stored, keyed by this nodes [`FileSpan`].
+	/// This is set by default on all root nodes.
 	/// ## Example
 	/// ```rust ignore
 	/// <div is:template />
 	/// ```
-	RsxTemplate,
+	NodeTemplate,
+	/// This directive is applied to script and style tags that have had their content removed.
+	/// The `content_hash` is used to retrieve the styleid when resolving scoped styles.
+	/// ## Example
+	/// ```rust ignore
+	/// // before
+	///
+	/// <style>
+	/// 	div { color: blue; }
+	/// </style>
+	/// // after, this wont be rendered but conceptually this is what happens
+	/// <style placeholder="1234567890" />
+	/// ```
+	LangTemplate {
+		/// A rapidhash of a [`StyleTemplate`], including:
+		/// - the inner text of the style tag.
+		/// - its [`StyleScope`] directive.
+		/// The hash is used to resolve the style id when rendering.
+		content_hash: u64,
+	},
 	/// Indicates that a component should be rendered in html, and also
 	/// hydrated on the client. This is the `client islands architecture` used
 	/// by frameworks like astro.
@@ -43,25 +62,6 @@ pub enum TemplateDirective {
 	/// </style>
 	/// ```
 	StyleCascade,
-	/// This directive is applied to script and style tags that have had their content removed.
-	/// The `content_hash` is used to retrieve the styleid when resolving scoped styles.
-	/// ## Example
-	/// ```rust ignore
-	/// // before
-	///
-	/// <style>
-	/// 	div { color: blue; }
-	/// </style>
-	/// // after, this wont be rendered but conceptually this is what happens
-	/// <style is:placeholder="1234567890" />
-	/// ```
-	LangTemplate {
-		/// A rapidhash of a [`StyleTemplate`], including:
-		/// - the inner text of the style tag.
-		/// - its [`StyleScope`] directive.
-		/// The hash is used to resolve the style id when rendering.
-		content_hash: u64,
-	},
 	/// This script or style tag should be rendered inline, and not
 	/// deduplicated or be used for component scoped styles.
 	/// ## Example
@@ -170,7 +170,7 @@ pub trait TemplateDirectiveExt {
 		.copied()
 	}
 	fn is_template(&self) -> bool {
-		self.any_directive(|d| matches!(d, TemplateDirective::RsxTemplate))
+		self.any_directive(|d| matches!(d, TemplateDirective::NodeTemplate))
 	}
 
 	/// Check if the template directive is a cascade style directive
@@ -225,8 +225,8 @@ use quote::quote;
 impl crate::prelude::RustTokens for TemplateDirective {
 	fn into_rust_tokens(&self) -> proc_macro2::TokenStream {
 		match self {
-			TemplateDirective::RsxTemplate => {
-				quote! {TemplateDirective::RsxTemplate}
+			TemplateDirective::NodeTemplate => {
+				quote! {TemplateDirective::NodeTemplate}
 			}
 			TemplateDirective::ClientLoad => {
 				quote! {TemplateDirective::ClientLoad}

@@ -41,7 +41,7 @@ fn attr_to_template_directive(
 ) -> Option<TemplateDirective> {
 	match attr {
 		RsxAttributeTokens::Key { key } => match key.as_str() {
-			"is:template" => Some(TemplateDirective::RsxTemplate),
+			"is:template" => Some(TemplateDirective::NodeTemplate),
 			"client:load" => Some(TemplateDirective::ClientLoad),
 			"scope:local" => {
 				Some(TemplateDirective::StyleScope(StyleScope::Local))
