@@ -1,19 +1,19 @@
 use crate::prelude::*;
-
+use beet_common::prelude::*;
 
 pub struct NodeToTemplate;
 
-impl<T: AsRef<WebNode>> Pipeline<T, TemplateResult<RsxTemplateNode>>
+impl<T: AsRef<WebNode>> Pipeline<T, TemplateResult<WebNodeTemplate>>
 	for NodeToTemplate
 {
-	fn apply(self, node: T) -> TemplateResult<RsxTemplateNode> {
+	fn apply(self, node: T) -> TemplateResult<WebNodeTemplate> {
 		match node.as_ref() {
 			WebNode::Fragment(RsxFragment { nodes, meta }) => {
 				let items = nodes
 					.iter()
 					.map(|n| n.xpipe(NodeToTemplate))
 					.collect::<TemplateResult<Vec<_>>>()?;
-				Ok(RsxTemplateNode::Fragment {
+				Ok(WebNodeTemplate::Fragment {
 					items,
 					meta: meta.clone(),
 				})
@@ -29,7 +29,7 @@ impl<T: AsRef<WebNode>> Pipeline<T, TemplateResult<RsxTemplateNode>>
 				ron: _,
 				slot_children,
 				meta,
-			}) => Ok(RsxTemplateNode::Component {
+			}) => Ok(WebNodeTemplate::Component {
 				slot_children: Box::new(slot_children.xpipe(NodeToTemplate)?),
 				tracker: tracker.clone(),
 				tag: tag.clone(),
@@ -40,7 +40,7 @@ impl<T: AsRef<WebNode>> Pipeline<T, TemplateResult<RsxTemplateNode>>
 				// ignore initial, its a seperate tree
 				initial: _,
 				meta,
-			}) => Ok(RsxTemplateNode::RustBlock {
+			}) => Ok(WebNodeTemplate::RustBlock {
 				tracker: effect.tracker.clone(),
 				meta: meta.clone(),
 			}),
@@ -50,7 +50,7 @@ impl<T: AsRef<WebNode>> Pipeline<T, TemplateResult<RsxTemplateNode>>
 				children,
 				self_closing,
 				meta,
-			}) => Ok(RsxTemplateNode::Element {
+			}) => Ok(WebNodeTemplate::Element {
 				tag: tag.clone(),
 				self_closing: *self_closing,
 				attributes: attributes
@@ -61,19 +61,19 @@ impl<T: AsRef<WebNode>> Pipeline<T, TemplateResult<RsxTemplateNode>>
 				meta: meta.clone(),
 			}),
 			WebNode::Text(RsxText { value, meta }) => {
-				Ok(RsxTemplateNode::Text {
+				Ok(WebNodeTemplate::Text {
 					value: value.clone(),
 					meta: meta.clone(),
 				})
 			}
 			WebNode::Comment(RsxComment { value, meta }) => {
-				Ok(RsxTemplateNode::Comment {
+				Ok(WebNodeTemplate::Comment {
 					value: value.clone(),
 					meta: meta.clone(),
 				})
 			}
 			WebNode::Doctype(RsxDoctype { meta }) => {
-				Ok(RsxTemplateNode::Doctype { meta: meta.clone() })
+				Ok(WebNodeTemplate::Doctype { meta: meta.clone() })
 			}
 		}
 	}

@@ -11,7 +11,7 @@ use sweet::prelude::WorkspacePathBuf;
 /// The advantage of this approach is we can build templates statically without
 /// a compile step.
 ///
-/// When joining an [RsxTemplateNode] with an [RustyPartMap],
+/// When joining an [WebNodeTemplate] with an [RustyPartMap],
 /// we need the entire [RsxTemplateMap] to resolve components.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -22,7 +22,7 @@ pub struct RsxTemplateMap {
 	// canonicalized [here](ws_rsx/beet_router/src/parser/build_template_map/mod.rs#L110-L111)
 	pub root: WorkspacePathBuf,
 	/// The templates themselves, keyed by their location.
-	pub templates: HashMap<FileSpan, RsxTemplateNode>,
+	pub templates: HashMap<FileSpan, WebNodeTemplate>,
 }
 
 // TODO use a visitor that doesnt exit early if a parent has no nodes.
@@ -110,7 +110,7 @@ mod test {
 	/// used for testing, load directly from a collection of template roots.
 	#[cfg(test)]
 	pub fn test_template_map(
-		templates: Vec<RsxTemplateNode>,
+		templates: Vec<WebNodeTemplate>,
 	) -> RsxTemplateMap {
 		RsxTemplateMap {
 			root: WorkspacePathBuf::new(file!()),
@@ -234,7 +234,7 @@ mod test {
 		else {
 			panic!();
 		};
-		let RsxTemplateNode::Component {
+		let WebNodeTemplate::Component {
 			tracker: tracker2, ..
 		} = node2_template
 		else {

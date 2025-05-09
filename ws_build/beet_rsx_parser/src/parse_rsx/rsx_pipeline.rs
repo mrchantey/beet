@@ -81,7 +81,7 @@ impl<T: Into<TokenStream>> Pipeline<T, TokenStream>
 			.xmap(|tokens| {
 				let str_tokens = tokens.to_string();
 				//TODO here we should embed errors like the rsx macro
-				quote! {RsxTemplateNode::from_ron(#str_tokens).unwrap()}
+				quote! {WebNodeTemplate::from_ron(#str_tokens).unwrap()}
 			})
 	}
 }

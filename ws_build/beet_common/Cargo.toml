@@ -29,6 +29,7 @@ tokens = [
 sweet.workspace = true
 rapidhash.workspace = true
 anyhow.workspace = true
+thiserror.workspace = true
 
 #💡 serde
 serde = { workspace = true, optional = true }

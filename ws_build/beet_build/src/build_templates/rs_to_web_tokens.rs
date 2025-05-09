@@ -27,7 +27,7 @@ impl Pipeline<WorkspacePathBuf, Result<Vec<WebTokens>>> for RsToWebTokens {
 
 
 
-/// Visit a file, extracting an [`FileSpan`] and [`RsxTemplateNode`] for each
+/// Visit a file, extracting an [`FileSpan`] and [`WebNodeTemplate`] for each
 /// `rsx!` macro in the file.
 #[derive(Debug)]
 struct RsxSynVisitor {

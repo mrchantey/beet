@@ -159,7 +159,7 @@ mod test {
 		// println!("Template Map: {:#?}", map);
 		// println!("location: {:#?}", node.location());
 		let node1 = map.templates.get(&node.span()).unwrap();
-		let RsxTemplateNode::Component {
+		let WebNodeTemplate::Component {
 			tracker: tracker1, ..
 		} = &node1
 		else {

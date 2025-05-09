@@ -18,7 +18,7 @@ use syn::Token;
 /// - mdx files
 /// ## Example outputs:
 /// - WebNode TokenStream
-/// - RsxTemplateNode TokenStream (ron)
+/// - WebNodeTemplate TokenStream (ron)
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum WebTokens {
 	Fragment {
@@ -176,7 +176,7 @@ impl WebTokens {
 	// 		WebTokens::Fragment { nodes }
 	// 	}
 	// }
-	#[cfg(test)]
+
 	/// When testing for equality sometimes we dont want to compare spans and trackers.
 	pub fn reset_spans_and_trackers(mut self) -> Self {
 		use std::convert::Infallible;
@@ -203,7 +203,6 @@ impl WebTokens {
 		.ok();
 		self
 	}
-	#[cfg(test)]
 	fn reset_component(component: &mut ElementTokens) {
 		component.tag.tokens_span = proc_macro2::Span::call_site();
 		*component.meta_mut().span_mut() = FileSpan::default();

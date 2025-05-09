@@ -19,7 +19,7 @@ pub fn rsx(tokens: TokenStream) -> TokenStream {
 	tokens.xpipe(RsxMacroPipeline::new(source_file)).into()
 }
 
-/// Mostly used for testing, this macro expands to an [`RsxTemplateNode`]
+/// Mostly used for testing, this macro expands to an [`WebNodeTemplate`]
 #[proc_macro]
 pub fn rsx_template(tokens: TokenStream) -> TokenStream {
 	let source_file = source_file(&tokens);

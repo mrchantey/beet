@@ -1,10 +1,10 @@
 use crate::prelude::*;
 use anyhow::Result;
+use beet_common::prelude::*;
 use beet_rsx::prelude::*;
 use beet_rsx_parser::prelude::*;
 use sweet::prelude::WorkspacePathBuf;
 use sweet::prelude::*;
-
 
 /// When parsing a file, it may contain multiple rsx templates and style templates:
 /// ## Rsx Templates
@@ -16,8 +16,8 @@ use sweet::prelude::*;
 /// [`TemplateDirective::StylePlaceholder`] directive.
 #[derive(Debug, Default)]
 pub struct FileTemplates {
-	/// A [`TokenStream`] representing a [`ron`] representation of a [`RsxTemplateNode`].
-	pub rsx_templates: Vec<RsxTemplateNode>,
+	/// A [`TokenStream`] representing a [`ron`] representation of a [`WebNodeTemplate`].
+	pub rsx_templates: Vec<WebNodeTemplate>,
 	// /// A [`TokenStream`] representing styles extracted from the file.
 	pub style_templates: Vec<StyleTemplate>,
 }
@@ -59,13 +59,13 @@ impl FileToTemplates {
 	fn extract_templates(
 		&self,
 		web_tokens: WebTokens,
-	) -> Result<(RsxTemplateNode, Vec<StyleTemplate>)> {
+	) -> Result<(WebNodeTemplate, Vec<StyleTemplate>)> {
 		let styles = vec![];
 		// let (web_tokens, styles) =
 		// 	web_tokens.xpipe(ExtractStyleTemplates::default())?;
 		let rsx_ron = web_tokens.xpipe(WebTokensToRon::default()).to_string();
 		let template_node =
-			ron::de::from_str::<RsxTemplateNode>(rsx_ron.trim())
+			ron::de::from_str::<WebNodeTemplate>(rsx_ron.trim())
 				.map_err(|e| ron_cx_err(e, &rsx_ron))?;
 		Ok((template_node, styles))
 	}

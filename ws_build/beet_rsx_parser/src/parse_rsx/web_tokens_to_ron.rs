@@ -14,7 +14,7 @@ impl Pipeline<WebTokens, TokenStream> for WebTokensToRon {
 }
 
 impl WebTokensToRon {
-	/// returns an RsxTemplateNode
+	/// returns an WebNodeTemplate
 	pub fn map_node(&mut self, node: WebTokens) -> TokenStream {
 		match node {
 			WebTokens::Fragment { nodes, meta } => {

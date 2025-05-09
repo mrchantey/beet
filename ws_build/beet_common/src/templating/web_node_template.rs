@@ -1,11 +1,10 @@
 use crate::prelude::*;
-use beet_common::prelude::*;
 use thiserror::Error;
 
 
 /// Serializable version of an web node that can be rehydrated.
 ///
-/// An [RsxTemplateNode] is conceptually similar to a html template
+/// An [WebNodeTemplate] is conceptually similar to a html template
 /// but instead of {{PLACEHOLDER}} there is a hash for a known
 /// location of the associated rust code.
 ///
@@ -15,7 +14,7 @@ use thiserror::Error;
 /// children when applying the templates.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub enum RsxTemplateNode {
+pub enum WebNodeTemplate {
 	/// Serializable [`WebNode::Doctype`]
 	Doctype { meta: NodeMeta },
 	/// Serializable [`WebNode::Comment`]
@@ -55,7 +54,7 @@ pub enum RsxTemplateNode {
 
 pub type TemplateResult<T> = std::result::Result<T, TemplateError>;
 
-impl Default for RsxTemplateNode {
+impl Default for WebNodeTemplate {
 	fn default() -> Self {
 		Self::Fragment {
 			items: Default::default(),
@@ -133,46 +132,49 @@ impl TemplateError {
 		}
 	}
 
-	pub fn no_rusty_map(
+	pub fn no_rusty_map<'a>(
 		cx: &str,
-		received_map: &RustyPartMap,
+		received: impl IntoIterator<Item = &'a RustyTracker>,
 		expected: RustyTracker,
 	) -> Self {
 		Self::NoRustyMap {
 			cx: cx.to_string(),
-			received: received_map.keys().cloned().collect(),
+			received: received
+				.into_iter()
+				.map(|tracker| (*tracker).clone())
+				.collect(),
 			expected,
 		}
 	}
 }
 
-impl GetNodeMeta for RsxTemplateNode {
+impl GetNodeMeta for WebNodeTemplate {
 	fn meta(&self) -> &NodeMeta {
 		match self {
-			RsxTemplateNode::Doctype { meta }
-			| RsxTemplateNode::Comment { meta, .. }
-			| RsxTemplateNode::Text { meta, .. }
-			| RsxTemplateNode::Fragment { meta, .. }
-			| RsxTemplateNode::RustBlock { meta, .. }
-			| RsxTemplateNode::Element { meta, .. }
-			| RsxTemplateNode::Component { meta, .. } => meta,
+			WebNodeTemplate::Doctype { meta }
+			| WebNodeTemplate::Comment { meta, .. }
+			| WebNodeTemplate::Text { meta, .. }
+			| WebNodeTemplate::Fragment { meta, .. }
+			| WebNodeTemplate::RustBlock { meta, .. }
+			| WebNodeTemplate::Element { meta, .. }
+			| WebNodeTemplate::Component { meta, .. } => meta,
 		}
 	}
 
 	fn meta_mut(&mut self) -> &mut NodeMeta {
 		match self {
-			RsxTemplateNode::Doctype { meta }
-			| RsxTemplateNode::Comment { meta, .. }
-			| RsxTemplateNode::Text { meta, .. }
-			| RsxTemplateNode::Fragment { meta, .. }
-			| RsxTemplateNode::RustBlock { meta, .. }
-			| RsxTemplateNode::Element { meta, .. }
-			| RsxTemplateNode::Component { meta, .. } => meta,
+			WebNodeTemplate::Doctype { meta }
+			| WebNodeTemplate::Comment { meta, .. }
+			| WebNodeTemplate::Text { meta, .. }
+			| WebNodeTemplate::Fragment { meta, .. }
+			| WebNodeTemplate::RustBlock { meta, .. }
+			| WebNodeTemplate::Element { meta, .. }
+			| WebNodeTemplate::Component { meta, .. } => meta,
 		}
 	}
 }
 
-impl RsxTemplateNode {
+impl WebNodeTemplate {
 	#[cfg(feature = "serde")]
 	pub fn from_ron(ron: &str) -> anyhow::Result<Self> {
 		ron::de::from_str(ron).map_err(Into::into)
@@ -185,15 +187,15 @@ impl RsxTemplateNode {
 	fn visit_inner(&self, func: &mut impl FnMut(&Self)) {
 		func(self);
 		match self {
-			RsxTemplateNode::Fragment { items, .. } => {
+			WebNodeTemplate::Fragment { items, .. } => {
 				for item in items {
 					item.visit_inner(func);
 				}
 			}
-			RsxTemplateNode::Component { slot_children, .. } => {
+			WebNodeTemplate::Component { slot_children, .. } => {
 				slot_children.visit_inner(func);
 			}
-			RsxTemplateNode::Element { children, .. } => {
+			WebNodeTemplate::Element { children, .. } => {
 				children.visit_inner(func);
 			}
 			_ => {}
@@ -205,33 +207,32 @@ impl RsxTemplateNode {
 	fn visit_inner_mut(&mut self, func: &mut impl FnMut(&mut Self)) {
 		func(self);
 		match self {
-			RsxTemplateNode::Fragment { items, .. } => {
+			WebNodeTemplate::Fragment { items, .. } => {
 				for item in items.iter_mut() {
 					item.visit_inner_mut(func);
 				}
 			}
-			RsxTemplateNode::Component { slot_children, .. } => {
+			WebNodeTemplate::Component { slot_children, .. } => {
 				slot_children.visit_inner_mut(func);
 			}
-			RsxTemplateNode::Element { children, .. } => {
+			WebNodeTemplate::Element { children, .. } => {
 				children.visit_inner_mut(func);
 			}
 			_ => {}
 		}
 	}
-	#[cfg(test)]
 	/// When testing for equality sometimes we dont want to compare spans and trackers.
 	pub fn reset_spans_and_trackers(mut self) -> Self {
 		self.visit_mut(|node| {
 			*node.meta_mut().span_mut() = FileSpan::default();
 			match node {
-				RsxTemplateNode::RustBlock { tracker, .. } => {
+				WebNodeTemplate::RustBlock { tracker, .. } => {
 					*tracker = RustyTracker::PLACEHOLDER;
 				}
-				RsxTemplateNode::Component { tracker, .. } => {
+				WebNodeTemplate::Component { tracker, .. } => {
 					*tracker = RustyTracker::PLACEHOLDER;
 				}
-				RsxTemplateNode::Element { attributes, .. } => {
+				WebNodeTemplate::Element { attributes, .. } => {
 					attributes.iter_mut().for_each(|attr| match attr {
 						RsxTemplateAttribute::Block(tracker) => {
 							*tracker = RustyTracker::PLACEHOLDER
@@ -261,7 +262,7 @@ pub enum RsxTemplateAttribute {
 
 /// TODO this may be used for resumability
 #[allow(dead_code)]
-struct RsxTemplateNodeToHtml {
+struct WebNodeTemplateToHtml {
 	/// The attribute to identify the block,
 	/// ie `<div>{rust_code}</div>`
 	/// will become `<div><rsx-block hash="1234"/></div>`
@@ -276,120 +277,4 @@ struct RsxTemplateNodeToHtml {
 	attribute_value_prefix: String,
 }
 
-#[cfg(test)]
-mod test {
-	use crate::as_beet::*;
-	use sweet::prelude::*;
-
-	#[test]
-	fn simple() {
-		rsx_template! { <div>{value}</div> }
-			.reset_spans_and_trackers()
-			.xpect()
-			.to_be(RsxTemplateNode::Element {
-				tag: "div".to_string(),
-				self_closing: false,
-				attributes: vec![],
-				meta: NodeMeta::new(FileSpan::default(), vec![
-					TemplateDirective::RsxTemplate,
-				]),
-				children: Box::new(RsxTemplateNode::RustBlock {
-					tracker: RustyTracker::PLACEHOLDER,
-					meta: NodeMeta::default(),
-				}),
-			});
-	}
-	#[test]
-	fn complex() {
-		let template = rsx_template! {
-			<div key str="value" num=32 ident=some_val>
-				<p>
-					hello <MyComponent>
-						<div>some child</div>
-					</MyComponent>
-				</p>
-			</div>
-		}
-		.reset_spans_and_trackers();
-
-		expect(&template).to_be(&RsxTemplateNode::Element {
-			tag: "div".to_string(),
-			self_closing: false,
-			meta: NodeMeta::new(FileSpan::default(), vec![
-				TemplateDirective::RsxTemplate,
-			]),
-			attributes: vec![
-				RsxTemplateAttribute::Key {
-					key: "key".to_string(),
-				},
-				RsxTemplateAttribute::KeyValue {
-					key: "str".to_string(),
-					value: "value".to_string(),
-				},
-				RsxTemplateAttribute::KeyValue {
-					key: "num".to_string(),
-					value: "32".to_string(),
-				},
-				RsxTemplateAttribute::BlockValue {
-					key: "ident".to_string(),
-					tracker: RustyTracker::PLACEHOLDER,
-				},
-			],
-			children: Box::new(RsxTemplateNode::Element {
-				tag: "p".to_string(),
-				self_closing: false,
-				attributes: vec![],
-				meta: NodeMeta::default(),
-				children: Box::new(RsxTemplateNode::Fragment {
-					meta: NodeMeta::default(),
-					items: vec![
-						RsxTemplateNode::Text {
-							meta: NodeMeta::default(),
-							value: "\n\t\t\t\t\thello ".to_string(),
-						},
-						RsxTemplateNode::Component {
-							meta: NodeMeta::default(),
-							tracker: RustyTracker::PLACEHOLDER,
-							tag: "MyComponent".to_string(),
-							slot_children: Box::new(RsxTemplateNode::Element {
-								tag: "div".to_string(),
-								self_closing: false,
-								attributes: vec![],
-								meta: NodeMeta::default(),
-								children: Box::new(RsxTemplateNode::Text {
-									value: "some child".to_string(),
-									meta: NodeMeta::default(),
-								}),
-							}),
-						},
-					],
-				}),
-			}),
-		});
-	}
-
-	#[test]
-	fn ron() {
-		let template = rsx_template! {
-			<div key str="value" num=32 ident=some_val>
-				<p>
-					hello <MyComponent>
-						<div>some child</div>
-					</MyComponent>
-				</p>
-			</div>
-		}
-		.reset_spans_and_trackers();
-		let template2 = rsx_template! {
-			<div key str="value" num=32 ident=some_val>
-				<p>
-					hello <MyComponent>
-						<div>some child</div>
-					</MyComponent>
-				</p>
-			</div>
-		}
-		.reset_spans_and_trackers();
-		expect(template).to_be(template2);
-	}
-}
+// tests in beet_rsx

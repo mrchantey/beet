@@ -108,7 +108,7 @@ impl RsxAttributeTokens {
 		}
 	}
 
-	#[cfg(test)]
+	/// When testing for equality sometimes we dont want to compare spans and trackers.
 	pub fn reset_spans_and_trackers(&mut self) {
 		match self {
 			RsxAttributeTokens::Block { tracker, .. } => {

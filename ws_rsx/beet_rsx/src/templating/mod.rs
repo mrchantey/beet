@@ -1,12 +1,11 @@
 mod apply_template_to_node;
 mod node_to_template;
 mod rsx_template_map;
-mod rsx_template_node;
 mod rusty_part;
+mod web_node_template;
 pub use apply_template_to_node::*;
 pub use node_to_template::*;
 pub use rsx_template_map::*;
-pub use rsx_template_node::*;
 pub use rusty_part::*;
 mod text_block_encoder;
 pub use text_block_encoder::*;

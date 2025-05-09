@@ -1,4 +1,5 @@
 use crate::prelude::*;
+use beet_common::prelude::*;
 
 
 /// Apply the template for the given [`WebNode`] if it has a location and
@@ -12,14 +13,13 @@ pub struct ApplyTemplateToNode;
 
 
 
-impl Pipeline<(WebNode, RsxTemplateNode), TemplateResult<WebNode>>
+impl Pipeline<(WebNode, WebNodeTemplate), TemplateResult<WebNode>>
 	for ApplyTemplateToNode
 {
 	fn apply(
 		self,
-		(node, template): (WebNode, RsxTemplateNode),
+		(node, template): (WebNode, WebNodeTemplate),
 	) -> TemplateResult<WebNode> {
-
 		// println!("found template for node: {}\n{:?}", location, template);
 		self.apply_to_node(template, &mut node.xpipe(NodeToRustyPartMap))
 	}
@@ -30,26 +30,26 @@ impl ApplyTemplateToNode {
 	/// [`RsxBlock::initial`] or [`RsxComponent::node`].
 	fn apply_to_node(
 		&self,
-		template: RsxTemplateNode,
+		template: WebNodeTemplate,
 		rusty_map: &mut RustyPartMap,
 	) -> TemplateResult<WebNode> {
 		let node: WebNode = match template {
-			RsxTemplateNode::Doctype { meta } => RsxDoctype { meta }.into(),
-			RsxTemplateNode::Text { value, meta } => {
+			WebNodeTemplate::Doctype { meta } => RsxDoctype { meta }.into(),
+			WebNodeTemplate::Text { value, meta } => {
 				RsxText { value, meta }.into()
 			}
-			RsxTemplateNode::Comment { value, meta } => {
+			WebNodeTemplate::Comment { value, meta } => {
 				RsxComment { value, meta }.into()
 			}
 
-			RsxTemplateNode::Fragment { items, meta } => {
+			WebNodeTemplate::Fragment { items, meta } => {
 				let nodes = items
 					.into_iter()
 					.map(|item| self.apply_to_node(item, rusty_map))
 					.collect::<TemplateResult<Vec<_>>>()?;
 				RsxFragment { nodes, meta }.into()
 			}
-			RsxTemplateNode::Component {
+			WebNodeTemplate::Component {
 				tracker,
 				tag,
 				slot_children,
@@ -59,7 +59,7 @@ impl ApplyTemplateToNode {
 					match rusty_map.remove(&tracker).ok_or_else(|| {
 						TemplateError::no_rusty_map(
 							&format!("Component: {}", tag),
-							rusty_map,
+							rusty_map.keys(),
 							tracker,
 						)
 					})? {
@@ -92,12 +92,12 @@ impl ApplyTemplateToNode {
 				}
 				.into()
 			}
-			RsxTemplateNode::RustBlock { tracker, meta } => {
+			WebNodeTemplate::RustBlock { tracker, meta } => {
 				let (initial, effect) =
 					match rusty_map.remove(&tracker).ok_or_else(|| {
 						TemplateError::no_rusty_map(
 							&format!("RustBlock"),
-							rusty_map,
+							rusty_map.keys(),
 							tracker,
 						)
 					})? {
@@ -120,7 +120,7 @@ impl ApplyTemplateToNode {
 				}
 				.into()
 			}
-			RsxTemplateNode::Element {
+			WebNodeTemplate::Element {
 				tag,
 				self_closing,
 				attributes,
@@ -159,7 +159,7 @@ fn template_to_attr(
 				.ok_or_else(|| {
 					TemplateError::no_rusty_map(
 						"AttributeBlock",
-						rusty_map,
+						rusty_map.keys(),
 						tracker,
 					)
 				})? {
@@ -181,7 +181,7 @@ fn template_to_attr(
 				.ok_or_else(|| {
 					TemplateError::no_rusty_map(
 						"AttributeValue",
-						rusty_map,
+						rusty_map.keys(),
 						tracker,
 					)
 				})? {

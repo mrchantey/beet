@@ -1,5 +1,5 @@
-use beet_common::prelude::*;
 use crate::prelude::*;
+use beet_common::prelude::*;
 
 /// The parts of an rsx! macro that are not serializable are
 /// called Rusty Parts.
@@ -84,7 +84,7 @@ impl Pipeline<WebNode, RustyPartMap> for NodeToRustyPartMap {
 					}
 				}
 				WebNode::Component(component) => {
-					// note how we ignore slot_children, they are handled by RsxTemplateNode
+					// note how we ignore slot_children, they are handled by WebNodeTemplate
 					rusty_map.insert(component.tracker, RustyPart::Component {
 						root: std::mem::take(&mut component.node),
 						type_name: std::mem::take(&mut component.type_name),
