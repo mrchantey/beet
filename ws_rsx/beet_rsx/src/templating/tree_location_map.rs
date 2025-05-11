@@ -1,7 +1,7 @@
 use crate::prelude::*;
 use anyhow::Result;
-use rapidhash::RapidHashMap;
 use beet_common::prelude::*;
+use rapidhash::RapidHashMap;
 
 
 
@@ -17,7 +17,6 @@ impl<T: AsRef<WebNode>> Pipeline<T, TreeLocationMap> for NodeToTreeLocationMap {
 					map.rusty_locations.insert(effect.tracker, loc);
 				}
 				WebNode::Element(el) => {
-					// println!("el loc: {}", loc.tree_idx);
 					if el.children.directly_contains_rust_node() {
 						let encoded =
 							TextBlockEncoder::encode(loc.tree_idx, el);

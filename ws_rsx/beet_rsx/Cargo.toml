@@ -15,7 +15,8 @@ keywords.workspace = true
 
 [features]
 default = ["macros", "fs", "serde", "html"]
-css = ["dep:lightningcss", "dep:parcel_selectors", "beet_rsx_macros?/css"]
+# TODO deprecate
+css = ["beet_rsx_macros?/css"]
 reactive_graph = ["dep:reactive_graph", "dep:any_spawner"]
 html = ["dep:html-escape"]
 macros = ["dep:beet_rsx_macros"]
@@ -53,10 +54,6 @@ ron = { workspace = true, optional = true }
 #💡 parser
 quote = { workspace = true, optional = true }
 proc-macro2 = { workspace = true, optional = true }
-
-#💡 style
-parcel_selectors = { workspace = true, optional = true }
-lightningcss = { workspace = true, optional = true }
 
 #💡 reactivity
 reactive_graph = { version = "0.2.0-rc3", optional = true, features = [

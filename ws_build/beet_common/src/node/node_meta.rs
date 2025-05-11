@@ -35,11 +35,9 @@ pub trait GetNodeMeta {
 		self.meta_mut().span = span;
 		self
 	}
-	fn directives(&self) -> &[TemplateDirective] {
-		&self.meta().directives
-	}
-	fn push_directive(&mut self, directive: TemplateDirective) {
-		self.meta_mut().directives.push(directive);
+	fn directives(&self) -> &[TemplateDirective] { &self.meta().directives }
+	fn push_directive(&mut self, directive: impl Into<TemplateDirective>) {
+		self.meta_mut().directives.push(directive.into());
 	}
 
 	fn set_template_directives(&mut self, directives: Vec<TemplateDirective>) {

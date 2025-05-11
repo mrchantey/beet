@@ -31,10 +31,22 @@ impl
 	) -> Pin<Box<dyn Future<Output = Result<()>>>> {
 		let html_dir = self.html_dir;
 		Box::pin(async move {
+			// TODO load template maps here, not for each route
 			let routes = routes
 				.xpipe(RouteFuncsToRsx::default())
 				.await?
 				.xpipe(ApplyRouteTemplates::default())?;
+
+			// routes.iter().for_each(|(_, root)| {
+			// 	VisitWebNode::walk(&root, |node| {
+			// 		if node.lang_template().is_some() {
+			// 			println!("its a lang template: {:?}", node.meta());
+			// 		} else {
+			// 			// println!("its a lang template: {:?}");
+			// 		}
+			// 	})
+			// });
+
 
 			// export client islands after templates are applied,
 			// at this stage the only required transform is the slots pipeline

@@ -81,6 +81,10 @@ a {
 	line-height: var(--bt-line-height);
 }
 
+a:visited{
+	color:unset;
+}
+
 a:hover,
 a:focus {
 	color: var(--bt-color-on-surface);

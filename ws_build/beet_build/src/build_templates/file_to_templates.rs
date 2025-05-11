@@ -5,6 +5,7 @@ use beet_rsx::prelude::*;
 use beet_rsx_parser::prelude::*;
 use sweet::prelude::WorkspacePathBuf;
 use sweet::prelude::*;
+use super::ExtractedLangTemplate;
 
 /// When parsing a file, it may contain multiple rsx templates and style templates:
 /// ## Rsx Templates
@@ -15,11 +16,11 @@ use sweet::prelude::*;
 /// is considered a style template and will be extracted, replaced by a
 /// [`TemplateDirective::StylePlaceholder`] directive.
 #[derive(Debug, Default)]
-pub struct FileTemplates {
+pub(super) struct FileTemplates {
 	/// All collected rsx node templates
 	pub node_templates: Vec<WebNodeTemplate>,
 	/// All collected style templates
-	pub lang_templates: Vec<(FileSpan, LangTemplate)>,
+	pub lang_templates: Vec<ExtractedLangTemplate>,
 }
 
 
@@ -42,15 +43,15 @@ impl Pipeline<WorkspacePathBuf, Result<FileTemplates>> for FileToTemplates {
 		.xmap_each(|web_tokens| {
 			let web_tokens = web_tokens.xpipe(ParseWebTokens::default())?;
 
-			// this will replace the style templates with a placeholder
-			let (web_tokens, styles) =
+			// this will replace the lang templates with a placeholder
+			let (web_tokens, extracted_templates) =
 				web_tokens.xpipe(ExtractLangTemplates::default())?;
 			let template_node =
 				web_tokens.xpipe(WebTokensToTemplate::default());
 
 
 			templates.node_templates.push(template_node);
-			templates.lang_templates.extend(styles);
+			templates.lang_templates.extend(extracted_templates);
 			Ok(())
 		})
 		.into_iter()

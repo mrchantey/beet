@@ -86,7 +86,7 @@ impl BrowserDomTarget {
 			Ok(el)
 		} else {
 			Err(ParseError::Hydration(format!(
-				"Could not text node parent with rsx idx: {}",
+				"Could not find element with rsx idx: {}",
 				tree_idx
 			)))
 		}

@@ -1,7 +1,7 @@
+mod apply_style_ids;
+pub use apply_style_ids::*;
 mod lang_template_map;
 pub use lang_template_map::*;
-mod lang_template;
-pub use lang_template::*;
 mod apply_template_to_node;
 mod node_to_template;
 mod node_template_map;

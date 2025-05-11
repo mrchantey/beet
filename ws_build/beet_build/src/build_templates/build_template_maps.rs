@@ -1,9 +1,11 @@
+use super::error::Error;
+use super::error::Result;
 use crate::prelude::*;
-use anyhow::Result;
 use beet_router::prelude::*;
 use beet_rsx::prelude::*;
 use clap::Parser;
 use rayon::iter::*;
+use std::path::Path;
 use std::path::PathBuf;
 use sweet::prelude::*;
 
@@ -16,9 +18,12 @@ pub struct BuildTemplateMaps {
 	//  TODO this might be better as an include pattern
 	#[arg(long, default_value = "./")]
 	pub templates_root_dir: PathBuf,
-	/// Location of the `rsx-templates.ron` file
+	/// Location of the [`NodeTemplateMap`] file
 	#[arg(long, default_value = default_paths::NODE_TEMPLATE_MAP)]
-	pub template_map_path: PathBuf,
+	pub node_templates_path: PathBuf,
+	/// Location of the [`LangTemplateMap`] file
+	#[arg(long, default_value = default_paths::LANG_TEMPLATE_MAP)]
+	pub lang_templates_path: PathBuf,
 	/// Output the contents of the `rsx-templates.ron` file to stdout
 	/// on change
 	#[arg(short, long)]
@@ -40,50 +45,58 @@ impl Default for BuildTemplateMaps {
 }
 
 impl BuildStep for BuildTemplateMaps {
-	fn run(&self) -> Result<()> { self.build_and_write() }
+	fn run(&self) -> anyhow::Result<()> { self.build_and_write()?.xok() }
 }
 
 impl BuildTemplateMaps {
 	pub fn new(src: impl Into<PathBuf>) -> Self {
-		Self::new_with_dst(src, default_paths::NODE_TEMPLATE_MAP)
-	}
-	pub fn new_with_dst(
-		src: impl Into<PathBuf>,
-		dst: impl Into<PathBuf>,
-	) -> Self {
 		Self {
-			minify_templates: false,
 			templates_root_dir: src.into(),
-			template_map_path: dst.into(),
-			templates_map_stdout: false,
+			..Default::default()
 		}
 	}
 
 	pub fn build_and_write(&self) -> Result<()> {
-		let map = self.build_template_maps()?;
-		// its already minified, so we prettify if false
+		let (node_map, lang_map) = self.build_template_maps()?;
+		self.write(&self.node_templates_path, &node_map)?;
+		self.write(&self.lang_templates_path, &lang_map)?;
+		Ok(())
+	}
+	fn write(
+		&self,
+		path: &Path,
+		map: impl serde::ser::Serialize,
+	) -> Result<()> {
 		let map_str = if self.minify_templates {
 			ron::ser::to_string(&map)
 		} else {
 			ron::ser::to_string_pretty(&map, Default::default())
-		}?;
+		}
+		.map_err(|err| Error::serialize_ron(path, err))?;
 		if self.templates_map_stdout {
 			println!("{}", map_str);
 		}
-		FsExt::write(&self.template_map_path, &map_str)?;
+
+		FsExt::write(path, &map_str).map_err(Error::File)?;
 		Ok(())
 	}
 
 
-	pub fn build_template_maps(&self) -> Result<NodeTemplateMap> {
+	pub fn build_template_maps(
+		&self,
+	) -> Result<(NodeTemplateMap, LangTemplateMap)> {
 		let filter = default_filter();
 		let (node_templates, lang_templates) =
-			ReadDir::files_recursive(&self.templates_root_dir)?
+			ReadDir::files_recursive(&self.templates_root_dir)
+				.map_err(Error::File)?
 				.into_par_iter()
 				.filter(|path| filter.passes(path))
 				.map(|path| {
-					WorkspacePathBuf::new_from_canonicalizable(path)?
-						.xpipe(FileToTemplates)
+					let path = WorkspacePathBuf::new_from_canonicalizable(path)
+						.map_err(Error::File)?;
+					path.clone().xpipe(FileToTemplates).map_err(|err| {
+						Error::file_to_templates(&path, err.to_string())
+					})
 				})
 				.collect::<Result<Vec<_>>>()?
 				.into_iter()
@@ -98,11 +111,21 @@ impl BuildTemplateMaps {
 
 		let root = WorkspacePathBuf::new_from_canonicalizable(
 			&self.templates_root_dir,
-		)?;
-		LangTemplateMap::new(lang_templates);
+		)
+		.map_err(Error::File)?;
+		#[allow(unused_mut)]
+		let mut lang_template_map = lang_templates.xpipe(CollectLangTemplates)?;
+		#[cfg(feature = "style")]
+		{
+			lang_template_map =
+				lang_template_map.xpipe(ParseComponentStyles::default())?;
+		}
 
-
-		NodeTemplateMap::new(root, node_templates).xok()
+		(
+			NodeTemplateMap::new(root, node_templates),
+			lang_template_map,
+		)
+			.xok()
 	}
 }
 
@@ -121,18 +144,18 @@ mod test {
 			.into_abs()
 			.unwrap();
 
-		let map = BuildTemplateMaps {
+		let (node_map, lang_map) = BuildTemplateMaps {
 			templates_root_dir: src.to_path_buf(),
-			template_map_path: PathBuf::default(),
+			node_templates_path: PathBuf::default(),
 			..Default::default()
 		}
 		.build_template_maps()
 		.unwrap();
 
-		expect(map.root())
+		expect(node_map.root())
 			.to_be(&WorkspacePathBuf::new_from_canonicalizable(src).unwrap());
-		expect(map.node_templates.len()).to_be_greater_or_equal_to(8);
-		// println!("{:#?}", map);
+		expect(node_map.len()).to_be_greater_or_equal_to(8);
+		expect(lang_map.len()).to_be_greater_or_equal_to(2);
 	}
 
 	/// it asserts that the process of loading tokens from macros
@@ -151,7 +174,7 @@ mod test {
 
 
 		// 2. build, parse and compare
-		let map = builder.build_template_maps().unwrap();
+		let (node_map, _lang_map) = builder.build_template_maps().unwrap();
 
 		// println!("wrote to {}\n{:#?}", builder.dst.display(), map);
 
@@ -159,7 +182,7 @@ mod test {
 		let node = (rsx.func)().await.unwrap();
 		// println!("Template Map: {:#?}", map);
 		// println!("location: {:#?}", node.location());
-		let node1 = map.node_templates.get(&node.span()).unwrap();
+		let node1 = node_map.templates.get(&node.span()).unwrap();
 		let WebNodeTemplate::Component {
 			tracker: tracker1, ..
 		} = &node1

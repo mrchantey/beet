@@ -29,6 +29,7 @@ pub struct WorkspacePathBuf(PathBuf);
 
 
 impl WorkspacePathBuf {
+
 	/// Create a new [`WorkspacePathBuf`], a common use case is to use `file!()`
 	/// which is already relative to the workspace root.
 	pub fn new(path: impl AsRef<Path>) -> Self {
@@ -52,14 +53,17 @@ impl WorkspacePathBuf {
 	///
 	/// Panics if [`FsExt::workspace_root`] fails.
 	#[cfg(not(target_arch = "wasm32"))]
-	pub fn new_from_canonicalizable(
-		path: impl AsRef<Path>,
-	) -> anyhow::Result<Self> {
+	pub fn new_from_canonicalizable(path: impl AsRef<Path>) -> FsResult<Self> {
 		use crate::prelude::PathExt;
 		let path = PathExt::canonicalize(path)?;
 		let workspace_root = FsExt::workspace_root();
 		// TODO use pathdiff instead?
-		let path = path.strip_prefix(workspace_root)?;
+		let path = path.strip_prefix(workspace_root).map_err(|err| {
+			FsError::InvalidPath {
+				path: path.to_path_buf(),
+				err: err.to_string(),
+			}
+		})?;
 		Ok(Self::new(path))
 	}
 

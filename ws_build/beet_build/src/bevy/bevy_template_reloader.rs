@@ -35,7 +35,7 @@ impl Plugin for BevyTemplateReloader {
 		};
 		let builder = BuildTemplateMaps::new(&src);
 		let templates_root_dir = builder.templates_root_dir.clone();
-		let dst = builder.template_map_path.clone();
+		let dst = builder.node_templates_path.clone();
 
 		let recompile = move || {
 			builder.build_and_write()?;

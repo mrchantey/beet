@@ -32,20 +32,20 @@ impl LineCol {
 		(start, end)
 	}
 
-	#[cfg(feature = "tokens")]
-	pub fn syn_iter_to_spans(
-		vec: &[impl syn::spanned::Spanned],
-	) -> (LineCol, LineCol) {
-		let start = vec
-			.first()
-			.map(|n| n.span().start().into())
-			.unwrap_or_default();
-		let end = vec
-			.last()
-			.map(|n| n.span().end().into())
-			.unwrap_or_default();
-		(start, end)
-	}
+	// #[cfg(feature = "tokens")]
+	// pub fn syn_iter_to_spans(
+	// 	vec: &[impl syn::spanned::Spanned],
+	// ) -> (LineCol, LineCol) {
+	// 	let start = vec
+	// 		.first()
+	// 		.map(|n| n.span().start().into())
+	// 		.unwrap_or_default();
+	// 	let end = vec
+	// 		.last()
+	// 		.map(|n| n.span().end().into())
+	// 		.unwrap_or_default();
+	// 	(start, end)
+	// }
 }
 
 impl Default for LineCol {

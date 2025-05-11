@@ -1,8 +1,8 @@
 use crate::prelude::*;
 use anyhow::Result;
 use beet_common::prelude::*;
-use std::convert::Infallible;
 use sweet::prelude::Pipeline;
+use sweet::prelude::PipelineTarget;
 
 
 /// For each [`ElementTokens`], read its [`attributes`](ElementTokens::attributes) and extract them
@@ -10,7 +10,7 @@ use sweet::prelude::Pipeline;
 #[derive(Default)]
 pub struct ExtractTemplateDirectives;
 
-impl<T: ElementTokensVisitor<Infallible>> Pipeline<T, Result<T>>
+impl<T: ElementTokensVisitor> Pipeline<T, Result<T>>
 	for ExtractTemplateDirectives
 {
 	fn apply(self, mut node: T) -> Result<T> {
@@ -25,76 +25,34 @@ fn parse_node(
 	ElementTokens {
 		attributes, meta, ..
 	}: &mut ElementTokens,
-) -> Result<(), Infallible> {
-	attributes.retain(|attr| {
-		if let Some(directive) = attr_to_template_directive(attr) {
+) -> Result<()> {
+	let mut result = Ok(());
+	attributes.retain(|attr| match attr_to_template_directive(attr) {
+		Ok(Some(directive)) => {
 			meta.push_directive(directive);
-			return false;
+			false
 		}
-		true
+		Err(e) => {
+			result = Err(e);
+			true
+		}
+		Ok(None) => true,
 	});
-	Ok(())
+	result
 }
 
 fn attr_to_template_directive(
 	attr: &RsxAttributeTokens,
-) -> Option<TemplateDirective> {
+) -> Result<Option<TemplateDirective>> {
 	match attr {
-		RsxAttributeTokens::Key { key } => match key.as_str() {
-			"is:template" => Some(TemplateDirective::NodeTemplate),
-			"client:load" => Some(TemplateDirective::ClientLoad),
-			"scope:local" => {
-				Some(TemplateDirective::StyleScope(StyleScope::Local))
-			}
-			"scope:global" => {
-				Some(TemplateDirective::StyleScope(StyleScope::Global))
-			}
-			"is:inline" => Some(TemplateDirective::Inline),
-			"style:cascade" => Some(TemplateDirective::StyleCascade),
-			runtime_key if runtime_key.starts_with("runtime:") => {
-				let Some(suffix) = runtime_key.split(':').nth(1) else {
-					return None;
-				};
-				return Some(TemplateDirective::Runtime(suffix.to_string()));
-			}
-			custom_key if custom_key.contains(':') => {
-				let mut parts = custom_key.split(':');
-				let prefix = parts.next().unwrap_or_default().to_string();
-				let suffix = parts.next().unwrap_or_default().to_string();
-				Some(TemplateDirective::Custom {
-					prefix,
-					suffix,
-					value: None,
-				})
-			}
-			_attr => None,
-		},
-		// only key value pairs where the value is a string are valid
-		// templates
+		RsxAttributeTokens::Key { key } => {
+			TemplateDirective::try_from_attr(key.as_str(), None)?
+		}
 		RsxAttributeTokens::KeyValueLit { key, value } => {
 			let value = RsxAttributeTokens::lit_to_string(&value);
-			match key.as_str() {
-				"slot" => Some(TemplateDirective::Slot(value)),
-				"src" if value.starts_with('.') => {
-					// alternatively we could use an ignore approach
-					// if ["/", "http://", "https://"]
-					// .iter()
-					// .all(|p| val.starts_with(p) == false)
-					Some(TemplateDirective::FsSrc(value))
-				}
-				custom_key if custom_key.contains(':') => {
-					let mut parts = custom_key.split(':');
-					let prefix = parts.next().unwrap_or_default().to_string();
-					let suffix = parts.next().unwrap_or_default().to_string();
-					Some(TemplateDirective::Custom {
-						prefix,
-						suffix,
-						value: Some(value),
-					})
-				}
-				_attr => None,
-			}
+			TemplateDirective::try_from_attr(key.as_str(), Some(&value))?
 		}
 		_ => None,
 	}
+	.xok()
 }

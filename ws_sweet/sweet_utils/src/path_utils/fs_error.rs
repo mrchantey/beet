@@ -20,6 +20,8 @@ pub enum FsError {
 	/// in which case we dont know the child path
 	#[error("Fs Error - Child IO\nParent: {parent}\nError: {err}")]
 	ChildIo { parent: PathBuf, err: io::Error },
+	#[error("Fs Error - Invalid Path\nPath: {path}\nError: {err}")]
+	InvalidPath { path: PathBuf, err: String },
 	#[error("Fs Error\nPath: {path}\nError: {err}")]
 	Other { path: PathBuf, err: String },
 }

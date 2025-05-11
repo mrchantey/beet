@@ -5,26 +5,21 @@ use std::path::PathBuf;
 
 /// Load an [`NodeTemplateMap`] and apply the templates to each route
 pub struct ApplyRouteTemplates {
-	/// Location of the `rsx-templates.ron` file
-	pub templates_map_path: PathBuf,
+	/// Location of the [`NodeTemplateMap`] file
+	pub node_templates_path: PathBuf,
+	/// Location of the [`LangTemplateMap`] file
+	pub lang_templates_path: PathBuf,
 }
 
 impl Default for ApplyRouteTemplates {
 	fn default() -> Self {
 		Self {
-			templates_map_path: default_paths::NODE_TEMPLATE_MAP.into(),
+			node_templates_path: default_paths::NODE_TEMPLATE_MAP.into(),
+			lang_templates_path: default_paths::LANG_TEMPLATE_MAP.into(),
 		}
 	}
 }
-impl ApplyRouteTemplates {
-	/// Create a new instance of `RoutesToHtml` with a custom `templates_map_path`
-	pub fn new(templates_map_path: impl Into<PathBuf>) -> Self {
-		Self {
-			templates_map_path: templates_map_path.into(),
-		}
-	}
-}
-
+impl ApplyRouteTemplates {}
 
 impl Pipeline<Vec<(RouteInfo, WebNode)>, Result<Vec<(RouteInfo, WebNode)>>>
 	for ApplyRouteTemplates
@@ -33,19 +28,37 @@ impl Pipeline<Vec<(RouteInfo, WebNode)>, Result<Vec<(RouteInfo, WebNode)>>>
 		self,
 		routes: Vec<(RouteInfo, WebNode)>,
 	) -> Result<Vec<(RouteInfo, WebNode)>> {
-		let template_map = NodeTemplateMap::load(&self.templates_map_path)
-			.map_err(|err| {
-				// notify user that we are using routes
-				anyhow::anyhow!(
-					"Live reload disabled - Error loading template map at: {:?}\n{:#?}",
-					self.templates_map_path,
-					err,
-				)
-			})?;
+		let node_template_map = NodeTemplateMap::load(
+			&self.node_templates_path,
+		)
+		.map_err(|err| {
+			anyhow::anyhow!(
+				"Error loading node template map at: {:?}\n{:#?}",
+				self.node_templates_path,
+				err,
+			)
+		})?;
+		let lang_template_map = LangTemplateMap::load(
+			&self.lang_templates_path,
+		)
+		.map_err(|err| {
+			anyhow::anyhow!(
+				"Error loading lang template map at: {:?}\n{:#?}",
+				self.lang_templates_path,
+				err,
+			)
+		})?;
 
 		routes
 			.into_iter()
-			.map(|(route, root)| Ok((route, root.xpipe(&template_map)?)))
+			.map(|(route, root)| {
+				Ok((
+					route,
+					root.xpipe(&node_template_map)?
+						.xpipe(&lang_template_map)?
+						.xpipe(ApplyStyleIds::default()),
+				))
+			})
 			.collect()
 	}
 }

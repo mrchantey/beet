@@ -19,15 +19,13 @@ impl SpaToHtmlFile {
 
 impl Pipeline<WebNode, Result<()>> for SpaToHtmlFile {
 	fn apply(self, app: WebNode) -> Result<()> {
-		// the cli built the template map by looking at this file
-		let template_map =
-			NodeTemplateMap::load(default_paths::NODE_TEMPLATE_MAP)?;
-
 		// we'll create the app even though its static parts are stale
 		// because we need the rusty parts to fill in the html template
 		// apply the template to the app
 		let html = app
-			.xpipe(&template_map)?
+			// the cli built the template map by looking at this file
+			.xpipe(&NodeTemplateMap::load(default_paths::NODE_TEMPLATE_MAP)?)?
+			.xpipe(&LangTemplateMap::load(default_paths::LANG_TEMPLATE_MAP)?)?
 			.xpipe(RsxToHtmlDocument::default())?
 			.xpipe(RenderHtmlEscaped::default());
 

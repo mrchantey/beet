@@ -23,22 +23,12 @@ pub struct NodeTemplateMap {
 	// canonicalized [here](ws_rsx/beet_router/src/parser/build_template_map/mod.rs#L110-L111)
 	pub root: WorkspacePathBuf,
 	/// Template for each node with a [`TemplateDirective::NodeTemplate`], keyed by their span.
-	pub node_templates: RapidHashMap<FileSpan, WebNodeTemplate>,
+	pub templates: RapidHashMap<FileSpan, WebNodeTemplate>,
 }
 
-impl NodeTemplateMap {
-	pub fn new(
-		root: WorkspacePathBuf,
-		templates: Vec<WebNodeTemplate>,
-	) -> Self {
-		Self {
-			root,
-			node_templates: templates
-				.into_iter()
-				.map(|template| (template.span().clone(), template))
-				.collect(),
-		}
-	}
+impl std::ops::Deref for NodeTemplateMap {
+	type Target = RapidHashMap<FileSpan, WebNodeTemplate>;
+	fn deref(&self) -> &Self::Target { &self.templates }
 }
 
 // TODO use a visitor that doesnt exit early if a parent has no nodes.
@@ -73,17 +63,28 @@ impl Pipeline<WebNode, TemplateResult<WebNode>> for &NodeTemplateMap {
 }
 
 impl NodeTemplateMap {
+	pub fn new(
+		root: WorkspacePathBuf,
+		templates: Vec<WebNodeTemplate>,
+	) -> Self {
+		Self {
+			root,
+			templates: templates
+				.into_iter()
+				.map(|template| (template.span().clone(), template))
+				.collect(),
+		}
+	}
+
 	pub fn root(&self) -> &WorkspacePathBuf { &self.root }
 
-	/// Load the template map serialized by [beet_rsx_parser::RstmlToRsxTemplate]
+	/// Load the template map created by the beet cli.
+	/// Load the template map created by the beet cli.
 	#[cfg(all(feature = "serde", not(target_arch = "wasm32")))]
 	pub fn load(src: impl AsRef<std::path::Path>) -> Result<Self> {
-		use sweet::prelude::ReadFile;
-		{
-			let tokens = ReadFile::to_string(src)?;
-			let this: Self = ron::de::from_str(&tokens.to_string())?;
-			Result::Ok(this)
-		}
+		let tokens = sweet::prelude::ReadFile::to_string(src)?;
+		let this: Self = ron::de::from_str(&tokens.to_string())?;
+		Result::Ok(this)
 	}
 
 	fn apply_template(&self, node: &mut WebNode) -> TemplateResult<()> {
@@ -91,33 +92,47 @@ impl NodeTemplateMap {
 			return Ok(());
 		}
 		let span = node.span().clone();
-		// println!("applying template to node: {}", node.location_str());
 
-		if let Some(template) = self.node_templates.get(&span) {
+		if let Some(template) = self.templates.get(&span) {
+			// println!("applying template to node: {span}");
 			// clone because multiple nodes may have the same location
 			*node = (std::mem::take(node), template.clone())
 				.xpipe(ApplyTemplateToNode)
 				.map_err(|err| err.with_location(span.clone()))?;
 
-			Ok(())
-		} else if span.file().starts_with(&self.root) {
-			Err(TemplateError::NoTemplate {
-				received: self
-					.node_templates
-					.keys()
-					.map(|x| x.clone())
-					.collect(),
-				expected: span.clone(),
+			return Ok(());
+		}
+		// we cant check on wasm
+		#[cfg(target_arch = "wasm32")]
+		return Ok(());
+
+		#[cfg(not(target_arch = "wasm32"))]
+		{
+			let root_abs = self.root.into_abs().unwrap_or_default();
+			if span
+				.file()
+				.into_abs()
+				.map(|p| p.starts_with(&root_abs))
+				.unwrap_or(true)
+			{
+				Err(TemplateError::NoTemplate {
+					received: self
+						.templates
+						.keys()
+						.map(|x| x.clone())
+						.collect(),
+					expected: span.clone(),
+				}
+				.with_location(span.clone()))
+			} else {
+				// if the node location is outside the templates root directory,
+				// it wouldn't be expected to have a template.
+				println!(
+					"web node is outside templates dir so no template will be applied:\n{}",
+					span
+				);
+				Ok(())
 			}
-			.with_location(span.clone()))
-		} else {
-			// println!(
-			// 	"web node is outside templates dir so no template will be applied:\n{:?}",
-			// 	location
-			// );
-			// if the node location is outside the templates root directory,
-			// it wouldn't be expected to have a template.
-			Ok(())
 		}
 	}
 }
@@ -134,7 +149,7 @@ mod test {
 	) -> NodeTemplateMap {
 		NodeTemplateMap {
 			root: WorkspacePathBuf::new(file!()),
-			node_templates: templates
+			templates: templates
 				.into_iter()
 				.filter_map(|node| match node.is_template() {
 					true => Some((node.span().clone(), node)),
@@ -299,6 +314,8 @@ mod test {
 	}
 
 	#[test]
+	// cant canonicalize on wasm so cant check validity
+	#[cfg(not(target_arch = "wasm32"))]
 	fn ignores_exterior_roots() {
 		let map = test_template_map(vec![]);
 		let comp = rsx! { <div>foo</div> };

@@ -2,7 +2,7 @@ use crate::prelude::*;
 
 
 
-/// Convert [`WebNode`] structures into a string of [`HtmlNode`]
+/// Convert [`WebNode`] structures into a [`Vec<HtmlNode>`]
 ///
 /// ## Panics
 /// - Panics if `no_slot_check` is false and there are still slot children
@@ -101,6 +101,13 @@ impl RsxToHtml {
 				value: Some(idx.to_string()),
 			});
 		}
+
+		// add span attribute
+		// #[cfg(debug_assertions)]
+		// html_attributes.push(HtmlAttribute {
+		// 	key: self.html_constants.span_key.to_string(),
+		// 	value: Some(el.span().to_string()),
+		// });
 
 		let el = HtmlElementNode {
 			tag: el.tag.clone(),

@@ -1,6 +1,5 @@
 use crate::prelude::*;
 use beet_common::prelude::*;
-use proc_macro2::Span;
 use proc_macro2::TokenStream;
 use proc_macro2_diagnostics::Diagnostic;
 use proc_macro2_diagnostics::Level;
@@ -9,7 +8,6 @@ use rstml::node::Node;
 use rstml::node::NodeAttribute;
 use rstml::node::NodeBlock;
 use rstml::node::NodeElement;
-use rstml::node::NodeFragment;
 use rstml::node::NodeName;
 use std::collections::HashSet;
 use sweet::prelude::Pipeline;
@@ -116,16 +114,15 @@ impl<C: CustomNode> RstmlToWebTokens<C> {
 				meta: FileSpan::new_from_span(self.file.clone(), &node).into(),
 				value: LitStr::new(&node.to_string_best(), node.span()).into(),
 			},
-			Node::Fragment(NodeFragment { children, .. }) => {
-				let (start, end) = LineCol::syn_iter_to_spans(&children);
-				WebTokens::Fragment {
-					nodes: children
-						.into_iter()
-						.map(|n| self.map_node(n))
-						.collect(),
-					meta: FileSpan::new(self.file.clone(), start, end).into(),
-				}
-			}
+			Node::Fragment(fragment) => WebTokens::Fragment {
+				meta: FileSpan::new_from_span(self.file.clone(), &fragment)
+					.into(),
+				nodes: fragment
+					.children
+					.into_iter()
+					.map(|n| self.map_node(n))
+					.collect(),
+			},
 			Node::Block(NodeBlock::ValidBlock(node)) => WebTokens::Block {
 				tracker: self.rusty_tracker.next_tracker(&node),
 				meta: FileSpan::new_from_span(self.file.clone(), &node).into(),
@@ -144,19 +141,14 @@ impl<C: CustomNode> RstmlToWebTokens<C> {
 			}
 			Node::Element(el) => {
 				self.check_self_closing_children(&el);
+				let meta =
+					FileSpan::new_from_span(self.file.clone(), &el).into();
 
 				let NodeElement {
 					open_tag,
 					children,
 					close_tag,
 				} = el;
-				let (start, end) = LineCol::syn_iter_to_spans(&[
-					open_tag.span(),
-					close_tag
-						.as_ref()
-						.map(|t| t.span())
-						.unwrap_or(Span::call_site()),
-				]);
 
 				self.collected_elements.push(open_tag.name.clone());
 				let self_closing = close_tag.is_none();
@@ -172,7 +164,6 @@ impl<C: CustomNode> RstmlToWebTokens<C> {
 					.collect::<Vec<_>>();
 
 				let children = Box::new(self.map_nodes(children));
-				let meta = FileSpan::new(self.file.clone(), start, end).into();
 
 				if tag.as_str().starts_with(|c: char| c.is_uppercase()) {
 					// dont hash the span

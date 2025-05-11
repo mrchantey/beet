@@ -143,6 +143,7 @@ impl RustTokens for RsxAttributeTokens {
 			}
 			RsxAttributeTokens::KeyValueLit { key, value } => {
 				let key = key.into_rust_tokens();
+				let value = value.into_rust_tokens();
 				quote! {
 					RsxAttributeTokens::KeyValueLit {
 						key: #key,

@@ -1,9 +1,0 @@
-
-
-
-
-
-pub struct StyleTemplateMap{
-
-
-}

@@ -40,9 +40,10 @@ fn island_into_mount_tokens(island: &ClientIsland) -> TokenStream {
 		// TODO resolve tracker to location
 		beet::exports::ron::de::from_str::<#type_name>(#ron)?
 			.into_node()
-			// applying slots is a requirement of walking tree locations
+			// applying slots and removing lang nodes is a requirement of walking tree locations
 			// consistently, it panics otherwise
 			.xpipe(ApplySlots::default())?
+			.xpipe(RemoveLangTemplates::default())
 			.xpipe(RegisterEffects::new(
 				tree_location_map.rusty_locations[
 					&RustyTracker::new(#tracker_index,#tracker_hash)]
@@ -75,6 +76,7 @@ mod test {
 				beet::exports::ron::de::from_str::<MyComponent>("(val:32)")?
 					.into_node()
 					.xpipe(ApplySlots::default())?
+					.xpipe(RemoveLangTemplates::default())
 					.xpipe(RegisterEffects::new(tree_location_map.rusty_locations[&RustyTracker::new(0u32,89u64)]))?;
 			}
 			.to_string(),

@@ -31,13 +31,6 @@ impl std::fmt::Display for FileSpan {
 }
 
 impl FileSpan {
-	pub fn new_from_file(file: WorkspacePathBuf) -> Self {
-		Self {
-			file,
-			start: LineCol::default(),
-			end: LineCol::default(),
-		}
-	}
 
 	#[cfg(feature = "tokens")]
 	pub fn new_from_span(

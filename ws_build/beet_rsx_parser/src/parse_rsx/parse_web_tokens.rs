@@ -11,7 +11,6 @@ impl Pipeline<WebTokens, Result<WebTokens>> for ParseWebTokens {
 	fn apply(self, tokens: WebTokens) -> Result<WebTokens> {
 		tokens
 			.xpipe(ExtractTemplateDirectives)?
-			// .xpipe(RemoveStyleTags)
 			.xok()
 	}
 }

@@ -139,6 +139,8 @@ pub struct HtmlAttribute {
 pub struct HtmlConstants {
 	/// the attribute for element ids, used for encoding the [TreePosition],
 	pub tree_idx_key: &'static str,
+	/// in debug mode, the attribute for the span of the element
+	pub span_key: &'static str,
 	/// Attrubute tagging the [`TreeLocationMap`](crate::prelude::TreeLocationMap)
 	pub loc_map_key: &'static str,
 	/// the global event handler for all events
@@ -152,6 +154,7 @@ impl Default for HtmlConstants {
 		Self {
 			tree_idx_key: "data-beet-rsx-idx",
 			loc_map_key: "data-beet-loc-map",
+			span_key: "data-beet-span",
 			event_handler: "_beet_event_handler",
 			event_store: "_beet_event_store",
 		}
