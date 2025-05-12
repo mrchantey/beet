@@ -25,3 +25,6 @@ There are two ways of using sweet matchers:
 
 - `some().long().chain().xpect().to_be_true();`
 - `some().long().chain().xpect().to_be_close_to(0.300001);`
+
+
+Sweet matchers are not a replacement for `.unwrap()`, always use `.unwrap()` or `.unwrap_err()` in tests when you just want to get the value.

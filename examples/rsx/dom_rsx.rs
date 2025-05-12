@@ -16,7 +16,7 @@ fn main() {
 }
 
 #[allow(unused)]
-fn app() -> RsxNode {
+fn app() -> WebNode {
 	let (value, set_value) = signal(0);
 
 	rsx! {

@@ -9,7 +9,7 @@ pub struct Counter {
 	initial: i32,
 }
 
-fn counter(props: Counter) -> RsxNode {
+fn counter(props: Counter) -> WebNode {
 	let (get, set) = signal(props.initial);
 
 	let get2 = get.clone();

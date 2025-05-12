@@ -11,7 +11,7 @@ fn main() -> Result<()> {
 
 	fn with_sidebar(route: RouteFunc<RsxRouteFunc>) -> RouteFunc<RsxRouteFunc> {
 		route.map_func(|func| {
-			async move || -> anyhow::Result<RsxNode> {
+			async move || -> anyhow::Result<WebNode> {
 				let root = func().await?;
 				Ok(rsx! { <BeetSidebarLayout>{root}</BeetSidebarLayout> })
 			}
@@ -25,7 +25,6 @@ fn main() -> Result<()> {
 			.xtend(beet_site::docs::collect().xmap_each(with_sidebar)),
 	}
 	.run()?;
-
 
 	Ok(())
 }

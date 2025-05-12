@@ -1,17 +1,24 @@
 # Maximum width of each line
-max_width = 80 
+max_width = 80
 # Number of spaces per tab
-tab_spaces = 2 
+tab_spaces = 2
 # "Tabs", "Spaces" or "Auto"
-indentation_style = "Tabs" 
+indentation_style = "Tabs"
 # "Unix", "Windows" or "Auto"
-newline_style = "Unix" 
+newline_style = "Unix"
 # "Always", "AlwaysUnlessLit", "WhenRequired" or "Preserve"
-attr_value_brace_style = "WhenRequired" 
+attr_value_brace_style = "WhenRequired"
 # Macro names which will be formatted
-macro_names = [ "rsx","rsx_template", "beet::rsx","beet::rsx_template" ] 
+macro_names = [
+	"rsx",
+	"rsx_template",
+	"web_tokens",
+	"beet::rsx",
+	"beet::rsx_template",
+	"beet::web_tokens",
+]
 # "Preserve", "SelfClosing" or "NonSelfClosing"
-closing_tag_style = "Preserve" 
+closing_tag_style = "Preserve"
 
 # Attribute values can be formatted by custom formatters
 # Every attribute name may only select one formatter (this might change later on)

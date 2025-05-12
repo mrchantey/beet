@@ -13,7 +13,7 @@ opt-level = 0
 opt-level = 0
 
 [workspace.package]
-version = "0.4.2-dev.2"
+version = "0.0.6-dev.4"
 authors = ["Pete Hayman"]
 edition = "2024"
 description = "Tools for building reactive structures"
@@ -39,71 +39,75 @@ members = [
 	"crates/beet_site",
 	"crates/beet-cli",
 
-	"crates_flow/beet_examples",
-	"crates_flow/beet_flow",
-	"crates_flow/beet_flow/macros",
-	"crates_flow/beet_ml",
-	"crates_flow/beet_sim",
-	"crates_flow/beet_spatial",
+	"ws_build/beet_build",
+	"ws_build/beet_common",
+	"ws_build/beet_rsx_combinator",
+	"ws_build/beet_rsx_parser",
 
-	"crates_rsx/beet_build",
-	"crates_rsx/beet_connect",
-	"crates_rsx/beet_design",
-	"crates_rsx/beet_query",
-	"crates_rsx/beet_query/macros",
-	"crates_rsx/beet_router",
-	"crates_rsx/beet_rsx",
-	"crates_rsx/beet_rsx/macros",
-	"crates_rsx/beet_rsx/parser",
-	"crates_rsx/beet_rsx/combinator",
-	"crates_rsx/beet_server",
+	"ws_flow/beet_examples",
+	"ws_flow/beet_flow",
+	"ws_flow/beet_flow/macros",
+	"ws_flow/beet_ml",
+	"ws_flow/beet_sim",
+	"ws_flow/beet_spatial",
 
-	"crates_sweet/sweet",
-	"crates_sweet/sweet_bevy",
-	"crates_sweet/sweet_fs",
-	"crates_sweet/sweet_net",
-	"crates_sweet/sweet_server",
-	"crates_sweet/sweet_test/macros",
-	"crates_sweet/sweet_test",
-	"crates_sweet/sweet_utils",
-	"crates_sweet/sweet_web",
-	"crates_sweet/sweet-cli",
+	"ws_rsx/beet_connect",
+	"ws_rsx/beet_design",
+	"ws_rsx/beet_query",
+	"ws_rsx/beet_query/macros",
+	"ws_rsx/beet_router",
+	"ws_rsx/beet_rsx",
+	"ws_rsx/beet_rsx/macros",
+	"ws_rsx/beet_server",
+
+	"ws_sweet/sweet",
+	"ws_sweet/sweet_bevy",
+	"ws_sweet/sweet_fs",
+	"ws_sweet/sweet_net",
+	"ws_sweet/sweet_server",
+	"ws_sweet/sweet_test/macros",
+	"ws_sweet/sweet_test",
+	"ws_sweet/sweet_utils",
+	"ws_sweet/sweet_web",
+	"ws_sweet/sweet-cli",
 
 	# "crates/emby",
 ]
 
 [workspace.dependencies]
 ## internal
-beet = { path = "", version = "0.4.2-dev.2", default-features = false }
+beet = { path = "", version = "0.0.6-dev.4" }
 
-beet_examples = { path = "crates_flow/beet_examples", version = "0.4.2-dev.2" }
-beet_flow = { path = "crates_flow/beet_flow", version = "0.4.2-dev.2" }
-beet_flow_macros = { path = "crates_flow/beet_flow/macros", version = "0.4.2-dev.2" }
-beet_ml = { path = "crates_flow/beet_ml", version = "0.4.2-dev.2" }
-beet_spatial = { path = "crates_flow/beet_spatial", version = "0.4.2-dev.2", default-features = false }
-beet_sim = { path = "crates_flow/beet_sim", version = "0.4.2-dev.2" }
+beet_build = { path = "ws_build/beet_build", version = "0.0.6-dev.4" }
+beet_common = { path = "ws_build/beet_common", version = "0.0.6-dev.4" }
+beet_rsx_combinator = { path = "ws_build/beet_rsx_combinator", version = "0.0.6-dev.4" }
+beet_rsx_parser = { path = "ws_build/beet_rsx_parser", version = "0.0.6-dev.4" }
 
-beet_build = { path = "crates_rsx/beet_build", version = "0.4.2-dev.2", default-features = false }
-beet_connect = { path = "crates_rsx/beet_connect", version = "0.4.2-dev.2", default-features = false }
-beet_design = { path = "crates_rsx/beet_design", version = "0.4.2-dev.2", default-features = false }
-beet_query = { path = "crates_rsx/beet_query", version = "0.4.2-dev.2" }
-beet_query_macros = { path = "crates_rsx/beet_query/macros", version = "0.4.2-dev.2" }
-beet_router = { path = "crates_rsx/beet_router", version = "0.4.2-dev.2" }
-beet_rsx = { path = "crates_rsx/beet_rsx", version = "0.4.2-dev.2" }
-beet_rsx_macros = { path = "crates_rsx/beet_rsx/macros", version = "0.4.2-dev.2" }
-beet_rsx_parser = { path = "crates_rsx/beet_rsx/parser", version = "0.4.2-dev.2" }
-beet_rsx_combinator = { path = "crates_rsx/beet_rsx/combinator", version = "0.4.2-dev.2" }
-beet_server = { path = "crates_rsx/beet_server", version = "0.4.2-dev.2" }
+beet_examples = { path = "ws_flow/beet_examples", version = "0.0.6-dev.4" }
+beet_flow = { path = "ws_flow/beet_flow", version = "0.0.6-dev.4" }
+beet_flow_macros = { path = "ws_flow/beet_flow/macros", version = "0.0.6-dev.4" }
+beet_ml = { path = "ws_flow/beet_ml", version = "0.0.6-dev.4" }
+beet_spatial = { path = "ws_flow/beet_spatial", version = "0.0.6-dev.4" }
+beet_sim = { path = "ws_flow/beet_sim", version = "0.0.6-dev.4" }
 
-sweet = { path = "crates_sweet/sweet", version = "0.4.2-dev.2" }
-sweet_bevy = { path = "crates_sweet/sweet_bevy", version = "0.4.2-dev.2" }
-sweet_fs = { path = "crates_sweet/sweet_fs", version = "0.4.2-dev.2" }
-sweet_net = { path = "crates_sweet/sweet_net", version = "0.4.2-dev.2" }
-sweet_server = { path = "crates_sweet/sweet_server", version = "0.4.2-dev.2" }
-sweet_test = { path = "crates_sweet/sweet_test", version = "0.4.2-dev.2" }
-sweet_test_macros = { path = "crates_sweet/sweet_test/macros", version = "0.4.2-dev.2" }
-sweet_web = { path = "crates_sweet/sweet_web", version = "0.4.2-dev.2" }
-sweet_utils = { path = "crates_sweet/sweet_utils", version = "0.4.2-dev.2" }
+beet_connect = { path = "ws_rsx/beet_connect", version = "0.0.6-dev.4" }
+beet_design = { path = "ws_rsx/beet_design", version = "0.0.6-dev.4" }
+beet_query = { path = "ws_rsx/beet_query", version = "0.0.6-dev.4" }
+beet_query_macros = { path = "ws_rsx/beet_query/macros", version = "0.0.6-dev.4" }
+beet_router = { path = "ws_rsx/beet_router", version = "0.0.6-dev.4" }
+beet_rsx = { path = "ws_rsx/beet_rsx", version = "0.0.6-dev.4" }
+beet_rsx_macros = { path = "ws_rsx/beet_rsx/macros", version = "0.0.6-dev.4" }
+beet_server = { path = "ws_rsx/beet_server", version = "0.0.6-dev.4" }
+
+sweet = { path = "ws_sweet/sweet", version = "0.0.6-dev.4" }
+sweet_bevy = { path = "ws_sweet/sweet_bevy", version = "0.0.6-dev.4" }
+sweet_fs = { path = "ws_sweet/sweet_fs", version = "0.0.6-dev.4" }
+sweet_net = { path = "ws_sweet/sweet_net", version = "0.0.6-dev.4" }
+sweet_server = { path = "ws_sweet/sweet_server", version = "0.0.6-dev.4" }
+sweet_test = { path = "ws_sweet/sweet_test", version = "0.0.6-dev.4" }
+sweet_test_macros = { path = "ws_sweet/sweet_test/macros", version = "0.0.6-dev.4" }
+sweet_web = { path = "ws_sweet/sweet_web", version = "0.0.6-dev.4" }
+sweet_utils = { path = "ws_sweet/sweet_utils", version = "0.0.6-dev.4" }
 
 #💡 local
 bevy = { version = "0.16", default-features = false, features = ["bevy_color"] }
@@ -116,7 +120,6 @@ once_cell = "1"
 glob = "0.3"
 rapidhash = "1"
 chrono = "0.4"
-itertools = "0"
 # old rand until https://github.com/bevyengine/bevy/pull/18047
 # also when you update it remove all the RandomSource.0 in beet too please
 rand = "0.8.5"
@@ -147,9 +150,9 @@ tokio = { version = "1", features = [
 ] }
 
 #💡 macros
-syn = "2"
+syn = { version = "2", features = ["extra-traits", "visit"] }
 quote = "1"
-proc-macro2 = "1"
+proc-macro2 = { version = "1", features = ["span-locations"] }
 proc-macro2-diagnostics = "0.10"
 prettyplease = "0.2"
 
@@ -210,9 +213,9 @@ include = ["CHANGELOG.md", "README.md", "/src", "/examples", "/scenes"]
 
 [features]
 default = ["flow"]
-# helper features
+#💡 helper features
 web-server = ["server", "router", "design"]
-# fine-grained
+#💡 fine-grained
 connect = ["dep:beet_connect"]
 examples = ["bevy_default", "dep:beet_examples"]
 flow = ["dep:beet_flow"]
@@ -220,21 +223,16 @@ css = ["beet_rsx?/css"]
 design = ["rsx", "css", "dep:beet_design"]
 router = ["rsx", "dep:beet_router"]
 query = ["dep:beet_query"]
-parser = ["beet_rsx?/parser", "beet_router?/parser"]
+# parser = ["beet_rsx?/parser", "beet_router?/parser"]
 rsx = ["dep:beet_rsx"]
 fs = ["beet_rsx?/fs"]
 ml = ["flow", "dep:beet_ml", "beet_examples?/ml"]
-server = ["parser", "dep:beet_server"]
+server = ["dep:beet_server"]
 lambda = ["server", "beet_server/lambda"]
 spatial = ["flow", "dep:beet_spatial", "beet_ml?/spatial"]
 sim = ["flow", "dep:beet_sim"]
-build = [
-	"router",
-	"beet_design?/build",
-	"beet_router?/build",
-	"beet_server?/build",
-]
-bevy = ["dep:bevy", "beet_rsx?/bevy", "beet_router?/bevy"]
+build = ["dep:beet_build"]
+bevy = ["dep:bevy", "beet_rsx?/bevy", "beet_build?/bevy"]
 bevy_default = [
 	"bevy",
 	"bevy/default",
@@ -255,6 +253,8 @@ bevy_default = [
 # dynamic_linking = ["bevy/dynamic_linking"]
 
 [dependencies]
+beet_common = { workspace = true }
+beet_build = { workspace = true, optional = true }
 beet_connect = { workspace = true, optional = true }
 beet_design = { workspace = true, optional = true }
 beet_examples = { workspace = true, optional = true }
@@ -279,7 +279,7 @@ beet = { path = "", features = ["router", "bevy"] }
 sweet = { workspace = true, features = ["test", "bevy", "rand"] }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
-beet = { path = "", features = ["parser"] }
+beet = { path = "", features = ["build"] }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 beet_server = { workspace = true, optional = true }

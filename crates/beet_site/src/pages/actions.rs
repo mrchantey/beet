@@ -2,10 +2,10 @@ use crate::prelude::*;
 use beet::prelude::*;
 
 
-pub fn get() -> RsxNode {
+pub fn get() -> WebNode {
 	rsx! {
-		<BeetSidebarLayout>
+		// <BeetSidebarLayout>
 			<ActionTest client:load />
-		</BeetSidebarLayout>
+		// </BeetSidebarLayout>
 	}
 }

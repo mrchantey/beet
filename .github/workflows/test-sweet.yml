@@ -5,7 +5,7 @@ on:
   #   paths:
   #     - 'Cargo.lock'
   #     - '.github/workflows/test-sweet.yml'
-  #     - 'crates_sweet/**'
+  #     - 'ws_sweet/**'
   # push:
   #   branches:
   #     - main
@@ -13,7 +13,7 @@ on:
   #   paths:
   #     - 'Cargo.lock'
   #     - '.github/workflows/test-sweet.yml'
-  #     - 'crates_sweet/**'
+  #     - 'ws_sweet/**'
 env:
   CARGO_TERM_COLOR: always
 jobs:

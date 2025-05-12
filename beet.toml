@@ -1,0 +1,39 @@
+# This is the config file for both the beet site
+# and a test site used for internal testing.
+#
+# It contains some custom parts to handle the internal nature
+# of the beet site, an external project will be significantly simpler.
+
+package_name = "beet_site"
+src_path = "crates/beet_site/src"
+docs_route = "/docs"
+wasm_imports = ["use beet::design as beet_design;", "use beet::prelude::*;"]
+file_group_routes = ["beet_design_mockups"]
+
+[[file_group]]
+name = "test_site_pages"
+path = "ws_rsx/beet_router/src/test_site/pages"
+output = "ws_rsx/beet_router/src/test_site/codegen/pages.rs"
+include = ["*.rs"]
+exclude = ["*mod.rs"]
+package_name = "beet_router"
+import_tokens = ["use crate::as_beet::*;"]
+
+
+[[file_group]]
+name = "beet_design_mockups"
+# preset = "mockup"
+package_name = "beet_design"
+path = "ws_rsx/beet_design/src"
+output = "ws_rsx/beet_design/src/codegen/mockups.rs"
+include = ["*.mockup.*"]
+base_route = "/design"
+replace_route = [{ from = ".mockup", to = "" }]
+import_tokens = [
+	"#[allow(unused_imports)]use beet::prelude::*;",
+	"use beet_router::as_beet::*;",
+]
+
+
+# [wasm]
+# import_tokens = ["use beet::design as beet_design;", "use beet::prelude::*;"]

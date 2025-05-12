@@ -1,6 +1,9 @@
 #![cfg_attr(test, feature(test, custom_test_frameworks))]
 #![cfg_attr(test, test_runner(sweet::test_runner))]
 #![doc = include_str!("../README.md")]
+#[cfg(feature = "build")]
+pub use beet_build as build;
+pub use beet_common as common;
 #[cfg(feature = "connect")]
 pub use beet_connect as connect;
 #[cfg(feature = "design")]
@@ -24,12 +27,13 @@ pub use beet_sim as sim;
 #[cfg(feature = "spatial")]
 pub use beet_spatial as spatial;
 
-#[cfg(all(feature = "build", feature = "router"))]
-mod default_builder;
 #[cfg(all(feature = "router", not(target_arch = "wasm32")))]
 mod default_runner;
 
 pub mod prelude {
+	#[cfg(feature = "build")]
+	pub use crate::build::prelude::*;
+	pub use crate::common::prelude::*;
 	#[cfg(feature = "connect")]
 	pub use crate::connect::prelude::*;
 	#[cfg(feature = "design")]
@@ -54,14 +58,14 @@ pub mod prelude {
 	pub use crate::spatial::prelude::*;
 
 
-	#[cfg(all(feature = "build", feature = "router"))]
-	pub use crate::default_builder::*;
 	#[cfg(all(feature = "router", not(target_arch = "wasm32")))]
 	pub use crate::default_runner::*;
 }
 
 
 pub mod exports {
+	#[cfg(feature = "build")]
+	pub use beet_build::exports::*;
 	#[cfg(feature = "router")]
 	pub use beet_router::exports::*;
 	#[cfg(feature = "rsx")]

@@ -10,7 +10,7 @@ pub struct RunWatch {
 	#[command(flatten)]
 	build_args: BuildArgs,
 	#[command(flatten)]
-	build_template_map: BuildTemplateMap,
+	build_template_maps: BuildTemplateMaps,
 	#[command(flatten)]
 	build_cmd: CargoBuildCmd,
 }
@@ -53,23 +53,23 @@ impl RunWatch {
 	async fn watch(self) -> Result<()> {
 		let Self {
 			build_args: watch_args,
-			build_template_map,
+			build_template_maps,
 			build_cmd,
 		} = self;
 
 
-		let templates_root_dir = build_template_map.templates_root_dir.clone();
+		let templates_root_dir = build_template_maps.templates_root_dir.clone();
 
 		let recompile = RunBuild {
 			build_cmd: build_cmd.clone(),
 			build_args: watch_args.clone(),
-			build_template_map: build_template_map.clone(),
+			build_template_maps: build_template_maps.clone(),
 			server: true,
 		}
 		.into_group()?;
 
 		let reload = BuildStepGroup::default()
-			.with(build_template_map.clone())
+			.with(build_template_maps.clone())
 			.with(ExportStatic::new(&watch_args, &build_cmd.exe_path()));
 
 		TemplateWatcher::new(

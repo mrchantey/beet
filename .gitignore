@@ -4,11 +4,11 @@ target
 .rustc_info.json
 .env
 .vscode/settings.json
-
+dump.txt
 
 tests/assert.rs
 tests/expect.rs
 
 **/codegen
 
-crates_rsx/beet_query/test.db
+ws_rsx/beet_query/test.db

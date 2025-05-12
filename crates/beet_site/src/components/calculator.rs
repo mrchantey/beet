@@ -9,7 +9,7 @@ pub struct Calculator {
 	initial: i32,
 }
 
-fn calculator(props: Calculator) -> RsxNode {
+fn calculator(props: Calculator) -> WebNode {
 	let (get, set) = signal(props.initial);
 
 

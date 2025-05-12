@@ -1,0 +1,36 @@
+[package]
+name = "beet_rsx_macros"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+readme.workspace = true
+description.workspace = true
+documentation.workspace = true
+homepage.workspace = true
+repository.workspace = true
+categories.workspace = true
+keywords.workspace = true
+
+[features]
+default = ["sigfault"]
+sigfault = []
+css = ["beet_rsx_parser/css"]
+# bevy = []
+
+[lib]
+proc-macro = true
+
+[dependencies]
+beet_common = { workspace = true, features = ["tokens"] }
+beet_rsx_parser.workspace = true
+sweet.workspace = true
+syn.workspace = true
+quote.workspace = true
+proc-macro2.workspace = true
+proc-macro2-diagnostics.workspace = true
+anyhow.workspace = true
+
+
+[dev-dependencies]
+sweet = { workspace = true, features = ["test"] }

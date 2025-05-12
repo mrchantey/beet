@@ -24,10 +24,10 @@ init-repo:
 	just init-flow
 	just init-rsx
 
-# mkdir -p crates_flow/beet_rsx/assets/fonts && cp ./assets/fonts/* crates_rsx/beet_rsx/assets/fonts
+# mkdir -p ws_flow/beet_rsx/assets/fonts && cp ./assets/fonts/* ws_rsx/beet_rsx/assets/fonts
 init-flow:
 	just assets-pull
-	mkdir -p crates_flow/beet_ml/assets/ml && cp ./assets/ml/default-bert.ron crates_flow/beet_ml/assets/ml/default.bert.ron
+	mkdir -p ws_flow/beet_ml/assets/ml && cp ./assets/ml/default-bert.ron ws_flow/beet_ml/assets/ml/default.bert.ron
 
 # once beet-cli is binstallable we shouldnt need to compile in order to codegen
 init-rsx:
@@ -98,15 +98,15 @@ fmt *args:
 # soo bad
 leptosfmt *args:
 	leptosfmt -q											\
-	crates_rsx/beet_rsx/**/*.rs 					\
-	crates_rsx/beet_rsx/**/**/*.rs 				\
-	crates_rsx/beet_rsx/**/**/**/*.rs 		\
-	crates_rsx/beet_design/**/*.rs 				\
-	crates_rsx/beet_design/**/**/*.rs 		\
-	crates_rsx/beet_design/**/**/**/*.rs 	\
-	crates_rsx/beet_router/**/*.rs 				\
-	crates_rsx/beet_router/**/**/*.rs 		\
-	crates_rsx/beet_router/**/**/**/*.rs 	\
+	ws_rsx/beet_rsx/**/*.rs 					\
+	ws_rsx/beet_rsx/**/**/*.rs 				\
+	ws_rsx/beet_rsx/**/**/**/*.rs 		\
+	ws_rsx/beet_design/**/*.rs 				\
+	ws_rsx/beet_design/**/**/*.rs 		\
+	ws_rsx/beet_design/**/**/**/*.rs 	\
+	ws_rsx/beet_router/**/*.rs 				\
+	ws_rsx/beet_router/**/**/*.rs 		\
+	ws_rsx/beet_router/**/**/**/*.rs 	\
 	crates/beet_site/**/*.rs 					\
 	crates/beet_site/**/**/*.rs 			\
 	crates/beet_site/**/**/**/*.rs 		\
@@ -170,14 +170,25 @@ test-ci *args:
 	just test-fmt
 	just test-rsx
 
+# upstream from sweet_test
+test-fs *args:
+	just watch 'cargo test -p sweet_fs --lib {{args}}'
+# upstream from sweet_test
+test-utils *args:
+	just watch 'cargo test -p sweet_utils --lib --features=serde {{args}}'
+
+
 # just test-flow runs out of space
+test-build *args:
+	{{min-stack}} cargo test -p beet_common 					--all-features																		{{args}} -- {{test-threads}}
+	{{min-stack}} cargo test -p beet_rsx_combinator 	--all-features																		{{args}} -- {{test-threads}}
+	{{min-stack}} cargo test -p beet_rsx_parser 			--all-features																		{{args}} -- {{test-threads}}
+	{{min-stack}} cargo test -p beet_build 						--all-features																		{{args}} -- {{test-threads}}
 
 test-rsx *args:
 	{{min-stack}} cargo test -p beet_design 	 	 																												{{args}} -- {{test-threads}}
-	{{min-stack}} cargo test -p beet_router 	--features=_test_site,build,serde,parser,bevy 						{{args}} -- {{test-threads}}
+	{{min-stack}} cargo test -p beet_router 	--features=serde 																					{{args}} -- {{test-threads}}
 	{{min-stack}} cargo test -p beet_rsx 			--features=bevy,css,parser 																{{args}} -- {{test-threads}}
-	{{min-stack}} cargo test -p beet_rsx_parser 																												{{args}} -- {{test-threads}}
-	{{min-stack}} cargo test -p beet_rsx_combinator 																										{{args}} -- {{test-threads}}
 	{{min-stack}} cargo test -p beet_server 																														{{args}} -- {{test-threads}}
 	{{min-stack}} cargo test -p beet_site																																{{args}} -- {{test-threads}}
 	{{min-stack}} cargo test -p beet-cli																																{{args}} -- {{test-threads}}
@@ -244,8 +255,8 @@ test-rsx-macro *args:
 
 clear-artifacts:
 	rm -rf target
-	rm -rf crates_rsx/beet_router/src/test_site/codegen
-	rm -rf crates_rsx/beet_design/src/codegen
+	rm -rf ws_rsx/beet_router/src/test_site/codegen
+	rm -rf ws_rsx/beet_design/src/codegen
 	rm -rf crates/beet_site/src/codegen
 
 # massive purge
@@ -275,6 +286,7 @@ publish crate *args:
 	sleep 2
 
 publish-all *args:
+	just publish beet_rsx_combinator  {{args}} || true
 	@echo 'Publishing Sweet Crates'
 	just publish sweet_utils				{{args}} | true
 	just publish sweet_fs						{{args}} | true
@@ -293,15 +305,17 @@ publish-all *args:
 	just publish beet_ml              {{args}} || true
 	just publish beet_sim          		{{args}} || true
 	just publish beet_examples        {{args}} || true
-	@echo 'Publishing Rsx Crates'
-	just publish beet_rsx_combinator  {{args}} || true
+	@echo 'Publishing Rsx Build Crates'
+	just publish beet_common      		{{args}} || true
 	just publish beet_rsx_parser      {{args}} || true
 	just publish beet_rsx_macros      {{args}} || true
+	@echo 'Publishing Rsx Crates'
 	just publish beet_rsx             {{args}} || true
 	just publish beet_router          {{args}} || true
 	just publish beet_server       		{{args}} || true
 	just publish beet_connect      		{{args}} || true
 	just publish beet_design 					{{args}} || true
+	@echo 'Publishing Build Crates'
 	@echo 'Publishing Misc Crates'
 	just publish beet                 {{args}} || true
 	just publish beet-cli             {{args}} || true
@@ -314,7 +328,7 @@ watch *command:
 	sweet watch \
 	--include '**/*.rs' \
 	--exclude '{.git,target,html}/**' \
-	--exclude '*codegen*' \
+	--exclude '*/codegen/*' \
 	--cmd "{{command}}"
 
 assets-push:
