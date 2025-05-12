@@ -1,0 +1,49 @@
+
+watch:
+	sweet watch \
+	--include "*src*" 			\
+	--cmd "just build"			\
+
+
+
+build:
+	rm -rf wasm
+	just build-bin vanilla
+	just build-bin reactive_graph
+	just build-bin bevy_default
+	just build-bin bevy_minimal
+	just build-bin bevy_ecs
+	@just sizes-heading
+	@just sizes vanilla
+	@just sizes reactive_graph
+	@just sizes bevy_default
+	@just sizes bevy_minimal
+	@just sizes bevy_ecs
+
+
+build-bin bin_name:
+	@cargo build --target wasm32-unknown-unknown --release --bin {{bin_name}}
+	@wasm-bindgen \
+	--out-dir ./wasm \
+	--target web \
+	--out-name {{bin_name}} \
+	$CARGO_TARGET_DIR/wasm32-unknown-unknown/release/{{bin_name}}.wasm
+	@wasm-opt -Oz ./wasm/{{bin_name}}_bg.wasm -o ./wasm/{{bin_name}}_bg_opt.wasm
+	@brotli ./wasm/{{bin_name}}_bg_opt.wasm
+
+sizes-heading:
+	@echo "|Name|Size|"
+	@echo "|----|----|"
+
+sizes bin_name:
+	@just size {{bin_name}}_bg.wasm
+	@just size {{bin_name}}_bg_opt.wasm
+	@just size {{bin_name}}_bg_opt.wasm.br
+
+size name:
+	@du -k wasm/{{name}} | cut -f1 | xargs -I{} echo "|{{name}}| {} KB |"
+
+
+clear:
+	rm -rf wasm
+	rm $CARGO_TARGET_DIR/wasm32-unknown-unknown/release/hello-bevy-wasm.wasm

@@ -1,0 +1,23 @@
+[profile.release]
+opt-level = 'z'
+lto = true
+codegen-units = 1
+
+[package]
+name = "wasm-bundle-bench"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+any_spawner = { version = "0.3.0", features = [
+	"futures-executor",
+	"wasm-bindgen",
+	"tokio",
+] }
+reactive_graph = { version = "0.2.2", features = ["nightly", "effects"] }
+bevy = { version = "0.16.0", default-features = false }
+bevy_ecs = "0.16.0"
+console_error_panic_hook = "0.1.7"
+wasm-bindgen-futures = "0.4.50"
+web-sys = { version = "0.3.77", features = ["console"] }
