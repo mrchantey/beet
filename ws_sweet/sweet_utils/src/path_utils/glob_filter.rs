@@ -9,25 +9,11 @@ use std::path::Path;
 pub struct GlobFilter {
 	/// glob for watch patterns, leave empty to include all
 	#[arg(long, value_parser = parse_glob_pattern)]
-	#[cfg_attr(
-		feature = "serde",
-		serde(
-			default,
-			serialize_with = "serialize_patterns",
-			deserialize_with = "deserialize_patterns"
-		)
-	)]
+	#[cfg_attr(feature = "serde", serde(default, with = "serde_glob_vec",))]
 	pub include: Vec<glob::Pattern>,
 	/// glob for ignore patterns
 	#[arg(long, value_parser = parse_glob_pattern)]
-	#[cfg_attr(
-		feature = "serde",
-		serde(
-			default,
-			serialize_with = "serialize_patterns",
-			deserialize_with = "deserialize_patterns"
-		)
-	)]
+	#[cfg_attr(feature = "serde", serde(default, with = "serde_glob_vec",))]
 	pub exclude: Vec<glob::Pattern>,
 }
 
@@ -36,35 +22,37 @@ fn parse_glob_pattern(s: &str) -> Result<glob::Pattern, PatternError> {
 }
 
 #[cfg(feature = "serde")]
-fn serialize_patterns<S>(
-	patterns: &Vec<glob::Pattern>,
-	serializer: S,
-) -> Result<S::Ok, S::Error>
-where
-	S: serde::Serializer,
-{
-	use serde::ser::SerializeSeq;
+mod serde_glob_vec {
 
-	let mut seq = serializer.serialize_seq(Some(patterns.len()))?;
-	for pattern in patterns {
-		seq.serialize_element(pattern.as_str())?;
+	pub fn serialize<S>(
+		patterns: &Vec<glob::Pattern>,
+		serializer: S,
+	) -> Result<S::Ok, S::Error>
+	where
+		S: serde::Serializer,
+	{
+		use serde::ser::SerializeSeq;
+
+		let mut seq = serializer.serialize_seq(Some(patterns.len()))?;
+		for pattern in patterns {
+			seq.serialize_element(pattern.as_str())?;
+		}
+		seq.end()
 	}
-	seq.end()
-}
 
-#[cfg(feature = "serde")]
-fn deserialize_patterns<'de, D>(
-	deserializer: D,
-) -> Result<Vec<glob::Pattern>, D::Error>
-where
-	D: serde::Deserializer<'de>,
-{
-	use serde::Deserialize;
+	pub fn deserialize<'de, D>(
+		deserializer: D,
+	) -> Result<Vec<glob::Pattern>, D::Error>
+	where
+		D: serde::Deserializer<'de>,
+	{
+		use serde::Deserialize;
 
-	let strs = Vec::<String>::deserialize(deserializer)?;
-	strs.into_iter()
-		.map(|s| glob::Pattern::new(&s).map_err(serde::de::Error::custom))
-		.collect()
+		let strs = Vec::<String>::deserialize(deserializer)?;
+		strs.into_iter()
+			.map(|s| glob::Pattern::new(&s).map_err(serde::de::Error::custom))
+			.collect()
+	}
 }
 
 

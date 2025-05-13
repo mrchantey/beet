@@ -743,6 +743,7 @@ version = "0.0.6-dev.4"
 dependencies = [
  "anyhow",
  "beet",
+ "bevy",
  "clap",
  "rapidhash",
  "ron",

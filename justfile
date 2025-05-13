@@ -68,7 +68,7 @@ deploy *args:
 # --iam-role 				$AWS_IAM_ROLE 	\
 
 mod *args:
-	sweet mod --exclude *codegen* {{args}}
+	just sweet mod --exclude *codegen* {{args}}
 
 # Run and watch a workspace example
 run example *args:

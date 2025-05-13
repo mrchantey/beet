@@ -12,19 +12,23 @@ pub impl<T, E> Result<T, E> {
 		}
 	}
 }
-// #[ext]
-// pub impl<T, E: Display> Result<T, E> {
-// Consume the error, log it and return None, otherwise return the value.
-// fn log_err(self) -> Option<T> {
-// 	match self {
-// 		Ok(value) => Some(value),
-// 		Err(err) => {
-// 			log::error!("{err}");
-// 			None
-// 		}
-// 	}
-// }
-// }
+
+
+
+#[ext(name=ResultExtDisplay)]
+pub impl<T, E: std::fmt::Display> Result<T, E> {
+	/// Print a more nicely formatted error message
+	/// than `.unwrap()`
+	fn unwrap_or_exit(self) -> T {
+		match self {
+			Ok(value) => value,
+			Err(err) => {
+				crate::log!("{err}");
+				std::process::exit(1);
+			}
+		}
+	}
+}
 
 
 // #[ext(name =ResultExtEDebug)]

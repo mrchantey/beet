@@ -1,11 +1,13 @@
 use anyhow::Result;
 use beet::prelude::*;
+use bevy::ecs as bevy_ecs;
+use bevy::prelude::*;
 use clap::Parser;
 use std::path::PathBuf;
 use std::process::Command;
 
-/// Verbatim clone of cargo run args
-#[derive(Debug, Clone, Parser)]
+/// Verbatim clone of cargo build/run args
+#[derive(Debug, Clone, Parser, Resource)]
 pub struct CargoBuildCmd {
 	/// Package with the target to run
 	#[arg(short = 'p', long = "package")]

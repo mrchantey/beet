@@ -25,7 +25,7 @@ sweet = { workspace = true, features = ["fs", "server"] }
 clap.workspace = true
 tokio.workspace = true
 rapidhash.workspace = true
-
+bevy.workspace = true
 
 [dev-dependencies]
 sweet = { workspace = true, features = ["test"] }

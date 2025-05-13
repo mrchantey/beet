@@ -2,7 +2,7 @@
 # and a test site used for internal testing.
 #
 # It contains some custom parts to handle the internal nature
-# of the beet site, an external project will be significantly simpler.
+# of the beet site, an external starter project will be significantly simpler.
 
 package_name = "beet_site"
 src_path = "crates/beet_site/src"
