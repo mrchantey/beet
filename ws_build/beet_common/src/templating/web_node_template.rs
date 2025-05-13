@@ -69,9 +69,7 @@ pub enum TemplateError {
 		"WebNode has no tracker for {0}, ensure they are included in RstmlToRsx settings"
 	)]
 	DehydrationFailed(String),
-	#[error(
-		"No template found\nExpected: {expected:#?}\nReceived: {received:#?}"
-	)]
+	#[error("No template found\nExpected: {expected}\nReceived: {}",received.iter().map(|t| t.to_string()).collect::<Vec<_>>().join("\n"))]
 	NoTemplate {
 		expected: FileSpan,
 		received: Vec<FileSpan>,

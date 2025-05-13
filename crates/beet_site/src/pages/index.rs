@@ -24,7 +24,8 @@ pub fn get() -> WebNode {
 					class="primary-action"
 					href=paths::docs::index()
 					style:cascade
-					>Get Started woot</Link>
+					>Get Started</Link>
+				<p>"🚧 Mind your step! Beet is under construction, this site is currently published for testing and feedback only 🚧"</p>
 				<Counter client:load initial=1 />
 				<Calculator client:load initial=1 />
 				</div>
