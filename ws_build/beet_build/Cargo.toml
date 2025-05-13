@@ -14,14 +14,13 @@ keywords.workspace = true
 
 [features]
 default = ["markdown", "style"]
-bevy = ["dep:bevy", "dep:flume", "beet_rsx/bevy"]
 markdown = ["dep:pulldown-cmark"]
 style = ["dep:lightningcss", "dep:parcel_selectors"]
 
 [dependencies]
 #💡 Internal
+beet_rsx = { workspace = true, features = ["bevy"] }
 beet_common.workspace = true
-beet_rsx.workspace = true
 beet_router.workspace = true
 beet_rsx_parser.workspace = true
 sweet.workspace = true
@@ -58,12 +57,12 @@ parcel_selectors = { workspace = true, optional = true }
 lightningcss = { workspace = true, optional = true }
 
 #💡 Bevy
-bevy = { workspace = true, optional = true }
-flume = { workspace = true, optional = true }
+bevy = { workspace = true }
+flume = { workspace = true }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 tokio.workspace = true
 
 [dev-dependencies]
-sweet = { workspace = true, features = ["test"] }
+sweet = { workspace = true, features = ["test", "bevy"] }
 beet_router = { workspace = true, features = ["_test_site"] }

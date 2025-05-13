@@ -34,6 +34,10 @@ impl PathExt {
 			.map_err(|e| FsError::io(path, e))
 	}
 
+	pub fn absolute(path: impl AsRef<Path>) -> FsResult<PathBuf> {
+		std::path::absolute(path.as_ref()).map_err(|e| FsError::io(path, e))
+	}
+
 	/// Create a relative path from a source to a destination:
 	/// ## Example
 	/// ```rust

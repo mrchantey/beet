@@ -27,4 +27,9 @@ pub impl App {
 	fn update_with_millis(&mut self, millis: u64) -> &mut Self {
 		self.update_with_duration(Duration::from_millis(millis))
 	}
+	/// Method chaining utility, calls `update` and returns `self`.
+	fn update_then(&mut self) -> &mut Self {
+		self.update();
+		self
+	}
 }

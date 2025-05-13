@@ -38,8 +38,10 @@ resolver = "2"
 members = [
 	"crates/beet_site",
 	"crates/beet-cli",
+	# "crates/beet-cli-old",
 
 	"ws_build/beet_build",
+	"ws_build/beet_build_old",
 	"ws_build/beet_common",
 	"ws_build/beet_rsx_combinator",
 	"ws_build/beet_rsx_parser",
@@ -232,7 +234,7 @@ lambda = ["server", "beet_server/lambda"]
 spatial = ["flow", "dep:beet_spatial", "beet_ml?/spatial"]
 sim = ["flow", "dep:beet_sim"]
 build = ["dep:beet_build"]
-bevy = ["dep:bevy", "beet_rsx?/bevy", "beet_build?/bevy"]
+bevy = ["dep:bevy", "beet_rsx?/bevy"]
 bevy_default = [
 	"bevy",
 	"bevy/default",

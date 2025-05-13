@@ -13,9 +13,9 @@ pub use self::vec2::*;
 pub mod vec3;
 #[allow(unused_imports)]
 pub use self::vec3::*;
-pub mod world;
+pub mod world_matcher;
 #[allow(unused_imports)]
-pub use self::world::*;
+pub use self::world_matcher::*;
 pub mod observer_utils;
 #[allow(unused_imports)]
 pub use self::observer_utils::*;

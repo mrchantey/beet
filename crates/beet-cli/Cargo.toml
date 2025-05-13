@@ -21,7 +21,7 @@ beet = { workspace = true, features = ["router", "build"] }
 # beet_router = { workspace = true, features = ["parser"] }
 anyhow.workspace = true
 ron.workspace = true
-sweet = { workspace = true, features = ["fs", "server"] }
+sweet = { workspace = true, features = ["fs", "server", "bevy"] }
 clap.workspace = true
 tokio.workspace = true
 rapidhash.workspace = true

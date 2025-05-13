@@ -785,6 +785,39 @@ dependencies = [
 ]
 
 [[package]]
+name = "beet_build_old"
+version = "0.0.6-dev.4"
+dependencies = [
+ "anyhow",
+ "beet_common",
+ "beet_router",
+ "beet_rsx",
+ "beet_rsx_parser",
+ "bevy",
+ "clap",
+ "flume",
+ "futures",
+ "heck 0.4.1",
+ "lightningcss",
+ "parcel_selectors",
+ "prettyplease",
+ "proc-macro2",
+ "proc-macro2-diagnostics",
+ "pulldown-cmark",
+ "quote",
+ "rapidhash",
+ "rayon",
+ "ron",
+ "serde",
+ "serde_json",
+ "sweet",
+ "syn 2.0.101",
+ "thiserror 1.0.69",
+ "tokio",
+ "toml",
+]
+
+[[package]]
 name = "beet_common"
 version = "0.0.6-dev.4"
 dependencies = [
@@ -1037,6 +1070,7 @@ dependencies = [
  "anyhow",
  "beet_common",
  "beet_rsx_combinator",
+ "bevy",
  "heck 0.4.1",
  "lightningcss",
  "proc-macro2",

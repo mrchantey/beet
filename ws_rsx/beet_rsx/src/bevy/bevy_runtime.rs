@@ -144,8 +144,8 @@ mod test {
 		// flush signals
 		app.update();
 		let world = app.world_mut();
-		let mut query = world.query::<&Text>();
-		let text = query.iter(world).next().unwrap();
+		let mut query = world_matcher.query::<&Text>();
+		let text = query.iter(world_matcher).next().unwrap();
 		expect(&text.0).to_be("3");
 	}
 

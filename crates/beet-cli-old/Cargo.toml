@@ -1,5 +1,5 @@
 [package]
-name = "beet-cli"
+name = "beet-cli-old"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
