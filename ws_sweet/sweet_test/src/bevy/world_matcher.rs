@@ -1,16 +1,35 @@
 use crate::prelude::*;
+use bevy::ecs::query::QueryData;
 use bevy::prelude::*;
 use extend::ext;
-use std::ops::Deref;
 
-#[ext(name=MatcherMutExtWorld)]
+sweet_ref_impls!(World);
+impl SweetRef<World> for App {
+	fn sweet_ref(&self) -> &World { self.world() }
+}
+impl SweetMut<World> for App {
+	fn sweet_mut(&mut self) -> &mut World { self.world_mut() }
+}
+impl SweetRef<World> for &App {
+	fn sweet_ref(&self) -> &World { self.world() }
+}
+impl SweetRef<World> for &mut App {
+	fn sweet_ref(&self) -> &World { self.world() }
+}
+impl SweetMut<World> for &mut App {
+	fn sweet_mut(&mut self) -> &mut World { self.world_mut() }
+}
+
+
+#[ext(name=WorldMutExtMatcher)]
 /// Matcher extensions for `bevy::World`
-pub impl<'a, W> Matcher<W>
-where
-	W: 'a + Into<&'a mut World>,
-{
-	fn num_components<T: Component>(self) -> Matcher<usize> {
-		let world = self.value.into();
+pub impl<W: SweetMut<World>> Matcher<W> {
+	fn query<'a, D: QueryData>(&'a mut self) -> Vec<D::Item<'a>> {
+		let world = self.value.sweet_mut();
+		world.query::<D>().iter_mut(world).collect::<Vec<_>>()
+	}
+	fn num_components<T: Component>(&mut self) -> Matcher<usize> {
+		let world = self.value.sweet_mut();
 		let mut arr = world.query::<&T>();
 		let received = arr.iter(world).count();
 		Matcher::new(received)
@@ -19,45 +38,42 @@ where
 
 #[ext(name=MatcherExtWorld)]
 /// Matcher extensions for `bevy::World`
-pub impl<'a, W> Matcher<W>
-where
-	W: 'a + Deref<Target = World>,
-{
+pub impl<W: SweetRef<World>> Matcher<W> {
 	fn to_have_entity(&self, entity: Entity) {
-		let value = self.value.deref();
+		let value = self.value.sweet_ref();
 		let received = value.get_entity(entity);
 		self.assert_option_with_received_negatable(received.ok());
 	}
 
 	fn to_have_component<T: Component>(&self, entity: Entity) {
-		let received = self.value.deref().get::<T>(entity);
+		let received = self.value.sweet_ref().get::<T>(entity);
 		self.assert_option_with_received_negatable(received);
 	}
 
 	fn component<T: Component>(&self, entity: Entity) -> Matcher<&T> {
-		let received = self.value.deref().get::<T>(entity);
+		let received = self.value.sweet_ref().get::<T>(entity);
 		self.assert_some_with_received(received);
 		Matcher::new(received.unwrap())
 	}
 
 	fn to_contain_resource<T: Resource>(&self) {
-		let received = self.value.deref().get_resource::<T>();
+		let received = self.value.sweet_ref().get_resource::<T>();
 		self.assert_option_with_received_negatable(received);
 	}
 
 	fn resource<T: Resource>(&self) -> Matcher<&T> {
-		let received = self.value.deref().get_resource::<T>();
+		let received = self.value.sweet_ref().get_resource::<T>();
 		self.assert_some_with_received(received);
 		Matcher::new(received.unwrap())
 	}
 
 	fn to_contain_non_send_resource<T: 'static>(&self) {
-		let received = self.value.deref().get_non_send_resource::<T>();
+		let received = self.value.sweet_ref().get_non_send_resource::<T>();
 		self.assert_option_with_received_negatable(received);
 	}
 
 	fn non_send_resource<T: 'static>(&self) -> Matcher<&T> {
-		let received = self.value.deref().get_non_send_resource::<T>();
+		let received = self.value.sweet_ref().get_non_send_resource::<T>();
 		self.assert_some_with_received(received);
 		Matcher::new(received.unwrap())
 	}

@@ -209,10 +209,10 @@ impl<C: CustomNode> RstmlToWebTokens<C> {
 	fn map_attribute(
 		&mut self,
 		attr: NodeAttribute,
-	) -> Option<RsxAttributeTokens> {
+	) -> Option<AttributeTokens> {
 		match attr {
 			NodeAttribute::Block(NodeBlock::ValidBlock(block)) => {
-				Some(RsxAttributeTokens::Block {
+				Some(AttributeTokens::Block {
 					tracker: self.rusty_tracker.next_tracker(&block),
 					block: block.into(),
 				})
@@ -233,17 +233,17 @@ impl<C: CustomNode> RstmlToWebTokens<C> {
 				let key = self.map_node_name(&attr.key);
 				match attr.value() {
 					Some(value) if let Expr::Lit(value) = value => {
-						Some(RsxAttributeTokens::KeyValueLit {
+						Some(AttributeTokens::KeyValueLit {
 							key,
 							value: value.lit.clone(),
 						})
 					}
-					Some(value) => Some(RsxAttributeTokens::KeyValueExpr {
+					Some(value) => Some(AttributeTokens::KeyValueExpr {
 						tracker: self.rusty_tracker.next_tracker(&value),
 						key,
 						value: value.clone().into(),
 					}),
-					None => Some(RsxAttributeTokens::Key { key }),
+					None => Some(AttributeTokens::Key { key }),
 				}
 			}
 		}

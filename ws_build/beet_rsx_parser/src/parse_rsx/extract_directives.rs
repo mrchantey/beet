@@ -42,14 +42,14 @@ fn parse_node(
 }
 
 fn attr_to_template_directive(
-	attr: &RsxAttributeTokens,
+	attr: &AttributeTokens,
 ) -> Result<Option<TemplateDirective>> {
 	match attr {
-		RsxAttributeTokens::Key { key } => {
+		AttributeTokens::Key { key } => {
 			TemplateDirective::try_from_attr(key.as_str(), None)?
 		}
-		RsxAttributeTokens::KeyValueLit { key, value } => {
-			let value = RsxAttributeTokens::lit_to_string(&value);
+		AttributeTokens::KeyValueLit { key, value } => {
+			let value = AttributeTokens::lit_to_string(&value);
 			TemplateDirective::try_from_attr(key.as_str(), Some(&value))?
 		}
 		_ => None,

@@ -1,5 +1,6 @@
 use crate::prelude::*;
-
+#[cfg(feature = "bevy")]
+use bevy::prelude::*;
 
 /// Template directives contain instructions for various stages of a beet
 /// pipeline. Some the syntax of a colon, ie `<div client:load />`, and
@@ -352,3 +353,7 @@ impl crate::prelude::RustTokens for TemplateDirective {
 		}
 	}
 }
+
+// /// Marker directive indicating this node is the root of a template.
+// #[cfg_attr(feature = "bevy", derive(Component))]
+// pub struct NodeTemplate;

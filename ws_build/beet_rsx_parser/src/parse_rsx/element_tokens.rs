@@ -1,5 +1,6 @@
 use anyhow::Result;
 use beet_common::prelude::*;
+use bevy::prelude::*;
 use proc_macro2::TokenStream;
 use quote::ToTokens;
 use quote::quote;
@@ -17,7 +18,7 @@ pub struct ElementTokens {
 	/// the name of the component, ie <MyComponent/>
 	pub tag: Spanner<String>,
 	/// fields of the component, ie <MyComponent foo=bar bazz/>
-	pub attributes: Vec<RsxAttributeTokens>,
+	pub attributes: Vec<AttributeTokens>,
 	/// special directives for use by both
 	/// parser and WebNode pipelines, ie <MyComponent client:load/>
 	pub meta: NodeMeta,
@@ -64,10 +65,14 @@ pub trait ElementTokensVisitor<E = anyhow::Error> {
 	) -> Result<(), E>;
 }
 
+/// List of handles to the [`AttributeTokens`] that belong to this
+/// entity. This may contain template directives until they are extracted.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Component, Deref, DerefMut)]
+pub struct AttributeTokensHandles(Vec<NonSendHandle<AttributeTokens>>);
 
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum RsxAttributeTokens {
+pub enum AttributeTokens {
 	/// A block attribute, in jsx this is known as a spread attribute
 	Block { block: Block, tracker: RustyTracker },
 	/// A key attribute created by [`TokenStream`]
@@ -82,7 +87,7 @@ pub enum RsxAttributeTokens {
 		tracker: RustyTracker,
 	},
 }
-impl RsxAttributeTokens {
+impl AttributeTokens {
 	// pub fn try_lit_str(expr: &Expr) -> Option<String> {
 	// 	if let Expr::Lit(expr_lit) = expr {
 	// 		if let syn::Lit::Str(lit_str) = &expr_lit.lit {
@@ -111,37 +116,37 @@ impl RsxAttributeTokens {
 	/// When testing for equality sometimes we dont want to compare spans and trackers.
 	pub fn reset_spans_and_trackers(&mut self) {
 		match self {
-			RsxAttributeTokens::Block { tracker, .. } => {
+			AttributeTokens::Block { tracker, .. } => {
 				*tracker = RustyTracker::PLACEHOLDER
 			}
-			RsxAttributeTokens::Key { key, .. } => {
+			AttributeTokens::Key { key, .. } => {
 				key.tokens_span = proc_macro2::Span::call_site();
 			}
-			RsxAttributeTokens::KeyValueExpr { key, tracker, .. } => {
+			AttributeTokens::KeyValueExpr { key, tracker, .. } => {
 				key.tokens_span = proc_macro2::Span::call_site();
 				*tracker = RustyTracker::PLACEHOLDER
 			}
-			RsxAttributeTokens::KeyValueLit { key, .. } => {
+			AttributeTokens::KeyValueLit { key, .. } => {
 				key.tokens_span = proc_macro2::Span::call_site();
 			}
 		}
 	}
 }
-impl RustTokens for RsxAttributeTokens {
+impl RustTokens for AttributeTokens {
 	fn into_rust_tokens(&self) -> TokenStream {
 		match self {
-			RsxAttributeTokens::Block { block, tracker } => {
+			AttributeTokens::Block { block, tracker } => {
 				let tracker = tracker.into_rust_tokens();
 				quote! { RsxAttributeTokens::Block{
 					block: #block,
 					tracker: #tracker,
 				} }
 			}
-			RsxAttributeTokens::Key { key } => {
+			AttributeTokens::Key { key } => {
 				let key = key.into_rust_tokens();
 				quote! { RsxAttributeTokens::Key{ key: #key } }
 			}
-			RsxAttributeTokens::KeyValueLit { key, value } => {
+			AttributeTokens::KeyValueLit { key, value } => {
 				let key = key.into_rust_tokens();
 				let value = value.into_rust_tokens();
 				quote! {
@@ -151,7 +156,7 @@ impl RustTokens for RsxAttributeTokens {
 					}
 				}
 			}
-			RsxAttributeTokens::KeyValueExpr {
+			AttributeTokens::KeyValueExpr {
 				key,
 				value,
 				tracker,

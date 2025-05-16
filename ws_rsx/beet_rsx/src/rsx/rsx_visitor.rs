@@ -347,7 +347,7 @@ mod test {
 		fn visit_doctype(&mut self, doctype: &RsxDoctype) { self.doctype += 1; }
 		fn visit_comment(&mut self, comment: &RsxComment) { self.comment += 1; }
 		fn visit_text(&mut self, text: &RsxText) { self.text += 1; }
-		fn visit_block(&mut self, block: &RsxBlock) { self.block += 1; }
+		fn visit_block(&mut self, block: &BlockNode) { self.block += 1; }
 		fn visit_component(&mut self, component: &RsxComponent) {
 			self.component += 1;
 		}

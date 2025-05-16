@@ -111,7 +111,7 @@ impl ApplyTemplateToNode {
 							},
 						),
 					}?;
-				RsxBlock {
+				BlockNode {
 					// the node has no template applied yet, that is the
 					// responsibility of the [`NodeTemplateMap`]
 					initial: Box::new(initial),

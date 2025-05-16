@@ -822,6 +822,8 @@ name = "beet_common"
 version = "0.0.6-dev.4"
 dependencies = [
  "anyhow",
+ "bevy",
+ "extend",
  "proc-macro2",
  "proc-macro2-diagnostics",
  "quote",
@@ -941,6 +943,25 @@ dependencies = [
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "web-sys",
+]
+
+[[package]]
+name = "beet_parse"
+version = "0.0.6-dev.4"
+dependencies = [
+ "anyhow",
+ "beet_common",
+ "beet_rsx_combinator",
+ "bevy",
+ "heck 0.4.1",
+ "proc-macro2",
+ "proc-macro2-diagnostics",
+ "quote",
+ "rapidhash",
+ "ron",
+ "rstml",
+ "sweet",
+ "syn 2.0.101",
 ]
 
 [[package]]

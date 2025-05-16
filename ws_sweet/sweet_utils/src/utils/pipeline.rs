@@ -52,6 +52,8 @@ pub trait PipelineTarget: Sized {
 
 	/// Convenience wrapper for `&self` in method chaining contexts.
 	fn xref(&self) -> &Self { self }
+	/// Convenience wrapper for `&mut self` in method chaining contexts.
+	fn xmut(&mut self) -> &mut Self { self }
 	/// Wraps the value in a [`Result::Ok`]
 	///
 	/// ## Example

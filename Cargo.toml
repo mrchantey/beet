@@ -44,6 +44,7 @@ members = [
 	"ws_build/beet_build_old",
 	"ws_build/beet_common",
 	"ws_build/beet_rsx_combinator",
+	"ws_build/beet_parse",
 	"ws_build/beet_rsx_parser",
 
 	"ws_flow/beet_examples",
@@ -83,6 +84,7 @@ beet = { path = "", version = "0.0.6-dev.4" }
 beet_build = { path = "ws_build/beet_build", version = "0.0.6-dev.4" }
 beet_common = { path = "ws_build/beet_common", version = "0.0.6-dev.4" }
 beet_rsx_combinator = { path = "ws_build/beet_rsx_combinator", version = "0.0.6-dev.4" }
+beet_parse = { path = "ws_build/beet_parse", version = "0.0.6-dev.4" }
 beet_rsx_parser = { path = "ws_build/beet_rsx_parser", version = "0.0.6-dev.4" }
 
 beet_examples = { path = "ws_flow/beet_examples", version = "0.0.6-dev.4" }

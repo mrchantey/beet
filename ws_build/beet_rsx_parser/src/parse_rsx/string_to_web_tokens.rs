@@ -186,22 +186,22 @@ impl StringToWebTokens {
 	fn rsx_attribute(
 		&mut self,
 		attribute: RsxAttribute,
-	) -> Result<RsxAttributeTokens> {
+	) -> Result<AttributeTokens> {
 		match attribute {
 			RsxAttribute::Named(name, value)
 				if let RsxAttributeValue::Default = value =>
 			{
-				RsxAttributeTokens::Key {
+				AttributeTokens::Key {
 					key: name.to_string().into(),
 				}
 			}
 			RsxAttribute::Named(name, value) => {
 				match self.rsx_attribute_value(value)? {
-					Expr::Lit(value) => RsxAttributeTokens::KeyValueLit {
+					Expr::Lit(value) => AttributeTokens::KeyValueLit {
 						key: name.to_string().into(),
 						value: value.lit,
 					},
-					value => RsxAttributeTokens::KeyValueExpr {
+					value => AttributeTokens::KeyValueExpr {
 						tracker: self.rusty_tracker.next_tracker(&value),
 						key: name.to_string().into(),
 						value,
@@ -212,7 +212,7 @@ impl StringToWebTokens {
 				let block = self
 					.rsx_parsed_expression(value)?
 					.xpipe(WebTokensToRust::default());
-				RsxAttributeTokens::Block {
+				AttributeTokens::Block {
 					tracker: self.rusty_tracker.next_tracker(&block),
 					block: block.into(),
 				}

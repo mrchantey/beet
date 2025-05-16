@@ -11,23 +11,20 @@ impl<T: AsRef<WebNode>> Pipeline<T, TreeLocationMap> for NodeToTreeLocationMap {
 	fn apply(self, node: T) -> TreeLocationMap {
 		let mut map = TreeLocationMap::default();
 
-		TreeLocationVisitor::visit(node.as_ref(), |loc, node| {
-			match node {
-				WebNode::Block(RsxBlock { effect, .. }) => {
-					map.rusty_locations.insert(effect.tracker, loc);
-				}
-				WebNode::Element(el) => {
-					if el.children.directly_contains_rust_node() {
-						let encoded =
-							TextBlockEncoder::encode(loc.tree_idx, el);
-						map.collapsed_elements.insert(loc.tree_idx, encoded);
-					}
-				}
-				WebNode::Component(comp) => {
-					map.rusty_locations.insert(comp.tracker, loc);
-				}
-				_ => {}
+		TreeLocationVisitor::visit(node.as_ref(), |loc, node| match node {
+			WebNode::Block(BlockNode { effect, .. }) => {
+				map.rusty_locations.insert(effect.tracker, loc);
 			}
+			WebNode::Element(el) => {
+				if el.children.directly_contains_rust_node() {
+					let encoded = TextBlockEncoder::encode(loc.tree_idx, el);
+					map.collapsed_elements.insert(loc.tree_idx, encoded);
+				}
+			}
+			WebNode::Component(comp) => {
+				map.rusty_locations.insert(comp.tracker, loc);
+			}
+			_ => {}
 		});
 		map
 	}

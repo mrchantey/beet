@@ -3,6 +3,31 @@ use std::hash::Hash;
 use std::path::Path;
 use sweet::prelude::*;
 
+#[derive(Debug, Default, Clone, PartialEq, Eq, Hash)]
+pub struct Spanner<T> {
+	pub value: T,
+	/// In the case this was parsed outside of rustc the value span
+	/// will be [`Span::call_site()`], so we track the span manually
+	span: FileSpan,
+}
+
+impl<T> std::ops::Deref for Spanner<T> {
+	type Target = T;
+	fn deref(&self) -> &Self::Target { &self.value }
+}
+impl<T> std::ops::DerefMut for Spanner<T> {
+	fn deref_mut(&mut self) -> &mut Self::Target { &mut self.value }
+}
+
+impl<T> Spanner<T> {
+	pub fn new(span: FileSpan, value: T) -> Self { Self { value, span } }
+	pub fn value(&self) -> &T { &self.value }
+	pub fn span(&self) -> &FileSpan { &self.span }
+	pub fn into_value(self) -> T { self.value }
+	pub fn into_span(self) -> FileSpan { self.span }
+}
+
+
 /// File location of the first symbol inside an rsx macro, used by [RsxTemplate]
 /// to reconcile web nodes with templates
 ///
@@ -12,6 +37,7 @@ use sweet::prelude::*;
 /// ```
 #[derive(Debug, Default, Clone, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "bevy", derive(bevy::prelude::Component))]
 pub struct FileSpan {
 	/// Workspace relative path to the file, its essential to use consistent paths
 	/// as this struct is created in several places from all kinds concatenations,
@@ -31,7 +57,6 @@ impl std::fmt::Display for FileSpan {
 }
 
 impl FileSpan {
-
 	#[cfg(feature = "tokens")]
 	pub fn new_from_span(
 		file: WorkspacePathBuf,

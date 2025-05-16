@@ -14,7 +14,8 @@ keywords.workspace = true
 
 
 [features]
-default = []
+default = ["bevy"]
+bevy = ["dep:bevy"]
 # default = ["serde", "tokens"]
 serde = ["dep:serde", "dep:ron"]
 tokens = [
@@ -29,7 +30,10 @@ tokens = [
 sweet.workspace = true
 rapidhash.workspace = true
 anyhow.workspace = true
+extend.workspace = true
 thiserror.workspace = true
+
+bevy = { workspace = true, optional = true }
 
 #💡 serde
 serde = { workspace = true, optional = true }

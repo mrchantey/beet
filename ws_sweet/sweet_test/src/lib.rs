@@ -51,6 +51,7 @@ pub mod prelude {
 	pub use crate::matchers::*;
 	#[cfg(not(target_arch = "wasm32"))]
 	pub use crate::native::*;
+	pub use crate::sweet_ref_impls;
 	pub use crate::test_case::*;
 	pub use crate::test_runner::*;
 	pub use crate::utils::*;

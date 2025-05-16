@@ -69,27 +69,24 @@ impl WebTokensToTemplate {
 	}
 
 
-	fn map_attribute(
-		&mut self,
-		attr: RsxAttributeTokens,
-	) -> RsxTemplateAttribute {
+	fn map_attribute(&mut self, attr: AttributeTokens) -> RsxTemplateAttribute {
 		match attr {
-			RsxAttributeTokens::Block { block: _, tracker } => {
+			AttributeTokens::Block { block: _, tracker } => {
 				RsxTemplateAttribute::Block(tracker)
 			}
-			RsxAttributeTokens::Key { key } => RsxTemplateAttribute::Key {
+			AttributeTokens::Key { key } => RsxTemplateAttribute::Key {
 				key: key.to_string(),
 			},
-			RsxAttributeTokens::KeyValueLit { key, value } => {
+			AttributeTokens::KeyValueLit { key, value } => {
 				// ron stringifies all lit values?
 				// tbh not sure why we need to do this but it complains need string
-				let value = RsxAttributeTokens::lit_to_string(&value);
+				let value = AttributeTokens::lit_to_string(&value);
 				RsxTemplateAttribute::KeyValue {
 					key: key.to_string(),
 					value,
 				}
 			}
-			RsxAttributeTokens::KeyValueExpr {
+			AttributeTokens::KeyValueExpr {
 				key,
 				tracker,
 				value: _,

@@ -15,7 +15,7 @@ impl Runtime for SigfaultRuntime {
 		tracker: RustyTracker,
 		block: impl 'static + Send + Sync + Clone + IntoWebNode<M>,
 	) -> WebNode {
-		WebNode::Block(RsxBlock {
+		WebNode::Block(BlockNode {
 			initial: Box::new(block.clone().into_node()),
 			effect: Effect::new(
 				Box::new(move |loc: TreeLocation| {

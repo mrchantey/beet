@@ -136,11 +136,11 @@ impl WebTokensToRust {
 		}
 	}
 
-	fn map_attribute(&mut self, attr: &RsxAttributeTokens) -> TokenStream {
+	fn map_attribute(&mut self, attr: &AttributeTokens) -> TokenStream {
 		let ident = &self.idents.runtime.effect;
 		match attr {
 			// The attribute is a block
-			RsxAttributeTokens::Block { block, tracker } => {
+			AttributeTokens::Block { block, tracker } => {
 				let tracker = tracker.into_rust_tokens();
 				quote! {
 					#ident::parse_attribute_block(
@@ -150,14 +150,14 @@ impl WebTokensToRust {
 				}
 			}
 			// The attribute is a key
-			RsxAttributeTokens::Key { key } => {
+			AttributeTokens::Key { key } => {
 				quote!(RsxAttribute::Key {
 					key: #key.to_string()
 				})
 			}
 			// the attribute is a key value where
 			// the value is a string literal
-			RsxAttributeTokens::KeyValueLit { key, value } => {
+			AttributeTokens::KeyValueLit { key, value } => {
 				quote! {
 					RsxAttribute::KeyValue {
 						key: #key.to_string(),
@@ -167,7 +167,7 @@ impl WebTokensToRust {
 			}
 			// the attribute is a key value where the value
 			// is not an [`Expr::Lit`]
-			RsxAttributeTokens::KeyValueExpr {
+			AttributeTokens::KeyValueExpr {
 				key,
 				value,
 				tracker,
@@ -225,7 +225,7 @@ impl WebTokensToRust {
 
 		for attr in attributes.iter() {
 			match attr {
-				RsxAttributeTokens::Block { block, tracker: _ } => {
+				AttributeTokens::Block { block, tracker: _ } => {
 					if block_attr.is_some() {
 						let diagnostic = Diagnostic::spanned(
 							block.span(),
@@ -236,18 +236,18 @@ impl WebTokensToRust {
 					}
 					block_attr = Some(block);
 				}
-				RsxAttributeTokens::Key { key } => {
+				AttributeTokens::Key { key } => {
 					prop_names.push(key);
 					let key = key.into_ident();
 					// for components no value means a bool flag
 					prop_assignments.push(quote! {.#key(true)});
 				}
-				RsxAttributeTokens::KeyValueLit { key, value } => {
+				AttributeTokens::KeyValueLit { key, value } => {
 					prop_names.push(key);
 					let key = key.into_ident();
 					prop_assignments.push(quote! {.#key(#value)});
 				}
-				RsxAttributeTokens::KeyValueExpr { key, value, .. } => {
+				AttributeTokens::KeyValueExpr { key, value, .. } => {
 					prop_names.push(key);
 					let key = key.into_ident();
 					prop_assignments.push(quote! {.#key(#value)});

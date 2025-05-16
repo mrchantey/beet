@@ -1,3 +1,5 @@
+mod world;
+pub use world::*;
 mod app;
 pub use self::app::*;
 mod app_res;

@@ -1,0 +1,49 @@
+use anyhow::Result;
+use beet_common::prelude::*;
+use bevy::prelude::*;
+use proc_macro2::Span;
+use proc_macro2::TokenStream;
+use quote::quote;
+use quote::quote_spanned;
+use rapidhash::RapidHashSet;
+use std::sync::LazyLock;
+use sweet::prelude::*;
+
+// Collect elements to provide semantic highlight based on element tag.
+// No differences between open tag and closed tag.
+// Also multiple tags with same name can be present,
+// because we need to mark each of them.
+#[derive(Default, Deref, DerefMut, Component)]
+pub struct CollectedElements(Vec<(Spanner<String>, NonSendHandle<Span>)>);
+
+
+impl CollectedElements {
+	pub fn into_docs(
+		&self,
+		span_map: &NonSendAssets<Span>,
+	) -> Result<Vec<TokenStream>> {
+		// Mark some of elements as type,
+		// and other as elements as fn in crate::docs,
+		// to give an example how to link tag with docs.
+		static ELEMENTS_AS_TYPE: LazyLock<RapidHashSet<&'static str>> =
+			LazyLock::new(|| {
+				vec!["html", "head", "meta", "link", "body"]
+					.into_iter()
+					.collect()
+			});
+
+		self.0
+			.iter()
+			.map(|(name, span)| {
+				let span = span_map.get(span)?;
+				if ELEMENTS_AS_TYPE.contains(name.as_str()) {
+					let element = quote_spanned!(*span => enum);
+					quote!({#element X{}}).xok()
+				} else {
+					let element = quote_spanned!(*span => element);
+					quote!(let _ = crate::docs::#element).xok()
+				}
+			})
+			.collect()
+	}
+}
