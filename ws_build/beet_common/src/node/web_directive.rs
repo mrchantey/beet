@@ -1,5 +1,4 @@
 use crate::prelude::*;
-#[cfg(feature = "bevy")]
 use bevy::prelude::*;
 
 
@@ -11,40 +10,40 @@ pub enum WebDirective {
 }
 
 /// Indicates a Html Fragment Node, which has children but no tag
-#[cfg_attr(feature = "bevy", derive(Component))]
+#[derive(Component)]
 pub struct FragmentNode;
 
 /// Indicates a Html Doctype Node, [W3 Docs](https://www.w3schools.com/tags/tag_doctype.ASP)
-#[cfg_attr(feature = "bevy", derive(Component))]
+#[derive(Component)]
 pub struct DoctypeNode;
 /// Indicates a Html Comment Node, [W3 Docs](https://www.w3schools.com/tags/tag_comment.asp)
-#[cfg_attr(feature = "bevy", derive(Component))]
+#[derive(Component)]
 pub struct CommentNode {
 	pub value: String,
 }
 
 /// Indicates a Html Text Node, [W3 Docs](https://www.w3schools.com/jsref/prop_node_nodetype.asp)
-#[cfg_attr(feature = "bevy", derive(Component))]
+#[derive(Component)]
 pub struct TextNode {
 	pub value: String,
 }
 /// Indicates a Html Element Node, [W3 Docs](https://www.w3schools.com/jsref/prop_node_nodetype.asp)
-#[cfg_attr(feature = "bevy", derive(Component))]
+#[derive(Component)]
 pub struct ElementNode {
 	pub tag: Spanner<String>,
 	pub self_closing: bool,
 }
 
 /// A block of code that will resolve to a node
-#[cfg_attr(feature = "bevy", derive(Component))]
+#[derive(Component)]
 pub struct BlockNode {
 	pub tracker: RustyTracker,
 	#[cfg(feature = "tokens")]
-	pub handle: NonSendHandle<syn::Block>,
+	pub handle: NonSendHandle<syn::Expr>,
 }
 
 /// A node used for authoring, withoud a html representation
-#[cfg_attr(feature = "bevy", derive(Component))]
+#[derive(Component)]
 pub struct ComponentNode {
 	pub tag: Spanner<String>,
 	#[cfg(feature = "tokens")]

@@ -12,9 +12,10 @@ pub impl<T: Debug, U: Debug + SweetRef<Vec<T>>> Matcher<U> {
 		self
 	}
 	fn to_have_length(&self, length: usize) -> &Self {
-		self.assert_correct(
+		self.assert_correct_with_received(
 			self.value.sweet_ref().len() == length,
 			&format!("to have length {}", length),
+			&self.value.sweet_ref().len(),
 		);
 		self
 	}

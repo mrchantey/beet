@@ -1,5 +1,4 @@
 use crate::prelude::*;
-#[cfg(feature = "bevy")]
 use bevy::prelude::*;
 
 /// Template directives contain instructions for various stages of a beet
@@ -112,6 +111,38 @@ pub enum TemplateDirective {
 		value: Option<String>,
 	},
 }
+
+/// Directive for how the node should be rendered and loaded on the client.
+#[derive(Debug, Default, Component)]
+pub enum ClientIslandDirective {
+	/// Render the node statically then hydrate it on the client
+	#[default]
+	Load,
+	/// aka Client Side Rendering, do not render the node statically, only render on the client
+	Only,
+}
+
+/// Directive for which slot to render the node in.
+#[derive(Debug, Default, Component, Deref)]
+pub struct SlotDirective(String);
+
+
+impl TryFromAttribute for ClientIslandDirective {
+	fn try_from_attribute(key: &str, value: Option<&str>) -> Option<Self> {
+		match (key, value) {
+			("client:load", _) => Some(Self::Load),
+			("client:only", _) => Some(Self::Only),
+			_ => None,
+		}
+	}
+}
+
+pub trait TryFromAttribute: Sized {
+	/// Try to parse from an attribute key-value pair
+	fn try_from_attribute(key: &str, value: Option<&str>) -> Option<Self>;
+}
+
+
 
 impl TemplateDirective {
 	pub fn try_from_attr(
@@ -355,5 +386,4 @@ impl crate::prelude::RustTokens for TemplateDirective {
 }
 
 // /// Marker directive indicating this node is the root of a template.
-// #[cfg_attr(feature = "bevy", derive(Component))]
 // pub struct NodeTemplate;

@@ -14,8 +14,7 @@ keywords.workspace = true
 
 
 [features]
-default = ["bevy"]
-bevy = ["dep:bevy"]
+default = []
 # default = ["serde", "tokens"]
 serde = ["dep:serde", "dep:ron"]
 tokens = [
@@ -33,7 +32,7 @@ anyhow.workspace = true
 extend.workspace = true
 thiserror.workspace = true
 
-bevy = { workspace = true, optional = true }
+bevy = { workspace = true }
 
 #💡 serde
 serde = { workspace = true, optional = true }

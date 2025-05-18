@@ -2,6 +2,7 @@ use crate::prelude::*;
 use std::hash::Hash;
 use std::path::Path;
 use sweet::prelude::*;
+use bevy::prelude::*;
 
 #[derive(Debug, Default, Clone, PartialEq, Eq, Hash)]
 pub struct Spanner<T> {
@@ -30,14 +31,13 @@ impl<T> Spanner<T> {
 
 /// File location of the first symbol inside an rsx macro, used by [RsxTemplate]
 /// to reconcile web nodes with templates
-///
+/// ## Example
 /// ```rust ignore
 /// let tree = rsx!{<div>hello</div>};
 /// //              ^ this location
 /// ```
-#[derive(Debug, Default, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Default, Clone, PartialEq, Eq, Hash, Component)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "bevy", derive(bevy::prelude::Component))]
 pub struct FileSpan {
 	/// Workspace relative path to the file, its essential to use consistent paths
 	/// as this struct is created in several places from all kinds concatenations,

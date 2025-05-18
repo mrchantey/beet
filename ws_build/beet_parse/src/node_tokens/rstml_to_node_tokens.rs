@@ -11,10 +11,13 @@ use rstml::node::NodeAttribute;
 use rstml::node::NodeBlock;
 use rstml::node::NodeElement;
 use rstml::node::NodeName;
+use sweet::prelude::PipelineTarget;
 use sweet::prelude::WorkspacePathBuf;
-use syn::Block;
 use syn::Expr;
+use syn::ExprBlock;
+use syn::ExprLit;
 use syn::Lit;
+use syn::LitStr;
 use syn::spanned::Spanned;
 
 use super::RstmlCustomNode;
@@ -23,8 +26,6 @@ use super::RstmlCustomNode;
 pub fn rstml_to_node_tokens_plugin(app: &mut App) {
 	app.init_non_send_resource::<NonSendAssets<Span>>()
 		.init_non_send_resource::<NonSendAssets<Expr>>()
-		.init_non_send_resource::<NonSendAssets<Lit>>()
-		.init_non_send_resource::<NonSendAssets<Block>>()
 		.init_non_send_resource::<NonSendAssets<CollectedElements>>()
 		.add_systems(
 			Update,
@@ -33,13 +34,11 @@ pub fn rstml_to_node_tokens_plugin(app: &mut App) {
 }
 
 /// Replace [`RstmlNodes`] with children representing each [`rstml::Node`].
-fn rstml_to_node_tokens(
+pub(crate) fn rstml_to_node_tokens(
 	mut commands: Commands,
 	rstml_config: Res<RstmlConfig>,
 	mut spans_map: NonSendMut<NonSendAssets<Span>>,
 	mut expr_map: NonSendMut<NonSendAssets<Expr>>,
-	mut lit_map: NonSendMut<NonSendAssets<Lit>>,
-	mut block_map: NonSendMut<NonSendAssets<Block>>,
 	mut diagnostics_map: NonSendMut<NonSendAssets<TokensDiagnostics>>,
 	mut nodes_map: NonSendMut<NonSendAssets<RstmlNodes>>,
 	mut collected_elements_map: NonSendMut<NonSendAssets<CollectedElements>>,
@@ -65,8 +64,6 @@ fn rstml_to_node_tokens(
 			rusty_tracker: Default::default(),
 			spans_map: &mut spans_map,
 			expr_map: &mut expr_map,
-			lit_map: &mut lit_map,
-			block_map: &mut block_map,
 		}
 		.insert(entity, rstml_nodes);
 		commands
@@ -87,8 +84,6 @@ struct RstmlToWorld<'w, 's, 'a> {
 	rusty_tracker: RustyTrackerBuilder,
 	spans_map: &'a mut NonSendAssets<Span>,
 	expr_map: &'a mut NonSendAssets<Expr>,
-	lit_map: &'a mut NonSendAssets<Lit>,
-	block_map: &'a mut NonSendAssets<Block>,
 }
 
 impl<'w, 's, 'a> RstmlToWorld<'w, 's, 'a> {
@@ -166,7 +161,11 @@ impl<'w, 's, 'a> RstmlToWorld<'w, 's, 'a> {
 			}
 			Node::Block(NodeBlock::ValidBlock(block)) => {
 				let tracker = self.rusty_tracker.next_tracker(&block);
-				let handle = self.block_map.insert(block);
+				let handle = self.expr_map.insert(Expr::Block(ExprBlock {
+					attrs: Vec::new(),
+					label: None,
+					block,
+				}));
 				self.commands
 					.spawn((BlockNode { tracker, handle }, spans))
 					.id()
@@ -195,22 +194,17 @@ impl<'w, 's, 'a> RstmlToWorld<'w, 's, 'a> {
 					let close_tag = self.map_node_name(&close_tag.name);
 					self.collected_elements.push(close_tag);
 				}
-				open_tag.span();
-				let attributes = open_tag
-					.attributes
-					.clone()
-					.into_iter()
-					.map(|attr| self.map_attribute(attr))
-					.collect::<Vec<_>>();
-				let attributes = AttributeTokensList(attributes);
+
+				// let attributes = AttributeTokensList(attributes);
 
 				let children = self.map_nodes(children);
 
-				if tag.starts_with(|c: char| c.is_uppercase()) {
+				let parent = if tag.starts_with(|c: char| c.is_uppercase()) {
 					// dont hash the span
 					// at this stage directives are still attributes, which
 					// is good because we want to hash those too
-					let tracker = self.rusty_tracker.next_tracker(&attributes);
+					let tracker =
+						self.rusty_tracker.next_from_open_tag(&open_tag);
 
 					self.commands
 						.spawn((
@@ -228,7 +222,15 @@ impl<'w, 's, 'a> RstmlToWorld<'w, 's, 'a> {
 						.spawn((ElementNode { tag, self_closing }, spans))
 						.add_children(&children)
 						.id()
-				}
+				};
+
+				open_tag
+					.attributes
+					.into_iter()
+					.for_each(|attr| self.spawn_attribute(parent, attr));
+
+
+				parent
 			}
 			Node::Custom(_) => {
 				self.diagnostics.push(Diagnostic::spanned(
@@ -241,73 +243,97 @@ impl<'w, 's, 'a> RstmlToWorld<'w, 's, 'a> {
 		}
 	}
 
-	fn map_attribute(&mut self, attr: NodeAttribute) -> AttributeTokens {
+	/// Spawn an attribute for the given parent
+	fn spawn_attribute(&mut self, parent: Entity, attr: NodeAttribute) {
+		let common = (
+			AttributeOf::new(parent),
+			FileSpan::new_from_span(self.file.clone(), &attr),
+			self.spans_map.insert(attr.span()),
+		);
 		match attr {
 			NodeAttribute::Block(NodeBlock::Invalid(block)) => {
+				// invalid
 				self.diagnostics.push(Diagnostic::spanned(
 					block.span(),
 					Level::Error,
 					"Invalid block",
 				));
-				AttributeTokens::Key {
-					key: Spanner::new(
-						FileSpan::new_from_span(self.file.clone(), &block),
-						"invalid-block".to_string(),
-					),
-					key_span: None,
-				}
 			}
 			NodeAttribute::Block(NodeBlock::ValidBlock(block)) => {
-				AttributeTokens::Block {
-					tracker: self.rusty_tracker.next_tracker(&block),
-					value: Spanner::new(
-						FileSpan::new_from_span(self.file.clone(), &block),
-						self.block_map.insert(block),
-					),
-				}
+				// block attribute, ie `<div {is_hidden}>`
+				self.commands.spawn((
+					common,
+					AttributeExpr::new(self.expr_map.insert(Expr::Block(
+						ExprBlock {
+							attrs: Vec::new(),
+							label: None,
+							block,
+						},
+					))),
+				));
 			}
 			NodeAttribute::Attribute(attr) => {
-				// let value = attr.value().cloned();
-				let (key, key_span) = self.map_node_name(&attr.key);
-				let value = if let KeyedAttributeValue::Value(expr) =
-					attr.possible_value
-					&& let KVAttributeValue::Expr(expr) = expr.value
-				{
-					Some(expr)
-				} else {
-					None
+				let key_expr = self.node_name_to_expr(attr.key);
+				let key_expr_str =
+					if let Expr::Lit(ExprLit { lit, attrs: _ }) = &key_expr {
+						Some(AttributeKeyStr::new(lit_to_string(lit)))
+					} else {
+						None
+					};
+				let key_expr = key_expr.xmap(|key| {
+					AttributeKeyExpr::new(self.expr_map.insert(key))
+				});
+
+				let (val_expr, val_expr_str) = match attr.possible_value {
+					KeyedAttributeValue::Value(value) => match value.value {
+						KVAttributeValue::Expr(val_expr) => {
+							// key-value attribute, ie `<div hidden=true>`
+							let value_expr_str =
+								if let Expr::Lit(ExprLit { lit, attrs: _ }) =
+									&val_expr
+								{
+									Some(AttributeValueStr::new(lit_to_string(
+										lit,
+									)))
+								} else {
+									None
+								};
+							(
+								Some(AttributeValueExpr::new(
+									self.expr_map.insert(val_expr),
+								)),
+								value_expr_str,
+							)
+						}
+						KVAttributeValue::InvalidBraced(invalid) => {
+							// invalid
+							self.diagnostics.push(Diagnostic::spanned(
+								invalid.span(),
+								Level::Error,
+								"Invalid block",
+							));
+							(None, None)
+						}
+					},
+					_ => {
+						// key attribute, ie `<div hidden>`
+						(None, None)
+					}
 				};
-
-
-				match value {
-					// lit expr
-					Some(Expr::Lit(expr)) => AttributeTokens::KeyValueLit {
-						key,
-						key_span: Some(key_span),
-						value: Spanner::new(
-							FileSpan::new_from_span(self.file.clone(), &expr),
-							self.lit_map.insert(expr.lit),
-						),
-					},
-					// non-lit expr
-					Some(expr) => AttributeTokens::KeyValueExpr {
-						key,
-						key_span: Some(key_span),
-						tracker: self.rusty_tracker.next_tracker(&expr),
-						value: Spanner::new(
-							FileSpan::new_from_span(self.file.clone(), &expr),
-							self.expr_map.insert(expr),
-						),
-					},
-					// no value expr
-					None => AttributeTokens::Key {
-						key,
-						key_span: Some(key_span),
-					},
+				let mut entity = self.commands.spawn((common, key_expr));
+				if let Some(key_expr_str) = key_expr_str {
+					entity.insert(key_expr_str);
+				}
+				if let Some(val_expr) = val_expr {
+					entity.insert(val_expr);
+				}
+				if let Some(val_expr_str) = val_expr_str {
+					entity.insert(val_expr_str);
 				}
 			}
 		}
 	}
+
 	/// Simplifies the [`NodeName::Punctuated`],ie client:load to a string literal
 	fn map_node_name(
 		&mut self,
@@ -331,6 +357,19 @@ impl<'w, 's, 'a> RstmlToWorld<'w, 's, 'a> {
 			),
 			self.spans_map.insert(name.span()),
 		)
+	}
+	fn node_name_to_expr(&mut self, name: NodeName) -> Expr {
+		match name {
+			NodeName::Block(block) => Expr::Block(ExprBlock {
+				attrs: Vec::new(),
+				label: None,
+				block,
+			}),
+			name => Expr::Lit(ExprLit {
+				lit: Lit::Str(LitStr::new(&name.to_string(), name.span())),
+				attrs: Vec::new(),
+			}),
+		}
 	}
 
 	/// Ensure that self-closing elements do not have children,
@@ -398,6 +437,11 @@ mod test {
 		.xmap(map)
 		.query_once::<&FileSpan>()
 		.xpect()
-		.to_have_length(4);
+		// 1. root
+		// 2. span
+		// 3. component
+		// 4. client:load attribute
+		// 5. div
+		.to_have_length(5);
 	}
 }

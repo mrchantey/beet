@@ -1,3 +1,5 @@
+mod extract_rsx_directives;
+pub use extract_rsx_directives::*;
 mod collected_elements;
 pub use collected_elements::*;
 mod attribute_tokens;

@@ -3,7 +3,6 @@
 #![cfg_attr(test, test_runner(sweet::test_runner))]
 #![feature(let_chains)]
 
-#[cfg(feature = "bevy")]
 pub mod bevy_utils;
 pub mod node;
 pub mod templating;
@@ -11,7 +10,6 @@ pub mod templating;
 pub mod tokens_utils;
 
 pub mod prelude {
-	#[cfg(feature = "bevy")]
 	pub use crate::bevy_utils::*;
 	pub use crate::node::*;
 	pub use crate::templating::*;
