@@ -43,6 +43,7 @@ members = [
 	"crates/beet_build",
 	"crates/beet_build_old",
 	"crates/beet_common",
+	"crates/beet_common/macros",
 	"crates/beet_rsx_combinator",
 	"crates/beet_parse",
 	"crates/beet_rsx_parser",
@@ -86,6 +87,7 @@ beet = { path = "", version = "0.0.6-dev.4" }
 
 beet_build = { path = "crates/beet_build", version = "0.0.6-dev.4" }
 beet_common = { path = "crates/beet_common", version = "0.0.6-dev.4" }
+beet_common_macros = { path = "crates/beet_common/macros", version = "0.0.6-dev.4" }
 beet_rsx_combinator = { path = "crates/beet_rsx_combinator", version = "0.0.6-dev.4" }
 beet_parse = { path = "crates/beet_parse", version = "0.0.6-dev.4" }
 beet_rsx_parser = { path = "crates/beet_rsx_parser", version = "0.0.6-dev.4" }

@@ -1,32 +1,47 @@
-use super::TemplateDirective;
 use crate::prelude::*;
 use bevy::prelude::*;
 
 /// plugin containing all web directive extraction
 pub fn web_directives_plugin(app: &mut App) {
 	app.add_plugins((
-		directive_plugin::<HeadDirective>,
+		directive_plugin::<HtmlInsertDirective>,
 		directive_plugin::<ClientIslandDirective>,
 	));
 }
 
-/// Directive to indicate that the node should be hoisted to the head of the document
+/// Directive to indicate that the node should be inserted directly under some part of the
+/// body, regardless of where it is in the template.
+/// [`HtmlInsertDirective::Head`] is usually automatically added to non-layout elements
+/// like script and style.
 #[derive(Component)]
-pub struct HeadDirective;
+pub enum HtmlInsertDirective {
+	/// Insert the node in the head of the document.
+	Head,
+	/// Insert the node in the body of the document.
+	Body,
+}
 
-impl TemplateDirective for HeadDirective {
+impl TemplateDirective for HtmlInsertDirective {
 	fn try_from_attribute(key: &str, value: Option<&str>) -> Option<Self> {
 		match (key, value) {
-			("hoist:head", _) => Some(Self),
+			("insert:head", _) => Some(Self::Head),
+			("insert:body", _) => Some(Self::Body),
 			_ => None,
 		}
 	}
 }
 
 #[cfg(feature = "tokens")]
-impl crate::prelude::RustTokens for HeadDirective {
+impl crate::prelude::RustTokens for HtmlInsertDirective {
 	fn into_rust_tokens(&self) -> proc_macro2::TokenStream {
-		quote::quote! {HeadDirective}
+		match self {
+			HtmlInsertDirective::Head => {
+				quote::quote! {HtmlInsertDirective::Head}
+			}
+			HtmlInsertDirective::Body => {
+				quote::quote! {HtmlInsertDirective::Body}
+			}
+		}
 	}
 }
 
@@ -70,6 +85,18 @@ impl crate::prelude::RustTokens for ClientIslandDirective {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum WebDirective {
 	StyleId { id: u64 },
+}
+
+
+#[cfg(feature = "tokens")]
+impl crate::prelude::RustTokens for WebDirective {
+	fn into_rust_tokens(&self) -> proc_macro2::TokenStream {
+		match self {
+			WebDirective::StyleId { id } => {
+				quote::quote! {WebDirective::StyleId{ id: #id }}
+			}
+		}
+	}
 }
 
 

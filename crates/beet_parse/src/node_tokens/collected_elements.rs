@@ -14,10 +14,12 @@ use sweet::prelude::*;
 // Also multiple tags with same name can be present,
 // because we need to mark each of them.
 #[derive(Default, Deref, DerefMut, Component)]
-pub struct CollectedElements(Vec<(Spanner<String>, NonSendHandle<Span>)>);
+pub struct CollectedElements(Vec<(String, NonSendHandle<Span>)>);
 
 
 impl CollectedElements {
+	// TODO this is from the rstml example, havent yet looked into how to properly
+	// implement it
 	pub fn into_docs(
 		&self,
 		span_map: &NonSendAssets<Span>,

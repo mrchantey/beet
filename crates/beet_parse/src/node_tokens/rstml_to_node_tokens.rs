@@ -1,3 +1,4 @@
+use super::RstmlCustomNode;
 use crate::prelude::*;
 use beet_common::prelude::*;
 use bevy::prelude::*;
@@ -20,16 +21,15 @@ use syn::Lit;
 use syn::LitStr;
 use syn::spanned::Spanned;
 
-use super::RstmlCustomNode;
-
-
 pub fn rstml_to_node_tokens_plugin(app: &mut App) {
 	app.init_non_send_resource::<NonSendAssets<Span>>()
 		.init_non_send_resource::<NonSendAssets<Expr>>()
 		.init_non_send_resource::<NonSendAssets<CollectedElements>>()
 		.add_systems(
 			Update,
-			rstml_to_node_tokens.after(super::tokens_to_rstml),
+			rstml_to_node_tokens
+				.in_set(ImportNodesStep)
+				.after(super::tokens_to_rstml),
 		);
 }
 
@@ -127,30 +127,15 @@ impl<'w, 's, 'a> RstmlToWorld<'w, 's, 'a> {
 			Node::Doctype(_) => self.commands.spawn((DoctypeNode, spans)).id(),
 			Node::Comment(node) => self
 				.commands
-				.spawn((
-					CommentNode {
-						value: node.value.value(),
-					},
-					spans,
-				))
+				.spawn((CommentNode(node.value.value()), spans))
 				.id(),
 			Node::Text(node) => self
 				.commands
-				.spawn((
-					TextNode {
-						value: node.value.value(),
-					},
-					spans,
-				))
+				.spawn((TextNode(node.value.value()), spans))
 				.id(),
 			Node::RawText(node) => self
 				.commands
-				.spawn((
-					TextNode {
-						value: node.to_string_best(),
-					},
-					spans,
-				))
+				.spawn((TextNode(node.to_string_best()), spans))
 				.id(),
 			Node::Fragment(fragment) => {
 				let children = self.map_nodes(fragment.children);
@@ -167,7 +152,12 @@ impl<'w, 's, 'a> RstmlToWorld<'w, 's, 'a> {
 					block,
 				}));
 				self.commands
-					.spawn((BlockNode { tracker, handle }, spans))
+					.spawn((
+						BlockNode,
+						ItemOf::<BlockNode, _>::new(tracker),
+						ItemOf::<BlockNode, _>::new(handle),
+						spans,
+					))
 					.id()
 			}
 			Node::Block(NodeBlock::Invalid(invalid)) => {
@@ -176,7 +166,7 @@ impl<'w, 's, 'a> RstmlToWorld<'w, 's, 'a> {
 					Level::Error,
 					"Invalid block",
 				));
-				Entity::PLACEHOLDER
+				self.commands.spawn((BlockNode, spans)).id()
 			}
 			Node::Element(el) => {
 				self.check_self_closing_children(&el);
@@ -186,51 +176,46 @@ impl<'w, 's, 'a> RstmlToWorld<'w, 's, 'a> {
 					children,
 					close_tag,
 				} = el;
-				let (tag, tag_span) = self.map_node_name(&open_tag.name);
+				let (tag_str, tag_file_span, tag_span) =
+					self.parse_node_name(&open_tag.name);
 
-				self.collected_elements.push((tag.clone(), tag_span));
+				self.collected_elements.push((tag_str.clone(), tag_span));
 				let self_closing = close_tag.is_none();
 				if let Some(close_tag) = close_tag.as_ref() {
-					let close_tag = self.map_node_name(&close_tag.name);
-					self.collected_elements.push(close_tag);
+					let close_tag = self.parse_node_name(&close_tag.name);
+					self.collected_elements.push((close_tag.0, close_tag.2));
 				}
 
 				// let attributes = AttributeTokensList(attributes);
 
 				let children = self.map_nodes(children);
 
-				let parent = if tag.starts_with(|c: char| c.is_uppercase()) {
-					// dont hash the span
-					// at this stage directives are still attributes, which
-					// is good because we want to hash those too
+				let mut entity = self.commands.spawn((
+					NodeTag(tag_str.clone()),
+					ItemOf::<NodeTag, _>::new(tag_file_span),
+					ItemOf::<NodeTag, _>::new(tag_span),
+					spans,
+				));
+				entity.add_children(&children);
+
+				if tag_str.starts_with(|c: char| c.is_uppercase()) {
+					// yes we get the tracker after its children, its fine as long
+					// as its consistent with other parsers.
 					let tracker =
 						self.rusty_tracker.next_from_open_tag(&open_tag);
-
-					self.commands
-						.spawn((
-							ComponentNode {
-								tag,
-								tag_span: Some(tag_span),
-								tracker,
-							},
-							spans,
-						))
-						.add_children(&children)
-						.id()
+					entity.insert(ItemOf::<FragmentNode, _>::new(tracker));
 				} else {
-					self.commands
-						.spawn((ElementNode { tag, self_closing }, spans))
-						.add_children(&children)
-						.id()
-				};
+					entity.insert(ElementNode { self_closing });
+				}
+				let entity = entity.id();
 
 				open_tag
 					.attributes
 					.into_iter()
-					.for_each(|attr| self.spawn_attribute(parent, attr));
+					.for_each(|attr| self.spawn_attribute(entity, attr));
 
 
-				parent
+				entity
 			}
 			Node::Custom(_) => {
 				self.diagnostics.push(Diagnostic::spanned(
@@ -334,11 +319,11 @@ impl<'w, 's, 'a> RstmlToWorld<'w, 's, 'a> {
 		}
 	}
 
-	/// Simplifies the [`NodeName::Punctuated`],ie client:load to a string literal
-	fn map_node_name(
+	/// Simplifies parsing an `rstml::NodeName`
+	fn parse_node_name(
 		&mut self,
 		name: &NodeName,
-	) -> (Spanner<String>, NonSendHandle<Span>) {
+	) -> (String, FileSpan, NonSendHandle<Span>) {
 		match name {
 			NodeName::Block(block) => {
 				self.diagnostics.push(Diagnostic::spanned(
@@ -351,10 +336,8 @@ impl<'w, 's, 'a> RstmlToWorld<'w, 's, 'a> {
 		}
 		let key_str = name.to_string();
 		(
-			Spanner::new(
-				FileSpan::new_from_span(self.file.clone(), name),
-				key_str,
-			),
+			key_str,
+			FileSpan::new_from_span(self.file.clone(), name),
 			self.spans_map.insert(name.span()),
 		)
 	}
@@ -404,16 +387,7 @@ mod test {
 	use quote::quote;
 	use sweet::prelude::*;
 
-	// fn map(tokens: TokenStream) -> WebTokens {
-	// 	tokens
-	// 		.xpipe(TokensToRstml::default())
-	// 		.0
-	// 		.xpipe(RstmlToWebTokens::default())
-	// 		.0
-	// 		.xpipe(ParseWebTokens::default())
-	// }
-
-	fn map(tokens: TokenStream) -> App {
+	fn parse(tokens: TokenStream) -> App {
 		App::new()
 			.add_plugins((tokens_to_rstml_plugin, rstml_to_node_tokens_plugin))
 			.xtap(|app| {
@@ -428,20 +402,25 @@ mod test {
 
 	#[test]
 	fn works() {
-		quote! {
+		let mut app = quote! {
 			<span>
 				<MyComponent client:load />
 				<div/>
 			</span>
 		}
-		.xmap(map)
-		.query_once::<&FileSpan>()
-		.xpect()
-		// 1. root
-		// 2. span
-		// 3. component
-		// 4. client:load attribute
-		// 5. div
-		.to_have_length(5);
+		.xmap(parse);
+		app.query_once::<&FileSpan>()
+			.xpect()
+			// 1. root
+			// 2. span
+			// 3. component
+			// 4. client:load attribute
+			// 5. div
+			.to_have_length(5);
+
+		app.query_once::<&AttributeKeyStr>()[0]
+			.xmap(|attr| attr.as_str())
+			.xpect()
+			.to_be("client:load");
 	}
 }

@@ -822,6 +822,7 @@ name = "beet_common"
 version = "0.0.6-dev.4"
 dependencies = [
  "anyhow",
+ "beet_common_macros",
  "bevy",
  "extend",
  "proc-macro2",
@@ -833,6 +834,18 @@ dependencies = [
  "sweet",
  "syn 2.0.101",
  "thiserror 1.0.69",
+]
+
+[[package]]
+name = "beet_common_macros"
+version = "0.0.6-dev.4"
+dependencies = [
+ "anyhow",
+ "proc-macro2",
+ "proc-macro2-diagnostics",
+ "quote",
+ "sweet",
+ "syn 2.0.101",
 ]
 
 [[package]]

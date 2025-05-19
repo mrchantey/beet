@@ -1,3 +1,4 @@
+use crate::prelude::*;
 use beet_common::prelude::*;
 use bevy::prelude::*;
 use proc_macro2::TokenStream;
@@ -18,7 +19,7 @@ pub fn tokens_to_rstml_plugin(app: &mut App) {
 		.init_non_send_resource::<NonSendAssets<RstmlTokens>>()
 		.init_non_send_resource::<NonSendAssets<RstmlNodes>>()
 		.init_non_send_resource::<NonSendAssets<TokensDiagnostics>>()
-		.add_systems(Update, tokens_to_rstml);
+		.add_systems(Update, tokens_to_rstml.in_set(ImportNodesStep));
 	let rstml_config = app.world().resource::<RstmlConfig>();
 	app.insert_non_send_resource(parser_config(rstml_config));
 }
@@ -133,7 +134,7 @@ mod test {
 	use sweet::prelude::*;
 
 
-	fn map(tokens: TokenStream) -> Vec<RstmlNodes> {
+	fn parse(tokens: TokenStream) -> Vec<RstmlNodes> {
 		App::new()
 			.add_plugins(tokens_to_rstml_plugin)
 			.xtap(|app| {
@@ -162,7 +163,7 @@ mod test {
 			<MyComponent client:load />
 			<div/>
 		}
-		.xmap(map)
+		.xmap(parse)
 		.xmap(|nodes| nodes[0].len())
 		.xpect()
 		.to_be(2);

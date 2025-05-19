@@ -26,6 +26,7 @@ tokens = [
 ]
 
 [dependencies]
+beet_common_macros.workspace = true
 sweet.workspace = true
 rapidhash.workspace = true
 anyhow.workspace = true
@@ -47,4 +48,4 @@ proc-macro2-diagnostics = { workspace = true, optional = true }
 
 
 [dev-dependencies]
-sweet = { workspace = true, features = ["test"] }
+sweet = { workspace = true, features = ["test", "bevy"] }

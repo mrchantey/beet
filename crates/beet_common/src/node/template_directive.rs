@@ -5,9 +5,9 @@ use bevy::prelude::*;
 #[derive(Debug, Clone, PartialEq, Eq, Hash, SystemSet)]
 pub struct ExtractDirectivesSet;
 
-pub fn default_directive_plugin(app: &mut App) {
+pub fn default_directives_plugin(app: &mut App) {
 	app.add_plugins((
-		directive_plugin::<HeadDirective>,
+		directive_plugin::<HtmlInsertDirective>,
 		directive_plugin::<ClientIslandDirective>,
 	));
 }
@@ -157,11 +157,6 @@ pub enum TemplateDirectiveEnum {
 		value: Option<String>,
 	},
 }
-
-
-/// Directive for which slot to render the node in.
-#[derive(Debug, Default, Component, Deref)]
-pub struct SlotDirective(String);
 
 
 /// Trait for template directives

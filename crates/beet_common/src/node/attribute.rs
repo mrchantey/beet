@@ -52,9 +52,8 @@ impl AttributeKeyExpr {
 }
 
 /// The value of an attribute.
-/// This defaults to the unit type `()` for convenience usage with helpers that disregard the type, ie [`FileSpanOf`]
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Deref, Component)]
-pub struct AttributeValue<T = ()>(T);
+pub struct AttributeValue<T>(T);
 
 impl<T> AttributeValue<T> {
 	pub fn new(value: T) -> Self { Self(value) }

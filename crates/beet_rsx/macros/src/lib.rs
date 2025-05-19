@@ -1,3 +1,5 @@
+#![cfg_attr(test, feature(test, custom_test_frameworks))]
+#![cfg_attr(test, test_runner(sweet::test_runner))]
 #![feature(proc_macro_span)]
 use beet_rsx_parser::prelude::*;
 use proc_macro::TokenStream;

@@ -28,6 +28,9 @@ impl RustyTrackerBuilder {
 		let mut hasher = RapidHasher::default_const();
 
 		open_tag.name.to_string().hash(&mut hasher);
+
+		// at this stage directives are still attributes, which
+		// is good because we want to hash those too
 		for attr in open_tag.attributes.iter() {
 			attr.to_token_stream().to_string().hash(&mut hasher);
 		}

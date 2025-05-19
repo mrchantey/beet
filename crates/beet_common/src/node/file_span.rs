@@ -4,41 +4,6 @@ use std::hash::Hash;
 use std::path::Path;
 use sweet::prelude::*;
 
-#[derive(Debug, Default, Clone, PartialEq, Eq, Hash)]
-pub struct Spanner<T> {
-	pub value: T,
-	/// In the case this was parsed outside of rustc the value span
-	/// will be [`Span::call_site()`], so we track the span manually
-	span: FileSpan,
-}
-
-impl<T> std::ops::Deref for Spanner<T> {
-	type Target = T;
-	fn deref(&self) -> &Self::Target { &self.value }
-}
-impl<T> std::ops::DerefMut for Spanner<T> {
-	fn deref_mut(&mut self) -> &mut Self::Target { &mut self.value }
-}
-
-impl<T> Spanner<T> {
-	pub fn new(span: FileSpan, value: T) -> Self { Self { value, span } }
-	pub fn value(&self) -> &T { &self.value }
-	pub fn span(&self) -> &FileSpan { &self.span }
-	pub fn into_value(self) -> T { self.value }
-	pub fn into_span(self) -> FileSpan { self.span }
-}
-
-#[cfg(feature = "tokens")]
-impl<T: crate::prelude::RustTokens> crate::prelude::RustTokens for Spanner<T> {
-	fn into_rust_tokens(&self) -> proc_macro2::TokenStream {
-		let span = self.span.into_rust_tokens();
-		let value = self.value.into_rust_tokens();
-		quote::quote! {
-			Spanner::new(#span, #value)
-		}
-	}
-}
-
 /// File location of the first symbol inside an rsx macro, used by [RsxTemplate]
 /// to reconcile web nodes with templates
 /// ## Example
@@ -159,8 +124,8 @@ impl GetSpan for FileSpan {
 mod test {
 	use crate::prelude::*;
 	use sweet::prelude::*;
-	
-	
+
+
 	#[test]
 	fn to_rust_tokens() {
 		let span = FileSpan::new_with_start("foo", 1, 2);
