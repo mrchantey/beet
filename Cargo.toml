@@ -47,7 +47,7 @@ members = [
 	"ws_build/beet_parse",
 	"ws_build/beet_rsx_parser",
 
-	## 💡Beet Flow
+	## 💡 Beet Flow
 	"crates/beet_examples",
 	"crates/beet_flow",
 	"crates/beet_flow/macros",
@@ -64,16 +64,17 @@ members = [
 	"ws_rsx/beet_rsx/macros",
 	"ws_rsx/beet_server",
 
-	"ws_sweet/sweet",
-	"ws_sweet/sweet_bevy",
-	"ws_sweet/sweet_fs",
-	"ws_sweet/sweet_net",
-	"ws_sweet/sweet_server",
-	"ws_sweet/sweet_test/macros",
-	"ws_sweet/sweet_test",
-	"ws_sweet/sweet_utils",
-	"ws_sweet/sweet_web",
-	"ws_sweet/sweet-cli",
+	## 💡 Sweet
+	"crates/sweet",
+	"crates/sweet_bevy",
+	"crates/sweet_fs",
+	"crates/sweet_net",
+	"crates/sweet_server",
+	"crates/sweet_test/macros",
+	"crates/sweet_test",
+	"crates/sweet_utils",
+	"crates/sweet_web",
+	"crates/sweet-cli",
 
 	# "crates/emby",
 ]
@@ -104,15 +105,15 @@ beet_rsx = { path = "ws_rsx/beet_rsx", version = "0.0.6-dev.4" }
 beet_rsx_macros = { path = "ws_rsx/beet_rsx/macros", version = "0.0.6-dev.4" }
 beet_server = { path = "ws_rsx/beet_server", version = "0.0.6-dev.4" }
 
-sweet = { path = "ws_sweet/sweet", version = "0.0.6-dev.4" }
-sweet_bevy = { path = "ws_sweet/sweet_bevy", version = "0.0.6-dev.4" }
-sweet_fs = { path = "ws_sweet/sweet_fs", version = "0.0.6-dev.4" }
-sweet_net = { path = "ws_sweet/sweet_net", version = "0.0.6-dev.4" }
-sweet_server = { path = "ws_sweet/sweet_server", version = "0.0.6-dev.4" }
-sweet_test = { path = "ws_sweet/sweet_test", version = "0.0.6-dev.4" }
-sweet_test_macros = { path = "ws_sweet/sweet_test/macros", version = "0.0.6-dev.4" }
-sweet_web = { path = "ws_sweet/sweet_web", version = "0.0.6-dev.4" }
-sweet_utils = { path = "ws_sweet/sweet_utils", version = "0.0.6-dev.4" }
+sweet = { path = "crates/sweet", version = "0.0.6-dev.4" }
+sweet_bevy = { path = "crates/sweet_bevy", version = "0.0.6-dev.4" }
+sweet_fs = { path = "crates/sweet_fs", version = "0.0.6-dev.4" }
+sweet_net = { path = "crates/sweet_net", version = "0.0.6-dev.4" }
+sweet_server = { path = "crates/sweet_server", version = "0.0.6-dev.4" }
+sweet_test = { path = "crates/sweet_test", version = "0.0.6-dev.4" }
+sweet_test_macros = { path = "crates/sweet_test/macros", version = "0.0.6-dev.4" }
+sweet_web = { path = "crates/sweet_web", version = "0.0.6-dev.4" }
+sweet_utils = { path = "crates/sweet_utils", version = "0.0.6-dev.4" }
 
 #💡 local
 bevy = { version = "0.16", default-features = false, features = ["bevy_color"] }

@@ -45,7 +45,7 @@ An exploration of a rusty `jsx`, and the tools required to maximize performance 
 | [`beet_rsx`](ws_rsx/beet_rsx/Cargo.toml)       | 🐉      | Cross domain authoring tools   |
 | [`beet_router`](ws_rsx/beet_router/Cargo.toml) | 🐉      | File based router for websites |
 
-## `ws_sweet`
+## `sweet`
 
 General utilities including a test runner, file watcher etc.
 

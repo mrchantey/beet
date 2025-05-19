@@ -1,4 +1,4 @@
-/// for example implementation see ws_sweet/sweet-cli/src/test_runners/deno.ts
+/// for example implementation see crates/sweet-cli/src/test_runners/deno.ts
 pub mod js_runtime {
 	use wasm_bindgen::prelude::*;
 	#[wasm_bindgen]
