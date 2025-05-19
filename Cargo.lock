@@ -982,7 +982,7 @@ name = "beet_query"
 version = "0.0.6-dev.4"
 dependencies = [
  "anyhow",
- "base64 0.13.1",
+ "base64 0.22.1",
  "beet_query_macros",
  "extend",
  "libsql",
@@ -7226,7 +7226,7 @@ dependencies = [
  "once_cell",
  "socket2",
  "tracing",
- "windows-sys 0.52.0",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]

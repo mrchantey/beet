@@ -4,6 +4,10 @@ use quote::quote_spanned;
 use syn::Lit;
 
 
+pub trait IntoCustomTokens {
+	fn into_custom_tokens(&self, tokens: &mut TokenStream);
+}
+
 
 
 /// A trait for types that can be tokenized into

@@ -5,6 +5,11 @@ Always greet the user by saying one of
 - ahoyhoy
 - whats good chicken
 
+## Preferences
+
+- Do not 'create a fresh file' just because the one your working on is messy. instead iterate on the one you already have
+
+
 ## Method chaining
 
 In the case of `long().method().chains()` we prefer to continue chains than store temporary variables. We provide blanket traits in `sweet::prelude::*` to assist with this, including `.xmap()` which is just like `.map()` for iterators, but works for any type.

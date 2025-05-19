@@ -20,14 +20,118 @@ pub fn impl_derive_to_tokens(
 fn parse(input: DeriveInput) -> syn::Result<TokenStream> {
 	let name = &input.ident;
 	let content = match &input.data {
-		syn::Data::Struct(data_struct) => todo!(),
-		syn::Data::Enum(data_enum) => todo!(),
-		syn::Data::Union(data_union) => todo!(),
+		syn::Data::Struct(data_struct) => {
+			let fields = &data_struct.fields;
+			
+			match fields {
+				syn::Fields::Named(fields_named) => {
+					let field_tokens = fields_named.named.iter().map(|field| {
+						let field_name = &field.ident;
+						quote! {
+							tokens.extend(::quote::quote! { #field_name: });
+							::quote::ToTokens::to_tokens(&self.#field_name, tokens);
+							tokens.extend(::quote::quote! { , });
+						}
+					});
+					
+					quote! {
+						tokens.extend(::quote::quote! { #name });
+						tokens.extend(::proc_macro2::TokenStream::from_str("{").unwrap());
+						#(#field_tokens)*
+						tokens.extend(::proc_macro2::TokenStream::from_str("}").unwrap());
+					}
+				},
+				syn::Fields::Unnamed(fields_unnamed) => {
+					let field_tokens = fields_unnamed.unnamed.iter().enumerate().map(|(i, _)| {
+						let index = syn::Index::from(i);
+						quote! {
+							::quote::ToTokens::to_tokens(&self.#index, tokens);
+							tokens.extend(::quote::quote! { , });
+						}
+					});
+					
+					quote! {
+						tokens.extend(::quote::quote! { #name });
+						tokens.extend(::proc_macro2::TokenStream::from_str("(").unwrap());
+						#(#field_tokens)*
+						tokens.extend(::proc_macro2::TokenStream::from_str(")").unwrap());
+					}
+				},
+				syn::Fields::Unit => {
+					quote! {
+						tokens.extend(::quote::quote! { #name });
+					}
+				}
+			}
+		},
+		syn::Data::Enum(data_enum) => {
+			let match_arms = data_enum.variants.iter().map(|variant| {
+				let variant_name = &variant.ident;
+				
+				match &variant.fields {
+					syn::Fields::Named(fields_named) => {
+						let field_names = fields_named.named.iter().map(|field| {
+							field.ident.as_ref().unwrap()
+						}).collect::<Vec<_>>();
+						
+						quote! {
+							#name::#variant_name { #(#field_names),* } => {
+								tokens.extend(::quote::quote! { #name::#variant_name });
+								tokens.extend(::proc_macro2::TokenStream::from_str("{").unwrap());
+								#(
+									tokens.extend(::quote::quote! { #field_names: });
+									::quote::ToTokens::to_tokens(#field_names, tokens);
+									tokens.extend(::quote::quote! { , });
+								)*
+								tokens.extend(::proc_macro2::TokenStream::from_str("}").unwrap());
+							}
+						}
+					},
+					syn::Fields::Unnamed(fields_unnamed) => {
+						let field_vars = (0..fields_unnamed.unnamed.len())
+							.map(|i| syn::Ident::new(&format!("field{}", i), proc_macro2::Span::call_site()))
+							.collect::<Vec<_>>();
+						
+						quote! {
+							#name::#variant_name(#(#field_vars),*) => {
+								tokens.extend(::quote::quote! { #name::#variant_name });
+								tokens.extend(::proc_macro2::TokenStream::from_str("(").unwrap());
+								#(
+									::quote::ToTokens::to_tokens(#field_vars, tokens);
+									tokens.extend(::quote::quote! { , });
+								)*
+								tokens.extend(::proc_macro2::TokenStream::from_str(")").unwrap());
+							}
+						}
+					},
+					syn::Fields::Unit => {
+						quote! {
+							#name::#variant_name => {
+								tokens.extend(::quote::quote! { #name::#variant_name });
+							}
+						}
+					}
+				}
+			});
+			
+			quote! {
+				match self {
+					#(#match_arms),*
+				}
+			}
+		},
+		syn::Data::Union(data_union) => {
+			return Err(syn::Error::new_spanned(
+				&data_union.union_token,
+				"Union types are not supported by IntoCustomTokens derive"
+			));
+		},
 	};
+	
 	quote! {
-		impl ::quote::ToTokens for #name {
-			fn to_tokens(&self, tokens: &mut ::proc_macro2::TokenStream) {
-				// #content
+		impl IntoCustomTokens for #name {
+			fn into_custom_tokens(&self, tokens: &mut ::proc_macro2::TokenStream) {
+				#content
 			}
 		}
 	}
@@ -44,10 +148,11 @@ mod test {
 	use syn::DeriveInput;
 
 	#[test]
-	fn works() {
+	fn test_struct_named_fields() {
 		let input: DeriveInput = syn::parse_quote! {
 			struct Test {
 				inner: u32,
+				value: String,
 			}
 		};
 		input
@@ -57,11 +162,93 @@ mod test {
 			.xpect()
 			.to_be(
 				syn::parse2(quote! {
-				impl::quote::ToTokens for Test {
-							fn to_tokens(&self, tokens: &mut ::proc_macro2::TokenStream) {
-								// TODO
+					impl IntoCustomTokens for Test {
+						fn into_custom_tokens(&self, tokens: &mut ::proc_macro2::TokenStream) {
+							tokens.extend(::quote::quote! { Test });
+							tokens.extend(::proc_macro2::TokenStream::from_str("{").unwrap());
+							tokens.extend(::quote::quote! { inner: });
+							::quote::ToTokens::to_tokens(&self.inner, tokens);
+							tokens.extend(::quote::quote! { , });
+							tokens.extend(::quote::quote! { value: });
+							::quote::ToTokens::to_tokens(&self.value, tokens);
+							tokens.extend(::quote::quote! { , });
+							tokens.extend(::proc_macro2::TokenStream::from_str("}").unwrap());
+						}
+					}
+				})
+				.unwrap(),
+			);
+	}
+
+	#[test]
+	fn test_struct_tuple() {
+		let input: DeriveInput = syn::parse_quote! {
+			struct TupleTest(u32, String);
+		};
+		input
+			.xmap(parse)
+			.unwrap()
+			.xmap(|t| syn::parse2::<syn::ItemImpl>(t).unwrap())
+			.xpect()
+			.to_be(
+				syn::parse2(quote! {
+					impl IntoCustomTokens for TupleTest {
+						fn into_custom_tokens(&self, tokens: &mut ::proc_macro2::TokenStream) {
+							tokens.extend(::quote::quote! { TupleTest });
+							tokens.extend(::proc_macro2::TokenStream::from_str("(").unwrap());
+							::quote::ToTokens::to_tokens(&self.0, tokens);
+							tokens.extend(::quote::quote! { , });
+							::quote::ToTokens::to_tokens(&self.1, tokens);
+							tokens.extend(::quote::quote! { , });
+							tokens.extend(::proc_macro2::TokenStream::from_str(")").unwrap());
+						}
+					}
+				})
+				.unwrap(),
+			);
+	}
+
+	#[test]
+	fn test_enum() {
+		let input: DeriveInput = syn::parse_quote! {
+			enum TestEnum {
+				A,
+				B(u32),
+				C { value: String },
+			}
+		};
+		input
+			.xmap(parse)
+			.unwrap()
+			.xmap(|t| syn::parse2::<syn::ItemImpl>(t).unwrap())
+			.xpect()
+			.to_be(
+				syn::parse2(quote! {
+					impl IntoCustomTokens for TestEnum {
+						fn into_custom_tokens(&self, tokens: &mut ::proc_macro2::TokenStream) {
+							match self {
+								TestEnum::A => {
+									tokens.extend(::quote::quote! { TestEnum::A });
+								},
+								TestEnum::B(field0) => {
+									tokens.extend(::quote::quote! { TestEnum::B });
+									tokens.extend(::proc_macro2::TokenStream::from_str("(").unwrap());
+									::quote::ToTokens::to_tokens(field0, tokens);
+									tokens.extend(::quote::quote! { , });
+									tokens.extend(::proc_macro2::TokenStream::from_str(")").unwrap());
+								},
+								TestEnum::C { value } => {
+									tokens.extend(::quote::quote! { TestEnum::C });
+									tokens.extend(::proc_macro2::TokenStream::from_str("{").unwrap());
+									tokens.extend(::quote::quote! { value: });
+									::quote::ToTokens::to_tokens(value, tokens);
+									tokens.extend(::quote::quote! { , });
+									tokens.extend(::proc_macro2::TokenStream::from_str("}").unwrap());
+								}
 							}
-						}			})
+						}
+					}
+				})
 				.unwrap(),
 			);
 	}
