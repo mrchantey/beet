@@ -56,14 +56,14 @@ impl FileGroup {
 	#[cfg(test)]
 	pub fn test_site() -> Self {
 		Self::new(
-			WorkspacePathBuf::new("ws_rsx/beet_router/src/test_site")
+			WorkspacePathBuf::new("crates/beet_router/src/test_site")
 				.into_abs_unchecked(),
 		)
 	}
 	#[cfg(test)]
 	pub fn test_site_pages() -> Self {
 		Self::new(
-			WorkspacePathBuf::new("ws_rsx/beet_router/src/test_site/pages")
+			WorkspacePathBuf::new("crates/beet_router/src/test_site/pages")
 				.into_abs_unchecked(),
 		)
 		.with_filter(
@@ -75,7 +75,7 @@ impl FileGroup {
 	#[cfg(test)]
 	pub fn test_site_markdown() -> Self {
 		Self::new(
-			WorkspacePathBuf::new("ws_rsx/beet_router/src/test_site/test_docs")
+			WorkspacePathBuf::new("crates/beet_router/src/test_site/test_docs")
 				.into_abs_unchecked(),
 		)
 		.with_filter(GlobFilter::default().with_include("*.md"))

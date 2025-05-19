@@ -53,11 +53,11 @@ src_path = "crates/beet_site/src"
 
 [[file_group]]
 name = "test_site_pages"
-path = "ws_rsx/beet_router/src/test_site/pages"
+path = "crates/beet_router/src/test_site/pages"
 include = ["*.rs"]
 exclude = ["*mod.rs"]
 package_name = "beet_router"
-output = "ws_rsx/beet_router/src/test_site/codegen/pages.rs"
+output = "crates/beet_router/src/test_site/codegen/pages.rs"
 import_tokens = ["use crate::as_beet::*;"]
 "#;
 		toml::de::from_str(config).unwrap()
@@ -118,8 +118,8 @@ file_group_routes = ["beet_design_mockups"]
 
 [[file_group]]
 name = "test_site_pages"
-path = "ws_rsx/beet_router/src/test_site/pages"
-output = "ws_rsx/beet_router/src/test_site/codegen/pages.rs"
+path = "crates/beet_router/src/test_site/pages"
+output = "crates/beet_router/src/test_site/codegen/pages.rs"
 include = ["*.rs"]
 exclude = ["*mod.rs"]
 package_name = "beet_router"
@@ -135,8 +135,8 @@ import_tokens = ["use crate::as_beet::*;"]
 name = "beet_design_mockups"
 # preset = "mockup"
 package_name = "beet_design"
-path = "ws_rsx/beet_design/src"
-output = "ws_rsx/beet_design/src/codegen/mockups.rs"
+path = "crates/beet_design/src"
+output = "crates/beet_design/src/codegen/mockups.rs"
 include = ["*.mockup.*"]
 base_route = "/design"
 replace_route = [{ from = ".mockup", to = "" }]

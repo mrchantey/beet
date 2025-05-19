@@ -138,7 +138,7 @@ mod test {
 
 	#[test]
 	fn works() {
-		let src = WorkspacePathBuf::new("ws_rsx/beet_router/src/test_site")
+		let src = WorkspacePathBuf::new("crates/beet_router/src/test_site")
 			.into_abs()
 			.unwrap();
 
@@ -165,7 +165,7 @@ mod test {
 	async fn builds() {
 		use beet_rsx::prelude::*;
 
-		let src = WorkspacePathBuf::new("ws_rsx/beet_router/src/test_site")
+		let src = WorkspacePathBuf::new("crates/beet_router/src/test_site")
 			.into_abs()
 			.unwrap();
 		let builder = BuildTemplateMaps::new(src.as_path());

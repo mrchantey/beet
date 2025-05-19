@@ -20,7 +20,7 @@ pub struct NodeTemplateMap {
 	/// The root directory used to create the templates, templates
 	/// with a location outside of this root will not be expected to exists and
 	/// so will not produce an error.
-	// canonicalized [here](ws_rsx/beet_router/src/parser/build_template_map/mod.rs#L110-L111)
+	// canonicalized [here](crates/beet_router/src/parser/build_template_map/mod.rs#L110-L111)
 	pub root: WorkspacePathBuf,
 	/// Template for each node with a [`TemplateDirective::NodeTemplate`], keyed by their span.
 	pub templates: RapidHashMap<FileSpan, WebNodeTemplate>,

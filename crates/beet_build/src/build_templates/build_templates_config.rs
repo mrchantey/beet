@@ -22,7 +22,7 @@ impl Default for BuildTemplatesConfig {
 				.with_exclude("*/target/*")
 				.with_exclude("*/node_modules/*"),
 			#[cfg(test)]
-			root_dir: WorkspacePathBuf::new("ws_rsx/beet_router/src/test_site"),
+			root_dir: WorkspacePathBuf::new("crates/beet_router/src/test_site"),
 			#[cfg(not(test))]
 			root_dir: WorkspacePathBuf::default(),
 		}

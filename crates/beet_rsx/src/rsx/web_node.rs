@@ -472,7 +472,7 @@ mod test {
 		let span = rsx! { <div>hello world</div> }
 			.span().clone();
 		expect(&span.file().to_string_lossy())
-			.to_be("ws_rsx/beet_rsx/src/rsx/web_node.rs");
+			.to_be("crates/beet_rsx/src/rsx/web_node.rs");
 		expect(span.start_line()).to_be(line);
 		expect(span.start_col()).to_be(20);
 	}

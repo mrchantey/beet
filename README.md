@@ -36,14 +36,14 @@ Control flow crates built upon the [ecs engine](https://crates.io/crates/bevy_ec
 | [`beet_sim`](crates/beet_sim/Cargo.toml)         | 🐉      | Extend `beet_flow` with generalized simulation tooling like stats |
 
 
-## `ws_rsx`
+## `rsx`
 
 An exploration of a rusty `jsx`, and the tools required to maximize performance and developer productivity. 
 
 | Crate                                          | Status | Description                    |
 | ---------------------------------------------- | ------ | ------------------------------ |
-| [`beet_rsx`](ws_rsx/beet_rsx/Cargo.toml)       | 🐉      | Cross domain authoring tools   |
-| [`beet_router`](ws_rsx/beet_router/Cargo.toml) | 🐉      | File based router for websites |
+| [`beet_rsx`](crates/beet_rsx/Cargo.toml)       | 🐉      | Cross domain authoring tools   |
+| [`beet_router`](crates/beet_router/Cargo.toml) | 🐉      | File based router for websites |
 
 ## `sweet`
 

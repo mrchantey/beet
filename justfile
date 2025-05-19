@@ -24,7 +24,7 @@ init-repo:
 	just init-flow
 	just init-rsx
 
-# mkdir -p crates/beet_rsx/assets/fonts && cp ./assets/fonts/* ws_rsx/beet_rsx/assets/fonts
+# mkdir -p crates/beet_rsx/assets/fonts && cp ./assets/fonts/* crates/beet_rsx/assets/fonts
 init-flow:
 	just assets-pull
 	mkdir -p crates/beet_ml/assets/ml && cp ./assets/ml/default-bert.ron crates/beet_ml/assets/ml/default.bert.ron
@@ -98,15 +98,15 @@ fmt *args:
 # soo bad
 leptosfmt *args:
 	leptosfmt -q											\
-	ws_rsx/beet_rsx/**/*.rs 					\
-	ws_rsx/beet_rsx/**/**/*.rs 				\
-	ws_rsx/beet_rsx/**/**/**/*.rs 		\
-	ws_rsx/beet_design/**/*.rs 				\
-	ws_rsx/beet_design/**/**/*.rs 		\
-	ws_rsx/beet_design/**/**/**/*.rs 	\
-	ws_rsx/beet_router/**/*.rs 				\
-	ws_rsx/beet_router/**/**/*.rs 		\
-	ws_rsx/beet_router/**/**/**/*.rs 	\
+	crates/beet_rsx/**/*.rs 					\
+	crates/beet_rsx/**/**/*.rs 				\
+	crates/beet_rsx/**/**/**/*.rs 		\
+	crates/beet_design/**/*.rs 				\
+	crates/beet_design/**/**/*.rs 		\
+	crates/beet_design/**/**/**/*.rs 	\
+	crates/beet_router/**/*.rs 				\
+	crates/beet_router/**/**/*.rs 		\
+	crates/beet_router/**/**/**/*.rs 	\
 	crates/beet_site/**/*.rs 					\
 	crates/beet_site/**/**/*.rs 			\
 	crates/beet_site/**/**/**/*.rs 		\
@@ -255,8 +255,8 @@ test-rsx-macro *args:
 
 clear-artifacts:
 	rm -rf target
-	rm -rf ws_rsx/beet_router/src/test_site/codegen
-	rm -rf ws_rsx/beet_design/src/codegen
+	rm -rf crates/beet_router/src/test_site/codegen
+	rm -rf crates/beet_design/src/codegen
 	rm -rf crates/beet_site/src/codegen
 
 # massive purge

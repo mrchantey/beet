@@ -47,7 +47,7 @@ members = [
 	"crates/beet_parse",
 	"crates/beet_rsx_parser",
 
-	## 💡 Beet Flow
+	## 💡 Flow
 	"crates/beet_examples",
 	"crates/beet_flow",
 	"crates/beet_flow/macros",
@@ -55,14 +55,15 @@ members = [
 	"crates/beet_sim",
 	"crates/beet_spatial",
 
-	"ws_rsx/beet_connect",
-	"ws_rsx/beet_design",
-	"ws_rsx/beet_query",
-	"ws_rsx/beet_query/macros",
-	"ws_rsx/beet_router",
-	"ws_rsx/beet_rsx",
-	"ws_rsx/beet_rsx/macros",
-	"ws_rsx/beet_server",
+	## 💡 RSX
+	"crates/beet_connect",
+	"crates/beet_design",
+	"crates/beet_query",
+	"crates/beet_query/macros",
+	"crates/beet_router",
+	"crates/beet_rsx",
+	"crates/beet_rsx/macros",
+	"crates/beet_server",
 
 	## 💡 Sweet
 	"crates/sweet",
@@ -96,14 +97,14 @@ beet_ml = { path = "crates/beet_ml", version = "0.0.6-dev.4" }
 beet_spatial = { path = "crates/beet_spatial", version = "0.0.6-dev.4" }
 beet_sim = { path = "crates/beet_sim", version = "0.0.6-dev.4" }
 
-beet_connect = { path = "ws_rsx/beet_connect", version = "0.0.6-dev.4" }
-beet_design = { path = "ws_rsx/beet_design", version = "0.0.6-dev.4" }
-beet_query = { path = "ws_rsx/beet_query", version = "0.0.6-dev.4" }
-beet_query_macros = { path = "ws_rsx/beet_query/macros", version = "0.0.6-dev.4" }
-beet_router = { path = "ws_rsx/beet_router", version = "0.0.6-dev.4" }
-beet_rsx = { path = "ws_rsx/beet_rsx", version = "0.0.6-dev.4" }
-beet_rsx_macros = { path = "ws_rsx/beet_rsx/macros", version = "0.0.6-dev.4" }
-beet_server = { path = "ws_rsx/beet_server", version = "0.0.6-dev.4" }
+beet_connect = { path = "crates/beet_connect", version = "0.0.6-dev.4" }
+beet_design = { path = "crates/beet_design", version = "0.0.6-dev.4" }
+beet_query = { path = "crates/beet_query", version = "0.0.6-dev.4" }
+beet_query_macros = { path = "crates/beet_query/macros", version = "0.0.6-dev.4" }
+beet_router = { path = "crates/beet_router", version = "0.0.6-dev.4" }
+beet_rsx = { path = "crates/beet_rsx", version = "0.0.6-dev.4" }
+beet_rsx_macros = { path = "crates/beet_rsx/macros", version = "0.0.6-dev.4" }
+beet_server = { path = "crates/beet_server", version = "0.0.6-dev.4" }
 
 sweet = { path = "crates/sweet", version = "0.0.6-dev.4" }
 sweet_bevy = { path = "crates/sweet_bevy", version = "0.0.6-dev.4" }
