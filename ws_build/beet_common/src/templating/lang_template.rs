@@ -38,7 +38,7 @@ pub struct LangTemplate {
 	/// An incremented unique id for this template, counted up from 0 so suitable
 	/// as a short html data attribute.
 	pub id: u64,
-	pub directives: Vec<TemplateDirective>,
+	pub directives: Vec<TemplateDirectiveEnum>,
 	/// The content of the template, either inline or a file path
 	pub content: String,
 	/// The content hash of the template
@@ -62,7 +62,7 @@ impl LangTemplate {
 	pub fn new(
 		tag: String,
 		id: u64,
-		directives: Vec<TemplateDirective>,
+		directives: Vec<TemplateDirectiveEnum>,
 		content: String,
 		content_hash: LangContentHash,
 		spans: Vec<FileSpan>,

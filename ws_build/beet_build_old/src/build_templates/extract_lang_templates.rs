@@ -47,7 +47,7 @@ pub(super) struct ExtractedLangTemplate {
 	pub span: FileSpan,
 	pub content: ExtractedLangContent,
 	pub tag: String,
-	pub directives: Vec<TemplateDirective>,
+	pub directives: Vec<TemplateDirectiveEnum>,
 	pub content_hash: LangContentHash,
 }
 
@@ -56,7 +56,7 @@ impl ExtractedLangTemplate {
 	pub fn content_hash(
 		tag: &str,
 		content: &ExtractedLangContent,
-		directives: &[TemplateDirective],
+		directives: &[TemplateDirectiveEnum],
 	) -> LangContentHash {
 		let mut hasher = RapidHasher::default_const();
 		tag.hash(&mut hasher);
@@ -123,7 +123,7 @@ impl ExtractLangTemplates {
 				};
 
 
-				component.push_directive(TemplateDirective::LangTemplate {
+				component.push_directive(TemplateDirectiveEnum::LangTemplate {
 					content_hash,
 				});
 

@@ -16,7 +16,7 @@ fn color_scheme(props: ColorScheme) -> WebNode {
 	let css = ThemeToCss::default().map(&props.theme);
 
 	Style::new(css)
-		.with_directive(TemplateDirective::StyleScope(StyleScope::Global))
+		.with_directive(TemplateDirectiveEnum::StyleScope(StyleScope::Global))
 		.into_node()
 }
 

@@ -1,4 +1,5 @@
 use proc_macro2::TokenStream;
+use quote::quote;
 use quote::quote_spanned;
 use syn::Lit;
 
@@ -12,6 +13,14 @@ pub trait RustTokens {
 	/// rust files like macros, ie `MyStruct::new(7)`.
 	/// It assumes the type is in scope.
 	fn into_rust_tokens(&self) -> TokenStream;
+}
+
+impl RustTokens for String {
+	/// Create a token stream of the constructor for a [`String`]
+	fn into_rust_tokens(&self) -> TokenStream {
+		let value = self.to_string();
+		quote! { #value.to_string() }
+	}
 }
 
 

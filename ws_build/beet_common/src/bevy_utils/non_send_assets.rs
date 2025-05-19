@@ -133,23 +133,21 @@ pub impl<'a> EntityWorldMut<'a> {
 }
 
 
-
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
 	use bevy::prelude::*;
-	use proc_macro2::Span;
 	use sweet::prelude::*;
 
 	#[test]
 	fn works() {
 		// let assets = ::default();
 		App::new()
-			.init_non_send_resource::<NonSendAssets<Span>>()
+			.init_non_send_resource::<NonSendAssets<u32>>()
 			.add_systems(
 				Startup,
-				|mut assets: NonSendMut<NonSendAssets<Span>>| {
-					let handle = assets.insert(Span::call_site());
+				|mut assets: NonSendMut<NonSendAssets<u32>>| {
+					let handle = assets.insert(8);
 					expect(handle.inner()).to_be(0);
 				},
 			)

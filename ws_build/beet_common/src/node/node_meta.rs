@@ -5,12 +5,12 @@ use crate::prelude::*;
 #[derive(Debug, Default, Clone, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct NodeMeta {
-	directives: Vec<TemplateDirective>,
+	directives: Vec<TemplateDirectiveEnum>,
 	span: FileSpan,
 }
 
 impl NodeMeta {
-	pub fn new(span: FileSpan, directives: Vec<TemplateDirective>) -> Self {
+	pub fn new(span: FileSpan, directives: Vec<TemplateDirectiveEnum>) -> Self {
 		Self { span, directives }
 	}
 }
@@ -35,17 +35,20 @@ pub trait GetNodeMeta {
 		self.meta_mut().span = span;
 		self
 	}
-	fn directives(&self) -> &[TemplateDirective] { &self.meta().directives }
-	fn push_directive(&mut self, directive: impl Into<TemplateDirective>) {
+	fn directives(&self) -> &[TemplateDirectiveEnum] { &self.meta().directives }
+	fn push_directive(&mut self, directive: impl Into<TemplateDirectiveEnum>) {
 		self.meta_mut().directives.push(directive.into());
 	}
 
-	fn set_template_directives(&mut self, directives: Vec<TemplateDirective>) {
+	fn set_template_directives(
+		&mut self,
+		directives: Vec<TemplateDirectiveEnum>,
+	) {
 		self.meta_mut().directives = directives;
 	}
 	fn with_template_directives(
 		mut self,
-		directives: Vec<TemplateDirective>,
+		directives: Vec<TemplateDirectiveEnum>,
 	) -> Self
 	where
 		Self: Sized,
@@ -63,13 +66,13 @@ impl From<FileSpan> for NodeMeta {
 impl<T: GetNodeMeta> TemplateDirectiveExt for T {
 	fn find_directive(
 		&self,
-		mut func: impl FnMut(&TemplateDirective) -> bool,
-	) -> Option<&TemplateDirective> {
+		mut func: impl FnMut(&TemplateDirectiveEnum) -> bool,
+	) -> Option<&TemplateDirectiveEnum> {
 		self.meta().directives.iter().find(|d| func(d))
 	}
 	fn find_map_directive<U>(
 		&self,
-		mut func: impl FnMut(&TemplateDirective) -> Option<&U>,
+		mut func: impl FnMut(&TemplateDirectiveEnum) -> Option<&U>,
 	) -> Option<&U> {
 		self.meta().directives.iter().find_map(|d| func(d))
 	}

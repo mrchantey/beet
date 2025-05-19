@@ -1,8 +1,8 @@
 use crate::prelude::*;
+use bevy::prelude::*;
 use std::hash::Hash;
 use std::path::Path;
 use sweet::prelude::*;
-use bevy::prelude::*;
 
 #[derive(Debug, Default, Clone, PartialEq, Eq, Hash)]
 pub struct Spanner<T> {
@@ -28,6 +28,16 @@ impl<T> Spanner<T> {
 	pub fn into_span(self) -> FileSpan { self.span }
 }
 
+#[cfg(feature = "tokens")]
+impl<T: crate::prelude::RustTokens> crate::prelude::RustTokens for Spanner<T> {
+	fn into_rust_tokens(&self) -> proc_macro2::TokenStream {
+		let span = self.span.into_rust_tokens();
+		let value = self.value.into_rust_tokens();
+		quote::quote! {
+			Spanner::new(#span, #value)
+		}
+	}
+}
 
 /// File location of the first symbol inside an rsx macro, used by [RsxTemplate]
 /// to reconcile web nodes with templates
@@ -144,13 +154,13 @@ impl GetSpan for FileSpan {
 	fn span_mut(&mut self) -> &mut FileSpan { self }
 }
 
+#[cfg(feature = "tokens")]
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
 	use sweet::prelude::*;
-
-
-	#[cfg(feature = "tokens")]
+	
+	
 	#[test]
 	fn to_rust_tokens() {
 		let span = FileSpan::new_with_start("foo", 1, 2);

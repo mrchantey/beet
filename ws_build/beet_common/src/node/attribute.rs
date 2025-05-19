@@ -1,3 +1,4 @@
+#[cfg(feature = "tokens")]
 use crate::prelude::*;
 use bevy::prelude::*;
 
@@ -41,9 +42,11 @@ impl AttributeKeyStr {
 /// let key = "hidden";
 /// rsx!{<span {key}=true />};
 /// ```
+#[cfg(feature = "tokens")]
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Deref, Component)]
 #[component(immutable)]
 pub struct AttributeKeyExpr(NonSendHandle<syn::Expr>);
+#[cfg(feature = "tokens")]
 impl AttributeKeyExpr {
 	pub fn new(value: NonSendHandle<syn::Expr>) -> Self { Self(value) }
 }

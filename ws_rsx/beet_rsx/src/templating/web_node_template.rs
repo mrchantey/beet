@@ -13,7 +13,7 @@ mod test {
 				self_closing: false,
 				attributes: vec![],
 				meta: NodeMeta::new(FileSpan::default(), vec![
-					TemplateDirective::NodeTemplate,
+					TemplateDirectiveEnum::NodeTemplate,
 				]),
 				children: Box::new(WebNodeTemplate::RustBlock {
 					tracker: RustyTracker::PLACEHOLDER,
@@ -38,7 +38,7 @@ mod test {
 			tag: "div".to_string(),
 			self_closing: false,
 			meta: NodeMeta::new(FileSpan::default(), vec![
-				TemplateDirective::NodeTemplate,
+				TemplateDirectiveEnum::NodeTemplate,
 			]),
 			attributes: vec![
 				RsxTemplateAttribute::Key {

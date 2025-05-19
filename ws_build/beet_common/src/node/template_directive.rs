@@ -1,13 +1,68 @@
 use crate::prelude::*;
 use bevy::prelude::*;
 
+/// System set in which all template directives are extracted.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, SystemSet)]
+pub struct ExtractDirectivesSet;
+
+pub fn default_directive_plugin(app: &mut App) {
+	app.add_plugins((
+		directive_plugin::<HeadDirective>,
+		directive_plugin::<ClientIslandDirective>,
+	));
+}
+
+
+/// Generic plugin for extracting and propagating directives to tokens.
+/// ## Example
+/// ```rust
+/// # use bevy::prelude::*;
+/// # use beet_common::prelude::*;
+/// App::new().add_plugins(directive_plugin::<ClientIslandDirective>());
+/// ```
+pub fn directive_plugin<T: TemplateDirective>(app: &mut App) {
+	app.add_systems(
+		Update,
+		try_extract_directive::<T>.in_set(ExtractDirectivesSet),
+	);
+}
+
+/// Generic system for extracting a [TemplateDirective] from attributes.
+/// ## Example
+/// ```rust
+/// # use bevy::prelude::*;
+/// # use beet_common::prelude::*;
+/// App::new().add_systems(Update,
+/// 	try_extract_directive::<ClientIslandDirective>
+/// 		.in_set(ExtractDirectivesSet)
+/// );
+/// ```
+fn try_extract_directive<T: TemplateDirective>(
+	mut commands: Commands,
+	query: Populated<(
+		Entity,
+		&AttributeOf,
+		&AttributeKeyStr,
+		Option<&AttributeValueStr>,
+	)>,
+) {
+	for (entity, parent, key, value) in query.iter() {
+		if let Some(directive) =
+			T::try_from_attribute(key.as_str(), value.map(|v| v.as_str()))
+		{
+			commands.entity(**parent).insert(directive);
+			commands.entity(entity).despawn();
+		}
+	}
+}
+
 /// Template directives contain instructions for various stages of a beet
 /// pipeline. Some the syntax of a colon, ie `<div client:load />`, and
 /// some are more nuanced, for example a script with a src attribute that
 /// starts with a `.` is a file source directive.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub enum TemplateDirective {
+pub enum TemplateDirectiveEnum {
 	/// Indicate this node should be extracted from wherever it is and inserted
 	/// in the head of the document.
 	Head,
@@ -112,39 +167,21 @@ pub enum TemplateDirective {
 	},
 }
 
-/// Directive for how the node should be rendered and loaded on the client.
-#[derive(Debug, Default, Component)]
-pub enum ClientIslandDirective {
-	/// Render the node statically then hydrate it on the client
-	#[default]
-	Load,
-	/// aka Client Side Rendering, do not render the node statically, only render on the client
-	Only,
-}
 
 /// Directive for which slot to render the node in.
 #[derive(Debug, Default, Component, Deref)]
 pub struct SlotDirective(String);
 
 
-impl TryFromAttribute for ClientIslandDirective {
-	fn try_from_attribute(key: &str, value: Option<&str>) -> Option<Self> {
-		match (key, value) {
-			("client:load", _) => Some(Self::Load),
-			("client:only", _) => Some(Self::Only),
-			_ => None,
-		}
-	}
-}
-
-pub trait TryFromAttribute: Sized {
+/// Trait for template directives
+pub trait TemplateDirective: 'static + Sized + Component {
 	/// Try to parse from an attribute key-value pair
 	fn try_from_attribute(key: &str, value: Option<&str>) -> Option<Self>;
 }
 
 
 
-impl TemplateDirective {
+impl TemplateDirectiveEnum {
 	pub fn try_from_attr(
 		key: &str,
 		value: Option<&str>,
@@ -191,33 +228,33 @@ impl TemplateDirective {
 	}
 }
 
-impl TemplateDirectiveExt for TemplateDirective {
+impl TemplateDirectiveExt for TemplateDirectiveEnum {
 	fn find_directive(
 		&self,
-		func: impl Fn(&TemplateDirective) -> bool,
-	) -> Option<&TemplateDirective> {
+		func: impl Fn(&TemplateDirectiveEnum) -> bool,
+	) -> Option<&TemplateDirectiveEnum> {
 		if func(self) { Some(self) } else { None }
 	}
 
 	fn find_map_directive<T>(
 		&self,
-		func: impl Fn(&TemplateDirective) -> Option<&T>,
+		func: impl Fn(&TemplateDirectiveEnum) -> Option<&T>,
 	) -> Option<&T> {
 		func(self)
 	}
 }
 
-impl TemplateDirectiveExt for Vec<TemplateDirective> {
+impl TemplateDirectiveExt for Vec<TemplateDirectiveEnum> {
 	fn find_directive(
 		&self,
-		func: impl Fn(&TemplateDirective) -> bool,
-	) -> Option<&TemplateDirective> {
+		func: impl Fn(&TemplateDirectiveEnum) -> bool,
+	) -> Option<&TemplateDirectiveEnum> {
 		self.iter().find(|d| func(d))
 	}
 
 	fn find_map_directive<T>(
 		&self,
-		func: impl Fn(&TemplateDirective) -> Option<&T>,
+		func: impl Fn(&TemplateDirectiveEnum) -> Option<&T>,
 	) -> Option<&T> {
 		self.iter().find_map(|d| func(d))
 	}
@@ -229,11 +266,11 @@ impl TemplateDirectiveExt for Vec<TemplateDirective> {
 pub trait TemplateDirectiveExt {
 	fn find_directive(
 		&self,
-		func: impl Fn(&TemplateDirective) -> bool,
-	) -> Option<&TemplateDirective>;
+		func: impl Fn(&TemplateDirectiveEnum) -> bool,
+	) -> Option<&TemplateDirectiveEnum>;
 	fn find_map_directive<T>(
 		&self,
-		func: impl Fn(&TemplateDirective) -> Option<&T>,
+		func: impl Fn(&TemplateDirectiveEnum) -> Option<&T>,
 	) -> Option<&T>;
 
 	/// Check if the template directive is a client directive
@@ -241,44 +278,44 @@ pub trait TemplateDirectiveExt {
 	/// This must match TemplateDirective::is_client_reactive
 	fn is_client_reactive(&self) -> bool {
 		// Check if the template directive is a client directive
-		self.any_directive(|d| matches!(d, TemplateDirective::ClientLoad))
+		self.any_directive(|d| matches!(d, TemplateDirectiveEnum::ClientLoad))
 	}
 	/// Check if the template directive is a local scope directive
 	fn style_scope(&self) -> Option<StyleScope> {
 		self.find_map_directive(|d| match d {
-			TemplateDirective::StyleScope(scope) => Some(scope),
+			TemplateDirectiveEnum::StyleScope(scope) => Some(scope),
 			_ => None,
 		})
 		.copied()
 	}
 	fn is_template(&self) -> bool {
-		self.any_directive(|d| matches!(d, TemplateDirective::NodeTemplate))
+		self.any_directive(|d| matches!(d, TemplateDirectiveEnum::NodeTemplate))
 	}
 
 	/// Check if the template directive is a cascade style directive
 	fn is_cascade_style(&self) -> bool {
-		self.any_directive(|d| matches!(d, TemplateDirective::StyleCascade))
+		self.any_directive(|d| matches!(d, TemplateDirectiveEnum::StyleCascade))
 	}
 	fn is_inline(&self) -> bool {
-		self.any_directive(|d| matches!(d, TemplateDirective::Inline))
+		self.any_directive(|d| matches!(d, TemplateDirectiveEnum::Inline))
 	}
 
 	fn slot_directive(&self) -> Option<&String> {
 		self.find_map_directive(|d| match d {
-			TemplateDirective::Slot(slot) => Some(slot),
+			TemplateDirectiveEnum::Slot(slot) => Some(slot),
 			_ => None,
 		})
 	}
 
 	fn src_directive(&self) -> Option<&String> {
 		self.find_map_directive(|d| match d {
-			TemplateDirective::FsSrc(src) => Some(src),
+			TemplateDirectiveEnum::FsSrc(src) => Some(src),
 			_ => None,
 		})
 	}
 	fn lang_template(&self) -> Option<LangContentHash> {
 		self.find_map_directive(|d| match d {
-			TemplateDirective::LangTemplate { content_hash } => {
+			TemplateDirectiveEnum::LangTemplate { content_hash } => {
 				Some(content_hash)
 			}
 			_ => None,
@@ -289,12 +326,15 @@ pub trait TemplateDirectiveExt {
 
 	fn runtime(&self) -> Option<&String> {
 		self.find_map_directive(|d| match d {
-			TemplateDirective::Runtime(runtime) => Some(runtime),
+			TemplateDirectiveEnum::Runtime(runtime) => Some(runtime),
 			_ => None,
 		})
 	}
 
-	fn any_directive(&self, func: impl Fn(&TemplateDirective) -> bool) -> bool {
+	fn any_directive(
+		&self,
+		func: impl Fn(&TemplateDirectiveEnum) -> bool,
+	) -> bool {
 		self.find_directive(func).is_some()
 	}
 }
@@ -308,14 +348,14 @@ where
 		func: impl Fn(&WebDirective) -> Option<&T2>,
 	) -> Option<&T2> {
 		self.find_map_directive(|d| match d {
-			TemplateDirective::Web(web) => func(web),
+			TemplateDirectiveEnum::Web(web) => func(web),
 			_ => None,
 		})
 	}
 }
 
-impl Into<TemplateDirective> for WebDirective {
-	fn into(self) -> TemplateDirective { TemplateDirective::Web(self) }
+impl Into<TemplateDirectiveEnum> for WebDirective {
+	fn into(self) -> TemplateDirectiveEnum { TemplateDirectiveEnum::Web(self) }
 }
 
 #[cfg(feature = "tokens")]
@@ -324,49 +364,49 @@ use sweet::prelude::PipelineTarget;
 
 
 #[cfg(feature = "tokens")]
-impl crate::prelude::RustTokens for TemplateDirective {
+impl crate::prelude::RustTokens for TemplateDirectiveEnum {
 	fn into_rust_tokens(&self) -> proc_macro2::TokenStream {
 		match self {
-			TemplateDirective::Head => {
+			TemplateDirectiveEnum::Head => {
 				quote! {TemplateDirective::Head}
 			}
-			TemplateDirective::NodeTemplate => {
+			TemplateDirectiveEnum::NodeTemplate => {
 				quote! {TemplateDirective::NodeTemplate}
 			}
-			TemplateDirective::ClientLoad => {
+			TemplateDirectiveEnum::ClientLoad => {
 				quote! {TemplateDirective::ClientLoad}
 			}
-			TemplateDirective::StyleScope(scope) => {
+			TemplateDirectiveEnum::StyleScope(scope) => {
 				let scope = scope.into_rust_tokens();
 				quote! {TemplateDirective::StyleScope(#scope)}
 			}
-			TemplateDirective::StyleCascade => {
+			TemplateDirectiveEnum::StyleCascade => {
 				quote! {TemplateDirective::StyleCascade}
 			}
-			TemplateDirective::Web(web) => {
+			TemplateDirectiveEnum::Web(web) => {
 				let web = web.into_rust_tokens();
 				quote! {TemplateDirective::Web(#web)}
 			}
-			TemplateDirective::LangTemplate { content_hash } => {
+			TemplateDirectiveEnum::LangTemplate { content_hash } => {
 				let content_hash = content_hash.into_rust_tokens();
 				quote! {TemplateDirective::ContentPlaceholder{
 						content_hash: #content_hash
 					}
 				}
 			}
-			TemplateDirective::Inline => {
+			TemplateDirectiveEnum::Inline => {
 				quote! {TemplateDirective::Inline}
 			}
-			TemplateDirective::FsSrc(src) => {
+			TemplateDirectiveEnum::FsSrc(src) => {
 				quote! {TemplateDirective::FsSrc(#src.into())}
 			}
-			TemplateDirective::Slot(slot) => {
+			TemplateDirectiveEnum::Slot(slot) => {
 				quote! {TemplateDirective::Slot(#slot.into())}
 			}
-			TemplateDirective::Runtime(runtime) => {
+			TemplateDirectiveEnum::Runtime(runtime) => {
 				quote! {TemplateDirective::Runtime(#runtime.into())}
 			}
-			TemplateDirective::Custom {
+			TemplateDirectiveEnum::Custom {
 				prefix,
 				suffix,
 				value,

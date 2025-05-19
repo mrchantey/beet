@@ -1,3 +1,4 @@
+#![allow(unused)]
 use crate::prelude::*;
 use anyhow::Result;
 use beet_common::prelude::*;
@@ -36,7 +37,7 @@ impl<T: AsRef<str>> Pipeline<T, Result<WebTokens>> for StringToWebTokens {
 			));
 		}
 		let mut tokens = self.rsx_parsed_expression(expr)?;
-		tokens.push_directive(TemplateDirective::NodeTemplate);
+		tokens.push_directive(TemplateDirectiveEnum::NodeTemplate);
 		Ok(tokens)
 	}
 }
@@ -123,10 +124,11 @@ impl StringToWebTokens {
 		const STRING_TAGS: [&str; 3] = ["script", "style", "code"];
 
 		let children = if STRING_TAGS.contains(&el.0.to_string().as_str()) {
-			WebTokens::Text {
-				value: LitStr::new(&el.2.to_html(), Span::call_site()).into(),
-				meta: FileSpan::new_for_file(&self.source_file).into(),
-			}
+			unreachable!()
+			// WebTokens::Text {
+			// 	value: LitStr::new(&el.2.to_html(), Span::call_site()).into(),
+			// 	meta: FileSpan::new_for_file(&self.source_file).into(),
+			// }
 		} else {
 			self.rsx_children(el.2)?
 		};
@@ -175,12 +177,13 @@ impl StringToWebTokens {
 		}
 	}
 
-	fn rsx_text(&self, text: RsxText) -> Result<WebTokens> {
-		WebTokens::Text {
-			value: LitStr::new(&text.0, Span::call_site()).into(),
-			meta: FileSpan::new_for_file(&self.source_file).into(),
-		}
-		.xok()
+	fn rsx_text(&self, _text: RsxText) -> Result<WebTokens> {
+		unreachable!()
+		// WebTokens::Text {
+		// 	value: LitStr::new(&text.0, Span::call_site()).into(),
+		// 	meta: FileSpan::new_for_file(&self.source_file).into(),
+		// }
+		// .xok()
 	}
 
 	fn rsx_attribute(

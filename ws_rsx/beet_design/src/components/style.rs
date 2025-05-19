@@ -5,7 +5,7 @@ use beet_rsx::prelude::*;
 // is:inline now?
 pub struct Style {
 	pub css: String,
-	pub directives: Vec<TemplateDirective>,
+	pub directives: Vec<TemplateDirectiveEnum>,
 }
 
 impl IntoWebNode for Style {
@@ -28,7 +28,7 @@ impl Style {
 			directives: Default::default(),
 		}
 	}
-	pub fn with_directive(mut self, directive: TemplateDirective) -> Self {
+	pub fn with_directive(mut self, directive: TemplateDirectiveEnum) -> Self {
 		self.directives.push(directive);
 		self
 	}

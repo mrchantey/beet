@@ -16,7 +16,7 @@ use syn::LitStr;
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ElementTokens {
 	/// the name of the component, ie <MyComponent/>
-	pub tag: Spanner<String>,
+	pub tag: SpannerOld<String>,
 	/// fields of the component, ie <MyComponent foo=bar bazz/>
 	pub attributes: Vec<AttributeTokens>,
 	/// special directives for use by both
@@ -76,13 +76,13 @@ pub enum AttributeTokens {
 	/// A block attribute, in jsx this is known as a spread attribute
 	Block { block: Block, tracker: RustyTracker },
 	/// A key attribute created by [`TokenStream`]
-	Key { key: Spanner<String> },
+	Key { key: SpannerOld<String> },
 	/// A key value attribute where the value is a literal like
 	/// a string, number, or boolean
-	KeyValueLit { key: Spanner<String>, value: Lit },
+	KeyValueLit { key: SpannerOld<String>, value: Lit },
 	/// A key value attribute where the value is a rust expression
 	KeyValueExpr {
-		key: Spanner<String>,
+		key: SpannerOld<String>,
 		value: Expr,
 		tracker: RustyTracker,
 	},
@@ -178,7 +178,7 @@ impl RustTokens for AttributeTokens {
 
 /// A value that may have been created
 #[derive(Debug, Clone)]
-pub struct Spanner<T> {
+pub struct SpannerOld<T> {
 	/// The span, if any, of the original value.
 	/// This will be Span::call_site() if the value
 	pub(crate) tokens_span: proc_macro2::Span,
@@ -187,7 +187,7 @@ pub struct Spanner<T> {
 }
 
 
-impl<T> Spanner<T> {
+impl<T> SpannerOld<T> {
 	pub fn new(value: T) -> Self {
 		Self {
 			value,
@@ -203,18 +203,18 @@ impl<T> Spanner<T> {
 	pub fn into_value(self) -> T { self.value }
 }
 
-impl<T: std::hash::Hash> std::hash::Hash for Spanner<T> {
+impl<T: std::hash::Hash> std::hash::Hash for SpannerOld<T> {
 	fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
 		self.value.hash(state);
 	}
 }
 
-impl<T: PartialEq> PartialEq for Spanner<T> {
+impl<T: PartialEq> PartialEq for SpannerOld<T> {
 	fn eq(&self, other: &Self) -> bool { self.value == other.value }
 }
-impl<T: Eq> Eq for Spanner<T> {}
+impl<T: Eq> Eq for SpannerOld<T> {}
 
-impl<T: AsRef<str>> Spanner<T> {
+impl<T: AsRef<str>> SpannerOld<T> {
 	pub fn as_str(&self) -> &str { self.value.as_ref() }
 	pub fn into_lit_str(&self) -> LitStr {
 		LitStr::new(self.value.as_ref(), self.tokens_span)
@@ -224,30 +224,30 @@ impl<T: AsRef<str>> Spanner<T> {
 	}
 }
 
-impl Into<Spanner<String>> for LitStr {
-	fn into(self) -> Spanner<String> {
-		Spanner::new_with_span(self.value(), self.span())
+impl Into<SpannerOld<String>> for LitStr {
+	fn into(self) -> SpannerOld<String> {
+		SpannerOld::new_with_span(self.value(), self.span())
 	}
 }
-impl Into<Spanner<String>> for String {
-	fn into(self) -> Spanner<String> { Spanner::new(self) }
+impl Into<SpannerOld<String>> for String {
+	fn into(self) -> SpannerOld<String> { SpannerOld::new(self) }
 }
-impl<'a> Into<Spanner<String>> for &'a str {
-	fn into(self) -> Spanner<String> { Spanner::new(self.to_string()) }
+impl<'a> Into<SpannerOld<String>> for &'a str {
+	fn into(self) -> SpannerOld<String> { SpannerOld::new(self.to_string()) }
 }
-impl ToTokens for Spanner<String> {
+impl ToTokens for SpannerOld<String> {
 	fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
 		self.into_lit_str().to_tokens(tokens);
 	}
 }
 
-impl RustTokens for Spanner<String> {
+impl RustTokens for SpannerOld<String> {
 	fn into_rust_tokens(&self) -> TokenStream {
-		quote! { Spanner::new(#self.to_string()) }
+		quote! { SpannerOld::new(#self.to_string()) }
 	}
 }
 
-impl std::fmt::Display for Spanner<String> {
+impl std::fmt::Display for SpannerOld<String> {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		write!(f, "{}", self.value)
 	}

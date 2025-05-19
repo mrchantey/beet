@@ -43,14 +43,14 @@ fn parse_node(
 
 fn attr_to_template_directive(
 	attr: &AttributeTokens,
-) -> Result<Option<TemplateDirective>> {
+) -> Result<Option<TemplateDirectiveEnum>> {
 	match attr {
 		AttributeTokens::Key { key } => {
-			TemplateDirective::try_from_attr(key.as_str(), None)?
+			TemplateDirectiveEnum::try_from_attr(key.as_str(), None)?
 		}
 		AttributeTokens::KeyValueLit { key, value } => {
 			let value = AttributeTokens::lit_to_string(&value);
-			TemplateDirective::try_from_attr(key.as_str(), Some(&value))?
+			TemplateDirectiveEnum::try_from_attr(key.as_str(), Some(&value))?
 		}
 		_ => None,
 	}

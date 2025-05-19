@@ -98,7 +98,7 @@ impl LangTemplateMap {
 	) {
 		for template in templates.values() {
 			let mut meta = template.create_meta();
-			meta.push_directive(TemplateDirective::Head);
+			meta.push_directive(TemplateDirectiveEnum::Head);
 			node.push(
 				RsxElement {
 					tag: template.tag.clone(),
@@ -151,7 +151,7 @@ mod test {
 			children: Default::default(),
 			self_closing: false,
 			meta: NodeMeta::default().with_template_directives(vec![
-				TemplateDirective::LangTemplate {
+				TemplateDirectiveEnum::LangTemplate {
 					content_hash: LangContentHash::new(content_hash),
 				},
 			]),
