@@ -182,7 +182,7 @@ test-utils *args:
 test-build *args:
 	{{min-stack}} cargo test -p beet_common 					--all-features																		{{args}} -- {{test-threads}}
 	{{min-stack}} cargo test -p beet_rsx_combinator 	--all-features																		{{args}} -- {{test-threads}}
-	{{min-stack}} cargo test -p beet_rsx_parser 			--all-features																		{{args}} -- {{test-threads}}
+	{{min-stack}} cargo test -p beet_parse 						--all-features																		{{args}} -- {{test-threads}}
 	{{min-stack}} cargo test -p beet_build 						--all-features																		{{args}} -- {{test-threads}}
 
 test-rsx *args:

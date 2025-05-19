@@ -122,7 +122,7 @@ val_string	= "foo"
 					RsxText {
 						value: "hello world".to_string(),
 						meta: NodeMeta::new(
-							FileSpan::new("ws_build/beet_build/src/build_codegen/markdown_to_func_tokens.rs",
+							FileSpan::new("crates/beet_build/src/build_codegen/markdown_to_func_tokens.rs",
 								LineCol::new(1, 0),
 								LineCol::new(1, 0))
 								, vec![]
@@ -131,7 +131,7 @@ val_string	= "foo"
 				),
 				self_closing: false,
 				meta: NodeMeta::new(
-					FileSpan::new("ws_build/beet_build/src/build_codegen/markdown_to_func_tokens.rs",
+					FileSpan::new("crates/beet_build/src/build_codegen/markdown_to_func_tokens.rs",
 						LineCol::new(1, 0),
 						LineCol::new(1, 0))
 						, vec![TemplateDirective::NodeTemplate]

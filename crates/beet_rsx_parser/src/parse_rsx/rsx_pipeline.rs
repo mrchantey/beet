@@ -170,7 +170,7 @@ mod test {
 							RsxFragment {
 						nodes: vec![],
 						meta: NodeMeta::new(
-							FileSpan::new("ws_build/beet_rsx_parser/src/parse_rsx/rsx_pipeline.rs",
+							FileSpan::new("crates/beet_rsx_parser/src/parse_rsx/rsx_pipeline.rs",
 								LineCol::new(1, 0),
 								LineCol::new(1, 0))
 								, vec![]
@@ -179,7 +179,7 @@ mod test {
 					),
 					self_closing: true,
 					meta: NodeMeta::new(
-						FileSpan::new("ws_build/beet_rsx_parser/src/parse_rsx/rsx_pipeline.rs",
+						FileSpan::new("crates/beet_rsx_parser/src/parse_rsx/rsx_pipeline.rs",
 							LineCol::new(1, 0),
 							LineCol::new(1, 0))
 							, vec![

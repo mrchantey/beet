@@ -18,7 +18,7 @@ pub fn default_directive_plugin(app: &mut App) {
 /// ```rust
 /// # use bevy::prelude::*;
 /// # use beet_common::prelude::*;
-/// App::new().add_plugins(directive_plugin::<ClientIslandDirective>());
+/// App::new().add_plugins(directive_plugin::<ClientIslandDirective>);
 /// ```
 pub fn directive_plugin<T: TemplateDirective>(app: &mut App) {
 	app.add_systems(
@@ -28,15 +28,6 @@ pub fn directive_plugin<T: TemplateDirective>(app: &mut App) {
 }
 
 /// Generic system for extracting a [TemplateDirective] from attributes.
-/// ## Example
-/// ```rust
-/// # use bevy::prelude::*;
-/// # use beet_common::prelude::*;
-/// App::new().add_systems(Update,
-/// 	try_extract_directive::<ClientIslandDirective>
-/// 		.in_set(ExtractDirectivesSet)
-/// );
-/// ```
 fn try_extract_directive<T: TemplateDirective>(
 	mut commands: Commands,
 	query: Populated<(
