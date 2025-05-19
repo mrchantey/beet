@@ -24,16 +24,16 @@ Beet is a collection of tools for building web pages, realtime applications and 
 - 🐣 docs and tests are incomplete
 - 🐉 highly experimental, here be dragons
 
-## `ws_flow`
+## `beet_flow`
 
 Control flow crates built upon the [ecs engine](https://crates.io/crates/bevy_ecs) that powers Bevy. These can be used for a growing variety of behavior paradigms including Behavior Trees, LLMs and Reinforcement Learning. They are also decoupled from rendering, for instance they can be run on small microcontrollers like the ESP32.
 
 | Crate                                             | Status | Description                                                       |
 | ------------------------------------------------- | ------ | ----------------------------------------------------------------- |
-| [`beet_flow`](ws_flow/beet_flow/Cargo.toml)       | 🦢      | Scenes-as-control-flow bevy library for behavior trees etc        |
-| [`beet_spatial`](ws_flow/beet_spatial/Cargo.toml) | 🐣      | Extend `beet_flow` with spatial behaviors like steering           |
-| [`beet_ml`](ws_flow/beet_ml/Cargo.toml)           | 🐉      | Extend `beet_flow` with machine learning using `candle`           |
-| [`beet_sim`](ws_flow/beet_sim/Cargo.toml)         | 🐉      | Extend `beet_flow` with generalized simulation tooling like stats |
+| [`beet_flow`](crates/beet_flow/Cargo.toml)       | 🦢      | Scenes-as-control-flow bevy library for behavior trees etc        |
+| [`beet_spatial`](crates/beet_spatial/Cargo.toml) | 🐣      | Extend `beet_flow` with spatial behaviors like steering           |
+| [`beet_ml`](crates/beet_ml/Cargo.toml)           | 🐉      | Extend `beet_flow` with machine learning using `candle`           |
+| [`beet_sim`](crates/beet_sim/Cargo.toml)         | 🐉      | Extend `beet_flow` with generalized simulation tooling like stats |
 
 
 ## `ws_rsx`

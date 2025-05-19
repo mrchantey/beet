@@ -24,10 +24,10 @@ init-repo:
 	just init-flow
 	just init-rsx
 
-# mkdir -p ws_flow/beet_rsx/assets/fonts && cp ./assets/fonts/* ws_rsx/beet_rsx/assets/fonts
+# mkdir -p crates/beet_rsx/assets/fonts && cp ./assets/fonts/* ws_rsx/beet_rsx/assets/fonts
 init-flow:
 	just assets-pull
-	mkdir -p ws_flow/beet_ml/assets/ml && cp ./assets/ml/default-bert.ron ws_flow/beet_ml/assets/ml/default.bert.ron
+	mkdir -p crates/beet_ml/assets/ml && cp ./assets/ml/default-bert.ron crates/beet_ml/assets/ml/default.bert.ron
 
 # once beet-cli is binstallable we shouldnt need to compile in order to codegen
 init-rsx:

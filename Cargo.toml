@@ -47,12 +47,13 @@ members = [
 	"ws_build/beet_parse",
 	"ws_build/beet_rsx_parser",
 
-	"ws_flow/beet_examples",
-	"ws_flow/beet_flow",
-	"ws_flow/beet_flow/macros",
-	"ws_flow/beet_ml",
-	"ws_flow/beet_sim",
-	"ws_flow/beet_spatial",
+	## 💡Beet Flow
+	"crates/beet_examples",
+	"crates/beet_flow",
+	"crates/beet_flow/macros",
+	"crates/beet_ml",
+	"crates/beet_sim",
+	"crates/beet_spatial",
 
 	"ws_rsx/beet_connect",
 	"ws_rsx/beet_design",
@@ -87,12 +88,12 @@ beet_rsx_combinator = { path = "ws_build/beet_rsx_combinator", version = "0.0.6-
 beet_parse = { path = "ws_build/beet_parse", version = "0.0.6-dev.4" }
 beet_rsx_parser = { path = "ws_build/beet_rsx_parser", version = "0.0.6-dev.4" }
 
-beet_examples = { path = "ws_flow/beet_examples", version = "0.0.6-dev.4" }
-beet_flow = { path = "ws_flow/beet_flow", version = "0.0.6-dev.4" }
-beet_flow_macros = { path = "ws_flow/beet_flow/macros", version = "0.0.6-dev.4" }
-beet_ml = { path = "ws_flow/beet_ml", version = "0.0.6-dev.4" }
-beet_spatial = { path = "ws_flow/beet_spatial", version = "0.0.6-dev.4" }
-beet_sim = { path = "ws_flow/beet_sim", version = "0.0.6-dev.4" }
+beet_examples = { path = "crates/beet_examples", version = "0.0.6-dev.4" }
+beet_flow = { path = "crates/beet_flow", version = "0.0.6-dev.4" }
+beet_flow_macros = { path = "crates/beet_flow/macros", version = "0.0.6-dev.4" }
+beet_ml = { path = "crates/beet_ml", version = "0.0.6-dev.4" }
+beet_spatial = { path = "crates/beet_spatial", version = "0.0.6-dev.4" }
+beet_sim = { path = "crates/beet_sim", version = "0.0.6-dev.4" }
 
 beet_connect = { path = "ws_rsx/beet_connect", version = "0.0.6-dev.4" }
 beet_design = { path = "ws_rsx/beet_design", version = "0.0.6-dev.4" }
