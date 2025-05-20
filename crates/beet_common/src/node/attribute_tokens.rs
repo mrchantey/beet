@@ -4,18 +4,22 @@ use bevy::prelude::*;
 use heck::ToUpperCamelCase;
 use proc_macro2::Span;
 use proc_macro2::TokenStream;
+use quote::ToTokens;
 use quote::quote;
 use sweet::prelude::PipelineTarget;
 use syn::Expr;
 use syn::Ident;
+use syn::Pat;
+use syn::parse_quote;
 
 
-
+/// [`SystemParam`] capable of finding all [`Attributes`] of a node,
+/// collecting them into a [`TokenStream`].
 #[derive(SystemParam)]
 pub struct CollectNodeAttributes<'w, 's> {
 	attributes: Query<'w, 's, &'static Attributes>,
 	elements: Query<'w, 's, (), With<ElementNode>>,
-	components: Query<'w, 's, (), With<ElementNode>>,
+	fragments: Query<'w, 's, (), With<FragmentNode>>,
 	exprs_map: NonSend<'w, NonSendAssets<Expr>>,
 	exprs: MaybeSpannedQuery<'w, 's, AttributeExpr>,
 	keys: MaybeSpannedQuery<'w, 's, AttributeKeyExpr>,
@@ -36,8 +40,8 @@ impl CollectCustomTokens for CollectNodeAttributes<'_, '_> {
 		};
 		if self.elements.contains(entity) {
 			self.handle_element(spans, items, attributes)
-		} else if self.components.contains(entity) {
-			self.handle_component(spans, items, attributes, entity)
+		} else if self.fragments.contains(entity) {
+			self.handle_fragment(spans, items, attributes, entity)
 		} else {
 			Ok(())
 		}
@@ -83,6 +87,8 @@ impl CollectNodeAttributes<'_, '_> {
 				if let Some(event_key) =
 					self.try_event_key(spans, attr_entity)?
 				{
+					let attr = Self::try_insert_closure_type(attr, &event_key);
+
 					// in the case of an event the value is an observer added to the parent
 					entity_components.push(quote! {
 						EntityObserver::new::<#event_key,_,_,_>(#attr)
@@ -144,8 +150,43 @@ impl CollectNodeAttributes<'_, '_> {
 		Ident::new(&format!("On{suffix}"), span).xsome().xok()
 	}
 
+	/// if the tokens are a closure, insert the matching [`Trigger`] type
+	fn try_insert_closure_type(
+		tokens: TokenStream,
+		ident: &Ident,
+	) -> TokenStream {
+		if let Ok(Expr::Closure(mut closure)) =
+			syn::parse2(tokens.clone())
+		{
+			if let Some(first_param) = closure.inputs.first_mut() {
+				match &*first_param {
+					Pat::Type(_) => {
+						// Already has type annotation, leave as is
+					}
+					pat => {
+						let pat_clone = pat.clone();
+						// insert type
+						*first_param = Pat::Type(
+							parse_quote! {#pat_clone:Trigger<#ident>},
+						);
+					}
+				};
+				closure.to_token_stream()
+			} else {
+				// If no parameters, add one with discard name
+				closure
+					.inputs
+					.push(Pat::Type(parse_quote!(_:Trigger<#ident>)));
+				closure.to_token_stream()
+			}
+		} else {
+			// Not a closure, return unchanged
+			tokens
+		}
+	}
+
 	#[allow(unused)]
-	fn handle_component(
+	fn handle_fragment(
 		&self,
 		spans: &NonSendAssets<proc_macro2::Span>,
 		items: &mut Vec<TokenStream>,
@@ -165,20 +206,20 @@ impl CollectNodeAttributes<'_, '_> {
 /// ```
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Deref, Component)]
 #[component(immutable)]
-pub struct AttributeKeyExpr(NonSendHandle<syn::Expr>);
+pub struct AttributeKeyExpr(NonSendHandle<Expr>);
 impl AttributeKeyExpr {
-	pub fn new(value: NonSendHandle<syn::Expr>) -> Self { Self(value) }
+	pub fn new(value: NonSendHandle<Expr>) -> Self { Self(value) }
 }
 
 
 /// The tokens for an attribute value, usually a block or a literal.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Deref, Component)]
 #[component(immutable)]
-pub struct AttributeValueExpr(NonSendHandle<syn::Expr>);
+pub struct AttributeValueExpr(NonSendHandle<Expr>);
 
 
 impl AttributeValueExpr {
-	pub fn new(value: NonSendHandle<syn::Expr>) -> Self { Self(value) }
+	pub fn new(value: NonSendHandle<Expr>) -> Self { Self(value) }
 }
 
 
@@ -191,9 +232,49 @@ impl AttributeValueExpr {
 /// ```
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Deref, Component)]
 #[component(immutable)]
-pub struct AttributeExpr(NonSendHandle<syn::Expr>);
+pub struct AttributeExpr(NonSendHandle<Expr>);
 
 
 impl AttributeExpr {
-	pub fn new(value: NonSendHandle<syn::Expr>) -> Self { Self(value) }
+	pub fn new(value: NonSendHandle<Expr>) -> Self { Self(value) }
+}
+
+
+
+#[cfg(test)]
+mod test {
+	use crate::prelude::*;
+	use bevy::prelude::*;
+	use proc_macro2::Span;
+	use quote::quote;
+	use sweet::prelude::*;
+	use syn::Ident;
+
+	#[test]
+	fn insert_closure_type() {
+		// leaves typed
+		CollectNodeAttributes::try_insert_closure_type(
+			quote! { |_: Trigger<WeirdType>| {} },
+			&Ident::new("OnClick", Span::call_site()),
+		)
+		.to_string()
+		.xpect()
+		.to_be(quote! { |_: Trigger<WeirdType>| {} }.to_string());
+		// inserts inferred
+		CollectNodeAttributes::try_insert_closure_type(
+			quote! { |foo| {} },
+			&Ident::new("OnClick", Span::call_site()),
+		)
+		.to_string()
+		.xpect()
+		.to_be(quote! { |foo: Trigger<OnClick>| {} }.to_string());
+		// inserts discard for empty
+		CollectNodeAttributes::try_insert_closure_type(
+			quote! { || {} },
+			&Ident::new("OnClick", Span::call_site()),
+		)
+		.to_string()
+		.xpect()
+		.to_be(quote! { |_: Trigger<OnClick>| {} }.to_string());
+	}
 }

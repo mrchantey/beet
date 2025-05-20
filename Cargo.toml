@@ -159,7 +159,13 @@ tokio = { version = "1", features = [
 ] }
 
 #💡 macros
-syn = { version = "2", features = ["extra-traits", "visit"] }
+
+syn = { version = "2", features = [
+	"extra-traits",
+	"visit",
+	# full for syn::pat
+	"full",
+] }
 quote = "1"
 proc-macro2 = { version = "1", features = ["span-locations"] }
 proc-macro2-diagnostics = "0.10"
