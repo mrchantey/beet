@@ -45,6 +45,7 @@ struct Builder<'w, 's> {
 	rsx_directives: CollectRsxDirectiveTokens<'w, 's>,
 	web_nodes: CollectWebNodeTokens<'w, 's>,
 	web_directives: CollectWebDirectiveTokens<'w, 's>,
+	node_attributes: CollectNodeAttributes<'w, 's>,
 }
 
 impl Builder<'_, '_> {
@@ -57,6 +58,8 @@ impl Builder<'_, '_> {
 		self.web_nodes
 			.try_push_all(&self.spans, &mut items, entity)?;
 		self.web_directives
+			.try_push_all(&self.spans, &mut items, entity)?;
+		self.node_attributes
 			.try_push_all(&self.spans, &mut items, entity)?;
 
 		if let Ok(children) = self.children.get(entity) {
@@ -120,7 +123,11 @@ mod test {
 	#[test]
 	fn works() {
 		quote! {
-			<span>
+			<span
+				// {|on_click:Trigger<OnClick>|{}}
+				hidden=true
+				onclick=|_| { println!("clicked"); }
+				>
 				<MyComponent client:load />
 				<div/>
 			</span>
@@ -135,6 +142,19 @@ mod test {
 						ElementNode {
 							self_closing: false
 						},
+						EntityObserver::new::<OnClick,_,_,_>(|_|{println!("clicked") ; }),
+						related!(Attributes [
+							(
+								AttributeKey::new("hidden"),
+								AttributeValue::new(true),
+								AttributeKeyStr(String::from("hidden")),
+								AttributeValueStr(String::from("true"))
+							),
+							(
+								AttributeKey::new("onclick"),
+								AttributeKeyStr(String::from("onclick"))
+							)
+						]),
 						children![
 							(
 								NodeTag(String::from("MyComponent")),
@@ -153,20 +173,38 @@ mod test {
 	// copy paste from above test to see if the tokens are a valid bundle
 	#[test]
 	fn output_check() {
-		World::new().spawn(children![(
-			NodeTag(String::from("span")),
-			ElementNode {
-				self_closing: false
-			},
-			children![
-				(
-					NodeTag(String::from("MyComponent")),
-					ClientIslandDirective::Load
-				),
-				(NodeTag(String::from("div")), ElementNode {
-					self_closing: true
-				})
-			]
-		)]);
+		World::new().spawn(
+			// start copy pasta
+			children![(
+				NodeTag(String::from("span")),
+				ElementNode {
+					self_closing: false
+				},
+				EntityObserver::new(|_: Trigger<OnClick>| {
+					println!("clicked");
+				}),
+				related!(Attributes [
+					(
+						AttributeKey::new("hidden"),
+						AttributeValue::new(true),
+						AttributeKeyStr(String::from("hidden")),
+						AttributeValueStr(String::from("true"))
+					),
+					(
+						AttributeKey::new("onclick"),
+						AttributeKeyStr(String::from("onclick"))
+					)
+				]),
+				children![
+					(
+						NodeTag(String::from("MyComponent")),
+						ClientIslandDirective::Load
+					),
+					(NodeTag(String::from("div")), ElementNode {
+						self_closing: true
+					})
+				]
+			)], // end copy pasta
+		);
 	}
 }

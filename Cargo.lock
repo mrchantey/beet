@@ -826,6 +826,7 @@ dependencies = [
  "beet_common_macros",
  "bevy",
  "extend",
+ "heck 0.4.1",
  "proc-macro2",
  "proc-macro2-diagnostics",
  "quote",

@@ -1,5 +1,5 @@
 #[cfg(feature = "tokens")]
-use crate::prelude::*;
+use crate::as_beet::*;
 use bevy::prelude::*;
 
 
@@ -25,35 +25,32 @@ pub struct Attributes(Vec<Entity>);
 /// ```ignore
 /// rsx!{<span "hidden"=true />};
 /// ```#[derive(Debug, Clone, PartialEq, Eq, Hash, Deref, Component)]
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Deref, Component)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Deref, DerefMut, Component)]
 #[component(immutable)]
-pub struct AttributeKeyStr(String);
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "tokens", derive(ToTokens))]
+pub struct AttributeKeyStr(pub String);
 
 impl AttributeKeyStr {
 	pub fn new(value: String) -> Self { Self(value) }
-	pub fn as_str(&self) -> &str { self.0.as_str() }
 }
 
 
-/// An attribute key represented as tokens, usually either a string literal or a block.
-///
+/// The key of an attribute, ususally a string literal but can be anything.
 /// ## Example
 /// ```ignore
-/// let key = "hidden";
-/// rsx!{<span {key}=true />};
+/// rsx!{<span "hidden"=true {32}=true />};
 /// ```
-#[cfg(feature = "tokens")]
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Deref, Component)]
-#[component(immutable)]
-pub struct AttributeKeyExpr(NonSendHandle<syn::Expr>);
-#[cfg(feature = "tokens")]
-impl AttributeKeyExpr {
-	pub fn new(value: NonSendHandle<syn::Expr>) -> Self { Self(value) }
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Deref, DerefMut, Component)]
+pub struct AttributeKey<T>(pub T);
+
+impl<T> AttributeKey<T> {
+	pub fn new(key: T) -> Self { Self(key) }
 }
 
-/// The value of an attribute.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Deref, Component)]
-pub struct AttributeValue<T>(T);
+/// The value of an attribute
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Deref, DerefMut, Component)]
+pub struct AttributeValue<T>(pub T);
 
 impl<T> AttributeValue<T> {
 	pub fn new(value: T) -> Self { Self(value) }
@@ -61,42 +58,12 @@ impl<T> AttributeValue<T> {
 
 /// For literal attribute value types like strings, numbers, and booleans,
 /// store the stringified version of the value.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Deref, Component)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Deref, DerefMut, Component)]
 #[component(immutable)]
-pub struct AttributeValueStr(String);
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "tokens", derive(ToTokens))]
+pub struct AttributeValueStr(pub String);
 
 impl AttributeValueStr {
 	pub fn new(value: String) -> Self { Self(value) }
-	pub fn as_str(&self) -> &str { self.0.as_str() }
-}
-
-/// The tokens for an attribute value, usually a block or a literal.
-#[cfg(feature = "tokens")]
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Deref, Component)]
-#[component(immutable)]
-pub struct AttributeValueExpr(NonSendHandle<syn::Expr>);
-
-
-#[cfg(feature = "tokens")]
-impl AttributeValueExpr {
-	pub fn new(value: NonSendHandle<syn::Expr>) -> Self { Self(value) }
-}
-
-
-/// Tokens for an attribute without a specified key-value pair.
-/// This is known as the spread attribute in JSX, although rust
-/// apis dont require the `...` prefix.
-/// ## Example
-/// ```ignore
-/// rsx!{<span {props} />};
-/// ```
-#[cfg(feature = "tokens")]
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Deref, Component)]
-#[component(immutable)]
-pub struct AttributeExpr(NonSendHandle<syn::Expr>);
-
-
-#[cfg(feature = "tokens")]
-impl AttributeExpr {
-	pub fn new(value: NonSendHandle<syn::Expr>) -> Self { Self(value) }
 }

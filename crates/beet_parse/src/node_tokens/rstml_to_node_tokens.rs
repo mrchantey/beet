@@ -304,11 +304,17 @@ impl<'w, 's, 'a> RstmlToWorld<'w, 's, 'a> {
 
 				let mut entity = self.commands.spawn((
 					AttributeOf::new(parent),
-					ItemOf::<AttributeKeyExpr, _>::new(key_expr_file_span),
+					ItemOf::<AttributeKeyExpr, _>::new(
+						key_expr_file_span.clone(),
+					),
 					ItemOf::<AttributeKeyExpr, _>::new(key_expr_span),
 				));
 				if let Expr::Lit(ExprLit { lit, attrs: _ }) = &key_expr {
-					entity.insert(AttributeKeyStr::new(lit_to_string(lit)));
+					entity.insert((
+						AttributeKeyStr::new(lit_to_string(lit)),
+						ItemOf::<AttributeKeyStr, _>::new(key_expr_file_span),
+						ItemOf::<AttributeKeyStr, _>::new(key_expr_span),
+					));
 				}
 				entity.insert(AttributeKeyExpr::new(
 					self.expr_map.insert(key_expr),
@@ -327,8 +333,14 @@ impl<'w, 's, 'a> RstmlToWorld<'w, 's, 'a> {
 							if let Expr::Lit(ExprLit { lit, attrs: _ }) =
 								&val_expr
 							{
-								entity.insert(AttributeValueStr::new(
-									lit_to_string(lit),
+								entity.insert((
+									AttributeValueStr::new(lit_to_string(lit)),
+									ItemOf::<AttributeValueStr, _>::new(
+										val_expr_file_span.clone(),
+									),
+									ItemOf::<AttributeValueStr, _>::new(
+										val_expr_span,
+									),
 								));
 							}
 
