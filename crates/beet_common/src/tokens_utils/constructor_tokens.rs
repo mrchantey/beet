@@ -3,11 +3,56 @@ use quote::quote;
 use quote::quote_spanned;
 use syn::Lit;
 
-
+/// Trait for converting a type into a [`TokenStream`],
+/// usually derived using the [`ToTokens`] macro.
 pub trait IntoCustomTokens {
+	/// Append the type to a [`TokenStream`].
 	fn into_custom_tokens(&self, tokens: &mut TokenStream);
+	/// Create a new [`TokenStream`] from the type.
+	fn into_custom_token_stream(&self) -> TokenStream {
+		let mut tokens = TokenStream::new();
+		self.into_custom_tokens(&mut tokens);
+		tokens
+	}
+}
+impl IntoCustomTokens for String {
+	fn into_custom_tokens(&self, tokens: &mut TokenStream) {
+		tokens.extend(quote! { String::from(#self) });
+	}
 }
 
+macro_rules! impl_into_custom_tokens {
+	($($t:ty),*) => {
+		$(
+			impl IntoCustomTokens for $t {
+				fn into_custom_tokens(&self, tokens: &mut TokenStream) {
+					tokens.extend(quote! { #self });
+				}
+			}
+		)*
+	};
+}
+
+// Implement for all primitive types
+impl_into_custom_tokens!(
+	i8,
+	i16,
+	i32,
+	i64,
+	i128,
+	isize,
+	u8,
+	u16,
+	u32,
+	u64,
+	u128,
+	usize,
+	f32,
+	f64,
+	bool,
+	char,
+	&'static str
+);
 
 
 /// A trait for types that can be tokenized into

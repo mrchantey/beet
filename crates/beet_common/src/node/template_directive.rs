@@ -5,13 +5,6 @@ use bevy::prelude::*;
 #[derive(Debug, Clone, PartialEq, Eq, Hash, SystemSet)]
 pub struct ExtractDirectivesSet;
 
-pub fn default_directives_plugin(app: &mut App) {
-	app.add_plugins((
-		directive_plugin::<HtmlInsertDirective>,
-		directive_plugin::<ClientIslandDirective>,
-	));
-}
-
 
 /// Generic plugin for extracting and propagating directives to tokens.
 /// ## Example

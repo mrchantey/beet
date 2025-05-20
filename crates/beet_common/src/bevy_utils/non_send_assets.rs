@@ -38,6 +38,9 @@ impl<T> NonSendAssets<T> {
 			.remove(handle)
 			.ok_or_else(|| anyhow::anyhow!("Handle not found: {:#?}", handle))
 	}
+	pub fn into_inner(self) -> HashMap<NonSendHandle<T>, T> {
+		self.0
+	}
 }
 
 impl<T> Default for NonSendAssets<T> {

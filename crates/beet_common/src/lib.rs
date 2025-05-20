@@ -20,3 +20,25 @@ pub mod prelude {
 	pub use crate::tokens_utils::*;
 	pub use beet_common_macros::*;
 }
+
+pub mod exports {
+
+	#[cfg(feature = "tokens")]
+	pub use proc_macro2;
+	#[cfg(feature = "tokens")]
+	pub use quote;
+}
+
+pub mod as_beet {
+	pub use beet::prelude::*;
+	pub mod beet {
+		pub use crate as rsx;
+		pub mod prelude {
+			pub use crate::prelude::*;
+			// pub use beet_common::prelude::*;
+		}
+		pub mod exports {
+			pub use crate::exports::*;
+		}
+	}
+}

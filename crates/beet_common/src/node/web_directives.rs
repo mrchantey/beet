@@ -1,4 +1,4 @@
-use crate::prelude::*;
+use crate::as_beet::*;
 use bevy::prelude::*;
 
 /// plugin containing all web directive extraction
@@ -13,9 +13,14 @@ pub fn web_directives_plugin(app: &mut App) {
 /// body, regardless of where it is in the template.
 /// [`HtmlInsertDirective::Head`] is usually automatically added to non-layout elements
 /// like script and style.
-#[derive(Component)]
+#[derive(Debug, Default, Copy, Clone, Component, Reflect)]
+#[reflect(Default, Component)]
+#[component(immutable)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "tokens", derive(ToTokens))]
 pub enum HtmlInsertDirective {
 	/// Insert the node in the head of the document.
+	#[default]
 	Head,
 	/// Insert the node in the body of the document.
 	Body,
@@ -31,22 +36,12 @@ impl TemplateDirective for HtmlInsertDirective {
 	}
 }
 
-#[cfg(feature = "tokens")]
-impl crate::prelude::RustTokens for HtmlInsertDirective {
-	fn into_rust_tokens(&self) -> proc_macro2::TokenStream {
-		match self {
-			HtmlInsertDirective::Head => {
-				quote::quote! {HtmlInsertDirective::Head}
-			}
-			HtmlInsertDirective::Body => {
-				quote::quote! {HtmlInsertDirective::Body}
-			}
-		}
-	}
-}
-
 /// Directive for how the node should be rendered and loaded on the client.
-#[derive(Debug, Default, Component)]
+#[derive(Debug, Default, Copy, Clone, Component, Reflect)]
+#[reflect(Default, Component)]
+#[component(immutable)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "tokens", derive(ToTokens))]
 pub enum ClientIslandDirective {
 	/// Render the node statically then hydrate it on the client
 	#[default]
@@ -64,20 +59,6 @@ impl TemplateDirective for ClientIslandDirective {
 		}
 	}
 }
-#[cfg(feature = "tokens")]
-impl crate::prelude::RustTokens for ClientIslandDirective {
-	fn into_rust_tokens(&self) -> proc_macro2::TokenStream {
-		match self {
-			ClientIslandDirective::Load => {
-				quote::quote! {ClientIslandDirective::Load}
-			}
-			ClientIslandDirective::Only => {
-				quote::quote! {ClientIslandDirective::Only}
-			}
-		}
-	}
-}
-
 
 
 /// Template directives related to web rendering.

@@ -6,6 +6,8 @@ mod item_of;
 pub use item_of::*;
 mod attribute;
 pub use attribute::*;
+mod rsx_directives;
+pub use rsx_directives::*;
 mod web_directives;
 pub use web_directives::*;
 mod line_col;

@@ -3,7 +3,18 @@
 #![feature(proc_macro_span)]
 mod to_tokens;
 
-/// Self tokenizing
+/// Implements `IntoCustomTokens` for a struct or enum.
+/// All fields must also implement `IntoCustomTokens`, please open
+/// a pr if you want to add support for a type.
+///
+/// ## Example
+///
+/// ```rust ignore
+/// #[derive(ToTokens)]
+/// struct Foo{
+///   bar: String,
+/// }
+/// ```
 #[proc_macro_derive(ToTokens, attributes(field))]
 pub fn derive_to_tokens(
 	input: proc_macro::TokenStream,

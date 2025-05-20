@@ -48,4 +48,5 @@ proc-macro2-diagnostics = { workspace = true, optional = true }
 
 
 [dev-dependencies]
+beet_common = { path = ".", features = ["serde", "tokens"] }
 sweet = { workspace = true, features = ["test", "bevy"] }

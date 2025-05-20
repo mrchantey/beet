@@ -31,11 +31,11 @@ pub enum WebTokens {
 		meta: NodeMeta,
 	},
 	Comment {
-		value: Spanner<String>,
+		value: SpannerOld<String>,
 		meta: NodeMeta,
 	},
 	Text {
-		value: Spanner<String>,
+		value: SpannerOld<String>,
 		meta: NodeMeta,
 	},
 	Block {

@@ -11,7 +11,7 @@ pub struct ProcessNodesStep;
 #[derive(Debug, Clone, PartialEq, Eq, Hash, SystemSet)]
 pub struct ExportNodesStep;
 
-
+#[derive(Default)]
 pub struct NodeTokensPlugin;
 
 
@@ -21,8 +21,8 @@ impl Plugin for NodeTokensPlugin {
 			Update,
 			(
 				ProcessNodesStep.after(ImportNodesStep),
-				ExtractDirectivesSet.in_set(ProcessNodesStep),
 				ExportNodesStep.after(ProcessNodesStep),
+				ExtractDirectivesSet.in_set(ProcessNodesStep),
 			),
 		)
 		.add_plugins((
@@ -30,6 +30,6 @@ impl Plugin for NodeTokensPlugin {
 			rstml_to_node_tokens_plugin,
 			node_tokens_to_rust_plugin,
 		))
-		.add_plugins((default_directives_plugin, web_directives_plugin));
+		.add_plugins((rsx_directives_plugin, web_directives_plugin));
 	}
 }

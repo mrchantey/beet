@@ -822,6 +822,7 @@ name = "beet_common"
 version = "0.0.6-dev.4"
 dependencies = [
  "anyhow",
+ "beet_common",
  "beet_common_macros",
  "bevy",
  "extend",
@@ -971,6 +972,7 @@ dependencies = [
  "proc-macro2-diagnostics",
  "quote",
  "rapidhash",
+ "rayon",
  "ron",
  "rstml",
  "sweet",
