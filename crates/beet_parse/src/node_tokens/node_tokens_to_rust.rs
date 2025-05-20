@@ -119,39 +119,14 @@ mod test {
 	use crate::prelude::*;
 	use beet_common::prelude::*;
 	use bevy::prelude::*;
-	use proc_macro2::TokenStream;
 	use quote::quote;
 	use sweet::prelude::*;
-
-	fn parse(tokens: TokenStream) -> TokenStream {
-		App::new()
-			.add_plugins(NodeTokensPlugin)
-			.xtap(|app| {
-				app.world_mut()
-					.spawn((
-						SourceFile::new(WorkspacePathBuf::new(file!())),
-						NodeTokensToRust::default().exclude_errors(),
-					))
-					.insert_non_send(RstmlTokens::new(tokens));
-			})
-			.update_then()
-			.xmap(|app| {
-				app.world_mut()
-					.remove_non_send_resource::<NonSendAssets<TokenStream>>()
-					.unwrap()
-					.into_inner()
-					.into_values()
-					.next()
-					.unwrap()
-			})
-	}
-
 
 	#[test]
 	fn works() {
 		quote! {
 			<span
-				{EntityObserver::new(|on_click:Trigger<OnClick>|{})}
+				{EntityObserver::new(|_on_click:Trigger<OnClick>|{})}
 				hidden=true
 				onmousemove="some_js_func"
 				onclick=|| { println!("clicked"); }
@@ -160,7 +135,8 @@ mod test {
 				<div/>
 			</span>
 		}
-		.xmap(parse)
+		.xmap(|t| rstml_tokens_to_rust(t, WorkspacePathBuf::new(file!())))
+		.unwrap()
 		.to_string()
 		.xpect()
 		.to_be(
@@ -170,7 +146,7 @@ mod test {
 						ElementNode {
 							self_closing: false
 						},
-						{EntityObserver::new(|on_click:Trigger<OnClick>|{})},
+						{EntityObserver::new(|_on_click:Trigger<OnClick>|{})},
 						EntityObserver::new(|_:Trigger<OnClick>|{println!("clicked") ; }),
 						related!(Attributes [
 							(
@@ -223,8 +199,10 @@ mod test {
 						AttributeValueStr(String::from("true"))
 					),
 					(
-						AttributeKey::new("onclick"),
-						AttributeKeyStr(String::from("onclick"))
+						AttributeKey::new("onmousemove"),
+						AttributeValue::new("some_js_func"),
+						AttributeKeyStr(String::from("onmousemove")),
+						AttributeValueStr (String::from("some_js_func"))
 					)
 				]),
 				children![

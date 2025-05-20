@@ -1,3 +1,5 @@
+mod rstml_tokens_to_rust;
+pub use rstml_tokens_to_rust::*;
 mod node_tokens_to_rust;
 pub use node_tokens_to_rust::*;
 mod node_tokens_plugin;

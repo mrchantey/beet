@@ -92,7 +92,10 @@ impl TokensDiagnostics {
 	pub fn new(value: Vec<Diagnostic>) -> Self { Self(value) }
 	pub fn into_inner(self) -> Vec<Diagnostic> { self.0 }
 	pub fn into_tokens(self) -> Vec<TokenStream> {
-		self.0.into_iter().map(|d| d.emit_as_expr_tokens()).collect()
+		self.0
+			.into_iter()
+			.map(|d| d.emit_as_expr_tokens())
+			.collect()
 	}
 }
 
@@ -127,9 +130,7 @@ pub(super) fn tokens_to_rstml(
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use beet_common::prelude::EntityWorldMutInsertNonSendExt;
-	use beet_common::prelude::NonSendAssets;
-	use beet_common::prelude::NonSendHandle;
+	use beet_common::prelude::*;
 	use bevy::ecs::system::RunSystemOnce;
 	use bevy::prelude::*;
 	use proc_macro2::TokenStream;

@@ -120,9 +120,9 @@ unsafe impl<T> Send for NonSendHandle<T> {}
 // SAFETY: T is only used for phantom data
 unsafe impl<T> Sync for NonSendHandle<T> {}
 
-#[extend::ext(name=EntityWorldMutInsertNonSendExt)]
+#[extend::ext(name=EntityWorldMutNonSendExt)]
 pub impl<'a> EntityWorldMut<'a> {
-	fn insert_non_send<T: 'static>(&mut self, value: T) {
+	fn insert_non_send<T: 'static>(&mut self, value: T) -> &mut Self {
 		let id = self.id();
 		self.world_scope(|world| {
 			world.init_non_send_resource::<NonSendAssets<T>>();
@@ -130,6 +130,17 @@ pub impl<'a> EntityWorldMut<'a> {
 			let handle = assets.insert(value);
 			world.entity_mut(id).insert(handle);
 		});
+		self
+	}
+	fn remove_non_send<T: 'static>(&mut self) -> Result<Option<T>> {
+		let Some(handle) = self.get::<NonSendHandle<T>>().map(|h| *h) else {
+			return Ok(None);
+		};
+		self.world_scope(|world| {
+			let mut assets = world.non_send_resource_mut::<NonSendAssets<T>>();
+			let value = assets.remove(&handle)?;
+			Ok(Some(value))
+		})
 	}
 }
 
