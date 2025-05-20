@@ -58,6 +58,14 @@ impl CollectNodeAttributes<'_, '_> {
 		let mut attr_entities = Vec::new();
 
 		for attr_entity in attributes.iter() {
+			if let Some(event_func) =
+				self.try_event_observer(spans, attr_entity)?
+			{
+				// in the case of an event the value is an observer added to the parent
+				entity_components.push(event_func);
+				continue;
+			}
+
 			let mut attr_components = Vec::new();
 			// blocks ie <span {Vec3::new()} />
 			// inserted directly as an entity component
@@ -84,20 +92,8 @@ impl CollectNodeAttributes<'_, '_> {
 				attr_entity,
 				&self.vals,
 			)? {
-				if let Some(event_key) =
-					self.try_event_key(spans, attr_entity)?
-				{
-					let attr = Self::try_insert_closure_type(attr, &event_key);
-
-					// in the case of an event the value is an observer added to the parent
-					entity_components.push(quote! {
-						EntityObserver::new::<#event_key,_,_,_>(#attr)
-					});
-				} else {
-					attr_components.push(quote! {AttributeValue::new(#attr)});
-				}
+				attr_components.push(quote! {AttributeValue::new(#attr)});
 			}
-
 			self.try_push_custom(
 				spans,
 				&mut attr_components,
@@ -110,6 +106,7 @@ impl CollectNodeAttributes<'_, '_> {
 				attr_entity,
 				&self.val_strs,
 			)?;
+
 			if attr_components.len() == 1 {
 				attr_entities.push(attr_components.pop().unwrap());
 			} else if !attr_components.is_empty() {
@@ -128,11 +125,37 @@ impl CollectNodeAttributes<'_, '_> {
 		Ok(())
 	}
 
-	fn try_event_key(
+
+	/// If the attribute matches the requirements for an event observer,
+	/// parse and return as an [`EntityObserver`].
+	///
+	/// ## Requirements
+	/// - Key is a string literal starting with `on`
+	/// - Value is not a string, (allows for verbatim js handlers)
+	fn try_event_observer(
 		&self,
 		spans: &NonSendAssets<Span>,
 		entity: Entity,
-	) -> Result<Option<Ident>> {
+	) -> Result<Option<TokenStream>> {
+		let Some(attr) = self.maybe_spanned_expr(
+			&self.exprs_map,
+			spans,
+			entity,
+			&self.vals,
+		)?
+		else {
+			return Ok(None);
+		};
+
+		// If attr is a string literal, we shouldn't process it as an event handler
+		if let Ok(Expr::Lit(syn::ExprLit {
+			lit: syn::Lit::Str(_),
+			..
+		})) = syn::parse2(attr.clone())
+		{
+			return Ok(None);
+		};
+
 		let Ok((str, span)) = self.key_strs.get(entity) else {
 			return Ok(None);
 		};
@@ -147,7 +170,10 @@ impl CollectNodeAttributes<'_, '_> {
 
 		let suffix = ToUpperCamelCase::to_upper_camel_case(suffix);
 
-		Ident::new(&format!("On{suffix}"), span).xsome().xok()
+		let event_key = Ident::new(&format!("On{suffix}"), span);
+
+		let attr = Self::try_insert_closure_type(attr, &event_key);
+		quote! {EntityObserver::new(#attr)}.xsome().xok()
 	}
 
 	/// if the tokens are a closure, insert the matching [`Trigger`] type
@@ -155,9 +181,7 @@ impl CollectNodeAttributes<'_, '_> {
 		tokens: TokenStream,
 		ident: &Ident,
 	) -> TokenStream {
-		if let Ok(Expr::Closure(mut closure)) =
-			syn::parse2(tokens.clone())
-		{
+		if let Ok(Expr::Closure(mut closure)) = syn::parse2(tokens.clone()) {
 			if let Some(first_param) = closure.inputs.first_mut() {
 				match &*first_param {
 					Pat::Type(_) => {
@@ -185,6 +209,8 @@ impl CollectNodeAttributes<'_, '_> {
 		}
 	}
 
+	// currently construct using a custom builder pattern but we can
+	// replace that with the EntityPatch system when that arrives
 	#[allow(unused)]
 	fn handle_fragment(
 		&self,

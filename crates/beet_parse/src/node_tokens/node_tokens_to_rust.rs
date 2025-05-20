@@ -124,9 +124,10 @@ mod test {
 	fn works() {
 		quote! {
 			<span
-				// {|on_click:Trigger<OnClick>|{}}
+				{EntityObserver::new(|on_click:Trigger<OnClick>|{})}
 				hidden=true
-				onclick=|_| { println!("clicked"); }
+				onmousemove="some_js_func"
+				onclick=|| { println!("clicked"); }
 				>
 				<MyComponent client:load />
 				<div/>
@@ -142,7 +143,8 @@ mod test {
 						ElementNode {
 							self_closing: false
 						},
-						EntityObserver::new::<OnClick,_,_,_>(|_|{println!("clicked") ; }),
+						{EntityObserver::new(|on_click:Trigger<OnClick>|{})},
+						EntityObserver::new(|_:Trigger<OnClick>|{println!("clicked") ; }),
 						related!(Attributes [
 							(
 								AttributeKey::new("hidden"),
@@ -151,8 +153,10 @@ mod test {
 								AttributeValueStr(String::from("true"))
 							),
 							(
-								AttributeKey::new("onclick"),
-								AttributeKeyStr(String::from("onclick"))
+								AttributeKey::new("onmousemove"),
+								AttributeValue::new("some_js_func"),
+								AttributeKeyStr(String::from("onmousemove")),
+								AttributeValueStr (String::from("some_js_func"))
 							)
 						]),
 						children![
@@ -180,6 +184,7 @@ mod test {
 				ElementNode {
 					self_closing: false
 				},
+				{ EntityObserver::new(|_on_click: Trigger<OnClick>| {}) },
 				EntityObserver::new(|_: Trigger<OnClick>| {
 					println!("clicked");
 				}),
