@@ -91,6 +91,9 @@ pub struct TokensDiagnostics(Vec<Diagnostic>);
 impl TokensDiagnostics {
 	pub fn new(value: Vec<Diagnostic>) -> Self { Self(value) }
 	pub fn into_inner(self) -> Vec<Diagnostic> { self.0 }
+	pub fn into_tokens(self) -> Vec<TokenStream> {
+		self.0.into_iter().map(|d| d.emit_as_expr_tokens()).collect()
+	}
 }
 
 

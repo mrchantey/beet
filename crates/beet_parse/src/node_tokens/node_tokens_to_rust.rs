@@ -12,7 +12,20 @@ use sweet::prelude::PipelineTarget;
 /// containing the rust tokens for the node.
 #[derive(Default, Component, Reflect)]
 #[reflect(Default, Component)]
-pub struct NodeTokensToRust;
+pub struct NodeTokensToRust {
+	/// whether parsing errors should be excluded from the output.
+	exclude_errors: bool,
+}
+impl NodeTokensToRust {
+	pub fn include_errors(mut self) -> Self {
+		self.exclude_errors = false;
+		self
+	}
+	pub fn exclude_errors(mut self) -> Self {
+		self.exclude_errors = true;
+		self
+	}
+}
 
 
 pub fn node_tokens_to_rust_plugin(app: &mut App) {
@@ -26,17 +39,31 @@ pub fn node_tokens_to_rust_plugin(app: &mut App) {
 fn node_tokens_to_rust(
 	mut commands: Commands,
 	mut token_streams: NonSendMut<NonSendAssets<TokenStream>>,
+	mut diagnostics_map: NonSendMut<NonSendAssets<TokensDiagnostics>>,
 	builder: Builder,
-	template_roots: Populated<Entity, With<NodeTokensToRust>>,
+	template_roots: Populated<(
+		Entity,
+		&NodeTokensToRust,
+		Option<&NonSendHandle<TokensDiagnostics>>,
+	)>,
 ) -> Result {
-	for entity in template_roots.iter() {
-		let tokens = builder.token_stream(entity)?;
+	for (entity, settings, diagnostics) in template_roots.iter() {
+		let mut tokens = builder.token_stream(entity)?;
+		if !settings.exclude_errors
+			&& let Some(diagnostics) = diagnostics
+		{
+			let errors = diagnostics_map.remove(diagnostics)?.into_tokens();
+			tokens.extend(errors);
+		}
 		commands.entity(entity).insert(token_streams.insert(tokens));
 	}
 	Ok(())
 }
 
-/// recursively visit children and collect into a [`TokenStream`]
+/// recursively visit children and collect into a [`TokenStream`].
+/// We use a custom [`SystemParam`] for the traversal, its more of
+/// a 'map' function than an 'iter', as we need to resolve children
+/// and then wrap them as `children![]` in parents.
 #[derive(SystemParam)]
 struct Builder<'w, 's> {
 	spans: NonSend<'w, NonSendAssets<Span>>,
@@ -103,7 +130,7 @@ mod test {
 				app.world_mut()
 					.spawn((
 						SourceFile::new(WorkspacePathBuf::new(file!())),
-						NodeTokensToRust,
+						NodeTokensToRust::default().exclude_errors(),
 					))
 					.insert_non_send(RstmlTokens::new(tokens));
 			})
