@@ -1,9 +1,12 @@
+use std::str::FromStr;
+
 use proc_macro2::TokenStream;
 use quote::quote;
 use sweet::prelude::*;
 use syn;
 use syn::DeriveInput;
 
+use syn::Token;
 use syn::parse_macro_input;
 
 pub fn impl_derive_to_tokens(
@@ -19,26 +22,32 @@ pub fn impl_derive_to_tokens(
 
 fn parse(input: DeriveInput) -> syn::Result<TokenStream> {
 	let name = &input.ident;
+	let pound_token = pound_token();
 	let content = match &input.data {
 		syn::Data::Struct(data_struct) => {
 			let fields = &data_struct.fields;
 
 			match fields {
 				syn::Fields::Named(fields_named) => {
+					let field_defs = fields_named.named.iter().map(|field| {
+						let field_name = &field.ident;
+						quote! {
+							let #field_name = self.#field_name.into_custom_token_stream();
+						}
+					});
+
 					let field_tokens = fields_named.named.iter().map(|field| {
 						let field_name = &field.ident;
 						quote! {
-							tokens.extend(quote::quote! { #field_name: });
-							self.#field_name.into_custom_tokens(tokens);
-							tokens.extend(quote::quote! { , });
+							#field_name: #pound_token #field_name
 						}
 					});
 
 					quote! {
-						tokens.extend(quote::quote! { #name });
-						tokens.extend(proc_macro2::TokenStream::from_str("{").unwrap());
-						#(#field_tokens)*
-						tokens.extend(proc_macro2::TokenStream::from_str("}").unwrap());
+						#(#field_defs)*
+						tokens.extend(quote::quote! { #name {
+							#(#field_tokens),*,
+						} });
 					}
 				}
 				syn::Fields::Unnamed(fields_unnamed) => {
@@ -151,11 +160,15 @@ fn parse(input: DeriveInput) -> syn::Result<TokenStream> {
 	.xok()
 }
 
+/// workaround for the `#` token which cannot be escaped in a quote! macro
+fn pound_token() -> Token![#] { syn::Token![#](proc_macro2::Span::call_site()) }
+
 
 #[cfg(test)]
 mod test {
 	// use crate::prelude::*;
 	use super::parse;
+	use super::pound_token;
 	use quote::quote;
 	use sweet::prelude::*;
 	use syn::DeriveInput;
@@ -168,6 +181,9 @@ mod test {
 				value: String,
 			}
 		};
+		let pound_token = pound_token();
+
+
 		input.xmap(parse).unwrap().to_string().xpect().to_be(
 			quote! {
 					impl beet::prelude::IntoCustomTokens for Test {
@@ -175,15 +191,12 @@ mod test {
 							use std::str::FromStr;
 							use beet::exports::quote;
 							use beet::exports::proc_macro2;
-							tokens.extend(quote::quote! { Test });
-							tokens.extend(proc_macro2::TokenStream::from_str("{").unwrap());
-							tokens.extend(quote::quote! { inner: });
-							self.inner.into_custom_tokens(tokens);
-							tokens.extend(quote::quote! { , });
-							tokens.extend(quote::quote! { value: });
-							self.value.into_custom_tokens(tokens);
-							tokens.extend(quote::quote! { , });
-							tokens.extend(proc_macro2::TokenStream::from_str("}").unwrap());
+							let inner = self.inner.into_custom_token_stream();
+							let value = self.value.into_custom_token_stream();
+							tokens.extend(quote::quote! { Test {
+								inner: #pound_token inner,
+								value: #pound_token value,
+							} });
 						}
 					}
 				}
