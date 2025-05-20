@@ -8,7 +8,7 @@
 /// # use bevy::ecs::bundle::BundleEffect;
 ///
 /// struct Foo;
-///	effect_bundle!(Foo);
+///	bundle_effect!(Foo);
 ///
 ///	impl BundleEffect for Foo {
 ///		fn apply(self, _: &mut EntityWorldMut) { }
@@ -16,7 +16,7 @@
 ///
 /// ```
 #[macro_export]
-macro_rules! effect_bundle {
+macro_rules! bundle_effect {
 	($type:ty) => {
 		unsafe impl bevy::ecs::bundle::Bundle for $type {
 			fn component_ids(
@@ -65,7 +65,7 @@ mod test {
 		struct Bar;
 
 		struct Foo;
-		effect_bundle!(Foo);
+		bundle_effect!(Foo);
 
 		impl BundleEffect for Foo {
 			fn apply(self, entity: &mut EntityWorldMut) { entity.insert(Bar); }

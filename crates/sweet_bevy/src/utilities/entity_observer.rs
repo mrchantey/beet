@@ -1,9 +1,9 @@
-use crate::effect_bundle;
+use crate::bundle_effect;
 use bevy::ecs::bundle::BundleEffect;
 use bevy::ecs::system::IntoObserverSystem;
 use bevy::prelude::*;
 
-effect_bundle!(EntityObserver);
+bundle_effect!(EntityObserver);
 /// Spawn an observer for the target entity, or `Self` if no target is specified.
 ///
 /// ## Example
