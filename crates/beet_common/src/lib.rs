@@ -13,6 +13,7 @@ pub use beet_common_macros::*;
 
 
 pub mod prelude {
+	pub use crate::define_token_collector;
 	pub use crate::bevy_utils::*;
 	pub use crate::node::*;
 	pub use crate::templating::*;

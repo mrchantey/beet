@@ -1,6 +1,12 @@
 use crate::as_beet::*;
 use bevy::prelude::*;
 
+define_token_collector!(
+	CollectWebDirectiveTokens,
+	html_insert: HtmlInsertDirective,
+	client_island: ClientIslandDirective,
+);
+
 /// plugin containing all web directive extraction
 pub fn web_directives_plugin(app: &mut App) {
 	app.add_plugins((

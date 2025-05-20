@@ -30,7 +30,6 @@ fn node_tokens_to_rust(
 	template_roots: Populated<Entity, With<NodeTokensToRust>>,
 ) -> Result {
 	for entity in template_roots.iter() {
-		println!("here");
 		let tokens = builder.token_stream(entity)?;
 		commands.entity(entity).insert(token_streams.insert(tokens));
 	}
@@ -41,62 +40,44 @@ fn node_tokens_to_rust(
 #[derive(SystemParam)]
 struct Builder<'w, 's> {
 	spans: NonSend<'w, NonSendAssets<Span>>,
-	doctypes: MaybeWithItem<'w, 's, DoctypeNode, NonSendHandle<Span>>,
-	comments: MaybeWithItem<'w, 's, CommentNode, NonSendHandle<Span>>,
-	elements: MaybeWithItem<'w, 's, ElementNode, NonSendHandle<Span>>,
 	children: Query<'w, 's, &'static Children>,
+	rsx_nodes: CollectRsxNodeTokens<'w, 's>,
+	rsx_directives: CollectRsxDirectiveTokens<'w, 's>,
+	web_nodes: CollectWebNodeTokens<'w, 's>,
+	web_directives: CollectWebDirectiveTokens<'w, 's>,
 }
-
-type MaybeWithItem<'w, 's, C, T> =
-	Query<'w, 's, (&'static C, Option<&'static T>)>;
 
 impl Builder<'_, '_> {
 	fn token_stream(&self, entity: Entity) -> Result<TokenStream> {
-		let Ok(children) = self.children.get(entity) else {
-			return TokenStream::new().xok();
+		let mut items = Vec::<TokenStream>::new();
+		self.rsx_nodes
+			.try_push_all(&self.spans, &mut items, entity)?;
+		self.rsx_directives
+			.try_push_all(&self.spans, &mut items, entity)?;
+		self.web_nodes
+			.try_push_all(&self.spans, &mut items, entity)?;
+		self.web_directives
+			.try_push_all(&self.spans, &mut items, entity)?;
+
+		if let Ok(children) = self.children.get(entity) {
+			let children = children
+				.iter()
+				.map(|child| self.token_stream(child))
+				.collect::<Result<Vec<_>>>()?;
+			if !children.is_empty() {
+				items.push(quote! { children![#(#children),*] });
+			}
 		};
 
-		let mut items = Vec::<TokenStream>::new();
-		if let Ok(doctypes) = self.doctypes.get(entity) {
-			items.push(self.to_tokens_maybe_spanned(doctypes)?);
-		}
-		if let Ok(comments) = self.comments.get(entity) {
-			items.push(self.to_tokens_maybe_spanned(comments)?);
-		}
-		if let Ok(elements) = self.elements.get(entity) {
-			items.push(self.to_tokens_maybe_spanned(elements)?);
-		}
-
-		let children = children
-			.iter()
-			.map(|child| self.token_stream(child))
-			.collect::<Result<Vec<_>>>()?;
-		if !children.is_empty() {
-			items.push(quote! { children![#(#children),*] });
-		}
-
-
 		if items.is_empty() {
-			TokenStream::new()
+			// no components, unit type
+			quote! { () }
 		} else if items.len() == 1 {
+			// a single components
 			items.pop().unwrap()
 		} else {
-			quote! {#(#items),* }
-		}
-		.xok()
-	}
-	fn to_tokens_maybe_spanned<T: IntoCustomTokens>(
-		&self,
-		(item, span): (&T, Option<&NonSendHandle<Span>>),
-	) -> Result<TokenStream> {
-		if let Some(span) = span {
-			let span = *self.spans.get(span)?;
-			let item = item.into_custom_token_stream();
-			quote::quote_spanned! { span =>
-				#item
-			}
-		} else {
-			item.into_custom_token_stream()
+			// a component tuple
+			quote! {(#(#items),*) }
 		}
 		.xok()
 	}
@@ -105,8 +86,6 @@ impl Builder<'_, '_> {
 
 #[cfg(test)]
 mod test {
-	use std::str::FromStr;
-
 	use crate::prelude::*;
 	use beet_common::prelude::*;
 	use bevy::prelude::*;
@@ -140,33 +119,54 @@ mod test {
 
 	#[test]
 	fn works() {
-		let mut tokens = TokenStream::new();
-		let inner = true.into_custom_token_stream();
-		tokens.extend(quote::quote! {ElementNode {#inner}});
-		// tokens.extend(TokenStream::from_str("{"));
-		// tokens.extend(TokenStream::from_str("}"));
-		// tokens.extend(quote::quote! {self_closing: });
-		// tokens.extend(true.into_custom_token_stream());
+		quote! {
+			<span>
+				<MyComponent client:load />
+				<div/>
+			</span>
+		}
+		.xmap(parse)
+		.to_string()
+		.xpect()
+		.to_be(
+			quote! {
+			children![(
+						NodeTag(String::from("span")),
+						ElementNode {
+							self_closing: false
+						},
+						children![
+							(
+								NodeTag(String::from("MyComponent")),
+								ClientIslandDirective::Load
+							),
+							(NodeTag(String::from("div")), ElementNode {
+								self_closing: true
+							})
+						]
+					)]
+				}
+			.to_string(),
+		);
+	}
 
-		let a = tokens.to_string();
-		println!("tokens: {a}");
-		// quote! {
-		// 	<span>
-		// 		<MyComponent client:load />
-		// 		<div/>
-		// 	</span>
-		// }
-		// .xmap(parse)
-		// .to_string()
-		// .xpect()
-		// .to_be(
-		// 	quote! {
-		// 		span(
-		// 			"client:load",
-		// 			"div",
-		// 		)
-		// 	}
-		// 	.to_string(),
-		// );
+	// copy paste from above test to see if the tokens are a valid bundle
+	#[test]
+	fn output_check() {
+		World::new().spawn(children![(
+			NodeTag(String::from("span")),
+			ElementNode {
+				self_closing: false
+			},
+			children![
+				(
+					NodeTag(String::from("MyComponent")),
+					ClientIslandDirective::Load
+				),
+				(NodeTag(String::from("div")), ElementNode {
+					self_closing: true
+				})
+			]
+		)]);
 	}
 }

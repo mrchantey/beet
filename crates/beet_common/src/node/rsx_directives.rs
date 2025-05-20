@@ -1,13 +1,19 @@
 use crate::as_beet::*;
 use bevy::prelude::*;
 
-
+define_token_collector!(
+	CollectRsxDirectiveTokens,
+	slot: SlotDirective,
+);
 
 pub fn rsx_directives_plugin(app: &mut App) {
 	app.add_plugins(directive_plugin::<SlotDirective>);
 }
 /// Directive for which slot to render the node in.
-#[derive(Debug, Default, Component, Deref)]
+#[derive(Debug, Clone, Component, Reflect)]
+#[reflect(Component)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "tokens", derive(ToTokens))]
 pub struct SlotDirective(String);
 
 impl TemplateDirective for SlotDirective {

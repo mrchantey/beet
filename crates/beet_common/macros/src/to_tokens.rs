@@ -1,5 +1,3 @@
-use std::str::FromStr;
-
 use proc_macro2::TokenStream;
 use quote::quote;
 use sweet::prelude::*;
@@ -46,27 +44,39 @@ fn parse(input: DeriveInput) -> syn::Result<TokenStream> {
 					quote! {
 						#(#field_defs)*
 						tokens.extend(quote::quote! { #name {
-							#(#field_tokens),*,
+							#(#field_tokens),*
 						} });
 					}
 				}
 				syn::Fields::Unnamed(fields_unnamed) => {
-					let field_tokens =
+					let field_defs =
 						fields_unnamed.unnamed.iter().enumerate().map(
 							|(i, _)| {
 								let index = syn::Index::from(i);
+								let field_var = syn::Ident::new(
+									&format!("field{}", i),
+									proc_macro2::Span::call_site(),
+								);
 								quote! {
-									self.#index.into_custom_tokens(tokens);
-									tokens.extend(quote::quote! { , });
+									let #field_var = self.#index.into_custom_token_stream();
 								}
 							},
 						);
 
+					let field_vars = (0..fields_unnamed.unnamed.len())
+						.map(|i| {
+							syn::Ident::new(
+								&format!("field{}", i),
+								proc_macro2::Span::call_site(),
+							)
+						})
+						.collect::<Vec<_>>();
+
 					quote! {
-						tokens.extend(quote::quote! { #name });
-						tokens.extend(proc_macro2::TokenStream::from_str("(").unwrap());
-						#(#field_tokens)*
-						tokens.extend(proc_macro2::TokenStream::from_str(")").unwrap());
+						#(#field_defs)*
+						tokens.extend(quote::quote! { #name(
+							#(#pound_token #field_vars),*
+						) });
 					}
 				}
 				syn::Fields::Unit => {
@@ -90,14 +100,10 @@ fn parse(input: DeriveInput) -> syn::Result<TokenStream> {
 
 						quote! {
 							#name::#variant_name { #(#field_names),* } => {
-								tokens.extend(quote::quote! { #name::#variant_name });
-								tokens.extend(proc_macro2::TokenStream::from_str("{").unwrap());
-								#(
-									tokens.extend(quote::quote! { #field_names: });
-									#field_names.into_custom_tokens(tokens);
-									tokens.extend(quote::quote! { , });
-								)*
-								tokens.extend(proc_macro2::TokenStream::from_str("}").unwrap());
+								#(let #field_names = #field_names.into_custom_token_stream();)*
+								tokens.extend(quote::quote! { #name::#variant_name {
+									#(#field_names: #pound_token #field_names),*
+								} });
 							}
 						}
 					}
@@ -113,13 +119,10 @@ fn parse(input: DeriveInput) -> syn::Result<TokenStream> {
 
 						quote! {
 							#name::#variant_name(#(#field_vars),*) => {
-								tokens.extend(quote::quote! { #name::#variant_name });
-								tokens.extend(proc_macro2::TokenStream::from_str("(").unwrap());
-								#(
-									#field_vars.into_custom_tokens(tokens);
-									tokens.extend(quote::quote! { , });
-								)*
-								tokens.extend(proc_macro2::TokenStream::from_str(")").unwrap());
+								#(let #field_vars = #field_vars.into_custom_token_stream();)*
+								tokens.extend(quote::quote! { #name::#variant_name(
+									#(#pound_token #field_vars),*
+								) });
 							}
 						}
 					}
@@ -150,7 +153,6 @@ fn parse(input: DeriveInput) -> syn::Result<TokenStream> {
 	quote! {
 		impl beet::prelude::IntoCustomTokens for #name {
 			fn into_custom_tokens(&self, tokens: &mut beet::exports::proc_macro2::TokenStream) {
-				use std::str::FromStr;
 				use beet::exports::quote;
 				use beet::exports::proc_macro2;
 				#content
@@ -188,14 +190,13 @@ mod test {
 			quote! {
 					impl beet::prelude::IntoCustomTokens for Test {
 						fn into_custom_tokens(&self, tokens: &mut beet::exports::proc_macro2::TokenStream) {
-							use std::str::FromStr;
 							use beet::exports::quote;
 							use beet::exports::proc_macro2;
 							let inner = self.inner.into_custom_token_stream();
 							let value = self.value.into_custom_token_stream();
 							tokens.extend(quote::quote! { Test {
 								inner: #pound_token inner,
-								value: #pound_token value,
+								value: #pound_token value
 							} });
 						}
 					}
@@ -209,20 +210,20 @@ mod test {
 		let input: DeriveInput = syn::parse_quote! {
 			struct TupleTest(u32, String);
 		};
+		let pound_token = pound_token();
+
 		input.xmap(parse).unwrap().to_string().xpect().to_be(
 			quote! {
 					impl beet::prelude::IntoCustomTokens for TupleTest {
 						fn into_custom_tokens(&self, tokens: &mut beet::exports::proc_macro2::TokenStream) {
-							use std::str::FromStr;
 							use beet::exports::quote;
 							use beet::exports::proc_macro2;
-							tokens.extend(quote::quote! { TupleTest });
-							tokens.extend(proc_macro2::TokenStream::from_str("(").unwrap());
-							self.0.into_custom_tokens(tokens);
-							tokens.extend(quote::quote! { , });
-							self.1.into_custom_tokens(tokens);
-							tokens.extend(quote::quote! { , });
-							tokens.extend(proc_macro2::TokenStream::from_str(")").unwrap());
+							let field0 = self.0.into_custom_token_stream();
+							let field1 = self.1.into_custom_token_stream();
+							tokens.extend(quote::quote! { TupleTest(
+								#pound_token field0,
+								#pound_token field1
+							) });
 						}
 					}
 				}
@@ -239,11 +240,12 @@ mod test {
 				C { value: String },
 			}
 		};
+		let pound_token = pound_token();
+
 		input.xmap(parse).unwrap().to_string().xpect().to_be(
 			quote! {
 					impl beet::prelude::IntoCustomTokens for TestEnum {
 						fn into_custom_tokens(&self, tokens: &mut beet::exports::proc_macro2::TokenStream) {
-							use std::str::FromStr;
 							use beet::exports::quote;
 							use beet::exports::proc_macro2;
 							match self {
@@ -251,19 +253,16 @@ mod test {
 									tokens.extend(quote::quote! { TestEnum::A });
 								},
 								TestEnum::B(field0) => {
-									tokens.extend(quote::quote! { TestEnum::B });
-									tokens.extend(proc_macro2::TokenStream::from_str("(").unwrap());
-									field0.into_custom_tokens(tokens);
-									tokens.extend(quote::quote! { , });
-									tokens.extend(proc_macro2::TokenStream::from_str(")").unwrap());
+									let field0 = field0.into_custom_token_stream();
+									tokens.extend(quote::quote! { TestEnum::B(
+										#pound_token field0
+									) });
 								},
 								TestEnum::C { value } => {
-									tokens.extend(quote::quote! { TestEnum::C });
-									tokens.extend(proc_macro2::TokenStream::from_str("{").unwrap());
-									tokens.extend(quote::quote! { value: });
-									value.into_custom_tokens(tokens);
-									tokens.extend(quote::quote! { , });
-									tokens.extend(proc_macro2::TokenStream::from_str("}").unwrap());
+									let value = value.into_custom_token_stream();
+									tokens.extend(quote::quote! { TestEnum::C {
+										value: #pound_token value
+									} });
 								}
 							}
 						}
