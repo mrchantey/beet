@@ -124,7 +124,32 @@ impl CollectNodeAttributes<'_, '_> {
 		}
 		Ok(())
 	}
-
+	/// create a token stream for a [`NonSendHandle<syn::Expr>`] expression which may be spanned
+	fn maybe_spanned_expr<
+		T: Component + std::ops::Deref<Target = NonSendHandle<syn::Expr>>,
+	>(
+		&self,
+		exprs_map: &NonSendAssets<syn::Expr>,
+		spans: &NonSendAssets<Span>,
+		entity: Entity,
+		query: &MaybeSpannedQuery<T>,
+	) -> Result<Option<TokenStream>> {
+		if let Ok((item, span)) = query.get(entity) {
+			let item = exprs_map.get(item.deref())?;
+			if let Some(span) = span {
+				let span = *spans.get(span)?;
+				let item = item.into_token_stream();
+				Some(quote::quote_spanned! { span =>
+					#item
+				})
+			} else {
+				Some(item.into_token_stream())
+			}
+		} else {
+			None
+		}
+		.xok()
+	}
 
 	/// If the attribute matches the requirements for an event observer,
 	/// parse and return as an [`EntityObserver`].

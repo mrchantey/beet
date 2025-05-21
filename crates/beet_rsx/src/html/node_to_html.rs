@@ -4,8 +4,8 @@ use bevy::ecs::system::RunSystemOnce;
 use bevy::ecs::system::SystemParam;
 use bevy::prelude::*;
 
-
-pub fn node_to_html_oneshot(
+/// returns the HTML string representation of a given [`Bundle`]
+pub fn bundle_to_html_oneshot(
 	bundle: impl Bundle,
 ) -> Result<String, RunSystemError> {
 	let mut app = App::new();
@@ -14,26 +14,26 @@ pub fn node_to_html_oneshot(
 }
 
 
-pub fn node_to_html(node: In<Entity>, builder: Builder) -> String {
+fn node_to_html(node: In<Entity>, builder: Builder) -> String {
 	let mut html = String::new();
 	builder.parse(*node, &mut html);
 	html
 }
 #[rustfmt::skip]
 #[derive(SystemParam)]
-pub struct Builder<'w, 's> {
+struct Builder<'w, 's> {
 	elements: Query<'w,'s,(
-		&'static ElementNode,	
-		&'static NodeTag,	
-		Option<&'static Attributes>,	
+		&'static ElementNode,
+		&'static NodeTag,
+		Option<&'static Attributes>,
 		Option<&'static Children>
 	)>,
 	fragments: Query<'w, 's,(
-		&'static FragmentNode, 
+		&'static FragmentNode,
 		&'static Children
 	)>,
 	attributes: Query<'w,'s,(
-		&'static AttributeKeyStr, 
+		&'static AttributeKeyStr,
 		Option<&'static AttributeValueStr>
 	)>,
 	doctypes: Query<'w, 's, &'static DoctypeNode>,
@@ -99,7 +99,7 @@ mod test {
 	use sweet::prelude::*;
 
 	fn parse(bundle: impl Bundle) -> Matcher<String> {
-		bundle.xmap(node_to_html_oneshot).unwrap().xpect()
+		bundle.xmap(bundle_to_html_oneshot).unwrap().xpect()
 	}
 
 	#[test]

@@ -1,43 +1,61 @@
 use crate::prelude::*;
 use bevy::ecs::bundle::Bundle;
+use sweet::prelude::Maybe;
 
-
-/// Blanket Bundle trait called on all block nodes and attributes.
-/// allowing primitives to be converted into a bundle,
+/// Very inclusive version of [`Bundle`], accounting for the location
+/// of the bundle in a tree, and allowing primitives to be wrapped
+/// in a [`TextNode`].
 /// for example, [`String`] into [`TextNode`].
 ///
 /// ```rust ignore
 /// // the following
 /// rsx!{{"howdy"}}
 /// // becomes
-/// "howdy".into_bundle()
+/// "howdy".into_node_bundle()
 /// ```
-pub trait IntoBundle<M> {
+pub trait IntoRsxBundle<M> {
 	/// Called for nodes and attributes:
 	/// `rsx!{"howdy"}` becomes `TextNode::new("howdy")`
 	/// `rsx!{<span {"howdy"} />}` becomes `TextNode::new("howdy")`
 	fn into_node_bundle(self) -> impl Bundle;
-	/// Called for attribute keys:
-	/// `rsx!{<span {"hidden"}="true" />}` becomes `AttributeKey::new("hidden")`
-	///
-	/// For primitives this will also insert an [`AttributeKeyStr`]
-	fn into_attr_key_bundle(self) -> impl Bundle;
-	/// Called for attribute values:
-	/// `rsx!{<span hidden={true} />}` becomes `AttributeValue::new(true)`
-	///
-	/// For primitives this will also insert an [`AttributeValueStr`]
-	fn into_attr_val_bundle(self) -> impl Bundle;
+	/// Called for attribute keys, wrapping `Self` in an [`AttributeKey`].
+	/// for primitives this will also insert an [`AttributeKeyStr`]
+	fn into_attr_key_bundle(self) -> impl Bundle
+	where
+		Self: 'static + Send + Sync + Sized,
+	{
+		AttributeKey(self)
+	}
+	/// Called for attribute values, wrapping `Self` in an [`AttributeValue`].
+	/// for primitives this will also insert an [`AttributeValueStr`]
+	fn into_attr_val_bundle(self) -> impl Bundle
+	where
+		Self: 'static + Send + Sync + Sized,
+	{
+		AttributeValue(self)
+	}
 }
 
-impl<T: Bundle> IntoBundle<T> for T {
+impl<T: Bundle> IntoRsxBundle<T> for T {
 	fn into_node_bundle(self) -> impl Bundle { self }
-	fn into_attr_key_bundle(self) -> impl Bundle { AttributeValue(self) }
-	fn into_attr_val_bundle(self) -> impl Bundle { AttributeValue(self) }
 }
+
+pub struct OptionBundleMarker;
+
+
+impl<T: IntoRsxBundle<M>, M> IntoRsxBundle<(OptionBundleMarker, M)>
+	for Option<T>
+{
+	fn into_node_bundle(self) -> impl Bundle {
+		Maybe(self.map(|val| val.into_node_bundle()))
+	}
+}
+
+
 
 pub struct IntoTextNodeBundleMarker;
 
-impl IntoBundle<IntoTextNodeBundleMarker> for &str {
+impl IntoRsxBundle<IntoTextNodeBundleMarker> for &str {
 	fn into_node_bundle(self) -> impl Bundle { TextNode::new(self.to_string()) }
 	fn into_attr_key_bundle(self) -> impl Bundle {
 		(
@@ -56,7 +74,7 @@ impl IntoBundle<IntoTextNodeBundleMarker> for &str {
 macro_rules! primitives_into_bundle {
 	($($t:ty),*) => {
 		$(
-			impl IntoBundle<IntoTextNodeBundleMarker> for $t {
+			impl IntoRsxBundle<IntoTextNodeBundleMarker> for $t {
 				fn into_node_bundle(self) -> impl Bundle { TextNode::new(self.to_string()) }
 				fn into_attr_key_bundle(self) -> impl Bundle {
 					(AttributeKeyStr::new(self.to_string()), AttributeKey::new(self))
@@ -70,7 +88,10 @@ macro_rules! primitives_into_bundle {
 }
 
 // Implement for primitives
+#[rustfmt::skip]
 primitives_into_bundle!(
-	String, bool, u8, u16, u32, u64, u128, usize, i8, i16, i32, i64, i128,
-	isize, f32, f64
+	String, bool, 
+	f32, f64,
+	u8, u16, u32, u64, u128, usize, 
+	i8, i16, i32, i64, i128, isize
 );

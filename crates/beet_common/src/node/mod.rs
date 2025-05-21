@@ -1,5 +1,5 @@
-mod into_bundle;
-pub use into_bundle::*;
+mod into_rsx_bundle;
+pub use into_rsx_bundle::*;
 mod events;
 pub use events::*;
 #[cfg(feature = "tokens")]

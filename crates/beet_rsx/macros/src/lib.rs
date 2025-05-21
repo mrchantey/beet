@@ -4,6 +4,8 @@
 use beet_parse::prelude::*;
 use proc_macro::TokenStream;
 use sweet::prelude::*;
+use syn::DeriveInput;
+use syn::parse_macro_input;
 
 /// Parse [`rsmtl`] tokens into a [`Bundle`].
 /// ```ignore
@@ -33,32 +35,31 @@ pub fn rsx_template(_tokens: TokenStream) -> TokenStream { todo!() }
 #[proc_macro]
 pub fn node_tokens(_tokens: TokenStream) -> TokenStream { todo!() }
 
-// /// Adds a builder pattern to a struct enabling construction as an
-// /// rsx component
-// #[proc_macro_derive(Node, attributes(node, field))]
-// pub fn derive_node(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
-// 	let input = parse_macro_input!(input as DeriveInput);
-// 	parse_derive_node(input).into()
-// }
+/// Adds a builder pattern to a struct enabling construction as an
+/// rsx component
+#[proc_macro_derive(Node, attributes(node, field))]
+pub fn derive_node(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+	let input = parse_macro_input!(input as DeriveInput);
+	parse_derive_node(input).into()
+}
 
-// /// Allow a struct to be included as a `#[field(flatten)]` of another struct
-// #[proc_macro_derive(Buildable, attributes(field))]
-// pub fn derive_buildable(
-// 	input: proc_macro::TokenStream,
-// ) -> proc_macro::TokenStream {
-// 	let input = parse_macro_input!(input as DeriveInput);
-// 	parse_derive_buildable(input).into()
-// }
-// /// Implements [`IntoBlockAttribute`] for a struct.
-// /// Optional fields will checked and only added if they are Some.
-// /// All fields must implement Into<String>.
-// #[proc_macro_derive(IntoBlockAttribute, attributes(field))]
-// pub fn derive_into_block_attribute(
-// 	input: proc_macro::TokenStream,
-// ) -> proc_macro::TokenStream {
-// 	let input = parse_macro_input!(input as DeriveInput);
-// 	impl_into_block_attribute(input).into()
-// }
+/// Allow a struct to be included as a `#[field(flatten)]` of another struct
+#[proc_macro_derive(Buildable, attributes(field))]
+pub fn derive_buildable(
+	input: proc_macro::TokenStream,
+) -> proc_macro::TokenStream {
+	let input = parse_macro_input!(input as DeriveInput);
+	parse_derive_buildable(input).into()
+}
+/// Implements [`IntoRsxBundle`] for a struct with named fields,
+/// where each field also implements [`IntoRsxBundle`].
+#[proc_macro_derive(RsxBundle, attributes(field))]
+pub fn derive_rsx_bundle(
+	input: proc_macro::TokenStream,
+) -> proc_macro::TokenStream {
+	let input = parse_macro_input!(input as DeriveInput);
+	impl_into_rsx_bundle(input).into()
+}
 
 
 /// For a token stream create the [`FileSpan`] using its location.
