@@ -176,18 +176,21 @@ impl CollectNodeAttributes<'_, '_> {
 		quote! {EntityObserver::new(#attr)}.xsome().xok()
 	}
 
-	/// if the tokens are a closure or a block where the last statement is a closure, 
+	/// if the tokens are a closure or a block where the last statement is a closure,
 	/// insert the matching [`Trigger`] type
 	fn try_insert_closure_type(
 		tokens: TokenStream,
 		ident: &Ident,
 	) -> TokenStream {
-		fn process_closure(mut closure: syn::ExprClosure, ident: &Ident) -> syn::ExprClosure {
+		fn process_closure(
+			mut closure: syn::ExprClosure,
+			ident: &Ident,
+		) -> syn::ExprClosure {
 			match closure.inputs.first_mut() {
 				Some(first_param) => match &*first_param {
 					Pat::Type(_) => {
 						// Already has type annotation, leave as is
-					},
+					}
 					pat => {
 						let pat_clone = pat.clone();
 						// insert type
@@ -209,25 +212,27 @@ impl CollectNodeAttributes<'_, '_> {
 		match syn::parse2::<Expr>(tokens.clone()) {
 			Ok(Expr::Closure(closure)) => {
 				process_closure(closure, ident).to_token_stream()
-			},
+			}
 			Ok(Expr::Block(block)) => {
 				// Handle the case where a block's last statement is a closure
 				if let Some(last_stmt) = block.block.stmts.last() {
-					if let syn::Stmt::Expr(Expr::Closure(closure), _) = last_stmt {
+					if let syn::Stmt::Expr(Expr::Closure(closure), _) =
+						last_stmt
+					{
 						let processed = process_closure(closure.clone(), ident);
 						let mut new_stmts = block.block.stmts.clone();
 						new_stmts.pop(); // Remove the last statement
-						return quote! { 
+						return quote! {
 							{
 								#(#new_stmts)*
 								#processed
-							} 
+							}
 						};
 					}
 				}
 				// Block doesn't end with a closure, return unchanged
 				tokens
-			},
+			}
 			_ => {
 				// Not a closure or block, return unchanged
 				tokens

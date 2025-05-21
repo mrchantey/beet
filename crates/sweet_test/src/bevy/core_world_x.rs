@@ -21,6 +21,7 @@ pub impl World {
 		self
 	}
 
+	// TODO deprecated, bevy 0.16 fixes this
 	fn flush_trigger<E: Event>(&mut self, event: E) -> &mut Self {
 		self.flush();
 		self.trigger(event);
@@ -34,6 +35,7 @@ pub impl<'w> EntityWorldMut<'w> {
 	/// 1. Flushes
 	/// 2. Triggers the given event for this entity, which will run any observers watching for it.
 	/// 3. Flushes
+	// TODO deprecated, bevy 0.16 fixes this
 	fn flush_trigger<E: Event>(&mut self, event: E) -> &mut Self {
 		let entity = self.id();
 		unsafe {

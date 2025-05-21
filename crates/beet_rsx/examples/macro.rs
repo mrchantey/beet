@@ -5,10 +5,7 @@ fn main() {
 	App::new()
 		.world_mut()
 		.spawn(rsx! {
-		<div
-			onclick={||println!("clicked")}>
-			"hello world!"
-		</div>
+		<button onclick={||println!("clicked")}/>
 		})
-		.flush_trigger(OnClick);
+		.trigger(OnClick);
 }

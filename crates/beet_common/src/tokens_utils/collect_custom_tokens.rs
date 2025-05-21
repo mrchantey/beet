@@ -87,4 +87,3 @@ pub type MaybeSpannedQuery<'w, 's, T> = Query<
 	's,
 	(&'static T, Option<&'static ItemOf<T, NonSendHandle<Span>>>),
 >;
-

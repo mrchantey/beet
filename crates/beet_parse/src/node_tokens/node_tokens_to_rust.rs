@@ -48,7 +48,7 @@ fn node_tokens_to_rust(
 	)>,
 ) -> Result {
 	for (entity, settings, diagnostics) in template_roots.iter() {
-		let mut tokens = builder.token_stream(entity)?;
+		let mut tokens = builder.token_stream_from_root(entity)?;
 		if !settings.exclude_errors
 			&& let Some(diagnostics) = diagnostics
 		{
@@ -76,6 +76,29 @@ struct Builder<'w, 's> {
 }
 
 impl Builder<'_, '_> {
+	/// Entry point for the builder, rstml token roots are not elements themselves,
+	/// so if theres only one child return that instead of a fragment
+	fn token_stream_from_root(&self, entity: Entity) -> Result<TokenStream> {
+		let Some(children) = self.children.get(entity).ok() else {
+			return Ok(quote! { () });
+		};
+		if children.len() == 1 {
+			// a single child, return that
+			self.token_stream(children[0])
+		} else {
+			// multiple children, wrap in children![]
+			let children = children
+				.iter()
+				.map(|child| self.token_stream(child))
+				.collect::<Result<Vec<_>>>()?;
+			Ok(quote! { (
+				FragmentNode,
+				children![#(#children),*])
+			})
+		}
+	}
+
+
 	fn token_stream(&self, entity: Entity) -> Result<TokenStream> {
 		let mut items = Vec::<TokenStream>::new();
 		self.rsx_nodes
@@ -140,39 +163,67 @@ mod test {
 		.to_string()
 		.xpect()
 		.to_be(
+			quote! {(
+				NodeTag(String::from("span")),
+				ElementNode {
+					self_closing: false
+				},
+				{EntityObserver::new(|_on_click:Trigger<OnClick>|{})},
+				EntityObserver::new(|_:Trigger<OnClick>|{println!("clicked") ; }),
+				related!(Attributes [
+					(
+						AttributeKey::new("hidden"),
+						AttributeValue::new(true),
+						AttributeKeyStr(String::from("hidden")),
+						AttributeValueStr(String::from("true"))
+					),
+					(
+						AttributeKey::new("onmousemove"),
+						AttributeValue::new("some_js_func"),
+						AttributeKeyStr(String::from("onmousemove")),
+						AttributeValueStr (String::from("some_js_func"))
+					)
+				]),
+				children![
+					(
+						NodeTag(String::from("MyComponent")),
+						ClientIslandDirective::Load
+					),
+					(NodeTag(String::from("div")), ElementNode {
+						self_closing: true
+					})
+				]
+			)}
+			.to_string(),
+		);
+	}
+
+	#[test]
+	fn multiple_root_children() {
+		quote! {
+			<br/>
+			<br/>
+		}
+		.xmap(|t| rstml_tokens_to_rust(t, WorkspacePathBuf::new(file!())))
+		.unwrap()
+		.to_string()
+		.xpect()
+		.to_be(
 			quote! {
-			children![(
-						NodeTag(String::from("span")),
-						ElementNode {
-							self_closing: false
-						},
-						{EntityObserver::new(|_on_click:Trigger<OnClick>|{})},
-						EntityObserver::new(|_:Trigger<OnClick>|{println!("clicked") ; }),
-						related!(Attributes [
-							(
-								AttributeKey::new("hidden"),
-								AttributeValue::new(true),
-								AttributeKeyStr(String::from("hidden")),
-								AttributeValueStr(String::from("true"))
-							),
-							(
-								AttributeKey::new("onmousemove"),
-								AttributeValue::new("some_js_func"),
-								AttributeKeyStr(String::from("onmousemove")),
-								AttributeValueStr (String::from("some_js_func"))
-							)
-						]),
-						children![
-							(
-								NodeTag(String::from("MyComponent")),
-								ClientIslandDirective::Load
-							),
-							(NodeTag(String::from("div")), ElementNode {
-								self_closing: true
-							})
-						]
-					)]
-				}
+				(
+					FragmentNode,
+					children![
+						(
+							NodeTag(String::from("br")),
+							ElementNode { self_closing: true }
+						),
+						(
+							NodeTag(String::from("br")),
+							ElementNode { self_closing: true }
+						)
+					]
+				)
+			}
 			.to_string(),
 		);
 	}
