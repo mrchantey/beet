@@ -13,16 +13,16 @@ categories.workspace = true
 keywords.workspace = true
 
 [features]
-default = ["markdown", "style"]
+default = ["markdown", "css"]
 markdown = ["dep:pulldown-cmark"]
-style = ["dep:lightningcss", "dep:parcel_selectors"]
+css = ["dep:lightningcss", "dep:parcel_selectors"]
 
 [dependencies]
 #💡 Internal
-beet_rsx = { workspace = true, features = ["bevy"] }
+# beet_rsx = { workspace = true, features = ["bevy"] }
 beet_common.workspace = true
-beet_router.workspace = true
-beet_rsx_parser.workspace = true
+# beet_router.workspace = true
+# beet_rsx_parser.workspace = true
 sweet.workspace = true
 
 #💡 Utils

@@ -1,5 +1,5 @@
 use beet_common::node::FileSpan;
-use beet_rsx::error::ParseError;
+// use beet_rsx::error::ParseError;
 use std::path::Path;
 use std::path::PathBuf;
 use sweet::prelude::FsError;
@@ -13,8 +13,8 @@ pub enum Error {
 	FileToTemplates { path: PathBuf, err: String },
 	#[error("Failed to collect templates:\nSpan: {span}\nDetails:\n{err}")]
 	CollectLangTemplates { span: FileSpan, err: String },
-	#[error("Failed to parse templates:\nSpan: {span}\nDetails:\n{err}")]
-	Parse { span: FileSpan, err: ParseError },
+	// #[error("Failed to parse templates:\nSpan: {span}\nDetails:\n{err}")]
+	// Parse { span: FileSpan, err: ParseError },
 	#[error("Failed to serialize:\nPath: {path}\nDetails:\n{err}")]
 	SerializeRon {
 		path: PathBuf,

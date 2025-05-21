@@ -758,8 +758,6 @@ dependencies = [
  "anyhow",
  "beet_common",
  "beet_router",
- "beet_rsx",
- "beet_rsx_parser",
  "bevy",
  "clap",
  "flume",
