@@ -6,6 +6,7 @@ use proc_macro2::Span;
 use proc_macro2::TokenStream;
 use quote::quote;
 use sweet::prelude::PipelineTarget;
+use syn::Expr;
 
 
 /// Marker component to be swapped out for a [`NonSendHandle<TokenStream>`],
@@ -67,8 +68,11 @@ fn node_tokens_to_rust(
 #[derive(SystemParam)]
 struct Builder<'w, 's> {
 	spans: NonSend<'w, NonSendAssets<Span>>,
+	exprs: NonSend<'w, NonSendAssets<Expr>>,
 	children: Query<'w, 's, &'static Children>,
 	rsx_nodes: CollectRsxNodeTokens<'w, 's>,
+	block_node_exprs:
+		Query<'w, 's, &'static ItemOf<BlockNode, NonSendHandle<Expr>>>,
 	rsx_directives: CollectRsxDirectiveTokens<'w, 's>,
 	web_nodes: CollectWebNodeTokens<'w, 's>,
 	web_directives: CollectWebDirectiveTokens<'w, 's>,
@@ -111,6 +115,11 @@ impl Builder<'_, '_> {
 			.try_push_all(&self.spans, &mut items, entity)?;
 		self.node_attributes
 			.try_push_all(&self.spans, &mut items, entity)?;
+		if let Ok(block) = self.block_node_exprs.get(entity) {
+			let expr = self.exprs.get(&block)?;
+			items.push(quote! {#expr.into_node_bundle()});
+		}
+
 
 		if let Ok(children) = self.children.get(entity) {
 			let children = children
@@ -165,23 +174,19 @@ mod test {
 		.to_be(
 			quote! {(
 				NodeTag(String::from("span")),
-				ElementNode {
-					self_closing: false
-				},
-				{EntityObserver::new(|_on_click:Trigger<OnClick>|{})},
-				EntityObserver::new(|_:Trigger<OnClick>|{println!("clicked") ; }),
-				related!(Attributes [
+				ElementNode { self_closing: false },
+				{ EntityObserver::new(|_on_click: Trigger<OnClick>| {}) }.into_node_bundle(),
+				EntityObserver::new(|_: Trigger<OnClick>| {
+					println!("clicked");
+				}),
+				related!(Attributes[
 					(
-						AttributeKey::new("hidden"),
-						AttributeValue::new(true),
-						AttributeKeyStr(String::from("hidden")),
-						AttributeValueStr(String::from("true"))
+						"hidden".into_attr_key_bundle(),
+						true.into_attr_val_bundle()
 					),
 					(
-						AttributeKey::new("onmousemove"),
-						AttributeValue::new("some_js_func"),
-						AttributeKeyStr(String::from("onmousemove")),
-						AttributeValueStr (String::from("some_js_func"))
+						"onmousemove".into_attr_key_bundle(),
+						"some_js_func".into_attr_val_bundle()
 					)
 				]),
 				children![
@@ -189,11 +194,12 @@ mod test {
 						NodeTag(String::from("MyComponent")),
 						ClientIslandDirective::Load
 					),
-					(NodeTag(String::from("div")), ElementNode {
-						self_closing: true
-					})
+					(
+						NodeTag(String::from("div")),
+						ElementNode { self_closing: true }
+					)
 				]
-			)}
+			)	}
 			.to_string(),
 		);
 	}
@@ -226,6 +232,42 @@ mod test {
 			}
 			.to_string(),
 		);
+	}
+	#[test]
+	fn blocks() {
+		quote! {{foo}}
+			.xmap(|t| rstml_tokens_to_rust(t, WorkspacePathBuf::new(file!())))
+			.unwrap()
+			.to_string()
+			.xpect()
+			.to_be(
+				quote! {(
+					BlockNode,
+					{foo}.into_node_bundle()
+				)}
+				.to_string(),
+			);
+	}
+	#[test]
+	fn attribute_blocks() {
+		quote! {<input hidden=val/>}
+			.xmap(|t| rstml_tokens_to_rust(t, WorkspacePathBuf::new(file!())))
+			.unwrap()
+			.to_string()
+			.xpect()
+			.to_be(
+				quote! {(
+					NodeTag(String::from("input")),
+					ElementNode { self_closing: true },
+					related!(Attributes [
+						(
+							"hidden".into_attr_key_bundle(),
+							val.into_attr_val_bundle()
+						)
+					])
+				)}
+				.to_string(),
+			);
 	}
 
 	// copy paste from above test to see if the tokens are a valid bundle

@@ -23,17 +23,11 @@ pub fn directive_plugin<T: TemplateDirective>(app: &mut App) {
 /// Generic system for extracting a [TemplateDirective] from attributes.
 fn try_extract_directive<T: TemplateDirective>(
 	mut commands: Commands,
-	query: Populated<(
-		Entity,
-		&AttributeOf,
-		&AttributeKeyStr,
-		Option<&AttributeValueStr>,
-	)>,
+	query: Populated<(Entity, &AttributeOf, &AttributeLit)>,
 ) {
-	for (entity, parent, key, value) in query.iter() {
-		if let Some(directive) =
-			T::try_from_attribute(key.as_str(), value.map(|v| v.as_str()))
-		{
+	for (entity, parent, lit) in query.iter() {
+		let (key, value) = lit.into_parts();
+		if let Some(directive) = T::try_from_attribute(key, value) {
 			commands.entity(**parent).insert(directive);
 			commands.entity(entity).despawn();
 		}

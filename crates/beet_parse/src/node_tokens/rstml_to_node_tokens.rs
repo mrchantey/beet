@@ -171,18 +171,19 @@ impl<'w, 's, 'a> RstmlToWorld<'w, 's, 'a> {
 			}
 			Node::Block(NodeBlock::ValidBlock(block)) => {
 				let tracker = self.rusty_tracker.next_tracker(&block);
-				let handle = self.expr_map.insert(Expr::Block(ExprBlock {
-					attrs: Vec::new(),
-					label: None,
-					block,
-				}));
+				let expr_handle =
+					self.expr_map.insert(Expr::Block(ExprBlock {
+						attrs: Vec::new(),
+						label: None,
+						block,
+					}));
 				self.commands
 					.spawn((
 						BlockNode,
 						ItemOf::<BlockNode, _>::new(file_span),
 						ItemOf::<BlockNode, _>::new(node_span),
 						ItemOf::<BlockNode, _>::new(tracker),
-						ItemOf::<BlockNode, _>::new(handle),
+						ItemOf::<BlockNode, _>::new(expr_handle),
 					))
 					.id()
 			}
@@ -309,16 +310,19 @@ impl<'w, 's, 'a> RstmlToWorld<'w, 's, 'a> {
 					),
 					ItemOf::<AttributeKeyExpr, _>::new(key_expr_span),
 				));
-				if let Expr::Lit(ExprLit { lit, attrs: _ }) = &key_expr {
-					entity.insert((
-						AttributeKeyStr::new(lit_to_string(lit)),
-						ItemOf::<AttributeKeyStr, _>::new(key_expr_file_span),
-						ItemOf::<AttributeKeyStr, _>::new(key_expr_span),
-					));
-				}
+
+
+				let key_lit =
+					if let Expr::Lit(ExprLit { lit, attrs: _ }) = &key_expr {
+						Some(lit_to_string(lit))
+					} else {
+						None
+					};
 				entity.insert(AttributeKeyExpr::new(
 					self.expr_map.insert(key_expr),
 				));
+
+				let mut val_lit = None;
 
 				match attr.possible_value {
 					KeyedAttributeValue::Value(value) => match value.value {
@@ -333,15 +337,7 @@ impl<'w, 's, 'a> RstmlToWorld<'w, 's, 'a> {
 							if let Expr::Lit(ExprLit { lit, attrs: _ }) =
 								&val_expr
 							{
-								entity.insert((
-									AttributeValueStr::new(lit_to_string(lit)),
-									ItemOf::<AttributeValueStr, _>::new(
-										val_expr_file_span.clone(),
-									),
-									ItemOf::<AttributeValueStr, _>::new(
-										val_expr_span,
-									),
-								));
+								val_lit = Some(lit_to_string(lit));
 							}
 
 							entity.insert((
@@ -369,6 +365,10 @@ impl<'w, 's, 'a> RstmlToWorld<'w, 's, 'a> {
 						// key-only attribute, ie `<div hidden>`
 					}
 				};
+
+				if let Some(key_lit) = key_lit {
+					entity.insert(AttributeLit::new(key_lit, val_lit));
+				}
 			}
 		}
 	}
@@ -465,8 +465,8 @@ mod test {
 		.xmap(parse);
 		app.query_once::<&NodeTag>().xpect().to_have_length(3);
 
-		app.query_once::<&AttributeKeyStr>()[0]
-			.xmap(|attr| attr.as_str())
+		app.query_once::<&AttributeLit>()[0]
+			.xmap(|attr| attr.key.clone())
 			.xpect()
 			.to_be("client:load");
 	}

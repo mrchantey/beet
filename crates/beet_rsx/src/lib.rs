@@ -9,23 +9,16 @@
 //!
 //!
 pub use beet_rsx_macros::*;
+pub mod html;
 
 #[rustfmt::skip]
 pub mod prelude {
 	pub use beet_rsx_macros::*;
+	pub use crate::html::*;
 }
 
 pub mod exports {
 	pub use anyhow;
-	#[cfg(feature = "serde")]
-	pub use serde;
-
-	#[cfg(target_arch = "wasm32")]
-	pub use wasm_bindgen;
-	#[cfg(target_arch = "wasm32")]
-	pub use wasm_bindgen_futures;
-	#[cfg(target_arch = "wasm32")]
-	pub use web_sys;
 }
 
 // rsx macros expect 'beet'

@@ -19,12 +19,37 @@ impl AttributeOf {
 #[relationship_target(relationship = AttributeOf)]
 pub struct Attributes(Vec<Entity>);
 
+/// An attribute where the key is a literal and the value may be a literal,
+/// used by Directive extractors. This type is for tokens parsing only *not* propagated
+/// through the rsx! macro.
+///
+/// ## Example
+/// ```ignore
+/// rsx!{<span hidden=true />};
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Component)]
+#[component(immutable)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "tokens", derive(ToTokens))]
+pub struct AttributeLit {
+	pub key: String,
+	pub value: Option<String>,
+}
+
+impl AttributeLit {
+	pub fn new(key: String, value: Option<String>) -> Self {
+		Self { key, value }
+	}
+	pub fn into_parts(&self) -> (&str, Option<&str>) {
+		(&self.key, self.value.as_deref())
+	}
+}
+
 /// An attribute key represented as a string.
 ///
 /// ## Example
 /// ```ignore
 /// rsx!{<span "hidden"=true />};
-/// ```#[derive(Debug, Clone, PartialEq, Eq, Hash, Deref, Component)]
+/// ```
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Deref, DerefMut, Component)]
 #[component(immutable)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]

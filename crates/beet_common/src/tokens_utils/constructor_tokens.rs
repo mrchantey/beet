@@ -21,6 +21,20 @@ impl IntoCustomTokens for String {
 	}
 }
 
+impl<T: IntoCustomTokens> IntoCustomTokens for Option<T> {
+	fn into_custom_tokens(&self, tokens: &mut TokenStream) {
+		match self {
+			Some(value) => {
+				let value = value.into_custom_token_stream();
+				tokens.extend(quote! { Some(#value) });
+			}
+			None => {
+				tokens.extend(quote! { None });
+			}
+		}
+	}
+}
+
 macro_rules! impl_into_custom_tokens {
 	($($t:ty),*) => {
 		$(

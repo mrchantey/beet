@@ -7,12 +7,12 @@ use sweet::prelude::WorkspacePathBuf;
 
 
 /// A complete pipeline trip converting an [`rstml`] [`TokenStream`] into a
-/// [`Bundle`] [`TokenStream`].
+/// [`Bundle`] [`TokenStream`]. This creates and destroys a [`Bevy`] app
+/// each time so should not be used in hot paths.
 pub fn rstml_tokens_to_rust(
 	tokens: TokenStream,
 	source_file: WorkspacePathBuf,
 ) -> Result<TokenStream> {
-
 	let mut app = App::new();
 	app.add_plugins(NodeTokensPlugin);
 	let entity = app

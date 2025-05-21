@@ -1,3 +1,5 @@
+mod into_bundle;
+pub use into_bundle::*;
 mod events;
 pub use events::*;
 #[cfg(feature = "tokens")]

@@ -39,6 +39,10 @@ pub struct FragmentNode;
 #[cfg_attr(feature = "tokens", derive(ToTokens))]
 pub struct TextNode(pub String);
 
+impl TextNode {
+	pub fn new(text: impl Into<String>) -> Self { Self(text.into()) }
+}
+
 /// A block of code that will resolve to a node.
 #[derive(Debug, Default, Clone, Component, Reflect)]
 #[reflect(Default, Component)]

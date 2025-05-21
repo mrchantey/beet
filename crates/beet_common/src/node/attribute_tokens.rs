@@ -18,14 +18,13 @@ use syn::parse_quote;
 #[derive(SystemParam)]
 pub struct CollectNodeAttributes<'w, 's> {
 	attributes: Query<'w, 's, &'static Attributes>,
+	attr_lits: Query<'w, 's, &'static AttributeLit>,
 	elements: Query<'w, 's, (), With<ElementNode>>,
 	fragments: Query<'w, 's, (), With<FragmentNode>>,
 	exprs_map: NonSend<'w, NonSendAssets<Expr>>,
 	exprs: MaybeSpannedQuery<'w, 's, AttributeExpr>,
 	keys: MaybeSpannedQuery<'w, 's, AttributeKeyExpr>,
 	vals: MaybeSpannedQuery<'w, 's, AttributeValueExpr>,
-	key_strs: MaybeSpannedQuery<'w, 's, AttributeKeyStr>,
-	val_strs: MaybeSpannedQuery<'w, 's, AttributeValueStr>,
 }
 
 impl CollectCustomTokens for CollectNodeAttributes<'_, '_> {
@@ -75,7 +74,7 @@ impl CollectNodeAttributes<'_, '_> {
 				attr_entity,
 				&self.exprs,
 			)? {
-				entity_components.push(attr);
+				entity_components.push(quote! {#attr.into_node_bundle()});
 			}
 
 			if let Some(attr) = self.maybe_spanned_expr(
@@ -84,7 +83,7 @@ impl CollectNodeAttributes<'_, '_> {
 				attr_entity,
 				&self.keys,
 			)? {
-				attr_components.push(quote! {AttributeKey::new(#attr)});
+				attr_components.push(quote! {#attr.into_attr_key_bundle()});
 			}
 			if let Some(attr) = self.maybe_spanned_expr(
 				&self.exprs_map,
@@ -92,20 +91,21 @@ impl CollectNodeAttributes<'_, '_> {
 				attr_entity,
 				&self.vals,
 			)? {
-				attr_components.push(quote! {AttributeValue::new(#attr)});
+				attr_components.push(quote! {#attr.into_attr_val_bundle()});
 			}
-			self.try_push_custom(
-				spans,
-				&mut attr_components,
-				attr_entity,
-				&self.key_strs,
-			)?;
-			self.try_push_custom(
-				spans,
-				&mut attr_components,
-				attr_entity,
-				&self.val_strs,
-			)?;
+
+			// self.try_push_custom(
+			// 	spans,
+			// 	&mut attr_components,
+			// 	attr_entity,
+			// 	&self.key_strs,
+			// )?;
+			// self.try_push_custom(
+			// 	spans,
+			// 	&mut attr_components,
+			// 	attr_entity,
+			// 	&self.val_strs,
+			// )?;
 
 			if attr_components.len() == 1 {
 				attr_entities.push(attr_components.pop().unwrap());
@@ -147,22 +147,23 @@ impl CollectNodeAttributes<'_, '_> {
 			return Ok(None);
 		};
 
-		// If attr is a string literal, we shouldn't process it as an event handler
-		if let Ok(Expr::Lit(syn::ExprLit {
-			lit: syn::Lit::Str(_),
-			..
-		})) = syn::parse2(attr.clone())
-		{
+
+		let Ok(lit) = self.attr_lits.get(entity) else {
+			return Ok(None);
+		};
+		// If value is a string literal, we shouldn't process it as an event handler,
+		// to preserve onclick="some_js_function()"
+		if lit.value.is_some() {
+			return Ok(None);
+		}
+
+		let Some(suffix) = lit.key.strip_prefix("on") else {
 			return Ok(None);
 		};
 
-		let Ok((str, span)) = self.key_strs.get(entity) else {
-			return Ok(None);
-		};
-		let Some(suffix) = str.strip_prefix("on") else {
-			return Ok(None);
-		};
-		let span = if let Some(span) = span {
+		let span = if let Some(span) =
+			self.keys.get(entity).map(|s| s.1).ok().flatten()
+		{
 			spans.get(span).map(|s| *s)?
 		} else {
 			Span::call_site()
