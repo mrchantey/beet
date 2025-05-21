@@ -19,26 +19,24 @@ pub fn node_to_html(node: In<Entity>, builder: Builder) -> String {
 	builder.parse(*node, &mut html);
 	html
 }
-
+#[rustfmt::skip]
 #[derive(SystemParam)]
 pub struct Builder<'w, 's> {
-	elements: Query<
-		'w,
-		's,
-		(
-			&'static ElementNode,
-			&'static NodeTag,
-			Option<&'static Attributes>,
-			Option<&'static Children>,
-		),
-	>,
-	fragments: Query<'w, 's, (&'static FragmentNode, &'static Children)>,
+	elements: Query<'w,'s,(
+		&'static ElementNode,	
+		&'static NodeTag,	
+		Option<&'static Attributes>,	
+		Option<&'static Children>
+	)>,
+	fragments: Query<'w, 's,(
+		&'static FragmentNode, 
+		&'static Children
+	)>,
+	attributes: Query<'w,'s,(
+		&'static AttributeKeyStr, 
+		Option<&'static AttributeValueStr>
+	)>,
 	doctypes: Query<'w, 's, &'static DoctypeNode>,
-	attributes: Query<
-		'w,
-		's,
-		(&'static AttributeKeyStr, Option<&'static AttributeValueStr>),
-	>,
 	comments: Query<'w, 's, &'static CommentNode>,
 	texts: Query<'w, 's, &'static TextNode>,
 }
