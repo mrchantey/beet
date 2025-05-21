@@ -37,12 +37,11 @@ impl BevyRuntime {
 		tracker: RustyTracker,
 		block: impl Clone + IntoWebNode<M1> + SignalOrComponent<M2>,
 	) -> WebNode {
-		unreachable!()
-		// WebNode::Block(BlockNode {
-		// 	initial: Box::new(block.clone().into_node()),
-		// 	effect: Effect::new(block.into_node_block_effect(), tracker),
-		// 	meta: NodeMeta::default(),
-		// })
+		WebNode::Block(RsxBlock {
+			initial: Box::new(block.clone().into_node()),
+			effect: Effect::new(block.into_node_block_effect(), tracker),
+			meta: NodeMeta::default(),
+		})
 	}
 	/// Used by [`RstmlToRsx`] when it encounters an attribute block:
 	/// ```

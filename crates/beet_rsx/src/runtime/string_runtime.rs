@@ -14,7 +14,7 @@ impl Runtime for StringRuntime {
 		tracker: RustyTracker,
 		block: impl IntoWebNode<M>,
 	) -> WebNode {
-		WebNode::Block(BlockNode {
+		WebNode::Block(RsxBlock {
 			initial: Box::new(block.into_node()),
 			effect: Effect::new(noop(), tracker),
 			meta: NodeMeta::default(),

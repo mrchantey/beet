@@ -73,20 +73,18 @@ impl WebTokensToRust {
 				)
 			}
 			WebTokens::Comment { value, meta } => {
-				unreachable!()
-				// let meta = meta.into_rust_tokens();
-				// quote!(RsxComment {
-				// 	value: #value.to_string(),
-				// 	meta: #meta,
-				// }.into_node())
+				let meta = meta.into_rust_tokens();
+				quote!(RsxComment {
+					value: #value.to_string(),
+					meta: #meta,
+				}.into_node())
 			}
 			WebTokens::Text { value, meta } => {
-				unreachable!()
-				// let meta = meta.into_rust_tokens();
-				// quote!(RsxText {
-				// 	value: #value.to_string(),
-				// 	meta: #meta,
-				// }.into_node())
+				let meta = meta.into_rust_tokens();
+				quote!(RsxText {
+					value: #value.to_string(),
+					meta: #meta,
+				}.into_node())
 			}
 			WebTokens::Block {
 				value,

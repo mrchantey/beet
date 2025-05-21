@@ -72,6 +72,6 @@ impl<C: CustomNode> Pipeline<Vec<Node<C>>, (WebTokens, Vec<TokenStream>)>
 	for RstmlToWebTokens<C>
 {
 	fn apply(mut self, _nodes: Vec<Node<C>>) -> (WebTokens, Vec<TokenStream>) {
-		unreachable!()
+		(Default::default(), Vec::new())
 	}
 }

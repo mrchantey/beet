@@ -35,7 +35,7 @@ impl<T: AsRef<WebNode>> Pipeline<T, TemplateResult<WebNodeTemplate>>
 				tag: tag.clone(),
 				meta: meta.clone(),
 			}),
-			WebNode::Block(BlockNode {
+			WebNode::Block(RsxBlock {
 				effect,
 				// ignore initial, its a seperate tree
 				initial: _,

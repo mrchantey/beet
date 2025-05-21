@@ -12,7 +12,7 @@ impl<T: AsRef<WebNode>> Pipeline<T, TreeLocationMap> for NodeToTreeLocationMap {
 		let mut map = TreeLocationMap::default();
 
 		TreeLocationVisitor::visit(node.as_ref(), |loc, node| match node {
-			WebNode::Block(BlockNode { effect, .. }) => {
+			WebNode::Block(RsxBlock { effect, .. }) => {
 				map.rusty_locations.insert(effect.tracker, loc);
 			}
 			WebNode::Element(el) => {
