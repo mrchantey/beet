@@ -40,6 +40,7 @@ pub mod as_beet {
 			// pub use beet_common::prelude::*;
 		}
 		pub mod exports {
+			#[cfg(feature = "tokens")]
 			pub use crate::exports::*;
 		}
 	}

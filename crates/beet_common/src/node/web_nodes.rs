@@ -1,5 +1,4 @@
 use crate::as_beet::*;
-use beet_common_macros::ToTokens;
 use bevy::prelude::*;
 
 define_token_collector!(

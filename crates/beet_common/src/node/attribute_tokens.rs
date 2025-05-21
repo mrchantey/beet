@@ -176,17 +176,18 @@ impl CollectNodeAttributes<'_, '_> {
 		quote! {EntityObserver::new(#attr)}.xsome().xok()
 	}
 
-	/// if the tokens are a closure, insert the matching [`Trigger`] type
+	/// if the tokens are a closure or a block where the last statement is a closure, 
+	/// insert the matching [`Trigger`] type
 	fn try_insert_closure_type(
 		tokens: TokenStream,
 		ident: &Ident,
 	) -> TokenStream {
-		if let Ok(Expr::Closure(mut closure)) = syn::parse2(tokens.clone()) {
-			if let Some(first_param) = closure.inputs.first_mut() {
-				match &*first_param {
+		fn process_closure(mut closure: syn::ExprClosure, ident: &Ident) -> syn::ExprClosure {
+			match closure.inputs.first_mut() {
+				Some(first_param) => match &*first_param {
 					Pat::Type(_) => {
 						// Already has type annotation, leave as is
-					}
+					},
 					pat => {
 						let pat_clone = pat.clone();
 						// insert type
@@ -194,18 +195,43 @@ impl CollectNodeAttributes<'_, '_> {
 							parse_quote! {#pat_clone:Trigger<#ident>},
 						);
 					}
-				};
-				closure.to_token_stream()
-			} else {
-				// If no parameters, add one with discard name
-				closure
-					.inputs
-					.push(Pat::Type(parse_quote!(_:Trigger<#ident>)));
-				closure.to_token_stream()
+				},
+				None => {
+					// If no parameters, add one with discard name
+					closure
+						.inputs
+						.push(Pat::Type(parse_quote!(_:Trigger<#ident>)));
+				}
+			};
+			closure
+		}
+
+		match syn::parse2::<Expr>(tokens.clone()) {
+			Ok(Expr::Closure(closure)) => {
+				process_closure(closure, ident).to_token_stream()
+			},
+			Ok(Expr::Block(block)) => {
+				// Handle the case where a block's last statement is a closure
+				if let Some(last_stmt) = block.block.stmts.last() {
+					if let syn::Stmt::Expr(Expr::Closure(closure), _) = last_stmt {
+						let processed = process_closure(closure.clone(), ident);
+						let mut new_stmts = block.block.stmts.clone();
+						new_stmts.pop(); // Remove the last statement
+						return quote! { 
+							{
+								#(#new_stmts)*
+								#processed
+							} 
+						};
+					}
+				}
+				// Block doesn't end with a closure, return unchanged
+				tokens
+			},
+			_ => {
+				// Not a closure or block, return unchanged
+				tokens
 			}
-		} else {
-			// Not a closure, return unchanged
-			tokens
 		}
 	}
 
@@ -302,5 +328,13 @@ mod test {
 		.to_string()
 		.xpect()
 		.to_be(quote! { |_: Trigger<OnClick>| {} }.to_string());
+		// handles blocks
+		CollectNodeAttributes::try_insert_closure_type(
+			quote! { {|| {}} },
+			&Ident::new("OnClick", Span::call_site()),
+		)
+		.to_string()
+		.xpect()
+		.to_be(quote! { {|_: Trigger<OnClick>| {}} }.to_string());
 	}
 }

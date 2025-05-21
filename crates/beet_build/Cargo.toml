@@ -65,4 +65,4 @@ tokio.workspace = true
 
 [dev-dependencies]
 sweet = { workspace = true, features = ["test", "bevy"] }
-beet_router = { workspace = true, features = ["_test_site"] }
+# beet_router = { workspace = true, features = ["_test_site"] }

@@ -14,7 +14,7 @@ keywords.workspace = true
 
 [features]
 default = ["markdown", "style"]
-bevy = ["dep:bevy", "dep:flume", "beet_rsx/bevy"]
+bevy = ["dep:bevy", "dep:flume"]
 markdown = ["dep:pulldown-cmark"]
 style = ["dep:lightningcss", "dep:parcel_selectors"]
 

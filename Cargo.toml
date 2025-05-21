@@ -234,27 +234,24 @@ web-server = ["server", "router", "design"]
 connect = ["dep:beet_connect"]
 examples = ["bevy_default", "dep:beet_examples"]
 flow = ["dep:beet_flow"]
-css = ["beet_rsx?/css"]
+css = ["beet_build?/css"]
 design = ["rsx", "css", "dep:beet_design"]
 router = ["rsx", "dep:beet_router"]
 query = ["dep:beet_query"]
 # parser = ["beet_rsx?/parser", "beet_router?/parser"]
 rsx = ["dep:beet_rsx"]
-fs = ["beet_rsx?/fs"]
+# fs = ["beet_rsx?/fs"]
 ml = ["flow", "dep:beet_ml", "beet_examples?/ml"]
 server = ["dep:beet_server"]
 lambda = ["server", "beet_server/lambda"]
 spatial = ["flow", "dep:beet_spatial", "beet_ml?/spatial"]
 sim = ["flow", "dep:beet_sim"]
 build = ["dep:beet_build"]
-bevy = ["dep:bevy", "beet_rsx?/bevy"]
 bevy_default = [
-	"bevy",
 	"bevy/default",
 	"beet_examples?/bevy_default",
 	"beet_flow?/bevy_default",
 	"beet_ml?/bevy_default",
-	"beet_rsx?/bevy_default",
 	"beet_spatial?/bevy_default",
 	"beet_sim?/bevy_default",
 ]
@@ -280,7 +277,7 @@ beet_router = { workspace = true, optional = true }
 beet_rsx = { workspace = true, optional = true }
 beet_sim = { workspace = true, optional = true }
 beet_spatial = { workspace = true, optional = true }
-bevy = { workspace = true, optional = true }
+bevy = { workspace = true }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 # required for rand 0.9 to compile on wasm targets
@@ -288,7 +285,7 @@ uuid = { version = "1", features = ["rng-getrandom"] }
 getrandom = { workspace = true }
 
 [dev-dependencies]
-beet = { path = "", features = ["router", "bevy"] }
+beet = { path = "", features = ["router"] }
 # bevy.workspace = true
 # bevy = { workspace = true, default_features = true }
 sweet = { workspace = true, features = ["test", "bevy", "rand"] }

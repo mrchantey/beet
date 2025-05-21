@@ -12,6 +12,7 @@ pub fn rstml_tokens_to_rust(
 	tokens: TokenStream,
 	source_file: WorkspacePathBuf,
 ) -> Result<TokenStream> {
+
 	let mut app = App::new();
 	app.add_plugins(NodeTokensPlugin);
 	let entity = app

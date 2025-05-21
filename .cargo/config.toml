@@ -4,7 +4,13 @@
 
 [target.wasm32-unknown-unknown]
 runner = 'sweet test-wasm'
-rustflags = ["--cfg", "getrandom_backend=\"wasm_js\""]
+rustflags = [
+	"--cfg",
+	"getrandom_backend=\"wasm_js\"",
+	# get span.file()
+	# "--cfg",
+	# "procmacro2_semver_exempt",
+]
 
 [env]
 SWEET_ROOT = { value = "", relative = true }

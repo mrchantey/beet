@@ -1,5 +1,5 @@
 [package]
-name = "beet_rsx2"
+name = "beet_rsx"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
