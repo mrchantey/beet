@@ -163,7 +163,7 @@ mod test {
 				onmousemove="some_js_func"
 				onclick=|| { println!("clicked"); }
 				>
-				<MyComponent client:load />
+				<MyComponent foo="bar" client:load />
 				<div/>
 			</span>
 		}
@@ -176,30 +176,38 @@ mod test {
 				NodeTag(String::from("span")),
 				ElementNode { self_closing: false },
 				{ EntityObserver::new(|_on_click: Trigger<OnClick>| {}) }.into_node_bundle(),
-				EntityObserver::new(|_: Trigger<OnClick>| {
-					println!("clicked");
-				}),
-				related!(Attributes[
-					(
-						"hidden".into_attr_key_bundle(),
-						true.into_attr_val_bundle()
-					),
-					(
-						"onmousemove".into_attr_key_bundle(),
-						"some_js_func".into_attr_val_bundle()
-					)
-				]),
-				children![
-					(
-						NodeTag(String::from("MyComponent")),
-						ClientIslandDirective::Load
-					),
-					(
-						NodeTag(String::from("div")),
-						ElementNode { self_closing: true }
-					)
-				]
-			)	}
+				EntityObserver::new(#[allow(unused_braces)] |_: Trigger<OnClick>| { println!("clicked"); }),
+				related!(Attributes[(
+					"hidden".into_attr_key_bundle(),
+					true.into_attr_val_bundle()
+				), (
+					"onmousemove".into_attr_key_bundle(),
+					"some_js_func".into_attr_val_bundle()
+				)]),
+				children![(
+					NodeTag(String::from("MyComponent")),
+					FragmentNode,
+					ClientIslandDirective::Load,
+					ItemOf::<beet_common::node::rsx_nodes::TemplateNode, beet_common::templating::rusty_tracker::RustyTracker> {
+						value: RustyTracker { index: 0u32, tokens_hash: 6523630531850795118u64 },
+						phantom: std::marker::PhantomData::<beet_common::node::rsx_nodes::TemplateNode>
+					},
+					{
+						let template = <MyComponent as Props>::Builder::default().foo("bar").build();
+						#[allow(unused_braces)]
+						(
+							#[cfg(not(target_arch = "wasm32"))]
+							{ TemplateSerde::new(&template) }
+							#[cfg(target_arch = "wasm32")]
+							{ () },
+							children![template.into_node_bundle()]
+						)
+					}
+				), (
+					NodeTag(String::from("div")),
+					ElementNode { self_closing: true }
+				)]
+			)}
 			.to_string(),
 		);
 	}

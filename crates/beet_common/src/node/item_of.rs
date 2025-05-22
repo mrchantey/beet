@@ -1,3 +1,5 @@
+#[cfg(feature = "tokens")]
+use crate::as_beet::*;
 use bevy::ecs::query::QueryData;
 use bevy::prelude::*;
 
@@ -17,10 +19,13 @@ pub struct MaybeWithItem<C: Component, T: 'static + Send + Sync> {
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Component, Reflect)]
 #[reflect(Component)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "tokens", derive(ToTokens))]
 pub struct ItemOf<C, T> {
-	value: T,
-	phantom: std::marker::PhantomData<C>,
+	pub value: T,
+	pub phantom: std::marker::PhantomData<C>,
 }
+
+
 impl<C, T> std::ops::Deref for ItemOf<C, T> {
 	type Target = T;
 	fn deref(&self) -> &Self::Target { &self.value }
@@ -34,8 +39,6 @@ impl<C, T> ItemOf<C, T> {
 		}
 	}
 }
-
-
 
 #[cfg(test)]
 mod test {

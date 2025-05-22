@@ -54,8 +54,8 @@ impl<'a> NodeField<'a> {
 
 	/// In Builder pattern these are the tokens for assignment, depending
 	/// on attributes it will be checked in the following order:
-	/// - MaybeSignal<T>:	`(<M>, 						impl IntoMaybeSignal,		value.into_maybe_signal())`
 	/// - is_boxed:				`(Default, 				impl SomeType, 					Box::new(value))`
+	/// - MaybeSignal<T>:	`(<M>, 						impl IntoMaybeSignal,		value.into_maybe_signal())`
 	/// - into_type:			`(into_generics,	into_type, into_func							)`
 	/// - is_into: 				`(Default, 				impl Into<SomeType>, 		value.into())		`
 	/// - verbatim: 			`(Default, 				SomeType, 							value)					`

@@ -1,7 +1,9 @@
+#[cfg(feature = "tokens")]
+use crate::as_beet::*;
 use rapidhash::RapidHasher;
 use std::hash::Hasher;
 
-/// A serializable counterpart to a [`RustyPart`]
+/// A serializable counterpart to a [`RustyPart`], usually represented as an [`ItemOf`].
 /// This struct performs two roles:
 /// 1. hydration splitting and joining
 /// 2. storing the hash of a rusty part token stream, for hot reload diffing
@@ -15,6 +17,7 @@ use std::hash::Hasher;
 /// ```
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "tokens", derive(ToTokens))]
 pub struct RustyTracker {
 	/// the order in which this part was visited by the syn::Visitor
 	pub index: u32,

@@ -12,6 +12,18 @@ define_token_collector!(
 	texts: TextNode,
 	blocks: BlockNode,
 );
+/// aka `Component` in web, applied to nodes that are constructed using a builder pattern,
+/// denoted as uppercase in rsx `<MyTemplate/>`.
+/// These are represented in the entity graph as a [`FragmentNode`], ie they
+/// have children but no visual representation. This allows templates themselves
+/// to have components.
+#[derive(Debug, Default, Copy, Clone, Component, Reflect)]
+#[reflect(Default, Component)]
+#[component(immutable)]
+#[require(FragmentNode)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "tokens", derive(ToTokens))]
+pub struct TemplateNode;
 
 
 /// The tag of a node
@@ -22,8 +34,7 @@ define_token_collector!(
 pub struct NodeTag(pub String);
 
 /// Applied to non-visual nodes with children.
-/// A web-dev 'Component' is also a fragment in beet, in which case a [`NodeTag`]
-/// is used to determine the actual component.
+/// Every [`TemplateNode`] is a [`FragmentNode`]
 #[derive(Debug, Default, Copy, Clone, Component, Reflect)]
 #[reflect(Default, Component)]
 #[component(immutable)]

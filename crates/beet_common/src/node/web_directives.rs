@@ -66,6 +66,36 @@ impl TemplateDirective for ClientIslandDirective {
 	}
 }
 
+/// Serialized version of this [`TemplateNode`]
+#[derive(Debug, Default, Clone, Component, Reflect)]
+#[reflect(Default, Component)]
+#[component(immutable)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "tokens", derive(ToTokens))]
+pub struct TemplateSerde {
+	type_name: String,
+	ron: String,
+}
+
+#[cfg(feature = "serde")]
+impl TemplateSerde {
+	/// Create a new [`TemplateSerde`] from a value that can be serialized to RON.
+	/// ## Panics
+	/// Panics if the serialization failed.
+	pub fn new<T: serde::ser::Serialize>(val: &T) -> Self {
+		Self {
+			type_name: std::any::type_name::<T>().to_string(),
+			ron: ron::ser::to_string(val)
+				.expect("Failed to serialize template"),
+		}
+	}
+	pub fn parse<T>(&self) -> Result<T, ron::de::SpannedError>
+	where
+		T: serde::de::DeserializeOwned,
+	{
+		ron::de::from_str(&self.ron)
+	}
+}
 
 /// Template directives related to web rendering.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]

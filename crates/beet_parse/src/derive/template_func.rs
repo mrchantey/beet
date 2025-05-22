@@ -60,7 +60,10 @@ fn impl_rsx_bundle(func: &ItemFn, fields: &[NodeField]) -> Result<TokenStream> {
 
 	Ok(quote! {
 	impl #impl_generics IntoRsxBundle<Self> for #ident #type_generics #where_clause {
-		fn into_node_bundle(Self{#(#destructure),*}: self) #return_type #body
+		fn into_node_bundle(self) #return_type {
+			let Self{#(#destructure),*} = self;
+			#body
+		}
 	}
 	})
 }
@@ -95,8 +98,8 @@ mod test {
 				pub foo: u32
 			}
 			impl IntoRsxBundle<Self> for MyNode {
-				fn into_node_bundle(Self { foo }: self) -> impl Bundle {
-					()
+				fn into_node_bundle(self) -> impl Bundle {
+					let Self { foo } = self ; { () }
 				}
 			}
 			}

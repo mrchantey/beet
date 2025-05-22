@@ -6,7 +6,7 @@ pub use events::*;
 mod attribute_tokens;
 #[cfg(feature = "tokens")]
 pub use attribute_tokens::*;
-mod rsx_nodes;
+pub mod rsx_nodes;
 pub use rsx_nodes::*;
 mod web_nodes;
 pub use web_nodes::*;

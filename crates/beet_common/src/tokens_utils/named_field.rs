@@ -79,38 +79,38 @@ impl<'a> NamedField<'a> {
 		.collect::<Result<Vec<_>>>()
 	}
 
+	pub fn new(
+		attrs: &'a Vec<Attribute>,
+		ident: &'a Ident,
+		ty: &'a Type,
+	) -> Result<Self> {
+		let field_attributes = AttributeGroup::parse(&attrs, "field")?;
+		let inner_ty = Self::option_inner(&ty);
+		let inner_generics = Self::generic_inner(&inner_ty);
+		Ok(Self {
+			attrs,
+			field_attributes,
+			ident,
+			ty,
+			inner_ty,
+			inner_generics,
+		})
+	}
+
 	pub fn parse_pat_ty(inner: &'a PatType) -> Result<Self> {
-		let attributes = AttributeGroup::parse(&inner.attrs, "field")?;
 		let Pat::Ident(PatIdent { ident, .. }) = &*inner.pat else {
 			return Err(Error::new_spanned(
 				inner,
 				"Only named fields are supported",
 			));
 		};
-
-		Ok(Self {
-			inner_generics: Self::generic_inner(&inner.ty),
-			inner_ty: Self::option_inner(&inner.ty),
-			ty: &inner.ty,
-			attrs: &inner.attrs,
-			ident,
-			field_attributes: attributes,
-		})
+		Self::new(&inner.attrs, ident, &inner.ty)
 	}
 	pub fn parse_field(inner: &'a Field) -> Result<Self> {
-		let attributes = AttributeGroup::parse(&inner.attrs, "field")?;
 		let ident = inner.ident.as_ref().ok_or_else(|| {
 			Error::new_spanned(inner, "Only named fields are supported")
 		})?;
-
-		Ok(Self {
-			inner_generics: Self::generic_inner(&inner.ty),
-			inner_ty: Self::option_inner(&inner.ty),
-			ty: &inner.ty,
-			attrs: &inner.attrs,
-			ident,
-			field_attributes: attributes,
-		})
+		Self::new(&inner.attrs, ident, &inner.ty)
 	}
 
 	/// Returs whether this field is of type `Option<T>`.
@@ -221,7 +221,7 @@ mod test {
 	fn pat_ty() {
 		let field = syn::parse_quote! {
 			#[field(default)]
-			foo: Option<u32>
+			foo: Option<Foo<Bar>>
 		};
 		let FnArg::Typed(field) = field else {
 			panic!();
@@ -229,6 +229,7 @@ mod test {
 
 		let named = NamedField::parse_pat_ty(&field).unwrap();
 		expect(named.is_optional()).to_be_true();
+		expect(named.inner_ty).to_be(&syn::parse_quote! { Foo<Bar> });
 		expect(named.attrs.len()).to_be(1);
 	}
 }

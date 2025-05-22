@@ -1,3 +1,5 @@
+use std::marker::PhantomData;
+
 use proc_macro2::TokenStream;
 use quote::quote;
 use quote::quote_spanned;
@@ -15,6 +17,27 @@ pub trait IntoCustomTokens {
 		tokens
 	}
 }
+
+impl IntoCustomTokens for () {
+	fn into_custom_tokens(&self, tokens: &mut TokenStream) {
+		tokens.extend(quote! { () });
+	}
+}
+
+impl IntoCustomTokens for TokenStream {
+	fn into_custom_tokens(&self, tokens: &mut TokenStream) {
+		tokens.extend(self.clone());
+	}
+}
+
+impl<T> IntoCustomTokens for PhantomData<T> {
+	fn into_custom_tokens(&self, tokens: &mut TokenStream) {
+		let type_name =
+			syn::parse_str::<syn::Path>(std::any::type_name::<T>()).unwrap();
+		tokens.extend(quote! { std::marker::PhantomData::<#type_name> });
+	}
+}
+
 impl IntoCustomTokens for String {
 	fn into_custom_tokens(&self, tokens: &mut TokenStream) {
 		tokens.extend(quote! { String::from(#self) });

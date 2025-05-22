@@ -1,3 +1,5 @@
+mod collect_node_attributes;
+pub use collect_node_attributes::*;
 mod rstml_tokens_to_rust;
 pub use rstml_tokens_to_rust::*;
 mod node_tokens_to_rust;

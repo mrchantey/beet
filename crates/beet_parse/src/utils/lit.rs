@@ -17,3 +17,13 @@ pub fn lit_to_string(lit: &syn::Lit) -> String {
 		_ => unimplemented!(),
 	}
 }
+
+
+pub fn expr_to_ident(expr: &syn::Expr) -> Option<syn::Ident> {
+	if let syn::Expr::Lit(expr_lit) = expr {
+		if let syn::Lit::Str(lit_str) = &expr_lit.lit {
+			return Some(syn::Ident::new(&lit_str.value(), lit_str.span()));
+		}
+	}
+	None
+}

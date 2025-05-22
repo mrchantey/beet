@@ -11,7 +11,7 @@ fn rsx_macro() {
 
 	App::new()
 		.world_mut()
-		.spawn(rsx! {<button onclick={move||val2.call(2)}/>})
+		.spawn(rsx! {<button onclick=move||val2.call(2)/>})
 		.trigger(OnClick);
 	expect(&val).to_have_returned_with(2);
 }

@@ -6,6 +6,7 @@ use syn::DeriveInput;
 
 use syn::Token;
 use syn::parse_macro_input;
+use syn::WherePredicate;
 
 pub fn impl_derive_to_tokens(
 	input: proc_macro::TokenStream,
@@ -19,8 +20,38 @@ pub fn impl_derive_to_tokens(
 
 
 fn parse(input: DeriveInput) -> syn::Result<TokenStream> {
-	let name = &input.ident;
+	let ident = &input.ident;
 	let pound_token = pound_token();
+
+	let (impl_generics, type_generics, where_clause) =
+		input.generics.split_for_impl();
+
+	let generic_idents = input
+		.generics
+		.params
+		.iter()
+		.filter_map(|param| match param {
+			syn::GenericParam::Type(ty) => Some(ty),
+			syn::GenericParam::Lifetime(_) => None,
+			syn::GenericParam::Const(_) => None,
+		})
+		.enumerate()
+		.map(|(i, ty)| {
+			let ident = &ty.ident;
+			let generic_ident =
+				syn::Ident::new(&format!("generic{}", i), ty.ident.span());
+			(ident, generic_ident)
+		});
+
+	let qualified_name = if input.generics.params.is_empty() {
+		quote! { #ident }
+	} else {
+		let qualified = generic_idents.clone().map(|(_, generic_ident)| {
+			quote! { #pound_token #generic_ident }
+		});
+		quote! { #ident::<#(#qualified),*> }
+	};
+
 	let content = match &input.data {
 		syn::Data::Struct(data_struct) => {
 			let fields = &data_struct.fields;
@@ -43,7 +74,7 @@ fn parse(input: DeriveInput) -> syn::Result<TokenStream> {
 
 					quote! {
 						#(#field_defs)*
-						tokens.extend(quote::quote! { #name {
+						tokens.extend(quote::quote! { #qualified_name {
 							#(#field_tokens),*
 						} });
 					}
@@ -74,14 +105,14 @@ fn parse(input: DeriveInput) -> syn::Result<TokenStream> {
 
 					quote! {
 						#(#field_defs)*
-						tokens.extend(quote::quote! { #name(
+						tokens.extend(quote::quote! { #qualified_name(
 							#(#pound_token #field_vars),*
 						) });
 					}
 				}
 				syn::Fields::Unit => {
 					quote! {
-						tokens.extend(quote::quote! { #name });
+						tokens.extend(quote::quote! { #qualified_name });
 					}
 				}
 			}
@@ -99,9 +130,9 @@ fn parse(input: DeriveInput) -> syn::Result<TokenStream> {
 							.collect::<Vec<_>>();
 
 						quote! {
-							#name::#variant_name { #(#field_names),* } => {
+							Self::#variant_name { #(#field_names),* } => {
 								#(let #field_names = #field_names.into_custom_token_stream();)*
-								tokens.extend(quote::quote! { #name::#variant_name {
+								tokens.extend(quote::quote! { #qualified_name::#variant_name {
 									#(#field_names: #pound_token #field_names),*
 								} });
 							}
@@ -118,9 +149,9 @@ fn parse(input: DeriveInput) -> syn::Result<TokenStream> {
 							.collect::<Vec<_>>();
 
 						quote! {
-							#name::#variant_name(#(#field_vars),*) => {
+							Self::#variant_name(#(#field_vars),*) => {
 								#(let #field_vars = #field_vars.into_custom_token_stream();)*
-								tokens.extend(quote::quote! { #name::#variant_name(
+								tokens.extend(quote::quote! { #qualified_name::#variant_name(
 									#(#pound_token #field_vars),*
 								) });
 							}
@@ -128,8 +159,8 @@ fn parse(input: DeriveInput) -> syn::Result<TokenStream> {
 					}
 					syn::Fields::Unit => {
 						quote! {
-							#name::#variant_name => {
-								tokens.extend(quote::quote! { #name::#variant_name });
+							Self::#variant_name => {
+								tokens.extend(quote::quote! { #qualified_name::#variant_name });
 							}
 						}
 					}
@@ -149,12 +180,31 @@ fn parse(input: DeriveInput) -> syn::Result<TokenStream> {
 			));
 		}
 	};
+	let generic_defs = generic_idents.clone().map(|(ident, generic_ident)| {
+		quote! {
+			let #generic_ident = syn::parse_str::<syn::Path>(
+				std::any::type_name::<#ident>()
+			).expect("failed to parse generic type from std::any::type_name");
+		}
+	});
+
+	let mut where_clause = where_clause
+		.cloned()
+		.unwrap_or_else(|| syn::parse_quote!(where));
+	where_clause.predicates.extend(generic_idents.map(|(ident, _)| {
+		let predicate: WherePredicate = syn::parse_quote! {
+			#ident: beet::prelude::IntoCustomTokens
+		};
+		predicate
+	}));
+
 
 	quote! {
-		impl beet::prelude::IntoCustomTokens for #name {
+		impl #impl_generics beet::prelude::IntoCustomTokens for #ident #type_generics #where_clause {
 			fn into_custom_tokens(&self, tokens: &mut beet::exports::proc_macro2::TokenStream) {
 				use beet::exports::quote;
 				use beet::exports::proc_macro2;
+				#(#generic_defs)*
 				#content
 			}
 		}
@@ -249,16 +299,16 @@ mod test {
 							use beet::exports::quote;
 							use beet::exports::proc_macro2;
 							match self {
-								TestEnum::A => {
+								Self::A => {
 									tokens.extend(quote::quote! { TestEnum::A });
 								},
-								TestEnum::B(field0) => {
+								Self::B(field0) => {
 									let field0 = field0.into_custom_token_stream();
 									tokens.extend(quote::quote! { TestEnum::B(
 										#pound_token field0
 									) });
 								},
-								TestEnum::C { value } => {
+								Self::C { value } => {
 									let value = value.into_custom_token_stream();
 									tokens.extend(quote::quote! { TestEnum::C {
 										value: #pound_token value
@@ -268,6 +318,33 @@ mod test {
 						}
 					}
 				}
+			.to_string(),
+		);
+	}
+	#[test]
+	fn test_generics() {
+		let input: DeriveInput = syn::parse_quote! {
+			struct Foo<U:Clone>{}
+		};
+		let pound_token = pound_token();
+
+
+		input.xmap(parse).unwrap().to_string().xpect().to_be(
+			quote! {
+				impl<U: Clone> beet::prelude::IntoCustomTokens for Foo<U> 
+				where 
+					U: beet::prelude::IntoCustomTokens
+				{
+					fn into_custom_tokens(&self, tokens: &mut beet::exports::proc_macro2::TokenStream) {
+						use beet::exports::quote;
+						use beet::exports::proc_macro2;
+						
+						let generic0 = syn::parse_str::<syn::Path>(std::any::type_name::<U>())
+							.expect("failed to parse generic type from std::any::type_name");
+						tokens.extend(quote::quote! { Foo::<#pound_token generic0>{ } });
+					}
+				}
+			}
 			.to_string(),
 		);
 	}

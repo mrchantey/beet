@@ -236,9 +236,10 @@ impl<'w, 's, 'a> RstmlToWorld<'w, 's, 'a> {
 					let tracker =
 						self.rusty_tracker.next_from_open_tag(&open_tag);
 					entity.insert((
-						ItemOf::<FragmentNode, _>::new(tracker),
-						ItemOf::<FragmentNode, _>::new(file_span),
-						ItemOf::<FragmentNode, _>::new(node_span),
+						TemplateNode,
+						ItemOf::<TemplateNode, _>::new(tracker),
+						ItemOf::<TemplateNode, _>::new(file_span),
+						ItemOf::<TemplateNode, _>::new(node_span),
 					));
 				} else {
 					entity.insert((
