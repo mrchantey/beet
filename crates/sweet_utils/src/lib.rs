@@ -3,10 +3,12 @@ pub use utils::sleep::*;
 pub mod extensions;
 pub mod path_utils;
 pub mod utils;
+pub mod arena;
 pub mod prelude {
 	pub use crate::abs_file;
 	pub use crate::extensions::*;
 	pub use crate::path_utils::*;
+	pub use crate::arena::*;
 	pub use crate::utils::*;
 	#[cfg(feature = "rand")]
 	pub use rand::Rng;

@@ -26,6 +26,7 @@ thiserror.workspace = true
 clap.workspace = true
 path-clean = "1"
 pathdiff = "0.2"
+# slotmap = "1"
 
 rapidhash.workspace = true
 bevy = { workspace = true, optional = true }
