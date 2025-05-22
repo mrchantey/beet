@@ -4,7 +4,8 @@
 /// The following example creates a struct `CollectRsxNodeTokens` and
 /// implements the [`CollectCustomTokens`] trait for it.
 /// ```rust
-/// # use beet_common::prelude::*;
+/// # use bevy::prelude::*;
+/// # use beet_common::as_beet::*;
 ///
 /// define_token_collector!(
 ///		CollectRsxNodeTokens,

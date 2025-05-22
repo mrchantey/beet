@@ -186,6 +186,12 @@ test-build *args:
 	{{min-stack}} cargo test -p beet_build 						--all-features																		{{args}} -- {{test-threads}}
 
 test-rsx *args:
+	{{min-stack}} cargo test -p beet_common 				--all-features 	 	 																	{{args}} -- {{test-threads}}
+	{{min-stack}} cargo test -p beet_parse 					--all-features 	 	 																	{{args}} -- {{test-threads}}
+	{{min-stack}} cargo test -p beet_rsx_macros 		--all-features 	 	 																	{{args}} -- {{test-threads}}
+	{{min-stack}} cargo test -p beet_rsx 						--all-features 	 	 																	{{args}} -- {{test-threads}}
+
+test-rsx-old *args:
 	{{min-stack}} cargo test -p beet_design 	 	 																												{{args}} -- {{test-threads}}
 	{{min-stack}} cargo test -p beet_router 	--features=serde 																					{{args}} -- {{test-threads}}
 	{{min-stack}} cargo test -p beet_rsx 			--features=bevy,css,parser 																{{args}} -- {{test-threads}}
