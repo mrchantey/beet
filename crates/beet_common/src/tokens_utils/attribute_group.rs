@@ -92,6 +92,7 @@ pub struct AttributeItem {
 	pub value: Option<Expr>,
 }
 
+
 impl AttributeItem {
 	pub fn parse(input: ParseStream) -> syn::Result<Self> {
 		let key: syn::Member = input.parse()?;

@@ -19,7 +19,7 @@ async fn main() {
 		.run();
 }
 
-#[derive(Node)]
+#[derive(derive_template)]
 struct Counter {
 	initial: i32,
 }

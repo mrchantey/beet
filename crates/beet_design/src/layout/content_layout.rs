@@ -2,7 +2,7 @@ use crate::prelude::*;
 
 
 /// A [`PageLayout`] with a `<main>` content area.
-#[derive(Node)]
+#[derive(derive_template)]
 pub struct ContentLayout {
 	// pub page_layout: PageLayout,
 }

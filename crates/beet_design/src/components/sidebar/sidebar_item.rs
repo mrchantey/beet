@@ -1,7 +1,7 @@
 use crate::prelude::*;
 use beet_rsx::as_beet::*;
 
-#[derive(Clone, Node)]
+#[derive(Clone, derive_template)]
 pub struct SidebarItem {
 	pub node: SidebarNode,
 	pub root: bool,

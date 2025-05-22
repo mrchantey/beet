@@ -11,7 +11,7 @@ use material_colors::theme::Theme;
 /// 	- [`material-colors` crate](https://crates.io/crates/material-colors)
 /// - Typography: Starlight
 /// - Layout: PicoCSS
-#[derive(Node)]
+#[derive(derive_template)]
 pub struct DesignSystem {
 	pub theme: Theme,
 }

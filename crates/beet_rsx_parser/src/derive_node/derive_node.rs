@@ -112,7 +112,7 @@ fn impl_builder(
 
 	let builder_defaults = fields.iter().map(|field| {
 		let name = &field.ident;
-		if let Some(attr) = field.attributes.get("default") {
+		if let Some(attr) = field.field_attributes.get("default") {
 			let val = attr.value.as_ref().unwrap_or(&default_fallback);
 			quote! { #name: #val }
 		} else {

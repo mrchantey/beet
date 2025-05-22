@@ -23,7 +23,7 @@ impl TextFieldVariant {
 
 
 /// A styled text field
-#[derive(Node)]
+#[derive(derive_template)]
 pub struct TextField {
 	#[field(default)]
 	pub variant: TextFieldVariant,
@@ -48,7 +48,7 @@ fn text_field(TextField { variant, mut attrs }: TextField) -> WebNode {
 
 
 /// A styled text area
-#[derive(Node)]
+#[derive(derive_template)]
 pub struct TextArea {
 	#[field(default)]
 	pub variant: TextFieldVariant,

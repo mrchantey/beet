@@ -8,7 +8,7 @@ pub fn get() -> WebNode {
 }
 
 // temp until global client:load
-#[derive(Node, serde::Serialize, serde::Deserialize)]
+#[derive(derive_template, serde::Serialize, serde::Deserialize)]
 pub struct Inner;
 
 fn inner(_: Inner) -> WebNode {

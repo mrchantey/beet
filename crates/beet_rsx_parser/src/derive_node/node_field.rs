@@ -19,10 +19,10 @@ impl<'a> std::ops::Deref for NodeField<'a> {
 
 impl<'a> NodeField<'a> {
 	pub fn parse_all(input: &DeriveInput) -> Result<Vec<NodeField>> {
-		NamedField::parse_all(input)?
+		NamedField::parse_derive_input(input)?
 			.into_iter()
 			.map(|field| {
-				field.attributes.validate_allowed_keys(&[
+				field.field_attributes.validate_allowed_keys(&[
 					"default",
 					"required",
 					"into",
@@ -65,15 +65,15 @@ impl<'a> NodeField<'a> {
 			)),
 			// 3. handle into_type attribute
 			_ if let Some(ty) =
-				field.attributes.get_value_parsed::<Type>("into_type")? =>
+				field.field_attributes.get_value_parsed::<Type>("into_type")? =>
 			{
 				let generics = field
-					.attributes
+					.field_attributes
 					.get_value_parsed::<TokenStream>("into_generics")?
 					.unwrap_or_default();
 
 				let func = field
-					.attributes
+					.field_attributes
 					.get_value_parsed::<Expr>("into_func")?
 					.map(|func| {
 						parse_quote! { value.#func() }

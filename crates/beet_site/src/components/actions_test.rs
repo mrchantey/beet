@@ -5,7 +5,7 @@ use serde::Deserialize;
 use serde::Serialize;
 use sweet::prelude::*;
 
-#[derive(Node, Serialize, Deserialize)]
+#[derive(derive_template, Serialize, Deserialize)]
 pub struct ActionTest;
 
 fn action_test(_props: ActionTest) -> WebNode {
@@ -24,7 +24,7 @@ fn action_test(_props: ActionTest) -> WebNode {
 }
 
 
-#[derive(Node)]
+#[derive(derive_template)]
 pub struct RejectsNeg {}
 fn rejects_neg(_props: RejectsNeg) -> WebNode {
 	let (val, _set_val) = signal(0);

@@ -2,7 +2,7 @@ use crate::prelude::*;
 use beet_rsx::as_beet::*;
 use chrono::Datelike;
 
-#[derive(Node)]
+#[derive(derive_template)]
 pub struct Footer;
 
 fn footer(_props: Footer) -> WebNode {

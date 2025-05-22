@@ -13,7 +13,7 @@ pub fn impl_into_rsx_bundle(input: DeriveInput) -> TokenStream {
 // TODO this needs a rework, in bevy IntoBlockAttribute will be something
 // more like IntoRsxBundle
 fn parse(input: DeriveInput) -> Result<TokenStream> {
-	let fields = NodeField::parse_all(&input)?;
+	let fields = NodeField::parse_derive_input(&input)?;
 	let fields = fields.iter().map(|f| &f.ident);
 
 	let target_name = &input.ident;

@@ -5,6 +5,7 @@ use beet_parse::prelude::*;
 use proc_macro::TokenStream;
 use sweet::prelude::*;
 use syn::DeriveInput;
+use syn::ItemFn;
 use syn::parse_macro_input;
 
 /// Parse [`rsmtl`] tokens into a [`Bundle`].
@@ -37,11 +38,34 @@ pub fn node_tokens(_tokens: TokenStream) -> TokenStream { todo!() }
 
 /// Adds a builder pattern to a struct enabling construction as an
 /// rsx component
-#[proc_macro_derive(Node, attributes(node, field))]
-pub fn derive_node(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+#[proc_macro_derive(Props, attributes(node, field))]
+pub fn derive_props(
+	input: proc_macro::TokenStream,
+) -> proc_macro::TokenStream {
 	let input = parse_macro_input!(input as DeriveInput);
-	parse_derive_node(input).into()
+	parse_derive_props(input).into()
 }
+
+
+/// Mark a function as a template function.
+///
+/// ## Example
+///
+/// ```rust ignore
+/// #[template]
+/// fn MyTemplate(hidden:bool) -> impl Bundle {
+/// 	rsx!{<div hidden={hidden}>hello world</div>}
+/// }
+/// ```
+#[proc_macro_attribute]
+pub fn template(
+	_attr: proc_macro::TokenStream,
+	input: proc_macro::TokenStream,
+) -> proc_macro::TokenStream {
+	let input = parse_macro_input!(input as ItemFn);
+	template_func(input).into()
+}
+
 
 /// Allow a struct to be included as a `#[field(flatten)]` of another struct
 #[proc_macro_derive(Buildable, attributes(field))]

@@ -31,13 +31,13 @@ impl<'a> TableField<'a> {
 		);
 		// if the field is called 'id' it is assumed to be the primary key
 		let auto_primary_key = inner.ident == "id"
-			&& !inner.attributes.contains("not_primary_key");
+			&& !inner.field_attributes.contains("not_primary_key");
 
 		let primary_key =
-			auto_primary_key || inner.attributes.contains("primary_key");
-		let auto_increment =
-			auto_primary_key || inner.attributes.contains("auto_increment");
-		let unique = inner.attributes.contains("unique");
+			auto_primary_key || inner.field_attributes.contains("primary_key");
+		let auto_increment = auto_primary_key
+			|| inner.field_attributes.contains("auto_increment");
+		let unique = inner.field_attributes.contains("unique");
 
 		Self {
 			named_field: inner,
@@ -53,7 +53,7 @@ impl<'a> TableField<'a> {
 	/// - a non-primary key with partial_exclude
 	#[rustfmt::skip]
 	pub fn partial_exclude(&self) -> bool {
-		 (self.primary_key && !self.attributes.contains("partial_include"))
-		 || self.attributes.contains("partial_exclude") 
+		 (self.primary_key && !self.field_attributes.contains("partial_include"))
+		 || self.field_attributes.contains("partial_exclude") 
 	}
 }

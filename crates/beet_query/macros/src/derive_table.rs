@@ -41,7 +41,7 @@ impl<'a> DeriveTable<'a> {
 	fn new(input: &'a DeriveInput) -> Result<Self> {
 		let attributes = AttributeGroup::parse(&input.attrs, "table")?;
 		attributes.validate_allowed_keys(&["name", "if_not_exists"])?;
-		let fields = NamedField::parse_all(&input)?
+		let fields = NamedField::parse_derive_input(&input)?
 			.into_iter()
 			.map(|f| f.xmap(|f| TableField::new(f)))
 			.collect::<Vec<_>>();
@@ -163,7 +163,6 @@ impl<'a> DeriveTable<'a> {
 		let variants = self.fields.iter().map(|field| {
 			let iden_attrs = field
 				.named_field
-				.syn_field
 				.attrs
 				.iter()
 				.filter(|attr| attr.path().is_ident("iden"));
@@ -210,7 +209,7 @@ impl<'a> DeriveTable<'a> {
 
 		let value_types = self.fields.iter().map(|field| {
 			let value_type = field
-				.attributes
+				.field_attributes
 				.get_value("type")
 				.map(|v| v.to_token_stream())
 				.unwrap_or_else(|| field.inner_ty.to_token_stream());
@@ -259,7 +258,7 @@ impl<'a> DeriveTable<'a> {
 				None
 			} else {
 				let ident = &field.ident;
-				let ty = &field.named_field.syn_field.ty;
+				let ty = &field.named_field.ty;
 				Some(quote! {
 					#ident: #ty
 				})
@@ -318,7 +317,7 @@ impl<'a> DeriveTable<'a> {
 			.fields
 			.iter()
 			.find(|field| field.primary_key)
-			.map(|field| field.named_field.syn_field.ty.to_token_stream())
+			.map(|field| field.named_field.ty.to_token_stream())
 			.unwrap_or_else(|| quote! { () });
 
 		let ident = &self.input.ident;
@@ -387,7 +386,7 @@ fn parse_col_def(field: &TableField) -> Result<TokenStream> {
 		None
 	};
 
-	let default_value = match field.attributes.get_value("default") {
+	let default_value = match field.field_attributes.get_value("default") {
 		Some(value) => Some(quote! {.default(#value)}),
 		None => None,
 	};

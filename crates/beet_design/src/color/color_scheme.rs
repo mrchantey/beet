@@ -5,7 +5,7 @@ use material_colors::theme::Theme;
 use material_colors::theme::ThemeBuilder;
 
 
-#[derive(Debug, Node)]
+#[derive(Debug, derive_template)]
 pub struct ColorScheme {
 	theme: Theme,
 }

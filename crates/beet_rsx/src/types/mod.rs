@@ -1,2 +1,2 @@
-mod props;
-pub use props::*;
+mod template;
+pub use template::*;

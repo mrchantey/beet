@@ -26,7 +26,7 @@ impl ButtonVariant {
 
 
 /// A styled button
-#[derive(Node)]
+#[derive(derive_template)]
 pub struct Button {
 	#[field(default)]
 	pub variant: ButtonVariant,
@@ -52,7 +52,7 @@ fn button(Button { variant, mut attrs }: Button) -> WebNode {
 
 
 /// A button with no text, only an icon
-#[derive(Node)]
+#[derive(derive_template)]
 pub struct IconButton {
 	#[field(default=ButtonVariant::default())]
 	pub variant: ButtonVariant,
@@ -74,7 +74,7 @@ fn icon_button(IconButton { variant }: IconButton) -> WebNode {
 }
 
 /// An anchor tag styled as a button
-#[derive(Node)]
+#[derive(derive_template)]
 pub struct Link {
 	#[field(default)]
 	pub variant: ButtonVariant,

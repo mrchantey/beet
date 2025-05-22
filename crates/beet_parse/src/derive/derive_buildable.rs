@@ -10,7 +10,7 @@ pub fn parse_derive_buildable(input: DeriveInput) -> TokenStream {
 }
 
 fn parse(input: DeriveInput) -> Result<TokenStream> {
-	let fields = NodeField::parse_all(&input)?;
+	let fields = NodeField::parse_derive_input(&input)?;
 	let impl_buildable = impl_buildable(&input, &fields)?;
 	let impl_flatten = impl_flatten(&input.ident, &input, &fields)?;
 	let impl_self_as_ref_mut = impl_self_as_ref_mut(&input);
@@ -52,7 +52,7 @@ fn impl_buildable(
 		.iter()
 		.map(|field| {
 			let name = &field.ident;
-			let actual_ty = &field.syn_field.ty;
+			let actual_ty = &field.ty;
 			let (generics, builder_ty, expr) = NodeField::assign_tokens(field)?;
 			let docs = field.docs();
 

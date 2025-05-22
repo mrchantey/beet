@@ -1,6 +1,6 @@
 use beet_rsx::as_beet::*;
 
-#[derive(Node)]
+#[derive(derive_template)]
 pub struct PageLayout {
 	pub title: String,
 }

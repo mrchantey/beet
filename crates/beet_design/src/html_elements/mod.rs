@@ -86,7 +86,7 @@ mod test {
 
 	#[test]
 	fn events_omitted() {
-		#[derive(Node)]
+		#[derive(derive_template)]
 		struct Button {
 			#[field(flatten = BaseHtmlAttributes)]
 			_button_attrs: ButtonHtmlAttributes,

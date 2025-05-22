@@ -2,7 +2,7 @@ use crate::prelude::*;
 
 
 /// Wraps an entire page, including the head and body
-#[derive(Node)]
+#[derive(derive_template)]
 pub struct DocumentLayout {
 	// pub head: Head,
 }

@@ -2,7 +2,7 @@ use beet::design::exports::*;
 use beet::prelude::*;
 
 /// Provide the Beet Theme and Brand context to the application.
-#[derive(Node)]
+#[derive(derive_template)]
 pub struct BeetContext {}
 
 fn beet_context(_: BeetContext) -> WebNode {

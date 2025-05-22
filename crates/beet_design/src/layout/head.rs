@@ -6,7 +6,7 @@ use crate::prelude::*;
 /// A `<head>` element with sensible defaults.
 /// ## Required Context
 /// - [`Brand`]
-#[derive(Node)]
+#[derive(derive_template)]
 pub struct Head {
 	/// Enable to force the page to be displayed at a fixed scale,
 	/// disabling zooming.

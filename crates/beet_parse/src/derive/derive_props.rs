@@ -1,78 +1,29 @@
 use crate::prelude::*;
-use beet_common::prelude::*;
 use proc_macro2::TokenStream;
-use quote::ToTokens;
 use quote::format_ident;
 use quote::quote;
 use syn::DeriveInput;
-use syn::Expr;
 use syn::Ident;
 use syn::Result;
 
-pub fn parse_derive_node(input: DeriveInput) -> TokenStream {
+pub fn parse_derive_props(input: DeriveInput) -> TokenStream {
 	parse(input).unwrap_or_else(|err| err.into_compile_error())
 }
 
 fn parse(input: DeriveInput) -> Result<TokenStream> {
-	let fields = NodeField::parse_all(&input)?;
-	let impl_component = impl_component(&input)?;
+	let fields = NodeField::parse_derive_input(&input)?;
 	let impl_props = impl_props(&input)?;
 	let impl_builder = impl_builder(&input, &fields)?;
 	let impl_required = impl_required(&input, &fields)?;
-	let impl_flatten = impl_flatten(
-		&name_lookup::builder_ident(&input.ident),
-		&input,
-		&fields,
-	)?;
 
 	Ok(quote! {
 		use beet::prelude::*;
 
-		#impl_component
 		#impl_props
 		#impl_builder
 		#impl_required
-		#impl_flatten
 	})
 }
-
-fn impl_component(input: &DeriveInput) -> Result<TokenStream> {
-	let attributes = AttributeGroup::parse(&input.attrs, "node")?;
-	attributes.validate_allowed_keys(&["into_rsx", "no_component"])?;
-	if attributes.get("no_component").is_some() {
-		return Ok(Default::default());
-	}
-
-	let into_rsx = if let Some(into_rsx) = attributes.get("into_rsx") {
-		into_rsx
-			.value
-			.as_ref()
-			.map(|expr| expr.to_token_stream())
-			.unwrap_or_else(|| {
-				Expr::Verbatim(quote! { into_rsx }).to_token_stream()
-			})
-	} else {
-		Ident::new(
-			&heck::AsSnakeCase(&input.ident.to_string()).to_string(),
-			input.ident.span(),
-		)
-		.to_token_stream()
-	};
-
-	let (impl_generics, type_generics, where_clause) =
-		input.generics.split_for_impl();
-	let name = &input.ident;
-
-	Ok(quote! {
-	impl #impl_generics IntoWebNode for #name #type_generics #where_clause {
-
-		fn into_node(self) -> WebNode {
-			#into_rsx(self)
-		}
-	}
-	})
-}
-
 
 fn impl_props(input: &DeriveInput) -> Result<TokenStream> {
 	let name = &input.ident;
@@ -87,9 +38,6 @@ fn impl_props(input: &DeriveInput) -> Result<TokenStream> {
 			type Builder = #builder_ident #type_generics;
 			type Required = #required_ident;
 		}
-
-
-		// #impl_component
 	})
 }
 
@@ -101,10 +49,17 @@ fn impl_builder(
 	let builder_fields = fields.iter().map(|field| {
 		let name = &field.ident;
 		let ty = field.inner_ty;
+		let attrs = field.attrs;
 		if field.is_default() {
-			quote! { #name: #ty }
+			quote! {
+				#(#attrs)*
+				#name: #ty
+			}
 		} else {
-			quote! { #name: Option<#ty> }
+			quote! {
+				#(#attrs)*
+				#name: Option<#ty>
+			}
 		}
 	});
 
@@ -112,36 +67,13 @@ fn impl_builder(
 
 	let builder_defaults = fields.iter().map(|field| {
 		let name = &field.ident;
-		if let Some(attr) = field.attributes.get("default") {
+		if let Some(attr) = field.field_attributes.get("default") {
 			let val = attr.value.as_ref().unwrap_or(&default_fallback);
 			quote! { #name: #val }
 		} else {
 			quote! { #name: Default::default() }
 		}
 	});
-
-
-	let set_val_methods = fields
-		.iter()
-		.map(|field| {
-			let name = &field.ident;
-			let (generics, ty, expr) = NodeField::assign_tokens(field)?;
-			let expr = if field.is_default() {
-				quote! { #expr }
-			} else {
-				quote! { Some(#expr) }
-			};
-			let docs = field.docs();
-
-			Ok(quote! {
-				#(#docs)*
-				pub fn #name #generics(mut self, value: #ty) -> Self {
-					self.#name = #expr;
-					self
-				}
-			})
-		})
-		.collect::<Result<Vec<_>>>()?;
 
 	let unwrap_fields = fields.iter().map(|field| {
 		let name = &field.ident;
@@ -169,13 +101,14 @@ fn impl_builder(
 
 	Ok(quote! {
 		#[allow(missing_docs)]
+		#[derive(Buildable)]
 		#vis struct #builder_ident #impl_generics {
 			#(#builder_fields),*
 		}
 
-		impl #impl_generics #builder_ident #type_generics #where_clause {
-			#(#set_val_methods)*
-		}
+		// impl #impl_generics #builder_ident #type_generics #where_clause {
+		// 	#(#set_val_methods)*
+		// }
 
 		impl #impl_generics Default for #builder_ident #type_generics #where_clause {
 			fn default() -> Self {
@@ -186,10 +119,10 @@ fn impl_builder(
 		}
 
 		impl #impl_generics PropsBuilder for #builder_ident #type_generics #where_clause {
-			type Component = #node_name #type_generics;
+			type Props = #node_name #type_generics;
 
-			fn build(self) -> Self::Component {
-				Self::Component{
+			fn build(self) -> Self::Props {
+				Self::Props{
 					#(#unwrap_fields),*
 				}
 			}
@@ -329,7 +262,7 @@ mod test {
 			}
 		};
 
-		let actual = parse_derive_node(input);
+		let actual = parse_derive_props(input);
 		expect(actual.to_string()).to_be(expected.to_string());
 	}
 }

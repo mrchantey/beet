@@ -2,7 +2,7 @@ use crate::prelude::*;
 use beet::prelude::*;
 
 
-#[derive(Node)]
+#[derive(derive_template)]
 pub struct BeetSidebarLayout {}
 
 

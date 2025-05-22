@@ -27,10 +27,10 @@ pub fn impl_flatten(
 		input.generics.split_for_impl();
 
 	let flatten_impls = fields.iter()
-			.filter(|field|field.attributes.contains("flatten"))
+			.filter(|field|field.field_attributes.contains("flatten"))
 			.map(|field| {
 				let field_ident = &field.ident;
-				let field_type = &field.syn_field.ty;
+				let field_type = &field.ty;
 				let second_order_as_mut = second_order_impl(target_ident,input, field)?;
 
 				Ok(quote! {
@@ -62,7 +62,7 @@ fn second_order_impl(
 		input.generics.split_for_impl();
 	let field_ident = &field.ident;
 
-	let flatten_attrs = field.attributes.get_many("flatten");
+	let flatten_attrs = field.field_attributes.get_many("flatten");
 
 	flatten_attrs.iter().filter_map(|attr|{
 		attr.value.as_ref()
@@ -72,7 +72,7 @@ fn second_order_impl(
 		}else{
 			syn::parse2(expr.to_token_stream())?
 		};
-		if ty == field.syn_field.ty {
+		if ty == *field.ty {
 			// its already implemented, should we warn unnecessary attr value?
 			return Ok(TokenStream::default());
 		}

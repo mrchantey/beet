@@ -56,7 +56,7 @@ fn fn_initial_attributes(fields: &[NodeField]) -> TokenStream {
 			}
 		};
 
-		if field.attributes.contains("flatten") {
+		if field.field_attributes.contains("flatten") {
 			quote! {
 				initial.extend(self.#ident.initial_attributes());
 			}
@@ -92,7 +92,7 @@ fn fn_register_effects(
 	let fields = fields.iter().map(|field| {
 		let ident = &field.ident;
 		let ident_str = ident.to_string();
-		let inner = if field.attributes.contains("flatten") {
+		let inner = if field.field_attributes.contains("flatten") {
 			quote! {
 				#ident.register_effects(loc)?;
 			}

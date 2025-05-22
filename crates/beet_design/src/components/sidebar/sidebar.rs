@@ -1,7 +1,7 @@
 use crate::prelude::*;
 use beet_rsx::as_beet::*;
 
-#[derive(Node)]
+#[derive(derive_template)]
 pub struct Sidebar {
 	pub nodes: Vec<SidebarNode>,
 }

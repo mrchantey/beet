@@ -7,27 +7,8 @@ use bevy::prelude::*;
 use std::marker::PhantomData;
 
 
-fn some_custom_name(props: MyNode) -> impl Bundle {
-	rsx! {
-		<div>
-			<p>is_optional: {format!("{:?}", props.is_optional)}</p>
-			<p>is_required: {format!("{:?}", props.is_required)}</p>
-			<p>is_default: {format!("{:?}", props.is_default)}</p>
-			<p>is_generic_default: {format!("{:?}", props.is_generic_default)}</p>
-			<p>is_into: {format!("{:?}", props.is_no_into)}</p>
-			<p>is_boxed: {format!("{:?}", (props.is_boxed)())}</p>
-			<p>is_flatten.class: {format!("{:?}", props.is_flatten.class)}</p>
-			<p>is_flatten.id: {format!("{:?}", props.is_flatten.id)}</p>
-			<p>is_flatten.disabled: {format!("{:?}", props.is_flatten.disabled)}</p>
-			<p>is_marker_into: {format!("{:?}", props.is_marker_into)}</p>
-			<p>is_maybe_signal: {format!("{:?}", props.is_maybe_signal)}</p>
-		</div>
-	}
-}
-
-
-
-fn main() {
+#[test]
+fn works() {
 	let str = rsx! {
 		<MyNode
 			is_required=38
@@ -49,6 +30,7 @@ fn main() {
 	sweet::log!("success!");
 }
 
+#[allow(unused)]
 trait MarkerIntoString<M> {
 	fn marker_into_string(self) -> String;
 }
@@ -70,28 +52,64 @@ struct MyFlattenedNode {
 	onclick: Option<EntityObserver>,
 }
 
-#[derive(Node)]
-#[node(into_rsx=some_custom_name)]
-struct MyNode {
+// #[derive(Template)]
+// #[node(into_rsx=some_custom_name)]
+// struct MyNode {
+// 	/// This is a comment
+// 	is_required: u32,
+// 	is_boxed: Box<dyn Fn() -> u32>,
+// 	is_optional: Option<u32>,
+// 	#[field(default = 7)]
+// 	is_default: u32,
+// 	#[field(default)]
+// 	is_generic_default: Foo<u32>,
+// 	#[field(no_into)]
+// 	is_no_into: String,
+// 	#[field(flatten)]
+// 	is_flatten: MyFlattenedNode,
+
+// 	#[field(into_type = "impl MarkerIntoString<M>")]
+// 	#[field(into_generics = "<M>")]
+// 	#[field(into_func=marker_into_string)]
+// 	is_marker_into: String,
+// 	// is_maybe_signal: MaybeSignal<u32>,
+// 	// #[field(foo)]
+// 	// is_bad_macro: String,
+// }
+
+
+#[template]
+fn MyNode(
 	/// This is a comment
 	is_required: u32,
 	is_boxed: Box<dyn Fn() -> u32>,
 	is_optional: Option<u32>,
-	#[field(default = 7)]
-	is_default: u32,
-	#[field(default)]
-	is_generic_default: Foo<u32>,
-	#[field(no_into)]
-	is_no_into: String,
-	#[field(flatten)]
-	is_flatten: MyFlattenedNode,
+	#[field(default = 7)] is_default: u32,
+	#[field(default)] is_generic_default: Foo<u32>,
+	#[field(no_into)] is_no_into: String,
+	#[field(flatten)] is_flatten: MyFlattenedNode,
 
 	#[field(into_type = "impl MarkerIntoString<M>")]
 	#[field(into_generics = "<M>")]
 	#[field(into_func=marker_into_string)]
 	is_marker_into: String,
-
 	// is_maybe_signal: MaybeSignal<u32>,
 	// #[field(foo)]
 	// is_bad_macro: String,
+) -> impl Bundle {
+	rsx! {
+		<div>
+			<p>is_optional: {format!("{:?}", is_optional)}</p>
+			<p>is_required: {format!("{:?}", is_required)}</p>
+			<p>is_default: {format!("{:?}", is_default)}</p>
+			<p>is_generic_default: {format!("{:?}", is_generic_default)}</p>
+			<p>is_into: {format!("{:?}", is_no_into)}</p>
+			<p>is_boxed: {format!("{:?}", (is_boxed)())}</p>
+			<p>is_flatten.class: {format!("{:?}", is_flatten.class)}</p>
+			<p>is_flatten.id: {format!("{:?}", is_flatten.id)}</p>
+			<p>is_flatten.disabled: {format!("{:?}", is_flatten.disabled)}</p>
+			<p>is_marker_into: {format!("{:?}", is_marker_into)}</p>
+			// <p>is_maybe_signal: {format!("{:?}", props.is_maybe_signal)}</p>
+		</div>
+	}
 }

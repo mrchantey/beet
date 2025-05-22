@@ -2,6 +2,7 @@ use beet_common::prelude::*;
 use proc_macro2::TokenStream;
 use syn::DeriveInput;
 use syn::Expr;
+use syn::ItemFn;
 use syn::Result;
 use syn::Type;
 use syn::parse_quote;
@@ -18,24 +19,39 @@ impl<'a> std::ops::Deref for NodeField<'a> {
 
 
 impl<'a> NodeField<'a> {
-	pub fn parse_all(input: &DeriveInput) -> Result<Vec<NodeField>> {
-		NamedField::parse_all(input)?
+	pub fn parse_item_fn(input: &ItemFn) -> Result<Vec<NodeField>> {
+		NamedField::parse_item_fn(input)?
 			.into_iter()
 			.map(|field| {
-				field.attributes.validate_allowed_keys(&[
-					"default",
-					"required",
-					"into",
-					"no_into",
-					"into_generics",
-					"into_func",
-					"into_type",
-					"flatten",
-				])?;
+				Self::validate_keys(&field)?;
 				Ok(NodeField(field))
 			})
 			.collect()
 	}
+	pub fn parse_derive_input(input: &DeriveInput) -> Result<Vec<NodeField>> {
+		NamedField::parse_derive_input(input)?
+			.into_iter()
+			.map(|field| {
+				Self::validate_keys(&field)?;
+				Ok(NodeField(field))
+			})
+			.collect()
+	}
+	fn validate_keys(named_field: &NamedField) -> Result<()> {
+		named_field.field_attributes.validate_allowed_keys(&[
+			"default",
+			"required",
+			"into",
+			"no_into",
+			"into_generics",
+			"into_func",
+			"into_type",
+			"flatten",
+		])?;
+		Ok(())
+	}
+
+
 	/// In Builder pattern these are the tokens for assignment, depending
 	/// on attributes it will be checked in the following order:
 	/// - MaybeSignal<T>:	`(<M>, 						impl IntoMaybeSignal,		value.into_maybe_signal())`
@@ -64,16 +80,17 @@ impl<'a> NodeField<'a> {
 				parse_quote! { value.into_maybe_signal() },
 			)),
 			// 3. handle into_type attribute
-			_ if let Some(ty) =
-				field.attributes.get_value_parsed::<Type>("into_type")? =>
+			_ if let Some(ty) = field
+				.field_attributes
+				.get_value_parsed::<Type>("into_type")? =>
 			{
 				let generics = field
-					.attributes
+					.field_attributes
 					.get_value_parsed::<TokenStream>("into_generics")?
 					.unwrap_or_default();
 
 				let func = field
-					.attributes
+					.field_attributes
 					.get_value_parsed::<Expr>("into_func")?
 					.map(|func| {
 						parse_quote! { value.#func() }

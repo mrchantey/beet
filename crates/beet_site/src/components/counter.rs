@@ -3,7 +3,7 @@ use beet::rsx::sigfault::signal;
 use serde::Deserialize;
 use serde::Serialize;
 
-#[derive(Node, Serialize, Deserialize)]
+#[derive(derive_template, Serialize, Deserialize)]
 pub struct Counter {
 	#[field(default = 0)]
 	initial: i32,

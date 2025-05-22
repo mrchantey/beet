@@ -1,7 +1,7 @@
 use crate::prelude::*;
 
 /// Layout for any html page, superset of [`DocumentLayout`].
-#[derive(Node)]
+#[derive(derive_template)]
 pub struct PageLayout;
 
 fn page_layout(_props: PageLayout) -> WebNode {

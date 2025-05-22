@@ -1,10 +1,12 @@
+mod template_func;
+pub use template_func::*;
 mod derive_buildable;
 mod derive_flatten;
 mod derive_rsx_bundle;
-mod derive_node;
+mod derive_props;
 mod node_field;
 pub use derive_buildable::*;
 pub use derive_flatten::*;
 pub use derive_rsx_bundle::*;
-pub use derive_node::*;
+pub use derive_props::*;
 pub use node_field::*;

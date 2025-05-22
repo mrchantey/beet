@@ -2,7 +2,7 @@ use beet::prelude::*;
 use serde::Deserialize;
 use serde::Serialize;
 
-#[derive(Node, Serialize, Deserialize)]
+#[derive(derive_template, Serialize, Deserialize)]
 pub struct Broken;
 
 fn broken(_props: Broken) -> WebNode {
@@ -21,7 +21,7 @@ fn broken(_props: Broken) -> WebNode {
 }
 
 
-#[derive(Node)]
+#[derive(derive_template)]
 struct RejectsNeg {}
 fn rejects_neg(_props: RejectsNeg) -> WebNode {
 	let onclick = move |_| {
