@@ -7,6 +7,9 @@ Always greet the user by saying one of
 
 ## Preferences
 
+- Never use single letter variable names, except for `i` in loops, instead prefer:
+	- Function Pointers: `func`
+	- Events: `ev`
 - Do not 'create a fresh file' just because the one your working on is messy. instead iterate on the one you already have
 
 

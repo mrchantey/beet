@@ -11,6 +11,12 @@ impl NonSendArena {
 	thread_local! {
 		static ARENA: LazyLock<NonSendArenaMap> = LazyLock::new(|| NonSendArenaMap::new());
 	}
+	pub fn with<F, R>(&'static self, func: F) -> R
+	where
+		F: FnOnce(&LazyLock<NonSendArenaMap>) -> R,
+	{
+		Self::ARENA.with(func)
+	}
 	/// Insert the object into the arena and return a handle to it
 	pub fn insert<T: 'static>(object: T) -> RcArenaHandle<T> {
 		Self::ARENA.with(|arena| arena.insert(object))
