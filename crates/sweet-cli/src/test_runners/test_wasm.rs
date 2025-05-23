@@ -31,7 +31,7 @@ pub struct TestWasm {
 	#[arg(long)]
 	wasm_bindgen_args: Option<String>,
 
-	// we wont actuallly use this because the args will
+	// we wont actuallly use this struct because the args will
 	// be passed to deno, but it provides --help messages
 	#[command(flatten)]
 	runner_args: sweet::prelude::TestRunnerConfig,
@@ -75,7 +75,7 @@ impl TestWasm {
 		let deno_runner_path = deno_runner_path();
 		let deno_str = include_str!("./deno.ts");
 
-		// ⚠️ we should check the hash here
+		// return if the deno file already exists
 		if ReadFile::exists(&deno_runner_path) {
 			let runner_hash = ReadFile::hash_file(&deno_runner_path)?;
 			let deno_hash = ReadFile::hash_string(deno_str);

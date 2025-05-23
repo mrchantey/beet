@@ -19,6 +19,8 @@ struct Cli {
 #[derive(Subcommand)]
 enum Commands {
 	BenchAssert(BenchAssert),
+	Run(CargoRun),
+	Test(CargoTest),
 	TestServer(TestServer),
 	TestWasm(TestWasm),
 	Serve(Server),
@@ -30,6 +32,8 @@ enum Commands {
 async fn main() -> Result<()> {
 	match Cli::parse().command {
 		Commands::BenchAssert(cmd) => cmd.run(),
+		Commands::Run(cmd) => cmd.run().await,
+		Commands::Test(cmd) => cmd.run().await,
 		Commands::TestServer(cmd) => cmd.run(),
 		Commands::TestWasm(cmd) => cmd.run(),
 		Commands::Serve(cmd) => cmd.run().await,

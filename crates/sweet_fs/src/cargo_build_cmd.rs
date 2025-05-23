@@ -1,14 +1,14 @@
 use anyhow::Result;
-use beet::prelude::*;
-use bevy::ecs as bevy_ecs;
-use bevy::prelude::*;
 use clap::Parser;
 use std::path::PathBuf;
 use std::process::Command;
 
 /// Verbatim clone of cargo build/run args
-#[derive(Debug, Clone, Parser, Resource)]
+#[derive(Debug, Clone, Parser)]
 pub struct CargoBuildCmd {
+	/// The top level command to run: `build`, `run`, `test`, etc.
+	#[arg(default_value = "build")]
+	pub cmd: String,
 	/// Package with the target to run
 	#[arg(short = 'p', long = "package")]
 	pub package: Option<String>,
@@ -18,26 +18,28 @@ pub struct CargoBuildCmd {
 	/// Name of the example target to run
 	#[arg(long)]
 	pub example: Option<String>,
+	/// Specify the integration test to
+	#[arg(long)]
+	pub test: Option<String>,
 	/// Build artifacts in release mode, with optimizations
 	#[arg(long)]
 	pub release: bool,
+	/// Only test lib
+	#[arg(long)]
+	pub lib: bool,
+	/// Only test docs
+	#[arg(long)]
+	pub doc: bool,
+	/// used by watcher to also build for wasm
+	#[arg(long)]
+	pub target: Option<String>,
 	/// Any additional arguments passed to cargo
 	#[arg(long)]
-	pub cargo_args: Option<String>,
-	/// used by watcher to also build for wasm
-	pub target: Option<String>,
+	cargo_args: Option<String>,
 }
 
 impl Default for CargoBuildCmd {
 	fn default() -> Self { Self::parse_from(&[""]) }
-}
-
-
-impl BuildStep for CargoBuildCmd {
-	fn run(&self) -> Result<()> {
-		self.spawn()?;
-		Ok(())
-	}
 }
 
 impl CargoBuildCmd {
@@ -76,47 +78,77 @@ impl CargoBuildCmd {
 		path
 	}
 
+	pub fn push_cargo_args(&mut self, args: impl Into<String>) {
+		if let Some(cargo_args) = &mut self.cargo_args {
+			cargo_args.push(' ');
+			cargo_args.push_str(&args.into());
+		} else {
+			self.cargo_args = Some(args.into());
+		}
+	}
+
 	/// Blocking spawn of the cargo build command
 	pub fn spawn(&self) -> Result<()> {
 		let CargoBuildCmd {
+			cmd,
 			package,
 			bin,
 			example,
+			test,
+			lib,
+			doc,
 			release,
 			target,
 			cargo_args,
 		} = self;
-		let mut cmd = Command::new("cargo");
-		cmd.arg("build");
+		let mut command = Command::new("cargo");
+		command.arg(cmd);
 
 		if let Some(pkg) = package {
-			cmd.arg("--package").arg(pkg);
+			command.arg("--package").arg(pkg);
 		}
-
 		if let Some(bin) = bin {
-			cmd.arg("--bin").arg(bin);
+			command.arg("--bin").arg(bin);
 		}
-
 		if let Some(ex) = example {
-			cmd.arg("--example").arg(ex);
+			command.arg("--example").arg(ex);
 		}
-
+		if let Some(test) = test {
+			command.arg("--test").arg(test);
+		}
+		if *lib {
+			command.arg("--lib");
+		}
+		if *doc {
+			command.arg("--doc");
+		}
 		if *release {
-			cmd.arg("--release");
+			command.arg("--release");
 		}
-
 		if let Some(target) = target {
-			cmd.arg("--target").arg(target);
+			command.arg("--target").arg(target);
 		}
-
 		if let Some(args) = cargo_args {
-			cmd.args(args.split_whitespace());
+			command.arg("--");
+			command.args(args.split_whitespace());
 		}
 
 
-		cmd.status()?.exit_ok()?;
+		command.status()?.exit_ok()?;
 		Ok(())
 	}
 }
 
 //cargo build -p beet_site --message-format=json | jq -r 'select(.reason == "compiler-artifact" and .target.kind == ["bin"]) | .filenames[]'
+
+
+#[cfg(test)]
+mod test {
+	use crate::prelude::*;
+	// use sweet::prelude::*;
+
+	#[test]
+	fn works() {
+		assert_eq!(CargoBuildCmd::default().cmd, "build");
+	}
+}

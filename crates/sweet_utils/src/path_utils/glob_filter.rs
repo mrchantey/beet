@@ -72,12 +72,21 @@ impl GlobFilter {
 		self
 	}
 
-	pub fn with_include(mut self, watch: &str) -> Self {
-		self.include.push(glob::Pattern::new(watch).unwrap());
+	pub fn include(&mut self, pattern: &str) -> &mut Self {
+		self.include.push(glob::Pattern::new(pattern).unwrap());
 		self
 	}
-	pub fn with_exclude(mut self, watch: &str) -> Self {
-		self.exclude.push(glob::Pattern::new(watch).unwrap());
+	pub fn exclude(&mut self, pattern: &str) -> &mut Self {
+		self.exclude.push(glob::Pattern::new(pattern).unwrap());
+		self
+	}
+
+	pub fn with_include(mut self, pattern: &str) -> Self {
+		self.include.push(glob::Pattern::new(pattern).unwrap());
+		self
+	}
+	pub fn with_exclude(mut self, pattern: &str) -> Self {
+		self.exclude.push(glob::Pattern::new(pattern).unwrap());
 		self
 	}
 	/// Currently converts to string with forward slashes
