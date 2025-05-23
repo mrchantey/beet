@@ -151,6 +151,11 @@ impl NonSendArenaMap {
 	}
 }
 
+const PANIC_MSG: &str =r#"
+Object does not exist in the NonSendArena. 
+It may have been manually removed by another handle, or created in a different thread.
+"#;
+
 
 pub trait Handle: Sized {
 	type ObjectType: 'static;
@@ -163,7 +168,7 @@ pub trait Handle: Sized {
 	fn get(&self) -> Ref<Self::ObjectType> {
 		self.get_arena()
 			.get(self)
-			.expect("Object has been manually removed")
+			.expect(PANIC_MSG)
 	}
 
 	/// Get a mutable reference to the object in the arena
@@ -172,7 +177,7 @@ pub trait Handle: Sized {
 	fn get_mut(&self) -> RefMut<Self::ObjectType> {
 		self.get_arena()
 			.get_mut(self)
-			.expect("Object has been manually removed")
+			.expect(PANIC_MSG)
 	}
 
 	/// Manually remove the object from the arena.
@@ -182,12 +187,12 @@ pub trait Handle: Sized {
 	fn remove(self) -> Self::ObjectType {
 		self.get_arena()
 			.remove(&self)
-			.expect("Object has been manually removed")
+			.expect(PANIC_MSG)
 	}
 	fn ref_count(&self) -> usize {
 		self.get_arena()
 			.ref_count(self.id())
-			.expect("Object has been manually removed")
+			.expect(PANIC_MSG)
 	}
 }
 impl<T: 'static> Handle for RcArenaHandle<T> {
@@ -467,7 +472,7 @@ mod tests {
 	}
 
 	#[test]
-	#[should_panic(expected = "Object has been manually removed")]
+	#[should_panic]
 	fn test_panic_on_invalid_handle_access() {
 		NonSendArena::clear();
 
@@ -484,7 +489,7 @@ mod tests {
 	}
 
 	#[test]
-	#[should_panic(expected = "Object has been manually removed")]
+	#[should_panic]
 	fn test_panic_on_invalid_handle_get_mut() {
 		NonSendArena::clear();
 
@@ -501,7 +506,7 @@ mod tests {
 	}
 
 	#[test]
-	#[should_panic(expected = "Object has been manually removed")]
+	#[should_panic]
 	fn test_panic_on_invalid_handle_remove() {
 		NonSendArena::clear();
 

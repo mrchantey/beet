@@ -30,7 +30,6 @@ strum.workspace = true
 rapidhash.workspace = true
 strum_macros.workspace = true
 prettyplease.workspace = true
-once_cell.workspace = true
 http.workspace = true
 
 #💡 html

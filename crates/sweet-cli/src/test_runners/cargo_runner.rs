@@ -76,7 +76,7 @@ impl CargoCmdExtra {
 			.unwrap_or(false);
 		if self.watch && self.build_cmd.lib && !is_upstream {
 			// watching
-			self.build_cmd.push_cargo_args("--watch".to_string());
+			self.build_cmd.trailing_args.push("--watch".to_string());
 		}
 	}
 	// 	--include '**/*.rs' \
@@ -102,6 +102,7 @@ impl CargoCmdExtra {
 	fn run_binary(&self) -> Result<()> {
 		if self.watch {
 			terminal::clear()?;
+			println!("\n🤘 sweet as 🤘\n");
 		}
 		self.build_cmd.spawn()?;
 		Ok(())

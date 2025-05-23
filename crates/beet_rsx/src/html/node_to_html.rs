@@ -19,6 +19,9 @@ fn node_to_html(node: In<Entity>, builder: Builder) -> String {
 	builder.parse(*node, &mut html);
 	html
 }
+
+
+// use a struct pattern to handle recursion
 #[rustfmt::skip]
 #[derive(SystemParam)]
 struct Builder<'w, 's> {

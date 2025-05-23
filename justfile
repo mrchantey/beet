@@ -241,15 +241,11 @@ test-all *args:
 # cargo test --workspace --all-features -- {{args}}
 
 test crate *args:
-	just watch cargo test -p {{crate}} --lib -- 																								--watch {{args}}
+	sweet test -p {{crate}} --lib --watch {{args}}
 test-e2e crate *args:
 	just watch cargo test -p {{crate}} --lib --features=e2e -- 														--e2e	--watch {{args}}
 test-doc crate *args:
 	just watch cargo test -p {{crate}} --doc 																														{{args}}
-test-integration crate test_name *args:
-	just watch cargo test -p {{crate}} --test {{test_name}} -- 																	--watch {{args}}
-test-feat crate *args:
-	just watch cargo test -p {{crate}} --lib --all-features -- 																					{{args}}
 test-wasm crate *args:
 	just watch cargo test -p {{crate}} --lib --target wasm32-unknown-unknown -- 								--watch {{args}}
 test-wasm-feat crate *args:
@@ -359,7 +355,7 @@ sweet *args:
 	cargo run -p sweet-cli -- {{args}}
 
 # Install the sweet cli
-install-sweet-cli *args:
+install-sweet *args:
 	cargo install --path crates/sweet-cli {{args}}
 
 

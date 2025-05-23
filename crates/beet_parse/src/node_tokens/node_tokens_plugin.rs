@@ -1,3 +1,5 @@
+use std::cell::RefCell;
+
 use crate::prelude::*;
 use beet_common::prelude::*;
 use bevy::ecs::schedule::SystemSet;
@@ -31,5 +33,33 @@ impl Plugin for NodeTokensPlugin {
 			node_tokens_to_rust_plugin,
 		))
 		.add_plugins((rsx_directives_plugin, web_directives_plugin));
+	}
+}
+
+
+
+thread_local! {
+	static TOKENS_APP: RefCell<Option<App>> = RefCell::new(None);
+}
+
+
+/// Access the thread local [`App`] used by the [`NodeTokensPlugin`].
+pub struct TokensApp;
+
+impl TokensApp {
+	pub fn with<O>(func: impl FnOnce(&mut App) -> O) -> O {
+		TOKENS_APP.with(|app_cell| {
+			// Initialize the app if needed
+			let mut app_ref = app_cell.borrow_mut();
+			if app_ref.is_none() {
+				let mut app = App::new();
+				app.add_plugins(NodeTokensPlugin);
+				*app_ref = Some(app);
+			}
+			
+			// Now we can safely unwrap and use the app
+			let app = app_ref.as_mut().unwrap();
+			func(app)
+		})
 	}
 }
