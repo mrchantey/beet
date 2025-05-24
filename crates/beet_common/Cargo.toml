@@ -33,6 +33,7 @@ rapidhash.workspace = true
 anyhow.workspace = true
 extend.workspace = true
 thiserror.workspace = true
+send_wrapper.workspace = true
 
 bevy = { workspace = true }
 

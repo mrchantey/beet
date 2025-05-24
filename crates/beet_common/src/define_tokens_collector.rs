@@ -31,12 +31,11 @@ macro_rules! define_token_collector {
 		impl CollectCustomTokens for $name<'_, '_> {
 			fn try_push_all(
 				&self,
-				spans: &NonSendAssets<proc_macro2::Span>,
 				items: &mut Vec<proc_macro2::TokenStream>,
 				entity: Entity,
 			) -> Result<()> {
 				$(
-					self.try_push_custom(spans, items, entity, &self.$field)?;
+					self.try_push_custom(items, entity, &self.$field)?;
 				)*
 				Ok(())
 			}

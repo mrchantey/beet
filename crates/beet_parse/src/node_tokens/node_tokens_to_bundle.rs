@@ -2,22 +2,22 @@ use crate::prelude::*;
 use beet_common::prelude::*;
 use bevy::ecs::system::SystemParam;
 use bevy::prelude::*;
-use proc_macro2::Span;
 use proc_macro2::TokenStream;
 use quote::quote;
+use send_wrapper::SendWrapper;
 use sweet::prelude::PipelineTarget;
 use syn::Expr;
 
 
-/// Marker component to be swapped out for a [`NonSendHandle<TokenStream>`],
+/// Marker component to be swapped out for a [`BundleTokens`],
 /// containing the rust tokens for the node.
 #[derive(Default, Component, Reflect)]
 #[reflect(Default, Component)]
-pub struct NodeTokensToRust {
+pub struct NodeTokensToBundle {
 	/// whether parsing errors should be excluded from the output.
 	exclude_errors: bool,
 }
-impl NodeTokensToRust {
+impl NodeTokensToBundle {
 	pub fn include_errors(mut self) -> Self {
 		self.exclude_errors = false;
 		self
@@ -29,23 +29,28 @@ impl NodeTokensToRust {
 }
 
 
-pub fn node_tokens_to_rust_plugin(app: &mut App) {
-	app.init_non_send_resource::<NonSendAssets<TokenStream>>()
-		.add_systems(Update, node_tokens_to_rust.in_set(ExportNodesStep));
+pub fn node_tokens_to_bundle_plugin(app: &mut App) {
+	app.add_systems(Update, node_tokens_to_bundle.in_set(ExportNodesStep));
 }
 
+/// A [`TokenStream`] representing a bevy bundle, usually a tuple.
+#[derive(Debug, Clone, Deref, DerefMut, Component)]
+pub struct BundleTokens(pub SendWrapper<TokenStream>);
+impl BundleTokens {
+	pub fn new(value: TokenStream) -> Self { Self(SendWrapper::new(value)) }
+	pub fn take(self) -> TokenStream { self.0.take() }
+}
 
-/// Walks children of an entity collecting into an [`impl Bundle`] [`TokenStream`].
+/// Walks children of an entity collecting into a [`BundleTokens`].
 // TODO i guess this will be a bottleneck, challenging as TokenStream is not `Send`
-fn node_tokens_to_rust(
+fn node_tokens_to_bundle(
+	_: TempNonSendMarker,
 	mut commands: Commands,
-	mut token_streams: NonSendMut<NonSendAssets<TokenStream>>,
-	mut diagnostics_map: NonSendMut<NonSendAssets<TokensDiagnostics>>,
 	builder: Builder,
 	template_roots: Populated<(
 		Entity,
-		&NodeTokensToRust,
-		Option<&NonSendHandle<TokensDiagnostics>>,
+		&NodeTokensToBundle,
+		Option<&TokensDiagnostics>,
 	)>,
 ) -> Result {
 	for (entity, settings, diagnostics) in template_roots.iter() {
@@ -53,10 +58,10 @@ fn node_tokens_to_rust(
 		if !settings.exclude_errors
 			&& let Some(diagnostics) = diagnostics
 		{
-			let errors = diagnostics_map.remove(diagnostics)?.into_tokens();
-			tokens.extend(errors);
+			let diagnostics = TokensDiagnostics((*diagnostics).clone());
+			tokens.extend(diagnostics.into_tokens());
 		}
-		commands.entity(entity).insert(token_streams.insert(tokens));
+		commands.entity(entity).insert(BundleTokens::new(tokens));
 	}
 	Ok(())
 }
@@ -67,12 +72,10 @@ fn node_tokens_to_rust(
 /// and then wrap them as `children![]` in parents.
 #[derive(SystemParam)]
 struct Builder<'w, 's> {
-	spans: NonSend<'w, NonSendAssets<Span>>,
-	exprs: NonSend<'w, NonSendAssets<Expr>>,
 	children: Query<'w, 's, &'static Children>,
 	rsx_nodes: CollectRsxNodeTokens<'w, 's>,
 	block_node_exprs:
-		Query<'w, 's, &'static ItemOf<BlockNode, NonSendHandle<Expr>>>,
+		Query<'w, 's, &'static ItemOf<BlockNode, SendWrapper<Expr>>>,
 	rsx_directives: CollectRsxDirectiveTokens<'w, 's>,
 	web_nodes: CollectWebNodeTokens<'w, 's>,
 	web_directives: CollectWebDirectiveTokens<'w, 's>,
@@ -105,19 +108,14 @@ impl Builder<'_, '_> {
 
 	fn token_stream(&self, entity: Entity) -> Result<TokenStream> {
 		let mut items = Vec::<TokenStream>::new();
-		self.rsx_nodes
-			.try_push_all(&self.spans, &mut items, entity)?;
-		self.rsx_directives
-			.try_push_all(&self.spans, &mut items, entity)?;
-		self.web_nodes
-			.try_push_all(&self.spans, &mut items, entity)?;
-		self.web_directives
-			.try_push_all(&self.spans, &mut items, entity)?;
-		self.node_attributes
-			.try_push_all(&self.spans, &mut items, entity)?;
+		self.rsx_nodes.try_push_all(&mut items, entity)?;
+		self.rsx_directives.try_push_all(&mut items, entity)?;
+		self.web_nodes.try_push_all(&mut items, entity)?;
+		self.web_directives.try_push_all(&mut items, entity)?;
+		self.node_attributes.try_push_all(&mut items, entity)?;
 		if let Ok(block) = self.block_node_exprs.get(entity) {
-			let expr = self.exprs.get(&block)?;
-			items.push(quote! {#expr.into_node_bundle()});
+			let block = &***block;
+			items.push(quote! {#block.into_node_bundle()});
 		}
 
 

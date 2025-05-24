@@ -30,7 +30,7 @@ impl Plugin for NodeTokensPlugin {
 		.add_plugins((
 			tokens_to_rstml_plugin,
 			rstml_to_node_tokens_plugin,
-			node_tokens_to_rust_plugin,
+			node_tokens_to_bundle_plugin,
 		))
 		.add_plugins((rsx_directives_plugin, web_directives_plugin));
 	}
@@ -56,7 +56,7 @@ impl TokensApp {
 				app.add_plugins(NodeTokensPlugin);
 				*app_ref = Some(app);
 			}
-			
+
 			// Now we can safely unwrap and use the app
 			let app = app_ref.as_mut().unwrap();
 			func(app)

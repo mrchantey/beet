@@ -11,10 +11,10 @@ impl NonSendArena {
 	thread_local! {
 		static ARENA: LazyLock<NonSendArenaMap> = LazyLock::new(|| NonSendArenaMap::new());
 	}
-	pub fn with<F, R>(&'static self, func: F) -> R
-	where
-		F: FnOnce(&LazyLock<NonSendArenaMap>) -> R,
-	{
+	pub fn with<F, R>(
+		&'static self,
+		func: impl FnOnce(&LazyLock<NonSendArenaMap>) -> R,
+	) -> R {
 		Self::ARENA.with(func)
 	}
 	/// Insert the object into the arena and return a handle to it
@@ -151,7 +151,7 @@ impl NonSendArenaMap {
 	}
 }
 
-const PANIC_MSG: &str =r#"
+const PANIC_MSG: &str = r#"
 Object does not exist in the NonSendArena. 
 It may have been manually removed by another handle, or created in a different thread.
 "#;
@@ -166,18 +166,14 @@ pub trait Handle: Sized {
 	/// ## Panics
 	/// Panics if the object has been manually removed.
 	fn get(&self) -> Ref<Self::ObjectType> {
-		self.get_arena()
-			.get(self)
-			.expect(PANIC_MSG)
+		self.get_arena().get(self).expect(PANIC_MSG)
 	}
 
 	/// Get a mutable reference to the object in the arena
 	/// ## Panics
 	/// Panics if the object has been manually removed.
 	fn get_mut(&self) -> RefMut<Self::ObjectType> {
-		self.get_arena()
-			.get_mut(self)
-			.expect(PANIC_MSG)
+		self.get_arena().get_mut(self).expect(PANIC_MSG)
 	}
 
 	/// Manually remove the object from the arena.
@@ -185,14 +181,10 @@ pub trait Handle: Sized {
 	/// ## Panics
 	/// Panics if the object has already been manually removed.
 	fn remove(self) -> Self::ObjectType {
-		self.get_arena()
-			.remove(&self)
-			.expect(PANIC_MSG)
+		self.get_arena().remove(&self).expect(PANIC_MSG)
 	}
 	fn ref_count(&self) -> usize {
-		self.get_arena()
-			.ref_count(self.id())
-			.expect(PANIC_MSG)
+		self.get_arena().ref_count(self.id()).expect(PANIC_MSG)
 	}
 }
 impl<T: 'static> Handle for RcArenaHandle<T> {
@@ -292,6 +284,13 @@ mod tests {
 		}
 	}
 
+	#[test]
+	fn handle_is_send() {
+		// Check if the handle is Send
+		// fn assert_send<T: Send>() {}
+		// assert_send::<RcArenaHandle<NonSendCounter>>();
+		// assert_send::<ArenaHandle<NonSendCounter>>();
+	}
 	#[test]
 	fn test_automatic_cleanup() {
 		NonSendArena::clear();

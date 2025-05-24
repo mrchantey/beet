@@ -2,6 +2,7 @@ use crate::prelude::*;
 use bevy::prelude::*;
 use proc_macro2::Span;
 use proc_macro2::TokenStream;
+use send_wrapper::SendWrapper;
 use sweet::prelude::PipelineTarget;
 
 
@@ -11,7 +12,6 @@ pub trait CollectCustomTokens {
 	/// for that component if it is present.
 	fn try_push_all(
 		&self,
-		spans: &NonSendAssets<Span>,
 		items: &mut Vec<TokenStream>,
 		entity: Entity,
 	) -> Result<()>;
@@ -20,12 +20,11 @@ pub trait CollectCustomTokens {
 	/// using its span if it exists.
 	fn try_push_custom<T: Component + IntoCustomTokens>(
 		&self,
-		spans: &NonSendAssets<Span>,
 		items: &mut Vec<TokenStream>,
 		entity: Entity,
 		query: &MaybeSpannedQuery<T>,
 	) -> Result<()> {
-		if let Some(tokens) = self.maybe_spanned_custom(spans, entity, query)? {
+		if let Some(tokens) = self.maybe_spanned_custom(entity, query)? {
 			items.push(tokens);
 		}
 		Ok(())
@@ -34,15 +33,13 @@ pub trait CollectCustomTokens {
 	/// create a token stream for an [`IntoCustomTokens`] item which may be spanned
 	fn maybe_spanned_custom<T: Component + IntoCustomTokens>(
 		&self,
-		spans: &NonSendAssets<Span>,
 		entity: Entity,
 		query: &MaybeSpannedQuery<T>,
 	) -> Result<Option<TokenStream>> {
 		if let Ok((item, span)) = query.get(entity) {
 			if let Some(span) = span {
-				let span = *spans.get(span)?;
 				let item = item.into_custom_token_stream();
-				Some(quote::quote_spanned! { span =>
+				Some(quote::quote_spanned! { ***span =>
 					#item
 				})
 			} else {
@@ -53,11 +50,7 @@ pub trait CollectCustomTokens {
 		}
 		.xok()
 	}
-
 }
 
-pub type MaybeSpannedQuery<'w, 's, T> = Query<
-	'w,
-	's,
-	(&'static T, Option<&'static ItemOf<T, NonSendHandle<Span>>>),
->;
+pub type MaybeSpannedQuery<'w, 's, T> =
+	Query<'w, 's, (&'static T, Option<&'static ItemOf<T, SendWrapper<Span>>>)>;

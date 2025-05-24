@@ -92,7 +92,9 @@ impl CargoCmdExtra {
 			if !ev.has_mutate() {
 				return Ok(());
 			}
-			self.run_binary()?;
+			// its ok if the run failed, because its
+			// a command we assume stderr has already logged, so its .ok()
+			self.run_binary().ok();
 			Ok(())
 		})
 		.await?;

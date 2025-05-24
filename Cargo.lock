@@ -817,6 +817,7 @@ dependencies = [
  "quote",
  "rapidhash",
  "ron",
+ "send_wrapper",
  "serde",
  "sweet",
  "syn 2.0.101",
@@ -961,6 +962,7 @@ dependencies = [
  "rayon",
  "ron",
  "rstml",
+ "send_wrapper",
  "sweet",
  "syn 2.0.101",
 ]

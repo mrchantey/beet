@@ -6,6 +6,7 @@ use heck::ToUpperCamelCase;
 use proc_macro2::Span;
 use proc_macro2::TokenStream;
 use quote::quote;
+use send_wrapper::SendWrapper;
 use sweet::prelude::PipelineTarget;
 use syn::Expr;
 use syn::ExprClosure;
@@ -19,19 +20,19 @@ use syn::parse_quote;
 #[rustfmt::skip]
 #[derive(SystemParam)]
 pub struct CollectNodeAttributes<'w, 's> {
+	_non_send:TempNonSendMarker<'w>,	
 	attr_lits: Query<'w, 's, &'static AttributeLit>,
 	elements: Query<'w, 's, Option<&'static Attributes>, With<ElementNode>>,
 	templates: Query<'w,'s,
 		(
 			&'static NodeTag,
-			Option<&'static ItemOf<NodeTag, NonSendHandle<Span>>>,
+			Option<&'static ItemOf<NodeTag, SendWrapper<Span>>>,
 			&'static ItemOf<TemplateNode,RustyTracker>, 
 			Option<&'static Attributes>,
 		),
 		With<TemplateNode>,
 	>,
 	client_directives: Query<'w, 's, (), With<ClientIslandDirective>>,
-	exprs_map: NonSend<'w, NonSendAssets<Expr>>,
 	exprs: MaybeSpannedQuery<'w, 's, AttributeExpr>,
 	keys: MaybeSpannedQuery<'w, 's, AttributeKeyExpr>,
 	vals: MaybeSpannedQuery<'w, 's, AttributeValueExpr>,
@@ -40,12 +41,11 @@ pub struct CollectNodeAttributes<'w, 's> {
 impl CollectCustomTokens for CollectNodeAttributes<'_, '_> {
 	fn try_push_all(
 		&self,
-		spans: &NonSendAssets<proc_macro2::Span>,
 		items: &mut Vec<proc_macro2::TokenStream>,
 		entity: Entity,
 	) -> Result<()> {
-		self.handle_element(spans, items, entity)?;
-		self.handle_template(spans, items, entity)?;
+		self.handle_element(items, entity)?;
+		self.handle_template(items, entity)?;
 		Ok(())
 	}
 }
@@ -53,7 +53,6 @@ impl CollectCustomTokens for CollectNodeAttributes<'_, '_> {
 impl CollectNodeAttributes<'_, '_> {
 	fn handle_element(
 		&self,
-		spans: &NonSendAssets<proc_macro2::Span>,
 		entity_components: &mut Vec<TokenStream>,
 		entity: Entity,
 	) -> Result<()> {
@@ -66,7 +65,7 @@ impl CollectNodeAttributes<'_, '_> {
 		if let Some(attrs) = attributes {
 			for attr_entity in attrs.iter() {
 				if let Some(event_func) =
-					self.try_event_observer(spans, attr_entity)?
+					self.try_event_observer(attr_entity)?
 				{
 					// in the case of an event the value is an observer added to the parent
 					entity_components.push(event_func);
@@ -76,29 +75,20 @@ impl CollectNodeAttributes<'_, '_> {
 				let mut attr_components = Vec::new();
 				// blocks ie <span {Vec3::new()} />
 				// inserted directly as an entity component
-				if let Some(attr) = self.maybe_spanned_expr(
-					&self.exprs_map,
-					spans,
-					attr_entity,
-					&self.exprs,
-				)? {
+				if let Some(attr) =
+					self.maybe_spanned_expr(attr_entity, &self.exprs)?
+				{
 					entity_components.push(quote! {#attr.into_node_bundle()});
 				}
 
-				if let Some(attr) = self.maybe_spanned_expr(
-					&self.exprs_map,
-					spans,
-					attr_entity,
-					&self.keys,
-				)? {
+				if let Some(attr) =
+					self.maybe_spanned_expr(attr_entity, &self.keys)?
+				{
 					attr_components.push(quote! {#attr.into_attr_key_bundle()});
 				}
-				if let Some(attr) = self.maybe_spanned_expr(
-					&self.exprs_map,
-					spans,
-					attr_entity,
-					&self.vals,
-				)? {
+				if let Some(attr) =
+					self.maybe_spanned_expr(attr_entity, &self.vals)?
+				{
 					attr_components.push(quote! {#attr.into_attr_val_bundle()});
 				}
 
@@ -120,21 +110,18 @@ impl CollectNodeAttributes<'_, '_> {
 		}
 		Ok(())
 	}
-	/// create a token stream for a [`NonSendHandle<syn::Expr>`] expression which may be spanned
+	/// create a token stream for a [`SendWrapper<syn::Expr>`] expression which may be spanned
 	fn maybe_spanned_expr<
-		T: Component + std::ops::Deref<Target = NonSendHandle<Expr>>,
+		T: Component + std::ops::Deref<Target = SendWrapper<Expr>>,
 	>(
 		&self,
-		exprs_map: &NonSendAssets<Expr>,
-		spans: &NonSendAssets<Span>,
 		entity: Entity,
 		query: &MaybeSpannedQuery<T>,
 	) -> Result<Option<Expr>> {
 		if let Ok((item, span)) = query.get(entity) {
-			let item = exprs_map.get(item.deref())?.clone();
+			let item = (***item).clone();
 			if let Some(span) = span {
-				let span = *spans.get(span)?;
-				Some(syn::parse_quote_spanned! { span =>
+				Some(syn::parse_quote_spanned! { ***span =>
 					#item
 				})
 			} else {
@@ -154,15 +141,9 @@ impl CollectNodeAttributes<'_, '_> {
 	/// - Value is not a string, (allows for verbatim js handlers)
 	fn try_event_observer(
 		&self,
-		spans: &NonSendAssets<Span>,
 		entity: Entity,
 	) -> Result<Option<TokenStream>> {
-		let Some(mut attr) = self.maybe_spanned_expr(
-			&self.exprs_map,
-			spans,
-			entity,
-			&self.vals,
-		)?
+		let Some(mut attr) = self.maybe_spanned_expr(entity, &self.vals)?
 		else {
 			return Ok(None);
 		};
@@ -181,13 +162,14 @@ impl CollectNodeAttributes<'_, '_> {
 			return Ok(None);
 		};
 
-		let span = if let Some(span) =
-			self.keys.get(entity).map(|s| s.1).ok().flatten()
-		{
-			spans.get(span).map(|s| *s)?
-		} else {
-			Span::call_site()
-		};
+		let span = self
+			.keys
+			.get(entity)
+			.map(|s| s.1)
+			.ok()
+			.flatten()
+			.map(|s| ***s)
+			.unwrap_or(Span::call_site());
 
 		let suffix = ToUpperCamelCase::to_upper_camel_case(suffix);
 
@@ -251,7 +233,6 @@ impl CollectNodeAttributes<'_, '_> {
 	#[allow(unused)]
 	fn handle_template(
 		&self,
-		spans: &NonSendAssets<proc_macro2::Span>,
 		entity_components: &mut Vec<TokenStream>,
 		entity: Entity,
 	) -> Result<()> {
@@ -265,29 +246,18 @@ impl CollectNodeAttributes<'_, '_> {
 
 		if let Some(attrs) = attributes {
 			for attr_entity in attrs.iter() {
-				if let Some(attr) = self.maybe_spanned_expr(
-					&self.exprs_map,
-					spans,
-					attr_entity,
-					&self.exprs,
-				)? {
+				if let Some(attr) =
+					self.maybe_spanned_expr(attr_entity, &self.exprs)?
+				{
 					entity_components.push(quote! {#attr.into_node_bundle()});
 				}
 
-				if let Some(key) = self.maybe_spanned_expr(
-					&self.exprs_map,
-					spans,
-					attr_entity,
-					&self.keys,
-				)? && let Some(key) = expr_to_ident(&key)
+				if let Some(key) =
+					self.maybe_spanned_expr(attr_entity, &self.keys)?
+					&& let Some(key) = expr_to_ident(&key)
 				{
 					let value = self
-						.maybe_spanned_expr(
-							&self.exprs_map,
-							spans,
-							attr_entity,
-							&self.vals,
-						)?
+						.maybe_spanned_expr(attr_entity, &self.vals)?
 						.unwrap_or_else(|| {
 							// for templates no value means a bool flag
 							syn::parse_quote! {true}
@@ -299,9 +269,7 @@ impl CollectNodeAttributes<'_, '_> {
 
 		let template_ident = Ident::new(
 			&node_tag.as_str(),
-			node_tag_span
-				.map(|s| spans.get(s).map(|s| *s))
-				.unwrap_or(Ok(Span::call_site()))?,
+			node_tag_span.map(|s| ***s).unwrap_or(Span::call_site()),
 		);
 
 		// we create an inner tuple, so that we can define the template

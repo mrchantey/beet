@@ -1,11 +1,11 @@
 use anyhow::Result;
-use beet_common::prelude::*;
 use bevy::prelude::*;
 use proc_macro2::Span;
 use proc_macro2::TokenStream;
 use quote::quote;
 use quote::quote_spanned;
 use rapidhash::RapidHashSet;
+use send_wrapper::SendWrapper;
 use std::sync::LazyLock;
 use sweet::prelude::*;
 
@@ -14,16 +14,13 @@ use sweet::prelude::*;
 // Also multiple tags with same name can be present,
 // because we need to mark each of them.
 #[derive(Default, Deref, DerefMut, Component)]
-pub struct CollectedElements(Vec<(String, NonSendHandle<Span>)>);
+pub struct CollectedElements(Vec<(String, SendWrapper<Span>)>);
 
 
 impl CollectedElements {
 	// TODO this is from the rstml example, havent yet looked into how to properly
 	// implement it
-	pub fn into_docs(
-		&self,
-		span_map: &NonSendAssets<Span>,
-	) -> Result<Vec<TokenStream>> {
+	pub fn into_docs(&self) -> Result<Vec<TokenStream>> {
 		// Mark some of elements as type,
 		// and other as elements as fn in crate::docs,
 		// to give an example how to link tag with docs.
@@ -37,12 +34,11 @@ impl CollectedElements {
 		self.0
 			.iter()
 			.map(|(name, span)| {
-				let span = span_map.get(span)?;
 				if ELEMENTS_AS_TYPE.contains(name.as_str()) {
-					let element = quote_spanned!(*span => enum);
+					let element = quote_spanned!(**span => enum);
 					quote!({#element X{}}).xok()
 				} else {
-					let element = quote_spanned!(*span => element);
+					let element = quote_spanned!(**span => element);
 					quote!(let _ = crate::docs::#element).xok()
 				}
 			})

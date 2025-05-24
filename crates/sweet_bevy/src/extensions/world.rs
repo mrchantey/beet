@@ -32,4 +32,16 @@ pub impl<W: IntoWorldMut> W {
 		let world = self.into_world_mut();
 		world.query::<D>().iter_mut(world).collect::<Vec<_>>()
 	}
+
+	/// Shorthand for removing all components of a given type.
+	fn remove<'a, C: Component>(&'a mut self) -> Vec<C> {
+		let world = self.into_world_mut();
+		world
+			.query_filtered::<Entity, With<C>>()
+			.iter(world)
+			.collect::<Vec<_>>()
+			.into_iter()
+			.filter_map(|entity| world.entity_mut(entity).take::<C>())
+			.collect()
+	}
 }

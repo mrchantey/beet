@@ -12,6 +12,7 @@ use rstml::node::NodeAttribute;
 use rstml::node::NodeBlock;
 use rstml::node::NodeElement;
 use rstml::node::NodeName;
+use send_wrapper::SendWrapper;
 use sweet::prelude::WorkspacePathBuf;
 use syn::Expr;
 use syn::ExprBlock;
@@ -20,37 +21,31 @@ use syn::Lit;
 use syn::LitStr;
 use syn::spanned::Spanned;
 
+
+
 pub fn rstml_to_node_tokens_plugin(app: &mut App) {
-	app.init_non_send_resource::<NonSendAssets<Span>>()
-		.init_non_send_resource::<NonSendAssets<Expr>>()
-		.init_non_send_resource::<NonSendAssets<CollectedElements>>()
-		.add_systems(
-			Update,
-			rstml_to_node_tokens
-				.in_set(ImportNodesStep)
-				.after(super::tokens_to_rstml),
-		);
+	app.add_systems(
+		Update,
+		rstml_to_node_tokens
+			.in_set(ImportNodesStep)
+			.after(super::tokens_to_rstml),
+	);
 }
 
 /// Replace [`RstmlNodes`] with children representing each [`rstml::Node`].
-pub(crate) fn rstml_to_node_tokens(
+fn rstml_to_node_tokens(
+	_: TempNonSendMarker,
 	mut commands: Commands,
 	rstml_config: Res<RstmlConfig>,
-	mut spans_map: NonSendMut<NonSendAssets<Span>>,
-	mut expr_map: NonSendMut<NonSendAssets<Expr>>,
-	mut diagnostics_map: NonSendMut<NonSendAssets<TokensDiagnostics>>,
-	mut nodes_map: NonSendMut<NonSendAssets<RstmlNodes>>,
-	mut collected_elements_map: NonSendMut<NonSendAssets<CollectedElements>>,
-	query: Populated<(
+	mut query: Populated<(
 		Entity,
 		&SourceFile,
-		&NonSendHandle<RstmlNodes>,
-		&NonSendHandle<TokensDiagnostics>,
+		&RstmlNodes,
+		&mut TokensDiagnostics,
 	)>,
 ) -> Result {
-	for (entity, source_file, rstml_nodes, diagnostics) in query.iter() {
-		let rstml_nodes = nodes_map.remove(rstml_nodes)?;
-		let diagnostics = diagnostics_map.get_mut(diagnostics)?;
+	for (entity, source_file, rstml_nodes, diagnostics) in query.iter_mut() {
+		let rstml_nodes = rstml_nodes.clone();
 
 		let mut collected_elements = CollectedElements::default();
 
@@ -61,14 +56,12 @@ pub(crate) fn rstml_to_node_tokens(
 			diagnostics,
 			commands: &mut commands,
 			rusty_tracker: Default::default(),
-			spans_map: &mut spans_map,
-			expr_map: &mut expr_map,
 		}
-		.insert(entity, rstml_nodes);
+		.map_to_children(entity, rstml_nodes);
 		commands
 			.entity(entity)
-			.remove::<NonSendHandle<RstmlNodes>>()
-			.insert(collected_elements_map.insert(collected_elements));
+			.remove::<RstmlNodes>()
+			.insert(collected_elements);
 	}
 	Ok(())
 }
@@ -78,16 +71,14 @@ struct RstmlToWorld<'w, 's, 'a> {
 	file: &'a WorkspacePathBuf,
 	rstml_config: &'a RstmlConfig,
 	collected_elements: &'a mut CollectedElements,
-	diagnostics: &'a mut TokensDiagnostics,
+	diagnostics: Mut<'a, TokensDiagnostics>,
 	commands: &'a mut Commands<'w, 's>,
 	rusty_tracker: RustyTrackerBuilder,
-	spans_map: &'a mut NonSendAssets<Span>,
-	expr_map: &'a mut NonSendAssets<Expr>,
 }
 
 impl<'w, 's, 'a> RstmlToWorld<'w, 's, 'a> {
 	/// Parse all nodes in [`RstmlNodes`] and add their tokens as children
-	fn insert(&mut self, root: Entity, nodes: RstmlNodes) {
+	fn map_to_children(&mut self, root: Entity, nodes: RstmlNodes) {
 		let span = if nodes.len() == 1 {
 			nodes.first().unwrap().span()
 		} else {
@@ -100,7 +91,7 @@ impl<'w, 's, 'a> RstmlToWorld<'w, 's, 'a> {
 				)
 				.unwrap_or(Span::call_site())
 		};
-		let children = self.map_nodes(nodes.into_inner());
+		let children = self.map_nodes(nodes.take());
 		self.commands
 			.entity(root)
 			.insert(ItemOf::<(), _>::new(FileSpan::new_from_span(
@@ -122,7 +113,7 @@ impl<'w, 's, 'a> RstmlToWorld<'w, 's, 'a> {
 
 
 	fn map_node(&mut self, node: Node<RstmlCustomNode>) -> Entity {
-		let node_span = self.spans_map.insert(node.span());
+		let node_span = SendWrapper::new(node.span());
 		let file_span = FileSpan::new_from_span(self.file.clone(), &node);
 		// let spans = (node_span, file_span);
 		match node {
@@ -171,19 +162,18 @@ impl<'w, 's, 'a> RstmlToWorld<'w, 's, 'a> {
 			}
 			Node::Block(NodeBlock::ValidBlock(block)) => {
 				let tracker = self.rusty_tracker.next_tracker(&block);
-				let expr_handle =
-					self.expr_map.insert(Expr::Block(ExprBlock {
-						attrs: Vec::new(),
-						label: None,
-						block,
-					}));
+				let expr = SendWrapper::new(Expr::Block(ExprBlock {
+					attrs: Vec::new(),
+					label: None,
+					block,
+				}));
 				self.commands
 					.spawn((
 						BlockNode,
 						ItemOf::<BlockNode, _>::new(file_span),
 						ItemOf::<BlockNode, _>::new(node_span),
 						ItemOf::<BlockNode, _>::new(tracker),
-						ItemOf::<BlockNode, _>::new(expr_handle),
+						ItemOf::<BlockNode, _>::new(expr),
 					))
 					.id()
 			}
@@ -212,7 +202,8 @@ impl<'w, 's, 'a> RstmlToWorld<'w, 's, 'a> {
 				let (tag_str, tag_file_span, tag_span) =
 					self.parse_node_name(&open_tag.name);
 
-				self.collected_elements.push((tag_str.clone(), tag_span));
+				self.collected_elements
+					.push((tag_str.clone(), tag_span.clone()));
 				let self_closing = close_tag.is_none();
 				if let Some(close_tag) = close_tag.as_ref() {
 					let close_tag = self.parse_node_name(&close_tag.name);
@@ -283,24 +274,22 @@ impl<'w, 's, 'a> RstmlToWorld<'w, 's, 'a> {
 			NodeAttribute::Block(NodeBlock::ValidBlock(block)) => {
 				let block_file_span =
 					FileSpan::new_from_span(self.file.clone(), &block);
-				let block_span = self.spans_map.insert(block.span());
+				let block_span = SendWrapper::new(block.span());
 				// block attribute, ie `<div {is_hidden}>`
 				self.commands.spawn((
 					AttributeOf::new(parent),
 					ItemOf::<AttributeExpr, _>::new(block_file_span),
 					ItemOf::<AttributeExpr, _>::new(block_span),
-					AttributeExpr::new(self.expr_map.insert(Expr::Block(
-						ExprBlock {
-							attrs: Vec::new(),
-							label: None,
-							block,
-						},
-					))),
+					AttributeExpr::new(Expr::Block(ExprBlock {
+						attrs: Vec::new(),
+						label: None,
+						block,
+					})),
 				));
 			}
 			NodeAttribute::Attribute(attr) => {
 				let key_expr = self.node_name_to_expr(attr.key);
-				let key_expr_span = self.spans_map.insert(key_expr.span());
+				let key_expr_span = SendWrapper::new(key_expr.span());
 				let key_expr_file_span =
 					FileSpan::new_from_span(self.file.clone(), &key_expr);
 
@@ -319,9 +308,7 @@ impl<'w, 's, 'a> RstmlToWorld<'w, 's, 'a> {
 					} else {
 						None
 					};
-				entity.insert(AttributeKeyExpr::new(
-					self.expr_map.insert(key_expr),
-				));
+				entity.insert(AttributeKeyExpr::new(key_expr));
 
 				let mut val_lit = None;
 
@@ -330,7 +317,7 @@ impl<'w, 's, 'a> RstmlToWorld<'w, 's, 'a> {
 						KVAttributeValue::Expr(val_expr) => {
 							// key-value attribute, ie `<div hidden=true>`
 							let val_expr_span =
-								self.spans_map.insert(val_expr.span());
+								SendWrapper::new(val_expr.span());
 							let val_expr_file_span = FileSpan::new_from_span(
 								self.file.clone(),
 								&val_expr,
@@ -342,9 +329,7 @@ impl<'w, 's, 'a> RstmlToWorld<'w, 's, 'a> {
 							}
 
 							entity.insert((
-								AttributeValueExpr::new(
-									self.expr_map.insert(val_expr),
-								),
+								AttributeValueExpr::new(val_expr),
 								ItemOf::<AttributeValueExpr, _>::new(
 									val_expr_file_span,
 								),
@@ -378,7 +363,7 @@ impl<'w, 's, 'a> RstmlToWorld<'w, 's, 'a> {
 	fn parse_node_name(
 		&mut self,
 		name: &NodeName,
-	) -> (String, FileSpan, NonSendHandle<Span>) {
+	) -> (String, FileSpan, SendWrapper<Span>) {
 		match name {
 			NodeName::Block(block) => {
 				self.diagnostics.push(Diagnostic::spanned(
@@ -393,7 +378,7 @@ impl<'w, 's, 'a> RstmlToWorld<'w, 's, 'a> {
 		(
 			key_str,
 			FileSpan::new_from_span(self.file.clone(), name),
-			self.spans_map.insert(name.span()),
+			SendWrapper::new(name.span()),
 		)
 	}
 	fn node_name_to_expr(&mut self, name: NodeName) -> Expr {
@@ -446,9 +431,10 @@ mod test {
 		App::new()
 			.add_plugins((tokens_to_rstml_plugin, rstml_to_node_tokens_plugin))
 			.xtap(|app| {
-				app.world_mut()
-					.spawn(SourceFile::new(WorkspacePathBuf::new(file!())))
-					.insert_non_send(RstmlTokens::new(tokens));
+				app.world_mut().spawn((
+					SourceFile::new(WorkspacePathBuf::new(file!())),
+					RstmlTokens::new(tokens),
+				));
 			})
 			.update_then()
 			.xmap(std::mem::take)

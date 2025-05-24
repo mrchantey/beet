@@ -1,2 +1,2 @@
-mod non_send_assets;
-pub use non_send_assets::*;
+mod non_send_marker;
+pub use non_send_marker::*;
