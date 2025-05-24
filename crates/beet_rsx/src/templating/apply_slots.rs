@@ -12,14 +12,14 @@ pub struct ApplySlotsStep;
 /// Slotting is the process of traversing the [RsxComponent::slot_children]
 /// and applying them to the [RsxComponent::node] in the corresponding slots.
 ///
-/// ```ignore
+/// ## Example
+/// ```
 /// # use beet_rsx::as_beet::*;
-///
-/// #[derive(Node)]
-/// struct MyComponent;
+/// # use bevy::prelude::*;
 ///
 ///
-/// fn my_component(_: MyComponent)->WebNode {
+/// #[template]
+/// fn MyComponent() -> impl Bundle {
 /// 	rsx!{
 /// 		<html>
 /// 			<slot name="header"/>
@@ -27,31 +27,27 @@ pub struct ApplySlotsStep;
 /// 		</html>
 /// 	}
 /// }
-///
-/// assert_eq!(rsx!{
-/// 	<MyComponent>
-///  		<div slot="header">Header</div>
-/// 		<div>Default</div>
-///  	</MyComponent>
-/// }.xpipe(RsxToHtmlString::default()).unwrap(),
-/// "<html><div>Header</div><div>Default</div></html>");
+/// assert_eq!(
+/// 	bundle_to_html(rsx!{
+/// 		<MyComponent>
+///  			<div slot="header">Header</div>
+/// 			<div>Default</div>
+///  		</MyComponent>
+/// 	}),
+/// 	"<html><div>Header</div><div>Default</div></html>"
+/// );
 ///
 /// ```
 ///
 /// ## Slot Rules
 ///
-/// - Slot children will be inserted into the first slot with a matching name,
-/// 	found via [RsxVisitor] dfs traversal.
-/// - Only top level slots, fragments aside, are supported
-/// - Any unconsumed slot children will be returned in an error
-/// - For unnamed slots `<div/>`, they will be inserted in the components unnamed
-/// 	<sag.
-/// - Comnot recursively searched because they would steal the slot
-/// 	from following internal siblings.
+/// - Slot children will be inserted into the first slot with a matching name
+/// - Only top level slots are supported to avoid 'slot stealing'
+/// - Any unconsumed slot children will return in an error
+/// - For unnamed slots `<div/>`, they will be inserted in the components default <slot/>
 /// - All <slot> elements are replaced with a <fragment> element containing the
 /// 	slot children.
-/// - All slot="foo" attributes are removed.
-/// - 'Slot Transfers' are allowed, ie <slot name="header" slot="default"/>
+/// - 'Slot Transfers' are supported, ie <slot name="header" slot="default"/>
 ///   see https://docs.astro.build/en/basics/astro-components/#transferring-slots
 pub fn apply_slots_plugin(app: &mut App) {
 	app.add_systems(Update, apply_slots.in_set(ApplySlotsStep));

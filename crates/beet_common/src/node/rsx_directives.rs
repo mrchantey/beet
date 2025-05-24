@@ -70,28 +70,26 @@ impl SlotTarget {
 // convert all nodes with the `slot` tag into a `SlotTarget`
 fn slot_target_directive(
 	mut commands: Commands,
-	query: Populated<(Entity, &NodeTag, Option<&Attributes>)>,
+	attributes: Query<&Attributes>,
+	query: Populated<(Entity, &NodeTag)>,
 	attributes_query: Query<(Entity, &AttributeLit)>,
 ) {
-	for (node_ent, node_tag, attributes) in query.iter() {
+	for (node_ent, node_tag) in query.iter() {
 		if **node_tag != "slot" {
 			continue;
 		}
 		let target = attributes
-			.map(|a| {
-				a.iter()
-					.filter_map(|a| attributes_query.get(a).ok())
-					.find(|(_, lit)| lit.key == "name")
-					.map(|(entity, lit)| {
-						commands.entity(entity).despawn();
-						if let Some(value) = lit.value.as_ref() {
-							SlotTarget::Named(value.to_string())
-						} else {
-							SlotTarget::Default
-						}
-					})
+			.iter_descendants(node_ent)
+			.filter_map(|a| attributes_query.get(a).ok())
+			.find(|(_, lit)| lit.key == "name")
+			.map(|(entity, lit)| {
+				commands.entity(entity).despawn();
+				if let Some(value) = lit.value.as_ref() {
+					SlotTarget::Named(value.to_string())
+				} else {
+					SlotTarget::Default
+				}
 			})
-			.flatten()
 			.unwrap_or(SlotTarget::Default);
 
 		commands.entity(node_ent).remove::<NodeTag>().insert(target);
