@@ -4,11 +4,7 @@ use beet_common::prelude::*;
 use beet_rsx_combinator::prelude::*;
 use bevy::prelude::*;
 use proc_macro2::TokenStream;
-use send_wrapper::SendWrapper;
 use sweet::prelude::*;
-use syn::Block;
-use syn::Expr;
-use syn::ExprBlock;
 
 pub fn combinator_to_bundle(
 	tokens: &str,
@@ -43,11 +39,6 @@ pub fn combinator_to_bundle(
 #[derive(Default, Component, Deref, Reflect)]
 #[reflect(Default, Component)]
 pub struct CombinatorToNodeTokens(pub String);
-
-
-
-
-
 
 
 pub fn combinator_to_node_tokens_plugin(app: &mut App) {
@@ -97,13 +88,15 @@ impl<'w, 's, 'a> Builder<'w, 's, 'a> {
 				remaining
 			));
 		}
-		let children = self.rsx_parsed_expression(expr)?;
+		// add as a child to keep consistency with rstml_to_tokens
+		let child = self.commands.spawn_empty().id();
+		self.rsx_parsed_expression(child, expr)?;
 		self.commands
 			.entity(root)
 			.insert(ItemOf::<(), _>::new(FileSpan::new_for_file(
 				&self.source_file,
 			)))
-			.add_children(&children);
+			.add_child(child);
 		Ok(())
 	}
 
@@ -111,53 +104,39 @@ impl<'w, 's, 'a> Builder<'w, 's, 'a> {
 	fn default_file_span(&self) -> FileSpan {
 		FileSpan::new_for_file(&self.source_file)
 	}
-
+	/// insert a [`CombinatorExpr`] into the entity
 	fn rsx_parsed_expression(
 		&mut self,
+		entity: Entity,
 		expr: RsxParsedExpression,
-	) -> Result<Vec<Entity>> {
-		expr.inner()
+	) -> Result<()> {
+		let partials = expr
+			.inner()
 			.into_iter()
 			.map(|item| self.rsx_tokens_or_element(item))
-			.collect()
+			.collect::<Result<Vec<_>>>()?;
+
+		let file_span = self.default_file_span();
+		self.commands.entity(entity).insert((
+			CombinatorExpr(partials),
+			ItemOf::<CombinatorExpr, _>::new(file_span),
+		));
+		Ok(())
 	}
 
 	fn rsx_tokens_or_element(
 		&mut self,
 		tokens: RsxTokensOrElement,
-	) -> Result<Entity> {
+	) -> Result<CombinatorExprPartial> {
 		match tokens {
 			RsxTokensOrElement::Tokens(tokens) => {
-				// TODO this is incorrect, what we need is a new type,
-				// like a PartialBlock or something that allows for interspersed
-				// tokens and elements
-				let block: Block = syn::parse_str(&format!("{{{}}}", &tokens))
-					.map_err(|e| {
-						anyhow::anyhow!(
-							"\nWarning: This parser is a wip so the error may not be accurate \n\
-									Failed to parse block:\nblock:{}\nerror:{}",
-							tokens,
-							e.to_string()
-						)
-					})?;
-				let tracker = self.rusty_tracker.next_tracker(&block);
-				let expr = SendWrapper::new(Expr::Block(ExprBlock {
-					attrs: Vec::new(),
-					label: None,
-					block,
-				}));
-				self.commands
-					.spawn((
-						BlockNode,
-						ItemOf::<BlockNode, _>::new(self.default_file_span()),
-						ItemOf::<BlockNode, _>::new(tracker),
-						ItemOf::<BlockNode, _>::new(expr),
-					))
-					.id()
-					.xok()
+				CombinatorExprPartial::Tokens(tokens)
 			}
-			RsxTokensOrElement::Element(el) => self.rsx_element(el),
+			RsxTokensOrElement::Element(el) => {
+				CombinatorExprPartial::Element(self.rsx_element(el)?)
+			}
 		}
+		.xok()
 	}
 
 	fn rsx_element(&mut self, element: RsxElement) -> Result<Entity> {
@@ -227,18 +206,18 @@ impl<'w, 's, 'a> Builder<'w, 's, 'a> {
 				.into_iter()
 				.map(|child| self.rsx_child(child))
 				.collect::<Result<Vec<_>>>()?
-				.into_iter()
-				.flatten()
-				.collect::<Vec<_>>()
 				.xok()
 		}
 	}
-	fn rsx_child(&mut self, child: RsxChild) -> Result<Vec<Entity>> {
+
+	fn rsx_child(&mut self, child: RsxChild) -> Result<Entity> {
 		match child {
-			RsxChild::Element(el) => vec![self.rsx_element(el)?].xok(),
-			RsxChild::Text(text) => vec![self.rsx_text(text)?].xok(),
+			RsxChild::Element(el) => self.rsx_element(el),
+			RsxChild::Text(text) => self.rsx_text(text),
 			RsxChild::CodeBlock(code_block) => {
-				self.rsx_parsed_expression(code_block)
+				let entity = self.commands.spawn_empty().id();
+				self.rsx_parsed_expression(entity, code_block)?;
+				entity.xok()
 			}
 		}
 	}
@@ -260,83 +239,67 @@ impl<'w, 's, 'a> Builder<'w, 's, 'a> {
 	) -> Result<()> {
 		match attribute {
 			RsxAttribute::Spread(value) => {
-				let children = self.rsx_parsed_expression(value)?;
-				self.commands
+				let entity = self
+					.commands
 					.spawn((
 						AttributeOf::new(parent),
 						ItemOf::<AttributeExpr, _>::new(
 							self.default_file_span(),
 						),
-						// AttributeExpr::new(Expr::Block(ExprBlock {
-						// 	attrs: Vec::new(),
-						// 	label: None,
-						// 	block,
-						// })),
 					))
-					.add_children(&children);
+					.id();
+				self.rsx_parsed_expression(entity, value)?;
 			}
 			RsxAttribute::Named(name, value) => {
 				let key = name.to_string();
-
-
-				let (val_lit, val_expr, children) =
-					self.rsx_attribute_value(value)?;
-
-				// println!("Attribute: {} = {:?}", key, value);
 
 				let mut entity = self.commands.spawn((
 					AttributeOf::new(parent),
 					AttributeKeyExpr::new(syn::parse_quote!(#key)),
 					ItemOf::<AttributeOf, _>::new(self.default_file_span()),
-					AttributeLit::new(key.clone(), val_lit),
 				));
-				if !children.is_empty() {
-					entity.add_children(&children);
+
+				match value {
+					RsxAttributeValue::Default => {
+						entity.insert(AttributeLit::new(key, None));
+					}
+					RsxAttributeValue::Boolean(val) => {
+						let val = val.0;
+						entity.insert((
+							AttributeLit::new(key, Some(val.to_string())),
+							AttributeValueExpr::new(syn::parse_quote! {#val}),
+						));
+					}
+					RsxAttributeValue::Number(val) => {
+						let val = val.0;
+						entity.insert((
+							AttributeLit::new(key, Some(val.to_string())),
+							AttributeValueExpr::new(syn::parse_quote! {#val}),
+						));
+					}
+					RsxAttributeValue::Str(val) => {
+						let val = val.to_string_unquoted();
+						entity.insert((
+							AttributeLit::new(key, Some(val.to_string())),
+							AttributeValueExpr::new(syn::parse_quote! {#val}),
+						));
+					}
+					RsxAttributeValue::Element(value) => {
+						let id = entity.id();
+						let child = self.rsx_element(value)?;
+						self.commands.entity(id).insert((
+							CombinatorExpr(vec![
+								CombinatorExprPartial::Element(child),
+							]),
+							AttributeLit::new(key, None),
+						));
+					}
+					RsxAttributeValue::CodeBlock(value) => {
+						entity.insert(AttributeLit::new(key, None));
+						let id = entity.id();
+						self.rsx_parsed_expression(id, value)?;
+					}
 				}
-				if let Some(expr) = val_expr {
-					entity.insert(AttributeValueExpr::new(expr));
-				}
-			}
-		}
-		.xok()
-	}
-	fn rsx_attribute_value(
-		&mut self,
-		value: RsxAttributeValue,
-	) -> Result<(Option<String>, Option<Expr>, Vec<Entity>)> {
-		match value {
-			RsxAttributeValue::Default => (None, None, Vec::default()),
-			RsxAttributeValue::Boolean(val) => {
-				let val = val.0;
-				(
-					Some(val.to_string()),
-					Some(syn::parse_quote!(#val)),
-					Vec::default(),
-				)
-			}
-			RsxAttributeValue::Number(val) => {
-				let val = val.0;
-				(
-					Some(val.to_string()),
-					Some(syn::parse_quote!(#val)),
-					Vec::default(),
-				)
-			}
-			RsxAttributeValue::Str(val) => {
-				let val = val.to_string_unquoted();
-				(
-					Some(val.to_string()),
-					Some(syn::parse_quote!(#val)),
-					Vec::default(),
-				)
-			}
-			RsxAttributeValue::Element(value) => {
-				let child = self.rsx_element(value)?;
-				(None, None, vec![child])
-			}
-			RsxAttributeValue::CodeBlock(value) => {
-				let children = self.rsx_parsed_expression(value)?;
-				(None, None, children)
 			}
 		}
 		.xok()
@@ -360,24 +323,24 @@ mod test {
 	#[test]
 	fn element() {
 		"<br/>".xmap(parse).to_be(
-			quote! {(
+			quote! {{(
 				NodeTag(String::from("br")),
 				ElementNode{self_closing:true}
-			)}
+			)}}
 			.to_string(),
 		);
 	}
 	#[test]
 	fn unclosed() {
 		"<div align=\"center\" />".xmap(parse).to_be(
-			quote! {(
+			quote! {{(
 				NodeTag(String::from("div")),
 				ElementNode{self_closing:true},
 				related!(Attributes[(
 					"align".into_attr_key_bundle(),
 					"center".into_attr_val_bundle()
 				)])
-			)}
+			)}}
 			.to_string(),
 		);
 	}
@@ -385,115 +348,209 @@ mod test {
 	#[test]
 	fn text() {
 		"<div>hello</div>".xmap(parse).to_be(
-			quote! {(
+			quote! {{(
 				NodeTag(String::from("div")),
 				ElementNode{self_closing:false},
 				children![TextNode(String::from("hello"))]
-			)}
+			)}}
 			.to_string(),
 		);
 	}
 	#[test]
-	fn attributes() {
+	fn element_attributes() {
 		// default
 		"<br foo />".xmap(parse).to_be(
-			quote! {(
+			quote! {{(
 				NodeTag(String::from("br")),
 				ElementNode{self_closing:true},
 				related!(Attributes["foo".into_attr_key_bundle()])
-			)}
+			)}}
 			.to_string(),
 		);
 		// string
 		"<br foo=\"bar\"/>".xmap(parse).to_be(
-			quote! {(
+			quote! {{(
 				NodeTag(String::from("br")),
 				ElementNode{self_closing:true},
 				related!(Attributes[(
 					"foo".into_attr_key_bundle(),
 					"bar".into_attr_val_bundle()
 				)])
-			)}
+			)}}
 			.to_string(),
 		);
 		// bool
 		"<br foo=true />".xmap(parse).to_be(
-			quote! {(
+			quote! {{(
 				NodeTag(String::from("br")),
 				ElementNode{self_closing:true},
 				related!(Attributes[(
 					"foo".into_attr_key_bundle(),
 					true.into_attr_val_bundle()
 				)])
-			)}
+			)}}
 			.to_string(),
 		);
 		// number
 		"<br foo=20 />".xmap(parse).to_be(
-			quote! {(
+			quote! {{(
 				NodeTag(String::from("br")),
 				ElementNode{self_closing:true},
 				related!(Attributes[(
 					"foo".into_attr_key_bundle(),
 					20f64.into_attr_val_bundle()
 				)])
-			)}
+			)}}
 			.to_string(),
 		);
 		// ident
 		"<br foo={bar} />".xmap(parse).to_be(
-			quote! {(
+			quote! {{(
 				NodeTag(String::from("br")),
 				ElementNode{self_closing:true},
 				related!(Attributes[(
 					"foo".into_attr_key_bundle(),
-					// it shouldnt be a child, and should not include
-					// the BlockNode. ie if bar is a u32, we need to call
-					// u32.into_attr_val_bundle() so that we end up with
-					// an AttributeValue<u32>
-					children![
-						(BlockNode, { bar }.into_node_bundle())
-						].into_attr_val_bundle()
+					{ bar }.into_attr_val_bundle()
 				)])
-			)}
+			)}}
 			.to_string(),
 		);
 		// element
 		"<br foo={<br/>} />".xmap(parse).to_be(
-			quote! {(
+			quote! {{(
 				NodeTag(String::from("br")),
 				ElementNode{self_closing:true},
 				related!(Attributes[(
 					"foo".into_attr_key_bundle(),
-					children![
-						(
+						{(
 							NodeTag(String::from("br")),
 							ElementNode { self_closing: true }
-						)
-					].into_attr_val_bundle()
+						)}.into_attr_val_bundle()
 				)])
-			)}
+			)}}
 			.to_string(),
 		);
 		// mixed
-		// "<br foo={
-		// 	let bar = <br/>;
-		// 	bar
-		// } />".xmap(parse).to_be(
-		// 	quote! {(
-		// 		NodeTag(String::from("br")),
-		// 		ElementNode{self_closing:true},
-		// 		related!(Attributes[(
-		// 			"foo".into_attr_key_bundle(),
-		// 			children![
-		// 				(
-		// 					NodeTag(String::from("br")),
-		// 					ElementNode { self_closing: true }
-		// 				)
-		// 			].into_attr_val_bundle()
-		// 		)])
-		// 	)}
-		// 	.to_string(),
-		// );
+		"<br foo={
+			let bar = <br/>;
+			bar
+		} />"
+			.xmap(parse)
+			.to_be(
+				quote! {{(
+					NodeTag(String::from("br")),
+					ElementNode{self_closing:true},
+					related!(Attributes[(
+						"foo".into_attr_key_bundle(),
+						{
+							let bar = (
+								NodeTag(String::from("br")),
+								ElementNode{self_closing:true}
+							);
+							bar
+						}.into_attr_val_bundle()
+					)])
+				)}}
+				.to_string(),
+			);
+	}
+	#[test]
+	#[ignore]
+	fn template_attributes() {
+		// default
+		"<MyTemplate foo />".xmap(parse).to_be(
+			quote! {{(
+				NodeTag(String::from("br")),
+				ElementNode{self_closing:true},
+				related!(Attributes["foo".into_attr_key_bundle()])
+			)}}
+			.to_string(),
+		);
+		// string
+		"<MyTemplate foo=\"bar\"/>".xmap(parse).to_be(
+			quote! {{(
+				NodeTag(String::from("br")),
+				ElementNode{self_closing:true},
+				related!(Attributes[(
+					"foo".into_attr_key_bundle(),
+					"bar".into_attr_val_bundle()
+				)])
+			)}}
+			.to_string(),
+		);
+		// bool
+		"<MyTemplate foo=true />".xmap(parse).to_be(
+			quote! {{(
+				NodeTag(String::from("br")),
+				ElementNode{self_closing:true},
+				related!(Attributes[(
+					"foo".into_attr_key_bundle(),
+					true.into_attr_val_bundle()
+				)])
+			)}}
+			.to_string(),
+		);
+		// number
+		"<MyTemplate foo=20 />".xmap(parse).to_be(
+			quote! {{(
+				NodeTag(String::from("br")),
+				ElementNode{self_closing:true},
+				related!(Attributes[(
+					"foo".into_attr_key_bundle(),
+					20f64.into_attr_val_bundle()
+				)])
+			)}}
+			.to_string(),
+		);
+		// ident
+		"<MyTemplate foo={bar} />".xmap(parse).to_be(
+			quote! {{(
+				NodeTag(String::from("br")),
+				ElementNode{self_closing:true},
+				related!(Attributes[(
+					"foo".into_attr_key_bundle(),
+					{ bar }.into_attr_val_bundle()
+				)])
+			)}}
+			.to_string(),
+		);
+		// element
+		"<MyTemplate foo={<br/>} />".xmap(parse).to_be(
+			quote! {{(
+				NodeTag(String::from("br")),
+				ElementNode{self_closing:true},
+				related!(Attributes[(
+					"foo".into_attr_key_bundle(),
+						{(
+							NodeTag(String::from("br")),
+							ElementNode { self_closing: true }
+						)}.into_attr_val_bundle()
+				)])
+			)}}
+			.to_string(),
+		);
+		// mixed
+		"<MyTemplate foo={
+			let bar = <br/>;
+			bar
+		} />"
+			.xmap(parse)
+			.to_be(
+				quote! {{(
+					NodeTag(String::from("br")),
+					ElementNode{self_closing:true},
+					related!(Attributes[(
+						"foo".into_attr_key_bundle(),
+						{
+							let bar = (
+								NodeTag(String::from("br")),
+								ElementNode{self_closing:true}
+							);
+							bar
+						}.into_attr_val_bundle()
+					)])
+				)}}
+				.to_string(),
+			);
 	}
 }

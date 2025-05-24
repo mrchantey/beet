@@ -1,3 +1,5 @@
+mod combinator_expr;
+pub use combinator_expr::*;
 mod combinator_to_node_tokens;
 pub use combinator_to_node_tokens::*;
 mod collect_node_attributes;

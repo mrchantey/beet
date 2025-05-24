@@ -39,58 +39,67 @@ pub struct CollectNodeAttributes<'w, 's> {
 	vals: MaybeSpannedQuery<'w, 's, AttributeValueExpr>,
 }
 
-impl CollectCustomTokens for CollectNodeAttributes<'_, '_> {
-	fn try_push_all(
+impl CollectNodeAttributes<'_, '_> {
+	pub fn try_push_all(
 		&self,
+		try_combinator: impl Clone + Fn(Entity) -> Result<Option<TokenStream>>,
 		items: &mut Vec<proc_macro2::TokenStream>,
 		entity: Entity,
 	) -> Result<()> {
-		self.handle_element(items, entity)?;
-		self.handle_template(items, entity)?;
+		self.handle_element(try_combinator.clone(), items, entity)?;
+		self.handle_template(try_combinator, items, entity)?;
 		Ok(())
 	}
-}
-
-impl CollectNodeAttributes<'_, '_> {
 	fn handle_element(
 		&self,
+		try_combinator: impl Fn(Entity) -> Result<Option<TokenStream>>,
 		entity_components: &mut Vec<TokenStream>,
 		entity: Entity,
 	) -> Result<()> {
 		let Ok(attributes) = self.elements.get(entity) else {
 			return Ok(());
 		};
-		
+
 		let mut attr_entities = Vec::new();
-		
+
 		if let Some(attrs) = attributes {
 			for attr_entity in attrs.iter() {
 				if let Some(event_func) =
-				self.try_event_observer(attr_entity)?
+					self.try_event_observer(attr_entity)?
 				{
 					// in the case of an event the value is an observer added to the parent
 					entity_components.push(event_func);
 					continue;
 				}
-				
+
 				let mut attr_components = Vec::new();
 				// blocks ie <span {Vec3::new()} />
 				// inserted directly as an entity component
 				if let Some(attr) =
-				self.maybe_spanned_expr(attr_entity, &self.exprs)?
+					self.maybe_spanned_expr(attr_entity, &self.exprs)?
 				{
 					entity_components.push(quote! {#attr.into_node_bundle()});
 				}
-				
+
 				if let Some(attr) =
 					self.maybe_spanned_expr(attr_entity, &self.keys)?
-					{
+				{
 					attr_components.push(quote! {#attr.into_attr_key_bundle()});
 				}
 				if let Some(attr) =
 					self.maybe_spanned_expr(attr_entity, &self.vals)?
 				{
 					attr_components.push(quote! {#attr.into_attr_val_bundle()});
+				}
+				if let Some(attr) = try_combinator(attr_entity)? {
+					if self.keys.contains(attr_entity) {
+						// if this attribute has a key, the combinator must be a value
+						attr_components
+							.push(quote! {#attr.into_attr_val_bundle()});
+					} else {
+						// otherwise the combinator is a block value, aka a component
+						entity_components.push(attr);
+					}
 				}
 
 				if attr_components.len() == 1 {
@@ -234,6 +243,7 @@ impl CollectNodeAttributes<'_, '_> {
 	#[allow(unused)]
 	fn handle_template(
 		&self,
+		build_tokens: impl Fn(Entity) -> Result<Option<TokenStream>>,
 		entity_components: &mut Vec<TokenStream>,
 		entity: Entity,
 	) -> Result<()> {
@@ -252,18 +262,28 @@ impl CollectNodeAttributes<'_, '_> {
 				{
 					entity_components.push(quote! {#attr.into_node_bundle()});
 				}
+				let combinator_attr = build_tokens(attr_entity)?;
 
 				if let Some(key) =
 					self.maybe_spanned_expr(attr_entity, &self.keys)?
 					&& let Some(key) = expr_to_ident(&key)
 				{
-					let value = self
-						.maybe_spanned_expr(attr_entity, &self.vals)?
-						.unwrap_or_else(|| {
-							// for templates no value means a bool flag
-							syn::parse_quote! {true}
-						});
-					prop_assignments.push(quote! {.#key(#value)});
+					if let Some(val) = combinator_attr {
+						// first check if there was a combinator value
+						prop_assignments.push(quote! {.#key(#val)});
+					} else {
+						// otherwise check if theres a regular value
+						let value = self
+							.maybe_spanned_expr(attr_entity, &self.vals)?
+							.unwrap_or_else(|| {
+								// finally no value means a bool flag
+								syn::parse_quote! {true}
+							});
+						prop_assignments.push(quote! {.#key(#value)});
+					}
+				} else if let Some(value) = combinator_attr {
+					// if it doesnt have a key, the combinator must be a block value
+					entity_components.push(value);
 				}
 			}
 		}

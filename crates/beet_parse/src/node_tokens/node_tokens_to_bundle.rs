@@ -54,7 +54,7 @@ impl BundleTokens {
 fn resolve_attribute_values(
 	_: TempNonSendMarker,
 	mut commands: Commands,
-	builder: Builder,
+	builder: TokensBuilder,
 	attribute_values: Populated<Entity, (With<AttributeOf>, With<Children>)>,
 ) -> Result {
 	for entity in attribute_values.iter() {
@@ -76,7 +76,7 @@ fn resolve_attribute_values(
 fn node_tokens_to_bundle(
 	_: TempNonSendMarker,
 	mut commands: Commands,
-	builder: Builder,
+	builder: TokensBuilder,
 	template_roots: Populated<(
 		Entity,
 		&NodeTokensToBundle,
@@ -101,18 +101,19 @@ fn node_tokens_to_bundle(
 /// a 'map' function than an 'iter', as we need to resolve children
 /// and then wrap them as `children![]` in parents.
 #[derive(SystemParam)]
-struct Builder<'w, 's> {
+pub(super) struct TokensBuilder<'w, 's> {
 	children: Query<'w, 's, &'static Children>,
-	rsx_nodes: CollectRsxNodeTokens<'w, 's>,
 	block_node_exprs:
 		Query<'w, 's, &'static ItemOf<BlockNode, SendWrapper<Expr>>>,
+	combinators: Query<'w, 's, &'static CombinatorExpr>,
+	rsx_nodes: CollectRsxNodeTokens<'w, 's>,
 	rsx_directives: CollectRsxDirectiveTokens<'w, 's>,
 	web_nodes: CollectWebNodeTokens<'w, 's>,
 	web_directives: CollectWebDirectiveTokens<'w, 's>,
 	node_attributes: CollectNodeAttributes<'w, 's>,
 }
 
-impl Builder<'_, '_> {
+impl TokensBuilder<'_, '_> {
 	/// Entry point for the builder, rstml token roots are not elements themselves,
 	/// so if theres only one child return that instead of a fragment
 	fn token_stream_from_root(&self, entity: Entity) -> Result<TokenStream> {
@@ -142,22 +143,14 @@ impl Builder<'_, '_> {
 		self.rsx_directives.try_push_all(&mut items, entity)?;
 		self.web_nodes.try_push_all(&mut items, entity)?;
 		self.web_directives.try_push_all(&mut items, entity)?;
-		self.node_attributes.try_push_all(&mut items, entity)?;
-		if let Ok(block) = self.block_node_exprs.get(entity) {
-			let block = &***block;
-			items.push(quote! {#block.into_node_bundle()});
-		}
-
-
-		if let Ok(children) = self.children.get(entity) {
-			let children = children
-				.iter()
-				.map(|child| self.token_stream(child))
-				.collect::<Result<Vec<_>>>()?;
-			if !children.is_empty() {
-				items.push(quote! { children![#(#children),*] });
-			}
-		};
+		self.node_attributes.try_push_all(
+			|e| self.try_combinator(e),
+			&mut items,
+			entity,
+		)?;
+		self.try_push_blocks(&mut items, entity)?;
+		self.try_push_combinators(&mut items, entity)?;
+		self.try_push_children(&mut items, entity)?;
 
 		if items.is_empty() {
 			// no components, unit type
@@ -170,6 +163,69 @@ impl Builder<'_, '_> {
 			quote! {(#(#items),*) }
 		}
 		.xok()
+	}
+	fn try_push_blocks(
+		&self,
+		items: &mut Vec<TokenStream>,
+		entity: Entity,
+	) -> Result<()> {
+		if let Ok(block) = self.block_node_exprs.get(entity) {
+			let block = &***block;
+			items.push(quote! {#block.into_node_bundle()});
+		}
+		Ok(())
+	}
+	/// push combinators for nodes, attributes are handled by CollectNodeAttributes
+	fn try_push_combinators(
+		&self,
+		items: &mut Vec<TokenStream>,
+		entity: Entity,
+	) -> Result<()> {
+		if let Some(expr) = self.try_combinator(entity)? {
+			items.push(quote! {#expr});
+		}
+		Ok(())
+	}
+	fn try_combinator(&self, entity: Entity) -> Result<Option<TokenStream>> {
+		if let Ok(combinator) = self.combinators.get(entity) {
+			let mut expr = String::new();
+			for item in combinator.iter() {
+				match item {
+					CombinatorExprPartial::Tokens(tokens) => {
+						expr.push_str(tokens);
+					}
+					CombinatorExprPartial::Element(entity) => {
+						let tokens = self.token_stream(*entity)?;
+						expr.push_str(&tokens.to_string());
+					}
+				}
+			}
+			// combinator removes braces so we put them back
+			let expr = format!("{{{}}}", expr);
+			let expr_tokens = syn::parse_str::<TokenStream>(&expr)?;
+			return Ok(Some(expr_tokens));
+		} else {
+			Ok(None)
+		}
+	}
+
+
+	fn try_push_children(
+		&self,
+		items: &mut Vec<TokenStream>,
+		entity: Entity,
+	) -> Result<()> {
+		if let Ok(children) = self.children.get(entity) {
+			let children = children
+				.iter()
+				.map(|child| self.token_stream(child))
+				.collect::<Result<Vec<_>>>()?;
+			if !children.is_empty() {
+				items.push(quote! { children![#(#children),*] });
+			}
+		};
+
+		Ok(())
 	}
 }
 
