@@ -92,21 +92,27 @@ impl CargoCmdExtra {
 			if !ev.has_mutate() {
 				return Ok(());
 			}
-			// its ok if the run failed, because its
-			// a command we assume stderr has already logged, so its .ok()
-			self.run_binary().ok();
+			self.run_binary()?;
 			Ok(())
 		})
 		.await?;
 		Ok(())
 	}
 
+	/// run the binary:
+	/// ## Errors
+	/// Errors if not in watch mode and the command fails
 	fn run_binary(&self) -> Result<()> {
 		if self.watch {
 			terminal::clear()?;
 			println!("\n🤘 sweet as 🤘\n");
 		}
-		self.build_cmd.spawn()?;
+		let result = self.build_cmd.spawn();
+		// we only propagate command errors if not in watch mode,
+		// otherwise assume its been logged to the terminal
+		if !self.watch {
+			result?;
+		}
 		Ok(())
 	}
 }

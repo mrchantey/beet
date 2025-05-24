@@ -17,6 +17,17 @@ pub impl<
 	// T: HierarchyQueryExt<'w, 's, D, F>,
 > Query<'w, 's, D, F>
 {
+	/// Iterates over all direct children of the given entity.
+	fn iter_direct_descendants<S: RelationshipTarget>(
+		&'w self,
+		entity: Entity,
+	) -> DirectDescendantIter
+	where
+		D::ReadOnly: QueryData<Item<'w> = &'w S>,
+	{
+		DirectDescendantIter::new(self, entity)
+	}
+
 	/// Iterates over all ancestors of the given entity, including the entity itself.
 	fn iter_ancestors_inclusive<R: Relationship>(
 		&'w self,
@@ -38,4 +49,36 @@ pub impl<
 	{
 		Iterator::chain(std::iter::once(entity), self.iter_descendants(entity))
 	}
+}
+
+
+
+
+/// An [`Iterator`] of [`Entity`]s over the direct descendants of an [`Entity`].
+pub struct DirectDescendantIter {
+	vec: Vec<Entity>,
+}
+
+impl DirectDescendantIter {
+	/// Returns a new [`DDirectescendantIter`].
+	pub fn new<'w, 's, D: QueryData, F: QueryFilter, S: RelationshipTarget>(
+		children_query: &'w Query<'w, 's, D, F>,
+		entity: Entity,
+	) -> Self
+	where
+		D::ReadOnly: QueryData<Item<'w> = &'w S>,
+	{
+		Self {
+			vec: children_query
+				.get(entity)
+				.into_iter()
+				.flat_map(RelationshipTarget::iter)
+				.collect(),
+		}
+	}
+}
+
+impl Iterator for DirectDescendantIter {
+	type Item = Entity;
+	fn next(&mut self) -> Option<Self::Item> { self.vec.pop() }
 }

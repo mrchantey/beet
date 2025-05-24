@@ -1,5 +1,4 @@
 use crate::prelude::*;
-use beet_common::prelude::*;
 use bevy::ecs::schedule::SystemSet;
 use bevy::prelude::*;
 use std::cell::RefCell;
@@ -25,12 +24,7 @@ impl Plugin for TemplatePlugin {
 				ApplySlotsStep.in_set(ApplyTransformsStep),
 			),
 		)
-		.add_plugins((
-			apply_slots_plugin,
-			// rstml_to_node_tokens_plugin,
-			// node_tokens_to_bundle_plugin,
-		))
-		.add_plugins((rsx_directives_plugin, web_directives_plugin));
+		.add_plugins((apply_slots_plugin, render_html_plugin));
 	}
 }
 
@@ -42,9 +36,9 @@ thread_local! {
 
 
 /// Access the thread local [`App`] used by the [`TemplatePlugin`].
-pub struct TokensApp;
+pub struct TemplateApp;
 
-impl TokensApp {
+impl TemplateApp {
 	pub fn with<O>(func: impl FnOnce(&mut App) -> O) -> O {
 		TEMPLATE_APP.with(|app_cell| {
 			// Initialize the app if needed

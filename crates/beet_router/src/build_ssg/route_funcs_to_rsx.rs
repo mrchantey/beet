@@ -129,7 +129,7 @@ mod test {
 		expect(
 			html.iter()
 				.find(|(info, _)| info.path.to_string_lossy() == "/")
-				.map(|(_, html)| html.clone().xpipe(RenderHtml::default()))
+				.map(|(_, html)| html.clone().xpipe(ToHtml::default()))
 				.unwrap(),
 		)
 		.to_contain("<!DOCTYPE html>");

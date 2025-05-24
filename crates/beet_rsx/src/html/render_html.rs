@@ -1,23 +1,46 @@
+use crate::prelude::*;
 use beet_common::prelude::*;
-use bevy::ecs::system::RunSystemError;
-use bevy::ecs::system::RunSystemOnce;
 use bevy::ecs::system::SystemParam;
 use bevy::prelude::*;
 
 /// returns the HTML string representation of a given [`Bundle`]
-pub fn bundle_to_html_oneshot(
-	bundle: impl Bundle,
-) -> Result<String, RunSystemError> {
-	let mut app = App::new();
-	let entity = app.world_mut().spawn(bundle).id();
-	app.world_mut().run_system_once_with(node_to_html, entity)
+pub fn bundle_to_html(bundle: impl Bundle) -> String {
+	TemplateApp::with(|app| {
+		let entity = app.world_mut().spawn((bundle, ToHtml)).id();
+		app.update();
+		app.world_mut()
+			.entity_mut(entity)
+			.take::<RenderedHtml>()
+			.expect("Expected RenderedHtml")
+			.0
+	})
 }
 
+pub fn render_html_plugin(app: &mut App) {
+	app.add_systems(Update, render_html.in_set(RenderStep));
+}
 
-fn node_to_html(node: In<Entity>, builder: Builder) -> String {
-	let mut html = String::new();
-	builder.parse(*node, &mut html);
-	html
+/// Marker indicating that the entity should be converted to HTML,
+/// appending a [`RenderedHtml`] component.
+#[derive(Default, Component, Reflect)]
+#[reflect(Default, Component)]
+pub struct ToHtml;
+
+#[derive(Default, Component, Deref, DerefMut, Reflect)]
+#[reflect(Default, Component)]
+pub struct RenderedHtml(pub String);
+
+
+fn render_html(
+	mut commands: Commands,
+	query: Populated<(Entity, &ToHtml)>,
+	builder: Builder,
+) {
+	for (entity, _) in query.iter() {
+		let mut html = String::new();
+		builder.parse(entity, &mut html);
+		commands.entity(entity).insert(RenderedHtml(html));
+	}
 }
 
 
@@ -101,60 +124,73 @@ mod test {
 	use bevy::prelude::*;
 	use sweet::prelude::*;
 
-	fn parse(bundle: impl Bundle) -> Matcher<String> {
-		bundle.xmap(bundle_to_html_oneshot).unwrap().xpect()
-	}
-
 	#[test]
 	fn works() {
 		// doctype
-		rsx! {<!doctype/>}.xmap(parse).to_be("<!DOCTYPE html>");
+		rsx! {<!doctype/>}
+			.xmap(bundle_to_html)
+			.xpect()
+			.to_be("<!DOCTYPE html>");
 		// comment (in rstml must be quoted)
-		rsx! {<!-- "howdy" -->}.xmap(parse).to_be("<!-- howdy -->");
+		rsx! {<!-- "howdy" -->}
+			.xmap(bundle_to_html)
+			.xpect()
+			.to_be("<!-- howdy -->");
 		// raw text
-		rsx! {howdy}.xmap(parse).to_be("howdy");
+		rsx! {howdy}.xmap(bundle_to_html).xpect().to_be("howdy");
 		// quoted text
-		rsx! {"howdy"}.xmap(parse).to_be("howdy");
+		rsx! {"howdy"}.xmap(bundle_to_html).xpect().to_be("howdy");
 		// fragment
-		rsx! {<>"howdy"</>}.xmap(parse).to_be("howdy");
+		rsx! {<>"howdy"</>}
+			.xmap(bundle_to_html)
+			.xpect()
+			.to_be("howdy");
 		// block
-		rsx! {{"howdy"}}.xmap(parse).to_be("howdy");
+		rsx! {{"howdy"}}.xmap(bundle_to_html).xpect().to_be("howdy");
 		// self closing
-		rsx! {<br/>}.xmap(parse).to_be("<br/>");
+		rsx! {<br/>}.xmap(bundle_to_html).xpect().to_be("<br/>");
 		// not self closing
 		rsx! {<span>hello</span>}
-			.xmap(parse)
+			.xmap(bundle_to_html)
+			.xpect()
 			.to_be("<span>hello</span>");
 		// child elements
 		rsx! {<span><span>hello</span></span>}
-			.xmap(parse)
+			.xmap(bundle_to_html)
+			.xpect()
 			.to_be("<span><span>hello</span></span>");
 		// simple attribute
 		rsx! {<div class="container"></div>}
-			.xmap(parse)
+			.xmap(bundle_to_html)
+			.xpect()
 			.to_be("<div class=\"container\"></div>");
 		// multiple attributes
 		rsx! {<div class="container" id="main"></div>}
-			.xmap(parse)
+			.xmap(bundle_to_html)
+			.xpect()
 			.to_be("<div class=\"container\" id=\"main\"></div>");
 		// boolean attribute
 		rsx! {<input disabled/>}
-			.xmap(parse)
+			.xmap(bundle_to_html)
+			.xpect()
 			.to_be("<input disabled/>");
 		// attribute in self-closing
 		rsx! {<img src="image.jpg"/>}
-			.xmap(parse)
+			.xmap(bundle_to_html)
+			.xpect()
 			.to_be("<img src=\"image.jpg\"/>");
 		// complex nested with attributes
 		rsx! {<div class="wrapper"><span id="text">content</span></div>}
-			.xmap(parse)
+			.xmap(bundle_to_html)
+			.xpect()
 			.to_be(
 				"<div class=\"wrapper\"><span id=\"text\">content</span></div>",
 			);
 		// expr attributes
 		let val = true;
 		rsx! {<input hidden=val/>}
-			.xmap(parse)
+			.xmap(bundle_to_html)
+			.xpect()
 			.to_be("<input hidden=\"true\"/>");
 	}
 
@@ -169,7 +205,8 @@ mod test {
 			"outer"
 			<Template/>
 		}
-		.xmap(parse)
+		.xmap(bundle_to_html)
+		.xpect()
 		.to_be("outer<div class=\"container\"><span>hello</span></div>");
 	}
 }

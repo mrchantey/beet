@@ -16,10 +16,11 @@ pub fn rstml_to_bundle(
 	tokens: TokenStream,
 	source_file: WorkspacePathBuf,
 ) -> Result<TokenStream> {
-	// let mut app = App::new();
-	// app.add_plugins(NodeTokensPlugin);
+	let mut app = App::new();
+	app.add_plugins(NodeTokensPlugin);
 
-	TokensApp::with(|app| {
+	// TODO shared app breaks rust analyzer?
+	// TokensApp::with(|app| {
 	let entity = app
 		.world_mut()
 		.spawn((
@@ -40,7 +41,7 @@ pub fn rstml_to_bundle(
 		.xok();
 	app.world_mut().entity_mut(entity).despawn();
 	result
-	})
+	// })
 }
 
 // for tests see ../node_tokens_to_bundle.rs

@@ -21,8 +21,8 @@ fn works() {
 			id="bar"
 		/>
 	}
-	.xmap(bundle_to_html_oneshot)
-	.unwrap().xpect().to_be(
+	.xmap(bundle_to_html)
+	.xpect().to_be(
 		"<div><p>is_optional: Some(3)</p><p>is_required: 38</p><p>is_default: 7</p><p>is_generic_default: Foo(PhantomData<u32>)</p><p>is_into: \"foobar\"</p><p>is_boxed: 3</p><p>is_flatten.class: \"kablamo\"</p><p>is_flatten.id: Some(\"bar\")</p><p>is_flatten.disabled: None</p><p>is_marker_into: \"3\"</p><p>is_maybe_signal: Func(5)</p></div>"
 	);
 }
