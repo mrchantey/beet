@@ -273,12 +273,15 @@ impl<'w, 's, 'a> Builder<'w, 's, 'a> {
 			RsxAttribute::Named(name, value) => {
 				let key = name.to_string();
 
+				
 				let (val_lit, val_expr, children) =
-					self.rsx_attribute_value(value)?;
-
+				self.rsx_attribute_value(value)?;
+				
+				// println!("Attribute: {} = {:?}", key, value);
 
 				let mut entity = self.commands.spawn((
 					AttributeOf::new(parent),
+					AttributeKeyExpr::new(syn::parse_quote!(#key)),
 					ItemOf::<AttributeOf, _>::new(self.default_file_span()),
 					AttributeLit::new(key.clone(), val_lit),
 				));
@@ -315,7 +318,7 @@ impl<'w, 's, 'a> Builder<'w, 's, 'a> {
 				)
 			}
 			RsxAttributeValue::Str(val) => {
-				let val = val.to_string();
+				let val = val.to_string_unquoted();
 				(
 					Some(val.to_string()),
 					Some(syn::parse_quote!(#val)),
@@ -339,6 +342,7 @@ impl<'w, 's, 'a> Builder<'w, 's, 'a> {
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
+	use quote::quote;
 	use sweet::prelude::*;
 
 	fn parse(str: &str) -> Matcher<String> {
@@ -349,44 +353,111 @@ mod test {
 	}
 
 	#[test]
-	fn element() { "<br/>".xmap(parse).to_contain("Element(tag:\"br\""); }
+	fn element() {
+		"<br/>".xmap(parse).to_be(
+			quote! {(
+				NodeTag(String::from("br")),
+				ElementNode{self_closing:true}
+			)}
+			.to_string(),
+		);
+	}
 	#[test]
-	#[ignore]
 	fn unclosed() {
-		"<div align=\"center\" />"
-			.xmap(parse)
-			.to_contain("Element(tag:\"br\"");
+		"<div align=\"center\" />".xmap(parse).to_be(
+			quote! {(
+				NodeTag(String::from("div")),
+				ElementNode{self_closing:true},
+				related!(Attributes[(
+					"align".into_attr_key_bundle(),
+					"center".into_attr_val_bundle()
+				)])
+			)}
+			.to_string(),
+		);
 	}
 
 	#[test]
 	fn text() {
-		"<div>hello</div>"
-			.xmap(parse)
-			.to_contain("Text(value:\"hello\"");
+		"<div>hello</div>".xmap(parse).to_be(
+			quote! {(
+				NodeTag(String::from("div")),
+				ElementNode{self_closing:false},
+				children![TextNode(String::from("hello"))]
+			)}
+			.to_string(),
+		);
 	}
 	#[test]
+	#[ignore]
 	fn attributes() {
 		// default
-		"<br foo />".xmap(parse).to_contain("Key(key:\"foo\")");
+		"<br foo />".xmap(parse).to_be(
+			quote! {(
+				NodeTag(String::from("br")),
+				ElementNode{self_closing:true},
+				related!(Attributes["foo".into_attr_key_bundle()])
+			)}
+			.to_string(),
+		);
 		// string
-		"<br foo=\"bar\"/>"
-			.xmap(parse)
-			.to_contain("KeyValue(key:\"foo\",value:\"bar\")");
+		"<br foo=\"bar\"/>".xmap(parse).to_be(
+			quote! {(
+				NodeTag(String::from("br")),
+				ElementNode{self_closing:true},
+				related!(Attributes[(
+					"foo".into_attr_key_bundle(),
+					"bar".into_attr_val_bundle()
+				)])
+			)}
+			.to_string(),
+		);
 		// bool
-		"<br foo=true />"
-			.xmap(parse)
-			.to_contain("KeyValue(key:\"foo\",value:\"true\")");
+		"<br foo=true />".xmap(parse).to_be(
+			quote! {(
+				NodeTag(String::from("br")),
+				ElementNode{self_closing:true},
+				related!(Attributes[(
+					"foo".into_attr_key_bundle(),
+					true.into_attr_val_bundle()
+				)])
+			)}.to_string(),
+		);
 		// number
-		"<br foo=20 />"
-			.xmap(parse)
-			.to_contain("KeyValue(key:\"foo\",value:\"20\")");
+		"<br foo=20 />".xmap(parse).to_be(
+			quote! {(
+				NodeTag(String::from("br")),
+				ElementNode{self_closing:true},
+				related!(Attributes[(
+					"foo".into_attr_key_bundle(),
+					20f64.into_attr_val_bundle()
+				)])
+			)}.to_string(),
+		);
 		// ident
-		"<br foo={bar} />"
-			.xmap(parse)
-			.to_contain("BlockValue(key:\"foo\",tracker:(index:1,");
+		"<br foo={bar} />".xmap(parse).to_be(
+			quote! {(
+				NodeTag(String::from("br")),
+				ElementNode{self_closing:true},
+				related!(Attributes[(
+					"foo".into_attr_key_bundle(),
+					{bar}.into_attr_val_bundle()
+				)])
+			)}.to_string(),
+		);
 		// element
-		"<br foo={<br/>} />"
-			.xmap(parse)
-			.to_contain("BlockValue(key:\"foo\",tracker:(index:0,");
+		"<br foo={<br/>} />".xmap(parse).to_be(
+			quote! {(
+				NodeTag(String::from("br")),
+				ElementNode{self_closing:true},
+				related!(Attributes[(
+					"foo".into_attr_key_bundle(),
+					(
+						NodeTag(String::from("br")),
+						ElementNode { self_closing: true }
+					).into_attr_val_bundle()
+				)])
+			)}.to_string(),
+		);
 	}
 }

@@ -41,6 +41,7 @@ impl BundleTokens {
 	pub fn take(self) -> TokenStream { self.0.take() }
 }
 
+
 /// Walks children of an entity collecting into a [`BundleTokens`].
 // TODO i guess this will be a bottleneck, challenging as TokenStream is not `Send`
 fn node_tokens_to_bundle(

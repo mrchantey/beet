@@ -59,31 +59,31 @@ impl CollectNodeAttributes<'_, '_> {
 		let Ok(attributes) = self.elements.get(entity) else {
 			return Ok(());
 		};
-
+		
 		let mut attr_entities = Vec::new();
-
+		
 		if let Some(attrs) = attributes {
 			for attr_entity in attrs.iter() {
 				if let Some(event_func) =
-					self.try_event_observer(attr_entity)?
+				self.try_event_observer(attr_entity)?
 				{
 					// in the case of an event the value is an observer added to the parent
 					entity_components.push(event_func);
 					continue;
 				}
-
+				
 				let mut attr_components = Vec::new();
 				// blocks ie <span {Vec3::new()} />
 				// inserted directly as an entity component
 				if let Some(attr) =
-					self.maybe_spanned_expr(attr_entity, &self.exprs)?
+				self.maybe_spanned_expr(attr_entity, &self.exprs)?
 				{
 					entity_components.push(quote! {#attr.into_node_bundle()});
 				}
-
+				
 				if let Some(attr) =
 					self.maybe_spanned_expr(attr_entity, &self.keys)?
-				{
+					{
 					attr_components.push(quote! {#attr.into_attr_key_bundle()});
 				}
 				if let Some(attr) =
@@ -285,8 +285,9 @@ impl CollectNodeAttributes<'_, '_> {
 		}
 		// the output of a template is *children!*, ie the template is a fragment.
 		// this is important to avoid duplicate components like NodeTag
-		inner_items
-			.push(quote! {TemplateRoot::spawn(Spawn(template.into_node_bundle()))});
+		inner_items.push(
+			quote! {TemplateRoot::spawn(Spawn(template.into_node_bundle()))},
+		);
 		entity_components.push(tracker.into_custom_token_stream());
 
 		entity_components.push(quote! {{
