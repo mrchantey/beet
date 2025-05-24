@@ -165,7 +165,7 @@ mod test {
 				<div/>
 			</span>
 		}
-		.xmap(|t| rstml_tokens_to_rust(t, WorkspacePathBuf::new(file!())))
+		.xmap(|t| rstml_to_bundle(t, WorkspacePathBuf::new(file!())))
 		.unwrap()
 		.to_string()
 		.xpect()
@@ -216,7 +216,7 @@ mod test {
 			<br/>
 			<br/>
 		}
-		.xmap(|t| rstml_tokens_to_rust(t, WorkspacePathBuf::new(file!())))
+		.xmap(|t| rstml_to_bundle(t, WorkspacePathBuf::new(file!())))
 		.unwrap()
 		.to_string()
 		.xpect()
@@ -242,7 +242,7 @@ mod test {
 	#[test]
 	fn blocks() {
 		quote! {{foo}}
-			.xmap(|t| rstml_tokens_to_rust(t, WorkspacePathBuf::new(file!())))
+			.xmap(|t| rstml_to_bundle(t, WorkspacePathBuf::new(file!())))
 			.unwrap()
 			.to_string()
 			.xpect()
@@ -257,7 +257,7 @@ mod test {
 	#[test]
 	fn attribute_blocks() {
 		quote! {<input hidden=val/>}
-			.xmap(|t| rstml_tokens_to_rust(t, WorkspacePathBuf::new(file!())))
+			.xmap(|t| rstml_to_bundle(t, WorkspacePathBuf::new(file!())))
 			.unwrap()
 			.to_string()
 			.xpect()

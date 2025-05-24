@@ -19,7 +19,7 @@ pub fn rsx(tokens: TokenStream) -> TokenStream {
 	// this method creates a new app for every rstml macro,
 	// we may find it faster to reuse a single app, although
 	// parallelism will still be tricky because tokens are non-send
-	rstml_tokens_to_rust(tokens.into(), source_file)
+	rstml_to_bundle(tokens.into(), source_file)
 		.unwrap_or_else(|e| {
 			let e = e.to_string();
 			quote::quote! {
@@ -39,9 +39,7 @@ pub fn node_tokens(_tokens: TokenStream) -> TokenStream { todo!() }
 /// Adds a builder pattern to a struct enabling construction as an
 /// rsx component
 #[proc_macro_derive(Props, attributes(node, field))]
-pub fn derive_props(
-	input: proc_macro::TokenStream,
-) -> proc_macro::TokenStream {
+pub fn derive_props(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 	let input = parse_macro_input!(input as DeriveInput);
 	parse_derive_props(input).into()
 }

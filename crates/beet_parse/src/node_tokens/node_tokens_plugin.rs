@@ -59,7 +59,30 @@ impl TokensApp {
 
 			// Now we can safely unwrap and use the app
 			let app = app_ref.as_mut().unwrap();
-			func(app)
+
+			let out = func(app);
+			assert_empty(app);
+			out
 		})
 	}
+}
+
+fn assert_empty(app: &App) {
+	let num_entities = app.world().entities().len();
+	if app.world().entities().is_empty() {
+		return;
+	}
+	let mut err = String::from("Static App contains entities after use\n");
+	for entity in app.world().iter_entities() {
+		let entity = entity.id();
+		let info = app.world().inspect_entity(entity).unwrap();
+		err.push_str(&format!(
+			"Entity {}\n{}",
+			entity,
+			info.map(|i| format!("\t{}", i.name()))
+				.collect::<Vec<_>>()
+				.join("\n")
+		));
+	}
+	panic!("{err}");
 }

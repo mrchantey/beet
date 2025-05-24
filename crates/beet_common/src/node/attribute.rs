@@ -16,7 +16,7 @@ impl AttributeOf {
 /// All attributes belonging to this entity, which may be
 /// an element or a node.
 #[derive(Component, Deref)]
-#[relationship_target(relationship = AttributeOf)]
+#[relationship_target(relationship = AttributeOf,linked_spawn)]
 pub struct Attributes(Vec<Entity>);
 
 /// An attribute where the key is a literal and the value may be a literal,

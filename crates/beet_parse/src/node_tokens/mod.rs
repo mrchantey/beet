@@ -1,7 +1,7 @@
 mod collect_node_attributes;
 pub use collect_node_attributes::*;
-mod rstml_tokens_to_rust;
-pub use rstml_tokens_to_rust::*;
+mod rstml_to_bundle;
+pub use rstml_to_bundle::*;
 mod node_tokens_to_bundle;
 pub use node_tokens_to_bundle::*;
 mod node_tokens_plugin;
