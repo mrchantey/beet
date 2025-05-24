@@ -62,8 +62,20 @@ impl From<JSBool> for RsxAttributeBoolean {
 	fn from(v: JSBool) -> Self { RsxAttributeBoolean(v.0) }
 }
 
+impl std::fmt::Display for RsxAttributeBoolean {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		write!(f, "{}", self.0)
+	}
+}
+
 #[derive(Debug, PartialEq)]
 pub struct RsxAttributeNumber(pub f64);
+
+impl std::fmt::Display for RsxAttributeNumber {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		write!(f, "{}", self.0)
+	}
+}
 
 impl From<JSNumber> for RsxAttributeNumber {
 	fn from(n: JSNumber) -> Self { RsxAttributeNumber(n.0) }
@@ -75,8 +87,20 @@ pub enum RsxAttributeString {
 	DoubleQuoted(JSDoubleStringCharacters),
 }
 
-impl ToString for RsxAttributeString {
-	fn to_string(&self) -> String {
+impl std::fmt::Display for RsxAttributeString {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		use self::RsxAttributeString::*;
+		match self {
+			&SingleQuoted(ref s) => write!(f, "'{}'", s.0),
+			&DoubleQuoted(ref s) => write!(f, "\"{}\"", s.0),
+		}
+	}
+}
+
+
+impl RsxAttributeString {
+	/// Returns the string without quotes, useful for comparisons.
+	pub fn to_string_unquoted(&self) -> String {
 		match self {
 			RsxAttributeString::SingleQuoted(v) => v.0.to_string(),
 			RsxAttributeString::DoubleQuoted(v) => v.0.to_string(),

@@ -30,6 +30,7 @@ impl Plugin for NodeTokensPlugin {
 		.add_plugins((
 			tokens_to_rstml_plugin,
 			rstml_to_node_tokens_plugin,
+			rsx_to_node_tokens_plugin,
 			node_tokens_to_bundle_plugin,
 		))
 		.add_plugins((rsx_directives_plugin, web_directives_plugin));
@@ -48,6 +49,12 @@ pub struct TokensApp;
 
 impl TokensApp {
 	pub fn with<O>(func: impl FnOnce(&mut App) -> O) -> O {
+		let mut app = App::new();
+		app.add_plugins(NodeTokensPlugin);
+		func(&mut app)
+	}
+	//	TODO static app breaks rust analyzer?
+	pub fn with_broken<O>(func: impl FnOnce(&mut App) -> O) -> O {
 		TOKENS_APP.with(|app_cell| {
 			// Initialize the app if needed
 			let mut app_ref = app_cell.borrow_mut();

@@ -25,8 +25,11 @@ use std::str::FromStr;
 /// ```
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Default, Clone, PartialEq, Eq, Hash)]
-// #[cfg_attr(feature = "bevy", derive(bevy::reflect::Reflect))]
-pub struct WorkspacePathBuf(PathBuf);
+#[cfg_attr(feature = "bevy", derive(bevy::reflect::Reflect))]
+pub struct WorkspacePathBuf(
+	// TODO upstream Pathbuf Reflect
+	#[cfg_attr(feature = "bevy", reflect(ignore))] PathBuf,
+);
 
 
 impl WorkspacePathBuf {

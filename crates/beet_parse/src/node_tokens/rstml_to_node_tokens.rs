@@ -224,8 +224,7 @@ impl<'w, 's, 'a> RstmlToWorld<'w, 's, 'a> {
 				if tag_str.starts_with(|c: char| c.is_uppercase()) {
 					// yes we get the tracker after its children, its fine as long
 					// as its consistent with other parsers.
-					let tracker =
-						self.rusty_tracker.next_from_open_tag(&open_tag);
+					let tracker = self.rusty_tracker.next_rstml_el(&open_tag);
 					entity.insert((
 						TemplateNode,
 						ItemOf::<TemplateNode, _>::new(tracker),
