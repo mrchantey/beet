@@ -68,11 +68,10 @@ impl TokensApp {
 }
 
 fn assert_empty(app: &App) {
-	let num_entities = app.world().entities().len();
 	if app.world().entities().is_empty() {
 		return;
 	}
-	let mut err = String::from("Static App contains entities after use\n");
+	let mut err = String::from("TokensApp contains entities after use\n");
 	for entity in app.world().iter_entities() {
 		let entity = entity.id();
 		let info = app.world().inspect_entity(entity).unwrap();

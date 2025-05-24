@@ -198,7 +198,7 @@ mod test {
 							{ TemplateSerde::new(&template) }
 							#[cfg(target_arch = "wasm32")]
 							{ () },
-							children![template.into_node_bundle()]
+							TemplateRoot::spawn(Spawn(template.into_node_bundle()))
 						)
 					}
 				), (

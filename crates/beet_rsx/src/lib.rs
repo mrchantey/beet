@@ -10,6 +10,7 @@
 //!
 pub use beet_rsx_macros::*;
 pub mod html;
+pub mod templating;
 pub mod types;
 
 #[rustfmt::skip]
@@ -17,6 +18,7 @@ pub mod prelude {
 	pub use beet_rsx_macros::*;
 	pub use crate::html::*;
 	pub use crate::types::*;
+	pub use crate::templating::*;
 }
 
 pub mod exports {

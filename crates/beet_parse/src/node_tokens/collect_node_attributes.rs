@@ -285,7 +285,8 @@ impl CollectNodeAttributes<'_, '_> {
 		}
 		// the output of a template is *children!*, ie the template is a fragment.
 		// this is important to avoid duplicate components like NodeTag
-		inner_items.push(quote! {children![template.into_node_bundle()]});
+		inner_items
+			.push(quote! {TemplateRoot::spawn(Spawn(template.into_node_bundle()))});
 		entity_components.push(tracker.into_custom_token_stream());
 
 		entity_components.push(quote! {{

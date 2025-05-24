@@ -21,7 +21,7 @@ fn node_to_html(node: In<Entity>, builder: Builder) -> String {
 }
 
 
-// use a struct pattern to handle recursion
+// TODO bench this approach vs flat multi-threaded
 #[rustfmt::skip]
 #[derive(SystemParam)]
 struct Builder<'w, 's> {
@@ -156,5 +156,20 @@ mod test {
 		rsx! {<input hidden=val/>}
 			.xmap(parse)
 			.to_be("<input hidden=\"true\"/>");
+	}
+
+	#[test]
+	#[ignore = "wip"]
+	fn templates() {
+		#[template]
+		fn Template() -> impl Bundle {
+			rsx! {<div class="container"><span>hello</span></div>}
+		}
+		rsx! {
+			"outer"
+			<Template/>
+		}
+		.xmap(parse)
+		.to_be("outer<div class=\"container\"><span>hello</span></div>");
 	}
 }

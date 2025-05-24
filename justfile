@@ -255,7 +255,11 @@ test-wasm-e2e crate test_name *args:
 test-rsx-macro *args:
 	just watch cargo test -p beet_rsx --test rsx_macro --features=css -- 												--watch {{args}}
 
+clear-ice:
+	rm -f rustc-ice-*
+
 clear-artifacts:
+	just clear-ice
 	rm -rf target
 	rm -rf crates/beet_router/src/test_site/codegen
 	rm -rf crates/beet_design/src/codegen
@@ -265,8 +269,7 @@ clear-artifacts:
 purge:
 	just clear-artifacts
 	cargo clean
-	rm -rf ./target
-	rm -rf $CARGO_TARGET_DIR/rust-analyzer
+	rm -rf $CARGO_TARGET_DIR
 # rm -rf ./Cargo.lock
 
 pws *args:

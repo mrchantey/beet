@@ -9,7 +9,9 @@ define_token_collector!(
 pub fn rsx_directives_plugin(app: &mut App) {
 	app.add_plugins(directive_plugin::<SlotDirective>);
 }
-/// Directive for which slot to render the node in.
+
+/// Directive indicating a node should be moved to the slot with the given name.
+/// All nodes without this directive are moved to the default slot.
 #[derive(Debug, Clone, Component, Reflect)]
 #[reflect(Component)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
