@@ -30,7 +30,7 @@ impl Plugin for NodeTokensPlugin {
 		.add_plugins((
 			tokens_to_rstml_plugin,
 			rstml_to_node_tokens_plugin,
-			rsx_to_node_tokens_plugin,
+			combinator_to_node_tokens_plugin,
 			node_tokens_to_bundle_plugin,
 		))
 		.add_plugins((rsx_directives_plugin, web_directives_plugin));

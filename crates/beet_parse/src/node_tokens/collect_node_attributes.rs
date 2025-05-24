@@ -16,7 +16,8 @@ use syn::parse_quote;
 
 
 /// [`SystemParam`] capable of finding all [`Attributes`] of a node,
-/// collecting them into a [`TokenStream`].
+/// collecting them into a [`TokenStream`]. The manner in shich they 
+/// are added depends on whether the node is an [`ElementNode`] or a [`TemplateNode`].
 #[rustfmt::skip]
 #[derive(SystemParam)]
 pub struct CollectNodeAttributes<'w, 's> {

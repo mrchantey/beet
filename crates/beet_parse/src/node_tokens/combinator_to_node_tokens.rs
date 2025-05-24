@@ -10,7 +10,7 @@ use syn::Block;
 use syn::Expr;
 use syn::ExprBlock;
 
-pub fn rsx_to_bundle(
+pub fn combinator_to_bundle(
 	tokens: &str,
 	source_file: WorkspacePathBuf,
 ) -> Result<TokenStream> {
@@ -20,7 +20,7 @@ pub fn rsx_to_bundle(
 			.spawn((
 				SourceFile::new(source_file),
 				NodeTokensToBundle::default().exclude_errors(),
-				RsxToNodeTokens(tokens.to_string()),
+				CombinatorToNodeTokens(tokens.to_string()),
 			))
 			.id();
 		app.update();
@@ -39,20 +39,25 @@ pub fn rsx_to_bundle(
 }
 
 
-
+/// Provide a string of rsx tokens to be parsed into a node tree.
 #[derive(Default, Component, Deref, Reflect)]
 #[reflect(Default, Component)]
-pub struct RsxToNodeTokens(pub String);
+pub struct CombinatorToNodeTokens(pub String);
 
 
-pub fn rsx_to_node_tokens_plugin(app: &mut App) {
-	app.add_systems(Update, rsx_to_node_tokens.in_set(ImportNodesStep));
+
+
+
+
+
+pub fn combinator_to_node_tokens_plugin(app: &mut App) {
+	app.add_systems(Update, combinator_to_node_tokens.in_set(ImportNodesStep));
 }
 
 
-fn rsx_to_node_tokens(
+fn combinator_to_node_tokens(
 	mut commands: Commands,
-	query: Populated<(Entity, &RsxToNodeTokens, Option<&SourceFile>)>,
+	query: Populated<(Entity, &CombinatorToNodeTokens, Option<&SourceFile>)>,
 ) -> bevy::prelude::Result {
 	for (entity, tokens, source_file) in query.iter() {
 		let default_source_file = WorkspacePathBuf::default();
@@ -63,7 +68,7 @@ fn rsx_to_node_tokens(
 			commands: &mut commands,
 		}
 		.map_to_children(entity, tokens)?;
-		commands.entity(entity).remove::<RsxToNodeTokens>();
+		commands.entity(entity).remove::<CombinatorToNodeTokens>();
 	}
 	Ok(())
 }
@@ -81,7 +86,7 @@ impl<'w, 's, 'a> Builder<'w, 's, 'a> {
 	fn map_to_children(
 		mut self,
 		root: Entity,
-		rsx: &RsxToNodeTokens,
+		rsx: &CombinatorToNodeTokens,
 	) -> Result<()> {
 		let (expr, remaining) = parse(&rsx).map_err(|e| {
 			anyhow::anyhow!("Failed to parse HTML: {}", e.to_string())
@@ -273,10 +278,10 @@ impl<'w, 's, 'a> Builder<'w, 's, 'a> {
 			RsxAttribute::Named(name, value) => {
 				let key = name.to_string();
 
-				
+
 				let (val_lit, val_expr, children) =
-				self.rsx_attribute_value(value)?;
-				
+					self.rsx_attribute_value(value)?;
+
 				// println!("Attribute: {} = {:?}", key, value);
 
 				let mut entity = self.commands.spawn((
@@ -346,7 +351,7 @@ mod test {
 	use sweet::prelude::*;
 
 	fn parse(str: &str) -> Matcher<String> {
-		rsx_to_bundle(str, WorkspacePathBuf::new(file!()))
+		combinator_to_bundle(str, WorkspacePathBuf::new(file!()))
 			.unwrap()
 			.to_string()
 			.xpect()
@@ -389,7 +394,6 @@ mod test {
 		);
 	}
 	#[test]
-	#[ignore]
 	fn attributes() {
 		// default
 		"<br foo />".xmap(parse).to_be(
@@ -421,7 +425,8 @@ mod test {
 					"foo".into_attr_key_bundle(),
 					true.into_attr_val_bundle()
 				)])
-			)}.to_string(),
+			)}
+			.to_string(),
 		);
 		// number
 		"<br foo=20 />".xmap(parse).to_be(
@@ -432,7 +437,8 @@ mod test {
 					"foo".into_attr_key_bundle(),
 					20f64.into_attr_val_bundle()
 				)])
-			)}.to_string(),
+			)}
+			.to_string(),
 		);
 		// ident
 		"<br foo={bar} />".xmap(parse).to_be(
@@ -441,9 +447,16 @@ mod test {
 				ElementNode{self_closing:true},
 				related!(Attributes[(
 					"foo".into_attr_key_bundle(),
-					{bar}.into_attr_val_bundle()
+					// it shouldnt be a child, and should not include
+					// the BlockNode. ie if bar is a u32, we need to call
+					// u32.into_attr_val_bundle() so that we end up with
+					// an AttributeValue<u32>
+					children![
+						(BlockNode, { bar }.into_node_bundle())
+						].into_attr_val_bundle()
 				)])
-			)}.to_string(),
+			)}
+			.to_string(),
 		);
 		// element
 		"<br foo={<br/>} />".xmap(parse).to_be(
@@ -452,12 +465,35 @@ mod test {
 				ElementNode{self_closing:true},
 				related!(Attributes[(
 					"foo".into_attr_key_bundle(),
-					(
-						NodeTag(String::from("br")),
-						ElementNode { self_closing: true }
-					).into_attr_val_bundle()
+					children![
+						(
+							NodeTag(String::from("br")),
+							ElementNode { self_closing: true }
+						)
+					].into_attr_val_bundle()
 				)])
-			)}.to_string(),
+			)}
+			.to_string(),
 		);
+		// mixed
+		// "<br foo={
+		// 	let bar = <br/>;
+		// 	bar
+		// } />".xmap(parse).to_be(
+		// 	quote! {(
+		// 		NodeTag(String::from("br")),
+		// 		ElementNode{self_closing:true},
+		// 		related!(Attributes[(
+		// 			"foo".into_attr_key_bundle(),
+		// 			children![
+		// 				(
+		// 					NodeTag(String::from("br")),
+		// 					ElementNode { self_closing: true }
+		// 				)
+		// 			].into_attr_val_bundle()
+		// 		)])
+		// 	)}
+		// 	.to_string(),
+		// );
 	}
 }

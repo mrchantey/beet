@@ -30,7 +30,12 @@ impl NodeTokensToBundle {
 
 
 pub fn node_tokens_to_bundle_plugin(app: &mut App) {
-	app.add_systems(Update, node_tokens_to_bundle.in_set(ExportNodesStep));
+	app.add_systems(
+		Update,
+		(resolve_attribute_values, node_tokens_to_bundle)
+			.chain()
+			.in_set(ExportNodesStep),
+	);
 }
 
 /// A [`TokenStream`] representing a bevy bundle, usually a tuple.
@@ -39,6 +44,30 @@ pub struct BundleTokens(pub SendWrapper<TokenStream>);
 impl BundleTokens {
 	pub fn new(value: TokenStream) -> Self { Self(SendWrapper::new(value)) }
 	pub fn take(self) -> TokenStream { self.0.take() }
+}
+
+/// the rstml macro parses in steps, ie <div foo={rsx!{<bar/>}}/> will resolve
+/// the `bar` node first.
+/// the combinator, however, represents attribute value expressions as child nodes
+/// ie `<div foo={<bar/>}/>` so we need to resolve the attribute values
+/// before walking the node tree.
+fn resolve_attribute_values(
+	_: TempNonSendMarker,
+	mut commands: Commands,
+	builder: Builder,
+	attribute_values: Populated<Entity, (With<AttributeOf>, With<Children>)>,
+) -> Result {
+	for entity in attribute_values.iter() {
+		let tokens = builder.token_stream(entity)?;
+		println!("expr: {}", tokens.to_string());
+		let expr = syn::parse2::<Expr>(tokens)?;
+		// if parse2 becomes problematic use Expr::Verbatim(tokens)
+		commands
+			.entity(entity)
+			.insert(AttributeValueExpr::new(expr));
+	}
+
+	Ok(())
 }
 
 
