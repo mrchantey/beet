@@ -455,77 +455,109 @@ mod test {
 			);
 	}
 	#[test]
-	#[ignore]
 	fn template_attributes() {
 		// default
 		"<MyTemplate foo />".xmap(parse).to_be(
 			quote! {{(
-				NodeTag(String::from("br")),
-				ElementNode{self_closing:true},
-				related!(Attributes["foo".into_attr_key_bundle()])
+				NodeTag(String::from("MyTemplate")),
+				FragmentNode,
+				ItemOf::<beet_common::node::rsx_nodes::TemplateNode, beet_common::templating::rusty_tracker::RustyTracker>{
+					value: RustyTracker{index: 0u32, tokens_hash: 10188144591803042436u64},
+					phantom: std::marker::PhantomData::<beet_common::node::rsx_nodes::TemplateNode>
+				},
+				{
+					let template = <MyTemplate as Props>::Builder::default().foo(true).build();
+					#[allow(unused_braces)]
+					(TemplateRoot::spawn(Spawn(template.into_node_bundle())))
+				}
 			)}}
 			.to_string(),
 		);
 		// string
 		"<MyTemplate foo=\"bar\"/>".xmap(parse).to_be(
 			quote! {{(
-				NodeTag(String::from("br")),
-				ElementNode{self_closing:true},
-				related!(Attributes[(
-					"foo".into_attr_key_bundle(),
-					"bar".into_attr_val_bundle()
-				)])
+				NodeTag(String::from("MyTemplate")),
+				FragmentNode,
+				ItemOf::<beet_common::node::rsx_nodes::TemplateNode, beet_common::templating::rusty_tracker::RustyTracker>{
+					value: RustyTracker{index: 0u32, tokens_hash: 4889923030152902413u64},
+					phantom: std::marker::PhantomData::<beet_common::node::rsx_nodes::TemplateNode>
+				},
+				{
+					let template = <MyTemplate as Props>::Builder::default().foo("bar").build();
+					#[allow(unused_braces)]
+					(TemplateRoot::spawn(Spawn(template.into_node_bundle())))
+				}
 			)}}
 			.to_string(),
 		);
 		// bool
 		"<MyTemplate foo=true />".xmap(parse).to_be(
 			quote! {{(
-				NodeTag(String::from("br")),
-				ElementNode{self_closing:true},
-				related!(Attributes[(
-					"foo".into_attr_key_bundle(),
-					true.into_attr_val_bundle()
-				)])
+				NodeTag(String::from("MyTemplate")),
+				FragmentNode,
+				ItemOf::<beet_common::node::rsx_nodes::TemplateNode, beet_common::templating::rusty_tracker::RustyTracker>{
+					value: RustyTracker{index: 0u32, tokens_hash: 15310342799507411129u64},
+					phantom: std::marker::PhantomData::<beet_common::node::rsx_nodes::TemplateNode>
+				},
+				{
+					let template = <MyTemplate as Props>::Builder::default().foo(true).build();
+					#[allow(unused_braces)]
+					(TemplateRoot::spawn(Spawn(template.into_node_bundle())))
+				}
 			)}}
 			.to_string(),
 		);
 		// number
 		"<MyTemplate foo=20 />".xmap(parse).to_be(
 			quote! {{(
-				NodeTag(String::from("br")),
-				ElementNode{self_closing:true},
-				related!(Attributes[(
-					"foo".into_attr_key_bundle(),
-					20f64.into_attr_val_bundle()
-				)])
+				NodeTag(String::from("MyTemplate")),
+				FragmentNode,
+				ItemOf::<beet_common::node::rsx_nodes::TemplateNode, beet_common::templating::rusty_tracker::RustyTracker>{
+					value: RustyTracker{index: 0u32, tokens_hash: 11502427431261689614u64},
+					phantom: std::marker::PhantomData::<beet_common::node::rsx_nodes::TemplateNode>
+				},
+				{
+					let template = <MyTemplate as Props>::Builder::default().foo(20f64).build();
+					#[allow(unused_braces)]
+					(TemplateRoot::spawn(Spawn(template.into_node_bundle())))
+				}
 			)}}
 			.to_string(),
 		);
 		// ident
 		"<MyTemplate foo={bar} />".xmap(parse).to_be(
 			quote! {{(
-				NodeTag(String::from("br")),
-				ElementNode{self_closing:true},
-				related!(Attributes[(
-					"foo".into_attr_key_bundle(),
-					{ bar }.into_attr_val_bundle()
-				)])
+				NodeTag(String::from("MyTemplate")),
+				FragmentNode,
+				ItemOf::<beet_common::node::rsx_nodes::TemplateNode, beet_common::templating::rusty_tracker::RustyTracker>{
+					value: RustyTracker{index: 0u32, tokens_hash: 9730180295528883542u64},
+					phantom: std::marker::PhantomData::<beet_common::node::rsx_nodes::TemplateNode>
+				},
+				{
+					let template = <MyTemplate as Props>::Builder::default().foo({ bar }).build();
+					#[allow(unused_braces)]
+					(TemplateRoot::spawn(Spawn(template.into_node_bundle())))
+				}
 			)}}
 			.to_string(),
 		);
 		// element
 		"<MyTemplate foo={<br/>} />".xmap(parse).to_be(
 			quote! {{(
-				NodeTag(String::from("br")),
-				ElementNode{self_closing:true},
-				related!(Attributes[(
-					"foo".into_attr_key_bundle(),
-						{(
-							NodeTag(String::from("br")),
-							ElementNode { self_closing: true }
-						)}.into_attr_val_bundle()
-				)])
+				NodeTag(String::from("MyTemplate")),
+				FragmentNode,
+				ItemOf::<beet_common::node::rsx_nodes::TemplateNode, beet_common::templating::rusty_tracker::RustyTracker>{
+					value: RustyTracker{index: 0u32, tokens_hash: 7310951454258190932u64},
+					phantom: std::marker::PhantomData::<beet_common::node::rsx_nodes::TemplateNode>
+				},
+				{
+					let template = <MyTemplate as Props>::Builder::default().foo({ (
+						NodeTag(String::from("br")),
+						ElementNode { self_closing: true }
+					) }).build();
+					#[allow(unused_braces)]
+					(TemplateRoot::spawn(Spawn(template.into_node_bundle())))
+				}
 			)}}
 			.to_string(),
 		);
@@ -537,18 +569,23 @@ mod test {
 			.xmap(parse)
 			.to_be(
 				quote! {{(
-					NodeTag(String::from("br")),
-					ElementNode{self_closing:true},
-					related!(Attributes[(
-						"foo".into_attr_key_bundle(),
-						{
+					NodeTag(String::from("MyTemplate")),
+					FragmentNode,
+					ItemOf::<beet_common::node::rsx_nodes::TemplateNode, beet_common::templating::rusty_tracker::RustyTracker>{
+						value: RustyTracker{index: 0u32, tokens_hash: 577660515964029912u64},
+						phantom: std::marker::PhantomData::<beet_common::node::rsx_nodes::TemplateNode>
+					},
+					{
+						let template = <MyTemplate as Props>::Builder::default().foo({
 							let bar = (
 								NodeTag(String::from("br")),
 								ElementNode{self_closing:true}
 							);
 							bar
-						}.into_attr_val_bundle()
-					)])
+						}).build();
+						#[allow(unused_braces)]
+						(TemplateRoot::spawn(Spawn(template.into_node_bundle())))
+					}
 				)}}
 				.to_string(),
 			);
