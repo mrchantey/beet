@@ -1,0 +1,30 @@
+[package]
+name = "beet_mcp"
+edition = "2024"
+publish = false
+
+[dependencies]
+#💡 utils
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "io-std"] }
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+anyhow = "1"
+dotenv = "0.15"
+tracing = "0.1"
+serde = { version = "1", features = ["derive"] }
+
+#💡 mcp
+rmcp = { git = "https://github.com/modelcontextprotocol/rust-sdk", branch = "main", features = [
+	"transport-io",
+] }
+axum = { version = "0.8", features = ["macros"] }
+serde_json = "1"
+
+#💡 rig
+rig-core = { version = "0.12", features = ["derive"] }
+#💡 sqlite
+rig-sqlite = { version = "0.1", features = [] }
+rusqlite = { version = "0.32", features = ["bundled"] }
+sqlite-vec = "0.1"
+tokio-rusqlite = { version = "0.6", features = [
+	"bundled",
+], default-features = false }

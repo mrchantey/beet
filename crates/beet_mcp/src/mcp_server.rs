@@ -1,0 +1,293 @@
+#![allow(unexpected_cfgs)]
+use crate::prelude::*;
+use anyhow::Result;
+use rmcp::Error as McpError;
+use rmcp::RoleServer;
+use rmcp::ServerHandler;
+use rmcp::ServiceExt;
+use rmcp::const_string;
+use rmcp::model::*;
+use rmcp::schemars;
+use rmcp::service::RequestContext;
+use rmcp::tool;
+use rmcp::transport::stdio;
+use serde_json::json;
+use std::sync::Arc;
+use tokio::sync::Mutex;
+
+#[derive(Debug, serde::Deserialize, schemars::JsonSchema)]
+pub struct StructRequest {
+	pub a: i32,
+	pub b: i32,
+}
+
+#[derive(Clone)]
+pub struct McpServer {
+	/// example of persistant server state.
+	/// for stdio requests this will always be 0.
+	request_count: Arc<Mutex<i32>>,
+	/// a test database of a fictional world
+	nexus_db: NexusArcanaDb,
+}
+
+#[tool(tool_box)]
+impl McpServer {
+	pub async fn new() -> Result<Self> {
+		Ok(Self {
+			request_count: Arc::new(Mutex::new(0)),
+			nexus_db: NexusArcanaDb::init().await?,
+		})
+	}
+
+	pub async fn serve_stdio(self) -> Result<()> {
+		self.serve(stdio())
+			.await
+			.inspect_err(|e| {
+				tracing::error!("serving error: {:?}", e);
+			})?
+			.waiting()
+			.await?;
+		Ok(())
+	}
+
+	fn create_resource_text(&self, uri: &str, name: &str) -> Resource {
+		RawResource::new(uri, name.to_string()).no_annotation()
+	}
+
+	async fn increment_count(&self) -> Result<i32, McpError> {
+		let mut counter = self.request_count.lock().await;
+		*counter += 1;
+		Ok(*counter)
+	}
+
+	#[tool(description = "Get the number of requests made to the server")]
+	async fn get_count(&self) -> Result<CallToolResult, McpError> {
+		Ok(CallToolResult::success(vec![Content::text(
+			self.increment_count().await?.to_string(),
+		)]))
+	}
+
+	#[tool(description = "Ping the server to check if it's alive")]
+	async fn ping(&self) -> Result<CallToolResult, McpError> {
+		tracing::info!("ping");
+		self.increment_count().await?;
+		let now = std::time::SystemTime::now();
+		let formatted = now
+			.duration_since(std::time::UNIX_EPOCH)
+			.map_err(|_| McpError::internal_error("time_error", None))?
+			.as_secs();
+		Ok(CallToolResult::success(vec![Content::text(format!(
+			"pong at {:2} seconds since epoch",
+			formatted
+		))]))
+	}
+
+	#[tool(
+		description = "Query a vector db about the fictional world of Nexus Arcana"
+	)]
+	async fn query_nexus(
+		&self,
+		#[tool(param)]
+		#[schemars(
+			description = "Summary of the question to ask about Nexus Arcana"
+		)]
+		question: String,
+		#[tool(param)]
+		#[schemars(
+			description = "Max number of results to return, agents discression, start with 5"
+		)]
+		max_results: usize,
+	) -> Result<CallToolResult, McpError> {
+		self.nexus_db.query_mcp(&question, max_results).await
+	}
+
+	#[tool(description = "Calculate the sum of two numbers")]
+	fn sum(
+		&self,
+		#[tool(aggr)] StructRequest { a, b }: StructRequest,
+	) -> Result<CallToolResult, McpError> {
+		Ok(CallToolResult::success(vec![Content::text(
+			(a + b).to_string(),
+		)]))
+	}
+}
+
+const_string!(Echo = "echo");
+#[tool(tool_box)]
+impl ServerHandler for McpServer {
+	fn get_info(&self) -> ServerInfo {
+		ServerInfo {
+            protocol_version: ProtocolVersion::V_2024_11_05,
+            capabilities: ServerCapabilities::builder()
+                .enable_prompts()
+                .enable_resources()
+                .enable_tools()
+                .build(),
+            server_info: Implementation::from_build_env(),
+            instructions: Some(r#"
+This is an mcp server primarily for retrieving documents from vector stores.
+For testing we use a fictional world called Nexus Arcana, see the `query_nexus` tool.
+"#.to_string()),
+        }
+	}
+
+	async fn list_resources(
+		&self,
+		_request: Option<PaginatedRequestParam>,
+		_: RequestContext<RoleServer>,
+	) -> Result<ListResourcesResult, McpError> {
+		Ok(ListResourcesResult {
+			resources: vec![
+				self.create_resource_text("str:////Users/to/some/path/", "cwd"),
+				self.create_resource_text("memo://insights", "memo-name"),
+			],
+			next_cursor: None,
+		})
+	}
+
+	async fn read_resource(
+		&self,
+		ReadResourceRequestParam { uri }: ReadResourceRequestParam,
+		_: RequestContext<RoleServer>,
+	) -> Result<ReadResourceResult, McpError> {
+		match uri.as_str() {
+			"str:////Users/to/some/path/" => {
+				let cwd = "/Users/to/some/path/";
+				Ok(ReadResourceResult {
+					contents: vec![ResourceContents::text(cwd, uri)],
+				})
+			}
+			"memo://insights" => {
+				let memo = "Business Intelligence Memo\n\nAnalysis has revealed 5 key insights ...";
+				Ok(ReadResourceResult {
+					contents: vec![ResourceContents::text(memo, uri)],
+				})
+			}
+			_ => Err(McpError::resource_not_found(
+				"resource_not_found",
+				Some(json!({
+					"uri": uri
+				})),
+			)),
+		}
+	}
+
+	async fn list_prompts(
+		&self,
+		_request: Option<PaginatedRequestParam>,
+		_: RequestContext<RoleServer>,
+	) -> Result<ListPromptsResult, McpError> {
+		Ok(ListPromptsResult {
+			next_cursor: None,
+			prompts: vec![Prompt::new(
+				"example_prompt",
+				Some(
+					"This is an example prompt that takes one required argument, message",
+				),
+				Some(vec![PromptArgument {
+					name: "message".to_string(),
+					description: Some(
+						"A message to put in the prompt".to_string(),
+					),
+					required: Some(true),
+				}]),
+			)],
+		})
+	}
+
+	async fn get_prompt(
+		&self,
+		GetPromptRequestParam { name, arguments }: GetPromptRequestParam,
+		_: RequestContext<RoleServer>,
+	) -> Result<GetPromptResult, McpError> {
+		match name.as_str() {
+			"example_prompt" => {
+				let message = arguments
+					.and_then(|json| {
+						json.get("message")?.as_str().map(|s| s.to_string())
+					})
+					.ok_or_else(|| {
+						McpError::invalid_params(
+							"No message provided to example_prompt",
+							None,
+						)
+					})?;
+
+				let prompt = format!(
+					"This is an example prompt with your message here: '{message}'"
+				);
+				Ok(GetPromptResult {
+					description: None,
+					messages: vec![PromptMessage {
+						role: PromptMessageRole::User,
+						content: PromptMessageContent::text(prompt),
+					}],
+				})
+			}
+			_ => Err(McpError::invalid_params("prompt not found", None)),
+		}
+	}
+
+	async fn list_resource_templates(
+		&self,
+		_request: Option<PaginatedRequestParam>,
+		_: RequestContext<RoleServer>,
+	) -> Result<ListResourceTemplatesResult, McpError> {
+		Ok(ListResourceTemplatesResult {
+			next_cursor: None,
+			resource_templates: Vec::new(),
+		})
+	}
+
+	async fn initialize(
+		&self,
+		_request: InitializeRequestParam,
+		context: RequestContext<RoleServer>,
+	) -> Result<InitializeResult, McpError> {
+		if let Some(http_request_part) =
+			context.extensions.get::<axum::http::request::Parts>()
+		{
+			let initialize_headers = &http_request_part.headers;
+			let initialize_uri = &http_request_part.uri;
+			tracing::info!(?initialize_headers, %initialize_uri, "initialize from http server");
+		}
+		Ok(self.get_info())
+	}
+}
+
+impl Into<Content> for QueryResult {
+	fn into(self) -> Content { Content::text(self.to_markdown()) }
+}
+
+/// a test database
+#[derive(Clone)]
+struct NexusArcanaDb {
+	db: Database,
+}
+
+impl std::ops::Deref for NexusArcanaDb {
+	type Target = Database;
+
+	fn deref(&self) -> &Self::Target { &self.db }
+}
+
+impl NexusArcanaDb {
+	/// Connect to the Nexus Arcana database, populating it with initial data if necessary.
+	async fn init() -> Result<Self> {
+		let path = "vector_stores/nexus_arcana.db";
+		let db = Database::connect(path).await?;
+		// fs::remove_dir(path).ok();
+
+		if db.is_empty().await? {
+			tracing::info!("initializing nexus arcana db");
+			let content = include_str!("../nexus_arcana.md");
+			db.split_and_store("nexus_arcana.md", content, SplitText::Newline)
+				.await?;
+			// println!("Inserting documents: {:#?}", documents);
+		} else {
+			tracing::info!("connecting to nexus arcana db");
+		}
+
+		Ok(Self { db })
+	}
+}

@@ -1,0 +1,19 @@
+{
+	"servers": {
+		// "rmcp-servers-stdio": {
+		// 	"type": "stdio",
+		// 	// "command": "/home/pete/.cargo_target/release/examples/servers_std_io",
+		// 	"command": "cargo",
+		// 	"args": ["run", "--example", "servers_std_io"]
+		// },
+		"servers-stdio-dev": {
+			"type": "stdio",
+			// "command": "/home/pete/.cargo_target/release/examples/servers_std_io",
+			"command": "cargo",
+			"args": ["run",
+			"--manifest-path",
+			"/home/pete/me/beet/crates/beet_mcp/Cargo.toml",
+			"--example", "hello_mcp"]
+		}
+	}
+}

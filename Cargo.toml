@@ -35,6 +35,7 @@ publish = false
 [workspace]
 # default resolver
 resolver = "2"
+exclude = ["crates/beet_mcp"]
 members = [
 	"crates/beet_site",
 	"crates/beet-cli",
