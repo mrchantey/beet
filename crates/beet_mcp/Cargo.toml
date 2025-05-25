@@ -28,3 +28,4 @@ sqlite-vec = "0.1"
 tokio-rusqlite = { version = "0.6", features = [
 	"bundled",
 ], default-features = false }
+rustdoc-md = "0.1.0"

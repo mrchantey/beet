@@ -6,3 +6,11 @@ clear:
 inspect:
 	cargo build
 	sweet watch --cmd "npx @modelcontextprotocol/inspector cargo run"
+
+
+
+mddoc:
+	RUSTDOCFLAGS="-Z unstable-options --output-format json" \
+	cargo doc \
+	--target-dir target/doc
+	cargo run --bin mddoc
