@@ -2,6 +2,12 @@
 name = "beet_mcp"
 edition = "2024"
 publish = false
+default-run = "beet_mcp"
+
+[[bin]]
+name = "beet_mcp"
+path = "src/main.rs"
+
 
 [dependencies]
 #💡 utils
@@ -14,7 +20,13 @@ serde = { version = "1", features = ["derive"] }
 
 #💡 mcp
 # fix: generic tool_box
-rmcp = { path = "../../../rmcp/crates/rmcp", features = ["transport-io"] }
+rmcp = { path = "../../../rmcp/crates/rmcp", features = [
+	"client",
+	"__reqwest",
+	"transport-io",
+	"transport-sse-client",
+	"transport-child-process",
+] }
 # rmcp = { git = "https://github.com/modelcontextprotocol/rust-sdk", branch = "main", features = [
 # 	"transport-io",
 # ] }

@@ -3,6 +3,7 @@
 pub mod database;
 pub mod embed_model;
 pub mod mcp_server;
+pub mod mcp_client;
 pub mod split_text;
 
 
@@ -12,11 +13,12 @@ pub mod prelude {
 	pub use crate::database::*;
 	pub use crate::embed_model::*;
 	pub use crate::mcp_server::*;
+	pub use crate::mcp_client::*;
 	pub use crate::split_text::*;
 }
 
 
-/// init tracing and dotenv
+/// inits tracing
 pub fn init_tracing() {
 	tracing_subscriber::fmt()
 		.with_env_filter(
@@ -27,5 +29,4 @@ pub fn init_tracing() {
 		// dont format the output
 		.with_ansi(false)
 		.init();
-	tracing::info!("initializing environment");
 }
