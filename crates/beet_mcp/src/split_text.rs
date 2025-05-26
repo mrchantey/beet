@@ -234,7 +234,7 @@ More content here to ensure we get multiple chunks.
 		// Check document structure
 		for (i, doc) in documents.iter().enumerate() {
 			// ID should be path with chunk index
-			assert_eq!(doc.id, format!("test.md/{}", i));
+			assert_eq!(doc.id, format!("test.md#{}", i));
 			assert!(!doc.content.is_empty());
 		}
 	}
@@ -250,7 +250,7 @@ More content here to ensure we get multiple chunks.
 
 		// Check that path is preserved in document IDs
 		for (i, doc) in documents.iter().enumerate() {
-			assert_eq!(doc.id, format!("src/lib.rs/{}", i));
+			assert_eq!(doc.id, format!("src/lib.rs#{}", i));
 		}
 	}
 

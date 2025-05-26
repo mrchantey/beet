@@ -6,7 +6,7 @@ async fn main() -> Result<(), anyhow::Error> {
 
 	let db = Database::connect(
 		EmbedModel::mxbai_large(),
-		"vector_stores/vector_store_example.db",
+		"vector_stores/examples/vector_store.db",
 	)
 	.await?;
 

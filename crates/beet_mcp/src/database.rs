@@ -14,6 +14,8 @@ use serde::Deserialize;
 use sqlite_vec::sqlite3_vec_init;
 use std::path::Path;
 use std::usize;
+use sweet::prelude::GlobFilter;
+use sweet::prelude::ReadDir;
 use tokio_rusqlite::Connection;
 
 
@@ -92,11 +94,45 @@ impl<E: EmbeddingModel> Database<E> {
 		Ok(self.query("foo", 2).await?.is_empty())
 	}
 
-	pub async fn load_and_store(&self, path: impl AsRef<Path>) -> Result<()> {
+	// TODO parallel split and group store
+	pub async fn load_and_store_dir(
+		&self,
+		dir: impl AsRef<Path>,
+		filter: GlobFilter,
+	) -> Result<()> {
+		let files = ReadDir::files_recursive(dir)?
+			.into_iter()
+			.filter(|file| filter.passes(file))
+			.collect::<Vec<_>>();
+		let num_files = files.len();
+		println!("Loading {} files", num_files);
+		for (i, file) in files.into_iter().enumerate() {
+			tracing::info!(
+				"🚀🚀🚀 Loading file {}/{}: {}",
+				i + 1,
+				num_files,
+				file.to_string_lossy()
+			);
+			self.load_and_store_file(file).await?;
+		}
+		// let files = files
+		// 	.into_iter()
+		// 	// todo par_iter()
+		// 	.map(|file| self.load_and_store_file(file));
+		// futures::future::try_join_all(files).await?;
+		Ok(())
+	}
+
+	pub async fn load_and_store_file(
+		&self,
+		path: impl AsRef<Path>,
+	) -> Result<()> {
 		let path = path.as_ref();
-		let content = std::fs::read_to_string(path)?;
+		let content = tokio::fs::read_to_string(path).await?;
 		self.split_and_store(path, &content).await
 	}
+
+
 	pub async fn split_and_store(
 		&self,
 		path: impl AsRef<Path>,
@@ -258,7 +294,7 @@ mod test {
 		let db = Database::connect(EmbedModel::all_minilm(), ":memory:")
 			.await
 			.unwrap();
-		db.load_and_store("nexus_arcana.md").await.unwrap();
+		db.load_and_store_file("nexus_arcana.md").await.unwrap();
 
 		let results = db.query("resonance", 1).await.unwrap();
 		assert_eq!(results.len(), 1);

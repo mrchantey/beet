@@ -12,6 +12,7 @@ path = "src/main.rs"
 [dependencies]
 #💡 utils
 tokio = { version = "1", features = ["macros", "rt-multi-thread", "io-std"] }
+sweet = { path = "../../ws_sweet/sweet", features = ["fs"] }
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 anyhow = "1"
 dotenv = "0.15"
@@ -45,6 +46,7 @@ tokio-rusqlite = { version = "0.6", features = [
 rustdoc-md = "0.1"
 text-splitter = { version = "0.26", features = ["code", "markdown"] }
 tree-sitter-rust = "0.24"
+futures = "0.3"
 
 [dev-dependencies]
 tokio-test = "0.4"
