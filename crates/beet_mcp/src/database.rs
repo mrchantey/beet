@@ -128,21 +128,11 @@ impl<E: EmbeddingModel> Database<E> {
 			.filter(|file| filter.passes(file))
 			.collect::<Vec<_>>();
 		let num_files = files.len();
-		println!("Loading {} files", num_files);
+		tracing::info!("Loading {} files", num_files);
 		for (i, file) in files.into_iter().enumerate() {
-			tracing::info!(
-				"🚀🚀🚀 Loading file {}/{}: {}",
-				i + 1,
-				num_files,
-				file.to_string_lossy()
-			);
+			tracing::info!("Loading file {}/{}", i + 1, num_files,);
 			self.load_and_store_file(file).await?;
 		}
-		// let files = files
-		// 	.into_iter()
-		// 	// todo par_iter()
-		// 	.map(|file| self.load_and_store_file(file));
-		// futures::future::try_join_all(files).await?;
 		Ok(())
 	}
 
@@ -169,7 +159,7 @@ impl<E: EmbeddingModel> Database<E> {
 				content: doc.content,
 			})
 			.collect::<Vec<_>>();
-		tracing::info!(
+		tracing::debug!(
 			"Storing {} documents from {}",
 			documents.len(),
 			path.as_ref().to_string_lossy()
@@ -234,7 +224,7 @@ impl std::fmt::Display for QueryResult {
 
 #[derive(Debug, Clone, Embed, Deserialize, PartialEq, Eq, Hash)]
 pub struct Document {
-	/// id for tracing the origin of the document, this is ignored in the vector store
+	/// id for tracing the origin of the document
 	pub id: String,
 	#[embed]
 	pub content: String,
@@ -304,7 +294,7 @@ mod test {
 			results[0]
 				.document
 				.content
-				.starts_with("## Core Concepts\n\n- **Resonance**"),
+				.contains("## Core Concepts\n\n- **Resonance**"),
 		);
 	}
 }

@@ -79,7 +79,7 @@ impl<S: Service<RoleClient>> McpClient<S> {
 				arguments: serde_json::to_value(query)?.as_object().cloned(),
 			})
 			.await?;
-		tracing::info!("Tool result: {tool_result:#?}");
+		tracing::debug!("Tool result: {tool_result:#?}");
 		Ok(tool_result)
 	}
 
@@ -90,13 +90,13 @@ impl<S: Service<RoleClient>> McpClient<S> {
 		let tool_result = self
 			.service
 			.call_tool(CallToolRequestParam {
-				name: "crate_rag".into(),
+				name: "crate_usage_rag".into(),
 				arguments: serde_json::to_value(crate_query)?
 					.as_object()
 					.cloned(),
 			})
 			.await?;
-		tracing::info!("Tool result: {tool_result:#?}");
+		tracing::debug!("Tool result: {tool_result:#?}");
 		Ok(tool_result)
 	}
 

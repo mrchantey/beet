@@ -1,13 +1,13 @@
+use crate::prelude::CrateQueryScope;
+use crate::prelude::Database;
 use anyhow::Result;
 use rig::embeddings::EmbeddingModel;
 use rmcp::schemars;
 use serde::Deserialize;
 use serde::Serialize;
-use sweet::prelude::GlobFilter;
-
-use crate::prelude::Database;
 use std::collections::HashMap;
 use std::sync::LazyLock;
+
 
 /// The key in a kvp of [`CrateMeta`] and [`RepoMeta`].
 #[derive(
@@ -28,9 +28,7 @@ pub struct CrateMeta {
 }
 
 impl CrateMeta {
-	pub fn bevy_0_16_0() -> Self {
-		Self::new("bevy", "0.16.0")
-	}
+	pub fn bevy_0_16_0_usage() -> Self { Self::new("bevy", "0.16.0") }
 
 	pub fn new(crate_name: &str, crate_version: &str) -> Self {
 		Self {
@@ -41,10 +39,11 @@ impl CrateMeta {
 	pub fn local_repo_path(&self) -> String {
 		format!(".cache/repos/{}", self.crate_name)
 	}
-	/// ie the connection string to the database.
-	pub fn local_db_path(&self) -> String {
+	/// ie the connection string to the database. Each crate has a seperate
+	/// database for each of the scopes.
+	pub fn local_db_path(&self, scope: CrateQueryScope) -> String {
 		format!(
-			".cache/repo-dbs/{}-{}.db",
+			".cache/repo-dbs/{}-{}-{scope}.db",
 			self.crate_name, self.crate_version
 		)
 	}
@@ -87,6 +86,18 @@ pub static KNOWN_CRATES: LazyLock<HashMap<CrateMeta, RepoMeta>> =
 						.to_string(),
 				},
 			),
+			(
+				CrateMeta {
+					crate_name: "bevy".to_string(),
+					crate_version: "0.4.0".to_string(),
+				},
+				RepoMeta {
+					git_url: "https://github.com/BevyEngine/bevy.git"
+						.to_string(),
+					commit_hash: "3b2c6ce49b3b9ea8bc5cb68f8d350a80ff928af6"
+						.to_string(),
+				},
+			),
 		]
 		.into_iter()
 		.collect()
@@ -97,11 +108,12 @@ pub struct IndexRepository;
 impl IndexRepository {
 	/// Yup, its a big one, if using a cloud embedding model this could result in
 	/// $5-$100 dollars in charges.
-	pub async fn try_index_all<E: 'static + EmbeddingModel>(
+	pub async fn index_all_known_crates<E: 'static + EmbeddingModel>(
 		embed_model: E,
+		scope: CrateQueryScope,
 	) -> Result<()> {
 		for (crate_meta, _) in KNOWN_CRATES.iter() {
-			Self::try_index(embed_model.clone(), crate_meta).await?;
+			Self::try_index(embed_model.clone(), crate_meta, scope).await?;
 		}
 		Ok(())
 	}
@@ -110,6 +122,7 @@ impl IndexRepository {
 	pub async fn try_index<E: 'static + EmbeddingModel>(
 		embed_model: E,
 		crate_meta: &CrateMeta,
+		scope: CrateQueryScope,
 	) -> Result<()> {
 		let Some(repo_meta) = KNOWN_CRATES.get(&crate_meta) else {
 			anyhow::bail!(
@@ -118,7 +131,7 @@ impl IndexRepository {
 				crate_meta.crate_version
 			);
 		};
-		let db_path = crate_meta.local_db_path();
+		let db_path = crate_meta.local_db_path(scope);
 		let repo_path = crate_meta.local_repo_path();
 
 		let db = Database::connect(embed_model, &db_path).await?;
@@ -153,11 +166,7 @@ impl IndexRepository {
 				.spawn()?
 				.wait()
 				.await?;
-			let filter = GlobFilter::default()
-				.with_exclude("*.git*")
-				.with_include("*.rs")
-				.with_include("*.md");
-			db.load_and_store_dir(repo_path, filter).await?;
+			db.load_and_store_dir(repo_path, scope.filter()).await?;
 			let elapsed = start.elapsed();
 
 			let metadata = std::fs::metadata(db_path)?;

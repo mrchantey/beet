@@ -6,7 +6,7 @@ async fn main() -> Result<()> {
 	// clear db when changing repo or embedding model
 	// std::fs::remove_file(db_path).ok();
 
-	init_tracing();
+	init_tracing(tracing::Level::INFO);
 	// let repository = "https://github.com/bevyengine/bevy.git";
 	// let embed_model = EmbedModel::all_minilm();
 	let embedding_model = EmbedModel::mxbai_large();
@@ -15,15 +15,17 @@ async fn main() -> Result<()> {
 		crate_name: "bevy".to_string(),
 		crate_version: "0.16.0".to_string(),
 	};
+	let scope = CrateQueryScope::PublicApi;
 
 	// IndexRepository::new(
 	// 	"pokemon-info",
 	// 	"https://github.com/minsoeaung/pokemon-info.git",
 	// )
-	IndexRepository::try_index(embedding_model.clone(), &crate_meta).await?;
+	IndexRepository::try_index(embedding_model.clone(), &crate_meta, scope)
+		.await?;
 
 	let results =
-		Database::connect(embedding_model, &crate_meta.local_db_path())
+		Database::connect(embedding_model, &crate_meta.local_db_path(scope))
 			.await?
 			.query(&RagQuery::new("how to create a character controller", 10))
 			.await?;

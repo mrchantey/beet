@@ -2,7 +2,7 @@ use beet_mcp::prelude::*;
 
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
-	init_tracing();
+	init_tracing(tracing::Level::INFO);
 
 	let db = Database::connect(
 		EmbedModel::mxbai_large(),

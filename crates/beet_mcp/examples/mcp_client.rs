@@ -3,7 +3,7 @@ use beet_mcp::prelude::*;
 
 #[tokio::main]
 async fn main() -> Result<()> {
-	init_tracing();
+	init_tracing(tracing::Level::INFO);
 	let client = McpClient::new_stdio_dev().await?;
 	let tools = client.list_tools(Default::default()).await?;
 	println!("Tools: {:#?}", tools);
@@ -19,7 +19,8 @@ async fn main() -> Result<()> {
 				"how do you create a simple scene with a 2d camera",
 				2,
 			),
-			crate_meta: CrateMeta::bevy_0_16_0(),
+			crate_meta: CrateMeta::bevy_0_16_0_usage(),
+			scope: CrateQueryScope::PublicApi,
 		})
 		.await?;
 	tracing::info!("Crate Responses: {results:#?}");

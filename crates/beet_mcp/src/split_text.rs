@@ -16,7 +16,10 @@ pub struct SplitText<'a> {
 	pub chunk_range: Range<usize>,
 }
 
-const DEFAULT_CHUNK_RANGE: Range<usize> = 300..1000;
+/// min/max chunk size for text splitting
+// experiments:
+// 300..1000 too small, cant get a full function
+const DEFAULT_CHUNK_RANGE: Range<usize> = 1500..3000;
 
 impl<'a> SplitText<'a> {
 	pub fn new(path: &'a Path, content: &'a str) -> Self {

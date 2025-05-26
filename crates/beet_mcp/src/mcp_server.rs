@@ -22,8 +22,14 @@ use tokio::sync::Mutex;
 pub struct CrateRagQuery {
 	pub rag_query: RagQuery,
 	pub crate_meta: CrateMeta,
+	#[schemars(
+		description = "Whether the query is for usage or internals of the crate"
+	)]
+	pub scope: CrateQueryScope,
 }
 
+
+impl CrateRagQuery {}
 
 #[derive(Clone)]
 pub struct McpServer<E: 'static + Clone + EmbeddingModel> {
@@ -102,8 +108,7 @@ impl<E: 'static + Clone + EmbeddingModel> McpServer<E> {
 	}
 
 	#[tool(description = r#"
-For a provided crate name, version and query, get the  
-
+Query for information about how the public api of a crate may be used.
 "#)]
 	async fn crate_rag(
 		&self,
@@ -114,7 +119,7 @@ For a provided crate name, version and query, get the
 		self.tool_middleware("crate_rag", query, async move |query| {
 			let db = Database::connect(
 				model.clone(),
-				&query.crate_meta.local_db_path(),
+				&query.crate_meta.local_db_path(query.scope),
 			)
 			.await?;
 			db.query(&query.rag_query).await

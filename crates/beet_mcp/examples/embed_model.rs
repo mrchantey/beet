@@ -3,7 +3,7 @@ use rig::embeddings::EmbeddingModel;
 
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
-	init_tracing();
+	init_tracing(tracing::Level::INFO);
 	let model = EmbedModel::mxbai_large();
 
 	let content = "**Luminaris**: The central city built around the Nexus Spire, where reality is most stable. Home to the Council of Archons who govern the fragmented realms.";
