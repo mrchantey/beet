@@ -6,7 +6,6 @@ use rmcp::model::ClientCapabilities;
 use rmcp::model::ClientInfo;
 use rmcp::model::Implementation;
 use rmcp::model::InitializeRequestParam;
-use rmcp::model::ListToolsResult;
 use rmcp::service::RunningService;
 use rmcp::service::ServiceExt;
 use rmcp::transport::ConfigureCommandExt;
@@ -17,7 +16,12 @@ use tokio::process::Command;
 /// A typed example of a beet mcp client, this is for testing and examples, usually
 /// an llm would be querying the mcp server directly
 pub struct McpClient<S: Service<RoleClient>> {
-	service: RunningService<RoleClient, S>,
+	pub service: RunningService<RoleClient, S>,
+}
+
+impl<S: Service<RoleClient>> std::ops::Deref for McpClient<S> {
+	type Target = RunningService<RoleClient, S>;
+	fn deref(&self) -> &Self::Target { &self.service }
 }
 
 impl McpClient<()> {
@@ -39,15 +43,24 @@ impl McpClient<()> {
 }
 
 impl McpClient<InitializeRequestParam> {
-	pub async fn new_sse() -> Result<Self> {
-		let transport =
-			SseClientTransport::start("http://localhost:8000/sse").await?;
+	/// create new mcp client using Server Sent Events (SSE) transport
+	/// ## Example
+	/// ```no_run
+	/// # use beet_mcp::prelude::*;
+	/// # tokio_test::block_on(async {
+	/// let client = McpClient::new_sse("http://localhost:8000/sse").await.unwrap();
+	/// let tools = client.list_tools().await.unwrap();
+	/// println!("Available tools: {:#?}", tools);
+	/// # })
+	/// ```
+	pub async fn new_sse(url: &str) -> Result<Self> {
+		let transport = SseClientTransport::start(url).await?;
 		let client_info = ClientInfo {
 			protocol_version: Default::default(),
 			capabilities: ClientCapabilities::default(),
 			client_info: Implementation {
-				name: "test sse client".to_string(),
-				version: "0.0.1".to_string(),
+				name: "beet_mcp client".to_string(),
+				version: env!("CARGO_PKG_VERSION").to_string(),
 			},
 		};
 		let service = client_info.serve(transport).await?;
@@ -56,10 +69,6 @@ impl McpClient<InitializeRequestParam> {
 }
 
 impl<S: Service<RoleClient>> McpClient<S> {
-	pub async fn list_tools(&self) -> Result<ListToolsResult> {
-		let tools = self.service.list_tools(Default::default()).await?;
-		Ok(tools)
-	}
 	pub async fn query_nexus(
 		&self,
 		question: &str,

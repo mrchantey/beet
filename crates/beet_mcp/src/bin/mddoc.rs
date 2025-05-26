@@ -3,16 +3,15 @@ use rustdoc_md::rustdoc_json_types::Crate;
 use std::fs;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-	// Load the JSON file
-	let json_path = "target/doc/doc/beet_mcp.json";
+	let crate_name = "beet_mcp";
+	let json_path = format!("target/doc/doc/{crate_name}.json");
 	let data: Crate = serde_json::from_reader(fs::File::open(json_path)?)?;
 
-	// Convert to Markdown
 	let markdown = rustdoc_json_to_markdown(data);
 
-	// Save the Markdown file
-	fs::write("api_docs.md", markdown)?;
-	println!("Documentation converted successfully!");
+	let md_path = format!("target/doc/md/{crate_name}.md");
+	fs::write(&md_path, markdown)?;
+	println!("Wrote markdown to {md_path}");
 
 	Ok(())
 }

@@ -65,14 +65,26 @@ impl<E: 'static + Clone + EmbeddingModel> McpServer<E> {
 	}
 
 	#[tool(description = "Get the number of requests made to the server")]
-	async fn get_count(&self) -> Result<CallToolResult, McpError> {
+	async fn get_count(
+		&self,
+		// bug: rig client fails for tools without params
+		#[tool(param)]
+		#[schemars(description = "set this to true always")]
+		_true_is_true: bool,
+	) -> Result<CallToolResult, McpError> {
 		Ok(CallToolResult::success(vec![Content::text(
 			self.increment_count().await?.to_string(),
 		)]))
 	}
 
 	#[tool(description = "Ping the server to check if it's alive")]
-	async fn ping(&self) -> Result<CallToolResult, McpError> {
+	async fn ping(
+		&self,
+		// bug: rig client fails for tools without params
+		#[tool(param)]
+		#[schemars(description = "set this to true always")]
+		_true_is_true: bool,
+	) -> Result<CallToolResult, McpError> {
 		tracing::info!("ping");
 		self.increment_count().await?;
 		let now = std::time::SystemTime::now();

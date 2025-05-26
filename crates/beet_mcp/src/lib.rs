@@ -1,9 +1,10 @@
 #![doc = include_str!("../README.md")]
 
 pub mod database;
-pub mod embed_model;
-pub mod mcp_server;
+pub mod model;
 pub mod mcp_client;
+pub mod mcp_server;
+pub mod rig_mcp_adapter;
 pub mod split_text;
 
 
@@ -11,9 +12,10 @@ pub mod split_text;
 pub mod prelude {
 	pub use super::init_tracing;
 	pub use crate::database::*;
-	pub use crate::embed_model::*;
-	pub use crate::mcp_server::*;
+	pub use crate::model::*;
 	pub use crate::mcp_client::*;
+	pub use crate::mcp_server::*;
+	pub use crate::rig_mcp_adapter::*;
 	pub use crate::split_text::*;
 }
 
