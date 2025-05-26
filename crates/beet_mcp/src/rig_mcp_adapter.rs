@@ -148,7 +148,7 @@ impl RigTool for McpToolAdaptor {
 						.map_err(rig::tool::ToolError::JsonError)?,
 				})
 				.await
-				.inspect(|result| tracing::info!(?result))
+				.inspect(|result| tracing::debug!(?result))
 				.inspect_err(|error| tracing::error!(%error))
 				.map_err(|e| {
 					rig::tool::ToolError::ToolCallError(Box::new(e))

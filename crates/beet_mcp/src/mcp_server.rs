@@ -15,21 +15,40 @@ use rmcp::transport::stdio;
 use serde::Deserialize;
 use serde::Serialize;
 use serde_json::json;
+use std::fs;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
 #[derive(Debug, Serialize, Deserialize, schemars::JsonSchema)]
+#[schemars(description = "A query for a crate's documentation or source code")]
 pub struct CrateRagQuery {
+	#[serde(flatten)]
 	pub rag_query: RagQuery,
+	#[serde(flatten)]
 	pub crate_meta: CrateMeta,
-	#[schemars(
-		description = "Whether the query is for usage or internals of the crate"
-	)]
-	pub scope: CrateQueryScope,
+	// this sucks but rmcp no enum
+	#[schemars(description = "\
+Either `public-api` or `internals`. \
+## `public-api` 
+How to use the crate, ie examples, tests, documentation. \
+	This should be the default scope for most queries.
+## `internals` \
+Implementations of engine internals. \
+Only query for this if you are certain you need to know how the internals of a function\
+as it may misguide you to reimplement engine internals instead of using the public API. \
+an example for an acceptable use is implementing new features for the crate
+		 ")]
+	// #[serde(flatten)]
+	pub scope: String,
+	// pub scope: CrateQueryScope,
 }
 
+impl CrateRagQuery {
+	pub fn scope(&self) -> Result<CrateQueryScope> {
+		CrateQueryScope::try_from(self.scope.as_str())
+	}
+}
 
-impl CrateRagQuery {}
 
 #[derive(Clone)]
 pub struct McpServer<E: 'static + Clone + EmbeddingModel> {
@@ -106,26 +125,6 @@ impl<E: 'static + Clone + EmbeddingModel> McpServer<E> {
 			formatted
 		))]))
 	}
-
-	#[tool(description = r#"
-Query for information about a crate, including documentation, examples, source code, etc
-"#)]
-	async fn crate_rag(
-		&self,
-		#[tool(aggr)] query: CrateRagQuery,
-	) -> Result<CallToolResult, McpError> {
-		// panic!()
-		let model = self.embedding_model.clone();
-		self.tool_middleware("crate_rag", query, async move |query| {
-			let db = Database::connect(
-				model.clone(),
-				&query.crate_meta.local_db_path(query.scope),
-			)
-			.await?;
-			db.query(&query.rag_query).await
-		})
-		.await
-	}
 	#[tool(
 		description = "Query a vector db about the fictional world of Nexus Arcana"
 	)]
@@ -139,6 +138,32 @@ Query for information about a crate, including documentation, examples, source c
 		})
 		.await
 	}
+	#[tool(description = r#"
+	Query for information about a crate, including documentation, examples, source code, etc
+	"#)]
+	async fn crate_rag(
+		&self,
+		#[tool(aggr)] query: CrateRagQuery,
+	) -> Result<CallToolResult, McpError> {
+		let model = self.embedding_model.clone();
+		self.tool_middleware("crate_rag", query, async move |query| {
+			let scope = query.scope()?;
+			let db_path = query.crate_meta.local_db_path(scope);
+			IndexRepository::check_known(&query.crate_meta)?;
+			if !fs::exists(&db_path)? {
+				anyhow::bail!("crate has not yet been indexed");
+			}
+
+			let db = Database::connect(
+				model.clone(),
+				&query.crate_meta.local_db_path(scope),
+			)
+			.await?;
+			db.query(&query.rag_query).await
+		})
+		.await
+	}
+
 	/// wrap a tool call with tracing and error handling
 	async fn tool_middleware<I: Serialize, O: IntoCallToolResult<M>, M>(
 		&self,

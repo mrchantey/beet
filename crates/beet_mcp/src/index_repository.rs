@@ -28,7 +28,7 @@ pub struct CrateMeta {
 }
 
 impl CrateMeta {
-	pub fn bevy_0_16_0_usage() -> Self { Self::new("bevy", "0.16.0") }
+	pub fn bevy_0_16_0() -> Self { Self::new("bevy", "0.16.0") }
 
 	pub fn new(crate_name: &str, crate_version: &str) -> Self {
 		Self {
@@ -37,14 +37,20 @@ impl CrateMeta {
 		}
 	}
 	pub fn local_repo_path(&self) -> String {
-		format!(".cache/repos/{}", self.crate_name)
+		format!(
+			"/home/pete/me/beet/crates/beet_mcp/.cache/repos/{}",
+			self.crate_name
+		)
+		// format!(".cache/repos/{}", self.crate_name)
 	}
 	/// ie the connection string to the database. Each crate has a seperate
 	/// database for each of the scopes.
 	pub fn local_db_path(&self, scope: CrateQueryScope) -> String {
 		format!(
-			".cache/repo-dbs/{}-{}-{scope}.db",
-			self.crate_name, self.crate_version
+			"/home/pete/me/beet/crates/beet_mcp/.cache/repo-dbs/{}-{}-{scope}.db",
+			// ".cache/repo-dbs/{}-{}-{scope}.db",
+			self.crate_name,
+			self.crate_version
 		)
 	}
 }
@@ -118,6 +124,17 @@ impl IndexRepository {
 		Ok(())
 	}
 
+	pub fn check_known(crate_meta: &CrateMeta) -> Result<()> {
+		if !KNOWN_CRATES.contains_key(crate_meta) {
+			anyhow::bail!(
+				"crate {}@{} not found in known crates",
+				crate_meta.crate_name,
+				crate_meta.crate_version
+			);
+		}
+		Ok(())
+	}
+
 	/// indexes the repo if the database is empty
 	pub async fn try_index<E: 'static + EmbeddingModel>(
 		embed_model: E,
@@ -125,11 +142,7 @@ impl IndexRepository {
 		scope: CrateQueryScope,
 	) -> Result<()> {
 		let Some(repo_meta) = KNOWN_CRATES.get(&crate_meta) else {
-			anyhow::bail!(
-				"The git url for {}@{} is not known, please create a PR adding it to the `KNOWN_CRATES` map.",
-				crate_meta.crate_name,
-				crate_meta.crate_version
-			);
+			return Err(Self::check_known(crate_meta).unwrap_err());
 		};
 		let db_path = crate_meta.local_db_path(scope);
 		let repo_path = crate_meta.local_repo_path();

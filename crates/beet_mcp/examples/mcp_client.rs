@@ -19,8 +19,8 @@ async fn main() -> Result<()> {
 				"how do you create a simple scene with a 2d camera",
 				2,
 			),
-			crate_meta: CrateMeta::bevy_0_16_0_usage(),
-			scope: CrateQueryScope::PublicApi,
+			crate_meta: CrateMeta::bevy_0_16_0(),
+			scope: CrateQueryScope::PublicApi.to_string(),
 		})
 		.await?;
 	tracing::info!("Crate Responses: {results:#?}");

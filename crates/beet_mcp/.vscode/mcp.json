@@ -3,9 +3,10 @@
 		"beet-mcp": {
 			"type": "stdio",
 			"command": "cargo",
-			"args": ["run",
-			"--manifest-path",
-			"/home/pete/me/beet/crates/beet_mcp/Cargo.toml"
+			"args": [
+				"run",
+				"--manifest-path",
+				"/home/pete/me/beet/crates/beet_mcp/Cargo.toml"
 		]
 		}
 	}
