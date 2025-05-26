@@ -8,15 +8,38 @@ use rig_sqlite::Column;
 use rig_sqlite::ColumnValue;
 use rig_sqlite::SqliteVectorStore;
 use rig_sqlite::SqliteVectorStoreTable;
-use rmcp::model::CallToolResult;
+use rmcp::schemars;
 use rusqlite::ffi::sqlite3_auto_extension;
 use serde::Deserialize;
+use serde::Serialize;
 use sqlite_vec::sqlite3_vec_init;
 use std::path::Path;
 use std::usize;
 use sweet::prelude::GlobFilter;
 use sweet::prelude::ReadDir;
 use tokio_rusqlite::Connection;
+
+
+
+#[derive(Debug, Serialize, Deserialize, schemars::JsonSchema)]
+pub struct RagQuery {
+	#[schemars(description = "The max results to return")]
+	pub max_docs: usize,
+	#[schemars(description = "The search term that will be \
+		converted to an embedding and used to query the vector database\
+		")]
+	pub search_query: String,
+}
+
+impl RagQuery {
+	/// Create a new RagQuery with the given search query and max docs.
+	pub fn new(search_query: &str, max_docs: usize) -> Self {
+		Self {
+			max_docs,
+			search_query: search_query.to_string(),
+		}
+	}
+}
 
 
 /// Database wrapper for a sqlite vector store.
@@ -43,7 +66,7 @@ use tokio_rusqlite::Connection;
 ///	];
 ///
 ///	db.store(documents).await.unwrap();
-///	let results = db.query("ancient", 1).await.unwrap();
+///	let results = db.query(&RagQuery::new("ancient", 1)).await.unwrap();
 ///	assert_eq!(results.len(), 1);
 ///	assert_eq!(results[0].id, "doc1");
 /// # })
@@ -91,7 +114,7 @@ impl<E: EmbeddingModel> Database<E> {
 
 	pub async fn is_empty(&self) -> Result<bool> {
 		// expensive way to do this, but rig doesnt expose the conn
-		Ok(self.query("foo", 2).await?.is_empty())
+		Ok(self.query(&RagQuery::new("foo", 1)).await?.is_empty())
 	}
 
 	// TODO parallel split and group store
@@ -165,11 +188,7 @@ impl<E: EmbeddingModel> Database<E> {
 		Ok(())
 	}
 
-	pub async fn query(
-		&self,
-		query: &str,
-		top_n: usize,
-	) -> Result<Vec<QueryResult>> {
+	pub async fn query(&self, query: &RagQuery) -> Result<Vec<QueryResult>> {
 		let index = self
 			.vector_store
 			.clone()
@@ -177,7 +196,7 @@ impl<E: EmbeddingModel> Database<E> {
 
 		// Query the index
 		let results = index
-			.top_n::<Document>(query, top_n)
+			.top_n::<Document>(&query.search_query, query.max_docs)
 			.await?
 			.into_iter()
 			.map(|(score, id, document)| QueryResult {
@@ -188,27 +207,6 @@ impl<E: EmbeddingModel> Database<E> {
 			.collect::<Vec<_>>();
 
 		Ok(results)
-	}
-
-	pub async fn query_mcp(
-		&self,
-		query: &str,
-		top_n: usize,
-	) -> Result<CallToolResult, rmcp::Error> {
-		let results = self
-			.query(&query, top_n)
-			.await
-			.map_err(|e| {
-				rmcp::Error::internal_error(
-					"vector_db_query_error",
-					Some(serde_json::json!({ "error": e.to_string() })),
-				)
-			})?
-			.into_iter()
-			.map(|r| r.into())
-			.collect();
-
-		Ok(CallToolResult::success(results))
 	}
 }
 
@@ -228,7 +226,11 @@ impl QueryResult {
 		)
 	}
 }
-
+impl std::fmt::Display for QueryResult {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		write!(f, "{}", self.to_markdown())
+	}
+}
 
 #[derive(Debug, Clone, Embed, Deserialize, PartialEq, Eq, Hash)]
 pub struct Document {
@@ -285,7 +287,7 @@ mod test {
 		];
 
 		db.store(documents).await.unwrap();
-		let results = db.query("ancient", 1).await.unwrap();
+		let results = db.query(&RagQuery::new("ancient", 1)).await.unwrap();
 		assert_eq!(results.len(), 1);
 		assert_eq!(results[0].id, "doc1");
 	}
@@ -296,7 +298,7 @@ mod test {
 			.unwrap();
 		db.load_and_store_file("nexus_arcana.md").await.unwrap();
 
-		let results = db.query("resonance", 1).await.unwrap();
+		let results = db.query(&RagQuery::new("resonance", 1)).await.unwrap();
 		assert_eq!(results.len(), 1);
 		assert!(
 			results[0]

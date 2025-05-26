@@ -12,15 +12,18 @@ use rmcp::schemars;
 use rmcp::service::RequestContext;
 use rmcp::tool;
 use rmcp::transport::stdio;
+use serde::Deserialize;
+use serde::Serialize;
 use serde_json::json;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
-#[derive(Debug, serde::Deserialize, schemars::JsonSchema)]
-pub struct StructRequest {
-	pub a: i32,
-	pub b: i32,
+#[derive(Debug, Serialize, Deserialize, schemars::JsonSchema)]
+pub struct CrateRagQuery {
+	pub rag_query: RagQuery,
+	pub crate_meta: CrateMeta,
 }
+
 
 #[derive(Clone)]
 pub struct McpServer<E: 'static + Clone + EmbeddingModel> {
@@ -98,39 +101,82 @@ impl<E: 'static + Clone + EmbeddingModel> McpServer<E> {
 		))]))
 	}
 
+	#[tool(description = r#"
+For a provided crate name, version and query, get the  
+
+"#)]
+	async fn crate_rag(
+		&self,
+		#[tool(aggr)] query: CrateRagQuery,
+	) -> Result<CallToolResult, McpError> {
+		// panic!()
+		let model = self.embedding_model.clone();
+		self.tool_middleware("crate_rag", query, async move |query| {
+			let db = Database::connect(
+				model.clone(),
+				&query.crate_meta.local_db_path(),
+			)
+			.await?;
+			db.query(&query.rag_query).await
+		})
+		.await
+	}
 	#[tool(
 		description = "Query a vector db about the fictional world of Nexus Arcana"
 	)]
-	async fn query_nexus(
+	async fn nexus_rag(
 		&self,
-		#[tool(param)]
-		#[schemars(
-			description = "Summary of the question to ask about Nexus Arcana"
-		)]
-		question: String,
-		#[tool(param)]
-		#[schemars(
-			description = "Max number of results to return, agents discression, start with 5"
-		)]
-		max_results: usize,
+		#[tool(aggr)] query: RagQuery,
+	) -> Result<CallToolResult, McpError> {
+		let db = self.nexus_db.clone();
+		self.tool_middleware("nexus_rag", query, async move |q| {
+			db.clone().query(&q).await
+		})
+		.await
+	}
+	/// wrap a tool call with tracing and error handling
+	async fn tool_middleware<I: Serialize, O: IntoCallToolResult<M>, M>(
+		&self,
+		tool_name: &str,
+		param: I,
+		func: impl 'static + AsyncFn(I) -> anyhow::Result<O>,
+		// func: impl AsyncFn(I) -> anyhow::Result<O>,
 	) -> Result<CallToolResult, McpError> {
 		tracing::info!(
-			"Tool Call: \nmax_results: {max_results}\nquestion: {question}"
+			"Tool Call: {tool_name} \n{}",
+			serde_json::to_string_pretty(&param)
+				.unwrap_or_else(|_| "invalid json".to_string())
 		);
-		self.nexus_db.query_mcp(&question, max_results).await
-	}
-
-	#[tool(description = "Calculate the sum of two numbers")]
-	fn sum(
-		&self,
-		#[tool(aggr)] StructRequest { a, b }: StructRequest,
-	) -> Result<CallToolResult, McpError> {
-		tracing::info!("Tool Call: sum({a}, {b})");
-		Ok(CallToolResult::success(vec![Content::text(
-			(a + b).to_string(),
-		)]))
+		let result = func(param).await.map_err(|e| {
+			tracing::error!("Tool Call Error: {tool_name} - {e}");
+			McpError::internal_error(
+				"tool_call_error",
+				Some(json!({ "error": e.to_string() })),
+			)
+		})?;
+		Ok(result.into_call_tool_result())
 	}
 }
+
+trait IntoCallToolResult<M> {
+	fn into_call_tool_result(self) -> CallToolResult;
+}
+impl<T> IntoCallToolResult<(Vec<T>, String)> for Vec<T>
+where
+	T: ToString,
+{
+	fn into_call_tool_result(self) -> CallToolResult {
+		CallToolResult::success(
+			self.into_iter()
+				.map(|val| {
+					let val = val.to_string();
+					Content::text(val)
+				})
+				.collect(),
+		)
+	}
+}
+
 
 const_string!(Echo = "echo");
 #[tool(tool_box)]
@@ -146,7 +192,7 @@ impl<E: 'static + Clone + EmbeddingModel> ServerHandler for McpServer<E> {
             server_info: Implementation::from_build_env(),
             instructions: Some(r#"
 This is an mcp server primarily for retrieving documents from vector stores.
-For testing we use a fictional world called Nexus Arcana, see the `query_nexus` tool.
+For testing we use a fictional world called Nexus Arcana, see the `nexus_rag` tool.
 "#.to_string()),
         }
 	}
@@ -275,15 +321,12 @@ For testing we use a fictional world called Nexus Arcana, see the `query_nexus` 
 	}
 }
 
-impl Into<Content> for QueryResult {
-	fn into(self) -> Content { Content::text(self.to_markdown()) }
-}
 
 impl<E: 'static + Clone + EmbeddingModel> Database<E> {
 	/// Connect to the Nexus Arcana test database,
 	/// populating it with initial data if necessary.
 	async fn nexus_arcana(embedding_model: E) -> Result<Self> {
-		let path = "vector_stores/nexus_arcana.db";
+		let path = ".cache/nexus_arcana.db";
 		let db = Self::connect(embedding_model, path).await?;
 
 		if db.is_empty().await? {

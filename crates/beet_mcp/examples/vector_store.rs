@@ -6,7 +6,7 @@ async fn main() -> Result<(), anyhow::Error> {
 
 	let db = Database::connect(
 		EmbedModel::mxbai_large(),
-		"vector_stores/examples/vector_store.db",
+		".cache/examples/vector_store.db",
 	)
 	.await?;
 
@@ -30,7 +30,9 @@ async fn main() -> Result<(), anyhow::Error> {
 		db.store(documents).await?;
 	}
 
-	let results = db.query("what tools do old people use", 1).await?;
+	let results = db
+		.query(&RagQuery::new("what tools do old people use", 1))
+		.await?;
 	println!("Query results: {:#?}", results);
 
 	Ok(())

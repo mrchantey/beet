@@ -1,7 +1,9 @@
+use crate::prelude::*;
 use anyhow::Result;
 use rmcp::RoleClient;
 use rmcp::Service;
 use rmcp::model::CallToolRequestParam;
+use rmcp::model::CallToolResult;
 use rmcp::model::ClientCapabilities;
 use rmcp::model::ClientInfo;
 use rmcp::model::Implementation;
@@ -49,7 +51,7 @@ impl McpClient<InitializeRequestParam> {
 	/// # use beet_mcp::prelude::*;
 	/// # tokio_test::block_on(async {
 	/// let client = McpClient::new_sse("http://localhost:8000/sse").await.unwrap();
-	/// let tools = client.list_tools().await.unwrap();
+	/// let tools = client.list_tools(Default::default()).await.unwrap();
 	/// println!("Available tools: {:#?}", tools);
 	/// # })
 	/// ```
@@ -69,25 +71,33 @@ impl McpClient<InitializeRequestParam> {
 }
 
 impl<S: Service<RoleClient>> McpClient<S> {
-	pub async fn query_nexus(
-		&self,
-		question: &str,
-		max_results: usize,
-	) -> Result<()> {
+	pub async fn nexus_rag(&self, query: &RagQuery) -> Result<CallToolResult> {
 		let tool_result = self
 			.service
 			.call_tool(CallToolRequestParam {
-				name: "query_nexus".into(),
-				arguments: serde_json::json!({
-					"max_results": max_results,
-					"question": question,
-				})
-				.as_object()
-				.cloned(),
+				name: "nexus_rag".into(),
+				arguments: serde_json::to_value(query)?.as_object().cloned(),
 			})
 			.await?;
 		tracing::info!("Tool result: {tool_result:#?}");
-		Ok(())
+		Ok(tool_result)
+	}
+
+	pub async fn crate_rag(
+		&self,
+		crate_query: CrateRagQuery,
+	) -> Result<CallToolResult> {
+		let tool_result = self
+			.service
+			.call_tool(CallToolRequestParam {
+				name: "crate_rag".into(),
+				arguments: serde_json::to_value(crate_query)?
+					.as_object()
+					.cloned(),
+			})
+			.await?;
+		tracing::info!("Tool result: {tool_result:#?}");
+		Ok(tool_result)
 	}
 
 	pub async fn cancel(self) -> Result<()> {

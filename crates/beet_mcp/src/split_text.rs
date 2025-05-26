@@ -57,7 +57,7 @@ impl<'a> SplitText<'a> {
 			// we should be using the breadcrumbs but text-splitter doesnt
 			// yet support them https://github.com/benbrandt/text-splitter/issues/726
 			.map(|(i, content)| Document {
-				id: self.path.join(i.to_string()).to_string_lossy().to_string(),
+				id: format!("{}#{}", &self.path.to_string_lossy(), i),
 				content: content.to_string(),
 			})
 			.collect()

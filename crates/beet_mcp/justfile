@@ -1,7 +1,7 @@
 
 
 clear:
-	rm -rf vector_stores || true
+	rm -rf .cache || true
 
 inspect:
 	cargo build
