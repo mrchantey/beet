@@ -90,7 +90,7 @@ impl<S: Service<RoleClient>> McpClient<S> {
 		let tool_result = self
 			.service
 			.call_tool(CallToolRequestParam {
-				name: "crate_usage_rag".into(),
+				name: "crate_rag".into(),
 				arguments: serde_json::to_value(crate_query)?
 					.as_object()
 					.cloned(),

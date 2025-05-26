@@ -108,7 +108,7 @@ impl<E: 'static + Clone + EmbeddingModel> McpServer<E> {
 	}
 
 	#[tool(description = r#"
-Query for information about how the public api of a crate may be used.
+Query for information about a crate, including documentation, examples, source code, etc
 "#)]
 	async fn crate_rag(
 		&self,
