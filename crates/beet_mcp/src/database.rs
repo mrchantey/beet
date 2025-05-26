@@ -67,34 +67,33 @@ impl Database {
 	}
 
 	pub async fn is_empty(&self) -> Result<bool> {
-		Ok(self.query("foo", 10).await?.is_empty())
+		// expensive way to do this, but rig doesnt expose the conn
+		Ok(self.query("foo", 2).await?.is_empty())
 	}
 
-	pub async fn load_and_store(
-		&self,
-		path: impl AsRef<Path>,
-		splitter: SplitText,
-	) -> Result<()> {
+	pub async fn load_and_store(&self, path: impl AsRef<Path>) -> Result<()> {
 		let path = path.as_ref();
 		let content = std::fs::read_to_string(path)?;
-		self.split_and_store(&path.to_string_lossy(), &content, splitter)
-			.await
+		self.split_and_store(path, &content).await
 	}
 	pub async fn split_and_store(
 		&self,
-		id: &str,
+		path: impl AsRef<Path>,
 		content: &str,
-		splitter: SplitText,
 	) -> Result<()> {
-		let documents = splitter
-			.split_to_documents(&id, &content)
+		let documents = SplitText::new(path.as_ref(), content)
+			.split_to_documents()
 			.into_iter()
 			.map(|doc| Document {
 				id: doc.id,
 				content: doc.content,
 			})
 			.collect::<Vec<_>>();
-		tracing::info!("Storing {} documents from {}", documents.len(), id);
+		tracing::info!(
+			"Storing {} documents from {}",
+			documents.len(),
+			path.as_ref().to_string_lossy()
+		);
 		self.store(documents).await?;
 		Ok(())
 	}
@@ -241,9 +240,7 @@ mod test {
 			.await
 			.unwrap();
 		// let db = Database::connect(":memory:").await.unwrap();
-		db.load_and_store("nexus_arcana.md", SplitText::Newline)
-			.await
-			.unwrap();
+		db.load_and_store("nexus_arcana.md").await.unwrap();
 
 		let results = db.query("resonance", 1).await.unwrap();
 		assert_eq!(results.len(), 1);

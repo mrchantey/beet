@@ -281,8 +281,7 @@ impl NexusArcanaDb {
 		if db.is_empty().await? {
 			tracing::info!("initializing nexus arcana db");
 			let content = include_str!("../nexus_arcana.md");
-			db.split_and_store("nexus_arcana.md", content, SplitText::Newline)
-				.await?;
+			db.split_and_store("nexus_arcana.md", content).await?;
 			// println!("Inserting documents: {:#?}", documents);
 		} else {
 			tracing::info!("connecting to nexus arcana db");
