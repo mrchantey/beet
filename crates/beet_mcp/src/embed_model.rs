@@ -1,0 +1,30 @@
+use rig::providers::ollama;
+use rig::providers::openai;
+
+
+/// Convenience wrapper for [`EmbeddingModel`] with one-liner helper methods
+pub struct EmbedModel;
+
+impl EmbedModel {
+	/// uses the `OPENAI_API_KEY` environment variable to connect to
+	/// the [`openai::TEXT_EMBEDDING_ADA_002`] model.
+	/// Loads environment variables from a `.env` file if it exists,
+	pub fn openai() -> openai::EmbeddingModel {
+		dotenv::dotenv().ok();
+		openai::Client::from_env()
+			.embedding_model(openai::TEXT_EMBEDDING_ADA_002)
+	}
+	/// open source model run locally with ollama
+	pub fn mxbai_large() -> ollama::EmbeddingModel {
+		// ollama::Client::new().embedding_model("mxbai-embed-large")
+		ollama::EmbeddingModel::new(
+			ollama::Client::new(),
+			"mxbai-embed-large",
+			1024,
+		)
+	}
+	/// small local model, great for testing
+	pub fn all_minilm() -> ollama::EmbeddingModel {
+		ollama::EmbeddingModel::new(ollama::Client::new(), "all-minilm", 384)
+	}
+}

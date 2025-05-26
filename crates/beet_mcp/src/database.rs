@@ -1,10 +1,8 @@
 use crate::prelude::*;
 use anyhow::Result;
 use rig::Embed;
+use rig::embeddings::EmbeddingModel;
 use rig::embeddings::EmbeddingsBuilder;
-use rig::providers::openai;
-use rig::providers::openai::Client;
-use rig::providers::openai::TEXT_EMBEDDING_ADA_002;
 use rig::vector_store::VectorStoreIndex;
 use rig_sqlite::Column;
 use rig_sqlite::ColumnValue;
@@ -14,24 +12,56 @@ use rmcp::model::CallToolResult;
 use rusqlite::ffi::sqlite3_auto_extension;
 use serde::Deserialize;
 use sqlite_vec::sqlite3_vec_init;
-use std::env;
 use std::path::Path;
 use std::usize;
 use tokio_rusqlite::Connection;
 
 
-const MODEL: &'static str = TEXT_EMBEDDING_ADA_002;
-
-/// Cheap to clone, just a reqwest client and a crossbeam sender
+/// Database wrapper for a sqlite vector store.
+///
+/// ## Example
+///
+/// ```rust
+/// # use beet_mcp::prelude::*;
+/// # tokio_test::block_on(async {
+/// let db = Database::connect(EmbedModel::mxbai_large(), ":memory:").await.unwrap();
+///	let documents = vec![
+///	    Document {
+///	        id: "doc0".to_string(),
+///	        content: "Definition of a *flurbo*: A flurbo is a green alien that lives on cold planets".to_string(),
+///	    },
+///	    Document {
+///	        id: "doc1".to_string(),
+///	        content: "Definition of a *glarb-glarb*: A glarb-glarb is a ancient tool used by the ancestors of the inhabitants of planet Jiro to farm the land.".to_string(),
+///	    },
+///	    Document {
+///	        id: "doc2".to_string(),
+///	        content: "Definition of a *linglingdong*: A term used by inhabitants of the far side of the moon to describe humans.".to_string(),
+///	    },
+///	];
+///
+///	db.store(documents).await.unwrap();
+///	let results = db.query("ancient", 1).await.unwrap();
+///	assert_eq!(results.len(), 1);
+///	assert_eq!(results[0].id, "doc1");
+/// # })
+/// ```
 #[derive(Clone)]
-pub struct Database {
-	// 	path: String,
-	pub vector_store: SqliteVectorStore<openai::EmbeddingModel, Document>,
-	embedding_model: openai::EmbeddingModel,
+pub struct Database<E: 'static + Clone + EmbeddingModel> {
+	pub vector_store: SqliteVectorStore<E, Document>,
+	embedding_model: E,
 }
 
-impl Database {
-	pub async fn connect(connection_string: &str) -> Result<Self> {
+
+impl<E: EmbeddingModel> Database<E> {
+	/// Connect to the database using the provided embedding model
+	/// for storing and querying.
+	/// The model used for querying must be the same as the one used
+	/// to store the documents.
+	pub async fn connect(
+		embedding_model: E,
+		connection_string: &str,
+	) -> Result<Self> {
 		if connection_string != ":memory:" {
 			// Ensure the directory exists for persistent databases
 			let path = Path::new(connection_string);
@@ -46,17 +76,8 @@ impl Database {
 			)));
 		}
 
-
-
-		let openai_api_key =
-			env::var("OPENAI_API_KEY").expect("OPENAI_API_KEY not set");
-		let openai_client = Client::new(&openai_api_key);
-
-
-
 		let conn = Connection::open(connection_string).await?;
 
-		let embedding_model = openai_client.embedding_model(MODEL);
 		let vector_store =
 			SqliteVectorStore::new(conn, &embedding_model).await?;
 
@@ -209,9 +230,9 @@ mod test {
 
 	#[tokio::test]
 	async fn store() {
-		dotenv::dotenv().ok();
-
-		let db = Database::connect(":memory:").await.unwrap();
+		let db = Database::connect(EmbedModel::all_minilm(), ":memory:")
+			.await
+			.unwrap();
 		let documents = vec![
 		    Document {
 		        id: "doc0".to_string(),
@@ -234,19 +255,18 @@ mod test {
 	}
 	#[tokio::test]
 	async fn load_and_store() {
-		dotenv::dotenv().ok();
-
-		let db = Database::connect("vector_stores/nexus_arcana.db")
+		let db = Database::connect(EmbedModel::all_minilm(), ":memory:")
 			.await
 			.unwrap();
-		// let db = Database::connect(":memory:").await.unwrap();
 		db.load_and_store("nexus_arcana.md").await.unwrap();
 
 		let results = db.query("resonance", 1).await.unwrap();
 		assert_eq!(results.len(), 1);
-		assert_eq!(
-			results[0].document.content,
-			"- **Resonance**: The fundamental force that replaced conventional physics, allowing both magic and technology to function by attuning to different frequency bands."
+		assert!(
+			results[0]
+				.document
+				.content
+				.starts_with("## Core Concepts\n\n- **Resonance**"),
 		);
 	}
 }

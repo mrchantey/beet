@@ -1,15 +1,17 @@
-use std::fs;
-
 use beet_mcp::prelude::*;
 
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
-	init_env();
+	init_tracing();
 
-	let db = Database::connect("vector_stores/hello_vector_store.db").await?;
+	let db = Database::connect(
+		EmbedModel::mxbai_large(),
+		"vector_stores/vector_store_example.db",
+	)
+	.await?;
 
 	// populating the database should only be done once
-	if !fs::exists("vector_stores/hello_vector_store.db")? {
+	if db.is_empty().await? {
 		println!("Populating the vector store with initial data...");
 		let documents = vec![
             Document {

@@ -1,6 +1,7 @@
 #![allow(unexpected_cfgs)]
 use crate::prelude::*;
 use anyhow::Result;
+use rig::embeddings::EmbeddingModel;
 use rmcp::Error as McpError;
 use rmcp::RoleServer;
 use rmcp::ServerHandler;
@@ -22,20 +23,23 @@ pub struct StructRequest {
 }
 
 #[derive(Clone)]
-pub struct McpServer {
+pub struct McpServer<E: 'static + Clone + EmbeddingModel> {
 	/// example of persistant server state.
 	/// for stdio requests this will always be 0.
 	request_count: Arc<Mutex<i32>>,
 	/// a test database of a fictional world
-	nexus_db: NexusArcanaDb,
+	nexus_db: Database<E>,
+	#[allow(unused)]
+	embedding_model: E,
 }
 
 #[tool(tool_box)]
-impl McpServer {
-	pub async fn new() -> Result<Self> {
+impl<E: 'static + Clone + EmbeddingModel> McpServer<E> {
+	pub async fn new(embedding_model: E) -> Result<Self> {
 		Ok(Self {
 			request_count: Arc::new(Mutex::new(0)),
-			nexus_db: NexusArcanaDb::init().await?,
+			nexus_db: Database::nexus_arcana(embedding_model.clone()).await?,
+			embedding_model,
 		})
 	}
 
@@ -114,7 +118,7 @@ impl McpServer {
 
 const_string!(Echo = "echo");
 #[tool(tool_box)]
-impl ServerHandler for McpServer {
+impl<E: 'static + Clone + EmbeddingModel> ServerHandler for McpServer<E> {
 	fn get_info(&self) -> ServerInfo {
 		ServerInfo {
             protocol_version: ProtocolVersion::V_2024_11_05,
@@ -259,24 +263,12 @@ impl Into<Content> for QueryResult {
 	fn into(self) -> Content { Content::text(self.to_markdown()) }
 }
 
-/// a test database
-#[derive(Clone)]
-struct NexusArcanaDb {
-	db: Database,
-}
-
-impl std::ops::Deref for NexusArcanaDb {
-	type Target = Database;
-
-	fn deref(&self) -> &Self::Target { &self.db }
-}
-
-impl NexusArcanaDb {
-	/// Connect to the Nexus Arcana database, populating it with initial data if necessary.
-	async fn init() -> Result<Self> {
+impl<E: 'static + Clone + EmbeddingModel> Database<E> {
+	/// Connect to the Nexus Arcana test database,
+	/// populating it with initial data if necessary.
+	async fn nexus_arcana(embedding_model: E) -> Result<Self> {
 		let path = "vector_stores/nexus_arcana.db";
-		let db = Database::connect(path).await?;
-		// fs::remove_dir(path).ok();
+		let db = Self::connect(embedding_model, path).await?;
 
 		if db.is_empty().await? {
 			tracing::info!("initializing nexus arcana db");
@@ -287,6 +279,6 @@ impl NexusArcanaDb {
 			tracing::info!("connecting to nexus arcana db");
 		}
 
-		Ok(Self { db })
+		Ok(db)
 	}
 }
