@@ -2,7 +2,7 @@
 /// i recommend the mcp inspector:
 /// ```sh
 /// npm i -g @modelcontextprotocol/inspector
-/// npx @modelcontextprotocol/inspector cargo run --example hello_mcp
+/// npx @modelcontextprotocol/inspector cargo run --example mcp_server
 /// ```
 use anyhow::Result;
 use beet_mcp::prelude::*;

@@ -114,6 +114,9 @@ impl<E: 'static + Clone + EmbeddingModel> McpServer<E> {
 		)]
 		max_results: usize,
 	) -> Result<CallToolResult, McpError> {
+		tracing::info!(
+			"Tool Call: \nmax_results: {max_results}\nquestion: {question}"
+		);
 		self.nexus_db.query_mcp(&question, max_results).await
 	}
 
@@ -122,6 +125,7 @@ impl<E: 'static + Clone + EmbeddingModel> McpServer<E> {
 		&self,
 		#[tool(aggr)] StructRequest { a, b }: StructRequest,
 	) -> Result<CallToolResult, McpError> {
+		tracing::info!("Tool Call: sum({a}, {b})");
 		Ok(CallToolResult::success(vec![Content::text(
 			(a + b).to_string(),
 		)]))

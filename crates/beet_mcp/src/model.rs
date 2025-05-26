@@ -32,10 +32,10 @@ impl EmbedModel {
 }
 
 
-pub struct CompletionModel;
+pub struct ChatModel;
 
 
-impl CompletionModel {
+impl ChatModel {
 	pub fn gpt_4o() -> AgentBuilder<openai::CompletionModel> {
 		dotenv::dotenv().ok();
 		openai::Client::from_env().agent(openai::GPT_4O)
