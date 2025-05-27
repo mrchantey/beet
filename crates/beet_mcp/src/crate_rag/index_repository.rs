@@ -1,4 +1,4 @@
-use crate::prelude::CrateQueryScope;
+use crate::prelude::CrateDocumentType;
 use crate::prelude::Database;
 use anyhow::Result;
 use rig::embeddings::EmbeddingModel;
@@ -45,7 +45,7 @@ impl CrateMeta {
 	}
 	/// ie the connection string to the database. Each crate has a seperate
 	/// database for each of the scopes.
-	pub fn local_db_path(&self, scope: CrateQueryScope) -> String {
+	pub fn local_db_path(&self, scope: CrateDocumentType) -> String {
 		format!(
 			"/home/pete/me/beet/crates/beet_mcp/.cache/repo-dbs/{}-{}-{scope}.db",
 			// ".cache/repo-dbs/{}-{}-{scope}.db",
@@ -116,7 +116,7 @@ impl IndexRepository {
 	/// $5-$100 dollars in charges.
 	pub async fn index_all_known_crates<E: 'static + EmbeddingModel>(
 		embed_model: E,
-		scope: CrateQueryScope,
+		scope: CrateDocumentType,
 	) -> Result<()> {
 		for (crate_meta, _) in KNOWN_CRATES.iter() {
 			Self::try_index(embed_model.clone(), crate_meta, scope).await?;
@@ -139,7 +139,7 @@ impl IndexRepository {
 	pub async fn try_index<E: 'static + EmbeddingModel>(
 		embed_model: E,
 		crate_meta: &CrateMeta,
-		scope: CrateQueryScope,
+		scope: CrateDocumentType,
 	) -> Result<()> {
 		let Some(repo_meta) = KNOWN_CRATES.get(&crate_meta) else {
 			return Err(Self::check_known(crate_meta).unwrap_err());

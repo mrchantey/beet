@@ -16,7 +16,7 @@ use sweet::prelude::GlobFilter;
 	Deserialize,
 	schemars::JsonSchema,
 )]
-pub enum CrateQueryScope {
+pub enum CrateDocumentType {
 	#[default]
 	#[schemars(description = "\
 	How to use the crate, ie examples, tests, documentation. \
@@ -31,36 +31,36 @@ pub enum CrateQueryScope {
 	Internals,
 }
 
-impl CrateQueryScope {
+impl CrateDocumentType {
 	pub fn filter(&self) -> GlobFilter {
 		let filter = GlobFilter::default().with_exclude("*.git*");
 		// these are very coarse, we'll need to refine and use other heuristics
 		match self {
-			CrateQueryScope::PublicApi => {
+			CrateDocumentType::PublicApi => {
 				filter.with_include("*examples/**/*.rs")
 			}
-			CrateQueryScope::Internals => filter.with_exclude("*src/**/*.rs"),
+			CrateDocumentType::Internals => filter.with_exclude("*src/**/*.rs"),
 		}
 	}
 }
 
-impl std::fmt::Display for CrateQueryScope {
+impl std::fmt::Display for CrateDocumentType {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		match self {
-			CrateQueryScope::PublicApi => write!(f, "public-api"),
-			CrateQueryScope::Internals => write!(f, "internals"),
+			CrateDocumentType::PublicApi => write!(f, "public-api"),
+			CrateDocumentType::Internals => write!(f, "internals"),
 		}
 	}
 }
 
 
-impl TryFrom<&str> for CrateQueryScope {
+impl TryFrom<&str> for CrateDocumentType {
 	type Error = anyhow::Error;
 
 	fn try_from(value: &str) -> Result<Self, Self::Error> {
 		match value {
-			"public-api" => Ok(CrateQueryScope::PublicApi),
-			"internals" => Ok(CrateQueryScope::Internals),
+			"public-api" => Ok(CrateDocumentType::PublicApi),
+			"internals" => Ok(CrateDocumentType::Internals),
 			_ => anyhow::bail!("Invalid CrateQueryScope: {}", value),
 		}
 	}

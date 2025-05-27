@@ -44,8 +44,8 @@ an example for an acceptable use is implementing new features for the crate
 }
 
 impl CrateRagQuery {
-	pub fn scope(&self) -> Result<CrateQueryScope> {
-		CrateQueryScope::try_from(self.scope.as_str())
+	pub fn scope(&self) -> Result<CrateDocumentType> {
+		CrateDocumentType::try_from(self.scope.as_str())
 	}
 }
 
@@ -361,7 +361,7 @@ impl<E: 'static + Clone + EmbeddingModel> Database<E> {
 
 		if db.is_empty().await? {
 			tracing::info!("initializing nexus arcana db");
-			let content = include_str!("../nexus_arcana.md");
+			let content = include_str!("../../nexus_arcana.md");
 			db.split_and_store("nexus_arcana.md", content).await?;
 			// println!("Inserting documents: {:#?}", documents);
 		} else {

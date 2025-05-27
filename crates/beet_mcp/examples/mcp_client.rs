@@ -20,7 +20,7 @@ async fn main() -> Result<()> {
 				2,
 			),
 			crate_meta: CrateMeta::bevy_0_16_0(),
-			scope: CrateQueryScope::PublicApi.to_string(),
+			scope: CrateDocumentType::PublicApi.to_string(),
 		})
 		.await?;
 	tracing::info!("Crate Responses: {results:#?}");

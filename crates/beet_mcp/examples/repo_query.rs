@@ -15,7 +15,7 @@ async fn main() -> Result<()> {
 		crate_name: "bevy".to_string(),
 		crate_version: "0.16.0".to_string(),
 	};
-	let scope = CrateQueryScope::PublicApi;
+	let scope = CrateDocumentType::PublicApi;
 
 	// IndexRepository::new(
 	// 	"pokemon-info",

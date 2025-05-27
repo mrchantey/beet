@@ -1,2 +1,4 @@
-mod crate_query_scope;
-pub use crate_query_scope::*;
+mod crate_document_type;
+pub use crate_document_type::*;
+mod index_repository;
+pub use index_repository::*;
