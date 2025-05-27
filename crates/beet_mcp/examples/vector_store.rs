@@ -14,24 +14,24 @@ async fn main() -> Result<(), anyhow::Error> {
 	if db.is_empty().await? {
 		println!("Populating the vector store with initial data...");
 		let documents = vec![
-            Document {
-                id: "doc0".to_string(),
-                content: "Definition of a *flurbo*: A flurbo is a green alien that lives on cold planets".to_string(),
-            },
-            Document {
-                id: "doc1".to_string(), 
-                content: "Definition of a *glarb-glarb*: A glarb-glarb is a ancient tool used by the ancestors of the inhabitants of planet Jiro to farm the land.".to_string(),
-            },
-            Document {
-                id: "doc2".to_string(),
-                content: "Definition of a *linglingdong*: A term used by inhabitants of the far side of the moon to describe humans.".to_string(),
-            },
-            ];
+			Document::new(
+				"doc0",
+				"**Resonance**: The fundamental force that replaced conventional physics, allowing both magic and technology to function by attuning to different frequency bands.",
+			),
+			Document::new(
+				"doc1", 
+				"**Echo Fragments**: Crystallized memories of lost realities that can be used as power sources or to temporarily recreate what was lost.",
+			),
+			Document::new(
+				"doc2",
+				"**Reality Anchors**: Ancient artifacts that stabilize regions against the constant flux of the Ethereal Sea.",
+			),
+		];
 		db.store(documents).await?;
 	}
 
 	let results = db
-		.query(&RagQuery::new("what tools do old people use", 1))
+		.query(&RagQuery::new("how does resonance work", 1))
 		.await?;
 	println!("Query results: {:#?}", results);
 

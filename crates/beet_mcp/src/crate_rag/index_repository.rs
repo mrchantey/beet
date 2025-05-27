@@ -1,12 +1,20 @@
-use crate::prelude::CrateDocumentType;
 use crate::prelude::Database;
 use anyhow::Result;
+use rayon::iter::ParallelBridge;
+use rayon::iter::ParallelIterator;
 use rig::embeddings::EmbeddingModel;
 use rmcp::schemars;
 use serde::Deserialize;
 use serde::Serialize;
-use std::collections::HashMap;
-use std::sync::LazyLock;
+use std::path::Path;
+use sweet::prelude::AbsPathBuf;
+use sweet::prelude::ReadDir;
+use sweet::prelude::ReadFile;
+use sweet::prelude::WorkspacePathBuf;
+
+use super::ContentSource;
+use super::ContentSourceKey;
+use super::KnownSources;
 
 
 /// The key in a kvp of [`CrateMeta`] and [`RepoMeta`].
@@ -28,7 +36,7 @@ pub struct CrateMeta {
 }
 
 impl CrateMeta {
-	pub fn bevy_0_16_0() -> Self { Self::new("bevy", "0.16.0") }
+	pub fn bevy_0_16() -> Self { Self::new("bevy", "0.16.0") }
 
 	pub fn new(crate_name: &str, crate_version: &str) -> Self {
 		Self {
@@ -36,118 +44,50 @@ impl CrateMeta {
 			crate_version: crate_version.to_string(),
 		}
 	}
-	pub fn local_repo_path(&self) -> String {
-		format!(
-			"/home/pete/me/beet/crates/beet_mcp/.cache/repos/{}",
-			self.crate_name
-		)
-		// format!(".cache/repos/{}", self.crate_name)
-	}
-	/// ie the connection string to the database. Each crate has a seperate
-	/// database for each of the scopes.
-	pub fn local_db_path(&self, scope: CrateDocumentType) -> String {
-		format!(
-			"/home/pete/me/beet/crates/beet_mcp/.cache/repo-dbs/{}-{}-{scope}.db",
-			// ".cache/repo-dbs/{}-{}-{scope}.db",
-			self.crate_name,
-			self.crate_version
-		)
+	pub fn local_repo_path(&self) -> AbsPathBuf {
+		WorkspacePathBuf::default()
+			.into_abs()
+			.unwrap()
+			.join(format!(
+				"/home/pete/me/beet/crates/beet_mcp/.cache/repos/{}",
+				self.crate_name
+			))
 	}
 }
 
 
-/// The value in a kvp of [`CrateMeta`] and [`RepoMeta`].
-#[derive(Debug, Clone, Hash)]
-pub struct RepoMeta {
-	/// The git url of the repository.
-	/// ie `https://github.com/BevyEngine/bevy.git`
-	pub git_url: String,
-	pub commit_hash: String,
+
+
+pub struct IndexRepository<E: 'static + Clone + EmbeddingModel> {
+	embedding_model: E,
 }
 
-pub static KNOWN_CRATES: LazyLock<HashMap<CrateMeta, RepoMeta>> =
-	LazyLock::new(|| {
-		[
-			(
-				CrateMeta {
-					crate_name: "bevy".to_string(),
-					crate_version: "0.16.0".to_string(),
-				},
-				RepoMeta {
-					git_url: "https://github.com/BevyEngine/bevy.git"
-						.to_string(),
-					commit_hash: "e9418b3845c1ffc9624a3a4003bde66a2ad6566a"
-						.to_string(),
-				},
-			),
-			(
-				CrateMeta {
-					crate_name: "bevy".to_string(),
-					crate_version: "0.8.0".to_string(),
-				},
-				RepoMeta {
-					git_url: "https://github.com/BevyEngine/bevy.git"
-						.to_string(),
-					commit_hash: "0149c4145f0f398e9fba85c2584d0481a260f57c"
-						.to_string(),
-				},
-			),
-			(
-				CrateMeta {
-					crate_name: "bevy".to_string(),
-					crate_version: "0.4.0".to_string(),
-				},
-				RepoMeta {
-					git_url: "https://github.com/BevyEngine/bevy.git"
-						.to_string(),
-					commit_hash: "3b2c6ce49b3b9ea8bc5cb68f8d350a80ff928af6"
-						.to_string(),
-				},
-			),
-		]
-		.into_iter()
-		.collect()
-	});
+impl<E: 'static + Clone + EmbeddingModel> IndexRepository<E> {
+	pub fn new(embedding_model: E) -> Self { Self { embedding_model } }
 
-pub struct IndexRepository;
-
-impl IndexRepository {
 	/// Yup, its a big one, if using a cloud embedding model this could result in
 	/// $5-$100 dollars in charges.
-	pub async fn index_all_known_crates<E: 'static + EmbeddingModel>(
-		embed_model: E,
-		scope: CrateDocumentType,
+	pub async fn index_all_known_crates(
+		&self,
+		filter: impl Fn(&(&ContentSourceKey, &ContentSource)) -> bool,
 	) -> Result<()> {
-		for (crate_meta, _) in KNOWN_CRATES.iter() {
-			Self::try_index(embed_model.clone(), crate_meta, scope).await?;
-		}
-		Ok(())
-	}
-
-	pub fn check_known(crate_meta: &CrateMeta) -> Result<()> {
-		if !KNOWN_CRATES.contains_key(crate_meta) {
-			anyhow::bail!(
-				"crate {}@{} not found in known crates",
-				crate_meta.crate_name,
-				crate_meta.crate_version
-			);
+		for (crate_meta, _) in KnownSources.iter().filter(filter) {
+			self.try_index(crate_meta).await?;
 		}
 		Ok(())
 	}
 
 	/// indexes the repo if the database is empty
-	pub async fn try_index<E: 'static + EmbeddingModel>(
-		embed_model: E,
-		crate_meta: &CrateMeta,
-		scope: CrateDocumentType,
-	) -> Result<()> {
-		let Some(repo_meta) = KNOWN_CRATES.get(&crate_meta) else {
-			return Err(Self::check_known(crate_meta).unwrap_err());
-		};
-		let db_path = crate_meta.local_db_path(scope);
-		let repo_path = crate_meta.local_repo_path();
+	pub async fn try_index(&self, key: &ContentSourceKey) -> Result<()> {
+		let source = KnownSources::get(&key)?;
+		let db_path = key.local_db_path();
+		let repo_path = key.crate_meta.local_repo_path();
 
-		let db = Database::connect(embed_model, &db_path).await?;
+		let db = Database::connect(
+			self.embedding_model.clone(),
+			&db_path.to_string_lossy(),
+		)
+		.await?;
 
 
 		if !std::fs::exists(&repo_path)? {
@@ -155,8 +95,8 @@ impl IndexRepository {
 			// Clone the repository
 			tokio::process::Command::new("git")
 				.arg("clone")
-				.arg(&repo_meta.git_url)
-				.arg(&repo_path)
+				.arg(&source.git_url)
+				.arg(&repo_path.as_os_str())
 				.spawn()?
 				.wait()
 				.await?;
@@ -167,6 +107,8 @@ impl IndexRepository {
 			tokio::process::Command::new("git")
 				.current_dir(&repo_path)
 				.arg("pull")
+				.arg("origin")
+				.arg(&source.git_branch)
 				.spawn()?
 				.wait()
 				.await?;
@@ -175,25 +117,66 @@ impl IndexRepository {
 			tokio::process::Command::new("git")
 				.current_dir(&repo_path)
 				.arg("checkout")
-				.arg(&repo_meta.commit_hash)
+				.arg(&source.git_hash)
 				.spawn()?
 				.wait()
 				.await?;
-			db.load_and_store_dir(repo_path, scope.filter()).await?;
+			self.load_and_store_dir(db, source, repo_path).await?;
 			let elapsed = start.elapsed();
 
 			let metadata = std::fs::metadata(db_path)?;
 			let size_in_mb = metadata.len() as f64 / 1_048_576.0; // 1024*1024
-			println!(
+			tracing::info!(
 				"Success!\n \
 				Vector Database size: {:.2} MB\n \
-				Time elapsed: {:.2} minutes",
+				Time elapsed: {}",
 				size_in_mb,
-				elapsed.as_secs_f64() / 60.0
+				secs_to_str(elapsed.as_secs()),
 			);
 		}
 		// tokio::fs::remove_dir_all(&repo_dir).await.ok();
 
 		Ok(())
 	}
+
+	async fn load_and_store_dir(
+		&self,
+		db: Database<E>,
+		source: &ContentSource,
+		dir: impl AsRef<Path>,
+	) -> Result<()> {
+		let files = ReadDir::files_recursive(dir)?
+			.into_iter()
+			.filter(|file| source.filter.passes(file))
+			.par_bridge()
+			// .into_par_iter()
+			.map(|path| {
+				let content = ReadFile::to_string(&path)?;
+				let documents =
+					source.split_text.split_to_documents(path, &content);
+				Ok(documents)
+			})
+			.collect::<Result<Vec<_>>>()?;
+		let num_files = files.len();
+		let chunks = files.into_iter().flatten().collect::<Vec<_>>();
+		let num_chunks = chunks.len();
+		tracing::info!(
+			"Succesfully split {num_files} files into {num_chunks} chunks",
+		);
+		// Calculate estimated time based on 30 seconds per 1000 chunks
+		let eta_seconds = (num_chunks as f64 * 0.03) as u64;
+		tracing::info!(
+			"generating embeddings.. eta: ~{}",
+			secs_to_str(eta_seconds)
+		);
+		db.store(chunks).await?;
+
+		Ok(())
+	}
+}
+
+fn secs_to_str(secs: u64) -> String {
+	let mins = secs / 60;
+	let secs = secs % 60;
+	format!("{:02}:{:02} minutes", mins, secs)
 }

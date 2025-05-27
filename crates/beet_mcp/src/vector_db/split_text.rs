@@ -7,13 +7,18 @@ use text_splitter::TextSplitter;
 
 
 /// Split text into chunks, using the extension to determine the approach
-pub struct SplitText<'a> {
-	/// Path to the file being split, used to determine the splitting strategy
-	pub path: &'a Path,
-	/// Content of the file to be split
-	pub content: &'a str,
+#[derive(Debug, Clone)]
+pub struct SplitText {
 	/// Range of character count to use for chunking.
 	pub chunk_range: Range<usize>,
+}
+
+impl Default for SplitText {
+	fn default() -> Self {
+		Self {
+			chunk_range: DEFAULT_CHUNK_RANGE,
+		}
+	}
 }
 
 /// min/max chunk size for text splitting
@@ -21,47 +26,47 @@ pub struct SplitText<'a> {
 // 300..1000 too small, cant get a full function
 const DEFAULT_CHUNK_RANGE: Range<usize> = 1500..3000;
 
-impl<'a> SplitText<'a> {
-	pub fn new(path: &'a Path, content: &'a str) -> Self {
-		Self {
-			path,
-			content,
-			chunk_range: DEFAULT_CHUNK_RANGE,
-		}
-	}
-	pub fn with_chunk_range(mut self, range: Range<usize>) -> Self {
-		self.chunk_range = range;
-		self
-	}
+impl SplitText {
+	pub fn new(chunk_range: Range<usize>) -> Self { Self { chunk_range } }
 
-	pub fn split(&self) -> Vec<&'a str> {
-		match self.path.extension().and_then(|s| s.to_str()) {
+	pub fn split<'a>(
+		&self,
+		path: impl AsRef<Path>,
+		content: &'a str,
+	) -> Vec<&'a str> {
+		match path.as_ref().extension().and_then(|s| s.to_str()) {
 			Some("md") => MarkdownSplitter::new(self.chunk_range.clone())
-				.chunks(self.content)
+				.chunks(content)
 				.collect(),
 			Some("rs") => CodeSplitter::new(
 				tree_sitter_rust::LANGUAGE,
 				self.chunk_range.clone(),
 			)
 			.expect("Invalid tree-sitter language")
-			.chunks(self.content)
+			.chunks(content)
 			.collect(),
 			// default to character splitting
 			_ => TextSplitter::new(self.chunk_range.clone())
-				.chunks(self.content)
+				.chunks(content)
 				.collect(),
 		}
 	}
 
-	pub fn split_to_documents(&self) -> Vec<Document> {
-		self.split()
+	pub fn split_to_documents(
+		&self,
+		path: impl AsRef<Path>,
+		content: &str,
+	) -> Vec<Document> {
+		self.split(&path, content)
 			.into_iter()
 			.enumerate()
 			// we should be using the breadcrumbs but text-splitter doesnt
 			// yet support them https://github.com/benbrandt/text-splitter/issues/726
-			.map(|(i, content)| Document {
-				id: format!("{}#{}", &self.path.to_string_lossy(), i),
-				content: content.to_string(),
+			.map(|(i, content)| {
+				Document::new(
+					&format!("{}#{}", &path.as_ref().to_string_lossy(), i),
+					content,
+				)
 			})
 			.collect()
 	}
@@ -77,31 +82,9 @@ mod test {
 	use super::*;
 	use std::path::Path;
 
-	#[test]
-	fn test_new() {
-		let path = Path::new("test.md");
-		let content = "This is test content";
-		let splitter = SplitText::new(path, content);
-
-		assert_eq!(splitter.path, path);
-		assert_eq!(splitter.content, content);
-		assert_eq!(splitter.chunk_range, DEFAULT_CHUNK_RANGE);
-	}
-
-	#[test]
-	fn test_with_chunk_range() {
-		let path = Path::new("test.md");
-		let content = "This is test content";
-		let custom_range = 100..500;
-		let splitter = SplitText::new(path, content)
-			.with_chunk_range(custom_range.clone());
-
-		assert_eq!(splitter.chunk_range, custom_range);
-	}
 
 	#[test]
 	fn test_split_markdown() {
-		let path = Path::new("test.md");
 		let content = r#"# Title
 
 This is a paragraph with some content that should be long enough to trigger splitting.
@@ -119,8 +102,7 @@ And here's even more content to make sure we have enough text for meaningful spl
 Some subsection content here that continues the document.
 
 "#;
-		let splitter = SplitText::new(path, content);
-		let chunks = splitter.split();
+		let chunks = SplitText::default().split("test.md", content);
 
 		assert!(!chunks.is_empty());
 		// Verify content is properly split
@@ -129,7 +111,6 @@ Some subsection content here that continues the document.
 
 	#[test]
 	fn test_split_rust_code() {
-		let path = Path::new("test.rs");
 		let content = r#"
 use std::collections::HashMap;
 
@@ -158,8 +139,7 @@ fn main() {
     println!("{}: {}", test.get_field1(), test.get_field2());
 }
 "#;
-		let splitter = SplitText::new(path, content);
-		let chunks = splitter.split();
+		let chunks = SplitText::default().split("test.rs", content);
 
 		assert!(!chunks.is_empty());
 		// Verify Rust code structure is preserved in chunks
@@ -168,10 +148,8 @@ fn main() {
 
 	#[test]
 	fn test_split_default_text() {
-		let path = Path::new("test.txt");
 		let content = "This is a long text document that should be split into multiple chunks based on character count. ".repeat(20);
-		let splitter = SplitText::new(path, &content);
-		let chunks = splitter.split();
+		let chunks = SplitText::default().split("test.txt", &content);
 
 		assert!(!chunks.is_empty());
 		// With repeated text, we should get multiple chunks
@@ -182,11 +160,9 @@ fn main() {
 
 	#[test]
 	fn test_split_unknown_extension() {
-		let path = Path::new("test.xyz");
 		let content =
 			"This is content with an unknown file extension. ".repeat(10);
-		let splitter = SplitText::new(path, &content);
-		let chunks = splitter.split();
+		let chunks = SplitText::default().split("test.xyz", &content);
 
 		assert!(!chunks.is_empty());
 		// Should fall back to default text splitting
@@ -195,10 +171,9 @@ fn main() {
 
 	#[test]
 	fn test_split_no_extension() {
-		let path = Path::new("test_file");
 		let content = "This is content without any file extension. ".repeat(10);
-		let splitter = SplitText::new(path, &content);
-		let chunks = splitter.split();
+		let chunks = SplitText::default().split("test.xyz", &content);
+
 
 		assert!(!chunks.is_empty());
 		// Should fall back to default text splitting
@@ -207,10 +182,7 @@ fn main() {
 
 	#[test]
 	fn test_split_empty_content() {
-		let path = Path::new("test.md");
-		let content = "";
-		let splitter = SplitText::new(path, content);
-		let chunks = splitter.split();
+		let chunks = SplitText::default().split("test.md", "");
 
 		// Empty content should result in empty chunks array or single empty chunk
 		if !chunks.is_empty() {
@@ -220,7 +192,6 @@ fn main() {
 
 	#[test]
 	fn test_split_to_documents() {
-		let path = Path::new("test.md");
 		let content = r#"# Test Document
 
 This is some content for testing document generation.
@@ -229,8 +200,8 @@ This is some content for testing document generation.
 
 More content here to ensure we get multiple chunks.
 "#;
-		let splitter = SplitText::new(path, content);
-		let documents = splitter.split_to_documents();
+		let documents =
+			SplitText::default().split_to_documents("test.md", &content);
 
 		assert!(!documents.is_empty());
 
@@ -244,10 +215,9 @@ More content here to ensure we get multiple chunks.
 
 	#[test]
 	fn test_split_to_documents_with_path() {
-		let path = Path::new("src/lib.rs");
 		let content = "fn main() { println!(\"Hello\"); }".repeat(20);
-		let splitter = SplitText::new(path, &content);
-		let documents = splitter.split_to_documents();
+		let documents =
+			SplitText::default().split_to_documents("src/lib.rs", &content);
 
 		assert!(!documents.is_empty());
 
@@ -259,12 +229,13 @@ More content here to ensure we get multiple chunks.
 
 	#[test]
 	fn test_custom_chunk_range_splitting() {
-		let path = Path::new("test.txt");
 		let content = "Short content";
 		let small_range = 5..10;
-		let splitter =
-			SplitText::new(path, content).with_chunk_range(small_range);
-		let chunks = splitter.split();
+		let chunks = SplitText {
+			chunk_range: small_range,
+			..Default::default()
+		}
+		.split("test.txt", &content);
 
 		assert!(!chunks.is_empty());
 		// With very small chunk range, each chunk should be small
@@ -286,8 +257,7 @@ More content here to ensure we get multiple chunks.
 		for (filename, expected_type) in test_cases {
 			let path = Path::new(filename);
 			let content = "Some test content here";
-			let splitter = SplitText::new(path, content);
-			let chunks = splitter.split();
+			let chunks = SplitText::default().split(path, &content);
 
 			assert!(
 				!chunks.is_empty(),

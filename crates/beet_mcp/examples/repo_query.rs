@@ -11,24 +11,26 @@ async fn main() -> Result<()> {
 	// let embed_model = EmbedModel::all_minilm();
 	let embedding_model = EmbedModel::mxbai_large();
 
-	let crate_meta = CrateMeta {
-		crate_name: "bevy".to_string(),
-		crate_version: "0.16.0".to_string(),
-	};
-	let scope = CrateDocumentType::PublicApi;
+	let key = ContentSourceKey::new("bevy", "0.16.0", ContentType::Guides);
 
 	// IndexRepository::new(
 	// 	"pokemon-info",
 	// 	"https://github.com/minsoeaung/pokemon-info.git",
 	// )
-	IndexRepository::try_index(embedding_model.clone(), &crate_meta, scope)
+	IndexRepository::new(embedding_model.clone())
+		.try_index(&key)
 		.await?;
 
-	let results =
-		Database::connect(embedding_model, &crate_meta.local_db_path(scope))
-			.await?
-			.query(&RagQuery::new("how to create a character controller", 10))
-			.await?;
+	let results = Database::connect(
+		embedding_model,
+		&key.local_db_path().to_string_lossy(),
+	)
+	.await?
+	.query(&RagQuery::new(
+		"how to create a character controller in version 0.16",
+		10,
+	))
+	.await?;
 	println!("Query results: {:#?}", results);
 
 	// assert!(results.iter().any(|r| r.document.content.contains(

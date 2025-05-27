@@ -15,8 +15,6 @@ use serde::Serialize;
 use sqlite_vec::sqlite3_vec_init;
 use std::path::Path;
 use std::usize;
-use sweet::prelude::GlobFilter;
-use sweet::prelude::ReadDir;
 use tokio_rusqlite::Connection;
 
 
@@ -51,24 +49,24 @@ impl RagQuery {
 /// # tokio_test::block_on(async {
 /// let db = Database::connect(EmbedModel::mxbai_large(), ":memory:").await.unwrap();
 ///	let documents = vec![
-///	    Document {
-///	        id: "doc0".to_string(),
-///	        content: "Definition of a *flurbo*: A flurbo is a green alien that lives on cold planets".to_string(),
-///	    },
-///	    Document {
-///	        id: "doc1".to_string(),
-///	        content: "Definition of a *glarb-glarb*: A glarb-glarb is a ancient tool used by the ancestors of the inhabitants of planet Jiro to farm the land.".to_string(),
-///	    },
-///	    Document {
-///	        id: "doc2".to_string(),
-///	        content: "Definition of a *linglingdong*: A term used by inhabitants of the far side of the moon to describe humans.".to_string(),
-///	    },
+///	    Document::new(
+///	        "doc0",
+///	        "- **Resonance**: The fundamental force that replaced conventional physics, allowing both magic and technology to function by attuning to different frequency bands.",
+///	    ),
+///	    Document::new(
+///	        "doc1",
+///	        "- **Echo Fragments**: Crystallized memories of lost realities that can be used as power sources or to temporarily recreate what was lost.",
+///	    ),
+///	    Document::new(
+///	        "doc2",
+///	        "- **Reality Anchors**: Ancient artifacts that stabilize regions against the constant flux of the Ethereal Sea.",
+///	    ),
 ///	];
 ///
 ///	db.store(documents).await.unwrap();
-///	let results = db.query(&RagQuery::new("ancient", 1)).await.unwrap();
+///	let results = db.query(&RagQuery::new("resonance", 1)).await.unwrap();
 ///	assert_eq!(results.len(), 1);
-///	assert_eq!(results[0].id, "doc1");
+///	assert_eq!(results[0].id, "doc0");
 /// # })
 /// ```
 #[derive(Clone)]
@@ -118,51 +116,32 @@ impl<E: EmbeddingModel> Database<E> {
 	}
 
 	// TODO parallel split and group store
-	pub async fn load_and_store_dir(
-		&self,
-		dir: impl AsRef<Path>,
-		filter: GlobFilter,
-	) -> Result<()> {
-		let files = ReadDir::files_recursive(dir)?
-			.into_iter()
-			.filter(|file| filter.passes(file))
-			.collect::<Vec<_>>();
-		let num_files = files.len();
-		tracing::info!("Loading {} files", num_files);
-		for (i, file) in files.into_iter().enumerate() {
-			tracing::info!("Loading file {}/{}", i + 1, num_files,);
-			self.load_and_store_file(file).await?;
-		}
-		Ok(())
-	}
+
 
 	pub async fn load_and_store_file(
 		&self,
+		splitter: &SplitText,
 		path: impl AsRef<Path>,
 	) -> Result<()> {
 		let path = path.as_ref();
 		let content = tokio::fs::read_to_string(path).await?;
-		self.split_and_store(path, &content).await
+		let documetns = splitter.split_to_documents(path, &content);
+		self.store(documetns).await
 	}
 
 
 	pub async fn split_and_store(
 		&self,
+		split_text: &SplitText,
 		path: impl AsRef<Path>,
 		content: &str,
 	) -> Result<()> {
-		let documents = SplitText::new(path.as_ref(), content)
-			.split_to_documents()
-			.into_iter()
-			.map(|doc| Document {
-				id: doc.id,
-				content: doc.content,
-			})
-			.collect::<Vec<_>>();
+		let path = path.as_ref();
+		let documents = split_text.split_to_documents(path, content);
 		tracing::debug!(
 			"Storing {} documents from {}",
 			documents.len(),
-			path.as_ref().to_string_lossy()
+			path.to_string_lossy()
 		);
 		self.store(documents).await?;
 		Ok(())
@@ -179,6 +158,7 @@ impl<E: EmbeddingModel> Database<E> {
 	}
 
 	pub async fn query(&self, query: &RagQuery) -> Result<Vec<QueryResult>> {
+
 		let index = self
 			.vector_store
 			.clone()
@@ -230,6 +210,18 @@ pub struct Document {
 	pub content: String,
 }
 
+impl Document {
+	pub fn new(path: &str, content: &str) -> Self {
+		// we want to index the path too its very relevent for the embeddings
+		let joined_content = format!("uri: {path}\ncontent: {content}");
+
+		Self {
+			id: path.to_string(),
+			content: joined_content,
+		}
+	}
+}
+
 impl SqliteVectorStoreTable for Document {
 	fn name() -> &'static str { "documents" }
 
@@ -252,6 +244,29 @@ impl SqliteVectorStoreTable for Document {
 
 
 
+// nexus arcana for testing
+impl<E: 'static + Clone + EmbeddingModel> Database<E> {
+	/// Connect to the Nexus Arcana test database,
+	/// populating it with initial data if necessary.
+	pub async fn nexus_arcana(embedding_model: E, path: &str) -> Result<Self> {
+		let db = Self::connect(embedding_model, path).await?;
+
+		if db.is_empty().await? {
+			tracing::info!("initializing nexus arcana db");
+			let content = include_str!("../../nexus_arcana.md");
+			let documents = SplitText::default()
+				.split_to_documents("nexus_arcana.db", content);
+			db.store(documents).await?;
+		} else {
+			tracing::info!("connecting to nexus arcana db");
+		}
+
+		Ok(db)
+	}
+}
+
+
+
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
@@ -262,31 +277,30 @@ mod test {
 			.await
 			.unwrap();
 		let documents = vec![
-		    Document {
-		        id: "doc0".to_string(),
-		        content: "Definition of a *flurbo*: A flurbo is a green alien that lives on cold planets".to_string(),
-		    },
-		    Document {
-		        id: "doc1".to_string(),
-		        content: "Definition of a *glarb-glarb*: A glarb-glarb is a ancient tool used by the ancestors of the inhabitants of planet Jiro to farm the land.".to_string(),
-		    },
-		    Document {
-		        id: "doc2".to_string(),
-		        content: "Definition of a *linglingdong*: A term used by inhabitants of the far side of the moon to describe humans.".to_string(),
-		    },
+			Document::new(
+				"doc0",
+				"- **Resonance**: The fundamental force that replaced conventional physics, allowing both magic and technology to function by attuning to different frequency bands.",
+			),
+			Document::new(
+				"doc1",
+				"- **Echo Fragments**: Crystallized memories of lost realities that can be used as power sources or to temporarily recreate what was lost.",
+			),
+			Document::new(
+				"doc2",
+				"- **Reality Anchors**: Ancient artifacts that stabilize regions against the constant flux of the Ethereal Sea.",
+			),
 		];
 
 		db.store(documents).await.unwrap();
-		let results = db.query(&RagQuery::new("ancient", 1)).await.unwrap();
+		let results = db.query(&RagQuery::new("resonance", 1)).await.unwrap();
 		assert_eq!(results.len(), 1);
-		assert_eq!(results[0].id, "doc1");
+		assert_eq!(results[0].id, "doc0");
 	}
 	#[tokio::test]
 	async fn load_and_store() {
-		let db = Database::connect(EmbedModel::all_minilm(), ":memory:")
+		let db = Database::nexus_arcana(EmbedModel::all_minilm(), ":memory:")
 			.await
 			.unwrap();
-		db.load_and_store_file("nexus_arcana.md").await.unwrap();
 
 		let results = db.query(&RagQuery::new("resonance", 1)).await.unwrap();
 		assert_eq!(results.len(), 1);

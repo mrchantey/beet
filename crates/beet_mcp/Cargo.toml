@@ -47,6 +47,8 @@ rustdoc-md = "0.1"
 text-splitter = { version = "0.26", features = ["code", "markdown"] }
 tree-sitter-rust = "0.24"
 futures = "0.3"
+rayon = "1"
 
 [dev-dependencies]
 tokio-test = "0.4"
+sweet = { path = "../../ws_sweet/sweet", features = ["fs", "test"] }

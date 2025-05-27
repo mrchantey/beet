@@ -19,7 +19,7 @@ async fn main() -> Result<(), anyhow::Error> {
 
 
 	let response = agent
-		.prompt("lets create a simple 3d scene in the crate bevy 0.16.0")
+		.prompt("lets create a simple 3d scene in the crate bevy 0.16.0 using the provided tools")
 		// .prompt("ahoy matey, how does the resonance work in nexus arcana?")
 		.await?;
 

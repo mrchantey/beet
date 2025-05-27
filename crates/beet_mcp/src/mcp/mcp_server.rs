@@ -26,26 +26,25 @@ pub struct CrateRagQuery {
 	pub rag_query: RagQuery,
 	#[serde(flatten)]
 	pub crate_meta: CrateMeta,
-	// this sucks but rmcp no enum
-	#[schemars(description = "\
-Either `public-api` or `internals`. \
-## `public-api` 
-How to use the crate, ie examples, tests, documentation. \
-	This should be the default scope for most queries.
-## `internals` \
-Implementations of engine internals. \
-Only query for this if you are certain you need to know how the internals of a function\
-as it may misguide you to reimplement engine internals instead of using the public API. \
-an example for an acceptable use is implementing new features for the crate
-		 ")]
-	// #[serde(flatten)]
-	pub scope: String,
-	// pub scope: CrateQueryScope,
+	pub content_type: ContentTypeStr,
 }
 
 impl CrateRagQuery {
-	pub fn scope(&self) -> Result<CrateDocumentType> {
-		CrateDocumentType::try_from(self.scope.as_str())
+	pub fn source_key(&self) -> ContentSourceKey {
+		ContentSourceKey {
+			crate_meta: self.crate_meta.clone(),
+			content_type: self.content_type.clone().into(),
+		}
+	}
+	/// for use with guides queries to ensure we're getting up-to-date information
+	pub fn versioned_query(&self) -> RagQuery {
+		RagQuery {
+			max_docs: self.rag_query.max_docs,
+			search_query: format!(
+				"version {} {}",
+				self.crate_meta.crate_version, self.rag_query.search_query,
+			),
+		}
 	}
 }
 
@@ -66,7 +65,11 @@ impl<E: 'static + Clone + EmbeddingModel> McpServer<E> {
 	pub async fn new(embedding_model: E) -> Result<Self> {
 		Ok(Self {
 			request_count: Arc::new(Mutex::new(0)),
-			nexus_db: Database::nexus_arcana(embedding_model.clone()).await?,
+			nexus_db: Database::nexus_arcana(
+				embedding_model.clone(),
+				".cache/nexus_arcana.db",
+			)
+			.await?,
 			embedding_model,
 		})
 	}
@@ -147,19 +150,17 @@ impl<E: 'static + Clone + EmbeddingModel> McpServer<E> {
 	) -> Result<CallToolResult, McpError> {
 		let model = self.embedding_model.clone();
 		self.tool_middleware("crate_rag", query, async move |query| {
-			let scope = query.scope()?;
-			let db_path = query.crate_meta.local_db_path(scope);
-			IndexRepository::check_known(&query.crate_meta)?;
+			let key = query.source_key();
+			let db_path = key.local_db_path();
+			KnownSources::assert_exists(&key)?;
 			if !fs::exists(&db_path)? {
-				anyhow::bail!("crate has not yet been indexed");
+				anyhow::bail!("source is known but has not yet been indexed");
 			}
 
-			let db = Database::connect(
-				model.clone(),
-				&query.crate_meta.local_db_path(scope),
-			)
-			.await?;
-			db.query(&query.rag_query).await
+			Database::connect(model.clone(), &db_path.to_string_lossy())
+				.await?
+				.query(&query.versioned_query())
+				.await
 		})
 		.await
 	}
@@ -348,26 +349,5 @@ For testing we use a fictional world called Nexus Arcana, see the `nexus_rag` to
 			tracing::info!(?initialize_headers, %initialize_uri, "initialize from http server");
 		}
 		Ok(self.get_info())
-	}
-}
-
-
-impl<E: 'static + Clone + EmbeddingModel> Database<E> {
-	/// Connect to the Nexus Arcana test database,
-	/// populating it with initial data if necessary.
-	async fn nexus_arcana(embedding_model: E) -> Result<Self> {
-		let path = ".cache/nexus_arcana.db";
-		let db = Self::connect(embedding_model, path).await?;
-
-		if db.is_empty().await? {
-			tracing::info!("initializing nexus arcana db");
-			let content = include_str!("../../nexus_arcana.md");
-			db.split_and_store("nexus_arcana.md", content).await?;
-			// println!("Inserting documents: {:#?}", documents);
-		} else {
-			tracing::info!("connecting to nexus arcana db");
-		}
-
-		Ok(db)
 	}
 }
