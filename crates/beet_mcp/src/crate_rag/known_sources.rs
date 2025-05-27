@@ -127,6 +127,11 @@ impl ContentTypeBuilder {
 	) -> Self {
 		let filter = GlobFilter::default().with_exclude("*.git*");
 		match content_type {
+			ContentType::Docs => Self {
+				git_url: git_url.to_string(),
+				split_text: SplitText::default(),
+				filter: filter.with_include("**/*.md"),
+			},
 			ContentType::Examples => Self {
 				git_url: git_url.to_string(),
 				split_text: SplitText::default(),

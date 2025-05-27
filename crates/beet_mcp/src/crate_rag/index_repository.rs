@@ -35,6 +35,10 @@ pub struct CrateMeta {
 	pub crate_version: String,
 }
 
+impl Default for CrateMeta {
+	fn default() -> Self { Self::bevy_0_16() }
+}
+
 impl CrateMeta {
 	pub fn bevy_0_16() -> Self { Self::new("bevy", "0.16.0") }
 

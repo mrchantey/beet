@@ -5,29 +5,27 @@ use serde::Serialize;
 
 
 
-/// cos enums broken for
 #[derive(
-	Debug,
-	Default,
-	Clone,
-	Hash,
-	PartialEq,
-	Eq,
-	Serialize,
-	Deserialize,
-	JsonSchema,
+	Debug, Clone, Hash, PartialEq, Eq, Serialize, Deserialize, JsonSchema,
 )]
-// this sucks but rmcp no enum
-#[schemars(description = "\
-C
-		 ")]
-// #[serde(flatten)]
-pub struct ContentTypeStr(pub String);
+/// this absolutely sucks but schemars/rcmp so broken
+pub struct ContentTypeStr {
+	#[schemars(description = "\
+The type of content to query for. this can **only** be one of
+['docs', 'guides', 'examples', 'internals']. in almost every case
+you will want to use 'docs' as it is the most accurate for the specific crate version you are querying for.
+")]
+	pub content_type: String,
+}
+
+impl Default for ContentTypeStr {
+	fn default() -> Self { ContentType::default().into() }
+}
 
 
 impl Into<ContentType> for ContentTypeStr {
 	fn into(self) -> ContentType {
-		ContentType::try_from(self.0.as_str()).unwrap_or_default()
+		ContentType::try_from(self.content_type.as_str()).unwrap_or_default()
 	}
 }
 
@@ -46,22 +44,9 @@ impl Into<ContentType> for ContentTypeStr {
 )]
 pub enum ContentType {
 	#[default]
-	#[schemars(description = "\
-	How to use the crate, ie examples, tests, documentation. \
-	This should be the default scope for most queries.
-")]
+	Docs,
 	Guides,
-	#[schemars(description = "\
-	How to use the crate, ie examples, tests, documentation. \
-	This should be the default scope for most queries.
-")]
 	Examples,
-	#[schemars(description = "\
-	Implementations of engine internals. \
-	Only query for this if you are certain you need to know how the internals of a function\
-	as it may misguide you to reimplement engine internals instead of using the public API. \
-	an example for an acceptable use is implementing new features for the crate
-		 ")]
 	Internals,
 }
 
@@ -69,6 +54,7 @@ pub enum ContentType {
 impl std::fmt::Display for ContentType {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		match self {
+			ContentType::Docs => write!(f, "docs"),
 			ContentType::Guides => write!(f, "guides"),
 			ContentType::Examples => write!(f, "examples"),
 			ContentType::Internals => write!(f, "internals"),
@@ -82,6 +68,7 @@ impl TryFrom<&str> for ContentType {
 
 	fn try_from(value: &str) -> Result<Self, Self::Error> {
 		match value {
+			"docs" => Ok(ContentType::Docs),
 			"guides" => Ok(ContentType::Guides),
 			"examples" => Ok(ContentType::Examples),
 			"internals" => Ok(ContentType::Internals),
@@ -91,5 +78,9 @@ impl TryFrom<&str> for ContentType {
 }
 
 impl Into<ContentTypeStr> for ContentType {
-	fn into(self) -> ContentTypeStr { ContentTypeStr(self.to_string()) }
+	fn into(self) -> ContentTypeStr {
+		ContentTypeStr {
+			content_type: self.to_string(),
+		}
+	}
 }

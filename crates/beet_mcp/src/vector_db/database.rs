@@ -29,6 +29,15 @@ pub struct RagQuery {
 	pub search_query: String,
 }
 
+impl Default for RagQuery {
+	fn default() -> Self {
+		Self {
+			max_docs: 5,
+			search_query: "how to create a simple 3d scene".into(),
+		}
+	}
+}
+
 impl RagQuery {
 	/// Create a new RagQuery with the given search query and max docs.
 	pub fn new(search_query: &str, max_docs: usize) -> Self {
@@ -158,7 +167,6 @@ impl<E: EmbeddingModel> Database<E> {
 	}
 
 	pub async fn query(&self, query: &RagQuery) -> Result<Vec<QueryResult>> {
-
 		let index = self
 			.vector_store
 			.clone()

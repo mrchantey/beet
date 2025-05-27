@@ -22,10 +22,11 @@ use tokio::sync::Mutex;
 #[derive(Debug, Serialize, Deserialize, schemars::JsonSchema)]
 #[schemars(description = "A query for a crate's documentation or source code")]
 pub struct CrateRagQuery {
-	#[serde(flatten)]
+	#[serde(default, flatten)]
 	pub rag_query: RagQuery,
-	#[serde(flatten)]
+	#[serde(default, flatten)]
 	pub crate_meta: CrateMeta,
+	#[serde(default, flatten)]
 	pub content_type: ContentTypeStr,
 }
 
