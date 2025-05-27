@@ -98,31 +98,24 @@ impl<E: 'static + Clone + EmbeddingModel> IndexRepository<E> {
 				.await?;
 		}
 		if db.is_empty().await? {
+			tracing::info!("Indexing {}", key);
+
 			let start = std::time::Instant::now();
 
-			// Reset hard to discard any local changes
+			// Fetch the latest changes from remote without merging
+			tokio::process::Command::new("git")
+				.current_dir(&repo_path)
+				.arg("fetch")
+				.arg("origin")
+				.spawn()?
+				.wait()
+				.await?;
+
+			// Reset hard to the specific commit, discarding any local changes
 			tokio::process::Command::new("git")
 				.current_dir(&repo_path)
 				.arg("reset")
 				.arg("--hard")
-				.spawn()?
-				.wait()
-				.await?;
-
-			// Pull the latest changes
-			tokio::process::Command::new("git")
-				.current_dir(&repo_path)
-				.arg("pull")
-				.arg("origin")
-				.arg(&source.git_branch)
-				.spawn()?
-				.wait()
-				.await?;
-
-			// Checkout the specific commit
-			tokio::process::Command::new("git")
-				.current_dir(&repo_path)
-				.arg("checkout")
 				.arg(&source.git_hash)
 				.spawn()?
 				.wait()

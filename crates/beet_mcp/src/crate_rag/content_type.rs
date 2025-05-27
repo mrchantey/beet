@@ -12,8 +12,13 @@ use serde::Serialize;
 pub struct ContentTypeStr {
 	#[schemars(description = "\
 The type of content to query for. this can **only** be one of
-['docs', 'guides', 'examples', 'internals']. in almost every case
-you will want to use 'docs' as it is the most accurate for the specific crate version you are querying for.
+['docs', 'guides', 'examples', 'internals']. 
+The reccommended type depends on the query, for example:
+- 'how does the related! macro work?' = 'docs'
+- 'lets create a simple 3d scene' = 'examples'
+- 'what changed in bevy 0.16' = 'guides'
+- 'help me add the NonSend attribute to the Component trait' = 'internals'
+When in doubt, go with 'examples' as that provides the most holistic usage patterns 
 ")]
 	pub content_type: String,
 }

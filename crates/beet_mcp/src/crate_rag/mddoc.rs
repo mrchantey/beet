@@ -95,7 +95,7 @@ impl<'a> Mddoc<'a> {
 
 		FsExt::write(&md_path, &markdown)?;
 
-		tracing::info!("Wrote markdown to {}", md_path.display());
+		tracing::trace!("Wrote markdown to {}", md_path.display());
 		Ok(())
 	}
 }

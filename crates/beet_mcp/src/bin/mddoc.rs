@@ -13,7 +13,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 	let md_path = format!("target/doc/md/{crate_name}.md");
 	FsExt::write(&md_path, &markdown)?;
-	println!("Wrote markdown to {md_path}");
+	tracing::trace!("Wrote markdown to {md_path}");
 
 	Ok(())
 }

@@ -17,6 +17,9 @@ npx @modelcontextprotocol/inspector cargo run
 
 ### Findings
 
+
+
+
 #### Source code vs examples
 
 Indexing examples and source code together can *worsen* the rag.
