@@ -166,11 +166,11 @@ static KNOWN_SOURCES: LazyLock<HashMap<ContentSourceKey, ContentSource>> =
 			KnownSourceBuilder::new("bevy")
 				.add_content_type(
 					ContentType::Examples,
-					"https://github.com/BevyEngine/bevy.git",
+					"https://github.com/bevyengine/bevy.git",
 				)
 				.add_content_type(
 					ContentType::Internals,
-					"https://github.com/BevyEngine/bevy.git",
+					"https://github.com/bevyengine/bevy.git",
 				)
 				.add_content_type(
 					ContentType::Guides,

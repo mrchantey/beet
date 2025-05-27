@@ -12,5 +12,15 @@ inspect:
 mddoc:
 	RUSTDOCFLAGS="-Z unstable-options --output-format json" \
 	cargo doc \
+	--no-deps \
 	--target-dir target/doc
 	cargo run --bin mddoc
+
+
+mddoc-bevy:
+	cd .cache/repos/bevy && \
+	RUSTDOCFLAGS="-Z unstable-options --output-format json" \
+	cargo doc \
+	--no-deps \
+	--target-dir target/doc
+# cd .cache/repos/bevy && cargo run --bin mddoc

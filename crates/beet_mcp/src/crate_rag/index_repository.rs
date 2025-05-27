@@ -7,10 +7,8 @@ use rmcp::schemars;
 use serde::Deserialize;
 use serde::Serialize;
 use std::path::Path;
-use sweet::prelude::AbsPathBuf;
 use sweet::prelude::ReadDir;
 use sweet::prelude::ReadFile;
-use sweet::prelude::WorkspacePathBuf;
 
 use super::ContentSource;
 use super::ContentSourceKey;
@@ -48,15 +46,6 @@ impl CrateMeta {
 			crate_version: crate_version.to_string(),
 		}
 	}
-	pub fn local_repo_path(&self) -> AbsPathBuf {
-		WorkspacePathBuf::default()
-			.into_abs()
-			.unwrap()
-			.join(format!(
-				"/home/pete/me/beet/crates/beet_mcp/.cache/repos/{}",
-				self.crate_name
-			))
-	}
 }
 
 
@@ -85,7 +74,7 @@ impl<E: 'static + Clone + EmbeddingModel> IndexRepository<E> {
 	pub async fn try_index(&self, key: &ContentSourceKey) -> Result<()> {
 		let source = KnownSources::get(&key)?;
 		let db_path = key.local_db_path();
-		let repo_path = key.crate_meta.local_repo_path();
+		let repo_path = source.local_repo_path();
 
 		let db = Database::connect(
 			self.embedding_model.clone(),
@@ -138,8 +127,6 @@ impl<E: 'static + Clone + EmbeddingModel> IndexRepository<E> {
 				secs_to_str(elapsed.as_secs()),
 			);
 		}
-		// tokio::fs::remove_dir_all(&repo_dir).await.ok();
-
 		Ok(())
 	}
 

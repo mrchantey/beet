@@ -13,7 +13,7 @@ async fn main() -> Result<()> {
 			matches!(
 				key.content_type,
 				ContentType::Examples | ContentType::Guides // ContentType::Internals // entire src dir, very slow
-			)
+			) && key.crate_meta.crate_version == "0.16.0"
 		})
 		.await?;
 	Ok(())

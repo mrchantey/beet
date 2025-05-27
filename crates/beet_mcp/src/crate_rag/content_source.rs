@@ -5,6 +5,7 @@ use rmcp::schemars;
 use rmcp::schemars::JsonSchema;
 use serde::Deserialize;
 use serde::Serialize;
+use std::path::Path;
 use sweet::prelude::*;
 
 
@@ -72,4 +73,26 @@ pub struct ContentSource {
 	pub git_branch: String,
 	/// strategy for splitting text into chunks
 	pub split_text: SplitText,
+}
+
+
+impl ContentSource {
+	pub fn local_repo_path(&self) -> AbsPathBuf {
+		let path = Path::new(&self.git_url);
+		let author = path
+			.parent()
+			.and_then(|p| p.file_name())
+			.and_then(|s| s.to_str())
+			.unwrap_or("unknown_author");
+
+		let repo_name = Path::new(&self.git_url)
+			.file_stem()
+			.and_then(|s| s.to_str())
+			.unwrap_or("unknown_repo");
+
+		WorkspacePathBuf::default()
+			.into_abs()
+			.unwrap()
+			.join(format!(".cache/repos/{}/{}", author, repo_name))
+	}
 }
