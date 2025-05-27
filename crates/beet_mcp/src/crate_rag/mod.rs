@@ -1,5 +1,7 @@
 mod content_type;
 pub use content_type::*;
+mod mddoc;
+pub use mddoc::*;
 mod content_source;
 pub use content_source::*;
 mod index_repository;

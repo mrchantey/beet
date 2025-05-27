@@ -1,4 +1,6 @@
+use crate::prelude::ContentType;
 use crate::prelude::Database;
+use crate::prelude::Mddoc;
 use anyhow::Result;
 use rayon::iter::ParallelBridge;
 use rayon::iter::ParallelIterator;
@@ -7,6 +9,7 @@ use rmcp::schemars;
 use serde::Deserialize;
 use serde::Serialize;
 use std::path::Path;
+
 use sweet::prelude::ReadDir;
 use sweet::prelude::ReadFile;
 
@@ -96,6 +99,16 @@ impl<E: 'static + Clone + EmbeddingModel> IndexRepository<E> {
 		}
 		if db.is_empty().await? {
 			let start = std::time::Instant::now();
+
+			// Reset hard to discard any local changes
+			tokio::process::Command::new("git")
+				.current_dir(&repo_path)
+				.arg("reset")
+				.arg("--hard")
+				.spawn()?
+				.wait()
+				.await?;
+
 			// Pull the latest changes
 			tokio::process::Command::new("git")
 				.current_dir(&repo_path)
@@ -114,6 +127,11 @@ impl<E: 'static + Clone + EmbeddingModel> IndexRepository<E> {
 				.spawn()?
 				.wait()
 				.await?;
+
+			if key.content_type == ContentType::Docs {
+				Mddoc::new(&source).build().await?;
+			}
+
 			self.load_and_store_dir(db, source, repo_path).await?;
 			let elapsed = start.elapsed();
 
@@ -129,6 +147,7 @@ impl<E: 'static + Clone + EmbeddingModel> IndexRepository<E> {
 		}
 		Ok(())
 	}
+
 
 	async fn load_and_store_dir(
 		&self,

@@ -130,7 +130,8 @@ impl ContentTypeBuilder {
 			ContentType::Docs => Self {
 				git_url: git_url.to_string(),
 				split_text: SplitText::default(),
-				filter: filter.with_include("**/*.md"),
+				// this should match [`ContentSource::md_path`]
+				filter: filter.with_include("*target/md/*.md"),
 			},
 			ContentType::Examples => Self {
 				git_url: git_url.to_string(),
@@ -165,6 +166,10 @@ static KNOWN_SOURCES: LazyLock<HashMap<ContentSourceKey, ContentSource>> =
 		map.extend(
 			KnownSourceBuilder::new("bevy")
 				.add_content_type(
+					ContentType::Docs,
+					"https://github.com/bevyengine/bevy.git",
+				)
+				.add_content_type(
 					ContentType::Examples,
 					"https://github.com/bevyengine/bevy.git",
 				)
@@ -177,17 +182,29 @@ static KNOWN_SOURCES: LazyLock<HashMap<ContentSourceKey, ContentSource>> =
 					"https://github.com/bevyengine/bevy-website.git",
 				)
 				.add_source(
-					&[ContentType::Examples, ContentType::Internals],
+					&[
+						ContentType::Docs,
+						ContentType::Examples,
+						ContentType::Internals,
+					],
 					"0.4.0",
 					"0149c4145f0f398e9fba85c2584d0481a260f57c",
 				)
 				.add_source(
-					&[ContentType::Examples, ContentType::Internals],
+					&[
+						ContentType::Docs,
+						ContentType::Examples,
+						ContentType::Internals,
+					],
 					"0.8.0",
 					"0149c4145f0f398e9fba85c2584d0481a260f57c",
 				)
 				.add_source(
-					&[ContentType::Examples, ContentType::Internals],
+					&[
+						ContentType::Docs,
+						ContentType::Examples,
+						ContentType::Internals,
+					],
 					"0.16.0",
 					"e9418b3845c1ffc9624a3a4003bde66a2ad6566a",
 				)

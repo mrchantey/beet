@@ -22,8 +22,8 @@ pub struct ContentSourceKey {
 }
 
 impl ContentSourceKey {
-	pub fn bevy_16_guides() -> Self {
-		Self::new("bevy", "0.16.0", ContentType::Guides)
+	pub fn bevy_16_docs() -> Self {
+		Self::new("bevy", "0.16.0", ContentType::Docs)
 	}
 
 	pub fn new(
@@ -94,5 +94,9 @@ impl ContentSource {
 			.into_abs()
 			.unwrap()
 			.join(format!(".cache/repos/{}/{}", author, repo_name))
+	}
+
+	pub fn target_path(&self) -> AbsPathBuf {
+		self.local_repo_path().join("target")
 	}
 }
