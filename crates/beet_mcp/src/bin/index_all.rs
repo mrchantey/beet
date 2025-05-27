@@ -6,7 +6,7 @@ use beet_mcp::prelude::*;
 #[tokio::main]
 #[rustfmt::skip]
 async fn main() -> Result<()> {
-	std::fs::remove_dir_all(".cache/repo-dbs").ok();
+	// std::fs::remove_dir_all(".cache/repo-dbs").ok();
 	init_tracing(tracing::Level::INFO);
 	let model = EmbedModel::mxbai_large();
 	IndexRepository::new(model)
