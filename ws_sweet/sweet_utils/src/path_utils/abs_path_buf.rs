@@ -83,6 +83,11 @@ impl AbsPathBuf {
 		let path = self.0.join(path);
 		Self::new_unchecked(path)
 	}
+	pub fn with_extension(mut self, ext: &str) -> Self {
+		self.0.set_extension(ext);
+		self
+	}
+
 	/// Add a path to the current [`AbsPathBuf`], which will also naturally
 	/// be a canonical path. This will error if the path cannot be canonicalized.
 	pub fn join_checked(&self, path: impl AsRef<Path>) -> FsResult<Self> {
