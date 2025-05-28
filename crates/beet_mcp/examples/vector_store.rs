@@ -5,7 +5,7 @@ async fn main() -> Result<(), anyhow::Error> {
 	init_tracing(tracing::Level::INFO);
 
 	let db = Database::connect(
-		EmbedModel::mxbai_large(),
+		EmbedModel::from_env(),
 		".cache/examples/vector_store.db",
 	)
 	.await?;

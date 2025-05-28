@@ -3,37 +3,22 @@ use rig::completion::Prompt;
 
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
-	init_tracing(tracing::Level::INFO);
+	init_tracing(tracing::Level::ERROR);
 	let mcp_client = McpClient::new_stdio_dev().await?;
-	// model for how the agent discovers and uses tools, this can be different from
-	// the rag model
-	let tools_embedding_model = EmbedModel::all_minilm();
 
-	// let agent = CompletionModel::deepseek() // Error: tools not supported?
-	let agent = ChatModel::gpt_4o()
+	let agent = AgentModel::from_env()
 		.preamble("Talk like an old sea farer.")
-		.add_mcp_tools(&mcp_client, tools_embedding_model)
+		.add_mcp_tools(&mcp_client, EmbedModel::from_env())
 		.await?
 		.temperature(0.5)
 		.build();
 
 
 	let response = agent
-		.prompt("lets create a simple 3d scene in the crate bevy 0.16.0. use the provided mcp tools")
-		// .prompt("ahoy matey, how does the resonance work in nexus arcana?")
+		.prompt("how does the new related! macro work in bevy 0.16?")
 		.await?;
 
 	println!("Response: {}", response);
 
-	// fuzzy test that it actually read the tool
-	assert!(response.contains(".add_systems(Startup, setup)"));
-	let response = agent
-		.prompt("lets create a simple 3d scene in the crate bevy 0.4.0")
-		.await?;
-
-	println!("Response: {}", response);
-
-	// fuzzy test that it actually read the tool
-	assert!(response.contains(".add_startup_system(setup.system())"));
 	Ok(())
 }

@@ -19,30 +19,29 @@ pub struct McpToolAdaptor {
 	server: ServerSink,
 }
 
-#[allow(async_fn_in_trait)]
-pub trait AddMcpTools: Sized {
-	async fn add_mcp_tools<
-		S: Service<RoleClient>,
-		E: 'static + EmbeddingModel,
-	>(
-		self,
-		client: &RunningService<RoleClient, S>,
-		embedding_model: E,
-	) -> Result<Self>;
-}
 
-impl<M: CompletionModel> AddMcpTools for AgentBuilder<M> {
+#[extend::ext(name=MyTypeExt)]
+#[allow(async_fn_in_trait)]
+pub impl<M: CompletionModel> AgentBuilder<M>
+where
+	Self: Sized,
+{
+	// async fn add_stdio_mcp_from_env()
+
+	/// Add the beet MCP tools to the agent.
+	/// - `tool_embedding_model` is the embedding model used to embed the tools, this can be different from
+	/// the rag model used with the vector database.
 	async fn add_mcp_tools<
 		S: Service<RoleClient>,
 		E: 'static + EmbeddingModel,
 	>(
 		mut self,
 		client: &RunningService<RoleClient, S>,
-		embedding_model: E,
+		tool_embedding_model: E,
 	) -> Result<Self> {
 		let tool_set = McpToolAdaptor::get_tools(client).await?;
 
-		let embeddings = EmbeddingsBuilder::new(embedding_model.clone())
+		let embeddings = EmbeddingsBuilder::new(tool_embedding_model.clone())
 			.documents(tool_set.schemas()?)?
 			.build()
 			.await?;
@@ -51,7 +50,7 @@ impl<M: CompletionModel> AddMcpTools for AgentBuilder<M> {
 				tracing::info!("store tool {}", f.name);
 				f.name.clone()
 			});
-		let index = store.index(embedding_model);
+		let index = store.index(tool_embedding_model);
 		const MAX_TOOLS_TO_RETRIEVE: usize = 4;
 
 		self = self.dynamic_tools(MAX_TOOLS_TO_RETRIEVE, index, tool_set);

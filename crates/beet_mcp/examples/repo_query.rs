@@ -9,7 +9,7 @@ async fn main() -> Result<()> {
 	init_tracing(tracing::Level::INFO);
 	// let repository = "https://github.com/bevyengine/bevy.git";
 	// let embed_model = EmbedModel::all_minilm();
-	let embedding_model = EmbedModel::mxbai_large();
+	let embedding_model = EmbedModel::from_env();
 
 	let key = ContentSourceKey::new("bevy", "0.16.0", ContentType::Guides);
 
@@ -21,16 +21,16 @@ async fn main() -> Result<()> {
 		.try_index(&key)
 		.await?;
 
-	let results = Database::connect(
-		embedding_model,
-		&key.local_db_path().to_string_lossy(),
-	)
-	.await?
-	.query(&RagQuery::new(
-		"how to create a character controller in version 0.16",
-		10,
-	))
-	.await?;
+	let db_path = key.local_db_path(&embedding_model);
+	let results =
+		Database::connect(embedding_model, &db_path.to_string_lossy())
+			.await?
+			.query(&RagQuery::new(
+				"related! macro",
+				// "how to create a character controller in version 0.16",
+				10,
+			))
+			.await?;
 	println!("Query results: {:#?}", results);
 
 	// assert!(results.iter().any(|r| r.document.content.contains(

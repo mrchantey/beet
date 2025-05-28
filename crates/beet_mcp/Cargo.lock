@@ -261,6 +261,7 @@ dependencies = [
  "anyhow",
  "axum",
  "dotenv",
+ "extend",
  "futures",
  "rayon",
  "rig-core",

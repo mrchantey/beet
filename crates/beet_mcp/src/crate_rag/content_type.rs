@@ -12,9 +12,9 @@ use serde::Serialize;
 pub struct ContentTypeStr {
 	#[schemars(description = "\
 The type of content to query for. this can **only** be one of
-['docs', 'guides', 'examples', 'internals']. 
-## Examples
-The reccommended type depends on the query, for example:
+['docs', 'guides', 'examples', 'internals'].
+
+If the first query does not return relevant results, try another type.
 
 ### 'docs'
 
@@ -44,13 +44,12 @@ This is great for high level queries:
 ### 'internals'
 
 The source code of the crate itself, useful for understanding how the crate internals work,
-or when making changes to the crate itself.
+or when making changes to the crate itself. Be careful using this, for example it may
+return the *definition* of Camera2D which may confuse you to think *using* Camera2d requires
+defining a new one yourself.
 
 - 'help me add the NonSend attribute to the Component trait'
 
-
-When in doubt, go with 'examples' as that provides the most holistic usage patterns.
-If the first query does not return relevant results, try another type.
 ")]
 	pub content_type: String,
 }
