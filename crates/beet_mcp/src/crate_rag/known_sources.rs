@@ -1,25 +1,28 @@
 use crate::prelude::*;
 use anyhow::Result;
+use serde::Deserialize;
 use std::collections::HashMap;
 use std::sync::LazyLock;
 use sweet::prelude::GlobFilter;
 
-
-pub struct KnownSources;
+#[derive(Serialize, Deserialize, Clone)]
+pub struct KnownSources(HashMap<ContentSourceKey, ContentSource>);
 
 impl std::ops::Deref for KnownSources {
 	type Target = HashMap<ContentSourceKey, ContentSource>;
-	fn deref(&self) -> &Self::Target { &*KNOWN_SOURCES }
+	fn deref(&self) -> &Self::Target {
+		&self.0
+	}
 }
 
 impl KnownSources {
-	pub fn get(key: &ContentSourceKey) -> Result<&ContentSource> {
-		KNOWN_SOURCES.get(key).ok_or_else(|| {
+	pub fn get(&self, key: &ContentSourceKey) -> Result<&ContentSource> {
+		self.0.get(key).ok_or_else(|| {
 			anyhow::anyhow!("Could not find source for crate: {}", key)
 		})
 	}
-	pub fn assert_exists(key: &ContentSourceKey) -> Result<()> {
-		if KNOWN_SOURCES.contains_key(key) {
+	pub fn assert_exists(&self, key: &ContentSourceKey) -> Result<()> {
+		if self.0.contains_key(key) {
 			Ok(())
 		} else {
 			Err(anyhow::anyhow!("Could not find source for crate: {}", key))
@@ -27,14 +30,12 @@ impl KnownSources {
 	}
 }
 
-
 struct KnownSourceBuilder {
 	crate_name: String,
 	/// usually sources share a single repo url for each content type.
 	content_types: HashMap<ContentType, ContentTypeBuilder>,
 	sources: Vec<SourceBuilder>,
 }
-
 
 impl KnownSourceBuilder {
 	pub fn new(crate_name: &str) -> Self {
@@ -159,80 +160,77 @@ struct SourceBuilder {
 	version: String,
 }
 
-static KNOWN_SOURCES: LazyLock<HashMap<ContentSourceKey, ContentSource>> =
-	LazyLock::new(|| {
-		let mut map = HashMap::new();
+static KNOWN_SOURCES: LazyLock<KnownSources> = LazyLock::new(|| {
+	let mut map = HashMap::new();
 
-		// still working on a better way to do this.
-		map.extend(
-			KnownSourceBuilder::new("bevy")
-				.add_content_type(
+	// still working on a better way to do this.
+	map.extend(
+		KnownSourceBuilder::new("bevy")
+			.add_content_type(
+				ContentType::Docs,
+				"https://github.com/bevyengine/bevy.git",
+			)
+			.add_content_type(
+				ContentType::Examples,
+				"https://github.com/bevyengine/bevy.git",
+			)
+			.add_content_type(
+				ContentType::Internals,
+				"https://github.com/bevyengine/bevy.git",
+			)
+			.add_content_type(
+				ContentType::Guides,
+				"https://github.com/bevyengine/bevy-website.git",
+			)
+			.add_source(
+				&[
 					ContentType::Docs,
-					"https://github.com/bevyengine/bevy.git",
-				)
-				.add_content_type(
 					ContentType::Examples,
-					"https://github.com/bevyengine/bevy.git",
-				)
-				.add_content_type(
 					ContentType::Internals,
-					"https://github.com/bevyengine/bevy.git",
-				)
-				.add_content_type(
-					ContentType::Guides,
-					"https://github.com/bevyengine/bevy-website.git",
-				)
-				.add_source(
-					&[
-						ContentType::Docs,
-						ContentType::Examples,
-						ContentType::Internals,
-					],
-					"0.4.0",
-					"0149c4145f0f398e9fba85c2584d0481a260f57c",
-				)
-				.add_source(
-					&[
-						ContentType::Docs,
-						ContentType::Examples,
-						ContentType::Internals,
-					],
-					"0.8.0",
-					"0149c4145f0f398e9fba85c2584d0481a260f57c",
-				)
-				.add_source(
-					&[
-						ContentType::Docs,
-						ContentType::Examples,
-						ContentType::Internals,
-					],
-					"0.16.0",
-					"e9418b3845c1ffc9624a3a4003bde66a2ad6566a",
-				)
-				// guides should be the last commit before the next release
-				// to capture as much content as possible.
-				.add_source(
-					&[ContentType::Guides],
-					"0.16.0",
-					"166e7d46b2768b905ee71783ae9a0ea609761a36", // latest
-				)
-				.add_source(
-					&[ContentType::Guides],
-					"0.8.0",
-					"5fcc38e6b38c16d02eb05c112f08d95b32ff9654", // just before 0.9
-				)
-				.add_source(
-					&[ContentType::Guides],
-					"0.4.0",
-					"714ad927bd53e3db903a2adaaed531a9dbd5c7f3", // just before 0.5
-				)
-				.build(),
-		);
+				],
+				"0.4.0",
+				"0149c4145f0f398e9fba85c2584d0481a260f57c",
+			)
+			.add_source(
+				&[
+					ContentType::Docs,
+					ContentType::Examples,
+					ContentType::Internals,
+				],
+				"0.8.0",
+				"0149c4145f0f398e9fba85c2584d0481a260f57c",
+			)
+			.add_source(
+				&[
+					ContentType::Docs,
+					ContentType::Examples,
+					ContentType::Internals,
+				],
+				"0.16.0",
+				"e9418b3845c1ffc9624a3a4003bde66a2ad6566a",
+			)
+			// guides should be the last commit before the next release
+			// to capture as much content as possible.
+			.add_source(
+				&[ContentType::Guides],
+				"0.16.0",
+				"166e7d46b2768b905ee71783ae9a0ea609761a36", // latest
+			)
+			.add_source(
+				&[ContentType::Guides],
+				"0.8.0",
+				"5fcc38e6b38c16d02eb05c112f08d95b32ff9654", // just before 0.9
+			)
+			.add_source(
+				&[ContentType::Guides],
+				"0.4.0",
+				"714ad927bd53e3db903a2adaaed531a9dbd5c7f3", // just before 0.5
+			)
+			.build(),
+	);
 
-		map
-	});
-
-
+	KnownSources(map)
+});
 
 #[cfg(test)]
 mod test {
@@ -241,7 +239,7 @@ mod test {
 
 	#[test]
 	fn works() {
-		expect(KnownSources::get(&ContentSourceKey::new(
+		expect(KNOWN_SOURCES.get(&ContentSourceKey::new(
 			"bevy",
 			"0.16.0",
 			ContentType::Examples,

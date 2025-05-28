@@ -50,7 +50,6 @@ impl CrateRagQuery {
 	// }
 }
 
-
 #[derive(Clone)]
 pub struct McpServer<E: BeetEmbedModel> {
 	/// example of persistant server state.
@@ -60,11 +59,15 @@ pub struct McpServer<E: BeetEmbedModel> {
 	nexus_db: Database<E>,
 	#[allow(unused)]
 	embedding_model: E,
+	known_sources: KnownSources,
 }
 
 #[tool(tool_box)]
 impl<E: BeetEmbedModel> McpServer<E> {
-	pub async fn new(embedding_model: E) -> Result<Self> {
+	pub async fn new(
+		embedding_model: E,
+		sources: KnownSources,
+	) -> Result<Self> {
 		Ok(Self {
 			request_count: Arc::new(Mutex::new(0)),
 			nexus_db: Database::connect(
@@ -73,6 +76,7 @@ impl<E: BeetEmbedModel> McpServer<E> {
 			)
 			.await?,
 			embedding_model,
+			known_sources,
 		})
 	}
 	/// Start the server using SSE transport.
@@ -81,6 +85,7 @@ impl<E: BeetEmbedModel> McpServer<E> {
 	pub async fn serve_sse(
 		embedding_model: E,
 		bind_address: &str,
+		sources: KnownSources,
 	) -> Result<()> {
 		let addr = bind_address.to_string();
 		tracing::info!(
@@ -91,7 +96,9 @@ impl<E: BeetEmbedModel> McpServer<E> {
 			.with_service_directly(move || {
 				futures::executor::block_on(async {
 					tracing::info!("Starting MCP Server on {addr}");
-					Self::new(embedding_model.clone()).await.unwrap()
+					Self::new(embedding_model.clone(), sources.clone())
+						.await
+						.unwrap()
 				})
 			});
 
@@ -164,7 +171,6 @@ impl<E: BeetEmbedModel> McpServer<E> {
 	) -> Result<CallToolResult, McpError> {
 		let db = self.nexus_db.clone();
 
-
 		self.tool_middleware("nexus_rag", query, async move |q| {
 			db.try_init_nexus_arcana().await?;
 			db.query(&q).await
@@ -182,7 +188,7 @@ impl<E: BeetEmbedModel> McpServer<E> {
 		self.tool_middleware("crate_rag", query, async move |query| {
 			let key = query.source_key();
 			let db_path = key.local_db_path(&model);
-			KnownSources::assert_exists(&key)?;
+			self.known_sources.assert_exists(&key)?;
 			if !fs::exists(&db_path)? {
 				anyhow::bail!(
 					"source is known but could not be found at: {}\nit may need to be indexed first, or the path is incorrect",
@@ -241,7 +247,6 @@ where
 		)
 	}
 }
-
 
 const_string!(Echo = "echo");
 #[tool(tool_box)]
