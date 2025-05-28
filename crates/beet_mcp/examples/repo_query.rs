@@ -17,7 +17,7 @@ async fn main() -> Result<()> {
 	// 	"pokemon-info",
 	// 	"https://github.com/minsoeaung/pokemon-info.git",
 	// )
-	IndexRepository::new(embedding_model.clone())
+	IndexRepository::new(embedding_model.clone(), &KNOWN_SOURCES)
 		.try_index(&key)
 		.await?;
 

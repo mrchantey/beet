@@ -56,12 +56,18 @@ impl std::fmt::Display for CrateMeta {
 	}
 }
 
-pub struct IndexRepository<E: BeetEmbedModel> {
+pub struct IndexRepository<'a, E: BeetEmbedModel> {
 	embedding_model: E,
+	sources: &'a KnownSources,
 }
 
-impl<E: BeetEmbedModel> IndexRepository<E> {
-	pub fn new(embedding_model: E) -> Self { Self { embedding_model } }
+impl<'a, E: BeetEmbedModel> IndexRepository<'a, E> {
+	pub fn new(embedding_model: E, sources: &'a KnownSources) -> Self {
+		Self {
+			embedding_model,
+			sources,
+		}
+	}
 
 	/// Yup, its a big one, if using a paid model this could result in
 	/// measurable charges.
@@ -69,7 +75,7 @@ impl<E: BeetEmbedModel> IndexRepository<E> {
 		&self,
 		filter: impl Fn(&(&ContentSourceKey, &ContentSource)) -> bool,
 	) -> Result<()> {
-		for (crate_meta, _) in KnownSources.iter().filter(filter) {
+		for (crate_meta, _) in self.sources.iter().filter(filter) {
 			self.try_index(crate_meta).await?;
 		}
 		Ok(())
@@ -77,7 +83,7 @@ impl<E: BeetEmbedModel> IndexRepository<E> {
 
 	/// indexes the repo if the database is empty
 	pub async fn try_index(&self, key: &ContentSourceKey) -> Result<()> {
-		let source = KnownSources::get(&key)?;
+		let source = self.sources.get(&key)?;
 		let db_path = key.local_db_path(&self.embedding_model);
 		let repo_path = source.local_repo_path();
 

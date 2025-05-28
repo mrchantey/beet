@@ -1,13 +1,14 @@
 use crate::prelude::Document;
+use serde::Deserialize;
+use serde::Serialize;
 use std::ops::Range;
 use std::path::Path;
 use text_splitter::CodeSplitter;
 use text_splitter::MarkdownSplitter;
 use text_splitter::TextSplitter;
 
-
 /// Split text into chunks, using the extension to determine the approach
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SplitText {
 	/// Range of character count to use for chunking.
 	pub chunk_range: Range<usize>,
@@ -27,7 +28,9 @@ impl Default for SplitText {
 const DEFAULT_CHUNK_RANGE: Range<usize> = 1500..3000;
 
 impl SplitText {
-	pub fn new(chunk_range: Range<usize>) -> Self { Self { chunk_range } }
+	pub fn new(chunk_range: Range<usize>) -> Self {
+		Self { chunk_range }
+	}
 
 	pub fn split<'a>(
 		&self,
@@ -72,16 +75,10 @@ impl SplitText {
 	}
 }
 
-
-
-
-
-
 #[cfg(test)]
 mod test {
 	use super::*;
 	use std::path::Path;
-
 
 	#[test]
 	fn test_split_markdown() {
@@ -124,11 +121,11 @@ impl TestStruct {
     pub fn new(field1: String, field2: i32) -> Self {
         Self { field1, field2 }
     }
-    
+
     pub fn get_field1(&self) -> &str {
         &self.field1
     }
-    
+
     pub fn get_field2(&self) -> i32 {
         self.field2
     }
@@ -173,7 +170,6 @@ fn main() {
 	fn test_split_no_extension() {
 		let content = "This is content without any file extension. ".repeat(10);
 		let chunks = SplitText::default().split("test.xyz", &content);
-
 
 		assert!(!chunks.is_empty());
 		// Should fall back to default text splitting

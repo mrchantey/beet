@@ -9,7 +9,6 @@ use serde::Serialize;
 use std::path::Path;
 use sweet::prelude::*;
 
-
 /*
 that also gets me thinking about the difference between the big expensive censored models and these local libre models, like in the 90s we got local 3d graphics which spawned the demo scene, what does that look like for ml
 */
@@ -71,7 +70,7 @@ impl std::fmt::Display for ContentSourceKey {
 	}
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ContentSource {
 	/// crate metadata
 	pub crate_meta: CrateMeta,
@@ -87,7 +86,6 @@ pub struct ContentSource {
 	/// strategy for splitting text into chunks
 	pub split_text: SplitText,
 }
-
 
 impl ContentSource {
 	pub fn local_repo_path(&self) -> AbsPathBuf {
