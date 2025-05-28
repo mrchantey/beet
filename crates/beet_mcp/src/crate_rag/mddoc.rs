@@ -109,7 +109,7 @@ mod test {
 
 	#[sweet::test]
 	#[ignore = "takes long time but required for first run"]
-	async fn build() {
+	async fn build_for_crate() {
 		Mddoc::new(
 			&KnownSources::get(&ContentSourceKey::bevy_16_docs()).unwrap(),
 		)
@@ -118,7 +118,8 @@ mod test {
 		.unwrap();
 	}
 	#[sweet::test]
-	async fn mddoc_all() {
+	#[ignore = "takes long time, and requires repo to be installed"]
+	async fn mddoc_crate_all() {
 		Mddoc::new(
 			&KnownSources::get(&ContentSourceKey::bevy_16_docs()).unwrap(),
 		)

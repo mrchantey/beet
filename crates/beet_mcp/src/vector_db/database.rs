@@ -252,6 +252,20 @@ impl<E: BeetEmbedModel> Database<E> {
 
 		Ok(results)
 	}
+
+	/// populate a database with the nexus arcana content if its empty.
+	pub(crate) async fn try_init_nexus_arcana(&self) -> Result<()> {
+		if self.is_empty().await? {
+			tracing::trace!("initializing nexus arcana db");
+			let content = include_str!("../../nexus_arcana.md");
+			let documents = SplitText::default()
+				.split_to_documents("nexus_arcana.db", content);
+			self.store(documents).await?;
+		} else {
+			tracing::trace!("connecting to nexus arcana db");
+		}
+		Ok(())
+	}
 }
 
 #[derive(Debug, Clone)]
@@ -320,20 +334,6 @@ impl SqliteVectorStoreTable for Document {
 }
 
 
-
-// nexus arcana for testing
-impl<E: BeetEmbedModel> Database<E> {
-	/// Connect to the Nexus Arcana test database,
-	/// populating it with initial data if necessary.
-	pub async fn nexus_arcana(embedding_model: E, path: &str) -> Result<Self> {
-		let db = Self::connect(embedding_model, path).await?;
-
-		Ok(db)
-	}
-}
-
-
-
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
@@ -365,9 +365,10 @@ mod test {
 	}
 	#[tokio::test]
 	async fn load_and_store() {
-		let db = Database::nexus_arcana(EmbedModel::all_minilm(), ":memory:")
+		let db = Database::connect(EmbedModel::all_minilm(), ":memory:")
 			.await
 			.unwrap();
+		db.try_init_nexus_arcana().await.unwrap();
 
 		let results = db.query(&RagQuery::new("resonance", 1)).await.unwrap();
 		assert_eq!(results.len(), 1);

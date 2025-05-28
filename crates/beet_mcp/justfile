@@ -18,9 +18,9 @@ mddoc:
 
 
 mddoc-bevy:
-	cd .cache/repos/bevy && \
+	cd .cache/repositories/bevy && \
 	RUSTDOCFLAGS="-Z unstable-options --output-format json" \
 	cargo doc \
 	--no-deps \
 	--target-dir target/doc
-# cd .cache/repos/bevy && cargo run --bin mddoc
+# cd .cache/repositories/bevy && cargo run --bin mddoc

@@ -50,7 +50,7 @@ impl ContentSourceKey {
 	///
 	/// An example path may look like:
 	/// ```sh
-	/// .cache/repo-dbs/mxbai-embed-large/bevy@0.16.0/docs.db
+	/// .cache/databases/mxbai-embed-large/bevy@0.16.0/docs.db
 	/// ```
 	///
 	pub fn local_db_path<E: Model>(&self, embedding_model: &E) -> AbsPathBuf {
@@ -58,7 +58,7 @@ impl ContentSourceKey {
 			.into_abs()
 			.unwrap()
 			.join(format!(
-				".cache/repo-dbs/{}/{}.db",
+				".cache/databases/{}/{}.db",
 				embedding_model.model_name(),
 				self,
 			))
@@ -106,7 +106,7 @@ impl ContentSource {
 		WorkspacePathBuf::default()
 			.into_abs()
 			.unwrap()
-			.join(format!(".cache/repos/{}/{}", author, repo_name))
+			.join(format!(".cache/repositories/{}/{}", author, repo_name))
 	}
 
 	pub fn target_path(&self) -> AbsPathBuf {

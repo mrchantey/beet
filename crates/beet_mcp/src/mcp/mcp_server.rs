@@ -164,15 +164,7 @@ impl<E: BeetEmbedModel> McpServer<E> {
 
 
 		self.tool_middleware("nexus_rag", query, async move |q| {
-			if db.is_empty().await? {
-				tracing::trace!("initializing nexus arcana db");
-				let content = include_str!("../../nexus_arcana.md");
-				let documents = SplitText::default()
-					.split_to_documents("nexus_arcana.db", content);
-				db.store(documents).await?;
-			} else {
-				tracing::trace!("connecting to nexus arcana db");
-			}
+			db.try_init_nexus_arcana().await?;
 			db.query(&q).await
 		})
 		.await
