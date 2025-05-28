@@ -207,8 +207,8 @@ impl<E: BeetEmbedModel> McpServer<E> {
 	}
 
 	/// wrap a tool call with tracing and error handling
-	async fn tool_middleware<'a, I: Serialize, O: IntoCallToolResult<M>, M>(
-		&'a self,
+	async fn tool_middleware<I: Serialize, O: IntoCallToolResult<M>, M>(
+		&self,
 		tool_name: &str,
 		param: I,
 		func: impl 'static
