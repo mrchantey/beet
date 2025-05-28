@@ -111,7 +111,9 @@ mod test {
 	#[ignore = "takes long time but required for first run"]
 	async fn build_for_crate() {
 		Mddoc::new(
-			&KnownSources::get(&ContentSourceKey::bevy_16_docs()).unwrap(),
+			KNOWN_SOURCES
+				.get(&ContentSourceKey::bevy_16_docs())
+				.unwrap(),
 		)
 		.build()
 		.await
@@ -121,7 +123,9 @@ mod test {
 	#[ignore = "takes long time, and requires repo to be installed"]
 	async fn mddoc_crate_all() {
 		Mddoc::new(
-			&KnownSources::get(&ContentSourceKey::bevy_16_docs()).unwrap(),
+			KNOWN_SOURCES
+				.get(&ContentSourceKey::bevy_16_docs())
+				.unwrap(),
 		)
 		.build_matching_mdddocs()
 		.await
