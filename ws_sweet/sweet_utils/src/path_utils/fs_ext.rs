@@ -62,11 +62,11 @@ impl FsExt {
 	/// 1. tries to get the `SWEET_ROOT` env var.
 	/// 2. if wasm, returns an empty path
 	/// 3. Otherwise return the closest ancestor (inclusive) that contains a `Cargo.lock` file
+	/// 4. Otherwise returns cwd
 	///
 	/// ## Panics
 	/// - The current directory is not found
 	/// - Insufficient permissions to access the current directory
-	/// - There is no `Cargo.lock` in the directory or any of its ancestors
 	pub fn workspace_root() -> PathBuf {
 		if let Ok(root_str) = std::env::var("SWEET_ROOT") {
 			return PathBuf::from_str(&root_str).unwrap();
@@ -89,9 +89,8 @@ impl FsExt {
 					return PathBuf::from(p);
 				}
 			}
-			panic!(
-				"No Cargo.lock found in the current directory or any of its ancestors"
-			);
+			// If no workspace root is found, fall back to the current directory
+			return path;
 		}
 	}
 

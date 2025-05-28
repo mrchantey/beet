@@ -80,7 +80,7 @@ See the commented out `sse` parts of [examples/mcp_server](./examples/mcp_server
 
 During development its usually easier to work with an agent as rust code, see [examples/agent.rs](./examples/agent.rs).
 
-For 'out in the wild' agents like cursor, claude code, vscode etc, an `mcp.json` is used. See [.vscode/mcp.json](.vscode/mcp.json). I'm having a tough time getting stdio to work with `cargo run` so recommend the sse approach.
+For 'out in the wild' agents like cursor, claude code, vscode etc, an `mcp.json` is used. See [.vscode/mcp.json](.vscode/mcp.json). Agents like to query from all kinds of directories so i haven't yet worked out where to put the cache for stdio so recommend the sse approach.
 
 ```sh
 cargo run --bin sse-server

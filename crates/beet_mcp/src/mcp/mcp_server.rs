@@ -184,7 +184,10 @@ impl<E: BeetEmbedModel> McpServer<E> {
 			let db_path = key.local_db_path(&model);
 			KnownSources::assert_exists(&key)?;
 			if !fs::exists(&db_path)? {
-				anyhow::bail!("source is known but has not yet been indexed");
+				anyhow::bail!(
+					"source is known but could not be found at: {}\nit may need to be indexed first, or the path is incorrect",
+					db_path.to_string_lossy()
+				);
 			}
 
 			Database::connect(model.clone(), &db_path.to_string_lossy())
