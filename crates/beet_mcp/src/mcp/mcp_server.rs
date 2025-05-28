@@ -66,7 +66,7 @@ pub struct McpServer<E: BeetEmbedModel> {
 impl<E: BeetEmbedModel> McpServer<E> {
 	pub async fn new(
 		embedding_model: E,
-		sources: KnownSources,
+		known_sources: KnownSources,
 	) -> Result<Self> {
 		Ok(Self {
 			request_count: Arc::new(Mutex::new(0)),
@@ -185,10 +185,12 @@ impl<E: BeetEmbedModel> McpServer<E> {
 		#[tool(aggr)] query: CrateRagQuery,
 	) -> Result<CallToolResult, McpError> {
 		let model = self.embedding_model.clone();
+
+		let known_sources = &self.known_sources;
 		self.tool_middleware("crate_rag", query, async move |query| {
 			let key = query.source_key();
 			let db_path = key.local_db_path(&model);
-			self.known_sources.assert_exists(&key)?;
+			known_sources.assert_exists(&key)?;
 			if !fs::exists(&db_path)? {
 				anyhow::bail!(
 					"source is known but could not be found at: {}\nit may need to be indexed first, or the path is incorrect",
@@ -206,11 +208,17 @@ impl<E: BeetEmbedModel> McpServer<E> {
 	}
 
 	/// wrap a tool call with tracing and error handling
-	async fn tool_middleware<I: Serialize, O: IntoCallToolResult<M>, M>(
-		&self,
+	async fn tool_middleware<
+		'slf,
+		'f,
+		I: Serialize,
+		O: IntoCallToolResult<M>,
+		M,
+	>(
+		&'slf self,
 		tool_name: &str,
 		param: I,
-		func: impl 'static + AsyncFn(I) -> anyhow::Result<O>,
+		func: impl 'f + AsyncFn(I) -> anyhow::Result<O>,
 		// func: impl AsyncFn(I) -> anyhow::Result<O>,
 	) -> Result<CallToolResult, McpError> {
 		tracing::info!(

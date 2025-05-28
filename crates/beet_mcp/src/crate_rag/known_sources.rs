@@ -1,6 +1,7 @@
 use crate::prelude::*;
 use anyhow::Result;
 use serde::Deserialize;
+use serde::Serialize;
 use std::collections::HashMap;
 use std::sync::LazyLock;
 use sweet::prelude::GlobFilter;
@@ -10,9 +11,7 @@ pub struct KnownSources(HashMap<ContentSourceKey, ContentSource>);
 
 impl std::ops::Deref for KnownSources {
 	type Target = HashMap<ContentSourceKey, ContentSource>;
-	fn deref(&self) -> &Self::Target {
-		&self.0
-	}
+	fn deref(&self) -> &Self::Target { &self.0 }
 }
 
 impl KnownSources {
@@ -160,7 +159,7 @@ struct SourceBuilder {
 	version: String,
 }
 
-static KNOWN_SOURCES: LazyLock<KnownSources> = LazyLock::new(|| {
+pub static KNOWN_SOURCES: LazyLock<KnownSources> = LazyLock::new(|| {
 	let mut map = HashMap::new();
 
 	// still working on a better way to do this.
