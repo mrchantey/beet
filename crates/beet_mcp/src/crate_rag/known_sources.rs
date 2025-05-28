@@ -163,6 +163,7 @@ static KNOWN_SOURCES: LazyLock<HashMap<ContentSourceKey, ContentSource>> =
 	LazyLock::new(|| {
 		let mut map = HashMap::new();
 
+		// still working on a better way to do this.
 		map.extend(
 			KnownSourceBuilder::new("bevy")
 				.add_content_type(

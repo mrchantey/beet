@@ -83,7 +83,9 @@ impl<E: BeetEmbedModel> McpServer<E> {
 		bind_address: &str,
 	) -> Result<()> {
 		let addr = bind_address.to_string();
-		tracing::info!("Listening for mcp clients\nconnect via{addr}/sse");
+		tracing::info!(
+			"Listening for mcp clients\nServer URL http://{addr}/sse"
+		);
 		let ct = SseServer::serve(bind_address.parse()?)
 			.await?
 			.with_service_directly(move || {

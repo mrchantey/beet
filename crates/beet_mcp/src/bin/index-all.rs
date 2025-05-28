@@ -6,11 +6,12 @@ use beet_mcp::prelude::*;
 #[tokio::main]
 #[rustfmt::skip]
 async fn main() -> Result<()> {
-	// std::fs::remove_dir_all(".cache/databases").ok();
+	// std::fs::remove_dir_all(".cache/").ok();
 	init_tracing(tracing::Level::INFO);
 	let model = EmbedModel::from_env();
 	IndexRepository::new(model)
 		.try_index_all_known_crates(|(key, _)| {
+			// TODO clap args
 			matches!(
 				key.content_type,
 				|	ContentType::Docs

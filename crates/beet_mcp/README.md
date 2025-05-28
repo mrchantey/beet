@@ -78,14 +78,33 @@ See the commented out `sse` parts of [examples/mcp_server](./examples/mcp_server
 
 ### Discovering MCP Servers
 
-During development its usually easier to work with an agent 'in code', see [examples/agent.rs](./examples/agent.rs)
+During development its usually easier to work with an agent as rust code, see [examples/agent.rs](./examples/agent.rs).
 
-For 'out in the wild' agents like cursor, claude code, vscode etc, an `mcp.json` is used. See [.vscode/mcp.json](.vscode/mcp.json) for an example of calling this server with the vs code agent during development.
+For 'out in the wild' agents like cursor, claude code, vscode etc, an `mcp.json` is used. See [.vscode/mcp.json](.vscode/mcp.json). I'm having a tough time getting stdio to work with `cargo run` so recommend the sse approach.
+
+```sh
+cargo run --bin sse-server
+```
+option 1: use the inspector
+```sh
+npx @modelcontextprotocol/inspector
+```
+option 2: add this to mcp.json
+```json
+{
+	"servers": {
+		"beet-mcp": {
+			"type": "sse",
+      "url": "http://127.0.0.1:8000/sse",
+		}	
+	}
+}
+```
 
 
 ## `crate_rag`
 
-The goal of this repo is, for a given [`CrateRagQuery`](src/mcp/mcp_server.rs#L25), to return the top n chunks of data that match it. An example query might look like this:
+The goal of this tool is, for a given [`CrateRagQuery`](src/mcp/mcp_server.rs#L25), to return the top n chunks of data that match it. An example query might look like this:
 
 ```json
 {
@@ -97,12 +116,15 @@ The goal of this repo is, for a given [`CrateRagQuery`](src/mcp/mcp_server.rs#L2
 }
 ```
 
-For this to work we need to know the git url and commit hash for that version, finding a nice way to handle that is a work in progress but its currently hardcoded, see [KnownSources](src/crate_rag/known_sources.rs#L166-L167).
+For this to work we need to know the git url and commit hash for that version, finding a nice way to handle that is a work in progress but its currently hardcoded, see [`KnownSources`](src/crate_rag/known_sources.rs#L166-L167). Feel free to add as many as you like,
+
+ By default the only sources indexed by [index-all](src/bin/index-all.rs) are `bevy 0.16` docs, examples and guides. eventually these should be cli args.
+
 
 `beet_mcp` uses the approach of a [Vector Database](https://www.cloudflare.com/learning/ai/what-is-vector-database/#:~:text=A%20vector%20database%20stores%20pieces,construction%20of%20powerful%20AI%20models.) to store and query the repository. 
 This differs from grepping techniques in that it can match phrases that are similar in *meaning* instead of exact terms, the tradeoff being that we need to index the db beforehand.
 
-Vector DB RAG has two phases:
+Vector DB rag has two phases:
 1. create embeddings for the content: `cargo run --bin index-all`
 2. run a query against the database: `cargo run --example repo_query`
 
@@ -132,11 +154,7 @@ For example `create a 2d camera` will likely return the definition of `Camera2d`
 
 ### Contributing
 
-The following are prerequisites for running `cargo test`: should 'just work' as long as `ollama` with `all-minilm:latest` are installed.
-```
-
-```
-You will notice references to the sample document [nexus_arcana](nexus_arcana.md), used for unit tests.
+Running `cargo test` requires the steps in the local quickstart, except only the `all-minilm:latest` model is required. You will notice references to the sample document [nexus_arcana](nexus_arcana.md) used for unit tests.
 
 
 ### Future Work
