@@ -2,7 +2,7 @@
 
 <div align="center">
   <p>
-    <strong>🦄 The anything framework 🦄</strong>
+    <strong>🦄 A very bevy metaframework 🦄</strong>
   </p>
   <p>
     <a href="https://crates.io/crates/beet"><img src="https://img.shields.io/crates/v/beet.svg?style=flat-square" alt="Crates.io version" /></a>
@@ -18,8 +18,10 @@
   </h3>
 </div>
 
-Beet is a collection of tools for building web pages, realtime applications and behaviors. Its early days so your mileage may vary depending on the crate of interest:
+Beet extends the capabilities of bevy with systems for developing and publishing applications, using the engine in several ways. Its *very* early days so your mileage may vary depending on the crate of interest:
 
+
+**readiness meter**
 - 🦢 documented and tested
 - 🐣 docs and tests are incomplete
 - 🐉 highly experimental, here be dragons
@@ -65,6 +67,7 @@ Top level crates that depend on several of the above.
 | Crate                                           | Status | Description                  |
 | ----------------------------------------------- | ------ | ---------------------------- |
 | [`beet-cli`](https://crates.io/crates/beet-cli) | 🐉      | CLI for beet authoring tools |
+| [`beet_mcp`](https://crates.io/crates/beet_mcp) | 🐉      | VectorDB MCP Server          |
 
 
 ## Bevy Versions
@@ -75,37 +78,3 @@ Top level crates that depend on several of the above.
 | 0.15   | 0.0.4  |
 | 0.14   | 0.0.2  |
 | 0.12   | 0.0.1  |
-
-
-## Wishlist
-
-Most of these are quite complex but if you'd like to have a go open an issue and I'll help where i can.
-
-### `beet_rsx`
-- [ ] escape html 
-- [ ] reactive graph
-- [ ] minify style
-
-
-### `beet_router`
-- [ ] markdown live reload
-- [ ] markdown rsx
-- [ ] markdown recursive parsing
-
-### `sweet`
-- [ ] native cli
-
-### `beet_common`
-- [ ] css parser / style tag location
-- [ ] markdown parser
-- [ ] file hashing
-
-### `beet_query`
-- [ ] sqlx
-
-
-### `beet_server`
-- [ ] sever signals
-
-### `infra`
-- [ ] serve static files on s3 instead of bundled in the lambda
