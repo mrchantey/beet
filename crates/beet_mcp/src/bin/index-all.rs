@@ -9,7 +9,7 @@ async fn main() -> Result<()> {
 	// std::fs::remove_dir_all(".cache/").ok();
 	init_tracing(tracing::Level::INFO);
 	let model = EmbedModel::from_env();
-	IndexRepository::new(model &KNOWN_SOURCES)
+	IndexRepository::new(model, &KNOWN_SOURCES)
 		.try_index_all_known_crates(|(key, _)| {
 			// TODO clap args
 			matches!(

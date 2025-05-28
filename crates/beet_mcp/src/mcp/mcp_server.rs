@@ -171,7 +171,7 @@ impl<E: BeetEmbedModel> McpServer<E> {
 	) -> Result<CallToolResult, McpError> {
 		let db = self.nexus_db.clone();
 
-		self.tool_middleware("nexus_rag", query, async move |q| {
+		self.tool_middleware("nexus_rag", query, async move |q, _| {
 			db.try_init_nexus_arcana().await?;
 			db.query(&q).await
 		})
@@ -186,8 +186,7 @@ impl<E: BeetEmbedModel> McpServer<E> {
 	) -> Result<CallToolResult, McpError> {
 		let model = self.embedding_model.clone();
 
-		let known_sources = &self.known_sources;
-		self.tool_middleware("crate_rag", query, async move |query| {
+		self.tool_middleware("crate_rag", query, async move |query, known_sources| {
 			let key = query.source_key();
 			let db_path = key.local_db_path(&model);
 			known_sources.assert_exists(&key)?;
@@ -208,17 +207,12 @@ impl<E: BeetEmbedModel> McpServer<E> {
 	}
 
 	/// wrap a tool call with tracing and error handling
-	async fn tool_middleware<
-		'slf,
-		'f,
-		I: Serialize,
-		O: IntoCallToolResult<M>,
-		M,
-	>(
-		&'slf self,
+	async fn tool_middleware<'a, I: Serialize, O: IntoCallToolResult<M>, M>(
+		&'a self,
 		tool_name: &str,
 		param: I,
-		func: impl 'f + AsyncFn(I) -> anyhow::Result<O>,
+		func: impl 'static
+		+ for<'b> AsyncFn(I, &'b KnownSources) -> anyhow::Result<O>,
 		// func: impl AsyncFn(I) -> anyhow::Result<O>,
 	) -> Result<CallToolResult, McpError> {
 		tracing::info!(
@@ -226,7 +220,7 @@ impl<E: BeetEmbedModel> McpServer<E> {
 			serde_json::to_string_pretty(&param)
 				.unwrap_or_else(|_| "invalid json".to_string())
 		);
-		let result = func(param).await.map_err(|e| {
+		let result = func(param, &self.known_sources).await.map_err(|e| {
 			tracing::error!("Tool Call Error: {tool_name} - {e}");
 			McpError::internal_error(
 				"tool_call_error",

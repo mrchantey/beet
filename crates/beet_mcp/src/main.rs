@@ -7,7 +7,7 @@ async fn main() -> Result<()> {
 	init_tracing(tracing::Level::DEBUG);
 	#[cfg(not(debug_assertions))]
 	init_tracing(tracing::Level::INFO);
-	McpServer::new(EmbedModel::from_env())
+	McpServer::new(EmbedModel::from_env(), KNOWN_SOURCES.clone())
 		.await?
 		.serve_stdio()
 		.await
