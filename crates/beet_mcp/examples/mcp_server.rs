@@ -14,4 +14,5 @@ async fn main() -> Result<()> {
 		.await?
 		.serve_stdio()
 		.await
+	// McpServer::serve_sse(EmbedModel::from_env(), "127.0.0.1:8000").await
 }

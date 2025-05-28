@@ -16,44 +16,49 @@ openai = []
 
 [dependencies]
 #💡 utils
-tokio = { version = "1", features = ["macros", "rt-multi-thread", "io-std"] }
+tokio = { version = "1", features = [
+	"macros",
+	"rt-multi-thread",
+	"io-std",
+	"signal",
+] }
 sweet = { path = "../../ws_sweet/sweet", features = ["fs"] }
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 anyhow = "1"
 dotenv = "0.15"
 tracing = "0.1"
 serde = { version = "1", features = ["derive"] }
+futures = "0.3"
+rayon = "1"
+extend = "1"
 
 #💡 mcp
-# fix: generic tool_box
-rmcp = { path = "../../../rmcp/crates/rmcp", features = [
+# rmcp = { path = "../../../rmcp/crates/rmcp", features = [
+rmcp = { git = "https://github.com/modelcontextprotocol/rust-sdk", branch = "main", features = [
 	"client",
 	"__reqwest",
 	"transport-io",
 	"transport-sse-client",
+	"transport-sse-server",
 	"transport-child-process",
 ] }
-# rmcp = { git = "https://github.com/modelcontextprotocol/rust-sdk", branch = "main", features = [
-# 	"transport-io",
-# ] }
 axum = { version = "0.8", features = ["macros"] }
 serde_json = "1"
 
-#💡 rig
+#💡 rig / sqlite vector db
 rig-core = { version = "0.12", features = ["derive"] }
-#💡 sqlite
 rig-sqlite = { version = "0.1", features = [] }
 rusqlite = { version = "0.32", features = ["bundled"] }
 sqlite-vec = "0.1"
 tokio-rusqlite = { version = "0.6", features = [
 	"bundled",
 ], default-features = false }
+
+
+#💡 text splitting
 rustdoc-md = "0.1"
 text-splitter = { version = "0.26", features = ["code", "markdown"] }
 tree-sitter-rust = "0.24"
-futures = "0.3"
-rayon = "1"
-extend = "1"
 
 [dev-dependencies]
 tokio-test = "0.4"

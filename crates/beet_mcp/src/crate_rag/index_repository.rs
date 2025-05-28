@@ -63,8 +63,8 @@ pub struct IndexRepository<E: BeetEmbedModel> {
 impl<E: BeetEmbedModel> IndexRepository<E> {
 	pub fn new(embedding_model: E) -> Self { Self { embedding_model } }
 
-	/// Yup, its a big one, if using a cloud embedding model this could result in
-	/// $5-$100 dollars in charges.
+	/// Yup, its a big one, if using a paid model this could result in
+	/// measurable charges.
 	pub async fn try_index_all_known_crates(
 		&self,
 		filter: impl Fn(&(&ContentSourceKey, &ContentSource)) -> bool,

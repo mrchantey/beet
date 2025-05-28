@@ -20,7 +20,10 @@ use tokio_rusqlite::Connection;
 
 #[derive(Debug, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct RagQuery {
-	#[schemars(description = "The max results to return")]
+	#[schemars(
+		description = "The max results to return, use a number appropriate for your context window\
+		A reasonable range is 3-15"
+	)]
 	pub max_docs: usize,
 	#[schemars(description = "The search term that will be \
 		converted to an embedding and used to query the vector database\
@@ -101,6 +104,7 @@ impl<E: BeetEmbedModel> Database<E> {
 			}
 		}
 
+		// initialize the sqlite_vec extension
 		unsafe {
 			sqlite3_auto_extension(Some(std::mem::transmute(
 				sqlite3_vec_init as *const (),
@@ -119,7 +123,7 @@ impl<E: BeetEmbedModel> Database<E> {
 	}
 
 	pub async fn is_empty(&self) -> Result<bool> {
-		// expensive way to do this, but rig doesnt expose the conn
+		// TODO use the conn directly to check for rows
 		Ok(self.query(&RagQuery::new("foo", 1)).await?.is_empty())
 	}
 
@@ -155,7 +159,69 @@ impl<E: BeetEmbedModel> Database<E> {
 		Ok(())
 	}
 
+	/// Store a list of documents in the vector store, batching
+	/// into groups that fit within the [`Model::max_tokens_per_request`].
 	pub async fn store(&self, documents: Vec<Document>) -> Result<()> {
+		let max_tokens_per_request =
+			self.embedding_model.max_tokens_per_request();
+		let chars_per_token = self.embedding_model.characters_per_token();
+
+		// Calculate max characters per request
+		let max_chars_per_request =
+			(max_tokens_per_request as f64 * chars_per_token) as usize;
+
+		// Split documents into batches that fit within token limits
+		let mut batches = Vec::new();
+		let mut current_batch = Vec::new();
+		let mut current_batch_chars = 0;
+		let mut total_chars = 0;
+
+		for document in documents {
+			let doc_chars = document.content_len();
+			total_chars += doc_chars;
+
+			// If adding this document would exceed the limit, finalize the batch
+			if current_batch_chars > 0
+				&& current_batch_chars + doc_chars > max_chars_per_request
+			{
+				batches.push(std::mem::take(&mut current_batch));
+				current_batch_chars = 0;
+			}
+
+			// Add document to the current batch
+			current_batch.push(document);
+			current_batch_chars += doc_chars;
+		}
+
+		// Add the final batch if not empty
+		if !current_batch.is_empty() {
+			batches.push(current_batch);
+		}
+
+		let cost = self
+			.embedding_model
+			.estimate_cost(total_chars)
+			.map(|cost| {
+				format!(
+					"\nEstimated cost: ${:.4} ({} characters)",
+					cost, total_chars
+				)
+			})
+			.unwrap_or_default();
+		tracing::info!(
+			"Creating embeddings for {} batches{cost}",
+			batches.len(),
+		);
+
+		// Process each batch
+		for batch in batches {
+			self.store_batch(batch).await?;
+		}
+
+		Ok(())
+	}
+
+	async fn store_batch(&self, documents: Vec<Document>) -> Result<()> {
 		let embeddings = EmbeddingsBuilder::new(self.embedding_model.clone())
 			.documents(documents)?
 			.build()
@@ -164,6 +230,7 @@ impl<E: BeetEmbedModel> Database<E> {
 		self.vector_store.add_rows(embeddings).await?;
 		Ok(())
 	}
+
 
 	pub async fn query(&self, query: &RagQuery) -> Result<Vec<QueryResult>> {
 		let index = self
@@ -227,6 +294,9 @@ impl Document {
 			content: joined_content,
 		}
 	}
+
+	/// length of the embedded content in characters
+	pub fn content_len(&self) -> usize { self.content.chars().count() }
 }
 
 impl SqliteVectorStoreTable for Document {
@@ -257,16 +327,6 @@ impl<E: BeetEmbedModel> Database<E> {
 	/// populating it with initial data if necessary.
 	pub async fn nexus_arcana(embedding_model: E, path: &str) -> Result<Self> {
 		let db = Self::connect(embedding_model, path).await?;
-
-		if db.is_empty().await? {
-			tracing::trace!("initializing nexus arcana db");
-			let content = include_str!("../../nexus_arcana.md");
-			let documents = SplitText::default()
-				.split_to_documents("nexus_arcana.db", content);
-			db.store(documents).await?;
-		} else {
-			tracing::trace!("connecting to nexus arcana db");
-		}
 
 		Ok(db)
 	}

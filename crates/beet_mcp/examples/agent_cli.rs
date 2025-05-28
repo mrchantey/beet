@@ -1,9 +1,10 @@
 use beet_mcp::prelude::*;
-use rig::completion::Prompt;
+use rig::cli_chatbot::cli_chatbot;
 
 #[tokio::main]
 async fn main() -> Result<(), anyhow::Error> {
 	init_tracing(tracing::Level::DEBUG);
+	// Print the current tracing level
 	let mcp_client = McpClient::new_stdio_dev().await?;
 
 	let agent = AgentModel::from_env()
@@ -13,12 +14,7 @@ async fn main() -> Result<(), anyhow::Error> {
 		.temperature(0.5)
 		.build();
 
-
-	let response = agent
-		.prompt("code snippet for a fps camera controller in bevy 0.16")
-		.await?;
-
-	println!("✨ Response:\n{}", response);
+	cli_chatbot(agent).await?;
 
 	Ok(())
 }

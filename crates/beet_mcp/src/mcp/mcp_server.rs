@@ -10,7 +10,9 @@ use rmcp::model::*;
 use rmcp::schemars;
 use rmcp::service::RequestContext;
 use rmcp::tool;
+use rmcp::transport::sse_server::SseServer;
 use rmcp::transport::stdio;
+
 use serde::Deserialize;
 use serde::Serialize;
 use serde_json::json;
@@ -36,16 +38,16 @@ impl CrateRagQuery {
 			content_type: self.content_type.clone().into(),
 		}
 	}
-	/// for use with guides queries to ensure we're getting up-to-date information
-	pub fn versioned_query(&self) -> RagQuery {
-		RagQuery {
-			max_docs: self.rag_query.max_docs,
-			search_query: format!(
-				"version {} {}",
-				self.crate_meta.crate_version, self.rag_query.search_query,
-			),
-		}
-	}
+	// /// for use with guides queries to ensure we're getting up-to-date information
+	// pub fn versioned_query(&self) -> RagQuery {
+	// 	RagQuery {
+	// 		max_docs: self.rag_query.max_docs,
+	// 		search_query: format!(
+	// 			"version {} {}",
+	// 			self.crate_meta.crate_version, self.rag_query.search_query,
+	// 		),
+	// 	}
+	// }
 }
 
 
@@ -65,13 +67,36 @@ impl<E: BeetEmbedModel> McpServer<E> {
 	pub async fn new(embedding_model: E) -> Result<Self> {
 		Ok(Self {
 			request_count: Arc::new(Mutex::new(0)),
-			nexus_db: Database::nexus_arcana(
+			nexus_db: Database::connect(
 				embedding_model.clone(),
 				".cache/nexus_arcana.db",
 			)
 			.await?,
 			embedding_model,
 		})
+	}
+	/// Start the server using SSE transport.
+	/// This will spawn a new insance of [`McpServer`] for each client that
+	/// connects via `bind_address/sse`.
+	pub async fn serve_sse(
+		embedding_model: E,
+		bind_address: &str,
+	) -> Result<()> {
+		let addr = bind_address.to_string();
+		tracing::info!("Listening for mcp clients\nconnect via{addr}/sse");
+		let ct = SseServer::serve(bind_address.parse()?)
+			.await?
+			.with_service_directly(move || {
+				futures::executor::block_on(async {
+					tracing::info!("Starting MCP Server on {addr}");
+					Self::new(embedding_model.clone()).await.unwrap()
+				})
+			});
+
+		tokio::signal::ctrl_c().await?;
+		ct.cancel();
+
+		Ok(())
 	}
 
 	pub async fn serve_stdio(self) -> Result<()> {
@@ -136,8 +161,19 @@ impl<E: BeetEmbedModel> McpServer<E> {
 		#[tool(aggr)] query: RagQuery,
 	) -> Result<CallToolResult, McpError> {
 		let db = self.nexus_db.clone();
+
+
 		self.tool_middleware("nexus_rag", query, async move |q| {
-			db.clone().query(&q).await
+			if db.is_empty().await? {
+				tracing::trace!("initializing nexus arcana db");
+				let content = include_str!("../../nexus_arcana.md");
+				let documents = SplitText::default()
+					.split_to_documents("nexus_arcana.db", content);
+				db.store(documents).await?;
+			} else {
+				tracing::trace!("connecting to nexus arcana db");
+			}
+			db.query(&q).await
 		})
 		.await
 	}
@@ -159,7 +195,8 @@ impl<E: BeetEmbedModel> McpServer<E> {
 
 			Database::connect(model.clone(), &db_path.to_string_lossy())
 				.await?
-				.query(&query.versioned_query())
+				.query(&query.rag_query)
+				// .query(&query.versioned_query())
 				.await
 		})
 		.await

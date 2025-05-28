@@ -27,15 +27,24 @@ impl<S: Service<RoleClient>> std::ops::Deref for McpClient<S> {
 }
 
 impl McpClient<()> {
+	/// create new mcp client using a child process
+	/// that calls `cargo run` to start the mcp server.
+	/// It will propagate the BEET_LOG environment variable,
+	/// and use openai for the mcp server if the `openai` feature is enabled.
 	pub async fn new_stdio_dev() -> Result<Self> {
 		#[cfg(not(feature = "openai"))]
-		let args = "cargo run".to_string();
+		let args = format!("cargo run").to_string();
 		#[cfg(feature = "openai")]
 		let args = "cargo run --features=openai".to_string();
 		let mut args = args.split_whitespace();
 		let service = ()
 			.serve(TokioChildProcess::new(
 				Command::new(args.next().unwrap()).configure(|cmd| {
+					cmd.env(
+						"BEET_LOG",
+						tracing::level_filters::LevelFilter::current()
+							.to_string(),
+					);
 					while let Some(arg) = args.next() {
 						cmd.arg(arg);
 					}

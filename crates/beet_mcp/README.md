@@ -4,7 +4,7 @@ An mcp server for rust developers, currently only exposing a single tool: `crate
 
 ## Quickstart
 
-Models can be run locally or in the cloud, I have not noticed a measurable difference in performance so the decision is more about portability. Give local a go if you have an NVIDIA or AMD GPU with [at least 5GB](https://claude.ai/share/f375b98b-820d-4c5d-bb52-9f731353e976) of RAM, (anything from the last 5 years should be fine).
+Models can be run locally or in the cloud, give local a go if you have an NVIDIA or AMD GPU with [at least 5GB](https://claude.ai/share/f375b98b-820d-4c5d-bb52-9f731353e976) of RAM, anything from the last 5 years should be fine.
 
 ### Quickstart - Local (recommended)
 
@@ -45,14 +45,31 @@ This is the fastest way to get started and good option if you don't have a decen
 
 If you would like to experiment with other models, for example if openai releases a new model, or if you have a small or large GPU, you may want to experiment with a different model.
 
-For example I have a 3080(12GB) so wanted to try [a bigger qwen3 model](https://ollama.com/library/qwen3)
+For example I have a 3080(12GB) so wanted to try [a bigger qwen3 model](https://ollama.com/library/qwen3).
 ```sh
+# trying a different ollama model
 ollama pull qwen3:14b
 # .env
-BEET_OLLAMA_AGENT=qwen3:14b
-# or for openai
-BEET_OPENAI_AGENT=GPT_4_5_PREVIEW_2025_02_27
+BEET_MODEL_AGENT_OLLAMA=qwen3:14b
+# or for trying a new openai model
+BEET_MODEL_AGENT_OPENAI=GPT_4_5_PREVIEW_2025_02_27
 ```
+See [`.env.example`](.env.example) for all options.
+
+
+### Running MCP Servers
+
+Agents primarily communicate with MPC servers in one of two ways:
+- via stdio, ie the agent will call the executable, (or `cargo run` during development).
+- via http Server Side Events (sse)
+
+See the commented out `sse` parts of [`./examples/mcp_server.rs`](./examples/mcp_server.rs) and [`./examples/mcp_client.rs`](./examples/mcp_client.rs) for details.
+
+### Discovering MCP Servers
+
+During development its usually easier to work with an agent 'in code', see []
+
+For 'out in the wild' agents like cursor, claude code, vscode etc, an `mcp.json` is used. See [`.vscode/mcp.json`](.vscode/mcp.json) for an example of calling this server with the vs code agent during development.
 
 
 ## `crate_rag`
@@ -61,19 +78,16 @@ Vector Databases have two phases:
 1. create embeddings for the content: `cargo run --bin index-all`
 2. run a query against the database: `cargo run --example repo_query`
 
-
-
 ### How it works
 
-This tool is essentially some glue code for several crates:
+This tool is essentially glue code for several crates:
 
 - `rig-core`: agentic ai crate used for running models and working with vector databases
 - `rmcp`: the official rust mcp sdk
-- `text-splitter`
+- `rustdoc-md`: generate markdown documents from `cargo doc`
+- `text-splitter`: split a document, ie `.md`, `.rs` into chunks
 
-- Indexing: crates for putting
-	- ds
-
+The only part I'd consider specialized is the [`ContentType`](src/crate_rag/content_type.rs) layer, which allows us to split `docs`, `examples`, `src`, `guides`.
 
 ### MCP testing
 
@@ -83,31 +97,14 @@ npm i -g @modelcontextprotocol/inspector
 npx @modelcontextprotocol/inspector cargo run
 ```
 
-
-
-
 ### Findings
 
+#### Source code vs public apis
 
-
-
-#### Source code vs examples
-
-Indexing examples and source code together can *worsen* the rag.
-For example `create a 2d camera` will likely return the definition of `Camera2d`, encouraging the llm to *create a 2d camera from scratch* just like the source code.
-
+Indexing examples and source code together can *worsen* the agent's performance.
+For example `create a 2d camera` will likely return the definition of `Camera2d`, encouraging the agent to *create a 2d camera from scratch* just like the source code.
 
 ### Future Work
 
 - `bevy_remote` mcp
-
-
-
-
-would you be open to some kind of base `Model` trait? I'm benchmarking `openai` vs `ollama` embedding models and would like a base trait to 
-```rust
-
-```
-
-
-trait for `EmbeddingModel` and `CompletionModel`?
+- a more sophisticated approach than `ContentType`, perhaps something like [`graphrag`](https://microsoft.github.io/graphrag/)

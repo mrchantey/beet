@@ -4,6 +4,7 @@ use beet_mcp::prelude::*;
 #[tokio::main]
 async fn main() -> Result<()> {
 	init_tracing(tracing::Level::INFO);
+	// let client = McpClient::new_sse("http://127.0.0.1:8000/sse").await?;
 	let client = McpClient::new_stdio_dev().await?;
 	let tools = client.list_tools(Default::default()).await?;
 	println!("Tools: {:#?}", tools);
