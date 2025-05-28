@@ -11,6 +11,11 @@ git clone https://github.com/mrchantey/beet
 code beet/crates/beet_mcp
 ```
 
+`sqlite` is required for the vector databases.
+```sh
+sudo apt-get install sqlite3
+```
+
 Models can be run locally or in the cloud, I'd recommend giving local a go if you have an NVIDIA or AMD GPU with [at least 5GB](https://claude.ai/share/f375b98b-820d-4c5d-bb52-9f731353e976) of RAM, anything from the last 5 years should be fine.
 
 ### Quickstart - Local (recommended)
