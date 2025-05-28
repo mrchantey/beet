@@ -3,12 +3,12 @@
 An mcp server for rust developers, currently only exposing a single tool: [`crate_rag`](#crate_rag).
 
 ## Quickstart
-This crate is currently separate from the rest of the repo
+
+There's a few moving parts in this crate, and it currently requires `nightly`. Its also currently separate from the rest of the repo so better to cd directly into it.
 
 ```sh
 git clone https://github.com/mrchantey/beet
-# best to just work in this directory
-code beet/crates/beet_mcp
+cd beet/crates/beet_mcp
 ```
 
 `sqlite` is required for the vector databases.
@@ -20,9 +20,7 @@ Models can be run locally or in the cloud, I'd recommend giving local a go if yo
 
 ### Quickstart - Local (recommended)
 
-Running models locally lets us use the mcp without incurring any costs.
-
-1. Install [`ollama`](https://ollama.com/download) and some models
+1. Install [`ollama`](https://ollama.com/download) and these three models used for tests and examples.
 	```sh
 	# install ollama
 	curl -fsSL https://ollama.com/install.sh | sh
