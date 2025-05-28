@@ -28,7 +28,10 @@ impl<S: Service<RoleClient>> std::ops::Deref for McpClient<S> {
 
 impl McpClient<()> {
 	pub async fn new_stdio_dev() -> Result<Self> {
+		#[cfg(not(feature = "openai"))]
 		let args = "cargo run".to_string();
+		#[cfg(feature = "openai")]
+		let args = "cargo run --features=openai".to_string();
 		let mut args = args.split_whitespace();
 		let service = ()
 			.serve(TokioChildProcess::new(

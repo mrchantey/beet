@@ -1,10 +1,10 @@
 use crate::prelude::ContentType;
 use crate::prelude::Database;
 use crate::prelude::Mddoc;
+use crate::utils::BeetEmbedModel;
 use anyhow::Result;
 use rayon::iter::ParallelBridge;
 use rayon::iter::ParallelIterator;
-use rig::embeddings::EmbeddingModel;
 use rmcp::schemars;
 use serde::Deserialize;
 use serde::Serialize;
@@ -50,20 +50,22 @@ impl CrateMeta {
 		}
 	}
 }
+impl std::fmt::Display for CrateMeta {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		write!(f, "{}@{}", self.crate_name, self.crate_version)
+	}
+}
 
-
-
-
-pub struct IndexRepository<E: 'static + Clone + EmbeddingModel> {
+pub struct IndexRepository<E: BeetEmbedModel> {
 	embedding_model: E,
 }
 
-impl<E: 'static + Clone + EmbeddingModel> IndexRepository<E> {
+impl<E: BeetEmbedModel> IndexRepository<E> {
 	pub fn new(embedding_model: E) -> Self { Self { embedding_model } }
 
 	/// Yup, its a big one, if using a cloud embedding model this could result in
 	/// $5-$100 dollars in charges.
-	pub async fn index_all_known_crates(
+	pub async fn try_index_all_known_crates(
 		&self,
 		filter: impl Fn(&(&ContentSourceKey, &ContentSource)) -> bool,
 	) -> Result<()> {
@@ -76,7 +78,7 @@ impl<E: 'static + Clone + EmbeddingModel> IndexRepository<E> {
 	/// indexes the repo if the database is empty
 	pub async fn try_index(&self, key: &ContentSourceKey) -> Result<()> {
 		let source = KnownSources::get(&key)?;
-		let db_path = key.local_db_path();
+		let db_path = key.local_db_path(&self.embedding_model);
 		let repo_path = source.local_repo_path();
 
 		let db = Database::connect(

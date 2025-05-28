@@ -1,7 +1,6 @@
 use crate::prelude::*;
 use anyhow::Result;
 use rig::Embed;
-use rig::embeddings::EmbeddingModel;
 use rig::embeddings::EmbeddingsBuilder;
 use rig::vector_store::VectorStoreIndex;
 use rig_sqlite::Column;
@@ -56,7 +55,7 @@ impl RagQuery {
 /// ```rust
 /// # use beet_mcp::prelude::*;
 /// # tokio_test::block_on(async {
-/// let db = Database::connect(EmbedModel::mxbai_large(), ":memory:").await.unwrap();
+/// let db = Database::connect(EmbedModel::from_env(), ":memory:").await.unwrap();
 ///	let documents = vec![
 ///	    Document::new(
 ///	        "doc0",
@@ -79,13 +78,13 @@ impl RagQuery {
 /// # })
 /// ```
 #[derive(Clone)]
-pub struct Database<E: 'static + Clone + EmbeddingModel> {
+pub struct Database<E: BeetEmbedModel> {
 	pub vector_store: SqliteVectorStore<E, Document>,
 	embedding_model: E,
 }
 
 
-impl<E: EmbeddingModel> Database<E> {
+impl<E: BeetEmbedModel> Database<E> {
 	/// Connect to the database using the provided embedding model
 	/// for storing and querying.
 	/// The model used for querying must be the same as the one used
@@ -253,20 +252,20 @@ impl SqliteVectorStoreTable for Document {
 
 
 // nexus arcana for testing
-impl<E: 'static + Clone + EmbeddingModel> Database<E> {
+impl<E: BeetEmbedModel> Database<E> {
 	/// Connect to the Nexus Arcana test database,
 	/// populating it with initial data if necessary.
 	pub async fn nexus_arcana(embedding_model: E, path: &str) -> Result<Self> {
 		let db = Self::connect(embedding_model, path).await?;
 
 		if db.is_empty().await? {
-			tracing::info!("initializing nexus arcana db");
+			tracing::trace!("initializing nexus arcana db");
 			let content = include_str!("../../nexus_arcana.md");
 			let documents = SplitText::default()
 				.split_to_documents("nexus_arcana.db", content);
 			db.store(documents).await?;
 		} else {
-			tracing::info!("connecting to nexus arcana db");
+			tracing::trace!("connecting to nexus arcana db");
 		}
 
 		Ok(db)

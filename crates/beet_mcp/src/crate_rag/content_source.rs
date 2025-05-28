@@ -1,6 +1,7 @@
 use super::ContentType;
 use super::CrateMeta;
 use crate::prelude::SplitText;
+use crate::utils::Model;
 use rmcp::schemars;
 use rmcp::schemars::JsonSchema;
 use serde::Deserialize;
@@ -36,25 +37,37 @@ impl ContentSourceKey {
 			content_type,
 		}
 	}
-	/// ie the connection string to the database. Each crate has a seperate
-	/// database for each of the scopes.
-	pub fn local_db_path(&self) -> AbsPathBuf {
+	/// ie the connection string to the vector database. Its important that
+	/// the same model is used for each db, so the model must be provided.
+	///
+	/// the path uses several factors:
+	/// - [`Model::model_name`]
+	/// - [`CrateMeta::crate_name`]
+	/// - [`CrateMeta::crate_version`]
+	/// - [`ContentSourceKey::content_type`]
+	///
+	/// ### Example
+	///
+	/// An example path may look like:
+	/// ```sh
+	/// .cache/repo-dbs/mxbai-embed-large/bevy@0.16.0/docs.db
+	/// ```
+	///
+	pub fn local_db_path<E: Model>(&self, embedding_model: &E) -> AbsPathBuf {
 		WorkspacePathBuf::default()
 			.into_abs()
 			.unwrap()
-			.join(format!(".cache/repo-dbs/{self}.db"))
+			.join(format!(
+				".cache/repo-dbs/{}/{}.db",
+				embedding_model.model_name(),
+				self,
+			))
 	}
 }
 
 impl std::fmt::Display for ContentSourceKey {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		write!(
-			f,
-			"{}@{}/{}",
-			self.crate_meta.crate_name,
-			self.crate_meta.crate_version,
-			self.content_type
-		)
+		write!(f, "{}/{}", self.crate_meta, self.content_type)
 	}
 }
 

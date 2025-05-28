@@ -1,7 +1,6 @@
 #![allow(unexpected_cfgs)]
 use crate::prelude::*;
 use anyhow::Result;
-use rig::embeddings::EmbeddingModel;
 use rmcp::Error as McpError;
 use rmcp::RoleServer;
 use rmcp::ServerHandler;
@@ -51,7 +50,7 @@ impl CrateRagQuery {
 
 
 #[derive(Clone)]
-pub struct McpServer<E: 'static + Clone + EmbeddingModel> {
+pub struct McpServer<E: BeetEmbedModel> {
 	/// example of persistant server state.
 	/// for stdio requests this will always be 0.
 	request_count: Arc<Mutex<i32>>,
@@ -62,7 +61,7 @@ pub struct McpServer<E: 'static + Clone + EmbeddingModel> {
 }
 
 #[tool(tool_box)]
-impl<E: 'static + Clone + EmbeddingModel> McpServer<E> {
+impl<E: BeetEmbedModel> McpServer<E> {
 	pub async fn new(embedding_model: E) -> Result<Self> {
 		Ok(Self {
 			request_count: Arc::new(Mutex::new(0)),
@@ -152,7 +151,7 @@ impl<E: 'static + Clone + EmbeddingModel> McpServer<E> {
 		let model = self.embedding_model.clone();
 		self.tool_middleware("crate_rag", query, async move |query| {
 			let key = query.source_key();
-			let db_path = key.local_db_path();
+			let db_path = key.local_db_path(&model);
 			KnownSources::assert_exists(&key)?;
 			if !fs::exists(&db_path)? {
 				anyhow::bail!("source is known but has not yet been indexed");
@@ -212,7 +211,7 @@ where
 
 const_string!(Echo = "echo");
 #[tool(tool_box)]
-impl<E: 'static + Clone + EmbeddingModel> ServerHandler for McpServer<E> {
+impl<E: BeetEmbedModel> ServerHandler for McpServer<E> {
 	fn get_info(&self) -> ServerInfo {
 		ServerInfo {
             protocol_version: ProtocolVersion::V_2024_11_05,

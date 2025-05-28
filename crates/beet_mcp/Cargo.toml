@@ -8,6 +8,11 @@ default-run = "beet_mcp"
 name = "beet_mcp"
 path = "src/main.rs"
 
+[features]
+default = ["ollama"]
+ollama = []
+# setting this feature overrides ollama
+openai = []
 
 [dependencies]
 #💡 utils
@@ -48,6 +53,7 @@ text-splitter = { version = "0.26", features = ["code", "markdown"] }
 tree-sitter-rust = "0.24"
 futures = "0.3"
 rayon = "1"
+extend = "1"
 
 [dev-dependencies]
 tokio-test = "0.4"
