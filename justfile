@@ -7,8 +7,6 @@
 # ```
 #
 
-#💡 Init
-
 set windows-shell := ["C:/tools/cygwin/bin/sh.exe","-c"]
 set dotenv-load
 crates := 'beet beet_spatial beet_flow'
@@ -17,30 +15,6 @@ crates := 'beet beet_spatial beet_flow'
 default:
 	just --list --unsorted
 
-# Initialize the repository, pulling assets into their respective crates.
-# Also we need to build the test_site codegen, which cant use a build script
-# due to cyclic dependencies
-init-repo:
-	just init-flow
-	just init-rsx
-
-# mkdir -p ws_flow/beet_rsx/assets/fonts && cp ./assets/fonts/* ws_rsx/beet_rsx/assets/fonts
-init-flow:
-	just assets-pull
-	mkdir -p ws_flow/beet_ml/assets/ml && cp ./assets/ml/default-bert.ron ws_flow/beet_ml/assets/ml/default.bert.ron
-
-# once beet-cli is binstallable we shouldnt need to compile in order to codegen
-init-rsx:
-	just cli build -p beet_site
-	cd infra && npm ci
-	mkdir -p target/lambda/crates/beet_site || true
-	@echo 'dummy file so sst deploys' > target/lambda/crates/beet_site/bootstrap
-
-init-sweet:
-	just install-chromedriver
-
-# just test-site
-# just export-scenes
 
 #💡 CLI
 
@@ -331,11 +305,6 @@ assets-push:
 	aws s3 sync ./assets s3://bevyhub-public/assets --delete
 	tar -czvf ./assets.tar.gz ./assets
 	aws s3 cp ./assets.tar.gz s3://bevyhub-public/assets.tar.gz
-	rm ./assets.tar.gz
-
-assets-pull:
-	curl -o ./assets.tar.gz https://bevyhub-public.s3.us-west-2.amazonaws.com/assets.tar.gz
-	tar -xzvf ./assets.tar.gz
 	rm ./assets.tar.gz
 
 #💡 Misc
