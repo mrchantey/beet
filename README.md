@@ -18,8 +18,8 @@
   </h3>
 </div>
 
-Beet extends the capabilities of bevy with systems for developing and publishing applications, using the engine in several ways. Its *very* early days so your mileage may vary depending on the crate of interest:
-
+Beet is an ecosystem of development tools and runtime libraries for cross-domain Bevy Apps.
+Its *very* early days so your mileage may vary depending on the crate of interest:
 
 **readiness meter**
 - 🦢 documented and tested
@@ -78,3 +78,7 @@ Top level crates that depend on several of the above.
 | 0.15   | 0.0.4  |
 | 0.14   | 0.0.2  |
 | 0.12   | 0.0.1  |
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md)

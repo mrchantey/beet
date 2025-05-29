@@ -36,6 +36,8 @@ pub struct BuildTemplateMaps {
 
 fn default_filter() -> GlobFilter {
 	GlobFilter::default()
+		.with_exclude("*/.git/*")
+		.with_exclude("*/.cache/*")
 		.with_exclude("*/target/*")
 		.with_exclude("*/node_modules/*")
 }

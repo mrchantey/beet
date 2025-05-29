@@ -31,7 +31,6 @@ init-flow:
 
 # once beet-cli is binstallable we shouldnt need to compile in order to codegen
 init-rsx:
-	cargo run -p beet_router --example build
 	just cli build -p beet_site
 	cd infra && npm ci
 	mkdir -p target/lambda/crates/beet_site || true

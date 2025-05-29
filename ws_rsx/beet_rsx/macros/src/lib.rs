@@ -86,6 +86,6 @@ fn source_file(tokens: &proc_macro::TokenStream) -> WorkspacePathBuf {
 		.clone()
 		.into_iter()
 		.next()
-		.map(|token| WorkspacePathBuf::new(token.span().source_file().path()))
+		.map(|token| WorkspacePathBuf::new(token.span().file()))
 		.unwrap_or_default()
 }
