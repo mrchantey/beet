@@ -712,7 +712,7 @@ dependencies = [
 
 [[package]]
 name = "beet"
-version = "0.0.6-dev.4"
+version = "0.0.6-dev.0"
 dependencies = [
  "beet",
  "beet_build",
@@ -739,7 +739,7 @@ dependencies = [
 
 [[package]]
 name = "beet-cli"
-version = "0.0.6-dev.4"
+version = "0.0.6-dev.0"
 dependencies = [
  "anyhow",
  "beet",
@@ -752,7 +752,7 @@ dependencies = [
 
 [[package]]
 name = "beet_build"
-version = "0.0.6-dev.4"
+version = "0.0.6-dev.0"
 dependencies = [
  "anyhow",
  "beet_common",
@@ -785,7 +785,7 @@ dependencies = [
 
 [[package]]
 name = "beet_common"
-version = "0.0.6-dev.4"
+version = "0.0.6-dev.0"
 dependencies = [
  "anyhow",
  "proc-macro2",
@@ -801,7 +801,7 @@ dependencies = [
 
 [[package]]
 name = "beet_connect"
-version = "0.0.6-dev.4"
+version = "0.0.6-dev.0"
 dependencies = [
  "anyhow",
  "http 1.3.1",
@@ -815,7 +815,7 @@ dependencies = [
 
 [[package]]
 name = "beet_design"
-version = "0.0.6-dev.4"
+version = "0.0.6-dev.0"
 dependencies = [
  "anyhow",
  "beet_common",
@@ -831,7 +831,7 @@ dependencies = [
 
 [[package]]
 name = "beet_examples"
-version = "0.0.6-dev.4"
+version = "0.0.6-dev.0"
 dependencies = [
  "anyhow",
  "beet_flow",
@@ -851,7 +851,7 @@ dependencies = [
 
 [[package]]
 name = "beet_flow"
-version = "0.0.6-dev.4"
+version = "0.0.6-dev.0"
 dependencies = [
  "anyhow",
  "beet_flow",
@@ -866,7 +866,7 @@ dependencies = [
 
 [[package]]
 name = "beet_flow_macros"
-version = "0.0.6-dev.4"
+version = "0.0.6-dev.0"
 dependencies = [
  "anyhow",
  "extend",
@@ -879,7 +879,7 @@ dependencies = [
 
 [[package]]
 name = "beet_ml"
-version = "0.0.6-dev.4"
+version = "0.0.6-dev.0"
 dependencies = [
  "anyhow",
  "beet_flow",
@@ -911,7 +911,7 @@ dependencies = [
 
 [[package]]
 name = "beet_query"
-version = "0.0.6-dev.4"
+version = "0.0.6-dev.0"
 dependencies = [
  "anyhow",
  "base64 0.13.1",
@@ -931,7 +931,7 @@ dependencies = [
 
 [[package]]
 name = "beet_query_macros"
-version = "0.0.6-dev.4"
+version = "0.0.6-dev.0"
 dependencies = [
  "anyhow",
  "beet_common",
@@ -945,7 +945,7 @@ dependencies = [
 
 [[package]]
 name = "beet_router"
-version = "0.0.6-dev.4"
+version = "0.0.6-dev.0"
 dependencies = [
  "anyhow",
  "axum 0.8.4",
@@ -974,7 +974,7 @@ dependencies = [
 
 [[package]]
 name = "beet_rsx"
-version = "0.0.6-dev.4"
+version = "0.0.6-dev.0"
 dependencies = [
  "any_spawner",
  "anyhow",
@@ -1008,7 +1008,7 @@ dependencies = [
 
 [[package]]
 name = "beet_rsx_combinator"
-version = "0.0.6-dev.4"
+version = "0.0.6-dev.0"
 dependencies = [
  "combine 2.5.2",
  "itertools 0.14.0",
@@ -1017,7 +1017,7 @@ dependencies = [
 
 [[package]]
 name = "beet_rsx_macros"
-version = "0.0.6-dev.4"
+version = "0.0.6-dev.0"
 dependencies = [
  "anyhow",
  "beet_common",
@@ -1031,7 +1031,7 @@ dependencies = [
 
 [[package]]
 name = "beet_rsx_parser"
-version = "0.0.6-dev.4"
+version = "0.0.6-dev.0"
 dependencies = [
  "anyhow",
  "beet_common",
@@ -1050,7 +1050,7 @@ dependencies = [
 
 [[package]]
 name = "beet_server"
-version = "0.0.6-dev.4"
+version = "0.0.6-dev.0"
 dependencies = [
  "anyhow",
  "axum 0.8.4",
@@ -1074,7 +1074,7 @@ dependencies = [
 
 [[package]]
 name = "beet_sim"
-version = "0.0.6-dev.4"
+version = "0.0.6-dev.0"
 dependencies = [
  "anyhow",
  "beet_flow",
@@ -1085,7 +1085,7 @@ dependencies = [
 
 [[package]]
 name = "beet_site"
-version = "0.0.6-dev.4"
+version = "0.0.6-dev.0"
 dependencies = [
  "anyhow",
  "beet",
@@ -1096,7 +1096,7 @@ dependencies = [
 
 [[package]]
 name = "beet_spatial"
-version = "0.0.6-dev.4"
+version = "0.0.6-dev.0"
 dependencies = [
  "anyhow",
  "beet_flow",
@@ -4741,6 +4741,7 @@ dependencies = [
  "tokio",
  "tokio-rustls 0.26.2",
  "tower-service",
+ "webpki-roots",
 ]
 
 [[package]]
@@ -5740,6 +5741,12 @@ name = "log"
 version = "0.4.27"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "13dc2df351e3202783a1fe0d44375f7295ffb4049267b0f3018346dc122a1d94"
+
+[[package]]
+name = "lru-slab"
+version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "112b39cec0b298b6c1999fee3e31427f74f676e4cb9879ed1a121b43661a4154"
 
 [[package]]
 name = "mach2"
@@ -7106,6 +7113,61 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a1d01941d82fa2ab50be1e79e6714289dd7cde78eba4c074bc5a4374f650dfe0"
 
 [[package]]
+name = "quinn"
+version = "0.11.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "626214629cda6781b6dc1d316ba307189c85ba657213ce642d9c77670f8202c8"
+dependencies = [
+ "bytes",
+ "cfg_aliases",
+ "pin-project-lite",
+ "quinn-proto",
+ "quinn-udp",
+ "rustc-hash 2.1.1",
+ "rustls 0.23.26",
+ "socket2",
+ "thiserror 2.0.12",
+ "tokio",
+ "tracing",
+ "web-time",
+]
+
+[[package]]
+name = "quinn-proto"
+version = "0.11.12"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "49df843a9161c85bb8aae55f101bc0bac8bcafd637a620d9122fd7e0b2f7422e"
+dependencies = [
+ "bytes",
+ "getrandom 0.3.2",
+ "lru-slab",
+ "rand 0.9.1",
+ "ring",
+ "rustc-hash 2.1.1",
+ "rustls 0.23.26",
+ "rustls-pki-types",
+ "slab",
+ "thiserror 2.0.12",
+ "tinyvec",
+ "tracing",
+ "web-time",
+]
+
+[[package]]
+name = "quinn-udp"
+version = "0.5.12"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ee4e529991f949c5e25755532370b8af5d114acae52326361d68d47af64aa842"
+dependencies = [
+ "cfg_aliases",
+ "libc",
+ "once_cell",
+ "socket2",
+ "tracing",
+ "windows-sys 0.52.0",
+]
+
+[[package]]
 name = "quote"
 version = "1.0.40"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7441,7 +7503,10 @@ dependencies = [
  "once_cell",
  "percent-encoding",
  "pin-project-lite",
+ "quinn",
+ "rustls 0.23.26",
  "rustls-pemfile",
+ "rustls-pki-types",
  "serde",
  "serde_json",
  "serde_urlencoded",
@@ -7449,6 +7514,7 @@ dependencies = [
  "system-configuration",
  "tokio",
  "tokio-native-tls",
+ "tokio-rustls 0.26.2",
  "tokio-util",
  "tower 0.5.2",
  "tower-service",
@@ -7457,6 +7523,7 @@ dependencies = [
  "wasm-bindgen-futures",
  "wasm-streams",
  "web-sys",
+ "webpki-roots",
  "windows-registry",
 ]
 
@@ -7668,6 +7735,9 @@ name = "rustls-pki-types"
 version = "1.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "917ce264624a4b4db1c364dcc35bfca9ded014d0a958cd47ad3e960e988ea51c"
+dependencies = [
+ "web-time",
+]
 
 [[package]]
 name = "rustls-webpki"
@@ -8200,7 +8270,7 @@ dependencies = [
 
 [[package]]
 name = "sweet"
-version = "0.0.6-dev.4"
+version = "0.0.6-dev.0"
 dependencies = [
  "console_error_panic_hook",
  "console_log",
@@ -8220,7 +8290,7 @@ dependencies = [
 
 [[package]]
 name = "sweet-cli"
-version = "0.0.6-dev.4"
+version = "0.0.6-dev.0"
 dependencies = [
  "anyhow",
  "clap",
@@ -8235,7 +8305,7 @@ dependencies = [
 
 [[package]]
 name = "sweet_bevy"
-version = "0.0.6-dev.4"
+version = "0.0.6-dev.0"
 dependencies = [
  "anyhow",
  "bevy",
@@ -8252,7 +8322,7 @@ dependencies = [
 
 [[package]]
 name = "sweet_fs"
-version = "0.0.6-dev.4"
+version = "0.0.6-dev.0"
 dependencies = [
  "anyhow",
  "clap",
@@ -8270,7 +8340,7 @@ dependencies = [
 
 [[package]]
 name = "sweet_net"
-version = "0.0.6-dev.4"
+version = "0.0.6-dev.0"
 dependencies = [
  "anyhow",
  "http 1.3.1",
@@ -8293,7 +8363,7 @@ dependencies = [
 
 [[package]]
 name = "sweet_server"
-version = "0.0.6-dev.4"
+version = "0.0.6-dev.0"
 dependencies = [
  "anyhow",
  "axum 0.8.4",
@@ -8317,7 +8387,7 @@ dependencies = [
 
 [[package]]
 name = "sweet_test"
-version = "0.0.6-dev.4"
+version = "0.0.6-dev.0"
 dependencies = [
  "anyhow",
  "backtrace",
@@ -8350,7 +8420,7 @@ dependencies = [
 
 [[package]]
 name = "sweet_test_macros"
-version = "0.0.6-dev.4"
+version = "0.0.6-dev.0"
 dependencies = [
  "anyhow",
  "proc-macro2",
@@ -8360,7 +8430,7 @@ dependencies = [
 
 [[package]]
 name = "sweet_utils"
-version = "0.0.6-dev.4"
+version = "0.0.6-dev.0"
 dependencies = [
  "anyhow",
  "bevy",
@@ -8386,7 +8456,7 @@ dependencies = [
 
 [[package]]
 name = "sweet_web"
-version = "0.0.6-dev.4"
+version = "0.0.6-dev.0"
 dependencies = [
  "anyhow",
  "console_error_panic_hook",
