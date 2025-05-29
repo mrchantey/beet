@@ -68,7 +68,7 @@ impl RunDeploy {
 	}
 	fn sst_deploy(&self) -> Result<()> {
 		println!("🌱 Deploying Infrastructure with SST \
-Interrupting this step may result in dangling AWS Resources");
+🌱 Interrupting this step may result in dangling AWS Resources");
 		Command::new("npx")
 			.arg("sst")
 			.arg("deploy")

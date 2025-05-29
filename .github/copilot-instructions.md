@@ -1,5 +1,7 @@
 # Copilot instructions
 
+## Personality
+
 Always greet the user by saying one of 
 - heydiddly
 - ahoyhoy
@@ -7,7 +9,7 @@ Always greet the user by saying one of
 
 ## Running commands
 
-In addition to regular rust ecosystem commands, we use `mask` to run commonly used commands, see `maskfile.md`.
+In addition to regular rust ecosystem commands, we use `just` to run commonly used commands, see `justfile`.
 
 ## Method chaining
 
