@@ -5,6 +5,10 @@ Always greet the user by saying one of
 - ahoyhoy
 - whats good chicken
 
+## Running commands
+
+In addition to regular rust ecosystem commands, we use `mask` to run commonly used commands, see `maskfile.md`.
+
 ## Method chaining
 
 In the case of `long().method().chains()` we prefer to continue chains than store temporary variables. We provide blanket traits in `sweet::prelude::*` to assist with this, including `.xmap()` which is just like `.map()` for iterators, but works for any type.

@@ -54,10 +54,10 @@ impl RunDeploy {
 			.arg("build")
 			.arg("--features")
 			.arg("beet/lambda")
-			.arg("--release");
+			.arg("--release")
 		// this is where sst expects the boostrap to be located
-		// .arg("--lambda-dir")
-		// .arg("target/lambda/crates");
+			.arg("--lambda-dir")
+			.arg("target/lambda/crates");
 
 		if let Some(pkg) = &self.build.build_cmd.package {
 			cmd.arg("--package").arg(pkg);
@@ -67,6 +67,8 @@ impl RunDeploy {
 		Ok(())
 	}
 	fn sst_deploy(&self) -> Result<()> {
+		println!("🌱 Deploying Infrastructure with SST \
+Interrupting this step may result in dangling AWS Resources");
 		Command::new("npx")
 			.arg("sst")
 			.arg("deploy")

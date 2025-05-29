@@ -58,7 +58,11 @@ else
 	tar -xzvf ./assets.tar.gz
 	rm ./assets.tar.gz
 fi
-``
+```
 
+## deploy-sst
 
-
+Deploys the `beet_site` to sst.
+```sh
+npx sst deploy --stage production --config infra/sst.config.ts
+```
