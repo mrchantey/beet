@@ -9,7 +9,7 @@ fn beet_context(_: BeetContext) -> WebNode {
 	set_context(Brand {
 		title: "Beet".into(),
 		description: "A Rust web framework".into(),
-		site_url: "https://beetrsx.dev".into(),
+		site_url: "https://beetrs.dev".into(),
 		version: env!("CARGO_PKG_VERSION").into(),
 	});
 	let theme = ThemeBuilder::with_source(Argb::new(255, 0, 255, 127)).build();

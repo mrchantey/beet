@@ -1,7 +1,8 @@
 /// <reference path="./.sst/platform/config.d.ts" />
 
+// TODO get these from Cargo.toml or beet.toml
 const appName = "BeetServer";
-const domainName = "beetrsx.dev";
+const domainName = "beetrs.dev";
 const lambdaHandler = "./crates/beet_site/";
 
 export default $config({
