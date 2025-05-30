@@ -18,7 +18,7 @@
   </h3>
 </div>
 
-Beet is an ecosystem of development tools and runtime libraries for cross-domain Bevy Apps.
+Beet is a set of crates for making and running Bevy apps.
 Its *very* early days so your mileage may vary depending on the crate of interest:
 
 **readiness meter**
