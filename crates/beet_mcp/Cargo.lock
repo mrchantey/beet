@@ -2411,7 +2411,7 @@ checksum = "13c2bddecc57b384dee18652358fb23172facb8a2c51ccc10d74c157bdea3292"
 
 [[package]]
 name = "sweet"
-version = "0.0.6-dev.4"
+version = "0.0.6-dev.2"
 dependencies = [
  "sweet_fs",
  "sweet_test",
@@ -2420,7 +2420,7 @@ dependencies = [
 
 [[package]]
 name = "sweet_fs"
-version = "0.0.6-dev.4"
+version = "0.0.6-dev.2"
 dependencies = [
  "anyhow",
  "clap",
@@ -2438,7 +2438,7 @@ dependencies = [
 
 [[package]]
 name = "sweet_test"
-version = "0.0.6-dev.4"
+version = "0.0.6-dev.2"
 dependencies = [
  "anyhow",
  "backtrace",
@@ -2468,7 +2468,7 @@ dependencies = [
 
 [[package]]
 name = "sweet_test_macros"
-version = "0.0.6-dev.4"
+version = "0.0.6-dev.2"
 dependencies = [
  "anyhow",
  "proc-macro2",
@@ -2478,7 +2478,7 @@ dependencies = [
 
 [[package]]
 name = "sweet_utils"
-version = "0.0.6-dev.4"
+version = "0.0.6-dev.2"
 dependencies = [
  "anyhow",
  "clap",
