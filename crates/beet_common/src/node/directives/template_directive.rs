@@ -1,6 +1,7 @@
 use crate::prelude::*;
 use bevy::prelude::*;
 
+
 /// System set in which all template directives are extracted.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, SystemSet)]
 pub struct ExtractDirectivesSet;

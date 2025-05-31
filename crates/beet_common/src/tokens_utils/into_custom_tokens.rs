@@ -3,6 +3,7 @@ use std::marker::PhantomData;
 use proc_macro2::TokenStream;
 use quote::quote;
 use quote::quote_spanned;
+use sweet::prelude::WorkspacePathBuf;
 use syn::Lit;
 
 /// Trait for converting a type into a [`TokenStream`],
@@ -27,6 +28,13 @@ impl IntoCustomTokens for () {
 impl IntoCustomTokens for TokenStream {
 	fn into_custom_tokens(&self, tokens: &mut TokenStream) {
 		tokens.extend(self.clone());
+	}
+}
+
+impl IntoCustomTokens for WorkspacePathBuf {
+	fn into_custom_tokens(&self, tokens: &mut TokenStream) {
+		let path = self.to_string_lossy();
+		tokens.extend(quote! { WorkspacePathBuf::new(#path) });
 	}
 }
 

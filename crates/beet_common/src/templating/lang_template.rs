@@ -34,7 +34,6 @@ impl RustTokens for LangContentHash {
 pub struct LangTemplate {
 	/// The tag of the template, either `script` or `style`
 	pub tag: String,
-	/// the scope of the style
 	/// An incremented unique id for this template, counted up from 0 so suitable
 	/// as a short html data attribute.
 	pub id: u64,

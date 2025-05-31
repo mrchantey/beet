@@ -2,7 +2,6 @@ use crate::as_beet::*;
 use bevy::prelude::*;
 
 
-
 define_token_collector!(
 	CollectRsxDirectiveTokens,
 	slot_child: SlotChild,

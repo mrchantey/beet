@@ -52,6 +52,7 @@ pub struct TextNode(pub String);
 
 impl TextNode {
 	pub fn new(text: impl Into<String>) -> Self { Self(text.into()) }
+	pub fn text(&self) -> &str { &self.0 }
 }
 
 /// A block of code that will resolve to a node.
