@@ -31,7 +31,6 @@ impl Default for BuildTemplatesConfig {
 
 
 impl BuildTemplatesConfig {
-
 	pub fn get_files(&self) -> Result<Vec<WorkspacePathBuf>> {
 		ReadDir::files_recursive(
 			&self.root_dir.into_abs().map_err(Error::File)?,

@@ -44,10 +44,12 @@ thread_local! {
 }
 
 
-/// Access the thread local [`App`] used by the [`NodeTokensPlugin`].
+/// Access a shared `thread_local!` [`App`] used by the [`NodeTokensPlugin`].
 pub struct TokensApp;
 
 impl TokensApp {
+	// The idea is for every macro instance to not have to spin up a new app,
+	// but it breaks rust-analyzer for some reason so is currently disabled.
 	pub fn with<O>(func: impl FnOnce(&mut App) -> O) -> O {
 		let mut app = App::new();
 		app.add_plugins(NodeTokensPlugin);

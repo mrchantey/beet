@@ -700,7 +700,7 @@ dependencies = [
 
 [[package]]
 name = "beet"
-version = "0.0.6-dev.4"
+version = "0.0.6-dev.0"
 dependencies = [
  "beet",
  "beet_build",
@@ -727,7 +727,7 @@ dependencies = [
 
 [[package]]
 name = "beet-cli"
-version = "0.0.6-dev.4"
+version = "0.0.6-dev.0"
 dependencies = [
  "anyhow",
  "beet",
@@ -741,10 +741,11 @@ dependencies = [
 
 [[package]]
 name = "beet_build"
-version = "0.0.6-dev.4"
+version = "0.0.6-dev.0"
 dependencies = [
  "anyhow",
  "beet_common",
+ "beet_parse",
  "bevy",
  "clap",
  "flume",
@@ -771,7 +772,7 @@ dependencies = [
 
 [[package]]
 name = "beet_build_old"
-version = "0.0.6-dev.4"
+version = "0.0.6-dev.0"
 dependencies = [
  "anyhow",
  "beet_common",
@@ -804,7 +805,7 @@ dependencies = [
 
 [[package]]
 name = "beet_common"
-version = "0.0.6-dev.4"
+version = "0.0.6-dev.0"
 dependencies = [
  "anyhow",
  "beet_common",
@@ -826,7 +827,7 @@ dependencies = [
 
 [[package]]
 name = "beet_common_macros"
-version = "0.0.6-dev.4"
+version = "0.0.6-dev.0"
 dependencies = [
  "anyhow",
  "proc-macro2",
@@ -838,7 +839,7 @@ dependencies = [
 
 [[package]]
 name = "beet_connect"
-version = "0.0.6-dev.4"
+version = "0.0.6-dev.0"
 dependencies = [
  "anyhow",
  "http 1.3.1",
@@ -852,7 +853,7 @@ dependencies = [
 
 [[package]]
 name = "beet_design"
-version = "0.0.6-dev.4"
+version = "0.0.6-dev.0"
 dependencies = [
  "anyhow",
  "beet_common",
@@ -868,7 +869,7 @@ dependencies = [
 
 [[package]]
 name = "beet_examples"
-version = "0.0.6-dev.4"
+version = "0.0.6-dev.0"
 dependencies = [
  "anyhow",
  "beet_flow",
@@ -888,7 +889,7 @@ dependencies = [
 
 [[package]]
 name = "beet_flow"
-version = "0.0.6-dev.4"
+version = "0.0.6-dev.0"
 dependencies = [
  "anyhow",
  "beet_flow",
@@ -903,7 +904,7 @@ dependencies = [
 
 [[package]]
 name = "beet_flow_macros"
-version = "0.0.6-dev.4"
+version = "0.0.6-dev.0"
 dependencies = [
  "anyhow",
  "extend",
@@ -916,7 +917,7 @@ dependencies = [
 
 [[package]]
 name = "beet_ml"
-version = "0.0.6-dev.4"
+version = "0.0.6-dev.0"
 dependencies = [
  "anyhow",
  "beet_flow",
@@ -948,7 +949,7 @@ dependencies = [
 
 [[package]]
 name = "beet_parse"
-version = "0.0.6-dev.4"
+version = "0.0.6-dev.0"
 dependencies = [
  "anyhow",
  "beet_common",
@@ -969,10 +970,10 @@ dependencies = [
 
 [[package]]
 name = "beet_query"
-version = "0.0.6-dev.4"
+version = "0.0.6-dev.0"
 dependencies = [
  "anyhow",
- "base64 0.22.1",
+ "base64 0.13.1",
  "beet_query_macros",
  "extend",
  "libsql",
@@ -989,7 +990,7 @@ dependencies = [
 
 [[package]]
 name = "beet_query_macros"
-version = "0.0.6-dev.4"
+version = "0.0.6-dev.0"
 dependencies = [
  "anyhow",
  "beet_common",
@@ -1003,7 +1004,7 @@ dependencies = [
 
 [[package]]
 name = "beet_router"
-version = "0.0.6-dev.4"
+version = "0.0.6-dev.0"
 dependencies = [
  "anyhow",
  "axum 0.8.4",
@@ -1032,7 +1033,7 @@ dependencies = [
 
 [[package]]
 name = "beet_rsx"
-version = "0.0.6-dev.4"
+version = "0.0.6-dev.0"
 dependencies = [
  "anyhow",
  "beet_common",
@@ -1060,7 +1061,7 @@ dependencies = [
 
 [[package]]
 name = "beet_rsx_combinator"
-version = "0.0.6-dev.4"
+version = "0.0.6-dev.0"
 dependencies = [
  "combine 2.5.2",
  "itertools 0.14.0",
@@ -1069,7 +1070,7 @@ dependencies = [
 
 [[package]]
 name = "beet_rsx_macros"
-version = "0.0.6-dev.4"
+version = "0.0.6-dev.0"
 dependencies = [
  "anyhow",
  "beet_common",
@@ -1083,7 +1084,7 @@ dependencies = [
 
 [[package]]
 name = "beet_rsx_parser"
-version = "0.0.6-dev.4"
+version = "0.0.6-dev.0"
 dependencies = [
  "anyhow",
  "beet_common",
@@ -1103,7 +1104,7 @@ dependencies = [
 
 [[package]]
 name = "beet_server"
-version = "0.0.6-dev.4"
+version = "0.0.6-dev.0"
 dependencies = [
  "anyhow",
  "axum 0.8.4",
@@ -1127,7 +1128,7 @@ dependencies = [
 
 [[package]]
 name = "beet_sim"
-version = "0.0.6-dev.4"
+version = "0.0.6-dev.0"
 dependencies = [
  "anyhow",
  "beet_flow",
@@ -1138,7 +1139,7 @@ dependencies = [
 
 [[package]]
 name = "beet_site"
-version = "0.0.6-dev.4"
+version = "0.0.6-dev.0"
 dependencies = [
  "anyhow",
  "beet",
@@ -1149,7 +1150,7 @@ dependencies = [
 
 [[package]]
 name = "beet_spatial"
-version = "0.0.6-dev.4"
+version = "0.0.6-dev.0"
 dependencies = [
  "anyhow",
  "beet_flow",
@@ -8265,7 +8266,7 @@ dependencies = [
 
 [[package]]
 name = "sweet"
-version = "0.0.6-dev.4"
+version = "0.0.6-dev.0"
 dependencies = [
  "console_error_panic_hook",
  "console_log",
@@ -8285,7 +8286,7 @@ dependencies = [
 
 [[package]]
 name = "sweet-cli"
-version = "0.0.6-dev.4"
+version = "0.0.6-dev.0"
 dependencies = [
  "anyhow",
  "clap",
@@ -8300,7 +8301,7 @@ dependencies = [
 
 [[package]]
 name = "sweet_bevy"
-version = "0.0.6-dev.4"
+version = "0.0.6-dev.0"
 dependencies = [
  "anyhow",
  "bevy",
@@ -8317,7 +8318,7 @@ dependencies = [
 
 [[package]]
 name = "sweet_fs"
-version = "0.0.6-dev.4"
+version = "0.0.6-dev.0"
 dependencies = [
  "anyhow",
  "clap",
@@ -8335,7 +8336,7 @@ dependencies = [
 
 [[package]]
 name = "sweet_net"
-version = "0.0.6-dev.4"
+version = "0.0.6-dev.0"
 dependencies = [
  "anyhow",
  "http 1.3.1",
@@ -8358,7 +8359,7 @@ dependencies = [
 
 [[package]]
 name = "sweet_server"
-version = "0.0.6-dev.4"
+version = "0.0.6-dev.0"
 dependencies = [
  "anyhow",
  "axum 0.8.4",
@@ -8382,7 +8383,7 @@ dependencies = [
 
 [[package]]
 name = "sweet_test"
-version = "0.0.6-dev.4"
+version = "0.0.6-dev.0"
 dependencies = [
  "anyhow",
  "backtrace",
@@ -8415,7 +8416,7 @@ dependencies = [
 
 [[package]]
 name = "sweet_test_macros"
-version = "0.0.6-dev.4"
+version = "0.0.6-dev.0"
 dependencies = [
  "anyhow",
  "proc-macro2",
@@ -8425,7 +8426,7 @@ dependencies = [
 
 [[package]]
 name = "sweet_utils"
-version = "0.0.6-dev.4"
+version = "0.0.6-dev.0"
 dependencies = [
  "anyhow",
  "bevy",
@@ -8451,7 +8452,7 @@ dependencies = [
 
 [[package]]
 name = "sweet_web"
-version = "0.0.6-dev.4"
+version = "0.0.6-dev.0"
 dependencies = [
  "anyhow",
  "console_error_panic_hook",

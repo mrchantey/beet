@@ -35,7 +35,7 @@ pub fn combinator_to_bundle(
 }
 
 
-/// Provide a string of rsx tokens to be parsed into a node tree.
+/// A [`String`] of rsx tokens to be parsed into a node tree.
 #[derive(Default, Component, Deref, Reflect)]
 #[reflect(Default, Component)]
 pub struct CombinatorToNodeTokens(pub String);

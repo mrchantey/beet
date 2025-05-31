@@ -11,6 +11,7 @@ pub struct TemplateFile {
 
 impl TemplateFile {
 	pub fn new(path: WorkspacePathBuf) -> Self { Self { path } }
+	pub fn path(&self) -> &WorkspacePathBuf { &self.path }
 }
 
 
