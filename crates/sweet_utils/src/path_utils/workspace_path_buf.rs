@@ -28,7 +28,7 @@ use std::str::FromStr;
 #[cfg_attr(feature = "bevy", derive(bevy::reflect::Reflect))]
 pub struct WorkspacePathBuf(
 	// TODO upstream Pathbuf Reflect
-	#[cfg_attr(feature = "bevy", reflect(ignore))] PathBuf,
+	PathBuf,
 );
 
 

@@ -1,13 +1,11 @@
-use bevy::prelude::Component;
+use bevy::prelude::*;
 use sweet::prelude::*;
-
-/// A scene contaning all templates used in the project.
-pub struct TemplateScene;
 
 
 /// Used to reconcile [`BundleTokens`] with their corresponding template
 /// entity in the [`TemplateScene`].
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Component)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Reflect, Component)]
+#[reflect(Component)]
 pub struct TemplateKey {
 	/// The source file containing the template.
 	pub file: WorkspacePathBuf,

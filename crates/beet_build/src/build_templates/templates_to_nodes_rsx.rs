@@ -4,8 +4,7 @@ use bevy::prelude::*;
 use sweet::prelude::ReadFile;
 
 
-/// For a given markdown file, parse to valid rsx combinator syntax and insert
-/// as [`CombinatorToNodeTokens`].
+/// For a given rsx file, insert as [`CombinatorToNodeTokens`].
 pub fn templates_to_nodes_rsx(
 	mut commands: Commands,
 	query: Populated<(Entity, &TemplateFile), Changed<TemplateFile>>,

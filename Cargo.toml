@@ -119,7 +119,10 @@ sweet_web = { path = "crates/sweet_web", version = "0.0.6-dev.0" }
 sweet_utils = { path = "crates/sweet_utils", version = "0.0.6-dev.0" }
 
 #💡 local
-bevy = { version = "0.16", default-features = false, features = ["bevy_color"] }
+bevy = { version = "0.16", default-features = false, features = [
+	"std",        # std for reflect PathBuf
+	"bevy_color",
+] }
 
 #💡 utility
 anyhow = "1"
