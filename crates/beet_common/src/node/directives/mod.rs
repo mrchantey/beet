@@ -1,3 +1,5 @@
+mod lang_content;
+pub use lang_content::*;
 mod template_directive;
 pub use template_directive::*;
 mod web_directives;

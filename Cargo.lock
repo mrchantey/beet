@@ -746,6 +746,7 @@ dependencies = [
  "anyhow",
  "beet_common",
  "beet_parse",
+ "beet_rsx",
  "bevy",
  "clap",
  "flume",

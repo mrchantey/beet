@@ -16,8 +16,6 @@ mod attribute;
 pub use attribute::*;
 mod line_col;
 pub use line_col::*;
-mod style_scope;
-pub use style_scope::*;
 mod file_span;
 pub use file_span::*;
 mod node_meta;

@@ -35,6 +35,9 @@ fn try_extract_directive<T: TemplateDirective>(
 	}
 }
 
+
+/// DEPRECATED BELOW THIS LINE
+
 /// Template directives contain instructions for various stages of a beet
 /// pipeline. Some the syntax of a colon, ie `<div client:load />`, and
 /// some are more nuanced, for example a script with a src attribute that
