@@ -27,7 +27,7 @@ pub struct StyleId(u64);
 /// For each style [`LangPartial`] with a [`StyleScope::Local`],
 /// assign a unique [`StyleId`] to the entity and each
 /// [`NodePortalTarget`].
-pub fn parse_local_style(
+pub fn apply_style_ids(
 	mut commands: Commands,
 	query: Populated<(
 		Entity,

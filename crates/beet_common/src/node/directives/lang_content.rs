@@ -1,5 +1,7 @@
 use crate::as_beet::*;
 use bevy::prelude::*;
+use std::hash::Hash;
+use std::hash::Hasher;
 use std::path::PathBuf;
 use sweet::prelude::WorkspacePathBuf;
 
@@ -24,6 +26,19 @@ impl LangContent {
 			.map(|parent| parent.join(src))
 			.unwrap_or(PathBuf::from(src));
 		Self::File(WorkspacePathBuf::new(path))
+	}
+
+	/// create a hash ignoring whitespace in the case of [`Self::InnerText`]
+	pub fn hash_no_whitespace(&self, hasher: &mut impl Hasher) {
+		match self {
+			Self::InnerText(text) => {
+				let text = text.replace(char::is_whitespace, "");
+				text.hash(hasher);
+			}
+			Self::File(path) => {
+				path.to_string_lossy().hash(hasher);
+			}
+		}
 	}
 }
 

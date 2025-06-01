@@ -1,5 +1,6 @@
 use crate::prelude::*;
 use anyhow::Result;
+use beet_common::node::HtmlConstants;
 use bevy::prelude::*;
 use serde::Deserialize;
 use serde::Serialize;
@@ -9,20 +10,12 @@ use sweet::prelude::*;
 
 
 /// Config file usually located at `beet.toml`
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, PartialEq, Serialize, Deserialize)]
 pub struct BeetConfig {
 	/// Output location for generated static files, ie html, css, wasm
 	templates_config: BuildFileTemplates,
+	html_constants: HtmlConstants,
 }
-
-impl Default for BeetConfig {
-	fn default() -> Self {
-		Self {
-			templates_config: BuildFileTemplates::default(),
-		}
-	}
-}
-
 
 impl BeetConfig {
 	/// 1. Attempt to load the config from the specified path
@@ -48,8 +41,7 @@ impl BeetConfig {
 
 impl Plugin for BeetConfig {
 	fn build(&self, app: &mut App) {
+		app.insert_resource(self.html_constants.clone());
 		app.world_mut().spawn(self.templates_config.clone());
-		// app.insert_resource(self.templates_config.clone());
-		// app.insert_resource(self.clone());
 	}
 }

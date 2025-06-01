@@ -9,8 +9,8 @@ use std::str::FromStr;
 
 
 
-/// A newtype `PathBuf` with several guarantees:
-/// 1. the path is relative to the workspace root (because the user pinky-promises)
+/// A newtype `PathBuf` with several indications:
+/// 1. the path is relative to the workspace root
 /// 2. the path is cleaned using [`path_clean`]
 /// 3. on windows backslashes are replaced by forward slashes
 ///

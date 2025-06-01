@@ -22,7 +22,7 @@ use sweet::prelude::ReadFile;
 	Reflect,
 )]
 #[reflect(Component)]
-#[component(immutable)]
+// #[component(immutable)]
 pub struct LangPartial(pub String);
 
 /// Deduplicate `script` and `style` tags by replacing the
@@ -39,7 +39,7 @@ pub fn extract_lang_partials(
 	for (entity, tag, lang_content, scope) in query.iter() {
 		let mut hasher = RapidHasher::default();
 		tag.hash(&mut hasher);
-		lang_content.hash(&mut hasher);
+		lang_content.hash_no_whitespace(&mut hasher);
 		scope.map(|s| s.hash(&mut hasher));
 		let hash = hasher.finish();
 		groups.entry(hash).or_default().push(entity);

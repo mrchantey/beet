@@ -41,7 +41,7 @@ impl Plugin for BuildTemplatesPlugin {
 			)
 			.add_systems(
 				Update,
-				(extract_lang_partials, parse_local_style)
+				(extract_lang_partials, apply_style_ids, parse_lightning)
 					.chain()
 					.in_set(ProcessTemplateStep),
 			)
@@ -93,7 +93,7 @@ mod test {
 	#[test]
 	fn load_all_templates() {
 		App::new()
-			.add_plugins(BuildTemplatesPlugin)
+			.add_plugins((BeetConfig::default(), BuildTemplatesPlugin))
 			.update_then()
 			.world_mut()
 			.xpect()

@@ -23,6 +23,8 @@ pub enum Error {
 	// Deliberately not `from` as some fs errors are FileToTemplates
 	#[error("{0}")]
 	File(FsError),
+	#[error("Failed to parse css: {err}\nSpan: {span:?}")]
+	LightningCss { span: Option<FileSpan>, err: String },
 }
 
 
