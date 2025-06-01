@@ -1,5 +1,6 @@
 use crate::prelude::*;
 use bevy::prelude::*;
+use sweet::prelude::*;
 use clap::Parser;
 
 /// Build the project

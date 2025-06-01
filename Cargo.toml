@@ -242,7 +242,7 @@ css = ["beet_build?/css"]
 design = ["rsx", "css", "dep:beet_design"]
 router = ["rsx", "dep:beet_router"]
 query = ["dep:beet_query"]
-# parser = ["beet_rsx?/parser", "beet_router?/parser"]
+parse = ["dep:beet_parse"]
 rsx = ["dep:beet_rsx"]
 # fs = ["beet_rsx?/fs"]
 ml = ["flow", "dep:beet_ml", "beet_examples?/ml"]
@@ -250,7 +250,7 @@ server = ["dep:beet_server"]
 lambda = ["server", "beet_server/lambda"]
 spatial = ["flow", "dep:beet_spatial", "beet_ml?/spatial"]
 sim = ["flow", "dep:beet_sim"]
-build = ["dep:beet_build"]
+build = ["parse", "dep:beet_build"]
 bevy_default = [
 	"bevy/default",
 	"beet_examples?/bevy_default",
@@ -271,6 +271,7 @@ bevy_default = [
 [dependencies]
 beet_common = { workspace = true }
 beet_build = { workspace = true, optional = true }
+beet_parse = { workspace = true, optional = true }
 beet_connect = { workspace = true, optional = true }
 beet_design = { workspace = true, optional = true }
 beet_examples = { workspace = true, optional = true }

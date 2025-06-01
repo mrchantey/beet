@@ -9,7 +9,7 @@ use sweet::prelude::*;
 pub struct BuildArgs {
 	/// Location of the beet.toml config file
 	#[arg(long)]
-	pub config: Option<PathBuf>,
+	pub beet_config: Option<PathBuf>,
 	/// Run a simple file server in this process instead of
 	/// spinning up the native binary with the --server feature
 	#[arg(long = "static")]
@@ -22,11 +22,15 @@ pub struct BuildArgs {
 
 impl Plugin for BuildArgs {
 	fn build(&self, app: &mut App) {
-		let config = BeetConfig::load(self.config.as_deref()).unwrap_or_exit();
+		let config =
+			BeetConfig::load(self.beet_config.as_deref()).unwrap_or_exit();
 		app.add_plugins(config.clone());
 
 		if self.only.is_empty() || self.only.contains(&BuildOnly::Templates) {
-			app.add_plugins(BuildTemplatesPlugin::default());
+			app.add_plugins((
+				NodeTokensPlugin::default(),
+				BuildTemplatesPlugin::default(),
+			));
 		}
 	}
 }

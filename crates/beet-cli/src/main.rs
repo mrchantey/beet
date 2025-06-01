@@ -17,9 +17,9 @@ fn main() {
 #[command(version, about, long_about = None)]
 struct Cli {
 	#[command(subcommand)]
-	command: Commands,
+	commands: Commands,
 }
 
 impl Plugin for Cli {
-	fn build(&self, app: &mut App) { app.add_plugins(self.command.clone()); }
+	fn build(&self, app: &mut App) { app.add_plugins(self.commands.clone()); }
 }

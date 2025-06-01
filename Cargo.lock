@@ -710,6 +710,7 @@ dependencies = [
  "beet_examples",
  "beet_flow",
  "beet_ml",
+ "beet_parse",
  "beet_query",
  "beet_router",
  "beet_rsx",
@@ -8322,6 +8323,7 @@ name = "sweet_fs"
 version = "0.0.6-dev.0"
 dependencies = [
  "anyhow",
+ "bevy",
  "clap",
  "crossterm",
  "ctrlc",

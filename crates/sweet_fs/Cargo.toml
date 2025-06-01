@@ -12,6 +12,7 @@ repository.workspace = true
 [features]
 default = ["serde"]
 serde = ["dep:serde"]
+bevy = ["dep:bevy"]
 
 [dependencies]
 sweet_utils.workspace = true
@@ -19,6 +20,7 @@ sweet_utils.workspace = true
 anyhow.workspace = true
 thiserror.workspace = true
 extend.workspace = true
+bevy = { workspace = true, optional = true }
 
 ## terminal
 crossterm = "0.28"
