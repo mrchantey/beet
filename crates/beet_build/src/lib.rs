@@ -11,6 +11,7 @@ mod build_codegen_actions;
 mod build_templates;
 mod config;
 mod utils;
+mod watch_templates;
 pub mod prelude {
 	// pub use crate::bevy::*;
 	// pub use crate::build_codegen::*;
@@ -18,6 +19,7 @@ pub mod prelude {
 	pub use crate::build_templates::*;
 	pub use crate::config::*;
 	pub use crate::utils::*;
+	pub use crate::watch_templates::*;
 }
 pub mod exports {
 	pub use proc_macro2;

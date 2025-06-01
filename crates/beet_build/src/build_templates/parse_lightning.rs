@@ -85,3 +85,55 @@ pub fn parse_lightning(
 	}
 	Ok(())
 }
+
+
+
+
+#[cfg(test)]
+mod test {
+	use crate::prelude::*;
+	use beet_common::node::HtmlConstants;
+	use beet_common::node::NodeTag;
+	use bevy::prelude::*;
+	use sweet::prelude::*;
+
+	#[test]
+	fn works() {
+		let mut app = App::new();
+		app.init_resource::<HtmlConstants>()
+			.add_systems(Update, parse_lightning);
+
+		let global = app
+			.world_mut()
+			.spawn((
+				LangPartial("div { color: red; }".to_string()),
+				NodeTag("style".into()),
+			))
+			.id();
+		let local = app
+			.world_mut()
+			.spawn((
+				LangPartial("div { color: red; }".to_string()),
+				NodeTag("style".into()),
+				StyleId::new(7),
+			))
+			.id();
+
+		app.update();
+
+		app.world()
+			.entity(global)
+			.get::<LangPartial>()
+			.unwrap()
+			.xpect()
+			.to_be(&LangPartial("div {\n  color: red;\n}\n".to_string()));
+		app.world()
+			.entity(local)
+			.get::<LangPartial>()
+			.unwrap()
+			.xpect()
+			.to_be(&LangPartial(
+				"div[data-beet-style-id-7] {\n  color: red;\n}\n".to_string(),
+			));
+	}
+}

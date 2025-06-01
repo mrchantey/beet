@@ -11,7 +11,7 @@ pub struct BuildTemplatesPlugin;
 
 impl Plugin for BuildTemplatesPlugin {
 	fn build(&self, app: &mut App) {
-		app
+		app.init_resource::<HtmlConstants>()
 			// types
 			.add_plugins((
 				node_types_plugin,

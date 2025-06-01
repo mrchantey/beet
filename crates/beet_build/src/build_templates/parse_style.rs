@@ -22,6 +22,10 @@ use std::hash::Hash;
 #[reflect(Component)]
 #[component(immutable)]
 pub struct StyleId(u64);
+impl StyleId {
+	/// Create a new [`StyleId`] from a `u64`.
+	pub fn new(id: u64) -> Self { Self(id) }
+}
 
 
 /// For each style [`LangPartial`] with a [`StyleScope::Local`],
