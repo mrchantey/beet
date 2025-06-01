@@ -27,7 +27,7 @@ impl LangContent {
 	}
 }
 
-
+/// For script and style tags, replace the [`ElementNode`] with a [`LangContent`]
 pub(super) fn extract_lang_content(
 	mut commands: Commands,
 	text_nodes: Query<&TextNode>,
@@ -63,6 +63,7 @@ pub(super) fn extract_lang_content(
 			{
 				commands
 					.entity(entity)
+					.remove::<ElementNode>()
 					.insert(LangContent::file(value, span));
 				// found a LangContent::File
 				continue 'iter_elements;
@@ -70,9 +71,9 @@ pub(super) fn extract_lang_content(
 		}
 		for child in children.iter().flat_map(|c| c.iter()) {
 			if let Ok(text_node) = text_nodes.get(child) {
-				commands.entity(entity).insert(LangContent::InnerText(
-					text_node.text().to_string(),
-				));
+				commands.entity(entity).remove::<ElementNode>().insert(
+					LangContent::InnerText(text_node.text().to_string()),
+				);
 				commands.entity(child).despawn();
 				// found a LangContent::InnerText
 				continue 'iter_elements;

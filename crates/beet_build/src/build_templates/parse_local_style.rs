@@ -6,6 +6,7 @@ use serde::Serialize;
 use std::hash::Hash;
 
 
+/// Added to each [`LangPartial`] and each [`NodePortalTarget`] source
 #[derive(
 	Debug,
 	Copy,
@@ -26,7 +27,7 @@ pub struct StyleId(u64);
 /// For each style [`LangPartial`] with a [`StyleScope::Local`],
 /// assign a unique [`StyleId`] to the entity and each
 /// [`NodePortalTarget`].
-pub fn parse_component_style(
+pub fn parse_local_style(
 	mut commands: Commands,
 	query: Populated<(
 		Entity,

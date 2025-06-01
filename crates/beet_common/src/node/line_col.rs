@@ -1,8 +1,9 @@
+use bevy::reflect::Reflect;
 use super::GetSpan;
 
 /// A location in a source file, the line is 1 indexed and the column is 0 indexed.
 /// The Default implementation is `1:0`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Reflect)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct LineCol {
 	/// The 1 indexed line in the source file, reflecting the behavior of `line!()` and

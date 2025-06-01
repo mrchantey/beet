@@ -1,4 +1,5 @@
-use crate::prelude::*;
+use super::*;
+use beet_common::prelude::*;
 use beet_parse::prelude::*;
 use bevy::prelude::*;
 
@@ -11,22 +12,23 @@ pub struct BuildTemplatesPlugin;
 impl Plugin for BuildTemplatesPlugin {
 	fn build(&self, app: &mut App) {
 		app
-			// should already be initialized by [`BeetConfig`]
-			.init_resource::<BuildTemplatesConfig>()
+			// types
+			.add_plugins((
+				node_types_plugin,
+				directive_types_plugin,
+				template_types_plugin,
+			))
 			.configure_sets(
 				Update,
 				(
-					ImportTemplatesStep.before(ImportNodesStep),
-					ProcessTemplatesStep
+					ImportTemplateStep.before(ImportNodesStep),
+					ProcessTemplateStep
 						.after(ExportNodesStep)
-						.after(ImportTemplatesStep),
-					ExportTemplatesStep.after(ProcessNodesStep),
+						.after(ImportTemplateStep),
+					ExportTemplateStep.after(ProcessNodesStep),
 				),
 			)
-			.add_systems(
-				Startup,
-				load_all_templates.in_set(ImportTemplatesStep),
-			)
+			.add_systems(Update, load_template_files.in_set(ImportTemplateStep))
 			.add_systems(
 				Update,
 				(
@@ -34,13 +36,18 @@ impl Plugin for BuildTemplatesPlugin {
 					templates_to_nodes_md,
 					templates_to_nodes_rsx,
 				)
-					.in_set(ImportTemplatesStep),
+					.after(load_template_files)
+					.in_set(ImportTemplateStep),
 			)
 			.add_systems(
 				Update,
-				(extract_lang_partials, parse_component_style)
+				(extract_lang_partials, parse_local_style)
 					.chain()
-					.in_set(ProcessTemplatesStep),
+					.in_set(ProcessTemplateStep),
+			)
+			.add_systems(
+				Update,
+				export_template_scene.in_set(ExportTemplateStep),
 			);
 	}
 }
@@ -48,32 +55,21 @@ impl Plugin for BuildTemplatesPlugin {
 /// Import template files into parsable formats like [`RstmlTokens`], or [`CombinatorToNodeTokens`].
 /// - Before [`ImportNodesStep`]
 #[derive(Debug, Clone, PartialEq, Eq, Hash, SystemSet)]
-pub struct ImportTemplatesStep;
+pub struct ImportTemplateStep;
 
 /// Perform extra processing after nodes have been imported and processed.
 /// - After [`ExportNodesStep`]
 /// - After [`ImportTemplatesStep`]
 #[derive(Debug, Clone, PartialEq, Eq, Hash, SystemSet)]
-pub struct ProcessTemplatesStep;
+pub struct ProcessTemplateStep;
 
 /// Export parsed nodes to a template scene file.
 /// - After [`ProcessTemplatesStep`]
 #[derive(Debug, Clone, PartialEq, Eq, Hash, SystemSet)]
-pub struct ExportTemplatesStep;
+pub struct ExportTemplateStep;
 
 
 
-/// Create a [`TemplateFile`] for each file specified in the [`BuildTemplatesConfig`].
-fn load_all_templates(
-	mut commands: Commands,
-	config: Res<BuildTemplatesConfig>,
-) -> Result<()> {
-	config.get_files()?.into_iter().for_each(|path| {
-		commands.spawn(TemplateFile::new(path));
-	});
-
-	Ok(())
-}
 
 #[allow(unused)]
 fn clear_existing_templates(

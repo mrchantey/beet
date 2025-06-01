@@ -1,4 +1,5 @@
 use crate::prelude::*;
+use bevy::reflect::Reflect;
 use std::hash::Hash;
 use std::path::Path;
 use sweet::prelude::*;
@@ -10,7 +11,7 @@ use sweet::prelude::*;
 /// let tree = rsx!{<div>hello</div>};
 /// //              ^ this location
 /// ```
-#[derive(Debug, Default, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Default, Clone, PartialEq, Eq, Hash, Reflect)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct FileSpan {
 	/// Workspace relative path to the file, its essential to use consistent paths

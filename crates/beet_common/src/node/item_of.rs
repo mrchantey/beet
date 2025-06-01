@@ -22,6 +22,7 @@ pub struct MaybeWithItem<C: Component, T: 'static + Send + Sync> {
 #[cfg_attr(feature = "tokens", derive(ToTokens))]
 pub struct ItemOf<C, T> {
 	pub value: T,
+	#[reflect(ignore)]
 	pub phantom: std::marker::PhantomData<C>,
 }
 

@@ -6,3 +6,16 @@ mod web_directives;
 pub use web_directives::*;
 mod rsx_directives;
 pub use rsx_directives::*;
+
+
+
+pub fn directive_types_plugin(app: &mut bevy::prelude::App) {
+	app
+		//web directives
+		.register_type::<LangContent>()
+		.register_type::<HtmlInsertDirective>()
+		.register_type::<ClientIslandDirective>()
+		// rsx directives
+		.register_type::<SlotChild>()
+		.register_type::<SlotTarget>();
+}

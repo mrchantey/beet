@@ -5,7 +5,8 @@ use bevy::prelude::*;
 
 /// An attribute belonging to the target entity, which may be
 /// an element or a node.
-#[derive(Component, Deref)]
+#[derive(Deref, Reflect, Component)]
+#[reflect(Component)]
 #[relationship(relationship_target = Attributes)]
 pub struct AttributeOf(Entity);
 
@@ -15,7 +16,8 @@ impl AttributeOf {
 
 /// All attributes belonging to this entity, which may be
 /// an element or a node.
-#[derive(Component, Deref)]
+#[derive(Deref, Reflect, Component)]
+#[reflect(Component)]
 #[relationship_target(relationship = AttributeOf,linked_spawn)]
 pub struct Attributes(Vec<Entity>);
 
@@ -26,7 +28,8 @@ pub struct Attributes(Vec<Entity>);
 /// ## Example
 /// ```ignore
 /// rsx!{<span hidden=true />};
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Component)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Reflect, Component)]
+#[reflect(Component)]
 #[component(immutable)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "tokens", derive(ToTokens))]

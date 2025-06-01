@@ -11,6 +11,7 @@ repository.workspace = true
 
 [features]
 bevy_default = ["bevy/default"]
+bevy_scene = ["bevy/bevy_scene"]
 rand = ["dep:rand", "dep:rand_chacha", "dep:getrandom"]
 
 [dependencies]

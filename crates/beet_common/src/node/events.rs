@@ -1,4 +1,4 @@
 use bevy::prelude::*;
 
-#[derive(Event)]
+#[derive(Debug, Clone, Reflect, Event)]
 pub struct OnClick;

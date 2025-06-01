@@ -24,7 +24,7 @@ beet_common.workspace = true
 beet_parse.workspace = true
 # beet_router.workspace = true
 # beet_rsx_parser.workspace = true
-sweet.workspace = true
+sweet = { workspace = true, features = ["bevy_scene"] }
 
 #💡 Utils
 thiserror.workspace = true

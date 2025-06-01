@@ -12,13 +12,13 @@ use sweet::prelude::*;
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct BeetConfig {
 	/// Output location for generated static files, ie html, css, wasm
-	templates_config: BuildTemplatesConfig,
+	templates_config: BuildFileTemplates,
 }
 
 impl Default for BeetConfig {
 	fn default() -> Self {
 		Self {
-			templates_config: BuildTemplatesConfig::default(),
+			templates_config: BuildFileTemplates::default(),
 		}
 	}
 }
@@ -48,7 +48,8 @@ impl BeetConfig {
 
 impl Plugin for BeetConfig {
 	fn build(&self, app: &mut App) {
-		app.insert_resource(self.templates_config.clone());
+		app.world_mut().spawn(self.templates_config.clone());
+		// app.insert_resource(self.templates_config.clone());
 		// app.insert_resource(self.clone());
 	}
 }

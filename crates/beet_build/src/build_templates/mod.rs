@@ -1,5 +1,5 @@
-mod parse_style_content;
-pub use parse_style_content::*;
+mod parse_local_style;
+pub use parse_local_style::*;
 mod extract_lang_partials;
 pub use extract_lang_partials::*;
 mod node_portal;
@@ -19,3 +19,14 @@ pub mod error;
 pub use build_templates_config::*;
 mod build_templates_plugin;
 pub use build_templates_plugin::*;
+
+
+
+
+
+pub fn template_types_plugin(app: &mut bevy::prelude::App) {
+	app.register_type::<LangPartial>()
+		.register_type::<StyleId>()
+		.register_type::<NodePortal>()
+		.register_type::<NodePortalTarget>();
+}

@@ -63,7 +63,10 @@ pub fn extract_lang_partials(
 		}
 		let target = target.id();
 		for entity in entities.iter() {
-			commands.entity(*entity).insert(NodePortal::new(target));
+			commands
+				.entity(*entity)
+				.remove::<LangContent>()
+				.insert(NodePortal::new(target));
 		}
 	}
 	Ok(())
@@ -83,14 +86,8 @@ mod test {
 
 		let entity = app.world_mut().spawn(rsx! {<style>div{}</style>}).id();
 		app.update();
-		let portal = app
-			.world()
-			.get::<NodePortal>(entity)
-			.expect("should have portal");
+		let portal = app.world().get::<NodePortal>(entity).unwrap();
 
-		let _partial = app
-			.world()
-			.get::<LangPartial>(**portal)
-			.expect("should have partial");
+		let _partial = app.world().get::<LangPartial>(**portal).unwrap();
 	}
 }

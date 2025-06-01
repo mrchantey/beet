@@ -22,3 +22,36 @@ mod node_meta;
 pub use node_meta::*;
 mod directives;
 pub use directives::*;
+
+
+
+pub fn node_types_plugin(app: &mut bevy::prelude::App) {
+	app
+		// attributes
+		.register_type::<AttributeOf>()
+		.register_type::<Attributes>()
+		.register_type::<AttributeLit>()
+		// .register_type::<AttributeKey<T>>()
+		// .register_type::<AttributeValue<T>>()
+		// .register_type::<AttributeKeyStr>()
+		// .register_type::<AttributeValueStr>()
+		// misc
+		.register_type::<OnClick>()
+		.register_type::<ItemOf<TemplateNode, FileSpan>>()
+		.register_type::<ItemOf<FragmentNode, FileSpan>>()
+		.register_type::<ItemOf<TextNode, FileSpan>>()
+		.register_type::<ItemOf<BlockNode, FileSpan>>()
+		.register_type::<ItemOf<DoctypeNode, FileSpan>>()
+		.register_type::<ItemOf<CommentNode, FileSpan>>()
+		.register_type::<ItemOf<ElementNode, FileSpan>>()
+		// rsx nodes
+		.register_type::<NodeTag>()
+		.register_type::<TemplateNode>()
+		.register_type::<FragmentNode>()
+		.register_type::<TextNode>()
+		.register_type::<BlockNode>()
+		// web nodes
+		.register_type::<DoctypeNode>()
+		.register_type::<CommentNode>()
+		.register_type::<ElementNode>();
+}

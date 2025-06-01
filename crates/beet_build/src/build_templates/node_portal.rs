@@ -45,7 +45,8 @@ pub fn into_portal_system(
 /// A node that, like a pointer, exists only to point to another node.
 /// Examples include the content of template `<style>` tags which is replaced with
 /// a `NodePointer` component in order to deduplicate for the html output.
-#[derive(Component, Deref)]
+#[derive(Deref, Component, Reflect)]
+#[reflect(Component)]
 #[relationship(relationship_target = NodePortalTarget)]
 pub struct NodePortal {
 	target: Entity,
@@ -56,7 +57,8 @@ impl NodePortal {
 }
 
 /// A node that is pointed to by multiple other nodes.
-#[derive(Component, Deref)]
+#[derive(Deref, Component, Reflect)]
+#[reflect(Component)]
 #[relationship_target(relationship = NodePortal,linked_spawn)]
 pub struct NodePortalTarget {
 	sources: Vec<Entity>,

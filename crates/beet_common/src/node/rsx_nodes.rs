@@ -12,6 +12,13 @@ define_token_collector!(
 	texts: TextNode,
 	blocks: BlockNode,
 );
+/// The tag of a node
+#[derive(Debug, Clone, Component, Reflect, Deref, DerefMut)]
+#[reflect(Component)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "tokens", derive(ToTokens))]
+pub struct NodeTag(pub String);
+
 /// aka `Component` in web, applied to nodes that are constructed using a builder pattern,
 /// denoted as uppercase in rsx `<MyTemplate/>`.
 /// These are represented in the entity graph as a [`FragmentNode`], ie they
@@ -24,14 +31,6 @@ define_token_collector!(
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "tokens", derive(ToTokens))]
 pub struct TemplateNode;
-
-
-/// The tag of a node
-#[derive(Debug, Clone, Component, Reflect, Deref, DerefMut)]
-#[reflect(Component)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "tokens", derive(ToTokens))]
-pub struct NodeTag(pub String);
 
 /// Applied to non-visual nodes with children.
 /// Every [`TemplateNode`] is a [`FragmentNode`]
