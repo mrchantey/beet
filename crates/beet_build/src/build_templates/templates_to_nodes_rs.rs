@@ -63,7 +63,7 @@ impl<'a, 'w, 's> Visit<'a> for RsxSynVisitor<'a, 'w, 's> {
 			// important for tracking exact span of the macro
 			let tokens = mac.tokens.clone();
 			self.commands.spawn((
-				TemplateSource(self.parent),
+				TemplateFileSource(self.parent),
 				SourceFile::new(self.file.clone()),
 				RstmlTokens::new(tokens),
 				TemplateKey::new(self.file.clone(), index),

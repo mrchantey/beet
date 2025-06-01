@@ -74,7 +74,7 @@ pub struct ExportTemplateStep;
 #[allow(unused)]
 fn clear_existing_templates(
 	mut commands: Commands,
-	query: Populated<&Templates, Changed<Templates>>,
+	query: Populated<&TemplateFileTemplates, Changed<TemplateFileTemplates>>,
 ) -> Result {
 	for templates in query.iter() {
 		for template in templates.iter() {

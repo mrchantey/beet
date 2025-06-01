@@ -17,10 +17,10 @@ impl TemplateFile {
 
 /// The entity containing the [`TemplateFile`] that this template belongs to.
 #[derive(Component)]
-#[relationship(relationship_target = Templates)]
-pub struct TemplateSource(pub Entity);
+#[relationship(relationship_target = TemplateFileTemplates)]
+pub struct TemplateFileSource(pub Entity);
 
 /// The templates created from this entities [`TemplateFile`].
 #[derive(Component, Deref)]
-#[relationship_target(relationship = TemplateSource)]
-pub struct Templates(Vec<Entity>);
+#[relationship_target(relationship = TemplateFileSource,linked_spawn)]
+pub struct TemplateFileTemplates(Vec<Entity>);

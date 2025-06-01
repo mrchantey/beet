@@ -1,3 +1,5 @@
+mod template_file_hash;
+pub use template_file_hash::*;
 mod parse_style;
 pub use parse_style::*;
 mod parse_lightning;
@@ -21,15 +23,10 @@ pub mod error;
 pub use build_templates_config::*;
 mod build_templates_plugin;
 pub use build_templates_plugin::*;
-
-
-
-
-
 pub fn template_types_plugin(app: &mut bevy::prelude::App) {
-	app.register_type::<LangPartial>()
-		.register_type::<TemplateKey>()
-		.register_type::<StyleId>()
-		.register_type::<NodePortal>()
-		.register_type::<NodePortalTarget>();
+    app.register_type::<LangPartial>()
+        .register_type::<TemplateKey>()
+        .register_type::<StyleId>()
+        .register_type::<NodePortal>()
+        .register_type::<NodePortalTarget>();
 }

@@ -16,7 +16,7 @@ pub fn templates_to_nodes_rsx(
 			let file = ReadFile::to_string(path.into_abs_unchecked())?;
 
 			commands.spawn((
-				TemplateSource(entity),
+				TemplateFileSource(entity),
 				TemplateKey::new(path.path().clone(), 0),
 				SourceFile::new(path.path().clone()),
 				CombinatorToNodeTokens(file),

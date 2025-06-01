@@ -16,7 +16,9 @@ pub trait PropsBuilder: Default {
 
 
 
-/// An entity that was created as a non-slot child of a template.
+/// An entity that was created as a non-slot child of a template,
+/// which must be held as as seperate relationship to distinguish between
+/// the entities created by a template function and inline/slot children.
 #[derive(Component, Deref)]
 #[relationship(relationship_target = TemplateRoot)]
 pub struct TemplateOf(Entity);
