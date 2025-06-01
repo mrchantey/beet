@@ -17,9 +17,10 @@ impl Plugin for BuildTemplatesPlugin {
 				Update,
 				(
 					ImportTemplatesStep.before(ImportNodesStep),
-					ExportTemplatesStep
+					ProcessTemplatesStep
 						.after(ExportNodesStep)
 						.after(ImportTemplatesStep),
+					ExportTemplatesStep.after(ProcessNodesStep),
 				),
 			)
 			.add_systems(
@@ -34,6 +35,12 @@ impl Plugin for BuildTemplatesPlugin {
 					templates_to_nodes_rsx,
 				)
 					.in_set(ImportTemplatesStep),
+			)
+			.add_systems(
+				Update,
+				(extract_lang_partials, parse_component_style)
+					.chain()
+					.in_set(ProcessTemplatesStep),
 			);
 	}
 }
@@ -43,9 +50,14 @@ impl Plugin for BuildTemplatesPlugin {
 #[derive(Debug, Clone, PartialEq, Eq, Hash, SystemSet)]
 pub struct ImportTemplatesStep;
 
-/// Export parsed nodes to a template scene file.
+/// Perform extra processing after nodes have been imported and processed.
 /// - After [`ExportNodesStep`]
 /// - After [`ImportTemplatesStep`]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, SystemSet)]
+pub struct ProcessTemplatesStep;
+
+/// Export parsed nodes to a template scene file.
+/// - After [`ProcessTemplatesStep`]
 #[derive(Debug, Clone, PartialEq, Eq, Hash, SystemSet)]
 pub struct ExportTemplatesStep;
 
