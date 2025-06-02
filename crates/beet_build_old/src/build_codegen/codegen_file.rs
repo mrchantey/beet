@@ -39,7 +39,8 @@ impl Default for CodegenFile {
 				use beet::prelude::*;
 			)],
 			output: WorkspacePathBuf::new("src/codegen/mod.rs")
-				.into_abs_unchecked(),
+				.into_abs()
+				.unwrap(),
 			pkg_name: None,
 			items: Default::default(),
 		}

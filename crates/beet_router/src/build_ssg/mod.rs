@@ -30,6 +30,6 @@ pub mod default_paths {
 	pub const CLIENT_ISLANDS: &str = "target/client-islands.ron";
 
 	pub fn client_islands() -> AbsPathBuf {
-		WorkspacePathBuf::new(CLIENT_ISLANDS).into_abs_unchecked()
+		WorkspacePathBuf::new(CLIENT_ISLANDS).into_abs()
 	}
 }

@@ -61,7 +61,7 @@ impl DefaultSiteConfig {
 		self.build_server_actions()?;
 
 
-		if let Ok(pages_dir) = self.src_path.join_checked("pages") {
+		if let Ok(pages_dir) = self.src_path.join("pages") {
 			routes.extend(
 				FileGroup::new(pages_dir)
 					.with_filter(
@@ -83,7 +83,7 @@ impl DefaultSiteConfig {
 			);
 		}
 
-		if let Ok(docs_dir) = self.src_path.join_checked("docs") {
+		if let Ok(docs_dir) = self.src_path.join("docs") {
 			routes.extend(
 				FileGroup::new(docs_dir)
 					.xpipe(FileGroupToFuncTokens::default())?
@@ -115,7 +115,7 @@ impl DefaultSiteConfig {
 	}
 
 	fn build_server_actions(&self) -> Result<()> {
-		let Ok(actions_dir) = self.src_path.join_checked("actions") else {
+		let Ok(actions_dir) = self.src_path.join("actions") else {
 			return Ok(());
 		};
 

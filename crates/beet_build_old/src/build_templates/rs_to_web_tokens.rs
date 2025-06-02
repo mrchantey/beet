@@ -13,7 +13,7 @@ pub struct RsToWebTokens;
 
 impl Pipeline<WorkspacePathBuf, Result<Vec<WebTokens>>> for RsToWebTokens {
 	fn apply(self, path: WorkspacePathBuf) -> Result<Vec<WebTokens>> {
-		let file = ReadFile::to_string(path.into_abs_unchecked())?;
+		let file = ReadFile::to_string(path.into_abs())?;
 		let file = syn::parse_file(&file)?;
 		let mac = syn::parse_quote!(rsx);
 		// let path = WorkspacePathBuf::new_from_canonicalizable(path)?;

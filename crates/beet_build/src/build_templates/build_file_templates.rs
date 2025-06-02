@@ -39,6 +39,42 @@ impl Default for BuildFileTemplates {
 	}
 }
 
+pub fn handle_changed_files(
+	In(ev): In<WatchEventVec>,
+	mut commands: Commands,
+	builders: Query<&BuildFileTemplates>,
+	query: Query<(Entity, &TemplateFile)>,
+) -> bevy::prelude::Result {
+	for ev in ev
+		.mutated()
+		.iter()
+		// we only care about files that a builder will want to save
+		.filter(|ev| {
+			builders.iter().any(|config| config.filter.passes(&ev.path))
+		}) {
+		// remove existing TemplateFile entities and their children
+		for (entity, template_file) in query.iter() {
+			if **template_file.path() == ev.path {
+				commands.entity(entity).despawn();
+				tracing::debug!(
+					"Removed TemplateFile entity for changed file: {}",
+					ev.path.display()
+				);
+			} else {
+				println!(
+					"no match:\n{}\n{}",
+					ev.path.display(),
+					template_file.path().display()
+				);
+			}
+		}
+		commands.spawn(TemplateFile::new(WorkspacePathBuf::new_from_cwd_rel(
+			&ev.path,
+		)?));
+	}
+	Ok(())
+}
+
 
 /// Create a [`TemplateFile`] for each file specified in the [`BuildTemplatesConfig`].
 pub(super) fn load_template_files(
@@ -53,7 +89,7 @@ pub(super) fn load_template_files(
 	Ok(())
 }
 
-
+/// if any [`TemplateFile`] has changed, export the template scene
 pub(super) fn export_template_scene(
 	world: &mut World,
 ) -> bevy::prelude::Result {
@@ -92,9 +128,10 @@ pub(super) fn export_template_scene(
 
 		let type_registry = world.resource::<AppTypeRegistry>();
 		let type_registry = type_registry.read();
+		// TODO only serialize TemplateRoot entities
 		let scene = scene.serialize(&type_registry)?;
 
-		FsExt::write(path.into_abs_unchecked(), &scene)?;
+		FsExt::write(path.into_abs(), &scene)?;
 		entities.push(entity);
 	}
 
@@ -106,7 +143,7 @@ pub(super) fn export_template_scene(
 impl BuildFileTemplates {
 	pub fn get_files(&self) -> Result<Vec<WorkspacePathBuf>> {
 		ReadDir::files_recursive(
-			&self.root_dir.into_abs().map_err(Error::File)?,
+			&self.root_dir.into_abs(),
 		)
 		.map_err(Error::File)?
 		.into_iter()

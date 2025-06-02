@@ -15,7 +15,7 @@ pub struct MdToWebTokens;
 
 impl Pipeline<WorkspacePathBuf, Result<WebTokens>> for MdToWebTokens {
 	fn apply(self, path: WorkspacePathBuf) -> Result<WebTokens> {
-		let file = ReadFile::to_string(path.into_abs_unchecked())?;
+		let file = ReadFile::to_string(path.into_abs())?;
 		let web_tokens = ParseMarkdown::markdown_to_rsx_str(&file)
 			.xpipe(StringToWebTokens::new(path.clone()))
 			.map_err(|e| {

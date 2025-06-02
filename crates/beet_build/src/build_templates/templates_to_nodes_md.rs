@@ -14,7 +14,7 @@ pub fn templates_to_nodes_md(
 		if let Some(ex) = path.extension()
 			&& ex == "md"
 		{
-			let file = ReadFile::to_string(path.into_abs_unchecked())?;
+			let file = ReadFile::to_string(path.into_abs())?;
 			let rsx_str = ParseMarkdown::markdown_to_rsx_str(&file);
 
 			commands.spawn((

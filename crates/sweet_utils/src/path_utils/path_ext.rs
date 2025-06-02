@@ -26,7 +26,7 @@ impl PathExt {
 			.map_err(|e| FsError::other(path.as_ref(), e))
 	}
 
-	/// Wraps [`Path::canonicalize`] error with a [`FsError`], actually
+	/// Wraps [`Path::canonicalize`] error with a [`FsError`],
 	/// outputting the path that caused the error.
 	pub fn canonicalize(path: impl AsRef<Path>) -> FsResult<PathBuf> {
 		path.as_ref()
@@ -34,6 +34,8 @@ impl PathExt {
 			.map_err(|e| FsError::io(path, e))
 	}
 
+	/// Wraps [`std::path::absolute`] error with a [`FsError`],
+	/// outputting the path that caused the error.
 	pub fn absolute(path: impl AsRef<Path>) -> FsResult<PathBuf> {
 		std::path::absolute(path.as_ref()).map_err(|e| FsError::io(path, e))
 	}

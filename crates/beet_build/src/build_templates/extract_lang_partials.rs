@@ -50,7 +50,7 @@ pub fn extract_lang_partials(
 		let content = match content {
 			LangContent::InnerText(text) => text.to_string(),
 			LangContent::File(path) => {
-				let file = ReadFile::to_string(path.into_abs()?)?;
+				let file = ReadFile::to_string(path.into_abs())?;
 				file.to_string()
 			}
 		};

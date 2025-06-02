@@ -13,7 +13,7 @@ pub fn templates_to_nodes_rsx(
 		if let Some(ex) = path.extension()
 			&& ex == "rsx"
 		{
-			let file = ReadFile::to_string(path.into_abs_unchecked())?;
+			let file = ReadFile::to_string(path.into_abs())?;
 
 			commands.spawn((
 				TemplateFileSource(entity),

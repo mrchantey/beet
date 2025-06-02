@@ -71,7 +71,8 @@ impl FuncTokens {
 			mod_import: ModImport::Inline,
 			frontmatter: syn::parse_quote! {{}},
 			item_fn,
-			abs_path: AbsPathBuf::new_unchecked(path),
+			// TODO dont use unchecked
+			abs_path: AbsPathBuf::new(path).unwrap(),
 			local_path: path.to_path_buf(),
 			route_info: RouteInfo {
 				path: RoutePath::from_file_path(path).unwrap(),

@@ -27,7 +27,8 @@ impl RoutesToClientIslandMap {
 impl RoutesToClientIslandMap {
 	pub fn default_islands_map_path() -> AbsPathBuf {
 		WorkspacePathBuf::new(default_paths::CLIENT_ISLANDS)
-			.into_abs_unchecked()
+			.into_abs()
+			.unwrap()
 	}
 }
 

@@ -25,10 +25,10 @@ macro_rules! abs_file {
 
 
 
-/// A newtype `PathBuf` that makes several guarantees:
-/// 1. the path is canonical
-/// 2. on windows backslashes are replaced by forward slashes
-/// 3. The hash is cross-platform as it uses encoded bytes
+/// A newtype `PathBuf` with several indications:
+/// 1. the path is absolute, ie [`std::path::absolute`] is called
+/// 2. the path is cleaned using [`path_clean`]
+///
 /// ## Serialization
 /// Naturally serializing absolute paths is problematic for several reasons:
 /// - moving the serialized path between machines will break
@@ -46,15 +46,15 @@ impl Default for AbsPathBuf {
 }
 
 impl AbsPathBuf {
-	/// Create a new [`AbsPathBuf`] from a `PathBuf`.
-	/// Canonicalization will prepend the `env::current_dir`,
-	/// if your path is instead relative to the workspace root, ie `file!()`,
+	/// Create a new [`AbsPathBuf`] from a `PathBuf`, calling [`std::path::absolute`]
+	/// which prepends the `env::current_dir` to relative paths.
+	/// If your path is instead relative to the workspace root, ie `file!()`,
 	/// use [`AbsPathBuf::new_workspace_rel`].
 	///
 	/// For wasm builds this just return the path as is.
 	///
-	/// ## Panics
-	/// Panics if the path cannot be canonicalized. This will always be the case
+	/// ## Errors
+	/// Errors if calling [`std::path::absolute`] errors. This will always be the case
 	/// for wasm builds or if the path does not exist.
 	///
 	/// ## Example
@@ -64,31 +64,13 @@ impl AbsPathBuf {
 	/// let path = AbsPathBuf::new("Cargo.toml");
 	/// ```
 	pub fn new(path: impl AsRef<Path>) -> FsResult<Self> {
-		#[cfg(target_os = "windows")]
-		{
-			let canonical = PathExt::canonicalize(path)?;
-			let canonical =
-				canonical.to_string_lossy().replace('\\', "/").to_path_buf();
-			Ok(Self(canonical))
-		}
-		#[cfg(not(target_os = "windows"))]
-		{
-			Ok(Self(PathExt::canonicalize(path)?))
-		}
+		let path = path.as_ref();
+		let path = PathExt::absolute(path)?;
+		let path = path.clean();
+		Ok(Self(path))
 	}
 
-	/// Add a path to the current [`AbsPathBuf`], which will also naturally
-	/// be a canonical path.
-	pub fn join(&self, path: impl AsRef<Path>) -> Self {
-		let path = self.0.join(path);
-		Self::new_unchecked(path)
-	}
-	/// Add a path to the current [`AbsPathBuf`], which will also naturally
-	/// be a canonical path. This will error if the path cannot be canonicalized.
-	pub fn join_checked(&self, path: impl AsRef<Path>) -> FsResult<Self> {
-		let path = self.0.join(path);
-		Self::new(path)
-	}
+
 	/// Create a new [`AbsPathBuf`] from a path relative to the workspace root,
 	/// ie from using the `file!()` macro.
 	/// ## Errors
@@ -137,17 +119,17 @@ impl AbsPathBuf {
 			.join(path)
 			.xmap(Self::new_unchecked)
 	}
-	/// Create a new [`AbsPathBuf`] without canonicalizing, instead it is the users
-	/// responsibility to ensure this path is already canonical.
+	/// Create a new [`AbsPathBuf`] verbatim from a path, its the user's
+	/// responsibility to ensure that the path is absolute and cleaned.
 	pub fn new_unchecked(path: impl AsRef<Path>) -> Self {
 		let path = path.as_ref().clean();
-		#[cfg(target_os = "windows")]
-		{
-			let canonical =
-				path.to_string_lossy().replace('\\', "/").to_path_buf();
-			Ok(Self(canonical))
-		}
 		Self(path)
+	}
+	/// Add a path to the current [`AbsPathBuf`], which will also naturally
+	/// be an absolute path path.
+	pub fn join(&self, path: impl AsRef<Path>) -> Self {
+		let path = self.0.join(path);
+		Self(path.clean())
 	}
 }
 impl FromStr for AbsPathBuf {
@@ -184,7 +166,7 @@ impl serde::Serialize for AbsPathBuf {
 		let rel_path = pathdiff::diff_paths(&self.0, &workspace_root)
 			.ok_or_else(|| {
 				serde::ser::Error::custom(
-					"Failed to make path relative to workspace root",
+					"failed to make path relative to workspace root",
 				)
 			})?;
 
@@ -206,7 +188,13 @@ impl<'de> serde::Deserialize<'de> for AbsPathBuf {
 		let abs_path = FsExt::workspace_root().join(rel_path);
 
 		// Return as AbsPathBuf
-		Ok(AbsPathBuf::new_unchecked(abs_path))
+		let abs_path = AbsPathBuf::new(abs_path).map_err(|err| {
+			serde::de::Error::custom(format!(
+				"failed to create AbsPathBuf: {}",
+				err
+			))
+		})?;
+		Ok(abs_path)
 	}
 }
 
@@ -216,7 +204,7 @@ impl<'de> serde::Deserialize<'de> for AbsPathBuf {
 #[cfg(not(target_arch = "wasm32"))]
 mod test {
 	use crate::prelude::*;
-	// use sweet_test::prelude::*;
+
 
 	#[test]
 	fn canonicalizes() { let _buf = AbsPathBuf::new("Cargo.toml").unwrap(); }

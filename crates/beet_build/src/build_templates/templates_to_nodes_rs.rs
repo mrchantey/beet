@@ -19,7 +19,7 @@ pub fn templates_to_nodes_rs(
 		if let Some(ex) = path.extension()
 			&& ex == "rs"
 		{
-			let file = ReadFile::to_string(path.into_abs_unchecked())?;
+			let file = ReadFile::to_string(path.into_abs())?;
 			let file = syn::parse_file(&file)?;
 			RsxSynVisitor {
 				parent: entity,

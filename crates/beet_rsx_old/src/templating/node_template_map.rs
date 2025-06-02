@@ -108,7 +108,7 @@ impl NodeTemplateMap {
 
 		#[cfg(not(target_arch = "wasm32"))]
 		{
-			let root_abs = self.root.into_abs().unwrap_or_default();
+			let root_abs = self.root.into_abs();
 			if span
 				.file()
 				.into_abs()

@@ -36,16 +36,11 @@ impl WorkspacePathBuf {
 	/// Create a new [`WorkspacePathBuf`], a common use case is to use `file!()`
 	/// which is already relative to the workspace root.
 	pub fn new(path: impl AsRef<Path>) -> Self {
-		let path = path.as_ref().clean();
+		let path = path.as_ref();
 		#[cfg(target_os = "windows")]
-		{
-			let path = path.to_string_lossy().replace('\\', "/");
-			Self(PathBuf::from(path))
-		}
-		#[cfg(not(target_os = "windows"))]
-		{
-			Self(path)
-		}
+		let path = PathBuf::from(path.to_string_lossy().replace('\\', "/"));
+		let path = path.clean();
+		Self(path)
 	}
 
 	/// Using calls like `std::fs::read_dir` will return paths relative
@@ -79,19 +74,23 @@ impl WorkspacePathBuf {
 
 	#[cfg(not(target_arch = "wasm32"))]
 	/// Convert to a [`AbsPathBuf`]. This should be used instead of
-	/// canonicalize because canonicalize expects cwd relative paths.
-	pub fn into_abs(&self) -> FsResult<AbsPathBuf> {
+	/// canonicalize/path::absolute because they prepend cwd instead of
+	/// workspace root.
+	///
+	/// # Panics
+	/// Panics if the workspace root or cwd cannot be determined.
+	pub fn into_abs(&self) -> AbsPathBuf {
 		let path = FsExt::workspace_root().join(self).clean();
-		let abs = AbsPathBuf::new(path)?;
-		Ok(abs)
+		AbsPathBuf::new(path)
+			.map_err(|err| {
+				anyhow::anyhow!(
+					"Failed to convert WorkspacePathBuf to AbsPathBuf: {}",
+					err
+				)
+			})
+			.unwrap()
 	}
-	#[cfg(not(target_arch = "wasm32"))]
-	/// Convert to a [`AbsPathBuf`] by simply prepending the workspace root
-	/// and cleaning, without checking if the path exists.
-	pub fn into_abs_unchecked(&self) -> AbsPathBuf {
-		let path = FsExt::workspace_root().join(self);
-		AbsPathBuf::new_unchecked(path)
-	}
+
 }
 
 impl std::ops::Deref for WorkspacePathBuf {
