@@ -47,30 +47,31 @@ pub fn handle_changed_files(
 ) -> bevy::prelude::Result {
 	for ev in ev
 		.mutated()
-		.iter()
+		.into_iter()
 		// we only care about files that a builder will want to save
 		.filter(|ev| {
 			builders.iter().any(|config| config.filter.passes(&ev.path))
 		}) {
+		let workspace_path = ev.path.workspace_rel()?;
+
 		// remove existing TemplateFile entities and their children
 		for (entity, template_file) in query.iter() {
-			if **template_file.path() == ev.path {
+			if template_file.path() == &workspace_path {
 				commands.entity(entity).despawn();
 				tracing::debug!(
 					"Removed TemplateFile entity for changed file: {}",
-					ev.path.display()
-				);
-			} else {
-				println!(
-					"no match:\n{}\n{}",
-					ev.path.display(),
-					template_file.path().display()
+					workspace_path.display()
 				);
 			}
+			//  else {
+			// 	tracing::debug!(
+			// 		"no match:\n{}\n{}",
+			// 		workspace_path.display(),
+			// 		template_file.path().display()
+			// 	);
+			// }
 		}
-		commands.spawn(TemplateFile::new(WorkspacePathBuf::new_from_cwd_rel(
-			&ev.path,
-		)?));
+		commands.spawn(TemplateFile::new(workspace_path));
 	}
 	Ok(())
 }
@@ -142,15 +143,13 @@ pub(super) fn export_template_scene(
 
 impl BuildFileTemplates {
 	pub fn get_files(&self) -> Result<Vec<WorkspacePathBuf>> {
-		ReadDir::files_recursive(
-			&self.root_dir.into_abs(),
-		)
-		.map_err(Error::File)?
-		.into_iter()
-		.filter(|path| self.filter.passes(path))
-		.map(|path| {
-			WorkspacePathBuf::new_from_cwd_rel(path).map_err(Error::File)
-		})
-		.collect::<Result<Vec<_>>>()
+		ReadDir::files_recursive(&self.root_dir.into_abs())
+			.map_err(Error::File)?
+			.into_iter()
+			.filter(|path| self.filter.passes(path))
+			.map(|path| {
+				WorkspacePathBuf::new_cwd_rel(path).map_err(Error::File)
+			})
+			.collect::<Result<Vec<_>>>()
 	}
 }

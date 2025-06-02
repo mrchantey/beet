@@ -73,7 +73,7 @@ impl FsWatcher {
 		})?;
 		debouncer.watch(&self.cwd, RecursiveMode::Recursive)?;
 		for ev in rx {
-			if let Some(ev) = WatchEventVec::new(ev)
+			if let Some(ev) = WatchEventVec::new(ev)?
 				.apply_filter(|ev| self.filter.passes(&ev.path))
 			{
 				self.handle_on_change_result(on_change(ev))?;
@@ -100,7 +100,7 @@ impl FsWatcher {
 		debouncer.watch(&self.cwd, RecursiveMode::Recursive)?;
 
 		while let Some(ev) = rx.recv().await {
-			if let Some(ev) = WatchEventVec::new(ev)
+			if let Some(ev) = WatchEventVec::new(ev)?
 				.apply_filter(|ev| self.filter.passes(&ev.path))
 			{
 				self.handle_on_change_result(on_change(ev))?;
@@ -126,14 +126,11 @@ impl FsWatcher {
 #[derive(Debug, Default, Clone, PartialEq, Eq, Hash)]
 pub struct WatchEvent {
 	pub kind: EventKind,
-	pub path: PathBuf,
+	pub path: AbsPathBuf,
 }
 impl WatchEvent {
-	pub fn new(kind: EventKind, path: impl Into<PathBuf>) -> Self {
-		Self {
-			kind,
-			path: path.into(),
-		}
+	pub fn new(kind: EventKind, path: AbsPathBuf) -> Self {
+		Self { kind, path }
 	}
 	pub fn display(&self) -> String { format!("{}", self) }
 }
@@ -143,36 +140,42 @@ impl std::fmt::Display for WatchEvent {
 	}
 }
 
+pub type WatchEventResult = Result<WatchEventVec, Vec<Error>>;
+
 /// Wrapper for debounced events,
 /// queries are match
 #[derive(Debug, Default)]
 pub struct WatchEventVec {
 	pub events: Vec<WatchEvent>,
-	pub errors: Vec<Error>,
 }
 impl WatchEventVec {
-	pub fn new(events: DebounceEventResult) -> Self {
-		match events {
-			Ok(events) => Self {
-				events: events
-					.into_iter()
-					.map(|e| {
-						let kind = e.kind;
-						e.event
-							.paths
-							.into_iter()
-							.map(move |p| WatchEvent::new(kind.clone(), p))
-					})
-					.flatten()
-					.collect(),
-				errors: Vec::new(),
-			},
-			Err(errors) => Self {
-				events: Vec::new(),
-				errors,
-			},
+	pub fn new(events: DebounceEventResult) -> Result<Self> {
+		let events = match events {
+			Ok(events) => events,
+			Err(errors) => {
+				anyhow::bail!("Watch event contains errors: {:?}", errors)
+			}
+		};
+
+		Self {
+			events: events
+				.into_iter()
+				.map(|e| {
+					let kind = e.kind;
+					e.paths
+						.iter()
+						.map(move |path| {
+							let path = AbsPathBuf::new(path)?;
+							WatchEvent::new(kind.clone(), path).xok()
+						})
+						.collect::<Vec<_>>()
+				})
+				.flatten()
+				.collect::<Result<Vec<_>>>()?,
 		}
+		.xok()
 	}
+
 
 	/// Returns None if no events match the filter
 	pub fn apply_filter(
@@ -200,9 +203,9 @@ impl WatchEventVec {
 	pub fn has_mutate(&self) -> bool {
 		self.has_create() || self.has_modify() || self.has_remove()
 	}
-	pub fn mutated(&self) -> Vec<&WatchEvent> {
+	pub fn mutated(self) -> Vec<WatchEvent> {
 		self.events
-			.iter()
+			.into_iter()
 			.filter_map(|e| {
 				if e.kind.is_create()
 					|| e.kind.is_modify()
@@ -216,7 +219,7 @@ impl WatchEventVec {
 			.collect()
 	}
 
-	pub fn mutated_pretty(&self) -> Option<String> {
+	pub fn mutated_pretty(self) -> Option<String> {
 		let str = self
 			.mutated()
 			.iter()

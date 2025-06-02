@@ -92,7 +92,7 @@ impl BuildTemplateMaps {
 				.into_par_iter()
 				.filter(|path| filter.passes(path))
 				.map(|path| {
-					let path = WorkspacePathBuf::new_from_cwd_rel(path)
+					let path = WorkspacePathBuf::new_cwd_rel(path)
 						.map_err(Error::File)?;
 					path.clone().xpipe(FileToTemplates).map_err(|err| {
 						Error::file_to_templates(&path, err.to_string())
@@ -109,7 +109,7 @@ impl BuildTemplateMaps {
 					},
 				);
 
-		let root = WorkspacePathBuf::new_from_cwd_rel(&self.templates_root_dir)
+		let root = WorkspacePathBuf::new_cwd_rel(&self.templates_root_dir)
 			.map_err(Error::File)?;
 		#[allow(unused_mut)]
 		let mut lang_template_map = lang_templates.xpipe(CollectLangTemplates)?;
@@ -151,7 +151,7 @@ mod test {
 		.unwrap();
 
 		expect(node_map.root())
-			.to_be(&WorkspacePathBuf::new_from_cwd_rel(src).unwrap());
+			.to_be(&WorkspacePathBuf::new_cwd_rel(src).unwrap());
 		expect(node_map.len()).to_be_greater_or_equal_to(8);
 		expect(lang_map.len()).to_be_greater_or_equal_to(2);
 	}

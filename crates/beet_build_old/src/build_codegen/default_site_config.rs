@@ -31,7 +31,7 @@ pub struct DefaultSiteConfig {
 	pub wasm_imports: Vec<syn::Item>,
 }
 fn default_src_path() -> AbsPathBuf {
-	AbsPathBuf::new_workspace_rel_unchecked("src")
+	AbsPathBuf::new_workspace_rel("src").unwrap()
 }
 fn default_docs_route() -> String { "/".to_string() }
 fn default_wasm_imports() -> Vec<syn::Item> {

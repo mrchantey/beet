@@ -51,24 +51,18 @@ impl WorkspacePathBuf {
 	///
 	/// Panics if [`FsExt::workspace_root`] fails.
 	#[cfg(not(target_arch = "wasm32"))]
-	pub fn new_from_cwd_rel(path: impl AsRef<Path>) -> FsResult<Self> {
+	pub fn new_cwd_rel(path: impl AsRef<Path>) -> FsResult<Self> {
 		use crate::prelude::PathExt;
 		let path = PathExt::absolute(path)?;
-		let workspace_root = FsExt::workspace_root();
 		// TODO use pathdiff instead?
-		let path = path.strip_prefix(workspace_root).map_err(|err| {
-			FsError::InvalidPath {
-				path: path.to_path_buf(),
-				err: err.to_string(),
-			}
-		})?;
+		let path = PathExt::strip_prefix(&path, &FsExt::workspace_root())?;
 		Ok(Self::new(path))
 	}
 
 	/// Create a new [`WorkspacePathBuf`] from joining this one with
 	/// another [`Path`]
 	pub fn join(&self, path: impl AsRef<Path>) -> Self {
-		let path = self.0.join(path);
+		let path = self.0.join(path).clean();
 		Self::new(path)
 	}
 
@@ -90,7 +84,6 @@ impl WorkspacePathBuf {
 			})
 			.unwrap()
 	}
-
 }
 
 impl std::ops::Deref for WorkspacePathBuf {

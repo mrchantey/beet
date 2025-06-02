@@ -74,23 +74,18 @@ impl AbsPathBuf {
 	/// Create a new [`AbsPathBuf`] from a path relative to the workspace root,
 	/// ie from using the `file!()` macro.
 	/// ## Errors
-	/// If the path cannot be canonicalized.
-	pub fn new_workspace_rel(path: impl AsRef<Path>) -> FsResult<Self> {
-		let path = FsExt::workspace_root().join(path);
-		Self::new(path)
-	}
-	/// Create a new unchecked [`AbsPathBuf`] from a path relative to the workspace root,
-	/// ie from using the `file!()` macro.
+	/// If the cwd cannot be resolved.
 	/// ## Example
 	///
 	/// ```
 	/// # use sweet_utils::prelude::*;
 	/// let path = AbsPathBuf::new_workspace_rel(file!());
 	/// ```
-	pub fn new_workspace_rel_unchecked(path: impl AsRef<Path>) -> Self {
+	pub fn new_workspace_rel(path: impl AsRef<Path>) -> FsResult<Self> {
 		let path = FsExt::workspace_root().join(path);
-		Self::new_unchecked(path)
+		Self::new(path)
 	}
+
 	/// Create a new [`AbsPathBuf`] from a path relative to `CARGO_MANIFEST_DIR`,
 	/// which will be the `crates/my_crate` dir in the case of a workspace.
 	/// This is particularly useful inside of `build.rs` files.
@@ -106,19 +101,7 @@ impl AbsPathBuf {
 			.join(path)
 			.xmap(Self::new)
 	}
-	/// Create a new unchecked [`AbsPathBuf`] from a path relative to `CARGO_MANIFEST_DIR`,
-	/// which will be the `crates/my_crate` dir in the case of a workspace.
-	/// This is particularly useful inside of `build.rs` files.
-	/// ## Panics
-	/// Panics if `CARGO_MANIFEST_DIR` is not set.
-	pub fn new_manifest_rel_unchecked(path: impl AsRef<Path>) -> Self {
-		std::env::var("CARGO_MANIFEST_DIR")
-			.unwrap()
-			.xref()
-			.xmap(Path::new)
-			.join(path)
-			.xmap(Self::new_unchecked)
-	}
+
 	/// Create a new [`AbsPathBuf`] verbatim from a path, its the user's
 	/// responsibility to ensure that the path is absolute and cleaned.
 	pub fn new_unchecked(path: impl AsRef<Path>) -> Self {
@@ -128,8 +111,16 @@ impl AbsPathBuf {
 	/// Add a path to the current [`AbsPathBuf`], which will also naturally
 	/// be an absolute path path.
 	pub fn join(&self, path: impl AsRef<Path>) -> Self {
-		let path = self.0.join(path);
-		Self(path.clean())
+		let path = self.0.join(path).clean();
+		Self(path)
+	}
+
+	pub fn workspace_rel(
+		&self,
+	) -> FsResult<crate::path_utils::WorkspacePathBuf> {
+		// Strip the workspace root from the path
+		let path = PathExt::strip_prefix(&self.0, &FsExt::workspace_root())?;
+		Ok(crate::path_utils::WorkspacePathBuf::new(path))
 	}
 }
 impl FromStr for AbsPathBuf {
@@ -210,13 +201,30 @@ mod test {
 	fn canonicalizes() { let _buf = AbsPathBuf::new("Cargo.toml").unwrap(); }
 
 	#[test]
+	fn resolves_relative_non_exist() {
+		#[cfg(not(target_os = "windows"))]
+		let expected = "foo/bar/boo.rs";
+		#[cfg(target_os = "windows")]
+		let expected = "foo\\bar\\boo.rs";
+
+		assert!(
+			AbsPathBuf::new("foo/bar/bazz/../boo.rs")
+				.unwrap()
+				.to_string_lossy()
+				.ends_with(expected)
+		);
+	}
+	#[test]
 	fn abs_file() {
 		assert!(abs_file!().to_string_lossy().ends_with("abs_path_buf.rs"));
 	}
 	#[test]
 	fn workspace_rel() {
-		let buf = AbsPathBuf::new_workspace_rel(file!()).unwrap();
+		let file = file!();
+		let buf = AbsPathBuf::new_workspace_rel(file).unwrap();
 		assert_eq!(buf, abs_file!());
+		let workspace_rel = buf.workspace_rel().unwrap();
+		assert_eq!(workspace_rel.to_string_lossy(), file);
 	}
 	#[test]
 	fn manifest_rel() {

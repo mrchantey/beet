@@ -19,7 +19,7 @@ impl MarkdownToFuncTokens {
 		abs_path: AbsPathBuf,
 		local_path: PathBuf,
 	) -> Result<FuncTokens> {
-		let workspace_path = WorkspacePathBuf::new_from_cwd_rel(&abs_path)?;
+		let workspace_path = WorkspacePathBuf::new_cwd_rel(&abs_path)?;
 		let frontmatter =
 			ParseMarkdown::markdown_to_frontmatter_tokens(markdown)?;
 		let rsx_str = ParseMarkdown::markdown_to_rsx_str(markdown);
@@ -106,7 +106,7 @@ val_string	= "foo"
 		let func_tokens = MarkdownToFuncTokens::parse(
 			syn::parse_quote!(foo),
 			MARKDOWN,
-			AbsPathBuf::new_workspace_rel_unchecked(file!()),
+			AbsPathBuf::new_workspace_rel(file!()).unwrap(),
 			"bar".into(),
 		)
 		.unwrap();
