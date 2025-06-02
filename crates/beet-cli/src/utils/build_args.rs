@@ -24,14 +24,15 @@ impl Plugin for BuildArgs {
 	fn build(&self, app: &mut App) {
 		let config =
 			BeetConfig::load(self.beet_config.as_deref()).unwrap_or_exit();
-		app.add_plugins(config.clone());
+		app.add_plugins((
+			config.clone(),
+			NodeTokensPlugin::default(),
+			BuildTemplatesPlugin::default(),
+		));
 
-		if self.only.is_empty() || self.only.contains(&BuildOnly::Templates) {
-			app.add_plugins((
-				NodeTokensPlugin::default(),
-				BuildTemplatesPlugin::default(),
-			));
-		}
+		// if self.only.is_empty() || self.only.contains(&BuildOnly::Templates) {
+		// 	// app.add_plugins(());
+		// }
 	}
 }
 

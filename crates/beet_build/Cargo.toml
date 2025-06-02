@@ -28,6 +28,7 @@ sweet = { workspace = true, features = ["bevy_scene"] }
 
 #💡 Utils
 thiserror.workspace = true
+tracing.workspace = true
 anyhow.workspace = true
 rapidhash.workspace = true
 futures.workspace = true

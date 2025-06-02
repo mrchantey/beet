@@ -1,4 +1,5 @@
 use crate::prelude::*;
+use beet_common::prelude::*;
 use beet_parse::prelude::*;
 use bevy::prelude::*;
 use sweet::prelude::ReadFile;
@@ -9,6 +10,7 @@ use syn::visit::Visit;
 /// For a given rust file, extract tokens from `rsx!` macros and insert them
 /// as [`RstmlTokens`].
 pub fn templates_to_nodes_rs(
+	_: TempNonSendMarker,
 	mut commands: Commands,
 	query: Populated<(Entity, &TemplateFile), Changed<TemplateFile>>,
 ) -> Result {

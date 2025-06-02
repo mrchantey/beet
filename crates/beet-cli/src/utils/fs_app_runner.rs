@@ -6,19 +6,19 @@ use sweet::prelude::*;
 
 
 /// An alternative to the default app runner [`App::set_runner`]
-/// 
+///
 /// ## Example
-/// 
+///
 /// ```rust
 /// # use bevy::prelude::*;
 /// # use beet_cli::prelude::*;
-/// 
+///
 /// let runner = FsAppRunner::default();
 ///
 /// App::new()
 /// 	.set_runner(runner.into_app_runner())
 /// 	.run();
-/// 
+///
 /// ```
 pub struct FsAppRunner {
 	watcher: FsWatcher,
@@ -82,9 +82,11 @@ impl FsAppRunner {
 	}
 
 	fn on_change(app: &mut App, watch_event: WatchEventVec) -> Result<()> {
-		println!("In main loop");
-		// TODO insert events
+		let start = std::time::Instant::now();
 		app.update();
+		let elapsed = start.elapsed();
+		// TODO proper profiling https://github.com/bevyengine/bevy/blob/main/docs/profiling.md
+		println!("App updated in {:?}", elapsed);
 		match app.should_exit() {
 			Some(AppExit::Success) => return Ok(()),
 			Some(AppExit::Error(err)) => {

@@ -23,6 +23,10 @@ impl Default for BuildFileTemplates {
 	fn default() -> Self {
 		Self {
 			filter: GlobFilter::default()
+				// TODO move to beet.toml
+				.with_include("*/crates/beet_design/src/**/*")
+				.with_include("*/crates/beet_site/src/**/*")
+				.with_include("*/crates/beet_router/src/test_site/**/*")
 				.with_exclude("*/target/*")
 				.with_exclude("*/.cache/*")
 				.with_exclude("*/node_modules/*"),
@@ -55,6 +59,30 @@ pub(super) fn export_template_scene(
 ) -> bevy::prelude::Result {
 	let mut entities = Vec::new();
 
+	let changed_files = world
+		.query_filtered::<&TemplateFile, Changed<TemplateFile>>()
+		.iter(world)
+		.collect::<Vec<_>>();
+
+	if changed_files.is_empty() {
+		// no changes, do nothing
+		return Ok(());
+	} else {
+		tracing::info!(
+			"Exporting {} template files to scene",
+			changed_files.len()
+		);
+		tracing::debug!(
+			"Changed template files: {}",
+			changed_files
+				.iter()
+				.map(|f| f.path().to_string_lossy())
+				.collect::<Vec<_>>()
+				.join("\n")
+		);
+	}
+
+
 	for (entity, config) in
 		world.query::<(Entity, &BuildFileTemplates)>().iter(world)
 	{
@@ -69,10 +97,6 @@ pub(super) fn export_template_scene(
 		FsExt::write(path.into_abs_unchecked(), &scene)?;
 		entities.push(entity);
 	}
-	for entity in entities {
-		world.entity_mut(entity).despawn();
-	}
-
 
 	Ok(())
 }

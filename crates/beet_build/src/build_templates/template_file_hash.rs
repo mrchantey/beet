@@ -18,10 +18,10 @@ impl TemplateFileHash {
 
 pub fn apply_template_file_hash(
 	mut commands: Commands,
-	templates: Query<&TemplateFileTemplates>,
+	templates: Query<&TemplateRoots>,
 	children: Query<&Children>,
 	// hashable:Query<&ItemOf
-	query: Populated<(Entity, &TemplateFile), Changed<TemplateFileTemplates>>,
+	query: Populated<(Entity, &TemplateFile), Changed<TemplateRoots>>,
 ) {
 	for (entity, template_file) in query.iter() {
 		let mut hasher = FixedHasher::default();

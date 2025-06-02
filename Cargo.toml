@@ -123,7 +123,9 @@ sweet_utils = { path = "crates/sweet_utils", version = "0.0.6-dev.0" }
 
 #💡 local
 bevy = { version = "0.16", default-features = false, features = [
-	"std",        # std for reflect PathBuf
+	"std",            # std for reflect PathBuf
+	"multi_threaded",
+	"bevy_log",
 	"bevy_color",
 ] }
 
