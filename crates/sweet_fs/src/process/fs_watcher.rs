@@ -145,7 +145,7 @@ impl std::fmt::Display for WatchEvent {
 
 /// Wrapper for debounced events,
 /// queries are match
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct WatchEventVec {
 	pub events: Vec<WatchEvent>,
 	pub errors: Vec<Error>,

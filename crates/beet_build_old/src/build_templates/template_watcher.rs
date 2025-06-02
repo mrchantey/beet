@@ -74,7 +74,6 @@ impl<Reload: FnMut() -> Result<()>, Recompile: FnMut() -> Result<()>>
 		.await
 	}
 
-
 	/// OnChange will iterate over the watch events,
 	/// - if any break the file hash cache, [`Self::recompile`] will be called
 	/// - otherwise if it was a file change, [`Self::reload`] will be called
