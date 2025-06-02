@@ -64,9 +64,9 @@ pub(super) fn export_template_scene(
 
 		let type_registry = world.resource::<AppTypeRegistry>();
 		let type_registry = type_registry.read();
-		let scene1 = scene.serialize(&type_registry)?;
+		let scene = scene.serialize(&type_registry)?;
 
-		FsExt::write(path.into_abs_unchecked(), &scene1)?;
+		FsExt::write(path.into_abs_unchecked(), &scene)?;
 		entities.push(entity);
 	}
 	for entity in entities {

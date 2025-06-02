@@ -18,11 +18,14 @@ mod templates_to_nodes_rs;
 pub use templates_to_nodes_rs::*;
 mod template_file;
 pub use template_file::*;
-mod build_templates_config;
+mod build_file_templates;
 pub mod error;
-pub use build_templates_config::*;
+pub use build_file_templates::*;
 mod build_templates_plugin;
 pub use build_templates_plugin::*;
+
+
+
 pub fn template_types_plugin(app: &mut bevy::prelude::App) {
     app.register_type::<LangPartial>()
         .register_type::<TemplateKey>()

@@ -11,12 +11,11 @@ struct User {
 
 #[tokio::main]
 async fn main() {
-	// #[cfg(feature = "libsql")]
+	#[allow(unused)]
 	let db = Database::new().await.unwrap();
-	// #[cfg(not(feature = "libsql"))]
-	// let conn = LimboUtils::memory_db().await.unwrap();
 
 	// 1. Initialize Schema
+	#[allow(unreachable_code)]
 	db.create_table::<User>().await.unwrap();
 
 	// 2. Create Row

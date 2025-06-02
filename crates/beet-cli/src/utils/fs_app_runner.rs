@@ -4,6 +4,22 @@ use std::num::NonZeroU8;
 use std::time::Duration;
 use sweet::prelude::*;
 
+
+/// An alternative to the default app runner [`App::set_runner`]
+/// 
+/// ## Example
+/// 
+/// ```rust
+/// # use bevy::prelude::*;
+/// # use beet_cli::prelude::*;
+/// 
+/// let runner = FsAppRunner::default();
+///
+/// App::new()
+/// 	.set_runner(runner.into_app_runner())
+/// 	.run();
+/// 
+/// ```
 pub struct FsAppRunner {
 	watcher: FsWatcher,
 }

@@ -31,7 +31,7 @@ pub mod prelude {
 	#[cfg(feature = "test")]
 	pub use crate::test::prelude::*;
 	pub use crate::utils::prelude::*;
-	#[cfg(feature = "web")]
+	#[cfg(all(feature = "web", target_arch = "wasm32"))]
 	pub use crate::web::prelude::*;
 }
 

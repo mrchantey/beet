@@ -13,7 +13,8 @@ categories.workspace = true
 keywords.workspace = true
 
 [features]
-default = ["tokio", "libsql"]
+default = ["tokio"]
+# default = ["tokio", "libsql"]
 limbo = ["dep:limbo"]
 libsql = ["dep:libsql"]
 tokio = ["dep:tokio"]

@@ -28,26 +28,24 @@ impl Plugin for BuildTemplatesPlugin {
 					ExportTemplateStep.after(ProcessNodesStep),
 				),
 			)
-			.add_systems(Update, load_template_files.in_set(ImportTemplateStep))
 			.add_systems(
 				Update,
 				(
-					templates_to_nodes_rs,
-					templates_to_nodes_md,
-					templates_to_nodes_rsx,
-				)
-					.after(load_template_files)
-					.in_set(ImportTemplateStep),
-			)
-			.add_systems(
-				Update,
-				(extract_lang_partials, apply_style_ids, parse_lightning)
-					.chain()
-					.in_set(ProcessTemplateStep),
-			)
-			.add_systems(
-				Update,
-				export_template_scene.in_set(ExportTemplateStep),
+					(
+						load_template_files,
+						(
+							templates_to_nodes_rs,
+							templates_to_nodes_md,
+							templates_to_nodes_rsx,
+						),
+					)
+						.chain()
+						.in_set(ImportTemplateStep),
+					(extract_lang_partials, apply_style_ids, parse_lightning)
+						.chain()
+						.in_set(ProcessTemplateStep),
+					export_template_scene.in_set(ExportTemplateStep),
+				),
 			);
 	}
 }

@@ -24,6 +24,8 @@ impl ConnectionInner for Connection {
 			Self::Libsql(conn) => conn.statement_builder(),
 			#[cfg(feature = "limbo")]
 			Self::Limbo(conn) => conn.statement_builder(),
+			#[cfg(not(any(feature = "libsql", feature = "limbo")))]
+			_ => panic!("please enable a database feature"),
 		}
 	}
 
@@ -33,22 +35,30 @@ impl ConnectionInner for Connection {
 		#[cfg(feature = "limbo")]
 		#[allow(unused)]
 		return Ok(Self::Limbo(limbo::Connection::new().await?));
+		#[cfg(not(any(feature = "libsql", feature = "limbo")))]
+		panic!("please enable a database feature");
 	}
+	#[allow(unused)]
 	async fn execute_uncached(&self, stmt: &impl Statement) -> Result<()> {
 		match self {
 			#[cfg(feature = "libsql")]
 			Self::Libsql(conn) => ConnectionInner::execute_uncached(conn, stmt).await,
 			#[cfg(feature = "limbo")]
 			Self::Limbo(conn) => ConnectionInner::execute_uncached(conn, stmt).await,
+			#[cfg(not(any(feature = "libsql", feature = "limbo")))]
+			_ => panic!("please enable a database feature"),
 		}
 	}
 
+	#[allow(unused)]
 	async fn prepare(&self, sql: &str) -> Result<CachedStatement> {
 		match self {
 			#[cfg(feature = "libsql")]
 			Self::Libsql(conn) => ConnectionInner::prepare(conn, sql).await,
 			#[cfg(feature = "limbo")]
 			Self::Limbo(conn) => ConnectionInner::prepare(conn, sql).await,
+			#[cfg(not(any(feature = "libsql", feature = "limbo")))]
+			_ => panic!("please enable a database feature"),
 		}
 	}
 }

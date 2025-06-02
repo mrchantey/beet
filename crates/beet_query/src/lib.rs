@@ -1,7 +1,7 @@
 #![cfg_attr(test, feature(test, custom_test_frameworks))]
 #![cfg_attr(test, test_runner(sweet::test_runner))]
 #![allow(async_fn_in_trait)]
-#![feature(let_chains, trait_upcasting)]
+#![feature(let_chains)]
 
 
 // #[cfg(test)]

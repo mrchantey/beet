@@ -126,8 +126,10 @@ mod test {
 
 	#[sweet::test]
 	async fn works() {
+		#[allow(unused)]
 		let db = Database::new().await.unwrap();
-
+		
+		#[allow(unreachable_code)]
 		db.create_table::<User>().await.unwrap();
 
 		let user = User {

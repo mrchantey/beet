@@ -35,6 +35,9 @@ publish = false
 [workspace]
 # default resolver
 resolver = "2"
+
+exclude = ["crates/wasm-bundle-bench"]
+
 members = [
 	"crates/beet_site",
 	"crates/beet-cli",

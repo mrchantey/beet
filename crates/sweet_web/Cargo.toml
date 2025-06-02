@@ -12,7 +12,7 @@ repository.workspace = true
 [features]
 default = []
 
-[dependencies]
+[target.'cfg(target_arch = "wasm32")'.dependencies]
 sweet_utils.workspace = true
 anyhow.workspace = true
 extend.workspace = true
@@ -28,7 +28,7 @@ sweet_test.workspace = true
 
 #https://rustwasm.github.io/wasm-bindgen/api/web_sys/
 #https://github.com/rustwasm/wasm-bindgen/blob/main/crates/web-sys/Cargo.toml
-[dependencies.web-sys]
+[target.'cfg(target_arch = "wasm32")'.dependencies.web-sys]
 workspace = true
 features = [
 	"Text",
