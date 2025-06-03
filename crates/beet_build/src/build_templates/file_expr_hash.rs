@@ -1,0 +1,129 @@
+use super::HashNonTemplateRust;
+use crate::prelude::*;
+use beet_common::prelude::*;
+use beet_parse::exports::SendWrapper;
+use beet_rsx::prelude::*;
+use bevy::prelude::*;
+use quote::ToTokens;
+use rapidhash::RapidHasher;
+use std::hash::Hash;
+use std::hash::Hasher;
+use syn::Expr;
+
+/// A hash of all non-literal expressions in a file containing rust code,
+/// including `.rs`, `.mdx` and `.rsx` files.
+#[derive(Debug, Default, Clone, PartialEq, Eq, Component, Deref)]
+pub struct FileExprHash(u64);
+
+impl FileExprHash {
+	pub fn new(hash: u64) -> Self { Self(hash) }
+
+	pub fn hash(&self) -> u64 { self.0 }
+}
+
+
+/// Update the [`FileExprHash`] component for all template files if it changed.
+/// Use change detection to trigger extra work based on the hash change.
+pub fn update_file_expr_hash(
+	macros: Res<TemplateMacros>,
+	source_files: Query<&TemplateRoots>,
+	template_roots: Query<&TemplateRoot>,
+	children: Query<&Children>,
+	attributes: Query<&Attributes>,
+	block_nodes: Query<&ItemOf<BlockNode, SendWrapper<Expr>>>,
+	attr_exprs: Query<&AttributeExpr>,
+	attr_key_exprs: Query<&AttributeKeyExpr>,
+	attr_val_exprs: Query<&AttributeValueExpr>,
+	mut query: Populated<
+		(Entity, &TemplateFile, &mut FileExprHash),
+		Changed<TemplateFile>,
+	>,
+) -> Result {
+	for (entity, template_file, mut hash) in query.iter_mut() {
+		let mut hasher = RapidHasher::default_const();
+		HashNonTemplateRust {
+			macros: &macros,
+			hasher: &mut hasher,
+		}
+		.hash(template_file)?;
+
+		for template in source_files.iter_descendants(entity) {
+			for root in template_roots.iter_descendants(template) {
+				for node in children.iter_descendants(root) {
+					if let Ok(block_node) = block_nodes.get(node) {
+						block_node
+							.to_token_stream()
+							.to_string()
+							.hash(&mut hasher);
+					}
+
+					// has attribute expressions
+					for attribute in attributes.iter_descendants(node) {
+						if let Ok(attr_expr) = attr_exprs.get(attribute) {
+							attr_expr
+								.to_token_stream()
+								.to_string()
+								.hash(&mut hasher);
+						}
+
+						if let Ok(attr_key_expr) = attr_key_exprs.get(attribute)
+						// dont hash literals
+							&& !matches!(attr_key_expr.inner(), Expr::Lit(_))
+						{
+							attr_key_expr
+								.to_token_stream()
+								.to_string()
+								.hash(&mut hasher);
+						}
+						if let Ok(attr_val_expr) = attr_val_exprs.get(attribute)
+						// dont hash literals
+							&& !matches!(attr_val_expr.inner(), Expr::Lit(_))
+						{
+							attr_val_expr
+								.to_token_stream()
+								.to_string()
+								.hash(&mut hasher);
+						}
+					}
+				}
+			}
+		}
+		let new_hash = hasher.finish();
+		hash.set_if_neq(FileExprHash::new(new_hash));
+	}
+	Ok(())
+}
+
+
+#[cfg(test)]
+mod test {
+	use crate::as_beet::*;
+	use bevy::prelude::*;
+	use sweet::prelude::*;
+
+	fn hash(bundle: impl Bundle) -> u64 {
+		let mut app = App::new();
+		app.init_resource::<TemplateMacros>()
+			.add_systems(Update, update_file_expr_hash);
+		let entity = app
+			.world_mut()
+			.spawn((
+				TemplateFile::new(WorkspacePathBuf::new(file!())),
+				related! {TemplateRoots[related!{TemplateRoot[bundle]}]},
+			))
+			.id();
+		app.update();
+		app.world().get::<FileExprHash>(entity).unwrap().0
+	}
+
+
+	#[test]
+	#[rustfmt::skip]
+	fn works() {
+		expect(hash(rsx! {<div/>}))
+		.to_be(hash(rsx! {<span/>}));
+		expect(hash(rsx! {<div>{1}</div>}))
+		.to_be(hash(rsx! {{2}}));
+	todo!("this is wrong, we need rsx_tokens!");
+	}
+}

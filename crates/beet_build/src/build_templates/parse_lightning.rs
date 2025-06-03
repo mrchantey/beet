@@ -108,6 +108,7 @@ mod test {
 			.spawn((
 				LangPartial("div { color: red; }".to_string()),
 				NodeTag("style".into()),
+				// no styleid indicates global
 			))
 			.id();
 		let local = app

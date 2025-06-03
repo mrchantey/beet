@@ -14,6 +14,7 @@ use syn::Expr;
 pub struct AttributeKeyExpr(SendWrapper<Expr>);
 impl AttributeKeyExpr {
 	pub fn new(value: Expr) -> Self { Self(SendWrapper::new(value)) }
+	pub fn inner(&self) -> &Expr { &*self.0 }
 	pub fn take(self) -> Expr { self.0.take() }
 }
 
@@ -26,6 +27,7 @@ pub struct AttributeValueExpr(SendWrapper<Expr>);
 
 impl AttributeValueExpr {
 	pub fn new(value: Expr) -> Self { Self(SendWrapper::new(value)) }
+	pub fn inner(&self) -> &Expr { &*self.0 }
 	pub fn take(self) -> Expr { self.0.take() }
 }
 

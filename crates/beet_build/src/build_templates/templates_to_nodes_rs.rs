@@ -11,10 +11,10 @@ use syn::visit::Visit;
 /// as [`RstmlTokens`].
 pub fn templates_to_nodes_rs(
 	_: TempNonSendMarker,
+	macros: Res<TemplateMacros>,
 	mut commands: Commands,
 	query: Populated<(Entity, &TemplateFile), Changed<TemplateFile>>,
 ) -> Result {
-	let mac_ident = syn::parse_quote!(rsx);
 	for (entity, path) in query.iter() {
 		if let Some(ex) = path.extension()
 			&& ex == "rs"
@@ -25,7 +25,7 @@ pub fn templates_to_nodes_rs(
 				parent: entity,
 				commands: &mut commands,
 				file: &*path,
-				mac: &mac_ident,
+				macros: &*macros,
 				index: 0,
 			}
 			.visit_file(&file);
@@ -44,7 +44,7 @@ struct RsxSynVisitor<'a, 'w, 's> {
 	/// We must use workspace relative paths because locations are created
 	/// via the `file!()` macro.
 	file: &'a WorkspacePathBuf,
-	mac: &'a syn::Ident,
+	macros: &'a TemplateMacros,
 	/// the index used for building the [`TemplateKey`].
 	index: usize,
 }
@@ -55,7 +55,7 @@ impl<'a, 'w, 's> Visit<'a> for RsxSynVisitor<'a, 'w, 's> {
 			.path
 			.segments
 			.last()
-			.map_or(false, |seg| &seg.ident == self.mac)
+			.map_or(false, |seg| *&seg.ident == *self.macros.rstml)
 		{
 			let index = self.index;
 			self.index += 1;

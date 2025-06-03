@@ -21,7 +21,7 @@ use syn::parse_quote;
 #[rustfmt::skip]
 #[derive(SystemParam)]
 pub struct CollectNodeAttributes<'w, 's> {
-	_non_send:TempNonSendMarker<'w>,	
+	_non_send: TempNonSendMarker<'w>,	
 	attr_lits: Query<'w, 's, &'static AttributeLit>,
 	elements: Query<'w, 's, Option<&'static Attributes>, With<ElementNode>>,
 	templates: Query<'w,'s,

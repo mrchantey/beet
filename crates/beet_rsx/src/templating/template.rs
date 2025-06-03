@@ -16,9 +16,8 @@ pub trait PropsBuilder: Default {
 
 
 
-/// An entity that was created as a non-slot child of a template,
-/// which must be held as as seperate relationship to distinguish between
-/// the entities created by a template function and inline/slot children.
+/// A root level entity built from a template contructor, with this as a
+/// a non-children relationship to distinguish it from inline/slot children.
 #[derive(Component, Deref)]
 #[relationship(relationship_target = TemplateRoot)]
 pub struct TemplateOf(Entity);
@@ -27,8 +26,9 @@ impl TemplateOf {
 	pub fn new(value: Entity) -> Self { Self(value) }
 }
 
-/// The entity that was spawned by this template. This should
+/// Points to the entity that was spawned by this template. This should
 /// always only be a single entity, which may have [`Children`].
+// TODO 1:1 relationship
 #[derive(Component)]
 #[relationship_target(relationship = TemplateOf,linked_spawn)]
 pub struct TemplateRoot(Vec<Entity>);

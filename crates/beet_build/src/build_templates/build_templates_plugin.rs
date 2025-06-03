@@ -9,9 +9,25 @@ use bevy::prelude::*;
 #[derive(Debug, Default)]
 pub struct BuildTemplatesPlugin;
 
+
+/// Idents used for template macros.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Resource)]
+pub struct TemplateMacros {
+	pub rstml: String,
+}
+impl Default for TemplateMacros {
+	fn default() -> Self {
+		Self {
+			rstml: "rsx".to_string(),
+		}
+	}
+}
+
+
 impl Plugin for BuildTemplatesPlugin {
 	fn build(&self, app: &mut App) {
 		app.init_resource::<HtmlConstants>()
+			.init_resource::<TemplateMacros>()
 			// types
 			.add_plugins((
 				node_types_plugin,

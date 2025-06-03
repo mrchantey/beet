@@ -47,6 +47,7 @@ pub fn combinator_to_node_tokens_plugin(app: &mut App) {
 
 
 fn combinator_to_node_tokens(
+	_: TempNonSendMarker,
 	mut commands: Commands,
 	query: Populated<(Entity, &CombinatorToNodeTokens, Option<&SourceFile>)>,
 ) -> bevy::prelude::Result {

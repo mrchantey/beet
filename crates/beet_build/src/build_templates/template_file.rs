@@ -1,10 +1,12 @@
 use bevy::prelude::*;
 use sweet::prelude::*;
+use crate::prelude::*;
 
-
-/// A file specified by [`BuildTemplatesConfig`], to be parsed for its templates.
+/// Adde to an entity used to represent an entire file specified by [`BuildTemplatesConfig`],
+/// which may contain multiple templates.
 #[derive(Debug, Clone, PartialEq, Eq, Component, Deref)]
 // #[component(immutable)]
+#[require(FileExprHash)]
 pub struct TemplateFile {
 	path: WorkspacePathBuf,
 }
@@ -20,7 +22,8 @@ impl TemplateFile {
 #[relationship(relationship_target = TemplateRoots)]
 pub struct TemplateFileSource(pub Entity);
 
-/// The templates created from this entities [`TemplateFile`].
+/// The templates created from this entities [`TemplateFile`]. Each of these
+/// should have an associated [`TemplateRoot`]
 #[derive(Component, Deref)]
 #[relationship_target(relationship = TemplateFileSource,linked_spawn)]
 pub struct TemplateRoots(Vec<Entity>);
