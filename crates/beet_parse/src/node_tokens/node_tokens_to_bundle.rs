@@ -54,14 +54,13 @@ impl BundleTokens {
 fn resolve_attribute_values(
 	_: TempNonSendMarker,
 	mut commands: Commands,
-	builder: TokensBuilder,
+	builder: BundleBuilder,
 	attribute_values: Populated<Entity, (With<AttributeOf>, With<Children>)>,
 ) -> Result {
 	for entity in attribute_values.iter() {
 		let tokens = builder.token_stream(entity)?;
-		println!("expr: {}", tokens.to_string());
-		let expr = syn::parse2::<Expr>(tokens)?;
 		// if parse2 becomes problematic use Expr::Verbatim(tokens)
+		let expr = syn::parse2::<Expr>(tokens)?;
 		commands
 			.entity(entity)
 			.insert(AttributeValueExpr::new(expr));
@@ -76,7 +75,7 @@ fn resolve_attribute_values(
 fn node_tokens_to_bundle(
 	_: TempNonSendMarker,
 	mut commands: Commands,
-	builder: TokensBuilder,
+	builder: BundleBuilder,
 	template_roots: Populated<(
 		Entity,
 		&NodeTokensToBundle,
@@ -96,13 +95,15 @@ fn node_tokens_to_bundle(
 	Ok(())
 }
 
+
 /// recursively visit children and collect into a [`TokenStream`].
 /// We use a custom [`SystemParam`] for the traversal, its more of
 /// a 'map' function than an 'iter', as we need to resolve children
 /// and then wrap them as `children![]` in parents.
 #[derive(SystemParam)]
-pub(super) struct TokensBuilder<'w, 's> {
-	children: Query<'w, 's, &'static Children>,
+struct BundleBuilder<'w, 's> {
+	children: TokenizeRelated<'w, 's, Children>,
+	// children: Query<'w, 's, &'static Children>,
 	block_node_exprs:
 		Query<'w, 's, &'static ItemOf<BlockNode, SendWrapper<Expr>>>,
 	combinators: Query<'w, 's, &'static CombinatorExpr>,
@@ -113,7 +114,7 @@ pub(super) struct TokensBuilder<'w, 's> {
 	node_attributes: CollectNodeAttributes<'w, 's>,
 }
 
-impl TokensBuilder<'_, '_> {
+impl BundleBuilder<'_, '_> {
 	/// Entry point for the builder, rstml token roots are not elements themselves,
 	/// so if theres only one child return that instead of a fragment
 	fn token_stream_from_root(&self, entity: Entity) -> Result<TokenStream> {
@@ -124,7 +125,7 @@ impl TokensBuilder<'_, '_> {
 			// a single child, return that
 			self.token_stream(children[0])
 		} else {
-			// multiple children, wrap in children![]
+			// multiple children, wrap in fragment
 			let children = children
 				.iter()
 				.map(|child| self.token_stream(child))
@@ -150,7 +151,9 @@ impl TokensBuilder<'_, '_> {
 		)?;
 		self.try_push_blocks(&mut items, entity)?;
 		self.try_push_combinators(&mut items, entity)?;
-		self.try_push_children(&mut items, entity)?;
+		self.children.try_push_all(&mut items, entity, |child| {
+			self.token_stream(child)
+		})?;
 
 		if items.is_empty() {
 			// no components, unit type
@@ -208,25 +211,6 @@ impl TokensBuilder<'_, '_> {
 			Ok(None)
 		}
 	}
-
-
-	fn try_push_children(
-		&self,
-		items: &mut Vec<TokenStream>,
-		entity: Entity,
-	) -> Result<()> {
-		if let Ok(children) = self.children.get(entity) {
-			let children = children
-				.iter()
-				.map(|child| self.token_stream(child))
-				.collect::<Result<Vec<_>>>()?;
-			if !children.is_empty() {
-				items.push(quote! { children![#(#children),*] });
-			}
-		};
-
-		Ok(())
-	}
 }
 
 
@@ -268,7 +252,7 @@ mod test {
 					"onmousemove".into_attr_key_bundle(),
 					"some_js_func".into_attr_val_bundle()
 				)]),
-				children![(
+				related!{Children[(
 					NodeTag(String::from("MyComponent")),
 					FragmentNode,
 					ClientIslandDirective::Load,
@@ -290,7 +274,7 @@ mod test {
 				), (
 					NodeTag(String::from("div")),
 					ElementNode { self_closing: true }
-				)]
+				)]}
 			)}
 			.to_string(),
 		);
