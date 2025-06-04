@@ -13,6 +13,7 @@ use syn::Expr;
 /// containing the rust tokens for the node.
 #[derive(Default, Component, Reflect)]
 #[reflect(Default, Component)]
+#[component(storage = "SparseSet")]
 pub struct NodeTokensToBundle {
 	/// whether parsing errors should be excluded from the output.
 	exclude_errors: bool,
@@ -28,6 +29,13 @@ impl NodeTokensToBundle {
 	}
 }
 
+/// A [`TokenStream`] representing a bevy bundle, usually a tuple.
+#[derive(Debug, Clone, Deref, DerefMut, Component)]
+pub struct BundleTokens(pub SendWrapper<TokenStream>);
+impl BundleTokens {
+	pub fn new(value: TokenStream) -> Self { Self(SendWrapper::new(value)) }
+	pub fn take(self) -> TokenStream { self.0.take() }
+}
 
 pub fn node_tokens_to_bundle_plugin(app: &mut App) {
 	app.add_systems(
@@ -38,20 +46,13 @@ pub fn node_tokens_to_bundle_plugin(app: &mut App) {
 	);
 }
 
-/// A [`TokenStream`] representing a bevy bundle, usually a tuple.
-#[derive(Debug, Clone, Deref, DerefMut, Component)]
-pub struct BundleTokens(pub SendWrapper<TokenStream>);
-impl BundleTokens {
-	pub fn new(value: TokenStream) -> Self { Self(SendWrapper::new(value)) }
-	pub fn take(self) -> TokenStream { self.0.take() }
-}
 
 /// the rstml macro parses in steps, ie <div foo={rsx!{<bar/>}}/> will resolve
 /// the `bar` node first.
 /// the combinator, however, represents attribute value expressions as child nodes
 /// ie `<div foo={<bar/>}/>` so we need to resolve the attribute values
 /// before walking the node tree.
-fn resolve_attribute_values(
+pub(super) fn resolve_attribute_values(
 	_: TempNonSendMarker,
 	mut commands: Commands,
 	builder: BundleBuilder,
@@ -101,7 +102,7 @@ fn node_tokens_to_bundle(
 /// a 'map' function than an 'iter', as we need to resolve children
 /// and then wrap them as `children![]` in parents.
 #[derive(SystemParam)]
-struct BundleBuilder<'w, 's> {
+pub(super) struct BundleBuilder<'w, 's> {
 	children: TokenizeRelated<'w, 's, Children>,
 	// children: Query<'w, 's, &'static Children>,
 	block_node_exprs:
@@ -140,20 +141,23 @@ impl BundleBuilder<'_, '_> {
 
 	fn token_stream(&self, entity: Entity) -> Result<TokenStream> {
 		let mut items = Vec::<TokenStream>::new();
-		self.rsx_nodes.try_push_all(&mut items, entity)?;
-		self.rsx_directives.try_push_all(&mut items, entity)?;
-		self.web_nodes.try_push_all(&mut items, entity)?;
-		self.web_directives.try_push_all(&mut items, entity)?;
-		self.node_attributes.try_push_all(
+		self.rsx_nodes.try_push_components(&mut items, entity)?;
+		self.rsx_directives
+			.try_push_components(&mut items, entity)?;
+		self.web_nodes.try_push_components(&mut items, entity)?;
+		self.web_directives
+			.try_push_components(&mut items, entity)?;
+		self.node_attributes.try_push_attributes(
 			|e| self.try_combinator(e),
 			&mut items,
 			entity,
 		)?;
 		self.try_push_blocks(&mut items, entity)?;
 		self.try_push_combinators(&mut items, entity)?;
-		self.children.try_push_all(&mut items, entity, |child| {
-			self.token_stream(child)
-		})?;
+		self.children
+			.try_push_related(&mut items, entity, |child| {
+				self.token_stream(child)
+			})?;
 
 		if items.is_empty() {
 			// no components, unit type

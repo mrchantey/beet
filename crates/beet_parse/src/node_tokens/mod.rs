@@ -1,3 +1,5 @@
+mod node_tokens_to_ir;
+pub use node_tokens_to_ir::*;
 mod combinator_expr;
 pub use combinator_expr::*;
 mod combinator_to_node_tokens;
@@ -8,6 +10,8 @@ mod rstml_to_bundle;
 pub use rstml_to_bundle::*;
 mod node_tokens_to_bundle;
 pub use node_tokens_to_bundle::*;
+mod rstml_to_ir;
+pub use rstml_to_ir::*;
 mod node_tokens_plugin;
 pub use node_tokens_plugin::*;
 mod collected_elements;
@@ -18,5 +22,3 @@ mod rstml_to_node_tokens;
 pub use rstml_to_node_tokens::*;
 mod tokens_to_rstml;
 pub use tokens_to_rstml::*;
-
-

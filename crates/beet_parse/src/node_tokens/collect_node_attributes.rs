@@ -40,7 +40,7 @@ pub struct CollectNodeAttributes<'w, 's> {
 }
 
 impl CollectNodeAttributes<'_, '_> {
-	pub fn try_push_all(
+	pub fn try_push_attributes(
 		&self,
 		try_combinator: impl Clone + Fn(Entity) -> Result<Option<TokenStream>>,
 		items: &mut Vec<proc_macro2::TokenStream>,

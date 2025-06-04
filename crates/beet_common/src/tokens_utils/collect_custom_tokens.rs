@@ -8,9 +8,9 @@ use sweet::prelude::PipelineTarget;
 
 /// A trait that can be implemented for types that implement [`SystemParam`]
 pub trait CollectCustomTokens {
-	/// For each [`MaybeSpannedQuery`] in this struct, push the token stream
+	/// For each [`Component`] in this type, push the token stream
 	/// for that component if it is present.
-	fn try_push_all(
+	fn try_push_components(
 		&self,
 		items: &mut Vec<TokenStream>,
 		entity: Entity,

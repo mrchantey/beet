@@ -352,7 +352,7 @@ mod test {
 			quote! {{(
 				NodeTag(String::from("div")),
 				ElementNode{self_closing:false},
-				children![TextNode(String::from("hello"))]
+				related!{Children[TextNode(String::from("hello"))]}
 			)}}
 			.to_string(),
 		);

@@ -29,7 +29,7 @@ macro_rules! define_token_collector {
 
 		#[cfg(feature = "tokens")]
 		impl CollectCustomTokens for $name<'_, '_> {
-			fn try_push_all(
+			fn try_push_components(
 				&self,
 				items: &mut Vec<proc_macro2::TokenStream>,
 				entity: Entity,
