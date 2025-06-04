@@ -14,11 +14,11 @@ use syn::Expr;
 #[derive(Default, Component, Reflect)]
 #[reflect(Default, Component)]
 #[component(storage = "SparseSet")]
-pub struct NodeTokensToBundle {
+pub struct GetBundleTokens {
 	/// whether parsing errors should be excluded from the output.
 	exclude_errors: bool,
 }
-impl NodeTokensToBundle {
+impl GetBundleTokens {
 	pub fn include_errors(mut self) -> Self {
 		self.exclude_errors = false;
 		self
@@ -29,7 +29,7 @@ impl NodeTokensToBundle {
 	}
 }
 
-/// A [`TokenStream`] representing a bevy bundle, usually a tuple.
+/// A [`TokenStream`] representing a [`Bundle`], like a tuple of components.
 #[derive(Debug, Clone, Deref, DerefMut, Component)]
 pub struct BundleTokens(pub SendWrapper<TokenStream>);
 impl BundleTokens {
@@ -37,10 +37,10 @@ impl BundleTokens {
 	pub fn take(self) -> TokenStream { self.0.take() }
 }
 
-pub fn node_tokens_to_bundle_plugin(app: &mut App) {
+pub fn tokenize_bundle_plugin(app: &mut App) {
 	app.add_systems(
 		Update,
-		(resolve_attribute_values, node_tokens_to_bundle)
+		(resolve_attribute_values, tokenize_bundle_system)
 			.chain()
 			.in_set(ExportNodesStep),
 	);
@@ -55,11 +55,11 @@ pub fn node_tokens_to_bundle_plugin(app: &mut App) {
 pub(super) fn resolve_attribute_values(
 	_: TempNonSendMarker,
 	mut commands: Commands,
-	builder: BundleBuilder,
+	builder: TokenizeBundle,
 	attribute_values: Populated<Entity, (With<AttributeOf>, With<Children>)>,
 ) -> Result {
 	for entity in attribute_values.iter() {
-		let tokens = builder.token_stream(entity)?;
+		let tokens = builder.tokenize_bundle(entity)?;
 		// if parse2 becomes problematic use Expr::Verbatim(tokens)
 		let expr = syn::parse2::<Expr>(tokens)?;
 		commands
@@ -73,18 +73,18 @@ pub(super) fn resolve_attribute_values(
 
 /// Walks children of an entity collecting into a [`BundleTokens`].
 // TODO i guess this will be a bottleneck, challenging as TokenStream is not `Send`
-fn node_tokens_to_bundle(
+fn tokenize_bundle_system(
 	_: TempNonSendMarker,
 	mut commands: Commands,
-	builder: BundleBuilder,
+	tokenizer: TokenizeBundle,
 	template_roots: Populated<(
 		Entity,
-		&NodeTokensToBundle,
+		&GetBundleTokens,
 		Option<&TokensDiagnostics>,
 	)>,
 ) -> Result {
 	for (entity, settings, diagnostics) in template_roots.iter() {
-		let mut tokens = builder.token_stream_from_root(entity)?;
+		let mut tokens = tokenizer.tokenize_child_bundles(entity)?;
 		if !settings.exclude_errors
 			&& let Some(diagnostics) = diagnostics
 		{
@@ -102,34 +102,34 @@ fn node_tokens_to_bundle(
 /// a 'map' function than an 'iter', as we need to resolve children
 /// and then wrap them as `children![]` in parents.
 #[derive(SystemParam)]
-pub(super) struct BundleBuilder<'w, 's> {
+pub(super) struct TokenizeBundle<'w, 's> {
 	children: TokenizeRelated<'w, 's, Children>,
 	// children: Query<'w, 's, &'static Children>,
 	block_node_exprs:
 		Query<'w, 's, &'static ItemOf<BlockNode, SendWrapper<Expr>>>,
 	combinators: Query<'w, 's, &'static CombinatorExpr>,
-	rsx_nodes: CollectRsxNodeTokens<'w, 's>,
-	rsx_directives: CollectRsxDirectiveTokens<'w, 's>,
-	web_nodes: CollectWebNodeTokens<'w, 's>,
-	web_directives: CollectWebDirectiveTokens<'w, 's>,
-	node_attributes: CollectNodeAttributes<'w, 's>,
+	rsx_nodes: TokenizeRsxNode<'w, 's>,
+	rsx_directives: TokenizeRsxDirectives<'w, 's>,
+	web_nodes: TokenizeWebNodes<'w, 's>,
+	web_directives: TokenizeWebDirectives<'w, 's>,
+	node_attributes: TokenizeAttributes<'w, 's>,
 }
 
-impl BundleBuilder<'_, '_> {
+impl TokenizeBundle<'_, '_> {
 	/// Entry point for the builder, rstml token roots are not elements themselves,
 	/// so if theres only one child return that instead of a fragment
-	fn token_stream_from_root(&self, entity: Entity) -> Result<TokenStream> {
+	fn tokenize_child_bundles(&self, entity: Entity) -> Result<TokenStream> {
 		let Some(children) = self.children.get(entity).ok() else {
 			return Ok(quote! { () });
 		};
 		if children.len() == 1 {
 			// a single child, return that
-			self.token_stream(children[0])
+			self.tokenize_bundle(children[0])
 		} else {
 			// multiple children, wrap in fragment
 			let children = children
 				.iter()
-				.map(|child| self.token_stream(child))
+				.map(|child| self.tokenize_bundle(child))
 				.collect::<Result<Vec<_>>>()?;
 			Ok(quote! { (
 				FragmentNode,
@@ -139,7 +139,7 @@ impl BundleBuilder<'_, '_> {
 	}
 
 
-	fn token_stream(&self, entity: Entity) -> Result<TokenStream> {
+	fn tokenize_bundle(&self, entity: Entity) -> Result<TokenStream> {
 		let mut items = Vec::<TokenStream>::new();
 		self.rsx_nodes.tokenize_components(&mut items, entity)?;
 		self.rsx_directives
@@ -152,11 +152,11 @@ impl BundleBuilder<'_, '_> {
 			&mut items,
 			entity,
 		)?;
-		self.try_push_blocks(&mut items, entity)?;
+		self.tokenize_blocks(&mut items, entity)?;
 		self.try_push_combinators(&mut items, entity)?;
 		self.children
 			.try_push_related(&mut items, entity, |child| {
-				self.token_stream(child)
+				self.tokenize_bundle(child)
 			})?;
 
 		if items.is_empty() {
@@ -171,7 +171,7 @@ impl BundleBuilder<'_, '_> {
 		}
 		.xok()
 	}
-	fn try_push_blocks(
+	fn tokenize_blocks(
 		&self,
 		items: &mut Vec<TokenStream>,
 		entity: Entity,
@@ -202,7 +202,7 @@ impl BundleBuilder<'_, '_> {
 						expr.push_str(tokens);
 					}
 					CombinatorExprPartial::Element(entity) => {
-						let tokens = self.token_stream(*entity)?;
+						let tokens = self.tokenize_bundle(*entity)?;
 						expr.push_str(&tokens.to_string());
 					}
 				}

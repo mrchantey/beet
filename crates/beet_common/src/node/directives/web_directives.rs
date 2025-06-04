@@ -2,8 +2,8 @@ use super::*;
 use crate::as_beet::*;
 use bevy::prelude::*;
 
-component_tokenizer!(
-	CollectWebDirectiveTokens,
+tokenize_components!(
+	TokenizeWebDirectives,
 	html_insert: HtmlInsertDirective,
 	client_island: ClientIslandDirective,
 	lang_content: LangContent,

@@ -1,15 +1,15 @@
-/// Implement ComponentTokenizer for a struct,
+/// Implement TokenizeComponents for a struct,
 /// tokenizing each component defined in the fields.
 ///
 /// ## Example
-/// The following example creates a struct `CollectRsxNodeTokens` and
-/// implements the [`ComponentTokenizer`] trait for it.
+/// The following example creates a struct `TokenizeRsxNodes` and
+/// implements the [`TokenizeComponents`] trait for it.
 /// ```rust
 /// # use bevy::prelude::*;
 /// # use beet_common::as_beet::*;
 ///
-/// component_tokenizer!(
-///		CollectRsxNodeTokens,
+/// tokenize_components!(
+///		TokenizeRsxNodes,
 ///		node_tags: NodeTag,
 ///		fragments: FragmentNode,
 ///		texts: TextNode,
@@ -18,7 +18,7 @@
 ///
 ///	```
 #[macro_export]
-macro_rules! component_tokenizer {
+macro_rules! tokenize_components {
 		($name:ident, $($field:ident: $type:ty),* $(,)?) => {
 		#[cfg(feature = "tokens")]
 		#[derive(bevy::ecs::system::SystemParam)]
@@ -29,7 +29,7 @@ macro_rules! component_tokenizer {
 			}
 
 		#[cfg(feature = "tokens")]
-		impl ComponentTokenizer for $name<'_, '_> {
+		impl TokenizeComponents for $name<'_, '_> {
 			fn tokenize_components(
 				&self,
 				items: &mut Vec<proc_macro2::TokenStream>,

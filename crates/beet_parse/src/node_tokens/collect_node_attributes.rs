@@ -20,7 +20,7 @@ use syn::parse_quote;
 /// are added depends on whether the node is an [`ElementNode`] or a [`TemplateNode`].
 #[rustfmt::skip]
 #[derive(SystemParam)]
-pub struct CollectNodeAttributes<'w, 's> {
+pub struct TokenizeAttributes<'w, 's> {
 	_non_send: TempNonSendMarker<'w>,	
 	attr_lits: Query<'w, 's, &'static AttributeLit>,
 	elements: Query<'w, 's, Option<&'static Attributes>, With<ElementNode>>,
@@ -39,7 +39,7 @@ pub struct CollectNodeAttributes<'w, 's> {
 	vals: MaybeSpannedQuery<'w, 's, AttributeValueExpr>,
 }
 
-impl CollectNodeAttributes<'_, '_> {
+impl TokenizeAttributes<'_, '_> {
 	pub fn try_push_attributes(
 		&self,
 		try_combinator: impl Clone + Fn(Entity) -> Result<Option<TokenStream>>,
@@ -335,7 +335,7 @@ mod test {
 
 	fn parse(val: TokenStream) -> String {
 		let mut val = syn::parse2(val).unwrap();
-		CollectNodeAttributes::try_insert_closure_type(
+		TokenizeAttributes::try_insert_closure_type(
 			&mut val,
 			&Ident::new("OnClick", Span::call_site()),
 		);

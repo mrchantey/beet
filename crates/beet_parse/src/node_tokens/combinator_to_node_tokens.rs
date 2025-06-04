@@ -15,7 +15,7 @@ pub fn combinator_to_bundle(
 			.world_mut()
 			.spawn((
 				SourceFile::new(source_file),
-				NodeTokensToBundle::default().exclude_errors(),
+				GetBundleTokens::default().exclude_errors(),
 				CombinatorToNodeTokens(tokens.to_string()),
 			))
 			.id();

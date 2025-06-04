@@ -1,8 +1,8 @@
 use crate::as_beet::*;
 use bevy::prelude::*;
 
-component_tokenizer!(
-	CollectWebNodeTokens,
+tokenize_components!(
+	TokenizeWebNodes,
 	doctypes: DoctypeNode,
 	comments: CommentNode,
 	elements: ElementNode,

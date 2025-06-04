@@ -1,13 +1,13 @@
 use crate::node_tokens::resolve_attribute_values;
 use crate::prelude::*;
-use beet_common::prelude::*;
-use bevy::ecs::system::SystemParam;
+// use beet_common::prelude::*;
+// use bevy::ecs::system::SystemParam;
 use bevy::prelude::*;
 use proc_macro2::TokenStream;
-use quote::quote;
+// use quote::quote;
 use send_wrapper::SendWrapper;
-use sweet::prelude::PipelineTarget;
-use syn::Expr;
+// use sweet::prelude::PipelineTarget;
+// use syn::Expr;
 
 
 /// Marker component to be swapped out for a [`IrTokens`],
@@ -47,25 +47,20 @@ pub fn node_tokens_to_ir_plugin(app: &mut App) {
 fn node_tokens_to_ir() {}
 
 
-/// recursively visit children and collect into a [`TokenStream`].
-/// We use a custom [`SystemParam`] for the traversal, its more of
-/// a 'map' function than an 'iter', as we need to resolve children
-/// and then wrap them as `children![]` in parents.
-#[derive(SystemParam)]
-struct IrBuilder<'w, 's> {
-	children: TokenizeRelated<'w, 's, Children>,
-	// children: Query<'w, 's, &'static Children>,
-	block_node_exprs:
-		Query<'w, 's, &'static ItemOf<BlockNode, SendWrapper<Expr>>>,
-	combinators: Query<'w, 's, &'static CombinatorExpr>,
-	rsx_nodes: CollectRsxNodeTokens<'w, 's>,
-	rsx_directives: CollectRsxDirectiveTokens<'w, 's>,
-	web_nodes: CollectWebNodeTokens<'w, 's>,
-	web_directives: CollectWebDirectiveTokens<'w, 's>,
-	node_attributes: CollectNodeAttributes<'w, 's>,
-}
-
-
-
-
-
+// /// recursively visit children and collect into a [`TokenStream`].
+// /// We use a custom [`SystemParam`] for the traversal, its more of
+// /// a 'map' function than an 'iter', as we need to resolve children
+// /// and then wrap them as `children![]` in parents.
+// #[derive(SystemParam)]
+// struct IrBuilder<'w, 's> {
+// 	children: TokenizeRelated<'w, 's, Children>,
+// 	// children: Query<'w, 's, &'static Children>,
+// 	block_node_exprs:
+// 		Query<'w, 's, &'static ItemOf<BlockNode, SendWrapper<Expr>>>,
+// 	combinators: Query<'w, 's, &'static CombinatorExpr>,
+// 	rsx_nodes: TokenizeRsxNode<'w, 's>,
+// 	rsx_directives: TokenizeRsxDirectives<'w, 's>,
+// 	web_nodes: TokenizeWebNodes<'w, 's>,
+// 	web_directives: TokenizeWebDirectives<'w, 's>,
+// 	node_attributes: TokenizeAttributes<'w, 's>,
+// }

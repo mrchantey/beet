@@ -5,11 +5,14 @@ use proc_macro2::TokenStream;
 use send_wrapper::SendWrapper;
 use sweet::prelude::PipelineTarget;
 
+/// Query for an item that may have an associated ItemOf Span, allowing
+/// the tokenizer to span the output token stream in 
+/// [`TokenizeComponents::tokenize_component`].
 pub type MaybeSpannedQuery<'w, 's, T> =
 	Query<'w, 's, (&'static T, Option<&'static ItemOf<T, SendWrapper<Span>>>)>;
 
 /// A trait that can be implemented for types that implement [`SystemParam`]
-pub trait ComponentTokenizer {
+pub trait TokenizeComponents {
 	/// For each [`Component`] in this type, push the token stream
 	/// for that component if it is present.
 	fn tokenize_components(
@@ -25,7 +28,7 @@ pub trait ComponentTokenizer {
 		entity: Entity,
 		query: &MaybeSpannedQuery<T>,
 	) -> Result<()> {
-		if let Some(tokens) = maybe_spanned_custom(entity, query)? {
+		if let Some(tokens) = tokenize_maybe_spanned(entity, query)? {
 			items.push(tokens);
 		}
 		Ok(())
@@ -33,7 +36,7 @@ pub trait ComponentTokenizer {
 
 }
 /// create a token stream for an [`IntoCustomTokens`] item which may be spanned
-fn maybe_spanned_custom<T: Component + IntoCustomTokens>(
+fn tokenize_maybe_spanned<T: Component + IntoCustomTokens>(
 	entity: Entity,
 	query: &MaybeSpannedQuery<T>,
 ) -> Result<Option<TokenStream>> {

@@ -21,7 +21,7 @@ pub fn rstml_to_ir(
 			.world_mut()
 			.spawn((
 				SourceFile::new(source_file),
-				NodeTokensToBundle::default().exclude_errors(),
+				GetBundleTokens::default().exclude_errors(),
 				RstmlTokens::new(tokens),
 			))
 			.id();
