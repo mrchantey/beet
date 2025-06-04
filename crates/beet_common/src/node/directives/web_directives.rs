@@ -2,7 +2,7 @@ use super::*;
 use crate::as_beet::*;
 use bevy::prelude::*;
 
-define_token_collector!(
+component_tokenizer!(
 	CollectWebDirectiveTokens,
 	html_insert: HtmlInsertDirective,
 	client_island: ClientIslandDirective,

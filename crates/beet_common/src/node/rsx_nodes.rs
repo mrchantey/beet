@@ -5,7 +5,7 @@ use bevy::prelude::*;
 /// ie server, html, bevy_render. This type is only for helper methods
 pub enum RsxNode {}
 
-define_token_collector!(
+component_tokenizer!(
 	CollectRsxNodeTokens,
 	node_tags: NodeTag,
 	fragments: FragmentNode,

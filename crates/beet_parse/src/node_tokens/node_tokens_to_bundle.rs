@@ -141,12 +141,12 @@ impl BundleBuilder<'_, '_> {
 
 	fn token_stream(&self, entity: Entity) -> Result<TokenStream> {
 		let mut items = Vec::<TokenStream>::new();
-		self.rsx_nodes.try_push_components(&mut items, entity)?;
+		self.rsx_nodes.tokenize_components(&mut items, entity)?;
 		self.rsx_directives
-			.try_push_components(&mut items, entity)?;
-		self.web_nodes.try_push_components(&mut items, entity)?;
+			.tokenize_components(&mut items, entity)?;
+		self.web_nodes.tokenize_components(&mut items, entity)?;
 		self.web_directives
-			.try_push_components(&mut items, entity)?;
+			.tokenize_components(&mut items, entity)?;
 		self.node_attributes.try_push_attributes(
 			|e| self.try_combinator(e),
 			&mut items,

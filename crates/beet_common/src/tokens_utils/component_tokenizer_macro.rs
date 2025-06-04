@@ -1,13 +1,14 @@
-/// Implement CollectCustomTokens for a struct with provided field names:
+/// Implement ComponentTokenizer for a struct,
+/// tokenizing each component defined in the fields.
 ///
 /// ## Example
 /// The following example creates a struct `CollectRsxNodeTokens` and
-/// implements the [`CollectCustomTokens`] trait for it.
+/// implements the [`ComponentTokenizer`] trait for it.
 /// ```rust
 /// # use bevy::prelude::*;
 /// # use beet_common::as_beet::*;
 ///
-/// define_token_collector!(
+/// component_tokenizer!(
 ///		CollectRsxNodeTokens,
 ///		node_tags: NodeTag,
 ///		fragments: FragmentNode,
@@ -17,7 +18,7 @@
 ///
 ///	```
 #[macro_export]
-macro_rules! define_token_collector {
+macro_rules! component_tokenizer {
 		($name:ident, $($field:ident: $type:ty),* $(,)?) => {
 		#[cfg(feature = "tokens")]
 		#[derive(bevy::ecs::system::SystemParam)]
@@ -28,14 +29,14 @@ macro_rules! define_token_collector {
 			}
 
 		#[cfg(feature = "tokens")]
-		impl CollectCustomTokens for $name<'_, '_> {
-			fn try_push_components(
+		impl ComponentTokenizer for $name<'_, '_> {
+			fn tokenize_components(
 				&self,
 				items: &mut Vec<proc_macro2::TokenStream>,
 				entity: Entity,
 			) -> Result<()> {
 				$(
-					self.try_push_custom(items, entity, &self.$field)?;
+					Self::tokenize_component(items, entity, &self.$field)?;
 				)*
 				Ok(())
 			}

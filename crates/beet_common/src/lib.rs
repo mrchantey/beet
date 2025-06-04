@@ -11,11 +11,10 @@ pub mod tokens_utils;
 
 pub use beet_common_macros::*;
 
-mod define_tokens_collector;
 
 pub mod prelude {
 	pub use crate::bevy_utils::*;
-	pub use crate::define_token_collector;
+	pub use crate::component_tokenizer;
 	pub use crate::node::*;
 	pub use crate::templating::*;
 	#[cfg(feature = "tokens")]
