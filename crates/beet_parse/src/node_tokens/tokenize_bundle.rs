@@ -40,7 +40,7 @@ impl BundleTokens {
 pub fn tokenize_bundle_plugin(app: &mut App) {
 	app.add_systems(
 		Update,
-		(resolve_attribute_values, tokenize_bundle_system)
+		(resolve_attribute_values, tokenize_bundle)
 			.chain()
 			.in_set(ExportNodesStep),
 	);
@@ -73,7 +73,7 @@ pub(super) fn resolve_attribute_values(
 
 /// Walks children of an entity collecting into a [`BundleTokens`].
 // TODO i guess this will be a bottleneck, challenging as TokenStream is not `Send`
-fn tokenize_bundle_system(
+fn tokenize_bundle(
 	_: TempNonSendMarker,
 	mut commands: Commands,
 	tokenizer: TokenizeBundle,

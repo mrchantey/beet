@@ -15,7 +15,7 @@ use send_wrapper::SendWrapper;
 #[derive(Default, Component, Reflect)]
 #[reflect(Default, Component)]
 #[component(storage = "SparseSet")]
-pub struct NodeTokensToIr {
+pub struct GetExprTreeTokens {
 	/// whether parsing errors should be excluded from the output.
 	exclude_errors: bool,
 }
@@ -24,18 +24,18 @@ pub struct NodeTokensToIr {
 /// Intermediate Representation of some hierarchy. For example,
 /// an [`ItemOf<BlockNode,syn::Expr>`] is exported as-is.
 #[derive(Debug, Clone, Deref, DerefMut, Component)]
-pub struct IrTokens(pub SendWrapper<TokenStream>);
-impl IrTokens {
+pub struct ExprTreeTokens(pub SendWrapper<TokenStream>);
+impl ExprTreeTokens {
 	pub fn new(value: TokenStream) -> Self { Self(SendWrapper::new(value)) }
 	pub fn take(self) -> TokenStream { self.0.take() }
 }
 
 
 
-pub fn node_tokens_to_ir_plugin(app: &mut App) {
+pub fn tokenize_expr_tree_plugin(app: &mut App) {
 	app.add_systems(
 		Update,
-		node_tokens_to_ir
+		tokenize_expr_tree
 			// i *think* we want the resolved combinator attribute expressions,
 			// but can change this to 'before' if we dont
 			.after(resolve_attribute_values)
@@ -44,7 +44,7 @@ pub fn node_tokens_to_ir_plugin(app: &mut App) {
 }
 
 
-fn node_tokens_to_ir() {}
+fn tokenize_expr_tree() {}
 
 
 // /// recursively visit children and collect into a [`TokenStream`].

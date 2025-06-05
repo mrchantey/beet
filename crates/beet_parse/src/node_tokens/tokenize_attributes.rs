@@ -46,7 +46,7 @@ impl TokenizeAttributes<'_, '_> {
 		entity: Entity,
 	) -> Result<()> {
 		self.tokenize_element_attributes(try_combinator.clone(), items, entity)?;
-		self.handle_template(try_combinator, items, entity)?;
+		self.tokenize_template_attributes(try_combinator, items, entity)?;
 		Ok(())
 	}
 	fn tokenize_element_attributes(
@@ -240,7 +240,7 @@ impl TokenizeAttributes<'_, '_> {
 	// currently construct using a custom builder pattern but we can
 	// replace that with the EntityPatch system when that arrives
 	#[allow(unused)]
-	fn handle_template(
+	fn tokenize_template_attributes(
 		&self,
 		build_tokens: impl Fn(Entity) -> Result<Option<TokenStream>>,
 		entity_components: &mut Vec<TokenStream>,
