@@ -21,7 +21,6 @@ use syn::parse_quote;
 #[rustfmt::skip]
 #[derive(SystemParam)]
 pub struct TokenizeAttributes<'w, 's> {
-	_non_send: TempNonSendMarker<'w>,	
 	attr_lits: Query<'w, 's, &'static AttributeLit>,
 	elements: Query<'w, 's, Option<&'static Attributes>, With<ElementNode>>,
 	templates: Query<'w,'s,
@@ -46,11 +45,11 @@ impl TokenizeAttributes<'_, '_> {
 		items: &mut Vec<proc_macro2::TokenStream>,
 		entity: Entity,
 	) -> Result<()> {
-		self.handle_element(try_combinator.clone(), items, entity)?;
+		self.tokenize_element_attributes(try_combinator.clone(), items, entity)?;
 		self.handle_template(try_combinator, items, entity)?;
 		Ok(())
 	}
-	fn handle_element(
+	fn tokenize_element_attributes(
 		&self,
 		try_combinator: impl Fn(Entity) -> Result<Option<TokenStream>>,
 		entity_components: &mut Vec<TokenStream>,

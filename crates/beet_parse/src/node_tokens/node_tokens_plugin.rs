@@ -31,8 +31,8 @@ impl Plugin for NodeTokensPlugin {
 			tokens_to_rstml_plugin,
 			rstml_to_node_tokens_plugin,
 			combinator_to_node_tokens_plugin,
-			rsx_directives_plugin,
-			web_directives_plugin,
+			extract_rsx_directives_plugin,
+			extract_web_directives_plugin,
 			tokenize_bundle_plugin,
 		));
 	}

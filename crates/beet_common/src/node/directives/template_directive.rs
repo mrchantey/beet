@@ -14,7 +14,7 @@ pub struct ExtractDirectivesSet;
 /// # use beet_common::prelude::*;
 /// App::new().add_plugins(directive_plugin::<ClientIslandDirective>);
 /// ```
-pub fn directive_plugin<T: TemplateDirective>(app: &mut App) {
+pub fn extract_directive_plugin<T: TemplateDirective>(app: &mut App) {
 	app.add_systems(
 		Update,
 		try_extract_directive::<T>.in_set(ExtractDirectivesSet),

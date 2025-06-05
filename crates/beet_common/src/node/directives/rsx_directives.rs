@@ -8,11 +8,12 @@ tokenize_components!(
 	slot_target: SlotTarget,
 );
 
-pub fn rsx_directives_plugin(app: &mut App) {
-	app.add_plugins(directive_plugin::<SlotChild>).add_systems(
-		Update,
-		slot_target_directive.in_set(ExtractDirectivesSet),
-	);
+pub fn extract_rsx_directives_plugin(app: &mut App) {
+	app.add_plugins(extract_directive_plugin::<SlotChild>)
+		.add_systems(
+			Update,
+			slot_target_directive.in_set(ExtractDirectivesSet),
+		);
 }
 
 /// Directive indicating a node should be moved to the slot with the given name.

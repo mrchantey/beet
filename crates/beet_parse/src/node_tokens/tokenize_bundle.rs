@@ -107,7 +107,7 @@ pub(super) struct TokenizeBundle<'w, 's> {
 	// children: Query<'w, 's, &'static Children>,
 	block_node_exprs:
 		Query<'w, 's, &'static ItemOf<BlockNode, SendWrapper<Expr>>>,
-	combinators: Query<'w, 's, &'static CombinatorExpr>,
+	combinator_exprs: Query<'w, 's, &'static CombinatorExpr>,
 	rsx_nodes: TokenizeRsxNode<'w, 's>,
 	rsx_directives: TokenizeRsxDirectives<'w, 's>,
 	web_nodes: TokenizeWebNodes<'w, 's>,
@@ -148,12 +148,12 @@ impl TokenizeBundle<'_, '_> {
 		self.web_directives
 			.tokenize_components(&mut items, entity)?;
 		self.node_attributes.try_push_attributes(
-			|e| self.try_combinator(e),
+			|e| self.tokenize_combinator_expr(e),
 			&mut items,
 			entity,
 		)?;
-		self.tokenize_blocks(&mut items, entity)?;
-		self.try_push_combinators(&mut items, entity)?;
+		self.tokenize_block_node_exprs(&mut items, entity)?;
+		self.tokenize_combinator_exprs(&mut items, entity)?;
 		self.children
 			.try_push_related(&mut items, entity, |child| {
 				self.tokenize_bundle(child)
@@ -171,7 +171,7 @@ impl TokenizeBundle<'_, '_> {
 		}
 		.xok()
 	}
-	fn tokenize_blocks(
+	fn tokenize_block_node_exprs(
 		&self,
 		items: &mut Vec<TokenStream>,
 		entity: Entity,
@@ -183,18 +183,21 @@ impl TokenizeBundle<'_, '_> {
 		Ok(())
 	}
 	/// push combinators for nodes, attributes are handled by CollectNodeAttributes
-	fn try_push_combinators(
+	fn tokenize_combinator_exprs(
 		&self,
 		items: &mut Vec<TokenStream>,
 		entity: Entity,
 	) -> Result<()> {
-		if let Some(expr) = self.try_combinator(entity)? {
+		if let Some(expr) = self.tokenize_combinator_expr(entity)? {
 			items.push(quote! {#expr});
 		}
 		Ok(())
 	}
-	fn try_combinator(&self, entity: Entity) -> Result<Option<TokenStream>> {
-		if let Ok(combinator) = self.combinators.get(entity) {
+	fn tokenize_combinator_expr(
+		&self,
+		entity: Entity,
+	) -> Result<Option<TokenStream>> {
+		if let Ok(combinator) = self.combinator_exprs.get(entity) {
 			let mut expr = String::new();
 			for item in combinator.iter() {
 				match item {

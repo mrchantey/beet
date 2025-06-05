@@ -10,10 +10,10 @@ tokenize_components!(
 );
 
 /// plugin containing all web directive extraction
-pub fn web_directives_plugin(app: &mut App) {
+pub fn extract_web_directives_plugin(app: &mut App) {
 	app.add_plugins((
-		directive_plugin::<HtmlInsertDirective>,
-		directive_plugin::<ClientIslandDirective>,
+		extract_directive_plugin::<HtmlInsertDirective>,
+		extract_directive_plugin::<ClientIslandDirective>,
 	))
 	.add_systems(Update, extract_lang_content.in_set(ExtractDirectivesSet));
 }
