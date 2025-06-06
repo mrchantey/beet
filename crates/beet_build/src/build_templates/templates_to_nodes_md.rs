@@ -21,7 +21,7 @@ pub fn templates_to_nodes_md(
 				TemplateFileSource(entity),
 				TemplateKey::new(path.path().clone(), 0),
 				SourceFile::new(path.path().clone()),
-				CombinatorToNodeTokens(rsx_str),
+				CombinatorTokens(rsx_str),
 			));
 		}
 	}

@@ -41,16 +41,17 @@ pub fn flatten_fragment(
 /// child with `map_child` and return a `related!` [`TokenStream`]
 pub fn tokenize_related<T: Component + RelationshipTarget + TypePath>(
 	world: &World,
+	items: &mut Vec<TokenStream>,
 	entity: Entity,
 	map_child: impl Fn(&World, Entity) -> Result<TokenStream>,
-) -> Result<Option<TokenStream>> {
+) -> Result<()> {
 	let entity = world.entity(entity);
 	let Some(related) = entity.get::<T>().map(|c| c.iter().collect::<Vec<_>>())
 	else {
-		return Ok(None);
+		return Ok(());
 	};
 	if related.is_empty() {
-		return Ok(None);
+		return Ok(());
 	}
 	let related = related
 		.into_iter()
@@ -58,7 +59,8 @@ pub fn tokenize_related<T: Component + RelationshipTarget + TypePath>(
 		.collect::<Result<Vec<_>>>()?;
 	let ident = type_path_to_ident::<T>()?;
 
-	Ok(Some(quote! { related!{#ident [#(#related),*]} }))
+	items.push(quote! { related!{#ident [#(#related),*]} });
+	Ok(())
 }
 
 

@@ -1,3 +1,4 @@
+use beet_common::as_beet::*;
 use bevy::prelude::*;
 
 
@@ -11,11 +12,12 @@ use bevy::prelude::*;
 /// apply scoped styles etc, but its tracked so that it can later be combined into
 /// a single expression `let foo = (NodeTag("div"),ElementNode{self_closing=true});`
 ///
-#[derive(Default, Component, Deref, DerefMut)]
+#[derive(Default, Component, Deref, DerefMut, ToTokens)]
 pub struct CombinatorExpr(pub Vec<CombinatorExprPartial>);
 
 /// A section of a [`CombinatorExpr`],
 /// a 1:1 mapping from [`RsxTokensOrElement`](beet_rsx_combinator::types::RsxTokensOrElement)
+#[derive(ToTokens)]
 pub enum CombinatorExprPartial {
 	/// partial expressions must be a string as it may not be a valid
 	/// TokenTree at this stage, for instance {let foo = <bar/>} will be split into

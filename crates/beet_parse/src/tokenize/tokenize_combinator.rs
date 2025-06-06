@@ -13,7 +13,7 @@ pub fn tokenize_combinator_str(
 			.world_mut()
 			.spawn((
 				SourceFile::new(source_file),
-				CombinatorToNodeTokens(tokens.to_string()),
+				CombinatorTokens(tokens.to_string()),
 			))
 			.id();
 		app.update();
@@ -22,5 +22,23 @@ pub fn tokenize_combinator_str(
 			.run_system_once_with(tokenize_bundle_children, entity)?;
 		app.world_mut().entity_mut(entity).despawn();
 		tokens
+	})
+}
+pub fn tokenize_combinator_tree(
+	tokens: &str,
+	source_file: WorkspacePathBuf,
+) -> Result<TokenStream> {
+	TokensApp::with(|app| {
+		let entity = app
+			.world_mut()
+			.spawn((
+				SourceFile::new(source_file),
+				CombinatorTokens::new(tokens),
+			))
+			.id();
+		app.update();
+		let result = tokenize_node_tree(app.world(), entity);
+		app.world_mut().entity_mut(entity).despawn();
+		result
 	})
 }

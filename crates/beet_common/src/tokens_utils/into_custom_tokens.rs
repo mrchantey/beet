@@ -1,11 +1,11 @@
-use std::marker::PhantomData;
-use std::ops::Deref;
-
+use bevy::ecs::entity::Entity;
 use proc_macro2::TokenStream;
 use quote::ToTokens;
 use quote::quote;
 use quote::quote_spanned;
 use send_wrapper::SendWrapper;
+use std::marker::PhantomData;
+use std::ops::Deref;
 use sweet::prelude::WorkspacePathBuf;
 use syn::Lit;
 
@@ -36,6 +36,12 @@ impl IntoCustomTokens for () {
 		tokens.extend(quote! { () });
 	}
 }
+impl IntoCustomTokens for Entity {
+	fn into_custom_tokens(&self, tokens: &mut TokenStream) {
+		let bits = self.to_bits();
+		tokens.extend(quote! { Entity::from_bits(#bits) });
+	}
+}
 
 impl IntoCustomTokens for TokenStream {
 	fn into_custom_tokens(&self, tokens: &mut TokenStream) {
@@ -60,6 +66,16 @@ impl<T> IntoCustomTokens for PhantomData<T> {
 		let type_name =
 			syn::parse_str::<syn::Path>(std::any::type_name::<T>()).unwrap();
 		tokens.extend(quote! { std::marker::PhantomData::<#type_name> });
+	}
+}
+
+impl<T> IntoCustomTokens for Vec<T>
+where
+	T: IntoCustomTokens,
+{
+	fn into_custom_tokens(&self, tokens: &mut TokenStream) {
+		let items = self.iter().map(|item| item.into_custom_token_stream());
+		tokens.extend(quote! { vec![#(#items),*] });
 	}
 }
 

@@ -8,8 +8,11 @@ use sweet::prelude::*;
 /// A [`String`] of rsx tokens to be parsed into a node tree.
 #[derive(Default, Component, Deref, Reflect)]
 #[reflect(Default, Component)]
-pub struct CombinatorToNodeTokens(pub String);
-
+pub struct CombinatorTokens(pub String);
+impl CombinatorTokens {
+	/// Create a new [`CombinatorTokens`] from a string.
+	pub fn new(tokens: &str) -> Self { Self(tokens.to_string()) }
+}
 
 pub fn combinator_to_node_tokens_plugin(app: &mut App) {
 	app.add_systems(Update, combinator_to_node_tokens.in_set(ImportNodesStep));
@@ -19,7 +22,7 @@ pub fn combinator_to_node_tokens_plugin(app: &mut App) {
 fn combinator_to_node_tokens(
 	_: TempNonSendMarker,
 	mut commands: Commands,
-	query: Populated<(Entity, &CombinatorToNodeTokens, Option<&SourceFile>)>,
+	query: Populated<(Entity, &CombinatorTokens, Option<&SourceFile>)>,
 ) -> bevy::prelude::Result {
 	for (entity, tokens, source_file) in query.iter() {
 		let default_source_file = WorkspacePathBuf::default();
@@ -30,7 +33,7 @@ fn combinator_to_node_tokens(
 			commands: &mut commands,
 		}
 		.map_to_children(entity, tokens)?;
-		commands.entity(entity).remove::<CombinatorToNodeTokens>();
+		commands.entity(entity).remove::<CombinatorTokens>();
 	}
 	Ok(())
 }
@@ -48,7 +51,7 @@ impl<'w, 's, 'a> Builder<'w, 's, 'a> {
 	fn map_to_children(
 		mut self,
 		root: Entity,
-		rsx: &CombinatorToNodeTokens,
+		rsx: &CombinatorTokens,
 	) -> Result<()> {
 		let (expr, remaining) = parse(&rsx).map_err(|e| {
 			anyhow::anyhow!("Failed to parse HTML: {}", e.to_string())

@@ -19,7 +19,7 @@ pub fn templates_to_nodes_rsx(
 				TemplateFileSource(entity),
 				TemplateKey::new(path.path().clone(), 0),
 				SourceFile::new(path.path().clone()),
-				CombinatorToNodeTokens(file),
+				CombinatorTokens(file),
 			));
 		}
 	}

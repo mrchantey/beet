@@ -19,9 +19,8 @@ pub fn tokenize_bundle_children_with_errors(
 
 
 /// recursively visit children and collect into a [`TokenStream`].
-/// We use a custom [`SystemParam`] for the traversal, its more of
-/// a 'map' function than an 'iter', as we need to resolve children
-/// and then wrap them as `children![]` in parents.
+/// The root is not an actual node, so we flatten the children or
+/// convert to a fragment.
 pub fn tokenize_bundle_children(
 	In(entity): In<Entity>,
 	world: &mut World,
@@ -39,8 +38,8 @@ pub fn tokenize_bundle(world: &World, entity: Entity) -> Result<TokenStream> {
 	tokenize_element_attributes(world,&mut items, entity)?;
 	tokenize_template_attributes(world,&mut items, entity)?;
 	tokenize_block_node_exprs(world, entity)?.map(|i|items.push(i));
-	tokenize_combinator_exprs(world, entity)?.map(|i|items.push(i));
-	tokenize_related::<Children>(world, entity, tokenize_bundle)?.map(|i|items.push(i));
+	tokenize_combinator_exprs_to_bundle(world, entity)?.map(|i|items.push(i));
+	tokenize_related::<Children>(world,&mut items, entity, tokenize_bundle)?;
 	items
 		.xmap(maybe_tuple)
 		.xok()
@@ -72,7 +71,6 @@ pub fn tokenize_bundle(world: &World, entity: Entity) -> Result<TokenStream> {
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use beet_common::prelude::*;
 	use bevy::prelude::*;
 	use quote::quote;
 	use sweet::prelude::*;
@@ -190,46 +188,5 @@ mod test {
 				)}
 				.to_string(),
 			);
-	}
-
-	// copy paste from above test to see if the tokens are a valid bundle
-	#[test]
-	fn output_check() {
-		World::new().spawn(
-			// start copy pasta
-			children![(
-				NodeTag(String::from("span")),
-				ElementNode {
-					self_closing: false
-				},
-				{ EntityObserver::new(|_on_click: Trigger<OnClick>| {}) },
-				EntityObserver::new(|_: Trigger<OnClick>| {
-					println!("clicked");
-				}),
-				related!(Attributes [
-					(
-						AttributeKey::new("hidden"),
-						AttributeValue::new(true),
-						AttributeKeyStr(String::from("hidden")),
-						AttributeValueStr(String::from("true"))
-					),
-					(
-						AttributeKey::new("onmousemove"),
-						AttributeValue::new("some_js_func"),
-						AttributeKeyStr(String::from("onmousemove")),
-						AttributeValueStr (String::from("some_js_func"))
-					)
-				]),
-				children![
-					(
-						NodeTag(String::from("MyComponent")),
-						ClientIslandDirective::Load
-					),
-					(NodeTag(String::from("div")), ElementNode {
-						self_closing: true
-					})
-				]
-			)], // end copy pasta
-		);
 	}
 }

@@ -30,4 +30,22 @@ pub fn tokenize_rstml_tokens(
 	})
 }
 
+
+
+pub fn rstml_to_token_tree(
+	tokens: TokenStream,
+	source_file: WorkspacePathBuf,
+) -> Result<TokenStream> {
+	TokensApp::with(|app| {
+		let entity = app
+			.world_mut()
+			.spawn((SourceFile::new(source_file), RstmlTokens::new(tokens)))
+			.id();
+		app.update();
+		let result = tokenize_node_tree(app.world(), entity);
+		app.world_mut().entity_mut(entity).despawn();
+		result
+	})
+}
+
 // for tests see ../tokenize_bundle.rs
