@@ -27,7 +27,9 @@ where
 	T: IntoCustomTokens,
 {
 	fn into_custom_tokens(&self, tokens: &mut TokenStream) {
-		self.deref().into_custom_tokens(tokens);
+		let inner = 
+		self.deref().into_custom_token_stream();
+		tokens.extend(quote! { SendWrapper::new(#inner) });
 	}
 }
 
@@ -50,7 +52,8 @@ impl IntoCustomTokens for TokenStream {
 }
 impl IntoCustomTokens for syn::Expr {
 	fn into_custom_tokens(&self, tokens: &mut TokenStream) {
-		self.to_tokens(tokens);
+		let inner = self.to_token_stream();
+		tokens.extend(quote! { syn::parse_quote!(#inner) });
 	}
 }
 

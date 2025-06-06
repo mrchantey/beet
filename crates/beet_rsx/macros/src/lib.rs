@@ -20,22 +20,23 @@ pub fn rsx(tokens: TokenStream) -> TokenStream {
 	// we may find it faster to reuse a single app, although
 	// parallelism will still be tricky because tokens are non-send
 	tokenize_rstml_tokens(tokens.into(), source_file)
-		.unwrap_or_else(|e| {
-			let e = e.to_string();
-			quote::quote! {
-				compile_error!(#e);
-			}
-		})
+		.unwrap_or_else(err_tokens)
 		.into()
-	// quote::quote!{()}.into()
 }
 
 /// Mostly used for testing, this macro expands to an [`WebNodeTemplate`]
 #[proc_macro]
 pub fn rsx_template(_tokens: TokenStream) -> TokenStream { todo!() }
+
+
 /// Mostly used for testing, this macro expands to [`WebTokens`]
 #[proc_macro]
-pub fn node_tokens(_tokens: TokenStream) -> TokenStream { todo!() }
+pub fn rsx_tokens(tokens: TokenStream) -> TokenStream {
+	let source_file = source_file(&tokens);
+	rstml_to_token_tree(tokens.into(), source_file)
+		.unwrap_or_else(err_tokens)
+		.into()
+}
 
 /// Adds a builder pattern to a struct enabling construction as an
 /// rsx component
@@ -82,6 +83,13 @@ pub fn derive_rsx_bundle(
 ) -> proc_macro::TokenStream {
 	let input = parse_macro_input!(input as DeriveInput);
 	impl_into_rsx_bundle(input).into()
+}
+
+fn err_tokens(err: impl ToString) -> proc_macro2::TokenStream {
+	let err = err.to_string();
+	quote::quote! {
+		compile_error!(#err);
+	}
 }
 
 

@@ -2,7 +2,9 @@ use crate::prelude::*;
 use beet_common::prelude::*;
 use bevy::prelude::*;
 use proc_macro2::TokenStream;
+use send_wrapper::SendWrapper;
 use sweet::prelude::PipelineTarget;
+use syn::Expr;
 
 #[rustfmt::skip]
 pub fn tokenize_node_tree(
@@ -14,6 +16,7 @@ pub fn tokenize_node_tree(
 	tokenize_rsx_directives(world, &mut items, entity)?;
 	tokenize_web_nodes(world, &mut items, entity)?;
 	tokenize_web_directives(world, &mut items, entity)?;
+	tokenize_block_node_exprs(world, &mut items, entity)?;
 	tokenize_combinator_exprs_to_node_tree(world, entity)?.map(|i|items.push(i));
 	tokenize_related::<Attributes>(world, &mut items, entity, tokenize_attribute_tokens)?;
 	tokenize_related::<Children>(world, &mut items, entity, tokenize_node_tree)?;
@@ -21,6 +24,18 @@ pub fn tokenize_node_tree(
 	items.xmap(maybe_tuple).xok()
 }
 
+fn tokenize_block_node_exprs(
+	world: &World,
+	items: &mut Vec<TokenStream>,
+	entity: Entity,
+) -> Result<()> {
+	if let Some(expr) = world.entity(entity).get::<ItemOf::<BlockNode,SendWrapper<Expr>>>() {
+		let block_node = expr.into_custom_token_stream();
+		items.push(block_node);
+	}
+
+	Ok(())
+}
 fn tokenize_attribute_tokens(
 	world: &World,
 	entity: Entity,
@@ -90,6 +105,7 @@ mod test {
 			<br 
 				hidden
 				class="foo"
+				some_key={bar}
 				onmousemove="some_js_func"
 				onclick={|_: Trigger<OnClick>| {}}
 			/>}).to_be(
@@ -101,10 +117,38 @@ mod test {
 							ElementNode { self_closing: true },
 							related ! {
 								Attributes [
-									AttributeKeyExpr("hidden"),
-									(AttributeKeyExpr("class"), AttributeValueExpr("foo")),
-									(AttributeKeyExpr("onmousemove"), AttributeValueExpr("some_js_func")),
-									(AttributeKeyExpr("onclick"), AttributeValueExpr({ |_: Trigger<OnClick>| {} }))
+									AttributeKeyExpr(SendWrapper::new(syn::parse_quote!("hidden"))),
+									(AttributeKeyExpr(SendWrapper::new(syn::parse_quote!("class"))), 			AttributeValueExpr(SendWrapper::new(syn::parse_quote!("foo")))),
+									(AttributeKeyExpr(SendWrapper::new(syn::parse_quote!("some_key"))) , 	AttributeValueExpr(SendWrapper::new(syn::parse_quote!({ bar })))),
+									(AttributeKeyExpr(SendWrapper::new(syn::parse_quote!("onmousemove"))), AttributeValueExpr(SendWrapper::new(syn::parse_quote!("some_js_func")))),
+									(AttributeKeyExpr(SendWrapper::new(syn::parse_quote!("onclick"))), 		AttributeValueExpr(SendWrapper::new(syn::parse_quote!({ |_: Trigger<OnClick>| {} }))))
+								]
+							}
+						)
+					]
+				}
+			}
+			.to_string(),
+		);
+	}
+	#[test]
+	fn block_node() {
+		parse_rstml(quote! {<div>{7}</div>}).to_be(
+			quote! {
+				related! {
+					Children [
+						(
+							NodeTag(String::from("div")),
+							ElementNode { self_closing: false },
+							related! {
+								Children [
+									(
+										BlockNode,
+										ItemOf::<beet_common::node::rsx_nodes::BlockNode, send_wrapper::SendWrapper<syn::expr::Expr> > {
+											value: SendWrapper::new(syn::parse_quote!({ 7 })),
+											phantom: std::marker::PhantomData::<beet_common::node::rsx_nodes::BlockNode>
+										}
+									)
 								]
 							}
 						)
@@ -132,10 +176,10 @@ mod test {
 							ElementNode { self_closing : true }, 
 							related ! { 
 								Attributes [
-									AttributeKeyExpr ("hidden"), 
-									(AttributeKeyExpr ("class"), AttributeValueExpr ("foo")), 
-									(AttributeKeyExpr ("onmousemove"), AttributeValueExpr ("some_js_func")), 
-									(AttributeKeyExpr ("onclick"), {|_:Trigger<OnClick>| { } })
+									AttributeKeyExpr (SendWrapper::new(syn::parse_quote!("hidden"))), 
+									(AttributeKeyExpr (SendWrapper::new(syn::parse_quote!("class"))), AttributeValueExpr (SendWrapper::new(syn::parse_quote!("foo")))), 
+									(AttributeKeyExpr (SendWrapper::new(syn::parse_quote!("onmousemove"))), AttributeValueExpr (SendWrapper::new(syn::parse_quote!("some_js_func")))), 
+									(AttributeKeyExpr (SendWrapper::new(syn::parse_quote!("onclick"))), {|_:Trigger<OnClick>| { } })
 								]
 							}
 						)
@@ -163,7 +207,7 @@ mod test {
 							ElementNode { self_closing: true },
 							related ! {
 								Attributes [(
-									AttributeKeyExpr("foo"),
+									AttributeKeyExpr(SendWrapper::new(syn::parse_quote!("foo"))),
 									{
 										let class = "bar";
 										(
@@ -171,7 +215,7 @@ mod test {
 											ElementNode { self_closing: true },
 											related ! {
 												Attributes [(
-													AttributeKeyExpr("class"),
+													AttributeKeyExpr(SendWrapper::new(syn::parse_quote!("class"))),
 													{ class }
 												)]
 											}

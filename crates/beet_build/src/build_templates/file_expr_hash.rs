@@ -115,15 +115,23 @@ mod test {
 		app.update();
 		app.world().get::<FileExprHash>(entity).unwrap().0
 	}
-
+	mod syn {
+		pub use syn::*;
+		pub mod expr {
+			pub use syn::Expr;
+		}
+	}
+	mod send_wrapper {
+		pub use beet_parse::exports::SendWrapper;
+	}
+	use send_wrapper::SendWrapper;
 
 	#[test]
 	#[rustfmt::skip]
 	fn works() {
-		expect(hash(rsx! {<div/>}))
-		.to_be(hash(rsx! {<span/>}));
-		expect(hash(rsx! {<div>{1}</div>}))
-		.to_be(hash(rsx! {{2}}));
-	todo!("this is wrong, we need rsx_tokens!");
+		expect(hash(rsx_tokens! {<div/>}))
+		.to_be(hash(rsx_tokens! {<span/>}));
+		expect(hash(rsx_tokens! {<div>{1}</div>}))
+		.not().to_be(hash(rsx_tokens! {<div>{2}</div>}));
 	}
 }
