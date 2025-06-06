@@ -1,8 +1,11 @@
 use std::marker::PhantomData;
+use std::ops::Deref;
 
 use proc_macro2::TokenStream;
+use quote::ToTokens;
 use quote::quote;
 use quote::quote_spanned;
+use send_wrapper::SendWrapper;
 use sweet::prelude::WorkspacePathBuf;
 use syn::Lit;
 
@@ -19,6 +22,15 @@ pub trait IntoCustomTokens {
 	}
 }
 
+impl<T> IntoCustomTokens for SendWrapper<T>
+where
+	T: IntoCustomTokens,
+{
+	fn into_custom_tokens(&self, tokens: &mut TokenStream) {
+		self.deref().into_custom_tokens(tokens);
+	}
+}
+
 impl IntoCustomTokens for () {
 	fn into_custom_tokens(&self, tokens: &mut TokenStream) {
 		tokens.extend(quote! { () });
@@ -27,7 +39,12 @@ impl IntoCustomTokens for () {
 
 impl IntoCustomTokens for TokenStream {
 	fn into_custom_tokens(&self, tokens: &mut TokenStream) {
-		tokens.extend(self.clone());
+		self.to_tokens(tokens);
+	}
+}
+impl IntoCustomTokens for syn::Expr {
+	fn into_custom_tokens(&self, tokens: &mut TokenStream) {
+		self.to_tokens(tokens);
 	}
 }
 

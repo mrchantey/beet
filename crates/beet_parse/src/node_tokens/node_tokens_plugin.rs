@@ -33,7 +33,6 @@ impl Plugin for NodeTokensPlugin {
 			combinator_to_node_tokens_plugin,
 			extract_rsx_directives_plugin,
 			extract_web_directives_plugin,
-			tokenize_bundle_plugin,
 		));
 	}
 }

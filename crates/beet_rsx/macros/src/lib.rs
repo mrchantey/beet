@@ -19,7 +19,7 @@ pub fn rsx(tokens: TokenStream) -> TokenStream {
 	// this method creates a new app for every rstml macro,
 	// we may find it faster to reuse a single app, although
 	// parallelism will still be tricky because tokens are non-send
-	rstml_to_bundle(tokens.into(), source_file)
+	tokenize_rstml_tokens(tokens.into(), source_file)
 		.unwrap_or_else(|e| {
 			let e = e.to_string();
 			quote::quote! {

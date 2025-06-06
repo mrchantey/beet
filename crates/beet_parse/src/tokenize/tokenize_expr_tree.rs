@@ -1,4 +1,4 @@
-use crate::node_tokens::resolve_attribute_values;
+// use crate::node_tokens::resolve_attribute_values;
 use crate::prelude::*;
 // use beet_common::prelude::*;
 // use bevy::ecs::system::SystemParam;
@@ -38,7 +38,7 @@ pub fn tokenize_expr_tree_plugin(app: &mut App) {
 		tokenize_expr_tree
 			// i *think* we want the resolved combinator attribute expressions,
 			// but can change this to 'before' if we dont
-			.after(resolve_attribute_values)
+			// .after(resolve_attribute_values)
 			.in_set(ExportNodesStep),
 	);
 }

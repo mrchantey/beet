@@ -12,6 +12,7 @@ tokenize_components!(
 	texts: TextNode,
 	blocks: BlockNode,
 );
+
 /// The tag of a node
 #[derive(Debug, Clone, Component, Reflect, Deref, DerefMut)]
 #[reflect(Component)]

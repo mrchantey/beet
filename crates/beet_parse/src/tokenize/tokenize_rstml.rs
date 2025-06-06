@@ -1,7 +1,7 @@
 use crate::prelude::*;
+use bevy::ecs::system::RunSystemOnce;
 use bevy::prelude::*;
 use proc_macro2::TokenStream;
-use sweet::prelude::PipelineTarget;
 use sweet::prelude::WorkspacePathBuf;
 
 // pub fn get_app()-
@@ -12,32 +12,22 @@ use sweet::prelude::WorkspacePathBuf;
 /// created entities are despawned after the conversion,
 /// otherwise we get a TokenStream 'use after free' error.
 ///
-pub fn rstml_to_bundle(
+pub fn tokenize_rstml_tokens(
 	tokens: TokenStream,
 	source_file: WorkspacePathBuf,
 ) -> Result<TokenStream> {
 	TokensApp::with(|app| {
 		let entity = app
 			.world_mut()
-			.spawn((
-				SourceFile::new(source_file),
-				GetBundleTokens::default().exclude_errors(),
-				RstmlTokens::new(tokens),
-			))
+			.spawn((SourceFile::new(source_file), RstmlTokens::new(tokens)))
 			.id();
 		app.update();
-		let result = app
+		let tokens = app
 			.world_mut()
-			.entity_mut(entity)
-			.take::<BundleTokens>()
-			.map(|tokens| tokens.take())
-			.ok_or_else(|| {
-				anyhow::anyhow!("Internal Error: Expected token stream")
-			})?
-			.xok();
+			.run_system_once_with(tokenize_bundle_children, entity)?;
 		app.world_mut().entity_mut(entity).despawn();
-		result
+		tokens
 	})
 }
 
-// for tests see ../node_tokens_to_bundle.rs
+// for tests see ../tokenize_bundle.rs

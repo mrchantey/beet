@@ -3,37 +3,7 @@ use anyhow::Result;
 use beet_common::prelude::*;
 use beet_rsx_combinator::prelude::*;
 use bevy::prelude::*;
-use proc_macro2::TokenStream;
 use sweet::prelude::*;
-
-pub fn combinator_to_bundle(
-	tokens: &str,
-	source_file: WorkspacePathBuf,
-) -> Result<TokenStream> {
-	TokensApp::with(|app| {
-		let entity = app
-			.world_mut()
-			.spawn((
-				SourceFile::new(source_file),
-				GetBundleTokens::default().exclude_errors(),
-				CombinatorToNodeTokens(tokens.to_string()),
-			))
-			.id();
-		app.update();
-		let result = app
-			.world_mut()
-			.entity_mut(entity)
-			.take::<BundleTokens>()
-			.map(|tokens| tokens.take())
-			.ok_or_else(|| {
-				anyhow::anyhow!("Internal Error: Expected token stream")
-			})?
-			.xok();
-		app.world_mut().entity_mut(entity).despawn();
-		result
-	})
-}
-
 
 /// A [`String`] of rsx tokens to be parsed into a node tree.
 #[derive(Default, Component, Deref, Reflect)]
@@ -315,7 +285,7 @@ mod test {
 	use sweet::prelude::*;
 
 	fn parse(str: &str) -> Matcher<String> {
-		combinator_to_bundle(str, WorkspacePathBuf::new(file!()))
+		tokenize_combinator_str(str, WorkspacePathBuf::new(file!()))
 			.unwrap()
 			.to_string()
 			.xpect()
