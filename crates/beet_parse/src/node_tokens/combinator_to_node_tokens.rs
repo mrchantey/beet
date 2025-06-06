@@ -435,6 +435,7 @@ mod test {
 			quote! {{(
 				NodeTag(String::from("MyTemplate")),
 				FragmentNode,
+				TemplateNode,
 				ItemOf::<beet_common::node::rsx_nodes::TemplateNode, beet_common::templating::rusty_tracker::RustyTracker>{
 					value: RustyTracker{index: 0u32, tokens_hash: 10188144591803042436u64},
 					phantom: std::marker::PhantomData::<beet_common::node::rsx_nodes::TemplateNode>
@@ -452,6 +453,7 @@ mod test {
 			quote! {{(
 				NodeTag(String::from("MyTemplate")),
 				FragmentNode,
+				TemplateNode,
 				ItemOf::<beet_common::node::rsx_nodes::TemplateNode, beet_common::templating::rusty_tracker::RustyTracker>{
 					value: RustyTracker{index: 0u32, tokens_hash: 4889923030152902413u64},
 					phantom: std::marker::PhantomData::<beet_common::node::rsx_nodes::TemplateNode>
@@ -469,6 +471,7 @@ mod test {
 			quote! {{(
 				NodeTag(String::from("MyTemplate")),
 				FragmentNode,
+				TemplateNode,
 				ItemOf::<beet_common::node::rsx_nodes::TemplateNode, beet_common::templating::rusty_tracker::RustyTracker>{
 					value: RustyTracker{index: 0u32, tokens_hash: 15310342799507411129u64},
 					phantom: std::marker::PhantomData::<beet_common::node::rsx_nodes::TemplateNode>
@@ -486,6 +489,7 @@ mod test {
 			quote! {{(
 				NodeTag(String::from("MyTemplate")),
 				FragmentNode,
+				TemplateNode,
 				ItemOf::<beet_common::node::rsx_nodes::TemplateNode, beet_common::templating::rusty_tracker::RustyTracker>{
 					value: RustyTracker{index: 0u32, tokens_hash: 11502427431261689614u64},
 					phantom: std::marker::PhantomData::<beet_common::node::rsx_nodes::TemplateNode>
@@ -503,6 +507,7 @@ mod test {
 			quote! {{(
 				NodeTag(String::from("MyTemplate")),
 				FragmentNode,
+				TemplateNode,
 				ItemOf::<beet_common::node::rsx_nodes::TemplateNode, beet_common::templating::rusty_tracker::RustyTracker>{
 					value: RustyTracker{index: 0u32, tokens_hash: 9730180295528883542u64},
 					phantom: std::marker::PhantomData::<beet_common::node::rsx_nodes::TemplateNode>
@@ -520,6 +525,7 @@ mod test {
 			quote! {{(
 				NodeTag(String::from("MyTemplate")),
 				FragmentNode,
+				TemplateNode,
 				ItemOf::<beet_common::node::rsx_nodes::TemplateNode, beet_common::templating::rusty_tracker::RustyTracker>{
 					value: RustyTracker{index: 0u32, tokens_hash: 7310951454258190932u64},
 					phantom: std::marker::PhantomData::<beet_common::node::rsx_nodes::TemplateNode>
@@ -545,6 +551,7 @@ mod test {
 				quote! {{(
 					NodeTag(String::from("MyTemplate")),
 					FragmentNode,
+					TemplateNode,
 					ItemOf::<beet_common::node::rsx_nodes::TemplateNode, beet_common::templating::rusty_tracker::RustyTracker>{
 						value: RustyTracker{index: 0u32, tokens_hash: 577660515964029912u64},
 						phantom: std::marker::PhantomData::<beet_common::node::rsx_nodes::TemplateNode>

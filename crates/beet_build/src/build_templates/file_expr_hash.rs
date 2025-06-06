@@ -22,12 +22,15 @@ impl FileExprHash {
 }
 
 
+
 /// Update the [`FileExprHash`] component for all template files if it changed.
 /// Use change detection to trigger extra work based on the hash change.
 pub fn update_file_expr_hash(
+	_: TempNonSendMarker,
 	macros: Res<TemplateMacros>,
 	source_files: Query<&TemplateRoots>,
 	template_roots: Query<&TemplateRoot>,
+	template_tags: Query<&NodeTag, With<TemplateNode>>,
 	children: Query<&Children>,
 	attributes: Query<&Attributes>,
 	block_nodes: Query<&ItemOf<BlockNode, SendWrapper<Expr>>>,
@@ -50,6 +53,12 @@ pub fn update_file_expr_hash(
 		for template in source_files.iter_descendants(entity) {
 			for root in template_roots.iter_descendants(template) {
 				for node in children.iter_descendants(root) {
+					// has template tags
+					if let Ok(tag) = template_tags.get(node) {
+						tag.to_string().hash(&mut hasher);
+					}
+
+					// hash block nodes
 					if let Ok(block_node) = block_nodes.get(node) {
 						block_node
 							.to_token_stream()
@@ -128,10 +137,28 @@ mod test {
 
 	#[test]
 	#[rustfmt::skip]
-	fn works() {
+	fn tag_names() {
 		expect(hash(rsx_tokens! {<div/>}))
 		.to_be(hash(rsx_tokens! {<span/>}));
-		expect(hash(rsx_tokens! {<div>{1}</div>}))
-		.not().to_be(hash(rsx_tokens! {<div>{2}</div>}));
+
+		expect(hash(rsx_tokens! {<Foo/>}))
+    .not()		
+		.to_be(hash(rsx_tokens! {<Bar/>}));
 	}
+	#[test]
+	fn attributes() {
+		expect(hash(rsx_tokens! {<div foo/>}))
+			.to_be(hash(rsx_tokens! {<div bar/>}));
+	}
+	#[test]
+	fn node_blocks() {
+		expect(hash(rsx_tokens! {<div>{1}</div>}))
+			.to_be(hash(rsx_tokens! {<div>{1}</div>}));
+
+		expect(hash(rsx_tokens! {<div>{1}</div>}))
+			.not()
+			.to_be(hash(rsx_tokens! {<div>{2}</div>}));
+	}
+
+	// TODO combinator attributes
 }

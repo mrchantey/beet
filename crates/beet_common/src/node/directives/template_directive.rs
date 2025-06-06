@@ -12,7 +12,7 @@ pub struct ExtractDirectivesSet;
 /// ```rust
 /// # use bevy::prelude::*;
 /// # use beet_common::prelude::*;
-/// App::new().add_plugins(directive_plugin::<ClientIslandDirective>);
+/// App::new().add_plugins(extract_directive_plugin::<ClientIslandDirective>);
 /// ```
 pub fn extract_directive_plugin<T: TemplateDirective>(app: &mut App) {
 	app.add_systems(

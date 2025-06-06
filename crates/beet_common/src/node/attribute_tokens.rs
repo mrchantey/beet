@@ -12,7 +12,7 @@ use syn::Expr;
 /// ```
 #[derive(Debug, Clone, Deref, Component, ToTokens)]
 #[component(immutable)]
-pub struct AttributeExpr(SendWrapper<Expr>);
+pub struct AttributeExpr(pub SendWrapper<Expr>);
 
 
 impl AttributeExpr {
@@ -30,7 +30,7 @@ impl AttributeExpr {
 /// ```
 #[derive(Debug, Clone, Deref, Component, ToTokens)]
 #[component(immutable)]
-pub struct AttributeKeyExpr(SendWrapper<Expr>);
+pub struct AttributeKeyExpr(pub SendWrapper<Expr>);
 impl AttributeKeyExpr {
 	pub fn new(value: Expr) -> Self { Self(SendWrapper::new(value)) }
 	pub fn inner(&self) -> &Expr { &*self.0 }
@@ -41,7 +41,7 @@ impl AttributeKeyExpr {
 /// The tokens for an attribute value, usually a block or a literal.
 #[derive(Debug, Clone, Deref, Component, ToTokens)]
 #[component(immutable)]
-pub struct AttributeValueExpr(SendWrapper<Expr>);
+pub struct AttributeValueExpr(pub SendWrapper<Expr>);
 
 
 impl AttributeValueExpr {

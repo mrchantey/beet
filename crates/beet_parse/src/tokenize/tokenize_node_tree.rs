@@ -98,6 +98,20 @@ mod test {
 			}
 			.to_string(),
 		);
+		parse_rstml(quote! {<Foo/>}).to_be(
+			quote! {
+				related ! {
+					Children [
+						(
+							NodeTag(String::from("Foo")),
+							FragmentNode,
+							TemplateNode
+						)
+					]
+				}
+			}
+			.to_string(),
+		);
 	}
 	#[test]
 	fn attributes() {

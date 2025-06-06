@@ -45,6 +45,7 @@ tokenize_maybe_spanned![
 	tokenize_rsx_nodes,
 	NodeTag,
 	FragmentNode,
+	TemplateNode,
 	TextNode,
 	BlockNode
 ];
