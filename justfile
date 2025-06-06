@@ -312,7 +312,8 @@ publish-all *args:
 	just publish beet_examples        {{args}} || true
 	@echo 'Publishing Rsx Build Crates'
 	just publish beet_common      		{{args}} || true
-	just publish beet_rsx_parser      {{args}} || true
+	just publish beet_parse      			{{args}} || true
+	just publish beet_build      			{{args}} || true
 	just publish beet_rsx_macros      {{args}} || true
 	@echo 'Publishing Rsx Crates'
 	just publish beet_rsx             {{args}} || true

@@ -17,7 +17,6 @@ keywords.workspace = true
 tokens = ["beet_common/tokens"]
 
 [dependencies]
-# beet_rsx_parser = { workspace = true, optional = true }
 beet_rsx_macros.workspace = true
 beet_common.workspace = true
 sweet = { workspace = true, features = ["bevy"] }
