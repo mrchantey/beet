@@ -66,17 +66,16 @@ pub fn update_file_expr_hash(
 							.hash(&mut hasher);
 					}
 
-					// has attribute expressions
 					for attribute in attributes.iter_descendants(node) {
+						// has attribute expressions
 						if let Ok(attr_expr) = attr_exprs.get(attribute) {
 							attr_expr
 								.to_token_stream()
 								.to_string()
 								.hash(&mut hasher);
 						}
-
+						// hash non-literal attribute keys
 						if let Ok(attr_key_expr) = attr_key_exprs.get(attribute)
-						// dont hash literals
 							&& !matches!(attr_key_expr.inner(), Expr::Lit(_))
 						{
 							attr_key_expr
@@ -84,8 +83,8 @@ pub fn update_file_expr_hash(
 								.to_string()
 								.hash(&mut hasher);
 						}
+						// hash non-literal attribute values
 						if let Ok(attr_val_expr) = attr_val_exprs.get(attribute)
-						// dont hash literals
 							&& !matches!(attr_val_expr.inner(), Expr::Lit(_))
 						{
 							attr_val_expr

@@ -57,8 +57,15 @@ impl Plugin for BuildTemplatesPlugin {
 					)
 						.chain()
 						.in_set(ImportTemplateStep),
-					(extract_lang_partials, apply_style_ids, parse_lightning)
-						.chain()
+					(
+						update_file_expr_hash,
+						(
+							extract_lang_partials,
+							apply_style_ids,
+							parse_lightning,
+						)
+							.chain(),
+					)
 						.in_set(ProcessTemplateStep),
 					export_template_scene.in_set(ExportTemplateStep),
 				),
