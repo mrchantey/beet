@@ -1,13 +1,6 @@
 use crate::as_beet::*;
 use bevy::prelude::*;
 
-
-tokenize_components!(
-	TokenizeRsxDirectives,
-	slot_child: SlotChild,
-	slot_target: SlotTarget,
-);
-
 pub fn extract_rsx_directives_plugin(app: &mut App) {
 	app.add_plugins(extract_directive_plugin::<SlotChild>)
 		.add_systems(

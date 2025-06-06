@@ -1,18 +1,6 @@
 use crate::as_beet::*;
 use bevy::prelude::*;
 
-/// Platform agnostic node types used for various target platforms,
-/// ie server, html, bevy_render. This type is only for helper methods
-pub enum RsxNode {}
-
-tokenize_components!(
-	TokenizeRsxNode,
-	node_tags: NodeTag,
-	fragments: FragmentNode,
-	texts: TextNode,
-	blocks: BlockNode,
-);
-
 /// The tag of a node
 #[derive(Debug, Clone, Component, Reflect, Deref, DerefMut)]
 #[reflect(Component)]

@@ -2,13 +2,6 @@ use super::*;
 use crate::as_beet::*;
 use bevy::prelude::*;
 
-tokenize_components!(
-	TokenizeWebDirectives,
-	html_insert: HtmlInsertDirective,
-	client_island: ClientIslandDirective,
-	lang_content: LangContent,
-);
-
 /// plugin containing all web directive extraction
 pub fn extract_web_directives_plugin(app: &mut App) {
 	app.add_plugins((
