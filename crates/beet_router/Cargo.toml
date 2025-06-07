@@ -14,7 +14,7 @@ keywords.workspace = true
 
 [features]
 default = ["serde", "actions"]
-actions = ["serde", "sweet/net", "dep:once_cell"]
+actions = ["serde", "sweet/net"]
 axum = ["dep:axum", "dep:tower", "dep:http-body-util"]
 serde = [
 	"beet_rsx/serde",
@@ -33,6 +33,8 @@ _test_site = []
 beet_rsx = { workspace = true }
 beet_common = { workspace = true }
 
+bevy.workspace = true
+
 anyhow.workspace = true
 thiserror.workspace = true
 rapidhash.workspace = true
@@ -41,8 +43,6 @@ futures.workspace = true
 clap.workspace = true
 sweet.workspace = true
 extend.workspace = true
-
-once_cell = { workspace = true, optional = true }
 
 #💡 serde
 serde = { workspace = true, optional = true }
