@@ -1,8 +1,13 @@
 # Beet RSX Combinator
 
-JSX-like parser combinator for Rust.
+JSX-like parser combinator for Rust, forked from Victor Porof's [rsx-parser](https://github.com/victorporof/rsx-parser).
 
-This crate is a fork of Victor Porof's [rsx-parser](https://github.com/victorporof/rsx-parser)
+Where macro parsers like `rstml` work with rust tokens,  It works on the level of strings, not rust tokens, 
+
+## Why not `TokenStream` parsers like `rstml`?
+
+1. Cleaner element definitions, see [jsx: why not template literals](https://facebook.github.io/jsx/#sec-why-not-template-literals). 
+2. Some html/css is not a valid `TokenStream`, ie `padding: 2em;`
 
 ## Purpose
 This is an experimental parser for JSX-like code in Rust. The long term goal might be to build "something like React" in Rust, but this can mean a number of things, from a direct port with 100% API compatibility to a completely different product. A JSX-like parser is a good and simple place to start experimenting from.

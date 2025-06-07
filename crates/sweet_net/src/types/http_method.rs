@@ -5,8 +5,7 @@ use std::fmt;
 /// and quite error prone in this high level context. For example
 /// `http::method::from_str("get") != http::Method::GET` due to
 /// case sensitivity.
-/// Instead we use an enum which is far easier to use, including
-/// being `serde` and `Copy`.
+/// Instead we use an enum which is safer and allows implementing `Copy`, `serde`, etc.
 ///
 /// Additionally the naming convention follows Rusty conventions rather
 /// than HTTP conventions, ie `Get` instead of `GET`.
@@ -33,6 +32,7 @@ impl HttpMethod {
 
 impl From<http::Method> for HttpMethod {
 	fn from(method: http::Method) -> Self {
+		// case insensitive
 		match method.as_str().to_ascii_uppercase().as_str() {
 			"GET" => HttpMethod::Get,
 			"POST" => HttpMethod::Post,
@@ -83,6 +83,7 @@ impl fmt::Display for HttpMethod {
 impl std::str::FromStr for HttpMethod {
 	type Err = anyhow::Error;
 	fn from_str(s: &str) -> Result<Self, Self::Err> {
+		// case insensitive
 		Ok(match s.to_ascii_uppercase().as_str() {
 			"GET" => HttpMethod::Get,
 			"POST" => HttpMethod::Post,
