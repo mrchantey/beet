@@ -5,7 +5,9 @@ use axum::Router;
 use axum::ServiceExt;
 #[cfg(not(feature = "lambda"))]
 use axum::body::Body;
-use beet_router::types::RouteFunc;
+use beet_router::types::BundleRoute;
+use beet_router::types::RouteInfo;
+// use beet_router::types::RouteFunc;
 #[cfg(feature = "lambda")]
 use lambda_http::Body;
 use std::path::PathBuf;
@@ -19,8 +21,7 @@ use tower::Service;
 // use tower_http::normalize_path::NormalizePathLayer;
 
 
-/// The main server struct for Beet.
-/// By default a file server will be used as a fallback.
+/// An Axum Server with file based routing and a live reload dev server.
 pub struct BeetServer<S> {
 	pub html_dir: PathBuf,
 	pub router: Router<S>,
@@ -36,13 +37,12 @@ impl Default for BeetServer<()> {
 }
 
 impl<S> BeetServer<S> {
-	pub fn register(
+	pub fn bundle_route<M>(
 		mut self,
-		funcs: Vec<RouteFunc<RegisterAxumRoute<S>>>,
+		info: RouteInfo,
+		route: impl BundleRoute<M, State = S>,
 	) -> Self {
-		for func in funcs.into_iter() {
-			self.router = (func.func)(self.router);
-		}
+		self.router = (func.func)(self.router);
 		self
 	}
 

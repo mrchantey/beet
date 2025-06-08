@@ -1,4 +1,9 @@
 # Beet Router
 
+Routing features:
 
-The Beet router is a file based router inspired by Astro, Next etc.
+- File Based Routes
+- Client Islands
+- Server Actions
+
+This crate contains both client and server code for these features.

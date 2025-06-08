@@ -29,9 +29,11 @@ impl HttpMethod {
 		matches!(self, HttpMethod::Post | HttpMethod::Put | HttpMethod::Patch)
 	}
 }
-
 impl From<http::Method> for HttpMethod {
-	fn from(method: http::Method) -> Self {
+	fn from(value: http::Method) -> Self { Self::from(&value) }
+}
+impl From<&http::Method> for HttpMethod {
+	fn from(method: &http::Method) -> Self {
 		// case insensitive
 		match method.as_str().to_ascii_uppercase().as_str() {
 			"GET" => HttpMethod::Get,

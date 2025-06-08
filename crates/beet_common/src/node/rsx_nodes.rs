@@ -1,3 +1,4 @@
+#[cfg(feature = "tokens")]
 use crate::as_beet::*;
 use bevy::prelude::*;
 
