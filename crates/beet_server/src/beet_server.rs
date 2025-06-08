@@ -41,8 +41,14 @@ impl<S> BeetServer<S> {
 		mut self,
 		info: RouteInfo,
 		route: impl BundleRoute<M, State = S>,
-	) -> Self {
-		self.router = (func.func)(self.router);
+	) -> Self
+	where
+		S: 'static + Send + Sync + Clone,
+	{
+		self.router = self.router.route(
+			&info.path.to_string(),
+			route.into_method_router(info.method),
+		);
 		self
 	}
 
