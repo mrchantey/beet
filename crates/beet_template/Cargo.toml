@@ -31,6 +31,9 @@ strum_macros.workspace = true
 prettyplease.workspace = true
 http.workspace = true
 
+# temp until proper bevy reactivity
+flume.workspace = true
+
 #💡 html
 html-escape = { version = "0.2", optional = true }
 

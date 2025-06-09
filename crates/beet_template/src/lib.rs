@@ -5,6 +5,7 @@
 //!
 pub use beet_template_macros::*;
 pub mod html;
+pub mod reactivity;
 pub mod templating;
 pub mod types;
 #[cfg(target_arch = "wasm32")]
@@ -15,6 +16,7 @@ pub mod prelude {
 	pub use beet_template_macros::*;
 	pub use crate::html::*;
 	pub use crate::types::*;
+	pub use crate::reactivity::*;
 	pub use crate::templating::*;
 	// #[cfg(target_arch = "wasm32")]
 	// pub use crate::wasm::*;
