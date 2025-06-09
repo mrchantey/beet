@@ -702,6 +702,7 @@ dependencies = [
 name = "beet"
 version = "0.0.6-dev.1"
 dependencies = [
+ "axum 0.8.4",
  "beet",
  "beet_build",
  "beet_common",
@@ -720,6 +721,7 @@ dependencies = [
  "bevy",
  "console_error_panic_hook",
  "getrandom 0.2.16",
+ "serde",
  "sweet",
  "tokio",
  "uuid",

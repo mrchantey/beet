@@ -1,8 +1,11 @@
 #![doc = include_str!("../README.md")]
 #![cfg_attr(test, feature(test, custom_test_frameworks))]
 #![cfg_attr(test, test_runner(sweet::test_runner))]
+#![cfg_attr(
+	feature = "nightly",
+	feature(tuple_trait, fn_traits, unboxed_closures)
+)]
 #![allow(async_fn_in_trait)]
-// #![feature(impl_trait_in_fn_trait_return)]
 // #![feature(more_qualified_paths, if_let_guard, tuple_trait, unboxed_closures)]
 
 // #[cfg(not(target_arch = "wasm32"))]

@@ -10,5 +10,10 @@ mod route_info;
 pub use route_info::*;
 mod bundle_route;
 pub use bundle_route::*;
-// mod route_func;
-// pub use route_func::*;
+#[cfg(feature = "nightly")]
+/// implement `BundleRoute` for handlers with any number of parameters
+mod bundle_route_nightly;
+#[cfg(not(feature = "nightly"))]
+/// implement `BundleRoute` for handlers with a single parameter,
+/// requiring the use of tuples for multiple extractors
+mod bundle_route_stable;

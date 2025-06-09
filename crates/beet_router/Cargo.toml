@@ -13,8 +13,9 @@ categories.workspace = true
 keywords.workspace = true
 
 [features]
-default = ["serde", "actions", "axum"]
+default = ["nightly", "serde", "actions", "axum"]
 actions = ["serde", "sweet/net"]
+nightly = []
 axum = ["dep:axum", "dep:tower", "dep:tokio", "dep:http-body-util"]
 serde = [
 	"beet_rsx/serde",

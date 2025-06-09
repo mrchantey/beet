@@ -1,12 +1,13 @@
 use crate::prelude::*;
+use axum::Router;
 use axum::extract::FromRequestParts;
-use axum::handler::Handler;
+use axum::response::Html;
 use axum::routing;
+use axum::routing::MethodFilter;
 use axum::routing::MethodRouter;
 use beet_rsx::html::bundle_to_html;
 use bevy::prelude::*;
 use std::convert::Infallible;
-use std::pin::Pin;
 
 /// Methods that accept a tuple of extractors and return a bundle.
 pub trait BundleRoute<M>: 'static + Send + Sync + Clone {
@@ -16,6 +17,7 @@ pub trait BundleRoute<M>: 'static + Send + Sync + Clone {
 	type Future: Future<Output = AppResult<Self::Bundle>> + Send + 'static;
 	fn into_bundle_result(self, extractors: Self::Extractors) -> Self::Future;
 
+	/// Converts the route into a method router that can be used in an axum router.
 	fn into_method_router(
 		self,
 		method: HttpMethod,
@@ -23,116 +25,54 @@ pub trait BundleRoute<M>: 'static + Send + Sync + Clone {
 	where
 		Self: Sized,
 	{
-		method_router(
-			method,
-			async move |extractors: Self::Extractors| -> AppResult<String> {
+		routing::on(
+			method.into_axum_method(),
+			async move |extractors: Self::Extractors| -> AppResult<Html<String>> {
 				let bundle = self.into_bundle_result(extractors).await?;
 				let html = bundle_to_html(bundle);
-				Ok(html)
+				Ok(Html(html))
 			},
 		)
 	}
 }
-
-fn method_router<H, T, S>(
-	method: HttpMethod,
-	handler: H,
-) -> MethodRouter<S, Infallible>
+#[extend::ext(name=RouterBundleRouteExt)]
+pub impl<S> Router<S>
 where
-	H: Handler<T, S>,
-	T: 'static,
-	S: Clone + Send + Sync + 'static,
-{
-	let func = match method {
-		HttpMethod::Get => routing::get,
-		HttpMethod::Post => routing::post,
-		HttpMethod::Put => routing::put,
-		HttpMethod::Patch => routing::patch,
-		HttpMethod::Delete => routing::delete,
-		HttpMethod::Options => routing::options,
-		HttpMethod::Head => routing::head,
-		HttpMethod::Trace => routing::trace,
-		HttpMethod::Connect => routing::connect,
-	};
-	func(handler)
-}
-
-
-pub struct BundleRouteToAsyncResultMarker;
-pub struct BundleRouteToAsyncBundleMarker;
-pub struct BundleRouteToBundleMarker;
-pub struct BundleRouteToResultMarker;
-
-impl<E, B, S, Func, Fut> BundleRoute<(E, B, S, BundleRouteToAsyncResultMarker)>
-	for Func
-where
-	E: 'static + Send + FromRequestParts<S>,
-	B: Bundle,
 	S: 'static + Send + Sync + Clone,
-	Func: 'static + Send + Sync + Clone + Fn(E) -> Fut,
-	Fut: Future<Output = AppResult<B>> + Send + 'static,
 {
-	type Bundle = B;
-	type Extractors = E;
-	type State = S;
-	type Future = Fut;
-	fn into_bundle_result(self, extractors: E) -> Self::Future {
-		self(extractors)
-	}
-}
-
-impl<E, B, S, Func, Fut> BundleRoute<(B, E, S, BundleRouteToAsyncBundleMarker)>
-	for Func
-where
-	E: 'static + Send + FromRequestParts<S>,
-	B: Bundle,
-	S: 'static + Send + Sync + Clone,
-	Func: 'static + Send + Sync + Clone + Fn(E) -> Fut,
-	Fut: Future<Output = B> + Send + 'static,
-{
-	type Bundle = B;
-	type Extractors = E;
-	type State = S;
-	type Future = Pin<Box<dyn Future<Output = AppResult<B>> + Send + 'static>>;
-	fn into_bundle_result(self, extractors: E) -> Self::Future {
-		Box::pin(async move { Ok(self(extractors).await) })
-	}
-}
-
-impl<E, B, S, Func> BundleRoute<(B, E, S, BundleRouteToBundleMarker)> for Func
-where
-	E: 'static + Send + FromRequestParts<S>,
-	B: Bundle,
-	S: 'static + Send + Sync + Clone,
-	Func: 'static + Send + Sync + Clone + Fn(E) -> B,
-{
-	type Bundle = B;
-	type Extractors = E;
-	type State = S;
-	type Future = Pin<Box<dyn Future<Output = AppResult<B>> + Send + 'static>>;
-	fn into_bundle_result(self, extractors: E) -> Self::Future {
-		Box::pin(async move { Ok(self(extractors)) })
-	}
-}
-
-impl<E, B, S, Func> BundleRoute<(B, E, S, BundleRouteToResultMarker)> for Func
-where
-	E: 'static + Send + FromRequestParts<S>,
-	B: Bundle,
-	S: 'static + Send + Sync + Clone,
-	Func: 'static + Send + Sync + Clone + Fn(E) -> AppResult<B>,
-{
-	type Bundle = B;
-	type Extractors = E;
-	type State = S;
-	type Future = Pin<Box<dyn Future<Output = AppResult<B>> + Send + 'static>>;
-	fn into_bundle_result(self, extractors: E) -> Self::Future {
-		Box::pin(async move { self(extractors) })
+	fn bundle_route<R, M>(
+		self,
+		info: impl Into<RouteInfo>,
+		route: R,
+	) -> Router<S>
+	where
+		R: BundleRoute<M, State = S>,
+	{
+		let info = info.into();
+		self.route(
+			&info.path.to_string(),
+			route.into_method_router(info.method),
+		)
 	}
 }
 
 
-
+#[extend::ext(name=MyTypeExt)]
+pub impl HttpMethod {
+	fn into_axum_method(&self) -> MethodFilter {
+		match self {
+			HttpMethod::Get => MethodFilter::GET,
+			HttpMethod::Post => MethodFilter::POST,
+			HttpMethod::Put => MethodFilter::PUT,
+			HttpMethod::Patch => MethodFilter::PATCH,
+			HttpMethod::Delete => MethodFilter::DELETE,
+			HttpMethod::Options => MethodFilter::OPTIONS,
+			HttpMethod::Head => MethodFilter::HEAD,
+			HttpMethod::Trace => MethodFilter::TRACE,
+			HttpMethod::Connect => MethodFilter::CONNECT,
+		}
+	}
+}
 
 #[cfg(test)]
 mod test {
@@ -152,18 +92,11 @@ mod test {
 	}
 
 
-	fn my_route(
-		// System Input, if any, is a tuple of axum extractors
-		payload: QueryParams<RequestPayload>,
-		// otherwise its a regular system
-		// query: Query<&Name>,
-		// world: &mut World,
-	) -> impl Bundle {
+	fn my_route(payload: QueryParams<RequestPayload>) -> impl Bundle {
 		let name = payload.name.clone();
 		rsx! {
 			<body>
 				<h1>hello {name}!</h1>
-				// <p>time: {time.elapsed_secs()}</p>
 			</body>
 		}
 	}

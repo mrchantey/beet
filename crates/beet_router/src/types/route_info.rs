@@ -36,6 +36,9 @@ impl RouteInfo {
 	pub fn from_parts(parts: &Parts) -> Self {
 		Self::new(parts.uri.path(), &parts.method)
 	}
+	pub fn get(path: impl Into<PathBuf>) -> Self {
+		Self::new(path, HttpMethod::Get)
+	}
 }
 
 impl std::fmt::Display for RouteInfo {
@@ -50,4 +53,8 @@ impl From<Parts> for RouteInfo {
 		let method = HttpMethod::from(parts.method);
 		Self::new(path, method)
 	}
+}
+
+impl Into<RouteInfo> for &str {
+	fn into(self) -> RouteInfo { RouteInfo::get(self) }
 }

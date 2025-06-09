@@ -247,7 +247,7 @@ parse = ["dep:beet_parse"]
 rsx = ["dep:beet_rsx"]
 # fs = ["beet_rsx?/fs"]
 ml = ["flow", "dep:beet_ml", "beet_examples?/ml"]
-server = ["dep:beet_server"]
+server = ["router", "dep:beet_server"]
 lambda = ["server", "beet_server/lambda"]
 spatial = ["flow", "dep:beet_spatial", "beet_ml?/spatial"]
 sim = ["flow", "dep:beet_sim"]
@@ -298,6 +298,9 @@ sweet = { workspace = true, features = ["test", "bevy", "rand"] }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
 beet = { path = "", features = ["build"] }
+tokio.workspace = true
+axum.workspace = true
+serde.workspace = true
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 beet_server = { workspace = true, optional = true }
@@ -306,6 +309,12 @@ tokio.workspace = true
 [target.'cfg(target_arch = "wasm32")'.dev-dependencies]
 console_error_panic_hook.workspace = true
 web-sys.workspace = true
+
+# 💡 Examples - dom
+[[example]]
+name = "ssr"
+path = "examples/dom/ssr.rs"
+required-features = ["server"]
 
 # 💡 Examples - rsx
 
