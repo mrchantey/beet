@@ -18,7 +18,7 @@ actions = ["serde", "sweet/net"]
 nightly = []
 axum = ["dep:axum", "dep:tower", "dep:tokio", "dep:http-body-util"]
 serde = [
-	"beet_rsx/serde",
+	"beet_template/serde",
 	"beet_common/serde",
 	"dep:serde",
 	"dep:serde_json",
@@ -31,7 +31,7 @@ _test_site = []
 
 
 [dependencies]
-beet_rsx = { workspace = true }
+beet_template = { workspace = true }
 beet_common = { workspace = true }
 
 bevy.workspace = true

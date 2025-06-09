@@ -1,6 +1,6 @@
 use anyhow::Result;
 #[allow(unused)]
-use beet_rsx::prelude::*;
+use beet_template::prelude::*;
 use rapidhash::RapidHashMap;
 
 

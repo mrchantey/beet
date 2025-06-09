@@ -32,7 +32,7 @@ pub mod prelude {
 	pub use crate::interactive::*;
 	pub use crate::layout::*;
 	pub use crate::macros::*;
-	pub(crate) use beet_rsx::as_beet::*;
+	pub(crate) use beet_template::as_beet::*;
 }
 
 

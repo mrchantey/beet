@@ -1,5 +1,5 @@
 use beet_common::node::FileSpan;
-// use beet_rsx::error::ParseError;
+// use beet_template::error::ParseError;
 use std::path::Path;
 use std::path::PathBuf;
 use sweet::prelude::FsError;

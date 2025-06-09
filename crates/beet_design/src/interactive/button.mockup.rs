@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use beet_rsx::sigfault::signal;
+use beet_template::sigfault::signal;
 
 pub fn get() -> WebNode {
 	rsx! { <Inner client:load /> }

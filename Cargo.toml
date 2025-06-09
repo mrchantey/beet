@@ -62,8 +62,8 @@ members = [
 	"crates/beet_query",
 	"crates/beet_query/macros",
 	"crates/beet_router",
-	"crates/beet_rsx",
-	"crates/beet_rsx/macros",
+	"crates/beet_template",
+	"crates/beet_template/macros",
 	"crates/beet_server",
 
 	## 💡 Sweet
@@ -103,8 +103,8 @@ beet_design = { path = "crates/beet_design", version = "0.0.6-dev.1" }
 beet_query = { path = "crates/beet_query", version = "0.0.6-dev.1" }
 beet_query_macros = { path = "crates/beet_query/macros", version = "0.0.6-dev.1" }
 beet_router = { path = "crates/beet_router", version = "0.0.6-dev.1" }
-beet_rsx = { path = "crates/beet_rsx", version = "0.0.6-dev.1" }
-beet_rsx_macros = { path = "crates/beet_rsx/macros", version = "0.0.6-dev.1" }
+beet_template = { path = "crates/beet_template", version = "0.0.6-dev.1" }
+beet_template_macros = { path = "crates/beet_template/macros", version = "0.0.6-dev.1" }
 beet_server = { path = "crates/beet_server", version = "0.0.6-dev.1" }
 
 sweet = { path = "crates/sweet", version = "0.0.6-dev.1" }
@@ -240,12 +240,12 @@ connect = ["dep:beet_connect"]
 examples = ["bevy_default", "dep:beet_examples"]
 flow = ["dep:beet_flow"]
 css = ["beet_build?/css"]
-design = ["rsx", "css", "dep:beet_design"]
-router = ["rsx", "dep:beet_router"]
+design = ["template", "css", "dep:beet_design"]
+router = ["template", "dep:beet_router"]
 query = ["dep:beet_query"]
 parse = ["dep:beet_parse"]
-rsx = ["dep:beet_rsx"]
-# fs = ["beet_rsx?/fs"]
+template = ["dep:beet_template"]
+# fs = ["beet_template?/fs"]
 ml = ["flow", "dep:beet_ml", "beet_examples?/ml"]
 server = ["router", "dep:beet_server"]
 lambda = ["server", "beet_server/lambda"]
@@ -280,7 +280,7 @@ beet_flow = { workspace = true, optional = true }
 beet_ml = { workspace = true, optional = true }
 beet_query = { workspace = true, optional = true }
 beet_router = { workspace = true, optional = true }
-beet_rsx = { workspace = true, optional = true }
+beet_template = { workspace = true, optional = true }
 beet_sim = { workspace = true, optional = true }
 beet_spatial = { workspace = true, optional = true }
 bevy = { workspace = true }

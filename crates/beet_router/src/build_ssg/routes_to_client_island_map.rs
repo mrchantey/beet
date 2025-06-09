@@ -1,6 +1,6 @@
 use crate::prelude::*;
 use anyhow::Result;
-use beet_rsx::prelude::*;
+use beet_template::prelude::*;
 use rapidhash::RapidHashMap;
 use sweet::prelude::*;
 

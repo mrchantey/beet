@@ -9,7 +9,7 @@ use std::borrow::Cow;
 /// they will fallback to Brand values.
 /// ```
 /// # #![feature(more_qualified_paths)]
-/// # use beet_rsx::as_beet::*;
+/// # use beet_template::as_beet::*;
 /// # use beet_design::prelude::*;
 ///
 /// fn my_component()-> WebNode {

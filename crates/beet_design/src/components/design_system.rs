@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use beet_rsx::as_beet::*;
+use beet_template::as_beet::*;
 use material_colors::theme::Theme;
 
 

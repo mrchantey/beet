@@ -1,5 +1,5 @@
 [package]
-name = "beet_rsx"
+name = "beet_template"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -17,7 +17,7 @@ keywords.workspace = true
 tokens = ["beet_common/tokens"]
 
 [dependencies]
-beet_rsx_macros.workspace = true
+beet_template_macros.workspace = true
 beet_common.workspace = true
 sweet = { workspace = true, features = ["bevy"] }
 
@@ -57,5 +57,5 @@ web-sys.workspace = true
 
 
 [dev-dependencies]
-beet_rsx = { path = "", features = ["tokens"] }
+beet_template = { path = "", features = ["tokens"] }
 sweet = { workspace = true, features = ["test", "bevy"] }

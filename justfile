@@ -24,7 +24,6 @@ init-repo:
 	just init-flow
 	just init-rsx
 
-# mkdir -p crates/beet_rsx/assets/fonts && cp ./assets/fonts/* crates/beet_rsx/assets/fonts
 init-flow:
 	just assets-pull
 	mkdir -p crates/beet_ml/assets/ml && cp ./assets/ml/default-bert.ron crates/beet_ml/assets/ml/default.bert.ron
@@ -98,9 +97,9 @@ fmt *args:
 # soo bad
 leptosfmt *args:
 	leptosfmt -q											\
-	crates/beet_rsx/**/*.rs 					\
-	crates/beet_rsx/**/**/*.rs 				\
-	crates/beet_rsx/**/**/**/*.rs 		\
+	crates/beet_template/**/*.rs 					\
+	crates/beet_template/**/**/*.rs 				\
+	crates/beet_template/**/**/**/*.rs 		\
 	crates/beet_design/**/*.rs 				\
 	crates/beet_design/**/**/*.rs 		\
 	crates/beet_design/**/**/**/*.rs 	\
@@ -168,7 +167,7 @@ test-fmt:
 
 test-ci *args:
 	just test-fmt
-	just test-rsx
+	just test-template
 
 # upstream from sweet_test
 test-fs *args:
@@ -185,20 +184,20 @@ test-build *args:
 	{{min-stack}} cargo test -p beet_parse 						--all-features																		{{args}} -- {{test-threads}}
 	{{min-stack}} cargo test -p beet_build 						--all-features																		{{args}} -- {{test-threads}}
 
-test-rsx *args:
-	{{min-stack}} cargo test -p beet_common 				--all-features 	 	 																	{{args}} -- {{test-threads}}
-	{{min-stack}} cargo test -p beet_parse 					--all-features 	 	 																	{{args}} -- {{test-threads}}
-	{{min-stack}} cargo test -p beet_rsx_macros 		--all-features 	 	 																	{{args}} -- {{test-threads}}
-	{{min-stack}} cargo test -p beet_rsx 						--all-features 	 	 																	{{args}} -- {{test-threads}}
+test-template *args:
+	{{min-stack}} cargo test -p beet_common 					--all-features 	 	 																	{{args}} -- {{test-threads}}
+	{{min-stack}} cargo test -p beet_parse 						--all-features 	 	 																	{{args}} -- {{test-threads}}
+	{{min-stack}} cargo test -p beet_template_macros 	--all-features 	 	 																	{{args}} -- {{test-threads}}
+	{{min-stack}} cargo test -p beet_template					--all-features 	 	 																	{{args}} -- {{test-threads}}
 
 test-rsx-old *args:
 	{{min-stack}} cargo test -p beet_design 	 	 																												{{args}} -- {{test-threads}}
 	{{min-stack}} cargo test -p beet_router 	--features=serde 																					{{args}} -- {{test-threads}}
-	{{min-stack}} cargo test -p beet_rsx 			--features=bevy,css,parser 																{{args}} -- {{test-threads}}
+	{{min-stack}} cargo test -p beet_template	--features=bevy,css,parser 																{{args}} -- {{test-threads}}
 	{{min-stack}} cargo test -p beet_server 																														{{args}} -- {{test-threads}}
 	{{min-stack}} cargo test -p beet_site																																{{args}} -- {{test-threads}}
 	{{min-stack}} cargo test -p beet-cli																																{{args}} -- {{test-threads}}
-	{{min-stack}} cargo test -p beet_rsx 			--lib --features=bevy 		--target wasm32-unknown-unknown {{args}} -- {{test-threads}}
+	{{min-stack}} cargo test -p beet_template	--lib --features=bevy 		--target wasm32-unknown-unknown {{args}} -- {{test-threads}}
 	
 test-flow *args:
 	{{min-stack}} cargo test -p beet_flow 		--features=_doctest,reflect 															{{args}} -- {{test-threads}}
@@ -230,7 +229,7 @@ test-all *args:
 	just test-ci
 	just test-all-lib 																																								{{args}}
 	just test-all-doc 																																								{{args}}
-	{{min-stack}}	cargo test -p beet_rsx 			--lib 	--target wasm32-unknown-unknown --all-features  {{args}} -- {{test-threads}}
+	{{min-stack}}	cargo test -p beet_template	--lib 	--target wasm32-unknown-unknown --all-features  {{args}} -- {{test-threads}}
 	{{min-stack}}	cargo test -p beet_flow 		--lib 	--target wasm32-unknown-unknown --all-features  {{args}} -- {{test-threads}}
 	{{min-stack}}	cargo test -p beet_spatial 	--lib 	--target wasm32-unknown-unknown --all-features  {{args}} -- {{test-threads}}
 
@@ -253,7 +252,7 @@ test-wasm-feat crate *args:
 test-wasm-e2e crate test_name *args:
 	just watch cargo test -p {{crate}} --test {{test_name}} --target wasm32-unknown-unknown -- 	--watch {{args}}
 test-rsx-macro *args:
-	just watch cargo test -p beet_rsx --test rsx_macro --features=css -- 												--watch {{args}}
+	just watch cargo test -p beet_template --test rsx_macro --features=css -- 												--watch {{args}}
 
 clear-ice:
 	rm -f rustc-ice-*
@@ -314,9 +313,9 @@ publish-all *args:
 	just publish beet_common      		{{args}} || true
 	just publish beet_parse      			{{args}} || true
 	just publish beet_build      			{{args}} || true
-	just publish beet_rsx_macros      {{args}} || true
-	@echo 'Publishing Rsx Crates'
-	just publish beet_rsx             {{args}} || true
+	just publish beet_template_macros      {{args}} || true
+	@echo 'Publishing Template Crates'
+	just publish beet_template        {{args}} || true
 	just publish beet_router          {{args}} || true
 	just publish beet_server       		{{args}} || true
 	just publish beet_connect      		{{args}} || true

@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use beet_rsx::as_beet::*;
+use beet_template::as_beet::*;
 
 #[derive(Clone, derive_template)]
 pub struct SidebarItem {

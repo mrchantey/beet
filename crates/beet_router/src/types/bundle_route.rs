@@ -5,7 +5,7 @@ use axum::response::Html;
 use axum::routing;
 use axum::routing::MethodFilter;
 use axum::routing::MethodRouter;
-use beet_rsx::html::bundle_to_html;
+use beet_template::html::bundle_to_html;
 use bevy::prelude::*;
 use std::convert::Infallible;
 
@@ -80,7 +80,7 @@ mod test {
 	use axum::Router;
 	use axum::extract::Query as QueryParams;
 	use beet_common::prelude::*;
-	use beet_rsx::prelude::*;
+	use beet_template::prelude::*;
 	use bevy::prelude::*;
 	use serde::Deserialize;
 	use sweet::prelude::*;

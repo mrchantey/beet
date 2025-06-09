@@ -42,7 +42,7 @@ An exploration of a rusty `jsx`, and the tools required to maximize performance 
 
 | Crate                                          | Status | Description                    |
 | ---------------------------------------------- | ------ | ------------------------------ |
-| [`beet_rsx`](crates/beet_rsx/Cargo.toml)       | 🐉      | Cross domain authoring tools   |
+| [`beet_template`](crates/beet_template/Cargo.toml)       | 🐉      | Cross domain authoring tools   |
 | [`beet_router`](crates/beet_router/Cargo.toml) | 🐉      | File based router for websites |
 
 ## `sweet`
@@ -81,7 +81,7 @@ Top level crates that depend on several of the above.
 
 Most of these are quite complex but if you'd like to have a go get in touch [on discord](https://discord.com/channels/691052431525675048/1034543904478998539/threads/1333204907414523964).
 
-### `beet_rsx`
+### `beet_template`
 - [ ] escape html 
 - [ ] reactive graph
 - [ ] minify style

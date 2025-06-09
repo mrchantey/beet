@@ -35,7 +35,7 @@ fn my_route(
 ) -> impl Bundle {
 	let name = payload.name.clone().unwrap_or("world".to_string());
 	let now = state.started.elapsed();
-	let uptime = format!("{}.{:03}", now.as_secs(), now.subsec_millis());
+	let uptime = format!("{:.2}", now.as_secs_f32());
 	rsx! {
 		<body>
 			<h1>Hello {name}!</h1>

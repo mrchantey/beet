@@ -2,7 +2,7 @@ use super::HashNonTemplateRust;
 use crate::prelude::*;
 use beet_common::prelude::*;
 use beet_parse::exports::SendWrapper;
-use beet_rsx::prelude::*;
+use beet_template::prelude::*;
 use bevy::prelude::*;
 use quote::ToTokens;
 use rapidhash::RapidHasher;

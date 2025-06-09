@@ -5,7 +5,7 @@ use axum::extract::Request;
 use axum::handler::Handler;
 use axum::response::IntoResponse;
 use axum::routing::MethodRouter;
-use beet_rsx::html::bundle_to_html;
+use beet_template::html::bundle_to_html;
 use bevy::ecs::schedule::ScheduleConfigs;
 use bevy::ecs::system::ScheduleSystem;
 use http::StatusCode;
@@ -56,7 +56,7 @@ mod test {
 	use axum::extract::Query as QueryParams;
 	use axum::routing::get;
 	use beet_common::prelude::*;
-	use beet_rsx::prelude::*;
+	use beet_template::prelude::*;
 	use bevy::prelude::*;
 	use serde::Deserialize;
 	// use sweet::prelude::*;

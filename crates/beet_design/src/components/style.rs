@@ -1,5 +1,5 @@
 use beet_common::prelude::*;
-use beet_rsx::prelude::*;
+use beet_template::prelude::*;
 
 // what does this do? i think it can be removed since we have
 // is:inline now?

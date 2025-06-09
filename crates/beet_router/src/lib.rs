@@ -36,15 +36,15 @@ pub mod as_beet {
 	pub use beet::prelude::*;
 	pub mod beet {
 		pub use crate as router;
-		pub use beet_rsx as rsx;
+		pub use beet_template as template;
 		pub mod prelude {
 			pub use crate::prelude::*;
 			pub use beet_common::prelude::*;
-			pub use beet_rsx::prelude::*;
+			pub use beet_template::prelude::*;
 		}
 		pub mod exports {
 			pub use crate::exports::*;
-			pub use beet_rsx::exports::*;
+			pub use beet_template::exports::*;
 		}
 	}
 }

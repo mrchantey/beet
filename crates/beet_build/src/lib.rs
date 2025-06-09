@@ -1,5 +1,3 @@
-//! This crate is downstream of `beet_rsx` unlike `beet_rsx_parser`
-//!
 #![cfg_attr(test, feature(test, custom_test_frameworks))]
 #![cfg_attr(test, test_runner(sweet::test_runner))]
 #![cfg_attr(test, feature(stmt_expr_attributes))]
@@ -29,16 +27,16 @@ pub mod as_beet {
 	pub mod beet {
 		pub use crate as build;
 		pub use beet_parse as parse;
-		pub use beet_rsx as rsx;
+		pub use beet_template as template;
 		pub mod prelude {
 			pub use crate::prelude::*;
 			pub use beet_common::prelude::*;
 			pub use beet_parse::prelude::*;
-			pub use beet_rsx::prelude::*;
+			pub use beet_template::prelude::*;
 		}
 		pub mod exports {
 			pub use crate::exports::*;
-			pub use beet_rsx::exports::*;
+			pub use beet_template::exports::*;
 		}
 	}
 }

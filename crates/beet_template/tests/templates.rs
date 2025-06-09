@@ -2,7 +2,7 @@
 #![cfg_attr(test, feature(test, custom_test_frameworks))]
 #![cfg_attr(test, test_runner(sweet::test_runner))]
 #![feature(more_qualified_paths)]
-use beet_rsx::as_beet::*;
+use beet_template::as_beet::*;
 use bevy::prelude::*;
 
 #[test]

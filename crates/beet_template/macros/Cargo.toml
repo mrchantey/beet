@@ -1,5 +1,5 @@
 [package]
-name = "beet_rsx_macros"
+name = "beet_template_macros"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -13,7 +13,7 @@ categories.workspace = true
 keywords.workspace = true
 
 [features]
-# css = ["beet_rsx_parse/css"]
+# css = ["beet_parse/css"]
 # bevy = []
 
 [lib]

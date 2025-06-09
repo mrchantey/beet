@@ -1,4 +1,4 @@
-use beet_rsx::as_beet::*;
+use beet_template::as_beet::*;
 
 #[derive(Default, Buildable, IntoBlockAttribute)]
 pub struct BaseHtmlAttributes {

@@ -19,7 +19,7 @@ lambda = ["dep:lambda_http"]
 
 [dependencies]
 sweet = { workspace = true, features = ["fs"] }
-beet_rsx.workspace = true
+beet_template.workspace = true
 beet_router = { workspace = true, features = ["axum"] }
 
 thiserror.workspace = true

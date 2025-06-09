@@ -1,6 +1,6 @@
 use crate::prelude::*;
 use anyhow::Result;
-use beet_rsx::prelude::*;
+use beet_template::prelude::*;
 use std::future::Future;
 use std::path::PathBuf;
 use std::pin::Pin;
@@ -99,7 +99,7 @@ impl
 mod test {
 	use super::RouteFuncsToRsx;
 	use crate::prelude::*;
-	use beet_rsx::prelude::*;
+	use beet_template::prelude::*;
 	use sweet::prelude::*;
 
 	#[sweet::test]

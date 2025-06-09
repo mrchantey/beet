@@ -3,19 +3,19 @@
 #![feature(more_qualified_paths, let_chains)]
 // #![deny(missing_docs)]
 //!
-//! All about rsx trees, html, hydrating patterns, signals.
-//! beet_rsx has many features but by default it is quite
+//! All about node trees, html, hydrating patterns, signals.
+//! beet_template has many features but by default it is quite
 //! lightweight and intended to run on constrained devices like the ESP32
 //!
 //!
-pub use beet_rsx_macros::*;
+pub use beet_template_macros::*;
 pub mod html;
 pub mod templating;
 pub mod types;
 
 #[rustfmt::skip]
 pub mod prelude {
-	pub use beet_rsx_macros::*;
+	pub use beet_template_macros::*;
 	pub use crate::html::*;
 	pub use crate::types::*;
 	pub use crate::templating::*;
@@ -27,7 +27,7 @@ pub mod exports {
 
 // rsx macros expect 'beet'
 // so import this
-// `use beet_rsx::as_beet::*;`
+// `use beet_template::as_beet::*;`
 // only for internal examples
 // #[cfg(debug_assertions)]
 pub mod as_beet {

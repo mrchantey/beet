@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use beet_rsx::prelude::*;
+use beet_template::prelude::*;
 use rapidhash::RapidHashMap;
 
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
