@@ -4,7 +4,6 @@ use extend::ext;
 #[ext]
 pub impl App {
 	#[cfg(target_arch = "wasm32")]
-	#[must_use]
 	fn run_on_animation_frame(mut self) -> sweet_web::AnimationFrame {
 		sweet_web::AnimationFrame::new(move || {
 			self.update();

@@ -288,7 +288,8 @@ bevy = { workspace = true }
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 # required for rand 0.9 to compile on wasm targets
 uuid = { version = "1", features = ["rng-getrandom"] }
-getrandom = { workspace = true }
+# getrandom = { workspace = true }
+getrandom = { version = "0.3", features = ["wasm_js"] }
 
 [dev-dependencies]
 beet = { path = "", features = ["router"] }
@@ -311,6 +312,11 @@ console_error_panic_hook.workspace = true
 web-sys.workspace = true
 
 # 💡 Examples - dom
+[[example]]
+name = "csr"
+path = "examples/dom/csr.rs"
+required-features = ["template"]
+
 [[example]]
 name = "ssr"
 path = "examples/dom/ssr.rs"

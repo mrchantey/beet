@@ -3,15 +3,12 @@
 #![feature(more_qualified_paths, let_chains)]
 // #![deny(missing_docs)]
 //!
-//! All about node trees, html, hydrating patterns, signals.
-//! beet_template has many features but by default it is quite
-//! lightweight and intended to run on constrained devices like the ESP32
-//!
-//!
 pub use beet_template_macros::*;
 pub mod html;
 pub mod templating;
 pub mod types;
+#[cfg(target_arch = "wasm32")]
+pub mod wasm;
 
 #[rustfmt::skip]
 pub mod prelude {
@@ -19,6 +16,8 @@ pub mod prelude {
 	pub use crate::html::*;
 	pub use crate::types::*;
 	pub use crate::templating::*;
+	// #[cfg(target_arch = "wasm32")]
+	// pub use crate::wasm::*;
 }
 
 pub mod exports {

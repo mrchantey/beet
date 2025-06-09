@@ -5,9 +5,11 @@ use axum::response::Html;
 use axum::routing;
 use axum::routing::MethodFilter;
 use axum::routing::MethodRouter;
+use beet_router::types::RouteInfo;
 use beet_template::html::bundle_to_html;
 use bevy::prelude::*;
 use std::convert::Infallible;
+use sweet::prelude::HttpMethod;
 
 /// Methods that accept a tuple of extractors and return a bundle.
 pub trait BundleRoute<M>: 'static + Send + Sync + Clone {

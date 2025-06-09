@@ -57,7 +57,7 @@ fn create_app() {
 // from bevy_app
 fn run_once(mut app: App) -> AppExit {
 	while app.plugins_state() == PluginsState::Adding {
-		// #[cfg(not(all(target_arch = "wasm32", feature = "web")))]
+		#[cfg(not(target_arch = "wasm32"))]
 		bevy::tasks::tick_global_task_pools_on_main_thread();
 	}
 	app.finish();

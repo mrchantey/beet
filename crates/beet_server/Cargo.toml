@@ -13,15 +13,19 @@ categories.workspace = true
 publish = true
 
 [features]
-default = ["reload"]
+default = ["nightly", "reload"]
+nightly = []
 reload = ["tower-livereload"]
 lambda = ["dep:lambda_http"]
 
 [dependencies]
 sweet = { workspace = true, features = ["fs"] }
+bevy.workspace = true
+beet_common.workspace = true
 beet_template.workspace = true
 beet_router = { workspace = true, features = ["axum"] }
 
+extend.workspace = true
 thiserror.workspace = true
 tracing.workspace = true
 tracing-subscriber.workspace = true
