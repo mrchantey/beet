@@ -18,7 +18,7 @@ impl NonSendArena {
 		Self::ARENA.with(func)
 	}
 	/// Insert the object into the arena and return a handle to it
-	pub fn insert<T: 'static>(object: T) -> RcArenaHandle<T> {
+	pub fn insert<T: 'static>(object: T) -> RcNonSendArenaHandle<T> {
 		Self::ARENA.with(|arena| arena.insert(object))
 	}
 	/// Get the number of objects stored in the arena
@@ -50,7 +50,7 @@ impl NonSendArenaMap {
 	}
 
 	/// Store an object and return a handle to it
-	pub fn insert<T: 'static>(&self, object: T) -> RcArenaHandle<T> {
+	pub fn insert<T: 'static>(&self, object: T) -> RcNonSendArenaHandle<T> {
 		let mut objects = self.objects.borrow_mut();
 		let mut next_id = self.next_id.borrow_mut();
 
@@ -64,7 +64,7 @@ impl NonSendArenaMap {
 
 		objects.insert(id, entry);
 
-		RcArenaHandle {
+		RcNonSendArenaHandle {
 			id,
 			arena: self as *const NonSendArenaMap,
 			_phantom: std::marker::PhantomData,
@@ -187,12 +187,12 @@ pub trait Handle: Sized {
 		self.get_arena().ref_count(self.id()).expect(PANIC_MSG)
 	}
 }
-impl<T: 'static> Handle for RcArenaHandle<T> {
+impl<T: 'static> Handle for RcNonSendArenaHandle<T> {
 	type ObjectType = T;
 	fn id(&self) -> usize { self.id }
 	fn get_arena(&self) -> &NonSendArenaMap { unsafe { &*self.arena } }
 }
-impl<T: 'static> Handle for ArenaHandle<T> {
+impl<T: 'static> Handle for NonSendArenaHandle<T> {
 	type ObjectType = T;
 	fn id(&self) -> usize { self.id }
 	fn get_arena(&self) -> &NonSendArenaMap { unsafe { &*self.arena } }
@@ -200,16 +200,16 @@ impl<T: 'static> Handle for ArenaHandle<T> {
 
 // Handle that provides type-safe access to objects in the arena
 // Automatically manages reference counting
-pub struct RcArenaHandle<T: 'static> {
+pub struct RcNonSendArenaHandle<T: 'static> {
 	id: usize,
 	arena: *const NonSendArenaMap,
 	_phantom: std::marker::PhantomData<T>,
 }
 
-impl<T> RcArenaHandle<T> {
-	pub fn forget(self) -> ArenaHandle<T> {
+impl<T> RcNonSendArenaHandle<T> {
+	pub fn forget(self) -> NonSendArenaHandle<T> {
 		let id = self.id;
-		let handle = ArenaHandle {
+		let handle = NonSendArenaHandle {
 			id,
 			arena: self.arena,
 			_phantom: std::marker::PhantomData,
@@ -219,11 +219,11 @@ impl<T> RcArenaHandle<T> {
 	}
 }
 
-impl<T: 'static> Clone for RcArenaHandle<T> {
+impl<T: 'static> Clone for RcNonSendArenaHandle<T> {
 	fn clone(&self) -> Self {
 		let arena = self.get_arena();
 		if arena.inc_ref(self.id) {
-			RcArenaHandle {
+			RcNonSendArenaHandle {
 				id: self.id,
 				arena: self.arena,
 				_phantom: std::marker::PhantomData,
@@ -236,7 +236,7 @@ impl<T: 'static> Clone for RcArenaHandle<T> {
 	}
 }
 
-impl<T: 'static> Drop for RcArenaHandle<T> {
+impl<T: 'static> Drop for RcNonSendArenaHandle<T> {
 	fn drop(&mut self) {
 		let arena = self.get_arena();
 		arena.dec_ref(self.id);
@@ -245,7 +245,7 @@ impl<T: 'static> Drop for RcArenaHandle<T> {
 
 /// A `Copy` version of the `RcArenaHandle` that doesn't automatically clean up.
 #[derive(Clone, Copy)]
-pub struct ArenaHandle<T> {
+pub struct NonSendArenaHandle<T> {
 	id: usize,
 	arena: *const NonSendArenaMap,
 	_phantom: std::marker::PhantomData<T>,

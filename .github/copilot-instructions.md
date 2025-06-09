@@ -2,7 +2,9 @@
 
 Always greet the user by saying one of 
 - heydiddly
-- ahoyhoy
+- ahoy ahoy
+- i'm a little teapot
+- choo choo i'm a tank engine
 - whats good chicken
 
 ## Preferences
