@@ -1,4 +1,4 @@
-//! An example of basic server-side rendering (SSR).
+//! An example of basic server-side rendering (SSR) with beet.
 use axum::Router;
 use axum::extract::Query as QueryParams;
 use axum::extract::State;
@@ -19,16 +19,19 @@ async fn main() {
 	axum::serve(listener, app).await.unwrap();
 }
 
-#[derive(serde::Deserialize)]
-struct RequestPayload {
-	name: Option<String>,
-}
-
 #[derive(Clone)]
 struct AppState {
 	started: std::time::Instant,
 }
 
+#[derive(serde::Deserialize)]
+struct RequestPayload {
+	name: Option<String>,
+}
+
+
+
+/// A [`BundleRoute`] is a regular axum route that returns a [`Bundle`].
 fn my_route(
 	state: State<AppState>,
 	payload: QueryParams<RequestPayload>,
@@ -37,10 +40,17 @@ fn my_route(
 	let now = state.started.elapsed();
 	let uptime = format!("{:.2}", now.as_secs_f32());
 	rsx! {
-		<body>
+		<WarmGreeting name=name/>
+		<p>uptime: {uptime} seconds</p>
+	}
+}
+
+
+#[template]
+fn WarmGreeting(name: String) -> impl Bundle {
+	rsx! {
+		<div>
 			<h1>Hello {name}!</h1>
-			<p>uptime: {uptime}</p>
-			<p>"use the 'name' query params to receive a warm greeting!"</p>
-		</body>
+		</div>
 	}
 }
