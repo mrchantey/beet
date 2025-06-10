@@ -5,13 +5,13 @@ use syn::DeriveInput;
 use syn::Result;
 
 
-/// For a struct where each field implements `IntoRsxBundle`
-pub fn impl_into_rsx_bundle(input: DeriveInput) -> TokenStream {
+/// For a struct where each field implements `IntoTemplateBundle`
+pub fn impl_into_template_bundle(input: DeriveInput) -> TokenStream {
 	parse(input).unwrap_or_else(|err| err.into_compile_error())
 }
 
 // TODO this needs a rework, in bevy IntoBlockAttribute will be something
-// more like IntoRsxBundle
+// more like IntoTemplateBundle
 fn parse(input: DeriveInput) -> Result<TokenStream> {
 	let fields = NodeField::parse_derive_input(&input)?;
 	let fields = fields.iter().map(|f| &f.ident);
@@ -23,7 +23,7 @@ fn parse(input: DeriveInput) -> Result<TokenStream> {
 	Ok(quote! {
 		use beet::prelude::*;
 
-		impl #impl_generics IntoRsxBundle<Self> for #target_name #type_generics #where_clause {
+		impl #impl_generics IntoTemplateBundle<Self> for #target_name #type_generics #where_clause {
 		fn into_node_bundle(self) -> impl Bundle{
 			#[allow(unused_braces)]
 			(#(self.#fields.into_node_bundle()),*)

@@ -9,6 +9,7 @@ use std::marker::PhantomData;
 
 #[test]
 fn works() {
+	let (get, _set) = signal(7);
 	rsx! {
 		<MyNode
 			is_required=38
@@ -16,14 +17,14 @@ fn works() {
 			is_no_into="foobar".into()
 			is_optional=3
 			is_marker_into=3
-			is_maybe_signal=|| 5u32
+			is_maybe_signal=get
 			class="kablamo"
 			id="bar"
 		/>
 	}
 	.xmap(bundle_to_html)
 	.xpect().to_be(
-		"<div><p>is_optional: Some(3)</p><p>is_required: 38</p><p>is_default: 7</p><p>is_generic_default: Foo(PhantomData<u32>)</p><p>is_into: \"foobar\"</p><p>is_boxed: 3</p><p>is_flatten.class: \"kablamo\"</p><p>is_flatten.id: Some(\"bar\")</p><p>is_flatten.disabled: None</p><p>is_marker_into: \"3\"</p><p>is_maybe_signal: Func(5)</p></div>"
+		"<div><p>is_optional: Some(3)</p><p>is_required: 38</p><p>is_default: 7</p><p>is_generic_default: Foo(PhantomData<u32>)</p><p>is_into: \"foobar\"</p><p>is_boxed: 3</p><p>is_flatten.class: \"kablamo\"</p><p>is_flatten.id: Some(\"bar\")</p><p>is_flatten.disabled: None</p><p>is_marker_into: \"3\"</p><p>is_maybe_signal: Getter(7)</p></div>"
 	);
 }
 
@@ -39,7 +40,7 @@ impl MarkerIntoString<()> for u32 {
 #[derive(Debug, Default)]
 struct Foo<T>(PhantomData<T>);
 
-#[derive(Default, Buildable, RsxBundle)]
+#[derive(Default, Buildable, TemplateBundle)]
 struct MyFlattenedNode {
 	/// the class that will be set
 	class: String,

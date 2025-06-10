@@ -10,7 +10,7 @@ fn main() {
 		.spawn(MyBundle::default().into_node_bundle());
 }
 
-#[derive(Default, Buildable, RsxBundle)]
+#[derive(Default, Buildable, TemplateBundle)]
 struct MyBundle {
 	/// the class that will be set
 	class: String,

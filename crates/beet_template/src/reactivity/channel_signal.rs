@@ -13,7 +13,7 @@ pub fn reactivity_plugin(app: &mut App) {
 /// Placeholder for [`bevy::prelude::Text`] when building without the `bevy_default` feature.
 #[cfg(not(feature = "bevy_default"))]
 #[derive(Component)]
-pub struct Text(pub String);
+pub struct TextSpan(pub String);
 
 #[derive(Component)]
 pub struct UpdateText<T>(Receiver<T>);
@@ -31,7 +31,7 @@ impl<T: 'static + Send + Sync> UpdateText<T> {
 	}
 }
 
-fn update_text(mut query: Query<(&mut Text, &UpdateText<String>)>) {
+fn update_text(mut query: Query<(&mut TextSpan, &UpdateText<String>)>) {
 	for (mut text, update) in query.iter_mut() {
 		while let Ok(new_text) = update.0.try_recv() {
 			text.0 = new_text;
@@ -56,12 +56,12 @@ mod test {
 
 		let entity = app
 			.world_mut()
-			.spawn((Text("foo".to_string()), UpdateText::new(get)))
+			.spawn((TextSpan("foo".to_string()), UpdateText::new(get)))
 			.id();
 
 		app.world()
 			.entity(entity)
-			.get::<Text>()
+			.get::<TextSpan>()
 			.unwrap()
 			.0
 			.xref()
@@ -75,7 +75,7 @@ mod test {
 
 		app.world()
 			.entity(entity)
-			.get::<Text>()
+			.get::<TextSpan>()
 			.unwrap()
 			.0
 			.xref()

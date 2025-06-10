@@ -48,19 +48,19 @@ pub struct Getter<T> {
 impl<T> Copy for Getter<T> {}
 
 #[cfg(feature = "nightly")]
-impl<T: Clone + Send + 'static> std::ops::Fn<()> for Getter<T> {
+impl<T: 'static + Send + Clone> std::ops::Fn<()> for Getter<T> {
 	extern "rust-call" fn call(&self, _args: ()) -> Self::Output { self.get() }
 }
 
 #[cfg(feature = "nightly")]
-impl<T: Clone + Send + 'static> std::ops::FnMut<()> for Getter<T> {
+impl<T: 'static + Send + Clone> std::ops::FnMut<()> for Getter<T> {
 	extern "rust-call" fn call_mut(&mut self, args: ()) -> Self::Output {
 		self.call(args)
 	}
 }
 
 #[cfg(feature = "nightly")]
-impl<T: Clone + Send + 'static> std::ops::FnOnce<()> for Getter<T> {
+impl<T: 'static + Send + Clone> std::ops::FnOnce<()> for Getter<T> {
 	type Output = T;
 	extern "rust-call" fn call_once(self, args: ()) -> Self::Output {
 		self.call(args)
@@ -76,7 +76,7 @@ impl<T> Clone for Getter<T> {
 }
 
 
-impl<T: Clone + Send + 'static> Getter<T> {
+impl<T: 'static + Send + Clone> Getter<T> {
 	pub fn get(&self) -> T {
 		// First, register the callback if we're in an effect
 		EFFECT_CALLBACK.with(|current| {
@@ -97,21 +97,21 @@ pub struct Setter<T> {
 impl<T> Copy for Setter<T> {}
 
 #[cfg(feature = "nightly")]
-impl<T: Clone + Send + 'static> std::ops::Fn<(T,)> for Setter<T> {
+impl<T: 'static + Send + Clone> std::ops::Fn<(T,)> for Setter<T> {
 	extern "rust-call" fn call(&self, args: (T,)) -> Self::Output {
 		self.set(args.0)
 	}
 }
 
 #[cfg(feature = "nightly")]
-impl<T: Clone + Send + 'static> std::ops::FnMut<(T,)> for Setter<T> {
+impl<T: 'static + Send + Clone> std::ops::FnMut<(T,)> for Setter<T> {
 	extern "rust-call" fn call_mut(&mut self, args: (T,)) -> Self::Output {
 		self.call(args)
 	}
 }
 
 #[cfg(feature = "nightly")]
-impl<T: Clone + Send + 'static> std::ops::FnOnce<(T,)> for Setter<T> {
+impl<T: 'static + Send + Clone> std::ops::FnOnce<(T,)> for Setter<T> {
 	type Output = ();
 	extern "rust-call" fn call_once(self, args: (T,)) -> Self::Output {
 		self.call(args)
@@ -125,7 +125,7 @@ impl<T> Clone for Setter<T> {
 	}
 }
 
-impl<T: Clone + Send + 'static> Setter<T> {
+impl<T: 'static + Send + Clone> Setter<T> {
 	pub fn set(&self, new_val: T) {
 		// First, extract the callbacks outside of the arena lock
 		let callbacks = self.handle.with(|signal| {
@@ -141,7 +141,7 @@ impl<T: Clone + Send + 'static> Setter<T> {
 }
 
 /// Very simple implementation of signals used for testing and demos
-pub fn signal<T: Clone + Send + 'static>(value: T) -> (Getter<T>, Setter<T>) {
+pub fn signal<T: 'static + Send + Clone>(value: T) -> (Getter<T>, Setter<T>) {
 	let signal = Signal::new(value);
 	let signal_handle = Arena::insert(signal);
 

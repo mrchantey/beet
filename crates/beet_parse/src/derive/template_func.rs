@@ -11,7 +11,7 @@ pub fn template_func(input: ItemFn) -> TokenStream {
 fn parse(input: ItemFn) -> Result<TokenStream> {
 	let fields = NodeField::parse_item_fn(&input)?;
 	let define_struct = define_struct(&input, &fields)?;
-	let impl_rsx_bundle = impl_rsx_bundle(&input, &fields)?;
+	let impl_rsx_bundle = impl_template_bundle(&input, &fields)?;
 
 	Ok(quote! {
 		use beet::prelude::*;
@@ -49,7 +49,7 @@ fn define_struct(func: &ItemFn, fields: &[NodeField]) -> Result<TokenStream> {
 	})
 }
 
-fn impl_rsx_bundle(func: &ItemFn, fields: &[NodeField]) -> Result<TokenStream> {
+fn impl_template_bundle(func: &ItemFn, fields: &[NodeField]) -> Result<TokenStream> {
 	let (impl_generics, type_generics, where_clause) =
 		func.sig.generics.split_for_impl();
 	let ident = &func.sig.ident;
@@ -59,7 +59,7 @@ fn impl_rsx_bundle(func: &ItemFn, fields: &[NodeField]) -> Result<TokenStream> {
 	let return_type = &func.sig.output;
 
 	Ok(quote! {
-	impl #impl_generics IntoRsxBundle<Self> for #ident #type_generics #where_clause {
+	impl #impl_generics IntoTemplateBundle<Self> for #ident #type_generics #where_clause {
 		fn into_node_bundle(self) #return_type {
 			let Self{#(#destructure),*} = self;
 			#body
@@ -97,7 +97,7 @@ mod test {
 				#[doc = r" some comment"]
 				pub foo: u32
 			}
-			impl IntoRsxBundle<Self> for MyNode {
+			impl IntoTemplateBundle<Self> for MyNode {
 				fn into_node_bundle(self) -> impl Bundle {
 					let Self { foo } = self ; { () }
 				}

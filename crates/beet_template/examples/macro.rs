@@ -4,6 +4,10 @@ use bevy::prelude::*;
 fn main() {
 	App::new()
 		.world_mut()
-		.spawn(rsx! {<button onclick={||println!("clicked")}/>})
+		.spawn(rsx! {
+			<button onclick={||println!("clicked")}/>
+				{"click me"}
+			</button>
+		})
 		.trigger(OnClick);
 }

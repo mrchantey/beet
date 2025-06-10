@@ -50,6 +50,7 @@ impl AutoMod {
 		self.watcher.filter = self
 			.watcher
 			.filter
+			.with_exclude("**/{examples,tests,bin}/**")
 			.with_exclude("**/mod.rs")
 			.with_exclude("**/lib.rs")
 			.with_exclude("**/main.rs")

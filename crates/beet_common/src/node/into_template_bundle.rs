@@ -13,8 +13,8 @@ use sweet::prelude::Maybe;
 /// // becomes
 /// "howdy".into_node_bundle()
 /// ```
-pub trait IntoRsxBundle<M> {
-	/// Called for nodes and attributes:
+pub trait IntoTemplateBundle<M> {
+	/// Called for nodes and attributes expressions:
 	/// `rsx!{"howdy"}` becomes `TextNode::new("howdy")`
 	/// `rsx!{<span {"howdy"} />}` becomes `TextNode::new("howdy")`
 	fn into_node_bundle(self) -> impl Bundle;
@@ -36,14 +36,14 @@ pub trait IntoRsxBundle<M> {
 	}
 }
 
-impl<T: Bundle> IntoRsxBundle<T> for T {
+impl<T: Bundle> IntoTemplateBundle<T> for T {
 	fn into_node_bundle(self) -> impl Bundle { self }
 }
 
 pub struct OptionBundleMarker;
 
 
-impl<T: IntoRsxBundle<M>, M> IntoRsxBundle<(OptionBundleMarker, M)>
+impl<T: IntoTemplateBundle<M>, M> IntoTemplateBundle<(OptionBundleMarker, M)>
 	for Option<T>
 {
 	fn into_node_bundle(self) -> impl Bundle {
@@ -55,7 +55,7 @@ impl<T: IntoRsxBundle<M>, M> IntoRsxBundle<(OptionBundleMarker, M)>
 
 pub struct IntoTextNodeBundleMarker;
 
-impl IntoRsxBundle<IntoTextNodeBundleMarker> for &str {
+impl IntoTemplateBundle<IntoTextNodeBundleMarker> for &str {
 	fn into_node_bundle(self) -> impl Bundle { TextNode::new(self.to_string()) }
 	fn into_attr_key_bundle(self) -> impl Bundle {
 		(
@@ -74,7 +74,7 @@ impl IntoRsxBundle<IntoTextNodeBundleMarker> for &str {
 macro_rules! primitives_into_bundle {
 	($($t:ty),*) => {
 		$(
-			impl IntoRsxBundle<IntoTextNodeBundleMarker> for $t {
+			impl IntoTemplateBundle<IntoTextNodeBundleMarker> for $t {
 				fn into_node_bundle(self) -> impl Bundle { TextNode::new(self.to_string()) }
 				fn into_attr_key_bundle(self) -> impl Bundle {
 					(AttributeKeyStr::new(self.to_string()), AttributeKey::new(self))

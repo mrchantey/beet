@@ -15,8 +15,9 @@ keywords.workspace = true
 
 [features]
 default = ["nightly"]
+# default = ["nightly", "bevy_default"]
 nightly = []
-bevy_default = ["bevy/default"]
+bevy_default = ["bevy/bevy_text"]
 tokens = ["beet_common/tokens"]
 
 [dependencies]

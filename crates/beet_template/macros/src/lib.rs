@@ -75,14 +75,14 @@ pub fn derive_buildable(
 	let input = parse_macro_input!(input as DeriveInput);
 	parse_derive_buildable(input).into()
 }
-/// Implements [`IntoRsxBundle`] for a struct with named fields,
-/// where each field also implements [`IntoRsxBundle`].
-#[proc_macro_derive(RsxBundle, attributes(field))]
-pub fn derive_rsx_bundle(
+/// Implements [`IntoTemplateBundle`] for a struct with named fields,
+/// where each field also implements [`IntoTemplateBundle`].
+#[proc_macro_derive(TemplateBundle, attributes(field))]
+pub fn derive_template_bundle(
 	input: proc_macro::TokenStream,
 ) -> proc_macro::TokenStream {
 	let input = parse_macro_input!(input as DeriveInput);
-	impl_into_rsx_bundle(input).into()
+	impl_into_template_bundle(input).into()
 }
 
 fn err_tokens(err: impl ToString) -> proc_macro2::TokenStream {
