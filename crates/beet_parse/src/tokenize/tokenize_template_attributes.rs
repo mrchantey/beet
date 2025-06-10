@@ -75,7 +75,7 @@ pub fn tokenize_template_attributes(
 	if entity.contains::<ClientIslandDirective>() {
 		inner_items.push(quote! {
 			#[cfg(not(target_arch = "wasm32"))]
-			{TemplateSerde::new(&template)}
+			{TemplateSerde::new(&template)},
 			#[cfg(target_arch = "wasm32")]
 			{()}
 		});

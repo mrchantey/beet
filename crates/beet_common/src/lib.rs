@@ -19,6 +19,9 @@ pub mod prelude {
 	#[cfg(feature = "tokens")]
 	pub use crate::tokens_utils::*;
 	pub use beet_common_macros::*;
+
+	// temp, we need to merge beet and sweet
+	pub use sweet::prelude::*;
 }
 
 pub mod exports {

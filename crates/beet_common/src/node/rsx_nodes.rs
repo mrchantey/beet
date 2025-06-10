@@ -32,7 +32,8 @@ pub struct TemplateNode;
 pub struct FragmentNode;
 
 
-/// Indicates a Html Text Node, [W3 Docs](https://www.w3schools.com/jsref/prop_node_nodetype.asp)
+/// Indicates a Html Text Node, [W3 Docs](https://www.w3schools.com/jsref/prop_node_nodetype.asp).
+/// Note that adjacent text nodes are collapsed when rendering to html.
 #[derive(Debug, Default, Clone, Component, Reflect, Deref, DerefMut)]
 #[reflect(Default, Component)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]

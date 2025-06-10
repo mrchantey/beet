@@ -17,8 +17,8 @@ pub trait IntoTemplateBundle<M> {
 	/// Called for nodes and attributes expressions:
 	/// `rsx!{"howdy"}` becomes `TextNode::new("howdy")`
 	/// `rsx!{<span {"howdy"} />}` becomes `TextNode::new("howdy")`
-	/// This is also called by default in `Self::into_attr_key_bundle` and
-	/// `Self::into_attr_val_bundle`,
+	/// This is also called by default in [`Self::into_attr_key_bundle`] and
+	/// [`Self::into_attr_val_bundle`],
 	/// wrapping them in [`AttributeKey`] and [`AttributeValue`].
 	fn into_node_bundle(self) -> impl Bundle;
 	/// Called for attribute keys, wrapping `Self` in an [`AttributeKey`].

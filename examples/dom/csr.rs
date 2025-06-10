@@ -13,14 +13,27 @@ use beet::prelude::*;
 use bevy::prelude::*;
 
 
-fn main() { TemplateApp::mount(rsx! {<Counter initial=7/>}); }
+#[rustfmt::skip]
+fn main() {
+	App::new()
+		.add_plugins(TemplatePlugin)
+    .add_systems(Startup, setup)
+    .run();
+}
 
-
+fn setup(mut commands: Commands) {
+	commands.spawn(rsx! {
+		<Counter initial=7/>
+	});
+}
 
 #[template]
+#[derive(serde::Serialize)]
 fn Counter(initial: u32) -> impl Bundle {
+	let (get, set) = signal(initial);
+
 	rsx! {
-			<p>Count: {initial}</p>
-			<button>Increment</button>
+			<p>Count: {get}</p>
+			<button onclick={move ||set(get()+1)}>Increment</button>
 	}
 }

@@ -3,16 +3,22 @@ use beet_common::prelude::*;
 use bevy::ecs::system::SystemParam;
 use bevy::prelude::*;
 
-/// returns the HTML string representation of a given [`Bundle`]
+/// returns the HTML string representation of a given [`Bundle`].
+/// There are several transformations involved in the process,
+/// for example resolving slots, so we reuse a [`TemplateApp`]
+/// and run a full update cycle.
 pub fn bundle_to_html(bundle: impl Bundle) -> String {
 	TemplateApp::with(|app| {
 		let entity = app.world_mut().spawn((bundle, ToHtml)).id();
 		app.update();
-		app.world_mut()
+		let value = app
+			.world_mut()
 			.entity_mut(entity)
 			.take::<RenderedHtml>()
 			.expect("Expected RenderedHtml")
-			.0
+			.0;
+		app.world_mut().despawn(entity);
+		value
 	})
 }
 

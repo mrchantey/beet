@@ -9,11 +9,9 @@ pub fn signals_plugin(app: &mut App) {
 	app.add_systems(Update, receive_text_signals);
 }
 
-/// Placeholder for [`bevy::prelude::Text`] when building without the `bevy_default` feature.
+/// When building without `bevy_default` we assume the target is the web
 #[cfg(not(feature = "bevy_default"))]
-#[derive(Component)]
-pub struct TextSpan(pub String);
-
+pub type TextSpan = beet_common::node::TextNode;
 
 /// A component with a [`flume::Receiver`] that can be used to propagate changes
 /// throughout the app, for instance in [`receive_text_signals`].
@@ -49,7 +47,7 @@ impl<T: 'static + Send + Sync + Clone + ToString> IntoTemplateBundle<Self>
 	fn into_node_bundle(self) -> impl Bundle {
 		let string_getter = move || self.get().to_string();
 		(
-			TextSpan(self.get().to_string()),
+			TextSpan::new(self.get().to_string()),
 			SignalReceiver::new(string_getter),
 		)
 	}
@@ -70,7 +68,7 @@ mod test {
 
 		let entity = app
 			.world_mut()
-			.spawn((TextSpan("foo".to_string()), SignalReceiver::new(get)))
+			.spawn((TextSpan::new("foo".to_string()), SignalReceiver::new(get)))
 			.id();
 
 		app.world()

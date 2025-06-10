@@ -109,7 +109,7 @@ mod test {
 							#[allow(unused_braces)]
 							(
 								#[cfg(not(target_arch = "wasm32"))]
-								{ TemplateSerde::new(&template) }
+								{ TemplateSerde::new(&template) },
 								#[cfg(target_arch = "wasm32")]
 								{ () },
 								TemplateRoot::spawn(Spawn(template.into_node_bundle()))
