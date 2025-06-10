@@ -5,7 +5,6 @@
 
 pub mod bevy_utils;
 pub mod node;
-pub mod templating;
 #[cfg(feature = "tokens")]
 pub mod tokens_utils;
 
@@ -15,13 +14,9 @@ pub use beet_common_macros::*;
 pub mod prelude {
 	pub use crate::bevy_utils::*;
 	pub use crate::node::*;
-	pub use crate::templating::*;
 	#[cfg(feature = "tokens")]
 	pub use crate::tokens_utils::*;
 	pub use beet_common_macros::*;
-
-	// temp, we need to merge beet and sweet
-	pub use sweet::prelude::*;
 }
 
 pub mod exports {

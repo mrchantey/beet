@@ -69,14 +69,3 @@ impl From<proc_macro2::LineColumn> for LineCol {
 		}
 	}
 }
-
-#[cfg(feature = "tokens")]
-impl crate::prelude::RustTokens for LineCol {
-	fn into_rust_tokens(&self) -> proc_macro2::TokenStream {
-		let line = proc_macro2::Literal::u32_unsuffixed(self.line);
-		let col = proc_macro2::Literal::u32_unsuffixed(self.col);
-		quote::quote! {
-			LineCol::new(#line, #col)
-		}
-	}
-}

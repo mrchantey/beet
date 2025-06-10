@@ -4,7 +4,6 @@ use beet_common::as_beet::*;
 use quote::quote;
 use sweet::prelude::*;
 
-
 #[test]
 fn named() {
 	#[derive(ToTokens)]

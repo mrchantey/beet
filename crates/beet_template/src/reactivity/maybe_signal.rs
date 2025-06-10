@@ -1,4 +1,6 @@
-use crate::prelude::Getter;
+use crate::prelude::*;
+use beet_common::prelude::*;
+use bevy::prelude::*;
 
 #[derive(Clone)]
 pub enum MaybeSignal<T: 'static> {
@@ -23,6 +25,35 @@ impl<T: 'static + Send + Clone> MaybeSignal<T> {
 		}
 	}
 }
+
+impl<T: IntoTemplateBundle<M>, M> IntoTemplateBundle<(Self, M)>
+	for MaybeSignal<T>
+where
+	T: 'static + Send + Sync + Clone + ToString,
+{
+	fn into_node_bundle(self) -> impl Bundle {
+		// to ensure the types match we need to create a SignalReceiver
+		// for const values that will not change
+		match self {
+			Self::Const(val) => {
+				let val = val.to_string();
+				(
+					TextSpan::new(val.clone()),
+					SignalReceiver::new(move || val.clone()),
+				)
+			}
+			Self::Getter(getter) => {
+				// changes here should be reflected in bevy_signal.rs
+				let string_getter = move || getter.get().to_string();
+				(
+					TextSpan::new(getter.get().to_string()),
+					SignalReceiver::new(string_getter),
+				)
+			}
+		}
+	}
+}
+
 
 impl<T: 'static + Send + Clone + std::fmt::Debug> std::fmt::Debug
 	for MaybeSignal<T>

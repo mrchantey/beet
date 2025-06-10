@@ -131,15 +131,3 @@ pub enum StyleScope {
 	/// ```
 	Global,
 }
-
-
-impl StyleScope {}
-#[cfg(feature = "tokens")]
-impl crate::prelude::RustTokens for StyleScope {
-	fn into_rust_tokens(&self) -> proc_macro2::TokenStream {
-		match self {
-			Self::Local => quote::quote! { StyleScope::Local },
-			Self::Global => quote::quote! { StyleScope::Global },
-		}
-	}
-}

@@ -100,7 +100,7 @@ mod test {
 						FragmentNode,
 						TemplateNode,
 						ClientIslandDirective::Load,
-						ItemOf::<beet_common::node::rsx_nodes::TemplateNode, beet_common::templating::rusty_tracker::RustyTracker> {
+						ItemOf::<beet_common::node::rsx_nodes::TemplateNode, beet_common::node::rusty_tracker::RustyTracker> {
 							value: RustyTracker { index: 0u32, tokens_hash: 6523630531850795118u64 },
 							phantom: std::marker::PhantomData::<beet_common::node::rsx_nodes::TemplateNode>
 						},

@@ -45,6 +45,7 @@ impl<T: 'static + Send + Sync + Clone + ToString> IntoTemplateBundle<Self>
 	for Getter<T>
 {
 	fn into_node_bundle(self) -> impl Bundle {
+		// changes here should be reflected in maybe_signal.rs
 		let string_getter = move || self.get().to_string();
 		(
 			TextSpan::new(self.get().to_string()),

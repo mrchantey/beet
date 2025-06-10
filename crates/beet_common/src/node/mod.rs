@@ -1,3 +1,5 @@
+pub mod rusty_tracker;
+pub use rusty_tracker::*;
 mod into_template_bundle;
 pub use into_template_bundle::*;
 mod events;
@@ -18,8 +20,6 @@ mod line_col;
 pub use line_col::*;
 mod file_span;
 pub use file_span::*;
-mod node_meta;
-pub use node_meta::*;
 mod directives;
 pub use directives::*;
 mod html_constants;

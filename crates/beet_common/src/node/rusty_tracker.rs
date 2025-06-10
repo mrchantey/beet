@@ -56,13 +56,3 @@ impl RustyTracker {
 		Self { index, tokens_hash }
 	}
 }
-
-#[cfg(feature = "tokens")]
-impl crate::prelude::RustTokens for RustyTracker {
-	fn into_rust_tokens(&self) -> proc_macro2::TokenStream {
-		let index = proc_macro2::Literal::u32_unsuffixed(self.index);
-		let tokens_hash =
-			proc_macro2::Literal::u64_unsuffixed(self.tokens_hash);
-		quote::quote! { RustyTracker::new(#index, #tokens_hash) }
-	}
-}

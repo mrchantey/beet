@@ -96,18 +96,6 @@ impl FileSpan {
 	pub fn end_col(&self) -> u32 { self.end.col() }
 }
 
-#[cfg(feature = "tokens")]
-impl RustTokens for FileSpan {
-	fn into_rust_tokens(&self) -> proc_macro2::TokenStream {
-		let file = self.file.to_string_lossy();
-		let start = self.start.into_rust_tokens();
-		let end = self.end.into_rust_tokens();
-		quote::quote! {
-			FileSpan::new(#file, #start, #end)
-		}
-	}
-}
-
 pub trait GetSpan {
 	fn span(&self) -> &FileSpan;
 	// probs an anti-pattern but need it until proper spans in rsx combinator
@@ -117,24 +105,4 @@ pub trait GetSpan {
 impl GetSpan for FileSpan {
 	fn span(&self) -> &FileSpan { self }
 	fn span_mut(&mut self) -> &mut FileSpan { self }
-}
-
-#[cfg(feature = "tokens")]
-#[cfg(test)]
-mod test {
-	use crate::prelude::*;
-	use sweet::prelude::*;
-
-
-	#[test]
-	fn to_rust_tokens() {
-		let span = FileSpan::new_with_start("foo", 1, 2);
-		let tokens = span.into_rust_tokens();
-		expect(tokens.to_string()).to_be(
-			quote::quote! {
-				FileSpan::new("foo", LineCol::new(1, 2), LineCol::new(1, 2))
-			}
-			.to_string(),
-		);
-	}
 }
