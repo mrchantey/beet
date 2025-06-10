@@ -80,11 +80,21 @@ It may have been manually removed by another handle.
 "#;
 
 /// A `Copy` handle that provides type-safe access to objects in the arena
-#[derive(Clone, Copy)]
 pub struct ArenaHandle<T> {
 	id: usize,
 	_phantom: std::marker::PhantomData<T>,
 }
+
+impl<T> Copy for ArenaHandle<T> {}
+
+impl<T> Clone for ArenaHandle<T> {
+	fn clone(&self) -> Self {
+		Self {
+			id: self.id,
+			_phantom: std::marker::PhantomData,
+		}
+	}
+}  
 
 impl<T: Clone + 'static> ArenaHandle<T> {
 	/// Get a clone of the object
