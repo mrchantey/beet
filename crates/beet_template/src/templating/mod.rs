@@ -1,5 +1,7 @@
 mod template_plugin;
 mod text_node_parent;
+mod tree_idx;
+pub use tree_idx::*;
 pub use template_plugin::*;
 pub use text_node_parent::*;
 mod template;

@@ -1,4 +1,3 @@
-use super::apply_slots;
 use crate::prelude::*;
 use beet_common::prelude::*;
 use bevy::ecs::system::SystemParam;
@@ -10,7 +9,7 @@ pub fn apply_text_node_parents_plugin(app: &mut App) {
 	app.add_systems(
 		Update,
 		apply_text_node_parents
-			.after(apply_slots)
+			.after(super::apply_slots)
 			.in_set(ApplyTransformsStep),
 	);
 }

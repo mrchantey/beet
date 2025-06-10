@@ -24,6 +24,7 @@ impl Plugin for TemplatePlugin {
 		)
 		.add_plugins((
 			apply_slots_plugin,
+			apply_tree_idx_plugin,
 			apply_text_node_parents_plugin,
 			render_html_plugin,
 		))
