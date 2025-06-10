@@ -68,13 +68,14 @@ impl DirectDescendantIter {
 	where
 		D::ReadOnly: QueryData<Item<'w> = &'w S>,
 	{
-		Self {
-			vec: children_query
-				.get(entity)
-				.into_iter()
-				.flat_map(RelationshipTarget::iter)
-				.collect(),
-		}
+		let mut items = children_query
+			.get(entity)
+			.into_iter()
+			.flat_map(RelationshipTarget::iter)
+			.collect::<Vec<_>>();
+		// we pop from the end, so reverse to maintain order
+		items.reverse();
+		Self { vec: items }
 	}
 }
 

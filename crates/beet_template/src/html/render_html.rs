@@ -77,7 +77,7 @@ fn render_html(
 }
 
 
-// TODO bench this approach vs flat multi-threaded
+// TODO bench this approach vs concatenating parallel systems 
 #[rustfmt::skip]
 #[derive(SystemParam)]
 struct Builder<'w, 's> {

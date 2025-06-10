@@ -6,9 +6,6 @@ use bevy::prelude::*;
 use sweet::prelude::HierarchyQueryExtExt;
 
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, SystemSet)]
-pub struct ApplySlotsStep;
-
 /// Slotting is the process of traversing the [RsxComponent::slot_children]
 /// and applying them to the [RsxComponent::node] in the corresponding slots.
 ///
@@ -50,7 +47,7 @@ pub struct ApplySlotsStep;
 /// - 'Slot Transfers' are supported, ie <slot name="header" slot="default"/>
 ///   see https://docs.astro.build/en/basics/astro-components/#transferring-slots
 pub fn apply_slots_plugin(app: &mut App) {
-	app.add_systems(Update, apply_slots.in_set(ApplySlotsStep));
+	app.add_systems(Update, apply_slots.in_set(ApplyTransformsStep));
 }
 
 
@@ -62,7 +59,7 @@ pub fn apply_slots_plugin(app: &mut App) {
 /// 3. For each slot, apply to the slot target.
 /// 4. Move the [`TemplateRoot`] relation to a [`Children`].
 /// 5. Remove any fallback children from slot targets which are used.
-fn apply_slots(
+pub(super) fn apply_slots(
 	mut commands: Commands,
 	children: Query<&Children>,
 	slot_targets: Query<(Entity, &SlotTarget)>,

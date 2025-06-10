@@ -20,10 +20,13 @@ impl Plugin for TemplatePlugin {
 			(
 				ApplyTransformsStep.after(SpawnStep),
 				RenderStep.after(ApplyTransformsStep),
-				ApplySlotsStep.in_set(ApplyTransformsStep),
 			),
 		)
-		.add_plugins((apply_slots_plugin, render_html_plugin))
+		.add_plugins((
+			apply_slots_plugin,
+			apply_text_node_parents_plugin,
+			render_html_plugin,
+		))
 		.set_runner(SignalAppRunner::runner);
 		#[cfg(target_arch = "wasm32")]
 		app.add_plugins(wasm_template_plugin);

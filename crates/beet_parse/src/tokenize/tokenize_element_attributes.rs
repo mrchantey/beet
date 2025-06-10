@@ -6,7 +6,6 @@ use proc_macro2::Span;
 use proc_macro2::TokenStream;
 use quote::quote;
 use send_wrapper::SendWrapper;
-use sweet::prelude::PipelineTarget;
 use syn::Expr;
 use syn::ExprClosure;
 use syn::Ident;
@@ -26,9 +25,8 @@ pub fn tokenize_element_attributes(
 	} else if let Some(attrs) = entity.get::<Attributes>() {
 		let mut attr_entities = Vec::new();
 		for attr_entity in attrs.iter() {
-			if let Some(event_func) = try_event_observer(world, attr_entity)? {
-				// in the case of an event the value is an observer added to the parent
-				entity_components.push(event_func);
+			if try_event_observer(world, entity_components, attr_entity)? {
+				// events are handled separately
 				continue;
 			}
 
@@ -85,34 +83,35 @@ pub fn tokenize_element_attributes(
 
 
 /// If the attribute matches the requirements for an event observer,
-/// parse and return as an [`EntityObserver`].
+/// append to the `entity_components` and return `Ok(true)`.
 ///
 /// ## Requirements
 /// - Key is a string literal starting with `on`
 /// - Value is not a string, (allows for verbatim js handlers)
 fn try_event_observer(
 	world: &World,
+	entity_components: &mut Vec<TokenStream>,
 	entity: Entity,
-) -> Result<Option<TokenStream>> {
+) -> Result<bool> {
 	let Some(mut attr) =
 		maybe_spanned_expr::<AttributeValueExpr>(world, entity)?
 	else {
-		return Ok(None);
+		return Ok(false);
 	};
 
 	let entity = world.entity(entity);
 
 	let Some(lit) = entity.get::<AttributeLit>() else {
-		return Ok(None);
+		return Ok(false);
 	};
 	// If value is a string literal, we shouldn't process it as an event handler,
 	// to preserve onclick="some_js_function()"
 	if lit.value.is_some() {
-		return Ok(None);
+		return Ok(false);
 	}
 
 	let Some(suffix) = lit.key.strip_prefix("on") else {
-		return Ok(None);
+		return Ok(false);
 	};
 
 	let span = entity
@@ -123,11 +122,13 @@ fn try_event_observer(
 	let suffix = ToUpperCamelCase::to_upper_camel_case(suffix);
 
 	let event_key = Ident::new(&format!("On{suffix}"), span);
+	let lit_key_str = &lit.key;
 
 	try_insert_closure_type(&mut attr, &event_key);
-	quote! {EntityObserver::new(#[allow(unused_braces)]#attr)}
-		.xsome()
-		.xok()
+	entity_components.push(quote! {EventObserver::new(#lit_key_str)});
+	entity_components
+		.push(quote! {EntityObserver::new(#[allow(unused_braces)]#attr)});
+	Ok(true)
 }
 
 /// if the tokens are a closure or a block where the last statement is a closure,
@@ -281,6 +282,7 @@ mod test {
 			quote! {(
 				NodeTag(String::from("span")),
 				ElementNode { self_closing: true },
+				EventObserver::new("onclick"),
 				EntityObserver::new(#[allow(unused_braces)]{foo})
 			)}
 			.to_string(),
@@ -318,6 +320,7 @@ mod test {
 				NodeTag(String::from("span")),
 				ElementNode { self_closing: true },
 				{foo}.into_node_bundle(),
+				EventObserver::new("onclick"),
 				EntityObserver::new(#[allow(unused_braces)] |_: Trigger<OnClick>| { println!("clicked"); }),
 				related!(Attributes[
 					"hidden".into_attr_key_bundle(),
