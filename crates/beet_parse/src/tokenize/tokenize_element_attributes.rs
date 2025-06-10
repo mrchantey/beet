@@ -131,7 +131,8 @@ fn try_event_observer(
 }
 
 /// if the tokens are a closure or a block where the last statement is a closure,
-/// insert the matching [`Trigger`] type
+/// insert the matching [`Trigger`] type.
+/// ie `<div onclick=|_|{ do_stuff() }/>` doesnt specify a type.
 fn try_insert_closure_type(expr: &mut Expr, ident: &Ident) {
 	fn process_closure(closure: &mut ExprClosure, ident: &Ident) {
 		match closure.inputs.first_mut() {

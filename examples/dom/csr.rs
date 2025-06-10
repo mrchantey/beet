@@ -1,7 +1,9 @@
 //! Example of Client-Side Rendering (CSR) with Beet and Bevy.
 //!
-//! Usually the beet cli takes care of building, but beet can also be used as a library.
-//! Here's an example of how to build with vanilla wasm-bindgen.
+//! Note that this approach is not recommended because the entire wasm
+//! app must be built and run before the HTML is rendered.
+//!
+//! That said, here's an example of how to build with vanilla wasm-bindgen.
 //! ```sh
 //! cargo build --example csr --target-dir=target --features=template --target wasm32-unknown-unknown
 //! wasm-bindgen --out-dir target/csr-demo/wasm --out-name main --target web --no-typescript target/wasm32-unknown-unknown/debug/examples/csr.wasm
@@ -22,12 +24,14 @@ fn main() {
 }
 
 fn setup(mut commands: Commands) {
+	// the client:only directive instructs the wasm build to render and mount the component in the browser
 	commands.spawn(rsx! {
 		<Counter client:only initial=7/>
 	});
 }
 
 #[template]
+// components with client directives must be serde
 #[derive(serde::Serialize)]
 fn Counter(initial: u32) -> impl Bundle {
 	let (get, set) = signal(initial);
