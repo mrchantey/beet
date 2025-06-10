@@ -11,7 +11,7 @@
 //!
 use beet::prelude::*;
 use bevy::prelude::*;
-
+use sweet::prelude::*;
 
 #[rustfmt::skip]
 fn main() {
@@ -23,7 +23,7 @@ fn main() {
 
 fn setup(mut commands: Commands) {
 	commands.spawn(rsx! {
-		<Counter initial=7/>
+		<Counter client:only initial=7/>
 	});
 }
 

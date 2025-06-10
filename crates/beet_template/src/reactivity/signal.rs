@@ -1,7 +1,38 @@
 use std::sync::Arc;
 use std::sync::Mutex;
-use sweet::prelude::Arena;
-use sweet::prelude::ArenaHandle;
+use sweet::prelude::*;
+
+/// Very simple implementation of signals used for testing and demos
+pub fn signal<T: 'static + Send + Clone>(value: T) -> (Getter<T>, Setter<T>) {
+	let signal = Signal::new(value);
+	let signal_handle = Arena::insert(signal);
+
+	(
+		Getter {
+			handle: signal_handle,
+		},
+		Setter {
+			handle: signal_handle,
+		},
+	)
+}
+
+thread_local! {
+	static EFFECT_CALLBACK: Mutex<Option<Arc<Mutex<dyn FnMut() + Send>>>> = Mutex::new(None);
+}
+
+/// Very simple implementation of effects used for testing and demos
+pub fn effect<F>(callback: F)
+where
+	F: 'static + Send + Sync + FnMut(),
+{
+	let callback = Arc::new(Mutex::new(callback));
+	EFFECT_CALLBACK
+		.with(|current| *current.lock().unwrap() = Some(callback.clone()));
+	callback.lock().unwrap()();
+	EFFECT_CALLBACK.with(|current| *current.lock().unwrap() = None);
+}
+
 
 /// an absolute minimal implementation of a signal
 /// for testing of the reactive abstraction and use as an example
@@ -24,48 +55,11 @@ impl<T: Clone + Send> Signal<T> {
 	}
 }
 
-thread_local! {
-	static EFFECT_CALLBACK: Mutex<Option<Arc<Mutex<dyn FnMut() + Send>>>> = Mutex::new(None);
-}
-
-/// Very simple implementation of effects used for testing and demos
-pub fn effect<F>(callback: F)
-where
-	F: 'static + Send + Sync + FnMut(),
-{
-	let callback = Arc::new(Mutex::new(callback));
-	EFFECT_CALLBACK
-		.with(|current| *current.lock().unwrap() = Some(callback.clone()));
-	callback.lock().unwrap()();
-	EFFECT_CALLBACK.with(|current| *current.lock().unwrap() = None);
-}
-
-
 /// A Copy type that provides read access to a signal
 pub struct Getter<T> {
 	handle: ArenaHandle<Signal<T>>,
 }
 impl<T> Copy for Getter<T> {}
-
-#[cfg(feature = "nightly")]
-impl<T: 'static + Send + Clone> std::ops::Fn<()> for Getter<T> {
-	extern "rust-call" fn call(&self, _args: ()) -> Self::Output { self.get() }
-}
-
-#[cfg(feature = "nightly")]
-impl<T: 'static + Send + Clone> std::ops::FnMut<()> for Getter<T> {
-	extern "rust-call" fn call_mut(&mut self, args: ()) -> Self::Output {
-		self.call(args)
-	}
-}
-
-#[cfg(feature = "nightly")]
-impl<T: 'static + Send + Clone> std::ops::FnOnce<()> for Getter<T> {
-	type Output = T;
-	extern "rust-call" fn call_once(self, args: ()) -> Self::Output {
-		self.call(args)
-	}
-}
 
 impl<T> Clone for Getter<T> {
 	fn clone(&self) -> Self {
@@ -90,12 +84,59 @@ impl<T: 'static + Send + Clone> Getter<T> {
 	}
 }
 
+
+#[cfg(feature = "nightly")]
+impl<T: 'static + Send + Clone> std::ops::Fn<()> for Getter<T> {
+	extern "rust-call" fn call(&self, _args: ()) -> Self::Output { self.get() }
+}
+
+#[cfg(feature = "nightly")]
+impl<T: 'static + Send + Clone> std::ops::FnMut<()> for Getter<T> {
+	extern "rust-call" fn call_mut(&mut self, args: ()) -> Self::Output {
+		self.call(args)
+	}
+}
+
+#[cfg(feature = "nightly")]
+impl<T: 'static + Send + Clone> std::ops::FnOnce<()> for Getter<T> {
+	type Output = T;
+	extern "rust-call" fn call_once(self, args: ()) -> Self::Output {
+		self.call(args)
+	}
+}
+
 /// A Copy type that provides write access to a signal
 pub struct Setter<T> {
 	handle: ArenaHandle<Signal<T>>,
 }
 impl<T> Copy for Setter<T> {}
 
+impl<T> Clone for Setter<T> {
+	fn clone(&self) -> Self {
+		Setter {
+			handle: self.handle.clone(),
+		}
+	}
+}
+
+impl<T: 'static + Send + Clone> Setter<T> {
+	pub fn set(&self, new_val: T) {
+		// First, extract the callbacks outside of the arena lock
+		let callbacks = self.handle.with(|signal| {
+			*signal.value.lock().unwrap() = new_val;
+			signal.subscribers.lock().unwrap().clone()
+		});
+
+		// Now execute callbacks without holding any arena locks
+		for callback in callbacks.iter() {
+			callback.lock().unwrap()();
+		}
+
+		// TEMPORARY: a quick-and-dirty way to trigger an update in the static
+		// app on change, we need to think of a cleaner way to do this
+		super::SignalAppRunner::try_update();
+	}
+}
 #[cfg(feature = "nightly")]
 impl<T: 'static + Send + Clone> std::ops::Fn<(T,)> for Setter<T> {
 	extern "rust-call" fn call(&self, args: (T,)) -> Self::Output {
@@ -117,49 +158,12 @@ impl<T: 'static + Send + Clone> std::ops::FnOnce<(T,)> for Setter<T> {
 		self.call(args)
 	}
 }
-impl<T> Clone for Setter<T> {
-	fn clone(&self) -> Self {
-		Setter {
-			handle: self.handle.clone(),
-		}
-	}
-}
-
-impl<T: 'static + Send + Clone> Setter<T> {
-	pub fn set(&self, new_val: T) {
-		// First, extract the callbacks outside of the arena lock
-		let callbacks = self.handle.with(|signal| {
-			*signal.value.lock().unwrap() = new_val;
-			signal.subscribers.lock().unwrap().clone()
-		});
-
-		// Now execute callbacks without holding any arena locks
-		for callback in callbacks.iter() {
-			callback.lock().unwrap()();
-		}
-	}
-}
-
-/// Very simple implementation of signals used for testing and demos
-pub fn signal<T: 'static + Send + Clone>(value: T) -> (Getter<T>, Setter<T>) {
-	let signal = Signal::new(value);
-	let signal_handle = Arena::insert(signal);
-
-	(
-		Getter {
-			handle: signal_handle,
-		},
-		Setter {
-			handle: signal_handle,
-		},
-	)
-}
 
 
 #[cfg(test)]
 mod test {
 	use super::*;
-	use sweet::prelude::*;
+	// use sweet::prelude::*;
 
 	#[test]
 	fn signals() {

@@ -72,7 +72,9 @@ pub fn tokenize_template_attributes(
 	// we create an inner tuple, so that we can define the template
 	// and reuuse it for serialization
 	let mut inner_items = Vec::new();
-	if entity.contains::<ClientIslandDirective>() {
+	if entity.contains::<ClientLoadDirective>()
+		|| entity.contains::<ClientOnlyDirective>()
+	{
 		inner_items.push(quote! {
 			#[cfg(not(target_arch = "wasm32"))]
 			{TemplateSerde::new(&template)},

@@ -1,3 +1,5 @@
+use std::cell::RefCell;
+
 use crate::prelude::*;
 use beet_common::prelude::*;
 use bevy::ecs::system::SystemParam;
@@ -8,7 +10,32 @@ use bevy::prelude::*;
 /// for example resolving slots, so we reuse a [`TemplateApp`]
 /// and run a full update cycle.
 pub fn bundle_to_html(bundle: impl Bundle) -> String {
-	TemplateApp::with(|app| {
+	/// Access the thread local [`App`] used by the [`TemplatePlugin`].
+	struct SharedTemplateApp;
+
+	impl SharedTemplateApp {
+		pub fn with<O>(func: impl FnOnce(&mut App) -> O) -> O {
+			thread_local! {
+				static TEMPLATE_APP: RefCell<Option<App>> = RefCell::new(None);
+			}
+			TEMPLATE_APP.with(|app_cell| {
+				// Initialize the app if needed
+				let mut app_ref = app_cell.borrow_mut();
+				if app_ref.is_none() {
+					let mut app = App::new();
+					app.add_plugins(TemplatePlugin);
+					*app_ref = Some(app);
+				}
+
+				// Now we can safely unwrap and use the app
+				let app = app_ref.as_mut().unwrap();
+
+				func(app)
+			})
+		}
+	}
+
+	SharedTemplateApp::with(|app| {
 		let entity = app.world_mut().spawn((bundle, ToHtml)).id();
 		app.update();
 		let value = app
@@ -39,10 +66,10 @@ pub struct RenderedHtml(pub String);
 
 fn render_html(
 	mut commands: Commands,
-	query: Populated<(Entity, &ToHtml)>,
+	query: Populated<Entity, Added<ToHtml>>,
 	builder: Builder,
 ) {
-	for (entity, _) in query.iter() {
+	for entity in query.iter() {
 		let mut html = String::new();
 		builder.parse(entity, &mut html);
 		commands.entity(entity).insert(RenderedHtml(html));

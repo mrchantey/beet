@@ -67,7 +67,8 @@ tokenize_maybe_spanned!(
 tokenize_maybe_spanned!(
 	tokenize_web_directives,
 	HtmlInsertDirective,
-	ClientIslandDirective,
+	ClientLoadDirective,
+	ClientOnlyDirective,
 	LangContent
 );
 

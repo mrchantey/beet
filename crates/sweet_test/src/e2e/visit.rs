@@ -38,7 +38,12 @@ pub async fn visit(url: &str) -> Page {
 		Ok(page) => page,
 		Err(err) => {
 			eprintln!(
-				"Error visiting page: {}\n\nPlease ensure the --e2e flag was passed to the test: \n\n`cargo test --lib -- --e2e`\n\n",
+				r#"
+Error visiting page: {}
+This is usually either an issue with webdriver or the the e2e flag not being set.
+Please ensure the --e2e flag was passed to the test:
+`cargo test --lib -- --e2e`
+"#,
 				err
 			);
 			std::process::exit(1);

@@ -54,7 +54,7 @@ fn create_app() {
 	.run();
 }
 
-// from bevy_app
+// from bevy_app https://github.com/mrchantey/bevy/blob/a1f4e56610c090b44f8b4a8f3eb56aeda5eb9669/crates/bevy_app/src/app.rs#L1392
 fn run_once(mut app: App) -> AppExit {
 	while app.plugins_state() == PluginsState::Adding {
 		#[cfg(not(target_arch = "wasm32"))]

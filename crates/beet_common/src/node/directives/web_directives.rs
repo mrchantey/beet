@@ -7,7 +7,8 @@ use bevy::prelude::*;
 pub fn extract_web_directives_plugin(app: &mut App) {
 	app.add_plugins((
 		extract_directive_plugin::<HtmlInsertDirective>,
-		extract_directive_plugin::<ClientIslandDirective>,
+		extract_directive_plugin::<ClientLoadDirective>,
+		extract_directive_plugin::<ClientOnlyDirective>,
 	))
 	.add_systems(Update, extract_lang_content.in_set(ExtractDirectivesSet));
 }
@@ -39,25 +40,36 @@ impl TemplateDirective for HtmlInsertDirective {
 	}
 }
 
-/// Directive for how the node should be rendered and loaded on the client.
+/// Render the node statically then hydrate it on the client
 #[derive(Debug, Default, Copy, Clone, Component, Reflect)]
 #[reflect(Default, Component)]
 #[component(immutable)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "tokens", derive(ToTokens))]
-pub enum ClientIslandDirective {
-	/// Render the node statically then hydrate it on the client
-	#[default]
-	Load,
-	/// aka Client Side Rendering, do not render the node statically, only render on the client
-	Only,
-}
+pub struct ClientLoadDirective;
 
-impl TemplateDirective for ClientIslandDirective {
+impl TemplateDirective for ClientLoadDirective {
 	fn try_from_attribute(key: &str, value: Option<&str>) -> Option<Self> {
 		match (key, value) {
-			("client:only", _) => Some(ClientIslandDirective::Only),
-			("client:load", _) => Some(ClientIslandDirective::Load),
+			("client:load", _) => Some(Self),
+			_ => None,
+		}
+	}
+}
+
+/// aka Client Side Rendering, do not create a server-side version of this node,
+/// and instead mount it directly on the client.
+#[derive(Debug, Default, Copy, Clone, Component, Reflect)]
+#[reflect(Default, Component)]
+#[component(immutable)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "tokens", derive(ToTokens))]
+pub struct ClientOnlyDirective;
+
+impl TemplateDirective for ClientOnlyDirective {
+	fn try_from_attribute(key: &str, value: Option<&str>) -> Option<Self> {
+		match (key, value) {
+			("client:only", _) => Some(Self),
 			_ => None,
 		}
 	}

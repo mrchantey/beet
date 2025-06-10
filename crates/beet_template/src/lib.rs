@@ -17,8 +17,8 @@ pub mod prelude {
 	pub use crate::html::*;
 	pub use crate::reactivity::*;
 	pub use crate::templating::*;
-	// #[cfg(target_arch = "wasm32")]
-	// pub use crate::wasm::*;
+	#[cfg(target_arch = "wasm32")]
+	pub use crate::wasm::*;
 }
 
 pub mod exports {

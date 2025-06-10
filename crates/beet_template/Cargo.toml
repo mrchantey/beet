@@ -66,3 +66,4 @@ web-sys.workspace = true
 [dev-dependencies]
 beet_template = { path = "", features = ["tokens"] }
 sweet = { workspace = true, features = ["test", "bevy"] }
+serde.workspace = true

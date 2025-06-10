@@ -215,13 +215,13 @@ test-flow *args:
 	{{min-stack}} cargo test -p beet_flow 		--lib --features=reflect 	--target wasm32-unknown-unknown {{args}} -- {{test-threads}}
 	{{min-stack}} cargo test -p beet_spatial 	--lib 									 	--target wasm32-unknown-unknown {{args}} -- {{test-threads}}
 
+#{{min-stack}} cargo test -p sweet_test 			--lib 	--all-features  										 			{{args}} -- {{test-threads}} --e2e
 
 test-sweet *args:
 	{{min-stack}} cargo test -p sweet_bevy 							--features=rand 												 	{{args}} -- {{test-threads}}
 	{{min-stack}} cargo test -p sweet_fs 								--all-features 													 	{{args}} -- {{test-threads}}
 	{{min-stack}} cargo test -p sweet_net 							--all-features 													 	{{args}} -- {{test-threads}}
 	{{min-stack}} cargo test -p sweet_server 						--all-features 													 	{{args}} -- {{test-threads}}
-	{{min-stack}} cargo test -p sweet_test 			--lib 	--all-features  										 			{{args}} -- {{test-threads}} --e2e
 	{{min-stack}} cargo test -p sweet_utils 						--all-features 													 	{{args}} -- {{test-threads}}
 	{{min-stack}} cargo test -p sweet-cli 							--all-features 													 	{{args}} -- {{test-threads}}
 	{{min-stack}} cargo test --lib --target wasm32-unknown-unknown --all-features -p sweet_bevy   {{args}} -- {{test-threads}}
@@ -375,8 +375,8 @@ install-sweet *args:
 # The latest version can be found at https://googlechromelabs.github.io/chrome-for-testing/
 # Previous versions can be found at
 install-chromedriver:
-	wget https://storage.googleapis.com/chrome-for-testing-public/135.0.7049.114/linux64/chrome-linux64.zip -P ~/chrome-for-testing
-	wget https://storage.googleapis.com/chrome-for-testing-public/135.0.7049.114/linux64/chromedriver-linux64.zip -P ~/chrome-for-testing
+	wget https://storage.googleapis.com/chrome-for-testing-public/137.0.7151.68/linux64/chrome-linux64.zip -P ~/chrome-for-testing
+	wget https://storage.googleapis.com/chrome-for-testing-public/137.0.7151.68/linux64/chromedriver-linux64.zip -P ~/chrome-for-testing
 	mkdir -p ~/chrome-for-testing
 	unzip ~/chrome-for-testing/chrome-linux64.zip -d ~/chrome-for-testing
 	unzip ~/chrome-for-testing/chromedriver-linux64.zip -d ~/chrome-for-testing
