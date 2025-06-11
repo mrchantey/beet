@@ -53,9 +53,15 @@ pub struct TreeIdx(
 	pub u32,
 );
 
+impl std::fmt::Display for TreeIdx {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		write!(f, "TreeIdx({})", self.0)
+	}
+}
 
 impl TreeIdx {
 	pub fn new(idx: u32) -> Self { Self(idx) }
+	pub fn inner(&self) -> u32 { self.0 }
 }
 
 
@@ -72,7 +78,7 @@ mod test {
 	fn applies_ids() {
 		let mut world = World::new();
 		world.init_resource::<HtmlConstants>();
-		let (get,_set) = signal(2);
+		let (get, _set) = signal(2);
 		let entity = world
 			.spawn((
 				rsx! {
@@ -85,7 +91,9 @@ mod test {
 				ToHtml,
 			))
 			.id();
-		world.run_system_once(super::super::apply_text_node_parents).unwrap();
+		world
+			.run_system_once(super::super::apply_text_node_parents)
+			.unwrap();
 		world.run_system_once(super::apply_tree_idx).unwrap();
 
 		world

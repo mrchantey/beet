@@ -39,6 +39,9 @@ fn Counter(initial: u32) -> impl Bundle {
 
 	rsx! {
 			<p>Count: {get}</p>
-			<button onclick={move ||set(get()+1)}>Increment</button>
+			<button onclick={move || {
+				set(get()+1);
+				sweet::log!("clicked! {}", get());
+			}}>Increment</button>
 	}
 }

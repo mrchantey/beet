@@ -1088,6 +1088,7 @@ dependencies = [
  "beet_template",
  "beet_template_macros",
  "bevy",
+ "console_error_panic_hook",
  "console_log",
  "extend",
  "flume",

@@ -3,10 +3,13 @@ use beet_common::node::IntoTemplateBundle;
 use bevy::prelude::*;
 use flume::Receiver;
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash, SystemSet)]
+pub struct ReceiveSignalStep;
 
 
 pub fn signals_plugin(app: &mut App) {
-	app.add_systems(Update, receive_text_signals);
+	app.configure_sets(Update, ReceiveSignalStep.after(BindStep))
+		.add_systems(Update, receive_text_signals.in_set(ReceiveSignalStep));
 }
 
 /// When building without `bevy_default` we assume the target is the web
@@ -31,7 +34,7 @@ impl<T: 'static + Send + Sync> SignalReceiver<T> {
 	}
 }
 
-fn receive_text_signals(
+pub(crate) fn receive_text_signals(
 	mut query: Query<(&mut TextSpan, &SignalReceiver<String>)>,
 ) {
 	for (mut text, update) in query.iter_mut() {

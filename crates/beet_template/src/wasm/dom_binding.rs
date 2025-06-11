@@ -1,0 +1,200 @@
+use crate::prelude::*;
+use beet_common::prelude::*;
+use bevy::ecs::system::SystemParam;
+use bevy::prelude::*;
+use send_wrapper::SendWrapper;
+use wasm_bindgen::JsCast;
+use wasm_bindgen::prelude::Closure;
+
+#[derive(Component, Deref)]
+pub struct DomElementBinding(SendWrapper<web_sys::HtmlElement>);
+impl DomElementBinding {
+	pub fn inner(&self) -> &web_sys::HtmlElement { self.0.as_ref() }
+}
+#[derive(Component, Deref)]
+pub struct DomTextBinding(SendWrapper<web_sys::Text>);
+impl DomTextBinding {
+	pub fn inner(&self) -> &web_sys::Text { self.0.as_ref() }
+}
+
+
+/// Track a created closure, usually to ensure it is not dropped
+#[derive(Component, Deref)]
+pub struct DomClosureBinding(
+	SendWrapper<wasm_bindgen::prelude::Closure<dyn FnMut(web_sys::Event)>>,
+);
+
+/// lazily uncollapse text nodes and bind to the DOM
+pub(super) fn bind_text_nodes(
+	mut commands: Commands,
+	mut get_binding: GetDomBinding,
+	parents: Query<&ChildOf>,
+	elements: Query<(Entity, &TreeIdx, &TextNodeParent)>,
+	query: Populated<
+		Entity,
+		(
+			Changed<TextNode>,
+			(With<SignalReceiver<String>>, Without<DomTextBinding>),
+		),
+	>,
+) -> Result<()> {
+	sweet::log!("el: {:?}", elements.iter().next().unwrap().0);
+
+	for entity in query.iter() {
+		// 1. get the parent element
+		let Some((parent_entity, parent_idx, text_node_parent)) = parents
+			.iter_ancestors(entity)
+			.find_map(|ancestor| elements.get(ancestor).ok())
+		else {
+			return Err(format!(
+				r#"
+TextNode {entity} has no parent ElementNode
+Please ensure that any text nodes are wrapped in an ElementNode:
+✅ # Good: rsx!{{<div>{{my_signal}}</div>}}
+❌ # Bad:	rsx!{{my_signal}}
+"#,
+			)
+			.into());
+		};
+
+		let element = get_binding.get_element(parent_entity, *parent_idx)?;
+		let children = element.child_nodes();
+
+		// 2. uncollapse child text nodes
+		for child in text_node_parent.text_nodes.iter() {
+			// get the collapsed node
+			let collapsed_text_node =
+				children.item(child.child_index as u32).ok_or_else(|| {
+					format!(
+						"TextNodeParent {} has no child at index {}",
+						parent_idx, child.child_index
+					)
+				})?;
+			let mut current_node: web_sys::Text = collapsed_text_node
+				.dyn_into()
+				.map_err(|_| format!("Could not convert child to text node"))?;
+
+
+			// iterate over the split positions and split the text node,
+			// assigning the uncollapsed nodes to entities as required
+			for (entity, position) in child
+				.split_positions
+				.iter()
+				// dont split the last position
+				.take(child.split_positions.len().saturating_sub(1))
+			{
+				// assign the text node to the entity if its dynamic
+				if let Some(entity) = entity {
+					commands.entity(*entity).insert(DomTextBinding(
+						SendWrapper::new(current_node.clone()),
+					));
+				}
+				//https://developer.mozilla.org/en-US/docs/Web/API/Text/splitText
+				current_node =
+					current_node.split_text(*position as u32).unwrap();
+			}
+
+			// handle the last entity
+			if let Some(entity) =
+				child.split_positions.last().and_then(|(entity, _)| *entity)
+			{
+				commands.entity(entity).insert(DomTextBinding(
+					SendWrapper::new(current_node.clone()),
+				));
+			}
+		}
+	}
+	Ok(())
+}
+pub(super) fn update_text_nodes(
+	_: TempNonSendMarker,
+	query: Populated<(&TextNode, &DomTextBinding), Changed<TextNode>>,
+) -> Result<()> {
+	for (text, node) in query.iter() {
+		node.set_data(text);
+	}
+	Ok(())
+}
+
+pub(super) fn bind_events(
+	mut commands: Commands,
+	mut get_binding: GetDomBinding,
+	query: Populated<(Entity, &TreeIdx, &EventObserver), Added<TreeIdx>>,
+) -> Result<()> {
+	for (entity, idx, event) in query.iter() {
+		let element = get_binding.get_element(entity, *idx)?;
+		let event_name = event.event_name();
+		element.remove_attribute(&event_name).ok();
+
+		let func = move |ev: web_sys::Event| {
+			ReactiveApp::with(|app| {
+				let mut entity = app.world_mut().entity_mut(entity);
+				match event_name.as_str() {
+					"onclick" => {
+						let ev = ev.unchecked_into::<web_sys::MouseEvent>();
+						entity.trigger(BeetEvent::new(SendWrapper::new(ev)));
+					}
+					_ => unimplemented!(),
+				}
+				// we must update the app manually to flush any signals,
+				// they will not be able to update the app themselves because
+				// ReactiveApp is already borrowd
+				app.update();
+			})
+		};
+
+		let closure = Closure::wrap(Box::new(func) as Box<dyn FnMut(_)>);
+		element
+			.add_event_listener_with_callback(
+				&event.event_name().replace("on", ""),
+				closure.as_ref().unchecked_ref(),
+			)
+			.unwrap();
+		commands
+			.entity(entity)
+			.insert(DomClosureBinding(SendWrapper::new(closure)));
+	}
+	Ok(())
+}
+
+
+#[derive(SystemParam)]
+pub(super) struct GetDomBinding<'w, 's> {
+	commands: Commands<'w, 's>,
+	elements: Query<'w, 's, &'static DomElementBinding>,
+	constants: Res<'w, HtmlConstants>,
+}
+
+impl GetDomBinding<'_, '_> {
+	pub fn get_element(
+		&mut self,
+		entity: Entity,
+		idx: TreeIdx,
+	) -> Result<web_sys::HtmlElement> {
+		if let Ok(binding) = self.elements.get(entity) {
+			return Ok(binding.inner().clone());
+		}
+		let query =
+			format!("[{}='{}']", self.constants.tree_idx_key, idx.inner());
+		if let Some(el) = web_sys::window()
+			.unwrap()
+			.document()
+			.unwrap()
+			.query_selector(&query)
+			.unwrap()
+		{
+			let el = el.dyn_into::<web_sys::HtmlElement>().unwrap();
+
+			self.commands
+				.entity(entity)
+				.insert(DomElementBinding(SendWrapper::new(el.clone())));
+			return Ok(el);
+		} else {
+			return Err(format!(
+				"Element with TreeIdx {} not found",
+				idx.inner()
+			)
+			.into());
+		}
+	}
+}

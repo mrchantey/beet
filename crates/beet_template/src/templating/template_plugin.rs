@@ -10,6 +10,8 @@ pub struct SpawnStep;
 pub struct ApplyTransformsStep;
 #[derive(Debug, Clone, PartialEq, Eq, Hash, SystemSet)]
 pub struct RenderStep;
+#[derive(Debug, Clone, PartialEq, Eq, Hash, SystemSet)]
+pub struct BindStep;
 
 #[derive(Default)]
 pub struct TemplatePlugin;
@@ -17,12 +19,14 @@ pub struct TemplatePlugin;
 
 impl Plugin for TemplatePlugin {
 	fn build(&self, app: &mut App) {
+		app.add_plugins(signals_plugin);
 		app.init_resource::<HtmlConstants>()
 			.configure_sets(
 				Update,
 				(
 					ApplyTransformsStep.after(SpawnStep),
 					RenderStep.after(ApplyTransformsStep),
+					BindStep.after(RenderStep),
 				),
 			)
 			.add_systems(
@@ -34,7 +38,7 @@ impl Plugin for TemplatePlugin {
 					render_html.in_set(RenderStep),
 				),
 			)
-			.set_runner(SignalAppRunner::runner);
+			.set_runner(ReactiveApp::runner);
 		#[cfg(target_arch = "wasm32")]
 		app.add_plugins(wasm_template_plugin);
 	}

@@ -5,12 +5,12 @@ use std::cell::RefCell;
 /// By default an app will run in a continuous loop,
 /// but for ui applications we usually only want to run it after
 /// some user input.
-pub struct SignalAppRunner;
+pub struct ReactiveApp;
 thread_local! {
 	static APP: RefCell<Option<App>> = RefCell::new(None);
 }
 
-impl SignalAppRunner {
+impl ReactiveApp {
 	/// Consume the app, running it once then
 	/// storing it in a [`thread_local`] and returning immediately.
 	pub fn runner(mut app: App) -> AppExit {
@@ -34,17 +34,21 @@ impl SignalAppRunner {
 		APP.with(|app_ref| {
 			let mut app_cell = app_ref.borrow_mut();
 			let app = app_cell.as_mut().expect(
-				"App not initialized. plese call app.set_runner(SignalAppRunner::runner).run()");
+				"ReactiveApp not initialized. plese call app.set_runner(ReactiveApp::runner).run()");
 				func(app)
 			})
 	}
 
-	/// Try to access the thread local [`App`], returns None if not initialized.
+	/// Try to access the thread local [`App`], returns None if 
+	/// already borrowed or uninitialized.
 	pub fn try_with<O>(func: impl FnOnce(&mut App) -> O) -> Option<O> {
 		APP.with(|app_ref| {
-			let mut app_cell = app_ref.borrow_mut();
-			let app = app_cell.as_mut()?;
-			Some(func(app))
+			if let Ok(mut app_cell) = app_ref.try_borrow_mut() {
+				let app = app_cell.as_mut()?;
+				Some(func(app))
+			} else {
+				None
+			}
 		})
 	}
 

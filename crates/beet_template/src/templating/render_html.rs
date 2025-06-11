@@ -14,7 +14,13 @@ pub fn bundle_to_html(bundle: impl Bundle) -> String {
 	struct SharedTemplateApp;
 
 	impl SharedTemplateApp {
-		pub fn with<O>(func: impl FnOnce(&mut App) -> O) -> O {
+		#[allow(unused)]
+		fn with_new<O>(func: impl FnOnce(&mut App) -> O) -> O {
+			let mut app = App::new();
+			app.add_plugins(TemplatePlugin);
+			func(&mut app)
+		}
+		fn with<O>(func: impl FnOnce(&mut App) -> O) -> O {
 			thread_local! {
 				static TEMPLATE_APP: RefCell<Option<App>> = RefCell::new(None);
 			}
@@ -34,6 +40,7 @@ pub fn bundle_to_html(bundle: impl Bundle) -> String {
 			})
 		}
 	}
+
 
 	SharedTemplateApp::with(|app| {
 		let entity = app.world_mut().spawn((bundle, ToHtml)).id();
@@ -251,10 +258,10 @@ mod test {
 	}
 	#[test]
 	fn signal_text_nodes() {
-		let (get,_set) = signal("foo");
+		let (get, _set) = signal("foo");
 		rsx! {<div>{get}</div>}
-		.xmap(bundle_to_html)
-		.xpect()
-		.to_be("<div data-beet-rsx-idx=\"0\">foo</div>");
+			.xmap(bundle_to_html)
+			.xpect()
+			.to_be("<div data-beet-rsx-idx=\"0\">foo</div>");
 	}
 }

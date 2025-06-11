@@ -87,8 +87,10 @@ run-p crate example *args:
 run-b crate *args:
 	just watch cargo run -p {{crate}} --bin run-build --features=build {{args}}
 
-
 run-csr:
+	just watch just build-csr
+
+build-csr:
 	cargo build --example csr --target-dir=target --features=template --target wasm32-unknown-unknown
 	wasm-bindgen --out-dir target/csr-demo/wasm --out-name main --target web --no-typescript target/wasm32-unknown-unknown/debug/examples/csr.wasm
 	cp examples/dom/csr.html target/csr-demo/index.html

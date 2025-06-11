@@ -4,21 +4,13 @@ use bevy::ecs::component::HookContext;
 use bevy::ecs::world::DeferredWorld;
 use bevy::prelude::*;
 
-/// Systems for mounting client-only bundles
-pub fn client_only_plugin(app: &mut App) {
-	app.world_mut().add_observer(mount_html);
-	app.world_mut()
-		.register_component_hooks::<ClientOnlyDirective>()
-		.on_add(on_add_client_only);
-}
-
 // all client-only nodes need to render html
 // we cant require because downstream crate
-fn on_add_client_only(mut world: DeferredWorld, cx: HookContext) {
+pub(super) fn on_add_client_only(mut world: DeferredWorld, cx: HookContext) {
 	world.commands().entity(cx.entity).insert(ToHtml);
 }
 
-fn mount_html(
+pub(super) fn mount_html(
 	ev: Trigger<OnAdd, RenderedHtml>,
 	query: Populated<&RenderedHtml, With<ClientOnlyDirective>>,
 ) {
@@ -26,6 +18,10 @@ fn mount_html(
 		mount(&html.0);
 	}
 }
+/// ensure all text nodes are collapsed, critical when mounting
+/// nodes via append_child
+#[allow(unused)]
+fn normalize() { web_sys::window().unwrap().document().unwrap().normalize(); }
 
 fn mount(html: &str) {
 	// let html = bundle_to_html(bundle);
@@ -51,9 +47,8 @@ mod test {
 	use sweet::prelude::*;
 
 	#[test]
-	// panics because deno no window. 
-	// we should eventually mock the dom
-	#[should_panic]
+	// we cant do anything with this because
+	// deno no document, eventually we should mock the dom
 	fn works() {
 		App::new()
 			.add_plugins(TemplatePlugin)
