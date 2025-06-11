@@ -1,57 +1,49 @@
+//! Slotting is the process of traversing the [RsxComponent::slot_children]
+//! and applying them to the [RsxComponent::node] in the corresponding slots.
+//!
+//! ## Example
+//! ```
+//! # use beet_template::as_beet::*;
+//! # use bevy::prelude::*;
+//!
+//!
+//! #[template]
+//! fn MyComponent() -> impl Bundle {
+//! 	rsx!{
+//! 		<html>
+//! 			<slot name="header"/>
+//! 			<slot/> //default
+//! 		</html>
+//! 	}
+//! }
+//! assert_eq!(
+//! 	bundle_to_html(rsx!{
+//! 		<MyComponent>
+//!  			<div slot="header">Header</div>
+//! 			<div>Default</div>
+//!  		</MyComponent>
+//! 	}),
+//! 	"<html><div>Header</div><div>Default</div></html>"
+//! );
+//!
+//! ```
+//!
+//! ## Slot Rules
+//!
+//! - Slot children will be inserted into the first slot with a matching name
+//! - Only top level slots are supported to avoid 'slot stealing'
+//! - Any unconsumed slot children will return in an error
+//! - For unnamed slots `<div/>`, they will be inserted in the components default <slot/>
+//! - All <slot> elements are replaced with a <fragment> element containing the
+//! 	slot children.
+//! - 'Slot Transfers' are supported, ie <slot name="header" slot="default"/>
+//!   see https://docs.astro.build/en/basics/astro-components/#transferring-slots
 use crate::prelude::*;
 use beet_common::node::SlotChild;
 use beet_common::node::SlotTarget;
 use bevy::platform::collections::HashSet;
 use bevy::prelude::*;
 use sweet::prelude::HierarchyQueryExtExt;
-
-
-/// Slotting is the process of traversing the [RsxComponent::slot_children]
-/// and applying them to the [RsxComponent::node] in the corresponding slots.
-///
-/// ## Example
-/// ```
-/// # use beet_template::as_beet::*;
-/// # use bevy::prelude::*;
-///
-///
-/// #[template]
-/// fn MyComponent() -> impl Bundle {
-/// 	rsx!{
-/// 		<html>
-/// 			<slot name="header"/>
-/// 			<slot/> //default
-/// 		</html>
-/// 	}
-/// }
-/// assert_eq!(
-/// 	bundle_to_html(rsx!{
-/// 		<MyComponent>
-///  			<div slot="header">Header</div>
-/// 			<div>Default</div>
-///  		</MyComponent>
-/// 	}),
-/// 	"<html><div>Header</div><div>Default</div></html>"
-/// );
-///
-/// ```
-///
-/// ## Slot Rules
-///
-/// - Slot children will be inserted into the first slot with a matching name
-/// - Only top level slots are supported to avoid 'slot stealing'
-/// - Any unconsumed slot children will return in an error
-/// - For unnamed slots `<div/>`, they will be inserted in the components default <slot/>
-/// - All <slot> elements are replaced with a <fragment> element containing the
-/// 	slot children.
-/// - 'Slot Transfers' are supported, ie <slot name="header" slot="default"/>
-///   see https://docs.astro.build/en/basics/astro-components/#transferring-slots
-pub fn apply_slots_plugin(app: &mut App) {
-	app.add_systems(Update, apply_slots.in_set(ApplyTransformsStep));
-}
-
-
-
 
 /// Applying slots has several steps:
 /// 1. Collect all slot children.

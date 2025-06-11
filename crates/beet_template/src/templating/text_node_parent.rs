@@ -4,17 +4,6 @@ use bevy::ecs::system::SystemParam;
 use bevy::prelude::*;
 use sweet::prelude::HierarchyQueryExtExt;
 
-
-pub fn apply_text_node_parents_plugin(app: &mut App) {
-	app.add_systems(
-		Update,
-		apply_text_node_parents
-			.after(super::apply_slots)
-			.in_set(ApplyTransformsStep),
-	);
-}
-
-
 pub(super) fn apply_text_node_parents(
 	mut commands: Commands,
 	query: Populated<(Entity, &Children), With<ElementNode>>,
@@ -33,7 +22,8 @@ pub(super) fn apply_text_node_parents(
 #[derive(SystemParam)]
 pub(super) struct Parser<'w, 's> {
 	fragment_children: Query<'w, 's,&'static Children,Without<ElementNode>>,
-	texts: Query<'w, 's, &'static TextNode>,
+	signal_texts: Query<'w, 's, &'static TextNode,With<SignalReceiver<String>>>,
+	static_texts: Query<'w, 's, &'static TextNode,Without<SignalReceiver<String>>>,
 	breaks: Query<'w, 's, (),Or<(With<DoctypeNode>, With<CommentNode>, With<ElementNode>)>>,
 }
 
@@ -48,7 +38,7 @@ impl Parser<'_, '_> {
 		}
 		if out
 			.iter()
-			.any(|node| matches!(node, CollapsedNode::Text(_)))
+			.any(|node| matches!(node, CollapsedNode::SignalText(_)))
 		{
 			Some(out)
 		} else {
@@ -58,11 +48,11 @@ impl Parser<'_, '_> {
 
 	// we must dfs because thats the order in which a collapse occurs
 	fn append(&self, out: &mut Vec<CollapsedNode>, entity: Entity) {
-		if let Ok(text) = self.texts.get(entity) {
-			// if we have a text node, we push it
-			out.push(CollapsedNode::Text(text.0.clone()));
+		if let Ok(text) = self.signal_texts.get(entity) {
+			out.push(CollapsedNode::SignalText(text.0.clone()));
+		} else if let Ok(text) = self.static_texts.get(entity) {
+			out.push(CollapsedNode::StaticText(text.0.clone()));
 		} else if self.breaks.contains(entity) {
-			// if we have a break, we push it
 			out.push(CollapsedNode::Break);
 		} else {
 			// do nothing, its a fragment
@@ -82,8 +72,9 @@ impl Parser<'_, '_> {
 }
 
 
-/// An [`ElementNode`] with one or more [`TextNode`] children. This component
-/// contains the split positions of the text nodes, which can be used to
+/// An [`ElementNode`] with one or more [`TextNode`] children with a [`SignalReceiver<String>`],
+/// meaning it can be used for reactive text updates.
+/// This component contains the split positions of the text nodes, which can be used to
 /// 'uncollapse' adjacent html text nodes.
 #[derive(Debug, Clone, Component, Reflect)]
 #[reflect(Component)]
@@ -107,7 +98,10 @@ impl TextNodeParent {
 
 		for node in collapsed_nodes.into_iter() {
 			match node {
-				CollapsedNode::Text(t) => {
+				CollapsedNode::SignalText(t) => {
+					push(t.len(), child_index);
+				}
+				CollapsedNode::StaticText(t) => {
 					push(t.len(), child_index);
 				}
 				CollapsedNode::Break => {
@@ -126,26 +120,15 @@ impl TextNodeParent {
 }
 
 
-
-
-
-
 #[derive(Debug, Clone, PartialEq)]
 enum CollapsedNode {
-	/// A [`TextNode`]
-	Text(String),
+	/// A [`TextNode`] with a [`SignalReceiver<String>`]
+	SignalText(String),
+	/// A [`TextNode`] without a [`SignalReceiver<String>`]
+	StaticText(String),
 	/// A [`DoctypeNode`], [`CommentNode`], or [`ElementNode`] which would
 	/// break an adjacent [`TextNode`] collapse
 	Break,
-}
-impl CollapsedNode {
-	#[allow(unused)]
-	pub(crate) fn as_str(&self) -> &str {
-		match self {
-			CollapsedNode::Text(val) => val,
-			CollapsedNode::Break => "|",
-		}
-	}
 }
 
 #[cfg(test)]
@@ -189,13 +172,13 @@ mod test {
 	fn roundtrip() {
 		let desc = "quick";
 		let color = "brown";
-		let action = "jumps over";
+		let (get, _set) = signal("jumps over".to_string());
 
 		let mut world = World::new();
 		let entity = world
 			.spawn(rsx! {
 				<div>
-					"The "{desc}" and "{color}<b>fox</b> {action}" the "
+					"The "{desc}" and "{color}<b>fox</b> {get}" the "
 					<Adjective>and fat</Adjective>dog
 				</div>
 			})
@@ -212,16 +195,16 @@ mod test {
 			.unwrap()
 			.xpect()
 			.to_be(vec![
-				CollapsedNode::Text("The ".into()),
-				CollapsedNode::Text("quick".into()),
-				CollapsedNode::Text(" and ".into()),
-				CollapsedNode::Text("brown".into()),
+				CollapsedNode::StaticText("The ".into()),
+				CollapsedNode::StaticText("quick".into()),
+				CollapsedNode::StaticText(" and ".into()),
+				CollapsedNode::StaticText("brown".into()),
 				CollapsedNode::Break,
-				CollapsedNode::Text("jumps over".into()),
-				CollapsedNode::Text(" the ".into()),
-				CollapsedNode::Text("lazy".into()),
+				CollapsedNode::SignalText("jumps over".into()),
+				CollapsedNode::StaticText(" the ".into()),
+				CollapsedNode::StaticText("lazy".into()),
 				CollapsedNode::Break,
-				CollapsedNode::Text("dog\n\t\t\t\t".into()),
+				CollapsedNode::StaticText("dog\n\t\t\t\t".into()),
 			]);
 	}
 }

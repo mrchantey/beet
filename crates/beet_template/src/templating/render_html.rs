@@ -49,10 +49,6 @@ pub fn bundle_to_html(bundle: impl Bundle) -> String {
 	})
 }
 
-pub fn render_html_plugin(app: &mut App) {
-	app.add_systems(Update, render_html.in_set(RenderStep));
-}
-
 /// Marker indicating that the entity should be converted to HTML,
 /// appending a [`RenderedHtml`] component.
 #[derive(Default, Component, Reflect)]
@@ -64,7 +60,7 @@ pub struct ToHtml;
 pub struct RenderedHtml(pub String);
 
 
-fn render_html(
+pub(super) fn render_html(
 	mut commands: Commands,
 	query: Populated<Entity, Added<ToHtml>>,
 	builder: Builder,
@@ -77,10 +73,10 @@ fn render_html(
 }
 
 
-// TODO bench this approach vs concatenating parallel systems 
+// TODO bench this approach vs concatenating parallel systems
 #[rustfmt::skip]
 #[derive(SystemParam)]
-struct Builder<'w, 's> {
+pub(super) struct Builder<'w, 's> {
 	elements: Query<'w,'s,(
 		&'static ElementNode,
 		&'static NodeTag,
@@ -245,5 +241,20 @@ mod test {
 		.xmap(bundle_to_html)
 		.xpect()
 		.to_be("outer<div class=\"container\"><span>hello</span></div>");
+	}
+	#[test]
+	fn events() {
+		rsx! {<div onclick={||{}}/>}
+			.xmap(bundle_to_html)
+			.xpect()
+			.to_be("<div data-beet-rsx-idx=\"0\"/>");
+	}
+	#[test]
+	fn signal_text_nodes() {
+		let (get,_set) = signal("foo");
+		rsx! {<div>{get}</div>}
+		.xmap(bundle_to_html)
+		.xpect()
+		.to_be("<div data-beet-rsx-idx=\"0\">foo</div>");
 	}
 }

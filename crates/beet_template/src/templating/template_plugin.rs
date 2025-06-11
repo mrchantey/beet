@@ -1,3 +1,4 @@
+use super::*;
 use crate::prelude::*;
 use beet_common::node::HtmlConstants;
 use bevy::ecs::schedule::SystemSet;
@@ -24,12 +25,19 @@ impl Plugin for TemplatePlugin {
 					RenderStep.after(ApplyTransformsStep),
 				),
 			)
-			.add_plugins((
-				apply_slots_plugin,
-				apply_tree_idx_plugin,
-				apply_text_node_parents_plugin,
-				render_html_plugin,
-			))
+			.add_systems(
+				Update,
+				(
+					(
+						apply_slots,
+						(apply_tree_idx, apply_text_node_parents),
+						add_tree_idx_attributes,
+					)
+						.chain()
+						.in_set(ApplyTransformsStep),
+					render_html.in_set(RenderStep),
+				),
+			)
 			.set_runner(SignalAppRunner::runner);
 		#[cfg(target_arch = "wasm32")]
 		app.add_plugins(wasm_template_plugin);

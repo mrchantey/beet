@@ -195,7 +195,7 @@ test-template *args:
 	{{min-stack}} cargo test -p beet_common 					--all-features 	 	 																	{{args}} -- {{test-threads}}
 	{{min-stack}} cargo test -p beet_parse 						--all-features 	 	 																	{{args}} -- {{test-threads}}
 	{{min-stack}} cargo test -p beet_template_macros 	--all-features 	 	 																	{{args}} -- {{test-threads}}
-	{{min-stack}} cargo test -p beet_template					--all-features 	 	 																	{{args}} -- {{test-threads}}
+	{{min-stack}} cargo test -p beet_template					 	 	 																								{{args}} -- {{test-threads}}
 	{{min-stack}} cargo test -p beet_router						--all-features 	 	 																	{{args}} -- {{test-threads}}
 	{{min-stack}} cargo test -p beet_server						--all-features 	 	 																	{{args}} -- {{test-threads}}
 

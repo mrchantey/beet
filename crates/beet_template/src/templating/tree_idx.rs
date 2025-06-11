@@ -4,18 +4,7 @@ use bevy::prelude::*;
 use sweet::prelude::HierarchyQueryExtExt;
 
 
-pub fn apply_tree_idx_plugin(app: &mut App) {
-	app.add_systems(
-		Update,
-		(
-			apply_tree_idx.after(super::apply_slots),
-			add_tree_idx_attributes.after(super::apply_text_node_parents),
-		)
-			.in_set(ApplyTransformsStep),
-	);
-}
-
-fn apply_tree_idx(
+pub(super) fn apply_tree_idx(
 	mut commands: Commands,
 	query: Populated<Entity, Added<ToHtml>>,
 	children: Query<&Children>,
@@ -33,7 +22,7 @@ fn apply_tree_idx(
 /// Currently only [`EventObserver`] and [`TextNodeParent`] elements are
 /// the only ones that require a [`TreeIdx`] attribute
 // see render_html.rs for tests
-fn add_tree_idx_attributes(
+pub(super) fn add_tree_idx_attributes(
 	mut commands: Commands,
 	html_constants: Res<HtmlConstants>,
 	requires_tree_idx_attr: Query<
@@ -91,7 +80,7 @@ mod test {
 	use sweet::prelude::*;
 
 	#[test]
-	fn works() {
+	fn applies_bfs_ids() {
 		let mut world = World::new();
 		let entity = world
 			.spawn((
