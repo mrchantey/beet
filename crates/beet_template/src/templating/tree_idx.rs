@@ -9,14 +9,29 @@ use bevy::prelude::*;
 pub(super) fn apply_tree_idx(
 	mut commands: Commands,
 	html_constants: Res<HtmlConstants>,
-	requires_tree_idx_attr: Populated<
+	query: Populated<Entity, With<ElementNode>>,
+	requires_tree_idx_attr: Query<
 		Entity,
 		Or<(Added<EventObserver>, Added<TextNodeParent>)>,
 	>,
+	attributes: Query<&Attributes>,
+	dyn_attrs: Query<(), (With<AttributeOf>, Added<SignalReceiver<String>>)>,
 ) {
 	let mut id = 0;
 
-	for entity in requires_tree_idx_attr.iter() {
+	let needs_id = |entity: Entity| {
+		requires_tree_idx_attr.contains(entity)
+			|| attributes
+				.get(entity)
+				.map(|attrs| attrs.iter().any(|attr| dyn_attrs.contains(attr)))
+				.unwrap_or(false)
+	};
+
+	for entity in query.iter() {
+		if !needs_id(entity) {
+			continue;
+		}
+
 		commands.entity(entity).insert(TreeIdx::new(id));
 
 		commands.spawn((

@@ -36,12 +36,15 @@ fn setup(mut commands: Commands) {
 #[derive(serde::Serialize)]
 fn Counter(initial: u32) -> impl Bundle {
 	let (get, set) = signal(initial);
+	let (style, set_style) = signal("display: block;");
 
 	rsx! {
 			<p>Count: {get}</p>
-			<button onclick={move || {
-				set(get()+1);
-				sweet::log!("clicked! {}", get());
-			}}>Increment</button>
+			<button onclick={move || set(get()+1)}>Increment</button>
+			<button
+				style={style}
+				onclick={move || set_style("display: none;")}>
+				Hide Me
+			</button>
 	}
 }

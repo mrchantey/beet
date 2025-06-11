@@ -25,8 +25,10 @@ pub fn wasm_template_plugin(app: &mut App) {
 	app.add_systems(
 		Update,
 		(
-			(bind_events, bind_text_nodes).in_set(BindStep),
-			update_text_nodes.after(ReceiveSignalStep),
+			(bind_events, bind_text_nodes, bind_attribute_values)
+				.in_set(BindStep),
+			(update_text_nodes, update_attribute_values)
+				.after(ReceiveSignalStep),
 		),
 	);
 }

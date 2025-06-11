@@ -87,7 +87,6 @@ impl<T> AttributeValue<T> {
 /// For literal attribute value types like strings, numbers, and booleans,
 /// store the stringified version of the value.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Deref, DerefMut, Component)]
-#[component(immutable)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "tokens", derive(ToTokens))]
 pub struct AttributeValueStr(pub String);

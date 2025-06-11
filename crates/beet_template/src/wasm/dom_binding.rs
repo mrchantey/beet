@@ -6,6 +6,8 @@ use send_wrapper::SendWrapper;
 use wasm_bindgen::JsCast;
 use wasm_bindgen::prelude::Closure;
 
+
+/// Added to element entities and dynamic attribute entities
 #[derive(Component, Deref)]
 pub struct DomElementBinding(SendWrapper<web_sys::HtmlElement>);
 impl DomElementBinding {
@@ -23,6 +25,27 @@ impl DomTextBinding {
 pub struct DomClosureBinding(
 	SendWrapper<wasm_bindgen::prelude::Closure<dyn FnMut(web_sys::Event)>>,
 );
+pub(super) fn update_text_nodes(
+	_: TempNonSendMarker,
+	query: Populated<(&TextNode, &DomTextBinding), Changed<TextNode>>,
+) -> Result<()> {
+	for (text, node) in query.iter() {
+		node.set_data(text);
+	}
+	Ok(())
+}
+pub(super) fn update_attribute_values(
+	_: TempNonSendMarker,
+	query: Populated<
+		(&AttributeKeyStr, &AttributeValueStr, &DomElementBinding),
+		Changed<AttributeValueStr>,
+	>,
+) -> Result<()> {
+	for (key, value, el) in query.iter() {
+		el.set_attribute(&key.0, &value.0);
+	}
+	Ok(())
+}
 
 /// lazily uncollapse text nodes and bind to the DOM
 pub(super) fn bind_text_nodes(
@@ -38,8 +61,6 @@ pub(super) fn bind_text_nodes(
 		),
 	>,
 ) -> Result<()> {
-	sweet::log!("el: {:?}", elements.iter().next().unwrap().0);
-
 	for entity in query.iter() {
 		// 1. get the parent element
 		let Some((parent_entity, parent_idx, text_node_parent)) = parents
@@ -106,12 +127,33 @@ Please ensure that any text nodes are wrapped in an ElementNode:
 	}
 	Ok(())
 }
-pub(super) fn update_text_nodes(
-	_: TempNonSendMarker,
-	query: Populated<(&TextNode, &DomTextBinding), Changed<TextNode>>,
+
+pub(super) fn bind_attribute_values(
+	mut commands: Commands,
+	mut get_binding: GetDomBinding,
+	elements: Query<(Entity, &TreeIdx)>,
+	query: Populated<
+		(Entity, &AttributeOf),
+		(
+			Changed<AttributeValueStr>,
+			(With<SignalReceiver<String>>, Without<DomElementBinding>),
+		),
+	>,
 ) -> Result<()> {
-	for (text, node) in query.iter() {
-		node.set_data(text);
+	for (entity, parent) in query.iter() {
+		let Ok((parent_entity, parent_idx)) = elements.get(parent.entity())
+		else {
+			return Err(format!(
+				"AttributeOf {} has no parent ElementNode",
+				entity
+			)
+			.into());
+		};
+
+		let element = get_binding.get_element(parent_entity, *parent_idx)?;
+		commands
+			.entity(entity)
+			.insert(DomElementBinding(SendWrapper::new(element)));
 	}
 	Ok(())
 }
