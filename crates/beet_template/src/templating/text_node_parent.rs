@@ -10,8 +10,9 @@ pub(super) fn apply_text_node_parents(
 	parser: Parser,
 ) {
 	for (entity, children) in query.iter() {
-		if let Some(nodes) = parser.parse(children) {
-			commands.entity(entity).insert(TextNodeParent::new(nodes));
+		let nodes = parser.parse(children);
+		if let Some(parent) = TextNodeParent::try_from_collapsed(nodes) {
+			commands.entity(entity).insert(parent);
 		}
 	}
 }
@@ -31,27 +32,25 @@ pub(super) struct Parser<'w, 's> {
 impl Parser<'_, '_> {
 	/// Parse the children of this element into a vector of [`CollapsedNode`],
 	/// which can be used to create a [`TextNodeParent`].
-	fn parse(&self, children: &Children) -> Option<Vec<CollapsedNode>> {
+	fn parse(&self, children: &Children) -> Vec<CollapsedNode> {
 		let mut out = Vec::new();
 		for child in children.iter() {
 			self.append(&mut out, child);
 		}
-		if out
-			.iter()
-			.any(|node| matches!(node, CollapsedNode::SignalText(_)))
-		{
-			Some(out)
-		} else {
-			None
-		}
+		out
 	}
 
 	// we must dfs because thats the order in which a collapse occurs
 	fn append(&self, out: &mut Vec<CollapsedNode>, entity: Entity) {
 		if let Ok(text) = self.signal_texts.get(entity) {
-			out.push(CollapsedNode::SignalText(text.0.clone()));
+			out.push(CollapsedNode::SignalText {
+				entity,
+				value: text.0.clone(),
+			});
 		} else if let Ok(text) = self.static_texts.get(entity) {
-			out.push(CollapsedNode::StaticText(text.0.clone()));
+			out.push(CollapsedNode::StaticText {
+				value: text.0.clone(),
+			});
 		} else if self.breaks.contains(entity) {
 			out.push(CollapsedNode::Break);
 		} else {
@@ -76,46 +75,64 @@ impl Parser<'_, '_> {
 /// meaning it can be used for reactive text updates.
 /// This component contains the split positions of the text nodes, which can be used to
 /// 'uncollapse' adjacent html text nodes.
-#[derive(Debug, Clone, Component, Reflect)]
+#[derive(Debug, Clone, PartialEq, Eq, Component, Reflect)]
 #[reflect(Component)]
 pub struct TextNodeParent {
-	pub split_positions: Vec<Vec<usize>>,
+	pub text_nodes: Vec<TextNodeChild>,
 }
-impl TextNodeParent {
-	fn new(collapsed_nodes: Vec<CollapsedNode>) -> Self {
-		let mut child_index = 0;
-		let mut split_positions: Vec<Vec<usize>> = Vec::new();
 
-		let mut push = |pos: usize, child_index: usize| match split_positions
-			.get_mut(child_index)
-		{
-			Some(vec) => vec.push(pos),
-			None => {
-				split_positions.resize(child_index + 1, Vec::new());
-				split_positions.last_mut().unwrap().push(pos);
-			}
-		};
+#[derive(Debug, Clone, PartialEq, Eq, Reflect)]
+pub struct TextNodeChild {
+	/// The *post-collapse* index of this html TextNode.
+	pub child_index: usize,
+	/// A vec of next index to split text at, and optionally the signal entity
+	/// that should be assigned a pointer to the node on uncollapse.
+	pub split_positions: Vec<(Option<Entity>, usize)>,
+}
+impl TextNodeChild {
+	pub fn new(child_index: usize) -> Self {
+		Self {
+			child_index,
+			split_positions: Vec::new(),
+		}
+	}
+}
+
+impl TextNodeParent {
+	fn try_from_collapsed(collapsed_nodes: Vec<CollapsedNode>) -> Option<Self> {
+		// track which *post-collapse* index we are up to
+		let mut child_index = 0;
+		let mut text_nodes = Vec::new();
+		let mut current_child = TextNodeChild::new(child_index);
 
 		for node in collapsed_nodes.into_iter() {
 			match node {
-				CollapsedNode::SignalText(t) => {
-					push(t.len(), child_index);
+				CollapsedNode::SignalText { entity, value } => {
+					current_child
+						.split_positions
+						.push((Some(entity), value.len()));
 				}
-				CollapsedNode::StaticText(t) => {
-					push(t.len(), child_index);
+				CollapsedNode::StaticText { value } => {
+					current_child.split_positions.push((None, value.len()));
 				}
 				CollapsedNode::Break => {
 					child_index += 1;
+					text_nodes.push(std::mem::replace(
+						&mut current_child,
+						TextNodeChild::new(child_index),
+					));
 				}
 			}
 		}
-
-		// no need to split at the last index
-		for pos in split_positions.iter_mut() {
-			pos.pop();
+		text_nodes.push(current_child);
+		text_nodes.retain(|child| {
+			child.split_positions.iter().any(|node| node.0.is_some())
+		});
+		if text_nodes.is_empty() {
+			None
+		} else {
+			Some(Self { text_nodes })
 		}
-		split_positions.retain(|pos| !pos.is_empty());
-		Self { split_positions }
 	}
 }
 
@@ -123,9 +140,9 @@ impl TextNodeParent {
 #[derive(Debug, Clone, PartialEq)]
 enum CollapsedNode {
 	/// A [`TextNode`] with a [`SignalReceiver<String>`]
-	SignalText(String),
+	SignalText { entity: Entity, value: String },
 	/// A [`TextNode`] without a [`SignalReceiver<String>`]
-	StaticText(String),
+	StaticText { value: String },
 	/// A [`DoctypeNode`], [`CommentNode`], or [`ElementNode`] which would
 	/// break an adjacent [`TextNode`] collapse
 	Break,
@@ -136,6 +153,7 @@ mod test {
 	use super::CollapsedNode;
 	use crate::as_beet::*;
 	use crate::templating::apply_slots;
+	use crate::templating::apply_text_node_parents;
 	use crate::templating::text_node_parent::Parser;
 	use bevy::ecs::system::RunSystemOnce;
 	use bevy::prelude::*;
@@ -166,7 +184,7 @@ mod test {
 			)
 			.unwrap()
 			.xpect()
-			.to_be_none();
+			.to_be(vec![CollapsedNode::Break]);
 	}
 	#[test]
 	fn roundtrip() {
@@ -192,19 +210,53 @@ mod test {
 				},
 			)
 			.unwrap()
-			.unwrap()
 			.xpect()
 			.to_be(vec![
-				CollapsedNode::StaticText("The ".into()),
-				CollapsedNode::StaticText("quick".into()),
-				CollapsedNode::StaticText(" and ".into()),
-				CollapsedNode::StaticText("brown".into()),
+				CollapsedNode::StaticText {
+					value: "The ".into(),
+				},
+				CollapsedNode::StaticText {
+					value: "quick".into(),
+				},
+				CollapsedNode::StaticText {
+					value: " and ".into(),
+				},
+				CollapsedNode::StaticText {
+					value: "brown".into(),
+				},
 				CollapsedNode::Break,
-				CollapsedNode::SignalText("jumps over".into()),
-				CollapsedNode::StaticText(" the ".into()),
-				CollapsedNode::StaticText("lazy".into()),
+				CollapsedNode::SignalText {
+					entity: Entity::from_raw(7),
+					value: "jumps over".into(),
+				},
+				CollapsedNode::StaticText {
+					value: " the ".into(),
+				},
+				CollapsedNode::StaticText {
+					value: "lazy".into(),
+				},
 				CollapsedNode::Break,
-				CollapsedNode::StaticText("dog\n\t\t\t\t".into()),
+				CollapsedNode::StaticText {
+					value: "dog\n\t\t\t\t".into(),
+				},
 			]);
+
+		world.run_system_once(apply_text_node_parents).unwrap();
+
+		world
+			.entity(entity)
+			.get::<TextNodeParent>()
+			.unwrap()
+			.xpect()
+			.to_be(&TextNodeParent {
+				text_nodes: vec![TextNodeChild {
+					child_index: 1,
+					split_positions: vec![
+						(Some(Entity::from_raw(7)), 10),
+						(None, 5),
+						(None, 4),
+					],
+				}],
+			});
 	}
 }
