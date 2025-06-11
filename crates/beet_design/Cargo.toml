@@ -18,6 +18,7 @@ publish = true
 # required-features = ["build"]
 
 [features]
+_test_lightningcss = ["dep:lightningcss"]
 
 [dependencies]
 anyhow.workspace = true
@@ -30,10 +31,10 @@ heck.workspace = true
 material-colors = "0.4.2"
 
 serde.workspace = true
+lightningcss = { workspace = true, optional = true }
 
 [dev-dependencies]
 sweet = { workspace = true, features = ["test"] }
-lightningcss.workspace = true
 
 [build-dependencies]
 anyhow.workspace = true

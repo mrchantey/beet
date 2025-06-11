@@ -22,7 +22,8 @@ pub struct NodeTag(pub String);
 #[cfg_attr(feature = "tokens", derive(ToTokens))]
 pub struct TemplateNode;
 
-/// Applied to non-visual nodes with children.
+/// Applied to non-visual nodes with children, this component enables
+/// querying for entities that *are* a node but *are not* an element.
 /// Every [`TemplateNode`] is a [`FragmentNode`]
 #[derive(Debug, Default, Copy, Clone, Component, Reflect)]
 #[reflect(Default, Component)]

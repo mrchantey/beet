@@ -13,7 +13,9 @@ categories.workspace = true
 keywords.workspace = true
 
 [features]
-default = ["markdown", "css"]
+default = ["markdown"]
+# should usually be enabled but slows down rust analyzer
+# default = ["markdown", "css"] 
 markdown = ["dep:pulldown-cmark"]
 css = ["dep:lightningcss", "dep:parcel_selectors"]
 

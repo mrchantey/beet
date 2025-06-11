@@ -41,7 +41,6 @@ pub fn bundle_to_html(bundle: impl Bundle) -> String {
 		}
 	}
 
-
 	SharedTemplateApp::with(|app| {
 		let entity = app.world_mut().spawn((bundle, ToHtml)).id();
 		app.update();
