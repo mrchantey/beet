@@ -26,6 +26,7 @@ beet_common.workspace = true
 sweet = { workspace = true, features = ["bevy"] }
 
 #💡 utils
+send_wrapper.workspace = true
 anyhow.workspace = true
 thiserror.workspace = true
 extend.workspace = true

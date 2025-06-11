@@ -1,7 +1,8 @@
 //! Example of Client-Side Rendering (CSR) with Beet and Bevy.
 //!
 //! Note that this approach is not recommended because the entire wasm
-//! app must be built and run before the HTML is rendered.
+//! app must be built and run before the HTML is rendered, resulting in a long time
+//! to first paint.
 //!
 //! That said, here's an example of how to build with vanilla wasm-bindgen.
 //! ```sh

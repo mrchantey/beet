@@ -2,8 +2,6 @@ pub mod rusty_tracker;
 pub use rusty_tracker::*;
 mod into_template_bundle;
 pub use into_template_bundle::*;
-mod events;
-pub use events::*;
 #[cfg(feature = "tokens")]
 mod attribute_tokens;
 #[cfg(feature = "tokens")]
@@ -38,7 +36,7 @@ pub fn node_types_plugin(app: &mut bevy::prelude::App) {
 		// .register_type::<AttributeKeyStr>()
 		// .register_type::<AttributeValueStr>()
 		// misc
-		.register_type::<OnClick>()
+		// .register_type::<OnClick>()
 		.register_type::<ItemOf<TemplateNode, FileSpan>>()
 		.register_type::<ItemOf<FragmentNode, FileSpan>>()
 		.register_type::<ItemOf<TextNode, FileSpan>>()

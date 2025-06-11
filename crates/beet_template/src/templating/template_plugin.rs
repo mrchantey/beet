@@ -28,11 +28,7 @@ impl Plugin for TemplatePlugin {
 			.add_systems(
 				Update,
 				(
-					(
-						apply_slots,
-						(apply_tree_idx, apply_text_node_parents),
-						add_tree_idx_attributes,
-					)
+					(apply_slots, apply_text_node_parents, apply_tree_idx)
 						.chain()
 						.in_set(ApplyTransformsStep),
 					render_html.in_set(RenderStep),

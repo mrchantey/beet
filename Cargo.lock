@@ -1097,6 +1097,7 @@ dependencies = [
  "prettyplease",
  "rapidhash",
  "ron",
+ "send_wrapper",
  "serde",
  "strum",
  "strum_macros",

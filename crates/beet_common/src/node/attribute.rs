@@ -60,7 +60,7 @@ impl AttributeLit {
 pub struct AttributeKeyStr(pub String);
 
 impl AttributeKeyStr {
-	pub fn new(value: String) -> Self { Self(value) }
+	pub fn new(value: impl Into<String>) -> Self { Self(value.into()) }
 }
 
 
@@ -93,5 +93,5 @@ impl<T> AttributeValue<T> {
 pub struct AttributeValueStr(pub String);
 
 impl AttributeValueStr {
-	pub fn new(value: String) -> Self { Self(value) }
+	pub fn new(value: impl Into<String>) -> Self { Self(value.into()) }
 }

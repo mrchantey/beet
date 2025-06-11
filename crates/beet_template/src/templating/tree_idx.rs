@@ -1,41 +1,30 @@
 use crate::prelude::*;
 use beet_common::as_beet::*;
 use bevy::prelude::*;
-use sweet::prelude::HierarchyQueryExtExt;
 
-
-pub(super) fn apply_tree_idx(
-	mut commands: Commands,
-	query: Populated<Entity, Added<ToHtml>>,
-	children: Query<&Children>,
-) {
-	for root in query.iter() {
-		let mut id = 0;
-		// bfs traversal of the tree
-		for child in children.iter_descendants_inclusive(root) {
-			commands.entity(child).insert(TreeIdx::new(id));
-			id += 1;
-		}
-	}
-}
 
 /// Currently only [`EventObserver`] and [`TextNodeParent`] elements are
 /// the only ones that require a [`TreeIdx`] attribute
 // see render_html.rs for tests
-pub(super) fn add_tree_idx_attributes(
+pub(super) fn apply_tree_idx(
 	mut commands: Commands,
 	html_constants: Res<HtmlConstants>,
-	requires_tree_idx_attr: Query<
-		(Entity, &TreeIdx),
-		Or<(With<EventObserver>, With<TextNodeParent>)>,
+	requires_tree_idx_attr: Populated<
+		Entity,
+		Or<(Added<EventObserver>, Added<TextNodeParent>)>,
 	>,
 ) {
-	for (entity, tree_idx) in requires_tree_idx_attr.iter() {
+	let mut id = 0;
+
+	for entity in requires_tree_idx_attr.iter() {
+		commands.entity(entity).insert(TreeIdx::new(id));
+
 		commands.spawn((
 			AttributeOf::new(entity),
 			AttributeKeyStr::new(html_constants.tree_idx_key.clone()),
-			AttributeValueStr::new(tree_idx.0.to_string()),
+			AttributeValueStr::new(id.to_string()),
 		));
+		id += 1;
 	}
 }
 
@@ -80,20 +69,23 @@ mod test {
 	use sweet::prelude::*;
 
 	#[test]
-	fn applies_bfs_ids() {
+	fn applies_ids() {
 		let mut world = World::new();
+		world.init_resource::<HtmlConstants>();
+		let (get,_set) = signal(2);
 		let entity = world
 			.spawn((
 				rsx! {
-					<div>
+					<div onclick=||{}>
 						"child 1"
-						<span>"nested child"</span>
+						<span>"child with signal"{get}</span>
 						"child 2"
 					</div>
 				},
 				ToHtml,
 			))
 			.id();
+		world.run_system_once(super::super::apply_text_node_parents).unwrap();
 		world.run_system_once(super::apply_tree_idx).unwrap();
 
 		world
@@ -104,26 +96,9 @@ mod test {
 
 		let children = world.get::<Children>(entity).unwrap();
 		world
-			.get::<TreeIdx>(children[0])
-			.unwrap()
-			.xpect()
-			.to_be(&TreeIdx(1));
-		world
 			.get::<TreeIdx>(children[1])
 			.unwrap()
 			.xpect()
-			.to_be(&TreeIdx(2));
-		world
-			.get::<TreeIdx>(children[2])
-			.unwrap()
-			.xpect()
-			.to_be(&TreeIdx(3));
-
-		let nested_children = world.get::<Children>(children[1]).unwrap();
-		world
-			.get::<TreeIdx>(nested_children[0])
-			.unwrap()
-			.xpect()
-			.to_be(&TreeIdx(4));
+			.to_be(&TreeIdx(1));
 	}
 }

@@ -6,12 +6,11 @@ use bevy::prelude::*;
 
 #[test]
 fn rsx_macro() {
-	let val = mock_bucket();
-	let val2 = val.clone();
+	let (get, set) = signal(String::new());
 
 	App::new()
 		.world_mut()
-		.spawn(rsx! {<button onclick=move||val2.call(2)/>})
-		.trigger(OnClick);
-	expect(&val).to_have_returned_with(2);
+		.spawn(rsx! {<button onclick=move|ev|set(ev.value())/>})
+		.trigger(OnClick::new(MockEvent::new("foo")));
+	get().xpect().to_be("foo");
 }
