@@ -7,13 +7,15 @@ use sweet::prelude::HierarchyQueryExtExt;
 pub fn apply_tree_idx_plugin(app: &mut App) {
 	app.add_systems(
 		Update,
-		apply_tree_idx_system
-			.after(super::apply_slots)
+		(
+			apply_tree_idx.after(super::apply_slots),
+			add_tree_idx_attributes.after(super::apply_text_node_parents),
+		)
 			.in_set(ApplyTransformsStep),
 	);
 }
 
-fn apply_tree_idx_system(
+fn apply_tree_idx(
 	mut commands: Commands,
 	query: Populated<Entity, Added<ToHtml>>,
 	children: Query<&Children>,
@@ -25,6 +27,26 @@ fn apply_tree_idx_system(
 			commands.entity(child).insert(TreeIdx::new(id));
 			id += 1;
 		}
+	}
+}
+
+/// Currently only [`EventObserver`] and [`TextNodeParent`] elements are
+/// the only ones that require a [`TreeIdx`] attribute
+// see render_html.rs for tests
+fn add_tree_idx_attributes(
+	mut commands: Commands,
+	html_constants: Res<HtmlConstants>,
+	requires_tree_idx_attr: Query<
+		(Entity, &TreeIdx),
+		Or<(With<EventObserver>, With<TextNodeParent>)>,
+	>,
+) {
+	for (entity, tree_idx) in requires_tree_idx_attr.iter() {
+		commands.spawn((
+			AttributeOf::new(entity),
+			AttributeKeyStr::new(html_constants.tree_idx_key.clone()),
+			AttributeValueStr::new(tree_idx.0.to_string()),
+		));
 	}
 }
 
@@ -83,7 +105,7 @@ mod test {
 				ToHtml,
 			))
 			.id();
-		world.run_system_once(super::apply_tree_idx_system).unwrap();
+		world.run_system_once(super::apply_tree_idx).unwrap();
 
 		world
 			.get::<TreeIdx>(entity)
@@ -107,13 +129,12 @@ mod test {
 			.unwrap()
 			.xpect()
 			.to_be(&TreeIdx(3));
-		
+
 		let nested_children = world.get::<Children>(children[1]).unwrap();
 		world
 			.get::<TreeIdx>(nested_children[0])
 			.unwrap()
 			.xpect()
 			.to_be(&TreeIdx(4));
-
 	}
 }

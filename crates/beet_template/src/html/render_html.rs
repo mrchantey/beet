@@ -98,7 +98,6 @@ struct Builder<'w, 's> {
 	doctypes: Query<'w, 's, &'static DoctypeNode>,
 	comments: Query<'w, 's, &'static CommentNode>,
 	texts: Query<'w, 's, &'static TextNode>,
-	// event_bindings:Query<'w,'s,(),With<SpawnedEntityObserver>>,
 }
 
 impl Builder<'_, '_> {
@@ -137,6 +136,9 @@ impl Builder<'_, '_> {
 				}
 			}
 			// add binding ids
+
+
+
 			if element.self_closing {
 				html.push_str("/>");
 				return;
@@ -231,7 +233,6 @@ mod test {
 	}
 
 	#[test]
-	#[ignore = "wip"]
 	fn templates() {
 		#[template]
 		fn Template() -> impl Bundle {

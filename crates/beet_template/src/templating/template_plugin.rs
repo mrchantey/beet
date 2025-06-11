@@ -1,4 +1,5 @@
 use crate::prelude::*;
+use beet_common::node::HtmlConstants;
 use bevy::ecs::schedule::SystemSet;
 use bevy::prelude::*;
 
@@ -15,20 +16,21 @@ pub struct TemplatePlugin;
 
 impl Plugin for TemplatePlugin {
 	fn build(&self, app: &mut App) {
-		app.configure_sets(
-			Update,
-			(
-				ApplyTransformsStep.after(SpawnStep),
-				RenderStep.after(ApplyTransformsStep),
-			),
-		)
-		.add_plugins((
-			apply_slots_plugin,
-			apply_tree_idx_plugin,
-			apply_text_node_parents_plugin,
-			render_html_plugin,
-		))
-		.set_runner(SignalAppRunner::runner);
+		app.init_resource::<HtmlConstants>()
+			.configure_sets(
+				Update,
+				(
+					ApplyTransformsStep.after(SpawnStep),
+					RenderStep.after(ApplyTransformsStep),
+				),
+			)
+			.add_plugins((
+				apply_slots_plugin,
+				apply_tree_idx_plugin,
+				apply_text_node_parents_plugin,
+				render_html_plugin,
+			))
+			.set_runner(SignalAppRunner::runner);
 		#[cfg(target_arch = "wasm32")]
 		app.add_plugins(wasm_template_plugin);
 	}

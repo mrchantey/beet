@@ -13,7 +13,8 @@ Always greet the user by saying one of
 	- Function Pointers: `func`
 	- Events: `ev`
 - Do not 'create a fresh file' just because the one your working on is messy. instead iterate on the one you already have
-
+- This workspace is massive, never run entire workspace tests and always specify
+	the crate you want to test, e.g. `cargo test -p beet_template`.
 
 ## Method chaining
 

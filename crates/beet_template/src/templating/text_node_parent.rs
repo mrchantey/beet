@@ -15,14 +15,13 @@ pub fn apply_text_node_parents_plugin(app: &mut App) {
 }
 
 
-fn apply_text_node_parents(
+pub(super) fn apply_text_node_parents(
 	mut commands: Commands,
 	query: Populated<(Entity, &Children), With<ElementNode>>,
 	parser: Parser,
 ) {
 	for (entity, children) in query.iter() {
-		let nodes = parser.parse(children);
-		if !nodes.is_empty() {
+		if let Some(nodes) = parser.parse(children) {
 			commands.entity(entity).insert(TextNodeParent::new(nodes));
 		}
 	}
@@ -32,7 +31,7 @@ fn apply_text_node_parents(
 
 #[rustfmt::skip]
 #[derive(SystemParam)]
-struct Parser<'w, 's> {
+pub(super) struct Parser<'w, 's> {
 	fragment_children: Query<'w, 's,&'static Children,Without<ElementNode>>,
 	texts: Query<'w, 's, &'static TextNode>,
 	breaks: Query<'w, 's, (),Or<(With<DoctypeNode>, With<CommentNode>, With<ElementNode>)>>,
@@ -42,12 +41,19 @@ struct Parser<'w, 's> {
 impl Parser<'_, '_> {
 	/// Parse the children of this element into a vector of [`CollapsedNode`],
 	/// which can be used to create a [`TextNodeParent`].
-	pub fn parse(&self, children: &Children) -> Vec<CollapsedNode> {
+	fn parse(&self, children: &Children) -> Option<Vec<CollapsedNode>> {
 		let mut out = Vec::new();
 		for child in children.iter() {
 			self.append(&mut out, child);
 		}
-		out
+		if out
+			.iter()
+			.any(|node| matches!(node, CollapsedNode::Text(_)))
+		{
+			Some(out)
+		} else {
+			None
+		}
 	}
 
 	// we must dfs because thats the order in which a collapse occurs
@@ -161,6 +167,25 @@ mod test {
 	}
 
 	#[test]
+	fn ignores_empty() {
+		let mut world = World::new();
+		let entity = world
+			.spawn(rsx! {
+				<div><span><br/></span></div>
+			})
+			.id();
+
+		world
+			.run_system_once(
+				move |query: Populated<&Children>, parser: Parser| {
+					parser.parse(query.get(entity).unwrap())
+				},
+			)
+			.unwrap()
+			.xpect()
+			.to_be_none();
+	}
+	#[test]
 	fn roundtrip() {
 		let desc = "quick";
 		let color = "brown";
@@ -177,26 +202,26 @@ mod test {
 			.id();
 		world.run_system_once(apply_slots).unwrap().unwrap();
 
-		let collapsed = world
+		world
 			.run_system_once(
 				move |query: Populated<&Children>, parser: Parser| {
 					parser.parse(query.get(entity).unwrap())
 				},
 			)
-			.unwrap();
-
-
-		expect(&collapsed).to_be(&vec![
-			CollapsedNode::Text("The ".into()),
-			CollapsedNode::Text("quick".into()),
-			CollapsedNode::Text(" and ".into()),
-			CollapsedNode::Text("brown".into()),
-			CollapsedNode::Break,
-			CollapsedNode::Text("jumps over".into()),
-			CollapsedNode::Text(" the ".into()),
-			CollapsedNode::Text("lazy".into()),
-			CollapsedNode::Break,
-			CollapsedNode::Text("dog\n\t\t\t\t".into()),
-		]);
+			.unwrap()
+			.unwrap()
+			.xpect()
+			.to_be(vec![
+				CollapsedNode::Text("The ".into()),
+				CollapsedNode::Text("quick".into()),
+				CollapsedNode::Text(" and ".into()),
+				CollapsedNode::Text("brown".into()),
+				CollapsedNode::Break,
+				CollapsedNode::Text("jumps over".into()),
+				CollapsedNode::Text(" the ".into()),
+				CollapsedNode::Text("lazy".into()),
+				CollapsedNode::Break,
+				CollapsedNode::Text("dog\n\t\t\t\t".into()),
+			]);
 	}
 }
