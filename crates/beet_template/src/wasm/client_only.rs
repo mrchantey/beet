@@ -5,16 +5,21 @@ use bevy::ecs::world::DeferredWorld;
 use bevy::prelude::*;
 
 // all client-only nodes need to render html
-// we cant require because downstream crate
+// we cant use component::require because downstream crate
 pub(super) fn on_add_client_only(mut world: DeferredWorld, cx: HookContext) {
-	world.commands().entity(cx.entity).insert(ToHtml);
+	world
+		.commands()
+		.entity(cx.entity)
+		.insert(HtmlFragment::default());
 }
 
 pub(super) fn mount_html(
-	ev: Trigger<OnAdd, RenderedHtml>,
-	query: Populated<&RenderedHtml, With<ClientOnlyDirective>>,
+	query: Populated<
+		&HtmlFragment,
+		(Added<HtmlFragment>, With<ClientOnlyDirective>),
+	>,
 ) {
-	if let Ok(html) = query.get(ev.target()) {
+	for html in query.iter() {
 		mount(&html.0);
 	}
 }

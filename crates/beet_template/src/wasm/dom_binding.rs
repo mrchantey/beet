@@ -42,7 +42,8 @@ pub(super) fn update_attribute_values(
 	>,
 ) -> Result<()> {
 	for (key, value, el) in query.iter() {
-		el.set_attribute(&key.0, &value.0);
+		el.set_attribute(&key.0, &value.0)
+			.map_err(|err| format!("{err:?}"))?;
 	}
 	Ok(())
 }

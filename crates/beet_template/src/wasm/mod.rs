@@ -11,13 +11,12 @@ use client_only::*;
 
 pub fn wasm_template_plugin(app: &mut App) {
 	console_error_panic_hook::set_once();
-	if web_sys::window().map(|w| w.document()).flatten().is_none() {
-		// no document, probably deno
-		return;
-	}
+	// if web_sys::window().map(|w| w.document()).flatten().is_none() {
+	// 	// no document, probably deno
+	// 	return;
+	// }
 
 	// client-only stuff
-	app.world_mut().add_observer(mount_html);
 	app.world_mut()
 		.register_component_hooks::<ClientOnlyDirective>()
 		.on_add(on_add_client_only);
@@ -29,6 +28,7 @@ pub fn wasm_template_plugin(app: &mut App) {
 				.in_set(BindStep),
 			(update_text_nodes, update_attribute_values)
 				.after(ReceiveSignalStep),
+			mount_html.in_set(MountStep),
 		),
 	);
 }

@@ -22,6 +22,8 @@ pub struct ApplyTransformsStep;
 #[derive(Debug, Clone, PartialEq, Eq, Hash, SystemSet)]
 pub struct RenderStep;
 #[derive(Debug, Clone, PartialEq, Eq, Hash, SystemSet)]
+pub struct MountStep;
+#[derive(Debug, Clone, PartialEq, Eq, Hash, SystemSet)]
 pub struct BindStep;
 #[derive(Default)]
 pub struct TemplatePlugin;
@@ -34,7 +36,8 @@ impl Plugin for TemplatePlugin {
 				(
 					ApplyTransformsStep.after(SpawnStep),
 					RenderStep.after(ApplyTransformsStep),
-					BindStep.after(RenderStep),
+					MountStep.after(RenderStep),
+					BindStep.after(MountStep),
 				),
 			)
 			.add_systems(

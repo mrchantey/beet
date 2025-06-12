@@ -17,7 +17,7 @@ use sweet::prelude::*;
 fn main() {
 	App::new()
 		.add_plugins(TemplatePlugin)
-    .add_systems(Startup, |mut commands:Commands|commands.spawn(app()))
+    .add_systems(Startup, |mut commands:Commands|{commands.spawn(app());})
     .run();
 }
 
