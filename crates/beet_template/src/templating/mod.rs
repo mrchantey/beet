@@ -43,8 +43,11 @@ impl Plugin for TemplatePlugin {
 					(
 						apply_slots,
 						apply_text_node_parents,
-						apply_tree_idx,
-						rearrange_html_document,
+						(
+							apply_tree_idx,
+							(rearrange_html_document, hoist_document_elements)
+								.chain(),
+						),
 					)
 						.chain()
 						.in_set(ApplyTransformsStep),

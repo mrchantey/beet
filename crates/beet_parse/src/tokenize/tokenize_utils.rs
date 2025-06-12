@@ -11,8 +11,8 @@ use syn::Expr;
 macro_rules! tokenize_maybe_spanned {
 		($name:ident,$($type:ty),* $(,)?) => {
 			pub fn $name(
-				world: &World, 
-				items: &mut Vec<TokenStream>, 
+				world: &World,
+				items: &mut Vec<TokenStream>,
 				entity: Entity
 			) -> Result<()> {
 				$(
@@ -66,7 +66,7 @@ tokenize_maybe_spanned!(
 
 tokenize_maybe_spanned!(
 	tokenize_web_directives,
-	HtmlInsertDirective,
+	HtmlHoistDirective,
 	ClientLoadDirective,
 	ClientOnlyDirective,
 	LangContent

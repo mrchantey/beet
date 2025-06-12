@@ -13,9 +13,11 @@ use sweet::prelude::HierarchyQueryExtExt;
 /// 	 ├─ (ElementNode, NodeTag(head))
 /// 	 ├─ (ElementNode, NodeTag(body))
 /// ```
-/// The contents of head and body are determined by performing checks on
-/// the components and children of the [`HtmlDocument`] entity.
-/// For instance any head or body elements are hoisted to the correct position.
+/// Only a single check is performed: whether the root is a fragment containing an `<html>` tag.
+/// - If this is is the case, missing nodes are inserted.
+/// - Otherwise, a new document structure is created with the root moved into the body.
+/// This will create malformed html for partially correct documents, so it is the user's responsibility
+/// to either pass a valid document structure or none at all.
 #[derive(Component, Reflect)]
 #[reflect(Component)]
 #[require(FragmentNode)]
@@ -28,7 +30,9 @@ impl HtmlDocument {
 	}
 }
 
-
+/// Rarrange the HTML document accountinf for one of two cases:
+/// 1. The root is a fragment containing a <html> tag. doctype, head and body are added if missing.
+/// 2. All other cases: root is moved to the body.
 pub(super) fn rearrange_html_document(
 	mut commands: Commands,
 	doctypes: Query<&DoctypeNode>,
@@ -38,85 +42,109 @@ pub(super) fn rearrange_html_document(
 ) {
 	for (doc_entity, doc_children) in query.iter() {
 		let root = doc_children[0];
-
-		let _doctype_node = match children
-			.iter_descendants_inclusive(root)
-			.find(|child| doctypes.contains(*child))
-		{
-			Some(doctype_node) => {
-				commands.entity(doctype_node).insert(ChildOf(doc_entity));
-				doctype_node
-			}
-			None => commands.spawn((DoctypeNode, ChildOf(doc_entity))).id(),
-		};
-
-
-		let html_node =
-			match children.iter_descendants_inclusive(root).find(|child| {
+		if let Some(html_node) =
+			children.iter_direct_descendants(root).find(|child| {
 				node_tags.get(*child).map_or(false, |tag| tag.0 == "html")
 			}) {
-				Some(html_node) => {
-					commands.entity(html_node).insert(ChildOf(doc_entity));
-					html_node
-				}
-				None => commands
-					.spawn((
-						ElementNode::open(),
-						NodeTag::new("html"),
-						ChildOf(doc_entity),
-					))
-					.id(),
-			};
+			// a html tag was found, add missing nodes
+			if !children
+				.iter_direct_descendants(root)
+				.any(|child| doctypes.contains(child))
+			{
+				// ensure the doctype is the first child
+				let mut new_children = vec![commands.spawn(DoctypeNode).id()];
+				new_children.extend(children.iter_direct_descendants(root));
+				commands.entity(root).replace_children(&new_children);
+			}
+			if !children.iter_direct_descendants(html_node).any(|child| {
+				node_tags.get(child).map_or(false, |tag| tag.0 == "head")
+			}) {
+				commands
+					.entity(html_node)
+					.with_child((ElementNode::open(), NodeTag::new("head")));
+			}
+			if !children.iter_direct_descendants(html_node).any(|child| {
+				node_tags.get(child).map_or(false, |tag| tag.0 == "body")
+			}) {
+				commands
+					.entity(html_node)
+					.with_child((ElementNode::open(), NodeTag::new("body")));
+			}
+		} else {
+			// no html tag found, create full document structure and
+			// move the root into the body
+			let new_root = commands
+				.spawn(FragmentNode)
+				.with_children(|parent| {
+					parent.spawn((DoctypeNode,));
+					parent
+						.spawn((ElementNode::open(), NodeTag::new("html")))
+						.with_children(|parent| {
+							parent.spawn((
+								ElementNode::open(),
+								NodeTag::new("head"),
+							));
+							parent
+								.spawn((
+									ElementNode::open(),
+									NodeTag::new("body"),
+								))
+								.add_child(root);
+						});
+				})
+				.id();
+			commands.entity(doc_entity).replace_children(&[new_root]);
+		}
+	}
+}
 
-		let head_node =
-			match children.iter_descendants_inclusive(root).find(|child| {
+/// Elements with either [`HtmlHoistDirective`] or a [`HtmlConstants::hoist_to_head_tags`]
+/// tag will be hoisted to their respective part of the document.
+pub(super) fn hoist_document_elements(
+	mut commands: Commands,
+	constants: Res<HtmlConstants>,
+	documents: Populated<Entity, Added<HtmlDocument>>,
+	children: Query<&Children>,
+	node_tags: Query<&NodeTag>,
+	directives: Query<&HtmlHoistDirective>,
+) {
+	for document in documents.iter() {
+		let head = children
+			.iter_descendants(document)
+			.find(|child| {
 				node_tags.get(*child).map_or(false, |tag| tag.0 == "head")
-			}) {
-				Some(head_node) => {
-					commands.entity(head_node).insert(ChildOf(html_node));
-					head_node
-				}
-				None => commands
-					.spawn((
-						ElementNode::open(),
-						NodeTag::new("head"),
-						ChildOf(html_node),
-					))
-					.id(),
-			};
-		let _body_node =
-			match children.iter_descendants_inclusive(root).find(|child| {
+			})
+			.expect("Invalid HTML document: no head tag found");
+		let body = children
+			.iter_descendants(document)
+			.find(|child| {
 				node_tags.get(*child).map_or(false, |tag| tag.0 == "body")
-			}) {
-				Some(body_node) => {
-					commands.entity(body_node).insert(ChildOf(html_node));
-					body_node
+			})
+			.expect("Invalid HTML document: no body tag found");
+		for entity in children.iter_descendants(document) {
+			match (directives.get(entity), node_tags.get(entity)) {
+				(Ok(HtmlHoistDirective::Head), _) => {
+					commands.entity(head).add_child(entity);
 				}
-				None => commands
-					.spawn((
-						ElementNode::open(),
-						NodeTag::new("body"),
-						ChildOf(html_node),
-					))
-					.id(),
-			};
-
-
-		for node in children.iter_descendants_inclusive(root) {
-			match node_tags.get(node) {
-				Ok(tag)
-					if matches!(
-						tag.0.as_str(),
-						"title" | "meta" | "link" | "style" | "script" | "base"
-					) =>
+				(Ok(HtmlHoistDirective::Body), _) => {
+					commands.entity(body).add_child(entity);
+				}
+				(Ok(HtmlHoistDirective::None), _) => {
+					// leave in place
+				}
+				(Err(_), Ok(tag))
+					if constants.hoist_to_head_tags.contains(&tag.0) =>
 				{
-					commands.entity(node).insert(ChildOf(head_node));
+					commands.entity(head).add_child(entity);
 				}
-				_ => {}
+				(Err(_), _) => {
+					// leave in place
+				}
 			}
 		}
 	}
 }
+
 
 #[cfg(test)]
 mod test {
@@ -145,27 +173,37 @@ mod test {
 		);
 	}
 	#[test]
-	fn fragment_with_head() {
+	fn malformed() {
 		HtmlDocument::parse_bundle(rsx! {<head><br/></head><br/>})
 			.xpect()
 			.to_be(
-				"<!DOCTYPE html><html><head><br/></head><body><br/></body></html>",
+				"<!DOCTYPE html><html><head></head><body><head><br/></head><br/></body></html>",
 			);
 	}
 	#[test]
-	fn fragment_with_head_and_body() {
+	fn partial() {
 		HtmlDocument::parse_bundle(
-			rsx! {<body><br/></body><!doctype pizza><head>7</head>},
+			rsx! {<!DOCTYPE html><html><head><br/></head></html>},
 		)
 		.xpect()
-		.to_be("<!doctype pizza><html><head>7</head><body><br/></body></html>");
+		.to_be("<!DOCTYPE html><html><head><br/></head><body></body></html>");
 	}
 	#[test]
-	fn html_element() {
-		HtmlDocument::parse_bundle(rsx! {<html><br/></html>})
-			.xpect()
-			.to_be(
-				"<!DOCTYPE html><html><head></head><body><br/></body></html>",
-			);
+	fn hoist_tag() {
+		HtmlDocument::parse_bundle(
+			rsx! {<script></script><br/>},
+		)
+		.xpect()
+		.to_be("<!DOCTYPE html><html><head><script></script></head><body><br/></body></html>");
+	}
+	#[test]
+	fn hoist_directive() {
+		HtmlDocument::parse_bundle(
+		rsx! {<!DOCTYPE html><html><head><br hoist:body/></head><body><span hoist:head/><script hoist:none/></body></html>},
+	)
+	.xpect()
+	.to_be(
+		"<!DOCTYPE html><html><head><span/></head><body><script/><br/></body></html>",
+	);
 	}
 }

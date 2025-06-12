@@ -13,7 +13,7 @@ pub fn directive_types_plugin(app: &mut bevy::prelude::App) {
 	app
 		//web directives
 		.register_type::<LangContent>()
-		.register_type::<HtmlInsertDirective>()
+		.register_type::<HtmlHoistDirective>()
 		.register_type::<ClientLoadDirective>()
 		.register_type::<ClientOnlyDirective>()
 		// rsx directives

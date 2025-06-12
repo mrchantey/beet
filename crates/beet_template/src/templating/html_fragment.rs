@@ -6,8 +6,7 @@ use bevy::ecs::system::SystemParam;
 use bevy::prelude::*;
 
 /// Add this component to have it populated with HTML on the next update cycle.
-/// Html rendered from a bundle as-is without resolving any [`HtmlInsertDirective`]
-/// or inserting missing body, head and doctype tags.
+/// See [`HtmlDocument`] for hoisting and correct html structure.
 #[derive(Default, Component, Deref, DerefMut, Reflect)]
 #[reflect(Default, Component)]
 pub struct HtmlFragment(pub String);
