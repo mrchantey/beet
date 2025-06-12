@@ -35,7 +35,8 @@ serde_urlencoded = "0.7"
 #💡 Native
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 # reqwest = { version = "0.12" }
-# rustls keeps triggering recompilation?
+# rustls keeps triggering recompilation so sucks for dev, but zig fails to get openssl 
+# so rustls is required for zig/cargo-lambda
 reqwest = { version = "0.12", default-features = false, features = [
 	"rustls-tls",
 ] }

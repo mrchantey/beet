@@ -13,13 +13,13 @@ opt-level = 0
 opt-level = 0
 
 [workspace.package]
-version = "0.0.6-dev.4"
+version = "0.0.6-dev.2"
 authors = ["Pete Hayman"]
 edition = "2024"
-description = "Tools for building reactive structures"
+description = "🦄 A very bevy metaframework 🦄"
 documentation = "https://docs.rs/beet"
 readme = "README.md"
-homepage = "https://beetrsx.dev"
+homepage = "https://beetrs.dev"
 repository = "https://github.com/mrchantey/beet"
 license = "MIT OR Apache-2.0"
 keywords = ["beet", "beetmash", "behavior", "game-ai", "robotics"]
@@ -38,6 +38,7 @@ resolver = "2"
 
 exclude = ["crates/wasm-bundle-bench"]
 
+exclude = ["crates/beet_mcp"]
 members = [
 	"crates/beet_site",
 	"crates/beet-cli",
@@ -83,7 +84,7 @@ members = [
 
 [workspace.dependencies]
 ## internal
-beet = { path = "", version = "0.0.6-dev.4" }
+beet = { path = "", version = "0.0.6-dev.2" }
 
 beet_build = { path = "crates/beet_build", version = "0.0.6-dev.4" }
 beet_common = { path = "crates/beet_common", version = "0.0.6-dev.4" }

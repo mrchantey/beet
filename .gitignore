@@ -1,5 +1,6 @@
 rustc-ice*
 assets
+assets.tar.gz
 target
 .rustc_info.json
 .env

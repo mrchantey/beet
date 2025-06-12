@@ -2,7 +2,7 @@
 
 <div align="center">
   <p>
-    <strong>🦄 The anything framework 🦄</strong>
+    <strong>🦄 A very bevy metaframework 🦄</strong>
   </p>
   <p>
     <a href="https://crates.io/crates/beet"><img src="https://img.shields.io/crates/v/beet.svg?style=flat-square" alt="Crates.io version" /></a>
@@ -18,8 +18,10 @@
   </h3>
 </div>
 
-Beet is a collection of tools for building web pages, realtime applications and behaviors. Its early days so your mileage may vary depending on the crate of interest:
+Beet is a set of crates for making and running Bevy apps.
+Its *very* early days so your mileage may vary depending on the crate of interest:
 
+**readiness meter**
 - 🦢 documented and tested
 - 🐣 docs and tests are incomplete
 - 🐉 highly experimental, here be dragons
@@ -65,6 +67,7 @@ Top level crates that depend on several of the above.
 | Crate                                           | Status | Description                  |
 | ----------------------------------------------- | ------ | ---------------------------- |
 | [`beet-cli`](https://crates.io/crates/beet-cli) | 🐉      | CLI for beet authoring tools |
+| [`beet_mcp`](https://crates.io/crates/beet_mcp) | 🐉      | VectorDB MCP Server          |
 
 
 ## Bevy Versions
@@ -76,6 +79,7 @@ Top level crates that depend on several of the above.
 | 0.14   | 0.0.2  |
 | 0.12   | 0.0.1  |
 
+## Contributing
 
 ## Wishlist
 
@@ -109,3 +113,4 @@ Most of these are quite complex but if you'd like to have a go get in touch [on 
 
 ### `infra`
 - [ ] serve static files on s3 instead of bundled in the lambda
+See [CONTRIBUTING.md](CONTRIBUTING.md)

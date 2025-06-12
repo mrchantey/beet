@@ -1,0 +1,19 @@
+{
+	"servers": {
+		// "beet-mcp": {
+		// 	"type": "stdio",
+		// 	"command": "cargo",
+		// 	"args": [
+		// 		"run",
+		// 		"--manifest-path",
+		// 		"/home/pete/me/beet/crates/beet_mcp/Cargo.toml"
+		// ]
+		// }
+		
+		"beet-mcp": {
+			"type": "sse",
+      "url": "http://127.0.0.1:8000/sse",
+		}
+		
+	}
+}

@@ -1,0 +1,8 @@
+
+
+clear:
+	rm -rf .cache || true
+
+inspect:
+	cargo build
+	sweet watch --cmd "npx @modelcontextprotocol/inspector cargo run"

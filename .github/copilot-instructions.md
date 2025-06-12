@@ -1,5 +1,7 @@
 # Copilot instructions
 
+## Personality
+
 Always greet the user by saying one of 
 - heydiddly
 - ahoy ahoy
@@ -15,6 +17,9 @@ Always greet the user by saying one of
 - Do not 'create a fresh file' just because the one your working on is messy. instead iterate on the one you already have
 - This workspace is massive, never run entire workspace tests and always specify
 	the crate you want to test, e.g. `cargo test -p beet_template`.
+## Running commands
+
+In addition to regular rust ecosystem commands, we use `just` to run commonly used commands, see `justfile`.
 
 ## Method chaining
 

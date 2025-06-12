@@ -1,4 +1,9 @@
-# Beet uses the Just command runner
+# Command runners are great for individual projects
+# but as a metaframework these are all signs of painpoints in the workflow
+# arguments should be config files, shell command chains should be beet subcommands etc
+# 
+# Anyway for now this is useful, but if you feel like making a change here, consider instead
+# adding a subcommand to the beet or sweet cli, and describing it in the cli readme.
 # 
 # ```rust 
 # cargo binstall just
@@ -6,8 +11,6 @@
 # just test-ci
 # ```
 #
-
-#💡 Init
 
 set windows-shell := ["C:/tools/cygwin/bin/sh.exe","-c"]
 set dotenv-load
@@ -17,9 +20,10 @@ crates := 'beet beet_spatial beet_flow'
 default:
 	just --list --unsorted
 
+#💡 Init
+
 # Initialize the repository, pulling assets into their respective crates.
-# Also we need to build the test_site codegen, which cant use a build script
-# due to cyclic dependencies
+# Also we need to build the codegen files for rsx crates like beet_design.
 init-repo:
 	just init-flow
 	just init-rsx
@@ -30,7 +34,6 @@ init-flow:
 
 # once beet-cli is binstallable we shouldnt need to compile in order to codegen
 init-rsx:
-	cargo run -p beet_router --example build
 	just cli build -p beet_site
 	cd infra && npm ci
 	mkdir -p target/lambda/crates/beet_site || true
@@ -38,6 +41,11 @@ init-rsx:
 
 init-sweet:
 	just install-chromedriver
+
+assets-pull:
+	curl -o ./assets.tar.gz https://bevyhub-public.s3.us-west-2.amazonaws.com/assets.tar.gz
+	tar -xzvf ./assets.tar.gz
+	rm ./assets.tar.gz
 
 # just test-site
 # just export-scenes
@@ -51,20 +59,17 @@ cli *args:
 install-cli *args:
 	cargo install --path crates/beet-cli {{args}}
 
-sst-deploy:
-	npx sst deploy --stage production --config infra/sst.config.ts
 
-sst-remove:
-	npx sst remove --stage production --config infra/sst.config.ts
-
-deploy *args:
+deploy-site *args:
 	just cli deploy 										\
 	--package 				beet_site 				\
 	--function-name 	BeetServerLambda	\
 	{{args}}
-
 # --region 					us-west-2 			\
 # --iam-role 				$AWS_IAM_ROLE 	\
+
+remove-site:
+	npx sst remove --stage production --config infra/sst.config.ts
 
 mod *args:
 	just sweet mod --exclude *codegen* {{args}}
@@ -364,11 +369,6 @@ assets-push:
 	aws s3 sync ./assets s3://bevyhub-public/assets --delete
 	tar -czvf ./assets.tar.gz ./assets
 	aws s3 cp ./assets.tar.gz s3://bevyhub-public/assets.tar.gz
-	rm ./assets.tar.gz
-
-assets-pull:
-	curl -o ./assets.tar.gz https://bevyhub-public.s3.us-west-2.amazonaws.com/assets.tar.gz
-	tar -xzvf ./assets.tar.gz
 	rm ./assets.tar.gz
 
 #💡 Misc
