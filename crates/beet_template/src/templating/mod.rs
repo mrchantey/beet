@@ -55,6 +55,7 @@ impl Plugin for TemplatePlugin {
 							)
 								.chain(),
 						),
+						insert_event_playback_attribute
 					)
 						.chain()
 						.in_set(ApplyTransformsStep),

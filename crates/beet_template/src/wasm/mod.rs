@@ -1,6 +1,8 @@
 mod dom_binding;
 pub use dom_binding::*;
 mod client_only;
+mod event_playback;
+use event_playback::*;
 
 
 use crate::prelude::*;
@@ -24,7 +26,12 @@ pub fn wasm_template_plugin(app: &mut App) {
 	app.add_systems(
 		Update,
 		(
-			(bind_events, bind_text_nodes, bind_attribute_values)
+			(
+				bind_events,
+				event_playback.run_if(run_once),
+				bind_text_nodes,
+				bind_attribute_values,
+			)
 				.in_set(BindStep),
 			(update_text_nodes, update_attribute_values)
 				.after(ReceiveSignalStep),

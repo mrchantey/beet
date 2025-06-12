@@ -1,9 +1,8 @@
-use std::cell::RefCell;
-
 use crate::prelude::*;
 use beet_common::prelude::*;
 use bevy::ecs::system::SystemParam;
 use bevy::prelude::*;
+use std::cell::RefCell;
 
 /// Add this component to have it populated with HTML on the next update cycle.
 /// See [`HtmlDocument`] for hoisting and correct html structure.
@@ -76,6 +75,24 @@ pub(super) fn render_html_fragments(
 	}
 }
 
+/// Assign a javascript function that will collect events until hydration
+pub(super) fn insert_event_playback_attribute(
+	mut commands: Commands,
+	html_constants: Res<HtmlConstants>,
+	query: Populated<(Entity, &TreeIdx, &EventObserver), Added<TreeIdx>>,
+) {
+	for (entity, idx, event) in query.iter() {
+		let event_name = event.event_name();
+		let js_func =
+			format!("{}({}, event)", html_constants.event_handler, idx.inner());
+		commands.spawn((
+			AttributeOf::new(entity),
+			AttributeKeyStr(event_name.clone()),
+			AttributeValueStr(js_func),
+		));
+	}
+}
+
 
 // TODO bench this approach vs concatenating parallel systems
 #[rustfmt::skip]
@@ -135,9 +152,6 @@ impl Builder<'_, '_> {
 					}
 				}
 			}
-			// add binding ids
-
-
 
 			if element.self_closing {
 				html.push_str("/>");
@@ -263,7 +277,7 @@ mod test {
 		rsx! {<div onclick={||{}}/>}
 			.xmap(HtmlFragment::parse_bundle)
 			.xpect()
-			.to_be("<div data-beet-rsx-idx=\"0\"/>");
+			.to_be("<div data-beet-rsx-idx=\"0\" onclick=\"_beet_event_handler(0, event)\"/>");
 	}
 	#[test]
 	fn signal_text_nodes() {

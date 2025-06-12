@@ -62,7 +62,7 @@ pub trait EventExt {
 	fn value(&self) -> String;
 }
 
-#[derive(Default, Component, Reflect)]
+#[derive(Default, Clone, PartialEq, Eq, Hash, Component, Reflect)]
 #[reflect(Default, Component)]
 pub struct EventObserver {
 	/// The unchanged event name used in the template, which
@@ -81,6 +81,25 @@ impl EventObserver {
 
 	/// Get the event name in a consistent lowercase format
 	pub fn event_name(&self) -> String { self.name.to_lowercase() }
+
+
+
+	#[cfg(target_arch = "wasm32")]
+	pub fn trigger(
+		commands: &mut EntityCommands,
+		event_name: &str,
+		ev: web_sys::Event,
+	) {
+		use send_wrapper::SendWrapper;
+		use wasm_bindgen::JsCast;
+		match event_name {
+			"onclick" => {
+				let ev = ev.unchecked_into::<web_sys::MouseEvent>();
+				commands.trigger(BeetEvent::new(SendWrapper::new(ev)));
+			}
+			_ => unimplemented!(),
+		}
+	}
 }
 
 
@@ -88,8 +107,8 @@ impl EventObserver {
 #[cfg(not(target_arch = "wasm32"))]
 mod test {
 	use crate::as_beet::*;
-	use sweet::prelude::*;
 	use bevy::prelude::*;
+	use sweet::prelude::*;
 
 	#[test]
 	fn works() {

@@ -171,14 +171,11 @@ pub(super) fn bind_events(
 
 		let func = move |ev: web_sys::Event| {
 			ReactiveApp::with(|app| {
-				let mut entity = app.world_mut().entity_mut(entity);
-				match event_name.as_str() {
-					"onclick" => {
-						let ev = ev.unchecked_into::<web_sys::MouseEvent>();
-						entity.trigger(BeetEvent::new(SendWrapper::new(ev)));
-					}
-					_ => unimplemented!(),
-				}
+				let mut commands = app.world_mut().commands();
+				let mut commands = commands.entity(entity);
+				EventObserver::trigger(&mut commands, &event_name, ev);
+				// apply commands
+				app.world_mut().flush();
 				// we must update the app manually to flush any signals,
 				// they will not be able to update the app themselves because
 				// ReactiveApp is already borrowd

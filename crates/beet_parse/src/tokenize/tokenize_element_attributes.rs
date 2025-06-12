@@ -121,10 +121,10 @@ fn try_event_observer(
 
 	let suffix = ToUpperCamelCase::to_upper_camel_case(suffix);
 
-	let event_key = Ident::new(&format!("On{suffix}"), span);
+	let event_ident = Ident::new(&format!("On{suffix}"), span);
 	let lit_key_str = &lit.key;
 
-	try_insert_closure_type(&mut attr, &event_key);
+	try_insert_closure_type(&mut attr, &event_ident);
 	entity_components.push(quote! {EventObserver::new(#lit_key_str)});
 	entity_components
 		.push(quote! {EntityObserver::new(#[allow(unused_braces)]#attr)});
