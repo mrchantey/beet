@@ -1,77 +1,128 @@
 use super::*;
 use beet_common::prelude::*;
 use bevy::prelude::*;
+use sweet::prelude::HierarchyQueryExtExt;
 
 
-
+/// Add this node to any bundle to have it rearranged into a valid HTML document structure.
+/// The resulting structure is guaranteed to have the following layout:
+/// ```text
+/// (FragmentNode, HtmlDocumet)
+/// ├─ DoctypeNode
+/// ├─ (ElementNode, NodeTag(html))
+/// 	 ├─ (ElementNode, NodeTag(head))
+/// 	 ├─ (ElementNode, NodeTag(body))
+/// ```
+/// The contents of head and body are determined by performing checks on
+/// the components and children of the [`HtmlDocument`] entity.
+/// For instance any head or body elements are hoisted to the correct position.
 #[derive(Component, Reflect)]
 #[reflect(Component)]
-pub struct HtmlDocument {
-	pub head: Entity,
-	pub body: Entity,
+#[require(FragmentNode)]
+pub struct HtmlDocument;
+
+impl HtmlDocument {
+	pub fn parse_bundle(bundle: impl Bundle) -> String {
+		// add the bundle as a child to make rearranging easier
+		HtmlFragment::parse_bundle((HtmlDocument, children![bundle]))
+	}
 }
 
 
-impl HtmlDocument {
-	pub fn from_entity(mut entity: EntityWorldMut) -> Self {
-		let is_element = entity.contains::<ElementNode>();
-		let is_fragment = entity.contains::<FragmentNode>();
-		if !is_element && !is_fragment {
-			let head = entity.world_scope(|world| {
-				world
+pub(super) fn rearrange_html_document(
+	mut commands: Commands,
+	doctypes: Query<&DoctypeNode>,
+	children: Query<&Children>,
+	node_tags: Query<&NodeTag>,
+	query: Populated<(Entity, &Children), Added<HtmlDocument>>,
+) {
+	for (doc_entity, doc_children) in query.iter() {
+		let root = doc_children[0];
+
+		let _doctype_node = match children
+			.iter_descendants_inclusive(root)
+			.find(|child| doctypes.contains(*child))
+		{
+			Some(doctype_node) => {
+				commands.entity(doctype_node).insert(ChildOf(doc_entity));
+				doctype_node
+			}
+			None => commands.spawn((DoctypeNode, ChildOf(doc_entity))).id(),
+		};
+
+
+		let html_node =
+			match children.iter_descendants_inclusive(root).find(|child| {
+				node_tags.get(*child).map_or(false, |tag| tag.0 == "html")
+			}) {
+				Some(html_node) => {
+					commands.entity(html_node).insert(ChildOf(doc_entity));
+					html_node
+				}
+				None => commands
 					.spawn((
+						ElementNode::open(),
+						NodeTag::new("html"),
+						ChildOf(doc_entity),
+					))
+					.id(),
+			};
+
+		let head_node =
+			match children.iter_descendants_inclusive(root).find(|child| {
+				node_tags.get(*child).map_or(false, |tag| tag.0 == "head")
+			}) {
+				Some(head_node) => {
+					commands.entity(head_node).insert(ChildOf(html_node));
+					head_node
+				}
+				None => commands
+					.spawn((
+						ElementNode::open(),
 						NodeTag::new("head"),
-						ElementNode::non_self_closing(),
-						HtmlFragment::default(),
+						ChildOf(html_node),
 					))
-					.id()
-			});
-			let body = entity.world_scope(|world| {
-				world
+					.id(),
+			};
+		let _body_node =
+			match children.iter_descendants_inclusive(root).find(|child| {
+				node_tags.get(*child).map_or(false, |tag| tag.0 == "body")
+			}) {
+				Some(body_node) => {
+					commands.entity(body_node).insert(ChildOf(html_node));
+					body_node
+				}
+				None => commands
 					.spawn((
+						ElementNode::open(),
 						NodeTag::new("body"),
-						ElementNode::non_self_closing(),
-						HtmlFragment::default(),
+						ChildOf(html_node),
 					))
-					.id()
-			});
-			entity.insert(ChildOf(body));
-			Self { head, body }
-		} else {
-			todo!()
+					.id(),
+			};
+
+
+		for node in children.iter_descendants_inclusive(root) {
+			match node_tags.get(node) {
+				Ok(tag)
+					if matches!(
+						tag.0.as_str(),
+						"title" | "meta" | "link" | "style" | "script" | "base"
+					) =>
+				{
+					commands.entity(node).insert(ChildOf(head_node));
+				}
+				_ => {}
+			}
 		}
-	}
-
-	pub fn parse_bundle(bundle: impl Bundle) -> String {
-		SharedTemplateApp::with(|app| {
-			let entity = app.world_mut().spawn(bundle);
-			let doc = Self::from_entity(entity);
-			app.update();
-			doc.collect_fragments(app.world_mut())
-		})
-	}
-
-	fn collect_fragments(&self, world: &mut World) -> String {
-		let head = world
-			.entity_mut(self.head)
-			.take::<HtmlFragment>()
-			.expect("HtmlDocument Head has no HtmlFragment")
-			.0;
-		let body = world
-			.entity_mut(self.body)
-			.take::<HtmlFragment>()
-			.expect("HtmlDocument Body has no HtmlFragment")
-			.0;
-
-		format!("<!DOCTYPE html><html>{head}{body}</html>")
 	}
 }
 
 #[cfg(test)]
 mod test {
 	use crate::as_beet::*;
-	use sweet::prelude::*;
 	use bevy::prelude::*;
+	use sweet::prelude::*;
 
 	#[test]
 	fn text() {
@@ -83,19 +134,15 @@ mod test {
 	}
 	#[test]
 	fn elements() {
-		HtmlDocument::parse_bundle(rsx! {<br/>})
-			.xpect()
-			.to_be(
-				"<!DOCTYPE html><html><head></head><body><br/></body></html>",
-			);
+		HtmlDocument::parse_bundle(rsx! {<br/>}).xpect().to_be(
+			"<!DOCTYPE html><html><head></head><body><br/></body></html>",
+		);
 	}
 	#[test]
 	fn fragment() {
-		HtmlDocument::parse_bundle(rsx! {<br/><br/>})
-			.xpect()
-			.to_be(
-				"<!DOCTYPE html><html><head></head><body><br/><br/></body></html>",
-			);
+		HtmlDocument::parse_bundle(rsx! {<br/><br/>}).xpect().to_be(
+			"<!DOCTYPE html><html><head></head><body><br/><br/></body></html>",
+		);
 	}
 	#[test]
 	fn fragment_with_head() {
@@ -107,11 +154,11 @@ mod test {
 	}
 	#[test]
 	fn fragment_with_head_and_body() {
-		HtmlDocument::parse_bundle(rsx! {<body><br/></body><!doctype pizza><head>7</head>})
-			.xpect()
-			.to_be(
-				"<!doctype pizza><html><head>7</head><body><br/></body></html>",
-			);
+		HtmlDocument::parse_bundle(
+			rsx! {<body><br/></body><!doctype pizza><head>7</head>},
+		)
+		.xpect()
+		.to_be("<!doctype pizza><html><head>7</head><body><br/></body></html>");
 	}
 	#[test]
 	fn html_element() {

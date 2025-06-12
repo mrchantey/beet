@@ -40,10 +40,15 @@ impl Plugin for TemplatePlugin {
 			.add_systems(
 				Update,
 				(
-					(apply_slots, apply_text_node_parents, apply_tree_idx)
+					(
+						apply_slots,
+						apply_text_node_parents,
+						apply_tree_idx,
+						rearrange_html_document,
+					)
 						.chain()
 						.in_set(ApplyTransformsStep),
-					render_html.in_set(RenderStep),
+					(render_html_fragments).in_set(RenderStep),
 				),
 			)
 			.set_runner(ReactiveApp::runner);

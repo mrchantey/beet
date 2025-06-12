@@ -68,8 +68,7 @@ impl SharedTemplateApp {
 	}
 }
 
-
-pub(super) fn render_html(
+pub(super) fn render_html_fragments(
 	mut query: Populated<(Entity, &mut HtmlFragment), Added<HtmlFragment>>,
 	builder: Builder,
 ) {

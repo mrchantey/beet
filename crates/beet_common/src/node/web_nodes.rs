@@ -27,10 +27,12 @@ pub struct ElementNode {
 	pub self_closing: bool,
 }
 impl ElementNode {
-	pub fn self_closing() -> Self { Self { self_closing: true } }
-	pub fn non_self_closing() -> Self {
+	/// Creates a new [`ElementNode`] that is not self-closing.
+	pub fn open() -> Self {
 		Self {
 			self_closing: false,
 		}
 	}
+	/// Creates a new [`ElementNode`] that is self-closing.
+	pub fn self_closing() -> Self { Self { self_closing: true } }
 }
