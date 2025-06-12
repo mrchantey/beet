@@ -13,7 +13,7 @@ opt-level = 0
 opt-level = 0
 
 [workspace.package]
-version = "0.0.6-dev.2"
+version = "0.0.6-dev.4"
 authors = ["Pete Hayman"]
 edition = "2024"
 description = "🦄 A very bevy metaframework 🦄"
@@ -36,9 +36,8 @@ publish = false
 # default resolver
 resolver = "2"
 
-exclude = ["crates/wasm-bundle-bench"]
+exclude = ["crates/wasm-bundle-bench","crates/beet_mcp"]
 
-exclude = ["crates/beet_mcp"]
 members = [
 	"crates/beet_site",
 	"crates/beet-cli",
@@ -84,7 +83,7 @@ members = [
 
 [workspace.dependencies]
 ## internal
-beet = { path = "", version = "0.0.6-dev.2" }
+beet = { path = "", version = "0.0.6-dev.4" }
 
 beet_build = { path = "crates/beet_build", version = "0.0.6-dev.4" }
 beet_common = { path = "crates/beet_common", version = "0.0.6-dev.4" }

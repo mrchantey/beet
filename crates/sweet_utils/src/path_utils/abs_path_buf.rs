@@ -71,11 +71,13 @@ impl AbsPathBuf {
 	}
 
 	/// Add a path to the current [`AbsPathBuf`], which will also naturally
-	/// be a canonical path.
+	/// be an absolute path path.
 	pub fn join(&self, path: impl AsRef<Path>) -> Self {
-		let path = self.0.join(path);
-		Self::new_unchecked(path)
+		let path = self.0.join(path).clean();
+		Self(path)
 	}
+
+
 	pub fn with_extension(mut self, ext: &str) -> Self {
 		self.0.set_extension(ext);
 		self
@@ -122,12 +124,6 @@ impl AbsPathBuf {
 	/// responsibility to ensure that the path is absolute and cleaned.
 	pub fn new_unchecked(path: impl AsRef<Path>) -> Self {
 		let path = path.as_ref().clean();
-		Self(path)
-	}
-	/// Add a path to the current [`AbsPathBuf`], which will also naturally
-	/// be an absolute path path.
-	pub fn join(&self, path: impl AsRef<Path>) -> Self {
-		let path = self.0.join(path).clean();
 		Self(path)
 	}
 
