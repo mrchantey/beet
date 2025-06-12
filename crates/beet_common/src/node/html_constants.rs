@@ -18,6 +18,10 @@ pub struct HtmlConstants {
 	pub event_store: String,
 	/// Used for setting the style id on elements
 	pub style_id_key: String,
+	/// Path to the wasm script, defaults to `/wasm/main.js`
+	pub wasm_js_path: String,
+	/// Path to the wasm binary, defaults to `/wasm/main_bg.wasm`
+	pub wasm_bin_path: String,
 	/// When parsing a [`HtmlDocument`], elements with these tags will be hoisted to the head of the document.
 	/// Defauts to `["title", "meta", "link", "style", "script", "base"]`.
 	pub hoist_to_head_tags: Vec<String>,
@@ -32,6 +36,8 @@ impl Default for HtmlConstants {
 			event_handler: "_beet_event_handler".to_string(),
 			event_store: "_beet_event_store".to_string(),
 			style_id_key: "data-beet-style-id".to_string(),
+			wasm_js_path: "/wasm/main.js".to_string(),
+			wasm_bin_path: "/wasm/main_bg.wasm".to_string(),
 			hoist_to_head_tags: vec![
 				"title".to_string(),
 				"meta".to_string(),

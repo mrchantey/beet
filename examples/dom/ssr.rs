@@ -1,4 +1,8 @@
 //! An example of basic server-side rendering (SSR) with beet.
+//! 
+//! ```sh
+//! cargo run --example ssr --features=server
+//! ```
 use axum::Router;
 use axum::extract::Query as QueryParams;
 use axum::extract::State;

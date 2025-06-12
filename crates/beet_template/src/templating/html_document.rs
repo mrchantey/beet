@@ -145,6 +145,89 @@ pub(super) fn hoist_document_elements(
 	}
 }
 
+/// Any tree containing a [`ClientLoadDirective`] or [`ClientOnlyDirective`]
+/// will need several scripts to be ran in order to hydrate the page.
+pub(super) fn insert_hydration_scripts(
+	mut commands: Commands,
+	html_constants: Res<HtmlConstants>,
+	children: Query<&Children>,
+	is_hydrated: Query<
+		(),
+		Or<(With<ClientLoadDirective>, With<ClientOnlyDirective>)>,
+	>,
+	documents: Populated<Entity, Added<HtmlDocument>>,
+) {
+	for doc in documents.iter().filter(|doc| {
+		children
+			.iter_descendants(*doc)
+			.any(|child| is_hydrated.contains(child))
+	}) {
+		commands
+			.entity(doc)
+			.with_child(event_playback_script(&html_constants))
+			.with_child(load_wasm_script(&html_constants));
+	}
+}
+
+fn event_playback_script(html_constants: &HtmlConstants) -> impl Bundle {
+	script(format!(
+		r#"
+// console.log('sweet has loaded')
+globalThis.{event_store} = []
+globalThis.{event_handler} = (id,event) => globalThis.{event_store}.push([id, event])
+"#,
+		event_store = html_constants.event_store,
+		event_handler = html_constants.event_handler,
+	))
+}
+
+fn load_wasm_script(html_constants: &HtmlConstants) -> impl Bundle {
+	script(format!(
+		r#"
+		import init from '{js_path}'
+		init('{bin_path}')
+			.catch((error) => {{
+				if (!error.message.startsWith("Using exceptions for control flow,"))
+					throw error
+		}})
+"#,
+		js_path = html_constants.wasm_js_path,
+		bin_path = html_constants.wasm_bin_path
+	))
+}
+
+// fn insert_tree_location_map(&self, node: &WebNode, doc: &mut HtmlDocument) {
+// 	let loc_map = node.xpipe(NodeToTreeLocationMap);
+// 	let loc_map =
+// 		ron::ser::to_string_pretty(&loc_map, Default::default()).unwrap();
+// 	let el = HtmlElementNode::inline_script(loc_map, vec![
+// 		HtmlAttribute {
+// 			key: "type".to_string(),
+// 			value: Some("beet/ron".to_string()),
+// 		},
+// 		HtmlAttribute {
+// 			key: self.html_constants.loc_map_key.to_string(),
+// 			value: None,
+// 		},
+// 	]);
+// 	doc.body.push(el.into());
+// }
+
+
+fn script(content: impl Into<String>) -> impl Bundle {
+	(
+		ElementNode::open(),
+		NodeTag::new("script"),
+		related!(
+			Attributes[(
+				AttributeKeyStr::new("type"),
+				AttributeValueStr::new("module"),
+			)]
+		),
+		children![TextNode::new(content)],
+	)
+}
+
 
 #[cfg(test)]
 mod test {
@@ -204,6 +287,16 @@ mod test {
 	.xpect()
 	.to_be(
 		"<!DOCTYPE html><html><head><span/></head><body><script/><br/></body></html>",
+	);
+	}
+	#[test]
+	fn hydration_scripts() {
+		HtmlDocument::parse_bundle(
+		rsx! {<div client:load>},
+	)
+	.xpect()
+	.to_be(
+		"<!DOCTYPE html><html><head><script type=\"module\">\n// console.log('sweet has loaded')\nglobalThis._beet_event_store = []\nglobalThis._beet_event_handler = (id,event) => globalThis._beet_event_store.push([id, event])\n</script><script type=\"module\">\n\t\timport init from '/wasm/main.js'\n\t\tinit('/wasm/main_bg.wasm')\n\t\t\t.catch((error) => {\n\t\t\t\tif (!error.message.startsWith(\"Using exceptions for control flow,\"))\n\t\t\t\t\tthrow error\n\t\t})\n</script></head><body><div/></body></html>",
 	);
 	}
 }

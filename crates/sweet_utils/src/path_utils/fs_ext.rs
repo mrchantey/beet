@@ -97,7 +97,7 @@ impl FsExt {
 
 
 	/// Write a file, ensuring the path exists
-	pub fn write(path: impl AsRef<Path>, data: &str) -> FsResult<()> {
+	pub fn write(path: impl AsRef<Path>, data: impl AsRef<[u8]>) -> FsResult<()> {
 		let path = path.as_ref();
 		if let Some(parent) = path.parent() {
 			fs::create_dir_all(parent)

@@ -92,10 +92,18 @@ run-csr:
 
 build-csr:
 	cargo build --example csr --target-dir=target --features=template --target wasm32-unknown-unknown
-	wasm-bindgen --out-dir target/csr-demo/wasm --out-name main --target web --no-typescript target/wasm32-unknown-unknown/debug/examples/csr.wasm
-	cp examples/dom/csr.html target/csr-demo/index.html
-	sweet serve target/csr-demo
+	wasm-bindgen --out-dir target/examples/csr/wasm --out-name main --target web --no-typescript target/wasm32-unknown-unknown/debug/examples/csr.wasm
+	cp examples/dom/csr.html target/examples/csr/index.html
+	sweet serve target/examples/csr
 
+run-hydration:
+	just watch just build-hydration && sweet serve target/examples/hydration
+
+build-hydration:
+	cargo run --example hydration
+	cargo build --example hydration --target-dir=target --features=template --target wasm32-unknown-unknown
+	wasm-bindgen --out-dir target/examples/hydration/wasm --out-name main --target web --no-typescript target/wasm32-unknown-unknown/debug/examples/hydration.wasm
+	
 
 doc crate *args:
 	just watch cargo doc -p {{crate}} --open {{args}}
