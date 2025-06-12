@@ -243,8 +243,13 @@ test-all-lib *args:
 test-all-doc *args:
 	{{min-stack}} cargo test --workspace 			--doc 	--all-features																	{{args}} -- {{test-threads}}
 
+test-all:
+	just test-template
+	just test-flow
+	just test-sweet
+
 # rebuilding bevy_render for wasm results in 'no space left on device'
-test-all *args:
+test-all-old *args:
 	just test-ci
 	just test-all-lib 																																								{{args}}
 	just test-all-doc 																																								{{args}}
