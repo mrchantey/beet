@@ -63,9 +63,14 @@ pub fn extract_lang_partials(
 		}
 		let target = target.id();
 		for entity in entities.iter() {
+			// these entities are now just portals to the shared content
 			commands
 				.entity(*entity)
 				.remove::<LangContent>()
+				.remove::<NodeTag>()
+				.remove::<ElementNode>()
+				.remove::<Children>()
+				.remove::<Attributes>()
 				.insert(NodePortal::new(target));
 		}
 	}

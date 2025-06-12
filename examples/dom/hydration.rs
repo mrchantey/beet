@@ -17,7 +17,9 @@ use sweet::prelude::*;
 fn main() {
 	App::new()
 		.add_plugins(TemplatePlugin)
-    .add_systems(Startup, |mut commands:Commands|{commands.spawn(app());})
+    .add_systems(Startup, |mut commands:Commands|{
+			commands.spawn(app());
+		})
     .run();
 }
 
@@ -29,17 +31,28 @@ fn main() {
 
 
 fn app() -> impl Bundle {
-	// the client:load directive results in a script tag being added which will
-	// load the wasm module
-	rsx! {<Counter client:load initial=7/>}
+	// the client:load directive adds a script tag for loading the wasm module
+	rsx! {
+		<Counter client:load initial=7/>
+		<style>
+			body{
+				background: black;
+				color: white;
+			}
+		</style>
+	}
 }
+
+
 
 #[template]
 #[derive(serde::Serialize)]
 fn Counter(initial: u32) -> impl Bundle {
 	let (get, set) = signal(initial);
 	rsx! {
-			<p>Count: {get}</p>
-			<button onclick={move || set(get()+1)}>Increment</button>
+		<p>"Count: "{get}</p>
+		<button 
+			onclick={move || set(get()+1)}
+		>"Increment"</button>
 	}
 }

@@ -190,4 +190,33 @@ mod test {
 				.to_string(),
 			);
 	}
+	#[test]
+	fn lang_content() {
+		quote! {<style></style>}
+			.xmap(|t| tokenize_rstml_tokens(t, WorkspacePathBuf::new(file!())))
+			.unwrap()
+			.to_string()
+			.xpect()
+			.to_be(
+				quote! {(
+					NodeTag(String::from("style")),
+					ElementNode { self_closing: false }
+				)}
+				.to_string(),
+			);
+		quote! {<style>foo</style>}
+			.xmap(|t| tokenize_rstml_tokens(t, WorkspacePathBuf::new(file!())))
+			.unwrap()
+			.to_string()
+			.xpect()
+			.to_be(
+				quote! {(
+					NodeTag(String::from("style")),
+					ElementNode { self_closing: false },
+					LangContent::InnerText(String::from("foo")),
+					related!{Children[TextNode(String::from("foo"))]}
+				)}
+				.to_string(),
+			);
+	}
 }

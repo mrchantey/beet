@@ -274,6 +274,11 @@ mod test {
 	#[test]
 	fn hoist_tag() {
 		HtmlDocument::parse_bundle(
+			rsx! {<style>body{}</style>},
+		)
+		.xpect()
+		.to_be("<!DOCTYPE html><html><head><style>body{}</style></head><body></body></html>");
+		HtmlDocument::parse_bundle(
 			rsx! {<script></script><br/>},
 		)
 		.xpect()

@@ -78,18 +78,20 @@ pub(super) fn extract_lang_content(
 			{
 				commands
 					.entity(entity)
-					.remove::<ElementNode>()
+					// .remove::<ElementNode>()
 					.insert(LangContent::file(value, span));
+
+				// TODO load content as child text node?
+
 				// found a LangContent::File
 				continue 'iter_elements;
 			}
 		}
 		for child in children.iter().flat_map(|c| c.iter()) {
 			if let Ok(text_node) = text_nodes.get(child) {
-				commands.entity(entity).remove::<ElementNode>().insert(
+				commands.entity(entity).insert(
 					LangContent::InnerText(text_node.text().to_string()),
 				);
-				commands.entity(child).despawn();
 				// found a LangContent::InnerText
 				continue 'iter_elements;
 			}
