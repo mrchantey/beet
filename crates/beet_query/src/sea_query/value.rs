@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use sweet::prelude::*;
+use beet_utils::prelude::*;
 
 
 impl ConvertValue for sea_query::Value {

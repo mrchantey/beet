@@ -5,7 +5,7 @@ use proc_macro2::TokenTree;
 use quote::ToTokens;
 use std::hash::Hash;
 use std::hash::Hasher;
-use sweet::prelude::ReadFile;
+use beet_utils::prelude::*;
 
 pub(super) struct HashNonTemplateRust<'a, H> {
 	pub macros: &'a TemplateMacros,

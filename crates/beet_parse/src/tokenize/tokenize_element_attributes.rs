@@ -189,6 +189,7 @@ mod test {
 	use quote::quote;
 	use sweet::prelude::*;
 	use syn::Ident;
+use beet_utils::prelude::*;
 
 	#[test]
 	fn insert_closure_type() {

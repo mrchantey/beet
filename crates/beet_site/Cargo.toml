@@ -16,11 +16,5 @@ keywords.workspace = true
 anyhow.workspace = true
 serde.workspace = true
 
-sweet = { workspace = true, features = ["web"] }
-beet = { workspace = true, features = ["web-server"] }
+beet = { workspace = true, features = ["web","web-server"] }
 getrandom = { version = "0.3", features = ["wasm_js"] }
-
-[build-dependencies]
-anyhow.workspace = true
-beet = { workspace = true, features = ["web-server", "build"] }
-sweet = { workspace = true, features = ["fs"] }

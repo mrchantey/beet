@@ -22,7 +22,7 @@ tokio = { version = "1", features = [
     "io-std",
     "signal",
 ] }
-sweet = { path = "../../ws_sweet/sweet", features = ["fs"] }
+beet_fs = { path = "../beet_fs" }
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 anyhow = "1"
 dotenv = "0.15"
@@ -62,4 +62,4 @@ tree-sitter-rust = "0.24"
 
 [dev-dependencies]
 tokio-test = "0.4"
-sweet = { path = "../../ws_sweet/sweet", features = ["fs", "test"] }
+sweet = { path = "../sweet" }

@@ -2,7 +2,7 @@ use crate::prelude::*;
 use bevy::ecs::system::RunSystemOnce;
 use bevy::prelude::*;
 use proc_macro2::TokenStream;
-use sweet::prelude::WorkspacePathBuf;
+use beet_utils::prelude::*;
 
 // pub fn get_app()-
 

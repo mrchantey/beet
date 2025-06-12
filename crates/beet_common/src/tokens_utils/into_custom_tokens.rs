@@ -5,7 +5,7 @@ use quote::quote;
 use send_wrapper::SendWrapper;
 use std::marker::PhantomData;
 use std::ops::Deref;
-use sweet::prelude::WorkspacePathBuf;
+use beet_utils::prelude::*;
 
 /// Trait for converting a type into a [`TokenStream`],
 /// usually derived using the [`ToTokens`] macro.

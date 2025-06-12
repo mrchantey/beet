@@ -18,13 +18,13 @@ pub mod prelude {
 	// pub use crate::server_actions::*;
 	pub use crate::types::*;
 
-	pub use sweet::prelude::HttpMethod;
+	pub use beet_net::prelude::HttpMethod;
 }
 
 
 pub mod exports {
 	pub use http;
-	pub use sweet::prelude::GlobFilter;
+	pub use beet_utils::prelude::GlobFilter;
 }
 
 /// expose prelude and as beet for macros

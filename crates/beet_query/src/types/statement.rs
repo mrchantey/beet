@@ -17,7 +17,7 @@ use sea_query::TableRenameStatement;
 use sea_query::TableTruncateStatement;
 use sea_query::UpdateStatement;
 use sea_query::WithQuery;
-use sweet::prelude::*;
+use beet_utils::prelude::*;
 
 pub trait StatementBuilder: SchemaBuilder + QueryBuilder {}
 impl<T: SchemaBuilder + QueryBuilder> StatementBuilder for T {}

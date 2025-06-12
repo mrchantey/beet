@@ -4,7 +4,8 @@ use super::error::Result;
 use bevy::prelude::*;
 use serde::Deserialize;
 use serde::Serialize;
-use sweet::prelude::*;
+use beet_fs::prelude::*;
+use beet_utils::prelude::*;
 
 
 /// Config for the template creation stage of the build process

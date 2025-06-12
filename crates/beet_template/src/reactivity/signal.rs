@@ -1,6 +1,6 @@
 use std::sync::Arc;
 use std::sync::Mutex;
-use sweet::prelude::*;
+use beet_utils::prelude::*;
 
 /// Very simple implementation of signals used for testing and demos
 pub fn signal<T: 'static + Send + Clone>(value: T) -> (Getter<T>, Setter<T>) {
@@ -163,7 +163,7 @@ impl<T: 'static + Send + Clone> std::ops::FnOnce<(T,)> for Setter<T> {
 #[cfg(test)]
 mod test {
 	use super::*;
-	// use sweet::prelude::*;
+	use sweet::prelude::*;
 
 	#[test]
 	fn signals() {

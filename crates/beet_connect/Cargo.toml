@@ -19,7 +19,8 @@ keywords.workspace = true
 anyhow.workspace = true
 thiserror.workspace = true
 
-sweet = { workspace = true, features = ["net"] }
+beet_net.workspace=true
+beet_utils.workspace=true
 serde.workspace = true
 serde_json.workspace = true
 serde_with = "3.12"
@@ -27,4 +28,4 @@ http.workspace = true
 
 [dev-dependencies]
 tokio.workspace = true
-sweet = { workspace = true, features = ["test"] }
+sweet.workspace = true

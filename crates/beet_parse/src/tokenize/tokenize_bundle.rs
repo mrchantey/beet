@@ -1,7 +1,7 @@
 use crate::prelude::*;
+use beet_utils::prelude::*;
 use bevy::prelude::*;
 use proc_macro2::TokenStream;
-use sweet::prelude::PipelineTarget;
 
 pub fn tokenize_bundle_children_with_errors(
 	In(entity): In<Entity>,
@@ -71,6 +71,7 @@ pub fn tokenize_bundle(world: &World, entity: Entity) -> Result<TokenStream> {
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
+	use beet_utils::prelude::*;
 	use bevy::prelude::*;
 	use quote::quote;
 	use sweet::prelude::*;

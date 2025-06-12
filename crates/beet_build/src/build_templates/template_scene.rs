@@ -1,5 +1,5 @@
 use bevy::prelude::*;
-use sweet::prelude::*;
+use beet_utils::prelude::*;
 
 
 /// Used to reconcile [`BundleTokens`] with their corresponding template

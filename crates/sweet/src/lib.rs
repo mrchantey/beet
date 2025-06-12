@@ -1,42 +1,88 @@
+#![cfg_attr(test, feature(custom_test_frameworks))]
+#![cfg_attr(test, test_runner(crate::test_runner))]
+#![feature(test)]
+// #![deny(missing_docs)]
+#![doc = include_str!("../README.md")]
+#![feature(panic_payload_as_str)]
+// implement FnMut for MockFunc
+#![feature(unboxed_closures)]
+#![cfg_attr(feature = "nightly", feature(fn_traits))]
+// #![feature(panic_payload_as_str)]
+
+/// Matchers and utilities for running webdriver tests
+#[cfg(all(feature = "e2e", not(target_arch = "wasm32")))]
+pub mod e2e;
+
+extern crate test;
+// the #[sweet::test] macro
+pub use sweet_macros;
+pub use sweet_macros::test;
+// #[cfg(test)]
+// use libtest_runner::testlib_runner as libtest_runner;
+pub mod backtrace;
 #[cfg(feature = "bevy")]
-pub use sweet_bevy as bevy;
-#[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
-pub use sweet_fs as fs;
-#[cfg(feature = "net")]
-pub use sweet_net as net;
-#[cfg(all(feature = "server", not(target_arch = "wasm32")))]
-pub use sweet_server as server;
-#[cfg(feature = "test")]
-pub use sweet_test as test;
-#[cfg(feature = "test")]
-pub use sweet_test::sweet_test_macros::*;
-#[cfg(feature = "test")]
-pub use sweet_test::test_runner;
-pub use sweet_utils as utils;
-pub use sweet_utils::elog;
-pub use sweet_utils::log;
-pub use sweet_utils::noop;
-#[cfg(feature = "web")]
-pub use sweet_web as web;
+pub mod bevy;
+/// Utilities for [libtest](https://github.com/rust-lang/rust/tree/master/library/test)
+pub mod libtest;
+/// Cross platform logging utils
+pub mod logging;
+/// Test runner module
+pub mod test_runner;
+pub mod utils;
+
+#[path = "_matchers/mod.rs"]
+/// Matchers used for assertions: `expect(true).to_be_true()`
+pub mod matchers;
+#[cfg(not(target_arch = "wasm32"))]
+#[doc(hidden)]
+pub mod native;
+pub mod test_case;
+#[cfg(target_arch = "wasm32")]
+pub mod wasm;
 
 pub mod prelude {
+	pub use crate::backtrace::*;
 	#[cfg(feature = "bevy")]
-	pub use crate::bevy::prelude::*;
-	#[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
-	pub use crate::fs::prelude::*;
-	#[cfg(feature = "net")]
-	pub use crate::net::prelude::*;
-	#[cfg(all(feature = "server", not(target_arch = "wasm32")))]
-	pub use crate::server::prelude::*;
-	#[cfg(feature = "test")]
-	pub use crate::test::prelude::*;
-	pub use crate::utils::prelude::*;
-	#[cfg(all(feature = "web", target_arch = "wasm32"))]
-	pub use crate::web::prelude::*;
+	pub use crate::bevy::*;
+	#[cfg(all(feature = "e2e", not(target_arch = "wasm32")))]
+	pub use crate::e2e::*;
+	pub use crate::libtest::*;
+	pub use crate::logging::*;
+	pub use crate::matchers::*;
+	#[cfg(not(target_arch = "wasm32"))]
+	pub use crate::native::*;
+	pub use crate::sweet_ref_impls;
+	pub use crate::test_case::*;
+	pub use crate::test_runner::*;
+	pub use crate::utils::*;
+	#[cfg(target_arch = "wasm32")]
+	pub use crate::wasm::*;
+	#[cfg(all(feature = "e2e", not(target_arch = "wasm32")))]
+	pub use fantoccini::Client;
+	#[cfg(all(feature = "e2e", not(target_arch = "wasm32")))]
+	pub use fantoccini::Locator;
+}
+
+pub mod as_sweet {
+	pub use crate::prelude::*;
+	pub mod sweet {
+		pub use crate::exports;
+		pub use crate::prelude;
+	}
 }
 
 pub mod exports {
-	#[cfg(feature = "test")]
-	pub use sweet_test::exports::*;
-	pub use sweet_utils::exports::*;
+	pub use anyhow::Result;
+}
+
+/// Entry point for the sweet test runner
+pub fn test_runner(tests: &[&test::TestDescAndFn]) {
+	#[cfg(target_arch = "wasm32")]
+	let result = crate::wasm::run_libtest_wasm(tests);
+	#[cfg(not(target_arch = "wasm32"))]
+	let result = crate::native::run_libtest_native(tests);
+	if let Err(e) = result {
+		eprintln!("Test runner failed: {e}");
+		std::process::exit(1);
+	}
 }

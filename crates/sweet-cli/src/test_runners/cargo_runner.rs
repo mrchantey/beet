@@ -1,9 +1,7 @@
 use anyhow::Result;
 use clap::Parser;
-use sweet::fs::terminal;
-use sweet::prelude::CargoBuildCmd;
-use sweet::prelude::FsWatcher;
-use sweet::prelude::GlobFilter;
+use beet_fs::prelude::*;
+use beet_utils::prelude::*;
 
 #[derive(Debug, Parser)]
 #[command(name = "test")]
@@ -72,7 +70,7 @@ impl CargoCmdExtra {
 			.package
 			.as_ref()
 			// these crates are upstream of sweet test so do not support the watch command
-			.map(|p| ["sweet_utils", "sweet_fs"].contains(&p.as_str()))
+			.map(|p| ["beet_utils", "beet_fs"].contains(&p.as_str()))
 			.unwrap_or(false);
 		if self.watch && self.build_cmd.lib && !is_upstream {
 			// watching

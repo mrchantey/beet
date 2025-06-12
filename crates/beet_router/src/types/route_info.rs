@@ -1,7 +1,6 @@
 use crate::prelude::*;
 use http::request::Parts;
 use std::path::PathBuf;
-use sweet::prelude::*;
 
 // pub trait RoutesToRsx {
 // 	async fn routes_to_rsx(&mut self) -> Result<Vec<(RouteInfo, WebNode)>>;

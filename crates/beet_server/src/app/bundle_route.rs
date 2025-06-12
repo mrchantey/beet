@@ -5,11 +5,11 @@ use axum::response::Html;
 use axum::routing;
 use axum::routing::MethodFilter;
 use axum::routing::MethodRouter;
+use beet_net::prelude::HttpMethod;
 use beet_router::types::RouteInfo;
 use beet_template::prelude::*;
 use bevy::prelude::*;
 use std::convert::Infallible;
-use sweet::prelude::HttpMethod;
 
 /// Methods that accept a tuple of extractors and return a bundle.
 pub trait BundleRoute<M>: 'static + Send + Sync + Clone {
@@ -82,6 +82,7 @@ mod test {
 	use axum::Router;
 	use axum::extract::Query as QueryParams;
 	use beet_common::prelude::*;
+	use beet_net::prelude::*;
 	use beet_template::prelude::*;
 	use bevy::prelude::*;
 	use serde::Deserialize;

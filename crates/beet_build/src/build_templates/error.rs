@@ -1,8 +1,8 @@
 use beet_common::node::FileSpan;
+use beet_utils::prelude::*;
 // use beet_template::error::ParseError;
 use std::path::Path;
 use std::path::PathBuf;
-use sweet::prelude::FsError;
 
 pub type Result<T> = std::result::Result<T, Error>;
 

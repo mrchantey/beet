@@ -1,6 +1,7 @@
 use super::RstmlCustomNode;
 use crate::prelude::*;
 use beet_common::prelude::*;
+use beet_utils::prelude::*;
 use bevy::prelude::*;
 use proc_macro2::Span;
 use proc_macro2_diagnostics::Diagnostic;
@@ -13,7 +14,6 @@ use rstml::node::NodeBlock;
 use rstml::node::NodeElement;
 use rstml::node::NodeName;
 use send_wrapper::SendWrapper;
-use sweet::prelude::WorkspacePathBuf;
 use syn::Expr;
 use syn::ExprBlock;
 use syn::ExprLit;
@@ -420,11 +420,14 @@ impl<'w, 's, 'a> RstmlToWorld<'w, 's, 'a> {
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
+	use beet_bevy::prelude::*;
 	use beet_common::prelude::*;
+	use beet_utils::prelude::*;
 	use bevy::prelude::*;
 	use proc_macro2::TokenStream;
 	use quote::quote;
 	use sweet::prelude::*;
+
 
 	fn parse(tokens: TokenStream) -> App {
 		App::new()

@@ -1,6 +1,6 @@
 use crate::prelude::*;
 use bevy::prelude::*;
-use sweet::prelude::When;
+use beet_bevy::prelude::When;
 
 
 /// Implementation of position, velocity, force integration

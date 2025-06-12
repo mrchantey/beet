@@ -3,7 +3,7 @@ use beet_common::prelude::*;
 use bevy::prelude::*;
 use proc_macro2::TokenStream;
 use send_wrapper::SendWrapper;
-use sweet::prelude::PipelineTarget;
+use beet_utils::prelude::*;
 use syn::Expr;
 
 #[rustfmt::skip]
@@ -68,6 +68,7 @@ mod test {
 	use proc_macro2::TokenStream;
 	use quote::quote;
 	use sweet::prelude::*;
+	use beet_utils::prelude::*;
 
 	fn parse_rstml(tokens: TokenStream) -> Matcher<String> {
 		rstml_to_token_tree(tokens, WorkspacePathBuf::new(file!()))

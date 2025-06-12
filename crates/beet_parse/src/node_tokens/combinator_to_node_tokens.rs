@@ -3,7 +3,7 @@ use anyhow::Result;
 use beet_common::prelude::*;
 use beet_rsx_combinator::prelude::*;
 use bevy::prelude::*;
-use sweet::prelude::*;
+use beet_utils::prelude::*;
 
 /// A [`String`] of rsx tokens to be parsed into a node tree.
 #[derive(Default, Component, Deref, Reflect)]
@@ -284,6 +284,7 @@ impl<'w, 's, 'a> Builder<'w, 's, 'a> {
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
+	use beet_utils::prelude::*;
 	use quote::quote;
 	use sweet::prelude::*;
 

@@ -1,6 +1,6 @@
 use proc_macro2::TokenStream;
 use quote::quote;
-use sweet::prelude::*;
+use beet_utils::prelude::*;
 use syn;
 use syn::DeriveInput;
 
@@ -218,7 +218,7 @@ fn pound_token() -> Token![#] { syn::Token![#](proc_macro2::Span::call_site()) }
 
 #[cfg(test)]
 mod test {
-	// use crate::prelude::*;
+	use beet_utils::prelude::*;
 	use super::parse;
 	use super::pound_token;
 	use quote::quote;

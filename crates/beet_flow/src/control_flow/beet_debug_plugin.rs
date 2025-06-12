@@ -3,7 +3,7 @@ use crate::prelude::*;
 use bevy::color::palettes::tailwind;
 use bevy::prelude::*;
 use std::borrow::Cow;
-use sweet::prelude::When;
+use beet_bevy::prelude::When;
 
 
 

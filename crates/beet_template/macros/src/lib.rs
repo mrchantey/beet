@@ -3,7 +3,7 @@
 #![feature(proc_macro_span)]
 use beet_parse::prelude::*;
 use proc_macro::TokenStream;
-use sweet::prelude::*;
+use beet_utils::prelude::*;
 use syn::DeriveInput;
 use syn::ItemFn;
 use syn::parse_macro_input;

@@ -1,7 +1,7 @@
 use http::StatusCode;
 use serde::Deserialize;
 use serde::Serialize;
-use sweet::net::cross_fetch;
+use beet_net::prelude::*;
 
 pub type ActionResult<T, E = String> = Result<T, ActionError<E>>;
 

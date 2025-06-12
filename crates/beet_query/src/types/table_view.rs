@@ -4,7 +4,7 @@ use sea_query::Expr;
 use sea_query::InsertStatement;
 use sea_query::Query;
 use sea_query::SimpleExpr;
-use sweet::prelude::*;
+use beet_utils::prelude::*;
 
 #[derive(Debug, Clone, thiserror::Error)]
 pub enum DeserializeError {

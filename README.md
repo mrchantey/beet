@@ -30,8 +30,8 @@ Its *very* early days so your mileage may vary depending on the crate of interes
 
 Control flow crates built upon the [ecs engine](https://crates.io/crates/bevy_ecs) that powers Bevy. These can be used for a growing variety of behavior paradigms including Behavior Trees, LLMs and Reinforcement Learning. They are also decoupled from rendering, for instance they can be run on small microcontrollers like the ESP32.
 
-| Crate                                             | Status | Description                                                       |
-| ------------------------------------------------- | ------ | ----------------------------------------------------------------- |
+| Crate                                            | Status | Description                                                       |
+| ------------------------------------------------ | ------ | ----------------------------------------------------------------- |
 | [`beet_flow`](crates/beet_flow/Cargo.toml)       | 🦢      | Scenes-as-control-flow bevy library for behavior trees etc        |
 | [`beet_spatial`](crates/beet_spatial/Cargo.toml) | 🐣      | Extend `beet_flow` with spatial behaviors like steering           |
 | [`beet_ml`](crates/beet_ml/Cargo.toml)           | 🐉      | Extend `beet_flow` with machine learning using `candle`           |
@@ -42,22 +42,22 @@ Control flow crates built upon the [ecs engine](https://crates.io/crates/bevy_ec
 
 An exploration of a rusty `jsx`, and the tools required to maximize performance and developer productivity. 
 
-| Crate                                          | Status | Description                    |
-| ---------------------------------------------- | ------ | ------------------------------ |
-| [`beet_template`](crates/beet_template/Cargo.toml)       | 🐉      | Cross domain authoring tools   |
-| [`beet_router`](crates/beet_router/Cargo.toml) | 🐉      | File based router for websites |
+| Crate                                              | Status | Description                    |
+| -------------------------------------------------- | ------ | ------------------------------ |
+| [`beet_template`](crates/beet_template/Cargo.toml) | 🐉      | Cross domain authoring tools   |
+| [`beet_router`](crates/beet_router/Cargo.toml)     | 🐉      | File based router for websites |
 
 ## `sweet`
 
 General utilities including a test runner, file watcher etc.
 
-| Crate                                                   | Status | Description                            |
-| ------------------------------------------------------- | ------ | -------------------------------------- |
-| [`sweet_bevy`](https://crates.io/crates/sweet_bevy)     | 🐉      | Bevy utilities                         |
-| [`sweet_fs`](https://crates.io/crates/sweet_fs)         | 🐉      | FS utilities                           |
-| [`sweet_server`](https://crates.io/crates/sweet_server) | 🐉      | Simple file server with live reload    |
-| [`sweet_test`](https://crates.io/crates/sweet_test)     | 🐣      | A pretty cross platform test runner    |
-| [`sweet-cli`](https://crates.io/crates/sweet-cli)       | 🐣      | Cross-platform utilities and dev tools |
+| Crate                                                             | Status | Description                            |
+| ----------------------------------------------------------------- | ------ | -------------------------------------- |
+| [`beet_bevy`](https://crates.io/crates/beet_bevy)                 | 🐉      | Bevy utilities                         |
+| [`beet_fs`](https://crates.io/crates/beet_fs)                     | 🐉      | FS utilities                           |
+| [`beet_server_utils`](https://crates.io/crates/beet_server_utils) | 🐉      | Simple file server with live reload    |
+| [`sweet`](https://crates.io/crates/sweet)                         | 🐣      | A pretty cross platform test runner    |
+| [`sweet-cli`](https://crates.io/crates/sweet-cli)                 | 🐣      | Cross-platform utilities and dev tools |
 
 
 ## `crates`

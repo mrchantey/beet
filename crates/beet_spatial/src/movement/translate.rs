@@ -1,6 +1,6 @@
 use beet_flow::prelude::*;
 use bevy::prelude::*;
-use sweet::prelude::When;
+use beet_bevy::prelude::When;
 
 /// Applies constant translation to [`Running::origin`],
 /// multiplied by [`Time::delta_secs`]

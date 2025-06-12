@@ -3,7 +3,7 @@ use once_cell::sync::Lazy;
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 use std::sync::Mutex;
-use sweet::net::cross_fetch;
+use beet_net::prelude::*;
 use sweet::prelude::*;
 
 /// the url for the server.

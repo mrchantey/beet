@@ -16,7 +16,7 @@ pub use algo::*;
 use beet_flow::prelude::*;
 use bevy::prelude::*;
 pub use steer_target::*;
-use sweet::prelude::RandomSource;
+use beet_utils::prelude::RandomSource;
 
 type M = GroupSteerAgent;
 

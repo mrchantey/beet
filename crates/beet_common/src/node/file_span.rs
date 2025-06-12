@@ -2,7 +2,7 @@ use crate::prelude::*;
 use bevy::reflect::Reflect;
 use std::hash::Hash;
 use std::path::Path;
-use sweet::prelude::*;
+use beet_utils::prelude::*;
 
 /// File location of the first symbol inside an rsx macro, used by [RsxTemplate]
 /// to reconcile web nodes with templates

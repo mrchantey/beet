@@ -5,7 +5,7 @@ use bevy::prelude::*;
 use serde::Deserialize;
 use serde::Serialize;
 use std::path::Path;
-use sweet::prelude::*;
+use beet_utils::prelude::*;
 
 
 

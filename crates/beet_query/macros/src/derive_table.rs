@@ -5,7 +5,7 @@ use proc_macro2;
 use proc_macro2::TokenStream;
 use quote::ToTokens;
 use quote::quote;
-use sweet::prelude::*;
+use beet_utils::prelude::*;
 use syn;
 use syn::DeriveInput;
 use syn::Ident;

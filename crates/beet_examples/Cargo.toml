@@ -18,7 +18,7 @@ bevy_default = [
 	"beet_flow/bevy_default",
 	"beet_ml?/bevy_default",
 	"beet_spatial/bevy_default",
-	"sweet/bevy_default",
+	# "beet_bevy/bevy_default",
 ]
 ml = ["dep:beet_ml"]
 
@@ -29,6 +29,7 @@ beet_ml = { workspace = true, features = [
 	"spatial",
 ], optional = true }
 beet_spatial = { workspace = true, features = [] }
+beet_utils = { workspace = true, features = ["rand"] }
 
 
 serde.workspace = true
@@ -39,10 +40,9 @@ bevy = { workspace = true }
 log.workspace = true
 pretty_env_logger.workspace = true
 anyhow.workspace = true
-sweet = { workspace = true, features = ["rand"] }
 
 [dev-dependencies]
-sweet = { workspace = true, features = ["test"] }
+sweet.workspace = true
 log.workspace = true
 pretty_env_logger.workspace = true
 anyhow.workspace = true

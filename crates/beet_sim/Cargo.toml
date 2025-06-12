@@ -25,7 +25,7 @@ anyhow.workspace = true
 
 
 [dev-dependencies]
-sweet = { workspace = true, features = ["test"] }
+sweet.workspace = true
 
 
 # bevy = { workspace = true, default-features = true }

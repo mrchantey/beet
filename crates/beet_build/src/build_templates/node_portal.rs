@@ -69,6 +69,7 @@ pub struct NodePortalTarget {
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
+	use beet_bevy::prelude::*;
 	use bevy::prelude::*;
 	use sweet::prelude::*;
 

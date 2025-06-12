@@ -1,7 +1,7 @@
 use crate::prelude::*;
 use anyhow::Result;
 use sea_query::Expr;
-use sweet::prelude::*;
+use beet_utils::prelude::*;
 
 
 #[derive(Clone)]
@@ -115,6 +115,8 @@ impl Database {
 mod test {
 	use crate::as_beet::*;
 	use sweet::prelude::*;
+	use beet_utils::prelude::*;
+
 
 	#[derive(Debug, Clone, PartialEq, Table)]
 	struct User {

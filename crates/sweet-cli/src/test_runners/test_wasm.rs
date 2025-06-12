@@ -1,11 +1,11 @@
 use anyhow::Result;
+use beet_utils::prelude::*;
 use clap::Parser;
 use std::fs;
 use std::path::PathBuf;
 use std::process::Child;
 use std::process::Command;
 use std::str::FromStr;
-use sweet::prelude::*;
 
 /// The wasm test runner
 ///

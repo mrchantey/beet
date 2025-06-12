@@ -1,6 +1,6 @@
 use beet_build::as_beet::*;
 use bevy::prelude::*;
-use sweet::prelude::WorldMutExt;
+use beet_bevy::prelude::*;
 
 
 fn main() {

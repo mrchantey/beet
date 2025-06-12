@@ -8,12 +8,16 @@ pub use beet_common as common;
 pub use beet_connect as connect;
 #[cfg(feature = "design")]
 pub use beet_design as design;
+// flow
+
 #[cfg(feature = "examples")]
 pub use beet_examples as examples;
 #[cfg(feature = "flow")]
 pub use beet_flow as flow;
 #[cfg(feature = "ml")]
 pub use beet_ml as ml;
+
+
 #[cfg(feature = "parse")]
 pub use beet_parse as parse;
 #[cfg(feature = "query")]
@@ -29,8 +33,26 @@ pub use beet_spatial as spatial;
 #[cfg(feature = "template")]
 pub use beet_template as template;
 
-// #[cfg(all(feature = "router", not(target_arch = "wasm32")))]
-// mod default_runner;
+// Utils
+#[cfg(feature = "bevy")]
+pub use beet_bevy as bevy;
+#[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
+pub use beet_fs as fs;
+#[cfg(feature = "net")]
+pub use beet_net as net;
+#[cfg(all(feature = "server", not(target_arch = "wasm32")))]
+pub use beet_server_utils as server;
+#[cfg(feature = "test")]
+pub use sweet as test;
+#[cfg(feature = "test")]
+pub use sweet::sweet_macros::*;
+pub use beet_utils as utils;
+pub use beet_utils::elog;
+pub use beet_utils::log;
+pub use beet_utils::noop;
+#[cfg(feature = "web")]
+pub use beet_web as web;
+
 
 pub mod prelude {
 	#[cfg(feature = "build")]
@@ -61,20 +83,32 @@ pub mod prelude {
 	#[cfg(feature = "template")]
 	pub use crate::template::prelude::*;
 
-	// #[cfg(all(feature = "router", not(target_arch = "wasm32")))]
-	// pub use crate::default_runner::*;
+	// utils
+	#[cfg(feature = "bevy")]
+	pub use crate::bevy::prelude::*;
+	#[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
+	pub use crate::fs::prelude::*;
+	#[cfg(feature = "net")]
+	pub use crate::net::prelude::*;
+	#[cfg(all(feature = "server", not(target_arch = "wasm32")))]
+	pub use crate::server::prelude::*;
+	#[cfg(feature = "test")]
+	pub use crate::test::prelude::*;
+	pub use crate::utils::prelude::*;
+	#[cfg(all(feature = "web", target_arch = "wasm32"))]
+	pub use crate::web::prelude::*;
 }
 
 
 pub mod exports {
 	#[cfg(feature = "build")]
-	pub use beet_build::exports::*;
+	pub use crate::build::exports::*;
 	#[cfg(feature = "router")]
-	pub use beet_router::exports::*;
+	pub use crate::router::exports::*;
 	#[cfg(all(feature = "server", not(target_arch = "wasm32")))]
-	pub use beet_server::exports::*;
+	pub use crate::server::exports::*;
 	#[cfg(feature = "template")]
-	pub use beet_template::exports::*;
+	pub use crate::template::exports::*;
 	// #[cfg(feature = "examples")]
 	// pub use beet_examples::exports::*;
 	// #[cfg(feature = "flow")]
@@ -89,6 +123,10 @@ pub mod exports {
 	// pub use beet_sim::exports::*;
 	// #[cfg(feature = "spatial")]
 	// pub use beet_spatial::exports::*;
+
+	#[cfg(feature = "test")]
+	pub use sweet::exports::*;
+	pub use beet_utils::exports::*;
 }
 
 

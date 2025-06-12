@@ -34,7 +34,7 @@ serde.workspace = true
 lightningcss = { workspace = true, optional = true }
 
 [dev-dependencies]
-sweet = { workspace = true, features = ["test"] }
+sweet.workspace = true
 
 [build-dependencies]
 anyhow.workspace = true

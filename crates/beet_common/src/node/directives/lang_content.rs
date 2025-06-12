@@ -3,7 +3,7 @@ use bevy::prelude::*;
 use std::hash::Hash;
 use std::hash::Hasher;
 use std::path::PathBuf;
-use sweet::prelude::WorkspacePathBuf;
+use beet_utils::prelude::*;
 
 
 

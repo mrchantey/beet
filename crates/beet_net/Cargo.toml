@@ -1,0 +1,64 @@
+[package]
+name = "beet_net"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+documentation.workspace = true
+license.workspace = true
+readme.workspace = true
+description.workspace = true
+repository.workspace = true
+
+[features]
+default = ["serde"]
+serde = ["dep:serde", "dep:serde_json"]
+
+
+[dependencies]
+#💡 Utils
+anyhow.workspace = true
+thiserror.workspace = true
+beet_utils.workspace = true
+once_cell.workspace = true
+
+#💡 Serde
+serde = { workspace = true, optional = true }
+serde_json = { workspace = true, optional = true }
+
+
+#💡 HTTP
+http.workspace = true
+http-body-util.workspace = true
+url = "2"
+serde_urlencoded = "0.7"
+
+#💡 Native
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+# reqwest = { version = "0.12" }
+# rustls keeps triggering recompilation so sucks for dev, but zig fails to get openssl 
+# so rustls is required for zig/cargo-lambda
+reqwest = { version = "0.12", default-features = false, features = [
+	"rustls-tls",
+] }
+
+#💡 Web
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+wasm-bindgen.workspace = true
+wasm-bindgen-futures.workspace = true
+js-sys.workspace = true
+#https://rustwasm.github.io/wasm-bindgen/api/web_sys/
+#https://github.com/rustwasm/wasm-bindgen/blob/main/crates/web-sys/Cargo.toml
+web-sys = { workspace = true, features = [
+	"Window",
+	"Blob",
+	"Request",
+	"RequestInit",
+	"Headers",
+	"Response",
+] }
+
+[target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
+tokio.workspace = true
+
+[dev-dependencies]
+sweet.workspace = true

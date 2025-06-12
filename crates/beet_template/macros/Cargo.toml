@@ -21,8 +21,9 @@ proc-macro = true
 
 [dependencies]
 beet_common = { workspace = true, features = ["tokens"] }
+beet_utils.workspace = true
 beet_parse.workspace = true
-sweet = { workspace = true, features = ["bevy"] }
+beet_bevy.workspace = true
 syn.workspace = true
 quote.workspace = true
 proc-macro2.workspace = true
@@ -30,4 +31,4 @@ proc-macro2-diagnostics.workspace = true
 anyhow.workspace = true
 
 [dev-dependencies]
-sweet = { workspace = true, features = ["test", "bevy"] }
+sweet.workspace = true

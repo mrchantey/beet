@@ -27,9 +27,9 @@ In the case of `long().method().chains()` we prefer to continue chains than stor
 
 ## Testing
 
-> These instructions are only for crates downstream of `sweet_test` which is all crates except:
-> - `sweet_utils`
-> - `sweet_fs`
+> These instructions are only for crates downstream of `sweet` which is all crates except:
+> - `beet_utils`
+> - `beet_fs`
 
 We use the custom `sweet` test runner, which prefers matchers instead of `assert!`.
 

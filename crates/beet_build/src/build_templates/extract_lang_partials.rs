@@ -7,7 +7,7 @@ use serde::Deserialize;
 use serde::Serialize;
 use std::hash::Hash;
 use std::hash::Hasher;
-use sweet::prelude::ReadFile;
+use beet_utils::prelude::*;
 
 /// The loaded and deduplicated [`LangContent`].
 #[derive(

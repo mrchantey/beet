@@ -7,7 +7,7 @@ use quote::quote_spanned;
 use rapidhash::RapidHashSet;
 use send_wrapper::SendWrapper;
 use std::sync::LazyLock;
-use sweet::prelude::*;
+use beet_utils::prelude::*;
 
 // Collect elements to provide semantic highlight based on element tag.
 // No differences between open tag and closed tag.

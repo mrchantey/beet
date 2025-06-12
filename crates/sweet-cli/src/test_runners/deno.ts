@@ -5,7 +5,7 @@ import init from "./bindgen.js";
 
 /**
 This file is cached and will be replaced on hash change
-For more info see [js_runtime_extern.rs](crates/sweet_test/src/wasm/js_runtime_extern.rs)
+For more info see [js_runtime_extern.rs](crates/sweet/src/wasm/js_runtime_extern.rs)
 **/
 globalThis.cwd = () => Deno.cwd();
 globalThis.exit = (code: number) => Deno.exit(code);

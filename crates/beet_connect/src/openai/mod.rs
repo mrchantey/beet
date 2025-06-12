@@ -1,5 +1,5 @@
-use sweet::net::cross_fetch;
-use sweet::prelude::*;
+use beet_net::cross_fetch;
+use beet_utils::prelude::*;
 
 pub mod realtime;
 

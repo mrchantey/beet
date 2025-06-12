@@ -1,7 +1,7 @@
 use crate::prelude::*;
 use beet_parse::prelude::*;
 use bevy::prelude::*;
-use sweet::prelude::ReadFile;
+use beet_utils::prelude::*;
 
 
 /// For a given markdown file, parse to valid rsx combinator syntax and insert

@@ -108,6 +108,7 @@ mod test {
 	use crate::as_beet::*;
 	use bevy::prelude::*;
 	use sweet::prelude::*;
+	use beet_utils::prelude::*;
 
 	fn hash(bundle: impl Bundle) -> u64 {
 		let mut app = App::new();

@@ -1,7 +1,8 @@
 use crate::prelude::*;
+use beet_bevy::prelude::*;
 use beet_flow::prelude::*;
+use beet_utils::prelude::*;
 use bevy::prelude::*;
-use sweet::prelude::*;
 
 /// Random walk that uses a pair of circles
 /// to create somewhat cohesive movement, see [wander_impulse]

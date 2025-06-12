@@ -1,13 +1,14 @@
 use anyhow::Result;
+use beet_fs::exports::notify::EventKind;
+use beet_fs::exports::notify::event::ModifyKind;
+use beet_fs::exports::notify::event::RenameMode;
+use beet_fs::prelude::*;
+use beet_utils::prelude::*;
 use clap::Parser;
 use quote::quote;
 use rapidhash::RapidHashMap;
 use std::path::Path;
 use std::path::PathBuf;
-use sweet::fs::exports::notify::EventKind;
-use sweet::fs::exports::notify::event::ModifyKind;
-use sweet::fs::exports::notify::event::RenameMode;
-use sweet::prelude::*;
 use syn::File;
 use syn::Ident;
 use syn::ItemMod;
@@ -374,6 +375,7 @@ impl<'a> FileMeta<'a> {
 #[cfg(test)]
 mod test {
 	use super::*;
+	use sweet::prelude::*;
 
 	#[test]
 	fn insert_works() {

@@ -5,6 +5,7 @@
 use beet_template::as_beet::*;
 use bevy::prelude::*;
 use std::marker::PhantomData;
+use sweet::prelude::*;
 
 
 #[test]

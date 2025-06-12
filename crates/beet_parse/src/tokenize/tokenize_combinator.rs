@@ -2,7 +2,7 @@ use crate::prelude::*;
 use bevy::ecs::system::RunSystemOnce;
 use bevy::prelude::*;
 use proc_macro2::TokenStream;
-use sweet::prelude::*;
+use beet_utils::prelude::*;
 
 pub fn tokenize_combinator_str(
 	tokens: &str,

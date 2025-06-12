@@ -21,14 +21,15 @@ _doctest = []
 
 [dependencies]
 beet_flow_macros.workspace = true
+beet_bevy.workspace = true
+
 bevy.workspace = true
 log.workspace = true
 extend.workspace = true
 anyhow.workspace = true
 thiserror.workspace = true
 serde = { workspace = true, optional = true }
-sweet = { workspace = true, features = ["bevy"] }
 
 [dev-dependencies]
 beet_flow = { path = "", features = ["_doctest"] }
-sweet = { workspace = true, features = ["test", "bevy"] }
+sweet.workspace = true

@@ -2,8 +2,7 @@ use crate::prelude::*;
 use beet_common::prelude::*;
 use beet_parse::prelude::*;
 use bevy::prelude::*;
-use sweet::prelude::ReadFile;
-use sweet::prelude::WorkspacePathBuf;
+use beet_utils::prelude::*;
 use syn::visit::Visit;
 
 

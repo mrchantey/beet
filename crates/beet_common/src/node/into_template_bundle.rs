@@ -1,6 +1,6 @@
 use crate::prelude::*;
 use bevy::ecs::bundle::Bundle;
-use sweet::prelude::Maybe;
+use beet_bevy::prelude::Maybe;
 
 /// Very inclusive version of [`Bundle`], accounting for the location
 /// of the bundle in a tree, and allowing primitives to be wrapped

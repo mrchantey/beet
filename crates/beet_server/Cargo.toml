@@ -19,11 +19,13 @@ reload = ["tower-livereload"]
 lambda = ["dep:lambda_http"]
 
 [dependencies]
-sweet = { workspace = true, features = ["fs"] }
-bevy.workspace = true
+beet_fs.workspace = true
+beet_net.workspace = true
 beet_common.workspace = true
 beet_template.workspace = true
 beet_router = { workspace = true, features = ["axum"] }
+
+bevy.workspace = true
 
 extend.workspace = true
 thiserror.workspace = true
@@ -45,4 +47,4 @@ tower-http.workspace = true
 lambda_http = { version = "0.14", optional = true }
 
 [dev-dependencies]
-sweet = { workspace = true, features = ["test"] }
+sweet.workspace = true

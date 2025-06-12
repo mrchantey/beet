@@ -1,8 +1,8 @@
 use crate::prelude::*;
+use beet_bevy::prelude::HierarchyQueryExtExt;
 use beet_common::prelude::*;
 use bevy::ecs::system::SystemParam;
 use bevy::prelude::*;
-use sweet::prelude::HierarchyQueryExtExt;
 
 pub(super) fn apply_text_node_parents(
 	mut commands: Commands,

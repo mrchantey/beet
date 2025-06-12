@@ -17,7 +17,11 @@ path = "src/main.rs"
 
 [dependencies]
 anyhow.workspace = true
-sweet = { workspace = true, features = ["fs", "server", "test"] }
+beet_server_utils.workspace = true
+beet_utils.workspace = true
+beet_fs.workspace = true
+beet_server.workspace = true
+sweet.workspace = true
 rapidhash.workspace = true
 
 #💡 parsing

@@ -191,28 +191,22 @@ test-ci *args:
 	just test-fmt
 	just test-template
 
-# upstream from sweet_test
+# upstream from sweet
 test-fs *args:
-	just watch 'cargo test -p sweet_fs --lib {{args}}'
-# upstream from sweet_test
-test-utils *args:
-	just watch 'cargo test -p sweet_utils --lib --features=serde {{args}}'
-
-
-# just test-flow runs out of space
-test-build *args:
-	{{min-stack}} cargo test -p beet_common 					--all-features																		{{args}} -- {{test-threads}}
-	{{min-stack}} cargo test -p beet_rsx_combinator 	--all-features																		{{args}} -- {{test-threads}}
-	{{min-stack}} cargo test -p beet_parse 						--all-features																		{{args}} -- {{test-threads}}
-	{{min-stack}} cargo test -p beet_build 						--all-features																		{{args}} -- {{test-threads}}
+	just watch 'cargo test -p beet_fs --lib {{args}}'
+# upstream from sweet
+test-beet-utils *args:
+	just watch 'cargo test -p beet_utils --lib --features=serde {{args}}'
 
 test-template *args:
 	{{min-stack}} cargo test -p beet_common 					--all-features 	 	 																	{{args}} -- {{test-threads}}
+	{{min-stack}} cargo test -p beet_rsx_combinator 	--all-features																		{{args}} -- {{test-threads}}
 	{{min-stack}} cargo test -p beet_parse 						--all-features 	 	 																	{{args}} -- {{test-threads}}
 	{{min-stack}} cargo test -p beet_template_macros 	--all-features 	 	 																	{{args}} -- {{test-threads}}
 	{{min-stack}} cargo test -p beet_template					 	 	 																								{{args}} -- {{test-threads}}
 	{{min-stack}} cargo test -p beet_router						--all-features 	 	 																	{{args}} -- {{test-threads}}
 	{{min-stack}} cargo test -p beet_server						--all-features 	 	 																	{{args}} -- {{test-threads}}
+	{{min-stack}} cargo test -p beet_build 						--all-features																		{{args}} -- {{test-threads}}
 
 test-rsx-old *args:
 	{{min-stack}} cargo test -p beet_design 	 	 																												{{args}} -- {{test-threads}}
@@ -230,18 +224,18 @@ test-flow *args:
 	{{min-stack}} cargo test -p beet_flow 		--lib --features=reflect 	--target wasm32-unknown-unknown {{args}} -- {{test-threads}}
 	{{min-stack}} cargo test -p beet_spatial 	--lib 									 	--target wasm32-unknown-unknown {{args}} -- {{test-threads}}
 
-#{{min-stack}} cargo test -p sweet_test 			--lib 	--all-features  										 			{{args}} -- {{test-threads}} --e2e
+#{{min-stack}} cargo test -p sweet 			--lib 	--all-features  										 			{{args}} -- {{test-threads}} --e2e
 
-test-sweet *args:
-	{{min-stack}} cargo test -p sweet_bevy 							--features=rand 												 	{{args}} -- {{test-threads}}
-	{{min-stack}} cargo test -p sweet_fs 								--all-features 													 	{{args}} -- {{test-threads}}
-	{{min-stack}} cargo test -p sweet_net 							--all-features 													 	{{args}} -- {{test-threads}}
-	{{min-stack}} cargo test -p sweet_server 						--all-features 													 	{{args}} -- {{test-threads}}
-	{{min-stack}} cargo test -p sweet_utils 						--all-features 													 	{{args}} -- {{test-threads}}
+test-utils *args:
+	{{min-stack}} cargo test -p beet_bevy 							--features=rand 												 	{{args}} -- {{test-threads}}
+	{{min-stack}} cargo test -p beet_fs 								--all-features 													 	{{args}} -- {{test-threads}}
+	{{min-stack}} cargo test -p beet_net 							--all-features 													 	{{args}} -- {{test-threads}}
+	{{min-stack}} cargo test -p beet_server_utils 						--all-features 													 	{{args}} -- {{test-threads}}
+	{{min-stack}} cargo test -p beet_utils 						--all-features 													 	{{args}} -- {{test-threads}}
 	{{min-stack}} cargo test -p sweet-cli 							--all-features 													 	{{args}} -- {{test-threads}}
-	{{min-stack}} cargo test --lib --target wasm32-unknown-unknown --all-features -p sweet_bevy   {{args}} -- {{test-threads}}
-	{{min-stack}} cargo test --lib --target wasm32-unknown-unknown --all-features -p sweet_test   {{args}} -- {{test-threads}}
-	{{min-stack}} cargo test --lib --target wasm32-unknown-unknown --all-features -p sweet_web   	{{args}} -- {{test-threads}}
+	{{min-stack}} cargo test --lib --target wasm32-unknown-unknown --all-features -p beet_bevy   {{args}} -- {{test-threads}}
+	{{min-stack}} cargo test --lib --target wasm32-unknown-unknown --all-features -p sweet   {{args}} -- {{test-threads}}
+	{{min-stack}} cargo test --lib --target wasm32-unknown-unknown --all-features -p beet_web   	{{args}} -- {{test-threads}}
 
 test-all-lib *args:
 	{{min-stack}} cargo test --workspace 			--lib 	--all-features																	{{args}} -- {{test-threads}}
@@ -249,9 +243,9 @@ test-all-doc *args:
 	{{min-stack}} cargo test --workspace 			--doc 	--all-features																	{{args}} -- {{test-threads}}
 
 test-all:
-	just test-template
+	just test-utils
 	just test-flow
-	just test-sweet
+	just test-template
 
 # rebuilding bevy_render for wasm results in 'no space left on device'
 test-all-old *args:
@@ -321,14 +315,14 @@ publish crate *args:
 publish-all *args:
 	just publish beet_rsx_combinator  {{args}} || true
 	@echo 'Publishing Sweet Crates'
-	just publish sweet_utils				{{args}} | true
-	just publish sweet_fs						{{args}} | true
-	just publish sweet_test_macros	{{args}} | true
-	just publish sweet_test					{{args}} | true
-	just publish sweet_server				{{args}} | true
-	just publish sweet_web					{{args}} | true
-	just publish sweet_bevy					{{args}} | true
-	just publish sweet_net					{{args}} | true
+	just publish beet_utils				{{args}} | true
+	just publish beet_fs						{{args}} | true
+	just publish sweet_macros	{{args}} | true
+	just publish sweet					{{args}} | true
+	just publish beet_server_utils				{{args}} | true
+	just publish beet_web					{{args}} | true
+	just publish beet_bevy					{{args}} | true
+	just publish beet_net					{{args}} | true
 	just publish sweet 							{{args}} | true
 	just publish sweet-cli					{{args}} | true
 	@echo 'Publishing Flow Crates'

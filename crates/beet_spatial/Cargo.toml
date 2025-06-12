@@ -19,7 +19,8 @@ _doctest = []
 
 [dependencies]
 beet_flow = { workspace = true }
-sweet = { workspace = true, features = ["bevy", "rand"] }
+beet_utils = { workspace = true, features = ["rand"] }
+beet_bevy = { workspace = true, features = ["rand"] }
 # bevyhub = { workspace = true, optional = true, features = ["core"] }
 
 bevy.workspace = true
@@ -37,4 +38,4 @@ web-sys.workspace = true
 
 [dev-dependencies]
 beet_spatial = { path = "", features = ["_doctest"] }
-sweet = { workspace = true, features = ["test"] }
+sweet.workspace = true

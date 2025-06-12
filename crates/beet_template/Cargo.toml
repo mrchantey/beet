@@ -23,7 +23,8 @@ tokens = ["beet_common/tokens"]
 [dependencies]
 beet_template_macros.workspace = true
 beet_common.workspace = true
-sweet = { workspace = true, features = ["bevy"] }
+beet_utils.workspace = true
+beet_bevy.workspace = true
 
 #💡 utils
 send_wrapper.workspace = true
@@ -51,12 +52,12 @@ bevy = { workspace = true }
 
 #💡 native
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-sweet = { workspace = true, features = ["fs"] }
+beet_fs.workspace = true
 tokio.workspace = true
 
 #💡 wasm
 [target.'cfg(target_arch = "wasm32")'.dependencies]
-sweet = { workspace = true, features = ["web"] }
+beet_web.workspace = true
 console_log.workspace = true
 js-sys.workspace = true
 wasm-bindgen.workspace = true
@@ -66,5 +67,5 @@ console_error_panic_hook.workspace = true
 
 [dev-dependencies]
 beet_template = { path = "", features = ["tokens"] }
-sweet = { workspace = true, features = ["test", "bevy"] }
 serde.workspace = true
+sweet.workspace = true

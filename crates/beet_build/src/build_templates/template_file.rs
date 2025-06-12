@@ -1,5 +1,5 @@
 use bevy::prelude::*;
-use sweet::prelude::*;
+use beet_utils::prelude::*;
 use crate::prelude::*;
 
 /// Adde to an entity used to represent an entire file specified by [`BuildTemplatesConfig`],

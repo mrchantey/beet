@@ -1,7 +1,7 @@
 use super::*;
+use beet_bevy::prelude::HierarchyQueryExtExt;
 use beet_common::prelude::*;
 use bevy::prelude::*;
-use sweet::prelude::HierarchyQueryExtExt;
 
 
 /// Add this node to any bundle to have it rearranged into a valid HTML document structure.

@@ -19,7 +19,8 @@ html = ["dep:beet_rsx_combinator"]
 
 [dependencies]
 beet_common = { workspace = true, features = ["serde", "tokens"] }
-sweet = { workspace = true, features = ["bevy"] }
+beet_utils.workspace = true
+beet_bevy.workspace = true
 beet_rsx_combinator = { workspace = true, optional = true }
 
 ron.workspace = true
@@ -37,7 +38,7 @@ rstml = { version = "0.12", features = ["rawtext-stable-hack"] }
 proc-macro2-diagnostics.workspace = true
 
 [dev-dependencies]
-sweet = { workspace = true, features = ["test"] }
+sweet.workspace = true
 
 [target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
-sweet = { workspace = true, features = ["bevy", "fs"] }
+beet_fs.workspace = true

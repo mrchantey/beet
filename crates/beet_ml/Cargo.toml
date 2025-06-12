@@ -26,8 +26,7 @@ bevy_default = ["bevy/default"]
 
 [dependencies]
 beet_flow.workspace = true
-sweet = { workspace = true, features = ["bevy", "rand"] }
-
+beet_utils = { workspace = true, features = ["rand"] }
 bevy = { workspace = true, features = ["bevy_asset"] }
 beet_spatial = { workspace = true, optional = true }
 
@@ -62,7 +61,7 @@ console_error_panic_hook.workspace = true
 
 [dev-dependencies]
 # beet_ml = { path = "", features = ["bevy_default", "spatial"] }
-sweet = { workspace = true, features = ["test"] }
+sweet.workspace = true
 
 pretty_env_logger.workspace = true
 [target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]

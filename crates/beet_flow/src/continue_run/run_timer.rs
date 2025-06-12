@@ -2,7 +2,7 @@ use crate::prelude::*;
 use bevy::prelude::*;
 use bevy::time::Stopwatch;
 use std::fmt::Debug;
-use sweet::prelude::When;
+use beet_bevy::prelude::When;
 
 /// Tracks the last time a node was run.
 /// This action is required by [`ContinueRun`] so is rarely added manually.

@@ -1,7 +1,8 @@
 #![allow(unused)]
 use crate::prelude::*;
+use beet_bevy::prelude::*;
+use beet_utils::prelude::*;
 use bevy::prelude::*;
-use sweet::prelude::*;
 
 /// Calculate a wander impulse
 /// as described [here](https://youtu.be/ujsR2vcJlLk?list=PLRqwX-V7Uu6ZV4yEcW3uDwOgGXKUUsPOM&t=249)
@@ -35,6 +36,7 @@ pub fn wander_impulse(
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
+	use beet_utils::prelude::RandomSource;
 	use bevy::prelude::*;
 	use sweet::prelude::*;
 

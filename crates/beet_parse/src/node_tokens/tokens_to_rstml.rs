@@ -1,5 +1,6 @@
 use crate::prelude::*;
 use beet_common::prelude::*;
+use beet_utils::prelude::*;
 use bevy::prelude::*;
 use proc_macro2::TokenStream;
 use proc_macro2_diagnostics::Diagnostic;
@@ -8,7 +9,6 @@ use rstml::Parser;
 use rstml::ParserConfig;
 use rstml::node::Node;
 use send_wrapper::SendWrapper;
-use sweet::prelude::WorkspacePathBuf;
 
 // we must use `std::collections::HashSet` because thats what rstml uses
 type HashSet<T> = std::collections::HashSet<T>;
@@ -121,6 +121,8 @@ pub(super) fn tokens_to_rstml(
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
+	use beet_bevy::prelude::*;
+	use beet_utils::prelude::*;
 	use bevy::prelude::*;
 	use proc_macro2::TokenStream;
 	use quote::quote;

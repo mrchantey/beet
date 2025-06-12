@@ -1,7 +1,7 @@
 use crate::prelude::*;
 use beet_parse::prelude::*;
 use bevy::prelude::*;
-use sweet::prelude::ReadFile;
+use beet_utils::prelude::*;
 
 
 /// For a given rsx file, insert as [`CombinatorToNodeTokens`].

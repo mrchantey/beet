@@ -116,7 +116,7 @@ impl<S> BeetServer<S> {
 		tower_livereload::LiveReloadLayer,
 		std::thread::JoinHandle<Result<()>>,
 	) {
-		use sweet::prelude::FsWatcher;
+		use beet_fs::prelude::FsWatcher;
 
 		let livereload = tower_livereload::LiveReloadLayer::new();
 		let reload = livereload.reloader();

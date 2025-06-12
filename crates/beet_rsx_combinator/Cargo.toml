@@ -21,4 +21,4 @@ sweet.workspace = true
 
 
 [dev-dependencies]
-sweet = { workspace = true, features = ["test"] }
+sweet.workspace = true
