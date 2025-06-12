@@ -85,7 +85,7 @@ pub struct TextNodeParent {
 pub struct TextNodeChild {
 	/// The *post-collapse* index of this html TextNode.
 	pub child_index: usize,
-	/// A vec of next index to split text at, 
+	/// A vec of next index to split text at,
 	/// and optionally the signal entity
 	/// that should be assigned a [`DomTextBinding`] of the **existing**
 	/// text node on [`web_sys::Text::split_text`].

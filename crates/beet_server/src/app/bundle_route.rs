@@ -31,7 +31,7 @@ pub trait BundleRoute<M>: 'static + Send + Sync + Clone {
 			method.into_axum_method(),
 			async move |extractors: Self::Extractors| -> AppResult<Html<String>> {
 				let bundle = self.into_bundle_result(extractors).await?;
-				let html = bundle_to_html(bundle);
+				let html = HtmlFragment::parse_bundle(bundle);
 				Ok(Html(html))
 			},
 		)

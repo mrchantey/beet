@@ -17,7 +17,7 @@
 //! 	}
 //! }
 //! assert_eq!(
-//! 	bundle_to_html(rsx!{
+//! 	HtmlFragment::parse_bundle(rsx!{
 //! 		<MyComponent>
 //!  			<div slot="header">Header</div>
 //! 			<div>Default</div>
@@ -202,7 +202,7 @@ mod test {
 				<div slot="header">Title</div>
 			</MyComponent>
 		}
-		.xmap(bundle_to_html)
+		.xmap(HtmlFragment::parse_bundle)
 		.xpect()
 		.to_be("<html><div>Title</div><br/><div>Default</div></html>");
 	}
@@ -215,7 +215,7 @@ mod test {
 				<Span slot="header">Title</Span>
 			</MyComponent>
 		}
-		.xmap(bundle_to_html)
+		.xmap(HtmlFragment::parse_bundle)
 		.xpect()
 		.to_be("<html><span>Title</span><br/><div>Default</div></html>");
 	}
@@ -223,7 +223,7 @@ mod test {
 	#[test]
 	fn fallback() {
 		rsx! { <MyComponent /> }
-			.xmap(bundle_to_html)
+			.xmap(HtmlFragment::parse_bundle)
 			.xpect()
 			.to_be("<html>Fallback Title<br/></html>");
 	}
@@ -238,7 +238,7 @@ mod test {
 				</MyComponent>
 			</Span>
 		}
-		.xmap(bundle_to_html)
+		.xmap(HtmlFragment::parse_bundle)
 		.xpect()
 		.to_be(
 			"<span><html><div>Title</div><br/><div>Default</div></html></span>",
@@ -269,7 +269,7 @@ mod test {
 				<h1 slot="header">"Title"</h1>
 			</Layout>
 		}
-		.xmap(bundle_to_html)
+		.xmap(HtmlFragment::parse_bundle)
 		.xpect()
 		.to_be("<header><h1>Title</h1></header>");
 	}
@@ -305,7 +305,7 @@ mod test {
 				<h1 slot="header">"Title"</h1>
 			</Layout>
 		}
-		.xmap(bundle_to_html)
+		.xmap(HtmlFragment::parse_bundle)
 		.xpect()
 		.to_be("<body><header><h1>Title</h1></header><main><div>Content</div></main></body>");
 	}

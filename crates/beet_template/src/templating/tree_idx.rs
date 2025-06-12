@@ -19,19 +19,18 @@ pub(super) fn apply_tree_idx(
 ) {
 	let mut id = 0;
 
-	let needs_id = |entity: Entity| {
-		requires_tree_idx_attr.contains(entity)
-			|| attributes
-				.get(entity)
-				.map(|attrs| attrs.iter().any(|attr| dyn_attrs.contains(attr)))
-				.unwrap_or(false)
-	};
-
-	for entity in query.iter() {
-		if !needs_id(entity) {
-			continue;
-		}
-
+	for entity in query
+		.iter()
+		// only 'dynamic' elements need a TreeIdx
+		.filter(|entity| {
+			requires_tree_idx_attr.contains(*entity)
+				|| attributes
+					.get(*entity)
+					.map(|attrs| {
+						attrs.iter().any(|attr| dyn_attrs.contains(attr))
+					})
+					.unwrap_or(false)
+		}) {
 		commands.entity(entity).insert(TreeIdx::new(id));
 
 		commands.spawn((
@@ -103,7 +102,7 @@ mod test {
 						"child 2"
 					</div>
 				},
-				ToHtml,
+				HtmlFragment::default(),
 			))
 			.id();
 		world

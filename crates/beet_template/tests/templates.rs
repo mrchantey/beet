@@ -8,7 +8,7 @@ use bevy::prelude::*;
 #[test]
 fn works() {
 	rsx! {<HelloWorld/>}
-		.xmap(bundle_to_html)
+		.xmap(HtmlFragment::parse_bundle)
 		.xpect()
 		.to_be("<div>hello</div>");
 }

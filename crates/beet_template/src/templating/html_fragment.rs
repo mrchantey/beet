@@ -5,76 +5,76 @@ use beet_common::prelude::*;
 use bevy::ecs::system::SystemParam;
 use bevy::prelude::*;
 
-/// returns the HTML string representation of a given [`Bundle`].
-/// There are several transformations involved in the process,
-/// for example resolving slots, so we reuse a [`TemplateApp`]
-/// and run a full update cycle.
-pub fn bundle_to_html(bundle: impl Bundle) -> String {
-	/// Access the thread local [`App`] used by the [`TemplatePlugin`].
-	struct SharedTemplateApp;
-
-	impl SharedTemplateApp {
-		#[allow(unused)]
-		fn with_new<O>(func: impl FnOnce(&mut App) -> O) -> O {
-			let mut app = App::new();
-			app.add_plugins(TemplatePlugin);
-			func(&mut app)
-		}
-		fn with<O>(func: impl FnOnce(&mut App) -> O) -> O {
-			thread_local! {
-				static TEMPLATE_APP: RefCell<Option<App>> = RefCell::new(None);
-			}
-			TEMPLATE_APP.with(|app_cell| {
-				// Initialize the app if needed
-				let mut app_ref = app_cell.borrow_mut();
-				if app_ref.is_none() {
-					let mut app = App::new();
-					app.add_plugins(TemplatePlugin);
-					*app_ref = Some(app);
-				}
-
-				// Now we can safely unwrap and use the app
-				let app = app_ref.as_mut().unwrap();
-
-				func(app)
-			})
-		}
-	}
-
-	SharedTemplateApp::with(|app| {
-		let entity = app.world_mut().spawn((bundle, ToHtml)).id();
-		app.update();
-		let value = app
-			.world_mut()
-			.entity_mut(entity)
-			.take::<RenderedHtml>()
-			.expect("Expected RenderedHtml")
-			.0;
-		app.world_mut().despawn(entity);
-		value
-	})
-}
-
-/// Marker indicating that the entity should be converted to HTML,
-/// appending a [`RenderedHtml`] component.
-#[derive(Default, Component, Reflect)]
-#[reflect(Default, Component)]
-pub struct ToHtml;
-
+/// Add this component to have it populated with HTML on the next update cycle.
+/// Html rendered from a bundle as-is without resolving any [`HtmlInsertDirective`]
+/// or inserting missing body, head and doctype tags.
 #[derive(Default, Component, Deref, DerefMut, Reflect)]
 #[reflect(Default, Component)]
-pub struct RenderedHtml(pub String);
+pub struct HtmlFragment(pub String);
+
+impl HtmlFragment {
+	/// returns the HTML string representation of a given [`Bundle`].
+	/// There are several transformations involved in the process,
+	/// for example resolving slots, so we reuse a [`TemplateApp`]
+	/// and run a full update cycle.
+	pub fn parse_bundle(bundle: impl Bundle) -> String {
+		SharedTemplateApp::with(|app| {
+			let entity = app
+				.world_mut()
+				.spawn((bundle, HtmlFragment::default()))
+				.id();
+			app.update();
+			let value = app
+				.world_mut()
+				.entity_mut(entity)
+				.take::<HtmlFragment>()
+				.unwrap()
+				.0;
+			app.world_mut().despawn(entity);
+			value
+		})
+	}
+}
+/// A thread-local [`App`] cached so a new app doesn't need to be
+/// created for each render job.
+pub(super) struct SharedTemplateApp;
+
+impl SharedTemplateApp {
+	#[allow(unused)]
+	fn with_new<O>(func: impl FnOnce(&mut App) -> O) -> O {
+		let mut app = App::new();
+		app.add_plugins(TemplatePlugin);
+		func(&mut app)
+	}
+	/// Access the thread local [`App`] used by the [`TemplatePlugin`].
+	pub(super) fn with<O>(func: impl FnOnce(&mut App) -> O) -> O {
+		thread_local! {
+			static TEMPLATE_APP: RefCell<Option<App>> = RefCell::new(None);
+		}
+		TEMPLATE_APP.with(|app_cell| {
+			// Initialize the app if needed
+			let mut app_ref = app_cell.borrow_mut();
+			if app_ref.is_none() {
+				let mut app = App::new();
+				app.add_plugins(TemplatePlugin);
+				*app_ref = Some(app);
+			}
+
+			// Now we can safely unwrap and use the app
+			let app = app_ref.as_mut().unwrap();
+
+			func(app)
+		})
+	}
+}
 
 
 pub(super) fn render_html(
-	mut commands: Commands,
-	query: Populated<Entity, Added<ToHtml>>,
+	mut query: Populated<(Entity, &mut HtmlFragment), Added<HtmlFragment>>,
 	builder: Builder,
 ) {
-	for entity in query.iter() {
-		let mut html = String::new();
+	for (entity, mut html) in query.iter_mut() {
 		builder.parse(entity, &mut html);
-		commands.entity(entity).insert(RenderedHtml(html));
 	}
 }
 
@@ -168,60 +168,72 @@ mod test {
 	fn works() {
 		// doctype
 		rsx! {<!doctype/>}
-			.xmap(bundle_to_html)
+			.xmap(HtmlFragment::parse_bundle)
 			.xpect()
 			.to_be("<!DOCTYPE html>");
 		// comment (in rstml must be quoted)
 		rsx! {<!-- "howdy" -->}
-			.xmap(bundle_to_html)
+			.xmap(HtmlFragment::parse_bundle)
 			.xpect()
 			.to_be("<!-- howdy -->");
 		// raw text
-		rsx! {howdy}.xmap(bundle_to_html).xpect().to_be("howdy");
+		rsx! {howdy}
+			.xmap(HtmlFragment::parse_bundle)
+			.xpect()
+			.to_be("howdy");
 		// quoted text
-		rsx! {"howdy"}.xmap(bundle_to_html).xpect().to_be("howdy");
+		rsx! {"howdy"}
+			.xmap(HtmlFragment::parse_bundle)
+			.xpect()
+			.to_be("howdy");
 		// fragment
 		rsx! {<>"howdy"</>}
-			.xmap(bundle_to_html)
+			.xmap(HtmlFragment::parse_bundle)
 			.xpect()
 			.to_be("howdy");
 		// block
-		rsx! {{"howdy"}}.xmap(bundle_to_html).xpect().to_be("howdy");
+		rsx! {{"howdy"}}
+			.xmap(HtmlFragment::parse_bundle)
+			.xpect()
+			.to_be("howdy");
 		// self closing
-		rsx! {<br/>}.xmap(bundle_to_html).xpect().to_be("<br/>");
+		rsx! {<br/>}
+			.xmap(HtmlFragment::parse_bundle)
+			.xpect()
+			.to_be("<br/>");
 		// not self closing
 		rsx! {<span>hello</span>}
-			.xmap(bundle_to_html)
+			.xmap(HtmlFragment::parse_bundle)
 			.xpect()
 			.to_be("<span>hello</span>");
 		// child elements
 		rsx! {<span><span>hello</span></span>}
-			.xmap(bundle_to_html)
+			.xmap(HtmlFragment::parse_bundle)
 			.xpect()
 			.to_be("<span><span>hello</span></span>");
 		// simple attribute
 		rsx! {<div class="container"></div>}
-			.xmap(bundle_to_html)
+			.xmap(HtmlFragment::parse_bundle)
 			.xpect()
 			.to_be("<div class=\"container\"></div>");
 		// multiple attributes
 		rsx! {<div class="container" id="main"></div>}
-			.xmap(bundle_to_html)
+			.xmap(HtmlFragment::parse_bundle)
 			.xpect()
 			.to_be("<div class=\"container\" id=\"main\"></div>");
 		// boolean attribute
 		rsx! {<input disabled/>}
-			.xmap(bundle_to_html)
+			.xmap(HtmlFragment::parse_bundle)
 			.xpect()
 			.to_be("<input disabled/>");
 		// attribute in self-closing
 		rsx! {<img src="image.jpg"/>}
-			.xmap(bundle_to_html)
+			.xmap(HtmlFragment::parse_bundle)
 			.xpect()
 			.to_be("<img src=\"image.jpg\"/>");
 		// complex nested with attributes
 		rsx! {<div class="wrapper"><span id="text">content</span></div>}
-			.xmap(bundle_to_html)
+			.xmap(HtmlFragment::parse_bundle)
 			.xpect()
 			.to_be(
 				"<div class=\"wrapper\"><span id=\"text\">content</span></div>",
@@ -229,7 +241,7 @@ mod test {
 		// expr attributes
 		let val = true;
 		rsx! {<input hidden=val/>}
-			.xmap(bundle_to_html)
+			.xmap(HtmlFragment::parse_bundle)
 			.xpect()
 			.to_be("<input hidden=\"true\"/>");
 	}
@@ -244,14 +256,14 @@ mod test {
 			"outer"
 			<Template/>
 		}
-		.xmap(bundle_to_html)
+		.xmap(HtmlFragment::parse_bundle)
 		.xpect()
 		.to_be("outer<div class=\"container\"><span>hello</span></div>");
 	}
 	#[test]
 	fn events() {
 		rsx! {<div onclick={||{}}/>}
-			.xmap(bundle_to_html)
+			.xmap(HtmlFragment::parse_bundle)
 			.xpect()
 			.to_be("<div data-beet-rsx-idx=\"0\"/>");
 	}
@@ -259,7 +271,7 @@ mod test {
 	fn signal_text_nodes() {
 		let (get, _set) = signal("foo");
 		rsx! {<div>{get}</div>}
-			.xmap(bundle_to_html)
+			.xmap(HtmlFragment::parse_bundle)
 			.xpect()
 			.to_be("<div data-beet-rsx-idx=\"0\">foo</div>");
 	}

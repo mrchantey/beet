@@ -24,7 +24,7 @@ pub(super) fn mount_html(
 fn normalize() { web_sys::window().unwrap().document().unwrap().normalize(); }
 
 fn mount(html: &str) {
-	// let html = bundle_to_html(bundle);
+	// let html = HtmlFragment::parse_bundle(bundle);
 	let document = web_sys::window().unwrap().document().unwrap();
 	let body = document.body().unwrap();
 	let current_html = body.inner_html();

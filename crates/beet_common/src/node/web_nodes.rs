@@ -26,3 +26,11 @@ pub struct CommentNode(pub String);
 pub struct ElementNode {
 	pub self_closing: bool,
 }
+impl ElementNode {
+	pub fn self_closing() -> Self { Self { self_closing: true } }
+	pub fn non_self_closing() -> Self {
+		Self {
+			self_closing: false,
+		}
+	}
+}
