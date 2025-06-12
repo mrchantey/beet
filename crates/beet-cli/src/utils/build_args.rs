@@ -2,7 +2,7 @@ use beet::prelude::*;
 use bevy::prelude::*;
 use clap::Parser;
 use std::path::PathBuf;
-use sweet::prelude::*;
+use beet::prelude::*;
 
 // TODO probably integrate with RunBuild, and just nest
 #[derive(Debug, Clone, Parser)]

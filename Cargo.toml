@@ -235,7 +235,7 @@ default = ["flow"]
 web-server = ["server", "router", "design"]
 #💡 fine-grained
 serde = ["beet_utils/serde"]
-rand = ["beet_utils/rand", "beet_bevy?/rand"]
+rand = ["beet_utils/rand", "beet_bevy/rand"]
 connect = ["dep:beet_connect"]
 examples = ["bevy_default", "dep:beet_examples"]
 flow = ["dep:beet_flow"]
@@ -255,7 +255,7 @@ build = ["parse", "dep:beet_build"]
 bevy_scene = ["beet_bevy/bevy_scene"]
 bevy_default = [
 	"bevy/default",
-	"beet_bevy?/bevy_default",
+	"beet_bevy/bevy_default",
 	"beet_examples?/bevy_default",
 	"beet_flow?/bevy_default",
 	"beet_ml?/bevy_default",
@@ -294,7 +294,7 @@ beet_sim = { workspace = true, optional = true }
 beet_spatial = { workspace = true, optional = true }
 #💡 utils
 beet_utils.workspace = true
-beet_bevy = { workspace = true, optional = true }
+beet_bevy = { workspace = true }
 beet_net = { workspace = true, optional = true }
 beet_server_utils = { workspace = true, optional = true }
 beet_fs = { workspace = true, optional = true }

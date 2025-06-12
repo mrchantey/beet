@@ -62,6 +62,7 @@ impl Plugin for BuildTemplatesPlugin {
 						(
 							extract_lang_partials,
 							apply_style_ids,
+							#[cfg(feature = "css")]
 							parse_lightning,
 						)
 							.chain(),

@@ -34,25 +34,19 @@ pub use beet_spatial as spatial;
 pub use beet_template as template;
 
 // Utils
-#[cfg(feature = "bevy")]
 pub use beet_bevy as bevy;
 #[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
 pub use beet_fs as fs;
 #[cfg(feature = "net")]
 pub use beet_net as net;
 #[cfg(all(feature = "server", not(target_arch = "wasm32")))]
-pub use beet_server_utils as server;
-#[cfg(feature = "test")]
-pub use sweet as test;
-#[cfg(feature = "test")]
-pub use sweet::sweet_macros::*;
+pub use beet_server_utils as server_utils;
 pub use beet_utils as utils;
 pub use beet_utils::elog;
 pub use beet_utils::log;
 pub use beet_utils::noop;
 #[cfg(feature = "web")]
 pub use beet_web as web;
-
 
 pub mod prelude {
 	#[cfg(feature = "build")]
@@ -84,16 +78,13 @@ pub mod prelude {
 	pub use crate::template::prelude::*;
 
 	// utils
-	#[cfg(feature = "bevy")]
 	pub use crate::bevy::prelude::*;
 	#[cfg(all(feature = "fs", not(target_arch = "wasm32")))]
 	pub use crate::fs::prelude::*;
 	#[cfg(feature = "net")]
 	pub use crate::net::prelude::*;
 	#[cfg(all(feature = "server", not(target_arch = "wasm32")))]
-	pub use crate::server::prelude::*;
-	#[cfg(feature = "test")]
-	pub use crate::test::prelude::*;
+	pub use crate::server_utils::prelude::*;
 	pub use crate::utils::prelude::*;
 	#[cfg(all(feature = "web", target_arch = "wasm32"))]
 	pub use crate::web::prelude::*;
@@ -123,9 +114,8 @@ pub mod exports {
 	// pub use beet_sim::exports::*;
 	// #[cfg(feature = "spatial")]
 	// pub use beet_spatial::exports::*;
-
-	#[cfg(feature = "test")]
-	pub use sweet::exports::*;
+	// #[cfg(feature = "test")]
+	// pub use sweet::exports::*;
 	pub use beet_utils::exports::*;
 }
 

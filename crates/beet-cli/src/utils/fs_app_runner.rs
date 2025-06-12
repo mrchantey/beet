@@ -4,7 +4,7 @@ use bevy::ecs::system::RunSystemOnce;
 use bevy::prelude::*;
 use std::num::NonZeroU8;
 use std::time::Duration;
-use sweet::prelude::*;
+use beet::prelude::*;
 
 
 /// An alternative to the default app runner [`App::set_runner`]

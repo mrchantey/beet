@@ -774,6 +774,7 @@ dependencies = [
  "beet_common",
  "beet_fs",
  "beet_parse",
+ "beet_router",
  "beet_template",
  "beet_utils",
  "bevy",

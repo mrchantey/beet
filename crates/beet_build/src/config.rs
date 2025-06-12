@@ -1,11 +1,11 @@
 use crate::prelude::*;
 use anyhow::Result;
 use beet_common::node::HtmlConstants;
+use beet_utils::prelude::*;
 use bevy::prelude::*;
 use serde::Deserialize;
 use serde::Serialize;
 use std::path::Path;
-use beet_utils::prelude::*;
 
 
 
@@ -15,6 +15,11 @@ pub struct BeetConfig {
 	/// Output location for generated static files, ie html, css, wasm
 	templates_config: BuildFileTemplates,
 	html_constants: HtmlConstants,
+	#[serde(rename = "file_group")]
+	pub file_groups: Vec<FileGroupConfig>,
+	// /// Configuration for a default site configuration.
+	// #[serde(flatten)]
+	// pub default_site_config: DefaultSiteConfig,
 }
 
 impl BeetConfig {
@@ -44,4 +49,15 @@ impl Plugin for BeetConfig {
 		app.insert_resource(self.html_constants.clone());
 		app.world_mut().spawn(self.templates_config.clone());
 	}
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct FileGroupConfig {
+	name: String,
+	// #[serde(flatten)]
+	// pub file_group: FileGroup,
+	// #[serde(flatten)]
+	// pub codegen: CodegenFile,
+	// #[serde(flatten)]
+	// pub map_tokens: MapFuncTokens,
 }

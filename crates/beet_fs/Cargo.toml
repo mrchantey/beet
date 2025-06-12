@@ -10,7 +10,7 @@ description = "FS utilities"
 repository.workspace = true
 
 [features]
-default = ["serde"]
+default = ["serde", "bevy"]
 serde = ["dep:serde"]
 bevy = ["dep:bevy"]
 

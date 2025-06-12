@@ -4,7 +4,9 @@ mod file_expr_hash;
 pub use file_expr_hash::*;
 mod parse_style;
 pub use parse_style::*;
+#[cfg(feature = "css")]
 mod parse_lightning;
+#[cfg(feature = "css")]
 pub use parse_lightning::*;
 mod extract_lang_partials;
 pub use extract_lang_partials::*;

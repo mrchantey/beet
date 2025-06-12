@@ -200,13 +200,14 @@ test-beet-utils *args:
 
 test-template *args:
 	{{min-stack}} cargo test -p beet_common 					--all-features 	 	 																	{{args}} -- {{test-threads}}
-	{{min-stack}} cargo test -p beet_rsx_combinator 	--all-features																		{{args}} -- {{test-threads}}
+	{{min-stack}} cargo test -p beet_rsx_combinator 	--all-features																			{{args}} -- {{test-threads}}
 	{{min-stack}} cargo test -p beet_parse 						--all-features 	 	 																	{{args}} -- {{test-threads}}
 	{{min-stack}} cargo test -p beet_template_macros 	--all-features 	 	 																	{{args}} -- {{test-threads}}
 	{{min-stack}} cargo test -p beet_template					 	 	 																								{{args}} -- {{test-threads}}
 	{{min-stack}} cargo test -p beet_router						--all-features 	 	 																	{{args}} -- {{test-threads}}
 	{{min-stack}} cargo test -p beet_server						--all-features 	 	 																	{{args}} -- {{test-threads}}
-	{{min-stack}} cargo test -p beet_build 						--all-features																		{{args}} -- {{test-threads}}
+	{{min-stack}} cargo test -p beet_build 						--all-features																			{{args}} -- {{test-threads}}
+	{{min-stack}} cargo test -p beet-cli 							--all-features																			{{args}} -- {{test-threads}}
 
 test-rsx-old *args:
 	{{min-stack}} cargo test -p beet_design 	 	 																												{{args}} -- {{test-threads}}
