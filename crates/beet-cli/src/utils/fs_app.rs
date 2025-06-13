@@ -1,4 +1,3 @@
-use anyhow::Result;
 use beet::prelude::handle_changed_files;
 use beet::prelude::*;
 use bevy::ecs::system::RunSystemOnce;
@@ -8,7 +7,7 @@ use std::ops::ControlFlow;
 use std::time::Duration;
 
 
-/// An alternative to the default app runner [`App::set_runner`]
+/// A bevy app runner that will update when a file is added, changed or removed.
 ///
 /// ## Example
 ///
@@ -16,10 +15,8 @@ use std::time::Duration;
 /// # use bevy::prelude::*;
 /// # use beet_cli::prelude::*;
 ///
-/// let runner = FsAppRunner::default();
-///
 /// App::new()
-/// 	.set_runner(runner.into_app_runner())
+/// 	.set_runner(FsApp::default().runner())
 /// 	.run();
 ///
 /// ```
@@ -57,32 +54,36 @@ impl FsApp {
 				return AppExit::Error(NonZeroU8::new(1).unwrap());
 			}
 
-			let body = async move {
-				let watcher_result = self
-					.watcher
-					.watch(move |ev| {
-						if !ev.has_mutate() {
-							return Ok(());
-						}
-						Self::on_change(&mut app, ev)?;
-						Ok(())
-					})
-					.await;
-				match watcher_result {
-					Ok(_) => AppExit::Success,
-					Err(err) => {
-						eprintln!("Error during file change: {}", err);
-						AppExit::Error(NonZeroU8::new(1).unwrap())
-					}
-				}
-			};
 			tokio::runtime::Builder::new_multi_thread()
 				.enable_all()
 				.build()
 				.expect("Failed building the Runtime")
-				.block_on(body)
+				.block_on(async move {
+					let result: Result<AppExit> = async move {
+						let mut rx = self.watcher.watch()?;
+
+						while let Some(ev) = rx.recv().await? {
+							if ev.has_mutate() {
+								match Self::on_change(&mut app, ev)? {
+									ControlFlow::Continue(_) => {}
+									ControlFlow::Break(exit) => {
+										return Ok(exit);
+									}
+								}
+							}
+						}
+						Ok(AppExit::Success)
+					}
+					.await;
+					result.unwrap_or_else(|err| {
+						// non-bevy results havent printed yet
+						eprintln!("Error during file change: {}", err);
+						AppExit::Error(NonZeroU8::new(1).unwrap())
+					})
+				})
 		}
 	}
+
 
 	fn on_change(
 		app: &mut App,
@@ -90,10 +91,10 @@ impl FsApp {
 	) -> Result<ControlFlow<AppExit>> {
 		let start = std::time::Instant::now();
 		app.world_mut()
-			.run_system_once_with(handle_changed_files, watch_event)?;
+			.run_system_once_with(handle_changed_files, watch_event)??;
 		app.update();
 		let elapsed = start.elapsed();
-		// TODO proper profiling https://github.com/bevyengine/bevy/blob/main/docs/profiling.md
+		// TODO per-system profiling https://github.com/bevyengine/bevy/blob/main/docs/profiling.md
 		println!("App updated in {:?}", elapsed);
 		match app.should_exit() {
 			Some(exit) => Ok(ControlFlow::Break(exit)),

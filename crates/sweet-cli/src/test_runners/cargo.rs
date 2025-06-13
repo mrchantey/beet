@@ -1,7 +1,7 @@
 use anyhow::Result;
 use beet_fs::prelude::*;
-use beet_utils::prelude::*;
 use clap::Parser;
+use beet_utils::prelude::*;
 
 #[derive(Debug, Parser)]
 #[command(name = "test")]
@@ -31,6 +31,7 @@ impl CargoRun {
 	}
 }
 
+
 /// A cargo command with extra functionality like watch
 #[derive(Debug, Parser)]
 pub struct CargoCmdExtra {
@@ -38,13 +39,13 @@ pub struct CargoCmdExtra {
 	///
 	/// It will look something like $CARGO_TARGET_DIR/wasm32-unknown-unknown/debug/deps/hello_test-c3298911e67ad05b.wasm
 	#[command(flatten)]
-	build_cmd: CargoBuildCmd,
+	pub build_cmd: CargoBuildCmd,
 	#[arg(short, long)]
-	watch: bool,
+	pub watch: bool,
 	#[arg(short, long)]
-	no_default_filters: bool,
+	pub no_default_filters: bool,
 	#[command(flatten)]
-	filter: GlobFilter,
+	pub filter: GlobFilter,
 }
 
 

@@ -54,8 +54,8 @@ pub mod prelude {
 	pub use crate::common::prelude::*;
 	#[cfg(feature = "connect")]
 	pub use crate::connect::prelude::*;
-	#[cfg(feature = "design")]
-	pub use crate::design::prelude::*;
+	// #[cfg(feature = "design")]
+	// pub use crate::design::prelude::*;
 	#[cfg(feature = "examples")]
 	pub use crate::examples::prelude::*;
 	#[cfg(feature = "flow")]
@@ -114,9 +114,9 @@ pub mod exports {
 	// pub use beet_sim::exports::*;
 	// #[cfg(feature = "spatial")]
 	// pub use beet_spatial::exports::*;
-	// #[cfg(feature = "test")]
-	// pub use sweet::exports::*;
-	pub use beet_utils::exports::*;
+	#[cfg(feature = "fs")]
+	pub use crate::fs::exports::*;
+	pub use crate::utils::exports::*;
 }
 
 

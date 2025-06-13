@@ -7,7 +7,6 @@ use anyhow::Result;
 fn main() -> Result<()> {
 	use beet::prelude::*;
 	use beet_site::prelude::*;
-	use sweet::prelude::*;
 
 	fn with_sidebar(route: RouteFunc<RsxRouteFunc>) -> RouteFunc<RsxRouteFunc> {
 		route.map_func(|func| {

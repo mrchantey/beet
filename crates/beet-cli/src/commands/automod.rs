@@ -1,9 +1,8 @@
 use anyhow::Result;
-use beet_fs::exports::notify::EventKind;
-use beet_fs::exports::notify::event::ModifyKind;
-use beet_fs::exports::notify::event::RenameMode;
-use beet_fs::prelude::*;
-use beet_utils::prelude::*;
+use beet::exports::notify::EventKind;
+use beet::exports::notify::event::ModifyKind;
+use beet::exports::notify::event::RenameMode;
+use beet::prelude::*;
 use clap::Parser;
 use quote::quote;
 use rapidhash::RapidHashMap;
@@ -61,7 +60,6 @@ impl AutoMod {
 		while let Some(ev) = rx.recv().await? {
 			let mut files = ModFiles::default();
 			let any_mutated = ev
-				.events
 				.iter()
 				.map(|e| self.handle_event(&mut files, e))
 				.collect::<Result<Vec<_>>>()?

@@ -193,10 +193,10 @@ test-ci *args:
 
 # upstream from sweet
 test-fs *args:
-	just watch 'cargo test -p beet_fs --lib {{args}}'
+	just watch 'cargo test -p beet_fs --lib -- --nocapture {{args}}'
 # upstream from sweet
 test-beet-utils *args:
-	just watch 'cargo test -p beet_utils --lib --features=serde {{args}}'
+	just watch 'cargo test -p beet_utils --lib --features=serde --nocapture -- {{args}}'
 
 test-template *args:
 	{{min-stack}} cargo test -p beet_common 					--all-features 	 	 																	{{args}} -- {{test-threads}}

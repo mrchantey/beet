@@ -2,6 +2,8 @@ mod world;
 pub use world::*;
 mod app;
 pub use self::app::*;
+mod app_exit;
+pub use self::app_exit::*;
 mod app_res;
 pub use self::app_res::*;
 mod pose;

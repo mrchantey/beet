@@ -14,7 +14,6 @@
 //!
 use beet::prelude::*;
 use bevy::prelude::*;
-use sweet::prelude::*;
 
 #[rustfmt::skip]
 #[cfg(target_arch = "wasm32")]

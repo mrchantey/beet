@@ -742,9 +742,13 @@ dependencies = [
  "beet",
  "bevy",
  "clap",
+ "prettyplease",
+ "proc-macro2",
+ "quote",
  "rapidhash",
  "ron",
  "sweet",
+ "syn 2.0.101",
  "tokio",
 ]
 
@@ -936,6 +940,7 @@ dependencies = [
  "notify",
  "notify-debouncer-full",
  "serde",
+ "tempfile",
  "thiserror 1.0.69",
  "tokio",
 ]

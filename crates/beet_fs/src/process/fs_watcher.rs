@@ -5,6 +5,8 @@ use notify::event::CreateKind;
 use notify::event::RemoveKind;
 use notify::*;
 use notify_debouncer_full::DebounceEventResult;
+use notify_debouncer_full::Debouncer;
+use notify_debouncer_full::NoCache;
 use notify_debouncer_full::new_debouncer;
 use std::num::ParseIntError;
 use std::path::PathBuf;
@@ -60,17 +62,17 @@ impl FsWatcher {
 	/// Return a [`WatchEventReceiver`] that will return
 	/// a [`WatchEventVec`] for each event that contains events
 	/// matching the [`Self::filter`].
-	/// 
+	///
 	/// ## Example
 	/// ```rust no_run
 	/// # use beet_fs::process::FsWatcher;
 	/// # async fn foo()->anyhow::Result<()> {
-	/// 
+	///
 	/// let mut rx = FsWatcher::default().watch()?;
 	/// while let Some(events) = rx.recv().await? {
 	/// 	println!("Received events: {:?}", events);
 	/// }
-	/// 
+	///
 	/// # Ok(())
 	/// # }
 	/// ```
@@ -86,14 +88,18 @@ impl FsWatcher {
 
 		Ok(WatchEventReceiver {
 			rx,
+			_tx: debouncer,
 			filter: self.filter.clone(),
 		})
 	}
 }
-
+// TODO async iterator when stablizes
+// https://doc.rust-lang.org/std/async_iter/trait.AsyncIterator.html
 pub struct WatchEventReceiver {
 	rx: UnboundedReceiver<DebounceEventResult>,
 	filter: GlobFilter,
+	// keep reference to debouncer so it does not get dropped
+	_tx: Debouncer<INotifyWatcher, NoCache>,
 }
 
 impl WatchEventReceiver {
@@ -138,8 +144,13 @@ pub type WatchEventResult = Result<WatchEventVec, Vec<Error>>;
 /// queries are match
 #[derive(Debug, Default)]
 pub struct WatchEventVec {
-	pub events: Vec<WatchEvent>,
+	events: Vec<WatchEvent>,
 }
+impl std::ops::Deref for WatchEventVec {
+	type Target = Vec<WatchEvent>;
+	fn deref(&self) -> &Self::Target { &self.events }
+}
+
 impl WatchEventVec {
 	pub fn new(events: DebounceEventResult) -> Result<Self> {
 		let events = match events {
@@ -170,7 +181,7 @@ impl WatchEventVec {
 
 
 	/// Returns None if no events match the filter
-	pub fn apply_filter(
+	fn apply_filter(
 		mut self,
 		filter: impl Fn(&WatchEvent) -> bool,
 	) -> Option<Self> {
@@ -255,5 +266,37 @@ impl WatchEventVec {
 	}
 	pub fn has_other(&self) -> bool {
 		self.events.iter().any(|e| e.kind.is_other())
+	}
+}
+
+
+#[cfg(test)]
+mod test {
+	use crate::prelude::*;
+	use anyhow::Result;
+	use beet_utils::prelude::FsExt;
+	use notify::EventKind;
+	use notify::event::CreateKind;
+	use tempfile::tempdir;
+
+	#[tokio::test]
+	async fn works() -> Result<()> {
+		let tmp_dir = tempdir()?;
+		let mut rx = FsWatcher {
+			cwd: tmp_dir.path().to_path_buf(),
+			..Default::default()
+		}
+		.watch()?;
+
+		let file_path = tmp_dir.path().join("foo.txt");
+		FsExt::write(&file_path, "hello")?;
+
+		// does not hang
+		let ev = rx.recv().await?.unwrap();
+
+		assert_eq!(ev[0].kind, EventKind::Create(CreateKind::File));
+		assert_eq!(ev[0].path.as_ref(), file_path);
+
+		Ok(())
 	}
 }

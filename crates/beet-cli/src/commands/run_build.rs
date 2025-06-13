@@ -1,6 +1,7 @@
 use crate::prelude::*;
-use bevy::prelude::*;
 use beet::prelude::*;
+use bevy::log::LogPlugin;
+use bevy::prelude::*;
 use clap::Parser;
 
 /// Build the project
@@ -14,9 +15,17 @@ pub struct RunBuild {
 	pub build_args: BuildArgs,
 }
 
-impl Plugin for RunBuild {
-	fn build(&self, app: &mut App) {
-		app.insert_resource(self.build_cmd.clone())
-			.add_plugins(self.build_args.clone());
+impl RunBuild {
+	pub fn run(self) -> anyhow::Result<()> {
+		App::new()
+			.add_plugins(LogPlugin {
+				level: bevy::log::Level::DEBUG,
+				..default()
+			})
+			.insert_resource(self.build_cmd.clone())
+			.add_plugins(self.build_args.clone())
+			.set_runner(FsApp::default().runner())
+			.run()
+			.anyhow()
 	}
 }

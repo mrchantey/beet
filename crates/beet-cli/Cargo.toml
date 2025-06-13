@@ -26,5 +26,11 @@ tokio.workspace = true
 rapidhash.workspace = true
 bevy.workspace = true
 
+#💡 Automod
+syn.workspace = true
+proc-macro2.workspace = true
+quote.workspace = true
+prettyplease.workspace = true
+
 [dev-dependencies]
 sweet.workspace = true
