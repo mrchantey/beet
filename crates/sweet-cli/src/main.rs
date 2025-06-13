@@ -20,10 +20,10 @@ struct Cli {
 #[derive(Subcommand)]
 enum Commands {
 	BenchAssert(BenchAssert),
-	Run(CargoRun),
 	Test(CargoTest),
 	TestServer(TestServer),
 	TestWasm(TestWasm),
+	Run(CargoRun),
 	Serve(Server),
 	Watch(FsWatchCmd),
 	Mod(AutoMod),

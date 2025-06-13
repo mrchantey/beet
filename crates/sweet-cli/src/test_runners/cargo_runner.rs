@@ -1,7 +1,7 @@
 use anyhow::Result;
-use clap::Parser;
 use beet_fs::prelude::*;
 use beet_utils::prelude::*;
+use clap::Parser;
 
 #[derive(Debug, Parser)]
 #[command(name = "test")]
@@ -82,18 +82,19 @@ impl CargoCmdExtra {
 	// --exclude '*/codegen/*' \
 
 	async fn watch(self) -> Result<()> {
-		FsWatcher {
+		let mut rx = FsWatcher {
 			filter: self.filter.clone(),
 			..Default::default()
 		}
-		.watch_async(|ev| {
+		.watch()?;
+
+		while let Some(ev) = rx.recv().await? {
 			if !ev.has_mutate() {
 				return Ok(());
 			}
 			self.run_binary()?;
-			Ok(())
-		})
-		.await?;
+		}
+
 		Ok(())
 	}
 

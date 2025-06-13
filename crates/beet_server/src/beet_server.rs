@@ -10,6 +10,8 @@ use beet_router::types::RouteInfo;
 #[cfg(feature = "lambda")]
 use lambda_http::Body;
 use std::path::PathBuf;
+#[cfg(all(debug_assertions, feature = "reload"))]
+use tokio::task::JoinHandle;
 use tower::Service;
 // use tower_http::trace::TraceLayer;
 // use tower_http::trace;
@@ -105,38 +107,36 @@ impl<S> BeetServer<S> {
 		}
 
 		#[cfg(all(debug_assertions, feature = "reload"))]
-		reload_handle.join().unwrap()?;
+		reload_handle.await??;
 
 		Ok(())
 	}
 	#[cfg(all(debug_assertions, feature = "reload"))]
 	fn get_reload(
 		html_dir: &std::path::Path,
-	) -> (
-		tower_livereload::LiveReloadLayer,
-		std::thread::JoinHandle<Result<()>>,
-	) {
+	) -> (tower_livereload::LiveReloadLayer, JoinHandle<Result<()>>) {
 		use beet_fs::prelude::FsWatcher;
 
 		let livereload = tower_livereload::LiveReloadLayer::new();
 		let reload = livereload.reloader();
 		let html_dir = html_dir.to_path_buf();
 
-		let reload_handle = std::thread::spawn(move || -> Result<()> {
-			FsWatcher {
+		let reload_handle = tokio::spawn(async move {
+			let mut rx = FsWatcher {
 				cwd: html_dir,
 				// no filter because any change in the html dir should trigger a reload
 				..Default::default()
 			}
-			.watch_blocking(move |e| {
-				if e.has_mutate() {
+			.watch()?;
+			while let Some(ev) = rx.recv().await? {
+				if ev.has_mutate() {
 					println!("html files changed, reloading wasm...");
 					reload.reload();
 					// println!("{}", events);
 					// this2.print_start();
 				}
-				Ok(())
-			})
+			}
+			Ok(())
 		});
 		(livereload, reload_handle)
 	}

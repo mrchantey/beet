@@ -22,16 +22,15 @@ impl FsWatchCmd {
 		terminal::clear().unwrap();
 		println!("{:#?}", self);
 		self.try_run_cmd().ok();
-		self.watcher
-			.watch_async(|e| {
-				if let Some(mutated) = e.mutated_pretty() {
-					terminal::clear().unwrap();
-					println!("{}", mutated);
-					self.try_run_cmd().ok();
-				}
-				Ok(())
-			})
-			.await?;
+		let mut rx = self.watcher.clone().watch()?;
+		while let Some(ev) = rx.recv().await? {
+			if let Some(mutated) = ev.mutated_pretty() {
+				terminal::clear().unwrap();
+				println!("{}", mutated);
+				self.try_run_cmd().ok();
+			}
+		}
+
 		Ok(())
 	}
 

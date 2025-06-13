@@ -1,17 +1,18 @@
 use anyhow::Result;
 use beet::prelude::handle_changed_files;
+use beet::prelude::*;
 use bevy::ecs::system::RunSystemOnce;
 use bevy::prelude::*;
 use std::num::NonZeroU8;
+use std::ops::ControlFlow;
 use std::time::Duration;
-use beet::prelude::*;
 
 
 /// An alternative to the default app runner [`App::set_runner`]
 ///
 /// ## Example
 ///
-/// ```rust
+/// ```rust no_run
 /// # use bevy::prelude::*;
 /// # use beet_cli::prelude::*;
 ///
@@ -22,14 +23,14 @@ use beet::prelude::*;
 /// 	.run();
 ///
 /// ```
-pub struct FsAppRunner {
+pub struct FsApp {
 	watcher: FsWatcher,
 }
 
 
-impl Default for FsAppRunner {
+impl Default for FsApp {
 	fn default() -> Self {
-		let templates_root_dir = WorkspacePathBuf::default();
+		// let templates_root_dir = WorkspacePathBuf::default();
 
 		Self {
 			watcher: FsWatcher {
@@ -45,9 +46,9 @@ impl Default for FsAppRunner {
 	}
 }
 
-impl FsAppRunner {
+impl FsApp {
 	/// Update the app whenever a file is created, modified, or deleted.
-	pub fn into_app_runner(self) -> impl FnOnce(App) -> AppExit + 'static {
+	pub fn runner(self) -> impl FnOnce(App) -> AppExit + 'static {
 		|mut app| {
 			if let Err(err) =
 				Self::on_change(&mut app, WatchEventVec::default())
@@ -59,7 +60,7 @@ impl FsAppRunner {
 			let body = async move {
 				let watcher_result = self
 					.watcher
-					.watch_async(move |ev| {
+					.watch(move |ev| {
 						if !ev.has_mutate() {
 							return Ok(());
 						}
@@ -83,21 +84,20 @@ impl FsAppRunner {
 		}
 	}
 
-	fn on_change(app: &mut App, watch_event: WatchEventVec) -> Result<()> {
+	fn on_change(
+		app: &mut App,
+		watch_event: WatchEventVec,
+	) -> Result<ControlFlow<AppExit>> {
 		let start = std::time::Instant::now();
 		app.world_mut()
-			.run_system_once_with(handle_changed_files, watch_event);
+			.run_system_once_with(handle_changed_files, watch_event)?;
 		app.update();
 		let elapsed = start.elapsed();
 		// TODO proper profiling https://github.com/bevyengine/bevy/blob/main/docs/profiling.md
 		println!("App updated in {:?}", elapsed);
 		match app.should_exit() {
-			Some(AppExit::Success) => return Ok(()),
-			Some(AppExit::Error(err)) => {
-				Err(anyhow::anyhow!("App exited with error: {}", err))?;
-			}
-			None => {}
+			Some(exit) => Ok(ControlFlow::Break(exit)),
+			None => Ok(ControlFlow::Continue(())),
 		}
-		Ok(())
 	}
 }

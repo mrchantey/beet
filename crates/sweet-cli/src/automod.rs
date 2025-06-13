@@ -47,7 +47,6 @@ impl AutoMod {
 			);
 		}
 
-		self.watcher.infallible = true;
 		self.watcher.filter = self
 			.watcher
 			.filter
@@ -58,37 +57,35 @@ impl AutoMod {
 			.with_exclude("**/lib.rs")
 			.with_exclude("**/main.rs")
 			.with_include("**/*.rs");
-		self.watcher
-			.watch_async(|e| {
-				let mut files = ModFiles::default();
-				let any_mutated = e
-					.events
-					.iter()
-					.map(|e| self.handle_event(&mut files, e))
-					.collect::<Result<Vec<_>>>()?
-					.into_iter()
-					.filter_map(|r| match r {
-						DidMutate::No => None,
-						DidMutate::Yes { action, path } => {
-							if !self.quiet {
-								println!(
-									"AutoMod: {action} {}",
-									PathExt::relative(&path)
-										.unwrap_or(&path)
-										.display(),
-								);
-							}
-							Some(())
+		let mut rx = self.watcher.watch()?;
+		while let Some(ev) = rx.recv().await? {
+			let mut files = ModFiles::default();
+			let any_mutated = ev
+				.events
+				.iter()
+				.map(|e| self.handle_event(&mut files, e))
+				.collect::<Result<Vec<_>>>()?
+				.into_iter()
+				.filter_map(|r| match r {
+					DidMutate::No => None,
+					DidMutate::Yes { action, path } => {
+						if !self.quiet {
+							println!(
+								"AutoMod: {action} {}",
+								PathExt::relative(&path)
+									.unwrap_or(&path)
+									.display(),
+							);
 						}
-					})
-					.next()
-					.is_some();
-				if any_mutated {
-					files.write_all()?;
-				}
-				Ok(())
-			})
-			.await?;
+						Some(())
+					}
+				})
+				.next()
+				.is_some();
+			if any_mutated {
+				files.write_all()?;
+			}
+		}
 		Ok(())
 	}
 

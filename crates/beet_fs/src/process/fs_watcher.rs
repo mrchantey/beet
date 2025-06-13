@@ -1,4 +1,5 @@
 use anyhow::Result;
+use beet_utils::prelude::*;
 use clap::Parser;
 use notify::event::CreateKind;
 use notify::event::RemoveKind;
@@ -8,7 +9,7 @@ use notify_debouncer_full::new_debouncer;
 use std::num::ParseIntError;
 use std::path::PathBuf;
 use std::time::Duration;
-use beet_utils::prelude::*;
+use tokio::sync::mpsc::UnboundedReceiver;
 
 /// A file watcher with glob patterns. All matches against
 /// `include` and `exclude` patterns will be normalized to forward slashes
@@ -32,9 +33,6 @@ pub struct FsWatcher {
 		default_value="50"
 	)]
 	pub debounce: Duration,
-	/// if true any error will be printed but will not terminate the program
-	#[arg(short, long)]
-	pub infallible: bool,
 }
 
 pub fn parse_duration(s: &str) -> Result<Duration, ParseIntError> {
@@ -59,39 +57,26 @@ impl FsWatcher {
 			Ok(())
 		}
 	}
-
-	pub fn watch_blocking(
-		&self,
-		mut on_change: impl FnMut(WatchEventVec) -> Result<()>,
-	) -> Result<()> {
+	/// Return a [`WatchEventReceiver`] that will return
+	/// a [`WatchEventVec`] for each event that contains events
+	/// matching the [`Self::filter`].
+	/// 
+	/// ## Example
+	/// ```rust no_run
+	/// # use beet_fs::process::FsWatcher;
+	/// # async fn foo()->anyhow::Result<()> {
+	/// 
+	/// let mut rx = FsWatcher::default().watch()?;
+	/// while let Some(events) = rx.recv().await? {
+	/// 	println!("Received events: {:?}", events);
+	/// }
+	/// 
+	/// # Ok(())
+	/// # }
+	/// ```
+	pub fn watch(&self) -> Result<WatchEventReceiver> {
 		self.assert_path_exists()?;
-		let (tx, rx) = std::sync::mpsc::channel();
-		let mut debouncer = new_debouncer(self.debounce, None, move |ev| {
-			if let Err(err) = tx.send(ev) {
-				eprintln!("{:?}", err);
-			}
-		})?;
-		debouncer.watch(&self.cwd, RecursiveMode::Recursive)?;
-		for ev in rx {
-			if let Some(ev) = WatchEventVec::new(ev)?
-				.apply_filter(|ev| self.filter.passes(&ev.path))
-			{
-				self.handle_on_change_result(on_change(ev))?;
-			}
-		}
-		Ok(())
-	}
-
-
-	/// Watch asynchronously and call [on_change] on each event.
-	/// Note that watch events may not actually be fs mutations,
-	/// see [WatchEventVec] for more information.
-	pub async fn watch_async(
-		&self,
-		mut on_change: impl FnMut(WatchEventVec) -> Result<()>,
-	) -> Result<()> {
-		self.assert_path_exists()?;
-		let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
+		let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
 		let mut debouncer = new_debouncer(self.debounce, None, move |ev| {
 			if let Err(err) = tx.send(ev) {
 				eprintln!("{:?}", err);
@@ -99,27 +84,34 @@ impl FsWatcher {
 		})?;
 		debouncer.watch(&self.cwd, RecursiveMode::Recursive)?;
 
-		while let Some(ev) = rx.recv().await {
-			if let Some(ev) = WatchEventVec::new(ev)?
+		Ok(WatchEventReceiver {
+			rx,
+			filter: self.filter.clone(),
+		})
+	}
+}
+
+pub struct WatchEventReceiver {
+	rx: UnboundedReceiver<DebounceEventResult>,
+	filter: GlobFilter,
+}
+
+impl WatchEventReceiver {
+	pub async fn recv(&mut self) -> Result<Option<WatchEventVec>> {
+		while let Some(ev) = self.rx.recv().await {
+			match WatchEventVec::new(ev)?
 				.apply_filter(|ev| self.filter.passes(&ev.path))
 			{
-				self.handle_on_change_result(on_change(ev))?;
+				Some(ev_vec) => {
+					// receieved events that matches filter
+					return Ok(Some(ev_vec));
+				}
+				// event received but did not match filter so keep waiting
+				None => continue,
 			}
 		}
-		Ok(())
-	}
-
-	/// Decides how to handle a result from the [on_change] callback
-	/// based on the [`infallible`] flag.
-	fn handle_on_change_result(&self, result: Result<()>) -> Result<()> {
-		match (self.infallible, result) {
-			(false, Err(err)) => Err(err),
-			(true, Err(err)) => {
-				eprintln!("Error: {:?}", err);
-				Ok(())
-			}
-			_ => Ok(()),
-		}
+		// done receiving events
+		Ok(None)
 	}
 }
 

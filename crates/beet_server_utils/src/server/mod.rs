@@ -8,12 +8,12 @@ use axum::extract::Request;
 use axum::http::Method;
 use axum::response::Response;
 use axum::routing::get;
-use clap::Parser;
-use std::path::PathBuf;
-use std::thread::JoinHandle;
-use std::time::Duration;
 use beet_fs::prelude::*;
 use beet_utils::prelude::*;
+use clap::Parser;
+use std::path::PathBuf;
+use std::time::Duration;
+use tokio::task::JoinHandle;
 use tower_http::cors::CorsLayer;
 use tower_http::services::ServeDir;
 use tower_http::services::ServeFile;
@@ -135,23 +135,24 @@ impl Server {
 		let livereload = LiveReloadLayer::new();
 		let reload = livereload.reloader();
 		let this = self.clone();
-		let reload_handle = std::thread::spawn(move || -> Result<()> {
+		let reload_handle = tokio::spawn(async move {
 			let this2 = this.clone();
 
-			FsWatcher {
-				infallible: false,
+			let mut rx = FsWatcher {
 				cwd: this.dir.clone(),
 				filter: this.filter.clone(),
 				debounce: this.debounce.clone(),
 			}
-			.watch_blocking(move |e| {
-				if let Some(events) = e.mutated_pretty() {
+			.watch()?;
+			while let Some(ev) = rx.recv().await? {
+				if let Some(events) = ev.mutated_pretty() {
 					reload.reload();
 					println!("{}", events);
 					this2.print_start();
 				}
-				Ok(())
-			})
+			}
+
+			Ok(())
 		});
 		(livereload, reload_handle)
 	}
