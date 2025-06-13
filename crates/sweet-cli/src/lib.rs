@@ -2,9 +2,9 @@
 #![cfg_attr(test, test_runner(sweet::test_runner))]
 #![feature(exit_status_error)]
 pub mod bench;
-pub mod test_runners;
+pub mod commands;
 
 pub mod prelude {
 	pub use crate::bench::*;
-	pub use crate::test_runners::*;
+	pub use crate::commands::*;
 }

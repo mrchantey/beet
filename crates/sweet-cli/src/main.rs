@@ -22,6 +22,9 @@ enum Commands {
 	TestWasm(TestWasm),
 	CargoRun(CargoRun),
 	CargoTest(CargoTest),
+	Serve(Server),
+	Watch(FsWatchCmd),
+	Mod(AutoMod),
 }
 
 #[tokio::main]
@@ -32,5 +35,8 @@ async fn main() -> Result<()> {
 		Commands::TestWasm(cmd) => cmd.run(),
 		Commands::CargoRun(cmd) => cmd.run().await,
 		Commands::CargoTest(cmd) => cmd.run().await,
+		Commands::Serve(cmd) => cmd.run().await,
+		Commands::Watch(cmd) => cmd.run_and_watch().await,
+		Commands::Mod(cmd) => cmd.run().await,
 	}
 }
