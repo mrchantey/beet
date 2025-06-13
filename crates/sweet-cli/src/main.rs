@@ -1,6 +1,8 @@
 #![cfg_attr(test, feature(test, custom_test_frameworks))]
 #![cfg_attr(test, test_runner(sweet::test_runner))]
 use anyhow::Result;
+use beet_fs::process::FsWatchCmd;
+use beet_server_utils::server::Server;
 use clap::Parser;
 use clap::Subcommand;
 use sweet_cli::prelude::*;

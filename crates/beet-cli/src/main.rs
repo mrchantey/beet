@@ -6,8 +6,6 @@ use bevy::prelude::*;
 use clap::Parser;
 use clap::Subcommand;
 
-
-
 /// Sweet CLI
 ///
 /// Various commands for testing and serving files.
@@ -25,7 +23,8 @@ enum Commands {
 
 #[tokio::main]
 async fn main() -> Result<()> {
+	init_tracing(bevy::log::Level::DEBUG);
 	match Cli::parse().command {
-		Commands::Build(cmd) => cmd.run(),
+		Commands::Build(cmd) => cmd.run().await,
 	}
 }

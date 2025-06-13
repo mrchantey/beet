@@ -13,8 +13,8 @@ use std::path::Path;
 #[derive(Debug, Default, Clone, PartialEq, Serialize, Deserialize)]
 pub struct BeetConfig {
 	/// Output location for generated static files, ie html, css, wasm
-	templates_config: BuildFileTemplates,
-	html_constants: HtmlConstants,
+	pub templates_config: BuildFileTemplates,
+	pub html_constants: HtmlConstants,
 	#[serde(rename = "file_group")]
 	pub file_groups: Vec<FileGroupConfig>,
 	// /// Configuration for a default site configuration.
@@ -28,7 +28,7 @@ impl BeetConfig {
 	/// 3. Fall back to the default config if not found
 	/// ## Errors
 	/// If a path is specified and the file is not found
-	pub fn load(path: Option<&Path>) -> Result<Self> {
+	pub fn try_load_or_default(path: Option<&Path>) -> Result<Self> {
 		path
 			// if a config is specified and not found, exit
 			.map(|path| BeetConfig::from_file(&path))
@@ -43,13 +43,6 @@ impl BeetConfig {
 	}
 }
 
-
-impl Plugin for BeetConfig {
-	fn build(&self, app: &mut App) {
-		app.insert_resource(self.html_constants.clone());
-		app.world_mut().spawn(self.templates_config.clone());
-	}
-}
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct FileGroupConfig {

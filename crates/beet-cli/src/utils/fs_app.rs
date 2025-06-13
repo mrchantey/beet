@@ -45,8 +45,10 @@ impl Default for FsApp {
 
 impl FsApp {
 	/// Update the app whenever a file is created, modified, or deleted.
-	pub fn runner(self) -> impl FnOnce(App) -> AppExit + 'static {
-		|mut app| {
+	// We dont use [`App::set_runner`] because its an async runner and
+	// we want to be able to call it from inside a tokio
+	pub fn runner(self) -> impl AsyncFnOnce(App) -> AppExit + 'static {
+		async |mut app| {
 			if let Err(err) =
 				Self::on_change(&mut app, WatchEventVec::default())
 			{
@@ -54,33 +56,27 @@ impl FsApp {
 				return AppExit::Error(NonZeroU8::new(1).unwrap());
 			}
 
-			tokio::runtime::Builder::new_multi_thread()
-				.enable_all()
-				.build()
-				.expect("Failed building the Runtime")
-				.block_on(async move {
-					let result: Result<AppExit> = async move {
-						let mut rx = self.watcher.watch()?;
+			let result: Result<AppExit> = async move {
+				let mut rx = self.watcher.watch()?;
 
-						while let Some(ev) = rx.recv().await? {
-							if ev.has_mutate() {
-								match Self::on_change(&mut app, ev)? {
-									ControlFlow::Continue(_) => {}
-									ControlFlow::Break(exit) => {
-										return Ok(exit);
-									}
-								}
+				while let Some(ev) = rx.recv().await? {
+					if ev.has_mutate() {
+						match Self::on_change(&mut app, ev)? {
+							ControlFlow::Continue(_) => {}
+							ControlFlow::Break(exit) => {
+								return Ok(exit);
 							}
 						}
-						Ok(AppExit::Success)
 					}
-					.await;
-					result.unwrap_or_else(|err| {
-						// non-bevy results havent printed yet
-						eprintln!("Error during file change: {}", err);
-						AppExit::Error(NonZeroU8::new(1).unwrap())
-					})
-				})
+				}
+				Ok(AppExit::Success)
+			}
+			.await;
+			result.unwrap_or_else(|err| {
+				// non-bevy results havent printed yet
+				eprintln!("Error during file change: {}", err);
+				AppExit::Error(NonZeroU8::new(1).unwrap())
+			})
 		}
 	}
 

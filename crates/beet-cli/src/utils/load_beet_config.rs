@@ -5,7 +5,7 @@ use std::path::PathBuf;
 
 // TODO probably integrate with RunBuild, and just nest
 #[derive(Debug, Clone, Parser)]
-pub struct BuildArgs {
+pub struct LoadBeetConfig {
 	/// Location of the beet.toml config file
 	#[arg(long)]
 	pub beet_config: Option<PathBuf>,
@@ -19,15 +19,13 @@ pub struct BuildArgs {
 	pub only: Vec<BuildOnly>,
 }
 
-impl Plugin for BuildArgs {
+impl Plugin for LoadBeetConfig {
 	fn build(&self, app: &mut App) {
 		let config =
-			BeetConfig::load(self.beet_config.as_deref()).unwrap_or_exit();
-		app.add_plugins((
-			config.clone(),
-			NodeTokensPlugin::default(),
-			BuildTemplatesPlugin::default(),
-		));
+			BeetConfig::try_load_or_default(self.beet_config.as_deref())
+				.unwrap_or_exit();
+		app.insert_resource(config.html_constants);
+		app.world_mut().spawn(config.templates_config);
 
 		// if self.only.is_empty() || self.only.contains(&BuildOnly::Templates) {
 		// 	// app.add_plugins(());

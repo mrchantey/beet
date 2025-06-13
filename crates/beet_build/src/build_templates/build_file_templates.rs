@@ -1,11 +1,11 @@
 use super::TemplateFile;
 use super::error::Error;
 use super::error::Result;
+use beet_fs::prelude::*;
+use beet_utils::prelude::*;
 use bevy::prelude::*;
 use serde::Deserialize;
 use serde::Serialize;
-use beet_fs::prelude::*;
-use beet_utils::prelude::*;
 
 
 /// Config for the template creation stage of the build process
@@ -110,14 +110,18 @@ pub(super) fn export_template_scene(
 			"Exporting {} template files to scene",
 			changed_files.len()
 		);
-		tracing::debug!(
-			"Changed template files: {}",
+
+		let msg = if changed_files.len() > 5 {
+			changed_files.len().to_string()
+		} else {
 			changed_files
 				.iter()
 				.map(|f| f.path().to_string_lossy())
 				.collect::<Vec<_>>()
 				.join("\n")
-		);
+		};
+
+		tracing::debug!("Changed template files: {msg}",);
 	}
 
 
