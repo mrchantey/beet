@@ -1,7 +1,7 @@
 use anyhow::Result;
 use beet_fs::prelude::*;
-use clap::Parser;
 use beet_utils::prelude::*;
+use clap::Parser;
 
 #[derive(Debug, Parser)]
 #[command(name = "test")]
@@ -91,7 +91,7 @@ impl CargoCmdExtra {
 
 		while let Some(ev) = rx.recv().await? {
 			if !ev.has_mutate() {
-				return Ok(());
+				continue;
 			}
 			self.run_binary()?;
 		}

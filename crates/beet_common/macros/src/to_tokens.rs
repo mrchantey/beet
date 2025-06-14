@@ -1,10 +1,9 @@
 use proc_macro2::TokenStream;
 use quote::quote;
 use beet_utils::prelude::*;
+use crate::utils::pound_token;
 use syn;
 use syn::DeriveInput;
-
-use syn::Token;
 use syn::parse_macro_input;
 use syn::WherePredicate;
 
@@ -211,9 +210,6 @@ fn parse(input: DeriveInput) -> syn::Result<TokenStream> {
 	}
 	.xok()
 }
-
-/// workaround for the `#` token which cannot be escaped in a quote! macro
-fn pound_token() -> Token![#] { syn::Token![#](proc_macro2::Span::call_site()) }
 
 
 #[cfg(test)]

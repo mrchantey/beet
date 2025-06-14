@@ -1,8 +1,9 @@
 #![cfg_attr(test, feature(test, custom_test_frameworks))]
 #![cfg_attr(test, test_runner(sweet::test_runner))]
 #![feature(proc_macro_span)]
-mod non_send_component;
+mod sendit;
 mod to_tokens;
+mod utils;
 
 /// Implements `IntoCustomTokens` for a struct or enum.
 /// All fields must also implement `IntoCustomTokens`, please open
@@ -22,22 +23,25 @@ pub fn derive_to_tokens(
 ) -> proc_macro::TokenStream {
 	to_tokens::impl_derive_to_tokens(input).into()
 }
-/// Implements `IntoCustomTokens` for a struct or enum.
-/// All fields must also implement `IntoCustomTokens`, please open
-/// a pr if you want to add support for a type.
+/// Creates a [SendWrapper](send_wrapper::SendWrapper) newtype that implements `Send` for a struct or enum.
 ///
 /// ## Example
 ///
 /// ```rust ignore
-/// #[derive(NonSendComponent)]
+/// #[derive(Sendit)]
 /// struct Foo{
 /// 	// some non-send field
 ///   bar: RefCell<String>,
 /// }
+///
+/// /*
+/// struct FooSend(pub send_wrapper::SendWrapper<Foo>);
+/// */
+///
 /// ```
-#[proc_macro_derive(NonSendComponent, attributes(field))]
-pub fn derive_non_send_component(
+#[proc_macro_derive(Sendit, attributes(sendit))]
+pub fn derive_sendit(
 	input: proc_macro::TokenStream,
 ) -> proc_macro::TokenStream {
-	non_send_component::impl_non_send_component(input).into()
+	sendit::impl_sendit(input).into()
 }
