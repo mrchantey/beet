@@ -109,13 +109,17 @@ fn clear_existing_templates(
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
+	use beet_utils::prelude::*;
 	use bevy::prelude::*;
 	use sweet::prelude::*;
 
 	#[test]
 	fn load_all_templates() {
 		App::new()
-			.add_plugins((BeetConfig::default(), BuildTemplatesPlugin))
+			.add_plugins(BuildTemplatesPlugin)
+			.xtap(|app| {
+				app.world_mut().spawn(BuildFileTemplates::default());
+			})
 			.update_then()
 			.world_mut()
 			.xpect()

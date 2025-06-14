@@ -9,7 +9,7 @@ use serde::Serialize;
 
 
 /// Config for the template creation stage of the build process
-#[derive(Debug, Clone, Component, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Component)]
 pub struct BuildFileTemplates {
 	/// Filter for files that should be parsed,
 	/// excludes 'target' and 'node_modules' directories by default

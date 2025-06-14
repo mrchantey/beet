@@ -12,7 +12,7 @@ use serde::Serialize;
 /// - If a `src/docs` dir exists, generate docs codegen and add to the route tree
 ///
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct DefaultSiteConfig {
+pub struct CodegenConfig {
 	/// The name of the package being built, used for imports in codegen.
 	#[serde(rename = "package_name")]
 	pub pkg_name: String,
@@ -39,7 +39,7 @@ fn default_wasm_imports() -> Vec<syn::Item> {
 	)]
 }
 
-impl Default for DefaultSiteConfig {
+impl Default for CodegenConfig {
 	fn default() -> Self {
 		Self {
 			pkg_name: std::env::var("CARGO_PKG_NAME")
@@ -52,7 +52,7 @@ impl Default for DefaultSiteConfig {
 }
 
 
-impl DefaultSiteConfig {
+impl CodegenConfig {
 	// pub fn build_wasm(&self) -> Result<()> {
 	// 	CodegenFile {
 	// 		output: self.src_path.join("codegen/wasm.rs"),

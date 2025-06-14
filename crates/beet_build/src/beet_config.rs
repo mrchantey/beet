@@ -18,8 +18,8 @@ pub struct BeetConfig {
 	#[serde(rename = "file_group")]
 	pub file_groups: Vec<FileGroupConfig>,
 	// /// Configuration for a default site configuration.
-	// #[serde(flatten)]
-	// pub default_site_config: DefaultSiteConfig,
+	#[serde(flatten)]
+	pub default_site_config: CodegenConfig,
 }
 
 impl BeetConfig {
