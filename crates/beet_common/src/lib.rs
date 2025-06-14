@@ -20,7 +20,7 @@ pub mod prelude {
 }
 
 pub mod exports {
-
+	pub use send_wrapper::SendWrapper;
 	#[cfg(feature = "tokens")]
 	pub use proc_macro2;
 	#[cfg(feature = "tokens")]

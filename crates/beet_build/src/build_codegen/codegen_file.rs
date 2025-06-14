@@ -1,17 +1,19 @@
-use crate::prelude::syn_item_vec_serde;
+use crate::prelude::*;
 use anyhow::Result;
+use beet_common::as_beet::*;
 use beet_utils::prelude::*;
 use serde::Deserialize;
 use serde::Serialize;
 use std::path::Path;
 use syn::Expr;
 use syn::Item;
-
+use bevy::prelude::*;
 
 
 /// Every codegen file is created via this struct. It contains
 /// several utilities and standards that make the whole thing nicer.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Sendit)]
+#[sendit(derive(Component))]
 pub struct CodegenFile {
 	/// The output codegen file location.
 	pub output: AbsPathBuf,

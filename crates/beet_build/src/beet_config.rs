@@ -1,5 +1,7 @@
 use crate::prelude::*;
 use anyhow::Result;
+use beet_bevy::prelude::AppExt;
+use beet_bevy::prelude::NonSendPlugin;
 use beet_common::node::HtmlConstants;
 use beet_utils::prelude::*;
 use bevy::prelude::*;
@@ -12,14 +14,9 @@ use std::path::Path;
 /// Config file usually located at `beet.toml`
 #[derive(Debug, Default, Clone, PartialEq, Serialize, Deserialize)]
 pub struct BeetConfig {
-	/// Output location for generated static files, ie html, css, wasm
-	pub templates_config: BuildFileTemplates,
 	pub html_constants: HtmlConstants,
-	#[serde(rename = "file_group")]
-	pub file_groups: Vec<FileGroupConfig>,
-	// /// Configuration for a default site configuration.
-	#[serde(flatten)]
-	pub codegen_config: CodegenConfig,
+	pub template_scene: BuildFileTemplates,
+	pub codegen: CodegenConfig,
 }
 
 impl BeetConfig {
@@ -43,17 +40,11 @@ impl BeetConfig {
 	}
 }
 
-
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct FileGroupConfig {
-	name: String,
-	/// Whether to include this file group in the route tree.
-	/// Usually this includes pages but excludes actions.
-	is_route: bool,
-	#[serde(flatten)]
-	pub file_group: FileGroup,
-	#[serde(flatten)]
-	pub codegen: CodegenFile,
-	#[serde(flatten)]
-	pub map_tokens: MapFuncTokens,
+impl NonSendPlugin for BeetConfig {
+	fn build(self, app: &mut App) {
+		app.insert_resource(self.html_constants)
+			.add_non_send_plugin(self.codegen)
+			.world_mut()
+			.spawn(self.template_scene);
+	}
 }

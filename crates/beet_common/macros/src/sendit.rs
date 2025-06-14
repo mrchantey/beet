@@ -38,25 +38,31 @@ fn parse(input: DeriveInput) -> syn::Result<TokenStream> {
 
 	Ok(quote! {
 		#(#sendit_attrs)*
-		#vis struct #ident <#impl_generics>(send_wrapper::SendWrapper<#input_ident #type_generics>) #where_clause;
+		#vis struct #ident #impl_generics(beet::exports::SendWrapper<#input_ident #type_generics>) #where_clause;
 
 		impl #impl_generics #ident #type_generics #where_clause{
 			pub fn new(value: #input_ident #type_generics) -> Self {
-				Self(send_wrapper::SendWrapper::new(value))
+				Self(beet::exports::SendWrapper::new(value))
 			}
 			pub fn inner(self) -> #input_ident #type_generics {
 				self.0.take()
 			}
 		}
-		impl std::ops::Deref for #ident <#impl_generics> #where_clause {
+		impl #impl_generics std::ops::Deref for #ident #type_generics #where_clause {
 			type Target = #input_ident #type_generics;
 			fn deref(&self) -> &Self::Target {
 				&self.0
 			}
 		}
-		impl std::ops::DerefMut for #ident <#impl_generics> #where_clause {
+		impl #impl_generics std::ops::DerefMut for #ident #type_generics #where_clause {
 			fn deref_mut(&mut self) -> &mut Self::Target {
 				&mut self.0
+			}
+		}
+
+		impl #impl_generics #input_ident #type_generics #where_clause {
+			pub fn sendit(self) -> #ident #type_generics {
+				#ident::new(self)
 			}
 		}
 	})
@@ -74,33 +80,43 @@ mod test {
 	#[test]
 	fn works() {
 		let input: DeriveInput = syn::parse_quote! {
-			#[sendit(derive(Clone))]
-			pub struct ElementNode {
-				pub self_closing: bool,
-			}
+					#[sendit(derive(Clone))]
+		pub struct Foo<T: ToString>
+		where
+			T: std::fmt::Display
+		{
+			inner: T
+		}
 		};
 
 		input.xmap(parse).unwrap().to_string().xpect().to_be(
 			quote! {
 				#[derive(Clone)]
-				pub struct ElementNodeSend<>(send_wrapper::SendWrapper<ElementNode>);
-				impl ElementNodeSend {
-					pub fn new(value: ElementNode) -> Self {
-						Self(send_wrapper::SendWrapper::new(value))
+				pub struct FooSend<T: ToString>(beet::exports::SendWrapper< Foo<T> >) where T: std::fmt::Display;
+
+				impl<T: ToString> FooSend<T> where T: std::fmt::Display {
+					pub fn new(value: Foo<T>) -> Self {
+						Self(beet::exports::SendWrapper::new(value))
 					}
-					pub fn inner(self) -> ElementNode {
+					pub fn inner(self) -> Foo<T> {
 						self.0.take()
 					}
 				}
-				impl std::ops::Deref for ElementNodeSend<> {
-					type Target = ElementNode;
+				impl<T: ToString> std::ops::Deref for FooSend<T> where T: std::fmt::Display {
+					type Target = Foo<T>;
 					fn deref(&self) -> &Self::Target {
 						&self.0
 					}
 				}
-				impl std::ops::DerefMut for ElementNodeSend<> {
+				impl<T: ToString> std::ops::DerefMut for FooSend<T> where T: std::fmt::Display {
 					fn deref_mut(&mut self) -> &mut Self::Target {
 						&mut self.0
+					}
+				}
+
+				impl<T: ToString> Foo<T> where T: std::fmt::Display {
+					pub fn sendit(self) -> FooSend<T> {
+						FooSend::new(self)
 					}
 				}
 			}

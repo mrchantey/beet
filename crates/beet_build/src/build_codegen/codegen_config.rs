@@ -1,4 +1,5 @@
 use crate::prelude::*;
+use beet_bevy::prelude::NonSendPlugin;
 use beet_utils::prelude::*;
 use bevy::prelude::*;
 use serde::Deserialize;
@@ -24,6 +25,9 @@ pub struct CodegenConfig {
 	/// site it may be more idiomatic to set this to `None`.
 	#[serde(default = "default_docs_route")]
 	pub docs_route: String,
+	/// Additional file groups to be included in the codegen.
+	#[serde(rename = "file_group")]
+	pub file_groups: Vec<FileGroupConfig>,
 	/// These imports will be added to the head of the wasm imports file.
 	/// This will be required for any components with a client island directive.
 	/// By default this will include `use beet::prelude::*;`
@@ -46,14 +50,69 @@ impl Default for CodegenConfig {
 			pkg_name: std::env::var("CARGO_PKG_NAME")
 				.unwrap_or_else(|_| "beet".to_string()),
 			src_path: default_src_path(),
+			file_groups: Vec::new(),
 			docs_route: default_docs_route(),
 			wasm_imports: default_wasm_imports(),
 		}
 	}
 }
 
+impl NonSendPlugin for CodegenConfig {
+	fn build(self, app: &mut App) {
+		let mut root = app.world_mut().spawn_empty();
+		if let Some(pages) = self.default_group("pages") {
+			root.with_child(pages.into_bundle());
+		}
+		if let Some(mut docs) = self.default_group("docs") {
+			docs.modifier.base_route = Some(self.docs_route.clone().into());
+			root.with_child(docs.into_bundle());
+		}
+		if let Some(actions) = self.default_group("actions") {
+			// TODO insert additional parse_actions modifier
+			root.with_child(actions.into_bundle());
+		}
+
+		for group in self.file_groups {
+			root.with_child(group.into_bundle());
+		}
+	}
+}
+
 
 impl CodegenConfig {
+	fn default_group(&self, name: &str) -> Option<FileGroupConfig> {
+		let path = self.src_path.join(name);
+		if !path.exists() {
+			return None;
+		}
+
+		Some(FileGroupConfig {
+			file_group: FileGroup::new(path),
+			codegen: CodegenFile::new(
+				self.src_path.join(format!("codegen/{name}.rs")),
+			),
+			modifier: Default::default(),
+		})
+	}
+
+
+	// pub fn routes(&self) -> Result<Vec<impl Bundle>> {
+	// 	.iter()
+	// 	.map(|name| {
+	// 		self.file_groups
+	// 			.iter()
+	// 			.find(|group| group.name == *name)
+	// 			.ok_or_else(|| {
+	// 				anyhow::anyhow!("File group {} not found", name)
+	// 			})
+	// 			.map(|group| {
+	// 				group.to_func_tokens().map(|group| group.funcs)
+	// 			})
+	// 			.flatten()
+	// 	})
+	// 	.collect::<Result<Vec<_>>>()
+	// 	.map(|vecs| vecs.into_iter().flatten().collect())
+	// }
 	// pub fn build_wasm(&self) -> Result<()> {
 	// 	CodegenFile {
 	// 		output: self.src_path.join("codegen/wasm.rs"),
@@ -70,7 +129,7 @@ impl CodegenConfig {
 	// TODO expose various options
 	// pub fn build_native(&self, mut routes: Vec<FuncTokens>) -> Result<()> {
 	// 	// removing dir breaks the FsWatcher in live reload
-	// 	self.build_server_actions()?;
+	// 	// self.build_server_actions()?;
 
 
 	// 	if let Ok(pages_dir) = self.src_path.join_checked("pages") {
@@ -168,6 +227,6 @@ mod test {
 	#[test]
 	fn works() {
 		let mut app = App::new();
-		app.add_plugins(BuildCodegenPlugin).update();
+		app.add_plugins(CodegenPlugin).update();
 	}
 }

@@ -24,12 +24,7 @@ impl Plugin for LoadBeetConfig {
 		let config =
 			BeetConfig::try_load_or_default(self.beet_config.as_deref())
 				.unwrap_or_exit();
-		app.insert_resource(config.html_constants);
-		app.world_mut().spawn(config.templates_config);
-
-		// if self.only.is_empty() || self.only.contains(&BuildOnly::Templates) {
-		// 	// app.add_plugins(());
-		// }
+		app.add_non_send_plugin(config);
 	}
 }
 

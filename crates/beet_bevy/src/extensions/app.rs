@@ -1,3 +1,4 @@
+use crate::prelude::NonSendPlugin;
 use bevy::app::PluginsState;
 use bevy::prelude::*;
 use extend::ext;
@@ -38,6 +39,11 @@ pub impl App {
 		}
 		self.finish();
 		self.cleanup();
+		self
+	}
+
+	fn add_non_send_plugin(&mut self, plugin: impl NonSendPlugin) -> &mut Self {
+		plugin.build(self);
 		self
 	}
 }

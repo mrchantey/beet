@@ -1,13 +1,41 @@
+use crate::prelude::*;
 use anyhow::Result;
+use beet_common::as_beet::*;
 use beet_utils::prelude::*;
+use bevy::prelude::*;
 use clap::Parser;
 use serde::Deserialize;
 use serde::Serialize;
 
+
+/// Config included in the `beet.toml` file for a file group.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Sendit)]
+#[sendit(derive(Component))]
+pub struct FileGroupConfig {
+	#[serde(flatten)]
+	pub file_group: FileGroup,
+	#[serde(flatten)]
+	pub codegen: CodegenFile,
+	#[serde(flatten)]
+	pub modifier: ModifyFileRouteTokens,
+}
+
+
+impl FileGroupConfig {
+	pub fn into_bundle(self) -> impl Bundle {
+		(self.file_group, self.codegen.sendit(), self.modifier)
+	}
+}
+
 /// Definition for a group of files that should be collected together.
 /// This is used as a field of types like [`ComponentFileGroup`] and [`RoutesFileGroup`].
-#[derive(Debug, Default, PartialEq, Clone, Parser, Serialize, Deserialize)]
+#[derive(
+	Debug, Default, PartialEq, Clone, Parser, Serialize, Deserialize, Component,
+)]
 pub struct FileGroup {
+	/// Setting this will include the file group in the route tree,
+	/// defaults to `false`.
+	pub is_pages: bool,
 	/// The directory where the files are located.
 	#[arg(long, default_value = ".")]
 	#[serde(rename = "path")]
@@ -18,9 +46,11 @@ pub struct FileGroup {
 	pub filter: GlobFilter,
 }
 
+
 impl FileGroup {
 	pub fn new(src: AbsPathBuf) -> Self {
 		Self {
+			is_pages: false,
 			src,
 			filter: GlobFilter::default(),
 		}

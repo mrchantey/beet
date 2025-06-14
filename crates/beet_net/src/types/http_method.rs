@@ -1,6 +1,8 @@
 use std::fmt;
 
 
+
+
 /// Alternative to the [`http::Method`] which is a low level representation of HTTP methods
 /// and quite error prone in this high level context. For example
 /// `http::method::from_str("get") != http::Method::GET` due to
@@ -25,6 +27,11 @@ pub enum HttpMethod {
 }
 
 impl HttpMethod {
+	pub const METHODS: [&str; 9] = [
+		"get", "post", "put", "delete", "head", "options", "connect", "trace",
+		"patch",
+	];
+
 	pub fn has_body(&self) -> bool {
 		matches!(self, HttpMethod::Post | HttpMethod::Put | HttpMethod::Patch)
 	}

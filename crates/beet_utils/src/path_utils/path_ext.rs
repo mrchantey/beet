@@ -82,6 +82,7 @@ impl PathExt {
 		path.file_name()
 			.ok_or_else(|| FsError::other(path, "No file name"))
 	}
+
 	pub fn is_dir_or_extension(path: &impl AsRef<Path>, ext: &str) -> bool {
 		let path = path.as_ref();
 		match path.extension() {

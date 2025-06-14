@@ -1,8 +1,10 @@
 #[allow(unused_imports)]
 use crate::prelude::*;
 use anyhow::Result;
+use beet_common::as_beet::*;
 use beet_router::prelude::*;
 use beet_utils::prelude::*;
+use bevy::prelude::*;
 use std::path::PathBuf;
 use std::str::FromStr;
 use syn::Block;
@@ -12,7 +14,8 @@ use syn::ItemMod;
 
 /// Tokens for a function that may be used as a route. This may
 /// be considered the `Tokens` version of a [`FileRoute`](beet_router::prelude::FileRoute).
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Sendit)]
+#[sendit(derive(Component))]
 pub struct FileRouteTokens {
 	/// A unique identifier for this file based on its index in
 	/// the [`FileGroup`], ie `file1`. It is used for importing the file
@@ -58,7 +61,7 @@ impl FileRouteTokens {
 		})
 	}
 
-	/// create a simple `FuncTokens` for testing
+	/// create a simple [`FileRouteTokens`] from a path for testing
 	pub fn simple_with_func(
 		local_path: impl AsRef<std::path::Path>,
 		item_fn: ItemFn,

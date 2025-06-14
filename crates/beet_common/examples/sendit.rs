@@ -1,11 +1,14 @@
 use beet_common::as_beet::*;
 
 fn main() {
-	let foo = ElementNodeSend::new(ElementNode { self_closing: true });
-	let _bar: ElementNodeSend = foo.clone();
+	let foo = FooSend::new(Foo { _inner: true });
+	let _bar: FooSend<bool> = foo.clone();
 }
 #[derive(Sendit, Clone)]
 #[sendit(derive(Clone))]
-pub struct ElementNode {
-	pub self_closing: bool,
+pub struct Foo<T: ToString>
+where
+	T: std::fmt::Display,
+{
+	_inner: T,
 }
