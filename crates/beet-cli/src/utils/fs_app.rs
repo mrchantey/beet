@@ -13,11 +13,11 @@ use std::time::Duration;
 ///
 /// ```rust no_run
 /// # use bevy::prelude::*;
+/// # use beet::prelude::*;
 /// # use beet_cli::prelude::*;
 ///
 /// App::new()
-/// 	.set_runner(FsApp::default().runner())
-/// 	.run();
+/// 	.run_async(FsApp::default().runner());
 ///
 /// ```
 pub struct FsApp {
@@ -49,6 +49,8 @@ impl FsApp {
 	// we want to be able to call it from inside a tokio
 	pub fn runner(self) -> impl AsyncFnOnce(App) -> AppExit + 'static {
 		async |mut app| {
+			app.init();
+			
 			if let Err(err) =
 				Self::on_change(&mut app, WatchEventVec::default())
 			{

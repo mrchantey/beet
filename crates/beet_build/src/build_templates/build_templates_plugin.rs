@@ -23,6 +23,13 @@ impl Default for TemplateMacros {
 	}
 }
 
+pub fn template_types_plugin(app: &mut bevy::prelude::App) {
+	app.register_type::<LangPartial>()
+		.register_type::<TemplateKey>()
+		.register_type::<StyleId>()
+		.register_type::<NodePortal>()
+		.register_type::<NodePortalTarget>();
+}
 
 impl Plugin for BuildTemplatesPlugin {
 	fn build(&self, app: &mut App) {

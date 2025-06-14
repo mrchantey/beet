@@ -1,3 +1,4 @@
+use bevy::app::PluginsState;
 use bevy::prelude::*;
 use extend::ext;
 
@@ -19,6 +20,25 @@ pub impl App {
 	) -> AppExit {
 		let app = std::mem::take(self);
 		runner(app).await
+	}
+
+	fn run_once(&mut self) -> AppExit {
+		self.init();
+		self.update();
+		self.should_exit().unwrap_or(AppExit::Success)
+	}
+
+	/// Call this on custom runners before update
+	/// to ensure that the app is fully initialized.
+	// from bevy_app https://github.com/mrchantey/bevy/blob/a1f4e56610c090b44f8b4a8f3eb56aeda5eb9669/crates/bevy_app/src/app.rs#L1392
+	fn init(&mut self) -> &mut Self {
+		while self.plugins_state() == PluginsState::Adding {
+			#[cfg(not(target_arch = "wasm32"))]
+			bevy::tasks::tick_global_task_pools_on_main_thread();
+		}
+		self.finish();
+		self.cleanup();
+		self
 	}
 }
 

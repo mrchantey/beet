@@ -1,15 +1,13 @@
+use beet_bevy::prelude::*;
 use beet_build::as_beet::*;
 use bevy::prelude::*;
-use beet_bevy::prelude::*;
 
 
 fn main() {
 	let mut app = App::new();
-	app.add_plugins((
-		BeetConfig::default(),
-		NodeTokensPlugin,
-		BuildTemplatesPlugin,
-	));
+	app.add_plugins((NodeTokensPlugin, BuildTemplatesPlugin))
+		.world_mut()
+		.spawn(BuildFileTemplates::default());
 
 	app.update();
 

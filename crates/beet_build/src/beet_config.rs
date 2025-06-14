@@ -19,7 +19,7 @@ pub struct BeetConfig {
 	pub file_groups: Vec<FileGroupConfig>,
 	// /// Configuration for a default site configuration.
 	#[serde(flatten)]
-	pub default_site_config: CodegenConfig,
+	pub codegen_config: CodegenConfig,
 }
 
 impl BeetConfig {
@@ -47,10 +47,13 @@ impl BeetConfig {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct FileGroupConfig {
 	name: String,
-	// #[serde(flatten)]
-	// pub file_group: FileGroup,
-	// #[serde(flatten)]
-	// pub codegen: CodegenFile,
-	// #[serde(flatten)]
-	// pub map_tokens: MapFuncTokens,
+	/// Whether to include this file group in the route tree.
+	/// Usually this includes pages but excludes actions.
+	is_route: bool,
+	#[serde(flatten)]
+	pub file_group: FileGroup,
+	#[serde(flatten)]
+	pub codegen: CodegenFile,
+	#[serde(flatten)]
+	pub map_tokens: MapFuncTokens,
 }

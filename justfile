@@ -72,7 +72,7 @@ remove-site:
 	npx sst remove --stage production --config infra/sst.config.ts
 
 mod *args:
-	just sweet mod --exclude *codegen* {{args}}
+	just sweet mod --exclude */codegen/* {{args}}
 
 # Run and watch a workspace example
 run example *args:

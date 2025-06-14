@@ -1,4 +1,4 @@
-use bevy::app::PluginsState;
+use beet_bevy::prelude::AppExt;
 use bevy::prelude::*;
 use std::cell::RefCell;
 
@@ -14,12 +14,7 @@ impl ReactiveApp {
 	/// Consume the app, running it once then
 	/// storing it in a [`thread_local`] and returning immediately.
 	pub fn runner(mut app: App) -> AppExit {
-		while app.plugins_state() == PluginsState::Adding {
-			#[cfg(not(target_arch = "wasm32"))]
-			bevy::tasks::tick_global_task_pools_on_main_thread();
-		}
-		app.finish();
-		app.cleanup();
+		app.init();
 		app.update();
 		APP.with(move |app_ref| {
 			let mut app_cell = app_ref.borrow_mut();
@@ -39,7 +34,7 @@ impl ReactiveApp {
 			})
 	}
 
-	/// Try to access the thread local [`App`], returns None if 
+	/// Try to access the thread local [`App`], returns None if
 	/// already borrowed or uninitialized.
 	pub fn try_with<O>(func: impl FnOnce(&mut App) -> O) -> Option<O> {
 		APP.with(|app_ref| {

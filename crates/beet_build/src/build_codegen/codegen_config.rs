@@ -1,5 +1,6 @@
 use crate::prelude::*;
 use beet_utils::prelude::*;
+use bevy::prelude::*;
 use serde::Deserialize;
 use serde::Serialize;
 
@@ -154,4 +155,19 @@ impl CodegenConfig {
 	// 		})?;
 	// 	Ok(())
 	// }
+}
+
+
+
+#[cfg(test)]
+mod test {
+	use crate::prelude::*;
+	use bevy::prelude::*;
+	// use sweet::prelude::*;
+
+	#[test]
+	fn works() {
+		let mut app = App::new();
+		app.add_plugins(BuildCodegenPlugin).update();
+	}
 }
