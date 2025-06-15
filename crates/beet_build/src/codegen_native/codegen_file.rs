@@ -11,6 +11,16 @@ use syn::Expr;
 use syn::Item;
 
 
+/// Call [`CodegenFile::build_and_write`] for every [`Changed`] [`CodegenFileSendit`]
+pub fn export_codegen_files(
+	query: Populated<&CodegenFileSendit, Changed<CodegenFileSendit>>,
+) -> bevy::prelude::Result {
+	for codegen_file in query.iter() {
+		codegen_file.build_and_write()?;
+	}
+	Ok(())
+}
+
 /// Every codegen file is created via this struct. It contains
 /// several utilities and standards that make the whole thing nicer.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Sendit)]

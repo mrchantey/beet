@@ -10,12 +10,11 @@ pub struct ImportCodegenNativeStep;
 
 /// Perform extra processing after files have been imported and processed.
 /// - After [`ExportNodesStep`]
-/// - After [`ImportCodegenNativesStep`]
 #[derive(Debug, Clone, PartialEq, Eq, Hash, SystemSet)]
 pub struct ProcessCodegenNativeStep;
 
 /// Generate the [`CodegenFile`] for native files.
-/// - After [`ProcessCodegenNativesStep`]
+/// - After [`ProcessCodegenNativeStep`]
 #[derive(Debug, Clone, PartialEq, Eq, Hash, SystemSet)]
 pub struct ExportCodegenNativeStep;
 
@@ -30,9 +29,7 @@ impl Plugin for CodegenNativePlugin {
 				Update,
 				(
 					ImportCodegenNativeStep.before(ImportNodesStep),
-					ProcessCodegenNativeStep
-						.after(ExportNodesStep)
-						.after(ImportCodegenNativeStep),
+					ProcessCodegenNativeStep.after(ExportNodesStep),
 					ExportCodegenNativeStep.after(ProcessCodegenNativeStep),
 				),
 			)
@@ -49,6 +46,8 @@ impl Plugin for CodegenNativePlugin {
 					(markdown_route_codegen, combinator_route_codegen)
 						.chain()
 						.in_set(ProcessCodegenNativeStep),
+					#[cfg(not(test))] // dont hit the fs in tests
+					export_codegen_files.in_set(ExportCodegenNativeStep),
 				),
 			);
 	}

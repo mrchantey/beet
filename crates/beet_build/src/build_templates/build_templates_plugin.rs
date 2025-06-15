@@ -10,12 +10,11 @@ pub struct ImportTemplateStep;
 
 /// Perform extra processing after nodes have been imported and processed.
 /// - After [`ExportNodesStep`]
-/// - After [`ImportTemplatesStep`]
 #[derive(Debug, Clone, PartialEq, Eq, Hash, SystemSet)]
 pub struct ProcessTemplateStep;
 
 /// Export parsed nodes to a template scene file.
-/// - After [`ProcessTemplatesStep`]
+/// - After [`ProcessTemplateStep`]
 #[derive(Debug, Clone, PartialEq, Eq, Hash, SystemSet)]
 pub struct ExportTemplateStep;
 
@@ -62,9 +61,7 @@ impl Plugin for BuildTemplatesPlugin {
 				Update,
 				(
 					ImportTemplateStep.before(ImportNodesStep),
-					ProcessTemplateStep
-						.after(ExportNodesStep)
-						.after(ImportTemplateStep),
+					ProcessTemplateStep.after(ExportNodesStep),
 					ExportTemplateStep.after(ProcessTemplateStep),
 				),
 			)
