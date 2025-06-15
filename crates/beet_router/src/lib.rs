@@ -3,28 +3,14 @@
 #![cfg_attr(test, test_runner(sweet::test_runner))]
 #![allow(async_fn_in_trait)]
 // #![feature(more_qualified_paths, if_let_guard, tuple_trait, unboxed_closures)]
-
-// #[cfg(not(target_arch = "wasm32"))]
-// pub mod build_ssg;
-// pub mod client_islands;
-// pub mod server_actions;
-pub mod types;
-
 pub mod prelude {
-	// pub use crate::app_cx;
-	// #[cfg(not(target_arch = "wasm32"))]
-	// pub use crate::build_ssg::*;
-	// pub use crate::client_islands::*;
-	// pub use crate::server_actions::*;
-	pub use crate::types::*;
-
-	pub use beet_net::prelude::HttpMethod;
+	pub const FOO: bool = true;
 }
 
 
 pub mod exports {
-	pub use http;
 	pub use beet_utils::prelude::GlobFilter;
+	pub use http;
 }
 
 /// expose prelude and as beet for macros

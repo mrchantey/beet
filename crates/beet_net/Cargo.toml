@@ -12,10 +12,19 @@ repository.workspace = true
 [features]
 default = ["serde"]
 serde = ["dep:serde", "dep:serde_json"]
+tokens = [
+	"serde",
+	"beet_common/tokens",
+	"dep:syn",
+	"dep:quote",
+	"dep:proc-macro2",
+	"dep:proc-macro2-diagnostics",
+]
 
 
 [dependencies]
 #💡 Utils
+beet_common.workspace = true
 anyhow.workspace = true
 thiserror.workspace = true
 beet_utils.workspace = true
@@ -31,6 +40,12 @@ http.workspace = true
 http-body-util.workspace = true
 url = "2"
 serde_urlencoded = "0.7"
+
+#💡 Tokens
+syn = { workspace = true, optional = true }
+quote = { workspace = true, optional = true }
+proc-macro2 = { workspace = true, optional = true }
+proc-macro2-diagnostics = { workspace = true, optional = true }
 
 #💡 Native
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]

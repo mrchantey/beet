@@ -43,8 +43,11 @@ impl Plugin for CodegenNativePlugin {
 					)
 						.chain()
 						.in_set(ImportCodegenNativeStep),
-					(markdown_route_codegen, combinator_route_codegen)
-						.chain()
+					(
+						collect_file_group,
+						(collect_combinator_route, tokenize_combinator_route)
+							.chain(),
+					)
 						.in_set(ProcessCodegenNativeStep),
 					#[cfg(not(test))] // dont hit the fs in tests
 					export_codegen_files.in_set(ExportCodegenNativeStep),

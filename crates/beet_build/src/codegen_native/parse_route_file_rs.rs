@@ -1,7 +1,5 @@
 use crate::prelude::*;
-use beet_router::prelude::HttpMethod;
-use beet_router::types::RouteInfo;
-use beet_router::types::RoutePath;
+use beet_net::prelude::*;
 use beet_utils::prelude::ReadFile;
 use bevy::prelude::*;
 use std::str::FromStr;
@@ -70,8 +68,7 @@ pub fn parse_route_file_rs(
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use beet_router::prelude::HttpMethod;
-	use beet_router::types::RoutePath;
+	use beet_net::prelude::*;
 	use bevy::ecs::system::RunSystemOnce;
 	use bevy::prelude::*;
 	use sweet::prelude::*;

@@ -1,10 +1,8 @@
 use bevy::prelude::*;
-use serde::Deserialize;
-use serde::Serialize;
-
 
 /// Constant values used in the HTML rendering process.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Resource)]
+#[derive(Debug, Clone, PartialEq, Resource)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct HtmlConstants {
 	/// the attribute for element ids, used for encoding the [TreePosition],
 	pub tree_idx_key: String,

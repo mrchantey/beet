@@ -1,6 +1,8 @@
 use crate::prelude::*;
 use http::request::Parts;
 use std::path::PathBuf;
+#[cfg(feature = "tokens")]
+use beet_common::as_beet::*;
 
 // pub trait RoutesToRsx {
 // 	async fn routes_to_rsx(&mut self) -> Result<Vec<(RouteInfo, WebNode)>>;
@@ -9,6 +11,7 @@ use std::path::PathBuf;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "tokens", derive(ToTokens))]
 pub struct RouteInfo {
 	/// the url path
 	pub path: RoutePath,

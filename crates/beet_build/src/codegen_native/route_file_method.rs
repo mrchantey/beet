@@ -1,10 +1,9 @@
 #[allow(unused_imports)]
 use crate::prelude::*;
-use beet_router::prelude::*;
+use beet_net::prelude::*;
 use bevy::prelude::*;
 
-/// Tokens for a function that may be used as a route. This may
-/// be considered the `Tokens` version of a [`FileRoute`](beet_router::prelude::FileRoute).
+/// Tokens for a function that may be used as a route.
 #[derive(Debug, Clone, PartialEq, Eq, Component)]
 pub struct RouteFileMethod {
 	///

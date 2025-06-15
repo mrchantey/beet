@@ -1,3 +1,4 @@
+use beet_utils::prelude::*;
 use bevy::ecs::entity::Entity;
 use proc_macro2::TokenStream;
 use quote::ToTokens;
@@ -5,11 +6,11 @@ use quote::quote;
 use send_wrapper::SendWrapper;
 use std::marker::PhantomData;
 use std::ops::Deref;
-use beet_utils::prelude::*;
+use std::path::PathBuf;
 
 /// Trait for converting a type into a [`TokenStream`],
 /// usually derived using the [`ToTokens`] macro.
-pub trait IntoCustomTokens {
+pub trait IntoCustomTokens<M = Self> {
 	/// Append the type to a [`TokenStream`].
 	fn into_custom_tokens(&self, tokens: &mut TokenStream);
 	/// Create a new [`TokenStream`] from the type.
@@ -25,8 +26,7 @@ where
 	T: IntoCustomTokens,
 {
 	fn into_custom_tokens(&self, tokens: &mut TokenStream) {
-		let inner = 
-		self.deref().into_custom_token_stream();
+		let inner = self.deref().into_custom_token_stream();
 		tokens.extend(quote! { SendWrapper::new(#inner) });
 	}
 }
@@ -61,6 +61,12 @@ impl IntoCustomTokens for WorkspacePathBuf {
 		tokens.extend(quote! { WorkspacePathBuf::new(#path) });
 	}
 }
+impl IntoCustomTokens for PathBuf {
+	fn into_custom_tokens(&self, tokens: &mut TokenStream) {
+		let path = self.to_string_lossy();
+		tokens.extend(quote! { std::path::PathBuf::new(#path) });
+	}
+}
 
 impl<T> IntoCustomTokens for PhantomData<T> {
 	fn into_custom_tokens(&self, tokens: &mut TokenStream) {
@@ -71,6 +77,17 @@ impl<T> IntoCustomTokens for PhantomData<T> {
 }
 
 impl<T> IntoCustomTokens for Vec<T>
+where
+	T: IntoCustomTokens,
+{
+	fn into_custom_tokens(&self, tokens: &mut TokenStream) {
+		let items = self.iter().map(|item| item.into_custom_token_stream());
+		tokens.extend(quote! { vec![#(#items),*] });
+	}
+}
+pub struct IntoCustomTokensRefMarker;
+
+impl<T> IntoCustomTokens<IntoCustomTokensRefMarker> for Vec<&T>
 where
 	T: IntoCustomTokens,
 {

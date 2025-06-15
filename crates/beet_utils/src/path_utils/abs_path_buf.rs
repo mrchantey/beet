@@ -2,6 +2,7 @@ use super::FsError;
 use super::FsExt;
 use super::FsResult;
 use super::PathExt;
+use crate::prelude::WorkspacePathBuf;
 use crate::utils::PipelineTarget;
 use path_clean::PathClean;
 use std::path::Path;
@@ -127,12 +128,10 @@ impl AbsPathBuf {
 		Self(path)
 	}
 
-	pub fn workspace_rel(
-		&self,
-	) -> FsResult<crate::path_utils::WorkspacePathBuf> {
+	pub fn workspace_rel(&self) -> FsResult<WorkspacePathBuf> {
 		// Strip the workspace root from the path
 		let path = PathExt::strip_prefix(&self.0, &FsExt::workspace_root())?;
-		Ok(crate::path_utils::WorkspacePathBuf::new(path))
+		Ok(WorkspacePathBuf::new(path))
 	}
 }
 impl FromStr for AbsPathBuf {
@@ -156,6 +155,11 @@ impl std::ops::Deref for AbsPathBuf {
 
 	fn deref(&self) -> &Self::Target { &self.0 }
 }
+
+impl std::ops::DerefMut for AbsPathBuf {
+	fn deref_mut(&mut self) -> &mut Self::Target { &mut self.0 }
+}
+
 #[cfg(feature = "serde")]
 impl serde::Serialize for AbsPathBuf {
 	fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>

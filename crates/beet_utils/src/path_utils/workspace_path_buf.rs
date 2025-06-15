@@ -59,6 +59,8 @@ impl WorkspacePathBuf {
 		Ok(Self::new(path))
 	}
 
+	pub fn take(self) -> PathBuf { self.0 }
+
 	/// Create a new [`WorkspacePathBuf`] from joining this one with
 	/// another [`Path`]
 	pub fn join(&self, path: impl AsRef<Path>) -> Self {
@@ -90,6 +92,11 @@ impl std::ops::Deref for WorkspacePathBuf {
 	type Target = PathBuf;
 	fn deref(&self) -> &Self::Target { &self.0 }
 }
+
+impl std::ops::DerefMut for WorkspacePathBuf {
+	fn deref_mut(&mut self) -> &mut Self::Target { &mut self.0 }
+}
+
 impl AsRef<Path> for WorkspacePathBuf {
 	fn as_ref(&self) -> &Path { self.0.as_ref() }
 }

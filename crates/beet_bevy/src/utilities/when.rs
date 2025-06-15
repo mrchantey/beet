@@ -120,11 +120,18 @@ mod test {
 
 	#[test]
 	#[should_panic]
-	fn default() { App::new().add_systems(Update, |_res: Res<Foo>| {}).run(); }
+	fn default() {
+		// Suppress panic output to stderr
+		std::panic::set_hook(Box::new(|_| {}));
+		App::new().add_systems(Update, |_res: Res<Foo>| {}).run();
+	}
 
 	#[test]
 	#[should_panic]
 	fn panics() {
+		// Suppress panic output to stderr
+		std::panic::set_hook(Box::new(|_| {}));
+
 		App::new()
 			.init_resource::<Foo>()
 			.add_systems(Update, |_res: When<Res<Foo>>| {

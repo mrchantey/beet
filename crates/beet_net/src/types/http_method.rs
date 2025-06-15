@@ -1,7 +1,6 @@
 use std::fmt;
-
-
-
+#[cfg(feature = "tokens")]
+use beet_common::as_beet::*;
 
 /// Alternative to the [`http::Method`] which is a low level representation of HTTP methods
 /// and quite error prone in this high level context. For example
@@ -13,6 +12,7 @@ use std::fmt;
 /// than HTTP conventions, ie `Get` instead of `GET`.
 #[derive(Debug, Default, Clone, PartialEq, Eq, Hash, Copy)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "tokens", derive(ToTokens))]
 pub enum HttpMethod {
 	#[default]
 	Get,
@@ -32,6 +32,8 @@ impl HttpMethod {
 		"patch",
 	];
 
+	/// Whether this method is one of the HTTP methods that typically
+	/// has a request body, such as `POST`, `PUT`, or `PATCH`.
 	pub fn has_body(&self) -> bool {
 		matches!(self, HttpMethod::Post | HttpMethod::Put | HttpMethod::Patch)
 	}

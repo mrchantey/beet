@@ -1,6 +1,6 @@
 use crate::prelude::*;
 use beet_common::prelude::*;
-use beet_router::prelude::*;
+use beet_net::prelude::*;
 use bevy::prelude::*;
 use serde::Deserialize;
 use serde::Serialize;

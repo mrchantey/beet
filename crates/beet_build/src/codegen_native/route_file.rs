@@ -3,6 +3,7 @@ use beet_utils::prelude::AbsPathBuf;
 use beet_utils::prelude::PathExt;
 use bevy::prelude::*;
 use proc_macro2::Span;
+use syn::ItemMod;
 use std::path::PathBuf;
 use syn::Ident;
 
@@ -21,7 +22,9 @@ pub struct RouteFile {
 	/// The absolute path to the file.
 	pub abs_path: AbsPathBuf,
 	/// The local path relative to the [`FileGroup::src`],
-	/// used to generate the route path.
+	/// used to generate the route path. This usually starts based from the
+	/// abs path but may be modified, for example [`parse_route_file_md`]
+	/// will change the path to point to the newly generated `.rs` codegen file.
 	pub local_path: PathBuf,
 }
 
@@ -29,6 +32,15 @@ impl RouteFile {
 	/// The identifier for the module import in the generated code.
 	pub fn mod_ident(&self) -> syn::Ident {
 		Ident::new(&format!("route{}", self.index), Span::call_site())
+	}
+	/// The module import for the generated code.
+	pub fn item_mod(&self) -> ItemMod {
+		let ident = self.mod_ident();
+		let path = &self.local_path.to_string_lossy();
+		syn::parse_quote! {
+			#[path = #path]
+			mod #ident;
+		}
 	}
 }
 

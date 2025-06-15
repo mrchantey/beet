@@ -23,6 +23,7 @@ css = ["dep:lightningcss", "dep:parcel_selectors"]
 #💡 Internal
 beet_template = { workspace = true, features = ["tokens"] }
 beet_common.workspace = true
+beet_net = { workspace = true, features = ["tokens"] }
 beet_fs.workspace = true
 beet_utils.workspace = true
 beet_parse.workspace = true

@@ -5,7 +5,7 @@ use axum::Router;
 use axum::ServiceExt;
 #[cfg(not(feature = "lambda"))]
 use axum::body::Body;
-use beet_router::types::RouteInfo;
+use beet_net::prelude::*;
 // use beet_router::types::RouteFunc;
 #[cfg(feature = "lambda")]
 use lambda_http::Body;

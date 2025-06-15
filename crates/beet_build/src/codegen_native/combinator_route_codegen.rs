@@ -8,7 +8,7 @@ use syn::ItemFn;
 
 /// After a [`CombinatorTokens`] has been parsed into a [`Bundle`],
 /// tokenize it and append to the [`CodegenFile`].
-pub fn combinator_route_codegen(world: &mut World) -> Result {
+pub fn tokenize_combinator_route(world: &mut World) -> Result {
 	let mut query =
 		world.query_filtered::<Entity, (
 			With<CodegenFileSendit>,
@@ -41,7 +41,7 @@ pub struct CombinatorRouteCodegen {
 }
 
 /// insert the config function into the codegen file if it exists
-pub fn markdown_route_codegen(
+pub fn collect_combinator_route(
 	_: TempNonSendMarker,
 	mut query: Populated<
 		(&mut CodegenFileSendit, &CombinatorRouteCodegenSendit),
