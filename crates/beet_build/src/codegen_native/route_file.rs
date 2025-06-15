@@ -2,11 +2,13 @@ use crate::prelude::*;
 use beet_utils::prelude::AbsPathBuf;
 use beet_utils::prelude::PathExt;
 use bevy::prelude::*;
+use proc_macro2::Span;
 use std::path::PathBuf;
+use syn::Ident;
 
 
 /// A file that belongs to a [`FileGroup`], spawned as its child.
-/// The number of child [`FileRouteTokens`] that will be spawned
+/// The number of child [`RouteFileMethod`] that will be spawned
 /// will be either 1 or 0..many, depending on whether the file
 /// is a 'single file route':
 /// - `foo.md`: 1
@@ -21,6 +23,13 @@ pub struct RouteFile {
 	/// The local path relative to the [`FileGroup::src`],
 	/// used to generate the route path.
 	pub local_path: PathBuf,
+}
+
+impl RouteFile {
+	/// The identifier for the module import in the generated code.
+	pub fn mod_ident(&self) -> syn::Ident {
+		Ident::new(&format!("route{}", self.index), Span::call_site())
+	}
 }
 
 /// Search the directory of each [`FileGroup`] and parse each file

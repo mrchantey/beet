@@ -5,7 +5,9 @@ use beet_rsx_combinator::prelude::*;
 use beet_utils::prelude::*;
 use bevy::prelude::*;
 
-/// A [`String`] of rsx tokens to be parsed into a node tree.
+/// A [`String`] of rsx tokens to be parsed into a node tree, which can then
+/// be extracted into a [`Bundle`] [`TokenStream`] via [`tokenize_bundle`]
+/// or [`tokenize_bundle_tokens`].
 #[derive(Default, Component, Deref, Reflect)]
 #[reflect(Default, Component)]
 pub struct CombinatorTokens(pub String);

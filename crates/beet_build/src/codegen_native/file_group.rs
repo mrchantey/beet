@@ -17,7 +17,7 @@ pub struct FileGroupConfig {
 	#[serde(flatten)]
 	pub codegen: CodegenFile,
 	#[serde(flatten)]
-	pub modifier: ModifyFileRouteTokens,
+	pub modifier: ModifyRouteFileMethod,
 }
 
 

@@ -8,7 +8,7 @@ use std::path::PathBuf;
 
 /// Helper for common route mapping
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Component)]
-pub struct ModifyFileRouteTokens {
+pub struct ModifyRouteFileMethod {
 	/// A base path to prepend to the route path
 	pub base_route: Option<RoutePath>,
 	/// List of strings to replace in the route path
@@ -24,7 +24,7 @@ pub struct ReplaceRoute {
 	to: String,
 }
 
-impl Default for ModifyFileRouteTokens {
+impl Default for ModifyRouteFileMethod {
 	fn default() -> Self {
 		Self {
 			base_route: None,
@@ -34,7 +34,7 @@ impl Default for ModifyFileRouteTokens {
 }
 
 
-impl ModifyFileRouteTokens {
+impl ModifyRouteFileMethod {
 	pub fn base_route(mut self, base_route: impl Into<PathBuf>) -> Self {
 		self.base_route = Some(RoutePath::new(base_route));
 		self
@@ -57,8 +57,8 @@ impl ModifyFileRouteTokens {
 pub fn modify_file_route_tokens(
 	_: TempNonSendMarker,
 	mut query: Populated<
-		(&mut FileRouteTokensSend, &ModifyFileRouteTokens),
-		Added<FileRouteTokensSend>,
+		(&mut RouteFileMethod, &ModifyRouteFileMethod),
+		Added<RouteFileMethod>,
 	>,
 ) {
 	for (mut route, modifier) in query.iter_mut() {
@@ -91,14 +91,8 @@ mod test {
 
 		let entity = world
 			.spawn((
-				FileRouteTokens::simple_with_func(
-					file!(),
-					syn::parse_quote!(
-						fn get() {}
-					),
-				)
-				.sendit(),
-				ModifyFileRouteTokens::default()
+				RouteFileMethod::new(&*file!().replace(".rs", "")),
+				ModifyRouteFileMethod::default()
 					.base_route("/design")
 					.replace_route([(
 						&format!("/{}", dir!().display()),
@@ -109,7 +103,7 @@ mod test {
 			.id();
 		world.run_system_once(modify_file_route_tokens).unwrap();
 		world
-			.get::<FileRouteTokensSend>(entity)
+			.get::<RouteFileMethod>(entity)
 			.unwrap()
 			.route_info
 			.path
