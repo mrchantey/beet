@@ -11,7 +11,7 @@ pub struct RunBuild {
 	pub build_cmd: CargoBuildCmd,
 	/// Determine the config location and which builds steps to run
 	#[command(flatten)]
-	pub build_args: LoadBeetConfig,
+	pub load_beet_config: LoadBeetConfig,
 }
 
 impl RunBuild {
@@ -19,9 +19,10 @@ impl RunBuild {
 		App::new()
 			.insert_resource(self.build_cmd.clone())
 			.add_plugins((
-				self.build_args.clone(),
+				self.load_beet_config.clone(),
 				NodeTokensPlugin::default(),
 				BuildTemplatesPlugin::default(),
+				CodegenNativePlugin::default(),
 			))
 			.run_async(FsApp::default().runner())
 			.await

@@ -26,7 +26,7 @@ pub struct CodegenNativeConfig {
 	#[serde(default = "default_docs_route")]
 	pub docs_route: String,
 	/// Additional file groups to be included in the codegen.
-	#[serde(rename = "file_group")]
+	#[serde(default,rename = "file_group")]
 	pub file_groups: Vec<FileGroupConfig>,
 }
 fn default_src_path() -> AbsPathBuf {

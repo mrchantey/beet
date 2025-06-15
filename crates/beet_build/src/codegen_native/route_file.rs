@@ -3,9 +3,9 @@ use beet_utils::prelude::AbsPathBuf;
 use beet_utils::prelude::PathExt;
 use bevy::prelude::*;
 use proc_macro2::Span;
-use syn::ItemMod;
 use std::path::PathBuf;
 use syn::Ident;
+use syn::ItemMod;
 
 
 /// A file that belongs to a [`FileGroup`], spawned as its child.
@@ -19,13 +19,14 @@ use syn::Ident;
 pub struct RouteFile {
 	/// The index of the file in the group, used for generating unique identifiers.
 	pub index: usize,
-	/// The absolute path to the file.
-	pub abs_path: AbsPathBuf,
-	/// The local path relative to the [`FileGroup::src`],
-	/// used to generate the route path. This usually starts based from the
-	/// abs path but may be modified, for example [`parse_route_file_md`]
+	/// The path to the original file specified by the [`FileGroup`]. This may be
+	/// of any file type.
+	pub origin_path: AbsPathBuf,
+	/// The local path to the rust file containing the routes.
+	/// By default this is the [`origin_path`](Self::origin_path) relative to the
+	/// [`FileGroup::src`] but may be modified, for example [`parse_route_file_md`]
 	/// will change the path to point to the newly generated `.rs` codegen file.
-	pub local_path: PathBuf,
+	pub mod_path: PathBuf,
 }
 
 impl RouteFile {
@@ -36,7 +37,7 @@ impl RouteFile {
 	/// The module import for the generated code.
 	pub fn item_mod(&self) -> ItemMod {
 		let ident = self.mod_ident();
-		let path = &self.local_path.to_string_lossy();
+		let path = &self.mod_path.to_string_lossy();
 		syn::parse_quote! {
 			#[path = #path]
 			mod #ident;
@@ -57,8 +58,8 @@ pub fn spawn_route_files(
 
 			entity.with_child(RouteFile {
 				index,
-				abs_path,
-				local_path,
+				origin_path: abs_path,
+				mod_path: local_path,
 			});
 		}
 	}

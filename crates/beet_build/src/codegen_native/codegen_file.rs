@@ -16,6 +16,10 @@ pub fn export_codegen_files(
 	query: Populated<&CodegenFileSendit, Changed<CodegenFileSendit>>,
 ) -> bevy::prelude::Result {
 	for codegen_file in query.iter() {
+		tracing::debug!(
+			"Exporting codegen file: {}",
+			codegen_file.output.to_string_lossy()
+		);
 		codegen_file.build_and_write()?;
 	}
 	Ok(())

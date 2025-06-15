@@ -12,12 +12,14 @@ pub fn parse_route_file_rs(
 	query: Populated<(Entity, &RouteFile), Added<RouteFile>>,
 ) -> Result<()> {
 	for (entity, route_file) in query.iter().filter(|(_, file)| {
-		file.abs_path.extension().map_or(false, |ext| ext == "rs")
+		file.origin_path
+			.extension()
+			.map_or(false, |ext| ext == "rs")
 	}) {
 		let mut parent = commands.entity(entity);
 
-		let route_path = RoutePath::from_file_path(&route_file.local_path)?;
-		let file_str = ReadFile::to_string(&route_file.abs_path)?;
+		let route_path = RoutePath::from_file_path(&route_file.mod_path)?;
+		let file_str = ReadFile::to_string(&route_file.origin_path)?;
 
 		// collect all public functions, including handlers and
 		// possibly their frontmatter

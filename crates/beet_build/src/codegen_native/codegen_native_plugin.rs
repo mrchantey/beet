@@ -18,7 +18,7 @@ pub struct ProcessCodegenNativeStep;
 #[derive(Debug, Clone, PartialEq, Eq, Hash, SystemSet)]
 pub struct ExportCodegenNativeStep;
 
-
+#[derive(Debug, Default)]
 pub struct CodegenNativePlugin;
 
 

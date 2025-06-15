@@ -4,11 +4,14 @@
 # It contains some custom parts to handle the internal nature
 # of the beet site, an external starter project will be significantly simpler.
 
+[codegen_native]
 package_name = "beet_site"
 src_path = "crates/beet_site/src"
 docs_route = "/docs"
 wasm_imports = ["use beet::design as beet_design;", "use beet::prelude::*;"]
 file_group_routes = ["beet_design_mockups"]
+foo = true
+
 
 [[file_group]]
 name = "test_site_pages"

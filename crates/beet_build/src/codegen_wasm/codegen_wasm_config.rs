@@ -1,4 +1,5 @@
 use crate::prelude::*;
+use beet_bevy::prelude::*;
 use bevy::prelude::*;
 use serde::Deserialize;
 use serde::Serialize;
@@ -24,4 +25,8 @@ impl Default for CodegenWasmConfig {
 			wasm_imports: default_wasm_imports(),
 		}
 	}
+}
+
+impl NonSendPlugin for CodegenWasmConfig {
+	fn build(self, _app: &mut App) { todo!() }
 }
