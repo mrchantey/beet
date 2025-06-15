@@ -13,11 +13,12 @@ use syn::Item;
 
 /// Call [`CodegenFile::build_and_write`] for every [`Changed`] [`CodegenFileSendit`]
 pub fn export_codegen_files(
+	_: TempNonSendMarker,
 	query: Populated<&CodegenFileSendit, Changed<CodegenFileSendit>>,
 ) -> bevy::prelude::Result {
 	for codegen_file in query.iter() {
 		tracing::debug!(
-			"Exporting codegen file: {}",
+			"Exporting codegen file:\n{}",
 			codegen_file.output.to_string_lossy()
 		);
 		codegen_file.build_and_write()?;
@@ -112,6 +113,7 @@ impl CodegenFile {
 
 	pub fn build_and_write(&self) -> Result<()> {
 		let output_tokens = self.build_output()?;
+		// ideally we'd use rustfmt instead
 		let output_str = prettyplease::unparse(&output_tokens);
 
 		FsExt::write(&self.output, &output_str)?;

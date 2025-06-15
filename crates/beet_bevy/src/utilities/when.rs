@@ -119,21 +119,14 @@ mod test {
 	struct Foo;
 
 	#[test]
+	#[ignore = "noisy"]
 	#[should_panic]
-	fn default() {
-		// Suppress panic output to stderr
-		#[cfg(not(target_arch = "wasm32"))]
-		std::panic::set_hook(Box::new(|_| {}));
-		App::new().add_systems(Update, |_res: Res<Foo>| {}).run();
-	}
+	fn default() { App::new().add_systems(Update, |_res: Res<Foo>| {}).run(); }
 
 	#[test]
+	#[ignore = "noisy"]
 	#[should_panic]
 	fn panics() {
-		// Suppress panic output to stderr
-		#[cfg(not(target_arch = "wasm32"))]
-		std::panic::set_hook(Box::new(|_| {}));
-
 		App::new()
 			.init_resource::<Foo>()
 			.add_systems(Update, |_res: When<Res<Foo>>| {

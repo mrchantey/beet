@@ -4,28 +4,49 @@ use serde::Deserializer;
 use serde::Serialize;
 use serde::Serializer;
 use syn::Item;
+use syn::Type;
 
 
+/// Serialization and deserialization helpers for syn::Type
+pub mod syn_type_serde {
+	use super::*;
+
+	pub fn serialize<S>(val: &Type, serializer: S) -> Result<S::Ok, S::Error>
+	where
+		S: Serializer,
+	{
+		let val_str = val.to_token_stream().to_string();
+		val_str.serialize(serializer)
+	}
+
+	pub fn deserialize<'de, D>(deserializer: D) -> Result<Type, D::Error>
+	where
+		D: Deserializer<'de>,
+	{
+		let val_str = String::deserialize(deserializer)?;
+		syn::parse_str::<Type>(&val_str)
+			.map_err(|e| serde::de::Error::custom(e.to_string()))
+	}
+}
 /// Serialization and deserialization helpers for syn::Item
 pub mod syn_item_serde {
 	use super::*;
 
-	pub fn serialize<S>(item: &Item, serializer: S) -> Result<S::Ok, S::Error>
+	pub fn serialize<S>(val: &Item, serializer: S) -> Result<S::Ok, S::Error>
 	where
 		S: Serializer,
 	{
-		let item_as_string = item.to_token_stream().to_string();
-		item_as_string.serialize(serializer)
+		let val_str = val.to_token_stream().to_string();
+		val_str.serialize(serializer)
 	}
 
 	pub fn deserialize<'de, D>(deserializer: D) -> Result<Item, D::Error>
 	where
 		D: Deserializer<'de>,
 	{
-		let s = String::deserialize(deserializer)?;
-		syn::parse_str::<Item>(&s).map_err(|e| {
-			serde::de::Error::custom(format!("Failed to parse item: {}", e))
-		})
+		let val_str = String::deserialize(deserializer)?;
+		syn::parse_str::<Item>(&val_str)
+			.map_err(|e| serde::de::Error::custom(e.to_string()))
 	}
 }
 
@@ -73,10 +94,10 @@ pub mod syn_item_vec_serde {
 #[cfg(test)]
 mod test {
 	use super::syn_item_serde;
+	use beet_utils::prelude::*;
 	use quote::ToTokens;
 	use serde::Deserialize;
 	use serde::Serialize;
-	use beet_utils::prelude::*;
 	use sweet::prelude::*;
 	use syn::Item;
 

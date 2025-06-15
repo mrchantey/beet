@@ -9,7 +9,7 @@ use bevy::prelude::*;
 pub fn parse_route_file_md(
 	_: TempNonSendMarker,
 	mut commands: Commands,
-	group_codegen: Query<&CodegenFileSendit, With<FileGroup>>,
+	group_codegen: Query<&CodegenFileSendit, With<FileGroupSendit>>,
 	parents: Query<&ChildOf>,
 	mut query: Populated<(Entity, &mut RouteFile), Added<RouteFile>>,
 ) -> Result {
@@ -60,9 +60,8 @@ pub fn parse_route_file_md(
 		});
 
 		route_file.mod_path = md_codegen_path.workspace_rel()?.take();
-		// here the markdown will be generated in its own codegen,
-		// it is seperate to the filegroup codegen tree
-		commands.spawn((
+		// here the markdown will be generated in its own codegen
+		parent.with_child((
 			CombinatorTokens(rsx_str),
 			SourceFile::new(ws_path.clone()),
 			CombinatorRouteCodegen { config }.sendit(),

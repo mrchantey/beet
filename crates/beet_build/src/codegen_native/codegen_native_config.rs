@@ -25,8 +25,11 @@ pub struct CodegenNativeConfig {
 	/// site it may be more idiomatic to set this to `None`.
 	#[serde(default = "default_docs_route")]
 	pub docs_route: String,
+	/// Disable the default file groups: `pages`, `docs`, and `actions`.
+	#[serde(default)]
+	pub no_default_groups: bool,
 	/// Additional file groups to be included in the codegen.
-	#[serde(default,rename = "file_group")]
+	#[serde(default, rename = "file_group")]
 	pub file_groups: Vec<FileGroupConfig>,
 }
 fn default_src_path() -> AbsPathBuf {
@@ -37,6 +40,7 @@ fn default_docs_route() -> String { "/".to_string() }
 impl Default for CodegenNativeConfig {
 	fn default() -> Self {
 		Self {
+			no_default_groups: false,
 			pkg_name: std::env::var("CARGO_PKG_NAME")
 				.unwrap_or_else(|_| "beet".to_string()),
 			src_path: default_src_path(),
@@ -47,20 +51,10 @@ impl Default for CodegenNativeConfig {
 }
 
 impl NonSendPlugin for CodegenNativeConfig {
-	fn build(self, app: &mut App) {
-		let mut root = app.world_mut().spawn_empty();
-		if let Some(pages) = self.default_group("pages") {
-			root.with_child(pages.into_bundle());
-		}
-		if let Some(mut docs) = self.default_group("docs") {
-			docs.modifier.base_route = Some(self.docs_route.clone().into());
-			root.with_child(docs.into_bundle());
-		}
-		if let Some(actions) = self.default_group("actions") {
-			// TODO insert additional parse_actions modifier
-			root.with_child(actions.into_bundle());
-		}
+	fn build(mut self, app: &mut App) {
+		self.try_append_default_groups();
 
+		let mut root = app.world_mut().spawn_empty();
 		for group in self.file_groups {
 			root.with_child(group.into_bundle());
 		}
@@ -69,6 +63,24 @@ impl NonSendPlugin for CodegenNativeConfig {
 
 
 impl CodegenNativeConfig {
+	fn try_append_default_groups(&mut self) {
+		if self.no_default_groups {
+			return;
+		}
+		if let Some(pages) = self.default_group("pages") {
+			self.file_groups.push(pages);
+		}
+		if let Some(mut docs) = self.default_group("docs") {
+			docs.modifier.base_route = Some(self.docs_route.clone().into());
+			self.file_groups.push(docs);
+		}
+		if let Some(actions) = self.default_group("actions") {
+			// TODO insert additional parse_actions modifier
+			self.file_groups.push(actions);
+		}
+	}
+
+
 	fn default_group(&self, name: &str) -> Option<FileGroupConfig> {
 		let path = self.src_path.join(name);
 		if !path.exists() {

@@ -783,7 +783,6 @@ dependencies = [
  "beet_template",
  "beet_utils",
  "bevy",
- "clap",
  "flume",
  "futures",
  "heck 0.4.1",

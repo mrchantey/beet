@@ -54,12 +54,10 @@ serde_json.workspace = true
 #💡 Parsing
 prettyplease.workspace = true
 pulldown-cmark = { version = "0.13", optional = true }
-# TODO direct dep, not workspace. this should be the only place
-# we dep on lightning
-clap.workspace = true
 
 #💡 style
 parcel_selectors = { workspace = true, optional = true }
+# TODO direct dep, not workspace. this should be the only place
 lightningcss = { workspace = true, optional = true }
 
 #💡 Bevy

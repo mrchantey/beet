@@ -44,19 +44,32 @@ pub struct CombinatorRouteCodegen {
 pub fn collect_combinator_route(
 	_: TempNonSendMarker,
 	mut query: Populated<
-		(&mut CodegenFileSendit, &CombinatorRouteCodegenSendit),
+		(
+			Entity,
+			&mut CodegenFileSendit,
+			&CombinatorRouteCodegenSendit,
+		),
 		Added<CombinatorRouteCodegenSendit>,
 	>,
-) {
-	for (mut codegen_file, markdown_codegen) in query.iter_mut() {
+	parents: Query<&ChildOf>,
+	file_groups: Query<&FileGroupSendit>,
+) -> Result {
+	for (entity, mut codegen_file, markdown_codegen) in query.iter_mut() {
 		if let Some(config) = &markdown_codegen.config {
+			let file_group = parents
+				.iter_ancestors(entity)
+				.find_map(|e| file_groups.get(e).ok())
+				.unwrap(); // TODO bevyhow!
+			let meta_type = &file_group.meta_type;
+
 			codegen_file.add_item::<ItemFn>(syn::parse_quote!(
-				pub fn config_get()-> impl Bundle{
+				pub fn config_get()-> #meta_type{
 					#config
 				}
 			));
 		}
 	}
+	Ok(())
 }
 
 
@@ -84,7 +97,7 @@ mod test {
 		.unwrap()
 		.to_token_stream()
 		.to_string();
-		expect(&codegen).to_contain("pub fn config_get () -> impl Bundle {");
+		expect(&codegen).to_contain("pub fn config_get () -> () {");
 		expect(&codegen).to_contain("pub fn get () -> impl Bundle {");
 	}
 }

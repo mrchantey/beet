@@ -12,8 +12,8 @@ use syn::parse_quote;
 pub fn collect_file_group(
 	_: TempNonSendMarker,
 	mut query: Populated<
-		(&mut CodegenFileSendit, &FileGroup, &Children),
-		Added<FileGroup>,
+		(&mut CodegenFileSendit, &FileGroupSendit, &Children),
+		Added<FileGroupSendit>,
 	>,
 	route_files: Query<(&RouteFile, &Children)>,
 	methods: Query<&RouteFileMethod>,
@@ -81,14 +81,17 @@ mod test {
 		app.update();
 		let codegen = app
 			.world_mut()
-			.query_filtered_once::<&CodegenFileSendit, With<FileGroup>>()[0]
+			.query_filtered_once::<&CodegenFileSendit, With<FileGroupSendit>>()[0]
 			.build_output()
 			.unwrap()
 			.to_token_stream()
 			.to_string();
 		// println!("{codegen}");
-		expect(&codegen).to_contain("pub fn route_infos () -> Vec < RouteInfo > { vec ! [RouteInfo {");
+		expect(&codegen).to_contain(
+			"pub fn route_infos () -> Vec < RouteInfo > { vec ! [RouteInfo {",
+		);
 		expect(&codegen).to_contain("mod route0 ;");
-		expect(&codegen).to_contain("router = beet_route (router , route0 :: get) ;");
+		expect(&codegen)
+			.to_contain("router = beet_route (router , route0 :: get) ;");
 	}
 }

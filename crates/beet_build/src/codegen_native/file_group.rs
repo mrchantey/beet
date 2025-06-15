@@ -3,7 +3,6 @@ use anyhow::Result;
 use beet_common::as_beet::*;
 use beet_utils::prelude::*;
 use bevy::prelude::*;
-use clap::Parser;
 use serde::Deserialize;
 use serde::Serialize;
 
@@ -23,37 +22,50 @@ pub struct FileGroupConfig {
 
 impl FileGroupConfig {
 	pub fn into_bundle(self) -> impl Bundle {
-		(self.file_group, self.codegen.sendit(), self.modifier)
+		(
+			self.file_group.sendit(),
+			self.codegen.sendit(),
+			self.modifier,
+		)
 	}
 }
 
 /// Definition for a group of files that should be collected together.
 /// This is used as a field of types like [`ComponentFileGroup`] and [`RoutesFileGroup`].
-#[derive(
-	Debug, Default, PartialEq, Clone, Parser, Serialize, Deserialize, Component,
-)]
-#[require(CodegenFileSendit)]
+#[derive(Debug, PartialEq, Clone, Serialize, Deserialize, Sendit)]
+#[sendit(derive(Component))]
+#[sendit(require(CodegenFileSendit))]
 pub struct FileGroup {
-	/// Setting this will include the file group in the route tree,
-	/// defaults to `false`.
-	pub is_pages: bool,
 	/// The directory where the files are located.
-	#[arg(long, default_value = ".")]
 	#[serde(rename = "path")]
 	pub src: AbsPathBuf,
 	/// Include and exclude filters for the files.
-	#[command(flatten)]
 	#[serde(flatten)]
 	pub filter: GlobFilter,
+	/// Specify the meta type, used for the file group codegen and individual
+	/// route codegen like `.md` and `.rsx` files.
+	#[serde(default = "default_meta_type", with = "syn_type_serde")]
+	pub meta_type: syn::Type,
 }
 
+fn default_meta_type() -> syn::Type { syn::parse_str("()").unwrap() }
+
+
+impl Default for FileGroup {
+	fn default() -> Self {
+		Self {
+			src: AbsPathBuf::default(),
+			filter: GlobFilter::default(),
+			meta_type: default_meta_type(),
+		}
+	}
+}
 
 impl FileGroup {
 	pub fn new(src: AbsPathBuf) -> Self {
 		Self {
-			is_pages: false,
 			src,
-			filter: GlobFilter::default(),
+			..Default::default()
 		}
 	}
 
@@ -85,31 +97,30 @@ impl FileGroup {
 	}
 
 	#[cfg(test)]
-	pub fn test_site() -> Self {
-		Self::new(
-			WsPathBuf::new("crates/beet_router/src/test_site")
-				.into_abs(),
-		)
+	pub fn test_site() -> FileGroupSendit {
+		Self::new(WsPathBuf::new("crates/beet_router/src/test_site").into_abs())
+			.sendit()
 	}
 	#[cfg(test)]
-	pub fn test_site_pages() -> Self {
+	pub fn test_site_pages() -> FileGroupSendit {
 		Self::new(
-			WsPathBuf::new("crates/beet_router/src/test_site/pages")
-				.into_abs(),
+			WsPathBuf::new("crates/beet_router/src/test_site/pages").into_abs(),
 		)
 		.with_filter(
 			GlobFilter::default()
 				.with_include("*.rs")
 				.with_exclude("*mod.rs"),
 		)
+		.sendit()
 	}
 	#[cfg(test)]
-	pub fn test_site_markdown() -> Self {
+	pub fn test_site_markdown() -> FileGroupSendit {
 		Self::new(
 			WsPathBuf::new("crates/beet_router/src/test_site/test_docs")
 				.into_abs(),
 		)
 		.with_filter(GlobFilter::default().with_include("*.md"))
+		.sendit()
 	}
 }
 
@@ -123,6 +134,7 @@ mod test {
 	fn works() {
 		expect(
 			FileGroup::test_site()
+				.inner()
 				.with_filter(GlobFilter::default().with_include("*.mockup.rs"))
 				.collect_files()
 				.unwrap()
