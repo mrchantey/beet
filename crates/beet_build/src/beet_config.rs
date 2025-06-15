@@ -16,7 +16,8 @@ use std::path::Path;
 pub struct BeetConfig {
 	pub html_constants: HtmlConstants,
 	pub template_scene: BuildFileTemplates,
-	pub codegen: CodegenConfig,
+	pub codegen_native: CodegenNativeConfig,
+	pub codegen_wasm: CodegenWasmConfig,
 }
 
 impl BeetConfig {
@@ -43,7 +44,7 @@ impl BeetConfig {
 impl NonSendPlugin for BeetConfig {
 	fn build(self, app: &mut App) {
 		app.insert_resource(self.html_constants)
-			.add_non_send_plugin(self.codegen)
+			.add_non_send_plugin(self.codegen_native)
 			.world_mut()
 			.spawn(self.template_scene);
 	}

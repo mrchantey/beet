@@ -3,7 +3,8 @@
 #![cfg_attr(test, feature(stmt_expr_attributes))]
 #![feature(let_chains, if_let_guard, result_flattening)]
 
-mod build_codegen;
+mod codegen_native;
+mod codegen_wasm;
 // mod build_codegen_actions;
 mod beet_config;
 mod build_templates;
@@ -11,7 +12,8 @@ mod utils;
 
 pub mod prelude {
 	// pub use crate::bevy::*;
-	pub use crate::build_codegen::*;
+	pub use crate::codegen_native::*;
+	pub use crate::codegen_wasm::*;
 	// pub use crate::build_codegen_actions::*;
 	pub use crate::beet_config::*;
 	pub use crate::build_templates::*;

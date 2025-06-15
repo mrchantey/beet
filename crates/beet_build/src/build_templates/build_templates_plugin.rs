@@ -3,6 +3,23 @@ use beet_common::prelude::*;
 use beet_parse::prelude::*;
 use bevy::prelude::*;
 
+/// Import template files into parsable formats like [`RstmlTokens`], or [`CombinatorToNodeTokens`].
+/// - Before [`ImportNodesStep`]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, SystemSet)]
+pub struct ImportTemplateStep;
+
+/// Perform extra processing after nodes have been imported and processed.
+/// - After [`ExportNodesStep`]
+/// - After [`ImportTemplatesStep`]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, SystemSet)]
+pub struct ProcessTemplateStep;
+
+/// Export parsed nodes to a template scene file.
+/// - After [`ProcessTemplatesStep`]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, SystemSet)]
+pub struct ExportTemplateStep;
+
+
 /// Plugin containing all systems for building templates from files.
 /// This plugin is usually added in combination with:
 /// - [`NodeTokensPlugin`](beet_parse::prelude::NodeTokensPlugin)
@@ -48,7 +65,7 @@ impl Plugin for BuildTemplatesPlugin {
 					ProcessTemplateStep
 						.after(ExportNodesStep)
 						.after(ImportTemplateStep),
-					ExportTemplateStep.after(ProcessNodesStep),
+					ExportTemplateStep.after(ProcessTemplateStep),
 				),
 			)
 			.add_systems(
@@ -80,24 +97,6 @@ impl Plugin for BuildTemplatesPlugin {
 			);
 	}
 }
-
-/// Import template files into parsable formats like [`RstmlTokens`], or [`CombinatorToNodeTokens`].
-/// - Before [`ImportNodesStep`]
-#[derive(Debug, Clone, PartialEq, Eq, Hash, SystemSet)]
-pub struct ImportTemplateStep;
-
-/// Perform extra processing after nodes have been imported and processed.
-/// - After [`ExportNodesStep`]
-/// - After [`ImportTemplatesStep`]
-#[derive(Debug, Clone, PartialEq, Eq, Hash, SystemSet)]
-pub struct ProcessTemplateStep;
-
-/// Export parsed nodes to a template scene file.
-/// - After [`ProcessTemplatesStep`]
-#[derive(Debug, Clone, PartialEq, Eq, Hash, SystemSet)]
-pub struct ExportTemplateStep;
-
-
 
 
 #[allow(unused)]

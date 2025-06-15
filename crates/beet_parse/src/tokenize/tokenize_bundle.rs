@@ -3,7 +3,23 @@ use beet_utils::prelude::*;
 use bevy::prelude::*;
 use proc_macro2::TokenStream;
 
-pub fn tokenize_bundle_children_with_errors(
+/// Create a [`TokenStream`] of a [`Bundle`] that represents the *finalized*
+/// tree of nodes for the given [`Entity`], as opposed to the *tokenized* tree,
+/// see [`tokenize_bundle_tokens`].
+pub fn tokenize_bundle(
+	world: &mut World,
+	entity: Entity,
+) -> Result<TokenStream> {
+	// The root is not an actual node, so we flatten the children if its 1, or
+	// convert to a fragment.
+	flatten_fragment(world, entity, tokenize_bundle_no_flatten)
+}
+
+
+/// Calls [`tokenize_bundle`] and appends any diagnostics tokens like rstml
+/// compile errors. Prefer this method for macros, and [`tokenize_bundle`] for
+/// codegen.
+pub fn tokenize_bundle_with_errors(
 	world: &mut World,
 	entity: Entity,
 ) -> Result<TokenStream> {
@@ -18,17 +34,6 @@ pub fn tokenize_bundle_children_with_errors(
 }
 
 
-/// Create a [`TokenStream`] of a [`Bundle`] that represents the *finalized*
-/// tree of nodes for the given [`Entity`], as opposed to the *tokenized* tree,
-/// see [`tokenize_bundle_tokens`].
-pub fn tokenize_bundle(
-	world: &mut World,
-	entity: Entity,
-) -> Result<TokenStream> {
-	// The root is not an actual node, so we flatten the children if its 1, or
-	// convert to a fragment.
-	flatten_fragment(world, entity, tokenize_bundle_no_flatten)
-}
 
 #[rustfmt::skip]
 pub(super) fn tokenize_bundle_no_flatten(world: &World, entity: Entity) -> Result<TokenStream> {

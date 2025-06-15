@@ -14,7 +14,7 @@ use serde::Serialize;
 /// - If a `src/docs` dir exists, generate docs codegen and add to the route tree
 ///
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct CodegenConfig {
+pub struct CodegenNativeConfig {
 	/// The name of the package being built, used for imports in codegen.
 	#[serde(rename = "package_name")]
 	pub pkg_name: String,
@@ -28,23 +28,13 @@ pub struct CodegenConfig {
 	/// Additional file groups to be included in the codegen.
 	#[serde(rename = "file_group")]
 	pub file_groups: Vec<FileGroupConfig>,
-	/// These imports will be added to the head of the wasm imports file.
-	/// This will be required for any components with a client island directive.
-	/// By default this will include `use beet::prelude::*;`
-	#[serde(default = "default_wasm_imports", with = "syn_item_vec_serde")]
-	pub wasm_imports: Vec<syn::Item>,
 }
 fn default_src_path() -> AbsPathBuf {
 	AbsPathBuf::new_workspace_rel("src").unwrap()
 }
 fn default_docs_route() -> String { "/".to_string() }
-fn default_wasm_imports() -> Vec<syn::Item> {
-	vec![syn::parse_quote!(
-		use beet::prelude::*;
-	)]
-}
 
-impl Default for CodegenConfig {
+impl Default for CodegenNativeConfig {
 	fn default() -> Self {
 		Self {
 			pkg_name: std::env::var("CARGO_PKG_NAME")
@@ -52,12 +42,11 @@ impl Default for CodegenConfig {
 			src_path: default_src_path(),
 			file_groups: Vec::new(),
 			docs_route: default_docs_route(),
-			wasm_imports: default_wasm_imports(),
 		}
 	}
 }
 
-impl NonSendPlugin for CodegenConfig {
+impl NonSendPlugin for CodegenNativeConfig {
 	fn build(self, app: &mut App) {
 		let mut root = app.world_mut().spawn_empty();
 		if let Some(pages) = self.default_group("pages") {
@@ -79,7 +68,7 @@ impl NonSendPlugin for CodegenConfig {
 }
 
 
-impl CodegenConfig {
+impl CodegenNativeConfig {
 	fn default_group(&self, name: &str) -> Option<FileGroupConfig> {
 		let path = self.src_path.join(name);
 		if !path.exists() {
@@ -227,6 +216,6 @@ mod test {
 	#[test]
 	fn works() {
 		let mut app = App::new();
-		app.add_plugins(CodegenPlugin).update();
+		app.add_plugins(CodegenNativePlugin).update();
 	}
 }

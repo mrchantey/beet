@@ -4,6 +4,22 @@ use std::path::Path;
 use std::path::PathBuf;
 use std::str::FromStr;
 
+/// The workspace relative directory for this file, 
+/// internally using the `file!()` macro.
+/// ## Example
+///
+/// ```rust
+/// # use beet_utils::prelude::*;
+/// let dir = dir!();
+/// ```
+#[macro_export]
+macro_rules! dir {
+	() => {
+		std::path::Path::new(file!()).parent().unwrap()
+	};
+}
+
+
 /// Better Fs, actually outputs missing path
 pub struct FsExt;
 

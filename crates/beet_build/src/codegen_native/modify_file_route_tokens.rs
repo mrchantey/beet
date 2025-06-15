@@ -39,9 +39,9 @@ impl ModifyFileRouteTokens {
 		self.base_route = Some(RoutePath::new(base_route));
 		self
 	}
-	pub fn replace_route<S: ToString>(
+	pub fn replace_route<S1: ToString, S2: ToString>(
 		mut self,
-		replace: impl IntoIterator<Item = (S, S)>,
+		replace: impl IntoIterator<Item = (S1, S2)>,
 	) -> Self {
 		self.replace_route = replace
 			.into_iter()
@@ -80,6 +80,7 @@ pub fn modify_file_route_tokens(
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
+	use beet_utils::dir;
 	use bevy::ecs::system::RunSystemOnce;
 	use bevy::prelude::*;
 	use sweet::prelude::*;
@@ -100,7 +101,8 @@ mod test {
 				ModifyFileRouteTokens::default()
 					.base_route("/design")
 					.replace_route([(
-						"crates/beet_build/src/build_codegen/",
+						&format!("/{}", dir!().display()),
+						// "crates/beet_build/src/codegen_native/",
 						"",
 					)]),
 			))
