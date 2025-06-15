@@ -2,8 +2,8 @@ use crate::prelude::*;
 use anyhow::Result;
 use beet_common::prelude::*;
 use beet_rsx_combinator::prelude::*;
-use bevy::prelude::*;
 use beet_utils::prelude::*;
+use bevy::prelude::*;
 
 /// A [`String`] of rsx tokens to be parsed into a node tree.
 #[derive(Default, Component, Deref, Reflect)]
@@ -22,7 +22,10 @@ pub fn combinator_to_node_tokens_plugin(app: &mut App) {
 fn combinator_to_node_tokens(
 	_: TempNonSendMarker,
 	mut commands: Commands,
-	query: Populated<(Entity, &CombinatorTokens, Option<&SourceFile>)>,
+	query: Populated<
+		(Entity, &CombinatorTokens, Option<&SourceFile>),
+		Added<CombinatorTokens>,
+	>,
 ) -> bevy::prelude::Result {
 	for (entity, tokens, source_file) in query.iter() {
 		let default_source_file = WorkspacePathBuf::default();
@@ -62,7 +65,7 @@ impl<'w, 's, 'a> Builder<'w, 's, 'a> {
 				remaining
 			));
 		}
-		// add as a child to keep consistency with rstml_to_tokens
+		// add as a child to keep consistency with [`rstml_to_tokens`]
 		let child = self.commands.spawn_empty().id();
 		self.rsx_parsed_expression(child, expr)?;
 		self.commands
@@ -289,7 +292,7 @@ mod test {
 	use sweet::prelude::*;
 
 	fn parse(str: &str) -> Matcher<String> {
-		tokenize_combinator_str(str, WorkspacePathBuf::new(file!()))
+		tokenize_combinator(str, WorkspacePathBuf::new(file!()))
 			.unwrap()
 			.to_string()
 			.xpect()

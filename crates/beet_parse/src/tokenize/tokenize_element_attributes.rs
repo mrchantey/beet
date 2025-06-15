@@ -49,9 +49,7 @@ pub fn tokenize_element_attributes(
 			{
 				attr_components.push(quote! {#attr.into_attr_val_bundle()});
 			}
-			if let Some(attr) =
-				tokenize_combinator_exprs_to_bundle(world, attr_entity)?
-			{
+			if let Some(attr) = tokenize_combinator_exprs(world, attr_entity)? {
 				if world.entity(attr_entity).contains::<AttributeKeyExpr>() {
 					// if this attribute has a key, the combinator must be a value
 					attr_components.push(quote! {#attr.into_attr_val_bundle()});
@@ -182,6 +180,7 @@ fn try_insert_closure_type(expr: &mut Expr, ident: &Ident) {
 mod test {
 	use crate::prelude::*;
 	use crate::tokenize::tokenize_element_attributes::try_insert_closure_type;
+	use beet_utils::prelude::*;
 	use bevy::prelude::*;
 	use proc_macro2::Span;
 	use proc_macro2::TokenStream;
@@ -189,7 +188,6 @@ mod test {
 	use quote::quote;
 	use sweet::prelude::*;
 	use syn::Ident;
-use beet_utils::prelude::*;
 
 	#[test]
 	fn insert_closure_type() {
@@ -220,7 +218,7 @@ use beet_utils::prelude::*;
 	}
 
 	fn parse(tokens: TokenStream) -> Matcher<String> {
-		tokenize_rstml_tokens(tokens, WorkspacePathBuf::new(file!()))
+		tokenize_rstml(tokens, WorkspacePathBuf::new(file!()))
 			.unwrap()
 			.to_string()
 			.xpect()

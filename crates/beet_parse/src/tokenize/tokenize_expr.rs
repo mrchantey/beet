@@ -22,22 +22,22 @@ pub fn tokenize_block_node_exprs(
 	}
 }
 
-pub fn tokenize_combinator_exprs_to_bundle(
+pub fn tokenize_combinator_exprs(
 	world: &World,
 	entity: Entity,
 ) -> Result<Option<TokenStream>> {
-	tokenize_combinator_exprs(world, entity, tokenize_bundle)
+	tokenize_combinator_exprs_inner(world, entity, super::tokenize_bundle_no_flatten)
 }
 
-pub fn tokenize_combinator_exprs_to_node_tree(
+pub fn tokenize_combinator_exprs_tokens(
 	world: &World,
 	entity: Entity,
 ) -> Result<Option<TokenStream>> {
-	tokenize_combinator_exprs(world, entity, tokenize_node_tree)
+	tokenize_combinator_exprs_inner(world, entity, tokenize_bundle_tokens)
 }
 
 /// push combinators for nodes, attributes are handled by tokenize_attributes
-fn tokenize_combinator_exprs(
+fn tokenize_combinator_exprs_inner(
 	world: &World,
 	entity: Entity,
 	map_child: impl Fn(&World, Entity) -> Result<TokenStream>,

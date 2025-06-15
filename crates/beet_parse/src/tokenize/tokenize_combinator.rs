@@ -1,10 +1,10 @@
 use crate::prelude::*;
-use bevy::ecs::system::RunSystemOnce;
+use beet_utils::prelude::*;
 use bevy::prelude::*;
 use proc_macro2::TokenStream;
-use beet_utils::prelude::*;
 
-pub fn tokenize_combinator_str(
+/// Parse combinator string into a *finalized* [`Bundle`], see [`tokenize_bundle`].
+pub fn tokenize_combinator(
 	tokens: &str,
 	source_file: WorkspacePathBuf,
 ) -> Result<TokenStream> {
@@ -17,14 +17,14 @@ pub fn tokenize_combinator_str(
 			))
 			.id();
 		app.update();
-		let tokens = app
-			.world_mut()
-			.run_system_once_with(tokenize_bundle_children, entity)?;
+		let tokens = tokenize_bundle(app.world_mut(), entity);
 		app.world_mut().entity_mut(entity).despawn();
 		tokens
 	})
 }
-pub fn tokenize_combinator_tree(
+
+/// Parse combinator string into a *tokenized* [`Bundle`], see [`tokenize_bundle_tokens`].
+pub fn tokenize_combinator_tokens(
 	tokens: &str,
 	source_file: WorkspacePathBuf,
 ) -> Result<TokenStream> {
@@ -37,7 +37,7 @@ pub fn tokenize_combinator_tree(
 			))
 			.id();
 		app.update();
-		let result = tokenize_node_tree(app.world(), entity);
+		let result = tokenize_bundle_tokens(app.world(), entity);
 		app.world_mut().entity_mut(entity).despawn();
 		result
 	})

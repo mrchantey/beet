@@ -36,7 +36,7 @@ pub fn tokenize_template_attributes(
 				entity_components.push(quote! {#attr.into_node_bundle()});
 			}
 			let combinator_attr =
-				tokenize_combinator_exprs_to_bundle(world, attr_entity)?;
+				tokenize_combinator_exprs(world, attr_entity)?;
 
 			if let Some(key) =
 				maybe_spanned_expr::<AttributeKeyExpr>(world, attr_entity)?

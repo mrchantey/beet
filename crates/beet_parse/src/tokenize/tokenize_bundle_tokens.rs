@@ -6,8 +6,12 @@ use send_wrapper::SendWrapper;
 use beet_utils::prelude::*;
 use syn::Expr;
 
+
+/// Create a [`TokenStream`] of a [`Bundle`] that represents the *tokenized*
+/// tree of nodes for the given [`Entity`], as opposed to the *finalized* tree,
+/// see [`tokenize_bundle`].
 #[rustfmt::skip]
-pub fn tokenize_node_tree(
+pub fn tokenize_bundle_tokens(
 	world: &World,
 	entity: Entity,
 ) -> Result<TokenStream> {
@@ -17,9 +21,9 @@ pub fn tokenize_node_tree(
 	tokenize_web_nodes(world, &mut items, entity)?;
 	tokenize_web_directives(world, &mut items, entity)?;
 	tokenize_block_node_exprs(world, &mut items, entity)?;
-	tokenize_combinator_exprs_to_node_tree(world, entity)?.map(|i|items.push(i));
+	tokenize_combinator_exprs_tokens(world, entity)?.map(|i|items.push(i));
 	tokenize_related::<Attributes>(world, &mut items, entity, tokenize_attribute_tokens)?;
-	tokenize_related::<Children>(world, &mut items, entity, tokenize_node_tree)?;
+	tokenize_related::<Children>(world, &mut items, entity, tokenize_bundle_tokens)?;
 
 	items.xmap(maybe_tuple).xok()
 }
@@ -51,10 +55,9 @@ fn tokenize_attribute_tokens(
 	if let Some(attr_val) = entity.get::<AttributeValueExpr>() {
 		items.push(attr_val.into_custom_token_stream());
 	}
-	// tokenize_related::<Children>(world, &mut items, entity.id(), tokenize_node_tree)?;
 let attr_entity = entity.id();
 	if let Some(attr) =
-				tokenize_combinator_exprs_to_node_tree(world, attr_entity)?
+				tokenize_combinator_exprs_tokens(world, attr_entity)?
 	{
 				items.push(attr);
 	}
@@ -71,14 +74,14 @@ mod test {
 	use beet_utils::prelude::*;
 
 	fn parse_rstml(tokens: TokenStream) -> Matcher<String> {
-		rstml_to_token_tree(tokens, WorkspacePathBuf::new(file!()))
+		tokenize_rstml_tokens(tokens, WorkspacePathBuf::new(file!()))
 			.unwrap()
 			.to_string()
 			.xpect()
 	}
 
 	fn parse_combinator(tokens: &str) -> Matcher<String> {
-		tokenize_combinator_tree(tokens, WorkspacePathBuf::new(file!()))
+		tokenize_combinator_tokens(tokens, WorkspacePathBuf::new(file!()))
 			.unwrap()
 			.to_string().replace(" ", "")
 			.xpect()

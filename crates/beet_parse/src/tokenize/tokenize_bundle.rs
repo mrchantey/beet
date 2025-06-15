@@ -4,11 +4,11 @@ use bevy::prelude::*;
 use proc_macro2::TokenStream;
 
 pub fn tokenize_bundle_children_with_errors(
-	In(entity): In<Entity>,
 	world: &mut World,
+	entity: Entity,
 ) -> Result<TokenStream> {
 	// TODO insert errors
-	let mut tokens = tokenize_bundle_children(In(entity), world)?;
+	let mut tokens = tokenize_bundle(world, entity)?;
 	if let Some(diagnostics) = world.entity(entity).get::<TokensDiagnostics>() {
 		let diagnostics = TokensDiagnostics((*diagnostics).clone());
 		tokens.extend(diagnostics.into_tokens());
@@ -18,18 +18,20 @@ pub fn tokenize_bundle_children_with_errors(
 }
 
 
-/// recursively visit children and collect into a [`TokenStream`].
-/// The root is not an actual node, so we flatten the children or
-/// convert to a fragment.
-pub fn tokenize_bundle_children(
-	In(entity): In<Entity>,
+/// Create a [`TokenStream`] of a [`Bundle`] that represents the *finalized*
+/// tree of nodes for the given [`Entity`], as opposed to the *tokenized* tree,
+/// see [`tokenize_bundle_tokens`].
+pub fn tokenize_bundle(
 	world: &mut World,
+	entity: Entity,
 ) -> Result<TokenStream> {
-	flatten_fragment(world, entity, tokenize_bundle)
+	// The root is not an actual node, so we flatten the children if its 1, or
+	// convert to a fragment.
+	flatten_fragment(world, entity, tokenize_bundle_no_flatten)
 }
 
 #[rustfmt::skip]
-pub fn tokenize_bundle(world: &World, entity: Entity) -> Result<TokenStream> {
+pub(super) fn tokenize_bundle_no_flatten(world: &World, entity: Entity) -> Result<TokenStream> {
 	let mut items = Vec::new();
 	tokenize_rsx_nodes(world,&mut items, entity)?;
 	tokenize_rsx_directives(world,&mut items, entity)?;
@@ -38,8 +40,8 @@ pub fn tokenize_bundle(world: &World, entity: Entity) -> Result<TokenStream> {
 	tokenize_element_attributes(world,&mut items, entity)?;
 	tokenize_template_attributes(world,&mut items, entity)?;
 	tokenize_block_node_exprs(world, entity)?.map(|i|items.push(i));
-	tokenize_combinator_exprs_to_bundle(world, entity)?.map(|i|items.push(i));
-	tokenize_related::<Children>(world,&mut items, entity, tokenize_bundle)?;
+	tokenize_combinator_exprs(world, entity)?.map(|i|items.push(i));
+	tokenize_related::<Children>(world,&mut items, entity, tokenize_bundle_no_flatten)?;
 	items
 		.xmap(maybe_tuple)
 		.xok()
@@ -84,7 +86,7 @@ mod test {
 				<div/>
 			</span>
 		}
-		.xmap(|t| tokenize_rstml_tokens(t, WorkspacePathBuf::new(file!())))
+		.xmap(|t| tokenize_rstml(t, WorkspacePathBuf::new(file!())))
 		.unwrap()
 		.to_string()
 		.xpect()
@@ -132,7 +134,7 @@ mod test {
 			<br/>
 			<br/>
 		}
-		.xmap(|t| tokenize_rstml_tokens(t, WorkspacePathBuf::new(file!())))
+		.xmap(|t| tokenize_rstml(t, WorkspacePathBuf::new(file!())))
 		.unwrap()
 		.to_string()
 		.xpect()
@@ -158,7 +160,7 @@ mod test {
 	#[test]
 	fn blocks() {
 		quote! {{foo}}
-			.xmap(|t| tokenize_rstml_tokens(t, WorkspacePathBuf::new(file!())))
+			.xmap(|t| tokenize_rstml(t, WorkspacePathBuf::new(file!())))
 			.unwrap()
 			.to_string()
 			.xpect()
@@ -173,7 +175,7 @@ mod test {
 	#[test]
 	fn attribute_blocks() {
 		quote! {<input hidden=val/>}
-			.xmap(|t| tokenize_rstml_tokens(t, WorkspacePathBuf::new(file!())))
+			.xmap(|t| tokenize_rstml(t, WorkspacePathBuf::new(file!())))
 			.unwrap()
 			.to_string()
 			.xpect()
@@ -194,7 +196,7 @@ mod test {
 	#[test]
 	fn lang_content() {
 		quote! {<style></style>}
-			.xmap(|t| tokenize_rstml_tokens(t, WorkspacePathBuf::new(file!())))
+			.xmap(|t| tokenize_rstml(t, WorkspacePathBuf::new(file!())))
 			.unwrap()
 			.to_string()
 			.xpect()
@@ -206,7 +208,7 @@ mod test {
 				.to_string(),
 			);
 		quote! {<style>foo</style>}
-			.xmap(|t| tokenize_rstml_tokens(t, WorkspacePathBuf::new(file!())))
+			.xmap(|t| tokenize_rstml(t, WorkspacePathBuf::new(file!())))
 			.unwrap()
 			.to_string()
 			.xpect()

@@ -2,8 +2,8 @@
 #![cfg_attr(test, test_runner(sweet::test_runner))]
 #![feature(proc_macro_span)]
 use beet_parse::prelude::*;
-use proc_macro::TokenStream;
 use beet_utils::prelude::*;
+use proc_macro::TokenStream;
 use syn::DeriveInput;
 use syn::ItemFn;
 use syn::parse_macro_input;
@@ -19,7 +19,7 @@ pub fn rsx(tokens: TokenStream) -> TokenStream {
 	// this method creates a new app for every rstml macro,
 	// we may find it faster to reuse a single app, although
 	// parallelism will still be tricky because tokens are non-send
-	tokenize_rstml_tokens(tokens.into(), source_file)
+	tokenize_rstml(tokens.into(), source_file)
 		.unwrap_or_else(err_tokens)
 		.into()
 }
@@ -33,7 +33,7 @@ pub fn rsx_template(_tokens: TokenStream) -> TokenStream { todo!() }
 #[proc_macro]
 pub fn rsx_tokens(tokens: TokenStream) -> TokenStream {
 	let source_file = source_file(&tokens);
-	rstml_to_token_tree(tokens.into(), source_file)
+	tokenize_rstml_tokens(tokens.into(), source_file)
 		.unwrap_or_else(err_tokens)
 		.into()
 }
