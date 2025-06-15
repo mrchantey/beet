@@ -15,9 +15,9 @@ pub struct BuildFileTemplates {
 	/// excludes 'target' and 'node_modules' directories by default
 	filter: GlobFilter,
 	/// The root directory for files including templates
-	root_dir: WorkspacePathBuf,
+	root_dir: WsPathBuf,
 	/// The location for the generated template scene file
-	scene_file: WorkspacePathBuf,
+	scene_file: WsPathBuf,
 }
 
 impl Default for BuildFileTemplates {
@@ -31,11 +31,11 @@ impl Default for BuildFileTemplates {
 				.with_exclude("*/target/*")
 				.with_exclude("*/.cache/*")
 				.with_exclude("*/node_modules/*"),
-			scene_file: WorkspacePathBuf::new("target/template_scene.ron"),
+			scene_file: WsPathBuf::new("target/template_scene.ron"),
 			#[cfg(test)]
-			root_dir: WorkspacePathBuf::new("crates/beet_router/src/test_site"),
+			root_dir: WsPathBuf::new("crates/beet_router/src/test_site"),
 			#[cfg(not(test))]
-			root_dir: WorkspacePathBuf::default(),
+			root_dir: WsPathBuf::default(),
 		}
 	}
 }
@@ -53,26 +53,26 @@ pub fn handle_changed_files(
 		.filter(|ev| {
 			builders.iter().any(|config| config.filter.passes(&ev.path))
 		}) {
-		let workspace_path = ev.path.workspace_rel()?;
+		let ws_path = ev.path.workspace_rel()?;
 
 		// remove existing TemplateFile entities and their children
 		for (entity, template_file) in query.iter() {
-			if template_file.path() == &workspace_path {
+			if template_file.path() == &ws_path {
 				commands.entity(entity).despawn();
 				tracing::debug!(
 					"Removed TemplateFile entity for changed file: {}",
-					workspace_path.display()
+					ws_path.display()
 				);
 			}
 			//  else {
 			// 	tracing::debug!(
 			// 		"no match:\n{}\n{}",
-			// 		workspace_path.display(),
+			// 		ws_path.display(),
 			// 		template_file.path().display()
 			// 	);
 			// }
 		}
-		commands.spawn(TemplateFile::new(workspace_path));
+		commands.spawn(TemplateFile::new(ws_path));
 	}
 	Ok(())
 }
@@ -147,14 +147,12 @@ pub(super) fn export_template_scene(
 
 
 impl BuildFileTemplates {
-	pub fn get_files(&self) -> Result<Vec<WorkspacePathBuf>> {
+	pub fn get_files(&self) -> Result<Vec<WsPathBuf>> {
 		ReadDir::files_recursive(&self.root_dir.into_abs())
 			.map_err(Error::File)?
 			.into_iter()
 			.filter(|path| self.filter.passes(path))
-			.map(|path| {
-				WorkspacePathBuf::new_cwd_rel(path).map_err(Error::File)
-			})
+			.map(|path| WsPathBuf::new_cwd_rel(path).map_err(Error::File))
 			.collect::<Result<Vec<_>>>()
 	}
 }

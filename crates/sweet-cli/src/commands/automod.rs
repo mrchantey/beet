@@ -375,11 +375,10 @@ mod test {
 
 	#[test]
 	fn insert_works() {
-		fn insert(workspace_path: impl AsRef<Path>) -> Result<String> {
-			let abs = AbsPathBuf::new(
-				FsExt::workspace_root().join(workspace_path.as_ref()),
-			)
-			.unwrap();
+		fn insert(ws_path: impl AsRef<Path>) -> Result<String> {
+			let abs =
+				AbsPathBuf::new(FsExt::workspace_root().join(ws_path.as_ref()))
+					.unwrap();
 			let file_meta = FileMeta::new(abs.as_ref())?;
 			let file = ReadFile::to_string(&file_meta.parent_mod)?;
 			let mut file = syn::parse_file(&file)?;
@@ -398,11 +397,10 @@ mod test {
 	}
 	#[test]
 	fn remove_works() {
-		fn remove(workspace_path: impl AsRef<Path>) -> Result<String> {
-			let abs = AbsPathBuf::new(
-				FsExt::workspace_root().join(workspace_path.as_ref()),
-			)
-			.unwrap();
+		fn remove(ws_path: impl AsRef<Path>) -> Result<String> {
+			let abs =
+				AbsPathBuf::new(FsExt::workspace_root().join(ws_path.as_ref()))
+					.unwrap();
 			let file_meta = FileMeta::new(abs.as_ref())?;
 			let file = ReadFile::to_string(&file_meta.parent_mod)?;
 			let mut file = syn::parse_file(&file)?;

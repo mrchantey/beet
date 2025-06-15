@@ -55,10 +55,10 @@ impl IntoCustomTokens for syn::Expr {
 	}
 }
 
-impl IntoCustomTokens for WorkspacePathBuf {
+impl IntoCustomTokens for WsPathBuf {
 	fn into_custom_tokens(&self, tokens: &mut TokenStream) {
 		let path = self.to_string_lossy();
-		tokens.extend(quote! { WorkspacePathBuf::new(#path) });
+		tokens.extend(quote! { WsPathBuf::new(#path) });
 	}
 }
 impl IntoCustomTokens for PathBuf {

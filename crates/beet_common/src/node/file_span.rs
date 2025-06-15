@@ -17,7 +17,7 @@ pub struct FileSpan {
 	/// Workspace relative path to the file, its essential to use consistent paths
 	/// as this struct is created in several places from all kinds concatenations,
 	/// and we need PartialEq & Hash to be identical.
-	file: WorkspacePathBuf,
+	file: WsPathBuf,
 	/// The position of the first token in this span
 	start: LineCol,
 	/// The position of the last token in this span, in cases where the end
@@ -34,7 +34,7 @@ impl std::fmt::Display for FileSpan {
 impl FileSpan {
 	#[cfg(feature = "tokens")]
 	pub fn new_from_span(
-		file: WorkspacePathBuf,
+		file: WsPathBuf,
 		spanned: &impl syn::spanned::Spanned,
 	) -> Self {
 		let span = spanned.span();
@@ -49,7 +49,7 @@ impl FileSpan {
 	/// the entire file, the line and column are set to 1 and 0 respectively.
 	pub fn new_for_file(file: impl AsRef<Path>) -> Self {
 		Self {
-			file: WorkspacePathBuf::new(file),
+			file: WsPathBuf::new(file),
 			start: LineCol::default(),
 			end: LineCol::default(),
 		}
@@ -61,7 +61,7 @@ impl FileSpan {
 		end: LineCol,
 	) -> Self {
 		Self {
-			file: WorkspacePathBuf::new(workspace_file_path),
+			file: WsPathBuf::new(workspace_file_path),
 			start,
 			end,
 		}
@@ -82,12 +82,12 @@ impl FileSpan {
 		col: u32,
 	) -> Self {
 		Self {
-			file: WorkspacePathBuf::new(workspace_file_path),
+			file: WsPathBuf::new(workspace_file_path),
 			start: LineCol::new(line, col),
 			end: LineCol::new(line, col),
 		}
 	}
-	pub fn file(&self) -> &WorkspacePathBuf { &self.file }
+	pub fn file(&self) -> &WsPathBuf { &self.file }
 	pub fn start(&self) -> LineCol { self.start }
 	pub fn start_line(&self) -> u32 { self.start.line() }
 	pub fn start_col(&self) -> u32 { self.start.col() }

@@ -16,7 +16,7 @@ use beet_utils::prelude::*;
 #[cfg_attr(feature = "tokens", derive(ToTokens))]
 pub enum LangContent {
 	InnerText(String),
-	File(WorkspacePathBuf),
+	File(WsPathBuf),
 }
 impl LangContent {
 	pub fn file(src: &str, span: &FileSpan) -> Self {
@@ -25,7 +25,7 @@ impl LangContent {
 			.parent()
 			.map(|parent| parent.join(src))
 			.unwrap_or(PathBuf::from(src));
-		Self::File(WorkspacePathBuf::new(path))
+		Self::File(WsPathBuf::new(path))
 	}
 
 	/// create a hash ignoring whitespace in the case of [`Self::InnerText`]

@@ -8,11 +8,12 @@ use std::str::FromStr;
 
 
 
-
-/// A newtype `PathBuf` with several indications:
+/// ## Workspace PathBuf
+/// A newtype with several indications:
 /// 1. the path is relative to the workspace root
 /// 2. the path is cleaned using [`path_clean`]
 /// 3. on windows backslashes are replaced by forward slashes
+///    - This is done to ensure exact matches because this type is often used across architectures.
 ///
 /// The path does **not** have to exist
 ///
@@ -20,20 +21,20 @@ use std::str::FromStr;
 ///
 /// ```rust
 /// # use beet_utils::prelude::*;
-/// let path = WorkspacePathBuf::new(file!());
+/// let path = WsPathBuf::new(file!());
 ///
 /// ```
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Default, Clone, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "bevy", derive(bevy::reflect::Reflect))]
-pub struct WorkspacePathBuf(
+pub struct WsPathBuf(
 	// TODO upstream Pathbuf Reflect
 	PathBuf,
 );
 
 
-impl WorkspacePathBuf {
-	/// Create a new [`WorkspacePathBuf`], a common use case is to use `file!()`
+impl WsPathBuf {
+	/// Create a new [`WsPathBuf`], a common use case is to use `file!()`
 	/// which is already relative to the workspace root.
 	pub fn new(path: impl AsRef<Path>) -> Self {
 		let path = path.as_ref();
@@ -61,7 +62,7 @@ impl WorkspacePathBuf {
 
 	pub fn take(self) -> PathBuf { self.0 }
 
-	/// Create a new [`WorkspacePathBuf`] from joining this one with
+	/// Create a new [`WsPathBuf`] from joining this one with
 	/// another [`Path`]
 	pub fn join(&self, path: impl AsRef<Path>) -> Self {
 		let path = self.0.join(path).clean();
@@ -80,7 +81,7 @@ impl WorkspacePathBuf {
 		AbsPathBuf::new(path)
 			.map_err(|err| {
 				anyhow::anyhow!(
-					"Failed to convert WorkspacePathBuf to AbsPathBuf: {}",
+					"Failed to convert WsPathBuf to AbsPathBuf: {}",
 					err
 				)
 			})
@@ -88,27 +89,27 @@ impl WorkspacePathBuf {
 	}
 }
 
-impl std::ops::Deref for WorkspacePathBuf {
+impl std::ops::Deref for WsPathBuf {
 	type Target = PathBuf;
 	fn deref(&self) -> &Self::Target { &self.0 }
 }
 
-impl std::ops::DerefMut for WorkspacePathBuf {
+impl std::ops::DerefMut for WsPathBuf {
 	fn deref_mut(&mut self) -> &mut Self::Target { &mut self.0 }
 }
 
-impl AsRef<Path> for WorkspacePathBuf {
+impl AsRef<Path> for WsPathBuf {
 	fn as_ref(&self) -> &Path { self.0.as_ref() }
 }
-impl FromStr for WorkspacePathBuf {
+impl FromStr for WsPathBuf {
 	type Err = anyhow::Error;
 	fn from_str(s: &str) -> Result<Self, Self::Err> { Ok(Self::new(s)) }
 }
-impl Into<WorkspacePathBuf> for &str {
-	fn into(self) -> WorkspacePathBuf { WorkspacePathBuf::new(self) }
+impl Into<WsPathBuf> for &str {
+	fn into(self) -> WsPathBuf { WsPathBuf::new(self) }
 }
-impl Into<WorkspacePathBuf> for PathBuf {
-	fn into(self) -> WorkspacePathBuf { WorkspacePathBuf::new(self) }
+impl Into<WsPathBuf> for PathBuf {
+	fn into(self) -> WsPathBuf { WsPathBuf::new(self) }
 }
 
 
@@ -120,11 +121,11 @@ mod test {
 	#[test]
 	fn works() {
 		assert_eq!(
-			WorkspacePathBuf::new("Cargo.toml").as_path(),
+			WsPathBuf::new("Cargo.toml").as_path(),
 			PathBuf::from("Cargo.toml").as_path()
 		);
 		assert_eq!(
-			WorkspacePathBuf::new("foo/../Cargo.toml").as_path(),
+			WsPathBuf::new("foo/../Cargo.toml").as_path(),
 			PathBuf::from("Cargo.toml").as_path()
 		);
 	}

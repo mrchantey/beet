@@ -8,12 +8,12 @@ use crate::prelude::*;
 // #[component(immutable)]
 #[require(FileExprHash)]
 pub struct TemplateFile {
-	path: WorkspacePathBuf,
+	path: WsPathBuf,
 }
 
 impl TemplateFile {
-	pub fn new(path: WorkspacePathBuf) -> Self { Self { path } }
-	pub fn path(&self) -> &WorkspacePathBuf { &self.path }
+	pub fn new(path: WsPathBuf) -> Self { Self { path } }
+	pub fn path(&self) -> &WsPathBuf { &self.path }
 }
 
 

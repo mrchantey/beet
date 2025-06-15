@@ -34,7 +34,7 @@ pub fn parse_route_file_md(
 			.into());
 		};
 
-		let default_path = WorkspacePathBuf::default().into_abs();
+		let default_path = WsPathBuf::default().into_abs();
 		let group_codegen_dir =
 			group_codegen.output.parent().unwrap_or(&default_path);
 

@@ -6,7 +6,7 @@ use proc_macro2::TokenStream;
 /// Parse rstml tokens into a *finalized* [`Bundle`], see [`tokenize_bundle`].
 pub fn tokenize_rstml(
 	tokens: TokenStream,
-	source_file: WorkspacePathBuf,
+	source_file: WsPathBuf,
 ) -> Result<TokenStream> {
 	TokensApp::with(|app| {
 		let entity = app
@@ -24,7 +24,7 @@ pub fn tokenize_rstml(
 /// Parse rstml tokens into a *tokenized* [`Bundle`], see [`tokenize_bundle_tokens`].
 pub fn tokenize_rstml_tokens(
 	tokens: TokenStream,
-	source_file: WorkspacePathBuf,
+	source_file: WsPathBuf,
 ) -> Result<TokenStream> {
 	TokensApp::with(|app| {
 		let entity = app

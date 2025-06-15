@@ -91,7 +91,7 @@ mod test {
 				<div/>
 			</span>
 		}
-		.xmap(|t| tokenize_rstml(t, WorkspacePathBuf::new(file!())))
+		.xmap(|t| tokenize_rstml(t, WsPathBuf::new(file!())))
 		.unwrap()
 		.to_string()
 		.xpect()
@@ -139,7 +139,7 @@ mod test {
 			<br/>
 			<br/>
 		}
-		.xmap(|t| tokenize_rstml(t, WorkspacePathBuf::new(file!())))
+		.xmap(|t| tokenize_rstml(t, WsPathBuf::new(file!())))
 		.unwrap()
 		.to_string()
 		.xpect()
@@ -165,7 +165,7 @@ mod test {
 	#[test]
 	fn blocks() {
 		quote! {{foo}}
-			.xmap(|t| tokenize_rstml(t, WorkspacePathBuf::new(file!())))
+			.xmap(|t| tokenize_rstml(t, WsPathBuf::new(file!())))
 			.unwrap()
 			.to_string()
 			.xpect()
@@ -180,7 +180,7 @@ mod test {
 	#[test]
 	fn attribute_blocks() {
 		quote! {<input hidden=val/>}
-			.xmap(|t| tokenize_rstml(t, WorkspacePathBuf::new(file!())))
+			.xmap(|t| tokenize_rstml(t, WsPathBuf::new(file!())))
 			.unwrap()
 			.to_string()
 			.xpect()
@@ -201,7 +201,7 @@ mod test {
 	#[test]
 	fn lang_content() {
 		quote! {<style></style>}
-			.xmap(|t| tokenize_rstml(t, WorkspacePathBuf::new(file!())))
+			.xmap(|t| tokenize_rstml(t, WsPathBuf::new(file!())))
 			.unwrap()
 			.to_string()
 			.xpect()
@@ -213,7 +213,7 @@ mod test {
 				.to_string(),
 			);
 		quote! {<style>foo</style>}
-			.xmap(|t| tokenize_rstml(t, WorkspacePathBuf::new(file!())))
+			.xmap(|t| tokenize_rstml(t, WsPathBuf::new(file!())))
 			.unwrap()
 			.to_string()
 			.xpect()

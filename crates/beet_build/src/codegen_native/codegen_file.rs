@@ -54,7 +54,7 @@ impl Default for CodegenFile {
 				#[allow(unused_imports)]
 				use beet::prelude::*;
 			)],
-			output: WorkspacePathBuf::new("src/codegen/mod.rs").into_abs(),
+			output: WsPathBuf::new("src/codegen/mod.rs").into_abs(),
 			pkg_name: None,
 			items: Default::default(),
 		}

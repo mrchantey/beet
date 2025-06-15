@@ -87,14 +87,14 @@ impl FileGroup {
 	#[cfg(test)]
 	pub fn test_site() -> Self {
 		Self::new(
-			WorkspacePathBuf::new("crates/beet_router/src/test_site")
+			WsPathBuf::new("crates/beet_router/src/test_site")
 				.into_abs(),
 		)
 	}
 	#[cfg(test)]
 	pub fn test_site_pages() -> Self {
 		Self::new(
-			WorkspacePathBuf::new("crates/beet_router/src/test_site/pages")
+			WsPathBuf::new("crates/beet_router/src/test_site/pages")
 				.into_abs(),
 		)
 		.with_filter(
@@ -106,7 +106,7 @@ impl FileGroup {
 	#[cfg(test)]
 	pub fn test_site_markdown() -> Self {
 		Self::new(
-			WorkspacePathBuf::new("crates/beet_router/src/test_site/test_docs")
+			WsPathBuf::new("crates/beet_router/src/test_site/test_docs")
 				.into_abs(),
 		)
 		.with_filter(GlobFilter::default().with_include("*.md"))

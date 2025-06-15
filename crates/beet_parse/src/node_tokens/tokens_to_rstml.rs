@@ -55,14 +55,14 @@ impl Default for RstmlConfig {
 	}
 }
 
-/// A [`WorkspacePathBuf`] representing the source file for the contents of
+/// A [`WsPathBuf`] representing the source file for the contents of
 /// this entity.
 // When we get Construct this should be a pointer to reduce needless string allocation
 #[derive(Debug, Clone, Component, Deref)]
-pub struct SourceFile(WorkspacePathBuf);
+pub struct SourceFile(WsPathBuf);
 
 impl SourceFile {
-	pub fn new(path: WorkspacePathBuf) -> Self { Self(path) }
+	pub fn new(path: WsPathBuf) -> Self { Self(path) }
 }
 
 /// A [`TokenStream`] representing [`rstml`] flavored rsx tokens.

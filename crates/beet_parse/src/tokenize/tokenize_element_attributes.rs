@@ -218,7 +218,7 @@ mod test {
 	}
 
 	fn parse(tokens: TokenStream) -> Matcher<String> {
-		tokenize_rstml(tokens, WorkspacePathBuf::new(file!()))
+		tokenize_rstml(tokens, WsPathBuf::new(file!()))
 			.unwrap()
 			.to_string()
 			.xpect()

@@ -1,5 +1,5 @@
-use bevy::prelude::*;
 use beet_utils::prelude::*;
+use bevy::prelude::*;
 
 
 /// Used to reconcile [`BundleTokens`] with their corresponding template
@@ -8,7 +8,7 @@ use beet_utils::prelude::*;
 #[reflect(Component)]
 pub struct TemplateKey {
 	/// The source file containing the template.
-	pub file: WorkspacePathBuf,
+	pub file: WsPathBuf,
 	/// The index of the template in the file.
 	/// - For md and rsx files this is always 0 as they only have one template.
 	/// - For rust files this is the top-down appearance of the `rsx!` macro.
@@ -16,7 +16,5 @@ pub struct TemplateKey {
 }
 impl TemplateKey {
 	/// Create a new [`TemplateKey`] from a file and index.
-	pub fn new(file: WorkspacePathBuf, index: usize) -> Self {
-		Self { file, index }
-	}
+	pub fn new(file: WsPathBuf, index: usize) -> Self { Self { file, index } }
 }

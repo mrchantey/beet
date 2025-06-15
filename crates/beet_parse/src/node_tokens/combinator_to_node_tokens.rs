@@ -30,7 +30,7 @@ fn combinator_to_node_tokens(
 	>,
 ) -> bevy::prelude::Result {
 	for (entity, tokens, source_file) in query.iter() {
-		let default_source_file = WorkspacePathBuf::default();
+		let default_source_file = WsPathBuf::default();
 		Builder {
 			verbatim_tags: &["script", "style", "code"],
 			source_file: source_file.map_or(&default_source_file, |sf| &sf),
@@ -47,7 +47,7 @@ fn combinator_to_node_tokens(
 /// For a given string of rsx, use [`beet_rsx_combinator`] to parse.
 struct Builder<'w, 's, 'a> {
 	verbatim_tags: &'a [&'a str],
-	source_file: &'a WorkspacePathBuf,
+	source_file: &'a WsPathBuf,
 	rusty_tracker: RustyTrackerBuilder,
 	commands: &'a mut Commands<'w, 's>,
 }
@@ -294,7 +294,7 @@ mod test {
 	use sweet::prelude::*;
 
 	fn parse(str: &str) -> Matcher<String> {
-		tokenize_combinator(str, WorkspacePathBuf::new(file!()))
+		tokenize_combinator(str, WsPathBuf::new(file!()))
 			.unwrap()
 			.to_string()
 			.xpect()

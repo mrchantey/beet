@@ -53,14 +53,11 @@ impl ContentSourceKey {
 	/// ```
 	///
 	pub fn local_db_path<E: Model>(&self, embedding_model: &E) -> AbsPathBuf {
-		WorkspacePathBuf::default()
-			.into_abs()
-			.unwrap()
-			.join(format!(
-				".cache/databases/{}/{}.db",
-				embedding_model.model_name(),
-				self,
-			))
+		WsPathBuf::default().into_abs().unwrap().join(format!(
+			".cache/databases/{}/{}.db",
+			embedding_model.model_name(),
+			self,
+		))
 	}
 }
 
@@ -101,7 +98,7 @@ impl ContentSource {
 			.and_then(|s| s.to_str())
 			.unwrap_or("unknown_repo");
 
-		WorkspacePathBuf::default()
+		WsPathBuf::default()
 			.into_abs()
 			.unwrap()
 			.join(format!(".cache/repositories/{}/{}", author, repo_name))

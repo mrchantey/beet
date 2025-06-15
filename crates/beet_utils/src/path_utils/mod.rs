@@ -1,7 +1,7 @@
 mod path_ext;
-mod workspace_path_buf;
+mod ws_path_buf;
 pub use path_ext::*;
-pub use workspace_path_buf::*;
+pub use ws_path_buf::*;
 mod fs_error;
 pub use fs_error::*;
 mod fs_ext;

@@ -80,7 +80,7 @@ impl BacktraceLocation {
 	pub fn stack_line_string(&self, cwd_root: &Path) -> String {
 		let prefix = String::from("at").faint();
 
-		let workspace_path = self
+		let ws_path = self
 			.cwd_path
 			.strip_prefix(&cwd_root)
 			.unwrap_or(&self.cwd_path)
@@ -90,7 +90,7 @@ impl BacktraceLocation {
 		let line_loc =
 			String::from(format!(":{}:{}", self.line_no, self.col_no)).faint();
 
-		format!("{} {}{}", prefix, workspace_path, line_loc)
+		format!("{} {}{}", prefix, ws_path, line_loc)
 	}
 
 	/// Number of lines before and after the panic of the file to load

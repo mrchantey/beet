@@ -2,7 +2,7 @@ use super::FsError;
 use super::FsExt;
 use super::FsResult;
 use super::PathExt;
-use crate::prelude::WorkspacePathBuf;
+use crate::prelude::WsPathBuf;
 use crate::utils::PipelineTarget;
 use path_clean::PathClean;
 use std::path::Path;
@@ -128,10 +128,10 @@ impl AbsPathBuf {
 		Self(path)
 	}
 
-	pub fn workspace_rel(&self) -> FsResult<WorkspacePathBuf> {
+	pub fn workspace_rel(&self) -> FsResult<WsPathBuf> {
 		// Strip the workspace root from the path
 		let path = PathExt::strip_prefix(&self.0, &FsExt::workspace_root())?;
-		Ok(WorkspacePathBuf::new(path))
+		Ok(WsPathBuf::new(path))
 	}
 }
 impl FromStr for AbsPathBuf {

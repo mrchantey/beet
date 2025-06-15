@@ -122,6 +122,7 @@ mod test {
 	#[should_panic]
 	fn default() {
 		// Suppress panic output to stderr
+		#[cfg(not(target_arch = "wasm32"))]
 		std::panic::set_hook(Box::new(|_| {}));
 		App::new().add_systems(Update, |_res: Res<Foo>| {}).run();
 	}
@@ -130,6 +131,7 @@ mod test {
 	#[should_panic]
 	fn panics() {
 		// Suppress panic output to stderr
+		#[cfg(not(target_arch = "wasm32"))]
 		std::panic::set_hook(Box::new(|_| {}));
 
 		App::new()

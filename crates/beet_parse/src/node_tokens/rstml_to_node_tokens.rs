@@ -68,7 +68,7 @@ fn rstml_to_node_tokens(
 
 
 struct RstmlToWorld<'w, 's, 'a> {
-	file: &'a WorkspacePathBuf,
+	file: &'a WsPathBuf,
 	rstml_config: &'a RstmlConfig,
 	collected_elements: &'a mut CollectedElements,
 	diagnostics: Mut<'a, TokensDiagnostics>,
@@ -434,7 +434,7 @@ mod test {
 			.add_plugins((tokens_to_rstml_plugin, rstml_to_node_tokens_plugin))
 			.xtap(|app| {
 				app.world_mut().spawn((
-					SourceFile::new(WorkspacePathBuf::new(file!())),
+					SourceFile::new(WsPathBuf::new(file!())),
 					RstmlTokens::new(tokens),
 				));
 			})

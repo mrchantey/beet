@@ -27,7 +27,7 @@ pub struct FsApp {
 
 impl Default for FsApp {
 	fn default() -> Self {
-		// let templates_root_dir = WorkspacePathBuf::default();
+		// let templates_root_dir = WsPathBuf::default();
 
 		Self {
 			watcher: FsWatcher {
@@ -50,7 +50,7 @@ impl FsApp {
 	pub fn runner(self) -> impl AsyncFnOnce(App) -> AppExit + 'static {
 		async |mut app| {
 			app.init();
-			
+
 			if let Err(err) =
 				Self::on_change(&mut app, WatchEventVec::default())
 			{

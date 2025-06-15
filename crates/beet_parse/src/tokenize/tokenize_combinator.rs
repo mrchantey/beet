@@ -6,7 +6,7 @@ use proc_macro2::TokenStream;
 /// Parse combinator string into a *finalized* [`Bundle`], see [`tokenize_bundle`].
 pub fn tokenize_combinator(
 	tokens: &str,
-	source_file: WorkspacePathBuf,
+	source_file: WsPathBuf,
 ) -> Result<TokenStream> {
 	TokensApp::with(|app| {
 		let entity = app
@@ -26,7 +26,7 @@ pub fn tokenize_combinator(
 /// Parse combinator string into a *tokenized* [`Bundle`], see [`tokenize_bundle_tokens`].
 pub fn tokenize_combinator_tokens(
 	tokens: &str,
-	source_file: WorkspacePathBuf,
+	source_file: WsPathBuf,
 ) -> Result<TokenStream> {
 	TokensApp::with(|app| {
 		let entity = app

@@ -1,8 +1,8 @@
 use crate::prelude::*;
 use beet_common::prelude::*;
 use beet_parse::prelude::*;
-use bevy::prelude::*;
 use beet_utils::prelude::*;
+use bevy::prelude::*;
 use syn::visit::Visit;
 
 
@@ -42,7 +42,7 @@ struct RsxSynVisitor<'a, 'w, 's> {
 	/// Used for creating [`FileSpan`] in several places.
 	/// We must use workspace relative paths because locations are created
 	/// via the `file!()` macro.
-	file: &'a WorkspacePathBuf,
+	file: &'a WsPathBuf,
 	macros: &'a TemplateMacros,
 	/// the index used for building the [`TemplateKey`].
 	index: usize,

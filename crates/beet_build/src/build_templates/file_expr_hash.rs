@@ -106,9 +106,9 @@ pub fn update_file_expr_hash(
 #[cfg(test)]
 mod test {
 	use crate::as_beet::*;
+	use beet_utils::prelude::*;
 	use bevy::prelude::*;
 	use sweet::prelude::*;
-	use beet_utils::prelude::*;
 
 	fn hash(bundle: impl Bundle) -> u64 {
 		let mut app = App::new();
@@ -117,7 +117,7 @@ mod test {
 		let entity = app
 			.world_mut()
 			.spawn((
-				TemplateFile::new(WorkspacePathBuf::new(file!())),
+				TemplateFile::new(WsPathBuf::new(file!())),
 				related! {TemplateRoots[related!{TemplateRoot[bundle]}]},
 			))
 			.id();

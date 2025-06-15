@@ -74,14 +74,14 @@ mod test {
 	use beet_utils::prelude::*;
 
 	fn parse_rstml(tokens: TokenStream) -> Matcher<String> {
-		tokenize_rstml_tokens(tokens, WorkspacePathBuf::new(file!()))
+		tokenize_rstml_tokens(tokens, WsPathBuf::new(file!()))
 			.unwrap()
 			.to_string()
 			.xpect()
 	}
 
 	fn parse_combinator(tokens: &str) -> Matcher<String> {
-		tokenize_combinator_tokens(tokens, WorkspacePathBuf::new(file!()))
+		tokenize_combinator_tokens(tokens, WsPathBuf::new(file!()))
 			.unwrap()
 			.to_string().replace(" ", "")
 			.xpect()

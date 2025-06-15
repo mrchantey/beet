@@ -96,12 +96,12 @@ fn err_tokens(err: impl ToString) -> proc_macro2::TokenStream {
 /// For a token stream create the [`FileSpan`] using its location.
 /// we'll get this from proc_macro2::Span::source_file, when this issue resolves:
 /// https://github.com/dtolnay/proc-macro2/issues/499
-fn source_file(tokens: &proc_macro::TokenStream) -> WorkspacePathBuf {
+fn source_file(tokens: &proc_macro::TokenStream) -> WsPathBuf {
 	// cloning is cheap, its an immutable arc
 	tokens
 		.clone()
 		.into_iter()
 		.next()
-		.map(|token| WorkspacePathBuf::new(token.span().file()))
+		.map(|token| WsPathBuf::new(token.span().file()))
 		.unwrap_or_default()
 }
