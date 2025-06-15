@@ -29,15 +29,17 @@ pub fn derive_to_tokens(
 ///
 /// ```rust ignore
 /// #[derive(Sendit)]
+/// #[sendit(derive(Clone))]
 /// struct Foo{
 /// 	// some non-send field
 ///   bar: RefCell<String>,
 /// }
 ///
 /// /*
-/// struct FooSend(pub send_wrapper::SendWrapper<Foo>);
+/// The above will generate the following code:
+/// #[derive(Clone)]
+/// struct FooSendit(pub send_wrapper::SendWrapper<Foo>);
 /// */
-///
 /// ```
 #[proc_macro_derive(Sendit, attributes(sendit))]
 pub fn derive_sendit(

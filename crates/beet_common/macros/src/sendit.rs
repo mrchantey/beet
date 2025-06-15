@@ -18,7 +18,7 @@ fn parse(input: DeriveInput) -> syn::Result<TokenStream> {
 		input.generics.split_for_impl();
 	let vis = &input.vis;
 	let input_ident = &input.ident;
-	let ident = format_ident!("{}Send", input.ident);
+	let ident = format_ident!("{}Sendit", input.ident);
 
 	// Extract sendit attributes and convert them
 	let sendit_attrs: Vec<TokenStream> = input

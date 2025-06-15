@@ -1,8 +1,8 @@
 use beet_common::as_beet::*;
 
 fn main() {
-	let foo = FooSend::new(Foo { _inner: true });
-	let _bar: FooSend<bool> = foo.clone();
+	let foo = FooSendit::new(Foo { _inner: true });
+	let _bar: FooSendit<bool> = foo.clone();
 }
 #[derive(Sendit, Clone)]
 #[sendit(derive(Clone))]

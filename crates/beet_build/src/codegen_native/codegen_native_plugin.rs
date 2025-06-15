@@ -29,23 +29,27 @@ impl Plugin for CodegenNativePlugin {
 			.configure_sets(
 				Update,
 				(
-					ImportTemplateStep.before(ImportNodesStep),
-					ProcessTemplateStep
+					ImportCodegenNativeStep.before(ImportNodesStep),
+					ProcessCodegenNativeStep
 						.after(ExportNodesStep)
-						.after(ImportTemplateStep),
-					ExportTemplateStep.after(ProcessTemplateStep),
+						.after(ImportCodegenNativeStep),
+					ExportCodegenNativeStep.after(ProcessCodegenNativeStep),
 				),
 			)
 			.add_systems(
 				Update,
 				(
-					spawn_route_files,
-					parse_route_file_rust,
-					// (parse_route_file_rust, parse_route_file_markdown),
-					modify_file_route_tokens,
-				)
-					.chain()
-					.in_set(ImportCodegenNativeStep),
+					(
+						spawn_route_files,
+						(parse_route_file_rs, parse_route_file_md),
+						modify_file_route_tokens,
+					)
+						.chain()
+						.in_set(ImportCodegenNativeStep),
+					(markdown_route_codegen, combinator_route_codegen)
+						.chain()
+						.in_set(ProcessCodegenNativeStep),
+				),
 			);
 	}
 }

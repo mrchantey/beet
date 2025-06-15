@@ -1,4 +1,5 @@
 use bevy::ecs::query::QueryData;
+use bevy::ecs::query::QueryFilter;
 use bevy::prelude::*;
 use extend::ext;
 
@@ -21,10 +22,23 @@ impl IntoWorld for App {
 pub impl<W: IntoWorld> W {
 	/// Shorthand for creating a query and immediatly collecting it into a Vec.
 	/// This is less efficient than caching the [`QueryState`] so should only be
-	/// used for one-off queries, otherwise `world.query::<D>()` should be preferred.
+	/// used for one-off queries, otherwise [`World::query`] should be preferred.
 	fn query_once<'a, D: QueryData>(&'a mut self) -> Vec<D::Item<'a>> {
 		let world = self.into_world_mut();
 		world.query::<D>().iter_mut(world).collect::<Vec<_>>()
+	}
+
+	/// Shorthand for creating a query and immediatly collecting it into a Vec.
+	/// This is less efficient than caching the [`QueryState`] so should only be
+	/// used for one-off queries, otherwise [`World::query_filtered`] should be preferred.
+	fn query_filtered_once<'a, D: QueryData, F: QueryFilter>(
+		&'a mut self,
+	) -> Vec<D::Item<'a>> {
+		let world = self.into_world_mut();
+		world
+			.query_filtered::<D, F>()
+			.iter_mut(world)
+			.collect::<Vec<_>>()
 	}
 
 	/// Shorthand for removing all components of a given type.

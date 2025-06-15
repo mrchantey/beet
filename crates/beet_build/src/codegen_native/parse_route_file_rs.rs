@@ -9,7 +9,7 @@ use syn::Visibility;
 
 
 
-pub fn parse_route_file_rust(
+pub fn parse_route_file_rs(
 	mut commands: Commands,
 	query: Populated<(Entity, &RouteFile), Added<RouteFile>>,
 ) -> Result<()> {
@@ -82,10 +82,7 @@ mod test {
 
 		let group = world.spawn(FileGroup::test_site_pages()).id();
 		world.run_system_once(spawn_route_files).unwrap().unwrap();
-		world
-			.run_system_once(parse_route_file_rust)
-			.unwrap()
-			.unwrap();
+		world.run_system_once(parse_route_file_rs).unwrap().unwrap();
 		let file = world.entity(group).get::<Children>().unwrap()[0];
 		let route = world.entity(file).get::<Children>().unwrap()[0];
 		let route_method = world

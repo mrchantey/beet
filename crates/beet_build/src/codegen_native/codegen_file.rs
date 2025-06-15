@@ -1,13 +1,14 @@
 use crate::prelude::*;
 use anyhow::Result;
 use beet_common::as_beet::*;
+use beet_parse::exports::SendWrapper;
 use beet_utils::prelude::*;
+use bevy::prelude::*;
 use serde::Deserialize;
 use serde::Serialize;
 use std::path::Path;
 use syn::Expr;
 use syn::Item;
-use bevy::prelude::*;
 
 
 /// Every codegen file is created via this struct. It contains
@@ -32,6 +33,9 @@ pub struct CodegenFile {
 	pub items: Vec<Item>,
 }
 
+impl Default for CodegenFileSendit {
+	fn default() -> Self { Self(SendWrapper::new(CodegenFile::default())) }
+}
 
 impl Default for CodegenFile {
 	fn default() -> Self {

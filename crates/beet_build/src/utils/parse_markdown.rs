@@ -50,25 +50,25 @@ impl ParseMarkdown {
 	/// wrapped in parentheses as a requirement of the `ron` parser
 	pub fn markdown_to_frontmatter_tokens<'a>(
 		markdown: &'a str,
-	) -> Result<Block> {
+	) -> Result<Option<Block>> {
 		let frontmatter = Self::extract_frontmatter_string(markdown);
 		// frontmatter
 		let tokens = match frontmatter {
+			// pluses indicates toml, ie foo = "bar"
 			Some((frontmatter, MetadataBlockKind::PlusesStyle)) => {
 				let frontmatter = frontmatter.to_string();
-				syn::parse_quote!({
+				Some(syn::parse_quote!({
 					beet::exports::toml::from_str(#frontmatter)
-				})
+				}))
 			}
+			// minus indicates yaml, ie foo: "bar"
 			Some((frontmatter, MetadataBlockKind::YamlStyle)) => {
 				let frontmatter = Self::yaml_frontmatter_to_ron(&frontmatter)?;
-				syn::parse_quote!({
+				Some(syn::parse_quote!({
 					beet::exports::ron::from_str(#frontmatter)
-				})
+				}))
 			}
-			None => {
-				syn::parse_quote!({ Default::default() })
-			}
+			None => None,
 		};
 		Ok(tokens)
 	}

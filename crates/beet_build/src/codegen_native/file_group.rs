@@ -32,6 +32,7 @@ impl FileGroupConfig {
 #[derive(
 	Debug, Default, PartialEq, Clone, Parser, Serialize, Deserialize, Component,
 )]
+#[require(CodegenFileSendit)]
 pub struct FileGroup {
 	/// Setting this will include the file group in the route tree,
 	/// defaults to `false`.

@@ -5,6 +5,7 @@ pub mod path_utils;
 pub mod utils;
 pub mod arena;
 pub mod prelude {
+	pub use crate::dir;
 	pub use crate::abs_file;
 	pub use crate::extensions::*;
 	pub use crate::path_utils::*;

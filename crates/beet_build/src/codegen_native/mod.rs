@@ -12,7 +12,9 @@
 //! ├── RouteFile
 //! ```
 //!
+mod combinator_route_codegen;
 mod parse_route_file_md;
+pub use combinator_route_codegen::*;
 pub use parse_route_file_md::*;
 mod parse_route_file_rs;
 pub use parse_route_file_rs::*;
