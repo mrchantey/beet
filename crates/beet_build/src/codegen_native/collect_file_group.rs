@@ -55,7 +55,7 @@ pub fn collect_file_group(
 			}
 		});
 		codegen_file.add_item::<ItemFn>(parse_quote! {
-			pub fn router_plugin(router: Router<#state_ty>)-> Router<#state_ty> {
+			pub fn router_plugin(router: beet::exports::axum::Router<#state_ty>)-> beet::exports::axum::Router<#state_ty> {
 				#(router = beet_route(router, #route_handlers);)*
 				router
 			}
@@ -87,6 +87,7 @@ mod test {
 			.to_token_stream()
 			.to_string();
 		// println!("{codegen}");
+		expect(&codegen).to_contain("use crate as test_site");
 		expect(&codegen).to_contain(
 			"pub fn route_infos () -> Vec < RouteInfo > { vec ! [RouteInfo {",
 		);

@@ -36,6 +36,9 @@ impl FileGroupConfig {
 #[sendit(derive(Component))]
 #[sendit(require(CodegenFileSendit))]
 pub struct FileGroup {
+	/// Passed to [`CodegenFile::pkg_name`]
+	#[serde(rename = "package_name")]
+	pub pkg_name: Option<String>,
 	/// The directory where the files are located.
 	#[serde(rename = "path")]
 	pub src: AbsPathBuf,
@@ -54,6 +57,7 @@ fn default_meta_type() -> syn::Type { syn::parse_str("()").unwrap() }
 impl Default for FileGroup {
 	fn default() -> Self {
 		Self {
+			pkg_name: None,
 			src: AbsPathBuf::default(),
 			filter: GlobFilter::default(),
 			meta_type: default_meta_type(),
@@ -109,6 +113,7 @@ impl FileGroup {
 				)
 				.into_abs(),
 			)
+			.with_pkg_name("test_site")
 			.sendit(),
 		)
 	}
@@ -131,6 +136,7 @@ impl FileGroup {
 				)
 				.into_abs(),
 			)
+			.with_pkg_name("test_site")
 			.sendit(),
 		)
 	}
@@ -149,6 +155,7 @@ impl FileGroup {
 				)
 				.into_abs(),
 			)
+			.with_pkg_name("test_site")
 			.sendit(),
 		)
 	}

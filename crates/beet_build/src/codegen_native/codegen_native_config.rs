@@ -16,6 +16,7 @@ use serde::Serialize;
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct CodegenNativeConfig {
 	/// The name of the package being built, used for imports in codegen.
+	/// This will be applied to each [`FileGroup::pkg_name`] if it is None.
 	#[serde(rename = "package_name")]
 	pub pkg_name: String,
 	#[serde(default = "default_src_path")]
@@ -55,7 +56,10 @@ impl NonSendPlugin for CodegenNativeConfig {
 		self.try_append_default_groups();
 
 		let mut root = app.world_mut().spawn_empty();
-		for group in self.file_groups {
+		for mut group in self.file_groups {
+			if group.codegen.pkg_name.is_none() {
+				group.codegen.pkg_name = Some(self.pkg_name.clone());
+			}
 			root.with_child(group.into_bundle());
 		}
 	}
