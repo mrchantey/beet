@@ -9,6 +9,8 @@ pub fn extract_web_directives_plugin(app: &mut App) {
 		extract_directive_plugin::<HtmlHoistDirective>,
 		extract_directive_plugin::<ClientLoadDirective>,
 		extract_directive_plugin::<ClientOnlyDirective>,
+		extract_directive_plugin::<StyleScope>,
+		extract_directive_plugin::<StyleCascade>,
 	))
 	.add_systems(Update, extract_lang_content.in_set(ExtractDirectivesSet));
 }
@@ -88,7 +90,7 @@ impl TemplateDirective for ClientOnlyDirective {
 #[cfg_attr(feature = "tokens", derive(ToTokens))]
 pub struct TemplateSerde {
 	/// Store the [`std::any::type_name`] of the value that was serialized,
-	/// for generating via codegen. 
+	/// for generating via codegen.
 	// This approach is quite fickle, ie all
 	// module paths must be public and its not the intended purpose of typename.
 	// We may be able to better with bevy_reflect

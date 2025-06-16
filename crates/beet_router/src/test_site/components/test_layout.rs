@@ -1,15 +1,11 @@
 use beet_template::as_beet::*;
 
-#[derive(derive_template)]
-pub struct PageLayout {
-	pub title: String,
-}
-
-fn page_layout(props: PageLayout) -> WebNode {
+#[template]
+fn PageLayout(title: String) -> impl Bundle {
 	rsx! {
 		<html>
 			<div>
-				<h1>{props.title}</h1>
+				<h1>{title}</h1>
 				<slot />
 			</div>
 			<style>

@@ -38,7 +38,7 @@ pub fn maybe_tuple(items: Vec<TokenStream>) -> TokenStream {
 		items.into_iter().next().unwrap()
 	} else {
 		// so far this is fine because attributes and children
-		// are relationships 
+		// are relationships
 		// if we end up with more than 12 items
 		// we can use SpawnEffect
 		quote! { (#(#items),*) }
@@ -73,6 +73,8 @@ tokenize_maybe_spanned!(
 	HtmlHoistDirective,
 	ClientLoadDirective,
 	ClientOnlyDirective,
+	StyleScope,
+	StyleCascade,
 	LangContent
 );
 

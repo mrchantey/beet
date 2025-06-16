@@ -13,29 +13,31 @@ file_group_routes = ["beet_design_mockups"]
 foo = true
 
 
-[[file_group]]
+[[codegen_native.file_group]]
+package_name = "beet_router"
 name = "test_site_pages"
 path = "crates/beet_router/src/test_site/pages"
 output = "crates/beet_router/src/test_site/codegen/pages.rs"
 include = ["*.rs"]
 exclude = ["*mod.rs"]
-package_name = "beet_router"
 import_tokens = ["use crate::as_beet::*;"]
 
 
-[[file_group]]
-name = "beet_design_mockups"
-# preset = "mockup"
-package_name = "beet_design"
-path = "crates/beet_design/src"
-output = "crates/beet_design/src/codegen/mockups.rs"
-include = ["*.mockup.*"]
-base_route = "/design"
-replace_route = [{ from = ".mockup", to = "" }]
-import_tokens = [
-	"#[allow(unused_imports)]use beet::prelude::*;",
-	"use beet_router::as_beet::*;",
-]
+
+# example of how to perform codegen for a workspace crate
+# [[codegen_native.file_group]]
+# name = "beet_design_mockups"
+# # preset = "mockup"
+# package_name = "beet_design"
+# path = "crates/beet_design/src"
+# output = "crates/beet_design/src/codegen/mockups.rs"
+# include = ["*.mockup.*"]
+# base_route = "/design"
+# replace_route = [{ from = ".mockup", to = "" }]
+# import_tokens = [
+# 	"#[allow(unused_imports)]use beet::prelude::*;",
+# 	"use beet_router::as_beet::*;",
+# ]
 
 
 # [wasm]

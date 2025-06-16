@@ -1,5 +1,5 @@
-mod bert;
-pub use self::bert::*;
+mod bert_asset;
+pub use self::bert_asset::*;
 mod bert_config;
 pub use self::bert_config::*;
 mod bert_loader;

@@ -13,15 +13,17 @@ pub mod exports {
 	pub use http;
 }
 
-/// expose prelude and as beet for macros
+/// Internal use only
 pub mod as_beet {
 	pub use beet::prelude::*;
+	pub use bevy::prelude::*;
 	pub mod beet {
 		pub use crate as router;
 		pub use beet_template as template;
 		pub mod prelude {
 			pub use crate::prelude::*;
 			pub use beet_common::prelude::*;
+			pub use beet_net::prelude::*;
 			pub use beet_template::prelude::*;
 		}
 		pub mod exports {

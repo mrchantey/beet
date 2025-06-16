@@ -26,16 +26,17 @@ pub mod exports {
 // rsx macros expect 'beet'
 // so import this
 // `use beet_template::as_beet::*;`
-// only for internal examples
 // #[cfg(debug_assertions)]
+/// Internal use only
 pub mod as_beet {
 	pub use beet::prelude::*;
+	pub use bevy::prelude::*;
 	pub mod beet {
 		pub use crate as rsx;
 		pub mod prelude {
 			pub use crate::prelude::*;
-			pub use beet_common::prelude::*;
 			pub use beet_bevy::prelude::*;
+			pub use beet_common::prelude::*;
 			pub use beet_utils::prelude::*;
 		}
 		pub mod exports {
