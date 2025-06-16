@@ -13,7 +13,7 @@ use bevy::prelude::*;
 pub struct CombinatorTokens(pub String);
 impl CombinatorTokens {
 	/// Create a new [`CombinatorTokens`] from a string.
-	pub fn new(tokens: &str) -> Self { Self(tokens.to_string()) }
+	pub fn new(tokens: impl Into<String>) -> Self { Self(tokens.into()) }
 }
 
 pub fn combinator_to_node_tokens_plugin(app: &mut App) {
@@ -307,6 +307,22 @@ mod test {
 				NodeTag(String::from("br")),
 				ElementNode{self_closing:true}
 			)}}
+			.to_string(),
+		);
+	}
+	#[test]
+	fn fragment() {
+		"<br/><br/>".xmap(parse).to_be(
+			quote! {(
+				FragmentNode,
+				children![(
+					NodeTag(String::from("br")),
+					ElementNode{self_closing:true}
+				), (
+					NodeTag(String::from("br")),
+					ElementNode{self_closing:true}
+				)]
+			)}
 			.to_string(),
 		);
 	}

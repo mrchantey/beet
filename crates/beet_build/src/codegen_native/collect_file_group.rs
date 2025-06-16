@@ -120,6 +120,6 @@ mod test {
 		);
 		expect(&codegen).to_contain("mod route0 ;");
 		expect(&codegen)
-			.to_contain("router = beet_route (router , route0 :: get) ;");
+			.to_contain("router = self . add_route (router , route0 :: get)");
 	}
 }

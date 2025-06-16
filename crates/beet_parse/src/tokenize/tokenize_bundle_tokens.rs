@@ -179,6 +179,7 @@ mod test {
 	#[test]
 	fn combinator() {
 		parse_combinator(r#"
+			<br/>
 			<br 
 				hidden
 				class="foo"
@@ -187,22 +188,24 @@ mod test {
 			/>
 		"#).to_be(
 			quote! {
-				related ! { 
-					Children [{ 
-						(
-							NodeTag (String :: from ("br")), 
-							ElementNode { self_closing : true }, 
-							related ! { 
-								Attributes [
-									AttributeKeyExpr (SendWrapper::new(syn::parse_quote!("hidden"))), 
-									(AttributeKeyExpr (SendWrapper::new(syn::parse_quote!("class"))), AttributeValueExpr (SendWrapper::new(syn::parse_quote!("foo")))), 
-									(AttributeKeyExpr (SendWrapper::new(syn::parse_quote!("onmousemove"))), AttributeValueExpr (SendWrapper::new(syn::parse_quote!("some_js_func")))), 
-									(AttributeKeyExpr (SendWrapper::new(syn::parse_quote!("onclick"))), {|_:Trigger<OnClick>| { } })
-								]
-							}
-						)
-					}]
-				}
+				(FragmentNode, children![ 
+					(
+						NodeTag (String :: from ("br")), 
+						ElementNode { self_closing : true }
+					),
+					(
+						NodeTag (String :: from ("br")), 
+						ElementNode { self_closing : true }, 
+						related ! { 
+							Attributes [
+								AttributeKeyExpr (SendWrapper::new(syn::parse_quote!("hidden"))), 
+								(AttributeKeyExpr (SendWrapper::new(syn::parse_quote!("class"))), AttributeValueExpr (SendWrapper::new(syn::parse_quote!("foo")))), 
+								(AttributeKeyExpr (SendWrapper::new(syn::parse_quote!("onmousemove"))), AttributeValueExpr (SendWrapper::new(syn::parse_quote!("some_js_func")))), 
+								(AttributeKeyExpr (SendWrapper::new(syn::parse_quote!("onclick"))), {|_:Trigger<OnClick>| { } })
+							]
+						}
+					)
+				])
 			}
 			.to_string().replace(" ", ""),
 		);
