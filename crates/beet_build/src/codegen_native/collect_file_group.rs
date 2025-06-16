@@ -23,7 +23,7 @@ pub fn collect_file_group(
 	for (mut codegen_file, file_group, file_group_children) in query.iter_mut()
 	{
 		let mut route_infos = Vec::<&RouteInfo>::new();
-		let mut route_handlers = Vec::<syn::Path>::new();
+		let mut route_handlers = Vec::<syn::Expr>::new();
 
 		for (route_file, route_file_children) in file_group_children
 			.iter()
@@ -41,8 +41,9 @@ pub fn collect_file_group(
 					"{}",
 					method.route_info.method.to_string().to_lowercase()
 				);
+				let route_info = &method.route_info.self_token_stream();
 				route_handlers.push(parse_quote!(
-					#mod_ident::#http_method
+					(#route_info, #mod_ident::#http_method)
 				));
 			}
 		}
