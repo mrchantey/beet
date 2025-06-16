@@ -37,6 +37,10 @@ pub fn maybe_tuple(items: Vec<TokenStream>) -> TokenStream {
 	} else if items.len() == 1 {
 		items.into_iter().next().unwrap()
 	} else {
+		// so far this is fine because attributes and children
+		// are relationships 
+		// if we end up with more than 12 items
+		// we can use the tokenize_related strategy
 		quote! { (#(#items),*) }
 	}
 }

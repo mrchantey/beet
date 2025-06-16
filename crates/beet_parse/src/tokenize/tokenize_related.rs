@@ -31,11 +31,22 @@ pub fn flatten_fragment(
 			.into_iter()
 			.map(|child| map_child(world, child))
 			.collect::<Result<Vec<_>>>()?;
-		Ok(quote! { (
-			FragmentNode,
-			children![#(#children),*])
-			// related!{Children,[#(#children),*]})
-		})
+
+		if children.len() <= MAX_BUNDLE_TUPLE {
+			Ok(quote! { (
+				FragmentNode,
+				children![#(#children),*])
+			})
+		} else {
+			Ok(quote! {
+				(
+					FragmentNode,
+					spawn_with::<Children,_>(|parent| {
+						#(parent.spawn(#children);)*
+					})
+				)
+			})
+		}
 	}
 }
 
@@ -46,10 +57,7 @@ pub fn tokenize_related<T: Component + RelationshipTarget + TypePath>(
 	items: &mut Vec<TokenStream>,
 	entity: Entity,
 	map_child: impl Fn(&World, Entity) -> Result<TokenStream>,
-) -> Result<()>
-where
-	T::Relationship: TypePath,
-{
+) -> Result<()> {
 	let entity = world.entity(entity);
 	let Some(related) = entity.get::<T>().map(|c| c.iter().collect::<Vec<_>>())
 	else {
@@ -63,19 +71,13 @@ where
 		.map(|child| map_child(world, child))
 		.collect::<Result<Vec<_>>>()?;
 	let ident = type_path_to_ident::<T>()?;
-	let child_ident = type_path_to_ident::<T::Relationship>()?;
 
 	if related.len() <= MAX_BUNDLE_TUPLE {
 		items.push(quote! { related!{#ident [#(#related),*]} });
 	} else {
-		// must be send+sync
-		items.push(quote! {#ident::spawn(
-			bevy::ecs::spawn::SpawnWith(
-				|parent: &mut bevy::ecs::relationship::RelatedSpawner<#child_ident>| {
-					#(parent.spawn(#related);)*
-				},
-			)
-		)});
+		items.push(quote! {spawn_with::<#ident,_>(|parent| {
+			#(parent.spawn(#related);)*
+		})});
 	}
 	Ok(())
 }
