@@ -7,7 +7,10 @@ pub mod utilities;
 
 
 pub mod prelude {
+	pub use crate::bevybail;
+	pub use crate::bevyhow;
 	pub use crate::bundle_effect;
+
 	pub use crate::extensions::*;
 	pub use crate::systems::*;
 	pub use crate::utilities::*;

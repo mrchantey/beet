@@ -64,7 +64,7 @@ impl IntoCustomTokens for WsPathBuf {
 impl IntoCustomTokens for PathBuf {
 	fn into_custom_tokens(&self, tokens: &mut TokenStream) {
 		let path = self.to_string_lossy();
-		tokens.extend(quote! { std::path::PathBuf::new(#path) });
+		tokens.extend(quote! { std::path::PathBuf::from(#path) });
 	}
 }
 

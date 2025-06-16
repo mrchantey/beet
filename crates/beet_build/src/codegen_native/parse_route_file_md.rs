@@ -54,7 +54,7 @@ pub fn parse_route_file_md(
 				RouteFileMethodConfig::FileGroup
 			},
 			route_info: RouteInfo {
-				path: RoutePath::from_file_path(&route_file.mod_path)?,
+				path: route_file.route_path.clone(),
 				method: HttpMethod::Get,
 			},
 		});
@@ -84,7 +84,7 @@ mod test {
 	fn works() {
 		let mut world = World::new();
 
-		let group = world.spawn(FileGroup::test_site_markdown()).id();
+		let group = world.spawn(FileGroup::test_site_docs()).id();
 		world.run_system_once(spawn_route_files).unwrap().unwrap();
 		world.run_system_once(parse_route_file_md).unwrap().unwrap();
 		let file = world.entity(group).get::<Children>().unwrap()[0];

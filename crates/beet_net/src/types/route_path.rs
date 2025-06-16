@@ -7,7 +7,7 @@ use beet_common::as_beet::*;
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "tokens", derive(ToTokens))]
-pub struct RoutePath(PathBuf);
+pub struct RoutePath(pub PathBuf);
 
 impl Default for RoutePath {
 	fn default() -> Self { Self(PathBuf::from("/")) }

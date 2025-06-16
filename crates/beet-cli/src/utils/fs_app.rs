@@ -82,7 +82,7 @@ impl FsApp {
 		}
 	}
 
-
+	/// Updates changed template files
 	fn on_change(
 		app: &mut App,
 		watch_event: WatchEventVec,

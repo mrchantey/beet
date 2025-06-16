@@ -97,30 +97,60 @@ impl FileGroup {
 	}
 
 	#[cfg(test)]
-	pub fn test_site() -> FileGroupSendit {
-		Self::new(WsPathBuf::new("crates/beet_router/src/test_site").into_abs())
-			.sendit()
-	}
-	#[cfg(test)]
-	pub fn test_site_pages() -> FileGroupSendit {
-		Self::new(
-			WsPathBuf::new("crates/beet_router/src/test_site/pages").into_abs(),
-		)
-		.with_filter(
-			GlobFilter::default()
-				.with_include("*.rs")
-				.with_exclude("*mod.rs"),
-		)
-		.sendit()
-	}
-	#[cfg(test)]
-	pub fn test_site_markdown() -> FileGroupSendit {
-		Self::new(
-			WsPathBuf::new("crates/beet_router/src/test_site/test_docs")
+	pub fn test_site() -> impl Bundle {
+		(
+			Self::new(
+				WsPathBuf::new("crates/beet_router/src/test_site").into_abs(),
+			)
+			.sendit(),
+			CodegenFile::new(
+				WsPathBuf::new(
+					"crates/beet_router/src/test_site/codegen/mod.rs",
+				)
 				.into_abs(),
+			)
+			.sendit(),
 		)
-		.with_filter(GlobFilter::default().with_include("*.md"))
-		.sendit()
+	}
+	#[cfg(test)]
+	pub fn test_site_pages() -> impl Bundle {
+		(
+			Self::new(
+				WsPathBuf::new("crates/beet_router/src/test_site/pages")
+					.into_abs(),
+			)
+			.with_filter(
+				GlobFilter::default()
+					.with_include("*.rs")
+					.with_exclude("*mod.rs"),
+			)
+			.sendit(),
+			CodegenFile::new(
+				WsPathBuf::new(
+					"crates/beet_router/src/test_site/codegen/pages.rs",
+				)
+				.into_abs(),
+			)
+			.sendit(),
+		)
+	}
+	#[cfg(test)]
+	pub fn test_site_docs() -> impl Bundle {
+		(
+			Self::new(
+				WsPathBuf::new("crates/beet_router/src/test_site/test_docs")
+					.into_abs(),
+			)
+			.with_filter(GlobFilter::default().with_include("*.md"))
+			.sendit(),
+			CodegenFile::new(
+				WsPathBuf::new(
+					"crates/beet_router/src/test_site/codegen/test_docs.rs",
+				)
+				.into_abs(),
+			)
+			.sendit(),
+		)
 	}
 }
 
@@ -128,17 +158,19 @@ impl FileGroup {
 mod test {
 	use crate::prelude::*;
 	use beet_utils::prelude::GlobFilter;
+	use beet_utils::prelude::WsPathBuf;
 	use sweet::prelude::*;
 
 	#[test]
 	fn works() {
 		expect(
-			FileGroup::test_site()
-				.inner()
-				.with_filter(GlobFilter::default().with_include("*.mockup.rs"))
-				.collect_files()
-				.unwrap()
-				.len(),
+			FileGroup::new(
+				WsPathBuf::new("crates/beet_router/src/test_site").into_abs(),
+			)
+			.with_filter(GlobFilter::default().with_include("*.mockup.rs"))
+			.collect_files()
+			.unwrap()
+			.len(),
 		)
 		.to_be(2);
 	}

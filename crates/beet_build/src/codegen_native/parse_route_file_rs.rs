@@ -18,7 +18,6 @@ pub fn parse_route_file_rs(
 	}) {
 		let mut parent = commands.entity(entity);
 
-		let route_path = RoutePath::from_file_path(&route_file.mod_path)?;
 		let file_str = ReadFile::to_string(&route_file.origin_path)?;
 
 		// collect all public functions, including handlers and
@@ -44,13 +43,13 @@ pub fn parse_route_file_rs(
 			.iter()
 			.filter_map(|ident_str| HttpMethod::from_str(ident_str).ok())
 		{
-			let method_config_ident =
-				format!("config_{}", method.to_string().to_lowercase());
+			let meta_ident =
+				format!("meta_{}", method.to_string().to_lowercase());
 			let config = func_idents
 				.iter()
 				.find_map(|ident| match ident.as_str() {
-					"config" => Some(RouteFileMethodConfig::File),
-					ident if ident == &method_config_ident => {
+					"meta" => Some(RouteFileMethodConfig::File),
+					ident if ident == &meta_ident => {
 						Some(RouteFileMethodConfig::Method)
 					}
 					_ => None,
@@ -58,7 +57,10 @@ pub fn parse_route_file_rs(
 				.unwrap_or_default();
 
 			parent.with_child(RouteFileMethod {
-				route_info: RouteInfo::new(route_path.clone(), method),
+				route_info: RouteInfo::new(
+					route_file.route_path.clone(),
+					method,
+				),
 				config,
 			});
 		}

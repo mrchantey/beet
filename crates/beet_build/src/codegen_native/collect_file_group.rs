@@ -77,7 +77,7 @@ mod test {
 	fn works() {
 		let mut app = App::new();
 		app.add_plugins((CodegenNativePlugin, NodeTokensPlugin));
-		app.world_mut().spawn(FileGroup::test_site_markdown());
+		app.world_mut().spawn(FileGroup::test_site_docs());
 		app.update();
 		let codegen = app
 			.world_mut()

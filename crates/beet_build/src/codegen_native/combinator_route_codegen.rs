@@ -1,4 +1,5 @@
 use crate::prelude::*;
+use beet_bevy::bevyhow;
 use beet_common::Sendit;
 use beet_common::as_beet::*;
 use beet_parse::prelude::tokenize_bundle;
@@ -59,11 +60,11 @@ pub fn collect_combinator_route(
 			let file_group = parents
 				.iter_ancestors(entity)
 				.find_map(|e| file_groups.get(e).ok())
-				.unwrap(); // TODO bevyhow!
+				.ok_or_else(|| bevyhow!("failed to find parent FileGroup"))?;
 			let meta_type = &file_group.meta_type;
 
 			codegen_file.add_item::<ItemFn>(syn::parse_quote!(
-				pub fn config_get()-> #meta_type{
+				pub fn meta_get()-> #meta_type{
 					#config
 				}
 			));
@@ -87,7 +88,7 @@ mod test {
 	fn works() {
 		let mut app = App::new();
 		app.add_plugins((CodegenNativePlugin, NodeTokensPlugin));
-		app.world_mut().spawn(FileGroup::test_site_markdown());
+		app.world_mut().spawn(FileGroup::test_site_docs());
 		app.update();
 		let codegen = app
 			.world_mut()
@@ -97,7 +98,7 @@ mod test {
 		.unwrap()
 		.to_token_stream()
 		.to_string();
-		expect(&codegen).to_contain("pub fn config_get () -> () {");
+		expect(&codegen).to_contain("pub fn meta_get () -> () {");
 		expect(&codegen).to_contain("pub fn get () -> impl Bundle {");
 	}
 }
