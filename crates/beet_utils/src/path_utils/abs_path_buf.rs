@@ -24,8 +24,6 @@ macro_rules! abs_file {
 	};
 }
 
-
-
 /// A newtype `PathBuf` with several indications:
 /// 1. the path is absolute, ie [`std::path::absolute`] is called
 /// 2. the path is cleaned using [`path_clean`]
@@ -78,6 +76,9 @@ impl AbsPathBuf {
 		Self(path)
 	}
 
+	pub fn parent(&self) -> Option<Self> {
+		self.0.parent().map(Self::new_unchecked)
+	}
 
 	pub fn with_extension(mut self, ext: &str) -> Self {
 		self.0.set_extension(ext);

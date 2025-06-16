@@ -6,7 +6,6 @@ use beet_utils::prelude::*;
 use bevy::prelude::*;
 use serde::Deserialize;
 use serde::Serialize;
-use std::path::Path;
 use syn::Expr;
 use syn::Item;
 
@@ -86,7 +85,7 @@ impl CodegenFile {
 	}
 
 
-	pub fn output_dir(&self) -> Result<&Path> {
+	pub fn output_dir(&self) -> Result<AbsPathBuf> {
 		self.output.parent().ok_or_else(|| {
 			anyhow::anyhow!("Output path must have a parent directory")
 		})

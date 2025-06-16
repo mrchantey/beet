@@ -29,11 +29,12 @@ use anyhow::Result;
 #[derive(Debug, Clone)]
 pub struct SweetError {
 	pub message: String,
-	pub assertion_depth: usize,
+	assertion_depth: usize,
 	#[cfg(not(target_arch = "wasm32"))]
-	pub backtrace: backtrace::Backtrace,
+	backtrace: backtrace::Backtrace,
 }
 
+impl std::error::Error for SweetError {}
 
 impl SweetError {
 	/// callsite of a users expect, ie
@@ -93,18 +94,32 @@ impl std::fmt::Display for SweetError {
 
 #[cfg(not(target_arch = "wasm32"))]
 impl SweetError {
-	pub fn assertion_frame(&self) -> Result<&backtrace::BacktraceFrame> {
-		if let Some(frame) = &self.backtrace.frames().get(self.assertion_depth)
-		{
-			Ok(frame)
-		} else {
-			anyhow::bail!("Failed to find backtrace frame");
+	fn assertion_location(&self) -> Result<BacktraceLocation> {
+		let mut assertion_depth = self.assertion_depth;
+		loop {
+			if let Some(frame) = self.backtrace.frames().get(assertion_depth) {
+				let loc = BacktraceLocation::from_unresolved_frame(frame)?;
+				// skip frames in the cargo registry
+				// TODO maybe expose this as a filter func?
+				if !loc
+					.cwd_path
+					.to_string_lossy()
+					.contains(".cargo/registry/src/index.crates.io-")
+				{
+					break Ok(loc);
+				}
+				assertion_depth += 1;
+			} else {
+				anyhow::bail!(
+					"Failed to find backtrace frame at depth {}",
+					assertion_depth
+				);
+			}
 		}
 	}
 
 	pub fn backtrace_str(&self) -> Result<String> {
-		let frame = self.assertion_frame()?;
-		BacktraceLocation::from_unresolved_frame(&frame)?.file_context()
+		self.assertion_location()?.file_context()
 	}
 }
 

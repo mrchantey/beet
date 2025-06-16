@@ -36,13 +36,14 @@ pub fn parse_route_file_md(
 			.into());
 		};
 
-		let default_path = WsPathBuf::default().into_abs();
-		let group_codegen_dir =
-			group_codegen.output.parent().unwrap_or(&default_path);
+		let group_codegen_dir = group_codegen
+			.output
+			.parent()
+			.unwrap_or_else(|| WsPathBuf::default().into_abs());
 
 
 		let mut md_codegen_path = AbsPathBuf::new_unchecked(
-			group_codegen_dir.join(&route_file.mod_path),
+			group_codegen_dir.join(&route_file.route_path),
 		);
 		md_codegen_path.set_extension("rs");
 
