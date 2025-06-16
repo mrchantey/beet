@@ -303,8 +303,8 @@ tree:
 
 #💡 Misc
 
-expand crate example *args:
-	just watch 'cargo expand -p {{crate}} --example {{example}} {{args}}'
+expand crate test *args:
+	just watch 'cargo expand -p {{crate}} --test {{test}} {{args}}'
 
 patch:
 	cargo set-version --bump patch

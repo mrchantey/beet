@@ -58,8 +58,12 @@ pub fn tokenize_related<T: Component + RelationshipTarget + TypePath>(
 		.map(|child| map_child(world, child))
 		.collect::<Result<Vec<_>>>()?;
 	let ident = type_path_to_ident::<T>()?;
+	// we cant use related! macros because it expands
+	// to bundles which have limited impl of ~12
+	items.push(quote! {#ident::spawn(
+		bevy::ecs::spawn::SpawnIter([#(#related),*].into_iter())
+	)});
 
-	items.push(quote! { related!{#ident [#(#related),*]} });
 	Ok(())
 }
 

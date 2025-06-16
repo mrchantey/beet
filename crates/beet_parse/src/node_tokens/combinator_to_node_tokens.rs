@@ -319,8 +319,11 @@ mod test {
 		tokenize_combinator(str, WsPathBuf::new(file!()))
 			.unwrap()
 			.to_string()
-			.replace("{ (FragmentNode , related ! { Children [", "")
-			.replace("] }) }", "")
+			.replace(
+				"{ (FragmentNode , Children :: spawn (bevy :: ecs :: spawn :: SpawnIter ([",
+				"",
+			)
+			.replace("] . into_iter ()))) }", "")
 			.xpect()
 	}
 
@@ -346,13 +349,13 @@ mod test {
 			.to_be(
 				quote! {{(
 					FragmentNode,
-					related!{Children[(
+					Children::spawn(bevy::ecs::spawn::SpawnIter([(
 						NodeTag(String::from("br")),
 						ElementNode{self_closing:true}
 					), (
 						NodeTag(String::from("br")),
 						ElementNode{self_closing:true}
-					)]}
+					)].into_iter()))
 				)}}
 				.to_string(),
 			);
@@ -378,7 +381,7 @@ mod test {
 			quote! {(
 				NodeTag(String::from("div")),
 				ElementNode{self_closing:false},
-				related!{Children[TextNode(String::from("hello"))]}
+				Children::spawn(bevy::ecs::spawn::SpawnIter([TextNode(String::from("hello"))].into_iter()))
 			)}
 			.to_string(),
 		);
