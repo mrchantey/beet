@@ -7,7 +7,7 @@ use send_wrapper::SendWrapper;
 use syn::Expr;
 
 /// Define a function for tokenizing each listed component, all of which
-/// must implement [`IntoCustomTokens`].
+/// must implement [`TokenizeSelf`].
 macro_rules! tokenize_maybe_spanned {
 		($name:ident,$($type:ty),* $(,)?) => {
 			pub fn $name(
@@ -33,7 +33,7 @@ macro_rules! tokenize_maybe_spanned {
 
 pub fn maybe_tuple(items: Vec<TokenStream>) -> TokenStream {
 	if items.is_empty() {
-		().into_custom_token_stream()
+		().self_token_stream()
 	} else if items.len() == 1 {
 		items.into_iter().next().unwrap()
 	} else {
@@ -73,7 +73,7 @@ tokenize_maybe_spanned!(
 );
 
 
-pub(super) fn tokenize_maybe_spanned<T: Component + IntoCustomTokens>(
+pub(super) fn tokenize_maybe_spanned<T: Component + TokenizeSelf>(
 	world: &World,
 	entity: Entity,
 ) -> Result<Option<TokenStream>> {
@@ -83,12 +83,12 @@ pub(super) fn tokenize_maybe_spanned<T: Component + IntoCustomTokens>(
 		entity.get::<ItemOf<T, SendWrapper<Span>>>(),
 	) {
 		(Some(value), Some(span)) => {
-			let value = value.into_custom_token_stream();
+			let value = value.self_token_stream();
 			Ok(Some(quote::quote_spanned! { ***span =>
 				#value
 			}))
 		}
-		(Some(value), None) => Ok(Some(value.into_custom_token_stream())),
+		(Some(value), None) => Ok(Some(value.self_token_stream())),
 		_ => Ok(None),
 	}
 }
@@ -108,7 +108,7 @@ pub(super) fn maybe_spanned_expr<
 	) {
 		(Some(value), Some(span)) => {
 			let value = &***value;
-			// let value = value.into_custom_token_stream();
+			// let value = value.self_token_stream();
 			Ok(Some(syn::parse_quote_spanned! { ***span =>
 				#value
 			}))

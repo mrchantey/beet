@@ -86,7 +86,7 @@ pub fn tokenize_template_attributes(
 	// this is important to avoid duplicate components like NodeTag
 	inner_items
 		.push(quote! {TemplateRoot::spawn(Spawn(template.into_node_bundle()))});
-	entity_components.push(tracker.into_custom_token_stream());
+	entity_components.push(tracker.self_token_stream());
 
 	entity_components.push(quote! {{
 		let template = <#template_ident as Props>::Builder::default()

@@ -1,5 +1,5 @@
-mod into_custom_tokens;
-pub use into_custom_tokens::*;
+mod tokenize_self;
+pub use tokenize_self::*;
 mod named_field;
 pub use named_field::*;
 mod attribute_group;

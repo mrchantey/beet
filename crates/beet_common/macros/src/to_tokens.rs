@@ -60,7 +60,7 @@ fn parse(input: DeriveInput) -> syn::Result<TokenStream> {
 					let field_defs = fields_named.named.iter().map(|field| {
 						let field_name = &field.ident;
 						quote! {
-							let #field_name = self.#field_name.into_custom_token_stream();
+							let #field_name = self.#field_name.self_token_stream();
 						}
 					});
 
@@ -88,7 +88,7 @@ fn parse(input: DeriveInput) -> syn::Result<TokenStream> {
 									proc_macro2::Span::call_site(),
 								);
 								quote! {
-									let #field_var = self.#index.into_custom_token_stream();
+									let #field_var = self.#index.self_token_stream();
 								}
 							},
 						);
@@ -130,7 +130,7 @@ fn parse(input: DeriveInput) -> syn::Result<TokenStream> {
 
 						quote! {
 							Self::#variant_name { #(#field_names),* } => {
-								#(let #field_names = #field_names.into_custom_token_stream();)*
+								#(let #field_names = #field_names.self_token_stream();)*
 								tokens.extend(quote::quote! { #qualified_name::#variant_name {
 									#(#field_names: #pound_token #field_names),*
 								} });
@@ -149,7 +149,7 @@ fn parse(input: DeriveInput) -> syn::Result<TokenStream> {
 
 						quote! {
 							Self::#variant_name(#(#field_vars),*) => {
-								#(let #field_vars = #field_vars.into_custom_token_stream();)*
+								#(let #field_vars = #field_vars.self_token_stream();)*
 								tokens.extend(quote::quote! { #qualified_name::#variant_name(
 									#(#pound_token #field_vars),*
 								) });
@@ -175,7 +175,7 @@ fn parse(input: DeriveInput) -> syn::Result<TokenStream> {
 		syn::Data::Union(data_union) => {
 			return Err(syn::Error::new_spanned(
 				&data_union.union_token,
-				"Union types are not supported by IntoCustomTokens derive",
+				"Union types are not supported by TokenizeSelf derive",
 			));
 		}
 	};
@@ -192,15 +192,15 @@ fn parse(input: DeriveInput) -> syn::Result<TokenStream> {
 		.unwrap_or_else(|| syn::parse_quote!(where));
 	where_clause.predicates.extend(generic_idents.map(|(ident, _)| {
 		let predicate: WherePredicate = syn::parse_quote! {
-			#ident: beet::prelude::IntoCustomTokens
+			#ident: beet::prelude::TokenizeSelf
 		};
 		predicate
 	}));
 
 
 	quote! {
-		impl #impl_generics beet::prelude::IntoCustomTokens for #ident #type_generics #where_clause {
-			fn into_custom_tokens(&self, tokens: &mut beet::exports::proc_macro2::TokenStream) {
+		impl #impl_generics beet::prelude::TokenizeSelf for #ident #type_generics #where_clause {
+			fn self_tokens(&self, tokens: &mut beet::exports::proc_macro2::TokenStream) {
 				use beet::exports::quote;
 				use beet::exports::proc_macro2;
 				#(#generic_defs)*
@@ -234,12 +234,12 @@ mod test {
 
 		input.xmap(parse).unwrap().to_string().xpect().to_be(
 			quote! {
-					impl beet::prelude::IntoCustomTokens for Test {
-						fn into_custom_tokens(&self, tokens: &mut beet::exports::proc_macro2::TokenStream) {
+					impl beet::prelude::TokenizeSelf for Test {
+						fn self_tokens(&self, tokens: &mut beet::exports::proc_macro2::TokenStream) {
 							use beet::exports::quote;
 							use beet::exports::proc_macro2;
-							let inner = self.inner.into_custom_token_stream();
-							let value = self.value.into_custom_token_stream();
+							let inner = self.inner.self_token_stream();
+							let value = self.value.self_token_stream();
 							tokens.extend(quote::quote! { Test {
 								inner: #pound_token inner,
 								value: #pound_token value
@@ -260,12 +260,12 @@ mod test {
 
 		input.xmap(parse).unwrap().to_string().xpect().to_be(
 			quote! {
-					impl beet::prelude::IntoCustomTokens for TupleTest {
-						fn into_custom_tokens(&self, tokens: &mut beet::exports::proc_macro2::TokenStream) {
+					impl beet::prelude::TokenizeSelf for TupleTest {
+						fn self_tokens(&self, tokens: &mut beet::exports::proc_macro2::TokenStream) {
 							use beet::exports::quote;
 							use beet::exports::proc_macro2;
-							let field0 = self.0.into_custom_token_stream();
-							let field1 = self.1.into_custom_token_stream();
+							let field0 = self.0.self_token_stream();
+							let field1 = self.1.self_token_stream();
 							tokens.extend(quote::quote! { TupleTest(
 								#pound_token field0,
 								#pound_token field1
@@ -290,8 +290,8 @@ mod test {
 
 		input.xmap(parse).unwrap().to_string().xpect().to_be(
 			quote! {
-					impl beet::prelude::IntoCustomTokens for TestEnum {
-						fn into_custom_tokens(&self, tokens: &mut beet::exports::proc_macro2::TokenStream) {
+					impl beet::prelude::TokenizeSelf for TestEnum {
+						fn self_tokens(&self, tokens: &mut beet::exports::proc_macro2::TokenStream) {
 							use beet::exports::quote;
 							use beet::exports::proc_macro2;
 							match self {
@@ -299,13 +299,13 @@ mod test {
 									tokens.extend(quote::quote! { TestEnum::A });
 								},
 								Self::B(field0) => {
-									let field0 = field0.into_custom_token_stream();
+									let field0 = field0.self_token_stream();
 									tokens.extend(quote::quote! { TestEnum::B(
 										#pound_token field0
 									) });
 								},
 								Self::C { value } => {
-									let value = value.into_custom_token_stream();
+									let value = value.self_token_stream();
 									tokens.extend(quote::quote! { TestEnum::C {
 										value: #pound_token value
 									} });
@@ -327,11 +327,11 @@ mod test {
 
 		input.xmap(parse).unwrap().to_string().xpect().to_be(
 			quote! {
-				impl<U: Clone> beet::prelude::IntoCustomTokens for Foo<U> 
+				impl<U: Clone> beet::prelude::TokenizeSelf for Foo<U> 
 				where 
-					U: beet::prelude::IntoCustomTokens
+					U: beet::prelude::TokenizeSelf
 				{
-					fn into_custom_tokens(&self, tokens: &mut beet::exports::proc_macro2::TokenStream) {
+					fn self_tokens(&self, tokens: &mut beet::exports::proc_macro2::TokenStream) {
 						use beet::exports::quote;
 						use beet::exports::proc_macro2;
 						

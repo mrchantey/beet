@@ -5,8 +5,8 @@ mod sendit;
 mod to_tokens;
 mod utils;
 
-/// Implements `IntoCustomTokens` for a struct or enum.
-/// All fields must also implement `IntoCustomTokens`, please open
+/// Implements `TokenizeSelf` for a struct or enum.
+/// All fields must also implement `TokenizeSelf`, please open
 /// a pr if you want to add support for a type.
 ///
 /// ## Example

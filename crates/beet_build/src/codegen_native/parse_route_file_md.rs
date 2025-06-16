@@ -64,7 +64,7 @@ pub fn parse_route_file_md(
 		parent.with_child((
 			CombinatorTokens(rsx_str),
 			SourceFile::new(ws_path.clone()),
-			CombinatorRouteCodegen { config }.sendit(),
+			CombinatorRouteCodegen { meta: config }.sendit(),
 			CodegenFile::new(md_codegen_path).sendit(),
 		));
 	}

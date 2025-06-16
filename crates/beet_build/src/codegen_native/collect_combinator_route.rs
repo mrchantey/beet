@@ -32,13 +32,12 @@ pub fn tokenize_combinator_route(world: &mut World) -> Result {
 }
 
 
-
 /// Added to the root of route files that have been parsed into a tree via
 /// [`CombinatorTokens`], ie `.md` and `.rsx` files.
 #[derive(Debug, Clone, Sendit)]
 #[sendit(derive(Component))]
 pub struct CombinatorRouteCodegen {
-	pub config: Option<Block>,
+	pub meta: Option<Block>,
 }
 
 /// insert the config function into the codegen file if it exists
@@ -56,7 +55,7 @@ pub fn collect_combinator_route(
 	file_groups: Query<&FileGroupSendit>,
 ) -> Result {
 	for (entity, mut codegen_file, markdown_codegen) in query.iter_mut() {
-		if let Some(config) = &markdown_codegen.config {
+		if let Some(meta) = &markdown_codegen.meta {
 			let file_group = parents
 				.iter_ancestors(entity)
 				.find_map(|e| file_groups.get(e).ok())
@@ -65,7 +64,7 @@ pub fn collect_combinator_route(
 
 			codegen_file.add_item::<ItemFn>(syn::parse_quote!(
 				pub fn meta_get()-> #meta_type{
-					#config
+					#meta
 				}
 			));
 		}

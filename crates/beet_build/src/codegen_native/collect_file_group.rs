@@ -1,6 +1,6 @@
 use crate::prelude::*;
-use beet_common::prelude::IntoCustomTokens;
 use beet_common::prelude::TempNonSendMarker;
+use beet_common::prelude::TokenizeSelf;
 use beet_net::prelude::*;
 use bevy::prelude::*;
 use syn::ItemFn;
@@ -48,7 +48,7 @@ pub fn collect_file_group(
 		// TODO allow file group to specify axum router state type
 		let state_ty: syn::Type = parse_quote!(());
 
-		let route_infos = route_infos.into_custom_token_stream();
+		let route_infos = route_infos.self_token_stream();
 		codegen_file.add_item::<ItemFn>(parse_quote! {
 			pub fn route_infos()-> Vec<RouteInfo> {
 				#route_infos

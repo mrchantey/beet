@@ -1,4 +1,4 @@
-use beet_common::prelude::IntoCustomTokens;
+use beet_common::prelude::TokenizeSelf;
 use bevy::ecs::system::SystemParam;
 use bevy::prelude::*;
 use proc_macro2::TokenStream;
@@ -18,7 +18,7 @@ pub fn flatten_fragment(
 		.get::<Children>()
 		.map(|c| c.iter().collect::<Vec<_>>())
 	else {
-		return Ok(().into_custom_token_stream());
+		return Ok(().self_token_stream());
 	};
 	if children.len() == 1 {
 		// a single child, return that

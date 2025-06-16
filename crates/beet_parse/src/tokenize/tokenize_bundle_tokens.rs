@@ -34,7 +34,7 @@ fn tokenize_block_node_exprs(
 	entity: Entity,
 ) -> Result<()> {
 	if let Some(expr) = world.entity(entity).get::<ItemOf::<BlockNode,SendWrapper<Expr>>>() {
-		let block_node = expr.into_custom_token_stream();
+		let block_node = expr.self_token_stream();
 		items.push(block_node);
 	}
 
@@ -47,13 +47,13 @@ fn tokenize_attribute_tokens(
 	let entity = world.entity(entity);
 	let mut items = Vec::new();
 	if let Some(attr_expr) = entity.get::<AttributeExpr>() {
-		items.push(attr_expr.into_custom_token_stream());
+		items.push(attr_expr.self_token_stream());
 	}
 	if let Some(attr_key) = entity.get::<AttributeKeyExpr>() {
-		items.push(attr_key.into_custom_token_stream());
+		items.push(attr_key.self_token_stream());
 	}
 	if let Some(attr_val) = entity.get::<AttributeValueExpr>() {
-		items.push(attr_val.into_custom_token_stream());
+		items.push(attr_val.self_token_stream());
 	}
 let attr_entity = entity.id();
 	if let Some(attr) =
