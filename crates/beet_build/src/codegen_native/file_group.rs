@@ -36,6 +36,10 @@ impl FileGroupConfig {
 #[sendit(derive(Component))]
 #[sendit(require(CodegenFileSendit))]
 pub struct FileGroup {
+	/// Optionally set the group name, used for codegen file names
+	/// like `FooRouterPlugin`, otherwise falls back to the
+	/// [`CodegenFile::output`] filename.
+	pub group_name: Option<String>,
 	/// Passed to [`CodegenFile::pkg_name`]
 	#[serde(rename = "package_name")]
 	pub pkg_name: Option<String>,
@@ -47,20 +51,24 @@ pub struct FileGroup {
 	pub filter: GlobFilter,
 	/// Specify the meta type, used for the file group codegen and individual
 	/// route codegen like `.md` and `.rsx` files.
-	#[serde(default = "default_meta_type", with = "syn_type_serde")]
+	#[serde(default = "unit_type", with = "syn_type_serde")]
 	pub meta_type: syn::Type,
+	#[serde(default = "unit_type", with = "syn_type_serde")]
+	pub router_state_type: syn::Type,
 }
 
-fn default_meta_type() -> syn::Type { syn::parse_str("()").unwrap() }
+fn unit_type() -> syn::Type { syn::parse_str("()").unwrap() }
 
 
 impl Default for FileGroup {
 	fn default() -> Self {
 		Self {
+			group_name: None,
 			pkg_name: None,
 			src: AbsPathBuf::default(),
 			filter: GlobFilter::default(),
-			meta_type: default_meta_type(),
+			meta_type: unit_type(),
+			router_state_type: unit_type(),
 		}
 	}
 }

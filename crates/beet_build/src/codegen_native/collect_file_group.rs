@@ -1,8 +1,10 @@
 use crate::prelude::*;
+use beet_bevy::bevyhow;
 use beet_common::prelude::TempNonSendMarker;
 use beet_common::prelude::TokenizeSelf;
 use beet_net::prelude::*;
 use bevy::prelude::*;
+use heck::ToUpperCamelCase;
 use syn::ItemFn;
 use syn::parse_quote;
 
@@ -17,8 +19,8 @@ pub fn collect_file_group(
 	>,
 	route_files: Query<(&RouteFile, &Children)>,
 	methods: Query<&RouteFileMethod>,
-) {
-	for (mut codegen_file, _file_group, file_group_children) in query.iter_mut()
+) -> Result {
+	for (mut codegen_file, file_group, file_group_children) in query.iter_mut()
 	{
 		let mut route_infos = Vec::<&RouteInfo>::new();
 		let mut route_handlers = Vec::<syn::Path>::new();
@@ -45,22 +47,47 @@ pub fn collect_file_group(
 			}
 		}
 
-		// TODO allow file group to specify axum router state type
-		let state_ty: syn::Type = parse_quote!(());
-
 		let route_infos = route_infos.self_token_stream();
 		codegen_file.add_item::<ItemFn>(parse_quote! {
 			pub fn route_infos()-> Vec<RouteInfo> {
 				#route_infos
 			}
 		});
-		codegen_file.add_item::<ItemFn>(parse_quote! {
-			pub fn router_plugin(router: beet::exports::axum::Router<#state_ty>)-> beet::exports::axum::Router<#state_ty> {
-				#(router = beet_route(router, #route_handlers);)*
-				router
+
+		let group_name = if let Some(group_name) = &file_group.group_name {
+			group_name.clone()
+		} else {
+			codegen_file
+				.output
+				.file_stem()
+				.map(|name| name.to_string_lossy().to_string())
+				.ok_or_else(|| bevyhow!("failed"))?
+		};
+
+		let router_plugin_ident = quote::format_ident!(
+			"{}RouterPlugin",
+			group_name.to_upper_camel_case()
+		);
+
+		codegen_file.add_item::<syn::ItemStruct>(parse_quote! {
+			pub struct #router_plugin_ident;
+		});
+
+		let meta_ty = &file_group.meta_type;
+		let router_state_type = &file_group.router_state_type;
+		codegen_file.add_item::<syn::ItemImpl>(parse_quote! {
+			impl RouterPlugin for #router_plugin_ident {
+				type State = #router_state_type;
+				type Meta = #meta_ty;
+				fn build(self, mut router: beet::exports::axum::Router<#router_state_type>)
+					-> beet::exports::axum::Router<#router_state_type> {
+					#(router = self.add_route(router, #route_handlers);)*
+					router
+				}
 			}
 		});
 	}
+	Ok(())
 }
 
 

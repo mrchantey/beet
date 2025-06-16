@@ -49,6 +49,8 @@ pub use beet_utils::noop;
 pub use beet_web as web;
 
 pub mod prelude {
+	pub use bevy::prelude::*;
+
 	#[cfg(feature = "build")]
 	pub use crate::build::prelude::*;
 	pub use crate::common::prelude::*;

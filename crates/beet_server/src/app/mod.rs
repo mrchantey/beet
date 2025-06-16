@@ -1,5 +1,7 @@
 mod app_error;
 pub use app_error::*;
+mod beet_route;
+pub use beet_route::*;
 #[cfg(not(feature = "nightly"))]
 mod bundle_route_stable;
 #[cfg(not(feature = "nightly"))]

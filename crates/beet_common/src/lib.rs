@@ -20,11 +20,14 @@ pub mod prelude {
 }
 
 pub mod exports {
-	pub use send_wrapper::SendWrapper;
+	#[cfg(feature = "serde")]
+	pub use ron;
+
 	#[cfg(feature = "tokens")]
 	pub use proc_macro2;
 	#[cfg(feature = "tokens")]
 	pub use quote;
+	pub use send_wrapper::SendWrapper;
 }
 
 pub mod as_beet {
