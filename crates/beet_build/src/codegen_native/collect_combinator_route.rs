@@ -13,17 +13,17 @@ pub fn tokenize_combinator_route(world: &mut World) -> Result {
 	let mut query =
 		world.query_filtered::<Entity, (
 			With<CodegenFileSendit>,
-			With<CombinatorRouteCodegenSendit>
+			Added<CombinatorRouteCodegenSendit>
 		)>();
 	for entity in query.iter(world).collect::<Vec<_>>() {
 		let tokens = tokenize_bundle(world, entity)?;
-
+		trace!("Tokenizing combinator route for entity: {:?}", entity);
 		world
 			.entity_mut(entity)
 			.get_mut::<CodegenFileSendit>()
 			.unwrap() // checked in query filter
 			.add_item::<ItemFn>(syn::parse_quote!(
-				pub fn get()-> impl Bundle{
+				pub fn get() -> impl Bundle{
 					#tokens
 				}
 			));

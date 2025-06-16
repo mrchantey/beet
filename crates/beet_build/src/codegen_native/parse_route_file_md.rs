@@ -62,7 +62,7 @@ pub fn parse_route_file_md(
 				method: HttpMethod::Get,
 			},
 		});
-
+		trace!("Parsed route file: {}", route_file.origin_path.display());
 		route_file.mod_path = route_codegen_path;
 		// here the markdown will be generated in its own codegen
 		parent.with_child((

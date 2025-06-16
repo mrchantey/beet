@@ -6,6 +6,15 @@ use bevy::prelude::*;
 use serde::Deserialize;
 use serde::Serialize;
 
+pub fn despawn_file_groups(
+	mut commands: Commands,
+	query: Populated<Entity, With<FileGroupSendit>>,
+) {
+	for entity in query.iter() {
+		commands.entity(entity).despawn();
+	}
+}
+
 
 /// Config included in the `beet.toml` file for a file group.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Sendit)]

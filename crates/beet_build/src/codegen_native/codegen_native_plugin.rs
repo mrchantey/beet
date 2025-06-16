@@ -49,8 +49,14 @@ impl Plugin for CodegenNativePlugin {
 							.chain(),
 					)
 						.in_set(ProcessCodegenNativeStep),
-					#[cfg(not(test))] // dont hit the fs in tests
-					export_codegen_files.in_set(ExportCodegenNativeStep),
+					#[cfg(not(test))]
+					(
+						// dont hit the fs in tests
+						export_codegen_files,
+						despawn_file_groups,
+					)
+						.chain()
+						.in_set(ExportCodegenNativeStep),
 				),
 			);
 	}

@@ -10,13 +10,15 @@ use syn::Expr;
 use syn::Item;
 
 
-/// Call [`CodegenFile::build_and_write`] for every [`Changed`] [`CodegenFileSendit`]
+/// Call [`CodegenFile::build_and_write`] for every [`Added`] [`CodegenFileSendit`]
 pub fn export_codegen_files(
 	_: TempNonSendMarker,
-	query: Populated<&CodegenFileSendit, Changed<CodegenFileSendit>>,
+	query: Populated<&CodegenFileSendit, Added<CodegenFileSendit>>,
 ) -> bevy::prelude::Result {
+	let num_files = query.iter().count();
+	info!("Exporting {} codegen files...", num_files);
 	for codegen_file in query.iter() {
-		tracing::debug!(
+		trace!(
 			"Exporting codegen file:\n{}",
 			codegen_file.output.to_string_lossy()
 		);

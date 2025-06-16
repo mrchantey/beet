@@ -40,7 +40,7 @@ pub fn maybe_tuple(items: Vec<TokenStream>) -> TokenStream {
 		// so far this is fine because attributes and children
 		// are relationships 
 		// if we end up with more than 12 items
-		// we can use the tokenize_related strategy
+		// we can use SpawnEffect
 		quote! { (#(#items),*) }
 	}
 }
