@@ -42,12 +42,14 @@ pub fn parse_route_file_md(
 			.unwrap_or_else(|| WsPathBuf::default().into_abs());
 
 
+		// relative to the group codegen dir
+		let mut route_codegen_path =
+			route_file.route_path.as_relative().to_path_buf();
+		route_codegen_path.set_extension("rs");
 
-
-		let mut md_codegen_path = AbsPathBuf::new_unchecked(
-			group_codegen_dir.join(&route_file.route_path.as_relative()),
+		let route_codegen_path_abs = AbsPathBuf::new_unchecked(
+			group_codegen_dir.join(&route_codegen_path),
 		);
-		md_codegen_path.set_extension("rs");
 
 		parent.with_child(RouteFileMethod {
 			config: if config.is_some() {
@@ -61,13 +63,13 @@ pub fn parse_route_file_md(
 			},
 		});
 
-		route_file.mod_path = md_codegen_path.into_ws_path()?.take();
+		route_file.mod_path = route_codegen_path;
 		// here the markdown will be generated in its own codegen
 		parent.with_child((
 			CombinatorTokens(rsx_str),
 			SourceFile::new(ws_path.clone()),
 			CombinatorRouteCodegen { meta: config }.sendit(),
-			CodegenFile::new(md_codegen_path).sendit(),
+			CodegenFile::new(route_codegen_path_abs).sendit(),
 		));
 	}
 	Ok(())

@@ -3,9 +3,9 @@
 // #[path = "codegen/client_actions.rs"]
 // pub mod client_actions;
 // pub mod components;
-// #[cfg(not(target_arch = "wasm32"))]
-// #[path = "codegen/docs.rs"]
-// pub mod docs;
+#[cfg(not(target_arch = "wasm32"))]
+#[path = "codegen/docs.rs"]
+pub mod docs;
 #[cfg(not(target_arch = "wasm32"))]
 #[path = "codegen/pages.rs"]
 pub mod pages;
