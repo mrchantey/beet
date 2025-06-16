@@ -43,6 +43,22 @@ where
 		.parse_stream(input)
 }
 
+pub fn fragment_open_tag<I>(input: I) -> ParseResult<(), I>
+where
+	I: Stream<Item = char>,
+{
+	(token('<'), token('>')).with(value(())).parse_stream(input)
+}
+
+pub fn fragment_close_tag<I>(input: I) -> ParseResult<(), I>
+where
+	I: Stream<Item = char>,
+{
+	(token('<'), token('/'), token('>'))
+		.with(value(()))
+		.parse_stream(input)
+}
+
 pub fn sign<I>(input: I) -> ParseResult<char, I>
 where
 	I: Stream<Item = char>,
@@ -190,6 +206,31 @@ mod test {
 				.is_err(),
 			true
 		);
+	}
+
+	#[test]
+	pub fn test_fragment_open_tag() {
+		assert_eq!(parser(fragment_open_tag).parse("").is_err(), true);
+		assert_eq!(parser(fragment_open_tag).parse("foo").is_err(), true);
+		assert_eq!(parser(fragment_open_tag).parse("<>").unwrap(), ((), ""));
+		assert_eq!(parser(fragment_open_tag).parse("foo<>").is_err(), true);
+		assert_eq!(parser(fragment_open_tag).parse("<").is_err(), true);
+		assert_eq!(parser(fragment_open_tag).parse(">").is_err(), true);
+		assert_eq!(parser(fragment_open_tag).parse("<>").unwrap(), ((), ""));
+		assert_eq!(parser(fragment_open_tag).parse("foo<>").is_err(), true);
+	}
+
+	#[test]
+	pub fn test_fragment_close_tag() {
+		assert_eq!(parser(fragment_close_tag).parse("").is_err(), true);
+		assert_eq!(parser(fragment_close_tag).parse("foo").is_err(), true);
+		assert_eq!(parser(fragment_close_tag).parse("</>").unwrap(), ((), ""));
+		assert_eq!(parser(fragment_close_tag).parse("foo</>").is_err(), true);
+		assert_eq!(parser(fragment_close_tag).parse("").is_err(), true);
+		assert_eq!(parser(fragment_close_tag).parse("<").is_err(), true);
+		assert_eq!(parser(fragment_close_tag).parse("</").is_err(), true);
+		assert_eq!(parser(fragment_close_tag).parse("</>").unwrap(), ((), ""));
+		assert_eq!(parser(fragment_close_tag).parse("foo</>").is_err(), true);
 	}
 
 	#[test]

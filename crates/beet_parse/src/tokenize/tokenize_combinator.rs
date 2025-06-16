@@ -19,7 +19,6 @@ pub fn tokenize_combinator(
 	source_file: WsPathBuf,
 ) -> Result<TokenStream> {
 	let tokens = wrap_in_fragment(tokens);
-	println!("Tokenizing combinator: {}", tokens);
 	TokensApp::with(|app| {
 		let entity = app
 			.world_mut()

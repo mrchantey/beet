@@ -9,9 +9,17 @@ use syn::Expr;
 
 /// Create a [`TokenStream`] of a [`Bundle`] that represents the *tokenized*
 /// tree of nodes for the given [`Entity`], as opposed to the *finalized* tree,
-/// see [`tokenize_bundle`].
 #[rustfmt::skip]
 pub fn tokenize_bundle_tokens(
+	world: &World,
+	entity: Entity,
+) -> Result<TokenStream> {
+		// The root is not an actual node, so we flatten the children if its 1, or
+	// convert to a fragment.
+	flatten_fragment(world, entity, tokenize_bundle_tokens_no_flatten)
+}
+#[rustfmt::skip]
+pub(super) fn tokenize_bundle_tokens_no_flatten(
 	world: &World,
 	entity: Entity,
 ) -> Result<TokenStream> {
@@ -23,7 +31,7 @@ pub fn tokenize_bundle_tokens(
 	tokenize_block_node_exprs(world, &mut items, entity)?;
 	tokenize_combinator_exprs_tokens(world, entity)?.map(|i|items.push(i));
 	tokenize_related::<Attributes>(world, &mut items, entity, tokenize_attribute_tokens)?;
-	tokenize_related::<Children>(world, &mut items, entity, tokenize_bundle_tokens)?;
+	tokenize_related::<Children>(world, &mut items, entity, tokenize_bundle_tokens_no_flatten)?;
 
 	items.xmap(maybe_tuple).xok()
 }
@@ -82,37 +90,40 @@ mod test {
 
 	fn parse_combinator(tokens: &str) -> Matcher<String> {
 		tokenize_combinator_tokens(tokens, WsPathBuf::new(file!()))
-			.unwrap()
-			.to_string().replace(" ", "")
-			.xpect()
+				.unwrap()
+				.to_string()
+				.replace(" ", "")
+				.chars()
+				.skip(33)
+				.collect::<String>()
+				.chars()
+				.rev()
+				.skip(4)
+				.collect::<String>()
+				.chars()
+				.rev()
+				.collect::<String>()
+				.xpect()
 	}
 
 	#[test]
 	fn tag_only() {
 		parse_rstml(quote! {<br/>}).to_be(
 			quote! {
-				related ! {
-					Children [
-						(
-							NodeTag(String::from("br")),
-							ElementNode { self_closing: true }
-						)
-					]
-				}
+				(
+					NodeTag(String::from("br")),
+					ElementNode { self_closing: true }
+				)
 			}
 			.to_string(),
 		);
 		parse_rstml(quote! {<Foo/>}).to_be(
 			quote! {
-				related ! {
-					Children [
-						(
-							NodeTag(String::from("Foo")),
-							FragmentNode,
-							TemplateNode
-						)
-					]
-				}
+				(
+					NodeTag(String::from("Foo")),
+					FragmentNode,
+					TemplateNode
+				)
 			}
 			.to_string(),
 		);
@@ -128,23 +139,19 @@ mod test {
 				onclick={|_: Trigger<OnClick>| {}}
 			/>}).to_be(
 			quote! {
-				related ! {
-					Children [
-						(
-							NodeTag(String::from("br")),
-							ElementNode { self_closing: true },
-							related ! {
-								Attributes [
-									AttributeKeyExpr(SendWrapper::new(syn::parse_quote!("hidden"))),
-									(AttributeKeyExpr(SendWrapper::new(syn::parse_quote!("class"))), 			AttributeValueExpr(SendWrapper::new(syn::parse_quote!("foo")))),
-									(AttributeKeyExpr(SendWrapper::new(syn::parse_quote!("some_key"))) , 	AttributeValueExpr(SendWrapper::new(syn::parse_quote!({ bar })))),
-									(AttributeKeyExpr(SendWrapper::new(syn::parse_quote!("onmousemove"))), AttributeValueExpr(SendWrapper::new(syn::parse_quote!("some_js_func")))),
-									(AttributeKeyExpr(SendWrapper::new(syn::parse_quote!("onclick"))), 		AttributeValueExpr(SendWrapper::new(syn::parse_quote!({ |_: Trigger<OnClick>| {} }))))
-								]
-							}
-						)
-					]
-				}
+				(
+					NodeTag(String::from("br")),
+					ElementNode { self_closing: true },
+					related ! {
+						Attributes [
+							AttributeKeyExpr(SendWrapper::new(syn::parse_quote!("hidden"))),
+							(AttributeKeyExpr(SendWrapper::new(syn::parse_quote!("class"))), 			AttributeValueExpr(SendWrapper::new(syn::parse_quote!("foo")))),
+							(AttributeKeyExpr(SendWrapper::new(syn::parse_quote!("some_key"))) , 	AttributeValueExpr(SendWrapper::new(syn::parse_quote!({ bar })))),
+							(AttributeKeyExpr(SendWrapper::new(syn::parse_quote!("onmousemove"))), AttributeValueExpr(SendWrapper::new(syn::parse_quote!("some_js_func")))),
+							(AttributeKeyExpr(SendWrapper::new(syn::parse_quote!("onclick"))), 		AttributeValueExpr(SendWrapper::new(syn::parse_quote!({ |_: Trigger<OnClick>| {} }))))
+						]
+					}
+				)
 			}
 			.to_string(),
 		);
@@ -152,10 +159,7 @@ mod test {
 	#[test]
 	fn block_node() {
 		parse_rstml(quote! {<div>{7}</div>}).to_be(
-			quote! {
-				related! {
-					Children [
-						(
+			quote! {(
 							NodeTag(String::from("div")),
 							ElementNode { self_closing: false },
 							related! {
@@ -170,16 +174,50 @@ mod test {
 								]
 							}
 						)
-					]
-				}
 			}
 			.to_string(),
 		);
 	}
 	#[test]
+	fn combinator_simple() {
+		parse_combinator("<br/>").to_be(
+			quote! {
+				(
+					NodeTag(String::from("br")),
+					ElementNode { self_closing: true }
+				)
+			}
+			.to_string().replace(" ", ""),
+		);
+	}
+	#[test]
+	fn combinator_siblings() {
+		tokenize_combinator_tokens("<br/><br/>", WsPathBuf::new(file!()))
+				.unwrap()
+				.to_string()
+				.xpect().to_be(
+			quote! {{
+				(
+					FragmentNode,
+					related!{Children[
+						(
+							NodeTag(String::from("br")),
+							ElementNode { self_closing: true }
+						),
+						(
+							NodeTag(String::from("br")),
+							ElementNode { self_closing: true }
+						)
+					]}
+				)
+			}}
+			.to_string(),
+		);
+	}
+
+	#[test]
 	fn combinator() {
 		parse_combinator(r#"
-			<br/>
 			<br 
 				hidden
 				class="foo"
@@ -188,11 +226,6 @@ mod test {
 			/>
 		"#).to_be(
 			quote! {
-				(FragmentNode, children![ 
-					(
-						NodeTag (String :: from ("br")), 
-						ElementNode { self_closing : true }
-					),
 					(
 						NodeTag (String :: from ("br")), 
 						ElementNode { self_closing : true }, 
@@ -205,24 +238,19 @@ mod test {
 							]
 						}
 					)
-				])
 			}
 			.to_string().replace(" ", ""),
 		);
 	}
 	#[test]
 	fn nested_combinator() {
-		parse_combinator(r#"
-			<br 
+		parse_combinator(r#"<br 
 				foo={
 					let class = "bar";
 					<div class={class}/>
 				}
-			/>
-		"#).to_be(
+			/>"#).to_be(
 			quote! {
-				related ! {
-					Children [{
 						(
 							NodeTag(String::from("br")),
 							ElementNode { self_closing: true },
@@ -245,10 +273,8 @@ mod test {
 								)]
 							}
 						)
-					}]
-				}
-			}
-			.to_string().replace(" ", ""),
+					}
+			.to_string().replace(" ", "")
 		);
 	}
 

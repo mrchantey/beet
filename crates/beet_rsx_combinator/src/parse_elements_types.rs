@@ -8,7 +8,11 @@ use itertools::Itertools;
 pub enum RsxElement {
 	SelfClosing(RsxSelfClosingElement),
 	Normal(RsxNormalElement),
+	Fragment(RsxFragment),
 }
+
+#[derive(Debug, PartialEq)]
+pub struct RsxFragment(pub RsxChildren);
 
 #[derive(Debug, PartialEq)]
 pub struct RsxSelfClosingElement(pub RsxElementName, pub RsxAttributes);

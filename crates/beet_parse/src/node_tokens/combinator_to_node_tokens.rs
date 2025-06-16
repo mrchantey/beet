@@ -118,8 +118,21 @@ impl<'w, 's, 'a> Builder<'w, 's, 'a> {
 		.xok()
 	}
 
+	fn rsx_fragment(&mut self, fragment: RsxFragment) -> Result<Entity> {
+		let children = self.rsx_children("fragment", fragment.0)?;
+		let file_span = self.default_file_span();
+		self.commands
+			.spawn((FragmentNode, ItemOf::<FragmentNode, _>::new(file_span)))
+			.add_children(&children)
+			.id()
+			.xok()
+	}
+
 	fn rsx_element(&mut self, element: RsxElement) -> Result<Entity> {
 		let (element_name, attributes, children, self_closing) = match element {
+			RsxElement::Fragment(fragment) => {
+				return self.rsx_fragment(fragment);
+			}
 			RsxElement::SelfClosing(el) => {
 				(el.0, el.1, RsxChildren::default(), true)
 			}
@@ -297,46 +310,55 @@ mod test {
 		tokenize_combinator(str, WsPathBuf::new(file!()))
 			.unwrap()
 			.to_string()
+			.replace("{ (FragmentNode , related ! { Children [", "")
+			.replace("] }) }", "")
 			.xpect()
 	}
 
 	#[test]
 	fn element() {
 		"<br/>".xmap(parse).to_be(
-			quote! {{(
+			quote! {(
 				NodeTag(String::from("br")),
 				ElementNode{self_closing:true}
-			)}}
-			.to_string(),
-		);
-	}
-	#[test]
-	fn fragment() {
-		"<br/><br/>".xmap(parse).to_be(
-			quote! {(
-				FragmentNode,
-				children![(
-					NodeTag(String::from("br")),
-					ElementNode{self_closing:true}
-				), (
-					NodeTag(String::from("br")),
-					ElementNode{self_closing:true}
-				)]
 			)}
 			.to_string(),
 		);
 	}
 	#[test]
+	fn fragment() {
+		"<br/><br/>"
+			.xmap(|str| {
+				tokenize_combinator(str, WsPathBuf::new(file!()))
+					.unwrap()
+					.to_string()
+					.xpect()
+			})
+			.to_be(
+				quote! {{(
+					FragmentNode,
+					related!{Children[(
+						NodeTag(String::from("br")),
+						ElementNode{self_closing:true}
+					), (
+						NodeTag(String::from("br")),
+						ElementNode{self_closing:true}
+					)]}
+				)}}
+				.to_string(),
+			);
+	}
+	#[test]
 	fn unclosed() {
 		"<div align=\"center\" />".xmap(parse).to_be(
-			quote! {{(
+			quote! {(
 				NodeTag(String::from("div")),
 				ElementNode{self_closing:true},
 				related!(Attributes[(
 					"align".into_attr_key_bundle(),
 					"center".into_attr_val_bundle()
 				)])
-			)}}
+			)}
 			.to_string(),
 		);
 	}
@@ -344,11 +366,11 @@ mod test {
 	#[test]
 	fn text() {
 		"<div>hello</div>".xmap(parse).to_be(
-			quote! {{(
+			quote! {(
 				NodeTag(String::from("div")),
 				ElementNode{self_closing:false},
 				related!{Children[TextNode(String::from("hello"))]}
-			)}}
+			)}
 			.to_string(),
 		);
 	}
@@ -356,64 +378,64 @@ mod test {
 	fn element_attributes() {
 		// default
 		"<br foo />".xmap(parse).to_be(
-			quote! {{(
+			quote! {(
 				NodeTag(String::from("br")),
 				ElementNode{self_closing:true},
 				related!(Attributes["foo".into_attr_key_bundle()])
-			)}}
+			)}
 			.to_string(),
 		);
 		// string
 		"<br foo=\"bar\"/>".xmap(parse).to_be(
-			quote! {{(
+			quote! {(
 				NodeTag(String::from("br")),
 				ElementNode{self_closing:true},
 				related!(Attributes[(
 					"foo".into_attr_key_bundle(),
 					"bar".into_attr_val_bundle()
 				)])
-			)}}
+			)}
 			.to_string(),
 		);
 		// bool
 		"<br foo=true />".xmap(parse).to_be(
-			quote! {{(
+			quote! {(
 				NodeTag(String::from("br")),
 				ElementNode{self_closing:true},
 				related!(Attributes[(
 					"foo".into_attr_key_bundle(),
 					true.into_attr_val_bundle()
 				)])
-			)}}
+			)}
 			.to_string(),
 		);
 		// number
 		"<br foo=20 />".xmap(parse).to_be(
-			quote! {{(
+			quote! {(
 				NodeTag(String::from("br")),
 				ElementNode{self_closing:true},
 				related!(Attributes[(
 					"foo".into_attr_key_bundle(),
 					20f64.into_attr_val_bundle()
 				)])
-			)}}
+			)}
 			.to_string(),
 		);
 		// ident
 		"<br foo={bar} />".xmap(parse).to_be(
-			quote! {{(
+			quote! {(
 				NodeTag(String::from("br")),
 				ElementNode{self_closing:true},
 				related!(Attributes[(
 					"foo".into_attr_key_bundle(),
 					{ bar }.into_attr_val_bundle()
 				)])
-			)}}
+			)}
 			.to_string(),
 		);
 		// element
 		"<br foo={<br/>} />".xmap(parse).to_be(
-			quote! {{(
+			quote! {(
 				NodeTag(String::from("br")),
 				ElementNode{self_closing:true},
 				related!(Attributes[(
@@ -423,7 +445,7 @@ mod test {
 							ElementNode { self_closing: true }
 						)}.into_attr_val_bundle()
 				)])
-			)}}
+			)}
 			.to_string(),
 		);
 		// mixed
@@ -433,7 +455,7 @@ mod test {
 		} />"
 			.xmap(parse)
 			.to_be(
-				quote! {{(
+				quote! {(
 					NodeTag(String::from("br")),
 					ElementNode{self_closing:true},
 					related!(Attributes[(
@@ -446,7 +468,7 @@ mod test {
 							bar
 						}.into_attr_val_bundle()
 					)])
-				)}}
+				)}
 				.to_string(),
 			);
 	}
@@ -454,7 +476,7 @@ mod test {
 	fn template_attributes() {
 		// default
 		"<MyTemplate foo />".xmap(parse).to_be(
-			quote! {{(
+			quote! {(
 				NodeTag(String::from("MyTemplate")),
 				FragmentNode,
 				TemplateNode,
@@ -467,12 +489,12 @@ mod test {
 					#[allow(unused_braces)]
 					(TemplateRoot::spawn(Spawn(template.into_node_bundle())))
 				}
-			)}}
+			)}
 			.to_string(),
 		);
 		// string
 		"<MyTemplate foo=\"bar\"/>".xmap(parse).to_be(
-			quote! {{(
+			quote! {(
 				NodeTag(String::from("MyTemplate")),
 				FragmentNode,
 				TemplateNode,
@@ -485,12 +507,12 @@ mod test {
 					#[allow(unused_braces)]
 					(TemplateRoot::spawn(Spawn(template.into_node_bundle())))
 				}
-			)}}
+			)}
 			.to_string(),
 		);
 		// bool
 		"<MyTemplate foo=true />".xmap(parse).to_be(
-			quote! {{(
+			quote! {(
 				NodeTag(String::from("MyTemplate")),
 				FragmentNode,
 				TemplateNode,
@@ -503,12 +525,12 @@ mod test {
 					#[allow(unused_braces)]
 					(TemplateRoot::spawn(Spawn(template.into_node_bundle())))
 				}
-			)}}
+			)}
 			.to_string(),
 		);
 		// number
 		"<MyTemplate foo=20 />".xmap(parse).to_be(
-			quote! {{(
+			quote! {(
 				NodeTag(String::from("MyTemplate")),
 				FragmentNode,
 				TemplateNode,
@@ -521,12 +543,12 @@ mod test {
 					#[allow(unused_braces)]
 					(TemplateRoot::spawn(Spawn(template.into_node_bundle())))
 				}
-			)}}
+			)}
 			.to_string(),
 		);
 		// ident
 		"<MyTemplate foo={bar} />".xmap(parse).to_be(
-			quote! {{(
+			quote! {(
 				NodeTag(String::from("MyTemplate")),
 				FragmentNode,
 				TemplateNode,
@@ -539,12 +561,12 @@ mod test {
 					#[allow(unused_braces)]
 					(TemplateRoot::spawn(Spawn(template.into_node_bundle())))
 				}
-			)}}
+			)}
 			.to_string(),
 		);
 		// element
 		"<MyTemplate foo={<br/>} />".xmap(parse).to_be(
-			quote! {{(
+			quote! {(
 				NodeTag(String::from("MyTemplate")),
 				FragmentNode,
 				TemplateNode,
@@ -560,7 +582,7 @@ mod test {
 					#[allow(unused_braces)]
 					(TemplateRoot::spawn(Spawn(template.into_node_bundle())))
 				}
-			)}}
+			)}
 			.to_string(),
 		);
 		// mixed
@@ -570,7 +592,7 @@ mod test {
 		} />"
 			.xmap(parse)
 			.to_be(
-				quote! {{(
+				quote! {(
 					NodeTag(String::from("MyTemplate")),
 					FragmentNode,
 					TemplateNode,
@@ -589,7 +611,7 @@ mod test {
 						#[allow(unused_braces)]
 						(TemplateRoot::spawn(Spawn(template.into_node_bundle())))
 					}
-				)}}
+				)}
 				.to_string(),
 			);
 	}

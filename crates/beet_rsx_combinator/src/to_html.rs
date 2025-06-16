@@ -14,6 +14,7 @@ impl ToHtml for RsxElement {
 		match self {
 			RsxElement::SelfClosing(element) => element.to_html(),
 			RsxElement::Normal(element) => element.to_html(),
+			RsxElement::Fragment(fragment) => fragment.to_html(),
 		}
 	}
 }
@@ -46,6 +47,11 @@ impl ToHtml for RsxNormalElement {
 		result
 	}
 }
+
+impl ToHtml for RsxFragment {
+	fn to_html(&self) -> String { self.0.to_html() }
+}
+
 impl ToHtml for RsxChildren {
 	fn to_html(&self) -> String {
 		self.0

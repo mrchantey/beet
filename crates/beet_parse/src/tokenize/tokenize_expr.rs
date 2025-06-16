@@ -1,4 +1,5 @@
 use crate::prelude::*;
+use crate::tokenize::tokenize_bundle_tokens_no_flatten;
 use beet_common::prelude::*;
 use bevy::prelude::*;
 use proc_macro2::TokenStream;
@@ -26,14 +27,22 @@ pub fn tokenize_combinator_exprs(
 	world: &World,
 	entity: Entity,
 ) -> Result<Option<TokenStream>> {
-	tokenize_combinator_exprs_inner(world, entity, super::tokenize_bundle_no_flatten)
+	tokenize_combinator_exprs_inner(
+		world,
+		entity,
+		super::tokenize_bundle_no_flatten,
+	)
 }
 
 pub fn tokenize_combinator_exprs_tokens(
 	world: &World,
 	entity: Entity,
 ) -> Result<Option<TokenStream>> {
-	tokenize_combinator_exprs_inner(world, entity, tokenize_bundle_tokens)
+	tokenize_combinator_exprs_inner(
+		world,
+		entity,
+		tokenize_bundle_tokens_no_flatten,
+	)
 }
 
 /// push combinators for nodes, attributes are handled by tokenize_attributes

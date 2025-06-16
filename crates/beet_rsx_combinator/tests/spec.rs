@@ -40,3 +40,38 @@ pub fn test_to_html_3() {
 	let (ast, _) = parse(source).unwrap();
 	expect(ast.to_html()).to_be("{<x-foo-bar>Hello world!</x-foo-bar>}");
 }
+
+#[test]
+pub fn test_fragment_empty() {
+	let source = "<></>";
+	let (ast, _) = parse(source).unwrap();
+	expect(ast.to_html()).to_be("{}");
+}
+
+#[test]
+pub fn test_fragment_with_single_element() {
+	let source = "<><div>Hello</div></>";
+	let (ast, _) = parse(source).unwrap();
+	expect(ast.to_html()).to_be("{<div>Hello</div>}");
+}
+
+#[test]
+pub fn test_fragment_with_multiple_elements() {
+	let source = "<><div>Hello</div><span>World</span></>";
+	let (ast, _) = parse(source).unwrap();
+	expect(ast.to_html()).to_be("{<div>Hello</div><span>World</span>}");
+}
+
+#[test]
+pub fn test_fragment_with_text_and_elements() {
+	let source = "<>Text before<div>content</div>Text after</>";
+	let (ast, _) = parse(source).unwrap();
+	expect(ast.to_html()).to_be("{Text before<div>content</div>Text after}");
+}
+
+#[test]
+pub fn test_nested_fragments() {
+	let source = "<><>Inner fragment</><div>Element</div></>";
+	let (ast, _) = parse(source).unwrap();
+	expect(ast.to_html()).to_be("{Inner fragment<div>Element</div>}");
+}

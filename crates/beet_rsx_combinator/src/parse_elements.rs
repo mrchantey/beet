@@ -19,6 +19,7 @@ where
 {
 	choice!(
 		r#try(parser(rsx_self_closing_element).map(RsxElement::SelfClosing)),
+		r#try(parser(rsx_fragment).map(RsxElement::Fragment)),
 		parser(rsx_normal_element).map(RsxElement::Normal)
 	)
 	.parse_stream(input)
@@ -66,6 +67,19 @@ where
 				})
 				.parse_stream(consumed.into_inner())
 		})
+}
+
+pub fn rsx_fragment<I>(input: I) -> ParseResult<RsxFragment, I>
+where
+	I: Stream<Item = char>,
+{
+	(
+		parser(fragment_open_tag).skip(parser(js_whitespace)),
+		optional(parser(rsx_children).skip(parser(js_whitespace))),
+		parser(fragment_close_tag),
+	)
+		.map(|(_, children, _)| RsxFragment(children.into()))
+		.parse_stream(input)
 }
 
 pub fn rsx_opening_element<I>(input: I) -> ParseResult<RsxOpeningElement, I>
@@ -1028,5 +1042,43 @@ mod test {
 				.into_vec(),
 			vec!["foo".into(), "bar1".into()]
 		);
+	}
+
+	use sweet::prelude::*;
+
+	#[test]
+	pub fn test_rsx_fragment_empty() {
+		let result = p(rsx_fragment).parse("<></>");
+		expect(result.is_ok()).to_be_true();
+		let (fragment, _) = result.unwrap();
+		expect(fragment.0.0.len()).to_be(0);
+	}
+
+	#[test]
+	pub fn test_rsx_fragment_with_content() {
+		let result = p(rsx_fragment).parse("<>Hello World</>");
+		expect(result.is_ok()).to_be_true();
+		let (fragment, _) = result.unwrap();
+		expect(fragment.0.0.len()).to_be(1);
+	}
+
+	#[test]
+	pub fn test_rsx_fragment_with_elements() {
+		let result =
+			p(rsx_fragment).parse("<><div>content</div><span>more</span></>");
+		expect(result.is_ok()).to_be_true();
+		let (fragment, _) = result.unwrap();
+		expect(fragment.0.0.len()).to_be(2);
+	}
+
+	#[test]
+	pub fn test_rsx_element_includes_fragment() {
+		let result = p(rsx_element).parse("<></>");
+		expect(result.is_ok()).to_be_true();
+		let (element, _) = result.unwrap();
+		match element {
+			RsxElement::Fragment(_) => {}
+			_ => panic!("Expected fragment element"),
+		}
 	}
 }
