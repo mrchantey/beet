@@ -121,6 +121,6 @@ mod test {
 		);
 		expect(&codegen).to_contain("mod route0 ;");
 		expect(&codegen)
-			.to_contain("router = self . add_route (router , route0 :: get)");
+			.to_contain("self . add_route (router , (RouteInfo { path : RoutePath (std :: path :: PathBuf :: from (\"/hello\")) , method : HttpMethod :: Get } , route0 :: get))");
 	}
 }

@@ -5,7 +5,7 @@ use beet::prelude::*;
 #[derive(derive_template)]
 pub struct BeetContext {}
 
-fn beet_context(_: BeetContext) -> WebNode {
+fn beet_context(_: BeetContext) -> impl Bundle {
 	set_context(Brand {
 		title: "Beet".into(),
 		description: "A Rust web framework".into(),

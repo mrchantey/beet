@@ -1,5 +1,5 @@
 use std::borrow::Cow;
-
+use bevy::prelude::*;
 
 /// A struct that should be set as a top level context value.
 ///
@@ -12,7 +12,7 @@ use std::borrow::Cow;
 /// # use beet_template::as_beet::*;
 /// # use beet_design::prelude::*;
 ///
-/// fn my_component()-> WebNode {
+/// fn my_component()-> impl Bundle {
 /// 	set_context(Brand{
 /// 		title: "My Site".into(),
 /// 		description: "A site about stuff".into(),
@@ -26,7 +26,7 @@ use std::borrow::Cow;
 /// }
 ///
 /// ```
-#[derive(Clone)]
+#[derive(Clone, Resource)]
 pub struct Brand {
 	/// The pretty title of the application,
 	/// ie `My App`

@@ -24,11 +24,6 @@ pub fn rsx(tokens: TokenStream) -> TokenStream {
 		.into()
 }
 
-/// Mostly used for testing, this macro expands to an [`WebNodeTemplate`]
-#[proc_macro]
-pub fn rsx_template(_tokens: TokenStream) -> TokenStream { todo!() }
-
-
 /// Mostly used for testing, this macro expands to [`WebTokens`]
 #[proc_macro]
 pub fn rsx_tokens(tokens: TokenStream) -> TokenStream {

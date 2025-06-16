@@ -1,5 +1,5 @@
 use beet_template::prelude::*;
 
-pub fn get() -> WebNode {
+pub fn get() -> impl Bundle {
 	rsx! { <div></div> }
 }

@@ -5,7 +5,7 @@ use serde::Serialize;
 #[derive(derive_template, Serialize, Deserialize)]
 pub struct Broken;
 
-fn broken(_props: Broken) -> WebNode {
+fn broken(_props: Broken) -> impl Bundle {
 	rsx! {
 	<div>
 		<RejectsNeg/>
@@ -23,7 +23,7 @@ fn broken(_props: Broken) -> WebNode {
 
 #[derive(derive_template)]
 struct RejectsNeg {}
-fn rejects_neg(_props: RejectsNeg) -> WebNode {
+fn rejects_neg(_props: RejectsNeg) -> impl Bundle {
 	let onclick = move |_| {
 		sweet::log!("clicked");
 	};

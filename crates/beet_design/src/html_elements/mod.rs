@@ -91,7 +91,7 @@ mod test {
 			#[field(flatten = BaseHtmlAttributes)]
 			_button_attrs: ButtonHtmlAttributes,
 		}
-		fn button(_props: Button) -> WebNode { Default::default() }
+		fn button(_props: Button) -> impl Bundle { Default::default() }
 		// onclick was ommitted from the into_rsx_attributes
 		let _foo = rsx! { <Button onclick=|_| {} /> };
 	}

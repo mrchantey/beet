@@ -15,14 +15,14 @@ pub struct Head {
 	pub fixed_scale: bool,
 }
 
-fn head(Head { fixed_scale }: Head) -> WebNode {
+fn head(Head { fixed_scale }: Head) -> impl Bundle {
 	let Brand {
 		title,
 		description,
 		site_url,
 		version,
 		..
-	} = get_context::<Brand>();
+	} = ReactiveApp::resource::<Brand>();
 
 
 	let scale = {

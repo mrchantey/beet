@@ -3,7 +3,6 @@
 #![cfg_attr(test, test_runner(sweet::test_runner))]
 #![feature(more_qualified_paths)]
 use beet_template::as_beet::*;
-use bevy::prelude::*;
 use sweet::prelude::*;
 
 #[test]

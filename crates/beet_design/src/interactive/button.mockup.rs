@@ -1,7 +1,7 @@
 use crate::prelude::*;
 use beet_template::sigfault::signal;
 
-pub fn get() -> WebNode {
+pub fn get() -> impl Bundle {
 	rsx! { <Inner client:load /> }
 }
 
@@ -9,7 +9,7 @@ pub fn get() -> WebNode {
 #[derive(derive_template, serde::Serialize, serde::Deserialize)]
 pub struct Inner;
 
-fn inner(_: Inner) -> WebNode {
+fn inner(_: Inner) -> impl Bundle {
 	let (value, set_value) = signal(0);
 	let val2 = value.clone();
 	rsx! {

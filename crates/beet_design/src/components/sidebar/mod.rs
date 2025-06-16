@@ -2,11 +2,10 @@ mod sidebar;
 mod sidebar_item;
 use beet_router::prelude::*;
 use beet_template::prelude::*;
+use beet_utils::prelude::GlobFilter;
 use heck::ToTitleCase;
 pub use sidebar::*;
 pub use sidebar_item::*;
-use sweet::prelude::GlobFilter;
-
 
 #[derive(Debug, Default, Clone)]
 pub struct RoutePathTreeToSidebarTree {

@@ -21,11 +21,13 @@ publish = true
 _test_lightningcss = ["dep:lightningcss"]
 
 [dependencies]
+bevy.workspace = true
 anyhow.workspace = true
 sweet.workspace = true
 beet_template.workspace = true
 beet_common.workspace = true
 beet_router.workspace = true
+beet_utils.workspace = true
 chrono.workspace = true
 heck.workspace = true
 material-colors = "0.4.2"

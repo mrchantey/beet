@@ -2,12 +2,8 @@ use beet_template::as_beet::*;
 
 
 
-#[derive(derive_template)]
-pub struct Css;
-
-
-
-fn css(_: Css) -> WebNode {
+#[template]
+pub fn Css() -> impl Bundle {
 	rsx! {
 		<style scope:global src="./elements/code.css" />
 		<style scope:global src="./elements/details.css" />

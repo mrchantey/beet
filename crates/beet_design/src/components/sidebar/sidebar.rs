@@ -1,12 +1,8 @@
 use crate::prelude::*;
 use beet_template::as_beet::*;
 
-#[derive(derive_template)]
-pub struct Sidebar {
-	pub nodes: Vec<SidebarNode>,
-}
-
-fn sidebar(Sidebar { nodes }: Sidebar) -> WebNode {
+#[template]
+pub fn Sidebar(nodes: Vec<SidebarNode>) -> impl Bundle {
 	rsx! {
 		<nav id="sidebar" aria-hidden="false">
 		{nodes.into_iter().map(|node|{

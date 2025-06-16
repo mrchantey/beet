@@ -2,12 +2,8 @@ use crate::prelude::*;
 
 
 /// Wraps an entire page, including the head and body
-#[derive(derive_template)]
-pub struct DocumentLayout {
-	// pub head: Head,
-}
-
-fn document_layout(_props: DocumentLayout) -> WebNode {
+#[template]
+pub fn DocumentLayout() -> impl Bundle {
 	rsx! {
 		<!DOCTYPE html>
 		<html lang="en">

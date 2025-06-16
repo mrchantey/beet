@@ -3,7 +3,6 @@ use beet_template::as_beet::*;
 use material_colors::theme::Theme;
 
 
-
 /// Entry point for the beet design system.
 ///
 /// Beet's design system is inspired by a few places:
@@ -11,15 +10,10 @@ use material_colors::theme::Theme;
 /// 	- [`material-colors` crate](https://crates.io/crates/material-colors)
 /// - Typography: Starlight
 /// - Layout: PicoCSS
-#[derive(derive_template)]
-pub struct DesignSystem {
-	pub theme: Theme,
-}
-
-
-fn design_system(props: DesignSystem) -> WebNode {
+#[template]
+pub fn DesignSystem(theme: Theme) -> impl Bundle {
 	rsx! {
-		<ColorScheme theme=props.theme />
+		<ColorScheme theme=theme />
 		<Css />
 	}
 }

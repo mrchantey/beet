@@ -2,11 +2,9 @@ use crate::prelude::*;
 use beet_template::as_beet::*;
 use chrono::Datelike;
 
-#[derive(derive_template)]
-pub struct Footer;
-
-fn footer(_props: Footer) -> WebNode {
-	let Brand { title, version, .. } = get_context::<Brand>();
+#[template]
+pub fn Footer() -> impl Bundle {
+	let Brand { title, version, .. } = ReactiveApp::resource::<Brand>();
 	let current_year = chrono::Utc::now().year();
 	let footer_text = format!("&copy; {title} {current_year}");
 

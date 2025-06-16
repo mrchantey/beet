@@ -26,15 +26,11 @@ impl ButtonVariant {
 
 
 /// A styled button
-#[derive(derive_template)]
-pub struct Button {
-	#[field(default)]
-	pub variant: ButtonVariant,
-	#[field(flatten=BaseHtmlAttributes)]
-	pub attrs: ButtonHtmlAttributes,
-}
-
-fn button(Button { variant, mut attrs }: Button) -> WebNode {
+#[template]
+pub fn Button(
+	#[field(default)] variant: ButtonVariant,
+	#[field(flatten=BaseHtmlAttributes)] mut attrs: ButtonHtmlAttributes,
+) -> impl Bundle {
 	attrs.push_class(format!(
 		"bt-c-button bt-c-button--{}",
 		variant.class_suffix()
@@ -51,15 +47,11 @@ fn button(Button { variant, mut attrs }: Button) -> WebNode {
 
 
 
-/// A button with no text, only an icon
-#[derive(derive_template)]
-pub struct IconButton {
-	#[field(default=ButtonVariant::default())]
-	pub variant: ButtonVariant,
-}
-
-
-fn icon_button(IconButton { variant }: IconButton) -> WebNode {
+/// A button styled with no text, only an icon
+#[template]
+pub fn IconButton(
+	#[field(default=ButtonVariant::default())] variant: ButtonVariant,
+) -> impl Bundle {
 	let class = format!(
 		"bt-c-button bt-c-button--icon bt-c-button--{}",
 		variant.class_suffix()
@@ -74,17 +66,11 @@ fn icon_button(IconButton { variant }: IconButton) -> WebNode {
 }
 
 /// An anchor tag styled as a button
-#[derive(derive_template)]
-pub struct Link {
-	#[field(default)]
-	pub variant: ButtonVariant,
-	#[field(flatten)]
-	#[field(flatten=BaseHtmlAttributes)]
-	pub attrs: AnchorHtmlAttributes,
-}
-
-
-pub fn link(Link { variant, mut attrs }: Link) -> WebNode {
+#[template]
+pub fn Link(
+	#[field(default)] variant: ButtonVariant,
+	#[field(flatten=BaseHtmlAttributes)] mut attrs: AnchorHtmlAttributes,
+) -> impl Bundle {
 	let class = format!(" bt-c-button--{}", variant.class_suffix());
 	attrs.push_class(csx!("bt-c-button", class));
 	rsx! {

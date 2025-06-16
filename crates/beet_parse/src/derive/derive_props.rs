@@ -192,7 +192,7 @@ mod test {
 			use beet::prelude::*;
 
 			impl beet::prelude::Component for MyNode {
-				fn render (self) -> WebNode { my_node (self) }
+				fn render (self) -> impl Bundle { my_node (self) }
 			}
 			impl Props for MyNode {
 				type Builder = MyNodeBuilder;

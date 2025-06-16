@@ -169,23 +169,20 @@ impl ThemeToCss {
 		)
 	}
 }
+// avoid lightning dependencies
+// #[cfg(test)]
+// mod test {
+// 	use crate::prelude::*;
+// 	use lightningcss::stylesheet::ParserOptions;
+// 	use lightningcss::stylesheet::StyleSheet;
+// 	use material_colors::color::Argb;
+// 	use material_colors::theme::ThemeBuilder;
+// 	use sweet::prelude::*;
 
-
-#[cfg(test)]
-mod test {
-	use crate::prelude::*;
-	use lightningcss::stylesheet::ParserOptions;
-	use lightningcss::stylesheet::StyleSheet;
-	use material_colors::color::Argb;
-	use material_colors::theme::ThemeBuilder;
-	use sweet::prelude::*;
-
-	#[test]
-	fn works() {
-		let css = ThemeToCss::default()
-			.map(&ThemeBuilder::with_source(Argb::new(255, 255, 0, 0)).build());
-		expect(StyleSheet::parse(&css, ParserOptions::default())).to_be_ok();
-
-		// println!("{}", css);
-	}
-}
+// 	#[test]
+// 	fn works() {
+// 		let css = ThemeToCss::default()
+// 			.map(&ThemeBuilder::with_source(Argb::new(255, 255, 0, 0)).build());
+// 		expect(StyleSheet::parse(&css, ParserOptions::default())).to_be_ok();
+// 	}
+// }

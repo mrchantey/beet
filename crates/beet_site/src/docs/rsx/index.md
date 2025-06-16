@@ -1,36 +1,12 @@
 ---
 # for parser whatever it is for the rest of that line, trimming whitespace, as a string. people can parse it as they wish later.
-title: Sweet
-
-
+title: Beet
 ---
 
 
 Rusty tools for developing reative structures.
 
 Sweet builds upon Astro's principle of creating interoperability between various reactive libraries, and extends that capability with support for multiple renderers and authoring flavours.
-
-# Planned Authoring Flavours
-- Vanilla Rust `WebNode`
-- Reactive html `rsx!`
-- Reactive bevy scenes `bsn!`
-
-# Reactive frameworks
-- [Leptos Signals](https://crates.io/crates/reactive_graph) 
-- Headless Bevy
-
-# Planned Renderers
-- html
-- bevy graphics
-- esp32 robotics
-- agentic ai
-- behavior trees
-
-## The preprocessor
-
-Sweet has a preprocessor that enables instant reloads for non-code changes in `rsx!` macros.
-
-
 
 # Features
 - 🔥 **Smokin hot reload** instant reloads for non-code changes

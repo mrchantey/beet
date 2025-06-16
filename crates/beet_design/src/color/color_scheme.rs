@@ -4,20 +4,15 @@ use material_colors::color::Argb;
 use material_colors::theme::Theme;
 use material_colors::theme::ThemeBuilder;
 
-
-#[derive(Debug, derive_template)]
-pub struct ColorScheme {
-	theme: Theme,
-}
-
-fn color_scheme(props: ColorScheme) -> WebNode {
-	// Theme
-
-	let css = ThemeToCss::default().map(&props.theme);
-
-	Style::new(css)
-		.with_directive(TemplateDirectiveEnum::StyleScope(StyleScope::Global))
-		.into_node()
+#[template]
+fn ColorScheme(theme: Theme) -> impl Bundle {
+	let css = ThemeToCss::default().map(&theme);
+	(
+		NodeTag::new("style"),
+		StyleScope::Global,
+		ElementNode::open(),
+		children![TextNode::new(css)],
+	)
 }
 
 impl ColorScheme {

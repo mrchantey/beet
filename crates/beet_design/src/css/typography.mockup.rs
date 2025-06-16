@@ -3,7 +3,7 @@ use beet_template::as_beet::*;
 
 
 
-pub fn get() -> WebNode {
+pub fn get() -> impl Bundle {
 	rsx! {
 		<h1>This is a H1 Heading</h1>
 		<p>Here is some text under the heading</p>

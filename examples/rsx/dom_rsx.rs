@@ -16,7 +16,7 @@ fn main() {
 }
 
 #[allow(unused)]
-fn app() -> WebNode {
+fn app() -> impl Bundle {
 	let (value, set_value) = signal(0);
 
 	rsx! {

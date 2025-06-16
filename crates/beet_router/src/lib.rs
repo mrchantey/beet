@@ -9,7 +9,6 @@ pub mod prelude {
 
 
 pub mod exports {
-	pub use beet_utils::prelude::GlobFilter;
 	pub use http;
 }
 

@@ -867,6 +867,8 @@ dependencies = [
  "beet_common",
  "beet_router",
  "beet_template",
+ "beet_utils",
+ "bevy",
  "chrono",
  "heck 0.4.1",
  "lightningcss",

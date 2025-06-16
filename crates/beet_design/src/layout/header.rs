@@ -8,8 +8,8 @@ pub struct Header {
 }
 
 
-fn header(Header { home_route }: Header) -> WebNode {
-	let Brand { title, .. } = get_context::<Brand>();
+fn header(Header { home_route }: Header) -> impl Bundle {
+	let Brand { title, .. } = ReactiveApp::resource::<Brand>();
 
 	rsx! {
 		<header>

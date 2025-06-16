@@ -1,13 +1,8 @@
 use crate::prelude::*;
 
-
 /// A [`PageLayout`] with a `<main>` content area.
-#[derive(derive_template)]
-pub struct ContentLayout {
-	// pub page_layout: PageLayout,
-}
-
-fn content_layout(_: ContentLayout) -> WebNode {
+#[template]
+pub fn ContentLayout() -> impl Bundle {
 	rsx! {
 			<PageLayout>
 			<slot name="head" slot="head" />

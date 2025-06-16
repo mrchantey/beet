@@ -1,24 +1,14 @@
 use crate::prelude::*;
 use beet_template::as_beet::*;
 
-#[derive(Clone, derive_template)]
-pub struct SidebarItem {
-	pub node: SidebarNode,
-	pub root: bool,
-}
-
-fn sidebar_item(
-	SidebarItem {
-		node:
-			SidebarNode {
-				display_name,
-				path,
-				children,
-				expanded,
-			},
-		root,
-	}: SidebarItem,
-) -> WebNode {
+#[template]
+pub fn SidebarItem(node: SidebarNode, root: bool) -> impl Bundle {
+	let SidebarNode {
+		display_name,
+		path,
+		children,
+		expanded,
+	} = node;
 	// let items = tree.
 	let class = if root { "root" } else { "" };
 

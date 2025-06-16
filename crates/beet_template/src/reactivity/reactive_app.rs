@@ -64,4 +64,13 @@ impl ReactiveApp {
 			app.should_exit()
 		})
 	}
+	/// Wrapper for [`World::insert_resource`].
+	pub fn insert_resource<T: Resource>(resource: T) {
+		Self::with(|app| app.world_mut().insert_resource(resource));
+	}
+
+	/// Wrapper for [`World::resource`].
+	pub fn resource<T: Clone + Resource>() -> T {
+		Self::with(|app| app.world().resource::<T>().clone())
+	}
 }

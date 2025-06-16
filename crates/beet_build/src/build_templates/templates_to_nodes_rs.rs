@@ -33,9 +33,7 @@ pub fn templates_to_nodes_rs(
 	Ok(())
 }
 
-
-/// Visit a file, extracting an [`FileSpan`] and [`WebNodeTemplate`] for each
-/// `rsx!` macro in the file.
+/// Spawn an [`RstmlTokens`] for each `rsx!` macro in the file.
 struct RsxSynVisitor<'a, 'w, 's> {
 	parent: Entity,
 	commands: &'a mut Commands<'w, 's>,

@@ -23,15 +23,12 @@ impl TextFieldVariant {
 
 
 /// A styled text field
-#[derive(derive_template)]
-pub struct TextField {
-	#[field(default)]
-	pub variant: TextFieldVariant,
-	#[field(flatten=BaseHtmlAttributes)]
-	pub attrs: InputHtmlAttributes,
-}
-
-fn text_field(TextField { variant, mut attrs }: TextField) -> WebNode {
+#[template]
+pub fn TextField(
+	#[field(default)] variant: TextFieldVariant,
+	#[field(flatten)] attrs: InputHtmlAttributes,
+) -> impl Bundle {
+	let mut attrs = attrs;
 	attrs.push_class(format!(
 		"bt-c-input bt-c-input--{}",
 		variant.class_suffix()
@@ -48,16 +45,12 @@ fn text_field(TextField { variant, mut attrs }: TextField) -> WebNode {
 
 
 /// A styled text area
-#[derive(derive_template)]
-pub struct TextArea {
-	#[field(default)]
-	pub variant: TextFieldVariant,
-	#[field(flatten=BaseHtmlAttributes)]
-	#[field(flatten=InputHtmlAttributes)]
-	pub attrs: TextAreaHtmlAttributes,
-}
-
-fn text_area(TextArea { variant, mut attrs }: TextArea) -> WebNode {
+#[template]
+pub fn TextArea(
+	#[field(default)] variant: TextFieldVariant,
+	#[field(flatten)] attrs: TextAreaHtmlAttributes,
+) -> impl Bundle {
+	let mut attrs = attrs;
 	attrs.push_class(format!(
 		"bt-c-input bt-c-input--{}",
 		variant.class_suffix()

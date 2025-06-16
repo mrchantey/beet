@@ -9,7 +9,7 @@ pub struct Calculator {
 	initial: i32,
 }
 
-fn calculator(props: Calculator) -> WebNode {
+fn calculator(props: Calculator) -> impl Bundle {
 	let (get, set) = signal(props.initial);
 
 
