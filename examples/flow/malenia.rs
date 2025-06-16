@@ -10,7 +10,6 @@
 //!
 //! https://eldenring.wiki.fextralife.com/Malenia+Blade+of+Miquella
 use beet::prelude::*;
-use bevy::prelude::*;
 use std::io;
 use std::io::Write;
 

@@ -2,7 +2,6 @@
 //! see `malenia.rs` for custom score providers
 //!
 use beet::prelude::*;
-use bevy::prelude::*;
 use sweet::prelude::EntityWorldMutwExt;
 
 #[rustfmt::skip]

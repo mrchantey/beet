@@ -1,7 +1,6 @@
 use beet::prelude::handle_changed_files;
 use beet::prelude::*;
 use bevy::ecs::system::RunSystemOnce;
-use bevy::prelude::*;
 use std::num::NonZeroU8;
 use std::ops::ControlFlow;
 use std::time::Duration;

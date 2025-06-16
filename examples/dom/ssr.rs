@@ -7,7 +7,7 @@ use axum::Router;
 use axum::extract::Query as QueryParams;
 use axum::extract::State;
 use beet::prelude::*;
-use bevy::prelude::*;
+
 #[tokio::main]
 async fn main() {
 	let app = Router::<AppState>::new()

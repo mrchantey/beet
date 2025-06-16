@@ -2,7 +2,6 @@
 //! by multiple sources from arbitary positions in a graph.
 //! In beet this is achieved using the [`RunNext`] action.
 use beet::prelude::*;
-use bevy::prelude::*;
 use sweet::prelude::EntityWorldMutwExt;
 
 #[rustfmt::skip]

@@ -9,7 +9,6 @@
 //! wasm-bindgen --out-dir target/examples/hydration/wasm --out-name main --target web --no-typescript target/wasm32-unknown-unknown/debug/examples/hydration.wasm
 //! ```
 use beet::prelude::*;
-use bevy::prelude::*;
 
 #[rustfmt::skip]
 #[cfg(target_arch = "wasm32")]
