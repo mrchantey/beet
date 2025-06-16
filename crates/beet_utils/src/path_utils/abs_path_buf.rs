@@ -129,7 +129,7 @@ impl AbsPathBuf {
 		Self(path)
 	}
 
-	pub fn workspace_rel(&self) -> FsResult<WsPathBuf> {
+	pub fn into_ws_path(&self) -> FsResult<WsPathBuf> {
 		// Strip the workspace root from the path
 		let path = PathExt::strip_prefix(&self.0, &FsExt::workspace_root())?;
 		Ok(WsPathBuf::new(path))
@@ -240,7 +240,7 @@ mod test {
 		let file = file!();
 		let buf = AbsPathBuf::new_workspace_rel(file).unwrap();
 		assert_eq!(buf, abs_file!());
-		let workspace_rel = buf.workspace_rel().unwrap();
+		let workspace_rel = buf.into_ws_path().unwrap();
 		assert_eq!(workspace_rel.to_string_lossy(), file);
 	}
 	#[test]

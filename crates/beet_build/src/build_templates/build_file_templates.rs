@@ -53,7 +53,7 @@ pub fn handle_changed_files(
 		.filter(|ev| {
 			builders.iter().any(|config| config.filter.passes(&ev.path))
 		}) {
-		let ws_path = ev.path.workspace_rel()?;
+		let ws_path = ev.path.into_ws_path()?;
 
 		// remove existing TemplateFile entities and their children
 		for (entity, template_file) in query.iter() {

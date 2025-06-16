@@ -1,8 +1,8 @@
 use anyhow::Result;
-use std::path::Path;
-use std::path::PathBuf;
 #[cfg(feature = "tokens")]
 use beet_common::as_beet::*;
+use std::path::Path;
+use std::path::PathBuf;
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -43,6 +43,15 @@ impl AsRef<Path> for RoutePath {
 
 impl RoutePath {
 	pub fn new(path: impl Into<PathBuf>) -> Self { Self(path.into()) }
+
+
+	/// when joining with other paths ensure that the path
+	/// does not start with a leading slash, as this would
+	/// cause the path to be treated as an absolute path
+	pub fn as_relative(&self) -> &Path {
+		self.0.strip_prefix("/").unwrap_or(&self.0)
+	}
+
 	/// Creates a route join even if the other route path begins with `/`
 	pub fn join(&self, new_path: &RoutePath) -> Self {
 		let new_path = new_path.0.strip_prefix("/").unwrap_or(&new_path.0);

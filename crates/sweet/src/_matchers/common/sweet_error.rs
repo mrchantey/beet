@@ -96,6 +96,7 @@ impl std::fmt::Display for SweetError {
 impl SweetError {
 	fn assertion_location(&self) -> Result<BacktraceLocation> {
 		let mut assertion_depth = self.assertion_depth;
+		// how to test this?
 		loop {
 			if let Some(frame) = self.backtrace.frames().get(assertion_depth) {
 				let loc = BacktraceLocation::from_unresolved_frame(frame)?;

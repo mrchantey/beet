@@ -21,7 +21,7 @@ pub fn parse_route_file_md(
 		let mut parent = commands.entity(entity);
 		let file_str = ReadFile::to_string(&route_file.origin_path)?;
 
-		let ws_path = route_file.origin_path.workspace_rel()?;
+		let ws_path = route_file.origin_path.into_ws_path()?;
 		let config = ParseMarkdown::markdown_to_frontmatter_tokens(&file_str)?;
 		let rsx_str = ParseMarkdown::markdown_to_rsx_str(&file_str);
 
@@ -42,11 +42,12 @@ pub fn parse_route_file_md(
 			.unwrap_or_else(|| WsPathBuf::default().into_abs());
 
 
+
+
 		let mut md_codegen_path = AbsPathBuf::new_unchecked(
-			group_codegen_dir.join(&route_file.route_path),
+			group_codegen_dir.join(&route_file.route_path.as_relative()),
 		);
 		md_codegen_path.set_extension("rs");
-
 
 		parent.with_child(RouteFileMethod {
 			config: if config.is_some() {
@@ -60,7 +61,7 @@ pub fn parse_route_file_md(
 			},
 		});
 
-		route_file.mod_path = md_codegen_path.workspace_rel()?.take();
+		route_file.mod_path = md_codegen_path.into_ws_path()?.take();
 		// here the markdown will be generated in its own codegen
 		parent.with_child((
 			CombinatorTokens(rsx_str),
