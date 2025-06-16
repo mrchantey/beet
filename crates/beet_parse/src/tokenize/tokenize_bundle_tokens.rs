@@ -94,11 +94,11 @@ mod test {
 				.to_string()
 				.replace(" ", "")
 				.chars()
-				.skip(60)
+				.skip(33)
 				.collect::<String>()
 				.chars()
 				.rev()
-				.skip(17)
+				.skip(4)
 				.collect::<String>()
 				.chars()
 				.rev()
@@ -142,13 +142,13 @@ mod test {
 				(
 					NodeTag(String::from("br")),
 					ElementNode { self_closing: true },
-					Attributes::spawn(bevy::ecs::spawn::SpawnIter([
+					related!{Attributes[
 						AttributeKeyExpr(SendWrapper::new(syn::parse_quote!("hidden"))),
 						(AttributeKeyExpr(SendWrapper::new(syn::parse_quote!("class"))), 			AttributeValueExpr(SendWrapper::new(syn::parse_quote!("foo")))),
 						(AttributeKeyExpr(SendWrapper::new(syn::parse_quote!("some_key"))) , 	AttributeValueExpr(SendWrapper::new(syn::parse_quote!({ bar })))),
 						(AttributeKeyExpr(SendWrapper::new(syn::parse_quote!("onmousemove"))), AttributeValueExpr(SendWrapper::new(syn::parse_quote!("some_js_func")))),
 						(AttributeKeyExpr(SendWrapper::new(syn::parse_quote!("onclick"))), 		AttributeValueExpr(SendWrapper::new(syn::parse_quote!({ |_: Trigger<OnClick>| {} }))))
-					].into_iter()))
+					]}
 				)
 			}
 			.to_string(),
@@ -160,15 +160,13 @@ mod test {
 			quote! {(
 							NodeTag(String::from("div")),
 							ElementNode { self_closing: false },
-							Children::spawn(bevy::ecs::spawn::SpawnIter([
-								(
-									BlockNode,
-									ItemOf::<beet_common::node::rsx_nodes::BlockNode, send_wrapper::SendWrapper<syn::expr::Expr> > {
-										value: SendWrapper::new(syn::parse_quote!({ 7 })),
-										phantom: std::marker::PhantomData::<beet_common::node::rsx_nodes::BlockNode>
-									}
-								)
-							].into_iter()))
+							related!{Children[(
+								BlockNode,
+								ItemOf::<beet_common::node::rsx_nodes::BlockNode, send_wrapper::SendWrapper<syn::expr::Expr> > {
+									value: SendWrapper::new(syn::parse_quote!({ 7 })),
+									phantom: std::marker::PhantomData::<beet_common::node::rsx_nodes::BlockNode>
+								}
+							)]}
 						)
 			}
 			.to_string(),
@@ -195,16 +193,14 @@ mod test {
 			quote! {{
 				(
 					FragmentNode,
-					Children::spawn(bevy::ecs::spawn::SpawnIter([
-						(
-							NodeTag(String::from("br")),
-							ElementNode { self_closing: true }
-						),
-						(
-							NodeTag(String::from("br")),
-							ElementNode { self_closing: true }
-						)
-					].into_iter()))
+					related!{Children[(
+						NodeTag(String::from("br")),
+						ElementNode { self_closing: true }
+					),
+					(
+						NodeTag(String::from("br")),
+						ElementNode { self_closing: true }
+					)]}
 				)
 			}}
 			.to_string(),
@@ -225,12 +221,12 @@ mod test {
 					(
 						NodeTag (String :: from ("br")), 
 						ElementNode { self_closing : true }, 
-						Attributes::spawn(bevy::ecs::spawn::SpawnIter([
+						related!{Attributes[
 							AttributeKeyExpr (SendWrapper::new(syn::parse_quote!("hidden"))), 
 							(AttributeKeyExpr (SendWrapper::new(syn::parse_quote!("class"))), AttributeValueExpr (SendWrapper::new(syn::parse_quote!("foo")))), 
 							(AttributeKeyExpr (SendWrapper::new(syn::parse_quote!("onmousemove"))), AttributeValueExpr (SendWrapper::new(syn::parse_quote!("some_js_func")))), 
 							(AttributeKeyExpr (SendWrapper::new(syn::parse_quote!("onclick"))), {|_:Trigger<OnClick>| { } })
-						].into_iter()))
+						]}
 					)
 			}
 			.to_string().replace(" ", ""),
@@ -248,20 +244,20 @@ mod test {
 						(
 							NodeTag(String::from("br")),
 							ElementNode { self_closing: true },
-							Attributes::spawn(bevy::ecs::spawn::SpawnIter([(
+							related!{Attributes[(
 								AttributeKeyExpr(SendWrapper::new(syn::parse_quote!("foo"))),
 								{
 									let class = "bar";
 									(
 										NodeTag(String::from("div")),
 										ElementNode { self_closing: true },
-										Attributes::spawn(bevy::ecs::spawn::SpawnIter([(
+										related!{Attributes[(
 											AttributeKeyExpr(SendWrapper::new(syn::parse_quote!("class"))),
 											{ class }
-										)].into_iter()))
+										)]}
 									)
 								}
-							)].into_iter()))
+							)]}
 						)
 					}
 			.to_string().replace(" ", "")

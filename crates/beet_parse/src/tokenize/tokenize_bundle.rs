@@ -103,7 +103,7 @@ mod test {
 					"hidden".into_attr_key_bundle(),
 					true.into_attr_val_bundle()
 				)]),
-				Children::spawn(bevy::ecs::spawn::SpawnIter([(
+				related!{Children[(
 						NodeTag(String::from("MyComponent")),
 						FragmentNode,
 						TemplateNode,
@@ -126,7 +126,7 @@ mod test {
 					), (
 						NodeTag(String::from("div")),
 						ElementNode { self_closing: true }
-					)].into_iter()))
+					)]}
 				
 			)}
 			.to_string(),
@@ -222,9 +222,7 @@ mod test {
 					NodeTag(String::from("style")),
 					ElementNode { self_closing: false },
 					LangContent::InnerText(String::from("foo")),
-					Children::spawn(bevy::ecs::spawn::SpawnIter([
-						TextNode(String::from("foo"))
-						].into_iter()))
+					related!{Children[TextNode(String::from("foo"))]}
 				)}
 				.to_string(),
 			);

@@ -55,7 +55,7 @@ struct MyFlattenedNode {
 fn MyNode(
 	/// This is a comment
 	is_required: u32,
-	is_boxed: Box<dyn Fn() -> u32>,
+	is_boxed: Box<dyn Fn() -> u32 + Send + Sync>,
 	is_optional: Option<u32>,
 	#[field(default = 7)] is_default: u32,
 	#[field(default)] is_generic_default: Foo<u32>,

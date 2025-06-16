@@ -29,6 +29,7 @@ use anyhow::Result;
 #[derive(Debug, Clone)]
 pub struct SweetError {
 	pub message: String,
+	#[cfg(not(target_arch = "wasm32"))]
 	assertion_depth: usize,
 	#[cfg(not(target_arch = "wasm32"))]
 	backtrace: backtrace::Backtrace,
@@ -55,18 +56,16 @@ impl SweetError {
 	pub const BACKTRACE_LEVEL_0: usize = 0;
 
 
-	#[allow(unused_mut)]
+	#[allow(unused)]
 	pub fn new(message: impl Into<String>, mut assertion_depth: usize) -> Self {
 		// not sure why the windows backtrace is so much deeper
 		#[cfg(target_os = "windows")]
 		{
 			assertion_depth += 4;
 		}
-
 		#[cfg(target_arch = "wasm32")]
 		return Self {
 			message: message.into(),
-			assertion_depth,
 		};
 		#[cfg(not(target_arch = "wasm32"))]
 		return Self {

@@ -5,6 +5,8 @@ use proc_macro2::TokenStream;
 use quote::quote;
 use syn::Ident;
 
+/// bundle impl limit
+pub const MAX_BUNDLE_TUPLE: usize = 12;
 
 /// 1. If the entity has no children, return `()`
 /// 2. If the entity has a single child, map that child with `map_child`.
@@ -44,7 +46,10 @@ pub fn tokenize_related<T: Component + RelationshipTarget + TypePath>(
 	items: &mut Vec<TokenStream>,
 	entity: Entity,
 	map_child: impl Fn(&World, Entity) -> Result<TokenStream>,
-) -> Result<()> {
+) -> Result<()>
+where
+	T::Relationship: TypePath,
+{
 	let entity = world.entity(entity);
 	let Some(related) = entity.get::<T>().map(|c| c.iter().collect::<Vec<_>>())
 	else {
@@ -58,12 +63,20 @@ pub fn tokenize_related<T: Component + RelationshipTarget + TypePath>(
 		.map(|child| map_child(world, child))
 		.collect::<Result<Vec<_>>>()?;
 	let ident = type_path_to_ident::<T>()?;
-	// we cant use related! macros because it expands
-	// to bundles which have limited impl of ~12
-	items.push(quote! {#ident::spawn(
-		bevy::ecs::spawn::SpawnIter([#(#related),*].into_iter())
-	)});
+	let child_ident = type_path_to_ident::<T::Relationship>()?;
 
+	if related.len() <= MAX_BUNDLE_TUPLE {
+		items.push(quote! { related!{#ident [#(#related),*]} });
+	} else {
+		// must be send+sync
+		items.push(quote! {#ident::spawn(
+			bevy::ecs::spawn::SpawnWith(
+				|parent: &mut bevy::ecs::relationship::RelatedSpawner<#child_ident>| {
+					#(parent.spawn(#related);)*
+				},
+			)
+		)});
+	}
 	Ok(())
 }
 
