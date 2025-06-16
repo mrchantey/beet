@@ -61,10 +61,11 @@ pub fn collect_combinator_route(
 				.find_map(|e| file_groups.get(e).ok())
 				.ok_or_else(|| bevyhow!("failed to find parent FileGroup"))?;
 			let meta_type = &file_group.meta_type;
-
 			codegen_file.add_item::<ItemFn>(syn::parse_quote!(
 				pub fn meta_get()-> #meta_type{
-					#meta
+					#meta.map_err(|err|{
+						format!("Failed to parse meta: {}", err)
+					}).unwrap()
 				}
 			));
 		}

@@ -94,6 +94,7 @@ pub mod prelude {
 
 
 pub mod exports {
+	pub use crate::common::exports::*;
 	#[cfg(feature = "build")]
 	pub use crate::build::exports::*;
 	#[cfg(feature = "router")]

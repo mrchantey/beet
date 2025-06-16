@@ -233,9 +233,9 @@ include = ["CHANGELOG.md", "README.md", "/src", "/examples", "/scenes"]
 [features]
 default = ["flow"]
 #💡 helper features
-web-server = ["server", "router", "design", "net"]
+web-server = ["server", "router", "design", "net", "serde"]
 #💡 fine-grained
-serde = ["beet_utils/serde"]
+serde = ["beet_utils/serde", ]
 rand = ["beet_utils/rand", "beet_bevy/rand"]
 connect = ["dep:beet_connect"]
 examples = ["bevy_default", "dep:beet_examples"]

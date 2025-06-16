@@ -4,13 +4,6 @@ use bevy::prelude::*;
 use proc_macro2::TokenStream;
 
 
-fn wrap_in_fragment(tokens: &str) -> String {
-	if tokens.trim().starts_with("<>") {
-		tokens.to_string()
-	} else {
-		format!("<>{}</>", tokens)
-	}
-}
 
 
 /// Parse combinator string into a *finalized* [`Bundle`], see [`tokenize_bundle`].
@@ -18,11 +11,13 @@ pub fn tokenize_combinator(
 	tokens: &str,
 	source_file: WsPathBuf,
 ) -> Result<TokenStream> {
-	let tokens = wrap_in_fragment(tokens);
 	TokensApp::with(|app| {
 		let entity = app
 			.world_mut()
-			.spawn((SourceFile::new(source_file), CombinatorTokens(tokens)))
+			.spawn((
+				SourceFile::new(source_file),
+				CombinatorTokens::new(tokens),
+			))
 			.id();
 		app.update();
 		let tokens = tokenize_bundle(app.world_mut(), entity);
@@ -36,7 +31,6 @@ pub fn tokenize_combinator_tokens(
 	tokens: &str,
 	source_file: WsPathBuf,
 ) -> Result<TokenStream> {
-	let tokens = wrap_in_fragment(tokens);
 	TokensApp::with(|app| {
 		let entity = app
 			.world_mut()

@@ -51,6 +51,13 @@ struct Builder<'w, 's, 'a> {
 	rusty_tracker: RustyTrackerBuilder,
 	commands: &'a mut Commands<'w, 's>,
 }
+fn wrap_in_fragment(tokens: &str) -> String {
+	if tokens.trim().starts_with("<>") {
+		tokens.to_string()
+	} else {
+		format!("<>{}</>", tokens)
+	}
+}
 
 impl<'w, 's, 'a> Builder<'w, 's, 'a> {
 	fn map_to_children(
@@ -58,6 +65,8 @@ impl<'w, 's, 'a> Builder<'w, 's, 'a> {
 		root: Entity,
 		rsx: &CombinatorTokens,
 	) -> Result<()> {
+		let rsx = wrap_in_fragment(&rsx.0);
+
 		let (expr, remaining) = parse(&rsx).map_err(|e| {
 			anyhow::anyhow!("Failed to parse HTML: {}", e.to_string())
 		})?;
