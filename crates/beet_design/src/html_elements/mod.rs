@@ -4,9 +4,9 @@ use beet_template::as_beet::*;
 pub struct BaseHtmlAttributes {
 	pub id: Option<String>,
 	pub class: Option<String>,
-	pub onchange: Option<EntityObserver>,
-	pub oninput: Option<EntityObserver>,
-	pub onclick: Option<EntityObserver>,
+	pub onchange: Option<EventHandler<OnChange>>,
+	pub oninput: Option<EventHandler<OnInput>>,
+	pub onclick: Option<EventHandler<OnClick>>,
 }
 #[derive(Default, Buildable, TemplateBundle)]
 pub struct ButtonHtmlAttributes {

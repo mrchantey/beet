@@ -1,5 +1,4 @@
 use beet::prelude::*;
-use beet::rsx::sigfault::signal;
 use serde::Deserialize;
 use serde::Serialize;
 

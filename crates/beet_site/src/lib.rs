@@ -2,7 +2,7 @@
 
 // #[path = "codegen/client_actions.rs"]
 // pub mod client_actions;
-// pub mod components;
+pub mod components;
 #[cfg(not(target_arch = "wasm32"))]
 #[path = "codegen/docs.rs"]
 pub mod docs;
@@ -21,6 +21,6 @@ pub mod pages;
 pub mod prelude {
 	pub use super::*;
 	// 	pub use crate::client_actions::root as actions;
-	// 	pub use crate::components::*;
+	pub use crate::components::*;
 	// 	pub use crate::route_tree::root as paths;
 }

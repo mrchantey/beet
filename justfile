@@ -210,6 +210,11 @@ test-template *args:
 	{{min-stack}} cargo test -p beet_build 						--all-features																			{{args}} -- {{test-threads}}
 	{{min-stack}} cargo test -p beet-cli 							--all-features																			{{args}} -- {{test-threads}}
 
+test-site *args:
+	{{min-stack}} cargo test -p beet_design 					--all-features																			{{args}} -- {{test-threads}}
+	{{min-stack}} cargo test -p beet_site 						--all-features																			{{args}} -- {{test-threads}}
+
+
 test-rsx-old *args:
 	{{min-stack}} cargo test -p beet_design 	 	 																												{{args}} -- {{test-threads}}
 	{{min-stack}} cargo test -p beet_router 	--features=serde 																					{{args}} -- {{test-threads}}
@@ -248,6 +253,7 @@ test-all:
 	just test-utils
 	just test-flow
 	just test-template
+	just test-site
 
 # rebuilding bevy_render for wasm results in 'no space left on device'
 test-all-old *args:

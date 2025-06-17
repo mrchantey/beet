@@ -11,8 +11,9 @@ use bevy::prelude::*;
 /// # use beet_template::as_beet::*;
 /// # use beet_design::prelude::*;
 ///
-/// fn my_component()-> impl Bundle {
-/// 	set_context(Brand{
+/// #[template]
+/// fn MyTemplate()-> impl Bundle {
+/// 	ReactiveApp::insert_resource(Brand{
 /// 		title: "My Site".into(),
 /// 		description: "A site about stuff".into(),
 ///			site_url: "https://myapp.com".into(),

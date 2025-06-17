@@ -56,8 +56,8 @@ pub mod prelude {
 	pub use crate::common::prelude::*;
 	#[cfg(feature = "connect")]
 	pub use crate::connect::prelude::*;
-	// #[cfg(feature = "design")]
-	// pub use crate::design::prelude::*;
+	#[cfg(feature = "design")]
+	pub use crate::design::prelude::*;
 	#[cfg(feature = "examples")]
 	pub use crate::examples::prelude::*;
 	#[cfg(feature = "flow")]
@@ -94,32 +94,34 @@ pub mod prelude {
 
 
 pub mod exports {
-	pub use crate::common::exports::*;
 	#[cfg(feature = "build")]
 	pub use crate::build::exports::*;
+	pub use crate::common::exports::*;
+	#[cfg(feature = "fs")]
+	pub use crate::fs::exports::*;
 	#[cfg(feature = "router")]
 	pub use crate::router::exports::*;
 	#[cfg(all(feature = "server", not(target_arch = "wasm32")))]
 	pub use crate::server::exports::*;
 	#[cfg(feature = "template")]
 	pub use crate::template::exports::*;
-	// #[cfg(feature = "examples")]
-	// pub use beet_examples::exports::*;
+	#[cfg(feature = "design")]
+	pub use crate::design::exports::*;
+	pub use crate::utils::exports::*;
+	#[cfg(feature = "examples")]
+	pub use beet_examples::exports::*;
 	// #[cfg(feature = "flow")]
 	// pub use beet_flow::exports::*;
-	// #[cfg(feature = "ml")]
-	// pub use beet_ml::exports::*;
+	#[cfg(feature = "ml")]
+	pub use beet_ml::exports::*;
 	// #[cfg(feature = "router")]
 	// pub use beet_router::exports::*;
 	// #[cfg(feature = "server")]
 	// pub use beet_server::exports::*;
-	// #[cfg(feature = "sim")]
-	// pub use beet_sim::exports::*;
-	// #[cfg(feature = "spatial")]
-	// pub use beet_spatial::exports::*;
-	#[cfg(feature = "fs")]
-	pub use crate::fs::exports::*;
-	pub use crate::utils::exports::*;
+	#[cfg(feature = "sim")]
+	pub use beet_sim::exports::*;
+	#[cfg(feature = "spatial")]
+	pub use beet_spatial::exports::*;
 }
 
 

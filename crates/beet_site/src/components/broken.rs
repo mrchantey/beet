@@ -3,6 +3,7 @@ use serde::Deserialize;
 use serde::Serialize;
 
 #[template]
+#[derive(Serialize, Deserialize)]
 pub fn Broken() -> impl Bundle {
 	rsx! {
 	<div>
@@ -21,8 +22,8 @@ pub fn Broken() -> impl Bundle {
 
 #[template]
 fn RejectsNeg() -> impl Bundle {
-	let onclick = move |_| {
-		sweet::log!("clicked");
+	let onclick = move |_: Trigger<OnClick>| {
+		beet::log!("clicked");
 	};
 
 	rsx! {

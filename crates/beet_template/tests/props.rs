@@ -6,7 +6,6 @@ use beet_template::as_beet::*;
 use std::marker::PhantomData;
 use sweet::prelude::*;
 
-
 #[test]
 fn works() {
 	let (get, _set) = signal(7);
@@ -19,7 +18,7 @@ fn works() {
 			is_marker_into=3
 			is_maybe_signal=get
 			class="kablamo"
-			onclick=||println!("pizza is good for your health")
+			onclick=|| println!("hello world")
 			id="bar"
 		/>
 	}

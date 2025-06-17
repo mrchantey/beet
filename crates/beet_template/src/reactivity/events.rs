@@ -1,6 +1,8 @@
 use bevy::prelude::*;
 
 pub type OnClick = BeetEvent<MouseEvent>;
+pub type OnChange = BeetEvent<BaseEvent>;
+pub type OnInput = BeetEvent<BaseEvent>;
 
 
 #[derive(Debug, Clone, Event, Deref, DerefMut)]
@@ -27,8 +29,8 @@ mod event_types_native {
 			}
 		}
 	}
+	pub type BaseEvent = MockEvent;
 	pub type MouseEvent = MockEvent;
-	// pub type Event = MockEvent;
 
 	impl EventExt for MockEvent {
 		fn value(&self) -> String { self.value.clone() }
@@ -44,6 +46,7 @@ mod event_types_wasm {
 
 	use super::*;
 	// pub type Event = web_sys::MouseEvent;
+	pub type BaseEvent = SendWrapper<web_sys::Event>;
 	pub type MouseEvent = SendWrapper<web_sys::MouseEvent>;
 	impl EventExt for MouseEvent {
 		fn value(&self) -> String {

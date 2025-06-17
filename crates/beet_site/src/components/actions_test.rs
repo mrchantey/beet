@@ -1,11 +1,9 @@
-use crate::prelude::*;
 use beet::prelude::*;
-use beet::rsx::sigfault::signal;
 use serde::Deserialize;
 use serde::Serialize;
-use sweet::prelude::*;
 
 #[template]
+#[derive(Serialize, Deserialize)]
 pub fn ActionTest() -> impl Bundle {
 	rsx! {
 	<div>

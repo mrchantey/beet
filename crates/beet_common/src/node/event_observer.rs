@@ -64,19 +64,3 @@ impl EventKey {
 		}
 	}
 }
-
-
-#[cfg(test)]
-mod test {
-	use crate::prelude::*;
-	use bevy::prelude::*;
-	use std::borrow::Cow;
-
-	#[derive(Event)]
-	struct Foo;
-
-	#[test]
-	fn works() {
-		// let foo: Box<dyn IntoEventObserver<_, Event = Foo>> = Box::new(|| {});
-	}
-}
