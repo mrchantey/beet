@@ -1,9 +1,8 @@
-use crate::bundle_effect;
+use beet_common_macros::ImplBundle;
 use bevy::ecs::bundle::BundleEffect;
 use bevy::ecs::system::IntoObserverSystem;
 use bevy::prelude::*;
 
-bundle_effect!(EntityObserver);
 /// Spawn an observer for the target entity, or `Self` if no target is specified.
 ///
 /// ## Example
@@ -21,6 +20,7 @@ bundle_effect!(EntityObserver);
 /// );
 ///
 /// ```
+#[derive(ImplBundle)]
 pub struct EntityObserver {
 	/// The observer to spawn.
 	observer: Observer,

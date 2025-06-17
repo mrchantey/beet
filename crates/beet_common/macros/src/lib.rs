@@ -1,6 +1,7 @@
 #![cfg_attr(test, feature(test, custom_test_frameworks))]
 #![cfg_attr(test, test_runner(sweet::test_runner))]
 #![feature(proc_macro_span)]
+mod impl_bundle;
 mod sendit;
 mod to_tokens;
 mod utils;
@@ -46,4 +47,22 @@ pub fn derive_sendit(
 	input: proc_macro::TokenStream,
 ) -> proc_macro::TokenStream {
 	sendit::impl_sendit(input).into()
+}
+
+/// Implement [`Bundle`] for a struct that implements [`BundleEffect`].
+///
+/// ## Example
+///
+/// ```rust ignore
+/// #[derive(BundleEffect)]
+/// struct Foo{
+///   bar: String,
+/// }
+/// impl BundleEffect for Foo {
+///		fn apply(self, entity: &mut EntityWorldMut) { entity.insert(Bar); }
+///	}
+/// ```
+#[proc_macro_derive(ImplBundle)]
+pub fn impl_bundle(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+	impl_bundle::impl_bundle(input).into()
 }

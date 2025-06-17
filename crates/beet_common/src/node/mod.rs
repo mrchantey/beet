@@ -1,4 +1,6 @@
+mod event_observer;
 pub mod rusty_tracker;
+pub use event_observer::*;
 pub use rusty_tracker::*;
 mod into_template_bundle;
 pub use into_template_bundle::*;

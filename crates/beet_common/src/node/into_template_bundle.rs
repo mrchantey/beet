@@ -54,7 +54,7 @@ where
 {
 	fn into_node_bundle(self) -> impl Bundle {
 		let bundle_iter = self.into_iter().map(|item| item.into_node_bundle());
-		BundleIter(bundle_iter)
+		BundleIter::new(bundle_iter)
 	}
 }
 

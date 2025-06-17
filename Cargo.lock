@@ -758,6 +758,7 @@ version = "0.0.6-dev.5"
 dependencies = [
  "anyhow",
  "beet_bevy",
+ "beet_common_macros",
  "beet_utils",
  "beet_web",
  "bevy",

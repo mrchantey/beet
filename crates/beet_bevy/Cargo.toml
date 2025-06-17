@@ -15,7 +15,8 @@ bevy_scene = ["bevy/bevy_scene"]
 rand = ["dep:rand", "dep:rand_chacha", "dep:getrandom"]
 
 [dependencies]
-beet_utils.workspace=true
+beet_utils.workspace = true
+beet_common_macros.workspace = true
 bevy.workspace = true
 
 anyhow.workspace = true
