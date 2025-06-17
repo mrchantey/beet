@@ -1,14 +1,14 @@
 use beet_template::as_beet::*;
 
-#[derive(Default, Buildable, IntoBlockAttribute)]
+#[derive(Default, Buildable, TemplateBundle)]
 pub struct BaseHtmlAttributes {
 	pub id: Option<String>,
 	pub class: Option<String>,
-	pub onchange: Option<Box<dyn EventHandler<Event>>>,
-	pub oninput: Option<Box<dyn EventHandler<Event>>>,
-	pub onclick: Option<Box<dyn EventHandler<MouseEvent>>>,
+	pub onchange: Option<EntityObserver>,
+	pub oninput: Option<EntityObserver>,
+	pub onclick: Option<EntityObserver>,
 }
-#[derive(Default, Buildable, IntoBlockAttribute)]
+#[derive(Default, Buildable, TemplateBundle)]
 pub struct ButtonHtmlAttributes {
 	#[field(flatten)]
 	pub base_attrs: BaseHtmlAttributes,
@@ -16,7 +16,7 @@ pub struct ButtonHtmlAttributes {
 }
 
 
-#[derive(Default, Buildable, IntoBlockAttribute)]
+#[derive(Default, Buildable, TemplateBundle)]
 pub struct AnchorHtmlAttributes {
 	// #[field(flatten=BaseHtmlAttributes)]
 	#[field(flatten)]
@@ -24,7 +24,7 @@ pub struct AnchorHtmlAttributes {
 	/// the download thing
 	pub href: Option<String>,
 }
-#[derive(Default, Buildable, IntoBlockAttribute)]
+#[derive(Default, Buildable, TemplateBundle)]
 pub struct InputHtmlAttributes {
 	#[field(flatten)]
 	pub base_attrs: BaseHtmlAttributes,
@@ -34,7 +34,7 @@ pub struct InputHtmlAttributes {
 	pub value: Option<MaybeSignal<String>>,
 }
 
-#[derive(Default, Buildable, IntoBlockAttribute)]
+#[derive(Default, Buildable, TemplateBundle)]
 pub struct TextAreaHtmlAttributes {
 	#[field(flatten=BaseHtmlAttributes)]
 	pub input_attrs: InputHtmlAttributes,
@@ -74,7 +74,7 @@ mod test {
 
 	#[test]
 	fn third_order() {
-		#[derive(Default, Buildable, IntoBlockAttribute)]
+		#[derive(Default, Buildable, TemplateBundle)]
 		struct Button {
 			#[field(flatten)]
 			#[field(flatten = BaseHtmlAttributes)]
@@ -85,13 +85,15 @@ mod test {
 	}
 
 	#[test]
+	// #[allow(unused)]
 	fn events_omitted() {
-		#[derive(derive_template)]
-		struct Button {
+		#[template]
+		fn Button(
 			#[field(flatten = BaseHtmlAttributes)]
 			_button_attrs: ButtonHtmlAttributes,
+		) -> impl Bundle {
+			()
 		}
-		fn button(_props: Button) -> impl Bundle { Default::default() }
 		// onclick was ommitted from the into_rsx_attributes
 		let _foo = rsx! { <Button onclick=|_| {} /> };
 	}

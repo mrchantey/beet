@@ -2,10 +2,8 @@ use beet::design::exports::*;
 use beet::prelude::*;
 
 /// Provide the Beet Theme and Brand context to the application.
-#[derive(derive_template)]
-pub struct BeetContext {}
-
-fn beet_context(_: BeetContext) -> impl Bundle {
+#[template]
+pub fn BeetContext() -> impl Bundle {
 	set_context(Brand {
 		title: "Beet".into(),
 		description: "A Rust web framework".into(),

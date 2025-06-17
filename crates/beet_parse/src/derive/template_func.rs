@@ -1,5 +1,6 @@
 use crate::prelude::*;
 use proc_macro2::TokenStream;
+use quote::ToTokens;
 use quote::quote;
 use syn::ItemFn;
 use syn::Result;
@@ -11,12 +12,12 @@ pub fn template_func(input: ItemFn) -> TokenStream {
 fn parse(input: ItemFn) -> Result<TokenStream> {
 	let fields = NodeField::parse_item_fn(&input)?;
 	let define_struct = define_struct(&input, &fields)?;
-	let impl_rsx_bundle = impl_template_bundle(&input, &fields)?;
+	let impl_template_bundle = impl_template_bundle(&input, &fields)?;
 
 	Ok(quote! {
 		use beet::prelude::*;
 		#define_struct
-		#impl_rsx_bundle
+		#impl_template_bundle
 		// #impl_props
 		// #impl_builder
 		// #impl_required
@@ -49,12 +50,24 @@ fn define_struct(func: &ItemFn, fields: &[NodeField]) -> Result<TokenStream> {
 	})
 }
 
-fn impl_template_bundle(func: &ItemFn, fields: &[NodeField]) -> Result<TokenStream> {
+fn impl_template_bundle(
+	func: &ItemFn,
+	fields: &[NodeField],
+) -> Result<TokenStream> {
 	let (impl_generics, type_generics, where_clause) =
 		func.sig.generics.split_for_impl();
 	let ident = &func.sig.ident;
 
-	let destructure = fields.iter().map(|f| &f.ident);
+	let destructure = fields.iter().map(|field| {
+		let mutability = field
+			.mutability
+			.map(|m| m.to_token_stream())
+			.unwrap_or_default();
+		let ident = &field.ident;
+		quote! {
+			#mutability #ident
+		}
+	});
 	let body = &func.block;
 	let return_type = &func.sig.output;
 
@@ -82,7 +95,8 @@ mod test {
 			/// probably the best templating layout
 			pub(crate) fn MyNode(
 				/// some comment
-				foo:u32
+				foo:u32,
+				mut bar:u32
 			) -> impl Bundle{()}
 		})
 		.to_string()
@@ -95,11 +109,12 @@ mod test {
 			#[derive(Props)]
 			pub struct MyNode {
 				#[doc = r" some comment"]
-				pub foo: u32
+				pub foo: u32,
+				pub bar: u32
 			}
 			impl IntoTemplateBundle<Self> for MyNode {
 				fn into_node_bundle(self) -> impl Bundle {
-					let Self { foo } = self ; { () }
+					let Self { foo, mut bar } = self ; { () }
 				}
 			}
 			}

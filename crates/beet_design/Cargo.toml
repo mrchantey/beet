@@ -27,6 +27,7 @@ sweet.workspace = true
 beet_template.workspace = true
 beet_common.workspace = true
 beet_router.workspace = true
+beet_net.workspace = true
 beet_utils.workspace = true
 chrono.workspace = true
 heck.workspace = true

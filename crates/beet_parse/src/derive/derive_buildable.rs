@@ -62,10 +62,13 @@ fn impl_buildable(
 				quote! {#expr}
 			};
 
-			let get = format_ident!("get_{}", name);
-			let get_mut = format_ident!("get_{}_mut", name);
-			let set = format_ident!("set_{}", name);
-
+			let strip_underscore = name.to_string().replace("#", "");
+			let strip_underscore = strip_underscore
+				.strip_prefix('_')
+				.unwrap_or(&strip_underscore);
+			let get = format_ident!("get_{}", strip_underscore);
+			let get_mut = format_ident!("get_{}_mut", strip_underscore);
+			let set = format_ident!("set_{}", strip_underscore);
 			Ok(quote! {
 				#(#docs)*
 				fn #name #generics(mut self, value: #builder_ty) -> Self {

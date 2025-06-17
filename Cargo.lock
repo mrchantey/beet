@@ -865,6 +865,7 @@ version = "0.0.6-dev.5"
 dependencies = [
  "anyhow",
  "beet_common",
+ "beet_net",
  "beet_router",
  "beet_template",
  "beet_utils",

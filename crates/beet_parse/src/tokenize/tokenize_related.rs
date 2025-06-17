@@ -1,12 +1,10 @@
+use crate::prelude::*;
 use beet_common::prelude::TokenizeSelf;
 use bevy::ecs::system::SystemParam;
 use bevy::prelude::*;
 use proc_macro2::TokenStream;
 use quote::quote;
 use syn::Ident;
-
-/// bundle impl limit
-pub const MAX_BUNDLE_TUPLE: usize = 12;
 
 /// 1. If the entity has no children, return `()`
 /// 2. If the entity has a single child, map that child with `map_child`.
@@ -32,23 +30,16 @@ pub fn flatten_fragment(
 			.map(|child| map_child(world, child))
 			.collect::<Result<Vec<_>>>()?;
 
-		if children.len() <= MAX_BUNDLE_TUPLE {
-			Ok(quote! { (
-				FragmentNode,
-				children![#(#children),*])
-			})
-		} else {
-			Ok(quote! {
-				(
-					FragmentNode,
-					spawn_with::<Children,_>(|parent| {
-						#(parent.spawn(#children);)*
-					})
-				)
-			})
-		}
+		let children =
+			unbounded_related(&syn::parse_quote!(Children), children);
+
+		Ok(quote! { (
+			FragmentNode,
+			#children
+		)})
 	}
 }
+
 
 /// If the entity has this [`RelationshipTarget`], then map each
 /// child with `map_child` and return a `related!` [`TokenStream`]
@@ -71,14 +62,7 @@ pub fn tokenize_related<T: Component + RelationshipTarget + TypePath>(
 		.map(|child| map_child(world, child))
 		.collect::<Result<Vec<_>>>()?;
 	let ident = type_path_to_ident::<T>()?;
-
-	if related.len() <= MAX_BUNDLE_TUPLE {
-		items.push(quote! { related!{#ident [#(#related),*]} });
-	} else {
-		items.push(quote! {spawn_with::<#ident,_>(|parent| {
-			#(parent.spawn(#related);)*
-		})});
-	}
+	items.push(unbounded_related(&ident, related));
 	Ok(())
 }
 

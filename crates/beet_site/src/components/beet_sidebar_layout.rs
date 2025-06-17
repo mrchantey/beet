@@ -2,11 +2,8 @@ use crate::prelude::*;
 use beet::prelude::*;
 
 
-#[derive(derive_template)]
-pub struct BeetSidebarLayout {}
-
-
-fn beet_sidebar_layout(_: BeetSidebarLayout) -> impl Bundle {
+#[template]
+pub fn BeetSidebarLayout() -> impl Bundle {
 	let sidebar_nodes =
 		route_tree::collect().xpipe(RoutePathTreeToSidebarTree::default());
 	rsx! {

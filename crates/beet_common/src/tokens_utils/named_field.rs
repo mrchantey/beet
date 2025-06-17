@@ -22,6 +22,7 @@ use syn::parse_quote;
 /// that provides additional functionality
 #[derive(Debug)]
 pub struct NamedField<'a> {
+	pub mutability: Option<&'a syn::token::Mut>,
 	pub attrs: &'a Vec<Attribute>,
 	/// The `Bar` in `foo: Bar`
 	pub ty: &'a Type,
@@ -83,12 +84,14 @@ impl<'a> NamedField<'a> {
 		attrs: &'a Vec<Attribute>,
 		ident: &'a Ident,
 		ty: &'a Type,
+		mutability: Option<&'a syn::token::Mut>,
 	) -> Result<Self> {
 		let field_attributes = AttributeGroup::parse(&attrs, "field")?;
 		let inner_ty = Self::option_inner(&ty);
 		let inner_generics = Self::generic_inner(&inner_ty);
 		Ok(Self {
 			attrs,
+			mutability,
 			field_attributes,
 			ident,
 			ty,
@@ -98,19 +101,23 @@ impl<'a> NamedField<'a> {
 	}
 
 	pub fn parse_pat_ty(inner: &'a PatType) -> Result<Self> {
-		let Pat::Ident(PatIdent { ident, .. }) = &*inner.pat else {
+		let Pat::Ident(PatIdent {
+			ident, mutability, ..
+		}) = &*inner.pat
+		else {
 			return Err(Error::new_spanned(
 				inner,
 				"Only named fields are supported",
 			));
 		};
-		Self::new(&inner.attrs, ident, &inner.ty)
+		// Note: mutability is available here if needed for future use
+		Self::new(&inner.attrs, ident, &inner.ty, mutability.as_ref())
 	}
 	pub fn parse_field(inner: &'a Field) -> Result<Self> {
 		let ident = inner.ident.as_ref().ok_or_else(|| {
 			Error::new_spanned(inner, "Only named fields are supported")
 		})?;
-		Self::new(&inner.attrs, ident, &inner.ty)
+		Self::new(&inner.attrs, ident, &inner.ty, None)
 	}
 
 	/// Returs whether this field is of type `Option<T>`.

@@ -6,16 +6,14 @@ use crate::prelude::*;
 /// A `<head>` element with sensible defaults.
 /// ## Required Context
 /// - [`Brand`]
-#[derive(derive_template)]
-pub struct Head {
+#[template]
+pub fn Head(
 	/// Enable to force the page to be displayed at a fixed scale,
 	/// disabling zooming.
 	/// This is useful for games, but will reduce accessibility in documents.
 	#[field(default)]
-	pub fixed_scale: bool,
-}
-
-fn head(Head { fixed_scale }: Head) -> impl Bundle {
+	fixed_scale: bool,
+) -> impl Bundle {
 	let Brand {
 		title,
 		description,

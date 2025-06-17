@@ -5,10 +5,8 @@ use beet::prelude::*;
 
 
 
-#[derive(derive_template)]
-pub struct BeetHeaderLinks;
-
-fn beet_header_links(_: BeetHeaderLinks) -> impl Bundle {
+#[template]
+pub fn BeetHeaderLinks() -> impl Bundle {
 	rsx! {
 		<Link
 			variant=ButtonVariant::Text

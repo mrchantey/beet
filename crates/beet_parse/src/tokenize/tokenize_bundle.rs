@@ -48,7 +48,7 @@ pub(super) fn tokenize_bundle_no_flatten(world: &World, entity: Entity) -> Resul
 	tokenize_combinator_exprs(world, entity)?.map(|i|items.push(i));
 	tokenize_related::<Children>(world,&mut items, entity, tokenize_bundle_no_flatten)?;
 	items
-		.xmap(maybe_tuple)
+		.xmap(unbounded_bundle)
 		.xok()
 }
 
@@ -147,7 +147,7 @@ mod test {
 			quote! {
 				(
 					FragmentNode,
-					children![
+					related!{Children[
 						(
 							NodeTag(String::from("br")),
 							ElementNode { self_closing: true }
@@ -156,7 +156,7 @@ mod test {
 							NodeTag(String::from("br")),
 							ElementNode { self_closing: true }
 						)
-					]
+					]}
 				)
 			}
 			.to_string(),

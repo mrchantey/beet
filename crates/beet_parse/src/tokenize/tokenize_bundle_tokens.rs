@@ -33,7 +33,7 @@ pub(super) fn tokenize_bundle_tokens_no_flatten(
 	tokenize_related::<Attributes>(world, &mut items, entity, tokenize_attribute_tokens)?;
 	tokenize_related::<Children>(world, &mut items, entity, tokenize_bundle_tokens_no_flatten)?;
 
-	items.xmap(maybe_tuple).xok()
+	items.xmap(unbounded_bundle).xok()
 }
 
 fn tokenize_block_node_exprs(
@@ -70,7 +70,7 @@ let attr_entity = entity.id();
 				items.push(attr);
 	}
 
-	maybe_tuple(items).xok()
+	unbounded_bundle(items).xok()
 }
 
 #[cfg(test)]

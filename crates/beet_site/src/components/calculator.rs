@@ -3,14 +3,10 @@ use beet::rsx::sigfault::signal;
 use serde::Deserialize;
 use serde::Serialize;
 
-#[derive(derive_template, Serialize, Deserialize)]
-pub struct Calculator {
-	#[field(default = 0)]
-	initial: i32,
-}
-
-fn calculator(props: Calculator) -> impl Bundle {
-	let (get, set) = signal(props.initial);
+#[template]
+#[derive(Serialize, Deserialize)]
+pub fn Calculator(#[field(default = 0)] initial: i32) -> impl Bundle {
+	let (get, set) = signal(initial);
 
 
 	let get2 = get.clone();

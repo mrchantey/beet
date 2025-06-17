@@ -1,6 +1,6 @@
 use crate::prelude::*;
+use beet_bevy::prelude::BundleIter;
 use bevy::ecs::bundle::Bundle;
-use beet_bevy::prelude::Maybe;
 
 /// Very inclusive version of [`Bundle`], accounting for the location
 /// of the bundle in a tree, and allowing primitives to be wrapped
@@ -38,23 +38,25 @@ pub trait IntoTemplateBundle<M> {
 		AttributeValue(self)
 	}
 }
+pub struct BundleMarker;
 
-impl<T: Bundle> IntoTemplateBundle<T> for T {
+impl<T: Bundle> IntoTemplateBundle<(T, BundleMarker)> for T {
 	fn into_node_bundle(self) -> impl Bundle { self }
 }
 
-pub struct OptionBundleMarker;
+// includes Option
+pub struct IterMarker;
 
-
-impl<T: IntoTemplateBundle<M>, M> IntoTemplateBundle<(OptionBundleMarker, M)>
-	for Option<T>
+impl<I: IntoIterator<Item = B>, B, M> IntoTemplateBundle<(IterMarker, M)> for I
+where
+	B: IntoTemplateBundle<M>,
+	I::IntoIter: 'static + Send + Sync + Iterator<Item = B>,
 {
 	fn into_node_bundle(self) -> impl Bundle {
-		Maybe(self.map(|val| val.into_node_bundle()))
+		let bundle_iter = self.into_iter().map(|item| item.into_node_bundle());
+		BundleIter(bundle_iter)
 	}
 }
-
-
 
 pub struct IntoTextNodeBundleMarker;
 

@@ -2,10 +2,8 @@ use beet::prelude::*;
 use serde::Deserialize;
 use serde::Serialize;
 
-#[derive(derive_template, Serialize, Deserialize)]
-pub struct Broken;
-
-fn broken(_props: Broken) -> impl Bundle {
+#[template]
+pub fn Broken() -> impl Bundle {
 	rsx! {
 	<div>
 		<RejectsNeg/>
@@ -21,9 +19,8 @@ fn broken(_props: Broken) -> impl Bundle {
 }
 
 
-#[derive(derive_template)]
-struct RejectsNeg {}
-fn rejects_neg(_props: RejectsNeg) -> impl Bundle {
+#[template]
+fn RejectsNeg() -> impl Bundle {
 	let onclick = move |_| {
 		sweet::log!("clicked");
 	};

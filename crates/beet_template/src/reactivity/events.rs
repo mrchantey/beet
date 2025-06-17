@@ -1,7 +1,5 @@
 use bevy::prelude::*;
 
-
-
 pub type OnClick = BeetEvent<MouseEvent>;
 
 

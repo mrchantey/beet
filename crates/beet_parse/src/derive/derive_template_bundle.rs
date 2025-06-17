@@ -10,8 +10,6 @@ pub fn impl_into_template_bundle(input: DeriveInput) -> TokenStream {
 	parse(input).unwrap_or_else(|err| err.into_compile_error())
 }
 
-// TODO this needs a rework, in bevy IntoBlockAttribute will be something
-// more like IntoTemplateBundle
 fn parse(input: DeriveInput) -> Result<TokenStream> {
 	let fields = NodeField::parse_derive_input(&input)?;
 	let fields = fields.iter().map(|f| &f.ident);

@@ -19,13 +19,9 @@ async fn main() {
 		.run();
 }
 
-#[derive(derive_template)]
-struct Counter {
-	initial: i32,
-}
-
-fn counter(props: Counter) -> impl Bundle {
-	let (get, set) = BevySignal::signal(props.initial);
+#[template]
+fn Counter(initial: i32) -> impl Bundle {
+	let (get, set) = BevySignal::signal(initial);
 	let get2 = get.clone();
 	rsx! {
 		<entity runtime:bevy

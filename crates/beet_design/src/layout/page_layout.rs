@@ -1,10 +1,8 @@
 use crate::prelude::*;
 
 /// Layout for any html page, superset of [`DocumentLayout`].
-#[derive(derive_template)]
-pub struct PageLayout;
-
-fn page_layout(_props: PageLayout) -> impl Bundle {
+#[template]
+pub fn PageLayout() -> impl Bundle {
 	rsx! {
 		<DocumentLayout>
 		<slot name="head" slot="head" />

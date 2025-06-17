@@ -8,10 +8,9 @@ pub fn get() -> impl Bundle {
 }
 
 // temp until global client:load
-#[derive(derive_template, serde::Serialize, serde::Deserialize)]
-pub struct Inner;
-
-fn inner(_: Inner) -> impl Bundle {
+#[template]
+#[derive(serde::Serialize, serde::Deserialize)]
+pub fn Inner() -> impl Bundle {
 	let (value, set_value) = signal("Hello world".to_string());
 
 	let val2 = value.clone();

@@ -5,10 +5,8 @@ use serde::Deserialize;
 use serde::Serialize;
 use sweet::prelude::*;
 
-#[derive(derive_template, Serialize, Deserialize)]
-pub struct ActionTest;
-
-fn action_test(_props: ActionTest) -> impl Bundle {
+#[template]
+pub fn ActionTest() -> impl Bundle {
 	rsx! {
 	<div>
 		<RejectsNeg/>
@@ -24,9 +22,8 @@ fn action_test(_props: ActionTest) -> impl Bundle {
 }
 
 
-#[derive(derive_template)]
-pub struct RejectsNeg {}
-fn rejects_neg(_props: RejectsNeg) -> impl Bundle {
+#[template]
+pub fn RejectsNeg() -> impl Bundle {
 	let (val, _set_val) = signal(0);
 	let (get, set) = signal("Ready".to_string());
 

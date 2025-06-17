@@ -6,9 +6,14 @@ use beet_template::as_beet::*;
 #[cfg(not(target_arch = "wasm32"))]
 #[test]
 fn children() {
+	use std::borrow::Cow;
+
+
+	let temp_val: Cow<'static, str> = "Hello, World!".into();
+
 	App::new().world_mut().spawn(rsx! {
 		<div>
-			<br/>
+			<br>{temp_val}</br>
 			<br/>
 			<br/>
 			<br/>

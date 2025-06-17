@@ -1,14 +1,10 @@
 use crate::prelude::*;
 
 
-#[derive(derive_template)]
-pub struct Header {
-	#[field(into, default = "/".to_string())]
-	home_route: String,
-}
-
-
-fn header(Header { home_route }: Header) -> impl Bundle {
+#[template]
+pub fn Header(
+	#[field(into, default = "/".to_string())] home_route: String,
+) -> impl Bundle {
 	let Brand { title, .. } = ReactiveApp::resource::<Brand>();
 
 	rsx! {

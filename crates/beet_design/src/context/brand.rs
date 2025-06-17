@@ -1,4 +1,3 @@
-use std::borrow::Cow;
 use bevy::prelude::*;
 
 /// A struct that should be set as a top level context value.
@@ -30,14 +29,14 @@ use bevy::prelude::*;
 pub struct Brand {
 	/// The pretty title of the application,
 	/// ie `My App`
-	pub title: Cow<'static, str>,
+	pub title: String,
 	/// A short description of the application
 	/// ie `A site about stuff`
-	pub description: Cow<'static, str>,
+	pub description: String,
 	/// The canonical url of the production site,
 	/// ie `https://myapp.com`
-	pub site_url: Cow<'static, str>,
+	pub site_url: String,
 	/// The site version, usually set via
 	/// `std::env!("CARGO_PKG_VERSION")`
-	pub version: Cow<'static, str>,
+	pub version: String,
 }
