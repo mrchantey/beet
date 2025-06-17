@@ -489,9 +489,9 @@ mod test {
 				NodeTag(String::from("MyTemplate")),
 				FragmentNode,
 				TemplateNode,
-				ItemOf::<beet_common::node::rsx_nodes::TemplateNode, beet_common::node::rusty_tracker::RustyTracker>{
+				ItemOf::<TemplateNode, RustyTracker>{
 					value: RustyTracker{index: 0u32, tokens_hash: 10188144591803042436u64},
-					phantom: std::marker::PhantomData::<beet_common::node::rsx_nodes::TemplateNode>
+					phantom: std::marker::PhantomData::<TemplateNode>
 				},
 				{
 					let template = <MyTemplate as Props>::Builder::default().foo(true).build();
@@ -507,9 +507,9 @@ mod test {
 				NodeTag(String::from("MyTemplate")),
 				FragmentNode,
 				TemplateNode,
-				ItemOf::<beet_common::node::rsx_nodes::TemplateNode, beet_common::node::rusty_tracker::RustyTracker>{
+				ItemOf::<TemplateNode, RustyTracker>{
 					value: RustyTracker{index: 0u32, tokens_hash: 4889923030152902413u64},
-					phantom: std::marker::PhantomData::<beet_common::node::rsx_nodes::TemplateNode>
+					phantom: std::marker::PhantomData::<TemplateNode>
 				},
 				{
 					let template = <MyTemplate as Props>::Builder::default().foo("bar").build();
@@ -525,9 +525,9 @@ mod test {
 				NodeTag(String::from("MyTemplate")),
 				FragmentNode,
 				TemplateNode,
-				ItemOf::<beet_common::node::rsx_nodes::TemplateNode, beet_common::node::rusty_tracker::RustyTracker>{
+				ItemOf::<TemplateNode, RustyTracker>{
 					value: RustyTracker{index: 0u32, tokens_hash: 15310342799507411129u64},
-					phantom: std::marker::PhantomData::<beet_common::node::rsx_nodes::TemplateNode>
+					phantom: std::marker::PhantomData::<TemplateNode>
 				},
 				{
 					let template = <MyTemplate as Props>::Builder::default().foo(true).build();
@@ -543,9 +543,9 @@ mod test {
 				NodeTag(String::from("MyTemplate")),
 				FragmentNode,
 				TemplateNode,
-				ItemOf::<beet_common::node::rsx_nodes::TemplateNode, beet_common::node::rusty_tracker::RustyTracker>{
+				ItemOf::<TemplateNode, RustyTracker>{
 					value: RustyTracker{index: 0u32, tokens_hash: 11502427431261689614u64},
-					phantom: std::marker::PhantomData::<beet_common::node::rsx_nodes::TemplateNode>
+					phantom: std::marker::PhantomData::<TemplateNode>
 				},
 				{
 					let template = <MyTemplate as Props>::Builder::default().foo(20f64).build();
@@ -561,9 +561,9 @@ mod test {
 				NodeTag(String::from("MyTemplate")),
 				FragmentNode,
 				TemplateNode,
-				ItemOf::<beet_common::node::rsx_nodes::TemplateNode, beet_common::node::rusty_tracker::RustyTracker>{
+				ItemOf::<TemplateNode, RustyTracker>{
 					value: RustyTracker{index: 0u32, tokens_hash: 9730180295528883542u64},
-					phantom: std::marker::PhantomData::<beet_common::node::rsx_nodes::TemplateNode>
+					phantom: std::marker::PhantomData::<TemplateNode>
 				},
 				{
 					let template = <MyTemplate as Props>::Builder::default().foo({ bar }).build();
@@ -579,9 +579,9 @@ mod test {
 				NodeTag(String::from("MyTemplate")),
 				FragmentNode,
 				TemplateNode,
-				ItemOf::<beet_common::node::rsx_nodes::TemplateNode, beet_common::node::rusty_tracker::RustyTracker>{
+				ItemOf::<TemplateNode, RustyTracker>{
 					value: RustyTracker{index: 0u32, tokens_hash: 7310951454258190932u64},
-					phantom: std::marker::PhantomData::<beet_common::node::rsx_nodes::TemplateNode>
+					phantom: std::marker::PhantomData::<TemplateNode>
 				},
 				{
 					let template = <MyTemplate as Props>::Builder::default().foo({ (
@@ -605,9 +605,9 @@ mod test {
 					NodeTag(String::from("MyTemplate")),
 					FragmentNode,
 					TemplateNode,
-					ItemOf::<beet_common::node::rsx_nodes::TemplateNode, beet_common::node::rusty_tracker::RustyTracker>{
+					ItemOf::<TemplateNode, RustyTracker>{
 						value: RustyTracker{index: 0u32, tokens_hash: 577660515964029912u64},
-						phantom: std::marker::PhantomData::<beet_common::node::rsx_nodes::TemplateNode>
+						phantom: std::marker::PhantomData::<TemplateNode>
 					},
 					{
 						let template = <MyTemplate as Props>::Builder::default().foo({

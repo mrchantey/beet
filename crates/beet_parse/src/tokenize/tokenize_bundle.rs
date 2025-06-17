@@ -108,9 +108,9 @@ mod test {
 						FragmentNode,
 						TemplateNode,
 						ClientLoadDirective,
-						ItemOf::<beet_common::node::rsx_nodes::TemplateNode, beet_common::node::rusty_tracker::RustyTracker> {
+						ItemOf::<TemplateNode, RustyTracker> {
 							value: RustyTracker { index: 0u32, tokens_hash: 6523630531850795118u64 },
-							phantom: std::marker::PhantomData::<beet_common::node::rsx_nodes::TemplateNode>
+							phantom: std::marker::PhantomData::<TemplateNode>
 						},
 						{
 							let template = <MyComponent as Props>::Builder::default().foo("bar").build();

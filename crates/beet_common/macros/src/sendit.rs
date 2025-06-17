@@ -92,9 +92,9 @@ mod test {
 		input.xmap(parse).unwrap().to_string().xpect().to_be(
 			quote! {
 				#[derive(Clone)]
-				pub struct FooSend<T: ToString>(beet::exports::SendWrapper< Foo<T> >) where T: std::fmt::Display;
+				pub struct FooSendit<T: ToString>(beet::exports::SendWrapper< Foo<T> >) where T: std::fmt::Display;
 
-				impl<T: ToString> FooSend<T> where T: std::fmt::Display {
+				impl<T: ToString> FooSendit<T> where T: std::fmt::Display {
 					pub fn new(value: Foo<T>) -> Self {
 						Self(beet::exports::SendWrapper::new(value))
 					}
@@ -102,21 +102,21 @@ mod test {
 						self.0.take()
 					}
 				}
-				impl<T: ToString> std::ops::Deref for FooSend<T> where T: std::fmt::Display {
+				impl<T: ToString> std::ops::Deref for FooSendit<T> where T: std::fmt::Display {
 					type Target = Foo<T>;
 					fn deref(&self) -> &Self::Target {
 						&self.0
 					}
 				}
-				impl<T: ToString> std::ops::DerefMut for FooSend<T> where T: std::fmt::Display {
+				impl<T: ToString> std::ops::DerefMut for FooSendit<T> where T: std::fmt::Display {
 					fn deref_mut(&mut self) -> &mut Self::Target {
 						&mut self.0
 					}
 				}
 
 				impl<T: ToString> Foo<T> where T: std::fmt::Display {
-					pub fn sendit(self) -> FooSend<T> {
-						FooSend::new(self)
+					pub fn sendit(self) -> FooSendit<T> {
+						FooSendit::new(self)
 					}
 				}
 			}

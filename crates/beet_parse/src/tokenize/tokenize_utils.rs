@@ -1,3 +1,4 @@
+use crate::prelude::*;
 use beet_common::prelude::*;
 use bevy::prelude::*;
 use proc_macro2::Span;
@@ -7,30 +8,31 @@ use send_wrapper::SendWrapper;
 use syn::Expr;
 use syn::Ident;
 
-/// Define a function for tokenizing each listed component, all of which
-/// must implement [`TokenizeSelf`].
-macro_rules! tokenize_maybe_spanned {
-		($name:ident,$($type:ty),* $(,)?) => {
-			pub fn $name(
-				world: &World,
-				items: &mut Vec<TokenStream>,
-				entity: Entity
-			) -> Result<()> {
-				$(
-					if let Some(value) = tokenize_maybe_spanned::<$type>(world, entity)? {
-						items.push(value);
-					}
-				)*
-				Ok(())
-			}
-	};
+/// Gets the first 'expression' for an attribute, searching in the following order:
+/// - [`AttributeKeyExpr`]
+/// - [`AttributeExpr`]
+/// - [`tokenize_combinator_exprs`]
+pub fn first_attribute_expr(
+	world: &World,
+	attr_entity: Entity,
+) -> Result<Option<Expr>> {
+	if let Some(attr) =
+		maybe_spanned_expr::<AttributeValueExpr>(world, attr_entity)?
+	{
+		Ok(Some(attr))
+	} else if let Some(attr) =
+		maybe_spanned_expr::<AttributeExpr>(world, attr_entity)?
+	{
+		Ok(Some(attr))
+	} else if let Some(combinator) =
+		tokenize_combinator_exprs(world, attr_entity)?
+	{
+		syn::parse2(combinator).map(Some).map_err(Into::into)
+	} else {
+		Ok(None)
+	}
 }
 
-// pub fn maybe_push(items: &mut Vec<TokenStream>, item: Option<TokenStream>) {
-// 	if let Some(item) = item {
-// 		items.push(item);
-// 	}
-// }
 
 /// bundle impl limit
 const BOUNDED_MAX: usize = 12;
@@ -66,6 +68,26 @@ pub fn unbounded_bundle(items: Vec<TokenStream>) -> TokenStream {
 		})}
 	}
 }
+
+/// Define a function for tokenizing each listed component, all of which
+/// must implement [`TokenizeSelf`].
+macro_rules! tokenize_maybe_spanned {
+		($name:ident,$($type:ty),* $(,)?) => {
+			pub fn $name(
+				world: &World,
+				items: &mut Vec<TokenStream>,
+				entity: Entity
+			) -> Result<()> {
+				$(
+					if let Some(value) = tokenize_maybe_spanned::<$type>(world, entity)? {
+						items.push(value);
+					}
+				)*
+				Ok(())
+			}
+	};
+}
+
 
 tokenize_maybe_spanned![
 	tokenize_rsx_nodes,

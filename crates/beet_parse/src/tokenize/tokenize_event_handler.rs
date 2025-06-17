@@ -1,71 +1,37 @@
-use crate::tokenize::*;
-use beet_common::prelude::*;
 use bevy::prelude::*;
 use heck::ToUpperCamelCase;
 use proc_macro2::Span;
-use proc_macro2::TokenStream;
-use quote::quote;
-use send_wrapper::SendWrapper;
 use syn::Expr;
 use syn::ExprClosure;
 use syn::Ident;
 use syn::Pat;
 use syn::parse_quote;
 
+/// Events are any attribute keys that start with `on`,
+/// and the value is not a string literal.
+/// This is to allow verbatim js handlers like `onclick="some_js_function()"`.
+pub fn is_event(key: &str, value: &Expr) -> bool {
+	key.starts_with("on") && !matches!(value, Expr::Lit(_))
+}
 
-/// If the attribute matches the requirements for an event observer,
-/// append to the `entity_components` and return `Ok(true)`.
-///
-/// ## Requirements
-/// - Key is a string literal starting with `on`
-/// - Value is not a string, (allows for verbatim js handlers)
-pub fn try_event_observer(
-	world: &World,
-	entity_components: &mut Vec<TokenStream>,
-	entity: Entity,
-) -> Result<bool> {
-	let Some(mut attr) =
-		maybe_spanned_expr::<AttributeValueExpr>(world, entity)?
-	else {
-		return Ok(false);
-	};
 
-	let entity = world.entity(entity);
+pub fn tokenize_event_handler(
+	key_str: &str,
+	key_span: Span,
+	mut value: Expr,
+) -> Result<Expr> {
+	let suffix = key_str.strip_prefix("on").unwrap_or(key_str);
+	let event_ident =
+		Ident::new(&format!("On{}", suffix.to_upper_camel_case()), key_span);
 
-	let Some(lit) = entity.get::<AttributeLit>() else {
-		return Ok(false);
-	};
-	// If value is a string literal, we shouldn't process it as an event handler,
-	// to preserve onclick="some_js_function()"
-	if lit.value.is_some() {
-		return Ok(false);
-	}
-
-	let Some(suffix) = lit.key.strip_prefix("on") else {
-		return Ok(false);
-	};
-
-	let span = entity
-		.get::<ItemOf<AttributeKeyExpr, SendWrapper<Span>>>()
-		.map(|s| ***s)
-		.unwrap_or(Span::call_site());
-
-	let suffix = ToUpperCamelCase::to_upper_camel_case(suffix);
-
-	let event_ident = Ident::new(&format!("On{suffix}"), span);
-	let lit_key_str = &lit.key;
-
-	try_insert_closure_type(&mut attr, &event_ident);
-	entity_components.push(quote! {EventKey::new(#lit_key_str)});
-	entity_components
-		.push(quote! {EntityObserver::new(#[allow(unused_braces)]#attr)});
-	Ok(true)
+	parse_event_handler(&mut value, &event_ident);
+	Ok(value)
 }
 
 /// if the tokens are a closure or a block where the last statement is a closure,
 /// insert the matching [`Trigger`] type.
 /// ie `<div onclick=|_|{ do_stuff() }/>` doesnt specify a type.
-fn try_insert_closure_type(expr: &mut Expr, ident: &Ident) {
+fn parse_event_handler(expr: &mut Expr, ident: &Ident) {
 	fn process_closure(closure: &mut ExprClosure, ident: &Ident) {
 		match closure.inputs.first_mut() {
 			Some(first_param) => match &*first_param {
@@ -91,6 +57,11 @@ fn try_insert_closure_type(expr: &mut Expr, ident: &Ident) {
 	match expr {
 		Expr::Closure(closure) => {
 			process_closure(closure, ident);
+
+			// closures should be wrapped in a block
+			// so we can safely call .into_node_bundle()
+			// on the closure itsself
+			*expr = syn::parse_quote! {{#closure}}
 		}
 		Expr::Block(block) => {
 			// Handle the case where a block's last statement is a closure
@@ -121,10 +92,10 @@ mod test {
 	use syn::Ident;
 
 	#[test]
-	fn insert_closure_type() {
+	fn test_parse_event_handler() {
 		fn parse(val: TokenStream) -> String {
 			let mut val = syn::parse2(val).unwrap();
-			try_insert_closure_type(
+			parse_event_handler(
 				&mut val,
 				&Ident::new("OnClick", Span::call_site()),
 			);
@@ -133,15 +104,15 @@ mod test {
 		// leaves typed
 		parse(quote! { |_: Trigger<WeirdType>| {} })
 			.xpect()
-			.to_be(quote! { |_: Trigger<WeirdType>| {} }.to_string());
+			.to_be(quote! { {|_: Trigger<WeirdType>| {}} }.to_string());
 		// inserts inferred
 		parse(quote! { |foo| {} })
 			.xpect()
-			.to_be(quote! { |foo: Trigger<OnClick>| {} }.to_string());
+			.to_be(quote! { {|foo: Trigger<OnClick>| {}} }.to_string());
 		// inserts discard for empty
-		parse(quote! { || {} })
+		parse(quote! { {|| {}} })
 			.xpect()
-			.to_be(quote! { |_: Trigger<OnClick>| {} }.to_string());
+			.to_be(quote! { {|_: Trigger<OnClick>| {}} }.to_string());
 		// handles blocks
 		parse(quote! { {|| {}} })
 			.xpect()

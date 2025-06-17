@@ -1,24 +1,29 @@
 use beet_common_macros::ImplBundle;
 use bevy::ecs::bundle::BundleEffect;
+use bevy::ecs::system::IntoObserverSystem;
 use bevy::prelude::*;
-use std::borrow::Cow;
 
-
-pub trait EventMeta {
-	type Payload: 'static + Send + Sync + Event;
-	fn name() -> Cow<'static, str>;
-}
-
+/// A typed version of an [`EntityObserver`](beet_bevy::prelude::EntityObserver) to help with type inference
 #[derive(ImplBundle)]
-pub struct EventBundle<E: 'static + Send + Sync + EventMeta> {
-	event_observer: EventKey,
+pub struct EventHandler<E: 'static + Send + Sync + Event> {
 	observer: Observer,
 	_phantom: std::marker::PhantomData<E>,
 }
 
-impl<E: 'static + Send + Sync + EventMeta> BundleEffect for EventBundle<E> {
+impl<E: 'static + Send + Sync + Event> EventHandler<E> {
+	/// Create a new event handler for the given event type
+	pub fn new<B: Bundle, M>(
+		handler: impl IntoObserverSystem<E, B, M>,
+	) -> Self {
+		Self {
+			observer: Observer::new(handler),
+			_phantom: std::marker::PhantomData,
+		}
+	}
+}
+
+impl<E: 'static + Send + Sync + Event> BundleEffect for EventHandler<E> {
 	fn apply(self, entity: &mut EntityWorldMut) {
-		entity.insert(self.event_observer);
 		entity.insert(self.observer);
 	}
 }
@@ -39,11 +44,8 @@ impl EventKey {
 			name: name.to_string(),
 		}
 	}
-
 	/// Get the event name in a consistent lowercase format
 	pub fn event_name(&self) -> String { self.name.to_lowercase() }
-
-
 
 	#[cfg(target_arch = "wasm32")]
 	pub fn trigger(
@@ -66,19 +68,12 @@ impl EventKey {
 
 #[cfg(test)]
 mod test {
-	use std::borrow::Cow;
-
 	use crate::prelude::*;
 	use bevy::prelude::*;
-	use sweet::prelude::*;
+	use std::borrow::Cow;
 
 	#[derive(Event)]
 	struct Foo;
-
-	impl EventMeta for Foo {
-		type Payload = Self;
-		fn name() -> Cow<'static, str> { "foo".into() }
-	}
 
 	#[test]
 	fn works() {

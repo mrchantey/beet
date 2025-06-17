@@ -8,6 +8,89 @@ use std::marker::PhantomData;
 use std::ops::Deref;
 use std::path::PathBuf;
 
+/// Returns the past part of an [`std::any::type_name`] as a [`syn::Path`],
+/// the user is expected to bring the type into scope.
+/// Where the typename is `"std::option::Option<std::vec::Vec<usize>>"`,
+/// the output is `Option<Vec<usize>>`
+pub fn short_type_path<T>() -> syn::Path {
+	let type_name = std::any::type_name::<T>();
+	let result = shorten_generic_type_name(type_name);
+	syn::parse_str::<syn::Path>(&result).expect(&format!(
+		"Failed to parse type name {result} into syn::Path"
+	))
+}
+
+fn shorten_generic_type_name(type_name: &str) -> String {
+	let mut result = String::new();
+	let mut depth = 0;
+	let mut current_segment = String::new();
+
+	for ch in type_name.chars() {
+		match ch {
+			'<' => {
+				if depth == 0 {
+					// Extract the last part before the generic
+					let last_part = current_segment
+						.split("::")
+						.last()
+						.unwrap_or(&current_segment);
+					result.push_str(last_part);
+				}
+				result.push(ch);
+				depth += 1;
+				current_segment.clear();
+			}
+			'>' => {
+				if depth > 0 {
+					if !current_segment.is_empty() {
+						let shortened_inner =
+							shorten_generic_type_name(&current_segment);
+						result.push_str(&shortened_inner);
+						current_segment.clear();
+					}
+					result.push(ch);
+					depth -= 1;
+				}
+			}
+			',' => {
+				if depth > 0 {
+					if !current_segment.is_empty() {
+						let shortened_inner =
+							shorten_generic_type_name(&current_segment);
+						result.push_str(&shortened_inner);
+						current_segment.clear();
+					}
+					result.push_str(", ");
+				} else {
+					current_segment.push(ch);
+				}
+			}
+			' ' => {
+				if depth > 0 {
+					// Skip spaces inside generics except after commas
+				} else {
+					current_segment.push(ch);
+				}
+			}
+			_ => {
+				current_segment.push(ch);
+			}
+		}
+	}
+
+	// Handle the case where there are no generics
+	if depth == 0 && !current_segment.is_empty() {
+		let last_part = current_segment
+			.split("::")
+			.last()
+			.unwrap_or(&current_segment);
+		result.push_str(last_part);
+	}
+
+	result
+}
+
+
 /// Trait for converting a type into a [`TokenStream`],
 /// usually derived using the [`ToTokens`] macro.
 pub trait TokenizeSelf<M = Self> {
@@ -68,8 +151,7 @@ impl TokenizeSelf for PathBuf {
 
 impl<T> TokenizeSelf for PhantomData<T> {
 	fn self_tokens(&self, tokens: &mut TokenStream) {
-		let type_name =
-			syn::parse_str::<syn::Path>(std::any::type_name::<T>()).unwrap();
+		let type_name = short_type_path::<T>();
 		tokens.extend(quote! { std::marker::PhantomData::<#type_name> });
 	}
 }
@@ -147,3 +229,20 @@ impl_self_tokens!(
 	char,
 	&'static str
 );
+
+
+#[cfg(test)]
+mod test {
+	use crate::prelude::*;
+	use quote::ToTokens;
+use sweet::prelude::*;
+
+	#[test]
+	fn works() {
+		short_type_path::<Option<Vec<Matcher<u32>>>>()
+			.to_token_stream()
+			.to_string()
+			.xpect()
+			.to_be("Option<Vec<Matcher<u32>>>");
+	}
+}

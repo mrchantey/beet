@@ -162,9 +162,9 @@ mod test {
 							ElementNode { self_closing: false },
 							related!{Children[(
 								BlockNode,
-								ItemOf::<beet_common::node::rsx_nodes::BlockNode, send_wrapper::SendWrapper<syn::expr::Expr> > {
+								ItemOf::<BlockNode, SendWrapper<Expr> > {
 									value: SendWrapper::new(syn::parse_quote!({ 7 })),
-									phantom: std::marker::PhantomData::<beet_common::node::rsx_nodes::BlockNode>
+									phantom: std::marker::PhantomData::<BlockNode>
 								}
 							)]}
 						)

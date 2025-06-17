@@ -3,6 +3,7 @@ use beet_common::prelude::*;
 use bevy::prelude::*;
 use proc_macro2::TokenStream;
 use quote::quote;
+use syn::spanned::Spanned;
 
 
 
@@ -18,37 +19,48 @@ pub fn tokenize_element_attributes(
 	} else if let Some(attrs) = entity.get::<Attributes>() {
 		let mut attr_entities = Vec::new();
 		for attr_entity in attrs.iter() {
-			if try_event_observer(world, entity_components, attr_entity)? {
-				continue;
-			}
+			let key =
+				maybe_spanned_expr::<AttributeKeyExpr>(world, attr_entity)?
+					.map(|key| {
+						if let syn::Expr::Lit(expr_lit) = &key {
+							if let syn::Lit::Str(lit_str) = &expr_lit.lit {
+								return Some((lit_str.value(), key));
+							}
+						}
+						None
+					})
+					.flatten();
+
+			let value = first_attribute_expr(world, attr_entity)?;
+
 
 			let mut attr_components = Vec::new();
-			// blocks ie <span {Vec3::new()} />
-			// inserted directly as an entity component
-			if let Some(attr) =
-				maybe_spanned_expr::<AttributeExpr>(world, attr_entity)?
-			{
-				entity_components.push(quote! {#attr.into_node_bundle()});
-			}
-
-			if let Some(attr) =
-				maybe_spanned_expr::<AttributeKeyExpr>(world, attr_entity)?
-			{
-				attr_components.push(quote! {#attr.into_attr_key_bundle()});
-			}
-			if let Some(attr) =
-				maybe_spanned_expr::<AttributeValueExpr>(world, attr_entity)?
-			{
-				attr_components.push(quote! {#attr.into_attr_val_bundle()});
-			}
-			if let Some(attr) = tokenize_combinator_exprs(world, attr_entity)? {
-				if world.entity(attr_entity).contains::<AttributeKeyExpr>() {
-					// if this attribute has a key, the combinator must be a value
-					attr_components.push(quote! {#attr.into_attr_val_bundle()});
-				} else {
-					// otherwise the combinator is a block value, aka a component
-					entity_components.push(attr);
+			match (key, value) {
+				// 1: Events
+				(Some((key_str, key)), Some(value))
+					if is_event(&key_str, &value) =>
+				{
+					let value =
+						tokenize_event_handler(&key_str, key.span(), value)?;
+					entity_components.push(quote! {EventKey::new(#key_str)});
+					entity_components.push(quote! {#value.into_node_bundle()});
 				}
+				// 2. Key with value
+				(Some((_, key)), Some(value)) => {
+					attr_components.push(quote! {#key.into_attr_key_bundle()});
+					attr_components
+						.push(quote! {#value.into_attr_val_bundle()});
+				}
+				// 3. Key without value
+				(Some((_, key)), None) => {
+					attr_components.push(quote! {#key.into_attr_key_bundle()});
+				}
+				// 4. Value without key (block/spread attribute)
+				(None, Some(value)) => {
+					entity_components.push(quote! {#value.into_node_bundle()});
+				}
+				// 5. No key or value, should be unreachable but no big deal
+				(None, None) => {}
 			}
 			if attr_components.len() == 1 {
 				attr_entities.push(attr_components.pop().unwrap());
@@ -147,7 +159,7 @@ mod test {
 				NodeTag(String::from("span")),
 				ElementNode { self_closing: true },
 				EventKey::new("onclick"),
-				EntityObserver::new(#[allow(unused_braces)]{foo})
+				{foo}.into_node_bundle()
 			)}
 			.to_string(),
 		);
@@ -185,7 +197,7 @@ mod test {
 				ElementNode { self_closing: true },
 				{foo}.into_node_bundle(),
 				EventKey::new("onclick"),
-				EntityObserver::new(#[allow(unused_braces)] |_: Trigger<OnClick>| { println!("clicked"); }),
+				{|_: Trigger<OnClick>| { println!("clicked"); }}.into_node_bundle(),
 				related!(Attributes[
 					"hidden".into_attr_key_bundle(),
 					(

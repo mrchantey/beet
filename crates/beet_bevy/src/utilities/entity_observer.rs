@@ -49,18 +49,10 @@ impl BundleEffect for EntityObserver {
 	fn apply(self, entity: &mut EntityWorldMut) {
 		// If no target is specified, use the entity this bundle is applied to.
 		let target = self.target.unwrap_or_else(|| entity.id());
-		let observed_entity = entity.world_scope(|world| {
-			world.spawn(self.observer.with_entity(target)).id()
-		});
-		entity.insert(SpawnedEntityObserver {
-			observer: observed_entity,
+		entity.world_scope(|world| {
+			world.spawn(self.observer.with_entity(target));
 		});
 	}
-}
-
-#[derive(Debug, Clone, Copy, Component)]
-pub struct SpawnedEntityObserver {
-	pub observer: Entity,
 }
 
 

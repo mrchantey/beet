@@ -55,6 +55,7 @@ impl<'a> NodeField<'a> {
 	/// In Builder pattern these are the tokens for assignment, depending
 	/// on attributes it will be checked in the following order:
 	/// - is_boxed:				`(Default, 				impl SomeType, 					Box::new(value))`
+	/// - EventHandler<E>:`(<E,B,M>, 				impl IntoObserverSystem<E, B, M>,,		EventHandler::new(value)`
 	/// - MaybeSignal<T>:	`(<M>, 						impl IntoMaybeSignal,		value.into_maybe_signal())`
 	/// - into_type:			`(into_generics,	into_type, into_func							)`
 	/// - is_into: 				`(Default, 				impl Into<SomeType>, 		value.into())		`
@@ -73,6 +74,12 @@ impl<'a> NodeField<'a> {
 					parse_quote! { Box::new(value) },
 				))
 			}
+			// 2. handle EventHandler<T>
+			Some((seg, ty)) if seg.ident == "EventHandler" => Ok((
+				parse_quote! {<B:Bundle,M>},
+				parse_quote! { impl bevy::ecs::system::IntoObserverSystem<#ty,B,M> },
+				parse_quote! { EventHandler::new(value) },
+			)),
 			// 2. handle MaybeSignal<T>
 			Some((seg, ty)) if seg.ident == "MaybeSignal" => Ok((
 				parse_quote! {<M>},

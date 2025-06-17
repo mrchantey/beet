@@ -181,9 +181,7 @@ fn parse(input: DeriveInput) -> syn::Result<TokenStream> {
 	};
 	let generic_defs = generic_idents.clone().map(|(ident, generic_ident)| {
 		quote! {
-			let #generic_ident = syn::parse_str::<syn::Path>(
-				std::any::type_name::<#ident>()
-			).expect("failed to parse generic type from std::any::type_name");
+			let #generic_ident = short_type_path::<#ident>();
 		}
 	});
 
@@ -335,8 +333,7 @@ mod test {
 						use beet::exports::quote;
 						use beet::exports::proc_macro2;
 						
-						let generic0 = syn::parse_str::<syn::Path>(std::any::type_name::<U>())
-							.expect("failed to parse generic type from std::any::type_name");
+						let generic0 = short_type_path::<U>();
 						tokens.extend(quote::quote! { Foo::<#pound_token generic0>{ } });
 					}
 				}

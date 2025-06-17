@@ -199,6 +199,7 @@ test-beet-utils *args:
 	just watch 'cargo test -p beet_utils --lib --features=serde --nocapture -- {{args}}'
 
 test-template *args:
+	{{min-stack}} cargo test -p beet_common_macros		--all-features 	 	 																	{{args}} -- {{test-threads}}
 	{{min-stack}} cargo test -p beet_common 					--all-features 	 	 																	{{args}} -- {{test-threads}}
 	{{min-stack}} cargo test -p beet_rsx_combinator 	--all-features																			{{args}} -- {{test-threads}}
 	{{min-stack}} cargo test -p beet_parse 						--all-features 	 	 																	{{args}} -- {{test-threads}}

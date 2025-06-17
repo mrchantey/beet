@@ -92,7 +92,7 @@ pub struct TemplateSerde {
 	/// Store the [`std::any::type_name`] of the value that was serialized,
 	/// for generating via codegen.
 	// This approach is quite fickle, ie all
-	// module paths must be public and its not the intended purpose of typename.
+	// module paths must be public and its not the intended purpose of type_name.
 	// We may be able to better with bevy_reflect
 	type_name: String,
 	/// The serialized RON string of the value.

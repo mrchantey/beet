@@ -69,3 +69,4 @@ tokio.workspace = true
 
 [dev-dependencies]
 sweet.workspace = true
+send_wrapper.workspace = true

@@ -1,5 +1,4 @@
 use crate::tokenize::*;
-use crate::utils::expr_to_ident;
 use beet_common::prelude::*;
 use bevy::prelude::*;
 use proc_macro2::Span;
@@ -30,36 +29,47 @@ pub fn tokenize_template_attributes(
 
 	if let Some(attrs) = entity.get::<Attributes>() {
 		for attr_entity in attrs.iter() {
-			if let Some(attr) =
-				maybe_spanned_expr::<AttributeExpr>(world, attr_entity)?
-			{
-				entity_components.push(quote! {#attr.into_node_bundle()});
-			}
-			let combinator_attr =
-				tokenize_combinator_exprs(world, attr_entity)?;
-
-			if let Some(key) =
+			let key =
 				maybe_spanned_expr::<AttributeKeyExpr>(world, attr_entity)?
-				&& let Some(key) = expr_to_ident(&key)
-			{
-				if let Some(val) = combinator_attr {
-					// first check if there was a combinator value
-					prop_assignments.push(quote! {.#key(#val)});
-				} else {
-					// otherwise check if theres a regular value
-					let value = maybe_spanned_expr::<AttributeValueExpr>(
-						world,
-						attr_entity,
-					)?
-					.unwrap_or_else(|| {
-						// finally no value means a bool flag
-						syn::parse_quote! {true}
-					});
+					.map(|key| {
+						// expr to ident
+						if let syn::Expr::Lit(expr_lit) = key {
+							if let syn::Lit::Str(lit_str) = &expr_lit.lit {
+								let value = lit_str.value();
+								let ident =
+									syn::Ident::new(&value, lit_str.span());
+								return Some((value, ident));
+							}
+						}
+						None
+					})
+					.flatten();
+
+			let value = first_attribute_expr(world, attr_entity)?;
+
+			match (key, value) {
+				// 1: Events
+				(Some((key_str, key)), Some(value))
+					if is_event(&key_str, &value) =>
+				{
+					let value =
+						tokenize_event_handler(&key_str, key.span(), value)?;
 					prop_assignments.push(quote! {.#key(#value)});
 				}
-			} else if let Some(value) = combinator_attr {
-				// if it doesnt have a key, the combinator must be a block value
-				entity_components.push(value);
+				// 2. Key with value
+				(Some((_, key)), Some(value)) => {
+					prop_assignments.push(quote! {.#key(#value)});
+				}
+				// 3. Key without value (boolean attribute)
+				(Some((_, key)), None) => {
+					prop_assignments.push(quote! {.#key(true)});
+				}
+				// 4. Value without key (block/spread attribute)
+				(None, Some(value)) => {
+					entity_components.push(quote! {#value.into_node_bundle()});
+				}
+				// 5. No key or value, should be unreachable but no big deal
+				(None, None) => {}
 			}
 		}
 	}

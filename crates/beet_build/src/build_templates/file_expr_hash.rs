@@ -125,17 +125,8 @@ mod test {
 		app.update();
 		app.world().get::<FileExprHash>(entity).unwrap().0
 	}
-	mod syn {
-		pub use syn::*;
-		pub mod expr {
-			pub use syn::Expr;
-		}
-	}
-	mod send_wrapper {
-		pub use beet_parse::exports::SendWrapper;
-	}
 	use send_wrapper::SendWrapper;
-
+	use syn::Expr;
 	#[test]
 	#[rustfmt::skip]
 	fn tag_names() {

@@ -19,6 +19,7 @@ fn works() {
 			is_marker_into=3
 			is_maybe_signal=get
 			class="kablamo"
+			onclick=||println!("pizza is good for your health")
 			id="bar"
 		/>
 	}
@@ -47,7 +48,7 @@ struct MyFlattenedNode {
 	/// this is what identifies it
 	id: Option<String>,
 	disabled: Option<bool>,
-	onclick: Option<EntityObserver>,
+	onclick: Option<EventHandler<OnClick>>,
 }
 
 #[template]

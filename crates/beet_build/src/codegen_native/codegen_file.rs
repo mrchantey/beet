@@ -38,7 +38,7 @@ pub struct CodegenFile {
 	/// inline module.
 	#[serde(default, rename = "import_tokens", with = "syn_item_vec_serde")]
 	pub imports: Vec<Item>,
-	/// As `std::any::typename`, which is used with [`TemplateSerde`], resolves to a named crate, we need to alias the current
+	/// As [`std::any::type_name`], which is used with [`TemplateSerde`], resolves to a named crate, we need to alias the current
 	/// crate to match any internal types, setting this option will add `use crate as pkg_name`
 	/// to the top of the file.
 	#[serde(rename = "package_name")]

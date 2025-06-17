@@ -1,6 +1,9 @@
 use crate::prelude::*;
 use beet_bevy::prelude::BundleIter;
+use beet_bevy::prelude::EntityObserver;
 use bevy::ecs::bundle::Bundle;
+use bevy::ecs::event::Event;
+use bevy::ecs::system::IntoObserverSystem;
 
 /// Very inclusive version of [`Bundle`], accounting for the location
 /// of the bundle in a tree, and allowing primitives to be wrapped
@@ -43,6 +46,19 @@ pub struct BundleMarker;
 impl<T: Bundle> IntoTemplateBundle<(T, BundleMarker)> for T {
 	fn into_node_bundle(self) -> impl Bundle { self }
 }
+
+/// Observers
+pub struct ObserverMarker;
+
+impl<T, E, B: Bundle, M> IntoTemplateBundle<(ObserverMarker, E, B, M)> for T
+where
+	E: Event,
+	B: Bundle,
+	T: IntoObserverSystem<E, B, M>,
+{
+	fn into_node_bundle(self) -> impl Bundle { EntityObserver::new(self) }
+}
+
 
 // includes Option
 pub struct IterMarker;
@@ -100,3 +116,19 @@ primitives_into_bundle!(
 	u8, u16, u32, u64, u128, usize, 
 	i8, i16, i32, i64, i128, isize
 );
+
+
+
+#[cfg(test)]
+mod test {
+	use crate::prelude::*;
+	use bevy::prelude::*;
+
+	#[test]
+	fn works() {
+		fn is_bundle<M>(_: impl IntoTemplateBundle<M>) {}
+		#[derive(Event)]
+		struct Foo;
+		is_bundle(|_: Trigger<Foo>| {});
+	}
+}
