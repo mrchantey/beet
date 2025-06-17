@@ -162,7 +162,7 @@ pub(super) fn bind_attribute_values(
 pub(super) fn bind_events(
 	mut commands: Commands,
 	mut get_binding: GetDomBinding,
-	query: Populated<(Entity, &TreeIdx, &EventObserver), Added<TreeIdx>>,
+	query: Populated<(Entity, &TreeIdx, &EventKey), Added<TreeIdx>>,
 ) -> Result<()> {
 	for (entity, idx, event) in query.iter() {
 		let element = get_binding.get_element(entity, *idx)?;
@@ -173,7 +173,7 @@ pub(super) fn bind_events(
 			ReactiveApp::with(|app| {
 				let mut commands = app.world_mut().commands();
 				let mut commands = commands.entity(entity);
-				EventObserver::trigger(&mut commands, &event_name, ev);
+				EventKey::trigger(&mut commands, &event_name, ev);
 				// apply commands
 				app.world_mut().flush();
 				// we must update the app manually to flush any signals,

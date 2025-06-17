@@ -1,45 +1,38 @@
-use beet_bevy::prelude::EntityObserver;
-use bevy::ecs::system::ObserverSystem;
+use beet_common_macros::ImplBundle;
+use bevy::ecs::bundle::BundleEffect;
 use bevy::prelude::*;
+use std::borrow::Cow;
 
-#[derive(Bundle)]
-pub struct EventBundle<E: 'static + Send + Sync> {
-	event_observer: EventObserver,
-	// entity_observer: EntityObserver,
-	#[bundle(ignore)]
+
+pub trait EventMeta {
+	type Payload: 'static + Send + Sync + Event;
+	fn name() -> Cow<'static, str>;
+}
+
+#[derive(ImplBundle)]
+pub struct EventBundle<E: 'static + Send + Sync + EventMeta> {
+	event_observer: EventKey,
+	observer: Observer,
 	_phantom: std::marker::PhantomData<E>,
 }
 
-
-pub trait IntoEventObserver<M> {
-	/// Used for implicit closure types
-	type Event;
-	fn into_event_observer(self) -> EntityObserver;
+impl<E: 'static + Send + Sync + EventMeta> BundleEffect for EventBundle<E> {
+	fn apply(self, entity: &mut EntityWorldMut) {
+		entity.insert(self.event_observer);
+		entity.insert(self.observer);
+	}
 }
-
-
-impl<E, B, M, S> IntoEventObserver<(S, E, B, M)> for S
-where
-	S: IntoSystem<Trigger<'static, E, B>, (), M> + Send + 'static,
-	S::System: ObserverSystem<E, B, ()>,
-	E: 'static + Send + Sync + Event,
-	B: Bundle,
-{
-	type Event = E;
-	fn into_event_observer(self) -> EntityObserver { EntityObserver::new(self) }
-}
-
 
 #[derive(Default, Clone, PartialEq, Eq, Hash, Component, Reflect)]
 #[reflect(Default, Component)]
-pub struct EventObserver {
+pub struct EventKey {
 	/// The unchanged event name used in the template, which
 	/// may be one of several casings, ie
 	/// `onmousemove`, `onMouseMove`, `OnMouseMove`
 	name: String,
 }
 
-impl EventObserver {
+impl EventKey {
 	/// Create a new event observer with the given name
 	pub fn new(name: &str) -> Self {
 		Self {
@@ -73,12 +66,19 @@ impl EventObserver {
 
 #[cfg(test)]
 mod test {
+	use std::borrow::Cow;
+
 	use crate::prelude::*;
 	use bevy::prelude::*;
 	use sweet::prelude::*;
 
 	#[derive(Event)]
 	struct Foo;
+
+	impl EventMeta for Foo {
+		type Payload = Self;
+		fn name() -> Cow<'static, str> { "foo".into() }
+	}
 
 	#[test]
 	fn works() {

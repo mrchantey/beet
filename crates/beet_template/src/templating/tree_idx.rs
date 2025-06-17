@@ -3,7 +3,7 @@ use beet_common::as_beet::*;
 use bevy::prelude::*;
 
 
-/// Currently only [`EventObserver`] and [`TextNodeParent`] elements are
+/// Currently only [`EventKey`] and [`TextNodeParent`] elements are
 /// the only ones that require a [`TreeIdx`] attribute
 // see render_html.rs for tests
 pub(super) fn apply_tree_idx(
@@ -12,7 +12,7 @@ pub(super) fn apply_tree_idx(
 	query: Populated<Entity, With<ElementNode>>,
 	requires_tree_idx_attr: Query<
 		Entity,
-		Or<(Added<EventObserver>, Added<TextNodeParent>)>,
+		Or<(Added<EventKey>, Added<TextNodeParent>)>,
 	>,
 	attributes: Query<&Attributes>,
 	dyn_attrs: Query<(), (With<AttributeOf>, Added<SignalReceiver<String>>)>,

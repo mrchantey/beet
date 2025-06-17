@@ -12,9 +12,9 @@ use web_sys::Event;
 pub(super) fn event_playback(
 	constants: Res<HtmlConstants>,
 	mut commands: Commands,
-	query: Populated<(Entity, &TreeIdx, &EventObserver), Added<TreeIdx>>,
+	query: Populated<(Entity, &TreeIdx, &EventKey), Added<TreeIdx>>,
 ) -> Result<()> {
-	let event_map: HashMap<(TreeIdx, &EventObserver), Entity> = query
+	let event_map: HashMap<(TreeIdx, &EventKey), Entity> = query
 		.iter()
 		.map(|(entity, idx, event)| ((*idx, event), entity))
 		.collect();
@@ -42,9 +42,9 @@ pub(super) fn event_playback(
 				let event_type = format!("on{}", event.type_());
 				if let Some(entity) = event_map.get(&(
 					TreeIdx::new(tree_idx),
-					&EventObserver::new(&event_type),
+					&EventKey::new(&event_type),
 				)) {
-					EventObserver::trigger(
+					EventKey::trigger(
 						&mut commands.entity(*entity),
 						&event_type,
 						event,

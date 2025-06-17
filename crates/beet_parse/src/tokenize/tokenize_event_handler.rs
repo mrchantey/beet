@@ -56,7 +56,7 @@ pub fn try_event_observer(
 	let lit_key_str = &lit.key;
 
 	try_insert_closure_type(&mut attr, &event_ident);
-	entity_components.push(quote! {EventObserver::new(#lit_key_str)});
+	entity_components.push(quote! {EventKey::new(#lit_key_str)});
 	entity_components
 		.push(quote! {EntityObserver::new(#[allow(unused_braces)]#attr)});
 	Ok(true)

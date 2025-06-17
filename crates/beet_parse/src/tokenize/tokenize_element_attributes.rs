@@ -146,7 +146,7 @@ mod test {
 			quote! {(
 				NodeTag(String::from("span")),
 				ElementNode { self_closing: true },
-				EventObserver::new("onclick"),
+				EventKey::new("onclick"),
 				EntityObserver::new(#[allow(unused_braces)]{foo})
 			)}
 			.to_string(),
@@ -184,7 +184,7 @@ mod test {
 				NodeTag(String::from("span")),
 				ElementNode { self_closing: true },
 				{foo}.into_node_bundle(),
-				EventObserver::new("onclick"),
+				EventKey::new("onclick"),
 				EntityObserver::new(#[allow(unused_braces)] |_: Trigger<OnClick>| { println!("clicked"); }),
 				related!(Attributes[
 					"hidden".into_attr_key_bundle(),

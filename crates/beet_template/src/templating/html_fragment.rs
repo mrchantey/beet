@@ -79,7 +79,7 @@ pub(super) fn render_html_fragments(
 pub(super) fn insert_event_playback_attribute(
 	mut commands: Commands,
 	html_constants: Res<HtmlConstants>,
-	query: Populated<(Entity, &TreeIdx, &EventObserver), Added<TreeIdx>>,
+	query: Populated<(Entity, &TreeIdx, &EventKey), Added<TreeIdx>>,
 ) {
 	for (entity, idx, event) in query.iter() {
 		let event_name = event.event_name();
@@ -277,7 +277,9 @@ mod test {
 		rsx! {<div onclick={||{}}/>}
 			.xmap(HtmlFragment::parse_bundle)
 			.xpect()
-			.to_be("<div data-beet-rsx-idx=\"0\" onclick=\"_beet_event_handler(0, event)\"/>");
+			.to_be(
+				"<div data-beet-rsx-idx=\"0\" onclick=\"_beet_event_handler(0, event)\"/>",
+			);
 	}
 	#[test]
 	fn signal_text_nodes() {
