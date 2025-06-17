@@ -25,6 +25,7 @@ pub fn SidebarItem(node: SidebarNode, root: bool) -> impl Bundle {
 				{display_name}
 			</a>
 		}
+		.any_bundle()
 	} else {
 		let children = children
 			.into_iter()
@@ -36,11 +37,10 @@ pub fn SidebarItem(node: SidebarNode, root: bool) -> impl Bundle {
 					{display_name}
 				</a>
 			}
+			.any_bundle()
 		} else {
-			rsx! { <span class="large">{display_name}</span> }
+			rsx! { <span class="large">{display_name}</span> }.any_bundle()
 		};
-
-		// if children.is_e
 
 		rsx! {
 			// {group}
@@ -54,6 +54,7 @@ pub fn SidebarItem(node: SidebarNode, root: bool) -> impl Bundle {
 			// <Astro.self entries={entry.items}/>
 			</details>
 		}
+		.any_bundle()
 	};
 
 	rsx! {

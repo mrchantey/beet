@@ -1,4 +1,6 @@
+mod bundle;
 mod world;
+pub use self::bundle::*;
 pub use world::*;
 mod app;
 pub use self::app::*;

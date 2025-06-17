@@ -5,6 +5,8 @@ use bevy::ecs::spawn::SpawnRelatedBundle;
 use bevy::ecs::spawn::SpawnWith;
 use bevy::prelude::*;
 
+use crate::bundle_effect;
+
 /// Type helper for [`SpawnWith`]
 pub fn spawn_with<T: RelationshipTarget, F>(
 	func: F,
@@ -63,4 +65,24 @@ unsafe impl<T: 'static + Send + Sync + FnOnce(&mut EntityWorldMut)> Bundle
 		_required_components: &mut bevy::ecs::component::RequiredComponents,
 	) {
 	}
+}
+
+
+/// A type erased [`BundleEffect`] that runs a function when the entity is spawned.
+pub struct OnSpawnBoxed(
+	pub Box<dyn 'static + Send + Sync + FnOnce(&mut EntityWorldMut)>,
+);
+
+impl OnSpawnBoxed {
+	/// Create a new [`OnSpawnBoxed`] effect.
+	pub fn new(
+		func: impl 'static + Send + Sync + FnOnce(&mut EntityWorldMut),
+	) -> Self {
+		Self(Box::new(func))
+	}
+}
+bundle_effect!(OnSpawnBoxed);
+
+impl BundleEffect for OnSpawnBoxed {
+	fn apply(self, entity: &mut EntityWorldMut) { (self.0)(entity); }
 }

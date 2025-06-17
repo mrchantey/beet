@@ -2,6 +2,8 @@
 //! into a single [`TokenStream`], usually representing
 //! an instantiated `Bundle` of the structure.
 mod tokenize_combinator;
+mod tokenize_event_handler;
+pub use tokenize_event_handler::*;
 pub use tokenize_combinator::*;
 mod tokenize_rstml;
 pub use tokenize_rstml::*;
