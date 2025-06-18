@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use beet_common::node::AttributeValueStr;
+use beet_common::node::AttributeLit;
 use beet_common::node::IntoTemplateBundle;
 use bevy::prelude::*;
 use flume::Receiver;
@@ -49,11 +49,11 @@ pub(crate) fn receive_text_node_signals(
 	}
 }
 pub(crate) fn receive_attribute_value_signals(
-	mut query: Populated<(&mut AttributeValueStr, &SignalReceiver<String>)>,
+	mut query: Populated<(&mut AttributeLit, &SignalReceiver<String>)>,
 ) {
 	for (mut text, update) in query.iter_mut() {
 		while let Ok(new_text) = update.0.try_recv() {
-			text.0 = new_text;
+			*text = AttributeLit::new(new_text);
 		}
 	}
 }
@@ -66,15 +66,12 @@ impl<T: 'static + Send + Sync + Clone + ToString> IntoTemplateBundle<Self>
 		let get_str = move || self.get().to_string();
 		(TextSpan::new(get_str()), SignalReceiver::new(get_str))
 	}
-	fn into_attr_val_bundle(self) -> impl Bundle
+	fn into_attribute_bundle(self) -> impl Bundle
 	where
 		Self: 'static + Send + Sync + Sized,
 	{
 		let get_str = move || self.get().to_string();
-		(
-			AttributeValueStr::new(get_str()),
-			SignalReceiver::new(get_str),
-		)
+		(AttributeLit::new(get_str()), SignalReceiver::new(get_str))
 	}
 }
 
@@ -159,9 +156,9 @@ mod test {
 
 		app.world()
 			.entity(attr)
-			.get::<AttributeValueStr>()
+			.get::<AttributeLit>()
 			.unwrap()
-			.0
+			.to_string()
 			.xref()
 			.xpect()
 			.to_be("foo");
@@ -171,9 +168,9 @@ mod test {
 		app.update();
 		app.world()
 			.entity(attr)
-			.get::<AttributeValueStr>()
+			.get::<AttributeLit>()
 			.unwrap()
-			.0
+			.to_string()
 			.xref()
 			.xpect()
 			.to_be("bar");

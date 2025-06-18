@@ -37,8 +37,8 @@ pub(super) fn update_text_nodes(
 pub(super) fn update_attribute_values(
 	_: TempNonSendMarker,
 	query: Populated<
-		(&AttributeKey, &AttributeValueStr, &DomElementBinding),
-		Changed<AttributeValueStr>,
+		(&AttributeKey, &AttributeLit, &DomElementBinding),
+		Changed<AttributeLit>,
 	>,
 ) -> Result<()> {
 	for (key, value, el) in query.iter() {
@@ -136,7 +136,7 @@ pub(super) fn bind_attribute_values(
 	query: Populated<
 		(Entity, &AttributeOf),
 		(
-			Changed<AttributeValueStr>,
+			Changed<AttributeLit>,
 			(With<SignalReceiver<String>>, Without<DomElementBinding>),
 		),
 	>,

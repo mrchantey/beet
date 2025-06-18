@@ -220,7 +220,7 @@ fn script(content: impl Into<String>) -> impl Bundle {
 		NodeTag::new("script"),
 		related!(
 			Attributes
-				[(AttributeKey::new("type"), AttributeValueStr::new("module"),)]
+				[(AttributeKey::new("type"), AttributeLit::new("module"),)]
 		),
 		children![TextNode::new(content)],
 	)

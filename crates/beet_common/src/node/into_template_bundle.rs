@@ -20,13 +20,13 @@ pub trait IntoTemplateBundle<M> {
 	/// Called for nodes and attributes expressions:
 	/// `rsx!{"howdy"}` becomes `TextNode::new("howdy")`
 	/// `rsx!{<span {"howdy"} />}` becomes `TextNode::new("howdy")`
-	/// This is also called by default in [`Self::into_attr_val_bundle`],
+	/// This is also called by default in [`Self::into_attribute_bundle`],
 	/// wrapping them in [`AttributeKey`] and [`AttributeValue`].
 	fn into_node_bundle(self) -> impl Bundle;
 	/// By default calls [`Self::into_node_bundle`], but can be overridden,
 	/// for instance literals like `String` or `bool` will insert
-	/// an [`AttributeValueStr`] instead.
-	fn into_attr_val_bundle(self) -> impl Bundle
+	/// an [`AttributeLit`] instead.
+	fn into_attribute_bundle(self) -> impl Bundle
 	where
 		Self: 'static + Send + Sync + Sized,
 	{
@@ -68,22 +68,13 @@ where
 
 pub struct IntoTextNodeBundleMarker;
 
-impl IntoTemplateBundle<IntoTextNodeBundleMarker> for &str {
-	fn into_node_bundle(self) -> impl Bundle { TextNode::new(self.to_string()) }
-	fn into_attr_val_bundle(self) -> impl Bundle {
-		(
-			AttributeValueStr::new(self.to_string()),
-		)
-	}
-}
-
 macro_rules! primitives_into_bundle {
 	($($t:ty),*) => {
 		$(
 			impl IntoTemplateBundle<IntoTextNodeBundleMarker> for $t {
 				fn into_node_bundle(self) -> impl Bundle { TextNode::new(self.to_string()) }
-				fn into_attr_val_bundle(self) -> impl Bundle {
-					AttributeValueStr::new(self.to_string())
+				fn into_attribute_bundle(self) -> impl Bundle {
+					AttributeLit::new(self)
 				}
 			}
 		)*
@@ -93,7 +84,7 @@ macro_rules! primitives_into_bundle {
 // Implement for primitives
 #[rustfmt::skip]
 primitives_into_bundle!(
-	String, bool, 
+	&str,String, bool, 
 	f32, f64,
 	u8, u16, u32, u64, u128, usize, 
 	i8, i16, i32, i64, i128, isize

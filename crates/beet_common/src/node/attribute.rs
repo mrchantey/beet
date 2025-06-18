@@ -41,20 +41,106 @@ impl AttributeKey {
 }
 
 
-/// For literal attribute value types like strings, numbers, and booleans,
-/// store the stringified version of the value.
-#[derive(
-	Debug, Clone, PartialEq, Eq, Hash, Deref, DerefMut, Reflect, Component,
-)]
+/// For literal attribute value types like strings, numbers, and booleans
+///
+/// ## Hash
+/// This type implements `Hash` including its f64 variant,
+/// disregarding the fact that technically NaN is not equal to itself.
+#[derive(Debug, Clone, PartialEq, Reflect, Component)]
 #[reflect(Component)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "tokens", derive(ToTokens))]
-pub struct AttributeValueStr(pub String);
-
-impl AttributeValueStr {
-	pub fn new(value: impl Into<String>) -> Self { Self(value.into()) }
+pub enum AttributeLit {
+	String(String),
+	Number(f64),
+	Boolean(bool),
 }
 
-impl AsRef<str> for AttributeValueStr {
-	fn as_ref(&self) -> &str { &self.0 }
+impl AttributeLit {
+	pub fn new(value: impl Into<Self>) -> Self { value.into() }
+}
+impl std::hash::Hash for AttributeLit {
+	fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+		match self {
+			Self::String(s) => s.hash(state),
+			Self::Number(n) => n.to_string().hash(state),
+			Self::Boolean(b) => b.hash(state),
+		}
+	}
+}
+impl std::fmt::Display for AttributeLit {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		match self {
+			Self::String(s) => write!(f, "{}", s),
+			Self::Number(n) => write!(f, "{}", n),
+			Self::Boolean(b) => write!(f, "{}", b),
+		}
+	}
+}
+
+impl Into<AttributeLit> for String {
+	fn into(self) -> AttributeLit { AttributeLit::String(self) }
+}
+impl Into<AttributeLit> for &str {
+	fn into(self) -> AttributeLit { AttributeLit::String(self.to_string()) }
+}
+
+impl Into<AttributeLit> for bool {
+	fn into(self) -> AttributeLit { AttributeLit::Boolean(self) }
+}
+
+impl Into<AttributeLit> for f32 {
+	fn into(self) -> AttributeLit { AttributeLit::Number(self as f64) }
+}
+
+impl Into<AttributeLit> for f64 {
+	fn into(self) -> AttributeLit { AttributeLit::Number(self) }
+}
+
+impl Into<AttributeLit> for u8 {
+	fn into(self) -> AttributeLit { AttributeLit::Number(self as f64) }
+}
+
+impl Into<AttributeLit> for u16 {
+	fn into(self) -> AttributeLit { AttributeLit::Number(self as f64) }
+}
+
+impl Into<AttributeLit> for u32 {
+	fn into(self) -> AttributeLit { AttributeLit::Number(self as f64) }
+}
+
+impl Into<AttributeLit> for u64 {
+	fn into(self) -> AttributeLit { AttributeLit::Number(self as f64) }
+}
+
+impl Into<AttributeLit> for u128 {
+	fn into(self) -> AttributeLit { AttributeLit::Number(self as f64) }
+}
+
+impl Into<AttributeLit> for usize {
+	fn into(self) -> AttributeLit { AttributeLit::Number(self as f64) }
+}
+
+impl Into<AttributeLit> for i8 {
+	fn into(self) -> AttributeLit { AttributeLit::Number(self as f64) }
+}
+
+impl Into<AttributeLit> for i16 {
+	fn into(self) -> AttributeLit { AttributeLit::Number(self as f64) }
+}
+
+impl Into<AttributeLit> for i32 {
+	fn into(self) -> AttributeLit { AttributeLit::Number(self as f64) }
+}
+
+impl Into<AttributeLit> for i64 {
+	fn into(self) -> AttributeLit { AttributeLit::Number(self as f64) }
+}
+
+impl Into<AttributeLit> for i128 {
+	fn into(self) -> AttributeLit { AttributeLit::Number(self as f64) }
+}
+
+impl Into<AttributeLit> for isize {
+	fn into(self) -> AttributeLit { AttributeLit::Number(self as f64) }
 }

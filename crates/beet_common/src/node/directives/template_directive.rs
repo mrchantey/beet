@@ -14,7 +14,7 @@ pub trait TemplateDirective: 'static + Sized + Component {
 	/// Try to parse from an attribute key-value pair
 	fn try_from_attribute(
 		key: &str,
-		value: Option<&AttributeValueStr>,
+		value: Option<&AttributeLit>,
 	) -> Option<Self>;
 }
 
@@ -42,7 +42,7 @@ fn try_extract_directive<T: TemplateDirective>(
 		Entity,
 		&AttributeOf,
 		&AttributeKey,
-		Option<&AttributeValueStr>,
+		Option<&AttributeLit>,
 	)>,
 ) {
 	for (entity, parent, key, value) in query.iter() {

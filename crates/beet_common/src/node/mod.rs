@@ -33,7 +33,7 @@ pub fn node_types_plugin(app: &mut bevy::prelude::App) {
 		.register_type::<AttributeOf>()
 		.register_type::<Attributes>()
 		.register_type::<AttributeKey>()
-		.register_type::<AttributeValueStr>()
+		.register_type::<AttributeLit>()
 		// misc
 		// .register_type::<OnClick>()
 		.register_type::<ItemOf<TemplateNode, FileSpan>>()

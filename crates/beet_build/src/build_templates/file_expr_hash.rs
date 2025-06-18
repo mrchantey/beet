@@ -36,7 +36,7 @@ pub fn update_file_expr_hash(
 	attributes: Query<&Attributes>,
 	block_nodes: Query<&ItemOf<BlockNode, SendWrapper<Expr>>>,
 	// dont hash literal attribute values
-	attr_exprs: Query<&AttributeExpr, Without<AttributeValueStr>>,
+	attr_exprs: Query<&AttributeExpr, Without<AttributeLit>>,
 	mut query: Populated<
 		(Entity, &TemplateFile, &mut FileExprHash),
 		Changed<TemplateFile>,

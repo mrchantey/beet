@@ -57,7 +57,7 @@ fn tokenize_attribute_tokens(
 	if let Some(attr_key) = entity.get::<AttributeKey>() {
 		items.push(attr_key.self_token_stream());
 	}
-	if let Some(attr_val) = entity.get::<AttributeValueStr>() {
+	if let Some(attr_val) = entity.get::<AttributeLit>() {
 		items.push(attr_val.self_token_stream());
 	}
 	if let Some(attr_expr) = entity.get::<AttributeExpr>() {
@@ -134,6 +134,7 @@ mod test {
 			<br 
 				hidden
 				class="foo"
+				party_time=true
 				some_key={bar}
 				onmousemove="some_js_func"
 				onclick={|_: Trigger<OnClick>| {}}
@@ -146,8 +147,13 @@ mod test {
 						AttributeKey(String::from("hidden")),
 						(
 							AttributeKey(String::from("class")),
-							AttributeValueStr(String::from("foo")),
+							AttributeLit::String(String::from("foo")),
 							AttributeExpr(SendWrapper::new(syn::parse_quote!("foo")))
+						),
+						(
+							AttributeKey(String::from("party_time")),
+							AttributeLit::Boolean(true),
+							AttributeExpr(SendWrapper::new(syn::parse_quote!(true)))
 						),
 						(
 							AttributeKey(String::from("some_key")),
@@ -155,7 +161,7 @@ mod test {
 						),
 						(
 							AttributeKey(String::from("onmousemove")),
-							AttributeValueStr(String::from("some_js_func")),
+							AttributeLit::String(String::from("some_js_func")),
 							AttributeExpr(SendWrapper::new(syn::parse_quote!("some_js_func")))
 						),
 						(
@@ -226,7 +232,7 @@ mod test {
 		parse_combinator(r#"
 			<br 
 				hidden
-				class="foo"
+				class=true
 				onmousemove="some_js_func"
 				onclick={|_: Trigger<OnClick>| {}}
 			/>
@@ -240,12 +246,12 @@ mod test {
 								AttributeKey(String::from("hidden")),
 								(
 									AttributeKey(String::from("class")),
-									AttributeValueStr(String::from("foo")),
-									AttributeExpr(SendWrapper::new(syn::parse_quote!("foo")))
+									AttributeLit::Boolean(true),
+									AttributeExpr(SendWrapper::new(syn::parse_quote!(true)))
 								),
 								(
 									AttributeKey(String::from("onmousemove")),
-									AttributeValueStr(String::from("some_js_func")),
+									AttributeLit::String(String::from("some_js_func")),
 									AttributeExpr(SendWrapper::new(syn::parse_quote!("some_js_func")))
 								),
 								(

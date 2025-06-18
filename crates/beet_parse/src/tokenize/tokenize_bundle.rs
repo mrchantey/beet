@@ -101,7 +101,7 @@ mod test {
 				ElementNode { self_closing: false },
 				related!(Attributes[(
 					AttributeKey::new("hidden"),
-					true.into_attr_val_bundle()
+					true.into_attribute_bundle()
 				)]),
 				related!{Children[(
 						NodeTag(String::from("MyComponent")),
@@ -191,7 +191,7 @@ mod test {
 					related!(Attributes [
 						(
 							AttributeKey::new("hidden"),
-							val.into_attr_val_bundle()
+							val.into_attribute_bundle()
 						)
 					])
 				)}

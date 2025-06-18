@@ -46,7 +46,7 @@ impl LangContent {
 pub(super) fn extract_lang_content(
 	mut commands: Commands,
 	text_nodes: Query<&TextNode>,
-	attr_lits: Query<(&AttributeKey, Option<&AttributeValueStr>)>,
+	attr_lits: Query<(&AttributeKey, Option<&AttributeLit>)>,
 	query: Populated<
 		(
 			Entity,
@@ -69,22 +69,25 @@ pub(super) fn extract_lang_content(
 			.flat_map(|a| a.iter())
 			.filter_map(|a| attr_lits.get(a).ok())
 		{
-			if **key == "is:inline" {
-				// skip inline templates
-				continue 'iter_elements;
-			} else if **key == "src"
-				&& let Some(value) = value
-				&& value.starts_with(".")
-			{
-				commands
-					.entity(entity)
-					// .remove::<ElementNode>()
-					.insert(LangContent::file(value, span));
+			match (key.as_str(), value) {
+				("is:inline", _) => {
+					// skip inline templates
+					continue 'iter_elements;
+				}
+				("src", Some(AttributeLit::String(value)))
+					if value.starts_with(".") =>
+				{
+					commands
+						.entity(entity)
+						// .remove::<ElementNode>()
+						.insert(LangContent::file(value, span));
 
-				// TODO load content as child text node?
+					// TODO load content as child text node?
 
-				// found a LangContent::File
-				continue 'iter_elements;
+					// found a LangContent::File
+					continue 'iter_elements;
+				}
+				_ => {}
 			}
 		}
 		for child in children.iter().flat_map(|c| c.iter()) {

@@ -36,7 +36,7 @@ pub(super) fn apply_tree_idx(
 		commands.spawn((
 			AttributeOf::new(entity),
 			AttributeKey::new(html_constants.tree_idx_key.clone()),
-			AttributeValueStr::new(id.to_string()),
+			AttributeLit::new(id.to_string()),
 		));
 		id += 1;
 	}

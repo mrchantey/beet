@@ -42,7 +42,7 @@ pub fn tokenize_element_attributes(
 				(Some((_, key)), Some(value)) => {
 					attr_components.push(quote! {AttributeKey::new(#key)});
 					attr_components
-						.push(quote! {#value.into_attr_val_bundle()});
+						.push(quote! {#value.into_attribute_bundle()});
 				}
 				// 3. Key without value
 				(Some((_, key)), None) => {
@@ -120,7 +120,7 @@ mod test {
 				ElementNode { self_closing: true },
 				related!(Attributes[(
 					AttributeKey::new("hidden"),
-					true.into_attr_val_bundle()
+					true.into_attribute_bundle()
 				)])
 			)}
 			.to_string(),
@@ -166,7 +166,7 @@ mod test {
 				ElementNode { self_closing: true },
 				related!(Attributes[(
 					AttributeKey::new("onclick"),
-					"some_js_func".into_attr_val_bundle()
+					"some_js_func".into_attribute_bundle()
 				)])
 			)}
 			.to_string(),
@@ -195,11 +195,11 @@ mod test {
 					AttributeKey::new("hidden"),
 					(
 						AttributeKey::new("class"),
-						"foo".into_attr_val_bundle()
+						"foo".into_attribute_bundle()
 					),
 					(
 						AttributeKey::new("onmousemove"),
-						"some_js_func".into_attr_val_bundle()
+						"some_js_func".into_attribute_bundle()
 					)
 				])
 			)}

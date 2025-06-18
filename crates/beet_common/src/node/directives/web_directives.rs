@@ -37,7 +37,7 @@ pub enum HtmlHoistDirective {
 impl TemplateDirective for HtmlHoistDirective {
 	fn try_from_attribute(
 		key: &str,
-		value: Option<&AttributeValueStr>,
+		value: Option<&AttributeLit>,
 	) -> Option<Self> {
 		match (key, value) {
 			("hoist:head", _) => Some(Self::Head),
@@ -59,7 +59,7 @@ pub struct ClientLoadDirective;
 impl TemplateDirective for ClientLoadDirective {
 	fn try_from_attribute(
 		key: &str,
-		value: Option<&AttributeValueStr>,
+		value: Option<&AttributeLit>,
 	) -> Option<Self> {
 		match (key, value) {
 			("client:load", _) => Some(Self),
@@ -80,7 +80,7 @@ pub struct ClientOnlyDirective;
 impl TemplateDirective for ClientOnlyDirective {
 	fn try_from_attribute(
 		key: &str,
-		value: Option<&AttributeValueStr>,
+		value: Option<&AttributeLit>,
 	) -> Option<Self> {
 		match (key, value) {
 			("client:only", _) => Some(Self),

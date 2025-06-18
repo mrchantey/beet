@@ -262,14 +262,14 @@ impl<'w, 's, 'a> Builder<'w, 's, 'a> {
 					RsxAttributeValue::Boolean(val) => {
 						let val = val.0;
 						entity.insert((
-							val.into_attr_val_bundle(),
+							val.into_attribute_bundle(),
 							AttributeExpr::new(syn::parse_quote! {#val}),
 						));
 					}
 					RsxAttributeValue::Number(val) => {
 						let val = val.0;
 						entity.insert((
-							val.into_attr_val_bundle(),
+							val.into_attribute_bundle(),
 							AttributeExpr::new(syn::parse_quote! {#val}),
 						));
 					}
@@ -277,7 +277,7 @@ impl<'w, 's, 'a> Builder<'w, 's, 'a> {
 						let val = val.to_string_unquoted();
 						entity.insert((
 							AttributeExpr::new(syn::parse_quote! {#val}),
-							val.into_attr_val_bundle(),
+							val.into_attribute_bundle(),
 						));
 					}
 					RsxAttributeValue::Element(value) => {
@@ -356,7 +356,7 @@ mod test {
 				ElementNode{self_closing:true},
 				related!(Attributes[(
 					AttributeKey::new("align"),
-					"center".into_attr_val_bundle()
+					"center".into_attribute_bundle()
 				)])
 			)}
 			.to_string(),
@@ -392,7 +392,7 @@ mod test {
 				ElementNode{self_closing:true},
 				related!(Attributes[(
 					AttributeKey::new("foo"),
-					"bar".into_attr_val_bundle()
+					"bar".into_attribute_bundle()
 				)])
 			)}
 			.to_string(),
@@ -404,7 +404,7 @@ mod test {
 				ElementNode{self_closing:true},
 				related!(Attributes[(
 					AttributeKey::new("foo"),
-					true.into_attr_val_bundle()
+					true.into_attribute_bundle()
 				)])
 			)}
 			.to_string(),
@@ -416,7 +416,7 @@ mod test {
 				ElementNode{self_closing:true},
 				related!(Attributes[(
 					AttributeKey::new("foo"),
-					20f64.into_attr_val_bundle()
+					20f64.into_attribute_bundle()
 				)])
 			)}
 			.to_string(),
@@ -428,7 +428,7 @@ mod test {
 				ElementNode{self_closing:true},
 				related!(Attributes[(
 					AttributeKey::new("foo"),
-					{ bar }.into_attr_val_bundle()
+					{ bar }.into_attribute_bundle()
 				)])
 			)}
 			.to_string(),
@@ -443,7 +443,7 @@ mod test {
 						{(
 							NodeTag(String::from("br")),
 							ElementNode { self_closing: true }
-						)}.into_attr_val_bundle()
+						)}.into_attribute_bundle()
 				)])
 			)}
 			.to_string(),
@@ -466,7 +466,7 @@ mod test {
 								ElementNode{self_closing:true}
 							);
 							bar
-						}.into_attr_val_bundle()
+						}.into_attribute_bundle()
 					)])
 				)}
 				.to_string(),

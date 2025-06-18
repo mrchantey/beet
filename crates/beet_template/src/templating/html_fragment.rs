@@ -88,7 +88,7 @@ pub(super) fn insert_event_playback_attribute(
 		commands.spawn((
 			AttributeOf::new(entity),
 			AttributeKey(event_name.clone()),
-			AttributeValueStr(js_func),
+			AttributeLit::new(js_func),
 		));
 	}
 }
@@ -110,7 +110,7 @@ pub(super) struct Builder<'w, 's> {
 	)>,
 	attributes: Query<'w,'s,(
 		&'static AttributeKey,
-		Option<&'static AttributeValueStr>
+		Option<&'static AttributeLit>
 	)>,
 	doctypes: Query<'w, 's, &'static DoctypeNode>,
 	comments: Query<'w, 's, &'static CommentNode>,
@@ -147,7 +147,7 @@ impl Builder<'_, '_> {
 					html.push_str(&key);
 					if let Some(value) = &value {
 						html.push_str("=\"");
-						html.push_str(value);
+						html.push_str(&value.to_string());
 						html.push_str("\"");
 					}
 				}
