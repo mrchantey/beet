@@ -58,7 +58,7 @@ where
 }
 
 
-#[extend::ext(name=MyTypeExt)]
+#[extend::ext(name=HttpMethodExt)]
 pub impl HttpMethod {
 	fn into_axum_method(&self) -> MethodFilter {
 		match self {

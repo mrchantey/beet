@@ -235,7 +235,7 @@ default = ["flow"]
 #💡 helper features
 web-server = ["server", "router", "design", "net", "serde"]
 #💡 fine-grained
-serde = ["beet_utils/serde", ]
+serde = ["beet_utils/serde"]
 rand = ["beet_utils/rand", "beet_bevy/rand"]
 connect = ["dep:beet_connect"]
 examples = ["bevy_default", "dep:beet_examples"]
@@ -248,7 +248,12 @@ parse = ["dep:beet_parse"]
 template = ["dep:beet_template"]
 # fs = ["beet_template?/fs"]
 ml = ["flow", "dep:beet_ml", "beet_examples?/ml"]
-server = ["router", "dep:beet_server", "dep:beet_server_utils"]
+server = [
+	"router",
+	"beet_router/axum",
+	"dep:beet_server",
+	"dep:beet_server_utils",
+]
 lambda = ["server", "beet_server/lambda"]
 spatial = ["flow", "dep:beet_spatial", "beet_ml?/spatial"]
 sim = ["flow", "dep:beet_sim"]
