@@ -1,5 +1,4 @@
 use crate::prelude::*;
-use beet_template::sigfault::signal;
 
 pub fn get() -> impl Bundle {
 	rsx! { <Inner client:load /> }

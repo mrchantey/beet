@@ -1,5 +1,4 @@
 use crate::prelude::*;
-use beet_template::as_beet::*;
 
 #[template]
 pub fn Sidebar(nodes: Vec<SidebarNode>) -> impl Bundle {

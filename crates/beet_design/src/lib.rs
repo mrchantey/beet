@@ -17,8 +17,8 @@ pub mod layout;
 pub mod macros;
 // /// Collection of mockups for all components
 // // #[cfg(not(target_arch = "wasm32"))]
-// #[path = "codegen/mockups.rs"]
-// pub mod mockups;
+#[path = "codegen/mockups.rs"]
+pub mod mockups;
 
 
 /// Commonly used components for beet_design
@@ -32,7 +32,26 @@ pub mod prelude {
 	pub use crate::interactive::*;
 	pub use crate::layout::*;
 	pub use crate::macros::*;
-	pub(crate) use beet_template::as_beet::*;
+	// pub(crate) use beet_template::as_beet::*;
+	#[allow(unused)]
+	pub(crate) use beet::prelude::*;
+	#[allow(unused)]
+	pub(crate) mod beet {
+		pub mod prelude {
+			pub use crate::prelude::*;
+			pub use beet_bevy::prelude::*;
+			pub use beet_common::prelude::*;
+			pub use beet_net::prelude::*;
+			pub use beet_server::prelude::*;
+			pub use beet_template::prelude::*;
+			pub use beet_utils::prelude::*;
+			#[allow(unused)]
+			pub(crate) use bevy::prelude::*;
+		}
+		pub mod exports {
+			pub use beet_server::exports::*;
+		}
+	}
 }
 
 

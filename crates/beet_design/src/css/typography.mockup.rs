@@ -1,7 +1,4 @@
-use beet_template::as_beet::*;
-
-
-
+use crate::prelude::*;
 
 pub fn get() -> impl Bundle {
 	rsx! {

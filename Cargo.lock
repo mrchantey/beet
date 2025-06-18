@@ -866,9 +866,11 @@ name = "beet_design"
 version = "0.0.6-dev.1"
 dependencies = [
  "anyhow",
+ "beet_bevy",
  "beet_common",
  "beet_net",
  "beet_router",
+ "beet_server",
  "beet_template",
  "beet_utils",
  "bevy",

@@ -1,6 +1,4 @@
 use crate::prelude::*;
-use beet_template::sigfault::effect;
-use beet_template::sigfault::signal;
 
 
 pub fn get() -> impl Bundle {
@@ -15,7 +13,7 @@ pub fn Inner() -> impl Bundle {
 
 	let val2 = value.clone();
 	effect(move || {
-		sweet::log!("value: {}", val2());
+		beet::prelude::log!("value: {}", val2());
 	});
 
 	let set_value1 = set_value.clone();

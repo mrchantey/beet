@@ -1,4 +1,4 @@
-use beet_template::as_beet::*;
+use crate::prelude::*;
 
 #[derive(Default, Buildable, TemplateBundle)]
 pub struct BaseHtmlAttributes {

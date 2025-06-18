@@ -26,7 +26,7 @@ impl TextFieldVariant {
 #[template]
 pub fn TextField(
 	#[field(default)] variant: TextFieldVariant,
-	#[field(flatten)] attrs: InputHtmlAttributes,
+	#[field(flatten=BaseHtmlAttributes)] attrs: InputHtmlAttributes,
 ) -> impl Bundle {
 	let mut attrs = attrs;
 	attrs.push_class(format!(
@@ -48,7 +48,9 @@ pub fn TextField(
 #[template]
 pub fn TextArea(
 	#[field(default)] variant: TextFieldVariant,
-	#[field(flatten)] attrs: TextAreaHtmlAttributes,
+	#[field(flatten=BaseHtmlAttributes)]
+	#[field(flatten=InputHtmlAttributes)]
+	attrs: TextAreaHtmlAttributes,
 ) -> impl Bundle {
 	let mut attrs = attrs;
 	attrs.push_class(format!(

@@ -1,5 +1,4 @@
 use crate::prelude::*;
-use beet_template::as_beet::*;
 use chrono::Datelike;
 
 #[template]

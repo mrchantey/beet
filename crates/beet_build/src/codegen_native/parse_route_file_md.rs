@@ -41,11 +41,10 @@ pub fn parse_route_file_md(
 			.parent()
 			.unwrap_or_else(|| WsPathBuf::default().into_abs());
 
-
 		// relative to the group codegen dir
-		let mut route_codegen_path =
-			route_file.route_path.as_relative().to_path_buf();
+		let mut route_codegen_path = route_file.group_path.clone();
 		route_codegen_path.set_extension("rs");
+		println!("Route codegen path: {}", route_codegen_path.display());
 
 		let route_codegen_path_abs = AbsPathBuf::new_unchecked(
 			group_codegen_dir.join(&route_codegen_path),
@@ -69,7 +68,7 @@ pub fn parse_route_file_md(
 			CombinatorTokens(rsx_str),
 			SourceFile::new(ws_path.clone()),
 			CombinatorRouteCodegen { meta: config }.sendit(),
-			CodegenFile::new(route_codegen_path_abs).sendit(),
+			group_codegen.clone_meta(route_codegen_path_abs).sendit(),
 		));
 	}
 	Ok(())

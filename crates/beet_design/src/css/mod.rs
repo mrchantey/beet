@@ -1,6 +1,4 @@
-use beet_template::as_beet::*;
-
-
+use crate::prelude::*;
 
 #[template]
 pub fn Css() -> impl Bundle {

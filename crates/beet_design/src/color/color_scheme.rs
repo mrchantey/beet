@@ -1,5 +1,4 @@
 use crate::prelude::*;
-use beet_template::prelude::*;
 use material_colors::color::Argb;
 use material_colors::theme::Theme;
 use material_colors::theme::ThemeBuilder;

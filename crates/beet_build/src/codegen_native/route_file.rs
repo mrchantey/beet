@@ -30,6 +30,9 @@ pub struct RouteFile {
 	/// [`CodegenFile::output_dir`] but may be modified, for example [`parse_route_file_md`]
 	/// will change the path to point to the newly generated `.rs` codegen file.
 	pub mod_path: PathBuf,
+	/// The [`origin_path`](Self::origin_path) relative to [`FileGroup::src`],
+	/// Used for per-file codegen.
+	pub group_path: PathBuf,
 	/// The route path for the file, derived from the file path
 	/// relative to the [`FileGroup::src`].
 	pub route_path: RoutePath,
@@ -71,9 +74,13 @@ pub fn spawn_route_files(
 				PathExt::create_relative(&group.src, &origin_path)?
 					.xmap(RoutePath::from_file_path)?;
 
+			let group_path =
+				PathExt::create_relative(&group.src, &origin_path)?;
+
 			entity.with_child(RouteFile {
 				index,
 				origin_path,
+				group_path,
 				mod_path,
 				route_path,
 			});
