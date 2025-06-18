@@ -2,6 +2,7 @@ use crate::prelude::*;
 use anyhow::Result;
 use beet_common::as_beet::*;
 use beet_utils::prelude::*;
+use bevy::ecs::relationship::RelatedSpawner;
 use bevy::prelude::*;
 use serde::Deserialize;
 use serde::Serialize;
@@ -32,7 +33,11 @@ pub struct FileGroupConfig {
 
 
 impl FileGroupConfig {
-	pub fn into_bundle(self, parent_codegen: &CodegenFile) -> impl Bundle {
+	pub fn spawn(
+		self,
+		spawner: &mut RelatedSpawner<ChildOf>,
+		parent_codegen: &CodegenFile,
+	) -> impl Bundle {
 		let codegen = self.codegen.unwrap_or_else(|| {
 			let default_out = self
 				.file_group
@@ -42,7 +47,31 @@ impl FileGroupConfig {
 				.join("codegen.rs");
 			parent_codegen.clone_meta(default_out)
 		});
-		(self.file_group.sendit(), codegen.sendit(), self.modifier)
+
+		let client_actions_codegen =
+			if self.file_group.category == FileGroupCategory::Actions {
+				// If this is an actions file group, we need to set the output file name
+				let mut output = codegen.output.clone();
+				if let Some(stem) = output.file_stem() {
+					let stem = format!("{}_server.rs", stem.to_string_lossy());
+					output.set_file_name(stem);
+				}
+				Some(codegen.clone_meta(output))
+			} else {
+				None
+			};
+
+		let mut entity = spawner.spawn((
+			self.file_group.sendit(),
+			codegen.sendit(),
+			self.modifier,
+		));
+		if let Some(client_actions_codegen) = client_actions_codegen {
+			entity.with_child((
+				client_actions_codegen.sendit(),
+				CollectClientActions::default(),
+			));
+		}
 	}
 }
 
@@ -71,19 +100,38 @@ pub struct FileGroup {
 	pub meta_type: syn::Type,
 	#[serde(default = "unit_type", with = "syn_type_serde")]
 	pub router_state_type: syn::Type,
-	#[serde(default = "default_true")]
-	pub route_tree: bool,
+	pub category: FileGroupCategory,
+}
+
+
+#[derive(Debug, Default, Copy, Clone, PartialEq, Serialize, Deserialize)]
+pub enum FileGroupCategory {
+	/// Files contain public functions named after the http methods,
+	/// and will be included in the route tree.
+	#[default]
+	Pages,
+	/// Files contain arbitary axum routes,
+	/// and will be excluded from the route tree.
+	Actions,
+}
+
+impl FileGroupCategory {
+	pub fn include_in_route_tree(&self) -> bool {
+		match self {
+			Self::Pages => true,
+			Self::Actions => false,
+		}
+	}
 }
 
 fn unit_type() -> syn::Type { syn::parse_str("()").unwrap() }
-fn default_true() -> bool { true }
 
 impl Default for FileGroup {
 	fn default() -> Self {
 		Self {
 			group_name: None,
 			pkg_name: None,
-			route_tree: true,
+			category: Default::default(),
 			src: AbsPathBuf::default(),
 			filter: GlobFilter::default(),
 			meta_type: unit_type(),

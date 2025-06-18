@@ -1,12 +1,20 @@
 #[allow(unused_imports)]
 use crate::prelude::*;
+use beet_common::as_beet::*;
 use beet_net::prelude::*;
 use bevy::prelude::*;
+use syn::ItemFn;
 
+/// The signature of a route file method
+#[derive(Debug, Clone, Deref, Sendit)]
+#[sendit(derive(Component))]
+pub struct RouteFileMethodSyn(ItemFn);
+impl RouteFileMethodSyn {
+	pub fn new(func: ItemFn) -> Self { Self(func) }
+}
 /// Tokens for a function that may be used as a route.
 #[derive(Debug, Clone, PartialEq, Eq, Component)]
 pub struct RouteFileMethod {
-	///
 	/// Whether this handler has an associated `meta_` method,
 	/// ie for `my_route::post()` this would be `my_route::meta_post()`.
 	pub meta: RouteFileMethodMeta,

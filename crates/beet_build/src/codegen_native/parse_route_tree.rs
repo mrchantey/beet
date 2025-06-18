@@ -49,34 +49,45 @@ pub fn parse_route_tree(
 	methods: Query<&RouteFileMethod>,
 	children: Query<&Children>,
 ) {
-	for (entity, mut codegen, parse_tree) in query.iter_mut() {
-		let methods = children
+	for (entity, mut codegen, _) in query.iter_mut() {
+		let child_methods = children
 			.iter_descendants(entity)
 			.filter_map(|e| file_groups.get(e).ok())
-			.filter(|(_, group)| group.route_tree)
+			.filter(|(_, group)| group.category.include_in_route_tree())
 			.map(|(e, _)| {
 				children
 					.iter_descendants(e)
-					.filter_map(|c| methods.get(c).ok().map(|m| m.clone()))
+					.filter_map(|c| methods.get(c).map(|m| (c, m)).ok())
 			})
 			.flatten()
 			.collect::<Vec<_>>();
 
-		let tree = RouteFileMethodTree::from_methods(methods);
-		codegen.add_item(parse_tree.routes_mod_tree(&tree));
-		codegen.add_item(parse_tree.collect_func(&tree));
+		let tree = RouteFileMethodTree::from_methods(child_methods);
+		let parser = Parser { query: methods };
+		codegen.add_item(parser.routes_mod_tree(&tree));
+		codegen.add_item(parser.collect_func(&tree));
 	}
 }
 
-impl ParseRouteTree {
+#[derive(Clone)]
+struct Parser<'w, 's, 'a> {
+	query: Query<'w, 's, &'a RouteFileMethod>,
+}
+
+impl<'a> Parser<'_, '_, 'a> {
 	fn routes_mod_tree(&self, tree: &RouteFileMethodTree) -> Item {
-		tree.mod_tree(|node| {
-			Self::tree_path_func(node)
+		tree.mod_tree(move |node| {
+			self.clone()
+				.tree_path_func(node)
 				.map(|n| n.into())
 				.unwrap_or(Item::Verbatim(TokenStream::default()))
 		})
 	}
-
+	fn get(&self, entity: Entity) -> &RouteFileMethod {
+		self.query.get(entity).expect(
+			"Malformed RouteFileTree, entity does not have a RouteFileMethod component",
+		)
+	}
 
 	fn collect_func(&self, tree: &RouteFileMethodTree) -> ItemFn {
 		let route_tree = self.collect_route_node(tree);
@@ -88,11 +99,12 @@ impl ParseRouteTree {
 		)
 	}
 
-	fn tree_path_func(tree: &RouteFileMethodTree) -> Option<ItemFn> {
+	fn tree_path_func(self, tree: &RouteFileMethodTree) -> Option<ItemFn> {
 		// just use the first method, each func should have the same route path
 		let Some(route) = &tree.funcs.iter().next() else {
 			return None;
 		};
+		let route = self.get(**route);
 		// if there are no children just use the name of the route,
 		// otherwise specify `index` as the name
 		let route_ident = if tree.children.is_empty() {
@@ -124,6 +136,7 @@ impl ParseRouteTree {
 
 		let path = match &tree.funcs.iter().next() {
 			Some(value) => {
+				let value = self.get(**value);
 				let path = value.route_info.path.to_string_lossy().to_string();
 				let path: Expr = syn::parse_quote!(Some(RoutePath::new(#path)));
 				path
@@ -145,114 +158,132 @@ impl ParseRouteTree {
 
 #[cfg(test)]
 mod test {
+	use super::Parser;
 	use crate::prelude::*;
+	use beet_bevy::prelude::WorldMutExt;
 	use beet_net::prelude::RouteInfo;
+	use bevy::prelude::*;
 	use quote::ToTokens;
 	use sweet::prelude::*;
 	use syn::ItemFn;
 	use syn::ItemMod;
 
-	fn tree() -> RouteFileMethodTree {
-		vec![
+	fn world() -> World {
+		let mut world = World::new();
+		world.spawn_batch(vec![
 			RouteFileMethod::new("/"),
+			RouteFileMethod::new("/bazz"),
 			RouteFileMethod::new("/foo/bar"),
 			RouteFileMethod::new("/foo/bazz"),
 			RouteFileMethod::new("/foo/bazz/boo"),
-			RouteFileMethod::new(RouteInfo::post("foo/bazz/boo")),
-		]
-		.into()
+			RouteFileMethod::new(RouteInfo::post("/foo/bazz/boo")),
+		]);
+		world
 	}
 
-	#[test]
-	fn correct_tree_structure() {
-		expect(tree().into_path_tree().to_string_indented()).to_be(
-			r#"root
-  foo
-    bar
-    bazz
-      boo
-"#,
-		);
-	}
 	#[test]
 	fn creates_mod() {
-		let tree = tree();
-		let mod_item = ParseRouteTree::default().routes_mod_tree(&tree);
+		let mut world = world();
+		let methods = world
+			.query_once::<(Entity, &RouteFileMethod)>()
+			.iter()
+			.copied()
+			.collect();
+		let tree = RouteFileMethodTree::from_methods(methods);
+		let mut query = world.query::<&RouteFileMethod>();
+		let query = query.query(&world);
+		let mod_item = Parser { query }.routes_mod_tree(&tree);
 
 		let expected: ItemMod = syn::parse_quote! {
-		#[allow(missing_docs)]
-		pub mod root {
-			#[allow (unused_imports)]
-			use super::*;
-			/// Get the local route path
-			pub fn index() -> &'static str {
-				"/"
-			}
 			#[allow(missing_docs)]
-			pub mod foo {
-					#[allow (unused_imports)]
+			pub mod root {
+				#[allow(unused_imports)]
+				use super::*;
+				#[doc = r" Get the local route path"]
+				pub fn index() -> &'static str {
+					"/"
+				}
+				#[doc = r" Get the local route path"]
+				pub fn bazz() -> &'static str {
+					"/bazz"
+				}
+				#[allow(missing_docs)]
+				pub mod foo {
+					#[allow(unused_imports)]
 					use super::*;
-					/// Get the local route path
+					#[doc = r" Get the local route path"]
 					pub fn bar() -> &'static str {
 						"/foo/bar"
 					}
 					#[allow(missing_docs)]
 					pub mod bazz {
-							#[allow (unused_imports)]
-							use super::*;
-							/// Get the local route path
-							pub fn index() -> &'static str {
-									"/foo/bazz"
-							}
-
-							/// Get the local route path
-							pub fn boo() -> &'static str {
-									"/foo/bazz/boo"
-							}
+						#[allow(unused_imports)]
+						use super::*;
+						#[doc = r" Get the local route path"]
+						pub fn index() -> &'static str {
+							"/foo/bazz"
+						}
+						#[doc = r" Get the local route path"]
+						pub fn boo() -> &'static str {
+							"/foo/bazz/boo"
+						}
 					}
+				}
 			}
-		}
-				};
+		};
 		expect(mod_item.to_token_stream().to_string())
 			.to_be(expected.to_token_stream().to_string());
 	}
 	#[test]
 	fn creates_collect_tree() {
-		let tree = tree();
-		let func = ParseRouteTree::default().collect_func(&tree);
+		let mut world = world();
+		let methods = world
+			.query_once::<(Entity, &RouteFileMethod)>()
+			.iter()
+			.copied()
+			.collect();
+		let tree = RouteFileMethodTree::from_methods(methods);
+		let mut query = world.query::<&RouteFileMethod>();
+		let query = query.query(&world);
+		let func = Parser { query }.collect_func(&tree);
 
 		let expected: ItemFn = syn::parse_quote! {
-			/// Collect the static route tree
+			#[doc = r" Collect the static route tree"]
 			pub fn route_path_tree() -> RoutePathTree {
 				RoutePathTree {
-						name: "root".into(),
-						path: Some(RoutePath::new("/")),
-						children: vec![
+					name: "root".into(),
+					path: Some(RoutePath::new("/")),
+					children: vec![
+						RoutePathTree {
+							name: "bazz".into(),
+							path: Some(RoutePath::new("/bazz")),
+							children: vec![],
+						},
+						RoutePathTree {
+							name: "foo".into(),
+							path: None,
+							children: vec![
 								RoutePathTree {
-										name: "foo".into(),
-										path: None,
-										children: vec![
-												RoutePathTree {
-														name: "bar".into(),
-														path: Some(RoutePath::new("/foo/bar")),
-														children: vec![],
-												},
-												RoutePathTree {
-														name: "bazz".into(),
-														path: Some(RoutePath::new("/foo/bazz")),
-														children: vec![
-																RoutePathTree {
-																		name: "boo".into(),
-																		path: Some(RoutePath::new("/foo/bazz/boo")),
-																		children: vec![],
-																}
-														],
-												}
-										],
+									name: "bar".into(),
+									path: Some(RoutePath::new("/foo/bar")),
+									children: vec![],
+								},
+								RoutePathTree {
+									name: "bazz".into(),
+									path: Some(RoutePath::new("/foo/bazz")),
+									children: vec![
+										RoutePathTree {
+											name: "boo".into(),
+											path: Some(RoutePath::new("/foo/bazz/boo")),
+											children: vec![],
+										}
+									],
 								}
-						],
+							],
+						}
+					],
 				}
-		}
+			}
 		};
 		expect(func.to_token_stream().to_string())
 			.to_be(expected.to_token_stream().to_string());

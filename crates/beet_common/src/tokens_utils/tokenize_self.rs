@@ -8,6 +8,21 @@ use std::marker::PhantomData;
 use std::ops::Deref;
 use std::path::PathBuf;
 
+/// Trait for converting a type into a [`TokenStream`],
+/// usually derived using the [`ToTokens`] macro.
+pub trait TokenizeSelf<M = Self> {
+	/// Append the type to a [`TokenStream`].
+	fn self_tokens(&self, tokens: &mut TokenStream);
+	/// Create a new [`TokenStream`] from the type.
+	fn self_token_stream(&self) -> TokenStream {
+		let mut tokens = TokenStream::new();
+		self.self_tokens(&mut tokens);
+		tokens
+	}
+}
+
+
+
 /// Returns the past part of an [`std::any::type_name`] as a [`syn::Path`],
 /// the user is expected to bring the type into scope.
 /// Where the typename is `"std::option::Option<std::vec::Vec<usize>>"`,
@@ -92,19 +107,6 @@ fn shorten_generic_type_name(type_name: &str) -> String {
 	result
 }
 
-
-/// Trait for converting a type into a [`TokenStream`],
-/// usually derived using the [`ToTokens`] macro.
-pub trait TokenizeSelf<M = Self> {
-	/// Append the type to a [`TokenStream`].
-	fn self_tokens(&self, tokens: &mut TokenStream);
-	/// Create a new [`TokenStream`] from the type.
-	fn self_token_stream(&self) -> TokenStream {
-		let mut tokens = TokenStream::new();
-		self.self_tokens(&mut tokens);
-		tokens
-	}
-}
 
 impl<T> TokenizeSelf for SendWrapper<T>
 where
@@ -244,7 +246,7 @@ mod test {
 		short_type_path::<Option<Vec<Matcher<u32>>>>()
 			.to_token_stream()
 			.to_string()
-.replace(" ", "")
+			.replace(" ", "")
 			.xpect()
 			.to_be("Option<Vec<Matcher<u32>>>");
 	}

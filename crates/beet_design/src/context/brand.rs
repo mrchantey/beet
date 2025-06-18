@@ -10,6 +10,7 @@ use bevy::prelude::*;
 /// # #![feature(more_qualified_paths)]
 /// # use beet_template::as_beet::*;
 /// # use beet_design::prelude::*;
+/// # use bevy::prelude::*;
 ///
 /// #[template]
 /// fn MyTemplate()-> impl Bundle {

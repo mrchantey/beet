@@ -82,10 +82,6 @@ pub fn modify_file_route_tokens(
 		};
 		for ReplaceRoute { from, to } in &modifier.replace_route {
 			route_path = route_path.replace(from, to);
-			println!(
-				"Replacing '{}' with '{}' in route path: {}",
-				from, to, route_path
-			);
 		}
 		route.route_info.path = RoutePath::new(route_path);
 	}

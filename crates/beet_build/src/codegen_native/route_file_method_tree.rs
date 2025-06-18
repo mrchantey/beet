@@ -1,6 +1,8 @@
 use crate::prelude::*;
+use beet_router::as_beet::Entity;
 use beet_utils::prelude::VecExt;
 use beet_utils::utils::Tree;
+use bevy::prelude::*;
 use syn::Item;
 
 #[derive(Debug, Clone)]
@@ -8,7 +10,11 @@ pub struct RouteFileMethodTree {
 	/// The route path for this part of the tree. It may be
 	/// a parent or leaf node.
 	pub name: String,
-	pub funcs: Vec<RouteFileMethod>,
+	/// A list of entities with a [`RouteFileMethod`] component
+	/// that are associated with this route. These usually
+	/// originate from a single file but may come from sepearate file groups
+	/// if they share the same route path.
+	pub funcs: Vec<Entity>,
 	/// Children mapped by their [`RouteTreeBuilder::name`].
 	/// If this is empty then the route is a leaf node.
 	pub children: Vec<RouteFileMethodTree>,
@@ -27,13 +33,12 @@ impl RouteFileMethodTree {
 	/// and the route names, collapsing methods with the same path.
 	#[allow(dead_code)]
 	pub fn into_path_tree(&self) -> Tree<String> {
-		let mut children = self
+		let children = self
 			.children
 			.iter()
 			.map(|child| child.into_path_tree())
 			.collect::<Vec<_>>();
 
-		children.sort_by(|a, b| a.value.cmp(&b.value));
 		Tree {
 			value: self.name.clone(),
 			children,
@@ -70,7 +75,7 @@ impl RouteFileMethodTree {
 		self.children.iter().all(|child| child.children.is_empty())
 	}
 
-	pub fn flatten(self) -> Vec<RouteFileMethod> {
+	pub fn flatten(self) -> Vec<Entity> {
 		let mut out = Vec::new();
 		out.extend(self.funcs.into_iter());
 		for child in self.children.into_iter() {
@@ -79,11 +84,11 @@ impl RouteFileMethodTree {
 		out
 	}
 
-	pub fn from_methods(funcs: Vec<RouteFileMethod>) -> Self {
+	pub fn from_methods(funcs: Vec<(Entity, &RouteFileMethod)>) -> Self {
 		let mut this = RouteFileMethodTree::new("root");
 		for func in funcs {
 			let mut current = &mut this;
-			for component in func.route_info.path.components() {
+			for component in func.1.route_info.path.components() {
 				match component {
 					std::path::Component::Normal(os_str)
 						if let Some(str) = os_str.to_str() =>
@@ -97,15 +102,9 @@ impl RouteFileMethodTree {
 					_ => {}
 				}
 			}
-			current.funcs.push(func);
+			current.funcs.push(func.0);
 		}
 		this
-	}
-}
-
-impl Into<RouteFileMethodTree> for Vec<RouteFileMethod> {
-	fn into(self) -> RouteFileMethodTree {
-		RouteFileMethodTree::from_methods(self)
 	}
 }
 
@@ -113,24 +112,39 @@ impl Into<RouteFileMethodTree> for Vec<RouteFileMethod> {
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
+	use beet_bevy::prelude::WorldMutExt;
 	use beet_net::prelude::*;
+	use bevy::prelude::*;
 	use sweet::prelude::*;
 
-	fn tree() -> RouteFileMethodTree {
-		vec![
+
+	fn world() -> World {
+		let mut world = World::new();
+		world.spawn_batch(vec![
 			RouteFileMethod::new("/"),
 			RouteFileMethod::new("/bazz"),
 			RouteFileMethod::new("/foo/bar"),
 			RouteFileMethod::new("/foo/bazz"),
 			RouteFileMethod::new("/foo/bazz/boo"),
 			RouteFileMethod::new(RouteInfo::post("/foo/bazz/boo")),
-		]
-		.into()
+		]);
+		world
 	}
 
 	#[test]
 	fn correct_tree_structure() {
-		expect(tree().into_path_tree().to_string_indented()).to_be(
+		let mut world = world();
+		let methods = world
+			.query_once::<(Entity, &RouteFileMethod)>()
+			.iter()
+			.copied()
+			.collect();
+		expect(
+			RouteFileMethodTree::from_methods(methods)
+				.into_path_tree()
+				.to_string_indented(),
+		)
+		.to_be(
 			r#"root
   bazz
   foo

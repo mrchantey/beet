@@ -64,9 +64,11 @@ impl NonSendPlugin for CodegenNativeConfig {
 		if !self.no_defaults {
 			root.insert(ParseRouteTree);
 		}
-		for group in self.file_groups {
-			root.with_child(group.into_bundle(&self.codegen_file));
-		}
+		root.with_children(|mut parent| {
+			for group in self.file_groups {
+				group.spawn(&mut parent, &self.codegen_file);
+			}
+		});
 	}
 }
 
@@ -84,8 +86,7 @@ impl CodegenNativeConfig {
 			self.file_groups.push(docs);
 		}
 		if let Some(mut actions) = self.default_group("actions") {
-			actions.file_group.route_tree = false;
-			// TODO insert additional parse_actions modifier
+			actions.file_group.category = FileGroupCategory::Actions;
 			self.file_groups.push(actions);
 		}
 	}

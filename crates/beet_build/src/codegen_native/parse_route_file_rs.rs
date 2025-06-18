@@ -21,16 +21,15 @@ pub fn parse_route_file_rs(
 		let file_str = ReadFile::to_string(&route_file.origin_path)?;
 
 		// collect all public functions, including handlers and
-		// possibly their frontmatter
-		let func_idents = syn::parse_file(&file_str)?
+		// possibly their meta functions
+		let funcs = syn::parse_file(&file_str)?
 			.items
 			.into_iter()
 			.filter_map(|item| {
 				if let syn::Item::Fn(func) = item {
 					match &func.vis {
 						Visibility::Public(_) => {
-							let sig_str = func.sig.ident.to_string();
-							return Some(sig_str);
+							return Some((func.sig.ident.to_string(), func));
 						}
 						_ => {}
 					}
@@ -39,15 +38,16 @@ pub fn parse_route_file_rs(
 			})
 			.collect::<Vec<_>>();
 
-		for method in func_idents
-			.iter()
-			.filter_map(|ident_str| HttpMethod::from_str(ident_str).ok())
-		{
-			let meta_ident =
-				format!("meta_{}", method.to_string().to_lowercase());
-			let config = func_idents
+		for (ident, method, func) in
+			funcs.iter().filter_map(|(ident, sig)| {
+				HttpMethod::from_str(ident)
+					.ok()
+					.map(|method| (ident, method, sig))
+			}) {
+			let meta_ident = format!("meta_{}", ident);
+			let meta = funcs
 				.iter()
-				.find_map(|ident| match ident.as_str() {
+				.find_map(|(ident, _)| match ident.as_str() {
 					"meta" => Some(RouteFileMethodMeta::File),
 					ident if ident == &meta_ident => {
 						Some(RouteFileMethodMeta::Method)
@@ -56,13 +56,16 @@ pub fn parse_route_file_rs(
 				})
 				.unwrap_or_default();
 
-			parent.with_child(RouteFileMethod {
-				route_info: RouteInfo::new(
-					route_file.route_path.clone(),
-					method,
-				),
-				meta: config,
-			});
+			parent.with_child((
+				RouteFileMethodSyn::new(func.clone()).sendit(),
+				RouteFileMethod {
+					route_info: RouteInfo::new(
+						route_file.route_path.clone(),
+						method,
+					),
+					meta,
+				},
+			));
 		}
 	}
 	Ok(())
