@@ -25,16 +25,16 @@ pub fn RejectsNeg() -> impl Bundle {
 	let (val, _set_val) = signal(0);
 	let (get, set) = signal("Ready".to_string());
 
-	let onclick = move |_| {
-		let val = val.clone();
-		let set = set.clone();
-		spawn_local(async move {
-			let result = actions::error_handling::reject_neg(val()).await;
-			match result {
-				Ok(_) => set("Success".into()),
-				Err(e) => set(format!("Error: {}", e)),
-			}
-		});
+	let onclick = move |_: Trigger<OnClick>| {
+		// let val = val.clone();
+		// let set = set.clone();
+		// spawn_local(async move {
+		// 	let result = actions::error_handling::reject_neg(val()).await;
+		// 	match result {
+		// 		Ok(_) => set("Success".into()),
+		// 		Err(e) => set(format!("Error: {}", e)),
+		// 	}
+		// });
 	};
 
 	rsx! {

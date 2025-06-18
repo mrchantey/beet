@@ -5,7 +5,7 @@ use beet::prelude::*;
 #[template]
 pub fn BeetSidebarLayout() -> impl Bundle {
 	let sidebar_nodes =
-		route_tree::collect().xpipe(RoutePathTreeToSidebarTree::default());
+		route_path_tree().xpipe(RoutePathTreeToSidebarTree::default());
 	rsx! {
 		<BeetContext>
 		<PageLayout>
@@ -15,7 +15,7 @@ pub fn BeetSidebarLayout() -> impl Bundle {
 		// <slot name="footer" slot="footer" />
 		<BeetHeaderLinks slot="header-nav"/>
 		<div class="container">
-			<Sidebar nodes={sidebar_nodes} />
+			<Sidebar nodes=sidebar_nodes />
 			<main>
 				<slot/>
 			</main>

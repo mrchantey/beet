@@ -1,8 +1,8 @@
 use crate::prelude::*;
-use http::request::Parts;
-use std::path::PathBuf;
 #[cfg(feature = "tokens")]
 use beet_common::as_beet::*;
+use http::request::Parts;
+use std::path::PathBuf;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -35,6 +35,30 @@ impl RouteInfo {
 	}
 	pub fn get(path: impl Into<PathBuf>) -> Self {
 		Self::new(path, HttpMethod::Get)
+	}
+	pub fn post(path: impl Into<PathBuf>) -> Self {
+		Self::new(path, HttpMethod::Post)
+	}
+	pub fn put(path: impl Into<PathBuf>) -> Self {
+		Self::new(path, HttpMethod::Put)
+	}
+	pub fn delete(path: impl Into<PathBuf>) -> Self {
+		Self::new(path, HttpMethod::Delete)
+	}
+	pub fn patch(path: impl Into<PathBuf>) -> Self {
+		Self::new(path, HttpMethod::Patch)
+	}
+	pub fn head(path: impl Into<PathBuf>) -> Self {
+		Self::new(path, HttpMethod::Head)
+	}
+	pub fn options(path: impl Into<PathBuf>) -> Self {
+		Self::new(path, HttpMethod::Options)
+	}
+	pub fn trace(path: impl Into<PathBuf>) -> Self {
+		Self::new(path, HttpMethod::Trace)
+	}
+	pub fn connect(path: impl Into<PathBuf>) -> Self {
+		Self::new(path, HttpMethod::Connect)
 	}
 }
 

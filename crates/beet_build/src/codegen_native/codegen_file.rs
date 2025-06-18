@@ -36,7 +36,11 @@ pub struct CodegenFile {
 	pub output: AbsPathBuf,
 	/// All of the imports that must be included both globally and inside each
 	/// inline module.
-	#[serde(default, rename = "import_tokens", with = "syn_item_vec_serde")]
+	#[serde(
+		default = "default_imports",
+		rename = "import_tokens",
+		with = "syn_item_vec_serde"
+	)]
 	pub imports: Vec<Item>,
 	/// As [`std::any::type_name`], which is used with [`TemplateSerde`], resolves to a named crate, we need to alias the current
 	/// crate to match any internal types, setting this option will add `use crate as pkg_name`
@@ -53,13 +57,17 @@ impl Default for CodegenFileSendit {
 	fn default() -> Self { Self(SendWrapper::new(CodegenFile::default())) }
 }
 
+fn default_imports() -> Vec<Item> {
+	vec![syn::parse_quote!(
+		#[allow(unused_imports)]
+		use beet::prelude::*;
+	)]
+}
+
 impl Default for CodegenFile {
 	fn default() -> Self {
 		Self {
-			imports: vec![syn::parse_quote!(
-				#[allow(unused_imports)]
-				use beet::prelude::*;
-			)],
+			imports: default_imports(),
 			output: WsPathBuf::new("src/codegen/mod.rs").into_abs(),
 			pkg_name: None,
 			items: Default::default(),

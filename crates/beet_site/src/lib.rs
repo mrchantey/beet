@@ -1,7 +1,11 @@
+#![cfg_attr(test, feature(test, custom_test_frameworks))]
+#![cfg_attr(test, test_runner(sweet::test_runner))]
+
 // #![feature(more_qualified_paths)]
 
 // #[path = "codegen/client_actions.rs"]
 // pub mod client_actions;
+pub mod codegen;
 pub mod components;
 #[cfg(not(target_arch = "wasm32"))]
 #[path = "codegen/docs.rs"]
@@ -20,7 +24,8 @@ pub mod pages;
 
 pub mod prelude {
 	pub use super::*;
+	pub use crate::codegen::root as paths;
+	pub use crate::codegen::route_path_tree;
 	// 	pub use crate::client_actions::root as actions;
 	pub use crate::components::*;
-	// 	pub use crate::route_tree::root as paths;
 }

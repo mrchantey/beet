@@ -44,6 +44,7 @@ impl Plugin for CodegenNativePlugin {
 						.chain()
 						.in_set(ImportCodegenNativeStep),
 					(
+						parse_route_tree,
 						collect_file_group,
 						(collect_combinator_route, tokenize_combinator_route)
 							.chain(),

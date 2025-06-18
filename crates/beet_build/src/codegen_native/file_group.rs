@@ -20,22 +20,29 @@ pub fn despawn_file_groups(
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Sendit)]
 #[sendit(derive(Component))]
 pub struct FileGroupConfig {
+	/// Exclude the routes in this group from the route tree.
+	/// Usually this should be true for pages and false for actions.
 	#[serde(flatten)]
 	pub file_group: FileGroup,
 	#[serde(flatten)]
-	pub codegen: CodegenFile,
+	pub codegen: Option<CodegenFile>,
 	#[serde(flatten)]
 	pub modifier: ModifyRouteFileMethod,
 }
 
 
 impl FileGroupConfig {
-	pub fn into_bundle(self) -> impl Bundle {
-		(
-			self.file_group.sendit(),
-			self.codegen.sendit(),
-			self.modifier,
-		)
+	pub fn into_bundle(self, parent_codegen: &CodegenFile) -> impl Bundle {
+		let codegen = self.codegen.unwrap_or_else(|| {
+			let default_out = self
+				.file_group
+				.src
+				.parent()
+				.unwrap_or(self.file_group.src.clone())
+				.join("codegen.rs");
+			parent_codegen.clone_meta(default_out)
+		});
+		(self.file_group.sendit(), codegen.sendit(), self.modifier)
 	}
 }
 
@@ -64,16 +71,19 @@ pub struct FileGroup {
 	pub meta_type: syn::Type,
 	#[serde(default = "unit_type", with = "syn_type_serde")]
 	pub router_state_type: syn::Type,
+	#[serde(default = "default_true")]
+	pub route_tree: bool,
 }
 
 fn unit_type() -> syn::Type { syn::parse_str("()").unwrap() }
-
+fn default_true() -> bool { true }
 
 impl Default for FileGroup {
 	fn default() -> Self {
 		Self {
 			group_name: None,
 			pkg_name: None,
+			route_tree: true,
 			src: AbsPathBuf::default(),
 			filter: GlobFilter::default(),
 			meta_type: unit_type(),

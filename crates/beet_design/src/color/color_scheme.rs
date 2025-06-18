@@ -4,7 +4,7 @@ use material_colors::theme::Theme;
 use material_colors::theme::ThemeBuilder;
 
 #[template]
-fn ColorScheme(theme: Theme) -> impl Bundle {
+pub fn ColorScheme(theme: Theme) -> impl Bundle {
 	let css = ThemeToCss::default().map(&theme);
 	(
 		NodeTag::new("style"),

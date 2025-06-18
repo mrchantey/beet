@@ -16,5 +16,9 @@ keywords.workspace = true
 anyhow.workspace = true
 serde.workspace = true
 
-beet = { workspace = true, features = ["web","web-server"] }
+beet = { workspace = true, features = ["web", "web-server"] }
 getrandom = { version = "0.3", features = ["wasm_js"] }
+
+
+[dev-dependencies]
+sweet.workspace = true

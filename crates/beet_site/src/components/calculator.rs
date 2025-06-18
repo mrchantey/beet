@@ -9,7 +9,7 @@ pub fn Calculator(#[field(default = 0)] initial: i32) -> impl Bundle {
 
 
 	let get2 = get.clone();
-	let onclick = move |_| {
+	let onclick = move |_: Trigger<OnClick>| {
 		#[allow(unused)]
 		let set = set.clone();
 		#[allow(unused)]

@@ -44,17 +44,16 @@ pub fn parse_route_file_md(
 		// relative to the group codegen dir
 		let mut route_codegen_path = route_file.group_path.clone();
 		route_codegen_path.set_extension("rs");
-		println!("Route codegen path: {}", route_codegen_path.display());
 
 		let route_codegen_path_abs = AbsPathBuf::new_unchecked(
 			group_codegen_dir.join(&route_codegen_path),
 		);
 
 		parent.with_child(RouteFileMethod {
-			config: if config.is_some() {
-				RouteFileMethodConfig::Method
+			meta: if config.is_some() {
+				RouteFileMethodMeta::Method
 			} else {
-				RouteFileMethodConfig::FileGroup
+				RouteFileMethodMeta::FileGroup
 			},
 			route_info: RouteInfo {
 				path: route_file.route_path.clone(),

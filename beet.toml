@@ -6,7 +6,7 @@
 
 [codegen_native]
 package_name = "beet_site"
-src_path = "crates/beet_site/src"
+output = "crates/beet_site/src/codegen/mod.rs"
 docs_route = "/docs"
 wasm_imports = ["use beet::design as beet_design;", "use beet::prelude::*;"]
 file_group_routes = ["beet_design_mockups"]

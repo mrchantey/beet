@@ -1187,6 +1187,7 @@ dependencies = [
  "beet",
  "getrandom 0.3.2",
  "serde",
+ "sweet",
 ]
 
 [[package]]

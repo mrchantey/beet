@@ -1,4 +1,5 @@
 use crate::prelude::*;
+use beet_bevy::prelude::HierarchyQueryExtExt;
 use beet_common::prelude::*;
 use beet_net::prelude::*;
 use bevy::prelude::*;
@@ -56,12 +57,21 @@ impl ModifyRouteFileMethod {
 
 pub fn modify_file_route_tokens(
 	_: TempNonSendMarker,
+	parents: Query<&ChildOf>,
+	modifiers: Query<&ModifyRouteFileMethod>,
 	mut query: Populated<
-		(&mut RouteFileMethod, &ModifyRouteFileMethod),
+		(Entity, &mut RouteFileMethod),
 		Added<RouteFileMethod>,
 	>,
 ) {
-	for (mut route, modifier) in query.iter_mut() {
+	for (entity, mut route) in query.iter_mut() {
+		let Some(modifier) = parents
+			.iter_ancestors_inclusive(entity)
+			.find_map(|e| modifiers.get(e).ok())
+		else {
+			continue;
+		};
+
 		let mut route_path = if let Some(base_route) = &modifier.base_route {
 			base_route
 				.join(&route.route_info.path)
@@ -72,6 +82,10 @@ pub fn modify_file_route_tokens(
 		};
 		for ReplaceRoute { from, to } in &modifier.replace_route {
 			route_path = route_path.replace(from, to);
+			println!(
+				"Replacing '{}' with '{}' in route path: {}",
+				from, to, route_path
+			);
 		}
 		route.route_info.path = RoutePath::new(route_path);
 	}

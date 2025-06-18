@@ -40,11 +40,12 @@ fn define_struct(func: &ItemFn, fields: &[NodeField]) -> Result<TokenStream> {
 			pub #ident: #ty
 		}
 	});
+	let vis = &func.vis;
 
 	Ok(quote! {
 	#(#attrs)*
 	#[derive(Props)]
-	pub struct #ident #type_generics #where_clause {
+	#vis struct #ident #type_generics #where_clause {
 		#(#fields),*
 	}
 	})
@@ -104,17 +105,17 @@ mod test {
 		.to_be(
 			quote! {
 			use beet::prelude::*;
-
 			#[doc = r" probably the best templating layout"]
 			#[derive(Props)]
-			pub struct MyNode {
+			pub(crate) struct MyNode {
 				#[doc = r" some comment"]
 				pub foo: u32,
 				pub bar: u32
 			}
 			impl IntoTemplateBundle<Self> for MyNode {
 				fn into_node_bundle(self) -> impl Bundle {
-					let Self { foo, mut bar } = self ; { () }
+					let Self { foo, mut bar } = self;
+					{ () }
 				}
 			}
 			}

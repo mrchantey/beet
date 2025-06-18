@@ -48,9 +48,9 @@ pub fn parse_route_file_rs(
 			let config = func_idents
 				.iter()
 				.find_map(|ident| match ident.as_str() {
-					"meta" => Some(RouteFileMethodConfig::File),
+					"meta" => Some(RouteFileMethodMeta::File),
 					ident if ident == &meta_ident => {
-						Some(RouteFileMethodConfig::Method)
+						Some(RouteFileMethodMeta::Method)
 					}
 					_ => None,
 				})
@@ -61,7 +61,7 @@ pub fn parse_route_file_rs(
 					route_file.route_path.clone(),
 					method,
 				),
-				config,
+				meta: config,
 			});
 		}
 	}
@@ -93,9 +93,9 @@ mod test {
 			.clone();
 		// send_wrapper::SendWrapper::assert_send(&tokens);
 		route_method
-			.config
+			.meta
 			.xpect()
-			.to_be(RouteFileMethodConfig::FileGroup);
+			.to_be(RouteFileMethodMeta::FileGroup);
 		route_method
 			.route_info
 			.method
