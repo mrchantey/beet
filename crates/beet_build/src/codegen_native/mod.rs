@@ -12,10 +12,10 @@
 //! ├── RouteFile
 //! ```
 //!
-mod collect_client_actions;
-mod parse_client_action;
-pub use collect_client_actions::*;
-pub use parse_client_action::*;
+mod collect_client_action_group;
+mod collect_client_action;
+pub use collect_client_action_group::*;
+pub use collect_client_action::*;
 mod parse_route_tree;
 mod reexport_file_groups;
 mod route_file_method_tree;

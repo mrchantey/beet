@@ -1,4 +1,5 @@
 use crate::prelude::*;
+use beet_common::prelude::TempNonSendMarker;
 use beet_net::prelude::*;
 use beet_utils::prelude::ReadFile;
 use bevy::prelude::*;
@@ -8,6 +9,7 @@ use syn::Visibility;
 
 
 pub fn parse_route_file_rs(
+	_: TempNonSendMarker, // spawning !send
 	mut commands: Commands,
 	query: Populated<(Entity, &RouteFile), Added<RouteFile>>,
 ) -> Result<()> {
@@ -38,12 +40,11 @@ pub fn parse_route_file_rs(
 			})
 			.collect::<Vec<_>>();
 
-		for (ident, method, func) in
-			funcs.iter().filter_map(|(ident, sig)| {
-				HttpMethod::from_str(ident)
-					.ok()
-					.map(|method| (ident, method, sig))
-			}) {
+		for (ident, method, func) in funcs.iter().filter_map(|(ident, sig)| {
+			HttpMethod::from_str(ident)
+				.ok()
+				.map(|method| (ident, method, sig))
+		}) {
 			let meta_ident = format!("meta_{}", ident);
 			let meta = funcs
 				.iter()

@@ -8,6 +8,7 @@ use serde::Deserialize;
 use serde::Serialize;
 
 pub fn despawn_file_groups(
+	_: TempNonSendMarker,
 	mut commands: Commands,
 	query: Populated<Entity, With<FileGroupSendit>>,
 ) {
@@ -53,7 +54,7 @@ impl FileGroupConfig {
 				// If this is an actions file group, we need to set the output file name
 				let mut output = codegen.output.clone();
 				if let Some(stem) = output.file_stem() {
-					let stem = format!("{}_server.rs", stem.to_string_lossy());
+					let stem = format!("client_{}.rs", stem.to_string_lossy());
 					output.set_file_name(stem);
 				}
 				Some(codegen.clone_meta(output))
@@ -100,6 +101,7 @@ pub struct FileGroup {
 	pub meta_type: syn::Type,
 	#[serde(default = "unit_type", with = "syn_type_serde")]
 	pub router_state_type: syn::Type,
+	#[serde(default)]
 	pub category: FileGroupCategory,
 }
 

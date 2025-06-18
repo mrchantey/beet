@@ -20,22 +20,23 @@ impl Default for CollectClientActions {
 }
 
 
-pub fn collect_client_actions(
+pub fn collect_client_action_group(
 	_: TempNonSendMarker,
 	mut query: Populated<
-		(Entity, &mut CodegenFileSendit, &CollectClientActions),
+		(&mut CodegenFileSendit, &CollectClientActions, &ChildOf),
 		Added<CollectClientActions>,
 	>,
 	children: Query<&Children>,
 	methods: Query<(&RouteFileMethod, &RouteFileMethodSynSendit)>,
 ) {
-	for (entity, mut codegen_file, collect) in query.iter_mut() {
+	for (mut codegen_file, collect, childof) in query.iter_mut() {
 		let child_methods = children
-			.iter_descendants(entity)
+			.iter_descendants(childof.parent())
 			.filter_map(|child| {
 				methods.get(child).map(|(r, _)| (child, r)).ok()
 			})
 			.collect::<Vec<_>>();
+		println!("Collecting client actions: {}", child_methods.len());
 		let tree = RouteFileMethodTree::from_methods(child_methods);
 
 		let item = Builder {
@@ -179,7 +180,10 @@ mod test {
 				fn get() {}
 			))
 			.sendit(),
-		)]).xpect().to_be(quote! {
+		)])
+		.xpect()
+		.to_be(
+			quote! {
 				#[allow(missing_docs)]
 				pub mod root {
 					#[allow(unused_imports)]
@@ -191,26 +195,54 @@ mod test {
 						}).await
 					}
 				}
-			}.to_string());
+			}
+			.to_string(),
+		);
 	}
 
 
 	#[test]
 	fn correct_tree_structure() {
 		mod_tree(vec![
-				(RouteFileMethod::new("bazz"),
-					RouteFileMethodSyn::new( syn::parse_quote!(fn get() {})).sendit()),
-				(RouteFileMethod::new("foo/bar"),
-					RouteFileMethodSyn::new( syn::parse_quote!(fn get() {})).sendit()),
-				(RouteFileMethod::new("foo/boo"),
-					RouteFileMethodSyn::new( syn::parse_quote!(fn get() {})).sendit()),
-				(RouteFileMethod::new("foo/boo"),
-					RouteFileMethodSyn::new( syn::parse_quote!(fn post() {})).sendit()),
-				(RouteFileMethod::new("foo/bing/bong"),
-					RouteFileMethodSyn::new( syn::parse_quote!(fn post() {})).sendit()),
-			])
-			.xpect()
-			.to_be(quote! {
+			(
+				RouteFileMethod::new("bazz"),
+				RouteFileMethodSyn::new(syn::parse_quote!(
+					fn get() {}
+				))
+				.sendit(),
+			),
+			(
+				RouteFileMethod::new("foo/bar"),
+				RouteFileMethodSyn::new(syn::parse_quote!(
+					fn get() {}
+				))
+				.sendit(),
+			),
+			(
+				RouteFileMethod::new("foo/boo"),
+				RouteFileMethodSyn::new(syn::parse_quote!(
+					fn get() {}
+				))
+				.sendit(),
+			),
+			(
+				RouteFileMethod::new("foo/boo"),
+				RouteFileMethodSyn::new(syn::parse_quote!(
+					fn post() {}
+				))
+				.sendit(),
+			),
+			(
+				RouteFileMethod::new("foo/bing/bong"),
+				RouteFileMethodSyn::new(syn::parse_quote!(
+					fn post() {}
+				))
+				.sendit(),
+			),
+		])
+		.xpect()
+		.to_be(
+			quote! {
 				#[allow(missing_docs)]
 				pub mod root {
 					#[allow(unused_imports)]
@@ -261,6 +293,8 @@ mod test {
 						}
 					}
 				}
-			}.to_string());
+			}
+			.to_string(),
+		);
 	}
 }

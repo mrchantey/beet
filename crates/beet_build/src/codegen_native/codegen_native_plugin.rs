@@ -46,7 +46,7 @@ impl Plugin for CodegenNativePlugin {
 					(
 						parse_route_tree,
 						collect_file_group,
-						collect_client_actions,
+						collect_client_action_group,
 						(collect_combinator_route, tokenize_combinator_route)
 							.chain(),
 					)

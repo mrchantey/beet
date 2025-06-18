@@ -3,8 +3,8 @@
 
 // #![feature(more_qualified_paths)]
 
-// #[path = "codegen/client_actions.rs"]
-// pub mod client_actions;
+#[path = "codegen/client_actions.rs"]
+pub mod client_actions;
 pub mod codegen;
 pub mod components;
 #[cfg(not(target_arch = "wasm32"))]
