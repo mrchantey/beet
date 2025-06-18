@@ -5,18 +5,18 @@ use wasm_bindgen::closure::Closure;
 use web_sys::Window;
 use web_sys::window;
 
-pub struct Interval {
+pub struct IntervalHandle {
 	_func: Function,
 	target: Window,
 	handle: i32,
 }
 
-impl Drop for Interval {
+impl Drop for IntervalHandle {
 	fn drop(&mut self) { self.target.clear_interval_with_handle(self.handle); }
 }
 
 
-impl Interval {
+impl IntervalHandle {
 	#[must_use]
 	pub fn new(interval: i32, func: impl 'static + Fn()) -> Self {
 		Self::new_with_target(interval, window().unwrap(), func)

@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use beet_common::node::HtmlConstants;
+use beet_common::prelude::*;
 use bevy::platform::collections::HashMap;
 use bevy::prelude::*;
 use js_sys::Array;
@@ -44,7 +44,7 @@ pub(super) fn event_playback(
 					TreeIdx::new(tree_idx),
 					&EventKey::new(&event_type),
 				)) {
-					EventKey::trigger(
+					BeetEvent::trigger(
 						&mut commands.entity(*entity),
 						&event_type,
 						event,

@@ -4,7 +4,7 @@
 //! app must be built and run before the HTML is rendered, resulting in a long time
 //! to first paint.
 //!
-//! That said, here's an example of how to build with vanilla wasm-bindgen.
+//! Here's an example of how to build with vanilla wasm-bindgen.
 //! ```sh
 //! cargo run --example csr
 //! cargo build --example csr --target-dir=target --features=template --target wasm32-unknown-unknown

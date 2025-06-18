@@ -11,7 +11,24 @@ impl<T> BeetEvent<T> {
 	/// Create a new event with the given value
 	pub fn new(value: T) -> Self { Self(value) }
 }
-
+impl BeetEvent<()>{	
+	#[cfg(target_arch = "wasm32")]
+	pub fn trigger(
+		commands: &mut EntityCommands,
+		event_name: &str,
+		ev: web_sys::Event,
+	) {
+		use send_wrapper::SendWrapper;
+		use wasm_bindgen::JsCast;
+		match event_name {
+			"onclick" => {
+				let ev = ev.unchecked_into::<web_sys::MouseEvent>();
+				commands.trigger(BeetEvent::new(SendWrapper::new(ev)));
+			}
+			_ => unimplemented!(),
+		}
+	}
+}
 
 #[cfg(not(target_arch = "wasm32"))]
 pub use event_types_native::*;

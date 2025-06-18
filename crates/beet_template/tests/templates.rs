@@ -4,6 +4,7 @@
 #![feature(more_qualified_paths)]
 use beet_template::as_beet::*;
 use sweet::prelude::*;
+use bevy::prelude::*;
 
 #[test]
 fn works() {

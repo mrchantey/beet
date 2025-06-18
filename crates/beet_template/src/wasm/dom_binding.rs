@@ -42,7 +42,7 @@ pub(super) fn update_attribute_values(
 	>,
 ) -> Result<()> {
 	for (key, value, el) in query.iter() {
-		el.set_attribute(&key.0, &value.0)
+		el.set_attribute(&key.0, &value.to_string())
 			.map_err(|err| format!("{err:?}"))?;
 	}
 	Ok(())
@@ -173,7 +173,7 @@ pub(super) fn bind_events(
 			ReactiveApp::with(|app| {
 				let mut commands = app.world_mut().commands();
 				let mut commands = commands.entity(entity);
-				EventKey::trigger(&mut commands, &event_name, ev);
+				BeetEvent::trigger(&mut commands, &event_name, ev);
 				// apply commands
 				app.world_mut().flush();
 				// we must update the app manually to flush any signals,

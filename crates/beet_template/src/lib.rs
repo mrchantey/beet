@@ -30,7 +30,6 @@ pub mod exports {
 /// Internal use only
 pub mod as_beet {
 	pub use beet::prelude::*;
-	pub use bevy::prelude::*;
 	pub mod beet {
 		pub use crate as rsx;
 		pub mod prelude {
