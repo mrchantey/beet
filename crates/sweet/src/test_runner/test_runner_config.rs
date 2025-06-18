@@ -30,10 +30,9 @@ pub struct TestRunnerConfig {
 	#[arg(long)]
 	/// Runs both ignored and non-ignored tests.
 	pub include_ignored: bool,
-	#[arg(long)]
-	// /// Do not silence stdout
-	// not yet supported
-	// pub nocapture: bool,
+	#[arg(long, default_value_t = true)]
+	/// Do not silence stdout
+	pub nocapture: bool,
 	#[arg(long)]
 	/// Excludes tests marked with the [should_panic](test::should_panic) attribute.
 	pub exclude_should_panic: bool,

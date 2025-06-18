@@ -1,8 +1,10 @@
 //
 
+use beet_common::node::AttributeValueStr;
+
 /// For a given [`syn::Lit`], return its most sensible string representation.
-pub fn lit_to_string(lit: &syn::Lit) -> String {
-	match lit {
+pub fn lit_to_attr(lit: &syn::Lit) -> AttributeValueStr {
+	let str = match lit {
 		syn::Lit::Int(lit_int) => lit_int.base10_digits().to_string(),
 		syn::Lit::Float(lit_float) => lit_float.base10_digits().to_string(),
 		syn::Lit::Bool(lit_bool) => lit_bool.value.to_string(),
@@ -15,7 +17,8 @@ pub fn lit_to_string(lit: &syn::Lit) -> String {
 		syn::Lit::Verbatim(lit_verbatim) => lit_verbatim.to_string(),
 		syn::Lit::CStr(_) => unimplemented!(),
 		_ => unimplemented!(),
-	}
+	};
+	AttributeValueStr::new(str)
 }
 
 pub fn expr_str(expr: syn::Expr) -> Option<String> {

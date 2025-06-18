@@ -1,5 +1,4 @@
 use super::*;
-#[cfg(feature = "tokens")]
 use crate::as_beet::*;
 use bevy::prelude::*;
 
@@ -36,7 +35,10 @@ pub enum HtmlHoistDirective {
 }
 
 impl TemplateDirective for HtmlHoistDirective {
-	fn try_from_attribute(key: &str, value: Option<&str>) -> Option<Self> {
+	fn try_from_attribute(
+		key: &str,
+		value: Option<&AttributeValueStr>,
+	) -> Option<Self> {
 		match (key, value) {
 			("hoist:head", _) => Some(Self::Head),
 			("hoist:body", _) => Some(Self::Body),
@@ -55,7 +57,10 @@ impl TemplateDirective for HtmlHoistDirective {
 pub struct ClientLoadDirective;
 
 impl TemplateDirective for ClientLoadDirective {
-	fn try_from_attribute(key: &str, value: Option<&str>) -> Option<Self> {
+	fn try_from_attribute(
+		key: &str,
+		value: Option<&AttributeValueStr>,
+	) -> Option<Self> {
 		match (key, value) {
 			("client:load", _) => Some(Self),
 			_ => None,
@@ -73,7 +78,10 @@ impl TemplateDirective for ClientLoadDirective {
 pub struct ClientOnlyDirective;
 
 impl TemplateDirective for ClientOnlyDirective {
-	fn try_from_attribute(key: &str, value: Option<&str>) -> Option<Self> {
+	fn try_from_attribute(
+		key: &str,
+		value: Option<&AttributeValueStr>,
+	) -> Option<Self> {
 		match (key, value) {
 			("client:only", _) => Some(Self),
 			_ => None,

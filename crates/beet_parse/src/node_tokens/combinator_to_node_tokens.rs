@@ -252,53 +252,44 @@ impl<'w, 's, 'a> Builder<'w, 's, 'a> {
 				self.rsx_parsed_expression(entity, value)?;
 			}
 			RsxAttribute::Named(name, value) => {
-				let key = name.to_string();
-
 				let mut entity = self.commands.spawn((
+					AttributeKey::new(name.to_string()),
 					AttributeOf::new(parent),
-					AttributeKeyExpr::new(syn::parse_quote!(#key)),
 					ItemOf::<AttributeOf, _>::new(self.default_file_span()),
 				));
-
 				match value {
-					RsxAttributeValue::Default => {
-						entity.insert(AttributeLit::new(key, None));
-					}
+					RsxAttributeValue::Default => {}
 					RsxAttributeValue::Boolean(val) => {
 						let val = val.0;
 						entity.insert((
-							AttributeLit::new(key, Some(val.to_string())),
-							AttributeValueExpr::new(syn::parse_quote! {#val}),
+							val.into_attr_val_bundle(),
+							AttributeExpr::new(syn::parse_quote! {#val}),
 						));
 					}
 					RsxAttributeValue::Number(val) => {
 						let val = val.0;
 						entity.insert((
-							AttributeLit::new(key, Some(val.to_string())),
-							AttributeValueExpr::new(syn::parse_quote! {#val}),
+							val.into_attr_val_bundle(),
+							AttributeExpr::new(syn::parse_quote! {#val}),
 						));
 					}
 					RsxAttributeValue::Str(val) => {
 						let val = val.to_string_unquoted();
 						entity.insert((
-							AttributeLit::new(key, Some(val.to_string())),
-							AttributeValueExpr::new(syn::parse_quote! {#val}),
+							AttributeExpr::new(syn::parse_quote! {#val}),
+							val.into_attr_val_bundle(),
 						));
 					}
 					RsxAttributeValue::Element(value) => {
 						let id = entity.id();
 						let child = self.rsx_element(value)?;
-						self.commands.entity(id).insert((
-							CombinatorExpr(vec![
-								CombinatorExprPartial::Element(child),
-							]),
-							AttributeLit::new(key, None),
-						));
+						self.commands.entity(id).insert(CombinatorExpr(vec![
+							CombinatorExprPartial::Element(child),
+						]));
 					}
 					RsxAttributeValue::CodeBlock(value) => {
-						entity.insert(AttributeLit::new(key, None));
-						let id = entity.id();
-						self.rsx_parsed_expression(id, value)?;
+						let entity = entity.id();
+						self.rsx_parsed_expression(entity, value)?;
 					}
 				}
 			}
@@ -364,7 +355,7 @@ mod test {
 				NodeTag(String::from("div")),
 				ElementNode{self_closing:true},
 				related!(Attributes[(
-					"align".into_attr_key_bundle(),
+					AttributeKey::new("align"),
 					"center".into_attr_val_bundle()
 				)])
 			)}
@@ -390,7 +381,7 @@ mod test {
 			quote! {(
 				NodeTag(String::from("br")),
 				ElementNode{self_closing:true},
-				related!(Attributes["foo".into_attr_key_bundle()])
+				related!(Attributes[AttributeKey::new("foo")])
 			)}
 			.to_string(),
 		);
@@ -400,7 +391,7 @@ mod test {
 				NodeTag(String::from("br")),
 				ElementNode{self_closing:true},
 				related!(Attributes[(
-					"foo".into_attr_key_bundle(),
+					AttributeKey::new("foo"),
 					"bar".into_attr_val_bundle()
 				)])
 			)}
@@ -412,7 +403,7 @@ mod test {
 				NodeTag(String::from("br")),
 				ElementNode{self_closing:true},
 				related!(Attributes[(
-					"foo".into_attr_key_bundle(),
+					AttributeKey::new("foo"),
 					true.into_attr_val_bundle()
 				)])
 			)}
@@ -424,7 +415,7 @@ mod test {
 				NodeTag(String::from("br")),
 				ElementNode{self_closing:true},
 				related!(Attributes[(
-					"foo".into_attr_key_bundle(),
+					AttributeKey::new("foo"),
 					20f64.into_attr_val_bundle()
 				)])
 			)}
@@ -436,7 +427,7 @@ mod test {
 				NodeTag(String::from("br")),
 				ElementNode{self_closing:true},
 				related!(Attributes[(
-					"foo".into_attr_key_bundle(),
+					AttributeKey::new("foo"),
 					{ bar }.into_attr_val_bundle()
 				)])
 			)}
@@ -448,7 +439,7 @@ mod test {
 				NodeTag(String::from("br")),
 				ElementNode{self_closing:true},
 				related!(Attributes[(
-					"foo".into_attr_key_bundle(),
+					AttributeKey::new("foo"),
 						{(
 							NodeTag(String::from("br")),
 							ElementNode { self_closing: true }
@@ -468,7 +459,7 @@ mod test {
 					NodeTag(String::from("br")),
 					ElementNode{self_closing:true},
 					related!(Attributes[(
-						"foo".into_attr_key_bundle(),
+						AttributeKey::new("foo"),
 						{
 							let bar = (
 								NodeTag(String::from("br")),

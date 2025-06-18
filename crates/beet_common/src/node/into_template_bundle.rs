@@ -20,25 +20,17 @@ pub trait IntoTemplateBundle<M> {
 	/// Called for nodes and attributes expressions:
 	/// `rsx!{"howdy"}` becomes `TextNode::new("howdy")`
 	/// `rsx!{<span {"howdy"} />}` becomes `TextNode::new("howdy")`
-	/// This is also called by default in [`Self::into_attr_key_bundle`] and
-	/// [`Self::into_attr_val_bundle`],
+	/// This is also called by default in [`Self::into_attr_val_bundle`],
 	/// wrapping them in [`AttributeKey`] and [`AttributeValue`].
 	fn into_node_bundle(self) -> impl Bundle;
-	/// Called for attribute keys, wrapping `Self` in an [`AttributeKey`].
-	/// for primitives this will also insert an [`AttributeKeyStr`]
-	fn into_attr_key_bundle(self) -> impl Bundle
-	where
-		Self: 'static + Send + Sync + Sized,
-	{
-		AttributeKey(self)
-	}
-	/// Called for attribute values, wrapping `Self` in an [`AttributeValue`].
-	/// for primitives this will also insert an [`AttributeValueStr`]
+	/// By default calls [`Self::into_node_bundle`], but can be overridden,
+	/// for instance literals like `String` or `bool` will insert
+	/// an [`AttributeValueStr`] instead.
 	fn into_attr_val_bundle(self) -> impl Bundle
 	where
 		Self: 'static + Send + Sync + Sized,
 	{
-		AttributeValue(self)
+		self.into_node_bundle()
 	}
 }
 pub struct BundleMarker;
@@ -78,16 +70,9 @@ pub struct IntoTextNodeBundleMarker;
 
 impl IntoTemplateBundle<IntoTextNodeBundleMarker> for &str {
 	fn into_node_bundle(self) -> impl Bundle { TextNode::new(self.to_string()) }
-	fn into_attr_key_bundle(self) -> impl Bundle {
-		(
-			AttributeKeyStr::new(self.to_string()),
-			AttributeKey::new(self.to_string()),
-		)
-	}
 	fn into_attr_val_bundle(self) -> impl Bundle {
 		(
 			AttributeValueStr::new(self.to_string()),
-			AttributeValue::new(self.to_string()),
 		)
 	}
 }
@@ -97,11 +82,8 @@ macro_rules! primitives_into_bundle {
 		$(
 			impl IntoTemplateBundle<IntoTextNodeBundleMarker> for $t {
 				fn into_node_bundle(self) -> impl Bundle { TextNode::new(self.to_string()) }
-				fn into_attr_key_bundle(self) -> impl Bundle {
-					(AttributeKeyStr::new(self.to_string()), AttributeKey::new(self))
-				}
 				fn into_attr_val_bundle(self) -> impl Bundle {
-					(AttributeValueStr::new(self.to_string()), AttributeValue::new(self))
+					AttributeValueStr::new(self.to_string())
 				}
 			}
 		)*

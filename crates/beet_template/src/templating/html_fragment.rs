@@ -87,7 +87,7 @@ pub(super) fn insert_event_playback_attribute(
 			format!("{}({}, event)", html_constants.event_handler, idx.inner());
 		commands.spawn((
 			AttributeOf::new(entity),
-			AttributeKeyStr(event_name.clone()),
+			AttributeKey(event_name.clone()),
 			AttributeValueStr(js_func),
 		));
 	}
@@ -109,7 +109,7 @@ pub(super) struct Builder<'w, 's> {
 		&'static Children
 	)>,
 	attributes: Query<'w,'s,(
-		&'static AttributeKeyStr,
+		&'static AttributeKey,
 		Option<&'static AttributeValueStr>
 	)>,
 	doctypes: Query<'w, 's, &'static DoctypeNode>,

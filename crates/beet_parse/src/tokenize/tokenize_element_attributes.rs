@@ -3,9 +3,7 @@ use beet_common::prelude::*;
 use bevy::prelude::*;
 use proc_macro2::TokenStream;
 use quote::quote;
-use syn::spanned::Spanned;
-
-
+use syn::LitStr;
 
 
 pub fn tokenize_element_attributes(
@@ -19,17 +17,12 @@ pub fn tokenize_element_attributes(
 	} else if let Some(attrs) = entity.get::<Attributes>() {
 		let mut attr_entities = Vec::new();
 		for attr_entity in attrs.iter() {
-			let key =
-				maybe_spanned_expr::<AttributeKeyExpr>(world, attr_entity)?
-					.map(|key| {
-						if let syn::Expr::Lit(expr_lit) = &key {
-							if let syn::Lit::Str(lit_str) = &expr_lit.lit {
-								return Some((lit_str.value(), key));
-							}
-						}
-						None
-					})
-					.flatten();
+			let key = maybe_spanned_attr_key(world, attr_entity).map(
+				|(key_str, span)| {
+					let key_lit = LitStr::new(&key_str, span);
+					(key_str, key_lit)
+				},
+			);
 
 			let value = first_attribute_expr(world, attr_entity)?;
 
@@ -47,13 +40,13 @@ pub fn tokenize_element_attributes(
 				}
 				// 2. Key with value
 				(Some((_, key)), Some(value)) => {
-					attr_components.push(quote! {#key.into_attr_key_bundle()});
+					attr_components.push(quote! {AttributeKey::new(#key)});
 					attr_components
 						.push(quote! {#value.into_attr_val_bundle()});
 				}
 				// 3. Key without value
 				(Some((_, key)), None) => {
-					attr_components.push(quote! {#key.into_attr_key_bundle()});
+					attr_components.push(quote! {AttributeKey::new(#key)});
 				}
 				// 4. Value without key (block/spread attribute)
 				(None, Some(value)) => {
@@ -112,7 +105,7 @@ mod test {
 				NodeTag(String::from("span")),
 				ElementNode { self_closing: true },
 				related!(Attributes[
-					"hidden".into_attr_key_bundle()
+					AttributeKey::new("hidden")
 				])
 			)}
 			.to_string(),
@@ -126,7 +119,7 @@ mod test {
 				NodeTag(String::from("span")),
 				ElementNode { self_closing: true },
 				related!(Attributes[(
-					"hidden".into_attr_key_bundle(),
+					AttributeKey::new("hidden"),
 					true.into_attr_val_bundle()
 				)])
 			)}
@@ -172,7 +165,7 @@ mod test {
 				NodeTag(String::from("span")),
 				ElementNode { self_closing: true },
 				related!(Attributes[(
-					"onclick".into_attr_key_bundle(),
+					AttributeKey::new("onclick"),
 					"some_js_func".into_attr_val_bundle()
 				)])
 			)}
@@ -199,13 +192,13 @@ mod test {
 				EventKey::new("onclick"),
 				{|_: Trigger<OnClick>| { println!("clicked"); }}.into_node_bundle(),
 				related!(Attributes[
-					"hidden".into_attr_key_bundle(),
+					AttributeKey::new("hidden"),
 					(
-						"class".into_attr_key_bundle(),
+						AttributeKey::new("class"),
 						"foo".into_attr_val_bundle()
 					),
 					(
-						"onmousemove".into_attr_key_bundle(),
+						AttributeKey::new("onmousemove"),
 						"some_js_func".into_attr_val_bundle()
 					)
 				])

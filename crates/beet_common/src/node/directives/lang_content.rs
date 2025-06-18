@@ -1,9 +1,9 @@
 use crate::as_beet::*;
+use beet_utils::prelude::*;
 use bevy::prelude::*;
 use std::hash::Hash;
 use std::hash::Hasher;
 use std::path::PathBuf;
-use beet_utils::prelude::*;
 
 
 
@@ -46,7 +46,7 @@ impl LangContent {
 pub(super) fn extract_lang_content(
 	mut commands: Commands,
 	text_nodes: Query<&TextNode>,
-	attr_lits: Query<&AttributeLit>,
+	attr_lits: Query<(&AttributeKey, Option<&AttributeValueStr>)>,
 	query: Populated<
 		(
 			Entity,
@@ -64,16 +64,16 @@ pub(super) fn extract_lang_content(
 		if !["style", "script"].contains(&tag.as_str()) {
 			continue;
 		}
-		for lit in attributes
+		for (key, value) in attributes
 			.iter()
 			.flat_map(|a| a.iter())
 			.filter_map(|a| attr_lits.get(a).ok())
 		{
-			if lit.key == "is:inline" {
+			if **key == "is:inline" {
 				// skip inline templates
 				continue 'iter_elements;
-			} else if lit.key == "src"
-				&& let Some(value) = &lit.value
+			} else if **key == "src"
+				&& let Some(value) = value
 				&& value.starts_with(".")
 			{
 				commands
@@ -89,9 +89,9 @@ pub(super) fn extract_lang_content(
 		}
 		for child in children.iter().flat_map(|c| c.iter()) {
 			if let Ok(text_node) = text_nodes.get(child) {
-				commands.entity(entity).insert(
-					LangContent::InnerText(text_node.text().to_string()),
-				);
+				commands.entity(entity).insert(LangContent::InnerText(
+					text_node.text().to_string(),
+				));
 				// found a LangContent::InnerText
 				continue 'iter_elements;
 			}

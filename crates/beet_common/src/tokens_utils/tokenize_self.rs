@@ -22,69 +22,71 @@ pub fn short_type_path<T>() -> syn::Path {
 
 fn shorten_generic_type_name(type_name: &str) -> String {
 	let mut result = String::new();
-	let mut depth = 0;
-	let mut current_segment = String::new();
+	let mut chars = type_name.chars().peekable();
 
-	for ch in type_name.chars() {
+	while let Some(ch) = chars.next() {
 		match ch {
 			'<' => {
-				if depth == 0 {
-					// Extract the last part before the generic
-					let last_part = current_segment
-						.split("::")
-						.last()
-						.unwrap_or(&current_segment);
-					result.push_str(last_part);
-				}
+				// We hit a generic start, collect everything until the matching '>'
 				result.push(ch);
-				depth += 1;
-				current_segment.clear();
-			}
-			'>' => {
-				if depth > 0 {
-					if !current_segment.is_empty() {
-						let shortened_inner =
-							shorten_generic_type_name(&current_segment);
-						result.push_str(&shortened_inner);
-						current_segment.clear();
+				let mut depth = 1;
+				let mut inner_content = String::new();
+
+				while let Some(inner_ch) = chars.next() {
+					match inner_ch {
+						'<' => {
+							depth += 1;
+							inner_content.push(inner_ch);
+						}
+						'>' => {
+							depth -= 1;
+							if depth == 0 {
+								// We found the matching closing bracket
+								// Process the inner content and add it
+								if !inner_content.is_empty() {
+									let shortened_inner =
+										shorten_generic_type_name(
+											&inner_content,
+										);
+									result.push_str(&shortened_inner);
+								}
+								result.push(inner_ch);
+								break;
+							} else {
+								inner_content.push(inner_ch);
+							}
+						}
+						',' if depth == 1 => {
+							// Comma at the top level of this generic
+							if !inner_content.is_empty() {
+								let shortened_inner = shorten_generic_type_name(
+									&inner_content.trim(),
+								);
+								result.push_str(&shortened_inner);
+								inner_content.clear();
+							}
+							result.push_str(", ");
+						}
+						_ => {
+							inner_content.push(inner_ch);
+						}
 					}
+				}
+			}
+			':' => {
+				// Check if this is part of ::
+				if chars.peek() == Some(&':') {
+					chars.next(); // consume the second :
+					// Skip everything up to this point and start fresh
+					result.clear();
+				} else {
 					result.push(ch);
-					depth -= 1;
-				}
-			}
-			',' => {
-				if depth > 0 {
-					if !current_segment.is_empty() {
-						let shortened_inner =
-							shorten_generic_type_name(&current_segment);
-						result.push_str(&shortened_inner);
-						current_segment.clear();
-					}
-					result.push_str(", ");
-				} else {
-					current_segment.push(ch);
-				}
-			}
-			' ' => {
-				if depth > 0 {
-					// Skip spaces inside generics except after commas
-				} else {
-					current_segment.push(ch);
 				}
 			}
 			_ => {
-				current_segment.push(ch);
+				result.push(ch);
 			}
 		}
-	}
-
-	// Handle the case where there are no generics
-	if depth == 0 && !current_segment.is_empty() {
-		let last_part = current_segment
-			.split("::")
-			.last()
-			.unwrap_or(&current_segment);
-		result.push_str(last_part);
 	}
 
 	result
@@ -235,13 +237,14 @@ impl_self_tokens!(
 mod test {
 	use crate::prelude::*;
 	use quote::ToTokens;
-use sweet::prelude::*;
+	use sweet::prelude::*;
 
 	#[test]
 	fn works() {
 		short_type_path::<Option<Vec<Matcher<u32>>>>()
 			.to_token_stream()
 			.to_string()
+.replace(" ", "")
 			.xpect()
 			.to_be("Option<Vec<Matcher<u32>>>");
 	}

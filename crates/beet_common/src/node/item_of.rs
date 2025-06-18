@@ -39,6 +39,7 @@ impl<C, T> ItemOf<C, T> {
 			phantom: std::marker::PhantomData,
 		}
 	}
+	pub fn take(self) -> T { self.value }
 }
 
 #[cfg(test)]

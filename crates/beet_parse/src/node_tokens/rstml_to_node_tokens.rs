@@ -17,8 +17,6 @@ use send_wrapper::SendWrapper;
 use syn::Expr;
 use syn::ExprBlock;
 use syn::ExprLit;
-use syn::Lit;
-use syn::LitStr;
 use syn::spanned::Spanned;
 
 
@@ -287,54 +285,50 @@ impl<'w, 's, 'a> RstmlToWorld<'w, 's, 'a> {
 				));
 			}
 			NodeAttribute::Attribute(attr) => {
-				let key_expr = self.node_name_to_expr(attr.key);
-				let key_expr_span = SendWrapper::new(key_expr.span());
-				let key_expr_file_span =
-					FileSpan::new_from_span(self.file.clone(), &key_expr);
-
+				let key = match &attr.key {
+					NodeName::Block(block) => {
+						self.diagnostics.push(Diagnostic::spanned(
+							block.span(),
+							Level::Error,
+							"Block tag names are not supported as attribute keys",
+						));
+						"block-key".to_string()
+					}
+					key => key.to_string(),
+				};
 				let mut entity = self.commands.spawn((
 					AttributeOf::new(parent),
-					ItemOf::<AttributeKeyExpr, _>::new(
-						key_expr_file_span.clone(),
-					),
-					ItemOf::<AttributeKeyExpr, _>::new(key_expr_span),
+					AttributeKey::new(key),
+					ItemOf::<AttributeKey, _>::new(FileSpan::new_from_span(
+						self.file.clone(),
+						&attr.key,
+					)),
+					ItemOf::<AttributeKey, _>::new(SendWrapper::new(
+						attr.key.span(),
+					)),
 				));
-
-
-				let key_lit =
-					if let Expr::Lit(ExprLit { lit, attrs: _ }) = &key_expr {
-						Some(lit_to_string(lit))
-					} else {
-						None
-					};
-				entity.insert(AttributeKeyExpr::new(key_expr));
-
-				let mut val_lit = None;
+				// key-value attribute, ie `<div hidden=true>`
+				let val_expr_span =
+					SendWrapper::new(attr.possible_value.span());
+				let val_expr_file_span = FileSpan::new_from_span(
+					self.file.clone(),
+					&attr.possible_value,
+				);
 
 				match attr.possible_value {
 					KeyedAttributeValue::Value(value) => match value.value {
 						KVAttributeValue::Expr(val_expr) => {
-							// key-value attribute, ie `<div hidden=true>`
-							let val_expr_span =
-								SendWrapper::new(val_expr.span());
-							let val_expr_file_span = FileSpan::new_from_span(
-								self.file.clone(),
-								&val_expr,
-							);
 							if let Expr::Lit(ExprLit { lit, attrs: _ }) =
 								&val_expr
 							{
-								val_lit = Some(lit_to_string(lit));
+								entity.insert(lit_to_attr(lit));
 							}
-
 							entity.insert((
-								AttributeValueExpr::new(val_expr),
-								ItemOf::<AttributeValueExpr, _>::new(
+								AttributeExpr::new(val_expr),
+								ItemOf::<AttributeExpr, _>::new(
 									val_expr_file_span,
 								),
-								ItemOf::<AttributeValueExpr, _>::new(
-									val_expr_span,
-								),
+								ItemOf::<AttributeExpr, _>::new(val_expr_span),
 							));
 						}
 						KVAttributeValue::InvalidBraced(invalid) => {
@@ -350,10 +344,6 @@ impl<'w, 's, 'a> RstmlToWorld<'w, 's, 'a> {
 						// key-only attribute, ie `<div hidden>`
 					}
 				};
-
-				if let Some(key_lit) = key_lit {
-					entity.insert(AttributeLit::new(key_lit, val_lit));
-				}
 			}
 		}
 	}
@@ -379,19 +369,6 @@ impl<'w, 's, 'a> RstmlToWorld<'w, 's, 'a> {
 			FileSpan::new_from_span(self.file.clone(), name),
 			SendWrapper::new(name.span()),
 		)
-	}
-	fn node_name_to_expr(&mut self, name: NodeName) -> Expr {
-		match name {
-			NodeName::Block(block) => Expr::Block(ExprBlock {
-				attrs: Vec::new(),
-				label: None,
-				block,
-			}),
-			name => Expr::Lit(ExprLit {
-				lit: Lit::Str(LitStr::new(&name.to_string(), name.span())),
-				attrs: Vec::new(),
-			}),
-		}
 	}
 
 	/// Ensure that self-closing elements do not have children,
@@ -454,8 +431,8 @@ mod test {
 		.xmap(parse);
 		app.query_once::<&NodeTag>().xpect().to_have_length(3);
 
-		app.query_once::<&AttributeLit>()[0]
-			.xmap(|attr| attr.key.clone())
+		app.query_once::<&AttributeKey>()[0]
+			.xmap(|attr| attr.clone().0)
 			.xpect()
 			.to_be("client:load");
 	}

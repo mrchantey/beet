@@ -29,21 +29,12 @@ pub fn tokenize_template_attributes(
 
 	if let Some(attrs) = entity.get::<Attributes>() {
 		for attr_entity in attrs.iter() {
-			let key =
-				maybe_spanned_expr::<AttributeKeyExpr>(world, attr_entity)?
-					.map(|key| {
-						// expr to ident
-						if let syn::Expr::Lit(expr_lit) = key {
-							if let syn::Lit::Str(lit_str) = &expr_lit.lit {
-								let value = lit_str.value();
-								let ident =
-									syn::Ident::new(&value, lit_str.span());
-								return Some((value, ident));
-							}
-						}
-						None
-					})
-					.flatten();
+			let key = maybe_spanned_attr_key(world, attr_entity).map(
+				|(key, span)| {
+					let ident = Ident::new(&key, span);
+					(key, ident)
+				},
+			);
 
 			let value = first_attribute_expr(world, attr_entity)?;
 

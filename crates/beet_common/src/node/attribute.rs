@@ -21,76 +21,40 @@ impl AttributeOf {
 #[relationship_target(relationship = AttributeOf,linked_spawn)]
 pub struct Attributes(Vec<Entity>);
 
-/// An attribute where the key is a literal and the value may be a literal,
-/// used by Directive extractors. This type is for tokens parsing only *not* propagated
-/// through the rsx! macro.
-///
-/// ## Example
-/// ```ignore
-/// rsx!{<span hidden=true />};
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Reflect, Component)]
-#[reflect(Component)]
-#[component(immutable)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "tokens", derive(ToTokens))]
-pub struct AttributeLit {
-	pub key: String,
-	pub value: Option<String>,
-}
-
-impl AttributeLit {
-	pub fn new(key: String, value: Option<String>) -> Self {
-		Self { key, value }
-	}
-	pub fn into_parts(&self) -> (&str, Option<&str>) {
-		(&self.key, self.value.as_deref())
-	}
-}
-
 /// An attribute key represented as a string.
 ///
 /// ## Example
 /// ```ignore
 /// rsx!{<span "hidden"=true />};
 /// ```
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Deref, DerefMut, Component)]
+#[derive(
+	Debug, Clone, PartialEq, Eq, Hash, Deref, DerefMut, Reflect, Component,
+)]
+#[reflect(Component)]
 #[component(immutable)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "tokens", derive(ToTokens))]
-pub struct AttributeKeyStr(pub String);
+pub struct AttributeKey(pub String);
 
-impl AttributeKeyStr {
+impl AttributeKey {
 	pub fn new(value: impl Into<String>) -> Self { Self(value.into()) }
 }
 
 
-/// The key of an attribute, ususally a string literal but can be anything.
-/// ## Example
-/// ```ignore
-/// rsx!{<span "hidden"=true {32}=true />};
-/// ```
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Deref, DerefMut, Component)]
-pub struct AttributeKey<T>(pub T);
-
-impl<T> AttributeKey<T> {
-	pub fn new(key: T) -> Self { Self(key) }
-}
-
-/// The value of an attribute
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Deref, DerefMut, Component)]
-pub struct AttributeValue<T>(pub T);
-
-impl<T> AttributeValue<T> {
-	pub fn new(value: T) -> Self { Self(value) }
-}
-
 /// For literal attribute value types like strings, numbers, and booleans,
 /// store the stringified version of the value.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Deref, DerefMut, Component)]
+#[derive(
+	Debug, Clone, PartialEq, Eq, Hash, Deref, DerefMut, Reflect, Component,
+)]
+#[reflect(Component)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "tokens", derive(ToTokens))]
 pub struct AttributeValueStr(pub String);
 
 impl AttributeValueStr {
 	pub fn new(value: impl Into<String>) -> Self { Self(value.into()) }
+}
+
+impl AsRef<str> for AttributeValueStr {
+	fn as_ref(&self) -> &str { &self.0 }
 }

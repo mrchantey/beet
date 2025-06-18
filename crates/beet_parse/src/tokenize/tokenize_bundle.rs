@@ -69,7 +69,7 @@ pub(super) fn tokenize_bundle_no_flatten(world: &World, entity: Entity) -> Resul
 // 	let expr = syn::parse2::<Expr>(tokens)?;
 // 	commands
 // 		.entity(entity)
-// 		.insert(AttributeValueExpr::new(expr));
+// 		.insert(AttributeExpr::new(expr));
 // }
 
 // 	Ok(())
@@ -100,7 +100,7 @@ mod test {
 				NodeTag(String::from("span")),
 				ElementNode { self_closing: false },
 				related!(Attributes[(
-					"hidden".into_attr_key_bundle(),
+					AttributeKey::new("hidden"),
 					true.into_attr_val_bundle()
 				)]),
 				related!{Children[(
@@ -190,7 +190,7 @@ mod test {
 					ElementNode { self_closing: true },
 					related!(Attributes [
 						(
-							"hidden".into_attr_key_bundle(),
+							AttributeKey::new("hidden"),
 							val.into_attr_val_bundle()
 						)
 					])

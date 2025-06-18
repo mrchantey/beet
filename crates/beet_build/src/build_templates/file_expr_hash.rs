@@ -35,9 +35,8 @@ pub fn update_file_expr_hash(
 	children: Query<&Children>,
 	attributes: Query<&Attributes>,
 	block_nodes: Query<&ItemOf<BlockNode, SendWrapper<Expr>>>,
-	attr_exprs: Query<&AttributeExpr>,
-	attr_key_exprs: Query<&AttributeKeyExpr>,
-	attr_val_exprs: Query<&AttributeValueExpr>,
+	// dont hash literal attribute values
+	attr_exprs: Query<&AttributeExpr, Without<AttributeValueStr>>,
 	mut query: Populated<
 		(Entity, &TemplateFile, &mut FileExprHash),
 		Changed<TemplateFile>,
@@ -66,33 +65,12 @@ pub fn update_file_expr_hash(
 							.to_string()
 							.hash(&mut hasher);
 					}
-
-					for attribute in attributes.iter_descendants(node) {
-						// has attribute expressions
-						if let Ok(attr_expr) = attr_exprs.get(attribute) {
-							attr_expr
-								.to_token_stream()
-								.to_string()
-								.hash(&mut hasher);
-						}
-						// hash non-literal attribute keys
-						if let Ok(attr_key_expr) = attr_key_exprs.get(attribute)
-							&& !matches!(attr_key_expr.inner(), Expr::Lit(_))
-						{
-							attr_key_expr
-								.to_token_stream()
-								.to_string()
-								.hash(&mut hasher);
-						}
-						// hash non-literal attribute values
-						if let Ok(attr_val_expr) = attr_val_exprs.get(attribute)
-							&& !matches!(attr_val_expr.inner(), Expr::Lit(_))
-						{
-							attr_val_expr
-								.to_token_stream()
-								.to_string()
-								.hash(&mut hasher);
-						}
+					// hash attribute expressions
+					for expr in attributes
+						.iter_descendants(node)
+						.filter_map(|entity| attr_exprs.get(entity).ok())
+					{
+						expr.to_token_stream().to_string().hash(&mut hasher);
 					}
 				}
 			}

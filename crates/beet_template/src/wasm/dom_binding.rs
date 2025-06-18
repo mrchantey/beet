@@ -37,7 +37,7 @@ pub(super) fn update_text_nodes(
 pub(super) fn update_attribute_values(
 	_: TempNonSendMarker,
 	query: Populated<
-		(&AttributeKeyStr, &AttributeValueStr, &DomElementBinding),
+		(&AttributeKey, &AttributeValueStr, &DomElementBinding),
 		Changed<AttributeValueStr>,
 	>,
 ) -> Result<()> {

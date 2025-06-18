@@ -54,16 +54,16 @@ fn tokenize_attribute_tokens(
 ) -> Result<TokenStream> {
 	let entity = world.entity(entity);
 	let mut items = Vec::new();
+	if let Some(attr_key) = entity.get::<AttributeKey>() {
+		items.push(attr_key.self_token_stream());
+	}
+	if let Some(attr_val) = entity.get::<AttributeValueStr>() {
+		items.push(attr_val.self_token_stream());
+	}
 	if let Some(attr_expr) = entity.get::<AttributeExpr>() {
 		items.push(attr_expr.self_token_stream());
 	}
-	if let Some(attr_key) = entity.get::<AttributeKeyExpr>() {
-		items.push(attr_key.self_token_stream());
-	}
-	if let Some(attr_val) = entity.get::<AttributeValueExpr>() {
-		items.push(attr_val.self_token_stream());
-	}
-let attr_entity = entity.id();
+	let attr_entity = entity.id();
 	if let Some(attr) =
 				tokenize_combinator_exprs_tokens(world, attr_entity)?
 	{
@@ -142,12 +142,26 @@ mod test {
 				(
 					NodeTag(String::from("br")),
 					ElementNode { self_closing: true },
-					related!{Attributes[
-						AttributeKeyExpr(SendWrapper::new(syn::parse_quote!("hidden"))),
-						(AttributeKeyExpr(SendWrapper::new(syn::parse_quote!("class"))), 			AttributeValueExpr(SendWrapper::new(syn::parse_quote!("foo")))),
-						(AttributeKeyExpr(SendWrapper::new(syn::parse_quote!("some_key"))) , 	AttributeValueExpr(SendWrapper::new(syn::parse_quote!({ bar })))),
-						(AttributeKeyExpr(SendWrapper::new(syn::parse_quote!("onmousemove"))), AttributeValueExpr(SendWrapper::new(syn::parse_quote!("some_js_func")))),
-						(AttributeKeyExpr(SendWrapper::new(syn::parse_quote!("onclick"))), 		AttributeValueExpr(SendWrapper::new(syn::parse_quote!({ |_: Trigger<OnClick>| {} }))))
+					related! { Attributes[
+						AttributeKey(String::from("hidden")),
+						(
+							AttributeKey(String::from("class")),
+							AttributeValueStr(String::from("foo")),
+							AttributeExpr(SendWrapper::new(syn::parse_quote!("foo")))
+						),
+						(
+							AttributeKey(String::from("some_key")),
+							AttributeExpr(SendWrapper::new(syn::parse_quote!({ bar })))
+						),
+						(
+							AttributeKey(String::from("onmousemove")),
+							AttributeValueStr(String::from("some_js_func")),
+							AttributeExpr(SendWrapper::new(syn::parse_quote!("some_js_func")))
+						),
+						(
+							AttributeKey(String::from("onclick")),
+							AttributeExpr(SendWrapper::new(syn::parse_quote!({ |_: Trigger<OnClick>| {} })))
+						)
 					]}
 				)
 			}
@@ -219,14 +233,27 @@ mod test {
 		"#).to_be(
 			quote! {
 					(
-						NodeTag (String :: from ("br")), 
-						ElementNode { self_closing : true }, 
-						related!{Attributes[
-							AttributeKeyExpr (SendWrapper::new(syn::parse_quote!("hidden"))), 
-							(AttributeKeyExpr (SendWrapper::new(syn::parse_quote!("class"))), AttributeValueExpr (SendWrapper::new(syn::parse_quote!("foo")))), 
-							(AttributeKeyExpr (SendWrapper::new(syn::parse_quote!("onmousemove"))), AttributeValueExpr (SendWrapper::new(syn::parse_quote!("some_js_func")))), 
-							(AttributeKeyExpr (SendWrapper::new(syn::parse_quote!("onclick"))), {|_:Trigger<OnClick>| { } })
-						]}
+						NodeTag(String::from("br")),
+						ElementNode { self_closing: true },
+						related! {
+							Attributes[
+								AttributeKey(String::from("hidden")),
+								(
+									AttributeKey(String::from("class")),
+									AttributeValueStr(String::from("foo")),
+									AttributeExpr(SendWrapper::new(syn::parse_quote!("foo")))
+								),
+								(
+									AttributeKey(String::from("onmousemove")),
+									AttributeValueStr(String::from("some_js_func")),
+									AttributeExpr(SendWrapper::new(syn::parse_quote!("some_js_func")))
+								),
+								(
+									AttributeKey(String::from("onclick")),
+									{ |_: Trigger<OnClick>| {} }
+								)
+							]
+						}
 					)
 			}
 			.to_string().replace(" ", ""),
@@ -245,14 +272,14 @@ mod test {
 							NodeTag(String::from("br")),
 							ElementNode { self_closing: true },
 							related!{Attributes[(
-								AttributeKeyExpr(SendWrapper::new(syn::parse_quote!("foo"))),
+								AttributeKey(String::from("foo")),
 								{
 									let class = "bar";
 									(
 										NodeTag(String::from("div")),
 										ElementNode { self_closing: true },
 										related!{Attributes[(
-											AttributeKeyExpr(SendWrapper::new(syn::parse_quote!("class"))),
+											AttributeKey(String::from("class")),
 											{ class }
 										)]}
 									)

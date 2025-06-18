@@ -66,14 +66,6 @@ impl<T: 'static + Send + Sync + Clone + ToString> IntoTemplateBundle<Self>
 		let get_str = move || self.get().to_string();
 		(TextSpan::new(get_str()), SignalReceiver::new(get_str))
 	}
-	fn into_attr_key_bundle(self) -> impl Bundle
-	where
-		Self: 'static + Send + Sync + Sized,
-	{
-		unimplemented!("Getter<T> cannot be used as an attribute key");
-		#[allow(unused)]
-		()
-	}
 	fn into_attr_val_bundle(self) -> impl Bundle
 	where
 		Self: 'static + Send + Sync + Sized,

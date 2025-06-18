@@ -9,19 +9,13 @@ use syn::Expr;
 use syn::Ident;
 
 /// Gets the first 'expression' for an attribute, searching in the following order:
-/// - [`AttributeKeyExpr`]
 /// - [`AttributeExpr`]
 /// - [`tokenize_combinator_exprs`]
 pub fn first_attribute_expr(
 	world: &World,
 	attr_entity: Entity,
 ) -> Result<Option<Expr>> {
-	if let Some(attr) =
-		maybe_spanned_expr::<AttributeValueExpr>(world, attr_entity)?
-	{
-		Ok(Some(attr))
-	} else if let Some(attr) =
-		maybe_spanned_expr::<AttributeExpr>(world, attr_entity)?
+	if let Some(attr) = maybe_spanned_expr::<AttributeExpr>(world, attr_entity)?
 	{
 		Ok(Some(attr))
 	} else if let Some(combinator) =
@@ -165,5 +159,23 @@ pub(super) fn maybe_spanned_expr<
 		}
 		(Some(value), None) => Ok(Some((***value).clone())),
 		_ => Ok(None),
+	}
+}
+/// Return the [`AttributeKey`] if it exists,
+/// and its span or [`Span::call_site()`].
+pub(super) fn maybe_spanned_attr_key(
+	world: &World,
+	entity: Entity,
+) -> Option<(String, Span)> {
+	let entity = world.entity(entity);
+	match (
+		entity.get::<AttributeKey>(),
+		entity.get::<ItemOf<AttributeKey, SendWrapper<Span>>>(),
+	) {
+		(Some(key), Some(span)) => {
+			Some((key.to_string(), span.clone().take().take()))
+		}
+		(Some(key), None) => Some((key.to_string(), Span::call_site())),
+		_ => None,
 	}
 }
