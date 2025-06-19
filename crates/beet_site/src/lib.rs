@@ -1,8 +1,6 @@
 #![cfg_attr(test, feature(test, custom_test_frameworks))]
 #![cfg_attr(test, test_runner(sweet::test_runner))]
 
-// #![feature(more_qualified_paths)]
-
 #[cfg(not(target_arch = "wasm32"))]
 #[path = "codegen/actions.rs"]
 pub mod actions;

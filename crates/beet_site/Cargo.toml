@@ -22,3 +22,4 @@ getrandom = { version = "0.3", features = ["wasm_js"] }
 
 [dev-dependencies]
 sweet.workspace = true
+tokio.workspace = true

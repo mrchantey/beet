@@ -83,8 +83,8 @@ pub(super) fn apply_slots(
 				.find(|(_, target)| target.name() == Some(named_slot.as_str()))
 			else {
 				return Err(anyhow::anyhow!(
-					"Attempted to add a child to {node_tag} which has no {named_slot} slot target,
-					consider adding a <slot name = \"{named_slot}\"/> element to {node_tag}."
+					"Attempted to add a child to {node_tag} which has no '{named_slot}' slot target,
+					consider adding a <slot name=\"{named_slot}\"/> to {node_tag}."
 					
 				)
 				.into());
@@ -98,7 +98,7 @@ pub(super) fn apply_slots(
 			let Some((target, _)) = default_slot_target else {
 				return Err(anyhow::anyhow!(
 					"Attempted to add a child to {node_tag} which has no default slot target,
-					consider adding a <slot/> element to {node_tag}."
+					consider adding a <slot/> to {node_tag}."
 				)
 				.into());
 			};

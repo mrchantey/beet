@@ -29,6 +29,14 @@ pub struct AppRouterConfig {
 	#[arg(long, default_value = "target/client")]
 	pub html_dir: WsPathBuf,
 }
+impl Default for AppRouterConfig {
+	fn default() -> Self {
+		Self {
+			mode: None,
+			html_dir: "target/client".into(),
+		}
+	}
+}
 
 #[derive(Default, Subcommand)]
 enum RouterMode {
@@ -67,6 +75,20 @@ pub struct AppRouter<S = ()> {
 impl Default for AppRouter<()> {
 	fn default() -> Self { Self::new(Default::default()) }
 }
+
+impl AppRouter<()> {
+	/// The default app router parses cli arguments which is not desired in tests.
+	pub fn test() -> Self {
+		Self {
+			config: default(),
+			router: default(),
+			static_routes: default(),
+			state: default(),
+			tracing: Level::WARN,
+		}
+	}
+}
+
 impl<S: 'static + Clone + Send + Sync> AppRouter<S> {
 	pub fn new(state: S) -> Self {
 		Self {
@@ -126,28 +148,9 @@ where
 
 	pub async fn export_static(self, html_dir: &WsPathBuf) -> Result {
 		let html_dir = html_dir.into_abs();
-		let router = self.router.with_state(self.state);
 
 		for route in &self.static_routes {
-			let res = router
-				.clone()
-				.oneshot(
-					axum::http::Request::builder()
-						.uri(route.path.to_string_lossy().to_string())
-						.body(axum::body::Body::empty())
-						.unwrap(),
-				)
-				.await
-				.unwrap();
-			if !res.status().is_success() {
-				bevybail!(
-					"Failed to export static html for route {}: {}",
-					route.path.to_string_lossy(),
-					res.status()
-				);
-			}
-			let body = res.into_body().collect().await.unwrap().to_bytes();
-			let html = String::from_utf8(body.to_vec()).unwrap();
+			let html = self.render_route(route).await?;
 			// route path is dir, and file is index, a common convention
 			// for static html files making it easier to serve
 			let route_path =
@@ -161,6 +164,30 @@ where
 		);
 
 		Ok(())
+	}
+
+	pub async fn render_route(&self, route: &RouteInfo) -> Result<String> {
+		let router = self.router.clone().with_state(self.state.clone());
+		let res = router
+			.clone()
+			.oneshot(
+				axum::http::Request::builder()
+					.uri(route.path.to_string_lossy().to_string())
+					.body(axum::body::Body::empty())
+					.unwrap(),
+			)
+			.await
+			.unwrap();
+		if !res.status().is_success() {
+			bevybail!(
+				"Failed to export static html for route {}: {}",
+				route.path.to_string_lossy(),
+				res.status()
+			);
+		}
+		let body = res.into_body().collect().await.unwrap().to_bytes();
+		let html = String::from_utf8(body.to_vec())?;
+		Ok(html)
 	}
 
 	/// Server the provided router, adding
@@ -252,5 +279,30 @@ where
 			Ok(())
 		});
 		(livereload, reload_handle)
+	}
+}
+
+
+#[cfg(test)]
+mod test {
+	use crate::prelude::*;
+	use bevy::prelude::*;
+	use sweet::prelude::*;
+
+	#[sweet::test]
+	async fn works() {
+		AppRouter::test()
+			.add_route("/", || {
+				rsx! {
+					<h1>Hello World</h1>
+					<p>This is a test page.</p>
+				}
+			})
+			// .add_plugin(PagesPlugin)
+			.render_route(&"/".into())
+			.await
+			.unwrap()
+			.xpect()
+			.to_be("<h1>Hello World</h1><p>This is a test page.</p>");
 	}
 }

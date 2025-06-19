@@ -1,4 +1,3 @@
-#![feature(more_qualified_paths)]
 use beet::prelude::*;
 use beet_site::prelude::*;
 
