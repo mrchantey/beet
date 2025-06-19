@@ -20,6 +20,10 @@ pub mod prelude {
 	pub use crate::axum_utils::*;
 	#[cfg(feature = "lambda")]
 	pub use crate::lambda_utils::*;
+
+	pub(crate) use beet_net::prelude::*;
+	// pub(crate) use beet_fs::prelude::*;
+	pub(crate) use beet_utils::prelude::*;
 }
 
 

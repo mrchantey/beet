@@ -105,7 +105,7 @@ pub fn collect_file_group(
 					vec![#(#route_metas()),*]
 				}
 
-				fn build(self, mut router: beet::exports::axum::Router<#router_state_type>)
+				fn add_routes(&self, mut router: beet::exports::axum::Router<#router_state_type>)
 					-> beet::exports::axum::Router<#router_state_type> {
 					#(router = self.add_route(router, #route_handlers);)*
 					router
@@ -164,8 +164,8 @@ mod test {
 					fn meta(&self) -> Vec<Self::Meta> {
 						vec![route0::meta()]
 					}
-					fn build(
-						self,
+					fn add_routes(
+						&self,
 						mut router: beet::exports::axum::Router<()>
 					) -> beet::exports::axum::Router<()> {
 						router = self.add_route(

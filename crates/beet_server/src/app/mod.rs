@@ -1,3 +1,5 @@
+mod router_plugin;
+pub use router_plugin::*;
 mod app_router;
 pub use app_router::*;
 mod app_error;

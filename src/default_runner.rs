@@ -13,7 +13,6 @@ pub struct DefaultRunner {
 impl DefaultRunner {
 	#[tokio::main]
 	pub async fn run(self) -> Result<()> {
-		let args = AppRouterArgs::parse();
 
 		if args.is_static {
 			self.routes

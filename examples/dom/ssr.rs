@@ -3,17 +3,16 @@
 //! ```sh
 //! cargo run --example ssr --features=server
 //! ```
-use axum::Router;
 use axum::extract::Query as QueryParams;
 use axum::extract::State;
 use beet::prelude::*;
 
-fn main() {
+fn main() -> Result {
 	AppRouter::<AppState>::new(AppState {
 		started: std::time::Instant::now(),
 	})
-	.bundle_route("/", my_route)
-	.serve();
+	.add_route("/", my_route)
+	.run()
 }
 
 #[derive(Clone)]
