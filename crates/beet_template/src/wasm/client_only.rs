@@ -58,6 +58,7 @@ mod test {
 		App::new()
 			.add_plugins(TemplatePlugin)
 			.add_systems(Startup, setup)
+			.set_runner(ReactiveApp::runner)
 			.run();
 	}
 

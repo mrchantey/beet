@@ -2,7 +2,6 @@ use crate::prelude::*;
 use beet_common::prelude::*;
 use bevy::ecs::system::SystemParam;
 use bevy::prelude::*;
-use std::cell::RefCell;
 
 /// Add this component to have it populated with HTML on the next update cycle.
 /// See [`HtmlDocument`] for hoisting and correct html structure.
@@ -16,7 +15,7 @@ impl HtmlFragment {
 	/// for example resolving slots, so we reuse a [`TemplateApp`]
 	/// and run a full update cycle.
 	pub fn parse_bundle(bundle: impl Bundle) -> String {
-		SharedTemplateApp::with(|app| {
+		ReactiveApp::with(|app| {
 			let entity = app
 				.world_mut()
 				.spawn((bundle, HtmlFragment::default()))
@@ -30,38 +29,6 @@ impl HtmlFragment {
 				.0;
 			app.world_mut().despawn(entity);
 			value
-		})
-	}
-}
-/// A thread-local [`App`] cached so a new app doesn't need to be
-/// created for each render job.
-pub(super) struct SharedTemplateApp;
-
-impl SharedTemplateApp {
-	#[allow(unused)]
-	fn with_new<O>(func: impl FnOnce(&mut App) -> O) -> O {
-		let mut app = App::new();
-		app.add_plugins(TemplatePlugin);
-		func(&mut app)
-	}
-	/// Access the thread local [`App`] used by the [`TemplatePlugin`].
-	pub(super) fn with<O>(func: impl FnOnce(&mut App) -> O) -> O {
-		thread_local! {
-			static TEMPLATE_APP: RefCell<Option<App>> = RefCell::new(None);
-		}
-		TEMPLATE_APP.with(|app_cell| {
-			// Initialize the app if needed
-			let mut app_ref = app_cell.borrow_mut();
-			if app_ref.is_none() {
-				let mut app = App::new();
-				app.add_plugins(TemplatePlugin);
-				*app_ref = Some(app);
-			}
-
-			// Now we can safely unwrap and use the app
-			let app = app_ref.as_mut().unwrap();
-
-			func(app)
 		})
 	}
 }

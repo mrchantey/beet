@@ -1,14 +1,11 @@
 #![feature(more_qualified_paths)]
-use anyhow::Result;
+use beet::prelude::*;
 use beet_site::prelude::*;
 
 
 #[cfg(not(target_arch = "wasm32"))]
-fn main() -> Result<()> {
-	use beet::prelude::*;
-
-	AppRouter::new().add_plugin(pages::PagesRouterPlugin).run()
-
+fn main() -> Result {
+	AppRouter::default().add_plugin(PagesPlugin).run()
 	// fn with_sidebar(route: RouteFunc<RsxRouteFunc>) -> RouteFunc<RsxRouteFunc> {
 	// 	route.map_func(|func| {
 	// 		async move || -> anyhow::Result<WebNode> {

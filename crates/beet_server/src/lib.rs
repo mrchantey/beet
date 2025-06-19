@@ -22,6 +22,7 @@ pub mod prelude {
 	pub use crate::lambda_utils::*;
 
 	pub(crate) use beet_net::prelude::*;
+	pub(crate) use beet_template::prelude::*;
 	// pub(crate) use beet_fs::prelude::*;
 	pub(crate) use beet_utils::prelude::*;
 }

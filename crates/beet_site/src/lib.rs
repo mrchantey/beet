@@ -3,6 +3,9 @@
 
 // #![feature(more_qualified_paths)]
 
+#[cfg(not(target_arch = "wasm32"))]
+#[path = "codegen/actions.rs"]
+pub mod actions;
 #[path = "codegen/client_actions.rs"]
 pub mod client_actions;
 pub mod codegen;
@@ -13,9 +16,6 @@ pub mod docs;
 #[cfg(not(target_arch = "wasm32"))]
 #[path = "codegen/pages.rs"]
 pub mod pages;
-#[cfg(not(target_arch = "wasm32"))]
-#[path = "codegen/actions.rs"]
-pub mod actions;
 // #[path = "codegen/route_tree.rs"]
 // pub mod route_tree;
 // #[cfg(not(target_arch = "wasm32"))]
@@ -26,6 +26,7 @@ pub mod actions;
 // pub mod wasm;
 
 pub mod prelude {
+	pub use super::pages::*;
 	pub use super::*;
 	pub use crate::codegen::root as paths;
 	pub use crate::codegen::route_path_tree;

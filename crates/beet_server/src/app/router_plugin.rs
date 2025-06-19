@@ -7,6 +7,7 @@ pub trait RouterPlugin {
 	type Meta;
 
 	/// Whether routes provided by this plugin are static.
+	/// Usually this shoult be `true` for pages and `false` for actions.
 	fn is_static(&self) -> bool;
 
 	/// List of routes that this plugin provides.

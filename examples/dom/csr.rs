@@ -23,6 +23,7 @@ fn main() {
 			// the client:only directive instructs the wasm build to render and mount the component in the browser
 			commands.spawn(rsx! {<Counter client:only initial=7/>});
 		})
+		.set_runner(ReactiveApp::runner)
     .run();
 }
 

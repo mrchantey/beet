@@ -55,14 +55,13 @@ impl Plugin for TemplatePlugin {
 							)
 								.chain(),
 						),
-						insert_event_playback_attribute
+						insert_event_playback_attribute,
 					)
 						.chain()
 						.in_set(ApplyTransformsStep),
 					(render_html_fragments).in_set(RenderStep),
 				),
-			)
-			.set_runner(ReactiveApp::runner);
+			);
 		#[cfg(target_arch = "wasm32")]
 		app.add_plugins(wasm_template_plugin);
 	}

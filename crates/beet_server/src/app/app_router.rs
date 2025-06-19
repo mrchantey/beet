@@ -1,6 +1,6 @@
 use crate::prelude::*;
 use axum::Router;
-use bevy::prelude::Result;
+use bevy::prelude::*;
 // use beet_router::types::RouteFunc;
 use clap::Parser;
 use clap::Subcommand;
@@ -115,6 +115,7 @@ where
 	}
 	#[tokio::main]
 	pub async fn run_with_config(self, config: AppRouterConfig) -> Result<()> {
+
 		match self.config.mode {
 			Some(RouterMode::ExportStatic) => {
 				self.export_static(&config.html_dir).await

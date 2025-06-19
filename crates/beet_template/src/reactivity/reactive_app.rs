@@ -2,6 +2,8 @@ use beet_bevy::prelude::AppExt;
 use bevy::prelude::*;
 use std::cell::RefCell;
 
+use crate::prelude::TemplatePlugin;
+
 /// By default an app will run in a continuous loop,
 /// but for ui applications we usually only want to run it after
 /// some user input.
@@ -22,16 +24,21 @@ impl ReactiveApp {
 		});
 		AppExit::Success
 	}
-	/// Access the thread local [`App`]
-	/// # Panics
-	/// Panics if the app is not initialized.
+	/// Access the thread local [`App`], initializing it if it is not already.
 	pub fn with<O>(func: impl FnOnce(&mut App) -> O) -> O {
 		APP.with(|app_ref| {
 			let mut app_cell = app_ref.borrow_mut();
-			let app = app_cell.as_mut().expect(
-				"ReactiveApp not initialized. plese call app.set_runner(ReactiveApp::runner).run()");
-				func(app)
-			})
+			match app_cell.as_mut() {
+				Some(app) => func(app),
+				None => {
+					let mut app = App::new();
+					app.add_plugins(TemplatePlugin).init().update();
+					let out = func(&mut app);
+					*app_cell = Some(app);
+					out
+				}
+			}
+		})
 	}
 
 	/// Try to access the thread local [`App`], returns None if

@@ -18,6 +18,7 @@ fn main() {
     .add_systems(Startup, |mut commands:Commands|{
 			commands.spawn(app());
 		})
+		.set_runner(ReactiveApp::runner)
     .run();
 }
 

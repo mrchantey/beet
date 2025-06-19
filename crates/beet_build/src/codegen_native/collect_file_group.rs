@@ -92,10 +92,16 @@ pub fn collect_file_group(
 		});
 		let meta_ty = &file_group.meta_type;
 		let router_state_type = &file_group.router_state_type;
+		let is_static = file_group.category.include_in_route_tree();
+
 		codegen_file.add_item::<syn::ItemImpl>(parse_quote! {
 			impl RouterPlugin for #router_plugin_ident {
 				type State = #router_state_type;
 				type Meta = #meta_ty;
+
+				fn is_static(&self) -> bool {
+					#is_static
+				}
 
 				fn routes(&self)-> Vec<RouteInfo> {
 					vec![#(#route_infos),*]
@@ -155,6 +161,9 @@ mod test {
 				impl RouterPlugin for TestDocsPlugin {
 					type State = ();
 					type Meta = ();
+					fn is_static(&self) -> bool {
+						true
+					}
 					fn routes(&self) -> Vec<RouteInfo> {
 						vec![RouteInfo {
 							path: RoutePath(std::path::PathBuf::from("/hello")),
