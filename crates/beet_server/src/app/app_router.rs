@@ -1,5 +1,6 @@
 use crate::prelude::*;
 use axum::Router;
+use beet_template::as_beet::bevybail;
 use bevy::prelude::*;
 // use beet_router::types::RouteFunc;
 use clap::Parser;
@@ -115,7 +116,6 @@ where
 	}
 	#[tokio::main]
 	pub async fn run_with_config(self, config: AppRouterConfig) -> Result<()> {
-
 		match self.config.mode {
 			Some(RouterMode::ExportStatic) => {
 				self.export_static(&config.html_dir).await
@@ -133,15 +133,25 @@ where
 				.clone()
 				.oneshot(
 					axum::http::Request::builder()
-						.uri("/test?name=world")
+						.uri(route.path.to_string_lossy().to_string())
 						.body(axum::body::Body::empty())
 						.unwrap(),
 				)
 				.await
 				.unwrap();
+			if !res.status().is_success() {
+				bevybail!(
+					"Failed to export static html for route {}: {}",
+					route.path.to_string_lossy(),
+					res.status()
+				);
+			}
 			let body = res.into_body().collect().await.unwrap().to_bytes();
 			let html = String::from_utf8(body.to_vec()).unwrap();
-			let route_path = html_dir.join(&route.path).with_extension("html");
+			// route path is dir, and file is index, a common convention
+			// for static html files making it easier to serve
+			let route_path =
+				html_dir.join(&route.path.as_relative()).join("index.html");
 			FsExt::write(&route_path, html)?;
 		}
 		tracing::info!(

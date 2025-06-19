@@ -21,10 +21,13 @@ pub mod prelude {
 	#[cfg(feature = "lambda")]
 	pub use crate::lambda_utils::*;
 
-	pub(crate) use beet_net::prelude::*;
-	pub(crate) use beet_template::prelude::*;
-	// pub(crate) use beet_fs::prelude::*;
-	pub(crate) use beet_utils::prelude::*;
+	pub(crate) use internal::*;
+	#[allow(unused_imports)]
+	mod internal {
+		pub use beet_net::prelude::*;
+		pub use beet_template::prelude::*;
+		pub use beet_utils::prelude::*;
+	}
 }
 
 

@@ -1,7 +1,6 @@
 use bevy::prelude::BevyError;
 
 /// Intermediary type for converting to [`BevyError`].
-#[derive(Debug)]
 pub struct BevyhowError(pub String);
 
 impl BevyhowError {
@@ -16,7 +15,11 @@ impl std::fmt::Display for BevyhowError {
 		write!(f, "{}", self.0)
 	}
 }
-
+impl std::fmt::Debug for BevyhowError {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		write!(f, "{}", self.0)
+	}
+}
 
 /// A bevy version of [`anyhow::anyhow!`].
 #[macro_export]

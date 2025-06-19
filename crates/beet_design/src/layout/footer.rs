@@ -18,6 +18,7 @@ pub fn Footer() -> impl Bundle {
 	rsx! {
 		<footer id="page-footer">
 			<span>{footer_text}</span>
+			<slot/>
 			<span id="footer-version">{version}</span>
 		</footer>
 		<style>

@@ -4,9 +4,7 @@ use std::cell::RefCell;
 
 use crate::prelude::TemplatePlugin;
 
-/// By default an app will run in a continuous loop,
-/// but for ui applications we usually only want to run it after
-/// some user input.
+/// Temporary solution until reactivity in bevy.
 pub struct ReactiveApp;
 thread_local! {
 	static APP: RefCell<Option<App>> = RefCell::new(None);

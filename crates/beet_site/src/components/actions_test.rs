@@ -22,19 +22,21 @@ pub fn ActionTest() -> impl Bundle {
 
 #[template]
 pub fn RejectsNeg() -> impl Bundle {
+	#[allow(unused_variables)]
 	let (val, _set_val) = signal(0);
+	#[allow(unused_variables)]
 	let (get, set) = signal("Ready".to_string());
 
 	let onclick = move |_: Trigger<OnClick>| {
-		// let val = val.clone();
-		// let set = set.clone();
-		// spawn_local(async move {
-		// 	let result = actions::error_handling::reject_neg(val()).await;
-		// 	match result {
-		// 		Ok(_) => set("Success".into()),
-		// 		Err(e) => set(format!("Error: {}", e)),
-		// 	}
-		// });
+		#[cfg(target_arch = "wasm32")]
+		spawn_local(async move {
+			let result =
+				crate::actions::error_handling::reject_neg(val()).await;
+			match result {
+				Ok(_) => set("Success".into()),
+				Err(e) => set(format!("Error: {}", e)),
+			}
+		});
 	};
 
 	rsx! {

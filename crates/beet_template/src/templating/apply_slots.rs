@@ -40,6 +40,7 @@
 //!   see https://docs.astro.build/en/basics/astro-components/#transferring-slots
 use crate::prelude::*;
 use beet_bevy::prelude::HierarchyQueryExtExt;
+use beet_common::node::NodeTag;
 use beet_common::node::SlotChild;
 use beet_common::node::SlotTarget;
 use bevy::platform::collections::HashSet;
@@ -56,11 +57,11 @@ pub(super) fn apply_slots(
 	children: Query<&Children>,
 	slot_targets: Query<(Entity, &SlotTarget)>,
 	slot_children: Query<(Entity, &SlotChild)>,
-	query: Populated<(Entity, &TemplateRoot)>,
+	query: Populated<(Entity, &TemplateRoot, &NodeTag)>,
 ) -> Result {
-	for (node_ent, root) in query.iter() {
+	for (node_entity, root, node_tag) in query.iter() {
 		let (named_slots, default_slots) =
-			collect_slot_children(node_ent, &children, &slot_children);
+			collect_slot_children(node_entity, &children, &slot_children);
 
 		// 2.a Collect all named slot targets
 		let slot_targets = children
@@ -82,7 +83,7 @@ pub(super) fn apply_slots(
 				.find(|(_, target)| target.name() == Some(named_slot.as_str()))
 			else {
 				return Err(anyhow::anyhow!(
-					"Named slot `{}` found but no matching target found for {node_ent:?}",
+					"Named slot `{}` found but no matching target found for {node_tag:?}",
 					named_slot
 				)
 				.into());
@@ -95,7 +96,7 @@ pub(super) fn apply_slots(
 		if !default_slots.is_empty() {
 			let Some((target, _)) = default_slot_target else {
 				return Err(anyhow::anyhow!(
-					"Default slot found but no default slot target found for {node_ent:?}"
+					"Default slot found but no default slot target found for {node_tag:?}"
 				)
 				.into());
 			};
@@ -109,7 +110,7 @@ pub(super) fn apply_slots(
 		commands
 			.entity(**root)
 			.remove::<TemplateOf>()
-			.insert(ChildOf(node_ent));
+			.insert(ChildOf(node_entity));
 		// 5. remove fallback children from used targets
 		used_targets
 			.into_iter()

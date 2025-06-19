@@ -28,8 +28,8 @@ pub mod pages;
 pub mod prelude {
 	pub use super::pages::*;
 	pub use super::*;
+	pub use crate::client_actions::root as actions;
 	pub use crate::codegen::root as paths;
 	pub use crate::codegen::route_path_tree;
-	// 	pub use crate::client_actions::root as actions;
 	pub use crate::components::*;
 }
