@@ -9,6 +9,12 @@ use bevy::prelude::*;
 #[cfg_attr(feature = "tokens", derive(ToTokens))]
 pub struct NodeTag(pub String);
 
+impl std::fmt::Display for NodeTag {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		write!(f, "{}", self.0)
+	}
+}
+
 impl NodeTag {
 	/// Create a new tag from a string
 	pub fn new(tag: impl Into<String>) -> Self { Self(tag.into()) }
