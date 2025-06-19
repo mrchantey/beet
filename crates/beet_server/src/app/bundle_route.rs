@@ -29,7 +29,7 @@ pub trait BundleRoute<M>: 'static + Send + Sync + Clone {
 			method.into_axum_method(),
 			async move |extractors: Self::Extractors| -> AppResult<Html<String>> {
 				let bundle = self.into_bundle_result(extractors).await?;
-				let html = HtmlFragment::parse_bundle(bundle);
+				let html = HtmlDocument::parse_bundle(bundle);
 				Ok(Html(html))
 			},
 		)
@@ -83,6 +83,7 @@ mod test {
 
 	#[sweet::test]
 	async fn works() {
+		// this machinery is usually done by the AppRouter
 		let router: Router = Router::new()
 			.route("/test", my_route.into_method_router(HttpMethod::Get));
 		let response = router

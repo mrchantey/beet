@@ -105,6 +105,7 @@ impl<S: 'static + Clone + Send + Sync> AppRouter<S> {
 }
 
 impl<S> AppRouter<S> {
+	/// Add any axum route or bundle route to the router.
 	pub fn add_route<M>(
 		mut self,
 		info: impl Into<RouteInfo>,
