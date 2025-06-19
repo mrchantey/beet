@@ -1,5 +1,5 @@
 //! An example of basic server-side rendering (SSR) with beet.
-//! 
+//!
 //! ```sh
 //! cargo run --example ssr --features=server
 //! ```
@@ -8,19 +8,12 @@ use axum::extract::Query as QueryParams;
 use axum::extract::State;
 use beet::prelude::*;
 
-#[tokio::main]
-async fn main() {
-	let app = Router::<AppState>::new()
-		.bundle_route("/", my_route)
-		.with_state(AppState {
-			started: std::time::Instant::now(),
-		});
-
-	let listener = tokio::net::TcpListener::bind("127.0.0.1:3000")
-		.await
-		.unwrap();
-	println!("listening on {}", listener.local_addr().unwrap());
-	axum::serve(listener, app).await.unwrap();
+fn main() {
+	AppRouter::<AppState>::new(AppState {
+		started: std::time::Instant::now(),
+	})
+	.bundle_route("/", my_route)
+	.serve();
 }
 
 #[derive(Clone)]
@@ -32,8 +25,6 @@ struct AppState {
 struct RequestPayload {
 	name: Option<String>,
 }
-
-
 
 /// A [`BundleRoute`] is a regular axum route that returns a [`Bundle`].
 fn my_route(

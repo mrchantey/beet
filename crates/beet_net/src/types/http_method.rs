@@ -1,6 +1,6 @@
-use std::fmt;
 #[cfg(feature = "tokens")]
 use beet_common::as_beet::*;
+use std::fmt;
 
 /// Alternative to the [`http::Method`] which is a low level representation of HTTP methods
 /// and quite error prone in this high level context. For example
@@ -36,6 +36,9 @@ impl HttpMethod {
 	/// has a request body, such as `POST`, `PUT`, or `PATCH`.
 	pub fn has_body(&self) -> bool {
 		matches!(self, HttpMethod::Post | HttpMethod::Put | HttpMethod::Patch)
+	}
+	pub fn to_string_lowercase(&self) -> String {
+		self.to_string().to_ascii_lowercase()
 	}
 }
 impl From<http::Method> for HttpMethod {

@@ -62,7 +62,7 @@ pub fn collect_combinator_route(
 				.ok_or_else(|| bevyhow!("failed to find parent FileGroup"))?;
 			let meta_type = &file_group.meta_type;
 			codegen_file.add_item::<ItemFn>(syn::parse_quote!(
-				pub fn meta_get()-> #meta_type{
+				pub fn meta()-> #meta_type{
 					#meta.map_err(|err|{
 						format!("Failed to parse meta: {}", err)
 					}).unwrap()
@@ -98,7 +98,7 @@ mod test {
 		.unwrap()
 		.to_token_stream()
 		.to_string();
-		expect(&codegen).to_contain("pub fn meta_get () -> () {");
+		expect(&codegen).to_contain("pub fn meta () -> () {");
 		expect(&codegen).to_contain("pub fn get () -> impl Bundle {");
 	}
 }

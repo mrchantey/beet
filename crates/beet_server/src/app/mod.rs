@@ -1,3 +1,5 @@
+mod app_router;
+pub use app_router::*;
 mod app_error;
 pub use app_error::*;
 mod beet_route;

@@ -23,12 +23,12 @@ use tower::Service;
 
 
 /// An Axum Server with file based routing and a live reload dev server.
-pub struct BeetServer<S> {
+pub struct AppRouter<S = ()> {
 	pub html_dir: PathBuf,
 	pub router: Router<S>,
 }
 
-impl Default for BeetServer<()> {
+impl<S: Clone + Send + Sync + 'static> Default for AppRouter<S> {
 	fn default() -> Self {
 		Self {
 			html_dir: "target".into(),
@@ -36,35 +36,48 @@ impl Default for BeetServer<()> {
 		}
 	}
 }
+impl<S: Clone + Send + Sync + 'static> AppRouter<S> {
+	pub fn new(state: S) -> Self {
+		let mut this = Self::default();
+		this.router = this.router.with_state(state);
+		this
+	}
+}
 
-impl<S> BeetServer<S> {
+impl<S> AppRouter<S> {
 	pub fn bundle_route<M>(
 		mut self,
-		info: RouteInfo,
+		info: impl Into<RouteInfo>,
 		route: impl BundleRoute<M, State = S>,
 	) -> Self
 	where
 		S: 'static + Send + Sync + Clone,
 	{
+		let info = info.into();
 		self.router = self.router.route(
 			&info.path.to_string(),
 			route.into_method_router(info.method),
 		);
 		self
 	}
+}
+
+impl<S> AppRouter<S>
+where
+	S: Clone + Send + Sync + 'static,
+	Router<S>: Service<
+			http::Request<Body>,
+			Response = axum::response::Response,
+			Error = std::convert::Infallible,
+		> + Clone,
+	<Router<S> as Service<http::Request<Body>>>::Future: Send,
+{
+	#[tokio::main]
+	pub async fn serve(self) -> Result<()> { self.serve_async().await }
 
 	/// Server the provided router, adding
 	/// a fallback file server with live reload.
-	pub async fn serve(self) -> Result<()>
-	where
-		S: Clone + Send + Sync + 'static,
-		Router<S>: Service<
-				http::Request<Body>,
-				Response = axum::response::Response,
-				Error = std::convert::Infallible,
-			> + Clone,
-		<Router<S> as Service<http::Request<Body>>>::Future: Send,
-	{
+	pub async fn serve_async(self) -> Result<()> {
 		#[allow(unused_mut)]
 		let mut router = self
 			.router

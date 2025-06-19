@@ -22,7 +22,7 @@ pub fn parse_route_file_md(
 		let file_str = ReadFile::to_string(&route_file.origin_path)?;
 
 		let ws_path = route_file.origin_path.into_ws_path()?;
-		let config = ParseMarkdown::markdown_to_frontmatter_tokens(&file_str)?;
+		let meta = ParseMarkdown::markdown_to_frontmatter_tokens(&file_str)?;
 		let rsx_str = ParseMarkdown::markdown_to_rsx_str(&file_str);
 
 		let Some(group_codegen) = parents
@@ -50,8 +50,8 @@ pub fn parse_route_file_md(
 		);
 
 		parent.with_child(RouteFileMethod {
-			meta: if config.is_some() {
-				RouteFileMethodMeta::Method
+			meta: if meta.is_some() {
+				RouteFileMethodMeta::File
 			} else {
 				RouteFileMethodMeta::FileGroup
 			},
@@ -66,7 +66,7 @@ pub fn parse_route_file_md(
 		parent.with_child((
 			CombinatorTokens(rsx_str),
 			SourceFile::new(ws_path.clone()),
-			CombinatorRouteCodegen { meta: config }.sendit(),
+			CombinatorRouteCodegen { meta }.sendit(),
 			group_codegen.clone_meta(route_codegen_path_abs).sendit(),
 		));
 	}

@@ -1,5 +1,4 @@
 use crate::prelude::*;
-use axum::Router;
 use axum::extract::FromRequestParts;
 use axum::response::Html;
 use axum::routing;
@@ -36,27 +35,6 @@ pub trait BundleRoute<M>: 'static + Send + Sync + Clone {
 		)
 	}
 }
-#[extend::ext(name=RouterBundleRouteExt)]
-pub impl<S> Router<S>
-where
-	S: 'static + Send + Sync + Clone,
-{
-	fn bundle_route<R, M>(
-		self,
-		info: impl Into<RouteInfo>,
-		route: R,
-	) -> Router<S>
-	where
-		R: BundleRoute<M, State = S>,
-	{
-		let info = info.into();
-		self.route(
-			&info.path.to_string(),
-			route.into_method_router(info.method),
-		)
-	}
-}
-
 
 #[extend::ext(name=HttpMethodExt)]
 pub impl HttpMethod {

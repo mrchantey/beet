@@ -3,6 +3,7 @@ use crate::prelude::*;
 use beet_common::as_beet::*;
 use beet_net::prelude::*;
 use bevy::prelude::*;
+use syn::Ident;
 use syn::ItemFn;
 
 /// The signature of a route file method
@@ -65,4 +66,17 @@ pub enum RouteFileMethodMeta {
 	/// the group level or default.
 	#[default]
 	FileGroup,
+}
+
+impl RouteFileMethodMeta {
+	pub fn ident(&self, mod_ident: &Ident, method_name: &str) -> syn::Path {
+		match self {
+			RouteFileMethodMeta::Method => {
+				let meta_ident = quote::format_ident!("meta_{}", method_name);
+				syn::parse_quote!(#mod_ident::#meta_ident)
+			}
+			RouteFileMethodMeta::File => syn::parse_quote!(#mod_ident::meta),
+			RouteFileMethodMeta::FileGroup => syn::parse_quote!(Self::meta),
+		}
+	}
 }

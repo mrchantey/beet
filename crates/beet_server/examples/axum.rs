@@ -1,10 +1,8 @@
 use beet_server::prelude::*;
 
 #[rustfmt::skip]
-#[tokio::main]
-async fn main() {
-	BeetServer::default()
+fn main() {
+	AppRouter::default()
 		.serve()
-		.await
 		.unwrap();
 }
