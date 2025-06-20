@@ -47,10 +47,9 @@ impl ReactiveApp {
 			match app_cell.as_mut() {
 				Some(app) => func(app),
 				None => {
-					let mut app = App::new();
-					app.add_plugins(TemplatePlugin).init().update();
+					*app_cell = Some(CREATE_APP.read().unwrap()());
+					let mut app = app_cell.as_mut().unwrap();
 					let out = func(&mut app);
-					*app_cell = Some(app);
 					out
 				}
 			}

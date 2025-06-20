@@ -17,6 +17,7 @@ default = ["nightly", "reload"]
 nightly = []
 reload = ["tower-livereload"]
 lambda = ["dep:lambda_http"]
+build = ["dep:beet_build"]
 
 [dependencies]
 beet_fs.workspace = true
@@ -25,6 +26,7 @@ beet_net.workspace = true
 beet_common.workspace = true
 beet_template.workspace = true
 beet_router = { workspace = true, features = ["axum"] }
+beet_build = { workspace = true, features = ["css"], optional = true }
 
 bevy.workspace = true
 

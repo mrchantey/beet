@@ -12,11 +12,13 @@ repository.workspace = true
 categories.workspace = true
 keywords.workspace = true
 
+
 [dependencies]
 anyhow.workspace = true
 serde.workspace = true
 
-beet = { workspace = true, features = ["web", "web-server"] }
+beet = { workspace = true, features = ["web", "web-server", "build"] }
+# beet = { workspace = true, features = ["web", "web-server"] }
 getrandom = { version = "0.3", features = ["wasm_js"] }
 
 

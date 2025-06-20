@@ -74,9 +74,23 @@ impl Default for AppRouter<()> {
 	fn default() -> Self { Self::new(Default::default()) }
 }
 
+// so dirty we need cleaner solution, ReactiveApp in general sucks
+fn set_app() {
+	#[cfg(feature = "build")]
+	ReactiveApp::set_create_app(|| {
+		let mut app = App::new();
+		app.add_plugins((
+			beet_build::prelude::BuildTemplatesPlugin,
+			TemplatePlugin,
+		));
+		app
+	});
+}
+
 impl AppRouter<()> {
 	/// The default app router parses cli arguments which is not desired in tests.
 	pub fn test() -> Self {
+		set_app();
 		Self {
 			config: default(),
 			router: default(),
@@ -89,6 +103,7 @@ impl AppRouter<()> {
 
 impl<S: 'static + Clone + Send + Sync> AppRouter<S> {
 	pub fn new(state: S) -> Self {
+		set_app();
 		Self {
 			router: Router::new(),
 			static_routes: Vec::new(),
@@ -178,13 +193,22 @@ where
 			.await
 			.unwrap();
 		if !res.status().is_success() {
+			let status = res.status();
+			let body = res
+				.into_body()
+				.collect()
+				.await
+				.unwrap_or_default()
+				.to_bytes()
+				.to_vec();
+			let msg = String::from_utf8(body)?;
+
 			bevybail!(
-				"Failed to export static html for route {}: {}",
+				"Failed to render route {}\n{status}: {msg}",
 				route.path.to_string_lossy(),
-				res.status()
 			);
 		}
-		let body = res.into_body().collect().await.unwrap().to_bytes();
+		let body = res.into_body().collect().await?.to_bytes().to_vec();
 		let html = String::from_utf8(body.to_vec())?;
 		Ok(html)
 	}

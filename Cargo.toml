@@ -257,7 +257,7 @@ server = [
 lambda = ["server", "beet_server/lambda"]
 spatial = ["flow", "dep:beet_spatial", "beet_ml?/spatial"]
 sim = ["flow", "dep:beet_sim"]
-build = ["parse", "dep:beet_build"]
+build = ["parse", "dep:beet_build", "beet_server?/build"]
 bevy_scene = ["beet_bevy/bevy_scene"]
 bevy_default = [
 	"bevy/default",
