@@ -102,6 +102,6 @@ mod test {
 		String::from_utf8(body.to_vec())
 			.unwrap()
 			.xpect()
-			.to_be("<body><h1>hello world!</h1></body>");
+			.to_be("<!DOCTYPE html><html><head></head><body><body><h1>hello world!</h1></body></body></html>");
 	}
 }

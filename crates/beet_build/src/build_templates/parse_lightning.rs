@@ -1,6 +1,6 @@
 use super::error::Error;
-use crate::prelude::*;
 use beet_common::prelude::*;
+use beet_template::prelude::*;
 use bevy::prelude::*;
 use lightningcss::printer::PrinterOptions;
 use lightningcss::stylesheet::ParserOptions;
@@ -81,7 +81,7 @@ pub fn parse_lightning(
 	// only local style tags
 
 	for (entity, css) in output {
-		commands.entity(entity).insert(LangPartial(css));
+		commands.entity(entity).insert(LangPartial::new(css));
 	}
 	Ok(())
 }
@@ -92,8 +92,8 @@ pub fn parse_lightning(
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use beet_common::node::HtmlConstants;
-	use beet_common::node::NodeTag;
+	use beet_common::prelude::*;
+	use beet_template::prelude::*;
 	use bevy::prelude::*;
 	use sweet::prelude::*;
 

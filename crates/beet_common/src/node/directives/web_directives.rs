@@ -19,7 +19,9 @@ pub fn extract_web_directives_plugin(app: &mut App) {
 /// Note that by default elements matching the [`HtmlConstants::hoist_to_head_tags`]
 /// will be hoisted to the head of the document, to disable this behavior
 /// use the `hoist:none` directive on the element.
-#[derive(Debug, Default, Copy, Clone, Component, Reflect)]
+#[derive(
+	Debug, Default, Copy, Clone, PartialEq, Eq, Hash, Component, Reflect,
+)]
 #[reflect(Default, Component)]
 #[component(immutable)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]

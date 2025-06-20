@@ -221,8 +221,7 @@ mod test {
 				quote! {(
 					NodeTag(String::from("style")),
 					ElementNode { self_closing: false },
-					LangContent::InnerText(String::from("foo")),
-					related!{Children[TextNode(String::from("foo"))]}
+					LangContent::InnerText(String::from("foo"))
 				)}
 				.to_string(),
 			);

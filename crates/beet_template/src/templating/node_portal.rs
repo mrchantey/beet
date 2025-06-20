@@ -1,6 +1,43 @@
 use bevy::platform::collections::HashMap;
 use bevy::prelude::*;
 
+
+/// Flag component to accompany a [`NodePortal`] used for query filtering.
+#[derive(Component, Reflect)]
+#[reflect(Component)]
+pub struct PortalTo<T> {
+	phantom: std::marker::PhantomData<T>,
+}
+impl<T> Default for PortalTo<T> {
+	fn default() -> Self { Self { phantom: default() } }
+}
+
+
+/// A node that, like a pointer, exists only to point to another node.
+/// Examples include the content of template `<style>` tags which is replaced with
+/// a `NodePointer` component in order to deduplicate for the html output.
+#[derive(Deref, Component, Reflect)]
+#[reflect(Component)]
+#[relationship(relationship_target = NodePortalTarget)]
+pub struct NodePortal {
+	target: Entity,
+}
+
+impl NodePortal {
+	pub fn new(target: Entity) -> Self { Self { target } }
+}
+
+/// A node that is pointed to by multiple other nodes.
+#[derive(Deref, Component, Reflect)]
+#[reflect(Component)]
+#[relationship_target(relationship = NodePortal,linked_spawn)]
+pub struct NodePortalTarget {
+	sources: Vec<Entity>,
+}
+
+
+
+
 /// Allows seperate nodes to point to the same content by using the same hash.
 /// This component will be replaced with a shared `NodePortal` pointing to
 /// a cloned version of the first entity encountered with the same hash.
@@ -8,6 +45,8 @@ use bevy::prelude::*;
 	Debug, Clone, Copy, Component, PartialEq, Eq, PartialOrd, Ord, Deref,
 )]
 pub struct IntoPortal {
+	/// a hash of everything that makes this node unique,
+	/// such as the tag, attributes, directives and inner text.
 	hash: u64,
 }
 impl IntoPortal {
@@ -40,30 +79,6 @@ pub fn into_portal_system(
 		}
 	}
 }
-
-
-/// A node that, like a pointer, exists only to point to another node.
-/// Examples include the content of template `<style>` tags which is replaced with
-/// a `NodePointer` component in order to deduplicate for the html output.
-#[derive(Deref, Component, Reflect)]
-#[reflect(Component)]
-#[relationship(relationship_target = NodePortalTarget)]
-pub struct NodePortal {
-	target: Entity,
-}
-
-impl NodePortal {
-	pub fn new(target: Entity) -> Self { Self { target } }
-}
-
-/// A node that is pointed to by multiple other nodes.
-#[derive(Deref, Component, Reflect)]
-#[reflect(Component)]
-#[relationship_target(relationship = NodePortal,linked_spawn)]
-pub struct NodePortalTarget {
-	sources: Vec<Entity>,
-}
-
 
 
 #[cfg(test)]

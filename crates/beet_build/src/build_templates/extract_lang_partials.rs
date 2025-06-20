@@ -1,51 +1,41 @@
-use crate::prelude::*;
 use beet_common::prelude::*;
+use beet_template::prelude::*;
+use beet_utils::prelude::*;
 use bevy::platform::collections::HashMap;
 use bevy::prelude::*;
 use rapidhash::RapidHasher;
-use serde::Deserialize;
-use serde::Serialize;
 use std::hash::Hash;
 use std::hash::Hasher;
-use beet_utils::prelude::*;
-
-/// The loaded and deduplicated [`LangContent`].
-#[derive(
-	Debug,
-	Clone,
-	PartialEq,
-	Hash,
-	Deref,
-	Serialize,
-	Deserialize,
-	Component,
-	Reflect,
-)]
-#[reflect(Component)]
-// #[component(immutable)]
-pub struct LangPartial(pub String);
 
 /// Deduplicate `script` and `style` tags by replacing the
 /// [`LangContent`] directive with a [`NodePortal`] to a shared [`LangPartial`].
 pub fn extract_lang_partials(
 	mut commands: Commands,
 	query: Populated<
-		(Entity, &NodeTag, &LangContent, Option<&StyleScope>),
+		(
+			Entity,
+			&NodeTag,
+			&LangContent,
+			Option<&StyleScope>,
+			Option<&HtmlHoistDirective>,
+		),
 		Added<LangContent>,
 	>,
 ) -> Result<()> {
 	let mut groups = HashMap::<u64, Vec<Entity>>::new();
 
-	for (entity, tag, lang_content, scope) in query.iter() {
+	for (entity, tag, lang_content, scope, hoist) in query.iter() {
 		let mut hasher = RapidHasher::default();
 		tag.hash(&mut hasher);
 		lang_content.hash_no_whitespace(&mut hasher);
 		scope.map(|s| s.hash(&mut hasher));
+		hoist.map(|h| h.hash(&mut hasher));
 		let hash = hasher.finish();
 		groups.entry(hash).or_default().push(entity);
 	}
 	for entities in groups.into_values() {
-		let (_, tag, content, scope) = query.get(entities[0]).expect("checked");
+		let (_, tag, content, scope, hoist) =
+			query.get(entities[0]).expect("checked");
 
 		let content = match content {
 			LangContent::InnerText(text) => text.to_string(),
@@ -56,11 +46,13 @@ pub fn extract_lang_partials(
 		};
 
 		let mut target = commands.spawn((tag.clone(), LangPartial(content)));
-
-
-		if let Some(scope) = scope {
+		scope.map(|scope| {
 			target.insert(scope.clone());
-		}
+		});
+		hoist.map(|hoist| {
+			target.insert(hoist.clone());
+		});
+
 		let target = target.id();
 		for entity in entities.iter() {
 			// these entities are now just portals to the shared content
@@ -71,10 +63,41 @@ pub fn extract_lang_partials(
 				.remove::<ElementNode>()
 				.remove::<Children>()
 				.remove::<Attributes>()
+				.insert(PortalTo::<LangPartial>::default())
 				.insert(NodePortal::new(target));
 		}
 	}
 	Ok(())
+}
+
+/// For each style [`LangPartial`] with a [`StyleScope::Local`],
+/// assign a unique [`StyleId`] to the entity and each
+/// [`NodePortalTarget`].
+pub fn apply_style_ids(
+	mut commands: Commands,
+	query: Populated<(
+		Entity,
+		&NodeTag,
+		&LangPartial,
+		&NodePortalTarget,
+		Option<&StyleScope>,
+	)>,
+) {
+	for (id, (entity, tag, _partial, portal_sources, scope)) in
+		query.iter().enumerate()
+	{
+		// only local style tags
+		if tag.as_str() != "style"
+			|| scope.map(|s| s == &StyleScope::Global).unwrap_or(false)
+		{
+			continue;
+		}
+		let styleid = StyleId::new(id as u64);
+		commands.entity(entity).insert(styleid);
+		for source in portal_sources.iter() {
+			commands.entity(source).insert(styleid);
+		}
+	}
 }
 
 
@@ -82,17 +105,31 @@ pub fn extract_lang_partials(
 mod test {
 	use crate::as_beet::*;
 	use bevy::prelude::*;
-	// use sweet::prelude::*;
+	use sweet::prelude::*;
 
 	#[test]
 	fn works() {
 		let mut app = App::new();
 		app.add_plugins((NodeTokensPlugin, BuildTemplatesPlugin));
 
-		let entity = app.world_mut().spawn(rsx! {<style>div{}</style>}).id();
+		let entity = app
+			.world_mut()
+			.spawn(rsx! {<style>div{color:blue;}</style>})
+			.id();
 		app.update();
 		let portal = app.world().get::<NodePortal>(entity).unwrap();
 
-		let _partial = app.world().get::<LangPartial>(**portal).unwrap();
+		#[cfg(feature = "css")]
+		let expected = "div[data-beet-style-id-0] {\n  color: #00f;\n}\n";
+		#[cfg(not(feature = "css"))]
+		let expected = "div{color:blue;}";
+
+		app.world()
+			.get::<LangPartial>(**portal)
+			.unwrap()
+			.0
+			.clone()
+			.xpect()
+			.to_be(expected);
 	}
 }

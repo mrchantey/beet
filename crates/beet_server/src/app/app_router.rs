@@ -6,8 +6,6 @@ use bevy::prelude::*;
 use clap::Parser;
 use clap::Subcommand;
 use http_body_util::BodyExt;
-#[cfg(feature = "lambda")]
-use lambda_http::Body;
 #[cfg(all(debug_assertions, feature = "reload"))]
 use tokio::task::JoinHandle;
 use tower::util::ServiceExt;
@@ -304,6 +302,6 @@ mod test {
 			.await
 			.unwrap()
 			.xpect()
-			.to_be("<h1>Hello World</h1><p>This is a test page.</p>");
+			.to_be("<!DOCTYPE html><html><head></head><body><h1>Hello World</h1><p>This is a test page.</p></body></html>");
 	}
 }

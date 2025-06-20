@@ -1,6 +1,9 @@
 use beet_bevy::prelude::AppExt;
 use bevy::prelude::*;
 use std::cell::RefCell;
+use std::sync::Arc;
+use std::sync::LazyLock;
+use std::sync::RwLock;
 
 use crate::prelude::TemplatePlugin;
 
@@ -10,7 +13,22 @@ thread_local! {
 	static APP: RefCell<Option<App>> = RefCell::new(None);
 }
 
+/// Machinery allowing downstream crates to add plugins to the app
+static CREATE_APP: LazyLock<
+	Arc<RwLock<Box<dyn 'static + Send + Sync + Fn() -> App>>>,
+> = LazyLock::new(|| {
+	Arc::new(RwLock::new(Box::new(|| {
+		let mut app = App::new();
+		app.add_plugins(TemplatePlugin);
+		app
+	})))
+});
+
 impl ReactiveApp {
+	pub fn set_create_app(func: impl 'static + Send + Sync + Fn() -> App) {
+		*CREATE_APP.write().unwrap() = Box::new(func);
+	}
+
 	/// Consume the app, running it once then
 	/// storing it in a [`thread_local`] and returning immediately.
 	pub fn runner(mut app: App) -> AppExit {

@@ -7,15 +7,18 @@ use std::path::PathBuf;
 
 
 
-/// The content of a style template, either as inner text or a file path. The
-/// content of file paths is resolved lazily by the
+/// The content of a script or style template, either as inner text or a file path.
+/// Attributes and children are removed.
+/// File paths are resolved lazily in beet_build.
 #[derive(Debug, Clone, PartialEq, Hash, Component, Reflect)]
 #[reflect(Component)]
 #[component(immutable)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "tokens", derive(ToTokens))]
 pub enum LangContent {
+	/// The content is the inner text of a `<style>` or `<script>` tag.
 	InnerText(String),
+	/// The content is a file path to a `<style src="...">` or `<script src="...">`.
 	File(WsPathBuf),
 }
 impl LangContent {
@@ -43,10 +46,10 @@ impl LangContent {
 }
 
 /// For script and style tags, replace the [`ElementNode`] with a [`LangContent`]
-pub(super) fn extract_lang_content(
+pub(crate) fn extract_lang_content(
 	mut commands: Commands,
 	text_nodes: Query<&TextNode>,
-	attr_lits: Query<(&AttributeKey, Option<&AttributeLit>)>,
+	attr_lits: Query<(Entity, &AttributeKey, Option<&AttributeLit>)>,
 	query: Populated<
 		(
 			Entity,
@@ -64,41 +67,101 @@ pub(super) fn extract_lang_content(
 		if !["style", "script"].contains(&tag.as_str()) {
 			continue;
 		}
-		for (key, value) in attributes
+		// 1. Check for file src attribute
+		for (attr_entity, key, value) in attributes
 			.iter()
 			.flat_map(|a| a.iter())
 			.filter_map(|a| attr_lits.get(a).ok())
 		{
 			match (key.as_str(), value) {
 				("is:inline", _) => {
+					commands.entity(attr_entity).despawn();
 					// skip inline templates
 					continue 'iter_elements;
 				}
 				("src", Some(AttributeLit::String(value)))
 					if value.starts_with(".") =>
 				{
+					commands.entity(attr_entity).despawn();
 					commands
 						.entity(entity)
-						// .remove::<ElementNode>()
 						.insert(LangContent::file(value, span));
-
-					// TODO load content as child text node?
-
-					// found a LangContent::File
 					continue 'iter_elements;
 				}
 				_ => {}
 			}
 		}
+		// 2. Check for inner text
 		for child in children.iter().flat_map(|c| c.iter()) {
 			if let Ok(text_node) = text_nodes.get(child) {
 				commands.entity(entity).insert(LangContent::InnerText(
 					text_node.text().to_string(),
 				));
-				// found a LangContent::InnerText
+				commands.entity(child).despawn();
 				continue 'iter_elements;
 			}
 		}
-		// ignore empty tag with no workspace src
+		// 3. ignore empty tag with no workspace src
+	}
+}
+
+
+#[cfg(test)]
+mod test {
+	use crate::prelude::*;
+	use beet_utils::dir;
+	use beet_utils::prelude::WsPathBuf;
+	use bevy::ecs::system::RunSystemOnce;
+	use bevy::prelude::*;
+	use sweet::prelude::*;
+
+	#[test]
+	fn extracts_inline() {
+		let mut world = World::new();
+		let entity = world
+			.spawn((
+				NodeTag::new("style"),
+				ItemOf::<ElementNode, _>::new(FileSpan::default()),
+				children![TextNode::new("div { color: red; }")],
+			))
+			.id();
+		world.run_system_once(super::extract_lang_content).unwrap();
+		let entity = world.entity(entity);
+		entity
+			.get::<LangContent>()
+			.unwrap()
+			.xpect()
+			.to_be(&LangContent::InnerText("div { color: red; }".to_string()));
+		entity.contains::<Children>().xpect().to_be(false);
+	}
+	#[test]
+	fn extracts_src() {
+		let mut world = World::new();
+		let entity = world
+			.spawn((
+				NodeTag::new("style"),
+				ItemOf::<ElementNode, _>::new(FileSpan::new(
+					file!(),
+					default(),
+					default(),
+				)),
+				related!(
+					Attributes[(
+						AttributeKey::new("src"),
+						AttributeLit::String("./style.css".to_string())
+					)]
+				),
+			))
+			.id();
+		world.run_system_once(super::extract_lang_content).unwrap();
+		let entity = world.entity(entity);
+		entity
+			.get::<LangContent>()
+			.unwrap()
+			.xpect()
+			.to_be(&LangContent::File(
+				WsPathBuf::new(dir!()).join("style.css"),
+			));
+		entity.contains::<Attributes>().xpect().to_be(false);
 	}
 }

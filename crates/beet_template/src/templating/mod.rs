@@ -1,9 +1,13 @@
 mod html_fragment;
+mod lang_partial;
+mod node_portal;
+pub use node_portal::*;
 pub use html_fragment::*;
 mod html_document;
 pub use html_document::*;
 mod text_node_parent;
 mod tree_idx;
+pub use lang_partial::*;
 pub use text_node_parent::*;
 pub use tree_idx::*;
 mod template;
@@ -31,6 +35,7 @@ impl Plugin for TemplatePlugin {
 	fn build(&self, app: &mut App) {
 		app.add_plugins(signals_plugin);
 		app.init_resource::<HtmlConstants>()
+			.register_type::<LangPartial>()
 			.configure_sets(
 				Update,
 				(
