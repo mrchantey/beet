@@ -1,5 +1,6 @@
 use crate::prelude::*;
 use beet_bevy::bevybail;
+use beet_common::node::ElementNode;
 use beet_common::node::TextNode;
 use bevy::platform::collections::HashMap;
 use bevy::prelude::*;
@@ -48,7 +49,9 @@ pub fn resolve_lang_partials(
 				.entity(partial_entity)
 				.clone_and_spawn()
 				.remove::<LangPartial>()
-				.insert((ChildOf(root), children![TextNode::new(contents)]));
+				.insert((ChildOf(root), ElementNode::open(), children![
+					TextNode::new(contents)
+				]));
 		}
 	}
 

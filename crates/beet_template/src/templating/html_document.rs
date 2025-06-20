@@ -25,6 +25,10 @@ use bevy::prelude::*;
 pub struct HtmlDocument;
 
 impl HtmlDocument {
+	pub fn wrap_bundle(bundle: impl Bundle) -> impl Bundle {
+		(HtmlDocument, children![bundle])
+	}
+
 	pub fn parse_bundle(bundle: impl Bundle) -> String {
 		// add the bundle as a child to make rearranging easier
 		HtmlFragment::parse_bundle((HtmlDocument, children![bundle]))
@@ -248,11 +252,11 @@ mod test {
 	}
 	#[test]
 	fn hoist_tag() {
-		HtmlDocument::parse_bundle(
-			rsx! {<style></style>},
-		)
-		.xpect()
-		.to_be("<!DOCTYPE html><html><head><style></style></head><body></body></html>");
+		HtmlDocument::parse_bundle(rsx! {<style></style>})
+			.xpect()
+			.to_be(
+				"<!DOCTYPE html><html><head><style></style></head><body></body></html>",
+			);
 		HtmlDocument::parse_bundle(
 			rsx! {<script></script><br/>},
 		)
@@ -262,12 +266,12 @@ mod test {
 	#[test]
 	fn hoist_top_tag() {
 		HtmlDocument::parse_bundle(
-		rsx! {<script/><!DOCTYPE html><html><head></head><body></body></html>},
-	)
-	.xpect()
-	.to_be(
-		"<!DOCTYPE html><html><head><script/></head><body></body></html>",
-	);
+			rsx! {<script/><!DOCTYPE html><html><head></head><body></body></html>},
+		)
+		.xpect()
+		.to_be(
+			"<!DOCTYPE html><html><head><script/></head><body></body></html>",
+		);
 	}
 	#[test]
 	fn hoist_directive() {

@@ -19,6 +19,11 @@ default = ["markdown"]
 markdown = ["dep:pulldown-cmark"]
 css = ["dep:lightningcss", "dep:parcel_selectors"]
 
+[[test]]
+name="style_roundtrip"
+path = "tests/style_roundtrip.rs"
+required-features = ["css"]
+
 [dependencies]
 #💡 Internal
 beet_template = { workspace = true, features = ["tokens"] }

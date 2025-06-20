@@ -1,6 +1,7 @@
 use super::*;
 use beet_common::prelude::*;
 use beet_parse::prelude::*;
+use beet_router::as_beet::ApplyTransformsStep;
 use bevy::prelude::*;
 
 /// Import template files into parsable formats like [`RstmlTokens`], or [`CombinatorToNodeTokens`].
@@ -40,8 +41,7 @@ impl Default for TemplateMacros {
 }
 
 pub fn template_types_plugin(app: &mut bevy::prelude::App) {
-	app
-		.register_type::<TemplateKey>();
+	app.register_type::<TemplateKey>();
 }
 
 impl Plugin for BuildTemplatesPlugin {
@@ -59,7 +59,10 @@ impl Plugin for BuildTemplatesPlugin {
 				(
 					ImportTemplateStep.before(ImportNodesStep),
 					ProcessTemplateStep.after(ExportNodesStep),
-					ExportTemplateStep.after(ProcessTemplateStep),
+					ExportTemplateStep
+						.after(ProcessTemplateStep)
+						// before all [`TemplatePlugin`] systems
+						.before(ApplyTransformsStep),
 				),
 			)
 			.add_systems(
