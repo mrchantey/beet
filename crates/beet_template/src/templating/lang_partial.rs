@@ -14,7 +14,7 @@ pub struct LangPartial(pub String);
 
 impl LangPartial {
 	/// Create a new [`LangPartial`] from a `String`.
-	pub fn new(content: String) -> Self { Self(content) }
+	pub fn new(content: impl Into<String>) -> Self { Self(content.into()) }
 }
 
 
@@ -53,4 +53,70 @@ pub fn resolve_lang_partials(
 	}
 
 	Ok(())
+}
+
+
+
+#[cfg(test)]
+mod test {
+	use crate::prelude::*;
+	use beet_common::node::HtmlHoistDirective;
+	use beet_common::node::NodeTag;
+	use beet_common::node::StyleScope;
+	use bevy::ecs::system::RunSystemOnce;
+	use bevy::prelude::*;
+	use sweet::prelude::*;
+
+
+	// emulate the beet_build::extract_lang_partials
+	fn setup() -> (World, Entity) {
+		let mut world = World::new();
+		let partial = world
+			.spawn((
+				NodeTag::new("style"),
+				LangPartial::new("body { color: red; }"),
+				StyleScope::Global,
+				HtmlHoistDirective::Body,
+			))
+			.id();
+		let tree = world
+			.spawn((NodeTag::new("html"), children![(
+				NodePortal::new(partial),
+				PortalTo::<LangPartial>::default()
+			)]))
+			.id();
+
+		(world, tree)
+	}
+
+
+	#[test]
+	fn works() {
+		let (mut world, tree) = setup();
+		world
+			.run_system_once(super::resolve_lang_partials)
+			.unwrap()
+			.unwrap();
+
+		let children = world.entity(tree).get::<Children>().unwrap();
+		expect(children.len()).to_be(2);
+
+		let spawned = world.entity(children[1]);
+		spawned.contains::<Children>().xpect().to_be_true();
+		spawned
+			.get::<NodeTag>()
+			.unwrap()
+			.xpect()
+			.to_be(&NodeTag::new("style"));
+		spawned
+			.get::<HtmlHoistDirective>()
+			.unwrap()
+			.xpect()
+			.to_be(&HtmlHoistDirective::Body);
+		spawned
+			.get::<StyleScope>()
+			.unwrap()
+			.xpect()
+			.to_be(&StyleScope::Global);
+	}
 }

@@ -1,5 +1,7 @@
 use bevy::prelude::*;
 
+use crate::node::StyleId;
+
 /// Constant values used in the HTML rendering process.
 #[derive(Debug, Clone, PartialEq, Resource)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -49,7 +51,7 @@ impl Default for HtmlConstants {
 }
 impl HtmlConstants {
 	/// Returns the attribute key for the style id
-	pub fn style_id_class(&self, id: u64) -> String {
-		format!("{}-{}", self.style_id_key, id)
+	pub fn style_id_attribute(&self, id: StyleId) -> String {
+		format!("{}-{}", self.style_id_key, *id)
 	}
 }

@@ -3,7 +3,7 @@ use crate::as_beet::*;
 use bevy::prelude::*;
 
 /// The tag of a node
-#[derive(Debug, Clone, Component, Reflect, Deref, DerefMut)]
+#[derive(Debug, Clone,PartialEq, Eq, Component, Reflect, Deref, DerefMut)]
 #[reflect(Component)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "tokens", derive(ToTokens))]

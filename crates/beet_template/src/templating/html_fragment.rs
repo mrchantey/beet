@@ -32,14 +32,20 @@ impl HtmlFragment {
 		})
 	}
 }
-
+/// A parallizable system to render all HTML fragments in the world.
 pub(super) fn render_html_fragments(
 	mut query: Populated<(Entity, &mut HtmlFragment), Added<HtmlFragment>>,
-	builder: Builder,
+	builder: HtmlBuilder,
 ) {
 	for (entity, mut html) in query.iter_mut() {
 		builder.parse(entity, &mut html);
 	}
+}
+/// A one-off system to render a single HTML fragment.
+pub fn render_fragment(In(entity): In<Entity>, builder: HtmlBuilder) -> String {
+	let mut str = String::new();
+	builder.parse(entity, &mut str);
+	str
 }
 
 /// Assign a javascript function that will collect events until hydration
@@ -64,7 +70,7 @@ pub(super) fn insert_event_playback_attribute(
 // TODO bench this approach vs concatenating parallel systems
 #[rustfmt::skip]
 #[derive(SystemParam)]
-pub(super) struct Builder<'w, 's> {
+pub struct HtmlBuilder<'w, 's> {
 	elements: Query<'w,'s,(
 		&'static ElementNode,
 		&'static NodeTag,
@@ -84,7 +90,7 @@ pub(super) struct Builder<'w, 's> {
 	texts: Query<'w, 's, &'static TextNode>,
 }
 
-impl Builder<'_, '_> {
+impl HtmlBuilder<'_, '_> {
 	fn parse(&self, entity: Entity, html: &mut String) {
 		if let Ok(_) = self.doctypes.get(entity) {
 			html.push_str("<!DOCTYPE html>");

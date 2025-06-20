@@ -45,8 +45,8 @@ impl TemplateDirective for StyleCascade {
 #[cfg_attr(feature = "tokens", derive(ToTokens))]
 pub enum StyleScope {
 	/// The default scope for a style tag, its styles will only be applied to
-	/// elements within the component, each selector will be preprended with
-	/// an attribute selector for the component, eg `[data-styleid-1]`.
+	/// elements within the template, each selector will be preprended with
+	/// an attribute selector for the template, eg `[data-styleid-1]`. See [`StyleId`]
 	/// ## Example
 	/// Remember `scope:local` is the default so this directive can be ommitted.
 	/// ```rust ignore

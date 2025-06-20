@@ -38,7 +38,7 @@ pub fn parse_lightning(
 						err: e.to_string(),
 					})?;
 			if let Some(styleid) = styleid {
-				let class_name = constants.style_id_class(**styleid);
+				let class_name = constants.style_id_attribute(*styleid);
 				stylesheet.rules.0.iter_mut().for_each(|rule| {
 					match rule {
 						// currently only style rules are supported
