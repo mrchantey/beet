@@ -35,7 +35,7 @@ pub struct FileGroupConfig {
 	/// All templates must meet the following requirements:
 	/// - Have a `meta` field that matches the [`FileGroup::meta_type`]
 	/// - Have a default `<slot/>` for the content
-	#[serde(with = "syn_expr_serde::option")]
+	#[serde(default,with = "syn_expr_serde::option")]
 	pub template: Option<syn::Expr>,
 }
 

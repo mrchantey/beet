@@ -14,6 +14,8 @@ pub mod docs;
 #[cfg(not(target_arch = "wasm32"))]
 #[path = "codegen/pages.rs"]
 pub mod pages;
+mod layouts;
+pub use layouts::*;
 // #[path = "codegen/route_tree.rs"]
 // pub mod route_tree;
 // #[cfg(not(target_arch = "wasm32"))]
