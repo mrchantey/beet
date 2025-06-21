@@ -1042,7 +1042,7 @@ name = "beet_query"
 version = "0.0.6-dev.2"
 dependencies = [
  "anyhow",
- "base64 0.13.1",
+ "base64 0.22.1",
  "beet_net",
  "beet_query_macros",
  "beet_utils",
@@ -3418,6 +3418,12 @@ dependencies = [
  "syn 2.0.101",
  "unicode-xid",
 ]
+
+[[package]]
+name = "diff"
+version = "0.1.13"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "56254986775e3233ffa9c4d7d3faaf6d36a2c09d30b20687e9f88bc8bafc16c8"
 
 [[package]]
 name = "dirs"
@@ -8417,6 +8423,7 @@ dependencies = [
  "colorize",
  "console_error_panic_hook",
  "console_log",
+ "diff",
  "extend",
  "fantoccini",
  "flume",
@@ -8435,6 +8442,7 @@ dependencies = [
  "wasm-bindgen-futures",
  "web-sys",
  "web-time",
+ "yansi",
 ]
 
 [[package]]

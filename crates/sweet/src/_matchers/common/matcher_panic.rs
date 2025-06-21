@@ -37,4 +37,14 @@ impl<T> Matcher<T> {
 			"Expected: {expected}\nReceived: {received}"
 		));
 	}
+	/// # Panics
+	/// always.
+	/// Must be called at [`SweetError::BACKTRACE_LEVEL_2`]
+	pub(crate) fn panic_with_str(&self, str: &str) -> ! {
+		let mut str = str.to_string();
+		if self.negated {
+			str = format!("{} {}", "NOT".bold().green(), str);
+		}
+		SweetError::panic(str);
+	}
 }

@@ -28,12 +28,14 @@ anyhow.workspace = true
 extend.workspace = true
 web-time = "1"
 
-
 #💡 logging
 log.workspace = true
 pretty_env_logger.workspace = true
 colorize.workspace = true
 backtrace = "0.3"
+# pretty_assertions
+yansi = "1"
+diff = "0.1"
 
 #💡 parse 
 glob.workspace = true

@@ -9,6 +9,14 @@ use std::fmt::Debug;
 impl<T> Matcher<T> {
 	/// Must be called at [`SweetError::BACKTRACE_LEVEL_3`]
 	#[allow(unused)]
+	pub(crate) fn assert(&self, result: bool, msg: &str) {
+		let result = if self.negated { !result } else { result };
+		if !result {
+			self.panic_with_str(msg);
+		}
+	}
+	/// Must be called at [`SweetError::BACKTRACE_LEVEL_3`]
+	#[allow(unused)]
 	pub(crate) fn assert_some_with_received<T2>(&self, received: Option<T2>) {
 		self.panic_if_negated();
 		if received.is_none() {

@@ -1,25 +1,38 @@
 use super::*;
 
 impl<T: std::fmt::Debug + AsRef<str>> Matcher<T> {
-	pub fn to_contain(&self, other: &str) {
+	pub fn to_contain(&self, other: impl AsRef<str>) {
+		let other = other.as_ref();
 		let result = self.value.as_ref().contains(other);
 		let expected = format!("to contain '{}'", other);
 		self.assert_correct(result, &expected);
 	}
-	pub fn to_start_with(&self, other: &str) {
+	pub fn to_start_with(&self, other: impl AsRef<str>) {
+		let other = other.as_ref();
 		let result = self.value.as_ref().starts_with(other);
 		let expected = format!("to start with '{}'", other);
 		self.assert_correct(result, &expected);
 	}
-	pub fn to_end_with(&self, other: &str) {
+	pub fn to_end_with(&self, other: impl AsRef<str>) {
+		let other = other.as_ref();
 		let result = self.value.as_ref().ends_with(other);
 		let expected = format!("to end with '{}'", other);
 		self.assert_correct(result, &expected);
 	}
-	pub fn to_be_str(&self, other: &str) {
-		let result = self.value.as_ref() == other;
-		let expected = format!("to be '{}'", other);
-		self.assert_correct(result, &expected);
+	/// Like `to_be`, but with pretty diffing
+	pub fn to_be_str(&self, other: impl AsRef<str>) {
+		self.panic_if_negated();
+		let expected = other.as_ref();
+		let received = self.value.as_ref();
+		if received != expected {
+			let mut msg = String::from("Diff Found:\n\n");
+			crate::utils::pretty_diff::write_lines(
+				&mut msg, expected, received,
+			)
+			.unwrap();
+
+			self.assert(false, &msg);
+		};
 	}
 }
 
