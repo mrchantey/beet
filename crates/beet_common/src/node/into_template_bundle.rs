@@ -1,9 +1,8 @@
 use crate::prelude::*;
-use beet_bevy::prelude::BundleIter;
 use beet_bevy::prelude::EntityObserver;
-use bevy::ecs::bundle::Bundle;
-use bevy::ecs::event::Event;
+use bevy::ecs::spawn::SpawnIter;
 use bevy::ecs::system::IntoObserverSystem;
+use bevy::prelude::*;
 
 /// Very inclusive version of [`Bundle`], accounting for the location
 /// of the bundle in a tree, and allowing primitives to be wrapped
@@ -52,17 +51,19 @@ where
 }
 
 
-// includes Option
+/// includes Option, all iterators are spawned as children
 pub struct IterMarker;
 
-impl<I: IntoIterator<Item = B>, B, M> IntoTemplateBundle<(IterMarker, M)> for I
+impl<I: IntoIterator<Item = BundleType>, BundleType, MarkerType>
+	IntoTemplateBundle<(IterMarker, MarkerType)> for I
 where
-	B: IntoTemplateBundle<M>,
-	I::IntoIter: 'static + Send + Sync + Iterator<Item = B>,
+	BundleType: IntoTemplateBundle<MarkerType>,
+	I::IntoIter: 'static + Send + Sync + Iterator<Item = BundleType>,
 {
 	fn into_node_bundle(self) -> impl Bundle {
-		let bundle_iter = self.into_iter().map(|item| item.into_node_bundle());
-		BundleIter::new(bundle_iter)
+		Children::spawn(SpawnIter(
+			self.into_iter().map(|item| item.into_node_bundle()),
+		))
 	}
 }
 

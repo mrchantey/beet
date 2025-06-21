@@ -25,3 +25,40 @@ pub fn Sidebar(nodes: Vec<SidebarNode>) -> impl Bundle {
 		</style>
 	}
 }
+
+
+
+#[cfg(test)]
+mod test {
+	use crate::prelude::*;
+	use sweet::prelude::*;
+
+	#[test]
+	fn works() {
+		let nodes = vec![
+			SidebarNode {
+			display_name: "Home".to_string(),
+			path: None,
+			children: vec![SidebarNode {
+				display_name: "Docs".to_string(),
+				path: Some(RoutePath::new("/docs")),
+				children: vec![SidebarNode {
+					display_name: "Testing".to_string(),
+					path: Some(RoutePath::new("/docs/testing")),
+					children: vec![],
+					expanded: false,
+				}],
+				expanded: false,
+			}],
+			expanded: true,
+		}
+		
+		];
+
+		rsx! {
+			<Sidebar nodes=nodes />
+		}
+		.xmap(HtmlFragment::parse_bundle)
+		.xpect().to_contain("Testing");
+	}
+}

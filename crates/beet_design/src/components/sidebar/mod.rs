@@ -48,11 +48,11 @@ impl Pipeline<RoutePathTree, Vec<SidebarNode>> for RoutePathTreeToSidebarTree {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SidebarNode {
 	/// A Title Case name for the group
-	display_name: String,
+	pub display_name: String,
 	/// if this node has a route, this is its path
-	path: Option<RoutePath>,
+	pub path: Option<RoutePath>,
 	/// all paths available at this level of the tree
-	children: Vec<SidebarNode>,
+	pub children: Vec<SidebarNode>,
 	/// expanded portions of the tree
-	expanded: bool,
+	pub expanded: bool,
 }
