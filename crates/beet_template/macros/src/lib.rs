@@ -70,14 +70,23 @@ pub fn derive_buildable(
 	let input = parse_macro_input!(input as DeriveInput);
 	parse_derive_buildable(input).into()
 }
-/// Implements [`IntoTemplateBundle`] for a struct with named fields,
-/// where each field also implements [`IntoTemplateBundle`].
-#[proc_macro_derive(TemplateBundle, attributes(field))]
-pub fn derive_template_bundle(
+
+
+
+/// Types that can be used as an attribute block, where each field
+/// is applied as [`Attributes`](beet_common::prelude::Attributes) of the entity.
+/// Use [`#[field(flatten)]`] for the key to be discarded, and the value to be
+/// applied by calling `into_node_bundle`. This allows for a nested [`AttributeBlock`].
+/// 
+/// 
+/// 
+/// 
+#[proc_macro_derive(AttributeBlock, attributes(field))]
+pub fn derive_attribute_block(
 	input: proc_macro::TokenStream,
 ) -> proc_macro::TokenStream {
 	let input = parse_macro_input!(input as DeriveInput);
-	impl_into_template_bundle(input).into()
+	parse_derive_attribute_block(input).into()
 }
 
 fn err_tokens(err: impl ToString) -> proc_macro2::TokenStream {

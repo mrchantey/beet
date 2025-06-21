@@ -51,8 +51,8 @@ pub fn impl_flatten(
 	Ok(quote! {#(#flatten_impls)*})
 }
 
-// when A flattens B and B flattens C we use second order flattening
-// to also implement the flattened builders
+/// when A flattens B and B flattens C we use second order flattening
+/// to also implement the flattened builders
 fn second_order_impl(
 	target_ident: &Ident,
 	input: &DeriveInput,

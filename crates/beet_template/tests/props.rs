@@ -39,7 +39,7 @@ impl MarkerIntoString<()> for u32 {
 #[derive(Debug, Default)]
 struct Foo<T>(PhantomData<T>);
 
-#[derive(Default, Buildable, TemplateBundle)]
+#[derive(Default, Buildable, AttributeBlock)]
 struct MyFlattenedNode {
 	/// the class that will be set
 	class: String,
