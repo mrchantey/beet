@@ -72,6 +72,7 @@ pub fn Head(
 		// <!-- microsoft -->
 		<meta name="msapplication-TileColor" content="#000000">
 		<meta name="msapplication-TileImage" content="/icons/icon-144x144.png">
+		<script hoist:body src="../css/initColorScheme.js" />
 		<slot/>
 		</head>
 	}

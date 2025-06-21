@@ -30,6 +30,7 @@ beet_build = { workspace = true, features = ["css"], optional = true }
 
 bevy.workspace = true
 
+variadics_please.workspace = true
 extend.workspace = true
 clap.workspace = true
 thiserror.workspace = true

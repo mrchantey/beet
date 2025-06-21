@@ -4,7 +4,9 @@ use beet_site::prelude::*;
 
 #[cfg(not(target_arch = "wasm32"))]
 fn main() -> Result {
-	AppRouter::default().add_plugin(PagesPlugin).run()
+	AppRouter::default()
+		.add_plugins((PagesPlugin, DocsPlugin))
+		.run()
 	// fn with_sidebar(route: RouteFunc<RsxRouteFunc>) -> RouteFunc<RsxRouteFunc> {
 	// 	route.map_func(|func| {
 	// 		async move || -> anyhow::Result<WebNode> {

@@ -134,11 +134,11 @@ impl<S> AppRouter<S> {
 		);
 		self
 	}
-	pub fn add_plugin(mut self, plugin: impl RouterPlugin<State = S>) -> Self {
-		if plugin.is_static() {
-			self.static_routes.extend(plugin.routes());
-		}
-		self.router = plugin.add_routes(self.router);
+	pub fn add_plugins<M>(
+		mut self,
+		plugin: impl IntoRoutePlugins<S, M>,
+	) -> Self {
+		plugin.add_to_router(&mut self);
 		self
 	}
 }

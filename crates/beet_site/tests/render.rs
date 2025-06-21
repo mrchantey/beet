@@ -7,7 +7,7 @@ use sweet::prelude::*;
 #[sweet::test]
 async fn works() {
 	AppRouter::test()
-		.add_plugin(PagesPlugin)
+		.add_plugins(PagesPlugin)
 		.render_route(&"/".into())
 		.await
 		.unwrap()

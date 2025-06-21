@@ -24,6 +24,7 @@ pub mod pages;
 // pub mod wasm;
 
 pub mod prelude {
+	pub use super::docs::*;
 	pub use super::pages::*;
 	pub use super::*;
 	pub use crate::client_actions::root as actions;

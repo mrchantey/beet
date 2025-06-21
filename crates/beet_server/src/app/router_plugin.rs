@@ -35,3 +35,81 @@ pub trait RouterPlugin {
 		handler.into_beet_route(router)
 	}
 }
+
+
+pub trait IntoRoutePlugins<S, M> {
+	fn add_to_router(self, router: &mut AppRouter<S>);
+}
+
+impl<T: RouterPlugin> IntoRoutePlugins<T::State, T> for T {
+	fn add_to_router(self, router: &mut AppRouter<T::State>) {
+		if self.is_static() {
+			router.static_routes.extend(self.routes());
+		}
+		router.router = self.add_routes(router.router.clone());
+	}
+}
+
+
+use variadics_please::all_tuples;
+
+pub struct RouterPluginsTupleMarker;
+
+macro_rules! impl_router_plugins_tuples {
+        ($(#[$meta:meta])* $(($param: ident, $plugins: ident)),*) => {
+            $(#[$meta])*
+            impl<S,$($param, $plugins),*> IntoRoutePlugins<S,(RouterPluginsTupleMarker, $($param,)*)> for ($($plugins,)*)
+            where
+                $($plugins: IntoRoutePlugins<S,$param>),*
+            {
+                #[expect(
+                    clippy::allow_attributes,
+                    reason = "This is inside a macro, and as such, may not trigger in all cases."
+                )]
+                #[allow(non_snake_case, reason = "`all_tuples!()` generates non-snake-case variable names.")]
+                #[allow(unused_variables, reason = "`app` is unused when implemented for the unit type `()`.")]
+                #[track_caller]
+                fn add_to_router(self, router: &mut AppRouter<S>) {
+                    let ($($plugins,)*) = self;
+                    $($plugins.add_to_router(router);)*
+                }
+            }
+        }
+    }
+
+all_tuples!(impl_router_plugins_tuples, 1, 15, M, T);
+
+
+#[cfg(test)]
+mod test {
+	use crate::prelude::*;
+
+	struct Plugin1;
+	impl RouterPlugin for Plugin1 {
+		type State = ();
+		type Meta = ();
+		fn is_static(&self) -> bool { unimplemented!() }
+		fn routes(&self) -> Vec<RouteInfo> { unimplemented!() }
+		fn meta(&self) -> Vec<Self::Meta> { unimplemented!() }
+		fn add_routes(&self, _: Router<Self::State>) -> Router<Self::State> {
+			unimplemented!()
+		}
+	}
+	struct Plugin2;
+	impl RouterPlugin for Plugin2 {
+		type State = ();
+		type Meta = ();
+		fn is_static(&self) -> bool { unimplemented!() }
+		fn routes(&self) -> Vec<RouteInfo> { unimplemented!() }
+		fn meta(&self) -> Vec<Self::Meta> { unimplemented!() }
+		fn add_routes(&self, _: Router<Self::State>) -> Router<Self::State> {
+			unimplemented!()
+		}
+	}
+
+	#[test]
+	fn works() {
+		fn foo<M>(_: impl IntoRoutePlugins<(), M>) {}
+		foo((Plugin1, Plugin2));
+	}
+}

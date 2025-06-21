@@ -11,7 +11,6 @@ pub fn DocumentLayout() -> impl Bundle {
 				<slot name="head" />
 			</Head>
 			<body>
-				<script hoist:none src="../css/initColorScheme.js" />
 				<slot />
 			</body>
 		</html>
