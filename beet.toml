@@ -9,9 +9,12 @@ package_name = "beet_site"
 output = "crates/beet_site/src/codegen/mod.rs"
 docs_route = "/docs"
 wasm_imports = ["use beet::design as beet_design;", "use beet::prelude::*;"]
-file_group_routes = ["beet_design_mockups"]
-foo = true
 
+[[codegen_native.file_group]]
+name = "docs"
+path = "crates/beet_site/src/docs"
+output = "crates/beet_site/src/codegen/docs.rs"
+template = "BeetSidebarLayout"
 
 [[codegen_native.file_group]]
 package_name = "beet_router"

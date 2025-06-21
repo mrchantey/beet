@@ -67,7 +67,7 @@ pub fn parse_route_file_md(
 			CombinatorTokens(rsx_str),
 			SourceFile::new(ws_path.clone()),
 			CombinatorRouteCodegen { meta }.sendit(),
-			group_codegen.clone_meta(route_codegen_path_abs).sendit(),
+			group_codegen.clone_info(route_codegen_path_abs).sendit(),
 		));
 	}
 	Ok(())

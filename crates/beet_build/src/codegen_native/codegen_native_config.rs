@@ -15,15 +15,9 @@ use serde::Serialize;
 ///
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct CodegenNativeConfig {
-	/// The name of the package being built, used for imports in codegen.
-	/// This will be applied to each [`FileGroup::pkg_name`] if it is None.
+	/// The root codegen, containing the route mod tree and other utilities.
 	#[serde(flatten)]
 	pub codegen_file: CodegenFile,
-	/// Optionally set the path for the docs route.
-	/// By default this is set to `/docs` but if your entire site is a docs
-	/// site it may be more idiomatic to set this to `None`.
-	#[serde(default = "default_docs_route")]
-	pub docs_route: String,
 	/// Disable the default file groups: `pages`, `docs`, and `actions`.
 	/// Also disables the [`ParseRouteTree`] modifier.
 	#[serde(default)]
@@ -32,8 +26,6 @@ pub struct CodegenNativeConfig {
 	#[serde(default, rename = "file_group")]
 	pub file_groups: Vec<FileGroupConfig>,
 }
-
-fn default_docs_route() -> String { "/".to_string() }
 
 fn default_codegen_file() -> CodegenFile {
 	CodegenFile::new(
@@ -48,7 +40,6 @@ impl Default for CodegenNativeConfig {
 	fn default() -> Self {
 		Self {
 			codegen_file: default_codegen_file(),
-			docs_route: default_docs_route(),
 			no_defaults: false,
 			file_groups: Vec::new(),
 		}
@@ -81,10 +72,6 @@ impl CodegenNativeConfig {
 		if let Some(pages) = self.default_group("pages") {
 			self.file_groups.push(pages);
 		}
-		if let Some(mut docs) = self.default_group("docs") {
-			docs.modifier.base_route = Some(self.docs_route.clone().into());
-			self.file_groups.push(docs);
-		}
 		if let Some(mut actions) = self.default_group("actions") {
 			actions.file_group.category = FileGroupCategory::Actions;
 			self.file_groups.push(actions);
@@ -107,8 +94,9 @@ impl CodegenNativeConfig {
 
 		Some(FileGroupConfig {
 			file_group: FileGroup::new(group_dir),
-			codegen: Some(self.codegen_file.clone_meta(codegen_path)),
+			codegen: Some(self.codegen_file.clone_info(codegen_path)),
 			modifier: Default::default(),
+			template: None,
 		})
 	}
 }

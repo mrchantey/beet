@@ -3,52 +3,75 @@ use serde::Deserialize;
 use serde::Deserializer;
 use serde::Serialize;
 use serde::Serializer;
+use syn::Expr;
 use syn::Item;
 use syn::Type;
 
 
-/// Serialization and deserialization helpers for syn::Type
-pub mod syn_type_serde {
-	use super::*;
-
-	pub fn serialize<S>(val: &Type, serializer: S) -> Result<S::Ok, S::Error>
-	where
-		S: Serializer,
-	{
-		let val_str = val.to_token_stream().to_string();
-		val_str.serialize(serializer)
-	}
-
-	pub fn deserialize<'de, D>(deserializer: D) -> Result<Type, D::Error>
-	where
-		D: Deserializer<'de>,
-	{
-		let val_str = String::deserialize(deserializer)?;
-		syn::parse_str::<Type>(&val_str)
-			.map_err(|e| serde::de::Error::custom(e.to_string()))
-	}
+/// Macro to generate serialization and deserialization helpers for syn types
+macro_rules! syn_serde_mod {
+	($mod_name:ident, $ty:ty) => {
+		/// Serialization and deserialization helpers,
+		/// for option see the [`option`] submodule.
+		pub mod $mod_name {
+			use super::*;
+			pub fn serialize<S>(
+				val: &$ty,
+				serializer: S,
+			) -> Result<S::Ok, S::Error>
+			where
+				S: Serializer,
+			{
+				let val_str = val.to_token_stream().to_string();
+				val_str.serialize(serializer)
+			}
+			pub fn deserialize<'de, D>(deserializer: D) -> Result<$ty, D::Error>
+			where
+				D: Deserializer<'de>,
+			{
+				let val_str = String::deserialize(deserializer)?;
+				syn::parse_str::<$ty>(&val_str)
+					.map_err(|e| serde::de::Error::custom(e.to_string()))
+			}
+			pub mod option {
+				use super::*;
+				pub fn serialize<S>(
+					val: &Option<$ty>,
+					serializer: S,
+				) -> Result<S::Ok, S::Error>
+				where
+					S: Serializer,
+				{
+					match val {
+						Some(inner) => {
+							let val_str = inner.to_token_stream().to_string();
+							serializer.serialize_some(&val_str)
+						}
+						None => serializer.serialize_none(),
+					}
+				}
+				pub fn deserialize<'de, D>(
+					deserializer: D,
+				) -> Result<Option<$ty>, D::Error>
+				where
+					D: Deserializer<'de>,
+				{
+					let opt = Option::<String>::deserialize(deserializer)?;
+					opt.map(|val_str| {
+						syn::parse_str::<$ty>(&val_str).map_err(|e| {
+							serde::de::Error::custom(e.to_string())
+						})
+					})
+					.transpose()
+				}
+			}
+		}
+	};
 }
-/// Serialization and deserialization helpers for syn::Item
-pub mod syn_item_serde {
-	use super::*;
 
-	pub fn serialize<S>(val: &Item, serializer: S) -> Result<S::Ok, S::Error>
-	where
-		S: Serializer,
-	{
-		let val_str = val.to_token_stream().to_string();
-		val_str.serialize(serializer)
-	}
-
-	pub fn deserialize<'de, D>(deserializer: D) -> Result<Item, D::Error>
-	where
-		D: Deserializer<'de>,
-	{
-		let val_str = String::deserialize(deserializer)?;
-		syn::parse_str::<Item>(&val_str)
-			.map_err(|e| serde::de::Error::custom(e.to_string()))
-	}
-}
+syn_serde_mod!(syn_type_serde, Type);
+syn_serde_mod!(syn_item_serde, Item);
+syn_serde_mod!(syn_expr_serde, Expr);
 
 /// Serialization and deserialization helpers for Vec<syn::Item>
 pub mod syn_item_vec_serde {

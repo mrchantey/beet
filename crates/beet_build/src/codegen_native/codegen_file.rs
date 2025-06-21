@@ -86,7 +86,7 @@ impl CodegenFile {
 
 	/// Clone the metadata of this codegen file, but change the output path
 	/// and clears the items.
-	pub fn clone_meta(&self, output: AbsPathBuf) -> Self {
+	pub fn clone_info(&self, output: AbsPathBuf) -> Self {
 		Self {
 			output,
 			imports: self.imports.clone(),

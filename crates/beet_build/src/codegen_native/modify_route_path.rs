@@ -9,7 +9,7 @@ use std::path::PathBuf;
 
 /// Helper for common route mapping
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Component)]
-pub struct ModifyRouteFileMethod {
+pub struct ModifyRoutePath {
 	/// A base path to prepend to the route path
 	pub base_route: Option<RoutePath>,
 	/// List of strings to replace in the route path
@@ -25,7 +25,7 @@ pub struct ReplaceRoute {
 	to: String,
 }
 
-impl Default for ModifyRouteFileMethod {
+impl Default for ModifyRoutePath {
 	fn default() -> Self {
 		Self {
 			base_route: None,
@@ -35,7 +35,7 @@ impl Default for ModifyRouteFileMethod {
 }
 
 
-impl ModifyRouteFileMethod {
+impl ModifyRoutePath {
 	pub fn base_route(mut self, base_route: impl Into<PathBuf>) -> Self {
 		self.base_route = Some(RoutePath::new(base_route));
 		self
@@ -58,7 +58,7 @@ impl ModifyRouteFileMethod {
 pub fn modify_file_route_tokens(
 	_: TempNonSendMarker,
 	parents: Query<&ChildOf>,
-	modifiers: Query<&ModifyRouteFileMethod>,
+	modifiers: Query<&ModifyRoutePath>,
 	mut query: Populated<
 		(Entity, &mut RouteFileMethod),
 		Added<RouteFileMethod>,
@@ -102,7 +102,7 @@ mod test {
 		let entity = world
 			.spawn((
 				RouteFileMethod::new(&*file!().replace(".rs", "")),
-				ModifyRouteFileMethod::default()
+				ModifyRoutePath::default()
 					.base_route("/design")
 					.replace_route([(
 						&format!("/{}", dir!().display()),
@@ -119,6 +119,6 @@ mod test {
 			.path
 			.to_string()
 			.xpect()
-			.to_be("/design/modify_file_route_tokens".to_string());
+			.to_be("/design/modify_route_path");
 	}
 }

@@ -29,7 +29,14 @@ pub struct FileGroupConfig {
 	#[serde(flatten)]
 	pub codegen: Option<CodegenFile>,
 	#[serde(flatten)]
-	pub modifier: ModifyRouteFileMethod,
+	pub modifier: ModifyRoutePath,
+	/// For file groups that generate the code for pages, ie md & rsx,
+	/// add the returned type  as a child of this template.
+	/// All templates must meet the following requirements:
+	/// - Have a `meta` field that matches the [`FileGroup::meta_type`]
+	/// - Have a default `<slot/>` for the content
+	#[serde(with = "syn_expr_serde::option")]
+	pub template: Option<syn::Expr>,
 }
 
 
@@ -46,7 +53,7 @@ impl FileGroupConfig {
 				.parent()
 				.unwrap_or(self.file_group.src.clone())
 				.join("codegen.rs");
-			parent_codegen.clone_meta(default_out)
+			parent_codegen.clone_info(default_out)
 		});
 
 		let client_actions_codegen =
@@ -57,7 +64,7 @@ impl FileGroupConfig {
 					let stem = format!("client_{}.rs", stem.to_string_lossy());
 					output.set_file_name(stem);
 				}
-				Some(codegen.clone_meta(output))
+				Some(codegen.clone_info(output))
 			} else {
 				None
 			};
@@ -67,6 +74,10 @@ impl FileGroupConfig {
 			codegen.sendit(),
 			self.modifier,
 		));
+		if let Some(template) = self.template {
+			entity.insert(TemplateWrapper(template).sendit());
+		}
+
 		if let Some(client_actions_codegen) = client_actions_codegen {
 			entity.with_child((
 				client_actions_codegen.sendit(),
