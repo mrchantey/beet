@@ -12,5 +12,5 @@ async fn works() {
 		.await
 		.unwrap()
 		.xpect()
-		.to_be("");
+		.to_contain("A very bevy metaframework");
 }

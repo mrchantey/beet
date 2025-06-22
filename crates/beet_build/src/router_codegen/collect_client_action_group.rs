@@ -182,10 +182,10 @@ mod test {
 			.sendit(),
 		)])
 		.xpect()
-		.to_be(
+		.to_be_str(
 			quote! {
 				#[allow(missing_docs)]
-				pub mod root {
+				pub mod routes {
 					#[allow(unused_imports)]
 					use super::*;
 					pub async fn bazz() -> ServerActionResult<(), ()> {
@@ -241,10 +241,10 @@ mod test {
 			),
 		])
 		.xpect()
-		.to_be(
+		.to_be_str(
 			quote! {
 				#[allow(missing_docs)]
-				pub mod root {
+				pub mod routes {
 					#[allow(unused_imports)]
 					use super::*;
 					pub async fn bazz() -> ServerActionResult<(), ()> {

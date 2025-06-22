@@ -85,7 +85,7 @@ impl RouteFileMethodTree {
 	}
 
 	pub fn from_methods(funcs: Vec<(Entity, &RouteFileMethod)>) -> Self {
-		let mut this = RouteFileMethodTree::new("root");
+		let mut this = RouteFileMethodTree::new("routes");
 		for func in funcs {
 			let mut current = &mut this;
 			for component in func.1.route_info.path.components() {
@@ -145,7 +145,7 @@ mod test {
 				.to_string_indented(),
 		)
 		.to_be(
-			r#"root
+			r#"routes
   bazz
   foo
     bar

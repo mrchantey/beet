@@ -23,7 +23,7 @@ fn works() {
 	app
 		.world_mut()
 		.run_system_once_with(render_fragment, entity)
-		.unwrap().xpect().to_be(
+		.unwrap().xpect().to_be_str(
 			"<!DOCTYPE html><html><head><style>h1[data-beet-style-id-0] {\n  font-size: 1px;\n}\n</style></head><body><div data-beet-style-id-0><h1 data-beet-style-id-0>Roundtrip Test</h1></div></body></html>",
 		);
 }

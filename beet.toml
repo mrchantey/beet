@@ -9,12 +9,35 @@ package_name = "beet_site"
 output = "crates/beet_site/src/codegen/mod.rs"
 
 [[router_codegen.file_group]]
+name = "pages"
+path = "crates/beet_site/src/pages"
+output = "crates/beet_site/src/codegen/pages/mod.rs"
+import_tokens = [
+	"#[allow(unused_imports)]use beet::prelude::*;",
+	"#[allow(unused_imports)]use crate::prelude::*;",
+]
+
+[[router_codegen.file_group]]
 name = "docs"
-base_route = "/docs"
 path = "crates/beet_site/src/docs"
 output = "crates/beet_site/src/codegen/docs/mod.rs"
+base_route = "/docs"
 template = "DocsLayout"
-import_tokens = ["use beet::prelude::*;", "use crate::prelude::*;"]
+import_tokens = [
+	"#[allow(unused_imports)]use beet::prelude::*;",
+	"#[allow(unused_imports)]use crate::prelude::*;",
+]
+
+[[router_codegen.file_group]]
+name = "actions"
+path = "crates/beet_site/src/actions"
+output = "crates/beet_site/src/codegen/actions/mod.rs"
+base_route = "/actions"
+category = "Actions"
+import_tokens = [
+	"#[allow(unused_imports)]use beet::prelude::*;",
+	"#[allow(unused_imports)]use crate::prelude::*;",
+]
 
 # [[router_codegen.file_group]]
 # package_name = "beet_router"

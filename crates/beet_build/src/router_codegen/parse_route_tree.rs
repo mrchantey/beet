@@ -195,7 +195,7 @@ mod test {
 
 		let expected: ItemMod = syn::parse_quote! {
 			#[allow(missing_docs)]
-			pub mod root {
+			pub mod routes {
 				#[allow(unused_imports)]
 				use super::*;
 				#[doc = r" Get the local route path"]
@@ -231,7 +231,7 @@ mod test {
 			}
 		};
 		expect(mod_item.to_token_stream().to_string())
-			.to_be(expected.to_token_stream().to_string());
+			.to_be_str(expected.to_token_stream().to_string());
 	}
 	#[test]
 	fn creates_collect_tree() {
@@ -250,7 +250,7 @@ mod test {
 			#[doc = r" Collect the static route tree"]
 			pub fn route_path_tree() -> RoutePathTree {
 				RoutePathTree {
-					name: "root".into(),
+					name: "routes".into(),
 					path: Some(RoutePath::new("/")),
 					children: vec![
 						RoutePathTree {
@@ -285,6 +285,6 @@ mod test {
 			}
 		};
 		expect(func.to_token_stream().to_string())
-			.to_be(expected.to_token_stream().to_string());
+			.to_be_str(expected.to_token_stream().to_string());
 	}
 }

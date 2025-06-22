@@ -12,10 +12,11 @@
 //! ├── RouteFile
 //! ```
 //!
-mod collect_client_action_group;
 mod collect_client_action;
-pub use collect_client_action_group::*;
+mod collect_client_action_group;
 pub use collect_client_action::*;
+pub use collect_client_action_group::*;
+pub use reexport_file_groups::*;
 mod parse_route_tree;
 mod reexport_file_groups;
 mod route_file_method_tree;
@@ -40,6 +41,6 @@ pub use file_group::*;
 mod router_codegen_plugin;
 pub use router_codegen_plugin::*;
 mod codegen_file;
-mod router_codegen_config;
+mod router_codegen_root;
 pub use codegen_file::*;
-pub use router_codegen_config::*;
+pub use router_codegen_root::*;

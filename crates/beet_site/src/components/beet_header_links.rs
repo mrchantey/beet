@@ -10,7 +10,7 @@ pub fn BeetHeaderLinks() -> impl Bundle {
 	rsx! {
 		<Link
 			variant=ButtonVariant::Text
-			href=paths::docs::index()
+			href=routes::docs::index()
 			>
 			Docs
 		</Link>

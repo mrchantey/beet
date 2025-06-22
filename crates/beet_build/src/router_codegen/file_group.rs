@@ -42,7 +42,6 @@ pub struct FileGroupConfig {
 
 impl FileGroupConfig {
 	pub fn spawn(self, spawner: &mut RelatedSpawner<ChildOf>) -> impl Bundle {
-
 		let client_actions_codegen =
 			if self.file_group.category == FileGroupCategory::Actions {
 				// If this is an actions file group, we need to set the output file name
@@ -84,7 +83,7 @@ pub struct FileGroup {
 	/// like `FooRouterPlugin`, otherwise falls back to the
 	/// [`CodegenFile::output`] filename.
 	#[serde(rename = "name")]
-	pub group_name: Option<String>,
+	pub name: Option<String>,
 	/// Passed to [`CodegenFile::pkg_name`]
 	#[serde(rename = "package_name")]
 	pub pkg_name: Option<String>,
@@ -130,7 +129,7 @@ fn unit_type() -> syn::Type { syn::parse_str("()").unwrap() }
 impl Default for FileGroup {
 	fn default() -> Self {
 		Self {
-			group_name: None,
+			name: None,
 			pkg_name: None,
 			category: Default::default(),
 			src: AbsPathBuf::default(),

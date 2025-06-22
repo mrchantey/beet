@@ -4,6 +4,7 @@ use beet_common::Sendit;
 use beet_common::as_beet::*;
 use beet_parse::prelude::tokenize_bundle;
 use bevy::prelude::*;
+use quote::quote;
 use syn::Block;
 use syn::Expr;
 use syn::ItemFn;
@@ -34,7 +35,7 @@ pub fn tokenize_combinator_route(world: &mut World) -> Result {
 		{
 			let template = &template_wrapper.0.0;
 			tokens = quote::quote! {rsx!{
-				<#template meta={meta()}/>
+				<#template meta=meta()/>
 					#tokens
 				</#template>
 			}};
@@ -78,21 +79,25 @@ pub fn collect_combinator_route(
 	parents: Query<&ChildOf>,
 	file_groups: Query<&FileGroupSendit>,
 ) -> Result {
-	for (entity, mut codegen_file, markdown_codegen) in query.iter_mut() {
-		if let Some(meta) = &markdown_codegen.meta {
-			let file_group = parents
-				.iter_ancestors(entity)
-				.find_map(|e| file_groups.get(e).ok())
-				.ok_or_else(|| bevyhow!("failed to find parent FileGroup"))?;
-			let meta_type = &file_group.meta_type;
-			codegen_file.add_item::<ItemFn>(syn::parse_quote!(
-				pub fn meta()-> #meta_type{
-					#meta.map_err(|err|{
-						format!("Failed to parse meta: {}", err)
-					}).unwrap()
-				}
-			));
-		}
+	for (entity, mut codegen_file, combinator_codegen) in query.iter_mut() {
+		let file_group = parents
+			.iter_ancestors(entity)
+			.find_map(|e| file_groups.get(e).ok())
+			.ok_or_else(|| bevyhow!("failed to find parent FileGroup"))?;
+		let meta_block = match &combinator_codegen.meta {
+			Some(meta) => quote! {
+				#meta.map_err(|err|{
+					format!("Failed to parse meta: {}", err)
+				}).unwrap()
+			},
+			None => quote!(Default::default()),
+		};
+		let meta_type = &file_group.meta_type;
+		codegen_file.add_item::<ItemFn>(syn::parse_quote!(
+			pub fn meta()-> #meta_type{
+				#meta_block
+			}
+		));
 	}
 	Ok(())
 }
