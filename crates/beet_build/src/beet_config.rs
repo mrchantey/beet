@@ -19,7 +19,7 @@ pub struct BeetConfig {
 	#[serde(default)]
 	pub template_scene: BuildFileTemplates,
 	#[serde(default)]
-	pub codegen_native: CodegenNativeConfig,
+	pub router_codegen: RouterCodegenConfig,
 	#[serde(default)]
 	pub codegen_wasm: CodegenWasmConfig,
 }
@@ -57,7 +57,7 @@ impl BeetConfig {
 			app.world_mut().spawn(self.template_scene);
 		}
 		if all || only.contains(&BuildOnly::Native) {
-			app.add_non_send_plugin(self.codegen_native);
+			app.add_non_send_plugin(self.router_codegen);
 		}
 		if all || only.contains(&BuildOnly::Wasm) {
 			app.add_non_send_plugin(self.codegen_wasm);

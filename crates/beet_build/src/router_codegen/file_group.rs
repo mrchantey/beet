@@ -27,52 +27,39 @@ pub struct FileGroupConfig {
 	#[serde(flatten)]
 	pub file_group: FileGroup,
 	#[serde(flatten)]
-	pub codegen: Option<CodegenFile>,
+	pub codegen: CodegenFile,
 	#[serde(flatten)]
-	pub modifier: ModifyRoutePath,
+	pub modify_route: ModifyRoutePath,
 	/// For file groups that generate the code for pages, ie md & rsx,
 	/// add the returned type  as a child of this template.
 	/// All templates must meet the following requirements:
 	/// - Have a `meta` field that matches the [`FileGroup::meta_type`]
 	/// - Have a default `<slot/>` for the content
-	#[serde(default,with = "syn_expr_serde::option")]
+	#[serde(default, with = "syn_expr_serde::option")]
 	pub template: Option<syn::Expr>,
 }
 
 
 impl FileGroupConfig {
-	pub fn spawn(
-		self,
-		spawner: &mut RelatedSpawner<ChildOf>,
-		parent_codegen: &CodegenFile,
-	) -> impl Bundle {
-		let codegen = self.codegen.unwrap_or_else(|| {
-			let default_out = self
-				.file_group
-				.src
-				.parent()
-				.unwrap_or(self.file_group.src.clone())
-				.join("codegen.rs");
-			parent_codegen.clone_info(default_out)
-		});
+	pub fn spawn(self, spawner: &mut RelatedSpawner<ChildOf>) -> impl Bundle {
 
 		let client_actions_codegen =
 			if self.file_group.category == FileGroupCategory::Actions {
 				// If this is an actions file group, we need to set the output file name
-				let mut output = codegen.output.clone();
+				let mut output = self.codegen.output.clone();
 				if let Some(stem) = output.file_stem() {
 					let stem = format!("client_{}.rs", stem.to_string_lossy());
 					output.set_file_name(stem);
 				}
-				Some(codegen.clone_info(output))
+				Some(self.codegen.clone_info(output))
 			} else {
 				None
 			};
 
 		let mut entity = spawner.spawn((
 			self.file_group.sendit(),
-			codegen.sendit(),
-			self.modifier,
+			self.codegen.sendit(),
+			self.modify_route,
 		));
 		if let Some(template) = self.template {
 			entity.insert(TemplateWrapper(template).sendit());
@@ -96,6 +83,7 @@ pub struct FileGroup {
 	/// Optionally set the group name, used for codegen file names
 	/// like `FooRouterPlugin`, otherwise falls back to the
 	/// [`CodegenFile::output`] filename.
+	#[serde(rename = "name")]
 	pub group_name: Option<String>,
 	/// Passed to [`CodegenFile::pkg_name`]
 	#[serde(rename = "package_name")]

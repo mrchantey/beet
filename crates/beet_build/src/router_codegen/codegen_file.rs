@@ -45,7 +45,7 @@ pub struct CodegenFile {
 	/// As [`std::any::type_name`], which is used with [`TemplateSerde`], resolves to a named crate, we need to alias the current
 	/// crate to match any internal types, setting this option will add `use crate as pkg_name`
 	/// to the top of the file.
-	#[serde(rename = "package_name")]
+	#[serde(default, rename = "package_name")]
 	pub pkg_name: Option<String>,
 	// List of all root level items to be included in the file.
 	// These are usually appended to as this struct is passed around.

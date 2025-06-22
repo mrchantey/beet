@@ -6,31 +6,31 @@ use bevy::prelude::*;
 /// Import files specified in each [`FileGroup`]
 /// - Before [`ImportNodesStep`]
 #[derive(Debug, Clone, PartialEq, Eq, Hash, SystemSet)]
-pub struct ImportCodegenNativeStep;
+pub struct ImportRouterCodegenStep;
 
 /// Perform extra processing after files have been imported and processed.
 /// - After [`ExportNodesStep`]
 #[derive(Debug, Clone, PartialEq, Eq, Hash, SystemSet)]
-pub struct ProcessCodegenNativeStep;
+pub struct ProcessRouterCodegenStep;
 
 /// Generate the [`CodegenFile`] for native files.
-/// - After [`ProcessCodegenNativeStep`]
+/// - After [`ProcessRouterCodegenStep`]
 #[derive(Debug, Clone, PartialEq, Eq, Hash, SystemSet)]
-pub struct ExportCodegenNativeStep;
+pub struct ExportRouterCodegenStep;
 
 #[derive(Debug, Default)]
-pub struct CodegenNativePlugin;
+pub struct RouterCodegenPlugin;
 
 
-impl Plugin for CodegenNativePlugin {
+impl Plugin for RouterCodegenPlugin {
 	fn build(&self, app: &mut App) {
-		app.init_non_send_resource::<CodegenNativeConfig>()
+		app.init_non_send_resource::<RouterCodegenConfig>()
 			.configure_sets(
 				Update,
 				(
-					ImportCodegenNativeStep.before(ImportNodesStep),
-					ProcessCodegenNativeStep.after(ExportNodesStep),
-					ExportCodegenNativeStep.after(ProcessCodegenNativeStep),
+					ImportRouterCodegenStep.before(ImportNodesStep),
+					ProcessRouterCodegenStep.after(ExportNodesStep),
+					ExportRouterCodegenStep.after(ProcessRouterCodegenStep),
 				),
 			)
 			.add_systems(
@@ -42,7 +42,7 @@ impl Plugin for CodegenNativePlugin {
 						modify_file_route_tokens,
 					)
 						.chain()
-						.in_set(ImportCodegenNativeStep),
+						.in_set(ImportRouterCodegenStep),
 					(
 						parse_route_tree,
 						collect_file_group,
@@ -50,7 +50,7 @@ impl Plugin for CodegenNativePlugin {
 						(collect_combinator_route, tokenize_combinator_route)
 							.chain(),
 					)
-						.in_set(ProcessCodegenNativeStep),
+						.in_set(ProcessRouterCodegenStep),
 					#[cfg(not(test))]
 					(
 						// dont hit the fs in tests
@@ -58,7 +58,7 @@ impl Plugin for CodegenNativePlugin {
 						despawn_file_groups,
 					)
 						.chain()
-						.in_set(ExportCodegenNativeStep),
+						.in_set(ExportRouterCodegenStep),
 				),
 			);
 	}

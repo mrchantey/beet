@@ -38,18 +38,17 @@ use syn::parse_quote;
 /// 	}
 /// }
 /// ```
-#[derive(Debug, Default, Clone, Component)]
-pub struct ParseRouteTree;
-
-
 pub fn parse_route_tree(
 	_: TempNonSendMarker,
-	mut query: Populated<(Entity, &mut CodegenFileSendit, &ParseRouteTree)>,
+	mut query: Populated<
+		(Entity, &mut CodegenFileSendit),
+		With<RouterCodegenRoot>,
+	>,
 	file_groups: Query<(Entity, &FileGroupSendit)>,
 	methods: Query<&RouteFileMethod>,
 	children: Query<&Children>,
 ) {
-	for (entity, mut codegen, _) in query.iter_mut() {
+	for (entity, mut codegen) in query.iter_mut() {
 		let child_methods = children
 			.iter_descendants(entity)
 			.filter_map(|e| file_groups.get(e).ok())

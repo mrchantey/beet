@@ -22,14 +22,16 @@ pub fn tokenize_combinator_route(world: &mut World) -> Result {
 			With<CodegenFileSendit>,
 			Added<CombinatorRouteCodegenSendit>
 		)>();
-		let mut parents = world.query::<&ChildOf>();
+	let mut parents = world.query::<&ChildOf>();
 	for entity in query.iter(world).collect::<Vec<_>>() {
 		let mut tokens = tokenize_bundle(world, entity)?;
 		trace!("Tokenizing combinator route for entity: {:?}", entity);
 
-		if let Some(template_wrapper) = parents.query(world).iter_ancestors(entity).find_map(|e| {
-			world.get::<TemplateWrapperSendit>(e)
-		}) {
+		if let Some(template_wrapper) = parents
+			.query(world)
+			.iter_ancestors(entity)
+			.find_map(|e| world.get::<TemplateWrapperSendit>(e))
+		{
 			let template = &template_wrapper.0.0;
 			tokens = quote::quote! {rsx!{
 				<#template meta={meta()}/>
@@ -106,14 +108,14 @@ mod test {
 	use quote::ToTokens;
 	use quote::quote;
 	use sweet::prelude::*;
-	
+
 	#[test]
 	fn works() {
 		let mut app = App::new();
-		app.add_plugins((CodegenNativePlugin, NodeTokensPlugin));
+		app.add_plugins((RouterCodegenPlugin, NodeTokensPlugin));
 		app.world_mut().spawn((
 			FileGroup::test_site_docs(),
-			TemplateWrapper(syn::parse_quote!(MyWrapperNode)).sendit()
+			TemplateWrapper(syn::parse_quote!(MyWrapperNode)).sendit(),
 		));
 		app.update();
 		app
