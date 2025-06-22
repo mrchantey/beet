@@ -150,7 +150,7 @@ mod test {
 
 			pub fn get() -> impl Bundle {
 				rsx! {
-					<MyWrapperNode meta={meta()}>
+					<MyWrapperNode meta=meta()>
 					{
 						(
 							FragmentNode,

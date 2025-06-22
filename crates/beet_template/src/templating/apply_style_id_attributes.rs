@@ -1,6 +1,7 @@
 use super::*;
 use beet_bevy::prelude::HierarchyQueryExtExt;
 use beet_common::prelude::*;
+use bevy::platform::collections::HashSet;
 use bevy::prelude::*;
 
 
@@ -17,15 +18,21 @@ pub fn apply_style_id_attributes(
 	// exclude single NodePortalTarget entities
 	query: Populated<(Entity, &StyleId), Without<NodePortalTarget>>,
 ) {
+	let mut visited = HashSet::new();
+
 	let mut apply_to_root = |root: Entity, styleid: StyleId| {
 		for child in children
 			.iter_descendants_inclusive(root)
 			.filter(|en| elements.contains(*en))
 		{
+			if visited.contains(&(child, styleid)) {
+				continue;
+			}
 			commands.spawn((
 				AttributeOf::new(child),
 				AttributeKey::new(html_constants.style_id_attribute(styleid)),
 			));
+			visited.insert((child, styleid));
 		}
 	};
 
@@ -73,7 +80,18 @@ mod test {
 	fn assigns_id_attr() {
 		parse(rsx! {<style {StyleId::new(0)}/>})
 			.xpect()
-			.to_be("<style data-beet-style-id-0/>");
+			.to_be_str("<style data-beet-style-id-0/>");
+	}
+	#[test]
+	fn deduplicates() {
+		parse(rsx! {
+			<div>
+			<style {StyleId::new(0)}/>
+			<style {StyleId::new(0)}/>
+			</div>
+		})
+		.xpect()
+		.to_be_str("<div data-beet-style-id-0><style data-beet-style-id-0/><style data-beet-style-id-0/></div>");
 	}
 	#[test]
 	fn assigns_id_to_all() {
@@ -84,7 +102,7 @@ mod test {
 			</div>
 		})
 		.xpect()
-		.to_be("<div data-beet-style-id-0><style data-beet-style-id-0/><span data-beet-style-id-0/></div>");
+		.to_be_str("<div data-beet-style-id-0><style data-beet-style-id-0/><span data-beet-style-id-0/></div>");
 	}
 	#[test]
 	fn ignores_templates() {
@@ -93,7 +111,7 @@ mod test {
 			<MyTemplate/>
 		})
 		.xpect()
-		.to_be("<style data-beet-style-id-0/><div/>");
+		.to_be_str("<style data-beet-style-id-0/><div/>");
 	}
 	#[test]
 	fn applies_to_slots() {
@@ -104,7 +122,9 @@ mod test {
 			</MyTemplate>
 		})
 		.xpect()
-		.to_be("<style data-beet-style-id-0/><div/><span data-beet-style-id-0/>");
+		.to_be_str(
+			"<style data-beet-style-id-0/><div/><span data-beet-style-id-0/>",
+		);
 	}
 	#[test]
 	fn cascades() {
@@ -113,6 +133,6 @@ mod test {
 			<MyTemplate style:cascade/>
 		})
 		.xpect()
-		.to_be("<style data-beet-style-id-0/><div data-beet-style-id-0/>");
+		.to_be_str("<style data-beet-style-id-0/><div data-beet-style-id-0/>");
 	}
 }

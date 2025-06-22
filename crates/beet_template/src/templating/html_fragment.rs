@@ -255,6 +255,20 @@ mod test {
 			);
 	}
 	#[test]
+	fn iterators() {
+		rsx! {
+			<div>{vec![
+				rsx! {<span>foo</span>},
+				rsx! {<span>bar</span>},
+				rsx! {<span>baz</span>},
+					]}
+			</div>
+		}
+		.xmap(HtmlFragment::parse_bundle)
+		.xpect()
+		.to_be("<div><span>foo</span><span>bar</span><span>baz</span></div>");
+	}
+	#[test]
 	fn signal_text_nodes() {
 		let (get, _set) = signal("foo");
 		rsx! {<div>{get}</div>}

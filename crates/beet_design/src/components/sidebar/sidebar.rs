@@ -35,30 +35,36 @@ mod test {
 
 	#[test]
 	fn works() {
-		let nodes = vec![
-			SidebarNode {
+		let nodes = vec![SidebarNode {
 			display_name: "Home".to_string(),
 			path: None,
 			children: vec![SidebarNode {
 				display_name: "Docs".to_string(),
 				path: Some(RoutePath::new("/docs")),
-				children: vec![SidebarNode {
-					display_name: "Testing".to_string(),
-					path: Some(RoutePath::new("/docs/testing")),
-					children: vec![],
-					expanded: false,
-				}],
+				children: vec![
+					SidebarNode {
+						display_name: "Testing".to_string(),
+						path: Some(RoutePath::new("/docs/testing")),
+						children: vec![],
+						expanded: false,
+					},
+					SidebarNode {
+						display_name: "Partying".to_string(),
+						path: Some(RoutePath::new("/docs/partying")),
+						children: vec![],
+						expanded: false,
+					},
+				],
 				expanded: false,
 			}],
 			expanded: true,
-		}
-		
-		];
+		}];
 
 		rsx! {
 			<Sidebar nodes=nodes />
 		}
 		.xmap(HtmlFragment::parse_bundle)
-		.xpect().to_contain("Testing");
+		.xpect()
+		.to_contain("Partying");
 	}
 }

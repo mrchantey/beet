@@ -15,6 +15,10 @@ where
 	T::spawn(SpawnWith(func))
 }
 
+
+
+
+
 /// A [`BundleEffect`] that runs a function when the entity is spawned.
 #[derive(ImplBundle)]
 pub struct OnSpawn<F: 'static + Send + Sync + FnOnce(&mut EntityWorldMut)>(

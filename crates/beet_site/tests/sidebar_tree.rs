@@ -11,5 +11,5 @@ async fn works() {
 	sidebar_tree[0].display_name.xref().xpect().to_be("Docs");
 	sidebar_tree[0].children[0].display_name.xref().xpect().to_be("Testing");
 
-	// println!("{:#?}", sidebar_tree);
+	println!("{:#?}", sidebar_tree);
 }

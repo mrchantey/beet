@@ -7,7 +7,9 @@ use std::hash::Hash;
 /// in the case of a [`StyleScope::Local`].
 /// The propagation of style ids to each element in a template is performed
 /// at a later stage.
-#[derive(Debug, Copy, Clone, PartialEq, Hash, Deref, Component, Reflect)]
+#[derive(
+	Debug, Copy, Clone, PartialEq, Eq, Hash, Deref, Component, Reflect,
+)]
 #[reflect(Component)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[component(immutable)]
