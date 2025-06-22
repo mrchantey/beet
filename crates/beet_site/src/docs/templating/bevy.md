@@ -1,7 +1,7 @@
----
-title: Bevy
++++
+title = "Bevy"
 
----
++++
 
 Sweet uses terminology from the web but the structural concepts map directly to bevy.
 

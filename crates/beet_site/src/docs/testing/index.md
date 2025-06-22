@@ -1,10 +1,10 @@
----
-title: Sweet
-description: Delightful Rust testing
-draft: true
-sidebar:
-  label: Overview
----
++++
+title = "Sweet"
+description = "Delightful Rust testing"
+draft = true
+[sidebar]
+label = "Overview"
++++
 
 The sweet test runner is built from the ground up with web dev in mind, the `#[sweet::test]` macro will run any test, be it sync, async, native or wasm.
 

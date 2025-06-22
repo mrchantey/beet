@@ -1,7 +1,7 @@
----
++++
 # for parser whatever it is for the rest of that line, trimming whitespace, as a string. people can parse it as they wish later.
-title: Beet
----
+title = "Beet"
++++
 
 Rusty tools for developing reactive structures.
 

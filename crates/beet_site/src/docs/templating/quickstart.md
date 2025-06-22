@@ -1,9 +1,9 @@
----
-title: Quickstart
++++
+title = "Quickstart"
 
-sidebar:
-  oder: 1
----
+[sidebar]
+oder = 1
++++
 
 A counter is a great way to demonstrate core concepts, for a deeper dive read [how it works](./how-it-works)
 

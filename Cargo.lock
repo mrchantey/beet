@@ -830,6 +830,7 @@ dependencies = [
  "sweet",
  "syn 2.0.101",
  "thiserror 1.0.69",
+ "toml",
 ]
 
 [[package]]

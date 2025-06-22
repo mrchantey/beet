@@ -6,7 +6,6 @@ use beet::prelude::*;
 pub fn BeetSidebarLayout() -> impl Bundle {
 	let sidebar_nodes =
 		route_path_tree().xpipe(RoutePathTreeToSidebarTree::default());
-		beet::log!("sidebar_nodes: {sidebar_nodes:#?}");
 	rsx! {
 		<BeetContext>
 		<PageLayout>

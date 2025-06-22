@@ -16,7 +16,7 @@ keywords.workspace = true
 [features]
 default = []
 # default = ["serde", "tokens"]
-serde = ["dep:serde", "dep:ron"]
+serde = ["dep:serde", "dep:ron", "dep:toml"]
 tokens = [
 	"serde",
 	"dep:heck",
@@ -41,6 +41,7 @@ bevy = { workspace = true }
 #💡 serde
 serde = { workspace = true, optional = true }
 ron = { workspace = true, optional = true }
+toml = { workspace = true, optional = true }
 
 
 #💡 Tokens

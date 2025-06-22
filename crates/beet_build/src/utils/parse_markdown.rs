@@ -62,11 +62,14 @@ impl ParseMarkdown {
 				}))
 			}
 			// minus indicates yaml, ie foo: "bar"
-			Some((frontmatter, MetadataBlockKind::YamlStyle)) => {
-				let frontmatter = Self::yaml_frontmatter_to_ron(&frontmatter)?;
-				Some(syn::parse_quote!({
-					beet::exports::ron::from_str(#frontmatter)
-				}))
+			Some((_frontmatter, MetadataBlockKind::YamlStyle)) => {
+				anyhow::bail!(
+					"yaml frontmatter is not yet supported, please use +++ toml +++ frontmatter"
+				);
+				// let frontmatter = Self::yaml_frontmatter_to_ron(&frontmatter)?;
+				// Some(syn::parse_quote!({
+				// 	beet::exports::ron::from_str(#frontmatter)
+				// }))
 			}
 			None => None,
 		};
@@ -104,6 +107,7 @@ impl ParseMarkdown {
 
 
 	/// a custom parser for the frontmatter
+	#[allow(unused)]
 	fn yaml_frontmatter_to_ron(yaml: &str) -> Result<String> {
 		let lines = yaml
 			.lines()
@@ -210,5 +214,23 @@ val_string	= "foo"
 				val_string: "foo".into(),
 			},
 		});
+	}
+
+	#[test]
+	#[ignore = "todo"]
+	fn yaml_frontmatter() {
+		// let yaml = r#"
+		// let foo = DocsMeta {
+		// 	title: Some("Beet Site".into()),
+		// 	description: Some("A very bevy metaframework".into()),
+		// 	draft: false,
+		// 	sidebar: SidebarInfo {
+		// 		label: Some("Beet Site".into()),
+		// 		..Default::default()
+		// 	},
+		// };
+
+		// let ron = beet::exports::ron::to_string(&foo).unwrap();
+		// println!("Ron: {}", ron);
 	}
 }

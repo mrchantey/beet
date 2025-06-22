@@ -22,6 +22,8 @@ pub mod prelude {
 pub mod exports {
 	#[cfg(feature = "serde")]
 	pub use ron;
+	#[cfg(feature = "serde")]
+	pub use toml;
 
 	#[cfg(feature = "tokens")]
 	pub use proc_macro2;

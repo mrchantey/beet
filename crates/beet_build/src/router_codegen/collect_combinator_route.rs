@@ -35,7 +35,7 @@ pub fn tokenize_combinator_route(world: &mut World) -> Result {
 		{
 			let template = &template_wrapper.0.0;
 			tokens = quote::quote! {rsx!{
-				<#template meta=meta()/>
+				<#template meta=meta()>
 					#tokens
 				</#template>
 			}};
@@ -150,7 +150,7 @@ mod test {
 
 			pub fn get() -> impl Bundle {
 				rsx! {
-					<MyWrapperNode meta={meta()}/>
+					<MyWrapperNode meta={meta()}>
 					{
 						(
 							FragmentNode,
