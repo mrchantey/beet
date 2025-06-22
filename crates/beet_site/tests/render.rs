@@ -5,8 +5,12 @@ use beet_site::prelude::*;
 use sweet::prelude::*;
 #[sweet::test]
 async fn works() {
-	let router =
-		AppRouter::test().add_plugins((PagesPlugin, DocsPlugin, ActionsPlugin));
+	let router = AppRouter::test().add_plugins((
+		PagesPlugin,
+		DocsPlugin,
+		ActionsPlugin,
+		BeetDesignMockupsPlugin,
+	));
 
 	// Ensure all routes build, including parsing their metadata.
 	for route in route_path_tree().flatten().iter() {

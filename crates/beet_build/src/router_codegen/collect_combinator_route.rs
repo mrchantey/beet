@@ -94,6 +94,7 @@ pub fn collect_combinator_route(
 		};
 		let meta_type = &file_group.meta_type;
 		codegen_file.add_item::<ItemFn>(syn::parse_quote!(
+			#[allow(unused)]
 			pub fn meta()-> #meta_type{
 				#meta_block
 			}
@@ -138,6 +139,7 @@ mod test {
 			#[allow(unused_imports)]
 			use crate as test_site;
 
+			#[allow(unused)]
 			pub fn meta() -> () {
 				{
 					beet::exports::toml::from_str("title = \"hello\"\n[sidebar]\norder = 2\n")

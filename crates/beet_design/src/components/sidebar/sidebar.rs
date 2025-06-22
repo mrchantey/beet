@@ -9,7 +9,7 @@ pub fn Sidebar(nodes: Vec<SidebarNode>) -> impl Bundle {
 		})
 		}
 		</nav>
-		<script src="./sidebar.js"/>
+		<script hoist:body src="./sidebar.js"/>
 		<style>
 			nav{
 				--sidebar-width:15rem;

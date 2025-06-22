@@ -4,7 +4,8 @@ use beet_utils::prelude::PathExt;
 use bevy::prelude::*;
 use syn::ItemMod;
 
-/// Add a pub mod #name; for each file group to the root codegen file.
+/// Add a pub mod #name; for each file group to the root codegen file
+/// with a matching package name.
 pub fn reexport_file_groups(
 	_: TempNonSendMarker,
 	mut roots: Query<
@@ -14,9 +15,13 @@ pub fn reexport_file_groups(
 	file_groups: Query<(&CodegenFileSendit, &FileGroupSendit)>,
 ) -> Result {
 	for (mut codegen, children) in roots.iter_mut() {
-		for (child_codegen, child_group) in
-			children.iter().filter_map(|id| file_groups.get(id).ok())
-		{
+		let codegen_name = codegen.pkg_name.clone();
+		for (child_codegen, child_group) in children
+			.iter()
+			.filter_map(|id| file_groups.get(id).ok())
+			.filter(|(child_codegen, _)| {
+				&child_codegen.pkg_name == &codegen_name
+			}) {
 			let relative_path = PathExt::create_relative(
 				codegen.output_dir()?,
 				&child_codegen.output,

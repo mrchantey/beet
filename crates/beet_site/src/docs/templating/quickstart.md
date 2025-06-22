@@ -9,6 +9,7 @@ A counter is a great way to demonstrate core concepts, for a deeper dive read [h
 
 <details>
 <summary>Show final code</summary>
+TODO
 </details>
 
 Assuming rust nightly is installed, the following will get a new project up and running in four steps.

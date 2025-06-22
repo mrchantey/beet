@@ -44,13 +44,9 @@ pub fn SidebarItem(node: SidebarNode, root: bool) -> impl Bundle {
 		rsx! {
 			// {group}
 			<details class="bm-c-sidebar__sublist" data-always-expand=expanded>
-				// open={
-				// // handled in js but this avoids FOUC
-				// entry.expanded || Sidebar.flatten(entry.items).some(item => item.isCurrent)}
-				// <IconChevronRight class="caret"/>
+			// open is handled in js
 				<summary>{item}</summary>
 				<ul class=class>{children}</ul>
-			// <Astro.self entries={entry.items}/>
 			</details>
 		}
 		.any_bundle()

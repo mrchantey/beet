@@ -23,6 +23,7 @@ pub mod mockups;
 
 /// Commonly used components for beet_design
 pub mod prelude {
+	pub use crate::mockups::*;
 	pub use crate::color::*;
 	pub use crate::components::*;
 	pub use crate::context::*;
@@ -45,6 +46,7 @@ pub mod prelude {
 			pub use beet_server::prelude::*;
 			pub use beet_template::prelude::*;
 			pub use beet_utils::prelude::*;
+			pub use beet_router::prelude::*;
 			#[allow(unused)]
 			pub(crate) use bevy::prelude::*;
 		}
