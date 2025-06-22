@@ -23,6 +23,7 @@ path = "crates/beet_site/src/docs"
 output = "crates/beet_site/src/codegen/docs/mod.rs"
 base_route = "/docs"
 template = "DocsLayout"
+meta_type = "DocsMeta"
 import_tokens = [
 	"#[allow(unused_imports)]use beet::prelude::*;",
 	"#[allow(unused_imports)]use crate::prelude::*;",

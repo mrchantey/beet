@@ -3,8 +3,8 @@
 
 pub mod codegen;
 pub mod components;
-mod layouts;
-pub use layouts::*;
+pub mod layouts;
+pub mod types;
 // #[path = "codegen/route_tree.rs"]
 // pub mod route_tree;
 // #[cfg(not(target_arch = "wasm32"))]
@@ -14,10 +14,13 @@ pub use layouts::*;
 // #[path = "codegen/wasm.rs"]
 // pub mod wasm;
 pub mod prelude {
+	pub use super::codegen::actions::*;
 	pub use super::codegen::docs::*;
 	pub use super::codegen::pages::*;
+	pub use super::layouts::*;
+	pub use super::types::*;
 	pub use super::*;
-	pub use crate::codegen::routes;
 	pub use crate::codegen::route_path_tree;
+	pub use crate::codegen::routes;
 	pub use crate::components::*;
 }
