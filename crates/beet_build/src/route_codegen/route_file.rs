@@ -47,9 +47,11 @@ impl RouteFile {
 	pub fn item_mod(&self) -> ItemMod {
 		let ident = self.mod_ident();
 		let path = &self.mod_path.to_string_lossy();
+		// currently we use a pub mod for client island resolution,
+		// this may change if we go for bevy reflect instead
 		syn::parse_quote! {
 			#[path = #path]
-			mod #ident;
+			pub mod #ident;
 		}
 	}
 }

@@ -5,17 +5,14 @@ pub mod codegen;
 pub mod components;
 pub mod layouts;
 pub mod types;
-// #[path = "codegen/route_tree.rs"]
-// pub mod route_tree;
-// #[cfg(not(target_arch = "wasm32"))]
-// #[path = "codegen/server_actions.rs"]
-// pub mod server_actions;
-// #[cfg(target_arch = "wasm32")]
-// #[path = "codegen/wasm.rs"]
-// pub mod wasm;
+
+#[path = "codegen/client_islands.rs"]
+pub mod client_islands;
+
 pub mod prelude {
-	pub use super::codegen::actions::*;
-	pub use super::codegen::docs::*;
+	pub use super::client_islands::*;
+	pub use super::codegen::actions::ActionsPlugin;
+	pub use super::codegen::docs::DocsPlugin;
 	pub use super::codegen::pages::*;
 	pub use super::layouts::*;
 	// pub use super::types::*;

@@ -70,6 +70,6 @@ mod test {
 	#[test]
 	fn works() {
 		let mut app = App::new();
-		app.add_plugins(RouterCodegenPlugin).update();
+		app.add_plugins(RouteCodegenPlugin).update();
 	}
 }

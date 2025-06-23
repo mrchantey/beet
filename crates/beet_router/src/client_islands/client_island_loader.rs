@@ -25,7 +25,7 @@ impl ClientIslandLoader {
 		}
 	}
 
-	/// For a given route, mount the islands if the current URL matches the route.
+	/// For a given route, mount
 	pub fn try_mount(
 		&self,
 		app: &mut App,

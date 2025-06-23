@@ -19,10 +19,10 @@ pub struct ProcessRouterCodegenStep;
 pub struct ExportRouterCodegenStep;
 
 #[derive(Debug, Default)]
-pub struct RouterCodegenPlugin;
+pub struct RouteCodegenPlugin;
 
 
-impl Plugin for RouterCodegenPlugin {
+impl Plugin for RouteCodegenPlugin {
 	fn build(&self, app: &mut App) {
 		app.init_non_send_resource::<RouteCodegenConfig>()
 			.configure_sets(

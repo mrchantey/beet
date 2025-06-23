@@ -21,7 +21,8 @@ impl RunBuild {
 				self.load_beet_config.clone(),
 				NodeTokensPlugin::default(),
 				BuildTemplatesPlugin::default(),
-				RouterCodegenPlugin::default(),
+				RouteCodegenPlugin::default(),
+				ClientIslandCodegenPlugin::default(),
 			))
 			.run_async(FsApp::default().runner())
 			.await

@@ -18,10 +18,8 @@ pub struct BeetConfig {
 	pub html_constants: HtmlConstants,
 	#[serde(default)]
 	pub template_scene: BuildFileTemplates,
-	#[serde(default)]
 	pub route_codegen: RouteCodegenConfig,
-	#[serde(default)]
-	pub client_islands_codegen: ClientIslandCodegenConfig,
+	pub client_island_codegen: ClientIslandCodegenConfig,
 }
 
 impl BeetConfig {
@@ -59,8 +57,8 @@ impl BeetConfig {
 		if all || only.contains(&BuildOnly::Routes) {
 			app.add_non_send_plugin(self.route_codegen);
 		}
-		if all || only.contains(&BuildOnly::Wasm) {
-			app.add_non_send_plugin(self.client_islands_codegen);
+		if all || only.contains(&BuildOnly::ClientIslands) {
+			app.add_non_send_plugin(self.client_island_codegen);
 		}
 	}
 }
@@ -74,7 +72,7 @@ pub enum BuildOnly {
 	Routes,
 	Server,
 	Static,
-	Wasm,
+	ClientIslands,
 }
 
 
@@ -85,7 +83,7 @@ impl std::fmt::Display for BuildOnly {
 			BuildOnly::Routes => write!(f, "routes"),
 			BuildOnly::Server => write!(f, "server"),
 			BuildOnly::Static => write!(f, "static"),
-			BuildOnly::Wasm => write!(f, "wasm"),
+			BuildOnly::ClientIslands => write!(f, "client-islands"),
 		}
 	}
 }
@@ -99,7 +97,7 @@ impl FromStr for BuildOnly {
 			"routes" => Ok(BuildOnly::Routes),
 			"server" => Ok(BuildOnly::Server),
 			"static" => Ok(BuildOnly::Static),
-			"wasm" => Ok(BuildOnly::Wasm),
+			"client-islands" => Ok(BuildOnly::ClientIslands),
 			_ => Err(format!("Unknown only field: {}", s)),
 		}
 	}

@@ -1,5 +1,7 @@
 use super::types::*;
 use crate::openai::*;
+use beet_net::cross_fetch::Request;
+use beet_net::cross_fetch::ResponseInner;
 use beet_net::prelude::*;
 
 /// REST API endpoint to generate ephemeral session tokens for use in client-side applications.
