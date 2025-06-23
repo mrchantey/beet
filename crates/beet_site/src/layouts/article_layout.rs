@@ -17,15 +17,15 @@ impl BundleLayerHandler for ArticleLayout {
 		_extractors: Self::Extractors,
 		bundle: impl Bundle,
 		meta: Self::Meta,
-	) -> impl Send + Sync + Future<Output = AppResult<Self::Output>> {
+	) -> impl Send + Sync + Future<Output = Self::Output> {
 		async move {
-			Ok(BundleResponse::new(rsx! {
+			BundleResponse::new(rsx! {
 				<BeetSidebarLayout>
 					<h1>{meta.title.unwrap_or("File".to_string())}</h1>
 					{bundle}
 				</BeetSidebarLayout>
 			})
-			.into_response())
+			.into_response()
 		}
 	}
 }

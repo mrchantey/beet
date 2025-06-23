@@ -17,7 +17,7 @@ pub trait RouterPlugin: Sized {
 	}
 
 	/// Whether routes provided by this plugin are static.
-	/// Usually this shoult be `true` for pages and `false` for actions.
+	/// Usually this should be `true` for pages and `false` for actions.
 	fn is_static(&self) -> bool;
 
 	/// List of routes that this plugin provides.
@@ -81,11 +81,15 @@ pub trait IntoRoutePlugins<S, M> {
 }
 
 impl<T: RouterPlugin> IntoRoutePlugins<T::State, T> for T {
-	fn add_to_router(self, router: &mut AppRouter<T::State>) {
+	fn add_to_router(self, app_router: &mut AppRouter<T::State>) {
 		if self.is_static() {
-			router.static_routes.extend(self.routes());
+			app_router.static_routes.extend(self.routes());
+			app_router.router = self.add_routes_with(
+				app_router.router.clone(),
+				&ClientIslandPlugin::<T>::default(),
+			);
 		}
-		router.router = self.add_routes(router.router.clone());
+		app_router.router = self.add_routes(app_router.router.clone());
 	}
 }
 

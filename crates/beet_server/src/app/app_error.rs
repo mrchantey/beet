@@ -12,6 +12,13 @@ pub struct AppError {
 	/// The HTTP status code
 	pub status_code: StatusCode,
 }
+impl std::fmt::Display for AppError {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		write!(f, "{}: {}", self.status_code, self.message)
+	}
+}
+
+impl std::error::Error for AppError {}
 
 impl AppError {
 	/// Creates a new [`AppError`] with the given status code and message.

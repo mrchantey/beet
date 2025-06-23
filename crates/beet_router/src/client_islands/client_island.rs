@@ -1,5 +1,8 @@
 use beet_bevy::prelude::*;
 use beet_common::prelude::*;
+use beet_template::prelude::TemplatePlugin;
+use bevy::ecs::system::RunSystemError;
+use bevy::ecs::system::RunSystemOnce;
 use bevy::prelude::*;
 use serde::Deserialize;
 use serde::Serialize;
@@ -12,6 +15,16 @@ pub struct ClientIsland {
 	pub tracker: RustyTracker, // pub route: RouteInfo,
 }
 
+
+impl ClientIsland {
+	pub fn collect(bundle: impl Bundle) -> Result<Vec<Self>, RunSystemError> {
+		let mut app = App::new();
+		app.add_plugins(TemplatePlugin);
+		let entity = app.world_mut().spawn(bundle).id();
+		app.world_mut()
+			.run_system_once_with(collect_client_islands, entity)
+	}
+}
 
 pub fn collect_client_islands(
 	In(root): In<Entity>,
@@ -46,8 +59,6 @@ pub fn collect_client_islands(
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use beet_template::prelude::TemplatePlugin;
-	use bevy::ecs::system::RunSystemOnce;
 	use bevy::prelude::*;
 	use serde::Deserialize;
 	use serde::Serialize;
@@ -64,22 +75,15 @@ mod test {
 
 	#[test]
 	fn works() {
-		let mut app = App::new();
-		app.add_plugins(TemplatePlugin);
-		let entity = app
-			.world_mut()
-			.spawn(rsx! {
-				<MyTemplate foo=3 client:only />
-			})
-			.id();
-		app.world_mut()
-			.run_system_once_with(collect_client_islands, entity)
-			.unwrap()
-			.xpect()
-			.to_be(vec![ClientIsland {
-				template: TemplateSerde::new(&MyTemplate { foo: 3 }),
-				tracker: RustyTracker::new(0, 7960668749389905152),
-				mount: true,
-			}]);
+		ClientIsland::collect(rsx! {
+			<MyTemplate foo=3 client:only />
+		})
+		.unwrap()
+		.xpect()
+		.to_be(vec![ClientIsland {
+			template: TemplateSerde::new(&MyTemplate { foo: 3 }),
+			tracker: RustyTracker::new(0, 7960668749389905152),
+			mount: true,
+		}]);
 	}
 }

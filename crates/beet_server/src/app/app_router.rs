@@ -1,5 +1,7 @@
 use crate::prelude::*;
 use axum::Router;
+use beet_router::prelude::ClientIsland;
+use beet_router::prelude::ClientIslandMap;
 use beet_template::as_beet::bevybail;
 use bevy::prelude::*;
 // use beet_router::types::RouteFunc;
@@ -156,20 +158,41 @@ where
 		}
 	}
 
+	/// Export static html files and client islands.
 	pub async fn export_static(self, html_dir: &WsPathBuf) -> Result {
 		let html_dir = html_dir.into_abs();
 
-		for route in &self.static_routes {
-			let html = self.render_route(route).await?;
-			// route path is dir, and file is index, a common convention
-			// for static html files making it easier to serve
-			let route_path =
-				html_dir.join(&route.path.as_relative()).join("index.html");
-			FsExt::write(&route_path, html)?;
-		}
+		self.static_routes
+			.iter()
+			.map(async |route| -> Result {
+				let html_dir = html_dir.clone();
+				let html = self.render_route(route).await?;
+				let route_path =
+					html_dir.join(&route.path.as_relative()).join("index.html");
+				FsExt::write(&route_path, html)?;
+				Ok(())
+			})
+			.xmap(futures::future::try_join_all)
+			.await?;
+
+		let islands = self
+			.static_routes
+			.iter()
+			.map(async |route| -> Result<(RouteInfo, Vec<ClientIsland>)> {
+				let islands = self.get_client_islands(route).await?;
+				Ok((route.clone(), islands))
+			})
+			.xmap(futures::future::try_join_all)
+			.await?;
+
+		let islands = ClientIslandMap::new(islands);
+		islands.write(&html_dir)?;
+		let num_islands = islands.values().map(|v| v.len()).sum::<usize>();
+
 		tracing::info!(
-			"Exported {} static html files to {}",
+			"Exported {} html files and {} client islands to {}",
 			self.static_routes.len(),
+			num_islands,
 			html_dir.display()
 		);
 
@@ -207,6 +230,22 @@ where
 		let body = res.into_body().collect().await?.to_bytes().to_vec();
 		let html = String::from_utf8(body.to_vec())?;
 		Ok(html)
+	}
+
+	pub async fn get_client_islands(
+		&self,
+		route: &RouteInfo,
+	) -> Result<Vec<ClientIsland>> {
+		let route_info = ClientIslandPlugin::route_info(route);
+		let ron = self.render_route(&route_info).await?;
+		let islands: Vec<ClientIsland> =
+			beet_common::exports::ron::de::from_str(&ron).map_err(|e| {
+				AppError::internal_error(format!(
+					"Failed to deserialize client islands: {}",
+					e
+				))
+			})?;
+		Ok(islands)
 	}
 
 	/// Server the provided router, adding

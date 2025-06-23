@@ -23,7 +23,7 @@ build = ["dep:beet_build"]
 beet_fs.workspace = true
 beet_utils.workspace = true
 beet_net.workspace = true
-beet_common.workspace = true
+beet_common = { workspace = true, features = ["serde"] }
 beet_template.workspace = true
 beet_router = { workspace = true, features = ["axum"] }
 beet_build = { workspace = true, features = ["css"], optional = true }
@@ -42,6 +42,8 @@ serde_json.workspace = true
 http.workspace = true
 http-body-util.workspace = true
 bytes.workspace = true
+
+futures.workspace = true
 
 #💡 server
 tokio.workspace = true
