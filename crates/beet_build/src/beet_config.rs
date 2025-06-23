@@ -56,7 +56,7 @@ impl BeetConfig {
 		if all || only.contains(&BuildOnly::Templates) {
 			app.world_mut().spawn(self.template_scene);
 		}
-		if all || only.contains(&BuildOnly::Router) {
+		if all || only.contains(&BuildOnly::Routes) {
 			app.add_non_send_plugin(self.router_codegen);
 		}
 		if all || only.contains(&BuildOnly::Wasm) {
@@ -71,7 +71,7 @@ impl BeetConfig {
 pub enum BuildOnly {
 	Templates,
 	/// Router codegen
-	Router,
+	Routes,
 	Server,
 	Static,
 	Wasm,
@@ -82,7 +82,7 @@ impl std::fmt::Display for BuildOnly {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		match self {
 			BuildOnly::Templates => write!(f, "templates"),
-			BuildOnly::Router => write!(f, "router"),
+			BuildOnly::Routes => write!(f, "routes"),
 			BuildOnly::Server => write!(f, "server"),
 			BuildOnly::Static => write!(f, "static"),
 			BuildOnly::Wasm => write!(f, "wasm"),
@@ -96,7 +96,7 @@ impl FromStr for BuildOnly {
 	fn from_str(s: &str) -> Result<Self, Self::Err> {
 		match s.to_lowercase().as_str() {
 			"templates" => Ok(BuildOnly::Templates),
-			"router" => Ok(BuildOnly::Router),
+			"routes" => Ok(BuildOnly::Routes),
 			"server" => Ok(BuildOnly::Server),
 			"static" => Ok(BuildOnly::Static),
 			"wasm" => Ok(BuildOnly::Wasm),

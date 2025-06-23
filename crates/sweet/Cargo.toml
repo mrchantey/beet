@@ -53,6 +53,8 @@ bevy = { workspace = true, optional = true }
 
 #💡 native
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+beet_utils = { workspace = true, features = ["tokio"] }
+
 tokio.workspace = true
 beet_fs.workspace = true
 pin-project-lite = "0.2.15"

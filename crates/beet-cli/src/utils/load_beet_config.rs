@@ -14,7 +14,7 @@ pub struct LoadBeetConfig {
 	#[arg(long = "static")]
 	pub r#static: bool,
 	/// Only execute the provided build steps,
-	/// options are `templates`, `native`, `server`, `static`, `wasm`
+	/// options are `templates`, `routes`, `server`, `static`, `wasm`
 	#[arg(long, value_delimiter = ',', value_parser = parse_build_only)]
 	pub only: Vec<BuildOnly>,
 }

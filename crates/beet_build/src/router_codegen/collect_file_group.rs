@@ -5,6 +5,7 @@ use beet_common::prelude::TokenizeSelf;
 use bevy::prelude::*;
 use heck::ToUpperCamelCase;
 use proc_macro2::TokenStream;
+use quote::quote;
 use syn::parse_quote;
 
 
@@ -19,14 +20,13 @@ pub fn collect_file_group(
 	route_files: Query<(&RouteFile, &Children)>,
 	methods: Query<&RouteFileMethod>,
 ) -> Result {
-	for (mut codegen_file, file_group, file_group_children) in query.iter_mut()
-	{
+	for (mut codegen_file, file_group, group_children) in query.iter_mut() {
 		let mut route_infos = Vec::<TokenStream>::new();
-		let mut route_handlers = Vec::<syn::Expr>::new();
+		let mut route_handlers = Vec::<TokenStream>::new();
 		let mut route_metas = Vec::<syn::Path>::new();
 		let mut contains_file_meta = false;
 
-		for (route_file, route_file_children) in file_group_children
+		for (route_file, route_file_children) in group_children
 			.iter()
 			.filter_map(|child| route_files.get(child).ok())
 		{
@@ -46,10 +46,29 @@ pub fn collect_file_group(
 
 				let http_method = quote::format_ident!("{method_name}",);
 				let route_info = method.route_info.self_token_stream();
-				route_metas.push(method.meta.ident(&mod_ident, &method_name));
-				route_handlers.push(parse_quote!(
-					(#route_info, #mod_ident::#http_method)
-				));
+				let meta_ident = method.meta.ident(&mod_ident, &method_name);
+
+				match file_group.category {
+					FileGroupCategory::Pages => {
+						// All page routes are BundleRoutes, so use add_bundle_route
+						// for middleware support
+						route_handlers.push(parse_quote! {
+								router = self.add_bundle_route(
+									router,
+									#route_info,
+									#mod_ident::#http_method,
+									#meta_ident()
+								);
+						});
+					}
+					FileGroupCategory::Actions => {
+						// Action routes may be any kind of route
+						route_handlers.push(quote! {
+								router = self.add_route(router,#route_info, #mod_ident::#http_method);
+						});
+					}
+				}
+				route_metas.push(meta_ident);
 				route_infos.push(route_info);
 			}
 		}
@@ -113,7 +132,7 @@ pub fn collect_file_group(
 
 				fn add_routes(&self, mut router: beet::exports::axum::Router<#router_state_type>)
 					-> beet::exports::axum::Router<#router_state_type> {
-					#(router = self.add_route(router, #route_handlers);)*
+						#(#route_handlers)*
 					router
 				}
 			}
@@ -177,12 +196,14 @@ mod test {
 						&self,
 						mut router: beet::exports::axum::Router<()>
 					) -> beet::exports::axum::Router<()> {
-						router = self.add_route(
+						router = self.add_bundle_route(
 							router,
-							(RouteInfo {
+							RouteInfo {
 								path: RoutePath(std::path::PathBuf::from("/hello")),
 								method: HttpMethod::Get
-							}, route0::get)
+							},
+							route0::get,
+							route0::meta()
 						);
 						router
 					}

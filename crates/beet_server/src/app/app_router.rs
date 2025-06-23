@@ -122,16 +122,12 @@ impl<S> AppRouter<S> {
 	pub fn add_route<M>(
 		mut self,
 		info: impl Into<RouteInfo>,
-		route: impl BundleRoute<M, State = S>,
+		route: impl IntoBeetRoute<M, State = S>,
 	) -> Self
 	where
 		S: 'static + Send + Sync + Clone,
 	{
-		let info = info.into();
-		self.router = self.router.route(
-			&info.path.to_string(),
-			route.into_method_router(info.method),
-		);
+		self.router = route.add_beet_route(self.router, info.into());
 		self
 	}
 	pub fn add_plugins<M>(

@@ -1,10 +1,11 @@
 use crate::prelude::*;
+use axum::extract::FromRequestParts;
 use beet_net::prelude::*;
 
 
 pub trait RouterPlugin {
-	type State;
-	type Meta;
+	type State: 'static + Send + Sync + Clone;
+	type Meta: 'static + Send + Sync + Clone;
 
 	/// Whether routes provided by this plugin are static.
 	/// Usually this shoult be `true` for pages and `false` for actions.
@@ -27,12 +28,30 @@ pub trait RouterPlugin {
 
 	fn add_routes(&self, router: Router<Self::State>) -> Router<Self::State>;
 
+	/// Call this method instead of [`add_routes`](Self::add_routes) to add routes which can
+	/// be layered by a [`BundleLayer`].
+	fn add_bundle_route<M, H>(
+		&self,
+		router: Router<Self::State>,
+		route_info: RouteInfo,
+		handler: H,
+		_meta: Self::Meta,
+	) -> Router<Self::State>
+	where
+		H: BundleRoute<M, State = Self::State>,
+		H::Extractors: 'static + Send + Sync + FromRequestParts<Self::State>,
+	{
+		// default to just calling `add_route`,
+		// but middleware layers can override this with a BundleLayer
+		Self::add_route(self, router, route_info, handler)
+	}
 	fn add_route<M>(
 		&self,
 		router: Router<Self::State>,
+		route_info: RouteInfo,
 		handler: impl IntoBeetRoute<M, State = Self::State>,
 	) -> Router<Self::State> {
-		handler.into_beet_route(router)
+		handler.add_beet_route(router, route_info)
 	}
 }
 

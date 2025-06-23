@@ -1,3 +1,4 @@
+//! Implement BundleRoute for functions that have any number of extractors
 use crate::prelude::*;
 use axum::extract::FromRequestParts;
 use bevy::prelude::*;

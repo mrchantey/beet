@@ -1,39 +1,22 @@
 use crate::prelude::*;
 use axum::extract::FromRequestParts;
-use axum::response::Html;
-use axum::routing;
 use axum::routing::MethodFilter;
-use axum::routing::MethodRouter;
+use axum::routing::{
+	self,
+};
 use beet_net::prelude::*;
-use beet_template::prelude::*;
 use bevy::prelude::*;
-use std::convert::Infallible;
 
 /// Methods that accept a tuple of extractors and return a bundle.
 pub trait BundleRoute<M>: 'static + Send + Sync + Clone {
 	type Bundle: Bundle;
 	type State: 'static + Send + Sync + Clone;
 	type Extractors: 'static + Send + FromRequestParts<Self::State>;
-	type Future: Future<Output = AppResult<Self::Bundle>> + Send + 'static;
+	type Future: 'static
+		+ Send
+		// + Sync
+		+ Future<Output = AppResult<Self::Bundle>>;
 	fn into_bundle_result(self, extractors: Self::Extractors) -> Self::Future;
-
-	/// Converts the route into a method router that can be used in an axum router.
-	fn into_method_router(
-		self,
-		method: HttpMethod,
-	) -> MethodRouter<Self::State, Infallible>
-	where
-		Self: Sized,
-	{
-		routing::on(
-			method.into_axum_method(),
-			async move |extractors: Self::Extractors| -> AppResult<Html<String>> {
-				let bundle = self.into_bundle_result(extractors).await?;
-				let html = HtmlDocument::parse_bundle(bundle);
-				Ok(Html(html))
-			},
-		)
-	}
 }
 
 #[extend::ext(name=HttpMethodExt)]
@@ -53,13 +36,36 @@ pub impl HttpMethod {
 	}
 }
 
+pub struct BundleRouteIntoBeetRouteMarker;
+
+impl<R, M> IntoBeetRoute<(BundleRouteIntoBeetRouteMarker, M)> for R
+where
+	R: BundleRoute<M>,
+{
+	type State = R::State;
+	fn add_beet_route(
+		self,
+		router: Router<Self::State>,
+		route_info: RouteInfo,
+	) -> Router<Self::State> {
+		router.route(
+			&route_info.path.to_string_lossy(),
+		routing::on(
+			route_info.method.into_axum_method(),
+			async move |extractors: R::Extractors| -> AppResult<BundleResponse<R::Bundle>> {
+				let bundle = self.into_bundle_result(extractors).await?;
+				Ok(BundleResponse::new(bundle))
+			},
+		)		)
+	}
+}
+
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
 	use axum::Router;
 	use axum::extract::Query as QueryParams;
 	use beet_common::prelude::*;
-	use beet_net::prelude::*;
 	use beet_template::prelude::*;
 	use bevy::prelude::*;
 	use serde::Deserialize;
@@ -84,8 +90,12 @@ mod test {
 	#[sweet::test]
 	async fn works() {
 		// this machinery is usually done by the AppRouter
-		let router: Router = Router::new()
-			.route("/test", my_route.into_method_router(HttpMethod::Get));
+
+		use axum::routing::get;
+		let router: Router = Router::new().route(
+			"/test",
+			get(async move |e| BundleResponse::new(my_route(e))),
+		);
 		let response = router
 			.oneshot(
 				axum::http::Request::builder()

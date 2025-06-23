@@ -69,6 +69,8 @@ pub enum RouteFileMethodMeta {
 }
 
 impl RouteFileMethodMeta {
+	/// Returns the path to the meta function for this route file method,
+	/// which can be called to get the metadata for the route.
 	pub fn ident(&self, mod_ident: &Ident, method_name: &str) -> syn::Path {
 		match self {
 			RouteFileMethodMeta::Method => {

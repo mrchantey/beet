@@ -1,3 +1,4 @@
+//! Implement BundleRoute for functions that have a single extractor, which may be a tuple
 use crate::prelude::*;
 use axum::extract::FromRequestParts;
 use bevy::prelude::*;

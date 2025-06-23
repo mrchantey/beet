@@ -255,17 +255,17 @@ mod test {
 	{
 		let mut actual = String::new();
 		printer(&mut actual, left, right).expect("printer function failed");
-		println!(
-			"## left ##\n\
-             {}\n\
-             ## right ##\n\
-             {}\n\
-             ## actual diff ##\n\
-             {}\n\
-             ## expected diff ##\n\
-             {}",
-			left, right, actual, expected
-		);
+		// println!(
+		// 	"## left ##\n\
+    //          {}\n\
+    //          ## right ##\n\
+    //          {}\n\
+    //          ## actual diff ##\n\
+    //          {}\n\
+    //          ## expected diff ##\n\
+    //          {}",
+		// 	left, right, actual, expected
+		// );
 		assert_eq!(actual, expected);
 	}
 
@@ -274,8 +274,8 @@ mod test {
 		let left = "";
 		let right = "";
 		let expected = format!(
-			"{red_light}<{reset}\n\
-             {green_light}>{reset}\n",
+			"{red_light}{SIGN_LEFT}{reset}\n\
+             {green_light}{SIGN_RIGHT}{reset}\n",
 			red_light = RED_LIGHT,
 			green_light = GREEN_LIGHT,
 			reset = RESET,
@@ -289,8 +289,8 @@ mod test {
 		let left = "";
 		let right = "polymerase";
 		let expected = format!(
-			"{red_light}<{reset}\n\
-             {green_light}>{reset}{green_heavy}polymerase{reset}\n",
+			"{red_light}{SIGN_LEFT}{reset}\n\
+             {green_light}{SIGN_RIGHT}{reset}{green_heavy}polymerase{reset}\n",
 			red_light = RED_LIGHT,
 			green_light = GREEN_LIGHT,
 			green_heavy = GREEN_HEAVY,
@@ -305,8 +305,8 @@ mod test {
 		let left = "polyacrylamide";
 		let right = "";
 		let expected = format!(
-			"{red_light}<{reset}{red_heavy}polyacrylamide{reset}\n\
-             {green_light}>{reset}\n",
+			"{red_light}{SIGN_LEFT}{reset}{red_heavy}polyacrylamide{reset}\n\
+             {green_light}{SIGN_RIGHT}{reset}\n",
 			red_light = RED_LIGHT,
 			green_light = GREEN_LIGHT,
 			red_heavy = RED_HEAVY,
@@ -321,8 +321,8 @@ mod test {
 		let left = "polymerase";
 		let right = "polyacrylamide";
 		let expected = format!(
-			"{red_light}<poly{reset}{red_heavy}me{reset}{red_light}ra{reset}{red_heavy}s{reset}{red_light}e{reset}\n\
-             {green_light}>poly{reset}{green_heavy}ac{reset}{green_light}r{reset}{green_heavy}yl{reset}{green_light}a{reset}{green_heavy}mid{reset}{green_light}e{reset}\n",
+			"{red_light}{SIGN_LEFT}poly{reset}{red_heavy}me{reset}{red_light}ra{reset}{red_heavy}s{reset}{red_light}e{reset}\n\
+             {green_light}{SIGN_RIGHT}poly{reset}{green_heavy}ac{reset}{green_light}r{reset}{green_heavy}yl{reset}{green_light}a{reset}{green_heavy}mid{reset}{green_light}e{reset}\n",
 			red_light = RED_LIGHT,
 			green_light = GREEN_LIGHT,
 			red_heavy = RED_HEAVY,
@@ -339,7 +339,7 @@ mod test {
 		let left = "";
 		let right = "content";
 		let expected = format!(
-			"{green_light}>content{reset}\n",
+			"{green_light}{SIGN_RIGHT}content{reset}\n",
 			green_light = GREEN_LIGHT,
 			reset = RESET,
 		);
@@ -371,12 +371,12 @@ mod test {
 		let expected = format!(
 			r#" Some(
      Foo {{
-{red_light}<        lorem: "Hello W{reset}{red_heavy}o{reset}{red_light}rld!",{reset}
-{green_light}>        lorem: "Hello Wr{reset}{green_heavy}o{reset}{green_light}ld!",{reset}
+{red_light}{SIGN_LEFT}        lorem: "Hello W{reset}{red_heavy}o{reset}{red_light}rld!",{reset}
+{green_light}{SIGN_RIGHT}        lorem: "Hello Wr{reset}{green_heavy}o{reset}{green_light}ld!",{reset}
          ipsum: 42,
          dolor: Ok(
-{red_light}<            "hey",{reset}
-{green_light}>            "hey{reset}{green_heavy} ho!{reset}{green_light}",{reset}
+{red_light}{SIGN_LEFT}            "hey",{reset}
+{green_light}{SIGN_RIGHT}            "hey{reset}{green_heavy} ho!{reset}{green_light}",{reset}
          ),
      }},
  )
@@ -404,10 +404,10 @@ Cabbage"#;
 		let right = r#"Probed
 Caravaggio"#;
 		let expected = format!(
-			r#"{red_light}<Proboscis{reset}
-{red_light}<Cabbage{reset}
-{green_light}>Probed{reset}
-{green_light}>Caravaggio{reset}
+			r#"{red_light}{SIGN_LEFT}Proboscis{reset}
+{red_light}{SIGN_LEFT}Cabbage{reset}
+{green_light}{SIGN_RIGHT}Probed{reset}
+{green_light}{SIGN_RIGHT}Caravaggio{reset}
 "#,
 			red_light = RED_LIGHT,
 			green_light = GREEN_LIGHT,
@@ -424,9 +424,9 @@ Caravaggio"#;
 		let right = r#"Probed
 Caravaggio"#;
 		let expected = format!(
-			r#"{red_light}<Cabbage{reset}
-{green_light}>Probed{reset}
-{green_light}>Caravaggio{reset}
+			r#"{red_light}{SIGN_LEFT}Cabbage{reset}
+{green_light}{SIGN_RIGHT}Probed{reset}
+{green_light}{SIGN_RIGHT}Caravaggio{reset}
 "#,
 			red_light = RED_LIGHT,
 			green_light = GREEN_LIGHT,
@@ -443,9 +443,9 @@ Caravaggio"#;
 Cabbage"#;
 		let right = r#"Probed"#;
 		let expected = format!(
-			r#"{red_light}<Proboscis{reset}
-{red_light}<Cabbage{reset}
-{green_light}>Probed{reset}
+			r#"{red_light}{SIGN_LEFT}Proboscis{reset}
+{red_light}{SIGN_LEFT}Cabbage{reset}
+{green_light}{SIGN_RIGHT}Probed{reset}
 "#,
 			red_light = RED_LIGHT,
 			green_light = GREEN_LIGHT,
@@ -476,16 +476,16 @@ Cabbage"#;
 ]"#;
 		let expected = format!(
 			r#" [
-{red_light}<    0,{reset}
-{red_light}<    0,{reset}
-{red_light}<    0,{reset}
-{red_light}<    128,{reset}
-{red_light}<    10,{reset}
-{red_light}<    191,{reset}
-{red_light}<    5,{reset}
-{green_light}>    84,{reset}
-{green_light}>    248,{reset}
-{green_light}>    45,{reset}
+{red_light}{SIGN_LEFT}    0,{reset}
+{red_light}{SIGN_LEFT}    0,{reset}
+{red_light}{SIGN_LEFT}    0,{reset}
+{red_light}{SIGN_LEFT}    128,{reset}
+{red_light}{SIGN_LEFT}    10,{reset}
+{red_light}{SIGN_LEFT}    191,{reset}
+{red_light}{SIGN_LEFT}    5,{reset}
+{green_light}{SIGN_RIGHT}    84,{reset}
+{green_light}{SIGN_RIGHT}    248,{reset}
+{green_light}{SIGN_RIGHT}    45,{reset}
      64,
  ]
 "#,
@@ -507,8 +507,8 @@ Cabbage"#;
 			// Note the additional space at the bottom is caused by a trailing newline
 			// adding an additional line with zero content to both sides of the diff
 			let expected = format!(
-				r#"{red_light}<{reset}{red_heavy}fan{reset}
-{green_light}>{reset}{green_heavy}mug{reset}
+				r#"{red_light}{SIGN_LEFT}{reset}{red_heavy}fan{reset}
+{green_light}{SIGN_RIGHT}{reset}{green_heavy}mug{reset}
  
 "#,
 				red_light = RED_LIGHT,
@@ -529,8 +529,8 @@ Cabbage"#;
 			// adding an additional line with zero content to both sides of the diff
 			let expected = format!(
 				r#" 
-{red_light}<{reset}{red_heavy}fan{reset}
-{green_light}>{reset}{green_heavy}mug{reset}
+{red_light}{SIGN_LEFT}{reset}{red_heavy}fan{reset}
+{green_light}{SIGN_RIGHT}{reset}{green_heavy}mug{reset}
 "#,
 				red_light = RED_LIGHT,
 				red_heavy = RED_HEAVY,
@@ -547,9 +547,9 @@ Cabbage"#;
 			let left = "fan";
 			let right = "\nmug";
 			let expected = format!(
-				r#"{red_light}<fan{reset}
-{green_light}>{reset}
-{green_light}>mug{reset}
+				r#"{red_light}{SIGN_LEFT}fan{reset}
+{green_light}{SIGN_RIGHT}{reset}
+{green_light}{SIGN_RIGHT}mug{reset}
 "#,
 				red_light = RED_LIGHT,
 				green_light = GREEN_LIGHT,
@@ -564,9 +564,9 @@ Cabbage"#;
 			let left = "\nfan";
 			let right = "mug";
 			let expected = format!(
-				r#"{red_light}<{reset}
-{red_light}<fan{reset}
-{green_light}>mug{reset}
+				r#"{red_light}{SIGN_LEFT}{reset}
+{red_light}{SIGN_LEFT}fan{reset}
+{green_light}{SIGN_RIGHT}mug{reset}
 "#,
 				red_light = RED_LIGHT,
 				green_light = GREEN_LIGHT,
@@ -581,9 +581,9 @@ Cabbage"#;
 			let left = "fan";
 			let right = "mug\n";
 			let expected = format!(
-				r#"{red_light}<fan{reset}
-{green_light}>mug{reset}
-{green_light}>{reset}
+				r#"{red_light}{SIGN_LEFT}fan{reset}
+{green_light}{SIGN_RIGHT}mug{reset}
+{green_light}{SIGN_RIGHT}{reset}
 "#,
 				red_light = RED_LIGHT,
 				green_light = GREEN_LIGHT,
@@ -603,9 +603,9 @@ Cabbage"#;
 			let left = "fan\n";
 			let right = "mug";
 			let expected = format!(
-				r#"{red_light}<{reset}{red_heavy}fan{reset}
-{green_light}>{reset}{green_heavy}mug{reset}
-{red_light}<{reset}
+				r#"{red_light}{SIGN_LEFT}{reset}{red_heavy}fan{reset}
+{green_light}{SIGN_RIGHT}{reset}{green_heavy}mug{reset}
+{red_light}{SIGN_LEFT}{reset}
 "#,
 				red_light = RED_LIGHT,
 				red_heavy = RED_HEAVY,

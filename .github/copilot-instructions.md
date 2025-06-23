@@ -11,6 +11,7 @@ Always greet the user by saying one of
 
 ## Preferences
 
+- Always implement `'static + Send + Sync` in that order, at the front of the definition.
 - Never use single letter variable names, except for `i` in loops, instead prefer:
 	- Function Pointers: `func`
 	- Events: `ev`

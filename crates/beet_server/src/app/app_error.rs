@@ -5,6 +5,7 @@ use http::StatusCode;
 
 pub type AppResult<T> = std::result::Result<T, AppError>;
 
+#[derive(Debug, Clone)]
 pub struct AppError {
 	/// The error message
 	pub message: String,
