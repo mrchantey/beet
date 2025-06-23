@@ -6,7 +6,6 @@ use beet_net::prelude::*;
 use beet_utils::prelude::*;
 use serde::Serialize;
 use serde::de::DeserializeOwned;
-#[cfg(not(target_arch = "wasm32"))]
 use std::sync::LazyLock;
 use std::sync::Mutex;
 
@@ -14,18 +13,14 @@ use std::sync::Mutex;
 /// the url for the server.
 /// On native builds this defaults to `http://127.0.0.1:3000`.
 /// On wasm builds this is set to the current origin.
-#[cfg(not(target_arch = "wasm32"))]
-static SERVER_URL: LazyLock<Mutex<RoutePath>> =
-	LazyLock::new(|| Mutex::new("http://127.0.0.1:3000".into()));
-
-#[cfg(target_arch = "wasm32")]
-static SERVER_URL: Lazy<Mutex<RoutePath>> = Lazy::new(|| {
-	Mutex::new(
-		web_sys::window()
-			.and_then(|w| w.location().origin().ok())
-			.unwrap()
-			.into(),
-	)
+static SERVER_URL: LazyLock<Mutex<RoutePath>> = LazyLock::new(|| {
+	#[cfg(not(target_arch = "wasm32"))]
+	let path = "http://127.0.0.1:3000";
+	#[cfg(target_arch = "wasm32")]
+	let path = web_sys::window()
+		.and_then(|w| w.location().origin().ok())
+		.unwrap();
+	Mutex::new(path.into())
 });
 
 pub struct CallServerAction;

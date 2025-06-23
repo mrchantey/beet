@@ -42,7 +42,7 @@ pub fn parse_route_tree(
 	_: TempNonSendMarker,
 	mut query: Populated<
 		(Entity, &mut CodegenFileSendit),
-		With<RouterCodegenRoot>,
+		With<RouteCodegenRoot>,
 	>,
 	file_groups: Query<(Entity, &FileGroupSendit)>,
 	methods: Query<&RouteFileMethod>,

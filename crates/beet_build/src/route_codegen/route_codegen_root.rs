@@ -5,14 +5,7 @@ use bevy::prelude::*;
 use serde::Deserialize;
 use serde::Serialize;
 
-/// The default codegen builder for a beet site.
-///
-/// This will perform the following tasks:
-///
-/// - If a `src/actions` dir exists, generate server actions
-/// - If a `src/pages` dir exists, generate pages codegen and add to the route tree
-/// - If a `src/docs` dir exists, generate docs codegen and add to the route tree
-///
+/// The codegen builder for routes in a beet site.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct RouteCodegenConfig {
 	/// The root codegen, containing the route mod tree and other utilities.
@@ -45,7 +38,7 @@ impl Default for RouteCodegenConfig {
 impl NonSendPlugin for RouteCodegenConfig {
 	fn build(self, app: &mut App) {
 		let mut root = app.world_mut().spawn((
-			RouterCodegenRoot::default(),
+			RouteCodegenRoot::default(),
 			self.codegen_file.clone().sendit(),
 		));
 		root.with_children(|mut parent| {
@@ -58,7 +51,7 @@ impl NonSendPlugin for RouteCodegenConfig {
 
 #[derive(Debug, Clone, Default, Component)]
 #[require(CodegenFileSendit)]
-pub struct RouterCodegenRoot {}
+pub struct RouteCodegenRoot {}
 
 
 #[cfg(test)]

@@ -10,7 +10,7 @@ pub fn reexport_file_groups(
 	_: TempNonSendMarker,
 	mut roots: Query<
 		(&mut CodegenFileSendit, &Children),
-		(With<RouterCodegenRoot>, Without<FileGroupSendit>),
+		(With<RouteCodegenRoot>, Without<FileGroupSendit>),
 	>,
 	file_groups: Query<(&CodegenFileSendit, &FileGroupSendit)>,
 ) -> Result {

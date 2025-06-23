@@ -16,7 +16,9 @@ fn main() -> Result {
 
 #[cfg(target_arch = "wasm32")]
 fn main() -> Result<()> {
-	App::new().add_plugins(ClientIslandPlugin).run();
+	App::new()
+		.add_plugins((TemplatePlugin, ClientIslandPlugin))
+		.run();
 
 	// beet_site::wasm::collect().mount_with_server_url("https://beetrs.dev")
 }
