@@ -63,7 +63,7 @@ pub trait RouterPlugin: Sized {
 	{
 		// default to just calling `add_route`,
 		// but middleware layers can override this with a BundleLayer
-		Self::add_route(self, router, route_info, handler)
+		self.add_route(router, route_info, handler)
 	}
 	fn add_route<M>(
 		&self,

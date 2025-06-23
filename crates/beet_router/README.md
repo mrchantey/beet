@@ -1,9 +1,3 @@
 # Beet Router
 
-Routing features:
-
-- File Based Routes
-- Client Islands
-- Server Actions
-
-This crate contains both client and server code for these features.
+This crate is for patterns that are used in both server and client like Client Islands and Server Actions.

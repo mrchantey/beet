@@ -27,7 +27,7 @@ where
 	type State = R::State;
 	type Meta = R::Meta;
 
-	fn is_static(&self) -> bool { self.router_plugin.is_static() }
+	fn is_static(&self) -> bool { self.layer.is_static() }
 	fn routes(&self) -> Vec<RouteInfo> { self.router_plugin.routes() }
 	fn meta(&self) -> Vec<Self::Meta> { self.router_plugin.meta() }
 

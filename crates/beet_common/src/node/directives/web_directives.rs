@@ -93,7 +93,7 @@ impl TemplateDirective for ClientOnlyDirective {
 
 /// Serialized version of this [`TemplateNode`], for use as an entrypoint
 /// for client islands.
-#[derive(Debug, Default, Clone, Component, Reflect)]
+#[derive(Debug, Default, Clone, PartialEq, Eq, Component, Reflect)]
 #[reflect(Default, Component)]
 #[component(immutable)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]

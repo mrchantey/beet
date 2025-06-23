@@ -1,6 +1,7 @@
 use crate::prelude::*;
 use axum::extract::FromRequestParts;
 use axum::response::IntoResponse;
+use axum::response::Response;
 use axum::routing;
 use beet_net::prelude::*;
 use bevy::prelude::*;
@@ -12,12 +13,15 @@ pub trait BundleLayerHandler: 'static + Send + Sync + Clone {
 	type Output: IntoResponse;
 	type Meta: 'static + Send + Sync + Clone;
 
+	/// Specify whether this layer is static.
+	fn is_static(&self) -> bool { true }
+
 	fn handle_bundle_route(
 		&self,
 		extractors: Self::Extractors,
 		bundle: impl Bundle,
 		meta: Self::Meta,
-	) -> impl Send + Sync + Future<Output = AppResult<Self::Output>>;
+	) -> impl Send + Sync + Future<Output = Self::Output>;
 }
 
 
@@ -71,7 +75,7 @@ where
 				route_info.method.into_axum_method(),
 				async move |layer_extractors,
 				            extractors|
-				            -> AppResult<Layer::Output> {
+				            -> AppResult<Response> {
 					let bundle =
 						self.route.into_bundle_result(extractors).await?;
 					let res = self
@@ -81,7 +85,8 @@ where
 							bundle,
 							self.meta,
 						)
-						.await?;
+						.await
+						.into_response();
 					Ok(res)
 				},
 			),
@@ -123,16 +128,15 @@ mod test {
 			params: Self::Extractors,
 			bundle: impl Bundle,
 			_meta: Self::Meta,
-		) -> impl Send + Sync + Future<Output = AppResult<Self::Output>> {
+		) -> impl Send + Sync + Future<Output = Self::Output> {
 			async move {
-				Ok(BundleResponse::new(rsx! {
+				BundleResponse::new(rsx! {
 					<div>
 						<span>name: {params.name.clone()}</span>
 						{bundle}
 					</div>
-
 				})
-				.into_response())
+				.into_response()
 			}
 		}
 	}
