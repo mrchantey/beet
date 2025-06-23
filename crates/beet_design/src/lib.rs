@@ -7,7 +7,7 @@
 pub mod color;
 pub mod components;
 /// Structs for use as context in components
-pub mod context;
+pub mod types;
 pub mod css;
 pub mod html_elements;
 /// Collection of interactive components
@@ -26,7 +26,7 @@ pub mod prelude {
 	pub use crate::mockups::*;
 	pub use crate::color::*;
 	pub use crate::components::*;
-	pub use crate::context::*;
+	pub use crate::types::*;
 	pub use crate::css::*;
 	pub use crate::csx;
 	pub use crate::html_elements::*;

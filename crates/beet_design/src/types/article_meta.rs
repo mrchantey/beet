@@ -1,9 +1,12 @@
 use serde::Deserialize;
 use serde::Serialize;
+use crate::prelude::SidebarInfo;
 
 
+
+/// General metadata common for blog posts, docs, etc.
 #[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct DocsMeta {
+pub struct ArticleMeta {
 	#[serde(default)]
 	pub title: Option<String>,
 	#[serde(default)]
@@ -12,12 +15,4 @@ pub struct DocsMeta {
 	pub draft: bool,
 	#[serde(default)]
 	pub sidebar: SidebarInfo,
-}
-
-#[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct SidebarInfo {
-	#[serde(default)]
-	pub label: Option<String>,
-	#[serde(default)]
-	pub order: Option<u32>,
 }

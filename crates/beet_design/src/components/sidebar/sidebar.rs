@@ -1,4 +1,15 @@
 use crate::prelude::*;
+use serde::Deserialize;
+use serde::Serialize;
+
+#[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SidebarInfo {
+	#[serde(default)]
+	pub label: Option<String>,
+	#[serde(default)]
+	pub order: Option<u32>,
+}
+
 
 #[template]
 pub fn Sidebar(nodes: Vec<SidebarNode>) -> impl Bundle {

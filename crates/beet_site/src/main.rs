@@ -7,9 +7,9 @@ fn main() -> Result {
 	AppRouter::default()
 		.add_plugins((
 			PagesPlugin,
-			DocsPlugin,
+			DocsPlugin.layer(ArticleLayout),
 			ActionsPlugin,
-			BeetDesignMockupsPlugin,
+			BeetDesignMockupsPlugin.layer(ArticleLayout),
 		))
 		.run()
 	// fn with_sidebar(route: RouteFunc<RsxRouteFunc>) -> RouteFunc<RsxRouteFunc> {

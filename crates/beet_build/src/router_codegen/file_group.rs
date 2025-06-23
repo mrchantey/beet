@@ -30,13 +30,6 @@ pub struct FileGroupConfig {
 	pub codegen: CodegenFile,
 	#[serde(flatten)]
 	pub modify_route: ModifyRoutePath,
-	/// For file groups that generate the code for pages, ie md & rsx,
-	/// add the returned type  as a child of this template.
-	/// All templates must meet the following requirements:
-	/// - Have a `meta` field that matches the [`FileGroup::meta_type`]
-	/// - Have a default `<slot/>` for the content
-	#[serde(default, with = "syn_expr_serde::option")]
-	pub template: Option<syn::Expr>,
 }
 
 
@@ -60,10 +53,6 @@ impl FileGroupConfig {
 			self.codegen.sendit(),
 			self.modify_route,
 		));
-		if let Some(template) = self.template {
-			entity.insert(TemplateWrapper(template).sendit());
-		}
-
 		if let Some(client_actions_codegen) = client_actions_codegen {
 			entity.with_child((
 				client_actions_codegen.sendit(),

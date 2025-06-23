@@ -24,8 +24,7 @@ package_name = "beet_site"
 path = "crates/beet_site/src/docs"
 output = "crates/beet_site/src/codegen/docs/mod.rs"
 base_route = "/docs"
-template = "DocsLayout"
-meta_type = "DocsMeta"
+meta_type = "ArticleMeta"
 import_tokens = [
 	"#[allow(unused_imports)]use beet::prelude::*;",
 	"#[allow(unused_imports)]use crate::prelude::*;",
@@ -49,6 +48,7 @@ name = "beet_design_mockups"
 # preset = "mockup"
 package_name = "beet_design"
 path = "crates/beet_design/src"
+meta_type = "ArticleMeta"
 output = "crates/beet_design/src/codegen/mockups.rs"
 include = ["*.mockup.*"]
 base_route = "/design"

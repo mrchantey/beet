@@ -6,14 +6,7 @@ use beet_parse::prelude::tokenize_bundle;
 use bevy::prelude::*;
 use quote::quote;
 use syn::Block;
-use syn::Expr;
 use syn::ItemFn;
-
-/// Added to the root of route files that have been parsed into a tree via
-/// [`CombinatorTokens`], ie `.md` and `.rsx` files.
-#[derive(Debug, Clone, Sendit)]
-#[sendit(derive(Component))]
-pub struct TemplateWrapper(pub Expr);
 
 /// After a [`CombinatorTokens`] has been parsed into a [`Bundle`],
 /// tokenize it and append to the [`CodegenFile`].
@@ -23,25 +16,9 @@ pub fn tokenize_combinator_route(world: &mut World) -> Result {
 			With<CodegenFileSendit>,
 			Added<CombinatorRouteCodegenSendit>
 		)>();
-	let mut parents = world.query::<&ChildOf>();
 	for entity in query.iter(world).collect::<Vec<_>>() {
-		let mut tokens = tokenize_bundle(world, entity)?;
+		let tokens = tokenize_bundle(world, entity)?;
 		trace!("Tokenizing combinator route for entity: {:?}", entity);
-
-		if let Some(template_wrapper) = parents
-			.query(world)
-			.iter_ancestors(entity)
-			.find_map(|e| world.get::<TemplateWrapperSendit>(e))
-		{
-			let template = &template_wrapper.0.0;
-			tokens = quote::quote! {rsx!{
-				<#template meta=meta()>
-					#tokens
-				</#template>
-			}};
-		}
-
-
 		world
 			.entity_mut(entity)
 			.get_mut::<CodegenFileSendit>()
@@ -119,10 +96,7 @@ mod test {
 	fn works() {
 		let mut app = App::new();
 		app.add_plugins((RouterCodegenPlugin, NodeTokensPlugin));
-		app.world_mut().spawn((
-			FileGroup::test_site_docs(),
-			TemplateWrapper(syn::parse_quote!(MyWrapperNode)).sendit(),
-		));
+		app.world_mut().spawn((FileGroup::test_site_docs(),));
 		app.update();
 		app
 		.world_mut()
@@ -151,61 +125,55 @@ mod test {
 			}
 
 			pub fn get() -> impl Bundle {
-				rsx! {
-					<MyWrapperNode meta=meta()>
-					{
-						(
-							FragmentNode,
-							related! {
-								Children [
-									(
-										NodeTag(String::from("h1")),
-										ElementNode { self_closing: false },
-										related! {
-											Children [
-												TextNode(String::from("Hello"))
-											]
-										}
-									),
-									(
-										NodeTag(String::from("p")),
-										ElementNode { self_closing: false },
-										related! {
-											Children [
-												TextNode(String::from("This page is all about saying hello"))
-											]
-										}
-									),
-									(
-										NodeTag(String::from("MyComponent")),
-										FragmentNode,
-										TemplateNode,
-										ItemOf::<TemplateNode, RustyTracker> {
-											value: RustyTracker {
-												index: 0u32,
-												tokens_hash: 15709703891249699336u64
-											},
-											phantom: std::marker::PhantomData::<TemplateNode>
-										},
-										{
-											let template = <MyComponent as Props>::Builder::default()
-												.val({ 2 + 2 })
-												.build();
-											#[allow(unused_braces)]
-											(TemplateRoot::spawn(Spawn(template.into_node_bundle())))
-										},
-										related! {
-											Children [
-												TextNode(String::from("## RSX\n\tIt contains some rsx, not sure if this will work"))
-											]
-										}
-									)
-								]
-							}
-						)
+				{(
+					FragmentNode,
+					related! {
+						Children [
+							(
+								NodeTag(String::from("h1")),
+								ElementNode { self_closing: false },
+								related! {
+									Children [
+										TextNode(String::from("Hello"))
+									]
+								}
+							),
+							(
+								NodeTag(String::from("p")),
+								ElementNode { self_closing: false },
+								related! {
+									Children [
+										TextNode(String::from("This page is all about saying hello"))
+									]
+								}
+							),
+							(
+								NodeTag(String::from("MyComponent")),
+								FragmentNode,
+								TemplateNode,
+								ItemOf::<TemplateNode, RustyTracker> {
+									value: RustyTracker {
+										index: 0u32,
+										tokens_hash: 15709703891249699336u64
+									},
+									phantom: std::marker::PhantomData::<TemplateNode>
+								},
+								{
+									let template = <MyComponent as Props>::Builder::default()
+										.val({ 2 + 2 })
+										.build();
+									#[allow(unused_braces)]
+									(TemplateRoot::spawn(Spawn(template.into_node_bundle())))
+								},
+								related! {
+									Children [
+										TextNode(String::from("## RSX\n\tIt contains some rsx, not sure if this will work"))
+									]
+								}
+							)
+						]
 					}
-					</MyWrapperNode>
-				}
+				)}
 			}
 	}.to_string());
 	}

@@ -1,2 +1,2 @@
-mod docs_layout;
-pub use docs_layout::*;
+mod article_layout;
+pub use article_layout::*;

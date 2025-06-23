@@ -18,7 +18,7 @@ pub mod prelude {
 	pub use super::codegen::docs::*;
 	pub use super::codegen::pages::*;
 	pub use super::layouts::*;
-	pub use super::types::*;
+	// pub use super::types::*;
 	pub use super::*;
 	pub use crate::codegen::route_path_tree;
 	pub use crate::codegen::routes;

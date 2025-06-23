@@ -53,7 +53,7 @@ pub fn collect_file_group(
 						// All page routes are BundleRoutes, so use add_bundle_route
 						// for middleware support
 						route_handlers.push(parse_quote! {
-								router = self.add_bundle_route(
+								router = plugin.add_bundle_route(
 									router,
 									#route_info,
 									#mod_ident::#http_method,
@@ -64,7 +64,7 @@ pub fn collect_file_group(
 					FileGroupCategory::Actions => {
 						// Action routes may be any kind of route
 						route_handlers.push(quote! {
-								router = self.add_route(router,#route_info, #mod_ident::#http_method);
+								router = plugin.add_route(router,#route_info, #mod_ident::#http_method);
 						});
 					}
 				}
@@ -130,7 +130,10 @@ pub fn collect_file_group(
 					vec![#(#route_metas()),*]
 				}
 
-				fn add_routes(&self, mut router: beet::exports::axum::Router<#router_state_type>)
+				fn add_routes_with(&self,
+					mut router: beet::exports::axum::Router<#router_state_type>,
+					plugin: &impl RouterPlugin<State = Self::State, Meta = Self::Meta>,
+				)
 					-> beet::exports::axum::Router<#router_state_type> {
 						#(#route_handlers)*
 					router
@@ -192,11 +195,12 @@ mod test {
 					fn meta(&self) -> Vec<Self::Meta> {
 						vec![route0::meta()]
 					}
-					fn add_routes(
+					fn add_routes_with(
 						&self,
-						mut router: beet::exports::axum::Router<()>
+						mut router: beet::exports::axum::Router<()>,
+						plugin: &impl RouterPlugin<State = Self::State, Meta = Self::Meta>,
 					) -> beet::exports::axum::Router<()> {
-						router = self.add_bundle_route(
+						router = plugin.add_bundle_route(
 							router,
 							RouteInfo {
 								path: RoutePath(std::path::PathBuf::from("/hello")),

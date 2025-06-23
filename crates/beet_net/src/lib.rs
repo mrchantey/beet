@@ -7,9 +7,6 @@ mod reqwest;
 mod types;
 
 pub mod prelude {
-	pub use crate::cross_fetch::Request;
-	pub use crate::cross_fetch::Response;
-	pub use crate::cross_fetch::ResponseInner;
 	#[cfg(not(target_arch = "wasm32"))]
 	pub use crate::reqwest::*;
 	pub use crate::types::*;

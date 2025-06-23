@@ -32,7 +32,15 @@ where
 	fn meta(&self) -> Vec<Self::Meta> { self.router_plugin.meta() }
 
 	fn add_routes(&self, router: Router<Self::State>) -> Router<Self::State> {
-		self.router_plugin.add_routes(router)
+		self.add_routes_with(router, self)
+	}
+
+	fn add_routes_with(
+		&self,
+		router: Router<Self::State>,
+		plugin: &impl RouterPlugin<State = Self::State, Meta = Self::Meta>,
+	) -> Router<Self::State> {
+		self.router_plugin.add_routes_with(router, plugin)
 	}
 
 	fn add_bundle_route<M, H>(

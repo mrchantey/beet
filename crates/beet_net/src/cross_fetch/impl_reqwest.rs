@@ -1,4 +1,5 @@
 use super::*;
+use crate::cross_fetch::request::Request;
 use crate::prelude::*;
 use beet_utils::utils::*;
 
@@ -6,7 +7,7 @@ use beet_utils::utils::*;
 
 
 
-impl super::Request {
+impl Request {
 	pub async fn send(self) -> Result<Response> {
 		ReqwestClient::client()
 			.request(self.method.into(), self.url)

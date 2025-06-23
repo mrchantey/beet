@@ -220,7 +220,7 @@ val_string	= "foo"
 	#[ignore = "todo"]
 	fn yaml_frontmatter() {
 		// let yaml = r#"
-		// let foo = DocsMeta {
+		// let foo = ArticleMeta {
 		// 	title: Some("Beet Site".into()),
 		// 	description: Some("A very bevy metaframework".into()),
 		// 	draft: false,

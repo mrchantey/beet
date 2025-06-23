@@ -1,3 +1,4 @@
+use axum::response::Html;
 use axum::response::IntoResponse;
 use axum::response::Response;
 use beet_template::prelude::*;
@@ -10,9 +11,7 @@ pub struct BundleResponse<T: 'static + Send + Sync> {
 }
 
 impl<T: 'static + Send + Sync> BundleResponse<T> {
-	pub fn new(bundle: T) -> Self {
-		Self { bundle }
-	}
+	pub fn new(bundle: T) -> Self { Self { bundle } }
 }
 
 
@@ -20,6 +19,6 @@ impl<B: Bundle> IntoResponse for BundleResponse<B> {
 	fn into_response(self) -> Response {
 		let bundle = self.bundle;
 		let html = HtmlDocument::parse_bundle(bundle);
-		html.into_response()
+		Html(html).into_response()
 	}
 }

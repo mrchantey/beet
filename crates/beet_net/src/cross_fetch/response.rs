@@ -58,9 +58,11 @@ impl ResponseInner for Response {
 
 #[cfg(test)]
 mod test {
+	use crate::cross_fetch::*;
 	use crate::prelude::*;
-	use sweet::prelude::*;
 	use beet_utils::utils::PipelineTarget;
+	use sweet::prelude::*;
+
 
 	const HTTPBIN: &str = "https://httpbin.org";
 

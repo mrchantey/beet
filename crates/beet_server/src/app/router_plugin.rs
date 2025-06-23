@@ -1,11 +1,20 @@
+use crate::app::bundle_layer_plugin::BundleLayerPlugin;
 use crate::prelude::*;
 use axum::extract::FromRequestParts;
 use beet_net::prelude::*;
 
 
-pub trait RouterPlugin {
+pub trait RouterPlugin: Sized {
 	type State: 'static + Send + Sync + Clone;
 	type Meta: 'static + Send + Sync + Clone;
+
+	/// Layer this plugin with a [`BundleLayer`].
+	fn layer<L>(self, layer: L) -> BundleLayerPlugin<L, Self>
+	where
+		Self: Sized,
+	{
+		BundleLayerPlugin::new(layer, self)
+	}
 
 	/// Whether routes provided by this plugin are static.
 	/// Usually this shoult be `true` for pages and `false` for actions.
@@ -26,7 +35,18 @@ pub trait RouterPlugin {
 			.collect()
 	}
 
-	fn add_routes(&self, router: Router<Self::State>) -> Router<Self::State>;
+	/// Add routes to the provided router, overridden by middleware layers,
+	/// which pass themselves to [`add_routes_with`](Self::add_routes_with).
+	fn add_routes(&self, router: Router<Self::State>) -> Router<Self::State> {
+		self.add_routes_with(router, self)
+	}
+
+	/// Allow for middleware routers to pass themselves in
+	fn add_routes_with(
+		&self,
+		router: Router<Self::State>,
+		plugin: &impl RouterPlugin<State = Self::State, Meta = Self::Meta>,
+	) -> Router<Self::State>;
 
 	/// Call this method instead of [`add_routes`](Self::add_routes) to add routes which can
 	/// be layered by a [`BundleLayer`].
@@ -110,7 +130,11 @@ mod test {
 		fn is_static(&self) -> bool { unimplemented!() }
 		fn routes(&self) -> Vec<RouteInfo> { unimplemented!() }
 		fn meta(&self) -> Vec<Self::Meta> { unimplemented!() }
-		fn add_routes(&self, _: Router<Self::State>) -> Router<Self::State> {
+		fn add_routes_with(
+			&self,
+			_: Router<Self::State>,
+			_: &impl RouterPlugin<State = Self::State, Meta = Self::Meta>,
+		) -> Router<Self::State> {
 			unimplemented!()
 		}
 	}
@@ -121,7 +145,11 @@ mod test {
 		fn is_static(&self) -> bool { unimplemented!() }
 		fn routes(&self) -> Vec<RouteInfo> { unimplemented!() }
 		fn meta(&self) -> Vec<Self::Meta> { unimplemented!() }
-		fn add_routes(&self, _: Router<Self::State>) -> Router<Self::State> {
+		fn add_routes_with(
+			&self,
+			_: Router<Self::State>,
+			_: &impl RouterPlugin<State = Self::State, Meta = Self::Meta>,
+		) -> Router<Self::State> {
 			unimplemented!()
 		}
 	}

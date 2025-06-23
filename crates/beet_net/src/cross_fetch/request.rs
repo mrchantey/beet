@@ -148,7 +148,7 @@ impl IntoUrl for &Cow<'_, str> {
 
 #[cfg(test)]
 mod test {
-	use crate::cross_fetch::ResponseInner;
+	use crate::cross_fetch::*;
 	use crate::prelude::*;
 	use beet_utils::prelude::*;
 	use sweet::prelude::*;
@@ -208,7 +208,7 @@ mod test {
 	}
 
 	#[sweet::test]
-		#[ignore = "flaky httpbin"]
+	#[ignore = "flaky httpbin"]
 	async fn put_and_delete_work() {
 		Request::new(format!("{HTTPBIN}/put"))
 			.method(HttpMethod::Put)
@@ -230,7 +230,7 @@ mod test {
 	}
 
 	#[sweet::test]
-		#[ignore = "flaky httpbin"]
+	#[ignore = "flaky httpbin"]
 	async fn body_raw_works() {
 		Request::new(format!("{HTTPBIN}/post"))
 			.method(HttpMethod::Post)
@@ -247,7 +247,7 @@ mod test {
 
 
 	#[test]
-		#[ignore = "flaky httpbin"]
+	#[ignore = "flaky httpbin"]
 
 	fn query_params() {
 		// #[derive(Serialize)]
@@ -259,7 +259,7 @@ mod test {
 	}
 
 	#[sweet::test]
-		#[ignore = "flaky httpbin"]
+	#[ignore = "flaky httpbin"]
 
 	async fn query_params_work() {
 		Request::new(format!("{HTTPBIN}/get"))
