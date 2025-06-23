@@ -36,8 +36,11 @@ impl ClientIslandMap {
 
 	pub fn read(html_dir: &AbsPathBuf) -> Result<Self> {
 		let path = html_dir.join("client_islands.ron");
-		let content = ReadFile::to_string(&path)?;
-		let islands: Self = ron::de::from_str(&content)?;
+		let content = ReadFile::to_bytes(&path)?;
+		let islands: Self = ron::de::from_bytes(&content)?;
 		Ok(islands)
 	}
+
+
+
 }

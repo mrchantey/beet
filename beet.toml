@@ -4,11 +4,11 @@
 # It contains some custom parts to handle the internal nature
 # of the beet site, an external starter project will be significantly simpler.
 
-[router_codegen]
+[route_codegen]
 package_name = "beet_site"
 output = "crates/beet_site/src/codegen/mod.rs"
 
-[[router_codegen.file_group]]
+[[route_codegen.file_group]]
 name = "pages"
 package_name = "beet_site"
 path = "crates/beet_site/src/pages"
@@ -18,7 +18,7 @@ import_tokens = [
 	"#[allow(unused_imports)]use crate::prelude::*;",
 ]
 
-[[router_codegen.file_group]]
+[[route_codegen.file_group]]
 name = "docs"
 package_name = "beet_site"
 path = "crates/beet_site/src/docs"
@@ -30,7 +30,7 @@ import_tokens = [
 	"#[allow(unused_imports)]use crate::prelude::*;",
 ]
 
-[[router_codegen.file_group]]
+[[route_codegen.file_group]]
 name = "actions"
 package_name = "beet_site"
 path = "crates/beet_site/src/actions"
@@ -43,7 +43,7 @@ import_tokens = [
 ]
 
 # example of how to perform codegen for a workspace crate
-[[router_codegen.file_group]]
+[[route_codegen.file_group]]
 name = "beet_design_mockups"
 # preset = "mockup"
 package_name = "beet_design"
@@ -55,7 +55,7 @@ base_route = "/design"
 replace_route = [{ from = ".mockup", to = "" }]
 import_tokens = ["#[allow(unused_imports)]use crate::prelude::*;"]
 
-# [[router_codegen.file_group]]
+# [[route_codegen.file_group]]
 # package_name = "beet_router"
 # name = "test_site_pages"
 # path = "crates/beet_router/src/test_site/pages"
@@ -65,6 +65,8 @@ import_tokens = ["#[allow(unused_imports)]use crate::prelude::*;"]
 # import_tokens = ["use crate::as_beet::*;"]
 
 
-# [wasm]
-# import_tokens = ["use beet::design as beet_design;", "use beet::prelude::*;"]
 
+[client_island_codegen]
+package_name = "beet_site"
+output = "crates/beet_site/src/codegen/client_islands.rs"
+import_tokens = ["use beet::design as beet_design;", "use beet::prelude::*;"]

@@ -14,7 +14,7 @@ use serde::Serialize;
 /// - If a `src/docs` dir exists, generate docs codegen and add to the route tree
 ///
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct RouterCodegenConfig {
+pub struct RouteCodegenConfig {
 	/// The root codegen, containing the route mod tree and other utilities.
 	#[serde(flatten)]
 	pub codegen_file: CodegenFile,
@@ -33,7 +33,7 @@ fn default_codegen_file() -> CodegenFile {
 	)
 }
 
-impl Default for RouterCodegenConfig {
+impl Default for RouteCodegenConfig {
 	fn default() -> Self {
 		Self {
 			codegen_file: default_codegen_file(),
@@ -42,7 +42,7 @@ impl Default for RouterCodegenConfig {
 	}
 }
 
-impl NonSendPlugin for RouterCodegenConfig {
+impl NonSendPlugin for RouteCodegenConfig {
 	fn build(self, app: &mut App) {
 		let mut root = app.world_mut().spawn((
 			RouterCodegenRoot::default(),

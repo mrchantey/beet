@@ -111,6 +111,8 @@ pub struct TemplateSerde {
 
 #[cfg(feature = "serde")]
 impl TemplateSerde {
+	pub fn type_name(&self) -> &str { &self.type_name }
+	pub fn ron(&self) -> &str { &self.ron }
 	/// Create a new [`TemplateSerde`] from a value that can be serialized to RON.
 	/// ## Panics
 	/// Panics if the serialization failed.
@@ -121,10 +123,10 @@ impl TemplateSerde {
 				.expect("Failed to serialize template"),
 		}
 	}
-	pub fn parse<T>(&self) -> Result<T, ron::de::SpannedError>
+	pub fn parse<T>(ron: &str) -> Result<T, ron::de::SpannedError>
 	where
 		T: serde::de::DeserializeOwned,
 	{
-		ron::de::from_str(&self.ron)
+		ron::de::from_str(ron)
 	}
 }

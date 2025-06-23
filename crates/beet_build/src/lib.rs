@@ -3,18 +3,15 @@
 #![cfg_attr(test, feature(stmt_expr_attributes))]
 #![feature(let_chains, if_let_guard, result_flattening)]
 
-mod router_codegen;
-mod codegen_wasm;
-// mod build_codegen_actions;
+mod route_codegen;
+mod client_island_codegen;
 mod beet_config;
 mod build_templates;
 mod utils;
 
 pub mod prelude {
-	// pub use crate::bevy::*;
-	pub use crate::router_codegen::*;
-	pub use crate::codegen_wasm::*;
-	// pub use crate::build_codegen_actions::*;
+	pub use crate::route_codegen::*;
+	pub use crate::client_island_codegen::*;
 	pub use crate::beet_config::*;
 	pub use crate::build_templates::*;
 	pub use crate::utils::*;

@@ -24,7 +24,7 @@ pub struct RouterCodegenPlugin;
 
 impl Plugin for RouterCodegenPlugin {
 	fn build(&self, app: &mut App) {
-		app.init_non_send_resource::<RouterCodegenConfig>()
+		app.init_non_send_resource::<RouteCodegenConfig>()
 			.configure_sets(
 				Update,
 				(

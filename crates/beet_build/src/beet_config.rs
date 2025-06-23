@@ -19,9 +19,9 @@ pub struct BeetConfig {
 	#[serde(default)]
 	pub template_scene: BuildFileTemplates,
 	#[serde(default)]
-	pub router_codegen: RouterCodegenConfig,
+	pub route_codegen: RouteCodegenConfig,
 	#[serde(default)]
-	pub codegen_wasm: CodegenWasmConfig,
+	pub client_islands_codegen: ClientIslandCodegenConfig,
 }
 
 impl BeetConfig {
@@ -57,10 +57,10 @@ impl BeetConfig {
 			app.world_mut().spawn(self.template_scene);
 		}
 		if all || only.contains(&BuildOnly::Routes) {
-			app.add_non_send_plugin(self.router_codegen);
+			app.add_non_send_plugin(self.route_codegen);
 		}
 		if all || only.contains(&BuildOnly::Wasm) {
-			app.add_non_send_plugin(self.codegen_wasm);
+			app.add_non_send_plugin(self.client_islands_codegen);
 		}
 	}
 }
