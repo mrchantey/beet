@@ -11,7 +11,7 @@ impl<T> BeetEvent<T> {
 	/// Create a new event with the given value
 	pub fn new(value: T) -> Self { Self(value) }
 }
-impl BeetEvent<()>{	
+impl BeetEvent<()> {
 	#[cfg(target_arch = "wasm32")]
 	pub fn trigger(
 		commands: &mut EntityCommands,
@@ -65,14 +65,21 @@ mod event_types_wasm {
 	// pub type Event = web_sys::MouseEvent;
 	pub type BaseEvent = SendWrapper<web_sys::Event>;
 	pub type MouseEvent = SendWrapper<web_sys::MouseEvent>;
-	impl EventExt for MouseEvent {
-		fn value(&self) -> String {
-			self.current_target()
-				.unwrap()
-				.unchecked_into::<web_sys::HtmlInputElement>()
-				.value()
-		}
+	macro_rules! impl_event_ext {
+		($event_type:ty) => {
+			impl EventExt for $event_type {
+				fn value(&self) -> String {
+					self.current_target()
+						.unwrap()
+						.unchecked_into::<web_sys::HtmlInputElement>()
+						.value()
+				}
+			}
+		};
 	}
+
+	impl_event_ext!(MouseEvent);
+	impl_event_ext!(BaseEvent);
 }
 
 pub trait EventExt {

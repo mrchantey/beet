@@ -45,8 +45,14 @@ impl Plugin for RouteCodegenPlugin {
 						.in_set(ImportRouterCodegenStep),
 					(
 						parse_route_tree,
-						reexport_file_groups,
-						collect_file_group,
+						(
+							(
+								reexport_file_groups,
+								add_client_codegen_to_actions_export,
+							),
+							collect_file_group,
+						)
+							.chain(),
 						collect_client_action_group,
 						(collect_combinator_route, tokenize_combinator_route)
 							.chain(),

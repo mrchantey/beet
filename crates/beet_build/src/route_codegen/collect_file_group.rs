@@ -30,7 +30,7 @@ pub fn collect_file_group(
 			.iter()
 			.filter_map(|child| route_files.get(child).ok())
 		{
-			codegen_file.add_item(route_file.item_mod());
+			codegen_file.add_item(route_file.item_mod(file_group.category));
 			let mod_ident = route_file.mod_ident();
 
 			for method in route_file_children
@@ -105,6 +105,7 @@ pub fn collect_file_group(
 		};
 
 		codegen_file.add_item::<syn::ItemImpl>(parse_quote! {
+			#[cfg(not(target_arch = "wasm32"))]
 			impl #router_plugin_ident {
 				#default_meta
 			}
@@ -114,6 +115,7 @@ pub fn collect_file_group(
 		let is_static = file_group.category.include_in_route_tree();
 
 		codegen_file.add_item::<syn::ItemImpl>(parse_quote! {
+			#[cfg(not(target_arch = "wasm32"))]
 			impl RouterPlugin for #router_plugin_ident {
 				type State = #router_state_type;
 				type Meta = #meta_ty;
@@ -179,7 +181,9 @@ mod test {
 				pub mod route0;
 				#[derive(Debug, Default, Clone)]
 				pub struct TestDocsPlugin;
+				#[cfg(not(target_arch = "wasm32"))]
 				impl TestDocsPlugin {}
+				#[cfg(not(target_arch = "wasm32"))]
 				impl RouterPlugin for TestDocsPlugin {
 					type State = ();
 					type Meta = ();

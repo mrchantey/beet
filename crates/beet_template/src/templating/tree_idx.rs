@@ -3,8 +3,10 @@ use beet_common::as_beet::*;
 use bevy::prelude::*;
 
 
-/// Currently only [`EventKey`] and [`TextNodeParent`] elements are
-/// the only ones that require a [`TreeIdx`] attribute
+/// Currently only [`ElementNodes`](ElementNode) with one of the following require a [`TreeIdx`] attribute:
+/// - [`EventKey`]
+/// - [`TextNodeParent`]
+/// - [`AttributeOf`] with a [`SignalReceiver<String>`]
 // see render_html.rs for tests
 pub(super) fn apply_tree_idx(
 	mut commands: Commands,
@@ -43,8 +45,7 @@ pub(super) fn apply_tree_idx(
 }
 
 /// Similar to an [`Entity`], contaning a unique identifier for this node in
-/// a templating tree. Unlike [`Entity`] this id will always be the same no matter
-/// how many other existing entities in the world.
+/// a templating tree.
 #[derive(
 	Debug,
 	Default,

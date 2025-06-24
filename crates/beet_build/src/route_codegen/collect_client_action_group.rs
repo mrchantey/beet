@@ -1,7 +1,10 @@
 use crate::prelude::*;
 use beet_common::prelude::TempNonSendMarker;
+use beet_utils::prelude::AbsPathBuf;
 use bevy::prelude::*;
 use syn::Item;
+use syn::ItemMod;
+use syn::ItemUse;
 
 
 #[derive(Debug, Clone, Component)]
@@ -9,6 +12,27 @@ use syn::Item;
 pub struct CollectClientActions {
 	/// Collapse single child functions into their parent mod
 	pub collapse_nodes: bool,
+}
+
+impl CollectClientActions {
+	pub fn path(actions_codegen: &AbsPathBuf) -> AbsPathBuf {
+		let mut path = actions_codegen.clone();
+		let stem = path
+			.file_stem()
+			.expect("Actions codegen path must have a file stem");
+		{
+			let stem = format!("client_{}.rs", stem.to_string_lossy());
+			path.set_file_name(stem);
+		}
+		path
+	}
+
+	pub fn ident(actions_codegen: &AbsPathBuf) -> syn::Ident {
+		let stem = actions_codegen
+			.file_stem()
+			.expect("Actions codegen path must have a file stem");
+		quote::format_ident!("client_{}", stem.to_string_lossy())
+	}
 }
 
 impl Default for CollectClientActions {
@@ -19,6 +43,25 @@ impl Default for CollectClientActions {
 	}
 }
 
+
+pub fn add_client_codegen_to_actions_export(
+	_: TempNonSendMarker,
+	query: Populated<&ChildOf, Added<CollectClientActions>>,
+	mut codegens: Query<&mut CodegenFileSendit>,
+) -> Result {
+	for child in query.iter() {
+		let mut codegen = codegens.get_mut(child.parent())?;
+
+		let ident = CollectClientActions::ident(&codegen.output);
+		codegen.add_item::<ItemMod>(syn::parse_quote! {
+			pub mod #ident;
+		});
+		codegen.add_item::<ItemUse>(syn::parse_quote! {
+			pub use #ident::routes::actions::*;
+		});
+	}
+	Ok(())
+}
 
 pub fn collect_client_action_group(
 	_: TempNonSendMarker,
@@ -36,7 +79,7 @@ pub fn collect_client_action_group(
 				methods.get(child).map(|(r, _)| (child, r)).ok()
 			})
 			.collect::<Vec<_>>();
-		println!("Collecting client actions: {}", child_methods.len());
+		debug!("Collecting {} client actions", child_methods.len());
 		let tree = RouteFileMethodTree::from_methods(child_methods);
 
 		let item = Builder {

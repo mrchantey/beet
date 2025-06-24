@@ -170,8 +170,8 @@ fn load_wasm_script(html_constants: &HtmlConstants) -> impl Bundle {
 					throw error
 		}})
 "#,
-		js_path = html_constants.wasm_js_path,
-		bin_path = html_constants.wasm_bin_path
+		js_path = html_constants.wasm_js_url(),
+		bin_path = html_constants.wasm_bin_url()
 	))
 }
 

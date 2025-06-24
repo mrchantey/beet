@@ -1,19 +1,19 @@
 #![cfg_attr(test, feature(test, custom_test_frameworks))]
 #![cfg_attr(test, test_runner(sweet::test_runner))]
 #![cfg_attr(test, feature(stmt_expr_attributes))]
-#![feature(let_chains, if_let_guard, result_flattening)]
+#![feature(let_chains, if_let_guard, result_flattening, exit_status_error)]
 
-mod route_codegen;
-mod client_island_codegen;
 mod beet_config;
 mod build_templates;
+mod client_island_codegen;
+mod route_codegen;
 mod utils;
 
 pub mod prelude {
-	pub use crate::route_codegen::*;
-	pub use crate::client_island_codegen::*;
 	pub use crate::beet_config::*;
 	pub use crate::build_templates::*;
+	pub use crate::client_island_codegen::*;
+	pub use crate::route_codegen::*;
 	pub use crate::utils::*;
 }
 pub mod exports {

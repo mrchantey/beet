@@ -123,6 +123,7 @@ impl CallServerAction {
 
 
 #[cfg(test)]
+#[cfg(feature = "axum")]
 mod test {
 	use crate::prelude::*;
 	use axum::Json;

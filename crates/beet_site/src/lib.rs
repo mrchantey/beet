@@ -9,8 +9,11 @@ pub mod types;
 #[path = "codegen/client_islands.rs"]
 pub mod client_islands;
 
+pub use codegen::actions;
+
 pub mod prelude {
 	pub use super::client_islands::*;
+	pub use super::codegen::actions;
 	pub use super::codegen::actions::ActionsPlugin;
 	pub use super::codegen::docs::DocsPlugin;
 	pub use super::codegen::pages::*;

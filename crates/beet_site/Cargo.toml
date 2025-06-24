@@ -17,11 +17,15 @@ keywords.workspace = true
 anyhow.workspace = true
 serde.workspace = true
 
-beet = { workspace = true, features = ["web", "web-server", "build"] }
-# beet = { workspace = true, features = ["web", "web-server"] }
-getrandom = { version = "0.3", features = ["wasm_js"] }
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+beet = { workspace = true, features = ["web-server", "build"] }
 
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+beet = { workspace = true, features = ["web-client"] }
+getrandom = { version = "0.3", features = ["wasm_js"] }
 
 [dev-dependencies]
 sweet.workspace = true
+
+[target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
 tokio.workspace = true

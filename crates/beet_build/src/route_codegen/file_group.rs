@@ -37,13 +37,10 @@ impl FileGroupConfig {
 	pub fn spawn(self, spawner: &mut RelatedSpawner<ChildOf>) -> impl Bundle {
 		let client_actions_codegen =
 			if self.file_group.category == FileGroupCategory::Actions {
-				// If this is an actions file group, we need to set the output file name
-				let mut output = self.codegen.output.clone();
-				if let Some(stem) = output.file_stem() {
-					let stem = format!("client_{}.rs", stem.to_string_lossy());
-					output.set_file_name(stem);
-				}
-				Some(self.codegen.clone_info(output))
+				let codegen = self.codegen.clone_info(
+					CollectClientActions::path(&self.codegen.output),
+				);
+				Some(codegen)
 			} else {
 				None
 			};

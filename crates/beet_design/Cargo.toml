@@ -28,7 +28,6 @@ beet_template.workspace = true
 beet_bevy.workspace = true
 beet_common.workspace = true
 beet_router.workspace = true
-beet_server.workspace = true
 beet_net.workspace = true
 beet_utils.workspace = true
 chrono.workspace = true
@@ -38,9 +37,8 @@ material-colors = "0.4.2"
 serde.workspace = true
 lightningcss = { workspace = true, optional = true }
 
-[dev-dependencies]
-sweet.workspace = true
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+beet_server.workspace = true
 
-[build-dependencies]
-anyhow.workspace = true
+[dev-dependencies]
 sweet.workspace = true

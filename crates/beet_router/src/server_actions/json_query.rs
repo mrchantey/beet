@@ -18,6 +18,7 @@ impl<T> JsonQuery<T> {
 
 
 #[cfg(test)]
+#[cfg(feature = "axum")]
 mod test {
 	use crate::prelude::*;
 	use axum::response::IntoResponse;

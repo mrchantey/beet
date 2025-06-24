@@ -7,8 +7,10 @@ use beet_utils::utils::PipelineTarget;
 use bevy::prelude::*;
 use proc_macro2::Span;
 use std::path::PathBuf;
+use syn::Attribute;
 use syn::Ident;
 use syn::ItemMod;
+use syn::parse_quote;
 
 
 /// A file that belongs to a [`FileGroup`], spawned as its child.
@@ -44,13 +46,22 @@ impl RouteFile {
 		Ident::new(&format!("route{}", self.index), Span::call_site())
 	}
 	/// The module import for the generated code.
-	pub fn item_mod(&self) -> ItemMod {
+	/// For Actions this will only export in non-wasm builds
+	pub fn item_mod(&self, category: FileGroupCategory) -> ItemMod {
 		let ident = self.mod_ident();
 		let path = &self.mod_path.to_string_lossy();
+		let target: Option<Attribute> = match category {
+			FileGroupCategory::Pages => None,
+			FileGroupCategory::Actions => Some(parse_quote! {
+				#[cfg(not(target_arch = "wasm32"))]
+			}),
+		};
+
 		// currently we use a pub mod for client island resolution,
 		// this may change if we go for bevy reflect instead
 		syn::parse_quote! {
 			#[path = #path]
+			#target
 			pub mod #ident;
 		}
 	}

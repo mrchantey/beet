@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use bevy::prelude::*;
 
 use crate::node::StyleId;
@@ -18,10 +20,10 @@ pub struct HtmlConstants {
 	pub event_store: String,
 	/// Used for setting the style id on elements
 	pub style_id_key: String,
-	/// Path to the wasm script, defaults to `/wasm/main.js`
-	pub wasm_js_path: String,
-	/// Path to the wasm binary, defaults to `/wasm/main_bg.wasm`
-	pub wasm_bin_path: String,
+	/// Path to the wasm directory, defaults to `wasm`
+	pub wasm_dir: PathBuf,
+	/// Name of the wasm js and bin files, defaults to `main`
+	pub wasm_name: String,
 	/// When parsing a [`HtmlDocument`], elements with these tags will be hoisted to the head of the document.
 	/// Defauts to `["title", "meta", "link", "style", "script", "base"]`.
 	pub hoist_to_head_tags: Vec<String>,
@@ -30,21 +32,21 @@ pub struct HtmlConstants {
 impl Default for HtmlConstants {
 	fn default() -> Self {
 		Self {
-			tree_idx_key: "data-beet-rsx-idx".to_string(),
-			loc_map_key: "data-beet-loc-map".to_string(),
-			span_key: "data-beet-span".to_string(),
-			event_handler: "_beet_event_handler".to_string(),
-			event_store: "_beet_event_store".to_string(),
-			style_id_key: "data-beet-style-id".to_string(),
-			wasm_js_path: "/wasm/main.js".to_string(),
-			wasm_bin_path: "/wasm/main_bg.wasm".to_string(),
+			tree_idx_key: "data-beet-rsx-idx".into(),
+			loc_map_key: "data-beet-loc-map".into(),
+			span_key: "data-beet-span".into(),
+			event_handler: "_beet_event_handler".into(),
+			event_store: "_beet_event_store".into(),
+			style_id_key: "data-beet-style-id".into(),
+			wasm_dir: "wasm".into(),
+			wasm_name: "main".into(),
 			hoist_to_head_tags: vec![
-				"title".to_string(),
-				"meta".to_string(),
-				"link".to_string(),
-				"style".to_string(),
-				"script".to_string(),
-				"base".to_string(),
+				"title".into(),
+				"meta".into(),
+				"link".into(),
+				"style".into(),
+				"script".into(),
+				"base".into(),
 			],
 		}
 	}
@@ -53,5 +55,16 @@ impl HtmlConstants {
 	/// Returns the attribute key for the style id
 	pub fn style_id_attribute(&self, id: StyleId) -> String {
 		format!("{}-{}", self.style_id_key, *id)
+	}
+
+	pub fn wasm_bin_url(&self) -> String {
+		format!(
+			"/{}/{}_bg.wasm",
+			self.wasm_dir.to_string_lossy(),
+			self.wasm_name
+		)
+	}
+	pub fn wasm_js_url(&self) -> String {
+		format!("/{}/{}.js", self.wasm_dir.to_string_lossy(), self.wasm_name)
 	}
 }

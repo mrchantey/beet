@@ -10,10 +10,21 @@ use std::path::Path;
 use std::str::FromStr;
 
 
+#[derive(
+	Debug, Default, Clone, PartialEq, Serialize, Deserialize, Resource,
+)]
+pub struct BeetSettings {
+	/// Location of the html directory, defaults to 'target/client'
+	#[serde(default = "default_html_dir")]
+	pub html_dir: WsPathBuf,
+}
+fn default_html_dir() -> WsPathBuf { WsPathBuf::new("target/client") }
 
 /// Config file usually located at `beet.toml`
 #[derive(Debug, Default, Clone, PartialEq, Serialize, Deserialize)]
 pub struct BeetConfig {
+	#[serde(flatten)]
+	pub settings: BeetSettings,
 	#[serde(default)]
 	pub html_constants: HtmlConstants,
 	#[serde(default)]
@@ -49,6 +60,7 @@ impl BeetConfig {
 	/// inserting all if [`only`] is empty.
 	pub fn build(self, app: &mut App, only: &Vec<BuildOnly>) {
 		let all = only.is_empty();
+		app.insert_resource(self.settings);
 		app.insert_resource(self.html_constants);
 		app.init_resource::<HtmlConstants>();
 		if all || only.contains(&BuildOnly::Templates) {
