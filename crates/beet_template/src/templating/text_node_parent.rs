@@ -22,7 +22,8 @@ pub(super) fn apply_text_node_parents(
 #[rustfmt::skip]
 #[derive(SystemParam)]
 pub(super) struct Parser<'w, 's> {
-	fragment_children: Query<'w, 's,&'static Children,Without<ElementNode>>,
+	// walk fragments and templates
+	non_element_children: Query<'w, 's,&'static Children,Without<ElementNode>>,
 	signal_texts: Query<'w, 's, &'static TextNode,With<SignalReceiver<String>>>,
 	static_texts: Query<'w, 's, &'static TextNode,Without<SignalReceiver<String>>>,
 	breaks: Query<'w, 's, (),Or<(With<DoctypeNode>, With<CommentNode>, With<ElementNode>)>>,
@@ -64,7 +65,7 @@ impl Parser<'_, '_> {
 			// 	.xpipe(RenderHtmlEscaped::default());
 			// out.push(CollapsedNode::Expr(html));
 		}
-		for child in self.fragment_children.iter_direct_descendants(entity) {
+		for child in self.non_element_children.iter_direct_descendants(entity) {
 			self.append(out, child);
 		}
 	}
@@ -189,6 +190,27 @@ mod test {
 			.to_be(vec![CollapsedNode::Break]);
 	}
 	#[test]
+	fn simple() {
+		let mut world = World::new();
+		let entity = world
+			.spawn(rsx! {
+				<div>foobar</div>
+			})
+			.id();
+
+		world
+			.run_system_once(
+				move |query: Populated<&Children>, parser: Parser| {
+					parser.parse(query.get(entity).unwrap())
+				},
+			)
+			.unwrap()
+			.xpect()
+			.to_be(vec![CollapsedNode::StaticText {
+				value: "foobar".to_string(),
+			}]);
+	}
+	#[test]
 	fn roundtrip() {
 		let desc = "quick";
 		let color = "brown";
@@ -237,7 +259,9 @@ mod test {
 				CollapsedNode::StaticText {
 					value: "lazy".into(),
 				},
-				CollapsedNode::Break,
+				CollapsedNode::StaticText {
+					value: "and fat".into(),
+				},
 				CollapsedNode::StaticText {
 					value: "dog\n\t\t\t\t".into(),
 				},
@@ -257,6 +281,8 @@ mod test {
 						(Some(Entity::from_raw(7)), 10),
 						(None, 5),
 						(None, 4),
+						(None, 7),
+						(None, 8),
 					],
 				}],
 			});

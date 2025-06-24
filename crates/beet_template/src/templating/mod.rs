@@ -3,6 +3,7 @@ mod html_fragment;
 mod lang_partial;
 mod node_portal;
 pub use apply_style_id_attributes::*;
+use beet_bevy::prelude::WorldMutExt;
 pub use html_fragment::*;
 pub use node_portal::*;
 mod html_document;
@@ -64,6 +65,7 @@ impl Plugin for TemplatePlugin {
 								.chain(),
 						),
 						insert_event_playback_attribute,
+						// debug,
 					)
 						.chain()
 						.in_set(ApplyTransformsStep),
@@ -72,5 +74,25 @@ impl Plugin for TemplatePlugin {
 			);
 		#[cfg(target_arch = "wasm32")]
 		app.add_plugins(wasm_template_plugin);
+	}
+}
+
+#[allow(unused)]
+fn debug(world: &mut World) {
+	for (entity, tree_idx) in world
+		.query_once::<(Entity, &TreeIdx)>()
+		.into_iter()
+		.map(|(e, t)| (e, t.clone()))
+		.collect::<Vec<_>>()
+		.into_iter()
+	{
+		for component in world.inspect_entity(entity).unwrap() {
+			beet_utils::log!(
+				"Entity: {:?}, TreeIdx: {}, Component: {:?}",
+				entity,
+				tree_idx,
+				component.name()
+			);
+		}
 	}
 }

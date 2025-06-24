@@ -73,7 +73,7 @@ impl SlotTarget {
 fn slot_target_directive(
 	mut commands: Commands,
 	attributes: Query<&Attributes>,
-	query: Populated<(Entity, &NodeTag)>,
+	query: Populated<(Entity, &NodeTag), With<ElementNode>>,
 	attributes_query: Query<(Entity, &AttributeKey, Option<&AttributeLit>)>,
 ) {
 	for (node_ent, node_tag) in query.iter() {
@@ -94,7 +94,12 @@ fn slot_target_directive(
 			})
 			.unwrap_or(SlotTarget::Default);
 
-		commands.entity(node_ent).remove::<NodeTag>().insert(target);
+		commands
+			.entity(node_ent)
+			.remove::<NodeTag>()
+			.remove::<ElementNode>()
+			// requires fragment
+			.insert(target);
 	}
 }
 

@@ -57,12 +57,12 @@ pub(super) fn apply_root_tree_idx(
 	requires_idx: RequiresIdx,
 ) {
 	let mut id = 0;
-	// even though we're iterating roots theres usually only one entrypoint, 
+	// even though we're iterating roots theres usually only one entrypoint,
 	// ie a BundleRoute, but it should still work with multiple
 	for root in roots.iter() {
 		for entity in children
-			//bfs
-			.iter_descendants_inclusive(root)
+			//dfs inclusive, root may need a TreeIdx
+			.iter_descendants_inclusive_depth_first(root)
 			.filter(|entity| requires_idx.requires(*entity))
 		{
 			// only 'dynamic' elements need a TreeIdx
@@ -95,15 +95,13 @@ pub(super) fn apply_child_tree_idx(
 	requires_idx: RequiresIdx,
 ) {
 	for (root, idx) in roots.iter() {
-		let mut id = idx.inner();
+		let mut id = idx.inner() + 1; // start at the next index after the root
 		for entity in children
-			//bfs
-			.iter_descendants_inclusive(root)
+			//dfs exclusive, root already has a TreeIdx
+			.iter_descendants_depth_first(root)
 			.filter(|entity| requires_idx.requires(*entity))
 		{
-			// only 'dynamic' elements need a TreeIdx
 			commands.entity(entity).insert(TreeIdx::new(id));
-
 			commands.spawn((
 				AttributeOf::new(entity),
 				AttributeKey::new(html_constants.tree_idx_key.clone()),
@@ -115,7 +113,8 @@ pub(super) fn apply_child_tree_idx(
 }
 
 /// Similar to an [`Entity`], contaning a unique identifier for this node in
-/// a templating tree.
+/// a templating tree. The index must be assigned in a depth-first manner
+/// so that client islands can resolve their child indices.
 #[derive(
 	Debug,
 	Default,
@@ -134,7 +133,7 @@ pub(super) fn apply_child_tree_idx(
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "tokens", derive(ToTokens))]
 pub struct TreeIdx(
-	/// Breadth-first index of this node in the templating tree.
+	/// Depth-first assigned index of this node in the templating tree.
 	pub u32,
 );
 

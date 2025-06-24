@@ -172,6 +172,7 @@ pub(super) fn bind_events(
 		for (attr_entity, attr_key) in attributes
 			.iter()
 			.filter_map(|attr| attribute_query.get(attr).ok())
+			.filter(|(_, key)| key.starts_with("on"))
 		{
 			let attr_key = attr_key.clone();
 			let attr_key2 = attr_key.clone();
@@ -200,9 +201,11 @@ pub(super) fn bind_events(
 					closure.as_ref().unchecked_ref(),
 				)
 				.unwrap();
-			commands
-				.entity(attr_entity)
-				.insert(DomClosureBinding(SendWrapper::new(closure)));
+			closure.forget();
+			// closure dropped cos entity cleaned up?
+			// commands
+			// 	.entity(attr_entity)
+			// 	.insert(DomClosureBinding(SendWrapper::new(closure)));
 		}
 	}
 	Ok(())
