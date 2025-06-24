@@ -49,7 +49,7 @@ fn mount_with_id(html: &str, id: &str) {
 mod test {
 	use crate::as_beet::*;
 	use bevy::prelude::*;
-	use sweet::prelude::*;
+	// use sweet::prelude::*;
 
 	#[test]
 	// we cant do anything with this because

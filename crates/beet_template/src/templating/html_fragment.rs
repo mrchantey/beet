@@ -52,17 +52,27 @@ pub fn render_fragment(In(entity): In<Entity>, builder: HtmlBuilder) -> String {
 pub(super) fn insert_event_playback_attribute(
 	mut commands: Commands,
 	html_constants: Res<HtmlConstants>,
-	query: Populated<(Entity, &TreeIdx, &EventKey), Added<TreeIdx>>,
+	query: Populated<
+		(&TreeIdx, &Attributes),
+		(With<EventTarget>, Added<TreeIdx>),
+	>,
+	// potential event attributes
+	attributes: Query<(Entity, &AttributeKey), Without<AttributeLit>>,
 ) {
-	for (entity, idx, event) in query.iter() {
-		let event_name = event.event_name();
-		let js_func =
-			format!("{}({}, event)", html_constants.event_handler, idx.inner());
-		commands.spawn((
-			AttributeOf::new(entity),
-			AttributeKey(event_name.clone()),
-			AttributeLit::new(js_func),
-		));
+	for (idx, attrs) in query.iter() {
+		for (attr_entity, _) in attrs
+			.iter()
+			.filter_map(|attr| attributes.get(attr).ok())
+			.filter(|(_, key)| key.starts_with("on"))
+		{
+			commands
+				.entity(attr_entity)
+				.insert(AttributeLit::new(format!(
+					"{}({}, event)",
+					html_constants.event_handler,
+					idx.inner()
+				)));
+		}
 	}
 }
 
@@ -251,7 +261,7 @@ mod test {
 			.xmap(HtmlFragment::parse_bundle)
 			.xpect()
 			.to_be(
-				"<div data-beet-tree-idx=\"0\" onclick=\"_beet_event_handler(0, event)\"/>",
+				"<div onclick=\"_beet_event_handler(0, event)\" data-beet-tree-idx=\"0\"/>",
 			);
 	}
 	#[test]

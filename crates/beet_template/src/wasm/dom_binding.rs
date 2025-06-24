@@ -162,38 +162,48 @@ pub(super) fn bind_attribute_values(
 pub(super) fn bind_events(
 	mut commands: Commands,
 	mut get_binding: GetDomBinding,
-	query: Populated<(Entity, &TreeIdx, &EventKey), Added<TreeIdx>>,
+	query: Populated<
+		(Entity, &TreeIdx, &Attributes),
+		(With<EventTarget>, Added<TreeIdx>),
+	>,
+	attribute_query: Query<(Entity, &AttributeKey)>,
 ) -> Result<()> {
-	for (entity, idx, event) in query.iter() {
-		let element = get_binding.get_element(entity, *idx)?;
-		let event_name = event.event_name();
-		// remove the temp event playback attribute 
-		element.remove_attribute(&event_name).ok();
+	for (el_entity, idx, attributes) in query.iter() {
+		for (attr_entity, attr_key) in attributes
+			.iter()
+			.filter_map(|attr| attribute_query.get(attr).ok())
+		{
+			let attr_key = attr_key.clone();
+			let attr_key2 = attr_key.clone();
+			let element = get_binding.get_element(el_entity, *idx)?;
+			// remove the temp event playback attribute
+			element.remove_attribute(&attr_key).ok();
 
-		let func = move |ev: web_sys::Event| {
-			ReactiveApp::with(|app| {
-				let mut commands = app.world_mut().commands();
-				let mut commands = commands.entity(entity);
-				BeetEvent::trigger(&mut commands, &event_name, ev);
-				// apply commands
-				app.world_mut().flush();
-				// we must update the app manually to flush any signals,
-				// they will not be able to update the app themselves because
-				// ReactiveApp is already borrowd
-				app.update();
-			})
-		};
+			let func = move |ev: web_sys::Event| {
+				ReactiveApp::with(|app| {
+					let mut commands = app.world_mut().commands();
+					let mut commands = commands.entity(el_entity);
+					BeetEvent::trigger(&mut commands, &attr_key, ev);
+					// apply commands
+					app.world_mut().flush();
+					// we must update the app manually to flush any signals,
+					// they will not be able to update the app themselves because
+					// ReactiveApp is already borrowd
+					app.update();
+				})
+			};
 
-		let closure = Closure::wrap(Box::new(func) as Box<dyn FnMut(_)>);
-		element
-			.add_event_listener_with_callback(
-				&event.event_name().replace("on", ""),
-				closure.as_ref().unchecked_ref(),
-			)
-			.unwrap();
-		commands
-			.entity(entity)
-			.insert(DomClosureBinding(SendWrapper::new(closure)));
+			let closure = Closure::wrap(Box::new(func) as Box<dyn FnMut(_)>);
+			element
+				.add_event_listener_with_callback(
+					&attr_key2.replace("on", ""),
+					closure.as_ref().unchecked_ref(),
+				)
+				.unwrap();
+			commands
+				.entity(attr_entity)
+				.insert(DomClosureBinding(SendWrapper::new(closure)));
+		}
 	}
 	Ok(())
 }

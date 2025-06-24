@@ -24,26 +24,13 @@ impl<E: 'static + Send + Sync + Event> EventHandler<E> {
 
 impl<E: 'static + Send + Sync + Event> BundleEffect for EventHandler<E> {
 	fn apply(self, entity: &mut EntityWorldMut) {
-		entity.insert(self.observer);
+		entity.insert((EventTarget, self.observer));
 	}
 }
 
+
+/// Marker type added to any entity with an event handler, often
+/// as an attribute.
 #[derive(Default, Clone, PartialEq, Eq, Hash, Component, Reflect)]
 #[reflect(Default, Component)]
-pub struct EventKey {
-	/// The unchanged event name used in the template, which
-	/// may be one of several casings, ie
-	/// `onmousemove`, `onMouseMove`, `OnMouseMove`
-	name: String,
-}
-
-impl EventKey {
-	/// Create a new event observer with the given name
-	pub fn new(name: &str) -> Self {
-		Self {
-			name: name.to_string(),
-		}
-	}
-	/// Get the event name in a consistent lowercase format
-	pub fn event_name(&self) -> String { self.name.to_lowercase() }
-}
+pub struct EventTarget;

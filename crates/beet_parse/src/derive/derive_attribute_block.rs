@@ -25,26 +25,34 @@ fn parse(input: DeriveInput) -> Result<TokenStream> {
 			// field.
 			let ident = &field.ident;
 			let name_str = ident.to_string().replace('#', "");
-			// let event_key = if name_str.starts_with("on") {
-			// 	Some(quote! {EventKey::new(#name_str)})
-			// } else {
-			// 	None
-			// };
+			// attribute values added to child entity,
+			// event handlers added to parent entity
+			let (attr_bundle, event_bundle) = match name_str.starts_with("on") {
+				true => (
+					None,
+					Some(quote! {
+						world.entity_mut(parent_entity)
+							.insert(#ident.into_node_bundle());
+					}),
+				),
+				false => (Some(quote! {#ident.into_attribute_bundle(),}), None),
+			};
 
 			let inner = quote! {(
 				AttributeOf::new(parent_entity),
-				AttributeKey::new(#name_str),
-				// #event_key,
-				#ident.into_attribute_bundle()
+				#attr_bundle
+				AttributeKey::new(#name_str)
 			)};
 			if field.is_optional() {
 				quote! {
 					if let Some(#ident) = #ident {
+						#event_bundle
 						world.spawn(#inner);
 					}
 				}
 			} else {
 				quote! {
+					#event_bundle
 					world.spawn(#inner);
 				}
 			}
@@ -101,6 +109,7 @@ mod test {
 			struct MyNode {
 				present: u32,
 				optional: Option<u32>,
+				onclick: EventHandler<OnClick>,
 				#[field(flatten)]
 				nested: OtherBlock,
 			}
@@ -112,7 +121,7 @@ mod test {
 				use beet::prelude::*;
 				impl IntoTemplateBundle<Self> for MyNode {
 					fn into_node_bundle(self) -> impl Bundle {
-						let Self { present, optional, nested } = self;
+						let Self { present, optional,onclick, nested } = self;
 						#[allow(unused_braces)]
 						(
 							OnSpawn::new(move |entity| {
@@ -120,16 +129,22 @@ mod test {
 								entity.world_scope(move |world| {
 									world.spawn((
 										AttributeOf::new(parent_entity),
-										AttributeKey::new("present"),
-										present.into_attribute_bundle()
+										present.into_attribute_bundle(),
+										AttributeKey::new("present")
 									));
 									if let Some(optional) = optional {
 										world.spawn((
 											AttributeOf::new(parent_entity),
-											AttributeKey::new("optional"),
-											optional.into_attribute_bundle()
+											optional.into_attribute_bundle(),
+											AttributeKey::new("optional")
 										));
 									}
+									world.entity_mut(parent_entity)
+										.insert(onclick.into_node_bundle());
+									world.spawn((
+										AttributeOf::new(parent_entity),
+										AttributeKey::new("onclick")
+									));
 								});
 							}),
 							nested.into_node_bundle()

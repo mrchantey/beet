@@ -99,6 +99,6 @@ mod test {
 		}
 			.xmap(HtmlFragment::parse_bundle)
 			.xpect()
-			.to_be_str("<button disabled=\"true\" id=\"foo\" onclick/>");
+			.to_be_str(r#"<button disabled="true" id="foo" onclick="_beet_event_handler(0, event)" data-beet-tree-idx="0"/>"#);
 	}
 }

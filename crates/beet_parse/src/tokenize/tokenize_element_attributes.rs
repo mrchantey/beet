@@ -35,7 +35,7 @@ pub fn tokenize_element_attributes(
 				{
 					let value =
 						tokenize_event_handler(&key_str, key.span(), value)?;
-					entity_components.push(quote! {EventKey::new(#key_str)});
+					attr_components.push(quote! {AttributeKey::new(#key)});
 					entity_components.push(quote! {#value.into_node_bundle()});
 				}
 				// 2. Key with value
@@ -147,12 +147,12 @@ mod test {
 			<span onclick={foo}/>
 		}
 		.xmap(parse)
-		.to_be(
+		.to_be_str(
 			quote! {(
 				NodeTag(String::from("span")),
 				ElementNode { self_closing: true },
-				EventKey::new("onclick"),
-				{foo}.into_node_bundle()
+				{foo}.into_node_bundle(),
+				related!(Attributes [AttributeKey::new("onclick")])
 			)}
 			.to_string(),
 		);
@@ -160,7 +160,7 @@ mod test {
 			<span onclick="some_js_func"/>
 		}
 		.xmap(parse)
-		.to_be(
+		.to_be_str(
 			quote! {(
 				NodeTag(String::from("span")),
 				ElementNode { self_closing: true },
@@ -184,12 +184,11 @@ mod test {
 			/>
 		}
 		.xmap(parse)
-		.to_be(
+		.to_be_str(
 			quote! {(
 				NodeTag(String::from("span")),
 				ElementNode { self_closing: true },
 				{foo}.into_node_bundle(),
-				EventKey::new("onclick"),
 				{|_: Trigger<OnClick>| { println!("clicked"); }}.into_node_bundle(),
 				related!(Attributes[
 					AttributeKey::new("hidden"),
@@ -200,7 +199,8 @@ mod test {
 					(
 						AttributeKey::new("onmousemove"),
 						"some_js_func".into_attribute_bundle()
-					)
+					),
+					AttributeKey::new("onclick")
 				])
 			)}
 			.to_string(),

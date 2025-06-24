@@ -16,7 +16,7 @@ pub struct RequiresIdx<'w, 's> {
 		's,
 		Entity,
 		Or<(
-			Added<EventKey>,
+			Added<EventTarget>,
 			Added<TextNodeParent>,
 			Added<ClientOnlyDirective>,
 			Added<ClientLoadDirective>,
@@ -67,7 +67,6 @@ pub(super) fn apply_root_tree_idx(
 		{
 			// only 'dynamic' elements need a TreeIdx
 			commands.entity(entity).insert(TreeIdx::new(id));
-			println!("Applying TreeIdx {} to {}", id, entity);
 
 			commands.spawn((
 				AttributeOf::new(entity),

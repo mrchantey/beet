@@ -13,17 +13,17 @@ async fn works() {
 	));
 
 	// // Ensure all routes build, including parsing their metadata.
-	// for route in route_path_tree().flatten().iter() {
-	// 	router
-	// 		.render_route(&RouteInfo::get(&route.0))
-	// 		.await
-	// 		.unwrap();
-	// }
+	for route in route_path_tree().flatten().iter() {
+		router
+			.render_route(&RouteInfo::get(&route.0))
+			.await
+			.unwrap();
+	}
 
 	// check a route contains content
 	let index = router.render_route(&"/".into()).await.unwrap();
-	// index.xref().xpect().to_contain("data-beet-tree-idx");
-	// index.xref().xpect().to_contain("A very bevy metaframework");
+	index.xref().xpect().to_contain("data-beet-tree-idx");
+	index.xref().xpect().to_contain("A very bevy metaframework");
 
 	// println!("{}", index);
 }

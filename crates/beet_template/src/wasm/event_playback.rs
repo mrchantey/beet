@@ -1,4 +1,5 @@
 use crate::prelude::*;
+use beet_bevy::prelude::*;
 use beet_common::prelude::*;
 use bevy::platform::collections::HashMap;
 use bevy::prelude::*;
@@ -6,18 +7,27 @@ use js_sys::Array;
 use js_sys::Reflect;
 use wasm_bindgen::JsCast;
 use web_sys::Event;
-use beet_bevy::prelude::*;
 
 /// A system that runs once after hydration to playback any events
 /// that occured while the wasm was loading.
 pub(super) fn event_playback(
 	constants: Res<HtmlConstants>,
 	mut commands: Commands,
-	query: Populated<(Entity, &TreeIdx, &EventKey), Added<TreeIdx>>,
+	query: Populated<
+		(Entity, &TreeIdx, &Attributes),
+		(With<EventTarget>, Added<TreeIdx>),
+	>,
+	attribute_query: Query<&AttributeKey>,
 ) -> Result<()> {
-	let event_map: HashMap<(TreeIdx, &EventKey), Entity> = query
+	let event_map: HashMap<(TreeIdx, &AttributeKey), Entity> = query
 		.iter()
-		.map(|(entity, idx, event)| ((*idx, event), entity))
+		.map(|(entity, idx, attributes)| {
+			attributes
+				.iter()
+				.filter_map(|attr| attribute_query.get(attr).ok())
+				.map(move |attr_key| ((*idx, attr_key), entity))
+		})
+		.flatten()
 		.collect();
 
 
@@ -41,9 +51,10 @@ pub(super) fn event_playback(
 					event_arr.get(0).as_f64().expect("bad event id") as u32;
 				let event: Event = event_arr.get(1).unchecked_into();
 				let event_type = format!("on{}", event.type_());
-				if let Some(entity) = event_map
-					.get(&(TreeIdx::new(tree_idx), &EventKey::new(&event_type)))
-				{
+				if let Some(entity) = event_map.get(&(
+					TreeIdx::new(tree_idx),
+					&AttributeKey::new(&event_type),
+				)) {
 					BeetEvent::trigger(
 						&mut commands.entity(*entity),
 						&event_type,
