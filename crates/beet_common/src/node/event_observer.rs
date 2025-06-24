@@ -24,7 +24,7 @@ impl<E: 'static + Send + Sync + Event> EventHandler<E> {
 
 impl<E: 'static + Send + Sync + Event> BundleEffect for EventHandler<E> {
 	fn apply(self, entity: &mut EntityWorldMut) {
-		entity.insert((EventTarget, self.observer));
+		entity.insert((EventTarget, self.observer.with_entity(entity.id())));
 	}
 }
 

@@ -16,16 +16,9 @@ fn main() -> Result {
 
 #[cfg(target_arch = "wasm32")]
 fn main() {
-	// this is TERRIBLE, reactivity jumps across apps!
-	ReactiveApp::set_create_app(|| {
-		let mut app = App::new();
-		app.add_plugins((TemplatePlugin, ClientIslandPlugin));
-		app
-	});
-
-
 	App::new()
 		.add_plugins((TemplatePlugin, ClientIslandPlugin))
+		.set_runner(ReactiveApp::runner)
 		// .add_resource(SiteUrl::new("https://beetrs.dev"))
 		.run();
 }
