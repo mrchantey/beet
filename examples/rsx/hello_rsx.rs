@@ -7,7 +7,7 @@ fn main() {
 		.xpipe(RsxToHtmlString::default())
 		.unwrap();
 
-	assert_eq!(html, "<div data-beet-rsx-idx=\"0\">hello world</div>");
+	assert_eq!(html, "<div data-beet-tree-idx=\"0\">hello world</div>");
 
 	println!("{}", html);
 }

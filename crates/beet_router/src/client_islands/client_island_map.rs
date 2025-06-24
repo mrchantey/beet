@@ -28,14 +28,14 @@ impl ClientIslandMap {
 		Self { islands }
 	}
 
-	pub fn write(&self, html_dir: &AbsPathBuf) -> Result {
-		let path = html_dir.join("client_islands.ron");
+	pub fn write(&self, target_dir: &AbsPathBuf) -> Result {
+		let path = target_dir.join("client_islands.ron");
 		FsExt::write(&path, ron::ser::to_string(self)?)?;
 		Ok(())
 	}
 
-	pub fn read(html_dir: &AbsPathBuf) -> Result<Self> {
-		let path = html_dir.join("client_islands.ron");
+	pub fn read(target_dir: &AbsPathBuf) -> Result<Self> {
+		let path = target_dir.join("client_islands.ron");
 		let content = ReadFile::to_bytes(&path)?;
 		let islands: Self = ron::de::from_bytes(&content)?;
 		Ok(islands)

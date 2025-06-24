@@ -7,13 +7,12 @@ use serde::Serialize;
 pub fn Counter(#[field(default = 0)] initial: i32) -> impl Bundle {
 	let (get, set) = signal(initial);
 
-	let get2 = get.clone();
 	rsx! {
 	<div>
 		<Button
 			variant=ButtonVariant::Outlined
-			onclick=move |_| set(get2() + 1)>
-			Cookie Count: {get.clone()}
+			onclick=move |_| set(get() + 1)>
+			Cookie Count: {get}
 		</Button>
 	</div>
 	<style>

@@ -1,46 +1,117 @@
 use crate::prelude::*;
+use beet_bevy::prelude::HierarchyQueryExtExt;
 use beet_common::as_beet::*;
+use bevy::ecs::system::SystemParam;
 use bevy::prelude::*;
 
-
-/// Currently only [`ElementNodes`](ElementNode) with one of the following require a [`TreeIdx`] attribute:
-/// - [`EventKey`]
-/// - [`TextNodeParent`]
-/// - [`AttributeOf`] with a [`SignalReceiver<String>`]
-// see render_html.rs for tests
-pub(super) fn apply_tree_idx(
+/// Only apply [`TreeIdx`] to nodes that require it. This restriction allows
+/// for template reloading, all other nodes can move around and the ids remain
+/// the same.
+/// Only [`ElementNodes`](ElementNode) matching one of the below filters
+/// require a [`TreeIdx`]
+#[derive(SystemParam)]
+pub struct RequiresIdx<'w, 's> {
+	requires_tree_idx_attr: Query<
+		'w,
+		's,
+		Entity,
+		Or<(
+			Added<EventKey>,
+			Added<TextNodeParent>,
+			Added<ClientOnlyDirective>,
+			Added<ClientLoadDirective>,
+		)>,
+	>,
+	attributes: Query<'w, 's, &'static Attributes>,
+	dyn_attrs:
+		Query<'w, 's, (), (With<AttributeOf>, Added<SignalReceiver<String>>)>,
+}
+impl RequiresIdx<'_, '_> {
+	pub fn requires(&self, entity: Entity) -> bool {
+		self.requires_tree_idx_attr.contains(entity)
+			|| self
+				.attributes
+				.get(entity)
+				.map(|attrs| {
+					attrs.iter().any(|attr| self.dyn_attrs.contains(attr))
+				})
+				.unwrap_or(false)
+	}
+}
+/// Recursively applies a [`TreeIdx`] to root nodes spawned *without* one,
+/// not counting roots that are spawned with one like client islands.
+pub(super) fn apply_root_tree_idx(
 	mut commands: Commands,
 	html_constants: Res<HtmlConstants>,
-	query: Populated<Entity, With<ElementNode>>,
-	requires_tree_idx_attr: Query<
+	// definition of a root: any fragment or element without a parent
+	roots: Populated<
 		Entity,
-		Or<(Added<EventKey>, Added<TextNodeParent>)>,
+		(
+			Without<ChildOf>,
+			Without<TreeIdx>,
+			// just client directives?
+			Or<(Added<FragmentNode>, Added<ElementNode>, Added<TemplateNode>)>,
+		),
 	>,
-	attributes: Query<&Attributes>,
-	dyn_attrs: Query<(), (With<AttributeOf>, Added<SignalReceiver<String>>)>,
+	children: Query<&Children>,
+	requires_idx: RequiresIdx,
 ) {
 	let mut id = 0;
+	// even though we're iterating roots theres usually only one entrypoint, 
+	// ie a BundleRoute, but it should still work with multiple
+	for root in roots.iter() {
+		for entity in children
+			//bfs
+			.iter_descendants_inclusive(root)
+			.filter(|entity| requires_idx.requires(*entity))
+		{
+			// only 'dynamic' elements need a TreeIdx
+			commands.entity(entity).insert(TreeIdx::new(id));
+			println!("Applying TreeIdx {} to {}", id, entity);
 
-	for entity in query
-		.iter()
-		// only 'dynamic' elements need a TreeIdx
-		.filter(|entity| {
-			requires_tree_idx_attr.contains(*entity)
-				|| attributes
-					.get(*entity)
-					.map(|attrs| {
-						attrs.iter().any(|attr| dyn_attrs.contains(attr))
-					})
-					.unwrap_or(false)
-		}) {
-		commands.entity(entity).insert(TreeIdx::new(id));
+			commands.spawn((
+				AttributeOf::new(entity),
+				AttributeKey::new(html_constants.tree_idx_key.clone()),
+				AttributeLit::new(id.to_string()),
+			));
+			id += 1;
+		}
+	}
+}
 
-		commands.spawn((
-			AttributeOf::new(entity),
-			AttributeKey::new(html_constants.tree_idx_key.clone()),
-			AttributeLit::new(id.to_string()),
-		));
-		id += 1;
+/// Recursively applies a [`TreeIdx`] to children of root nodes spawned *with* one,
+/// like client islands.
+pub(super) fn apply_child_tree_idx(
+	mut commands: Commands,
+	html_constants: Res<HtmlConstants>,
+	// definition of a root: any fragment or element without a parent
+	roots: Populated<
+		(Entity, &TreeIdx),
+		(
+			Without<ChildOf>,
+			Or<(Added<FragmentNode>, Added<ElementNode>, Added<TemplateNode>)>,
+		),
+	>,
+	children: Query<&Children>,
+	requires_idx: RequiresIdx,
+) {
+	for (root, idx) in roots.iter() {
+		let mut id = idx.inner();
+		for entity in children
+			//bfs
+			.iter_descendants_inclusive(root)
+			.filter(|entity| requires_idx.requires(*entity))
+		{
+			// only 'dynamic' elements need a TreeIdx
+			commands.entity(entity).insert(TreeIdx::new(id));
+
+			commands.spawn((
+				AttributeOf::new(entity),
+				AttributeKey::new(html_constants.tree_idx_key.clone()),
+				AttributeLit::new(id.to_string()),
+			));
+			id += 1;
+		}
 	}
 }
 
@@ -81,7 +152,7 @@ impl TreeIdx {
 
 
 
-
+// see render_html.rs for more tests
 #[cfg(test)]
 mod test {
 	use crate::as_beet::*;
@@ -95,21 +166,18 @@ mod test {
 		world.init_resource::<HtmlConstants>();
 		let (get, _set) = signal(2);
 		let entity = world
-			.spawn((
-				rsx! {
-					<div onclick=||{}>
-						"child 1"
-						<span>"child with signal"{get}</span>
-						"child 2"
-					</div>
-				},
-				HtmlFragment::default(),
-			))
+			.spawn(rsx! {
+				<div onclick=||{}>
+					"child 1"
+					<span>"child with signal"{get}</span>
+					"child 2"
+				</div>
+			})
 			.id();
 		world
 			.run_system_once(super::super::apply_text_node_parents)
 			.unwrap();
-		world.run_system_once(super::apply_tree_idx).unwrap();
+		world.run_system_once(super::apply_root_tree_idx).unwrap();
 
 		world
 			.get::<TreeIdx>(entity)

@@ -15,6 +15,11 @@ pub struct RunBuild {
 
 impl RunBuild {
 	pub async fn run(self) -> anyhow::Result<()> {
+		use bevy::ecs::error::GLOBAL_ERROR_HANDLER;
+		GLOBAL_ERROR_HANDLER
+			.set(bevy::ecs::error::panic)
+			.expect("The error handler can only be set once, globally.");
+
 		App::new()
 			.insert_resource(self.build_cmd.clone())
 			.add_plugins((
@@ -24,6 +29,7 @@ impl RunBuild {
 				RouteCodegenPlugin::default(),
 				ClientIslandCodegenPlugin::default(),
 			))
+			// .set_error_handler(warn)
 			.run_async(FsApp::default().runner())
 			.await
 			.anyhow()

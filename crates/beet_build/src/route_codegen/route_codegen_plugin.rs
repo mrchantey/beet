@@ -63,6 +63,7 @@ impl Plugin for RouteCodegenPlugin {
 						// dont hit the fs in tests
 						export_codegen_files,
 						despawn_file_groups,
+						compile_router,
 					)
 						.chain()
 						.in_set(ExportRouterCodegenStep),

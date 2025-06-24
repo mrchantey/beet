@@ -25,9 +25,16 @@ fn parse(input: DeriveInput) -> Result<TokenStream> {
 			// field.
 			let ident = &field.ident;
 			let name_str = ident.to_string().replace('#', "");
+			// let event_key = if name_str.starts_with("on") {
+			// 	Some(quote! {EventKey::new(#name_str)})
+			// } else {
+			// 	None
+			// };
+
 			let inner = quote! {(
 				AttributeOf::new(parent_entity),
 				AttributeKey::new(#name_str),
+				// #event_key,
 				#ident.into_attribute_bundle()
 			)};
 			if field.is_optional() {

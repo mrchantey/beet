@@ -14,8 +14,10 @@
 //!
 mod collect_client_action;
 mod collect_client_action_group;
+mod compile_router;
 pub use collect_client_action::*;
 pub use collect_client_action_group::*;
+pub use compile_router::*;
 pub use reexport_file_groups::*;
 mod parse_route_tree;
 mod reexport_file_groups;

@@ -32,7 +32,7 @@ impl HtmlFragment {
 		})
 	}
 }
-/// A parallizable system to render all HTML fragments in the world.
+/// A parallelizable system to render all HTML fragments in the world.
 pub(super) fn render_html_fragments(
 	mut query: Populated<(Entity, &mut HtmlFragment), Added<HtmlFragment>>,
 	builder: HtmlBuilder,
@@ -251,7 +251,7 @@ mod test {
 			.xmap(HtmlFragment::parse_bundle)
 			.xpect()
 			.to_be(
-				"<div data-beet-rsx-idx=\"0\" onclick=\"_beet_event_handler(0, event)\"/>",
+				"<div data-beet-tree-idx=\"0\" onclick=\"_beet_event_handler(0, event)\"/>",
 			);
 	}
 	#[test]
@@ -274,6 +274,6 @@ mod test {
 		rsx! {<div>{get}</div>}
 			.xmap(HtmlFragment::parse_bundle)
 			.xpect()
-			.to_be("<div data-beet-rsx-idx=\"0\">foo</div>");
+			.to_be("<div data-beet-tree-idx=\"0\">foo</div>");
 	}
 }

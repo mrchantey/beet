@@ -152,7 +152,7 @@ mod test {
 			.xpect()
 			.to_be(vec![ClientIsland {
 				template: TemplateSerde::new(&MyTemplate { foo: 3 }),
-				tracker: RustyTracker::new(0, 11604779077157604735),
+				tree_idx: TreeIdx(0),
 				mount: false,
 			}]);
 	}

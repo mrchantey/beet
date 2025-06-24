@@ -14,7 +14,6 @@ pub fn is_event(key: &str, value: &Expr) -> bool {
 	key.starts_with("on") && !matches!(value, Expr::Lit(_))
 }
 
-
 pub fn tokenize_event_handler(
 	key_str: &str,
 	key_span: Span,

@@ -6,6 +6,7 @@ use js_sys::Array;
 use js_sys::Reflect;
 use wasm_bindgen::JsCast;
 use web_sys::Event;
+use beet_bevy::prelude::*;
 
 /// A system that runs once after hydration to playback any events
 /// that occured while the wasm was loading.
@@ -40,14 +41,18 @@ pub(super) fn event_playback(
 					event_arr.get(0).as_f64().expect("bad event id") as u32;
 				let event: Event = event_arr.get(1).unchecked_into();
 				let event_type = format!("on{}", event.type_());
-				if let Some(entity) = event_map.get(&(
-					TreeIdx::new(tree_idx),
-					&EventKey::new(&event_type),
-				)) {
+				if let Some(entity) = event_map
+					.get(&(TreeIdx::new(tree_idx), &EventKey::new(&event_type)))
+				{
 					BeetEvent::trigger(
 						&mut commands.entity(*entity),
 						&event_type,
 						event,
+					);
+				} else {
+					bevybail!(
+						"Event playback: could not find entity for event {}",
+						tree_idx
 					);
 				}
 			}

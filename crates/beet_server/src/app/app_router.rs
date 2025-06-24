@@ -28,12 +28,16 @@ pub struct AppRouterConfig {
 	/// served from.
 	#[arg(long, default_value = "target/client")]
 	pub html_dir: WsPathBuf,
+	/// Directory for temp static files like client islands.
+	#[arg(long, default_value = "target")]
+	pub static_dir: WsPathBuf,
 }
 impl Default for AppRouterConfig {
 	fn default() -> Self {
 		Self {
 			mode: None,
 			html_dir: "target/client".into(),
+			static_dir: "target".into(),
 		}
 	}
 }
@@ -152,15 +156,16 @@ where
 	pub async fn run_with_config(self, config: AppRouterConfig) -> Result<()> {
 		match self.config.mode {
 			Some(RouterMode::ExportStatic) => {
-				self.export_static(&config.html_dir).await
+				self.export_static(&config).await
 			}
 			_ => self.serve().await,
 		}
 	}
 
 	/// Export static html files and client islands.
-	pub async fn export_static(self, html_dir: &WsPathBuf) -> Result {
-		let html_dir = html_dir.into_abs();
+	pub async fn export_static(self, config: &AppRouterConfig) -> Result {
+		let html_dir = config.html_dir.into_abs();
+		let static_dir = config.static_dir.into_abs();
 
 		self.static_routes
 			.iter()
@@ -186,7 +191,7 @@ where
 			.await?;
 
 		let islands = ClientIslandMap::new(islands);
-		islands.write(&html_dir)?;
+		islands.write(&static_dir)?;
 		let num_islands = islands.values().map(|v| v.len()).sum::<usize>();
 
 		tracing::info!(

@@ -117,8 +117,9 @@ beet_utils = { path = "crates/beet_utils", version = "0.0.6-dev.2" }
 
 #💡 local
 bevy = { version = "0.16", default-features = false, features = [
-	"std",            # std for reflect PathBuf
+	"std",                        # std for reflect PathBuf
 	"multi_threaded",
+	"configurable_error_handler",
 	"bevy_log",
 	"bevy_color",
 ] }

@@ -19,7 +19,8 @@ impl Plugin for ClientIslandCodegenPlugin {
 				collect_client_islands.in_set(ProcessRouterCodegenStep),
 				// after codegen
 				compile_wasm.after(ExportRouterCodegenStep),
-			),
+			)
+				.chain(),
 		);
 	}
 }

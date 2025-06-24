@@ -17,8 +17,6 @@ impl<T: 'static + Send + Sync> BundleResponse<T> {
 
 impl<B: Bundle> IntoResponse for BundleResponse<B> {
 	fn into_response(self) -> Response {
-		let bundle = self.bundle;
-		let html = HtmlDocument::parse_bundle(bundle);
-		Html(html).into_response()
+		Html(HtmlDocument::parse_bundle(self.bundle)).into_response()
 	}
 }

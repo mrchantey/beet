@@ -44,13 +44,12 @@ pub(super) fn rearrange_html_document(
 ) {
 	for (doc_entity, doc_children) in query.iter() {
 		let root = doc_children[0];
-		if children
-			.iter_descendants_inclusive(root)
-			.any(|child| doctypes.contains(child))
+		if false
+			== children
+				.iter_descendants_inclusive(root)
+				.any(|child| doctypes.contains(child))
 		{
-			// a doctype tag was found, do nothing
-		} else {
-			// no html tag found, create full document structure and
+			// no doctype found, create full document structure and
 			// move the root into the body
 			let new_root = commands
 				.spawn(FragmentNode)
@@ -151,7 +150,6 @@ pub(super) fn insert_hydration_scripts(
 fn event_playback_script(html_constants: &HtmlConstants) -> impl Bundle {
 	script(format!(
 		r#"
-// console.log('sweet has loaded')
 globalThis.{event_store} = []
 globalThis.{event_handler} = (id,event) => globalThis.{event_store}.push([id, event])
 "#,
@@ -216,27 +214,29 @@ mod test {
 	fn text() {
 		HtmlDocument::parse_bundle(rsx! {hello world})
 			.xpect()
-			.to_be(
+			.to_be_str(
 				"<!DOCTYPE html><html><head></head><body>hello world</body></html>",
 			);
 	}
 	#[test]
 	fn elements() {
-		HtmlDocument::parse_bundle(rsx! {<br/>}).xpect().to_be(
+		HtmlDocument::parse_bundle(rsx! {<br/>}).xpect().to_be_str(
 			"<!DOCTYPE html><html><head></head><body><br/></body></html>",
 		);
 	}
 	#[test]
 	fn fragment() {
-		HtmlDocument::parse_bundle(rsx! {<br/><br/>}).xpect().to_be(
-			"<!DOCTYPE html><html><head></head><body><br/><br/></body></html>",
-		);
+		HtmlDocument::parse_bundle(rsx! {<br/><br/>})
+			.xpect()
+			.to_be_str(
+				"<!DOCTYPE html><html><head></head><body><br/><br/></body></html>",
+			);
 	}
 	#[test]
 	fn ignores_incomplete() {
 		HtmlDocument::parse_bundle(rsx! {<head><br/></head><br/>})
 			.xpect()
-			.to_be(
+			.to_be_str(
 				"<!DOCTYPE html><html><head></head><body><head><br/></head><br/></body></html>",
 			);
 	}
@@ -248,20 +248,22 @@ mod test {
 			rsx! {<!DOCTYPE html><html><head><br/></head></html>},
 		)
 		.xpect()
-		.to_be("<!DOCTYPE html><html><head><br/></head><body></body></html>");
+		.to_be_str(
+			"<!DOCTYPE html><html><head><br/></head><body></body></html>",
+		);
 	}
 	#[test]
 	fn hoist_tag() {
 		HtmlDocument::parse_bundle(rsx! {<style></style>})
 			.xpect()
-			.to_be(
+			.to_be_str(
 				"<!DOCTYPE html><html><head><style></style></head><body></body></html>",
 			);
 		HtmlDocument::parse_bundle(
 			rsx! {<script></script><br/>},
 		)
 		.xpect()
-		.to_be("<!DOCTYPE html><html><head><script></script></head><body><br/></body></html>");
+		.to_be_str("<!DOCTYPE html><html><head><script></script></head><body><br/></body></html>");
 	}
 	#[test]
 	fn hoist_top_tag() {
@@ -269,7 +271,7 @@ mod test {
 			rsx! {<script/><!DOCTYPE html><html><head></head><body></body></html>},
 		)
 		.xpect()
-		.to_be(
+		.to_be_str(
 			"<!DOCTYPE html><html><head><script/></head><body></body></html>",
 		);
 	}
@@ -279,7 +281,7 @@ mod test {
 		rsx! {<!DOCTYPE html><html><head><br hoist:body/></head><body><span hoist:head/><script hoist:none/></body></html>},
 	)
 	.xpect()
-	.to_be(
+	.to_be_str(
 		"<!DOCTYPE html><html><head><span/></head><body><script/><br/></body></html>",
 	);
 	}
@@ -289,8 +291,8 @@ mod test {
 		rsx! {<div client:load>},
 	)
 	.xpect()
-	.to_be(
-		"<!DOCTYPE html><html><head><script type=\"module\">\n// console.log('sweet has loaded')\nglobalThis._beet_event_store = []\nglobalThis._beet_event_handler = (id,event) => globalThis._beet_event_store.push([id, event])\n</script><script type=\"module\">\n\t\timport init from '/wasm/main.js'\n\t\tinit('/wasm/main_bg.wasm')\n\t\t\t.catch((error) => {\n\t\t\t\tif (!error.message.startsWith(\"Using exceptions for control flow,\"))\n\t\t\t\t\tthrow error\n\t\t})\n</script></head><body><div/></body></html>",
+	.to_be_str(
+		"<!DOCTYPE html><html><head><script type=\"module\">\nglobalThis._beet_event_store = []\nglobalThis._beet_event_handler = (id,event) => globalThis._beet_event_store.push([id, event])\n</script><script type=\"module\">\n\t\timport init from '/wasm/main.js'\n\t\tinit('/wasm/main_bg.wasm')\n\t\t\t.catch((error) => {\n\t\t\t\tif (!error.message.startsWith(\"Using exceptions for control flow,\"))\n\t\t\t\t\tthrow error\n\t\t})\n</script></head><body><div data-beet-tree-idx=\"0\"/></body></html>",
 	);
 	}
 }

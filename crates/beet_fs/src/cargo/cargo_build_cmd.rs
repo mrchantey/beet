@@ -2,6 +2,7 @@ use anyhow::Result;
 use clap::Parser;
 use std::path::PathBuf;
 use std::process::Command;
+use bevy::prelude::*;
 
 /// Verbatim clone of cargo build/run args
 #[derive(Debug, Clone, Parser)]
@@ -303,7 +304,7 @@ impl CargoBuildCmd {
 		}
 
 		// Print the command
-		println!("Running: cargo {}", args.join(" "));
+		debug!("Running: cargo {}", args.join(" "));
 
 		// Build and execute command
 		let mut command = Command::new("cargo");

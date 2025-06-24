@@ -72,7 +72,7 @@ impl TemplateDirective for ClientLoadDirective {
 
 /// aka Client Side Rendering, do not create a server-side version of this node,
 /// and instead mount it directly on the client.
-#[derive(Debug, Default, Copy, Clone, Component, Reflect)]
+#[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Component, Reflect)]
 #[reflect(Default, Component)]
 #[component(immutable)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]

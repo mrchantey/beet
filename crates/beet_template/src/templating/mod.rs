@@ -55,7 +55,7 @@ impl Plugin for TemplatePlugin {
 						apply_slots,
 						apply_text_node_parents,
 						(
-							apply_tree_idx,
+							(apply_root_tree_idx, apply_child_tree_idx),
 							(
 								rearrange_html_document,
 								insert_hydration_scripts,

@@ -12,8 +12,6 @@ pub struct HtmlConstants {
 	pub tree_idx_key: String,
 	/// in debug mode, the attribute for the span of the element
 	pub span_key: String,
-	/// Attrubute tagging the [`TreeLocationMap`](crate::prelude::TreeLocationMap)
-	pub loc_map_key: String,
 	/// the global event handler for all events
 	pub event_handler: String,
 	/// the global vec that stores prehydrated events
@@ -32,8 +30,7 @@ pub struct HtmlConstants {
 impl Default for HtmlConstants {
 	fn default() -> Self {
 		Self {
-			tree_idx_key: "data-beet-rsx-idx".into(),
-			loc_map_key: "data-beet-loc-map".into(),
+			tree_idx_key: "data-beet-tree-idx".into(),
 			span_key: "data-beet-span".into(),
 			event_handler: "_beet_event_handler".into(),
 			event_store: "_beet_event_store".into(),

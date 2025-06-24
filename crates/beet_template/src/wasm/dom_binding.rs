@@ -167,6 +167,7 @@ pub(super) fn bind_events(
 	for (entity, idx, event) in query.iter() {
 		let element = get_binding.get_element(entity, *idx)?;
 		let event_name = event.event_name();
+		// remove the temp event playback attribute 
 		element.remove_attribute(&event_name).ok();
 
 		let func = move |ev: web_sys::Event| {
