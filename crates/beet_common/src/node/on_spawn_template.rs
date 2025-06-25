@@ -1,7 +1,14 @@
 use bevy::prelude::*;
 
-/// A method that will run *after* spawned, in breadth-first order from
-/// its root, meaning that parents are guaranteed to run before children.
+/// A method that will run in a regular system after spawn, giving static
+/// trees a chance to be applied:
+/// 
+/// 1. A Bundle is inserted on the entity
+/// 2. Component Hooks are run for the insert 
+/// 3. Observers are run for the insert
+/// 4. Bundle Effects are run
+/// 5. OnSpawnTemplate component is moved to its correct location in the static tree
+/// 6. OnSpawnTemplate methods are run
 #[derive(Reflect, Component)]
 #[reflect(Component)]
 pub struct OnSpawnTemplate(

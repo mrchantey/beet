@@ -18,6 +18,12 @@ impl ExprIdx {
 	pub fn new(index: u32) -> Self { Self(index) }
 }
 
+impl std::fmt::Display for ExprIdx {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		write!(f, "{}", self.0)
+	}
+}
+
 #[derive(Default)]
 pub struct ExprIdxBuilder {
 	current: u32,

@@ -174,10 +174,11 @@ impl<'w, 's, 'a> RstmlToWorld<'w, 's, 'a> {
 				));
 				let self_closing = close_tag.is_none();
 				if let Some(close_tag) = close_tag.as_ref() {
-					let close_tag = self.parse_node_name(&close_tag.name);
+					let (close_tag_name, _, close_tag_span) =
+						self.parse_node_name(&close_tag.name);
 					self.collected_elements.push((
-						close_tag.0,
-						send_wrapper::SendWrapper::new(close_tag.2),
+						close_tag_name,
+						send_wrapper::SendWrapper::new(close_tag_span),
 					));
 				}
 

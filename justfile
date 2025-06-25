@@ -164,8 +164,12 @@ run-test-site:
 	sweet serve target/test_site
 # --templates-root-dir crates \
 
+#just cli watch -p beet_site {{args}}
 run-site *args:
-	just cli watch -p beet_site {{args}}
+	just cli build -p beet_site --only=routes
+	cargo run -p beet_site --export-static
+	just cli build -p beet_site --only=client-islands
+	cargo run -p beet_site
 
 build-site *args:
 	just cli build -p beet_site {{args}}
@@ -173,7 +177,7 @@ build-site *args:
 
 #💡 Test
 
-# it keeps asking for bigger stacks?
+# it keeps asking for bigger stacks? a mold thing?
 min-stack := 'RUST_MIN_STACK=134217728'
 # min-stack := 'RUST_MIN_STACK=67108864'
 # min-stack := 'RUST_MIN_STACK=33554432'

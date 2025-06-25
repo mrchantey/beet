@@ -50,7 +50,7 @@ fn tokenize_combinator_exprs_inner(
 			}
 		}
 		// combinator removes braces so we put them back
-		let expr = format!("{{{}}}", expr);
+		let expr = format!("{{{expr}}}");
 		let expr_tokens = syn::parse_str::<TokenStream>(&expr)?;
 		Ok(Some(expr_tokens))
 	} else {
