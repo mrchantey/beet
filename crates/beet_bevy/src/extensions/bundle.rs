@@ -3,18 +3,20 @@ use bevy::prelude::*;
 
 
 pub trait BundleExt {
-	/// Converts the bundle into a boxed `OnSpawn`, allowing branches
+	/// Converts the bundle to be inserted via [`OnSpawnBoxed`], allowing branches
 	/// to return the same type.
 	///
 	/// ## Example
+	/// ```
+	/// # use bevy::prelude::*;
 	/// # use beet_bevy::prelude::*;
 	///
-	/// let bundle = if true{
+	/// let bundle = if true {
 	/// 	().any_bundle()
-	/// }else{
+	/// } else {
 	/// 	Name::new("foo").any_bundle()
 	/// }
-	///
+	///```
 	fn any_bundle(self) -> OnSpawnBoxed;
 }
 

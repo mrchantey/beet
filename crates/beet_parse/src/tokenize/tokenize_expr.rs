@@ -3,18 +3,12 @@ use beet_common::prelude::*;
 use bevy::prelude::*;
 use proc_macro2::TokenStream;
 use quote::quote;
-use send_wrapper::SendWrapper;
-use syn::Expr;
-
 
 pub fn tokenize_block_node_exprs(
 	world: &World,
 	entity: Entity,
 ) -> Result<Option<TokenStream>> {
-	if let Some(block) = world
-		.entity(entity)
-		.get::<ItemOf<BlockNode, SendWrapper<Expr>>>()
-	{
+	if let Some(block) = world.entity(entity).get::<BlockNodeExpr>() {
 		let block = &***block;
 		Ok(Some(quote! {#block.into_node_bundle()}))
 	} else {

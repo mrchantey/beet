@@ -15,6 +15,16 @@ impl OnSpawnTemplate {
 	) -> Self {
 		Self(Box::new(func))
 	}
+
+	/// Insert this bundle into the entity on spawn
+	pub fn new_insert(bundle: impl Bundle) -> Self {
+		Self::new(move |mut entity: EntityCommands| {
+			entity.insert(bundle);
+			Ok(())
+		})
+	}
+
+
 	/// Convenience for getting the method from inside a system,
 	/// this component should be removed when this is called
 	///

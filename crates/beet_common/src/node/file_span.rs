@@ -1,11 +1,12 @@
-use crate::prelude::*;
-use bevy::reflect::Reflect;
+use crate::as_beet::*;
+use beet_utils::prelude::*;
+use bevy::prelude::*;
 use std::hash::Hash;
 use std::path::Path;
-use beet_utils::prelude::*;
 
 /// File location of the first symbol inside an rsx macro, used by [RsxTemplate]
-/// to reconcile web nodes with templates
+/// to reconcile web nodes with templates.
+/// For the component version see [`FileSpanOf`].
 /// ## Example
 /// ```rust ignore
 /// let tree = rsx!{<div>hello</div>};
@@ -13,16 +14,17 @@ use beet_utils::prelude::*;
 /// ```
 #[derive(Debug, Default, Clone, PartialEq, Eq, Hash, Reflect)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "tokens", derive(ToTokens))]
 pub struct FileSpan {
 	/// Workspace relative path to the file, its essential to use consistent paths
 	/// as this struct is created in several places from all kinds concatenations,
 	/// and we need PartialEq & Hash to be identical.
-	file: WsPathBuf,
+	pub file: WsPathBuf,
 	/// The position of the first token in this span
-	start: LineCol,
+	pub start: LineCol,
 	/// The position of the last token in this span, in cases where the end
 	/// is not known this will be the same as start.
-	end: LineCol,
+	pub end: LineCol,
 }
 
 impl std::fmt::Display for FileSpan {
@@ -105,4 +107,56 @@ pub trait GetSpan {
 impl GetSpan for FileSpan {
 	fn span(&self) -> &FileSpan { self }
 	fn span_mut(&mut self) -> &mut FileSpan { self }
+}
+
+/// File span for a specific component type, ie [`NodeTag`] or [`AttributeKey`].
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Component, Reflect)]
+#[reflect(Component)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "tokens", derive(ToTokens))]
+pub struct FileSpanOf<C> {
+	pub value: FileSpan,
+	#[reflect(ignore)]
+	pub phantom: std::marker::PhantomData<C>,
+}
+
+
+impl<C> std::ops::Deref for FileSpanOf<C> {
+	type Target = FileSpan;
+	fn deref(&self) -> &Self::Target { &self.value }
+}
+
+impl<C> FileSpanOf<C> {
+	pub fn new(value: FileSpan) -> Self {
+		Self {
+			value,
+			phantom: std::marker::PhantomData,
+		}
+	}
+	pub fn take(self) -> FileSpan { self.value }
+}
+#[cfg(feature = "tokens")]
+#[derive(Debug, Clone, Component)]
+#[cfg_attr(feature = "tokens", derive(ToTokens))]
+pub struct SpanOf<C> {
+	pub value: send_wrapper::SendWrapper<proc_macro2::Span>,
+	pub phantom: std::marker::PhantomData<C>,
+}
+
+
+#[cfg(feature = "tokens")]
+impl<C> std::ops::Deref for SpanOf<C> {
+	type Target = proc_macro2::Span;
+	fn deref(&self) -> &Self::Target { &self.value }
+}
+
+#[cfg(feature = "tokens")]
+impl<C> SpanOf<C> {
+	pub fn new(value: proc_macro2::Span) -> Self {
+		Self {
+			value: send_wrapper::SendWrapper::new(value),
+			phantom: std::marker::PhantomData,
+		}
+	}
+	pub fn take(self) -> proc_macro2::Span { self.value.take() }
 }

@@ -23,7 +23,8 @@ pub trait IntoTemplateBundle<M> {
 	fn into_node_bundle(self) -> impl Bundle;
 	/// By default calls [`Self::into_node_bundle`], but can be overridden,
 	/// for instance literals like `String` or `bool` will insert
-	/// an [`AttributeLit`] instead.
+	/// an [`AttributeLit`] instead, and signals will update the [`AttributeLit`]
+	/// instead of the [`TextNode`].
 	fn into_attribute_bundle(self) -> impl Bundle
 	where
 		Self: 'static + Send + Sync + Sized,

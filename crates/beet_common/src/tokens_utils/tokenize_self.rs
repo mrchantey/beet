@@ -1,5 +1,6 @@
 use beet_utils::prelude::*;
 use bevy::ecs::entity::Entity;
+use proc_macro2::Span;
 use proc_macro2::TokenStream;
 use quote::ToTokens;
 use quote::quote;
@@ -184,6 +185,11 @@ where
 impl TokenizeSelf for String {
 	fn self_tokens(&self, tokens: &mut TokenStream) {
 		tokens.extend(quote! { String::from(#self) });
+	}
+}
+impl TokenizeSelf for Span {
+	fn self_tokens(&self, tokens: &mut TokenStream) {
+		tokens.extend(quote! { proc_macro2::Span::call_site() });
 	}
 }
 

@@ -2,14 +2,12 @@ use super::HashNonTemplateRust;
 use crate::prelude::*;
 use beet_bevy::prelude::HierarchyQueryExtExt;
 use beet_common::prelude::*;
-use beet_parse::exports::SendWrapper;
 use beet_router::as_beet::TemplateRoot;
 use bevy::prelude::*;
 use quote::ToTokens;
 use rapidhash::RapidHasher;
 use std::hash::Hash;
 use std::hash::Hasher;
-use syn::Expr;
 
 /// A hash of all non-literal expressions in a file containing rust code,
 /// including `.rs`, `.mdx` and `.rsx` files.
@@ -38,7 +36,7 @@ pub fn update_file_expr_hash(
 	children: Query<&Children>,
 	macro_idxs: Query<&MacroIdx>,
 	attributes: Query<&Attributes>,
-	block_nodes: Query<&ItemOf<BlockNode, SendWrapper<Expr>>>,
+	block_nodes: Query<&BlockNodeExpr>,
 	// dont hash literal attribute values
 	attr_exprs: Query<&AttributeExpr, Without<AttributeLit>>,
 ) -> Result {
@@ -90,6 +88,7 @@ mod test {
 	use beet_utils::prelude::*;
 	use bevy::prelude::*;
 	use sweet::prelude::*;
+	use send_wrapper::SendWrapper;
 
 	fn hash(bundle: impl Bundle) -> u64 { hash_inner(bundle, true) }
 
@@ -116,8 +115,6 @@ mod test {
 		app.world().get::<FileExprHash>(entity).unwrap().0
 	}
 
-	use send_wrapper::SendWrapper;
-	use syn::Expr;
 	#[test]
 	#[rustfmt::skip]
 	fn tag_names() {

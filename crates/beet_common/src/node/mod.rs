@@ -1,7 +1,7 @@
 mod event_observer;
 mod on_spawn_template;
-pub use on_spawn_template::*;
 pub use event_observer::*;
+pub use on_spawn_template::*;
 pub mod macro_idx;
 pub use macro_idx::*;
 pub mod expr_idx;
@@ -16,8 +16,6 @@ pub mod rsx_nodes;
 pub use rsx_nodes::*;
 mod web_nodes;
 pub use web_nodes::*;
-mod item_of;
-pub use item_of::*;
 mod attribute;
 pub use attribute::*;
 mod line_col;
@@ -40,13 +38,13 @@ pub fn node_types_plugin(app: &mut bevy::prelude::App) {
 		.register_type::<AttributeLit>()
 		// misc
 		// .register_type::<OnClick>()
-		.register_type::<ItemOf<TemplateNode, FileSpan>>()
-		.register_type::<ItemOf<FragmentNode, FileSpan>>()
-		.register_type::<ItemOf<TextNode, FileSpan>>()
-		.register_type::<ItemOf<BlockNode, FileSpan>>()
-		.register_type::<ItemOf<DoctypeNode, FileSpan>>()
-		.register_type::<ItemOf<CommentNode, FileSpan>>()
-		.register_type::<ItemOf<ElementNode, FileSpan>>()
+		.register_type::<FileSpanOf<TemplateNode>>()
+		.register_type::<FileSpanOf<FragmentNode>>()
+		.register_type::<FileSpanOf<TextNode>>()
+		.register_type::<FileSpanOf<BlockNode>>()
+		.register_type::<FileSpanOf<DoctypeNode>>()
+		.register_type::<FileSpanOf<CommentNode>>()
+		.register_type::<FileSpanOf<ElementNode>>()
 		// rsx nodes
 		.register_type::<NodeTag>()
 		.register_type::<TemplateNode>()

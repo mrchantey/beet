@@ -2,9 +2,7 @@ use crate::prelude::*;
 use beet_common::prelude::*;
 use bevy::prelude::*;
 use proc_macro2::TokenStream;
-use send_wrapper::SendWrapper;
 use beet_utils::prelude::*;
-use syn::Expr;
 
 
 /// Create a [`TokenStream`] of a [`Bundle`] that represents the *tokenized*
@@ -33,7 +31,7 @@ fn tokenize_block_node_exprs(
 	items: &mut Vec<TokenStream>,
 	entity: Entity,
 ) -> Result<()> {
-	if let Some(expr) = world.entity(entity).get::<ItemOf::<BlockNode,SendWrapper<Expr>>>() {
+	if let Some(expr) = world.entity(entity).get::<BlockNodeExpr>() {
 		let block_node = expr.self_token_stream();
 		items.push(block_node);
 	}
@@ -191,10 +189,7 @@ mod test {
 				related!{Children[(
 					ExprIdx(0u32),
 					BlockNode,
-					ItemOf::<BlockNode, SendWrapper<Expr> > {
-						value: SendWrapper::new(syn::parse_quote!(#[allow(unused_braces)]{ 7 })),
-						phantom: std::marker::PhantomData::<BlockNode>
-					}
+					BlockNodeExpr(SendWrapper::new(syn::parse_quote!(#[allow(unused_braces)]{ 7 })))
 				)]}
 				)
 			}

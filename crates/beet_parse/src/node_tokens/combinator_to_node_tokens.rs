@@ -39,10 +39,10 @@ fn combinator_to_node_tokens(
 			expr_idx: ExprIdxBuilder::new(),
 		}
 		.map_to_children(entity, tokens)?;
-		commands.entity(entity).remove::<CombinatorTokens>().insert(MacroIdx::new(
-			source_file.clone(),
-			LineCol::default(),
-		));
+		commands
+			.entity(entity)
+			.remove::<CombinatorTokens>()
+			.insert(MacroIdx::new(source_file.clone(), LineCol::default()));
 	}
 	Ok(())
 }
@@ -85,11 +85,9 @@ impl<'w, 's, 'a> Builder<'w, 's, 'a> {
 		}
 
 		self.rsx_parsed_expression(root, expr)?;
-		self.commands
-			.entity(root)
-			.insert(ItemOf::<(), _>::new(FileSpan::new_for_file(
-				&self.source_file,
-			)));
+		self.commands.entity(root).insert(FileSpanOf::<()>::new(
+			FileSpan::new_for_file(&self.source_file),
+		));
 		Ok(())
 	}
 
@@ -112,7 +110,7 @@ impl<'w, 's, 'a> Builder<'w, 's, 'a> {
 		let file_span = self.default_file_span();
 		self.commands.entity(entity).insert((
 			CombinatorExpr(partials),
-			ItemOf::<CombinatorExpr, _>::new(file_span),
+			FileSpanOf::<CombinatorExpr>::new(file_span),
 		));
 		Ok(())
 	}
@@ -136,7 +134,7 @@ impl<'w, 's, 'a> Builder<'w, 's, 'a> {
 		let children = self.rsx_children("fragment", fragment.0)?;
 		let file_span = self.default_file_span();
 		self.commands
-			.spawn((FragmentNode, ItemOf::<FragmentNode, _>::new(file_span)))
+			.spawn((FragmentNode, FileSpanOf::<FragmentNode>::new(file_span)))
 			.add_children(&children)
 			.id()
 			.xok()
@@ -159,7 +157,7 @@ impl<'w, 's, 'a> Builder<'w, 's, 'a> {
 
 		let mut entity = self.commands.spawn((
 			NodeTag(tag_str.clone()),
-			ItemOf::<NodeTag, _>::new(self.default_file_span()),
+			FileSpanOf::<NodeTag>::new(self.default_file_span()),
 		));
 
 		entity.add_children(&children);
@@ -171,12 +169,12 @@ impl<'w, 's, 'a> Builder<'w, 's, 'a> {
 				// yes we get the ExprIdx after its children, its fine as long
 				// as its consistent with other parsers.
 				self.expr_idx.next(),
-				ItemOf::<TemplateNode, _>::new(file_span),
+				FileSpanOf::<TemplateNode>::new(file_span),
 			));
 		} else {
 			entity.insert((
 				ElementNode { self_closing },
-				ItemOf::<TemplateNode, _>::new(file_span),
+				FileSpanOf::<ElementNode>::new(file_span),
 			));
 		}
 		let entity = entity.id();
@@ -199,7 +197,7 @@ impl<'w, 's, 'a> Builder<'w, 's, 'a> {
 				self.commands
 					.spawn((
 						TextNode(children.to_html()),
-						ItemOf::<TextNode, _>::new(self.default_file_span()),
+						FileSpanOf::<TextNode>::new(self.default_file_span()),
 					))
 					.id(),
 			]
@@ -230,7 +228,7 @@ impl<'w, 's, 'a> Builder<'w, 's, 'a> {
 		self.commands
 			.spawn((
 				TextNode(text.0.to_string()),
-				ItemOf::<TextNode, _>::new(self.default_file_span()),
+				FileSpanOf::<TextNode>::new(self.default_file_span()),
 			))
 			.id()
 			.xok()
@@ -247,7 +245,7 @@ impl<'w, 's, 'a> Builder<'w, 's, 'a> {
 					.commands
 					.spawn((
 						AttributeOf::new(parent),
-						ItemOf::<AttributeExpr, _>::new(
+						FileSpanOf::<AttributeExpr>::new(
 							self.default_file_span(),
 						),
 					))
@@ -258,7 +256,7 @@ impl<'w, 's, 'a> Builder<'w, 's, 'a> {
 				let mut entity = self.commands.spawn((
 					AttributeKey::new(name.to_string()),
 					AttributeOf::new(parent),
-					ItemOf::<AttributeOf, _>::new(self.default_file_span()),
+					FileSpanOf::<AttributeOf>::new(self.default_file_span()),
 				));
 				match value {
 					RsxAttributeValue::Default => {}

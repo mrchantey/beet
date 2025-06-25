@@ -4,7 +4,6 @@ use bevy::prelude::*;
 use proc_macro2::Span;
 use proc_macro2::TokenStream;
 use quote::quote;
-use send_wrapper::SendWrapper;
 use syn::Ident;
 
 pub fn tokenize_template_attributes(
@@ -20,7 +19,7 @@ pub fn tokenize_template_attributes(
 	let Some(node_tag) = entity.get::<NodeTag>() else {
 		return Ok(());
 	};
-	let node_tag_span = entity.get::<ItemOf<NodeTag, SendWrapper<Span>>>();
+	let node_tag_span = entity.get::<SpanOf<NodeTag>>();
 	let mut prop_assignments = Vec::new();
 
 	if let Some(attrs) = entity.get::<Attributes>() {
@@ -63,7 +62,7 @@ pub fn tokenize_template_attributes(
 
 	let template_ident = Ident::new(
 		&node_tag.as_str(),
-		node_tag_span.map(|s| ***s).unwrap_or(Span::call_site()),
+		node_tag_span.map(|s| **s).unwrap_or(Span::call_site()),
 	);
 
 	// we create an inner tuple, so that we can define the template

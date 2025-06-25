@@ -3,7 +3,7 @@ use crate::as_beet::*;
 use bevy::prelude::*;
 
 /// The tag of a node
-#[derive(Debug, Clone,PartialEq, Eq, Component, Reflect, Deref, DerefMut)]
+#[derive(Debug, Clone, PartialEq, Eq, Component, Reflect, Deref, DerefMut)]
 #[reflect(Component)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "tokens", derive(ToTokens))]
@@ -66,3 +66,20 @@ impl TextNode {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "tokens", derive(ToTokens))]
 pub struct BlockNode;
+
+
+
+
+#[cfg(feature = "tokens")]
+#[derive(Debug, Clone, Deref, Component, ToTokens)]
+#[component(immutable)]
+pub struct BlockNodeExpr(pub send_wrapper::SendWrapper<syn::Expr>);
+
+
+#[cfg(feature = "tokens")]
+impl BlockNodeExpr {
+	pub fn new(value: syn::Expr) -> Self {
+		Self(send_wrapper::SendWrapper::new(value))
+	}
+	pub fn take(self) -> syn::Expr { self.0.take() }
+}

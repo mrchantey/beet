@@ -56,7 +56,7 @@ pub(crate) fn extract_lang_content(
 			&NodeTag,
 			Option<&Attributes>,
 			Option<&Children>,
-			&ItemOf<ElementNode, FileSpan>,
+			&FileSpanOf<ElementNode>,
 		),
 		Added<NodeTag>,
 	>,
@@ -121,7 +121,7 @@ mod test {
 		let entity = world
 			.spawn((
 				NodeTag::new("style"),
-				ItemOf::<ElementNode, _>::new(FileSpan::default()),
+				FileSpanOf::<ElementNode>::new(FileSpan::default()),
 				children![TextNode::new("div { color: red; }")],
 			))
 			.id();
@@ -140,7 +140,7 @@ mod test {
 		let entity = world
 			.spawn((
 				NodeTag::new("style"),
-				ItemOf::<ElementNode, _>::new(FileSpan::new(
+				FileSpanOf::<ElementNode>::new(FileSpan::new(
 					file!(),
 					default(),
 					default(),

@@ -13,7 +13,6 @@ use rstml::node::NodeAttribute;
 use rstml::node::NodeBlock;
 use rstml::node::NodeElement;
 use rstml::node::NodeName;
-use send_wrapper::SendWrapper;
 use syn::Expr;
 use syn::ExprLit;
 use syn::spanned::Spanned;
@@ -91,36 +90,36 @@ impl<'w, 's, 'a> RstmlToWorld<'w, 's, 'a> {
 
 
 	fn insert_node(&mut self, entity: Entity, node: Node<RstmlCustomNode>) {
-		let node_span = SendWrapper::new(node.span());
+		let node_span = node.span();
 		let file_span = FileSpan::new_from_span(self.file.clone(), &node);
 		// let spans = (node_span, file_span);
 		match node {
 			Node::Doctype(_) => {
 				self.commands.entity(entity).insert((
 					DoctypeNode,
-					ItemOf::<DoctypeNode, _>::new(file_span),
-					ItemOf::<DoctypeNode, _>::new(node_span),
+					FileSpanOf::<DoctypeNode>::new(file_span),
+					SpanOf::<DoctypeNode>::new(node_span),
 				));
 			}
 			Node::Comment(node) => {
 				self.commands.entity(entity).insert((
 					CommentNode(node.value.value()),
-					ItemOf::<CommentNode, _>::new(file_span),
-					ItemOf::<CommentNode, _>::new(node_span),
+					FileSpanOf::<CommentNode>::new(file_span),
+					SpanOf::<CommentNode>::new(node_span),
 				));
 			}
 			Node::Text(node) => {
 				self.commands.entity(entity).insert((
 					TextNode(node.value.value()),
-					ItemOf::<TextNode, _>::new(file_span),
-					ItemOf::<TextNode, _>::new(node_span),
+					FileSpanOf::<TextNode>::new(file_span),
+					SpanOf::<TextNode>::new(node_span),
 				));
 			}
 			Node::RawText(node) => {
 				self.commands.entity(entity).insert((
 					TextNode(node.to_string_best()),
-					ItemOf::<TextNode, _>::new(file_span),
-					ItemOf::<TextNode, _>::new(node_span),
+					FileSpanOf::<TextNode>::new(file_span),
+					SpanOf::<TextNode>::new(node_span),
 				));
 			}
 			Node::Fragment(fragment) => {
@@ -129,22 +128,21 @@ impl<'w, 's, 'a> RstmlToWorld<'w, 's, 'a> {
 					.entity(entity)
 					.insert((
 						FragmentNode,
-						ItemOf::<FragmentNode, _>::new(file_span),
-						ItemOf::<FragmentNode, _>::new(node_span),
+						FileSpanOf::<FragmentNode>::new(file_span),
+						SpanOf::<FragmentNode>::new(node_span),
 					))
 					.add_children(&children);
 			}
 			Node::Block(NodeBlock::ValidBlock(block)) => {
-				let expr = SendWrapper::<Expr>::new(syn::parse_quote!(
-					#[allow(unused_braces)]
-					#block
-				));
 				self.commands.entity(entity).insert((
 					BlockNode,
 					self.expr_idx.next(),
-					ItemOf::<BlockNode, _>::new(file_span),
-					ItemOf::<BlockNode, _>::new(node_span),
-					ItemOf::<BlockNode, _>::new(expr),
+					FileSpanOf::<BlockNode>::new(file_span),
+					SpanOf::<BlockNode>::new(node_span),
+					BlockNodeExpr::new(syn::parse_quote!(
+						#[allow(unused_braces)]
+						#block
+					)),
 				));
 			}
 			Node::Block(NodeBlock::Invalid(invalid)) => {
@@ -155,8 +153,8 @@ impl<'w, 's, 'a> RstmlToWorld<'w, 's, 'a> {
 				));
 				self.commands.entity(entity).insert((
 					BlockNode,
-					ItemOf::<BlockNode, _>::new(file_span),
-					ItemOf::<BlockNode, _>::new(node_span),
+					FileSpanOf::<BlockNode>::new(file_span),
+					SpanOf::<BlockNode>::new(node_span),
 				));
 			}
 			Node::Element(el) => {
@@ -170,12 +168,17 @@ impl<'w, 's, 'a> RstmlToWorld<'w, 's, 'a> {
 				let (tag_str, tag_file_span, tag_span) =
 					self.parse_node_name(&open_tag.name);
 
-				self.collected_elements
-					.push((tag_str.clone(), tag_span.clone()));
+				self.collected_elements.push((
+					tag_str.clone(),
+					send_wrapper::SendWrapper::new(tag_span.clone()),
+				));
 				let self_closing = close_tag.is_none();
 				if let Some(close_tag) = close_tag.as_ref() {
 					let close_tag = self.parse_node_name(&close_tag.name);
-					self.collected_elements.push((close_tag.0, close_tag.2));
+					self.collected_elements.push((
+						close_tag.0,
+						send_wrapper::SendWrapper::new(close_tag.2),
+					));
 				}
 
 				// let attributes = AttributeTokensList(attributes);
@@ -185,8 +188,8 @@ impl<'w, 's, 'a> RstmlToWorld<'w, 's, 'a> {
 				let mut entity = self.commands.entity(entity);
 				entity.insert((
 					NodeTag(tag_str.clone()),
-					ItemOf::<NodeTag, _>::new(tag_file_span),
-					ItemOf::<NodeTag, _>::new(tag_span),
+					FileSpanOf::<NodeTag>::new(tag_file_span),
+					SpanOf::<NodeTag>::new(tag_span),
 				));
 				entity.add_children(&children);
 
@@ -196,14 +199,14 @@ impl<'w, 's, 'a> RstmlToWorld<'w, 's, 'a> {
 						// yes we get the ExprIdx after its children, its fine as long
 						// as its consistent with other parsers.
 						self.expr_idx.next(),
-						ItemOf::<TemplateNode, _>::new(file_span),
-						ItemOf::<TemplateNode, _>::new(node_span),
+						FileSpanOf::<TemplateNode>::new(file_span),
+						SpanOf::<TemplateNode>::new(node_span),
 					));
 				} else {
 					entity.insert((
 						ElementNode { self_closing },
-						ItemOf::<ElementNode, _>::new(file_span),
-						ItemOf::<ElementNode, _>::new(node_span),
+						FileSpanOf::<ElementNode>::new(file_span),
+						SpanOf::<ElementNode>::new(node_span),
 					));
 				}
 				let entity = entity.id();
@@ -237,12 +240,11 @@ impl<'w, 's, 'a> RstmlToWorld<'w, 's, 'a> {
 			NodeAttribute::Block(NodeBlock::ValidBlock(block)) => {
 				let block_file_span =
 					FileSpan::new_from_span(self.file.clone(), &block);
-				let block_span = SendWrapper::new(block.span());
 				// block attribute, ie `<div {is_hidden}>`
 				self.commands.spawn((
 					AttributeOf::new(parent),
-					ItemOf::<AttributeExpr, _>::new(block_file_span),
-					ItemOf::<AttributeExpr, _>::new(block_span),
+					FileSpanOf::<AttributeExpr>::new(block_file_span),
+					SpanOf::<AttributeExpr>::new(block.span()),
 					AttributeExpr::new(syn::parse_quote!(
 						#[allow(unused_braces)]
 						#block
@@ -264,22 +266,19 @@ impl<'w, 's, 'a> RstmlToWorld<'w, 's, 'a> {
 				let mut entity = self.commands.spawn((
 					AttributeOf::new(parent),
 					AttributeKey::new(key),
-					ItemOf::<AttributeKey, _>::new(FileSpan::new_from_span(
+					FileSpanOf::<AttributeKey>::new(FileSpan::new_from_span(
 						self.file.clone(),
 						&attr.key,
 					)),
-					ItemOf::<AttributeKey, _>::new(SendWrapper::new(
-						attr.key.span(),
-					)),
+					SpanOf::<AttributeKey>::new(attr.key.span()),
 				));
 				// key-value attribute, ie `<div hidden=true>`
-				let val_expr_span =
-					SendWrapper::new(attr.possible_value.span());
 				let val_expr_file_span = FileSpan::new_from_span(
 					self.file.clone(),
 					&attr.possible_value,
 				);
 
+				let val_expr_span = attr.possible_value.span();
 				match attr.possible_value {
 					KeyedAttributeValue::Value(value) => match value.value {
 						KVAttributeValue::Expr(mut val_expr) => {
@@ -296,10 +295,10 @@ impl<'w, 's, 'a> RstmlToWorld<'w, 's, 'a> {
 							}
 							entity.insert((
 								AttributeExpr::new(val_expr),
-								ItemOf::<AttributeExpr, _>::new(
+								FileSpanOf::<AttributeExpr>::new(
 									val_expr_file_span,
 								),
-								ItemOf::<AttributeExpr, _>::new(val_expr_span),
+								SpanOf::<AttributeExpr>::new(val_expr_span),
 							));
 						}
 						KVAttributeValue::InvalidBraced(invalid) => {
@@ -320,10 +319,7 @@ impl<'w, 's, 'a> RstmlToWorld<'w, 's, 'a> {
 	}
 
 	/// Simplifies parsing an `rstml::NodeName`
-	fn parse_node_name(
-		&mut self,
-		name: &NodeName,
-	) -> (String, FileSpan, SendWrapper<Span>) {
+	fn parse_node_name(&mut self, name: &NodeName) -> (String, FileSpan, Span) {
 		match name {
 			NodeName::Block(block) => {
 				self.diagnostics.push(Diagnostic::spanned(
@@ -338,7 +334,7 @@ impl<'w, 's, 'a> RstmlToWorld<'w, 's, 'a> {
 		(
 			key_str,
 			FileSpan::new_from_span(self.file.clone(), name),
-			SendWrapper::new(name.span()),
+			name.span(),
 		)
 	}
 

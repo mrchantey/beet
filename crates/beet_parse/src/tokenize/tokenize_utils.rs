@@ -129,11 +129,11 @@ pub(super) fn tokenize_maybe_spanned<T: Component + TokenizeSelf>(
 	let entity = world.entity(entity);
 	match (
 		entity.get::<T>(),
-		entity.get::<ItemOf<T, SendWrapper<Span>>>(),
+		entity.get::<SpanOf<T>>(),
 	) {
 		(Some(value), Some(span)) => {
 			let value = value.self_token_stream();
-			Ok(Some(quote::quote_spanned! { ***span =>
+			Ok(Some(quote::quote_spanned! { **span =>
 				#value
 			}))
 		}
@@ -153,12 +153,12 @@ pub(super) fn maybe_spanned_expr<
 	let entity = world.entity(entity);
 	match (
 		entity.get::<T>(),
-		entity.get::<ItemOf<T, SendWrapper<Span>>>(),
+		entity.get::<SpanOf<T>>(),
 	) {
 		(Some(value), Some(span)) => {
 			let value = &***value;
 			// let value = value.self_token_stream();
-			Ok(Some(syn::parse_quote_spanned! { ***span =>
+			Ok(Some(syn::parse_quote_spanned! { **span =>
 				#value
 			}))
 		}
@@ -175,10 +175,10 @@ pub(super) fn maybe_spanned_attr_key(
 	let entity = world.entity(entity);
 	match (
 		entity.get::<AttributeKey>(),
-		entity.get::<ItemOf<AttributeKey, SendWrapper<Span>>>(),
+		entity.get::<SpanOf<AttributeKey>>(),
 	) {
 		(Some(key), Some(span)) => {
-			Some((key.to_string(), span.clone().take().take()))
+			Some((key.to_string(), span.clone().take()))
 		}
 		(Some(key), None) => Some((key.to_string(), Span::call_site())),
 		_ => None,

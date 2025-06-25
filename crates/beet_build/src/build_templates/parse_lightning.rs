@@ -18,7 +18,7 @@ pub fn parse_lightning(
 			&LangPartial,
 			&NodeTag,
 			Option<&StyleId>,
-			Option<&ItemOf<ElementNode, FileSpan>>,
+			Option<&FileSpanOf<ElementNode>>,
 		),
 		Added<LangPartial>,
 	>,

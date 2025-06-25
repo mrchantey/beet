@@ -71,6 +71,7 @@ impl Plugin for TemplatePlugin {
 								.chain(),
 						),
 						insert_event_playback_attribute,
+						on_spawn_template,
 						// debug,
 					)
 						.chain()
