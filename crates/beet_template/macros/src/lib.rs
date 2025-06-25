@@ -24,7 +24,8 @@ pub fn rsx(tokens: TokenStream) -> TokenStream {
 		.into()
 }
 
-/// Mostly used for testing, this macro expands to [`WebTokens`]
+/// Mostly used for testing, this macro expands to a tokens respresentation
+/// of a bundle
 #[proc_macro]
 pub fn rsx_tokens(tokens: TokenStream) -> TokenStream {
 	let source_file = source_file(&tokens);

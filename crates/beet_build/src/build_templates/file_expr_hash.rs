@@ -86,11 +86,14 @@ pub fn update_file_expr_hash(
 #[cfg(test)]
 mod test {
 	use crate::as_beet::*;
+	use beet_bevy::prelude::WorldMutExt;
 	use beet_utils::prelude::*;
 	use bevy::prelude::*;
 	use sweet::prelude::*;
 
-	fn hash(bundle: impl Bundle) -> u64 {
+	fn hash(bundle: impl Bundle) -> u64 { hash_inner(bundle, true) }
+
+	fn hash_inner(bundle: impl Bundle, remove_macro_idxs: bool) -> u64 {
 		let mut app = App::new();
 		app.init_resource::<TemplateMacros>()
 			.add_systems(Update, update_file_expr_hash);
@@ -100,17 +103,28 @@ mod test {
 				related! {TemplateRoot[bundle]}
 			]))
 			.id();
+		// reset macro idxs for testing
+		if remove_macro_idxs {
+			for entity in app
+				.world_mut()
+				.query_filtered_once::<Entity, With<MacroIdx>>()
+			{
+				app.world_mut().entity_mut(entity).remove::<MacroIdx>();
+			}
+		}
 		app.update();
 		app.world().get::<FileExprHash>(entity).unwrap().0
 	}
+
 	use send_wrapper::SendWrapper;
 	use syn::Expr;
 	#[test]
 	#[rustfmt::skip]
 	fn tag_names() {
-		// expect(hash(rsx_tokens! {<div/>}))
-		// .to_be(hash(rsx_tokens! {<span/>}));
+		expect(hash(rsx_tokens! {<div/>}))
+		.to_be(hash(rsx_tokens! {<span/>}));
 
+		
 		expect(hash(rsx_tokens! {<Foo/>}))
     .not()		
 		.to_be(hash(rsx_tokens! {<Bar/>}));
@@ -131,23 +145,10 @@ mod test {
 	}
 	#[test]
 	fn macro_idxs() {
-		expect(hash((
-			MacroIdx::new(WsPathBuf::new(file!()), LineCol::default()),
-			rsx_tokens! {<div>{1}</div>},
-		)))
-		.to_be(hash((
-			MacroIdx::new(WsPathBuf::new(file!()), LineCol::default()),
-			rsx_tokens! {<div>{1}</div>},
-		)));
-		expect(hash((
-			MacroIdx::new(WsPathBuf::new(file!()), LineCol::default()),
-			rsx_tokens! {<div>{1}</div>},
-		)))
-		.not()
-		.to_be(hash((
-			MacroIdx::new(WsPathBuf::new(file!()), LineCol::new(1, 1)),
-			rsx_tokens! {<div>{1}</div>},
-		)));
+		// different LineCol means different hash
+		expect(hash_inner(rsx_tokens! {<div>{1}</div>}, false))
+			.not()
+			.to_be(hash_inner(rsx_tokens! {<div>{1}</div>}, false));
 	}
 
 	// TODO combinator attributes

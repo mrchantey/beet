@@ -102,6 +102,7 @@ mod test {
 		.xmap(parse)
 		.to_be_str(
 			quote! {(
+				MacroIdx{file:WsPathBuf::new("crates/beet_parse/src/tokenize/tokenize_element_attributes.rs"),start:LineCol{line:1u32,col:0u32}},
 				NodeTag(String::from("span")),
 				ElementNode { self_closing: true },
 				related!(Attributes[
@@ -116,6 +117,7 @@ mod test {
 		.xmap(parse)
 		.to_be_str(
 			quote! {(
+				MacroIdx{file:WsPathBuf::new("crates/beet_parse/src/tokenize/tokenize_element_attributes.rs"),start:LineCol{line:1u32,col:0u32}},
 				NodeTag(String::from("span")),
 				ElementNode { self_closing: true },
 				related!(Attributes[(
@@ -134,6 +136,7 @@ mod test {
 		.xmap(parse)
 		.to_be_str(
 			quote! {(
+				MacroIdx{file:WsPathBuf::new("crates/beet_parse/src/tokenize/tokenize_element_attributes.rs"),start:LineCol{line:1u32,col:0u32}},
 				NodeTag(String::from("span")),
 				ElementNode { self_closing: true },
 				#[allow(unused_braces)]{foo}.into_node_bundle()
@@ -149,6 +152,7 @@ mod test {
 		.xmap(parse)
 		.to_be_str(
 			quote! {(
+				MacroIdx{file:WsPathBuf::new("crates/beet_parse/src/tokenize/tokenize_element_attributes.rs"),start:LineCol{line:1u32,col:0u32}},
 				NodeTag(String::from("span")),
 				ElementNode { self_closing: true },
 				#[allow(unused_braces)]{foo}.into_node_bundle(),
@@ -162,6 +166,7 @@ mod test {
 		.xmap(parse)
 		.to_be_str(
 			quote! {(
+				MacroIdx{file:WsPathBuf::new("crates/beet_parse/src/tokenize/tokenize_element_attributes.rs"),start:LineCol{line:1u32,col:0u32}},
 				NodeTag(String::from("span")),
 				ElementNode { self_closing: true },
 				related!(Attributes[(
@@ -186,6 +191,7 @@ mod test {
 		.xmap(parse)
 		.to_be_str(
 			quote! {(
+				MacroIdx{file:WsPathBuf::new("crates/beet_parse/src/tokenize/tokenize_element_attributes.rs"),start:LineCol{line:1u32,col:0u32}},
 				NodeTag(String::from("span")),
 				ElementNode { self_closing: true },
 				#[allow(unused_braces)]{foo}.into_node_bundle(),

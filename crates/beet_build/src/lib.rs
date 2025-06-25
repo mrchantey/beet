@@ -29,6 +29,7 @@ pub mod as_beet {
 		pub use beet_template as template;
 		pub mod prelude {
 			pub use crate::prelude::*;
+			pub use beet_utils::prelude::*;
 			pub use beet_common::prelude::*;
 			pub use beet_parse::prelude::*;
 			pub use beet_template::prelude::*;

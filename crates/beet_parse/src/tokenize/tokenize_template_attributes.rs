@@ -21,9 +21,6 @@ pub fn tokenize_template_attributes(
 		return Ok(());
 	};
 	let node_tag_span = entity.get::<ItemOf<NodeTag, SendWrapper<Span>>>();
-	let Some(tracker) = entity.get::<ExprIdx>() else {
-		return Ok(());
-	};
 	let mut prop_assignments = Vec::new();
 
 	if let Some(attrs) = entity.get::<Attributes>() {
@@ -86,7 +83,6 @@ pub fn tokenize_template_attributes(
 	// this is important to avoid duplicate components like NodeTag
 	inner_items
 		.push(quote! {TemplateRoot::spawn(Spawn(template.into_node_bundle()))});
-	entity_components.push(tracker.self_token_stream());
 
 	entity_components.push(quote! {{
 		let template = <#template_ident as Props>::Builder::default()

@@ -90,6 +90,7 @@ mod test {
 		.xpect()
 		.to_be_str(
 			quote! {(
+				MacroIdx{file:WsPathBuf::new("crates/beet_parse/src/tokenize/tokenize_bundle.rs"),start:LineCol{line:1u32,col:0u32}},
 				NodeTag(String::from("span")),
 				ElementNode { self_closing: false },
 				related!(Attributes[(
@@ -97,11 +98,11 @@ mod test {
 					true.into_attribute_bundle()
 				)]),
 				related!{Children[(
+						ExprIdx(0u32),
 						NodeTag(String::from("MyComponent")),
 						FragmentNode,
 						TemplateNode,
 						ClientLoadDirective,
-						ExprIdx(0u32),
 						{
 							let template = <MyComponent as Props>::Builder::default().foo("bar").build();
 							#[allow(unused_braces)]
@@ -136,6 +137,7 @@ mod test {
 		.to_be_str(
 			quote! {
 				(
+					MacroIdx{file:WsPathBuf::new("crates/beet_parse/src/tokenize/tokenize_bundle.rs"),start:LineCol{line:1u32,col:0u32}},
 					FragmentNode,
 					related!{Children[
 						(
@@ -161,6 +163,8 @@ mod test {
 			.xpect()
 			.to_be_str(
 				quote! {(
+					MacroIdx{file:WsPathBuf::new("crates/beet_parse/src/tokenize/tokenize_bundle.rs"),start:LineCol{line:1u32,col:0u32}},
+					ExprIdx(0u32),
 					BlockNode,
 					#[allow(unused_braces)]{foo}.into_node_bundle()
 				)}
@@ -176,6 +180,7 @@ mod test {
 			.xpect()
 			.to_be_str(
 				quote! {(
+					MacroIdx{file:WsPathBuf::new("crates/beet_parse/src/tokenize/tokenize_bundle.rs"),start:LineCol{line:1u32,col:0u32}},
 					NodeTag(String::from("input")),
 					ElementNode { self_closing: true },
 					related!(Attributes [
@@ -197,6 +202,7 @@ mod test {
 			.xpect()
 			.to_be_str(
 				quote! {(
+					MacroIdx{file:WsPathBuf::new("crates/beet_parse/src/tokenize/tokenize_bundle.rs"),start:LineCol{line:1u32,col:0u32}},
 					NodeTag(String::from("style")),
 					ElementNode { self_closing: false }
 				)}
@@ -209,6 +215,7 @@ mod test {
 			.xpect()
 			.to_be_str(
 				quote! {(
+					MacroIdx{file:WsPathBuf::new("crates/beet_parse/src/tokenize/tokenize_bundle.rs"),start:LineCol{line:1u32,col:0u32}},
 					NodeTag(String::from("style")),
 					ElementNode { self_closing: false },
 					LangContent::InnerText(String::from("foo"))
