@@ -9,6 +9,7 @@ use rstml::Parser;
 use rstml::ParserConfig;
 use rstml::node::Node;
 use send_wrapper::SendWrapper;
+use syn::spanned::Spanned;
 
 // we must use `std::collections::HashSet` because thats what rstml uses
 type HashSet<T> = std::collections::HashSet<T>;
@@ -77,10 +78,10 @@ impl RstmlTokens {
 /// A vec of [`rstml::node::Node`] retrieved from the [`RstmlTokens`]
 /// via [`tokens_to_rstml`].
 #[derive(Debug, Clone, Deref, DerefMut, Component)]
-pub struct RstmlNodes(SendWrapper<Vec<Node>>);
-impl RstmlNodes {
-	pub fn new(nodes: Vec<Node>) -> Self { Self(SendWrapper::new(nodes)) }
-	pub fn take(self) -> Vec<Node> { self.0.take() }
+pub struct RstmlRoot(SendWrapper<Node>);
+impl RstmlRoot {
+	pub fn new(node: Node) -> Self { Self(SendWrapper::new(node)) }
+	pub fn take(self) -> Node { self.0.take() }
 }
 
 #[derive(Debug, Deref, DerefMut, Component)]
@@ -98,25 +99,74 @@ impl TokensDiagnostics {
 }
 
 
-/// Replace the tokens
+/// Replace the tokens with parsed [`RstmlNodes`], and apply a [`MacroIdx`]
 pub(super) fn tokens_to_rstml(
 	_: TempNonSendMarker,
 	mut commands: Commands,
 	parser: NonSend<Parser<RstmlCustomNode>>,
-	query: Populated<(Entity, &RstmlTokens)>,
+	query: Populated<
+		(Entity, &RstmlTokens, Option<&SourceFile>),
+		Added<RstmlTokens>,
+	>,
 ) -> Result {
-	for (entity, handle) in query.iter() {
+	for (entity, handle, source_file) in query.iter() {
+		let default_source_file = WsPathBuf::default();
+		let source_file = source_file.map_or(&default_source_file, |sf| &sf);
+
 		let tokens = handle.clone().take();
+		// this is the key to matching statically analyzed macros
+		// with instantiated ones
+		let start = tokens.span().start();
 		let (nodes, errors) = parser.parse_recoverable(tokens).split_vec();
-		commands
-			.entity(entity)
-			.remove::<RstmlTokens>()
-			.insert((RstmlNodes::new(nodes), TokensDiagnostics::new(errors)));
+
+		let node = match nodes.len() {
+			0 => rstml_fragment(vec![]),
+			1 => nodes.into_iter().next().unwrap(),
+			_ => rstml_fragment(nodes),
+		};
+
+		commands.entity(entity).remove::<RstmlTokens>().insert((
+			RstmlRoot::new(node),
+			TokensDiagnostics::new(errors),
+			MacroIdx::new(source_file.clone(), start.into()),
+		));
 	}
 	Ok(())
 }
 
+/// create an rstml fragment node
+fn rstml_fragment(
+	children: Vec<Node<RstmlCustomNode>>,
+) -> Node<RstmlCustomNode> {
+	// i guess we dont attempt to create a span, thats untruthful
+	// 	let span = if nodes.len() == 1 {
+	// 	nodes.first().unwrap().span()
+	// } else {
+	// 	nodes
+	// 		.first()
+	// 		.map(|n| n.span())
+	// 		.unwrap_or(Span::call_site())
+	// 		.join(
+	// 			nodes.last().map(|n| n.span()).unwrap_or(Span::call_site()),
+	// 		)
+	// 		.unwrap_or(Span::call_site())
+	// };
 
+	Node::Fragment(rstml::node::NodeFragment {
+		tag_open: rstml::node::atoms::FragmentOpen {
+			token_lt: Default::default(),
+			token_gt: Default::default(),
+		},
+		children,
+		tag_close: Some(rstml::node::atoms::FragmentClose {
+			start_tag: rstml::node::atoms::CloseTagStart {
+				token_lt: Default::default(),
+				token_solidus: Default::default(),
+			},
+			token_gt: Default::default(),
+		}),
+	})
+}
 
 #[cfg(test)]
 mod test {
@@ -126,17 +176,18 @@ mod test {
 	use bevy::prelude::*;
 	use proc_macro2::TokenStream;
 	use quote::quote;
+	use rstml::node::Node;
 	use sweet::prelude::*;
 
 
-	fn parse(tokens: TokenStream) -> Vec<RstmlNodes> {
+	fn parse(tokens: TokenStream) -> Vec<RstmlRoot> {
 		App::new()
 			.add_plugins(tokens_to_rstml_plugin)
 			.xtap(|app| {
 				app.world_mut().spawn(RstmlTokens::new(tokens));
 			})
 			.update_then()
-			.remove::<RstmlNodes>()
+			.remove::<RstmlRoot>()
 	}
 
 
@@ -147,7 +198,15 @@ mod test {
 			<div/>
 		}
 		.xmap(parse)
-		.xmap(|nodes| nodes[0].len())
+		.xmap(|nodes| {
+			let mut nodes = nodes;
+			let Node::Fragment(fragment) =
+				nodes.first_mut().unwrap().clone().take()
+			else {
+				panic!();
+			};
+			fragment.children().len()
+		})
 		.xpect()
 		.to_be(2);
 	}

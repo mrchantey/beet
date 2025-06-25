@@ -84,6 +84,11 @@ macro_rules! tokenize_maybe_spanned {
 
 
 tokenize_maybe_spanned![
+	tokenize_idxs,
+	MacroIdx,
+	ExprIdx,
+];
+tokenize_maybe_spanned![
 	tokenize_rsx_nodes,
 	NodeTag,
 	FragmentNode,

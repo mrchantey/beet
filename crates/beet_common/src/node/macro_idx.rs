@@ -1,4 +1,4 @@
-use crate::prelude::*;
+use crate::as_beet::*;
 use beet_utils::prelude::*;
 use bevy::prelude::*;
 
@@ -11,6 +11,8 @@ use bevy::prelude::*;
 /// Combining this with [`ExprIdx`] we can uniquely identify
 /// a template macro in a file, and the order of expressions inside it.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Reflect, Component)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "tokens", derive(ToTokens))]
 #[reflect(Component)]
 pub struct MacroIdx {
 	/// The source file containing the template.

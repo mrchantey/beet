@@ -6,13 +6,25 @@ use proc_macro2::TokenStream;
 /// Create a [`TokenStream`] of a [`Bundle`] that represents the *finalized*
 /// tree of nodes for the given [`Entity`], as opposed to the *tokenized* tree,
 /// see [`tokenize_bundle_tokens`].
+#[rustfmt::skip]
 pub fn tokenize_bundle(
-	world: &mut World,
+	world: &World,
 	entity: Entity,
 ) -> Result<TokenStream> {
-	// The root is not an actual node, so we flatten the children if its 1, or
-	// convert to a fragment.
-	flatten_fragment(world, entity, tokenize_bundle_no_flatten)
+	let mut items = Vec::new();
+	tokenize_idxs(world, &mut items, entity)?;
+	tokenize_rsx_nodes(world,&mut items, entity)?;
+	tokenize_rsx_directives(world,&mut items, entity)?;
+	tokenize_web_nodes(world,&mut items, entity)?;
+	tokenize_web_directives(world,&mut items, entity)?;
+	tokenize_element_attributes(world,&mut items, entity)?;
+	tokenize_template_attributes(world,&mut items, entity)?;
+	tokenize_block_node_exprs(world, entity)?.map(|i|items.push(i));
+	tokenize_combinator_exprs(world, entity)?.map(|i|items.push(i));
+	tokenize_related::<Children>(world,&mut items, entity, tokenize_bundle)?;
+	items
+		.xmap(unbounded_bundle)
+		.xok()
 }
 
 
@@ -20,7 +32,7 @@ pub fn tokenize_bundle(
 /// compile errors. Prefer this method for macros, and [`tokenize_bundle`] for
 /// codegen.
 pub fn tokenize_bundle_with_errors(
-	world: &mut World,
+	world: &World,
 	entity: Entity,
 ) -> Result<TokenStream> {
 	// TODO insert errors
@@ -31,25 +43,6 @@ pub fn tokenize_bundle_with_errors(
 	}
 
 	Ok(tokens)
-}
-
-
-
-#[rustfmt::skip]
-pub(super) fn tokenize_bundle_no_flatten(world: &World, entity: Entity) -> Result<TokenStream> {
-	let mut items = Vec::new();
-	tokenize_rsx_nodes(world,&mut items, entity)?;
-	tokenize_rsx_directives(world,&mut items, entity)?;
-	tokenize_web_nodes(world,&mut items, entity)?;
-	tokenize_web_directives(world,&mut items, entity)?;
-	tokenize_element_attributes(world,&mut items, entity)?;
-	tokenize_template_attributes(world,&mut items, entity)?;
-	tokenize_block_node_exprs(world, entity)?.map(|i|items.push(i));
-	tokenize_combinator_exprs(world, entity)?.map(|i|items.push(i));
-	tokenize_related::<Children>(world,&mut items, entity, tokenize_bundle_no_flatten)?;
-	items
-		.xmap(unbounded_bundle)
-		.xok()
 }
 
 /// the rstml macro parses in steps, ie <div foo={rsx!{<bar/>}}/> will resolve

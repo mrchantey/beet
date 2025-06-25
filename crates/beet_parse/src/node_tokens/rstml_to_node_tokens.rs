@@ -37,12 +37,12 @@ fn rstml_to_node_tokens(
 	mut query: Populated<(
 		Entity,
 		&SourceFile,
-		&RstmlNodes,
+		&RstmlRoot,
 		&mut TokensDiagnostics,
 	)>,
 ) -> Result {
 	for (entity, source_file, rstml_nodes, diagnostics) in query.iter_mut() {
-		let rstml_nodes = rstml_nodes.clone();
+		let root_node = rstml_nodes.clone();
 
 		let mut collected_elements = CollectedElements::default();
 
@@ -54,10 +54,10 @@ fn rstml_to_node_tokens(
 			commands: &mut commands,
 			expr_idx: ExprIdxBuilder::new(),
 		}
-		.map_to_children(entity, rstml_nodes);
+		.insert_node(entity, root_node.take());
 		commands
 			.entity(entity)
-			.remove::<RstmlNodes>()
+			.remove::<RstmlRoot>()
 			.insert(collected_elements);
 	}
 	Ok(())
@@ -74,103 +74,78 @@ struct RstmlToWorld<'w, 's, 'a> {
 }
 
 impl<'w, 's, 'a> RstmlToWorld<'w, 's, 'a> {
-	/// Parse all nodes in [`RstmlNodes`] and add their tokens as children
-	fn map_to_children(&mut self, root: Entity, nodes: RstmlNodes) {
-		let span = if nodes.len() == 1 {
-			nodes.first().unwrap().span()
-		} else {
-			nodes
-				.first()
-				.map(|n| n.span())
-				.unwrap_or(Span::call_site())
-				.join(
-					nodes.last().map(|n| n.span()).unwrap_or(Span::call_site()),
-				)
-				.unwrap_or(Span::call_site())
-		};
-		let children = self.map_nodes(nodes.take());
-		self.commands
-			.entity(root)
-			.insert(ItemOf::<(), _>::new(FileSpan::new_from_span(
-				self.file.clone(),
-				&span,
-			)))
-			.add_children(&children);
-	}
-
-	/// the number of actual html nodes will likely be different
-	/// due to fragments, blocks etc.
 	/// Returns the entity containing these nodes
-	pub fn map_nodes(
+	pub fn spawn_nodes(
 		&mut self,
 		nodes: Vec<Node<RstmlCustomNode>>,
 	) -> Vec<Entity> {
-		nodes.into_iter().map(|node| self.map_node(node)).collect()
+		nodes
+			.into_iter()
+			.map(|node| {
+				let entity = self.commands.spawn_empty().id();
+				self.insert_node(entity, node);
+				entity
+			})
+			.collect()
 	}
 
 
-	fn map_node(&mut self, node: Node<RstmlCustomNode>) -> Entity {
+	fn insert_node(&mut self, entity: Entity, node: Node<RstmlCustomNode>) {
 		let node_span = SendWrapper::new(node.span());
 		let file_span = FileSpan::new_from_span(self.file.clone(), &node);
 		// let spans = (node_span, file_span);
 		match node {
-			Node::Doctype(_) => self
-				.commands
-				.spawn((
+			Node::Doctype(_) => {
+				self.commands.entity(entity).insert((
 					DoctypeNode,
 					ItemOf::<DoctypeNode, _>::new(file_span),
 					ItemOf::<DoctypeNode, _>::new(node_span),
-				))
-				.id(),
-			Node::Comment(node) => self
-				.commands
-				.spawn((
+				));
+			}
+			Node::Comment(node) => {
+				self.commands.entity(entity).insert((
 					CommentNode(node.value.value()),
 					ItemOf::<CommentNode, _>::new(file_span),
 					ItemOf::<CommentNode, _>::new(node_span),
-				))
-				.id(),
-			Node::Text(node) => self
-				.commands
-				.spawn((
+				));
+			}
+			Node::Text(node) => {
+				self.commands.entity(entity).insert((
 					TextNode(node.value.value()),
 					ItemOf::<TextNode, _>::new(file_span),
 					ItemOf::<TextNode, _>::new(node_span),
-				))
-				.id(),
-			Node::RawText(node) => self
-				.commands
-				.spawn((
+				));
+			}
+			Node::RawText(node) => {
+				self.commands.entity(entity).insert((
 					TextNode(node.to_string_best()),
 					ItemOf::<TextNode, _>::new(file_span),
 					ItemOf::<TextNode, _>::new(node_span),
-				))
-				.id(),
+				));
+			}
 			Node::Fragment(fragment) => {
-				let children = self.map_nodes(fragment.children);
+				let children = self.spawn_nodes(fragment.children);
 				self.commands
-					.spawn((
+					.entity(entity)
+					.insert((
 						FragmentNode,
 						ItemOf::<FragmentNode, _>::new(file_span),
 						ItemOf::<FragmentNode, _>::new(node_span),
 					))
-					.add_children(&children)
-					.id()
+					.add_children(&children);
 			}
 			Node::Block(NodeBlock::ValidBlock(block)) => {
 				let expr = SendWrapper::<Expr>::new(syn::parse_quote!(
 					#[allow(unused_braces)]
 					#block
 				));
-				self.commands
-					.spawn((
-						BlockNode,
-						self.expr_idx.next(),
-						ItemOf::<BlockNode, _>::new(file_span),
-						ItemOf::<BlockNode, _>::new(node_span),
-						ItemOf::<BlockNode, _>::new(expr),
-					))
-					.id()
+				self.commands.entity(entity).insert((
+					BlockNode,
+					self.expr_idx.next(),
+					ItemOf::<BlockNode, _>::new(file_span),
+					ItemOf::<BlockNode, _>::new(node_span),
+					ItemOf::<BlockNode, _>::new(expr),
+				));
 			}
 			Node::Block(NodeBlock::Invalid(invalid)) => {
 				self.diagnostics.push(Diagnostic::spanned(
@@ -178,13 +153,11 @@ impl<'w, 's, 'a> RstmlToWorld<'w, 's, 'a> {
 					Level::Error,
 					"Invalid block",
 				));
-				self.commands
-					.spawn((
-						BlockNode,
-						ItemOf::<BlockNode, _>::new(file_span),
-						ItemOf::<BlockNode, _>::new(node_span),
-					))
-					.id()
+				self.commands.entity(entity).insert((
+					BlockNode,
+					ItemOf::<BlockNode, _>::new(file_span),
+					ItemOf::<BlockNode, _>::new(node_span),
+				));
 			}
 			Node::Element(el) => {
 				self.check_self_closing_children(&el);
@@ -207,9 +180,10 @@ impl<'w, 's, 'a> RstmlToWorld<'w, 's, 'a> {
 
 				// let attributes = AttributeTokensList(attributes);
 
-				let children = self.map_nodes(children);
+				let children = self.spawn_nodes(children);
 
-				let mut entity = self.commands.spawn((
+				let mut entity = self.commands.entity(entity);
+				entity.insert((
 					NodeTag(tag_str.clone()),
 					ItemOf::<NodeTag, _>::new(tag_file_span),
 					ItemOf::<NodeTag, _>::new(tag_span),
@@ -217,10 +191,10 @@ impl<'w, 's, 'a> RstmlToWorld<'w, 's, 'a> {
 				entity.add_children(&children);
 
 				if tag_str.starts_with(|c: char| c.is_uppercase()) {
-					// yes we get the tracker after its children, its fine as long
-					// as its consistent with other parsers.
 					entity.insert((
 						TemplateNode,
+						// yes we get the ExprIdx after its children, its fine as long
+						// as its consistent with other parsers.
 						self.expr_idx.next(),
 						ItemOf::<TemplateNode, _>::new(file_span),
 						ItemOf::<TemplateNode, _>::new(node_span),
@@ -238,9 +212,6 @@ impl<'w, 's, 'a> RstmlToWorld<'w, 's, 'a> {
 					.attributes
 					.into_iter()
 					.for_each(|attr| self.spawn_attribute(entity, attr));
-
-
-				entity
 			}
 			Node::Custom(_) => {
 				self.diagnostics.push(Diagnostic::spanned(
@@ -248,9 +219,8 @@ impl<'w, 's, 'a> RstmlToWorld<'w, 's, 'a> {
 					Level::Error,
 					"Unhandled custom node",
 				));
-				Entity::PLACEHOLDER
 			}
-		}
+		};
 	}
 
 	/// Spawn an attribute for the given parent

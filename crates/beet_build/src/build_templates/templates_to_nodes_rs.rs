@@ -3,7 +3,6 @@ use beet_common::prelude::*;
 use beet_parse::prelude::*;
 use beet_utils::prelude::*;
 use bevy::prelude::*;
-use syn::spanned::Spanned;
 use syn::visit::Visit;
 
 
@@ -26,7 +25,6 @@ pub fn templates_to_nodes_rs(
 				commands: &mut commands,
 				file: &*path,
 				macros: &*macros,
-				index: 0,
 			}
 			.visit_file(&file);
 		}
@@ -43,8 +41,6 @@ struct RsxSynVisitor<'a, 'w, 's> {
 	/// via the `file!()` macro.
 	file: &'a WsPathBuf,
 	macros: &'a TemplateMacros,
-	/// the index used for building the [`TemplateKey`].
-	index: usize,
 }
 
 impl<'a, 'w, 's> Visit<'a> for RsxSynVisitor<'a, 'w, 's> {
@@ -55,17 +51,14 @@ impl<'a, 'w, 's> Visit<'a> for RsxSynVisitor<'a, 'w, 's> {
 			.last()
 			.map_or(false, |seg| *&seg.ident == *self.macros.rstml)
 		{
-			let start = mac.span().start();
 			// mac.tokens is the inner tokens of the macro, ie the foo in rsx!{foo}
 			// important for tracking exact span of the macro
 			let tokens = mac.tokens.clone();
 			self.commands.spawn((
 				ChildOf(self.parent),
 				SourceFile::new(self.file.clone()),
-				RstmlTokens::new(tokens),
-				MacroIdx::new(self.file.clone(), start.into()),
+				RstmlTokens::new(tokens)
 			));
-			self.index += 1;
 		}
 	}
 }

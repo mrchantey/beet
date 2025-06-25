@@ -31,14 +31,18 @@ fn combinator_to_node_tokens(
 ) -> bevy::prelude::Result {
 	for (entity, tokens, source_file) in query.iter() {
 		let default_source_file = WsPathBuf::default();
+		let source_file = source_file.map_or(&default_source_file, |sf| &sf);
 		Builder {
 			verbatim_tags: &["script", "style", "code"],
-			source_file: source_file.map_or(&default_source_file, |sf| &sf),
+			source_file,
 			commands: &mut commands,
 			expr_idx: ExprIdxBuilder::new(),
 		}
 		.map_to_children(entity, tokens)?;
-		commands.entity(entity).remove::<CombinatorTokens>();
+		commands.entity(entity).remove::<CombinatorTokens>().insert(MacroIdx::new(
+			source_file.clone(),
+			LineCol::default(),
+		));
 	}
 	Ok(())
 }
@@ -51,6 +55,9 @@ struct Builder<'w, 's, 'a> {
 	expr_idx: ExprIdxBuilder,
 	commands: &'a mut Commands<'w, 's>,
 }
+
+
+// quick-and-dirty way to handle siblings without a parent fragment
 fn wrap_in_fragment(tokens: &str) -> String {
 	if tokens.trim().starts_with("<>") {
 		tokens.to_string()
@@ -68,7 +75,7 @@ impl<'w, 's, 'a> Builder<'w, 's, 'a> {
 		let rsx = wrap_in_fragment(&rsx.0);
 
 		let (expr, remaining) = parse(&rsx).map_err(|e| {
-			anyhow::anyhow!("Failed to parse HTML: {}", e.to_string())
+			anyhow::anyhow!("Failed to parse Combinator RSX: {}", e.to_string())
 		})?;
 		if !remaining.is_empty() {
 			return Err(anyhow::anyhow!(
@@ -76,15 +83,13 @@ impl<'w, 's, 'a> Builder<'w, 's, 'a> {
 				remaining
 			));
 		}
-		// add as a child to keep consistency with [`rstml_to_tokens`]
-		let child = self.commands.spawn_empty().id();
-		self.rsx_parsed_expression(child, expr)?;
+
+		self.rsx_parsed_expression(root, expr)?;
 		self.commands
 			.entity(root)
 			.insert(ItemOf::<(), _>::new(FileSpan::new_for_file(
 				&self.source_file,
-			)))
-			.add_child(child);
+			)));
 		Ok(())
 	}
 
@@ -163,7 +168,7 @@ impl<'w, 's, 'a> Builder<'w, 's, 'a> {
 		if tag_str.starts_with(|c: char| c.is_uppercase()) {
 			entity.insert((
 				TemplateNode,
-				// yes we get the tracker after its children, its fine as long
+				// yes we get the ExprIdx after its children, its fine as long
 				// as its consistent with other parsers.
 				self.expr_idx.next(),
 				ItemOf::<TemplateNode, _>::new(file_span),

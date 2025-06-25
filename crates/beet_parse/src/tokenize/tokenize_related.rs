@@ -1,45 +1,9 @@
 use crate::prelude::*;
-use beet_common::prelude::TokenizeSelf;
 use bevy::ecs::system::SystemParam;
 use bevy::prelude::*;
 use proc_macro2::TokenStream;
 use quote::quote;
 use syn::Ident;
-
-/// 1. If the entity has no children, return `()`
-/// 2. If the entity has a single child, map that child with `map_child`.
-pub fn flatten_fragment(
-	world: &World,
-	entity: Entity,
-	map_child: impl Fn(&World, Entity) -> Result<TokenStream>,
-) -> Result<TokenStream> {
-	let Some(children) = world
-		.entity(entity)
-		.get::<Children>()
-		.map(|c| c.iter().collect::<Vec<_>>())
-	else {
-		return Ok(().self_token_stream());
-	};
-	if children.len() == 1 {
-		// a single child, return that
-		map_child(world, children[0])
-	} else {
-		// multiple children, wrap in fragment
-		let children = children
-			.into_iter()
-			.map(|child| map_child(world, child))
-			.collect::<Result<Vec<_>>>()?;
-
-		let children =
-			unbounded_related(&syn::parse_quote!(Children), children);
-
-		Ok(quote! { (
-			FragmentNode,
-			#children
-		)})
-	}
-}
-
 
 /// If the entity has this [`RelationshipTarget`], then map each
 /// child with `map_child` and return a `related!` [`TokenStream`]

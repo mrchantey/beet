@@ -1,19 +1,20 @@
-use super::GetSpan;
 use bevy::reflect::Reflect;
+use crate::as_beet::*;
 
 /// A location in a source file, the line is 1 indexed and the column is 0 indexed,
 /// which follows the behavior of [`proc_macro2::Span`]
 /// The Default implementation is `1:0`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Reflect)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "tokens", derive(ToTokens))]
 pub struct LineCol {
 	/// The 1 indexed line in the source file, reflecting the behavior of `line!()` and
 	/// [`proc_macro2::Span`]
-	line: u32,
+	pub line: u32,
 	/// The 0 indexed column in the source file, reflecting the behavior of `column!()`
 	/// and [`proc_macro2::Span`]. This is not the same as `proc_macro::Span` which
 	/// is 1 indexed.
-	col: u32,
+	pub col: u32,
 }
 
 impl Default for LineCol {
