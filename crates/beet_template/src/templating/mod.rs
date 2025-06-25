@@ -32,6 +32,7 @@ pub struct RenderStep;
 pub struct MountStep;
 #[derive(Debug, Clone, PartialEq, Eq, Hash, SystemSet)]
 pub struct BindStep;
+
 #[derive(Default)]
 pub struct TemplatePlugin;
 impl Plugin for TemplatePlugin {

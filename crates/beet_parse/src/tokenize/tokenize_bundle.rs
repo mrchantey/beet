@@ -95,7 +95,7 @@ mod test {
 		.unwrap()
 		.to_string()
 		.xpect()
-		.to_be(
+		.to_be_str(
 			quote! {(
 				NodeTag(String::from("span")),
 				ElementNode { self_closing: false },
@@ -143,7 +143,7 @@ mod test {
 		.unwrap()
 		.to_string()
 		.xpect()
-		.to_be(
+		.to_be_str(
 			quote! {
 				(
 					FragmentNode,
@@ -169,10 +169,10 @@ mod test {
 			.unwrap()
 			.to_string()
 			.xpect()
-			.to_be(
+			.to_be_str(
 				quote! {(
 					BlockNode,
-					{foo}.into_node_bundle()
+					#[allow(unused_braces)]{foo}.into_node_bundle()
 				)}
 				.to_string(),
 			);
@@ -184,7 +184,7 @@ mod test {
 			.unwrap()
 			.to_string()
 			.xpect()
-			.to_be(
+			.to_be_str(
 				quote! {(
 					NodeTag(String::from("input")),
 					ElementNode { self_closing: true },
@@ -205,7 +205,7 @@ mod test {
 			.unwrap()
 			.to_string()
 			.xpect()
-			.to_be(
+			.to_be_str(
 				quote! {(
 					NodeTag(String::from("style")),
 					ElementNode { self_closing: false }
@@ -217,7 +217,7 @@ mod test {
 			.unwrap()
 			.to_string()
 			.xpect()
-			.to_be(
+			.to_be_str(
 				quote! {(
 					NodeTag(String::from("style")),
 					ElementNode { self_closing: false },

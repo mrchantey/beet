@@ -100,7 +100,7 @@ mod test {
 			<span hidden/>
 		}
 		.xmap(parse)
-		.to_be(
+		.to_be_str(
 			quote! {(
 				NodeTag(String::from("span")),
 				ElementNode { self_closing: true },
@@ -114,7 +114,7 @@ mod test {
 			<span hidden=true/>
 		}
 		.xmap(parse)
-		.to_be(
+		.to_be_str(
 			quote! {(
 				NodeTag(String::from("span")),
 				ElementNode { self_closing: true },
@@ -132,11 +132,11 @@ mod test {
 			<span {foo}/>
 		}
 		.xmap(parse)
-		.to_be(
+		.to_be_str(
 			quote! {(
 				NodeTag(String::from("span")),
 				ElementNode { self_closing: true },
-				{foo}.into_node_bundle()
+				#[allow(unused_braces)]{foo}.into_node_bundle()
 			)}
 			.to_string(),
 		);
@@ -151,7 +151,7 @@ mod test {
 			quote! {(
 				NodeTag(String::from("span")),
 				ElementNode { self_closing: true },
-				{foo}.into_node_bundle(),
+				#[allow(unused_braces)]{foo}.into_node_bundle(),
 				related!(Attributes [AttributeKey::new("onclick")])
 			)}
 			.to_string(),
@@ -188,7 +188,7 @@ mod test {
 			quote! {(
 				NodeTag(String::from("span")),
 				ElementNode { self_closing: true },
-				{foo}.into_node_bundle(),
+				#[allow(unused_braces)]{foo}.into_node_bundle(),
 				{|_: Trigger<OnClick>| { println!("clicked"); }}.into_node_bundle(),
 				related!(Attributes[
 					AttributeKey::new("hidden"),

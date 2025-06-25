@@ -1,4 +1,5 @@
 use crate::prelude::*;
+use beet_bevy::prelude::BundleExt;
 use beet_common::prelude::*;
 use bevy::prelude::*;
 
@@ -32,23 +33,31 @@ where
 	T: 'static + Send + Sync + Clone + ToString,
 {
 	fn into_node_bundle(self) -> impl Bundle {
-		// to ensure the types match we need to create a SignalReceiver
-		// for const values that will not change
 		match self {
-			Self::Const(val) => {
-				let val = val.to_string();
-				(
-					TextSpan::new(val.clone()),
-					SignalReceiver::new(move || val.clone()),
-				)
-			}
+			Self::Const(val) => TextSpan::new(val.to_string()).any_bundle(),
 			Self::Getter(getter) => {
-				// changes here should be reflected in bevy_signal.rs
-				let string_getter = move || getter.get().to_string();
+				// used by bevy_signal::receive_text_node_signals
 				(
 					TextSpan::new(getter.get().to_string()),
-					SignalReceiver::new(string_getter),
+					SignalReceiver::new(move || getter.get().to_string()),
 				)
+					.any_bundle()
+			}
+		}
+	}
+	fn into_attribute_bundle(self) -> impl Bundle
+	where
+		Self: 'static + Send + Sync + Sized,
+	{
+		match self {
+			Self::Const(val) => AttributeLit::new(val.to_string()).any_bundle(),
+			Self::Getter(getter) => {
+				// used by bevy_signal::receive_attribute_value_signals
+				(
+					AttributeLit::new(getter.get().to_string()),
+					SignalReceiver::new(move || getter.get().to_string()),
+				)
+					.any_bundle()
 			}
 		}
 	}

@@ -51,9 +51,9 @@ pub(crate) fn receive_text_node_signals(
 pub(crate) fn receive_attribute_value_signals(
 	mut query: Populated<(&mut AttributeLit, &SignalReceiver<String>)>,
 ) {
-	for (mut text, update) in query.iter_mut() {
+	for (mut lit, update) in query.iter_mut() {
 		while let Ok(new_text) = update.0.try_recv() {
-			*text = AttributeLit::new(new_text);
+			*lit = AttributeLit::new(new_text);
 		}
 	}
 }
@@ -164,6 +164,47 @@ mod test {
 			.to_be("foo");
 
 		set("bar");
+
+		app.update();
+		app.world()
+			.entity(attr)
+			.get::<AttributeLit>()
+			.unwrap()
+			.to_string()
+			.xref()
+			.xpect()
+			.to_be("bar");
+	}
+	#[test]
+	fn attribute_blocks() {
+		#[derive(Default, Buildable, AttributeBlock)]
+		struct Foo {
+			class: Option<MaybeSignal<String>>,
+		}
+
+		#[template]
+		fn Bar(#[field(flatten)] foo: Foo) -> impl Bundle {
+			rsx! { <div {foo}/> }
+		}
+
+		let mut app = App::new();
+		app.add_plugins(TemplatePlugin);
+		let (get, set) = signal("foo".to_string());
+		let template = app.world_mut().spawn(rsx! {<Bar class={get}/>}).id();
+		app.update();
+		let div = app.world().entity(template).get::<Children>().unwrap()[0];
+		let attr = app.world().entity(div).get::<Attributes>().unwrap()[0];
+
+		app.world()
+			.entity(attr)
+			.get::<AttributeLit>()
+			.unwrap()
+			.to_string()
+			.xref()
+			.xpect()
+			.to_be("foo");
+
+		set("bar".to_string());
 
 		app.update();
 		app.world()

@@ -12,8 +12,8 @@ macro_rules! paint {
     )
 }
 
-const SIGN_RIGHT: char = '+'; // + > →
-const SIGN_LEFT: char = '-'; // - < ←
+const SIGN_LEFT: &str = "Expected:\n";
+const SIGN_RIGHT: &str = "Received:\n";
 
 /// Present the diff output for two mutliline strings in a pretty, colorised manner.
 pub fn write_header(f: &mut fmt::Formatter) -> fmt::Result {
@@ -151,7 +151,7 @@ where
 	/// Push a new character into the buffer, specifying the style it should be written in.
 	fn write_with_style<T: Into<Style>>(
 		&mut self,
-		c: &char,
+		c: &impl fmt::Display,
 		style: T,
 	) -> fmt::Result {
 		// If the style is the same as previously, just write character
@@ -257,13 +257,13 @@ mod test {
 		printer(&mut actual, left, right).expect("printer function failed");
 		// println!(
 		// 	"## left ##\n\
-    //          {}\n\
-    //          ## right ##\n\
-    //          {}\n\
-    //          ## actual diff ##\n\
-    //          {}\n\
-    //          ## expected diff ##\n\
-    //          {}",
+		//          {}\n\
+		//          ## right ##\n\
+		//          {}\n\
+		//          ## actual diff ##\n\
+		//          {}\n\
+		//          ## expected diff ##\n\
+		//          {}",
 		// 	left, right, actual, expected
 		// );
 		assert_eq!(actual, expected);

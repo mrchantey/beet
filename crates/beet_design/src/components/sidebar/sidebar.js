@@ -34,7 +34,7 @@ function handleCurrentPage() {
 	
 	// handle show selected
 	links.forEach(link => {
-		console.log('links', link.href)
+		// console.log('links', link.href)
 		if (link.href === globalThis.location.href)
 			link.setAttribute('aria-current', 'page')
 		else

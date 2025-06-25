@@ -25,7 +25,19 @@ impl BeetEvent<()> {
 				let ev = ev.unchecked_into::<web_sys::MouseEvent>();
 				commands.trigger(BeetEvent::new(SendWrapper::new(ev)));
 			}
-			_ => unimplemented!(),
+			"oninput" => {
+				let ev = ev.unchecked_into::<web_sys::Event>();
+				commands.trigger(BeetEvent::new(SendWrapper::new(ev)));
+			}
+			"onchange" => {
+				let ev = ev.unchecked_into::<web_sys::Event>();
+				commands.trigger(BeetEvent::new(SendWrapper::new(ev)));
+			}
+			other => {
+				unimplemented!(
+					"typing for html event {other} not yet implemented, please open an issue"
+				)
+			}
 		}
 	}
 }

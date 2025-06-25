@@ -15,7 +15,6 @@ use rstml::node::NodeElement;
 use rstml::node::NodeName;
 use send_wrapper::SendWrapper;
 use syn::Expr;
-use syn::ExprBlock;
 use syn::ExprLit;
 use syn::spanned::Spanned;
 
@@ -160,11 +159,10 @@ impl<'w, 's, 'a> RstmlToWorld<'w, 's, 'a> {
 			}
 			Node::Block(NodeBlock::ValidBlock(block)) => {
 				let tracker = self.rusty_tracker.next_tracker(&block);
-				let expr = SendWrapper::new(Expr::Block(ExprBlock {
-					attrs: Vec::new(),
-					label: None,
-					block,
-				}));
+				let expr = SendWrapper::<Expr>::new(syn::parse_quote!(
+					#[allow(unused_braces)]
+					#block
+				));
 				self.commands
 					.spawn((
 						BlockNode,
@@ -277,11 +275,10 @@ impl<'w, 's, 'a> RstmlToWorld<'w, 's, 'a> {
 					AttributeOf::new(parent),
 					ItemOf::<AttributeExpr, _>::new(block_file_span),
 					ItemOf::<AttributeExpr, _>::new(block_span),
-					AttributeExpr::new(Expr::Block(ExprBlock {
-						attrs: Vec::new(),
-						label: None,
-						block,
-					})),
+					AttributeExpr::new(syn::parse_quote!(
+						#[allow(unused_braces)]
+						#block
+					)),
 				));
 			}
 			NodeAttribute::Attribute(attr) => {
@@ -317,11 +314,17 @@ impl<'w, 's, 'a> RstmlToWorld<'w, 's, 'a> {
 
 				match attr.possible_value {
 					KeyedAttributeValue::Value(value) => match value.value {
-						KVAttributeValue::Expr(val_expr) => {
+						KVAttributeValue::Expr(mut val_expr) => {
 							if let Expr::Lit(ExprLit { lit, attrs: _ }) =
 								&val_expr
 							{
 								entity.insert(lit_to_attr(lit));
+							}
+							if let Expr::Block(block) = &val_expr {
+								val_expr = syn::parse_quote!(
+									#[allow(unused_braces)]
+									#block
+								);
 							}
 							entity.insert((
 								AttributeExpr::new(val_expr),

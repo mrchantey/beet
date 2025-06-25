@@ -115,7 +115,10 @@ mod test {
 	#[test]
 	fn default_slot_target() {
 		let mut app = App::new();
-		let entity = app.world_mut().spawn((NodeTag("slot".to_string()),)).id();
+		let entity = app
+			.world_mut()
+			.spawn((ElementNode::self_closing(), NodeTag("slot".to_string())))
+			.id();
 		app.world_mut()
 			.run_system_once(slot_target_directive)
 			.unwrap();
@@ -132,6 +135,7 @@ mod test {
 		let entity = app
 			.world_mut()
 			.spawn((
+				ElementNode::self_closing(),
 				NodeTag("slot".to_string()),
 				related!(
 					Attributes[(

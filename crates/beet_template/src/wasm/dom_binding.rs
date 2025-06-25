@@ -13,6 +13,8 @@ pub struct DomElementBinding(SendWrapper<web_sys::HtmlElement>);
 impl DomElementBinding {
 	pub fn inner(&self) -> &web_sys::HtmlElement { self.0.as_ref() }
 }
+
+/// Binding to a DOM text node
 #[derive(Component, Deref)]
 pub struct DomTextBinding(SendWrapper<web_sys::Text>);
 impl DomTextBinding {
@@ -34,6 +36,10 @@ pub(super) fn update_text_nodes(
 	}
 	Ok(())
 }
+
+
+/// The attributes of elements are applied in the render html step,
+/// updating is applied to the DOM *properties* of the element
 pub(super) fn update_attribute_values(
 	_: TempNonSendMarker,
 	query: Populated<
@@ -42,10 +48,27 @@ pub(super) fn update_attribute_values(
 	>,
 ) -> Result<()> {
 	for (key, value, el) in query.iter() {
-		el.set_attribute(&key.0, &value.to_string())
-			.map_err(|err| format!("{err:?}"))?;
+		// el.set_attribute(&key.0, &value.to_string())
+		// 	.map_err(|err| format!("{err:?}"))?;
+		// TODO use heck for camelCase conversion
+		js_sys::Reflect::set(
+			el.inner().as_ref(),
+			&wasm_bindgen::JsValue::from_str(&key.0),
+			&attribute_lit_to_js_value(value)?,
+		)
+		.map_err(|err| format!("{err:?}"))?;
 	}
 	Ok(())
+}
+
+fn attribute_lit_to_js_value(
+	value: &AttributeLit,
+) -> Result<wasm_bindgen::JsValue> {
+	match value {
+		AttributeLit::String(s) => Ok(wasm_bindgen::JsValue::from_str(s)),
+		AttributeLit::Number(n) => Ok(wasm_bindgen::JsValue::from_f64(*n)),
+		AttributeLit::Boolean(b) => Ok(wasm_bindgen::JsValue::from_bool(*b)),
+	}
 }
 
 /// lazily uncollapse text nodes and bind to the DOM
@@ -58,7 +81,11 @@ pub(super) fn bind_text_nodes(
 		Entity,
 		(
 			Changed<TextNode>,
-			(With<SignalReceiver<String>>, Without<DomTextBinding>),
+			(
+				With<SignalReceiver<String>>,
+				Without<DomTextBinding>,
+				Without<AttributeOf>,
+			),
 		),
 	>,
 ) -> Result<()> {
@@ -145,8 +172,7 @@ pub(super) fn bind_attribute_values(
 		let Ok((parent_entity, parent_idx)) = elements.get(parent.entity())
 		else {
 			return Err(format!(
-				"AttributeOf {} has no parent ElementNode",
-				entity
+				"AttributeOf {entity} has no parent with a TreeIdx",
 			)
 			.into());
 		};
@@ -201,11 +227,9 @@ pub(super) fn bind_events(
 					closure.as_ref().unchecked_ref(),
 				)
 				.unwrap();
-			closure.forget();
-			// closure dropped cos entity cleaned up?
-			// commands
-			// 	.entity(attr_entity)
-			// 	.insert(DomClosureBinding(SendWrapper::new(closure)));
+			commands
+				.entity(attr_entity)
+				.insert(DomClosureBinding(SendWrapper::new(closure)));
 		}
 	}
 	Ok(())

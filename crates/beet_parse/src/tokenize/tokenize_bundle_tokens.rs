@@ -108,7 +108,7 @@ mod test {
 
 	#[test]
 	fn tag_only() {
-		parse_rstml(quote! {<br/>}).to_be(
+		parse_rstml(quote! {<br/>}).to_be_str(
 			quote! {
 				(
 					NodeTag(String::from("br")),
@@ -117,7 +117,7 @@ mod test {
 			}
 			.to_string(),
 		);
-		parse_rstml(quote! {<Foo/>}).to_be(
+		parse_rstml(quote! {<Foo/>}).to_be_str(
 			quote! {
 				(
 					NodeTag(String::from("Foo")),
@@ -138,7 +138,7 @@ mod test {
 				some_key={bar}
 				onmousemove="some_js_func"
 				onclick={|_: Trigger<OnClick>| {}}
-			/>}).to_be(
+			/>}).to_be_str(
 			quote! {
 				(
 					NodeTag(String::from("br")),
@@ -157,7 +157,7 @@ mod test {
 						),
 						(
 							AttributeKey(String::from("some_key")),
-							AttributeExpr(SendWrapper::new(syn::parse_quote!({ bar })))
+							AttributeExpr(SendWrapper::new(syn::parse_quote!(#[allow(unused_braces)]{ bar })))
 						),
 						(
 							AttributeKey(String::from("onmousemove")),
@@ -166,7 +166,7 @@ mod test {
 						),
 						(
 							AttributeKey(String::from("onclick")),
-							AttributeExpr(SendWrapper::new(syn::parse_quote!({ |_: Trigger<OnClick>| {} })))
+							AttributeExpr(SendWrapper::new(syn::parse_quote!(#[allow(unused_braces)]{ |_: Trigger<OnClick>| {} })))
 						)
 					]}
 				)
@@ -176,14 +176,14 @@ mod test {
 	}
 	#[test]
 	fn block_node() {
-		parse_rstml(quote! {<div>{7}</div>}).to_be(
+		parse_rstml(quote! {<div>{7}</div>}).to_be_str(
 			quote! {(
 							NodeTag(String::from("div")),
 							ElementNode { self_closing: false },
 							related!{Children[(
 								BlockNode,
 								ItemOf::<BlockNode, SendWrapper<Expr> > {
-									value: SendWrapper::new(syn::parse_quote!({ 7 })),
+									value: SendWrapper::new(syn::parse_quote!(#[allow(unused_braces)]{ 7 })),
 									phantom: std::marker::PhantomData::<BlockNode>
 								}
 							)]}
@@ -194,7 +194,7 @@ mod test {
 	}
 	#[test]
 	fn combinator_simple() {
-		parse_combinator("<br/>").to_be(
+		parse_combinator("<br/>").to_be_str(
 			quote! {
 				(
 					NodeTag(String::from("br")),
@@ -209,7 +209,7 @@ mod test {
 		tokenize_combinator_tokens("<br/><br/>", WsPathBuf::new(file!()))
 				.unwrap()
 				.to_string()
-				.xpect().to_be(
+				.xpect().to_be_str(
 			quote! {{
 				(
 					FragmentNode,
@@ -236,7 +236,7 @@ mod test {
 				onmousemove="some_js_func"
 				onclick={|_: Trigger<OnClick>| {}}
 			/>
-		"#).to_be(
+		"#).to_be_str(
 			quote! {
 					(
 						NodeTag(String::from("br")),
@@ -272,7 +272,7 @@ mod test {
 					let class = "bar";
 					<div class={class}/>
 				}
-			/>"#).to_be(
+			/>"#).to_be_str(
 			quote! {
 						(
 							NodeTag(String::from("br")),
