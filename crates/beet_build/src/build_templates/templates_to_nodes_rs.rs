@@ -54,19 +54,16 @@ impl<'a, 'w, 's> Visit<'a> for RsxSynVisitor<'a, 'w, 's> {
 			.last()
 			.map_or(false, |seg| *&seg.ident == *self.macros.rstml)
 		{
-			let index = self.index;
-			self.index += 1;
-
-
 			// mac.tokens is the inner tokens of the macro, ie the foo in rsx!{foo}
 			// important for tracking exact span of the macro
 			let tokens = mac.tokens.clone();
 			self.commands.spawn((
-				TemplateFileSource(self.parent),
+				ChildOf(self.parent),
 				SourceFile::new(self.file.clone()),
 				RstmlTokens::new(tokens),
-				TemplateKey::new(self.file.clone(), index),
+				TemplateKey::new(self.file.clone(), self.index),
 			));
+			self.index += 1;
 		}
 	}
 }

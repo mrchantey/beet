@@ -18,7 +18,7 @@ pub fn templates_to_nodes_md(
 			let rsx_str = ParseMarkdown::markdown_to_rsx_str(&file);
 
 			commands.spawn((
-				TemplateFileSource(entity),
+				ChildOf(entity),
 				TemplateKey::new(path.path().clone(), 0),
 				SourceFile::new(path.path().clone()),
 				CombinatorTokens(rsx_str),

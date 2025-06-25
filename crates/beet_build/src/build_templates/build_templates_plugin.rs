@@ -89,24 +89,11 @@ impl Plugin for BuildTemplatesPlugin {
 							.chain(),
 					)
 						.in_set(ProcessTemplateStep),
+					#[cfg(not(test))]
 					export_template_scene.in_set(ExportTemplateStep),
 				),
 			);
 	}
-}
-
-
-#[allow(unused)]
-fn clear_existing_templates(
-	mut commands: Commands,
-	query: Populated<&TemplateRoots, Changed<TemplateRoots>>,
-) -> Result {
-	for templates in query.iter() {
-		for template in templates.iter() {
-			commands.entity(template).despawn();
-		}
-	}
-	Ok(())
 }
 
 #[cfg(test)]

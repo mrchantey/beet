@@ -7,6 +7,8 @@ use std::hash::Hash;
 use std::hash::Hasher;
 use beet_utils::prelude::*;
 
+
+/// Hash all the parts of a rust file that are not part of an rsx! macro.
 pub(super) struct HashNonTemplateRust<'a, H> {
 	pub macros: &'a TemplateMacros,
 	pub hasher: &'a mut H,

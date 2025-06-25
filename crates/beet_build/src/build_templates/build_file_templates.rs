@@ -92,6 +92,7 @@ pub(super) fn load_template_files(
 }
 
 /// if any [`TemplateFile`] has changed, export the template scene
+#[allow(dead_code)]
 pub(super) fn export_template_scene(
 	world: &mut World,
 ) -> bevy::prelude::Result {

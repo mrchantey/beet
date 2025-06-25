@@ -1,7 +1,7 @@
 use crate::prelude::*;
 use beet_parse::prelude::*;
-use bevy::prelude::*;
 use beet_utils::prelude::*;
+use bevy::prelude::*;
 
 
 /// For a given rsx file, insert as [`CombinatorToNodeTokens`].
@@ -16,7 +16,7 @@ pub fn templates_to_nodes_rsx(
 			let file = ReadFile::to_string(path.into_abs())?;
 
 			commands.spawn((
-				TemplateFileSource(entity),
+				ChildOf(entity),
 				TemplateKey::new(path.path().clone(), 0),
 				SourceFile::new(path.path().clone()),
 				CombinatorTokens(file),

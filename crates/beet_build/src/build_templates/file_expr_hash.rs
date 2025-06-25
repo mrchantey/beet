@@ -3,7 +3,7 @@ use crate::prelude::*;
 use beet_bevy::prelude::HierarchyQueryExtExt;
 use beet_common::prelude::*;
 use beet_parse::exports::SendWrapper;
-use beet_template::prelude::*;
+use beet_router::as_beet::TemplateRoot;
 use bevy::prelude::*;
 use quote::ToTokens;
 use rapidhash::RapidHasher;
@@ -29,7 +29,10 @@ impl FileExprHash {
 pub fn update_file_expr_hash(
 	_: TempNonSendMarker,
 	macros: Res<TemplateMacros>,
-	source_files: Query<&TemplateRoots>,
+	mut query: Populated<
+		(Entity, &TemplateFile, &mut FileExprHash),
+		Changed<TemplateFile>,
+	>,
 	template_roots: Query<&TemplateRoot>,
 	template_tags: Query<&NodeTag, With<TemplateNode>>,
 	children: Query<&Children>,
@@ -37,10 +40,6 @@ pub fn update_file_expr_hash(
 	block_nodes: Query<&ItemOf<BlockNode, SendWrapper<Expr>>>,
 	// dont hash literal attribute values
 	attr_exprs: Query<&AttributeExpr, Without<AttributeLit>>,
-	mut query: Populated<
-		(Entity, &TemplateFile, &mut FileExprHash),
-		Changed<TemplateFile>,
-	>,
 ) -> Result {
 	for (entity, template_file, mut hash) in query.iter_mut() {
 		let mut hasher = RapidHasher::default_const();
@@ -49,30 +48,26 @@ pub fn update_file_expr_hash(
 			hasher: &mut hasher,
 		}
 		.hash(template_file)?;
+		for node in children
+			.iter_descendants(entity)
+			.flat_map(|child| template_roots.iter_descendants(child))
+			.flat_map(|en| children.iter_descendants_inclusive(en))
+		{
+			// has template tags
+			if let Ok(tag) = template_tags.get(node) {
+				tag.to_string().hash(&mut hasher);
+			}
 
-		for template in source_files.iter_descendants(entity) {
-			for root in template_roots.iter_descendants(template) {
-				for node in children.iter_descendants_inclusive(root) {
-					// has template tags
-					if let Ok(tag) = template_tags.get(node) {
-						tag.to_string().hash(&mut hasher);
-					}
-
-					// hash block nodes
-					if let Ok(block_node) = block_nodes.get(node) {
-						block_node
-							.to_token_stream()
-							.to_string()
-							.hash(&mut hasher);
-					}
-					// hash attribute expressions
-					for expr in attributes
-						.iter_descendants(node)
-						.filter_map(|entity| attr_exprs.get(entity).ok())
-					{
-						expr.to_token_stream().to_string().hash(&mut hasher);
-					}
-				}
+			// hash block nodes
+			if let Ok(block_node) = block_nodes.get(node) {
+				block_node.to_token_stream().to_string().hash(&mut hasher);
+			}
+			// hash attribute expressions
+			for expr in attributes
+				.iter_descendants(node)
+				.filter_map(|entity| attr_exprs.get(entity).ok())
+			{
+				expr.to_token_stream().to_string().hash(&mut hasher);
 			}
 		}
 		let new_hash = hasher.finish();
@@ -95,10 +90,9 @@ mod test {
 			.add_systems(Update, update_file_expr_hash);
 		let entity = app
 			.world_mut()
-			.spawn((
-				TemplateFile::new(WsPathBuf::new(file!())),
-				related! {TemplateRoots[related!{TemplateRoot[bundle]}]},
-			))
+			.spawn((TemplateFile::new(WsPathBuf::new(file!())), children![
+				related! {TemplateRoot[bundle]}
+			]))
 			.id();
 		app.update();
 		app.world().get::<FileExprHash>(entity).unwrap().0
