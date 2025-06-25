@@ -19,7 +19,7 @@ impl LangPartial {
 }
 
 
-/// For trees with [`PortalTo<LangPartial`], insert a single element at the top
+/// For trees with [`PortalTo<LangPartial>`], insert a single element at the top
 /// of the tree, to be hoisted to the head.
 pub fn resolve_lang_partials(
 	mut commands: Commands,

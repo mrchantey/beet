@@ -36,6 +36,8 @@ pub mod as_beet {
 			pub use beet_bevy::prelude::*;
 			pub use beet_common::prelude::*;
 			pub use beet_utils::prelude::*;
+			#[allow(unused)]
+			pub(crate) use bevy::prelude::*;
 		}
 		pub mod exports {
 			pub use crate::exports::*;

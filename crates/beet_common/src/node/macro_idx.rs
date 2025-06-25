@@ -10,7 +10,7 @@ use bevy::prelude::*;
 /// not size, will change the hash.
 /// Combining this with [`ExprIdx`] we can uniquely identify
 /// a template macro in a file, and the order of expressions inside it.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Reflect, Component)]
+#[derive(Debug, Default, Clone, PartialEq, Eq, Hash, Reflect, Component)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "tokens", derive(ToTokens))]
 #[reflect(Component)]

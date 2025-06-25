@@ -14,8 +14,9 @@ pub struct MaybeWithItem<C: Component, T: 'static + Send + Sync> {
 
 /// A bit like 'Component Relations', this item is related to its target [`C`] component.
 /// An example use case is where an entity represents a html element,
-/// and it may have a `Span` for only the `NodeTag`, in which case the span
-/// is stored as an `ItemOf<NodeTag, Span>`.
+/// and it may have a `Span` specifically for the [`NodeTag`], in which case the span
+/// is stored as an [`ItemOf<NodeTag, Span>`].
+// TODO this feels like antipattern, newtype for each usecase instead
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Component, Reflect)]
 #[reflect(Component)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
