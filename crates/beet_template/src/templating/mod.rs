@@ -3,6 +3,8 @@ mod apply_style_id_attributes;
 mod html_fragment;
 mod lang_partial;
 mod node_portal;
+mod on_spawn_template_impl;
+pub use on_spawn_template_impl::*;
 pub use apply_static_trees::*;
 pub use apply_style_id_attributes::*;
 use beet_bevy::prelude::WorldMutExt;

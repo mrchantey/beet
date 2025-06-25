@@ -1,4 +1,6 @@
 mod event_observer;
+mod on_spawn_template;
+pub use on_spawn_template::*;
 pub use event_observer::*;
 pub mod macro_idx;
 pub use macro_idx::*;

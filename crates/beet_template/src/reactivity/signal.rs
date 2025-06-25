@@ -1,20 +1,13 @@
+use beet_utils::prelude::*;
 use std::sync::Arc;
 use std::sync::Mutex;
-use beet_utils::prelude::*;
 
 /// Very simple implementation of signals used for testing and demos
 pub fn signal<T: 'static + Send + Clone>(value: T) -> (Getter<T>, Setter<T>) {
 	let signal = Signal::new(value);
 	let signal_handle = Arena::insert(signal);
 
-	(
-		Getter {
-			handle: signal_handle,
-		},
-		Setter {
-			handle: signal_handle,
-		},
-	)
+	(Getter::new(signal_handle), Setter::new(signal_handle))
 }
 
 thread_local! {
@@ -59,6 +52,10 @@ impl<T: Clone + Send> Signal<T> {
 pub struct Getter<T> {
 	handle: ArenaHandle<Signal<T>>,
 }
+impl<T> Getter<T> {
+	pub fn new(handle: ArenaHandle<Signal<T>>) -> Self { Getter { handle } }
+}
+
 impl<T> Copy for Getter<T> {}
 
 impl<T> Clone for Getter<T> {
@@ -107,19 +104,39 @@ impl<T: 'static + Send + Clone> std::ops::FnOnce<()> for Getter<T> {
 
 /// A Copy type that provides write access to a signal
 pub struct Setter<T> {
+	getter: Getter<T>,
 	handle: ArenaHandle<Signal<T>>,
 }
+impl<T> Setter<T> {
+	pub fn new(handle: ArenaHandle<Signal<T>>) -> Self {
+		Setter {
+			getter: Getter::new(handle),
+			handle,
+		}
+	}
+}
+
 impl<T> Copy for Setter<T> {}
 
 impl<T> Clone for Setter<T> {
 	fn clone(&self) -> Self {
 		Setter {
-			handle: self.handle.clone(),
+			getter: self.getter,
+			handle: self.handle,
 		}
 	}
 }
 
 impl<T: 'static + Send + Clone> Setter<T> {
+	pub fn map(&self, updater: impl FnOnce(T) -> T) {
+		self.set(updater(self.getter.get()));
+	}
+	pub fn update(&self, updater: impl FnOnce(&mut T)) {
+		let mut value = self.getter.get();
+		updater(&mut value);
+		self.set(value);
+	}
+
 	pub fn set(&self, new_val: T) {
 		// First, extract the callbacks outside of the arena lock
 		let callbacks = self.handle.with(|signal| {
