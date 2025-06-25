@@ -41,7 +41,7 @@ impl Default for TemplateMacros {
 }
 
 pub fn template_types_plugin(app: &mut bevy::prelude::App) {
-	app.register_type::<TemplateKey>();
+	app.register_type::<MacroIdx>();
 }
 
 impl Plugin for BuildTemplatesPlugin {

@@ -8,8 +8,6 @@ mod parse_lightning;
 pub use parse_lightning::*;
 mod extract_lang_partials;
 pub use extract_lang_partials::*;
-mod template_scene;
-pub use template_scene::*;
 mod templates_to_nodes_rsx;
 pub use templates_to_nodes_rsx::*;
 mod templates_to_nodes_md;

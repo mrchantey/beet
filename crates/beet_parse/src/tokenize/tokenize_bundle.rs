@@ -108,10 +108,7 @@ mod test {
 						FragmentNode,
 						TemplateNode,
 						ClientLoadDirective,
-						ItemOf::<TemplateNode, RustyTracker> {
-							value: RustyTracker { index: 0u32, tokens_hash: 6523630531850795118u64 },
-							phantom: std::marker::PhantomData::<TemplateNode>
-						},
+						ExprIdx(0u32),
 						{
 							let template = <MyComponent as Props>::Builder::default().foo("bar").build();
 							#[allow(unused_braces)]

@@ -1,4 +1,5 @@
 use crate::prelude::*;
+use beet_common::prelude::*;
 use beet_parse::prelude::*;
 use beet_utils::prelude::*;
 use bevy::prelude::*;
@@ -17,7 +18,7 @@ pub fn templates_to_nodes_rsx(
 
 			commands.spawn((
 				ChildOf(entity),
-				TemplateKey::new(path.path().clone(), 0),
+				MacroIdx::new(path.path().clone(), LineCol::default()),
 				SourceFile::new(path.path().clone()),
 				CombinatorTokens(file),
 			));

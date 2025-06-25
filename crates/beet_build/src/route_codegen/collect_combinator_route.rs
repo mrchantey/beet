@@ -151,13 +151,7 @@ mod test {
 								NodeTag(String::from("MyComponent")),
 								FragmentNode,
 								TemplateNode,
-								ItemOf::<TemplateNode, RustyTracker> {
-									value: RustyTracker {
-										index: 0u32,
-										tokens_hash: 15709703891249699336u64
-									},
-									phantom: std::marker::PhantomData::<TemplateNode>
-								},
+								ExprIdx(0u32),
 								{
 									let template = <MyComponent as Props>::Builder::default()
 										.val({ 2 + 2 })

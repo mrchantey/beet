@@ -34,8 +34,8 @@ fn combinator_to_node_tokens(
 		Builder {
 			verbatim_tags: &["script", "style", "code"],
 			source_file: source_file.map_or(&default_source_file, |sf| &sf),
-			rusty_tracker: RustyTrackerBuilder::default(),
 			commands: &mut commands,
+			expr_idx: ExprIdxBuilder::new(),
 		}
 		.map_to_children(entity, tokens)?;
 		commands.entity(entity).remove::<CombinatorTokens>();
@@ -48,7 +48,7 @@ fn combinator_to_node_tokens(
 struct Builder<'w, 's, 'a> {
 	verbatim_tags: &'a [&'a str],
 	source_file: &'a WsPathBuf,
-	rusty_tracker: RustyTrackerBuilder,
+	expr_idx: ExprIdxBuilder,
 	commands: &'a mut Commands<'w, 's>,
 }
 fn wrap_in_fragment(tokens: &str) -> String {
@@ -161,13 +161,11 @@ impl<'w, 's, 'a> Builder<'w, 's, 'a> {
 
 
 		if tag_str.starts_with(|c: char| c.is_uppercase()) {
-			// yes we get the tracker after its children, its fine as long
-			// as its consistent with other parsers.
-			let tracker =
-				self.rusty_tracker.next_rsx_el(&element_name, &attributes);
 			entity.insert((
 				TemplateNode,
-				ItemOf::<TemplateNode, _>::new(tracker),
+				// yes we get the tracker after its children, its fine as long
+				// as its consistent with other parsers.
+				self.expr_idx.next(),
 				ItemOf::<TemplateNode, _>::new(file_span),
 			));
 		} else {
@@ -317,7 +315,7 @@ mod test {
 
 	#[test]
 	fn element() {
-		"<br/>".xmap(parse).to_be(
+		"<br/>".xmap(parse).to_be_str(
 			quote! {(
 				NodeTag(String::from("br")),
 				ElementNode{self_closing:true}
@@ -334,7 +332,7 @@ mod test {
 					.to_string()
 					.xpect()
 			})
-			.to_be(
+			.to_be_str(
 				quote! {{(
 					FragmentNode,
 					related!{Children[(
@@ -350,7 +348,7 @@ mod test {
 	}
 	#[test]
 	fn unclosed() {
-		"<div align=\"center\" />".xmap(parse).to_be(
+		"<div align=\"center\" />".xmap(parse).to_be_str(
 			quote! {(
 				NodeTag(String::from("div")),
 				ElementNode{self_closing:true},
@@ -365,7 +363,7 @@ mod test {
 
 	#[test]
 	fn text() {
-		"<div>hello</div>".xmap(parse).to_be(
+		"<div>hello</div>".xmap(parse).to_be_str(
 			quote! {(
 				NodeTag(String::from("div")),
 				ElementNode{self_closing:false},
@@ -377,7 +375,7 @@ mod test {
 	#[test]
 	fn element_attributes() {
 		// default
-		"<br foo />".xmap(parse).to_be(
+		"<br foo />".xmap(parse).to_be_str(
 			quote! {(
 				NodeTag(String::from("br")),
 				ElementNode{self_closing:true},
@@ -386,7 +384,7 @@ mod test {
 			.to_string(),
 		);
 		// string
-		"<br foo=\"bar\"/>".xmap(parse).to_be(
+		"<br foo=\"bar\"/>".xmap(parse).to_be_str(
 			quote! {(
 				NodeTag(String::from("br")),
 				ElementNode{self_closing:true},
@@ -398,7 +396,7 @@ mod test {
 			.to_string(),
 		);
 		// bool
-		"<br foo=true />".xmap(parse).to_be(
+		"<br foo=true />".xmap(parse).to_be_str(
 			quote! {(
 				NodeTag(String::from("br")),
 				ElementNode{self_closing:true},
@@ -410,7 +408,7 @@ mod test {
 			.to_string(),
 		);
 		// number
-		"<br foo=20 />".xmap(parse).to_be(
+		"<br foo=20 />".xmap(parse).to_be_str(
 			quote! {(
 				NodeTag(String::from("br")),
 				ElementNode{self_closing:true},
@@ -422,7 +420,7 @@ mod test {
 			.to_string(),
 		);
 		// ident
-		"<br foo={bar} />".xmap(parse).to_be(
+		"<br foo={bar} />".xmap(parse).to_be_str(
 			quote! {(
 				NodeTag(String::from("br")),
 				ElementNode{self_closing:true},
@@ -434,7 +432,7 @@ mod test {
 			.to_string(),
 		);
 		// element
-		"<br foo={<br/>} />".xmap(parse).to_be(
+		"<br foo={<br/>} />".xmap(parse).to_be_str(
 			quote! {(
 				NodeTag(String::from("br")),
 				ElementNode{self_closing:true},
@@ -454,7 +452,7 @@ mod test {
 			bar
 		} />"
 			.xmap(parse)
-			.to_be(
+			.to_be_str(
 				quote! {(
 					NodeTag(String::from("br")),
 					ElementNode{self_closing:true},
@@ -475,15 +473,12 @@ mod test {
 	#[test]
 	fn template_attributes() {
 		// default
-		"<MyTemplate foo />".xmap(parse).to_be(
+		"<MyTemplate foo />".xmap(parse).to_be_str(
 			quote! {(
 				NodeTag(String::from("MyTemplate")),
 				FragmentNode,
 				TemplateNode,
-				ItemOf::<TemplateNode, RustyTracker>{
-					value: RustyTracker{index: 0u32, tokens_hash: 10188144591803042436u64},
-					phantom: std::marker::PhantomData::<TemplateNode>
-				},
+				ExprIdx(0u32),
 				{
 					let template = <MyTemplate as Props>::Builder::default().foo(true).build();
 					#[allow(unused_braces)]
@@ -493,15 +488,12 @@ mod test {
 			.to_string(),
 		);
 		// string
-		"<MyTemplate foo=\"bar\"/>".xmap(parse).to_be(
+		"<MyTemplate foo=\"bar\"/>".xmap(parse).to_be_str(
 			quote! {(
 				NodeTag(String::from("MyTemplate")),
 				FragmentNode,
 				TemplateNode,
-				ItemOf::<TemplateNode, RustyTracker>{
-					value: RustyTracker{index: 0u32, tokens_hash: 4889923030152902413u64},
-					phantom: std::marker::PhantomData::<TemplateNode>
-				},
+				ExprIdx(0u32),			
 				{
 					let template = <MyTemplate as Props>::Builder::default().foo("bar").build();
 					#[allow(unused_braces)]
@@ -511,15 +503,12 @@ mod test {
 			.to_string(),
 		);
 		// bool
-		"<MyTemplate foo=true />".xmap(parse).to_be(
+		"<MyTemplate foo=true />".xmap(parse).to_be_str(
 			quote! {(
 				NodeTag(String::from("MyTemplate")),
 				FragmentNode,
 				TemplateNode,
-				ItemOf::<TemplateNode, RustyTracker>{
-					value: RustyTracker{index: 0u32, tokens_hash: 15310342799507411129u64},
-					phantom: std::marker::PhantomData::<TemplateNode>
-				},
+				ExprIdx(0u32),			
 				{
 					let template = <MyTemplate as Props>::Builder::default().foo(true).build();
 					#[allow(unused_braces)]
@@ -529,15 +518,12 @@ mod test {
 			.to_string(),
 		);
 		// number
-		"<MyTemplate foo=20 />".xmap(parse).to_be(
+		"<MyTemplate foo=20 />".xmap(parse).to_be_str(
 			quote! {(
 				NodeTag(String::from("MyTemplate")),
 				FragmentNode,
 				TemplateNode,
-				ItemOf::<TemplateNode, RustyTracker>{
-					value: RustyTracker{index: 0u32, tokens_hash: 11502427431261689614u64},
-					phantom: std::marker::PhantomData::<TemplateNode>
-				},
+				ExprIdx(0u32),			
 				{
 					let template = <MyTemplate as Props>::Builder::default().foo(20f64).build();
 					#[allow(unused_braces)]
@@ -547,15 +533,12 @@ mod test {
 			.to_string(),
 		);
 		// ident
-		"<MyTemplate foo={bar} />".xmap(parse).to_be(
+		"<MyTemplate foo={bar} />".xmap(parse).to_be_str(
 			quote! {(
 				NodeTag(String::from("MyTemplate")),
 				FragmentNode,
 				TemplateNode,
-				ItemOf::<TemplateNode, RustyTracker>{
-					value: RustyTracker{index: 0u32, tokens_hash: 9730180295528883542u64},
-					phantom: std::marker::PhantomData::<TemplateNode>
-				},
+				ExprIdx(0u32),			
 				{
 					let template = <MyTemplate as Props>::Builder::default().foo({ bar }).build();
 					#[allow(unused_braces)]
@@ -565,15 +548,12 @@ mod test {
 			.to_string(),
 		);
 		// element
-		"<MyTemplate foo={<br/>} />".xmap(parse).to_be(
+		"<MyTemplate foo={<br/>} />".xmap(parse).to_be_str(
 			quote! {(
 				NodeTag(String::from("MyTemplate")),
 				FragmentNode,
 				TemplateNode,
-				ItemOf::<TemplateNode, RustyTracker>{
-					value: RustyTracker{index: 0u32, tokens_hash: 7310951454258190932u64},
-					phantom: std::marker::PhantomData::<TemplateNode>
-				},
+				ExprIdx(0u32),			
 				{
 					let template = <MyTemplate as Props>::Builder::default().foo({ (
 						NodeTag(String::from("br")),
@@ -591,15 +571,12 @@ mod test {
 			bar
 		} />"
 			.xmap(parse)
-			.to_be(
+			.to_be_str(
 				quote! {(
 					NodeTag(String::from("MyTemplate")),
 					FragmentNode,
 					TemplateNode,
-					ItemOf::<TemplateNode, RustyTracker>{
-						value: RustyTracker{index: 0u32, tokens_hash: 577660515964029912u64},
-						phantom: std::marker::PhantomData::<TemplateNode>
-					},
+					ExprIdx(0u32),
 					{
 						let template = <MyTemplate as Props>::Builder::default().foo({
 							let bar = (

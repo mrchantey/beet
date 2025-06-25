@@ -36,6 +36,7 @@ pub fn update_file_expr_hash(
 	template_roots: Query<&TemplateRoot>,
 	template_tags: Query<&NodeTag, With<TemplateNode>>,
 	children: Query<&Children>,
+	macro_idxs: Query<&MacroIdx>,
 	attributes: Query<&Attributes>,
 	block_nodes: Query<&ItemOf<BlockNode, SendWrapper<Expr>>>,
 	// dont hash literal attribute values
@@ -53,6 +54,11 @@ pub fn update_file_expr_hash(
 			.flat_map(|child| template_roots.iter_descendants(child))
 			.flat_map(|en| children.iter_descendants_inclusive(en))
 		{
+			// hash macro idxs
+			if let Ok(idx) = macro_idxs.get(node) {
+				idx.hash(&mut hasher);
+			}
+
 			// has template tags
 			if let Ok(tag) = template_tags.get(node) {
 				tag.to_string().hash(&mut hasher);
@@ -122,6 +128,26 @@ mod test {
 		expect(hash(rsx_tokens! {<div>{1}</div>}))
 			.not()
 			.to_be(hash(rsx_tokens! {<div>{2}</div>}));
+	}
+	#[test]
+	fn macro_idxs() {
+		expect(hash((
+			MacroIdx::new(WsPathBuf::new(file!()), LineCol::default()),
+			rsx_tokens! {<div>{1}</div>},
+		)))
+		.to_be(hash((
+			MacroIdx::new(WsPathBuf::new(file!()), LineCol::default()),
+			rsx_tokens! {<div>{1}</div>},
+		)));
+		expect(hash((
+			MacroIdx::new(WsPathBuf::new(file!()), LineCol::default()),
+			rsx_tokens! {<div>{1}</div>},
+		)))
+		.not()
+		.to_be(hash((
+			MacroIdx::new(WsPathBuf::new(file!()), LineCol::new(1, 1)),
+			rsx_tokens! {<div>{1}</div>},
+		)));
 	}
 
 	// TODO combinator attributes

@@ -52,7 +52,7 @@ fn rstml_to_node_tokens(
 			collected_elements: &mut collected_elements,
 			diagnostics,
 			commands: &mut commands,
-			rusty_tracker: Default::default(),
+			expr_idx: ExprIdxBuilder::new(),
 		}
 		.map_to_children(entity, rstml_nodes);
 		commands
@@ -70,7 +70,7 @@ struct RstmlToWorld<'w, 's, 'a> {
 	collected_elements: &'a mut CollectedElements,
 	diagnostics: Mut<'a, TokensDiagnostics>,
 	commands: &'a mut Commands<'w, 's>,
-	rusty_tracker: RustyTrackerBuilder,
+	expr_idx: ExprIdxBuilder,
 }
 
 impl<'w, 's, 'a> RstmlToWorld<'w, 's, 'a> {
@@ -158,7 +158,6 @@ impl<'w, 's, 'a> RstmlToWorld<'w, 's, 'a> {
 					.id()
 			}
 			Node::Block(NodeBlock::ValidBlock(block)) => {
-				let tracker = self.rusty_tracker.next_tracker(&block);
 				let expr = SendWrapper::<Expr>::new(syn::parse_quote!(
 					#[allow(unused_braces)]
 					#block
@@ -166,9 +165,9 @@ impl<'w, 's, 'a> RstmlToWorld<'w, 's, 'a> {
 				self.commands
 					.spawn((
 						BlockNode,
+						self.expr_idx.next(),
 						ItemOf::<BlockNode, _>::new(file_span),
 						ItemOf::<BlockNode, _>::new(node_span),
-						ItemOf::<BlockNode, _>::new(tracker),
 						ItemOf::<BlockNode, _>::new(expr),
 					))
 					.id()
@@ -220,10 +219,9 @@ impl<'w, 's, 'a> RstmlToWorld<'w, 's, 'a> {
 				if tag_str.starts_with(|c: char| c.is_uppercase()) {
 					// yes we get the tracker after its children, its fine as long
 					// as its consistent with other parsers.
-					let tracker = self.rusty_tracker.next_rstml_el(&open_tag);
 					entity.insert((
 						TemplateNode,
-						ItemOf::<TemplateNode, _>::new(tracker),
+						self.expr_idx.next(),
 						ItemOf::<TemplateNode, _>::new(file_span),
 						ItemOf::<TemplateNode, _>::new(node_span),
 					));

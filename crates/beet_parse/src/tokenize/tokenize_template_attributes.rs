@@ -21,8 +21,7 @@ pub fn tokenize_template_attributes(
 		return Ok(());
 	};
 	let node_tag_span = entity.get::<ItemOf<NodeTag, SendWrapper<Span>>>();
-	let Some(tracker) = entity.get::<ItemOf<TemplateNode, RustyTracker>>()
-	else {
+	let Some(tracker) = entity.get::<ExprIdx>() else {
 		return Ok(());
 	};
 	let mut prop_assignments = Vec::new();
