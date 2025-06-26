@@ -22,7 +22,6 @@ fn parse(input: DeriveInput) -> Result<TokenStream> {
 		.iter()
 		.filter(|field| !field.field_attributes.contains("flatten"))
 		.map(|field| {
-			// field.
 			let ident = &field.ident;
 			let name_str = ident.to_string().replace('#', "");
 			// attribute values added to child entity,

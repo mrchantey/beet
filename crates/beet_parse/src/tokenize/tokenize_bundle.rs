@@ -103,7 +103,6 @@ mod test {
 						ClientLoadDirective,
 						{
 							let template = <MyComponent as Props>::Builder::default().foo("bar").build();
-							#[allow(unused_braces)]
 							(
 								#[cfg(not(target_arch = "wasm32"))]
 								{ TemplateSerde::new(&template) },

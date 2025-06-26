@@ -84,12 +84,13 @@ pub fn tokenize_template(
 	inner_items
 		.push(quote! {TemplateRoot::spawn(Spawn(template.into_node_bundle()))});
 
+	let items = unbounded_bundle(inner_items);
+
 	entity_components.push(quote! {{
 		let template = <#template_ident as Props>::Builder::default()
 				#(#prop_assignments)*
 				.build();
-		#[allow(unused_braces)]
-		(#(#inner_items),*)
+		#items
 	}});
 	Ok(())
 }

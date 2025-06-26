@@ -11,27 +11,29 @@ use send_wrapper::SendWrapper;
 use syn::Expr;
 
 /// An expression in some part of the tree
-/// This is the *only* expression type, all tokenizations must pass through this type,
+/// Almost all tokenizations must pass through this type
 /// including:
 /// - `rsx!` macro expresisons
-/// - combinator expressions
+/// - combinator expressions, first represented as [`CombinatorExpr`]
 /// - template spawn funcs: `<MyTemplate/>`
-/// - `#[derive(AttributeBlock)]`
-/// 
+///
+/// Cases where this is not used:
+/// - `#[derive(AttributeBlock)]`, tokenized directly with `.into_node_bundle` and `.into_attribute_bundle`
+///
 /// The parsed output depends on the context in which this expression is used:
-/// 
+///
 /// ## Node Blocks
-/// 
+///
 /// Block Nodes that are expressions, any [`NodeExpr`] without an [`AttributeOf`]
 /// is a block node.
-/// 
+///
 /// ```ignore
 /// rsx!{<div>{my_expr}</div>};
 /// // templates also evaluate to blocks
 /// rsx!{<MyTemplate/>};
 /// ```
 /// ## Attribute Blocks
-/// 
+///
 /// any [`NodeExpr`] with an [`AttributeOf`] *without* an [`AttributeKey`]
 /// is an attribute block.
 /// This is known as the spread attribute in JSX, although rstml
@@ -40,7 +42,7 @@ use syn::Expr;
 /// rsx!{<span {props} />};
 /// ```
 /// ## Attribute Values
-/// 
+///
 /// An expression that is used as the value of an attribute.
 /// any [`NodeExpr`] with an [`AttributeOf`] *and* an [`AttributeKey`]
 /// is an attribute value.
@@ -61,7 +63,15 @@ impl NodeExpr {
 			label: None,
 		}))
 	}
-	
+	pub fn new_ident(ident: syn::Ident) -> Self {
+		Self::new(syn::Expr::Path(syn::ExprPath {
+			attrs: Vec::new(),
+			qself: None,
+			path: ident.into(),
+		}))
+	}
+
+
 	pub fn borrow(&self) -> &syn::Expr { &*self.0 }
 	/// ensure blocks have `#[allow(unused_braces)]`
 	pub fn inner_parsed(&self) -> Expr {

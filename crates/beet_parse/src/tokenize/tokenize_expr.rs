@@ -26,8 +26,7 @@ pub fn tokenize_combinator_exprs_mapped(
 			}
 		}
 		// combinator removes braces so we put them back
-		let expr = format!("{{{expr}}}");
-		let expr_tokens = syn::parse_str(&expr)?;
+		let expr_tokens = syn::parse_str(&format!("{{{expr}}}"))?;
 		Ok(Some(NodeExpr::new_block(expr_tokens)))
 	} else {
 		Ok(None)
