@@ -53,8 +53,8 @@ pub(super) fn insert_event_playback_attribute(
 	mut commands: Commands,
 	html_constants: Res<HtmlConstants>,
 	query: Populated<
-		(&TreeIdx, &Attributes),
-		(With<EventTarget>, Added<TreeIdx>),
+		(&DomIdx, &Attributes),
+		(With<EventTarget>, Added<DomIdx>),
 	>,
 	// potential event attributes
 	attributes: Query<(Entity, &AttributeKey), Without<AttributeLit>>,
@@ -303,7 +303,7 @@ mod test {
 			.xmap(HtmlFragment::parse_bundle)
 			.xpect()
 			.to_be(
-				"<div onclick=\"_beet_event_handler(0, event)\" data-beet-tree-idx=\"0\"/>",
+				"<div onclick=\"_beet_event_handler(0, event)\" data-beet-dom-idx=\"0\"/>",
 			);
 	}
 	#[test]
@@ -326,6 +326,6 @@ mod test {
 		rsx! {<div>{get}</div>}
 			.xmap(HtmlFragment::parse_bundle)
 			.xpect()
-			.to_be("<div data-beet-tree-idx=\"0\">foo</div>");
+			.to_be("<div data-beet-dom-idx=\"0\">foo</div>");
 	}
 }

@@ -9,7 +9,7 @@ use crate::node::StyleId;
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct HtmlConstants {
 	/// the attribute for element ids, used for encoding the [TreePosition],
-	pub tree_idx_key: String,
+	pub dom_idx_key: String,
 	/// in debug mode, the attribute for the span of the element
 	pub span_key: String,
 	/// the global event handler for all events
@@ -30,7 +30,7 @@ pub struct HtmlConstants {
 impl Default for HtmlConstants {
 	fn default() -> Self {
 		Self {
-			tree_idx_key: "data-beet-tree-idx".into(),
+			dom_idx_key: "data-beet-dom-idx".into(),
 			span_key: "data-beet-span".into(),
 			event_handler: "_beet_event_handler".into(),
 			event_store: "_beet_event_store".into(),

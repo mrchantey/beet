@@ -76,7 +76,7 @@ pub(super) fn bind_text_nodes(
 	mut commands: Commands,
 	mut get_binding: GetDomBinding,
 	parents: Query<&ChildOf>,
-	elements: Query<(Entity, &TreeIdx, &TextNodeParent)>,
+	elements: Query<(Entity, &DomIdx, &TextNodeParent)>,
 	query: Populated<
 		Entity,
 		(
@@ -159,7 +159,7 @@ Please ensure that any text nodes are wrapped in an ElementNode:
 pub(super) fn bind_attribute_values(
 	mut commands: Commands,
 	mut get_binding: GetDomBinding,
-	elements: Query<(Entity, &TreeIdx)>,
+	elements: Query<(Entity, &DomIdx)>,
 	query: Populated<
 		(Entity, &AttributeOf),
 		(
@@ -172,7 +172,7 @@ pub(super) fn bind_attribute_values(
 		let Ok((parent_entity, parent_idx)) = elements.get(parent.entity())
 		else {
 			return Err(format!(
-				"AttributeOf {entity} has no parent with a TreeIdx",
+				"AttributeOf {entity} has no parent with a DomIdx",
 			)
 			.into());
 		};
@@ -189,8 +189,8 @@ pub(super) fn bind_events(
 	mut commands: Commands,
 	mut get_binding: GetDomBinding,
 	query: Populated<
-		(Entity, &TreeIdx, &Attributes),
-		(With<EventTarget>, Added<TreeIdx>),
+		(Entity, &DomIdx, &Attributes),
+		(With<EventTarget>, Added<DomIdx>),
 	>,
 	attribute_query: Query<(Entity, &AttributeKey)>,
 ) -> Result<()> {
@@ -247,13 +247,13 @@ impl GetDomBinding<'_, '_> {
 	pub fn get_element(
 		&mut self,
 		entity: Entity,
-		idx: TreeIdx,
+		idx: DomIdx,
 	) -> Result<web_sys::HtmlElement> {
 		if let Ok(binding) = self.elements.get(entity) {
 			return Ok(binding.inner().clone());
 		}
 		let query =
-			format!("[{}='{}']", self.constants.tree_idx_key, idx.inner());
+			format!("[{}='{}']", self.constants.dom_idx_key, idx.inner());
 		if let Some(el) = web_sys::window()
 			.unwrap()
 			.document()
@@ -269,7 +269,7 @@ impl GetDomBinding<'_, '_> {
 			return Ok(el);
 		} else {
 			return Err(format!(
-				"Element with TreeIdx {} not found",
+				"Element with DomIdx {} not found",
 				idx.inner()
 			)
 			.into());

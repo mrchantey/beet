@@ -14,12 +14,12 @@ pub(super) fn event_playback(
 	constants: Res<HtmlConstants>,
 	mut commands: Commands,
 	query: Populated<
-		(Entity, &TreeIdx, &Attributes),
-		(With<EventTarget>, Added<TreeIdx>),
+		(Entity, &DomIdx, &Attributes),
+		(With<EventTarget>, Added<DomIdx>),
 	>,
 	attribute_query: Query<&AttributeKey>,
 ) -> Result<()> {
-	let event_map: HashMap<(TreeIdx, &AttributeKey), Entity> = query
+	let event_map: HashMap<(DomIdx, &AttributeKey), Entity> = query
 		.iter()
 		.map(|(entity, idx, attributes)| {
 			attributes
@@ -47,12 +47,12 @@ pub(super) fn event_playback(
 		for item in Array::from(&event_store).iter() {
 			let event_arr = Array::from(&item);
 			if event_arr.length() == 2 {
-				let tree_idx =
+				let dom_idx =
 					event_arr.get(0).as_f64().expect("bad event id") as u32;
 				let event: Event = event_arr.get(1).unchecked_into();
 				let event_type = format!("on{}", event.type_());
 				if let Some(entity) = event_map.get(&(
-					TreeIdx::new(tree_idx),
+					DomIdx::new(dom_idx),
 					&AttributeKey::new(&event_type),
 				)) {
 					BeetEvent::trigger(
@@ -63,7 +63,7 @@ pub(super) fn event_playback(
 				} else {
 					bevybail!(
 						"Event playback: could not find entity for event {}",
-						tree_idx
+						dom_idx
 					);
 				}
 			}

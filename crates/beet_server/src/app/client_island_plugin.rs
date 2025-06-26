@@ -152,7 +152,7 @@ mod test {
 			.xpect()
 			.to_be(vec![ClientIsland {
 				template: TemplateSerde::new(&MyTemplate { foo: 3 }),
-				tree_idx: TreeIdx(0),
+				dom_idx: DomIdx(0),
 				mount: false,
 			}]);
 	}

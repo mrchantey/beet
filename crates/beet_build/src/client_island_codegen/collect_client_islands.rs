@@ -34,7 +34,7 @@ impl CollectClientIslandPlugin {
 				let ty = syn::parse_str::<Type>(island.template.type_name())
 					.unwrap();
 				let ron = island.template.ron();
-				let idx = island.tree_idx.self_token_stream();
+				let idx = island.dom_idx.self_token_stream();
 				let mount_directive = if island.mount {
 					quote! {ClientOnlyDirective,}
 				} else {
@@ -112,12 +112,12 @@ mod test {
 		let map = ClientIslandMap::new(vec![(RouteInfo::get("test"), vec![
 			ClientIsland {
 				template: TemplateSerde::new(&Foo(7)),
-				tree_idx: TreeIdx(0),
+				dom_idx: DomIdx(0),
 				mount: true,
 			},
 			ClientIsland {
 				template: TemplateSerde::new(&Foo(8)),
-				tree_idx: TreeIdx(1),
+				dom_idx: DomIdx(1),
 				mount: false,
 			},
 		])]);
@@ -136,13 +136,13 @@ mod test {
 						|world| {
 							world.spawn((
 								ClientOnlyDirective,
-								TreeIdx(0u32),
+								DomIdx(0u32),
 								TemplateSerde::parse::<beet_build::client_island_codegen::collect_client_islands::test::Foo>("(7)")
 								.unwrap()
 								.into_node_bundle()
 							));
 							world.spawn((
-								TreeIdx(1u32),
+								DomIdx(1u32),
 								TemplateSerde::parse::<beet_build::client_island_codegen::collect_client_islands::test::Foo>("(8)")
 									.unwrap()
 									.into_node_bundle()

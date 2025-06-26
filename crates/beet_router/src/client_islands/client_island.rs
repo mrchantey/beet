@@ -1,7 +1,7 @@
 use beet_bevy::prelude::*;
 use beet_common::prelude::*;
+use beet_template::prelude::DomIdx;
 use beet_template::prelude::TemplatePlugin;
-use beet_template::prelude::TreeIdx;
 use bevy::ecs::system::RunSystemError;
 use bevy::ecs::system::RunSystemOnce;
 use bevy::prelude::*;
@@ -13,7 +13,7 @@ pub struct ClientIsland {
 	pub template: TemplateSerde,
 	/// If the template is [`ClientOnlyDirective`], this will be true.
 	pub mount: bool,
-	pub tree_idx: TreeIdx, // pub route: RouteInfo,
+	pub dom_idx: DomIdx, // pub route: RouteInfo,
 }
 
 
@@ -31,7 +31,7 @@ impl ClientIsland {
 pub fn collect_client_islands(
 	In(root): In<Entity>,
 	children: Query<&Children>,
-	islands: Query<(&TemplateSerde, &TreeIdx, Option<&ClientOnlyDirective>)>,
+	islands: Query<(&TemplateSerde, &DomIdx, Option<&ClientOnlyDirective>)>,
 ) -> Vec<ClientIsland> {
 	children
 		.iter_descendants_inclusive(root)
@@ -39,11 +39,11 @@ pub fn collect_client_islands(
 			islands
 				.get(entity)
 				.ok()
-				.map(|(template, tree_idx, client_only)| {
+				.map(|(template, dom_idx, client_only)| {
 					let mount = client_only.is_some();
 					ClientIsland {
 						template: template.clone(),
-						tree_idx: *tree_idx,
+						dom_idx: *dom_idx,
 						mount,
 						// route: RouteInfo::from_tracker(tracker),
 					}
@@ -81,7 +81,7 @@ mod test {
 		.xpect()
 		.to_be(vec![ClientIsland {
 			template: TemplateSerde::new(&MyTemplate { foo: 3 }),
-			tree_idx: TreeIdx::new(0),
+			dom_idx: DomIdx::new(0),
 			mount: true,
 		}]);
 	}

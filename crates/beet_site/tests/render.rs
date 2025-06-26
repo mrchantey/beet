@@ -22,7 +22,7 @@ async fn works() {
 
 	// check a route contains content
 	let index = router.render_route(&"/".into()).await.unwrap();
-	index.xref().xpect().to_contain("data-beet-tree-idx");
+	index.xref().xpect().to_contain("data-beet-dom-idx");
 	index.xref().xpect().to_contain("A very bevy metaframework");
 
 	// println!("{}", index);

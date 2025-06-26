@@ -292,7 +292,7 @@ mod test {
 	)
 	.xpect()
 	.to_be_str(
-		"<!DOCTYPE html><html><head><script type=\"module\">\nglobalThis._beet_event_store = []\nglobalThis._beet_event_handler = (id,event) => globalThis._beet_event_store.push([id, event])\n</script><script type=\"module\">\n\t\timport init from '/wasm/main.js'\n\t\tinit('/wasm/main_bg.wasm')\n\t\t\t.catch((error) => {\n\t\t\t\tif (!error.message.startsWith(\"Using exceptions for control flow,\"))\n\t\t\t\t\tthrow error\n\t\t})\n</script></head><body><div data-beet-tree-idx=\"0\"/></body></html>",
+		"<!DOCTYPE html><html><head><script type=\"module\">\nglobalThis._beet_event_store = []\nglobalThis._beet_event_handler = (id,event) => globalThis._beet_event_store.push([id, event])\n</script><script type=\"module\">\n\t\timport init from '/wasm/main.js'\n\t\tinit('/wasm/main_bg.wasm')\n\t\t\t.catch((error) => {\n\t\t\t\tif (!error.message.startsWith(\"Using exceptions for control flow,\"))\n\t\t\t\t\tthrow error\n\t\t})\n</script></head><body><div data-beet-dom-idx=\"0\"/></body></html>",
 	);
 	}
 }

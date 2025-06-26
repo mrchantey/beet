@@ -12,11 +12,11 @@ pub use node_portal::*;
 pub use on_spawn_template_impl::*;
 mod html_document;
 pub use html_document::*;
+mod dom_idx;
 mod text_node_parent;
-mod tree_idx;
+pub use dom_idx::*;
 pub use lang_partial::*;
 pub use text_node_parent::*;
-pub use tree_idx::*;
 mod template;
 pub use template::*;
 mod apply_slots;
@@ -62,7 +62,7 @@ impl Plugin for TemplatePlugin {
 						apply_slots,
 						apply_text_node_parents,
 						(
-							(apply_root_tree_idx, apply_child_tree_idx),
+							(apply_root_dom_idx, apply_child_dom_idx),
 							(
 								rearrange_html_document,
 								insert_hydration_scripts,
@@ -85,8 +85,8 @@ impl Plugin for TemplatePlugin {
 
 #[allow(unused)]
 fn debug(world: &mut World) {
-	for (entity, tree_idx) in world
-		.query_once::<(Entity, &TreeIdx)>()
+	for (entity, dom_idx) in world
+		.query_once::<(Entity, &DomIdx)>()
 		.into_iter()
 		.map(|(e, t)| (e, t.clone()))
 		.collect::<Vec<_>>()
@@ -94,9 +94,9 @@ fn debug(world: &mut World) {
 	{
 		for component in world.inspect_entity(entity).unwrap() {
 			beet_utils::log!(
-				"Entity: {:?}, TreeIdx: {}, Component: {:?}",
+				"Entity: {:?}, DomIdx: {}, Component: {:?}",
 				entity,
-				tree_idx,
+				dom_idx,
 				component.name()
 			);
 		}
