@@ -25,7 +25,7 @@ impl<T: std::fmt::Debug + AsRef<str>> Matcher<T> {
 		let expected = other.as_ref();
 		let received = self.value.as_ref();
 		if received != expected {
-			let mut msg = String::from("Diff Found:\n\n");
+			let mut msg = String::new();
 			crate::utils::pretty_diff::write_lines(
 				&mut msg, expected, received,
 			)

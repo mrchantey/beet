@@ -15,19 +15,6 @@ macro_rules! paint {
 const SIGN_LEFT: &str = "Expected:\n";
 const SIGN_RIGHT: &str = "Received:\n";
 
-/// Present the diff output for two mutliline strings in a pretty, colorised manner.
-pub fn write_header(f: &mut fmt::Formatter) -> fmt::Result {
-	writeln!(
-		f,
-		"{} {} {} / {} {} :",
-		"Diff".bold(),
-		SIGN_LEFT.red().linger(),
-		"left".resetting(),
-		"right".green().linger(),
-		SIGN_RIGHT.resetting(),
-	)
-}
-
 /// Delay formatting this deleted chunk until later.
 ///
 /// It can be formatted as a whole chunk by calling `flush`, or the inner value
@@ -192,11 +179,11 @@ fn write_inline_diff<TWrite: fmt::Write>(
 ) -> fmt::Result {
 	let diff = ::diff::chars(left, right);
 	let mut writer = InlineWriter::new(f);
-
+	
 	// Print the left string on one line, with differences highlighted
 	let light = Red;
 	let heavy = Red.on_fixed(52).bold();
-	writer.write_with_style(&SIGN_LEFT, light)?;
+	write!(writer.f, "{SIGN_LEFT}\n")?;
 	for change in diff.iter() {
 		match change {
 			::diff::Result::Both(value, _) => {
@@ -213,7 +200,7 @@ fn write_inline_diff<TWrite: fmt::Write>(
 	// Print the right string on one line, with differences highlighted
 	let light = Green;
 	let heavy = Green.on_fixed(22).bold();
-	writer.write_with_style(&SIGN_RIGHT, light)?;
+	write!(writer.f, "\n{SIGN_RIGHT}\n")?;
 	for change in diff.iter() {
 		match change {
 			::diff::Result::Both(value, _) => {

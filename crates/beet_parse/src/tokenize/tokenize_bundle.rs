@@ -101,7 +101,7 @@ mod test {
 						FragmentNode,
 						TemplateNode,
 						ClientLoadDirective,
-						{
+						#[allow(unused_braces)]{
 							let template = <MyComponent as Props>::Builder::default().foo("bar").build();
 							(
 								#[cfg(not(target_arch = "wasm32"))]
@@ -110,7 +110,7 @@ mod test {
 								{ () },
 								TemplateRoot::spawn(Spawn(template.into_node_bundle()))
 							)
-						}
+						}.into_node_bundle()
 					), (
 						NodeTag(String::from("div")),
 						ElementNode { self_closing: true }

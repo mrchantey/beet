@@ -1,3 +1,4 @@
+use crate::prelude::NodeExpr;
 use crate::tokenize::*;
 use beet_common::prelude::*;
 use bevy::prelude::*;
@@ -86,11 +87,13 @@ pub fn tokenize_template(
 
 	let items = unbounded_bundle(inner_items);
 
-	entity_components.push(quote! {{
+	let node_expr = NodeExpr::new_block(syn::parse_quote! {{
 		let template = <#template_ident as Props>::Builder::default()
 				#(#prop_assignments)*
 				.build();
 		#items
 	}});
+
+	entity_components.push(node_expr.node_bundle_tokens());
 	Ok(())
 }

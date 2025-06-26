@@ -532,7 +532,7 @@ mod test {
 				.to_string(),
 			);
 	}
-	
+
 	#[test]
 	fn template_attributes_default() {
 		"<MyTemplate foo />".xmap(parse).to_be_str(
@@ -544,10 +544,10 @@ mod test {
 					NodeTag(String::from("MyTemplate")),
 					FragmentNode,
 					TemplateNode,
-					{
+					#[allow(unused_braces)]{
 						let template = <MyTemplate as Props>::Builder::default().foo(true).build();
 						TemplateRoot::spawn(Spawn(template.into_node_bundle()))
-					}
+					}.into_node_bundle()
 				).into_node_bundle()
 			)}
 			.to_string(),
@@ -565,10 +565,10 @@ mod test {
 					NodeTag(String::from("MyTemplate")),
 					FragmentNode,
 					TemplateNode,
-					{
+					#[allow(unused_braces)]{
 						let template = <MyTemplate as Props>::Builder::default().foo("bar").build();
 						TemplateRoot::spawn(Spawn(template.into_node_bundle()))
-					}
+					}.into_node_bundle()
 				).into_node_bundle()
 			)}
 			.to_string(),
@@ -586,10 +586,10 @@ mod test {
 					NodeTag(String::from("MyTemplate")),
 					FragmentNode,
 					TemplateNode,
-					{
+					#[allow(unused_braces)]{
 						let template = <MyTemplate as Props>::Builder::default().foo(true).build();
 						TemplateRoot::spawn(Spawn(template.into_node_bundle()))
-					}
+					}.into_node_bundle()
 				).into_node_bundle()
 			)}
 			.to_string(),
@@ -607,10 +607,10 @@ mod test {
 					NodeTag(String::from("MyTemplate")),
 					FragmentNode,
 					TemplateNode,
-					{
+					#[allow(unused_braces)]{
 						let template = <MyTemplate as Props>::Builder::default().foo(20f64).build();
 						TemplateRoot::spawn(Spawn(template.into_node_bundle()))
-					}
+					}.into_node_bundle()
 				).into_node_bundle()
 			)}
 			.to_string(),
@@ -628,10 +628,10 @@ mod test {
 					NodeTag(String::from("MyTemplate")),
 					FragmentNode,
 					TemplateNode,
-					{
+					#[allow(unused_braces)]{
 						let template = <MyTemplate as Props>::Builder::default().foo(#[allow(unused_braces)]{ bar }).build();
 						TemplateRoot::spawn(Spawn(template.into_node_bundle()))
-					}
+					}.into_node_bundle()
 				).into_node_bundle()
 			)}
 			.to_string(),
@@ -649,13 +649,13 @@ mod test {
 					NodeTag(String::from("MyTemplate")),
 					FragmentNode,
 					TemplateNode,
-					{
+					#[allow(unused_braces)]{
 						let template = <MyTemplate as Props>::Builder::default().foo(#[allow(unused_braces)]{ (
 							NodeTag(String::from("br")),
 							ElementNode { self_closing: true }
 						) }).build();
 						TemplateRoot::spawn(Spawn(template.into_node_bundle()))
-					}
+					}.into_node_bundle()
 				).into_node_bundle()
 			)}
 			.to_string(),
@@ -678,7 +678,7 @@ mod test {
 						NodeTag(String::from("MyTemplate")),
 						FragmentNode,
 						TemplateNode,
-						{
+						#[allow(unused_braces)]{
 							let template = <MyTemplate as Props>::Builder::default().foo(#[allow(unused_braces)]{
 								let bar = (
 									NodeTag(String::from("br")),
@@ -687,7 +687,7 @@ mod test {
 								bar
 							}).build();
 						TemplateRoot::spawn(Spawn(template.into_node_bundle()))
-					}
+					}.into_node_bundle()
 				).into_node_bundle())}
 				.to_string(),
 			);
