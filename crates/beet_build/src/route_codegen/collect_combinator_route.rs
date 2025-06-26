@@ -130,7 +130,7 @@ mod test {
 						file: WsPathBuf::new("crates/beet_router/src/test_site/test_docs/hello.md"),
 						start: LineCol { line: 1u32, col: 0u32 }
 					},
-					{
+					# [allow (unused_braces)]{
 						(
 							FragmentNode,
 							related! {
@@ -174,7 +174,7 @@ mod test {
 								]
 							}
 						)
-					}
+					}.into_node_bundle()
 				)
 			}
 	}.to_string());
