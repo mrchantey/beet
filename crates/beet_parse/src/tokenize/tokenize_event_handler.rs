@@ -1,5 +1,4 @@
 use std::ops::DerefMut;
-
 use bevy::prelude::*;
 use heck::ToUpperCamelCase;
 use proc_macro2::Span;
@@ -8,8 +7,7 @@ use syn::ExprClosure;
 use syn::Ident;
 use syn::Pat;
 use syn::parse_quote;
-
-use crate::prelude::AttributeExpr;
+use crate::prelude::NodeExpr;
 
 /// Events are any attribute keys that start with `on`,
 /// and the value is not a string literal.
@@ -21,7 +19,7 @@ pub fn is_event(key: &str, value: &Expr) -> bool {
 pub fn tokenize_event_handler(
 	key_str: &str,
 	key_span: Span,
-	expr: &mut AttributeExpr,
+	expr: &mut NodeExpr,
 ) -> Result<()> {
 	let suffix = key_str.strip_prefix("on").unwrap_or(key_str);
 	let ident =
@@ -89,7 +87,7 @@ mod test {
 	#[test]
 	fn test_parse_event_handler() {
 		fn parse(val: TokenStream) -> String {
-			let mut expr = AttributeExpr::new(syn::parse2(val).unwrap());
+			let mut expr = NodeExpr::new(syn::parse2(val).unwrap());
 			tokenize_event_handler("onclick", Span::call_site(), &mut expr)
 				.unwrap();
 			expr.to_token_stream().to_string()

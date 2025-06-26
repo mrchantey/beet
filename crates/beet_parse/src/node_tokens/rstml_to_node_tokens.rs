@@ -241,9 +241,9 @@ impl<'w, 's, 'a> RstmlToWorld<'w, 's, 'a> {
 				// block attribute, ie `<div {is_hidden}>`
 				self.commands.spawn((
 					AttributeOf::new(parent),
-					FileSpanOf::<AttributeExpr>::new(block_file_span),
-					SpanOf::<AttributeExpr>::new(block.span()),
-					AttributeExpr::new_block(block),
+					FileSpanOf::<NodeExpr>::new(block_file_span),
+					SpanOf::<NodeExpr>::new(block.span()),
+					NodeExpr::new_block(block),
 				));
 			}
 			NodeAttribute::Attribute(attr) => {
@@ -283,11 +283,9 @@ impl<'w, 's, 'a> RstmlToWorld<'w, 's, 'a> {
 								entity.insert(lit_to_attr(lit));
 							}
 							entity.insert((
-								AttributeExpr::new(val_expr),
-								FileSpanOf::<AttributeExpr>::new(
-									val_expr_file_span,
-								),
-								SpanOf::<AttributeExpr>::new(val_expr_span),
+								NodeExpr::new(val_expr),
+								FileSpanOf::<NodeExpr>::new(val_expr_file_span),
+								SpanOf::<NodeExpr>::new(val_expr_span),
 							));
 						}
 						KVAttributeValue::InvalidBraced(invalid) => {

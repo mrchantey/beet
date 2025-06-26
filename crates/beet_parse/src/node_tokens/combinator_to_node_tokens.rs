@@ -245,9 +245,7 @@ impl<'w, 's, 'a> Builder<'w, 's, 'a> {
 					.commands
 					.spawn((
 						AttributeOf::new(parent),
-						FileSpanOf::<AttributeExpr>::new(
-							self.default_file_span(),
-						),
+						FileSpanOf::<NodeExpr>::new(self.default_file_span()),
 					))
 					.id();
 				self.rsx_parsed_expression(entity, value)?;
@@ -263,22 +261,22 @@ impl<'w, 's, 'a> Builder<'w, 's, 'a> {
 					RsxAttributeValue::Boolean(val) => {
 						let val = val.0;
 						entity.insert((
-							AttributeExpr::new(syn::parse_quote! {#val}),
-							AttributeLit::new(val)
+							NodeExpr::new(syn::parse_quote! {#val}),
+							AttributeLit::new(val),
 						));
 					}
 					RsxAttributeValue::Number(val) => {
 						let val = val.0;
 						entity.insert((
-							AttributeExpr::new(syn::parse_quote! {#val}),
-							AttributeLit::new(val)
+							NodeExpr::new(syn::parse_quote! {#val}),
+							AttributeLit::new(val),
 						));
 					}
 					RsxAttributeValue::Str(val) => {
 						let val = val.to_string_unquoted();
 						entity.insert((
-							AttributeExpr::new(syn::parse_quote! {#val}),
-							AttributeLit::new(val)
+							NodeExpr::new(syn::parse_quote! {#val}),
+							AttributeLit::new(val),
 						));
 					}
 					RsxAttributeValue::Element(value) => {

@@ -50,7 +50,7 @@ fn tokenize_attribute_tokens(
 	if let Some(attr_val) = entity.get::<AttributeLit>() {
 		items.push(attr_val.self_token_stream());
 	}
-	if let Some(attr_expr) = entity.get::<AttributeExpr>() {
+	if let Some(attr_expr) = entity.get::<NodeExpr>() {
 		items.push(attr_expr.self_token_stream());
 	}
 	let attr_entity = entity.id();
@@ -150,25 +150,25 @@ mod test {
 						(
 							AttributeKey(String::from("class")),
 							AttributeLit::String(String::from("foo")),
-							AttributeExpr(SendWrapper::new(syn::parse_quote!("foo")))
+							NodeExpr(SendWrapper::new(syn::parse_quote!("foo")))
 						),
 						(
 							AttributeKey(String::from("party_time")),
 							AttributeLit::Boolean(true),
-							AttributeExpr(SendWrapper::new(syn::parse_quote!(true)))
+							NodeExpr(SendWrapper::new(syn::parse_quote!(true)))
 						),
 						(
 							AttributeKey(String::from("some_key")),
-							AttributeExpr(SendWrapper::new(syn::parse_quote!({ bar })))
+							NodeExpr(SendWrapper::new(syn::parse_quote!({ bar })))
 						),
 						(
 							AttributeKey(String::from("onmousemove")),
 							AttributeLit::String(String::from("some_js_func")),
-							AttributeExpr(SendWrapper::new(syn::parse_quote!("some_js_func")))
+							NodeExpr(SendWrapper::new(syn::parse_quote!("some_js_func")))
 						),
 						(
 							AttributeKey(String::from("onclick")),
-							AttributeExpr(SendWrapper::new(syn::parse_quote!({ |_: Trigger<OnClick>| {} })))
+							NodeExpr(SendWrapper::new(syn::parse_quote!({ |_: Trigger<OnClick>| {} })))
 						)
 					]}
 				)
@@ -288,12 +288,12 @@ mod test {
 													(
 														AttributeKey(String::from("class")),
 														AttributeLit::Boolean(true),
-														AttributeExpr(SendWrapper::new(syn::parse_quote!(true)))
+														NodeExpr(SendWrapper::new(syn::parse_quote!(true)))
 													),
 													(
 														AttributeKey(String::from("onmousemove")),
 														AttributeLit::String(String::from("some_js_func")),
-														AttributeExpr(SendWrapper::new(syn::parse_quote!("some_js_func")))
+														NodeExpr(SendWrapper::new(syn::parse_quote!("some_js_func")))
 													),
 													(
 														AttributeKey(String::from("onclick")),

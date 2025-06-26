@@ -37,9 +37,9 @@ pub fn update_file_expr_hash(
 	children: Query<&Children>,
 	macro_idxs: Query<&MacroIdx>,
 	attributes: Query<&Attributes>,
-	node_exprs: Query<&NodeExpr>,
+	node_exprs: Query<&NodeExpr, Without<AttributeOf>>,
 	// dont hash literal attribute values
-	attr_exprs: Query<&AttributeExpr, Without<AttributeLit>>,
+	attr_exprs: Query<&NodeExpr, (With<AttributeOf>, Without<AttributeLit>)>,
 ) -> Result {
 	for (entity, template_file, mut hash) in query.iter_mut() {
 		let mut hasher = RapidHasher::default_const();
@@ -88,8 +88,8 @@ mod test {
 	use beet_bevy::prelude::WorldMutExt;
 	use beet_utils::prelude::*;
 	use bevy::prelude::*;
-	use sweet::prelude::*;
 	use send_wrapper::SendWrapper;
+	use sweet::prelude::*;
 
 	fn hash(bundle: impl Bundle) -> u64 { hash_inner(bundle, true) }
 

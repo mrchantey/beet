@@ -6,7 +6,7 @@ use proc_macro2::TokenStream;
 use quote::quote;
 use syn::Ident;
 
-pub fn tokenize_template_attributes(
+pub fn tokenize_template(
 	world: &World,
 	entity_components: &mut Vec<TokenStream>,
 	entity: Entity,

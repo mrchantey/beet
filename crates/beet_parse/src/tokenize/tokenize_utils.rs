@@ -7,19 +7,19 @@ use quote::quote;
 use syn::Ident;
 
 /// Gets the first 'expression' for an attribute, searching in the following order:
-/// - [`AttributeExpr`]
+/// - [`NodeExpr`]
 /// - [`tokenize_combinator_exprs`]
 pub fn first_attribute_expr(
 	world: &World,
 	attr_entity: Entity,
-) -> Result<Option<AttributeExpr>> {
-	if let Some(attr) =world.entity(attr_entity).get::<AttributeExpr>()
+) -> Result<Option<NodeExpr>> {
+	if let Some(attr) =world.entity(attr_entity).get::<NodeExpr>()
 	{
 		Ok(Some(attr.clone()))
 	} else if let Some(combinator) =
 		tokenize_combinator_exprs(world, attr_entity)?
 	{
-		Ok(Some(AttributeExpr::new(syn::parse2(combinator)?)))
+		Ok(Some(NodeExpr::new(syn::parse2(combinator)?)))
 	} else {
 		Ok(None)
 	}

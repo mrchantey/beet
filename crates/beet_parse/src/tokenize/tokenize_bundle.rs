@@ -18,7 +18,7 @@ pub fn tokenize_bundle(
 	tokenize_web_nodes(world,&mut items, entity)?;
 	tokenize_web_directives(world,&mut items, entity)?;
 	tokenize_element_attributes(world,&mut items, entity)?;
-	tokenize_template_attributes(world,&mut items, entity)?;
+	tokenize_template(world,&mut items, entity)?;
 	tokenize_node_exprs(world, entity)?.map(|i|items.push(i));
 	tokenize_combinator_exprs(world, entity)?.map(|i|items.push(i));
 	tokenize_related::<Children>(world,&mut items, entity, tokenize_bundle)?;

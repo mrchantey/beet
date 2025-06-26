@@ -10,20 +10,36 @@ use quote::quote;
 use send_wrapper::SendWrapper;
 use syn::Expr;
 
-/// Tokens for an attribute without a specified key-value pair.
-/// This is known as the spread attribute in JSX, although rust
-/// parsers usually dont require the `...` prefix.
-/// ## Example
+/// An expression in some part of the tree, its parsed form depending on the context:
+/// 
+/// ## Node Blocks
+/// Block Nodes that are expressions, any [`NodeExpr`] without an [`AttributeOf`]
+/// is a block node.
+/// 
+/// ```ignore
+/// rsx!{<div>{my_expr}</div>};
+/// ```
+/// ## Attribute Blocks
+/// any [`NodeExpr`] with an [`AttributeOf`] *without* an [`AttributeKey`]
+/// is an attribute block.
+/// This is known as the spread attribute in JSX, although rstml
+/// doesn't require the `...` prefix.
 /// ```ignore
 /// rsx!{<span {props} />};
+/// ```
+/// ## Attribute Values
+/// An expression that is used as the value of an attribute.
+/// any [`NodeExpr`] with an [`AttributeOf`] *and* an [`AttributeKey`]
+/// is an attribute value.
+/// If the entity also has an [`AttributeLit`] this will be an [`Expr::Lit`].
+/// ```ignore
 /// rsx!{<span key={value} />};
 /// ```
 #[derive(Debug, Clone, Deref, Component, ToTokens)]
 #[component(immutable)]
-pub struct AttributeExpr(pub SendWrapper<Expr>);
+pub struct NodeExpr(pub SendWrapper<Expr>);
 
-
-impl AttributeExpr {
+impl NodeExpr {
 	pub fn new(value: Expr) -> Self { Self(SendWrapper::new(value)) }
 	pub fn new_block(value: syn::Block) -> Self {
 		Self::new(syn::Expr::Block(syn::ExprBlock {
@@ -32,6 +48,7 @@ impl AttributeExpr {
 			label: None,
 		}))
 	}
+	
 	pub fn borrow(&self) -> &syn::Expr { &*self.0 }
 	/// ensure blocks have `#[allow(unused_braces)]`
 	pub fn inner_parsed(&self) -> Expr {
@@ -59,53 +76,6 @@ impl AttributeExpr {
 		quote! { #parsed.into_attribute_bundle() }
 	}
 }
-
-
-
-/// Nodes that are expressions, including block nodes and templates.
-/// ## Example
-/// ```ignore
-/// rsx!{<div>{my_expr}</div>};
-/// ```
-#[derive(Debug, Clone, Deref, Component, ToTokens)]
-#[component(immutable)]
-pub struct NodeExpr(pub send_wrapper::SendWrapper<syn::Expr>);
-
-
-impl NodeExpr {
-	pub fn new(value: syn::Expr) -> Self {
-		Self(send_wrapper::SendWrapper::new(value))
-	}
-	pub fn new_block(value: syn::Block) -> Self {
-		Self::new(syn::Expr::Block(syn::ExprBlock {
-			block: value,
-			attrs: Vec::new(),
-			label: None,
-		}))
-	}
-	pub fn borrow(&self) -> &syn::Expr { &*self.0 }
-
-	/// ensure blocks have `#[allow(unused_braces)]`
-	pub fn inner_parsed(&self) -> Expr {
-		match self.borrow().clone() {
-			syn::Expr::Block(mut block) => {
-				block.attrs.push(syn::parse_quote! {
-					#[allow(unused_braces)]
-				});
-				Expr::Block(block)
-			}
-			expr => expr,
-		}
-	}
-
-	/// Create the tokens for this expression to be instantiated
-	pub fn node_bundle_tokens(&self) -> TokenStream {
-		let inner = self.inner_parsed();
-		quote! { #inner.into_node_bundle() }
-	}
-}
-
-
 
 /// The partially parsed equivalent of a [`RsxParsedExpression`](beet_rsx_combinator::types::RsxParsedExpression).
 ///
