@@ -4,11 +4,12 @@ use beet_common::prelude::*;
 use bevy::platform::collections::HashMap;
 use bevy::prelude::*;
 
-/// Recusively apply LitNodes and run OnSpawnTemplate methods
+/// When a [`MacroIdx`] is added to an entity,
+/// recusively apply each [`StaticNodeRoot`] and run [`OnSpawnTemplate`] methods
 pub fn spawn_templates(world: &mut World) -> Result {
 	let mut query = world.query_filtered::<(), (
 		Added<MacroIdx>,
-		Without<LitNodeRoot>,
+		Without<StaticNodeRoot>,
 		Without<ResolvedRoot>,
 	)>();
 
@@ -19,11 +20,11 @@ pub fn spawn_templates(world: &mut World) -> Result {
 	Ok(())
 }
 
-/// LitNodes, aka Literal Nodes are trees created by statically analyzing a file,
+/// Static nodes are created by statically analyzing a file,
 /// so they should not be rendered directly, and only used for template reloading.
 #[derive(Default, Component, Reflect)]
 #[reflect(Default, Component)]
-pub struct LitNodeRoot;
+pub struct StaticNodeRoot;
 
 #[derive(Default, Component, Reflect)]
 #[reflect(Default, Component)]
@@ -33,9 +34,13 @@ pub(super) fn apply_lit_nodes(
 	mut commands: Commands,
 	instances: Populated<
 		(Entity, &MacroIdx),
-		(Added<MacroIdx>, Without<LitNodeRoot>, Without<ResolvedRoot>),
+		(
+			Added<MacroIdx>,
+			Without<StaticNodeRoot>,
+			Without<ResolvedRoot>,
+		),
 	>,
-	static_trees: Query<(Entity, &MacroIdx), With<LitNodeRoot>>,
+	static_trees: Query<(Entity, &MacroIdx), With<StaticNodeRoot>>,
 	children: Query<&Children>,
 	mut on_spawn_templates: Query<(&ExprIdx, &mut OnSpawnTemplate)>,
 ) -> Result {
@@ -57,7 +62,7 @@ pub(super) fn apply_lit_nodes(
 			.entity(static_tree)
 			.clone_with(instance, |builder| {
 				builder
-					.deny::<LitNodeRoot>()
+					.deny::<StaticNodeRoot>()
 					.linked_cloning(true)
 					.add_observers(true);
 			});
@@ -139,7 +144,7 @@ mod test {
 		let mut world = World::new();
 		let instance = world.spawn(instance).insert(MacroIdx::default()).id();
 		let _tree = world
-			.spawn((tree, LitNodeRoot))
+			.spawn((tree, StaticNodeRoot))
 			.insert(MacroIdx::default())
 			.id();
 

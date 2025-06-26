@@ -3,11 +3,9 @@ use beet_utils::prelude::*;
 use bevy::prelude::*;
 
 
-/// Placed at the root of a parsed template macro, with an index
-/// indicating the position of the macro in the source file visited in order
-/// of *tokens* not an actual tree.
-/// This type only tracks the start of a macro, so only a change in location,
-/// not size, will change the hash.
+/// Placed at the root of a parsed template macro, with a [`LineCol`] representing
+/// the start of the macro in the source file. Only a change in start [`LineCol`],
+/// not internal size or end [`LineCol`], will change the hash.
 /// Combining this with [`ExprIdx`] we can uniquely identify
 /// a template macro in a file, and the order of expressions inside it.
 #[derive(Debug, Default, Clone, PartialEq, Eq, Hash, Reflect, Component)]

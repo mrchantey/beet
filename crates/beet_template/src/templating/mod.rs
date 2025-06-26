@@ -1,10 +1,10 @@
-mod apply_lit_nodes;
+mod apply_static_nodes;
 mod apply_style_id_attributes;
 mod html_fragment;
 mod lang_partial;
 mod node_portal;
 mod on_spawn_template_impl;
-pub use apply_lit_nodes::*;
+pub use apply_static_nodes::*;
 pub use apply_style_id_attributes::*;
 use beet_bevy::prelude::WorldMutExt;
 pub use html_fragment::*;

@@ -8,7 +8,7 @@ use bevy::prelude::*;
 /// It must be called after *apply_slots* as it doesnt recurse into [`TemplateOf`]
 pub fn run_on_spawn_template(
 	mut commands: Commands,
-	roots: Populated<Entity, (Added<MacroIdx>, Without<LitNodeRoot>)>,
+	roots: Populated<Entity, (Added<MacroIdx>, Without<StaticNodeRoot>)>,
 	children: Query<&Children>,
 	attributes: Query<&Attributes>,
 	mut query: Query<(Entity, &mut OnSpawnTemplate), Added<OnSpawnTemplate>>,
