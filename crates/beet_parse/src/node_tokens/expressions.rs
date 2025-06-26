@@ -10,16 +10,28 @@ use quote::quote;
 use send_wrapper::SendWrapper;
 use syn::Expr;
 
-/// An expression in some part of the tree, its parsed form depending on the context:
+/// An expression in some part of the tree
+/// This is the *only* expression type, all tokenizations must pass through this type,
+/// including:
+/// - `rsx!` macro expresisons
+/// - combinator expressions
+/// - template spawn funcs: `<MyTemplate/>`
+/// - `#[derive(AttributeBlock)]`
+/// 
+/// The parsed output depends on the context in which this expression is used:
 /// 
 /// ## Node Blocks
+/// 
 /// Block Nodes that are expressions, any [`NodeExpr`] without an [`AttributeOf`]
 /// is a block node.
 /// 
 /// ```ignore
 /// rsx!{<div>{my_expr}</div>};
+/// // templates also evaluate to blocks
+/// rsx!{<MyTemplate/>};
 /// ```
 /// ## Attribute Blocks
+/// 
 /// any [`NodeExpr`] with an [`AttributeOf`] *without* an [`AttributeKey`]
 /// is an attribute block.
 /// This is known as the spread attribute in JSX, although rstml
@@ -28,6 +40,7 @@ use syn::Expr;
 /// rsx!{<span {props} />};
 /// ```
 /// ## Attribute Values
+/// 
 /// An expression that is used as the value of an attribute.
 /// any [`NodeExpr`] with an [`AttributeOf`] *and* an [`AttributeKey`]
 /// is an attribute value.

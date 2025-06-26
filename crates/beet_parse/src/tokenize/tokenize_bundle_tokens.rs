@@ -18,26 +18,36 @@ pub fn tokenize_bundle_tokens(
 	tokenize_rsx_directives(world, &mut items, entity)?;
 	tokenize_web_nodes(world, &mut items, entity)?;
 	tokenize_web_directives(world, &mut items, entity)?;
-	tokenize_node_exprs(world, &mut items, entity)?;
-	tokenize_combinator_exprs_tokens(world, entity)?.map(|i|items.push(i));
+	tokenize_node_exprs_tokens(world, &mut items, entity)?;
+	tokenize_combinator_exprs_tokens(world,&mut items, entity)?;
 	tokenize_related::<Attributes>(world, &mut items, entity, tokenize_attribute_tokens)?;
 	tokenize_related::<Children>(world, &mut items, entity, tokenize_bundle_tokens)?;
 	
 	items.xmap(unbounded_bundle).xok()
 }
 
-fn tokenize_node_exprs(
+fn tokenize_node_exprs_tokens(
 	world: &World,
 	items: &mut Vec<TokenStream>,
 	entity: Entity,
 ) -> Result<()> {
 	if let Some(expr) = world.entity(entity).get::<NodeExpr>() {
-		let block_node = expr.self_token_stream();
-		items.push(block_node);
+		items.push(expr.self_token_stream());
 	}
-
 	Ok(())
 }
+fn tokenize_combinator_exprs_tokens(
+	world: &World,
+		items: &mut Vec<TokenStream>,
+	entity: Entity,
+) -> Result<()> {
+	if let Some(expr) = tokenize_combinator_exprs_mapped(world, entity, tokenize_bundle_tokens)?{
+		items.push(expr.self_token_stream());
+	}
+	Ok(())
+}
+
+
 fn tokenize_attribute_tokens(
 	world: &World,
 	entity: Entity,
@@ -54,11 +64,8 @@ fn tokenize_attribute_tokens(
 		items.push(attr_expr.self_token_stream());
 	}
 	let attr_entity = entity.id();
-	if let Some(attr) =
-				tokenize_combinator_exprs_tokens(world, attr_entity)?
-	{
-				items.push(attr);
-	}
+	// we dont care if its an attr block, just self tokenizing
+	tokenize_combinator_exprs_tokens(world,&mut items, attr_entity)?;
 
 	unbounded_bundle(items).xok()
 }
@@ -205,7 +212,7 @@ mod test {
 						file: WsPathBuf::new("crates/beet_parse/src/tokenize/tokenize_bundle_tokens.rs"),
 						start: LineCol { line: 1u32, col: 0u32 }
 					},
-					{
+					NodeExpr(SendWrapper::new(syn::parse_quote!({
 						(
 							FragmentNode,
 							related! {
@@ -217,7 +224,7 @@ mod test {
 								]
 							}
 						)
-					}
+					})))
 				)
 			}
 			.to_string().replace(" ", ""),
@@ -235,7 +242,7 @@ mod test {
 						file: WsPathBuf::new("crates/beet_parse/src/tokenize/tokenize_bundle_tokens.rs"),
 						start: LineCol { line: 1u32, col: 0u32 }
 					},
-					{
+					NodeExpr(SendWrapper::new(syn::parse_quote!({
 						(
 							FragmentNode,
 							related! {
@@ -251,7 +258,7 @@ mod test {
 								]
 							}
 						)
-					}
+					})))
 				)
 			}
 			.to_string(),
@@ -274,7 +281,7 @@ mod test {
 							file: WsPathBuf::new("crates/beet_parse/src/tokenize/tokenize_bundle_tokens.rs"),
 							start: LineCol { line: 1u32, col: 0u32 }
 						},
-						{
+						NodeExpr(SendWrapper::new(syn::parse_quote!({
 							(
 								FragmentNode,
 								related! {
@@ -297,7 +304,7 @@ mod test {
 													),
 													(
 														AttributeKey(String::from("onclick")),
-														{ |_: Trigger<OnClick>| {} }
+														NodeExpr(SendWrapper::new(syn::parse_quote!({|_: Trigger<OnClick>| {}})))
 													)
 												]
 											}
@@ -305,7 +312,7 @@ mod test {
 									]
 								}
 							)
-						}
+						})))
 					)
 			}
 			.to_string().replace(" ", ""),
@@ -325,7 +332,7 @@ mod test {
 								file: WsPathBuf::new("crates/beet_parse/src/tokenize/tokenize_bundle_tokens.rs"),
 								start: LineCol { line: 1u32, col: 0u32 }
 							},
-							{
+							NodeExpr(SendWrapper::new(syn::parse_quote!({
 								(
 									FragmentNode,
 									related! {
@@ -337,7 +344,7 @@ mod test {
 													Attributes[
 														(
 															AttributeKey(String::from("foo")),
-															{
+															NodeExpr(SendWrapper::new(syn::parse_quote!({
 																let class = "bar";
 																(
 																	NodeTag(String::from("div")),
@@ -346,12 +353,12 @@ mod test {
 																		Attributes[
 																			(
 																				AttributeKey(String::from("class")),
-																				{ class }
+																				NodeExpr(SendWrapper::new(syn::parse_quote!({ class })))
 																			)
 																		]
 																	}
 																)
-															}
+															})))
 														)
 													]
 												}
@@ -359,7 +366,7 @@ mod test {
 										]
 									}
 								)
-							}
+							})))
 						)
 					}
 			.to_string().replace(" ", "")

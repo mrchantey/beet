@@ -19,8 +19,8 @@ pub fn tokenize_bundle(
 	tokenize_web_directives(world,&mut items, entity)?;
 	tokenize_element_attributes(world,&mut items, entity)?;
 	tokenize_template(world,&mut items, entity)?;
-	tokenize_node_exprs(world, entity)?.map(|i|items.push(i));
-	tokenize_combinator_exprs(world, entity)?.map(|i|items.push(i));
+	tokenize_node_exprs(world,&mut items, entity)?;
+	tokenize_combinator_exprs(world,&mut items, entity)?;
 	tokenize_related::<Children>(world,&mut items, entity, tokenize_bundle)?;
 	items
 		.xmap(unbounded_bundle)
@@ -29,13 +29,23 @@ pub fn tokenize_bundle(
 
 fn tokenize_node_exprs(
 	world: &World,
+	items: &mut Vec<TokenStream>,
 	entity: Entity,
-) -> Result<Option<TokenStream>> {
+) -> Result<()> {
 	if let Some(block) = world.entity(entity).get::<NodeExpr>() {
-		Ok(Some(block.node_bundle_tokens()))
-	} else {
-		Ok(None)
+		items.push(block.node_bundle_tokens());
 	}
+	Ok(())
+}
+fn tokenize_combinator_exprs(
+	world: &World,
+	items: &mut Vec<TokenStream>,
+	entity: Entity,
+) -> Result<()> {
+	if let Some(expr) = tokenize_combinator_exprs_mapped(world, entity, super::tokenize_bundle)?{
+		items.push(expr.node_bundle_tokens());
+	}
+	Ok(())
 }
 
 

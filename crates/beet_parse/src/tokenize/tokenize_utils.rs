@@ -16,10 +16,10 @@ pub fn first_attribute_expr(
 	if let Some(attr) =world.entity(attr_entity).get::<NodeExpr>()
 	{
 		Ok(Some(attr.clone()))
-	} else if let Some(combinator) =
-		tokenize_combinator_exprs(world, attr_entity)?
+	} else if let Some(expr) =	
+		tokenize_combinator_exprs_mapped(world, attr_entity,tokenize_bundle)?
 	{
-		Ok(Some(NodeExpr::new(syn::parse2(combinator)?)))
+	Ok(Some(expr))
 	} else {
 		Ok(None)
 	}
