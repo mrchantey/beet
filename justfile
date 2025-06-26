@@ -264,6 +264,8 @@ test-all-old *args:
 
 test crate *args:
 	sweet test -p {{crate}} --lib --watch {{args}}
+test-int crate test *args:
+	sweet test -p {{crate}} --watch --test {{test}} {{args}}
 test-e2e crate *args:
 	just watch cargo test -p {{crate}} --lib --features=e2e -- 														--e2e	--watch {{args}}
 test-doc crate *args:

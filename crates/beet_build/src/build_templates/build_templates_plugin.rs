@@ -1,7 +1,7 @@
 use super::*;
 use beet_common::prelude::*;
 use beet_parse::prelude::*;
-use beet_router::as_beet::ApplyTransformsStep;
+use beet_template::prelude::*;
 use bevy::prelude::*;
 
 /// Import template files into parsable formats like [`RstmlTokens`], or [`CombinatorToNodeTokens`].
@@ -58,17 +58,23 @@ impl Plugin for BuildTemplatesPlugin {
 				Update,
 				(
 					ImportTemplateStep.before(ImportNodesStep),
-					ProcessTemplateStep.after(ExportNodesStep),
+					ProcessTemplateStep
+					.after(ExportNodesStep)
+					.after(ImportTemplateStep),
 					ExportTemplateStep
 						.after(ProcessTemplateStep)
 						// before all [`TemplatePlugin`] systems
-						.before(ApplyTransformsStep),
+						.before(SpawnStep),
 				),
 			)
 			.add_systems(
 				Update,
 				(
 					(
+						// style roundtrip breaks without resolving templates, 
+						// im not sure if this should be here, doesnt it indicate
+						// we're relying on exprs in templates?
+						spawn_templates,
 						load_template_files,
 						(
 							templates_to_nodes_rs,

@@ -10,12 +10,22 @@ use sweet::prelude::*;
 #[cfg(not(target_arch = "wasm32"))]
 #[test]
 fn rsx_macro() {
+	use bevy::ecs::system::RunSystemOnce;
+
 	let (get, set) = signal(String::new());
 
 
-	App::new()
+	let mut app = App::new();
+	let entity = app
 		.world_mut()
 		.spawn(rsx! {<button onclick=move|ev|set(ev.value())>click me</button>})
+		.id();
+	app.world_mut()
+		.run_system_once(spawn_templates)
+		.unwrap()
+		.unwrap();
+	app.world_mut()
+		.entity_mut(entity)
 		.trigger(OnClick::new(MockEvent::new("foo")));
 	get().xpect().to_be("foo");
 }

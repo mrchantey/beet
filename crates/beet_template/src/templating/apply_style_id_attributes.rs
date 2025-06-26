@@ -65,6 +65,10 @@ mod test {
 		world.init_resource::<HtmlConstants>();
 		let entity = world.spawn(bundle).id();
 		world
+			.run_system_once(spawn_templates)
+			.unwrap()
+			.unwrap();
+		world
 			.run_system_once(super::apply_style_id_attributes)
 			.unwrap();
 		world.run_system_once(apply_slots).ok();

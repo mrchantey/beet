@@ -1,24 +1,41 @@
-use core::panic;
-
+use crate::prelude::*;
 use beet_bevy::prelude::HierarchyQueryExtExt;
 use beet_common::prelude::*;
 use bevy::platform::collections::HashMap;
 use bevy::prelude::*;
 
-use crate::prelude::TemplateRoot;
-use crate::prelude::on_spawn_template;
+/// Recusively apply LitNodes and run OnSpawnTemplate methods
+pub fn spawn_templates(world: &mut World) -> Result {
+	let mut query = world.query_filtered::<(), (
+		Added<MacroIdx>,
+		Without<LitNodeRoot>,
+		Without<ResolvedRoot>,
+	)>();
 
+	while query.iter(world).next().is_some() {
+		world.run_system_cached(apply_lit_nodes)??;
+		world.run_system_cached(run_on_spawn_template)??;
+	}
+	Ok(())
+}
 
-
-/// Marker to discern that this is the static template, not an instance.
+/// LitNodes, aka Literal Nodes are trees created by statically analyzing a file,
+/// so they should not be rendered directly, and only used for template reloading.
 #[derive(Default, Component, Reflect)]
 #[reflect(Default, Component)]
-pub struct StaticTree;
+pub struct LitNodeRoot;
 
-pub(super) fn apply_static_trees(
+#[derive(Default, Component, Reflect)]
+#[reflect(Default, Component)]
+pub struct ResolvedRoot;
+
+pub(super) fn apply_lit_nodes(
 	mut commands: Commands,
-	instances: Populated<(Entity, &MacroIdx), Without<StaticTree>>,
-	static_trees: Query<(Entity, &MacroIdx), With<StaticTree>>,
+	instances: Populated<
+		(Entity, &MacroIdx),
+		(Added<MacroIdx>, Without<LitNodeRoot>, Without<ResolvedRoot>),
+	>,
+	static_trees: Query<(Entity, &MacroIdx), With<LitNodeRoot>>,
 	children: Query<&Children>,
 	mut on_spawn_templates: Query<(&ExprIdx, &mut OnSpawnTemplate)>,
 ) -> Result {
@@ -39,8 +56,10 @@ pub(super) fn apply_static_trees(
 		commands
 			.entity(static_tree)
 			.clone_with(instance, |builder| {
-				builder.linked_cloning(true);
-				builder.add_observers(true);
+				builder
+					.deny::<LitNodeRoot>()
+					.linked_cloning(true)
+					.add_observers(true);
 			});
 		let instance_exprs: HashMap<_, _> = children
 			.iter_descendants_inclusive(instance)
@@ -55,8 +74,12 @@ pub(super) fn apply_static_trees(
 			(instance, instance_exprs),
 		);
 	}
+	for (entity, _) in instances.iter() {
+		commands.entity(entity).insert(ResolvedRoot);
+	}
 	Ok(())
 }
+
 
 
 pub(super) fn apply_template_locations(
@@ -100,16 +123,9 @@ The static tree is missing the following idxs found in the instance: {:?}
 			instance_exprs.keys()
 		);
 	}
-	commands
-		.run_system_cached_with(on_spawn_template.pipe(panic_on_err), entity);
 }
 
-fn panic_on_err(In(err): In<Result>) {
-	match err {
-		Ok(_) => {}
-		Err(e) => panic!("{e}"),
-	}
-}
+
 
 #[cfg(test)]
 mod test {
@@ -123,10 +139,11 @@ mod test {
 		let mut world = World::new();
 		let instance = world.spawn(instance).insert(MacroIdx::default()).id();
 		let _tree = world
-			.spawn(tree)
-			.insert((MacroIdx::default(), StaticTree))
+			.spawn((tree, LitNodeRoot))
+			.insert(MacroIdx::default())
 			.id();
-		world.run_system_once(apply_static_trees).unwrap().unwrap();
+
+		world.run_system_once(spawn_templates).unwrap().unwrap();
 		world.run_system_once(apply_slots).ok(); // no matching entities ok
 		world
 			.run_system_once_with(render_fragment, instance)
@@ -135,10 +152,9 @@ mod test {
 
 
 	#[test]
-	#[ignore = "temp disabled wrapping exprs in OnSpawnTemplate, needs design"]
 	fn works() {
 		parse(
-			rsx! {<div>{7}</div>},
+			rsx! {<main>{7}</main>},
 			// because ExprIdx matches, this should be replace with 7
 			rsx! {<div><span>{()}</span><br/></div>},
 		)
@@ -146,43 +162,36 @@ mod test {
 		.to_be("<div><span>7</span><br/></div>");
 	}
 	#[test]
-	#[ignore = "temp disabled wrapping exprs in OnSpawnTemplate, needs design"]
 	fn root() { parse(rsx! {{7}}, rsx! {hello{()}}).xpect().to_be("hello7"); }
 
 	#[test]
-	#[ignore = "temp disabled wrapping exprs in OnSpawnTemplate, needs design"]
 	#[should_panic = "Not all ExprIdx were applied.."]
 	fn tree_missing_idx() {
 		parse(rsx! {<div>{7}</div>}, rsx! {<div><br/></div>});
 	}
 	#[test]
-	#[ignore = "temp disabled wrapping exprs in OnSpawnTemplate, needs design"]
 	#[should_panic = "The instance is missing an ExprIdx.."]
 	fn instance_missing_idx() {
 		parse(rsx! {<div><br/></div>}, rsx! {<div>{7}</div>});
 	}
 
 
-	#[template]
-	fn Counter(initial: u32) -> impl Bundle {
-		let (count, set_count) = signal(initial);
-		rsx! {
-			<div>
-				<span>{count}</span>
-				<button onclick={move |_| set_count.update(|v| *v -= 1)}>-</button>
-			</div>
-		}
-	}
-
-
 	#[test]
-	#[ignore = "temp disabled wrapping exprs in OnSpawnTemplate, needs design"]
 	fn template() {
+		#[template]
+		fn MyTemplate(initial: u32) -> impl Bundle {
+			rsx! {{initial+2}}
+		}
 		parse(
-			rsx! {<Counter initial=3/>},
-			rsx! {<div><span>{()}</span><br/></div>},
+			rsx! {<MyTemplate initial=3/>},
+			(NodeTag::new("div"), ElementNode::open(), children![(
+				ExprIdx(0u32),
+				NodeTag(String::from("Counter")),
+				FragmentNode,
+				TemplateNode,
+			)]),
 		)
 		.xpect()
-		.to_be("<div><span>7</span><br/></div>");
+		.to_be("<div>5</div>");
 	}
 }

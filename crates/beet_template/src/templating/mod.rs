@@ -1,15 +1,15 @@
-mod apply_static_trees;
+mod apply_lit_nodes;
 mod apply_style_id_attributes;
 mod html_fragment;
 mod lang_partial;
 mod node_portal;
 mod on_spawn_template_impl;
-pub use on_spawn_template_impl::*;
-pub use apply_static_trees::*;
+pub use apply_lit_nodes::*;
 pub use apply_style_id_attributes::*;
 use beet_bevy::prelude::WorldMutExt;
 pub use html_fragment::*;
 pub use node_portal::*;
+pub use on_spawn_template_impl::*;
 mod html_document;
 pub use html_document::*;
 mod text_node_parent;
@@ -57,7 +57,7 @@ impl Plugin for TemplatePlugin {
 				Update,
 				(
 					(
-						apply_static_trees,
+						spawn_templates,
 						(resolve_lang_partials, apply_style_id_attributes),
 						apply_slots,
 						apply_text_node_parents,

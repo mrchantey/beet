@@ -90,13 +90,13 @@ impl NodeExpr {
 	/// ie `<div {my_expr} />`.
 	pub fn node_bundle_tokens(&self) -> TokenStream {
 		let parsed = self.inner_parsed();
-		quote! { #parsed.into_node_bundle() }
+		quote! { OnSpawnTemplate::new_insert(#parsed.into_node_bundle()) }
 	}
 	/// Called when this expression is in the position of a block attribute,
 	/// ie `<div key={my_expr} />`.
 	pub fn attribute_bundle_tokens(&self) -> TokenStream {
 		let parsed = self.inner_parsed();
-		quote! { #parsed.into_attribute_bundle() }
+		quote! { OnSpawnTemplate::new_insert(#parsed.into_attribute_bundle()) }
 	}
 }
 

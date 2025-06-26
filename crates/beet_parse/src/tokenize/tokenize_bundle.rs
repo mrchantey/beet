@@ -93,7 +93,7 @@ mod test {
 				ElementNode { self_closing: false },
 				related!(Attributes[(
 					AttributeKey::new("hidden"),
-					true.into_attribute_bundle()
+					OnSpawnTemplate::new_insert(true.into_attribute_bundle())
 				)]),
 				related!{Children[(
 						ExprIdx(0u32),
@@ -101,7 +101,7 @@ mod test {
 						FragmentNode,
 						TemplateNode,
 						ClientLoadDirective,
-						#[allow(unused_braces)]{
+						OnSpawnTemplate::new_insert(#[allow(unused_braces)]{
 							let template = <MyComponent as Props>::Builder::default().foo("bar").build();
 							(
 								#[cfg(not(target_arch = "wasm32"))]
@@ -110,7 +110,7 @@ mod test {
 								{ () },
 								TemplateRoot::spawn(Spawn(template.into_node_bundle()))
 							)
-						}.into_node_bundle()
+						}.into_node_bundle())
 					), (
 						NodeTag(String::from("div")),
 						ElementNode { self_closing: true }
@@ -163,7 +163,7 @@ mod test {
 					MacroIdx{file:WsPathBuf::new("crates/beet_parse/src/tokenize/tokenize_bundle.rs"),start:LineCol{line:1u32,col:0u32}},
 					ExprIdx(0u32),
 					BlockNode,
-					#[allow(unused_braces)]{foo}.into_node_bundle()
+					OnSpawnTemplate::new_insert(#[allow(unused_braces)]{foo}.into_node_bundle())
 				)}
 				.to_string(),
 			);
@@ -183,7 +183,7 @@ mod test {
 					related!(Attributes [
 						(
 							AttributeKey::new("hidden"),
-							val.into_attribute_bundle()
+							OnSpawnTemplate::new_insert(val.into_attribute_bundle())
 						)
 					])
 				)}

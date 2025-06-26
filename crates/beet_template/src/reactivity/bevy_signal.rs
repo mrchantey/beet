@@ -78,6 +78,7 @@ impl<T: 'static + Send + Sync + Clone + ToString> IntoTemplateBundle<Self>
 #[cfg(test)]
 mod test {
 	use crate::as_beet::*;
+	use bevy::ecs::system::RunSystemOnce;
 	use bevy::prelude::*;
 	use sweet::prelude::*;
 
@@ -122,8 +123,12 @@ mod test {
 		let mut app = App::new();
 		app.add_plugins(signals_plugin);
 		let (get, set) = signal(5);
-		let div = app.world_mut().spawn(rsx! {<div>{get}</div>});
-		let text = div.get::<Children>().unwrap()[0];
+		let div = app.world_mut().spawn(rsx! {<div>{get}</div>}).id();
+		app.world_mut()
+			.run_system_once(spawn_templates)
+			.unwrap()
+			.unwrap();
+		let text = app.world().entity(div).get::<Children>().unwrap()[0];
 
 		app.world()
 			.entity(text)
@@ -151,8 +156,12 @@ mod test {
 		let mut app = App::new();
 		app.add_plugins(signals_plugin);
 		let (get, set) = signal("foo");
-		let div = app.world_mut().spawn(rsx! {<div class={get}/>});
-		let attr = div.get::<Attributes>().unwrap()[0];
+		let div = app.world_mut().spawn(rsx! {<div class={get}/>}).id();
+		app.world_mut()
+			.run_system_once(spawn_templates)
+			.unwrap()
+			.unwrap();
+		let attr = app.world().entity(div).get::<Attributes>().unwrap()[0];
 
 		app.world()
 			.entity(attr)

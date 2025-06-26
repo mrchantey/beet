@@ -120,7 +120,7 @@ mod test {
 				ElementNode { self_closing: true },
 				related!(Attributes[(
 					AttributeKey::new("hidden"),
-					true.into_attribute_bundle()
+					OnSpawnTemplate::new_insert(true.into_attribute_bundle())
 				)])
 			)}
 			.to_string(),
@@ -137,7 +137,7 @@ mod test {
 				MacroIdx{file:WsPathBuf::new("crates/beet_parse/src/tokenize/tokenize_element_attributes.rs"),start:LineCol{line:1u32,col:0u32}},
 				NodeTag(String::from("span")),
 				ElementNode { self_closing: true },
-				#[allow(unused_braces)]{foo}.into_node_bundle()
+				OnSpawnTemplate::new_insert(#[allow(unused_braces)]{foo}.into_node_bundle())
 			)}
 			.to_string(),
 		);
@@ -153,7 +153,7 @@ mod test {
 				MacroIdx{file:WsPathBuf::new("crates/beet_parse/src/tokenize/tokenize_element_attributes.rs"),start:LineCol{line:1u32,col:0u32}},
 				NodeTag(String::from("span")),
 				ElementNode { self_closing: true },
-				#[allow(unused_braces)]{foo}.into_node_bundle(),
+				OnSpawnTemplate::new_insert(#[allow(unused_braces)]{foo}.into_node_bundle()),
 				related!(Attributes [AttributeKey::new("onclick")])
 			)}
 			.to_string(),
@@ -169,7 +169,7 @@ mod test {
 				ElementNode { self_closing: true },
 				related!(Attributes[(
 					AttributeKey::new("onclick"),
-					"some_js_func".into_attribute_bundle()
+					OnSpawnTemplate::new_insert("some_js_func".into_attribute_bundle())
 				)])
 			)}
 			.to_string(),
@@ -192,17 +192,17 @@ mod test {
 				MacroIdx{file:WsPathBuf::new("crates/beet_parse/src/tokenize/tokenize_element_attributes.rs"),start:LineCol{line:1u32,col:0u32}},
 				NodeTag(String::from("span")),
 				ElementNode { self_closing: true },
-				#[allow(unused_braces)]{foo}.into_node_bundle(),
-				#[allow(unused_braces)]{|_: Trigger<OnClick>| { println!("clicked"); }}.into_node_bundle(),
+				OnSpawnTemplate::new_insert(#[allow(unused_braces)]{foo}.into_node_bundle()),
+				OnSpawnTemplate::new_insert(#[allow(unused_braces)]{|_: Trigger<OnClick>| { println!("clicked"); }}.into_node_bundle()),
 				related!(Attributes[
 					AttributeKey::new("hidden"),
 					(
 						AttributeKey::new("class"),
-						"foo".into_attribute_bundle()
+						OnSpawnTemplate::new_insert("foo".into_attribute_bundle())
 					),
 					(
 						AttributeKey::new("onmousemove"),
-						"some_js_func".into_attribute_bundle()
+						OnSpawnTemplate::new_insert("some_js_func".into_attribute_bundle())
 					),
 					AttributeKey::new("onclick")
 				])

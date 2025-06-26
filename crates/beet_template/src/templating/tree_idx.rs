@@ -172,6 +172,7 @@ mod test {
 				</div>
 			})
 			.id();
+		world.run_system_once(spawn_templates).unwrap().unwrap();
 		world
 			.run_system_once(super::super::apply_text_node_parents)
 			.unwrap();

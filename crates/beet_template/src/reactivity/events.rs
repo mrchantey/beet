@@ -104,17 +104,23 @@ pub trait EventExt {
 #[cfg(not(target_arch = "wasm32"))]
 mod test {
 	use crate::as_beet::*;
+	use bevy::ecs::system::RunSystemOnce;
 	use bevy::prelude::*;
 	use sweet::prelude::*;
 
 	#[test]
 	fn works() {
-		let (get, set) = signal(String::new());
+		let (get, set) = signal(String::from("foo"));
 
-		App::new()
-			.world_mut()
+		let mut app = App::new();
+		let world = app.world_mut();
+		let entity = world
 			.spawn(rsx! {<button onclick=move|ev|set(ev.value())/>})
-			.trigger(OnClick::new(MockEvent::new("foo")));
-		get().xpect().to_be("foo");
+			.id();
+		world.run_system_once(spawn_templates).unwrap().unwrap();
+		world
+			.entity_mut(entity)
+			.trigger(OnClick::new(MockEvent::new("bar")));
+		get().xpect().to_be("bar");
 	}
 }
