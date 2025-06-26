@@ -38,12 +38,16 @@ pub fn tokenize_template_attributes(
 				(Some((key_str, key)), Some(value))
 					if is_event(&key_str, &value) =>
 				{
-					let value =
-						tokenize_event_handler(&key_str, key.span(), value)?;
+					let value = tokenize_event_handler(
+						&key_str,
+						key.span(),
+						value.inner_parsed(),
+					)?;
 					prop_assignments.push(quote! {.#key(#value)});
 				}
 				// 2. Key with value
 				(Some((_, key)), Some(value)) => {
+					let value = value.inner_parsed();
 					prop_assignments.push(quote! {.#key(#value)});
 				}
 				// 3. Key without value (boolean attribute)
@@ -52,7 +56,7 @@ pub fn tokenize_template_attributes(
 				}
 				// 4. Value without key (block/spread attribute)
 				(None, Some(value)) => {
-					entity_components.push(quote! {#value.into_node_bundle()});
+					entity_components.push(value.node_bundle_tokens());
 				}
 				// 5. No key or value, should be unreachable but no big deal
 				(None, None) => {}

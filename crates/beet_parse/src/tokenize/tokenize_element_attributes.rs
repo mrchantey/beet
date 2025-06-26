@@ -33,16 +33,18 @@ pub fn tokenize_element_attributes(
 				(Some((key_str, key)), Some(value))
 					if is_event(&key_str, &value) =>
 				{
-					let value =
-						tokenize_event_handler(&key_str, key.span(), value)?;
+					let value = tokenize_event_handler(
+						&key_str,
+						key.span(),
+						value.inner_parsed(),
+					)?;
 					attr_components.push(quote! {AttributeKey::new(#key)});
 					entity_components.push(quote! {#value.into_node_bundle()});
 				}
 				// 2. Key with value
 				(Some((_, key)), Some(value)) => {
 					attr_components.push(quote! {AttributeKey::new(#key)});
-					attr_components
-						.push(quote! {#value.into_attribute_bundle()});
+					attr_components.push(value.attribute_bundle_tokens());
 				}
 				// 3. Key without value
 				(Some((_, key)), None) => {
@@ -50,7 +52,7 @@ pub fn tokenize_element_attributes(
 				}
 				// 4. Value without key (block/spread attribute)
 				(None, Some(value)) => {
-					entity_components.push(quote! {#value.into_node_bundle()});
+					entity_components.push(value.node_bundle_tokens());
 				}
 				// 5. No key or value, should be unreachable but no big deal
 				(None, None) => {}

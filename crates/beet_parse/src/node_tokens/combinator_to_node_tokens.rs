@@ -263,22 +263,22 @@ impl<'w, 's, 'a> Builder<'w, 's, 'a> {
 					RsxAttributeValue::Boolean(val) => {
 						let val = val.0;
 						entity.insert((
-							val.into_attribute_bundle(),
 							AttributeExpr::new(syn::parse_quote! {#val}),
+							AttributeLit::new(val)
 						));
 					}
 					RsxAttributeValue::Number(val) => {
 						let val = val.0;
 						entity.insert((
-							val.into_attribute_bundle(),
 							AttributeExpr::new(syn::parse_quote! {#val}),
+							AttributeLit::new(val)
 						));
 					}
 					RsxAttributeValue::Str(val) => {
 						let val = val.to_string_unquoted();
 						entity.insert((
 							AttributeExpr::new(syn::parse_quote! {#val}),
-							val.into_attribute_bundle(),
+							AttributeLit::new(val)
 						));
 					}
 					RsxAttributeValue::Element(value) => {
@@ -455,7 +455,7 @@ mod test {
 					ElementNode{self_closing:true},
 					related!(Attributes[(
 						AttributeKey::new("foo"),
-						{ bar }.into_attribute_bundle()
+						#[allow(unused_braces)]{ bar }.into_attribute_bundle()
 					)])
 				)
 			)}
@@ -470,7 +470,7 @@ mod test {
 					ElementNode{self_closing:true},
 					related!(Attributes[(
 						AttributeKey::new("foo"),
-							{(
+							#[allow(unused_braces)]{(
 								NodeTag(String::from("br")),
 								ElementNode { self_closing: true }
 							)}.into_attribute_bundle()
@@ -493,7 +493,7 @@ mod test {
 						ElementNode{self_closing:true},
 						related!(Attributes[(
 							AttributeKey::new("foo"),
-							{
+							#[allow(unused_braces)]{
 								let bar = (
 									NodeTag(String::from("br")),
 									ElementNode{self_closing:true}
@@ -590,7 +590,7 @@ mod test {
 					FragmentNode,
 					TemplateNode,
 					{
-						let template = <MyTemplate as Props>::Builder::default().foo({ bar }).build();
+						let template = <MyTemplate as Props>::Builder::default().foo(#[allow(unused_braces)]{ bar }).build();
 						#[allow(unused_braces)]
 						(TemplateRoot::spawn(Spawn(template.into_node_bundle())))
 					}
@@ -608,7 +608,7 @@ mod test {
 					FragmentNode,
 					TemplateNode,
 					{
-						let template = <MyTemplate as Props>::Builder::default().foo({ (
+						let template = <MyTemplate as Props>::Builder::default().foo(#[allow(unused_braces)]{ (
 							NodeTag(String::from("br")),
 							ElementNode { self_closing: true }
 						) }).build();
@@ -634,7 +634,7 @@ mod test {
 						FragmentNode,
 						TemplateNode,
 						{
-							let template = <MyTemplate as Props>::Builder::default().foo({
+							let template = <MyTemplate as Props>::Builder::default().foo(#[allow(unused_braces)]{
 								let bar = (
 									NodeTag(String::from("br")),
 									ElementNode{self_closing:true}

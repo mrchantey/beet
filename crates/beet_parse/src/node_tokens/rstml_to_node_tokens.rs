@@ -139,10 +139,7 @@ impl<'w, 's, 'a> RstmlToWorld<'w, 's, 'a> {
 					self.expr_idx.next(),
 					FileSpanOf::<BlockNode>::new(file_span),
 					SpanOf::<BlockNode>::new(node_span),
-					BlockNodeExpr::new(syn::parse_quote!(
-						#[allow(unused_braces)]
-						#block
-					)),
+					NodeExpr::new_block(block),
 				));
 			}
 			Node::Block(NodeBlock::Invalid(invalid)) => {
@@ -246,10 +243,7 @@ impl<'w, 's, 'a> RstmlToWorld<'w, 's, 'a> {
 					AttributeOf::new(parent),
 					FileSpanOf::<AttributeExpr>::new(block_file_span),
 					SpanOf::<AttributeExpr>::new(block.span()),
-					AttributeExpr::new(syn::parse_quote!(
-						#[allow(unused_braces)]
-						#block
-					)),
+					AttributeExpr::new_block(block),
 				));
 			}
 			NodeAttribute::Attribute(attr) => {
@@ -282,17 +276,11 @@ impl<'w, 's, 'a> RstmlToWorld<'w, 's, 'a> {
 				let val_expr_span = attr.possible_value.span();
 				match attr.possible_value {
 					KeyedAttributeValue::Value(value) => match value.value {
-						KVAttributeValue::Expr(mut val_expr) => {
+						KVAttributeValue::Expr(val_expr) => {
 							if let Expr::Lit(ExprLit { lit, attrs: _ }) =
 								&val_expr
 							{
 								entity.insert(lit_to_attr(lit));
-							}
-							if let Expr::Block(block) = &val_expr {
-								val_expr = syn::parse_quote!(
-									#[allow(unused_braces)]
-									#block
-								);
 							}
 							entity.insert((
 								AttributeExpr::new(val_expr),

@@ -70,16 +70,3 @@ pub struct BlockNode;
 
 
 
-#[cfg(feature = "tokens")]
-#[derive(Debug, Clone, Deref, Component, ToTokens)]
-#[component(immutable)]
-pub struct BlockNodeExpr(pub send_wrapper::SendWrapper<syn::Expr>);
-
-
-#[cfg(feature = "tokens")]
-impl BlockNodeExpr {
-	pub fn new(value: syn::Expr) -> Self {
-		Self(send_wrapper::SendWrapper::new(value))
-	}
-	pub fn take(self) -> syn::Expr { self.0.take() }
-}

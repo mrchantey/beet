@@ -4,8 +4,6 @@ use bevy::prelude::*;
 use proc_macro2::Span;
 use proc_macro2::TokenStream;
 use quote::quote;
-use send_wrapper::SendWrapper;
-use syn::Expr;
 use syn::Ident;
 
 /// Gets the first 'expression' for an attribute, searching in the following order:
@@ -14,14 +12,14 @@ use syn::Ident;
 pub fn first_attribute_expr(
 	world: &World,
 	attr_entity: Entity,
-) -> Result<Option<Expr>> {
-	if let Some(attr) = maybe_spanned_expr::<AttributeExpr>(world, attr_entity)?
+) -> Result<Option<AttributeExpr>> {
+	if let Some(attr) =world.entity(attr_entity).get::<AttributeExpr>()
 	{
-		Ok(Some(attr))
+		Ok(Some(attr.clone()))
 	} else if let Some(combinator) =
 		tokenize_combinator_exprs(world, attr_entity)?
 	{
-		syn::parse2(combinator).map(Some).map_err(Into::into)
+		Ok(Some(AttributeExpr::new(syn::parse2(combinator)?)))
 	} else {
 		Ok(None)
 	}
@@ -142,30 +140,7 @@ pub(super) fn tokenize_maybe_spanned<T: Component + TokenizeSelf>(
 	}
 }
 
-/// Get an expression from the entity, if it exists, and wrap in the
-/// corresponding `span` if it exists.
-pub(super) fn maybe_spanned_expr<
-	T: Component + std::ops::Deref<Target = SendWrapper<Expr>>,
->(
-	world: &World,
-	entity: Entity,
-) -> Result<Option<Expr>> {
-	let entity = world.entity(entity);
-	match (
-		entity.get::<T>(),
-		entity.get::<SpanOf<T>>(),
-	) {
-		(Some(value), Some(span)) => {
-			let value = &***value;
-			// let value = value.self_token_stream();
-			Ok(Some(syn::parse_quote_spanned! { **span =>
-				#value
-			}))
-		}
-		(Some(value), None) => Ok(Some((***value).clone())),
-		_ => Ok(None),
-	}
-}
+
 /// Return the [`AttributeKey`] if it exists,
 /// and its span or [`Span::call_site()`].
 pub(super) fn maybe_spanned_attr_key(

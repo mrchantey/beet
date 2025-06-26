@@ -2,6 +2,7 @@ use super::HashNonTemplateRust;
 use crate::prelude::*;
 use beet_bevy::prelude::HierarchyQueryExtExt;
 use beet_common::prelude::*;
+use beet_parse::prelude::*;
 use beet_router::as_beet::TemplateRoot;
 use bevy::prelude::*;
 use quote::ToTokens;
@@ -36,7 +37,7 @@ pub fn update_file_expr_hash(
 	children: Query<&Children>,
 	macro_idxs: Query<&MacroIdx>,
 	attributes: Query<&Attributes>,
-	block_nodes: Query<&BlockNodeExpr>,
+	node_exprs: Query<&NodeExpr>,
 	// dont hash literal attribute values
 	attr_exprs: Query<&AttributeExpr, Without<AttributeLit>>,
 ) -> Result {
@@ -63,8 +64,8 @@ pub fn update_file_expr_hash(
 			}
 
 			// hash block nodes
-			if let Ok(block_node) = block_nodes.get(node) {
-				block_node.to_token_stream().to_string().hash(&mut hasher);
+			if let Ok(expr) = node_exprs.get(node) {
+				expr.to_token_stream().to_string().hash(&mut hasher);
 			}
 			// hash attribute expressions
 			for expr in attributes

@@ -18,7 +18,7 @@ pub fn tokenize_bundle_tokens(
 	tokenize_rsx_directives(world, &mut items, entity)?;
 	tokenize_web_nodes(world, &mut items, entity)?;
 	tokenize_web_directives(world, &mut items, entity)?;
-	tokenize_block_node_exprs(world, &mut items, entity)?;
+	tokenize_node_exprs(world, &mut items, entity)?;
 	tokenize_combinator_exprs_tokens(world, entity)?.map(|i|items.push(i));
 	tokenize_related::<Attributes>(world, &mut items, entity, tokenize_attribute_tokens)?;
 	tokenize_related::<Children>(world, &mut items, entity, tokenize_bundle_tokens)?;
@@ -26,12 +26,12 @@ pub fn tokenize_bundle_tokens(
 	items.xmap(unbounded_bundle).xok()
 }
 
-fn tokenize_block_node_exprs(
+fn tokenize_node_exprs(
 	world: &World,
 	items: &mut Vec<TokenStream>,
 	entity: Entity,
 ) -> Result<()> {
-	if let Some(expr) = world.entity(entity).get::<BlockNodeExpr>() {
+	if let Some(expr) = world.entity(entity).get::<NodeExpr>() {
 		let block_node = expr.self_token_stream();
 		items.push(block_node);
 	}
@@ -159,7 +159,7 @@ mod test {
 						),
 						(
 							AttributeKey(String::from("some_key")),
-							AttributeExpr(SendWrapper::new(syn::parse_quote!(#[allow(unused_braces)]{ bar })))
+							AttributeExpr(SendWrapper::new(syn::parse_quote!({ bar })))
 						),
 						(
 							AttributeKey(String::from("onmousemove")),
@@ -168,7 +168,7 @@ mod test {
 						),
 						(
 							AttributeKey(String::from("onclick")),
-							AttributeExpr(SendWrapper::new(syn::parse_quote!(#[allow(unused_braces)]{ |_: Trigger<OnClick>| {} })))
+							AttributeExpr(SendWrapper::new(syn::parse_quote!({ |_: Trigger<OnClick>| {} })))
 						)
 					]}
 				)
@@ -189,7 +189,7 @@ mod test {
 				related!{Children[(
 					ExprIdx(0u32),
 					BlockNode,
-					BlockNodeExpr(SendWrapper::new(syn::parse_quote!(#[allow(unused_braces)]{ 7 })))
+					NodeExpr(SendWrapper::new(syn::parse_quote!({ 7 })))
 				)]}
 				)
 			}

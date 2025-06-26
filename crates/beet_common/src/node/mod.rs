@@ -8,10 +8,6 @@ pub mod expr_idx;
 pub use expr_idx::*;
 mod into_template_bundle;
 pub use into_template_bundle::*;
-#[cfg(feature = "tokens")]
-mod attribute_tokens;
-#[cfg(feature = "tokens")]
-pub use attribute_tokens::*;
 pub mod rsx_nodes;
 pub use rsx_nodes::*;
 mod web_nodes;

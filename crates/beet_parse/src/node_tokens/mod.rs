@@ -1,5 +1,5 @@
-mod combinator_expr;
-pub use combinator_expr::*;
+mod expressions;
+pub use expressions::*;
 mod combinator_to_node_tokens;
 pub use combinator_to_node_tokens::*;
 mod node_tokens_plugin;

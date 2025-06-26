@@ -160,7 +160,7 @@ mod test {
 										TemplateNode,
 										{
 											let template = <MyComponent as Props>::Builder::default()
-												.val({ 2 + 2 })
+												.val(#[allow(unused_braces)] { 2 + 2 })
 												.build();
 											#[allow(unused_braces)]
 											(TemplateRoot::spawn(Spawn(template.into_node_bundle())))
