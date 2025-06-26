@@ -35,14 +35,11 @@ pub fn tokenize_template_attributes(
 
 			match (key, value) {
 				// 1: Events
-				(Some((key_str, key)), Some(value))
+				(Some((key_str, key)), Some(mut value))
 					if is_event(&key_str, &value) =>
 				{
-					let value = tokenize_event_handler(
-						&key_str,
-						key.span(),
-						value.inner_parsed(),
-					)?;
+					tokenize_event_handler(&key_str, key.span(), &mut value)?;
+					let value = value.inner_parsed();
 					prop_assignments.push(quote! {.#key(#value)});
 				}
 				// 2. Key with value

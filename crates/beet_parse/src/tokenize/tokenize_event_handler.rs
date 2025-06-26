@@ -1,3 +1,5 @@
+use std::ops::DerefMut;
+
 use bevy::prelude::*;
 use heck::ToUpperCamelCase;
 use proc_macro2::Span;
@@ -6,6 +8,8 @@ use syn::ExprClosure;
 use syn::Ident;
 use syn::Pat;
 use syn::parse_quote;
+
+use crate::prelude::AttributeExpr;
 
 /// Events are any attribute keys that start with `on`,
 /// and the value is not a string literal.
@@ -17,18 +21,20 @@ pub fn is_event(key: &str, value: &Expr) -> bool {
 pub fn tokenize_event_handler(
 	key_str: &str,
 	key_span: Span,
-	mut expr: Expr,
-) -> Result<Expr> {
+	expr: &mut AttributeExpr,
+) -> Result<()> {
 	let suffix = key_str.strip_prefix("on").unwrap_or(key_str);
 	let ident =
 		Ident::new(&format!("On{}", suffix.to_upper_camel_case()), key_span);
 
-	match &mut expr {
+	let expr = expr.0.deref_mut();
+
+	match expr {
 		Expr::Closure(closure) => {
 			process_closure(closure, &ident);
 			// wrap closures in a block so we can safely call .into_node_bundle()
 			// on the closure itsself
-			expr = syn::parse_quote! {{#closure}}
+			*expr = syn::parse_quote! {{#closure}}
 		}
 		Expr::Block(block) => {
 			// Handle the case where a block's last statement is a closure
@@ -43,7 +49,7 @@ pub fn tokenize_event_handler(
 			// Not a closure or block, unchanged
 		}
 	}
-	Ok(expr)
+	Ok(())
 }
 /// if the tokens are a closure or a block where the last statement is a closure,
 /// insert the matching [`Trigger`] type.
@@ -83,14 +89,10 @@ mod test {
 	#[test]
 	fn test_parse_event_handler() {
 		fn parse(val: TokenStream) -> String {
-			tokenize_event_handler(
-				"onclick",
-				Span::call_site(),
-				syn::parse2(val).unwrap(),
-			)
-			.unwrap()
-			.to_token_stream()
-			.to_string()
+			let mut expr = AttributeExpr::new(syn::parse2(val).unwrap());
+			tokenize_event_handler("onclick", Span::call_site(), &mut expr)
+				.unwrap();
+			expr.to_token_stream().to_string()
 		}
 		// leaves typed
 		parse(quote! { |_: Trigger<WeirdType>| {} })

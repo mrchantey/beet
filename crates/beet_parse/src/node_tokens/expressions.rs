@@ -83,25 +83,27 @@ impl NodeExpr {
 			label: None,
 		}))
 	}
-	pub fn take(self) -> syn::Expr { self.0.take() }
 	pub fn borrow(&self) -> &syn::Expr { &*self.0 }
+
+	/// ensure blocks have `#[allow(unused_braces)]`
+	pub fn inner_parsed(&self) -> Expr {
+		match self.borrow().clone() {
+			syn::Expr::Block(mut block) => {
+				block.attrs.push(syn::parse_quote! {
+					#[allow(unused_braces)]
+				});
+				Expr::Block(block)
+			}
+			expr => expr,
+		}
+	}
 
 	/// Create the tokens for this expression to be instantiated
 	pub fn node_bundle_tokens(&self) -> TokenStream {
-		match self.borrow() {
-			syn::Expr::Block(block) => {
-				quote! {
-					#[allow(unused_braces)]
-					#block.into_node_bundle()
-				}
-			}
-			expr => {
-				quote! { #expr.into_node_bundle() }
-			}
-		}
+		let inner = self.inner_parsed();
+		quote! { #inner.into_node_bundle() }
 	}
 }
-
 
 
 

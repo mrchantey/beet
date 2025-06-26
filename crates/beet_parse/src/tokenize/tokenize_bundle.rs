@@ -56,29 +56,6 @@ pub fn tokenize_bundle_with_errors(
 	Ok(tokens)
 }
 
-/// the rstml macro parses in steps, ie <div foo={rsx!{<bar/>}}/> will resolve
-/// the `bar` node first.
-/// the combinator, however, represents attribute value expressions as child nodes
-/// ie `<div foo={<bar/>}/>` so we need to resolve the attribute values
-/// before walking the node tree.
-// pub(super) fn resolve_attribute_values(
-// 	_: TempNonSendMarker,
-// 	mut commands: Commands,
-// 	builder: TokenizeBundle,
-// 	attribute_values: Populated<Entity, (With<AttributeOf>, With<Children>)>,
-// ) -> Result {
-// for entity in attribute_values.iter() {
-// 	let tokens = builder.tokenize_bundle(entity)?;
-// 	// if parse2 becomes problematic use Expr::Verbatim(tokens)
-// 	let expr = syn::parse2::<Expr>(tokens)?;
-// 	commands
-// 		.entity(entity)
-// 		.insert(AttributeExpr::new(expr));
-// }
-
-// 	Ok(())
-// }
-
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;

@@ -30,16 +30,12 @@ pub fn tokenize_element_attributes(
 			let mut attr_components = Vec::new();
 			match (key, value) {
 				// 1: Events
-				(Some((key_str, key)), Some(value))
+				(Some((key_str, key)), Some(mut value))
 					if is_event(&key_str, &value) =>
 				{
-					let value = tokenize_event_handler(
-						&key_str,
-						key.span(),
-						value.inner_parsed(),
-					)?;
+					tokenize_event_handler(&key_str, key.span(), &mut value)?;
 					attr_components.push(quote! {AttributeKey::new(#key)});
-					entity_components.push(quote! {#value.into_node_bundle()});
+					entity_components.push(value.node_bundle_tokens());
 				}
 				// 2. Key with value
 				(Some((_, key)), Some(value)) => {
@@ -197,7 +193,7 @@ mod test {
 				NodeTag(String::from("span")),
 				ElementNode { self_closing: true },
 				#[allow(unused_braces)]{foo}.into_node_bundle(),
-				{|_: Trigger<OnClick>| { println!("clicked"); }}.into_node_bundle(),
+				#[allow(unused_braces)]{|_: Trigger<OnClick>| { println!("clicked"); }}.into_node_bundle(),
 				related!(Attributes[
 					AttributeKey::new("hidden"),
 					(
