@@ -20,18 +20,23 @@ impl RunBuild {
 			.set(bevy::ecs::error::panic)
 			.expect("The error handler can only be set once, globally.");
 
-		App::new()
-			.insert_resource(self.build_cmd.clone())
-			.add_plugins((
-				self.load_beet_config.clone(),
-				NodeTokensPlugin::default(),
-				BuildTemplatesPlugin::default(),
-				RouteCodegenPlugin::default(),
-				ClientIslandCodegenPlugin::default(),
-			))
+		// specifying 'only' means just run once
+		let run_once = !self.load_beet_config.only.is_empty();
+
+		let mut app = App::new();
+		app.insert_resource(self.build_cmd.clone()).add_plugins((
+			self.load_beet_config.clone(),
+			NodeTokensPlugin::default(),
+			BuildTemplatesPlugin::default(),
+			RouteCodegenPlugin::default(),
+			ClientIslandCodegenPlugin::default(),
+		));
+
+		if run_once {
+			app.run_once().anyhow()
+		} else {
 			// .set_error_handler(warn)
-			.run_async(FsApp::default().runner())
-			.await
-			.anyhow()
+			app.run_async(FsApp::default().runner()).await.anyhow()
+		}
 	}
 }

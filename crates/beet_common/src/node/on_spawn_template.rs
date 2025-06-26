@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 
-/// A method that will run in a regular system after spawn, giving static
-/// trees a chance to be applied:
+/// A component containing a method that will run after spawn, giving LitNodes
+/// a chance to be applied:
 /// 
 /// 1. A Bundle is inserted on the entity
 /// 2. Component Hooks are run for the insert 

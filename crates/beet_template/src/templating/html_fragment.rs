@@ -160,80 +160,122 @@ mod test {
 	use sweet::prelude::*;
 
 	#[test]
-	fn works() {
-		// doctype
+	fn doctype() {
 		rsx! {<!doctype/>}
 			.xmap(HtmlFragment::parse_bundle)
 			.xpect()
 			.to_be("<!DOCTYPE html>");
+	}
+
+	#[test]
+	fn comment() {
 		// comment (in rstml must be quoted)
 		rsx! {<!-- "howdy" -->}
 			.xmap(HtmlFragment::parse_bundle)
 			.xpect()
 			.to_be("<!-- howdy -->");
-		// raw text
+	}
+
+	#[test]
+	fn raw_text() {
 		rsx! {howdy}
 			.xmap(HtmlFragment::parse_bundle)
 			.xpect()
 			.to_be("howdy");
-		// quoted text
+	}
+
+	#[test]
+	fn quoted_text() {
 		rsx! {"howdy"}
 			.xmap(HtmlFragment::parse_bundle)
 			.xpect()
 			.to_be("howdy");
-		// fragment
+	}
+
+	#[test]
+	fn fragment() {
 		rsx! {<>"howdy"</>}
 			.xmap(HtmlFragment::parse_bundle)
 			.xpect()
 			.to_be("howdy");
-		// block
+	}
+
+	#[test]
+	fn block() {
 		rsx! {{"howdy"}}
 			.xmap(HtmlFragment::parse_bundle)
 			.xpect()
 			.to_be("howdy");
-		// self closing
+	}
+
+	#[test]
+	fn self_closing_tag() {
 		rsx! {<br/>}
 			.xmap(HtmlFragment::parse_bundle)
 			.xpect()
 			.to_be("<br/>");
-		// not self closing
+	}
+
+	#[test]
+	fn not_self_closing_tag() {
 		rsx! {<span>hello</span>}
 			.xmap(HtmlFragment::parse_bundle)
 			.xpect()
 			.to_be("<span>hello</span>");
-		// child elements
+	}
+
+	#[test]
+	fn child_elements() {
 		rsx! {<span><span>hello</span></span>}
 			.xmap(HtmlFragment::parse_bundle)
 			.xpect()
 			.to_be("<span><span>hello</span></span>");
-		// simple attribute
+	}
+
+	#[test]
+	fn simple_attribute() {
 		rsx! {<div class="container"></div>}
 			.xmap(HtmlFragment::parse_bundle)
 			.xpect()
 			.to_be("<div class=\"container\"></div>");
-		// multiple attributes
+	}
+
+	#[test]
+	fn multiple_attributes() {
 		rsx! {<div class="container" id="main"></div>}
 			.xmap(HtmlFragment::parse_bundle)
 			.xpect()
 			.to_be("<div class=\"container\" id=\"main\"></div>");
-		// boolean attribute
+	}
+
+	#[test]
+	fn boolean_attribute() {
 		rsx! {<input disabled/>}
 			.xmap(HtmlFragment::parse_bundle)
 			.xpect()
 			.to_be("<input disabled/>");
-		// attribute in self-closing
+	}
+
+	#[test]
+	fn attribute_in_self_closing_tag() {
 		rsx! {<img src="image.jpg"/>}
 			.xmap(HtmlFragment::parse_bundle)
 			.xpect()
 			.to_be("<img src=\"image.jpg\"/>");
-		// complex nested with attributes
+	}
+
+	#[test]
+	fn complex_nested_with_attributes() {
 		rsx! {<div class="wrapper"><span id="text">content</span></div>}
 			.xmap(HtmlFragment::parse_bundle)
 			.xpect()
 			.to_be(
 				"<div class=\"wrapper\"><span id=\"text\">content</span></div>",
 			);
-		// expr attributes
+	}
+
+	#[test]
+	fn expr_attributes() {
 		let val = true;
 		rsx! {<input hidden=val/>}
 			.xmap(HtmlFragment::parse_bundle)

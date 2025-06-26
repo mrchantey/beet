@@ -20,6 +20,36 @@ impl IntoWorld for App {
 #[ext(name=WorldMutExt)]
 /// Matcher extensions for `bevy::World`
 pub impl<W: IntoWorld> W {
+	fn component_names(&self, entity: Entity) -> Vec<String> {
+		let world = self.into_world();
+		world
+			.inspect_entity(entity)
+			.map(|e| e.map(|c| c.name().to_string()).collect::<Vec<_>>())
+			.unwrap_or_default()
+	}
+	fn component_names_related<R: RelationshipTarget>(
+		&self,
+		entity: Entity,
+	) -> Vec<Vec<String>> {
+		let world = self.into_world();
+		world
+			.entity(entity)
+			.get::<R>()
+			.map(|related| {
+				related
+					.iter()
+					.filter_map(|entity| world.inspect_entity(entity).ok())
+					.map(|component_iter| {
+						component_iter
+							.map(|component| component.name().to_string())
+							.collect::<Vec<_>>()
+					})
+					.collect::<Vec<_>>()
+			})
+			.unwrap_or_default()
+	}
+
+
 	/// Shorthand for creating a query and immediatly collecting it into a Vec.
 	/// This is less efficient than caching the [`QueryState`] so should only be
 	/// used for one-off queries, otherwise [`World::query`] should be preferred.

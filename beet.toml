@@ -65,8 +65,10 @@ import_tokens = ["#[allow(unused_imports)]use crate::prelude::*;"]
 # import_tokens = ["use crate::as_beet::*;"]
 
 
-
 [client_island_codegen]
 package_name = "beet_site"
 output = "crates/beet_site/src/codegen/client_islands.rs"
-import_tokens = ["use beet::design as beet_design;", "use beet::prelude::*;"]
+import_tokens = [
+	"#[allow(unused_imports)]use beet::design as beet_design;",
+	"#[allow(unused_imports)]use beet::prelude::*;",
+]
