@@ -130,7 +130,7 @@ mod test {
 						file: WsPathBuf::new("crates/beet_router/src/test_site/test_docs/hello.md"),
 						start: LineCol { line: 1u32, col: 0u32 }
 					},
-					# [allow (unused_braces)]{
+					#[allow(unused_braces)]{
 						(
 							FragmentNode,
 							related! {
@@ -158,13 +158,12 @@ mod test {
 										NodeTag(String::from("MyComponent")),
 										FragmentNode,
 										TemplateNode,
-										{
+										#[allow(unused_braces)]{
 											let template = <MyComponent as Props>::Builder::default()
 												.val(#[allow(unused_braces)] { 2 + 2 })
 												.build();
-											#[allow(unused_braces)]
-											(TemplateRoot::spawn(Spawn(template.into_node_bundle())))
-										},
+											TemplateRoot::spawn(Spawn(template.into_node_bundle()))
+										}.into_node_bundle(),
 										related! {
 											Children [
 												TextNode(String::from("## RSX\n\tIt contains some rsx, not sure if this will work"))

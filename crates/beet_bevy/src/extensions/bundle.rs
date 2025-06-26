@@ -15,7 +15,7 @@ pub trait BundleExt {
 	/// 	().any_bundle()
 	/// } else {
 	/// 	Name::new("foo").any_bundle()
-	/// }
+	/// };
 	///```
 	fn any_bundle(self) -> OnSpawnBoxed;
 }
