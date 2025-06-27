@@ -17,17 +17,27 @@ use sweet::prelude::*;
 
 #[test]
 fn expressions() {
-	roundtrip_to_html(
-		rsx! {
-			<button key={1}> this will be replaced {2}</button>
-		},
-		quote! {
-			<div>
-			<button key={placeholder}>Click me</button>
-			<span>"The value is "{placeholder}</span>
-			</div>
-		},
-	)
+	let scene = build_scene(quote! {
+		<div>
+		<button key={placeholder}>Click me</button>
+		<span>"The value is "{placeholder}</span>
+		</div>
+	});
+	expect(&scene)
+		.to_contain("MacroIdx")
+		.to_contain("NodeTag")
+		.to_contain("ExprIdx")
+		.to_contain("StaticNodeRoot");
+
+	// println!(
+	// 	"children: {:#?}",
+	// 	build_app.component_names_related::<Children>(_entity)
+	// );
+	// println!("Exported Scene:\n{}", scene);
+
+	apply_and_render(&scene, rsx! {
+		<button key={1}> this will be replaced {2}</button>
+	})
 	.xpect()
 	.to_be_str(
 		"<div><button key=\"1\">Click me</button><span>The value is 2</span></div>",
@@ -35,30 +45,19 @@ fn expressions() {
 }
 #[test]
 fn style() {
-	roundtrip_to_html(
-		rsx! {"placeholder"},
-		quote! {
-			<div>
-				<h1>Roundtrip Test</h1>
-			</div>
-			<style>
-				h1{font-size: 1px;}
-			</style>
-		},
-	)
-	.xpect()
-	.to_be_str(
-		"<div><button key=\"1\">Click me</button><span>The value is 2</span></div>",
-	);
-}
-
-
-fn roundtrip_to_html(bundle: impl Bundle, tokens: TokenStream) -> String {
-	let scene = build_scene(tokens);
-	//
-	// simulated serde boundary
-	//
-	apply_scene(bundle, &scene)
+	let scene = build_scene(quote! {
+		<div>
+			<h1>Roundtrip Test</h1>
+		</div>
+		<style>
+			h1{font-size: 1px;}
+		</style>
+	});
+	apply_and_render(&scene, rsx! {"placeholder"})
+		.xpect()
+		.to_be(
+			"<div data-beet-style-id-0><h1 data-beet-style-id-0>Roundtrip Test</h1></div><style>h1[data-beet-style-id-0] {\n  font-size: 1px;\n}\n</style>",
+		);
 }
 
 
@@ -88,23 +87,10 @@ fn build_scene(tokens: TokenStream) -> String {
 		.id();
 	app.update();
 
-	let scene = app.build_scene();
-	expect(&scene)
-		.to_contain("MacroIdx")
-		.to_contain("NodeTag")
-		.to_contain("ExprIdx")
-		.to_contain("StaticNodeRoot");
-
-	// println!(
-	// 	"children: {:#?}",
-	// 	build_app.component_names_related::<Children>(_entity)
-	// );
-	// println!("Exported Scene:\n{}", scene);
-
-	scene
+	app.build_scene()
 }
 
-fn apply_scene(bundle: impl Bundle, scene: &str) -> String {
+fn apply_and_render(scene: &str, bundle: impl Bundle) -> String {
 	let mut app = App::new();
 	app.add_plugins(TemplatePlugin);
 	app.load_scene(scene).unwrap();

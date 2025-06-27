@@ -8,6 +8,18 @@ impl<T: std::fmt::Debug + AsRef<str>> Matcher<T> {
 		self.assert_correct(result, &expected);
 		self
 	}
+	pub fn to_contain_n(&self, other: impl AsRef<str>, count: usize) -> &Self {
+		let other = other.as_ref();
+		let actual_count = self.value.as_ref().matches(other).count();
+		let result = actual_count == count;
+		let expected = format!("{count} occurances of '{}'", other);
+		self.assert_correct_with_received(
+			result,
+			&expected,
+			&format!("{actual_count} occurances\n{}", self.value.as_ref()),
+		);
+		self
+	}
 	pub fn to_start_with(&self, other: impl AsRef<str>) -> &Self {
 		let other = other.as_ref();
 		let result = self.value.as_ref().starts_with(other);

@@ -150,6 +150,7 @@ fn rstml_fragment(
 	})
 }
 
+/// see rstml_to_node_tokens.rs for more tests
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;

@@ -15,11 +15,6 @@ pub struct RunBuild {
 
 impl RunBuild {
 	pub async fn run(self) -> anyhow::Result<()> {
-		use bevy::ecs::error::GLOBAL_ERROR_HANDLER;
-		GLOBAL_ERROR_HANDLER
-			.set(bevy::ecs::error::panic)
-			.expect("The error handler can only be set once, globally.");
-
 		// specifying 'only' means just run once
 		let run_once = !self.load_beet_config.only.is_empty();
 

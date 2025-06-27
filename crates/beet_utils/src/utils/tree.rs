@@ -9,6 +9,35 @@ pub struct Tree<T> {
 	/// The children of this node.
 	pub children: Vec<Tree<T>>,
 }
+
+impl<T> Tree<Vec<T>> {
+	pub fn iter_to_string_indented(&self) -> String
+	where
+		T: fmt::Display,
+	{
+		let mut str = String::new();
+		self.iter_to_string_indented_inner(&mut str, 0);
+		str
+	}
+	fn iter_to_string_indented_inner(&self, buffer: &mut String, indent: usize)
+	where
+		T: fmt::Display,
+	{
+		buffer.push_str(&" ".repeat(indent));
+		for item in &self.value {
+			buffer.push_str(&item.to_string());
+			buffer.push(',');
+			buffer.push(' ');
+		}
+		buffer.pop();
+		buffer.pop();
+		buffer.push('\n');
+		for child in &self.children {
+			child.iter_to_string_indented_inner(buffer, indent + 2);
+		}
+	}
+}
+
 impl<T> Tree<T> {
 	pub fn new(value: T) -> Self {
 		Self {
@@ -65,6 +94,7 @@ impl<T> Tree<T> {
 		self.to_string_indented_inner(&mut str, 0);
 		str
 	}
+
 	fn to_string_indented_inner(&self, buffer: &mut String, indent: usize)
 	where
 		T: fmt::Display,

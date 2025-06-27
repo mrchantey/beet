@@ -98,7 +98,6 @@ mod test {
 	use beet_common::prelude::*;
 	use beet_net::prelude::*;
 	use beet_router::prelude::*;
-	use beet_template::prelude::*;
 	use quote::quote;
 	use serde::Serialize;
 	use sweet::prelude::*;

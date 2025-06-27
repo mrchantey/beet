@@ -350,42 +350,65 @@ mod test {
 	use crate::prelude::*;
 	use beet_bevy::prelude::*;
 	use beet_common::prelude::*;
-	use beet_utils::prelude::*;
 	use bevy::prelude::*;
 	use proc_macro2::TokenStream;
 	use quote::quote;
 	use sweet::prelude::*;
 
-
-	fn parse(tokens: TokenStream) -> App {
-		App::new()
-			.add_plugins((tokens_to_rstml_plugin, rstml_to_node_tokens_plugin))
-			.xtap(|app| {
-				app.world_mut().spawn(RstmlTokens::new(tokens));
-			})
-			.update_then()
-			.xmap(std::mem::take)
+	fn parse(tokens: TokenStream) -> (App, Entity) {
+		let mut app = App::new();
+		app.add_plugins((
+			NodeTypesPlugin,
+			tokens_to_rstml_plugin,
+			rstml_to_node_tokens_plugin,
+		));
+		let entity = app.world_mut().spawn(RstmlTokens::new(tokens)).id();
+		app.update();
+		(app, entity)
 	}
 
 
 	#[test]
 	fn works() {
-		let mut app = parse(quote! {
+		let (app, _) = parse(quote! {
 			<span>
 				<MyComponent client:load />
 				<div/>
 			</span>
 		});
-		app.query_once::<&NodeTag>().xpect().to_have_length(3);
 
-		app.query_once::<&AttributeKey>()[0]
-			.xmap(|attr| attr.clone().0)
-			.xpect()
-			.to_be("client:load");
+		let tree = app.build_scene();
+		expect(&tree).to_contain("NodeTag\": (\"div\")");
+		expect(&tree).to_contain("client:load");
 	}
 	#[test]
 	fn attribute_expr() {
-		let mut app = parse(quote! {<div foo={7} bar="baz"/>});
+		let (mut app, _) = parse(quote! {<div foo={7} bar="baz"/>});
 		app.query_once::<&ExprIdx>().len().xpect().to_be(1);
 	}
+	#[test]
+	fn style_tags() {
+		let (mut app, _) = parse(quote! {
+			<style>
+			body{
+				font-size: 16px;
+			}
+			</style>
+		});
+		let text_nodes = app.query_once::<&TextNode>();
+		expect(text_nodes.len()).to_be(1);
+		// the nature of token streams means dashes are spaced
+		expect(&text_nodes[0].0).to_be("body { font - size : 16px ; }");
+	}
+
+	// #[test]
+	// fn style_tags() {
+	// 	quote! {
+
+	// 	}
+	// 	.xmap(parse)
+	// 	.xmap(|app| app.world_mut().query)
+	// 	.xpect()
+	// 	.to_be(2);
+	// }
 }

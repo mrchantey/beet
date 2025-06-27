@@ -41,6 +41,11 @@ pub struct BindStep;
 pub struct TemplatePlugin;
 impl Plugin for TemplatePlugin {
 	fn build(&self, app: &mut App) {
+		bevy::ecs::error::GLOBAL_ERROR_HANDLER
+			.set(bevy::ecs::error::panic)
+			.ok();
+
+
 		app.add_plugins((signals_plugin, NodeTypesPlugin));
 		app.init_resource::<HtmlConstants>()
 			.register_type::<LangPartial>()

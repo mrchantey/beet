@@ -46,6 +46,10 @@ impl Default for TemplateMacros {
 
 impl Plugin for StaticScenePlugin {
 	fn build(&self, app: &mut App) {
+		bevy::ecs::error::GLOBAL_ERROR_HANDLER
+			.set(bevy::ecs::error::panic)
+			.ok();
+
 		app.init_resource::<HtmlConstants>()
 			.init_resource::<TemplateMacros>()
 			// types

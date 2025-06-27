@@ -114,6 +114,7 @@ pub(crate) fn extract_lang_content(
 				continue 'iter_elements;
 			}
 		}
+		commands.entity(entity).despawn_related::<Children>();
 		// 3. ignore empty tag with no workspace src
 	}
 }
