@@ -49,7 +49,11 @@ impl MacroIdx {
 	}
 }
 
-
+impl std::fmt::Display for MacroIdx {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		write!(f, "{}:{}", self.file, self.start)
+	}
+}
 
 /// Static nodes are created by statically analyzing a file,
 /// so they should not be rendered directly, and only used for template reloading.

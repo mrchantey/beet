@@ -60,6 +60,7 @@ pub(super) fn apply_slots(
 	query: Populated<(Entity, &TemplateRoot, &NodeTag)>,
 ) -> Result {
 	for (node_entity, root, node_tag) in query.iter() {
+		// let node_tag = node_tag.map(|tag| tag.as_str()).unwrap_or("Unnamed");
 		let (named_slots, default_slots) =
 			collect_slot_children(node_entity, &children, &slot_children);
 

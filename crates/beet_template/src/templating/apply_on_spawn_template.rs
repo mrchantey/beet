@@ -5,7 +5,7 @@ use bevy::prelude::*;
 
 /// Add this system for [`OnSpawnTemplate`] behavior.
 /// It must be called after *apply_slots* as it doesnt recurse into [`TemplateOf`]
-pub fn run_on_spawn_template(
+pub fn apply_on_spawn_template(
 	mut commands: Commands,
 	roots: Populated<Entity, (Added<MacroIdx>, Without<StaticNodeRoot>)>,
 	children: Query<&Children>,
@@ -76,7 +76,7 @@ mod test {
 			],
 		));
 		world
-			.run_system_once(run_on_spawn_template)
+			.run_system_once(apply_on_spawn_template)
 			.unwrap()
 			.unwrap();
 		expect(val()).to_be(vec![0, 1, 2, 3, 4]);

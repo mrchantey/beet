@@ -15,7 +15,7 @@ pub fn spawn_templates(world: &mut World) -> Result {
 	while query.iter(world).next().is_some() {
 		// println!("Running spawn_templates system");
 		world.run_system_cached(apply_static_nodes)??;
-		world.run_system_cached(run_on_spawn_template)??;
+		world.run_system_cached(apply_on_spawn_template)??;
 	}
 	Ok(())
 }
@@ -35,13 +35,15 @@ pub(super) fn apply_static_nodes(
 	attributes: Query<&Attributes>,
 	mut on_spawn_templates: Query<(&ExprIdx, &mut OnSpawnTemplate)>,
 ) -> Result {
-	for (instance, static_tree) in
+	for (instance, static_tree, idx) in
 		instances.iter().filter_map(|(instance, idx)| {
 			static_trees
 				.iter()
 				.find(|(_, static_idx)| *static_idx == idx)
-				.map(|(static_tree, _)| (instance, static_tree))
+				.map(|(static_tree, idx)| (instance, static_tree, idx))
 		}) {
+		trace!("Applying static nodes for{}", idx);
+
 		// take all [`OnSpawnTemplate`] methods from the instance,
 		// then entirely clear it.
 		// this must be done before clearing and cloning are executed.
@@ -61,12 +63,24 @@ pub(super) fn apply_static_nodes(
 			}
 		}
 
+		// commands.run_system_cached_with(
+		// 	|entity: In<Entity>, world: &mut World| {
+		// 		let str = world.component_names_related::<Children>(*entity);
+		// 		let str = str.iter_to_string_indented();
+		// 		println!("tree: {}", str);
+		// 	},
+		// 	instance,
+		// );
+
 		commands
 			.entity(instance)
 			.despawn_related::<Children>()
 			.despawn_related::<TemplateRoot>()
 			.despawn_related::<Attributes>()
-			.clear();
+			// remove all components that the static tree may
+			// replace
+			// currently just TemplateOf but we may need to add more later 
+			.retain::<TemplateOf>();
 
 		// apply the static tree
 		commands
@@ -136,7 +150,7 @@ The static tree is missing the following idxs found in the instance: {:?}
 }
 
 
-
+/// more tests in static_scene_roundtrip.rs
 #[cfg(test)]
 mod test {
 	use super::*;
@@ -160,6 +174,16 @@ mod test {
 			.unwrap()
 	}
 
+	#[test]
+	#[should_panic = "Not all ExprIdx were applied.."]
+	fn static_node_missing_idx() {
+		parse(rsx! {<div>{7}</div>}, rsx! {<div><br/></div>});
+	}
+	#[test]
+	#[should_panic = "The instance is missing an ExprIdx.."]
+	fn instance_missing_idx() {
+		parse(rsx! {<div><br/></div>}, rsx! {<div>{7}</div>});
+	}
 
 	#[test]
 	fn block_nodes() {
@@ -182,18 +206,6 @@ mod test {
 	}
 	#[test]
 	fn root() { parse(rsx! {{7}}, rsx! {hello{()}}).xpect().to_be("hello7"); }
-
-	#[test]
-	#[should_panic = "Not all ExprIdx were applied.."]
-	fn static_node_missing_idx() {
-		parse(rsx! {<div>{7}</div>}, rsx! {<div><br/></div>});
-	}
-	#[test]
-	#[should_panic = "The instance is missing an ExprIdx.."]
-	fn instance_missing_idx() {
-		parse(rsx! {<div><br/></div>}, rsx! {<div>{7}</div>});
-	}
-
 
 	#[test]
 	fn template() {

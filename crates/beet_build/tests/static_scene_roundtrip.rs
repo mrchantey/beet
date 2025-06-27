@@ -59,22 +59,88 @@ fn style() {
 			"<div data-beet-style-id-0><h1 data-beet-style-id-0>Roundtrip Test</h1></div><style>h1[data-beet-style-id-0] {\n  font-size: 1px;\n}\n</style>",
 		);
 }
-
-
-#[template]
-fn MyTemplate(initial: u32) -> impl Bundle {
-	rsx! {
-		<div>
-			<h1>"value: "{initial}</h1>
-		</div>
-		<style>
-			h1{font-size: 1px;}
-		</style>
+#[test]
+fn simple_template() {
+	#[template]
+	fn MyTemplate(initial: u32) -> impl Bundle {
+		rsx! {
+			<main>"value: "{initial}</main>
+		}
 	}
+
+	let scene = build_scene(quote! {
+	<div>
+		<h1>Roundtrip Test</h1>
+		<SomeCapitalizedTagToIndicateATemplate/>
+	</div>
+	});
+	apply_and_render(&scene, rsx! {
+		<div>
+			<MyTemplate initial={1} />
+		</div>
+	})
+	.xpect()
+	.to_be("<div><h1>Roundtrip Test</h1><main>value: 1</main></div>");
 }
+
+
+#[test]
+fn nested_template() {
+	let mut app = App::new();
+	app.add_plugins((NodeTokensPlugin, StaticScenePlugin));
+	// create root static node
+	app.world_mut().spawn((
+		StaticNodeRoot,
+		common_idx(),
+		RstmlTokens::new(quote! {
+		<html>
+			<SomeCapitalizedTagToIndicateATemplate/>
+		</html>
+		}),
+	));
+	// create nested static node
+	app.world_mut().spawn((
+		StaticNodeRoot,
+		common_idx_nested(),
+		RstmlTokens::new(quote! {
+			<after>"value: "{}</after>
+		}),
+	));
+	app.update();
+
+	let scene = app.build_scene();
+	// println!("Exported Scene:\n{}", scene);
+
+	#[template]
+	fn NestedTemplate(initial: u32) -> impl Bundle {
+		(
+			rsx! {
+				<main>"value: "{initial}</main>
+			},
+			OnSpawn::new(|entity| {
+				entity.insert(common_idx_nested());
+			}),
+		)
+	}
+
+	apply_and_render(&scene, rsx! {
+		<div>
+			<NestedTemplate initial={1} />
+		</div>
+	})
+	.xpect()
+	.to_be("<html><after>value: 1</after></html>");
+}
+
+
+
 
 // create a common idx for matching in apply_static_nodes
 fn common_idx() -> MacroIdx {
+	MacroIdx::new_file_line_col(file!(), line!(), column!())
+}
+// create a common idx for matching in apply_static_nodes
+fn common_idx_nested() -> MacroIdx {
 	MacroIdx::new_file_line_col(file!(), line!(), column!())
 }
 

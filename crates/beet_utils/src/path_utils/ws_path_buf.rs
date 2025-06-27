@@ -31,7 +31,11 @@ pub struct WsPathBuf(
 	// TODO upstream Pathbuf Reflect
 	PathBuf,
 );
-
+impl std::fmt::Display for WsPathBuf {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		write!(f, "{}", self.0.to_string_lossy())
+	}
+}
 
 impl WsPathBuf {
 	/// Create a new [`WsPathBuf`], a common use case is to use `file!()`

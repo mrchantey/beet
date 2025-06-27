@@ -18,6 +18,14 @@ impl IntoWorld for App {
 	fn into_world_mut(&mut self) -> &mut World { self.world_mut() }
 }
 
+fn short_name(name: &str) -> String {
+	// Shorten the name to just the last part after the last `::`
+	name.split("::")
+		.last()
+		.map(|s| s.to_string())
+		.unwrap_or_else(|| name.to_string())
+}
+
 #[ext(name=WorldMutExt)]
 /// Matcher extensions for `bevy::World`
 pub impl<W: IntoWorld> W {
@@ -25,7 +33,7 @@ pub impl<W: IntoWorld> W {
 		let world = self.into_world();
 		world
 			.inspect_entity(entity)
-			.map(|e| e.map(|c| c.name().to_string()).collect::<Vec<_>>())
+			.map(|e| e.map(|c| short_name(c.name())).collect::<Vec<_>>())
 			.unwrap_or_default()
 	}
 	fn direct_component_names_related<R: RelationshipTarget>(
@@ -42,7 +50,7 @@ pub impl<W: IntoWorld> W {
 					.filter_map(|entity| world.inspect_entity(entity).ok())
 					.map(|component_iter| {
 						component_iter
-							.map(|component| component.name().to_string())
+							.map(|component| short_name(component.name()))
 							.collect::<Vec<_>>()
 					})
 					.collect::<Vec<_>>()
@@ -68,7 +76,7 @@ pub impl<W: IntoWorld> W {
 				.inspect_entity(entity)
 				.map(|component_iter| {
 					component_iter
-						.map(|component| component.name().to_string())
+						.map(|component| short_name(component.name()))
 						.collect::<Vec<_>>()
 				})
 				.unwrap_or_default();

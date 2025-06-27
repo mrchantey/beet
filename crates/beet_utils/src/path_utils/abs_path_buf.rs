@@ -43,6 +43,12 @@ impl Default for AbsPathBuf {
 		Self::new(std::env::current_dir().unwrap()).unwrap()
 	}
 }
+impl std::fmt::Display for AbsPathBuf {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		write!(f, "{}", self.0.to_string_lossy())
+	}
+}
+
 
 impl AbsPathBuf {
 	/// Create a new [`AbsPathBuf`] from a `PathBuf`, calling [`std::path::absolute`]
