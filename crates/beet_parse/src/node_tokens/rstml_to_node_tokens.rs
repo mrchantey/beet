@@ -281,6 +281,9 @@ impl<'w, 's, 'a> RstmlToWorld<'w, 's, 'a> {
 								&val_expr
 							{
 								entity.insert(lit_to_attr(lit));
+							} else {
+								// non-literal expression, needs an ExprIdx
+								entity.insert(self.expr_idx.next());
 							}
 							entity.insert((
 								NodeExpr::new(val_expr),
@@ -376,18 +379,22 @@ mod test {
 
 	#[test]
 	fn works() {
-		let mut app = quote! {
+		let mut app = parse(quote! {
 			<span>
 				<MyComponent client:load />
 				<div/>
 			</span>
-		}
-		.xmap(parse);
+		});
 		app.query_once::<&NodeTag>().xpect().to_have_length(3);
 
 		app.query_once::<&AttributeKey>()[0]
 			.xmap(|attr| attr.clone().0)
 			.xpect()
 			.to_be("client:load");
+	}
+	#[test]
+	fn attribute_expr() {
+		let mut app = parse(quote! {<div foo={7} bar="baz"/>});
+		app.query_once::<&ExprIdx>().len().xpect().to_be(1);
 	}
 }

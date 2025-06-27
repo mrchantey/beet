@@ -86,7 +86,7 @@ fn set_app() {
 	ReactiveApp::set_create_app(|| {
 		let mut app = App::new();
 		app.add_plugins((
-			beet_build::prelude::BuildTemplatesPlugin,
+			beet_build::prelude::StaticScenePlugin,
 			TemplatePlugin,
 		));
 		app
@@ -155,9 +155,7 @@ where
 	#[tokio::main]
 	pub async fn run_with_config(self, config: AppRouterConfig) -> Result<()> {
 		match self.config.mode {
-			Some(RouterMode::ExportStatic) => {
-				self.export_static(&config).await
-			}
+			Some(RouterMode::ExportStatic) => self.export_static(&config).await,
 			_ => self.serve().await,
 		}
 	}

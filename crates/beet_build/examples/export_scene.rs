@@ -5,7 +5,7 @@ use bevy::prelude::*;
 
 fn main() {
 	let mut app = App::new();
-	app.add_plugins((NodeTokensPlugin, BuildTemplatesPlugin));
+	app.add_plugins((NodeTokensPlugin, StaticScenePlugin));
 	app.world_mut().spawn(rsx! {
 		<div>
 			<h1>Export Scene Example</h1>

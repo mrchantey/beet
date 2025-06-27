@@ -53,6 +53,10 @@ pub fn tokenize_element_attributes(
 				// 5. No key or value, should be unreachable but no big deal
 				(None, None) => {}
 			}
+			if let Some(expr_idx) = world.entity(attr_entity).get::<ExprIdx>() {
+				attr_components.push(expr_idx.self_token_stream());
+			}
+
 			if attr_components.len() == 1 {
 				attr_entities.push(attr_components.pop().unwrap());
 			} else if !attr_components.is_empty() {
@@ -154,7 +158,10 @@ mod test {
 				NodeTag(String::from("span")),
 				ElementNode { self_closing: true },
 				OnSpawnTemplate::new_insert(#[allow(unused_braces)]{foo}.into_node_bundle()),
-				related!(Attributes [AttributeKey::new("onclick")])
+				related!(Attributes [(
+					AttributeKey::new("onclick"),
+					ExprIdx(0u32)
+				)])
 			)}
 			.to_string(),
 		);
@@ -204,7 +211,10 @@ mod test {
 						AttributeKey::new("onmousemove"),
 						OnSpawnTemplate::new_insert("some_js_func".into_attribute_bundle())
 					),
-					AttributeKey::new("onclick")
+					(
+						AttributeKey::new("onclick"),
+						ExprIdx(0u32)
+					)
 				])
 			)}
 			.to_string(),

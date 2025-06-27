@@ -183,7 +183,8 @@ mod test {
 					related!(Attributes [
 						(
 							AttributeKey::new("hidden"),
-							OnSpawnTemplate::new_insert(val.into_attribute_bundle())
+							OnSpawnTemplate::new_insert(val.into_attribute_bundle()),
+							ExprIdx(0u32)
 						)
 					])
 				)}

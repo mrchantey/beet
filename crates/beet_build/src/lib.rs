@@ -4,14 +4,14 @@
 #![feature(let_chains, if_let_guard, result_flattening, exit_status_error)]
 
 mod beet_config;
-mod build_templates;
+mod static_scene;
 mod client_island_codegen;
 mod route_codegen;
 mod utils;
 
 pub mod prelude {
 	pub use crate::beet_config::*;
-	pub use crate::build_templates::*;
+	pub use crate::static_scene::*;
 	pub use crate::client_island_codegen::*;
 	pub use crate::route_codegen::*;
 	pub use crate::utils::*;

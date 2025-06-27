@@ -110,7 +110,7 @@ mod test {
 	#[test]
 	fn works() {
 		let mut app = App::new();
-		app.add_plugins((NodeTokensPlugin, BuildTemplatesPlugin));
+		app.add_plugins((NodeTokensPlugin, StaticScenePlugin));
 
 		let entity = app
 			.world_mut()

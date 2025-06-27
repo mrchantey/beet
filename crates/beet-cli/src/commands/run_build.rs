@@ -27,7 +27,7 @@ impl RunBuild {
 		app.insert_resource(self.build_cmd.clone()).add_plugins((
 			self.load_beet_config.clone(),
 			NodeTokensPlugin::default(),
-			BuildTemplatesPlugin::default(),
+			StaticScenePlugin::default(),
 			RouteCodegenPlugin::default(),
 			ClientIslandCodegenPlugin::default(),
 		));

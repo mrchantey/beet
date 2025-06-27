@@ -10,7 +10,7 @@ use sweet::prelude::*;
 fn works() {
 	let mut app = App::new();
 
-	app.add_plugins((BuildTemplatesPlugin, TemplatePlugin));
+	app.add_plugins((StaticScenePlugin, TemplatePlugin));
 
 
 	let entity = app

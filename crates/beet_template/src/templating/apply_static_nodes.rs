@@ -14,7 +14,7 @@ pub fn spawn_templates(world: &mut World) -> Result {
 	)>();
 
 	while query.iter(world).next().is_some() {
-		world.run_system_cached(apply_lit_nodes)??;
+		world.run_system_cached(apply_static_nodes)??;
 		world.run_system_cached(run_on_spawn_template)??;
 	}
 	Ok(())
@@ -26,11 +26,13 @@ pub fn spawn_templates(world: &mut World) -> Result {
 #[reflect(Default, Component)]
 pub struct StaticNodeRoot;
 
+/// Added to non-static entities with a [`MacroIdx`], indicating they have
+/// had the [`StaticNodeRoot`] applied.
 #[derive(Default, Component, Reflect)]
 #[reflect(Default, Component)]
 pub struct ResolvedRoot;
 
-pub(super) fn apply_lit_nodes(
+pub(super) fn apply_static_nodes(
 	mut commands: Commands,
 	instances: Populated<
 		(Entity, &MacroIdx),
@@ -42,6 +44,7 @@ pub(super) fn apply_lit_nodes(
 	>,
 	static_trees: Query<(Entity, &MacroIdx), With<StaticNodeRoot>>,
 	children: Query<&Children>,
+	attributes: Query<&Attributes>,
 	mut on_spawn_templates: Query<(&ExprIdx, &mut OnSpawnTemplate)>,
 ) -> Result {
 	for (instance, static_tree) in
@@ -51,13 +54,33 @@ pub(super) fn apply_lit_nodes(
 				.find(|(_, static_idx)| *static_idx == idx)
 				.map(|(static_tree, _)| (instance, static_tree))
 		}) {
-		// recursively clear entire instance tree
+		// take all [`OnSpawnTemplate`] methods from the instance,
+		// then entirely clear it.
+		// this must be done before clearing and cloning are executed.
+		// TODO attributes too?
+		let mut instance_expr_map = HashMap::new();
+
+		for child in children.iter_descendants_inclusive(instance) {
+			if let Ok((idx, mut template)) = on_spawn_templates.get_mut(child) {
+				instance_expr_map.insert(*idx, template.take());
+			}
+			for attr in attributes.iter_direct_descendants(child) {
+				if let Ok((idx, mut template)) =
+					on_spawn_templates.get_mut(attr)
+				{
+					instance_expr_map.insert(*idx, template.take());
+				}
+			}
+		}
+
 		commands
 			.entity(instance)
 			.despawn_related::<Children>()
 			.despawn_related::<TemplateRoot>()
 			.despawn_related::<Attributes>()
 			.clear();
+
+		// apply the static tree
 		commands
 			.entity(static_tree)
 			.clone_with(instance, |builder| {
@@ -66,17 +89,11 @@ pub(super) fn apply_lit_nodes(
 					.linked_cloning(true)
 					.add_observers(true);
 			});
-		let instance_exprs: HashMap<_, _> = children
-			.iter_descendants_inclusive(instance)
-			.filter_map(|child| match on_spawn_templates.get_mut(child) {
-				Ok((idx, mut template)) => Some((*idx, template.take())),
-				Err(_) => None,
-			})
-			.collect();
-		// resolve template locations after clone
+
+		// queue system to resolve template locations after clone
 		commands.run_system_cached_with(
 			apply_template_locations,
-			(instance, instance_exprs),
+			(instance, instance_expr_map),
 		);
 	}
 	for (entity, _) in instances.iter() {
@@ -86,8 +103,8 @@ pub(super) fn apply_lit_nodes(
 }
 
 
-
-pub(super) fn apply_template_locations(
+/// A system queued after [`apply_static_nodes`],
+fn apply_template_locations(
 	In((entity, mut instance_exprs)): In<(
 		Entity,
 		HashMap<ExprIdx, OnSpawnTemplate>,
@@ -157,7 +174,7 @@ mod test {
 
 
 	#[test]
-	fn works() {
+	fn block_nodes() {
 		parse(
 			rsx! {<main>{7}</main>},
 			// because ExprIdx matches, this should be replace with 7
@@ -165,6 +182,15 @@ mod test {
 		)
 		.xpect()
 		.to_be("<div><span>7</span><br/></div>");
+	}
+	#[test]
+	fn attributes() {
+		parse(
+			rsx! {<main key={7}/>},
+			rsx! {<div><span key={()}></span><br/></div>},
+		)
+		.xpect()
+		.to_be("<div><span key=\"7\"></span><br/></div>");
 	}
 	#[test]
 	fn root() { parse(rsx! {{7}}, rsx! {hello{()}}).xpect().to_be("hello7"); }

@@ -20,11 +20,14 @@ pub struct ProcessTemplateStep;
 pub struct ExportTemplateStep;
 
 
-/// Plugin containing all systems for building templates from files.
+/// Plugin containing all systems for exporting a scene including:
+/// - [`LangPartial`]
+/// - [`StaticNodeRoot`]
+///  from files.
 /// This plugin is usually added in combination with:
 /// - [`NodeTokensPlugin`](beet_parse::prelude::NodeTokensPlugin)
 #[derive(Debug, Default)]
-pub struct BuildTemplatesPlugin;
+pub struct StaticScenePlugin;
 
 
 /// Idents used for template macros.
@@ -44,7 +47,7 @@ pub fn template_types_plugin(app: &mut bevy::prelude::App) {
 	app.register_type::<MacroIdx>();
 }
 
-impl Plugin for BuildTemplatesPlugin {
+impl Plugin for StaticScenePlugin {
 	fn build(&self, app: &mut App) {
 		app.init_resource::<HtmlConstants>()
 			.init_resource::<TemplateMacros>()
@@ -59,8 +62,8 @@ impl Plugin for BuildTemplatesPlugin {
 				(
 					ImportTemplateStep.before(ImportNodesStep),
 					ProcessTemplateStep
-					.after(ExportNodesStep)
-					.after(ImportTemplateStep),
+						.after(ExportNodesStep)
+						.after(ImportTemplateStep),
 					ExportTemplateStep
 						.after(ProcessTemplateStep)
 						// before all [`TemplatePlugin`] systems
@@ -71,7 +74,7 @@ impl Plugin for BuildTemplatesPlugin {
 				Update,
 				(
 					(
-						// style roundtrip breaks without resolving templates, 
+						// style roundtrip breaks without resolving templates,
 						// im not sure if this should be here, doesnt it indicate
 						// we're relying on exprs in templates?
 						spawn_templates,
@@ -112,7 +115,7 @@ mod test {
 	#[test]
 	fn load_all_templates() {
 		App::new()
-			.add_plugins(BuildTemplatesPlugin)
+			.add_plugins(StaticScenePlugin)
 			.xtap(|app| {
 				app.world_mut().spawn(BuildFileTemplates::default());
 			})
