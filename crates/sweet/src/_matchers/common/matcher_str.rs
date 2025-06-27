@@ -1,26 +1,29 @@
 use super::*;
 
 impl<T: std::fmt::Debug + AsRef<str>> Matcher<T> {
-	pub fn to_contain(&self, other: impl AsRef<str>) {
+	pub fn to_contain(&self, other: impl AsRef<str>) -> &Self {
 		let other = other.as_ref();
 		let result = self.value.as_ref().contains(other);
 		let expected = format!("to contain '{}'", other);
 		self.assert_correct(result, &expected);
+		self
 	}
-	pub fn to_start_with(&self, other: impl AsRef<str>) {
+	pub fn to_start_with(&self, other: impl AsRef<str>) -> &Self {
 		let other = other.as_ref();
 		let result = self.value.as_ref().starts_with(other);
 		let expected = format!("to start with '{}'", other);
 		self.assert_correct(result, &expected);
+		self
 	}
-	pub fn to_end_with(&self, other: impl AsRef<str>) {
+	pub fn to_end_with(&self, other: impl AsRef<str>) -> &Self {
 		let other = other.as_ref();
 		let result = self.value.as_ref().ends_with(other);
 		let expected = format!("to end with '{}'", other);
 		self.assert_correct(result, &expected);
+		self
 	}
 	/// Like `to_be`, but with pretty diffing
-	pub fn to_be_str(&self, other: impl AsRef<str>) {
+	pub fn to_be_str(&self, other: impl AsRef<str>) -> &Self {
 		self.panic_if_negated();
 		let expected = other.as_ref();
 		let received = self.value.as_ref();
@@ -33,6 +36,7 @@ impl<T: std::fmt::Debug + AsRef<str>> Matcher<T> {
 
 			self.assert(false, &msg);
 		};
+		self
 	}
 }
 

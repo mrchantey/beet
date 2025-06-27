@@ -16,11 +16,36 @@ pub struct MacroIdx {
 	/// The source file containing the template.
 	pub file: WsPathBuf,
 	/// The index of the template in the file.
-	/// - For md and rsx files this is always 0 as they only have one template.
+	/// - For md and rsx files this is always be [`LineCol::default()`] as they are one big 'macro'.
 	/// - For rust files this is the top-down appearance of the `rsx!` macro.
 	pub start: LineCol,
 }
 impl MacroIdx {
 	/// Create a new [`TemplateKey`] from a file and index.
 	pub fn new(file: WsPathBuf, start: LineCol) -> Self { Self { file, start } }
+	#[cfg(feature = "tokens")]
+	pub fn new_from_tokens(
+		file: WsPathBuf,
+		token: &proc_macro2::TokenStream,
+	) -> Self {
+		use syn::spanned::Spanned;
+		Self {
+			file,
+			start: token.span().start().into(),
+		}
+	}
 }
+
+
+
+/// Static nodes are created by statically analyzing a file,
+/// so they should not be rendered directly, and only used for template reloading.
+#[derive(Default, Component, Reflect)]
+#[reflect(Default, Component)]
+pub struct StaticNodeRoot;
+
+/// Added to non-static entities with a [`MacroIdx`], indicating they have
+/// had the [`StaticNodeRoot`] applied.
+#[derive(Default, Component, Reflect)]
+#[reflect(Default, Component)]
+pub struct ResolvedRoot;

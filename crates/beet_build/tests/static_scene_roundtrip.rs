@@ -30,10 +30,16 @@ fn works() {
 		))
 		.id();
 	build_app.update();
-	println!("children: {:#?}", build_app.component_names_related::<Children>(static_node));
+	println!(
+		"children: {:#?}",
+		build_app.component_names_related::<Children>(static_node)
+	);
 
 	let scene = build_app.build_scene();
-	expect(&scene).to_contain("MacroIdx");
+	expect(&scene)
+		.to_contain("MacroIdx")
+		.to_contain("NodeTag")
+		.to_contain("StaticNodeRoot");
 
 	println!("Exported Scene:\n{}", scene);
 }

@@ -34,10 +34,12 @@ impl bevy::app::Plugin for NodeTypesPlugin {
 	fn is_unique(&self) -> bool { false }
 	fn build(&self, app: &mut bevy::prelude::App) {
 		app
-			// idxs
+			// idxs & roots
 			// we dont need DomIdx, idxs applied after serde
 			// .register_type::<DomIdx>()
 			.register_type::<MacroIdx>()
+			.register_type::<StaticNodeRoot>()
+			.register_type::<ResolvedRoot>()
 			.register_type::<ExprIdx>()
 			// rsx nodes
 			.register_type::<NodeTag>()

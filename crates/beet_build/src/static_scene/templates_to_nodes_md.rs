@@ -1,7 +1,6 @@
 use crate::prelude::*;
 use beet_common::prelude::*;
 use beet_parse::prelude::*;
-use beet_template::prelude::*;
 use beet_utils::prelude::*;
 use bevy::prelude::*;
 

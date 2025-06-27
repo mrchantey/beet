@@ -20,18 +20,6 @@ pub fn spawn_templates(world: &mut World) -> Result {
 	Ok(())
 }
 
-/// Static nodes are created by statically analyzing a file,
-/// so they should not be rendered directly, and only used for template reloading.
-#[derive(Default, Component, Reflect)]
-#[reflect(Default, Component)]
-pub struct StaticNodeRoot;
-
-/// Added to non-static entities with a [`MacroIdx`], indicating they have
-/// had the [`StaticNodeRoot`] applied.
-#[derive(Default, Component, Reflect)]
-#[reflect(Default, Component)]
-pub struct ResolvedRoot;
-
 pub(super) fn apply_static_nodes(
 	mut commands: Commands,
 	instances: Populated<
