@@ -6,6 +6,7 @@ use bevy::prelude::*;
 #[derive(Component, Reflect)]
 #[reflect(Component)]
 pub struct PortalTo<T> {
+	#[reflect(ignore)]
 	phantom: std::marker::PhantomData<T>,
 }
 impl<T> Default for PortalTo<T> {

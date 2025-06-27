@@ -6,6 +6,19 @@ use std::hash::Hasher;
 use std::path::PathBuf;
 
 
+/// The fs loaded and deduplicated [`LangContent`], existing seperately from the
+/// originating tree(s).
+#[derive(Debug, Clone, PartialEq, Hash, Deref, Component, Reflect)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[reflect(Component)]
+// #[component(immutable)]
+pub struct LangPartial(pub String);
+
+impl LangPartial {
+	/// Create a new [`LangPartial`] from a `String`.
+	pub fn new(content: impl Into<String>) -> Self { Self(content.into()) }
+}
+
 
 /// The content of a script or style template, either as inner text or a file path.
 /// Attributes and children are removed.

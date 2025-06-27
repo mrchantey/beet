@@ -1,7 +1,6 @@
 use beet_bevy::prelude::*;
 use beet_common::prelude::*;
-use beet_template::prelude::DomIdx;
-use beet_template::prelude::TemplatePlugin;
+use beet_template::prelude::*;
 use bevy::ecs::system::RunSystemError;
 use bevy::ecs::system::RunSystemOnce;
 use bevy::prelude::*;

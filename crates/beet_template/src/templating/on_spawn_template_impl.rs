@@ -15,11 +15,13 @@ pub fn run_on_spawn_template(
 	for root in roots.iter() {
 		for entity in children.iter_descendants_inclusive(root) {
 			if let Ok((entity, mut on_spawn)) = query.get_mut(entity) {
+				// println!("Running onspawn for block node");
 				commands.entity(entity).remove::<OnSpawnTemplate>();
 				on_spawn.take().call(commands.entity(entity))?;
 			}
 			for attr in attributes.iter_direct_descendants(entity) {
 				if let Ok((attr_entity, mut on_spawn)) = query.get_mut(attr) {
+					// println!("Running onspawn for attribute");
 					commands.entity(attr_entity).remove::<OnSpawnTemplate>();
 					on_spawn.take().call(commands.entity(attr_entity))?;
 				}

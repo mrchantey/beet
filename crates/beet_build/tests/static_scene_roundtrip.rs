@@ -11,25 +11,62 @@ use beet_template::as_beet::*;
 // use bevy::ecs::system::RunSystemOnce;
 use bevy::ecs::system::RunSystemOnce;
 use bevy::prelude::*;
+use proc_macro2::TokenStream;
 use quote::quote;
 use sweet::prelude::*;
 
-
 #[test]
-fn works() {
-	let scene = build_scene();
+fn expressions() {
+	roundtrip_to_html(
+		rsx! {
+			<button key={1}> this will be replaced {2}</button>
+		},
+		quote! {
+			<div>
+			<button key={placeholder}>Click me</button>
+			<span>"The value is "{placeholder}</span>
+			</div>
+		},
+	)
+	.xpect()
+	.to_be_str(
+		"<div><button key=\"1\">Click me</button><span>The value is 2</span></div>",
+	);
+}
+#[test]
+fn style() {
+	roundtrip_to_html(
+		rsx! {"placeholder"},
+		quote! {
+			<div>
+				<h1>Roundtrip Test</h1>
+			</div>
+			<style>
+				h1{font-size: 1px;}
+			</style>
+		},
+	)
+	.xpect()
+	.to_be_str(
+		"<div><button key=\"1\">Click me</button><span>The value is 2</span></div>",
+	);
+}
+
+
+fn roundtrip_to_html(bundle: impl Bundle, tokens: TokenStream) -> String {
+	let scene = build_scene(tokens);
 	//
 	// simulated serde boundary
 	//
-	apply_scene(&scene);
+	apply_scene(bundle, &scene)
 }
 
 
 #[template]
-fn Roundtrip() -> impl Bundle {
+fn MyTemplate(initial: u32) -> impl Bundle {
 	rsx! {
 		<div>
-			<h1>Roundtrip Test</h1>
+			<h1>"value: "{initial}</h1>
 		</div>
 		<style>
 			h1{font-size: 1px;}
@@ -42,21 +79,12 @@ fn common_idx() -> MacroIdx {
 	MacroIdx::new_file_line_col(file!(), line!(), column!())
 }
 
-fn build_scene() -> String {
+fn build_scene(tokens: TokenStream) -> String {
 	let mut app = App::new();
 	app.add_plugins((NodeTokensPlugin, StaticScenePlugin));
 	let _entity = app
 		.world_mut()
-		.spawn((
-			StaticNodeRoot,
-			common_idx(),
-			RstmlTokens::new(quote! {
-				<div>
-				<button key={value}>Click me</button>
-				<span>The value is {value}</span>
-				</div>
-			}),
-		))
+		.spawn((StaticNodeRoot, common_idx(), RstmlTokens::new(tokens)))
 		.id();
 	app.update();
 
@@ -71,32 +99,27 @@ fn build_scene() -> String {
 	// 	"children: {:#?}",
 	// 	build_app.component_names_related::<Children>(_entity)
 	// );
-	println!("Exported Scene:\n{}", scene);
+	// println!("Exported Scene:\n{}", scene);
 
 	scene
 }
 
-fn apply_scene(scene: &str) {
+fn apply_scene(bundle: impl Bundle, scene: &str) -> String {
 	let mut app = App::new();
 	app.add_plugins(TemplatePlugin);
 	app.load_scene(scene).unwrap();
 
-	let value = 42;
+	let entity = app.world_mut().spawn(bundle).insert(common_idx()).id();
 
-	let entity = app
-		.world_mut()
-		.spawn(rsx! {
-			<button key={value}> value is {value}</button>
-		})
-		.insert(common_idx())
-		.id();
-
+	// app.world_mut().spawn((
+	// 	OnSpawnTemplate::new(|_| {
+	// 		panic!("dsds");
+	// 	}),
+	// 	MacroIdx::new_file_line_col(file!(), line!(), column!()),
+	// ));
 	app.update();
 
-	let html = app
-		.world_mut()
+	app.world_mut()
 		.run_system_once_with(render_fragment, entity)
-		.unwrap();
-
-	println!("Rendered HTML:\n{}", html);
+		.unwrap()
 }

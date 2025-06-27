@@ -1,27 +1,12 @@
-use crate::prelude::*;
 use beet_bevy::bevybail;
-use beet_common::node::ElementNode;
-use beet_common::node::TextNode;
+use beet_common::prelude::*;
 use bevy::platform::collections::HashMap;
 use bevy::prelude::*;
-
-/// The fs loaded and deduplicated [`LangContent`], existing seperately from the
-/// originating tree(s).
-#[derive(Debug, Clone, PartialEq, Hash, Deref, Component, Reflect)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[reflect(Component)]
-// #[component(immutable)]
-pub struct LangPartial(pub String);
-
-impl LangPartial {
-	/// Create a new [`LangPartial`] from a `String`.
-	pub fn new(content: impl Into<String>) -> Self { Self(content.into()) }
-}
 
 
 /// For trees with [`PortalTo<LangPartial>`], insert a single element at the top
 /// of the tree, to be hoisted to the head.
-pub fn resolve_lang_partials(
+pub fn apply_lang_partials(
 	mut commands: Commands,
 	partials: Query<(Entity, &LangPartial)>,
 	parents: Query<&ChildOf>,
@@ -62,10 +47,7 @@ pub fn resolve_lang_partials(
 
 #[cfg(test)]
 mod test {
-	use crate::prelude::*;
-	use beet_common::node::HtmlHoistDirective;
-	use beet_common::node::NodeTag;
-	use beet_common::node::StyleScope;
+	use beet_common::prelude::*;
 	use bevy::ecs::system::RunSystemOnce;
 	use bevy::prelude::*;
 	use sweet::prelude::*;
@@ -97,7 +79,7 @@ mod test {
 	fn works() {
 		let (mut world, tree) = setup();
 		world
-			.run_system_once(super::resolve_lang_partials)
+			.run_system_once(super::apply_lang_partials)
 			.unwrap()
 			.unwrap();
 

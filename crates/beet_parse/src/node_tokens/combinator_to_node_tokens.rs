@@ -168,14 +168,15 @@ impl<'w, 's, 'a> Builder<'w, 's, 'a> {
 			));
 		}
 		let entity = entity.id();
-		let children = self.rsx_children(&tag_str, children)?;
-		self.commands.entity(entity).add_children(&children);
 
 		attributes
 			.0
 			.into_iter()
 			.map(|attr| self.spawn_attribute(entity, attr))
 			.collect::<Result<Vec<_>>>()?;
+
+		let children = self.rsx_children(&tag_str, children)?;
+		self.commands.entity(entity).add_children(&children);
 
 		entity.xok()
 	}

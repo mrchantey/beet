@@ -7,7 +7,8 @@ use bevy::prelude::*;
 
 
 
-/// Apply any [`StyleId`] in a template to any  Runs before apply slots
+/// Apply a [`LangPartial`] to elements with a matching [`StyleId`], 
+/// runs before [`apply_slots`].
 pub fn apply_style_id_attributes(
 	html_constants: Res<HtmlConstants>,
 	mut commands: Commands,
@@ -64,10 +65,7 @@ mod test {
 		let mut world = World::new();
 		world.init_resource::<HtmlConstants>();
 		let entity = world.spawn(bundle).id();
-		world
-			.run_system_once(spawn_templates)
-			.unwrap()
-			.unwrap();
+		world.run_system_once(spawn_templates).unwrap().unwrap();
 		world
 			.run_system_once(super::apply_style_id_attributes)
 			.unwrap();

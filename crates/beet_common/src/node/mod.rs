@@ -4,6 +4,8 @@ pub use event_observer::*;
 pub use on_spawn_template::*;
 pub mod macro_idx;
 pub use macro_idx::*;
+pub mod node_portal;
+pub use node_portal::*;
 pub mod expr_idx;
 pub use expr_idx::*;
 mod into_template_bundle;
@@ -20,6 +22,8 @@ mod file_span;
 pub use file_span::*;
 mod directives;
 pub use directives::*;
+mod dom_idx;
+pub use dom_idx::*;
 mod html_constants;
 pub use html_constants::*;
 
@@ -30,17 +34,15 @@ pub use html_constants::*;
 pub struct NodeTypesPlugin;
 
 impl bevy::app::Plugin for NodeTypesPlugin {
-	// allow to be added in several places
 	fn is_unique(&self) -> bool { false }
 	fn build(&self, app: &mut bevy::prelude::App) {
 		app
 			// idxs & roots
-			// we dont need DomIdx, idxs applied after serde
-			// .register_type::<DomIdx>()
 			.register_type::<MacroIdx>()
 			.register_type::<StaticNodeRoot>()
 			.register_type::<ResolvedRoot>()
 			.register_type::<ExprIdx>()
+			.register_type::<DomIdx>()
 			// rsx nodes
 			.register_type::<NodeTag>()
 			.register_type::<TemplateNode>()
@@ -59,13 +61,23 @@ impl bevy::app::Plugin for NodeTypesPlugin {
 			.register_type::<FileSpanOf<DoctypeNode>>()
 			.register_type::<FileSpanOf<CommentNode>>()
 			.register_type::<FileSpanOf<ElementNode>>()
-			// directives
+			// directives - script/style
+			.register_type::<LangPartial>()
 			.register_type::<LangContent>()
-			.register_type::<HtmlHoistDirective>()
+			.register_type::<StyleId>()
+			.register_type::<StyleScope>()
+			.register_type::<StyleCascade>()
+			.register_type::<PortalTo<LangPartial>>()
+			// directives - client island
 			.register_type::<ClientLoadDirective>()
 			.register_type::<ClientOnlyDirective>()
-			.register_type::<SlotChild>()
+			// directives - slots
+            .register_type::<SlotChild>()
 			.register_type::<SlotTarget>()
+			// directives - other
+			.register_type::<NodePortal>()
+			.register_type::<NodePortalTarget>()
+			.register_type::<HtmlHoistDirective>()
 			// attributes
 			.register_type::<AttributeOf>()
 			.register_type::<Attributes>()

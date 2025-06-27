@@ -1,6 +1,5 @@
 use super::error::Error;
 use beet_common::prelude::*;
-use beet_template::prelude::*;
 use bevy::prelude::*;
 use lightningcss::printer::PrinterOptions;
 use lightningcss::stylesheet::ParserOptions;
@@ -74,7 +73,6 @@ pub fn parse_lightning(
 					err: e.to_string(),
 				})?
 				.code;
-			drop(stylesheet);
 			Ok((entity, new_css))
 		})
 		.collect::<Result<Vec<_>>>()?;

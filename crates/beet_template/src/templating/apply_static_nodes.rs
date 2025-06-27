@@ -12,8 +12,8 @@ pub fn spawn_templates(world: &mut World) -> Result {
 		Without<StaticNodeRoot>,
 		Without<ResolvedRoot>,
 	)>();
-
 	while query.iter(world).next().is_some() {
+		// println!("Running spawn_templates system");
 		world.run_system_cached(apply_static_nodes)??;
 		world.run_system_cached(run_on_spawn_template)??;
 	}

@@ -199,13 +199,14 @@ impl<'w, 's, 'a> RstmlToWorld<'w, 's, 'a> {
 					));
 				}
 				let entity = entity.id();
-				let children = self.spawn_nodes(children);
-				self.commands.entity(entity).add_children(&children);
 
 				open_tag
 					.attributes
 					.into_iter()
 					.for_each(|attr| self.spawn_attribute(entity, attr));
+
+				let children = self.spawn_nodes(children);
+				self.commands.entity(entity).add_children(&children);
 			}
 			Node::Custom(_) => {
 				self.diagnostics.push(Diagnostic::spanned(
