@@ -23,6 +23,10 @@ css = ["dep:lightningcss", "dep:parcel_selectors"]
 name="style_roundtrip"
 path = "tests/style_roundtrip.rs"
 required-features = ["css"]
+[[test]]
+name="static_scene_roundtrip"
+path = "tests/static_scene_roundtrip.rs"
+required-features = ["css"]
 
 [dependencies]
 #💡 Internal

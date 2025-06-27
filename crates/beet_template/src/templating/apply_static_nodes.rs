@@ -157,11 +157,11 @@ mod test {
 	use bevy::ecs::system::RunSystemOnce;
 	use sweet::prelude::*;
 
-	fn parse(instance: impl Bundle, tree: impl Bundle) -> String {
+	fn parse(instance: impl Bundle, static_node: impl Bundle) -> String {
 		let mut world = World::new();
 		let instance = world.spawn(instance).insert(MacroIdx::default()).id();
 		let _tree = world
-			.spawn((tree, StaticNodeRoot))
+			.spawn((static_node, StaticNodeRoot))
 			.insert(MacroIdx::default())
 			.id();
 
@@ -197,7 +197,7 @@ mod test {
 
 	#[test]
 	#[should_panic = "Not all ExprIdx were applied.."]
-	fn tree_missing_idx() {
+	fn static_node_missing_idx() {
 		parse(rsx! {<div>{7}</div>}, rsx! {<div><br/></div>});
 	}
 	#[test]

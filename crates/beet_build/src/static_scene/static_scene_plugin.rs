@@ -43,20 +43,13 @@ impl Default for TemplateMacros {
 	}
 }
 
-pub fn template_types_plugin(app: &mut bevy::prelude::App) {
-	app.register_type::<MacroIdx>();
-}
 
 impl Plugin for StaticScenePlugin {
 	fn build(&self, app: &mut App) {
 		app.init_resource::<HtmlConstants>()
 			.init_resource::<TemplateMacros>()
 			// types
-			.add_plugins((
-				node_types_plugin,
-				directive_types_plugin,
-				template_types_plugin,
-			))
+			.add_plugins(node_types_plugin)
 			.configure_sets(
 				Update,
 				(

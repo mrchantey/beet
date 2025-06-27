@@ -23,9 +23,11 @@ mod apply_slots;
 use crate::prelude::*;
 #[allow(unused)]
 pub use apply_slots::*;
-use beet_common::node::HtmlConstants;
+use beet_common::prelude::*;
 use bevy::ecs::schedule::SystemSet;
 use bevy::prelude::*;
+
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash, SystemSet)]
 pub struct SpawnStep;
 #[derive(Debug, Clone, PartialEq, Eq, Hash, SystemSet)]
@@ -41,7 +43,7 @@ pub struct BindStep;
 pub struct TemplatePlugin;
 impl Plugin for TemplatePlugin {
 	fn build(&self, app: &mut App) {
-		app.add_plugins(signals_plugin);
+		app.add_plugins((signals_plugin, node_types_plugin));
 		app.init_resource::<HtmlConstants>()
 			.register_type::<LangPartial>()
 			.configure_sets(

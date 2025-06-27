@@ -1,3 +1,4 @@
+use beet_utils::utils::Tree;
 use bevy::ecs::query::QueryData;
 use bevy::ecs::query::QueryFilter;
 use bevy::prelude::*;
@@ -27,7 +28,7 @@ pub impl<W: IntoWorld> W {
 			.map(|e| e.map(|c| c.name().to_string()).collect::<Vec<_>>())
 			.unwrap_or_default()
 	}
-	fn component_names_related<R: RelationshipTarget>(
+	fn direct_component_names_related<R: RelationshipTarget>(
 		&self,
 		entity: Entity,
 	) -> Vec<Vec<String>> {
@@ -48,6 +49,49 @@ pub impl<W: IntoWorld> W {
 			})
 			.unwrap_or_default()
 	}
+	fn component_names_related<R: RelationshipTarget>(
+		&self,
+		entity: Entity,
+	) -> Tree<Vec<String>> {
+		let world = self.into_world();
+
+		fn recurse<'a, R: RelationshipTarget>(
+			world: &'a World,
+			entity: Entity,
+			visited: &mut std::collections::HashSet<Entity>,
+		) -> Tree<Vec<String>> {
+			if !visited.insert(entity) {
+				return Tree::default(); // Prevent cycles
+			}
+			// Inspect the entity itself
+			let value = world
+				.inspect_entity(entity)
+				.map(|component_iter| {
+					component_iter
+						.map(|component| component.name().to_string())
+						.collect::<Vec<_>>()
+				})
+				.unwrap_or_default();
+			// Recurse into related entities
+			let children = world
+				.entity(entity)
+				.get::<R>()
+				.map(|related| {
+					related
+						.iter()
+						.map(|related_entity| {
+							recurse::<R>(world, related_entity, visited)
+						})
+						.collect::<Vec<_>>()
+				})
+				.unwrap_or_default();
+			Tree::new_with_children(value, children)
+		}
+
+		let mut visited = std::collections::HashSet::new();
+		recurse::<R>(world, entity, &mut visited)
+	}
+
 
 
 	/// Shorthand for creating a query and immediatly collecting it into a Vec.

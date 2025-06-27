@@ -33,14 +33,20 @@ fn rstml_to_node_tokens(
 	_: TempNonSendMarker,
 	mut commands: Commands,
 	rstml_config: Res<RstmlConfig>,
-	mut query: Populated<(
-		Entity,
-		&SourceFile,
-		&RstmlRoot,
-		&mut TokensDiagnostics,
-	)>,
+	mut query: Populated<
+		(
+			Entity,
+			Option<&SourceFile>,
+			&RstmlRoot,
+			&mut TokensDiagnostics,
+		),
+		Added<RstmlRoot>,
+	>,
 ) -> Result {
 	for (entity, source_file, rstml_nodes, diagnostics) in query.iter_mut() {
+		let default_source_file = WsPathBuf::default();
+		let source_file = source_file.map_or(&default_source_file, |sf| &sf);
+
 		let root_node = rstml_nodes.clone();
 
 		let mut collected_elements = CollectedElements::default();

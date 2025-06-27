@@ -1,6 +1,7 @@
 use crate::prelude::*;
 use beet_common::prelude::*;
 use beet_parse::prelude::*;
+use beet_template::prelude::*;
 use beet_utils::prelude::*;
 use bevy::prelude::*;
 use syn::visit::Visit;
@@ -57,7 +58,8 @@ impl<'a, 'w, 's> Visit<'a> for RsxSynVisitor<'a, 'w, 's> {
 			self.commands.spawn((
 				ChildOf(self.parent),
 				SourceFile::new(self.file.clone()),
-				RstmlTokens::new(tokens)
+				StaticNodeRoot,
+				RstmlTokens::new(tokens),
 			));
 		}
 	}

@@ -1,8 +1,8 @@
 use crate::prelude::*;
 use beet_parse::prelude::*;
+use beet_template::prelude::*;
 use beet_utils::prelude::*;
 use bevy::prelude::*;
-
 
 /// For a given markdown file, parse to valid rsx combinator syntax and insert
 /// as [`CombinatorToNodeTokens`].
@@ -20,6 +20,7 @@ pub fn templates_to_nodes_md(
 			commands.spawn((
 				ChildOf(entity),
 				SourceFile::new(path.path().clone()),
+				StaticNodeRoot,
 				CombinatorTokens(rsx_str),
 			));
 		}

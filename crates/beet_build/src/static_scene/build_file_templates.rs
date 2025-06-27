@@ -1,6 +1,7 @@
 use super::TemplateFile;
 use super::error::Error;
 use super::error::Result;
+use beet_bevy::prelude::WorldMutExt;
 use beet_fs::prelude::*;
 use beet_utils::prelude::*;
 use bevy::prelude::*;
@@ -96,17 +97,14 @@ pub(super) fn load_template_files(
 pub(super) fn export_template_scene(
 	world: &mut World,
 ) -> bevy::prelude::Result {
-	let mut entities = Vec::new();
-
-	let changed_files = world
-		.query_filtered::<&TemplateFile, Changed<TemplateFile>>()
-		.iter(world)
-		.collect::<Vec<_>>();
+	let changed_files =
+		world.query_filtered_once::<&TemplateFile, Changed<TemplateFile>>();
 
 	if changed_files.is_empty() {
 		// no changes, do nothing
 		return Ok(());
 	} else {
+		// print the changed files
 		tracing::info!(
 			"Exporting {} template files to scene",
 			changed_files.len()
@@ -126,26 +124,14 @@ pub(super) fn export_template_scene(
 	}
 
 
-	for (entity, config) in
-		world.query::<(Entity, &BuildFileTemplates)>().iter(world)
-	{
-		let path = config.scene_file.clone();
-
-		let scene = DynamicScene::from_world(world);
-
-		let type_registry = world.resource::<AppTypeRegistry>();
-		let type_registry = type_registry.read();
-		// TODO only serialize TemplateRoot entities
-		let scene = scene.serialize(&type_registry)?;
-
-		FsExt::write(path.into_abs(), &scene)?;
-		entities.push(entity);
+	// should really only be one of these
+	for config in world.query::<&BuildFileTemplates>().iter(world) {
+		let scene = world.build_scene();
+		FsExt::write(config.scene_file.into_abs(), &scene)?;
 	}
 
 	Ok(())
 }
-
-
 
 impl BuildFileTemplates {
 	pub fn get_files(&self) -> Result<Vec<WsPathBuf>> {
