@@ -1,4 +1,5 @@
 use crate::prelude::*;
+use beet_common::prelude::*;
 use beet_utils::prelude::*;
 use bevy::prelude::*;
 use proc_macro2::TokenStream;
@@ -11,7 +12,10 @@ pub fn tokenize_rstml(
 	TokensApp::with(|app| {
 		let entity = app
 			.world_mut()
-			.spawn((SourceFile::new(source_file), RstmlTokens::new(tokens)))
+			.spawn((
+				MacroIdx::new(source_file, LineCol::default()),
+				RstmlTokens::new(tokens),
+			))
 			.id();
 		app.update();
 		let tokens = tokenize_bundle(app.world_mut(), entity);
@@ -29,7 +33,10 @@ pub fn tokenize_rstml_tokens(
 	TokensApp::with(|app| {
 		let entity = app
 			.world_mut()
-			.spawn((SourceFile::new(source_file), RstmlTokens::new(tokens)))
+			.spawn((
+				MacroIdx::new(source_file, LineCol::default()),
+				RstmlTokens::new(tokens),
+			))
 			.id();
 		app.update();
 		let result = tokenize_bundle_tokens(app.world(), entity);

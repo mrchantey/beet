@@ -49,7 +49,7 @@ impl Plugin for StaticScenePlugin {
 		app.init_resource::<HtmlConstants>()
 			.init_resource::<TemplateMacros>()
 			// types
-			.add_plugins(node_types_plugin)
+			.add_plugins(NodeTypesPlugin)
 			.configure_sets(
 				Update,
 				(

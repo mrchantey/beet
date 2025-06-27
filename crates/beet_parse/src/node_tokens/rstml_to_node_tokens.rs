@@ -34,25 +34,17 @@ fn rstml_to_node_tokens(
 	mut commands: Commands,
 	rstml_config: Res<RstmlConfig>,
 	mut query: Populated<
-		(
-			Entity,
-			Option<&SourceFile>,
-			&RstmlRoot,
-			&mut TokensDiagnostics,
-		),
+		(Entity, &RstmlRoot, &MacroIdx, &mut TokensDiagnostics),
 		Added<RstmlRoot>,
 	>,
 ) -> Result {
-	for (entity, source_file, rstml_nodes, diagnostics) in query.iter_mut() {
-		let default_source_file = WsPathBuf::default();
-		let source_file = source_file.map_or(&default_source_file, |sf| &sf);
-
+	for (entity, rstml_nodes, macro_idx, diagnostics) in query.iter_mut() {
 		let root_node = rstml_nodes.clone();
 
 		let mut collected_elements = CollectedElements::default();
 
 		RstmlToWorld {
-			file: source_file,
+			file_path: &macro_idx.file,
 			rstml_config: &rstml_config,
 			collected_elements: &mut collected_elements,
 			diagnostics,
@@ -70,7 +62,7 @@ fn rstml_to_node_tokens(
 
 
 struct RstmlToWorld<'w, 's, 'a> {
-	file: &'a WsPathBuf,
+	file_path: &'a WsPathBuf,
 	rstml_config: &'a RstmlConfig,
 	collected_elements: &'a mut CollectedElements,
 	diagnostics: Mut<'a, TokensDiagnostics>,
@@ -97,7 +89,7 @@ impl<'w, 's, 'a> RstmlToWorld<'w, 's, 'a> {
 
 	fn insert_node(&mut self, entity: Entity, node: Node<RstmlCustomNode>) {
 		let node_span = node.span();
-		let file_span = FileSpan::new_from_span(self.file.clone(), &node);
+		let file_span = FileSpan::new_from_span(self.file_path.clone(), &node);
 		// let spans = (node_span, file_span);
 		match node {
 			Node::Doctype(_) => {
@@ -243,7 +235,7 @@ impl<'w, 's, 'a> RstmlToWorld<'w, 's, 'a> {
 			}
 			NodeAttribute::Block(NodeBlock::ValidBlock(block)) => {
 				let block_file_span =
-					FileSpan::new_from_span(self.file.clone(), &block);
+					FileSpan::new_from_span(self.file_path.clone(), &block);
 				// block attribute, ie `<div {is_hidden}>`
 				self.commands.spawn((
 					AttributeOf::new(parent),
@@ -268,14 +260,14 @@ impl<'w, 's, 'a> RstmlToWorld<'w, 's, 'a> {
 					AttributeOf::new(parent),
 					AttributeKey::new(key),
 					FileSpanOf::<AttributeKey>::new(FileSpan::new_from_span(
-						self.file.clone(),
+						self.file_path.clone(),
 						&attr.key,
 					)),
 					SpanOf::<AttributeKey>::new(attr.key.span()),
 				));
 				// key-value attribute, ie `<div hidden=true>`
 				let val_expr_file_span = FileSpan::new_from_span(
-					self.file.clone(),
+					self.file_path.clone(),
 					&attr.possible_value,
 				);
 
@@ -329,7 +321,7 @@ impl<'w, 's, 'a> RstmlToWorld<'w, 's, 'a> {
 		let key_str = name.to_string();
 		(
 			key_str,
-			FileSpan::new_from_span(self.file.clone(), name),
+			FileSpan::new_from_span(self.file_path.clone(), name),
 			name.span(),
 		)
 	}
@@ -373,10 +365,7 @@ mod test {
 		App::new()
 			.add_plugins((tokens_to_rstml_plugin, rstml_to_node_tokens_plugin))
 			.xtap(|app| {
-				app.world_mut().spawn((
-					SourceFile::new(WsPathBuf::new(file!())),
-					RstmlTokens::new(tokens),
-				));
+				app.world_mut().spawn(RstmlTokens::new(tokens));
 			})
 			.update_then()
 			.xmap(std::mem::take)

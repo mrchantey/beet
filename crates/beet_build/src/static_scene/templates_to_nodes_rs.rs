@@ -4,6 +4,7 @@ use beet_parse::prelude::*;
 use beet_template::prelude::*;
 use beet_utils::prelude::*;
 use bevy::prelude::*;
+use syn::spanned::Spanned;
 use syn::visit::Visit;
 
 
@@ -57,7 +58,7 @@ impl<'a, 'w, 's> Visit<'a> for RsxSynVisitor<'a, 'w, 's> {
 			let tokens = mac.tokens.clone();
 			self.commands.spawn((
 				ChildOf(self.parent),
-				SourceFile::new(self.file.clone()),
+				MacroIdx::new(self.file.clone(), tokens.span().start().into()),
 				StaticNodeRoot,
 				RstmlTokens::new(tokens),
 			));

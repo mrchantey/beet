@@ -1,4 +1,5 @@
 use crate::prelude::*;
+use beet_common::prelude::*;
 use beet_utils::prelude::*;
 use bevy::prelude::*;
 use proc_macro2::TokenStream;
@@ -15,7 +16,7 @@ pub fn tokenize_combinator(
 		let entity = app
 			.world_mut()
 			.spawn((
-				SourceFile::new(source_file),
+				MacroIdx::new(source_file, LineCol::default()),
 				CombinatorTokens::new(tokens),
 			))
 			.id();
@@ -35,7 +36,7 @@ pub fn tokenize_combinator_tokens(
 		let entity = app
 			.world_mut()
 			.spawn((
-				SourceFile::new(source_file),
+				MacroIdx::new(source_file, LineCol::default()),
 				CombinatorTokens::new(tokens),
 			))
 			.id();

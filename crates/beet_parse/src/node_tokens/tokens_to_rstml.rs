@@ -1,6 +1,5 @@
 use crate::prelude::*;
 use beet_common::prelude::*;
-use beet_utils::prelude::*;
 use bevy::prelude::*;
 use proc_macro2::TokenStream;
 use proc_macro2_diagnostics::Diagnostic;
@@ -9,7 +8,6 @@ use rstml::Parser;
 use rstml::ParserConfig;
 use rstml::node::Node;
 use send_wrapper::SendWrapper;
-use syn::spanned::Spanned;
 
 // we must use `std::collections::HashSet` because thats what rstml uses
 type HashSet<T> = std::collections::HashSet<T>;
@@ -56,18 +54,9 @@ impl Default for RstmlConfig {
 	}
 }
 
-/// A [`WsPathBuf`] representing the source file for the contents of
-/// this entity.
-// When we get Construct this should be a pointer to reduce needless string allocation
-#[derive(Debug, Clone, Component, Deref)]
-pub struct SourceFile(WsPathBuf);
-
-impl SourceFile {
-	pub fn new(path: WsPathBuf) -> Self { Self(path) }
-}
-
 /// A [`TokenStream`] representing [`rstml`] flavored rsx tokens.
 #[derive(Debug, Clone, Deref, Component)]
+#[require(MacroIdx)]
 pub struct RstmlTokens(SendWrapper<TokenStream>);
 impl RstmlTokens {
 	pub fn new(tokens: TokenStream) -> Self { Self(SendWrapper::new(tokens)) }
@@ -78,6 +67,7 @@ impl RstmlTokens {
 /// A vec of [`rstml::node::Node`] retrieved from the [`RstmlTokens`]
 /// via [`tokens_to_rstml`].
 #[derive(Debug, Clone, Deref, DerefMut, Component)]
+#[require(MacroIdx)]
 pub struct RstmlRoot(SendWrapper<Node>);
 impl RstmlRoot {
 	pub fn new(node: Node) -> Self { Self(SendWrapper::new(node)) }
@@ -104,19 +94,12 @@ pub(super) fn tokens_to_rstml(
 	_: TempNonSendMarker,
 	mut commands: Commands,
 	parser: NonSend<Parser<RstmlCustomNode>>,
-	query: Populated<
-		(Entity, &RstmlTokens, Option<&SourceFile>),
-		Added<RstmlTokens>,
-	>,
+	query: Populated<(Entity, &RstmlTokens), Added<RstmlTokens>>,
 ) -> Result {
-	for (entity, handle, source_file) in query.iter() {
-		let default_source_file = WsPathBuf::default();
-		let source_file = source_file.map_or(&default_source_file, |sf| &sf);
-
+	for (entity, handle) in query.iter() {
 		let tokens = handle.clone().take();
 		// this is the key to matching statically analyzed macros
 		// with instantiated ones
-		let start = tokens.span().start();
 		let (nodes, errors) = parser.parse_recoverable(tokens).split_vec();
 
 		let node = match nodes.len() {
@@ -125,11 +108,10 @@ pub(super) fn tokens_to_rstml(
 			_ => rstml_fragment(nodes),
 		};
 
-		commands.entity(entity).remove::<RstmlTokens>().insert((
-			RstmlRoot::new(node),
-			TokensDiagnostics::new(errors),
-			MacroIdx::new(source_file.clone(), start.into()),
-		));
+		commands
+			.entity(entity)
+			.remove::<RstmlTokens>()
+			.insert((RstmlRoot::new(node), TokensDiagnostics::new(errors)));
 	}
 	Ok(())
 }

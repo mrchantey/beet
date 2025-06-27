@@ -26,37 +26,50 @@ pub use html_constants::*;
 
 /// Added to the [`StaticScenePlugin`] and the [`TemplatePlugin`] for static scene
 /// serde.
-pub fn node_types_plugin(app: &mut bevy::prelude::App) {
-	app.add_plugins(directive_types_plugin)
-		// idxs
-		// we dont need DomIdx, idxs applied after serde
-		// .register_type::<DomIdx>()
-		.register_type::<MacroIdx>()
-		.register_type::<ExprIdx>()
-		// attributes
-		.register_type::<AttributeOf>()
-		.register_type::<Attributes>()
-		.register_type::<AttributeKey>()
-		.register_type::<AttributeLit>()
-		// misc
-		// rsx nodes
-		.register_type::<NodeTag>()
-		.register_type::<TemplateNode>()
-		.register_type::<FragmentNode>()
-		.register_type::<TextNode>()
-		.register_type::<BlockNode>()
-		.register_type::<FileSpanOf<NodeTag>>()
-		.register_type::<FileSpanOf<TemplateNode>>()
-		.register_type::<FileSpanOf<FragmentNode>>()
-		.register_type::<FileSpanOf<TextNode>>()
-		.register_type::<FileSpanOf<BlockNode>>()
-		// web nodes
-		.register_type::<DoctypeNode>()
-		.register_type::<CommentNode>()
-		.register_type::<ElementNode>()
-		.register_type::<FileSpanOf<DoctypeNode>>()
-		.register_type::<FileSpanOf<CommentNode>>()
-		.register_type::<FileSpanOf<ElementNode>>()
-		// _
-		;
+/// This plugin is not unique, so can be added in multiple places.
+pub struct NodeTypesPlugin;
+
+impl bevy::app::Plugin for NodeTypesPlugin {
+	// allow to be added in several places
+	fn is_unique(&self) -> bool { false }
+	fn build(&self, app: &mut bevy::prelude::App) {
+		app
+			// idxs
+			// we dont need DomIdx, idxs applied after serde
+			// .register_type::<DomIdx>()
+			.register_type::<MacroIdx>()
+			.register_type::<ExprIdx>()
+			// rsx nodes
+			.register_type::<NodeTag>()
+			.register_type::<TemplateNode>()
+			.register_type::<FragmentNode>()
+			.register_type::<TextNode>()
+			.register_type::<BlockNode>()
+			.register_type::<FileSpanOf<NodeTag>>()
+			.register_type::<FileSpanOf<TemplateNode>>()
+			.register_type::<FileSpanOf<FragmentNode>>()
+			.register_type::<FileSpanOf<TextNode>>()
+			.register_type::<FileSpanOf<BlockNode>>()
+			// web nodes
+			.register_type::<DoctypeNode>()
+			.register_type::<CommentNode>()
+			.register_type::<ElementNode>()
+			.register_type::<FileSpanOf<DoctypeNode>>()
+			.register_type::<FileSpanOf<CommentNode>>()
+			.register_type::<FileSpanOf<ElementNode>>()
+			// directives
+			.register_type::<LangContent>()
+			.register_type::<HtmlHoistDirective>()
+			.register_type::<ClientLoadDirective>()
+			.register_type::<ClientOnlyDirective>()
+			.register_type::<SlotChild>()
+			.register_type::<SlotTarget>()
+			// attributes
+			.register_type::<AttributeOf>()
+			.register_type::<Attributes>()
+			.register_type::<AttributeKey>()
+			.register_type::<AttributeLit>()
+			//_
+			;
+	}
 }

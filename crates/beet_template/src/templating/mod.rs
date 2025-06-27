@@ -43,7 +43,7 @@ pub struct BindStep;
 pub struct TemplatePlugin;
 impl Plugin for TemplatePlugin {
 	fn build(&self, app: &mut App) {
-		app.add_plugins((signals_plugin, node_types_plugin));
+		app.add_plugins((signals_plugin, NodeTypesPlugin));
 		app.init_resource::<HtmlConstants>()
 			.register_type::<LangPartial>()
 			.configure_sets(

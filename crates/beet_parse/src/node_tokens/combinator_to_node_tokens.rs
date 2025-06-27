@@ -10,6 +10,7 @@ use bevy::prelude::*;
 /// or [`tokenize_bundle_tokens`].
 #[derive(Default, Component, Deref, Reflect)]
 #[reflect(Default, Component)]
+#[require(MacroIdx)]
 pub struct CombinatorTokens(pub String);
 impl CombinatorTokens {
 	/// Create a new [`CombinatorTokens`] from a string.
@@ -25,24 +26,19 @@ fn combinator_to_node_tokens(
 	_: TempNonSendMarker,
 	mut commands: Commands,
 	query: Populated<
-		(Entity, &CombinatorTokens, Option<&SourceFile>),
+		(Entity, &CombinatorTokens, &MacroIdx),
 		Added<CombinatorTokens>,
 	>,
 ) -> bevy::prelude::Result {
-	for (entity, tokens, source_file) in query.iter() {
-		let default_source_file = WsPathBuf::default();
-		let source_file = source_file.map_or(&default_source_file, |sf| &sf);
+	for (entity, tokens, macro_idx) in query.iter() {
 		Builder {
 			verbatim_tags: &["script", "style", "code"],
-			source_file,
+			file_path: &macro_idx.file,
 			commands: &mut commands,
 			expr_idx: ExprIdxBuilder::new(),
 		}
 		.map_to_children(entity, tokens)?;
-		commands
-			.entity(entity)
-			.remove::<CombinatorTokens>()
-			.insert(MacroIdx::new(source_file.clone(), LineCol::default()));
+		commands.entity(entity).remove::<CombinatorTokens>();
 	}
 	Ok(())
 }
@@ -51,7 +47,7 @@ fn combinator_to_node_tokens(
 /// For a given string of rsx, use [`beet_rsx_combinator`] to parse.
 struct Builder<'w, 's, 'a> {
 	verbatim_tags: &'a [&'a str],
-	source_file: &'a WsPathBuf,
+	file_path: &'a WsPathBuf,
 	expr_idx: ExprIdxBuilder,
 	commands: &'a mut Commands<'w, 's>,
 }
@@ -86,14 +82,14 @@ impl<'w, 's, 'a> Builder<'w, 's, 'a> {
 
 		self.rsx_parsed_expression(root, expr)?;
 		self.commands.entity(root).insert(FileSpanOf::<()>::new(
-			FileSpan::new_for_file(&self.source_file),
+			FileSpan::new_for_file(&self.file_path),
 		));
 		Ok(())
 	}
 
 	// not ideal but we dont have spans for beet_rsx_combinator yet
 	fn default_file_span(&self) -> FileSpan {
-		FileSpan::new_for_file(&self.source_file)
+		FileSpan::new_for_file(&self.file_path)
 	}
 	/// insert a [`CombinatorExpr`] into the entity
 	fn rsx_parsed_expression(
