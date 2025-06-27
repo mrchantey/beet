@@ -23,6 +23,19 @@ pub struct MacroIdx {
 impl MacroIdx {
 	/// Create a new [`TemplateKey`] from a file and index.
 	pub fn new(file: WsPathBuf, start: LineCol) -> Self { Self { file, start } }
+	/// Convenience for using the `file!` and friends macros.
+	/// ## Example
+	/// ```rust
+	/// use beet_common::prelude::*;
+	/// let idx = MacroIdx::new_file_line_col(file!(), line!(), column!());
+	/// ```
+	pub fn new_file_line_col(file: &str, line: u32, col: u32) -> Self {
+		Self {
+			file: WsPathBuf::new(file),
+			start: LineCol::new(line, col),
+		}
+	}
+
 	#[cfg(feature = "tokens")]
 	pub fn new_from_tokens(
 		file: WsPathBuf,

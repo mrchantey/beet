@@ -177,23 +177,16 @@ impl<'w, 's, 'a> RstmlToWorld<'w, 's, 'a> {
 					));
 				}
 
-				// let attributes = AttributeTokensList(attributes);
-
-				let children = self.spawn_nodes(children);
-
 				let mut entity = self.commands.entity(entity);
 				entity.insert((
 					NodeTag(tag_str.clone()),
 					FileSpanOf::<NodeTag>::new(tag_file_span),
 					SpanOf::<NodeTag>::new(tag_span),
 				));
-				entity.add_children(&children);
 
 				if tag_str.starts_with(|c: char| c.is_uppercase()) {
 					entity.insert((
 						TemplateNode,
-						// yes we get the ExprIdx after its children, its fine as long
-						// as its consistent with other parsers.
 						self.expr_idx.next(),
 						FileSpanOf::<TemplateNode>::new(file_span),
 						SpanOf::<TemplateNode>::new(node_span),
@@ -206,6 +199,8 @@ impl<'w, 's, 'a> RstmlToWorld<'w, 's, 'a> {
 					));
 				}
 				let entity = entity.id();
+				let children = self.spawn_nodes(children);
+				self.commands.entity(entity).add_children(&children);
 
 				open_tag
 					.attributes

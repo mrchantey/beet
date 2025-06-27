@@ -148,7 +148,6 @@ impl<'w, 's, 'a> Builder<'w, 's, 'a> {
 		};
 		let tag_str = element_name.to_string();
 
-		let children = self.rsx_children(&tag_str, children)?;
 		let file_span = self.default_file_span();
 
 		let mut entity = self.commands.spawn((
@@ -156,14 +155,9 @@ impl<'w, 's, 'a> Builder<'w, 's, 'a> {
 			FileSpanOf::<NodeTag>::new(self.default_file_span()),
 		));
 
-		entity.add_children(&children);
-
-
 		if tag_str.starts_with(|c: char| c.is_uppercase()) {
 			entity.insert((
 				TemplateNode,
-				// yes we get the ExprIdx after its children, its fine as long
-				// as its consistent with other parsers.
 				self.expr_idx.next(),
 				FileSpanOf::<TemplateNode>::new(file_span),
 			));
@@ -174,6 +168,9 @@ impl<'w, 's, 'a> Builder<'w, 's, 'a> {
 			));
 		}
 		let entity = entity.id();
+		let children = self.rsx_children(&tag_str, children)?;
+		self.commands.entity(entity).add_children(&children);
+
 		attributes
 			.0
 			.into_iter()

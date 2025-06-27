@@ -130,13 +130,41 @@ pub impl<W: IntoWorld> W {
 	/// Shorthand for building a serialized scene from the current world.
 	#[cfg(feature = "bevy_scene")]
 	fn build_scene(&self) -> String {
+		use bevy::scene::ron;
+		use bevy::scene::serde::SceneSerializer;
+
 		let world = self.into_world();
 		let scene = DynamicScene::from_world(world);
 		let type_registry = world.resource::<AppTypeRegistry>();
 		let type_registry = type_registry.read();
-		let scene = scene
-			.serialize(&type_registry)
-			.expect("failed to serialize scene");
+		let scene_serializer = SceneSerializer::new(&scene, &type_registry);
+		let pretty_config = ron::ser::PrettyConfig::default()
+			.indentor("  ".to_string())
+			.new_line("\n".to_string());
+		let scene =
+			ron::ser::to_string_pretty(&scene_serializer, pretty_config)
+				.expect("failed to serialize scene");
 		scene
+	}
+	#[cfg(feature = "bevy_scene")]
+	fn load_scene(&mut self, scene: &str) -> Result {
+		use bevy::ecs::entity::EntityHashMap;
+		let world = self.into_world_mut();
+		let scene = {
+			use serde::de::DeserializeSeed;
+			let type_registry = world.resource::<AppTypeRegistry>();
+			let mut deserializer =
+				bevy::scene::ron::de::Deserializer::from_str(scene)?;
+			let scene_deserializer = bevy::scene::serde::SceneDeserializer {
+				type_registry: &type_registry.read(),
+			};
+
+			scene_deserializer
+				.deserialize(&mut deserializer)
+				.map_err(|e| deserializer.span_error(e))
+		}?;
+		scene.write_to_world(world, &mut EntityHashMap::default())?;
+
+		Ok(())
 	}
 }

@@ -11,7 +11,7 @@ repository.workspace = true
 
 [features]
 bevy_default = ["bevy/default"]
-bevy_scene = ["bevy/bevy_scene"]
+bevy_scene = ["bevy/bevy_scene", "dep:serde"]
 rand = ["dep:rand", "dep:rand_chacha", "dep:getrandom"]
 
 [dependencies]
@@ -21,6 +21,7 @@ bevy.workspace = true
 
 anyhow.workspace = true
 extend.workspace = true
+serde = { workspace = true, optional = true }
 rand = { workspace = true, optional = true }
 rand_chacha = { workspace = true, optional = true }
 getrandom = { workspace = true, optional = true }
