@@ -51,7 +51,7 @@ fn rstml_to_node_tokens(
 			commands: &mut commands,
 			expr_idx: ExprIdxBuilder::new(),
 		}
-		.insert_node(entity, root_node.take());
+		.insert_node(ParentContext::default(), entity, root_node.take());
 		commands
 			.entity(entity)
 			.remove::<RstmlRoot>()
@@ -70,24 +70,39 @@ struct RstmlToWorld<'w, 's, 'a> {
 	expr_idx: ExprIdxBuilder,
 }
 
+#[derive(Default, Copy, Clone, PartialEq, Eq)]
+enum ParentContext {
+	#[default]
+	None,
+	// attempt to mend RawText children
+	StyleTag,
+}
+
+
 impl<'w, 's, 'a> RstmlToWorld<'w, 's, 'a> {
 	/// Returns the entity containing these nodes
 	pub fn spawn_nodes(
 		&mut self,
+		parent_cx: ParentContext,
 		nodes: Vec<Node<RstmlCustomNode>>,
 	) -> Vec<Entity> {
 		nodes
 			.into_iter()
 			.map(|node| {
 				let entity = self.commands.spawn_empty().id();
-				self.insert_node(entity, node);
+				self.insert_node(parent_cx, entity, node);
 				entity
 			})
 			.collect()
 	}
 
 
-	fn insert_node(&mut self, entity: Entity, node: Node<RstmlCustomNode>) {
+	fn insert_node(
+		&mut self,
+		parent_cx: ParentContext,
+		entity: Entity,
+		node: Node<RstmlCustomNode>,
+	) {
 		let node_span = node.span();
 		let file_span = FileSpan::new_from_span(self.file_path.clone(), &node);
 		// let spans = (node_span, file_span);
@@ -114,14 +129,18 @@ impl<'w, 's, 'a> RstmlToWorld<'w, 's, 'a> {
 				));
 			}
 			Node::RawText(node) => {
+				let mut text = node.to_string_best();
+				if parent_cx == ParentContext::StyleTag {
+					text = self.mend_style_raw_text(&text);
+				}
 				self.commands.entity(entity).insert((
-					TextNode(node.to_string_best()),
+					TextNode(text),
 					FileSpanOf::<TextNode>::new(file_span),
 					SpanOf::<TextNode>::new(node_span),
 				));
 			}
 			Node::Fragment(fragment) => {
-				let children = self.spawn_nodes(fragment.children);
+				let children = self.spawn_nodes(parent_cx, fragment.children);
 				self.commands
 					.entity(entity)
 					.insert((
@@ -205,7 +224,11 @@ impl<'w, 's, 'a> RstmlToWorld<'w, 's, 'a> {
 					.into_iter()
 					.for_each(|attr| self.spawn_attribute(entity, attr));
 
-				let children = self.spawn_nodes(children);
+				let parent_cx = match tag_str.as_str() {
+					"style" => ParentContext::StyleTag,
+					_ => ParentContext::None,
+				};
+				let children = self.spawn_nodes(parent_cx, children);
 				self.commands.entity(entity).add_children(&children);
 			}
 			Node::Custom(_) => {
@@ -321,6 +344,14 @@ impl<'w, 's, 'a> RstmlToWorld<'w, 's, 'a> {
 			name.span(),
 		)
 	}
+	fn mend_style_raw_text(&self, str: &str) -> String {
+		str
+			// em is not valid in rstml, we provide an alternative .em
+			// hacks and attempts to fix back up the rstml parse
+			.replace(".em", "em")
+			// parsing rstml via token streams results in spaces around dashes
+			.replace(" - ", "-")
+	}
 
 	/// Ensure that self-closing elements do not have children,
 	/// ie <br>foo</br>
@@ -391,24 +422,13 @@ mod test {
 		let (mut app, _) = parse(quote! {
 			<style>
 			body{
-				font-size: 16px;
+				font-size: 1.em;
 			}
 			</style>
 		});
 		let text_nodes = app.query_once::<&TextNode>();
 		expect(text_nodes.len()).to_be(1);
-		// the nature of token streams means dashes are spaced
-		expect(&text_nodes[0].0).to_be("body { font - size : 16px ; }");
+		// mended
+		expect(&text_nodes[0].0).to_be("body { font-size : 1 . em ; }");
 	}
-
-	// #[test]
-	// fn style_tags() {
-	// 	quote! {
-
-	// 	}
-	// 	.xmap(parse)
-	// 	.xmap(|app| app.world_mut().query)
-	// 	.xpect()
-	// 	.to_be(2);
-	// }
 }

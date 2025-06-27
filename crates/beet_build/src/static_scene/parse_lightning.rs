@@ -28,14 +28,9 @@ pub fn parse_lightning(
 		.into_par_iter()
 		.filter(|(_, _, tag, _, _)| tag.as_str() == "style")
 		.map(|(entity, partial, _tag, styleid, span)| {
-			// em is not valid in rstml, we provide an alternative .em
-			// hacks and attempts to fix back up the rstml parse
-			let style_str = partial.replace(".em", "em");
-			// parsing rstml via token streams results in spaces around dashes
-			let style_str = style_str.replace(" - ", "-");
 			// Parse the stylesheet
 			let mut stylesheet =
-				StyleSheet::parse(&style_str, ParserOptions::default())
+				StyleSheet::parse(&partial, ParserOptions::default())
 					.map_err(|e| Error::LightningCss {
 						span: span.map(|s| s.value.clone()),
 						err: e.to_string(),
