@@ -155,7 +155,8 @@ pub impl<W: IntoWorld> W {
 		scene
 	}
 	#[cfg(feature = "bevy_scene")]
-	fn load_scene(&mut self, scene: &str) -> Result {
+	fn load_scene(&mut self, scene: impl AsRef<str>) -> Result {
+		let scene = scene.as_ref();
 		use bevy::ecs::entity::EntityHashMap;
 		let world = self.into_world_mut();
 		let scene = {

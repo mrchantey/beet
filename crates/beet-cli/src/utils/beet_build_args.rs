@@ -25,14 +25,16 @@ fn parse_build_only(s: &str) -> Result<BuildOnly, String> {
 /// inserting all if [`only`] is empty.
 impl Plugin for BeetBuildArgs {
 	fn build(&self, app: &mut App) {
-		let config =
-			BuildConfig::try_load_or_default(self.beet_config.as_deref())
-				.unwrap_or_exit();
-
-		let all = self.only.is_empty();
+		let config = BeetConfigFile::try_load_or_default::<BuildConfig>(
+			self.beet_config.as_deref(),
+		)
+		.unwrap_or_exit();
 
 		app.add_non_send_plugin(config)
 			.add_plugins(NodeTokensPlugin::default());
+
+		// selectively load plugins
+		let all = self.only.is_empty();
 
 		if all || self.only.contains(&BuildOnly::Routes) {
 			app.add_plugins(RouteCodegenPlugin::default());

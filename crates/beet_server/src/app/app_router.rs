@@ -4,6 +4,7 @@ use beet_router::prelude::ClientIsland;
 use beet_router::prelude::ClientIslandMap;
 use beet_template::as_beet::bevybail;
 use bevy::prelude::*;
+use std::path::PathBuf;
 // use beet_router::types::RouteFunc;
 use clap::Parser;
 use clap::Subcommand;
@@ -20,24 +21,19 @@ use tracing::Level;
 /// Cli args parser when running an [`AppRouter`].
 #[derive(Parser)]
 #[command(version, about, long_about = None)]
-pub struct AppRouterConfig {
+pub struct AppRouterArgs {
 	/// Specify the router mode
 	#[command(subcommand)]
 	mode: Option<RouterMode>,
-	/// The directory where the static html files will be exported and
-	/// served from.
-	#[arg(long, default_value = "target/client")]
-	pub html_dir: WsPathBuf,
-	/// Directory for temp static files like client islands.
-	#[arg(long, default_value = "target")]
-	pub static_dir: WsPathBuf,
+	/// Location of the beet.toml config file
+	#[arg(long)]
+	beet_config: Option<PathBuf>,
 }
-impl Default for AppRouterConfig {
+impl Default for AppRouterArgs {
 	fn default() -> Self {
 		Self {
 			mode: None,
-			html_dir: "target/client".into(),
-			static_dir: "target".into(),
+			beet_config: None,
 		}
 	}
 }
@@ -54,7 +50,7 @@ enum RouterMode {
 	ExportStatic,
 }
 
-impl AppRouterConfig {
+impl AppRouterArgs {
 	#[cfg(target_arch = "wasm32")]
 	pub fn from_url_params() -> anyhow::Result<Self> {
 		// TODO actually parse from search params
@@ -73,7 +69,10 @@ pub struct AppRouter<S = ()> {
 	pub tracing: Level,
 	/// A list of routes that can be used to generate static html files.
 	pub static_routes: Vec<RouteInfo>,
-	pub config: AppRouterConfig,
+	/// cli arguments passed in.
+	pub args: AppRouterArgs,
+
+	template_config: TemplateConfig,
 }
 
 impl Default for AppRouter<()> {
@@ -81,14 +80,15 @@ impl Default for AppRouter<()> {
 }
 
 // so dirty we need cleaner solution, ReactiveApp in general sucks
-fn set_app() {
-	#[cfg(feature = "build")]
-	ReactiveApp::set_create_app(|| {
+fn set_app(template_config: TemplateConfig) {
+	// insert config here!
+	ReactiveApp::set_create_app(move || {
 		let mut app = App::new();
-		app.add_plugins((
-			beet_build::prelude::StaticScenePlugin,
-			TemplatePlugin,
-		));
+		app.add_plugins((TemplatePlugin, template_config.clone()));
+
+		#[cfg(feature = "build")]
+		app.add_plugins(beet_build::prelude::StaticScenePlugin);
+
 		app
 	});
 }
@@ -96,21 +96,30 @@ fn set_app() {
 impl AppRouter<()> {
 	/// The default app router parses cli arguments which is not desired in tests.
 	pub fn test() -> Self {
-		set_app();
+		let template_config = TemplateConfig::default();
+		set_app(template_config.clone());
 		Self {
-			config: default(),
 			router: default(),
 			static_routes: default(),
 			state: default(),
 			tracing: Level::WARN,
+			args: default(),
+			template_config,
 		}
 	}
 }
 
 impl<S: 'static + Clone + Send + Sync> AppRouter<S> {
 	pub fn new(state: S) -> Self {
-		set_app();
+		let args = AppRouterArgs::parse();
+		let template_config = BeetConfigFile::try_load_or_default::<
+			TemplateConfig,
+		>(args.beet_config.as_deref())
+		.unwrap_or_exit();
+		set_app(template_config.clone());
 		Self {
+			args,
+			template_config,
 			router: Router::new(),
 			static_routes: Vec::new(),
 			state,
@@ -118,7 +127,6 @@ impl<S: 'static + Clone + Send + Sync> AppRouter<S> {
 			tracing: Level::INFO,
 			#[cfg(not(debug_assertions))]
 			tracing: Level::WARN,
-			config: AppRouterConfig::parse(),
 		}
 	}
 }
@@ -149,21 +157,26 @@ impl<'a, S> AppRouter<S>
 where
 	S: 'static + Send + Sync + Clone,
 {
-	pub fn run(self) -> Result {
-		self.run_with_config(AppRouterConfig::parse())
-	}
 	#[tokio::main]
-	pub async fn run_with_config(self, config: AppRouterConfig) -> Result<()> {
-		match self.config.mode {
-			Some(RouterMode::ExportStatic) => self.export_static(&config).await,
+	pub async fn run(self) -> Result<()> {
+		match self.args.mode {
+			Some(RouterMode::ExportStatic) => self.export_static().await,
 			_ => self.serve().await,
 		}
 	}
 
 	/// Export static html files and client islands.
-	pub async fn export_static(self, config: &AppRouterConfig) -> Result {
-		let html_dir = config.html_dir.into_abs();
-		let static_dir = config.static_dir.into_abs();
+	pub async fn export_static(self) -> Result {
+		let html_dir = self
+			.template_config
+			.server_output_config
+			.html_dir
+			.into_abs();
+		let static_dir = self
+			.template_config
+			.server_output_config
+			.static_dir
+			.into_abs();
 
 		self.static_routes
 			.iter()
@@ -254,6 +267,12 @@ where
 	/// Server the provided router, adding
 	/// a fallback file server with live reload.
 	pub async fn serve(self) -> Result<()> {
+		let html_dir = self
+			.template_config
+			.server_output_config
+			.html_dir
+			.into_abs();
+
 		#[allow(unused_mut)]
 		let mut router = self
 			.router
@@ -261,20 +280,18 @@ where
 			.merge(state_utils_routes());
 		// .layer(NormalizePathLayer::trim_trailing_slash());
 
-		match self.config.mode {
+		match self.args.mode {
 			Some(RouterMode::Ssg) | None => {
-				router = router.fallback_service(file_and_error_handler(
-					&self.config.html_dir,
-				));
+				router =
+					router.fallback_service(file_and_error_handler(&html_dir));
 			}
 			_ => {}
 		};
 
 		#[cfg(all(debug_assertions, feature = "reload"))]
-		let reload_handle = match self.config.mode {
+		let reload_handle = match self.args.mode {
 			Some(RouterMode::Ssg) | None => {
-				let (reload_layer, reload_handle) =
-					Self::get_reload(&self.config.html_dir);
+				let (reload_layer, reload_handle) = Self::get_reload(html_dir);
 				router = router.layer(reload_layer);
 				Some(reload_handle)
 			}
@@ -314,17 +331,16 @@ where
 	}
 	#[cfg(all(debug_assertions, feature = "reload"))]
 	fn get_reload(
-		html_dir: &std::path::Path,
+		html_dir: AbsPathBuf,
 	) -> (tower_livereload::LiveReloadLayer, JoinHandle<Result<()>>) {
 		use beet_fs::prelude::FsWatcher;
 
 		let livereload = tower_livereload::LiveReloadLayer::new();
 		let reload = livereload.reloader();
-		let html_dir = html_dir.to_path_buf();
 
 		let reload_handle = tokio::spawn(async move {
 			let mut rx = FsWatcher {
-				cwd: html_dir,
+				cwd: html_dir.to_path_buf(),
 				// no filter because any change in the html dir should trigger a reload
 				..Default::default()
 			}

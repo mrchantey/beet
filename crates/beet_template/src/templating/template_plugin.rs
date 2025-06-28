@@ -23,7 +23,8 @@ impl Plugin for TemplatePlugin {
 		bevy::ecs::error::GLOBAL_ERROR_HANDLER
 			.set(bevy::ecs::error::panic)
 			.ok();
-
+		#[cfg(feature = "serde")]
+		app.add_systems(Startup, load_static_scene);
 
 		app.add_plugins((signals_plugin, NodeTypesPlugin));
 		app.init_resource::<HtmlConstants>()

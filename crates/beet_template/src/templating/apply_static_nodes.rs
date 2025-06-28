@@ -4,9 +4,19 @@ use beet_common::prelude::*;
 use bevy::platform::collections::HashMap;
 use bevy::prelude::*;
 
-
-pub fn load_template_scene(world: &mut World) {
-	// let path = WsPathBuf::new
+/// Load static scene if it exists.
+#[cfg(feature = "serde")]
+pub fn load_static_scene(world: &mut World) -> Result {
+	use beet_bevy::prelude::WorldMutExt;
+	use beet_utils::prelude::ReadFile;
+	if let Some(static_scene_config) = world.get_resource::<StaticSceneConfig>()
+	{
+		if let Ok(file) = ReadFile::to_string(static_scene_config.scene_file())
+		{
+			world.load_scene(file)?;
+		}
+	}
+	Ok(())
 }
 
 
