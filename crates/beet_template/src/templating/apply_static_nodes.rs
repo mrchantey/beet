@@ -105,6 +105,9 @@ pub(super) fn apply_static_nodes(
 			.clone_with(instance, |builder| {
 				builder
 					.deny::<StaticNodeRoot>()
+					// a static node should not have a TemplateOf 
+					// but specify for completeness
+					.deny::<TemplateOf>()
 					.linked_cloning(true)
 					.add_observers(true);
 			});
@@ -121,7 +124,6 @@ pub(super) fn apply_static_nodes(
 	Ok(())
 }
 
-
 /// A system queued after [`apply_static_nodes`],
 fn apply_template_locations(
 	In((macro_idx, entity, mut instance_exprs)): In<(
@@ -133,6 +135,7 @@ fn apply_template_locations(
 	children: Query<&Children>,
 	attributes: Query<&Attributes>,
 	expr_idxs: Query<&ExprIdx>,
+	templates: Query<&TemplateNode>,
 ) {
 	let all_keys = instance_exprs.keys().cloned().collect::<Vec<_>>();
 	let mut get_on_spawn = |idx: &ExprIdx| {
@@ -151,9 +154,12 @@ Expected idx: {idx}, instance idxs: {all_keys:?}
 		if let Ok(expr_idx) = expr_idxs.get(child) {
 			commands.entity(child).insert(get_on_spawn(expr_idx));
 		}
-		for attr in attributes.iter_direct_descendants(child) {
-			if let Ok(expr_idx) = expr_idxs.get(attr) {
-				commands.entity(attr).insert(get_on_spawn(expr_idx));
+		let is_template = templates.get(child).is_ok();
+		if !is_template {
+			for attr in attributes.iter_direct_descendants(child) {
+				if let Ok(expr_idx) = expr_idxs.get(attr) {
+					commands.entity(attr).insert(get_on_spawn(expr_idx));
+				}
 			}
 		}
 	}
@@ -227,22 +233,48 @@ mod test {
 	#[test]
 	fn root() { parse(rsx! {{7}}, rsx! {hello{()}}).xpect().to_be("hello7"); }
 
+	#[template]
+	fn MyTemplate(initial: u32) -> impl Bundle {
+		rsx! {{initial}}
+	}
+	#[template]
+	fn SomeOtherName() -> impl Bundle { () }
+
 	#[test]
-	fn template() {
-		#[template]
-		fn MyTemplate(initial: u32) -> impl Bundle {
-			rsx! {{initial+2}}
-		}
+	fn template_simple() {
 		parse(
 			rsx! {<MyTemplate initial=3/>},
-			(NodeTag::new("div"), ElementNode::open(), children![(
-				ExprIdx(0u32),
-				NodeTag(String::from("Counter")),
-				FragmentNode,
-				TemplateNode,
-			)]),
+			// the name doesnt matter, a <SomeTitleCase/> is treated the same as
+			// any other block {}
+			rsx! {<span><SomeOtherName/></span>},
 		)
 		.xpect()
-		.to_be("<div>5</div>");
+		.to_be("<span>3</span>");
+	}
+	#[test]
+	fn template_expr_attr() {
+		let val = 5;
+		parse(
+			// attributes are resolved here, there is only one ExprIdx
+			// in this tree
+			rsx! {<MyTemplate initial=val/>},
+			// this is something like the static/tokens representation
+			// of a template, ie attributes have not been resolved yet,
+			// this test ensures we dont try to resolve them
+			(
+				NodeTag(String::from("MyTemplate")),
+				ExprIdx(0u32),
+				FragmentNode,
+				TemplateNode,
+				related! {Attributes[
+						(
+							AttributeKey::new("initial"),
+							ExprIdx(1u32)
+						)
+				]},
+			),
+		)
+		.xpect()
+		.to_be("5");
 	}
 }
