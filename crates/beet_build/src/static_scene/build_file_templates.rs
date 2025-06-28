@@ -1,59 +1,38 @@
 use super::TemplateFile;
-use super::error::Error;
-use super::error::Result;
+use beet_bevy::prelude::When;
 use beet_bevy::prelude::WorldMutExt;
 use beet_fs::prelude::*;
+use beet_template::prelude::*;
 use beet_utils::prelude::*;
 use bevy::prelude::*;
-use serde::Deserialize;
-use serde::Serialize;
 
 
-/// Config for the template creation stage of the build process
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Component)]
-pub struct BuildFileTemplates {
-	/// Filter for files that should be parsed,
-	/// excludes 'target' and 'node_modules' directories by default
-	filter: GlobFilter,
-	/// The root directory for files including templates
-	root_dir: WsPathBuf,
-	/// The location for the generated template scene file
-	scene_file: WsPathBuf,
+/// Create a [`TemplateFile`] for each file specified in the [`StaticSceneConfig`].
+/// This will run once for the initial load, afterwards [`handle_changed_files`]
+/// will incrementally load changed files.
+pub(super) fn load_template_files(
+	mut commands: Commands,
+	config: When<Res<StaticSceneConfig>>,
+) -> bevy::prelude::Result {
+	config.get_files()?.into_iter().for_each(|path| {
+		commands.spawn(TemplateFile::new(path));
+	});
+	Ok(())
 }
 
-impl Default for BuildFileTemplates {
-	fn default() -> Self {
-		Self {
-			filter: GlobFilter::default()
-				// TODO move to beet.toml
-				.with_include("*/crates/beet_design/src/**/*")
-				.with_include("*/crates/beet_site/src/**/*")
-				.with_include("*/crates/beet_router/src/test_site/**/*")
-				.with_exclude("*/target/*")
-				.with_exclude("*/.cache/*")
-				.with_exclude("*/node_modules/*"),
-			scene_file: WsPathBuf::new("target/template_scene.ron"),
-			#[cfg(test)]
-			root_dir: WsPathBuf::new("crates/beet_router/src/test_site"),
-			#[cfg(not(test))]
-			root_dir: WsPathBuf::default(),
-		}
-	}
-}
-
+/// When a file is changed
 pub fn handle_changed_files(
 	In(ev): In<WatchEventVec>,
 	mut commands: Commands,
-	builders: Query<&BuildFileTemplates>,
+	config: When<Res<StaticSceneConfig>>,
 	query: Query<(Entity, &TemplateFile)>,
 ) -> bevy::prelude::Result {
 	for ev in ev
 		.mutated()
 		.into_iter()
 		// we only care about files that a builder will want to save
-		.filter(|ev| {
-			builders.iter().any(|config| config.filter.passes(&ev.path))
-		}) {
+		.filter(|ev| config.passes(&ev.path))
+	{
 		let ws_path = ev.path.into_ws_path()?;
 
 		// remove existing TemplateFile entities and their children
@@ -79,20 +58,8 @@ pub fn handle_changed_files(
 }
 
 
-/// Create a [`TemplateFile`] for each file specified in the [`BuildTemplatesConfig`].
-pub(super) fn load_template_files(
-	mut commands: Commands,
-	query: Populated<&BuildFileTemplates, Added<BuildFileTemplates>>,
-) -> bevy::prelude::Result {
-	for config in query.iter() {
-		config.get_files()?.into_iter().for_each(|path| {
-			commands.spawn(TemplateFile::new(path));
-		});
-	}
-	Ok(())
-}
-
-/// if any [`TemplateFile`] has changed, export the template scene
+/// if any [`TemplateFile`] has changed, export the template scene.
+/// This does nothing without a [`StaticSceneConfig`] resource
 #[allow(dead_code)]
 pub(super) fn export_template_scene(
 	world: &mut World,
@@ -123,23 +90,11 @@ pub(super) fn export_template_scene(
 		tracing::debug!("Changed template files: {msg}",);
 	}
 
-
 	// should really only be one of these
-	for config in world.query::<&BuildFileTemplates>().iter(world) {
+	if let Some(config) = world.get_resource::<StaticSceneConfig>() {
 		let scene = world.build_scene();
-		FsExt::write(config.scene_file.into_abs(), &scene)?;
+		FsExt::write(config.scene_file().into_abs(), &scene)?;
 	}
 
 	Ok(())
-}
-
-impl BuildFileTemplates {
-	pub fn get_files(&self) -> Result<Vec<WsPathBuf>> {
-		ReadDir::files_recursive(&self.root_dir.into_abs())
-			.map_err(Error::File)?
-			.into_iter()
-			.filter(|path| self.filter.passes(path))
-			.map(|path| WsPathBuf::new_cwd_rel(path).map_err(Error::File))
-			.collect::<Result<Vec<_>>>()
-	}
 }

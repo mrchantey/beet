@@ -1,16 +1,15 @@
 use beet_bevy::prelude::*;
 use beet_build::as_beet::*;
 use bevy::prelude::*;
+use sweet::bevy::CoreAppExtSweet;
 
 
 fn main() {
-	let mut app = App::new();
-	app.add_plugins((NodeTokensPlugin, StaticScenePlugin))
-		.world_mut()
-		.spawn(BuildFileTemplates::default());
+	let scene = App::new()
+		.add_plugins((NodeTokensPlugin, StaticScenePlugin))
+		.init_resource::<StaticSceneConfig>()
+		.update_then()
+		.build_scene();
 
-	app.update();
-
-	let scene = app.build_scene();
 	println!("Exported Scene: {}", scene);
 }

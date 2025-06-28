@@ -2,6 +2,7 @@ use crate::prelude::*;
 use anyhow::Result;
 use beet_bevy::prelude::AppExt;
 use beet_common::node::HtmlConstants;
+use beet_template::prelude::*;
 use beet_utils::prelude::*;
 use bevy::prelude::*;
 use serde::Deserialize;
@@ -28,7 +29,7 @@ pub struct BeetConfig {
 	#[serde(default)]
 	pub html_constants: HtmlConstants,
 	#[serde(default)]
-	pub template_scene: BuildFileTemplates,
+	pub static_scene_config: StaticSceneConfig,
 	pub route_codegen: RouteCodegenConfig,
 	pub client_island_codegen: ClientIslandCodegenConfig,
 }
@@ -64,7 +65,7 @@ impl BeetConfig {
 		app.insert_resource(self.html_constants);
 		app.init_resource::<HtmlConstants>();
 		if all || only.contains(&BuildOnly::Templates) {
-			app.world_mut().spawn(self.template_scene);
+			app.world_mut().insert_resource(self.static_scene_config);
 		}
 		if all || only.contains(&BuildOnly::Routes) {
 			app.add_non_send_plugin(self.route_codegen);

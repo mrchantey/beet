@@ -4,6 +4,13 @@ use beet_common::prelude::*;
 use bevy::platform::collections::HashMap;
 use bevy::prelude::*;
 
+
+pub fn load_template_scene(world: &mut World) {
+	// let path = WsPathBuf::new
+}
+
+
+
 /// When a [`MacroIdx`] is added to an entity,
 /// recusively apply each [`StaticNodeRoot`] and run [`OnSpawnTemplate`] methods
 pub fn spawn_templates(world: &mut World) -> Result {
@@ -79,7 +86,7 @@ pub(super) fn apply_static_nodes(
 			.despawn_related::<Attributes>()
 			// remove all components that the static tree may
 			// replace
-			// currently just TemplateOf but we may need to add more later 
+			// currently just TemplateOf but we may need to add more later
 			.retain::<TemplateOf>();
 
 		// apply the static tree

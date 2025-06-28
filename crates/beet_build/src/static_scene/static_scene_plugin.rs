@@ -67,6 +67,7 @@ impl Plugin for StaticScenePlugin {
 						.before(SpawnStep),
 				),
 			)
+			.add_systems(Startup, load_template_files)
 			.add_systems(
 				Update,
 				(
@@ -75,7 +76,6 @@ impl Plugin for StaticScenePlugin {
 						// im not sure if this should be here, doesnt it indicate
 						// we're relying on exprs in templates?
 						spawn_templates,
-						load_template_files,
 						(
 							templates_to_nodes_rs,
 							templates_to_nodes_md,
@@ -105,7 +105,7 @@ impl Plugin for StaticScenePlugin {
 #[cfg(test)]
 mod test {
 	use crate::prelude::*;
-	use beet_utils::prelude::*;
+	use beet_template::prelude::*;
 	use bevy::prelude::*;
 	use sweet::prelude::*;
 
@@ -113,9 +113,7 @@ mod test {
 	fn load_all_templates() {
 		App::new()
 			.add_plugins(StaticScenePlugin)
-			.xtap(|app| {
-				app.world_mut().spawn(BuildFileTemplates::default());
-			})
+			.insert_resource(StaticSceneConfig::test_site())
 			.update_then()
 			.world_mut()
 			.xpect()
