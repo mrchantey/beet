@@ -13,25 +13,34 @@ pub struct RunBuild {
 	pub load_beet_config: LoadBeetConfig,
 }
 
+fn build_plugins(app: &mut App) {
+	app.add_plugins((
+		NodeTokensPlugin::default(),
+		StaticScenePlugin::default(),
+		RouteCodegenPlugin::default(),
+		ClientIslandCodegenPlugin::default(),
+	));
+}
+
+
 impl RunBuild {
-	pub async fn run(self) -> anyhow::Result<()> {
-		// specifying 'only' means just run once
-		let run_once = !self.load_beet_config.only.is_empty();
+	/// Run once
+	pub async fn build(self) -> Result {
+		App::new()
+			.insert_resource(self.build_cmd.clone())
+			.add_plugins((self.load_beet_config.clone(), build_plugins))
+			.run_once()
+			.into_result()
+	}
 
-		let mut app = App::new();
-		app.insert_resource(self.build_cmd.clone()).add_plugins((
-			self.load_beet_config.clone(),
-			NodeTokensPlugin::default(),
-			StaticScenePlugin::default(),
-			RouteCodegenPlugin::default(),
-			ClientIslandCodegenPlugin::default(),
-		));
 
-		if run_once {
-			app.run_once().anyhow()
-		} else {
-			// .set_error_handler(warn)
-			app.run_async(FsApp::default().runner()).await.anyhow()
-		}
+	/// Run in watch mode with a file watcher
+	pub async fn run(self) -> Result {
+		App::new()
+			.insert_resource(self.build_cmd.clone())
+			.add_plugins((self.load_beet_config.clone(), build_plugins))
+			.run_async(FsApp::default().runner())
+			.await
+			.into_result()
 	}
 }
