@@ -55,7 +55,6 @@ impl WsPathBuf {
 	/// ## Panics
 	///
 	/// Panics if [`FsExt::workspace_root`] fails.
-	#[cfg(not(target_arch = "wasm32"))]
 	pub fn new_cwd_rel(path: impl AsRef<Path>) -> FsResult<Self> {
 		use crate::prelude::PathExt;
 		let path = PathExt::absolute(path)?;
@@ -73,7 +72,6 @@ impl WsPathBuf {
 		Self::new(path)
 	}
 
-	#[cfg(not(target_arch = "wasm32"))]
 	/// Convert to a [`AbsPathBuf`]. This should be used instead of
 	/// canonicalize/path::absolute because they prepend cwd instead of
 	/// workspace root.

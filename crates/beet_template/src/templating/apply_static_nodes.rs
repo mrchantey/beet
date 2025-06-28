@@ -112,7 +112,7 @@ pub(super) fn apply_static_nodes(
 		// queue system to resolve template locations after clone
 		commands.run_system_cached_with(
 			apply_template_locations,
-			(instance, instance_expr_map),
+			(idx.clone(), instance, instance_expr_map),
 		);
 	}
 	for (entity, _) in instances.iter() {
@@ -124,7 +124,8 @@ pub(super) fn apply_static_nodes(
 
 /// A system queued after [`apply_static_nodes`],
 fn apply_template_locations(
-	In((entity, mut instance_exprs)): In<(
+	In((macro_idx, entity, mut instance_exprs)): In<(
+		MacroIdx,
 		Entity,
 		HashMap<ExprIdx, OnSpawnTemplate>,
 	)>,
@@ -138,6 +139,7 @@ fn apply_template_locations(
 		instance_exprs.remove(idx).unwrap_or_else(|| {
 			panic!(
 				"
+Error resolving static node for macro at {macro_idx}
 The instance is missing an ExprIdx found in the static tree.
 Expected idx: {idx}, instance idxs: {all_keys:?}
 "
@@ -158,6 +160,7 @@ Expected idx: {idx}, instance idxs: {all_keys:?}
 	if !instance_exprs.is_empty() {
 		panic!(
 			"
+Error resolving static node for macro at {macro_idx}
 Not all ExprIdx were applied.
 The static tree is missing the following idxs found in the instance: {:?}
 ",
