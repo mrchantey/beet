@@ -97,17 +97,17 @@ pub(super) fn apply_static_nodes(
 			// remove all components that the static tree may
 			// replace
 			// currently just TemplateOf but we may need to add more later
-			.retain::<TemplateOf>();
+			.retain::<(ChildOf, TemplateOf)>();
 
 		// apply the static tree
 		commands
 			.entity(static_tree)
 			.clone_with(instance, |builder| {
 				builder
-					.deny::<StaticNodeRoot>()
-					// a static node should not have a TemplateOf 
+					// a static node should not have a TemplateOf
 					// but specify for completeness
-					.deny::<TemplateOf>()
+					//
+					.deny::<(StaticNodeRoot, ChildOf, TemplateOf)>()
 					.linked_cloning(true)
 					.add_observers(true);
 			});
@@ -142,10 +142,10 @@ fn apply_template_locations(
 		instance_exprs.remove(idx).unwrap_or_else(|| {
 			panic!(
 				"
-Error resolving static node for macro at {macro_idx}
-The instance is missing an ExprIdx found in the static tree.
-Expected idx: {idx}, instance idxs: {all_keys:?}
-"
+				Error resolving static node for macro at {macro_idx}
+				The instance is missing an ExprIdx found in the static tree.
+				Expected idx: {idx}, instance idxs: {all_keys:?}
+				"
 			);
 		})
 	};
@@ -154,6 +154,9 @@ Expected idx: {idx}, instance idxs: {all_keys:?}
 		if let Ok(expr_idx) = expr_idxs.get(child) {
 			commands.entity(child).insert(get_on_spawn(expr_idx));
 		}
+		// an instance template node does not have attributes,
+		// they are instead applied as props.
+		// but a static template node does, we can ignore them
 		let is_template = templates.get(child).is_ok();
 		if !is_template {
 			for attr in attributes.iter_direct_descendants(child) {
@@ -169,8 +172,10 @@ Expected idx: {idx}, instance idxs: {all_keys:?}
 Error resolving static node for macro at {macro_idx}
 Not all ExprIdx were applied.
 The static tree is missing the following idxs found in the instance: {:?}
+All instance idxs: {:?}
 ",
-			instance_exprs.keys()
+			instance_exprs.keys(),
+			all_keys,
 		);
 	}
 }
@@ -184,6 +189,26 @@ mod test {
 	use crate::templating::apply_slots;
 	use bevy::ecs::system::RunSystemOnce;
 	use sweet::prelude::*;
+
+	#[test]
+	fn retains_children() {
+		let mut world = World::new();
+
+		let child = world.spawn(rsx! {<div/>}).insert(MacroIdx::default()).id();
+		let parent = world.spawn(rsx! {<main></main>}).add_child(child).id();
+
+		let _tree = world
+			.spawn((rsx! {<span/>}, StaticNodeRoot))
+			.insert(MacroIdx::default())
+			.id();
+
+		world.run_system_once(spawn_templates).unwrap().unwrap();
+		world
+			.run_system_once_with(render_fragment, parent)
+			.unwrap()
+			.xpect()
+			.to_be("<main><span/></main>");
+	}
 
 	fn parse(instance: impl Bundle, static_node: impl Bundle) -> String {
 		let mut world = World::new();
@@ -211,6 +236,7 @@ mod test {
 		parse(rsx! {<div><br/></div>}, rsx! {<div>{7}</div>});
 	}
 
+
 	#[test]
 	fn block_nodes() {
 		parse(
@@ -220,6 +246,16 @@ mod test {
 		)
 		.xpect()
 		.to_be("<div><span>7</span><br/></div>");
+	}
+	#[test]
+	fn iterators() {
+		parse(
+			rsx! {<main>{["a","b","c"]}</main>},
+			// because ExprIdx matches, this should be replace with 7
+			rsx! {<div><span>{()}</span><br/></div>},
+		)
+		.xpect()
+		.to_be("<div><span>abc</span><br/></div>");
 	}
 	#[test]
 	fn attributes() {
@@ -276,5 +312,44 @@ mod test {
 		)
 		.xpect()
 		.to_be("5");
+	}
+	#[test]
+	#[ignore = "not sure how to test this this"]
+	fn bundle_templates() {
+		let bundle = MyTemplate { initial: 3 };
+
+		let idx1 = MacroIdx::new_file_line_col(file!(), line!(), column!());
+		let idx2 = MacroIdx::new_file_line_col(file!(), line!(), column!());
+
+		let mut world = World::new();
+		let child = world
+			.spawn(bundle.into_node_bundle())
+			.insert(idx2.clone())
+			.id();
+		let instance = world
+			.spawn((
+				idx1.clone(),
+				NodeTag(String::from("main")),
+				ElementNode::open(),
+			))
+			.add_child(child)
+			.insert(idx1.clone())
+			.id();
+
+		let _tree1 = world
+			.spawn((rsx! {<span>{}</span>}, StaticNodeRoot))
+			.insert(idx1)
+			.id();
+		let _tree2 = world
+			.spawn((rsx! {<span>{}</span>}, StaticNodeRoot))
+			.insert(idx2)
+			.id();
+
+		world.run_system_once(spawn_templates).unwrap().unwrap();
+		world
+			.run_system_once_with(render_fragment, instance)
+			.unwrap()
+			.xpect()
+			.to_be("<main><span/></main>");
 	}
 }

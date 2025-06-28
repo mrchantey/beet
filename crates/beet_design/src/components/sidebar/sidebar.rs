@@ -15,9 +15,8 @@ pub struct SidebarInfo {
 pub fn Sidebar(nodes: Vec<SidebarNode>) -> impl Bundle {
 	rsx! {
 		<nav id="sidebar" aria-hidden="false">
-		{nodes.into_iter().map(|node|{
-			SidebarItem { node, root: true}
-		})
+		{nodes.into_iter().map(|node|
+			rsx!{<SidebarItem root node=node/>})
 		}
 		</nav>
 		<script hoist:body src="./sidebar.js"/>

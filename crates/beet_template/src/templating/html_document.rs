@@ -1,4 +1,5 @@
 use super::*;
+use beet_bevy::bevyhow;
 use beet_bevy::prelude::HierarchyQueryExtExt;
 use beet_common::prelude::*;
 use bevy::prelude::*;
@@ -42,37 +43,31 @@ pub(super) fn rearrange_html_document(
 	children: Query<&Children>,
 	query: Populated<(Entity, &Children), Added<HtmlDocument>>,
 ) {
+
 	for (doc_entity, doc_children) in query.iter() {
 		let root = doc_children[0];
-		if false
-			== children
-				.iter_descendants_inclusive(root)
-				.any(|child| doctypes.contains(child))
+		if children
+			.iter_descendants_inclusive(root)
+			.any(|child| doctypes.contains(child))
 		{
-			// no doctype found, create full document structure and
-			// move the root into the body
-			let new_root = commands
-				.spawn(FragmentNode)
-				.with_children(|parent| {
-					parent.spawn((DoctypeNode,));
-					parent
-						.spawn((ElementNode::open(), NodeTag::new("html")))
-						.with_children(|parent| {
-							parent.spawn((
-								ElementNode::open(),
-								NodeTag::new("head"),
-							));
-							parent
-								.spawn((
-									ElementNode::open(),
-									NodeTag::new("body"),
-								))
-								.add_child(root);
-						});
-				})
-				.id();
-			commands.entity(doc_entity).replace_children(&[new_root]);
+			continue;
 		}
+		// no doctype found, create full document structure and
+		// move the root into the body
+		commands
+			.spawn((FragmentNode, ChildOf(doc_entity)))
+			.with_children(|parent| {
+				parent.spawn((DoctypeNode,));
+				parent
+					.spawn((ElementNode::open(), NodeTag::new("html")))
+					.with_children(|parent| {
+						parent
+							.spawn((ElementNode::open(), NodeTag::new("head")));
+						parent
+							.spawn((ElementNode::open(), NodeTag::new("body")))
+							.add_child(root);
+					});
+			});
 	}
 }
 
@@ -84,21 +79,43 @@ pub(super) fn hoist_document_elements(
 	documents: Populated<Entity, Added<HtmlDocument>>,
 	children: Query<&Children>,
 	node_tags: Query<&NodeTag>,
+	macro_idx: Query<&MacroIdx>,
 	directives: Query<&HtmlHoistDirective>,
-) {
+) -> Result {
 	for document in documents.iter() {
+		let get_idx = || {
+			children
+				.iter_descendants_inclusive(document)
+				.find_map(|child| {
+					macro_idx.get(child).map(|c| c.to_string()).ok()
+				})
+				.unwrap_or_else(|| String::from("unknown location"))
+		};
+
 		let head = children
 			.iter_descendants(document)
 			.find(|child| {
 				node_tags.get(*child).map_or(false, |tag| tag.0 == "head")
 			})
-			.expect("Invalid HTML document: no head tag found");
+			.ok_or_else(|| {
+				let idx = get_idx();
+				// commands.run_system_cached_with(output_info, document);
+				bevyhow!(
+					"Invalid HTML document: no head tag found\nlocation: {idx}"
+				)
+			})?;
 		let body = children
 			.iter_descendants(document)
 			.find(|child| {
 				node_tags.get(*child).map_or(false, |tag| tag.0 == "body")
 			})
-			.expect("Invalid HTML document: no body tag found");
+			.ok_or_else(|| {
+				let idx = get_idx();
+				// commands.run_system_cached_with(output_info, document);
+				bevyhow!(
+					"Invalid HTML document: no body tag found\nlocation: {idx}"
+				)
+			})?;
 		for entity in children.iter_descendants(document) {
 			match (directives.get(entity), node_tags.get(entity)) {
 				(Ok(HtmlHoistDirective::Head), _) => {
@@ -108,7 +125,7 @@ pub(super) fn hoist_document_elements(
 					commands.entity(body).add_child(entity);
 				}
 				(Ok(HtmlHoistDirective::None), _) => {
-					// leave in place
+					// leave in place, even if matches a hoist_to_head_tag
 				}
 				(Err(_), Ok(tag))
 					if constants.hoist_to_head_tags.contains(&tag.0) =>
@@ -121,6 +138,7 @@ pub(super) fn hoist_document_elements(
 			}
 		}
 	}
+	Ok(())
 }
 
 /// Any tree containing a [`ClientLoadDirective`] or [`ClientOnlyDirective`]
@@ -142,6 +160,7 @@ pub(super) fn insert_hydration_scripts(
 	}) {
 		commands
 			.entity(doc)
+			// will be hoisted to correct location
 			.with_child(event_playback_script(&html_constants))
 			.with_child(load_wasm_script(&html_constants));
 	}
@@ -231,6 +250,12 @@ mod test {
 			.to_be_str(
 				"<!DOCTYPE html><html><head></head><body><br/><br/></body></html>",
 			);
+	}
+	#[test]
+	fn empty_fragment() {
+		HtmlDocument::parse_bundle(rsx! {</>}).xpect().to_be_str(
+			"<!DOCTYPE html><html><head></head><body></body></html>",
+		);
 	}
 	#[test]
 	fn ignores_incomplete() {
