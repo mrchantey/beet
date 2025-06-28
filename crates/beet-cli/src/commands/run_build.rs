@@ -10,25 +10,15 @@ pub struct RunBuild {
 	pub build_cmd: CargoBuildCmd,
 	/// Determine the config location and which builds steps to run
 	#[command(flatten)]
-	pub load_beet_config: LoadBeetConfig,
+	pub beet_build_args: BeetBuildArgs,
 }
-
-fn build_plugins(app: &mut App) {
-	app.add_plugins((
-		NodeTokensPlugin::default(),
-		StaticScenePlugin::default(),
-		RouteCodegenPlugin::default(),
-		ClientIslandCodegenPlugin::default(),
-	));
-}
-
 
 impl RunBuild {
 	/// Run once
 	pub async fn build(self) -> Result {
 		App::new()
-			.insert_resource(self.build_cmd.clone())
-			.add_plugins((self.load_beet_config.clone(), build_plugins))
+			.insert_resource(self.build_cmd)
+			.add_plugins(self.beet_build_args)
 			.run_once()
 			.into_result()
 	}
@@ -37,8 +27,8 @@ impl RunBuild {
 	/// Run in watch mode with a file watcher
 	pub async fn run(self) -> Result {
 		App::new()
-			.insert_resource(self.build_cmd.clone())
-			.add_plugins((self.load_beet_config.clone(), build_plugins))
+			.insert_resource(self.build_cmd)
+			.add_plugins(self.beet_build_args)
 			.run_async(FsApp::default().runner())
 			.await
 			.into_result()

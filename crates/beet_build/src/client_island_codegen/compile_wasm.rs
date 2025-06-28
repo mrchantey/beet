@@ -1,6 +1,7 @@
 use crate::prelude::*;
 use beet_common::node::HtmlConstants;
 use beet_fs::cargo::CargoBuildCmd;
+use beet_template::prelude::*;
 use beet_utils::utils::PipelineTarget;
 use bevy::prelude::*;
 use std::path::Path;
@@ -9,7 +10,7 @@ use std::process::Command;
 pub fn compile_wasm(
 	html_constants: Res<HtmlConstants>,
 	cmd: Res<CargoBuildCmd>,
-	settings: Res<BeetSettings>,
+	settings: Res<ServerOutputConfig>,
 	// this system only runs if the `CollectClientIslandPlugin` is added to
 	// an entity
 	_query: Populated<(), Added<CollectClientIslandPlugin>>,

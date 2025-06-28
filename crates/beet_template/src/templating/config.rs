@@ -1,8 +1,45 @@
+use beet_common::node::HtmlConstants;
 use beet_utils::prelude::*;
 use bevy::prelude::*;
 use std::path::Path;
 
-/// Config for the template creation stage of the build process
+/// Collection of resources to be inserted into the app.
+#[derive(Debug, Default, Clone, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct TemplateConfig {
+	#[cfg_attr(feature = "serde", serde(default))]
+	pub html_constants: HtmlConstants,
+	#[cfg_attr(feature = "serde", serde(flatten))]
+	pub server_output_config: ServerOutputConfig,
+	#[cfg_attr(feature = "serde", serde(default))]
+	pub static_scene_config: StaticSceneConfig,
+}
+
+impl Plugin for TemplateConfig {
+	#[rustfmt::skip]
+	fn build(&self, app: &mut App) {
+		app
+			.insert_resource(self.html_constants.clone())
+			.insert_resource(self.server_output_config.clone())
+			.insert_resource(self.static_scene_config.clone())
+			;
+	}
+}
+
+
+#[derive(Debug, Default, Clone, PartialEq, Resource)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct ServerOutputConfig {
+	/// Location of the html directory, defaults to 'target/client'
+	#[cfg_attr(feature = "serde", serde(default = "default_html_dir"))]
+	pub html_dir: WsPathBuf,
+}
+#[allow(unused)]
+fn default_html_dir() -> WsPathBuf { WsPathBuf::new("target/client") }
+
+
+/// Config for the scene containing all information that can be statically extracted
+/// from files, including html, parsed styles etc.
 #[derive(Debug, Clone, PartialEq, Resource)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct StaticSceneConfig {
