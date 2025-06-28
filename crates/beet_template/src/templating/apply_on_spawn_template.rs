@@ -19,6 +19,7 @@ pub fn apply_on_spawn_template(
 				commands.entity(entity).remove::<OnSpawnTemplate>();
 				on_spawn.take().call(commands.entity(entity))?;
 			}
+			// only elements, not templates, will have attributes
 			for attr in attributes.iter_direct_descendants(entity) {
 				if let Ok((attr_entity, mut on_spawn)) = query.get_mut(attr) {
 					// println!("Running onspawn for attribute");

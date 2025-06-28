@@ -283,12 +283,12 @@ mod test {
 			.to_be("<input hidden=\"true\"/>");
 	}
 
+	#[template]
+	fn Template() -> impl Bundle {
+		rsx! {<div class="container"><span>hello</span></div>}
+	}
 	#[test]
 	fn templates() {
-		#[template]
-		fn Template() -> impl Bundle {
-			rsx! {<div class="container"><span>hello</span></div>}
-		}
 		rsx! {
 			"outer"
 			<Template/>

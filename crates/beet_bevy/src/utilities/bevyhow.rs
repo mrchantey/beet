@@ -24,28 +24,17 @@ impl std::fmt::Debug for BevyhowError {
 /// A bevy version of [`anyhow::anyhow!`].
 #[macro_export]
 macro_rules! bevyhow {
-	($msg:literal $(,)?) => {
-		$crate::prelude::BevyhowError::new($msg).into_bevy()
-	};
-	($fmt:expr, $($arg:tt)*) => {
-		$crate::prelude::BevyhowError::new(std::format!($fmt, $($arg)*)).into_bevy()
-		};
-		($err:expr $(,)?) => {
-			$crate::prelude::BevyhowError::new($err).into_bevy()
+		($($arg:tt)*) => {
+			$crate::prelude::BevyhowError::new(std::format!($($arg)*)).into_bevy()
 		};
 }
+
 
 /// A bevy version of [`anyhow::bail!`].
 #[macro_export]
 macro_rules! bevybail {
-	($msg:literal $(,)?) => {
-		return Err($crate::prelude::BevyhowError::new($msg).into_bevy())
-	};
-	($fmt:expr, $($arg:tt)*) => {
-		return Err($crate::prelude::BevyhowError::new(std::format!($fmt, $($arg)*)).into_bevy())
-	};
-	($err:expr $(,)?) => {
-		return Err($crate::prelude::BevyhowError::new($err).into_bevy())
+	($($arg:tt)*) => {
+		return Err($crate::prelude::BevyhowError::new(std::format!($($arg)*)).into_bevy())
 	};
 }
 
@@ -61,24 +50,29 @@ mod test {
 
 	#[test]
 	fn works() {
+		let foo = 1;
+		let bar = 2;
 		let a: BevyError = bevyhow!("literal");
-		let c: BevyError = bevyhow!(String::from("expression"));
-		let b: BevyError = bevyhow!("fmt literal {}{}", 1, 2);
+		let b: BevyError = bevyhow!("fmt literal inline {foo}{bar}");
+		let c: BevyError = bevyhow!("fmt literal {}{}", 1, 2);
+		// let d: BevyError = bevyhow!(String::from("expression"));
 		expect(a.to_string()).to_be("literal\n");
-		expect(b.to_string()).to_be("fmt literal 12\n");
-		expect(c.to_string()).to_be("expression\n");
+		expect(b.to_string()).to_be("fmt literal inline 12\n");
+		expect(c.to_string()).to_be("fmt literal 12\n");
 
 		let a = || -> Result {
 			bevybail!("literal");
 		};
 		let b = || -> Result {
-			bevybail!("fmt literal {}{}", 1, 2);
+			bevybail!("fmt literal inline {foo}{bar}");
 		};
 		let c = || -> Result {
-			bevybail!(String::from("expression"));
+			bevybail!("fmt literal {}{}", 1, 2);
 		};
+
 		expect(a().unwrap_err().to_string()).to_be("literal\n");
-		expect(b().unwrap_err().to_string()).to_be("fmt literal 12\n");
-		expect(c().unwrap_err().to_string()).to_be("expression\n");
+		expect(b().unwrap_err().to_string())
+			.to_be("fmt literal inline 12\n");
+		expect(c().unwrap_err().to_string()).to_be("fmt literal 12\n");
 	}
 }

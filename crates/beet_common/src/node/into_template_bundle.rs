@@ -1,5 +1,6 @@
 use crate::prelude::*;
 use beet_bevy::prelude::EntityObserver;
+use bevy::ecs::spawn::SpawnIter;
 use bevy::ecs::system::IntoObserverSystem;
 use bevy::prelude::*;
 
@@ -63,13 +64,12 @@ where
 	I::IntoIter: 'static + Send + Sync + Iterator<Item = BundleType>,
 {
 	fn into_node_bundle(self) -> impl Bundle {
-		beet_bevy::prelude::spawn_siblings::<Children, _>(
-			self.into_iter().map(|item| item.into_node_bundle()),
+		(
+			FragmentNode,
+			Children::spawn(SpawnIter(
+				self.into_iter().map(|item| item.into_node_bundle()),
+			)),
 		)
-
-		// Children::spawn(SpawnIter(
-		// 	self.into_iter().map(|item| item.into_node_bundle()),
-		// ))
 	}
 }
 

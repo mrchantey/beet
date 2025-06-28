@@ -11,6 +11,8 @@ use std::marker::PhantomData;
 ///
 /// ## Panics
 ///
+/// If the entity has no parent of this relationship type
+/// 
 /// This method will remove this entity, any other bundles attempting
 /// to access it after will panic.
 pub fn spawn_siblings<R, B>(
@@ -23,7 +25,8 @@ where
 	OnSpawn::new(move |entity| {
 		let parent = entity
 			.get::<R::Relationship>()
-			.expect("Spawn Siblings: Parent relationship not found")
+			.expect("Spawn Siblings: This entity has no parent, this can happen due to
+bundle effect race conditions, try reordering the effects")
 			.get();
 		let id = entity.id();
 		entity.world_scope(|world| {
