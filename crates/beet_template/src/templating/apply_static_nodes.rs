@@ -49,6 +49,7 @@ pub(super) fn apply_static_nodes(
 	>,
 	static_trees: Query<(Entity, &MacroIdx), With<StaticNodeRoot>>,
 	children: Query<&Children>,
+	parents: Query<&ChildOf>,
 	attributes: Query<&Attributes>,
 	mut on_spawn_templates: Query<(&ExprIdx, &mut OnSpawnTemplate)>,
 ) -> Result {
@@ -89,6 +90,12 @@ pub(super) fn apply_static_nodes(
 		// 	instance,
 		// );
 
+
+		// this is effectively a 'root level deny',
+		// builder.deny is recursive so we cant deny some root components
+		// that shouldnt be overridden, so cache and reapply after clone
+		let child = parents.get(instance).ok();
+
 		commands
 			.entity(instance)
 			.despawn_related::<Children>()
@@ -104,13 +111,18 @@ pub(super) fn apply_static_nodes(
 			.entity(static_tree)
 			.clone_with(instance, |builder| {
 				builder
-					// a static node should not have a TemplateOf
+					// a static node shouldnt have a TemplateOf
 					// but specify for completeness
 					//
-					.deny::<(StaticNodeRoot, ChildOf, TemplateOf)>()
+					.deny::<(StaticNodeRoot, TemplateOf)>()
 					.linked_cloning(true)
 					.add_observers(true);
 			});
+
+		if let Some(child) = child {
+			// if the instance had a parent, reapply it
+			commands.entity(instance).insert(child.clone());
+		}
 
 		// queue system to resolve template locations after clone
 		commands.run_system_cached_with(
