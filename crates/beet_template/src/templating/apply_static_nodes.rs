@@ -49,7 +49,16 @@ pub(super) fn apply_static_nodes(
 	>,
 	static_trees: Query<(Entity, &MacroIdx), With<StaticNodeRoot>>,
 	children: Query<&Children>,
-	parents: Query<&ChildOf>,
+	// items that should be preserved at the root level,
+	// but overridden in children
+	root_deny: Query<
+		(Option<&ChildOf>, Option<&ExprIdx>),
+		(
+			Added<MacroIdx>,
+			Without<StaticNodeRoot>,
+			Without<ResolvedRoot>,
+		),
+	>,
 	attributes: Query<&Attributes>,
 	mut on_spawn_templates: Query<(&ExprIdx, &mut OnSpawnTemplate)>,
 ) -> Result {
@@ -94,7 +103,7 @@ pub(super) fn apply_static_nodes(
 		// this is effectively a 'root level deny',
 		// builder.deny is recursive so we cant deny some root components
 		// that shouldnt be overridden, so cache and reapply after clone
-		let child = parents.get(instance).ok();
+		let root_deny = root_deny.get(instance).ok();
 
 		commands
 			.entity(instance)
@@ -119,9 +128,14 @@ pub(super) fn apply_static_nodes(
 					.add_observers(true);
 			});
 
-		if let Some(child) = child {
-			// if the instance had a parent, reapply it
-			commands.entity(instance).insert(child.clone());
+		if let Some((child, _expr_idx)) = root_deny {
+			if let Some(child) = child {
+				commands.entity(instance).insert(child.clone());
+			}
+			// understandably breaks, expridx collisions
+			// if let Some(expr_idx) = expr_idx {
+			// 	commands.entity(instance).insert(expr_idx.clone());
+			// }
 		}
 
 		// queue system to resolve template locations after clone
@@ -150,16 +164,21 @@ fn apply_template_locations(
 	templates: Query<&TemplateNode>,
 ) {
 	let all_keys = instance_exprs.keys().cloned().collect::<Vec<_>>();
+	let mut taken_keys = Vec::new();
 	let mut get_on_spawn = |idx: &ExprIdx| {
-		instance_exprs.remove(idx).unwrap_or_else(|| {
+		let out = instance_exprs.remove(idx).unwrap_or_else(|| {
 			panic!(
 				"
 				Error resolving static node for macro at {macro_idx}
 				The instance is missing an ExprIdx found in the static tree.
-				Expected idx: {idx}, instance idxs: {all_keys:?}
+				Expected idx: 	{idx}
+				Instance idxs: 	{all_keys:?}
+				Taken idxs: 		{taken_keys:?}
 				"
 			);
-		})
+		});
+		taken_keys.push(idx.clone());
+		out
 	};
 
 	for child in children.iter_descendants_inclusive(entity) {
