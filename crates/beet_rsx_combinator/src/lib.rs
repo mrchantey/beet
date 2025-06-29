@@ -1,7 +1,7 @@
 #![cfg_attr(test, feature(test, custom_test_frameworks))]
 #![cfg_attr(test, test_runner(sweet::test_runner))]
 
-mod parse;
+mod combinator_parser;
 mod parse_attributes;
 mod parse_attributes_types;
 mod parse_children;
@@ -32,7 +32,7 @@ pub mod types {
 }
 
 pub mod prelude {
-	pub use crate::parse::*;
+	pub use crate::combinator_parser::*;
 	pub use crate::parse_attributes::*;
 	pub use crate::parse_children::*;
 	pub use crate::parse_elements::*;

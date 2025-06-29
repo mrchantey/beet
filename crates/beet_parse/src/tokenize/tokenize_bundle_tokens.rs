@@ -242,12 +242,10 @@ mod test {
 					},
 					FragmentNode,
 					related! { Children[
-						NodeExpr(SendWrapper::new(syn::parse_quote!({
-							(
-								NodeTag(String::from("br")),
-								ElementNode { self_closing: true }
-							)
-						})))
+						(
+							NodeTag(String::from("br")),
+							ElementNode { self_closing: true }
+						)
 					]}
 				)
 			}
@@ -270,16 +268,14 @@ mod test {
 					},
 					FragmentNode,
 					related! { Children[
-						NodeExpr(SendWrapper::new(syn::parse_quote!({
-							(
-								NodeTag(String::from("br")),
-								ElementNode { self_closing: true }
-							)
-							(
-								NodeTag(String::from("br")),
-								ElementNode { self_closing: true }
-							)
-						})))
+						(
+							NodeTag(String::from("br")),
+							ElementNode { self_closing: true }
+						),
+						(
+							NodeTag(String::from("br")),
+							ElementNode { self_closing: true }
+						)
 					]}
 				)
 			}
@@ -307,31 +303,30 @@ mod test {
 						},
 						FragmentNode,
 						related! { Children[
-							NodeExpr(SendWrapper::new(syn::parse_quote!({
-								(
-									NodeTag(String::from("br")),
-									ElementNode { self_closing: true },
-									related! {
-										Attributes[
-											AttributeKey(String::from("hidden")),
-											(
-												AttributeKey(String::from("class")),
-												AttributeLit::Boolean(true),
-												NodeExpr(SendWrapper::new(syn::parse_quote!(true)))
-											),
-											(
-												AttributeKey(String::from("onmousemove")),
-												AttributeLit::String(String::from("some_js_func")),
-												NodeExpr(SendWrapper::new(syn::parse_quote!("some_js_func")))
-											),
-											(
-												AttributeKey(String::from("onclick")),
-												NodeExpr(SendWrapper::new(syn::parse_quote!({|_: Trigger<OnClick>| {}})))
-											)
-										]
-									}
-								)
-							})))
+							TextNode(String::from("\n")),
+							(
+								NodeTag(String::from("br")),
+								ElementNode { self_closing: true },
+								related! {
+									Attributes[
+										AttributeKey(String::from("hidden")),
+										(
+											AttributeKey(String::from("class")),
+											AttributeLit::Boolean(true),
+											NodeExpr(SendWrapper::new(syn::parse_quote!(true)))
+										),
+										(
+											AttributeKey(String::from("onmousemove")),
+											AttributeLit::String(String::from("some_js_func")),
+											NodeExpr(SendWrapper::new(syn::parse_quote!("some_js_func")))
+										),
+										(
+											AttributeKey(String::from("onclick")),
+											NodeExpr(SendWrapper::new(syn::parse_quote!({|_: Trigger<OnClick>| {}})))
+										)
+									]
+								}
+							)
 						]}
 					)
 			}
@@ -356,34 +351,32 @@ mod test {
 							},
 							FragmentNode,
 							related! { Children[
-								NodeExpr(SendWrapper::new(syn::parse_quote!({
-									(
-										NodeTag(String::from("br")),
-										ElementNode { self_closing: true },
-										related! {
-											Attributes[
-												(
-													AttributeKey(String::from("foo")),
-													NodeExpr(SendWrapper::new(syn::parse_quote!({
-														let class = "bar";
-														(
-															NodeTag(String::from("div")),
-															ElementNode { self_closing: true },
-															related! {
-																Attributes[
-																	(
-																		AttributeKey(String::from("class")),
-																		NodeExpr(SendWrapper::new(syn::parse_quote!({ class })))
-																	)
-																]
-															}
-														)
-													})))
-												)
-											]
-										}
-									)
-								})))
+								(
+									NodeTag(String::from("br")),
+									ElementNode { self_closing: true },
+									related! {
+										Attributes[
+											(
+												AttributeKey(String::from("foo")),
+												NodeExpr(SendWrapper::new(syn::parse_quote!({
+													let class = "bar";
+													(
+														NodeTag(String::from("div")),
+														ElementNode { self_closing: true },
+														related! {
+															Attributes[
+																(
+																	AttributeKey(String::from("class")),
+																	NodeExpr(SendWrapper::new(syn::parse_quote!({ class })))
+																)
+															]
+														}
+													)
+												})))
+											)
+										]
+									}
+								)
 							]}
 						)
 					}

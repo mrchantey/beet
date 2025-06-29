@@ -59,10 +59,13 @@ impl<'w, 's, 'a> Builder<'w, 's, 'a> {
 		root: Entity,
 		rsx: &CombinatorTokens,
 	) -> Result<()> {
-
-		let (expr, remaining) = parse(&rsx).map_err(|e| {
-			anyhow::anyhow!("Failed to parse Combinator RSX: {}", e.to_string())
-		})?;
+		let (children, remaining) =
+			CombinatorParser::parse(&rsx).map_err(|e| {
+				anyhow::anyhow!(
+					"Failed to parse Combinator RSX: {}",
+					e.to_string()
+				)
+			})?;
 		if !remaining.is_empty() {
 			return Err(anyhow::anyhow!(
 				"Unparsed input remaining: {}",
@@ -70,12 +73,8 @@ impl<'w, 's, 'a> Builder<'w, 's, 'a> {
 			));
 		}
 
-		// unlike rstml, we dont know what the root [`RsxParsedExpression`] will
-		// evaluate to, so just spawn as a single child entity.
-		let expr_root = self.commands.spawn_empty().id();
-
-		self.rsx_parsed_expression(expr_root, expr)?;
-		self.commands.entity(root).add_child(expr_root);
+		let children = self.rsx_children("fragment", children)?;
+		self.commands.entity(root).add_children(&children);
 		Ok(())
 	}
 
@@ -306,11 +305,10 @@ mod test {
 				InstanceRoot,
 				MacroIdx{file:WsPathBuf::new("crates/beet_parse/src/node_tokens/combinator_to_node_tokens.rs"),start:LineCol{line:1u32,col:0u32}},
 				FragmentNode,
-				related!{Children[OnSpawnTemplate::new_insert(#[allow(unused_braces)]
-				{(
+				related!{Children[(
 					NodeTag(String::from("br")),
 					ElementNode{self_closing:true}
-				)}.into_node_bundle())]}
+				)]}
 			)}
 			.to_string(),
 		);
@@ -330,14 +328,13 @@ mod test {
 					InstanceRoot,
 					MacroIdx{file:WsPathBuf::new("crates/beet_parse/src/node_tokens/combinator_to_node_tokens.rs"),start:LineCol{line:1u32,col:0u32}},
 					FragmentNode,
-					related!{Children[OnSpawnTemplate::new_insert(#[allow(unused_braces)]
-					{(
+					related!{Children[(
 						NodeTag(String::from("br")),
 						ElementNode{self_closing:true}
-					)(
+					),(
 						NodeTag(String::from("br")),
 						ElementNode{self_closing:true}
-					)}.into_node_bundle())]}
+					)]}
 				)}
 				.to_string(),
 			);
@@ -350,15 +347,14 @@ mod test {
 				InstanceRoot,
 				MacroIdx{file:WsPathBuf::new("crates/beet_parse/src/node_tokens/combinator_to_node_tokens.rs"),start:LineCol{line:1u32,col:0u32}},
 				FragmentNode,
-				related!{Children[OnSpawnTemplate::new_insert(#[allow(unused_braces)]
-				{(
+				related!{Children[(
 					NodeTag(String::from("div")),
 					ElementNode{self_closing:true},
 					related!(Attributes[(
 						AttributeKey::new("align"),
 						OnSpawnTemplate::new_insert("center".into_attribute_bundle())
 					)])
-				)}.into_node_bundle())]}
+				)]}
 			)}
 			.to_string(),
 		);
@@ -372,12 +368,11 @@ mod test {
 				InstanceRoot,
 				MacroIdx{file:WsPathBuf::new("crates/beet_parse/src/node_tokens/combinator_to_node_tokens.rs"),start:LineCol{line:1u32,col:0u32}},
 				FragmentNode,
-				related!{Children[OnSpawnTemplate::new_insert(#[allow(unused_braces)]
-				{(
+				related!{Children[(
 					NodeTag(String::from("div")),
 					ElementNode{self_closing:false},
 					related!{Children[TextNode(String::from("hello"))]}
-				)}.into_node_bundle())]}
+				)]}
 			)}
 			.to_string(),
 		);
@@ -390,12 +385,11 @@ mod test {
 				InstanceRoot,
 				MacroIdx{file:WsPathBuf::new("crates/beet_parse/src/node_tokens/combinator_to_node_tokens.rs"),start:LineCol{line:1u32,col:0u32}},
 				FragmentNode,
-				related!{Children[OnSpawnTemplate::new_insert(#[allow(unused_braces)]
-				{(
+				related!{Children[(
 					NodeTag(String::from("br")),
 					ElementNode{self_closing:true},
 					related!(Attributes[AttributeKey::new("foo")])
-				)}.into_node_bundle())]}
+				)]}
 			)}
 			.to_string(),
 		);
@@ -409,15 +403,14 @@ mod test {
 				InstanceRoot,
 				MacroIdx{file:WsPathBuf::new("crates/beet_parse/src/node_tokens/combinator_to_node_tokens.rs"),start:LineCol{line:1u32,col:0u32}},
 				FragmentNode,
-				related!{Children[OnSpawnTemplate::new_insert(#[allow(unused_braces)]
-				{(
+				related!{Children[(
 					NodeTag(String::from("br")),
 					ElementNode{self_closing:true},
 					related!(Attributes[(
 						AttributeKey::new("foo"),
 						OnSpawnTemplate::new_insert("bar".into_attribute_bundle())
 					)])
-				)}.into_node_bundle())]}
+				)]}
 			)}
 			.to_string(),
 		);
@@ -431,15 +424,14 @@ mod test {
 				InstanceRoot,
 				MacroIdx{file:WsPathBuf::new("crates/beet_parse/src/node_tokens/combinator_to_node_tokens.rs"),start:LineCol{line:1u32,col:0u32}},
 				FragmentNode,
-				related!{Children[OnSpawnTemplate::new_insert(#[allow(unused_braces)]
-				{(
+				related!{Children[(
 					NodeTag(String::from("br")),
 					ElementNode{self_closing:true},
 					related!(Attributes[(
 						AttributeKey::new("foo"),
 						OnSpawnTemplate::new_insert(true.into_attribute_bundle())
 					)])
-				)}.into_node_bundle())]}
+				)]}
 			)}
 			.to_string(),
 		);
@@ -453,15 +445,14 @@ mod test {
 				InstanceRoot,
 				MacroIdx{file:WsPathBuf::new("crates/beet_parse/src/node_tokens/combinator_to_node_tokens.rs"),start:LineCol{line:1u32,col:0u32}},
 				FragmentNode,
-				related!{Children[OnSpawnTemplate::new_insert(#[allow(unused_braces)]
-				{(
+				related!{Children[(
 					NodeTag(String::from("br")),
 					ElementNode{self_closing:true},
 					related!(Attributes[(
 						AttributeKey::new("foo"),
 						OnSpawnTemplate::new_insert(20f64.into_attribute_bundle())
 					)])
-				)}.into_node_bundle())]}
+				)]}
 			)}
 			.to_string(),
 		);
@@ -475,15 +466,14 @@ mod test {
 				InstanceRoot,
 				MacroIdx{file:WsPathBuf::new("crates/beet_parse/src/node_tokens/combinator_to_node_tokens.rs"),start:LineCol{line:1u32,col:0u32}},
 				FragmentNode,
-				related!{Children[OnSpawnTemplate::new_insert(#[allow(unused_braces)]
-				{(
+				related!{Children[(
 					NodeTag(String::from("br")),
 					ElementNode{self_closing:true},
 					related!(Attributes[(
 						AttributeKey::new("foo"),
 						OnSpawnTemplate::new_insert(#[allow(unused_braces)]{ bar }.into_attribute_bundle())
 					)])
-				)}.into_node_bundle())]}
+				)]}
 			)}
 			.to_string(),
 		);
@@ -497,8 +487,7 @@ mod test {
 				InstanceRoot,
 				MacroIdx{file:WsPathBuf::new("crates/beet_parse/src/node_tokens/combinator_to_node_tokens.rs"),start:LineCol{line:1u32,col:0u32}},
 				FragmentNode,
-				related!{Children[OnSpawnTemplate::new_insert(#[allow(unused_braces)]
-				{(
+				related!{Children[(
 					NodeTag(String::from("br")),
 					ElementNode{self_closing:true},
 					related!(Attributes[(
@@ -508,7 +497,7 @@ mod test {
 								ElementNode { self_closing: true }
 							)}.into_attribute_bundle())
 					)])
-				)}.into_node_bundle())]}
+				)]}
 			)}
 			.to_string(),
 		);
@@ -527,8 +516,7 @@ mod test {
 					InstanceRoot,
 					MacroIdx{file:WsPathBuf::new("crates/beet_parse/src/node_tokens/combinator_to_node_tokens.rs"),start:LineCol{line:1u32,col:0u32}},
 					FragmentNode,
-					related!{Children[OnSpawnTemplate::new_insert(#[allow(unused_braces)]
-					{(
+					related!{Children[(
 						NodeTag(String::from("br")),
 						ElementNode{self_closing:true},
 						related!(Attributes[(
@@ -541,7 +529,7 @@ mod test {
 								bar
 							}.into_attribute_bundle())
 						)])
-					)}.into_node_bundle())]}
+					)]}
 				)}
 				.to_string(),
 			);
@@ -555,8 +543,7 @@ mod test {
 				InstanceRoot,
 				MacroIdx{file:WsPathBuf::new("crates/beet_parse/src/node_tokens/combinator_to_node_tokens.rs"),start:LineCol{line:1u32,col:0u32}},
 				FragmentNode,
-				related!{Children[OnSpawnTemplate::new_insert(#[allow(unused_braces)]
-				{(
+				related!{Children[(
 					ExprIdx(0u32),
 					NodeTag(String::from("MyTemplate")),
 					FragmentNode,
@@ -565,7 +552,7 @@ mod test {
 						let template = <MyTemplate as Props>::Builder::default().foo(true).build();
 						TemplateRoot::spawn(Spawn(template.into_node_bundle()))
 					}.into_node_bundle())
-				)}.into_node_bundle())]}
+				)]}
 			)}
 			.to_string(),
 		);
@@ -579,8 +566,7 @@ mod test {
 				InstanceRoot,
 				MacroIdx{file:WsPathBuf::new("crates/beet_parse/src/node_tokens/combinator_to_node_tokens.rs"),start:LineCol{line:1u32,col:0u32}},
 				FragmentNode,
-				related!{Children[OnSpawnTemplate::new_insert(#[allow(unused_braces)]
-				{(
+				related!{Children[(
 					ExprIdx(0u32),
 					NodeTag(String::from("MyTemplate")),
 					FragmentNode,
@@ -589,7 +575,7 @@ mod test {
 						let template = <MyTemplate as Props>::Builder::default().foo("bar").build();
 						TemplateRoot::spawn(Spawn(template.into_node_bundle()))
 					}.into_node_bundle())
-				)}.into_node_bundle())]}
+				)]}
 			)}
 			.to_string(),
 		);
@@ -603,8 +589,7 @@ mod test {
 				InstanceRoot,
 				MacroIdx{file:WsPathBuf::new("crates/beet_parse/src/node_tokens/combinator_to_node_tokens.rs"),start:LineCol{line:1u32,col:0u32}},
 				FragmentNode,
-				related!{Children[OnSpawnTemplate::new_insert(#[allow(unused_braces)]
-				{(
+				related!{Children[(
 					ExprIdx(0u32),
 					NodeTag(String::from("MyTemplate")),
 					FragmentNode,
@@ -613,7 +598,7 @@ mod test {
 						let template = <MyTemplate as Props>::Builder::default().foo(true).build();
 						TemplateRoot::spawn(Spawn(template.into_node_bundle()))
 					}.into_node_bundle())
-				)}.into_node_bundle())]}
+				)]}
 			)}
 			.to_string(),
 		);
@@ -627,8 +612,7 @@ mod test {
 				InstanceRoot,
 				MacroIdx{file:WsPathBuf::new("crates/beet_parse/src/node_tokens/combinator_to_node_tokens.rs"),start:LineCol{line:1u32,col:0u32}},
 				FragmentNode,
-				related!{Children[OnSpawnTemplate::new_insert(#[allow(unused_braces)]
-				{(
+				related!{Children[(
 					ExprIdx(0u32),
 					NodeTag(String::from("MyTemplate")),
 					FragmentNode,
@@ -637,7 +621,7 @@ mod test {
 						let template = <MyTemplate as Props>::Builder::default().foo(20f64).build();
 						TemplateRoot::spawn(Spawn(template.into_node_bundle()))
 					}.into_node_bundle())
-				)}.into_node_bundle())]}
+				)]}
 			)}
 			.to_string(),
 		);
@@ -651,8 +635,7 @@ mod test {
 				InstanceRoot,
 				MacroIdx{file:WsPathBuf::new("crates/beet_parse/src/node_tokens/combinator_to_node_tokens.rs"),start:LineCol{line:1u32,col:0u32}},
 				FragmentNode,
-				related!{Children[OnSpawnTemplate::new_insert(#[allow(unused_braces)]
-				{(
+				related!{Children[(
 					ExprIdx(0u32),
 					NodeTag(String::from("MyTemplate")),
 					FragmentNode,
@@ -661,7 +644,7 @@ mod test {
 						let template = <MyTemplate as Props>::Builder::default().foo(#[allow(unused_braces)]{ bar }).build();
 						TemplateRoot::spawn(Spawn(template.into_node_bundle()))
 					}.into_node_bundle())
-				)}.into_node_bundle())]}
+				)]}
 			)}
 			.to_string(),
 		);
@@ -675,8 +658,7 @@ mod test {
 				InstanceRoot,
 				MacroIdx{file:WsPathBuf::new("crates/beet_parse/src/node_tokens/combinator_to_node_tokens.rs"),start:LineCol{line:1u32,col:0u32}},
 				FragmentNode,
-				related!{Children[OnSpawnTemplate::new_insert(#[allow(unused_braces)]
-				{(
+				related!{Children[(
 					ExprIdx(0u32),
 					NodeTag(String::from("MyTemplate")),
 					FragmentNode,
@@ -688,7 +670,7 @@ mod test {
 						) }).build();
 						TemplateRoot::spawn(Spawn(template.into_node_bundle()))
 					}.into_node_bundle())
-				)}.into_node_bundle())]}
+				)]}
 			)}
 			.to_string(),
 		);
@@ -707,8 +689,7 @@ mod test {
 					InstanceRoot,
 					MacroIdx{file:WsPathBuf::new("crates/beet_parse/src/node_tokens/combinator_to_node_tokens.rs"),start:LineCol{line:1u32,col:0u32}},
 					FragmentNode,
-					related!{Children[OnSpawnTemplate::new_insert(#[allow(unused_braces)]
-					{(
+					related!{Children[(
 						ExprIdx(0u32),
 						NodeTag(String::from("MyTemplate")),
 						FragmentNode,
@@ -723,7 +704,7 @@ mod test {
 							}).build();
 						TemplateRoot::spawn(Spawn(template.into_node_bundle()))
 					}.into_node_bundle())
-				)}.into_node_bundle())]}
+				)]}
 				)}
 				.to_string(),
 			);
