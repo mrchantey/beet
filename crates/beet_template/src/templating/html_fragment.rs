@@ -295,9 +295,9 @@ mod test {
 	#[test]
 	fn events() {
 		rsx! {<div onclick={||{}}/>}
-			.xmap(HtmlFragment::parse_bundle)
+			.xmap(HtmlDocument::parse_bundle)
 			.xpect()
-			.to_be(
+			.to_contain(
 				"<div onclick=\"_beet_event_handler(0, event)\" data-beet-dom-idx=\"0\"/>",
 			);
 	}
@@ -319,8 +319,8 @@ mod test {
 	fn signal_text_nodes() {
 		let (get, _set) = signal("foo");
 		rsx! {<div>{get}</div>}
-			.xmap(HtmlFragment::parse_bundle)
+			.xmap(HtmlDocument::parse_bundle)
 			.xpect()
-			.to_be("<div data-beet-dom-idx=\"0\">foo</div>");
+			.to_contain("<div data-beet-dom-idx=\"0\">foo</div>");
 	}
 }

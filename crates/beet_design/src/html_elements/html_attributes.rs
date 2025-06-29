@@ -97,8 +97,8 @@ mod test {
 			id="foo"			
 			onclick=|_| {} />
 		}
-			.xmap(HtmlFragment::parse_bundle)
+			.xmap(HtmlDocument::parse_bundle)
 			.xpect()
-			.to_be_str(r#"<button disabled="true" id="foo" onclick="_beet_event_handler(0, event)" data-beet-dom-idx="0"/>"#);
+			.to_contain(r#"<button disabled="true" id="foo" onclick="_beet_event_handler(0, event)" data-beet-dom-idx="0"/>"#);
 	}
 }

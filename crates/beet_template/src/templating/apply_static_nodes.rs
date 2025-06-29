@@ -11,7 +11,8 @@ pub fn load_static_scene(world: &mut World) -> Result {
 	use beet_utils::prelude::ReadFile;
 	if let Some(static_scene_config) = world.get_resource::<StaticSceneConfig>()
 	{
-		if let Ok(file) = ReadFile::to_string(static_scene_config.scene_file())
+		if let Ok(file) =
+			ReadFile::to_string(static_scene_config.scene_file().into_abs())
 		{
 			world.load_scene(file)?;
 		}
@@ -181,10 +182,10 @@ fn apply_template_locations(
 Error resolving static node for macro at {macro_idx}
 Not all ExprIdx were applied.
 The static tree is missing the following idxs found in the instance: {:?}
-All instance idxs: {:?}
+All idxs: 		{all_keys:?}
+Taken idxs: 	{taken_keys:?}
 ",
 			instance_exprs.keys(),
-			all_keys,
 		);
 	}
 }

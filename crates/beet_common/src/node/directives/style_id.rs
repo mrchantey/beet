@@ -18,3 +18,8 @@ impl StyleId {
 	/// Create a new [`StyleId`] from a `u64`.
 	pub fn new(id: u64) -> Self { Self(id) }
 }
+impl std::fmt::Display for StyleId {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		write!(f, "{}", self.0)
+	}
+}

@@ -136,7 +136,7 @@ mod test {
 			plugin.add_bundle_route(
 				router,
 				route_info(),
-				|| rsx! {<MyTemplate foo=3 client:load/>},
+				|| (HtmlDocument, rsx! {<MyTemplate foo=3 client:load/>}),
 				(),
 			)
 		}

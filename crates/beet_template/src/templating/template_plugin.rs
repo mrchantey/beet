@@ -47,7 +47,10 @@ impl Plugin for TemplatePlugin {
 						apply_slots,
 						apply_text_node_parents,
 						(
-							(apply_root_dom_idx, apply_child_dom_idx),
+							#[cfg(target_arch = "wasm32")]
+							apply_client_island_dom_idx,
+							#[cfg(not(target_arch = "wasm32"))]
+							apply_root_dom_idx,
 							(
 								rearrange_html_document,
 								insert_hydration_scripts,

@@ -73,9 +73,9 @@ mod test {
 
 	#[test]
 	fn works() {
-		ClientIsland::collect(rsx! {
+		ClientIsland::collect((HtmlDocument, rsx! {
 			<MyTemplate foo=3 client:only />
-		})
+		}))
 		.unwrap()
 		.xpect()
 		.to_be(vec![ClientIsland {
