@@ -104,12 +104,17 @@ mod test {
 		.xmap(parse)
 		.to_be_str(
 			quote! {(
+				BeetRoot,
+				InstanceRoot,
 				MacroIdx{file:WsPathBuf::new("crates/beet_parse/src/tokenize/tokenize_element_attributes.rs"),start:LineCol{line:1u32,col:0u32}},
-				NodeTag(String::from("span")),
-				ElementNode { self_closing: true },
-				related!(Attributes[
-					AttributeKey::new("hidden")
-				])
+				FragmentNode,
+				related!{Children[(
+					NodeTag(String::from("span")),
+					ElementNode { self_closing: true },
+					related!(Attributes[
+						AttributeKey::new("hidden")
+					])
+				)]}
 			)}
 			.to_string(),
 		);
@@ -119,13 +124,18 @@ mod test {
 		.xmap(parse)
 		.to_be_str(
 			quote! {(
+				BeetRoot,
+				InstanceRoot,
 				MacroIdx{file:WsPathBuf::new("crates/beet_parse/src/tokenize/tokenize_element_attributes.rs"),start:LineCol{line:1u32,col:0u32}},
-				NodeTag(String::from("span")),
-				ElementNode { self_closing: true },
-				related!(Attributes[(
-					AttributeKey::new("hidden"),
-					OnSpawnTemplate::new_insert(true.into_attribute_bundle())
-				)])
+				FragmentNode,
+				related!{Children[(
+					NodeTag(String::from("span")),
+					ElementNode { self_closing: true },
+					related!(Attributes[(
+						AttributeKey::new("hidden"),
+						OnSpawnTemplate::new_insert(true.into_attribute_bundle())
+					)])
+				)]}
 			)}
 			.to_string(),
 		);
@@ -138,10 +148,15 @@ mod test {
 		.xmap(parse)
 		.to_be_str(
 			quote! {(
+				BeetRoot,
+				InstanceRoot,
 				MacroIdx{file:WsPathBuf::new("crates/beet_parse/src/tokenize/tokenize_element_attributes.rs"),start:LineCol{line:1u32,col:0u32}},
-				NodeTag(String::from("span")),
-				ElementNode { self_closing: true },
-				OnSpawnTemplate::new_insert(#[allow(unused_braces)]{foo}.into_node_bundle())
+				FragmentNode,
+				related!{Children[(
+					NodeTag(String::from("span")),
+					ElementNode { self_closing: true },
+					OnSpawnTemplate::new_insert(#[allow(unused_braces)]{foo}.into_node_bundle())
+				)]}
 			)}
 			.to_string(),
 		);
@@ -154,14 +169,19 @@ mod test {
 		.xmap(parse)
 		.to_be_str(
 			quote! {(
+				BeetRoot,
+				InstanceRoot,
 				MacroIdx{file:WsPathBuf::new("crates/beet_parse/src/tokenize/tokenize_element_attributes.rs"),start:LineCol{line:1u32,col:0u32}},
-				NodeTag(String::from("span")),
-				ElementNode { self_closing: true },
-				OnSpawnTemplate::new_insert(#[allow(unused_braces)]{foo}.into_node_bundle()),
-				related!(Attributes [(
-					AttributeKey::new("onclick"),
-					ExprIdx(0u32)
-				)])
+				FragmentNode,
+				related!{Children[(
+					NodeTag(String::from("span")),
+					ElementNode { self_closing: true },
+					OnSpawnTemplate::new_insert(#[allow(unused_braces)]{foo}.into_node_bundle()),
+					related!(Attributes [(
+						AttributeKey::new("onclick"),
+						ExprIdx(0u32)
+					)])
+				)]}
 			)}
 			.to_string(),
 		);
@@ -171,13 +191,18 @@ mod test {
 		.xmap(parse)
 		.to_be_str(
 			quote! {(
+				BeetRoot,
+				InstanceRoot,
 				MacroIdx{file:WsPathBuf::new("crates/beet_parse/src/tokenize/tokenize_element_attributes.rs"),start:LineCol{line:1u32,col:0u32}},
-				NodeTag(String::from("span")),
-				ElementNode { self_closing: true },
-				related!(Attributes[(
-					AttributeKey::new("onclick"),
-					OnSpawnTemplate::new_insert("some_js_func".into_attribute_bundle())
-				)])
+				FragmentNode,
+				related!{Children[(
+					NodeTag(String::from("span")),
+					ElementNode { self_closing: true },
+					related!(Attributes[(
+						AttributeKey::new("onclick"),
+						OnSpawnTemplate::new_insert("some_js_func".into_attribute_bundle())
+					)])
+				)]}
 			)}
 			.to_string(),
 		);
@@ -196,26 +221,31 @@ mod test {
 		.xmap(parse)
 		.to_be_str(
 			quote! {(
+				BeetRoot,
+				InstanceRoot,
 				MacroIdx{file:WsPathBuf::new("crates/beet_parse/src/tokenize/tokenize_element_attributes.rs"),start:LineCol{line:1u32,col:0u32}},
-				NodeTag(String::from("span")),
-				ElementNode { self_closing: true },
-				OnSpawnTemplate::new_insert(#[allow(unused_braces)]{foo}.into_node_bundle()),
-				OnSpawnTemplate::new_insert(#[allow(unused_braces)]{|_: Trigger<OnClick>| { println!("clicked"); }}.into_node_bundle()),
-				related!(Attributes[
-					AttributeKey::new("hidden"),
-					(
-						AttributeKey::new("class"),
-						OnSpawnTemplate::new_insert("foo".into_attribute_bundle())
-					),
-					(
-						AttributeKey::new("onmousemove"),
-						OnSpawnTemplate::new_insert("some_js_func".into_attribute_bundle())
-					),
-					(
-						AttributeKey::new("onclick"),
-						ExprIdx(0u32)
-					)
-				])
+				FragmentNode,
+				related!{Children[(
+					NodeTag(String::from("span")),
+					ElementNode { self_closing: true },
+					OnSpawnTemplate::new_insert(#[allow(unused_braces)]{foo}.into_node_bundle()),
+					OnSpawnTemplate::new_insert(#[allow(unused_braces)]{|_: Trigger<OnClick>| { println!("clicked"); }}.into_node_bundle()),
+					related!(Attributes[
+						AttributeKey::new("hidden"),
+						(
+							AttributeKey::new("class"),
+							OnSpawnTemplate::new_insert("foo".into_attribute_bundle())
+						),
+						(
+							AttributeKey::new("onmousemove"),
+							OnSpawnTemplate::new_insert("some_js_func".into_attribute_bundle())
+						),
+						(
+							AttributeKey::new("onclick"),
+							ExprIdx(0u32)
+						)
+					])
+				)]}
 			)}
 			.to_string(),
 		);

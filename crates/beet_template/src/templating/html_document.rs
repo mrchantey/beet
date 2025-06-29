@@ -22,17 +22,17 @@ use bevy::prelude::*;
 /// to either pass a valid document structure or none at all.
 #[derive(Component, Reflect)]
 #[reflect(Component)]
-#[require(FragmentNode)]
+#[require(InstanceRoot)]
 pub struct HtmlDocument;
 
 impl HtmlDocument {
 	pub fn wrap_bundle(bundle: impl Bundle) -> impl Bundle {
-		(HtmlDocument, children![bundle])
+		(HtmlDocument, bundle)
 	}
 
 	pub fn parse_bundle(bundle: impl Bundle) -> String {
 		// add the bundle as a child to make rearranging easier
-		HtmlFragment::parse_bundle((HtmlDocument, children![bundle]))
+		HtmlFragment::parse_bundle((HtmlDocument, bundle))
 	}
 }
 
@@ -41,33 +41,31 @@ pub(super) fn rearrange_html_document(
 	mut commands: Commands,
 	doctypes: Query<&DoctypeNode>,
 	children: Query<&Children>,
-	query: Populated<(Entity, &Children), Added<HtmlDocument>>,
+	query: Populated<(Entity, Option<&Children>), Added<HtmlDocument>>,
 ) {
-
 	for (doc_entity, doc_children) in query.iter() {
-		let root = doc_children[0];
 		if children
-			.iter_descendants_inclusive(root)
+			.iter_descendants_inclusive(doc_entity)
 			.any(|child| doctypes.contains(child))
 		{
+			// doctype found, assume correct document structure
 			continue;
 		}
 		// no doctype found, create full document structure and
-		// move the root into the body
-		commands
-			.spawn((FragmentNode, ChildOf(doc_entity)))
-			.with_children(|parent| {
-				parent.spawn((DoctypeNode,));
-				parent
-					.spawn((ElementNode::open(), NodeTag::new("html")))
-					.with_children(|parent| {
-						parent
-							.spawn((ElementNode::open(), NodeTag::new("head")));
-						parent
-							.spawn((ElementNode::open(), NodeTag::new("body")))
-							.add_child(root);
-					});
-			});
+		// move the children into the body
+		commands.entity(doc_entity).with_children(|parent| {
+			parent.spawn(DoctypeNode);
+			parent
+				.spawn((ElementNode::open(), NodeTag::new("html")))
+				.with_children(|parent| {
+					parent.spawn((ElementNode::open(), NodeTag::new("head")));
+					let mut body = parent
+						.spawn((ElementNode::open(), NodeTag::new("body")));
+					if let Some(children) = doc_children {
+						body.add_children(children);
+					}
+				});
+		});
 	}
 }
 
@@ -76,19 +74,14 @@ pub(super) fn rearrange_html_document(
 pub(super) fn hoist_document_elements(
 	mut commands: Commands,
 	constants: Res<HtmlConstants>,
-	documents: Populated<Entity, Added<HtmlDocument>>,
+	documents: Populated<(Entity, Option<&MacroIdx>), Added<HtmlDocument>>,
 	children: Query<&Children>,
 	node_tags: Query<&NodeTag>,
-	macro_idx: Query<&MacroIdx>,
 	directives: Query<&HtmlHoistDirective>,
 ) -> Result {
-	for document in documents.iter() {
+	for (document, idx) in documents.iter() {
 		let get_idx = || {
-			children
-				.iter_descendants_inclusive(document)
-				.find_map(|child| {
-					macro_idx.get(child).map(|c| c.to_string()).ok()
-				})
+			idx.map(|idx| idx.to_string())
 				.unwrap_or_else(|| String::from("unknown location"))
 		};
 

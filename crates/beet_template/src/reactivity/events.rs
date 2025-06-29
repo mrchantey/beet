@@ -116,7 +116,8 @@ mod test {
 		let world = app.world_mut();
 		let entity = world
 			.spawn(rsx! {<button onclick=move|ev|set(ev.value())/>})
-			.id();
+			.get::<Children>()
+			.unwrap()[0];
 		world.run_system_once(spawn_templates).unwrap().unwrap();
 		world
 			.entity_mut(entity)

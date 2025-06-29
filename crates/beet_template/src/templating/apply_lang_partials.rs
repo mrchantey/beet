@@ -10,6 +10,7 @@ pub fn apply_lang_partials(
 	mut commands: Commands,
 	partials: Query<(Entity, &LangPartial)>,
 	parents: Query<&ChildOf>,
+	roots: Query<&BeetRoot>,
 	query: Populated<(Entity, &NodePortal), With<PortalTo<LangPartial>>>,
 ) -> Result {
 	let mut root_content = HashMap::<Entity, HashMap<Entity, String>>::new();
@@ -21,8 +22,15 @@ pub fn apply_lang_partials(
 				**portal
 			);
 		};
+
+		let Some(root_ancestor) =
+			parents.iter_ancestors(entity).find(|e| roots.contains(*e))
+		else {
+			bevybail!("NodePortal is not a child of a BeetRoot: {:?}", entity);
+		};
+
 		root_content
-			.entry(parents.root_ancestor(entity))
+			.entry(root_ancestor)
 			.or_default()
 			.insert(partial.0, partial.1.0.clone());
 	}
@@ -32,8 +40,10 @@ pub fn apply_lang_partials(
 			// insert as direct child of root
 			commands
 				.entity(partial_entity)
-				.clone_and_spawn()
-				.remove::<LangPartial>()
+				// just cloning NodeTag and StyleId
+				.clone_and_spawn_with(|builder| {
+					builder.deny::<(LangPartial, NodePortalTarget)>();
+				})
 				.insert((ChildOf(root), ElementNode::open(), children![
 					TextNode::new(contents)
 				]));
@@ -65,7 +75,7 @@ mod test {
 			))
 			.id();
 		let tree = world
-			.spawn((NodeTag::new("html"), children![(
+			.spawn((InstanceRoot, NodeTag::new("html"), children![(
 				NodePortal::new(partial),
 				PortalTo::<LangPartial>::default()
 			)]))

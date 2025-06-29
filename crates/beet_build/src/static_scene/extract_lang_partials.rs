@@ -114,7 +114,8 @@ mod test {
 		let entity = app
 			.world_mut()
 			.spawn(rsx! {<style>div{color:blue;}</style>})
-			.id();
+			.get::<Children>()
+			.unwrap()[0];
 		app.update();
 		let portal = app.world().get::<NodePortal>(entity).unwrap();
 

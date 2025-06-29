@@ -27,7 +27,7 @@ fn expressions() {
 		.to_contain("MacroIdx")
 		.to_contain("NodeTag")
 		.to_contain("ExprIdx")
-		.to_contain("StaticNodeRoot");
+		.to_contain("StaticRoot");
 
 	// println!(
 	// 	"children: {:#?}",
@@ -161,7 +161,7 @@ fn apply_and_render(scene: &str, bundle: impl Bundle) -> String {
 	app.add_plugins(TemplatePlugin);
 	app.load_scene(scene).unwrap();
 
-	let entity = app.world_mut().spawn(bundle).insert(common_idx()).id();
+	let root = app.world_mut().spawn(bundle).insert(common_idx()).id();
 
 	// app.world_mut().spawn((
 	// 	OnSpawnTemplate::new(|_| {
@@ -172,6 +172,6 @@ fn apply_and_render(scene: &str, bundle: impl Bundle) -> String {
 	app.update();
 
 	app.world_mut()
-		.run_system_once_with(render_fragment, entity)
+		.run_system_once_with(render_fragment, root)
 		.unwrap()
 }

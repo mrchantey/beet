@@ -7,7 +7,7 @@ use bevy::prelude::*;
 /// It must be called after *apply_slots* as it doesnt recurse into [`TemplateOf`]
 pub fn apply_on_spawn_template(
 	mut commands: Commands,
-	roots: Populated<Entity, (Added<MacroIdx>, Without<StaticNodeRoot>)>,
+	roots: Populated<Entity, Added<InstanceRoot>>,
 	children: Query<&Children>,
 	attributes: Query<&Attributes>,
 	mut query: Query<(Entity, &mut OnSpawnTemplate), Added<OnSpawnTemplate>>,
@@ -45,7 +45,7 @@ mod test {
 
 		let mut world = World::new();
 		world.spawn((
-			MacroIdx::default(),
+			InstanceRoot,
 			OnSpawnTemplate::new(move |_| {
 				set_val.update(|v| v.push(0));
 				Ok(())

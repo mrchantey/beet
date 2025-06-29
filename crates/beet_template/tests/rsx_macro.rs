@@ -16,16 +16,17 @@ fn rsx_macro() {
 
 
 	let mut app = App::new();
-	let entity = app
+	let button = app
 		.world_mut()
 		.spawn(rsx! {<button onclick=move|ev|set(ev.value())>click me</button>})
-		.id();
+		.get::<Children>()
+		.unwrap()[0];
 	app.world_mut()
 		.run_system_once(spawn_templates)
 		.unwrap()
 		.unwrap();
 	app.world_mut()
-		.entity_mut(entity)
+		.entity_mut(button)
 		.trigger(OnClick::new(MockEvent::new("foo")));
 	get().xpect().to_be("foo");
 }

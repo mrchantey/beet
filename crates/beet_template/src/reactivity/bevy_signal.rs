@@ -123,7 +123,11 @@ mod test {
 		let mut app = App::new();
 		app.add_plugins(signals_plugin);
 		let (get, set) = signal(5);
-		let div = app.world_mut().spawn(rsx! {<div>{get}</div>}).id();
+		let div = app
+			.world_mut()
+			.spawn(rsx! {<div>{get}</div>})
+			.get::<Children>()
+			.unwrap()[0];
 		app.world_mut()
 			.run_system_once(spawn_templates)
 			.unwrap()
@@ -156,7 +160,11 @@ mod test {
 		let mut app = App::new();
 		app.add_plugins(signals_plugin);
 		let (get, set) = signal("foo");
-		let div = app.world_mut().spawn(rsx! {<div class={get}/>}).id();
+		let div = app
+			.world_mut()
+			.spawn(rsx! {<div class={get}/>})
+			.get::<Children>()
+			.unwrap()[0];
 		app.world_mut()
 			.run_system_once(spawn_templates)
 			.unwrap()
@@ -199,10 +207,24 @@ mod test {
 		let mut app = App::new();
 		app.add_plugins(TemplatePlugin);
 		let (get, set) = signal("foo".to_string());
-		let template = app.world_mut().spawn(rsx! {<Bar class={get}/>}).id();
+		let template = app
+			.world_mut()
+			.spawn(rsx! {<Bar class={get}/>})
+			.get::<Children>()
+			.unwrap()[0];
 		app.update();
-		let div = app.world().entity(template).get::<Children>().unwrap()[0];
-		let attr = app.world().entity(div).get::<Attributes>().unwrap()[0];
+		let template_inner =
+			app.world().entity(template).get::<Children>().unwrap()[0];
+		let div = app
+			.world()
+			.entity(template_inner)
+			.get::<Children>()
+			.unwrap()[0];
+		let attr = app
+			.world()
+			.entity(div)
+			.get::<Attributes>()
+			.unwrap()[0];
 
 		app.world()
 			.entity(attr)

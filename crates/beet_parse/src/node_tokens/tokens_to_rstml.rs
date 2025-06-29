@@ -68,10 +68,9 @@ impl RstmlTokens {
 /// via [`tokens_to_rstml`].
 #[derive(Debug, Clone, Deref, DerefMut, Component)]
 #[require(MacroIdx)]
-pub struct RstmlRoot(SendWrapper<Node>);
+pub struct RstmlRoot(SendWrapper<Vec<Node>>);
 impl RstmlRoot {
-	pub fn new(node: Node) -> Self { Self(SendWrapper::new(node)) }
-	pub fn take(self) -> Node { self.0.take() }
+	pub fn take(self) -> Vec<Node> { self.0.take() }
 }
 
 #[derive(Debug, Deref, DerefMut, Component)]
@@ -102,52 +101,12 @@ pub(super) fn tokens_to_rstml(
 		// with instantiated ones
 		let (nodes, errors) = parser.parse_recoverable(tokens).split_vec();
 
-		let node = match nodes.len() {
-			0 => rstml_fragment(vec![]),
-			1 => nodes.into_iter().next().unwrap(),
-			_ => rstml_fragment(nodes),
-		};
-
-		commands
-			.entity(entity)
-			.remove::<RstmlTokens>()
-			.insert((RstmlRoot::new(node), TokensDiagnostics::new(errors)));
+		commands.entity(entity).remove::<RstmlTokens>().insert((
+			RstmlRoot(SendWrapper::new(nodes)),
+			TokensDiagnostics::new(errors),
+		));
 	}
 	Ok(())
-}
-
-/// create an rstml fragment node
-fn rstml_fragment(
-	children: Vec<Node<RstmlCustomNode>>,
-) -> Node<RstmlCustomNode> {
-	// i guess we dont attempt to create a span, thats untruthful
-	// 	let span = if nodes.len() == 1 {
-	// 	nodes.first().unwrap().span()
-	// } else {
-	// 	nodes
-	// 		.first()
-	// 		.map(|n| n.span())
-	// 		.unwrap_or(Span::call_site())
-	// 		.join(
-	// 			nodes.last().map(|n| n.span()).unwrap_or(Span::call_site()),
-	// 		)
-	// 		.unwrap_or(Span::call_site())
-	// };
-
-	Node::Fragment(rstml::node::NodeFragment {
-		tag_open: rstml::node::atoms::FragmentOpen {
-			token_lt: Default::default(),
-			token_gt: Default::default(),
-		},
-		children,
-		tag_close: Some(rstml::node::atoms::FragmentClose {
-			start_tag: rstml::node::atoms::CloseTagStart {
-				token_lt: Default::default(),
-				token_solidus: Default::default(),
-			},
-			token_gt: Default::default(),
-		}),
-	})
 }
 
 /// see rstml_to_node_tokens.rs for more tests
@@ -163,7 +122,7 @@ mod test {
 	use sweet::prelude::*;
 
 
-	fn parse(tokens: TokenStream) -> Vec<RstmlRoot> {
+	fn parse(tokens: TokenStream) -> Vec<Node> {
 		App::new()
 			.add_plugins(tokens_to_rstml_plugin)
 			.xtap(|app| {
@@ -171,6 +130,9 @@ mod test {
 			})
 			.update_then()
 			.remove::<RstmlRoot>()
+			.pop()
+			.unwrap()
+			.take()
 	}
 
 
@@ -178,19 +140,21 @@ mod test {
 	fn works() {
 		quote! {
 			<MyComponent client:load />
+			{"foo"}
 			<div/>
 		}
 		.xmap(parse)
 		.xmap(|nodes| {
 			let mut nodes = nodes;
-			let Node::Fragment(fragment) =
-				nodes.first_mut().unwrap().clone().take()
-			else {
+			let Node::Element(_) = nodes.pop().unwrap() else {
 				panic!();
 			};
-			fragment.children().len()
-		})
-		.xpect()
-		.to_be(2);
+			let Node::Block(_) = nodes.pop().unwrap() else {
+				panic!();
+			};
+			let Node::Element(_) = nodes.pop().unwrap() else {
+				panic!();
+			};
+		});
 	}
 }

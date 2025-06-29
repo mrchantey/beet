@@ -43,7 +43,7 @@ fn rstml_to_node_tokens(
 
 		let mut collected_elements = CollectedElements::default();
 
-		RstmlToWorld {
+		let children = RstmlToWorld {
 			file_path: &macro_idx.file,
 			rstml_config: &rstml_config,
 			collected_elements: &mut collected_elements,
@@ -51,11 +51,12 @@ fn rstml_to_node_tokens(
 			commands: &mut commands,
 			expr_idx: ExprIdxBuilder::new(),
 		}
-		.insert_node(ParentContext::default(), entity, root_node.take());
+		.spawn_nodes(ParentContext::default(), root_node.take());
 		commands
 			.entity(entity)
 			.remove::<RstmlRoot>()
-			.insert(collected_elements);
+			.insert(collected_elements)
+			.add_children(&children);
 	}
 	Ok(())
 }
@@ -80,7 +81,7 @@ enum ParentContext {
 
 
 impl<'w, 's, 'a> RstmlToWorld<'w, 's, 'a> {
-	/// Returns the entity containing these nodes
+	/// Create an entity for each node in the vector.
 	pub fn spawn_nodes(
 		&mut self,
 		parent_cx: ParentContext,

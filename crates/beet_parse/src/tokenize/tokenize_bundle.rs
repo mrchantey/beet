@@ -42,7 +42,9 @@ fn tokenize_combinator_exprs(
 	items: &mut Vec<TokenStream>,
 	entity: Entity,
 ) -> Result<()> {
-	if let Some(expr) = tokenize_combinator_exprs_mapped(world, entity, super::tokenize_bundle)?{
+	if let Some(expr) =
+		tokenize_combinator_exprs_mapped(world, entity, super::tokenize_bundle)?
+	{
 		items.push(expr.node_bundle_tokens());
 	}
 	Ok(())
@@ -88,34 +90,38 @@ mod test {
 		.xpect()
 		.to_be_str(
 			quote! {(
+				BeetRoot,
+				InstanceRoot,
 				MacroIdx{file:WsPathBuf::new("crates/beet_parse/src/tokenize/tokenize_bundle.rs"),start:LineCol{line:1u32,col:0u32}},
-				NodeTag(String::from("span")),
-				ElementNode { self_closing: false },
-				related!(Attributes[(
-					AttributeKey::new("hidden"),
-					OnSpawnTemplate::new_insert(true.into_attribute_bundle())
-				)]),
+				FragmentNode,
 				related!{Children[(
-						ExprIdx(0u32),
-						NodeTag(String::from("MyComponent")),
-						FragmentNode,
-						TemplateNode,
-						ClientLoadDirective,
-						OnSpawnTemplate::new_insert(#[allow(unused_braces)]{
-							let template = <MyComponent as Props>::Builder::default().foo("bar").build();
-							(
-								#[cfg(not(target_arch = "wasm32"))]
-								{ TemplateSerde::new(&template) },
-								#[cfg(target_arch = "wasm32")]
-								{ () },
-								TemplateRoot::spawn(Spawn(template.into_node_bundle()))
-							)
-						}.into_node_bundle())
-					), (
-						NodeTag(String::from("div")),
-						ElementNode { self_closing: true }
-					)]}
-				
+					NodeTag(String::from("span")),
+					ElementNode { self_closing: false },
+					related!(Attributes[(
+						AttributeKey::new("hidden"),
+						OnSpawnTemplate::new_insert(true.into_attribute_bundle())
+					)]),
+					related!{Children[(
+							ExprIdx(0u32),
+							NodeTag(String::from("MyComponent")),
+							FragmentNode,
+							TemplateNode,
+							ClientLoadDirective,
+							OnSpawnTemplate::new_insert(#[allow(unused_braces)]{
+								let template = <MyComponent as Props>::Builder::default().foo("bar").build();
+								(
+									#[cfg(not(target_arch = "wasm32"))]
+									{ TemplateSerde::new(&template) },
+									#[cfg(target_arch = "wasm32")]
+									{ () },
+									TemplateRoot::spawn(Spawn(template.into_node_bundle()))
+								)
+							}.into_node_bundle())
+						), (
+							NodeTag(String::from("div")),
+							ElementNode { self_closing: true }
+						)]}
+				)]}
 			)}
 			.to_string(),
 		);
@@ -134,6 +140,8 @@ mod test {
 		.to_be_str(
 			quote! {
 				(
+					BeetRoot,
+					InstanceRoot,
 					MacroIdx{file:WsPathBuf::new("crates/beet_parse/src/tokenize/tokenize_bundle.rs"),start:LineCol{line:1u32,col:0u32}},
 					FragmentNode,
 					related!{Children[
@@ -160,10 +168,15 @@ mod test {
 			.xpect()
 			.to_be_str(
 				quote! {(
+					BeetRoot,
+					InstanceRoot,
 					MacroIdx{file:WsPathBuf::new("crates/beet_parse/src/tokenize/tokenize_bundle.rs"),start:LineCol{line:1u32,col:0u32}},
-					ExprIdx(0u32),
-					BlockNode,
-					OnSpawnTemplate::new_insert(#[allow(unused_braces)]{foo}.into_node_bundle())
+					FragmentNode,
+					related!{Children[(
+						ExprIdx(0u32),
+						BlockNode,
+						OnSpawnTemplate::new_insert(#[allow(unused_braces)]{foo}.into_node_bundle())
+					)]}
 				)}
 				.to_string(),
 			);
@@ -177,16 +190,21 @@ mod test {
 			.xpect()
 			.to_be_str(
 				quote! {(
+					BeetRoot,
+					InstanceRoot,
 					MacroIdx{file:WsPathBuf::new("crates/beet_parse/src/tokenize/tokenize_bundle.rs"),start:LineCol{line:1u32,col:0u32}},
-					NodeTag(String::from("input")),
-					ElementNode { self_closing: true },
-					related!(Attributes [
-						(
-							AttributeKey::new("hidden"),
-							OnSpawnTemplate::new_insert(val.into_attribute_bundle()),
-							ExprIdx(0u32)
-						)
-					])
+					FragmentNode,
+					related!{Children[(
+						NodeTag(String::from("input")),
+						ElementNode { self_closing: true },
+						related!(Attributes [
+							(
+								AttributeKey::new("hidden"),
+								OnSpawnTemplate::new_insert(val.into_attribute_bundle()),
+								ExprIdx(0u32)
+							)
+						])
+					)]}
 				)}
 				.to_string(),
 			);
@@ -200,9 +218,14 @@ mod test {
 			.xpect()
 			.to_be_str(
 				quote! {(
+					BeetRoot,
+					InstanceRoot,
 					MacroIdx{file:WsPathBuf::new("crates/beet_parse/src/tokenize/tokenize_bundle.rs"),start:LineCol{line:1u32,col:0u32}},
-					NodeTag(String::from("style")),
-					ElementNode { self_closing: false }
+					FragmentNode,
+					related!{Children[(
+						NodeTag(String::from("style")),
+						ElementNode { self_closing: false }
+					)]}
 				)}
 				.to_string(),
 			);
@@ -213,10 +236,15 @@ mod test {
 			.xpect()
 			.to_be_str(
 				quote! {(
+					BeetRoot,
+					InstanceRoot,
 					MacroIdx{file:WsPathBuf::new("crates/beet_parse/src/tokenize/tokenize_bundle.rs"),start:LineCol{line:1u32,col:0u32}},
-					NodeTag(String::from("style")),
-					ElementNode { self_closing: false },
-					LangContent::InnerText(String::from("foo"))
+					FragmentNode,
+					related!{Children[(
+						NodeTag(String::from("style")),
+						ElementNode { self_closing: false },
+						LangContent::InnerText(String::from("foo"))
+					)]}
 				)}
 				.to_string(),
 			);

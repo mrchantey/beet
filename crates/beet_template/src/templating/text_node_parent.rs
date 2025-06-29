@@ -196,7 +196,8 @@ mod test {
 			.spawn(rsx! {
 				<div>foobar</div>
 			})
-			.id();
+			.get::<Children>()
+			.unwrap()[0];
 
 		world
 			.run_system_once(
@@ -224,7 +225,8 @@ mod test {
 					<Adjective>and fat</Adjective>dog
 				</div>
 			})
-			.id();
+			.get::<Children>()
+			.unwrap()[0];
 		world.run_system_once(spawn_templates).unwrap().unwrap();
 		world.run_system_once(apply_slots).unwrap().unwrap();
 
@@ -251,7 +253,7 @@ mod test {
 				},
 				CollapsedNode::Break,
 				CollapsedNode::SignalText {
-					entity: Entity::from_raw(7),
+					entity: Entity::from_raw(8),
 					value: "jumps over".into(),
 				},
 				CollapsedNode::StaticText {
@@ -279,7 +281,7 @@ mod test {
 				text_nodes: vec![TextNodeChild {
 					child_index: 1,
 					split_positions: vec![
-						(Some(Entity::from_raw(7)), 10),
+						(Some(Entity::from_raw(8)), 10),
 						(None, 5),
 						(None, 4),
 						(None, 7),

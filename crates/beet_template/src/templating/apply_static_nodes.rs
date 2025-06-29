@@ -24,11 +24,8 @@ pub fn load_static_scene(world: &mut World) -> Result {
 /// When a [`MacroIdx`] is added to an entity,
 /// recusively apply each [`StaticNodeRoot`] and run [`OnSpawnTemplate`] methods
 pub fn spawn_templates(world: &mut World) -> Result {
-	let mut query = world.query_filtered::<(), (
-		Added<MacroIdx>,
-		Without<StaticNodeRoot>,
-		Without<ResolvedRoot>,
-	)>();
+	let mut query = world
+		.query_filtered::<(), (Added<InstanceRoot>, Without<ResolvedRoot>)>();
 	while query.iter(world).next().is_some() {
 		// println!("Running spawn_templates system");
 		world.run_system_cached(apply_static_nodes)??;
@@ -41,24 +38,12 @@ pub(super) fn apply_static_nodes(
 	mut commands: Commands,
 	instances: Populated<
 		(Entity, &MacroIdx),
-		(
-			Added<MacroIdx>,
-			Without<StaticNodeRoot>,
-			Without<ResolvedRoot>,
-		),
+		(Added<InstanceRoot>, Without<ResolvedRoot>),
 	>,
-	static_trees: Query<(Entity, &MacroIdx), With<StaticNodeRoot>>,
+	static_trees: Query<(Entity, &MacroIdx), With<StaticRoot>>,
 	children: Query<&Children>,
-	// items that should be preserved at the root level,
-	// but overridden in children
-	root_deny: Query<
-		(Option<&ChildOf>, Option<&ExprIdx>),
-		(
-			Added<MacroIdx>,
-			Without<StaticNodeRoot>,
-			Without<ResolvedRoot>,
-		),
-	>,
+	// types that we want to deny clone for the root only, not children
+	deny_root: Query<Option<&ChildOf>>,
 	attributes: Query<&Attributes>,
 	mut on_spawn_templates: Query<(&ExprIdx, &mut OnSpawnTemplate)>,
 ) -> Result {
@@ -99,43 +84,29 @@ pub(super) fn apply_static_nodes(
 		// 	instance,
 		// );
 
-
-		// this is effectively a 'root level deny',
-		// builder.deny is recursive so we cant deny some root components
-		// that shouldnt be overridden, so cache and reapply after clone
-		let root_deny = root_deny.get(instance).ok();
-
 		commands
 			.entity(instance)
 			.despawn_related::<Children>()
 			.despawn_related::<TemplateRoot>()
 			.despawn_related::<Attributes>()
-			// remove all components that the static tree may
-			// replace
-			// currently just TemplateOf but we may need to add more later
-			.retain::<(ChildOf, TemplateOf)>();
+			.retain::<(BeetRoot, InstanceRoot, ChildOf, TemplateOf)>();
 
 		// apply the static tree
 		commands
 			.entity(static_tree)
 			.clone_with(instance, |builder| {
 				builder
-					// a static node shouldnt have a TemplateOf
-					// but specify for completeness
-					//
-					.deny::<(StaticNodeRoot, TemplateOf)>()
+					.deny::<(BeetRoot, StaticRoot)>()
 					.linked_cloning(true)
 					.add_observers(true);
 			});
 
-		if let Some((child, _expr_idx)) = root_deny {
-			if let Some(child) = child {
-				commands.entity(instance).insert(child.clone());
+		// if the static root is a ChildOf that would override the instance,
+		// we need to reapply it.
+		if let Ok(child_of) = deny_root.get(instance) {
+			if let Some(child_of) = child_of {
+				commands.entity(instance).insert(child_of.clone());
 			}
-			// understandably breaks, expridx collisions
-			// if let Some(expr_idx) = expr_idx {
-			// 	commands.entity(instance).insert(expr_idx.clone());
-			// }
 		}
 
 		// queue system to resolve template locations after clone
@@ -222,18 +193,27 @@ mod test {
 	use sweet::prelude::*;
 
 	#[test]
-	fn retains_children() {
+	fn retains_parent() {
 		let mut world = World::new();
 
 		let child = world.spawn(rsx! {<div/>}).insert(MacroIdx::default()).id();
-		let parent = world.spawn(rsx! {<main></main>}).add_child(child).id();
+		let parent = world.spawn(rsx! {<main></main>}).id();
+		let main = world.entity(parent).get::<Children>().unwrap()[0];
+		world.entity_mut(main).add_child(child);
 
 		let _tree = world
-			.spawn((rsx! {<span/>}, StaticNodeRoot))
+			.spawn((rsx! {<span/>}, StaticRoot))
+			.remove::<InstanceRoot>()
 			.insert(MacroIdx::default())
 			.id();
 
 		world.run_system_once(spawn_templates).unwrap().unwrap();
+
+		// let frag = world
+		// 	.component_names_related::<Children>(parent)
+		// 	.iter_to_string_indented();
+		// println!("frag: {}", frag);
+
 		world
 			.run_system_once_with(render_fragment, parent)
 			.unwrap()
@@ -245,7 +225,8 @@ mod test {
 		let mut world = World::new();
 		let instance = world.spawn(instance).insert(MacroIdx::default()).id();
 		let _tree = world
-			.spawn((static_node, StaticNodeRoot))
+			.spawn((static_node, StaticRoot))
+			.remove::<InstanceRoot>()
 			.insert(MacroIdx::default())
 			.id();
 
@@ -359,6 +340,7 @@ mod test {
 			.id();
 		let instance = world
 			.spawn((
+				InstanceRoot,
 				idx1.clone(),
 				NodeTag(String::from("main")),
 				ElementNode::open(),
@@ -368,11 +350,11 @@ mod test {
 			.id();
 
 		let _tree1 = world
-			.spawn((rsx! {<span>{}</span>}, StaticNodeRoot))
+			.spawn((rsx! {<span>{}</span>}, StaticRoot))
 			.insert(idx1)
 			.id();
 		let _tree2 = world
-			.spawn((rsx! {<span>{}</span>}, StaticNodeRoot))
+			.spawn((rsx! {<span>{}</span>}, StaticRoot))
 			.insert(idx2)
 			.id();
 

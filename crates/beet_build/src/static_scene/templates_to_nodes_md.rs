@@ -21,7 +21,6 @@ pub fn templates_to_nodes_md(
 				ChildOf(entity),
 				StaticRoot,
 				MacroIdx::new(path.path().clone(), LineCol::default()),
-				StaticRoot,
 				CombinatorTokens::new(rsx_str),
 			));
 		}

@@ -130,7 +130,7 @@ mod test {
 		let mut world = World::new();
 		world.init_resource::<HtmlConstants>();
 		let (get, _set) = signal(2);
-		let entity = world
+		let div = world
 			.spawn(rsx! {
 				<div onclick=||{}>
 					"child 1"
@@ -138,20 +138,17 @@ mod test {
 					"child 2"
 				</div>
 			})
-			.id();
+			.get::<Children>()
+			.unwrap()[0];
 		world.run_system_once(spawn_templates).unwrap().unwrap();
 		world
 			.run_system_once(super::super::apply_text_node_parents)
 			.unwrap();
 		world.run_system_once(super::apply_root_dom_idx).unwrap();
 
-		world
-			.get::<DomIdx>(entity)
-			.unwrap()
-			.xpect()
-			.to_be(&DomIdx(0));
+		world.get::<DomIdx>(div).unwrap().xpect().to_be(&DomIdx(0));
 
-		let children = world.get::<Children>(entity).unwrap();
+		let children = world.get::<Children>(div).unwrap();
 		world
 			.get::<DomIdx>(children[1])
 			.unwrap()
