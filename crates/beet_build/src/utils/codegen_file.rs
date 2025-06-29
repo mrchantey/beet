@@ -10,8 +10,24 @@ use syn::Expr;
 use syn::Item;
 
 
+
+/// Generate the [`CodegenFile`] for native files.
+/// - After [`ProcessRouterCodegenStep`]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, SystemSet)]
+pub struct ExportCodegenStep;
+
+#[derive(Debug, Default)]
+pub struct CodegenPlugin;
+
+
+impl Plugin for CodegenPlugin {
+	fn build(&self, app: &mut App) {
+		app.add_systems(Update, export_codegen_files.in_set(ExportCodegenStep));
+	}
+}
+
 /// Call [`CodegenFile::build_and_write`] for every [`Added`] [`CodegenFileSendit`]
-pub fn export_codegen_files(
+fn export_codegen_files(
 	_: TempNonSendMarker,
 	query: Populated<&CodegenFileSendit, Added<CodegenFileSendit>>,
 ) -> bevy::prelude::Result {

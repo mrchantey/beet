@@ -16,19 +16,14 @@ impl HtmlFragment {
 	/// and run a full update cycle.
 	pub fn parse_bundle(bundle: impl Bundle) -> String {
 		ReactiveApp::with(|app| {
-			let entity = app
-				.world_mut()
-				.spawn((bundle, HtmlFragment::default()))
-				.id();
+			let entity = app.world_mut().spawn(bundle).id();
 			app.update();
-			let value = app
+			let html = app
 				.world_mut()
-				.entity_mut(entity)
-				.take::<HtmlFragment>()
-				.unwrap()
-				.0;
+				.run_system_cached_with(render_fragment, entity)
+				.unwrap();
 			app.world_mut().despawn(entity);
-			value
+			html
 		})
 	}
 }

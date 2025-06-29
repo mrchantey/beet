@@ -13,7 +13,7 @@ pub fn compile_wasm(
 	settings: Res<ServerOutputConfig>,
 	// this system only runs if the `CollectClientIslandPlugin` is added to
 	// an entity
-	_query: Populated<(), Added<CollectClientIslandPlugin>>,
+	_query: Populated<(), Added<CollectClientIslands>>,
 ) -> Result {
 	let mut cmd = cmd.clone();
 	cmd.target = Some("wasm32-unknown-unknown".to_string());

@@ -1,30 +1,32 @@
-use super::collect_client_islands::collect_client_islands;
+use super::*;
 use crate::prelude::*;
 use beet_bevy::prelude::*;
 use bevy::prelude::*;
 use serde::Deserialize;
 use serde::Serialize;
 
-use crate::prelude::ProcessRouterCodegenStep;
-
 #[derive(Default)]
 pub struct ClientIslandCodegenPlugin;
+
+/// Perform extra processing after files have been imported and processed.
+/// - After [`ExportNodesStep`]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, SystemSet)]
+pub struct CollectClientIslandStep;
+
 
 
 impl Plugin for ClientIslandCodegenPlugin {
 	fn build(&self, app: &mut App) {
 		app
-			// ensure sets configured without RouterCodegenPlugin
 			.configure_sets(
 				Update,
-				ExportRouterCodegenStep.after(ProcessRouterCodegenStep),
+				CollectClientIslandStep.before(ExportCodegenStep),
 			)
 			.add_systems(
 				Update,
 				(
-					collect_client_islands.in_set(ProcessRouterCodegenStep),
-					// after codegen
-					compile_wasm.after(ExportRouterCodegenStep),
+					collect_client_islands.in_set(CollectClientIslandStep),
+					compile_wasm.after(ExportCodegenStep),
 				)
 					.chain(),
 			);
@@ -41,23 +43,21 @@ pub struct ClientIslandCodegenConfig {
 	#[serde(flatten)]
 	pub codegen_file: CodegenFile,
 	#[serde(flatten)]
-	pub collect_client_island_plugin: CollectClientIslandPlugin,
+	pub collect_client_islands: CollectClientIslands,
 }
 
 impl Default for ClientIslandCodegenConfig {
 	fn default() -> Self {
 		Self {
 			codegen_file: CodegenFile::default(),
-			collect_client_island_plugin: CollectClientIslandPlugin::default(),
+			collect_client_islands: CollectClientIslands::default(),
 		}
 	}
 }
 
 impl NonSendPlugin for ClientIslandCodegenConfig {
 	fn build(self, app: &mut App) {
-		app.world_mut().spawn((
-			self.codegen_file.sendit(),
-			self.collect_client_island_plugin,
-		));
+		app.world_mut()
+			.spawn((self.codegen_file.sendit(), self.collect_client_islands));
 	}
 }

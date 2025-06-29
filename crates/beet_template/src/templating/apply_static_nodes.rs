@@ -89,7 +89,14 @@ pub(super) fn apply_static_nodes(
 			.despawn_related::<Children>()
 			.despawn_related::<TemplateRoot>()
 			.despawn_related::<Attributes>()
-			.retain::<(BeetRoot, InstanceRoot, ChildOf, TemplateOf)>();
+			.retain::<(
+				BeetRoot,
+				InstanceRoot,
+				HtmlDocument,
+				HtmlFragment,
+				ChildOf,
+				TemplateOf,
+			)>();
 
 		// apply the static tree
 		commands

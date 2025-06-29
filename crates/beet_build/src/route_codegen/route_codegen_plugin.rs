@@ -13,11 +13,6 @@ pub struct ImportRouterCodegenStep;
 #[derive(Debug, Clone, PartialEq, Eq, Hash, SystemSet)]
 pub struct ProcessRouterCodegenStep;
 
-/// Generate the [`CodegenFile`] for native files.
-/// - After [`ProcessRouterCodegenStep`]
-#[derive(Debug, Clone, PartialEq, Eq, Hash, SystemSet)]
-pub struct ExportRouterCodegenStep;
-
 #[derive(Debug, Default)]
 pub struct RouteCodegenPlugin;
 
@@ -29,8 +24,9 @@ impl Plugin for RouteCodegenPlugin {
 				Update,
 				(
 					ImportRouterCodegenStep.before(ImportNodesStep),
-					ProcessRouterCodegenStep.after(ExportNodesStep),
-					ExportRouterCodegenStep.after(ProcessRouterCodegenStep),
+					ProcessRouterCodegenStep
+						.after(ExportNodesStep)
+						.before(ExportCodegenStep),
 				),
 			)
 			.add_systems(
@@ -61,12 +57,11 @@ impl Plugin for RouteCodegenPlugin {
 					#[cfg(not(test))]
 					(
 						// dont hit the fs in tests
-						export_codegen_files,
 						despawn_file_groups,
 						compile_router,
 					)
 						.chain()
-						.in_set(ExportRouterCodegenStep),
+						.after(ExportCodegenStep),
 				),
 			);
 	}

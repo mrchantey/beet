@@ -42,7 +42,5 @@ mod file_group;
 pub use file_group::*;
 mod route_codegen_plugin;
 pub use route_codegen_plugin::*;
-mod codegen_file;
 mod route_codegen_root;
-pub use codegen_file::*;
 pub use route_codegen_root::*;

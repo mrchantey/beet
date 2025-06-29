@@ -48,21 +48,8 @@ impl NonSendPlugin for RouteCodegenConfig {
 		});
 	}
 }
-
+/// Marker type indicating the (usually `mod.rs`) file
+/// containing reexports and static route trees.
 #[derive(Debug, Clone, Default, Component)]
 #[require(CodegenFileSendit)]
-pub struct RouteCodegenRoot {}
-
-
-#[cfg(test)]
-mod test {
-	use crate::prelude::*;
-	use bevy::prelude::*;
-	// use sweet::prelude::*;
-
-	#[test]
-	fn works() {
-		let mut app = App::new();
-		app.add_plugins(RouteCodegenPlugin).update();
-	}
-}
+pub struct RouteCodegenRoot;
