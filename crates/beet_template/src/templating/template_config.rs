@@ -59,7 +59,7 @@ pub struct StaticSceneConfig {
 	/// The root directory for files including templates
 	root_dir: WsPathBuf,
 	/// The location for the generated template scene file
-	scene_file: WsPathBuf,
+	pub scene_file: WsPathBuf,
 }
 
 impl Default for StaticSceneConfig {

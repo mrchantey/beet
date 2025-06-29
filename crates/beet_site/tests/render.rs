@@ -5,7 +5,7 @@ use beet_site::prelude::*;
 use sweet::prelude::*;
 
 fn router() -> AppRouter {
-	AppRouter::default().add_plugins((
+	AppRouter::test().add_plugins((
 		PagesPlugin,
 		DocsPlugin,
 		ActionsPlugin,

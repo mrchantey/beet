@@ -86,7 +86,7 @@ fn set_app(template_config: TemplateConfig) {
 		let mut app = App::new();
 		app.add_plugins((TemplatePlugin, template_config.clone()));
 
-		#[cfg(feature = "build")]
+		#[cfg(all(not(test), feature = "build"))]
 		app.add_plugins(beet_build::prelude::StaticScenePlugin);
 
 		app
@@ -96,7 +96,10 @@ fn set_app(template_config: TemplateConfig) {
 impl AppRouter<()> {
 	/// The default app router parses cli arguments which is not desired in tests.
 	pub fn test() -> Self {
-		let template_config = TemplateConfig::default();
+		let mut template_config = TemplateConfig::default();
+		// dont apply static 
+		template_config.static_scene_config.scene_file =
+			WsPathBuf::new("doesnt-exist.ron");
 		set_app(template_config.clone());
 		Self {
 			router: default(),
