@@ -67,7 +67,8 @@ impl Plugin for BuildArgs {
 		)
 		.unwrap_or_exit();
 
-		app.add_non_send_plugin(config).add_plugins((
+		app.add_plugins((
+			config.template_config,
 			NodeTokensPlugin::default(),
 			CodegenPlugin::default(),
 		));
@@ -76,13 +77,15 @@ impl Plugin for BuildArgs {
 		let all = self.only.is_empty();
 
 		if all || self.only.contains(&BuildOnly::Routes) {
-			app.add_plugins(RouteCodegenPlugin::default());
+			app.add_plugins(RouteCodegenPlugin::default())
+				.add_non_send_plugin(config.route_codegen);
 		}
 		if all || self.only.contains(&BuildOnly::StaticScene) {
 			app.add_plugins(StaticScenePlugin::default());
 		}
 		if all || self.only.contains(&BuildOnly::ClientIslands) {
-			app.add_plugins(ClientIslandCodegenPlugin::default());
+			app.add_plugins(ClientIslandCodegenPlugin::default())
+				.add_non_send_plugin(config.client_island_codegen);
 		}
 	}
 }
