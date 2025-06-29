@@ -48,7 +48,7 @@ pub(super) fn apply_static_nodes(
 	attributes: Query<&Attributes>,
 	mut on_spawn_templates: Query<(&ExprIdx, &mut OnSpawnTemplate)>,
 ) -> Result {
-	for (instance, static_tree, idx) in
+	for (instance_root, static_root, idx) in
 		instances.iter().filter_map(|(instance, idx)| {
 			static_trees
 				.iter()
@@ -63,7 +63,7 @@ pub(super) fn apply_static_nodes(
 		// TODO attributes too?
 		let mut instance_expr_map = HashMap::new();
 
-		for child in children.iter_descendants_inclusive(instance) {
+		for child in children.iter_descendants_inclusive(instance_root) {
 			if let Ok((idx, mut template)) = on_spawn_templates.get_mut(child) {
 				instance_expr_map.insert(*idx, template.take());
 			}
@@ -80,13 +80,21 @@ pub(super) fn apply_static_nodes(
 		// 	|entity: In<Entity>, world: &mut World| {
 		// 		let str = world.component_names_related::<Children>(*entity);
 		// 		let str = str.iter_to_string_indented();
-		// 		println!("tree: {}", str);
+		// 		println!("instance:\n{}", str);
 		// 	},
-		// 	instance,
+		// 	instance_root,
+		// );
+		// commands.run_system_cached_with(
+		// 	|entity: In<Entity>, world: &mut World| {
+		// 		let str = world.component_names_related::<Children>(*entity);
+		// 		let str = str.iter_to_string_indented();
+		// 		println!("static:\n{}", str);
+		// 	},
+		// 	static_root,
 		// );
 
 		commands
-			.entity(instance)
+			.entity(instance_root)
 			.despawn_related::<Children>()
 			.despawn_related::<TemplateRoot>()
 			.despawn_related::<Attributes>()
@@ -101,8 +109,8 @@ pub(super) fn apply_static_nodes(
 
 		// apply the static tree
 		commands
-			.entity(static_tree)
-			.clone_with(instance, |builder| {
+			.entity(static_root)
+			.clone_with(instance_root, |builder| {
 				builder
 					.deny::<(BeetRoot, StaticRoot)>()
 					.linked_cloning(true)
@@ -111,16 +119,16 @@ pub(super) fn apply_static_nodes(
 
 		// if the static root is a ChildOf that would override the instance,
 		// we need to reapply it.
-		if let Ok(child_of) = deny_root.get(instance) {
+		if let Ok(child_of) = deny_root.get(instance_root) {
 			if let Some(child_of) = child_of {
-				commands.entity(instance).insert(child_of.clone());
+				commands.entity(instance_root).insert(child_of.clone());
 			}
 		}
 
 		// queue system to resolve template locations after clone
 		commands.run_system_cached_with(
 			apply_template_locations,
-			(idx.clone(), instance, instance_expr_map),
+			(idx.clone(), instance_root, instance_expr_map),
 		);
 	}
 	for (entity, _) in instances.iter() {

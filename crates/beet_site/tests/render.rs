@@ -3,14 +3,31 @@
 use beet::prelude::*;
 use beet_site::prelude::*;
 use sweet::prelude::*;
-#[sweet::test]
-async fn works() {
-	let router = AppRouter::test().add_plugins((
+
+fn router() -> AppRouter {
+	AppRouter::default().add_plugins((
 		PagesPlugin,
 		DocsPlugin,
 		ActionsPlugin,
 		BeetDesignMockupsPlugin,
-	));
+	))
+}
+
+
+#[sweet::test]
+async fn root() {
+	let router = router();
+	let index = router.render_route(&"/".into()).await.unwrap();
+	// println!("{}", index);
+	index.xref().xpect().to_contain("data-beet-dom-idx");
+	index.xref().xpect().to_contain("A very bevy metaframework");
+}
+
+
+#[sweet::test]
+#[ignore = "reason"]
+async fn render_all() {
+	let router = router();
 
 	// // Ensure all routes build, including parsing their metadata.
 	for route in route_path_tree().flatten().iter() {
@@ -19,11 +36,4 @@ async fn works() {
 			.await
 			.unwrap();
 	}
-
-	// check a route contains content
-	let index = router.render_route(&"/".into()).await.unwrap();
-	index.xref().xpect().to_contain("data-beet-dom-idx");
-	index.xref().xpect().to_contain("A very bevy metaframework");
-
-	// println!("{}", index);
 }

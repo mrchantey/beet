@@ -1,5 +1,4 @@
 use crate::prelude::*;
-use beet_bevy::prelude::HierarchyQueryExtExt;
 use beet_common::as_beet::*;
 use bevy::ecs::system::SystemParam;
 use bevy::prelude::*;
@@ -44,29 +43,21 @@ impl RequiresIdx<'_, '_> {
 }
 /// Recursively applies a [`DomIdx`] to root nodes spawned *without* one,
 /// not counting roots that are spawned with one like client islands.
+#[allow(dead_code)]
 pub(super) fn apply_root_dom_idx(
 	mut commands: Commands,
 	html_constants: Res<HtmlConstants>,
-	// definition of a root: any fragment or element without a parent
-	roots: Populated<
-		Entity,
-		(
-			Without<ChildOf>,
-			Without<DomIdx>,
-			// just client directives?
-			Or<(Added<FragmentNode>, Added<ElementNode>, Added<TemplateNode>)>,
-		),
-	>,
+	roots: Populated<Entity, Added<HtmlDocument>>,
 	children: Query<&Children>,
 	requires_idx: RequiresIdx,
 ) {
 	let mut id = 0;
-	// even though we're iterating roots theres usually only one entrypoint,
-	// ie a BundleRoute, but it should still work with multiple
+
+	// find only the top level roots
 	for root in roots.iter() {
 		for entity in children
-			//dfs inclusive, root may need a DomIdx
-			.iter_descendants_inclusive_depth_first(root)
+			//dfs allows for client islands to accurately pick up the next index
+			.iter_descendants_depth_first(root)
 			.filter(|entity| requires_idx.requires(*entity))
 		{
 			// only 'dynamic' elements need a DomIdx
@@ -84,17 +75,12 @@ pub(super) fn apply_root_dom_idx(
 
 /// Recursively applies a [`DomIdx`] to children of root nodes spawned *with* one,
 /// like client islands.
-pub(super) fn apply_child_dom_idx(
+#[allow(dead_code)]
+pub(super) fn apply_client_island_dom_idx(
 	mut commands: Commands,
 	html_constants: Res<HtmlConstants>,
 	// definition of a root: any fragment or element without a parent
-	roots: Populated<
-		(Entity, &DomIdx),
-		(
-			Without<ChildOf>,
-			Or<(Added<FragmentNode>, Added<ElementNode>, Added<TemplateNode>)>,
-		),
-	>,
+	roots: Populated<(Entity, &DomIdx), (Added<DomIdx>, Without<ChildOf>)>,
 	children: Query<&Children>,
 	requires_idx: RequiresIdx,
 ) {
@@ -131,13 +117,13 @@ mod test {
 		world.init_resource::<HtmlConstants>();
 		let (get, _set) = signal(2);
 		let div = world
-			.spawn(rsx! {
+			.spawn((HtmlDocument, rsx! {
 				<div onclick=||{}>
 					"child 1"
 					<span>"child with signal"{get}</span>
 					"child 2"
 				</div>
-			})
+			}))
 			.get::<Children>()
 			.unwrap()[0];
 		world.run_system_once(spawn_templates).unwrap().unwrap();
