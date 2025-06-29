@@ -13,7 +13,7 @@ pub fn tokenize_bundle_tokens(
 	entity: Entity,
 ) -> Result<TokenStream> {
 	let mut items = Vec::new();
-	tokenize_idxs(world, &mut items, entity)?;
+	tokenize_roots(world, &mut items, entity)?;
 	tokenize_rsx_nodes(world, &mut items, entity)?;
 	tokenize_rsx_directives(world, &mut items, entity)?;
 	tokenize_web_nodes(world, &mut items, entity)?;
@@ -108,11 +108,18 @@ mod test {
 		parse_rstml(quote! {<br/>}).to_be_str(
 			quote! {
 				(
+					BeetRoot,
+					InstanceRoot,
 					MacroIdx { 
 						file: WsPathBuf::new("crates/beet_parse/src/tokenize/tokenize_bundle_tokens.rs"), 
 						start: LineCol { line: 1u32, col: 0u32 }},
-					NodeTag(String::from("br")),
-					ElementNode { self_closing: true }
+					FragmentNode,
+					related! { Children[
+						(
+							NodeTag(String::from("br")),
+							ElementNode { self_closing: true }
+						)
+					]}
 				)
 			}
 			.to_string(),
@@ -120,14 +127,21 @@ mod test {
 		parse_rstml(quote! {<Foo/>}).to_be_str(
 			quote! {
 				(
+					BeetRoot,
+					InstanceRoot,
 					MacroIdx {
 						file: WsPathBuf::new("crates/beet_parse/src/tokenize/tokenize_bundle_tokens.rs"),
 						start: LineCol { line: 1u32, col: 0u32 }
 					},
-					ExprIdx(0u32),
-					NodeTag(String::from("Foo")),
 					FragmentNode,
-					TemplateNode
+					related! { Children[
+						(
+							ExprIdx(0u32),
+							NodeTag(String::from("Foo")),
+							FragmentNode,
+							TemplateNode
+						)
+					]}
 				)
 			}
 			.to_string(),
@@ -146,36 +160,43 @@ mod test {
 			/>}).to_be_str(
 			quote! {
 				(
+					BeetRoot,
+					InstanceRoot,
 					MacroIdx {
 						file: WsPathBuf::new("crates/beet_parse/src/tokenize/tokenize_bundle_tokens.rs"),
 						start: LineCol { line: 1u32, col: 0u32 }
 					},
-					NodeTag(String::from("br")),
-					ElementNode { self_closing: true },
-					related! { Attributes[
-						AttributeKey(String::from("hidden")),
+					FragmentNode,
+					related! { Children[
 						(
-							AttributeKey(String::from("class")),
-							AttributeLit::String(String::from("foo")),
-							NodeExpr(SendWrapper::new(syn::parse_quote!("foo")))
-						),
-						(
-							AttributeKey(String::from("party_time")),
-							AttributeLit::Boolean(true),
-							NodeExpr(SendWrapper::new(syn::parse_quote!(true)))
-						),
-						(
-							AttributeKey(String::from("some_key")),
-							NodeExpr(SendWrapper::new(syn::parse_quote!({ bar })))
-						),
-						(
-							AttributeKey(String::from("onmousemove")),
-							AttributeLit::String(String::from("some_js_func")),
-							NodeExpr(SendWrapper::new(syn::parse_quote!("some_js_func")))
-						),
-						(
-							AttributeKey(String::from("onclick")),
-							NodeExpr(SendWrapper::new(syn::parse_quote!({ |_: Trigger<OnClick>| {} })))
+							NodeTag(String::from("br")),
+							ElementNode { self_closing: true },
+							related! { Attributes[
+								AttributeKey(String::from("hidden")),
+								(
+									AttributeKey(String::from("class")),
+									AttributeLit::String(String::from("foo")),
+									NodeExpr(SendWrapper::new(syn::parse_quote!("foo")))
+								),
+								(
+									AttributeKey(String::from("party_time")),
+									AttributeLit::Boolean(true),
+									NodeExpr(SendWrapper::new(syn::parse_quote!(true)))
+								),
+								(
+									AttributeKey(String::from("some_key")),
+									NodeExpr(SendWrapper::new(syn::parse_quote!({ bar })))
+								),
+								(
+									AttributeKey(String::from("onmousemove")),
+									AttributeLit::String(String::from("some_js_func")),
+									NodeExpr(SendWrapper::new(syn::parse_quote!("some_js_func")))
+								),
+								(
+									AttributeKey(String::from("onclick")),
+									NodeExpr(SendWrapper::new(syn::parse_quote!({ |_: Trigger<OnClick>| {} })))
+								)
+							]}
 						)
 					]}
 				)
@@ -187,16 +208,21 @@ mod test {
 	fn block_node() {
 		parse_rstml(quote! {<div>{7}</div>}).to_be_str(
 			quote! {(
+				BeetRoot,
+				InstanceRoot,
 				MacroIdx {
 					file: WsPathBuf::new("crates/beet_parse/src/tokenize/tokenize_bundle_tokens.rs"),
 					start: LineCol { line: 1u32, col: 0u32 }
 				},
-				NodeTag(String::from("div")),
-				ElementNode { self_closing: false },
+				FragmentNode,
 				related!{Children[(
-					ExprIdx(0u32),
-					BlockNode,
-					NodeExpr(SendWrapper::new(syn::parse_quote!({ 7 })))
+					NodeTag(String::from("div")),
+					ElementNode { self_closing: false },
+					related!{Children[(
+						ExprIdx(0u32),
+						BlockNode,
+						NodeExpr(SendWrapper::new(syn::parse_quote!({ 7 })))
+					)]}
 				)]}
 				)
 			}
@@ -208,23 +234,21 @@ mod test {
 		parse_combinator("<br/>").to_be_str(
 			quote! {
 				(
+					BeetRoot,
+					InstanceRoot,
 					MacroIdx {
 						file: WsPathBuf::new("crates/beet_parse/src/tokenize/tokenize_bundle_tokens.rs"),
 						start: LineCol { line: 1u32, col: 0u32 }
 					},
-					NodeExpr(SendWrapper::new(syn::parse_quote!({
-						(
-							FragmentNode,
-							related! {
-								Children[
-									(
-										NodeTag(String::from("br")),
-										ElementNode { self_closing: true }
-									)
-								]
-							}
-						)
-					})))
+					FragmentNode,
+					related! { Children[
+						NodeExpr(SendWrapper::new(syn::parse_quote!({
+							(
+								NodeTag(String::from("br")),
+								ElementNode { self_closing: true }
+							)
+						})))
+					]}
 				)
 			}
 			.to_string().replace(" ", ""),
@@ -238,27 +262,25 @@ mod test {
 				.xpect().to_be_str(
 			quote! {
 				(
+					BeetRoot,
+					InstanceRoot,
 					MacroIdx {
 						file: WsPathBuf::new("crates/beet_parse/src/tokenize/tokenize_bundle_tokens.rs"),
 						start: LineCol { line: 1u32, col: 0u32 }
 					},
-					NodeExpr(SendWrapper::new(syn::parse_quote!({
-						(
-							FragmentNode,
-							related! {
-								Children[
-									(
-										NodeTag(String::from("br")),
-										ElementNode { self_closing: true }
-									),
-									(
-										NodeTag(String::from("br")),
-										ElementNode { self_closing: true }
-									)
-								]
-							}
-						)
-					})))
+					FragmentNode,
+					related! { Children[
+						NodeExpr(SendWrapper::new(syn::parse_quote!({
+							(
+								NodeTag(String::from("br")),
+								ElementNode { self_closing: true }
+							)
+							(
+								NodeTag(String::from("br")),
+								ElementNode { self_closing: true }
+							)
+						})))
+					]}
 				)
 			}
 			.to_string(),
@@ -277,42 +299,40 @@ mod test {
 		"#).to_be_str(
 			quote! {
 					(
+						BeetRoot,
+						InstanceRoot,
 						MacroIdx {
 							file: WsPathBuf::new("crates/beet_parse/src/tokenize/tokenize_bundle_tokens.rs"),
 							start: LineCol { line: 1u32, col: 0u32 }
 						},
-						NodeExpr(SendWrapper::new(syn::parse_quote!({
-							(
-								FragmentNode,
-								related! {
-									Children[
-										(
-											NodeTag(String::from("br")),
-											ElementNode { self_closing: true },
-											related! {
-												Attributes[
-													AttributeKey(String::from("hidden")),
-													(
-														AttributeKey(String::from("class")),
-														AttributeLit::Boolean(true),
-														NodeExpr(SendWrapper::new(syn::parse_quote!(true)))
-													),
-													(
-														AttributeKey(String::from("onmousemove")),
-														AttributeLit::String(String::from("some_js_func")),
-														NodeExpr(SendWrapper::new(syn::parse_quote!("some_js_func")))
-													),
-													(
-														AttributeKey(String::from("onclick")),
-														NodeExpr(SendWrapper::new(syn::parse_quote!({|_: Trigger<OnClick>| {}})))
-													)
-												]
-											}
-										)
-									]
-								}
-							)
-						})))
+						FragmentNode,
+						related! { Children[
+							NodeExpr(SendWrapper::new(syn::parse_quote!({
+								(
+									NodeTag(String::from("br")),
+									ElementNode { self_closing: true },
+									related! {
+										Attributes[
+											AttributeKey(String::from("hidden")),
+											(
+												AttributeKey(String::from("class")),
+												AttributeLit::Boolean(true),
+												NodeExpr(SendWrapper::new(syn::parse_quote!(true)))
+											),
+											(
+												AttributeKey(String::from("onmousemove")),
+												AttributeLit::String(String::from("some_js_func")),
+												NodeExpr(SendWrapper::new(syn::parse_quote!("some_js_func")))
+											),
+											(
+												AttributeKey(String::from("onclick")),
+												NodeExpr(SendWrapper::new(syn::parse_quote!({|_: Trigger<OnClick>| {}})))
+											)
+										]
+									}
+								)
+							})))
+						]}
 					)
 			}
 			.to_string().replace(" ", ""),
@@ -328,45 +348,43 @@ mod test {
 			/>"#).to_be_str(
 			quote! {
 						(
+							BeetRoot,
+							InstanceRoot,
 							MacroIdx {
 								file: WsPathBuf::new("crates/beet_parse/src/tokenize/tokenize_bundle_tokens.rs"),
 								start: LineCol { line: 1u32, col: 0u32 }
 							},
-							NodeExpr(SendWrapper::new(syn::parse_quote!({
-								(
-									FragmentNode,
-									related! {
-										Children[
-											(
-												NodeTag(String::from("br")),
-												ElementNode { self_closing: true },
-												related! {
-													Attributes[
+							FragmentNode,
+							related! { Children[
+								NodeExpr(SendWrapper::new(syn::parse_quote!({
+									(
+										NodeTag(String::from("br")),
+										ElementNode { self_closing: true },
+										related! {
+											Attributes[
+												(
+													AttributeKey(String::from("foo")),
+													NodeExpr(SendWrapper::new(syn::parse_quote!({
+														let class = "bar";
 														(
-															AttributeKey(String::from("foo")),
-															NodeExpr(SendWrapper::new(syn::parse_quote!({
-																let class = "bar";
-																(
-																	NodeTag(String::from("div")),
-																	ElementNode { self_closing: true },
-																	related! {
-																		Attributes[
-																			(
-																				AttributeKey(String::from("class")),
-																				NodeExpr(SendWrapper::new(syn::parse_quote!({ class })))
-																			)
-																		]
-																	}
-																)
-															})))
+															NodeTag(String::from("div")),
+															ElementNode { self_closing: true },
+															related! {
+																Attributes[
+																	(
+																		AttributeKey(String::from("class")),
+																		NodeExpr(SendWrapper::new(syn::parse_quote!({ class })))
+																	)
+																]
+															}
 														)
-													]
-												}
-											)
-										]
-									}
-								)
-							})))
+													})))
+												)
+											]
+										}
+									)
+								})))
+							]}
 						)
 					}
 			.to_string().replace(" ", "")

@@ -56,8 +56,8 @@ impl<'a, 'w, 's> Visit<'a> for RsxSynVisitor<'a, 'w, 's> {
 			let tokens = mac.tokens.clone();
 			self.commands.spawn((
 				ChildOf(self.parent),
+				StaticRoot,
 				MacroIdx::new_from_tokens(self.file.clone(), &tokens),
-				StaticNodeRoot,
 				RstmlTokens::new(tokens),
 			));
 		}

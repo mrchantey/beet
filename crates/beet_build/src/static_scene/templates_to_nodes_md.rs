@@ -19,9 +19,10 @@ pub fn templates_to_nodes_md(
 
 			commands.spawn((
 				ChildOf(entity),
+				StaticRoot,
 				MacroIdx::new(path.path().clone(), LineCol::default()),
-				StaticNodeRoot,
-				CombinatorTokens(rsx_str),
+				StaticRoot,
+				CombinatorTokens::new(rsx_str),
 			));
 		}
 	}

@@ -4,7 +4,7 @@ use beet_utils::prelude::*;
 use bevy::prelude::*;
 use proc_macro2::TokenStream;
 
-/// Parse rstml tokens into a *finalized* [`Bundle`], see [`tokenize_bundle`].
+/// Parse rstml tokens into a *finalized* [`InstanceRoot`], see [`tokenize_bundle`].
 pub fn tokenize_rstml(
 	tokens: TokenStream,
 	source_file: WsPathBuf,
@@ -13,6 +13,7 @@ pub fn tokenize_rstml(
 		let entity = app
 			.world_mut()
 			.spawn((
+				InstanceRoot,
 				MacroIdx::new_from_tokens(source_file, &tokens),
 				RstmlTokens::new(tokens),
 			))
@@ -25,7 +26,7 @@ pub fn tokenize_rstml(
 }
 
 
-/// Parse rstml tokens into a *tokenized* [`Bundle`], see [`tokenize_bundle_tokens`].
+/// Parse rstml tokens into a *tokenized* [`InstanceRoot`], see [`tokenize_bundle_tokens`].
 pub fn tokenize_rstml_tokens(
 	tokens: TokenStream,
 	source_file: WsPathBuf,
@@ -34,6 +35,7 @@ pub fn tokenize_rstml_tokens(
 		let entity = app
 			.world_mut()
 			.spawn((
+				InstanceRoot,
 				MacroIdx::new_from_tokens(source_file, &tokens),
 				RstmlTokens::new(tokens),
 			))

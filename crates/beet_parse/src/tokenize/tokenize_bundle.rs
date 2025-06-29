@@ -12,7 +12,7 @@ pub fn tokenize_bundle(
 	entity: Entity,
 ) -> Result<TokenStream> {
 	let mut items = Vec::new();
-	tokenize_idxs(world, &mut items, entity)?;
+	tokenize_roots(world, &mut items, entity)?;
 	tokenize_rsx_nodes(world,&mut items, entity)?;
 	tokenize_rsx_directives(world,&mut items, entity)?;
 	tokenize_web_nodes(world,&mut items, entity)?;

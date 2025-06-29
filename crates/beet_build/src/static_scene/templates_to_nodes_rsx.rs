@@ -18,9 +18,9 @@ pub fn templates_to_nodes_rsx(
 
 			commands.spawn((
 				ChildOf(entity),
-				StaticNodeRoot,
+				StaticRoot,
 				MacroIdx::new(path.path().clone(), LineCol::default()),
-				CombinatorTokens(file),
+				CombinatorTokens::new(file),
 			));
 		}
 	}

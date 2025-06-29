@@ -90,7 +90,7 @@ fn nested_template() {
 	app.add_plugins((NodeTokensPlugin, StaticScenePlugin));
 	// create root static node
 	app.world_mut().spawn((
-		StaticNodeRoot,
+		StaticRoot,
 		common_idx(),
 		RstmlTokens::new(quote! {
 		<html>
@@ -100,7 +100,7 @@ fn nested_template() {
 	));
 	// create nested static node
 	app.world_mut().spawn((
-		StaticNodeRoot,
+		StaticRoot,
 		common_idx_nested(),
 		RstmlTokens::new(quote! {
 			<after>"value: "{}</after>
@@ -149,7 +149,7 @@ fn build_scene(tokens: TokenStream) -> String {
 	app.add_plugins((NodeTokensPlugin, StaticScenePlugin));
 	let _entity = app
 		.world_mut()
-		.spawn((StaticNodeRoot, common_idx(), RstmlTokens::new(tokens)))
+		.spawn((StaticRoot, common_idx(), RstmlTokens::new(tokens)))
 		.id();
 	app.update();
 

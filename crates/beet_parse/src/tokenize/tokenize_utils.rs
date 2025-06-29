@@ -82,7 +82,11 @@ macro_rules! tokenize_maybe_spanned {
 
 
 tokenize_maybe_spanned![
-	tokenize_idxs,
+	tokenize_roots,
+	BeetRoot,
+	StaticRoot,
+	InstanceRoot,
+	ResolvedRoot,
 	MacroIdx,
 	ExprIdx,
 ];

@@ -2,8 +2,8 @@ mod event_observer;
 mod on_spawn_template;
 pub use event_observer::*;
 pub use on_spawn_template::*;
-pub mod macro_idx;
-pub use macro_idx::*;
+pub mod beet_root;
+pub use beet_root::*;
 pub mod node_portal;
 pub use node_portal::*;
 pub mod expr_idx;
@@ -38,9 +38,11 @@ impl bevy::app::Plugin for NodeTypesPlugin {
 	fn build(&self, app: &mut bevy::prelude::App) {
 		app
 			// idxs & roots
-			.register_type::<MacroIdx>()
-			.register_type::<StaticNodeRoot>()
+			.register_type::<BeetRoot>()
+			.register_type::<StaticRoot>()
+			.register_type::<InstanceRoot>()
 			.register_type::<ResolvedRoot>()
+			.register_type::<MacroIdx>()
 			.register_type::<ExprIdx>()
 			.register_type::<DomIdx>()
 			// rsx nodes

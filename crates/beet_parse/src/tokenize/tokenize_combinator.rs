@@ -7,7 +7,7 @@ use proc_macro2::TokenStream;
 
 
 
-/// Parse combinator string into a *finalized* [`Bundle`], see [`tokenize_bundle`].
+/// Parse combinator string into a *finalized* [`InstanceRoot`], see [`tokenize_bundle`].
 pub fn tokenize_combinator(
 	tokens: &str,
 	source_file: WsPathBuf,
@@ -16,6 +16,7 @@ pub fn tokenize_combinator(
 		let entity = app
 			.world_mut()
 			.spawn((
+				InstanceRoot,
 				MacroIdx::new(source_file, LineCol::default()),
 				CombinatorTokens::new(tokens),
 			))
@@ -27,7 +28,7 @@ pub fn tokenize_combinator(
 	})
 }
 
-/// Parse combinator string into a *tokenized* [`Bundle`], see [`tokenize_bundle_tokens`].
+/// Parse combinator string into a *tokenized* [`InstanceRoot`], see [`tokenize_bundle_tokens`].
 pub fn tokenize_combinator_tokens(
 	tokens: &str,
 	source_file: WsPathBuf,
@@ -36,6 +37,7 @@ pub fn tokenize_combinator_tokens(
 		let entity = app
 			.world_mut()
 			.spawn((
+				InstanceRoot,
 				MacroIdx::new(source_file, LineCol::default()),
 				CombinatorTokens::new(tokens),
 			))
