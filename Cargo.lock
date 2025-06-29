@@ -1115,6 +1115,7 @@ dependencies = [
  "combine 2.5.2",
  "itertools 0.14.0",
  "sweet",
+ "thiserror 1.0.69",
 ]
 
 [[package]]

@@ -14,11 +14,10 @@ keywords.workspace = true
 
 
 [dependencies]
-# tough one to upgrade
+# combine 2 is >5 years old but its a tough one to upgrade
 combine = "2.5"
 itertools = "0.14"
-sweet.workspace = true
-
+thiserror.workspace = true
 
 [dev-dependencies]
 sweet.workspace = true

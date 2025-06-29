@@ -8,15 +8,46 @@ use combine::combinator::parser;
 pub struct CombinatorParser;
 
 impl CombinatorParser {
-	/// Parse a string into a [`RsxChildren`] structure, allowing for the
-	/// following top-level constructs:
+	/// Parse a string into a [`RsxChildren`] structure as if the string is the inner
+	/// of a fragment, allowing for the following top-level constructs:
 	/// - text 							`"hello"`
 	/// - blocks 						`{let foo = "bar"; foo}`
 	/// - single elements 	`<br/>`
 	/// - multiple elements `<br/><br/>`
 	/// - mixed 						`"hello"<br/>{let foo = "bar"; foo}`
-	pub fn parse(s: &str) -> Result<(RsxChildren, &str), ParseError<&str>> {
-		parser(rsx_children).skip(parser(js_whitespace)).parse(s)
+	///
+	/// ## Example
+	///
+	/// ```
+	/// # use beet_rsx_combinator::prelude::*;
+	///
+	/// ```
+	///
+	pub fn parse<'a>(
+		s: &'a str,
+	) -> Result<RsxChildren, CombinatorParserError<'a>> {
+		let (children, remaining) =
+			parser(rsx_children).skip(parser(js_whitespace)).parse(s)?;
+		if !remaining.trim().is_empty() {
+			return Err(CombinatorParserError::RemainingText(remaining));
+		}
+
+		Ok(children)
+	}
+}
+
+
+#[derive(Debug, thiserror::Error)]
+pub enum CombinatorParserError<'a> {
+	#[error("ParseError({0})")]
+	ParseError(ParseError<&'a str>),
+	#[error("RemainingText({0})")]
+	RemainingText(&'a str),
+}
+
+impl<'a> From<ParseError<&'a str>> for CombinatorParserError<'a> {
+	fn from(err: ParseError<&'a str>) -> Self {
+		CombinatorParserError::ParseError(err)
 	}
 }
 
@@ -27,80 +58,104 @@ mod test {
 
 	#[test]
 	pub fn top_level_expression() {
-		let source = "let a = <br/>; a";
-		let (ast, _remaining) = CombinatorParser::parse(source).unwrap();
-		expect(ast.to_html()).to_be("let a =<br/>; a");
+		CombinatorParser::parse("let a = <br/>; a")
+			.unwrap()
+			.to_html()
+			.xpect()
+			.to_be("let a =<br/>; a");
 	}
+
 	#[test]
 	pub fn style_tags() {
-		let source = "<style>body {padding: 1em}</style>";
-		let (ast, _remaining) = CombinatorParser::parse(source).unwrap();
-		expect(ast.to_html()).to_be("<style>body{padding: 1em}</style>");
+		CombinatorParser::parse("<style>body {padding: 1em}</style>")
+			.unwrap()
+			.to_html()
+			.xpect()
+			.to_be("<style>body{padding: 1em}</style>");
 	}
 
 	#[test]
 	pub fn simple() {
-		let source = "<foo>Hello world!</foo>";
-		let (ast, _) = CombinatorParser::parse(source).unwrap();
-
-		expect(ast.to_html()).to_be("<foo>Hello world!</foo>");
+		CombinatorParser::parse("<foo>Hello world!</foo>")
+			.unwrap()
+			.to_html()
+			.xpect()
+			.to_be("<foo>Hello world!</foo>");
 	}
 
 	#[test]
 	pub fn expression_attributes() {
-		let source =
-			"<div hidden style={stylesheet.get(\".foo\")}>Hello world!</div>";
-		let (ast, _) = CombinatorParser::parse(source).unwrap();
-		expect(ast.to_html()).to_be(
+		CombinatorParser::parse(
+			"<div hidden style={stylesheet.get(\".foo\")}>Hello world!</div>",
+		)
+		.unwrap()
+		.to_html()
+		.xpect()
+		.to_be(
 			"<div hidden style={stylesheet.get(\".foo\")}>Hello world!</div>",
 		);
 	}
 
 	#[test]
 	pub fn dashed_node_tags() {
-		let source = "<x-foo-bar>Hello world!</x-foo-bar>";
-		let (ast, _) = CombinatorParser::parse(source).unwrap();
-		expect(ast.to_html()).to_be("<x-foo-bar>Hello world!</x-foo-bar>");
+		CombinatorParser::parse("<x-foo-bar>Hello world!</x-foo-bar>")
+			.unwrap()
+			.to_html()
+			.xpect()
+			.to_be("<x-foo-bar>Hello world!</x-foo-bar>");
 	}
 
 	#[test]
 	pub fn empty_fragment() {
-		let source = "<></>";
-		let (ast, _) = CombinatorParser::parse(source).unwrap();
-		expect(ast.to_html()).to_be("");
+		CombinatorParser::parse("<></>")
+			.unwrap()
+			.to_html()
+			.xpect()
+			.to_be("");
 	}
 
 	#[test]
 	pub fn fragment_with_single_element() {
-		let source = "<><div>Hello</div></>";
-		let (ast, _) = CombinatorParser::parse(source).unwrap();
-		expect(ast.to_html()).to_be("<div>Hello</div>");
+		CombinatorParser::parse("<><div>Hello</div></>")
+			.unwrap()
+			.to_html()
+			.xpect()
+			.to_be("<div>Hello</div>");
 	}
 
 	#[test]
 	pub fn fragment_with_multiple_elements() {
-		let source = "<><div>Hello</div><span>World</span></>";
-		let (ast, _) = CombinatorParser::parse(source).unwrap();
-		expect(ast.to_html()).to_be("<div>Hello</div><span>World</span>");
+		CombinatorParser::parse("<><div>Hello</div><span>World</span></>")
+			.unwrap()
+			.to_html()
+			.xpect()
+			.to_be("<div>Hello</div><span>World</span>");
 	}
 
 	#[test]
 	pub fn fragment_with_text_and_elements() {
-		let source = "<>Text before<div>content</div>Text after</>";
-		let (ast, _) = CombinatorParser::parse(source).unwrap();
-		expect(ast.to_html()).to_be("Text before<div>content</div>Text after");
+		CombinatorParser::parse("<>Text before<div>content</div>Text after</>")
+			.unwrap()
+			.to_html()
+			.xpect()
+			.to_be("Text before<div>content</div>Text after");
 	}
 
 	#[test]
 	pub fn nested_fragments() {
-		let source = "<><>Inner fragment</><div>Element</div></>";
-		let (ast, _) = CombinatorParser::parse(source).unwrap();
-		expect(ast.to_html()).to_be("Inner fragment<div>Element</div>");
+		CombinatorParser::parse("<><>Inner fragment</><div>Element</div></>")
+			.unwrap()
+			.to_html()
+			.xpect()
+			.to_be("Inner fragment<div>Element</div>");
 	}
+
 	#[test]
 	pub fn multiple_root_elements() {
-		let source = "<br/><br/>";
-		let (ast, _) = CombinatorParser::parse(source).unwrap();
-		expect(ast.to_html()).to_be("<br/><br/>");
+		CombinatorParser::parse("<br/><br/>")
+			.unwrap()
+			.to_html()
+			.xpect()
+			.to_be("<br/><br/>");
 	}
 }

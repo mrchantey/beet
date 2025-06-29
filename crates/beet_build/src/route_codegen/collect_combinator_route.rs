@@ -135,48 +135,40 @@ mod test {
 					FragmentNode,
 					related! {
 						Children [
-							OnSpawnTemplate::new_insert(
-								#[allow(unused_braces)] {
-									(
-										NodeTag(String::from("h1")),
-										ElementNode { self_closing: false },
-										related! {
-											Children [
-												TextNode(String::from("Hello"))
-											]
-										}
-									)
-									(
-										NodeTag(String::from("p")),
-										ElementNode { self_closing: false },
-										related! {
-											Children [
-												TextNode(String::from("This page is all about saying hello"))
-											]
-										}
-									)
-									(
-										ExprIdx(0u32),
-										NodeTag(String::from("MyComponent")),
-										FragmentNode,
-										TemplateNode,
-										OnSpawnTemplate::new_insert(
-											#[allow(unused_braces)] {
-												let template = <MyComponent as Props>::Builder::default()
-													.val(#[allow(unused_braces)] { 2 + 2 })
-													.build();
-												TemplateRoot::spawn(Spawn(template.into_node_bundle()))
-											}
-											.into_node_bundle()
-										),
-										related! {
-											Children [
-												TextNode(String::from("## RSX\n\tIt contains some rsx, not sure if this will work"))
-											]
-										}
-									)
-								}
-								.into_node_bundle()
+							(NodeTag(String::from("h1")),
+							 ElementNode { self_closing: false },
+							 related! {
+								 Children [
+									 TextNode(String::from("Hello"))
+								 ]
+							 }
+							),
+							(NodeTag(String::from("p")),
+							 ElementNode { self_closing: false },
+							 related! {
+								 Children [
+									 TextNode(String::from("This page is all about saying hello"))
+								 ]
+							 }
+							),
+							(ExprIdx(0u32),
+							 NodeTag(String::from("MyComponent")),
+							 FragmentNode,
+							 TemplateNode,
+							 OnSpawnTemplate::new_insert(
+								 #[allow(unused_braces)] {
+									 let template = <MyComponent as Props>::Builder::default()
+										 .val(#[allow(unused_braces)] { 2 + 2 })
+										 .build();
+									 TemplateRoot::spawn(Spawn(template.into_node_bundle()))
+								 }
+								 .into_node_bundle()
+							 ),
+							 related! {
+								 Children [
+									 TextNode(String::from("## RSX\n\tIt contains some rsx, not sure if this will work"))
+								 ]
+							 }
 							)
 						]
 					}

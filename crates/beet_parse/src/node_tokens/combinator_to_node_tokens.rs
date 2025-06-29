@@ -59,19 +59,13 @@ impl<'w, 's, 'a> Builder<'w, 's, 'a> {
 		root: Entity,
 		rsx: &CombinatorTokens,
 	) -> Result<()> {
-		let (children, remaining) =
+		let children =
 			CombinatorParser::parse(&rsx).map_err(|e| {
 				anyhow::anyhow!(
 					"Failed to parse Combinator RSX: {}",
 					e.to_string()
 				)
 			})?;
-		if !remaining.is_empty() {
-			return Err(anyhow::anyhow!(
-				"Unparsed input remaining: {}",
-				remaining
-			));
-		}
 
 		let children = self.rsx_children("fragment", children)?;
 		self.commands.entity(root).add_children(&children);
