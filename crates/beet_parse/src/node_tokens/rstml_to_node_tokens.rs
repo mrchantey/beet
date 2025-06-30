@@ -350,13 +350,22 @@ impl<'w, 's, 'a> RstmlToWorld<'w, 's, 'a> {
 			name.span(),
 		)
 	}
+	/// Best effort to mend styles parsed as token streams
+	/// which introduces spaces around each character it considers
+	/// to be a 'token', ie 'foo-bar' becomes 'foo - bar'
 	fn mend_style_raw_text(&self, str: &str) -> String {
-		str
-			// em is not valid in rstml, we provide an alternative .em
-			// hacks and attempts to fix back up the rstml parse
-			.replace(".em", "em")
-			// parsing rstml via token streams results in spaces around dashes
-			.replace(" - ", "-")
+		{
+			let replaced = str
+				// em is not valid in rstml, we provide an alternative .em
+				// hacks and attempts to fix back up the rstml parse
+				.replace(".em", "em")
+				.replace(". em", "em");
+			// parsing rstml via token streams results in spaces around dashes.
+			// Replace "A - Z" or "a - z" (with spaces) with "A-Z" or "a-z" using regex
+			// Only if both sides are ASCII alphabetic
+			let regex = regex::Regex::new(r"([A-Za-z]) - ([A-Za-z])").unwrap();
+			regex.replace_all(&replaced, "$1-$2").to_string()
+		}
 	}
 
 	/// Ensure that self-closing elements do not have children,
@@ -435,6 +444,6 @@ mod test {
 		let text_nodes = app.query_once::<&TextNode>();
 		expect(text_nodes.len()).to_be(1);
 		// mended
-		expect(&text_nodes[0].0).to_be("body { font-size : 1 . em ; }");
+		expect(&text_nodes[0].0).to_be("body { font-size : 1 em ; }");
 	}
 }

@@ -41,7 +41,7 @@ impl<T: std::fmt::Debug + AsRef<str>> Matcher<T> {
 		let received = self.value.as_ref();
 		if received != expected {
 			let mut msg = String::new();
-			crate::utils::pretty_diff::write_lines(
+			crate::utils::pretty_diff::write_inline_diff(
 				&mut msg, expected, received,
 			)
 			.unwrap();

@@ -1,7 +1,7 @@
 :root {
-	--bt-form-element-height: 3.em;
+	--bt-form-element-height: 3em;
 	--bt-form-element-font-weight: 600;
-	--bt-form-element-font-size: 0.8.em;
+	--bt-form-element-font-size: 0.8em;
 	--bt-form-element-border-radius-percent: 0.5;
 	--bt-form-element-border-radius: calc(var(--bt-form-element-height) * var(--bt-form-element-border-radius-percent) * 0.5);
   --bt-form-element-spacing-vertical: 0.75rem;

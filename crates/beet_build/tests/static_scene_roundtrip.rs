@@ -64,7 +64,7 @@ fn simple_template() {
 	#[template]
 	fn MyTemplate(initial: u32) -> impl Bundle {
 		rsx! {
-			<main>"value: "{initial}</main>
+			<span>"value: "{initial}</span>
 		}
 	}
 
@@ -80,7 +80,7 @@ fn simple_template() {
 		</div>
 	})
 	.xpect()
-	.to_contain("<div><h1>Roundtrip Test</h1><main>value: 1</main></div>");
+	.to_contain("<div><h1>Roundtrip Test</h1><span>value: 1</span></div>");
 }
 
 
@@ -115,7 +115,7 @@ fn nested_template() {
 	fn NestedTemplate(initial: u32) -> impl Bundle {
 		(
 			rsx! {
-				<main>"value: "{initial}</main>
+				<span>"value: "{initial}</span>
 			},
 			OnSpawn::new(|entity| {
 				entity.insert(common_idx_nested());
@@ -165,6 +165,10 @@ fn apply_and_render(scene: &str, bundle: impl Bundle) -> String {
 		.world_mut()
 		.spawn((HtmlDocument, bundle))
 		.insert(common_idx())
+		// .spawn(HtmlDocument)
+		// .with_children(|parent| {
+		// 	parent.spawn(bundle).insert(common_idx());
+		// })
 		.id();
 
 	// app.world_mut().spawn((

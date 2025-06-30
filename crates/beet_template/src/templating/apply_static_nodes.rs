@@ -29,7 +29,9 @@ pub fn spawn_templates(world: &mut World) -> Result {
 		.query_filtered::<(), (Added<InstanceRoot>, Without<ResolvedRoot>)>();
 	while query.iter(world).next().is_some() {
 		// println!("Running spawn_templates system");
-		world.run_system_cached(apply_static_nodes)??;
+		if let Ok(result) = world.run_system_cached(apply_static_nodes){
+			result?;
+		};
 		world.run_system_cached(apply_on_spawn_template)??;
 	}
 	Ok(())

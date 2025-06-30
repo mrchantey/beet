@@ -172,7 +172,7 @@ where
 /// The given strings should not have a trailing newline.
 ///
 /// The output of this function will be two lines, each with a trailing newline.
-fn write_inline_diff<TWrite: fmt::Write>(
+pub(crate) fn write_inline_diff<TWrite: fmt::Write>(
 	f: &mut TWrite,
 	left: &str,
 	right: &str,
@@ -181,8 +181,8 @@ fn write_inline_diff<TWrite: fmt::Write>(
 	let mut writer = InlineWriter::new(f);
 
 	// Print the left string on one line, with differences highlighted
-	let light = Red;
-	let heavy = Red.on_fixed(52).bold();
+	let light = Green;
+	let heavy = Green.on_fixed(52).bold();
 	write!(writer.f, "{SIGN_LEFT}\n")?;
 	for change in diff.iter() {
 		match change {
@@ -198,8 +198,8 @@ fn write_inline_diff<TWrite: fmt::Write>(
 	writer.finish()?;
 
 	// Print the right string on one line, with differences highlighted
-	let light = Green;
-	let heavy = Green.on_fixed(22).bold();
+	let light = Red;
+	let heavy = Red.on_fixed(22).bold();
 	write!(writer.f, "\n{SIGN_RIGHT}\n")?;
 	for change in diff.iter() {
 		match change {

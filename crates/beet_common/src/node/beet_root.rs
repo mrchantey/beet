@@ -1,23 +1,25 @@
 //! Types associated with the root node of a tree in beet.
 use crate::as_beet::*;
+use beet_bevy::prelude::HierarchyQueryExtExt;
 use beet_utils::prelude::*;
+use bevy::ecs::system::SystemParam;
 use bevy::prelude::*;
 
 
 /// The root of a beet node tree, which is guaranteed to be
 /// an internally created [`FragmentNode`], even if the root of an `rsx!`
-/// macro is also a fragment. 
+/// macro is also a fragment.
 /// This allows for some very important functionality:
 ///
 /// - Rearranging a Html Document while maintaining the same root node.
 /// - The root of the macro in [`StaticRoot`] can safely change between
-///   a fragment and not. 
+///   a fragment and not.
 /// - Avoiding [`ExprIdx`], [`ChildOf`], etc collisions when applying
 ///  [`StaticNodeRoot`] to an [`InstanceRoot`].
 ///
-/// The [`BeetRoot`] can have multiple children, for example 
+/// The [`BeetRoot`] can have multiple children, for example
 /// `rsx!{<br/><br/>}`
-/// 
+///
 #[derive(
 	Debug, Default, Clone, Copy, PartialEq, Eq, Hash, Component, Reflect,
 )]
@@ -120,6 +122,28 @@ impl MacroIdx {
 		}
 	}
 }
+
+/// Print the closest [`MacroIdx`] ancestor of the entity,
+#[derive(SystemParam)]
+pub struct NodeLocation<'w, 's> {
+	parents: Query<'w, 's, &'static ChildOf>,
+	roots: Query<'w, 's, &'static MacroIdx>,
+}
+impl NodeLocation<'_, '_> {
+	/// Get the [`MacroIdx`] of the closest ancestor of the entity.
+	pub fn get_macro_idx(&self, entity: Entity) -> Option<&MacroIdx> {
+		self.parents
+			.iter_ancestors_inclusive(entity)
+			.find_map(|e| self.roots.get(e).ok())
+	}
+	/// Get the [`MacroIdx`] of the closest ancestor of the entity.
+	pub fn stringify(&self, entity: Entity) -> String {
+		self.get_macro_idx(entity)
+			.map(|idx| idx.to_string())
+			.unwrap_or_else(|| format!("Entity without location: {entity:?}"))
+	}
+}
+
 
 impl std::fmt::Display for MacroIdx {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

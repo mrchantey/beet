@@ -27,6 +27,8 @@ ron.workspace = true
 anyhow.workspace = true
 bevy.workspace = true
 send_wrapper.workspace = true
+# only for rawtext css hack, should be removed
+regex = "1"
 
 syn.workspace = true
 quote.workspace = true

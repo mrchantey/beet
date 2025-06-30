@@ -63,7 +63,7 @@ impl ApplyAttributes<'_, '_> {
 		}
 		visited.insert((entity, styleid));
 		if let Ok(tag) = self.elements.get(entity)
-			&& **tag != "style"
+			&& !self.html_constants.hoist_to_head_tags.contains(&tag.0)
 		{
 			self.commands.spawn((
 				AttributeOf::new(entity),
@@ -145,7 +145,9 @@ mod test {
 			</div>
 		})
 		.xpect()
-		.to_be_str("<div data-beet-style-id-0><style/><span data-beet-style-id-0/></div>");
+		.to_be_str(
+			"<div data-beet-style-id-0><style/><span data-beet-style-id-0/></div>",
+		);
 	}
 	#[test]
 	fn ignores_templates() {
@@ -165,9 +167,7 @@ mod test {
 			</MyTemplate>
 		})
 		.xpect()
-		.to_be_str(
-			"<style/><div/><span data-beet-style-id-0/>",
-		);
+		.to_be_str("<style/><div/><span data-beet-style-id-0/>");
 	}
 	#[test]
 	fn cascades() {

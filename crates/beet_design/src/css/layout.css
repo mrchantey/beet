@@ -14,9 +14,10 @@
 	--bt-border-width-sm: calc(var(--bt-border-width) * 0.75);
 	--bt-border-width-lg: calc(var(--bt-border-width) * 2);
 	--bt-border-width-xl: calc(var(--bt-border-width) * 4);
-
+  --bt-outline-width: 0.125rem;
+	
 	/* animation */
-	--bt-transition: .2s ease-in-out;
+  --bt-transition: 0.2s ease-in-out;
 
 	/* layout */
 	--bt-md-primary-tab-container-height: 32px;

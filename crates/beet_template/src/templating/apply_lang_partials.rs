@@ -1,4 +1,6 @@
+use crate::prelude::*;
 use beet_bevy::bevybail;
+use beet_bevy::prelude::HierarchyQueryExtExt;
 use beet_common::prelude::*;
 use bevy::platform::collections::HashMap;
 use bevy::prelude::*;
@@ -10,25 +12,31 @@ pub fn apply_lang_partials(
 	mut commands: Commands,
 	partials: Query<(Entity, &LangPartial)>,
 	parents: Query<&ChildOf>,
-	roots: Query<&BeetRoot>,
-	query: Populated<(Entity, &NodePortal), With<PortalTo<LangPartial>>>,
+	roots: Query<(), With<HtmlDocument>>,
+	query: Populated<(Entity, &NodePortal), Added<PortalTo<LangPartial>>>,
+	node_location: NodeLocation,
 ) -> Result {
 	let mut root_content = HashMap::<Entity, HashMap<Entity, String>>::new();
 
 	for (entity, portal) in query.iter() {
 		let Ok(partial) = partials.get(**portal) else {
 			bevybail!(
-				"NodePortal is missing a target LangPartial: {:?}",
-				**portal
+				"Failed to find a matching LangPartial for NodePortal: {}",
+				node_location.stringify(**portal)
 			);
 		};
 
-		let Some(root_ancestor) =
-			parents.iter_ancestors(entity).find(|e| roots.contains(*e))
+		let Some(root_ancestor) = parents
+			.iter_ancestors_inclusive(entity)
+			.find(|e| roots.contains(*e))
 		else {
-			bevybail!("NodePortal is not a child of a BeetRoot: {:?}", entity);
+			// if no HtmlDocument this must be a StaticNode
+			continue;
+			// bevybail!(
+			// 	"NodePortal is not a descendant of a HtmlDocument: {}",
+			// 	node_location.stringify(**portal)
+			// );
 		};
-
 		root_content
 			.entry(root_ancestor)
 			.or_default()
@@ -42,7 +50,9 @@ pub fn apply_lang_partials(
 				.entity(partial_entity)
 				// just cloning NodeTag and StyleId
 				.clone_and_spawn_with(|builder| {
-					builder.deny::<(LangPartial, NodePortalTarget)>();
+					builder
+						.allow::<(NodeTag, StyleId)>()
+						.deny::<(LangPartial, NodePortalTarget)>();
 				})
 				.insert((ChildOf(root), ElementNode::open(), children![
 					TextNode::new(contents)
@@ -57,14 +67,15 @@ pub fn apply_lang_partials(
 
 #[cfg(test)]
 mod test {
+	use crate::prelude::*;
 	use beet_common::prelude::*;
 	use bevy::ecs::system::RunSystemOnce;
 	use bevy::prelude::*;
 	use sweet::prelude::*;
 
-
 	// emulate the beet_build::extract_lang_partials
-	fn setup() -> (World, Entity) {
+	#[test]
+	fn global_style() {
 		let mut world = World::new();
 		let partial = world
 			.spawn((
@@ -75,43 +86,49 @@ mod test {
 			))
 			.id();
 		let tree = world
-			.spawn((InstanceRoot, NodeTag::new("html"), children![(
+			.spawn((
+				HtmlDocument,
 				NodePortal::new(partial),
-				PortalTo::<LangPartial>::default()
-			)]))
+				PortalTo::<LangPartial>::default(),
+			))
 			.id();
-
-		(world, tree)
-	}
-
-
-	#[test]
-	fn works() {
-		let (mut world, tree) = setup();
 		world
 			.run_system_once(super::apply_lang_partials)
 			.unwrap()
 			.unwrap();
-
-		let children = world.entity(tree).get::<Children>().unwrap();
-		expect(children.len()).to_be(2);
-
-		let spawned = world.entity(children[1]);
-		spawned.contains::<Children>().xpect().to_be_true();
-		spawned
-			.get::<NodeTag>()
+		world
+			.run_system_once_with(render_fragment, tree)
 			.unwrap()
 			.xpect()
-			.to_be(&NodeTag::new("style"));
-		spawned
-			.get::<HtmlHoistDirective>()
+			.to_be_str("<style>body { color: red; }</style>");
+	}
+	#[test]
+	fn deduplicates_nested_roots() {
+		let mut world = World::new();
+		let partial = world
+			.spawn((
+				NodeTag::new("style"),
+				LangPartial::new("body { color: red; }"),
+			))
+			.id();
+		let tree = world
+			.spawn((HtmlDocument, children![
+				(NodePortal::new(partial), PortalTo::<LangPartial>::default()),
+				(
+					InstanceRoot,
+					NodePortal::new(partial),
+					PortalTo::<LangPartial>::default()
+				)
+			]))
+			.id();
+		world
+			.run_system_once(super::apply_lang_partials)
+			.unwrap()
+			.unwrap();
+		world
+			.run_system_once_with(render_fragment, tree)
 			.unwrap()
 			.xpect()
-			.to_be(&HtmlHoistDirective::Body);
-		spawned
-			.get::<StyleScope>()
-			.unwrap()
-			.xpect()
-			.to_be(&StyleScope::Global);
+			.to_be_str("<style>body { color: red; }</style>");
 	}
 }
