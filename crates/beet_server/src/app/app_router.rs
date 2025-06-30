@@ -97,7 +97,7 @@ impl AppRouter<()> {
 	/// The default app router parses cli arguments which is not desired in tests.
 	pub fn test() -> Self {
 		let mut template_config = TemplateConfig::default();
-		// dont apply static 
+		// dont apply static
 		template_config.static_scene_config.scene_file =
 			WsPathBuf::new("doesnt-exist.ron");
 		set_app(template_config.clone());
@@ -251,12 +251,14 @@ where
 		Ok(html)
 	}
 
-	pub async fn get_client_islands(
+	pub(super) async fn get_client_islands(
 		&self,
 		route: &RouteInfo,
 	) -> Result<Vec<ClientIsland>> {
+		// convert /foobar into /__client_islands/foobar
 		let route_info = ClientIslandPlugin::route_info(route);
 		let ron = self.render_route(&route_info).await?;
+
 		let islands: Vec<ClientIsland> =
 			beet_common::exports::ron::de::from_str(&ron).map_err(|e| {
 				AppError::internal_error(format!(

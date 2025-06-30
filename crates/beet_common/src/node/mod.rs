@@ -71,10 +71,11 @@ impl bevy::app::Plugin for NodeTypesPlugin {
 			.register_type::<StyleCascade>()
 			.register_type::<PortalTo<LangPartial>>()
 			// directives - client island
+			.register_type::<TemplateSerde>()
 			.register_type::<ClientLoadDirective>()
 			.register_type::<ClientOnlyDirective>()
 			// directives - slots
-            .register_type::<SlotChild>()
+    	.register_type::<SlotChild>()
 			.register_type::<SlotTarget>()
 			// directives - other
 			.register_type::<NodePortal>()

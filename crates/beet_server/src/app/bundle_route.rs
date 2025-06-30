@@ -12,11 +12,10 @@ pub trait BundleRoute<M>: 'static + Send + Sync + Clone {
 	type Bundle: Bundle;
 	type State: 'static + Send + Sync + Clone;
 	type Extractors: 'static + Send + FromRequestParts<Self::State>;
-	type Future: 'static
-		+ Send
-		// + Sync
-		+ Future<Output = AppResult<Self::Bundle>>;
-	fn into_bundle_result(self, extractors: Self::Extractors) -> Self::Future;
+	fn into_bundle_result(
+		self,
+		extractors: Self::Extractors,
+	) -> impl 'static + Send + Future<Output = AppResult<Self::Bundle>>;
 }
 
 #[extend::ext(name=HttpMethodExt)]

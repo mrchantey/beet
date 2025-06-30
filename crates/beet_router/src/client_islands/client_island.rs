@@ -20,7 +20,7 @@ impl ClientIsland {
 	pub fn collect(bundle: impl Bundle) -> Result<Vec<Self>, RunSystemError> {
 		let mut app = App::new();
 		app.add_plugins(TemplatePlugin);
-		let entity = app.world_mut().spawn(bundle).id();
+		let entity = app.world_mut().spawn((HtmlDocument, bundle)).id();
 		app.update();
 		app.world_mut()
 			.run_system_once_with(collect_client_islands, entity)
@@ -73,9 +73,9 @@ mod test {
 
 	#[test]
 	fn works() {
-		ClientIsland::collect((HtmlDocument, rsx! {
+		ClientIsland::collect(rsx! {
 			<MyTemplate foo=3 client:only />
-		}))
+		})
 		.unwrap()
 		.xpect()
 		.to_be(vec![ClientIsland {

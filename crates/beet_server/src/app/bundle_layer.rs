@@ -6,14 +6,19 @@ use axum::routing;
 use beet_net::prelude::*;
 use bevy::prelude::*;
 
-/// A form of middleware, accepting a [`BundleRoute`] and wrapping it
+/// A form of middleware, accepting a [`BundleRoute`] and wrapping it.
+/// This type will be stored in the [`BundleLayer`] alongside the inner
+/// [`BundleRoute`] and associated metadata.
 pub trait BundleLayerHandler: 'static + Send + Sync + Clone {
+	/// The extractors that this layer will use
 	type Extractors: 'static + Send + Sync + FromRequestParts<Self::State>;
 	type State: 'static + Send + Sync + Clone;
+	/// The output type of the layer, which must implement [`IntoResponse`]
 	type Output: IntoResponse;
 	type Meta: 'static + Send + Sync + Clone;
 
-	/// Specify whether this layer is static.
+	/// Specify whether this layer should be included
+	/// in ssg output.
 	fn is_static(&self) -> bool { true }
 
 	fn handle_bundle_route(
@@ -24,7 +29,7 @@ pub trait BundleLayerHandler: 'static + Send + Sync + Clone {
 	) -> impl Send + Sync + Future<Output = Self::Output>;
 }
 
-
+/// Wraps a [`BundleRoute`] with a [`BundleLayerHandler`].
 #[derive(Debug, Clone)]
 pub struct BundleLayer<L, R, M> {
 	/// The [`BundleLayerHandler`]

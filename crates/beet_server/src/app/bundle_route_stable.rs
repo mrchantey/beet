@@ -2,7 +2,7 @@
 use crate::prelude::*;
 use axum::extract::FromRequestParts;
 use bevy::prelude::*;
-use std::pin::Pin;
+use std::future::Future;
 
 pub struct BundleRouteToAsyncResultMarker;
 pub struct BundleRouteToAsyncBundleMarker;
@@ -21,8 +21,11 @@ where
 	type Bundle = B;
 	type Extractors = E;
 	type State = S;
-	type Future = Fut;
-	fn into_bundle_result(self, extractors: E) -> Self::Future {
+
+	fn into_bundle_result(
+		self,
+		extractors: E,
+	) -> impl 'static + Send + Future<Output = AppResult<Self::Bundle>> {
 		self(extractors)
 	}
 }
@@ -39,9 +42,12 @@ where
 	type Bundle = B;
 	type Extractors = E;
 	type State = S;
-	type Future = Pin<Box<dyn Future<Output = AppResult<B>> + Send + 'static>>;
-	fn into_bundle_result(self, extractors: E) -> Self::Future {
-		Box::pin(async move { Ok(self(extractors).await) })
+
+	fn into_bundle_result(
+		self,
+		extractors: E,
+	) -> impl 'static + Send + Future<Output = AppResult<Self::Bundle>> {
+		async move { Ok(self(extractors).await) }
 	}
 }
 
@@ -55,9 +61,12 @@ where
 	type Bundle = B;
 	type Extractors = E;
 	type State = S;
-	type Future = Pin<Box<dyn Future<Output = AppResult<B>> + Send + 'static>>;
-	fn into_bundle_result(self, extractors: E) -> Self::Future {
-		Box::pin(async move { Ok(self(extractors)) })
+
+	fn into_bundle_result(
+		self,
+		extractors: E,
+	) -> impl 'static + Send + Future<Output = AppResult<Self::Bundle>> {
+		async move { Ok(self(extractors)) }
 	}
 }
 
@@ -71,8 +80,11 @@ where
 	type Bundle = B;
 	type Extractors = E;
 	type State = S;
-	type Future = Pin<Box<dyn Future<Output = AppResult<B>> + Send + 'static>>;
-	fn into_bundle_result(self, extractors: E) -> Self::Future {
-		Box::pin(async move { self(extractors) })
+
+	fn into_bundle_result(
+		self,
+		extractors: E,
+	) -> impl 'static + Send + Future<Output = AppResult<Self::Bundle>> {
+		async move { self(extractors) }
 	}
 }

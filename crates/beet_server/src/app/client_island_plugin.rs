@@ -69,7 +69,6 @@ where
 		H::Extractors: 'static + Send + Sync + FromRequestParts<Self::State>,
 	{
 		let route_info = ClientIslandPlugin::route_info(&route_info);
-
 		router.route(
 			&route_info.path.to_string_lossy(),
 			routing::on(
@@ -136,7 +135,7 @@ mod test {
 			plugin.add_bundle_route(
 				router,
 				route_info(),
-				|| (HtmlDocument, rsx! {<MyTemplate foo=3 client:load/>}),
+				|| rsx! {<MyTemplate foo=3 client:load/>},
 				(),
 			)
 		}
