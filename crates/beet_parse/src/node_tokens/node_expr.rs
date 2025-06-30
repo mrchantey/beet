@@ -100,7 +100,8 @@ impl NodeExpr {
 	}
 }
 
-/// The partially parsed equivalent of a [`RsxParsedExpression`](beet_rsx_combinator::types::RsxParsedExpression).
+/// The partially parsed equivalent of a [`RsxParsedExpression`](beet_rsx_combinator::types::RsxParsedExpression),
+/// eventually collected into a [`NodeExpr`]
 ///
 /// [`beet_rsx_combinator`] is very different from macro/tokens based parsers.
 /// A fundamental concept is support for mixed expressions `let foo = <div/>;`

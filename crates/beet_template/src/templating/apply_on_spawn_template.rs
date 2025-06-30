@@ -33,14 +33,15 @@ pub fn apply_on_spawn_template(
 }
 #[cfg(test)]
 mod test {
-	use crate::prelude::*;
+	use crate::as_beet::*;
+	use crate::templating::apply_slots;
 	use beet_common::prelude::*;
 	use bevy::ecs::system::RunSystemOnce;
 	use bevy::prelude::*;
 	use sweet::prelude::*;
 
 	#[test]
-	fn works() {
+	fn bfs_order() {
 		let (val, set_val) = signal::<Vec<u32>>(Vec::new());
 
 		let mut world = World::new();
@@ -81,5 +82,49 @@ mod test {
 			.unwrap()
 			.unwrap();
 		expect(val()).to_be(vec![0, 1, 2, 3, 4]);
+	}
+
+
+	fn parse(instance: impl Bundle) -> String {
+		let mut world = World::new();
+		let instance = world.spawn(instance).id();
+
+		world.run_system_once(spawn_templates).unwrap().unwrap();
+		world.run_system_once(apply_slots).ok(); // no matching entities ok
+		world
+			.run_system_once_with(render_fragment, instance)
+			.unwrap()
+	}
+
+	#[test]
+	fn templates() {
+		#[template]
+		fn MyTemplate() -> impl Bundle {
+			rsx! {<div/>}
+		}
+
+		parse(rsx! {
+			<MyTemplate/>
+		})
+		.xpect()
+		.to_be_str("<div/>");
+	}
+	#[test]
+	fn attribute_blocks() {
+		#[derive(Default,Buildable, AttributeBlock)]
+		struct MyAttributeBlock {
+			class: String,
+		}
+
+		#[template]
+		fn MyTemplate(#[field(flatten)] attrs: MyAttributeBlock) -> impl Bundle {
+			rsx! {<div {attrs}/>}
+		}
+
+		parse(rsx! {
+			<MyTemplate class="foo"/>
+		})
+		.xpect()
+		.to_be_str("<div class=\"foo\"/>");
 	}
 }

@@ -7,6 +7,11 @@ use bevy::prelude::*;
 
 /// Added to the *top-level* [`InstanceRoot`], and useful for getting the document root,
 /// rather than the root of a single macro.
+/// 
+/// When recursing [`Children`] or [`TemplateRoot`] it is reccomended to use this type as the
+/// starting point, its very easy to create unexpected behavior by starting at something like [`BeetRoot`],
+/// which appears all over the place.
+/// 
 /// Add this node to any bundle to have it rearranged into a valid HTML document structure.
 /// The resulting structure is guaranteed to have the following layout:
 /// ```text

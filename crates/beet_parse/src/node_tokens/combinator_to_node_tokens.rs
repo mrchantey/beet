@@ -59,13 +59,9 @@ impl<'w, 's, 'a> Builder<'w, 's, 'a> {
 		root: Entity,
 		rsx: &CombinatorTokens,
 	) -> Result<()> {
-		let children =
-			CombinatorParser::parse(&rsx).map_err(|e| {
-				anyhow::anyhow!(
-					"Failed to parse Combinator RSX: {}",
-					e.to_string()
-				)
-			})?;
+		let children = CombinatorParser::parse(&rsx).map_err(|e| {
+			anyhow::anyhow!("Failed to parse Combinator RSX: {}", e.to_string())
+		})?;
 
 		let children = self.rsx_children("fragment", children)?;
 		self.commands.entity(root).add_children(&children);
@@ -76,7 +72,9 @@ impl<'w, 's, 'a> Builder<'w, 's, 'a> {
 	fn default_file_span(&self) -> FileSpan {
 		FileSpan::new_for_file(&self.file_path)
 	}
-	/// insert a [`CombinatorExpr`] into the entity
+	/// insert a [`CombinatorExpr`] into the entity,
+	/// as these are eventually collected into a [`NodeExpr`] each
+	/// is assigned an [`ExprIdx`]
 	fn rsx_parsed_expression(
 		&mut self,
 		entity: Entity,
@@ -142,8 +140,8 @@ impl<'w, 's, 'a> Builder<'w, 's, 'a> {
 
 		if tag_str.starts_with(|c: char| c.is_uppercase()) {
 			entity.insert((
-				TemplateNode,
 				self.expr_idx.next(),
+				TemplateNode,
 				FileSpanOf::<TemplateNode>::new(file_span),
 			));
 		} else {
@@ -196,7 +194,7 @@ impl<'w, 's, 'a> Builder<'w, 's, 'a> {
 			RsxChild::Element(el) => self.rsx_element(el),
 			RsxChild::Text(text) => self.rsx_text(text),
 			RsxChild::CodeBlock(code_block) => {
-				let entity = self.commands.spawn_empty().id();
+				let entity = self.commands.spawn(self.expr_idx.next()).id();
 				self.rsx_parsed_expression(entity, code_block)?;
 				entity.xok()
 			}
@@ -227,6 +225,7 @@ impl<'w, 's, 'a> Builder<'w, 's, 'a> {
 						FileSpanOf::<NodeExpr>::new(self.default_file_span()),
 					))
 					.id();
+				self.commands.entity(parent).insert(self.expr_idx.next());
 				self.rsx_parsed_expression(entity, value)?;
 			}
 			RsxAttribute::Named(name, value) => {
@@ -260,12 +259,17 @@ impl<'w, 's, 'a> Builder<'w, 's, 'a> {
 					}
 					RsxAttributeValue::Element(value) => {
 						let id = entity.id();
+						let expr_id = self.expr_idx.next();
 						let child = self.rsx_element(value)?;
-						self.commands.entity(id).insert(CombinatorExpr(vec![
-							CombinatorExprPartial::Element(child),
-						]));
+						self.commands.entity(id).insert((
+							expr_id,
+							CombinatorExpr(vec![
+								CombinatorExprPartial::Element(child),
+							]),
+						));
 					}
 					RsxAttributeValue::CodeBlock(value) => {
+						entity.insert(self.expr_idx.next());
 						let entity = entity.id();
 						self.rsx_parsed_expression(entity, value)?;
 					}
@@ -453,7 +457,7 @@ mod test {
 	}
 
 	#[test]
-	fn element_attributes_ident() {
+	fn element_attributes_block_value() {
 		"<br foo={bar} />".xmap(parse).to_be_str(
 			quote! {(
 				BeetRoot,
@@ -465,8 +469,30 @@ mod test {
 					ElementNode{self_closing:true},
 					related!(Attributes[(
 						AttributeKey::new("foo"),
-						OnSpawnTemplate::new_insert(#[allow(unused_braces)]{ bar }.into_attribute_bundle())
+						OnSpawnTemplate::new_insert(#[allow(unused_braces)]{ bar }.into_attribute_bundle()),
+						ExprIdx(0u32)
 					)])
+				)]}
+			)}
+			.to_string(),
+		);
+	}
+	#[test]
+	fn element_attributes_spread() {
+		"<br {...bar} />".xmap(parse).to_be_str(
+			quote! {(
+				BeetRoot,
+				InstanceRoot,
+				MacroIdx {
+					file: WsPathBuf::new("crates/beet_parse/src/node_tokens/combinator_to_node_tokens.rs"),
+					start: LineCol { line: 1u32, col: 0u32 }
+				},
+				FragmentNode,
+				related! { Children [(
+					ExprIdx(0u32),
+					NodeTag(String::from("br")),
+					ElementNode { self_closing: true },
+					OnSpawnTemplate::new_insert(#[allow(unused_braces)]{ bar }.into_node_bundle())
 				)]}
 			)}
 			.to_string(),
@@ -489,7 +515,8 @@ mod test {
 							OnSpawnTemplate::new_insert(#[allow(unused_braces)]{(
 								NodeTag(String::from("br")),
 								ElementNode { self_closing: true }
-							)}.into_attribute_bundle())
+							)}.into_attribute_bundle()),
+						ExprIdx(0u32)
 					)])
 				)]}
 			)}
@@ -521,7 +548,8 @@ mod test {
 									ElementNode{self_closing:true}
 								);
 								bar
-							}.into_attribute_bundle())
+							}.into_attribute_bundle()),
+							ExprIdx(0u32)
 						)])
 					)]}
 				)}

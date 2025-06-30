@@ -263,6 +263,11 @@ impl<'w, 's, 'a> RstmlToWorld<'w, 's, 'a> {
 					SpanOf::<NodeExpr>::new(block.span()),
 					NodeExpr::new_block(block),
 				));
+
+				// once instantiated this block will be moved onto the parent
+				// element, which will require an ExprIdx to resolve the block
+				// this approach means only one block expr per element
+				self.commands.entity(parent).insert(self.expr_idx.next());
 			}
 			NodeAttribute::Attribute(attr) => {
 				let key = match &attr.key {

@@ -153,6 +153,7 @@ mod test {
 				MacroIdx{file:WsPathBuf::new("crates/beet_parse/src/tokenize/tokenize_element_attributes.rs"),start:LineCol{line:1u32,col:0u32}},
 				FragmentNode,
 				related!{Children[(
+					ExprIdx(0u32),
 					NodeTag(String::from("span")),
 					ElementNode { self_closing: true },
 					OnSpawnTemplate::new_insert(#[allow(unused_braces)]{foo}.into_node_bundle())
@@ -226,6 +227,7 @@ mod test {
 				MacroIdx{file:WsPathBuf::new("crates/beet_parse/src/tokenize/tokenize_element_attributes.rs"),start:LineCol{line:1u32,col:0u32}},
 				FragmentNode,
 				related!{Children[(
+					ExprIdx (0u32),
 					NodeTag(String::from("span")),
 					ElementNode { self_closing: true },
 					OnSpawnTemplate::new_insert(#[allow(unused_braces)]{foo}.into_node_bundle()),
@@ -242,7 +244,7 @@ mod test {
 						),
 						(
 							AttributeKey::new("onclick"),
-							ExprIdx(0u32)
+							ExprIdx(1u32)
 						)
 					])
 				)]}

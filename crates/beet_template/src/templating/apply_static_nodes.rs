@@ -286,13 +286,26 @@ mod test {
 		.to_be("<div><span>abc</span><br/></div>");
 	}
 	#[test]
-	fn attributes() {
+	fn attribute_values() {
 		parse(
 			rsx! {<main key={7}/>},
 			rsx! {<div><span key={()}></span><br/></div>},
 		)
 		.xpect()
 		.to_be("<div><span key=\"7\"></span><br/></div>");
+	}
+	#[test]
+	fn attribute_blocks() {
+		#[derive(Buildable, AttributeBlock)]
+		struct Foo {
+			key: u32,
+		}
+		parse(
+			rsx! {<main {Foo{key:9}}/>},
+			rsx! {<div><span {()}></span><br/></div>},
+		)
+		.xpect()
+		.to_be("<div><span key=\"9\"></span><br/></div>");
 	}
 	#[test]
 	fn root() { parse(rsx! {{7}}, rsx! {hello{()}}).xpect().to_be("hello7"); }

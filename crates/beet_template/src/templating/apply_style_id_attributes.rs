@@ -28,10 +28,7 @@ pub(super) fn apply_style_id_attributes(
 	// visit all docment roots and templates that aren't yet children
 	roots: Populated<Entity, Or<(Added<HtmlDocument>, Added<TemplateOf>)>>,
 	children: Query<&Children>,
-	parents: Query<&ChildOf>,
 	style_ids: Query<&StyleId>,
-	templates: Query<&TemplateRoot, With<StyleCascade>>,
-	skip_node: Query<(), Or<(With<TemplateRoot>, Without<StyleCascade>)>>,
 	mut builder: ApplyAttributes,
 ) {
 	for entity in roots.iter() {
@@ -40,12 +37,7 @@ pub(super) fn apply_style_id_attributes(
 			.iter_descendants(entity)
 			.filter_map(|en| style_ids.get(en).ok())
 		{
-			let local_root = parents
-				.iter_ancestors(entity)
-				.find(|e| templates.contains(*e) || skip_node.contains(*e))
-				.unwrap_or_else(|| parents.root_ancestor(entity));
-
-			builder.apply_recursive(&mut visited, local_root, *styleid);
+			builder.apply_recursive(&mut visited, entity, *styleid);
 		}
 	}
 }
@@ -55,7 +47,7 @@ pub(super) struct ApplyAttributes<'w, 's> {
 	html_constants: Res<'w, HtmlConstants>,
 	commands: Commands<'w, 's>,
 	children: Query<'w, 's, &'static Children>,
-	elements: Query<'w, 's, (), With<ElementNode>>,
+	elements: Query<'w, 's, &'static NodeTag, With<ElementNode>>,
 	cascade_templates: Query<'w, 's, &'static TemplateRoot, With<StyleCascade>>,
 }
 
@@ -70,7 +62,9 @@ impl ApplyAttributes<'_, '_> {
 			return;
 		}
 		visited.insert((entity, styleid));
-		if self.elements.contains(entity) {
+		if let Ok(tag) = self.elements.get(entity)
+			&& **tag != "style"
+		{
 			self.commands.spawn((
 				AttributeOf::new(entity),
 				AttributeKey::new(
@@ -127,9 +121,9 @@ mod test {
 
 	#[test]
 	fn assigns_id_attr() {
-		parse(rsx! {<style {StyleId::new(0)}/>})
+		parse(rsx! {<style {StyleId::new(0)}/><span/>})
 			.xpect()
-			.to_be_str("<style data-beet-style-id-0/>");
+			.to_be_str("<style/><span data-beet-style-id-0/>");
 	}
 	#[test]
 	fn deduplicates() {
@@ -140,7 +134,7 @@ mod test {
 			</div>
 		})
 		.xpect()
-		.to_be_str("<div data-beet-style-id-0><style data-beet-style-id-0/><style data-beet-style-id-0/></div>");
+		.to_be_str("<div data-beet-style-id-0><style/><style/></div>");
 	}
 	#[test]
 	fn assigns_id_to_all() {
@@ -151,7 +145,7 @@ mod test {
 			</div>
 		})
 		.xpect()
-		.to_be_str("<div data-beet-style-id-0><style data-beet-style-id-0/><span data-beet-style-id-0/></div>");
+		.to_be_str("<div data-beet-style-id-0><style/><span data-beet-style-id-0/></div>");
 	}
 	#[test]
 	fn ignores_templates() {
@@ -160,7 +154,7 @@ mod test {
 			<MyTemplate/>
 		})
 		.xpect()
-		.to_be_str("<style data-beet-style-id-0/><div/>");
+		.to_be_str("<style/><div/>");
 	}
 	#[test]
 	fn applies_to_slots() {
@@ -172,7 +166,7 @@ mod test {
 		})
 		.xpect()
 		.to_be_str(
-			"<style data-beet-style-id-0/><div/><span data-beet-style-id-0/>",
+			"<style/><div/><span data-beet-style-id-0/>",
 		);
 	}
 	#[test]
@@ -182,7 +176,7 @@ mod test {
 			<MyTemplate style:cascade/>
 		})
 		.xpect()
-		.to_be_str("<style data-beet-style-id-0/><div data-beet-style-id-0/>");
+		.to_be_str("<style/><div data-beet-style-id-0/>");
 	}
 	#[test]
 	fn nested_template() {
@@ -198,6 +192,6 @@ mod test {
 			<StyledTemplate/>
 		})
 		.xpect()
-		.to_be_str("<style data-beet-style-id-0/><div data-beet-style-id-0/>");
+		.to_be_str("<style/><div data-beet-style-id-0/>");
 	}
 }
