@@ -39,7 +39,7 @@ fn expressions() {
 		<button key={1}> this will be replaced {2}</button>
 	})
 	.xpect()
-	.to_be_str(
+	.to_contain(
 		"<div><button key=\"1\">Click me</button><span>The value is 2</span></div>",
 	);
 }
@@ -55,8 +55,8 @@ fn style() {
 	});
 	apply_and_render(&scene, rsx! {"placeholder"})
 		.xpect()
-		.to_be(
-			"<div data-beet-style-id-0><h1 data-beet-style-id-0>Roundtrip Test</h1></div><style>h1[data-beet-style-id-0] {\n  font-size: 1px;\n}\n</style>",
+		.to_be_str(
+			"<!DOCTYPE html><html><head><style>h1[data-beet-style-id-0] {\n  font-size: 1px;\n}\n</style></head><body><div data-beet-style-id-0><h1 data-beet-style-id-0>Roundtrip Test</h1></div></body></html>",
 		);
 }
 #[test]
@@ -80,7 +80,7 @@ fn simple_template() {
 		</div>
 	})
 	.xpect()
-	.to_be("<div><h1>Roundtrip Test</h1><main>value: 1</main></div>");
+	.to_contain("<div><h1>Roundtrip Test</h1><main>value: 1</main></div>");
 }
 
 
@@ -129,7 +129,7 @@ fn nested_template() {
 		</div>
 	})
 	.xpect()
-	.to_be("<html><after>value: 1</after></html>");
+	.to_contain("<html><after>value: 1</after></html>");
 }
 
 
@@ -161,7 +161,11 @@ fn apply_and_render(scene: &str, bundle: impl Bundle) -> String {
 	app.add_plugins(TemplatePlugin);
 	app.load_scene(scene).unwrap();
 
-	let root = app.world_mut().spawn(bundle).insert(common_idx()).id();
+	let root = app
+		.world_mut()
+		.spawn((HtmlDocument, bundle))
+		.insert(common_idx())
+		.id();
 
 	// app.world_mut().spawn((
 	// 	OnSpawnTemplate::new(|_| {

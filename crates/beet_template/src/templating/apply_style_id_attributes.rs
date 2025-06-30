@@ -1,54 +1,101 @@
 use super::*;
 use beet_bevy::prelude::HierarchyQueryExtExt;
 use beet_common::prelude::*;
+use bevy::ecs::system::SystemParam;
 use bevy::platform::collections::HashSet;
 use bevy::prelude::*;
 
-
-
-
-/// Apply a [`LangPartial`] to elements with a matching [`StyleId`], 
-/// runs before [`apply_slots`].
-pub fn apply_style_id_attributes(
-	html_constants: Res<HtmlConstants>,
-	mut commands: Commands,
-	parents: Query<&ChildOf>,
+/// Apply an [`AttributeKey`] with corresponding [`StyleId`] to elements with one.
+/// runs before [`apply_slots`] so that slot children are treated as belonging
+/// to the parent template.
+///
+/// ## Example
+/// In the below example, `div`, `span` and the contents of `Template2` will
+/// have the style applied, and the contents of `Template1` will not.
+/// ```rust ignore
+///
+/// <div>
+/// 	<Template1>
+///   	<span/>
+///   </Template1>
+///   </Template2 style:cascade>
+/// </div>
+/// <style>
+/// ...
+/// </style>
+/// ```
+pub(super) fn apply_style_id_attributes(
+	// visit all docment roots and templates that aren't yet children
+	roots: Populated<Entity, Or<(Added<HtmlDocument>, Added<TemplateOf>)>>,
 	children: Query<&Children>,
-	elements: Query<(), With<ElementNode>>,
+	parents: Query<&ChildOf>,
+	style_ids: Query<&StyleId>,
 	templates: Query<&TemplateRoot, With<StyleCascade>>,
-	// exclude single NodePortalTarget entities
-	query: Populated<(Entity, &StyleId), Without<NodePortalTarget>>,
+	skip_node: Query<(), Or<(With<TemplateRoot>, Without<StyleCascade>)>>,
+	mut builder: ApplyAttributes,
 ) {
-	let mut visited = HashSet::new();
-
-	let mut apply_to_root = |root: Entity, styleid: StyleId| {
-		for child in children
-			.iter_descendants_inclusive(root)
-			.filter(|en| elements.contains(*en))
+	for entity in roots.iter() {
+		let mut visited = HashSet::<(Entity, StyleId)>::default();
+		for styleid in children
+			.iter_descendants(entity)
+			.filter_map(|en| style_ids.get(en).ok())
 		{
-			if visited.contains(&(child, styleid)) {
-				continue;
-			}
-			commands.spawn((
-				AttributeOf::new(child),
-				AttributeKey::new(html_constants.style_id_attribute(styleid)),
-			));
-			visited.insert((child, styleid));
-		}
-	};
+			let local_root = parents
+				.iter_ancestors(entity)
+				.find(|e| templates.contains(*e) || skip_node.contains(*e))
+				.unwrap_or_else(|| parents.root_ancestor(entity));
 
-	for (entity, styleid) in query.iter() {
-		let root = parents.root_ancestor(entity);
-		apply_to_root(root, *styleid);
-		// also apply to StyleCascade templates
-		for child in children
-			.iter_descendants_inclusive(root)
-			.filter_map(|en| templates.get(en).ok())
-		{
-			apply_to_root(**child, *styleid);
+			builder.apply_recursive(&mut visited, local_root, *styleid);
 		}
 	}
 }
+
+#[derive(SystemParam)]
+pub(super) struct ApplyAttributes<'w, 's> {
+	html_constants: Res<'w, HtmlConstants>,
+	commands: Commands<'w, 's>,
+	children: Query<'w, 's, &'static Children>,
+	elements: Query<'w, 's, (), With<ElementNode>>,
+	cascade_templates: Query<'w, 's, &'static TemplateRoot, With<StyleCascade>>,
+}
+
+impl ApplyAttributes<'_, '_> {
+	fn apply_recursive(
+		&mut self,
+		visited: &mut HashSet<(Entity, StyleId)>,
+		entity: Entity,
+		styleid: StyleId,
+	) {
+		if visited.contains(&(entity, styleid)) {
+			return;
+		}
+		visited.insert((entity, styleid));
+		if self.elements.contains(entity) {
+			self.commands.spawn((
+				AttributeOf::new(entity),
+				AttributeKey::new(
+					self.html_constants.style_id_attribute(styleid),
+				),
+			));
+		}
+		for template in self
+			.cascade_templates
+			.iter_direct_descendants(entity)
+			.collect::<Vec<_>>()
+		{
+			self.apply_recursive(visited, template, styleid);
+		}
+
+		for child in self
+			.children
+			.iter_direct_descendants(entity)
+			.collect::<Vec<_>>()
+		{
+			self.apply_recursive(visited, child, styleid);
+		}
+	}
+}
+
 
 
 #[cfg(test)]
@@ -64,7 +111,7 @@ mod test {
 	fn parse(bundle: impl Bundle) -> String {
 		let mut world = World::new();
 		world.init_resource::<HtmlConstants>();
-		let entity = world.spawn(bundle).id();
+		let entity = world.spawn((HtmlDocument, bundle)).id();
 		world.run_system_once(spawn_templates).unwrap().unwrap();
 		world
 			.run_system_once(super::apply_style_id_attributes)
@@ -133,6 +180,22 @@ mod test {
 		parse(rsx! {
 			<style {StyleId::new(0)}/>
 			<MyTemplate style:cascade/>
+		})
+		.xpect()
+		.to_be_str("<style data-beet-style-id-0/><div data-beet-style-id-0/>");
+	}
+	#[test]
+	fn nested_template() {
+		#[template]
+		fn StyledTemplate() -> impl Bundle {
+			rsx! {
+				<style {StyleId::new(0)}/>
+				<div>
+			}
+		}
+
+		parse(rsx! {
+			<StyledTemplate/>
 		})
 		.xpect()
 		.to_be_str("<style data-beet-style-id-0/><div data-beet-style-id-0/>");

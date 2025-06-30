@@ -7,7 +7,7 @@ mod template_config;
 mod template_plugin;
 pub use apply_on_spawn_template::*;
 pub use apply_static_nodes::*;
-pub use apply_style_id_attributes::*;
+use apply_style_id_attributes::*;
 pub use html_fragment::*;
 pub use template_config::*;
 pub use template_plugin::*;

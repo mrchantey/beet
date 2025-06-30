@@ -26,6 +26,10 @@ impl TemplateOf {
 	pub fn new(value: Entity) -> Self { Self(value) }
 }
 
+/// Assigned to the 'container' entity of a template, pointing to the bundle
+/// spawned by the template. 
+/// This relationship will be replaced with a parent-child relationship
+/// in apply_slots.
 /// Points to the entity that was spawned by this template. This should
 /// always only be a single entity, which may have [`Children`].
 // TODO 1:1 relationship

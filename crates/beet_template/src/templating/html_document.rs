@@ -28,10 +28,6 @@ use bevy::prelude::*;
 pub struct HtmlDocument;
 
 impl HtmlDocument {
-	pub fn wrap_bundle(bundle: impl Bundle) -> impl Bundle {
-		(HtmlDocument, bundle)
-	}
-
 	pub fn parse_bundle(bundle: impl Bundle) -> String {
 		// add the bundle as a child to make rearranging easier
 		HtmlFragment::parse_bundle((HtmlDocument, bundle))

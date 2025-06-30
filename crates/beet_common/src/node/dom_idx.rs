@@ -6,6 +6,9 @@ use bevy::prelude::*;
 /// used for dom binding and reconcilling client island locations.
 /// The index must be assigned in a depth-first manner so that
 /// client islands can resolve their child indices.
+///
+/// A DomIdx is assigned to each [`ElementNode`] in the tree requiring
+/// a binding, and each [`TemplateNode`] with a client island directive.
 #[derive(
 	Debug,
 	Default,
