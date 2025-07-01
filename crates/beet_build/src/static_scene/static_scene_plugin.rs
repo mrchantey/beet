@@ -1,24 +1,9 @@
 use super::*;
+use crate::prelude::*;
 use beet_common::prelude::*;
 use beet_parse::prelude::*;
 use beet_template::prelude::*;
 use bevy::prelude::*;
-
-/// Import template files into parsable formats like [`RstmlTokens`], or [`CombinatorToNodeTokens`].
-/// - Before [`ParseRsxTokensSet`]
-#[derive(Debug, Clone, PartialEq, Eq, Hash, SystemSet)]
-pub struct ImportTemplateStep;
-
-/// Perform extra processing after nodes have been imported and processed.
-/// - After [`ParseRsxTokensSet`]
-#[derive(Debug, Clone, PartialEq, Eq, Hash, SystemSet)]
-pub struct ProcessTemplateStep;
-
-/// Export parsed nodes to a template scene file.
-/// - After [`ProcessTemplateStep`]
-#[derive(Debug, Clone, PartialEq, Eq, Hash, SystemSet)]
-pub struct ExportTemplateStep;
-
 
 /// Plugin containing all systems for exporting a scene including:
 /// - [`LangPartial`]
@@ -54,19 +39,6 @@ impl Plugin for StaticScenePlugin {
 			.init_resource::<TemplateMacros>()
 			// types
 			.add_plugins(NodeTypesPlugin)
-			.configure_sets(
-				Update,
-				(
-					ImportTemplateStep.before(ParseRsxTokensSet),
-					ProcessTemplateStep
-						.after(ParseRsxTokensSet)
-						.after(ImportTemplateStep),
-					ExportTemplateStep
-						.after(ProcessTemplateStep)
-						// before all [`TemplatePlugin`] systems
-						.before(SpawnStep),
-				),
-			)
 			.add_systems(Startup, load_template_files)
 			.add_systems(
 				Update,
@@ -83,7 +55,7 @@ impl Plugin for StaticScenePlugin {
 						),
 					)
 						.chain()
-						.in_set(ImportTemplateStep),
+						.before(ParseRsxTokensSet),
 					(
 						update_file_expr_hash,
 						(
@@ -94,9 +66,10 @@ impl Plugin for StaticScenePlugin {
 						)
 							.chain(),
 					)
-						.in_set(ProcessTemplateStep),
+						.after(ParseRsxTokensSet)
+						.before(ExportArtifactsSet),
 					#[cfg(not(test))]
-					export_template_scene.in_set(ExportTemplateStep),
+					export_template_scene.in_set(ExportArtifactsSet),
 				),
 			);
 	}

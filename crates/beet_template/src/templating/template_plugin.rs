@@ -5,16 +5,9 @@ use beet_common::prelude::*;
 use bevy::ecs::schedule::SystemSet;
 use bevy::prelude::*;
 
+/// System set for the [`TemplatePlugin`] to spawn templates.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, SystemSet)]
-pub struct SpawnStep;
-#[derive(Debug, Clone, PartialEq, Eq, Hash, SystemSet)]
-pub struct ApplyTransformsStep;
-#[derive(Debug, Clone, PartialEq, Eq, Hash, SystemSet)]
-pub struct RenderStep;
-#[derive(Debug, Clone, PartialEq, Eq, Hash, SystemSet)]
-pub struct MountStep;
-#[derive(Debug, Clone, PartialEq, Eq, Hash, SystemSet)]
-pub struct BindStep;
+pub struct TemplateSet;
 
 #[derive(Default)]
 pub struct TemplatePlugin;
@@ -26,46 +19,35 @@ impl Plugin for TemplatePlugin {
 		#[cfg(feature = "serde")]
 		app.add_systems(Startup, load_static_scene);
 
-		app.add_plugins((signals_plugin, NodeTypesPlugin));
-		app.init_resource::<HtmlConstants>()
+		app.add_plugins((SignalsPlugin, NodeTypesPlugin))
+			.init_resource::<HtmlConstants>()
 			.register_type::<LangPartial>()
-			.configure_sets(
-				Update,
-				(
-					ApplyTransformsStep.after(SpawnStep),
-					RenderStep.after(ApplyTransformsStep),
-					MountStep.after(RenderStep),
-					BindStep.after(MountStep),
-				),
-			)
 			.add_systems(
 				Update,
 				(
+					spawn_templates,
+					apply_style_id_attributes,
+					apply_slots,
+					apply_lang_partials,
+					apply_text_node_parents,
 					(
-						spawn_templates,
-						apply_style_id_attributes,
-						apply_slots,
-						apply_lang_partials,
-						apply_text_node_parents,
+						#[cfg(target_arch = "wasm32")]
+						apply_client_island_dom_idx,
+						#[cfg(not(target_arch = "wasm32"))]
+						apply_root_dom_idx,
 						(
-							#[cfg(target_arch = "wasm32")]
-							apply_client_island_dom_idx,
-							#[cfg(not(target_arch = "wasm32"))]
-							apply_root_dom_idx,
-							(
-								rearrange_html_document,
-								insert_hydration_scripts,
-								hoist_document_elements,
-							)
-								.chain(),
-						),
-						insert_event_playback_attribute,
-						// debug,
-					)
-						.chain()
-						.in_set(ApplyTransformsStep),
-					(render_html_fragments).in_set(RenderStep),
-				),
+							rearrange_html_document,
+							insert_hydration_scripts,
+							hoist_document_elements,
+						)
+							.chain(),
+					),
+					insert_event_playback_attribute,
+					render_html_fragments,
+					// debug,
+				)
+					.chain()
+					.in_set(TemplateSet),
 			);
 		#[cfg(target_arch = "wasm32")]
 		app.add_plugins(wasm_template_plugin);

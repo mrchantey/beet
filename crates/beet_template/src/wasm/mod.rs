@@ -27,15 +27,18 @@ pub fn wasm_template_plugin(app: &mut App) {
 		Update,
 		(
 			(
-				bind_events,
-				event_playback.run_if(run_once),
-				bind_text_nodes,
-				bind_attribute_values,
+				mount_html,
+				(
+					bind_events,
+					event_playback.run_if(run_once),
+					bind_text_nodes,
+					bind_attribute_values,
+				)
 			)
-				.in_set(BindStep),
-			(update_text_nodes, update_attribute_values)
-				.after(ReceiveSignalStep),
-			mount_html.in_set(MountStep),
+				.chain()
+				.after(TemplateSet)
+				.before(SignalsSet),
+			(update_text_nodes, update_attribute_values).after(SignalsSet),
 		),
 	);
 }

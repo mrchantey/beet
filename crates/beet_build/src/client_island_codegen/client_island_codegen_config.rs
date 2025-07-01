@@ -8,28 +8,17 @@ use serde::Serialize;
 #[derive(Default)]
 pub struct ClientIslandCodegenPlugin;
 
-/// Perform extra processing after files have been imported and processed.
-/// - After [`ExportNodesStep`]
-#[derive(Debug, Clone, PartialEq, Eq, Hash, SystemSet)]
-pub struct CollectClientIslandStep;
-
-
 
 impl Plugin for ClientIslandCodegenPlugin {
 	fn build(&self, app: &mut App) {
-		app
-			.configure_sets(
-				Update,
-				CollectClientIslandStep.before(ExportCodegenStep),
+		app.add_systems(
+			Update,
+			(
+				collect_client_islands.before(ExportArtifactsSet),
+				compile_wasm.after(ExportArtifactsSet),
 			)
-			.add_systems(
-				Update,
-				(
-					collect_client_islands.in_set(CollectClientIslandStep),
-					compile_wasm.after(ExportCodegenStep),
-				)
-					.chain(),
-			);
+				.chain(),
+		);
 	}
 }
 

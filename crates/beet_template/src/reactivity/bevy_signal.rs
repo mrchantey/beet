@@ -4,17 +4,20 @@ use beet_common::node::IntoTemplateBundle;
 use bevy::prelude::*;
 use flume::Receiver;
 
+/// System Set for [`SignalsPlugin`].
 #[derive(Debug, Clone, PartialEq, Eq, Hash, SystemSet)]
-pub struct ReceiveSignalStep;
+pub struct SignalsSet;
 
-
-pub fn signals_plugin(app: &mut App) {
-	app.configure_sets(Update, ReceiveSignalStep.after(BindStep))
-		.add_systems(
-			Update,
-			(receive_text_node_signals, receive_attribute_value_signals)
-				.in_set(ReceiveSignalStep),
-		);
+pub struct SignalsPlugin;
+impl Plugin for SignalsPlugin {
+	fn build(&self, app: &mut App) {
+		app.configure_sets(Update, SignalsSet.after(TemplateSet))
+			.add_systems(
+				Update,
+				(receive_text_node_signals, receive_attribute_value_signals)
+					.in_set(SignalsSet),
+			);
+	}
 }
 
 /// When building without `bevy_default` we assume the target is the web
@@ -85,7 +88,7 @@ mod test {
 	#[test]
 	fn app_signals() {
 		let mut app = App::new();
-		app.add_plugins(signals_plugin);
+		app.add_plugins(SignalsPlugin);
 
 		let (get, set) = signal("foo".to_string());
 
@@ -121,7 +124,7 @@ mod test {
 	#[test]
 	fn nodes() {
 		let mut app = App::new();
-		app.add_plugins(signals_plugin);
+		app.add_plugins(SignalsPlugin);
 		let (get, set) = signal(5);
 		let div = app
 			.world_mut()
@@ -158,7 +161,7 @@ mod test {
 	#[test]
 	fn attributes() {
 		let mut app = App::new();
-		app.add_plugins(signals_plugin);
+		app.add_plugins(SignalsPlugin);
 		let (get, set) = signal("foo");
 		let div = app
 			.world_mut()
@@ -220,11 +223,7 @@ mod test {
 			.entity(template_inner)
 			.get::<Children>()
 			.unwrap()[0];
-		let attr = app
-			.world()
-			.entity(div)
-			.get::<Attributes>()
-			.unwrap()[0];
+		let attr = app.world().entity(div).get::<Attributes>().unwrap()[0];
 
 		app.world()
 			.entity(attr)

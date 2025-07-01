@@ -2,33 +2,12 @@ use crate::prelude::*;
 use beet_parse::prelude::*;
 use bevy::prelude::*;
 
-
-/// Import files specified in each [`FileGroup`]
-/// - Before [`ParseRsxTokensSet`]
-#[derive(Debug, Clone, PartialEq, Eq, Hash, SystemSet)]
-pub struct ImportRouterCodegenStep;
-
-/// Perform extra processing after files have been imported and processed.
-/// - After [`ExportNodesStep`]
-#[derive(Debug, Clone, PartialEq, Eq, Hash, SystemSet)]
-pub struct ProcessRouterCodegenStep;
-
 #[derive(Debug, Default)]
 pub struct RouteCodegenPlugin;
-
 
 impl Plugin for RouteCodegenPlugin {
 	fn build(&self, app: &mut App) {
 		app.init_non_send_resource::<RouteCodegenConfig>()
-			.configure_sets(
-				Update,
-				(
-					ImportRouterCodegenStep.before(ParseRsxTokensSet),
-					ProcessRouterCodegenStep
-						.after(ParseRsxTokensSet)
-						.before(ExportCodegenStep),
-				),
-			)
 			.add_systems(
 				Update,
 				(
@@ -38,7 +17,7 @@ impl Plugin for RouteCodegenPlugin {
 						modify_file_route_tokens,
 					)
 						.chain()
-						.in_set(ImportRouterCodegenStep),
+						.before(ParseRsxTokensSet),
 					(
 						parse_route_tree,
 						(
@@ -53,7 +32,8 @@ impl Plugin for RouteCodegenPlugin {
 						(collect_combinator_route, tokenize_combinator_route)
 							.chain(),
 					)
-						.in_set(ProcessRouterCodegenStep),
+						.after(ParseRsxTokensSet)
+						.before(ExportArtifactsSet),
 					#[cfg(not(test))]
 					(
 						// dont hit the fs in tests
@@ -61,7 +41,7 @@ impl Plugin for RouteCodegenPlugin {
 						compile_router,
 					)
 						.chain()
-						.after(ExportCodegenStep),
+						.after(ExportArtifactsSet),
 				),
 			);
 	}
