@@ -1,11 +1,14 @@
-use super::RstmlCustomNode;
 use crate::prelude::*;
 use beet_common::prelude::*;
 use beet_utils::prelude::*;
 use bevy::prelude::*;
 use proc_macro2::Span;
+use proc_macro2::TokenStream;
 use proc_macro2_diagnostics::Diagnostic;
 use proc_macro2_diagnostics::Level;
+use quote::quote;
+use rstml::Parser;
+use rstml::ParserConfig;
 use rstml::node::KVAttributeValue;
 use rstml::node::KeyedAttributeValue;
 use rstml::node::Node;
@@ -13,33 +16,89 @@ use rstml::node::NodeAttribute;
 use rstml::node::NodeBlock;
 use rstml::node::NodeElement;
 use rstml::node::NodeName;
+use send_wrapper::SendWrapper;
 use syn::Expr;
 use syn::ExprLit;
 use syn::spanned::Spanned;
 
+// we must use `std::collections::HashSet` because thats what rstml uses
+type HashSet<T> = std::collections::HashSet<T>;
+/// definition for the rstml custom node, currently unused
+pub(super) type RstmlCustomNode = rstml::Infallible;
 
-
-pub fn rstml_to_node_tokens_plugin(app: &mut App) {
-	app.add_systems(
-		Update,
-		rstml_to_node_tokens
-			.in_set(ImportNodesStep)
-			.after(super::tokens_to_rstml),
-	);
+/// Hashset of element tag names that should be self-closing.
+#[derive(Debug, Clone, Resource)]
+pub struct RstmlConfig {
+	pub raw_text_elements: HashSet<&'static str>,
+	pub self_closing_elements: HashSet<&'static str>,
 }
 
-/// Replace [`RstmlNodes`] with children representing each [`rstml::Node`].
-fn rstml_to_node_tokens(
+impl Default for RstmlConfig {
+	fn default() -> Self {
+		Self {
+			raw_text_elements: ["script", "style"].into_iter().collect(),
+			self_closing_elements: [
+				"area", "base", "br", "col", "embed", "hr", "img", "input",
+				"link", "meta", "param", "source", "track", "wbr",
+			]
+			.into_iter()
+			.collect(),
+		}
+	}
+}
+
+impl RstmlConfig {
+	pub(super) fn into_parser(self) -> Parser<RstmlCustomNode> {
+		let config = ParserConfig::new()
+			.recover_block(true)
+			.always_self_closed_elements(self.self_closing_elements)
+			.raw_text_elements(self.raw_text_elements)
+			// here we define the rsx! macro as the constant thats used
+			// to resolve raw text blocks more correctly
+			.macro_call_pattern(quote!(rsx! {%%}))
+			.custom_node::<RstmlCustomNode>();
+		Parser::new(config)
+	}
+}
+
+/// A [`TokenStream`] representing [`rstml`] flavored rsx tokens.
+#[derive(Debug, Clone, Deref, Component)]
+#[require(MacroIdx)]
+pub struct RstmlTokens(SendWrapper<TokenStream>);
+impl RstmlTokens {
+	pub fn new(tokens: TokenStream) -> Self { Self(SendWrapper::new(tokens)) }
+	pub fn take(self) -> TokenStream { self.0.take() }
+}
+
+#[derive(Debug, Deref, DerefMut, Component)]
+pub struct TokensDiagnostics(pub SendWrapper<Vec<Diagnostic>>);
+
+impl TokensDiagnostics {
+	pub fn new(value: Vec<Diagnostic>) -> Self { Self(SendWrapper::new(value)) }
+	pub fn take(self) -> Vec<Diagnostic> { self.0.take() }
+	pub fn into_tokens(self) -> Vec<TokenStream> {
+		self.take()
+			.into_iter()
+			.map(|d| d.emit_as_expr_tokens())
+			.collect()
+	}
+}
+
+
+/// Replace the tokens with parsed [`RstmlNodes`], and apply a [`MacroIdx`]
+pub(super) fn parse_rstml_tokens(
 	_: TempNonSendMarker,
 	mut commands: Commands,
 	rstml_config: Res<RstmlConfig>,
-	mut query: Populated<
-		(Entity, &RstmlRoot, &MacroIdx, &mut TokensDiagnostics),
-		Added<RstmlRoot>,
-	>,
+	parser: NonSend<Parser<RstmlCustomNode>>,
+	query: Populated<(Entity, &MacroIdx, &RstmlTokens), Added<RstmlTokens>>,
 ) -> Result {
-	for (entity, rstml_nodes, macro_idx, diagnostics) in query.iter_mut() {
-		let root_node = rstml_nodes.clone();
+	for (entity, macro_idx, handle) in query.iter() {
+		let tokens = handle.clone().take();
+		// this is the key to matching statically analyzed macros
+		// with instantiated ones
+		let (nodes, mut diagnostics) =
+			parser.parse_recoverable(tokens).split_vec();
 
 		let mut collected_elements = CollectedElements::default();
 
@@ -47,26 +106,25 @@ fn rstml_to_node_tokens(
 			file_path: &macro_idx.file,
 			rstml_config: &rstml_config,
 			collected_elements: &mut collected_elements,
-			diagnostics,
+			diagnostics: &mut diagnostics,
 			commands: &mut commands,
 			expr_idx: ExprIdxBuilder::new(),
 		}
-		.spawn_nodes(ParentContext::default(), root_node.take());
+		.spawn_nodes(ParentContext::default(), nodes);
 		commands
 			.entity(entity)
-			.remove::<RstmlRoot>()
-			.insert(collected_elements)
+			.remove::<RstmlTokens>()
+			.insert((collected_elements, TokensDiagnostics::new(diagnostics)))
 			.add_children(&children);
 	}
 	Ok(())
 }
 
-
 struct RstmlToWorld<'w, 's, 'a> {
 	file_path: &'a WsPathBuf,
 	rstml_config: &'a RstmlConfig,
 	collected_elements: &'a mut CollectedElements,
-	diagnostics: Mut<'a, TokensDiagnostics>,
+	diagnostics: &'a mut Vec<Diagnostic>,
 	commands: &'a mut Commands<'w, 's>,
 	expr_idx: ExprIdxBuilder,
 }
@@ -403,11 +461,7 @@ mod test {
 
 	fn parse(tokens: TokenStream) -> (App, Entity) {
 		let mut app = App::new();
-		app.add_plugins((
-			NodeTypesPlugin,
-			tokens_to_rstml_plugin,
-			rstml_to_node_tokens_plugin,
-		));
+		app.add_plugins(ParseRsxTokensPlugin);
 		let entity = app.world_mut().spawn(RstmlTokens::new(tokens)).id();
 		app.update();
 		(app, entity)
@@ -416,22 +470,23 @@ mod test {
 
 	#[test]
 	fn works() {
-		let (app, _) = parse(quote! {
+		let (mut app, _) = parse(quote! {
 			<span>
 				<MyComponent client:load />
 				<div/>
 			</span>
 		});
 
-		let tree = app.build_scene();
-		expect(&tree).to_contain("NodeTag\": (\"div\")");
-		expect(&tree).to_contain("client:load");
+		expect(app.query_once::<&NodeTag>()).to_have_length(3);
+		expect(app.query_once::<&ClientLoadDirective>()).to_have_length(1);
 	}
+
 	#[test]
 	fn attribute_expr() {
 		let (mut app, _) = parse(quote! {<div foo={7} bar="baz"/>});
 		app.query_once::<&ExprIdx>().len().xpect().to_be(1);
 	}
+
 	#[test]
 	fn style_tags() {
 		let (mut app, _) = parse(quote! {
@@ -441,9 +496,8 @@ mod test {
 			}
 			</style>
 		});
-		let text_nodes = app.query_once::<&TextNode>();
-		expect(text_nodes.len()).to_be(1);
-		// mended
-		expect(&text_nodes[0].0).to_be("body { font-size : 1 em ; }");
+		expect(app.query_once::<&LangContent>()[0]).to_be(
+			&LangContent::InnerText("body { font-size : 1 em ; }".to_string()),
+		);
 	}
 }

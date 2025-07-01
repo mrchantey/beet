@@ -1,39 +1,40 @@
-use std::cell::RefCell;
-
-use crate::prelude::*;
+use super::*;
 use beet_common::prelude::*;
 use bevy::ecs::schedule::SystemSet;
 use bevy::prelude::*;
+use std::cell::RefCell;
 
-/// System step for creating the entities containing nodes and their tokens.
+/// System set for the [`ParseRsxTokensPlugin`] to extract directives
 #[derive(Debug, Clone, PartialEq, Eq, Hash, SystemSet)]
-pub struct ImportNodesStep;
-#[derive(Debug, Clone, PartialEq, Eq, Hash, SystemSet)]
-pub struct ProcessNodesStep;
-#[derive(Debug, Clone, PartialEq, Eq, Hash, SystemSet)]
-pub struct ExportNodesStep;
+pub struct ParseRsxTokensSet;
 
+/// A plugin for parsing raw rstml token streams and combinator strings into
+/// rsx trees, then extracting directives.
 #[derive(Default)]
-pub struct NodeTokensPlugin;
+pub struct ParseRsxTokensPlugin;
 
 
-impl Plugin for NodeTokensPlugin {
+impl Plugin for ParseRsxTokensPlugin {
 	fn build(&self, app: &mut App) {
-		app.configure_sets(
-			Update,
-			(
-				ProcessNodesStep.after(ImportNodesStep),
-				ExportNodesStep.after(ProcessNodesStep),
-				ExtractDirectivesSet.in_set(ProcessNodesStep),
-			),
-		)
-		.add_plugins((
-			tokens_to_rstml_plugin,
-			rstml_to_node_tokens_plugin,
-			combinator_to_node_tokens_plugin,
-			extract_rsx_directives_plugin,
-			extract_web_directives_plugin,
-		));
+		app.init_resource::<RstmlConfig>()
+			.configure_sets(
+				Update,
+				ExtractDirectivesSet.in_set(ParseRsxTokensSet),
+			)
+			.add_systems(
+				Update,
+				(parse_combinator_tokens, parse_rstml_tokens)
+					.in_set(ParseRsxTokensSet)
+					.before(ExtractDirectivesSet),
+			)
+			.add_plugins((
+				extract_rsx_directives_plugin,
+				extract_web_directives_plugin,
+			));
+
+		// cache the rstml parser to avoid recreating every frame
+		let rstml_config = app.world().resource::<RstmlConfig>();
+		app.insert_non_send_resource(rstml_config.clone().into_parser());
 	}
 }
 
@@ -45,14 +46,15 @@ thread_local! {
 
 
 /// Access a shared `thread_local!` [`App`] used by the [`NodeTokensPlugin`].
+// The idea is to save every single macro from spinning up an app
+// but this needs to be benched.
+// TODO it breaks rust-analyzer for some reason so is currently disabled.
 pub struct TokensApp;
 
 impl TokensApp {
-	// The idea is for every macro instance to not have to spin up a new app,
-	// but it breaks rust-analyzer for some reason so is currently disabled.
 	pub fn with<O>(func: impl FnOnce(&mut App) -> O) -> O {
 		let mut app = App::new();
-		app.add_plugins(NodeTokensPlugin);
+		app.add_plugins(ParseRsxTokensPlugin);
 		func(&mut app)
 	}
 	//	TODO static app breaks rust analyzer?
@@ -62,7 +64,7 @@ impl TokensApp {
 			let mut app_ref = app_cell.borrow_mut();
 			if app_ref.is_none() {
 				let mut app = App::new();
-				app.add_plugins(NodeTokensPlugin);
+				app.add_plugins(ParseRsxTokensPlugin);
 				*app_ref = Some(app);
 			}
 

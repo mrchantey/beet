@@ -4,7 +4,7 @@ use bevy::prelude::*;
 
 
 /// Import files specified in each [`FileGroup`]
-/// - Before [`ImportNodesStep`]
+/// - Before [`ParseRsxTokensSet`]
 #[derive(Debug, Clone, PartialEq, Eq, Hash, SystemSet)]
 pub struct ImportRouterCodegenStep;
 
@@ -23,9 +23,9 @@ impl Plugin for RouteCodegenPlugin {
 			.configure_sets(
 				Update,
 				(
-					ImportRouterCodegenStep.before(ImportNodesStep),
+					ImportRouterCodegenStep.before(ParseRsxTokensSet),
 					ProcessRouterCodegenStep
-						.after(ExportNodesStep)
+						.after(ParseRsxTokensSet)
 						.before(ExportCodegenStep),
 				),
 			)

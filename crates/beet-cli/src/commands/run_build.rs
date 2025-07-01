@@ -69,7 +69,7 @@ impl Plugin for BuildArgs {
 
 		app.add_plugins((
 			config.template_config,
-			NodeTokensPlugin::default(),
+			ParseRsxTokensPlugin::default(),
 			CodegenPlugin::default(),
 		));
 

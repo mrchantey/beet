@@ -109,7 +109,7 @@ mod test {
 	#[test]
 	fn works() {
 		let mut app = App::new();
-		app.add_plugins((NodeTokensPlugin, StaticScenePlugin));
+		app.add_plugins((ParseRsxTokensPlugin, StaticScenePlugin));
 
 		let entity = app
 			.world_mut()

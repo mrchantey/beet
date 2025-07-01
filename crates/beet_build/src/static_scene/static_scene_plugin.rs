@@ -5,12 +5,12 @@ use beet_template::prelude::*;
 use bevy::prelude::*;
 
 /// Import template files into parsable formats like [`RstmlTokens`], or [`CombinatorToNodeTokens`].
-/// - Before [`ImportNodesStep`]
+/// - Before [`ParseRsxTokensSet`]
 #[derive(Debug, Clone, PartialEq, Eq, Hash, SystemSet)]
 pub struct ImportTemplateStep;
 
 /// Perform extra processing after nodes have been imported and processed.
-/// - After [`ExportNodesStep`]
+/// - After [`ParseRsxTokensSet`]
 #[derive(Debug, Clone, PartialEq, Eq, Hash, SystemSet)]
 pub struct ProcessTemplateStep;
 
@@ -57,9 +57,9 @@ impl Plugin for StaticScenePlugin {
 			.configure_sets(
 				Update,
 				(
-					ImportTemplateStep.before(ImportNodesStep),
+					ImportTemplateStep.before(ParseRsxTokensSet),
 					ProcessTemplateStep
-						.after(ExportNodesStep)
+						.after(ParseRsxTokensSet)
 						.after(ImportTemplateStep),
 					ExportTemplateStep
 						.after(ProcessTemplateStep)

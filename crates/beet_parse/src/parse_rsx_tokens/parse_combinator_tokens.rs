@@ -18,12 +18,8 @@ impl CombinatorTokens {
 	pub fn new(tokens: impl Into<String>) -> Self { Self(tokens.into()) }
 }
 
-pub fn combinator_to_node_tokens_plugin(app: &mut App) {
-	app.add_systems(Update, combinator_to_node_tokens.in_set(ImportNodesStep));
-}
 
-
-fn combinator_to_node_tokens(
+pub(super) fn parse_combinator_tokens(
 	_: TempNonSendMarker,
 	mut commands: Commands,
 	query: Populated<
@@ -301,7 +297,7 @@ mod test {
 			quote! {(
 				BeetRoot,
 				InstanceRoot,
-				MacroIdx{file:WsPathBuf::new("crates/beet_parse/src/node_tokens/combinator_to_node_tokens.rs"),start:LineCol{line:1u32,col:0u32}},
+				MacroIdx{file:WsPathBuf::new("crates/beet_parse/src/parse_rsx_tokens/parse_combinator_tokens.rs"),start:LineCol{line:1u32,col:0u32}},
 				FragmentNode,
 				related!{Children[(
 					NodeTag(String::from("br")),
@@ -324,7 +320,7 @@ mod test {
 				quote! {(
 					BeetRoot,
 					InstanceRoot,
-					MacroIdx{file:WsPathBuf::new("crates/beet_parse/src/node_tokens/combinator_to_node_tokens.rs"),start:LineCol{line:1u32,col:0u32}},
+					MacroIdx{file:WsPathBuf::new("crates/beet_parse/src/parse_rsx_tokens/parse_combinator_tokens.rs"),start:LineCol{line:1u32,col:0u32}},
 					FragmentNode,
 					related!{Children[(
 						NodeTag(String::from("br")),
@@ -343,7 +339,7 @@ mod test {
 			quote! {(
 				BeetRoot,
 				InstanceRoot,
-				MacroIdx{file:WsPathBuf::new("crates/beet_parse/src/node_tokens/combinator_to_node_tokens.rs"),start:LineCol{line:1u32,col:0u32}},
+				MacroIdx{file:WsPathBuf::new("crates/beet_parse/src/parse_rsx_tokens/parse_combinator_tokens.rs"),start:LineCol{line:1u32,col:0u32}},
 				FragmentNode,
 				related!{Children[(
 					NodeTag(String::from("div")),
@@ -364,7 +360,7 @@ mod test {
 			quote! {(
 				BeetRoot,
 				InstanceRoot,
-				MacroIdx{file:WsPathBuf::new("crates/beet_parse/src/node_tokens/combinator_to_node_tokens.rs"),start:LineCol{line:1u32,col:0u32}},
+				MacroIdx{file:WsPathBuf::new("crates/beet_parse/src/parse_rsx_tokens/parse_combinator_tokens.rs"),start:LineCol{line:1u32,col:0u32}},
 				FragmentNode,
 				related!{Children[(
 					NodeTag(String::from("div")),
@@ -381,7 +377,7 @@ mod test {
 			quote! {(
 				BeetRoot,
 				InstanceRoot,
-				MacroIdx{file:WsPathBuf::new("crates/beet_parse/src/node_tokens/combinator_to_node_tokens.rs"),start:LineCol{line:1u32,col:0u32}},
+				MacroIdx{file:WsPathBuf::new("crates/beet_parse/src/parse_rsx_tokens/parse_combinator_tokens.rs"),start:LineCol{line:1u32,col:0u32}},
 				FragmentNode,
 				related!{Children[(
 					NodeTag(String::from("br")),
@@ -399,7 +395,7 @@ mod test {
 			quote! {(
 				BeetRoot,
 				InstanceRoot,
-				MacroIdx{file:WsPathBuf::new("crates/beet_parse/src/node_tokens/combinator_to_node_tokens.rs"),start:LineCol{line:1u32,col:0u32}},
+				MacroIdx{file:WsPathBuf::new("crates/beet_parse/src/parse_rsx_tokens/parse_combinator_tokens.rs"),start:LineCol{line:1u32,col:0u32}},
 				FragmentNode,
 				related!{Children[(
 					NodeTag(String::from("br")),
@@ -420,7 +416,7 @@ mod test {
 			quote! {(
 				BeetRoot,
 				InstanceRoot,
-				MacroIdx{file:WsPathBuf::new("crates/beet_parse/src/node_tokens/combinator_to_node_tokens.rs"),start:LineCol{line:1u32,col:0u32}},
+				MacroIdx{file:WsPathBuf::new("crates/beet_parse/src/parse_rsx_tokens/parse_combinator_tokens.rs"),start:LineCol{line:1u32,col:0u32}},
 				FragmentNode,
 				related!{Children[(
 					NodeTag(String::from("br")),
@@ -441,7 +437,7 @@ mod test {
 			quote! {(
 				BeetRoot,
 				InstanceRoot,
-				MacroIdx{file:WsPathBuf::new("crates/beet_parse/src/node_tokens/combinator_to_node_tokens.rs"),start:LineCol{line:1u32,col:0u32}},
+				MacroIdx{file:WsPathBuf::new("crates/beet_parse/src/parse_rsx_tokens/parse_combinator_tokens.rs"),start:LineCol{line:1u32,col:0u32}},
 				FragmentNode,
 				related!{Children[(
 					NodeTag(String::from("br")),
@@ -462,7 +458,7 @@ mod test {
 			quote! {(
 				BeetRoot,
 				InstanceRoot,
-				MacroIdx{file:WsPathBuf::new("crates/beet_parse/src/node_tokens/combinator_to_node_tokens.rs"),start:LineCol{line:1u32,col:0u32}},
+				MacroIdx{file:WsPathBuf::new("crates/beet_parse/src/parse_rsx_tokens/parse_combinator_tokens.rs"),start:LineCol{line:1u32,col:0u32}},
 				FragmentNode,
 				related!{Children[(
 					NodeTag(String::from("br")),
@@ -484,7 +480,7 @@ mod test {
 				BeetRoot,
 				InstanceRoot,
 				MacroIdx {
-					file: WsPathBuf::new("crates/beet_parse/src/node_tokens/combinator_to_node_tokens.rs"),
+					file: WsPathBuf::new("crates/beet_parse/src/parse_rsx_tokens/parse_combinator_tokens.rs"),
 					start: LineCol { line: 1u32, col: 0u32 }
 				},
 				FragmentNode,
@@ -505,7 +501,7 @@ mod test {
 			quote! {(
 				BeetRoot,
 				InstanceRoot,
-				MacroIdx{file:WsPathBuf::new("crates/beet_parse/src/node_tokens/combinator_to_node_tokens.rs"),start:LineCol{line:1u32,col:0u32}},
+				MacroIdx{file:WsPathBuf::new("crates/beet_parse/src/parse_rsx_tokens/parse_combinator_tokens.rs"),start:LineCol{line:1u32,col:0u32}},
 				FragmentNode,
 				related!{Children[(
 					NodeTag(String::from("br")),
@@ -535,7 +531,7 @@ mod test {
 				quote! {(
 					BeetRoot,
 					InstanceRoot,
-					MacroIdx{file:WsPathBuf::new("crates/beet_parse/src/node_tokens/combinator_to_node_tokens.rs"),start:LineCol{line:1u32,col:0u32}},
+					MacroIdx{file:WsPathBuf::new("crates/beet_parse/src/parse_rsx_tokens/parse_combinator_tokens.rs"),start:LineCol{line:1u32,col:0u32}},
 					FragmentNode,
 					related!{Children[(
 						NodeTag(String::from("br")),
@@ -563,7 +559,7 @@ mod test {
 			quote! {(
 				BeetRoot,
 				InstanceRoot,
-				MacroIdx{file:WsPathBuf::new("crates/beet_parse/src/node_tokens/combinator_to_node_tokens.rs"),start:LineCol{line:1u32,col:0u32}},
+				MacroIdx{file:WsPathBuf::new("crates/beet_parse/src/parse_rsx_tokens/parse_combinator_tokens.rs"),start:LineCol{line:1u32,col:0u32}},
 				FragmentNode,
 				related!{Children[(
 					ExprIdx(0u32),
@@ -586,7 +582,7 @@ mod test {
 			quote! {(
 				BeetRoot,
 				InstanceRoot,
-				MacroIdx{file:WsPathBuf::new("crates/beet_parse/src/node_tokens/combinator_to_node_tokens.rs"),start:LineCol{line:1u32,col:0u32}},
+				MacroIdx{file:WsPathBuf::new("crates/beet_parse/src/parse_rsx_tokens/parse_combinator_tokens.rs"),start:LineCol{line:1u32,col:0u32}},
 				FragmentNode,
 				related!{Children[(
 					ExprIdx(0u32),
@@ -609,7 +605,7 @@ mod test {
 			quote! {(
 				BeetRoot,
 				InstanceRoot,
-				MacroIdx{file:WsPathBuf::new("crates/beet_parse/src/node_tokens/combinator_to_node_tokens.rs"),start:LineCol{line:1u32,col:0u32}},
+				MacroIdx{file:WsPathBuf::new("crates/beet_parse/src/parse_rsx_tokens/parse_combinator_tokens.rs"),start:LineCol{line:1u32,col:0u32}},
 				FragmentNode,
 				related!{Children[(
 					ExprIdx(0u32),
@@ -632,7 +628,7 @@ mod test {
 			quote! {(
 				BeetRoot,
 				InstanceRoot,
-				MacroIdx{file:WsPathBuf::new("crates/beet_parse/src/node_tokens/combinator_to_node_tokens.rs"),start:LineCol{line:1u32,col:0u32}},
+				MacroIdx{file:WsPathBuf::new("crates/beet_parse/src/parse_rsx_tokens/parse_combinator_tokens.rs"),start:LineCol{line:1u32,col:0u32}},
 				FragmentNode,
 				related!{Children[(
 					ExprIdx(0u32),
@@ -655,7 +651,7 @@ mod test {
 			quote! {(
 				BeetRoot,
 				InstanceRoot,
-				MacroIdx{file:WsPathBuf::new("crates/beet_parse/src/node_tokens/combinator_to_node_tokens.rs"),start:LineCol{line:1u32,col:0u32}},
+				MacroIdx{file:WsPathBuf::new("crates/beet_parse/src/parse_rsx_tokens/parse_combinator_tokens.rs"),start:LineCol{line:1u32,col:0u32}},
 				FragmentNode,
 				related!{Children[(
 					ExprIdx(0u32),
@@ -678,7 +674,7 @@ mod test {
 			quote! {(
 				BeetRoot,
 				InstanceRoot,
-				MacroIdx{file:WsPathBuf::new("crates/beet_parse/src/node_tokens/combinator_to_node_tokens.rs"),start:LineCol{line:1u32,col:0u32}},
+				MacroIdx{file:WsPathBuf::new("crates/beet_parse/src/parse_rsx_tokens/parse_combinator_tokens.rs"),start:LineCol{line:1u32,col:0u32}},
 				FragmentNode,
 				related!{Children[(
 					ExprIdx(0u32),
@@ -709,7 +705,7 @@ mod test {
 				quote! {(
 					BeetRoot,
 					InstanceRoot,
-					MacroIdx{file:WsPathBuf::new("crates/beet_parse/src/node_tokens/combinator_to_node_tokens.rs"),start:LineCol{line:1u32,col:0u32}},
+					MacroIdx{file:WsPathBuf::new("crates/beet_parse/src/parse_rsx_tokens/parse_combinator_tokens.rs"),start:LineCol{line:1u32,col:0u32}},
 					FragmentNode,
 					related!{Children[(
 						ExprIdx(0u32),
