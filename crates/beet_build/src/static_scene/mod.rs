@@ -18,6 +18,6 @@ mod template_file;
 pub use template_file::*;
 mod build_file_templates;
 pub mod error;
-pub use build_file_templates::*;
+use build_file_templates::*;
 mod static_scene_plugin;
 pub use static_scene_plugin::*;

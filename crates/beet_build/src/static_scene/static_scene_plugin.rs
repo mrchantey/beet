@@ -1,6 +1,7 @@
 use super::*;
 use crate::prelude::*;
 use beet_common::prelude::*;
+use beet_fs::process::WatchEvent;
 use beet_parse::prelude::*;
 use beet_template::prelude::*;
 use bevy::prelude::*;
@@ -35,15 +36,17 @@ impl Plugin for StaticScenePlugin {
 			.set(bevy::ecs::error::panic)
 			.ok();
 
-		app.init_resource::<HtmlConstants>()
+		app.add_event::<WatchEvent>()
+			.init_resource::<HtmlConstants>()
 			.init_resource::<TemplateMacros>()
 			// types
 			.add_plugins(NodeTypesPlugin)
-			.add_systems(Startup, load_template_files)
+			.add_systems(Startup, load_all_template_files)
 			.add_systems(
 				Update,
 				(
 					(
+						load_changed_template_files,
 						// style roundtrip breaks without resolving templates,
 						// im not sure if this should be here, doesnt it indicate
 						// we're relying on exprs in templates?

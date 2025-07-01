@@ -19,18 +19,22 @@ use syn::Item;
 pub struct ExportArtifactsSet;
 
 #[derive(Debug, Default)]
-pub struct CodegenPlugin;
+pub struct ExportArtifactsPlugin;
 
 
-impl Plugin for CodegenPlugin {
+impl Plugin for ExportArtifactsPlugin {
 	fn build(&self, app: &mut App) {
-		app.configure_sets(
-			Update,
-			ExportArtifactsSet
-				.after(ParseRsxTokensSet)
-				.before(TemplateSet),
-		)
-		.add_systems(Update, export_codegen_files.in_set(ExportArtifactsSet));
+		app
+			.configure_sets(
+				Update,
+				ExportArtifactsSet
+					.after(ParseRsxTokensSet)
+					.before(TemplateSet),
+			)
+			.add_systems(
+				Update,
+				export_codegen_files.in_set(ExportArtifactsSet),
+			);
 	}
 }
 
@@ -160,7 +164,7 @@ impl CodegenFile {
 		// ideally we'd use rustfmt instead
 		let output_str = prettyplease::unparse(&output_tokens);
 
-		FsExt::write(&self.output, &output_str)?;
+		FsExt::write_if_diff(&self.output, &output_str)?;
 		Ok(())
 	}
 	fn crate_alias(&self) -> Result<Option<syn::Item>> {

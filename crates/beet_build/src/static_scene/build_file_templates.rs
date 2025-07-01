@@ -10,7 +10,7 @@ use bevy::prelude::*;
 /// Create a [`TemplateFile`] for each file specified in the [`StaticSceneConfig`].
 /// This will run once for the initial load, afterwards [`handle_changed_files`]
 /// will incrementally load changed files.
-pub(super) fn load_template_files(
+pub(super) fn load_all_template_files(
 	mut commands: Commands,
 	config: When<Res<StaticSceneConfig>>,
 ) -> bevy::prelude::Result {
@@ -21,36 +21,29 @@ pub(super) fn load_template_files(
 }
 
 /// When a file is changed
-pub fn handle_changed_files(
-	In(ev): In<WatchEventVec>,
+pub(super) fn load_changed_template_files(
+	mut events: EventReader<WatchEvent>,
 	mut commands: Commands,
 	config: When<Res<StaticSceneConfig>>,
 	query: Query<(Entity, &TemplateFile)>,
 ) -> bevy::prelude::Result {
-	for ev in ev
-		.mutated()
-		.into_iter()
+	for ev in events
+		.read()
 		// we only care about files that a builder will want to save
 		.filter(|ev| config.passes(&ev.path))
 	{
 		let ws_path = ev.path.into_ws_path()?;
 
-		// remove existing TemplateFile entities and their children
-		for (entity, template_file) in query.iter() {
-			if template_file.path() == &ws_path {
-				commands.entity(entity).despawn();
-				tracing::debug!(
-					"Removed TemplateFile entity for changed file: {}",
-					ws_path.display()
-				);
-			}
-			//  else {
-			// 	tracing::debug!(
-			// 		"no match:\n{}\n{}",
-			// 		ws_path.display(),
-			// 		template_file.path().display()
-			// 	);
-			// }
+		// recursively remove existing TemplateFile entities
+		for (entity, _) in query
+			.iter()
+			.filter(|(_, template_file)| template_file.path() == &ws_path)
+		{
+			commands.entity(entity).despawn();
+			tracing::debug!(
+				"Removed TemplateFile entity for changed file: {}",
+				ws_path.display()
+			);
 		}
 		commands.spawn(TemplateFile::new(ws_path));
 	}
@@ -93,7 +86,7 @@ pub(super) fn export_template_scene(
 	// should really only be one of these
 	if let Some(config) = world.get_resource::<StaticSceneConfig>() {
 		let scene = world.build_scene();
-		FsExt::write(config.scene_file().into_abs(), &scene)?;
+		FsExt::write_if_diff(config.scene_file().into_abs(), &scene)?;
 	}
 
 	Ok(())

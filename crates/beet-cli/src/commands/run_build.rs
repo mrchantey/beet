@@ -70,7 +70,7 @@ impl Plugin for BuildArgs {
 		app.add_plugins((
 			config.template_config,
 			ParseRsxTokensPlugin::default(),
-			CodegenPlugin::default(),
+			ExportArtifactsPlugin::default(),
 		));
 
 		// selectively load plugins

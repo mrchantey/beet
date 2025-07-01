@@ -1,6 +1,4 @@
-use beet::prelude::handle_changed_files;
 use beet::prelude::*;
-use bevy::ecs::system::RunSystemOnce;
 use std::num::NonZeroU8;
 use std::ops::ControlFlow;
 use std::time::Duration;
@@ -87,8 +85,9 @@ impl FsApp {
 		watch_event: WatchEventVec,
 	) -> Result<ControlFlow<AppExit>> {
 		let start = std::time::Instant::now();
-		app.world_mut()
-			.run_system_once_with(handle_changed_files, watch_event)??;
+		app.world_mut().send_event_batch(
+			watch_event.take().into_iter().filter(|ev| ev.mutated()),
+		);
 		app.update();
 		let elapsed = start.elapsed();
 		// TODO per-system profiling https://github.com/bevyengine/bevy/blob/main/docs/profiling.md

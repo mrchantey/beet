@@ -122,6 +122,7 @@ impl WatchEventReceiver {
 }
 
 #[derive(Debug, Default, Clone, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "bevy", derive(bevy::prelude::Event))]
 pub struct WatchEvent {
 	pub kind: EventKind,
 	pub path: AbsPathBuf,
@@ -129,6 +130,9 @@ pub struct WatchEvent {
 impl WatchEvent {
 	pub fn new(kind: EventKind, path: AbsPathBuf) -> Self {
 		Self { kind, path }
+	}
+	pub fn mutated(&self) -> bool {
+		self.kind.is_create() || self.kind.is_modify() || self.kind.is_remove()
 	}
 	pub fn display(&self) -> String { format!("{}", self) }
 }
@@ -178,6 +182,7 @@ impl WatchEventVec {
 		}
 		.xok()
 	}
+	pub fn take(self) -> Vec<WatchEvent> { self.events }
 
 
 	/// Returns None if no events match the filter
