@@ -13,6 +13,6 @@ pub use templates_to_nodes_rs::*;
 mod build_file_templates;
 pub mod error;
 #[allow(unused_imports)]
-use build_file_templates::*;
+pub use build_file_templates::*;
 mod static_scene_plugin;
 pub use static_scene_plugin::*;

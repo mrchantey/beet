@@ -8,12 +8,16 @@ use bevy::prelude::*;
 /// as [`CombinatorToNodeTokens`].
 pub fn templates_to_nodes_md(
 	mut commands: Commands,
-	query: Populated<(Entity, &SourceFile), Added<SourceFile>>,
+	query: Populated<
+		(Entity, &SourceFile),
+		(With<StaticFile>, Changed<SourceFile>),
+	>,
 ) -> Result {
 	for (entity, path) in query.iter() {
 		if let Some(ex) = path.extension()
 			&& ex == "md"
 		{
+			commands.entity(entity).despawn_related::<Children>();
 			let file = ReadFile::to_string(path)?;
 			let rsx_str = ParseMarkdown::markdown_to_rsx_str(&file);
 

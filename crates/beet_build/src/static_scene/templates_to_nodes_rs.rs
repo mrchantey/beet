@@ -12,12 +12,16 @@ pub fn templates_to_nodes_rs(
 	_: TempNonSendMarker,
 	macros: Res<TemplateMacros>,
 	mut commands: Commands,
-	query: Populated<(Entity, &SourceFile), Added<SourceFile>>,
+	query: Populated<
+		(Entity, &SourceFile),
+		(With<StaticFile>, Changed<SourceFile>),
+	>,
 ) -> Result {
 	for (entity, path) in query.iter() {
 		if let Some(ex) = path.extension()
 			&& ex == "rs"
 		{
+			commands.entity(entity).despawn_related::<Children>();
 			let file = ReadFile::to_string(path)?;
 			let file = syn::parse_file(&file)?;
 			RsxSynVisitor {

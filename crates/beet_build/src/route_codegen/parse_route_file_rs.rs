@@ -18,6 +18,7 @@ pub fn parse_route_file_rs(
 			file.extension().map_or(false, |ext| ext == "rs")
 		}) {
 		let mut parent = commands.entity(entity);
+		parent.despawn_related::<Children>();
 
 		let file_str = ReadFile::to_string(&source_file)?;
 

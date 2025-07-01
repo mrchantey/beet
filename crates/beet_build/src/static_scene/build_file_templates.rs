@@ -11,6 +11,10 @@ use bevy::prelude::*;
 #[derive(Debug, Clone, Default, Component)]
 pub struct StaticSceneRoot;
 
+/// Added alongside each [`SourceFile`] to distinguish them from a [`RouteFile`]
+#[derive(Debug, Clone, Default, Component)]
+pub struct StaticFile;
+
 
 /// Create a [`SourceFile`] for each file specified in the [`WorkspaceConfig`].
 /// This will run once for the initial load, afterwards [`handle_changed_files`]
@@ -26,7 +30,7 @@ pub(super) fn load_all_template_files(
 			config
 				.get_files()?
 				.into_iter()
-				.map(|path| SourceFile::new(path)),
+				.map(|path| (StaticFile, SourceFile::new(path))),
 		)),
 	));
 	Ok(())
@@ -40,8 +44,9 @@ pub(super) fn load_all_template_files(
 pub(super) fn export_template_scene(
 	world: &mut World,
 ) -> bevy::prelude::Result {
-	let changed_files =
-		world.query_filtered_once::<&SourceFile, Changed<SourceFile>>();
+	let changed_files = world
+		.query_filtered_once::<&SourceFile, (With<StaticFile>, Changed<SourceFile>)>(
+		);
 
 	if changed_files.is_empty() {
 		// no changes, do nothing

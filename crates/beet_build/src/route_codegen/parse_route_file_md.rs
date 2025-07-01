@@ -21,6 +21,8 @@ pub fn parse_route_file_md(
 			source.extension().map_or(false, |ext| ext == "md")
 		}) {
 		let mut parent = commands.entity(entity);
+		parent.despawn_related::<Children>();
+
 		let file_str = ReadFile::to_string(&source_file)?;
 
 		let ws_path = source_file.into_ws_path()?;
