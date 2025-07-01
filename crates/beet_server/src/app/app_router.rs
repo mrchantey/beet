@@ -98,7 +98,7 @@ impl AppRouter<()> {
 	pub fn test() -> Self {
 		let mut template_config = TemplateConfig::default();
 		// dont apply static
-		template_config.workspace_config.scene_file =
+		template_config.workspace.scene_file =
 			WsPathBuf::new("doesnt-exist.ron");
 		set_app(template_config.clone());
 		Self {
@@ -170,11 +170,10 @@ where
 
 	/// Export static html files and client islands.
 	pub async fn export_static(self) -> Result {
-		let html_dir =
-			self.template_config.workspace_config.html_dir.into_abs();
+		let html_dir = self.template_config.workspace.html_dir.into_abs();
 		let static_dir = self
 			.template_config
-			.workspace_config
+			.workspace
 			.client_islands_path
 			.into_abs();
 
@@ -269,8 +268,7 @@ where
 	/// Server the provided router, adding
 	/// a fallback file server with live reload.
 	pub async fn serve(self) -> Result<()> {
-		let html_dir =
-			self.template_config.workspace_config.html_dir.into_abs();
+		let html_dir = self.template_config.workspace.html_dir.into_abs();
 
 		#[allow(unused_mut)]
 		let mut router = self

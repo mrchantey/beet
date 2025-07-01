@@ -9,8 +9,8 @@ use std::path::Path;
 pub struct TemplateConfig {
 	#[cfg_attr(feature = "serde", serde(default))]
 	pub html_constants: HtmlConstants,
-	#[cfg_attr(feature = "serde", serde(flatten, default))]
-	pub workspace_config: WorkspaceConfig,
+	#[cfg_attr(feature = "serde", serde(default))]
+	pub workspace: WorkspaceConfig,
 }
 
 impl Plugin for TemplateConfig {
@@ -18,7 +18,7 @@ impl Plugin for TemplateConfig {
 	fn build(&self, app: &mut App) {
 		app
 			.insert_resource(self.html_constants.clone())
-			.insert_resource(self.workspace_config.clone())
+			.insert_resource(self.workspace.clone())
 			;
 	}
 }

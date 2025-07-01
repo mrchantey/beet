@@ -36,13 +36,7 @@ impl Plugin for RouteCodegenPlugin {
 						.after(ParseRsxTokensSet)
 						.before(ExportArtifactsSet),
 					#[cfg(not(test))]
-					(
-						// dont hit the fs in tests
-						despawn_file_groups,
-						compile_router,
-					)
-						.chain()
-						.after(ExportArtifactsSet),
+					compile_router.after(ExportArtifactsSet),
 				)
 					.before(TemplateSet),
 			);

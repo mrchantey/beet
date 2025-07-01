@@ -50,6 +50,8 @@ impl NonSendPlugin for RouteCodegenConfig {
 }
 /// Marker type indicating the (usually `mod.rs`) file
 /// containing reexports and static route trees.
+/// This component will be marked Changed when recompilation
+/// is required.
 #[derive(Debug, Clone, Default, Component)]
 #[require(CodegenFileSendit)]
 pub struct RouteCodegenRoot;

@@ -8,7 +8,7 @@ use bevy::prelude::*;
 /// For a given rsx file, insert as [`CombinatorToNodeTokens`].
 pub fn templates_to_nodes_rsx(
 	mut commands: Commands,
-	query: Populated<(Entity, &TemplateFile), Changed<TemplateFile>>,
+	query: Populated<(Entity, &TemplateFile), Added<TemplateFile>>,
 ) -> Result {
 	for (entity, path) in query.iter() {
 		if let Some(ex) = path.extension()

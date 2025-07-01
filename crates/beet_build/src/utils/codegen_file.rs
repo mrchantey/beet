@@ -2,8 +2,6 @@ use crate::prelude::*;
 use anyhow::Result;
 use beet_common::as_beet::*;
 use beet_parse::exports::SendWrapper;
-use beet_parse::prelude::ParseRsxTokensSet;
-use beet_template::prelude::*;
 use beet_utils::prelude::*;
 use bevy::prelude::*;
 use serde::Deserialize;
@@ -13,33 +11,8 @@ use syn::Item;
 
 
 
-/// System set for exporting codegen files, Static Trees, Lang Partials, etc.
-/// This set should be configured to run after all importing and processing.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, SystemSet)]
-pub struct ExportArtifactsSet;
-
-#[derive(Debug, Default)]
-pub struct ExportArtifactsPlugin;
-
-
-impl Plugin for ExportArtifactsPlugin {
-	fn build(&self, app: &mut App) {
-		app
-			.configure_sets(
-				Update,
-				ExportArtifactsSet
-					.after(ParseRsxTokensSet)
-					.before(TemplateSet),
-			)
-			.add_systems(
-				Update,
-				export_codegen_files.in_set(ExportArtifactsSet),
-			);
-	}
-}
-
 /// Call [`CodegenFile::build_and_write`] for every [`Added`] [`CodegenFileSendit`]
-fn export_codegen_files(
+pub(super) fn export_codegen_files(
 	_: TempNonSendMarker,
 	query: Populated<&CodegenFileSendit, Added<CodegenFileSendit>>,
 ) -> bevy::prelude::Result {

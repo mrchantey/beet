@@ -12,7 +12,7 @@ pub fn get() -> impl Bundle {
 	// 	// "client:only"
 	// };
 
-
+	
 	rsx! {
 		<BeetContext>
 			<ContentLayout>

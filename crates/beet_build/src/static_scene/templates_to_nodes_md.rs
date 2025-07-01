@@ -8,7 +8,7 @@ use bevy::prelude::*;
 /// as [`CombinatorToNodeTokens`].
 pub fn templates_to_nodes_md(
 	mut commands: Commands,
-	query: Populated<(Entity, &TemplateFile), Changed<TemplateFile>>,
+	query: Populated<(Entity, &TemplateFile), Added<TemplateFile>>,
 ) -> Result {
 	for (entity, path) in query.iter() {
 		if let Some(ex) = path.extension()

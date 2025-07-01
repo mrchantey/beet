@@ -8,21 +8,21 @@ Export the `LangPartials` and static trees collected by statically analyzing fil
 
 Triggers:
 - Startup - `load_all_template_files`
-- Any watched file changes - `load_changed_template_files`
+- A File specified in [`WorkspaceConfig`] changes - `load_changed_template_files`
 
 ## Route Codegen
-Export the routes specified in `beet.toml` into their respective paths, for example generating collection code for routes in `src/pages/..` into files in `src/codegen/..`, see [RouteCodegenPlugin](crates/beet_build/src/route_codegen/route_codegen_plugin.rs#L7).
+Export the routes specified in `RouteCodegenConfig` into their respective paths, for example generating collection code for routes in `src/pages/..` into files in `src/codegen/..`, see [RouteCodegenPlugin](crates/beet_build/src/route_codegen/route_codegen_plugin.rs#L7).
 
 Triggers:
-- Startup
-- A `FileExprHash` for a file specified in `beet.toml` changes.
+- Startup - `RouteCodegenConfig::file_groups`
+- A `FileExprHash` for a file specified in [`RouteCodegenConfig`] changes.
 
 ## Recompile Server
 
 Recompile the server.
 
 Triggers:
-- A `FileExprHash` for *any* rust file changes, including output from route codegen.
+- A `FileExprHash` for a file specified in [`WorkspaceConfig`] changes, including output from route codegen.
 
 ## Server Output
 

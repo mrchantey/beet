@@ -58,7 +58,7 @@ impl Plugin for RunBuild {
 		app.insert_resource(self.build_cmd.clone()).add_plugins((
 			config.template_config,
 			ParseRsxTokensPlugin::default(),
-			ExportArtifactsPlugin::default(),
+			BuildPlugin::default(),
 		));
 
 		// selectively load plugins

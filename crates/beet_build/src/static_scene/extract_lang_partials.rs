@@ -74,13 +74,16 @@ pub fn extract_lang_partials(
 /// [`NodePortalTarget`].
 pub fn apply_style_ids(
 	mut commands: Commands,
-	query: Populated<(
-		Entity,
-		&NodeTag,
-		&LangPartial,
-		&NodePortalTarget,
-		Option<&StyleScope>,
-	)>,
+	query: Populated<
+		(
+			Entity,
+			&NodeTag,
+			&LangPartial,
+			&NodePortalTarget,
+			Option<&StyleScope>,
+		),
+		Added<LangPartial>,
+	>,
 ) {
 	for (id, (entity, tag, _partial, portal_sources, scope)) in
 		query.iter().enumerate()

@@ -12,7 +12,7 @@ pub fn templates_to_nodes_rs(
 	_: TempNonSendMarker,
 	macros: Res<TemplateMacros>,
 	mut commands: Commands,
-	query: Populated<(Entity, &TemplateFile), Changed<TemplateFile>>,
+	query: Populated<(Entity, &TemplateFile), Added<TemplateFile>>,
 ) -> Result {
 	for (entity, path) in query.iter() {
 		if let Some(ex) = path.extension()
