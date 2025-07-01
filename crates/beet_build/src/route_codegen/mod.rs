@@ -42,5 +42,3 @@ mod file_group;
 pub use file_group::*;
 mod route_codegen_plugin;
 pub use route_codegen_plugin::*;
-mod route_codegen_root;
-pub use route_codegen_root::*;

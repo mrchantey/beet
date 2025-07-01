@@ -23,6 +23,20 @@ impl FileExprHash {
 
 
 
+/// Idents used for template macros.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Resource)]
+pub struct TemplateMacros {
+	pub rstml: String,
+}
+impl Default for TemplateMacros {
+	fn default() -> Self {
+		Self {
+			rstml: "rsx".to_string(),
+		}
+	}
+}
+
+
 /// Update the [`FileExprHash`] component for all template files if it changed.
 /// Use change detection to trigger extra work based on the hash change.
 pub fn update_file_expr_hash(

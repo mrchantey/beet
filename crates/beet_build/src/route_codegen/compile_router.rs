@@ -12,6 +12,7 @@ use std::process::Command;
 /// After Codegen, build the router binary and run it once.
 pub fn compile_router(
 	cmd: Res<CargoBuildCmd>,
+	// any changed child FileExprHash results in changed RouteCodegenRoot
 	_query: Populated<(), Changed<RouteCodegenRoot>>,
 ) -> Result {
 	debug!("Building native binary",);
